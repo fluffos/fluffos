@@ -5,13 +5,14 @@
 save_object() - save the values of variables in an object into a file
 
 .SH SYNOPSIS
-void save_object(string name)
+void save_object(string name, int flag)
 
 .SH DESCRIPTION
 Save all values of variables of this object in the file "name".
 It is illegal to have '.' or space in the field name.  The valid_write()
 function in master.c determines whether or not the save_object is allowed
-to write the save file.
+to write the save file.  If the optional second argument is 1, then variables
+that are zero (0) are also saved (normally, they aren't).
 
 .SH SEE ALSO
 restore_object(3).

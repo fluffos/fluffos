@@ -55,7 +55,17 @@
  * defaults config files.  If you don't wish to use this MACRO, you may
  * always specific a full path to the config file when starting the driver.
  */
-#define CONFIG_FILE_DIR "/usr/local/mud/etc"
+#define CONFIG_FILE_DIR "/usr/local/mud/mudos/etc"
+
+/* MATH: determines whether or not the math efuns (for floats) are defined -
+ * see func_spec.c for a list.
+ */
+#define MATH
+
+/* MATRIX: determines whether or not the 3d graphics efuns (for floats)
+ * are defined - see func_spec.c for a list.
+ */
+#undef MATRIX
 
 /* LAZY_RESETS: if this is defined, an object will only have reset()
    called in it when it is touched via apply_low() or move_object()
@@ -66,7 +76,7 @@
    once and never again (which can save memory since some objects won't get
    reloaded that otherwise would).
 */
-#undef LAZY_RESETS
+#define LAZY_RESETS
 
 /* SAVE_EXTENSION: defines the file extension used by save_object()
    and restore_object().  Some sysadmins run scripts that periodically
@@ -118,6 +128,11 @@
 */
 #undef OPCPROF
 
+/* HAS_MONCONTROL: define this if you wish to do profiling of the driver
+   on a machine that has the moncontrol() system call.
+*/
+#undef HAS_MONCONTROL
+
 /* TRAP_CRASHES define this if you want MudOS to call crash() in master.c
    and then shutdown when signals are received that would normally crash the
    driver.  This define only affects SIGINT and SIGTERM unless -DDEBUG is not
@@ -139,7 +154,7 @@
 /* Define this if you wish this_player() to be useable from within
    call_out() callbacks.
 */
-#undef THIS_PLAYER_IN_CALL_OUT
+#define THIS_PLAYER_IN_CALL_OUT
 
 /*
  * AUTO_SETEUID: when an object is created it's euid is automatically set to
@@ -279,7 +294,6 @@
    and id() in an object contains a call to present() -- infinite recursion).
    Best to leave OLD_PRESENT defined for now.
 */
-
 #define OLD_PRESENT
 
 /* various string sizes */

@@ -3,13 +3,17 @@
  * description: handle all file based efuns
  */
 
+#include "config.h"
 #include <sys/types.h>
-#if (defined(_SEQUENT_) || defined(hpux) || defined(sgi) || \
-	defined(_AUX_SOURCE) || defined(linux))
+#if (defined(_SEQUENT_) || defined(hpux) || defined(sgi) \
+	|| defined(_AUX_SOURCE) || defined(linux) || defined(cray) \
+	|| defined(SunOS_5))
 #include <sys/sysmacros.h>
 #endif
 #include <sys/stat.h>
+#ifndef SunOS_5
 #include <sys/dir.h>
+#endif
 #include <fcntl.h>
 #include <setjmp.h>
 #include <string.h>
@@ -19,7 +23,7 @@
 #if defined(sun)
 #include <alloca.h>
 #endif
-#if defined(M_UNIX) || defined(_SEQUENT_)
+#if defined(M_UNIX) || defined(_SEQUENT_) || defined(cray) || defined(SunOS_5)
 #include <dirent.h>
 #endif
 #if defined(SVR4)
@@ -30,7 +34,6 @@
 #endif
 #include <ctype.h>
 
-#include "config.h"
 #include "lint.h"
 #include "lang.tab.h"
 #include "interpret.h"
@@ -51,17 +54,19 @@ extern int symlink PROT((char *, char *));
 #ifdef MSDOS
 #define lstat stat
 #else
-#if !defined(hpux) && !defined(SVR4) && !defined(__386BSD__) && !defined(linux)
+#if !defined(hpux) && !defined(SVR4) && !defined(__386BSD__) \
+	&& !defined(linux) && !defined(SunOS_5)
 extern int lstat PROT((char *, struct stat *));
 #endif
 #endif
 #endif /* NeXT */
 
-#if !defined(hpux) && !defined(_AIX) && !defined(__386BSD__) && !defined(linux)
+#if !defined(hpux) && !defined(_AIX) && !defined(__386BSD__)  \
+	&& !defined(linux) && !defined(SunOS_5)
 extern int fchmod PROT((int, int));
 #endif /* !defined(hpux) && !defined(_AIX) */
 
-extern int legal_path PROT((char *));
+int legal_path PROT((char *));
 
 extern int d_flag;
 
@@ -142,7 +147,8 @@ struct vector *get_dir(path, flags)
     int i, count = 0;
     DIR *dirp;
     int namelen, do_match = 0;
-#if defined(_AIX) || defined(M_UNIX) || defined(_SEQUENT_) || defined(SVR4)
+#if defined(_AIX) || defined(M_UNIX) || defined(_SEQUENT_) || defined(SVR4) \
+	|| defined(cray) || defined(SunOS_5)
     struct dirent *de;
 #else
     struct direct *de;
@@ -202,7 +208,8 @@ struct vector *get_dir(path, flags)
      *  Count files
      */
     for (de = readdir(dirp); de; de = readdir(dirp)) {
-#if defined(M_UNIX) || defined(_SEQUENT_) || defined(SVR4) || defined(linux)
+#if defined(M_UNIX) || defined(_SEQUENT_) || defined(SVR4) || defined(linux) \
+	|| defined(cray) || defined(SunOS_5)
 	namelen = strlen(de->d_name);
 #else
 	namelen = de->d_namlen;
@@ -229,7 +236,8 @@ struct vector *get_dir(path, flags)
     endtemp = temppath + strlen(temppath);
     strcat(endtemp++, "/");
     for(i = 0, de = readdir(dirp); i < count; de = readdir(dirp)) {
-#if defined(M_UNIX) || defined(_SEQUENT_) || defined(SVR4) || defined(linux)
+#if defined(M_UNIX) || defined(_SEQUENT_) || defined(SVR4) || defined(linux) \
+	|| defined(cray) || defined(SunOS_5)
         namelen = strlen(de->d_name);
 #else
 	namelen = de->d_namlen;
@@ -354,15 +362,15 @@ void log_file(file, str)
 
     file_name = the_file_name;
     sprintf(file_name, "%s/%s", LOG_DIR, file);
-    if (file_name[0] == '/')
-       file_name++;
     file_name = check_valid_path(file_name, current_object, "log_file", 1);
     if (!file_name)
 	    return;
+    if (file_name[0] == '/')
+       file_name++;
     if (stat(file_name, &st) != -1 && st.st_size > MAX_LOG_SIZE) {
       char file_name2[sizeof file_name + 4];
-      sprintf(file_name2, "%s.old", file_name+1);
-      rename(file_name+1, file_name2);	/* No panic if failure */
+      sprintf(file_name2, "%s.old", file_name);
+      rename(file_name, file_name2);	/* No panic if failure */
     }
     f = fopen(file_name, "a");	/* Skip leading '/' */
     if (f == 0)

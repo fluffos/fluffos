@@ -1,4 +1,4 @@
-MudOS hints file for the NeXT:
+MudOS hints for the NeXT:
 
 Don't use bsdmalloc or smalloc.
 

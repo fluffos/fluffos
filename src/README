@@ -22,10 +22,6 @@ the MudOS information mailing list (info on new releases etc).
 Discuss the MudOS driver on the mudos@iastate.edu mailing list
 (request to be added at mudos-request@iastate.edu).
 
-ChangeLog.0 and ChangeLog.1 are no longer part of the src directory
-(although the most recent ChangeLog will be retained).  The older ChangeLogs
-will be kept in the documentation directory.
-
 The 'addr_server' file replaces the old hname program.  Unlike hname,
 addr_server must be started up manually (it takes a single argument
 which is the port # the addr_server should listen on -- this port #

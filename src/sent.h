@@ -6,10 +6,8 @@ struct sentence {
     int flags;
 };
 
-#define V_SHORT		1
+#define V_SHORT     1
 #define V_NOSPACE	2
-#define V_PREVERB	4
-#define V_REPLACE	8
 
 struct sentence *alloc_sentence();
 

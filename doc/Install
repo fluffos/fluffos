@@ -38,10 +38,10 @@ Perform the following steps:
 
    If you do not choose to set a value for CONFIG_FILE_DIR you will need
    to specify the full path to the config file each time you start the
-   driver (e.g.: driver /usr/local/mud/etc/config.basis).  If you do
-   specify a value for CONFIG_FILE_DIR (and you put the config.basis file
+   driver (e.g.: driver /usr/local/mud/etc/config.lil).  If you do
+   specify a value for CONFIG_FILE_DIR (and you put the config.lil file
    in that directory), then you may start the driver using:
-   driver config.basis
+   driver config.lil
 
 5) Read the comments in the options.h file and change those remaining macro
    definitions that are not set appropriately for your tastes.

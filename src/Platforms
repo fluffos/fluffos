@@ -1,26 +1,26 @@
-MudOS 0.9.15 should compile and run okay on these systems*:
-
+MudOS 0.9.16 should compile and run on the following systems:
+ 
 NeXTstation/NeXTcube (NeXT 2.1 and 3.0)
-RS/6000 (AIX 3.1 and 3.2)
-SPARCstation (SunOS 4.1)
+RS/6000 (AIX 3.x)
 Sun3 (SunOS)
-DECstation 2100/3100/5000 (Ultrix 3.1, 4.1, 4.2)
-Silicon Graphics Indigo, 4D/x and RS4000 Series (IRIX RELEASE 4.0.5F SYSTEM V)
-Sequent Symmetry (DYNIX ptx 2.0)
+SPARCstation (SunOS 4.1)
+SPARC Classic (Solaris/SunOS 5.1)
+DECstation 2100/3100/5000 (Ultrix 3.1, 4.x)
 HP Apollo
-HP PA-RISC (HP-UX 8.0.2)
-HP 9000/834 (HP-UX 7.0)
-HP 9000/360 (HP-UX)
+HP PA-RISC (HP-UX 7.x, 8.x, 9.0x)
+HP 68k Motorola (HP-UX)
+HP 68k Motorola (BSD 4.3)
+Silicon Graphics Indigo, 4D/x and RS4000 Series (IRIX release 4.0.5F System V)
+Sequent Symmetry (DYNIX/ptx 1.4, 2.0)
 Mac Quadra (A/UX 3.0)
 Ridge (RISC/os)
 IBM PC 386/486 Clone (386BSD)
 IBM PC 386/486 Clone (Linux 0.99.3)
 IBM PC 386/486 Clone (System V Release 4)
-
-*Send mail to mudos-bugs@gestalt.austin.tx.us if you experience any
-problems compiling or running on these systems.  Note that some of
-these machines have old versions of yacc and do require bison (a
-yacc replacement) to compile MudOS correctly.  If you manage to
-compile and run MudOS on a system other than one listed here,
-please send the diffs along with machine and OS information to the
-mudos-bugs address.
+ 
+*Send mail to mudos-bugs@gestalt.austin.tx.us if you experience any problems 
+compiling or running on these systems.  Note that some of these machines have 
+old versions of yacc and do require bison (a yacc replacement) to compile 
+MudOS correctly.  If you manage to compile and run MudOS on a system other 
+than one listed here, please send the diffs along with machine and OS 
+information to the mudos-bugs address.

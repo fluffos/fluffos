@@ -661,7 +661,7 @@ int doread(lin, fname)
 {
   FILE	*fp;
   int	err;
-  unsigned long	bytes;
+  unsigned int	bytes;
   unsigned int	lines;
   static char	str[MAXLINE];
 
@@ -707,7 +707,7 @@ int dowrite(from, to, fname, apflg)
   FILE	*fp;
   int	lin, err;
   unsigned int	lines;
-  unsigned long	bytes;
+  unsigned int	bytes;
   char	*str;
   LINE	*lptr;
 

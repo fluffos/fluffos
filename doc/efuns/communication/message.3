@@ -8,7 +8,7 @@ message() - deliver messages to "living" objects
 void message(string class, string message, mixed target, mixed exclude);
 
 .SH DESCRIPTION
-message calls catch_message(string message, string class) in all objects
+message calls receive_message(string class, string message) in all objects
 in the target list excluding those in the exclude list. This basically
 tells the object the message.
 .PP

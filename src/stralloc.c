@@ -285,13 +285,14 @@ int
 add_string_status(verbose)
 int verbose;
 {
-    if (verbose) {
+    if (verbose == 1) {
 	add_message("\nShared string hash table:\n");
 	add_message("-------------------------\t Strings    Bytes\n");
     }
-    add_message("Strings malloced\t\t%8d %8d + %d overhead\n",
+    if (verbose != -1)
+      add_message("Strings malloced\t\t%8d %8d + %d overhead\n",
 		num_distinct_strings, bytes_distinct_strings, overhead_bytes);
-    if (verbose) {
+    if (verbose == 1) {
 	add_message("Total asked for\t\t\t%8d %8d\n",
 		    allocd_strings, allocd_bytes);
 	add_message("Space actually required/total string bytes %d%%\n",

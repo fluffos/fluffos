@@ -1,3 +1,281 @@
+Sun Mar 21 02:55:08 CST 1993 (Blackthorn)
+        * bumped the patchlevel up to 0.9.16
+
+Thu Mar 18 05:07:56 CST 1993 (John Garnett (Truilkan))
+        * bumped the patchlevel up to 0.9.15.22
+        * note: Solaris port was done using gcc
+        * included stdlib.h in prelang.y for Solaris
+        * fixed log_file() so that it calls valid_write before stripping
+          the leading '/'
+        * added || defined(F_CLONE_OBJECT) to f_new in efunctions.c
+        * added define HAS_MONCONTROL to options.h for those machines that
+          don't have the moncontrol() system call.
+        * moved the #include <stdlib.h> for Solaris into port.c instead of
+          port.h
+
+Tue Mar 16 23:01:03 CST 1993 (Blackthorn, bobf@metronet.com)
+        * bumped the patchlevel up to 0.9.15.21
+        * added virtualp() back into func_spec.c - got lost somewhere/sometime
+        * added support for comments in object savefiles (.o files, usually)
+          lines beginning with '#' are ignored and treated as comments
+        * fixed a problem in Sun/Solaris support in port.h (Jacques)
+        * fixed reclaim_objects() so it won't hang on recursive data structures
+        * fixed a bug in 'make clean' in GNUmakefile (reported by Truilkan)
+
+Mon Mar 15 23:43:14 CST 1993 (John Garnett (Truilkan))
+        * bumped the patchlevel up to 0.9.15.20
+        * ported MudOS to Solaris (SunOS 5.1) for Sparc Classic.
+          be sure to read the Makefile for mentions of Solaris.
+          did not port addr_server (just driver).  Thanks to the UT Austin
+          RTF dept's ACTLAB for making available the machine used for porting.
+
+Tue Mar  9 06:05:46 CST 1993 (Blackthorn)
+        * bumped the patchlevel up to 0.9.15.19
+        * removed the F_STORE define from prelang.y since it is not used
+        * fixed another bug in remove_action() efun (probably a crasher,
+          fix from Wayfarer)
+        * put in a more optimized hash.c that was sent to me by
+          jor@solace.hsh.se
+        * added diffs from Darin Johnson to speed up the users() efun slightly
+        * COMPAT BUSTER: rewrote reclaim_objects() to be much cleaner:  it 
+          now scans recursively into all data structures (important 
+          particularly for pointers), and returns an int which is the total 
+          number of lingering objects that were fully freed
+        * fixed a leak that occurred in restore_object_from_buff() in 
+          object.c when "Illegal format when restore %s." error was given
+        * removed the patch to sprintf that was put in in 0.9.15.1 to allow 
+          %s to print "0" for 0, as it caused the column-stuff (ie 
+          sprintf("%-=75s", 0)) to crash, and maybe others as well
+ 
+Fri Mar  5 16:31:26 CST 1993 (John Garnett [Truilkan])
+        * bumped the patchlevel up to 0.9.15.18
+        * initialized single_char to 0 in comm.c:
+             master_ob->interactive->single_char = 0; /* line 681 */
+             - fix from Cygnus.
+    
+Fri Mar  5 16:25:33 CST 1993 (John Garnett (Truilkan))
+        * bumped the patchlevel up to 0.9.15.17
+        * removed #include <memory.h> from matrix.c since it's not needed now.
+        * fixed crasher occuring when query_snoop() called on non-interactive.
+
+Thu Mar  4 14:56:59 CST 1993 (John Garnett (Truilkan))
+        * bumped the patchlevel up to 0.9.15.16
+        * scrapped 0.9.15.15 changes
+        * fixed the adding of the SAVE_EXTENSION define in lex.c
+        * consolidated all of the parallel arrays used in apply_low()
+          global cache into one array of structs (interpret.c)
+        * changed mapping_each() in mapping.c to fix a recurring problem
+          with the each() efun (in rare cases it could fail to return ({})
+          when it should).
+
+Mon Mar  1 18:52:12 CST 1993 (John Garnett (Truilkan))
+        * bumped the patchlevel up to 0.9.15.14
+        * changed various matrix.c functions to use type Matrix rather than
+          (Matrix *) - so as to be more portable (keeps the compilers from
+          complaining).
+        * added back V_SHORT to simulate.c since it wasn't quite redundant
+          (removing it did break at least one mudlib).  V_NOSPACE prepends
+          the verb to the argument string passed to the action while V_SHORT
+          does not (although both allow verbs without following space).
+        * changed print_svalue() to use %g instead of %f (prevents overflowing
+          buffer).  Uses scientific notation when number really large.
+        * changes sprintf to use %g instead of %f.
+        * linked matrix.c into the efuns subdir.
+
+Sun Feb 28 22:25:34 CST 1993 (bobf@metronet.com (Blackthorn))
+        * bumped the patchlevel up to 0.9.15.13
+        * removed some 'const' declarations from _strtof() in interpret.c
+        * changed the PERSPECTIVE define to MATRIX, and added an ifdef in the
+          matrix.c code so it doesn't get compiled in if you don't want it
+        * removed an obsolete check for V_SHORT in interpret.c, and removed
+          the V_SHORT, V_PREVERB, and V_REPLACE defs from sent.h
+        * fixed a bug in the bad_arg() call for arg 1 of the sscanf() efun
+          (reported by Qqqq)
+        * updated the GNUmakefile, with recent Makefile changes
+        * increased the hash table size to 7001, and the object hash table
+          size to 1501, in the Config.example file.  if you're using quite
+          low numbers, and are getting average search times above 2,
+          you may want to increase the size of these tables in your config
+          file (you can check the search times with mud_status(1))
+
+Thu Feb 25 18:24:45 CST 1993 (Dwayne Fontenot (Jacques))
+        * bumped the patchlevel up to 0.9.15.12
+	* added support for T_POINTER write in stream mode to socket_efuns.c.
+	  currently, only arrays of integers and floats are supported (ints
+	  and floats may be mixed in an array).
+	* fixed a bug I introduced with typechecking the + case in postlang.y.
+	  bug reported by Decker@Cyberworld
+	* added some efuns for 3d graphics. #define PERSPECTIVE in options.h
+	  to enable them. see matrix.c for a clue as to what they do.
+	* added the following dependencies to the Makefile:
+		lang.tab.h: lang.tab.c
+		base.h: efun_defs.c
+		efun_protos.h: efun_defs.c
+		efunctions.h: efun_defs.c
+		opc.h: efun_defs.c
+	  so that parallel make on Solbourne (2cpus) does not complain.
+	  Also, changed PROFILE_OFF to PROFILE_ON.
+	  (both reported by Joakim Rastberg <jor@solace.hsh.se>)
+
+Thu Feb 25 16:20:12 CST 1993 (Blackthorn)
+        * bumped the patchlevel up to 0.9.15.11
+        * added a fix from Jacques for a bug in f_subtract()
+        * fixed bugs in f_ne() (!= eoperator)
+
+Thu Feb 25 10:01:11 CST 1993 (Dwayne Fontenot (Jacques))
+        * bumped the patchlevel up to 0.9.15.10
+	* fixed more type stuff in postlang.y for floats.
+	* fixed several operators which I had previously messed up.
+	* tested many operators using ops.c (which is included).
+
+Wed Feb 24 23:18:22 CST 1993 (John Garnett (Truilkan))
+        * bumped the patchlevel up to 0.9.15.9
+        * fixed things like: "int x; x = 5 * 3.14;" to work as the C
+          programmer would expect (x == 15 rather than 15.70).
+        * added to_int(int|float|string) and to_float(int|float|string) efuns.
+          these are used by postlang.y so you shouldn't remove them!
+        * #ifdef'd all the efuns so that removing an efun def from func_spec.c
+          will automagically remove (some of) the associated code for it.
+        * created the ./efuns subdir for organizational reasons (makes it
+          easier to find those source files that define efuns).  The
+          files in ./efuns are hardlinks to files in ./efuns/..
+
+Sun Feb 24 01:00:00 CST 1993 (Blackthorn)
+        * bumped the patchlevel up to 0.9.15.8
+        * added port for HP 68k (Motorola) systems running BSD 4.3
+        * fixed set_bit() efun to not accept a negative argument 2 (crasher, 
+          reported by Dworkin@Igor)
+        * added float support into restore_object() and sscanf() efuns
+        * added floatp() efun 
+        * fixed a bug in F_ADD_EQ from 0.9.15.7
+        * removed the duplicate 'static int i' definition from math.c (it's
+          defined in efuns.h which is included by math.c)
+        * fixed sprintf's typechecking to distinguish between %f and %d,
+          so printf("%f", 1) will generate an error instead of printing
+          "3.143700" (or something similar)
+        * added support for the 'function' variable type into (s)printf's
+          %O format specifier
+        * changed a sizeof(long) in postlang.y to a sizeof(int) on copy
+          of an int variable (current_key).  DEC Alpha has 8 byte longs
+          and 4 byte ints (though we still don't run on it, yet :)
+        * changed most longs and long ints to ints
+ 
+Wed Feb 24 02:36:44 CST 1993 (Dwayne Fontenot (Jacques))
+        * bumped the patchlevel up to 0.9.15.7
+        * did float support for all remaining operators, printf, and sprintf.
+        * modified typechecking in prelang.y and postlang.y for floats.
+ 
+Sun Feb 21 05:36:15 CST 1993 (John Garnett)
+        * bumped the patchlevel up to 0.9.15.6
+        * added foundation for the "float" type (floating point "real"
+          numbers) including +, *, /, unary -, save_object(), dump_stat,
+          cos(), sin(), tan(), asin(), acos(), atan(), sqrt(), log(), pow(),
+          exp(), floor(), ceil().  These math functions can be disabled by
+          #undef'ing MATH in options.h.  Several parts need finished including:
+          -, *=, /=, +=, -=, printf, sprintf, sscanf, and restore_object().
+          Some typechecking in postlang.y will need changed to support these
+          ops as well (see the F_MULTIPLY case as an example).
+
+Sat Feb 20 12:25:35 CUT 1993 (John Garnett)
+        * bumped the patchlevel up to 0.9.15.5
+        * did a partial port to the CRAY Y-MP8/864 running UNICOS 6.1.7.
+          driver now compiles ok (addr_server doesn't yet).  problem is
+          that the driver likes 4 byte ints while the Cray has 8 byte longs,
+          ints, and shorts (maybe other things as well); thus driver won't
+          run correctly.  anyone wanting to finish the port is welcome to do
+          so (DEC Alpha has 8 byte longs as well).
+
+Fri Feb 19 19:43:57 CST 1993 (John Garnett)
+        * bumped the patchlevel up to 0.9.15.4
+        * added linux to #include <malloc.h> #ifdef in lint.h
+        * fixed save_object() so that the original save file (.o file) isn't
+          lost if the save fails (in the middle of the save to the temp file).
+        * fixed a bug in do while () in postlang.y (reported by Darin Johnson).
+          continues weren't continuing to the right place.
+        * created an empty Dependencies file for GNUmakefile.
+        * added data_size() prototype to efunctions.c
+        * removed from extraneous extern declarations from memory_info() efun.
+        * added prototype for remove_all_call_out to object.c
+        * put ChangeLog.0 and ChangeLog.1 back with source.
+        * commented line in postlang.y that may be non-portable (switch stuff)
+        * added SAVE_EXTENSION as an add_define() in lex.c so that LPC
+          objects can determine what the extension is on files created
+          by save_object() (settable in options.h).
+
+Thu Feb 18 21:19:23 CST 1993 (Blackthorn, bobf@metronet.com)
+        * bumped the patchlevel up to 0.9.15.3
+        * added opc.h to the list of files removed by 'make clean'
+        * COMPAT BUSTER: changed name of garbage_collect() efun to 
+          reclaim_objects() (gc.c is now reclaim.c)  
+        * COMPAT BUSTER: removed special checks in query_snoop() efun,
+          so it can now be called from any object.  add a simul_efun override 
+          if you want it to be secure
+        * changed objects() to not create an array larger than the max 
+          array size allowed
+        * declared/prototyped some stuff used by the memory_info() efun
+        * put 'program blocks' stats back into mud_status() (not sure why/how
+          it got taken out)
+        * fixed the size displayed for mappings in sprintf's %O format spec
+        * added an efun shadowp(object ob) which returns the object that
+          ob is shadowing, or 0 if ob is not shadowing
+        * fixed remove_action() efun to correctly return 0 for failure and
+          1 for success
+        * added an efun: set_reset(ob, delay).  changes the time before the
+          next reset on ob to delay, or, if delay is omitted, sets the
+          next reset according to the driver's normal reset formula
+        * fixed reload_object() efun to clear the light value of an object
+
+Mon Feb 12 05:08:48 CST 1993 (Blackthorn, bobf@metronet.com)
+        * bumped the patchlevel up to 0.9.15.2
+        * fixed a bug in remove_all_call_out() (used by reload_object() efun)
+          in call_out.c
+        * incorporated grammar precedence diffs from djohnson@cs.ucsd.edu
+        * fixed a redundant jump that was being done when there was an if
+          without an else (patches from djohnson@cs.ucsd.edu)
+        * added a SHELL=/bin/sh to the Makefile (requested by
+          zak@rmit.edu.au)
+
+Mon Feb 09 03:37:20 CST 1993 (Blackthorn, bobf@metronet.com)
+        * bumped the patchlevel up to 0.9.15.1
+        * added an efun called garbage_collect() that runs through each
+          variable in each object and frees any destructed objects that
+          are still hanging around because of remaining references.  it
+          returns a mapping with 4 entries: "mapping", "pointer", "object",
+          and "function", containing the number of hanging objects that
+          were freed from each data type.  (in new file, gc.c)
+        * added an efun called objects() that returns an array of every
+          object on the mud (with proper hidden object behavior) 
+        * added an efun called memory_info(object|void) that, if passed an
+          object, returns the amount of memory that object is using (as
+          also seen in dumpallobj()'s output), or, if not given an argument,
+          the total amount of memory that the mud is using, as seen in
+          the mud_status() output (note this is the amount of memory the mud 
+          is _using_, not the actual total amount allocated from the system)
+        * added an efun called reload_object(object) that returns an object
+          to original condition without re-reading it from disk and parsing
+          it (re-inits all variables, calls create(), clears heart_beat,
+          clears call_out, etc etc)
+        * modified (s)printf to handle the null string (0) with the "%s"
+          format spec (patch from zak@rmit.edu.au)
+        * removed an unused function, show_info_about(), from comm.c (reported
+          by Decker@Cyberworld)
+        * added a defined(accel) to the #if defined(sun) case for 8-byte
+          alignment, in smalloc.c (reported by djohnson@cs.ucsd.edu)
+        * added support for string concatenation, without the use of the +
+          operator, ie: "foo" "bar" (patch from djohnson@cs.ucsd.edu)
+        * added a prototype for push_expression() into prelang.y
+        * removed extern modifier from legal_path() prototype in file.c
+          (reported by okolbu@ifi.uio.no)
+        * removed current_object check in restore_object() (in object.c),
+          since it was an impossible condition anyway (reported by 
+          okolbu@ifi.uio.no)
+        * fixed a memory leak (ref count wasn't being decreased) in
+          item_parse() in parse.c (reported by rickert@cco.caltech.edu)
+        * fixed a bug in explode() that occurred when the delimiter was the
+          same length as the string (patch from cs90djs2@brunel.ac.uk)
+        * fixed log_file()'s large log file renaming to work again (reported
+          by djohnson@cs.ucsd.edu)
+ 
 Thu Jan 28 02:33:23 CST 1993 (John Garnett)
 	* bumped the patchlevel up to 0.9.15
 	* removed #pragma alloca from config.h (for RS/6000) since MudOS doesn't

@@ -22,8 +22,8 @@ static totals[MAX_CATEGORY];
 int malloc_mask = 0;
 
 static node_t **table;
-unsigned long total_malloced = 0L;
-unsigned long hiwater = 0L;
+unsigned int total_malloced = 0L;
+unsigned int hiwater = 0L;
 
 void
 MDinit()
@@ -43,14 +43,14 @@ int size;
 int tag;
 char *desc;
 {
-	unsigned long int h;
+	unsigned int h;
 	static int count = 0;
 
 	total_malloced += size;
 	if (total_malloced > hiwater) {
 		hiwater = total_malloced;
 	}
-	h = (unsigned long)node % TABLESIZE;
+	h = (unsigned int)node % TABLESIZE;
 	node->size = size;
 	node->next = table[h];
 #ifdef DEBUGMALLOC_EXTENSIONS
@@ -73,10 +73,10 @@ int
 MDfree(ptr)
 void *ptr;
 {
-	unsigned long int h;
+	unsigned int h;
 	node_t *entry, **oentry;
 
-	h = (unsigned long)ptr % TABLESIZE;
+	h = (unsigned int)ptr % TABLESIZE;
 	oentry = &table[h];
 	for (entry = *oentry; entry; oentry = &entry->next, entry = *oentry) {
 		if (entry == ptr) {

@@ -5,6 +5,7 @@
   machines seem to need this done in different ways.
 */
 
+#include "config.h"
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -16,7 +17,6 @@
 #include <sys/filio.h>
 #include <sys/sockio.h>
 #endif
-#include "config.h"
 #include "lint.h"
 
 /*

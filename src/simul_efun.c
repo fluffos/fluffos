@@ -75,7 +75,7 @@ struct function *find_simul_efun(name)
 char *query_simul_efun_file_name() {
 #ifdef DEBUG
     if (simul_efunp == 0)
-	fatal("query_simlu_efun_file_name called when non exists!\n");
+	fatal("query_simul_efun_file_name called when none exists!\n");
 #endif
     return simul_efun_file_name;
 }

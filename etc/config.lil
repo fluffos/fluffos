@@ -1,5 +1,5 @@
 ###############################################################################
-#                 Custom config file for Basis                                #
+#                  Customizable runtime config file for MudOS                 #
 ###############################################################################
 # NOTE: All paths specified here are relative to the mudlib directory except  #
 #       for mudlib directory, and binary directory.                           #
@@ -7,16 +7,16 @@
 ###############################################################################
 
 # Name of this lpmud
-name : mini-basis
+name : lil
 
 # Define what port number the game is to use.
-port number : 6363
+port number : 4444
 
 # Maximum number of users in the game.
 # (currently this option is unused)
 maximum users : 40
 
-mudlib directory : /usr/local/mud/lib
+mudlib directory : /export/home/garnett/MudOS_0.9/mudlib/lil
 binary directory : /usr/local/mud/bin
 
 # This is the subdirectory where all the domain directorys are placed.
@@ -27,14 +27,14 @@ swap file : /adm/tmp/swap
 
 # Define this to be a directory which allows all objects within it to
 # become any euid they wish.
-secure directory : /adm
+secure directory : /single
 
 # the file which defines the master object
 # (should be in the secure directory)
-master file : /adm/obj/master
+master file : /single/master
 
 # This is where the mud configuration files belong (access.allow, etc)
-config directory : /adm/etc
+config directory : /etc
 
 # This is where log files will be placed by default.
 log directory : /log
@@ -44,14 +44,14 @@ log directory : /log
 include directories : /include
 
 # This is the file where all global simulated efuns are defined.
-simulated efun file : /adm/obj/simul_efun
+simulated efun file : /single/simul_efun
 
 # This is an include file which is automatically #include'd in all objects
 # This is an optional define, and currently doesn't work.
 #global include file : "/include/config.h"
 
 # the file which contains host access restrictions
-access allow file : /adm/etc/access.allow
+access allow file : /etc/access.allow
 
 # the file where host access is logged
 # (if enabled in access_check.c)
@@ -63,13 +63,13 @@ access log file : /log/access.allow.log
 # object, then nothing will happen.
 #
 # This time should be substantially longer than the swapping time.
-time to clean up : 900
+time to clean up : 180
 
 # How long time until an unused object is swapped out.
 # Machine with too many players and too little memory: 900 (15 minutes)
 # Machine with few players and lot of memory: 10000
 # Machine with infinite memory: 0 (never swap).
-time to swap : 900
+time to swap : 120
 
 # How many seconds until an object is reset again.
 # Set this value high if big system, otherwise low.
@@ -103,12 +103,12 @@ maximum local variables : 30
 # Maximum number of evaluated nodes/loop.
 # If this is exceeded, current function is halted.
 # The worst case yet encountered is 3600       (dec 1989)
-maximum evaluation cost : 300000
+maximum evaluation cost : 100000
 
 # This is the maximum array size allowed for one single array.
-maximum array size : 5000
+maximum array size : 15000
 
-maximum mapping size : 5000
+maximum mapping size : 15000
 
 inherit chain size : 30
 
@@ -140,7 +140,7 @@ reserved size : 0
 # (number of comparisons to find a string) very close to 1, as found strings
 # are automatically moved to the head of a hash chain.  You will never
 # need more, and you will still get good results with a smaller table.
-hash table size : 2203
+hash table size : 7001
 
 # There is a hash table for living objects, used by find_living().
 # THIS IS NOT IMPLEMENTED YET.
@@ -150,8 +150,10 @@ living hash table size : 100
 # Define this like you did with the strings; probably set to about 1/4 of
 # the number of objects in a game, as the distribution of accesses to
 # objects is somewhat more uniform than that of strings.
-object table size : 1009
+object table size : 1501
 
 # hname stuff
 address server ip : localhost
-address server port : 6364
+address server port : 7374
+
+default fail message : What?

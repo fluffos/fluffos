@@ -272,14 +272,15 @@ int print_call_out_usage(verbose)
 
     for (i=0, cop = call_list; cop; cop = cop->next)
 	i++;
-    if (verbose) {
+    if (verbose == 1) {
 	add_message("\nCall out information:\n");
 	add_message("---------------------\n");
 	add_message("Number of allocated call outs: %8d, %8d bytes\n",
 		    num_call, num_call * sizeof (struct call));
 	add_message("Current length: %d\n", i);
     } else {
-	add_message("call out:\t\t\t%8d %8d (current length %d)\n", num_call,
+        if (verbose != -1)
+	  add_message("call out:\t\t\t%8d %8d (current length %d)\n", num_call,
 		    num_call * sizeof (struct call), i);
     }
     return num_call * sizeof (struct call);
@@ -362,4 +363,25 @@ struct vector *get_all_call_outs() {
 	v->item[i].u.vec = vv;		/* Ref count is already 1 */
     }
     return v;
+}
+
+void
+remove_all_call_out(obj)
+struct object *obj;
+{
+  struct call **copp, *cop;
+  copp = &call_list;
+  while (*copp)
+  {
+    if ((*copp)->ob == obj)
+    {
+      cop = *copp;
+      if (cop->next)
+        cop->next->delta += cop->delta;
+      *copp = cop->next;
+      free_call(cop);
+    }
+      else 
+      copp = &(*copp)->next;
+  }
 }

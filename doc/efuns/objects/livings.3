@@ -1,0 +1,15 @@
+.\"return an array of all living objects
+.TH livings 3
+
+.SH NAME
+livings() - return an array of all living objects
+
+.SH SYNOPSIS
+object *livings();
+
+.SH DESCRIPTION
+Returns an array of pointers to all living objects (objects that have
+had enable_commands() called in them).
+
+.SH SEE ALSO
+enable_commands(3)

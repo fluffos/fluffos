@@ -2,6 +2,7 @@
  *  comm.c -- communications functions and more.
  *            Dwayne Fontenot (Jacques@TMI)
  */
+#include <varargs.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
@@ -15,7 +16,6 @@
 #include <ctype.h>
 #include <signal.h>
 #include <memory.h>
-#include <varargs.h>
 #include <setjmp.h>
 #include "config.h"
 #include "lint.h"
@@ -65,10 +65,8 @@ char *first_cmd_in_buf PROT((struct interactive *));
 int cmd_in_buf PROT((struct interactive *));
 void next_cmd_in_buf PROT((struct interactive *));
 void remove_interactive();
-struct object *get_interactive_object();
 int call_function_interactive();
 int set_call();
-void show_info_about();
 void set_prompt PROT((char *));
 void print_prompt();
 int new_set_snoop();
@@ -110,11 +108,11 @@ int add_message_calls=0;
 int inet_packets=0;
 int inet_volume=0;
 #endif /* COMM_STAT */
+struct interactive *all_users[MAX_USERS];
 
 /*
  * private local variables.
  */
-static struct interactive *all_users[MAX_USERS];
 static int new_user_fd;
 static int addr_server_fd = 0;
 
@@ -679,6 +677,7 @@ void new_user_handler()
     master_ob->interactive->message_length = 0;
     master_ob->interactive->num_carry = 0;
     master_ob->interactive->net_dead = 0;
+    master_ob->interactive->single_char = 0;
     all_users[i] = master_ob->interactive;
     all_users[i]->fd = new_socket_fd;
     set_prompt("> ");
@@ -1313,28 +1312,6 @@ int allow_host_access(new_socket)
 }
 #endif /* not ACCESS_RESTRICTED */
 
-/*
- * get the I'th user object from the interactive list, i starts at 0
- * and can go to num_user - 1.  For users(), etc.
- */
-struct object *get_interactive_object(i)
-     int i;
-{
-  int n;
-
-  if(i >= num_user) /* love them ASSERTS() :-) */
-    fatal("Get interactive (%d) with only %d users!", i, num_user);
-
-  for(n = 0; n < MAX_USERS; n++)
-    if(all_users[n])
-      if(!(i--))
-	return(all_users[n]->ob);
-
-  fatal("Get interactive: user %d not found! (num_users = %d)",
-	i, num_user);
-  return(0);   /* Just to satisfy some compiler warnings */
-}
-
 int call_function_interactive(i, str)
      struct interactive *i;
      char *str;
@@ -1434,16 +1411,6 @@ int set_call(ob, sent, flags, single_char)
     add_message("%c%c%c", IAC, WILL, TELOPT_SGA);
   command_giver = save_command_giver;
   return(1);
-}
-
-void show_info_about(str, room, i)
-     char *str, *room;
-     struct interactive *i;
-{
-  struct hostent *hp = 0;
-
-  add_message("%-15s %-15s %s\n",
-              hp ? hp->h_name : inet_ntoa(i->addr.sin_addr), str, room);
 }
 
 void
@@ -1742,7 +1709,7 @@ char *query_host_name()
 struct object *query_snoop(ob)
      struct object *ob;
 {
-  if(ob->interactive->snoop_by == 0)
+  if (!ob->interactive || (ob->interactive->snoop_by == 0))
     return(0);
   return(ob->interactive->snoop_by->ob);
 }

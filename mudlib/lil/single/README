@@ -1,0 +1,3 @@
+This directory is for objects that are intended to only have a _single_
+instance (no clones) yet are not typically inherited.  This sort of object
+includes what are sometimes known as daemons.

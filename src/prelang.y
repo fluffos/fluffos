@@ -10,19 +10,19 @@
  * the generated token list and post_lang.y. The reason for this is that there
  * is no #include statement that yacc recognizes.
  */
+#include "config.h"
 #include <string.h>
 #include <stdio.h>
 #include <memory.h>
 #if defined(sun)
 #include <alloca.h>
 #endif
-#ifdef NeXT
+#if defined(NeXT) || defined(SunOS_5)
 #include <stdlib.h>
 #endif
 
 #include "mudlib_stats.h"
 #include "interpret.h"
-#include "config.h"
 #define _YACC_
 #include "lint.h"
 #include "object.h"
@@ -89,6 +89,7 @@ static int expr_sptr = 0;
 static short switch_stack[SWITCH_STACK_SIZE];
 expr_t expr_stack[EXPR_STACK_SIZE];
 expr_t *pop_expression();
+void push_expression();
 
 /*
  * Some good macros to have.
@@ -212,6 +213,8 @@ static int compatible_types(t1, t2)
 #endif
     if (t1 == t2)
 	return 1;
+    if ((t1 & (TYPE_NUMBER | TYPE_REAL)) && (t2 & (TYPE_NUMBER | TYPE_REAL)))
+	return 1;
     if (t1 == TYPE_ANY || t2 == TYPE_ANY)
 	return 1;
     if ((t1 & TYPE_MOD_POINTER) && (t2 & TYPE_MOD_POINTER)) {
@@ -324,6 +327,17 @@ static void ins_long(l)
     add_to_mem_block(A_PROGRAM, (char *)&l+1, 1);
     add_to_mem_block(A_PROGRAM, (char *)&l+2, 1);
     add_to_mem_block(A_PROGRAM, (char *)&l+3, 1);
+}
+
+static void ins_real(l)
+    double l;
+{
+    float f = (float)l;
+
+    add_to_mem_block(A_PROGRAM, (char *)&f+0, 1);
+    add_to_mem_block(A_PROGRAM, (char *)&f+1, 1);
+    add_to_mem_block(A_PROGRAM, (char *)&f+2, 1);
+    add_to_mem_block(A_PROGRAM, (char *)&f+3, 1);
 }
 
 INLINE static void
@@ -672,7 +686,7 @@ void add_new_init_jump();
 %token F_BBRANCH_WHEN_ZERO F_BBRANCH_WHEN_NON_ZERO
 %token F_JUMP F_JUMP_WHEN_ZERO F_JUMP_WHEN_NON_ZERO
 %token F_POP_VALUE F_DUP
-%token F_STORE F_CALL_FUNCTION_BY_ADDRESS
+%token F_CALL_FUNCTION_BY_ADDRESS
 %token F_PUSH_IDENTIFIER_LVALUE F_PUSH_LOCAL_VARIABLE_LVALUE
 %token F_PUSH_INDEXED_LVALUE F_INDEX
 %token F_CONST0 F_CONST1
@@ -686,8 +700,8 @@ void add_new_init_jump();
 %token F_RETURN F_STRING
 %token F_INC F_DEC F_PRE_INC F_PRE_DEC
 %token F_POST_INC F_POST_DEC F_COMMA F_VOID_ASSIGN
-%token F_NUMBER F_BYTE F_NBYTE F_ASSIGN F_INT F_ADD F_SUBTRACT F_MULTIPLY
-%token F_DIVIDE F_LT F_GT F_EQ F_GE F_LE
+%token F_NUMBER F_REAL F_BYTE F_NBYTE F_ASSIGN F_INT F_FLOAT F_ADD F_SUBTRACT
+%token F_MULTIPLY F_DIVIDE F_LT F_GT F_EQ F_GE F_LE
 %token F_NE
 %token F_VOID_ADD_EQ F_ADD_EQ F_SUB_EQ F_DIV_EQ F_MULT_EQ
 %token F_NEGATE
@@ -706,3 +720,23 @@ void add_new_init_jump();
 %token F_PROTECTED F_PUBLIC
 %token F_FUNCTION F_FUNCTION_CALL F_FUNCTION_SPLIT F_FUNCTION_CONSTRUCTOR
 %token F_VARARGS
+
+/*
+ * Define precedences of operators to make grammar simpler.
+ * (this makes %token for them redundant, but...)
+ */
+
+%right F_ASSIGN
+%right '?'
+%left F_LOR
+%left F_LAND
+%left '|'
+%left '^'
+%left '&'
+%left F_EQ F_NE          /* nonassoc? */
+%left '>' F_GE '<' F_LE  /* nonassoc? */
+%left F_LSH F_RSH
+%left '+' '-'
+%left '*' '%' '/'
+%right F_NOT '~'
+%nonassoc F_PRE_INC F_PRE_DEC

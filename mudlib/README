@@ -1,14 +1,13 @@
-1993/01/28
+1993/03/18
 
-Since TMI-2 has released its beta mudlib (tmi.iastate.edu 5555) and since
-Basis is available elsewhere (basis-19.tar.Z), we have decided to
-discontinue including the mini-Basis mudlib with MudOS.  The Nightmare
-creators also reportedly plan to release a publically available mudlib
-(orlith.bates.edu 2999).  Also, the Portals mudlib may eventually be
-released.  If you have developed a MudOS mudlib that you wish to make
-publically available, please send email to mudos-bugs@gestalt.austin.tx.us
-letting us know where to obtain it (so that we may include a reference
-to it in a future release of MudOS).
+TMI-2 has released its beta mudlib (tmi.ccs.northeastern.edu 5555)
+The Nightmare mudlib is available Nightmare (orlith.bates.edu 2999).
+Also, the Portals mudlib may eventually be released.  If you have developed
+a MudOS mudlib that you wish to make publically available, please send
+email to mudos-bugs@gestalt.austin.tx.us letting us know where to obtain
+it (so that we may include a reference to it in a future release of MudOS).
 
 TMI-2 is available via anonymous ftp (login as ftp) from
-tmi.iastate.edu 5554:/pub/mudlibs (yes, ftp to the port).
+ftp.ccs.northeastern.edu:/pub/mudlibs
+
+Nightmare is available via anonymous ftp from orlith.bates.edu

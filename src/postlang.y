@@ -3,6 +3,7 @@
 %union
 {
 	int number;
+	float real; 
 	unsigned int address;	/* Address of an instruction */
 	char *string;
 	short type;
@@ -11,20 +12,20 @@
 }
 
 %type <number> assign F_NUMBER constant F_LOCAL_NAME expr_list
-%type <number> const1 const2 const3 const4 const5 const6 const7 const8 const9
+%type <real>   F_REAL
 %type <number> lvalue_list argument type basic_type optional_star expr_list2
 %type <number> expr_list3 expr_list4 assoc_pair
 %type <number> type_modifier type_modifier_list opt_basic_type block_or_semi
 %type <number> argument_list
-%type <string> F_IDENTIFIER F_STRING string_con1 string_constant function_name
+%type <string> F_IDENTIFIER F_STRING string_con1 string_con2
+%type <string> string_constant function_name
 
 %type <case_label> case_label
 
 /* The following symbols return type information */
 
-%type <type> function_call lvalue string cast expr01 comma_expr for_expr
-%type <type> expr2 expr211 expr1 expr212 expr213 expr22 expr23 expr25
-%type <type> expr27 expr28 expr24 expr3 expr31 expr4 number expr0
+%type <type> function_call lvalue string cast comma_expr for_expr
+%type <type> expr4 number expr0 real
 %%
 
 all: program;
@@ -77,6 +78,12 @@ inheritance: type_modifier_list F_INHERIT string_con1 ';'
 			add_new_init_jump();
 		    }
 		}
+
+real: F_REAL
+    {
+	ins_f_byte(F_REAL); ins_real($1); $$ = TYPE_REAL;
+    }
+    ;
 
 number: F_NUMBER
 	{
@@ -180,6 +187,7 @@ opt_basic_type: basic_type | /* empty */ { $$ = TYPE_UNKNOWN; } ;
 
 basic_type: F_STATUS { $$ = TYPE_NUMBER; current_type = $$; }
 	| F_INT { $$ = TYPE_NUMBER; current_type = $$; }
+	| F_FLOAT { $$ = TYPE_REAL; current_type = $$; }
 	| F_STRING_DECL { $$ = TYPE_STRING; current_type = $$; }
 	| F_OBJECT { $$ = TYPE_OBJECT; current_type = $$; }
 	| F_MAPPING { $$ = TYPE_MAPPING; current_type = $$; }
@@ -363,9 +371,14 @@ do: {
 		push_explicit(current_break_address);
 		current_break_address = BREAK_DELIMITER;
 		current_continue_address = CONTINUE_DELIMITER;
-		push_address(); /* 1 */
-    } F_DO statement F_WHILE '(' comma_expr ')' ';'
+        push_address(); /* 1 */
+    } F_DO statement
+    {
+        push_address(); /* 2 */
+    }
+    F_WHILE '(' comma_expr ')' ';'
 	{
+		int cont_addr = pop_address(); /* 2 */
 		int addr = pop_address(); /* 1 */
 		int next_addr;
 
@@ -373,7 +386,7 @@ do: {
 			current_continue_address = next_addr)
 		{
 			next_addr = read_short(current_continue_address);
-			upd_short(current_continue_address, addr);
+			upd_short(current_continue_address, cont_addr);
 		}
 		ins_f_byte(F_JUMP_WHEN_NON_ZERO);
 		ins_short(addr);
@@ -579,12 +592,10 @@ switch: F_SWITCH '(' comma_expr ')'
 		      last_line, curr_line);
                     yyerror(buf);
 		}
-		  else if (current_key == last_key + 1
-		    && current_addr == last_addr) {
-		    if (mem_block[A_CASE_LABELS].current_size
-		      != range_start + 6) {
-		      *(short*)(mem_block[A_CASE_LABELS].block+range_start+4)
-			=1;
+		else if (current_key == (last_key + 1) && current_addr == last_addr) {
+		    if (mem_block[A_CASE_LABELS].current_size != (range_start + 6)) {
+		     /* todo: this next line is probably non-portable (byte-ordering) */
+		      *(short*)(mem_block[A_CASE_LABELS].block+range_start+4) = 1;
 		      mem_block[A_CASE_LABELS].current_size = range_start + 6;
 		    }
 		} else {
@@ -595,7 +606,7 @@ switch: F_SWITCH '(' comma_expr ')'
 	    last_line = curr_line;
 	    last_addr = current_addr;
 	    add_to_mem_block(A_CASE_LABELS,
-                (char *)&current_key, sizeof(long) );
+                (char *)&current_key, sizeof(int) );
 	    add_to_mem_block(A_CASE_LABELS,
 		(char *)&current_addr, sizeof(short) );
             for ( offset = 0; ; )
@@ -720,47 +731,31 @@ case_label: constant
         }
 	  ;
 
-constant: const1
-	| constant '|' const1 { $$ = $1 | $3; } ;
-
-const1: const2
-      | const1 '^' const2 { $$ = $1 ^ $3; } ;
-
-const2: const3
-      | const2 '&' const3 { $$ = $1 & $3; } ;
-
-const3: const4
-      | const3 F_EQ const4 { $$ = $1 == $3; }
-      | const3 F_NE const4 { $$ = $1 != $3; } ;
-
-const4: const5
-      | const4 '>'  const5 { $$ = $1 >  $3; }
-      | const4 F_GE const5 { $$ = $1 >= $3; }
-      | const4 '<'  const5 { $$ = $1 <  $3; }
-      | const4 F_LE const5 { $$ = $1 <= $3; } ;
-
-const5: const6
-      | const5 F_LSH const6 { $$ = $1 << $3; }
-      | const5 F_RSH const6 { $$ = $1 >> $3; } ;
-
-const6: const7
-      | const6 '+' const7 { $$ = $1 + $3; }
-      | const6 '-' const7 { $$ = $1 - $3; } ;
-
-const7: const8
-      | const7 '*' const8 { $$ = $1 * $3; }
-      | const7 '%' const8
-      { if ($3) $$ = $1 % $3; else yyerror("Modulo by zero"); }
-      | const7 '/' const8
-      { if ($3) $$ = $1 / $3; else yyerror("Division by zero"); } ;
-
-const8: const9
-      | '(' constant ')' { $$ = $2; } ;
-
-const9: F_NUMBER
+constant:
+        constant '|' constant { $$ = $1 | $3; }
+      | constant '^' constant { $$ = $1 ^ $3; }
+      | constant '&' constant { $$ = $1 & $3; }
+      | constant F_EQ constant { $$ = $1 == $3; }
+      | constant F_NE constant { $$ = $1 != $3; }
+      | constant '>'  constant { $$ = $1 >  $3; }
+      | constant F_GE constant { $$ = $1 >= $3; }
+      | constant '<'  constant { $$ = $1 <  $3; }
+      | constant F_LE constant { $$ = $1 <= $3; } 
+      | constant F_LSH constant { $$ = $1 << $3; }
+      | constant F_RSH constant { $$ = $1 >> $3; }
+      | constant '+' constant { $$ = $1 + $3; }
+      | constant '-' constant { $$ = $1 - $3; }
+      | constant '*' constant { $$ = $1 * $3; }
+      | constant '%' constant
+            { if ($3) $$ = $1 % $3; else yyerror("Modulo by zero"); }
+      | constant '/' constant
+            { if ($3) $$ = $1 / $3; else yyerror("Division by zero"); }
+      | '(' constant ')' { $$ = $2; }
+      | F_NUMBER
       | '-'   F_NUMBER { $$ = -$2; }
       | F_NOT F_NUMBER { $$ = !$2; }
-      | '~'   F_NUMBER { $$ = ~$2; } ;
+      | '~'   F_NUMBER { $$ = ~$2; }
+      ;
 
 default: F_DEFAULT ':'
     {
@@ -781,27 +776,32 @@ comma_expr: expr0 { $$ = $1; }
 	',' expr0
 	{ $$ = $4; } ;
 
-expr0:  expr01
-     | lvalue assign expr0
+expr0:
+       lvalue assign expr0  %prec F_ASSIGN
 	{
 	    if (exact_types && !compatible_types($1, $3) &&
 		!($1 == TYPE_STRING && $3 == TYPE_NUMBER && $2 == F_ADD_EQ))
 	    {
 		type_error("Bad assignment. Rhs", $3);
 	    }
-	    ins_expr_f_byte($2);
-	    $$ = $3;
+		if (($1 == TYPE_REAL) && ($3 == TYPE_NUMBER)) {
+			ins_expr_f_byte(F_TO_FLOAT);
+		} else if (($1 == TYPE_NUMBER) && ($3 == TYPE_REAL)) {
+			ins_expr_f_byte(F_TO_INT);
+		}
+		ins_expr_f_byte($2);
+		$$ = $3;
 	}
-     | error assign expr01 { yyerror("Illegal LHS");  $$ = TYPE_ANY; };
+     | error assign expr0  %prec F_ASSIGN
+        { yyerror("Illegal LHS");  $$ = TYPE_ANY; }
 
-expr01: expr1 { $$ = $1; }
-     | expr1 '?'
+     | expr0 '?'
 	{
 	    ins_f_byte(F_BRANCH_WHEN_ZERO); /* relative0 */
 	    push_address();
 	    ins_short(0);
 	}
-      expr01
+      expr0
 	{
 	    int i;
 	    i = pop_address();
@@ -809,7 +809,7 @@ expr01: expr1 { $$ = $1; }
 	    push_address(); ins_short(0);
 	    upd_short(i, CURRENT_PROGRAM_SIZE - i); /* relative0 */
 	}
-      ':' expr01
+      ':' expr0  %prec '?'
 	{
 	    int i = pop_address();
 
@@ -824,7 +824,287 @@ expr01: expr1 { $$ = $1; }
 	    else if (TYPE($4, TYPE_MOD_POINTER|TYPE_ANY)) $$ = $7;
 	    else if (TYPE($7, TYPE_MOD_POINTER|TYPE_ANY)) $$ = $4;
 	    else $$ = $4;
+	}
+
+     | expr0 F_LOR
+	{
+	    ins_f_byte(F_DUP); ins_f_byte(F_BRANCH_WHEN_NON_ZERO); /* relative2 */
+	    push_address();
+	    ins_short(0);
+	    ins_f_byte(F_POP_VALUE);
+	}
+       expr0
+	{
+		int i = pop_address();
+
+	    last_expression = -1;
+	    upd_short(i, CURRENT_PROGRAM_SIZE - i); /* relative2 */
+	    if ($1 == $4)
+		$$ = $1;
+	    else
+		$$ = TYPE_ANY;	/* Return type can't be known */
+	}
+     | expr0 F_LAND
+	{
+	    ins_f_byte(F_DUP); ins_f_byte(F_BRANCH_WHEN_ZERO); /* relative3 */
+	    push_address();
+	    ins_short(0);
+	    ins_f_byte(F_POP_VALUE);
+	}
+       expr0
+	{
+		int i = pop_address();
+
+	    last_expression = -1;
+	    upd_short(i, CURRENT_PROGRAM_SIZE - i); /* relative3 */
+	    if ($1 == $4)
+		$$ = $1;
+	    else
+		$$ = TYPE_ANY;	/* Return type can't be known */
+	}
+
+       | expr0 '|' expr0
+          {
+	      if (exact_types && !TYPE($1,TYPE_NUMBER))
+		  type_error("Bad argument 1 to |", $1);
+	      if (exact_types && !TYPE($3,TYPE_NUMBER))
+		  type_error("Bad argument 2 to |", $3);
+	      $$ = TYPE_NUMBER;
+	      ins_f_byte(F_OR);
+	  }
+       | expr0 '^' expr0
+	  {
+	      if (exact_types && !TYPE($1,TYPE_NUMBER))
+		  type_error("Bad argument 1 to ^", $1);
+	      if (exact_types && !TYPE($3,TYPE_NUMBER))
+		  type_error("Bad argument 2 to ^", $3);
+	      $$ = TYPE_NUMBER;
+	      ins_f_byte(F_XOR);
+	  }
+       | expr0 '&' expr0
+	  {
+	      ins_f_byte(F_AND);
+	      if ( !($1 & TYPE_MOD_POINTER) || !($3 & TYPE_MOD_POINTER) ) {
+	          if (exact_types && !TYPE($1,TYPE_NUMBER))
+		      type_error("Bad argument 1 to &", $1);
+	          if (exact_types && !TYPE($3,TYPE_NUMBER))
+		      type_error("Bad argument 2 to &", $3);
+	      }
+	      $$ = TYPE_NUMBER;
+	  }
+
+      | expr0 F_EQ expr0
+	{
+	    int t1 = $1 & TYPE_MOD_MASK, t2 = $3 & TYPE_MOD_MASK;
+	    if (exact_types &&
+		(t1 != t2) &&
+!((t1 & (TYPE_NUMBER | TYPE_REAL)) && (t2 & (TYPE_NUMBER | TYPE_REAL))) &&
+		(t1 != TYPE_ANY && t2 != TYPE_ANY)) {
+		type_error("== always false because of incompatible types",$1);
+		type_error("                               compared to", $3);
+	    }
+	    ins_f_byte(F_EQ);
+	    $$ = TYPE_NUMBER;
+	}
+      | expr0 F_NE expr0
+	{
+	    int t1 = $1 & TYPE_MOD_MASK, t2 = $3 & TYPE_MOD_MASK;
+	    if (exact_types &&
+		(t1 != t2) &&
+!((t1 & (TYPE_NUMBER | TYPE_REAL)) && (t2 & (TYPE_NUMBER | TYPE_REAL))) &&
+		(t1 != TYPE_ANY && t2 != TYPE_ANY)) {
+		type_error("!= always true because of incompatible types", $1);
+		type_error("                               compared to", $3);
+	    }
+	    ins_f_byte(F_NE);
+	    $$ = TYPE_NUMBER;
+	}
+
+      | expr0 '>' expr0
+	{ $$ = TYPE_NUMBER; ins_f_byte(F_GT); };
+      | expr0 F_GE expr0
+	{ $$ = TYPE_NUMBER; ins_f_byte(F_GE); };
+      | expr0 '<' expr0
+	{ $$ = TYPE_NUMBER; ins_f_byte(F_LT); };
+      | expr0 F_LE expr0
+	{ $$ = TYPE_NUMBER; ins_f_byte(F_LE); };
+
+      | expr0 F_LSH expr0
+	{
+	    ins_f_byte(F_LSH);
+	    $$ = TYPE_NUMBER;
+	    if (exact_types && !TYPE($1, TYPE_NUMBER))
+		type_error("Bad argument number 1 to '<<'", $1);
+	    if (exact_types && !TYPE($3, TYPE_NUMBER))
+		type_error("Bad argument number 2 to '<<'", $3);
+	}
+      | expr0 F_RSH expr0
+	{
+	    ins_f_byte(F_RSH);
+	    $$ = TYPE_NUMBER;
+	    if (exact_types && !TYPE($1, TYPE_NUMBER))
+		type_error("Bad argument number 1 to '>>'", $1);
+	    if (exact_types && !TYPE($3, TYPE_NUMBER))
+		type_error("Bad argument number 2 to '>>'", $3);
+	}
+
+      | expr0 '+' expr0	/* Type checks of this case are incomplete */
+	{
+	  if($1 == $3)
+	    $$ = $1;
+	  else if(($1 & TYPE_ANY) || ($3 & TYPE_ANY))
+	    $$ = TYPE_ANY;
+	  else if((TYPE($1, TYPE_NUMBER) && TYPE($3, TYPE_REAL)) ||
+		  (TYPE($1, TYPE_REAL) && TYPE($3, TYPE_NUMBER)))
+	    $$ = TYPE_REAL;
+	  else
+	    $$ = TYPE_ANY;
+	  ins_f_byte(F_ADD);
 	};
+      | expr0 '-' expr0
+	{
+	  int bad_arg = 0;
+
+	  if(exact_types){
+	    if(!TYPE($1, TYPE_NUMBER) &&
+		!TYPE($1, TYPE_REAL) &&
+		!($1 & TYPE_MOD_POINTER)){
+	      type_error("Bad argument number 1 to '-'", $1);
+	      bad_arg++;
+	    }
+	    if(!TYPE($3, TYPE_NUMBER) &&
+	       !TYPE($3, TYPE_REAL) &&
+	       !($3 & TYPE_MOD_POINTER)){
+	      type_error("Bad argument number 2 to '-'", $3);
+	      bad_arg++;
+	    }
+	  }
+	  $$ = TYPE_ANY;
+	  if (($1 & TYPE_MOD_POINTER) || ($3 & TYPE_MOD_POINTER))
+	    $$ = TYPE_MOD_POINTER | TYPE_ANY;
+	  if (!($1 & TYPE_MOD_POINTER) || !($3 & TYPE_MOD_POINTER)) {
+	    if (exact_types && $$ != TYPE_ANY && !bad_arg)
+	      yyerror("Arguments to '-' don't match");
+	    if(($1 & TYPE_ANY) || ($3 & TYPE_ANY))
+	      $$ = TYPE_ANY;
+	    else if((TYPE($1, TYPE_REAL) || TYPE($3, TYPE_REAL)))
+	      $$ = TYPE_REAL;
+	    else
+	      $$ = TYPE_NUMBER;
+	  }
+	  ins_f_byte(F_SUBTRACT);
+	}
+      | expr0 '*' expr0
+	{
+	  if (($1 != TYPE_MAPPING) || ($3 != TYPE_MAPPING)) {
+	    if (exact_types && !TYPE($1, TYPE_NUMBER) && !TYPE($1, TYPE_REAL))
+	      type_error("Bad argument number 1 to '*'", $1);
+	    if (exact_types && !TYPE($3, TYPE_NUMBER) && !TYPE($3, TYPE_REAL))
+	      type_error("Bad argument number 2 to '*'", $3);
+	    if (TYPE($1, TYPE_NUMBER) && TYPE($3, TYPE_NUMBER))
+	      $$ = TYPE_NUMBER;
+	    else
+	      $$ = TYPE_REAL;
+	  }
+	  else
+	    $$ = TYPE_MAPPING;
+	  ins_f_byte(F_MULTIPLY);
+	};
+      | expr0 '%' expr0
+	{
+	    if (exact_types && !TYPE($1, TYPE_NUMBER))
+		type_error("Bad argument number 1 to '%'", $1);
+	    if (exact_types && !TYPE($3, TYPE_NUMBER))
+		type_error("Bad argument number 2 to '%'", $3);
+	    ins_f_byte(F_MOD);
+	    $$ = TYPE_NUMBER;
+	};
+      | expr0 '/' expr0
+	{
+	    if (exact_types && !TYPE($1, TYPE_NUMBER) && !TYPE($1, TYPE_REAL))
+		type_error("Bad argument number 1 to '/'", $1);
+	    if (exact_types && !TYPE($3, TYPE_NUMBER) && !TYPE($3, TYPE_REAL))
+		type_error("Bad argument number 2 to '/'", $3);
+	    ins_f_byte(F_DIVIDE);
+		if (TYPE($1, TYPE_NUMBER) && TYPE($3, TYPE_NUMBER))
+			$$ = TYPE_NUMBER;
+		else
+			$$ = TYPE_REAL;
+	}
+      | cast expr0  %prec F_NOT
+        {
+	  $$ = $1;
+	  if (exact_types && $2 != TYPE_ANY && $2 != TYPE_UNKNOWN &&
+	      $1 != TYPE_VOID)
+	type_error("Casts are only legal for type mixed, or when unknown", $2);
+	}
+
+      | F_PRE_INC lvalue  %prec F_NOT  /* note lower precedence here */
+        {
+	    ins_expr_f_byte(F_PRE_INC);
+	    if (exact_types && !TYPE($2, TYPE_NUMBER) && !TYPE($2, TYPE_REAL))
+		type_error("Bad argument to ++", $2);
+            if (TYPE($2, TYPE_REAL))
+              $$ = TYPE_REAL;
+            else
+	    $$ = TYPE_NUMBER;
+	};
+      | F_PRE_DEC lvalue  %prec F_NOT  /* note lower precedence here */
+        {
+	    ins_expr_f_byte(F_PRE_DEC);
+	    if (exact_types && !TYPE($2, TYPE_NUMBER) && !TYPE($2, TYPE_REAL))
+		type_error("Bad argument to --", $2);
+            if (TYPE($2, TYPE_REAL))
+              $$ = TYPE_REAL;
+            else
+	    $$ = TYPE_NUMBER;
+	};
+      | F_NOT expr0
+	{
+	    ins_f_byte(F_NOT);	/* Any type is valid here. */
+	    $$ = TYPE_NUMBER;
+	};
+      | '~' expr0
+	{
+	    ins_f_byte(F_COMPL);
+	    if (exact_types && !TYPE($2, TYPE_NUMBER))
+		type_error("Bad argument to ~", $2);
+	    $$ = TYPE_NUMBER;
+	};
+      | '-' expr0  %prec F_NOT
+	{
+	    ins_f_byte(F_NEGATE);
+	    if (exact_types && !TYPE($2, TYPE_NUMBER) && !TYPE($2, TYPE_REAL))
+		type_error("Bad argument to unary '-'", $2);
+            if (TYPE($2, TYPE_REAL))
+	      $$ = TYPE_REAL;
+	    else
+	      $$ = TYPE_NUMBER;
+	}
+
+      | lvalue F_PRE_INC   /* normal precedence here */
+         {
+	     ins_expr_f_byte(F_POST_INC);
+	     if (exact_types && !TYPE($1, TYPE_NUMBER) && !TYPE($1, TYPE_REAL))
+		 type_error("Bad argument to ++", $1);
+            if (TYPE($1, TYPE_REAL))
+              $$ = TYPE_REAL;
+            else
+	     $$ = TYPE_NUMBER;
+	 };
+      | lvalue F_PRE_DEC
+         {
+	     ins_expr_f_byte(F_POST_DEC);
+	     if (exact_types && !TYPE($1, TYPE_NUMBER) && !TYPE($1, TYPE_REAL))
+		 type_error("Bad argument to --", $1);
+            if (TYPE($1, TYPE_REAL))
+              $$ = TYPE_REAL;
+            else
+	     $$ = TYPE_NUMBER;
+	 }
+
+      | expr4
+      ;
 
 assign: '=' { $$ = F_ASSIGN; }
       | F_AND_EQ { $$ = F_AND_EQ; }
@@ -870,260 +1150,6 @@ expr_list4: assoc_pair          { $$ = $1; }
 
 assoc_pair: expr0 ':' expr0    { $$ = 2; } ;
 
-
-expr1: expr2 { $$ = $1; }
-     | expr2 F_LOR
-	{
-	    ins_f_byte(F_DUP); ins_f_byte(F_BRANCH_WHEN_NON_ZERO); /* relative2 */
-	    push_address();
-	    ins_short(0);
-	    ins_f_byte(F_POP_VALUE);
-	}
-       expr1
-	{
-		int i = pop_address();
-
-	    last_expression = -1;
-	    upd_short(i, CURRENT_PROGRAM_SIZE - i); /* relative2 */
-	    if ($1 == $4)
-		$$ = $1;
-	    else
-		$$ = TYPE_ANY;	/* Return type can't be known */
-	};
-
-expr2: expr211 { $$ = $1; }
-     | expr211 F_LAND
-	{
-	    ins_f_byte(F_DUP); ins_f_byte(F_BRANCH_WHEN_ZERO); /* relative3 */
-	    push_address();
-	    ins_short(0);
-	    ins_f_byte(F_POP_VALUE);
-	}
-       expr2
-	{
-		int i = pop_address();
-
-	    last_expression = -1;
-	    upd_short(i, CURRENT_PROGRAM_SIZE - i); /* relative3 */
-	    if ($1 == $4)
-		$$ = $1;
-	    else
-		$$ = TYPE_ANY;	/* Return type can't be known */
-	} ;
-
-expr211: expr212
-       | expr211 '|' expr212
-          {
-	      if (exact_types && !TYPE($1,TYPE_NUMBER))
-		  type_error("Bad argument 1 to |", $1);
-	      if (exact_types && !TYPE($3,TYPE_NUMBER))
-		  type_error("Bad argument 2 to |", $3);
-	      $$ = TYPE_NUMBER;
-	      ins_f_byte(F_OR);
-	  };
-
-expr212: expr213
-       | expr212 '^' expr213
-	  {
-	      if (exact_types && !TYPE($1,TYPE_NUMBER))
-		  type_error("Bad argument 1 to ^", $1);
-	      if (exact_types && !TYPE($3,TYPE_NUMBER))
-		  type_error("Bad argument 2 to ^", $3);
-	      $$ = TYPE_NUMBER;
-	      ins_f_byte(F_XOR);
-	  };
-
-expr213: expr22
-       | expr213 '&' expr22
-	  {
-	      ins_f_byte(F_AND);
-	      if ( !($1 & TYPE_MOD_POINTER) || !($3 & TYPE_MOD_POINTER) ) {
-	          if (exact_types && !TYPE($1,TYPE_NUMBER))
-		      type_error("Bad argument 1 to &", $1);
-	          if (exact_types && !TYPE($3,TYPE_NUMBER))
-		      type_error("Bad argument 2 to &", $3);
-	      }
-	      $$ = TYPE_NUMBER;
-	  };
-
-expr22: expr23
-      | expr24 F_EQ expr24
-	{
-	    int t1 = $1 & TYPE_MOD_MASK, t2 = $3 & TYPE_MOD_MASK;
-	    if (exact_types && t1 != t2 && t1 != TYPE_ANY && t2 != TYPE_ANY) {
-		type_error("== always false because of different types", $1);
-		type_error("                               compared to", $3);
-	    }
-	    ins_f_byte(F_EQ);
-	    $$ = TYPE_NUMBER;
-	};
-      | expr24 F_NE expr24
-	{
-	    int t1 = $1 & TYPE_MOD_MASK, t2 = $3 & TYPE_MOD_MASK;
-	    if (exact_types && t1 != t2 && t1 != TYPE_ANY && t2 != TYPE_ANY) {
-		type_error("!= always true because of different types", $1);
-		type_error("                               compared to", $3);
-	    }
-	    ins_f_byte(F_NE);
-	    $$ = TYPE_NUMBER;
-	};
-
-expr23: expr24
-      | expr24 '>' expr24
-	{ $$ = TYPE_NUMBER; ins_f_byte(F_GT); };
-      | expr24 F_GE expr24
-	{ $$ = TYPE_NUMBER; ins_f_byte(F_GE); };
-      | expr24 '<' expr24
-	{ $$ = TYPE_NUMBER; ins_f_byte(F_LT); };
-      | expr24 F_LE expr24
-	{ $$ = TYPE_NUMBER; ins_f_byte(F_LE); };
-
-expr24: expr25
-      | expr24 F_LSH expr25
-	{
-	    ins_f_byte(F_LSH);
-	    $$ = TYPE_NUMBER;
-	    if (exact_types && !TYPE($1, TYPE_NUMBER))
-		type_error("Bad argument number 1 to '<<'", $1);
-	    if (exact_types && !TYPE($3, TYPE_NUMBER))
-		type_error("Bad argument number 2 to '<<'", $3);
-	};
-      | expr24 F_RSH expr25
-	{
-	    ins_f_byte(F_RSH);
-	    $$ = TYPE_NUMBER;
-	    if (exact_types && !TYPE($1, TYPE_NUMBER))
-		type_error("Bad argument number 1 to '>>'", $1);
-	    if (exact_types && !TYPE($3, TYPE_NUMBER))
-		type_error("Bad argument number 2 to '>>'", $3);
-	};
-
-expr25: expr27
-      | expr25 '+' expr27	/* Type checks of this case are incomplete */
-	{	ins_f_byte(F_ADD);
-		if ($1 == $3)
-			$$ = $1;
-		else
-			$$ = TYPE_ANY;
-	};
-      | expr25 '-' expr27
-	{
-	    int bad_arg = 0;
-
-	    if (exact_types) {
-		if (!TYPE($1, TYPE_NUMBER) && !($1 & TYPE_MOD_POINTER) ) {
-                    type_error("Bad argument number 1 to '-'", $1);
-		    bad_arg++;
-		}
-		if (!TYPE($3, TYPE_NUMBER) && !($3 & TYPE_MOD_POINTER) ) {
-                    type_error("Bad argument number 2 to '-'", $3);
-		    bad_arg++;
-		}
-	    }
-	    $$ = TYPE_ANY;
-	    if (($1 & TYPE_MOD_POINTER) || ($3 & TYPE_MOD_POINTER))
-		$$ = TYPE_MOD_POINTER | TYPE_ANY;
-	    if (!($1 & TYPE_MOD_POINTER) || !($3 & TYPE_MOD_POINTER)) {
-		if (exact_types && $$ != TYPE_ANY && !bad_arg)
-		    yyerror("Arguments to '-' don't match");
-		$$ = TYPE_NUMBER;
-	    }
-	    ins_f_byte(F_SUBTRACT);
-	};
-
-expr27: expr28
-      | expr27 '*' expr3
-	{
-		if (($1 != TYPE_MAPPING) || ($3 != TYPE_MAPPING)) {
-			if (exact_types && !TYPE($1, TYPE_NUMBER))
-				type_error("Bad argument number 1 to '*'", $1);
-			if (exact_types && !TYPE($3, TYPE_NUMBER))
-				type_error("Bad argument number 2 to '*'", $3);
-			$$ = TYPE_NUMBER;
-		}
-		else
-			$$ = TYPE_MAPPING;
-		ins_f_byte(F_MULTIPLY);
-	};
-      | expr27 '%' expr3
-	{
-	    if (exact_types && !TYPE($1, TYPE_NUMBER))
-		type_error("Bad argument number 1 to '%'", $1);
-	    if (exact_types && !TYPE($3, TYPE_NUMBER))
-		type_error("Bad argument number 2 to '%'", $3);
-	    ins_f_byte(F_MOD);
-	    $$ = TYPE_NUMBER;
-	};
-      | expr27 '/' expr3
-	{
-	    if (exact_types && !TYPE($1, TYPE_NUMBER))
-		type_error("Bad argument number 1 to '/'", $1);
-	    if (exact_types && !TYPE($3, TYPE_NUMBER))
-		type_error("Bad argument number 2 to '/'", $3);
-	    ins_f_byte(F_DIVIDE);
-	    $$ = TYPE_NUMBER;
-	};
-
-expr28: expr3
-	| cast expr3
-	      {
-		  $$ = $1;
-		  if (exact_types && $2 != TYPE_ANY && $2 != TYPE_UNKNOWN &&
-		      $1 != TYPE_VOID)
-		      type_error("Casts are only legal for type mixed, or when unknown", $2);
-	      } ;
-
-expr3: expr31
-     | F_PRE_INC lvalue
-        {
-	    ins_expr_f_byte(F_PRE_INC);
-	    if (exact_types && !TYPE($2, TYPE_NUMBER))
-		type_error("Bad argument to ++", $2);
-	    $$ = TYPE_NUMBER;
-	};
-     | F_PRE_DEC lvalue
-        {
-	    ins_expr_f_byte(F_PRE_DEC);
-	    if (exact_types && !TYPE($2, TYPE_NUMBER))
-		type_error("Bad argument to --", $2);
-	    $$ = TYPE_NUMBER;
-	};
-     | F_NOT expr3
-	{
-	    ins_f_byte(F_NOT);	/* Any type is valid here. */
-	    $$ = TYPE_NUMBER;
-	};
-     | '~' expr3
-	{
-	    ins_f_byte(F_COMPL);
-	    if (exact_types && !TYPE($2, TYPE_NUMBER))
-		type_error("Bad argument to ~", $2);
-	    $$ = TYPE_NUMBER;
-	};
-     | '-' expr3
-	{
-	    ins_f_byte(F_NEGATE);
-	    if (exact_types && !TYPE($2, TYPE_NUMBER))
-		type_error("Bad argument to unary '-'", $2);
-	    $$ = TYPE_NUMBER;
-	};
-
-expr31: expr4
-      | lvalue F_PRE_INC
-         {
-	     ins_expr_f_byte(F_POST_INC);
-	     if (exact_types && !TYPE($1, TYPE_NUMBER))
-		 type_error("Bad argument to ++", $1);
-	     $$ = TYPE_NUMBER;
-	 };
-      | lvalue F_PRE_DEC
-         {
-	     ins_expr_f_byte(F_POST_DEC);
-	     if (exact_types && !TYPE($1, TYPE_NUMBER))
-		 type_error("Bad argument to --", $1);
-	     $$ = TYPE_NUMBER;
-	 };
-
 expr4: function_call
      | lvalue
 	{
@@ -1142,7 +1168,7 @@ expr4: function_call
 		fatal("Should be a push at this point !\n");
 	    $$ = $1;
 	}
-     | string | number
+     | string | number | real
      | '(' comma_expr ')' { $$ = $2; }
      | catch { $$ = TYPE_ANY; }
      | sscanf { $$ = TYPE_NUMBER; }
@@ -1251,7 +1277,7 @@ lvalue: F_IDENTIFIER
               }
            };
 
-string: F_STRING
+string: string_con2
 	{
 	    ins_f_byte(F_STRING);
 	    ins_short(store_prog_string($1));
@@ -1268,12 +1294,22 @@ string_constant: string_con1
 
 string_con1: F_STRING
 	   | string_con1 '+' F_STRING
+      {
+          $$ = DXALLOC( strlen($1) + strlen($3) + 1, 53, "string_con1" );
+          strcpy($$, $1);
+          strcat($$, $3);
+          FREE($1);
+          FREE($3);
+      };
+ 
+string_con2: F_STRING
+         | string_con2 F_STRING
 	{
-	    $$ = DXALLOC( strlen($1) + strlen($3) + 1, 53, "string_con1" );
+          $$ = DXALLOC( strlen($1) + strlen($2) + 1, 53, "string_con2" );
 	    strcpy($$, $1);
-	    strcat($$, $3);
+          strcat($$, $2);
 	    FREE($1);
-	    FREE($3);
+          FREE($2);
 	};
 
 function_call: function_name
@@ -1513,12 +1549,6 @@ function_name: F_IDENTIFIER
 
 cond: condStart
       statement
-	{
-	    int i;
-	    i = pop_address();
-	    ins_f_byte(F_JUMP); push_address(); ins_short(0);
-	    upd_short(i, mem_block[A_PROGRAM].current_size);
-	}
       optional_else_part
 	{ upd_short(pop_address(), mem_block[A_PROGRAM].current_size); } ;
 
@@ -1529,8 +1559,17 @@ condStart: F_IF '(' comma_expr ')'
 	    ins_short(0);
 	} ;
 
-optional_else_part: /* empty */
-       | F_ELSE statement ;
+optional_else_part:
+         /* empty */
+       | F_ELSE
+        {
+            int i;
+            i = pop_address();
+            ins_f_byte(F_JUMP); push_address(); ins_short(0);
+            upd_short(i, mem_block[A_PROGRAM].current_size);
+        }
+         statement
+       ;
 %%
 
 void yyerror(str)
@@ -1765,7 +1804,8 @@ static char *get_type_name(type)
 {
     static char buff[100];
     static char *type_name[] = { "unknown", "int", "string",
-				     "void", "object", "mapping", "mixed", "function", };
+				   "void", "object", "mapping", "function",
+				   "float", "mixed"};
     int pointer = 0;
 
     buff[0] = 0;

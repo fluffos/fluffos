@@ -249,7 +249,7 @@ int n;
 	newmap->filled = 0;
 #ifdef EACH
 	newmap->eachObj = (struct object *)0;
-	newmap->bucket = newmap->table_size - 1; /* must start at table_size - 1 */
+	newmap->bucket = 0;
 	newmap->elt = (struct node *)0;      /* must start at 0;see mapping_each */
 #endif
 	if (current_object) {
@@ -694,19 +694,22 @@ struct mapping *m;
 	*/
 	if (current_object != m->eachObj) {
 		m->eachObj = current_object;
-		m->bucket = m->table_size - 1;
+		m->bucket = 0;
 		m->elt = (struct node *)0;
 	}
 	if (!m->elt) { /* find next occupied bucket in hash table */
-		for (j = (m->bucket + 1) % m->table_size; j < m->table_size; j++) {
+		int found = 0;
+
+		for (j = m->bucket; j < m->table_size; j++) {
 			if (m->table[j]) {
-				m->bucket = j;
+				m->bucket = j + 1;
 				m->elt = m->table[j];
+				found = 1;
 				break;
 			}
 		}
-		if (j == m->table_size) {
-			m->bucket = m->table_size - 1;
+		if (!found) {
+			m->bucket = 0;
 			m->elt = (struct node *)0;
 			return null_array();  /* have reached the end */
 		}

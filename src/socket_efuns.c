@@ -305,8 +305,14 @@ socket_accept(fd, read_callback, write_callback)
 	lpc_socks[i].w_off = 0;
 	lpc_socks[i].w_len = 0;
 
+#ifdef cray
+/* cray can't take addresses of bitfields */
+	hp = gethostbyaddr((char *)&sin.sin_addr,
+		(int)sizeof (sin.sin_addr), AF_INET);
+#else
 	hp = gethostbyaddr((char *)&sin.sin_addr.s_addr,
 		(int)sizeof (sin.sin_addr.s_addr), AF_INET);
+#endif
 	if (hp != NULL)
 	    strncpy(lpc_socks[i].name, hp->h_name, ADDR_BUF_SIZE);
 	else
@@ -452,15 +458,41 @@ socket_write(fd, message, name)
 
     case STREAM:
 	switch (message->type) {
-
 	case T_STRING:
-	    len = strlen(message->u.string);
-	    buf = (char *)DMALLOC(len + 1, 105, "socket_write: T_STRING");
-	    if (buf == NULL)
-		crash_MudOS("Out of memory");
-	    strcpy(buf, message->u.string);
-	    break;
+	  len = strlen(message->u.string);
+	  buf = (char *)DMALLOC(len + 1, 105, "socket_write: T_STRING");
+	  if (buf == NULL)
+	    crash_MudOS("Out of memory");
+	  strcpy(buf, message->u.string);
+	  break;
+	case T_POINTER:
+	  {
+            int i;
+	    struct svalue *el;
 
+            len = message->u.vec->size * sizeof(int);
+            buf = (char *)DMALLOC(len + 1, 105, "socket_write: T_POINTER");
+            if (buf == NULL)
+              crash_MudOS("Out of memory");
+	    el = message->u.vec->item;
+            for(i=0;i<(len / sizeof(int));i++){
+	      switch(el[i].type){
+	      case T_NUMBER:
+		memcpy((char *)&buf[i * sizeof(int)],
+		       (char *)&el[i].u.number,
+		       sizeof(int));
+		break;
+	      case T_REAL:
+                memcpy((char *)&buf[i * sizeof(int)],
+                       (char *)&el[i].u.real,
+                       sizeof(int));
+		break;
+	      default:
+		break;
+	      }
+	    }
+            break;
+          }
 	default:
 	    return EETYPENOTSUPP;
 	}

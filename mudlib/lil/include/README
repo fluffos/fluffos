@@ -1,0 +1,2 @@
+This directory contains files that are included via the #include <file.h>
+preprocessor directive.

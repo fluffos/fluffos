@@ -33,6 +33,7 @@ int svalue_size(v)
 
     switch(v->type) {
     case T_OBJECT:
+    case T_REAL:
     case T_NUMBER:
       return 0;
     case T_STRING:
@@ -60,7 +61,7 @@ int svalue_size(v)
     return 0;
 }
 
-static int data_size(ob)
+int data_size(ob)
     struct object *ob;
 {
     int total = 0, i;

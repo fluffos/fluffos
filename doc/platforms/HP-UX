@@ -1,15 +1,17 @@
-MudOS hints file for HP-UX:
-
+MudOS hints for HP-UX:
+ 
 in the Makefile,
- comment out RESOLV
+ make sure RESOLV is commented out
  uncomment UALARM_C and UALARM_O
- for maximum optimization with cc, use: OPTIMIZE=+O3 +Obb3000
  uncomment EXTRALIBS=-lBSD
-
-HP-UX's malloc performs terribly in profiles, you should probably use
-smalloc or bsdmalloc.
-
-Varargs doesn't function properly in gcc 2.2 for HP (and possibly later
-versions of gcc will be messed up as well).  Part of the MudOS driver
-depends on varargs (the vprintf).  Either use HP's cc or undefine
-VARARGS in port.h.
+ use smalloc for best memory/speed performance--system malloc is way slow
+ 
+PA-RISC machines (at least):
+ MudOS runs fine compiled with cc under HP-UX 7.x and 8.x.  It does not work
+  with 9.0x's cc.  
+ With cc, use OPTIMIZE=+O3 +Obb3000 for maximum optimization.
+ gcc (as of 2.2.x) does not support varargs on the HP--the file that uses
+  varargs, comm.c, must be compiled _separately_ with cc (comm.c is OK
+  with 9.0x's cc).  Ignore this if you have a newer version of gcc that
+  is OK with varargs on HP-UX.  You know you don't if you get an error
+  at link time mentioning something like "__builtin_varargs undefined".

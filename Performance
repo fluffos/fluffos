@@ -22,7 +22,10 @@ smalloc is more space efficient than bsdmalloc (though slightly slower).
 3) Try to make your mudlib as memory efficient as possible.  Include
 clean_up() functions in your objects whenever reasonable and remember
 to use map_delete() to remove elements from mappings when those elements
-are no longer needed.
+are no longer needed.  Also take a look at the reclaim_objects() and
+reload_object() efuns for saving memory.  Don't use array addition
+any more than necessary (especially try not to use it inside a loop
+for building arrays).
 
 4) Do _not_ define TRACE_CODE in options.h.  TRACE_CODE can be useful
 when debugging code but it slows down most simple LPC instructions (in
@@ -30,3 +33,7 @@ eval_instruction()) by a factor of two.
 
 5) Don't give objects heartbeats (set_heart_beat(1)) unless really
 necessary.  Do as little in heart_beat() functions as reasonable.
+
+6) Read the comments in the example config file about hash table size, and
+object hash table size--setting proper (large enough) values for these
+two hash tables greatly increases overall speed.

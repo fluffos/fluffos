@@ -3,6 +3,7 @@
 #ifdef sun
 #include <alloca.h>
 #endif
+#include <sys/types.h>
 #include "config.h"
 #include "lint.h"
 #include "interpret.h"
@@ -11,12 +12,15 @@
 #include "exec.h"
 #include "sent.h"
 #include "debug.h"
+#include "comm.h"
 
 /*
  * This file contains functions used to manipulate arrays.
  * Some of them are connected to efuns, and some are only used internally
  * by the MudOS driver.
  */
+
+struct vector *order_alist PROT((struct vector *));
 
 extern int d_flag;
 extern int max_array_size;
@@ -166,7 +170,7 @@ struct vector *explode_string(str, del)
      * Compute number of array items. It is either number of delimiters,
      * or, one more.
      */
-	if ((slen < len) || (lastdel != (str + slen - len))) {
+      if ((slen <= len) || (lastdel != (str + slen - len))) {
 		num++;
 	}
 	if (num > max_array_size) {
@@ -238,8 +242,9 @@ char *implode_string(arr, del)
 struct vector *
 users()
 {
-	struct object *ob;
+	register struct object *ob;
 	extern int num_user, num_hidden; /* set by comm1.c */
+	extern struct interactive *all_users[MAX_USERS];
 	int i, j;
 	int display_hidden;
 	struct vector *ret;
@@ -253,8 +258,11 @@ users()
 	}
 
 	ret = allocate_array(num_user - (display_hidden ? 0 : num_hidden));
-	for (i = j = 0; i < num_user; i++) {
-		ob = get_interactive_object(i);
+        for (i = j = 0; i < MAX_USERS; i++) {
+		if (!all_users[i]) {
+			continue;
+		}
+		ob = all_users[i]->ob;
 		if (!display_hidden && (ob->flags & O_HIDDEN)) {
 			continue;
 		}
@@ -1043,7 +1051,6 @@ struct vector *symmetric_difference_alist(a1, a2)
 struct vector *intersect_array(a1, a2)
     struct vector *a1,*a2;
 {
-    struct vector *order_alist PROT((struct vector *));
     struct vector *vtmpp1,*vtmpp2,*vtmpp3;
     static struct vector vtmp = { 1, 1,
 #ifdef DEBUG
@@ -1297,4 +1304,47 @@ livings()
     FREE(obtab);
 
     return vec;
+}
+
+struct vector *
+objects()
+{
+  extern struct object *obj_list;
+  int i, j, t_sz;
+  struct object *ob;
+  struct object **tmp;
+  struct vector *ret;
+  int display_hidden;
+ 
+  display_hidden = -1;
+ 
+  if (!(tmp = (struct object **)DMALLOC(sizeof(struct object *) * (t_sz = 1000),
+        16, "objects: tmp")))
+    fatal("Out of memory!\n");
+ 
+  for (i = 0, ob = obj_list; ob; ob = ob->next_all)
+  {
+    if (ob->flags & O_HIDDEN)
+    {
+      if (display_hidden == -1)
+        display_hidden = valid_hide(current_object);
+      if (!display_hidden) continue;
+    }
+    tmp[i] = ob;
+    if ((++i == t_sz) &&
+       (!(tmp = (struct object **)DREALLOC((void *)tmp, sizeof(struct object *) * (t_sz += 1000),
+        17, "objects: tmp: realloc"))))
+      fatal("Out of memory!\n");
+  }
+  if (i > max_array_size)
+    i = max_array_size;
+  ret = allocate_array(i);
+  for (j = 0; j < i; j++) 
+  {
+    ret->item[j].type = T_OBJECT;
+    ret->item[j].u.ob = tmp[j];
+    add_ref(tmp[j], "objects");
+  }
+  FREE((void *)tmp);
+  return ret;
 }

@@ -59,7 +59,7 @@
 #define SETJMP(x) setjmp(x)
 #define LONGJMP(x,y) longjmp(x,y)
 
-#if defined(SYSV) || defined(SVR4)
+#if defined(SYSV) || defined(SVR4) || defined(cray)
 #define SYSV_HEARTBEAT_INTERVAL  ((HEARTBEAT_INTERVAL+999999)/1000000)
 #endif
 

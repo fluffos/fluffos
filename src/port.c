@@ -9,6 +9,10 @@
 time_t time PROT((time_t *));
 #endif
 
+#ifdef SunOS_5
+#include <stdlib.h>
+#endif
+
 
 /*
  * This file defines things that may have to be changem when porting

@@ -15,10 +15,10 @@
 #define MAX_LINE_LENGTH 120
 
 static char config_str[NUM_STRS][MAX_LINE_LENGTH];
-static long config_int[NUM_INTS];
+static int config_int[NUM_INTS];
 static char *buff;
 
-INLINE long get_config_int (num)
+INLINE int get_config_int (num)
 int num;
 {
 #ifdef DEBUG
@@ -152,33 +152,33 @@ void set_defaults (filename)
   scan_config_line(buff,"default error message : %[^\n]",config_str[12],0);
   scan_config_line(buff,"default fail message : %[^\n]",config_str[13],0);
   
-  scan_config_line(buff,"time to clean up : %ld\n",&config_int[0],1);
-  scan_config_line(buff,"time to swap : %ld\n",&config_int[1],1);
-  scan_config_line(buff,"time to reset : %ld\n",&config_int[2],1);
-  scan_config_line(buff,"allowed ed commands : %ld\n",&config_int[3],1);
-  scan_config_line(buff,"evaluator stack size : %ld\n",&config_int[4],0);
-  scan_config_line(buff,"compiler stack size : %ld\n",&config_int[5],0);
-  scan_config_line(buff,"maximum call depth : %ld\n",&config_int[6],1);
+  scan_config_line(buff,"time to clean up : %d\n",&config_int[0],1);
+  scan_config_line(buff,"time to swap : %d\n",&config_int[1],1);
+  scan_config_line(buff,"time to reset : %d\n",&config_int[2],1);
+  scan_config_line(buff,"allowed ed commands : %d\n",&config_int[3],1);
+  scan_config_line(buff,"evaluator stack size : %d\n",&config_int[4],0);
+  scan_config_line(buff,"compiler stack size : %d\n",&config_int[5],0);
+  scan_config_line(buff,"maximum call depth : %d\n",&config_int[6],1);
   scan_config_line
-    (buff,"maximum bits in a bitfield : %ld\n",&config_int[7],1);
-  scan_config_line(buff,"maximum local variables : %ld\n",&config_int[8],0);
-  scan_config_line(buff,"maximum evaluation cost : %ld\n",&config_int[9],1);
-  scan_config_line(buff,"maximum array size : %ld\n",&config_int[10],1);
-  scan_config_line(buff,"maximum mapping size : %ld\n",&config_int[11],1);
-  scan_config_line(buff,"maximum users : %ld\n",&config_int[12],0);
-  scan_config_line(buff,"maximum log size : %ld\n",&config_int[13],1);
-  scan_config_line(buff,"maximum read file size : %ld\n",&config_int[14],1);
-  scan_config_line(buff,"maximum string length : %ld\n",&config_int[15], 1);
-  scan_config_line(buff,"address server port : %ld\n",&config_int[16],1);
-  scan_config_line(buff,"maximum byte transfer : %ld\n",&config_int[17],1);
-  scan_config_line(buff,"port number : %ld\n",&config_int[18],1);
-  scan_config_line(buff,"reserved size : %ld\n",&config_int[19],1);
-  scan_config_line(buff,"living hash table size : %ld\n",&config_int[20],0);
-  scan_config_line(buff,"hash table size : %ld\n",&config_int[21],1);
-  scan_config_line(buff,"object table size : %ld\n",&config_int[22],1);
-  scan_config_line(buff,"inherit chain size : %ld\n",&config_int[23],1);
+    (buff,"maximum bits in a bitfield : %d\n",&config_int[7],1);
+  scan_config_line(buff,"maximum local variables : %d\n",&config_int[8],0);
+  scan_config_line(buff,"maximum evaluation cost : %d\n",&config_int[9],1);
+  scan_config_line(buff,"maximum array size : %d\n",&config_int[10],1);
+  scan_config_line(buff,"maximum mapping size : %d\n",&config_int[11],1);
+  scan_config_line(buff,"maximum users : %d\n",&config_int[12],0);
+  scan_config_line(buff,"maximum log size : %d\n",&config_int[13],1);
+  scan_config_line(buff,"maximum read file size : %d\n",&config_int[14],1);
+  scan_config_line(buff,"maximum string length : %d\n",&config_int[15], 1);
+  scan_config_line(buff,"address server port : %d\n",&config_int[16],1);
+  scan_config_line(buff,"maximum byte transfer : %d\n",&config_int[17],1);
+  scan_config_line(buff,"port number : %d\n",&config_int[18],1);
+  scan_config_line(buff,"reserved size : %d\n",&config_int[19],1);
+  scan_config_line(buff,"living hash table size : %d\n",&config_int[20],0);
+  scan_config_line(buff,"hash table size : %d\n",&config_int[21],1);
+  scan_config_line(buff,"object table size : %d\n",&config_int[22],1);
+  scan_config_line(buff,"inherit chain size : %d\n",&config_int[23],1);
 #if 0 /* not yet used */
-  scan_config_line(buff,"maximum efun sockets : %ld\n",&config_int[24],0);
+  scan_config_line(buff,"maximum efun sockets : %d\n",&config_int[24],0);
 #endif
   FREE(buff); 
   fclose (def);

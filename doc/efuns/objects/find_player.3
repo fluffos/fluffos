@@ -8,10 +8,8 @@ find_player() - find a player by name
 object find_player( string str );
 
 .SH DESCRIPTION
-Find a player with the name <str>. The string must be lowercase.
-Players are found even if they are invisible or link dead.
-Monsters are not found.
-This function uses the name that is set by set_living_name().
+Similar to find_living(), but only searches through objects that are
+interactive, or were once interactive.
 
 .SH SEE ALSO
 lower_case(3), find_living(3), set_living_name(3)

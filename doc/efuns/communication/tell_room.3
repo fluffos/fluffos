@@ -7,15 +7,6 @@ void tell_room(mixed ob, string str);
 .SH DESCRIPTION
 Send a message `str' to object all objects in the room `ob'.
 `ob' can also be the name of the room (string).
-.PP
-If the message depends on the reciever an array of two messages or a
-message containing words intended for 'value by function call' can be used.
-For information on reciever dependant messages pxref{Meeting Players}.
-.PP
-If third  argumnet "ex_ob" specified, messages is sent to all except "ex_ob".
-If 'ex_ob' is not an object, but an array of objects, all those objects are
-excluded, they do not get the message. (This is not true for the efun.
-There may be an lfun that defines this.)
 
 .SH SEE ALSO
 message(3), write(3), shout(3), say(3), tell_object(3).

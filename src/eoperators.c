@@ -66,6 +66,7 @@ extern struct svalue *sp;
 extern int eval_cost;
 
 static int i;
+static float r;
 static struct svalue *argp;
 
 INLINE void
@@ -73,128 +74,182 @@ f_add(num_arg, instruction)
 int num_arg, instruction;
 {
   struct svalue ret;
-  switch((sp-1)->type)
+  switch((sp-1)->type){
+  case T_REAL:
     {
-    case T_STRING:
-      {
-	switch(sp->type)
-	  {
-	  case T_STRING:
-	    {
-	      char *res;
-          int r = SVALUE_STRLEN(sp-1);
-          int len = r + SVALUE_STRLEN(sp) + 1;
-
-	      res = DXALLOC(len, 34, "f_add: 1");
-          eval_cost += (len >> 3);
-	      (void)strcpy(res, (sp-1)->u.string);
-	      (void)strcpy(res + r, sp->u.string);
-	      ret.type = T_STRING;
-	      ret.subtype = STRING_SHARED;
-	      ret.u.string = make_shared_string(res);
-	      FREE(res);
-	      break;
-	    } 
-	  case T_NUMBER:
-	    {
-	      char buff[20];
-	      char *res;
-          int len;
-
-	      sprintf(buff, "%d", sp->u.number);
-          len = SVALUE_STRLEN(sp-1) + strlen(buff) + 1;
-	      res = DXALLOC(len, 35, "f_add: 2");
-          eval_cost += (len >> 3);
-	      strcpy(res, (sp-1)->u.string);
-	      strcat(res, buff);
-	      ret.type = T_STRING;
-	      ret.subtype = STRING_SHARED;
-	      ret.u.string = make_shared_string(res);
-	      FREE(res);
-	      break;
-	    }
-	  case T_POINTER:
-	    ret.type = T_POINTER;
-	    ret.u.vec = (struct vector *)prepend_vector(sp->u.vec, sp-1);
-        eval_cost += (ret.u.vec->size << 3);
-	    break;
-	  default: 
-	    error("Bad type argument to +. %d %d\n", 
-		  (sp-1)->type, sp->type);
-	  }
-	break;
-      } 
-    case T_NUMBER:
-      {
-	ret.type = sp->type;
-	switch(sp->type)
-	  {
-	  case T_NUMBER:
-	    ret.u.number = sp->u.number + (sp-1)->u.number;
-	    break;
-	  case T_STRING:
-	    {
-	      char buff[20], *res;
-          int len;
-
-	      sprintf(buff, "%d", (sp-1)->u.number);
-          len = SVALUE_STRLEN(sp) + strlen(buff) + 1;
-	      res = DXALLOC(len, 36, "f_add: 3");
-          eval_cost += (len >> 3);
-	      strcpy(res, buff);
-	      strcat(res, sp->u.string);
-	      ret.subtype = STRING_SHARED;
-	      ret.u.string = make_shared_string(res);
-	      FREE(res);
-	      break;
-	    }
-	  case T_POINTER:
-	    ret.u.vec = (struct vector *)prepend_vector(sp->u.vec, sp-1);
-        eval_cost += (ret.u.vec->size << 3);
-	    break;
-	  default: 
-	    error("Bad type argument to +. %d %d\n", 
-		  (sp-1)->type, sp->type);
-	  }
-	break;
-      }
-    case T_POINTER:
-      {
-	ret.type = T_POINTER;
-	switch(sp->type)
-	  {
-	  case T_POINTER:
-	    ret.u.vec = add_array((sp-1)->u.vec, sp->u.vec);
-        eval_cost += (ret.u.vec->size << 3);
-	    break;
-	  case T_NUMBER:
-	  case T_STRING:
-	    ret.u.vec = (struct vector *)append_vector((sp-1)->u.vec, sp);
-        eval_cost += (ret.u.vec->size << 2);
-	    break;
-	  default: 
-	    error("Bad type argument to +. %d %d\n", 
-		  (sp-1)->type, sp->type);
-	  }
-	break;
-      } 
-    case T_MAPPING:
-      if (sp->type == T_MAPPING)
+      switch(sp->type)
 	{
-	  ret.type = T_MAPPING;
-	  ret.u.map = add_mapping((sp-1)->u.map, sp->u.map);
-      eval_cost += (ret.u.map->count << 2);
-	}
-      else
-	{
-	  error("Bad type argument to +. %d %d\n", (sp-1)->type,
-		sp->type);
+	case T_NUMBER:
+	  ret.type = T_REAL;
+	  ret.u.real = sp->u.number + (sp-1)->u.real;
+	  break;
+	case T_REAL:
+	  ret.type = T_REAL;
+	  ret.u.real = sp->u.real + (sp-1)->u.real;
+	  break;
+	case T_STRING:
+	  {
+	    char buff[25], *res;
+	    int len;
+
+	    sprintf(buff, "%f", (sp-1)->u.real);
+	    len = SVALUE_STRLEN(sp) + strlen(buff) + 1;
+	    res = DXALLOC(len, 36, "f_add: 3");
+	    eval_cost += (len >> 3);
+	    strcpy(res, buff);
+	    strcat(res, sp->u.string);
+	    ret.type = T_STRING;
+	    ret.subtype = STRING_SHARED;
+	    ret.u.string = make_shared_string(res);
+	    FREE(res);
+	    break;
+	  }
+	case T_POINTER:
+	  ret.type = T_POINTER;
+	  ret.u.vec = (struct vector *)prepend_vector(sp->u.vec, sp-1);
+	  eval_cost += (ret.u.vec->size << 3);
+	  break;
+	default: 
+	  error("Bad type argument to +. %d %d\n", (sp-1)->type, sp->type);
 	}
       break;
-    default: 
-      error("Bad type argument to +. %d %d\n", 
-	    (sp-1)->type, sp->type);
     }
+  case T_STRING:
+    {
+      switch(sp->type)
+	{
+	case T_STRING:
+	  {
+	    char *res;
+	    int r = SVALUE_STRLEN(sp-1);
+	    int len = r + SVALUE_STRLEN(sp) + 1;
+
+	    res = DXALLOC(len, 34, "f_add: 1");
+	    eval_cost += (len >> 3);
+	    (void)strcpy(res, (sp-1)->u.string);
+	    (void)strcpy(res + r, sp->u.string);
+	    ret.type = T_STRING;
+	    ret.subtype = STRING_SHARED;
+	    ret.u.string = make_shared_string(res);
+	    FREE(res);
+	    break;
+	  } 
+	case T_NUMBER:
+	  {
+	    char buff[20];
+	    char *res;
+	    int len;
+
+	    sprintf(buff, "%d", sp->u.number);
+	    len = SVALUE_STRLEN(sp-1) + strlen(buff) + 1;
+	    res = DXALLOC(len, 35, "f_add: 2");
+	    eval_cost += (len >> 3);
+	    strcpy(res, (sp-1)->u.string);
+	    strcat(res, buff);
+	    ret.type = T_STRING;
+	    ret.subtype = STRING_SHARED;
+	    ret.u.string = make_shared_string(res);
+	    FREE(res);
+	    break;
+	  }
+	case T_REAL:
+	  {
+	    char buff[25];
+	    char *res;
+	    int len;
+
+	    sprintf(buff, "%f", sp->u.real);
+	    len = SVALUE_STRLEN(sp-1) + strlen(buff) + 1;
+	    res = DXALLOC(len, 35, "f_add: 2");
+	    eval_cost += (len >> 3);
+	    strcpy(res, (sp-1)->u.string);
+	    strcat(res, buff);
+	    ret.type = T_STRING;
+	    ret.subtype = STRING_SHARED;
+	    ret.u.string = make_shared_string(res);
+	    FREE(res);
+	    break;
+	  }
+	case T_POINTER:
+	  ret.type = T_POINTER;
+	  ret.u.vec = (struct vector *)prepend_vector(sp->u.vec, sp-1);
+	  eval_cost += (ret.u.vec->size << 3);
+	  break;
+	default: 
+	  error("Bad type argument to +. %d %d\n",(sp-1)->type, sp->type);
+	}
+      break;
+    } 
+  case T_NUMBER:
+    {
+      ret.type = sp->type;
+      switch(sp->type)
+	{
+	case T_NUMBER:
+	  ret.u.number = sp->u.number + (sp-1)->u.number;
+	  break;
+	case T_REAL:
+	  ret.u.real = sp->u.real + (sp-1)->u.number;
+	  break;
+	case T_STRING:
+	  {
+	    char buff[20], *res;
+	    int len;
+
+	    sprintf(buff, "%d", (sp-1)->u.number);
+	    len = SVALUE_STRLEN(sp) + strlen(buff) + 1;
+	    res = DXALLOC(len, 36, "f_add: 3");
+	    eval_cost += (len >> 3);
+	    strcpy(res, buff);
+	    strcat(res, sp->u.string);
+	    ret.subtype = STRING_SHARED;
+	    ret.u.string = make_shared_string(res);
+	    FREE(res);
+	    break;
+	  }
+	case T_POINTER:
+	  ret.u.vec = (struct vector *)prepend_vector(sp->u.vec, sp-1);
+	  eval_cost += (ret.u.vec->size << 3);
+	  break;
+	default: 
+	  error("Bad type argument to +. %d %d\n",(sp-1)->type, sp->type);
+	}
+      break;
+    }
+  case T_POINTER:
+    {
+      ret.type = T_POINTER;
+      switch(sp->type)
+	{
+	case T_POINTER:
+	  ret.u.vec = add_array((sp-1)->u.vec, sp->u.vec);
+	  eval_cost += (ret.u.vec->size << 3);
+	  break;
+	case T_NUMBER:
+	case T_STRING:
+	case T_REAL:
+	  ret.u.vec = (struct vector *)append_vector((sp-1)->u.vec, sp);
+	  eval_cost += (ret.u.vec->size << 2);
+	  break;
+	default: 
+	  error("Bad type argument to +. %d %d\n", 
+		(sp-1)->type, sp->type);
+	}
+      break;
+    } 
+  case T_MAPPING:
+    if(sp->type == T_MAPPING){
+      ret.type = T_MAPPING;
+      ret.u.map = add_mapping((sp-1)->u.map, sp->u.map);
+      eval_cost += (ret.u.map->count << 2);
+    }
+    else {
+      error("Bad type argument to +. %d %d\n", (sp-1)->type, sp->type);
+    }
+    break;
+  default: 
+    error("Bad type argument to +. %d %d\n", (sp-1)->type, sp->type);
+  }
   pop_n_elems(2);
   push_svalue(&ret);
   free_svalue(&ret);
@@ -266,34 +321,98 @@ INLINE void
 f_divide(num_arg, instruction)
 int num_arg, instruction;
 {
-  if ((sp-1)->type != T_NUMBER)
+  double result;
+
+  if (((sp-1)->type != T_NUMBER) && ((sp-1)->type != T_REAL))
     bad_arg(1, instruction);
-  if (sp->type != T_NUMBER)
+  if ((sp->type != T_NUMBER) && (sp->type != T_REAL))
     bad_arg(2, instruction);
-  if (sp->u.number == 0)
+  if ((sp->type == T_NUMBER) && (sp->u.number == 0))
     error("Division by zero\n");
-  i = (sp-1)->u.number / sp->u.number;
-  sp--;
-  sp->u.number = i;
+  if ((sp->type == T_REAL) && (sp->u.real == 0.0))
+    error("Division by zero\n");
+  if (sp->type == T_NUMBER) {
+    if ((sp-1)->type == T_NUMBER) {
+      i = (sp-1)->u.number / sp->u.number;
+      sp--;
+      sp->u.number = i;
+      return;
+    } else { /* T_REAL */
+      result = (sp-1)->u.real / sp->u.number;
+      sp--;
+      sp->type = T_REAL;
+      sp->u.real = result;
+      return;
+    }
+  } else { /* T_REAL */
+    if ((sp-1)->type == T_REAL) {
+      result = (sp-1)->u.real / sp->u.real;
+      sp--;
+      sp->u.real = result;
+      return;
+    } else {
+      result = (sp-1)->u.number / sp->u.real;
+      sp--;
+      sp->type = T_REAL;
+      sp->u.real = result;
+      return;
+    }
+  }
 }
 
 INLINE void
 f_div_eq(num_arg, instruction)
 int num_arg, instruction;
 {
-  if (sp[-1].type != T_LVALUE)
+  if((sp - 1)->type != T_LVALUE)
     bad_arg(1, instruction);
-  argp = sp[-1].u.lvalue;
-  if (argp->type != T_NUMBER)
-    error("Bad left type to /=.\n");
-  if (sp->type != T_NUMBER)
-    error("Bad right type to /=");
-  if (sp->u.number == 0)
-    error("Division by 0\n");
-  i = argp->u.number / sp->u.number;
-  pop_n_elems(2);
-  push_number(i);
-  assign_svalue(argp, sp);
+  argp = (sp - 1)->u.lvalue;
+
+  if(argp->type == T_NUMBER){
+    if(sp->type == T_NUMBER){
+      if(sp->u.number == 0)
+	error("Division by 0nn\n");
+      i = argp->u.number / sp->u.number;
+      pop_n_elems(2);
+      push_number(i);
+      assign_svalue(argp, sp);
+    }
+    else if(sp->type == T_REAL){
+      if(sp->u.real == 0.)
+        error("Division by 0.nr\n");
+      r = argp->u.number / sp->u.real;
+      pop_n_elems(2);
+      push_real(r);
+      assign_svalue(argp, sp);
+    }
+    else {
+      error("Bad right type to /=");
+    }
+  }
+  else if(argp->type == T_REAL){
+    if(sp->type == T_NUMBER){
+      if(sp->u.number == 0)
+        error("Division by 0rn\n");
+      r = argp->u.real / sp->u.number;
+      pop_n_elems(2);
+      push_real(r);
+      assign_svalue(argp, sp);
+    }
+    else if(sp->type == T_REAL){
+      if(sp->u.real == 0.)
+        error("Division by 0.rr\n");
+      r = argp->u.real / sp->u.real;
+      pop_n_elems(2);
+      push_real(r);
+      assign_svalue(argp, sp);
+    }
+    else {
+      error("Bad right type to /=");
+    }
+  }
+  else {
+    error("Bad left type to /=\n");
+  }
 }
 
 INLINE void
@@ -315,30 +434,77 @@ INLINE void
 f_eq(num_arg, instruction)
 int num_arg, instruction;
 {
-  if ((sp-1)->type != sp->type)
-    {
+  switch(sp->type){
+  case T_NUMBER:
+    if((sp-1)->type == T_NUMBER){
+      i = ((sp-1)->u.number == sp->u.number);
+    }
+    else if((sp-1)->type == T_REAL){
+      i = ((sp-1)->u.real == sp->u.number);
+    }
+    else {
       pop_stack();
       assign_svalue(sp, &const0);
       return;
     }
-  switch(sp->type)
-    {
-    case T_NUMBER:
-      i = (sp-1)->u.number == sp->u.number;
-      break;
-    case T_POINTER:
-      i = (sp-1)->u.vec == sp->u.vec;
-      break;
-    case T_STRING:
-      i = strcmp((sp-1)->u.string, sp->u.string) == 0;
-      break;
-    case T_OBJECT:
-      i = (sp-1)->u.ob == sp->u.ob;
-      break;
-    default:
-      i = 0;
-      break;
+    break;
+  case T_REAL:
+    if((sp-1)->type == T_NUMBER){
+      i = ((sp-1)->u.number == sp->u.real);
     }
+    else if((sp-1)->type == T_REAL){
+      i = ((sp-1)->u.real == sp->u.real);
+    }
+    else {
+      pop_stack();
+      assign_svalue(sp, &const0);
+      return;
+    }
+    break;
+  case T_POINTER:
+    if((sp-1)->type == T_POINTER){
+      i = ((sp-1)->u.vec == sp->u.vec);
+    }
+    else {
+      pop_stack();
+      assign_svalue(sp, &const0);
+      return;
+    }
+    break;
+  case T_STRING:
+    if((sp-1)->type == T_STRING){
+      i = (strcmp((sp-1)->u.string, sp->u.string) == 0);
+    }
+    else {
+      pop_stack();
+      assign_svalue(sp, &const0);
+      return;
+    }
+    break;
+  case T_OBJECT:
+    if((sp-1)->type == T_OBJECT){
+      i = ((sp-1)->u.ob == sp->u.ob);
+    }
+    else {
+      pop_stack();
+      assign_svalue(sp, &const0);
+      return;
+    }
+    break;
+  case T_MAPPING:
+    if((sp-1)->type == T_MAPPING){
+      i = ((sp-1)->u.map == sp->u.map);
+    }
+    else {
+      pop_stack();
+      assign_svalue(sp, &const0);
+      return;
+    }
+    break;
+  default:
+    i = 0;
+    break;
+  }
   pop_n_elems(2);
   push_number(i);
 }
@@ -411,18 +577,38 @@ INLINE void
 f_multiply(num_arg, instruction)
 int num_arg, instruction;
 {
-  if ((sp-1)->type != sp->type)
+  double result;
+
+  if(((sp-1)->type != sp->type)
+      && (((sp-1)->type != T_NUMBER) || (sp->type != T_REAL))
+      && (((sp-1)->type != T_REAL) || (sp->type != T_NUMBER)))
     bad_arg(1, instruction);
-  if (sp->type == T_NUMBER)
-  {
-    i = (sp-1)->u.number * sp->u.number;
-    sp--;
-    sp->u.number = i;
+
+  if(sp->type == T_NUMBER){
+    if((sp-1)->type == T_REAL){
+      result = sp->u.number * (sp-1)->u.real;
+      sp--;
+      sp->type = T_REAL;
+      sp->u.real = result;
+    } else {
+      i = (sp-1)->u.number * sp->u.number;
+      sp--;
+      sp->u.number = i;
+    }
     return;
-  }
-  else if (sp->type == T_MAPPING)
-  {
+  } else if (sp->type == T_REAL){
+    if((sp-1)->type == T_NUMBER){
+      result = sp->u.real * (sp-1)->u.number;
+    } else {
+      result = sp->u.real * (sp-1)->u.real;
+    }
+    sp--;
+    sp->type = T_REAL;
+    sp->u.real = result;
+    return;
+  } else if(sp->type == T_MAPPING){
     struct mapping *m;
+
     m = compose_mapping((sp-1)->u.map, sp->u.map);
     pop_n_elems(2);
     push_mapping(m);
@@ -435,59 +621,137 @@ INLINE void
 f_mult_eq(num_arg, instruction)
 int num_arg, instruction;
 {
-  if (sp[-1].type != T_LVALUE)
+  if((sp - 1)->type != T_LVALUE)
     bad_arg(1, instruction);
-  argp = sp[-1].u.lvalue;
-  if (argp->type != sp->type)
-    error("Mismatched types on *=.\n");
-  if (sp->type == T_NUMBER)
-  {
-    i = argp->u.number * sp->u.number;
-    pop_n_elems(2);
-    push_number(i);
+  argp = (sp - 1)->u.lvalue;
+
+  if(argp->type == T_NUMBER){
+    if(sp->type == T_NUMBER){
+      i = argp->u.number * sp->u.number;
+      pop_n_elems(2);
+      push_number(i);
+      assign_svalue(argp, sp);
+    }
+    else if(sp->type == T_REAL){
+      r = argp->u.number * sp->u.real;
+      pop_n_elems(2);
+      push_real(r);
+      assign_svalue(argp, sp);
+    }
+    else {
+      error("Bad right type to *=");
+    }
   }
-  else if (sp->type == T_MAPPING)
-  {
-    struct mapping *m;
-    m = compose_mapping(argp->u.map, sp->u.map);
-    pop_n_elems(2);
-    push_mapping(m);
+  else if(argp->type == T_REAL){
+    if(sp->type == T_NUMBER){
+      r = argp->u.real * sp->u.number;
+      pop_n_elems(2);
+      push_real(r);
+      assign_svalue(argp, sp);
+    }
+    else if(sp->type == T_REAL){
+      r = argp->u.real * sp->u.real;
+      pop_n_elems(2);
+      push_real(r);
+      assign_svalue(argp, sp);
+    }
+    else {
+      error("Bad right type to *=");
+    }
   }
-  else
-    bad_arg(2, instruction);
-  assign_svalue(argp, sp);
+  else if(argp->type == T_MAPPING){
+    if(sp->type == T_MAPPING){
+      struct mapping *m;
+
+      m = compose_mapping(argp->u.map, sp->u.map);
+      pop_n_elems(2);
+      push_mapping(m);
+      assign_svalue(argp, sp);
+    }
+    else {
+      error("Bad right type to *=");
+    }
+  }
+  else {
+    error("Bad left type to *=\n");
+  }
 }
 
 INLINE void
 f_ne(num_arg, instruction)
 int num_arg, instruction;
 {
-  if ((sp-1)->type != sp->type)
-  {
-    pop_stack();
-    assign_svalue(sp, &const1);
-    return;
-  }
-  switch(sp->type)
-    {
-    case T_NUMBER:
-      i = (sp-1)->u.number != sp->u.number;
-      break;
-    case T_STRING:
-      i = strcmp((sp-1)->u.string, sp->u.string);
-      break;
-    case T_POINTER:
-      i = (sp-1)->u.vec != sp->u.vec;
-      break;
-    case T_OBJECT:
-      i = (sp-1)->u.ob != sp->u.ob;
-      break;
-	case T_MAPPING:
-      i = (sp-1)->u.map != sp->u.map;
-      break;
-    default:
-      fatal("Illegal type to !=\n");
+  switch(sp->type){
+  case T_NUMBER:
+    if((sp-1)->type == T_NUMBER){
+      i = ((sp-1)->u.number != sp->u.number);
     }
+    else if((sp-1)->type == T_REAL){
+      i = ((sp-1)->u.real != sp->u.number);
+    }
+    else {
+      pop_stack();
+      assign_svalue(sp, &const1);
+      return;
+    }
+    break;
+  case T_REAL:
+    if((sp-1)->type == T_NUMBER){
+      i = ((sp-1)->u.number != sp->u.real);
+    }
+    else if((sp-1)->type == T_REAL){
+      i = ((sp-1)->u.real != sp->u.real);
+    }
+    else {
+      pop_stack();
+      assign_svalue(sp, &const1);
+      return;
+    }
+    break;
+  case T_POINTER:
+    if((sp-1)->type == T_POINTER){
+      i = ((sp-1)->u.vec != sp->u.vec);
+    }
+    else {
+      pop_stack();
+      assign_svalue(sp, &const1);
+      return;
+    }
+    break;
+  case T_STRING:
+    if((sp-1)->type == T_STRING){
+      i = strcmp((sp-1)->u.string, sp->u.string);
+    }
+    else {
+      pop_stack();
+      assign_svalue(sp, &const1);
+      return;
+    }
+    break;
+  case T_OBJECT:
+    if((sp-1)->type == T_OBJECT){
+      i = ((sp-1)->u.ob != sp->u.ob);
+    }
+    else {
+      pop_stack();
+      assign_svalue(sp, &const1);
+      return;
+    }
+    break;
+  case T_MAPPING:
+    if((sp-1)->type == T_MAPPING){
+      i = ((sp-1)->u.map != sp->u.map);
+    }
+    else {
+      pop_stack();
+      assign_svalue(sp, &const1);
+      return;
+    }
+    break;
+  default:
+    i = 1;
+    break;
+  }
   pop_n_elems(2);
   push_number(i);
 }
@@ -624,69 +888,122 @@ INLINE void
 f_subtract(num_arg, instruction)
 int num_arg, instruction;
 {
-	extern struct vector *subtract_array PROT((struct vector *,struct vector*));
-	if ((sp-1)->type == T_POINTER && sp->type == T_POINTER) {
-		extern struct vector *subtract_array
-			PROT((struct vector *,struct vector*));
-		struct vector *v, *w;
+  if((sp - 1)->type == T_NUMBER){
+    if(sp->type == T_NUMBER){
+      i = (sp - 1)->u.number - sp->u.number;
+      pop_n_elems(2);
+      push_number(i);
+    }
+    else if(sp->type == T_REAL){
+      r = (sp - 1)->u.number - sp->u.real;
+      pop_n_elems(2);
+      push_real(r);
+    }
+    else {
+      error("Bad right type to -");
+    }
+  }
+  else if((sp - 1)->type == T_REAL){
+    if(sp->type == T_NUMBER){
+      r = (sp - 1)->u.real - sp->u.number;
+      pop_n_elems(2);
+      push_real(r);
+    }
+    else if(sp->type == T_REAL){
+      r = (sp - 1)->u.real - sp->u.real;
+      pop_n_elems(2);
+      push_real(r);
+    }
+    else {
+      error("Bad right type to -");
+    }
+  }
+  else if((sp - 1)->type == T_POINTER){
+    if(sp->type == T_POINTER){
+      extern struct vector *subtract_array
+	PROT((struct vector*,struct vector*));
+      struct vector *v, *w;
 
-		v = sp->u.vec;
-		if (v->ref > 1) {
-			v = slice_array(v, 0, v->size-1 );
-			v->ref--;
-		}
-		sp--;
-		/* subtract_array already takes care of destructed objects */
-		w = subtract_array(sp->u.vec, v);
-		free_vector(v);
-		free_vector(sp->u.vec);
-		sp->u.vec = w;
-		return;
-	}
-	if ((sp-1)->type != T_NUMBER)
-		bad_arg(1, instruction);
-	if (sp->type != T_NUMBER)
-		bad_arg(2, instruction);
-	i = (sp-1)->u.number - sp->u.number;
-	sp--;
-	sp->u.number = i;
+      v = sp->u.vec;
+      if(v->ref > 1){
+        v = slice_array(v, 0, v->size-1 );
+        v->ref--;
+      }
+      sp--;
+      /* subtract_array already takes care of destructed objects */
+      w = subtract_array(sp->u.vec, v);
+      free_vector(v);
+      free_vector(sp->u.vec);
+      sp->u.vec = w;
+      return;
+    }
+    else {
+      error("Bad right type to -");
+    }
+  }
+  else {
+    error("Bad left type to -\n");
+  }
 }
 
 INLINE void
 f_sub_eq(num_arg, instruction)
      int num_arg, instruction;
 {
-  if (sp[-1].type != T_LVALUE)
+  if((sp - 1)->type != T_LVALUE)
     bad_arg(1, instruction);
-  argp = sp[-1].u.lvalue;
-  switch (argp->type) {
+  argp = (sp - 1)->u.lvalue;
+
+  switch(argp->type){
   case T_NUMBER:
-    if (sp->type != T_NUMBER)
-      error("Bad right type to -=");
-    argp->u.number -= sp->u.number;
-    sp--;
+    if(sp->type == T_NUMBER){
+      argp->u.number -= sp->u.number;
+      sp--;
+    }
+    else if(sp->type == T_REAL){
+      argp->u.number -= sp->u.real;
+      sp--;
+    }
+    else {
+      error("Bad type number to rhs -=");
+    }
+    break;
+  case T_REAL:
+    if(sp->type == T_NUMBER){
+      argp->u.real -= sp->u.number;
+      sp--;
+    }
+    else if(sp->type == T_REAL){
+      argp->u.real -= sp->u.real;
+      sp--;
+    }
+    else {
+      error("Bad type number to rhs -=");
+    }
     break;
   case T_POINTER:
-    {
+    if(sp->type == T_POINTER){
       struct vector *subtract_array PROT((struct vector*,struct vector*));
       struct vector *v, *w;
 
-      if (sp->type != T_POINTER)
-	error("Bad right type to -=");
       v = sp->u.vec;
-      if (v->ref > 1) {
-	v = slice_array(v, 0, v->size-1 );
-	v->ref--;
+      if(v->ref > 1){
+        v = slice_array(v, 0, v->size-1 );
+        v->ref--;
       }
-      sp--;
       w = subtract_array(argp->u.vec, v);
       free_vector(argp->u.vec);
       free_vector(v);  /* no longer freed in subtract_array() */
+      eval_cost += (w->size << 3);
+      sp--;
       argp->u.vec = w;
-      break;
     }
+    else {
+      error("Bad type number to rhs -=");
+    }
+    break;
   default:
-    error("Bad left type to -=.\n");
+    error("Bad left type to -=\n");
   }
   assign_svalue_no_free(sp, argp);
 }

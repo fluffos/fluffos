@@ -103,7 +103,7 @@ maximum local variables : 30
 # Maximum number of evaluated nodes/loop.
 # If this is exceeded, current function is halted.
 # The worst case yet encountered is 3600       (dec 1989)
-maximum evaluation cost : 1000000000
+maximum evaluation cost : 100000
 
 # This is the maximum array size allowed for one single array.
 maximum array size : 15000
@@ -140,7 +140,7 @@ reserved size : 0
 # (number of comparisons to find a string) very close to 1, as found strings
 # are automatically moved to the head of a hash chain.  You will never
 # need more, and you will still get good results with a smaller table.
-hash table size : 2203
+hash table size : 7001
 
 # There is a hash table for living objects, used by find_living().
 # THIS IS NOT IMPLEMENTED YET.
@@ -150,10 +150,10 @@ living hash table size : 100
 # Define this like you did with the strings; probably set to about 1/4 of
 # the number of objects in a game, as the distribution of accesses to
 # objects is somewhat more uniform than that of strings.
-object table size : 1009
+object table size : 1501
 
 # hname stuff
 address server ip : localhost
 address server port : 7374
 
-default fail message : Errmm?
+default fail message : What?

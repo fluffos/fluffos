@@ -23,6 +23,7 @@ struct lpc_predef_s *lpc_predefs=NULL;
 extern char *argument_name;
 extern char *xalloc();
 static int number PROT((int)), ident PROT((char *)), string PROT((char *));
+static int real PROT((double));
 static int islocal PROT((char *));
 static void handle_define PROT((char *));
 static void free_defines PROT((void)), add_define PROT((char *, int, char *));
@@ -510,6 +511,8 @@ yylex1()
 {
   static char partial[MAXLINE+5]; /* extra 5 for safety buffer */
   static char terminator[MAXLINE+5];
+  int is_float;
+  float myreal;
   char *partp;
 
   register char *yyp;	/* Xeno */
@@ -826,19 +829,34 @@ yylex1()
 	myungetc(c);
 	c = '0';
 	/* fall through */
-             case '1':case '2':case '3':case '4':
+    case '1':case '2':case '3':case '4':
     case '5':case '6':case '7':case '8':case '9':
+    is_float = 0;
 	yyp = yytext;
 	*yyp++ = c;
 	for(;;) {
 	    c = mygetc();
-	    if (!isdigit(c))
-		break;
+        if (c == '.') {
+            if (!is_float) {
+                is_float = 1;
+            } else {
+                is_float = 0;
+                myungetc(c);
+                break;
+            }
+        }
+	    else if (!isdigit(c))
+		   break;
 	    SAVEC;
 	}
 	myungetc(c);
 	*yyp = 0;
-	return number(atoi(yytext));
+    if (is_float) {
+       sscanf(yytext, "%f", &myreal);
+       return real(myreal);
+    } else {
+	   return number(atoi(yytext));
+    }
     default:
 	if (isalpha(c) || c == '_') {
 	    int r;
@@ -986,6 +1004,13 @@ static int number(i)
     return F_NUMBER;
 }
 
+static int real(i)
+    double i;
+{
+    yylval.real = (float)i;
+    return F_REAL;
+}
+
 void end_new_file()
 {
     while (inctop) {
@@ -1015,7 +1040,7 @@ void start_new_file(f)
     FILE *f;
 {
     struct lpc_predef_s *tmpf;
-    char *dir, *tmp;
+    char *dir, *tmp, save_buf[20];
 
 	if (defines_need_freed) {
 		free_defines();
@@ -1023,6 +1048,10 @@ void start_new_file(f)
 	defines_need_freed = 1;
     add_define("LPC3", -1, "");
     add_define("MUDOS", -1, "");
+    strcpy(save_buf, "\"");
+    strcat(save_buf, SAVE_EXTENSION);
+    strcat(save_buf, "\"");
+    add_define("SAVE_EXTENSION", -1, save_buf);
     if (current_file)
       {
 	dir = (char *)DMALLOC(strlen(current_file)+3, 64, "start_new_file");
@@ -1096,6 +1125,7 @@ static struct keyword reswords[] = {
 { "default",		F_DEFAULT, },
 { "do",			F_DO, },
 { "else",		F_ELSE, },
+{ "float",      F_FLOAT, },
 { "for",		F_FOR, },
 { "function",   F_FUNCTION, },
 { "if",			F_IF, },
@@ -1209,6 +1239,7 @@ void init_num_args()
     add_instr_name("neg", F_NEGATE);
 	add_instr_name("++x", F_PRE_INC);
 	add_instr_name("--x", F_PRE_DEC);
+	add_instr_name("*", F_MULTIPLY);
 	add_instr_name("inc(x)", F_INC);
 	add_instr_name("dec(x)", F_DEC);
     add_instr_name("x++", F_POST_INC);

@@ -492,7 +492,7 @@ void save_stat_list (file, list)
       return;
     }
   while (list) {
-    fprintf (f, "%s %ld %ld %ld %ld\n", list->name, 
+    fprintf (f, "%s %d %d %d %d\n", list->name, 
 	     list->moves, list->cost, list->heart_beats, list->total_worth);
     list = list->next;
   }
@@ -537,7 +537,7 @@ void restore_stat_list (file, list)
   while (fscanf (f, "%s", fname) != EOF)
     {
       entry = add_stat_entry (fname, list);
-      fscanf (f, "%ld %ld %ld %ld\n", &entry->moves, &entry->cost, 
+      fscanf (f, "%d %d %d %d\n", &entry->moves, &entry->cost, 
 	      &entry->heart_beats, &entry->total_worth);
     }
   fclose (f);

@@ -13,11 +13,11 @@
 
 #include "md.h"
 
-extern unsigned long total_malloced;
-extern unsigned long hiwater;
+extern unsigned int total_malloced;
+extern unsigned int hiwater;
 
 typedef struct stats_s {
-	unsigned long free_calls, alloc_calls, realloc_calls;
+	unsigned int free_calls, alloc_calls, realloc_calls;
 } stats_t;
 
 static stats_t stats;

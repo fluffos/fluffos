@@ -1,0 +1,16 @@
+.\"generate a run-time error
+.TH error 3
+ 
+.SH NAME
+error - generate a run-time error
+ 
+.SH SYNOPSIS
+void error(string err);
+ 
+.SH DESCRIPTION
+A run-time error `err' will be generated when error() is called.  Execution
+of the current thread will halt, and the trace will be recorded to the
+debug log.
+ 
+.SH SEE ALSO
+catch(3), throw(3)

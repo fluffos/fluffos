@@ -162,7 +162,7 @@ static char sbuf[100];
 int show_otable_status(verbose)
     int verbose;
 {
-    if (verbose) {
+    if (verbose == 1) {
 	add_message("\nObject name hash table status:\n");
 	add_message("------------------------------\n");
 	sprintf(sbuf, "%.2f", objs_in_table / (float) OTABLE_SIZE);
@@ -173,7 +173,8 @@ int show_otable_status(verbose)
 	add_message("External lookups succeeded (succeed) %d (%d)\n",
 		    user_obj_lookups, user_obj_found);
     }
-    add_message("hash table overhead\t\t\t %8d\n",
+    if (verbose != -1)
+      add_message("hash table overhead\t\t\t %8d\n",
 		OTABLE_SIZE * sizeof(struct object *));
     return (OTABLE_SIZE * sizeof(struct object *) +
 	    objs_in_table * sizeof(struct object));

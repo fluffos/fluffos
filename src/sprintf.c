@@ -5,6 +5,7 @@
  * extensions (note that as no floating point exists, some parameters
  * have slightly different meaning or restrictions to "standard"
  * (s)printf.)  Implemented by Lynscar (Sean A Reith).
+ * 2/28/93: float support for MudOS added by jacques/blackthorn
  *
  * This version supports the following as modifiers:
  *  " "   pad positive integers with a space.
@@ -43,6 +44,7 @@
  *  "s"   the argument is a string.
  *  "d"   the integer arg is printed in decimal.
  *  "i"   as d.
+ *  "f"   floating point value.
  *  "c"   the integer arg is to be printed as a character.
  *  "o"   the integer arg is printed in octal.
  *  "x"   the integer arg is printed in hex.
@@ -92,6 +94,7 @@ typedef unsigned int format_info;
  *				1010 : octal;
  *				1011 : hex;
  *				1100 : HEX;
+ *				1101 : float;
  *   00000000 00xx0000 : justification:
  *				00 : right;
  *				01 : centre;
@@ -115,6 +118,7 @@ typedef unsigned int format_info;
 #define INFO_T_OCT 0xA
 #define INFO_T_HEX 0xB
 #define INFO_T_C_HEX 0xC
+#define INFO_T_FLOAT 0xD
 
 #define INFO_J 0x30
 #define INFO_J_CENTRE 0x10
@@ -225,12 +229,12 @@ void numadd(dst, size, num)
   int *size, num;
 {
   int i,
-      num_l, /* length of num as a string */
-      nve;   /* true if num negative */
+  num_l, /* length of num as a string */
+  nve;   /* true if num negative */
 
   if (num < 0) { num *= -1; nve=1; } else nve=0;
   for (i=num/10, num_l=nve+1; i; i /= 10, num_l++) ;
-  i = strlen(*dst); /* i = length ofconstructed string so far */
+  i = strlen(*dst); /* i = length of constructed string so far */
   if ((i + num_l) >= *size) {
     *size += i + num_l + 2;
     *dst = (char *)DREALLOC(*dst, *size, 109, "stradd");
@@ -238,7 +242,27 @@ void numadd(dst, size, num)
   (*dst)[i+num_l] = '\0';
   if (nve) (*dst)[i] = '-'; else i--;
   for (num_l-=nve; num_l; num_l--, num /= 10) (*dst)[i+num_l] = (num%10) + '0';
-} /* end of num_add() */
+} /* end of numadd() */
+
+void floatadd(dst, size, flt)
+     char **dst;
+     int *size;
+     double flt;
+{
+  int i;
+  int flt_l; /* length of float as a string */
+  char buf[80];
+
+  sprintf(buf,"%g",flt);
+  flt_l = strlen(buf) + 1;
+
+  i = strlen(*dst); /* i = length of constructed string so far */
+  if ((i + flt_l) >= *size) {
+    *size += i + flt_l + 2;
+    *dst = (char *)DREALLOC(*dst, *size, 109, "stradd");
+  }
+  sprintf(*dst, "%s", buf);
+} /* end of floatadd() */
 
 /*
  * This is a function purely because stradd() is, to keep same param
@@ -284,6 +308,9 @@ void svalue_to_string(obj, str, size, indent, trailing, indent2)
     case T_NUMBER:
       numadd(str, &size, obj->u.number);
       break;
+    case T_REAL:
+      floatadd(str, &size, obj->u.real);
+      break;
     case T_STRING:
       stradd(str, &size, "\"");
       stradd(str, &size, obj->u.string);
@@ -304,12 +331,19 @@ void svalue_to_string(obj, str, size, indent, trailing, indent2)
         stradd(str, &size, "})");
       }
       break;
+    case T_FUNCTION:
+      stradd(str, &size, "(: ");
+      svalue_to_string(&(obj->u.fp->obj), str, size, indent+2, trailing);
+      stradd(str, &size, ", ");
+      svalue_to_string(&(obj->u.fp->fun), str, size, indent+2, trailing);
+      stradd(str, &size, " :)");
+      break;
     case T_MAPPING:
       if (!(obj->u.map->table_size)) {
         stradd(str, &size, "([ ])");
       } else {
         stradd(str, &size, "([ /* sizeof() == ");
-        numadd(str, &str, obj->u.map->table_size);
+        numadd(str, &str, obj->u.map->count);
         stradd(str, &size, " */\n");
         for (i=0;i<(obj->u.map->table_size)-1;i++) {
           struct node *elm;
@@ -565,8 +599,15 @@ char *string_print_formatted(format_str, argc, argv)
   unsigned int i;
   char *pad;		/* fs pad string */
 
-  if ((i = SETJMP(error_jmp))) { /* error handling */
+#ifdef cray
+  if (SETJMP(error_jmp)) { /* the cray setjmp is braindead */
     char *err;
+
+    i = -1;
+#else
+  if (i = SETJMP(error_jmp)) { /* error handling */
+    char *err;
+#endif
 
     switch(i) {
       case ERR_BUFF_OVERFLOW:
@@ -764,6 +805,7 @@ char *string_print_formatted(format_str, argc, argv)
           case 's': finfo |= INFO_T_STRING; break;
           case 'd': finfo |= INFO_T_INT; break;
           case 'i': finfo |= INFO_T_INT; break;
+          case 'f': finfo |= INFO_T_FLOAT; break;
           case 'c': finfo |= INFO_T_CHAR; break;
           case 'o': finfo |= INFO_T_OCT; break;
           case 'x': finfo |= INFO_T_HEX; break;
@@ -934,13 +976,15 @@ add_table_now:
           }
           switch (finfo & INFO_T) {
             case INFO_T_INT: cheat[i++] = 'd'; break;
+            case INFO_T_FLOAT: cheat[i++] = 'f'; break;
             case INFO_T_CHAR: cheat[i++] = 'c'; break;
             case INFO_T_OCT: cheat[i++] = 'o'; break;
             case INFO_T_HEX: cheat[i++] = 'x'; break;
             case INFO_T_C_HEX: cheat[i++] = 'X'; break;
             default: ERROR(ERR_BAD_INT_TYPE);
           }
-          if (carg->type != T_NUMBER) { /* sigh... */
+      if ((cheat[i - 1] == 'f' && carg->type != T_REAL) || (cheat[i - 1] != 'f' && carg->type != T_NUMBER))
+  {
 #ifdef RETURN_ERROR_MESSAGES
             sprintf(buff,
               "ERROR: (s)printf(): incorrect argument type to %%%c.\n",
@@ -954,7 +998,8 @@ add_table_now:
 #endif /* RETURN_ERROR_MESSAGES */
           }
           cheat[i] = '\0';
-          sprintf(temp, cheat, carg->u.number);
+          if(carg->type == T_REAL) sprintf(temp, cheat, carg->u.real);
+	  else sprintf(temp, cheat, carg->u.number);
           {
             int tmpl = strlen(temp);
             if (pres && tmpl > pres) temp[pres] = '\0'; /* well.... */

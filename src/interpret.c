@@ -39,6 +39,9 @@ static int opc_eoper[MAXOPC];
 
 #ifdef RUSAGE			/* Defined in config.h */
 #include <sys/resource.h>
+#ifdef SunOS_5
+#include <sys/rusage.h>
+#endif
 extern int getrusage PROT((int, struct rusage *));
 #ifdef sun
 extern int getpagesize();
@@ -53,6 +56,7 @@ extern userid_t *backbone_uid;
 extern char *master_file_name;
 extern int max_cost;
 
+float _strtof PROT((char *, char **));
 extern void print_svalue PROT((struct svalue *));
 static struct svalue *sapply PROT((char *, struct object *, int));
 int inter_sscanf PROT((int));
@@ -224,6 +228,17 @@ int n;
   sp->u.number = n;
 }
 
+INLINE void
+push_real(n)
+double n;
+{
+  sp++;
+  if (sp == &start_of_stack[EVALUATOR_STACK_SIZE])
+    fatal("stack overflow\n");
+  sp->type = T_REAL;
+  sp->u.real = n;
+}
+
 /*
  * Push undefined (const0u) onto the value stack.
  */
@@ -380,7 +395,7 @@ INLINE void assign_svalue_no_free(to, from)
     debug_fatal("Null pointer to assign_svalue().\n");
 #endif
   *to = *from;
-  
+
   switch(from->type) {
   case T_STRING:
     switch(from->subtype) {
@@ -465,67 +480,67 @@ INLINE void pop_stack() {
 INLINE void
 push_indexed_lvalue()
 {
-	struct svalue *i, *vec, *item;
-	void mapping_too_large();
-	int ind, indType;
+  struct svalue *i, *vec, *item;
+  void mapping_too_large();
+  int ind, indType;
   
-	i = sp;
-	vec = sp - 1;
-	if (vec->type == T_MAPPING) {
-		struct mapping *m = vec->u.map;
-		vec = find_for_insert(m, i, 0);
-		pop_stack();
-		free_svalue(sp);
-		sp->type = T_LVALUE;
-		sp->u.lvalue = vec;
-		if (!vec) {
-		  mapping_too_large();
-		}
-		return;
-	}
-	ind = i->u.number;
-	indType = i->type;
-	pop_stack();
-	if ((indType != T_NUMBER) || (ind < 0))
-		error("Illegal index\n");
-	if (vec->type == T_FUNCTION) {
-		if (ind > 1) {
-			error("Function variables may only be indexed with 0 or 1.\n");
-		}
-		vec = ind ? &vec->u.fp->fun : &vec->u.fp->obj;
-		free_svalue(sp);
-		sp->type = T_LVALUE;
-		sp->u.lvalue = vec;
-		return;
-	}
-	if (vec->type == T_STRING) {
-		static struct svalue one_character;
+  i = sp;
+  vec = sp - 1;
+  if (vec->type == T_MAPPING) {
+    struct mapping *m = vec->u.map;
+    vec = find_for_insert(m, i, 0);
+    pop_stack();
+    free_svalue(sp);
+    sp->type = T_LVALUE;
+    sp->u.lvalue = vec;
+    if (!vec) {
+      mapping_too_large();
+    }
+    return;
+  }
+  ind = i->u.number;
+  indType = i->type;
+  pop_stack();
+  if ((indType != T_NUMBER) || (ind < 0))
+    error("Illegal index\n");
+  if (vec->type == T_FUNCTION) {
+    if (ind > 1) {
+      error("Function variables may only be indexed with 0 or 1.\n");
+    }
+    vec = ind ? &vec->u.fp->fun : &vec->u.fp->obj;
+    free_svalue(sp);
+    sp->type = T_LVALUE;
+    sp->u.lvalue = vec;
+    return;
+  }
+  if (vec->type == T_STRING) {
+    static struct svalue one_character;
 
-		/* marion says: this is a crude part of code */
-		one_character.type = T_NUMBER;
-		if ((ind > SVALUE_STRLEN(vec)) || ind < 0)
-			one_character.u.number = 0;
-		else
-			one_character.u.number = (unsigned char)vec->u.string[ind];
-		free_svalue(sp);
-		sp->type = T_LVALUE;
-		sp->u.lvalue = &one_character;
-		return;
-	}
-	if (vec->type != T_POINTER) error("Indexing on illegal type.\n");
-	if (ind >= vec->u.vec->size) error ("Index out of bounds\n");
-	item = &vec->u.vec->item[ind];
-	if (vec->u.vec->ref == 1) {
-		static struct svalue quickfix = { T_NUMBER };
-
-		/* marion says: but this is crude too */
-		/* marion blushes. */
-		assign_svalue (&quickfix, item);
-		item = &quickfix;
-	}
-	free_svalue(sp);		/* This will make 'vec' invalid to use */
-	sp->type = T_LVALUE;
-	sp->u.lvalue = item;
+    /* marion says: this is a crude part of code */
+    one_character.type = T_NUMBER;
+    if ((ind > SVALUE_STRLEN(vec)) || ind < 0)
+      one_character.u.number = 0;
+    else
+      one_character.u.number = (unsigned char)vec->u.string[ind];
+    free_svalue(sp);
+    sp->type = T_LVALUE;
+    sp->u.lvalue = &one_character;
+    return;
+  }
+  if (vec->type != T_POINTER) error("Indexing on illegal type.\n");
+  if (ind >= vec->u.vec->size) error ("Index out of bounds\n");
+  item = &vec->u.vec->item[ind];
+  if (vec->u.vec->ref == 1) {
+    static struct svalue quickfix = { T_NUMBER };
+    
+    /* marion says: but this is crude too */
+    /* marion blushes. */
+    assign_svalue (&quickfix, item);
+    item = &quickfix;
+  }
+  free_svalue(sp);		/* This will make 'vec' invalid to use */
+  sp->type = T_LVALUE;
+  sp->u.lvalue = item;
 }
 
 /*
@@ -869,6 +884,7 @@ eval_instruction(p)
 char *p;
 {
   int i, num_arg;
+  float real;
   int instruction, is_efun;
   unsigned short offset;
   unsigned short string_number;
@@ -973,11 +989,19 @@ char *p;
       if (sp->type != T_LVALUE)
         error("Bad argument to ++\n");
 #endif
-      if (sp->u.lvalue->type != T_NUMBER)
-        error("++ of non-numeric argument\n");
-      sp->u.lvalue->u.number++;
-	  sp--;
+      if(sp->u.lvalue->type == T_NUMBER){
+	sp->u.lvalue->u.number++;
+	sp--;
 	break;
+      }
+      else if(sp->u.lvalue->type == T_REAL){
+	sp->u.lvalue->u.real++;
+	sp--;
+	break;
+      }
+      else {
+	error("++ of non-numeric argument\n");
+      }
       case I(F_PUSH_LOCAL_VARIABLE_LVALUE) :
       sp++;
       sp->type = T_LVALUE;
@@ -991,6 +1015,14 @@ char *p;
       ((char *)&i)[3] = pc[3];
       pc += 4;
       push_number(i);
+      break;
+      case I(F_REAL) :
+      ((char *)&real)[0] = pc[0];
+      ((char *)&real)[1] = pc[1];
+      ((char *)&real)[2] = pc[2];
+      ((char *)&real)[3] = pc[3];
+      pc += 4;
+      push_real(real);
       break;
       case I(F_BYTE) :
       i = EXTRACT_UCHAR(pc);
@@ -1081,7 +1113,7 @@ char *p;
 		pc += 2;
 		sp--;
  	break;
-      case I(F_LOCAL_NAME) :
+    case I(F_LOCAL_NAME) :
       sp++;
       assign_svalue_no_free(sp, fp + EXTRACT_UCHAR(pc));
       pc++;
@@ -1095,160 +1127,209 @@ char *p;
         *sp = const0;
       }
 	break;
-      case I(F_LT) :
-      if (((sp - 1)->type == T_NUMBER) && (sp->type == T_NUMBER))
+    case I(F_LT) :
       {
-         sp--;
-         sp->u.number = (sp->u.number < (sp + 1)->u.number);
-         break;
+        if((sp - 1)->type == T_NUMBER){
+          if(sp->type == T_NUMBER){
+            i = ((sp - 1)->u.number < sp->u.number);
+          }
+          else if(sp->type == T_REAL){
+            i = ((sp - 1)->u.number < sp->u.real);
+          }
+          else {
+            bad_arg(2, instruction);
+          }
+        }
+        else if((sp - 1)->type == T_REAL){
+          if(sp->type == T_NUMBER){
+            i = ((sp - 1)->u.real < sp->u.number);
+          }
+          else if(sp->type == T_REAL){
+            i = ((sp - 1)->u.real < sp->u.real);
+          }
+          else {
+            bad_arg(2, instruction);
+          }
+        }
+        else if((sp-1)->type != T_STRING){
+          bad_arg(1, instruction);
+        }
+        else if(sp->type != T_STRING){
+          bad_arg(2, instruction);
+        }
+        else {
+          i = (strcmp((sp-1)->u.string, sp->u.string) < 0);
+        }
       }
-      if ((sp-1)->type != T_STRING)
-        bad_arg(1, instruction);
-      if (sp->type != T_STRING)
-        bad_arg(2, instruction);
-      i = (strcmp((sp-1)->u.string, sp->u.string) < 0);
       pop_n_elems(2);
       push_number(i);
 	break;
-      case I(F_ADD) :
-	f_add(num_arg, instruction);
-	break;
+    case I(F_ADD) :
+      f_add(num_arg, instruction);
+      break;
     case I(F_VOID_ADD_EQ) :
     case I(F_ADD_EQ) :
-	{
-		struct svalue *argp;
+      {
+	struct svalue *argp;
 
 #ifdef DEBUG
-		if (sp[-1].type != T_LVALUE)
-			bad_arg(1, instruction);
+	if((sp - 1)->type != T_LVALUE)
+	  bad_arg(1, instruction);
 #endif
-		  argp = sp[-1].u.lvalue;
-		  switch(argp->type) {
-		  case T_STRING:
-			{
-			  char *new_str;
-			  if (sp->type == T_STRING)
-			{
-			  int l = SVALUE_STRLEN(argp);
-			  int len = l + strlen(sp->u.string) + 1;
+	argp = (sp - 1)->u.lvalue;
+	switch(argp->type) {
+	case T_STRING:
+	  {
+	    char *new_str;
 
-			  new_str = DXALLOC(len, 45, "f_add_eq: 1");
-			  eval_cost += (len >> 3);
-			  strcpy(new_str, argp->u.string);
-			  strcpy(new_str + l, sp->u.string);
-			  free_string_svalue(sp); /* free the RHS */
-			  sp -= 2;
-			}
-			  else if (sp->type == T_NUMBER)
-			{
-			  char buff[20];
-			  int len;
-			  sprintf(buff, "%d", sp->u.number);
-			  len = SVALUE_STRLEN(argp) + strlen(buff) + 1;
-			  eval_cost += (len >> 3);
-			  new_str = DXALLOC(len, 46, "f_add_eq: 2");
-			  strcpy(new_str, argp->u.string);
-			  strcat(new_str, buff);
-			  sp -= 2; /* RHS is a number, doesn't need freed */
-			}
-			  else {
-			bad_arg(2, instruction);
-			  }
-			free_string_svalue(argp); /* free the LHS */
-			argp->subtype = STRING_MALLOC;
-			argp->u.string = new_str;
-		  }
-			break;
-		  case T_NUMBER:
-			if (sp->type == T_NUMBER) {
-				argp->u.number += sp->u.number;
-				sp -= 2; /* both sides are numbers, no freeing required */
-			} else
-				error("Bad type number to rhs +=.\n");
-			break;
-		  case T_POINTER:
-			if (sp->type != T_POINTER)
-			  bad_arg(2, instruction);
-			else
-			  {
-			struct vector *v;
+	    if(sp->type == T_STRING){
+	      int l = SVALUE_STRLEN(argp);
+	      int len = l + strlen(sp->u.string) + 1;
 
-			v = add_array(argp->u.vec, sp->u.vec);
-			free_vector(sp->u.vec); /* free RHS */
-			free_vector(argp->u.vec); /* free LHS */
-			eval_cost += (v->size << 3);
-			sp -= 2;
-			argp->u.vec = v;
-			  }
-			break;	      
-		  case T_MAPPING:
-			if (sp->type != T_MAPPING)
-			  bad_arg(2, instruction);
-			else
-			  {
-			absorb_mapping(argp->u.map, sp->u.map);
-			eval_cost += (argp->u.map->count << 2);
-			free_mapping(sp->u.map); /* free RHS */
-			sp -= 2; /* LHS not freed because its being reused */
-			  }
-			break;
-		  default:
-			bad_arg(1, instruction);
-		  }
-		/* if (void)add_eq then no need to produce an rvalue */
-		if (instruction == (F_ADD_EQ - F_OFFSET)) { /* not void add_eq */
-			sp++;
-			assign_svalue_no_free(sp, argp);
-		}
+	      new_str = DXALLOC(len, 45, "f_add_eq: 1");
+	      eval_cost += (len >> 3);
+	      strcpy(new_str, argp->u.string);
+	      strcpy(new_str + l, sp->u.string);
+	      free_string_svalue(sp); /* free the RHS */
+	      sp -= 2;
+	    }
+	    else if (sp->type == T_NUMBER){
+	      char buff[20];
+	      int len;
+
+	      sprintf(buff, "%d", sp->u.number);
+	      len = SVALUE_STRLEN(argp) + strlen(buff) + 1;
+	      eval_cost += (len >> 3);
+	      new_str = DXALLOC(len, 46, "f_add_eq: 2");
+	      strcpy(new_str, argp->u.string);
+	      strcat(new_str, buff);
+	      sp -= 2; /* RHS is a number, doesn't need freed */
+	    }
+            else if (sp->type == T_REAL){
+              char buff[20];
+              int len;
+
+              sprintf(buff, "%f", sp->u.real);
+              len = SVALUE_STRLEN(argp) + strlen(buff) + 1;
+              eval_cost += (len >> 3);
+              new_str = DXALLOC(len, 46, "f_add_eq: 2");
+              strcpy(new_str, argp->u.string);
+              strcat(new_str, buff);
+              sp -= 2; /* RHS is a real, doesn't need freed */
+            }
+	    else {
+	      bad_arg(2, instruction);
+	    }
+	    free_string_svalue(argp); /* free the LHS */
+	    argp->subtype = STRING_MALLOC;
+	    argp->u.string = new_str;
+	  }
+	  break;
+	case T_NUMBER:
+	  if(sp->type == T_NUMBER){
+	    argp->u.number += sp->u.number;
+	    sp -= 2; /* both sides are numbers, no freeing required */
+        } else
+          if(sp->type == T_REAL){
+            argp->u.number += sp->u.real;
+            sp -= 2; /* both sides are numerics, no freeing required */
+	  }
+	  else {
+	    error("Bad type number to rhs +=.\n");
+	  }
+	  break;
+        case T_REAL:
+	  if(sp->type == T_NUMBER){
+            argp->u.real += sp->u.number;
+            sp -= 2; /* both sides are numerics, no freeing required */
+          }
+          if(sp->type == T_REAL){
+            argp->u.real += sp->u.real;
+            sp -= 2; /* both sides are numerics, no freeing required */
+          }
+          else {
+            error("Bad type number to rhs +=.\n");
+          }
+          break;
+	case T_POINTER:
+	  if (sp->type != T_POINTER)
+	    bad_arg(2, instruction);
+	  else {
+	    struct vector *v;
+
+	    v = add_array(argp->u.vec, sp->u.vec);
+	    free_vector(sp->u.vec); /* free RHS */
+	    free_vector(argp->u.vec); /* free LHS */
+	    eval_cost += (v->size << 3);
+	    sp -= 2;
+	    argp->u.vec = v;
+	  }
+	  break;	      
+	case T_MAPPING:
+	  if (sp->type != T_MAPPING)
+	    bad_arg(2, instruction);
+	  else {
+	    absorb_mapping(argp->u.map, sp->u.map);
+	    eval_cost += (argp->u.map->count << 2);
+	    free_mapping(sp->u.map); /* free RHS */
+	    sp -= 2; /* LHS not freed because its being reused */
+	  }
+	  break;
+	default:
+	  bad_arg(1, instruction);
 	}
-	break;
-      case I(F_AND) :
-	f_and(num_arg, instruction);
-	break;
-      case I(F_AND_EQ) :
-	f_and_eq(num_arg, instruction);
-	break;
-	case I(F_FUNCTION_CONSTRUCTOR) :
-	f_function_constructor(num_arg, instruction);
-	break;
-	case I(F_FUNCTION_SPLIT) :
-	f_function_split(num_arg, instruction);
-	break;
-      case I(F_AGGREGATE) :
-	f_aggregate(num_arg, instruction);
-	break;
-      case I(F_AGGREGATE_ASSOC) :
-	f_aggregate_assoc(num_arg, instruction);
-	break;
-      case I(F_ASSIGN) :
+	/* if (void)add_eq then no need to produce an rvalue */
+	if (instruction == (F_ADD_EQ - F_OFFSET)) { /* not void add_eq */
+	  sp++;
+	  assign_svalue_no_free(sp, argp);
+	}
+      }
+      break;
+    case I(F_AND) :
+      f_and(num_arg, instruction);
+      break;
+    case I(F_AND_EQ) :
+      f_and_eq(num_arg, instruction);
+      break;
+    case I(F_FUNCTION_CONSTRUCTOR) :
+      f_function_constructor(num_arg, instruction);
+      break;
+    case I(F_FUNCTION_SPLIT) :
+      f_function_split(num_arg, instruction);
+      break;
+    case I(F_AGGREGATE) :
+      f_aggregate(num_arg, instruction);
+      break;
+    case I(F_AGGREGATE_ASSOC) :
+      f_aggregate_assoc(num_arg, instruction);
+      break;
+    case I(F_ASSIGN) :
+      if ((sp - 1)->type != T_LVALUE)
+	fatal("Bad argument to F_ASSIGN\n");
+      assign_svalue((sp - 1)->u.lvalue, sp);
+      assign_svalue(sp - 1, sp);
+      pop_stack();
+      break;
+    case I(F_VOID_ASSIGN) :
 #ifdef DEBUG
-       if (sp[-1].type != T_LVALUE)
-         fatal("Bad argument to F_ASSIGN\n");
+      if ((sp - 1)->type != T_LVALUE)
+	fatal("Bad argument to F_VOID_ASSIGN\n");
 #endif
-       assign_svalue((sp-1)->u.lvalue, sp);
-       assign_svalue(sp-1, sp);
-       pop_stack();
-	break;
-      case I(F_VOID_ASSIGN) :
-#ifdef DEBUG
-       if (sp[-1].type != T_LVALUE)
-         fatal("Bad argument to F_VOID_ASSIGN\n");
-#endif
-       assign_svalue((sp-1)->u.lvalue, sp);
-       pop_n_elems(2);
-	break;
-      case I(F_BREAK) :
+      assign_svalue((sp-1)->u.lvalue, sp);
+      pop_n_elems(2);
+      break;
+    case I(F_BREAK) :
       pc = current_prog->p.i.program + *break_sp++;
-	break;
+      break;
     case I(F_CALL_FUNCTION_BY_ADDRESS) :
-	{
-	  unsigned short func_index;
-	  struct function *funp;
+      {
+	unsigned short func_index;
+	struct function *funp;
 
-	  ((char *)&func_index)[0] = pc[0];
-	  ((char *)&func_index)[1] = pc[1];
-	  pc += 2;
-	  func_index += function_index_offset;
+	((char *)&func_index)[0] = pc[0];
+	((char *)&func_index)[1] = pc[1];
+	pc += 2;
+	func_index += function_index_offset;
 	  /*
 	   * Find the function in the function table. As the function may have
 	   * been redefined by inheritance, we must look in the last table,
@@ -1292,79 +1373,138 @@ char *p;
       case I(F_CONST1) :
       push_number(1);
 	break;
-      case I(F_PRE_DEC) :
-      if (sp->type != T_LVALUE)
-        error("Bad argument to --\n");
-      if (sp->u.lvalue->type != T_NUMBER)
+    case I(F_PRE_DEC) :
+#ifdef DEBUG
+      if(sp->type != T_LVALUE)
+	error("Bad argument to --\n");
+#endif
+      if(sp->u.lvalue->type == T_NUMBER){
+        sp->u.lvalue->u.number--;
+	assign_svalue(sp, sp->u.lvalue);
+        break;
+      }
+      else if(sp->u.lvalue->type == T_REAL){
+        sp->u.lvalue->u.real--;
+        assign_svalue(sp, sp->u.lvalue);
+        break;
+      }
+      else {
         error("-- of non-numeric argument\n");
-      sp->u.lvalue->u.number--;
-      assign_svalue(sp, sp->u.lvalue);
-	break;
-      case I(F_DEC) :
+      }
+      break;
+    case I(F_DEC) :
 #ifdef DEBUG
       if (sp->type != T_LVALUE)
         error("Bad argument to --\n");
 #endif
-      if (sp->u.lvalue->type != T_NUMBER)
+      if(sp->u.lvalue->type == T_NUMBER){
+	sp->u.lvalue->u.number--;
+      }
+      else if(sp->u.lvalue->type == T_REAL){
+	sp->u.lvalue->u.real--;
+      }
+      else {
         error("-- of non-numeric argument\n");
-      sp->u.lvalue->u.number--;
-	  sp--;
-	break;
-      case I(F_DIVIDE) :
-	f_divide(num_arg, instruction);
-	break;
-      case I(F_DIV_EQ) :
-	f_div_eq(num_arg, instruction);
-	break;
-      case I(F_DO) :
+      }
+      sp--;
+      break;
+    case I(F_DIVIDE) :
+      f_divide(num_arg, instruction);
+      break;
+    case I(F_DIV_EQ) :
+      f_div_eq(num_arg, instruction);
+      break;
+    case I(F_DO) :
       fatal("F_DO should not appear.\n");
-	break;
-      case I(F_DUP) :
+      break;
+    case I(F_DUP) :
       sp++;
       assign_svalue_no_free(sp, sp-1);
-	break;
-      case I(F_END_CATCH) :
-	f_end_catch(num_arg, instruction);
-	break;
-      case I(F_EQ) :
-	f_eq(num_arg, instruction);
-	break;
-      case I(F_FOR) :
+      break;
+    case I(F_END_CATCH) :
+      f_end_catch(num_arg, instruction);
+      break;
+    case I(F_EQ) :
+      f_eq(num_arg, instruction);
+      break;
+    case I(F_FOR) :
       fatal("F_FOR should not appear.\n");
-	break;
-      case I(F_GE) :
-      if ((sp-1)->type == T_STRING && sp->type == T_STRING)
+      break;
+    case I(F_GE) :
       {
-        i = strcmp((sp-1)->u.string, sp->u.string) >= 0;
-        pop_n_elems(2);
-        push_number(i);
-        break;
+        if((sp - 1)->type == T_NUMBER){
+          if(sp->type == T_NUMBER){
+            i = ((sp - 1)->u.number >= sp->u.number);
+          }
+          else if(sp->type == T_REAL){
+            i = ((sp - 1)->u.number >= sp->u.real);
+          }
+          else {
+            bad_arg(2, instruction);
+          }
+        }
+        else if((sp - 1)->type == T_REAL){
+          if(sp->type == T_NUMBER){
+            i = ((sp - 1)->u.real >= sp->u.number);
+          }
+          else if(sp->type == T_REAL){
+            i = ((sp - 1)->u.real >= sp->u.real);
+          }
+          else {
+            bad_arg(2, instruction);
+          }
+        }
+        else if((sp-1)->type != T_STRING){
+          bad_arg(1, instruction);
+        }
+        else if(sp->type != T_STRING){
+          bad_arg(2, instruction);
+        }
+        else {
+          i = (strcmp((sp-1)->u.string, sp->u.string) >= 0);
+        }
       }
-      if ((sp-1)->type != T_NUMBER)
-        bad_arg(1, instruction);
-      if (sp->type != T_NUMBER)
-        bad_arg(2, instruction);
-      i = (sp-1)->u.number >= sp->u.number;
-      sp--;
-      sp->u.number = i;
-	break;
-      case I(F_GT) :
-      if ((sp-1)->type == T_STRING && sp->type == T_STRING)
+      pop_n_elems(2);
+      push_number(i);
+      break;
+    case I(F_GT) :
       {
-        i = strcmp((sp-1)->u.string, sp->u.string) > 0;
-        pop_n_elems(2);
-        push_number(i);
-        break;
+        if((sp - 1)->type == T_NUMBER){
+          if(sp->type == T_NUMBER){
+            i = ((sp - 1)->u.number > sp->u.number);
+          }
+          else if(sp->type == T_REAL){
+            i = ((sp - 1)->u.number > sp->u.real);
+          }
+          else {
+            bad_arg(2, instruction);
+          }
+        }
+        else if((sp - 1)->type == T_REAL){
+          if(sp->type == T_NUMBER){
+            i = ((sp - 1)->u.real > sp->u.number);
+          }
+          else if(sp->type == T_REAL){
+            i = ((sp - 1)->u.real > sp->u.real);
+          }
+          else {
+            bad_arg(2, instruction);
+          }
+        }
+        else if((sp-1)->type != T_STRING){
+          bad_arg(1, instruction);
+        }
+        else if(sp->type != T_STRING){
+          bad_arg(2, instruction);
+        }
+        else {
+          i = (strcmp((sp-1)->u.string, sp->u.string) > 0);
+        }
       }
-      if ((sp-1)->type != T_NUMBER)
-        bad_arg(1, instruction);
-      if (sp->type != T_NUMBER)
-        bad_arg(2, instruction);
-      i = (sp-1)->u.number > sp->u.number;
-      sp--;
-      sp->u.number = i;
-	break;
-      case I(F_IDENTIFIER) :
+      pop_n_elems(2);
+      push_number(i);
+      break;
+    case I(F_IDENTIFIER) :
       sp++;
       assign_svalue_no_free(sp, find_value((int)(EXTRACT_UCHAR(pc) +
                          variable_index_offset)));
@@ -1380,14 +1520,25 @@ char *p;
       }
 	break;
       case I(F_PRE_INC) :
-      if (sp->type != T_LVALUE)
+#ifdef DEBUG
+      if(sp->type != T_LVALUE)
         error("Bad argument to ++\n");
-      if (sp->u.lvalue->type != T_NUMBER)
+#endif
+      if(sp->u.lvalue->type == T_NUMBER){
+        sp->u.lvalue->u.number++;
+        assign_svalue(sp, sp->u.lvalue);
+        break;
+      }
+      else if(sp->u.lvalue->type == T_REAL){
+        sp->u.lvalue->u.real++;
+        assign_svalue(sp, sp->u.lvalue);
+        break;
+      }
+      else {
         error("++ of non-numeric argument\n");
-      sp->u.lvalue->u.number++;
-      assign_svalue(sp, sp->u.lvalue);
-	break;
-      case I(F_INDEX) :
+      }
+      break;
+    case I(F_INDEX) :
       if ((sp-1)->type == T_MAPPING)
         {
           struct svalue *v;
@@ -1416,7 +1567,7 @@ char *p;
           sp->u.number = 0;
         }
 	break;
-      case I(F_JUMP_WHEN_ZERO) :
+    case I(F_JUMP_WHEN_ZERO) :
       if ((i = (sp->type == T_NUMBER)) && sp->u.number == 0) {
         ((char *)&offset)[0] = pc[0];
         ((char *)&offset)[1] = pc[1];
@@ -1425,39 +1576,61 @@ char *p;
         pc += 2;
       }
       if (i) {
-         sp--;  /* cheaper to do this when sp is an integer svalue */
+	sp--;  /* cheaper to do this when sp is an integer svalue */
       } else {
-         pop_stack();
+	pop_stack();
       }
-	break;
-      case I(F_JUMP) :
-     ((char *)&offset)[0] = pc[0];
-     ((char *)&offset)[1] = pc[1];
-     pc = current_prog->p.i.program + offset;
-	break;
-      case I(F_LE) :
-      if ((sp-1)->type == T_STRING && sp->type == T_STRING) {
-        i = strcmp((sp-1)->u.string, sp->u.string) <= 0;
-        pop_n_elems(2);
-        push_number(i);
-        break;
+      break;
+    case I(F_JUMP) :
+      ((char *)&offset)[0] = pc[0];
+      ((char *)&offset)[1] = pc[1];
+      pc = current_prog->p.i.program + offset;
+      break;
+    case I(F_LE) :
+      {
+        if((sp - 1)->type == T_NUMBER){
+          if(sp->type == T_NUMBER){
+            i = ((sp - 1)->u.number <= sp->u.number);
+          }
+          else if(sp->type == T_REAL){
+            i = ((sp - 1)->u.number <= sp->u.real);
+          }
+          else {
+            bad_arg(2, instruction);
+          }
+        }
+        else if((sp - 1)->type == T_REAL){
+          if(sp->type == T_NUMBER){
+            i = ((sp - 1)->u.real <= sp->u.number);
+          }
+          else if(sp->type == T_REAL){
+            i = ((sp - 1)->u.real <= sp->u.real);
+          }
+          else {
+            bad_arg(2, instruction);
+          }
+        }
+        else if((sp-1)->type != T_STRING){
+          bad_arg(1, instruction);
+        }
+        else if(sp->type != T_STRING){
+          bad_arg(2, instruction);
+        }
+	else {
+	  i = (strcmp((sp-1)->u.string, sp->u.string) <= 0);
+	}
       }
-      if ((sp-1)->type != T_NUMBER)
-        bad_arg(1, instruction);
-      if (sp->type != T_NUMBER)
-        bad_arg(2, instruction);
-      i = (sp-1)->u.number <= sp->u.number;
-      sp--;
-      sp->u.number = i;
-	break;
-      case I(F_LSH) :
-	f_lsh(num_arg, instruction);
-	break;
-      case I(F_LSH_EQ) :
-	f_lsh_eq(num_arg, instruction);
-	break;
+      pop_n_elems(2);
+      push_number(i);
+      break;
+    case I(F_LSH) :
+      f_lsh(num_arg, instruction);
+      break;
+    case I(F_LSH_EQ) :
+      f_lsh_eq(num_arg, instruction);
+      break;
       case I(F_MOD) :
-	f_mod(num_arg, instruction);
+      f_mod(num_arg, instruction);
 	break;
       case I(F_MOD_EQ) :
 	f_mod_eq(num_arg, instruction);
@@ -1472,9 +1645,12 @@ char *p;
 	f_ne(num_arg, instruction);
 	break;
       case I(F_NEGATE) :
-      if (sp->type != T_NUMBER)
+      if (sp->type == T_NUMBER)
+         sp->u.number = -sp->u.number;
+      else if (sp->type == T_REAL)
+         sp->u.real = -sp->u.real;
+      else
         error("Bad argument to unary minus\n");
-      sp->u.number = - sp->u.number;
 	break;
       case I(F_NOT) :
       if (sp->type == T_NUMBER && sp->u.number == 0)
@@ -1500,40 +1676,62 @@ char *p;
       break_sp += offset;
       pc += 2;
 	break;
-      case I(F_POST_DEC) :
-      if (sp->type != T_LVALUE)
+    case I(F_POST_DEC) :
+#ifdef DEBUG
+      if(sp->type != T_LVALUE)
         error("Bad argument to --\n");
-      if (sp->u.lvalue->type != T_NUMBER)
+#endif
+      if(sp->u.lvalue->type == T_NUMBER){
+        sp->u.lvalue->u.number--;
+        assign_svalue(sp, sp->u.lvalue);
+	sp->u.number++;
+        break;
+      }
+      else if(sp->u.lvalue->type == T_REAL){
+        sp->u.lvalue->u.real--;
+        assign_svalue(sp, sp->u.lvalue);
+	sp->u.real++;
+        break;
+      }
+      else {
         error("-- of non-numeric argument\n");
-      sp->u.lvalue->u.number--;
-      assign_svalue(sp, sp->u.lvalue);
-      sp->u.number++;
-	break;
-      case I(F_POST_INC) :
+      }
+      break;
+    case I(F_POST_INC) :
 #ifdef DEBUG
       if (sp->type != T_LVALUE)
          error("Bad argument to ++\n");
 #endif
-      if (sp->u.lvalue->type != T_NUMBER)
+      if(sp->u.lvalue->type == T_NUMBER){
+        sp->u.lvalue->u.number++;
+        assign_svalue(sp, sp->u.lvalue);
+        sp->u.number--;
+        break;
+      }
+      else if(sp->u.lvalue->type == T_REAL){
+        sp->u.lvalue->u.real++;
+        assign_svalue(sp, sp->u.lvalue);
+        sp->u.real--;
+        break;
+      }
+      else {
         error("++ of non-numeric argument\n");
-      sp->u.lvalue->u.number++;
-      assign_svalue(sp, sp->u.lvalue);
-      sp->u.number--;
-	break;
-      case I(F_PUSH_IDENTIFIER_LVALUE) :
+      }
+      break;
+    case I(F_PUSH_IDENTIFIER_LVALUE) :
       sp++;
       sp->type = T_LVALUE;
       sp->u.lvalue = find_value((int)(EXTRACT_UCHAR(pc) +
-                      variable_index_offset));
+				      variable_index_offset));
       pc++;
-	break;
-      case I(F_PUSH_INDEXED_LVALUE) :
+      break;
+    case I(F_PUSH_INDEXED_LVALUE) :
       push_indexed_lvalue();
-	break;
-      case I(F_RANGE) :
-	f_range(num_arg, instruction);
-	break;
-      case I(F_RETURN) :
+      break;
+    case I(F_RANGE) :
+      f_range(num_arg, instruction);
+      break;
+    case I(F_RETURN) :
 	{
 	  struct svalue sv;
 	  
@@ -1717,11 +1915,22 @@ char *p;
 char debug_apply_fun[30]; /* For debugging */
 
 #ifdef CACHE_STATS
-unsigned long int apply_low_call_others = 0;
-unsigned long int apply_low_cache_hits = 0;
-unsigned long int apply_low_slots_used = 0;
-unsigned long int apply_low_collisions = 0;
+unsigned int apply_low_call_others = 0;
+unsigned int apply_low_cache_hits = 0;
+unsigned int apply_low_slots_used = 0;
+unsigned int apply_low_collisions = 0;
 #endif
+
+typedef struct cache_entry_s {
+    int id;
+    char *name;
+    struct function *pr;
+    struct function *pr_inherited;
+    struct program *progp;
+    struct program *oprogp;
+    int function_index_offset;
+    int variable_index_offset;
+} cache_entry_t;
 
 int apply_low(fun, ob, num_arg)
      char *fun;
@@ -1729,14 +1938,8 @@ int apply_low(fun, ob, num_arg)
      int num_arg;
 {
   /* static memory is initialized to zero by the system or so Jacques says :) */
-  static int cache_id[APPLY_CACHE_SIZE];
-  static char *cache_name[APPLY_CACHE_SIZE];
-  static struct function *cache_pr[APPLY_CACHE_SIZE];
-  static struct function *cache_pr_inherited[APPLY_CACHE_SIZE];
-  static struct program *cache_progp[APPLY_CACHE_SIZE];
-  static struct program *cache_oprogp[APPLY_CACHE_SIZE];
-  static int cache_function_index_offset[APPLY_CACHE_SIZE];
-  static int cache_variable_index_offset[APPLY_CACHE_SIZE];
+  static cache_entry_t cache[APPLY_CACHE_SIZE];
+  cache_entry_t *entry;
   struct function *pr;
   struct program *progp;
   extern int num_error;
@@ -1782,9 +1985,10 @@ int apply_low(fun, ob, num_arg)
 #endif
     ix = (progp->p.i.id_number ^ (int)fun ^
 	  ((int)fun >> APPLY_CACHE_BITS )) & cache_mask;
-    if ((cache_id[ix] == progp->p.i.id_number)
-		&& (!cache_progp[ix] || (cache_oprogp[ix] == ob->prog))
-		&& !strcmp(cache_name[ix], fun))
+    entry = &cache[ix];
+    if ((entry->id == progp->p.i.id_number)
+		&& (!entry->progp || (entry->oprogp == ob->prog))
+		&& !strcmp(entry->name, fun))
     {
       /* We have found a matching entry in the cache. The pointer to
 	 the function name has to match, not only the contents.
@@ -1795,21 +1999,21 @@ int apply_low(fun, ob, num_arg)
 #ifdef CACHE_STATS
       apply_low_cache_hits++;
 #endif
-	if (cache_progp[ix]
+	if (entry->progp
 		/* Static functions may not be called from outside. */
 		/* the next two lines from Amylaar's driver */
-		&& (!(cache_pr[ix]->type & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE))
+		&& (!(entry->pr->type & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE))
 		|| current_object == ob) ) {
 
 	/* the cache will tell us in which program the function is, and
 	 * where
 	 */
-	push_control_stack(cache_pr[ix]);
+	push_control_stack(entry->pr);
 	csp->num_local_variables = num_arg;
-	current_prog = cache_progp[ix];
-	pr = cache_pr_inherited[ix];
-	function_index_offset = cache_function_index_offset[ix];
-	variable_index_offset = cache_variable_index_offset[ix];
+	current_prog = entry->progp;
+	pr = entry->pr_inherited;
+	function_index_offset = entry->function_index_offset;
+	variable_index_offset = entry->variable_index_offset;
 	/* Remove excessive arguments */
 	while((unsigned)csp->num_local_variables > pr->num_arg) {
 	  pop_stack();
@@ -1852,13 +2056,13 @@ int apply_low(fun, ob, num_arg)
 	 */
     } else {
       /* we have to search the function */
-      if (!cache_progp[ix] && cache_id[ix]) {
+      if (!entry->progp && entry->id) {
 	/* The old cache entry was for an undefined function, so the
 	   name had to be malloced */
-	FREE(cache_name[ix]);
+	FREE(entry->name);
       }
 #ifdef CACHE_STATS
-      if (!cache_id[ix]) {
+      if (!entry->id) {
 	apply_low_slots_used++;
       } else {
 	apply_low_collisions++;
@@ -1895,17 +2099,17 @@ int apply_low(fun, ob, num_arg)
 	      }
 	    push_control_stack(pr);
 	    /* The searched function is found */
-        cache_id[ix] = progp->p.i.id_number;
-	    cache_pr[ix] = pr;
-	    cache_name[ix] = pr->name;
+        entry->id = progp->p.i.id_number;
+	    entry->pr = pr;
+	    entry->name = pr->name;
 	    csp->num_local_variables = num_arg;
 	    current_prog = progp;
-	    cache_oprogp[ix] = current_prog; /* before setup_new_frame */
+	    entry->oprogp = current_prog; /* before setup_new_frame */
 	    pr = setup_new_frame(pr);
-	    cache_pr_inherited[ix] = pr;
-	    cache_progp[ix] = current_prog;
-	    cache_variable_index_offset[ix] = variable_index_offset;
-	    cache_function_index_offset[ix] = function_index_offset;
+	    entry->pr_inherited = pr;
+	    entry->progp = current_prog;
+	    entry->variable_index_offset = variable_index_offset;
+	    entry->function_index_offset = function_index_offset;
 #ifdef OLD_PREVIOUS_OBJECT_BEHAVIOUR
             if (current_object != ob)
 #endif
@@ -1925,9 +2129,9 @@ int apply_low(fun, ob, num_arg)
 	  }
       }
       /* We have to mark a function not to be in the object */
-      cache_id[ix] = progp->p.i.id_number;
-      cache_name[ix] = string_copy(fun);
-      cache_progp[ix] = (struct program *)0;
+      entry->id = progp->p.i.id_number;
+      entry->name = string_copy(fun);
+      entry->progp = (struct program *)0;
     }
 #ifndef NO_SHADOWS
     if (ob->shadowing) {
@@ -2221,7 +2425,7 @@ char *str;
 }
 
 int
-  inter_sscanf(num_arg)
+inter_sscanf(num_arg)
 int num_arg;
 {
   char *fmt;		/* Format description */
@@ -2235,7 +2439,7 @@ int num_arg;
    * First get the string to be parsed.
    */
   if (arg[0].type != T_STRING)
-    bad_arg(1, F_SSCANF);
+    bad_arg(1, I(F_SSCANF));
   in_string = arg[0].u.string;
   if (in_string == 0)
     return 0;
@@ -2288,6 +2492,8 @@ int num_arg;
     }
     if (fmt[1] == 'd')
       type = T_NUMBER;
+    else if (fmt[1] == 'f')
+      type = T_REAL;
     else if (fmt[1] != 's')
       error("Bad type : '%%%c' in sscanf fmt string.", fmt[1]);
     if (skipme) {
@@ -2321,6 +2527,36 @@ int num_arg;
       if (fmt[0] != '%') {
 	number_of_matches++;
 	break;
+      }
+      continue;
+    }
+    /*
+     * float case (bobf@metronet.com 2/24/93)
+     * too bad we can't use strtod() -- not all OS's have it
+     */
+    if (type == T_REAL)
+    {
+      char *tmp = in_string;
+      float tmp_num;
+      tmp_num = _strtof(in_string, &in_string);
+      if (!skipme)
+      {
+        if (tmp == in_string)
+          break;
+        free_svalue(arg->u.lvalue);
+        arg->u.lvalue->type = T_REAL;
+        arg->u.lvalue->u.real = tmp_num;
+      }
+      while (fmt[0] && fmt[0] == in_string[0])
+      {
+        fmt++;
+        in_string++;
+      }
+      skipme = 0;  /* just in case it was ++'d */
+      if (fmt[0] != '%')
+      {
+        number_of_matches++;
+        break;
       }
       continue;
     }
@@ -2745,4 +2981,65 @@ char *p, *s;
     if (*p++ != *s++)
       return 0;
   return 1;
+}
+
+float
+_strtof(nptr, endptr)
+char *nptr;
+char **endptr;
+{
+  register char *s = nptr;
+  register float acc;
+  register int neg, c, any, div;
+ 
+  div = 1;
+  neg = 0;
+  /*
+   * Skip white space and pick up leading +/- sign if any.
+   */
+  do
+  {
+    c = *s++;
+  } while (isspace(c));
+  if (c == '-')
+  {
+    neg = 1;
+    c = *s++;
+  }
+    else
+    if (c == '+')
+      c = *s++;
+ 
+  for (acc = 0, any = 0; ; c = *s++)
+  {
+    if (isdigit(c))
+      c -= '0';
+      else
+      if ((div == 1) && (c == '.'))
+      {
+        div = 10;
+        continue;
+      }
+        else
+        break;
+    if (div == 1)
+    {
+      acc *= (float)10;
+      acc += (float)c;
+    }
+      else
+    {
+      acc += (float)c / (float)div;
+      div *= 10;
+    }
+    any = 1;
+  }
+ 
+  if (neg)
+    acc = -acc;
+ 
+  if (endptr != 0)
+    *endptr = any ? s - 1 : (char *)nptr;
+ 
+  return acc;
 }

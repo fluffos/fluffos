@@ -25,6 +25,9 @@ void remove_swap_file PROT((struct object *));
 
 extern int atoi();
 
+void remove_all_call_out PROT((struct object *obj));
+
+
 struct object *previous_ob;
 extern struct svalue const0, const0n;
 
@@ -155,6 +158,10 @@ int svalue_save_size(v)
 		sprintf(numbuf, "%d", v->u.number);
 		return strlen(numbuf) + 1;
 	}
+	if (v->type == T_REAL) {
+		sprintf(numbuf, "%f", v->u.real);
+		return strlen(numbuf) + 1;
+	}
 	return 2;
 }
 
@@ -182,6 +189,8 @@ char *buf;
        strcat(buf, tbuf);  FREE(tbuf);
     } else if (v->type == T_NUMBER) {
        sprintf(buf + strlen(buf), "%d", v->u.number);
+	} else if (v->type == T_REAL) {
+       sprintf(buf + strlen(buf), "%f", v->u.real);
 	} else if (v->type == T_MAPPING) {
        tbuf = save_mapping(v->u.map);
        strcat(buf,tbuf);   FREE(tbuf);
@@ -359,8 +368,15 @@ restore_array(str, is_mapping)
       pt2 = strchr(pt, delim);
       if (!pt2) return v;
       pt2[0] = 0;
-      v->item[i].type = T_NUMBER;
-      sscanf(pt,"%d",&(v->item[i].u.number));
+      if (strchr(pt, '.'))
+      {
+        v->item[i].type = T_REAL;
+        sscanf(pt, "%f", &(v->item[i].u.real));
+      } else
+      {
+        v->item[i].type = T_NUMBER;
+        sscanf(pt,"%d",&(v->item[i].u.number));
+      }
       pt = &pt2[1];
     }
   }
@@ -428,6 +444,16 @@ struct svalue *v;
             return 0;
         }
 
+/* Restore real: blackthorn 2/24/93
+*/
+
+        if (strchr(val, '.'))
+        {
+          free_svalue(v);
+          v->type = T_REAL;
+          if (sscanf(val, "%f", &(v->u.real)) == 1)
+            return 0;
+        }
 	free_svalue(v);
 	v->type = T_NUMBER;
 	v->u.number = atoi(val);
@@ -458,8 +484,13 @@ char *theBuff, *name, *val;
 	} else {
 		nextBuff = 0;
 	}
+        if (buff[0] == '#')
+            continue;
 	space = strchr(buff, ' ');
 	if ((space == 0) || ((space - buff) >= sizeof(var))) {
+            FREE(val);
+            FREE(name);
+            FREE(theBuff);
 	    error("Illegal format when restore %s.\n", name);
 	}
 	(void)strncpy(var, buff, space - buff);
@@ -548,6 +579,9 @@ void save_object(ob, file, save_zeros)
 			}
 		FREE(new_string);
 	}
+	if (failed) {
+		add_message("Failed to completely save file. Disk could be full.\n");
+	} else {
 	(void)unlink(name);
 #ifndef MSDOS
 	if (link(tmp_name, name) == -1)
@@ -558,7 +592,8 @@ void save_object(ob, file, save_zeros)
 	{
 		perror(name);
 		printf("Failed to link %s to %s\n", tmp_name, name);
-		add_message("Failed to save object !\n");
+		add_message("Failed to save object!\n");
+	}
 	}
 #ifndef MSDOS
 	(void)fclose(f);
@@ -580,8 +615,6 @@ int restore_object(ob, file, noclear)
     struct object *save = current_object;
     struct stat st;
 
-    if (current_object != ob)
-        fatal("Bad argument to restore_object()\n");
     if (ob->flags & O_DESTRUCTED)
         return 0;
 
@@ -1025,4 +1058,55 @@ struct object *ob;
 	} else {
 		return 1;
 	}
+}
+
+void
+reload_object(obj)
+struct object *obj;
+{
+  int i;
+  if (!obj->prog) return;
+  for (i = 0; (unsigned)i < obj->prog->p.i.num_variables; i++)
+  {
+    free_svalue(&obj->variables[i]);
+    obj->variables[i] = const0n;
+  }
+  if (obj->flags & O_EFUN_SOCKET) {
+    close_referencing_sockets(obj);
+  }
+  /*
+   * If this is the first object being shadowed by another object, then
+   * destruct the whole list of shadows.
+   */
+#ifndef NO_SHADOWS
+  if (obj->shadowed && !obj->shadowing) {
+    struct svalue svp;
+    struct object *ob2;
+    svp.type = T_OBJECT;
+    for (ob2 = obj->shadowed; ob2; ) {
+      svp.u.ob = ob2;
+      ob2 = ob2->shadowed;
+      svp.u.ob->shadowed = 0;
+      svp.u.ob->shadowing = 0;
+      destruct_object(&svp);
+    }
+  }
+  /*
+   * The chain of shadows is a double linked list. Take care to update
+   * it correctly.
+   */
+  if (obj->shadowing)
+    obj->shadowing->shadowed = obj->shadowed;
+  if (obj->shadowed)
+    obj->shadowed->shadowing = obj->shadowing;
+  obj->shadowing = 0;
+  obj->shadowed = 0;
+#endif
+  if (obj->living_name)
+    remove_living_name(obj);
+  obj->flags &= ~O_ENABLE_COMMANDS;
+  set_heart_beat(obj, 0);
+  remove_all_call_out(obj);
+  add_light(obj, -(obj->total_light));
+  reset_object(obj, 0);
 }

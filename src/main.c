@@ -30,8 +30,8 @@ int t_flag = 0;	/* Disable heart beat and reset */
 int e_flag = 0;	/* Load empty, without castles. */
 int comp_flag = 0; /* Trace compilations */
 int max_cost;
-long time_to_swap;
-long time_to_clean_up;
+int time_to_swap;
+int time_to_clean_up;
 char *default_fail_message;
 
 #ifdef YYDEBUG
@@ -102,7 +102,7 @@ int main(argc, argv)
   MDinit();
 #endif
 
-#if (defined(PROFILING) && !defined(PROFILE_ON))
+#if (defined(PROFILING) && !defined(PROFILE_ON) && defined(HAS_MONCONTROL))
   moncontrol(0);
 #endif
   tzset();

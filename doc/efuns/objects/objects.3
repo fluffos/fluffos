@@ -1,0 +1,13 @@
+.\"return an array of all loaded objects
+.TH objects 3
+ 
+.SH NAME
+objects - return an array of all loaded objects
+ 
+.SH SYNOPSIS
+object *objects();
+ 
+.SH DESCRIPTION
+An array of every object loaded on the mud is returned by objects().  Note
+that if the system's maximum array size is set too low, objects() will
+truncate its array, in which case it might not be too useful.

@@ -1,18 +1,186 @@
-*  lvalue lifetime bug: There isn't an easy fix for it and it leads to delayed
-   and unpredictable crashes. It's simplest form is something like a[0]=(a=0).
-   There the reference to a[0] is pushed on the stack, a gets freed and then
-   the area formerly occupied by a gets assigned something. This leads to
-   especially nasty effects if you do something more on the right hand side,
-   i.e. a function call which deallocates a and then loads an object into the
-   free space - has rather devastating effects, I assure you. Fixing that means
-   major changes in the gamedriver.
-
-*  save_object() within objects containing circular arrays. Example:
-   mixed *a; create() { a = allocate(1); a[0]=a; save_object(SOME_FILE); }
-   Easy fix: disallow saving of objects with arrays more than a given depth.
-   Difficult fix (employed by Amylaar): save the circular structure in a special
-   format and make it recoverable by restore_object().
-
-*  telnet_neg() in comm.c seems not to handle some clients correctly.
-   In particular, carriage returns and line feeds aren't deal with as
-   expected.  This may be a problem with the clients.  Not sure.
+Updating master.c causes the mud to crash again. What seems to be happening 
+is that when init_object() is called on the new master object (from 
+assert_master_ob_loaded), a reset() gets called on the object.  Other than 
+being something incorrect, on our mud, this reset uses a file operation, 
+which causes assert_master_ob_loaded to be called again, causing the crash.
+ 
+The reset is being called because:
+  init_object() calls init_stats_for_object()
+  init_stats_for_object() calls init_domain_for_ob()
+    tmp_ob gets set to the new master object
+    there is a current object, so the NONAME part is skipped
+    apply(domain_file, new_ob) is called
+      this does a try_reset()
+      try_reset() actually calls the reset, because the new
+        object has not been fully initialized - reset() is being
+        called before create() even - the time_to_next_reset is
+        still 0...  The line after the init_object() is what
+        should be doing the create, but it doesn't make it that far.
+ 
+So, solutions...  Maybe have assert_master_ob_loaded temporarily reset 
+current_object to 0 when it is loading the object?  Or have special checks 
+in init_domain_for_ob, init_author_for_ob, and maybe in give_uid_to_object? 
+(djohnson@cs.ucsd.edu)
+ 
+-----
+ 
+In compile_object, it is possible for the object to get loaded twice, 
+causing the game to crash.  The sequence of events on our mud was to call 
+an external object to create the virtual object; when created, this 
+external object moved a couple of monsters into some rooms; one of these 
+rooms turned out to be the same virtual room that was currently being 
+created - so a recursive call to compile_object was made to create it; the 
+create() function in the external object finished; the external function 
+then cloned up a new object, initialized it, and returned it; the driver 
+then crashed because it had already entered an object with that name into 
+the hash table. 
+(djohnson@cs.ucsd.edu)
+ 
+-----
+ 
+        :z   
+           set_wandering(1, 120, 0);
+           set_chats(({
+                    "smile",
+                    "sing Santa Claws is coming to town!",
+                    "say Do we have any good children here?",
+                    "say You must be kind to your fellow people.",
+                    "smile Do you believe in the magic of christmas?",
+                    "smile",
+                    "laugh"
+                    }), 10);
+        :I
+        Indenting entire code...
+        Done indenting.
+        :I
+        Indenting entire code...
+        Detected a unterminated string on line 43
+        Indention halted.
+        :43
+                    "l}), 10);
+        :-10
+           
+        :z
+           
+           set_wandering(1, 120, 0);
+           set_chats(({
+                    "smile",
+                    "sing Santa Claws is coming to town!",
+                    "say Do we have any good children here?",
+                    "say You must be kind to your fellow people.",
+                    "smile Do you believe in the magic of christmas?",
+                    "smile",
+                    "laugh"
+                    "l}), 10);
+        }
+        :Q
+        Exit from ed.
+ 
+So there has been extra "l inserted into during the first intendation
+which caused the second intendation to barf about the unterminated string.
+ 
+-----
+ 
+using save_object() with large mapping variables is very very very very 
+slow.  
+(bobf@metronet.com)
+ 
+it's because of all the strcat()'s being done.  these could be optimized 
+away with proper coding :)
+(garnett@gestalt.austin.tx.us)
+ 
+-----
+ 
+in item_parse(), the %p doesnt seem to work correctly.  it returns 0, instead 
+of an array of prepositions, when it is passed such.  it works fine if it's 
+not passed anything.
+(rickert@cco.caltech.edu)
+ 
+-----
+ 
+following code crashed Genocide multiple times:
+  string *stuff; 
+  stuff = ({ "test1", "test2", "test3"}); 
+  stuff[0][2..4] = "ab"; 
+  write(stuff[0]);
+(maurg@csv.warwick.ac.uk)
+ 
+-----
+ 
+following code crashes NannyMUD:
+  ({ 1, 2, 3 })[1..0] = ({ 1, 2 });
+ 
+-----
+ 
+When using the efun say() with an array of "targets" to exclude as second 
+argument, it doesnt seem to exclude any of them but instead both objects gets 
+the message, even worse, when I got the first of the two items in the 
+array = 0 the GD just crashes.
+(Ged)
+ 
+-----
+ 
+the error(), fatal(), and debug_fatal() functions in simulate.c need to be 
+done with proper varargs stuff.  one reason: to support 64-bit systems in 
+the future, where strings and ints aren't of the same size.
+(bobf@metronet.com)
+ 
+-----
+ 
+printf("%.5ftest", 1.0);
+prints 1.000, but it should print 1.000test
+(maurg@csv.warwick.ac.uk)
+ 
+-----
+ 
+printf("%O", large_array)
+ERROR: (s)printf(): BUFF_SIZE overflowed... in arg 0
+couple of seconds later it crashes
+(maurg@csv.warwick.ac.uk)
+ 
+-----
+ 
+Could you fellas make it possible to refresh the simul_efun without taking 
+down the whole mud ? i.e. not doing a shutdown ! As it is now, one can make 
+changes in the function that are present but you cannot add or remove 
+function and then update the simul_efun object. 
+(Radagast)
+ 
+-----
+ 
+do we really want RETURN_ERROR_MESSAGES defined in sprintf.c?
+(bobf@metronet.com)
+ 
+-----
+ 
+the following crashed CyberMUD:
+  string *test;
+  test = ({ "Decker" });
+  printf( "Array is: %-15.15O\n", test );
+(Decker)
+ 
+-----
+ 
+Should all the d_flag checks only be present if DEBUG is defined?
+(djohnson@cs.ucsd.edu)
+ 
+-----
+ 
+crasher: message("say", "hello", ({ 0 }))
+ 
+-----
+ 
+save_object() doesn't prepend a "/" to the filename passed to valid_write()?
+ 
+-----
+ 
+lvalue lifetime bug: There isn't an easy fix for it and it leads to delayed 
+and unpredictable crashes. It's simplest form is something like a[0]=(a=0). 
+There the reference to a[0] is pushed on the stack, a gets freed and then 
+the area formerly occupied by a gets assigned something. This leads to 
+especially nasty effects if you do something more on the right hand side, 
+i.e. a function call which deallocates a and then loads an object into the 
+free space - has rather devastating effects, I assure you. Fixing that 
+means major changes in the gamedriver.
+ 
+-----

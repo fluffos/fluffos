@@ -2,16 +2,16 @@
 ** A simple and fast generic string hasher based on Peter K. Pearson's
 ** article in CACM 33-6, pp. 677.
 */
+#include "config.h"
 
-int
+INLINE int
 hashstr(s, maxn, hashs)
 char *s;			/* string to hash */
 int maxn;			/* maximum number of chars to consider */
 int hashs;			/* hash table size. */
 {
-    register int h;
+    register unsigned int h;
     register unsigned char *p;
-    register int i;
     static int T[] = {
 	1, 87, 49, 12, 176, 178, 102, 166, 121, 193, 6, 84, 249, 230, 44, 163,
 	14, 197, 213, 181, 161, 85, 218, 80, 64, 239, 24, 226, 236, 142, 38, 200,
@@ -30,15 +30,20 @@ int hashs;			/* hash table size. */
 	140, 36, 210, 172, 41, 54, 159, 8, 185, 232, 113, 196, 231, 47, 146, 120,
 	51, 65, 28, 144, 254, 221, 93, 189, 194, 139, 112, 43, 71, 109, 184, 209,
     };
-
-
-    for(h = 0, i = 0, p = (unsigned char *)s; *p && i < maxn; i++, p++)
-	h = T[h ^ *p];
-    if (hashs > 256 && *s) {
-	int oh = h;
-	for(i = 1, p = (unsigned char *)s, h = (*p++ + 1)&0xff; *p && i < maxn; i++, p++)
-	    h = T[h ^ *p];
-	h += (oh << 8);
+    
+    h = (unsigned char) *s;
+    if (h) {
+      if (hashs > 256) {
+	register int oh = T[(unsigned char) *s];
+	for(p = (unsigned char *)s + 1; *p && p <= (unsigned char*)s + maxn; p++) {
+	  h = T[h ^ *p];
+	  oh = T[oh ^ *p];
+	}
+	h |= (oh << 8);
+      }
+      else
+	for(p = (unsigned char *)s + 1; *p && p <= (unsigned char *)s + maxn; p++)
+	  h = T[h ^ *p];
     }
-    return h % hashs;		/* With 16 bit ints h has to be made positive first! */
+    return h % hashs;
 }

@@ -12,7 +12,7 @@
 #endif
 
 typedef struct stats_s {
-	unsigned long free_calls, alloc_calls, realloc_calls;
+	unsigned int free_calls, alloc_calls, realloc_calls;
 } stats_t;
 
 static stats_t stats;

@@ -29,3 +29,6 @@ above initialization does not restrict you to 200 entries.  It just that
 the first 200 entries will be stored more efficiently.  Note: if you will be
 deleting many elements from the mapping, you should use x = ([]) to
 initialize the mapping rather than using allocate_mapping().
+
+note: at this point in time, `size' is meaningless, x = allocate_mapping(200);
+is equivalent to x = ([ ]);

@@ -1047,6 +1047,7 @@ struct svalue *item_parse(obvec, wvec, cix_in, fail)
    
    stmp.type = T_POINTER;
    stmp.u.vec = ret;
+   ret->ref--;
    return &stmp;
 }
 

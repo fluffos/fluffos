@@ -215,8 +215,8 @@ void backend()
 */
 static void look_for_objects_to_swap()
 {
-  extern long time_to_swap; /* marion - for invocation parameter */
-  extern long time_to_clean_up;
+  extern int time_to_swap; /* marion - for invocation parameter */
+  extern int time_to_clean_up;
   static int next_time;
   struct object *ob;
   struct object *next_ob;
@@ -349,7 +349,7 @@ void call_heart_beat() {
   heart_beat_flag = 0;
 
   signal(SIGALRM, sigalrm_handler);
-#if defined(SYSV) || defined(SVR4)
+#if defined(SYSV) || defined(SVR4) || defined(cray)
   alarm(SYSV_HEARTBEAT_INTERVAL); /* defined in config.h */
 #else
   ualarm(HEARTBEAT_INTERVAL,0);
@@ -478,7 +478,7 @@ int heart_beat_status(verbose)
 {
   char buf[20];
 
-  if(verbose){
+  if (verbose == 1) {
     add_message("\nHeart beat information:\n");
     add_message("-----------------------\n");
     add_message("Number of objects with heart beat: %d, starts: %d\n",

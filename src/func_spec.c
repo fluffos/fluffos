@@ -46,6 +46,7 @@ mixed *localtime(int);
 object find_object(string);
 object find_player(string);
 string function_exists(string, object default: F_THIS_OBJECT);
+int reclaim_objects();
 string implode(string *, string);
 mixed *keys(mapping);
 mixed *values(mapping);
@@ -63,10 +64,12 @@ string lower_case(string);
 string *get_dir(string, int default: F_CONST0);
 mixed *map_array(mixed *, string, object|string, void|mixed);
 int member_array(mixed, mixed *);
+int memory_info(object|void);
 int mkdir(string);
 void move_object(object|string, void|object|string);
 void notify_fail(string);
 int objectp(mixed);
+object *objects();
 int pointerp(mixed);
 object present(object|string, void|object);
 object previous_object();
@@ -93,8 +96,10 @@ int set_heart_beat(int);
 void set_hide(int);
 int set_light(int);
 void set_living_name(string);
+void set_reset(object, void|int);
 #ifndef NO_SHADOWS 
 object shadow(object, int);
+int shadowp(object);
 #endif
 void shout(string);
 void shutdown(void|int);
@@ -171,9 +176,6 @@ int seteuid(string|int);
 object first_inventory(object|string default: F_THIS_OBJECT);
 object next_inventory(object default: F_THIS_OBJECT);
 
-/*
- * New functions for MudOS
- */
 int cp(string, string);
 int link(string, string);
 void get_char(string, void|int);
@@ -185,6 +187,7 @@ int undefinedp(mixed);
 int nullp(mixed);
 
 int refs(mixed);
+void reload_object(object);
 
 /*
  * socket efuns
@@ -210,7 +213,7 @@ void malloc_status();
 void dumpallobj(string|void);
 void mud_status(int default : F_CONST0);
 
-#ifdef PROFILING
+#if defined(PROFILING) && defined(HAS_MONCONTROL)
 void moncontrol(int);
 #endif
 
@@ -219,6 +222,7 @@ string arch();
 void error(string);
 
 int uptime();
+int virtualp(object);
 
 int strcmp(string, string);
 
@@ -263,3 +267,37 @@ void doppel_mod (string, string, int);
 mixed *find_keywords (string);
 void init_mire();
 #endif
+
+#ifdef MATH
+float cos(float);
+float sin(float);
+float tan(float);
+float asin(float);
+float acos(float);
+float atan(float);
+float sqrt(float);
+float log(float);
+float pow(float, float);
+float exp(float);
+float floor(float);
+float ceil(float);
+#endif
+
+int floatp(mixed);
+
+int to_int(string|float|int);
+float to_float(string|float|int);
+
+/*
+ * Perspective efuns
+ */
+#ifdef MATRIX
+float *id_matrix();
+float *translate(float *, float, float, float);
+float *scale(float *, float, float, float);
+float *rotate_x(float *, float);
+float *rotate_y(float *, float);
+float *rotate_z(float *, float);
+float *lookat_rotate(float *, float, float, float);
+float *lookat_rotate2(float *, float, float, float, float, float, float);
+#endif /* MATRIX */

@@ -11,13 +11,13 @@
 ** adapted by Blackthorn@Genocide to work with MudOS 0.9.15 - 93/01/26
 */
 
-#if defined(sun)
-#include <sys/types.h>
-#endif
-
 #include <stdio.h>
 #include "config.h"
 #include "lint.h"
+
+#if defined(sun) || defined(accel) || defined(hp68k)
+#include <sys/types.h>
+#endif
 
 #if defined(sparc)
 #define MALLOC_ALIGN 8
@@ -65,7 +65,7 @@ extern int using_smalloc;
 /* SMALL BLOCK info */
 
 #if defined( atarist ) || defined( linux ) || defined( AMIGA )
-typedef unsigned long u;
+typedef unsigned int u;
 #else
 typedef unsigned int u;
 #endif
@@ -84,10 +84,10 @@ static u *start_next_block=0;
 
 /* STATISTICS */
 
-static long small_count[SMALL_BLOCK_MAX]={0,0,0,0,0,0,0,0};
-static long small_total[SMALL_BLOCK_MAX]={0,0,0,0,0,0,0,0};
-static long small_max[SMALL_BLOCK_MAX]  ={0,0,0,0,0,0,0,0};
-static long small_free[SMALL_BLOCK_MAX] ={0,0,0,0,0,0,0,0};
+static int small_count[SMALL_BLOCK_MAX]={0,0,0,0,0,0,0,0};
+static int small_total[SMALL_BLOCK_MAX]={0,0,0,0,0,0,0,0};
+static int small_max[SMALL_BLOCK_MAX]  ={0,0,0,0,0,0,0,0};
+static int small_free[SMALL_BLOCK_MAX] ={0,0,0,0,0,0,0,0};
 
 typedef struct { unsigned counter, size; } t_stat;
 #define count(a,b) { a.size+=(b); if ((b)<0) --a.counter; else ++a.counter; }
@@ -1337,7 +1337,7 @@ POINTER calloc(nelem, sizel)
  */
 
 void walk_new_small_malloced(func)
-    void (*func) PROT((POINTER, long));
+    void (*func) PROT((POINTER, int));
 {
     int i;
     u *p, *q;

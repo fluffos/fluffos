@@ -23,22 +23,6 @@ A mapping can be initialized in one of two ways:
 
    (note: 'x = ([]);' can be used to create an empty mapping)
 
-or:
-   #define INITIAL_SIZE 200
-   x = allocate_mapping(INITIAL_SIZE);
-
-where INITIAL_SIZE is replaced by the initial size of the mapping.
-Using allocate_mapping is the preferred way to initalize the mapping if 
-you have some idea of how many elements the map will contain (200
-in this case) and if few elements will be deleted from the map.  The
-reason is that allocating storage all at once (contiguously) is slightly
-more memory efficient.  Note that the storage allocated by allocate_mapping()
-will not be freed until the mapping itself is freed; this is why use of
-allocate_mapping is not memory efficient if many deletion operations
-occur (via the map_delete efun).  Note, that the above initialization
-does _not_ limit the mapping to 200 entries.  It just that the first 200
-entries will be stored more efficiently.
-
 Note that a mapping _must_ be initialized before you may assign any elements
 to it.  This restriction exists because of the way the gamedriver
 initializes all variables (regardless of type) to zero (0).  If you do not

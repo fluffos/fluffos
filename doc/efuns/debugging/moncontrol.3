@@ -1,0 +1,14 @@
+.\"turns on/off profiling during execution
+.TH moncontrol 3
+
+.SH NAME
+moncontrol() - turns on/off profiling during execution
+
+.SH SYNOPSIS
+void moncontrol(int on);
+
+.SH DESCRIPTION
+If passed 1, moncontrol() enables profiling.  If passed 0, moncontrol()
+disables profiling.  It can be called many times during execution, typical
+use is to profile only certain parts of driver execution.  moncontrol()
+has no effect if profiling is not enabled at driver compile time.

@@ -1,6 +1,9 @@
+#include "config.h"
 #include <sys/types.h>
 #include <sys/stat.h>
+#if !defined(SunOS_5)
 #include <sys/dir.h>
+#endif
 #include <fcntl.h>
 #include <setjmp.h>
 #include <string.h>
@@ -14,7 +17,6 @@
 #include <dirent.h>
 #endif
 
-#include "config.h"
 #include "lint.h"
 #include "lang.tab.h"
 #include "interpret.h"
@@ -39,7 +41,8 @@ extern int readlink PROT((char *, char *, int));
 extern int symlink PROT((char *, char *));
 #endif /* NeXT */
      
-#if !defined(hpux) && !defined(_AIX) && !defined(__386BSD__) && !defined(linux)
+#if !defined(hpux) && !defined(_AIX) && !defined(__386BSD__) \
+	&& !defined(linux) && !defined(SunOS_5)
 extern int fchmod PROT((int, int));
 #endif /* !defined(hpux) && !defined(_AIX) */
 char *last_verb;
@@ -53,7 +56,6 @@ void pre_compile PROT((char *)),
        add_action PROT((char *, char *, int)),
        add_verb PROT((char *, int)),
        ipc_remove(),
-       show_info_about PROT((char *, char *, struct interactive *)),
        set_snoop PROT((struct object *, struct object *)),
        print_lnode_status PROT((int)),
        start_new_file PROT((FILE *)), end_new_file(),
@@ -960,6 +962,9 @@ void say(v, avoid)
   case T_NUMBER:
     sprintf(buff, "%d", v->u.number);
     break;
+  case T_REAL:
+    sprintf(buff, "%f", v->u.real);
+    break;
   default:
     error("Invalid argument %d to say()\n", v->type);
   }
@@ -1000,6 +1005,9 @@ void tell_room(room, v, avoid)
     break;
   case T_NUMBER:
     sprintf(buff, "%d", v->u.number);
+    break;
+  case T_REAL:
+    sprintf(buff, "%f", v->u.real);
     break;
   default:
     error("Invalid argument %d to tell_room()\n", v->type);
@@ -1217,6 +1225,8 @@ void print_svalue(arg)
     add_message("OBJ(%s)", arg->u.ob->name);
   else if(arg->type == T_NUMBER)
     add_message("%d", arg->u.number);
+  else if(arg->type == T_REAL)
+    add_message("%g", arg->u.real);
   else if(arg->type & T_POINTER)
     add_message("<ARRAY>");
   else if (arg->type == T_MAPPING)
@@ -1523,12 +1533,9 @@ int user_parser(buff)
     if (s->verb == 0)
       error("No action linked to verb.\n");
     len = strlen(s->verb);
-    if (s->flags & V_NOSPACE) {
+    if (s->flags & (V_NOSPACE | V_SHORT)) {
       if(strncmp(buff, s->verb,len) != 0)
-	continue;
-    } else if (s->flags & V_SHORT) {
-      if (strncmp(s->verb, buff, len) != 0)
-	continue;
+	      continue;
     } else {
       if (len != length) continue;
       if (strncmp(buff, s->verb, length))
@@ -1872,7 +1879,8 @@ void error(fmt, a, b, c, d, e, f, g, h)
  */
 int MudOS_is_being_shut_down;
 
-#if !defined(_AIX) && !defined(NeXT) && !defined(_SEQUENT_) && !defined(SVR4)
+#if !defined(_AIX) && !defined(NeXT) && !defined(_SEQUENT_) && !defined(SVR4) \
+	&& !defined(cray) && !defined(SunOS_5)
 void startshutdownMudOS() {
   MudOS_is_being_shut_down = 1;
 }
@@ -1956,7 +1964,8 @@ void slow_shut_down(minutes)
       shout_string("MudOS driver shouts: Out of memory.\n");
       command_giver = save_command;
       current_object = save_current;
-#if !defined(_AIX) && !defined(NeXT) && !defined(_SEQUENT_) && !defined(SVR4)
+#if !defined(_AIX) && !defined(NeXT) && !defined(_SEQUENT_) && !defined(SVR4) \
+	&& !defined(cray) && !defined(SunOS_5)
       startshutdownMudOS();
 #else
       startshutdownMudOS(1);

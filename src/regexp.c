@@ -198,7 +198,7 @@ static short   *regparse;	/* Input-scan pointer. */
 static int      regnpar;	/* () count. */
 static char     regdummy;
 static char    *regcode;	/* Code-emit pointer; &regdummy = don't. */
-static long     regsize;	/* Code size. */
+static int     regsize;	/* Code size. */
 
 /*
  * Forward declarations for regcomp()'s friends.
@@ -1181,7 +1181,7 @@ regexp         *r;
 	if (nxt == (char *)NULL)	/* nxt ptr. */
 	    printf("(0)");
 	else
-	    printf("(%ld)", (s - r->program) + (nxt - s));
+            printf("(%d)", (int)((s - r->program) + (nxt - s)));
 	s += 3;
 	if (op == ANYOF || op == ANYBUT || op == EXACTLY) {
 	    /* Literal string, where present. */

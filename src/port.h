@@ -1,12 +1,34 @@
 /*
  * port.h: global portability #defines for MudOS, an enhanced LPmud 3.1.2
  *
- * configured for: NeXT, Sequent, HP PA-RISC (HP-UX), Sparc, and RS/6000
- *
  * If you have to have to change this file to get MudOS to compile and
  * run on your system, please provide us wth a copy of your modified port.h
  * file and the name of the type of system you are using.
  */
+
+/* hack to figure out if we are being compiled under Solaris or not */
+#ifdef sun
+#ifdef __svr4__
+#define SunOS_5
+#else
+#define SunOS_4
+#endif
+#endif
+
+#ifdef SunOS_5
+#define SVR4
+#endif
+
+/*
+ * setup simpler defines to use to refer to some system types
+ */
+#if (defined(hp200) || defined(hp300) || defined(hp400) || defined(hp500)) && !defined(hpux)
+#define hp68k
+#endif
+
+#if defined(__osf__) || defined(__OSF__)
+#define M_UNIX
+#endif
 
 /* define this if your builtin version of inet_ntoa() works well.  It has a
  * problem on some sun 4's (SPARCstations) (if the driver crashes at
@@ -22,7 +44,7 @@
  * use drand48 if you have it (it is the better random # generator)
  */
 
-#if (defined(NeXT) || defined(__386BSD__))
+#if defined(NeXT) || defined(__386BSD__) || defined(hp68k)
 #define RANDOM
 #else /* Sequent, HP, Sparc, RS/6000 */
 #define DRAND48
@@ -32,7 +54,8 @@
  * Does the system have a getrusage() system call?
  * Sequent and HP don't have it.
  */
-#if !defined(_SEQUENT_) && !defined(hpux) && !defined(SVR4) && !defined(_AUX_SOURCE)
+#if !defined(_SEQUENT_) && !defined(hpux) && !defined(SVR4) \
+	&& !defined(_AUX_SOURCE) && !defined(cray)
 #define RUSAGE
 #endif
 
@@ -41,7 +64,7 @@
  * defined.
  */
 #if defined(hpux) || defined(apollo) || defined(__386BSD__) || \
-	defined(_AUX_SOURCE)
+	defined(_AUX_SOURCE) || defined(cray)
 #define TIMES
 #endif
 
@@ -67,7 +90,11 @@
  * Define FCHMOD_MISSING only if your system doesn't have fchmod().
  */
 /* HP, Sequent, NeXT, Sparc all have fchmod() */
+#ifdef cray
+#define FCHMOD_MISSING
+#else
 #undef FCHMOD_MISSING
+#endif
 
 /*
  * Define HAS_SETDTABLESIZE if your system has getdtablesize()/setdtablesize().
@@ -88,7 +115,7 @@
    look in /usr/include/signal.h for the return type of signal() when an
    error occurs
 */
-#if (defined(NeXT) || defined(accel) || defined(apollo) || defined(__386BSD__))
+#if defined(NeXT) || defined(accel) || defined(apollo) || defined(__386BSD__) || defined(hp68k)
 #define SIGNAL_ERROR BADSIG
 #else
 #define SIGNAL_ERROR SIG_ERR
@@ -159,6 +186,15 @@ asking your system adminstrator.
 #ifdef linux
 #define ARCH "Linux"
 #endif
+#ifdef hp68k
+#define ARCH "HP"
+#endif
+#ifdef cray
+#define ARCH "Cray"
+#endif
+#if defined(__osf__) || defined(__OSF__)
+#define ARCH "OSF/1"
+#endif
 
 #if (!defined(ARCH) && defined(SVR4))
 #define ARCH "SVR4"
@@ -170,3 +206,7 @@ asking your system adminstrator.
 
 /* undef this if your compiler doesn't support varargs */
 #define VARARGS
+
+#if defined(cray) && !defined(MAXPATHLEN)
+#define MAXPATHLEN PATH_MAX
+#endif

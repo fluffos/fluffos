@@ -7,6 +7,7 @@
 union u {
     char *string;
     int number;
+    float real;
     struct object *ob;
     struct vector *vec;
     struct mapping *map;
@@ -34,7 +35,8 @@ struct svalue {
 #define T_OBJECT	0x10
 #define T_MAPPING	0x20
 #define T_FUNCTION  0x40
-#define T_ANY       T_STRING|T_NUMBER|T_POINTER|T_OBJECT|T_MAPPING|T_FUNCTION
+#define T_REAL      0x80
+#define T_ANY T_STRING|T_NUMBER|T_POINTER|T_OBJECT|T_MAPPING|T_FUNCTION|T_REAL
 
 /* values for subtype field of svalue struct */
 #define STRING_MALLOC	0x0	   /* Allocated by malloc() */

@@ -18,11 +18,11 @@ typedef struct _mstats
   /* the next data element in the linked list */
   struct _mstats *next;
   /* statistics */
-  long moves;
-  long cost;
-  long heart_beats;
-  long total_worth;
-  long size_array;
+  int moves;
+  int cost;
+  int heart_beats;
+  int total_worth;
+  int size_array;
   int errors;
   int objects;
 } mudlib_stats_t;

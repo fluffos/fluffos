@@ -10,7 +10,7 @@
 #define _YACC_
 #include "lint.h"
 
-#if !defined(FUNC_SPEC)
+#ifndef FUNC_SPEC
 #define FUNC_SPEC 	"make list_funcs"
 #endif
 #define FUNC_TOKENS 	"efun_tokens.y"
@@ -70,12 +70,12 @@ void fatal(str)
 
 %token ID
 
-%token VOID INT STRING OBJECT MAPPING MIXED UNKNOWN
+%token VOID INT STRING OBJECT MAPPING MIXED UNKNOWN FLOAT FUNCTION
 
 %token DEFAULT
 
 %type <number> type VOID INT STRING OBJECT MAPPING MIXED UNKNOWN arg_list basic typel
-%type <number> arg_type typel2
+%type <number> arg_type typel2 FLOAT FUNCTION
 
 %type <string> ID optional_ID optional_default
 
@@ -146,7 +146,8 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 
 type: basic | basic '*' { $$ = $1 | 0x10000; };
 
-basic: VOID | INT | STRING | MIXED | UNKNOWN | OBJECT | MAPPING ;
+basic: VOID | FLOAT | FUNCTION | INT | STRING | MIXED | UNKNOWN | OBJECT
+   | MAPPING ;
 
 arg_list: /* empty */		{ $$ = 0; }
 	| typel2			{ $$ = 1; if ($1) min_arg = 0; }
@@ -186,7 +187,9 @@ struct type {
 { "object", OBJECT },
 { "mapping", MAPPING },
 { "mixed", MIXED },
-{ "unknown", UNKNOWN }
+{ "unknown", UNKNOWN },
+{ "float", FLOAT},
+{ "function", FUNCTION}
 };
 
 FILE *f;
@@ -337,7 +340,8 @@ int yylex1() {
 	    continue;
 	case '#':
 	{
-#ifdef sun /* no prototype in <stdio.h> *sigh* */
+/* no prototype in <stdio.h> *sigh* */
+#if defined(sun) && !defined(SunOS_5)
 	    extern int fscanf PROT((FILE *, char *, ...));
 #endif
 	    int line;
@@ -373,6 +377,10 @@ char *etype1(n)
     if (n & 0x10000)
 	return "T_POINTER";
     switch(n) {
+    case FLOAT:
+    return "T_REAL";
+    case FUNCTION:
+    return "T_FUNCTION";
     case INT:
 	return "T_NUMBER";
     case OBJECT:
@@ -439,6 +447,8 @@ char *ctype(n)
 	buff[0] = '\0';
     n &= ~0x10000;
     switch(n) {
+    case FLOAT: p = "TYPE_REAL"; break;
+    case FUNCTION: p = "TYPE_FUNCTION"; break;
     case VOID: p = "TYPE_VOID"; break;
     case STRING: p = "TYPE_STRING"; break;
     case INT: p = "TYPE_NUMBER"; break;

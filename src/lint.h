@@ -2,7 +2,7 @@
  * Some structure forward declarations are needed.
  */
 
-#ifdef _SEQUENT_
+#if defined(_SEQUENT_) || defined(linux)
 #include <malloc.h>
 #endif
 
@@ -46,6 +46,7 @@ void _longjmp();
 #ifdef NeXT
 #include <libc.h>
 #else
+#ifndef SunOS_5
 #ifndef MSDOS
 #if defined(sun) && defined(__STDC__)
 #ifdef BUFSIZ
@@ -61,7 +62,7 @@ void perror(char *);
 #endif
 
 #if !defined(_SEQUENT_) && !defined(_AIX) && !defined(__386BSD__) && \
-	!defined(linux)
+	!defined(linux) && !defined(cray)
 int read PROT((int, char *, int));
 #endif /* !defined(_SEQUENT_) && !defined(_AIX) */
 #if !defined(_AIX) && !defined(_SEQUENT_) && !defined(_YACC_) && \
@@ -72,7 +73,7 @@ void free PROT((void *));
 #endif
 #if !defined(sgi) && !defined(hpux) && !defined(_AIX) && \
 	!defined(_SEQUENT_) && !defined(SVR4) && \
-	!defined(__386BSD__) && !defined(linux)
+        !defined(__386BSD__) && !defined(linux) && !defined(hp68k)
 int mkdir PROT((char *, int));
 #endif
 int fclose PROT_STDIO((FILE *));
@@ -125,7 +126,7 @@ int ioctl PROT((int, ...));
 #endif /* !defined(hpux) */
 int close PROT((int));
 #if !defined(_SEQUENT_) && !defined(_AIX) && !defined(__386BSD__) && \
-	!defined(linux)
+	!defined(linux) && !defined(cray)
 int write PROT((int, char *, int));
 #endif /* !defined(_SEQUENT_) && !defined(_AIX) */
 int _filbuf();
@@ -158,6 +159,7 @@ int link PROT((char *, char *));
 int unlink PROT((char *));
 #endif
 #endif /* MSDOS */
+#endif /* SunOS_5 */
 
 #endif /* NeXT */
 
@@ -188,7 +190,6 @@ void debug_message_value PROT((struct svalue *)),
 	enable_commands PROT((int)),
 	load_ob_from_swap PROT((struct object *));
 int tail PROT((char *));
-struct object *get_interactive_object PROT((int));
 void enter_object_hash PROT((struct object *));
 void remove_object_hash PROT((struct object *));
 struct object *lookup_object_hash PROT((char *));
@@ -252,6 +253,7 @@ struct svalue *safe_apply PROT((char *, struct object *, int));
 struct svalue *apply PROT((char *, struct object *, int));
 INLINE void push_string PROT((char *, int));
 INLINE void push_number PROT((int));
+INLINE void push_real PROT((double));
 INLINE void push_object PROT((struct object *));
 struct object *clone_object PROT((char *));
 void init_num_args PROT((void));
@@ -267,7 +269,7 @@ struct object *environment PROT((struct svalue *));
 struct vector *add_array PROT((struct vector *, struct vector *));
 char *get_f_name PROT((int));
 #if !defined(_AIX) && !defined(NeXT) && !defined(_SEQUENT_) && !defined(SVR4) \
-	&& !defined(apollo)
+	&& !defined(apollo) && !defined(cray) && !defined(SunOS_5)
 void startshutdownMudOS PROT((void));
 #else
 void startshutdownMudOS PROT((int));
@@ -348,7 +350,7 @@ char *function_exists PROT((char *, struct object *));
 void set_inc_list PROT((char *list));
 int legal_path PROT((char *path));
 struct vector *get_dir PROT((char *path, int));
-#if defined(sun)
+#if defined(sun) && !defined(SunOS_5)
 extern int rename PROT((char *, char *));
 #endif
 void set_simul_efun PROT((char *));
@@ -361,7 +363,7 @@ int remove_action PROT((char *,char *));
 
 void get_version PROT((char *));
 
-INLINE long get_config_int PROT((int num));
+INLINE int get_config_int PROT((int num));
 INLINE char * get_config_str PROT((int num));
 void set_defaults PROT((char * filename));
 INLINE struct mapping *allocate_mapping PROT((int));

@@ -144,7 +144,8 @@ extern struct program *current_prog;
 #define TYPE_OBJECT	4
 #define TYPE_MAPPING	5
 #define TYPE_FUNCTION 6
-#define TYPE_ANY	7	/* Will match any type */
+#define TYPE_REAL     7
+#define TYPE_ANY	8	/* Will match any type */
 
 /*
  * These are or'ed in on top of the basic type.

@@ -1,0 +1,13 @@
+.\"return the number of references to a data structure
+.TH refs 3
+ 
+.SH NAME
+refs - return the number of references to a data structure
+ 
+.SH SYNOPSIS
+int refs(mixed data);
+ 
+.SH DESCRIPTION
+The number of references to `data' will be returned by refs().  This is 
+useful for deciding whether or not to make a copy of a data structure
+before returning it.

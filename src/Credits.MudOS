@@ -1,54 +1,57 @@
 Read the Credits.LPmud file for credit information on the original LPmud
 driver (that upon which MudOS is based).  LPmud was originally written
 by Lars Pensj|, April 1989.
-
+ 
 The following information is not guaranteed to be complete.  (I
 apologize in advance if I have forgotten anyone).  For more information
 read the various 'done' and 'ChangeLog' files.
-
+ 
 We would like to thank the following muds for extensive testing and numerous
 bug reports:
-
+ 
 TMI, Portals, Overdrive, Genocide, TMI-2, Vincent's Hollow, and DreamShadow.
-
+ 
 The MudOS driver was a team effort with specific contributions from the
 following people:
-
+ 
 Jeremy Radlow (Whiplash) - original mappings implementation, virtual objects,
    master::crash callback, and others.
-
+ 
 Erik Kay (Wayfarer) - runtime config system, message() efun, and others.
-
+ 
 John Garnett (Truilkan) - improved mappings implementation, process_input
    and write_prompt callbacks, DEBUGMALLOC, C++ style comments, lazy resets,
    master::valid_override callback, improved shared string management, and
    others.
-
+ 
 Dwayne Fontenot (Jacques) - major rewrite of comm.c, TCP socket efuns,
    ported to AIX 3.2.
-
+ 
 Dave Richards (Cynosure) - UDP socket efuns, enhanced TCP socket efuns,
    ported MudOS to the Sequent Symmetry (System V Release 3).
-
+ 
 Stephen Iannce (Huthar) - children() and message() efuns, extensive testing of
-  the socket efunctions.
-
+   the socket efunctions.
+ 
 Joel York (Shadowhawk) - multiple arguments version of input_to(), dprint
    option to ed.
-
-Bob Farmer (Blackthorn) - fixed various efuns to honor the hidden object flags.
-
+ 
+Bob Farmer (Blackthorn) - fixed various efuns to honor the hidden object 
+   flags, several new efuns, porting, bug fixes, and others.
+ 
 James Waldrop (Sulam) - helped with reorganizing the huge switch in
    interpret.c into efunctions.c.
-
+ 
 Michael Bundy - provided patches allowing MudOS to run on System V Release 4.
    (built on Dave Richard's System V Release 3 port).
-
+ 
 Luke Mewborn (Zak) - provided patches allowing MudOS to run on 386BSD
-
+ 
 Olav Kolbu (Aragorn) - provided patches allowing MudOS to run on Linux 0.99.3
 
+Darin Johnson - provided various patches and optimizations.
+ 
 --
 Thanks to Adam Beeman (Buddha) for making numerous suggestions on
 improving the MudOS driver and for providing the TMI site as the original
-place for MudOS contributors to meet.
+MudOS development site.
