@@ -143,6 +143,7 @@ f_bind PROT((void))
     
     new_fp = ALLOCATE(funptr_t, TAG_FUNP, "f_bind");
     *new_fp = *old_fp;
+    new_fp->hdr.ref = 1;
     new_fp->hdr.owner = ob; /* one ref from being on stack */
     if (new_fp->hdr.args)
         new_fp->hdr.args->ref++;
@@ -1199,6 +1200,22 @@ f_interactive PROT((void))
 
     i = (sp->u.ob->interactive != 0);
     free_object(sp->u.ob, "f_interactive");
+    put_number(i);
+}
+#endif
+
+#ifdef F_HAS_MXP
+void
+f_has_mxp PROT((void))
+{
+    int i;
+
+    if (sp->u.ob->interactive != 0)
+    {
+       i = sp->u.ob->interactive->iflags & USING_MXP;
+       i = i != 0;
+    }
+    free_object(sp->u.ob, "f_has_mxp");
     put_number(i);
 }
 #endif

@@ -31,8 +31,6 @@
 #endif
 #endif
 
-extern int sys_nerr;
-
 int legal_path PROT((const char *));
 
 static int match_string PROT((char *, char *));

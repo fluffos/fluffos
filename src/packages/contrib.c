@@ -1063,6 +1063,17 @@ static char *pluralize P1(const char *, str) {
             suffix = "en";
         }
         break;
+    case 'P':
+    case 'p':
+        if (!strcasecmp(rel + 1, "ants"))
+            found = PLURAL_SAME;
+        break;
+    case 'R':
+    case 'r':
+        if (!strcasecmp(rel + 1, "oof"))
+            found = PLURAL_SUFFIX;
+        break;
+
     case 'S':
     case 's':
         if (!strcasecmp(rel + 1, "niff")) {

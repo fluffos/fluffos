@@ -1,6 +1,9 @@
 #ifndef NETWORK_INCL_H
 #define NETWORK_INCL_H
 
+#ifdef INCL_SYS_TYPES_H
+#  include <sys/types.h>
+#endif
 #ifdef INCL_SYS_IOCTL_H
 #  include <sys/ioctl.h>
 #endif

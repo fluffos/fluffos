@@ -16,6 +16,7 @@
 
 #define TELOPT_COMPRESS 85
 #define TELOPT_COMPRESS2 86
+#define TELOPT_MXP  91  // mud extension protocol
 
 static unsigned char telnet_break_response[] = {  28, IAC, WILL, TELOPT_TM };
 static unsigned char telnet_ip_response[]    = { 127, IAC, WILL, TELOPT_TM };
@@ -54,6 +55,8 @@ static unsigned char telnet_compress_v2_response[] = { IAC, SB,
                                               TELOPT_COMPRESS2, IAC,
                                               SE };
 #endif
+static unsigned char telnet_do_mxp[]     = { IAC, DO, TELOPT_MXP };
+static unsigned char telnet_will_mxp[]     = { IAC, WILL, TELOPT_MXP };
    
 #ifdef DEBUG
 static char *slc_names[] = { SLC_NAMELIST };
@@ -811,6 +814,12 @@ static void copy_chars P3(interactive_t *, ip, char *, from, int, num_bytes)
                     case TELOPT_ECHO:
                     case TELOPT_NAWS:
                         /* do nothing, but don't send a dont response */
+                        break;
+
+                    case TELOPT_MXP :
+                        /* Mxp is enabled, tell the mudlib about it. */
+                        apply(APPLY_MXP_ENABLE, ip->ob, 0, ORIGIN_DRIVER);
+                        ip->iflags |= USING_MXP;
                         break;
 
                     default:
@@ -1674,6 +1683,8 @@ static void new_user_handler P1(int, which)
         add_binary_message(ob, telnet_compress_send_request_v2,
                     sizeof(telnet_compress_send_request_v2));
 #endif
+        // Ask them if they support mxp.
+        add_binary_message(ob, telnet_do_mxp, sizeof(telnet_do_mxp));
     }
     
     logon(ob);

@@ -282,6 +282,7 @@ void message(mixed, mixed, string | string * | object | object *,
  * Object properties
  */
     int interactive(object default:F__THIS_OBJECT);
+    int has_mxp(object default:F__THIS_OBJECT);
     string in_edit(object default:F__THIS_OBJECT);
     int in_input(object default:F__THIS_OBJECT);
     int userp(object);

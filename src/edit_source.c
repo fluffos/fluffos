@@ -1436,6 +1436,7 @@ static void handle_configure() {
     check_include("INCL_NETINET_IN_H", "netinet/in.h");
     check_include("INCL_ARPA_INET_H", "arpa/inet.h");
 
+    check_include("INCL_SYS_TYPES_H", "sys/types.h");
     check_include("INCL_SYS_IOCTL_H", "sys/ioctl.h");
     check_include("INCL_SYS_SOCKET_H", "sys/socket.h");
     check_include("INCL_NETDB_H", "netdb.h");

@@ -58,6 +58,7 @@ enum msgtypes {
 #define SKIP_COMMAND        0x0800              /* skip current command                    */
 #define SUPPRESS_GA         0x1000              /* suppress go ahead                       */
 #define USING_LINEMODE      0x2000              /* we've negotiated linemode               */
+#define USING_MXP           0x4000              /* we've negotiated mxp */
 
 typedef struct interactive_s {
     object_t *ob;               /* points to the associated object         */

@@ -79,9 +79,12 @@ static void report_holes() {
 
 void logon P1(object_t *, ob)
 {
-    /* current_object no longer set */
-    apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
-    /* function not existing is no longer fatal */
+  if(ob->flags & O_DESTRUCTED){
+    return;
+  }
+  /* current_object no longer set */
+  apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
+  /* function not existing is no longer fatal */
 }
 
 /*

@@ -1,3 +1,18 @@
+Fri Dec 12 12:10:04 2003 (marius@mudos.org (Marius))
+	* raised patchlevel to v22.2b14
+	* made changes to fix building on Mac OS X 10.3 (Panther)
+	* fixed logon() in backend.c to check for the object's
+	  destructed status before making the apply [reported by
+	  Arren@Anarres]
+	* moved the #include of std.h to before the HAS_UALARM
+	  check in ualarm.c [reported by Loriel@Lima]
+	* fixed pluralization of some words ending in f [reported
+	  by Loriel@Lima]
+	* fixed pluralization of pants [reported by Malic@Lima]
+	* fixed std_incl.h to avoid varargs.h if __GNUC__ > 2
+	  [reported by Loriel@Lima]
+	* fixed reference counting in f_bind [reported by Beyond]
+
 Sun Sep 15 17:53:16 2002 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2b13
 	* added a newline after the BIGENDIAN define in edit_source.

@@ -116,7 +116,6 @@ INSTALL_DIR="../bin"
 # ARCH: *sigh* and this one ...
 #OSFLAGS=-DSCO
 OSFLAGS=-DHAVE_ZLIB
-
 # try uncommenting this if you are using gcc and at runtime you see socket
 # errors saying that the "set socket nonblocking" operation is not supported.
 # That error is caused by old-style macros (that gcc doesn't normally grok)
@@ -130,9 +129,13 @@ EXTRALIBS=-Lzlib
 
 echo "Trying out some stuff to see what works; ignore errors ..."
 
-# Mac OS X needs this in order to build properly
+# Mac OS X needs this in order to build properly with gcc < 3
 if test "`uname`" = "Darwin"; then
-    NEED_OLD_CPP=-traditional-cpp
+    GCC_MAJOR="`gcc -v 2>&1 | grep "gcc version" | cut -d ' ' -f 3 | cut -d '.' -f 1`"
+    GCC_MINOR="`gcc -v 2>&1 | grep "gcc version" | cut -d ' ' -f 3 | cut -d '.' -f 2`"
+    if test "$GCC_MAJOR" -eq "2"; then
+        NEED_OLD_CPP=-traditional-cpp
+    fi
 fi
 
 # 

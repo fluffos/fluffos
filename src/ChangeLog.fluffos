@@ -1,5 +1,10 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
+
+new in FluffOS 1.24
+added mxp support (Pinkfish)
+updated with respect to MudOS v22.2b14
+
 new in FluffOS 1.23
 fixed crasher in sprintf
 fixed crasher in compressed files (by pinkfish)
