@@ -14,6 +14,7 @@
 #define LIV_MODIFIER         8
 #define VIS_ONLY_MODIFIER    16
 #define PLURAL_MODIFIER	     32
+#define CHOOSE_MODIFIER      64
 
 #define ADD_MOD(x, y) ((x) | (y))
 
@@ -90,6 +91,7 @@ typedef struct {
 #define PI_REMOTE_LIVINGS	8
 #define PI_INV_ACCESSIBLE	16
 #define PI_INV_VISIBLE		32
+#define PI_REFRESH		64
 
 typedef struct parse_info_s {
     int flags;
@@ -105,6 +107,7 @@ typedef struct parse_info_s {
 #define HV_NOUN   2
 #define HV_PLURAL 4
 #define HV_ADJ    8
+#define HV_NICKNAME	16
 
 /* An entry in the hash table that hashes words->interpretations;
  * Hmm ... maybe flags here should be removed.
@@ -207,6 +210,7 @@ typedef struct {
     int tok_index, word_index;
     int num_matches;
     int num_errors;
+    int num_objs;
 } parse_state_t;
 
 typedef struct {
@@ -225,6 +229,7 @@ void parse_free PROT((parse_info_t *));
 #ifdef DEBUGMALLOC_EXTENSIONS
 void parser_mark_verbs();
 void parser_mark PROT((parse_info_t *));
+void mark_hash_entry PROT((char *));
 #endif
 
 #endif

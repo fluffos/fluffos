@@ -6,10 +6,8 @@
 #define HANDLE_ERROR(routine, call) if ((call) == -1) { perror(#routine); exit(-1); }
 
 int main(int argc, char **argv) {
-#ifndef FD6_PORT
-    printf("portbind requires FD6_PORT support to be enabled.\n");
-#else
-    int port = FD6_PORT;
+    int port = -1;
+    char *ipaddress = 0;
     char *driver_name = "./driver";
     int uid = -1;
     int gid = -1;
@@ -24,6 +22,7 @@ int main(int argc, char **argv) {
      * -d <driver path>
      * -u <uid>
      * -g <gid>
+     * -i <ip address>
      * 
      * anything else causes us to quit scanning options.
      */
@@ -58,9 +57,22 @@ int main(int argc, char **argv) {
 	    }
 	    argc -= 2;
 	    argv += 2;
+	} else if (strcmp(argv[1], "-i") == 0) {
+	    if (argc == 2 || inet_addr(argv[2]) == INADDR_NONE) {
+		fprintf(stderr, "%s: -i must be followed by a valid dotted decimal ip address.\n", argv[0]);
+		exit(-1);
+	    }
+	    ipaddress = argv[2];
+	    argc -= 2;
+	    argv += 2;
 	} else break;
     }
     
+    if (port == -1) {
+	fprintf(stderr, "%s: a port must be specified with -p.\n", argv[0]);
+	exit(-1);
+    }
+
     /* create the socket */
     HANDLE_ERROR(socket, fd = socket(AF_INET, SOCK_STREAM, 0));
 
@@ -75,11 +87,7 @@ int main(int argc, char **argv) {
 
     /* setup our address */
     sin.sin_family = AF_INET;
-#ifdef SERVER_IP
-    sin.sin_addr.s_addr = inet_addr(SERVER_IP);
-#else
-    sin.sin_addr.s_addr = INADDR_ANY;
-#endif
+    sin.sin_addr.s_addr = (ipaddress ? inet_addr(ipaddress) : INADDR_ANY);
     sin.sin_port = htons((unsigned short)port);
 
     /* bind to our address */
@@ -95,6 +103,5 @@ int main(int argc, char **argv) {
     argv[0] = driver_name;
     /* exec the driver */
     HANDLE_ERROR(execv, execv(driver_name, argv));
-#endif
     return 0;
 }

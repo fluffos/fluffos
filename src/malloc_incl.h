@@ -62,6 +62,7 @@ int outbuf_extend PROT((outbuffer_t *, int));
 #ifdef PACKAGE_DB
 #define TAG_DB		    (TAG_PERMANENT + 40)
 #endif
+#define TAG_INTERPRETER	    (TAG_PERMANENT + 41)
 
 #define TAG_STRING          (TAG_DATA + 40)
 #define TAG_MALLOC_STRING   (TAG_DATA + 41)

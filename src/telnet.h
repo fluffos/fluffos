@@ -162,9 +162,24 @@ char *telopts[NTELOPTS] =
 
 #define	NSLC		18
 
-#define	SLC_NAMES	"0", "SYNCH", "BRK", "IP", "AO", "AYT", "EOR", \
+/*
+ * For backwards compatibility, we define SLC_NAMES to be the
+ * list of names if SLC_NAMES is not defined.
+ */
+#define	SLC_NAMELIST	"0", "SYNCH", "BRK", "IP", "AO", "AYT", "EOR", \
 			"ABORT", "EOF", "SUSP", "EC", "EL", "EW", "RP", \
 			"LNEXT", "XON", "XOFF", "FORW1", "FORW2"
+
+#ifdef SLC_NAMES
+char *slc_names[] = {
+	SLC_NAMELIST;
+};
+#else
+extern char *slc_names[];
+#endif
+
+#define SLC_NAME_OK(x)	((unsigned int)(x) <= NSLC)
+#define SLC_NAME(x)	slc_names[x]
 
 #define	SLC_NOSUPPORT	0
 #define	SLC_CANTCHANGE	1

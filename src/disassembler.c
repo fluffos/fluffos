@@ -62,8 +62,10 @@ dump_prog P3(program_t *, prog, char *, fn, int, flags)
     char *fname;
     FILE *f;
     int i, j;
+    int num_funcs_total;
 
     fname = check_valid_path(fn, current_object, "dumpallobj", 1);
+
     if (!fname) {
 	error("Invalid path '%s' for writing.\n", fn);
 	return;
@@ -93,34 +95,59 @@ dump_prog P3(program_t *, prog, char *, fn, int, flags)
     fprintf(f, "FUNCTIONS:\n");
     fprintf(f, "      name                  offset  flags  fio  # locals  # args\n");
     fprintf(f, "      --------------------- ------ ------- ---  --------  ------\n");
-    for (i = 0; i < prog->num_functions_total; i++) {
+    num_funcs_total = prog->last_inherited + prog->num_functions_defined;
+
+    for (i = 0; i < num_funcs_total; i++) {
 	char sflags[8];
 	int flags;
+	int runtime_index;
+	function_t *func_entry = find_func_entry(prog, i);
+	register int low, high, mid;
+	
 
 	flags = prog->function_flags[i];
+	if (flags & FUNC_ALIAS) {
+	    runtime_index = flags & ~FUNC_ALIAS;
+	    sflags[4] = 'a';
+	}
+	else {
+	    runtime_index = i;
+	    sflags[4] = '-';
+	}
+
+	flags = prog->function_flags[runtime_index];
+
 	sflags[0] = (flags & FUNC_INHERITED) ? 'i' : '-';
 	sflags[1] = (flags & FUNC_UNDEFINED) ? 'u' : '-';
 	sflags[2] = (flags & FUNC_STRICT_TYPES) ? 's' : '-';
 	sflags[3] = (flags & FUNC_PROTOTYPE) ? 'p' : '-';
-	sflags[4] = (flags & FUNC_DEF_BY_INHERIT) ? 'd' : '-';
-	sflags[5] = (flags & FUNC_ALIAS) ? 'a' : '-';
-	sflags[6] = (flags & FUNC_TRUE_VARARGS) ? 'v' : '-';
+	sflags[5] = (flags & FUNC_TRUE_VARARGS) ? 'V' : '-';
+	sflags[6] = (flags & FUNC_VARARGS) ? 'v' : '-';
 	sflags[7] = '\0';
+
 	if (flags & FUNC_INHERITED) {
-	    runtime_function_u *func_entry = FIND_FUNC_ENTRY(prog, i);
+	    low = 0;
+	    high = prog->num_inherited - 1;
+	    while (high > low) {
+		mid = (low + high + 1)/2;
+		if (prog->inherit[mid].function_index_offset > runtime_index)
+		    high = mid -1;
+		else low = mid;
+	    }
+	    
 	    fprintf(f, "%4d: %-20s  %5d  %7s %5d\n",
-		    i, function_name(prog, i),
-		    func_entry->inh.offset,
+		    i, func_entry->name,
+		    low,
 		    sflags,
-		    func_entry->inh.function_index_offset);
+		    runtime_index - prog->inherit[low].function_index_offset);
 	} else {
-	    runtime_function_u *func_entry = FIND_FUNC_ENTRY(prog, i);
+	    
 	    fprintf(f, "%4d: %-20s  %5d  %7s      %7d   %5d\n",
-		    i, function_name(prog, i),
-		    func_entry->def.f_index,
-		    sflags,
-		    func_entry->def.num_arg,
-		    func_entry->def.num_local);
+		    i, func_entry->name,
+		    runtime_index - prog->last_inherited
+		    ,sflags,
+		    (int) func_entry->num_arg,
+		    (int) func_entry->num_local);
 	}
     }
     fprintf(f, "VARIABLES:\n");
@@ -178,7 +205,7 @@ static char *disassem_string P1(char *, str)
     return buf;
 }
 
-#define NUM_FUNS prog->num_functions_total
+#define NUM_FUNS (prog->num_functions_defined + prog->last_inherited)
 #define NUM_FUNS_D prog->num_functions_defined
 #define VARS     prog->variable_names
 #define NUM_VARS prog->num_variables_total
@@ -200,7 +227,9 @@ static char *pushes[] = { "string", "number", "global", "local" };
 static void
 disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 {
-    int i, j, instr, iarg, is_efun;
+    extern int num_simul_efun;
+
+    int i, j, instr, iarg, is_efun, ri;
     unsigned short sarg;
     unsigned short offset;
     char *pc, buff[256];
@@ -212,12 +241,15 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	/* sort offsets of functions */
 	offsets = (short *) malloc(NUM_FUNS_D * 2 * sizeof(short));
 	for (i = 0; i < (int) NUM_FUNS_D; i++) {
-	    if (prog->function_flags[prog->function_table[i].runtime_index]
-		& (FUNC_INHERITED | FUNC_NO_CODE))
-		offsets[i * 2] = end + 1;
-	    else
-		offsets[i * 2] = prog->function_table[i].address;
-	    offsets[i * 2 + 1] = i;
+	    ri = i + prog->last_inherited;
+	    
+	    if (prog->function_flags[ri] & FUNC_NO_CODE) {
+		offsets[i << 1] = end + 1;
+	    }
+	    else {
+		offsets[i << 1] = prog->function_table[i].address;
+	    }
+	    offsets[(i << 1) + 1] = i;
 	}
 #ifdef _SEQUENT_
 	qsort((void *) &offsets[0],
@@ -387,7 +419,8 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	    newprog = (prog->inherit + EXTRACT_UCHAR(pc++))->prog;
 	    COPY_SHORT(&sarg, pc);
 	    pc += 3;
-	    if (sarg < newprog->num_functions_total)
+	    if (sarg < (newprog->num_functions_defined + 
+			newprog->last_inherited))
 		sprintf(buff, "%30s::%-12s %5d", newprog->name,
 			function_name(newprog, sarg), (int) sarg);
 	    else sprintf(buff, "<out of range in %30s - %d>", newprog->name,
@@ -459,7 +492,10 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	    break;
 	case F_SIMUL_EFUN:
 	    COPY_SHORT(&sarg, pc);
-	    sprintf(buff, "\"%s\" %d", simuls[sarg].func->name, pc[2]);
+	    if (sarg >= num_simul_efun)
+		sprintf(buff, "<invalid %d> %d\n", sarg, pc[2]);
+	    else
+		sprintf(buff, "\"%s\" %d", simuls[sarg].func->name, pc[2]);
 	    pc += 3;
 	    break;
 
@@ -527,21 +563,23 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	    {
 		unsigned char ttype;
 		unsigned short stable, etable, def;
+		unsigned int addr;
+		char *aptr;
 		char *parg;
 		
 		ttype = EXTRACT_UCHAR(pc);
-		((char *) &stable)[0] = pc[1];
-		((char *) &stable)[1] = pc[2];
-		((char *) &etable)[0] = pc[3];
-		((char *) &etable)[1] = pc[4];
-		((char *) &def)[0] = pc[5];
-		((char *) &def)[1] = pc[6];
+		COPY_SHORT(&stable, pc + 1);
+		COPY_SHORT(&etable, pc + 3);
+		COPY_SHORT(&def, pc + 5);
+		addr = pc - code;
+		aptr = pc;
+		
 		fprintf(f, "switch\n");
 		fprintf(f, "      type: %02x table: %04x-%04x deflt: %04x\n",
-			(unsigned) ttype, (unsigned) stable,
-			(unsigned) etable, (unsigned) def);
+			(unsigned) ttype, addr + stable,
+			addr + etable, addr + def);
 		/* recursively disassemble stuff in switch */
-		disassemble(f, code, pc - code + 7, stable, prog);
+		disassemble(f, code, pc - code + 7, addr + stable, prog);
 
 		/* now print out table - ugly... */
 		fprintf(f, "      switch table (for %04x)\n",
@@ -553,26 +591,29 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 		else
 		    ttype = 2;	/* string */
 
-		pc = code + stable;
+		pc += stable;
 		if (ttype == 0) {
 		    i = 0;
-		    while (pc < code + etable - 4) {
+		    while (pc < aptr + etable - 4) {
 			COPY_SHORT(&sarg, pc);
-			fprintf(f, "\t%2d: %04x\n", i++, (unsigned) sarg);
+			fprintf(f, "\t%2d: %04x\n", i++, addr + sarg);
 			pc += 2;
 		    }
 		    COPY_INT(&iarg, pc);
 		    fprintf(f, "\tminval = %d\n", iarg);
 		    pc += 4;
 		} else {
-		    while (pc < code + etable) {
+		    while (pc < aptr + etable) {
 			COPY_PTR(&parg, pc);
 			COPY_SHORT(&sarg, pc + SIZEOF_PTR);
 			if (ttype == 1 || !parg) {
-			    fprintf(f, "\t%-4d\t%04x\n",(int)parg, (unsigned) sarg);
+			    if (sarg == 1)
+				fprintf(f, "\t%-4d\t<range start>\n", (int)parg);
+			    else
+				fprintf(f, "\t%-4d\t%04x\n", (int)parg, addr+sarg);
 			} else {
 			    fprintf(f, "\t\"%s\"\t%04x\n",
-			    disassem_string(parg), (unsigned) sarg);
+			    disassem_string(parg), addr+sarg);
 			}
 			pc += 2 + SIZEOF_PTR;
 		    }
@@ -587,11 +628,14 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	case F_EFUN1:
 	case F_EFUN2:
 	case F_EFUN3:
+	    instr = EXTRACT_UCHAR(pc++) + ONEARG_MAX;
 	    if (instrs[instr].min_arg != instrs[instr].max_arg) {
 		sprintf(buff, "%d", instr - F_EFUN0);
 	    }
-	    instr = EXTRACT_UCHAR(pc++) + ONEARG_MAX;
 	    break;
+	case 0:
+	    fprintf(f, "*** zero opcode ***\n");
+	    continue;
 	}
 	fprintf(f, "%s %s\n", query_instr_name(instr), buff);
     }
@@ -610,7 +654,7 @@ dump_line_numbers P2(FILE *, f, program_t *, prog) {
     unsigned char *li;
     int addr;
     int sz;
-    short s;
+    ADDRESS_TYPE s;
 
     if (!prog->line_info) {
 	load_line_numbers(prog);
@@ -637,8 +681,12 @@ dump_line_numbers P2(FILE *, f, program_t *, prog) {
     fprintf(f,"\naddress -> absolute line table:\n");
     while (li < li_end) {
 	sz = *li++;
+#if !defined(USE_32BIT_ADDRESSES) && !defined(LPC_TO_C)
 	COPY_SHORT(&s, li);
-	li += 2;
+#else
+	COPY_INT(&s, li);
+#endif
+	li += sizeof(ADDRESS_TYPE);
 	fprintf(f, "%4x-%4x: %i\n", addr, addr + sz - 1, (int)s);
 	addr += sz;
     }

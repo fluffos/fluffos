@@ -19,33 +19,53 @@
 #define I_NOESC                    0x2	/* input_to flag */
 #define I_SINGLE_CHAR              0x4  /* get_char */
 #define I_WAS_SINGLE_CHAR          0x8  /* was get_char */
-#define SB_SIZE			   100	/* More than enough */
+#define SB_SIZE			   (NSLC * 3 + 3)
 
 enum msgtypes {
     NAMEBYIP = 0, IPBYNAME, DATALEN
 };
 
+#define TS_DATA	    0
+#define TS_IAC	    1
+#define TS_WILL	    2
+#define TS_WONT	    3
+#define TS_DO	    4
+#define TS_DONT	    5
+#define TS_SB	    6
+#define TS_SB_IAC   7
+
 /* The I_* flags are input_to flags */
-#define NOECHO              I_NOECHO        /* don't echo lines */
-#define NOESC               I_NOESC	    /* don't allow shell out */
-#define SINGLE_CHAR         I_SINGLE_CHAR   /* get_char */
-#define WAS_SINGLE_CHAR     I_WAS_SINGLE_CHAR
-#define HAS_PROCESS_INPUT  16	/* interactive object has process_input()  */
-#define HAS_WRITE_PROMPT   32	/* interactive object has write_prompt()   */
-#define CLOSING            64   /* true when closing this file descriptor  */
-#define CMD_IN_BUF        128	/* there is a full command in input buffer */
-#define NET_DEAD          256
-#define NOTIFY_FAIL_FUNC  512   /* default_err_mesg is a function pointer  */
-#define USING_TELNET     1024   /* they're using telnet, or something that */
-                                /* understands telnet codes                */
+#define NOECHO		    I_NOECHO		/* don't echo lines */
+#define NOESC		    I_NOESC		/* don't allow shell out */
+#define SINGLE_CHAR	    I_SINGLE_CHAR	/* get_char */
+#define WAS_SINGLE_CHAR	    I_WAS_SINGLE_CHAR
+#define HAS_PROCESS_INPUT   0x0010		/* interactive object has process_input()  */
+#define HAS_WRITE_PROMPT    0x0020		/* interactive object has write_prompt()   */
+#define CLOSING		    0x0040		/* true when closing this file descriptor  */
+#define CMD_IN_BUF	    0x0080		/* there is a full command in input buffer */
+#define NET_DEAD	    0x0100
+#define NOTIFY_FAIL_FUNC    0x0200		/* default_err_mesg is a function pointer  */
+#define USING_TELNET	    0x0400		/* they're using telnet, or something that */
+						/* understands telnet codes                */
+#define SKIP_COMMAND	    0x0800		/* skip current command                    */
+#define SUPPRESS_GA	    0x1000		/* suppress go ahead                       */
+#define USING_LINEMODE	    0x2000		/* we've negotiated linemode               */
+
 typedef struct interactive_s {
     object_t *ob;		/* points to the associated object         */
+#if defined(F_INPUT_TO) || defined(F_GET_CHAR)
     sentence_t *input_to;	/* to be called with next input line       */
+    svalue_t *carryover;	/* points to args for input_to             */
+    int num_carry;		/* number of args for input_to             */
+#endif
     int connection_type;        /* the type of connection this is          */
     int fd;			/* file descriptor for interactive object  */
     struct sockaddr_in addr;	/* socket address of interactive object    */
 #ifdef F_QUERY_IP_PORT
     int local_port;		/* which of our ports they connected to    */
+#endif
+#ifdef F_NETWORK_STATS
+    int external_port;		/* external port index for connection      */
 #endif
     char *prompt;		/* prompt string for interactive object    */
     char text[MAX_TEXT];	/* input buffer for interactive object     */
@@ -71,12 +91,11 @@ typedef struct interactive_s {
     int message_length;		/* message buffer length */
     char message_buf[MESSAGE_BUF_SIZE];	/* message buffer */
     int iflags;                 /* interactive flags */
-    svalue_t *carryover;	/* points to args for input_to             */
-    int num_carry;		/* number of args for input_to             */
     int out_of_band;		/* Send a telnet sync operation            */
     int state;			/* Current telnet state.  Bingly wop       */
     int sb_pos;			/* Telnet suboption negotiation stuff      */
     char sb_buf[SB_SIZE];
+    char slc[NSLC][2];
 } interactive_t;
 
  /*
@@ -110,11 +129,22 @@ typedef struct interactive_s {
 /*
  * comm.c
  */
-extern int total_users;
 extern fd_set readmask;
 extern fd_set writemask;
 extern int inet_packets;
 extern int inet_volume;
+#ifdef F_NETWORK_STATS
+extern int inet_out_packets;
+extern int inet_out_volume;
+extern int inet_in_packets;
+extern int inet_in_volume;
+#ifdef PACKAGE_SOCKETS
+extern int inet_socket_in_packets;
+extern int inet_socket_in_volume;
+extern int inet_socket_out_packets;
+extern int inet_socket_out_volume;
+#endif
+#endif
 extern int num_user;
 #ifdef F_SET_HIDE
 extern int num_hidden_users;
@@ -126,6 +156,7 @@ extern int max_users;
 
 void CDECL add_vmessage PROT2V(object_t *, char *);
 void add_message PROT((object_t *, char *, int));
+void add_binary_message PROT((object_t *, char *, int));
 
 #ifdef SIGNAL_FUNC_TAKES_INT
 void sigalrm_handler PROT((int));
@@ -138,15 +169,13 @@ void init_user_conn PROT((void));
 void init_addr_server PROT((char *, int));
 void ipc_remove PROT((void));
 void set_prompt PROT((char *));
-void notify_no_command PROT((void));
-void set_notify_fail_message PROT((char *));
 INLINE void process_io PROT((void));
 int process_user_command PROT((void));
 int replace_interactive PROT((object_t *, object_t *));
 int set_call PROT((object_t *, sentence_t *, int));
 void remove_interactive PROT((object_t *, int));
 int flush_message PROT((interactive_t *));
-int query_addr_number PROT((char *, char *));
+int query_addr_number PROT((char *, svalue_t *));
 char *query_ip_name PROT((object_t *));
 char *query_ip_number PROT((object_t *));
 char *query_host_name PROT((void));
@@ -156,7 +185,6 @@ int new_set_snoop PROT((object_t *, object_t *));
 object_t *query_snoop PROT((object_t *));
 object_t *query_snooping PROT((object_t *));
 #endif
-void set_notify_fail_function PROT((funptr_t *));
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_iptable PROT((void));

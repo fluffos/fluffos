@@ -205,9 +205,6 @@
  */
 #undef NO_SNOOP
 
-/* NO_ADD_ACTION: define this to remove add_action, commands, livings, etc.
-   process_input() then becomes the only way to deal with player input. */
-
 /* NO_ENVIRONMENT: define this to remove the handling of object containment
  * relationships by the driver 
  *
@@ -625,6 +622,11 @@
  */
 #undef PACKAGE_EXTERNAL
 
+/* NUM_EXTERNAL_CMDS: the number of external commands supported */
+#ifdef PACKAGE_EXTERNAL
+#define NUM_EXTERNAL_CMDS
+#endif
+
 /* PACKAGE_DB: efuns for external database access using msql */
 #undef PACKAGE_DB
 
@@ -632,7 +634,9 @@
  * databases
  */
 #ifdef PACKAGE_DB
-#define MSQL		/* MiniSQL, it's small; it's free */
+#define USE_MSQL 1		/* MiniSQL, it's small; it's free */
+#undef USE_MYSQL 2		/* MySQL, bigger; it's free */
+#define DEFAULT_DB USE_MSQL	/* default database */
 #endif
 
 /****************************************************************************
@@ -672,6 +676,19 @@
  * Most of these options will probably be of no interest to many users.  *
  *************************************************************************/
 
+/* USE_32BIT_ADDRESSES: Use 32 bits for addresses of function, instead of 
+ * the usual 16 bits.  This increases the maximum program size from 64k
+ * of LPC bytecode (NOT source) to 4 GB.  Branches are still 16 bits,
+ * imposing a 64k limit on catch(), if(), switch(), loops, and most other
+ * control structures.  It would take an extremely large function to hit
+ * those limits, though.
+ *
+ * Overhead: 2 bytes/function with LPC->C off.  Having LPC->C on forces
+ * this option, since it needs 4 bytes to store the function pointers
+ * anyway, and this setting is ignored.
+ */
+#undef USE_32BIT_ADDRESSES
+
 /* HEARTBEAT_INTERVAL: define heartbeat interval in microseconds (us).
  *   1,000,000 us = 1 second.  The value of this macro specifies
  *   the frequency with which the heart_beat method will be called in
@@ -705,10 +722,20 @@
 #define MESSAGE_BUFFER_SIZE 4096
 
 /* APPLY_CACHE_BITS: defines the number of bits to use in the call_other cache
- *   (in interpret.c).  Somewhere between six (6) and ten (10) is probably
- *   sufficient for small muds.
+ *   (in interpret.c).
+ * 
+ * Memory overhead is (1 << APPLY_CACHE_BITS)*16.
+ * [assuming 32 bit pointers and 16 bit shorts]
+ *
+ * ACB:    entries:     overhead:
+ *  6         64             1k
+ *  8        256             4k
+ * 10       1024            16k
+ * 12       4096            64k
+ * 14      16384           256k
+ * 16      65536             1M
  */
-#define APPLY_CACHE_BITS 11
+#define APPLY_CACHE_BITS 12
 
 /* CACHE_STATS: define this if you want call_other (apply_low) cache 
  * statistics.  Causes HAS_CACHE_STATS to be defined in all LPC objects.
@@ -732,7 +759,7 @@
  *
  * Note: This currently only works on machines that have the dlopen() system
  * call.  SunOS and IRIX do, as do a number of others.  AIX and Ultrix don't.
- * Linux does if you are using ELF.
+ * Linux does if you are using ELF.  Versions of FreeBSD prior to 3.0 don't.
  */
 #undef RUNTIME_LOADING
 
@@ -749,29 +776,15 @@
  */
 #define HEART_BEAT_CHUNK      32
 
-/* SERVER_IP: For machines with multiple IP addresses, this specifies which
- * one to use.  This is useful for IP accounting and is necessary to be
- * able to do ident lookups on such machines.
- *
- * example: #define SERVER_IP "194.229.18.27"
+/* GET_CHAR_IS_BUFFERED: Normally get_char() is unbuffered.  That is, once
+ * a character is received for get_char(), anything else is in the input
+ * stream is immediately thrown away.  This can be very undesirable, especially
+ * if you're calling get_char() again from the handler from the previous call.
+ * Define this if you want get_char() to be buffered.  In this case, the buffer
+ * will only get flushed if get_char() is not called from the first get_char()'s
+ * LPC callback handler.
  */
-#undef SERVER_IP
-
-/* If MudOS inherits an open file descriptor #6 from it's parent process,
- * it uses that as an additional login port.  The 'port #' for internal
- * purposes (debugging messages, argument to connect(), etc) and kind is
- * defined here.  The definition here assumes we inherited a port which
- * was bound to the telnet port by 'portbind'.
- *
- * #define FD6_KIND PORT_TELNET
- * #define FD6_PORT 23
- *
- * If you're not using this, I'd suggest leaving it disabled.  A suprising
- * number of operating systems/debuggers/etc leave files open on various
- * file descriptors, possibly including fd #6.
- */
-#undef FD6_KIND
-#undef FD6_PORT
+#undef GET_CHAR_IS_BUFFERED
 
 /* Some maximum string sizes
  */

@@ -1182,7 +1182,7 @@ static int set()
     }
     if (!strcmp(word, "shiftwidth")) {
 	Skip_White_Space;
-	if (isdigit(*inptr)) {
+	if (uisdigit(*inptr)) {
 	    P_SHIFTWIDTH = *inptr - '0';
 	    return 0;
 	}
@@ -1374,7 +1374,7 @@ static void indent P1(char *, buf)
     static char g[] =
     {2, 2, 1, 7, 1, 5, 5, 1, 3, 6, 2, 2, 2, 2, 0,};
     char text[ED_MAXLINE], ident[ED_MAXLINE];
-    register char *p, *sp;
+    char *p, *sp;
     register int *ip;
     register long indent_index;
     register int top, token;
@@ -1486,7 +1486,7 @@ static void indent P1(char *, buf)
 		int j = 0;
 		
 		if (*p == '@') p++;
-		while (isalnum(*p) || *p == '_') last_term[j++] = *p++;
+		while (uisalnum(*p) || *p == '_') last_term[j++] = *p++;
 		last_term[j] = '\0';
 		last_term_len = j;
 		in_mblock = TRUE;
@@ -1583,14 +1583,14 @@ static void indent P1(char *, buf)
 		break;
 
 	    default:
-		if (isalpha(*--p) || *p == '_') {
-		    register char *q;
+		if (uisalpha(*--p) || *p == '_') {
+		    char *q;
 
 		    /* Identifier. See if it's a keyword_t. */
 		    q = ident;
 		    do {
 			*q++ = *p++;
-		    } while (isalnum(*p) || *p == '_');
+		    } while (uisalnum(*p) || *p == '_');
 		    *q = '\0';
 
 		    if (strcmp(ident, "if") == 0)
@@ -2254,11 +2254,11 @@ void ed_cmd P1(char *, str)
 	more_append(str);
 	return;
     }
-    if (strlen(str) < ED_MAXLINE)
-	strcat(str, "\n");
 
-    strncpy(inlin, str, ED_MAXLINE - 1);
-    inlin[ED_MAXLINE - 1] = 0;
+    strncpy(inlin, str, ED_MAXLINE - 2);
+    inlin[ED_MAXLINE - 2] = 0;
+    strcat(inlin, "\n");
+
     inptr = inlin;
     if ((status = getlst()) >= 0 || status == NO_LINE_RANGE) {
 	if ((status = ckglob()) != 0) {
@@ -2662,6 +2662,9 @@ static void object_free_ed_buffer() {
 char *object_ed_start P3(object_t *, ob, char *, fname, int, restricted) {
     svalue_t *setup;
 
+    /* ensure that the result buffer is initialized */
+    outbuf_zero(&current_ed_results);
+
     regexp_user = ED_REGEXP;
     current_ed_buffer = add_ed_buffer(ob);
 
@@ -2762,7 +2765,7 @@ char *object_ed_cmd P2(object_t *, ob, char *, str)
     strcat(inlin, "\n");
 
     inptr = inlin;
-    if ((status = getlst()) >= 0 || status == NO_LINE_RANGE)
+    if ((status = getlst()) >= 0 || status == NO_LINE_RANGE) {
 	if ((status = ckglob()) != 0) {
 	    if (status >= 0 && (status = doglob()) >= 0) {
 		setCurLn(status);
@@ -2775,6 +2778,7 @@ char *object_ed_cmd P2(object_t *, ob, char *, str)
 		return object_ed_results();
 	    }
 	}
+    }
     report_status(status);
     return object_ed_results();
 }

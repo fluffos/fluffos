@@ -118,10 +118,15 @@ int dos_style_link PROT((char *, char *));
 #  include <alloca.h>
 #endif
 
+#if defined(__APPLE__) && defined(__GNUC__)
+/* varargs.h distributed with Mac OSX is broken */
+#include <stdarg.h>
+#else
 #ifdef INCL_STDARG_H
 #  include <stdarg.h>
 #else
 #  include <varargs.h>
+#endif
 #endif
 
 #ifdef INCL_BSTRING_H

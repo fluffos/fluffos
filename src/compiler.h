@@ -27,34 +27,34 @@ typedef struct {
  * the rest are only temporary.
  */
 #define A_PROGRAM		0	/* executable code */
-#define A_RUNTIME_FUNCTIONS	1	/* table of functions */
-#define A_COMPILER_FUNCTIONS    2
-#define A_RUNTIME_COMPRESSED	3
-#define A_FUNCTION_FLAGS	4
-#define A_STRINGS		5	/* table of strings */
-#define A_VAR_NAME		6
-#define A_VAR_TYPE		7
-#define A_LINENUMBERS		8	/* linenumber information */
-#define A_FILE_INFO             9       /* start of file line nos */
-#define A_INHERITS		10	/* table of inherited progs */
-#define A_CLASS_DEF             11
-#define A_CLASS_MEMBER          12
-#define A_ARGUMENT_TYPES	13	/* */
-#define A_ARGUMENT_INDEX	14	/* */
-#define NUMPAREAS		15
-#define A_CASES                 15      /* keep track of cases */
-#define A_STRING_NEXT		16	/* next prog string in hash chain */
-#define A_STRING_REFS		17	/* reference count of prog string */
-#define A_INCLUDES		18	/* list of included files */
-#define A_PATCH			19	/* for save_binary() */
-#define A_INITIALIZER           20
-#define A_FUNCTIONALS           21
-#define A_FUNCTION_DEFS		22
-#define A_VAR_TEMP	        23	/* table of variables */
-#define NUMAREAS		24
+#define A_FUNCTIONS             1
+#define A_STRINGS		2	/* table of strings */
+#define A_VAR_NAME		3
+#define A_VAR_TYPE		4
+#define A_LINENUMBERS		5	/* linenumber information */
+#define A_FILE_INFO             6       /* start of file line nos */
+#define A_INHERITS		7	/* table of inherited progs */
+#define A_CLASS_DEF             8
+#define A_CLASS_MEMBER          9
+#define A_ARGUMENT_TYPES	10	/* */
+#define A_ARGUMENT_INDEX	11	/* */
+#define NUMPAREAS		12
+#define A_CASES                 13      /* keep track of cases */
+#define A_STRING_NEXT		14	/* next prog string in hash chain */
+#define A_STRING_REFS		15	/* reference count of prog string */
+#define A_INCLUDES		16	/* list of included files */
+#define A_PATCH			17	/* for save_binary() */
+#define A_FUNCTIONALS           18
+#define A_FUNCTION_DEFS		19
+#define A_VAR_TEMP	        20	/* table of variables */
+#define NUMAREAS		22
 
-#define CURRENT_PROGRAM_SIZE (prog_code - mem_block[current_block].block)
-#define UPDATE_PROGRAM_SIZE mem_block[current_block].current_size = CURRENT_PROGRAM_SIZE
+#define TREE_MAIN               0
+#define TREE_INIT               1
+#define NUMTREES                2
+
+#define CURRENT_PROGRAM_SIZE (prog_code - mem_block[A_PROGRAM].block)
+#define UPDATE_PROGRAM_SIZE mem_block[A_PROGRAM].current_size = CURRENT_PROGRAM_SIZE
 
 /*
  * Types available. The number '0' is valid as any type. These types
@@ -73,6 +73,7 @@ typedef struct {
 #define TYPE_FUNCTION   8
 #define TYPE_REAL       9
 #define TYPE_BUFFER     10
+#define TYPE_MASK	0xf
 
 typedef struct {
     int runtime_index;
@@ -102,6 +103,21 @@ typedef struct function_context_s {
 
 extern function_context_t *current_function_context;
 extern int var_defined;
+extern parse_node_t *comp_trees[NUMTREES];
+extern unsigned short *comp_def_index_map;
+extern unsigned short *func_index_map;
+
+typedef struct compiler_temp_t {
+    unsigned short flags;
+    unsigned short offset;
+    unsigned short function_index_offset;
+    struct program_s *prog; /* inherited if nonzero */
+    union {
+	function_t *func;
+	int index;
+    } u;
+    struct compiler_temp_t *next;
+} compiler_temp_t;
 
 /*
  * Some good macros to have.
@@ -116,19 +132,16 @@ extern int var_defined;
 		       && (is_type[(unsigned char)(e & ~DECL_MODS)] & (1 << (t))))
 
 #define FUNCTION_TEMP(n) ((compiler_temp_t *)mem_block[A_FUNCTION_DEFS].block + (n))
-/* compiler_function_t from A_COMPILER_FUNCTIONS index */
-#define COMPILER_FUNC(n) ((compiler_function_t *)mem_block[A_COMPILER_FUNCTIONS].block + (n))
+#define FUNCTION_NEXT(n) (FUNCTION_TEMP(n)->next)
+/* function_t from A_FUNCTIONS index */
+#define FUNC(n) ((function_t *)mem_block[A_FUNCTIONS].block + (n))
 /* program for inherited entry from full function index */
 #define FUNCTION_PROG(n) (FUNCTION_TEMP(n)->prog)
 #define FUNCTION_ALIAS(n) (FUNCTION_TEMP(n)->alias_for)
-/* compiler_function_t from full function index */
-#define FUNCTION_DEF(n) (FUNCTION_PROG(n) ? FUNCTION_TEMP(n)->u.func : COMPILER_FUNC(FUNCTION_TEMP(n)->u.index))
-/* runtime_function_u from full function index */
-#define FUNCTION_RENTRY(n) ((runtime_function_u *)mem_block[A_RUNTIME_FUNCTIONS].block + (n))
-/* runtime_function_u from full function index, but digs down to the definition.  This is rather complex; maybe it should be stored in FUNCTION_TEMP too */
-#define FUNCTION_DEF_RENTRY(n) (FUNCTION_PROG(n) ? FIND_FUNC_ENTRY(FUNCTION_PROG(n), FUNCTION_TEMP(n)->u.func->runtime_index) : FUNCTION_RENTRY(n))
+/* function_t from full function index */
+#define FUNCTION_DEF(n) (FUNCTION_PROG(n) ? FUNCTION_TEMP(n)->u.func : FUNC(FUNCTION_TEMP(n)->u.index))
 /* flags from full function index */
-#define FUNCTION_FLAGS(n) *((unsigned short *)mem_block[A_FUNCTION_FLAGS].block + (n))
+#define FUNCTION_FLAGS(n) (FUNCTION_TEMP(n)->flags)
 
 #define NUM_INHERITS (mem_block[A_INHERITS].current_size / sizeof(inherit_t))
 
@@ -157,7 +170,6 @@ parse_node_t *validate_efun_call PROT((int, parse_node_t *));
 extern mem_block_t mem_block[];
 extern int exact_types, global_modifiers;
 extern int current_type;
-extern int current_block;
 extern char *prog_code;
 extern char *prog_code_max;
 extern program_t NULL_program;
@@ -167,6 +179,7 @@ extern local_info_t *locals, *locals_ptr;
 extern unsigned short *type_of_locals, *type_of_locals_ptr;
 extern int current_number_of_locals;
 extern int max_num_locals;
+extern int current_tree;
 
 extern int type_of_locals_size;
 extern int locals_size;
@@ -174,7 +187,9 @@ extern int current_number_of_locals;
 extern int max_num_locals;
 extern short compatible[11];
 extern short is_type[11];
+extern int comp_last_inherited;
 
+char *get_type_modifiers PROT((char *, char *, int));
 char *get_two_types PROT((char *, char *, int, int));
 char *get_type_name PROT((char *, char *, int));
 void init_locals PROT((void));
@@ -218,8 +233,8 @@ void pop_func_block PROT((void));
 int decl_fix PROT((int));
 parse_node_t *check_refs PROT((int, parse_node_t *, parse_node_t *));
 
-int lookup_any_class_member PROT((char *, char *));
-int lookup_class_member PROT((int, char *, char *));
+int lookup_any_class_member PROT((char *, unsigned char *));
+int lookup_class_member PROT((int, char *, unsigned char *));
 parse_node_t *reorder_class_values PROT((int, parse_node_t *));
 
 parse_node_t *promote_to_float PROT((parse_node_t *));
@@ -228,63 +243,51 @@ parse_node_t *do_promotions PROT((parse_node_t *, int));
 parse_node_t *throw_away_call PROT((parse_node_t *));
 parse_node_t *throw_away_mapping PROT((parse_node_t *));
 
+#define realloc_mem_block(m) do { \
+    mem_block_t *M = m; \
+    M->max_size <<= 1; \
+    M->block = DREALLOC(M->block, M->max_size, TAG_COMPILER, "realloc_mem_block"); \
+} while (0)
+
+#define add_to_mem_block(n, data, size) do { \
+    mem_block_t *mbp = &mem_block[n]; \
+    int Size = size; \
+    \
+    if (mbp->current_size + Size > mbp->max_size) { \
+	do { \
+            mbp->max_size <<= 1; \
+        } while (mbp->current_size + Size > mbp->max_size); \
+        \
+        mbp->block = DREALLOC(mbp->block, mbp->max_size, TAG_COMPILER, "insert_in_mem_block"); \
+    } \
+    memcpy(mbp->block + mbp->current_size, data, Size); \
+    mbp->current_size += Size; \
+} while (0)
+
 #ifndef SUPPRESS_COMPILER_INLINES
-/* inlines - if we're lucky, they'll get honored. */
-INLINE_STATIC void realloc_mem_block PROT((mem_block_t *, int));
-INLINE_STATIC void add_to_mem_block PROT((int, char *, int));
-INLINE_STATIC void insert_in_mem_block PROT((int, int, int));
-INLINE_STATIC char *allocate_in_mem_block PROT((int, int));
-
-INLINE_STATIC
-void realloc_mem_block P2(mem_block_t *, m, int, size)
-{
-    while (size > m->max_size) {
-	m->max_size <<= 1;
-	m->block = (char *)
-	    DREALLOC((char *) m->block, m->max_size, TAG_COMPILER, "realloc_mem_block");
-    }
-}
-
-INLINE_STATIC
-void add_to_mem_block P3(int, n, char *, data, int, size)
-{
-    mem_block_t *mbp = &mem_block[n];
-
-    if (mbp->current_size + size > mbp->max_size)
-	realloc_mem_block(mbp, mbp->current_size + size);
-    if (data)
-	memcpy(mbp->block + mbp->current_size, data, size);
-    mbp->current_size += size;
-}
-
 INLINE_STATIC
 char *allocate_in_mem_block P2(int, n, int, size)
 {
     mem_block_t *mbp = &mem_block[n];
     char *ret;
 
-    if (mbp->current_size + size > mbp->max_size)
-	realloc_mem_block(mbp, mbp->current_size + size);
+    if (mbp->current_size + size > mbp->max_size) {
+	do {
+	    mbp->max_size <<= 1;
+	} while (mbp->current_size + size > mbp->max_size);
+	
+	mbp->block = DREALLOC(mbp->block, mbp->max_size, TAG_COMPILER, "insert_in_mem_block");
+    }
     ret = mbp->block + mbp->current_size;
     mbp->current_size += size;
     return ret;
 }
 
-INLINE_STATIC
-void
-insert_in_mem_block P3(int, n, int, where, int, size)
-{
-    mem_block_t *mbp = &mem_block[n];
-    char *p;
+#endif
+#endif
 
-    if (mbp->current_size + size > mbp->max_size)
-	realloc_mem_block(mbp, mbp->current_size + size);
-    /* memcpy can't handle overlapping blocks on some systems */
-    p = mbp->block + mbp->current_size;
-    while (p-- > mbp->block + where)
-	*(p + size) = *p;
-    mbp->current_size += size;
-}
-#endif
-#endif
+
+
+
+
 

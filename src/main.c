@@ -36,6 +36,7 @@ static char *mud_lib;
 double consts[NUM_CONSTS];
 
 #ifndef NO_IP_DEMON
+int no_ip_demon = 0;
 void init_addr_server();
 #endif				/* NO_IP_DEMON */
 
@@ -63,21 +64,20 @@ static void CDECL sig_hup SIGPROT,
     CDECL sig_ill SIGPROT,
     CDECL sig_bus SIGPROT,
     CDECL sig_iot SIGPROT;
-#endif				/* DEBUG */
-#endif				/* TRAP_CRASHES */
+#endif
+#endif
 
 #ifdef DEBUG_MACRO
 /* used by debug.h: please leave this in here -- Tru (you can change its
    value if you like).
 */
-int debug_level = 32768;
-#endif				/* DEBUG_MACRO */
+int debug_level = 0;
+#endif
 
 int main P2(int, argc, char **, argv)
 {
     time_t tm;
     int i, new_mudlib = 0, got_defaults = 0;
-    int no_ip_demon = 0;
     char *p;
     char version_buf[80];
 #if 0
@@ -85,9 +85,7 @@ int main P2(int, argc, char **, argv)
 #endif
     error_context_t econ;
 
-/* FIXME: should be a configure check */
-#if !defined(LATTICE) && !defined(OLD_ULTRIX) && !defined(sequent) && \
-    !defined(sgi) && !defined(WIN32)
+#ifdef PROTO_TZSET
     void tzset();
 #endif
 
@@ -109,7 +107,7 @@ int main P2(int, argc, char **, argv)
 #if (defined(PROFILING) && !defined(PROFILE_ON) && defined(HAS_MONCONTROL))
     moncontrol(0);
 #endif
-#if !defined(OLD_ULTRIX) && !defined(LATTICE) && !defined(sequent)
+#ifdef USE_TZSET
     tzset();
 #endif
     boot_time = get_current_time();
@@ -343,7 +341,7 @@ int main P2(int, argc, char **, argv)
 		    exit(-1);
 		}
 		push_constant_string(argv[i] + 2);
-		(void) apply_master_ob(APPLY_FLAG, 1);
+		apply_master_ob(APPLY_FLAG, 1);
 		if (MudOS_is_being_shut_down) {
 		    debug_message("Shutdown by master object.\n");
 		    exit(0);
@@ -358,10 +356,14 @@ int main P2(int, argc, char **, argv)
 		continue;
             case 'd':
 #ifdef DEBUG_MACRO
-		debug_level |= DBG_d_flag;
+		if (argv[i][2])
+		    debug_level_set(&argv[i][2]);
+		else
+		    debug_level |= DBG_d_flag;
 #else
                 debug_message("Driver must be compiled with DEBUG_MACRO on to use -d.\n");
 #endif
+		break;
 	    case 'c':
 		comp_flag++;
 		continue;

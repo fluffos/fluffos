@@ -89,6 +89,8 @@ INLINE void absorb_mapping PROT((mapping_t *, mapping_t *));
 INLINE void mapping_delete PROT((mapping_t *, svalue_t *));
 INLINE mapping_t *add_mapping PROT((mapping_t *, mapping_t *));
 mapping_node_t *new_map_node PROT((void));
+int restore_hash_string PROT((char **str, svalue_t *));
+int growMap PROT((mapping_t *));
 void free_node PROT((mapping_t *, mapping_node_t *));
 void unlock_mapping PROT((mapping_t *));
 void map_mapping PROT((svalue_t *, int));

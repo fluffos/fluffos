@@ -68,9 +68,7 @@ typedef struct ref_s {
 #define T_LVALUE_BYTE   0x400	/* byte-sized lvalue */
 #define T_LVALUE_RANGE  0x800
 #define T_ERROR_HANDLER 0x1000
-#ifdef DEBUG
 #define T_FREED         0x2000
-#endif
 #define T_REF		0x4000
 
 #ifdef NO_BUFFER_TYPE

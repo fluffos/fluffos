@@ -5,9 +5,7 @@
 
 #include "std.h"
 #include "file.h"
-#include "file_incl.h"
 #include "comm.h"
-#include "strstr.h"
 #include "lex.h"
 #include "md.h"
 #include "port.h"
@@ -351,7 +349,7 @@ int legal_path P1(char *, path)
 	    if (p[1] == '/' || p[1] == '\0')
 		return 0;	/* check for `./', `..', or `../' */
 	}
-	p = (char *)_strstr(p, "/.");	/* search next component */
+	p = (char *)strstr(p, "/.");	/* search next component */
 	if (p)
 	    p++;		/* step over `/' */
     }
@@ -390,11 +388,11 @@ void smart_log P4(char *, error_file, int, line, char *, what, int, flag)
     else
 	sprintf(buff, "/%s line %d: %s", error_file, line, what);
 
-    if (pragmas & PRAGMA_ERROR_CONTEXT){
+    if (pragmas & PRAGMA_ERROR_CONTEXT) {
         char *ls = strrchr(buff, '\n');
-	char *tmp;
+	unsigned char *tmp;
 	if (ls) {
-	    tmp = ls + 1;
+	    tmp = (unsigned char *)ls + 1;
 	    while (*tmp && isspace(*tmp)) tmp++;
 	    if (!*tmp) *ls = 0;
 	}
@@ -1070,10 +1068,29 @@ int copy_file P2(char *, from, char *, to)
     if (to == 0)
 	return -2;
 
-
+    if (lstat(from, &from_stats) != 0) {
+	error("/%s: lstat failed\n", from);
+	return 1;
+    }
+    if (lstat(to, &to_stats) == 0) {
+#ifdef WIN32
+	if (!strcmp(from, to))
+#else
+	if (from_stats.st_dev == to_stats.st_dev
+	    && from_stats.st_ino == to_stats.st_ino)
+#endif
+	{
+	    error("`/%s' and `/%s' are the same file", from, to);
+	    return 1;
+	}
+    } else if (errno != ENOENT) {
+	error("/%s: unknown error\n", to);
+	return 1;
+    }
+    
     from_fd = open(from, OPEN_READ);
     if (from_fd < 0)
-	return (-1);
+	return -1;
 
     if (file_size(to) == -2) {
 	/* Target is a directory; build full target filename. */
@@ -1093,14 +1110,14 @@ int copy_file P2(char *, from, char *, to)
     to_fd = open(to, OPEN_WRITE | O_CREAT | O_TRUNC, 0666);
     if (to_fd < 0) {
 	close(from_fd);
-	return (-2);
+	return -2;
     }
     while ((num_read = read(from_fd, buf, 128)) != 0) {
 	if (num_read < 0) {
 	    debug_perror("copy_file: read", from);
 	    close(from_fd);
 	    close(to_fd);
-	    return (-3);
+	    return -3;
 	}
 	write_ptr = buf;
 	while (write_ptr != (buf + num_read)) {
@@ -1109,7 +1126,7 @@ int copy_file P2(char *, from, char *, to)
 		debug_perror("copy_file: write", to);
 		close(from_fd);
 		close(to_fd);
-		return (-3);
+		return -3;
 	    }
 	    write_ptr += num_written;
 	}

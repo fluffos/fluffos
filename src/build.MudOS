@@ -4,7 +4,7 @@ if test $# -ne 0; then
     case $1 in
         develop)
 	    echo Preparing to build developmental version of MudOS driver ...
-	    OPTIMIZE="-Wall -DPEDANTIC -pedantic"
+	    OPTIMIZE="-Wall -Wundef -DPEDANTIC -pedantic -Wmissing-declarations"
 	    DEBUG="-g -DDEBUG -DDEBUG_MACRO"
             ;;
         debug)
@@ -129,6 +129,11 @@ INSTALL_DIR="../bin"
 
 echo "Trying out some stuff to see what works; ignore errors ..."
 
+# Mac OS X needs this in order to build properly
+if test "`uname`" = "Darwin"; then
+    NEED_OLD_CPP=-traditional-cpp
+fi
+
 # 
 # Figure out what make is, and how to invoke it
 # 
@@ -146,6 +151,7 @@ if test "${MAKE-x}" = "x"; then
                 MAKEFILE=GNUmakefile
             else
                 MAKEFILE=Makefile
+		OBJDIR=
             fi
         else
             echo 'FATAL ERROR: Cannot find make or gmake'
@@ -158,6 +164,7 @@ else
         MAKEFILE=GNUmakefile
     else
         MAKEFILE=Makefile
+	OBJDIR=
     fi
 fi
 
@@ -182,8 +189,9 @@ else
         CC=gcc
         if test "${DEBUG-x}" = "x"; then
             OPTIMIZE=${OPTIMIZE-"-O2 -fstrength-reduce"}
-	    GNUC=1
         fi
+	GNUC=1
+	CCFLAGS=-D__USE_FIXED_PROTOTYPES__
     else
         clcc comptest.c
         if test $? -eq 0; then
@@ -325,7 +333,7 @@ else
 fi
 
 # Some of these are probably unnecessary
-CFLAGS="$OSFLAGS $WARN $PROFIL $DEBUG $DEBUG_MACRO $DEBUG_NON_FATAL $STR $PIPE $NEED_OLD_CPP"
+CFLAGS="$CCFLAGS $OSFLAGS $WARN $PROFIL $DEBUG $DEBUG_MACRO $DEBUG_NON_FATAL $STR $PIPE $NEED_OLD_CPP $EXPORT_DYNAMIC"
 
 #
 # Determine system type
@@ -340,6 +348,10 @@ END
 $CC $CFLAGS comptest.c
 ARCH=`./a.out`
 
+cat >comptest.c <<END
+int main(int argc, char **argv) { return 0; }
+END
+
 case $ARCH in
     AIX)
         OSFLAGS="$OSFLAGS -D_BSD -D_ALL_SOURCE"
@@ -348,6 +360,20 @@ case $ARCH in
     Solaris)
 	OSFLAGS="$OSFLAGS -DSunOS_5"
 	CFLAGS="$CFLAGS -DSunOS_5"
+	;;
+    Linux*)
+        EXPORT_DYNAMIC=-rdynamic
+	;;
+    FreeBSD)
+	cc -export-dynamic comptest.c
+	if test $? -eq 0; then
+	    EXPORT_DYNAMIC=-export-dynamic
+	else
+	    cc -rdynamic comptest.c
+	    if test $? -eq 0; then
+		EXPORT_DYNAMIC=-rdynamic
+	    fi
+	fi
 	;;
 esac
 
@@ -376,8 +402,10 @@ if test ! -f a.out; then
     STRFUNCS=strfuncs.o
 fi
 
-CFLAGS="$OSFLAGS $WARN $PROFIL $DEBUG $DEBUG_MACRO $DEBUG_NON_FATAL $STR $PIPE $NEED_OLD_CPP $INCLUDE"
-mkdir $OBJDIR
+CFLAGS="$CCFLAGS $OSFLAGS $WARN $PROFIL $DEBUG $DEBUG_MACRO $DEBUG_NON_FATAL $STR $PIPE $NEED_OLD_CPP $INCLUDE $EXPORT_DYNAMIC"
+if test ! "$OBJDIR" = ""; then
+    mkdir $OBJDIR
+fi
 
 echo SHELL=/bin/sh >>Makefile.tmp
 echo OBJDIR=$OBJDIR >>Makefile.tmp

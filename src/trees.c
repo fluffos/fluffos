@@ -5,6 +5,8 @@
  *    to parse trees at this point; the rest of code generation will likely
  *    follow later.
  *
+ * Note: it did.  See ChangeLogs.
+ *
  */
 
 #define SUPPRESS_COMPILER_INLINES
@@ -132,7 +134,7 @@ binary_int_op P4(parse_node_t *, l, parse_node_t *, r,
 		 char, op, char *, name) {
     parse_node_t *ret;
     
-    if (exact_types){
+    if (exact_types) {
 	if (!IS_TYPE(l->type, TYPE_NUMBER)) {
 	    char buf[256];
 	    char *end = EndOf(buf);
@@ -199,8 +201,8 @@ parse_node_t *make_range_node P4(int, code, parse_node_t *, expr,
 	CREATE_BINARY_OP(newnode, code, 0, l, expr);
     }
     
-    if (exact_types){
-        switch(expr->type){
+    if (exact_types) {
+        switch(expr->type) {
             case TYPE_ANY:
             case TYPE_STRING:
             case TYPE_BUFFER:
@@ -326,17 +328,15 @@ parse_node_t *insert_pop_value P1(parse_node_t *, expr) {
 	case F_LOCAL: case F_GLOBAL: case F_REF:
 	    return 0;
 	case F_EQ: case F_NE: case F_GT: case F_GE: case F_LT: case F_LE:
-	    yywarn("Value of conditional expression is unused");
-	    /* FALLTHRU */
 	case F_OR: case F_XOR: case F_AND: case F_LSH: case F_RSH:
 	case F_ADD: case F_SUBTRACT: case F_MULTIPLY: case F_DIVIDE:
 	case F_MOD: case F_RE_RANGE: case F_NE_RANGE: case F_RINDEX:
 	case F_INDEX:
-	    expr->kind = NODE_TWO_VALUES;
 	    if ((expr->l.expr = insert_pop_value(expr->l.expr))) {
-		if ((expr->r.expr = insert_pop_value(expr->r.expr)))
+		if ((expr->r.expr = insert_pop_value(expr->r.expr))) {
+		    expr->kind = NODE_TWO_VALUES;
 		    return expr;
-		else
+		} else
 		    return expr->l.expr;
 	    } else 
 		return insert_pop_value(expr->r.expr);
@@ -368,6 +368,23 @@ parse_node_t *insert_pop_value P1(parse_node_t *, expr) {
     return replacement;
 }
 
+parse_node_t *pop_value P1(parse_node_t *, pn) {
+    if (pn) {
+	parse_node_t *ret = insert_pop_value(pn);
+
+	if (!ret) {
+	    if (pn->kind == NODE_BINARY_OP && pn->v.number >= F_EQ &&
+		pn->v.number <= F_GT)
+		yywarn("Value of conditional expression is unused");
+	    else
+		yywarn("Expression has no side effects, and the value is unused");
+	}
+	return ret;
+    }
+    
+    return 0;
+}
+
 int is_boolean P1(parse_node_t *, pn) {
     switch (pn->kind) {
     case NODE_UNARY_OP:
@@ -387,6 +404,8 @@ int is_boolean P1(parse_node_t *, pn) {
 
 parse_node_t *optimize_loop_test P1(parse_node_t *, pn) {
     parse_node_t *ret;
+
+    if (!pn) return 0;
     
     if (IS_NODE(pn, NODE_BINARY_OP, F_LT) &&
 	IS_NODE(pn->l.expr, NODE_OPCODE_1, F_LOCAL)) {
@@ -409,3 +428,11 @@ parse_node_t *optimize_loop_test P1(parse_node_t *, pn) {
     
     return ret;
 }
+
+
+
+
+
+
+
+

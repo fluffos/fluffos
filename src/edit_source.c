@@ -190,9 +190,9 @@ static void refill()
     register char *p, *yyp;
     int c;
 
-    if (fgets(p = yyp = defbuf + (DEFMAX >> 1), MAXLINE - 1, yyin)){
-      while (((c = *yyp++) != '\n') && (c != EOF)){
-          if (c == '/'){
+    if (fgets(p = yyp = defbuf + (DEFMAX >> 1), MAXLINE - 1, yyin)) {
+      while (((c = *yyp++) != '\n') && (c != EOF)) {
+          if (c == '/') {
               if ((c = *yyp) == '*') {
                   yyp = skip_comment(yyp, 0);
                   continue;
@@ -219,11 +219,12 @@ static void handle_define()
 
     q = namebuf;
     end = q + NSIZE - 1;
-    while (isalunum(*tmp)){
+    while (isalunum(*tmp)) {
 	if (q < end) *q++ = *tmp++;
 	else yyerror("Name too long.\n");
     }
     if (q == namebuf) yyerror("Macro name missing.\n");
+    if (*namebuf != '_' && !isalpha(*namebuf)) yyerror("Invalid macro name.\n");
     *q = 0;
     if (*tmp == '(') {            /* if "function macro" */
         int arg;
@@ -237,11 +238,11 @@ static void handle_define()
 	} else {
             for (arg = 0; arg < NARGS;) {
                 end = (q = args[arg]) + NSIZE - 1;
-		while (isalunum(*tmp) || (*tmp == '#')){
+		while (isalunum(*tmp) || (*tmp == '#')) {
 		    if (q < end) *q++ = *tmp++;
 		    else yyerror("Name too long.\n");
 		}
-		if (q == args[arg]){
+		if (q == args[arg]) {
 		    char buff[200];
 		    sprintf(buff, "Missing argument %d in #define parameter list", arg + 1);
 		    yyerror(buff);
@@ -315,11 +316,11 @@ static void handle_define()
 
 #define SKPW while (isspace(*outp)) outp++
 
-static int cmygetc(){
+static int cmygetc() {
     int c;
 
-    for (;;){
-      if ((c = *outp++) == '/'){
+    for (;;) {
+      if ((c = *outp++) == '/') {
           if ((c = *outp) == '*') outp = skip_comment(outp, 0);
           else if (c == '/') return -1;
           else return c;
@@ -400,7 +401,7 @@ static int expand_define()
                         *q++ = c;
                   }
               }
-                if (!squote && !dquote){
+                if (!squote && !dquote) {
                     if ((c = cmygetc()) < 0) yyerror("End of macro in // comment");
               }
                 else c = *outp++;
@@ -445,7 +446,7 @@ static int exgetc()
     register char c, *yyp;
 
     SKPW;
-    while (isalpha(c = *outp) || c == '_'){
+    while (isalpha(c = *outp) || c == '_') {
       yyp = yytext;
       do {
           *yyp++ = c;
@@ -457,7 +458,7 @@ static int exgetc()
           if (*outp++ != '(') yyerror("Missing ( after 'defined'");
           SKPW;
           yyp = yytext;
-          if (isalpha(c = *outp) || c == '_'){
+          if (isalpha(c = *outp) || c == '_') {
               do {
                   *yyp++ = c;
               } while (isalnum(c = *++outp) || (c == '_'));
@@ -534,7 +535,7 @@ static int maybe_open_input_file P1(char *, fn) {
     if ((yyin = fopen(fn, "r")) == NULL) {
 	return 0;
     }
-    if (current_file) free(current_file);
+    if (current_file) free((char *)current_file);
     current_file = (char *)malloc(strlen(fn) + 1);
     current_line = 0;
     strcpy(current_file, fn);
@@ -565,7 +566,7 @@ static char *protect P1(char *, p) {
     char *bufp = buf;
 
     while (*p) {
-	if (*p=='\"' || *p == '\\') *bufp++ = '\\';
+	if (*p=='"' || *p == '\\') *bufp++ = '\\';
 	*bufp++ = *p++;
     }
     *bufp = 0;
@@ -611,11 +612,11 @@ create_option_defines() {
     close_output_file();
 }
 
-static void deltrail(){
+static void deltrail() {
     register char *p;
 
     p = outp;
-    while (*p && !isspace(*p) && *p != '\n'){
+    while (*p && !isspace(*p) && *p != '\n') {
       p++;
     }
     *p = 0;
@@ -688,7 +689,7 @@ preprocess() {
 	if (!buffered) current_line++;
 	else buffered = 0;
 	while (isspace(*yyp2)) yyp2++;
-	if ((c = *yyp2) == ppchar){
+	if ((c = *yyp2) == ppchar) {
 	    int quote = 0;
 	    char sp_buf = 0, *oldoutp;
 
@@ -701,8 +702,8 @@ preprocess() {
 	    for (;;) {
 		if ((c = *yyp2++) == '"') quote ^= 1;
 		else{
-		    if (!quote && c == '/'){
-			if (*yyp2 == '*'){
+		    if (!quote && c == '/') {
+			if (*yyp2 == '*') {
 			    yyp2 = skip_comment(yyp2, 0);
 			    continue;
 			}
@@ -723,7 +724,7 @@ preprocess() {
 	    *yyp = 0;
 	    yyp = defbuf + (DEFMAX >> 1) + 1;
 
-	    if (!strcmp("define", yyp)){
+	    if (!strcmp("define", yyp)) {
 		handle_define();
 	    } else if (!strcmp("if", yyp)) {
 		cond = cond_get_exp(0);
@@ -760,13 +761,13 @@ preprocess() {
 		handle_include(outp);
 	    } else if (!strcmp("pragma", yyp)) {
 		handle_pragma(outp);
-	    } else if (yyout){
-		if (!strcmp("line", yyp)){
+	    } else if (yyout) {
+		if (!strcmp("line", yyp)) {
 		    fprintf(yyout, "#line %d \"%s\"\n", current_line,
 			    current_file);
 		} else {
 		    if (sp_buf) *oldoutp = sp_buf;
-		    if (pragmas & PRAGMA_NOTE_CASE_START){
+		    if (pragmas & PRAGMA_NOTE_CASE_START) {
 			if (*yyp == '%') pragmas &= ~PRAGMA_NOTE_CASE_START;
 		    }
 		    fprintf(yyout, "%s\n", yyp-1);
@@ -777,34 +778,34 @@ preprocess() {
 		yyerror(buff);
 	    }
 	}
-	else if (c == '/'){
-	    if ((c = *++yyp2) == '*'){
+	else if (c == '/') {
+	    if ((c = *++yyp2) == '*') {
 		if (yyout) fputs(yyp, yyout);
 		yyp2 = skip_comment(yyp2, 1);
 	    } else if (c == '/' && !yyout) continue;
-	    else if (yyout){
+	    else if (yyout) {
 		fprintf(yyout, "%s", yyp);
 	    }
 	}
-	else if (yyout){
+	else if (yyout) {
 	    fprintf(yyout, "%s", yyp);
-	    if (pragmas & PRAGMA_NOTE_CASE_START){
+	    if (pragmas & PRAGMA_NOTE_CASE_START) {
 		static int line_to_print;
 		
 		line_to_print = 0;
 		
-		if (!in_c_case){
+		if (!in_c_case) {
 		    while (isalunum(*yyp2)) yyp2++;
 		    while (isspace(*yyp2)) yyp2++;
-		    if (*yyp2 == ':'){
+		    if (*yyp2 == ':') {
 			in_c_case = 1;
 			yyp2++;
 		    }
 		}
 		
-		if (in_c_case){
+		if (in_c_case) {
 		    while ((c = *yyp2++)) {
-			switch(c){
+			switch(c) {
 			  case '{':
 			    {
 				if (!cquote && (++block_nest == 1))
@@ -814,7 +815,7 @@ preprocess() {
 			    
 			  case '}':
 			    {
-				if (!cquote){
+				if (!cquote) {
 				    if (--block_nest < 0) yyerror("Too many }'s");
 				}
 				break;
@@ -833,10 +834,10 @@ preprocess() {
                             break;
 			    
 			  case '/':
-                            if (!cquote){
-                                if ((c = *yyp2) == '*'){
+                            if (!cquote) {
+                                if ((c = *yyp2) == '*') {
                                     yyp2 = skip_comment(yyp2, 1);
-                                } else if (c == '/'){
+                                } else if (c == '/') {
                                     *(yyp2-1) = '\n';
                                     *yyp2 = '\0';
                                 }
@@ -860,10 +861,10 @@ preprocess() {
 	    }
 	}
     }
-    if (iftop){
+    if (iftop) {
       ifstate_t *p = iftop;
 
-      while (iftop){
+      while (iftop) {
           p = iftop;
           iftop = p->next;
           free((char *)p);
@@ -874,7 +875,7 @@ preprocess() {
     free(current_file);
     current_file = 0;
     nexpands = 0;
-    if (inctop){
+    if (inctop) {
       incstate *p = inctop;
 
       current_file = p->file;
@@ -974,7 +975,7 @@ void make_efun_tables()
 	fclose(files[i]);
 }
 
-static void handle_local_defines() {
+static void handle_local_defines(int check) {
     defn_t *p;
     int i;
     int problem = 0;
@@ -997,6 +998,9 @@ static void handle_local_defines() {
     
     if ((p = lookup_define("_OPTIONS_H_")))
 	p->flags |= DEF_IS_UNDEFINED;
+
+    if (!check)
+	return;
 
     for (i = 0; i < DEFHASH; i++)
 	for (p = defns[i]; p; p = p->next)
@@ -1026,14 +1030,21 @@ static void write_options_incl P1(int, local) {
     close_output_file();
 }
 
-static void handle_options() {
+static void handle_options(int full) {
     open_input_file(OPTIONS_H);
     ppchar = '#';
     preprocess();
 
+    if (!full) {
+	/* don't do any checking, just find out what is defined */
+	if (maybe_open_input_file(LOCAL_OPTIONS))
+	    handle_local_defines(0);
+	return;
+    }
+
     if (maybe_open_input_file(LOCAL_OPTIONS)) {
 	fprintf(stdout, "Using '%s' file ...\n", LOCAL_OPTIONS);
-	handle_local_defines();
+	handle_local_defines(1);
 	write_options_incl(1);
     } else {
 	fprintf(stderr, "No \"%s\" file present.  If you create one from \"%s\",\nyou can use it when you get a new driver, and you will be warned if there are\nchanges to the real %s which you should include in your local file.\n",
@@ -1102,6 +1113,59 @@ static void handle_build_efuns() {
     open_input_file(FUNC_SPEC_CPP);
     yyparse();
     make_efun_tables();
+}
+
+static handle_applies() {
+    FILE *f = fopen("applies", "r");
+    FILE *out = fopen("applies.h", "w");
+    FILE *table = fopen("applies_table.c", "w");
+    char buf[8192];
+    char *colon;
+    char *p;
+    int apply_number = 0;
+    
+    fprintf(out, "/* autogenerated from 'applies' */\n#ifndef APPLIES_H\n#define APPLIES_H\n\nextern char *applies_table[];\n\n/* the folowing must be the first character of __INIT */\n#define APPLY___INIT_SPECIAL_CHAR\t\t'#'\n");
+    fprintf(table, "/* autogenerated from 'applies' */\n\nchar *applies_table[] = {\n");
+    
+    while (fgets(buf, 8192, f)) {
+	buf[strlen(buf)-1] = 0;
+	if (buf[0] == '#') break;
+	if ((colon = strchr(buf, ':'))) {
+	    *colon++ = 0;
+	    fprintf(out, "#define APPLY_%-30s\t\"%s\"\n", buf, colon);
+	} else {
+	    fprintf(out, "#define APPLY_%-30s\t", buf);
+	    p = buf;
+	    while (*p) {
+		*p = tolower(*p);
+		p++;
+	    }
+	    fprintf(out, "\"%s\"\n", buf);
+	}
+    }
+    while (fgets(buf, 8192, f)) {
+	buf[strlen(buf)-1] = 0;
+	if ((colon = strchr(buf, ':'))) {
+	    *colon++ = 0;
+	    fprintf(table, "\t\"%s\",\n", colon);
+	    fprintf(out, "#define APPLY_%-30s\t%i\n", buf, apply_number++);
+	} else {
+	    fprintf(out, "#define APPLY_%-30s\t%i\n", buf, apply_number++);
+	    p = buf;
+	    while (*p) {
+		*p = tolower(*p);
+		p++;
+	    }
+	    fprintf(table, "\t\"%s\",\n", buf);
+	}
+    }
+    
+    fprintf(table, "};\n");
+    fprintf(out, "\n#define NUM_MASTER_APPLIES\t%i\n\n#endif\n", apply_number);
+
+    fclose(out);
+    fclose(table);
+    fclose(f);
 }
 
 static void handle_malloc() {
@@ -1252,6 +1316,22 @@ static int check_prog P4(char *, tag, char *, pre, char *, code, int, andrun) {
     return 0;
 }
 
+static int check_code P2(char *, pre, char *, code) {
+    char buf[1024];
+    FILE *ct;
+    int rc;
+
+    ct = fopen("comptest.c", "w");
+    fprintf(ct, "#include \"configure.h\"\n#include \"std_incl.h\"\n%s\n\nint main() {%s}\n", (pre ? pre : ""), code);
+    fclose(ct);
+
+    sprintf(buf, "%s %s comptest.c -o comptest" TO_DEV_NULL, COMPILER, CFLAGS);
+    if (compile(buf) || (rc = system("./comptest")) == 127 || rc == -1) {
+	return -1;
+    }
+    return rc;
+}
+
 static void check_linux_libc() {
     char buf[1024];
     FILE *ct;
@@ -1327,7 +1407,17 @@ static void handle_configure() {
 #ifndef WIN32
     check_include("INCL_STDLIB_H", "stdlib.h");
     check_include("INCL_UNISTD_H", "unistd.h");
-    check_include("INCL_TIME_H", "time.h");
+    if (check_include("INCL_TIME_H", "time.h")) {
+	if (!check_prog(0, "#include <time.h>", "tzset();", 0)) {
+	    if (check_prog(0, 0, "void tzset(); tzset();", 0))
+		fprintf(yyout, "#define PROTO_TZSET\n#define USE_TZSET\n");
+	}
+	else
+	    fprintf(yyout, "#define USE_TZSET\n");
+    } else {
+	if (check_prog(0, 0, "void tzset(); tzset();", 0))
+	    fprintf(yyout, "#define PROTO_TZSET\n#define USE_TZSET\n");
+    }
     check_include("INCL_SYS_TIMES_H", "sys/times.h");
     check_include("INCL_FCNTL_H", "fcntl.h");
     check_include("INCL_SYS_TIME_H", "sys/time.h");
@@ -1393,7 +1483,7 @@ static void handle_configure() {
     /* Runtime loading support */
     if (check_include("INCL_DLFCN_H", "dlfcn.h")) {
 	if (!check_prog(0, "#include <dlfcn.h>", "int x = RTLD_LAZY;", 0))
-	    fprintf(yyout, "#define RTLD_LAZY     1\n");
+	    fprintf(yyout, "#define RTLD_LAZY      1\n");
     } else {
 	if (!check_prog(0, 0, "int x = RTLD_LAZY;", 0))
 	    fprintf(yyout, "#define RTLD_LAZY     1\n");
@@ -1459,6 +1549,14 @@ static void handle_configure() {
 		       "", "gettimeofday(0, 0);", 0);
     verbose_check_prog("Checking for fchmod()", "HAS_FCHMOD",
 		       "", "fchmod(0, 0);", 0);
+
+    printf("Checking for big or little endian ... ");
+    if (!check_code("char num[] = { 0x11, 0x22, 0x33, 0x44 }; int *foo = (int *)num;",
+		    "return (*foo == 0x44332211);")) {
+	printf("big\n");
+	fprintf(yyout, "#define BIGENDIAN 1");
+	fflush(yyout);
+    } else printf("little\n");
     
     find_memmove();
 #endif
@@ -1477,11 +1575,27 @@ static void handle_configure() {
 	exit(-1);
     }
     
-    if (!(check_include("INCL_LOCAL_MSQL_H", "/usr/local/include/msql.h") ||
-	  check_include("INCL_LOCAL_MSQL_MSQL_H", "/usr/local/msql/include/msql.h") ||
-	  check_include("INCL_LOCAL_MINERVA_MSQL_H", "/usr/local/Minerva/include/msql.h") ||
-	  check_include("INCL_LOCAL_HUGHES_MSQL_H", "/usr/local/Hughes/include/msql.h"))) {
-	check_include("INCL_LIB_HUGHES_MSQL_H", "/usr/lib/Hughes/include/msql.h");
+    /* PACKAGE_DB stuff */
+    if (lookup_define("PACKAGE_DB")) {
+	/* -I would be nicer for added include paths, but we don't have an easy way to
+	 * set -I paths right now 
+	 */
+	if (lookup_define("USE_MSQL")) {
+	    if (!(check_include("INCL_LOCAL_MSQL_H", "/usr/local/include/msql.h")
+		|| check_include("INCL_LOCAL_MSQL_MSQL_H", "/usr/local/msql/include/msql.h")
+		|| check_include("INCL_LOCAL_MINERVA_MSQL_H", "/usr/local/Minerva/include/msql.h")
+		|| check_include("INCL_LIB_HUGHES_MSQL_H", "/usr/lib/Hughes/include/msql.h"))) {
+		fprintf(stderr, "Cannot find msql.h, compilation is going to fail miserably.\n");
+	    }
+	}
+	if (lookup_define("USE_MYSQL")) {
+	    if (!(check_include("INCL_LOCAL_MYSQL_H", "/usr/local/include/mysql.h")
+		|| check_include("INCL_LOCAL_INCLUDE_MYSQL_MYSQL_H", "/usr/local/include/mysql/mysql.h")
+		|| check_include("INCL_LOCAL_MYSQL_MYSQL_H", "/usr/local/mysql/include/mysql.h")
+		|| check_include("INCL_MYSQL_MYSQL_H", "/usr/include/mysql/mysql.h"))) {
+		fprintf(stderr, "Cannot find mysql.h, compilation is going to fail miserably.\n");
+	    }
+	}
     }
     
     fprintf(yyout, "#define CONFIGURE_VERSION	%i\n\n", CONFIGURE_VERSION);
@@ -1522,12 +1636,23 @@ static void handle_configure() {
     fprintf(stderr, "Checking for flaky Linux systems ...\n");
     check_linux_libc();
 
-    if (!(check_library("-lmsql") ||
-	  check_library("-L/usr/local/lib -lmsql") ||
-	  check_library("-L/usr/local/msql/lib -lmsql") ||
-	  check_library("-L/usr/local/Minerva/lib -lmsql") ||
-	  check_library("-L/usr/local/Hughes/lib -lmsql"))) {
-	check_library("-L/usr/lib/Hughes/lib -lmsql");
+    /* PACKAGE_DB stuff */
+    if (lookup_define("PACKAGE_DB") && lookup_define("USE_MSQL")) {
+	if (!(check_library("-lmsql") ||
+	      check_library("-L/usr/local/lib -lmsql") ||
+	      check_library("-L/usr/local/msql/lib -lmsql") ||
+	      check_library("-L/usr/local/Minerva/lib -lmsql") ||
+	      check_library("-L/usr/lib/Hughes/lib -lmsql"))) {
+	    fprintf(stderr, "Cannot find libmsql.a, compilation is going to fail miserably\n");
+	}
+    }
+    if (lookup_define("PACKAGE_DB") && lookup_define("USE_MYSQL")) {
+	if (!(check_library("-lmysqlclient") ||
+	      check_library("-L/usr/local/lib -lmysqlclient") ||
+	      check_library("-L/usr/local/lib/mysql -lmysqlclient") ||
+	      check_library("-L/usr/local/mysql/lib -lmysqlclient"))) {
+	    fprintf(stderr, "Cannot find libmysqlclient.a, compilation is going to fail miserably\n");
+	}
     }
 
     fprintf(yyout, "\n\n");
@@ -1544,16 +1669,20 @@ int main P2(int, argc, char **, argv) {
 	    exit(-1);
 	}
 	if (strcmp(argv[idx], "-configure")==0) {
+	    handle_options(0);
 	    handle_configure();
 	} else
 	if (strcmp(argv[idx], "-process")==0) {
 	    handle_process(argv[++idx]);
 	} else
 	if (strcmp(argv[idx], "-options")==0) {
-	    handle_options();
+	    handle_options(1);
 	} else
 	if (strcmp(argv[idx], "-malloc")==0) {
 	    handle_malloc();
+	} else
+	if (strcmp(argv[idx], "-build_applies")==0) {
+	    handle_applies();
 	} else
 	if (strcmp(argv[idx], "-build_func_spec")==0) {
 	    handle_build_func_spec(argv[++idx]);

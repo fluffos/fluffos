@@ -23,6 +23,7 @@ static int forward_branch_stack[100];
 
 static int label;
 static int notreached;
+static int current_block;
 
 static parse_node_t *branch_list[2];
 
@@ -34,6 +35,16 @@ static void c_update_branch_list PROT((parse_node_t *));
 static void c_generate_loop PROT((int, parse_node_t *, parse_node_t *,
 				  parse_node_t *));
 static void c_generate_else PROT((void));
+
+#define CURRENT_BLOCK_SIZE (prog_code - mem_block[current_block].block)
+#define UPDATE_BLOCK_SIZE mem_block[current_block].current_size = CURRENT_BLOCK_SIZE
+
+#define switch_to_block(x) { \
+    UPDATE_BLOCK_SIZE; \
+    prog_code = mem_block[x].block + mem_block[x].current_size; \
+    prog_code_max = mem_block[x].block + mem_block[x].max_size; \
+    current_block = x; \
+			       }
 
 typedef struct switch_table_s {
     struct switch_table_s *next;
@@ -76,8 +87,8 @@ static int add_label PROT((void)) {
     if (prog_code + 12 > prog_code_max) {
         mem_block_t *mbp = &mem_block[current_block];
 
-        UPDATE_PROGRAM_SIZE;
-        realloc_mem_block(mbp, mbp->current_size * 2);
+        UPDATE_BLOCK_SIZE;
+        realloc_mem_block(mbp);
 
         prog_code = mbp->block + mbp->current_size;
         prog_code_max = mbp->block + mbp->max_size;
@@ -97,8 +108,8 @@ static void ins_string P1(char *, s) {
     if (prog_code + l + 1 > prog_code_max) {
         mem_block_t *mbp = &mem_block[current_block];
 
-        UPDATE_PROGRAM_SIZE;
-        realloc_mem_block(mbp, mbp->current_size * 2);
+        UPDATE_BLOCK_SIZE;
+        realloc_mem_block(mbp);
 
         prog_code = mbp->block + mbp->current_size;
         prog_code_max = mbp->block + mbp->max_size;
@@ -123,7 +134,7 @@ static void ins_vstring P1V(char *, format)
 }
 
 static int ins_jump PROT((void)) {
-    int ret = CURRENT_PROGRAM_SIZE;
+    int ret = CURRENT_BLOCK_SIZE;
 
     if (notreached) return 0;
     ins_string("goto label???;\n");
@@ -202,6 +213,15 @@ c_generate_node P1(parse_node_t *, expr) {
     if (!expr) return;
 
     switch (expr->kind) {
+    case NODE_FUNCTION:
+    {
+	unsigned short num;
+	
+	num = FUNCTION_TEMP(expr->v.number)->u.index;
+	FUNC(num)->address = generate_function(FUNC(num),
+					       expr->r.expr, expr->l.number);
+	break;
+    }
     case NODE_TERNARY_OP:
 	c_generate_node(expr->l.expr);
 	expr = expr->r.expr;
@@ -279,6 +299,9 @@ c_generate_node P1(parse_node_t *, expr) {
 	break;
     case NODE_CALL_1:
 	generate_expr_list(expr->r.expr);
+	if (expr->v.number == F_CALL_FUNCTION_BY_ADDRESS){
+	    expr->l.number = comp_def_index_map[expr->l.number];
+	}
 	ins_vstring(instrs[expr->v.number].routine, expr->l.number, 
 		    (expr->r.expr ? expr->r.expr->kind : 0));
 	break;
@@ -463,9 +486,12 @@ c_generate_node P1(parse_node_t *, expr) {
 	
 	switch (expr->v.number & 0xff) {
 	case FP_SIMUL:
-	case FP_LOCAL:
 	    ins_vstring("c_function_constructor(%i, %i);\n", 
 			expr->v.number & 0xff, expr->v.number >> 8);
+	    break;
+	case FP_LOCAL:
+	    ins_vstring("c_function_constructor(%i, %i);\n", 
+			expr->v.number & 0xff, comp_def_index_map[expr->v.number >> 8]);
 	    break;
 	case FP_EFUN:
 	    ins_vstring("c_function_constructor(%i, %i);\n", 
@@ -560,10 +586,10 @@ static void c_generate_loop P4(int, test_first, parse_node_t *, block,
     if (inc) c_generate_node(inc);
     if (!forever && test_first)
 	c_update_forward_branch();
-    if (test->kind == F_LOOP_COND_LOCAL || test->kind == F_LOOP_COND_NUMBER) {
+    if (test && (test->v.number == F_LOOP_COND_LOCAL ||
+		 test->v.number == F_LOOP_COND_NUMBER)) {
 	c_generate_node(test);
 	ins_vstring("goto label%03i;\n", pos);
-	notreached = 1;
     } else {
 	if (test_first == 2)
 	    ins_vstring("if (c_next_foreach())\ngoto label%03i;\n", pos);
@@ -583,7 +609,11 @@ c_generate_inherited_init_call P2(int, index, short, f) {
 
 void c_start_function P1(char *, fname) {
     notreached = 0;
-    ins_vstring("static void LPC_%s__%s() {\n", compilation_ident, fname);
+    if (fname[0] == APPLY___INIT_SPECIAL_CHAR)
+	ins_vstring("static void LPC_%s__LPCinit() {\n",
+		    compilation_ident);
+    else 
+	ins_vstring("static void LPC_%s__%s() {\n", compilation_ident, fname);
 }
 
 void c_end_function() {
@@ -630,7 +660,7 @@ c_update_forward_branch() {
     add_label();
 }
 
-static void c_update_forward_branch_links P2(char, kind, parse_node_t *, link_start){
+static void c_update_forward_branch_links P2(char, kind, parse_node_t *, link_start) {
     int i = *--forward_branch_ptr;
     int our_label;
     char *p;
@@ -706,6 +736,10 @@ c_initialize_parser() {
     notreached = 0;
 }
 
+void
+c_uninitialize_parser() {
+}
+
 #if 0
 static char *protect_allocated_string = 0;
 
@@ -750,7 +784,7 @@ c_generate_final_program P1(int, x) {
     switch_table_t *st, *next;
     int i;
     int index = 0;
-    compiler_function_t *funp;
+    int num_func;
     
     if (!x) {
 	if (string_switches) {
@@ -804,13 +838,8 @@ c_generate_final_program P1(int, x) {
 	fwrite(mem_block[A_FUNCTIONALS].block,
 	       mem_block[A_FUNCTIONALS].current_size, 1, f_out);
 
-	if (mem_block[A_INITIALIZER].current_size) {
-	    fprintf(f_out, "static void LPCINIT_%s() {\n", compilation_ident);
-	    fwrite(mem_block[A_INITIALIZER].block, 
-		   mem_block[A_INITIALIZER].current_size, 1, f_out);
-	    fprintf(f_out, "}\n");
-	}
-	
+	UPDATE_PROGRAM_SIZE;
+
 	fwrite(mem_block[A_PROGRAM].block,
 	       mem_block[A_PROGRAM].current_size, 1, f_out);
 
@@ -818,15 +847,22 @@ c_generate_final_program P1(int, x) {
 	prog_code = mem_block[A_PROGRAM].block;
 
 	fprintf(f_out, "\n\nstatic void (*functions[])() = {\n");
-	for (i = 0; i < mem_block[A_COMPILER_FUNCTIONS].current_size/sizeof(*funp); i++) {
-	    funp = COMPILER_FUNC(i);
-	    if (!(FUNCTION_FLAGS(funp->runtime_index) & FUNC_NO_CODE)) {
-		if (funp->name[0] == APPLY___INIT_SPECIAL_CHAR)
-		    fprintf(f_out, "LPCINIT_%s,\n", compilation_ident);
-		else
-		    fprintf(f_out, "LPC_%s__%s,\n", compilation_ident,
-			    funp->name);
-	    }
+
+	num_func = mem_block[A_FUNCTIONS].current_size/sizeof(function_t);
+	
+	while (num_func && 
+	       FUNC(func_index_map[num_func - 1])->address == USHRT_MAX) 
+	    num_func--;
+	
+	for (i = 0; i < num_func; i++){
+	    char *func_name = FUNC(func_index_map[i])->name;
+	    if (!FUNC(func_index_map[i])->address)
+		continue;
+	    if (func_name[0] == APPLY___INIT_SPECIAL_CHAR)
+			    fprintf(f_out, "LPC_%s__LPCinit,\n", compilation_ident);
+	    else 
+		fprintf(f_out, "LPC_%s__%s,\n", compilation_ident,
+			FUNC(func_index_map[i])->name);
 	}
 	fprintf(f_out, "0\n};\n");
 	{

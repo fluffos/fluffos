@@ -40,34 +40,55 @@
  * after compilation, to be used when the object is inherited.
  */
 
-/* FUNC_INHERITED - The function entry that exists in this object actually
-                    is a function in an object we inherited
- * FUNC_UNDEFINED - the function hasn't been defined yet at this level
- * FUNC_STRICT_TYPES - compiled with strict type testing
- * FUNC_PROTOTYPE - only a prototype has been found so far
- * FUNC_DEF_BY_INHERIT - this function actually exists in an object we've
-                         inherited; if we don't find a function at this level
-			 we'll use that one
- * FUNC_ALIAS     - This entry refers us to another entry, usually because
-                    this function was overloaded by that function
- */
-#define FUNC_INHERITED		0x1
-#define FUNC_UNDEFINED		0x2
-#define FUNC_STRICT_TYPES	0x4
-#define FUNC_PROTOTYPE		0x8
-#define FUNC_DEF_BY_INHERIT     0x10
-#define FUNC_ALIAS              0x20
-#define FUNC_TRUE_VARARGS       0x40
-#define FUNC_VARARGS		0x80
+/* The semantics of the flags are currently as follows:
 
-#define DECL_HIDDEN	        0x0200  /* used by private vars */
-#define DECL_PRIVATE		0x0400	/* Can't be inherited */
-#define DECL_PROTECTED		0x0800	/* Static function or variable */
-#define DECL_PUBLIC		0x1000	
-#define DECL_NOMASK		0x2000	/* The nomask => not redefineable */
-#define DECL_NOSAVE		0x4000
+   (1) A function is either a definition, a prototype or an undefined
+       function
+
+   (2) A definition is an address that executes code when
+       it is jumped to and finishes with a return.  
+       The address is labeled by the following info:
+       function name, type, flags,number of arguments, number of locals, 
+       argument types.
+
+   (3) A prototype does not execute code, and is basically a label with
+       the following info:
+       argument types (optionally also argument names),function name,
+       type, flags, number of arguments
+
+   (4) An undefined function is an unknown function that has been called or
+       a label that is as yet not known to be a prototype or definition
+
+   Note that the above rules apply to comments in compiler.c as well.
+   In particular, a known prototype is not undefined. When 'function'
+   by itself is used, (1) is always meant.
+
+   FUNC_INHERITED - The function entry that exists in this object actually
+                    is a function in an object we inherited
+   FUNC_UNDEFINED - see (4)
+   FUNC_STRICT_TYPES - compiled with strict type testing
+   FUNC_PROTOTYPE - see (3)
+   FUNC_ALIAS     - This entry refers us to another entry, usually because
+                    this function was overloaded by that function
+		    
+   Sym
+ */
+#define FUNC_INHERITED		0x0001
+#define FUNC_UNDEFINED          0x0002
+#define FUNC_STRICT_TYPES	0x0004
+#define FUNC_PROTOTYPE		0x0008
+#define FUNC_TRUE_VARARGS       0x0010
+#define FUNC_VARARGS		0x0020
+#define FUNC_ALIAS              0x8000        /* This shouldn't be changed */
+
+#define DECL_HIDDEN	        0x0100        /* used by private vars */
+#define DECL_PRIVATE		0x0200        /* Can't be inherited */
+#define DECL_PROTECTED		0x0400       /* Static function or variable */
+#define DECL_PUBLIC		0x0800	
+#define DECL_NOMASK		0x1000    /* The nomask => not redefineable */
+#define DECL_NOSAVE		0x2000
 #ifndef SENSIBLE_MODIFIERS
-#define DECL_VISIBLE		0x8000  /* Force inherit through private */
+#define DECL_VISIBLE		0x4000     /* Force inherit through private */
 
 #define DECL_ACCESS		(DECL_HIDDEN | DECL_PRIVATE | DECL_PROTECTED | DECL_PUBLIC | DECL_VISIBLE)
 
@@ -82,23 +103,31 @@
 #define DECL_MODIFY2(t, mod) ((((t) & DECL_ACCESS) > ((mod) & DECL_ACCESS)) ? ((t) & ~DECL_ACCESS) | (mod) : (t) | ((mod) & ~DECL_ACCESS))
 
 /* only the flags that should be copied up through inheritance levels */
-#define FUNC_MASK (FUNC_VARARGS | FUNC_UNDEFINED | FUNC_STRICT_TYPES | FUNC_PROTOTYPE | FUNC_TRUE_VARARGS | DECL_MODS)
+#define FUNC_MASK (FUNC_VARARGS | FUNC_UNDEFINED | FUNC_STRICT_TYPES | FUNC_PROTOTYPE | FUNC_TRUE_VARARGS | FUNC_ALIAS | DECL_MODS)
 
 /* a function that isn't 'real' */
-#define FUNC_NO_CODE  (FUNC_UNDEFINED | FUNC_ALIAS | FUNC_PROTOTYPE)
-#define REAL_FUNCTION(x) (!((x) & (FUNC_ALIAS | FUNC_PROTOTYPE)) && \
-                         (((x) & FUNC_DEF_BY_INHERIT) || (!((x) & FUNC_UNDEFINED))))
+#define FUNC_NO_CODE  (FUNC_ALIAS | FUNC_PROTOTYPE | FUNC_UNDEFINED)
+#define REAL_FUNCTION(x) (!((x) & (FUNC_ALIAS | FUNC_PROTOTYPE)))
 
 /*
  * These are or'ed in on top of the basic type.
  */
-#define TYPE_MOD_ARRAY   	0x0020	/* Pointer to a basic type */
-#define TYPE_MOD_CLASS          0x0040  /* a class */
-#define LOCAL_MOD_UNUSED	0x0080
+
+/* Note, the following restricts class_num to < 0x40 or 64   */
+/* The reason for this is that vars still have a ushort type */
+/* This restriction is not unreasonable, since LPC is still  */
+/* catered for mini-applications (compared to say, C++ or    */
+/* java)..for now - Sym                                      */ 
+  
+#define TYPE_MOD_ARRAY   	0x0040        /* Pointer to a basic type */
+#define TYPE_MOD_CLASS          0x0080        /* a class */
+#define CLASS_NUM_MASK          0x003f
+  
 #define LOCAL_MOD_REF		0x0100
-
+#define LOCAL_MOD_UNUSED	0x0200
+  
 #define LOCAL_MODS (LOCAL_MOD_UNUSED|LOCAL_MOD_REF)
-
+  
 typedef struct {
     unsigned char num_arg;
     unsigned char num_local;
@@ -123,30 +152,29 @@ typedef struct {
     unsigned char index[1];
 } compressed_offset_table_t;
 
+#ifdef LPC_TO_C
+#define ADDRESS_TYPE	POINTER_INT
+#define ADDRESS_MAX	UINT_MAX
+#else
+#  ifdef USE_32BIT_ADDRESSES
+#define ADDRESS_TYPE	unsigned int
+#define ADDRESS_MAX	UINT_MAX
+#  else
+#define ADDRESS_TYPE	unsigned short
+#define ADDRESS_MAX	USHRT_MAX
+#  endif
+#endif
+
 typedef struct {
     char *name;
     unsigned short type;
-    unsigned short runtime_index;
-#ifndef LPC_TO_C
-    unsigned short address;
-#else
-    POINTER_INT address;
-#endif
+    unsigned char num_arg;
+    unsigned char num_local;
+    ADDRESS_TYPE address;
 #ifdef PROFILE_FUNCTIONS
     unsigned long calls, self, children;
 #endif
-} compiler_function_t;
-
-typedef struct {
-    struct program_s *prog; /* inherited if nonzero */
-    union {
-	compiler_function_t *func;
-	int index;
-    } u;
-    /* For non-aliases, this is a count of the number of non-aliases we've
-       seen for this function. */
-    unsigned short alias_for;
-} compiler_temp_t;
+} function_t;
 
 typedef struct {
     unsigned short name;
@@ -174,7 +202,8 @@ typedef struct {
 
 typedef struct program_s {
     char *name;			/* Name of file that defined prog */
-    int flags;
+    unsigned short flags;
+    unsigned short last_inherited;
     unsigned short ref;			/* Reference count */
     unsigned short func_ref;
 #ifdef DEBUG
@@ -182,18 +211,11 @@ typedef struct program_s {
     int extra_func_ref;
 #endif
     char *program;		/* The binary instructions */
-    int id_number;		/* used to associate information with this
-				 * prog block without needing to increase the
-				 * reference count     */
     unsigned char *line_info;   /* Line number information */
     unsigned short *file_info;
     int line_swap_index;	/* Where line number info is swapped */
-    compiler_function_t *function_table;
+    function_t *function_table;
     unsigned short *function_flags; /* separate for alignment reasons */
-    runtime_function_u *function_offsets;
-#ifdef COMPRESS_FUNCTION_TABLES
-    compressed_offset_table_t *function_compressed;
-#endif
     class_def_t *classes;
     class_member_entry_t *class_members;
     char **strings;		/* All strings uses by the program */
@@ -201,8 +223,6 @@ typedef struct program_s {
     unsigned short *variable_types;	/* variables defined by this program */
     inherit_t *inherit;	/* List of inherited prgms */
     int total_size;		/* Sum of all data in this struct */
-    int heart_beat;		/* Index of the heart beat function. -1 means
-				 * no heart beat */
     /*
      * The types of function arguments are saved where 'argument_types'
      * points. It can be a variable number of arguments, so allocation is
@@ -219,9 +239,10 @@ typedef struct program_s {
     /*
      * And now some general size information.
      */
+    unsigned short heart_beat;  /* Index of the heart beat function. 0 means
+				 * no heart beat */
     unsigned short program_size;/* size of this instruction code */
     unsigned short num_classes;
-    unsigned short num_functions_total;
     unsigned short num_functions_defined;
     unsigned short num_strings;
     unsigned short num_variables_total;
@@ -235,15 +256,8 @@ void reference_prog PROT((program_t *, char *));
 void free_prog PROT((program_t *, int));
 void deallocate_program PROT((program_t *));
 char *variable_name PROT((program_t *, int));
-runtime_function_u *find_func_entry PROT((program_t *, int));
-
-/* the simple version */
-#define FUNC_ENTRY(p, i) ((p)->function_offsets + (i))
-#ifdef COMPRESS_FUNCTION_TABLES
-/* Find a function entry */
-#define FIND_FUNC_ENTRY(p, i) (((i) < (p)->function_compressed->first_defined) ? find_func_entry(p, i) : FUNC_ENTRY(p, (i) - (p)->function_compressed->num_deleted))
-#else
-#define FIND_FUNC_ENTRY(p, i) FUNC_ENTRY(p, i)
-#endif
+function_t *find_func_entry PROT((program_t *, int));
 
 #endif
+
+

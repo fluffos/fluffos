@@ -65,7 +65,7 @@ Anthon Pang (Robocoder) - provided various patches, optimize function
 Tim Hollebeek (Beek) - LPC->C and patches, compiler rewrite, new function
 	pointers, etc
 
-Ti-Ming Chiang (Symmetry) - Countless optimizations; array, mapping and
+Ti-Ming Chiang (Symmetry, Cloud) - Countless optimizations; array, mapping and
 	save_object rewrites
 
 Svata Dedic (Belgarat) - Win32 fixes, parser fixes, misc fixes
@@ -76,7 +76,7 @@ Troels Therkelsen (Qualin) - numerous bug reports and ideas
 
 Maarten de Jong - amiga compilation via gcc
 
-George Reese (Descartes) - bug reports, Win32 port
+George Reese (Descartes) - bug reports, original Win32 port, mSQL support
 
 Mark ? (Mystic) - tons of ideas; fixes for exotic options settings
 
@@ -89,6 +89,8 @@ Greg Stein (Deathblade) - various fixes and bug reports
 Ben Gras (Fermat) - MD5 crypt(), various fixes
 
 Kars de Jong (Turrican) - various bug fixes
+
+Simon Matthews (Andrew) - MySQL support, various patches and bug reports
 
 and tons of others who have accidentally been omitted
 --

@@ -4,10 +4,10 @@
 #include "../socket_efuns.h"
 #include "../include/socket_err.h"
 
-char *external_cmd[5];
+char *external_cmd[NUM_EXTERNAL_CMDS];
 
 #ifdef F_EXTERNAL_START
-int external_start P5(int, which, char *, args,
+int external_start P5(int, which, svalue_t *, args,
 		      svalue_t *, arg1, svalue_t *, arg2, svalue_t *, arg3) {
     int sv[2];
     char *cmd;
@@ -15,7 +15,7 @@ int external_start P5(int, which, char *, args,
     char **argv;
     pid_t ret;
     
-    if (--which < 0 || which > 4 || !external_cmd[which])
+    if (--which < 0 || which > (NUM_EXTERNAL_CMDS-1) || !external_cmd[which])
 	error("Bad argument 1 to external_start()\n");
     cmd = external_cmd[which];
     fd = find_new_socket();
@@ -37,7 +37,7 @@ int external_start P5(int, which, char *, args,
 	set_close_callback(fd, arg3);
 	lpc_socks[fd].owner_ob = current_object;
 	lpc_socks[fd].mode = STREAM;
-	lpc_socks[fd].state = DATA_XFER;
+	lpc_socks[fd].state = STATE_DATA_XFER;
 	memset((char *) &lpc_socks[fd].l_addr, 0, sizeof(lpc_socks[fd].l_addr));
 	memset((char *) &lpc_socks[fd].r_addr, 0, sizeof(lpc_socks[fd].r_addr));
 	lpc_socks[fd].owner_ob = current_object;
@@ -55,19 +55,24 @@ int external_start P5(int, which, char *, args,
 	int flag = 1;
 	int i = 1;
 	int n = 1;
-	char *p;
+	char *p, *arg;
 	
-	p = args;
-	while (*p) {
-	    if (isspace(*p)) {
-		flag = 1;
-	    } else {
-		if (flag) {
-		    n++;
-		    flag = 0;
+	if (args->type == T_ARRAY) {
+	    n = args->u.arr->size;
+	} else {
+	    p = args->u.string;
+	    
+	    while (*p) {
+		if (isspace(*p)) {
+		    flag = 1;
+		} else {
+		    if (flag) {
+			n++;
+			flag = 0;
+		    }
 		}
+		p++;
 	    }
-	    p++;
 	}
 
 	argv = CALLOCATE(n, char *, TAG_TEMPORARY, "external args");
@@ -75,15 +80,28 @@ int external_start P5(int, which, char *, args,
 	argv[0] = cmd;
 
 	/* need writable version */
-	args = alloc_cstring(args, "external args");
-	while (*args) {
-	    if (isspace(*args)) {
-		*args = 0;
-		flag = 1;
-	    } else {
-		if (flag) { argv[i++] = args; flag = 0; }
+	if (args->type == T_ARRAY) {
+	    int j;
+	    svalue_t *sv = args->u.arr->item;
+	    
+	    for (j = 0; j < n; j++) {
+		argv[i++] = alloc_cstring(sv[j].u.string, "external args");
 	    }
-	    args++;
+	} else {
+	    flag = 1;
+	    arg = alloc_cstring(args->u.string, "external args");
+	    while (*arg) {
+		if (isspace(*arg)) {
+		    *arg = 0;
+		    flag = 1;
+		} else {
+		    if (flag) {
+			argv[i++] = arg;
+			flag = 0;
+		    }
+		}
+		arg++;
+	    }
 	}
 	argv[i] = 0;
 	
@@ -92,7 +110,7 @@ int external_start P5(int, which, char *, args,
 	dup2(sv[1], 1);
 	dup2(sv[1], 2);
 	execv(cmd, argv);
-	exit(1);
+	return 0;
     }
 }
 
@@ -102,7 +120,7 @@ void f_external_start PROT((void))
     svalue_t *arg = sp - num_arg + 1;
     
     if (check_valid_socket("external", -1, current_object, "N/A", -1)) {
-	fd = external_start(arg[0].u.number, arg[1].u.string,
+	fd = external_start(arg[0].u.number, arg + 1,
 			    arg + 2, arg + 3, (num_arg == 5 ? arg + 4 : 0));
 	pop_n_elems(num_arg - 1);
 	sp->u.number = fd;

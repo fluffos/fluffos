@@ -133,6 +133,10 @@
 #define ARCH "Amiga"
 #endif
 
+#if !defined(ARCH) && defined(__APPLE__) && defined(__GNUC__)
+#define ARCH "Mac OS X"
+#endif
+
 #ifndef ARCH
 #define ARCH "unknown architecture"
 #endif

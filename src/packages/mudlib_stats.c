@@ -17,6 +17,7 @@
 #include "../backend.h"
 #include "../md.h"
 #include "../master.h"
+#include "../efun_protos.h"
 #endif
 
 #include "mudlib_stats.h"
@@ -89,8 +90,6 @@ static void restore_stat_list PROT((char *, mudlib_stats_t **));
 static mapping_t *get_info PROT((mudlib_stats_t *));
 static mapping_t *get_stats PROT((char *, mudlib_stats_t *));
 static mudlib_stats_t *insert_stat_entry PROT((mudlib_stats_t *, mudlib_stats_t **));
-
-static char *domain_file_fname = NULL;
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 /* debugging */
@@ -289,9 +288,6 @@ void mudlib_stats_decay()
 void mark_mudlib_stats() {
     mudlib_stats_t *dl;
 
-    if (domain_file_fname)
-	EXTRA_REF(BLOCK(domain_file_fname))++;
-
     for (dl = domains; dl; dl = dl->next) {
 	DO_MARK(dl, TAG_MUDLIB_STATS);
 	EXTRA_REF(BLOCK(dl->name))++;
@@ -374,12 +370,6 @@ static void init_domain_for_ob P1(object_t *, ob)
 {
     svalue_t *ret;
     char *domain_name;
-    object_t *tmp_ob;
-
-    if (master_ob == (object_t *)-1)
-	tmp_ob = ob;
-    else
-	tmp_ob = master_ob;
 
     if (!current_object
 #ifdef PACKAGE_UIDS
@@ -398,9 +388,12 @@ static void init_domain_for_ob P1(object_t *, ob)
      * Ask master object who the creator of this object is.
      */
     push_malloced_string(add_slash(ob->name));
-    if (!domain_file_fname)
-	domain_file_fname = make_shared_string(APPLY_DOMAIN_FILE);
-    ret = apply(domain_file_fname, tmp_ob, 1, ORIGIN_DRIVER);
+
+    if (master_ob)
+	ret = apply_master_ob(APPLY_DOMAIN_FILE, 1);
+    else
+	ret = apply(applies_table[APPLY_DOMAIN_FILE], ob, 1, ORIGIN_DRIVER);
+
     if (IS_ZERO(ret)) {
 	ob->stats.domain = current_object->stats.domain;
 	return;

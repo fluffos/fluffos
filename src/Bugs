@@ -6,10 +6,6 @@ doesn't, as well as some other efuns].
 
 -----
 
-(: foo, $(1) :) crashes
-
------
-
 In the MudOS v22a36 the livings efun gives back HIDDEN things too.
 I don't know why objects used that strange construction.
 I think, it's new form would be more usable.
@@ -82,20 +78,6 @@ Line numbers get messed up when files don't end in a newline?
 
 RUNTIME_LOADING needs -rdynamic passed in the link on some OS's?
 (reported for a gcc-linux system; possibly a mixed a.out/elf?)
-
------
-
-btw.. did you know that the uids behaviour differs slightly from under Amylaar ?
-In simulate.c there is a line that has a comment: /* FIXME - is this correct */
- - the line above this does something like  target->uid = my->uid
- Under Amylaar an object _never_ gives away its uid to another object, it always
- gives its euid. When I moved from Amy it took me a heck of a long time to
-figure out why i was getting all these weird bugs.. then I discovered it and 
- made the simple patch. 
- I just thought I'd mention it as you might wanna give Amylaar uid behaviour
- when COMPAT_32 is defined..
-
--Pace
 
 -----
 
@@ -255,14 +237,6 @@ heart_beat() is not shadowable
 
 -----
 
-need a way to tell the driver to try reconnecting to the addr_server
-after it has gone down and come back up (the addr_server).  maybe
-the driver could just retry every now and then?
-
---john
-
------
-
     mixed a;
     do {} while (a = ({ a, "" }));
 
@@ -281,12 +255,6 @@ Yet another comment: Whether it evals out or runs out of mem obviously depends
 on the ratio of MAX_EVAL_COST to available memory ...
 
 -----
-
-Currently, binaries are not checked to see if they are out of date with
-respect to the simul_efun object, causing wierd behavior of binaries of
-the order of the simuls changes, and then a binary is loaded.
-
-------
 
 Range/switch search should be binary, not linear. (in LPC->C)
 

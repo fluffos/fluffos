@@ -14,6 +14,7 @@
 #include "include/localtime.h"
 #include "port.h"
 #include "crypt.h"
+#include "efun_protos.h"
 
 /* get a value for CLK_TCK for use by times() */
 #if (defined(TIMES) && !defined(RUSAGE))
@@ -68,7 +69,7 @@ f_oldcrypt PROT((void)) {
         pop_stack();
     }
     salt[2] = 0;
-    res = string_copy(CRYPT(sp->u.string, salt), "f_crypt");
+    res = string_copy(OLDCRYPT(sp->u.string, salt), "f_crypt");
     free_string_svalue(sp);
     sp->subtype = STRING_MALLOC;
     sp->u.string = res;
@@ -92,7 +93,7 @@ f_localtime PROT((void))
     lt = sp->u.number;
     tm = localtime(&lt);
 
-    vec = allocate_empty_array(10);
+    vec = allocate_empty_array(11);
     vec->item[LT_SEC].type = T_NUMBER;
     vec->item[LT_SEC].u.number = tm->tm_sec;
     vec->item[LT_MIN].type = T_NUMBER;
@@ -112,13 +113,16 @@ f_localtime PROT((void))
     vec->item[LT_GMTOFF].type = T_NUMBER;
     vec->item[LT_ZONE].type = T_STRING;
     vec->item[LT_ZONE].subtype = STRING_MALLOC;
+    vec->item[LT_ISDST].type = T_NUMBER;
 #if defined(BSD42) || defined(apollo) || defined(_AUX_SOURCE) \
 	|| defined(OLD_ULTRIX)
-    /* 4.2 BSD doesn't seem to provide any way to get these last two values */
+    /* 4.2 BSD doesn't seem to provide any way to get these last three values */
     vec->item[LT_GMTOFF].u.number = 0;
     vec->item[LT_ZONE].type = T_NUMBER;
     vec->item[LT_ZONE].u.number = 0;
+    vec->item[LT_ISDST].u.number = -1;
 #else				/* BSD42 */
+    vec->item[LT_ISDST].u.number = tm->tm_isdst;
 #if defined(sequent)
     vec->item[LT_GMTOFF].u.number = 0;
     gettimeofday(NULL, &tz);

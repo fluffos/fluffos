@@ -45,7 +45,7 @@ static void report_holes PROT((void));
 void clear_state()
 {
     current_object = 0;
-    command_giver = 0;
+    set_command_giver(0);
     current_interactive = 0;
     previous_ob = 0;
     current_prog = 0;
@@ -77,34 +77,6 @@ void logon P1(object_t *, ob)
     /* function not existing is no longer fatal */
 }
 
-#ifndef NO_ADD_ACTION
-/*
- * Take a user command and parse it.
- * The command can also come from a NPC.
- * Beware that 'str' can be modified and extended !
- */
-int parse_command P2(char *, str, object_t *, ob)
-{
-    object_t *save = command_giver;
-    int res;
-
-    /* disallow users to issue commands containing ansi escape codes */
-#if defined(NO_ANSI) && !defined(STRIP_BEFORE_PROCESS_INPUT)
-    char *c;
-
-    for (c = str; *c; c++) {
-	if (*c == 27) {
-	    *c = ' ';		/* replace ESC with ' ' */
-	}
-    }
-#endif
-    command_giver = ob;
-    res = user_parser(str);
-    command_giver = save;
-    return (res);
-}				/* parse_command() */
-#endif
-
 /*
  * This is the backend. We will stay here for ever (almost).
  */
@@ -113,8 +85,8 @@ int eval_cost;
 void backend()
 {
     struct timeval timeout;
-    int nb;
-    int i;
+    int i, nb;
+    volatile int first_call = 1;
     int there_is_a_port = 0;
     error_context_t econ;
 
@@ -134,17 +106,18 @@ void backend()
 #ifdef SIGHUP
     signal(SIGHUP, startshutdownMudOS);
 #endif
-    if (!t_flag)
-	call_heart_beat();
     clear_state();
     save_context(&econ);
     if (SETJMP(econ.context))
 	restore_context(&econ);
+    if (!t_flag && first_call) {
+	first_call = 0;
+	call_heart_beat();
+    }
 
     while (1) {	
 	/* Has to be cleared if we jumped out of process_user_command() */
 	current_interactive = 0;
-	command_giver = 0;
 	eval_cost = max_cost;
 
 	if (obj_list_replace || obj_list_destruct)
@@ -213,14 +186,18 @@ void backend()
 
 /*
  * Despite the name, this routine takes care of several things.
- * It will loop through all objects once every 10 minutes.
+ * It will run once every 15 minutes.
  *
- * If an object is found in a state of not having done reset, and the
- * delay to next reset has passed, then reset() will be done.
+ * . It will attempt to reconnect to the address server if the connection has
+ *   been lost.
+ * . It will loop through all objects.
  *
- * If the object has a existed more than the time limit given for swapping,
- * then 'clean_up' will first be called in the object, after which it will
- * be swapped out if it still exists.
+ *   . If an object is found in a state of not having done reset, and the
+ *     delay to next reset has passed, then reset() will be done.
+ *
+ *   . If the object has a existed more than the time limit given for swapping,
+ *     then 'clean_up' will first be called in the object, after which it will
+ *     be swapped out if it still exists.
  *
  * There are some problems if the object self-destructs in clean_up, so
  * special care has to be taken of how the linked list is used.
@@ -228,9 +205,26 @@ void backend()
 static void look_for_objects_to_swap()
 {
     static int next_time;
+#ifndef NO_IP_DEMON
+    extern int no_ip_demon;
+    static int next_server_time;
+#endif
     object_t *ob;
     VOLATILE object_t *next_ob;
     error_context_t econ;
+
+#ifndef NO_IP_DEMON
+    if (current_time >= next_server_time) {
+	/* initialize the address server.  if it is already initialized, then
+	 * this is a nop.  this will cause the driver to reattempt connecting
+	 * to the address server once every 15 minutes in the event that it
+	 * has gone down.
+	 */
+	if (!no_ip_demon && next_server_time)
+	    init_addr_server(ADDR_SERVER_IP, ADDR_SERVER_PORT);
+	next_server_time = current_time + 15 * 60;
+    }
+#endif
 
     if (current_time < next_time)
 	return;			/* Not time to look yet */
@@ -247,7 +241,8 @@ static void look_for_objects_to_swap()
 	restore_context(&econ);
     
     while ((ob = (object_t *)next_ob)) {
-	int ready_for_swap;
+	int ready_for_swap = 0;
+	int ready_for_clean_up = 0;
 
 	eval_cost = max_cost;
 
@@ -257,15 +252,12 @@ static void look_for_objects_to_swap()
 
 	/*
 	 * Check reference time before reset() is called.
-	 *
-	 * FIXME: clean_up has the same problem. -Beek
 	 */
-	if (current_time < ob->time_of_ref + time_to_swap)
-	    ready_for_swap = 0;
-	else
+	if (current_time - ob->time_of_ref > time_to_swap)
 	    ready_for_swap = 1;
-#ifndef NO_RESETS
-#ifndef LAZY_RESETS
+	if (current_time - ob->time_of_ref > time_to_clean_up)
+	    ready_for_clean_up = 1;
+#if !defined(NO_RESETS) && !defined(LAZY_RESETS)
 	/*
 	 * Should this object have reset(1) called ?
 	 */
@@ -274,7 +266,6 @@ static void look_for_objects_to_swap()
 	    debug(d_flag, ("RESET /%s\n", ob->name));
 	    reset_object(ob);
 	}
-#endif
 #endif
 	if (time_to_clean_up > 0) {
 	    /*
@@ -287,8 +278,7 @@ static void look_for_objects_to_swap()
 	     * again.
 	     */
 
-	    if (current_time - ob->time_of_ref > time_to_clean_up
-		&& (ob->flags & O_WILL_CLEAN_UP)) {
+	    if (ready_for_clean_up && (ob->flags & O_WILL_CLEAN_UP)) {
 		int save_reset_state = ob->flags & O_RESET_STATE;
 		svalue_t *svp;
 
@@ -300,6 +290,15 @@ static void look_for_objects_to_swap()
 		 * believe they are not inherited. Swapped objects will not
 		 * have a ref count > 1 (and will have an invalid ob->prog
 		 * pointer).
+		 *
+		 * Note that if it is in the apply_low cache, it will also
+		 * get a flag of 1, which may cause the mudlib not to clean
+		 * up the object.  This isn't bad because:
+		 * (1) one expects it is rare for objects that have untouched
+		 * long enough to clean_up to still be in the cache, especially
+		 * on busy MUDs.
+		 * (2) the ones that are are the more heavily used ones, so
+		 * keeping them around seems justified.
 		 */
 
 		push_number(ob->flags & (O_CLONE | O_SWAPPED) ? 0 : ob->prog->ref);
@@ -314,7 +313,9 @@ static void look_for_objects_to_swap()
 	if (time_to_swap > 0) {
 	    /*
 	     * At last, there is a possibility that the object can be swapped
-	     * out.
+	     * out.  Always swap out line number information.  If already
+	     * swapped, not time yet, or the object has a heart_beat, don't
+	     * swap.
 	     */
 
 	    if (ob->prog && ob->prog->line_info)
@@ -373,6 +374,7 @@ static void call_heart_beat()
 {
     object_t *ob;
     heart_beat_t *curr_hb;
+    error_context_t econ;
 
 #ifdef WIN32
     static long Win32Thread = -1;
@@ -402,6 +404,7 @@ static void call_heart_beat()
     if ((num_hb_to_do = num_hb_objs)) {
 	num_hb_calls++;
 	heart_beat_index = 0;
+	save_context(&econ);
 	while (!heart_beat_flag) {
 	    ob = (curr_hb = &heart_beats[heart_beat_index])->ob;
 	    DEBUG_CHECK(!(ob->flags & O_HEART_BEAT),
@@ -411,32 +414,42 @@ static void call_heart_beat()
 	    /* is it time to do a heart beat ? */
 	    curr_hb->heart_beat_ticks--;
 
-	    if (ob->prog->heart_beat != -1) {
+	    if (ob->prog->heart_beat != 0) {
 		if (curr_hb->heart_beat_ticks < 1) {
+		    object_t *new_command_giver;
 		    curr_hb->heart_beat_ticks = curr_hb->time_to_heart_beat;
 		    current_heart_beat = ob;
-		    command_giver = ob;
+		    new_command_giver = ob;
 #ifndef NO_SHADOWS
-		    while (command_giver->shadowing)
-			command_giver = command_giver->shadowing;
+		    while (new_command_giver->shadowing)
+			new_command_giver = new_command_giver->shadowing;
 #endif
 #ifndef NO_ADD_ACTION
-		    if (!(command_giver->flags & O_ENABLE_COMMANDS))
-			command_giver = 0;
+		    if (!(new_command_giver->flags & O_ENABLE_COMMANDS))
+			new_command_giver = 0;
 #endif
 #ifdef PACKAGE_MUDLIB_STATS
 		    add_heart_beats(&ob->stats, 1);
 #endif
 		    eval_cost = max_cost;
-		    /* this should be looked at ... */
-		    call_function(ob->prog, ob->prog->heart_beat);
-		    command_giver = 0;
+
+		    if (SETJMP(econ.context)) {
+			restore_context(&econ);
+		    } else {
+			save_command_giver(new_command_giver);
+			call_direct(ob, ob->prog->heart_beat - 1,
+				    ORIGIN_DRIVER, 0);
+			pop_stack(); /* pop the return value */
+			restore_command_giver();
+		    }
+
 		    current_object = 0;
 		}
 	    }
 	    if (++heart_beat_index == num_hb_to_do)
 		break;
 	}
+	pop_context(&econ);
 	if (heart_beat_index < num_hb_to_do)
 	    perc_hb_probes = 100 * (float) heart_beat_index / num_hb_to_do;
 	else
@@ -678,17 +691,38 @@ char *query_load_av()
 
 #ifdef F_HEART_BEATS
 array_t *get_heart_beats() {
-    int n = num_hb_objs;
+    int nob = 0, n = num_hb_objs;
     heart_beat_t *hb = heart_beats;
+    object_t **obtab;
     array_t *arr;
-    
-    arr = allocate_empty_array(n);
+#ifdef F_SET_HIDE
+    int apply_valid_hide = 1, display_hidden = 0;
+#endif
+
+    obtab = CALLOCATE(n, object_t *, TAG_TEMPORARY, "heart_beats");
     while (n--) {
-	arr->item[n].type = T_OBJECT;
-	arr->item[n].u.ob = hb->ob;
-	add_ref(hb->ob, "get_heart_beats");
-	hb++;
+#ifdef F_SET_HIDE
+	if (hb->ob->flags & O_HIDDEN) {
+	    if (apply_valid_hide) {
+		apply_valid_hide = 0;
+		display_hidden = valid_hide(current_object);
+	    }
+	    if (!display_hidden)
+		continue;
+	}
+#endif
+	obtab[nob++] = (hb++)->ob;
     }
+    
+    arr = allocate_empty_array(nob);
+    while (nob--) {
+	arr->item[n].type = T_OBJECT;
+	arr->item[n].u.ob = obtab[nob];
+	add_ref(arr->item[nob].u.ob, "get_heart_beats");
+    }
+
+    FREE(obtab);
+
     return arr;
 }
 #endif

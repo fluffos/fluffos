@@ -132,8 +132,8 @@ typedef unsigned int format_info;
 					 * recover */
 
 #define ADD_CHAR(x) {\
-  outbuf_addchar(&(sprintf_state->obuff), x);\
   if (sprintf_state->obuff.real_size == USHRT_MAX) ERROR(ERR_BUFF_OVERFLOW); \
+  outbuf_addchar(&(sprintf_state->obuff), x);\
 }
 
 #define GET_NEXT_ARG {\
@@ -342,7 +342,7 @@ void svalue_to_string P5(svalue_t *, obj, outbuffer_t *, outbuf, int, indent, in
     }
     if (!indent2)
 	add_space(outbuf, indent);
-    switch (obj->type) {
+    switch ((obj->type & ~T_FREED)) {
     case T_INVALID:
 	outbuf_add(outbuf, "T_INVALID");
 	break;
@@ -445,7 +445,7 @@ void svalue_to_string P5(svalue_t *, obj, outbuffer_t *, outbuf, int, indent, in
 		{
 		    int i;
 		    i = obj->u.fp->f.efun.index;
-		    outbuf_add(outbuf, instrs[i].name);
+		    outbuf_add(outbuf, query_instr_name(i));
 		    break;
 		}
 	    }
@@ -512,7 +512,7 @@ static void add_pad P2(pad_info_t *, pad, int, len) {
     char *p;
     int padlen;
     
-    if (outbuf_extend(&(sprintf_state->obuff), len) != len)
+    if (outbuf_extend(&(sprintf_state->obuff), len) < len)
 	ERROR(ERR_BUFF_OVERFLOW);
     p = sprintf_state->obuff.buffer + sprintf_state->obuff.real_size;
     sprintf_state->obuff.real_size += len;
@@ -539,7 +539,7 @@ static void add_pad P2(pad_info_t *, pad, int, len) {
 }
 
 INLINE_STATIC void add_nstr P2(char *, str, int, len) {
-    if (outbuf_extend(&(sprintf_state->obuff), len) != len)
+    if (outbuf_extend(&(sprintf_state->obuff), len) < len)
 	ERROR(ERR_BUFF_OVERFLOW);
     memcpy(sprintf_state->obuff.buffer + sprintf_state->obuff.real_size, str, len);
     sprintf_state->obuff.real_size += len;
@@ -569,6 +569,13 @@ static void add_justified P6(char *, str, int, slen, pad_info_t *, pad,
 	    break;
 	case INFO_J_CENTRE:
 	    i = fs / 2 + fs % 2;
+	    add_pad(pad, i);
+	    add_nstr(str, slen);
+	    if (trailing)
+	    add_pad(pad, fs - i);
+	    break;
+	case INFO_J_CENTRE | INFO_J_LEFT:
+	    i = fs / 2;
 	    add_pad(pad, i);
 	    add_nstr(str, slen);
 	    if (trailing)

@@ -30,6 +30,7 @@
 #define DEFAULT_ERROR_MESSAGE   CONFIG_STR(__DEFAULT_ERROR_MESSAGE__)
 #define DEFAULT_FAIL_MESSAGE    CONFIG_STR(__DEFAULT_FAIL_MESSAGE__)
 #define GLOBAL_INCLUDE_FILE     CONFIG_STR(__GLOBAL_INCLUDE_FILE__)
+#define MUD_IP                  CONFIG_STR(__MUD_IP__)
 
 /*
  * runtime config ints
@@ -52,6 +53,8 @@
 #define HTABLE_SIZE             CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__)
 #define OTABLE_SIZE             CONFIG_INT(__OBJECT_HASH_TABLE_SIZE__)
 #define INHERIT_CHAIN_SIZE      CONFIG_INT(__INHERIT_CHAIN_SIZE__)
+#define FD6_PORT		CONFIG_INT(__FD6_PORT__)
+#define FD6_KIND		CONFIG_INT(__FD6_KIND__)
 
 #ifdef USE_POSIX_SIGNALS
 #define sigblock(m) port_sigblock(m)

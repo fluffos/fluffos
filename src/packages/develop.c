@@ -8,6 +8,7 @@
 #include "../comm.h"
 #include "../md.h"
 #include "../sprintf.h"
+#include "../efun_protos.h"
 #endif
 
 static object_t *ob;
@@ -93,12 +94,12 @@ f_debug_info PROT((void))
 	outbuf_addv(&out, "Name /%s\n", ob->prog->name);
 	outbuf_addv(&out, "program size %d\n",
 		    ob->prog->program_size);
-	outbuf_addv(&out, "runtime function table %d (%d) \n", 
-		    ob->prog->num_functions_total,
-		    ob->prog->num_functions_total * (sizeof(runtime_function_u)+1));
+	outbuf_addv(&out, "function flags table %d (%d) \n", 
+		    ob->prog->last_inherited + ob->prog->num_functions_defined,
+		    (ob->prog->last_inherited + ob->prog->num_functions_defined)* sizeof(unsigned short));
 	outbuf_addv(&out, "compiler function table %d (%d) \n", 
 		    ob->prog->num_functions_defined,
-		    ob->prog->num_functions_defined * sizeof(compiler_function_t));
+		    ob->prog->num_functions_defined * sizeof(function_t));
 	outbuf_addv(&out, "num strings %d\n", ob->prog->num_strings);
 	outbuf_addv(&out, "num vars %d (%d)\n", ob->prog->num_variables_defined,
 		    ob->prog->num_variables_defined * (sizeof(char *) + sizeof(short)));
@@ -159,6 +160,32 @@ f_refs PROT((void))
     free_svalue(sp, "f_refs");
     put_number(r - 1);		/* minus 1 to compensate for being arg of
 				 * refs() */
+}
+#endif
+
+#ifdef F_DESTRUCTED_OBJECTS
+void f_destructed_objects PROT((void))
+{
+    int i;
+    array_t *ret;
+    object_t *ob;
+
+    ret = allocate_empty_array(tot_dangling_object);
+    ob = obj_list_dangling;
+
+    for (i = 0;  i < tot_dangling_object;  i++) {
+        ret->item[i].type = T_ARRAY;
+        ret->item[i].u.arr = allocate_empty_array(2);
+        ret->item[i].u.arr->item[0].type = T_STRING;
+        ret->item[i].u.arr->item[0].subtype = STRING_SHARED;
+        ret->item[i].u.arr->item[0].u.string = make_shared_string(ob->name);
+        ret->item[i].u.arr->item[1].type = T_NUMBER;
+        ret->item[i].u.arr->item[1].u.number = ob->ref;
+
+        ob = ob->next_all;
+    }
+
+    push_refed_array(ret);
 }
 #endif
 

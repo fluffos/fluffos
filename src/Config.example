@@ -9,16 +9,28 @@
 # name of this mud
 name : testsuite
 
+# for machines with multiple IP addresses, this specifies which one to use.  this
+# replaces the SERVER_IP compile-time define.
+#mud ip : 255.255.255.255
+
+# if MudOS inherits an open file descriptor #6 from its parent process, it uses
+# that as an additional login port.  the 'port #' for internal purposes (debug
+# messages, argument to connect, etc.) and kind should be set here.  acceptable
+# port types are: ascii, binary, mud or telnet.  this replaces the FD6_KIND and
+# FD6_PORT compile-time defines.
+#fd6 kind : telnet
+#fd6 port : 23
+
 # the address server is an external program that lets the mud translate
 # internet names to numbers (and vice versa).  select an unused port.
 address server ip : localhost
 address server port : 9997
 
 # absolute pathname of mudlib
-mudlib directory : /home/mmessier/mudos/mudos/pre/testsuite
+mudlib directory : /home/mmessier/mudos/mudos/beta/testsuite
 
 # absolute pathname of driver/config dir
-binary directory : /home/mmessier/mudos/mudos/pre/testsuite
+binary directory : /home/mmessier/mudos/mudos/beta/testsuite
 
 # debug.log and author/domain stats are stored here
 log directory : /log

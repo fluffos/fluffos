@@ -9,6 +9,7 @@
 #include "/lpc_incl.h"
 #else
 #include "../lpc_incl.h"
+#include "../efun_protos.h"
 #endif
 
 #ifdef F_COS
@@ -96,6 +97,18 @@ f_log PROT((void))
         return;
     }
     sp->u.real = log(sp->u.real);
+}
+#endif
+
+#ifdef F_LOG10
+void
+f_log10 PROT((void))
+{
+    if (sp->u.real <= 0.0) {
+        error("math: log10(x) with (x <= 0.0)\n");
+        return;
+    }
+    sp->u.real = log10(sp->u.real);
 }
 #endif
 

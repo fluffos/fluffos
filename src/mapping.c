@@ -4,6 +4,7 @@
 #include "config.h"
 #include "lpc_incl.h"
 #include "md.h"
+#include "efun_protos.h"
 
 int num_mappings = 0;
 int total_mapping_size = 0;
@@ -67,11 +68,11 @@ INLINE int growMap P1(mapping_t *, m)
 	/* zero out the new storage area (2nd half of table) */
 	memset(a += oldsize, 0, oldsize * sizeof(mapping_node_t *));
 	i = oldsize;
-	while (a--, i--){
+	while (a--, i--) {
 	    if ((elt = *a)) {
 		eltp = a, b = a + oldsize;
 		do {
-		    if (node_hash(elt) & oldsize){
+		    if (node_hash(elt) & oldsize) {
 			*eltp = elt->next;
 			if (!(elt->next = *b)) m->unfilled--;
 			*b = elt;   
@@ -104,7 +105,7 @@ void *extra;
 	
 	debug(mapping,("mapTraverse %p\n", m));
 	do {
-	    for (elt = m->table[j]; elt; elt = nelt){
+	    for (elt = m->table[j]; elt; elt = nelt) {
 		nelt = elt->next;
 		if ((*func)(m, elt, extra)) return m;
 	    }
@@ -132,7 +133,7 @@ dealloc_mapping P1(mapping_t *, m)
 #endif
 
 	    do {
-		for (elt = a[j]; elt; elt = nelt){
+		for (elt = a[j]; elt; elt = nelt) {
 		    nelt = elt->next;
 		    free_svalue(elt->values, "free_mapping");
 		    free_node(m, elt);
@@ -284,9 +285,7 @@ allocate_mapping2 P2(array_t *, arr, svalue_t *, sv)
     int i;
     
     newmap = allocate_mapping(arr->size);
-    STACK_INC;
-    sp->type = T_MAPPING;
-    sp->u.map = newmap;
+    push_refed_mapping(newmap);
 
     for (i = 0; i < arr->size; i++) {
 	svalue_t *svp, *ret;
@@ -326,7 +325,7 @@ mkmapping P2(array_t *, k, array_t *, v) {
   copyMapping: make a copy of a mapping
 */
 
-INLINE mapping_t *
+INLINE_STATIC mapping_t *
 copyMapping P1(mapping_t *,m)
 {
     mapping_t *newmap;
@@ -339,7 +338,7 @@ copyMapping P1(mapping_t *,m)
     newmap->unfilled = m->unfilled;
     newmap->ref = 1;
     c = newmap->table = CALLOCATE(k, mapping_node_t *, TAG_MAP_TBL, "copy_mapping: 2");
-    if (!c){
+    if (!c) {
 	FREE((char *) newmap);
 	error("copyMapping 2 - out of memory.\n");
     }
@@ -358,7 +357,7 @@ copyMapping P1(mapping_t *,m)
     else null_stats (&newmap->stats);
 #endif
     num_mappings++;
-    while (k--){
+    while (k--) {
 	if ((elt = b[k])) {
 	    a = c + k;
 	    do {
@@ -381,7 +380,7 @@ restore_hash_string P2(char **, val, svalue_t *, sv)
     char c, *start = cp;
 
     while ((c = *cp++) != '"') {
-	switch(c){
+	switch(c) {
 	case '\r':
 	    *(cp-1) = '\n';
 	    break;
@@ -428,7 +427,7 @@ restore_hash_string P2(char **, val, svalue_t *, sv)
  * svalue_t_to_int: Converts an svalue into an integer index.
  */
 
-INLINE int
+INLINE_STATIC int
 svalue_to_int P1(svalue_t *, v)
 {
     if (v->type == T_STRING && v->subtype != STRING_SHARED) {
@@ -455,13 +454,13 @@ int msameval P2(svalue_t *, arg1, svalue_t *, arg2) {
     }
 }
 
+#if 0
 /*
  * node_find_in_mapping: Like find_for_insert(), but doesn't attempt
  * to add anything if a value is not found.  The returned pointer won't
  * necessarily have any meaningful value.
  */
-
-INLINE mapping_node_t *
+INLINE_STATIC mapping_node_t *
 node_find_in_mapping P2(mapping_t *, m, svalue_t *, lv)
 {
 	int i;
@@ -476,6 +475,7 @@ node_find_in_mapping P2(mapping_t *, m, svalue_t *, lv)
 	}
 	return (mapping_node_t *)0;
 }
+#endif
 
 /*
    mapping_delete: delete an element from the mapping
@@ -488,8 +488,8 @@ INLINE void mapping_delete P2(mapping_t *,m, svalue_t *,lv)
 
 	if ((elt = *prev)) {
 	    do {
-		if (msameval(elt->values, lv)){
-		    if (!(*prev = elt->next) && !m->table[i]){
+		if (msameval(elt->values, lv)) {
+		    if (!(*prev = elt->next) && !m->table[i]) {
 			m->unfilled++;
 			debug(mapping,("mapping delete: bucket empty, unfilled = %i",
 				    m->unfilled));
@@ -536,10 +536,10 @@ find_for_insert P3(mapping_t *, m, svalue_t *, lv, int, doTheFree)
 	    debug(mapping,("mapping.c: didn't find %p\n", lv));
 	    n = *a;
 	}
-	else if (!(--m->unfilled)){
+	else if (!(--m->unfilled)) {
 	    int size = m->table_size + 1;
 
-	    if (growMap(m)){ 
+	    if (growMap(m)) { 
 		if (oi & size) i |= size;
 		n = *(a = m->table + i);
 	    } else {
@@ -585,7 +585,7 @@ typedef struct unique_m_list_s {
 
 static unique_m_list_t *g_u_m_list = 0;
 
-void unique_mapping_error_handler PROT((void))
+static void unique_mapping_error_handler PROT((void))
 {
     unique_m_list_t *nlist = g_u_m_list;
     unique_node_t **table = nlist->utable;
@@ -687,7 +687,7 @@ void f_unique_mapping PROT((void))
     mtable = m->table;
     numkeys = 0;
 
-    if (nmask > MAP_HASH_TABLE_SIZE){
+    if (nmask > MAP_HASH_TABLE_SIZE) {
         nmask |= nmask >> 1;
         nmask |= nmask >> 2;
         nmask |= nmask >> 4;
@@ -790,8 +790,8 @@ load_mapping_from_aggregate P2(svalue_t *,sp, int, n)
 		} while ((elt = elt->next));
 		if (elt) continue;
 	    }
-	    else if (!(--m->unfilled)){
-		if (growMap(m)){
+	    else if (!(--m->unfilled)) {
+		if (growMap(m)) {
 		    a = m->table;
 		    if (oi & ++mask) elt2 = a[i |= mask];
 		    mask <<= 1;
@@ -807,7 +807,7 @@ load_mapping_from_aggregate P2(svalue_t *,sp, int, n)
 		}
 	    }
 
-	    if (++count > MAX_MAPPING_SIZE){
+	    if (++count > MAX_MAPPING_SIZE) {
 #ifdef PACKAGE_MUDLIB_STATS
 		add_array_size(&m->stats, (--count) << 1);
 #endif
@@ -840,7 +840,7 @@ find_in_mapping P2(mapping_t *, m, svalue_t *,lv)
 	int i = svalue_to_int(lv) & m->table_size;
 	mapping_node_t *n = m->table[i];
 
-	while (n){
+	while (n) {
 	    if (msameval(n->values, lv)) return n->values + 1;
 	    n = n->next;
 	}
@@ -882,19 +882,19 @@ add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int, free_flag)
     svalue_t *sv;
 
     do {
-	for (elt2 = a2[j]; elt2; elt2 = elt2->next){
+	for (elt2 = a2[j]; elt2; elt2 = elt2->next) {
 	    i = (oi = node_hash(elt2)) & mask;
 	    sv = elt2->values;
 	    if ((n = elt1 = a1[i])) {
 		do {
-		    if (msameval(sv, elt1->values)){
+		    if (msameval(sv, elt1->values)) {
 			assign_svalue(elt1->values + 1, sv + 1);
 			break; 
 		    }
 		} while ((elt1 = elt1->next));
 		if (elt1) continue;
-	    } else if (!(--m1->unfilled)){
-		if (growMap(m1)){
+	    } else if (!(--m1->unfilled)) {
+		if (growMap(m1)) {
 		    a1 = m1->table;
 		    if (oi & ++mask) n = a1[i |= mask];
 		    mask <<= 1;
@@ -913,7 +913,7 @@ add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int, free_flag)
 	    }
 	    count++;
 	    if (count > MAX_MAPPING_SIZE) {
-		if (count -= MAP_COUNT(m1) + 1){	
+		if (count -= MAP_COUNT(m1) + 1) {	
 #ifdef PACKAGE_MUDLIB_STATS
 		    add_array_size(&m1->stats, count << 1);
 #endif
@@ -958,7 +958,7 @@ unique_add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int,free_flag)
     svalue_t *sv;
 
     do {
-	for (elt2 = a2[j]; elt2; elt2 = elt2->next){
+	for (elt2 = a2[j]; elt2; elt2 = elt2->next) {
 	    i = (oi = node_hash(elt2)) & mask;
 	    sv = elt2->values;
 	    if ((n = elt1 = a1[i])) {
@@ -967,8 +967,8 @@ unique_add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int,free_flag)
 		} while ((elt1 = elt1->next));
 		if (elt1) continue;
 	    }
-	    else if (!(--m1->unfilled)){
-		if (growMap(m1)){
+	    else if (!(--m1->unfilled)) {
+		if (growMap(m1)) {
 		    a1 = m1->table;
 		    if (oi & ++mask) n = a1[i |= mask];
 		    mask <<= 1;
@@ -1063,21 +1063,27 @@ add_mapping P2(mapping_t *,m1, mapping_t *,m2)
 void
 map_mapping P2(svalue_t *, arg, int, num_arg)
 {
-    mapping_t *m = arg->u.map;
+    mapping_t *m;
     mapping_node_t **a, *elt;
-    int j = m->table_size;
+    int j;
     svalue_t *ret;
     function_to_call_t ftc;
     
     process_efun_callback(1, &ftc, F_MAP);
 
-    m = copyMapping(m);
-    push_refed_mapping(m);
+    if (arg->u.map->ref > 1) {
+	m = copyMapping(arg->u.map);
+	free_mapping(arg->u.map);
+	arg->u.map = m;
+    } else {
+	m = arg->u.map;
+    }
 
+    j = m->table_size;
     a = m->table;
     debug(mapping,("mapping.c: map_mapping\n"));
     do {
-	for (elt = a[j]; elt ; elt = elt->next){
+	for (elt = a[j]; elt ; elt = elt->next) {
 	    push_svalue(elt->values);
 	    push_svalue(elt->values+1);
 	    ret = call_efun_callback(&ftc, 2);
@@ -1086,9 +1092,7 @@ map_mapping P2(svalue_t *, arg, int, num_arg)
 	}
     } while (j--);
 
-    sp--;
-    pop_n_elems(num_arg);
-    push_refed_mapping(m);
+    pop_n_elems(num_arg-1);
 }
 #endif
 
@@ -1096,15 +1100,23 @@ map_mapping P2(svalue_t *, arg, int, num_arg)
 void
 filter_mapping P2(svalue_t *, arg, int, num_arg)
 {
-    mapping_t *m = arg->u.map, *newmap;
+    mapping_t *m, *newmap;
     mapping_node_t **a, *elt;
     mapping_node_t **b, *newnode, *n;
-    int j = m->table_size, count = 0, size;
+    int j, count = 0, size;
     svalue_t *ret;
     unsigned short tb_index;
     function_to_call_t ftc;
     
     process_efun_callback(1, &ftc, F_FILTER);
+
+    if (arg->u.map->ref > 1) {
+	m = copyMapping(arg->u.map);
+	free_mapping(arg->u.map);
+	arg->u.map = m;
+    } else {
+	m = arg->u.map;
+    }
 
     newmap = allocate_mapping(0);
     push_refed_mapping(newmap);
@@ -1112,9 +1124,10 @@ filter_mapping P2(svalue_t *, arg, int, num_arg)
     size = newmap->table_size;
 
     a = m->table;
+    j = m->table_size;
     debug(mapping,("mapping.c: filter_mapping\n"));
     do {
-	for (elt = a[j]; elt ; elt = elt->next){
+	for (elt = a[j]; elt ; elt = elt->next) {
 	    push_svalue(elt->values);
 	    push_svalue(elt->values+1);
 	    ret = call_efun_callback(&ftc, 2);
@@ -1123,7 +1136,7 @@ filter_mapping P2(svalue_t *, arg, int, num_arg)
 		tb_index = node_hash(elt) & size;
 		b = newmap->table + tb_index;
 		if (!(n = *b) && !(--newmap->unfilled)) {
-		    if (growMap(newmap)){
+		    if (growMap(newmap)) {
 			size = newmap->table_size;
 			tb_index = node_hash(elt) & size;
 			n = *(b = newmap->table + tb_index);
@@ -1137,7 +1150,7 @@ filter_mapping P2(svalue_t *, arg, int, num_arg)
 			error("Out of memory in filter_mapping\n");
 		    }
 		}
-		if (++count > MAX_MAPPING_SIZE){
+		if (++count > MAX_MAPPING_SIZE) {
 		    count--;
 #ifdef PACKAGE_MUDLIB_STATS
 		    add_array_size(&newmap->stats, count << 1);
@@ -1156,7 +1169,7 @@ filter_mapping P2(svalue_t *, arg, int, num_arg)
 	}
     } while (j--);
 
-    if (count){
+    if (count) {
 #ifdef PACKAGE_MUDLIB_STATS
         add_array_size(&newmap->stats, count << 1);
 #endif
@@ -1193,21 +1206,20 @@ compose_mapping P3(mapping_t *,m1, mapping_t *,m2, unsigned short,flag)
 		if ((elt2 = b[svalue_to_int(sv) & mask])) {
 		    do {
 			if (msameval(sv, elt2->values)) {
-			    if (sv != elt2->values + 1)	/* m1 == m2 */
+			    if (sv != elt2->values + 1)	/* if m1 == m2 */
 				assign_svalue(sv, elt2->values + 1);
 			    break;
 			}
 		    } while ((elt2 = elt2->next));
 		}
 		if (!elt2) {
-		    if (!(*prev = elt->next) && !(*a))
-			m1->unfilled++;
+		    if (!(*prev = elt->next) && !(*a)) m1->unfilled++;
 		    deleted++;
 		    free_node(m1, elt);
 		} else {
 		    prev = &(elt->next);
 		}
-    	    } while ((elt = *prev));
+	    } while ((elt = *prev));
 	}
     } while (a++, j--);
 

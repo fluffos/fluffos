@@ -5,6 +5,11 @@
 
 #include <globals.h>
 
+
+
+void create() {
+}
+
 int
 valid_shadow(object ob)
 {
@@ -89,3 +94,4 @@ valid_read(string, mixed, string)
 {
     return 1;
 }
+ private int y = 1;

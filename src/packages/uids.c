@@ -21,7 +21,8 @@
 #include "../avltree.h"
 #include "../md.h"
 #include "uids.h"
-#include "master.h"
+#include "../master.h"
+#include "../efun_protos.h"
 #endif
 
 static object_t *ob;
@@ -33,7 +34,7 @@ f_export_uid PROT((void))
     if (current_object->euid == NULL)
         error("Illegal to export uid 0\n");
     ob = sp->u.ob;
-    if (ob->euid){
+    if (ob->euid) {
         free_object(ob, "f_export_uid:1");
         *sp = const0;
     }

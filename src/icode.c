@@ -9,11 +9,10 @@
 
 static void ins_real PROT((double));
 static void ins_short PROT((short));
-static void upd_short PROT((int, short));
+static void upd_short PROT((int, int, char *));
 static void ins_byte PROT((unsigned char));
 static void upd_byte PROT((int, unsigned char));
 static void write_number PROT((int));
-static short read_short PROT((int));
 static void ins_int PROT((int));
 #if SIZEOF_PTR == 8
 static void ins_long PROT((long));
@@ -22,16 +21,11 @@ void i_generate_node PROT((parse_node_t *));
 static void i_generate_if_branch PROT((parse_node_t *, int));
 static void i_generate_loop PROT((int, parse_node_t *, parse_node_t *, 
 				  parse_node_t *));
-static void i_update_branch_list PROT((parse_node_t *));
+static void i_update_branch_list PROT((parse_node_t *, char *));
 static int try_to_push PROT((int, int));
 
-/*
-   this variable is used to properly adjust the 'break_sp' stack in
-   the event a 'continue' statement is issued from inside a 'switch'.
-*/
 static int foreach_depth = 0;
 
-static int current_forward_branch;
 static int current_num_values;
 
 static int last_size_generated;
@@ -41,16 +35,18 @@ static int push_state;
 static int push_start;
 
 static parse_node_t *branch_list[3];
+static int nforward_branches, nforward_branches_max;
+static int *forward_branches = 0;
 
 static void ins_real P1(double, l)
 {
     float f = (float)l;
 
     if (prog_code + 4 > prog_code_max) {
-	mem_block_t *mbp = &mem_block[current_block];
+	mem_block_t *mbp = &mem_block[A_PROGRAM];
 
 	UPDATE_PROGRAM_SIZE;
-	realloc_mem_block(mbp, mbp->current_size * 2);
+	realloc_mem_block(mbp);
 	
 	prog_code = mbp->block + mbp->current_size;
 	prog_code_max = mbp->block + mbp->max_size;
@@ -66,22 +62,14 @@ static void ins_real P1(double, l)
 static void ins_short P1(short, l)
 {
     if (prog_code + 2 > prog_code_max) {
-	mem_block_t *mbp = &mem_block[current_block];
+	mem_block_t *mbp = &mem_block[A_PROGRAM];
 	UPDATE_PROGRAM_SIZE;
-	realloc_mem_block(mbp, mbp->current_size * 2);
+	realloc_mem_block(mbp);
 	
 	prog_code = mbp->block + mbp->current_size;
 	prog_code_max = mbp->block + mbp->max_size;
     }
     STORE_SHORT(prog_code, l);
-}
-
-static short read_short P1(int, offset)
-{
-    short l;
-
-    COPY_SHORT(&l, mem_block[current_block].block + offset);
-    return l;
 }
 
 /*
@@ -92,9 +80,9 @@ static void ins_int P1(int, l)
 {
 
     if (prog_code + 4 > prog_code_max) {
-	mem_block_t *mbp = &mem_block[current_block];
+	mem_block_t *mbp = &mem_block[A_PROGRAM];
 	UPDATE_PROGRAM_SIZE;
-	realloc_mem_block(mbp, mbp->current_size * 2);
+	realloc_mem_block(mbp);
 	
 	prog_code = mbp->block + mbp->current_size;
 	prog_code_max = mbp->block + mbp->max_size;
@@ -110,9 +98,9 @@ static void ins_int P1(int, l)
 static void ins_long P1(long, l)
 {
     if (prog_code + 8 > prog_code_max) {
-	mem_block_t *mbp = &mem_block[current_block];
+	mem_block_t *mbp = &mem_block[A_PROGRAM];
 	UPDATE_PROGRAM_SIZE;
-	realloc_mem_block(mbp, mbp->current_size * 2);
+	realloc_mem_block(mbp);
 	
 	prog_code = mbp->block + mbp->current_size;
 	prog_code_max = mbp->block + mbp->max_size;
@@ -121,21 +109,44 @@ static void ins_long P1(long, l)
 }
 #endif
 
-static void upd_short P2(int, offset, short, l)
+static void upd_short P3(int, offset, int, l, char *, where)
 {
+    unsigned short s;
+    
     IF_DEBUG(UPDATE_PROGRAM_SIZE);
     DEBUG_CHECK2(offset > CURRENT_PROGRAM_SIZE,
 		 "patch offset %x larger than current program size %x.\n",
 		 offset, CURRENT_PROGRAM_SIZE);
-    COPY_SHORT(mem_block[current_block].block + offset, &l);
+    if (l > USHRT_MAX) {
+	char buf[256];
+	
+	sprintf(buf, "branch limit exceeded in %s, near line %i",
+		where, line_being_generated);
+	yyerror(buf);
+    }
+    s = l;
+    
+    COPY_SHORT(mem_block[A_PROGRAM].block + offset, &s);
+}
+
+static void ins_rel_short P1(int, l)
+{
+    if (l > USHRT_MAX) {
+	char buf[256];
+	
+	sprintf(buf, "branch limit exceeded in switch table, near line %i",
+		line_being_generated);
+	yyerror(buf);
+    }
+    ins_short(l);
 }
 
 static void ins_byte P1(unsigned char, b)
 {
     if (prog_code == prog_code_max) {
-	mem_block_t *mbp = &mem_block[current_block];
+	mem_block_t *mbp = &mem_block[A_PROGRAM];
 	UPDATE_PROGRAM_SIZE;
-	realloc_mem_block(mbp, mbp->current_size * 2);
+	realloc_mem_block(mbp);
 	
 	prog_code = mbp->block + mbp->current_size;
 	prog_code_max = mbp->block + mbp->max_size;
@@ -149,7 +160,7 @@ static void upd_byte P2(int, offset, unsigned char, b)
     DEBUG_CHECK2(offset > CURRENT_PROGRAM_SIZE,
 		"patch offset %x larger than current program size %x.\n",
 		offset, CURRENT_PROGRAM_SIZE);
-    mem_block[current_block].block[offset] = b;
+    mem_block[A_PROGRAM].block[offset] = b;
 }
 
 static void end_pushes PROT((void)) {
@@ -161,10 +172,10 @@ static void end_pushes PROT((void)) {
 }
 
 static void initialize_push PROT((void)) {
-    int what = mem_block[current_block].block[push_start];
-    int arg = mem_block[current_block].block[push_start + 1];
+    int what = mem_block[A_PROGRAM].block[push_start];
+    int arg = mem_block[A_PROGRAM].block[push_start + 1];
 
-    prog_code = mem_block[current_block].block + push_start;
+    prog_code = mem_block[A_PROGRAM].block + push_start;
     ins_byte(F_PUSH);
     push_start++; /* now points to the zero here */
     ins_byte(0);
@@ -211,6 +222,9 @@ static void write_number P1(int, val)
 	if (val < 0 && val > -256) {
 	    ins_byte(F_NBYTE);
 	    ins_byte(-val);
+	} else if (val >= -32768 && val <= 32767) {
+	    ins_byte(F_SHORT_INT);
+	    ins_short(val);
 	} else {
 	    ins_byte(F_NUMBER);
 	    ins_int(val);
@@ -254,29 +268,33 @@ generate_lvalue_list P1(parse_node_t *, expr) {
     }
 }
 
-INLINE void
+INLINE_STATIC void
 switch_to_line P1(int, line) {
     int sz = CURRENT_PROGRAM_SIZE - last_size_generated;
-    short s;
+    ADDRESS_TYPE s;
     unsigned char *p;
-
-    /* should be fixed later */
-    if (current_block != A_PROGRAM)
-	return;
 
     if (sz) {
 	s = line_being_generated;
 
 	last_size_generated += sz;
 	while (sz > 255) {
-	    p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS, 3);
+	    p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS, sizeof(ADDRESS_TYPE) + 1);
 	    *p++ = 255;
+#if !defined(USE_32BIT_ADDRESSES) && !defined(LPC_TO_C)
 	    STORE_SHORT(p, s);
+#else
+	    STORE_INT(p, s);
+#endif
 	    sz -= 255;
 	}
-	p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS, 3);
+	p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS, sizeof(ADDRESS_TYPE) + 1);
 	*p++ = sz;
+#if !defined(USE_32BIT_ADDRESSES) && !defined(LPC_TO_C)
 	STORE_SHORT(p, s);
+#else
+	STORE_INT(p, s);
+#endif
     }
     line_being_generated = line;
 }
@@ -323,6 +341,18 @@ i_generate_node P1(parse_node_t *, expr) {
     if (expr->line && expr->line != line_being_generated)
 	switch_to_line(expr->line);
     switch (expr->kind) {
+    case NODE_FUNCTION:
+      {
+	  unsigned short num;
+	  
+	  /* In the following we know that this function wins all the */
+	  /* rest  - Sym                                              */
+
+	  num = FUNCTION_TEMP(expr->v.number)->u.index;
+	  FUNC(num)->address = generate_function(FUNC(num),
+				  expr->r.expr, expr->l.number);
+	  break;
+      }
     case NODE_TERNARY_OP:
 	i_generate_node(expr->l.expr);
 	expr = expr->r.expr;
@@ -366,7 +396,8 @@ i_generate_node P1(parse_node_t *, expr) {
 	ins_byte(expr->l.number);
 	if (expr->v.number == F_LOOP_COND_NUMBER)
 	    ins_int(expr->r.number);
-	else ins_byte(expr->r.number);
+	else 
+	    ins_byte(expr->r.number);
 	break;
     case NODE_RETURN:
 	{
@@ -405,10 +436,10 @@ i_generate_node P1(parse_node_t *, expr) {
 	i_generate_node(expr->l.expr);
 	i_generate_forward_branch(expr->v.number);
 	i_generate_node(expr->r.expr);
-	if (expr->l.expr->kind == NODE_BRANCH_LINK) {
+	if (expr->l.expr->kind == NODE_BRANCH_LINK)
 	    i_update_forward_branch_links(expr->v.number,expr->l.expr);
-	}
-	else i_update_forward_branch();
+	else 
+	    i_update_forward_branch("&& or ||");
 	break;
     case NODE_BRANCH_LINK:
 	i_generate_node(expr->l.expr);
@@ -429,6 +460,9 @@ i_generate_node P1(parse_node_t *, expr) {
     case NODE_CALL_1:
 	generate_expr_list(expr->r.expr);
 	end_pushes();
+	if (expr->v.number == F_CALL_FUNCTION_BY_ADDRESS) {
+	    expr->l.number = comp_def_index_map[expr->l.number];
+	}
 	ins_byte(expr->v.number);
 	ins_short(expr->l.number);
 	ins_byte((expr->r.expr ? expr->r.expr->kind : 0));
@@ -474,7 +508,7 @@ i_generate_node P1(parse_node_t *, expr) {
 	    i_generate_else();
 	    i_generate_node(expr->r.expr);
 	}
-	i_update_forward_branch();
+	i_update_forward_branch("if");
 	break;
     case NODE_LOOP:
 	i_generate_loop(expr->type, expr->v.expr, expr->l.expr, expr->r.expr);
@@ -536,17 +570,22 @@ i_generate_node P1(parse_node_t *, expr) {
 	    branch_list[CJ_BREAK_SWITCH] = 0;
 	    end_pushes();
 	    ins_byte(F_SWITCH);
-	    ins_byte(0xff); /* kind of table */
 	    addr = CURRENT_PROGRAM_SIZE;
+	    /* all these are addresses in here are relative to addr now,
+	     * which is also the value of pc in f_switch().  Note that
+	     * addr is one less than it was in older drivers.
+	     */
+	    ins_byte(0xff); /* kind of table */
 	    ins_short(0); /* address of table */
 	    ins_short(0); /* end of table */
 	    ins_short(0); /* default address */
 	    i_generate_node(expr->r.expr);
 	    if (expr->v.expr && expr->v.expr->kind == NODE_DEFAULT) {
-		upd_short(addr + 4, expr->v.expr->v.number);
+		upd_short(addr + 5, expr->v.expr->v.number - addr,
+			  "switch");
 		expr->v.expr = expr->v.expr->l.expr;
 	    } else {
-		upd_short(addr + 4, CURRENT_PROGRAM_SIZE);
+		upd_short(addr + 5, CURRENT_PROGRAM_SIZE - addr, "switch");
 	    }
 	    /* just in case the last case doesn't have a break */
 	    end_pushes();
@@ -554,22 +593,24 @@ i_generate_node P1(parse_node_t *, expr) {
 	    last_break = CURRENT_PROGRAM_SIZE;
 	    ins_short(0);
 	    /* build table */
-	    upd_short(addr, CURRENT_PROGRAM_SIZE);
+	    upd_short(addr + 1, CURRENT_PROGRAM_SIZE - addr, "switch");
 #ifdef BINARIES
-	    if (expr->kind == NODE_SWITCH_STRINGS) {
-		short sw;
-		sw = addr - 2;
-		add_to_mem_block(A_PATCH, (char *)&sw, sizeof sw);
+	    if (pragmas & PRAGMA_SAVE_BINARY) {
+		if (expr->kind == NODE_SWITCH_STRINGS) {
+		    short sw;
+		    sw = addr - 1;
+		    add_to_mem_block(A_PATCH, (char *)&sw, sizeof sw);
+		}
 	    }
 #endif
 	    if (expr->kind == NODE_SWITCH_DIRECT) {
 		parse_node_t *pn = expr->v.expr;
 		while (pn) {
-		    ins_short((short)pn->v.number);
+		    ins_rel_short(pn->v.number - addr);
 		    pn = pn->l.expr;
 		}
 		ins_int(expr->v.expr->r.number);
-		mem_block[current_block].block[addr-1] = (char)0xfe;
+		mem_block[A_PROGRAM].block[addr] = (char)0xfe;
 	    } else {
 		int table_size = 0;
 		int power_of_two = 1;
@@ -585,7 +626,10 @@ i_generate_node P1(parse_node_t *, expr) {
 			    INS_POINTER((POINTER_INT)0);
 		    } else
 			INS_POINTER((POINTER_INT)pn->r.expr);
-		    ins_short((short)pn->v.number);
+		    if (pn->v.number == 1)
+			ins_short(1);
+		    else
+			ins_rel_short(pn->v.number - addr);
 		    pn = pn->l.expr;
 		    table_size += 1;
 		}
@@ -594,14 +638,14 @@ i_generate_node P1(parse_node_t *, expr) {
 		    i++;
 		}
 		if (expr->kind != NODE_SWITCH_STRINGS)
-		    mem_block[current_block].block[addr-1] = (char)(0xf0+i);
+		    mem_block[A_PROGRAM].block[addr] = (char)(0xf0+i);
 		else
-		    mem_block[current_block].block[addr-1] = (char)(i*0x10+0x0f);
+		    mem_block[A_PROGRAM].block[addr] = (char)(i*0x10+0x0f);
 	    }
-	    i_update_branch_list(branch_list[CJ_BREAK_SWITCH]);
+	    i_update_branch_list(branch_list[CJ_BREAK_SWITCH], "switch break");
 	    branch_list[CJ_BREAK_SWITCH] = save_switch_breaks;
-	    upd_short(last_break, CURRENT_PROGRAM_SIZE - last_break);
-	    upd_short(addr+2, CURRENT_PROGRAM_SIZE);
+	    upd_short(last_break, CURRENT_PROGRAM_SIZE - last_break, "switch break");
+	    upd_short(addr+3, CURRENT_PROGRAM_SIZE - addr, "switch");
 	    break;
 	}
     case NODE_CATCH:
@@ -614,7 +658,7 @@ i_generate_node P1(parse_node_t *, expr) {
 	    ins_short(0);
 	    i_generate_node(expr->r.expr);
 	    ins_byte(F_END_CATCH);
-	    upd_short(addr, CURRENT_PROGRAM_SIZE - addr);
+	    upd_short(addr, CURRENT_PROGRAM_SIZE - addr, "catch");
 	    break;
 	}
     case NODE_TIME_EXPRESSION:
@@ -640,13 +684,16 @@ i_generate_node P1(parse_node_t *, expr) {
 	    ins_byte(F_CONST0);
 	}
 	end_pushes();
+
 	ins_byte(F_FUNCTION_CONSTRUCTOR);
 	ins_byte(expr->v.number & 0xff);
 
 	switch (expr->v.number & 0xff) {
 	case FP_SIMUL:
-	case FP_LOCAL:
 	    ins_short(expr->v.number >> 8);
+	    break;
+	case FP_LOCAL:
+	    ins_short(comp_def_index_map[expr->v.number >> 8]);
 	    break;
 	case FP_EFUN:
 	    ins_short(predefs[expr->v.number >> 8].token);
@@ -663,7 +710,8 @@ i_generate_node P1(parse_node_t *, expr) {
 		current_num_values = save_current_num_values;
 		end_pushes();
 		ins_byte(F_RETURN);
-		upd_short(addr, CURRENT_PROGRAM_SIZE - addr - 2);
+		upd_short(addr, CURRENT_PROGRAM_SIZE - addr - 2,
+			  "function pointer");
 		break;
 	    }
 	}
@@ -685,7 +733,8 @@ i_generate_node P1(parse_node_t *, expr) {
 	    addr = CURRENT_PROGRAM_SIZE;
 	    ins_short(0);
 	    i_generate_node(expr->r.expr);
-	    upd_short(addr, CURRENT_PROGRAM_SIZE - addr - 2);
+	    upd_short(addr, CURRENT_PROGRAM_SIZE - addr - 2,
+		      "function pointer");
 	    foreach_depth = save_fd;
 	    break;
 	}
@@ -733,16 +782,16 @@ static void i_generate_loop P4(int, test_first, parse_node_t *, block,
 	i_generate_forward_branch(F_BRANCH);
     pos = CURRENT_PROGRAM_SIZE;
     i_generate_node(block);
-    i_update_branch_list(branch_list[CJ_CONTINUE]);
+    i_update_branch_list(branch_list[CJ_CONTINUE], "continue");
     if (inc) i_generate_node(inc);
-    if (!forever && test_first) i_update_forward_branch();
-    if (test->v.number == F_LOOP_COND_LOCAL ||
+    if (!forever && test_first) i_update_forward_branch("loop");
+    if (test && (test->v.number == F_LOOP_COND_LOCAL ||
 	test->v.number == F_LOOP_COND_NUMBER ||
-	test->v.number == F_NEXT_FOREACH) {
+	test->v.number == F_NEXT_FOREACH)) {
 	i_generate_node(test);
 	ins_short(CURRENT_PROGRAM_SIZE - pos);
     } else i_branch_backwards(generate_conditional_branch(test), pos);
-    i_update_branch_list(branch_list[CJ_BREAK]);
+    i_update_branch_list(branch_list[CJ_BREAK], "break");
     branch_list[CJ_BREAK] = save_breaks;
     branch_list[CJ_CONTINUE] = save_continues;
     if (test_first == 2) foreach_depth--;
@@ -815,39 +864,40 @@ i_generate_inherited_init_call P2(int, index, short, f) {
     ins_byte(F_POP_VALUE);
 }
 
-void i_generate___INIT() {
-    add_to_mem_block(A_PROGRAM, (char *)mem_block[A_INITIALIZER].block,
-		     mem_block[A_INITIALIZER].current_size);
-    prog_code = mem_block[A_PROGRAM].block + mem_block[A_PROGRAM].current_size;
-}
-
 void i_generate_forward_branch P1(char, b) {
     end_pushes();
     ins_byte(b);
-    ins_short(current_forward_branch);
-    current_forward_branch = CURRENT_PROGRAM_SIZE - 2;
+    if (nforward_branches == nforward_branches_max) {
+	nforward_branches_max += 10;
+	forward_branches = RESIZE(forward_branches, nforward_branches_max, int,
+				  TAG_COMPILER, "forward_branches");
+    }
+
+    forward_branches[nforward_branches++] = CURRENT_PROGRAM_SIZE;
+    ins_short(0);
 }
 
 void
-i_update_forward_branch() {
-    int i = read_short(current_forward_branch);
-    
+i_update_forward_branch P1(char *, what) {
     end_pushes();
-    upd_short(current_forward_branch, CURRENT_PROGRAM_SIZE - current_forward_branch);
-    current_forward_branch = i;
+    nforward_branches--;
+    upd_short(forward_branches[nforward_branches],
+	      CURRENT_PROGRAM_SIZE - forward_branches[nforward_branches],
+	      what);
 }
 
-void i_update_forward_branch_links P2(char, kind, parse_node_t *, link_start){
+void i_update_forward_branch_links P2(char, kind, parse_node_t *, link_start) {
     int i;
 
     end_pushes();
-    i = read_short(current_forward_branch);
-    upd_short(current_forward_branch, CURRENT_PROGRAM_SIZE - current_forward_branch);
-    current_forward_branch = i;
+    nforward_branches--;
+    upd_short(forward_branches[nforward_branches], 
+	      CURRENT_PROGRAM_SIZE - forward_branches[nforward_branches],
+	      "&& or ||");
     do {
 	i = link_start->v.number;
 	upd_byte(i-1, kind);
-	upd_short(i, CURRENT_PROGRAM_SIZE - i);
+	upd_short(i, CURRENT_PROGRAM_SIZE - i, "&& or ||");
 	link_start = link_start->l.expr;
     } while (link_start->kind == NODE_BRANCH_LINK);
 }
@@ -863,46 +913,71 @@ i_branch_backwards P2(char, b, int, addr) {
 }
 
 static void
-i_update_branch_list P1(parse_node_t *, bl) {
+i_update_branch_list P2(parse_node_t *, bl, char *, what) {
     int current_size;
     
     end_pushes();
     current_size = CURRENT_PROGRAM_SIZE;
 
     while (bl) {
-	upd_short(bl->l.number, current_size - bl->l.number);
+	upd_short(bl->l.number, current_size - bl->l.number, what);
 	bl = bl->v.expr;
     }
 }
 
 void
 i_generate_else() {
+    int old;
+    
+    old = forward_branches[nforward_branches - 1];
+
     /* set up a new branch to after the end of the if */
     end_pushes();
     ins_byte(F_BRANCH);
-    /* save the old saved value here */
-    ins_short(read_short(current_forward_branch));
+    forward_branches[nforward_branches-1] = CURRENT_PROGRAM_SIZE;
+    ins_short(0);
+
     /* update the old branch to point to this point */
-    upd_short(current_forward_branch, CURRENT_PROGRAM_SIZE - current_forward_branch);
-    /* point current_forward_branch at the new branch we made */
-    current_forward_branch = CURRENT_PROGRAM_SIZE - 2;
+    upd_short(old, CURRENT_PROGRAM_SIZE - old, "if");
 }
 
 void
 i_initialize_parser() {
     foreach_depth = 0;
+
+    if (!forward_branches) {
+	forward_branches = CALLOCATE(10, int, TAG_COMPILER, "forward_branches");
+	nforward_branches_max = 10;
+    }
+    nforward_branches = 0;
+    
     branch_list[CJ_BREAK] = 0;
     branch_list[CJ_BREAK_SWITCH] = 0;
     branch_list[CJ_CONTINUE] = 0;
 
-    current_forward_branch = 0;
-
-    current_block = A_PROGRAM;
     prog_code = mem_block[A_PROGRAM].block;
     prog_code_max = mem_block[A_PROGRAM].block + mem_block[A_PROGRAM].max_size;
 
     line_being_generated = 0;
     last_size_generated = 0;
+}
+
+void
+i_uninitialize_parser() {
+#ifdef DEBUGMALLOC_EXTENSIONS
+    /*
+     * The intention is to keep the allocated space for forward branches
+     * hanging around between compiles so we don't have to keep allocating it.
+     * The problem is that with DEBUGMALLOC_EXENTIONS compiled in, it'll be
+     * reported as a memory leak, so clean it up here.  Yes, it's a performance
+     * hit, but we're trying to debug not run a race, so deal with it.
+     * -- Marius, 11-Aug-2000
+     */
+    if (forward_branches) {
+	FREE(forward_branches);
+	forward_branches = 0;
+    }
+#endif
 }
 
 void
@@ -1109,6 +1184,5 @@ optimize_icode P3(char *, start, char *, pc, char *, end) {
 }
 	    
 		
-
 
 

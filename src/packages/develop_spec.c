@@ -2,6 +2,9 @@
 
     mixed debug_info(int, object);
     int refs(mixed);
+#ifdef DEBUG
+    mixed *destructed_objects();
+#endif
 
 /* dump_prog: disassembler... comment out this line if you don't want the
    disassembler compiled in.

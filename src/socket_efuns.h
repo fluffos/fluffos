@@ -13,8 +13,9 @@
 enum socket_mode {
     MUD, STREAM, DATAGRAM, STREAM_BINARY, DATAGRAM_BINARY
 };
+
 enum socket_state {
-    CLOSED, FLUSHING, UNBOUND, BOUND, LISTEN, DATA_XFER
+    STATE_CLOSED, STATE_FLUSHING, STATE_UNBOUND, STATE_BOUND, STATE_LISTEN, STATE_DATA_XFER
 };
 
 #define	BUF_SIZE	2048	/* max reliable packet size	   */
@@ -54,6 +55,8 @@ extern int max_lpc_socks;
 #define S_EXTERNAL	0x100
 #define S_LINKDEAD	0x200
 
+array_t *socket_status PROT((int));
+array_t *socket_status_by_fd PROT((int));
 int check_valid_socket PROT((char *, int, object_t *, char *, int));
 void socket_read_select_handler PROT((int));
 void socket_write_select_handler PROT((int));
@@ -61,8 +64,8 @@ void assign_socket_owner PROT((svalue_t *, object_t *));
 object_t *get_socket_owner PROT((int));
 void dump_socket_status PROT((outbuffer_t *));
 void close_referencing_sockets PROT((object_t *));
-int get_socket_address PROT((int, char *, int *));
-int socket_bind PROT((int, int));
+int get_socket_address PROT((int, char *, int *, int));
+int socket_bind PROT((int, int, char *));
 int socket_create PROT((enum socket_mode, svalue_t *, svalue_t *));
 int socket_listen PROT((int, svalue_t *));
 int socket_accept PROT((int, svalue_t *, svalue_t *));

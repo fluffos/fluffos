@@ -21,14 +21,14 @@ dealloc_funp P1(funptr_t *, fp)
 	    prog = fp->f.functional.prog;
 	    break;
     }
-    
+
     if (fp->hdr.owner)
-	free_object(fp->hdr.owner, "free_funp");
+        free_object(fp->hdr.owner, "free_funp");
     if (fp->hdr.args)
 	free_array(fp->hdr.args);
 
     if (prog) {
-	prog->func_ref--;
+    	prog->func_ref--;
 	debug(d_flag, ("subtr func ref /%s: now %i\n",
 		    prog->name, prog->func_ref));
 	if (!prog->func_ref && !prog->ref)
@@ -123,22 +123,26 @@ INLINE funptr_t *
 make_lfun_funp P2(int, index, svalue_t *, args)
 {
     funptr_t *fp;
+    int newindex;
 
     if (replace_program_pending(current_object))
 	error("cannot bind an lfun fp to an object with a pending replace_program()\n");
-    
+
     fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(local_ptr_t),
 			     TAG_FUNP, "make_lfun_funp");
     fp->hdr.owner = current_object;
     add_ref( current_object, "make_lfun_funp" );
     fp->hdr.type = FP_LOCAL | FP_NOT_BINDABLE;
     
-    fp->f.local.index = index + function_index_offset;
-    
     fp->hdr.owner->prog->func_ref++;
     debug(d_flag, ("add func ref /%s: now %i\n",
 		fp->hdr.owner->prog->name,
 		fp->hdr.owner->prog->func_ref));
+    
+    newindex = index + function_index_offset;
+    if (current_object->prog->function_flags[newindex] & FUNC_ALIAS)
+	newindex = current_object->prog->function_flags[newindex] & ~FUNC_ALIAS;
+    fp->f.local.index = newindex;
     
     if (args->type == T_ARRAY) {
 	fp->hdr.args = args->u.arr;
@@ -177,7 +181,7 @@ INLINE funptr_t *
 make_functional_funp P5(short, num_arg, short, num_local, short, len, svalue_t *, args, int, flag)
 {
     funptr_t *fp;
-    
+
     if (replace_program_pending(current_object))
 	error("cannot bind a functional to an object with a pending replace_program()\n");
     
@@ -283,11 +287,12 @@ call_function_pointer P2(funptr_t *, funp, int, num_arg)
 	    }
 	}
     case FP_LOCAL | FP_NOT_BINDABLE: {
-	compiler_function_t *func;
+        function_t *func;
+
 	fp = sp - num_arg + 1;
 
-	if (current_object->prog->function_flags[funp->f.local.index] & FUNC_UNDEFINED)
-	    error("Undefined function: %s\n", function_name(current_object->prog, funp->f.local.index));
+	if (current_object->prog->function_flags[funp->f.local.index] & (FUNC_PROTOTYPE|FUNC_UNDEFINED))
+	    error("Undefined lfun pointer called: %s\n", function_name(current_object->prog, funp->f.local.index));
 
 	push_control_stack(FRAME_FUNCTION);
 	current_prog = funp->hdr.owner->prog;

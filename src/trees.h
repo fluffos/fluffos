@@ -16,7 +16,8 @@ enum node_type {
     NODE_SWITCH_DIRECT, NODE_SWITCH_NUMBERS, NODE_CASE_NUMBER,
     NODE_CASE_STRING, NODE_DEFAULT, NODE_IF, NODE_BRANCH_LINK, NODE_PARAMETER,
     NODE_PARAMETER_LVALUE, NODE_EFUN, NODE_ANON_FUNC, NODE_REAL, NODE_NUMBER,
-    NODE_STRING, NODE_FUNCTION_CONSTRUCTOR, NODE_CATCH, NODE_TIME_EXPRESSION
+    NODE_STRING, NODE_FUNCTION_CONSTRUCTOR, NODE_CATCH, NODE_TIME_EXPRESSION,
+    NODE_FUNCTION
 };
 
 enum control_jump_type {
@@ -32,7 +33,7 @@ union parse_value {
 typedef struct parse_node_s {
     short kind;
     short line;
-    char type;
+    unsigned char type;
     union parse_value v, l, r; /* left, right, and value */
 } parse_node_t;
 
@@ -167,6 +168,15 @@ typedef struct parse_node_block_s {
 				    (vn)->l.expr = s;\
 				    (vn)->r.expr = (e);\
 				    )
+
+#define CREATE_IGNORE(vn, c,s,e) SAFE(\
+                                      (vn) = new_node_no_line();\
+				      (vn)->kind = NODE_IGNORE;\
+				      (vn)->v.expr = c;\
+				      (vn)->l.expr = s;\
+				      (vn)->r.expr = (e);\
+				      )
+
 #define CREATE_LOOP(vn, tf, b, i, t) SAFE(\
 					  (vn) = new_node_no_line();\
 					  (vn)->kind = NODE_LOOP;\
@@ -258,6 +268,7 @@ parse_node_t *make_range_node PROT((int, parse_node_t *,
 					 parse_node_t *,
 					 parse_node_t *));
 parse_node_t *insert_pop_value PROT((parse_node_t *));
+parse_node_t *pop_value PROT((parse_node_t *));
 parse_node_t *optimize_loop_test PROT((parse_node_t *));
 int is_boolean PROT((parse_node_t *));
 

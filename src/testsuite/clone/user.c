@@ -74,9 +74,9 @@ write_prompt() {
     }
 }
 
-void start_ed(string file)
-{
-    write(ed_start(file));
+void
+start_ed(string file) {
+    write(ed_start(file, 0));
 }
 #endif
 
@@ -136,11 +136,11 @@ commandHook(string arg)
 
     cobj = load_object(cmd_path);
     if (cobj) {
-		return (int)cobj->main(arg);
+	return (int)cobj->main(arg);
     } else {
-		// maybe call an emote/soul daemon here
+	// maybe call an emote/soul daemon here
     }
-	return 0;
+    return 0;
 }
 
 // init: called by the driver to give the object a chance to add some

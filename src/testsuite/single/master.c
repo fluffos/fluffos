@@ -273,11 +273,6 @@ int valid_hide() {
     return 1;
 }
 
-int valid_shadow() {
-    // same here
-    return 1;
-}
-
 int valid_compile_to_c() {
     return 1;
 }

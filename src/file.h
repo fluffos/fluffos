@@ -28,7 +28,6 @@
 /*
  * file.c
  */
-void debug_perror PROT((char *, char *));
 
 int legal_path PROT((char *));
 char *check_valid_path PROT((char *, object_t *, char *, int));

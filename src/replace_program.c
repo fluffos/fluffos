@@ -2,6 +2,7 @@
 #include "replace_program.h"
 #include "simul_efun.h"
 #include "swap.h"
+#include "efun_protos.h"
 
 /*
  * replace_program.c
@@ -68,7 +69,13 @@ void replace_programs PROT((void))
 	    }
 	}
 
-	r_ob->new_prog->ref++;
+        if (r_ob->ob->replaced_program) {
+            FREE_MSTR(r_ob->ob->replaced_program);
+            r_ob->ob->replaced_program = 0;
+        }
+        r_ob->ob->replaced_program = string_copy(r_ob->new_prog->name, "replace_programs");
+
+	reference_prog(r_ob->new_prog, "replace_programs");
 	old_prog = r_ob->ob->prog;
 	r_ob->ob->prog = r_ob->new_prog;
 	r_next = r_ob->next;

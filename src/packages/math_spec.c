@@ -8,6 +8,7 @@
     float atan(float);
     float sqrt(float);
     float log(float);
+    float log10(float);
     float pow(float, float);
     float exp(float);
     float floor(float);

@@ -283,7 +283,8 @@ char *scratch_copy_string P1(char *,s) {
     char *res;
 
     SDEBUG2(printf("scratch_copy_string\n"));
-    l = scratch_end - 1 - to;
+    l = scratch_end - to;
+
     if (l > 255) l = 255;
     s++;
     while (l--) {
@@ -301,8 +302,13 @@ char *scratch_copy_string P1(char *,s) {
 	    }
 	    s++;
 	} else if (*s == '"') {
-	    scr_last = scr_tail + 1;
 	    *to++ = 0;
+	    if (!l && (to == scratch_end)) {
+		res = scratch_large_alloc(to - scr_tail - 1);
+		Strcpy(res, scr_tail + 1);
+		return res;
+	    }
+	    scr_last = scr_tail + 1;
 	    scr_tail = to;
 	    *to = to - scr_last;
 	    return (char *)scr_last;
@@ -311,8 +317,7 @@ char *scratch_copy_string P1(char *,s) {
     }
     /* estimate the length we need */
     /* Note that the last char is we read is ", not \0 - Sym */
-    l = to - scr_tail + strlen(s) - 1;
-    res = scratch_large_alloc(l);
+    res = scratch_large_alloc(to - scr_tail + strlen(s) - 1);
     Strncpy(res, (scr_tail + 1), (to - scr_tail) - 1);
     to = Res + (to - scr_tail) - 1;
     for (;;) {

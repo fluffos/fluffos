@@ -14,3 +14,4 @@
 #define CONST const
 #define INLINE
 #define UINT32 unsigned long
+#define UINT32 unsigned long

@@ -1,0 +1,50 @@
+#!/usr/local/bin/perl -pi
+
+# Beek - 970910
+# Perl, as a language, is far from my favorite.  However, this task is
+# a good example of the kind of thing it is great at.  It would be hard
+# to express this anywhere nearly as concisely in any other language.
+
+# Note: This script isn't guaranteed to get things 100% correct, but it
+# does do a pretty good job of guessing what is meant, and the remaining
+# cases shouldn't be hard to fix by hand.
+#
+# As an example, it gets every instance of 'static' in the Lima mudlib
+# correct (all 513 of them!).
+#
+# Example usage:
+#
+# find mudlib -name "*.c" -print | xargs /path/to/this/script
+
+# Note that there is no checking whether things appear in quotes, which is
+# probably the most likely way this can mess up.
+#
+# if it contains an open (, which is not part of a ({, ([, or (:, then it
+# is a function prototype or definition
+#
+# Note: this is wrong for initializers that contain (.  For example
+# static object this = this_object();  Perhaps we should handle =
+# first ...
+if (/\([^{[:]/) {
+    s/static/protected/;
+}
+# commas and assignments are pretty clear indictations of variables.  Note
+# that we don't have to worry about commas in argument lists since we have
+# already handled lines with (, which must appear between static and any comma.
+elsif (/,/ || /=/) {
+    s/static/nosave/;
+}
+# static with a ; on the same line implies the entire line is here.  If it
+# was a prototype, it had a (.  Must be a variable.
+elsif (/;/) {
+    s/static/nosave/;
+}
+# This handles the common practice of doing things like:
+#
+# static
+# void create() {
+#
+# which is more common than most other uses of static alone on a line
+else {
+    s/static/protected/;
+}

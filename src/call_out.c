@@ -167,7 +167,6 @@ void call_out()
 {
     int extra, real_time;
     static pending_call_t *cop = 0;
-    object_t *save_command_giver = command_giver;
     error_context_t econ;
     VOLATILE int tm;
     
@@ -191,7 +190,7 @@ void call_out()
 	tm = current_time & (CALLOUT_CYCLE_SIZE - 1);
 	DBG(("   slot %i", tm));
 	while (call_list[tm] && call_list[tm]->delta == 0) {
-	    object_t *ob;
+	    object_t *ob, *new_command_giver;
 	    
 	    /*
 	     * Move the first call_out out of the chain.
@@ -200,7 +199,7 @@ void call_out()
 	    call_list[tm] = call_list[tm]->next;
 	    ob = (cop->ob ? cop->ob : cop->function.f->hdr.owner);
 
-	    DBG(("      /%s", (ob ? ob->name : "(null")));
+	    DBG(("      /%s", (ob ? ob->name : "(null)")));
 
 	    if (!ob || (ob->flags & O_DESTRUCTED)) {
 		DBG(("         (destructed)"));
@@ -223,17 +222,18 @@ void call_out()
 			while (ob->shadowing)
 			    ob = ob->shadowing;
 #endif
-		    command_giver = 0;
+		    new_command_giver = 0;
 #ifdef THIS_PLAYER_IN_CALL_OUT
 		    if (cop->command_giver &&
 			!(cop->command_giver->flags & O_DESTRUCTED)) {
-			command_giver = cop->command_giver;
+			new_command_giver = cop->command_giver;
 		    } else if (ob && (ob->flags & O_LISTENER)) {
-			command_giver = ob;
+			new_command_giver = ob;
 		    }
-		    if (command_giver)
-			DBG(("         command_giver: /%s", command_giver->name));
+		    if (new_command_giver)
+			DBG(("         command_giver: /%s", new_command_giver->name));
 #endif
+		    save_command_giver(new_command_giver);
 		    /* current object no longer set */
 		    
 		    if (cop->vs) {
@@ -263,6 +263,8 @@ void call_out()
 		    } else {
 			(void) call_function_pointer(cop->function.f, extra);
 		    }
+
+		    restore_command_giver();
 		}
 		free_called_call(cop);
 		cop = 0;
@@ -282,7 +284,6 @@ void call_out()
     }
     DBG(("Done."));
     pop_context(&econ);
-    command_giver = save_command_giver;
 }
 
 static int time_left P2(int, slot, int, delay) {
@@ -511,7 +512,7 @@ remove_all_call_out P1(object_t *, obj)
 		  (((*copp)->ob == obj) || ((*copp)->ob->flags & O_DESTRUCTED))) ||
 		 (!(*copp)->ob &&
 		  ((*copp)->function.f->hdr.owner == obj ||
-		    !(*copp)->function.f->hdr.owner ||
+                   !(*copp)->function.f->hdr.owner ||
 		   (*copp)->function.f->hdr.owner->flags & O_DESTRUCTED)) )
 		{
 		    cop = *copp;
@@ -523,4 +524,24 @@ remove_all_call_out P1(object_t *, obj)
 		    copp = &(*copp)->next;
 	}
     }
+}
+
+void reclaim_call_outs() {
+    pending_call_t *cop;
+    int i;
+    
+    remove_all_call_out(0); /* removes call_outs to destructed objects */
+    
+#ifdef THIS_PLAYER_IN_CALL_OUT
+    for (i = 0; i < CALLOUT_CYCLE_SIZE; i++) {
+	cop = call_list[i];
+	while (cop) {
+	    if (cop->command_giver && (cop->command_giver->flags & O_DESTRUCTED)) {
+		free_object(cop->command_giver, "reclaim_call_outs");
+		cop->command_giver = 0;
+	    }
+	    cop = cop->next;
+	}
+    }
+#endif
 }

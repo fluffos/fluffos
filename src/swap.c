@@ -2,6 +2,7 @@
 #include "swap.h"
 #include "file_incl.h"
 #include "simul_efun.h"
+#include "master.h"
 #include "comm.h"
 #include "md.h"
 #include "file.h"
@@ -312,12 +313,8 @@ locate_out P1(program_t *, prog)
 		      prog->argument_types, prog->type_start));
 
     prog->program = (char *)DIFF(prog->program, prog);
-    prog->function_table = (compiler_function_t *)DIFF(prog->function_table, prog);
+    prog->function_table = (function_t *)DIFF(prog->function_table, prog);
     prog->function_flags = (unsigned short *)DIFF(prog->function_flags, prog);
-    prog->function_offsets = (runtime_function_u *)DIFF(prog->function_offsets, prog);
-#ifdef COMPRESS_FUNCTION_TABLES
-    prog->function_compressed = (compressed_offset_table_t *)DIFF(prog->function_compressed, prog);
-#endif
     prog->strings = (char **)DIFF(prog->strings, prog);
     prog->variable_table = (char **)DIFF(prog->variable_table, prog);
     prog->variable_types = (unsigned short *)DIFF(prog->variable_types, prog);
@@ -348,12 +345,8 @@ locate_in P1(program_t *, prog)
     if (!prog)
 	return 0;
     prog->program = ADD(prog->program, prog);
-    prog->function_table = (compiler_function_t *)ADD(prog->function_table, prog);
+    prog->function_table = (function_t *)ADD(prog->function_table, prog);
     prog->function_flags = (unsigned short *)ADD(prog->function_flags, prog);
-    prog->function_offsets = (runtime_function_u *)ADD(prog->function_offsets, prog);
-#ifdef COMPRESS_FUNCTION_TABLES
-    prog->function_compressed = (compressed_offset_table_t *)ADD(prog->function_compressed, prog);
-#endif
     prog->strings = (char **)ADD(prog->strings, prog);
     prog->variable_table = (char **)ADD(prog->variable_table, prog);
     prog->variable_types = (unsigned short *)ADD(prog->variable_types, prog);
@@ -383,8 +376,12 @@ int swap P1(object_t *, ob)
      * program cannot be relocated.  locate_in() could be changed to
      * correct this or simuls[] could use offsets, but it doesn't seem
      * worth it just to get the simul_efun object to swap.  Maybe later.
+     *
+     * Ditto the master object and master_applies[].  Mudlibs that have
+     * a period TIME_TO_SWAP between successive master applies must be
+     * extremely rare ...
      */
-    if (ob == simul_efun_ob) return 0;
+    if (ob == simul_efun_ob || ob == master_ob) return 0;
     if (ob->flags & O_DESTRUCTED)
 	return 0;
     debug(d_flag, ("Swap object /%s (ref %d)", ob->name, ob->ref));
@@ -396,7 +393,7 @@ int swap P1(object_t *, ob)
 	return 0;
     }
     if (ob->prog->ref > 1 || ob->interactive) {
-	debug(d_flag, ("  object not swapped - inherited or interactive."));
+	debug(d_flag, ("  object not swapped - inherited or interactive or in apply_low() cache."));
 
 	return 0;
     }
@@ -561,3 +558,6 @@ void unlink_swap_file()
     fclose(swap_file);
 #endif
 }
+
+
+

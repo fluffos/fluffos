@@ -212,16 +212,6 @@ L_MAPPING_CLOSE requires a bit more work...
 
 -----
 
-Add an option to log the amount of input/output.
-
--- Leto
-
-Comment:
-number of packets and total output is already logged; it's hidden off in a
-corner tho.  A better interface for the mud info stuff, maybe?
-
------
-
 Threads :)
 
 -----
@@ -256,10 +246,6 @@ foreach (i, j in ({ 1, 2 }), ({ 3, 4, 5 }))
 The handling of || and && is still suboptimal; it tests twice, and does
 a uneccessary pop for expressions like: (x && y); it completely blows it
 on expressions like 1 || 1 || 1;
-
----
-
-tell_room should be able to take an object as the third arg
 
 ---
 

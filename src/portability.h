@@ -189,14 +189,16 @@
 #define memmove(a,b,c) bcopy(b,a,c)
 #endif
 
+#if defined(sun) && !defined(SunOS_5)
+#  define OLDCRYPT(x, y) _crypt(x, y)
+#else
+#  define OLDCRYPT(x, y) crypt(x, y)
+#endif
+
 #ifdef CUSTOM_CRYPT
 #  define CRYPT(x, y) custom_crypt(x, y, 0)
 #else
-#  if defined(sun) && !defined(SunOS_5)
-#    define CRYPT(x, y) _crypt(x, y)
-#  else
-#    define CRYPT(x, y) crypt(x, y)
-#  endif
+#  define CRYPT(x, y) OLDCRYPT(x, y)
 #endif
 
 #ifdef HAS_STRERROR

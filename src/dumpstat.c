@@ -142,6 +142,7 @@ void dumpstat P1(char *, tfn)
 		continue;
 	}
 #endif
+	/* FIXME */
 	if (ob->prog && (ob->prog->ref == 1 || !(ob->flags & O_CLONE)))
 	    tmp = ob->prog->total_size;
 	else

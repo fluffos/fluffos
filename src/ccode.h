@@ -13,6 +13,7 @@ void c_generate_inherited_call PROT((int, short));
 void c_generate_final_program PROT((int));
 void c_generate___INIT PROT((void));
 void c_initialize_parser PROT((void));
+void c_uninitialize_parser PROT((void));
 void c_generate_node PROT((parse_node_t *));
 void c_analyze PROT((parse_node_t *));
 void c_generate_inherited_init_call PROT((int, short));

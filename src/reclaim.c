@@ -8,6 +8,7 @@
 #include "std.h"
 #include "lpc_incl.h"
 #include "reclaim.h"
+#include "call_out.h"
 
 #define MAX_RECURSION 25
 
@@ -46,7 +47,7 @@ check_svalue P1(svalue_t *, v)
 	    svalue_t tmp;
 	    program_t *prog;
 
-	    if (v->u.fp->hdr.owner && (v->u.fp->hdr.owner->flags & O_DESTRUCTED)) {
+            if (v->u.fp->hdr.owner && (v->u.fp->hdr.owner->flags & O_DESTRUCTED)) {
 		if (v->u.fp->hdr.type == FP_LOCAL | FP_NOT_BINDABLE) {
 		    prog = v->u.fp->hdr.owner->prog;
 		    prog->func_ref--;
@@ -55,10 +56,11 @@ check_svalue P1(svalue_t *, v)
 		    if (!prog->ref && !prog->func_ref)
 			deallocate_program(prog);
 		}
-		free_object(v->u.fp->hdr.owner, "reclaim_objects");
-		v->u.fp->hdr.owner = 0;
-		cleaned++;
-	    }
+                free_object(v->u.fp->hdr.owner, "reclaim_objects");
+                v->u.fp->hdr.owner = 0;
+                cleaned++;
+            }
+
 	    tmp.type = T_ARRAY;
 	    if ((tmp.u.arr = v->u.fp->hdr.args))
 		check_svalue(&tmp);
@@ -111,10 +113,13 @@ int reclaim_objects()
     int i;
     object_t *ob;
 
+    reclaim_call_outs();
+
     cleaned = nested = 0;
     for (ob = obj_list; ob; ob = ob->next_all)
 	if (ob->prog)
 	    for (i = 0; i < (int) ob->prog->num_variables_total; i++)
 		check_svalue(&ob->variables[i]);
+    
     return cleaned;
 }

@@ -1,5 +1,5 @@
 #include "std.h"
-#ifdef LPC_TO_C
+#if defined(LPC_TO_C) && defined(BINARIES)
 #define SUPRESS_COMPILER_INLINES
 #include "compile_file.h"
 #include "file_incl.h"
@@ -18,12 +18,11 @@ void
 link_jump_table P2(program_t *, prog, void **, jump_table)
 {
     int num = prog->num_functions_defined;
-    compiler_function_t *funcs = prog->function_table;
+    function_t *funcs = prog->function_table;
     int i;
     int j;
 
     for (i = 0, j = 0; i < num; i++) {
-	if (prog->function_flags[funcs[i].runtime_index] & (FUNC_NO_CODE | FUNC_INHERITED)) continue;
 	if (jump_table[j])
 	    funcs[i].address = (unsigned long) jump_table[j];
 	else
@@ -50,7 +49,6 @@ init_lpc_to_c()
 	p++;
     }    
 }
-#endif
 
 /* F_GENERATE_SOURCE will only be def'd if LPC->C is */
 #ifdef F_GENERATE_SOURCE
@@ -68,6 +66,51 @@ static void generate_identifier P2(char *, buf, char *, name)
 }
 
 #ifdef RUNTIME_LOADING
+/* $c = COMPILER, $l = CFLAGS, $s = src dir, $f = file, $e = errors */
+static void create_command P7(char *, buf, char *, format,
+			      char *, compiler, char *, cflags,
+			      char *, src, char *, file, char *, errors) {
+    char *p = format, *q = buf;
+    while (1) {
+	switch (*p) {
+	case 0:
+	    *q = 0;
+	    return;
+	case '$':
+	    switch (*++p) {
+	    case 'c':
+		strcpy(q, compiler);
+		q += strlen(q);
+		break;
+	    case 'l':
+		strcpy(q, cflags);
+		q += strlen(q);
+		break;
+	    case 's':
+		strcpy(q, src);
+		q += strlen(q);
+		break;
+	    case 'f':
+		strcpy(q, file);
+		q += strlen(q);
+		break;
+	    case 'e':
+		strcpy(q, errors);
+		q += strlen(q);
+		break;
+	    default:
+		fprintf(stderr, "Bad character in command format.\n");
+		break;
+	    }
+	    p++;
+	    break;
+	default:
+	    *q++ = *p++;
+	    break;
+	}
+    }
+}
+
 static void compile_and_link P2(char *, file, char *, ident) {
     char *p, command[1024];
     char tmp[1024];
@@ -79,24 +122,18 @@ static void compile_and_link P2(char *, file, char *, ident) {
 	*p = 0;
 
     /* Do the compile */
-#ifdef sgi
-    sprintf(command,
-	    "%s %s -c -shared -I%s -G 0 -o %s.so %s.c > %s 2>&1",
-	    COMPILER, CFLAGS,
-	    "lpc2c", file, file, "lpc2c/errors");
+    create_command(command, 
+#if defined(sgi)
+		   "$c $l -c -shared -I$s -G 0 -o $f.so $f.c >$e 2>&1",
+#elif defined(__NetBSD__)
+		   "($c $l -c -fpic -DPIC -I$s -o $f.o $f.c && ld -X -Bshareable -o $f.so $f.o && rm $f.o) >$e 2>&1",
+#elif defined(__alpha)
+		   "($c $l -c -I$s -o $f.o $f.c && ld -msym -shared -expect_unresolved '*' -o $f.so $f.o && rm $f.o) >$e 2>&1",
 #else
-#  ifdef __NetBSD__
-    sprintf(command,
-	    "(%s %s -c -fpic -DPIC -I%s -o %s.o %s.c && ld -X -Bshareable -o %s.so %s.o && rm %s.o) > %s 2>&1",
-	    COMPILER, CFLAGS,
-	    "lpc2c", file, file, file, file, file, "lpc2c/errors");
-#  else
-    sprintf(command,
-	    "%s %s -c -shared -I%s -o %s.so %s.c > %s 2>&1",
-	    COMPILER, CFLAGS,
-	    "lpc2c", file, file, "lpc2c/errors");
-#  endif
+		   /* Everything else ... known to work for Linux and FreeBSD */
+		   "$c $l -I$s -fPIC -shared -Wl,-soname,$f.so -o $f.so $f.c > $e 2>&1",
 #endif
+		   COMPILER, CFLAGS, "lpc2c", file, "lpc2c/errors");
 
     if (system(command))
 	error("Compilation of generated C code failed.\n");
@@ -389,4 +426,6 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
     pop_context(&econ);
     return 1;
 }
+#endif
+
 #endif

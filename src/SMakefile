@@ -276,7 +276,7 @@ OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
 	port.o reclaim.o parse.o simul_efun.o sprintf.o uid.o program.o \
 	compiler.o avltree.o icode.o trees.o generate.o scratchpad.o \
 	socket_efuns.o socket_ctrl.o qsort.o eoperators.o socket_err.o md.o \
-	strstr.o disassembler.o binaries.o $(UALARM) $(STRFUNCS) \
+	strstr.o disassembler.o binaries.o add_action.o $(UALARM) $(STRFUNCS) \
 	$(EFUNS) replace_program.o functab_tree.o $(EXTRA_OBJS) \
 	$(EXTRA_PORT)
 

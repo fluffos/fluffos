@@ -32,7 +32,7 @@ int name_by_ip PROT((int, char *));
 int ip_by_name PROT((int, char *));
 INLINE_STATIC void process_queue PROT((void));
 void init_conns PROT((void));
-void init_conn_sock PROT((int));
+void init_conn_sock PROT((int, char *));
 
 #ifdef SIGNAL_FUNC_TAKES_INT
 void sigpipe_handler PROT((int));
@@ -50,6 +50,8 @@ void new_conn_handler PROT((void));
 void conn_data_handler PROT((int));
 int index_by_fd PROT((int));
 void terminate PROT((int));
+
+void debug_perror PROT((char *, char *));
 
 void debug_perror P2(char *, what, char *, file) {
     if (file)
@@ -77,7 +79,7 @@ void init_conns()
 /*
  * Initialize connection socket.
  */
-void init_conn_sock P1(int, port_num)
+void init_conn_sock P2(int, port_num, char *, ipaddress)
 {
     struct sockaddr_in sin;
     int sin_len;
@@ -109,11 +111,7 @@ void init_conn_sock P1(int, port_num)
      * fill in socket address information.
      */
     sin.sin_family = AF_INET;
-#ifdef SERVER_IP
-    sin.sin_addr.s_addr = inet_addr(SERVER_IP);
-#else
-    sin.sin_addr.s_addr = INADDR_ANY;
-#endif
+    sin.sin_addr.s_addr = (ipaddress ? inet_addr(ipaddress) : INADDR_ANY);
     sin.sin_port = htons((u_short) port_num);
     /*
      * bind name to socket.
@@ -522,7 +520,7 @@ int name_by_ip P2(int, conn_index, char *, buf)
     struct hostent *hp;
     static char out_buf[OUT_BUF_SIZE];
 
-    if ((addr = inet_addr(&buf[sizeof(int)])) == INADDR_NONE) {
+    if ((addr = inet_addr(&buf[sizeof(int)])) == -1) {
 	sprintf(out_buf, "%s 0\n", &buf[sizeof(int)]);
 	DBG(("name_by_ip: malformed address request."));
 	OS_socket_write(all_conns[conn_index].fd, out_buf, strlen(out_buf));
@@ -579,11 +577,18 @@ int main P2(int, argc, char **, argv)
     struct timeval timeout;
     int i;
     int nb;
+    char *ipaddress = 0;
 
     if (argc > 1) {
 	if ((addr_server_port = atoi(argv[1])) == 0) {
 	    fprintf(stderr, "addr_server: malformed port number.\n");
 	    exit(2);
+	}
+	if (argc > 2) {
+	    if (inet_addr((ipaddress = argv[2])) == INADDR_NONE) {
+		fprintf(stderr, "addr_server: malformed ip address.\n");
+		exit(3);
+	    }
 	}
     } else {
 	fprintf(stderr, "addr_server: first arg must be port number.\n");
@@ -592,7 +597,7 @@ int main P2(int, argc, char **, argv)
 #if defined(LATTICE) && defined(AMITCP)
     init_conns();
 #endif
-    init_conn_sock(addr_server_port);
+    init_conn_sock(addr_server_port, ipaddress);
     while (1) {
 	/*
 	 * use finite timeout for robustness.

@@ -73,6 +73,8 @@ void check_all_blocks PROT((int));
 
 outbuffer_t out;
 
+void MDmemcheck();
+
 void MDmemcheck() {
     check_all_blocks(2);
     if (out.buffer)
@@ -276,15 +278,13 @@ static void mark_object P1(object_t *, ob) {
 	DO_MARK(ob->name, TAG_OBJ_NAME);
     }
 
+    if (ob->replaced_program)
+	EXTRA_REF(BLOCK(ob->replaced_program))++;
+
 #ifdef PRIVS
     if (ob->privs)
 	EXTRA_REF(BLOCK(ob->privs))++;
 #endif
-
-    if (ob->interactive) {
-	if (ob->interactive->input_to)
-	    ob->interactive->input_to->ob->extra_ref++;
-    }
 
 #ifndef NO_ADD_ACTION
     if (ob->living_name)
@@ -358,7 +358,7 @@ static void mark_funp P1(funptr_t*, fp) {
 	fp->hdr.args->extra_ref++;
 
     if (fp->hdr.owner)
-	fp->hdr.owner->extra_ref++;
+        fp->hdr.owner->extra_ref++;
     switch (fp->hdr.type) {
 	case FP_LOCAL | FP_NOT_BINDABLE:
 	    if (fp->hdr.owner)
@@ -695,8 +695,8 @@ void check_all_blocks P1(int, flag) {
     
     if (!(flag & 2)) {
 	/* the easy ones to find */
-	if (blocks[TAG_SIMULS & 0xff] > 2)
-	    outbuf_add(&out, "WARNING: more than two simul_efun tables allocated.\n");
+	if (blocks[TAG_SIMULS & 0xff] > 3)
+	    outbuf_add(&out, "WARNING: more than three simul_efun tables allocated.\n");
 	if (blocks[TAG_INC_LIST & 0xff] > 1)
 	    outbuf_add(&out, "WARNING: more than one include list allocated.\n");
 	if (blocks[TAG_IDENT_TABLE & 0xff] > 1)
@@ -737,15 +737,15 @@ void check_all_blocks P1(int, flag) {
 	if (blocks[TAG_MAP_TBL & 0xff] != num_mappings)
 	    outbuf_addv(&out, "WARNING: %i tables for %i mappings\n",
 			blocks[TAG_MAP_TBL & 0xff], num_mappings);
-	if (blocks[TAG_INTERACTIVE & 0xff] != total_users)
-	    outbuf_addv(&out, "WATNING: total_users is: %i should be: %i\n",
-			total_users, blocks[TAG_INTERACTIVE & 0xff]);
+	if (blocks[TAG_INTERACTIVE & 0xff] != num_user)
+	    outbuf_addv(&out, "WATNING: num_user is: %i should be: %i\n",
+			num_user, blocks[TAG_INTERACTIVE & 0xff]);
 #ifdef STRING_STATS
 	check_string_stats(&out);
 #endif
 	
 #ifdef PACKAGE_EXTERNAL
-	for (i = 0; i < 5; i++) {
+	for (i = 0; i < NUM_EXTERNAL_CMDS; i++) {
 	    if (external_cmd[i]) {
 		DO_MARK(external_cmd[i], TAG_STRING);
 	    }
@@ -803,6 +803,7 @@ void check_all_blocks P1(int, flag) {
 	mark_free_sentences();
 	mark_iptable();
 	mark_stack();
+	mark_command_giver_stack();
 	mark_call_outs();
 	mark_simuls();
 	mark_apply_low_cache();
@@ -886,6 +887,15 @@ void check_all_blocks P1(int, flag) {
 			    tmp = obj_list_destruct;
 			    while (tmp && tmp != ob)
 				tmp = tmp->next_all;
+			}
+			if (!tmp) {
+			    tmp = obj_list_dangling;
+			    while (tmp && tmp != ob)
+				tmp = tmp->next_all;
+			    if (tmp)
+				outbuf_addv(&out,
+					"WARNING: %s is dangling.\n",
+					ob->name);
 			}
 			if (!tmp)
 			    outbuf_addv(&out, 

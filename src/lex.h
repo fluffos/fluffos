@@ -10,7 +10,7 @@
 #define NARGS 25
 #define MARKS '@'
 
-#define SKIPWHITE while (isspace(*p) && (*p != '\n')) p++
+#define SKIPWHITE while (isspace((unsigned char)*p) && (*p != '\n')) p++
 
 #define DEFAULT_NONE           0xff
 #define DEFAULT_THIS_OBJECT    0xfe
@@ -54,10 +54,11 @@ typedef struct defn_s {
 #define DEF_IS_NOT_LOCAL 4
 
 /* to speed up cleaning the hash table, and identify the union */
-#define IHE_RESWORD    0x8000
-#define IHE_EFUN       0x4000
-#define IHE_SIMUL      0x2000
-#define IHE_PERMANENT  (IHE_RESWORD | IHE_EFUN | IHE_SIMUL)
+#define IHE_RESWORD    0x8000	/* reserved word */
+#define IHE_EFUN       0x4000	/* efun name */
+#define IHE_SIMUL      0x2000	/* active simul efun name */
+#define IHE_ORPHAN     0x1000	/* old and unused simul efun name */
+#define IHE_PERMANENT  (IHE_RESWORD | IHE_EFUN | IHE_SIMUL | IHE_ORPHAN)
 #define TOKEN_MASK     0x0fff
 
 #define INDENT_HASH_SIZE 1024 /* must be a power of 2 */
@@ -100,7 +101,7 @@ typedef struct lpc_predef_s {
 
 extern lpc_predef_t *lpc_predefs;
 
-#define isalunum(c) (isalnum(c) || (c) == '_')
+#define isalunum(c) (uisalnum(c) || (c) == '_')
 
 /*
  * Information about all instructions. This is not really needed as the

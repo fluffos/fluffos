@@ -15,22 +15,22 @@
  * simulate.c
  */
 
-extern int illegal_sentence_action;
 extern object_t *obj_list;
 extern object_t *obj_list_destruct;
 extern object_t *current_object;
 extern object_t *command_giver;
 extern object_t *current_interactive;
 extern char *inherit_file;
-#ifndef NO_ADD_ACTION
-extern char *last_verb;
-#endif
 extern int tot_alloc_sentence;
 extern int MudOS_is_being_shut_down;
 #ifdef LPC_TO_C
 extern int compile_to_c;
 extern FILE *compilation_output_file;
 extern char *compilation_ident;
+#endif
+#ifdef DEBUG
+extern object_t *obj_list_dangling;
+extern int tot_dangling_object;
 #endif
 
 char *strput PROT((char *, char *, char *));
@@ -39,18 +39,12 @@ void CDECL debug_fatal PROT1V(char *);
 void CDECL fatal PROT1V(char *);
 void CDECL error PROT1V(char *);
 INLINE void check_legal_string PROT((char *));
-#ifndef NO_ADD_ACTION
-int user_parser PROT((char *));
-int command_for_object PROT((char *));
-void enable_commands PROT((int));
-void add_action PROT((svalue_t *, char *, int));
-int remove_action PROT((char *, char *));
-#endif
 #ifndef NO_LIGHT
 void add_light PROT((object_t *, int));
 #endif
 void free_sentence PROT((sentence_t *));
 
+sentence_t *alloc_sentence PROT((void));
 int input_to PROT((svalue_t *, int, int, svalue_t *));
 int get_char PROT((svalue_t *, int, int, svalue_t *));
 

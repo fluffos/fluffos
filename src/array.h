@@ -41,6 +41,7 @@ char *implode_string PROT((array_t *, char *, int));
 array_t *users PROT((void));
 array_t *commands PROT((object_t *));
 void filter_array PROT((svalue_t *, int));
+void filter_string PROT((svalue_t *, int));
 array_t *deep_inherit_list PROT((object_t *));
 array_t *inherit_list PROT((object_t *));
 array_t *children PROT((char *));

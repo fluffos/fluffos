@@ -454,7 +454,7 @@ generate P1(parse_node_t *, node) {
     return where;
 }
 
-void optimizer_start_function P1(int, n) {
+static void optimizer_start_function P1(int, n) {
     if (n) {
 	last_local_refs = CALLOCATE(n, parse_node_t *, TAG_COMPILER, "c_start_function");
 	optimizer_num_locals = n;
@@ -464,7 +464,7 @@ void optimizer_start_function P1(int, n) {
     } else last_local_refs = 0;
 }
 
-void optimizer_end_function PROT((void)) {
+static void optimizer_end_function PROT((void)) {
     int i;
     if (last_local_refs) {
 	for (i = 0; i < optimizer_num_locals; i++) 
@@ -477,7 +477,7 @@ void optimizer_end_function PROT((void)) {
 }
 
 #ifdef LPC_TO_C
-short generate_function P3(compiler_function_t *, cfp, parse_node_t *, node, int, num) {
+short generate_function P3(function_t *, cfp, parse_node_t *, node, int, num) {
     short ret;
     
     if (pragmas & PRAGMA_OPTIMIZE) {
@@ -497,7 +497,7 @@ short generate_function P3(compiler_function_t *, cfp, parse_node_t *, node, int
     return ret;
 }
 #else
-short generate_function P3(compiler_function_t *, f, parse_node_t *, node, int, num) {
+short generate_function P3(function_t *, f, parse_node_t *, node, int, num) {
     short ret;
     if (pragmas & PRAGMA_OPTIMIZE) {
 	optimizer_start_function(num);
@@ -512,6 +512,7 @@ short generate_function P3(compiler_function_t *, f, parse_node_t *, node, int, 
 
 int
 node_always_true P1(parse_node_t *, node) {
+    if (!node) return 1;
     if (node->kind == NODE_NUMBER)
 	return node->v.number;
     return 0;
@@ -520,6 +521,9 @@ node_always_true P1(parse_node_t *, node) {
 int
 generate_conditional_branch P1(parse_node_t *, node) {
     int branch;
+
+    if (!node)
+	return F_BBRANCH;
 
     /* only have to handle while (x != 0) since while (x == 0) will be
      * handled by the x == 0 -> !x and !x optimizations.

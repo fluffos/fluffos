@@ -2,6 +2,75 @@ This file is the *brief* version of what has been changed; see
 ChangeLog.alpha, ChangeLog.beta, and ChangeLog.old/ for all the gory
 details.
 
+(pre-v22.2 changes)
+      * new options:
+	. GET_CHAR_IS_BUFFERED
+	. USE_32BIT_ADDRESSING
+	. NUM_EXTERNAL_CMDS
+      * features:
+	. new efun: socket_status()
+	. classes can be inherited multiple times so long as the definitions
+	  are consistent
+	. implemented MUD mode external ports
+	. improved warnings for code with no side effects
+	. resolve() can now take a function pointer as the second arg
+	. filter() can now iterate over each character of a string
+	. LPC programs can now exceed 64k in size with USE_32BIT_ADDRESSING
+	. deep_inventory() and living() now default to this_object()
+	. cp() now errors like mv() when source and dest are the same
+	. -> syntax now uses call_other() simul_efun if one exists
+	. function tables are now always compressed
+	. '&' is now a synonym for 'ref' when COMPAT_32 is defined
+	. added #warn and #error preprocess directives
+	. when no address server connection exists, an attempt will be made
+	  once every fifteen minutes to establish one.
+	. (s)printf() is now re-entrant, so it can be used from the
+	  object_name() master apply.
+	. on most platforms, localtime() efun adds a new element to the array
+	  it returns indicating daylight savings time
+	. the 3rd argument to tell_room() can now be an object
+	. when COMPAT_32 is defined, closeurep becomes an alias for functionp
+	. added extensive socket statistics and network_stats() as a new
+	  contrib efun to retrieve these stats.
+	. socket_bind() now takes an optional 3rd argument that is the address
+	  to bind to rather than INADDR_ANY or the 'mud ip' config address.
+	. socket_address() now takes an optional 2nd argument to get the local
+	  address for a socket
+	. all objects now 'inherit' the class definitions from the simul_efun
+	  object if there are any.
+	. restructured PACKAGE_DB to make it easier to add more database
+	  support
+	. added support for MySQL in addition to MSQL to PACKAGE_DB
+	. compile_object() master apply now gets a second argument indicating
+	  whether or not a clone is being done
+	. compile_object() master apply now gets arguments passed to new()
+	  when cloning a virtual object as they'd be passed to create() in a
+	  real object.
+	. implemented rfc 1184 (telnet linemode option) to be support running
+	  on port 23.
+      * parser enhancements:
+	. new error ERR_MANY_PATHS
+	. new modifier ':c' that means just choose the first one found
+	. two object rules are examined more thoroughly.  This changes the
+	  semantics for direct_ and indirect_ applies.  They can now be called
+	  with 0s as the object-type arguments, but it is now guaranteed that
+	  they will be called with filled object arguments at least once
+	  during the processing of a rule.
+	. added optional 3rd and 4th arguments to parse_sentence().  The 3rd
+	  is an array of objects to use in the parse instead of the inventory
+	  of the user's environment.  Nested arrays indicate containment.  The
+	  4th is mapping of string -> object which can be used to supply
+	  nicknames and similar things.
+      * COMPAT BUSTERs:
+	. dump_socket_status() efun is gone, see socket_status()
+	. SERVER_IP is no longer a compile-time option.  it is now a runtime
+	  configuration option called "mud ip"
+	. when COMPAT_32 is defined with PACKAGE_UIDS, the uid assigned to a
+	  new object is the euid of the current object rather than the uid of
+	  the current object.
+	. when loading/cloning a virtual object, mudlib stats, uid/euid and
+	  privs are now properly reset with the newly assigned object name.
+
 (pre-v22.1 changes)
       * new options:
 	. NO_SNOOP

@@ -5,7 +5,7 @@
 
 operator pop_value, push, efun0, efun1, efun2, efun3, efunv;
 
-operator number, real, byte, nbyte, string, short_string, const0, const1;
+operator short_int, number, real, byte, nbyte, string, short_string, const0, const1;
 
 operator aggregate, aggregate_assoc;
 #ifdef DEBUG

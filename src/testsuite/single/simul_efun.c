@@ -88,7 +88,7 @@ dump_variable(mixed arg)
    string rtn;
    mixed x, y;
    
-   switch(typeof(arg)){
+   switch(typeof(arg)) {
    case OBJECT: return "("+file_name(arg)+")";
    case STRING: return "\""+arg+"\"";
    case INT: return "#"+arg;
@@ -130,7 +130,7 @@ string resolve_path(string curr, string newer) {
     int i, j, size;
     string *tmp;
     
-    switch(newer){
+    switch(newer) {
     case 0: 
     case ".":
 	return curr;
@@ -143,7 +143,7 @@ string resolve_path(string curr, string newer) {
     default:
 	if (newer[0..1] == "~/") newer = user_path((string)this_player()->query_name()) + newer[2..];
 	else {
-	    switch(newer[0]){
+	    switch(newer[0]) {
 	    case '~':
 	    {
 		i = strsrch(newer, '/');
@@ -161,10 +161,10 @@ string resolve_path(string curr, string newer) {
 	
 	i = j = 0;
 	
-	while (i < size){
-	    switch(tmp[i]){
+	while (i < size) {
+	    switch(tmp[i]) {
 	    case "..":
-		if (j){
+		if (j) {
 		    while (j-- && !tmp[j]);
 		    if (j >= 0) tmp[j] = 0;
 		    else j++;

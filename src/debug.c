@@ -3,6 +3,8 @@
 
 #ifdef DEBUG_MACRO
 
+mapping_t *debug_levels PROT((void));
+
 typedef struct {
     char *name;
     int bit;
@@ -15,7 +17,10 @@ debug_t levels[] = {
     E(d_flag),
     E(connections),
     E(mapping),
-    E(sockets)
+    E(sockets),
+    E(comp_func_tab),
+    E(LPC),
+    E(LPC_line)
 };
 
 #define NELEM(x) (sizeof(x)/sizeof(x[0]))

@@ -1,10 +1,265 @@
------------------------------------------------------------------------
-(v22.1pre5 promoted to v22.1)
+Thu Feb  7 18:39:16 2002 (marius@mduso.org (Marius))
+	* raised patchlevel to v22.2b12
+	* #152: Fixed a crasher using nested references.  Fix supplied
+	  by Avenger@AtP.
+	* #153: Fixed crasher in debug builds with an invalid assert.
+	  [reported by Pickett@Sumu]
+	* #159, #162: Fixed a crasher in repeat_string() when the max
+	  string length is exceeded [reported by Eleinor@Arkansia]
+	* Ported to Mac OS X (Darwin)
+	* #166: this_player() will now always be this_object() when
+	  the net_dead apply is called from remove_interactive().  This
+	  should fix the write() oddities reported by Uranus.  I'm not
+	  labelling this as a COMPAT BUSTER because previously there was
+	  no guarantee what this_player() would be.
+	* #165: pluralizing -ff words gives incorrect -fves suffix
+	  [reported by Avenger@AtP]
+	* #161: everyone can see hidden object in named_livings() and
+	  heart_beats().  Applied the fixes suggested by Ben Hoogterp.
+	  [reported by Eleinor@Arkansia]
 
-Wed Aug 30 18:58:56 2000 (mmessier@prilnari.com (Marius))
+Fri Mar 30 17:14:07 2001 (marius@mudos.org (Marius))
+	* raised patchlevel to v22.2b11
+	* #143: Fixed crashes when destructing various objects involved
+	  in APPLY_INIT calls.  Based on patches from Mark G. Adams
+	* Removed the definition of FP_THIS_OBJECT from
+	  include/function.h since it is not used anywhere and conflicts
+	  with FP_HAS_ARGUMENTS [reported by Arren@AnarresII]
+	* #148: Disallow load_object() with a filename containing a #
+	  (indicative of a clone).  [reported by Pickett@Sumu]
+	* #149: Crash when removing a function from the simul_efun when
+	  that function is also defined by another object that is then
+	  inherited and recompiled the second time after the function is
+	  removed from the simul_efun object (whew!) [reported by
+	  Avenger@AtP]
+	* #141: __FILE__ cannot be included multiple times [reported by
+	  Arren@Anarres]
+	* #140: Fixed a crasher in kill_ref().  Problem occured using a
+	  ref in foreach on a string [reported by Uranus, test case that
+	  finally exposed the problem reported by Pickett@Sumu]
+	* Fixed foreach() in LPC2C generated code.  Updated it to add
+	  the "new" support for the ref keyword in foreach.
+	* #48: sprintf() from master::error_handler() dumps int instead
+	  of string in 'locals'.  Should be fixed up now [reported by
+	  Javelin@Vincent's Hollow]
+
+Mon Feb 12 16:09:42 2001 (marius@mudos.org (Marius))
+	* raised patchlevel to v22.2b10
+	* #129: Added SLC_NAMELIST to the telnet.h included with MudOS
+	  for broken systems that are missing <arpa/telnet.h>
+	  [reported by Andrew@Nanvaent]
+	* #120: Fixed compilation problems when NO_RESETS is defined.
+	  [reported by Arren@Anarres II]
+	* #139: Fixed a crasher when using a foreach ref within another
+	  foreach loop [reported by Pickett@Sumu]
+	* #136: Fixed a problem with compiling a program after the
+	  previous program had a compile error inside of a function
+	  pointer [reported by Avenger@AtP]
+	* #131: Fixed some oddness with to_int(), in particular, a
+	  single digit followed by a whitespace character would return
+	  undefined which is incorrect [reported by
+	  kriton@gameworkshop.com]
+	* #135: Macro names must begin with either an underscore or a
+	  letter.  Successive characters may be digits [reported by
+	  Arren@Anarres II]
+
+Mon Nov  6 18:48:25 2000 (marius@mudos.org (Marius))
+	* raised patchlevel to v22.2b9
+	* #104: Corrected the spelling of "ninth" which is used by
+	  the parse_sentence() efun.  [reported by lundberg@vr.net]
+	* #97: More fixes for get_char() when GET_CHAR_IS_BUFFERED is
+	  enabled [fixes from Pelle Johansson]
+	* #111: Plural of "lotus" is "lotuses" [reported by
+	  Turrican@Discworld]
+	* #109: Fixed inline program reference increments to use the
+	  reference_prog() function.  [Reported by Andrew@Nanvaent]
+	* #110: Fix a bad call to free_string_svalue() in
+	  f_write_buffer().  The call should be free_svalue() instead.
+	  [reported by Beyond]
+	* #103: Runtime errors in heart_beat will no longer stop the
+	  entire process.  The next heart_beat will run, call_outs
+	  will run, and the time will continue to advance.  This is a
+	  bug that is older than old [reported by Scatter]
+
+Wed Sep 27 08:20:05 2000 (marius@mudos.org (Marius))
+	* raised patchlevel to v22.2b8
+	* #83: Fixed get_char() when GET_CHAR_IS_BUFFERED is enabled.
+	  Make sure that the string returned is null terminated and
+	  TELOPT_SGA is handled properly [patch from Pelle Johansson]
+	* #84: Fixed a ref count problem with the connect() master
+	  apply when 0 is returned.
+	* #86: Using default access modifiers, do not issue an error
+	  if a conflicting modifier is used [reported by Mystic]
+	* #77: Fixed a crasher when calling map_delete() from filter()
+	  on the mapping being filtered. [reported by Andrew@Nanvaent]
+	* #79: In certain cases generating a loop, a flag indicating
+	  the code that follows is not reached was being erroneously
+	  set, causing the code to not generate/compile properly
+	  [reported by Uranus]
+	* #80: If a function is declared but not defined, don't enter
+	  it in the function table when generating C source for LPC.
+	  [reported by Uranus]
+	* #90: Fixed a problem with inheriting multiple objects that
+	  each define classes and have functions with arguments using
+	  those classes.  Properly adjust the types for validating
+	  arguments [reported by Randor@Aurora]
+	* #81: Filled in missing definitions for reference support for
+	  LPC_TO_C [reported by Uranus]
+
+Thu Sep 21 14:16:49 2000 (marius@mudos.org (Marius))
+	* raised patchlevel to v22.2b7
+	* #75: Fixed a typo in C_TRANSFER_LOCAL macro added in v22.2b6
+	  [reported by Uranus]
+	* #63: Fixed heart_beat errors for optimized builds.
+	  [reported by scatter@thevortex.com]
+	* #71: For MySQL support, all string/char/text/blob field types
+	  will now be returned as strings by default unless the field
+	  has the BINARY modifier applied to it, in which case a buffer
+	  will be returned.
+	* #76: Filenames containing '//' are now allowed -- multiple
+	  slashes are stripped down to a single slash [patch from
+	  Skullslayer@RoD]
+	* Loading a binary now checks the simul_efun date to see if it
+	  has been modified (in addition to driver, includes, config,
+	  etc.) [from Bugs]
+
+Mon Sep 18 20:19:20 2000 (marius@mudos.org (Marius))
+	* raised patchlevel to v22.2b6
+	* #57: Fixed a problem with single quotes inside of a macro
+	  expansion [reported by Mystic]
+	* #64: Fixed unresolved symbol c_transfer_local for LPC_TO_C.
+	  Only used when LPC optimization is on [reported by Uranus]
+	* #63: Fixed an error in heart_beat causing heart_beat() to
+	  get called repeatedly [reported by scatter@thevortex.com]
+	* #65: Added some intelligence to build.MudOS on FreeBSD to
+	  try and determine if -export-dynamic or -rdynamic will work
+	  for compiling.  Old versions of FreeBSD do not support
+	  them [reported by darren@nighttide.net]
+	* Enabled #pragma optimize
+	* #73: Fixed memory_summary() efun to handle recursive data
+	  structures [reported by Avenger@AtP]
+	* If NO_BUFFER_TYPE is defined, MySQL BLOB fields will be
+	  treated as TEXT fields.
+	* #50: Fixed a crasher with recursive inherits deeper than the
+	  maximum call depth [reported by Beyond]
+
+Sat Sep  9 16:16:54 2000 (marius@mudos.org (Marius))
+	* raised patchlevel to v22.2b5
+	* #16: 'ref' works in foreach again [originally reported by
+	  Uranus]
+	* #54: Added a new search location for mysql.h to satisfy RPM
+	  installs on Linux from MySQL.com.  Also fixed edit_source to
+	  search for libmysqlclient.so properly [reported by jytong]
+	* #49: Fixed oldcrypt() to actually be oldcrypt() when
+	  CUSTOM_CRYPT is defined [reported by Beyond]
+	* Fixed a crasher when heart beats and the command_giver is
+	  shadowed [reported by Andrew@Nanvaent]
+	* Removed Beek's expand_all_defines hack introduced in v22.2a3.
+	  This caused an undesirable compat buster from older versions
+	  of MudOS.  Instead, fixed macro expansion to work according
+	  to the ANSI C standard -- almost.  The only major difference
+	  now is that comments are not considered whitespace everywhere
+	  that they should be.
+
+Sat Sep  2 09:40:38 2000 (marius@mudos.org (Marius))
+	* raised patchlevel to v22.2b4
+	* updated with respect to v22.1pre4
+	* #40: Fixed compilation error in add_action.c [reported by
+	  Loriel@LimaBean]
+	* Don't call the first heart_beat until after saving the
+	  initial error context, otherwise an error in heart_beats
+	  or call_outs (set by preloads) will cause a crash.
+	* #47: When using OLD_ED with a broken client that does not
+	  send CRLF for end of line, don't inadvertantly strip off the
+	  first character of the next command if there are multiple
+	  commands in the input buffer [reportd by fchen@uno.edu]
+	* #45: Added 'an' as a special word equivilent to 'a' and 'any'
+	  Also, change ordinal for 'a', 'an' and 'any' to 1 from -1.
+	  I'm not sure of the original intent in supporting -1, but the
+	  end result is the same -- at least it's supposed to be.  1
+	  works, -1 doesn't.  [reported by Zifnab@Red Dragon]
+
+Mon Aug 28 08:16:50 2000 (marius@mudos.org (Marius))
+	* raised patchlevel to v22.2b3
+	* updated with respect to v22.1pre3
+	* #15: Picked up the fix from v22.1pre2 that was missed in the
+	  last revision for some reason
+	* #17, #26: Removed a chunk of old dead code for binaries
+	  support that has been obsoleted since function tables are
+	  always sorted and compressed now.  Other new code had since
+	  been written assuming this and not handling the (unnecessary)
+	  binaries cases, causing the driver to crash in certain
+	  instances [reported by ackers@coolnet.net, Beyond@Lima]
+	* #30: If an object has had its program replace, mark the
+	  string that holds its name.  Also make sure that it gets
+	  freed properly when the object is deallocated [reported by
+	  Uranus]
+
+Wed Aug 23 05:08:05 2000 (marius@mudos.org (Marius))
+	* raised patchlevel to v22.2b2
+	* updated with respect to v22.1pre2
+	* #4: fixed a problem with using the third defined class in an
+	  object as an argument to a function getting treated
+	  incorrectly as void [reported by Loriel@LimaBean]
+	* #8: Fix compile problem when both DEBUGMALLOC_EXTENSIONS and
+	  PACKAGE_UIDS are defined [reported by Skullslayer@RoD]
+	* #16: With COMPAT_32 defined, '&' is now a synonym for 'ref'
+	  everywhere that is appropriate [reported by Uranus]
+	* #19: Made fixes so that RUNTIME_LOADING will work on FreeBSD
+	  [problem reported by Uranus]
+	* #23: Corrected arguments passed to compile_object() master
+	  apply when cloning a virtual object [reported by Uranus]
+
+Sun Aug 13 22:25:28 CDT 2000 (marius@mudos.org (Marius))
+	* raised patchlevel to v22.2b1
+	* updated with respect to v22.1pre1
+	* fixed a memory leak with MUD port external ports leaking
+	  ref counted objects received (arrays, mappings, etc.)
+	* fixed up check_memory() code to do proper checks:
+	  . mark_apply_low_cache now bumps extra_ref for each
+	    cache entry's oprogp and progp as appropriate
+	  . dangling object list is checked for missing objects,
+	    and if found, a more appropriate error is reported.
+	  . TAG_SIMULS is used for master applies, so changed the
+	    test in md.c to 3 rather than 2 uses for this tag.
+	  . added marks to objects on the command_giver stack
+	* PACKAGE_DB compiles again
+	* properly free an added reference when establishing a new
+	  user connection after APPLY_CONNECT is called.
+	* fixed a memory leak when updating the master object.  The
+	  master apply table reallocated memory without freeing the
+	  previous table.
+	* 'void' is now acceptable as an argument list for a function
+	  that takes no arguments.  If used, it must be the first and
+	  only argument, and it must not be named.  Also updated the
+	  testsuite to handle this.
+	* COMPAT BUSTER: SERVER_IP is no longer supported.  Use the
+	  runtime config option 'mud ip' to bind to a specific address.
+	  addr_server and portbind have both been updated to accept a
+	  parameter to specify a dotted decimal ip address to bind to.
+	  Examples:
+	  . portbind -i 192.168.1.1 -p 4000
+	  . addr_server 7334 192.168.1.1
+	* COMPAT BUSTER: FD6_KIND and FD6_PORT are no longer supported
+	  as compile time options.  Set 'fd6 kind' and 'fd6 port' in
+	  your config file to use them.  You may use 'telnet', 'mud',
+	  'binary' or 'ascii' as the kind.  Additionally, you must now
+	  always specify -p to portbind to specify the port to bind to.
+	* fixed various crashers in handling eof conditions while
+	  compiling, particularly in unexpected locations (comment,
+	  array block, text block, etc.)
+	* when DEBUGMALLOC_EXTENSIONS is enabled, free up some compiler
+	  scribble space that is normally reused (cleans up errors that
+	  check_memory() reports)
+	* fixed a crasher involving BINARIES being defined, functions
+	  being inherited and prototypes, and all sorts of other weird
+	  assorted nonsense [reported by Mystic]
+
+-----------------------------------------------------------------------
+Wed Aug 30 18:58:56 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1pre4
 	* Backported a fix from v22.2a24 for add_slash() to not prepend
-	  a slash when the filename is '<function>'
+	a slash when the filename is '<function>'
 	* #42: Added \n to the two new error messages introduced in
 	  v22.1pre3
 	* #34: Fixed another instance of regular expression memory
@@ -13,7 +268,7 @@ Wed Aug 30 18:58:56 2000 (mmessier@prilnari.com (Marius))
 	* #30: Fixed a problem with marking references for objects in
 	  sentences with get_char() and input_to() [reported by Uranus]
 
-Mon Aug 28 08:11:42 2000 (mmessier@prilnari.com (Marius))
+Mon Aug 28 08:11:42 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1pre3
 	* Check for INADDR_NONE is now done in edit_source rather than
 	  on os specific check in portability.h.  [suggested by Beek]
@@ -21,62 +276,62 @@ Mon Aug 28 08:11:42 2000 (mmessier@prilnari.com (Marius))
 	  passed to be sent (i.e., socket_write(fd, "")) [reported by
 	  Uranus]
 	* #33: Fixed a crasher when destructing command_giver from a fp
-	  set to notify_fail was executed for command failure.
-	* #28: Do not call LPC code when a too deep recursion or eval
-	  cost exceeded error is raised.  Especially in the former
-	  case, there is no stack space to run the code and it results
-	  in an unstable environment after the error is supposedly
-	  recovered from.  LPC code means the mudlib error handler or
-	  the object_name() apply from (s)printf().
-	  [reported by Pinkfish@Discworld]
-	* #35: Do not allow lfun or functional binding after to an
-	  object after replace_program() has been called on it, but
-	  before the current thread of execution has completed.
-	  Prevents bad code from creating dangling references to
-	  programs [reported by Skullslayer@RoD]
-	* Backport from v22.2a27 fixes to contrib efun replaceable() so
-	  that it works properly.
-	* #34: sscanf() efun was leaking memory in some cases if using
-	  regular expressions [reported by Skullslayer@RoD]
-	* #32, #38: Fixed a crasher problem with add_action weirdness.
-	  Involves using disable_commands() or destructing an object 
-	  in the sentence chain for command_giver and returning 1 from
-	  the function.  [reported by Loriel@NS and Uranus]
+          set to notify_fail was executed for command failure.
+        * #28: Do not call LPC code when a too deep recursion or eval
+          cost exceeded error is raised.  Especially in the former
+          case, there is no stack space to run the code and it results
+          in an unstable environment after the error is supposedly
+          recovered from.  LPC code means the mudlib error handler or
+          the object_name() apply from (s)printf().
+          [reported by Pinkfish@Discworld]
+        * #35: Do not allow lfun or functional binding after to an
+          object after replace_program() has been called on it, but
+          before the current thread of execution has completed.
+          Prevents bad code from creating dangling references to
+          programs [reported by Skullslayer@RoD]
+        * Backport from v22.2a27 fixes to contrib efun replaceable() so
+          that it works properly.
+        * #34: sscanf() efun was leaking memory in some cases if using
+          regular expressions [reported by Skullslayer@RoD]
+        * #32, #38: Fixed a crasher problem with add_action weirdness.
+          Involves using disable_commands() or destructing an object
+          in the sentence chain for command_giver and returning 1 from
+          the function.  [reported by Loriel@NS and Uranus]
 
-Wed Aug 23 04:59:44 2000 (mmessier@prilnari.com (Marius))
-	* raised patchlevel to v22.1pre2
-	* #1: fixed compilation error on Solaris where INADDR_NONE is
-	  not defined in system headers [reported by Dvarsk@Nightmare]
-	* Fix a braindead check in socket_write_select_handler() for
-	  S_LINKDEAD.  Also properly close and flag the socket as
-	  linkdead in socket_write() when an error occurs in sending.
-	  [reported by Eddy@MidnightSun]
-	* #7: Fix a crasher on some platforms in debug_message() where
-	  variable arguments are reset between calls to vfprintf()
-	  [fix from reetnem@bigfoot.com]
-	* #10: Remove completely (brain)dead code in the socket_accept
-	  efun that called gethostbyaddr on the accepted socket, which
-	  would cause the driver to possibly block unacceptably.  This
-	  information was then never used anywhere at all again.
-	  [reported by Eddy@MidnightSun]
-	* #11: Make sure the accepted socket is set to be nonblocking
-	  in the address server [reported by Eddy@MidnightSun]
-	* #5: Fixed a memory leak when LPC optimization was turned on
-	  using either #pragma optimize or by setting PRAGMA_OPTIMIZE
-	  in DEFAULT_PRAGMAS in local_options/options.h [reported by
-	  Skullslayer@RoD]
-	* #15: Fixed a crasher in implode() efun with some older
-	  versions of gcc (reported specifically against 2.7.2.3).
-	  Compiler optimization error [reported by Mystic]
-	* #2: children(), livings(), and objects() have been rewritten
-	  to better handle destructed objects and things of that
-	  nature.  Particularly objects().
-	* #22: Backport a fix from v22.2a27 to make the (s)printf efun
-	  re-entrant.  Allows the no-(s)printf in object_name() master
-	  apply restriction to be lifted.  Fixes error handler crashes
-	  [reported by Zifnab@Red Dragon]
+Wed Aug 23 04:59:44 2000 (marius@mudos.org (Marius))
+        * raised patchlevel to v22.1pre2
+        * #1: fixed compilation error on Solaris where INADDR_NONE is
+          not defined in system headers [reported by Dvarsk@Nightmare]
+        * Fix a braindead check in socket_write_select_handler() for
+          S_LINKDEAD.  Also properly close and flag the socket as
+          linkdead in socket_write() when an error occurs in sending.
+          [reported by Eddy@MidnightSun]
+        * #7: Fix a crasher on some platforms in debug_message() where
+          variable arguments are reset between calls to vfprintf()
+          [fix from reetnem@bigfoot.com]
+        * #10: Remove completely (brain)dead code in the socket_accept
+          efun that called gethostbyaddr on the accepted socket, which
+          would cause the driver to possibly block unacceptably.  This
+          information was then never used anywhere at all again.
+          [reported by Eddy@MidnightSun]
+        * #11: Make sure the accepted socket is set to be nonblocking
+          in the address server [reported by Eddy@MidnightSun]
+        * #5: Fixed a memory leak when LPC optimization was turned on
+          using either #pragma optimize or by setting PRAGMA_OPTIMIZE
+          in DEFAULT_PRAGMAS in local_options/options.h [reported by
+          Skullslayer@RoD]
+        * #15: Fixed a crasher in implode() efun with some older
+          versions of gcc (reported specifically against 2.7.2.3).
+          Compiler optimization error [reported by Mystic]
+        * #2: children(), livings(), and objects() have been rewritten
+          to better handle destructed objects and things of that
+          nature.  Particularly objects().
+        * #22: Backport a fix from v22.2a27 to make the (s)printf efun
+          re-entrant.  Allows the no-(s)printf in object_name() master
+          apply restriction to be lifted.  Fixes error handler crashes
+          [reported by Zifnab@Red Dragon]
 
-Wed Aug 13 22:03:44 CDT 2000 (mmessier@prilnari.com (Marius))
+Wed Aug 13 22:03:44 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1pre1
 	* patched a memory leak with MUD type LPC sockets
 	  leaking arrays/strings/mappings/classes received.
@@ -97,7 +352,7 @@ Wed Aug 13 22:03:44 CDT 2000 (mmessier@prilnari.com (Marius))
 	* more fixes to socket efuns to help prevent hangs on FreeBSD
 	  when a socket closes unexpectedly.
 
-Sat Jul 29 21:30:19 CDT 2000 (mmessier@prilnari.com (Marius))
+Sat Jul 29 21:30:19 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1b32
 	* fixed a crasher with reclaim_objects() and function
 	  pointers introduced in b31 [reported by Skullslayer@RoD]
@@ -113,7 +368,7 @@ Sat Jul 29 21:30:19 CDT 2000 (mmessier@prilnari.com (Marius))
 	* display a more appropriate error message when the global include
 	  file cannot be included for some reason [reported by Mystic]
 
-Fri Jul  7 20:43:00 CDT 2000 (mmessier@prilnari.com (Marius))
+Fri Jul  7 20:43:00 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1b31
 	* objectp() efun now returns 0 for a destructed object
 	  [reported by Ehan@MedievalTimes]
@@ -137,7 +392,7 @@ Fri Jul  7 20:43:00 CDT 2000 (mmessier@prilnari.com (Marius))
 	* fixed crasher when MAX_NUM_OBJECTS objects are found by the
 	  parser using plural modifier [reported by Dvarsk@Nightmare]
 
-Tue Jul  4 19:36:09 CDT 2000 (mmessier@prilnari.com (Marius))
+Tue Jul  4 19:36:09 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1b30
 	* virtual objects can be cloned again
 	* moved STACK_INC into interpret.h from interpret.c so
@@ -160,7 +415,7 @@ Tue Jul  4 19:36:09 CDT 2000 (mmessier@prilnari.com (Marius))
 	  caused by a bad call to free_object() when dereferencing
 	  a class member that held a destructed object
 
-Sat Jul  1 13:14:32 CDT 2000 (mmessier@prilnari.com (Marius))
+Sat Jul  1 13:14:32 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1b29
 	* various fixes from Alaron@RetroMud:
 	  . make db.c compile
@@ -190,7 +445,7 @@ Sat Jul  1 13:14:32 CDT 2000 (mmessier@prilnari.com (Marius))
 	  undefined class name and attempting to create an instance
 	  of an undefined class with new()
 
-Tue Jun 20 18:40:18 CDT 2000 (mmessier@prilnari.com (Marius))
+Tue Jun 20 18:40:18 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1b28
 	* fixed the changes made to ed in the last revision.  Turrican's
 	  patches were merged in wrong.
@@ -212,7 +467,7 @@ Tue Jun 20 18:40:18 CDT 2000 (mmessier@prilnari.com (Marius))
 	* raise class redefinition error only if member names and/or types differ
 	  [reported by Pinkfish@Discworld]
 
-Thu Jun 15 17:07:32 CDT 2000 (mmessier@prilnari.com (Marius))
+Thu Jun 15 17:07:32 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1b27
 	* if ARGUMENTS_IN_TRACEBACK or LOCALS_IN_TRACEBACK is defined, save
 	  error context in dump_trace() so as to maintain a consistent state if
@@ -243,7 +498,7 @@ Thu Jun 15 17:07:32 CDT 2000 (mmessier@prilnari.com (Marius))
 	* fix another crasher returning from a catch { ... } block [reported by
 	  Mystic]
 
-Mon Jun 12 08:46:33 CDT 2000 (mmessier@prilnari.com (Marius))
+Mon Jun 12 08:46:33 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1b26
 	* don't shut down the driver if a new connection fails to set
 	  non-blocking on linux, just dump the connection and move on
@@ -266,7 +521,7 @@ Mon Jun 12 08:46:33 CDT 2000 (mmessier@prilnari.com (Marius))
 	* correct index to local variable for warning about unused local
 	  variables [reported by Andrew@Nanvaent]
 
-Mon Jun  5 13:05:02 CDT 2000 (mmessier@prilnari.com (Marius))
+Mon Jun  5 13:05:02 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1b25
 	* several fixes to the terminal_colour() contrib efun:
 	  . bad stack/crash when string contains only %^'s
@@ -294,7 +549,7 @@ Mon Jun  5 13:05:02 CDT 2000 (mmessier@prilnari.com (Marius))
 	* added exceptions for plum and virus in the contrib efun pluralize().
 	  [reported by Avenger@AtP]
 
-Wed May 24 12:00:20 CDT 2000 (mmessier@prilnari.com (Marius))
+Wed May 24 12:00:20 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1b24
 	* updated contact information for reporting bugs
 	* remove undefined status with += when rhs is real (completes

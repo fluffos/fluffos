@@ -49,6 +49,7 @@ static char sccsid[] = "@(#)malloc.c	5.11 (Berkeley) 2/23/91";
 #define IN_MALLOC_WRAPPER
 #define NO_OPCODES
 #include "std.h"
+#include "main.h"
 
 #undef NULL
 #define	NULL 0

@@ -4,6 +4,7 @@
  * author: erikkay@mit.edu
  * last modified: July 4, 1994 [robo]
  * Mar 26, 1995: edited heavily by Beek
+ * Aug 29, 1998: modified by Gorta
  */
 
 #include "std.h"
@@ -120,7 +121,8 @@ static int scan_config_line P3(char *, fmt, void *, dest, int, required)
     return 1;
 }
 
-char *process_config_string(char *str) {
+#if 0
+static char *process_config_string(char *str) {
     char *p = str;
     char *q;
     int n;
@@ -136,6 +138,7 @@ char *process_config_string(char *str) {
     q[1] = 0;
     return alloc_cstring(p, "process_config_string()");
 }
+#endif
 
 void set_defaults P1(char *, filename)
 {
@@ -224,6 +227,26 @@ void set_defaults P1(char *, filename)
     scan_config_line("default fail message : %[^\n]", tmp, 0);
     CONFIG_STR(__DEFAULT_FAIL_MESSAGE__) = alloc_cstring(tmp, "config file: dfm");
 
+    scan_config_line("mud ip : %[^\n]", tmp, 0);
+    CONFIG_STR(__MUD_IP__) = alloc_cstring(tmp, "config file: mi");
+
+    if (scan_config_line("fd6 kind : %[^\n]", tmp, 0)) {
+	if (!strcasecmp(tmp, "telnet"))
+	    FD6_KIND = PORT_TELNET;
+	else if (!strcasecmp(tmp, "mud"))
+	    FD6_KIND = PORT_MUD;
+	else if (!strcasecmp(tmp, "ascii"))
+	    FD6_KIND = PORT_ASCII;
+	else if (!strcasecmp(tmp, "binary"))
+	    FD6_KIND = PORT_BINARY;
+	else {
+	    fprintf(stderr, "Unknown port type for fd6 kind.  fd6 support disabled.\n");
+	    FD6_KIND = PORT_UNDEFINED;
+	}
+    } else {
+	FD6_KIND = PORT_UNDEFINED;
+    }
+
     if (scan_config_line("port number : %d\n", &CONFIG_INT(__MUD_PORT__), 0)) {
 	external_port[0].port = PORTNO;
 	external_port[0].kind = PORT_TELNET;
@@ -232,6 +255,8 @@ void set_defaults P1(char *, filename)
     
     scan_config_line("address server port : %d\n",
 		     &CONFIG_INT(__ADDR_SERVER_PORT__), 0);
+
+    scan_config_line("fd6 port : %d\n", &CONFIG_INT(__FD6_PORT__), 0);
 
     scan_config_line("time to clean up : %d\n",
 		     &CONFIG_INT(__TIME_TO_CLEAN_UP__), 1);
@@ -288,8 +313,8 @@ void set_defaults P1(char *, filename)
     /* check for ports */
     if (port_start == 1) {
 	if (scan_config_line("external_port_1 : %[^\n]", tmp, 0)) {
-	    int p = CONFIG_INT(__MUD_PORT__);
-	    fprintf(stderr, "Warning: external_port_1 already defined to be 'telnet %i' by the line\n    'port number : %i'; ignoring the line 'external_port_1 : %s'\n", p, p, tmp);
+	    int port = CONFIG_INT(__MUD_PORT__);
+	    fprintf(stderr, "Warning: external_port_1 already defined to be 'telnet %i' by the line\n    'port number : %i'; ignoring the line 'external_port_1 : %s'\n", port, port, tmp);
 	}
     }
     for (i = port_start; i < 5; i++) {
@@ -311,7 +336,11 @@ void set_defaults P1(char *, filename)
 		} else
 		if (!strcmp(kind, "ascii"))
 		    external_port[i].kind = PORT_ASCII;
-		else {
+		else
+		if (!strcmp(kind, "MUD"))
+		    external_port[i].kind = PORT_MUD;
+		else
+		    {
 		    fprintf(stderr, "Unknown kind of external port: %s\n",
 				  kind);
 		    exit(-1);
@@ -324,7 +353,7 @@ void set_defaults P1(char *, filename)
     }		    
 #ifdef PACKAGE_EXTERNAL
     /* check for commands */
-    for (i = 0; i < 5; i++) {
+    for (i = 0; i < NUM_EXTERNAL_CMDS; i++) {
 	sprintf(kind, "external_cmd_%i : %%[^\n]", i + 1);
 	if (scan_config_line(kind, tmp, 0))
 	    external_cmd[i] = alloc_cstring(tmp, "external cmd");

@@ -9,5 +9,6 @@
 #define ERR_ALLOCATED		6
 #define ERR_THERE_IS_NO		7
 #define ERR_BAD_MULTIPLE	8
+#define ERR_MANY_PATHS    9
 
 #endif

@@ -1,1 +1,1 @@
-#define PATCH_LEVEL "v22.1"
+#define PATCH_LEVEL "v22.2b12"

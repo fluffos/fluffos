@@ -9,7 +9,6 @@
 #define FP_G_VAR              6
 #define FP_L_VAR              7
 #define FP_ANONYMOUS          8
-#define FP_THIS_OBJECT      0x10
 
 /* additional flags */
 #define FP_MASK             0x0f

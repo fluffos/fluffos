@@ -29,11 +29,15 @@ void debug_level_clear PROT((char *));
 #define debug(x,y)
 #endif
 
+/* Would be nice to have tons of these; should go to arbitrary bitsets */
 #define DBG_call_out	 	1
 #define DBG_addr_server		2
 #define DBG_d_flag		4
 #define DBG_connections		8
 #define DBG_mapping		16
 #define DBG_sockets		32
+#define DBG_comp_func_tab	64
+#define DBG_LPC			128
+#define DBG_LPC_line		256
 
 #endif

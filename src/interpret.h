@@ -92,10 +92,15 @@ typedef struct {
 typedef struct error_context_s {
     jmp_buf context;
     control_stack_t *save_csp;
-    object_t *save_command_giver; 
     svalue_t *save_sp;
+    object_t **save_cgsp;
     struct error_context_s *save_context;
 } error_context_t;
+
+typedef struct {
+    function_t *func;
+    int index;
+} function_lookup_info_t;
 
 #define IS_ZERO(x) (!(x) || (((x)->type == T_NUMBER) && ((x)->u.number == 0)))
 #define IS_UNDEFINED(x) (!(x) || (((x)->type == T_NUMBER) && \
@@ -140,7 +145,7 @@ typedef struct error_context_s {
 	sp->type = T_STRING; \
         sp->u.string = pss_res; \
         sp->subtype = STRING_MALLOC; \
-    )
+     )
 
 /* basically, string + string; faster than using extend b/c of SVALUE_STRLEN */
 #define SVALUE_STRING_JOIN(x, y, z) \
@@ -263,11 +268,19 @@ extern svalue_t const0;
 extern svalue_t const1;
 extern svalue_t const0u;
 extern svalue_t apply_ret_value;
+extern ref_t *global_ref_list;
+extern int lv_owner_type;
+extern refed_t *lv_owner;
+
+void kill_ref PROT((ref_t *));
+ref_t *make_ref PROT((void));
 
 /* with LPC_TO_C off, these are defines using eval_instruction */
 #ifdef LPC_TO_C
 void call_program PROT((program_t *, POINTER_INT));
 #endif
+void init_interpreter PROT((void));
+void call_direct PROT((object_t *, int, int, int));
 void eval_instruction PROT((char *p));
 INLINE void assign_svalue PROT((svalue_t *, svalue_t *));
 INLINE void assign_svalue_no_free PROT((svalue_t *, svalue_t *));
@@ -304,7 +317,8 @@ INLINE void pop_stack PROT((void));
 INLINE void pop_n_elems PROT((int));
 INLINE void pop_2_elems PROT((void));
 INLINE void pop_3_elems PROT((void));
-INLINE compiler_function_t *setup_inherited_frame PROT((int));
+INLINE function_t *setup_inherited_frame PROT((int));
+INLINE program_t *find_function_by_name PROT((object_t *, char *, int *, int *));
 char *function_name PROT((program_t *, int));
 void remove_object_from_stack PROT((object_t *));
 void setup_fake_frame PROT((funptr_t *));
@@ -345,12 +359,13 @@ void reset_machine PROT((int));
 void unlink_string_svalue PROT((svalue_t *));
 void copy_lvalue_range PROT((svalue_t *));
 void assign_lvalue_range PROT((svalue_t *));
+void debug_perror PROT((char *, char *));
 
 #ifndef NO_SHADOWS
 int validate_shadowing PROT((object_t *));
 #endif
 
-#ifdef LAZY_RESETS
+#if !defined(NO_RESETS) && defined(LAZY_RESETS)
 void try_reset PROT((object_t *));
 #endif
 
@@ -359,7 +374,7 @@ void restore_context PROT((error_context_t *));
 int save_context PROT((error_context_t *));
 
 void pop_control_stack PROT((void));
-INLINE compiler_function_t *setup_new_frame PROT((int));
+INLINE function_t *setup_new_frame PROT((int));
 INLINE void push_control_stack PROT((int));
 
 void break_point PROT((void));

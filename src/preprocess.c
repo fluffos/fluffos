@@ -18,7 +18,7 @@ static void handle_cond PROT((int));
 static defn_t *defns[DEFHASH];
 static ifstate_t *iftop = 0;
 
-defn_t *lookup_definition P1(char *, s)
+static defn_t *lookup_definition P1(char *, s)
 {
     defn_t *p;
     int h;
@@ -43,12 +43,25 @@ defn_t *lookup_define P1(char *, s)
 static void add_define P3(char *, name, int, nargs, char *, exps)
 {
     defn_t *p = lookup_definition(name);
-    int h;
+    int h, len;
+
+    /* trim off leading and trailing whitespace */
+    while (uisspace(*exps)) exps++;
+    for (len = strlen(exps);  len && uisspace(exps[len - 1]);  len--);
+    if (*exps == '#' && *(exps + 1) == '#') {
+	yyerror("'##' at start of macro definition");
+	return;
+    }
+    if (len > 2 && *(exps + len - 2) == '#' && *(exps + len - 1) == '#') {
+	yyerror("'##' at end of macro definition");
+	return;
+    }
 
     if (p) {
 	if (p->flags & DEF_IS_UNDEFINED) {
-	    p->exps = (char *)DREALLOC(p->exps, strlen(exps) + 1, TAG_COMPILER, "add_define: redef");
-	    strcpy(p->exps, exps);
+	    p->exps = (char *)DREALLOC(p->exps, len + 1, TAG_COMPILER, "add_define: redef");
+	    memcpy(p->exps, exps, len);
+	    p->exps[len] = 0;
 	    p->flags = 0;
 	    p->nargs = nargs;
 	} else {
@@ -62,8 +75,9 @@ static void add_define P3(char *, name, int, nargs, char *, exps)
 		sprintf(buf, "redefinition of #define %s\n", name);
 		yywarn(buf);
 		
-		p->exps = (char *)DREALLOC(p->exps, strlen(exps) + 1, TAG_COMPILER, "add_define: redef");
-		strcpy(p->exps, exps);
+		p->exps = (char *)DREALLOC(p->exps, len + 1, TAG_COMPILER, "add_define: redef");
+		memcpy(p->exps, exps, len);
+		p->exps[len] = 0;
 		p->nargs = nargs;
 	    }
 #ifndef LEXER
@@ -74,8 +88,9 @@ static void add_define P3(char *, name, int, nargs, char *, exps)
 	p = ALLOCATE(defn_t, TAG_COMPILER, "add_define: def");
 	p->name = (char *) DXALLOC(strlen(name) + 1, TAG_COMPILER, "add_define: def name");
 	strcpy(p->name, name);
-	p->exps = (char *) DXALLOC(strlen(exps) + 1, TAG_COMPILER, "add_define: def exps");
-	strcpy(p->exps, exps);
+	p->exps = (char *) DXALLOC(len + 1, TAG_COMPILER, "add_define: def exps");
+	memcpy(p->exps, exps, len);
+	p->exps[len] = 0;
 	p->flags = 0;
 	p->nargs = nargs;
 	h = defhash(name);

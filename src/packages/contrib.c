@@ -1,4 +1,4 @@
-#define SUPRESS_COMPILER_INLINES
+#define SUPPRESS_COMPILER_INLINES
 #ifdef LATTICE
 #include "/lpc_incl.h"
 #include "/comm.h"
@@ -10,6 +10,7 @@
 #include "/main.h"
 #include "/eoperators.h"
 #include "/simul_efun.h"
+#include "/add_action.h"
 #else
 #include "../lpc_incl.h"
 #include "../comm.h"
@@ -20,7 +21,9 @@
 #include "../compiler.h"
 #include "../main.h"
 #include "../eoperators.h"
+#include "../efun_protos.h"
 #include "../simul_efun.h"
+#include "../add_action.h"
 #endif
 
 /* should be done in configure */
@@ -39,7 +42,7 @@ void f_named_livings() {
     int i;
     int nob;
 #ifdef F_SET_HIDE
-    int apply_valid_hide, hide_is_valid = 0;
+    int apply_valid_hide, display_hidden = 0;
 #endif
     object_t *ob, **obtab;
     array_t *vec;
@@ -59,9 +62,9 @@ void f_named_livings() {
 	    if (ob->flags & O_HIDDEN) {
 		if (apply_valid_hide) {
 		    apply_valid_hide = 0;
-		    hide_is_valid = valid_hide(current_object);
+		    display_hidden = valid_hide(current_object);
 		}
-		if (hide_is_valid)
+		if (!display_hidden)
 		    continue;
 	    }
 #endif
@@ -141,7 +144,7 @@ f_store_variable PROT((void)) {
     svalue_t *sv;
     unsigned short type;
     
-    idx = find_global_variable(current_object->prog, (sp-1)->u.string, &type);
+    idx = find_global_variable(current_object->prog, (sp-1)->u.string, &type, 0);
     if (idx == -1)
 	error("No variable named '%s'!\n", (sp-1)->u.string);
     sv = &current_object->variables[idx];
@@ -158,7 +161,7 @@ f_fetch_variable PROT((void)) {
     svalue_t *sv;
     unsigned short type;
     
-    idx = find_global_variable(current_object->prog, sp->u.string, &type);
+    idx = find_global_variable(current_object->prog, sp->u.string, &type, 0);
     if (idx == -1)
 	error("No variable named '%s'!\n", sp->u.string);
     sv = &current_object->variables[idx];
@@ -193,9 +196,9 @@ f_set_prompt PROT((void)) {
 #ifdef F_COPY
 static int depth;
 
-void deep_copy_svalue PROT((svalue_t *, svalue_t *));
+static void deep_copy_svalue PROT((svalue_t *, svalue_t *));
 
-array_t *deep_copy_array P1( array_t *, arg ) {
+static array_t *deep_copy_array P1( array_t *, arg ) {
     array_t *vec;
     int i;
     
@@ -206,7 +209,7 @@ array_t *deep_copy_array P1( array_t *, arg ) {
     return vec;
 }
 
-array_t *deep_copy_class P1(array_t *, arg) {
+static array_t *deep_copy_class P1(array_t *, arg) {
     array_t *vec;
     int i;
     
@@ -217,28 +220,28 @@ array_t *deep_copy_class P1(array_t *, arg) {
     return vec;
 }
 
-int doCopy P3( mapping_t *, map, mapping_node_t *, elt, mapping_t *, dest) {
-    svalue_t *sp;
+static int doCopy P3( mapping_t *, map, mapping_node_t *, elt, mapping_t *, dest) {
+    svalue_t *sv;
     
-    sp = find_for_insert(dest, &elt->values[0], 1);
-    if (!sp) {
+    sv = find_for_insert(dest, &elt->values[0], 1);
+    if (!sv) {
 	mapping_too_large();
 	return 1;
     }
     
-    deep_copy_svalue(&elt->values[1], sp);
+    deep_copy_svalue(&elt->values[1], sv);
     return 0;
 }
 
-mapping_t *deep_copy_mapping P1( mapping_t *, arg ) {
+static mapping_t *deep_copy_mapping P1( mapping_t *, arg ) {
     mapping_t *map;
     
     map = allocate_mapping( 0 ); /* this should be fixed.  -Beek */
-    mapTraverse( arg, (int (*)()) doCopy, map);
+    mapTraverse( arg, (int (*)()) doCopy, map); /* Not horridly efficient either */
     return map;
 }
 
-void deep_copy_svalue P2(svalue_t *, from, svalue_t *, to) {
+static void deep_copy_svalue P2(svalue_t *, from, svalue_t *, to) {
     switch (from->type) {
     case T_ARRAY:
 	depth++;
@@ -295,8 +298,7 @@ void f_copy PROT((void))
 void f_functions PROT((void)) {
     int i, j, num, index;
     array_t *vec, *subvec;
-    runtime_function_u *func_entry;
-    compiler_function_t *funp;
+    function_t *funp;
     program_t *prog;
     int flag = (sp--)->u.number;
     unsigned short *types;
@@ -308,7 +310,7 @@ void f_functions PROT((void)) {
 	load_ob_from_swap(sp->u.ob);
 
     progp = sp->u.ob->prog;
-    num = progp->num_functions_total;
+    num = progp->num_functions_defined + progp->last_inherited;
     if (progp->num_functions_defined &&
 	progp->function_table[progp->num_functions_defined-1].name[0]
 	== APPLY___INIT_SPECIAL_CHAR)
@@ -318,18 +320,33 @@ void f_functions PROT((void)) {
     i = num;
     
     while (i--) {
+	unsigned short low, high, mid;
+	
 	prog = sp->u.ob->prog;
 	index = i;
-	func_entry = FIND_FUNC_ENTRY(prog, index);
 
-	/* Walk up the inheritance tree to the real definition */
-	while (prog->function_flags[index] & FUNC_INHERITED) {
-	    prog = prog->inherit[func_entry->inh.offset].prog;
-	    index = func_entry->inh.function_index_offset;
-	    func_entry = FIND_FUNC_ENTRY(prog, index);
+	/* Walk up the inheritance tree to the real definition */	
+	if (prog->function_flags[index] & FUNC_ALIAS) {
+	    index = prog->function_flags[index] & ~FUNC_ALIAS;
 	}
+	
+	while (prog->function_flags[index] & FUNC_INHERITED) {
+	    low = 0;
+	    high = prog->num_inherited -1;
+	    
+	    while (high > low) {
+		mid = (low + high + 1) >> 1;
+		if (prog->inherit[mid].function_index_offset > index)
+		    high = mid -1;
+		else low = mid;
+	    }
+	    index -= prog->inherit[low].function_index_offset;
+	    prog = prog->inherit[low].prog;
+	}
+    
+	index -= prog->last_inherited;
 
-	funp = prog->function_table + func_entry->def.f_index;
+	funp = prog->function_table + index;
 
 	if (flag) {
 	    if (prog->type_start && prog->type_start[index] != INDEX_START_NONE)
@@ -338,7 +355,7 @@ void f_functions PROT((void)) {
 		types = 0;
 
 	    vec->item[i].type = T_ARRAY;
-	    subvec = vec->item[i].u.arr = allocate_empty_array(3 + func_entry->def.num_arg);
+	    subvec = vec->item[i].u.arr = allocate_empty_array(3 + funp->num_arg);
 	    
 	    subvec->item[0].type = T_STRING;
 	    subvec->item[0].subtype = STRING_SHARED;
@@ -346,14 +363,14 @@ void f_functions PROT((void)) {
 
 	    subvec->item[1].type = T_NUMBER;
 	    subvec->item[1].subtype = 0;
-	    subvec->item[1].u.number = func_entry->def.num_arg;
+	    subvec->item[1].u.number = funp->num_arg;
 
 	    get_type_name(buf, end, funp->type);
 	    subvec->item[2].type = T_STRING;
 	    subvec->item[2].subtype = STRING_SHARED;
 	    subvec->item[2].u.string = make_shared_string(buf);
 
-	    for (j = 0; j < func_entry->def.num_arg; j++) {
+	    for (j = 0; j < funp->num_arg; j++) {
 		if (types) {
 		    get_type_name(buf, end, types[j]);
 		    subvec->item[3 + j].type = T_STRING;
@@ -471,7 +488,7 @@ void f_heart_beats PROT((void)) {
 #define TC_FIRST_CHAR '%'
 #define TC_SECOND_CHAR '^'
 
-int at_end(int i, int imax, int z, int *lens) {
+static int at_end(int i, int imax, int z, int *lens) {
     if (z + 1 != lens[i])
 	return 0;
     for (i++; i < imax; i++) {
@@ -504,8 +521,10 @@ f_terminal_colour PROT((void))
     cp = instr = (sp-1)->u.string;
     do {
 	cp = strchr(cp, TC_FIRST_CHAR);
-	if (cp) {
-	    if (cp[1] == TC_SECOND_CHAR) {
+	if (cp) 
+	{
+	    if (cp[1] == TC_SECOND_CHAR)
+	    {
 		savestr = string_copy(instr, "f_terminal_colour");
 		cp = savestr + ( cp - instr );
 		instr = savestr;
@@ -823,7 +842,7 @@ f_terminal_colour PROT((void))
 /* number to chop is added */
 #define PLURAL_CHOP    2
 
-char *pluralize P1(char *, str) {
+static char *pluralize P1(char *, str) {
     char *pre, *rel, *end;
     char *p, *of_buf;
     int of_len = 0, plen, slen;
@@ -912,7 +931,7 @@ char *pluralize P1(char *, str) {
 	break;
     case 'D':
     case 'd':
-	if (!strcasecmp(rel + 1, "atum")) {
+	if (!strcasecmp(rel + 1, "datum")) {
 	    found = PLURAL_CHOP + 2;
 	    suffix = "a";
 	} else
@@ -941,7 +960,7 @@ char *pluralize P1(char *, str) {
 	    found = PLURAL_SAME;
 	    break;
 	}
-	if (!strcasecmp(rel + 1, "orum")) {
+	if (!strcasecmp(rel + 1, "forum")) {
 	    found = PLURAL_CHOP + 2;
 	    suffix = "a";
 	    break;
@@ -985,6 +1004,10 @@ char *pluralize P1(char *, str) {
 	    found = PLURAL_CHOP + 4;
 	    suffix = "ice";
 	}
+        if (!strcasecmp(rel + 1, "otus")) {
+            found = PLURAL_SUFFIX;
+            break;
+        }
 	break;
     case 'M':
     case 'm':
@@ -1011,13 +1034,6 @@ char *pluralize P1(char *, str) {
 	if (!strcasecmp(rel + 1, "x")) {
 	    found = PLURAL_SUFFIX;
 	    suffix = "en";
-	}
-	break;
-    case 'P':
-    case 'p':
-	if (!strcasecmp(rel + 1, "lum")) {
-	    found = PLURAL_SUFFIX;
-	    suffix = "s";
 	}
 	break;
     case 'S':
@@ -1123,7 +1139,7 @@ char *pluralize P1(char *, str) {
 	case 'F': case 'f':
 	    if (end[-2] == 'e' || end[-2] == 'E')
 		break;
-	    found = PLURAL_CHOP + 1;
+	    found = PLURAL_CHOP + 2;
 	    suffix = "ves";
 	    break;
 	case 'H': case 'h':
@@ -1240,7 +1256,7 @@ f_pluralize PROT((void))
  * file_length() efun, returns the number of lines in a file.
  * Returns -1 if no privs or file doesn't exist.
  */
-int file_length P1(char *, file)
+static int file_length P1(char *, file)
 {
   struct stat st;
   FILE *f;
@@ -1288,18 +1304,18 @@ f_file_length PROT((void))
 void
 f_upper_case PROT((void))
 {
-    register char *str;
+    char *str;
 
     str = sp->u.string;
     /* find first upper case letter, if any */
     for (; *str; str++) {
-	if (islower((unsigned char)*str)) {
+	if (uislower(*str)) {
 	    int l = str - sp->u.string;
 	    unlink_string_svalue(sp);
 	    str = sp->u.string + l;
 	    *str = toupper((unsigned char)*str);
 	    for (str++; *str; str++) {
-		if (islower((unsigned char)*str))
+		if (uislower((unsigned char)*str))
 		    *str = toupper((unsigned char)*str);
 	    }
 	    return;
@@ -1340,12 +1356,12 @@ void f_replaceable PROT((void)) {
     }
     
     prog = obj->prog;
-    num = prog->num_functions_total;
+    num = prog->num_functions_defined + prog->last_inherited;
     
     for (i = 0; i < num; i++) {
 	if (prog->function_flags[i] & (FUNC_INHERITED | FUNC_NO_CODE)) continue;
 	for (j = 0; j < numignore; j++)
-	    if (ignore[j] == prog->function_table[FIND_FUNC_ENTRY(prog, i)->def.f_index].name)
+	    if (ignore[j] == find_func_entry(prog, i)->name)
 		break;
 	if (j == numignore)
 	    break;
@@ -1375,8 +1391,8 @@ void f_program_info PROT((void)) {
     int type_size = 0;
     int total_size = 0;
     object_t *ob;
+    mapping_t *m;
     program_t *prog;
-    outbuffer_t out;
     int i, n;
 
     if (st_num_arg == 1) {
@@ -1385,20 +1401,15 @@ void f_program_info PROT((void)) {
 	if (!(ob->flags & (O_CLONE|O_SWAPPED))) {
 	    hdr_size += sizeof(program_t);
 	    prog_size += prog->program_size;
-	    func_size += 2 * prog->num_functions_total; /* function flags */
-#ifdef COMPRESS_FUNCTION_TABLES
-	    /* compressed table header */
-	    func_size += sizeof(compressed_offset_table_t) - 1;
-	    /* it's entries */
-	    func_size += (prog->function_compressed->first_defined - prog->function_compressed->num_compressed);
-	    /* offset table */
-	    func_size += sizeof(runtime_function_u) * (prog->num_functions_total - prog->function_compressed->num_deleted);
-#else
-	    /* offset table */
-	    func_size += prog->num_functions_total * sizeof(runtime_function_u);
-#endif
+	    
+	    /* function flags */
+	    func_size += (prog->last_inherited +
+			  prog->num_functions_defined) *sizeof(unsigned short); 
+	         
 	    /* definitions */
-	    func_size += prog->num_functions_defined * sizeof(compiler_function_t);
+	    func_size += prog->num_functions_defined * 
+	     sizeof(function_t);
+
 	    string_size += prog->num_strings * sizeof(char *);
 	    var_size += prog->num_variables_defined * (sizeof(char *) + sizeof(unsigned short));
 	    inherit_size += prog->num_inherited * sizeof(inherit_t);
@@ -1406,19 +1417,15 @@ void f_program_info PROT((void)) {
 		class_size += prog->num_classes * sizeof(class_def_t) + (prog->classes[prog->num_classes - 1].index + prog->classes[prog->num_classes - 1].size) * sizeof(class_member_entry_t);
 	    type_size += prog->num_functions_defined * sizeof(short);
 	    n = 0;
-	    for (i = 0; i < prog->num_functions_defined; i++) {
-		int start;
+	    if (prog->type_start) {
 		unsigned short *ts = prog->type_start;
-		int ri;
-		
-		if (!ts) continue;
-		start = ts[i];
-		if (start == INDEX_START_NONE)
-		    continue;
-		ri = prog->function_table[i].runtime_index;
-		start += FIND_FUNC_ENTRY(prog, ri)->def.num_arg;
-		if (start > n)
-		    n = start;
+		int nfd = prog->num_functions_defined;
+
+		for (i = 0; i < nfd; i++) {
+		    if (ts[i] == INDEX_START_NONE)
+			continue;
+		    n += prog->function_table[i].num_arg;
+		}
 	    }
 	    type_size += n * sizeof(short);
 	    total_size += prog->total_size;
@@ -1430,20 +1437,16 @@ void f_program_info PROT((void)) {
 	    prog = ob->prog;
 	    hdr_size += sizeof(program_t);
 	    prog_size += prog->program_size;
-	    func_size += prog->num_functions_total; /* function flags */
-#ifdef COMPRESS_FUNCTION_TABLES
-	    /* compressed table header */
-	    func_size += sizeof(compressed_offset_table_t) - 1;
-	    /* it's entries */
-	    func_size += (prog->function_compressed->first_defined - prog->function_compressed->num_compressed);
-	    /* offset table */
-	    func_size += sizeof(runtime_function_u) * (prog->num_functions_total - prog->function_compressed->num_deleted);
-#else
-	    /* offset table */
-	    func_size += prog->num_functions_total * sizeof(runtime_function_u);
-#endif
+
+	    /* function flags */
+	    func_size += (prog->last_inherited +
+			  prog->num_functions_defined) << 1; 
+	                  
 	    /* definitions */
-	    func_size += prog->num_functions_defined * sizeof(compiler_function_t);
+	    func_size += prog->num_functions_defined * 
+	      sizeof(function_t);
+
+
 	    string_size += prog->num_strings * sizeof(char *);
 	    var_size += prog->num_variables_defined * (sizeof(char *) + sizeof(unsigned short));
 	    inherit_size += prog->num_inherited * sizeof(inherit_t);
@@ -1451,39 +1454,34 @@ void f_program_info PROT((void)) {
 		class_size += prog->num_classes * sizeof(class_def_t) + (prog->classes[prog->num_classes - 1].index + prog->classes[prog->num_classes - 1].size) * sizeof(class_member_entry_t);
 	    type_size += prog->num_functions_defined * sizeof(short);
 	    n = 0;
-	    for (i = 0; i < prog->num_functions_defined; i++) {
-		int start;
-		int ri;
-		
+	    if (prog->type_start) {
 		unsigned short *ts = prog->type_start;
-		if (!ts) continue;
-		start = ts[i];
-		if (start == INDEX_START_NONE)
-		    continue;
-		ri = prog->function_table[i].runtime_index;
-		start += FIND_FUNC_ENTRY(prog, ri)->def.num_arg;
-		if (start > n)
-		    n = start;
+		int nfd = prog->num_functions_defined;
+
+		for (i = 0; i < nfd; i++) {
+		    if (ts[i] == INDEX_START_NONE)
+			continue;
+		    n += prog->function_table[i].num_arg;
+		}
 	    }
 	    type_size += n * sizeof(short);
 	    total_size += prog->total_size;
 	}
     }
 
-    outbuf_zero(&out);
-    
-    outbuf_addv(&out, "\nheader size: %i\n", hdr_size);
-    outbuf_addv(&out, "code size: %i\n", prog_size);
-    outbuf_addv(&out, "function size: %i\n", func_size);
-    outbuf_addv(&out, "string size: %i\n", string_size);
-    outbuf_addv(&out, "var size: %i\n", var_size);
-    outbuf_addv(&out, "class size: %i\n", class_size);
-    outbuf_addv(&out, "inherit size: %i\n", inherit_size);
-    outbuf_addv(&out, "saved type size: %i\n\n", type_size);
+    m = allocate_mapping(0);
+    add_mapping_pair(m, "header size", hdr_size);
+    add_mapping_pair(m, "code size", prog_size);
+    add_mapping_pair(m, "function size", func_size);
+    add_mapping_pair(m, "string size", string_size);
+    add_mapping_pair(m, "var size", var_size);
+    add_mapping_pair(m, "class size", class_size);
+    add_mapping_pair(m, "inherit size", inherit_size);
+    add_mapping_pair(m, "saved type size", type_size);
 
-    outbuf_addv(&out, "total size: %i\n", total_size);
-    
-    outbuf_push(&out);
+    add_mapping_pair(m, "total size", total_size);
+
+    push_refed_mapping(m);
 }
 #endif
 
@@ -1514,7 +1512,7 @@ void f_remove_interactive PROT((void)) {
  * mud.
  */
 #ifdef F_QUERY_IP_PORT
-int query_ip_port P1(object_t *, ob)
+static int query_ip_port P1(object_t *, ob)
 {
     if (!ob || ob->interactive == 0)
 	return 0;
@@ -1662,20 +1660,24 @@ void f_function_owner PROT((void)) {
 #ifdef F_REPEAT_STRING
 void f_repeat_string PROT((void)) {
     char *str;
-    int repeat, len;
+    int repeat, len, newlen;
     char *ret, *p;
     int i;
     
     repeat = (sp--)->u.number;    
+    if (repeat > 0) {
+	str = sp->u.string;
+	len = SVALUE_STRLEN(sp);
+        if ((newlen = len * repeat) > max_string_length)
+            repeat = max_string_length / len;
+    }
     if (repeat <= 0) {
 	free_string_svalue(sp);
 	sp->type = T_STRING;
 	sp->subtype = STRING_CONSTANT;
 	sp->u.string = "";
     } else if (repeat != 1) {
-	str = sp->u.string;
-	len = SVALUE_STRLEN(sp);
-	p = ret = new_string(len * repeat, "f_repeat_string");
+	p = ret = new_string(newlen, "f_repeat_string");
 	for (i = 0; i < repeat; i++) {
 	    memcpy(p, str, len);
 	    p += len;
@@ -1705,6 +1707,7 @@ static int node_share P3(mapping_t *, m, mapping_node_t *, elt, void *, tp) {
 static int memory_share P1(svalue_t *, sv) {
     int i, total = sizeof(svalue_t);
     int subtotal;
+    static int depth = 0;
     
     switch (sv->type) {
     case T_STRING:
@@ -1721,22 +1724,32 @@ static int memory_share P1(svalue_t *, sv) {
 	break;
     case T_ARRAY:
     case T_CLASS:
+        if (++depth > 100)
+            return 0;
+
 	/* first svalue is stored inside the array struct, so sizeof(array_t)
 	 * includes one svalue.
 	 */
 	subtotal = sizeof(array_t) - sizeof(svalue_t);
 	for (i = 0; i < sv->u.arr->size; i++)
 	    subtotal += memory_share(&sv->u.arr->item[i]);
+        depth--;
 	return total + subtotal/sv->u.arr->ref;
     case T_MAPPING:
+        if (++depth > 100)
+            return 0;
 	subtotal = sizeof(mapping_t);
 	mapTraverse(sv->u.map, node_share, &subtotal);
+        depth--;
 	return total + subtotal/sv->u.map->ref;
     case T_FUNCTION:
     {
 	svalue_t tmp;
 	tmp.type = T_ARRAY;
 	tmp.u.arr = sv->u.fp->hdr.args;
+
+        if (++depth > 100)
+            return 0;
 
 	if (tmp.u.arr)
 	    subtotal = sizeof(funptr_hdr_t) + memory_share(&tmp) - sizeof(svalue_t);
@@ -1757,6 +1770,7 @@ static int memory_share P1(svalue_t *, sv) {
 	    subtotal += sizeof(functional_t);
 	    break;
 	}
+        depth--;
 	return total + subtotal/sv->u.fp->hdr.ref;
     }
 #ifndef NO_BUFFER_TYPE
@@ -1825,4 +1839,81 @@ void f_memory_summary PROT((void)) {
 }
 #endif
 
+#endif
+
+/* Marius */
+#ifdef F_QUERY_REPLACED_PROGRAM
+void f_query_replaced_program PROT((void))
+{
+    char *res = 0;
+
+    if (st_num_arg)
+    {
+        if (sp->u.ob->replaced_program)
+            res = add_slash(sp->u.ob->replaced_program);
+        free_object(sp->u.ob, "f_query_replaced_program");
+    }
+    else
+    {
+        if (current_object->replaced_program)
+            res = add_slash(sp->u.ob->replaced_program);
+        STACK_INC;
+    }
+
+    if (res) {
+        put_malloced_string(res);
+    } else {
+        put_number(0);
+    }
+}
+#endif
+
+/* Skullslayer@Realms of the Dragon */
+#ifdef F_NETWORK_STATS
+void f_network_stats PROT((void))
+{
+    mapping_t *m;
+    int i, ports = 0;
+
+    for (i = 0;  i < 5;  i++)
+	if (external_port[i].port)
+	    ports += 4;
+
+#ifndef PACKAGE_SOCKETS
+    m = allocate_mapping(ports + 4);
+#else
+    m = allocate_mapping(ports + 8);
+#endif
+
+    add_mapping_pair(m, "incoming packets total", inet_in_packets);
+    add_mapping_pair(m, "incoming volume total", inet_in_volume);
+    add_mapping_pair(m, "outgoing packets total", inet_out_packets);
+    add_mapping_pair(m, "outgoing volume total", inet_out_volume);
+
+#ifdef PACKAGE_SOCKETS
+    add_mapping_pair(m, "incoming packets sockets", inet_socket_in_packets);
+    add_mapping_pair(m, "incoming volume sockets", inet_socket_in_volume);
+    add_mapping_pair(m, "outgoing packets sockets", inet_socket_out_packets);
+    add_mapping_pair(m, "outgoing volume sockets", inet_socket_out_volume);
+#endif
+
+    if (ports) {
+    	for (i = 0;  i < 5;  i++) {
+    	    if (external_port[i].port) {
+    		char buf[30];
+
+    		sprintf(buf, "incoming packets port %d", external_port[i].port);
+		add_mapping_pair(m, buf, external_port[i].in_packets);
+		sprintf(buf, "incoming volume port %d", external_port[i].port);
+    		add_mapping_pair(m, buf, external_port[i].in_volume);
+		sprintf(buf, "outgoing packets port %d", external_port[i].port);
+		add_mapping_pair(m, buf, external_port[i].out_packets);
+		sprintf(buf, "outgoing volume port %d", external_port[i].port);
+		add_mapping_pair(m, buf, external_port[i].out_volume);
+	    }
+	}
+    }
+
+    push_refed_mapping(m);
+}
 #endif

@@ -1,0 +1,3 @@
+#ifdef PEDANTIC
+int I_really_could_do_without_warnings_about_ANSI_C_not_allowing_files_with_no_definitions;
+#endif

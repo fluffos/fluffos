@@ -285,4 +285,20 @@
 #  define INLINE_STATIC static INLINE
 #endif
 
+/* The ANSI versions must take an unsigned char, and must work on EOF.  These
+ * versions take a (possibly signed) char, and do not work correctly on EOF.
+ *
+ * Note that calling isdigit(x) where x is a signed char with x < 0 (i.e.
+ * high bit set) invokes undefined behavior.
+ */
+#define uisdigit(x) isdigit((unsigned char)x)
+#define uislower(x) islower((unsigned char)x)
+#define uisspace(x) isspace((unsigned char)x)
+#define uisalnum(x) isalnum((unsigned char)x)
+#define uisupper(x) isupper((unsigned char)x)
+#define uisalpha(x) isalpha((unsigned char)x)
+#define uisxdigit(x) isxdigit((unsigned char)x)
+#define uisascii(x) isascii((unsigned char)x)
+#define uisprint(x) isprint((unsigned char)x)
+
 #endif
