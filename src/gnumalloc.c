@@ -411,7 +411,7 @@ gnumalloc(size_t size)
 #include <limits.h>
 #include <stddef.h>
 
-extern void *sbrk(int);
+extern void *sbrkx(int);
 
 /* Note that morecore has to take a signed argument so
    that negative values can return memory to the system. */
@@ -420,7 +420,7 @@ _default_morecore(long size)
 {
     void *result;
 
-    result = sbrk(size);
+    result = sbrkx(size);
     if (result == (void *) -1)
 	return NULL;
     return result;

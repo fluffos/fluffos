@@ -1,6 +1,10 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
+new in FluffOS 1.27
+update to terminal_colour() (Pinkfish)
+added option to use mmap instead of sbrk for included malloc packages
+
 new in FluffOS 1.26
 check resets every 5 minutes
 new malloc package (GNU)

@@ -191,7 +191,7 @@ make_functional_funp P5(short, num_arg, short, num_local, short, len, svalue_t *
     add_ref( current_object, "make_functional_funp" );
     fp->hdr.type = FP_FUNCTIONAL + flag;
     
-    ((unsigned short)(current_prog->func_ref))++;
+    current_prog->func_ref++;
     debug(d_flag, ("add func ref /%s: now %i\n",
                current_prog->filename,
                current_prog->func_ref));

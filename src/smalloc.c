@@ -1035,10 +1035,10 @@ static char *esbrk P1(u, size)
 #else
 #ifdef LATTICE
 
-    extern void *sbrk();
+    extern void *sbrkx();
     void *addr = NULL;
 
-    addr = (char *)sbrk(size);
+    addr = (char *)sbrkx(size);
     if ((char *) addr == (char *) (-1))
 	return NULL;
 
@@ -1048,13 +1048,13 @@ static char *esbrk P1(u, size)
 #else
 
 #ifndef linux
-    extern char *sbrk();
+    extern char *sbrkx();
 #endif				/* linux */
 
     static char *current_break = 0;
 
     if (current_break == 0)
-	current_break = sbrk(0);
+	current_break = sbrkx(0);
     if (brk(current_break + size) == -1)
 	return 0;
 

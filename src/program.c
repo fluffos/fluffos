@@ -4,14 +4,14 @@
 
 int total_num_prog_blocks, total_prog_block_size;
 
-void reference_prog P2(const program_t *, progp, const char *, from)
+void reference_prog P2(program_t *, progp, const char *, from)
 {
-    ((unsigned short)(progp->ref))++;
+    progp->ref++;
     debug(d_flag, ("reference_prog: /%s ref %d (%s)\n",
                progp->filename, progp->ref, from));
 }
 
-void deallocate_program P1(const program_t *, progp)
+void deallocate_program P1(program_t *, progp)
 {
     int i;
 
@@ -54,9 +54,9 @@ void deallocate_program P1(const program_t *, progp)
  * as we want to be able to read the program in again from the swap area.
  * That means that strings are not swapped.
  */
-void free_prog P2(const program_t *, progp, int, free_sub_strings)
+void free_prog P2(program_t *, progp, int, free_sub_strings)
 {
-    ((unsigned short)(progp->ref))--;
+    progp->ref--;
     if (progp->ref > 0)
         return;
     if (progp->func_ref > 0)

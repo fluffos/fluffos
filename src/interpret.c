@@ -76,7 +76,7 @@ int stack_in_use_as_temporary = 0;
 #endif
 
 int inter_sscanf PROT((svalue_t *, svalue_t *, svalue_t *, int));
-const program_t *current_prog;
+program_t *current_prog;
 short int caller_type;
 static int tracedepth;
 int num_varargs;

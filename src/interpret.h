@@ -241,7 +241,7 @@ typedef struct {
 #define FOREACH_REF 4
 #define FOREACH_MAPPING 8
 
-extern const program_t *current_prog;
+extern program_t *current_prog;
 extern short caller_type;
 extern char *pc;
 extern svalue_t *sp;

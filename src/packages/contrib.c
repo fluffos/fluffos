@@ -529,17 +529,26 @@ f_terminal_colour PROT((void))
 {
     const char *instr, *cp, **parts;
     char *savestr, *deststr, *ncp;
+    char curcolour[100];
+    const char *resetstr;
+    char *resetstrname;
+    int resetstrlen;
     int num, i, j, k, col, start, space, *lens, maybe_at_end;
     int space_garbage = 0;
     mapping_node_t *elt, **mtab;
     int buflen, max_buflen, space_buflen;
     int wrap = 0;
     int indent = 0;
+    int fillout = 0;
 
     if (st_num_arg >= 3) {
         if (st_num_arg == 4)
             indent = (sp--)->u.number;
         wrap = (sp--)->u.number;
+        if (wrap < 0) {
+           wrap = -wrap;
+           fillout = 1;
+        }
         if (wrap < 2 && wrap != 0) wrap = 2;
         if (indent < 0 || indent >= wrap - 1)
             indent = wrap - 2;
@@ -580,6 +589,7 @@ f_terminal_colour PROT((void))
             *newstr = 0;
         } else
             num = 0;
+        // Search through for the %^...%^ combinations
         while (newstr) {
             newstr += 2;
             instr = newstr;
@@ -591,22 +601,28 @@ f_terminal_colour PROT((void))
                     newstr++;
                 }
             } while (newstr);
+            // Check and make sure we have an end marker.
             if (newstr) {
                 *newstr = 0;
+                // No idea why this would occur.
                 if (newstr > instr) {
                     if (num && num % NSTRSEGS == 0) {
+                        // Increase the size of the parts array.
                         parts = (const char **) RESIZE(parts, num + NSTRSEGS, char *, 
                                        TAG_TEMPORARY, "f_terminal_colour: parts realloc");
                     }
+                    // Put it in at the current location in the parts array.
                     parts[num++] = instr;
                 }
             }
         }
         if (*instr) {   /* trailing seg, if not delimiter */
             if (num && num % NSTRSEGS == 0) {
+                // Increase the size of the parts array.
                 parts = (const char **) RESIZE(parts, num + NSTRSEGS, char *,
                                TAG_TEMPORARY, "f_terminal_colour: parts realloc");
             }
+            // Put it in at the current location in the parts array.
             parts[num++] = instr;
         }
     }
@@ -629,6 +645,24 @@ f_terminal_colour PROT((void))
     lens = CALLOCATE(num, int, TAG_TEMPORARY, "f_terminal_colour: lens");
     mtab = sp->u.map->table;
 
+    // First setup some little things.
+    curcolour[0] = 0;
+    // Find the reset colour string.
+    resetstrname = findstring("RESET");
+    k = sp->u.map->table_size;
+    if (resetstrname) {
+       int tmp = MAP_POINTER_HASH(resetstrname);
+       for (elt = mtab[tmp & k]; elt; elt = elt->next) {
+           if ( elt->values->type == T_STRING && 
+                (elt->values + 1)->type == T_STRING &&
+                resetstrname == elt->values->u.string) {
+               resetstr = (elt->values + 1)->u.string;
+               resetstrlen = strlen((elt->values + 1)->u.string);
+               break;
+           }
+       }
+    }
+
     /* Do the the pointer replacement and calculate the lengths */
     col = 0;
     start = -1;
@@ -636,9 +670,10 @@ f_terminal_colour PROT((void))
     maybe_at_end = 0;
     buflen = max_buflen = space_buflen = 0;
     for (j = i = 0, k = sp->u.map->table_size; i < num; i++) {
+        // Look it up in the mapping.
         if ((cp = findstring(parts[i]))) {
             int tmp = MAP_POINTER_HASH(cp);
-            for (elt = mtab[tmp & k]; elt; elt = elt->next)
+            for (elt = mtab[tmp & k]; elt; elt = elt->next) {
                 if ( elt->values->type == T_STRING && 
                      (elt->values + 1)->type == T_STRING &&
                      cp == elt->values->u.string) {
@@ -646,17 +681,28 @@ f_terminal_colour PROT((void))
                     /* Negative indicates don't count for wrapping */
                     lens[i] = SVALUE_STRLEN(elt->values + 1);
                     if (wrap) lens[i] = -lens[i];
+                    // Do stuff for continueing colour codes.
+                    if (!strcmp(resetstr, parts[i])) {
+                        curcolour[0] = 0;
+                    } else {
+                        if (strlen(curcolour) + strlen((elt->values + 1)->u.string) < 100) {
+                           strcat(curcolour, (elt->values + 1)->u.string);
+                        }
+                    }
                     break;
                 }
-            if (!elt)
+            }
+            if (!elt) {
                 lens[i] = SHARED_STRLEN(cp);
+            }
         } else {
             lens[i] = strlen(parts[i]);
         }
 
         if (lens[i] <= 0) {
-            if (j + -lens[i] > max_string_length)
+            if (j + -lens[i] > max_string_length) {
                 lens[i] = -(-(lens[i]) - (j + -lens[i] - max_string_length));
+            }
             j += -lens[i];
             buflen += -lens[i];
             continue;
@@ -685,13 +731,21 @@ f_terminal_colour PROT((void))
         if (wrap) {
             int z;
             const char *p = parts[i];
+            // This is where we figure out the size of the lines and
+            // the final output string.  j is the size of the final output
+            // string and max_buflen is the size of the line.
             for (z = 0; z < lens[i]; z++) {
                 char c = p[z];
                 buflen++;
                 if (c == '\n') {
+                    if (fillout) {
+                       j += wrap - col;
+                    }
                     col = 0;
                     space = space_buflen = 0;
                     start = -1;
+                    j += resetstrlen + strlen(curcolour);
+                    buflen += resetstrlen + strlen(curcolour);
                     max_buflen = (buflen > max_buflen ? buflen : max_buflen);
                     buflen = 0;
                 } else {
@@ -710,14 +764,21 @@ f_terminal_colour PROT((void))
                     }
                     if (col == wrap+1) {
                         if (space) {
+                            if (fillout) {
+                                j += wrap - space;
+                            }
                             col -= space;
                             space = 0;
+                            j += resetstrlen + strlen(curcolour);
+                            buflen += resetstrlen + strlen(curcolour);
                             max_buflen = (buflen > max_buflen ? buflen : max_buflen);
                             buflen -= space_buflen;
                             space_buflen = 0;
                         } else {
                             j++;
                             col = 1;
+                            j += resetstrlen + strlen(curcolour);
+                            buflen += resetstrlen + strlen(curcolour);
                             max_buflen = (buflen > max_buflen ? buflen : max_buflen);
                             buflen = 1;
                         }
@@ -760,6 +821,7 @@ f_terminal_colour PROT((void))
         start = -1;
         space = 0;
         buflen = space_buflen = 0;
+        curcolour[0] = 0;
         for (i = 0; i < num; i++) {
             int kind;
             const char *p = parts[i];
@@ -769,14 +831,24 @@ f_terminal_colour PROT((void))
                 buflen += -lens[i];
                 space_garbage += -lens[i]; /* Number of chars due to ignored junk
                                               since last space */
+                // Do stuff for continueing colour codes.
+                if (!strcmp(p, resetstr)) {
+                    curcolour[0] = 0;
+                } else {
+                    if (strlen(curcolour) + strlen(p)) {
+                           strcat(curcolour, p);
+                    }
+                }
                 continue;
             }
             for (k = 0; k < lens[i]; k++) {
                 int n;
+                int endpad;
                 char c = p[k];
                 *pt++ = c;
                 buflen++;
                 if (c == '\n') {
+                    endpad = wrap - col;
                     col = 0;
                     kind = 0;
                     space = space_garbage = 0;
@@ -799,6 +871,7 @@ f_terminal_colour PROT((void))
                     }
                     if (col == wrap+1) {
                         if (space) {
+                            endpad = wrap - space;
                             col -= space;
                             space = 0;
                             kind = 1;
@@ -817,14 +890,27 @@ f_terminal_colour PROT((void))
                 n = (pt - tmp) - buflen;
                 memcpy(ncp, tmp, n);
                 ncp += n;
-                if (kind == 1) {
+                if (kind == 1 || kind == 0) {
                     /* replace the space */
-                    ncp[-1] = '\n';
+                    //ncp[-1] = '\n';
+                    ncp--;
                 }
                 if (kind == 2) {
                     /* need to insert a newline */
-                    *ncp++ = '\n';
+                    //*ncp++ = '\n';
                 }
+                // Insert the follow on colour codes.
+                memcpy(ncp, resetstr, resetstrlen);
+                ncp += resetstrlen;
+                if (fillout) {
+                   // Fill in the remaining bits with spaces.
+                   memset(ncp, ' ', endpad);
+                   ncp += endpad;
+                }
+                *ncp++ = '\n';
+                memcpy(ncp, curcolour, strlen(curcolour));
+                ncp += strlen(curcolour);
+                // Back to the normal code again.
                 memmove(tmp, tmp + n, buflen);
                 pt = tmp + buflen;
                 if (col || !at_end(i, num, k, lens)) {
@@ -1063,17 +1149,6 @@ static char *pluralize P1(const char *, str) {
             suffix = "en";
         }
         break;
-    case 'P':
-    case 'p':
-        if (!strcasecmp(rel + 1, "ants"))
-            found = PLURAL_SAME;
-        break;
-    case 'R':
-    case 'r':
-        if (!strcasecmp(rel + 1, "oof"))
-            found = PLURAL_SUFFIX;
-        break;
-
     case 'S':
     case 's':
         if (!strcasecmp(rel + 1, "niff")) {

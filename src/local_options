@@ -65,9 +65,9 @@
  *   * Faster than SMALLOC but more memory overhead.
  *   * Requires sbrk().
  */
-#define SYSMALLOC
+#undef SYSMALLOC
 #undef SMALLOC
-#undef BSDMALLOC
+#define BSDMALLOC
 #undef MMALLOC
 
 /* You may optionally choose one (or none) of these malloc wrappers.  These
@@ -692,7 +692,7 @@
  * this option, since it needs 4 bytes to store the function pointers
  * anyway, and this setting is ignored.
  */
-#undef USE_32BIT_ADDRESSES
+#define USE_32BIT_ADDRESSES
 
 /* HEARTBEAT_INTERVAL: define heartbeat interval in microseconds (us).
  *   1,000,000 us = 1 second.  The value of this macro specifies
@@ -857,4 +857,5 @@
 #undef CALL_OTHER_TYPE_CHECK 
 #define CALL_OTHER_WARN
 #define PACKAGE_DWLIB
+#define MMAP_SBRK
 #endif

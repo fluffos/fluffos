@@ -156,12 +156,12 @@ void *bsdmalloc_malloc P1(size_t, nbytes)
 #else
 	pagesz = n = getpagesize();
 #endif
-	op = (union overhead *) sbrk(0);
+	op = (union overhead *) sbrkx(0);
 	n = n - sizeof(*op) - ((int) op & (n - 1));
 	if (n < 0)
 	    n += pagesz;
 	if (n) {
-	    if ((char *)sbrk(n) == (char *) -1)
+	    if ((char *)sbrkx(n) == (char *) -1)
 		return (NULL);
 	}
 	bucket = 0;
@@ -252,7 +252,7 @@ morecore P1(int, bucket)
 	amt = sz + pagesz;
 	nblks = 1;
     }
-    op = (union overhead *) sbrk(amt);
+    op = (union overhead *) sbrkx(amt);
     /* no more room! */
     if ((int) op == -1)
 	return;
