@@ -1214,40 +1214,36 @@ restore_object_from_line P3(object_t *, ob, char *, line, int, noclear)
 }
 
 #ifdef HAVE_ZLIB
-void
-restore_object_from_gzip P3(object_t *, ob,
+int
+restore_object_from_gzip P4(object_t *, ob,
                             gzFile, gzf,
-                            int, noclear)
+                            int, noclear, int, count)
 {
     static char *buff = NULL;
     char* tmp;
     int idx;
     int t;
-    int igloo;
+    int igloo = 0;
     
-    t = 409600; //should be big enough, multiple reads for the same line break :(
+    t = 65536 << count; //should be big enough most of the time
     if (buff) {
         FREE(buff);
         buff = NULL;
     }
+
     buff = DXALLOC(t, TAG_TEMPORARY, "restore_object: 6");
-    while (!gzeof(gzf)) {
+    while (!gzeof(gzf) && tmp != Z_NULL) {
         idx = 0;
         buff[t - 2] = 0;
         // gzgets appaears to pay attension to zero termination even on short
         // strings
         buff[0] = 0;
         tmp = gzgets(gzf, buff, t);
-        while (buff[t - 2] != 0 && buff[t - 2] != '\n' && !gzeof(gzf)) {
-           if(tmp == Z_NULL) {
-               error("Could not read compressed file");
-           }
-           idx = t;
-           t += 40960;
-           buff = REALLOC(buff, t);
-           buff[t - 2] = 0;
-           tmp = gzgets(gzf, buff + idx - 1, t - (idx - 1));
+
+        if (buff[t - 2] != 0 && buff[t - 2] != '\n' && !gzeof(gzf)) {
+           return -1; //retry with bigger buffer
         }
+        
         if (buff[0]) {
             tmp = strchr(buff, '\n');
             if (tmp) {
@@ -1261,6 +1257,7 @@ restore_object_from_gzip P3(object_t *, ob,
     }
     FREE(buff);
     buff = NULL;
+    return 0;
 }
 #else
 
@@ -1584,6 +1581,7 @@ int restore_object P3(object_t *, ob, char *, file, int, noclear)
 #ifdef HAVE_ZLIB
     int pos;
     gzFile gzf;
+    int count = 0;
 #else
     FILE *f;
     // Try and keep one buffer for droping all the restores into
@@ -1656,8 +1654,8 @@ int restore_object P3(object_t *, ob, char *, file, int, noclear)
     if (!noclear) {
         clear_non_statics(ob);
     }
-    
-    restore_object_from_gzip(ob, gzf, noclear);
+    while((restore_object_from_gzip(ob, gzf, noclear, count++)))
+          gzseek(gzf, 0, SEEK_SET);
     gzclose(gzf);
 
 #else
