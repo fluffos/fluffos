@@ -6,7 +6,7 @@
 #include "config.h"
 #include <math.h>
 #include "efuns.h"
-#include "matrix.h"
+#include "efuns_matrix.h"
 
 #ifdef MATRIX
 

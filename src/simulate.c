@@ -1,4 +1,7 @@
 #include "config.h"
+#ifdef SunOS_5
+#include <stdlib.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #if !defined(SunOS_5)
@@ -9,8 +12,13 @@
 #include <string.h>
 #include <errno.h>
 #include <stdio.h>
+#ifndef LATTICE
 #include <varargs.h>
 #include <memory.h>
+#else
+#include <signal.h>
+#include "amiga.h"
+#endif
 #if defined(sun)
 #include <alloca.h>
 #endif
@@ -59,7 +67,6 @@ void pre_compile PROT((char *)),
        add_verb PROT((char *, int)),
        ipc_remove(),
        set_snoop PROT((struct object *, struct object *)),
-       print_lnode_status PROT((int)),
        start_new_file PROT((FILE *)), end_new_file(),
        move_or_destruct PROT((struct object *, struct object *)),
        load_ob_from_swap PROT((struct object *)), dump_malloc_data(),
@@ -85,7 +92,7 @@ struct variable *find_status(str, must_find)
 {
   int i;
   
-  for (i=0; (unsigned)i < current_object->prog->p.i.num_variables; i++) {
+  for (i=0; i < (int)current_object->prog->p.i.num_variables; i++) {
     if (strcmp(current_object->prog->p.i.variable_names[i].name, str) == 0)
       return &current_object->prog->p.i.variable_names[i];
   }
@@ -342,6 +349,8 @@ struct object *load_object(lname, dont_reset)
     /* Now set the file name of the specified object correctly...*/
     ob = v->u.ob;
     remove_object_hash(ob);
+    if (ob->name)
+	FREE(ob->name);
     ob->name = string_copy(name);
     enter_object_hash(ob);
     ob->flags |= O_VIRTUAL;
@@ -356,24 +365,31 @@ struct object *load_object(lname, dont_reset)
     error("Illegal path name.\n");
     return 0;
   }
-  if (comp_flag)
-    fprintf(stderr, " compiling %s ...", real_name);
-  f = fopen(real_name, "r");
-  if (f == 0) {
-    perror(real_name);
-    error("Could not read the file.\n");
+#ifdef SAVE_BINARIES
+  if (!load_binary(real_name)) {
+#endif
+      /* maybe move this section into compile_file? */
+      if (comp_flag)
+	  fprintf(stderr, " compiling %s ...", real_name);
+      f = fopen(real_name, "r");
+      if (f == 0) {
+	  perror(real_name);
+	  error("Could not read the file.\n");
+      }
+      current_file = string_copy(real_name);	/* This one is freed below */
+      start_new_file(f);
+      compile_file();
+      end_new_file();
+      if (comp_flag)
+	  fprintf(stderr, " done\n");
+      update_compile_av(total_lines);
+      total_lines = 0;
+      (void)fclose(f);
+      FREE(current_file);
+      current_file = 0;
+#ifdef SAVE_BINARIES
   }
-  current_file = string_copy(real_name);	/* This one is freed below */
-  start_new_file(f);
-  compile_file();
-  end_new_file();
-  if (comp_flag)
-    fprintf(stderr, " done\n");
-  update_compile_av(total_lines);
-  total_lines = 0;
-  (void)fclose(f);
-  FREE(current_file);
-  current_file = 0;
+#endif
   /* Sorry, can't handle objects without programs yet. */
   if (inherit_file == 0 && (num_parse_error > 0 || prog == 0)) {
     if (prog)
@@ -518,12 +534,22 @@ struct object *clone_object(str1)
 	}
 	p++;
       }
-      if (!(v = load_virtual_object(str1))) {
-	return 0;
+      if (ob->ref == 1 && !ob->super && !ob->contains) {
+	  /*
+	   * ob unused so reuse it instead to save space.
+	   * (possibly loaded just for cloning)
+	   */
+	  new_ob = ob;
+      } else {
+	  /* can't reuse, so load another */
+	  if (!(v = load_virtual_object(str1)))
+	      return 0;
+	  new_ob = v->u.ob;
       }
-      /* Now set the file name of the specified object correctly...*/
-      new_ob = v->u.ob;
       remove_object_hash(new_ob);
+      if (new_ob->name)
+	  FREE(new_ob->name);
+      /* Now set the file name of the specified object correctly...*/
       new_ob->name = make_new_name(str1);
       enter_object_hash(new_ob);
       new_ob->flags |= O_VIRTUAL;
@@ -724,6 +750,7 @@ void destruct_object_two(ob)
   struct object **pp;
   int removed;
   
+#ifdef SOCKET_EFUNS
   /*
    * check if object has an efun socket referencing it for
    * a callback. if so, close the efun socket.
@@ -731,7 +758,8 @@ void destruct_object_two(ob)
   if (ob->flags & O_EFUN_SOCKET) {
     close_referencing_sockets(ob);
   }
-  
+#endif
+
   if (ob->flags & O_DESTRUCTED)
     return;
   if (ob->flags & O_SWAPPED)
@@ -899,7 +927,7 @@ void destruct2(ob)
      * the object structure is freed in free_object().
      */
     int i;
-    for (i=0; (unsigned)i<ob->prog->p.i.num_variables; i++) {
+    for (i=0; i<(int)ob->prog->p.i.num_variables; i++) {
       free_svalue(&ob->variables[i]);
       ob->variables[i].type = T_NUMBER;
       ob->variables[i].u.number = 0;
@@ -909,183 +937,157 @@ void destruct2(ob)
   free_object(ob, "destruct_object");
 }
 
-
 /*
- * A message from an object will reach
- * all objects in the inventory,
- * all objects in the same environment and
- * the surrounding object.
- * Non interactive objects gets no messages.
+ * say() efun - send a message to:
+ *  all objects in the inventory of the source,
+ *  all objects in the same environment as the source,
+ *  and the object surrounding the source.
  *
- * There are two cases to take care of. If this routine is called from
- * a user (indirectly), then the message goes to all in his
- * environment. Otherwise, the message goes to all in the current_object's
- * environment (as the case when called from a heart_beat()).
+ * when there is no command_giver, current_object is used as the source,
+ *  otherwise, command_giver is used.
  *
- * If there is a second argument 'avoid_ob', then do not send the message
- * to that object.
+ * message never goes to objects in the avoid vector, or the source itself.
+ *
+ * rewritten, bobf@metronet.com (Blackthorn) 9/6/93
  */
-
+ 
+void send_say(ob, text, avoid)
+        struct object *ob;
+        char *text;
+        struct vector *avoid;
+{
+        int valid, j;
+ 
+        for (valid = 1, j = 0; j < avoid->size; j++)
+        {
+                if (avoid->item[j].type != T_OBJECT)
+                       continue;
+                if (avoid->item[j].u.ob == ob)
+                {
+                       valid = 0;
+                       break;
+                }
+        }
+        
+        if (!valid)
+                return;
+ 
+        tell_object(ob, text);
+}
+ 
 void say(v, avoid)
      struct svalue *v;
      struct vector *avoid;
 {
-  extern struct vector *order_alist PROT((struct vector *));
-  struct vector *vtmpp;
-  static struct vector vtmp = { 1, 1,
-#ifdef DEBUG
-				  1,
-#endif
-                                  {(mudlib_stats_t *)NULL,
-                                     (mudlib_stats_t *)NULL},
-				  { { T_POINTER } }
-			      };
-  
-  extern int assoc PROT((struct svalue *key, struct vector *));
-  struct object *ob, *save_command_giver = command_giver;
-  struct object *origin;
-  char buff[LARGEST_PRINTABLE_STRING];
-#define INITAL_MAX_RECIPIENTS 50 /* change from 3.1.1 */
-  int max_recipients = INITAL_MAX_RECIPIENTS;
-  struct object **first_recipients;
-  struct object **recipients;
-  struct object **curr_recipient;
-  struct object **last_recipients;
-  
-  struct object *save_again;
-  static struct svalue stmp = { T_OBJECT };
-  
-  curr_recipient = recipients = first_recipients =
-    (struct object **)
-	DMALLOC(max_recipients * sizeof(struct object *), 98, "say: 1");
-  last_recipients = first_recipients + max_recipients - 1;
+  struct object *ob, *origin, *save_command_giver = command_giver;
+  char *buff;
+ 
+  check_legal_string(v->u.string);
+  buff = v->u.string;
+ 
   if (current_object->flags & O_ENABLE_COMMANDS)
     command_giver = current_object;
-#ifndef NO_SHADOWS 
-  else if (current_object->shadowing)
-    command_giver = current_object->shadowing;
-#endif
-  if (command_giver) {
+  if (command_giver)
     origin = command_giver;
-    if (avoid->item[0].type == T_NUMBER) {
-      avoid->item[0].type = T_OBJECT;
-      avoid->item[0].u.ob = command_giver;
-      add_ref(command_giver, "ass to var");
-    }
-  } else
+    else
     origin = current_object;
-  vtmp.item[0].u.vec = avoid;
-  vtmpp = order_alist(&vtmp);
-  avoid = vtmpp->item[0].u.vec;
-  if ((ob = origin->super)) {
-    if (ob->flags & O_ENABLE_COMMANDS || ob->interactive) {
-      *curr_recipient++ = ob;
-    }
-    for (ob = origin->super->contains; ob; ob = ob->next_inv) {
-      if (ob->flags & O_ENABLE_COMMANDS || ob->interactive) {
-	if (curr_recipient >= last_recipients) {
-	  max_recipients <<= 1;
-	  curr_recipient = (struct object **)
-	    DREALLOC(recipients, max_recipients * sizeof(struct object *),
-		99, "say: 2");
-	  recipients = curr_recipient;
-	  last_recipients = &recipients[max_recipients-1];
-	}
-	*curr_recipient++ = ob;
+ 
+ /* To our surrounding object... */
+  if ((ob = origin->super))
+  {
+    if (ob->flags & O_ENABLE_COMMANDS || ob->interactive) 
+      send_say(ob, buff, avoid); 
+ 
+ /* And its inventory... */
+    for (ob = origin->super->contains; ob; ob = ob->next_inv)
+    {
+      if (ob != origin && (ob->flags & O_ENABLE_COMMANDS || ob->interactive))
+      {
+        send_say(ob, buff, avoid);
+        if (ob->flags & O_DESTRUCTED)
+                break;
       }
     }
   }
-  for (ob = origin->contains; ob; ob = ob->next_inv) {
-    if (ob->flags & O_ENABLE_COMMANDS || ob->interactive) {
-      if (curr_recipient >= last_recipients) {
-	max_recipients <<= 1;
-	curr_recipient = (struct object **)
-    DREALLOC(recipients, max_recipients * sizeof(struct object *), 100,
-		"say: 3");
-	recipients = curr_recipient;
-	last_recipients = &recipients[max_recipients-1];
-      }
-      *curr_recipient++ = ob;
+ 
+ /* Our inventory... */
+  for (ob = origin->contains; ob; ob = ob->next_inv)
+  {
+    if (ob->flags & O_ENABLE_COMMANDS || ob->interactive) 
+    {
+      send_say(ob, buff, avoid);
+      if (ob->flags & O_DESTRUCTED)
+        break;
     }
   }
-  *curr_recipient = (struct object *)0;
-  switch(v->type) {
-  case T_STRING:
-    strncpy(buff, v->u.string, sizeof buff);
-    buff[sizeof buff - 1] = '\0';
-    break;
-  case T_OBJECT:
-    strncpy(buff, v->u.ob->name, sizeof buff);
-    buff[sizeof buff - 1] = '\0';
-    break;
-  case T_NUMBER:
-    sprintf(buff, "%d", v->u.number);
-    break;
-  case T_REAL:
-    sprintf(buff, "%f", v->u.real);
-    break;
-  default:
-    error("Invalid argument %d to say()\n", v->type);
-  }
-  save_again = command_giver;
-  for (curr_recipient = recipients; (ob = *curr_recipient++); ) {
-    if (ob->flags & O_DESTRUCTED) continue;
-    stmp.u.ob = ob;
-    if (assoc(&stmp, avoid) >= 0) continue;
-    tell_object(ob, buff);
-  }
-  free_vector(vtmpp);
-  FREE((void *)recipients);
+ 
   command_giver = save_command_giver;
 }
 
 /*
- * Send a message to all objects inside an object.
- * Non interactive objects gets no messages.
- * Compare with say().
+ * Sends a string to all objects inside of a specific object.
+ * Revised, bobf@metronet.com 9/6/93
  */
-
+ 
 void tell_room(room, v, avoid)
      struct object *room;
      struct svalue *v;
-     struct vector *avoid; /* has to be in alist order */
+     struct vector *avoid; 
 {
   struct object *ob;
-  char buff[LARGEST_PRINTABLE_STRING];
+  char *buff;
+  int valid, j;
+  static char txt_buf[LARGEST_PRINTABLE_STRING];
   
-  switch(v->type) {
-  case T_STRING:
-    strncpy(buff, v->u.string, sizeof buff);
-    buff[sizeof buff - 1] = '\0';
-    break;
-  case T_OBJECT:
-    strncpy(buff, v->u.ob->name, sizeof buff);
-    buff[sizeof buff - 1] = '\0';
-    break;
-  case T_NUMBER:
-    sprintf(buff, "%d", v->u.number);
-    break;
-  case T_REAL:
-    sprintf(buff, "%f", v->u.real);
-    break;
-  default:
-    error("Invalid argument %d to tell_room()\n", v->type);
+  switch (v->type)
+  {
+          case T_STRING:
+   	    check_legal_string(v->u.string);
+            buff = v->u.string;
+            break;
+          case T_OBJECT:
+            buff = v->u.ob->name;
+            break;
+          case T_NUMBER:
+            buff = txt_buf;
+            sprintf(buff, "%d", v->u.number);
+            break;
+          case T_REAL:
+            buff = txt_buf;
+            sprintf(buff, "%g", v->u.real);
+            break;
+          default:
+            error("Bad arg 2 to tell_room()\n");
   }
-  for (ob = room->contains; ob; ob = ob->next_inv) {
-    int assoc PROT((struct svalue *key, struct vector *));
-    static struct svalue stmp = { T_OBJECT, } ;
-    
-    stmp.u.ob = ob;
-    if (assoc(&stmp, avoid) >= 0) continue;
-    if (ob->interactive == 0) {
-      if (ob->flags & O_ENABLE_COMMANDS) {
-	tell_npc(ob, buff);
-      }
-      if (ob->flags & O_DESTRUCTED)
-	break;
-      continue;
+ 
+  for (ob = room->contains; ob; ob = ob->next_inv)
+  {
+    if (!ob->interactive && !(ob->flags & O_ENABLE_COMMANDS))
+        continue;
+ 
+    for (valid = 1, j = 0; j < avoid->size; j++)
+    {
+        if (avoid->item[j].type != T_OBJECT)
+               continue;
+        if (avoid->item[j].u.ob == ob)
+        {
+               valid = 0;
+               break;
+        }
     }
-    tell_object(ob, buff);
+ 
+    if (!valid)
+        continue;
+ 
+    if (!ob->interactive) {
+        tell_npc(ob, buff);
+        if (ob->flags & O_DESTRUCTED)
+              break;
+    } else {
+        tell_object(ob, buff);
+        if (ob->flags & O_DESTRUCTED)
+              break;
+    }
   }
 }
 
@@ -1274,26 +1276,39 @@ char *s;
 void print_svalue(arg)
      struct svalue *arg;
 {
-  if (arg == 0) {
+  if (arg == 0)
+  {
     add_message("<NULL>");
-  } else if (arg->type == T_STRING) {
-      check_legal_string(arg->u.string);
-      tell_object(command_giver, arg->u.string);
+  } 
+  else switch (arg->type)
+  {
+        case T_STRING:
+              check_legal_string(arg->u.string);
+              tell_object(command_giver, arg->u.string);
+              break;
+        case T_OBJECT:
+              add_message("OBJ(%s)", arg->u.ob->name);
+              break;
+        case T_NUMBER:
+              add_message("%d", arg->u.number);
+              break;
+        case T_REAL:
+              add_message("%g", arg->u.real);
+              break;
+        case T_POINTER:
+              add_message("<ARRAY>");
+              break;
+        case T_MAPPING:
+              add_message("<MAPPING>");
+              break;
+        case T_FUNCTION:
+              add_message("<FUNCTION>");
+              break;
+        default:
+              add_message("<UNKNOWN>");
+              break;
   }
-  else if(arg->type == T_OBJECT)
-    add_message("OBJ(%s)", arg->u.ob->name);
-  else if(arg->type == T_NUMBER)
-    add_message("%d", arg->u.number);
-  else if(arg->type == T_REAL)
-    add_message("%g", arg->u.real);
-  else if(arg->type & T_POINTER)
-    add_message("<ARRAY>");
-  else if (arg->type == T_MAPPING)
-    add_message("<MAPPING>");
-  else if (arg->type == T_FUNCTION)
-    add_message("<FUNCTION>");
-  else
-    add_message("<UNKNOWN>");
+  return;
 }
 
 void do_write(arg)
@@ -1604,7 +1619,7 @@ int user_parser(buff)
          verb_buff[pos] = '\0';
      }
   }
-  clear_notify();
+  /* clear_notify(); */ /* moved to process_user_command() */
   s = save_command_giver->sent;
   for ( ; s; s = s->next) {
     struct svalue *ret;
@@ -1719,10 +1734,8 @@ void add_action(str, cmd, flag)
 		ob = ob->shadowing;
 	}
 	/* don't allow add_actions of a static function from a shadowing object */
-	if (ob != current_object) {
-		if (!function_exists(str ,ob)) {
-			return;
-		}
+	if ((ob != current_object) && is_static(str, ob)) {
+		return;
 	}
 #endif
   if (command_giver == 0 || (command_giver->flags & O_DESTRUCTED))
@@ -1908,6 +1921,7 @@ void error(va_alist)
   if (error_recovery_context_exists > 1) { /* user catches this error */
     struct svalue v;
 
+#ifdef LOG_CATCHES
 /* This is added so that catches generate messages in the log file. */
     debug_message("caught: %s", emsg_buf+1);
     if (current_object)
@@ -1916,6 +1930,7 @@ void error(va_alist)
 		    current_object->name,
 		    get_line_number_if_any());
     (void)dump_trace(0);
+#endif
 
     v.type = T_STRING;
     v.u.string = emsg_buf;
@@ -1997,13 +2012,11 @@ void error(va_alist)
  */
 int MudOS_is_being_shut_down;
 
-#if !defined(_AIX) && !defined(NeXT) && !defined(_SEQUENT_) && !defined(SVR4) \
-	&& !defined(cray) && !defined(SunOS_5) && !defined(__386BSD__) \
-	&& !defined(__bsdi__)
-void startshutdownMudOS()
-#else
+#if SIGNAL_FUNC_TAKES_INT
 void startshutdownMudOS(arg)
      int arg;
+#else
+void startshutdownMudOS()
 #endif
 {
   MudOS_is_being_shut_down = 1;
@@ -2020,6 +2033,13 @@ void shutdownMudOS(exit_code)
   shout_string("MudOS driver shouts: shutting down immediately.\n");
   save_stat_files();
   ipc_remove();
+#ifdef LATTICE
+	signal(SIGUSR1, SIG_IGN);
+	signal(SIGTERM, SIG_IGN);
+	signal(SIGINT, SIG_IGN);
+	signal(SIGHUP, SIG_IGN);
+	signal(SIGALRM,SIG_IGN);
+#endif
   unlink_swap_file();
 #ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
   remove_all_objects();
@@ -2071,8 +2091,11 @@ void slow_shut_down(minutes)
   /*
    * Swap out objects, and free some memory.
    */
+  struct svalue *amo;
   push_number(minutes);
-  if (IS_ZERO(apply_master_ob("slow_shutdown",1)))
+  amo=apply_master_ob("slow_shutdown",1);
+  if (IS_ZERO(amo))
+  /*if (IS_ZERO(apply_master_ob("slow_shutdown",1)))*/
     {
       struct object *save_current = current_object,
       *save_command = command_giver;
@@ -2081,77 +2104,68 @@ void slow_shut_down(minutes)
       shout_string("MudOS driver shouts: Out of memory.\n");
       command_giver = save_command;
       current_object = save_current;
-#if !defined(_AIX) && !defined(NeXT) && !defined(_SEQUENT_) && !defined(SVR4) \
-	&& !defined(cray) && !defined(SunOS_5) && !defined(__386BSD__) \
-	&& !defined(__bsdi__)
-      startshutdownMudOS();
-#else
+#if SIGNAL_FUNC_TAKES_INT
       startshutdownMudOS(1);
+#else
+      startshutdownMudOS();
 #endif
       return;
     }
 }
 
-void do_message(class, msg, scope, exclude)
+void do_message(class, msg, scope, exclude, recurse)
      char *class, *msg;
      struct vector *scope, *exclude;
+     int recurse;
 {
   int i, j, valid;
-  struct vector *use,*tmp;
   struct object *ob;
-  
-  /* make a copy of 'scope' named 'use' */
-  use = slice_array(scope,0,scope->size - 1);
-  for(i = 0; i < scope->size; i++)
-    {
-      if ((scope->item[i].type != T_STRING)
-        && (scope->item[i].type != T_OBJECT))
-          continue;
-      if(scope->item[i].type == T_STRING)
-	{
-	  error ("do_message: bad type.\n");
-	  ob = find_object(scope->item[i].u.string);
-	  if (ob && !object_visible(ob)) ob = 0;
-	  if(ob == 0)
-            error("message: Couldn't find %s",scope->item[i].u.string);
-	  scope->item[i].type = T_OBJECT;
-	  scope->item[i].u.ob = ob;
-	  add_ref(ob,"message");
-	}
-      if(!(scope->item[i].u.ob->flags & O_ENABLE_COMMANDS))
-	{
-	  struct vector *ai;
-
-	  tmp = use;
-	  use = add_array(use, ai = all_inventory(scope->item[i].u.ob, 1));
-	  free_vector(ai);
-	  free_vector(tmp);
-	}
-    }
-  
-  for(i = 0; i < use->size; i++)
-    {
-      if ((use->item[i].u.ob->flags & O_ENABLE_COMMANDS) ||
-	  use->item[i].u.ob->interactive)
-	{
-	  for(valid = 1, j = 0; j < exclude->size; j++)
-      {
-            if(exclude->item[j].type != T_OBJECT) continue;
-            if(exclude->item[j].u.ob == use->item[i].u.ob)
-	      {
-		valid = 0;
-		break;
-	      }
-      }
-	  if(valid)
-	    {
-	      push_string(class,STRING_CONSTANT);
-	      push_string(msg,STRING_CONSTANT);
-	      apply("receive_message",use->item[i].u.ob,2);
-	    }
-	}
-    }
-  free_vector(use);
+ 
+  for (i = 0; i < scope->size; i++)
+  {
+        switch (scope->item[i].type)
+        {
+                case T_STRING:
+                       ob = find_object(scope->item[i].u.string);
+                       if (ob && !object_visible(ob))
+                        ob = 0;
+                       break;
+                case T_OBJECT:
+                       ob = scope->item[i].u.ob;
+                       break;
+                default:
+                       ob = 0;
+                       break;
+        }
+        if (!ob)
+                continue;
+        if (ob->flags & O_ENABLE_COMMANDS || ob->interactive)
+        {
+          for (valid = 1, j = 0; j < exclude->size; j++)
+          {
+            if (exclude->item[j].type != T_OBJECT) 
+                continue;
+            if (exclude->item[j].u.ob == ob)
+            {
+                valid = 0;
+                break;
+            }
+          }
+          if (valid)
+          {
+              push_string(class, STRING_CONSTANT);
+              push_string(msg, STRING_CONSTANT);
+              apply("receive_message", ob, 2);
+          }
+        }
+        else if (recurse)
+        {
+              struct vector *tmp;
+              tmp = all_inventory(ob, 1);
+              do_message(class, msg, tmp, exclude, 0);
+              free_vector(tmp);
+        }
+  }
 }
 
 #ifdef LAZY_RESETS

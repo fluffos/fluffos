@@ -45,6 +45,7 @@ struct svalue {
 #define T_UNDEFINED     0x4    /* undefinedp() returns true */
 #define T_NULLVALUE     0x8    /* nullp() returns true */
 #define T_REMOTE        0x10   /* remote object (subtype of object) */
+#define T_ERROR         0x20   /* error code */
 
 struct funp {
 	struct svalue obj, fun;
@@ -65,8 +66,6 @@ struct vector {
     (struct vector *)DXALLOC(sizeof (struct vector) + \
 			    sizeof(struct svalue) * (nelem - 1), 121, "ALLOC_VECTOR")
 
-struct lnode_def;
-
 /*
  * Control stack element.
  * 'prog' is usually same as 'ob->prog' (current_object), except when
@@ -74,6 +73,9 @@ struct lnode_def;
  * The pointer, csp, will point to the values that will be used at return.
  */
 struct control_stack {
+#ifdef PROFILE_FUNCTIONS
+	unsigned long entry_secs, entry_usecs;
+#endif
     struct object *ob;		/* Current object */
     struct object *prev_ob;	/* Save previous object */
     struct program *prog;	/* Current program */
@@ -86,6 +88,7 @@ struct control_stack {
 				   programs */
     int variable_index_offset;	/* Same */
     short *break_sp;
+	short caller_type; /* was this a locally called function? */
 };
 
 #define IS_ZERO(x) (!(x) || (((x)->type == T_NUMBER) && ((x)->u.number == 0)))

@@ -37,10 +37,10 @@ object *all_inventory(object default: F_THIS_OBJECT);
 unknown call_other(object|string|object *, string|mixed *, ...);
 void call_out(string, int, ...);
 int member_array(mixed, mixed *, void|int);
-void notify_fail(string);
+int notify_fail(string);
 void input_to(string, ...);
 int random(int);
-void save_object(string, void|int);
+int save_object(string, void|int);
 void add_action(string, void|string, void|int);
 void add_verb(string);
 string query_verb();
@@ -50,6 +50,7 @@ string replace_string(string, string, string, ...);
 int restore_object(string, void|int);
 object *users();
 string *get_dir(string, int default: F_CONST0);
+int strsrch(string, string|int, int default: F_CONST0);
 
 /* communication functions */
 
@@ -58,7 +59,7 @@ void tell_object(object, string);
 void say(string, void|object|object *);
 void shout(string);
 int receive(string);
-void tell_room(object|string, string|object|int, void|object *);
+void tell_room(object|string, string|object|int|float, void|object *);
 void message(string, string, string|string *|object|object *,
              void|object|object *);
 
@@ -76,8 +77,9 @@ void map_delete(mapping,mixed);
 mixed *values(mapping);
 mixed *keys(mapping);
 #ifdef EACH
-mixed *each(mapping);
+mixed *each(mapping, int default: F_CONST0);
 #endif
+mixed match_path(mapping, string);
 
 /* all the *p() type functions */
 
@@ -117,7 +119,9 @@ string read_file(string, void|int, void|int);
 void log_file(string, string);
 int cat(string, void|int, void|int);
 int cp(string, string);
+#ifndef LATTICE
 int link(string, string);
+#endif
 int mkdir(string);
 int rm(string);
 void rmdir(string);
@@ -139,7 +143,7 @@ mixed *localtime(int);
 string function_exists(string, object default: F_THIS_OBJECT);
 
 object *livings();
-object *objects();
+object *objects(void|string, void|object);
 string process_string(string);
 string query_host_name();
 int query_idle(object);
@@ -149,6 +153,7 @@ object query_snoop(object);
 object query_snooping(object);
 int remove_call_out(string);
 int set_heart_beat(int);
+int query_heart_beat();
 void set_hide(int);
 
 void set_living_name(string);
@@ -191,9 +196,6 @@ void disable_wizard();
 int userp(object);
 int wizardp(object);
 
-/*
- * Globally scoped functions (huh?)
- */
 object master();
 
 /*
@@ -213,7 +215,6 @@ int seteuid(string|int);
 
 #ifdef PRIVS
 /* privledge functions */
-
 string query_privs(object default: F_THIS_OBJECT);
 void set_privs(object, int|string);
 #endif /* PRIVS */
@@ -223,6 +224,7 @@ object *children(string);
 
 void reload_object(object);
 
+#ifdef SOCKET_EFUNS
 /*
  * socket efuns
  */
@@ -238,8 +240,10 @@ int socket_acquire(int, string, string, string);
 string socket_error(int);
 string socket_address(int|object);
 void dump_socket_status();
+#endif /* SOCKET_EFUNS */
 
 void error(string);
+int errorp(mixed);
 int uptime();
 int strcmp(string, string);
 
@@ -323,6 +327,8 @@ int set_light(int);
 /* add_worth is a bit silly */
 void add_worth(int, void|object);
 
+int origin();
+
 /* the infrequently used functions */
 
 int reclaim_objects();
@@ -335,8 +341,7 @@ void moncontrol(int);
 /* dump_prog: disassembler... comment out this line if you don't want the
    disassembler compiled in.
 */
-void dump_prog(object, int default: F_CONST0);
-void break_point();
+void dump_prog(object, ...);
 
 #if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
 void debugmalloc(string,int);
@@ -355,8 +360,15 @@ void set_debug_level(int);
 void opcprof(string|void);
 #endif
 
+#ifdef PROFILE_FUNCTIONS
+mapping *function_profile(object default: F_THIS_OBJECT);
+#endif
+
+#ifdef TRACE
 string traceprefix(string|int);
 int trace(int);
+#endif
+
 void swap(object);		/* Only used for debugging */
 
 /* shutdown is at the end because it is only called once per boot cycle :) */

@@ -5,7 +5,7 @@
 #ifdef NeXT
 #include <libc.h>
 #endif
-#ifdef __386BSD__
+#if defined(__386BSD__) || defined(SunOS_5)
 #include <sys/types.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -32,10 +32,24 @@
 #define THE_MALLOC "debugmalloc.c"
 #endif
 
-int main()
+int main(argc, argv)
+int argc;
+char *argv[];
 {
 	unlink("malloc.c");
-	printf("Using memory allocation package: %s\n", THE_MALLOC);
+	if (argc == 2) {
+		printf("Using memory allocation package: %s\n", argv[1]);
+	} else {
+		printf("Using memory allocation package: %s\n", THE_MALLOC);
+	}
+#ifdef LATTICE
+	{
+		char cmd[100];
+		sprintf(cmd,"copy %s malloc.c",THE_MALLOC);
+		system(cmd);
+	}
+#else
 	link(THE_MALLOC,"malloc.c");
+#endif
 	return 0;
 }

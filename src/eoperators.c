@@ -6,15 +6,21 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#ifndef LATTICE
 #include <sys/ioctl.h>
-#include <fcntl.h>
 #include <netdb.h>
+#endif
+#include <fcntl.h>
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
 #include <ctype.h>
 #include <signal.h>
+#ifndef LATTICE
 #include <memory.h>
+#else
+#include "amiga.h"
+#endif
 #include <setjmp.h>
 #include "config.h"
 #include "lint.h"
@@ -70,192 +76,6 @@ extern int eval_cost;
 static int i;
 static float r;
 static struct svalue *argp;
-
-INLINE void
-f_add(num_arg, instruction)
-int num_arg, instruction;
-{
-  struct svalue ret;
-  switch((sp-1)->type){
-  case T_REAL:
-    {
-      switch(sp->type)
-	{
-	case T_NUMBER:
-	  ret.type = T_REAL;
-	  ret.u.real = sp->u.number + (sp-1)->u.real;
-	  break;
-	case T_REAL:
-	  ret.type = T_REAL;
-	  ret.u.real = sp->u.real + (sp-1)->u.real;
-	  break;
-	case T_STRING:
-	  {
-	    char buff[25], *res;
-	    int len;
-
-	    sprintf(buff, "%f", (sp-1)->u.real);
-	    len = SVALUE_STRLEN(sp) + strlen(buff) + 1;
-	    res = DXALLOC(len, 36, "f_add: 3");
-	    eval_cost += (len >> 3);
-	    strcpy(res, buff);
-	    strcat(res, sp->u.string);
-	    ret.type = T_STRING;
-	    ret.subtype = STRING_SHARED;
-	    ret.u.string = make_shared_string(res);
-	    FREE(res);
-	    break;
-	  }
-	case T_POINTER:
-	  ret.type = T_POINTER;
-	  ret.u.vec = (struct vector *)prepend_vector(sp->u.vec, sp-1);
-	  eval_cost += (ret.u.vec->size << 3);
-	  break;
-	default: 
-	  error("Bad type argument to +. %d %d\n", (sp-1)->type, sp->type);
-	}
-      break;
-    }
-  case T_STRING:
-    {
-      switch(sp->type)
-	{
-	case T_STRING:
-	  {
-	    char *res;
-	    int r = SVALUE_STRLEN(sp-1);
-	    int len = r + SVALUE_STRLEN(sp) + 1;
-
-	    res = DXALLOC(len, 34, "f_add: 1");
-	    eval_cost += (len >> 3);
-	    (void)strcpy(res, (sp-1)->u.string);
-	    (void)strcpy(res + r, sp->u.string);
-	    ret.type = T_STRING;
-	    ret.subtype = STRING_SHARED;
-	    ret.u.string = make_shared_string(res);
-	    FREE(res);
-	    break;
-	  } 
-	case T_NUMBER:
-	  {
-	    char buff[20];
-	    char *res;
-	    int len;
-
-	    sprintf(buff, "%d", sp->u.number);
-	    len = SVALUE_STRLEN(sp-1) + strlen(buff) + 1;
-	    res = DXALLOC(len, 35, "f_add: 2");
-	    eval_cost += (len >> 3);
-	    strcpy(res, (sp-1)->u.string);
-	    strcat(res, buff);
-	    ret.type = T_STRING;
-	    ret.subtype = STRING_SHARED;
-	    ret.u.string = make_shared_string(res);
-	    FREE(res);
-	    break;
-	  }
-	case T_REAL:
-	  {
-	    char buff[25];
-	    char *res;
-	    int len;
-
-	    sprintf(buff, "%f", sp->u.real);
-	    len = SVALUE_STRLEN(sp-1) + strlen(buff) + 1;
-	    res = DXALLOC(len, 35, "f_add: 2");
-	    eval_cost += (len >> 3);
-	    strcpy(res, (sp-1)->u.string);
-	    strcat(res, buff);
-	    ret.type = T_STRING;
-	    ret.subtype = STRING_SHARED;
-	    ret.u.string = make_shared_string(res);
-	    FREE(res);
-	    break;
-	  }
-	case T_POINTER:
-	  ret.type = T_POINTER;
-	  ret.u.vec = (struct vector *)prepend_vector(sp->u.vec, sp-1);
-	  eval_cost += (ret.u.vec->size << 3);
-	  break;
-	default: 
-	  error("Bad type argument to +. %d %d\n",(sp-1)->type, sp->type);
-	}
-      break;
-    } 
-  case T_NUMBER:
-    {
-      ret.type = sp->type;
-      switch(sp->type)
-	{
-	case T_NUMBER:
-	  ret.u.number = sp->u.number + (sp-1)->u.number;
-	  break;
-	case T_REAL:
-	  ret.u.real = sp->u.real + (sp-1)->u.number;
-	  break;
-	case T_STRING:
-	  {
-	    char buff[20], *res;
-	    int len;
-
-	    sprintf(buff, "%d", (sp-1)->u.number);
-	    len = SVALUE_STRLEN(sp) + strlen(buff) + 1;
-	    res = DXALLOC(len, 36, "f_add: 3");
-	    eval_cost += (len >> 3);
-	    strcpy(res, buff);
-	    strcat(res, sp->u.string);
-	    ret.subtype = STRING_SHARED;
-	    ret.u.string = make_shared_string(res);
-	    FREE(res);
-	    break;
-	  }
-	case T_POINTER:
-	  ret.u.vec = (struct vector *)prepend_vector(sp->u.vec, sp-1);
-	  eval_cost += (ret.u.vec->size << 3);
-	  break;
-	default: 
-	  error("Bad type argument to +. %d %d\n",(sp-1)->type, sp->type);
-	}
-      break;
-    }
-  case T_POINTER:
-    {
-      ret.type = T_POINTER;
-      switch(sp->type)
-	{
-	case T_POINTER:
-	  ret.u.vec = add_array((sp-1)->u.vec, sp->u.vec);
-	  eval_cost += (ret.u.vec->size << 3);
-	  break;
-	case T_NUMBER:
-	case T_STRING:
-	case T_REAL:
-	  ret.u.vec = (struct vector *)append_vector((sp-1)->u.vec, sp);
-	  eval_cost += (ret.u.vec->size << 2);
-	  break;
-	default: 
-	  error("Bad type argument to +. %d %d\n", 
-		(sp-1)->type, sp->type);
-	}
-      break;
-    } 
-  case T_MAPPING:
-    if(sp->type == T_MAPPING){
-      ret.type = T_MAPPING;
-      ret.u.map = add_mapping((sp-1)->u.map, sp->u.map);
-      eval_cost += (ret.u.map->count << 2);
-    }
-    else {
-      error("Bad type argument to +. %d %d\n", (sp-1)->type, sp->type);
-    }
-    break;
-  default: 
-    error("Bad type argument to +. %d %d\n", (sp-1)->type, sp->type);
-  }
-  pop_n_elems(2);
-  push_svalue(&ret);
-  free_svalue(&ret);
-}
 
 INLINE void
 f_and(num_arg, instruction)
@@ -317,49 +137,6 @@ int num_arg, instruction;
           num_arg-3);
     pop_n_elems(num_arg);   /* Get rid of all arguments */
     push_number(i);     /* Push the result value */
-}
-
-INLINE void
-f_divide(num_arg, instruction)
-int num_arg, instruction;
-{
-  double result;
-
-  if (((sp-1)->type != T_NUMBER) && ((sp-1)->type != T_REAL))
-    bad_arg(1, instruction);
-  if ((sp->type != T_NUMBER) && (sp->type != T_REAL))
-    bad_arg(2, instruction);
-  if ((sp->type == T_NUMBER) && (sp->u.number == 0))
-    error("Division by zero\n");
-  if ((sp->type == T_REAL) && (sp->u.real == 0.0))
-    error("Division by zero\n");
-  if (sp->type == T_NUMBER) {
-    if ((sp-1)->type == T_NUMBER) {
-      i = (sp-1)->u.number / sp->u.number;
-      sp--;
-      sp->u.number = i;
-      return;
-    } else { /* T_REAL */
-      result = (sp-1)->u.real / sp->u.number;
-      sp--;
-      sp->type = T_REAL;
-      sp->u.real = result;
-      return;
-    }
-  } else { /* T_REAL */
-    if ((sp-1)->type == T_REAL) {
-      result = (sp-1)->u.real / sp->u.real;
-      sp--;
-      sp->u.real = result;
-      return;
-    } else {
-      result = (sp-1)->u.number / sp->u.real;
-      sp--;
-      sp->type = T_REAL;
-      sp->u.real = result;
-      return;
-    }
-  }
 }
 
 INLINE void
@@ -527,21 +304,6 @@ int num_arg, instruction;
 }
 
 INLINE void
-f_mod(num_arg, instruction)
-int num_arg, instruction;
-{
-  if ((sp-1)->type != T_NUMBER)
-    bad_arg(1, instruction);
-  if (sp->type != T_NUMBER)
-    bad_arg(2, instruction);
-  if (sp->u.number == 0)
-    error("Modulus by zero.\n");
-  i = (sp-1)->u.number % sp->u.number;
-  sp--;
-  sp->u.number = i;
-}
-
-INLINE void
 f_mod_eq(num_arg, instruction)
 int num_arg, instruction;
 {
@@ -558,50 +320,6 @@ int num_arg, instruction;
   pop_n_elems(2);
   push_number(i);
   assign_svalue(argp, sp);
-}
-
-INLINE void
-f_multiply(num_arg, instruction)
-int num_arg, instruction;
-{
-  double result;
-
-  if(((sp-1)->type != sp->type)
-      && (((sp-1)->type != T_NUMBER) || (sp->type != T_REAL))
-      && (((sp-1)->type != T_REAL) || (sp->type != T_NUMBER)))
-    bad_arg(1, instruction);
-
-  if(sp->type == T_NUMBER){
-    if((sp-1)->type == T_REAL){
-      result = sp->u.number * (sp-1)->u.real;
-      sp--;
-      sp->type = T_REAL;
-      sp->u.real = result;
-    } else {
-      i = (sp-1)->u.number * sp->u.number;
-      sp--;
-      sp->u.number = i;
-    }
-    return;
-  } else if (sp->type == T_REAL){
-    if((sp-1)->type == T_NUMBER){
-      result = sp->u.real * (sp-1)->u.number;
-    } else {
-      result = sp->u.real * (sp-1)->u.real;
-    }
-    sp--;
-    sp->type = T_REAL;
-    sp->u.real = result;
-    return;
-  } else if(sp->type == T_MAPPING){
-    struct mapping *m;
-
-    m = compose_mapping((sp-1)->u.map, sp->u.map);
-    pop_n_elems(2);
-    push_mapping(m);
-    return;
-  }
-  bad_arg(2, instruction);
 }
 
 INLINE void
@@ -872,68 +590,6 @@ int num_arg, instruction;
 }
 
 INLINE void
-f_subtract(num_arg, instruction)
-int num_arg, instruction;
-{
-  if((sp - 1)->type == T_NUMBER){
-    if(sp->type == T_NUMBER){
-      i = (sp - 1)->u.number - sp->u.number;
-      pop_n_elems(2);
-      push_number(i);
-    }
-    else if(sp->type == T_REAL){
-      r = (sp - 1)->u.number - sp->u.real;
-      pop_n_elems(2);
-      push_real(r);
-    }
-    else {
-      error("Bad right type to -");
-    }
-  }
-  else if((sp - 1)->type == T_REAL){
-    if(sp->type == T_NUMBER){
-      r = (sp - 1)->u.real - sp->u.number;
-      pop_n_elems(2);
-      push_real(r);
-    }
-    else if(sp->type == T_REAL){
-      r = (sp - 1)->u.real - sp->u.real;
-      pop_n_elems(2);
-      push_real(r);
-    }
-    else {
-      error("Bad right type to -");
-    }
-  }
-  else if((sp - 1)->type == T_POINTER){
-    if(sp->type == T_POINTER){
-      extern struct vector *subtract_array
-	PROT((struct vector*,struct vector*));
-      struct vector *v, *w;
-
-      v = sp->u.vec;
-      if(v->ref > 1){
-        v = slice_array(v, 0, v->size-1 );
-        v->ref--;
-      }
-      sp--;
-      /* subtract_array already takes care of destructed objects */
-      w = subtract_array(sp->u.vec, v);
-      free_vector(v);
-      free_vector(sp->u.vec);
-      sp->u.vec = w;
-      return;
-    }
-    else {
-      error("Bad right type to -");
-    }
-  }
-  else {
-    error("Bad left type to -\n");
-  }
-}
-
-INLINE void
 f_sub_eq(num_arg, instruction)
      int num_arg, instruction;
 {
@@ -995,6 +651,60 @@ f_sub_eq(num_arg, instruction)
   assign_svalue_no_free(sp, argp);
 }
 
+/*
+ * Structure of F_SWITCH:
+ *   table type (1 byte)
+ *   address of table (1 short)
+ *   address of break (1 short)
+ *   address of default (1 short)
+ *     then all the switch code
+ *   switch table (varies)
+ *
+ * Table type is either
+ *   0xfe  - integer labels, direct lookup.
+ *           Table is followed by 1 long that is minimum key value.
+ *           Each table entry is a short address to jump to.
+ *   0xfN  - integer labels.  N is size as a power of 2.
+ *           Each table entry is 1 long (key) followed by 1 short (address).
+ *   0xNf  - string labels.  Otherwise same as for integer labels.
+ *
+ * For normal string or integer tables, if the address is 0 or 1,
+ * the key is the lower end of a range, and the upper end is in
+ * the next entry.  If it's a 0, the second address indicates a
+ * direct lookup table (currently this case is never generated by
+ * the compiler).  If it's a 1, the second address is used for
+ * all keys in the range (corresponds to 'case x..y:' labels).
+ *
+ * Binary search is used on the normal tables.
+ */
+
+/* offsets from 'pc' */
+#define SW_TYPE		0
+#define SW_TABLE	1
+#define SW_BREAK	3
+#define SW_DEFAULT	5
+
+#define ENTRY_SIZE	6
+
+/* offsets used for range (L_ for lower member, U_ for upper member) */
+#define L_LOWER	0
+#define L_TYPE	4
+#define L_UPPER	6
+#define L_ADDR	10
+#define U_LOWER	-6
+#define U_TYPE	-2
+#define U_UPPER	0
+#define U_ADDR	4
+
+#define COPY_SHORT(dst, src) \
+    { ((char *)(dst))[0] = ((char *)(src))[0]; \
+      ((char *)(dst))[1] = ((char *)(src))[1]; }
+#define COPY_LONG(dst, src) \
+    { ((char *)(dst))[0] = ((char *)(src))[0]; \
+      ((char *)(dst))[1] = ((char *)(src))[1]; \
+      ((char *)(dst))[2] = ((char *)(src))[2]; \
+      ((char *)(dst))[3] = ((char *)(src))[3]; }
+
 INLINE void
 f_switch(num_arg, instruction)
 int num_arg, instruction;
@@ -1004,20 +714,20 @@ int num_arg, instruction;
   int d, s = 0, r;
   char *l,*end_tab;
   static unsigned short off_tab[] = {
-    0*6,1*6,3*6,7*6,15*6,31*6,63*6,127*6,255*6,
-    511*6,1023*6,2047*6,4095*6,8191*6
+    0*ENTRY_SIZE, 1*ENTRY_SIZE, 3*ENTRY_SIZE, 7*ENTRY_SIZE, 15*ENTRY_SIZE,
+    31*ENTRY_SIZE, 63*ENTRY_SIZE, 127*ENTRY_SIZE, 255*ENTRY_SIZE,
+    511*ENTRY_SIZE, 1023*ENTRY_SIZE, 2047*ENTRY_SIZE, 4095*ENTRY_SIZE,
+    8191*ENTRY_SIZE,
   };
 
-  ((char *)&offset)[0] = pc[1];
-  ((char *)&offset)[1] = pc[2];
-  ((char *)&break_adr)[0] = pc[3];
-  ((char *)&break_adr)[1] = pc[4];
+  COPY_SHORT(&offset, pc+SW_TABLE);
+  COPY_SHORT(&break_adr, pc+SW_BREAK);
   *--break_sp = break_adr;
   if ( ( i = EXTRACT_UCHAR(pc) >> 4 ) != 0xf )
-  {
+  { /* String table, find correct key */
     if ( sp->type == T_NUMBER && !sp->u.number )
     {
-      /* special case: uninitalized string */
+      /* special case: 0 as a string */
       s = (int)ZERO_AS_STR_CASE_LABEL;
     }
     else if ( sp->type == T_STRING )
@@ -1031,6 +741,16 @@ int num_arg, instruction;
 	s = (int)findstring(sp->u.string);
 	break;
       }
+      if (s == 0)
+      {
+	/* Take default case now - else we could be get confused
+	 * with ZERO_AS_STR_CASE_LABEL.
+	 */
+	COPY_SHORT(&offset, pc+SW_DEFAULT);
+	pop_stack();
+	pc = current_prog->p.i.program + offset;
+	return;
+      }
     }
     else
     {
@@ -1038,149 +758,133 @@ int num_arg, instruction;
     }
   }
   else
-  {
-    if (sp->type != T_NUMBER) bad_arg(1, instruction);
+  { /* Integer table, check type */
+    if (sp->type != T_NUMBER)
+      bad_arg(1, instruction);
     s = sp->u.number;
     i = (int)pc[0] &0xf ;
   }
   pop_stack();
   end_tab = current_prog->p.i.program + break_adr;
+  /*
+   * i is the table size as a power of 2.  Tells us where to
+   * start searching.  i==14 is a special case.
+   */
   if ( i >= 14 )
     if ( i == 14 )
     {
       /* fastest switch format : lookup table */
       l = current_prog->p.i.program + offset;
-      ((char *)&d)[0] = end_tab[-4];
-      ((char *)&d)[1] = end_tab[-3];
-      ((char *)&d)[2] = end_tab[-2];
-      ((char *)&d)[3] = end_tab[-1];
-      if ( s >= d && l + (s=(s-d)*sizeof(short)) < end_tab - 4 )
+      COPY_LONG(&d, end_tab-4);
+      /* d is minimum value - see if in range or not */
+      if ( s >= d && l + (s=(s-d)*sizeof(short)) < (end_tab - 4) )
       {
-	((char *)&offset)[0] = l[s];
-	((char *)&offset)[1] = l[s+1];
+	COPY_SHORT(&offset, &l[s]);
 	if (offset) {
 	  pc = current_prog->p.i.program + offset;
+	  return;
 	}
-      } else
-      {
-        /* default */
-        ((char *)&offset)[0] = pc[5];
-        ((char *)&offset)[1] = pc[6];
-        pc = current_prog->p.i.program + offset;
       }
+      /* default */
+      COPY_SHORT(&offset, pc+SW_DEFAULT);
+      pc = current_prog->p.i.program + offset;
       return;
     }
     else
       fatal("unsupported switch table format.\n");
+
+  /*
+   * l - current entry we are looking at.
+   * d - size to add/subtract from l each iteration.
+   * s - key we're looking for
+   * r - key l is pointing at
+   */
   l = current_prog->p.i.program + offset + off_tab[i];
-  d = (off_tab[i]+(unsigned)6) >> 1;
-  if (d == 3) d=0;
+  d = (int)(off_tab[i]+ENTRY_SIZE) >> 1;
+  if (d < ENTRY_SIZE) d=0;
   for(;;)
   {
-    ((char *)&r)[0] = l[0];
-    ((char *)&r)[1] = l[1];
-    ((char *)&r)[2] = l[2];
-    ((char *)&r)[3] = l[3];
+    COPY_LONG(&r, l);
     if (s < r)
-      if (d < 6)
+    {
+      if (d < ENTRY_SIZE)
       {
-	if (!d)
-	{		/* test for range */
-	  ((char *)&offset)[0] = l[-2];
-	  ((char *)&offset)[1] = l[-1];
-
-	  /* F_BREAK is required to be > 1 */
-	  if (offset <= 1)
+	/* test if entry is part of a range */
+	/* Don't worry about reading from F_BREAK (byte before table) */
+	COPY_SHORT(&offset, l+U_TYPE);
+	if (offset <= 1)
+	{
+	  COPY_LONG(&r, l+U_LOWER);
+	  if (s >= r)
 	  {
-	    ((char *)&r)[0] = l[-6];
-	    ((char *)&r)[1] = l[-5];
-	    ((char *)&r)[2] = l[-4];
-	    ((char *)&r)[3] = l[-3];
-	    if (s >= r)
+	    /* s is in the range */
+	    COPY_SHORT(&offset, l+U_ADDR);
+	    if (!offset)
 	    {
-	      /* s is in the range */
-	      if (!offset)
-	      {
-		/* range with lookup table */
-		((char *)&offset)[0] = l[4];
-		((char *)&offset)[1] = l[5];
-		l = current_prog->p.i.program + offset +
-		  (s-r) * sizeof(short);
-		((char *)&offset)[0] = l[0];
-		((char *)&offset)[1] = l[1];
-		break;
-	      }
-	      ((char *)&offset)[0] = l[4];
-	      ((char *)&offset)[1] = l[5];
-	      break;
-	    }
+	      /* range with lookup table */
+	      l = current_prog->p.i.program + offset +
+		(s-r) * sizeof(short);
+	      COPY_SHORT(&offset, l);
+	    }  /* else normal range and offset is correct */
+	    break;
 	  }
-	  /* use default address */
-	  ((char *)&offset)[0] = pc[5];
-	  ((char *)&offset)[1] = pc[6];
-	  break;
-	}			/* !d */
-	d = 0;
+	}
+	/* key not found, use default address */
+	COPY_SHORT(&offset, pc+SW_DEFAULT);
+	break;
       }
       else
       {
-	/* d >= 6 */
+	/* d >= ENTRY_SIZE */
 	l -= d;
 	d >>= 1;
       }
+    }
     else if (s > r)
     {
-      if (d < 6) 
-     {
-	if (!d)
-	{		/* test for range */
-	  ((char *)&offset)[0] = l[4];
-	  ((char *)&offset)[1] = l[5];
-	  if (offset <= 1)
+      if (d < ENTRY_SIZE) 
+      {
+	/* test if entry is part of a range */
+	COPY_SHORT(&offset, l+L_TYPE);
+	if (offset <= 1)
+	{
+	  COPY_LONG(&r, l+L_UPPER);
+	  if (s <= r)
 	  {
-	    ((char *)&r)[0] = l[6];
-	    ((char *)&r)[1] = l[7];
-	    ((char *)&r)[2] = l[8];
-	    ((char *)&r)[3] = l[9];
-	    if (s <= r)
+	    /* s is in the range */
+	    COPY_SHORT(&offset, l+L_ADDR);
+	    if (!offset)
 	    {
-	      /* s is in the range */
-	      if (!offset)
-	      {
-		/* range with lookup table */
-		((char *)&offset)[0] = l[10];
-		((char *)&offset)[1] = l[11];
-		l = current_prog->p.i.program + offset +
-		  (s-r) * sizeof(short);
-		((char *)&offset)[0] = l[0];
-		((char *)&offset)[1] = l[1];
-		break;
-	      }
-	      ((char *)&offset)[0] = l[10];
-	      ((char *)&offset)[1] = l[11];
-	      break;
-	    }
+	      /* range with lookup table */
+	      l = current_prog->p.i.program + offset +
+		(s-r) * sizeof(short);
+	      COPY_SHORT(&offset, l);
+	    }  /* else normal range and offset is correct */
+	    break;
 	  }
-	  /* use default address */
-	  ((char *)&offset)[0] = pc[5];
-	  ((char *)&offset)[1] = pc[6];
-	  break;
-	}			/* !d */
-	d = 0;
+	}
+	/* use default address */
+	COPY_SHORT(&offset, pc+SW_DEFAULT);
+	break;
       }
       else
-      {
-	/* d >= 6 */
+      { /* d >= ENTRY_SIZE */
 	l += d;
+	/* if table isn't a power of 2 in size, fix us up */
 	while (l >= end_tab)
 	{
 	  d >>= 1;
-	  if (d <= 3)
+	  if (d < ENTRY_SIZE)
 	  {
-	    if (!d) break;
 	    d = 0;
+	    break;
 	  }
 	  l -= d;
+	}
+	if (l == end_tab) {
+	  /* use default address */
+	  COPY_SHORT(&offset, pc+SW_DEFAULT);
+	  break;
 	}
 	d >>= 1;
       }
@@ -1188,39 +892,29 @@ int num_arg, instruction;
     else
     {
       /* s == r */
-      ((char *)&offset)[0] = l[4];
-      ((char *)&offset)[1] = l[5];
-      if ( !l[-2] && !l[-1] )     
-     {
+      COPY_SHORT(&offset, l+U_ADDR);
+      /* found the key - but could be part of a range... */
+      if ( !l[U_TYPE] && !l[U_TYPE+1] )     
+      {
 	/* end of range with lookup table */
-	((char *)&r)[0] = l[-6];
-	((char *)&r)[1] = l[-5];
-	((char *)&r)[2] = l[-4];
-	((char *)&r)[3] = l[-3];
+	COPY_LONG(&r, l+U_LOWER);
 	l = current_prog->p.i.program + offset + (s-r)*sizeof(short);
-	((char *)&offset)[0] = l[0];
-	((char *)&offset)[1] = l[1];
+	COPY_SHORT(&offset, l);
       }
       if (offset <= 1)
       {
+	COPY_SHORT(&offset, l+L_ADDR);
 	if (!offset)
 	{
 	  /* start of range with lookup table */
-	  ((char *)&offset)[0] = l[10];
-	  ((char *)&offset)[1] = l[11];
 	  l = current_prog->p.i.program + offset;
-	  ((char *)&offset)[0] = l[0];
-	  ((char *)&offset)[1] = l[1];
-	}
-	else
-	{
-	  ((char *)&offset)[0] = l[10];
-	  ((char *)&offset)[1] = l[11];
-	}
+	  COPY_SHORT(&offset, l);
+	}  /* else normal range, offset is correct */
       }
       break;
     }
   }
+  /* now do jump */
   pc = current_prog->p.i.program + offset;
 }
 
@@ -1353,7 +1047,7 @@ int num_arg, instruction;
   ((char *)&num)[1] = pc[1];
   pc += 2;
   v = allocate_array((int)num);
-  for (i=0; (unsigned)i < num; i++)
+  for (i=0; i < (int)num; i++)
     assign_svalue_no_free(&v->item[i], sp + i - num + 1);
   pop_n_elems((int)num);
   push_vector(v);

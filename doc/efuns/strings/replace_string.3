@@ -5,20 +5,46 @@
 replace_string() - replace all instances of a string within a string
  
 .SH SYNOPSIS
-string replace_string(string str, string pat, string rep, int x, int y);
+.nf
+string replace_string( str, pattern, replace );
+string replace_string( str, pattern, replace, max );
+string replace_string( str, pattern, replace, first, last );
  
+string str, pattern replace;
+int max, first, last;
+.fi
 .SH DESCRIPTION
-With 3 arguments given, replace_string() returns `str' with all instances of 
-`pat' replaced with `rep'.  If `pat' is zero length then `str' is returned 
-unmodified.  If `rep' is zero length then all occurrences of `pat' are simply
-deleted.   If the resultant string would exceed the maximum string length 
-then replace_string() returns an undefinedp(), non-stringp() value.  If `x'
-is given and `y' is not, then replace_string() will replace up to `x'
-occurrences of the string starting at the beginning of the string; an `x'
-value of 0 means replace all occurrences.  If both `x' and `y' are given,
-then `x' indicates the match number to start replacing at (first match is 0),
-and `y' indicates the number of matches to replace (0 would mean replace 
-until the end is reached).
- 
+replace_string() returns str with all instances of pattern replaced with
+replace.  If pattern has zero length then str is returned unmodified.
+If the resultant string would exceed the maximum string length then
+replace_string() returns an undefinedp(), non-stringp() value.
+.PP
+replace_string() can be used to remove characters from a string by
+specifying a pattern and a zero-length replace parameter.  For example,
+replace_string(" 1 2 3 ", " ", "") would return "123".  replace_string()
+executes faster this way then explode()/implode().
+.PP
+The 4th and 5th arguments are optional (to retain backward compatibility.)
+The extra arguments have the following effect:
+.TP
+4 args
+The 4th argument specifies the maximum number of replacements
+to make (the count starts at 1). A value of 0 implies 'replace all', and
+thus, acts as replace_string() with 3 arguments would. E.g.,
+replace_string("xyxx", "x", "z", 2) would return "zyzx".
+.TP
+5 args
+The 4th and 5th arguments specify the range of matches to replace
+between, with the following constraints:
+.br
+- first < 1 : change all from the start.
+.br
+- last == 0, or last > max_matches : change all to end
+.br
+- first > last : return the unmodified array.
+.br
+E.g., replace_string("xyxxy", "x", "z", 2, 3) returns "xyzzy".
 .SH SEE ALSO
 extract(3), sscanf(3), explode(3)
+.SH AUTHOR
+Zak@TMI-2 wrote the range constraint additions.

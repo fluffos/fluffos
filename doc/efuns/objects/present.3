@@ -13,11 +13,9 @@ then return it.
 .PP
 `str' can also be an object, in which case the test is much faster and easier.
 .PP
-The object is searched for in the inventory of the current object, and
+If `ob' is given, then the search is done in the inventory of `ob', otherwise
+the object is searched for in the inventory of the current object, and
 in the inventory of the environment of the current object.
-.PP
-A second optional argument `ob' is the enviroment where the search for the
-`str' is done. Normally "this_player()" is a good environment.
 
 .SH SEE ALSO
 move_object(3), environment(3).

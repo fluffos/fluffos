@@ -1,3 +1,70 @@
+0.9.17 to 0.9.18
+ 
+. COMPAT BUSTER: preprocessor: MUDOS_PORT changed to __PORT__, MUDOS_ARCH
+  changed to __ARCH__, MUDOS_VERSION to __VERSION__.  Added __COMPILER__,
+  __COMPILER_VERSION__, and __OPTIMIZATION__ defines.  Removed the NO_SHADOWS
+  define, and added the following possible defines: HAS_SOCKETS, 
+  HAS_SHADOWS, HAS_DEBUGMALLOC, HAS_MATH, HAS_MATRIX, HAS_ED, HAS_PRINTF,
+  HAS_PRIVS, HAS_EACH, HAS_CACHE_STATS, HAS_RUSAGE, HAS_DEBUG_LEVEL, 
+  HAS_OPCPROF.
+ 
+. COMPAT BUSTER: rusage() efun: renamed the "usertime" field to "utime"
+  for consistency, and changed it so that the utime and stime fields are 
+  always returned in units of milliseconds.
+ 
+. COMPAT BUSTER: removed uid checks from add_worth() efun: if you don't
+  want people calling this function, you will need a simul_efun override.
+ 
+. call_other() on an array of objects now returns an array of the return
+  values.
+ 
+. Changed printf() to be caught by catch_tell() (if defined in options.h)
+ 
+. Changed notify_fail() to always return 0, allowing for simpler code,
+  ie: return notify_fail("Read what?\n");, etc
+ 
+. (s)printf()/sscanf() improvements/fixes.
+ 
+. New efuns: match_path(), query_heart_beat(), origin(), function_profile(),
+  strsrch(), errorp().
+ 
+. Added the capability of saving loaded LPC programs to disk (.b files) so
+  subsequent loading is faster (added new "save binaries directory" line in
+  the runtime configuration file).
+ 
+. Changed dump_prog() to take an optional third argument: the file to
+  dump to.
+ 
+. Disk swapping improved: line number info is swapped out, and swapfile
+  space is reused.
+ 
+. Added #elif (else if) to the preprocessor.
+ 
+. LOG_CATCHES option added to options.h; if defined, errors caught by
+  catch() will still be logged to debug.log, prefixed by "caught: ".
+ 
+. Incorporated Wildcard@TMI-2's (John Fehr: umfehr06@ccu.umanitoba.ca)
+  port of MudOS to the Amiga (running AmigaDOS).  The port was made using the
+  LATTICE C Compiler.  For those Amiga owners without the LATTICE C compiler 
+  (or the desire to compile the driver from the source), the Amiga MudOS 
+  binaries are available from actlab.rtf.utexas.edu in 
+  /MUD/LPmud/MudOS/amiga.  This port of MudOS does not fully support the 
+  socket efunctions.  Any Amiga guru wanting to make them work please feel 
+  free (and send your patches to mudos-bugs@actlab.rtf.utexas.edu!).
+ 
+. Added @@ENDMARKER processing, which works similarly to @ENDMARKER, but
+  produces an array of strings (1 string per line in the block).  
+ 
+. New second argument to each() efun that resets the current position in the
+  mapping kept track of by each().  each(map, 1) will reset the position.
+ 
+. Changed objects() to take two optional parameters: objects(func, ob)
+  will pass each object as an argument to ob->func(), and will only return
+  the ones for which that function returns 1.
+ 
+. Literally hundreds of bug fixes and optimizations--for full details,
+  read the ChangeLog in the ./src directory.
+ 
 0.9.16 to 0.9.17
  
 . MudOS now compiles and runs on the DEC Alpha running OSF/1

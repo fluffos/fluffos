@@ -50,7 +50,7 @@
 extern int max_string_length;
 
 char * xalloc();
-#ifndef _AIX
+#if !defined(_AIX) && !defined(LATTICE)
 char * strcpy();
 #endif
 
@@ -62,7 +62,7 @@ int overhead_bytes = 0;
 static int search_len = 0;
 static int num_str_searches = 0;
 
-#define StrHash(s) hashstr(s, 20, htable_size)
+#define StrHash(s) (whashstr((s), 20) & (htable_size_minus_one))
 
 #define hfindblock(s, h) sfindblock(s, h = StrHash(s))
 #define findblock(s) sfindblock(s, StrHash(s))
@@ -77,13 +77,17 @@ static int num_str_searches = 0;
 
 static block_t **base_table = (block_t **)0;
 static int htable_size;
+static int htable_size_minus_one;
 
 void
 init_strings()
 {
 	int x;
 
-	htable_size = HTABLE_SIZE;
+	/* ensure that htable size is a power of 2 */
+	for (htable_size = 1; htable_size <= HTABLE_SIZE; htable_size *= 2)
+		;
+	htable_size_minus_one = htable_size - 1;
 	base_table = (block_t **)
 		DXALLOC(sizeof(block_t *) * htable_size, 116, "init_strings");
 	overhead_bytes += (sizeof(block_t *) * htable_size);

@@ -1,21 +1,16 @@
 .\"restore values of variables from a file into an object
 .TH restore_object 3
-
+ 
 .SH NAME
 restore_object() - restore values of variables from a file into an object
-
+ 
 .SH SYNOPSIS
 int restore_object(string name, int flag)
-
+ 
 .SH DESCRIPTION
-Restore values of variables for current object from file `name'.
-It is illegal to have '.' or spaces in the name.
-Return true if success.
-.PP
-Variables that has the type modifer `static' will not be saved.
-Example: `static int xxx;'.
-If the optional second argument is 1, then all of the non-static variables
-are not zeroed out prior to restore (normally, they are).
-
+Restore values of variables for current object from file `name'. If the 
+optional second argument is 1, then all of the non-static variables are not 
+zeroed out prior to restore (normally, they are).
+ 
 .SH SEE ALSO
 save_object(3).

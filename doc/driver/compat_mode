@@ -1,3 +1,0 @@
-COMPAT_MODE is no longer supported in this version of the driver.  This
-means that MudOS cannot be used to run mudlibs written for the 2.4.5 version
-of the LPmud gamedriver.  MudOS requires a 3.0 native mudlib.

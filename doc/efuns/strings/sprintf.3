@@ -11,8 +11,6 @@ string sprintf(string format, ...)
 
 .SH DESCRIPTION
 An implementation of (s)printf() for LPC, with quite a few extensions
-(note that as no floating point exists, some parameters have slightly
-different meaning or restrictions to "standard" (s)printf.)
 Implemented by Lynscar (Sean A Reith).
 .PP
 This version supports the following as modifiers:
@@ -95,6 +93,9 @@ the integer arg is printed in hex.
 .TP
 X
 the integer arg is printed in hex (with A-F in capitals).
+.TP
+f
+floating point number
 
 .SH RETURN VALUES
 sprintf() returns the formatted string.

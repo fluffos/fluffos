@@ -1,7 +1,11 @@
-/* arch.h: MUDOS_ARCH - a predefined macro exported to all LPC objects */
+/* arch.h: __ARCH__ - a predefined macro exported to all LPC objects */
+
+#ifdef sequent
+#define ARCH "Sequent DYNIX"
+#endif
 
 #ifdef __SEQUENT__
-#define ARCH "Sequent"
+#define ARCH "Sequent DYNIX/ptx"
 #endif
 
 #ifdef NeXT
@@ -57,6 +61,10 @@
 #endif
 #ifdef __alpha
 #define ARCH "Alpha"
+#endif
+
+#if !defined(ARCH) && defined(__bsdi__)
+#define ARCH "BSDI"
 #endif
 
 #if !defined(ARCH) && defined(ultrix)

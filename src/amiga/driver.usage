@@ -1,0 +1,19 @@
+To run:
+
+1) Download a mudlib, and change the config file according to where
+the lib is located. (Also, the port # should be 4444.)
+
+2) Assign etc: to a directory that contains a hosts text file.  The
+first line should look like:
+
+6.66.66.6     exodus
+
+3) Run driver just as you normally ("driver <config file>")
+
+4) Run playmud to enter the game.
+
+One note of warning:  The TMI mudlib will NOT work with this driver.
+The socket efuns are currently not supported by the Amiga port of the
+MudOS driver, and the TMI mudlib seems to make extensive use of them.
+
+  Wildcard

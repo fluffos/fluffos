@@ -4,6 +4,9 @@
  */
 
 #include "config.h"
+#ifdef SunOS_5
+#include <stdlib.h>
+#endif
 #include <sys/types.h>
 #if (defined(_SEQUENT_) || defined(hpux) || defined(sgi) \
 	|| defined(_AUX_SOURCE) || defined(linux) || defined(cray) \
@@ -14,7 +17,7 @@
 #ifndef SunOS_5
 #include <sys/dir.h>
 #endif
-#ifdef __386BSD__
+#if defined(__386BSD__) || defined(SunOS_5)
 #include <unistd.h>
 #endif
 #include <fcntl.h>
@@ -22,7 +25,9 @@
 #include <string.h>
 #include <errno.h>
 #include <stdio.h>
+#ifndef LATTICE
 #include <memory.h>
+#endif
 #if defined(sun)
 #include <alloca.h>
 #endif
@@ -50,9 +55,13 @@ extern int errno;
 extern int comp_flag;
 extern int max_array_size;
 
+#ifndef LATTICE
 char *inherit_file;
+#else
+char *amigafypath(char *);
+#endif
 
-#if !defined(NeXT) && !defined(__386BSD__)
+#if !defined(NeXT) && !defined(__386BSD__) && !defined(SunOS_5)
 extern int readlink PROT((char *, char *, int));
 extern int symlink PROT((char *, char *));
 #ifdef MSDOS
@@ -76,9 +85,9 @@ int legal_path PROT((char *));
 
 extern int d_flag;
 
-struct object *current_object;      /* The object interpreting a function. */
-struct object *command_giver;       /* Where the current command came from. */
-struct object *current_interactive; /* The user who caused this execution */
+extern struct object *current_object;      /* The object interpreting a function. */
+extern struct object *command_giver;       /* Where the current command came from. */
+extern struct object *current_interactive; /* The user who caused this execution */
 
 #define MAX_LINES 50
 
@@ -140,8 +149,8 @@ struct stat *st;
  * of strings, the function will return an array of arrays about files.
  * The information in each array is supplied in the order:
  *    name of file,
- *    last update of file,
- *    size of file (-2 means file doesn't exist).
+ *    size of file,
+ *    last update of file.
  */
 #define MAX_FNAME_SIZE 255
 #define MAX_PATH_LEN   1024
@@ -154,7 +163,7 @@ struct vector *get_dir(path, flags)
     DIR *dirp;
     int namelen, do_match = 0;
 #if defined(_AIX) || defined(M_UNIX) || defined(OSF) || defined(_SEQUENT_) \
-	|| defined(SVR4) || defined(cray) || defined(SunOS_5)
+	|| defined(SVR4) || defined(cray) || defined(SunOS_5) || defined(LATTICE)
     struct dirent *de;
 #else
     struct direct *de;
@@ -174,7 +183,11 @@ struct vector *get_dir(path, flags)
 	return 0;
 
     if (strlen(path)<2) {
+#ifndef LATTICE
 	temppath[0]=path[0]?path[0]:'.';
+#else
+	temppath[0]=path[0];
+#endif
 	temppath[1]='\000';
 	p = temppath;
     } else {
@@ -196,7 +209,11 @@ struct vector *get_dir(path, flags)
 	    *p = '\0';
 	} else {
 	    strcpy(regexp, p);
+#ifndef LATTICE
 	    strcpy(temppath, ".");
+#else
+	    strcpy(temppath, "");
+#endif
 	}
 	do_match = 1;
     } else if (*p != '\0' && strcmp(temppath, ".")) {
@@ -206,7 +223,9 @@ struct vector *get_dir(path, flags)
         encode_stat(&v->item[0], flags, p, &st);
 	return v;
     }
-
+/*#ifdef LATTICE
+	if (temppath[0]=='.') temppath[0]=0;
+#endif*/
     if ((dirp = opendir(temppath)) == 0)
 	return 0;
 
@@ -406,13 +425,23 @@ int legal_path(path)
 #ifdef MSDOS
     if (!valid_msdos(path)) return(0);
 #endif
-    for(p = strchr(path, '.'); p; p = strchr(p+1, '.')) {
-	if (p[1] == '.')
-	    return 0;
-	if (p[1] == '/') /* disallow paths like /data/./mail/buddha-mbox.o */
-	    return 0;
+    p = path;
+    while (p) {			/* Zak, 930530 - do better checking */
+	if (p[0] == '.')
+	{
+	    if (p[1] == '\0')	/* trailing `.' ok */
+		break;
+	    if (p[1] == '.')	/* check for `..' or `../' */
+		p++;
+	    if (p[1] == '/' || p[1] == '\0')
+		return 0;	/* check for `./', `..', or `../' */
+	}
+	p = _strstr(p, "/.");	/* search next component */
+	if (p)
+	    p++;		/* step over `/' */
     }
-#ifdef AMIGA /* I don't know what the proper define should be, just leaving
+#if defined(AMIGA) || defined(LATTICE)
+	 /* I don't know what the proper define should be, just leaving
 		an appropriate place for the right stuff to happen here 
 		- Wayfarer */
     /* fail if there's a ':' since on AmigaDOS this means it's a
@@ -513,21 +542,21 @@ char *read_file(file,start,len)
 	    return 0;
 	}
     }
-    if (!start) start = 1;
+    if (start < 1) start = 1;
     if (!len) len = READ_FILE_MAX_SIZE;
     str = DXALLOC(size + 1, 41, "read_file: str");
     str[size] = '\0';
     do {
 	if (size > st.st_size)
 	    size = st.st_size;
-        if (fread(str, size, 1, f) != 1) {
+        if ((fread(str, size, 1, f) != 1) || !size) {
     	    fclose(f);
 	    FREE(str);
     	    return 0;
         }
 	st.st_size -= size;
 	end = str+size;
-        for (p=str; ( p2=memchr(p,'\n',end-p) ) && --start; ) p=p2+1;
+        for (p=str; ( p2=(char *)memchr(p,'\n',end-p) ) && --start; ) p=p2+1;
     } while ( start > 1 );
     for (p2=str; p != end; ) {
         c = *p++;
@@ -540,7 +569,7 @@ char *read_file(file,start,len)
 	size -= ( p2-str) ; 
 	if (size > st.st_size)
 	    size = st.st_size;
-        if (fread(p2, size, 1, f) != 1) {
+        if ((fread(p2, size, 1, f) != 1) || !size) {
     	    fclose(f);
 	    FREE(str);
     	    return 0;
@@ -726,12 +755,15 @@ char *check_valid_path(path, call_object, call_fun, writeflg)
 	v = apply_master_ob("valid_write", 3);
     else
 	v = apply_master_ob("valid_read", 3);
+
     if (v && v->type == T_NUMBER && v->u.number == 0)
 	return 0;
     if (path[0] == '/')
 	path++;
+#ifndef LATTICE
     if (path[0] == '\0')
 	path = ".";
+#endif
     if (legal_path(path))
 	return path;
     return 0;
@@ -949,7 +981,7 @@ int flag;
 	error ("%s: unknown error\n", to);
 	return 1;
      }
-#ifdef SYSV
+#if defined(SYSV) && !defined(_SEQUENT_)
    if ((flag == F_RENAME) && isdir(from)) {
       char cmd_buf[100];
       sprintf(cmd_buf, "/usr/lib/mv_dir %s %s", from, to);
@@ -1124,9 +1156,11 @@ dump_file_descriptors()
 	if (fstat(i, &stbuf) == -1)
 	    continue;
 
+#ifndef LATTICE
 	if (S_ISCHR(stbuf.st_mode) || S_ISBLK(stbuf.st_mode))
 	    dev = stbuf.st_rdev;
 	else
+#endif
 	    dev = stbuf.st_dev;
 
 	add_message("%2d", i);

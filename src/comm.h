@@ -6,15 +6,21 @@
 #ifndef _COMM_H_
 #define _COMM_H_
 
+#ifndef LATTICE
 #include <sys/socket.h>
-#if !defined(apollo) && !defined(linux)
+#if !defined(apollo) && !defined(linux) 
 #include <sys/socketvar.h>
 #endif
+#endif /* LATTICE */
 #ifdef _AIX
 #include <sys/select.h>
 #endif /* _AIX */
+#ifndef LATTICE
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#else
+#include "amiga.h"
+#endif
 
 #define MAX_TEXT                   2048
 #define MAX_SOCKET_PACKET_SIZE     1024

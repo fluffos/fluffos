@@ -1,5 +1,5 @@
 /*
- * options.h: global defines for MudOS
+ * options.h: global defines for the compile-time configuration of MudOS
  */
 
 /* note: most of the configurable options are now set via the configuration
@@ -41,6 +41,11 @@
 */
 #undef DO_MSTATS
 
+/* LOG_CATCHES: define this to cause errors that are catch()'d to be
+   sent to the debug log anyway.
+*/
+#define LOG_CATCHES
+
 /* defining this (in addition to DEBUGMALLOC) enables the set_malloc_mask(int)
    and debugmalloc(string,int) efuns.  These two efuns basically allow you
    to cause certain malloc's and free's (with tags selected by a specified
@@ -51,10 +56,28 @@
 */
 #undef DEBUGMALLOC_EXTENSIONS
 
+/* SOCKET_EFUNS: define this to enable the socket efunctions.  This
+   causes HAS_SOCKETS to be defined for all LPC objects.
+*/
+#define SOCKET_EFUNS
+
 /* LPC_OPTIMIZE: define this to enable constant expression elimination
    optimizations in compiler.y.  Not fully tested.
 */
-#undef LPC_OPTIMIZE
+#define LPC_OPTIMIZE
+
+/*
+  LPC_OPTIMIZE_LOOPS:  define this if you want the following optimizations:
+
+  - optimized a couple of common 'for loop' and 'while loop' forms.
+    The typical empty 'for loop' is now over twice as fast as it was before.
+    (note: for (i = 0; i < limit; i++); is now faster than
+    i = limit; while (i--) ; was in 0.9.17.4 and earlier.
+  - optimized while (i--); so that it only takes one LPC byte code
+    instruction instead of three.  This made it three (3) times faster (on
+    the NeXT 68040 for example) than it was in the past release.
+*/
+#define LPC_OPTIMIZE_LOOPS
 
 /* CONFIG_FILE_DIR specifies a directory in which the driver will search for
  * defaults config files.  If you don't wish to use this MACRO, you may
@@ -75,7 +98,7 @@
 /* MATRIX: determines whether or not the 3d graphics efuns (for floats)
  * are defined - see func_spec.c for a list.
  */
-#define MATRIX
+#undef MATRIX
 
 /* LAZY_RESETS: if this is defined, an object will only have reset()
    called in it when it is touched via apply_low() or move_object()
@@ -86,7 +109,7 @@
    once and never again (which can save memory since some objects won't get
    reloaded that otherwise would).
 */
-#define LAZY_RESETS
+#undef LAZY_RESETS
 
 /* SAVE_EXTENSION: defines the file extension used by save_object()
    and restore_object().  Some sysadmins run scripts that periodically
@@ -107,8 +130,8 @@
    hang your mud with an infinite loop, or 2) use valid_override() in master
    and add a set_eval_limit() simul_efun to restrict the use of
    set_eval_limit().  *The intended use of this efun is to let certain
-   privileged objects (e.g. daemons) that are trusted to not contain
-   infinite loops up the eval limit to temporarily exceed the normal max
+   privileged objects (e.g. daemons) that are trusted (to not contain
+   infinite loops) up the eval limit to temporarily exceed the normal max
    eval limit and then set the limit back to normal before the next
    unprivileged object executes.
 */
@@ -116,15 +139,24 @@
 
 /* EACH: define this if you want the each() operator for mappings.  Undefining
    EACH save about 12 bytes per allocated mapping but will make the each()
-   efun unavailable.
+   efun unavailable.  Many people think each() is a bad efun to have but
+   its here because people use it and would gripe if I took it away.  The
+   alternative to each() is to use keys() and iterate over the returned
+   array.
 */
-#define EACH
+#undef EACH
 
 /* STRICT_TYPE_CHECKING: define this if you wish to force formal parameter
    to include types.  If this is undef'd, then grossnesses like:
    func(obj) { string foo;  foo = allocate(3); } are allowed.
 */
 #undef STRICT_TYPE_CHECKING
+
+/* IGNORE_STRICT_PRAGMA: define this if you wish the #pragma strict_types to
+   be ignored.  This should normally be #undef'd but is useful in
+   certain situations.
+*/
+#undef IGNORE_STRICT_PRAGMA
 
 /* define NO_ANSI if you wish to disallow players (and wizards) from typing
    in commands that contain ANSI escape sequences.  Defining NO_ANSI causes
@@ -136,12 +168,7 @@
    Allow a dump of the # of times each efun is invoked (via the opcprof() efun)
    Also enables the opcprof() efun.
 */
-#define OPCPROF
-
-/* HAS_MONCONTROL: define this if you wish to do profiling of the driver
-   on a machine that has the moncontrol() system call.
-*/
-#undef HAS_MONCONTROL
+#undef OPCPROF
 
 /* TRAP_CRASHES define this if you want MudOS to call crash() in master.c
    and then shutdown when signals are received that would normally crash the
@@ -189,10 +216,9 @@
  * this will increase the size of the object structure by 4 bytes (8 bytes
  * on the DEC Alpha) and will add a new master apply during object creation
  * to "privs_file".  In general, privleges can be used to increase the
- * granularity of security beyond the current root uid mechanism, (for
- * those like Cygnus who tend to be paranoid).  Note for those who'd rather
- * do such things at the mudlib level, look at the inherits() efun and
- * the 'valid_object' apply to master.
+ * granularity of security beyond the current root uid mechanism,
+ * Note for those who'd rather do such things at the mudlib level, look at
+ * the inherits() efun and the 'valid_object' apply to master.
  */
 #undef PRIVS
 
@@ -215,7 +241,7 @@
  * will be mapped to ticks = 1.  Note: don't confuse this with the
  * OLD_HB_BEHAVIOR define (can anyone say 'we have _too_ many defines! :)'?
  */
-#define OLD_HEARTBEAT
+#undef OLD_HEARTBEAT
 
 /*
  * LARGEST_PRINTABLE_STRING is the size of the vsprintf() buffer in comm.c
@@ -285,10 +311,15 @@
  * TRACE_CODE
  * define this for to enable code tracing
  * (the driver will print out the previous lines of code to an error)
- * eval_instruction() runs about twice when this is not defined (for
- * the most common eoperators).
+ * eval_instruction() runs about twice as fast when this is not defined
+ * (for the most common eoperators).
  */
 #undef TRACE_CODE
+
+/* TRACE: define this to enable the trace() and traceprefix() efuns.
+   (keeping this undefined will cause the driver to run faster).
+*/
+#undef TRACE
 
 /*
  * undefine this if you want to use the old style of access control
@@ -322,7 +353,7 @@
    sent directly via add_message()).  This is useful if you want to
    build a smart client that does something different with snoop messages.
 */
-#undef RECEIVE_SNOOP
+#define RECEIVE_SNOOP
 
 /*
  * Define LOG_SHOUT if you want all shouts to be logged in
@@ -341,6 +372,47 @@
    Best to leave OLD_PRESENT defined for now.
 */
 #define OLD_PRESENT
+
+/* PROFILE_FUNCTIONS: define this to be able to measure the CPU time used by
+   all of the user-defined functions in each LPC object.  Note: defining
+   this adds three long ints (12 bytes on 32-bit machines) to the function
+   header structs.  Also note that the resolution of the getrusage() timer
+   may not be high enough on some machines to give non-zero execution
+   times to very small (fast) functions.  In particular if the clock
+   resolution is 1/60 of a second, then any time less than approxmately 15k
+   microseconds will resolve to zero (0).
+*/
+#undef PROFILE_FUNCTIONS
+
+/* NULL_MSG: this is the value that (s)printf() efun prints out when asked
+   to print a string that is 0-valued.  You may wish to redefine this to
+   "(null)" or something that makes more sense to you.
+*/
+#define NULL_MSG  "0"
+
+/* BINARIES: define this to enable the 'save_binary' pragma.
+   This pragma, when set in a program, will cause it to save a
+   binary image when loaded, so that subsequent loadings will
+   be much faster.  The binaries are saved in the directory
+   specified in the configuration file.  The binaries will not
+   load if the LPC source or any of the inherited or included
+   files are out of date, in which case the file is compiled
+   normally (and may save a new binary).
+   
+   In order to save the binary, valid_save_binary() is called
+   in master.c, and is passed the name of the source file.  If
+   this returns a non-zero value, the binary is allowed to be
+   saved.  Allowing any file by any wizard to be saved as a
+   binary is convenient, but may take up a lot of disk space.
+   Currently, this doesn't work on 64 bit machines (ie DEC Alpha)
+*/
+#define BINARIES
+
+/* ALWAYS_SAVE_BINARIES: define this to cause every LPC file to behave
+   as if it contains a line '#pragma save_binary'.  This #define has no
+   affect if BINARIES is not defined.
+*/
+#undef ALWAYS_SAVE_BINARIES
 
 /* various string sizes */
 

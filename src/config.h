@@ -25,6 +25,9 @@
 #define ADDR_SERVER_IP          get_config_str(11)
 #define DEFAULT_ERROR_MESSAGE   get_config_str(12)
 #define DEFAULT_FAIL_MESSAGE   get_config_str(13)
+#ifdef BINARIES
+#define SAVE_BINARIES           get_config_str(14)
+#endif
 
 /*
  * runtime config ints
@@ -59,7 +62,7 @@
 #define SETJMP(x) setjmp(x)
 #define LONGJMP(x,y) longjmp(x,y)
 
-#if defined(SYSV) || defined(SVR4) || defined(cray)
+#ifndef HAS_UALARM
 #define SYSV_HEARTBEAT_INTERVAL  ((HEARTBEAT_INTERVAL+999999)/1000000)
 #endif
 

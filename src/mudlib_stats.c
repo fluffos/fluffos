@@ -9,8 +9,11 @@
 
 #include <stdio.h>
 #include <string.h>
-#if (!defined(NeXT))
+#if !defined(NeXT) && !defined(LATTICE)
 #include <sys/param.h>
+#endif
+#ifdef LATTICE
+#include "amiga.h"
 #endif
 
 #include "config.h"

@@ -42,9 +42,17 @@ int	version = 6;	/* used only in the "set" function, for i.d. */
 
 #include <stdio.h>
 #include <string.h>
-#ifdef __STDC__
+
+#if defined(LATTICE)
+#include "amiga.h"
+#else
+
+#if defined(__STDC__)
 #include <memory.h>
 #endif
+
+#endif
+
 #include <sys/types.h>  /* need for netinet */
 #include <ctype.h>
 /* Regexp is Henry Spencer's package. WARNING: regsub is modified to return
@@ -210,7 +218,7 @@ static void _count_blanks PROT((char *str, int blanks));
 #define DPRINT_MASK     0x0400
 #define P_DPRINT        ( P_FLAGS & DPRINT_MASK )
 #define SHIFTWIDTH_MASK	0x000f
-#define ALL_FLAGS_MASK	0x03f0
+#define ALL_FLAGS_MASK	0x07f0
 #define ED_BUFFER       (command_giver->interactive->ed_buffer)
 #define P_APPENDING	(ED_BUFFER->appending)
 #define P_MORE		(ED_BUFFER->moring)
@@ -273,7 +281,7 @@ struct tbl {
 
 /*-------------------------------------------------------------------------*/
 
-#ifndef _AIX
+#if !defined(_AIX) && !defined(LATTICE)
 extern	char	*strcpy(), *strncpy();
 #endif
 extern	char	*xalloc();

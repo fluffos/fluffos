@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <setjmp.h>
+#ifndef LATTICE
 #include <memory.h>
+#endif
 #include <string.h>
 
 #include "config.h"

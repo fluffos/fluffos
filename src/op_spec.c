@@ -9,10 +9,16 @@ operator number, real, byte, nbyte, string, const0, const1;
 
 operator index, range;
 operator aggregate, aggregate_assoc;
+operator break_point;
 
 operator jump;
 operator branch, branch_when_zero, branch_when_non_zero;
 operator bbranch_when_zero, bbranch_when_non_zero;
+#ifdef LPC_OPTIMIZE_LOOPS
+operator loop_cond;
+operator loop_incr;
+operator while_dec;
+#endif
 operator lor, land;
 
 operator catch, end_catch;

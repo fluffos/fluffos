@@ -1,0 +1,18 @@
+.\"search a mapping for a path
+.TH match_path 3
+ 
+.SH NAME
+match_patch() - search a mapping for a path
+ 
+.SH SYNOPSIS
+mixed match_patch(mapping m, string str);
+ 
+.SH DESCRIPTION
+match_path() searches a mapping for a path.  Each key is assumed to be a 
+string.  The value is completely arbitrary.  The efun finds the largest 
+matching path in the mapping.  Keys ended in '/' are assumed to match paths 
+with character that follow the '/', i.e. / is a wildcard for anything below 
+this directory.  
+ 
+.SH AUTHOR
+Cygnus

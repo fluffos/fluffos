@@ -3,12 +3,14 @@
 #ifndef _MAPPING_H
 #define _MAPPING_H
 
+
 struct node {
-   int hashval;
    struct svalue values[2];
    struct node *next;
+   unsigned short hashval;
 };
 
+#define MAX_TABLE_SIZE 32768
 #define MAP_HASH_TABLE_SIZE 8 /* must be a power of 2 */
 #define FILL_PERCENT 80 /* must not be larger than 99 */
 
@@ -16,20 +18,20 @@ struct node {
  
 struct mapping {
 	struct node **table; /* the hash table */
-	int table_size;      /* # of buckets in hash table == power of 2 */
-	int filled;          /* # of buckets that have entries */
-	int count;           /* total # of nodes actually in mapping  */
-	int do_split;        /* indicates size at which to split the hash table */
+	unsigned short table_size;  /* # of buckets in hash table == power of 2 */
+	unsigned short filled;      /* # of buckets that have entries */
+	unsigned short do_split; /* indicates size at which to split the table */
+	unsigned short ref;      /* how many times this map has been referenced */
+	int count;               /* total # of nodes actually in mapping  */
+	statgroup_t stats;  /* creators of the mapping */
 #ifdef EACH
-	int bucket;          /* keeps track of where each() currently is */
 	struct object *eachObj; /* object that last called each() on this map */
 	struct node *elt;    /* keeps track of where each() is in the map */
+	unsigned short bucket;   /* keeps track of where each() currently is */
 #endif
-	short ref;           /* how many times this map has been referenced */
 #ifdef DEBUG
 	int extra_ref;
 #endif
-	statgroup_t stats;  /* creators of the mapping */
 };
 
 typedef struct finfo_s {

@@ -13,6 +13,8 @@ object `ob'. The returned value can be other than `file_name(ob)' if the
 function is defined by an inherited object.
 .PP
 0 is returned if the function was not defined.
+.PP
+Note that function_exists() does not check shadows.
 
 .SH SEE ALSO
 call_other(3)

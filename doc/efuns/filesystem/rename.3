@@ -5,10 +5,13 @@
 rename() - rename a file
 
 .SH SYNOPSIS
-void rename(string src, string dst);
+int rename(string src, string dst);
 
 .SH DESCRIPTION
-Renames the file <src> to the name <dst>.
+Renames the file <src> to <dst>.
+
+.SH RETURN VALUE
+rename() returns zero (0) to indicate success.  Nonzero indicates failure.
 
 .SH SEE ALSO
 rm(3), rmdir(3), cat(3), cp(3).

@@ -7,9 +7,16 @@
 
 #include <stdio.h>
 #include "config.h"
+#ifdef SunOS_5
+#include <unistd.h>
+#endif
 #include <sys/types.h>
+#ifndef LATTICE
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#else
+#include "amiga.h"
+#endif
 #if defined(_SEQUENT_) || defined(OLD_ULTRIX)
 #include <fcntl.h>
 #endif

@@ -5,8 +5,8 @@
     send out information on new MudOS versions and example mudlib code that
     demonstrates MudOS features.
 
-2)  Send email to mudos-request@iastate.edu if you wish to be added to
-    a mailing list for discussing the MudOS driver (proposed features etc).
+2)  Send email to mudos-request@actlab.rtf.utexas.edu if you wish to be added
+    to a mailing list for discussing the MudOS driver (proposed features etc).
 
 3)  Send email to mudos-bugs@actlab.rtf.utexas.edu if you find a bug (or bugs)
     in the MudOS driver that is not already listed in the ./doc/driver/bugs

@@ -6,36 +6,49 @@
 #ifdef NeXT
 #include <libc.h>
 #endif /* NeXT */
+#ifndef LATTICE
 #include <sys/ioctl.h>
+#endif
 #include <sys/types.h>
 #ifdef __386BSD__
 #include <sys/param.h>
 #endif /* __386BSD__ */
-#if (!defined(NeXT) && !defined(hpux) && !defined(apollo))
+#if !defined(NeXT) && !defined(hpux) && !defined(apollo) && !defined(LATTICE)
 #include <unistd.h>
 #endif /* NeXT */
 #include <fcntl.h>
 #include <sys/time.h>
+#ifndef LATTICE
 #include <sys/socket.h>
 #if !defined(apollo) && !defined(linux)
 #include <sys/socketvar.h>
 #endif /* !apollo && !linux */
+#endif /* LATTICE */
 #ifdef _AIX
 #include <sys/select.h>
 #endif /* _AIX */
+#ifndef LATTICE
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#endif
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
 #include <ctype.h>
 #include <signal.h>
+#ifndef LATTICE
 #include <memory.h>
+#else
+#include "amiga.h"
+#endif
 #include "debug.h"
 #include "addr_server.h"
 
 #include "config.h"
+#ifdef SunOS_5
+#include <stdlib.h>
+#endif
 #include "lint.h"
 
 #ifdef DEBUG_MACRO
@@ -152,7 +165,7 @@ void sigpipe_handler()
 /*
  * I/O handler.
  */
-void process_io(nb)
+INLINE void process_io(nb)
 int nb;
 {
   int i;

@@ -1,20 +1,19 @@
-.\"reports information gathered by the UNIX(tm) getrusage() system call.
+.\"reports information gathered by the getrusage() system call.
+ 
 .TH rusage 3
-
+ 
 .SH NAME
-rusage() - reports information gathered by the UNIX(tm) getrusage() system call
-
+rusage() - reports information gathered by the getrusage() system call
+ 
 .SH SYNOPSIS
 mapping rusage();
-
+ 
 .SH DESCRIPTION
-This efun collects information gathered via the UNIX(tm) getrusage() system
+This efun collects information gathered via the getrusage() system
 call.  Read the getrusage() man page for more information on what information
 will be collected.  Some systems do not have the getrusage() system call
-but do have the times() system call.  On those systems, only "usertime"
-and "stime" will be available (in units of clock ticks which are system
-dependent).  If getrusage() is available, times will be reported in
-milliseconds.
+but do have the times() system call.  On those systems, only "utime"
+and "stime" will be available.  Times are reported in milliseconds.
 .PP
 Here is an example usage of rusage():
 .PP
@@ -23,17 +22,17 @@ Here is an example usage of rusage():
   create()
   {
       mapping info;
-
+ 
       info = rusage();
-      write("user time = " + info["usertime"] + "ms\n");
+      write("user time = " + info["utime"] + "ms\n");
       write("system time = " + info["stime"] + "ms\n");
   }
 .fi
 .PP
 The available fields are:
 .IP
-usertime, stime, maxrss, ixrss, idrss, isrss, minflt, majflt, nswap, inblock,
+utime, stime, maxrss, ixrss, idrss, isrss, minflt, majflt, nswap, inblock,
 oublock, msgsnd, msgrcv, nsignals, nvcsw, nivcsw.
-
+ 
 .SH SEE ALSO
-time_expression(3), query_load_average(3)
+time_expression(3), function_profile(3).

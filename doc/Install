@@ -46,9 +46,8 @@ Perform the following steps:
 5) Read the comments in the options.h file and change those remaining macro
    definitions that are not set appropriately for your tastes.
 
-6) If you do not have a NeXT (2.1 or 3.0), HP (HP-UX 7.0 or 8.x), SPARCstation,
-   Sun3, RS/6000, Ultrix (e.g. DECstation), Sequent, System VR4 machine,
-   Linux, 386bsd, SGI, or A/UX machine, then you may need to change port.h.
+6) If your machine is not listed in the 'Platforms' file in this directory,
+   then you may need to change port.h.
 
 7) Type: make install
 

@@ -5,14 +5,14 @@
  * last modified: 2/16/92
  */
 
+#include "config.h"
 #include <stdio.h>
-#ifdef __386BSD__
+#if defined(__386BSD__) || defined(SunOS_5)
 #include <string.h>
 #endif
-#include "config.h"
 #include "lint.h"
 
-#define NUM_STRS 14
+#define NUM_STRS 15
 #define NUM_INTS 25
 
 #define MAX_LINE_LENGTH 120
@@ -154,6 +154,9 @@ void set_defaults (filename)
   scan_config_line(buff,"address server ip : %[^\n]",config_str[11],1);
   scan_config_line(buff,"default error message : %[^\n]",config_str[12],0);
   scan_config_line(buff,"default fail message : %[^\n]",config_str[13],0);
+#ifdef SAVE_BINARIES
+  scan_config_line(buff,"save binaries directory : %[^\n]",config_str[14],0);
+#endif
   
   scan_config_line(buff,"time to clean up : %d\n",&config_int[0],1);
   scan_config_line(buff,"time to swap : %d\n",&config_int[1],1);

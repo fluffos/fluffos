@@ -1,16 +1,16 @@
+#include "config.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
-#ifdef __386BSD__
+#if defined(__386BSD__) || defined(SunOS_5)
 #include <unistd.h>
 #endif
-#ifdef __STDC__
+#if defined(__STDC__) && !defined(LATTICE)
 #include <memory.h>
 #endif
 
-#include "config.h"
 #include "lint.h"
 #include "interpret.h"
 #include "mapping.h"
@@ -485,51 +485,51 @@ restore_object_from_buff(ob, theBuff, name, val)
 struct object *ob;
 char *theBuff, *name, *val;
 {
-	char *buff, *nextBuff, *tmp, *theEnd, *space;
-	char var[100];
-    struct variable *p;
-	int rc;
-
-	theEnd = theBuff + strlen(theBuff);
-	nextBuff = theBuff;
+        char *buff, *nextBuff, *tmp, *theEnd, *space;
+        char var[100];
+        struct variable *p;
+        int rc;
+ 
+        theEnd = theBuff + strlen(theBuff);
+        nextBuff = theBuff;
     while (1) {
-	struct svalue *v;
-
-	buff = nextBuff;
-	if (!buff || (buff == theEnd))
-	    break;
-	if ((tmp = strchr(buff, '\n'))) {
-		*tmp = '\0';
-		nextBuff = tmp + 1;
-	} else {
-		nextBuff = 0;
-	}
-	if (buff[0] == '#') /* ignore 'comments' in savefiles */
-		continue;
-	space = strchr(buff, ' ');
-	if ((space == 0) || ((space - buff) >= sizeof(var))) {
+        struct svalue *v;
+ 
+        buff = nextBuff;
+        if (!buff || (buff == theEnd))
+            break;
+        if ((tmp = strchr(buff, '\n'))) {
+                *tmp = '\0';
+                nextBuff = tmp + 1;
+        } else {
+                nextBuff = 0;
+        }
+        if (buff[0] == '#') /* ignore 'comments' in savefiles */
+                continue;
+        space = strchr(buff, ' ');
+        if ((space == 0) || ((space - buff) >= sizeof(var))) {
             FREE(val);
             FREE(name);
             FREE(theBuff);
-	    error("Illegal format when restore %s.\n", name);
-	}
-	(void)strncpy(var, buff, space - buff);
-	var[space - buff] = '\0';
-	(void)strcpy(val, space+1);
-	p = find_status(var, 0);
-	if (p == 0 || (p->type & TYPE_MOD_STATIC))
-	    continue;
-	v = &ob->variables[p - ob->prog->p.i.variable_names];
-    rc = restore_svalue(val, v);
-	if (rc < 0) {
-		FREE(val);	
-		FREE(name);
-		FREE(theBuff);
-		if (rc == -1)
- 	        error("Illegal array format when restore %s.\n", name);
-		else if (rc == -2)
-            error("Illegal mapping format when restore %s.\n", name);
-	}
+            error("restore_object(): Illegal file format.\n");
+        }
+        (void)strncpy(var, buff, space - buff);
+        var[space - buff] = '\0';
+        (void)strcpy(val, space+1);
+        p = find_status(var, 0);
+        if (p == 0 || (p->type & TYPE_MOD_STATIC))
+            continue;
+        v = &ob->variables[p - ob->prog->p.i.variable_names];
+        rc = restore_svalue(val, v);
+        if (rc < 0) {
+                FREE(val);
+                FREE(name);
+                FREE(theBuff);
+                if (rc == -1)
+                error("restore_object(): Illegal array format.\n");
+                else if (rc == -2)
+                  error("restore_object(): Illegal mapping format.\n");
+        }
     }
 }
 
@@ -539,7 +539,8 @@ char *theBuff, *name, *val;
  * to assertain that the write is legal.
  * If 'save_zeros' is set, 0 valued variables will be saved
  */
-void save_object(ob, file, save_zeros)
+int
+save_object(ob, file, save_zeros)
     struct object *ob;
     char *file;
     int save_zeros;
@@ -551,7 +552,7 @@ void save_object(ob, file, save_zeros)
     /* struct svalue *v; */
 
     if (ob->flags & O_DESTRUCTED)
-        return;
+        return 0;
     file = check_valid_path(file, ob, "save_object", 1);
     if (file == 0)
         error("Denied write permission in save_object().\n");
@@ -575,7 +576,7 @@ void save_object(ob, file, save_zeros)
         error("Could not open %s for a save.\n", tmp_name);
     }
 	fprintf(f, "#%s\n", ob->prog->name);
-	for (i=0; (unsigned)i < ob->prog->p.i.num_variables; i++) {
+	for (i=0; i < (int)ob->prog->p.i.num_variables; i++) {
 		struct svalue *v = &ob->variables[i];
 		char *new_string, *p;
 		int theSize;
@@ -604,27 +605,22 @@ void save_object(ob, file, save_zeros)
 	if (failed) {
 		add_message("Failed to completely save file. Disk could be full.\n");
 	} else {
-	(void)unlink(name);
-#ifndef MSDOS
-	if (link(tmp_name, name) == -1)
-#else
 	(void) fclose(f);
-	if (rename(tmp_name,name) < 0)
-#endif
+	if (rename(tmp_name, name) < 0)
 	{
 		perror(name);
-		printf("Failed to link %s to %s\n", tmp_name, name);
+		printf("Failed to rename %s to %s\n", tmp_name, name);
 		add_message("Failed to save object!\n");
 	}
 	}
-#ifndef MSDOS
-	(void)fclose(f);
-	unlink(tmp_name);
-#endif
 	FREE(name);
-	if (failed)
+	if (failed) {
 		add_message("Failed to save to file. Disk could be full.\n");
+		return 0;
+	}
+	return 1;
 }
+
 
 int restore_object(ob, file, noclear)
     struct object *ob;
@@ -762,6 +758,8 @@ void free_object(ob, from)
      * If the program is freed, then we can also free the variable
      * declarations.
      */
+    if (ob->swap_num != -1)
+	remove_swap_file(ob);  /* do this before prog is freed */
     if (ob->prog) {
 	tot_alloc_object_size -=
 	    (ob->prog->p.i.num_variables - 1) * sizeof (struct svalue) +
@@ -769,8 +767,6 @@ void free_object(ob, from)
 	free_prog(ob->prog, 1);
 	ob->prog = 0;
     }
-    if (ob->swap_num != -1)
-	remove_swap_file(ob);
     for (s = ob->sent; s;) {
 	struct sentence *next;
 	next = s->next;
@@ -995,19 +991,28 @@ void free_prog(progp, free_sub_strings)
 	int i;
 
 	/* Free all function names. */
-	for (i=0; (unsigned)i < progp->p.i.num_functions; i++)
+	for (i=0; i < (int)progp->p.i.num_functions; i++)
 	    if (progp->p.i.functions[i].name)
 		free_string(progp->p.i.functions[i].name);
 	/* Free all strings */
-	for (i=0; (unsigned)i < progp->p.i.num_strings; i++)
+	for (i=0; i < (int)progp->p.i.num_strings; i++)
 	    free_string(progp->p.i.strings[i]);
 	/* Free all variable names */
-	for (i=0; (unsigned)i < progp->p.i.num_variables; i++)
+	for (i=0; i < (int)progp->p.i.num_variables; i++)
 	    free_string(progp->p.i.variable_names[i].name);
 	/* Free all inherited objects */
-	for (i=0; (unsigned)i < progp->p.i.num_inherited; i++)
+	for (i=0; i < (int)progp->p.i.num_inherited; i++)
 	    free_prog(progp->p.i.inherit[i].prog, 1);
 	FREE(progp->name);
+
+	/*
+	 * We're going away for good, not just being swapped,
+	 * so free up line_number stuff.
+	 */
+	if (progp->p.i.line_swap_index != -1)
+	    remove_line_swap(progp);
+	if (progp->p.i.line_numbers)
+	    FREE(progp->p.i.line_numbers);
     }
     FREE((char *)progp);
 }
@@ -1087,14 +1092,16 @@ struct object *obj;
 {
   int i;
   if (!obj->prog) return;
-  for (i = 0; (unsigned)i < obj->prog->p.i.num_variables; i++)
+  for (i = 0; i < (int)obj->prog->p.i.num_variables; i++)
   {
     free_svalue(&obj->variables[i]);
     obj->variables[i] = const0n;
   }
+#ifdef SOCKET_EFUNS
   if (obj->flags & O_EFUN_SOCKET) {
     close_referencing_sockets(obj);
   }
+#endif
   /*
    * If this is the first object being shadowed by another object, then
    * destruct the whole list of shadows.

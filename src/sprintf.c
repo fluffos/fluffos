@@ -132,7 +132,7 @@ typedef unsigned int format_info;
 #define INFO_COLS 0x200
 #define INFO_TABLE 0x400
 
-#define BUFF_SIZE 10000
+#define BUFF_SIZE LARGEST_PRINTABLE_STRING
 
 #define ERROR(x) LONGJMP(error_jmp, x)
 #define ERR_BUFF_OVERFLOW	0x1	/* buffer overflowed */
@@ -295,6 +295,11 @@ void svalue_to_string(obj, str, size, indent, trailing, indent2)
 {
   int i;
 
+  /* prevent an infinite recursion on self-referential structures */
+  if (indent > 200) {
+     error("structure too deep to print.\n");
+     return;
+  }
   if (!indent2)
     add_indent(str, &size, indent);
   switch (obj->type) {
@@ -339,13 +344,13 @@ void svalue_to_string(obj, str, size, indent, trailing, indent2)
       stradd(str, &size, " :)");
       break;
     case T_MAPPING:
-      if (!(obj->u.map->table_size)) {
+      if (!(obj->u.map->count)) {
         stradd(str, &size, "([ ])");
       } else {
         stradd(str, &size, "([ /* sizeof() == ");
         numadd(str, &size, obj->u.map->count);
         stradd(str, &size, " */\n");
-        for (i=0;i<(obj->u.map->table_size)-1;i++) {
+        for (i=0;i<(int)(obj->u.map->table_size);i++) {
           struct node *elm;
 
           for (elm = obj->u.map->table[i];elm;elm = elm->next) {
@@ -490,6 +495,7 @@ int add_column(column, trailing)
 {
   register unsigned int done, off=0, inadd_off=0, first_ig=0;
   unsigned int save;
+  static char tmp_buf[2049];  /* hmm, is this always enough? */
 #define COL (*column)
 #define COL_D (COL->d.col)
 
@@ -514,11 +520,20 @@ int add_column(column, trailing)
      */
     if (!done) done = save;
   }
+  strncpy(tmp_buf, COL_D, done);
+  tmp_buf[done] = '\0';
+/*
+  this commented block and the one below would sometimes try to write to
+  a constant string (ie, the one returned by f_range()), causing a crash.
+  changed it to strncpy()...sigh  -bobf/Blackthorn
   save = COL_D[done];
   COL_D[done] = '\0';
-  add_justified(COL_D, COL->pad, COL->size, COL->info,
+*/
+  add_justified(tmp_buf, COL->pad, COL->size, COL->info,
                 (trailing || (COL->next)));
+/*
   COL_D[done] = save;
+*/
   COL_D += done; /* inc'ed below ... */
   /*
    * if this or the next character is a NULL then take this column out
@@ -608,6 +623,18 @@ char *string_print_formatted(format_str, argc, argv)
   if ((i = SETJMP(error_jmp))) { /* error handling */
     char *err;
 #endif
+
+/*
+ * Must restore format_str before we exit. /Oros 930902
+ */
+
+    while (saves) {
+      savechars *tmp;
+      *(saves->where) = saves->what;
+      tmp = saves;
+      saves = saves->next;
+      free((char *)tmp);
+    }
 
     switch(i) {
       case ERR_BUFF_OVERFLOW:
@@ -867,6 +894,19 @@ char *string_print_formatted(format_str, argc, argv)
         } else if ((finfo & INFO_T) == INFO_T_STRING) {
           int slen;
 
+
+       /* %s null handling added 930709 by Luke Mewburn <zak@rmit.oz.au> */
+     if (carg->type == T_NUMBER && carg->u.number == 0) {
+         clean = (struct svalue *)
+           DXALLOC(sizeof(struct svalue), 121, "string_print: z1");
+         clean->type = T_STRING;
+         clean->subtype = STRING_MALLOC;
+         clean->u.string = (char *)DXALLOC(sizeof(NULL_MSG),
+                         122, "string_print: z2");
+         strcpy(clean->u.string, NULL_MSG);
+         carg = clean;
+     }
+
           if (carg->type != T_STRING)
             ERROR(ERR_INCORRECT_ARG_S);
           slen = strlen(carg->u.string);
@@ -966,7 +1006,7 @@ add_table_now:
             }
           }
         } else if (finfo & INFO_T_INT) { /* one of the integer types */
-          char cheat[4];
+          char cheat[8];
           char temp[100];
   
           *cheat = '%';
@@ -999,10 +1039,17 @@ add_table_now:
 #endif /* RETURN_ERROR_MESSAGES */
           }
           cheat[i] = '\0';
-          if(carg->type == T_REAL) sprintf(temp, cheat, carg->u.real);
-	  else sprintf(temp, cheat, carg->u.number);
-          {
-            int tmpl = strlen(temp);
+  /* Floatingpoint output fixed by hasse@solace.hsh.se (Kniggit@VikingMud) */
+          if(carg->type == T_REAL) {
+	    if(pres) {
+	      sprintf(cheat, "%%.%df", pres);
+	      pres = 0;
+	    }
+	    sprintf(temp, cheat, carg->u.real);
+	  } else
+	    sprintf(temp, cheat, carg->u.number);
+	  {
+	    int tmpl = strlen(temp);
             if (pres && tmpl > pres) temp[pres] = '\0'; /* well.... */
             if (tmpl < fs)
               add_justified(temp, pad, fs, finfo,

@@ -4,6 +4,9 @@
 
 #include "efuns.h"
 #include "instrs.h"
+#ifdef SunOS_5
+#include <stdlib.h>
+#endif
 
 static struct object *ob;
 
@@ -15,23 +18,39 @@ f_dump_prog(num_arg, instruction)
 int num_arg, instruction;
 {
     struct program *prog;
+	char *where;
     int d;
-    
-    ob = sp[-1].u.ob;
-    d = sp->u.number;
-    pop_n_elems(2);
-    if (!(prog = ob->prog)) {
-        add_message("No program for object\n");
-    } else {
-        dump_prog(prog, "/PROG_DUMP", d);
-    }
-    push_number(0);
+	
+	if (num_arg == 2) {
+		ob = sp[-1].u.ob;
+		d = sp->u.number;
+		where = 0;
+	} else if (num_arg == 3) {
+		ob = sp[-2].u.ob;
+		d = sp[-1].u.number;
+		where = (sp->type == T_STRING) ? sp->u.string : 0;
+	} else {
+		ob = sp->u.ob;
+		d = 0;
+		where = 0;
+	}
+	pop_n_elems(num_arg);
+	if (!(prog = ob->prog)) {
+		add_message("No program for object.\n");
+	} else {
+		if (!where) {
+			where = "/PROG_DUMP";
+		}
+		dump_prog(prog, where, d);
+	}
+	push_number(0);
 }
 
-void dump_prog(prog, fn, do_dis)
-          struct program *prog;
-          char *fn;
-          int do_dis;
+void
+dump_prog(prog, fn, do_dis)
+	struct program *prog;
+	char *fn;
+	int do_dis;
 {
     char *fname;
     FILE *f;
@@ -39,7 +58,7 @@ void dump_prog(prog, fn, do_dis)
     
     fname = check_valid_path(fn, current_object, "dumpallobj", 1);
     if (!fname) {
-        add_message("Invalid path '%s' for writing.\n", fname);
+        add_message("Invalid path '%s' for writing.\n", fn);
         return;
     }
 
@@ -54,14 +73,14 @@ void dump_prog(prog, fn, do_dis)
     fprintf(f, "INHERITS:\n");
     fprintf(f, "\tname                    fio    vio\n");
     fprintf(f, "\t----------------        ---    ---\n");
-    for (i=0; (unsigned)i<prog->p.i.num_inherited; i++)
+    for (i=0; i<(int)prog->p.i.num_inherited; i++)
         fprintf(f, "\t%-20s  %5d  %5d\n",
             prog->p.i.inherit[i].prog->name,
             prog->p.i.inherit[i].function_index_offset,
             prog->p.i.inherit[i].variable_index_offset
             );
     fprintf(f, "PROGRAM:");
-    for (i=0; (unsigned)i<prog->p.i.program_size; i++) {
+    for (i=0; i<(int)prog->p.i.program_size; i++) {
         if (i%16 == 0)
             fprintf(f, "\n\t%04x: ", (unsigned int)i);
         fprintf(f, "%02d ", (unsigned char)prog->p.i.program[i]);
@@ -70,7 +89,7 @@ void dump_prog(prog, fn, do_dis)
     fprintf(f, "FUNCTIONS:\n");
 	fprintf(f, "      name        offset    fio  flags  # locals  # args\n");
 	fprintf(f, "      ----------- ------    ---  -----  --------  ------\n");
-    for (i=0; (unsigned)i<prog->p.i.num_functions; i++) {
+    for (i=0; i<(int)prog->p.i.num_functions; i++) {
         char sflags[6];
 		int flags;
 
@@ -92,13 +111,13 @@ void dump_prog(prog, fn, do_dis)
                );
     }
     fprintf(f, "VARIABLES:\n");
-    for (i=0; (unsigned)i<prog->p.i.num_variables; i++)
+    for (i=0; i<(int)prog->p.i.num_variables; i++)
         fprintf(f, "%4d: %-12s %02x\n", i,
                 prog->p.i.variable_names[i].name,
                 (unsigned)prog->p.i.variable_names[i].flags);
     fprintf(f, "STRINGS:\n");
-    for (i=0; (unsigned)i<prog->p.i.num_strings; i++) {
-        fprintf(f, "4%d: ", i);
+    for (i=0; i<(int)prog->p.i.num_strings; i++) {
+        fprintf(f, "%4d: ", i);
         for (j=0; j < 32; j++) {
             char c;
             if (!(c = prog->p.i.strings[i][j]))
@@ -126,6 +145,9 @@ char *disassem_string(str)
     static char buf[30];
     char *b;
     int i;
+
+    if (!str)
+	return "0";
 
     b = buf;
     for (i=0; i<29; i++) {
@@ -175,7 +197,7 @@ disassemble(f, code, start, end, prog)
     if (start == 0) {
         /* sort offsets of functions */
         offsets = (short *)malloc(NUM_FUNS * 2 * sizeof(short));
-        for (i=0; (unsigned)i<NUM_FUNS; i++) {
+        for (i=0; i<(int)NUM_FUNS; i++) {
             if (!FUNS[i].offset || (FUNS[i].flags & NAME_INHERITED))
                 offsets[i*2] = end+1;
             else
@@ -279,6 +301,14 @@ disassemble(f, code, start, end, prog)
             pc++;
             break;
             
+#ifdef LPC_OPTIMIZE_LOOPS
+		case I(F_LOOP_INCR) :
+			sprintf(buff, "LV%d", EXTRACT_UCHAR(pc));
+			pc++;
+			break;
+        case I(F_WHILE_DEC) :
+        case I(F_LOOP_COND) :
+#endif
         case I(F_LOCAL_NAME) :
         case I(F_PUSH_LOCAL_VARIABLE_LVALUE) :
             sprintf(buff, "LV%d", EXTRACT_UCHAR(pc));
@@ -349,7 +379,7 @@ disassemble(f, code, start, end, prog)
 
                 /* now print out table - ugly... */
                 fprintf(f, "      switch table (for %04x)\n",
-                      (unsigned)(pc-code));
+                      (unsigned)(pc-code-1));
                 if (ttype == 0xfe)
                     ttype = 0;  /* direct lookup */
                 else if (ttype >> 4 == 0xf)
@@ -380,9 +410,9 @@ disassemble(f, code, start, end, prog)
                         ((char *)&iarg)[3] = pc[3];
                         ((char *)&sarg)[0] = pc[4];
                         ((char *)&sarg)[1] = pc[5];
-                        if (ttype == 1) {
-                            fprintf(f, "\t%4d %04x\n", iarg, (unsigned)sarg);
-                        } else {
+                        if (ttype == 1 || !iarg) {
+                            fprintf(f, "\t%-4d\t%04x\n", iarg, (unsigned)sarg);
+			} else {
                             fprintf(f, "\t\"%s\"\t%04x\n",
                            disassem_string((char*)iarg), (unsigned)sarg);
                         }
@@ -404,7 +434,7 @@ disassemble(f, code, start, end, prog)
         if ((next_func >= 0) && ((pc-code) >= offsets[next_func])) {
             fprintf(f, "\n;; Function %s\n", FUNS[offsets[next_func+1]].name);
             next_func += 2;
-            if ((unsigned)next_func >= (NUM_FUNS * 2))
+            if (next_func >= ((int)NUM_FUNS * 2))
                 next_func = -1;
         }
     }

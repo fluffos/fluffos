@@ -7,7 +7,7 @@
 #ifdef GET_PROCESS_STATS
 #include <sys/procstats.h>
 #endif
-#ifdef __bsdi__
+#if defined(__bsdi__) || defined(epix)
 #include <sys/time.h>
 #endif
 #ifdef TIMES
@@ -20,20 +20,28 @@
 #if defined(sun) || defined(apollo) || defined(__386BSD__) || defined(hp68k)
 #include <sys/time.h>
 #endif /* sun, etc */
+#ifndef LATTICE
 #include <sys/resource.h>
+#endif
 #ifdef SunOS_5
 #include <sys/rusage.h>
 #include <crypt.h>
 #endif
+#ifndef LATTICE
 #include <sys/ioctl.h>
-#include <fcntl.h>
 #include <netdb.h>
+#endif
+#include <fcntl.h>
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
 #include <ctype.h>
 #include <signal.h>
+#ifndef LATTICE
 #include <memory.h>
+#else
+#include "amiga.h"
+#endif
 #include <setjmp.h>
 
 #include "lint.h"
@@ -88,6 +96,7 @@ extern struct control_stack *csp;	/* Points to last element pushed */
 extern struct svalue *sp;
 extern int num_hidden;
 extern int eval_cost;
+extern short int caller_type;
 
 #ifdef CACHE_STATS
 extern unsigned int apply_low_call_others;

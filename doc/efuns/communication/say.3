@@ -8,16 +8,15 @@ say() - send a message to all users in the same environment
 varargs void say(string str, object obj);
 
 .SH DESCRIPTION
-Send a message `str' to all players in the same object (room).
+Sends a message to the environment of the originator, all items in the
+same environment, and all items inside of the originator.  The originator
+is this_player(), unless this_player() == 0, in which case, the originator
+is this_object().
 .PP
-The second argument is optional.  If second argument `obj' specified,
+The second argument is optional.  If second argument `obj' is specified,
 the message is sent to all except `obj'.  If `obj' is not an object, but
 an array of objects, all those objects are excluded from receiving the
 message.
-.PP
-This command behaves differently if called from a "heart_beat()".
-When called from a "heart_beat()", the message will reach all players in
-the same environment of the object that calls "say()".
 
 .SH SEE ALSO
 message(3), write(3), shout(3), tell(3).

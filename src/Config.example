@@ -7,10 +7,10 @@
 ###############################################################################
 
 # Name of this lpmud
-name : basis
+name : Basis
 
 # Define what port number the game is to use.
-port number : 7373
+port number : 4000
 
 # Maximum number of users in the game.
 # (currently this option is unused)
@@ -43,6 +43,10 @@ log directory : /log
 # for multiple dirs, separate each path with a ':'
 include directories : /include
 
+# Directory to save binaries in.  (if BINARIES is defined)
+save binaries directory : /binaries
+
+# 
 # This is the file where all global simulated efuns are defined.
 simulated efun file : /adm/obj/simul_efun
 
@@ -156,4 +160,5 @@ object table size : 1501
 address server ip : localhost
 address server port : 7374
 
+# default no-matching-action message
 default fail message : What?

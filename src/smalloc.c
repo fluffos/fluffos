@@ -12,6 +12,10 @@
 */
 
 #include <stdio.h>
+#ifdef OLD_ULTRIX
+#include <stddef.h>
+#define size_t unsigned
+#endif
 #include "config.h"
 #include "lint.h"
 

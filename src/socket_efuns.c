@@ -4,30 +4,45 @@
  *   10-92 : Dave Richards (Cynosure) : less original coding.
  */
 
+#include "config.h"
+
+#ifdef SOCKET_EFUNS
+
+#ifdef SunOS_5
+#include <stdlib.h>
+#include <unistd.h>
+#endif
 #include <sys/types.h>
 #include <sys/time.h>
+#ifndef LATTICE
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#endif
 #ifdef __386BSD__
 #include <sys/param.h>
 #endif
-#if !defined(apollo) && !defined(linux)
+#if !defined(apollo) && !defined(linux) && !defined(LATTICE)
 #include <sys/socketvar.h>
 #endif
 #ifdef _AIX
 #include <sys/select.h>
 #endif /* _AIX */
+#ifndef LATTICE
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <fcntl.h>
 #include <netdb.h>
+#endif
+#include <fcntl.h>
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
 #include <ctype.h>
 #include <signal.h>
+#ifndef LATTICE
 #include <memory.h>
-#include "config.h"
+#else
+#include "amiga.h"
+#endif
 #include "lint.h"
 #include "interpret.h"
 #include "object.h"
@@ -139,7 +154,7 @@ socket_create(mode, read_callback, close_callback)
 	else
 	    strncpy(lpc_socks[i].read_callback, read_callback, CALLBK_BUF_SIZE);
 	lpc_socks[i].write_callback[0] = '\0';
-	if (type != SOCK_DGRAM)
+	if (type != SOCK_DGRAM && close_callback != NULL)
 	    strncpy(lpc_socks[i].close_callback, close_callback, CALLBK_BUF_SIZE);
 	else
 	    lpc_socks[i].close_callback[0] = '\0';
@@ -1013,3 +1028,4 @@ dump_socket_status() {
     add_message("%-21s\n", inet_address(&lpc_socks[i].r_addr));
   }
 }
+#endif /* SOCKET_EFUNS */

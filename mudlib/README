@@ -1,14 +1,12 @@
-1993/05/11
+1993/09/09
  
-TMI-2 (tmi.ccs.northeastern.edu 5555) has released its mudlib.  The 
-Nightmare (jericho.connected.com 6000) mudlib is available.  Also, the 
-Portals mudlib may eventually be released.  If you have developed a MudOS 
-mudlib that is publically available, please send email to 
-mudos-bugs@actlab.rtf.utexas.edu letting us know where to obtain it (so that
-we may include a reference to it in a future release of MudOS).
+TMI-2 (tmi.ccs.neu.edu 5555) has released its mudlib.  The Nightmare 
+(jericho.connected.com 6000) mudlib is also available.  If you have 
+developed a MudOS mudlib that is publically available, please send email to 
+mudos-bugs@actlab.rtf.utexas.edu letting us know where to obtain it (so 
+that we may include a reference to it in a future release of MudOS).
  
 TMI-2 is available via anonymous ftp (login as ftp) from 
-ftp.ccs.northeastern.edu:/pub/mudlibs
+ftp.ccs.neu.edu:/pub/mud/mudlibs.
  
-Nightmare is available via anonymous ftp from orlith.bates.edu and/or 
-jericho.connected.com 5999.
+Nightmare is available via anonymous ftp from jericho.connected.com 5999.

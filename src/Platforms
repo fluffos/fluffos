@@ -1,4 +1,4 @@
-MudOS 0.9.17 should compile and run on the following systems:
+MudOS 0.9.18 should compile and run on the following systems:
  
 DEC Alpha (OSF/1 1.2)
 NeXTstation/NeXTcube (NeXT 2.1 and 3.0)
@@ -19,6 +19,7 @@ IBM PC 386/486 Clone (386BSD)
 IBM PC 386/486 Clone (Linux 0.99.3)
 IBM PC 386/486 Clone (System V Release 4)
 IBM PC 386/486 CLone (BSDI's Commercial 386BSD)
+Amiga (AmigaDOS using the LATTICE C compiler)
 
 *Send mail to mudos-bugs@actlab.rtf.utexas.edu if you experience any problems 
 compiling or running on these systems.  Note that some of these machines have 
@@ -28,4 +29,4 @@ than one listed here, please send the diffs along with machine and OS
 information to the mudos-bugs address.
 
 MSDOS versions of MudOS are available in the /pub/mud/drivers/mudos/msdos
-directory on ftp.ccs.northeastern.edu.
+directory on ftp.ccs.neu.edu.

@@ -9,6 +9,23 @@
 #include "config.h"
 #include "lint.h"
 
+/* for get_cpu_times() */
+#ifdef GET_PROCESS_STATS
+#include <sys/procstats.h>
+#endif
+#ifdef TIMES
+#include <sys/times.h>
+#endif
+#ifdef RUSAGE
+#include <sys/resource.h>
+#endif
+
+/* get a value for CLK_TCK for use by times() */
+#if (defined(TIMES) && !defined(RUSAGE))
+/* this may need #ifdef'd to handle different types of machines */
+#include <limits.h>
+#endif
+
 #ifdef sun
 time_t time PROT((time_t *));
 #endif
@@ -139,3 +156,50 @@ port_sigsetmask(mask)
 	return (omask);
 }
 #endif
+
+int
+get_cpu_times(secs, usecs)
+	unsigned long *secs, *usecs;
+{
+#ifdef RUSAGE
+	struct rusage rus;
+#endif
+#ifdef TIMES
+	struct tms t;
+	unsigned long total;
+#endif
+#ifdef GET_PROCESS_STATS
+    struct process_stats ps;
+#endif
+
+#ifdef RUSAGE /* start RUSAGE */
+	if (getrusage(RUSAGE_SELF, &rus) < 0) {
+		return 0;
+	}
+    *secs = rus.ru_utime.tv_sec + rus.ru_stime.tv_sec;
+	*usecs = rus.ru_utime.tv_usec + rus.ru_stime.tv_usec;
+	return 1;
+#else /* end then RUSAGE */
+
+#ifdef GET_PROCESS_STATS /* start GET_PROCESS_STATS */
+	if (get_process_stats(NULL, PS_SELF, &ps, NULL) == -1) {
+		return 0;
+	}
+	*secs = ps.ps_utime.tv_sec + ps.ps_stime.tv_sec;
+	*usecs = ps.ps_utime.tv_usec + ps.ps_stime.tv_usec;
+	return 1;
+#else /* end then GET_PROCESS_STATS */
+
+#ifdef TIMES /* start TIMES */
+	times(&t);
+	*secs = (total = t.tms_utime + t.tms_stime) / CLK_TCK;
+	*usecs = ((total - (*secs * CLK_TCK)) * 1000000) / CLK_TCK;
+	return 1;
+#else /* end then TIMES */
+	return 0;
+#endif /* end TIMES */
+
+#endif /* end else GET_PROCESS_STATS */
+
+#endif /* end else RUSAGE */
+}

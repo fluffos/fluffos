@@ -1,3 +1,6 @@
 MudOS hints for the DEC Alpha running OSF/1:
 
 Don't try to use smalloc, and probably not bsdmalloc either.
+
+Don't define any BINARIES stuff in options.h--it doesn't support 64
+bit machines (yet).

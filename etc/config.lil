@@ -156,3 +156,6 @@ address server ip : localhost
 address server port : 7374
 
 default fail message : What?
+
+# directory to save binaries in
+save binaries directory : /binaries

@@ -39,9 +39,10 @@ static char coeff[] = {
 
 /*
  * LPC mapping (associative arrays) module.  Contains routines for
- * easy value and lvalue manipulation.  Will grow in the near future.
+ * easy value and lvalue manipulation.
  *
- * original version for LPC-A - written by Whiplash (JTR) (used a binary tree)
+ * Original binary tree version for LPCA written by one of the earliest MudOS
+ * hackers.
  * - some enhancements by Truilkan@TMI
  * - rewritten for MudOS to use an extensible hash table implementation styled
  *   after the one Perl uses in hash.c - 92/07/08 - by Truilkan@TMI
@@ -71,6 +72,9 @@ struct mapping *m;
 	int i;
 	struct node **a, **b, **eltp, *elt;
 
+	if (newsize > MAX_TABLE_SIZE) {
+		return;
+	}
 	/* resize the hash table to be twice the old size */
 	a = (struct node **)
 		DREALLOC(m->table, newsize * sizeof(struct node *), 72, "growMap");
@@ -86,7 +90,7 @@ struct mapping *m;
 	debug(1024,("mapping.c: growMap ptr = %x, size = %d\n", m, newsize));
 	m->table = a;
 	m->table_size = newsize;
-	m->do_split = m->table_size * FILL_PERCENT / 100;
+	m->do_split = m->table_size * (unsigned)FILL_PERCENT / (unsigned)100;
 	/* zero out the new storage area (2nd half of table) */
 	memset(&a[oldsize], 0, oldsize * sizeof(struct node *));
 	for (i = 0; i < oldsize; i++, a++) {
@@ -132,7 +136,7 @@ void *extra;
 	int j;
 	
 	debug(128,("mapTraverse %x\n", m));
-	for (j = 0; j < m->table_size; j++) {
+	for (j = 0; j < (int)m->table_size; j++) {
 		for (elt = m->table[j]; elt; elt = nelt) {
 			nelt = elt->next;
 			if ((*func)(m, elt, extra))
@@ -238,7 +242,8 @@ int n;
 	for (k = MAP_HASH_TABLE_SIZE; k < n; k *= 2)
 		;
 	newmap->table_size = k;
-	newmap->do_split = newmap->table_size * FILL_PERCENT / 100;
+	newmap->do_split = newmap->table_size * (unsigned)FILL_PERCENT /
+		(unsigned)100;
 	newmap->table = (struct node **)DXALLOC(sizeof(struct node *)
 		* newmap->table_size, 75, "allocate_mapping: 3");
 	total_mapping_size += (sizeof(struct node *) * newmap->table_size);
@@ -700,7 +705,7 @@ struct mapping *m;
 	if (!m->elt) { /* find next occupied bucket in hash table */
 		int found = 0;
 
-		for (j = m->bucket; j < m->table_size; j++) {
+		for (j = m->bucket; j < (int)m->table_size; j++) {
 			if (m->table[j]) {
 				m->bucket = j + 1;
 				m->elt = m->table[j];

@@ -2,10 +2,10 @@
 .TH add_worth 3
 
 .SH NAME
-add_worth () - credit an object with additional "worth"
+add_worth() - credit an object with additional "worth"
 
 .SH SYNOPSIS
-void add_worth (object ob, int worth);
+void add_worth(int worth, object ob);
 
 .SH DESCRIPTION
 add_worth credits an object with having a certain "worth".  This worth
@@ -17,8 +17,6 @@ objects's domain and author get credited with this object's additional
 A common use for add_worth is to monitor how much "wealth" is created
 in a certain area.  This is to monitor which areas might have too
 little or too much "wealth" available in them.
-.PP
-add_worth may only be called by objects with backbone or root uid's.
 
 .SH SEE ALSO
 author_stats(3), set_author(3), domain_stats(3)

@@ -1,14 +1,17 @@
 .\"remove a directory
 .TH rmdir 3
-
+ 
 .SH NAME
 rmdir() - remove a directory
-
+ 
 .SH SYNOPSIS
-void rmdir(string dir);
-
+int rmdir(string dir);
+ 
 .SH DESCRIPTION
 Remove directory `dir'.
-
+ 
+.SH RETURN VALUE
+Returns nonzero for success, zero (0) for failure.
+ 
 .SH SEE ALSO
 rm(3), mkdir(3).

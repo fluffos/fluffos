@@ -5,3 +5,5 @@ Don't use bsdmalloc or smalloc.
 Some earlier versions of AIX (e.g. 3.1) have problems which affect MudOS.
 
 Read the Makefile for comments referring to the RS/6000
+
+Bison uses alloca() (at least on the RS/6000) so you should stick to yacc.

@@ -12,18 +12,18 @@ message calls receive_message(string class, string message) in all objects
 in the target list excluding those in the exclude list. This basically
 tells the object the message.
 .PP
-Message is a string containing the message to be sent
-.PP
 Class is the type of message (used for clients and such). An example
 would be 'combat', 'shout', 'emergency' etc.
 .PP
-target is a list of objects to be sent the message. This can be either a 
+Message is a string containing the text to send.
+.PP
+Target is a list of objects to be sent the message. This can be either a 
 single object string or object pointer, or may be an array of either.
-If a target is non living all objects in it's environment will receive
+If a target is non-living all objects in its environment will receive
 the message.
 .PP
 Exclude is a list of objects that should not receive the message. This
 can either be one object or an array of objects.
 
 .SH SEE ALSO
-write(3), shout(3), tell(3).
+write(3), shout(3), tell_object(3).

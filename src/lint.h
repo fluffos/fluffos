@@ -10,10 +10,12 @@
 
 struct program;
 struct function;
+#ifndef LATTICE
 struct svalue;
 struct sockaddr;
 struct mapping;
 struct node;
+#endif
 
 #ifdef BUFSIZ
 #    define PROT_STDIO(x) PROT(x)
@@ -68,7 +70,8 @@ void exit PROT((int));
 #endif
 
 #if !defined(_SEQUENT_) && !defined(_AIX) && !defined(__386BSD__) && \
-	!defined(linux) && !defined(cray) && !defined(sgi) && !defined(__bsdi__)
+	!defined(linux) && !defined(cray) && !defined(sgi) && \
+	!defined(__bsdi__) && !defined(LATTICE)
 int read PROT((int, char *, int));
 #endif /* !defined(_SEQUENT_) && !defined(_AIX) */
 #if !defined(_AIX) && !defined(_SEQUENT_) && !defined(_YACC_) && \
@@ -96,16 +99,20 @@ int atoi PROT((char *));
 void srandom PROT((int));
 #endif
 #if !defined(_SEQUENT_) && !defined(__386BSD__) && !defined(linux) \
-	&& !defined(sgi) && !defined(__bsdi__)
+	&& !defined(sgi) && !defined(__bsdi__) && !defined(LATTICE)
 int chdir PROT((char *));
 #endif
+#if !defined(linux)
 int gethostname PROT((char *, int));
+#endif
 void abort PROT((void));
 int fflush PROT_STDIO((FILE *));
 #if !defined(_SEQUENT_) && !defined(__386BSD__) && !defined(linux) \
 	&& !defined(sgi) && !defined(__bsdi__)
 int rmdir PROT((char *));
+#ifndef LATTICE
 int unlink PROT((char *));
+#endif
 #endif
 int fclose PROT_STDIO((FILE *));
 #if !defined(sgi) && !defined(hpux) && !defined(_AIX) && !defined(M_UNIX) && !defined(_SEQUENT_) && !defined(SVR4) && !defined(OSF) && !defined(__386BSD__)
@@ -132,13 +139,13 @@ int dup2 PROT((int, int));
 unsigned int alarm PROT((unsigned int));
 #endif
 #if !defined(hpux) && !defined(__386BSD__) && !defined(linux) \
-	&& !defined(__bsdi__)
+	&& !defined(__bsdi__) && !defined(LATTICE)
 int ioctl PROT((int, ...));
 #endif /* !defined(hpux) */
 int close PROT((int));
 #if !defined(_SEQUENT_) && !defined(_AIX) && !defined(__386BSD__) && \
 	!defined(linux) && !defined(cray) && !defined(sgi) && \
-	!defined(__bsdi__)
+	!defined(__bsdi__) && !defined(LATTICE)
 int write PROT((int, char *, int));
 #endif /* !defined(_SEQUENT_) && !defined(_AIX) */
 int _filbuf();
@@ -167,7 +174,7 @@ long strtol PROT((char *, char **, int));
 #endif
 #endif
 #if !defined(_SEQUENT_) && !defined(__386BSD__) && !defined(linux) \
-	&& !defined(sgi) && !defined(__bsdi__)
+	&& !defined(sgi) && !defined(__bsdi__) && !defined(LATTICE)
 int link PROT((char *, char *));
 int unlink PROT((char *));
 #endif
@@ -218,7 +225,9 @@ struct mapping *add_mapping PROT((struct mapping *, struct mapping *));
 struct mapping *map_mapping 
    PROT((struct mapping *, char *, struct object *, struct svalue *));
 struct mapping *compose_mapping PROT((struct mapping *, struct mapping *));
+#ifndef LATTICE
 struct vector;
+#endif
 struct vector *mapping_indices PROT((struct mapping *));
 struct vector *mapping_values PROT((struct mapping *));
 void free_vector PROT((struct vector *));
@@ -241,8 +250,11 @@ struct vector *filter PROT((struct vector *arr,char *func,
 			    struct object *ob, struct svalue *)); 
 int match_string PROT((char *, char *));
 int set_heart_beat PROT((struct object *, int));
+int query_heart_beat PROT((struct object *));
 struct object *get_empty_object PROT((int));
+#ifndef LATTICE
 struct svalue;
+#endif
 INLINE void assign_svalue PROT((struct svalue *, struct svalue *));
 INLINE void assign_svalue_no_free PROT((struct svalue *to, struct svalue *from));
 INLINE void free_svalue PROT((struct svalue *));
@@ -258,7 +270,8 @@ void remove_living_name PROT((struct object *));
 struct object *find_living_object PROT((char *, int));
 int lookup_predef PROT((char *));
 void yyerror PROT((char *));
-int hashstr PROT((char *, int, int));
+INLINE int hashstr PROT((char *, int, int));
+INLINE int whashstr PROT((char *, int));
 int lookup_predef PROT((char *));
 char *dump_trace PROT((int));
 int parse_command PROT((char *, struct object *));
@@ -282,17 +295,15 @@ struct vector *deep_inventory PROT((struct object *, int));
 struct object *environment PROT((struct svalue *));
 struct vector *add_array PROT((struct vector *, struct vector *));
 char *get_f_name PROT((int));
-#if !defined(_AIX) && !defined(NeXT) && !defined(_SEQUENT_) && !defined(SVR4) \
-	&& !defined(__386BSD__) \
-	&& !defined(apollo) && !defined(cray) && !defined(SunOS_5) \
-	&& !defined(__bsdi__)
-void startshutdownMudOS PROT((void));
-#else
+#if SIGNAL_FUNC_TAKES_INT
 void startshutdownMudOS PROT((int));
+#else
+void startshutdownMudOS PROT((void));
 #endif
 void shutdownMudOS PROT((int));
 void set_notify_fail_message PROT((char *));
 int swap PROT((struct object *));
+int swap_line_numbers PROT((struct program *));
 int transfer_object PROT((struct object *, struct object *));
 struct vector *users PROT((void));
 void do_write PROT((struct svalue *));
@@ -356,13 +367,15 @@ struct vector *explode_string PROT((char *str, char *del));
 char *string_copy PROT((char *));
 int find_call_out PROT((struct object *ob, char *fun));
 void remove_object_from_stack PROT((struct object *ob));
-#if !defined(sgi) && !defined(NeXT) && !defined(hpux) && !defined(sun) && !defined(_AIX)
+#if !defined(sgi) && !defined(NeXT) && !defined(hpux) && !defined(sun) && \
+	 !defined(_AIX) && !defined(LATTICE)
 int getpeername PROT((int, struct sockaddr *, int *));
 int shutdown PROT((int, int));
 #endif
 void compile_file PROT((void));
 void unlink_swap_file();
 char *function_exists PROT((char *, struct object *));
+int is_static PROT((char *, struct object *));
 void set_inc_list PROT((char *list));
 int legal_path PROT((char *path));
 struct vector *get_dir PROT((char *path, int));
@@ -399,7 +412,7 @@ void save_svalue PROT((struct svalue *, char **buf));
 char *string_print_formatted PROT((char *format_str, int argc, struct svalue *argv));
 struct vector *children PROT((char *obj));
 struct vector *livings PROT((void));
-void do_message PROT((char *,char *, struct vector *, struct vector *));
+void do_message PROT((char *,char *, struct vector *, struct vector *, int));
 char *add_slash PROT((char *));
 struct object *load_extern_object PROT((char *name));
 INLINE struct vector *prepend_vector PROT((struct vector *v, struct svalue *a));
@@ -538,3 +551,12 @@ void absorb_mapping PROT((struct mapping *, struct mapping *));
 void init_usec_clock();
 void get_usec_clock PROT((long *sec, long *usec));
 void bufcat PROT((char **buf, char *str));
+int get_cpu_times PROT((unsigned long *secs, unsigned long *usecs));
+char *_strstr PROT((char *, char *));
+void print_swap_stats();
+void load_line_numbers PROT((struct program *prog));
+void remove_line_swap PROT((struct program *prog));
+int locate_out PROT((struct program *prog));
+int locate_in PROT((struct program *prog));
+short store_prog_string PROT((char *str));
+int load_binary PROT((char *name));

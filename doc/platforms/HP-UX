@@ -10,3 +10,5 @@ PA-RISC machines (at least):
  MudOS runs fine compiled with cc under HP-UX 7.x and 8.x.  It does not work
   with 9.0x's cc (might be OK if you turn off optimization?).
  With cc, use OPTIMIZE=+O3 +Obb3000 for maximum optimization.
+
+Use gcc if possible.

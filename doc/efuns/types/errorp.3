@@ -1,0 +1,19 @@
+.\"determine whether or not a given variable is an error code
+.TH errorp 3
+ 
+.SH NAME
+errorp() - determine whether or not a given variable is an error code
+ 
+.SH SYNOPSIS
+int errorp(mixed arg);
+ 
+.SH DESCRIPTION
+Returns 1 if `arg' is an integer that is an error code.  
+.PP
+Eventually efuns will be modified to return standard error codes so that 
+code like this will be possible: 
+.PP
+ if (errorp(result = efun_call())) printf("error = %d\n", result); 
+.PP
+Will also be a perror(result) efun to return error string that goes with 
+a particular error integer.  

@@ -1,4 +1,5 @@
 /* 92/04/18 - cleaned up stylistically by Sulam@TMI */
+#include "config.h"
 #include <stdio.h>
 #include <string.h>
 #include <signal.h>
@@ -12,14 +13,15 @@
 #include <sys/time.h>
 #endif
 #include <sys/stat.h>
-#ifdef __386BSD__
+#if defined(__386BSD__) || defined(SunOS_5)
 #include <unistd.h>
 #endif
 #include <fcntl.h>
+#ifndef LATTICE
 #include <sys/times.h>
-#include <math.h>
 #include <memory.h>
-#include "config.h"
+#endif
+#include <math.h>
 #include "lint.h"
 #include "interpret.h"
 #include "object.h"
@@ -37,10 +39,11 @@ int current_time;
 
 int heart_beat_flag = 0;
 
-static void cycle_hb_list PROT((void));
+INLINE static void cycle_hb_list PROT((void));
 extern struct object *command_giver, *current_interactive, *obj_list_destruct;
 extern struct object *previous_ob, *master_ob;
 extern int num_user, d_flag;
+extern short int caller_type;
 extern double consts[];
 
 extern INLINE void make_selectmasks();
@@ -76,6 +79,7 @@ void clear_state()
   current_interactive = 0;
   previous_ob = 0;
   current_prog = 0;
+  caller_type = 0;
   error_recovery_context_exists = 1;
   reset_machine(0);	/* Pop down the stack. */
 }
@@ -144,7 +148,9 @@ void backend()
 
   fprintf(stderr,"Setting up IPC on port %d.\n", (int)PORTNO);
   init_user_conn(); /* initialize user connection socket */
+#ifdef SOCKET_EFUNS
   init_sockets();   /* initialize efun sockets           */
+#endif
   signal(SIGHUP, startshutdownMudOS);
   if(!t_flag)
     call_heart_beat();
@@ -313,6 +319,8 @@ static void look_for_objects_to_swap()
       /* At last, there is a possibility that the object can be swapped
        * out.  */
 
+      if (ob->prog && ob->prog->p.i.line_numbers)
+	swap_line_numbers(ob->prog);
       if(ob->flags & O_SWAPPED || !ready_for_swap)
 	continue;
       if(ob->flags & O_HEART_BEAT)
@@ -359,10 +367,10 @@ void call_heart_beat()
 	heart_beat_flag = 0;
 
 	signal(SIGALRM, sigalrm_handler);
-#if defined(SYSV) || defined(SVR4) || defined(cray)
-	alarm(SYSV_HEARTBEAT_INTERVAL); /* defined in config.h */
-#else
+#ifdef HAS_UALARM
 	ualarm(HEARTBEAT_INTERVAL,0);
+#else
+	alarm(SYSV_HEARTBEAT_INTERVAL); /* defined in config.h */
 #endif
 
 	debug(256,("."));
@@ -422,7 +430,7 @@ void call_heart_beat()
 
 /* Take the first object off the heart beat list, place it at the end
  */
-static void cycle_hb_list()
+INLINE static void cycle_hb_list()
 {
   struct object *ob;
 
@@ -435,6 +443,17 @@ static void cycle_hb_list()
   hb_tail->next_heart_beat = ob;
   hb_tail = ob;
   ob->next_heart_beat = 0;
+}
+
+int
+query_heart_beat(ob)
+	struct object *ob;
+{
+	if (!(ob->flags & O_HEART_BEAT)) {
+		return 0;
+	} else {
+		return ob->time_to_heart_beat;
+	}
 }
 
 /* add or remove an object from the heart beat list; does the major check...

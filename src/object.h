@@ -24,7 +24,9 @@
 #define O_HIDDEN		0x800  /* We're hidden from nonprived objs  */
 #define O_MASTER                0x1000 /* We are the master object (?)      */
 #define O_EXTERN_PROGRAM        0x2000 /* external program                  */
+#ifdef SOCKET_EFUNS
 #define O_EFUN_SOCKET           0x4000 /* efun socket references object     */
+#endif
 #define O_WILL_RESET            0x8000 /* reset will be called next time */
 
 typedef struct object {
@@ -72,8 +74,8 @@ extern struct object *obj_list;
 extern struct object *obj_list_destruct;
 
 struct value;
-void save_object PROT((struct object *, char *, int)),
-    move_object PROT((struct object *, struct object *)),
+int save_object PROT((struct object *, char *, int));
+void move_object PROT((struct object *, struct object *)),
     tell_npc PROT((struct object *, char *)),
     free_object PROT((struct object *, char *)),
     reference_prog PROT((struct program *, char *));

@@ -2,35 +2,50 @@
  *  comm.c -- communications functions and more.
  *            Dwayne Fontenot (Jacques@TMI)
  */
-#ifdef __386BSD__
+#include "config.h"
+#ifdef SunOS_5
+#include <stdlib.h>
+#endif
+#if defined(__386BSD__) || defined(SunOS_5)
 #include <unistd.h>
 #endif
+#ifndef LATTICE
 #include <varargs.h>
+#endif
 #include <sys/types.h>
 #include <sys/time.h>
+#ifndef LATTICE
 #include <sys/ioctl.h>
+#endif
 #ifdef __386BSD__
 #include <sys/param.h>
 #endif
 #define TELOPTS
+#ifndef LATTICE
 #include <arpa/telnet.h>
-#include <fcntl.h>
 #include <netdb.h>
+#include <fcntl.h>
+#endif
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
 #include <ctype.h>
 #include <signal.h>
+#ifndef LATTICE
 #include <memory.h>
+#else
+#include "amiga.h"
+#define read(s,t,l) read_socket(s,t,l)
+#define write(s,t,l) write_socket(s,t,l)
+#define close(s) close_socket(s)
+#endif
 #include <setjmp.h>
-#include "config.h"
 #include "lint.h"
 #include "interpret.h"
 #include "comm.h"
 #include "socket_efuns.h"
 #include "object.h"
 #include "sent.h"
-#include "patchlevel.h"
 #include "debug.h"
 
 /*
@@ -98,7 +113,9 @@ extern int errno;
 extern int d_flag;
 extern int current_time;
 extern struct object *command_giver, *current_interactive;
+#ifdef SOCKET_EFUNS
 extern struct lpc_socket lpc_socks[];
+#endif
 extern int heart_beat_flag;
 extern char *default_fail_message;
 
@@ -187,10 +204,12 @@ void init_user_conn()
   /*
    * register signal handler for SIGPIPE.
    */
+#ifndef LATTICE
   if(signal(SIGPIPE,sigpipe_handler) == SIGNAL_ERROR){
     perror("init_user_conn: signal SIGPIPE");
     exit(5);
   }
+#endif
   /*
    * set socket non-blocking,
    */
@@ -225,6 +244,7 @@ void ipc_remove() {
   if(close(new_user_fd) == -1){
     perror("ipc_remove: close");
   }
+	printf("closed new_user_port\n");
 }
 
 void init_addr_server(hostname,addr_server_port)
@@ -674,6 +694,7 @@ INLINE void make_selectmasks()
   if(addr_server_fd != 0) {
     FD_SET(addr_server_fd,&readmask);
   }
+#ifdef SOCKET_EFUNS
   /*
    * set fd's for efun sockets.
    */
@@ -685,6 +706,7 @@ INLINE void make_selectmasks()
 	FD_SET(lpc_socks[i].fd,&writemask);
     }
   }
+#endif
 }
 
 /*
@@ -725,6 +747,7 @@ INLINE void process_io()
       command_giver = save_command_giver;
     }
   }
+#ifdef SOCKET_EFUNS
   /*
    * check for data pending on efun socket connections.
    */
@@ -736,6 +759,7 @@ INLINE void process_io()
       if(FD_ISSET(lpc_socks[i].fd,&writemask))
 	socket_write_select_handler(i);
   }
+#endif
   /*
    * check for data pending from address server.
    */
@@ -901,6 +925,7 @@ int process_user_command()
   if((user_command = get_user_command())){
     if(command_giver->flags & O_DESTRUCTED)
       return(1);
+    clear_notify(); /* moved from user_parser() */
     update_load_av();
     current_object = 0;
     current_interactive = command_giver;
@@ -921,7 +946,7 @@ int process_user_command()
 	  command_giver->interactive->has_process_input = 0;
 	}
       }
-      if (command_giver->flags & O_DESTRUCTED) {
+      if (!command_giver || (command_giver->flags & O_DESTRUCTED)) {
           return 1;
       }
       parse_command(tbuf+1,command_giver);
@@ -948,7 +973,7 @@ int process_user_command()
 	  command_giver->interactive->has_process_input = 0;
 	}
       }
-      if (command_giver->flags & O_DESTRUCTED) {
+      if (!command_giver || command_giver->flags & O_DESTRUCTED) {
           return 1;
       }
       parse_command(tbuf,command_giver);

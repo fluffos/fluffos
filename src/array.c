@@ -310,12 +310,15 @@ struct vector *commands(ob)
     struct vector *v;
     int cnt = 0;
 
-    for (s = ob->sent; s && (cnt < max_array_size); s = s->next)
-       cnt++;
+    for (s = ob->sent; s && (cnt < max_array_size); s = s->next) {
+       if (s->verb) cnt++;
+    }
     v = allocate_array(cnt);
     cnt = 0;
     for (s = ob->sent; s && cnt < max_array_size; s = s->next) {
        struct vector *p;
+
+       if (!s->verb) continue;
        v->item[cnt].type = T_POINTER;
        v->item[cnt].u.vec = p = allocate_array(3);
        p->item[0].type = T_STRING;
@@ -1015,7 +1018,7 @@ struct vector *intersect_alist(a1, a2)
 	else if (d>0)
 	    i2++;
 	else {
-	    assign_svalue_no_free(&a3->item[l++], &a2->item[i1++,i2++]);
+	    assign_svalue_no_free(&a3->item[l++], &a2->item[(i1++,i2++)]);
 	}
     }
     return shrink_array(a3, l);
@@ -1137,7 +1140,7 @@ struct vector *deep_inherit_list(ob)
     for (; cur < next && next < 256; cur++)
     {
 	pr = plist[cur];
-	for (il2 = 0; (unsigned)il2 < pr->p.i.num_inherited; il2++)
+	for (il2 = 0; il2 < (int)pr->p.i.num_inherited; il2++)
 	    plist[next++] = pr->p.i.inherit[il2].prog;
     }
 	    
@@ -1169,7 +1172,7 @@ struct object *ob;
 	plist[0] = ob->prog; next = 1; cur = 0;
     
 	pr = plist[cur];
-	for (il2 = 0; (unsigned)il2 < pr->p.i.num_inherited; il2++) {
+	for (il2 = 0; il2 < (int)pr->p.i.num_inherited; il2++) {
 		plist[next++] = pr->p.i.inherit[il2].prog;
 	}
  
@@ -1307,7 +1310,9 @@ livings()
 }
 
 struct vector *
-objects()
+objects(select_func, select_ob)
+  char *select_func;
+  struct object *select_ob;
 {
   extern struct object *obj_list;
   int i, j, t_sz;
@@ -1315,6 +1320,8 @@ objects()
   struct object **tmp;
   struct vector *ret;
   int display_hidden;
+  struct svalue *v;
+  int zerop;
  
   display_hidden = -1;
  
@@ -1322,13 +1329,28 @@ objects()
         16, "objects: tmp")))
     fatal("Out of memory!\n");
  
-  for (i = 0, ob = obj_list; ob; ob = ob->next_all)
-  {
-    if (ob->flags & O_HIDDEN)
-    {
+  for (i = 0, ob = obj_list; ob; ob = ob->next_all) {
+    if (ob->flags & O_HIDDEN) {
       if (display_hidden == -1)
         display_hidden = valid_hide(current_object);
       if (!display_hidden) continue;
+    }
+    if (select_func != NULL) {
+      push_object(ob);
+#if 0 /* safe_apply doesn't seem to be up to the task */
+      v = safe_apply(select_func, select_ob, 1);
+#else /* just take the memory hit for now so as not to crash the driver */
+      v = apply(select_func, select_ob, 1);
+#endif
+      zerop = IS_ZERO(v);
+      if (v) {
+        free_svalue(v);
+      } else {
+         FREE((void *)tmp);
+         return 0;
+      }
+      if (zerop)
+        continue;
     }
     tmp[i] = ob;
     if ((++i == t_sz) &&
@@ -1339,8 +1361,7 @@ objects()
   if (i > max_array_size)
     i = max_array_size;
   ret = allocate_array(i);
-  for (j = 0; j < i; j++) 
-  {
+  for (j = 0; j < i; j++) {
     ret->item[j].type = T_OBJECT;
     ret->item[j].u.ob = tmp[j];
     add_ref(tmp[j], "objects");

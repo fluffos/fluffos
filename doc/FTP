@@ -1,7 +1,8 @@
-1993/05/11
+1993/09/09
  
-The latest releases of MudOS of will be made available via anonymous ftp 
-from ftp.ccs.northeastern.edu:/pub/mud/drivers/mudos.
+The latest releases of MudOS are made available via anonymous ftp from 
+actlab.rtf.utexas.edu:/MUD/LPmud/MudOS/driver.  Beta releases are available 
+in the /MUD/LPmud/MudOS/driver/beta directory.
  
-Releases, and beta versions, are also available from 
-actlab.rtf.utexas.edu:/MUD/LPmud/MudOS/driver.
+ftp.ccs.neu.edu:/pub/mud also carries the latest releases, as well as 
+several mudlibs (such as TMI-2 and Nightmare).

@@ -1,9 +1,27 @@
+/*
+ * File: lex.c
+ *
+ * Revision:
+ * 93-06-27 (Robocoder):
+ *   Adjusted the meaning of the EXPECT_* flags;
+ *     EXPECT_ELSE  ... means the last condition was false, so we want to find
+ *                      an alternative or the end of the conditional block
+ *     EXPECT_ENDIF ... means the last condition was true, so we want to find
+ *                      the end of the conditional block
+ *   Added #elif preprocessor command
+ *   Fixed get_text_block bug so no text returned ""
+ *   Added get_array_block()...using @@ENDMARKER to return array of strings
+ */
+
+#include "config.h"
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#ifdef SunOS_5
+#include <stdlib.h>
+#endif
 
 #include "instrs.h"
-#include "config.h"
 #include "arch.h" /* put after config.h */
 #include "lint.h"
 #include "interpret.h"
@@ -12,15 +30,19 @@
 #include "string.h"
 #include "exec.h"
 #include "lex.h"
+#include "cc.h"
 
 #define isalunum(c) (isalnum(c) || (c) == '_')
-#define NELEM(a) (sizeof (a) / sizeof (a)[0])
+#define NELEM(a) (sizeof (a) / sizeof((a)[0]))
 
 int current_line;
 int total_lines;	/* Used to compute average compiled lines/s */
 char *current_file;
 int pragma_strict_types;	/* Force usage of strict types. */
 int pragma_save_types;		/* Save argument types after compilation */
+#ifdef SAVE_BINARIES
+int pragma_save_binaries;	/* Save program as binary file */
+#endif
 struct lpc_predef_s *lpc_predefs=NULL;
 extern char *argument_name;
 extern char *xalloc();
@@ -203,14 +225,11 @@ char *token, *atoken;
 	    do {
 		c = mygetc();
 	    } while(isspace(c));
-	    for(p = b; c != '\n' && c != EOF; ) {
+	    for(p = b; c != '\n' && !isspace(c) && c != EOF; ) {
 		if (p < b+sizeof b-1)
 		    *p++ = c;
 		c = mygetc();
 	    }
-	    *p++ = 0;
-	    for(p = b; *p && !isspace(*p); p++)
-		;
 	    *p = 0;
 /*fprintf(stderr, "skip checks %s\n", b);*/
 	    if (strcmp(b, "if") == 0 || strcmp(b, "ifdef") == 0 ||
@@ -220,10 +239,16 @@ char *token, *atoken;
 		if (strcmp(b, "endif") == 0)
 		    nest--;
 	    } else {
-		if (strcmp(b, token) == 0)
+		if (strcmp(b, token) == 0) {
+		    myungetc(c); add_input(b); myungetc('#');
 		    return 1;
-		else if (atoken && strcmp(b, atoken) == 0)
+		} else if (atoken && strcmp(b, atoken) == 0) {
+		    myungetc(c); add_input(b); myungetc('#');
 		    return 0;
+                } else if (strcmp(b, "elif") == 0) {
+		    myungetc(c); add_input(b); myungetc('#');
+                    return (atoken == 0);
+		}
 	    }
 	} else {
 /*fprintf(stderr, "skipping (%d) %c", c, c);*/
@@ -250,31 +275,28 @@ int c;
     struct ifstate *p;
 
 /*fprintf(stderr, "cond %d\n", c);*/
-    if (c || skip_to("else", "endif")) {
-	p = (struct ifstate *)DXALLOC(sizeof(struct ifstate), 60, "handle_cond");
-	p->next = iftop;
-	iftop = p;
-	p->state = c ? EXPECT_ELSE : EXPECT_ENDIF;
-    }
-    if (!c) {
-	if (inctop == 0)
-	    store_line_number_info();
-	current_line++;
-	total_lines++;
-    }
+    if (!c)
+        skip_to("else", "endif");
+    p = (struct ifstate *)DXALLOC(sizeof(struct ifstate), 60, "handle_cond");
+    p->next = iftop;
+    iftop = p;
+    p->state = c ? EXPECT_ENDIF : EXPECT_ELSE;
 }
 
 static FILE *
 inc_open(buf, name)
     char *buf, *name;
 {
+    extern save_include();
     FILE *f;
     int i;
     char *p;
 
     merge(name, buf);
-    if ((f = fopen(buf, "r")) != NULL)
+    if ((f = fopen(buf, "r")) != NULL) {
+	save_include(buf);
 	return f;
+    }
     /*
      * Search all include dirs specified.
      */
@@ -284,9 +306,10 @@ inc_open(buf, name)
     }
     for (i=0; i < inc_list_size; i++) {
       sprintf(buf,"%s/%s",inc_list[i],name);
-      f = fopen(buf, "r");
-      if (f)
+      if ((f = fopen(buf, "r"))) {
+	save_include(buf);
 	return f;
+      }
     }
     return NULL;
 }
@@ -375,25 +398,92 @@ char *terminator;
 	return j;
 }
 
+#define MAXBLOCK (MAXLINE*4)
+/* better solution needs to be found for large blocks than just
+ * increasing this larger and larger.
+ */
+
+static int
+get_array_block(text, term)
+char *text;
+char *term;
+{
+        int c, len, finished = 0, j, k;
+        int total_len = 0;
+        char *beg;
+        char array_line[MAXBLOCK + 1];
+
+        if (!strlen(term)) {
+                return 0;
+        }
+        beg = text;
+        array_line[0] = '(';
+        array_line[1] = '{';
+        array_line[2] = '"';
+        k = j = len = 3;
+        while (!finished) {
+                while (((c = mygetc()) != '\n') && (c != EOF)) {
+                        if (len++ == MAXBLOCK) {
+                                break;
+                        }
+                        array_line[j++] = c;
+                }
+                if (c == EOF) {
+                        return -1;
+                }
+                current_line++;
+                if (inctop == 0) {
+                        store_line_number_info();
+                }
+                array_line[j] = '\0';
+                if (!strcmp(array_line + k, term)) {
+                        if (beg == text) {
+                                *text++ = '(';
+                                *text++ = '{';
+                        }
+                        *text++ = '}';
+                        *text++ = ')';
+                        *text = '\0';
+                        finished = 1;
+                } else {
+                        if ((total_len + len) >= MAXBLOCK) {
+                                return -2;
+                        }
+                        strcpy(text, array_line);
+                        text += len;
+                        *text++ = '"';
+                        *text = '\0';
+
+                        array_line[0] = ',';
+                        array_line[1] = '"';
+                        k = j = 2;
+                        
+                        total_len += (len + 1);
+                        len = 2;
+                }
+        }
+        return 1;
+}
+
 static int
 get_text_block(text, term)
 char *text;
 char *term;
 {
-	int c, len, finished = 0, j;
+        int c, len, finished = 0, j, k;
 	int total_len = 0;
 	char *beg;
-	static char text_line[MAXLINE + 1];
+	static char text_line[MAXBLOCK + 1];
 
-	beg = text;
 	if (!strlen(term)) {
 		return 0;
 	}
+        beg = text;
 	text_line[0] = '"';
-	j = len = 1;
+        k = j = len = 1;
 	while (!finished) {
 		while (((c = mygetc()) != '\n') && (c != EOF)) {
-			if (len++ == MAXLINE) {
+			if (len++ == MAXBLOCK) {
 				break;
 			}
 			text_line[j++] = c;
@@ -406,22 +496,27 @@ char *term;
 			store_line_number_info();
 		}
 		text_line[j] = '\0';
-		if (!strcmp(text_line, term)) {
+                if (!strcmp(text_line + k, term)) {
+                        if (beg == text) {
+                                *text++ = '"';
+                        }
 			*text++ = '"';
 			*text = '\0';
 			finished = 1;
 		} else {
-			if ((total_len + len) >= MAXLINE) {
+			if ((total_len + len) >= MAXBLOCK) {
 				return -2;
 			}
 			strcpy(text, text_line);
-			j = 0;
 			text += len;
 			*text++ = '\n';
 			*text = '\0';
+
+                        k = j = 0;
+
 			total_len += (len + 1);
+                        len = 0;
 		}
-		len = 0;
 	}
 	return 1;
 }
@@ -501,10 +596,17 @@ char *sp;
 static void handle_pragma(str)
     char *str;
 {
+    extern int code_size();
     if (strcmp(str, "strict_types") == 0) {
+#ifndef IGNORE_STRICT_PRAGMA
 	pragma_strict_types = 1;
+#endif
     } else if (strcmp(str, "save_types") == 0) {
 	pragma_save_types = 1;
+#ifdef SAVE_BINARIES
+    } else if (strcmp(str, "save_binary") == 0) {
+	pragma_save_binaries = 1;
+#endif
     }
 }
 
@@ -550,7 +652,7 @@ yylex1()
 	}
 	if (iftop) {
 	    struct ifstate *p = iftop;
-	    yyerror(p->state == EXPECT_ENDIF ? "Missing #endif" : "Missing #else");
+            yyerror(p->state == EXPECT_ENDIF ? "Missing #endif" : "Missing #else/#elif");
 	    while(iftop) {
 		p = iftop;
 		iftop = p->next;
@@ -702,16 +804,40 @@ yylex1()
 	    } else if (strcmp("ifndef", yytext) == 0) {
 		deltrail(sp);
 		handle_cond(lookup_define(sp) == 0);
-	    } else if (strcmp("else", yytext) == 0) {
-		if (iftop && iftop->state == EXPECT_ELSE) {
-		    struct ifstate *p = iftop;
+            } else if (strcmp("elif", yytext) == 0) {
+                if (iftop) {
+                    if (iftop->state == EXPECT_ELSE) {
+                        /* last cond was false... */
+                        int cond;
+                        struct ifstate *p = iftop;
 
-/*fprintf(stderr, "found else\n");*/
-		    iftop = p->next;
-		    FREE((char *)p);
-		    skip_to("endif", (char *)0);
-		    current_line++;
-		    total_lines++;
+                        /* pop previous condition */
+                        iftop = p->next;
+                        FREE((char *)p);
+
+                        myungetc(0);
+                        add_input(sp);
+                        cond = cond_get_exp(0);
+                        if (mygetc()) {
+                            yyerror("Condition too complex in #elif");
+                            while ( mygetc() );
+                        } else {
+                            handle_cond(cond);
+                        }
+                    } else { /* EXPECT_ENDIF */
+                        /* last cond was true...skip to end of conditional */
+                        skip_to("endif", (char *)0);
+                    }
+                } else {
+                    yyerror("Unexpected #elif");
+                }
+	    } else if (strcmp("else", yytext) == 0) {
+                if (iftop) {
+                    if (iftop->state == EXPECT_ELSE) {
+                        iftop->state = EXPECT_ENDIF;
+                    } else {
+                        skip_to("endif", (char *)0);
+                    }
 		} else {
 		    yyerror("Unexpected #else");
 		}
@@ -720,7 +846,6 @@ yylex1()
 			      iftop->state == EXPECT_ELSE)) {
 		    struct ifstate *p = iftop;
 
-/*fprintf(stderr, "found endif\n");*/
 		    iftop = p->next;
 		    FREE((char *)p);
 		} else {
@@ -735,7 +860,6 @@ yylex1()
 	    } else if (strcmp("echo", yytext) == 0) {
 		fprintf(stderr, "%s\n", sp);
 	    } else if (strcmp("include", yytext) == 0) {
-/*fprintf(stderr, "including %s\n", sp);		*/
                 handle_include(sp);
 	    } else if (strcmp("pragma", yytext) == 0) {
 		handle_pragma(sp);
@@ -768,16 +892,39 @@ yylex1()
     case '@':
 	{
 		int rc;
+                int tmp;
+
+                tmp = mygetc();
+                if (tmp != '@') {
+                        /* check for Robocoder's @@ block */
+                        myungetc(tmp);
+                }
 
 		if (!get_terminator(terminator)) {
 			yyerror("Illegal terminator");
 		}
-		if ((rc = get_text_block(yytext, terminator)) > 0) {
-			return string(yytext);
-		} else if (rc == -1) {
-			yyerror("End of file in text block");
-		} else /* if (rc == -2) */ {
-			yyerror("Text block exceeded maximum length");
+
+                if (tmp == '@') {
+                        rc = get_array_block(yytext, terminator);
+
+                        if (rc > 0) {
+                                add_input(yytext);
+                                return mygetc();
+                        } else if (rc == -1) {
+                                yyerror("End of file in array block");
+                        } else {
+                                yyerror("Array block exceeded maximum length");
+                        }
+                } else {
+                        rc = get_text_block(yytext, terminator);
+
+                        if (rc > 0) {
+                                return string(yytext);
+                        } else if (rc == -1) {
+                                yyerror("End of file in text block");
+                        } else /* if (rc == -2) */ {
+                                yyerror("Text block exceeded maximum length");
+                        }
 		}
 	}
     break;
@@ -1049,7 +1196,7 @@ void
 add_quoted_define(def, val)
 char *def, *val;
 {
-	char save_buf[20];
+	char save_buf[1024];
 
     strcpy(save_buf, "\"");
     strcat(save_buf, val);
@@ -1057,43 +1204,95 @@ char *def, *val;
     add_define(def, -1, save_buf);
 }
 
+void
+add_predefines()
+{
+	char save_buf[80];
+	char *tmp, *dir;
+
+	add_define("LPC3", -1, "");
+	add_define("MUDOS", -1, "");
+	add_quoted_define("SAVE_EXTENSION", SAVE_EXTENSION);
+	add_quoted_define("__ARCH__", ARCH);
+#ifdef COMPILER
+	add_quoted_define("__COMPILER__", COMPILER);
+#endif
+#ifdef __VERSION__
+	add_quoted_define("__COMPILER_VERSION__", __VERSION__);
+#endif
+#ifdef OPTIMIZE
+	add_quoted_define("__OPTIMIZATION__", OPTIMIZE);
+#endif
+#ifndef CDLIB
+	add_quoted_define("MUD_NAME", MUD_NAME);
+#endif
+	get_version(save_buf);
+	add_quoted_define("__VERSION__", save_buf);
+	sprintf(save_buf,"%d", PORTNO);
+	add_define("__PORT__", -1, save_buf);
+	if (current_file) {
+		dir = (char *)DMALLOC(strlen(current_file)+3, 64, "start_new_file");
+		sprintf (dir,"\"%s",current_file);
+		tmp = strrchr (dir,'/');
+		if (tmp) {
+			tmp[1] = '"';
+			tmp[2] = 0;
+		}
+		add_define("__DIR__",-1,dir);
+		FREE(dir);
+	}
+	add_define("USE_EUID", -1, "");
+#ifdef SOCKET_EFUNS
+	add_define("HAS_SOCKETS", -1, "");
+#endif
+#ifndef NO_SHADOWS 
+	add_define("HAS_SHADOWS", -1, "");
+#endif
+#if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
+	add_define("HAS_DEBUGMALLOC", -1, "");
+#endif
+#ifdef MATH
+	add_define("HAS_MATH", -1, "");
+#endif
+#ifdef MATRIX
+	add_define("HAS_MATRIX", -1, "");
+#endif
+#ifdef ED
+	add_define("HAS_ED", -1, "");
+#endif
+#ifdef PRINTF
+	add_define("HAS_PRINTF", -1, "");
+#endif
+#ifdef PRIVS
+	add_define("HAS_PRIVS", -1, "");
+#endif
+#ifdef EACH
+	add_define("HAS_EACH", -1, "");
+#endif
+#ifdef CACHE_STATS
+	add_define("HAS_CACHE_STATS", -1, "");
+#endif
+#if (defined(RUSAGE) || defined(GET_PROCESS_STATS) || defined(TIMES))
+	add_define("HAS_RUSAGE", -1, "");
+#endif
+#ifdef DEBUG_MACRO
+	add_define("HAS_DEBUG_LEVEL", -1, "");
+#endif
+#ifdef OPCPROF
+	add_define("HAS_OPCPROF", -1, "");
+#endif
+}
+
 void start_new_file(f)
     FILE *f;
 {
     struct lpc_predef_s *tmpf;
-    char *dir, *tmp, save_buf[20];
 
 	if (defines_need_freed) {
 		free_defines();
 	}
 	defines_need_freed = 1;
-    add_define("LPC3", -1, "");
-    add_define("MUDOS", -1, "");
-	add_quoted_define("SAVE_EXTENSION", SAVE_EXTENSION);
-	add_quoted_define("MUDOS_ARCH", ARCH);
-	add_quoted_define("MUD_NAME", MUD_NAME);
-	get_version(save_buf);
-	add_quoted_define("MUDOS_VERSION", save_buf);
-	sprintf(save_buf,"%d", PORTNO);
-	add_define("MUDOS_PORT", -1, save_buf);
-    if (current_file)
-      {
-	dir = (char *)DMALLOC(strlen(current_file)+3, 64, "start_new_file");
-	sprintf (dir,"\"%s",current_file);
-	tmp = strrchr (dir,'/');
-	if (tmp) {
-	    tmp[1] = '"';
-	    tmp[2] = 0;
-	}
-#if 1	
-	add_define("MUDOS_DIR",-1,dir);
-#endif
-	FREE(dir);
-      }
-#ifndef NO_SHADOWS 
-        add_define("NO_SHADOWS", -1, "");
-#endif
-        add_define("USE_EUID", -1, "");
+    add_predefines();
     for (tmpf=lpc_predefs; tmpf; tmpf=tmpf->next) {
     char namebuf[NSIZE];
     char mtext[MLEN];
@@ -1112,6 +1311,9 @@ void start_new_file(f)
     nbuf = 0;
     outp = defbuf+DEFMAX;
     pragma_strict_types = 0;		/* I would prefer !o_flag   /Lars */
+#ifdef SAVE_BINARIES
+    pragma_save_binaries = 0;
+#endif
     nexpands = 0;
 }
 
@@ -1227,6 +1429,11 @@ void init_num_args()
     add_instr_name("&", F_AND);
     add_instr_name("&=", F_AND_EQ);
     add_instr_name("index", F_INDEX);
+#ifdef LPC_OPTIMIZE_LOOPS
+    add_instr_name("loop_cond", F_LOOP_COND);
+    add_instr_name("loop_incr", F_LOOP_INCR);
+    add_instr_name("while_dec", F_WHILE_DEC);
+#endif
     add_instr_name("push_indexed_lvalue", F_PUSH_INDEXED_LVALUE);
     add_instr_name("identifier", F_IDENTIFIER);
     add_instr_name("local", F_LOCAL_NAME);
@@ -1261,6 +1468,9 @@ void init_num_args()
     add_instr_name("parse_command", F_PARSE_COMMAND);
     add_instr_name("string", F_STRING);
     add_instr_name("call", F_CALL_FUNCTION_BY_ADDRESS);
+    add_instr_name("aggregate_assoc", F_AGGREGATE_ASSOC);
+    add_instr_name("break_point", F_BREAK_POINT);
+    add_instr_name("call_extra", F_CALL_EXTRA);
     add_instr_name("aggregate", F_AGGREGATE);
     add_instr_name("(::)", F_FUNCTION_CONSTRUCTOR);
     add_instr_name("(*)", F_FUNCTION_SPLIT);
@@ -1555,28 +1765,31 @@ add_define(name, nargs, exps)
 char *name, *exps;
 int nargs;
 {
-    struct defn *p;
-    int h;
+	struct defn *p;
+	int h;
 
-    if ((p = lookup_define(name))) {
-	if (nargs != p->nargs || strcmp(exps, p->exps) != 0) {
-	    char buf[200+NSIZE];
-	    sprintf(buf, "Redefinition of #define %s", name);
-	    yyerror(buf);
+	if ((p = lookup_define(name))) {
+		if (nargs != p->nargs || strcmp(exps, p->exps) != 0) {
+			char buf[200+NSIZE];
+			sprintf(buf, "Warning: redefinition of #define %s", name);
+			add_message(buf);
+		}
+		p->nargs = nargs;
+		p->exps = (char *)DREALLOC(p->exps, strlen(exps)+1,65,"add_define: 3");
+		strcpy(p->exps, exps);
+	} else {
+		p = (struct defn *)DXALLOC(sizeof(struct defn), 65, "add_define: 1");
+		p->name = DXALLOC(strlen(name)+1, 66, "add_define: 2");
+		strcpy(p->name, name);
+		p->undef = 0;
+		p->nargs = nargs;
+		p->exps = DXALLOC(strlen(exps)+1, 67, "add_define: 3");
+		strcpy(p->exps, exps);
+		h = defhash(name);
+		p->next = defns[h];
+		defns[h] = p;
 	}
-	return;
-    }
-    p = (struct defn *)DXALLOC(sizeof(struct defn), 65, "add_define: 1");
-    p->name = DXALLOC(strlen(name)+1, 66, "add_define: 2");
-    strcpy(p->name, name);
-    p->undef = 0;
-    p->nargs = nargs;
-    p->exps = DXALLOC(strlen(exps)+1, 67, "add_define: 3");
-    strcpy(p->exps, exps);
-    h = defhash(name);
-    p->next = defns[h];
-    defns[h] = p;
-/* fprintf(stderr, "define '%s' %d '%s'\n", name, nargs, exps); */
+	/* fprintf(stderr, "define '%s' %d '%s'\n", name, nargs, exps); */
 }
 
 static void
@@ -2004,5 +2217,3 @@ void set_inc_list (list)
       inc_list[i] = make_shared_string(p);
     }
 }
-
-

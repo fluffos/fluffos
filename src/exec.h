@@ -21,12 +21,13 @@
  * 5. Line number information. A table which tells at what address every
  *    line belongs to. The table has the same number of entries as the
  *    programs has source lines. This is used at errors, to find out the
- *    line number of the error.
+ *    line number of the error.  This is usually swapped out to save space.
+ *    First entry is the length of the table.
  * 6. List of inherited objects.
  */
 
 /*
- * When an new object inherits from another, all function definitions
+ * When a new object inherits from another, all function definitions
  * are copied, and all variable definitions.
  * Flags below can't explicitly declared. Flags that can be declared,
  * are found with TYPE_ below.
@@ -46,19 +47,22 @@
 #define T_EXTERNAL_PROGRAM 0x1
 
 struct function {
-    char *name;
-    unsigned short offset;	/* Address of function,
+	char *name;
+	unsigned short offset;	/* Address of function,
 				 * or inherit table index when inherited. */
     /* Used so that it is possible to quickly find this function
      * in the inherited program.
      */
-    unsigned short function_index_offset;
-    unsigned short type;	/* Return type of function. See below. */
-    unsigned char num_local;	/* Number of local variables */
-    unsigned char num_arg;	/* Number of arguments needed.
+	unsigned short function_index_offset;
+	unsigned short type;	/* Return type of function. See below. */
+	unsigned char num_local;	/* Number of local variables */
+	unsigned char num_arg;	/* Number of arguments needed.
 				   -1 arguments means function not defined
 				   in this object. Probably inherited */
-    unsigned char flags;	/* NAME_ . See above. */
+#ifdef PROFILE_FUNCTIONS
+	unsigned long calls, self, children;
+#endif
+	unsigned char flags;	/* NAME_ . See above. */
 };
 
 struct variable {
@@ -88,6 +92,7 @@ struct internal_program {
 					   this prog block without needing to
 					   increase the reference count     */
     unsigned short *line_numbers;	/* Line number information */
+    int line_swap_index;                /* Where line number info is swapped */
     struct function *functions;
     char **strings;			/* All strings uses by the program */
     struct variable *variable_names;	/* All variables defined */

@@ -1,7 +1,10 @@
+#include "config.h"
 #include <sys/types.h>
+#ifndef LATTICE
 #include <sys/socket.h>
+#endif
 #include <stdio.h>
-#ifdef __386BSD__
+#if defined(__386BSD__) || defined(SunOS_5)
 #include <stdlib.h>
 #include <unistd.h>
 #endif
@@ -12,8 +15,11 @@
 #if defined(sun)
 #include <alloca.h>
 #endif
+#ifndef LATTICE
 #include <varargs.h>
-#include "config.h"
+#else
+#include "amiga.h"
+#endif
 #include "lint.h"
 #include "interpret.h"
 #include "object.h"
@@ -75,7 +81,7 @@ static void sig_int(), sig_hup(),
 /* used by debug.h: please leave this in here -- Tru (you can change its
    value if you like).
 */
-int debug_level = 0;
+int debug_level = 32768;
 #endif /* DEBUG_MACRO */
 
 int main(argc, argv)
@@ -91,7 +97,12 @@ int main(argc, argv)
   struct svalue *ret;
   void init_strings(), init_otable();
   int dtablesize;
+#ifdef SAVE_BINARIES
+  void init_binaries();
+#endif
+#if !defined(LATTICE) && !defined(OLD_ULTRIX) && !defined(sequent)
   void tzset();
+#endif
   struct lpc_predef_s predefs;
 #ifdef GCMALLOC
   extern void gc_init();
@@ -107,7 +118,7 @@ int main(argc, argv)
 #if (defined(PROFILING) && !defined(PROFILE_ON) && defined(HAS_MONCONTROL))
   moncontrol(0);
 #endif
-#ifndef OLD_ULTRIX
+#if !defined(OLD_ULTRIX) && !defined(LATTICE) && !defined(sequent)
   tzset();
 #endif
   boot_time = get_current_time();
@@ -265,6 +276,10 @@ int main(argc, argv)
     exit(-1);
   }
 
+#ifdef SAVE_BINARIES
+  init_binaries(argc, argv);
+#endif
+
 #ifndef NO_IP_DEMON
   if(!no_ip_demon)
     init_addr_server(ADDR_SERVER_IP,ADDR_SERVER_PORT);
@@ -361,7 +376,7 @@ int main(argc, argv)
     signal(SIGTERM, sig_term);
     signal(SIGINT, sig_int);
 #ifndef DEBUG
-#ifdef SIGABRT
+#if defined(SIGABRT) && !defined(LATTICE)
     signal(SIGABRT, sig_abrt);
 #endif
 #ifdef SIGIOT
@@ -371,8 +386,10 @@ int main(argc, argv)
 #ifdef SIGBUS
     signal(SIGBUS, sig_bus);
 #endif
+#ifndef LATTICE
     signal(SIGSEGV, sig_segv);
     signal(SIGILL, sig_ill);
+#endif
 #endif /* DEBUG */
 #endif
     backend();
@@ -570,7 +587,10 @@ void crash_MudOS(str)
 
     fprintf(stderr, "Shutting down: %s\n", str);
     crash_condition++;
-
+{
+	char tmp[10];
+	gets(tmp);
+}
     save_stat_files();
     push_string(str, STRING_CONSTANT);
 	if (command_giver) {

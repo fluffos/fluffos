@@ -1,0 +1,16 @@
+.\"determine how the current function was called
+.TH origin 3
+
+.SH NAME
+origin() - determine how the current function was called
+
+.SH SYNOPSIS
+int origin();
+
+.SH DESCRIPTION
+Returns an integer specifying how the current function was called.  Current
+values are 1 for the driver (heart_beat, call_out, etc), 2 for a local
+function call, and 4 for a call_other().
+
+.SH SEE ALSO
+previous_object(3).

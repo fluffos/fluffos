@@ -13,10 +13,7 @@ TMI, Portals, Overdrive, Genocide, TMI-2, Vincent's Hollow, and DreamShadow.
  
 The MudOS driver was a team effort with specific contributions from the
 following people:
- 
-Jeremy Radlow (Whiplash) - original mappings implementation, virtual objects,
-   master::crash callback, and others.
- 
+
 Erik Kay (Wayfarer) - runtime config system, message() efun, and others.
  
 John Garnett (Truilkan) - improved mappings implementation, process_input

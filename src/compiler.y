@@ -10,7 +10,9 @@
 #include "config.h"
 #include <string.h>
 #include <stdio.h>
+#ifndef LATTICE
 #include <memory.h>
+#endif
 #ifdef __386BSD__
 #include <stdlib.h>
 #endif
@@ -19,6 +21,9 @@
 #endif
 #if defined(NeXT) || defined(SunOS_5)
 #include <stdlib.h>
+#endif
+#ifdef sun
+#include <malloc.h>
 #endif
 
 #include "mudlib_stats.h"
@@ -33,25 +38,34 @@
 #include "opcodes.h"
 
 static void insert_pop_value();
+#ifdef LPC_OPTIMIZE_LOOPS
+static int optimize_loop_cond PROT((char *e, int len));
+static int optimize_while_dec PROT((char *e, int len));
+#endif
 static int last_expression = -1;
 
 #define YYMAXDEPTH	600
 
-/* NUMPAREAS areas are saved with the program code after compilation.
+/* NUMPAREAS areas are saved with the program code after compilation,
+ * the rest are only temporary and used for convenience.
  */
-#define A_PROGRAM		0
-#define A_FUNCTIONS		1
-#define A_STRINGS		2
-#define A_VARIABLES		3
-#define A_LINENUMBERS		4
-#define A_INHERITS		5
-#define A_ARGUMENT_TYPES	6
-#define A_ARGUMENT_INDEX	7
+#define A_PROGRAM		0	/* executable code */
+#define A_FUNCTIONS		1	/* table of functions */
+#define A_STRINGS		2	/* table of strings */
+#define A_VARIABLES		3	/* table of variables */
+#define A_LINENUMBERS		4	/* linenumber information */
+#define A_INHERITS		5	/* table of inherited progs */
+#define A_ARGUMENT_TYPES	6	/* */
+#define A_ARGUMENT_INDEX	7	/* */
 #define NUMPAREAS		8
-#define A_CASE_NUMBERS		8
-#define A_CASE_STRINGS		9
-#define A_CASE_LABELS	       10
-#define NUMAREAS	       11
+#define A_CASE_NUMBERS		8	/* case labels for numbers */
+#define A_CASE_STRINGS		9	/* case labels for strings */
+#define A_CASE_LABELS		10	/* used to build switch tables */
+#define A_STRING_NEXT		11	/* next prog string in hash chain */
+#define A_STRING_REFS		12	/* reference count of prog string */
+#define A_INCLUDES		13	/* list of included files */
+#define A_PATCH			14	/* for save_binary() */
+#define NUMAREAS		15
 
 #define BREAK_ON_STACK		0x40000
 #define BREAK_FROM_CASE		0x80000
@@ -64,7 +78,7 @@ static int last_expression = -1;
 #define CONTINUE_DELIMITER    -0x40000000
 
 #define SET_CURRENT_PROGRAM_SIZE(x) \
-	do { CURRENT_PROGRAM_SIZE = (x); last_expression = -1; } while (0)
+	( CURRENT_PROGRAM_SIZE = (x), last_expression = -1 )
 
 #define LAST_EXPR_CODE (mem_block[A_PROGRAM].block[last_expression])
 
@@ -120,6 +134,9 @@ void push_expression();
 static int exact_types;
 extern int pragma_strict_types;	/* Maintained by lex.c */
 extern int pragma_save_types;	/* Also maintained by lex.c */
+#ifdef SAVE_BINARIES
+extern int pragma_save_binaries;/* here too :-) */
+#endif
 int approved_object;		/* How I hate all these global variables */
 
 extern int total_num_prog_blocks, total_prog_block_size;
@@ -290,8 +307,8 @@ static void add_to_mem_block(n, data, size)
     struct mem_block *mbp = &mem_block[n];
     if (mbp->current_size + size > mbp->max_size)
 	realloc_mem_block(mbp, mbp->current_size + size);
-    memcpy(mbp->block + mbp->current_size, data, size);
-    memcpy(mbp->block + mbp->current_size, data, size);
+    if (data)
+	memcpy(mbp->block + mbp->current_size, data, size);
     mbp->current_size += size;
 }
 
@@ -323,6 +340,15 @@ static void upd_short(offset, l)
     int offset;
     short l;
 {
+#ifdef DEBUG
+	if (offset > CURRENT_PROGRAM_SIZE) {
+		char buff[1024];
+
+		sprintf(buff, "patch offset %x larger than current program size %x.\n",
+			offset, CURRENT_PROGRAM_SIZE);
+		yyerror(buff);
+	}
+#endif
     mem_block[A_PROGRAM].block[offset + 0] = ((char *)&l)[0];
     mem_block[A_PROGRAM].block[offset + 1] = ((char *)&l)[1];
 }
@@ -395,11 +421,11 @@ static int defined_function(s)
     char *s;
 {
 	int offset;
-	char *shared;
+	char *shared_string;
 	struct function *funp;
 
 	/* if not in shared string table then it hasn't been defined */
-	if ((shared = findstring(s))) {
+	if ((shared_string = findstring(s))) {
 		for (offset = 0; offset < mem_block[A_FUNCTIONS].current_size;
 			offset += sizeof (struct function))
 		{
@@ -407,7 +433,7 @@ static int defined_function(s)
 			if (funp->flags & NAME_HIDDEN)
 				continue;
 			/* can do pointer compare instead of strcmp since is shared */
-			if (funp->name == shared)
+			if (funp->name == shared_string)
 				return offset / sizeof (struct function);
 		}
 	}
@@ -487,7 +513,7 @@ static void find_inherited(funp)
     struct inherit *ip;
     int num_inherits, super_length = 0;
     char *real_name, *super_name = 0, *p;
-	char *shared;
+	char *shared_string;
 
     real_name = funp->name;
     if (real_name[0] == ':')
@@ -500,7 +526,7 @@ static void find_inherited(funp)
     num_inherits = mem_block[A_INHERITS].current_size /
 	sizeof (struct inherit);
 	/* no need to look for it unless its in the shared string table */
-	if ((shared = findstring(real_name))) {
+	if ((shared_string = findstring(real_name))) {
     ip = (struct inherit *)mem_block[A_INHERITS].block;
     for (; num_inherits > 0; ip++, num_inherits--) {
 	if (super_name) {
@@ -515,7 +541,7 @@ static void find_inherited(funp)
 	    if (ip->prog->p.i.functions[i].flags & (NAME_UNDEFINED|NAME_HIDDEN))
 		continue;
 		/* can use pointer compare because both are shared */
-	    if (ip->prog->p.i.functions[i].name != shared)
+	    if (ip->prog->p.i.functions[i].name != shared_string)
 		continue;
 	    funp->offset = ip - (struct inherit *)mem_block[A_INHERITS].block;
 	    funp->flags = ip->prog->p.i.functions[i].flags | NAME_INHERITED;
@@ -531,7 +557,7 @@ static void find_inherited(funp)
 
 /*
  * Define a new function. Note that this function is called at least twice
- * for alll function definitions. First as a prototype, then as the real
+ * for all function definitions. First as a prototype, then as the real
  * function. Thus, there are tests to avoid generating error messages more
  * than once by looking at (flags & NAME_PROTOTYPE).
  */
@@ -621,6 +647,11 @@ static int define_new_function(name, num_arg, num_local, offset, flags, type)
     fun.num_local = num_local;
     fun.function_index_offset = 0;
     fun.type = type;
+#ifdef PROFILE_FUNCTIONS
+    fun.calls = 0L;
+    fun.self = 0L;
+    fun.children = 0L;
+#endif
     if (exact_types)
 	fun.flags |= NAME_STRICT_TYPES;
     num = mem_block[A_FUNCTIONS].current_size / sizeof fun;
@@ -669,22 +700,131 @@ static void define_variable(name, type, flags)
     add_to_mem_block(A_VARIABLES, (char *)&dummy, sizeof dummy);
 }
 
+static short string_idx[0x100];
+static unsigned char string_tags[0x20];
+static short freed_string;
+
+#define STRING_HASH(var,str) \
+    var = (long)str ^ (long)str >> 16; \
+    var = (var ^ var >> 8) & 0xff;
+
 short store_prog_string(str)
     char *str;
 {
-    short i;
+    short i, next, *next_tab, *idxp;
     char **p;
+    unsigned char hash, mask, *tagp;
+
+    str = make_shared_string(str);
+    STRING_HASH(hash,str);
+    idxp = &string_idx[hash];
+
+    /* string_tags is a big bit-array, so find correct bit */
+    mask = 1 << (hash & 7);
+    tagp = &string_tags[hash >> 3];
 
     p = (char **) mem_block[A_STRINGS].block;
-    str = make_shared_string(str);
-    for (i=mem_block[A_STRINGS].current_size / sizeof str -1; i>=0; --i)
-	if (p[i] == str)  {
-	    free_string(str); /* Needed as string is only free'ed once. */
-	    return i;
+    next_tab = (short *) mem_block[A_STRING_NEXT].block;
+    
+    if (*tagp & mask) {
+	/* search hash chain to see if it's there */
+	for (i = *idxp; i >= 0; i = next_tab[i]) {
+	    if (p[i] == str) {
+		free_string(str); /* needed as string is only free'ed once. */
+		((short *)mem_block[A_STRING_REFS].block)[i]++;
+		return i;
+	    }
 	}
+	next = *idxp;
+    } else {
+	*tagp |= mask;
+	next = -1;
+    }
 
-    add_to_mem_block(A_STRINGS, &str, sizeof str);
-    return mem_block[A_STRINGS].current_size / sizeof str - 1;
+    /*
+     * New string, add to table
+     */
+    
+    if (freed_string >= 0) {
+	/* reuse freed string*/
+	int top;
+	i = freed_string;
+	
+	top = mem_block[A_STRINGS].current_size / sizeof str;
+	for (freed_string++; freed_string < top; freed_string++) {
+	    if (p[freed_string] == 0)
+		break;
+	}
+	if (freed_string >= top)
+	    freed_string = -1;
+    } else {
+	/* grow by one element. */
+	add_to_mem_block(A_STRINGS, 0, sizeof str);
+	add_to_mem_block(A_STRING_NEXT, 0, sizeof(short));
+	add_to_mem_block(A_STRING_REFS, 0, sizeof(short));
+	/* test if number of strings isn't too large ? */
+	i = mem_block[A_STRINGS].current_size / sizeof str - 1;
+    }
+    ((char **)mem_block[A_STRINGS].block)[i] = str;
+    ((short *)mem_block[A_STRING_NEXT].block)[i] = next;
+    ((short *)mem_block[A_STRING_REFS].block)[i] = 1;
+    *idxp = i;
+    return i;
+}
+
+void free_prog_string(num)
+    short num;
+{
+    short i, prv, *next_tab, top, *idxp;
+    char **p, *str;
+    unsigned char hash, mask;
+
+    top = mem_block[A_STRINGS].current_size / sizeof(char*) - 1;
+    if (num < 0 || num > top)
+    {
+	yyerror("free_prog_string: index out of range.\n");
+	return;
+    }
+
+    if (--((short *)mem_block[A_STRING_REFS].block)[num] >= 1)
+	return;
+
+    p = (char **) mem_block[A_STRINGS].block;
+    next_tab = (short *) mem_block[A_STRING_NEXT].block;
+
+    str = p[num];
+    STRING_HASH(hash,str);
+    idxp = &string_idx[hash];
+
+    for (prv = -1, i = *idxp; i != num; prv = i, i = next_tab[i]) {
+	if (i == -1) {
+	    yyerror("free_prog_string: string not in prog table.\n");
+	    return;
+	}
+    }
+
+    if (prv == -1) {  /* string is head of list */
+	*idxp = next_tab[i];
+	if (*idxp == -1) {
+	    /* clear tag bit since hash chain now empty */
+	    mask = 1 << (hash & 7);
+	    string_tags[hash >> 3] &= ~mask;
+	}
+    } else {  /* easy unlink */
+	next_tab[prv] = next_tab[i];
+    }
+
+    free_string(str);  /* important */
+    p[i] = 0;
+    if (i != top) {
+	if (i < freed_string || freed_string == -1)
+	    freed_string = i;
+    } else {
+	/* shrink table */
+	mem_block[A_STRINGS].current_size -= sizeof str;
+	mem_block[A_STRING_REFS].current_size -= sizeof(short);
+	mem_block[A_STRING_NEXT].current_size -= sizeof(short);
+    }
 }
 
 void add_to_case_heap(block_index,entry)
@@ -806,6 +946,22 @@ static float read_real(address)
 	yyerror("Internal error in read_real.");
     }
 	return 0.0;
+}
+
+static short read_string(address)
+	  int address;
+{
+    register char *block;
+    block = &mem_block[A_PROGRAM].block[address];
+    if (EXTRACT_UCHAR(block++) == F_STRING) {
+	short num;
+	((char *)&num)[0] = block[0];
+	((char *)&num)[1] = block[1];
+	return num;
+    } else {
+	yyerror("Internal error in read_string.");
+    }
+	return -1;
 }
 #endif
 
@@ -1178,6 +1334,11 @@ while:  {
 		memcpy(e.expr, mem_block[A_PROGRAM].block + addr, e.len);
 		/* relative offset (backwards) branch */
 		e.expr[e.len] = branch;
+#ifdef LPC_OPTIMIZE_LOOPS
+		if (!optimize_loop_cond(e.expr, e.len)) {
+			optimize_while_dec(e.expr, e.len);
+		}
+#endif
 		/* adjust the size of the program so that we will overwrite the
 		   expression in the compiled code (remember we've already copied the
 		   expression into temp storage).
@@ -1308,8 +1469,10 @@ for: L_FOR '('{
 		e.len = CURRENT_PROGRAM_SIZE - start;
 		e.expr = (char *)DMALLOC(e.len + 3, 51, "for_expr");
 		memcpy(e.expr, mem_block[A_PROGRAM].block + start, e.len);
-		
 		e.expr[e.len] = branch;
+#ifdef LPC_OPTIMIZE_LOOPS
+		optimize_loop_cond(e.expr, e.len);
+#endif
 		push_expression(&e);
 		SET_CURRENT_PROGRAM_SIZE(start);
 		push_address(); /* 2 */
@@ -1326,6 +1489,14 @@ for: L_FOR '('{
 		e.expr = e.len ? (char *)DMALLOC(e.len, 52, "for_expr:") : (char *)0;
 		if (e.expr) {
 			memcpy(e.expr, mem_block[A_PROGRAM].block + start, e.len);
+#ifdef LPC_OPTIMIZE_LOOPS
+            if ((e.len == 3) && (e.expr[0] == F_PUSH_LOCAL_VARIABLE_LVALUE)
+                && (e.expr[2] == F_INC))
+            { /* optimizaton for the i++ of a for loop ;) - jwg */
+                e.expr[0] = F_LOOP_INCR;
+                e.len = 2;
+            }
+#endif
 		}
 		push_expression(&e);
 		SET_CURRENT_PROGRAM_SIZE(start);
@@ -1434,11 +1605,18 @@ switch: L_SWITCH '(' comma_expr ')'
 		struct case_heap_entry temp;
 
 		temp.key = (int)ZERO_AS_STR_CASE_LABEL;
-		temp.addr = zero_case_label;
+		temp.addr = zero_case_label & 0xffff;
 		temp.line = 0; /* if this is accessed later, something is
 				* really wrong				  */
 		add_to_case_heap(A_CASE_STRINGS,&temp);
 	    }
+#ifdef SAVE_BINARIES
+	    {
+		short sw;
+		sw = current_break_address - 4;  /* the F_SWITCH */
+		add_to_mem_block(A_PATCH, (char *)&sw, sizeof sw);
+	    }
+#endif
 	}
 	heap_start = mem_block[block_index].block + current_case_heap ;
 	heap_end_offs = mem_block[block_index].current_size -current_case_heap;
@@ -1542,6 +1720,10 @@ switch: L_SWITCH '(' comma_expr ')'
 		/* only using offset part of table here */
 		((char *)&offset)[0] = mem_block[A_CASE_LABELS].block[i*6 + 4];
 		((char *)&offset)[1] = mem_block[A_CASE_LABELS].block[i*6 + 5];
+              if (offset <= 1) {
+                  ((char *)&offset)[0] = mem_block[A_CASE_LABELS].block[i*6 + 4 + 6];
+                  ((char *)&offset)[1] = mem_block[A_CASE_LABELS].block[i*6 + 5 + 6];
+              }
 		ins_short(offset);
 	    }
 	    ins_long(first_key);
@@ -1555,7 +1737,7 @@ switch: L_SWITCH '(' comma_expr ')'
 		i++,o<<=1;
 	    if (block_index == A_CASE_STRINGS) i = ( i << 4 ) | 0xf;
 	    /* and store it */
-	    mem_block[A_PROGRAM].block[current_break_address-3] &= i;
+	    mem_block[A_PROGRAM].block[current_break_address-3] &= (i & 0xff);
 	}
 	upd_short(current_break_address, mem_block[A_PROGRAM].current_size);
 	
@@ -1601,7 +1783,7 @@ case: L_CASE case_label ':'
 	
 case_label: constant
         {
-	    if ( !(zero_case_label & NO_STRING_CASE_LABELS) )
+	    if ( !(zero_case_label & NO_STRING_CASE_LABELS) && $1 )
 		yyerror("Mixed case label list not allowed");
 	    if ( ($$.key = $1) )
 	        zero_case_label |= SOME_NUMERIC_CASE_LABELS;
@@ -1614,8 +1796,8 @@ case_label: constant
 	    if ( zero_case_label & SOME_NUMERIC_CASE_LABELS )
 		yyerror("Mixed case label list not allowed");
 	    zero_case_label &= ~NO_STRING_CASE_LABELS;
-            store_prog_string($1);
-            $$.key = (int)$1;
+	    store_prog_string($1);
+	    $$.key = (int)$1;
 	    $$.block = A_CASE_STRINGS;
         }
 	  ;
@@ -1793,6 +1975,17 @@ expr0:
 		  type_error("Bad argument 2 to |", $3.type);
 	      $$.type = TYPE_NUMBER;
 	      $$.addr = $1.addr; $$.iscon = 0;
+#ifdef LPC_OPTIMIZE
+	      /* constant expressions */
+	      if ($1.iscon && BASIC_TYPE($1.type, TYPE_NUMBER) &&
+		  $3.iscon && BASIC_TYPE($3.type, TYPE_NUMBER))
+	      {
+		  SET_CURRENT_PROGRAM_SIZE($1.addr);
+		  write_number(read_number($1.addr) | read_number($3.addr));
+		  $$.iscon = 1;
+		  break;
+	      }
+#endif
 	      ins_f_byte(F_OR);
 	  }
        | expr0 '^' expr0
@@ -1803,11 +1996,21 @@ expr0:
 		  type_error("Bad argument 2 to ^", $3.type);
 	      $$.type = TYPE_NUMBER;
 	      $$.addr = $1.addr; $$.iscon = 0;
+#ifdef LPC_OPTIMIZE
+	      /* constant expressions */
+	      if ($1.iscon && BASIC_TYPE($1.type, TYPE_NUMBER) &&
+		  $3.iscon && BASIC_TYPE($3.type, TYPE_NUMBER))
+	      {
+		  SET_CURRENT_PROGRAM_SIZE($1.addr);
+		  write_number(read_number($1.addr) ^ read_number($3.addr));
+		  $$.iscon = 1;
+		  break;
+	      }
+#endif
 	      ins_f_byte(F_XOR);
 	  }
        | expr0 '&' expr0
 	  {
-	      ins_f_byte(F_AND);
 	      if ( !($1.type & TYPE_MOD_POINTER) || !($3.type & TYPE_MOD_POINTER) ) {
 	          if (exact_types && !TYPE($1.type,TYPE_NUMBER))
 		      type_error("Bad argument 1 to &", $1.type);
@@ -1816,6 +2019,18 @@ expr0:
 	      }
 	      $$.type = TYPE_NUMBER;
 	      $$.addr = $1.addr; $$.iscon = 0;
+#ifdef LPC_OPTIMIZE
+	      /* constant expressions */
+	      if ($1.iscon && BASIC_TYPE($1.type, TYPE_NUMBER) &&
+		  $3.iscon && BASIC_TYPE($3.type, TYPE_NUMBER))
+	      {
+		  SET_CURRENT_PROGRAM_SIZE($1.addr);
+		  write_number(read_number($1.addr) & read_number($3.addr));
+		  $$.iscon = 1;
+		  break;
+	      }
+#endif
+	      ins_f_byte(F_AND);
 	  }
 
       | expr0 L_EQ expr0
@@ -1958,6 +2173,30 @@ expr0:
 		  ins_real(val);
 		  $$.iscon = 1;
 		  break;
+	      } else if ($$.type == TYPE_STRING) {
+		  /* Combine strings */
+		  short n1, n2;
+		  char *new, *s1, *s2;
+		  n1 = read_string($1.addr);
+		  s1 = ((char **)mem_block[A_STRINGS].block)[n1];
+		  n2 = read_string($3.addr);
+		  s2 = ((char **)mem_block[A_STRINGS].block)[n2];
+		  new = DXALLOC( strlen(s1)+strlen(s2)+1, 53, "string add" );
+		  strcpy(new, s1);
+		  strcat(new, s2);
+		  /* free old strings (ordering may help shrink table) */
+		  if (n1 > n2) {
+		      free_prog_string(n1); free_prog_string(n2);
+		  } else {
+		      free_prog_string(n2); free_prog_string(n1);
+		  }
+		  /* store new string */
+		  SET_CURRENT_PROGRAM_SIZE($1.addr);
+		  ins_f_byte(F_STRING);
+		  ins_short(store_prog_string(new));
+		  FREE(new);
+		  $$.iscon = 1;
+		  break;
 	      }
 	  }
 #endif /* OPTIMIZE */
@@ -2083,9 +2322,20 @@ expr0:
 		type_error("Bad argument number 1 to '%'", $1.type);
 	    if (exact_types && !TYPE($3.type, TYPE_NUMBER))
 		type_error("Bad argument number 2 to '%'", $3.type);
-	    ins_f_byte(F_MOD);
 	    $$.type = TYPE_NUMBER;
 	    $$.addr = $1.addr; $$.iscon = 0;
+#ifdef LPC_OPTIMIZE
+	      /* constant expressions */
+	      if ($1.iscon && BASIC_TYPE($1.type, TYPE_NUMBER) &&
+		  $3.iscon && BASIC_TYPE($3.type, TYPE_NUMBER))
+	      {
+		  SET_CURRENT_PROGRAM_SIZE($1.addr);
+		  write_number(read_number($1.addr) % read_number($3.addr));
+		  $$.iscon = 1;
+		  break;
+	      }
+#endif
+	    ins_f_byte(F_MOD);
 	};
       | expr0 '/' expr0
 	{
@@ -2176,21 +2426,40 @@ expr0:
 	};
       | L_NOT expr0
 	{
-	    ins_expr_f_byte(F_NOT);	/* Any type is valid here. */
 	    $$.type = TYPE_NUMBER;
 	    $$.addr = $2.addr; $$.iscon = 0;
+#ifdef LPC_OPTIMIZE
+	    /* constant expressions */
+	    if ($2.iscon && BASIC_TYPE($2.type, TYPE_NUMBER))
+	    {
+		SET_CURRENT_PROGRAM_SIZE($2.addr);
+		write_number(!read_number($2.addr));
+		$$.iscon = 1;
+		break;
+	    }
+#endif
+	    ins_expr_f_byte(F_NOT);	/* Any type is valid here. */
 	};
       | '~' expr0
 	{
-	    ins_f_byte(F_COMPL);
 	    if (exact_types && !TYPE($2.type, TYPE_NUMBER))
 		type_error("Bad argument to ~", $2.type);
 	    $$.type = TYPE_NUMBER;
 	    $$.addr = $2.addr; $$.iscon = 0;
+#ifdef LPC_OPTIMIZE
+	    /* constant expressions */
+	    if ($2.iscon && BASIC_TYPE($2.type, TYPE_NUMBER))
+	    {
+		SET_CURRENT_PROGRAM_SIZE($2.addr);
+		write_number(~read_number($2.addr));
+		$$.iscon = 1;
+		break;
+	    }
+#endif
+	    ins_f_byte(F_COMPL);
 	};
       | '-' expr0  %prec L_NOT
 	{
-	    ins_f_byte(F_NEGATE);
 	    if (exact_types && !TYPE($2.type, TYPE_NUMBER) && !TYPE($2.type, TYPE_REAL))
 		type_error("Bad argument to unary '-'", $2.type);
             if (TYPE($2.type, TYPE_NUMBER))
@@ -2198,6 +2467,24 @@ expr0:
 	    else
 	      $$.type = TYPE_REAL;
 	    $$.addr = $2.addr; $$.iscon = 0;
+#ifdef LPC_OPTIMIZE
+	    /* constant expressions */
+	    if ($2.iscon) {
+		if ($$.type == TYPE_NUMBER) {
+		    SET_CURRENT_PROGRAM_SIZE($2.addr);
+		    write_number(-read_number($2.addr));
+		    $$.iscon = 1;
+		    break;
+		} else if ($$.type == TYPE_REAL) {
+		    SET_CURRENT_PROGRAM_SIZE($2.addr);
+		    ins_f_byte(F_REAL);
+		    ins_real(-read_real($2.addr));
+		    $$.iscon = 1;
+		    break;
+		}
+	    }
+#endif
+	    ins_f_byte(F_NEGATE);
 	}
 
       | lvalue L_INC   /* normal precedence here */
@@ -2360,26 +2647,27 @@ lvalue: L_IDENTIFIER
 	    $$ = type_of_locals[$1];
 	}
 	| expr4 '[' comma_expr L_RANGE comma_expr ']'
-	  {
-	      ins_f_byte(F_RANGE);
-	      last_push_indexed = 0;
-	      if (exact_types) {
-		  if (($1.type & TYPE_MOD_POINTER) == 0 && !TYPE($1.type, TYPE_STRING))
-		      type_error("Bad type to indexed value", $1.type);
-		  if (!TYPE($3, TYPE_NUMBER))
-		      type_error("Bad type of index", $3);
-		  if (!TYPE($5, TYPE_NUMBER))
-		      type_error("Bad type of index", $5);
-	      }
-	      if ($1.type == TYPE_ANY)
-		  $$ = TYPE_ANY;
-	      else if (TYPE($1.type, TYPE_STRING))
-		  $$ = TYPE_STRING;
-	      else if ($1.type & TYPE_MOD_POINTER)
-		  $$ = $1.type;
-	      else if (exact_types)
-		  type_error("Bad type of argument used for range", $1.type);
-	  };
+       {
+         ins_f_byte(F_RANGE);
+         last_push_indexed = 0;
+         if (exact_types) {
+             if (($1.type & TYPE_MOD_POINTER) == 0
+               && !TYPE($1.type, TYPE_STRING))
+                 type_error("Bad type to indexed value", $1.type);
+             if (!TYPE($3, TYPE_NUMBER))
+                 type_error("Bad type of index", $3);
+             if (!TYPE($5, TYPE_NUMBER))
+                 type_error("Bad type of index", $5);
+         }
+            if ($1.type == TYPE_ANY)
+                $$ = TYPE_ANY;
+            else if (TYPE($1.type, TYPE_STRING))
+                $$ = TYPE_STRING;
+            else if ($1.type & TYPE_MOD_POINTER)
+                $$ = $1.type;
+            else if (exact_types)
+                type_error("Bad type of argument used for range", $1.type);
+       };
 	| expr4 '[' comma_expr ']'
 	{ 
                last_push_indexed = CURRENT_PROGRAM_SIZE;
@@ -2429,16 +2717,16 @@ string_con1: L_STRING
           FREE($1);
           FREE($3);
       };
- 
+
 string_con2: L_STRING
          | string_con2 L_STRING
-	{
+        {
           $$ = DXALLOC( strlen($1) + strlen($2) + 1, 53, "string_con2" );
-	    strcpy($$, $1);
+	  strcpy($$, $1);
           strcat($$, $2);
-	    FREE($1);
+	  FREE($1);
           FREE($2);
-	};
+        };
 
 function_call: function_name
     {
@@ -2686,7 +2974,22 @@ function_name: L_IDENTIFIER
 cond: condStart
       statement
       optional_else_part
-	{ int i=pop_address(); upd_short(i, CURRENT_PROGRAM_SIZE - i); } ;
+	{
+		int i = pop_address();
+#ifdef DEBUG
+		/* check on 'i' handled by upd_short() */
+		upd_short(i, CURRENT_PROGRAM_SIZE - i);
+#else
+		/* check on 'i' not handled by upd_short() */
+		if (i <= CURRENT_PROGRAM_SIZE) {
+			upd_short(i, CURRENT_PROGRAM_SIZE - i);
+		} else {
+			fprintf(stderr,
+		"compiler.y: patch offset %x larger than current program size %x.\n",
+		i, CURRENT_PROGRAM_SIZE);
+		}
+#endif
+	};
 
 condStart: L_IF '(' comma_expr ')'
 	{
@@ -2735,11 +3038,11 @@ static int check_declared(str)
     char *str;
 {
 	struct variable *vp;
-	char *shared;
+	char *shared_string;
 	int offset;
 
 	/* if not in shared string table, then its not declared */
-	if ((shared = findstring(str))) {
+	if ((shared_string = findstring(str))) {
 		/* find where its declared */
 		for (offset=0; offset < mem_block[A_VARIABLES].current_size;
 			offset += sizeof (struct variable))
@@ -2750,7 +3053,7 @@ static int check_declared(str)
 			/* Pointer comparison is possible since we compare against shared
 			   string.
 			*/
-			if (vp->name == shared)
+			if (vp->name == shared_string)
 				return offset / sizeof (struct variable);
 		}
 	}
@@ -2830,6 +3133,11 @@ static int copy_functions(from, type)
 	if (strchr(fun.name, ':'))
 	    fun.flags |= NAME_HIDDEN;	/* Not to be used again ! */
 	fun.name = make_shared_string(fun.name);	/* Incr ref count */
+#ifdef PROFILE_FUNCTIONS
+	fun.calls = 0L;
+	fun.self = 0L;
+	fun.children = 0L;
+#endif
 	fun.offset = mem_block[A_INHERITS].current_size /
 	    sizeof (struct inherit) - 1;
 	fun.function_index_offset = i;
@@ -3029,6 +3337,11 @@ static char *get_two_types(type1, type2)
     return buff;
 }
 
+int get_id_number() {
+    static int current_id_number = 1;
+    return current_id_number++;
+}
+
 /*
  * The program has been compiled. Prepare a 'struct program' to be returned.
  */
@@ -3036,9 +3349,10 @@ void epilog() {
     int size, i;
     char *p;
     struct function *funp;
-    static int current_id_number = 1;
+	void save_binary PROT((struct program *prog, struct mem_block *includes,
+		struct mem_block *patches));
 
-    if (num_parse_error > 0) {
+    if (num_parse_error > 0 || inherit_file) {
         clean_parser();
         return;
     }
@@ -3076,7 +3390,8 @@ void epilog() {
 
     size = align(sizeof (struct program));
     for (i=0; i<NUMPAREAS; i++)
-	size += align(mem_block[i].current_size);
+	if (i != A_LINENUMBERS && i != A_ARGUMENT_TYPES && i != A_ARGUMENT_INDEX)
+	    size += align(mem_block[i].current_size);
     p = (char *)DXALLOC(size, 56, "epilog: 1");
     prog = (struct program *)p;
     *prog = NULL_program;
@@ -3084,10 +3399,19 @@ void epilog() {
     prog->p.i.ref = 0;
     prog->p.i.heart_beat = heart_beat;
     prog->name = string_copy(current_file);
-    prog->p.i.id_number = current_id_number++;
+    prog->p.i.id_number = get_id_number();
     total_prog_block_size += prog->p.i.total_size;
     total_num_prog_blocks += 1;
 
+    prog->p.i.line_swap_index = -1;
+    prog->p.i.line_numbers = (unsigned short *)
+	XALLOC(mem_block[A_LINENUMBERS].current_size + sizeof(short));
+    memcpy(((char*)&prog->p.i.line_numbers[1]),
+	   mem_block[A_LINENUMBERS].block,
+	   mem_block[A_LINENUMBERS].current_size);
+    prog->p.i.line_numbers[0] =
+	(mem_block[A_LINENUMBERS].current_size / sizeof(short)) + 1;
+    
     p += align(sizeof (struct program));
     prog->p.i.program = p;
     if (mem_block[A_PROGRAM].current_size)
@@ -3096,12 +3420,6 @@ void epilog() {
     prog->p.i.program_size = mem_block[A_PROGRAM].current_size;
 
     p += align(mem_block[A_PROGRAM].current_size);
-    prog->p.i.line_numbers = (unsigned short *)p;
-    if (mem_block[A_LINENUMBERS].current_size)
-	memcpy(p, mem_block[A_LINENUMBERS].block,
-	       mem_block[A_LINENUMBERS].current_size);
-
-    p += align(mem_block[A_LINENUMBERS].current_size);
     prog->p.i.functions = (struct function *)p;
     prog->p.i.num_functions = mem_block[A_FUNCTIONS].current_size /
 	sizeof (struct function);
@@ -3136,8 +3454,20 @@ void epilog() {
 	prog->p.i.inherit = 0;
     
     prog->p.i.argument_types = 0;	/* For now. Will be fixed someday */
-
     prog->p.i.type_start = 0;
+
+#ifdef SAVE_BINARIES
+#ifdef ALWAYS_SAVE_BINARIES
+	save_binary(prog, &mem_block[A_INCLUDES], &mem_block[A_PATCH]);
+#else
+    if (pragma_save_binaries) {
+	save_binary(prog, &mem_block[A_INCLUDES], &mem_block[A_PATCH]);
+    }
+#endif
+#endif
+
+    swap_line_numbers(prog); /* do this after saving binary */
+    
     for (i=0; i<NUMAREAS; i++)
         FREE((char *)mem_block[i].block);
 
@@ -3188,6 +3518,8 @@ static void prolog() {
 	mem_block[i].current_size = 0;
 	mem_block[i].max_size = START_BLOCK_SIZE;
     }
+    memset(string_tags, 0, sizeof(string_tags));
+    freed_string = -1;
     add_new_init_jump();
     first_last_initializer_end = last_initializer_end;
 }
@@ -3224,7 +3556,8 @@ static void clean_parser() {
     prog = 0;
     for (i=0; i<NUMAREAS; i++)
         FREE(mem_block[i].block);
-    smart_log (NULL,0,NULL,1);
+    if (num_parse_error)
+	smart_log (NULL,0,NULL,1);
 }
 
 /*
@@ -3364,4 +3697,63 @@ insert_pop_value()
 	} else {
 		ins_f_byte(F_POP_VALUE);
 	}
+}
+
+#ifdef LPC_OPTIMIZE_LOOPS
+/* peephole optimization on the middle for_expr and while loop conditions. */
+
+static int
+optimize_loop_cond(e, len)
+char *e;
+int len;
+{
+	if ((len == 5) && (e[0] == F_LOCAL_NAME) && (e[2] == F_LOCAL_NAME)
+		&& (e[4] == F_LT) && (e[5] == F_BBRANCH_WHEN_NON_ZERO))
+	{
+		e[0] = F_LOOP_COND;
+		return 1;
+	}
+	if ((len == 8) && (e[0] == F_LOCAL_NAME) && (e[2] == F_NUMBER)
+		&& (e[7] == F_LT) && (e[8] == F_BBRANCH_WHEN_NON_ZERO))
+	{
+		e[0] = F_LOOP_COND;
+		return 1;
+	}
+	return 0;
+}
+
+/* peephole optimization on the middle for_expr and while loop conditions. */
+
+static int
+optimize_while_dec(e, len)
+char *e;
+int len;
+{
+	if ((len == 3) && (e[0] == F_PUSH_LOCAL_VARIABLE_LVALUE)
+		&& (e[2] == F_POST_DEC) && (e[3] == F_BBRANCH_WHEN_NON_ZERO))
+	{
+		e[0] = F_WHILE_DEC;
+		return 1;
+	}
+	return 0;
+}
+#endif
+
+/*
+ * Save a list of all the include files.  This is so we can
+ * tell if a saved binary is out of date or not.  In the future,
+ * may be used to give better line numbers for errors.
+ */
+void
+save_include(name)
+    char *name;
+{
+    /* at the moment, only used for binaries, so ifdef out */
+#ifdef SAVE_BINARIES
+    extern int pragma_save_binaries;
+
+    if (pragma_save_binaries) {
+	add_to_mem_block(A_INCLUDES, name, strlen(name)+1);
+    }
+#endif
 }

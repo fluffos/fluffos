@@ -1,4 +1,4 @@
-Some people have reported problems with using MudOS to run the
-TMI-2-1.0.1 mudlib under Linux.  It seems that the problem may
-be related to the socket efuns.  Try emptying the file named
-/adm/etc/socket_preload and rebooting the MUD.
+Some people have reported problems with using MudOS to run the TMI-2-1.0.1 
+mudlib under Linux.  It seems that the problem may be related to the socket 
+efuns.  Try emptying the file named /adm/etc/socket_preload and rebooting 
+the MUD.

@@ -1,6 +1,6 @@
-#################################################
-#       Standard Makefile for MudOS driver      #
-#################################################
+#####################################################
+#       Standard Makefile for the MudOS driver      #
+#####################################################
 
 SHELL=/bin/sh
 
@@ -9,9 +9,8 @@ SHELL=/bin/sh
 ###########################
 
 # Note: this Makefile may need modified depending upon which type of machine
-# you are to compile the driver.
-#
-# Edit options.h to choose which malloc you would like to use.
+# you are using to compile the driver.  Be sure to read all of the comments
+# in this file since they may pertain to your particular machine.
 #
 # If you get some weird compile-time error message from "make" about not being
 # able to find some .h file, then try one of the following two things:
@@ -24,7 +23,7 @@ SHELL=/bin/sh
 # driver (we call it driver because it does more than parse)
 DRIVER_BIN = driver
 
-# define this to be -lresolv if your machine has it.
+# RESOLV: define this to be -lresolv if your machine has it.
 # HP and NeXT don't have it.
 #RESOLV=-lresolv
 
@@ -36,20 +35,25 @@ DRIVER_BIN = driver
 #   two mallocs in which case you will get system malloc (read the comments
 #   in options.h for choices on malloc statistics and debugging).
 # uncomment these two lines for BSD Malloc.
+#
 #MALLOC_C=bsdmalloc.c
 #MALLOC_O=bsdmalloc.o
+#
 # uncomment these two lines for Smalloc (slightly slower than BSD malloc
-# but quite a bit less overhead).
+# but quite a bit less memory overhead).
+#
 #MALLOC_C=smalloc.c
 #MALLOC_O=smalloc.o
 
 # uncomment STRFUNCS* if your machine is missing memcpy(), memset(), strtol(),
-# and strcspn().
+# and strcspn(). (needed by Sequent Dynix/3)
 #STRFUNCS_C=strfuncs.c
 #STRFUNCS_O=strfuncs.o
 
 # uncomment UALARM* if your machine is missing ualarm().
-# uncomment for the HP (and other machines missing ualarm)
+# uncomment for the HP, A/UX (Apple Mac), EP/IX (MIPS),
+# Sequent Dynix/3 (BSD 4.3)
+# (and other machines missing ualarm)
 #UALARM_C=ualarm.c
 #UALARM_O=ualarm.o
 
@@ -78,12 +82,13 @@ INSTALL_DIR = ../bin
 
 # Enable run time debugging.
 #DEBUG=-g -DDEBUG
+#DEBUG=-g
 # compile in debug() macro code
 #DEBUG_MACRO=-DDEBUG_MACRO
 # prevent -DDEBUG from aborting the driver (when in -DDEBUG mode)
 #DEBUG_NON_FATAL=-DDEBUG_NON_FATAL
 
-# If you don't have strchr() and strrchr(), then uncomment the following line
+# If you don't have strchr() and strrchr(), then uncomment the following line.
 #STR=-Dstrchr=index -Dstrrchr=rindex
 
 # define this if you want (compiler) optimization enabled.
@@ -102,12 +107,19 @@ OPTIMIZE=-O
 #OPTIMIZE=-O -Q
 # high optimization for HP-UX 7.x/8.x's cc (don't use with 9.x)
 #OPTIMIZE=+O3 +Obb3000
+# MIPS R3000 running EP/IX Version 1.4.3. Compiler is RISCompiler C 2.11 (cc).
+#OPTIMIZE=-Olimit 1802
+# DEC Ultrix's cc:
+#OPTIMIZE=-O2 -Olimit 5000
 
 # RS/6000 AIX: use this OSFLAGS line (required).
 #OSFLAGS=-D_BSD -D_ALL_SOURCE
 
 # System V Release 4 (386/486)
 #OSFLAGS=-DSVR4
+
+# MIPS R3000 running EP/IX Version 1.4.3. Compiler is RISCompiler C 2.11 (cc).
+#OSFLAGS=-I/usr/include/bsd
 
 # if you use gcc (including NeXT cc) and have lots of RAM, try uncommenting
 #  this for speedier compiles:
@@ -127,26 +139,27 @@ CFLAGS= $(OSFLAGS) $(OPTIMIZE) $(WARN) $(PROFIL) $(DEBUG) $(DEBUG_MACRO) \
 #
 # NOTE: If you are using gcc (especially on a sun4), and the driver gives
 # a runtime error regarding "operation not supported on socket", then
-# try using cc instead (some installations of gcc have an error in one of
-# the system include (.h) files that prevents some socket ioctl operations
-# from working correctly).
+# try using cc instead (some UNIX's use unsupported hacks in some of
+# the system #include (.h) files which prevents some (socket) ioctl operations
+# from working correctly when using a less crufty compiler than that provided
+# by default on the system in question).
 #
-CC=cc
-#CC=gcc
+#CC=cc
+CC=gcc
 #CC=xlc
 
 # define this to be bison if you have it, and yacc otherwise.
-# The yaccs on SunOS and A/UX both have problems with compiler.y
-# because of hardcoded limits on the number of symbols.  You
-# can either build compiler.tab.* on another machine and move them
-# over or you can get bison from prep.ai.mit.edu:/pub/gnu.  Expect
-# one shift/reduce conflict if using Bison (from the IF ELSE construct).
 #YACC=bison
 #YFLAGS=-d -y
 YACC=yacc
 YFLAGS = -d
 
 # Add extra libraries here (using EXTRALIBS)
+
+# A/UX: may be required for Apple's UNIX (and possibly others).  Try
+# uncommenting this if the make results in link errors seemingly related
+# to yacc (e.g. undefined symbol "yyerror").
+#EXTRALIBS=-ly
 
 # HP-UX: use this EXTRALIBS line for HP-UX (required).
 #EXTRALIBS=-lBSD
@@ -161,14 +174,17 @@ YFLAGS = -d
 # used will remain close to normal.
 #EXTRALIBS=-lMallocDebug -lsys_s
 
-# Sequent DYNIX/ptx: use this EXTRALIBS line (required).
-#EXTRALIBS=-lsocket -linet -lnsl -lseq
+# Sequent DYNIX/ptx: use this EXTRALIBS line
+#EXTRALIBS=-lsocket -linet -lnsl -lseq -lmalloc
 
 # System V Release 4 (386/486)
 #EXTRALIBS=-lsocket -lnsl
 
 # Solaris (SunOS 5.1)
 #EXTRALIBS=-lnsl -lsocket -lresolv
+
+# MIPS R3000 running EP/IX Version 1.4.3. Compiler is RISCompiler C 2.11 (cc).
+#EXTRALIBS=-lbsd
 
 # Don't change this line.  Define EXTRALIBS before this line if you
 # wish to add any libraries.
@@ -179,21 +195,23 @@ LIBS=-lm $(EXTRALIBS)
 # don't change anything below this section      #
 #################################################
 
+EFUNS_SRC=efuns_main.c efuns_port.c efuns_math.c efuns_matrix.c efuns_sock.c
+EFUNS_OBJ=efuns_main.o efuns_port.o efuns_math.o efuns_matrix.o efuns_sock.o
+
 SRC=lex.c main.c rc.c interpret.c simulate.c object.c backend.c file.c\
   array.c mapping.c comm.c ed.c regexp.c swap.c malloc.c\
   call_out.c otable.c dumpstat.c stralloc.c hash.c port.c\
   reclaim.c access_check.c parse.c compiler.y mudlib_stats.c \
-  simul_efun.c sprintf.c uid.c socket_efuns.c efunctions.c eoperators.c \
-  socket_ctrl.c socket_err.c qsort.c math.c matrix.c\
-  md.c disassembler.c $(UALARM_C) $(STRFUNCS_C) $(MALLOC_C)
+  simul_efun.c sprintf.c uid.c socket_efuns.c eoperators.c \
+  socket_ctrl.c socket_err.c qsort.c strstr.c \
+  md.c disassembler.c binaries.c $(UALARM_C) $(STRFUNCS_C) $(MALLOC_C) $(EFUNS_SRC)
 
 OBJ=compiler.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   backend.o array.o mapping.o comm.o ed.o regexp.o swap.o \
   malloc.o call_out.o otable.o dumpstat.o stralloc.o hash.o mudlib_stats.o \
   port.o reclaim.o access_check.o parse.o simul_efun.o sprintf.o uid.o \
-  socket_efuns.o efunctions.o socket_ctrl.o qsort.o math.o eoperators.o \
-  matrix.o socket_err.o md.o \
-  disassembler.o $(UALARM_O) $(STRFUNCS_O) $(MALLOC_O)
+  socket_efuns.o socket_ctrl.o qsort.o eoperators.o socket_err.o md.o \
+  strstr.o disassembler.o binaries.o $(UALARM_O) $(STRFUNCS_O) $(MALLOC_O) $(EFUNS_OBJ)
 
 all: $(DRIVER_BIN) addr_server
 
@@ -209,13 +227,23 @@ depend:
 	makedepend *.c
 
 addr_server:  addr_server.o socket_ctrl.o port.o addr_server.h
-	$(CC) $(CFLAGS) socket_ctrl.o addr_server.o port.o $(RESOLV) -o addr_server \
-	$(EXTRALIBS)
+	$(CC) $(CFLAGS) socket_ctrl.o addr_server.o port.o $(RESOLV) \
+	-o addr_server $(EXTRALIBS)
 
 .c.o:
 	$(CC) $(CFLAGS) -c $*.c
 
 compiler.tab.h: compiler.tab.c
+
+cc.h: Makefile
+	rm -f cc.h
+	echo "/* this file automatically generated by the Makefile */" > cc.h
+	echo '#define COMPILER "$(CC)"' >> cc.h
+	echo '#define OPTIMIZE "$(OPTIMIZE)"' >> cc.h
+
+lex.o: cc.h lex.c compiler.tab.h
+
+interpret.o: interpret.c patchlevel.h
 
 base.h: efun_defs.c
 
@@ -238,7 +266,7 @@ make_func: make_func.tab.o
 make_malloc: make_malloc.o
 	$(CC) $(CFLAGS) make_malloc.o -o make_malloc
 
-make_malloc.c: config.h
+make_malloc.o: make_malloc.c config.h
 
 compiler.tab.o: opcodes.h
 
@@ -252,7 +280,7 @@ efun_defs.c opcodes.h: malloc.c func_spec.c make_func config.h func_spec.cpp
 	./make_func > efun_defs.c
 
 malloc.c: config.h make_malloc
-	./make_malloc
+	./make_malloc $(MALLOC_C)
 	touch malloc.c
 	$(CC) $(CFLAGS) -c malloc.c
 
@@ -270,6 +298,7 @@ install: $(DRIVER_BIN) addr_server
 clean:
 	-rm -rf obj *.o mon.out gmon.out *.tab.c *.tab.h *.orig *.rej
 	-rm -f efun_defs.c *.ln tags *~ TAGS
+	-rm -f cc.h
 	-rm -f opcodes.h efunctions.h opc.h base.h efun_protos.h
 	-rm -f make_func make_malloc $(DRIVER_BIN) $(DRIVER_BIN).old addr_server
 	-rm -f func_spec.cpp

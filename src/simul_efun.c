@@ -49,7 +49,7 @@ void set_simul_efun(file)
   funp = ob->prog->p.i.functions;
   simul_efunp = (struct function *)
     DMALLOC(sizeof (struct function) * num_simul_efun,96,"set_simul_efun");
-  for (i=0; (unsigned)i < ob->prog->p.i.num_functions; i++) {
+  for (i=0; i < (int)ob->prog->p.i.num_functions; i++) {
     simul_efunp[i].name = make_shared_string(funp[i].name);
     simul_efunp[i].flags = funp[i].flags;
     simul_efunp[i].num_arg = funp[i].num_arg;
