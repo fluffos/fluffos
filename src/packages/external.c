@@ -3,6 +3,7 @@
 #include "../network_incl.h"
 #include "../socket_efuns.h"
 #include "../include/socket_err.h"
+#include "../main.h"
 
 char *external_cmd[NUM_EXTERNAL_CMDS];
 
@@ -107,6 +108,9 @@ int external_start P5(int, which, svalue_t *, args,
         argv[i] = 0;
         
         close(sv[0]);
+	for(i=0; i<5; i++)
+	  if(external_port[i].port)
+	    close(external_port[i].fd); //close external ports
         dup2(sv[1], 0);
         dup2(sv[1], 1);
         dup2(sv[1], 2);

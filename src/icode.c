@@ -171,15 +171,25 @@ static void end_pushes PROT((void)) {
     }
 }
 
+//
+// F_PUSH pushes multiple data items onto the stack.  This function
+// sets up the multi push by reading the single push off the top of
+// the stack and rewriting the mult-push into the stack.
+//
+
 static void initialize_push PROT((void)) {
     int what = mem_block[A_PROGRAM].block[push_start];
-    int arg = mem_block[A_PROGRAM].block[push_start + 1];
+    int arg = 0;
 
+    // This is only valid if it is not a one byte const target.
+    if (what != F_CONST0 && what != F_CONST1) {
+       arg = mem_block[A_PROGRAM].block[push_start + 1];
+    }
     prog_code = mem_block[A_PROGRAM].block + push_start;
     ins_byte(F_PUSH);
     push_start++; /* now points to the zero here */
     ins_byte(0);
-    
+
     switch (what) {
     case F_CONST0:
         ins_byte(PUSH_NUMBER | 0);
@@ -201,6 +211,7 @@ static void initialize_push PROT((void)) {
         break;
     }
 }
+
 
 /*
  * Generate the code to push a number on the stack.

@@ -65,9 +65,9 @@
  *   * Faster than SMALLOC but more memory overhead.
  *   * Requires sbrk().
  */
-#define SYSMALLOC
+#undef SYSMALLOC
 #undef SMALLOC
-#undef BSDMALLOC
+#define BSDMALLOC
 #undef MMALLOC
 
 /* You may optionally choose one (or none) of these malloc wrappers.  These
