@@ -27,6 +27,7 @@ typedef struct {
 #endif
     struct program_s *prog;
     short fio, vio;
+    char lpccode[80];
 } functional_t;
 
 /* common header */

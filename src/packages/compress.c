@@ -73,6 +73,10 @@ void f_compress_file PROT((void))
    }
    // Copy it into our little buffer.
    strcpy(outname, real_output_file);
+   // Free the old file.
+   if (num_arg != 2) {
+      FREE_MSTR(output_file);
+   }
    output_file = outname;
 
    real_input_file = check_valid_path(input_file, current_object, "compress_file", 0);
@@ -82,14 +86,14 @@ void f_compress_file PROT((void))
       return ;
    }
 
-   in_file = fopen(real_input_file, "r");
+   in_file = fopen(real_input_file, "rb");
    if (!in_file) {
       pop_n_elems(num_arg);
       push_number(0);
       return ;
    }
 
-   out_file = gzopen(output_file, "w");
+   out_file = gzopen(output_file, "wb");
    if (!out_file) {
       fclose(in_file);
       pop_n_elems(num_arg);
@@ -105,10 +109,6 @@ void f_compress_file PROT((void))
    gzclose(out_file);
 
    unlink(real_input_file);
-
-   if (num_arg != 2) {
-      FREE_MSTR(output_file);
-   }
 
    pop_n_elems(num_arg);
    push_number(1);
@@ -127,7 +127,7 @@ void f_uncompress_file PROT((void))
    const char* real_output_file;
    FILE* out_file;
    gzFile in_file;
-   char buf[4096];
+   char buf[4196];
    char outname[1024];
 
    // Not a string?  Error!
@@ -154,8 +154,7 @@ void f_uncompress_file PROT((void))
          push_number(0);
          return ;
       }
-      tmp = new_string(strlen(input_file),
-                            "compress_file");
+      tmp = new_string(len, "compress_file");
       strcpy(tmp, input_file);
       tmp[len - strlen(GZ_EXTENSION)] = 0;
       output_file = tmp;
@@ -163,12 +162,19 @@ void f_uncompress_file PROT((void))
 
    real_output_file = check_valid_path(output_file, current_object, "compress_file", 1);
    if (!real_output_file) {
+      if (num_arg != 2) {
+         FREE_MSTR(output_file);
+      }
+
       pop_n_elems(num_arg);
       push_number(0);
       return ;
    }
    // Copy it into our little buffer.
    strcpy(outname, real_output_file);
+   if (num_arg != 2) {
+      FREE_MSTR(output_file);
+   }
    output_file = outname;
 
    real_input_file = check_valid_path(input_file, current_object, "compress_file", 0);
@@ -178,7 +184,7 @@ void f_uncompress_file PROT((void))
       return ;
    }
 
-   in_file = gzopen(real_input_file, "r");
+   in_file = gzopen(real_input_file, "rb");
    if (!in_file) {
       gzclose(in_file);
       pop_n_elems(num_arg);
@@ -186,7 +192,7 @@ void f_uncompress_file PROT((void))
       return ;
    }
 
-   out_file = fopen(output_file, "w");
+   out_file = fopen(output_file, "wb");
    if (!out_file) {
       fclose(out_file);
       pop_n_elems(num_arg);
@@ -202,10 +208,6 @@ void f_uncompress_file PROT((void))
    fclose(out_file);
 
    unlink(real_input_file);
-
-   if (num_arg != 2) {
-      FREE_MSTR(output_file);
-   }
 
    pop_n_elems(num_arg);
    push_number(1);

@@ -351,8 +351,12 @@ void svalue_to_string P5(svalue_t *, obj, outbuffer_t *, outbuf, int, indent, in
         svalue_to_string(obj->u.lvalue, outbuf, indent + 2, trailing, 0);
         break;
     case T_REF:
-        outbuf_add(outbuf, "ref: ");
-        svalue_to_string(obj->u.ref->lvalue, outbuf, indent + 2, trailing, 0);
+        if(!obj->u.ref->lvalue)
+	    kill_ref(obj->u.ref);
+	else {
+	    outbuf_add(outbuf, "ref: ");
+	    svalue_to_string(obj->u.ref->lvalue, outbuf, indent + 2, trailing, 0);
+	}
         break;
     case T_NUMBER:
         numadd(outbuf, obj->u.number);

@@ -614,7 +614,7 @@ void f_unique_mapping PROT((void))
     svalue_t *arg = sp - st_num_arg + 1, *sv;
     unique_node_t **table, *uptr, *nptr;
     array_t *v = arg->u.arr, *ret;
-    unsigned short oi, i, numkeys = 0, mask, size;
+    unsigned int oi, i, numkeys = 0, mask, size;
     unsigned short num_arg = st_num_arg;
     unsigned short nmask;
     mapping_t *m;

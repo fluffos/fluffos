@@ -1,5 +1,9 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
+new in FluffOS 1.23
+fixed crasher in sprintf
+fixed crasher in compressed files (by pinkfish)
+
 new in FluffOS 1.22
 fixed compiling a development version
 eval_cost reset for each call_out()ed function
