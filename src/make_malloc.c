@@ -20,21 +20,13 @@
 #define THE_MALLOC "wrappedmalloc.c"
 #endif
 
-#ifdef GCMALLOC
-#define THE_MALLOC "gc.c"
-#endif
-
-#ifdef GMALLOC
-#define THE_MALLOC "gmalloc.c"
-#endif
-
 #ifdef DEBUGMALLOC
 #define THE_MALLOC "debugmalloc.c"
 #endif
 
 int main(argc, argv)
-int argc;
-char *argv[];
+      int argc;
+      char *argv[];
 {
 	unlink("malloc.c");
 	if (argc == 2) {

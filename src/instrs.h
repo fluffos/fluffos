@@ -5,7 +5,7 @@
 
 struct instr {
     short max_arg, min_arg;	/* Can't use char to represent -1 */
-    char type[2];
+    short type[2]; /* need a short to hold the biggest type flag */
     short Default;
     short ret_type;
     char *name;

@@ -21,6 +21,8 @@ Note, (*f)(args) is internally translated to obj->func(args) where
 f == (: obj, func :).  In (: obj, func :), obj and func may be any
 type allowed by call_other(obj, func).
 
+(: "hi" :) makes a function pair that is equivalent to (: this_object(), "hi" :)
+
 Note that:
 
 f is the same as (: f[0], f[1] :)

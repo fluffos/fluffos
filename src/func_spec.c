@@ -1,3 +1,4 @@
+#define _FUNC_SPEC_
 #include "config.h"
 #include "op_spec.c"
 /*
@@ -19,12 +20,13 @@
 
 /* most frequently used functions */
 
+unknown call_other(object|string|object *, string|mixed *, ...);
 object present(object|string, void|object);
 object this_object();
 object this_player(void|int);
 object new(string);
 object clone_object new(string);
-void move_object(object|string, void|object|string);
+void move_object(object, void|object|string);
 object previous_object();
 int sizeof(mixed);
 int destruct(object);
@@ -34,17 +36,17 @@ string capitalize(string);
 string *explode(string, string);
 string implode(string *, string);
 object *all_inventory(object default: F_THIS_OBJECT);
-unknown call_other(object|string|object *, string|mixed *, ...);
 void call_out(string, int, ...);
 int member_array(mixed, mixed *, void|int);
 int notify_fail(string);
 void input_to(string, ...);
 int random(int);
 int save_object(string, void|int);
-void add_action(string, void|string, void|int);
-void add_verb(string);
+void add_action(string, string, void|int);
 string query_verb();
 string lower_case(string);
+object first_inventory(object|string default: F_THIS_OBJECT);
+object next_inventory(object default: F_THIS_OBJECT);
 int command(string, void|object);
 string replace_string(string, string, string, ...);
 int restore_object(string, void|int);
@@ -93,31 +95,44 @@ int virtualp(object);
 int functionp(mixed);
 int pointerp(mixed);
 int objectp(mixed);
+#ifndef DISALLOW_BUFFER_TYPE
+int bufferp(mixed);
+#endif
 
 int inherits(string, object);
+void replace_program(string);
 
+#ifndef DISALLOW_BUFFER_TYPE
+buffer allocate_buffer(int);
+#endif
 string *regexp(string *, string);
-void add_xverb(string);
 mixed *allocate(int);
 
 /* do not remove to_int() and to_float() because they are also used by
    the compiler (compiler.y)
 */
-int to_int(string|float|int);
+int to_int(string|float|int|buffer);
 float to_float(string|float|int);
 
 mixed *call_out_info();
 
+/* 32-bit cyclic redundancy code - see crc32.c and crctab.h */
+int crc32(string|buffer);
+
 /* commands operating on files */
 
+#ifndef DISALLOW_BUFFER_TYPE
+mixed read_buffer(string|buffer, void|int, void|int);
+#endif
 int write_file(string, string);
 int rename(string, string);
 int write_bytes(string, int, string);
+#ifndef DISALLOW_BUFFER_TYPE
+int write_buffer(string|buffer, int, string|buffer|int);
+#endif
 int file_size(string);
 string read_bytes(string, void|int, void|int);
 string read_file(string, void|int, void|int);
-void log_file(string, string);
-int cat(string, void|int, void|int);
 int cp(string, string);
 #ifndef LATTICE
 int link(string, string);
@@ -138,13 +153,14 @@ mixed debug_info(int, object);
 void disable_commands();
 void enable_commands();
 int exec(object, object);
-string extract(string, void|int, void|int);
 mixed *localtime(int);
 string function_exists(string, object default: F_THIS_OBJECT);
 
 object *livings();
 object *objects(void|string, void|object);
 string process_string(string);
+mixed process_value(string);
+string break_string(int|string, int, void|int|string);
 string query_host_name();
 int query_idle(object);
 string query_ip_name(void|object);
@@ -153,7 +169,7 @@ object query_snoop(object);
 object query_snooping(object);
 int remove_call_out(string);
 int set_heart_beat(int);
-int query_heart_beat();
+int query_heart_beat(object default: F_THIS_OBJECT);
 void set_hide(int);
 
 void set_living_name(string);
@@ -161,7 +177,6 @@ void set_reset(object, void|int);
 #ifndef NO_SHADOWS 
 object shadow(object, int);
 object query_shadowing(object);
-object shadowp query_shadowing(object);
 #endif
 object snoop(object, void|object);
 mixed *sort_array(mixed *,string,object|string default: F_THIS_OBJECT);
@@ -172,13 +187,8 @@ mixed *unique_array(mixed *, string, void|mixed);
 string *deep_inherit_list(object default: F_THIS_OBJECT);
 string *inherit_list(object default: F_THIS_OBJECT);
 int strlen(string);
-
-#if defined(PRINTF)
 void printf(string, ...);
 string sprintf(string, ...);
-#endif
-
-object next_living(object);
 int mapp(mixed);
 mixed *stat(string, int default: F_CONST0);
 int remove_action(string, string);
@@ -209,7 +219,7 @@ int memory_info(object|void);
 /* uid functions */
 
 int export_uid(object);
-string geteuid(object default: F_THIS_OBJECT);
+string geteuid(function|object default: F_THIS_OBJECT);
 string getuid(object default: F_THIS_OBJECT);
 int seteuid(string|int);
 
@@ -251,9 +261,7 @@ int strcmp(string, string);
 mapping rusage();
 #endif /* RUSAGE */
 
-#ifdef ED
 void ed(string|void, string|void, int|void);
-#endif
 
 #ifdef MATH
 float cos(float);
@@ -290,12 +298,6 @@ void cache_stats();
 
 object *deep_inventory(object);
 
-/* first_ next_inventory maybe not used that often if all_inventory used
-   very much.
-*/
-object first_inventory(object|string default: F_THIS_OBJECT);
-object next_inventory(object default: F_THIS_OBJECT);
-
 /*
  * MIRE efuns for the MIRE project at MIT
  */
@@ -324,8 +326,6 @@ string query_load_average();
 
 /* set_light should die a dark death */
 int set_light(int);
-/* add_worth is a bit silly */
-void add_worth(int, void|object);
 
 int origin();
 
@@ -348,9 +348,7 @@ void debugmalloc(string,int);
 void set_malloc_mask(int);
 #endif
 
-#ifdef SET_EVAL_LIMIT
 void set_eval_limit(int);
-#endif
 
 #ifdef DEBUG_MACRO
 void set_debug_level(int);
@@ -375,3 +373,7 @@ void swap(object);		/* Only used for debugging */
 void shutdown(void|int);
 
 int resolve(string, string);
+#if defined(NeXT) && defined(NEXT_MALLOC_DEBUG)
+int malloc_check();
+int malloc_debug(int);
+#endif

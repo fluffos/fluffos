@@ -15,8 +15,6 @@
  * Note: if you change an object name, you must remove it and reenter it.
  */
 
-char * xalloc();
-
 static int otable_size;
 
 /*
@@ -27,9 +25,6 @@ static int otable_size;
 /*
  * hash table - list of pointers to heads of object chains.
  * Each object in chain has a pointer, next_hash, to the next object.
- * OTABLE_SIZE is in config.h, and should be a prime, probably between
- * 100 and 1000.  You can have a quite small table and still get very good
- * performance!  Our database is 8Meg; we use about 500.
  */
 
 static struct object ** obj_table = 0;
@@ -174,8 +169,10 @@ int show_otable_status(verbose)
 		    user_obj_lookups, user_obj_found);
     }
     if (verbose != -1)
-      add_message("hash table overhead\t\t\t %8d\n",
-		OTABLE_SIZE * sizeof(struct object *));
+         add_message("Obj table overhead:\t\t%8d %8d\n",
+                 OTABLE_SIZE * sizeof(struct object *),
+           OTABLE_SIZE * sizeof(struct object *) +
+          objs_in_table * sizeof(struct object));
     return (OTABLE_SIZE * sizeof(struct object *) +
 	    objs_in_table * sizeof(struct object));
 }

@@ -62,6 +62,7 @@
 #include "stdio.h"
 #include "interpret.h"
 #include "mapping.h"
+#include "buffer.h"
 #include "object.h"
 #include "sent.h"
 #include "ignore.h"
@@ -336,6 +337,9 @@ void svalue_to_string(obj, str, size, indent, trailing, indent2)
         stradd(str, &size, "})");
       }
       break;
+    case T_BUFFER:
+      stradd(str, &size, "<buffer>");
+      break;
     case T_FUNCTION:
       stradd(str, &size, "(: ");
       svalue_to_string(&(obj->u.fp->obj), str, size, indent+2, trailing, 0);
@@ -603,7 +607,7 @@ char *string_print_formatted(format_str, argc, argv)
   struct svalue *argv;
 {
   format_info finfo;
-  savechars *saves;	/* chars to restore */
+  savechars *saves = 0;    /* chars to restore */
   cst *csts;		/* list of columns/tables to be done */
   struct svalue *carg;	/* current arg */
   VOLATILE unsigned int nelemno = 0;	/* next offset into array */
@@ -688,7 +692,7 @@ char *string_print_formatted(format_str, argc, argv)
         }
         sprintf(buff,
           "ERROR: (s)printf(): !feature - undefined error 0x%X !\n", i);
-        fprintf(stderr, "%s:%d: %s", current_object->name,
+        fprintf(stderr, "%s:%d: %s", current_prog->name,
                                      get_line_number_if_any(), buff);
         return buff;
 #else
@@ -697,7 +701,7 @@ char *string_print_formatted(format_str, argc, argv)
     }
 #ifdef RETURN_ERROR_MESSAGES
     sprintf(buff, "ERROR: (s)printf(): %s in arg %u\n", err, arg);
-    fprintf(stderr, "%s:%d: %s", current_object->name,
+    fprintf(stderr, "%s:%d: %s", current_prog->name,
                                  get_line_number_if_any(), buff);
     debug_message("%s", "ERROR: (s)printf(): %s in arg %u\n", err, arg);
     if (current_object) {
@@ -1030,7 +1034,7 @@ add_table_now:
             sprintf(buff,
               "ERROR: (s)printf(): incorrect argument type to %%%c.\n",
               cheat[i-1]);
-            fprintf(stderr, "%s:%d: %s", current_object->name,
+            fprintf(stderr, "%s:%d: %s", current_prog->name,
                                          get_line_number_if_any(), buff);
             return buff;
 #else

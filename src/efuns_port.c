@@ -243,3 +243,40 @@ int num_arg, instruction;
 #endif /* RUSAGE */
 
 #endif
+
+#ifdef F_MALLOC_CHECK
+/* this efun only useful on the NeXT (func_spec.c has #ifdef NeXT).  A
+   non-zero return value indicates that some memory corruption has occurred
+   at some time prior to this calling of this efun.
+*/
+void
+f_malloc_check(num_arg, instruction)
+int num_arg, instruction;
+{
+	push_number(NXMallocCheck());
+}
+#endif
+
+#ifdef F_MALLOC_DEBUG
+/* NeXT specific efun for setting the debugging level of NeXT's built-in
+   malloc.
+*/
+void
+f_malloc_debug(num_arg, instruction)
+int num_arg, instruction;
+{
+	int level;
+
+	level = sp->u.number;
+	pop_stack();
+	if (level < 0) {
+		int rc;
+
+		rc = malloc_debug(0);
+		malloc_singlethreaded();
+		push_number(rc);
+	} else {
+		push_number(malloc_debug(level));
+	}
+}
+#endif

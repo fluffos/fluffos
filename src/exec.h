@@ -150,7 +150,8 @@ extern struct program *current_prog;
 #define TYPE_MAPPING    5
 #define TYPE_FUNCTION   6
 #define TYPE_REAL       7
-#define TYPE_ANY        8  /* Will match any type */
+#define TYPE_BUFFER     8
+#define TYPE_ANY        9  /* Will match any type */
 
 /*
  * These are or'ed in on top of the basic type.

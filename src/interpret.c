@@ -9,7 +9,11 @@
 #include <setjmp.h>
 #include <string.h>
 #include <ctype.h>
+#ifndef LATTICE
 #include <sys/time.h>
+#else
+#include <time.h>
+#endif
 /* sys/types.h is here to enable include of comm.h below */
 #include <sys/types.h> 
 #include <sys/stat.h>
@@ -22,6 +26,7 @@
 #include "exec.h"
 #include "interpret.h"
 #include "mapping.h"
+#include "buffer.h"
 #include "object.h"
 #include "instrs.h"
 #include "patchlevel.h"
@@ -54,6 +59,21 @@ extern int getpagesize();
 #define RUSAGE_SELF	0
 #endif
 #endif
+
+
+struct type_name_s {
+    int code;
+    char *name;
+} type_names[] = {
+	{T_NUMBER,   "int"},
+	{T_STRING,   "string"},
+	{T_POINTER,  "array"},
+	{T_OBJECT,   "object"},
+	{T_MAPPING,  "mapping"},
+	{T_FUNCTION, "function"},
+	{T_REAL,     "float"},
+	{T_BUFFER,   "buffer"}
+};
 
 extern struct object *master_ob;
 extern userid_t *backbone_uid;
@@ -184,6 +204,22 @@ struct object *ob;
   }
 }
 
+char *
+type_name(c)
+int c;
+{
+	int j;
+	int limit;
+
+	limit = sizeof(type_names) / sizeof(struct type_name_s);
+	for (j = 0; j < limit; j++) {
+		if (c == type_names[j].code) {
+			return type_names[j].name;
+		}
+	}
+	return "unknown";
+}
+
 /*
  * May current_object shadow object 'ob' ? We rely heavily on the fact that
  * function names are pointers to shared strings, which means that equality
@@ -202,11 +238,11 @@ int validate_shadowing(ob)
   if (current_object->shadowed)
     error("shadow: Can't shadow when shadowed.\n");
   if (current_object->super)
-    error("The shadow must not reside inside another object.\n");
+    error("shadow: The shadow must not reside inside another object.\n");
   if (ob->flags & O_MASTER)
     error("shadow: cannot shadow the master object.\n");
   if (ob->shadowing)
-    error("Can't shadow a shadow.\n");
+    error("shadow: Can't shadow a shadow.\n");
   for (i=0; i < (int)shadow->p.i.num_functions; i++) {
     for (j=0; j < (int)victim->p.i.num_functions; j++) {
       if (shadow->p.i.functions[i].name != victim->p.i.functions[j].name)
@@ -255,7 +291,7 @@ double n;
  * Push undefined (const0u) onto the value stack.
  */
 INLINE
-  void push_undefined()
+void push_undefined()
 {
   sp++;
   if (sp == &start_of_stack[EVALUATOR_STACK_SIZE])
@@ -267,7 +303,7 @@ INLINE
  * Push null (const0n) onto the value stack.
  */
 INLINE
-  void push_null()
+void push_null()
 {
   sp++;
   if (sp == &start_of_stack[EVALUATOR_STACK_SIZE])
@@ -279,7 +315,7 @@ INLINE
  * Push a string on the value stack.
  */
 INLINE
-  void push_string(p, type)
+void push_string(p, type)
 char *p;
 int type;
 {
@@ -353,6 +389,9 @@ INLINE void free_svalue(v)
     break;
   case T_POINTER:
     free_vector(v->u.vec);
+    break;
+  case T_BUFFER:
+    free_buffer(v->u.buf);
     break;
   case T_MAPPING:
     free_mapping(v->u.map);
@@ -438,6 +477,11 @@ INLINE void assign_svalue_no_free(to, from)
   case T_FUNCTION:
     to->u.fp->ref++;
    break;
+  case T_BUFFER:
+    to->u.buf->ref++;
+   break;
+  default:
+   break;
   }
 }
 
@@ -520,26 +564,34 @@ push_indexed_lvalue()
     if (ind > 1) {
       error("Function variables may only be indexed with 0 or 1.\n");
     }
-    vec = ind ? &vec->u.fp->fun : &vec->u.fp->obj;
+    item = ind ? &vec->u.fp->fun : &vec->u.fp->obj;
+    if (vec->u.fp->ref == 1) { /* kludge */
+       static struct svalue quickfix = { T_NUMBER };
+    
+       assign_svalue (&quickfix, item);
+       item = &quickfix;
+    }
     free_svalue(sp);
     sp->type = T_LVALUE;
-    sp->u.lvalue = vec;
+    sp->u.lvalue = item;
     return;
   }
-  if (vec->type == T_STRING) {
-    static struct svalue one_character;
+	if (vec->type == T_STRING) {
+		error("LPC strings (in MudOS) are not mutable (maybe later).\n");
+		return;
+	}
+	if (vec->type == T_BUFFER) {
+		unsigned char *addr;
 
-    /* marion says: this is a crude part of code */
-    one_character.type = T_NUMBER;
-    if ((ind > SVALUE_STRLEN(vec)) || ind < 0)
-      one_character.u.number = 0;
-    else
-      one_character.u.number = (unsigned char)vec->u.string[ind];
-    free_svalue(sp);
-    sp->type = T_LVALUE;
-    sp->u.lvalue = &one_character;
-    return;
-  }
+		if ((ind >= vec->u.buf->size) || (ind < 0)) {
+			error("Buffer index out of bounds.\n");
+		}
+		addr = &vec->u.buf->item[ind];;
+		free_svalue(sp);
+		sp->type = T_LVALUE_BYTE;
+		sp->u.lvalue_byte = addr;
+		return;
+	}
   if (vec->type != T_POINTER) error("Indexing on illegal type.\n");
   if (ind >= vec->u.vec->size) error ("Index out of bounds\n");
   item = &vec->u.vec->item[ind];
@@ -657,6 +709,16 @@ INLINE void push_vector(v)
   sp++;
   sp->type = T_POINTER;
   sp->u.vec = v;
+}
+
+INLINE void
+push_buffer(b)
+struct buffer *b;
+{
+	b->ref++;
+	sp++;
+	sp->type = T_BUFFER;
+	sp->u.buf = b;
 }
 
 /*
@@ -1091,6 +1153,7 @@ char *p;
       do_trace("Exec ", get_f_name(instruction), "\n");
     }
 #endif
+   if (!is_efun)
     switch (instruction) {
       case I(F_INC) :
 #if DEBUG
@@ -1357,6 +1420,22 @@ char *p;
     case I(F_ADD) :
 	{
 	  switch((sp-1)->type){
+		case T_BUFFER:
+		if (sp->type != T_BUFFER) {
+			error("Bad type argument to +. %s %s\n",
+				type_name((sp-1)->type, type_name(sp->type)));
+		} else {
+			struct buffer *b;
+
+			b = allocate_buffer(sp->u.buf->size + (sp-1)->u.buf->size);
+			memcpy(b->item, (sp-1)->u.buf->item, (sp-1)->u.buf->size);
+			memcpy(b->item + (sp-1)->u.buf->size, sp->u.buf->item,
+				sp->u.buf->size);
+			pop_n_elems(2);
+			b->ref--;
+			push_buffer(b);
+		}
+		break;
 	  case T_REAL:
 		{
 		switch(sp->type)
@@ -1395,7 +1474,8 @@ char *p;
           vec->ref--;
 		  break;
 		default: 
-		  error("Bad type argument to +. %d %d\n", (sp-1)->type, sp->type);
+		  error("Bad type argument to +. %s %s\n",
+			type_name((sp-1)->type), type_name(sp->type));
 		}
 		}
 		break;
@@ -1462,7 +1542,8 @@ char *p;
 		  break;
         }
 		default: 
-		  error("Bad type argument to +. %d %d\n",(sp-1)->type, sp->type);
+		  error("Bad type argument to +. %s %s\n",
+			type_name((sp-1)->type), type_name(sp->type));
 		}
 		  break;
 		} 
@@ -1506,44 +1587,25 @@ char *p;
 		  break;
         }
 		default: 
-		  error("Bad type argument to +. %d %d\n",(sp-1)->type, sp->type);
+		  error("Bad type argument to +. %s %s\n",
+			type_name((sp-1)->type), type_name(sp->type));
 		}
 		  break;
 		}
-	  case T_POINTER:
-		{
-		  switch(sp->type)
-		{
-		case T_POINTER:
-        {
-            struct vector *vec;
-
-		   vec = add_array((sp-1)->u.vec, sp->u.vec);
-           pop_n_elems(2);
-           push_vector(vec);
-           vec->ref--;
-		   eval_cost += (vec->size << 3);
-		   break;
-        }
-		case T_NUMBER:
-		case T_STRING:
-		case T_REAL:
-        {
-          struct vector *vec;
-
-		  vec = (struct vector *)append_vector((sp-1)->u.vec, sp);
-          pop_n_elems(2);
-          push_vector(vec);
-          vec->ref--;
-		  eval_cost += (vec->size << 2);
-		  break;
-        }
-		default: 
-		  error("Bad type argument to +. %d %d\n", 
-			(sp-1)->type, sp->type);
-		}
-		  break;
-		} 
+          case T_POINTER:
+            if (sp->type != T_POINTER) {
+               error("Bad type argument to +. %s %s\n",
+                        type_name((sp-1)->type), type_name(sp->type));
+            } else
+            {
+               struct vector *vec;
+               vec = add_array((sp-1)->u.vec, sp->u.vec);
+               pop_n_elems(2);
+               push_vector(vec);
+               vec->ref--;
+               eval_cost += (vec->size << 3);
+               break;
+            }
 	  case T_MAPPING:
 		if (sp->type == T_MAPPING) {
           struct mapping *map;
@@ -1555,11 +1617,13 @@ char *p;
 		  eval_cost += (map->count << 2);
 		}
 		else {
-		  error("Bad type argument to +. %d %d\n", (sp-1)->type, sp->type);
+		  error("Bad type argument to +. %s %s\n",
+			type_name((sp-1)->type), type_name(sp->type));
 		}
 		break;
 	  default: 
-		error("Bad type argument to +. %d %d\n", (sp-1)->type, sp->type);
+		error("Bad type argument to +. %s %s\n",
+			type_name((sp-1)->type), type_name(sp->type));
 	  }
     break;
     }
@@ -1647,6 +1711,23 @@ char *p;
             error("Bad type number to rhs +=.\n");
           }
           break;
+	case T_BUFFER:
+		if (sp->type != T_BUFFER) {
+			bad_arg(2, instruction);
+		} else {
+			struct buffer *b;
+
+			b = allocate_buffer(argp->u.buf->size + sp->u.buf->size);
+			memcpy(b->item, argp->u.buf->item, argp->u.buf->size);
+			memcpy(b->item + argp->u.buf->size, sp->u.buf->item,
+				sp->u.buf->size);
+			free_buffer(sp->u.buf);
+			free_buffer(argp->u.buf);
+			sp -= 2;
+			argp->u.buf = b;
+			eval_cost += (b->size >> 2);
+		}
+		break;
 	case T_POINTER:
 	  if (sp->type != T_POINTER)
 	    bad_arg(2, instruction);
@@ -1690,6 +1771,9 @@ char *p;
     case I(F_FUNCTION_CONSTRUCTOR) :
       f_function_constructor(num_arg, instruction);
       break;
+    case I(F_THIS_FUNCTION_CONSTRUCTOR) :
+      f_this_function_constructor(num_arg,instruction);
+      break;
     case I(F_FUNCTION_SPLIT) :
       f_function_split(num_arg, instruction);
       break;
@@ -1701,21 +1785,39 @@ char *p;
       break;
     case I(F_ASSIGN) :
 #ifdef DEBUG
-      if ((sp - 1)->type != T_LVALUE)
-	fatal("Bad argument to F_ASSIGN\n");
+		if ((sp - 1)->type != T_LVALUE) {
+			fatal("Bad argument to F_ASSIGN\n");
+		}
 #endif
-      assign_svalue((sp - 1)->u.lvalue, sp);
-      assign_svalue(sp - 1, sp);
-      pop_stack();
-      break;
+		if ((sp-1)->type == T_LVALUE_BYTE) {
+			if (sp->type != T_NUMBER) {
+				*(sp - 1)->u.lvalue_byte = 0;
+			} else {
+				*(sp - 1)->u.lvalue_byte = (sp->u.number & 0xff);
+			}
+		} else {
+			assign_svalue((sp - 1)->u.lvalue, sp);
+		}
+		assign_svalue(sp - 1, sp);
+		pop_stack();
+		break;
     case I(F_VOID_ASSIGN) :
 #ifdef DEBUG
-      if ((sp - 1)->type != T_LVALUE)
-	fatal("Bad argument to F_VOID_ASSIGN\n");
+		if ((sp - 1)->type != T_LVALUE) {
+			fatal("Bad argument to F_VOID_ASSIGN\n");
+		}
 #endif
-      assign_svalue((sp-1)->u.lvalue, sp);
-      pop_n_elems(2);
-      break;
+		if ((sp-1)->type == T_LVALUE_BYTE) {
+			if (sp->type != T_NUMBER) {
+				*(sp - 1)->u.lvalue_byte = 0;
+			} else {
+				*(sp - 1)->u.lvalue_byte = (sp->u.number & 0xff);
+			}
+		} else {
+			assign_svalue((sp-1)->u.lvalue, sp);
+		}
+		pop_n_elems(2);
+		break;
     case I(F_BREAK_POINT) :
       break_point();
       break;
@@ -1970,22 +2072,51 @@ char *p;
       }
       break;
     case I(F_INDEX) :
-      if ((sp-1)->type == T_MAPPING)
-        {
-          struct svalue *v;
-          struct mapping *m;
+	if ((sp-1)->type == T_MAPPING) {
+		struct svalue *v;
+		struct mapping *m;
 
-          v = find_in_mapping((sp-1)->u.map, sp);
-          pop_stack(); /* free b from a[b] */
-          m = sp->u.map;
-          assign_svalue_no_free(sp, v); /* v will always have a value */
-          free_mapping(m);
-        }
-      else
-        {
-          push_indexed_lvalue();
-          assign_svalue_no_free(sp, sp->u.lvalue);
-        }
+		v = find_in_mapping((sp-1)->u.map, sp);
+		pop_stack(); /* free b from a[b] */
+		m = sp->u.map;
+		assign_svalue_no_free(sp, v); /* v will always have a value */
+		free_mapping(m);
+	} else if ((sp-1)->type == T_BUFFER) {
+		struct svalue w;
+		int idx;
+
+		if (sp->type != T_NUMBER) {
+			error("Indexing a buffer with an illegal type.\n");
+		}
+		idx = sp->u.number;
+		pop_stack();
+		w.type = T_NUMBER;
+		w.subtype = 0;
+		if ((idx > sp->u.buf->size) || (idx < 0)) {
+			error("Buffer index out of bounds.\n");
+		}
+		w.u.number = sp->u.buf->item[idx];
+		assign_svalue_no_free(sp, &w);
+	} else if ((sp-1)->type == T_STRING) {
+		struct svalue w;
+		int idx;
+
+		if (sp->type != T_NUMBER) {
+			error("Indexing a string with an illegal type.\n");
+		}
+		idx = sp->u.number;
+		pop_stack();
+		w.type = T_NUMBER;
+		w.subtype = 0;
+		if ((idx > SVALUE_STRLEN(sp)) || (idx < 0)) {
+			error("String index out of bounds.\n");
+		}
+		w.u.number = (unsigned char)sp->u.string[idx];
+		assign_svalue(sp, &w);
+	} else {
+		push_indexed_lvalue();
+		assign_svalue_no_free(sp, sp->u.lvalue);
+	}
       /*
        * Fetch value of a variable. It is possible that it is a variable
        * that points to a destructed object. In that case, it has to
@@ -2393,16 +2524,12 @@ char *p;
 	  break;
 	}
       default :
-		if (is_efun) {
-			(*oefun_table[instruction])(num_arg, instruction);
-		} else {
 			dump_trace(1);
 			fatal("Undefined instruction %s (%d)\n",
 				get_f_name(instruction), instruction);
 			return;
-		}
-		break;
 	}
+   else (*oefun_table[instruction])(num_arg, instruction);
 #ifdef DEBUG
     if ((expected_stack && (expected_stack != sp)) ||
 	(sp < fp + csp->num_local_variables - 1))

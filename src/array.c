@@ -125,6 +125,10 @@ struct vector *explode_string(str, del)
 
 	len = strlen(del);
 	slen = strlen(str);
+
+	if (!slen)
+		return null_array();
+
 	/* return an array of length strlen(str) -w- one character per element */
 	if (len == 0) {
 		if (slen > max_array_size) {
@@ -141,6 +145,73 @@ struct vector *explode_string(str, del)
 		}
 		return ret;
 	}
+	if (len == 1) {
+		char delimeter;
+
+		delimeter = *del;
+	/*
+	 *Skip leading 'del' strings, if any.
+	 */
+	while(*str == delimeter) {
+		str++;
+		slen--;
+		if (str[0] == '\0') {
+			return null_array();
+		}
+#ifdef SANE_EXPLODE_STRING
+		break;
+#endif
+	}
+    /*
+     * Find number of occurences of the delimiter 'del'.
+     */
+	for (p=str, num=0; *p; ) {
+		if (*p == delimeter) {
+			num++;
+			lastdel = p;
+		}
+		p++;
+	}
+    /*
+     * Compute number of array items. It is either number of delimiters,
+     * or, one more.
+     */
+	if ((slen == 1) || (lastdel != (str + slen - 1))) {
+		num++;
+	}
+	if (num > max_array_size) {
+		num = max_array_size;
+	}
+	buff = DXALLOC(slen + 1, 7, "explode_string: buff");
+	ret = allocate_array(num);
+	limit = max_array_size - 1; /* extra element can be added after loop */
+	for (p=str, beg = str, num=0; *p && (num < limit); ) {
+		if (*p == delimeter) {
+			strncpy(buff, beg, p - beg);
+			buff[p-beg] = '\0';
+			if (num >= ret->size) {
+				fatal("Index out of bounds in explode!\n");
+			}
+			/* free_svalue(&ret->item[num]); Not needed for new array */
+			ret->item[num].type = T_STRING;
+			ret->item[num].subtype = STRING_MALLOC;
+			ret->item[num].u.string = string_copy(buff);
+			num++;
+			beg = ++p;
+		} else {
+			p++;
+		}
+	}
+	/* Copy last occurence, if there was not a 'del' at the end. */
+	if (*beg != '\0') {
+		/* free_svalue(&ret->item[num]); */
+		ret->item[num].type = T_STRING;
+		ret->item[num].subtype = STRING_MALLOC;
+		ret->item[num].u.string = string_copy(beg);
+	}
+	FREE(buff);
+	return ret;
+	} /* len == 1 */
 	/*
 	 *Skip leading 'del' strings, if any.
 	 */
@@ -286,7 +357,7 @@ struct vector *slice_array(p,from,to)
     int cnt;
     
     if (from < 0)
-	from = 0;
+         from = 0;
     if (from >= p->size)
 	return null_array(); /* Slice starts above array */
     if (to >= p->size)
@@ -723,52 +794,6 @@ struct svalue *p1, *p2;
 	return ret;
 }
 
-/* Turns a structured array of elements into a flat array of elements.
-   */
-static int num_elems(arr)
-    struct vector *arr;
-{
-    int cnt,il;
-
-    cnt = arr->size;
-
-    for (il=0;il<arr->size;il++) 
-	if (arr->item[il].type == T_POINTER) 
-	    cnt += num_elems(arr->item[il].u.vec) - 1;
-    return cnt;
-}
-
-struct vector *flatten_array(arr)
-    struct vector *arr;
-{
-    int max, cnt, il, il2;
-    struct vector *res, *dres;
-    
-    if (arr->size < 1) 
-	return null_array();
-
-    max = num_elems(arr);
-
-    if (arr->size == max)
-	return arr;
-
-    if (max == 0) 	    /* In the case arr is an array of empty arrays */
-	return null_array();
-
-    res = allocate_array(max); 
-
-    for (cnt = 0 , il = 0; il < arr->size; il++)
-	if (arr->item[il].type != T_POINTER) 
-	    assign_svalue(&res->item[cnt++],&arr->item[il]);
-	else {
-	    dres = flatten_array(arr->item[il].u.vec);
-	    for (il2=0;il2<dres->size;il2++)
-		assign_svalue(&res->item[cnt++],&dres->item[il2]);
-	    free_vector(dres);
-	}
-    
-    return res;
-}
 /*
  * deep_inventory()
  *
@@ -813,45 +838,6 @@ struct vector *deep_inventory(ob, take_top)
 	free_vector(ainv);
     return sinv;
 }
-
-
-/* sum_array, processes each element in the array together with the
-              results from the previous element. Starting value is 0.
-	      Note! This routine allocates a struct svalue which it returns.
-	      This value should be pushed to the stack and then freed.
-   */
-struct svalue *sum_array (arr, func, ob, extra)
-    struct vector *arr;
-    char *func;
-    struct object *ob;
-    struct svalue *extra;
-{
-    struct svalue *ret, v;
-
-    int cnt;
-
-    v.type = T_NUMBER;
-    v.u.number = 0;
-
-    for (cnt=0;cnt<arr->size;cnt++) {
-	push_svalue(&arr->item[cnt]);
-	push_svalue(&v);
-	if (extra) {
-	    push_svalue (extra);
-	    ret = apply(func, ob, 3);
-	} else {
-	    ret = apply(func,ob,2);
-	}
-	if (ret)
-	    v = *ret;
-    }
-
-    ret = (struct svalue *) DXALLOC(sizeof(struct svalue), 12, "sum_array");
-    *ret = v;
-
-    return ret;
-}
-
 
 static INLINE int alist_cmp(p1, p2)
     struct svalue *p1,*p2;
@@ -1021,33 +1007,6 @@ struct vector *intersect_alist(a1, a2)
 	    assign_svalue_no_free(&a3->item[l++], &a2->item[(i1++,i2++)]);
 	}
     }
-    return shrink_array(a3, l);
-}
-
-struct vector *symmetric_difference_alist(a1, a2)
-    struct vector *a1,*a2;
-{
-    struct vector *a3;
-    int d, l, i1, i2, a1s, a2s;
-
-    a1s = a1->size;
-    a2s = a2->size;
-    a3 = allocate_array( a1s + a2s );
-    for (i1=i2=l=0; i1 < a1s && i2 < a2s; ) {
-	d = alist_cmp(&a1->item[i1], &a2->item[i2]);
-	if (d<0)
-	    assign_svalue_no_free(&a3->item[l++], &a1->item[i1++]);
-	else if (d>0)
-	    assign_svalue_no_free(&a3->item[l++], &a2->item[i2++]);
-	else {
-	    i1++;
-	    i2++;
-	}
-    }
-    while (i1 < a1s )
-	    assign_svalue_no_free(&a3->item[l++], &a1->item[i1++]);
-    while (i2 < a2s )
-	    assign_svalue_no_free(&a3->item[l++], &a2->item[i2++]);
     return shrink_array(a3, l);
 }
 

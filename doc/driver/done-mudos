@@ -1,3 +1,120 @@
+0.9.18 to 0.9.19
+ 
+. COMPAT BUSTER: array = array + scalar is no longer allowed
+  (array += scalar was already not allowed)
+ 
+. COMPAT BUSTER: socket_accept() no longer assumes the newly created socket
+  is immediately writable; this may cause slightly different behavior (such
+  as the return of EECALLBACK on the first socket_write() whereas it never
+  happened before, or write_callbacks being called that never got called
+  before)
+ 
+. COMPAT BUSTER: socket callbacks (including the resolve() callback) can
+  now be static and will still be callable by the driver.  this can cause
+  different previous_object() behavior, causing some old socket callback
+  security checks to behave improperly
+ 
+. COMPAT BUSTER: fixed explode() so that explode("", "\n") does not return
+  ({ 0 })...and removed support for a string as first argument of
+  move_object().
+ 
+. COMPAT BUSTER: removed the following efuns: cat(), log_file(), extract(),
+  shadowp(), next_living(), add_worth(), add_verb(), and add_xverb()
+ 
+. COMPAT BUSTER: removed the 'cost' and 'worth' fields from 
+  domain/author_stats
+ 
+. functionp() now returns 2 instead of 1 in the case where 
+  f = (: obj, ({ str, arg0, arg1, arg2, ... }) :).  (ie, the function portion 
+  is an array)
+ 
+. geteuid() may now be used on type 'function'.  geteuid(f) where f is of
+  type function will return the euid of the constructor of 'f'.  if the
+  constructor didn't have an euid at the time of f's creation, its uid
+  is stored instead
+ 
+. ed's indentor ('I' command) fixed
+ 
+. fixed the usage of '!' in get_char() mode
+ 
+. fixed several Linux crash/hang bugs
+ 
+. mud_status() improved, total now matches up with the sum of the fields
+ 
+. revised parse_command() and process_string() efuns, added process_value()
+  and break_string() efuns (see docs for information)
+ 
+. added a new LPC type called 'buffer' that is a cross between the
+  LPC array type and the LPC string type.  'buffer' is intended as a way to 
+  conveniently manipulate binary data.  'buffer' is not zero-terminated 
+  (that is, it has an associated length).  A 'buffer' is an array of bytes 
+  that is implemented using one byte per element.  buf[i] = x and x = buf[i] 
+  are allowed and do work.  sizeof(buf) works.  bufferp(buf) is available.  
+  buf[i..j] should work as well.  buff = read_buffer(file_name, ...) 
+  (same args as read_bytes).  also 'int write_buffer(string file, int start, 
+  mixed source)', buf = buf1 + buf2; buf += buf1, buf = allocate_buffer(size).
+  The socket efuns have been modified to accept and return the 'buffer' type.  
+  Two new socket modes are available:  STREAM_BINARY (3), and 
+  DATAGRAM_BINARY (4).  the runtime config file now needs a 'maximum buffer
+  size' parameter in it which sets the largest 'buffer' that may be created.
+ 
+. now possible to use write_bytes() to write past the end of the existing file
+ 
+. read_bytes(filename) will now read the entire file (instead of requiring 
+  read_bytes(filename, 0, length_of_file)).
+ 
+. added an 'int crc32(buffer b|string s) efun which computes a 32-bit
+  cyclic redundancy code for a given buffer or string.  This is the same 
+  algorithm (and code) that Zmodem uses for doing its CRC calculations.
+ 
+. overloaded to_int() to accept 'buffer'.  E.g. buffer b; int x;
+  b = read_buffer(file, 0, 4); x = to_int(b);  Note that to_int() expects 
+  the integer embedded in the buffer to be in network-byte-order.
+ 
+. In addition to 'int write_buffer(string file, int start, mixed source)'
+  there is also 'int write_buffer(buffer target, int start, mixed source)'
+  Note that write_buffer(string file, int start, int x) will write 'x'
+  into the file (or buffer) in network-byte-order.
+ 
+. In addition to 'buffer read_buffer(string file, int start, int len)'
+  there is also 'string read_buffer(buffer b, int start, int len)' which
+  provides a way to extract part or all of a buffer into a string.
+ 
+. added two malloc debugging efuns that provide an interface to the malloc 
+  debugging system calls provided by the NeXTSTEP OS (malloc_debug() and 
+  malloc_check()).  See NEXT_MALLOC_DEBUG in options.h for more info.  
+  These efuns aren't available on other OSes.
+ 
+. (: "string" :) is now equivalent to (: this_object(), "string" :)
+ 
+. added replace_program() efun, modified from Amylaar's 3.2.  
+ 
+. added optional argument to query_heart_beat(), object to query the 
+  heart_beat of 
+ 
+. changed set_eval_limit() so an argument of 0 resets the current eval_cost, 
+  rather than setting the eval limit to 0
+ 
+. added support to initialize local variables.  Any valid expression
+  allowed (int x = <exp>;), as with global initializations 
+ 
+. removed several no-longer-used options from options.h (some of the more
+  notable ones include support for driver-level host access restrictions
+  and shout logging)
+ 
+. changed more efuns so that removing their line in func_spec.c causes most, 
+  if not all, of their code to not be compiled in to the driver
+ 
+. removed the following items from the driver config file: "access log file",
+  "access allow file", "config directory", "allowed ed cmds" (an up-to-date
+  Config.example is in the src/ dir)
+ 
+. the simul_efun object can now be updated and new simul_efuns will go into
+  place without having to reboot the driver
+ 
+. hundreds of minor bug fixes and optimizations; see src/ChangeLog for a full
+  list
+  
 0.9.17 to 0.9.18
  
 . COMPAT BUSTER: preprocessor: MUDOS_PORT changed to __PORT__, MUDOS_ARCH

@@ -14,6 +14,7 @@
 #include "lint.h"
 #include "interpret.h"
 #include "mapping.h"
+#include "buffer.h"
 #include "object.h"
 #include "sent.h"
 #include "exec.h"
@@ -113,9 +114,12 @@ void bufcat(buf, str)
    char **buf;
    char *str;
 {
-    /* this could be optimized further :-) */
-    strcpy(*buf, str);
-    *buf += strlen(*buf);
+  while (*str)
+  {
+    **buf = *str++;
+    (*buf)++;
+  }
+  **buf = 0;
 }
 
 /*
@@ -545,20 +549,34 @@ save_object(ob, file, save_zeros)
     char *file;
     int save_zeros;
 {
-    char *name, tmp_name[80];
+    char *name;
+    static char tmp_name[80];
     int len, i;
     FILE *f;
     int failed = 0;
+    char *use_name;
+    int free_use_name = 0;
     /* struct svalue *v; */
 
     if (ob->flags & O_DESTRUCTED)
         return 0;
-    file = check_valid_path(file, ob, "save_object", 1);
+    if (file[0] != '/')
+    {
+      use_name = DXALLOC(strlen(file) + 2, 80, "save_object: 1");
+      strcpy(use_name, "/");
+      strcat(use_name, file);
+      free_use_name = 1;
+    } else
+      use_name = file;
+
+    file = check_valid_path(use_name, ob, "save_object", 1);
     if (file == 0)
         error("Denied write permission in save_object().\n");
     len = strlen(file);
     name = DXALLOC(len + strlen(SAVE_EXTENSION) + 1, 80, "save_object: 1");
     (void)strcpy(name, file);
+    if (free_use_name)
+      FREE(use_name);
 #ifndef MSDOS
     (void)strcat(name, SAVE_EXTENSION);
 #endif

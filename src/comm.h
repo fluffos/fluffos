@@ -51,9 +51,6 @@ struct interactive {
   int noesc;                  /* don't allow shell out                       */
   int last_time;              /* time of last command executed               */
   char *default_err_message;  /* this or What ? is printed when error        */
-#ifdef ACCESS_RESTRICTED
-  void *access_class;         /* represents cluster from which user connects */
-#endif /* ACCESS_RESTRICTED */
   int trace_level;            /* debug flags -- 0 means no debugging         */
   char *trace_prefix;         /* trace only object which has this as name    */
   struct ed_buffer *ed_buffer;/* local ed                                    */

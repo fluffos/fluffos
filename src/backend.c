@@ -6,7 +6,11 @@
 #include <setjmp.h>
 #include <ctype.h>
 #ifndef __386BSD__
+#ifndef LATTICE
 #include <sys/time.h>
+#else
+#include <time.h>
+#endif
 #include <sys/types.h>
 #else
 #include <sys/types.h>
@@ -20,6 +24,11 @@
 #ifndef LATTICE
 #include <sys/times.h>
 #include <memory.h>
+#else
+struct timeval {
+       unsigned long tv_sec;
+       unsigned long tv_usec;
+};
 #endif
 #include <math.h>
 #include "lint.h"
@@ -28,6 +37,7 @@
 #include "exec.h"
 #include "comm.h"
 #include "debug.h"
+#include "replace_program.h"
 
 jmp_buf	error_recovery_context;
 int error_recovery_context_exists = 0;
@@ -193,7 +203,12 @@ void backend()
        timeout.tv_sec = 60; 
        timeout.tv_usec = 0;
     }
+#ifndef hpux
     nb = select(FD_SETSIZE,&readmask,&writemask,(fd_set *)0, &timeout);
+#else
+    nb = select(FD_SETSIZE, (int *)&readmask, (int *)&writemask,
+          (int *)0, &timeout);
+#endif
     /*
      * process I/O if necessary.
      */
@@ -378,11 +393,7 @@ void call_heart_beat()
 	current_time = get_current_time();
 	current_interactive = 0;
 
-	if (hb_list
-#ifdef OLD_HB_BEHAVIOR
-		&& (num_user > 0)
-#endif /* OLD_HB_BEHAVIOR */
-	) {
+	if (hb_list) {
 		num_hb_calls++;
 		while(hb_list && !heart_beat_flag  && (num_done < num_hb_objs)){
 			num_done++;
@@ -423,7 +434,7 @@ void call_heart_beat()
 	current_object = save_current_object;
 	current_heart_beat = 0;
 	look_for_objects_to_swap();
-	call_out();	/* some things depend on this, even without users! */
+	call_out();
 	mudlib_stats_decay();
 	command_giver = save_command_giver;
 }
@@ -582,6 +593,7 @@ INLINE void remove_destructed_objects()
 {
   struct object *ob, *next;
 
+  if(obj_list_replace) replace_programs();
   for(ob=obj_list_destruct; ob; ob = next){
     next = ob->next_all;
     destruct2(ob);

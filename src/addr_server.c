@@ -504,7 +504,11 @@ int main(argc,argv)
       if(all_conns[i].state == OPEN)
 	FD_SET(all_conns[i].fd,&readmask);
     }
+#ifndef hpux
     nb = select(FD_SETSIZE, &readmask, (fd_set *)0, (fd_set *)0, &timeout);
+#else
+    nb = select(FD_SETSIZE, (int *)&readmask, (int *)0, (int *)0, &timeout);
+#endif
     if(nb != 0)
       process_io(nb);
     process_queue();

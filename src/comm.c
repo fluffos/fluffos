@@ -13,7 +13,11 @@
 #include <varargs.h>
 #endif
 #include <sys/types.h>
+#ifndef LATTICE
 #include <sys/time.h>
+#else
+#include <time.h>
+#endif
 #ifndef LATTICE
 #include <sys/ioctl.h>
 #endif
@@ -47,23 +51,15 @@
 #include "object.h"
 #include "sent.h"
 #include "debug.h"
+#include "opcodes.h"
 
-/*
- * external function prototypes.
- */
 extern char *xalloc(), *string_copy(), *unshared_str_copy();
 extern int parse_command();
 extern void call_heart_beat();
 extern void debug_message(), fatal(), free_sentence();
-#ifdef ED
+#ifdef F_ED
 extern void save_ed_buffer();
 #endif
-#ifdef ACCESS_RESTRICTED
-extern void release_host_access();
-void *allow_host_access();
-#else
-int allow_host_access();
-#endif /* ACCESS_RESTRICTED */
 
 int total_users = 0;
 
@@ -131,11 +127,9 @@ int num_user;
 int num_hidden; /* for the O_HIDDEN flag.  This counter must be kept
    up to date at all times!  If you modify the O_HIDDEN flag in an object,
    make sure that you update this counter if the object is interactive. */
-#ifdef COMM_STAT
 int add_message_calls=0;
 int inet_packets=0;
 int inet_volume=0;
-#endif /* COMM_STAT */
 struct interactive *all_users[MAX_USERS];
 
 /*
@@ -229,22 +223,13 @@ void init_user_conn()
 /*
  * Shut down new user accept file descriptor.
  */
-void ipc_remove() {
-  fprintf(stderr,"Shutting down new user conn...\n");
-  /*
-   * disallow further sends or receives on socket.
-   */
-#if !defined(ultrix)
-  if(shutdown(new_user_fd,2) == -1){
-    perror("ipc_remove: shutdown");
-  }
-#else /* ultrix */
-  shutdown(new_user_fd,2);
-#endif /* !defined(ultrix) */
-  if(close(new_user_fd) == -1){
-    perror("ipc_remove: close");
-  }
-	printf("closed new_user_port\n");
+void ipc_remove()
+{
+    if (close(new_user_fd) == -1)
+    {
+	perror("ipc_remove: close");
+    }
+    printf("closed new user port\n");
 }
 
 void init_addr_server(hostname,addr_server_port)
@@ -423,9 +408,7 @@ add_message(va_alist)
 #endif
 		command_giver = save_command_giver;
 	}
-#ifdef COMM_STAT
 	add_message_calls++;
-#endif /* COMM_STAT */
 }
 
 /*
@@ -461,25 +444,27 @@ int flush_message()
  */
                 num_bytes = send(ip->fd,ip->message_buf + ip->message_consumer,
                                   length, ip->out_of_band);
-		if (num_bytes == -1) {
-			if (errno == EWOULDBLOCK) {
-				debug(512,("flush_message: write: Operation would block\n"));
-				return 1;
-			} else {
-				fprintf(stderr,"flush_message: write on fd %d\n",ip->fd);
-				perror("flush_message: write");
-				ip->net_dead = 1;
-				return 0;
-			}
-		}
+                if (num_bytes == -1) {
+                        if (errno == EWOULDBLOCK) {
+                                debug(512,("flush_message: write: Operation would block\n"));
+                                return 1;
+#ifdef linux
+                        } else if (errno == EINTR) {
+                                debug(512,("flush_message: write: Interrupted system call"));
+                                return 1;
+#endif                        
+                        } else {
+                                perror("flush_message: write");
+                                ip->net_dead = 1;
+                                return 0;
+                        }
+                }
 		ip->message_consumer = (ip->message_consumer + num_bytes) %
 			MESSAGE_BUF_SIZE;
 		ip->message_length -= num_bytes;
                 ip->out_of_band = 0;
-#ifdef COMM_STAT
 		inet_packets++;
 		inet_volume += num_bytes;
-#endif /* COMM_STAT */
 	}
 	return 1;
 }
@@ -536,8 +521,6 @@ static int copy_chars(from, to, n, ip)
             break;
           default :
             *to++ = from[i];
-            /* single character mode */
-            /* ack! special case so we don't pick up flow control chars */
             break;
         }
         break;
@@ -650,6 +633,9 @@ static int copy_chars(from, to, n, ip)
 void sigpipe_handler()
 {
   fprintf(stderr,"SIGPIPE received.\n");
+#ifdef linux
+  signal(SIGPIPE, sigpipe_handler);
+#endif
 }
 
 /*
@@ -784,9 +770,6 @@ void new_user_handler()
   int length;
   int i;
   char *full_message;
-#ifdef ACCESS_RESTRICTED
-  void *class;
-#endif /* ACCESS_RESTRICTED */
   struct object *ob;
   struct svalue *ret;
   extern struct object *master_ob;
@@ -803,17 +786,15 @@ void new_user_handler()
     }
     return;
   }
-#ifdef ACCESS_RESTRICTED
-  if(!(class = allow_host_access(new_socket_fd, new_socket_fd))){
-    fprintf(stderr,"new_user_handler: allow_host_access denied.\n");
-    return;
+#ifdef linux
+  /* according to Amylaar, 'accepted' sockets in Linux 0.99p6 don't properly
+     inherit the nonblocking property from the listening socket.
+  */
+  if(set_socket_nonblocking(new_socket_fd, 1) == -1){
+    perror("new_user_handler: set_socket_nonblocking 1");
+    exit(8);
   }
-#else /* !ACCESS_RESTRICTED */
-  if(allow_host_access(new_socket_fd)){
-    fprintf(stderr,"new_user_handler: allow_host_access denied.\n");
-    return;
-  }
-#endif /* ACCESS_RESTRICTED */
+#endif /* linux */
   for(i=0;i<MAX_USERS;i++){
     if(all_users[i] != 0)
       continue;
@@ -856,9 +837,6 @@ void new_user_handler()
     all_users[i]->fd = new_socket_fd;
     set_prompt("> ");
     memcpy((char *)&all_users[i]->addr, (char *)&addr, length);
-#ifdef ACCESS_RESTRICTED
-    all_users[i]->access_class = class;
-#endif /* ACCESS_RESTRICTED */
     num_user++;
     debug(512,("New connection from %s.\n",inet_ntoa(addr.sin_addr)));
     /*
@@ -951,7 +929,7 @@ int process_user_command()
       }
       parse_command(tbuf+1,command_giver);
     } else if(command_giver->interactive->ed_buffer){
-#ifdef ED
+#ifdef F_ED
       ed_cmd(user_command);
 #endif /* ED */
     } else if (call_function_interactive(command_giver->interactive,
@@ -1378,24 +1356,14 @@ void remove_interactive(ob)
     debug(512,("Closing connection from %s.\n",
 	    inet_ntoa(ob->interactive->addr.sin_addr)));
     if(ob->interactive->ed_buffer){
-#ifdef ED
+#ifdef F_ED
       save_ed_buffer();
 #endif
     }
-#if !defined(ultrix)
-    if(shutdown(ob->interactive->fd,0) == -1){
-      perror("remove_interactive: shutdown");
-    }
-#else /* ultrix */
-    shutdown(ob->interactive->fd,0);
-#endif /* !defined(ultrix) */
     debug(512,("remove_interactive: closing fd %d\n",ob->interactive->fd));
     if(close(ob->interactive->fd) == -1){
       perror("remove_interactive: close");
     }
-#ifdef ACCESS_RESTRICTED
-    release_host_access(ob->interactive->access_class);
-#endif /* ACCESS_RESTRICTED */
     if(ob->flags & O_HIDDEN)
       num_hidden--;
     num_user--;
@@ -1421,113 +1389,6 @@ void remove_interactive(ob)
 	  ob->name);
   abort();
 }
-
-#ifndef ACCESS_RESTRICTED
-
-int allow_host_access(new_socket)
-     int new_socket;
-{
-  struct sockaddr_in apa;
-  int len = sizeof apa;
-  char *ipname, *xalloc();
-  static int read_access_list = 0;
-  static struct access_list {
-    int addr_len;
-    char * addr, *name, *comment;
-    struct access_list * next;
-  } *access_list;
-  register struct access_list * ap;
-
-  if(!read_access_list) {
-    FILE * f = fopen("ACCESS.DENY", "r");
-    char buf[1024], ipn[50], hname[100], comment[1024], *p1, *p2;
-    struct access_list * na;
-    struct hostent * hent;
-
-    read_access_list = 1;
-    if(f) {
-      while(fgets(buf, sizeof buf - 1, f)) {
-	if(*buf != '#') {
-	  ipn[0] = hname[0] = comment[0] = 0;
-	  if((p1 = strchr(buf, ':'))) *p1 = 0;
-	  if(buf[0] && buf[0] != '\n')
-	    strncpy(ipn, buf, sizeof ipn - 1);
-	  if((p2 = p1) && *++p2) {
-	    if((p1 = strchr(p2, ':'))) *p1 = 0;
-	    if(p2[0] && p2[0] != '\n')
-	      strcpy(hname, p2);
-	    if(p1 && p1[1] && p1[1] != '\n')
-	      strcpy(comment, p1+1);
-	  }
-	  if(!(na = (struct access_list *)
-		DXALLOC(sizeof na[0], 21, "allow_host_access: na"))) {
-	    fatal("Out of mem.\n");
-	  }
-	  na->addr = na->name = na->comment = 0;
-	  na->next = 0;
-	  if(*ipn && (!(na->addr = DXALLOC(strlen(ipn) + 1, 22,
-		"allow_host_access: na->addr")) ||
-		      !strcpy(na->addr, ipn)))
-	    fatal("Out of mem.\n");
-	  if(*hname && (!(na->name =
-		DXALLOC(strlen(hname) + 1, 23, "allow_host_access: na->name"))
-		|| !strcpy(na->name, hname)))
-	    fatal("Out of mem.\n");
-	  if(*comment
-		&& (!(na->comment=
-			DXALLOC(strlen(comment)+1, 24, "allow_host_access: na->comment"))
-			|| !strcpy(na->comment, comment)))
-	    fatal("Out of mem.\n");
-
-	  if((!(int)*ipn) && ((!*hname) || (!(hent = gethostbyname(hname))) ||
-			   (!(na->addr = DXALLOC(hent->h_length+1, 25,
-				"allow_host_access: na->addr")))||
-			      !strcpy(na->addr,
-			       inet_ntoa(*(struct in_addr *)hent->h_addr)))) {
-	    if(na->name) FREE(na->name);
-	    if(na->comment) FREE(na->comment);
-	    FREE((char *)na);
-	    continue;
-	  }
-	  if(!(na->addr_len = strlen(na->addr)))
-	    continue;
-
-	  /* printf("disabling: %s:%s:%s\n", na->addr,
-	     na->name?na->name:"no name",
-	     na->comment?na->comment:"no comment");  */
-
-	  na->next = access_list;
-	  access_list = na;
-	}
-      }
-      fclose(f);
-    }
-  }
-  if(!access_list)
-    return(0);
-
-  if(getpeername(new_socket, (struct sockaddr *)&apa, &len) == -1) {
-    if(close(new_socket) == -1){
-      perror("allow_host_access: close");
-    }
-    perror("allow_host_access: getpeername");
-    return(-1);
-  }
-  ipname = inet_ntoa(apa.sin_addr);
-
-  for(ap = access_list; ap; ap = ap->next)
-    if(!strncmp(ipname, ap->addr, ap->addr_len)){
-      if(ap->comment) (void) write(new_socket, ap->comment,
-				   strlen(ap->comment));
-      printf("Stopping: %s:%s\n", ap->addr, ap->name?ap->name:"no name");
-      if(close(new_socket) == -1){
-	perror("allow_host_access: close");
-      }
-      return(-1);
-    }
-  return(0);
-}
-#endif /* not ACCESS_RESTRICTED */
 
 int call_function_interactive(i, str)
      struct interactive *i;
@@ -1619,7 +1480,7 @@ int set_call(ob, sent, flags, single_char)
     return(0);
   ob->interactive->input_to = sent;
   ob->interactive->noecho = ((flags & I_NOECHO) != 0);
-  ob->interactive->noesc = ((flags & I_NOESC) != 0);
+  ob->interactive->noesc = (single_char | ((flags & I_NOESC) != 0));
   ob->interactive->single_char = single_char;
   command_giver = ob;
   if (flags & I_NOECHO)
@@ -1649,14 +1510,14 @@ void print_prompt()
   if(command_giver->interactive->input_to == 0){
     /* give user object a chance to write its own prompt */
     if(!command_giver->interactive->has_write_prompt)
-      add_message(command_giver->interactive->prompt);
+	add_message("%s", command_giver->interactive->prompt);
     else if(command_giver->interactive&&command_giver->interactive->ed_buffer)
-      add_message(command_giver->interactive->prompt);
+	add_message("%s", command_giver->interactive->prompt);
     else if(!(command_giver->flags & O_DESTRUCTED) &&
 	    !apply("write_prompt",command_giver,0)) {
       if (command_giver->interactive) {
 		  command_giver->interactive->has_write_prompt = 0;
-		  add_message(command_giver->interactive->prompt);
+		add_message("%s", command_giver->interactive->prompt);
       }
     }
   }
@@ -1881,6 +1742,7 @@ char *number, *name;
 /* Got it, do the call back... */
 	if (!(ipnumbertable[i].ob_to_call->flags&O_DESTRUCTED)) {
 		char *theName, *theNumber;
+		struct object *save_current_object;
 
 		theName = ipnumbertable[i].name;
 		theNumber = number;
@@ -1900,7 +1762,10 @@ char *number, *name;
 			push_null();
 		}
 		push_number(i+1);
+		save_current_object = current_object;
+		current_object = ipnumbertable[i].ob_to_call;
 		safe_apply(ipnumbertable[i].call_back, ipnumbertable[i].ob_to_call, 3);
+		current_object = save_current_object;
 	}
 	free_string(ipnumbertable[i].call_back);
 	free_string(ipnumbertable[i].name);
@@ -1987,7 +1852,7 @@ char *inet_ntoa(ad)
 
 char *query_host_name()
 {
-  static char name[20];
+  static char name[40];
 
   gethostname(name,sizeof(name));
   name[sizeof(name) - 1] = '\0'; /* Just to make sure */
@@ -2030,7 +1895,7 @@ void notify_no_command()
 #ifndef NO_SHADOWS
     if(!shadow_catch_message(command_giver, m))
 #endif /* NO_SHADOWS */
-      add_message(m);
+	add_message("%s", m);
     if(m != p)
       FREE(m);
     free_string(p);

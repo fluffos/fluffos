@@ -85,14 +85,6 @@ the driver could just retry every now and then?
  
 -----
  
-Updating master.c causes the mud to crash again. What seems to be happening 
-is that when init_object() is called on the new master object (from 
-assert_master_ob_loaded), a reset() gets called on the object.  Other than 
-being something incorrect, on our mud, this reset uses a file operation, 
-which causes assert_master_ob_loaded to be called again, causing the crash.
- 
------
- 
 Many of the functions in array.c allocate an array and call LPC-code
 afterwards. In case of an error, the memory will be gone. Pushing
 the array on the stack temporarily should remedy this (of course, for
@@ -120,45 +112,21 @@ functioning as one would expect.
  
 -----
  
-Example:
- 
-string *test;
- 
-        test = ({ "Decker" });
-        printf( "Array is: %-15.15O\n", test );
- 
-Just sit and wait now...it'll hang the driver.
- 
-Decker
- 
------
- 
-Could you fellas make it possible to refresh the simul_efun without
-taking down the whole mud ? i.e. not doing a shutdown !
- 
-As it is now, one can make changes in the function that are present
-but you cannot add or remove function and then update the simul_efun
-object.  This would be helpful on a running mud, at least whilst
-debugging it !
- 
-Radagast Redrobe !
- 
------
- 
   string *stuff; 
   stuff = ({"test1", "test2", "test3"}); 
   stuff[0][2..4] = "ab"; 
   write(stuff[0]);
  
-taht code crashes genocide apparently
-haven't looked further into it..will do it soon
+the above code crashed Genocide
  
-bt
+(bobf@metronet.com)
  
 Grendel says: int *stuff;stuff = ({  1, 2, 3, 4 });stuff[1..2] = ({ 2, 3});
 Grendel says: that crashes the mud
 Grendel says: because the grammar allows it
 Grendel says: and the eoperator doesn't expect it
+
+(tbrann@ox.ac.uk)
  
 -----
  
@@ -174,57 +142,8 @@ then crashed because it had already entered an object with that name into
 the hash table. 
 (djohnson@cs.ucsd.edu)
  
------
- 
-        :z   
-           set_wandering(1, 120, 0);
-           set_chats(({
-                    "smile",
-                    "sing Santa Claws is coming to town!",
-                    "say Do we have any good children here?",
-                    "say You must be kind to your fellow people.",
-                    "smile Do you believe in the magic of christmas?",
-                    "smile",
-                    "laugh"
-                    }), 10);
-        :I
-        Indenting entire code...
-        Done indenting.
-        :I
-        Indenting entire code...
-        Detected a unterminated string on line 43
-        Indention halted.
-        :43
-                    "l}), 10);
-        :-10
-           
-        :z
-           
-           set_wandering(1, 120, 0);
-           set_chats(({
-                    "smile",
-                    "sing Santa Claws is coming to town!",
-                    "say Do we have any good children here?",
-                    "say You must be kind to your fellow people.",
-                    "smile Do you believe in the magic of christmas?",
-                    "smile",
-                    "laugh"
-                    "l}), 10);
-        }
-        :Q
-        Exit from ed.
- 
-So there has been extra "l inserted into during the first intendation
-which caused the second intendation to barf about the unterminated string.
- 
 ---
- 
-save_object doesn't prepend a "/" to the filename before passing to 
-valid_write()
-(bobf@metronet.com)
- 
------
- 
+
 lvalue lifetime bug: There isn't an easy fix for it and it leads to delayed 
 and unpredictable crashes. It's simplest form is something like a[0]=(a=0). 
 There the reference to a[0] is pushed on the stack, a gets freed and then 
@@ -249,27 +168,6 @@ of some memory leaks... yes?
         ret = 0;
  
 (garnett@gestalt.austin.tx.us)
- 
------
- 
-'cost' field in domain/author stats isn't actually set anywhere
-(bobf@metronet.com)
- 
------
- 
-From: djohnson@cs.ucsd.edu (Darin Johnson)
-Message-Id: <9306220643.AA06062@elvis>
-Subject: + versus += for arrays
-To: mudos-bugs@actlab.rtf.utexas.edu (MudOS Buglist)
-Date: Mon, 21 Jun 1993 23:43:43 -0700 (PDT)
-X-Mailer: ELM [version 2.4 PL17]
-Mime-Version: 1.0
-Content-Type: text/plain; charset=US-ASCII
-Content-Transfer-Encoding: 7bit
-Content-Length: 142       
- 
-Note that  "array = array + scalar" is allowed, yet "array += scalar" 
-is not allowed.  (the first case uses append_vector() in interpret.c)
  
 -----
  
@@ -330,3 +228,143 @@ in these addresses are all 0's or something similar.
  
 So if patch_in/patch_out get fixed, the switch code will also
 need fixing at the same time.
+
+-----
+
+~: Ellery says: btw, there is a potential crasher in destruct_object
+~: Ellery says: move an object inside a shadow's inventory that causes an error
+     in move_or_destruct()
+Ellery says: thereafter the shadow chain will be corrupted.
+
+---
+
+From bobf Thu Sep 30 00:17:19 1993
+Received: from actlab.rtf.utexas.edu by feenix.metronet.com with SMTP id AA20288
+ 
+  (5.65c/feenix for <bobf@metronet.com>); Thu, 30 Sep 1993 05:23:07 -0500
+Return-Path: <bobf>
+Received: from feenix.metronet.com by actlab.rtf.utexas.edu (5.0/SMI-SVR4)
+        id AA24670; Thu, 30 Sep 93 05:17:43 CDT
+Received: by feenix.metronet.com id AA20192
+  (5.65c/feenix for mudos-bugs@actlab.rtf.utexas.edu); Thu, 30 Sep 1993 05:17:19
+ -0500
+Date: Thu, 30 Sep 1993 05:17:19 -0500
+From: Bob Farmer <bobf>
+Message-Id: <199309301017.AA20192@feenix.metronet.com>
+Apparently-To: mudos-bugs@actlab.rtf.utexas.edu
+Content-Length: 197
+ 
+read_file() doesn't guarantee that a "/" is at the start of the filename
+before passing to valid_read()...same problem might exist with
+write_file(), read_bytes(), write_bytes(), didn't check yet
+
+---
+
+From bobf Wed Oct 27 14:06:06 1993
+Received: from actlab.rtf.utexas.edu by feenix.metronet.com with SMTP id AA22843
+ 
+ 
+  (5.65c/feenix for <bobf@metronet.com>); Wed, 27 Oct 1993 20:02:02 -0500
+Return-Path: <bobf>
+Received: from feenix.metronet.com by actlab.rtf.utexas.edu (5.0/SMI-SVR4)
+        id AA06490; Wed, 27 Oct 93 19:06:21 CDT
+Received: by feenix.metronet.com id AA19571
+  (5.65c/feenix for mudos-bugs@actlab.rtf.utexas.edu); Wed, 27 Oct 1993 19:06:06
+ 
+ -0500
+Date: Wed, 27 Oct 1993 19:06:06 -0500
+From: Bob Farmer <bobf>
+Message-Id: <199310280006.AA19571@feenix.metronet.com>
+Apparently-To: mudos-bugs@actlab.rtf.utexas.edu
+Content-Length: 0
+ 
+log_error() in master causes a crash if a runtime error occurs during it.
+hmm.  dunno if this is acceptable or not.  happened to me on one mud cuz
+some guy made what would normally be his log file into a dir.
+and write_file() to a dir causes a runtime error.
+ 
+bt
+
+function f;
+ 
+f = (: this_object(), ({"func1", "func2"}) :);
+ 
+functionp(f) doesn't return 1.
+ 
+-john
+
+---
+
+I think if you do something like:
+ 
+  f = (: ob, ({ func, a, b, c }) :);
+  ...
+  (*f)(d, e, f);
+ 
+then the order of arguments may not be what the programmer expects...
+(it will be like func(d,e,f,a,b,c))
+
+(djohnson@cs.ucsd.edu)
+
+---
+
+when using binaries, sometimes it seems they don't notice that include files
+have newer dates.  it seems you must remove the .b file sometimes for
+it to update properly.  hmmmm.
+Not many details available, noticed by at least 2 people though.
+
+---
+
+Note  18  Vax          (Mon Dec 13)  regexp() bug
+ 
+> return regexp (({ "aa", "a", "aaabbb" }), "[a-z]+")
+Result = ({ })
+> return regexp (({ "a+" }), "[a-z]+")
+Result = ({ "a+" })
+
+---
+
+The following program,
+ 
+...
+// crash.c
+move(dst) { move_object(dst);        }
+init()    { destruct(this_player()); }
+...
+crashes the driver when you do:  
+  new("/whereever/crash")->move(this_player());
+ 
+bobf
+
+---
+
+nomask mixed query(string label) {
+    mixed value;
+ 
+   ...
+ 
+    return value;
+}
+ 
+Generates errors because the return type does not match "nomask mixed".
+
+---
+
+In move_or_destruct() of simulate.c [line 1966 in 0.9.19.31, I believe.]
+there is an apply to the move() of the dested object.  This hidden little
+bit of behavior was causing us a bit of a problem since our move lfun
+was move(dest, force-the-move).  forcing the move was always true of course,
+so players autoloads were not dested, they were moved to the env of the
+player.
+
+I don't know whether the above code is a bug, or just an undocumented 
+feature.  Perhaps it should be a master apply.  I do know that the lack
+of documentation of it made for a sticky debugging problem in the mudlib
+after we added the force-the-move flag to move().
+
+Thank you for you attention, and for all your work on the driver.
+
+Erik B. Flom
+Artagel
+  @TMI-2
+  @Elements of Parafox

@@ -1353,7 +1353,6 @@ int		n;
     register char   c;
     register int    no;
     register int    len;
-    extern char    *strncpy();
 
     if (prog == (regexp *)NULL || 
 	source == (char *)NULL || dest == (char *)NULL) {

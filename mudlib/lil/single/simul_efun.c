@@ -155,3 +155,11 @@ author_file(string file)
 {
 	return ROOT_UID;
 }
+
+// replaces the former efun
+
+void
+log_file(string file, string text)
+{
+	write_file(LOG_DIR + "/" + file, text);
+}

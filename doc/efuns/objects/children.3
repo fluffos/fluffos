@@ -1,23 +1,24 @@
 .\"returns an array of objects cloned from a given object
 .TH children 3
-
+ 
 .SH NAME
 children() - returns an array of objects cloned from a given object.
-
+ 
 .SH SYNOPSIS
 object *children(string name);
-
+ 
 .SH DESCRIPTION
 This efunction returns an array of objects that have been cloned from
-the file named by 'name'.  A typical use of children() is to find all objects
-that have been cloned from the player object.  For example:
+the file named by 'name', as well as the object 'name' itself, if loaded.
+An example use of children() is to find all objects that have been cloned 
+from the user object:
 .IP
 object *list;
 .IP
-list = children("/obj/player");
+list = children("/obj/user");
 .PP
-This lets you find all players (both netdead and interactive whereas users()
-only reports interactive players).
-
+This lets you find all users (both netdead and interactive whereas users()
+only reports interactive users).
+ 
 .SH SEE ALSO
-inherit_list(3), deep_inherit_list(3)
+deep_inherit_list(3), inherit_list(3), objects(3)

@@ -15,11 +15,8 @@
 #define MUD_LIB                 get_config_str(1)
 #define BIN_DIR                 get_config_str(2)
 #define SWAP_FILE               get_config_str(3)
-#define CONFIG_DIR              get_config_str(4)
 #define LOG_DIR                 get_config_str(5)
 #define MASTER_FILE             get_config_str(6)
-#define ACCESS_FILE             get_config_str(7)
-#define ACCESS_LOG              get_config_str(8)
 #define INCLUDE_DIRS            get_config_str(9)
 #define SIMUL_EFUN              get_config_str(10)
 #define ADDR_SERVER_IP          get_config_str(11)
@@ -36,7 +33,6 @@
 #define TIME_TO_CLEAN_UP        get_config_int(0)
 #define TIME_TO_SWAP            get_config_int(1)
 #define TIME_TO_RESET	        get_config_int(2)
-#define	ALLOWED_ED_CMDS         get_config_int(3)
 #define MAX_BITS                get_config_int(7)
 #define MAX_COST                get_config_int(9)
 #define MAX_ARRAY_SIZE          get_config_int(10)
@@ -51,6 +47,7 @@
 #define	HTABLE_SIZE             get_config_int(21)
 #define OTABLE_SIZE             get_config_int(22)
 #define INHERIT_CHAIN_SIZE      get_config_int(23)
+#define MAX_BUFFER_SIZE         get_config_int(24)
 
 #ifdef USE_POSIX_SIGNALS
 #define sigblock(m) port_sigblock(m)
@@ -73,6 +70,8 @@
 #define INLINE
 #endif
 #endif
+#undef INLINE
+#define INLINE
 
 #ifdef HAS_UNSIGNED_CHAR
 #define EXTRACT_UCHAR(p) (*(unsigned char *)p)
@@ -84,6 +83,11 @@
 
 #define NUM_CONSTS 5
 
+#define NULL_MSG "0"
+
+#define LPC_OPTIMIZE
+#define LPC_OPTIMIZE_LOOPS
+
 #define I(x) (x)
 
 /*
@@ -93,13 +97,6 @@
    that have shared libraries.  It will also let us keep malloc stats even 
    when system malloc is used.
 */
-
-#ifdef GMALLOC
-#define MALLOC(x)  gmalloc(x)
-#define FREE(x)    gfree(x)
-#define REALLOC(x,y) grealloc(x,y)
-#define CALLOC(x,y)   gcalloc(x,y)
-#endif
 
 #ifdef WRAPPEDMALLOC
 #define MALLOC(x)  wrappedmalloc(x)

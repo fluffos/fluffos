@@ -159,3 +159,5 @@ default fail message : What?
 
 # directory to save binaries in
 save binaries directory : /binaries
+
+maximum buffer size : 100000

@@ -20,11 +20,9 @@ services.
 Socket Modes
 ------------
 
-There are three different modes of communication, or socket modes:
-MUD, STREAM, and DATAGRAM.  Definitions for these modes can be obtained
-by including the LPC sockets header file:
-
-	#include <socket.h>
+There are five different modes of communication, or socket modes:
+MUD, STREAM, DATAGRAM, STREAM_BINARY, and DATAGRAM_BINARY.  Definitions
+for these modes can be obtained by including <socket.h> from the mudlib.
 
 MUD Mode
 --------

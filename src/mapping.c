@@ -191,7 +191,8 @@ struct mapping *m;
 {
 	debug(64,("mapping.c: free_mapping begin, ptr = %x\n", m));
 	m->ref--;
-	if (m->ref > 0) /* some other object is still referencing this mapping */
+	/* some other object is still referencing this mapping */
+	if (m->ref > 0)
 		return;
 	debug(1024,("mapping.c: actual free of %x\n", m));
 	num_mappings--;

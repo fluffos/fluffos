@@ -44,6 +44,7 @@
 #include "amiga.h"
 #endif
 #include "lint.h"
+#include "buffer.h"
 #include "interpret.h"
 #include "object.h"
 #include "exec.h"
@@ -101,7 +102,15 @@ socket_create(mode, read_callback, close_callback)
     char *read_callback, *close_callback;
 {
     int type, i, fd, optval;
+	int binary = 0;
 
+	if (mode == STREAM_BINARY) {
+		binary = 1;
+		mode = STREAM;
+	} else if (mode == DATAGRAM_BINARY) {
+		binary = 1;
+		mode = DATAGRAM;
+	}
     switch (mode) {
 
     case MUD:
@@ -142,6 +151,9 @@ socket_create(mode, read_callback, close_callback)
 
 	lpc_socks[i].fd = fd;
 	lpc_socks[i].flags = S_HEADER;
+	if (binary) {
+		lpc_socks[i].flags |= S_BINARY;
+	}
 	lpc_socks[i].mode = mode;
 	lpc_socks[i].state = UNBOUND;
 	memset((char *)&lpc_socks[i].l_addr, 0, sizeof (lpc_socks[i].l_addr));
@@ -302,11 +314,29 @@ socket_accept(fd, read_callback, write_callback)
     }
 
     for (i = 0; i < MAX_EFUN_SOCKS; i++) {
+	fd_set wmask;
+	struct timeval t;
+	int nb;
+
 	if (lpc_socks[i].state != CLOSED)
 	    continue;
 
 	lpc_socks[i].fd = accept_fd;
-	lpc_socks[i].flags = S_HEADER;
+	lpc_socks[i].flags = S_HEADER |
+		(lpc_socks[fd].flags & S_BINARY);
+
+	FD_ZERO(&wmask);
+	FD_SET(accept_fd, &wmask);
+	t.tv_sec = 0;
+	t.tv_usec = 0;
+#ifndef hpux
+        nb = select(FD_SETSIZE, (fd_set *)0, &wmask, (fd_set *)0, &t);
+#else
+        nb = select(FD_SETSIZE, (int *)0, (int *)&wmask, (int *)0, &t);
+#endif
+	if (!(FD_ISSET(accept_fd, &wmask)))
+		lpc_socks[i].flags |= S_BLOCKED;
+
 	lpc_socks[i].mode = lpc_socks[fd].mode;
 	lpc_socks[i].state = DATA_XFER;
 	lpc_socks[i].l_addr = lpc_socks[fd].l_addr;
@@ -477,6 +507,13 @@ socket_write(fd, message, name)
 
     case STREAM:
 	switch (message->type) {
+	case T_BUFFER:
+		len = message->u.buf->size;
+		buf = (char *)DMALLOC(len, 105, "socket_write: T_BUFFER");
+		if (buf == NULL)
+			crash_MudOS("Out of memory");
+		memcpy(buf, message->u.buf->item, len);
+		break;
 	case T_STRING:
 	  len = strlen(message->u.string);
 	  buf = (char *)DMALLOC(len + 1, 105, "socket_write: T_STRING");
@@ -485,35 +522,34 @@ socket_write(fd, message, name)
 	  strcpy(buf, message->u.string);
 	  break;
 	case T_POINTER:
-	  {
-            int i;
-	    struct svalue *el;
+	{
+		int i, limit;
+		struct svalue *el;
 
-            len = message->u.vec->size * sizeof(int);
-            buf = (char *)DMALLOC(len + 1, 105, "socket_write: T_POINTER");
-            if (buf == NULL)
-              crash_MudOS("Out of memory");
-	    el = message->u.vec->item;
-            for(i=0;i<(len / sizeof(int));i++){
-	      switch(el[i].type){
-	      case T_NUMBER:
-		memcpy((char *)&buf[i * sizeof(int)],
-		       (char *)&el[i].u.number,
-		       sizeof(int));
-		break;
-	      case T_REAL:
-                memcpy((char *)&buf[i * sizeof(int)],
-                       (char *)&el[i].u.real,
+		len = message->u.vec->size * sizeof(int);
+		buf = (char *)DMALLOC(len + 1, 105, "socket_write: T_POINTER");
+		if (buf == NULL)
+			crash_MudOS("Out of memory");
+		el = message->u.vec->item;
+		limit = len / sizeof(int);
+		for (i=0; i < limit; i++) {
+			switch(el[i].type) {
+				case T_NUMBER:
+					memcpy((char *)&buf[i * sizeof(int)],
+						(char *)&el[i].u.number, sizeof(int));
+				break;
+				case T_REAL:
+					memcpy((char *)&buf[i * sizeof(int)], (char *)&el[i].u.real,
                        sizeof(int));
+				break;
+				default:
+				break;
+			}
+		}
 		break;
-	      default:
-		break;
-	      }
-	    }
-            break;
-          }
+	}
 	default:
-	    return EETYPENOTSUPP;
+		return EETYPENOTSUPP;
 	}
 	break;
 
@@ -529,6 +565,17 @@ socket_write(fd, message, name)
 	        return EESENDTO;
 	    }
 	    return EESUCCESS;
+
+
+          case T_BUFFER:
+            if (sendto(lpc_socks[fd].fd, message->u.buf->item,
+                        message->u.buf->size, 0,
+                        (struct sockaddr *)&sin, sizeof (sin)) == -1)
+            {
+                perror("socket_write: sendto");
+                return EESENDTO;
+            }
+            return EESUCCESS;
 
 	default:
 	    return EETYPENOTSUPP;
@@ -606,10 +653,26 @@ socket_read_select_handler(fd)
 	    sprintf(addr, "%s %d", inet_ntoa(sin.sin_addr),
 		ntohs(sin.sin_port));
 	    push_number(fd);
-	    push_string(buf, STRING_MALLOC);
+	    if (lpc_socks[fd].flags & S_BINARY) {
+		struct buffer *b;
+
+		b = allocate_buffer(cc);
+		if (b) {
+			b->ref--;
+			memcpy(b->item, buf, cc);
+			push_buffer(b);
+		} else {
+			push_number(0);
+		}
+	    } else {
+		push_string(buf, STRING_MALLOC);
+	    }
 	    push_string(addr, STRING_MALLOC);
-	    debug(8192,("read_socket_handler: apply\n"));
-	    safe_apply(lpc_socks[fd].read_callback, lpc_socks[fd].owner_ob, 3);
+            debug(8192,("read_socket_handler: apply\n"));
+            save_current_object = current_object;
+            current_object = lpc_socks[fd].owner_ob;
+            safe_apply(lpc_socks[fd].read_callback, lpc_socks[fd].owner_ob, 3);
+            current_object = save_current_object;
 	    return;
 	}
 	break;
@@ -618,8 +681,11 @@ socket_read_select_handler(fd)
 	debug(8192,("read_socket_handler: apply read callback\n"));
 	lpc_socks[fd].flags |= S_WACCEPT;
 	push_number(fd);
-	safe_apply(lpc_socks[fd].read_callback, lpc_socks[fd].owner_ob, 1);
-	return;
+        save_current_object = current_object;
+        current_object = lpc_socks[fd].owner_ob;
+        safe_apply(lpc_socks[fd].read_callback, lpc_socks[fd].owner_ob, 1);
+        current_object = save_current_object;
+        return;
 
     case DATA_XFER:
 	switch (lpc_socks[fd].mode) {
@@ -674,8 +740,11 @@ socket_read_select_handler(fd)
 	    lpc_socks[fd].r_buf = NULL;
 	    lpc_socks[fd].r_off = 0;
 	    lpc_socks[fd].r_len = 0;
-	    debug(8192,("read_socket_handler: apply read callback\n"));
-	    safe_apply(lpc_socks[fd].read_callback, lpc_socks[fd].owner_ob, 2);
+            debug(8192,("read_socket_handler: apply read callback\n"));
+            save_current_object = current_object;
+            current_object = lpc_socks[fd].owner_ob;
+            safe_apply(lpc_socks[fd].read_callback, lpc_socks[fd].owner_ob, 2);
+            current_object = save_current_object;
 	    break;
 
 	case STREAM:
@@ -686,9 +755,25 @@ socket_read_select_handler(fd)
 	    debug(8192,("read_socket_handler: read %d bytes\n", cc));
 	    buf[cc] = '\0';
 	    push_number(fd);
-	    push_string(buf, STRING_MALLOC);
-	    debug(8192,("read_socket_handler: apply read callback\n"));
-	    safe_apply(lpc_socks[fd].read_callback, lpc_socks[fd].owner_ob, 2);
+	    if (lpc_socks[fd].flags & S_BINARY) {
+		struct buffer *b;
+
+		b = allocate_buffer(cc);
+		if (b) {
+			b->ref--;
+			memcpy(b->item, buf, cc);
+			push_buffer(b);
+		} else {
+			push_number(0);
+		}
+	    } else {
+		push_string(buf, STRING_MALLOC);
+	    }
+            debug(8192,("read_socket_handler: apply read callback\n"));
+            save_current_object = current_object;
+            current_object = lpc_socks[fd].owner_ob;
+            safe_apply(lpc_socks[fd].read_callback, lpc_socks[fd].owner_ob, 2);
+            current_object = save_current_object;
 	    return;
 	}
 	break;
@@ -709,7 +794,10 @@ socket_read_select_handler(fd)
 
     debug(8192,("read_socket_handler: apply close callback\n"));
     push_number(fd);
+    save_current_object = current_object;
+    current_object = lpc_socks[fd].owner_ob;
     safe_apply(lpc_socks[fd].close_callback, lpc_socks[fd].owner_ob, 1);
+    current_object = save_current_object;
 }
 
 /*
@@ -720,6 +808,7 @@ socket_write_select_handler(fd)
     int fd;
 {
     int cc;
+    struct object *save_current_object;
 
     debug(8192,("write_socket_handler: fd %d state %d\n",
 	fd, lpc_socks[fd].state));
@@ -746,7 +835,10 @@ socket_write_select_handler(fd)
     debug(8192,("write_socket_handler: apply write_callback\n"));
 
     push_number(fd);
+    save_current_object = current_object;
+    current_object = lpc_socks[fd].owner_ob;
     safe_apply(lpc_socks[fd].write_callback, lpc_socks[fd].owner_ob, 1);
+    current_object = save_current_object;
 }
 
 /*
@@ -762,13 +854,6 @@ socket_close(fd)
 	return EEBADF;
     if (lpc_socks[fd].owner_ob != current_object)
 	return EESECURITY;
-#ifndef SunOS_5
-	/* this sometimes hangs the driver on the SPARC Classic
-	   running Solaris 2.1 (and doesn't seem to be necessary).
-	*/
-    if (lpc_socks[fd].mode != DATAGRAM)
-	shutdown(lpc_socks[fd].fd, 2);
-#endif
     while (close(lpc_socks[fd].fd) == -1 && errno == EINTR)
 	; /* empty while */
     lpc_socks[fd].state = CLOSED;
@@ -789,6 +874,8 @@ socket_release(fd, ob, callback)
     struct object *ob;
     char *callback;
 {
+    struct object *save_current_object;
+
     if (fd < 0 || fd >= MAX_EFUN_SOCKS)
 	return EEFDRANGE;
     if (lpc_socks[fd].state == CLOSED)
@@ -803,7 +890,10 @@ socket_release(fd, ob, callback)
 
     push_number(fd);
     push_object(ob);
+    save_current_object = current_object;
+    current_object = ob;
     safe_apply(callback, ob, 2);
+    current_object = save_current_object;
 
     if ((lpc_socks[fd].flags & S_RELEASE) == 0)
 	return EESUCCESS;
@@ -1029,3 +1119,4 @@ dump_socket_status() {
   }
 }
 #endif /* SOCKET_EFUNS */
+

@@ -52,11 +52,13 @@
 #include "comm.h"
 
 extern int errno;
+extern int sys_nerr;
+extern char *sys_errlist[];
 extern int comp_flag;
 extern int max_array_size;
 
 #ifndef LATTICE
-char *inherit_file;
+extern char *inherit_file;
 #else
 char *amigafypath(char *);
 #endif
@@ -326,46 +328,6 @@ int tail(path)
     return 1;
 }
 
-int print_file(path, start, len)
-    char *path;
-    int start, len;
-{
-    char buff[1000];
-    FILE *f;
-    int i;
-
-    if (len < 0)
-	return 0;
-
-    path = check_valid_path(path, current_object, "print_file", 0);
-
-    if (path == 0)
-        return 0;
-    if (start < 0)
-	return 0;
-    f = fopen(path, "r");
-    if (f == 0)
-	return 0;
-    if (len == 0)
-	len = MAX_LINES;
-    if (len > MAX_LINES)
-	len = MAX_LINES;
-    if (start == 0)
-	start = 1;
-    for (i=1; i < start + len; i++) {
-	if (fgets(buff, sizeof buff, f) == 0)
-	    break;
-	if (i >= start)
-	    add_message("%s", buff);
-    }
-    fclose(f);
-    if (i <= start)
-	return 0;
-    if (i == MAX_LINES + start)
-	add_message("*****TRUNCATED****\n");
-    return i-start;
-}
-
 int remove_file(path)
     char *path;
 {
@@ -376,32 +338,6 @@ int remove_file(path)
     if (unlink(path) == -1)
         return 0;
     return 1;
-}
-
-void log_file(file, str)
-    char *file, *str;
-{
-    FILE *f;
-    char the_file_name[100], *file_name;
-    struct stat st;
-
-    file_name = the_file_name;
-    sprintf(file_name, "%s/%s", LOG_DIR, file);
-    file_name = check_valid_path(file_name, current_object, "log_file", 1);
-    if (!file_name)
-	    return;
-    if (file_name[0] == '/')
-       file_name++;
-    if (stat(file_name, &st) != -1 && st.st_size > MAX_LOG_SIZE) {
-      char file_name2[sizeof file_name + 4];
-      sprintf(file_name2, "%s.old", file_name);
-      rename(file_name, file_name2);	/* No panic if failure */
-    }
-    f = fopen(file_name, "a");	/* Skip leading '/' */
-    if (f == 0)
-      return;
-    fwrite(str, strlen(str), 1, f);
-    fclose(f);
 }
 
 /*
@@ -509,7 +445,17 @@ int write_file(file, str)
 	return 0;
     f = fopen(file, "a");
     if (f == 0)
-	error("Wrong permissions for opening file %s for append.\n", file);
+    {
+      if (errno < sys_nerr)
+      {
+        error("Wrong permissions for opening file %s for append.\n\"%s\"\n", 
+              file, sys_errlist[errno]);
+      }
+        else
+      {
+        error("Wrong permissions for opening file %s for append.\n", file);
+      }
+    }
     fwrite(str, strlen(str), 1, f);
     fclose(f);
     return 1;
@@ -560,7 +506,6 @@ char *read_file(file,start,len)
     } while ( start > 1 );
     for (p2=str; p != end; ) {
         c = *p++;
-	if ( !isprint(c) && !isspace(c) ) c=' ';
 	*p2++=c;
 	if ( c == '\n' )
 	    if (!--len) break;
@@ -578,7 +523,6 @@ char *read_file(file,start,len)
 	end = p2+size;
         for (; p2 != end; ) {
 	    c = *p2;
-	    if ( !isprint(c) && !isspace(c) ) *p2=' ';
 	    p2++;
 	    if ( c == '\n' )
 	        if (!--len) break;
@@ -596,120 +540,113 @@ char *read_file(file,start,len)
 }
 
 
-char *read_bytes(file,start,len)
+char *read_bytes(file,start,len,rlen)
     char *file;
     int start,len;
+    int *rlen;
 {
-    struct stat st;
-
-    char *str,*p;
-    int size, f;
+	struct stat st;
+	FILE *fp;
+    char *str;
+    int size;
 
     if (len < 0)
-	return 0;
-    if(len > MAX_BYTE_TRANSFER)
 	return 0;
     file = check_valid_path(file, current_object, 
 				"read_bytes", 0);
     if (!file)
 	return 0;
-    f = open(file, O_RDONLY);
-    if (f < 0)
+    fp = fopen(file, "rb");
+    if (fp == NULL)
 	return 0;
 
-    if (fstat(f, &st) == -1)
+    if (fstat(fileno(fp), &st) == -1)
 	fatal("Could not stat an open file.\n");
     size = st.st_size;
     if(start < 0) 
 	start = size + start;
 
+    if (len == 0) len = size;
+    if(len > MAX_BYTE_TRANSFER) {
+    error("Transfer exceeded maximum allowed number of bytes.\n");
+	return 0;
+    }
+
     if (start >= size) {
-	close(f);
+	fclose(fp);
 	return 0;
     }
     if ((start+len) > size) 
 	len = (size - start);
 
-    if ((size = lseek(f,start, 0)) < 0)
+    if ((size = fseek(fp, start, 0)) < 0)
 	return 0;
 
     str = DXALLOC(len + 1, 42, "read_bytes: str");
 
-    size = read(f, str, len);
+    size = fread(str, 1, len, fp);
 
-    close(f);
+    fclose(fp);
 
     if (size <= 0) {
 	FREE(str);
 	return 0;
     }
 
-    /* We want to allow all characters to pass untouched!
-    for (il=0;il<size;il++) 
-	if (!isprint(str[il]) && !isspace(str[il]))
-	    str[il] = ' ';
-
-    str[il] = 0;
-    */
     /*
      * The string has to end to '\0'!!!
      */
     str[size] = '\0';
 
-    p = string_copy(str);
-    FREE(str);
-
-    return p;
+    *rlen = size;
+    return str;
 }
 
-int write_bytes(file,start,str)
-    char *file, *str;
-    int start;
+int
+write_bytes(file, start, str, theLength)
+char *file, *str;
+int start, theLength;
 {
-    struct stat st;
+	struct stat st;
+	int size;
+	FILE *fp;
 
-    int size, f;
+	file = check_valid_path(file, current_object, "write_bytes", 1);
 
-    file = check_valid_path(file, current_object, 
-				"write_bytes", 1);
+	if (!file)
+		return 0;
+	if (theLength > MAX_BYTE_TRANSFER)
+		return 0;
+	fp = fopen(file, "ab");
+	if (fp == NULL) {
+		return 0;
+	}
 
-    if (!file)
-	return 0;
-    if(strlen(str) > MAX_BYTE_TRANSFER)
-	return 0;
-    f = open(file, O_WRONLY);
-    if (f < 0)
-	return 0;
+	if (fstat(fileno(fp), &st) == -1)
+		fatal("Could not stat an open file.\n");
+	size = st.st_size;
+	if (start < 0) 
+		start = size + start;
 
-    if (fstat(f, &st) == -1)
-	fatal("Could not stat an open file.\n");
-    size = st.st_size;
-    if(start < 0) 
-	start = size + start;
+	if (start > size) {
+		fclose(fp);
+		return 0;
+	}
 
-    if (start >= size) {
-	close(f);
-	return 0;
-    }
-    if ((start+strlen(str)) > size) {
-	close(f);
-	return 0;
-    }
+	if ((size = fseek(fp, start, 0)) < 0) {
+		fclose(fp);
+		return 0;
+	}
 
-    if ((size = lseek(f,start, 0)) < 0) {
-	close(f);
-	return 0;
-    }
+	size = fwrite(str, 1, theLength, fp);
 
-    size = write(f, str, strlen(str));
+	fclose(fp);
 
-    close(f);
+	if (size <= 0) {
+		return 0;
+	}
 
-    if (size <= 0) {
-	return 0;
-    }
-
-    return 1;
+	return 1;
 }
 
 int file_size(file)
@@ -737,7 +674,7 @@ int file_size(file)
  * The returned string may or may not be residing inside the argument 'path',
  * so don't deallocate arg 'path' until the returned result is used no longer.
  * Otherwise, the returned path is temporarily allocated by apply(), which
- * means it will be dealocated at next apply().
+ * means it will be deallocated at next apply().
  */
 char *check_valid_path(path, call_object, call_fun, writeflg)
     char *path;

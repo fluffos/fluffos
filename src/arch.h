@@ -4,7 +4,7 @@
 #define ARCH "Sequent DYNIX"
 #endif
 
-#ifdef __SEQUENT__
+#ifdef _SEQUENT_
 #define ARCH "Sequent DYNIX/ptx"
 #endif
 

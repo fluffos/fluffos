@@ -64,7 +64,6 @@ void pre_compile PROT((char *)),
        remove_interactive PROT((struct object *)),
        add_light PROT((struct object *, int)),
        add_action PROT((char *, char *, int)),
-       add_verb PROT((char *, int)),
        ipc_remove(),
        set_snoop PROT((struct object *, struct object *)),
        start_new_file PROT((FILE *)), end_new_file(),
@@ -73,6 +72,7 @@ void pre_compile PROT((char *)),
        print_svalue PROT((struct svalue *)),
        debug_message_value(),
        destruct2();
+char *query_simul_efun_file_name();
      
 extern int d_flag;
      
@@ -174,7 +174,6 @@ int give_uid_to_object(ob)
     error("No function 'creator_file' in master.c!\n");
   if (ret->type != T_STRING) {
     struct svalue arg;
-    /* This can be the case for objects in /ftp and /open. */
     arg.type = T_OBJECT;
     arg.u.ob = ob;
     destruct_object(&arg);
@@ -239,7 +238,6 @@ int init_object (ob)
 }
 
 
-
 struct svalue *
   load_virtual_object(name)
 char *name;
@@ -252,7 +250,7 @@ char *name;
   v = apply_master_ob("compile_object", 1);
   loading_virtual_object--;
   if (!v || (v->type != T_OBJECT)) {
-    fprintf(stderr, "Could not load descr for %s\n", name);
+	fprintf(stderr, "Could not load file: %s\n", name);
     error("Failed to load file: %s\n",name);
     return 0;
   }
@@ -293,18 +291,6 @@ struct object *load_object(lname, dont_reset)
   int name_length;
   char real_name[200], name[200];
   char *p;
-  
-#ifdef VALID_CLONE
-  if (current_object && master_ob) {
-    char *orig;
-    
-    orig = lname;
-    lname = check_valid_path(lname, current_object, "load_object", 0);
-    if (!lname) {
-      error("Insufficient permission to read file: %s\n", orig);
-    }
-  }
-#endif
   
   if (++num_objects_this_thread > INHERIT_CHAIN_SIZE)
     error ("Inherit chain too deep: > %d\n",INHERIT_CHAIN_SIZE);
@@ -390,6 +376,15 @@ struct object *load_object(lname, dont_reset)
 #ifdef SAVE_BINARIES
   }
 #endif
+ 
+  /* allow updating of simul_efun and adding of new functions -bobf */
+    if (prog && query_simul_efun_file_name() &&
+        strlen(prog->name) == (strlen(query_simul_efun_file_name()) + 1) &&
+        !strncmp(prog->name, query_simul_efun_file_name() + 1, 
+                 strlen(query_simul_efun_file_name()) - 1)
+       )
+      get_simul_efuns(prog);
+
   /* Sorry, can't handle objects without programs yet. */
   if (inherit_file == 0 && (num_parse_error > 0 || prog == 0)) {
     if (prog)
@@ -493,18 +488,6 @@ struct object *clone_object(str1)
     error("Object must call seteuid() prior to calling clone_object().\n");
   }
   
-#ifdef VALID_CLONE
-  if(current_object){
-    char *orig;
-    
-    orig = str1;
-    str1 = check_valid_path(str1, current_object, "clone_object", 0);
-    if(!str1){
-      error("Insufficient permission to read file: %s\n",orig);
-    }
-  }
-#endif /* VALID_CLONE */
-  
   num_objects_this_thread = 0;
   ob = find_object(str1);
   if (ob && !object_visible(ob)) ob = 0;
@@ -515,7 +498,7 @@ struct object *clone_object(str1)
     return(0);
   if(ob == 0 || ob->super || (ob->flags & O_CLONE))
     if(!(ob->flags & O_VIRTUAL) || strrchr(str1,'#'))
-      error("Cloning a bad object !\n");
+      error("Cloning a bad object!\n");
     else {
       /* 
        * well... it's a virtual object.  So now we're going to "clone" it.
@@ -630,17 +613,16 @@ int command_for_object(str, ob)
 }
 
 /*
- * To find if an object is present, we have to look in two inventory
- * lists. The first list is the inventory of the current object.
- * The second list is all things that have the same ->super as
- * current_object.
- * Also test the environment.
- * If the second argument 'ob' is non zero, only search in the
- * inventory of 'ob'. The argument 'ob' will be mandatory, later.
+ * With no argument, present() looks in the inventory of the current_object,
+ * the inventory of our super, and our super.
+ * If the second argument is nonzero, only the inventory of that object
+ * is searched.
  */
+ 
 
 static struct object *object_present2 PROT((char *, struct object *));
-     
+ 
+ 
 struct object *object_present(v, ob)
      struct svalue *v;
      struct object *ob;
@@ -648,7 +630,7 @@ struct object *object_present(v, ob)
   struct svalue *ret;
   struct object *ret_ob;
   int specific = 0;
-  
+ 
   if (ob == 0)
     ob = current_object;
   else
@@ -658,12 +640,12 @@ struct object *object_present(v, ob)
   if (v->type == T_OBJECT) {
     if (specific) {
       if (v->u.ob->super == ob)
-	return v->u.ob;
+        return v->u.ob;
       else
-	return 0;
+        return 0;
     }
     if (v->u.ob->super == ob ||
-	(v->u.ob->super == ob->super && ob->super != 0))
+        (v->u.ob->super == ob->super && ob->super != 0))
       return v->u.ob->super;
     return 0;
   }
@@ -678,23 +660,23 @@ struct object *object_present(v, ob)
     if (ob->super->flags & O_DESTRUCTED)
       return 0;
     if (!IS_ZERO(ret)) {
+#if 0
       /*
-	if id() returns a value of type object then query that object.
-	this will allow container objects to allow objects inside them
-	to be referred to (for attack or whatever).
-	*/
-#ifndef OLD_PRESENT
+        if id() returns a value of type object then query that object.
+        this will allow container objects to allow objects inside them
+        to be referred to (for attack or whatever).
+        */
       if (ret->type == T_OBJECT)
-	return ret->u.ob;
+        return ret->u.ob;
       else
-#endif
-	return ob->super;
+#endif /* 0 */
+        return ob->super;
     }
     return object_present2(v->u.string, ob->super->contains);
   }
   return 0;
 }
-
+ 
 static struct object *object_present2(str, ob)
      char *str;
      struct object *ob;
@@ -703,7 +685,7 @@ static struct object *object_present2(str, ob)
   char *p;
   int count = 0, length;
   char *item;
-  
+ 
   item = string_copy(str);
   length = strlen(item);
   p = item + length - 1;
@@ -713,7 +695,7 @@ static struct object *object_present2(str, ob)
     if (p > item && *p == ' ') {
       count = atoi(p+1) - 1;
       *p = '\0';
-      length = p - item;	/* This is never used again ! */
+      length = p - item;        /* This is never used again ! */
     }
   }
   for (; ob; ob = ob->next_inv) {
@@ -728,7 +710,7 @@ static struct object *object_present2(str, ob)
     if (count-- > 0)
       continue;
     FREE(item);
-#ifndef OLD_PRESENT
+#if 0
     if (ret->type == T_OBJECT)
       return ret->u.ob;
     else
@@ -824,7 +806,7 @@ void destruct_object_two(ob)
     struct object *save=command_giver;
     
     command_giver=ob;
-#ifdef ED
+#ifdef F_ED
     if (ob->interactive->ed_buffer) {
       extern void save_ed_buffer();
       
@@ -1095,82 +1077,14 @@ void shout_string(str)
      char *str;
 {
   struct object *ob;
-#ifdef LOG_SHOUT
-  FILE *f = 0;
-  char *tmpstr;
-#endif
-  char *p;
   
-  str = string_copy(str);	/* So that we can modify the string */
-  for (p=str; *p; p++) {
-    if ((*p < ' ' || *p > '~') && *p != '\n')
-      *p = ' ';
-  }
-  
-  p = 0;
-#ifdef LOG_SHOUT
-  if (command_giver) {
-    struct svalue *v;
-    v = apply("query_cap_name", command_giver, 0);
-    if (v && v->type == T_STRING)
-      p = v->u.string;
-    else {
-      v = apply("query_name", command_giver, 0);
-      if (v && v->type == T_STRING)
-	p = v->u.string;
-    }
-  } else if (current_object && current_object->uid)
-    p = current_object->uid->name;
-  if (p)
-    {
-      tmpstr = (char *)DMALLOC(strlen(LOG_DIR) + 8, 101, "shout_string: 1");
-      sprintf(tmpstr,"%s/shouts",LOG_DIR);
-      if (tmpstr[0] == '/')
-	strcpy (tmpstr, tmpstr+1);
-      f = fopen(tmpstr, "a");
-      FREE(tmpstr);
-    }
-  if (f) {
-    fprintf(f, "%s: %s\n", p, str);
-    fclose(f);
-  }
-#endif
-  for (ob = obj_list; ob; ob = ob->next_all) {
+  for (ob = obj_list; ob; ob = ob->next_all)
+  {
     if (!(ob->flags & O_ENABLE_COMMANDS) || (ob == command_giver)
-	|| !ob->super)
+        || !ob->super)
       continue;
-    tell_object(ob,str);
+    tell_object(ob, str);
   }
-  FREE(str);
-}
-
-struct object *first_inventory(arg)
-     struct svalue *arg;
-{
-  struct object *ob;
-  
-  if (arg->type == T_STRING)
-    {
-      ob = find_object(arg->u.string);
-      if (ob && !object_visible(ob)) ob = 0;
-    }
-  else
-    ob = arg->u.ob;
-  if (ob == 0)
-    error("No object to first_inventory()");
-  ob = ob->contains;
-  while (ob)
-    {
-      if (ob->flags & O_HIDDEN)
-        {
-	  if (object_visible(ob))
-            {
-	      return ob;
-            }
-        } else return ob;
-      ob = ob->next_inv;
-    }
-  return 0;
 }
 
 /*
@@ -1220,7 +1134,7 @@ int input_to(fun, flag, num_arg, args)
   if(num_arg){
     if((x = (struct svalue *)
 	DMALLOC(num_arg * sizeof(struct svalue), 102, "input_to: 1")) == NULL)
-      fatal("Not enough memory to copy args from input_to.\n");	 
+	fatal("Out of memory!\n");
     copy_some_svalues(x, args, num_arg);
   }
   else
@@ -1303,6 +1217,9 @@ void print_svalue(arg)
               break;
         case T_FUNCTION:
               add_message("<FUNCTION>");
+              break;
+        case T_BUFFER:
+              add_message("<BUFFER>");
               break;
         default:
               add_message("<UNKNOWN>");
@@ -1409,7 +1326,7 @@ void move_object(item, dest)
   struct object *save_cmd = command_giver;
   
   if (item != current_object)
-    error("Illegal to move other object than this_object()\n");
+	error("move_object(): can't move anything other than this_object()\n");
   /* Recursive moves are not allowed. */
   for (ob = dest; ob; ob = ob->super)
     if (ob == item)
@@ -1705,8 +1622,6 @@ int user_parser(buff)
 
 /*
  * Associate a command with function in this object.
- * The optional second argument is the command name. If the command name
- * is not given here, it should be given with add_verb().
  *
  * The optinal third argument is a flag that will state that the verb should
  * only match against leading characters.
@@ -1756,25 +1671,6 @@ void add_action(str, cmd, flag)
     p->verb = 0;
   command_giver->sent = p;
 }
-
-void add_verb(str, flag)
-     char *str;
-     int flag;
-{
-  if (command_giver == 0 || (command_giver->flags & O_DESTRUCTED))
-    return;
-  if (command_giver->sent == 0)
-    error("No add_action().\n");
-  if (command_giver->sent->verb != 0)
-    error("Tried to set verb again.\n");
-  command_giver->sent->verb = make_shared_string(str);
-  if (flag)
-    command_giver->sent->flags |= V_NOSPACE;
-  if (d_flag > 1)
-    debug_message("--Adding verb %s to action %s\n", str,
-		  command_giver->sent->function);
-}
-
 
 /*
  * Remove sentence with specified verb and action.  Return 1
@@ -2184,3 +2080,34 @@ struct object *ob;
 }
 #endif
 
+struct object *first_inventory(arg)
+     struct svalue *arg;
+{
+  struct object *ob;
+ 
+  if (arg->type == T_STRING)
+  {
+    ob = find_object(arg->u.string);
+    if (ob && !object_visible(ob)) 
+      ob = 0;
+  }
+    else
+    ob = arg->u.ob;
+  if (ob == 0)
+    error("first_inventory(): bad arg 1");
+  ob = ob->contains;
+  while (ob)
+  {
+    if (ob->flags & O_HIDDEN)
+    {
+      if (object_visible(ob))
+      {
+        return ob;
+      }
+    }
+      else 
+      return ob;
+    ob = ob->next_inv;
+  }
+  return 0;
+}

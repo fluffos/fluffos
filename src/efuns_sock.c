@@ -235,9 +235,10 @@ f_socket_write(num_arg, instruction)
     char addr[ADDR_BUF_SIZE];
 
     arg = sp - num_arg + 1;
-	if ((num_arg == 3) && (arg[2].type != T_STRING)) {
-		bad_arg(3, instruction);
-	}
+    if ((num_arg == 3) && (arg[2].type != T_STRING))
+    {
+            bad_arg(3, instruction);
+    }
     fd = arg[0].u.number;
     get_socket_address(fd, addr, &port);
 

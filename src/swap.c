@@ -29,7 +29,8 @@
 int num_swapped;
 int total_bytes_swapped;
 int line_num_bytes_swapped;
-char file_name[100];
+char file_name_buf[100];
+char *file_name = file_name_buf;
 
 FILE *swap_file;		/* The swap file is opened once */
 
@@ -57,13 +58,12 @@ extern int port_number;
  * Make sure swap file is opened.
  */
 int assert_swap_file() {
-    if (swap_file == 0) {
+    if (swap_file == NULL) {
 #ifndef MSDOS
 	char host[50];
 	gethostname(host, sizeof host);
 	sprintf(file_name, "%s.%s.%d", SWAP_FILE, host, port_number);
-	if (file_name[0] == '/')
-	  strcpy (file_name,file_name + 1);
+	if (file_name[0] == '/') file_name++;
 	swap_file = fopen(file_name, "w+");
 #else
 	swap_file = fopen(strcpy(file_name,"LPMUD.SWAP"),"w+b");

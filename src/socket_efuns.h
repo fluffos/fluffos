@@ -7,7 +7,7 @@
 #ifndef _SOCKET_EFUNS_H_
 #define _SOCKET_EFUNS_H_
 
-enum socket_mode { MUD, STREAM, DATAGRAM };
+enum socket_mode { MUD, STREAM, DATAGRAM, STREAM_BINARY, DATAGRAM_BINARY };
 enum socket_state { CLOSED, UNBOUND, BOUND, LISTEN, DATA_XFER };
 
 #define	BUF_SIZE	2048	/* max reliable packet size	   */
@@ -39,6 +39,7 @@ struct lpc_socket {
 #define	S_BLOCKED	0x02
 #define	S_HEADER	0x04
 #define	S_WACCEPT	0x08
+#define S_BINARY    0x10
 
 int socket_create PROT((enum socket_mode, char *, char *));
 

@@ -41,63 +41,6 @@ int num_arg, instruction;
 }
 #endif
 
-/*
-  OBSOLETE
-	I'm not sure this function should exist anymore, outside of
-	being a simul_efun that tells you to use add_action...
-	--Sulam
-*/
-
-#ifdef F_ADD_VERB
-void
-f_add_verb(num_arg, instruction)
-int num_arg, instruction;
-{
-  add_verb(sp->u.string, 0);
-  return;
-}
-#endif
-
-#ifdef F_ADD_WORTH
-void
-f_add_worth(num_arg, instruction)
-int num_arg, instruction;
-{
-  struct object *ob;
-  int worth;
-
-  if (num_arg == 2)
-    {
-      ob = sp->u.ob;
-      worth = (sp-1)->u.number;
-      pop_stack();
-    }
-  else
-    {
-      if (!previous_ob)
-	return;
-      ob = previous_ob;
-      worth = sp->u.number;
-    }
-  add_worth (&ob->stats, worth);
-}
-#endif
-
-/*
-  OBSOLETE
-	If we get rid of add_verb, we should also get rid of this...
-	--Sulam
-*/
-
-#ifdef F_ADD_XVERB
-void
-f_add_xverb(num_arg, instruction)
-int num_arg, instruction;
-{
-  add_verb(sp->u.string, 1);
-}
-#endif
-
 #ifdef F_ALL_INVENTORY
 void
 f_all_inventory(num_arg, instruction)
@@ -131,6 +74,24 @@ int num_arg, instruction;
 }
 #endif
 
+#ifdef F_ALLOCATE_BUFFER
+void
+f_allocate_buffer(num_arg, instruction)
+int num_arg, instruction;
+{
+	struct buffer *buf;
+
+	buf = allocate_buffer(sp->u.number);
+	pop_stack();
+	if (buf) {
+		push_buffer(buf);
+		buf->ref--;
+	} else {
+		push_number(0);
+	}
+}
+#endif
+
 #ifdef F_ALLOCATE_MAPPING
 void
 f_allocate_mapping(num_arg, instruction)
@@ -145,8 +106,31 @@ int num_arg, instruction;
 }
 #endif
 
-#ifdef F_CACHE_STATS
+#ifdef F_BREAK_STRING
+void
+f_break_string(num_arg, instruction)
+    int num_arg, instruction;
+{
+    struct svalue *arg = sp- num_arg + 1;
+    char *str;
+    extern char *break_string PROT((char *, int, struct svalue *));
 
+    if (arg[0].type == T_STRING)
+    {
+	str = break_string(arg[0].u.string, arg[1].u.number, 
+		(num_arg > 2 ? &arg[2] : (struct svalue *)0));
+	pop_n_elems(num_arg);
+	push_malloced_string(str);
+    }
+    else
+    {
+	pop_n_elems(num_arg);
+	push_number(0);
+    }
+}
+#endif
+
+#ifdef F_CACHE_STATS
 void print_cache_stats ()
 {
    add_message ("Function cache information\n");
@@ -258,6 +242,8 @@ int num_arg, instruction;
   struct svalue *arg;
 
   arg = sp - num_arg + 1;
+  if (arg[0].u.string[0] == ':')
+     error("Illegal function name in call_out: %s\n", arg[0].u.string);
   if (!(current_object->flags & O_DESTRUCTED))
     new_call_out(current_object, arg[0].u.string, arg[1].u.number,
 		 num_arg - 3, (num_arg >= 3) ? &arg[2] : 0);
@@ -291,29 +277,6 @@ int num_arg, instruction;
       push_malloced_string(str);
     }
   return;
-}
-#endif
-
-#ifdef F_CAT
-void
-f_cat(num_arg, instruction)
-int num_arg, instruction;
-{
-  struct svalue *arg;
-  int i, start = 0, len = 0;
-
-  arg = sp - num_arg + 1;
-  if (num_arg > 1)
-    start = arg[1].u.number;
-  if (num_arg == 3)
-    {	
-      if (arg[2].type != T_NUMBER)
-	bad_arg(2, instruction);
-      len = arg[2].u.number;
-    }
-  i = print_file(arg[0].u.string, start, len);
-  pop_n_elems(num_arg);
-  push_number(i);
 }
 #endif
 
@@ -410,16 +373,6 @@ int num_arg, instruction;
 }
 #endif
 
-/*
-  OBSOLETE
-	Couldn't this be a simul_efun??  Do we even need it as a
-	function at all??
-	--Sulam
-
-   problem with making it a simul_efun is that we are limited to copying
-   files of size less than read_file is limited to
-*/
-
 #ifdef F_CP
 void
 f_cp(num_arg, instruction)
@@ -430,6 +383,30 @@ int num_arg, instruction;
   i = copy_file(sp[-1].u.string, sp[0].u.string);
   pop_n_elems(2);
   push_number(i);
+}
+#endif
+
+#ifdef F_CRC32
+void
+f_crc32(num_arg, instruction)
+int num_arg, instruction;
+{
+	int len;
+	unsigned char *buf;
+	UINT32 crc;
+
+	if (sp->type == T_STRING) {
+		len = strlen(sp->u.string);
+		buf = (unsigned char *)sp->u.string;
+	} else if (sp->type == T_BUFFER) {
+		len = sp->u.buf->size;
+		buf = sp->u.buf->item;
+	} else {
+		bad_arg(1, instruction);
+	}
+	crc = compute_crc32(buf, len);
+	pop_stack();
+	push_number(crc);
 }
 #endif
 
@@ -490,6 +467,8 @@ int num_arg, instruction;
 		    flags & O_ENABLE_COMMANDS ?"TRUE":"FALSE");
 	add_message("O_CLONE           : %s\n",
 		    flags & O_CLONE           ?"TRUE":"FALSE");
+	add_message("O_VIRTUAL         : %s\n",
+		    flags & O_VIRTUAL         ?"TRUE":"FALSE");
 	add_message("O_DESTRUCTED      : %s\n",
 		    flags & O_DESTRUCTED      ?"TRUE":"FALSE");
 	add_message("O_SWAPPED         : %s\n",
@@ -631,13 +610,6 @@ void
 f_destruct(num_arg, instruction)
 int num_arg, instruction;
 {
-	struct object *ob;
-
-	if(sp->type == T_OBJECT) {
-		ob = sp->u.ob;
-	} else {
-		error("Invalid argument to destruct()\n");
-	}
 	destruct_object(sp);
 	pop_stack();
 	push_number(1);
@@ -827,8 +799,7 @@ int num_arg, instruction;
   int i;
 
   i = replace_interactive((sp-1)->u.ob, sp->u.ob);
-  pop_stack();
-  pop_stack();
+  pop_n_elems(2);
   push_number(i);
 }
 #endif
@@ -868,69 +839,6 @@ int num_arg, instruction;
       ob->uid = current_object->euid;
       push_number(1);
     }
-}
-#endif
-
-/*
-  OBSOLETE
-	Isn't this a simul_efun??  Why do we have it here??
-	--Sulam
-*/
-
-#ifdef F_EXTRACT
-void
-f_extract(num_arg, instruction)
-int num_arg, instruction;
-{
-  int len, from, to;
-  struct svalue *arg;
-  char *res;
-
-  arg = sp - num_arg + 1;
-  len = SVALUE_STRLEN(arg);
-  if (num_arg == 1)
-    return;
-  from = arg[1].u.number;
-  if (from < 0)
-    from = len + from;
-  if (from >= len)
-    {
-      pop_n_elems(num_arg);
-      push_string("", STRING_CONSTANT);
-      return;
-    }
-  if (num_arg == 2)
-    {
-      res = string_copy(arg->u.string + from);
-      pop_n_elems(2);
-      push_malloced_string(res);
-      return;
-    }
-  if (arg[2].type != T_NUMBER)
-    error("Bad third argument to extract\n");
-  to = arg[2].u.number;
-  if (to < 0)
-    to = len + to;
-  if (to < from)
-    {
-      pop_n_elems(3);
-      push_string("", STRING_CONSTANT);
-      return;
-    }
-  if (to >= len)
-    to = len - 1;
-  if (to == len -1)
-    {
-      res = string_copy(arg->u.string + from);
-      pop_n_elems(3);
-      push_malloced_string(res);
-      return;
-    }
-  res = DXALLOC(to - from + 2, 30, "f_extract: res");
-  strncpy(res, arg[0].u.string + from, to - from + 1);
-  res[to - from + 1] = '\0';
-  pop_n_elems(3);
-  push_malloced_string(res);
 }
 #endif
 
@@ -1063,27 +971,6 @@ int num_arg, instruction;
 }
 #endif
 
-/*
-  OBSOLETE
-	How much do we need this?  It would be easy to make into
-	a simul_efun...
-	--Sulam
-*/
-
-#ifdef F_FIRST_INVENTORY
-void
-f_first_inventory(num_arg, instruction)
-int num_arg, instruction;
-{
-  ob = first_inventory(sp);
-  pop_stack();
-  if (ob)
-    push_object(ob);
-  else
-    push_number(0);
-}
-#endif
-
 void add_mapping_shared_string(m, key, value)
 struct mapping *m;
 char *key, *value;
@@ -1197,20 +1084,29 @@ void
 f_geteuid(num_arg, instruction)
 int num_arg, instruction;
 {
-  ob = sp->u.ob;
-  if (ob->euid)
-    {
-      char *tmp;
-      
-      tmp = ob->euid->name;
-      pop_stack();
-      push_string(tmp, STRING_CONSTANT);
-    }
-  else
-    {
-      pop_stack();
-      push_number(0);
-    }
+	if (sp->type == T_OBJECT) {
+		ob = sp->u.ob;
+		if (ob->euid) {
+			char *tmp;
+		  
+			tmp = ob->euid->name;
+			pop_stack();
+			push_string(tmp, STRING_CONSTANT);
+			return;
+		} else {
+			pop_stack();
+			push_number(0);
+			return;
+		}
+	} else if (sp->type == T_FUNCTION) {
+		if (sp->u.fp->euid) {
+			pop_stack();
+			push_string(sp->u.fp->euid->name, STRING_CONSTANT);
+			return;
+		}
+	}
+	pop_stack();
+	push_number(0);
 }
 #endif
 
@@ -1398,15 +1294,22 @@ void
 f_functionp(num_arg, instruction)
 int num_arg, instruction;
 {
-	if (sp->type == T_FUNCTION &&
-		((sp->u.fp->obj.type == T_OBJECT &&
-		!(sp->u.fp->obj.u.ob->flags & O_DESTRUCTED)) ||
-		sp->u.fp->obj.type == T_STRING) &&
-		sp->u.fp->fun.type == T_STRING) {
-			assign_svalue(sp, &const1);
-	} else {
-		assign_svalue(sp, &const0);
+	if (sp->type == T_FUNCTION) {
+		if (((sp->u.fp->obj.type == T_OBJECT) &&
+			!(sp->u.fp->obj.u.ob->flags & O_DESTRUCTED)) ||
+			(sp->u.fp->obj.type == T_STRING))
+		{
+			if (sp->u.fp->fun.type == T_STRING) {
+				assign_svalue(sp, &const1);
+				return;
+			} else if (sp->u.fp->fun.type == T_POINTER) {
+				pop_stack();
+				push_number(2);
+				return;
+			}
+		}
 	}
+	assign_svalue(sp, &const0);
 }
 #endif
 
@@ -1480,21 +1383,6 @@ int num_arg, instruction;
 }
 #endif
 
-#ifdef F_LOG_FILE
-void
-f_log_file(num_arg, instruction)
-int num_arg, instruction;
-{
-	if (IS_ZERO(sp)) {
-		bad_arg(2, instruction);
-		pop_stack();
-	} else {
-		log_file((sp-1)->u.string, sp->u.string);
-		pop_stack();
-	}
-}
-#endif
-
 #ifdef F_LOWER_CASE
 void
 f_lower_case(num_arg, instruction)
@@ -1538,9 +1426,6 @@ int num_arg, instruction;
 	if (!using_bsd_malloc && !using_smalloc) {
 		add_message("Using system malloc.\n");
 	}
-#endif
-#ifdef GMALLOC
-    add_message("Using Gnu malloc.\n");
 #endif
     push_number(0);
 }
@@ -1671,8 +1556,7 @@ int num_arg, instruction;
  
   FREE(string.u.string);
  
-  pop_stack();
-  pop_stack();
+  pop_n_elems(2);
  
   push_svalue(value);
 }
@@ -1686,54 +1570,66 @@ int num_arg, instruction;
   struct vector *v;
   struct svalue *find;
   int i, ncmp = 0;
-
-  if ((num_arg > 2) && (sp->type == T_NUMBER) &&
-      sp->u.number && ((sp-2)->type == T_STRING))
-  {
-    ncmp = strlen((sp-2)->u.string);
+ 
+  if (num_arg > 2) {
     v = (sp-1)->u.vec;
     find = (sp-2);
+    if ((sp->type == T_NUMBER) &&
+        sp->u.number && ((sp-2)->type == T_STRING)) {
+      ncmp = strlen((sp-2)->u.string);
+    }
   } else {
     v = sp->u.vec;
     find = (sp-1);
   }
-  check_for_destr(v);
-  for (i=0; i < v->size; i++)
+ 
+  for (i = 0; i < v->size; i++)
   {
+    if (v->item[i].type == T_OBJECT &&
+        v->item[i].u.ob->flags & O_DESTRUCTED)
+       assign_svalue(&v->item[i], &const0);
     if (v->item[i].type != find->type)
       continue;
-    switch(find->type)
-      {
+    switch (find->type)
+    {
       case T_STRING:
         if (ncmp) {
           if (strncmp(find->u.string, v->item[i].u.string, ncmp) == 0)
             break;
         } else if (strcmp(find->u.string, v->item[i].u.string) == 0)
-	  break;
-	continue;
-      case T_POINTER:
-	if (find->u.vec == v->item[i].u.vec)
-	  break;
-	continue;
-      case T_OBJECT:
-	if (find->u.ob == v->item[i].u.ob)
-	  break;
-	continue;
+          break;
+        continue;
       case T_NUMBER:
-	if (find->u.number == v->item[i].u.number)
-	  break;
-	continue;
+        if (find->u.number == v->item[i].u.number)
+          break;
+        continue;
+      case T_POINTER:
+        if (find->u.vec == v->item[i].u.vec)
+          break;
+        continue;
+      case T_OBJECT:
+        if (find->u.ob == v->item[i].u.ob)
+          break;
+        continue;
       case T_MAPPING:
-	if (find->u.map == v->item[i].u.map)
-	  break;
-	continue;
+        if (find->u.map == v->item[i].u.map)
+          break;
+        continue;
+      case T_FUNCTION:
+        if (find->u.fp == v->item[i].u.fp)
+          break;
+        continue;
+      case T_BUFFER:
+        if (find->u.buf == v->item[i].u.buf)
+          break;
+        continue;
       default:
-	fatal("Bad type to member_array(): %d\n", (sp-1)->type);
-      }
+        fatal("Bad type to member_array(): %d\n", (sp-1)->type);
+    }
     break;
   }
   if (i == v->size)
-    i = -1;			/* Return -1 for failure */
+    i = -1;                     /* Return -1 for failure */
   pop_n_elems(num_arg);
   push_number(i);
 }
@@ -1865,9 +1761,7 @@ int num_arg, instruction;
   total_mapping_size, total_users, total_mapping_nodes;
   extern int total_num_prog_blocks;
   extern int total_prog_block_size;
-#ifdef COMM_STAT
   extern int add_message_calls, inet_packets, inet_volume;
-#endif
 
   verbose = sp->u.number;
   pop_stack();
@@ -1875,13 +1769,25 @@ int num_arg, instruction;
     res = RESERVED_SIZE;
   else
     res = 0;
-#ifdef COMM_STAT
   if (verbose) {
+	char dir_buf[1024];
+	FILE *testfp;
+
+	if (testfp = fopen(".mudos_test_file", "w")) {
+		fclose(testfp);
+		add_message("Open-file-test succeeded.\n");
+		unlink(".mudos_test_file");
+	} else {
+		/* if strerror() is missing, edit the #ifdef for it in port.c */
+		add_message("Open file test failed: %s\n", strerror(errno));
+	}
+
+	add_message("current working directory: %s\n\n",
+		get_current_dir(dir_buf, 1024));
      add_message ("add_message statistics\n");
      add_message ("------------------------------\n");
      add_message("Calls to add_message: %d   Packets: %d   Average packet size: %f\n\n",add_message_calls,inet_packets,(float)inet_volume/inet_packets);
   }
-#endif
   if (!verbose) {
     add_message("Sentences:\t\t\t%8d %8d\n", tot_alloc_sentence,
 		tot_alloc_sentence * sizeof (struct sentence));
@@ -1907,7 +1813,9 @@ int num_arg, instruction;
   tot = total_prog_block_size +
     total_array_size +
       total_mapping_size +
+          tot_alloc_sentence * sizeof(struct sentence) +
 	tot_alloc_object_size +
+     total_users * sizeof(struct interactive) +
 	  show_otable_status(verbose) +
 	    heart_beat_status(verbose) +
 	      add_string_status(verbose) +
@@ -1943,52 +1851,6 @@ int num_arg, instruction;
   }
   else
     push_number(0);
-}
-#endif
-
-/*
-   OBSOLETE
-   	Is this neccessary either? It could be a simul_efun. -SH
-*/
-#ifdef F_NEXT_INVENTORY
-void
-f_next_inventory(num_arg, instruction)
-int num_arg, instruction;
-{
-  ob = sp->u.ob;
-  pop_stack();
-  ob = ob->next_inv;
-  while (ob)
-  {
-    if (ob->flags & O_HIDDEN)
-    {
-      if (object_visible(ob))
-      {
-        push_object(ob);
-        return;
-      }
-    } else
-    {
-      push_object(ob);
-      return;
-    }
-    ob = ob->next_inv;
-  }
-    push_number(0);
-}
-#endif
-
-#ifdef F_NEXT_LIVING
-void
-f_next_living(num_arg, instruction)
-int num_arg, instruction;
-{
-  ob = sp->u.ob->next_hashed_living;
-  pop_stack();
-  if (!ob)
-    push_number(0);
-  else
-    push_object(ob);
 }
 #endif
 
@@ -2116,19 +1978,33 @@ int num_arg, instruction;
 #ifdef F_PROCESS_STRING
 void
 f_process_string(num_arg, instruction)
-int num_arg, instruction;
+    int num_arg, instruction;
 {
-  extern char
-    *process_string PROT((char *));
+    extern char *process_string PROT((char *));
+    char *str;
 
-  char *str;
-
-  str = process_string(sp->u.string);
-  if (str != sp->u.string)
+    str = process_string(sp->u.string);
+    if (str != sp->u.string)
     {
-      pop_stack();
-      push_malloced_string(str);
+	pop_stack();
+	push_malloced_string(str);
     }
+}
+#endif
+
+#ifdef F_PROCESS_VALUE
+void
+f_process_value(num_arg, instruction)
+    int num_arg, instruction;
+{
+    extern struct svalue *process_value PROT((char *));
+    struct svalue *ret;
+	
+    ret = process_value(sp->u.string);
+    pop_stack();
+    push_number(0);
+    if (ret)
+	assign_svalue(sp, ret);
 }
 #endif
 
@@ -2169,8 +2045,6 @@ int num_arg, instruction;
   extern char *query_ip_name PROT((struct object *));
   char *tmp;
 
-  if (num_arg == 1 && sp->type != T_OBJECT)
-    error("Bad optional argument to query_ip_name()\n");
   tmp = query_ip_name(num_arg ? sp->u.ob : 0);
   if (num_arg)
     pop_stack();
@@ -2189,8 +2063,6 @@ int num_arg, instruction;
   extern char *query_ip_number PROT((struct object *));
   char *tmp;
 
-  if (num_arg == 1 && sp->type != T_OBJECT)
-    error("Bad optional argument to query_ip_number()\n");
   tmp = query_ip_number(num_arg ? sp->u.ob : 0);
   if (num_arg)
     pop_stack();
@@ -2291,7 +2163,7 @@ int num_arg, instruction;
 {
   char *str;
   struct svalue *arg = sp- num_arg + 1;
-  int start = 0, len = 0;
+  int start = 0, len = 0, rlen = 0;
 
   if (num_arg > 1)
     start = arg[1].u.number;
@@ -2301,7 +2173,7 @@ int num_arg, instruction;
 	bad_arg(2, instruction);
       len = arg[2].u.number;
     }
-  str = read_bytes(arg[0].u.string, start, len);
+  str = read_bytes(arg[0].u.string, start, len, &rlen);
   pop_n_elems(num_arg);
   if (str == 0)
     push_number(0);
@@ -2309,6 +2181,48 @@ int num_arg, instruction;
     {
       push_string(str, STRING_MALLOC);
       FREE(str);
+    }
+}
+#endif
+
+#ifdef F_READ_BUFFER
+void
+f_read_buffer(num_arg, instruction)
+int num_arg, instruction;
+{
+    char *str;
+    struct svalue *arg = sp- num_arg + 1;
+    int start = 0, len = 0, rlen = 0;
+    int from_file = 0;  /* new line */
+ 
+    if (num_arg > 1) {
+        start = arg[1].u.number;
+    }
+    if (num_arg == 3) {
+        if (arg[2].type != T_NUMBER)
+            bad_arg(2, instruction);
+        len = arg[2].u.number;
+    }
+    if (arg[0].type == T_STRING) {
+        from_file = 1;  /* new line */
+        str = read_bytes(arg[0].u.string, start, len, &rlen);
+    } else { /* T_BUFFER */
+        str = read_buffer(arg[0].u.buf, start, len, &rlen);
+    }
+    pop_n_elems(num_arg);
+    if (str == 0) {
+        push_number(0);
+    } else if (from_file) { /* changed */
+        struct buffer *buf;
+ 
+        buf = allocate_buffer(rlen);
+        memcpy(buf->item, str, rlen);
+        buf->ref--;
+        push_buffer(buf);
+        FREE(str);
+    } else { /* T_BUFFER */
+        push_string(str, STRING_MALLOC);
+        FREE(str);
     }
 }
 #endif
@@ -2381,6 +2295,10 @@ int num_arg, instruction;
 		break;
 	case T_FUNCTION :
 		r = sp->u.fp->ref;
+		break;
+	case T_BUFFER:
+		r = sp->u.buf->ref;
+		break;
 	default :
 		r = 0;
 		break;
@@ -2696,7 +2614,10 @@ int num_arg, instruction;
 {
 	extern int max_cost;
 
-	max_cost = sp->u.number;
+	if (sp->u.number == 0) 
+		eval_cost = 0;
+		else
+		max_cost = sp->u.number;
 }
 #endif
 
@@ -2751,7 +2672,10 @@ void
 f_query_heart_beat(num_arg, instruction)
 int num_arg, instruction;
 {
-	push_number(query_heart_beat(current_object));
+        struct object *foo;
+	foo = sp->u.ob;
+	pop_stack();
+	push_number(query_heart_beat(foo));
 }
 #endif
 
@@ -2881,6 +2805,9 @@ int num_arg, instruction;
       push_number(0);
     return;
   }
+  if (ob == current_object) {
+     error("shadow: Can't shadow self\n");
+  }
   if (validate_shadowing(ob))
   {
      if (current_object->flags & O_DESTRUCTED) {
@@ -2936,11 +2863,13 @@ f_sizeof(num_arg, instruction)
 int num_arg, instruction;
 {
   int i;
-
-  if (sp->type == T_MAPPING)
-    i = sp->u.map->count;
-  else if (sp->type == T_POINTER)
+ 
+  if (sp->type == T_POINTER)
     i = sp->u.vec->size;
+  else if (sp->type == T_MAPPING)
+    i = sp->u.map->count;
+  else if (sp->type == T_BUFFER)
+    i = sp->u.buf->size;
   else
     i = 0;
   free_svalue(sp);
@@ -3066,8 +2995,13 @@ int num_arg, instruction;
 	struct vector *v;
       
 	path = (sp-1)->u.string;
-	if (*path == '/')
-		path++;
+       path = check_valid_path(path, current_object, "stat", 0);
+       if (!path)
+       {
+         pop_n_elems(2);
+         push_number(0);
+         return;
+       }
 	if (stat(path,&buf) != -1) {
 		if (buf.st_mode & S_IFREG) { /* if a regular file */
 			v = allocate_array(3);
@@ -3191,6 +3125,19 @@ int num_arg, instruction;
     assign_svalue(sp, &const1);
   else
     assign_svalue(sp, &const0);
+}
+#endif
+
+#ifdef F_BUFFERP
+void
+f_bufferp(num_arg, instruction)
+int num_arg, instruction;
+{
+	if (sp->type == T_BUFFER) {
+		assign_svalue(sp, &const1);
+	} else {
+		assign_svalue(sp, &const0);
+	}
 }
 #endif
 
@@ -3362,7 +3309,7 @@ int num_arg, instruction;
 		temp = (double)sp->u.number;
 		pop_stack();
 		push_real(temp);
-	} else if (sp->type == F_STRING) {
+	} else if (sp->type == T_STRING) {
 		sscanf(sp->u.string, "%lf", &temp);
 		pop_stack();
 		push_real(temp);
@@ -3387,6 +3334,18 @@ int num_arg, instruction;
 		sscanf(sp->u.string, "%d", &temp);
 		pop_stack();
 		push_number(temp);
+	} else if (sp->type == T_BUFFER) {
+		if (sp->u.buf->size < sizeof(int)) {
+			pop_stack();
+			push_number(0);
+		} else {
+			int hostint, netint;
+
+			memcpy((char *)&netint, sp->u.buf->item, sizeof(int));
+			hostint = ntohl(netint);
+			pop_stack();
+			push_number(hostint);
+		}
 	}
 }
 #endif
@@ -3628,7 +3587,62 @@ int num_arg, instruction;
 		pop_n_elems(3);
 		push_number(0);	
 	} else {
-		i = write_bytes((sp-2)->u.string, (sp-1)->u.number, sp->u.string);
+		if (sp->type == T_NUMBER) {
+			int netint;
+			char *netbuf;
+
+			netint = htonl(sp->u.number); /* convert to network byte-order */
+			netbuf = (char *)&netint;
+			i = write_bytes((sp-2)->u.string, (sp-1)->u.number, netbuf,
+					sizeof(int));
+		} else if (sp->type == T_BUFFER) {
+			i = write_bytes((sp-2)->u.string, (sp-1)->u.number,
+				(char *)sp->u.buf->item, sp->u.buf->size);
+		} else if (sp->type == T_STRING) {
+			i = write_bytes((sp-2)->u.string, (sp-1)->u.number,
+					sp->u.string, strlen(sp->u.string));
+		} else {
+			bad_arg(3, instruction);
+		}
+		pop_n_elems(3);
+		push_number(i);
+	}
+}
+#endif
+
+#ifdef F_WRITE_BUFFER
+void
+f_write_buffer(num_arg, instruction)
+int num_arg, instruction;
+{
+	int i;
+
+	if (IS_ZERO(sp)) {
+		bad_arg(3, instruction);
+		pop_n_elems(3);
+		push_number(0);	
+	} else {
+        if ((sp-2)->type == T_STRING) {
+            f_write_bytes(num_arg, instruction);
+            return;
+        }
+		if (sp->type == T_NUMBER) {
+			int netint;
+			char *netbuf;
+
+			netint = htonl(sp->u.number); /* convert to network byte-order */
+			netbuf = (char *)&netint;
+			i = write_buffer((sp-2)->u.buf, (sp-1)->u.number, netbuf,
+					sizeof(int));
+		} else if (sp->type == T_BUFFER) {
+			i = write_buffer((sp-2)->u.buf, (sp-1)->u.number,
+					(char *)sp->u.buf->item, sp->u.buf->size);
+		} else if (sp->type == T_STRING) {
+			i = write_buffer((sp-2)->u.buf, (sp-1)->u.number,
+					sp->u.string, strlen(sp->u.string));
+		} else {
+			bad_arg(3, instruction);
+		}
 		pop_n_elems(3);
 		push_number(i);
 	}
@@ -3718,6 +3732,7 @@ int num_arg, instruction;
   extern int total_prog_block_size;
   extern int total_array_size;
   extern int total_mapping_size;
+  extern int tot_alloc_sentence;
   extern int tot_alloc_object_size;
   extern char *reserved_area;
  
@@ -3731,6 +3746,7 @@ int num_arg, instruction;
     tot = total_prog_block_size + total_array_size + total_mapping_size +
           tot_alloc_object_size + show_otable_status(-1) +
           heart_beat_status(-1) + add_string_status(-1) +
+		tot_alloc_sentence +
           print_call_out_usage(-1) + res;
     push_number(tot);
     return;
@@ -3807,5 +3823,50 @@ int num_arg, instruction;
     assign_svalue(sp, &const1);
     else
     assign_svalue(sp, &const0);
+}
+#endif
+
+#ifdef F_FIRST_INVENTORY
+void
+f_first_inventory(num_arg, instruction)
+int num_arg, instruction;
+{
+  extern struct object *first_inventory();
+
+  ob = first_inventory(sp);
+  pop_stack();
+  if (ob)
+    push_object(ob);
+    else
+    push_number(0);
+}
+#endif
+ 
+#ifdef F_NEXT_INVENTORY
+void
+f_next_inventory(num_arg, instruction)
+int num_arg, instruction;
+{
+  ob = sp->u.ob;
+  pop_stack();
+  ob = ob->next_inv;
+  while (ob)
+  {
+    if (ob->flags & O_HIDDEN)
+    {
+      if (object_visible(ob))
+      {
+        push_object(ob);
+        return;
+      }
+    }
+      else
+    {
+      push_object(ob);
+      return;
+    }
+    ob = ob->next_inv;
+  }
+  push_number(0);
 }
 #endif

@@ -1,0 +1,4 @@
+SGI IRIX
+
+As of gcc 2.2.1, gcc does not produce correct code and the driver does not
+function.  Use cc.

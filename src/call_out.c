@@ -9,6 +9,7 @@
 #include "lint.h"
 #include "interpret.h"
 #include "object.h"
+#include "buffer.h"
 #include "mapping.h"
 
 /*
@@ -21,7 +22,7 @@
 
 #define CHUNK_SIZE	20
 
-extern char *xalloc(), *string_copy();
+extern char *string_copy();
 extern jmp_buf error_recovery_context;
 extern int error_recovery_context_exists;
 
@@ -98,6 +99,7 @@ void new_call_out(ob, fun, delay, num_args, arg)
     cop->ob = ob;
     add_ref(ob, "call_out");
     cop->v.type = T_NUMBER;
+    cop->v.subtype = 0;
     cop->v.u.number = 0;
     cop->vs = NULL; 
     if (arg) {
@@ -196,10 +198,12 @@ void call_out()
 		}
 #endif
 		v.type = cop->v.type;
+		v.subtype = 0;
 		v.u = cop->v.u;
 		v.subtype = cop->v.subtype;	/* Not always used */
 		if (v.type == T_OBJECT && (v.u.ob->flags & O_DESTRUCTED)) {
 		    v.type = T_NUMBER;
+		    v.subtype = 0;
 		    v.u.number = 0;
 		}
 		save_current_object = current_object;

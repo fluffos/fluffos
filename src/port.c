@@ -1,6 +1,11 @@
 #include <stdio.h>
+#include <string.h>
 #include <sys/types.h>
+#ifndef LATTICE
 #include <sys/time.h>
+#else
+#include <time.h>
+#endif
 #include <signal.h>
 #ifdef _SEQUENT_
 #include <usclkc.h>
@@ -33,13 +38,6 @@ time_t time PROT((time_t *));
 #if defined(SunOS_5) || defined(__386BSD__)
 #include <stdlib.h>
 #endif
-
-
-/*
- * This file defines things that may have to be changem when porting
- * LPmud to new environments. Hopefully, there are #ifdef's that will take
- * care of everything.
- */
 
 /*
  * Return a pseudo-random number in the range 0 .. n-1
@@ -164,7 +162,7 @@ get_cpu_times(secs, usecs)
 #ifdef RUSAGE
 	struct rusage rus;
 #endif
-#ifdef TIMES
+#if defined(TIMES) && !defined(RUSAGE)
 	struct tms t;
 	unsigned long total;
 #endif
@@ -203,3 +201,35 @@ get_cpu_times(secs, usecs)
 
 #endif /* end else RUSAGE */
 }
+
+/* return the current working directory */
+char *
+get_current_dir(buf, max)
+char *buf;
+int max;
+{
+#if defined(NeXT)
+	return getwd(buf); /* BSD */
+#else
+	extern char *getcwd();
+
+	return getcwd(buf, max); /* POSIX */
+#endif
+}
+
+#if defined(_AUX_SOURCE) || defined(SunOS_4)
+/* for those systems without strerror() but with sys_errlist, sys_nerr */
+extern char *sys_errlist[];
+extern int sys_nerr;
+
+char *
+strerror(which)
+int which;
+{
+	if ((which < 0) || (which >= sys_nerr)) {
+		return "unknown error";
+	} else {
+		return sys_errlist[which];
+	}
+}
+#endif /* STRERROR */

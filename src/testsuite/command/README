@@ -1,0 +1,2 @@
+This directory is to contain the objects implementing the commands that
+interactives can use (movement, building, communication, etc).

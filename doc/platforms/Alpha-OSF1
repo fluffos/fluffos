@@ -4,3 +4,6 @@ Don't try to use smalloc, and probably not bsdmalloc either.
 
 Don't define any BINARIES stuff in options.h--it doesn't support 64
 bit machines (yet).
+
+I wasn't able to compile the driver with gcc on Alpha; only cc.  And when
+using optimization, there were crashes.

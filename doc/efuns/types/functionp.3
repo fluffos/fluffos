@@ -16,5 +16,9 @@ f = (: obj, func :);
 Note that functionp() will return 0 if obj is not either a valid object
 pointer or string, and if func is not a string.
 
+functionp() will return 2 if the function pointer is of the format:
+
+(: obj, ({ str, arg0, arg1, arg3, ... }) :)
+
 .SH SEE ALSO
 stringp(3), pointerp(3), objectp(3), lpc/types/function

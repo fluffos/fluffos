@@ -50,7 +50,7 @@ operator negate, compl;
 
 operator assign, void_assign;
 
-operator function_constructor, function_split;
+operator function_constructor, this_function_constructor, function_split;
 
 operator sscanf;
 operator parse_command;

@@ -6,6 +6,7 @@
 #include "lint.h"
 #include "interpret.h"
 #include "mapping.h"
+#include "buffer.h"
 #include "object.h"
 #include "exec.h"
  
@@ -53,6 +54,9 @@ int svalue_size(v)
     case T_FUNCTION:
     return sizeof(struct funp) + svalue_size(&v->u.fp->obj) +
         svalue_size(&v->u.fp->fun);
+    case T_BUFFER:
+	/* first byte is stored inside the buffer struct */
+    return sizeof(struct buffer) + v->u.buf->size - 1;
     case T_ANY:
         break;
     default:

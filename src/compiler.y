@@ -8,6 +8,8 @@
  * This is the grammar definition of LPC, and its code generator.
  */
 #include "config.h"
+#define _YACC_
+#include "lint.h"
 #include <string.h>
 #include <stdio.h>
 #ifndef LATTICE
@@ -28,8 +30,6 @@
 
 #include "mudlib_stats.h"
 #include "interpret.h"
-#define _YACC_
-#include "lint.h"
 #include "object.h"
 #include "exec.h"
 #include "instrs.h"
@@ -181,13 +181,15 @@ static struct program NULL_program; /* marion - clean neat empty struct */
 void epilog();
 static int check_declared PROT((char *str));
 static void prolog();
+extern char *main_file_name();
 static void clean_parser();
 static char *get_two_types PROT((int type1, int type2));
 void free_all_local_names(),
-    add_local_name PROT((char *, int)), smart_log PROT((char *, int, char *,int));
+     smart_log PROT((char *, int, char *,int));
 extern int yylex();
 static int verify_declared PROT((char *));
 static void copy_variables();
+extern char *query_simul_efun_file_name();
 static int copy_functions PROT((struct program *, int type));
 void type_error PROT((char *, int));
 
@@ -614,7 +616,8 @@ static int define_new_function(name, num_arg, num_local, offset, flags, type)
 	}
 	if (exact_types && funp->type != TYPE_UNKNOWN) {
 	    int i;
-	    if (funp->num_arg != num_arg && !(funp->type & TYPE_MOD_VARARGS))
+	    if (funp->num_arg != num_arg && !(funp->type & TYPE_MOD_VARARGS)
+		&& !(flags & NAME_PROTOTYPE))
 		yyerror("Incorrect number of arguments.");
 	    else if (!(funp->flags & NAME_STRICT_TYPES))
 		yyerror("Called function not compiled with type testing.");
@@ -981,7 +984,7 @@ void add_new_init_jump();
 %token L_ADD_EQ L_SUB_EQ L_DIV_EQ L_MULT_EQ
 %token L_WHILE L_BREAK
 %token L_DO L_FOR L_SWITCH
-%token L_SSCANF L_PARSE_COMMAND L_STRING_DECL L_LOCAL_NAME
+%token L_SSCANF L_PARSE_COMMAND L_STRING_DECL L_LOCAL_NAME L_BUFFER_DECL
 %token L_ELSE
 %token L_CONTINUE
 %token L_MOD_EQ L_INHERIT L_COLON_COLON
@@ -1207,6 +1210,7 @@ basic_type: L_STATUS { $$ = TYPE_NUMBER; current_type = $$; }
 	| L_INT { $$ = TYPE_NUMBER; current_type = $$; }
 	| L_FLOAT { $$ = TYPE_REAL; current_type = $$; }
 	| L_STRING_DECL { $$ = TYPE_STRING; current_type = $$; }
+	| L_BUFFER_DECL { $$ = TYPE_BUFFER; current_type = $$; }
 	| L_OBJECT { $$ = TYPE_OBJECT; current_type = $$; }
 	| L_MAPPING { $$ = TYPE_MAPPING; current_type = $$; }
 	| L_FUNCTION { $$ = TYPE_FUNCTION; current_type = $$; }
@@ -1221,7 +1225,7 @@ new_name: optional_star L_IDENTIFIER
 	    define_variable($2, current_type | $1, 0);
 	    FREE($2);
 	}
-| optional_star L_IDENTIFIER
+	| optional_star L_IDENTIFIER
 	{
 	    int var_num;
 	    define_variable($2, current_type | $1, 0);
@@ -1251,7 +1255,25 @@ local_declarations: /* empty */
 new_local_name: optional_star L_IDENTIFIER
 	{
 	    add_local_name($2, current_type | $1);
-	} ;
+	}
+	| optional_star L_IDENTIFIER
+	{
+	    int var_num;
+	    var_num = add_local_name($2, current_type | $1);
+	    ins_f_byte(F_PUSH_LOCAL_VARIABLE_LVALUE);
+	    ins_byte(var_num);
+	}
+	'=' expr0
+	{
+	    if (!compatible_types((current_type | $1) & TYPE_MOD_MASK, $5.type)) {
+		char buff[100];
+		sprintf(buff, "Type mismatch %s when initializing %s",
+			get_two_types(current_type | $1, $5.type), $2);
+		yyerror(buff);
+	    }
+	    ins_f_byte(F_VOID_ASSIGN);
+	}
+	;
 
 local_name_list: new_local_name
 	| new_local_name ',' local_name_list ;
@@ -2535,7 +2557,7 @@ return: L_RETURN
 	}
       | L_RETURN comma_expr
 	{
-	    if (exact_types && !TYPE($2, exact_types & TYPE_MOD_MASK))
+	if (exact_types && !compatible_types($2, exact_types))
 		type_error("Return type not matching", exact_types);
 	    last_expression = -1;
 	    ins_f_byte(F_RETURN);
@@ -2579,6 +2601,12 @@ expr4: function_call { $$.type = $1; $$.addr = $$.iscon = 0; }
      | sscanf { $$.type = TYPE_NUMBER; $$.addr = $$.iscon = 0; }
      | parse_command { $$.type = TYPE_NUMBER; $$.addr = $$.iscon = 0; }
      | time_expression { $$.type = TYPE_NUMBER; $$.addr = $$.iscon = 0; }
+     | '(' ':' expr0 ':' ')'
+         {
+	   ins_f_byte(F_THIS_FUNCTION_CONSTRUCTOR);
+	   $$.type = TYPE_FUNCTION;
+	   $$.addr = $3.addr; $$.iscon = 0;
+	 }
      | '(' ':' expr0 ',' expr0 ':' ')'
          {
              ins_f_byte(F_FUNCTION_CONSTRUCTOR);
@@ -2652,7 +2680,8 @@ lvalue: L_IDENTIFIER
          last_push_indexed = 0;
          if (exact_types) {
              if (($1.type & TYPE_MOD_POINTER) == 0
-               && !TYPE($1.type, TYPE_STRING))
+               && !TYPE($1.type, TYPE_STRING)
+               && !TYPE($1.type, TYPE_BUFFER))
                  type_error("Bad type to indexed value", $1.type);
              if (!TYPE($3, TYPE_NUMBER))
                  type_error("Bad type of index", $3);
@@ -2663,6 +2692,8 @@ lvalue: L_IDENTIFIER
                 $$ = TYPE_ANY;
             else if (TYPE($1.type, TYPE_STRING))
                 $$ = TYPE_STRING;
+            else if (TYPE($1.type, TYPE_BUFFER))
+                $$ = TYPE_BUFFER;
             else if ($1.type & TYPE_MOD_POINTER)
                 $$ = $1.type;
             else if (exact_types)
@@ -2671,13 +2702,15 @@ lvalue: L_IDENTIFIER
 	| expr4 '[' comma_expr ']'
 	{ 
                last_push_indexed = CURRENT_PROGRAM_SIZE;
-               if (TYPE($1.type, TYPE_MAPPING) || TYPE($1.type, TYPE_FUNCTION)) {
+               if (TYPE($1.type, TYPE_MAPPING) || TYPE($1.type, TYPE_FUNCTION)){
                   ins_f_byte(F_PUSH_INDEXED_LVALUE);
                   $$ = TYPE_ANY;
                } else {
                 ins_f_byte(F_PUSH_INDEXED_LVALUE);
                 if (exact_types) {
-                      if (!($1.type & TYPE_MOD_POINTER) && !TYPE($1.type, TYPE_STRING))
+                      if (!($1.type & TYPE_MOD_POINTER) &&
+                        !TYPE($1.type, TYPE_STRING) &&
+                        !TYPE($1.type, TYPE_BUFFER))
                         type_error("Bad type to indexed value", $1.type);
                       if (!TYPE($3, TYPE_NUMBER))
                         type_error("Bad type of index", $3);
@@ -2685,6 +2718,8 @@ lvalue: L_IDENTIFIER
                 if ($1.type == TYPE_ANY)
                     $$ = TYPE_ANY;
                 else if (TYPE($1.type, TYPE_STRING))
+                    $$ = TYPE_NUMBER;
+                else if (TYPE($1.type, TYPE_BUFFER))
                     $$ = TYPE_NUMBER;
                 else
                     $$ = $1.type & TYPE_MOD_MASK & ~TYPE_MOD_POINTER;
@@ -2849,7 +2884,7 @@ function_call: function_name
 		    char buff[100];
 		    for (argn=0; argn < $4; argn++) {
 			int tmp = get_argument_type(argn, $4);
-			for(i=0; !TYPE(argp[i], tmp) && argp[i] != 0; i++)
+                        for(i=0; !compatible_types(argp[i], tmp) && argp[i] != 0; i++)
 			    ;
 			if (argp[i] == 0) {
 			    sprintf(buff, "Bad argument %d type to efun %s()",
@@ -2951,7 +2986,7 @@ function_name: L_IDENTIFIER
 			int invalid = 0;
 
 			if (master_ob && (strcmp($1, "efun") == 0)) {
-				push_malloced_string(the_file_name(current_file));
+				push_malloced_string(the_file_name(main_file_name()));
 				push_constant_string($3);
 				res = safe_apply_master_ob("valid_override", 2);
 				if (IS_ZERO(res)) {
@@ -3088,15 +3123,17 @@ void free_all_local_names()
     max_break_stack_need = 0;
 }
 
-void add_local_name(str, type)
+int add_local_name(str, type)
     char *str;
     int type;
 {
-    if (current_number_of_locals == MAX_LOCAL)
+    if (current_number_of_locals == MAX_LOCAL) {
 	yyerror("Too many local variables");
-    else {
+	return 0;
+    } else {
 	type_of_locals[current_number_of_locals] = type;
-	local_names[current_number_of_locals++] = str;
+	local_names[current_number_of_locals] = str;
+	return (current_number_of_locals++);
     }
 }
 
@@ -3265,7 +3302,7 @@ static char *get_type_name(type)
     static char buff[100];
     static char *type_name[] = { "unknown", "void", "int", "string",
 				   "object", "mapping", "function",
-				   "float", "mixed"};
+				    "float", "buffer", "mixed"};
     int pointer = 0;
 
     buff[0] = 0;

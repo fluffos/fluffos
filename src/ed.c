@@ -33,12 +33,19 @@
  *  Note: this version compatible with v.3.0.34  (and probably all others too)
  *  but i've only tested it on v.3 please mail me if it works on your mud
  *  and if you like it!
+ * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ *
+ * Dworkin rewrote the Indentation algorithm, originally for Amylaar's driver,
+ * around 5/20/1992.  
+ * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ *
+ * Inspiral grabbed indentation code from Amylaar, hacked it into MudOS version
+ * 0.9.18.17, around 12/11/1993.  Added some hacks to provide proper support
+ * for "//" commenting, and took out a PROMPT define.
+ *
  */
 
-/* A quick fix that hopefully does the job! -- Buddha */
-#define PROMPT ":"
-
-int	version = 6;	/* used only in the "set" function, for i.d. */
+int	version = 610;	/* used only in the "set" function, for i.d. */
 
 #include <stdio.h>
 #include <string.h>
@@ -66,11 +73,12 @@ int	version = 6;	/* used only in the "set" function, for i.d. */
 #include "object.h"
 #include "exec.h"
 #include "comm.h"
+#include "opcodes.h"
 
-#ifdef ED /* define ED in options.h if you want the ed() efun */
+#ifdef F_ED  /* remove ed() from func_spec.c if you don't want this */
 
 /* define this if you don't like the ending dollar signs in ed, in n-mode */
-#define NO_END_DOLLAR_SIGN
+#undef NO_END_DOLLAR_SIGN
 /*
  *	#defines for non-printing ASCII characters
  */
@@ -106,22 +114,10 @@ int	version = 6;	/* used only in the "set" function, for i.d. */
 #define ESC	0x1b	/* ^[ */
 #define FS	0x1c	/* ^\ */
 #define GS	0x1d	/* ^] */
-/*#define _RS	0x1e	   ^^ */
 #define US	0x1f	/* ^_ */
 #define SP	0x20	/* space */
 #define DEL	0x7f	/* DEL*/
 #define ESCAPE  '\\'
-
-#define TAB '\t'		/* added by Qixx for indentation */
-#define LB '{'
-#define RB '}'
-#define LC '('
-#define RC ')'
-#define LS '['
-#define _RS ']'
-#define PP '\"'
-#define EOL '\0'
-
 
 #ifndef TRUE
 #define TRUE	1
@@ -140,12 +136,12 @@ int	version = 6;	/* used only in the "set" function, for i.d. */
 
 #define	BUFFER_SIZE	2048	/* stream-buffer size:  == 1 hd cluster */
 
-#define LINFREE	1	/* entry not in use */
-#define LGLOB	2       /* line marked global */
+#define LINFREE		1	/* entry not in use */
+#define LGLOB		2       /* line marked global */
 
-#define MAXLINE	512	/* max number of chars per line */
-#define MAXPAT	256	/* max number of chars per replacement pattern */
-#define MAXFNAME 256	/* max file name size */
+#define MAXLINE		512	/* max number of chars per line */
+#define MAXPAT		256	/* max number of chars per replacemnt pattern */
+#define MAXFNAME 	256	/* max file name size */
 
 
 /**  Global variables  **/
@@ -179,8 +175,8 @@ static void print_help2 PROT((void));
 static void count_blanks PROT((int line));
 static void _count_blanks PROT((char *str, int blanks));
 
-#define P_INTERACTIVE (command_giver->interactive)
-#define P_NET_DEAD (P_INTERACTIVE->net_dead)
+#define P_INTERACTIVE 	(command_giver->interactive)
+#define P_NET_DEAD 	(P_INTERACTIVE->net_dead)
 #define P_DIAG		(P_INTERACTIVE->ed_buffer->diag)
 #define P_TRUNCFLG	(P_INTERACTIVE->ed_buffer->truncflg)
 #define P_NONASCII	(P_INTERACTIVE->ed_buffer->nonascii)
@@ -596,7 +592,7 @@ void prntln(str, vflg, len)
   char *line, start[MAXLINE+2]; 
 
   line = start;
-  if (len) add_message("%6d  ", len); /* made 8 chars wide */
+  if (len) add_message("%3d  ", len); /* made 8 chars wide */
   while (*str && *str != NL) {
     if ((line - start) > MAXLINE) {
       free_ed_buffer();
@@ -1336,192 +1332,436 @@ int subst(pat, sub, gflg, pflag)
   return (( nchngd == 0 && !gflg ) ? SUB_FAIL : nchngd);
 }
 
-#define MAX_INDENT 40
-int indent[MAX_INDENT];
-char codes[MAX_INDENT];
-int ind_occur[MAX_INDENT];
-int str_on;
-int indent_level;
-int temp_indent;
-int indent_error;
 
-static int
-indent_code()
+/*
+ * Indent code from DGD editor (v0.1), adapted.  No attempt has been made to
+ * optimize for this editor.   Dworkin 920510
+ */
+/* closure / symbol support Amylaar 30th Sep 1993 */
+# define error(s)               { add_message(s, lineno); errs++; return; }
+# define bool char
+static int lineno, errs;
+static int shi;         /* the current shift (negative for left shift) */
+ 
+/*
+ * NAME:        shift(char*)
+ * ACTION:      Shift a line left or right according to "shi".
+ */
+/* amylaar: don't use identifier index, this is reserved in SYS V compatible
+ *              environments.
+ */
+static void shift(text)
+register char *text;
 {
-  int from,to,current;
-  char *inlip;
-  /* static char	locti[MAXLINE]; */
-  /* static char idented[MAXLINE]; */
-  from=1;
-  to= P_LASTLN;
-    
-  indent_level=0;
-  str_on=0;
-  temp_indent=0;
-  indent_error=0;
-  for (current=0;current<MAX_INDENT;current++) {
-    indent[current]=0;
-    codes[current]=SP;
-    ind_occur[current]=0;}
-  P_FCHANGED = TRUE;
-  for (current=from;current<=to;current++) 
-    {
-      setCurLn(current);
-      inlip=gettxtl( P_CURPTR );
-      strip_buff(current,inlip);
-      if (indent_error) return (ERR);
+    register int indent_index;
+ 
+    /* first determine the number of leading spaces */
+    indent_index = 0;
+    while (*text == ' ' || *text == '\t') {
+        if (*text++ == ' ') {
+            indent_index++;
+        } else {
+            indent_index = (indent_index + 8) & ~7;
+        }
     }
-  return 0;
+ 
+    if (*text != '\0') { /* don't shift lines with ws only */
+        indent_index += shi;
+        if (indent_index < MAXLINE) {
+            char buffer[MAXLINE];
+            register char *p;
+ 
+            p = buffer;
+            /* fill with leading ws */
+            while (indent_index >= 8) {
+                *p++ = '\t';
+                indent_index -= 8;
+            }
+            while (indent_index > 0) {
+                *p++ = ' ';
+                --indent_index;
+            }
+            if (p - buffer + strlen(text) < MAXLINE) {
+                strcpy(p, text);
+                del(lineno, lineno);
+                ins(buffer);
+                return;
+            }
+        }
+ 
+        error("Result of shift would be too long, line %d\n");
+    }
 }
+ 
+# define STACKSZ        1024    /* size of indent stack */
+ 
+/* token definitions in indent */
+# define SEMICOLON      0
+# define LBRACKET       1
+# define RBRACKET       2
+# define LOPERATOR      3
+# define ROPERATOR      4
+# define LHOOK          5
+# define RHOOK          6
+# define TOKEN          7
+# define ELSE           8
+# define IF             9
+# define FOR            10
+# define WHILE          11
+# define DO             12
+# define XEOT           13
+ 
+static char *stack, *stackbot;  /* token stack */
+static int *ind, *indbot;       /* indent stack */
+static char quote;              /* ' or " */
+static bool in_ppcontrol, in_comment, after_keyword;    /* status */
+ 
+/*
+ * NAME:        indent(char*)
+ * ACTION:      Parse and indent a line of text. This isn't perfect, as
+ *              keywords could be defined as macros, comments are very hard to
+ *              handle properly, (, [ and ({ will match any of ), ] and }),
+ *              and last but not least everyone has his own taste of
+ *              indentation.
+ */
+static void indent(buf)
+char *buf;
+{
+    static char f[] = { 7, 1, 7, 1, 2, 1, 6, 4, 2, 6, 7, 7, 2, 0, };
+    static char g[] = { 2, 2, 1, 7, 1, 5, 1, 3, 6, 2, 2, 2, 2, 0, };
+    char text[MAXLINE], ident[MAXLINE];
+    register char *p, *sp;
+    register int *ip;
+    register long indent_index;
+    register int top, token;
+    char *start;
+    bool do_indent;
+ 
+    /*
+     * Problem: in this editor memory for deleted lines is reclaimed. So
+     * we cannot shift the line and then continue processing it, as in
+     * DGD ed. Instead make a copy of the line, and process the copy.
+     * Dworkin 920510
+     */
+    strcpy(text, buf);
+ 
+    do_indent = FALSE;
+    indent_index = 0;
+    p = text;
+ 
+    /* process status vars */
+    if (quote != '\0') {
+        shi = 0;        /* in case a comment starts on this line */
+    } else if (in_ppcontrol || *p == '#' && p[1] != '\'') {
+        while (*p != '\0') {
+            if (*p == '\\' && *++p == '\0') {
+                in_ppcontrol = TRUE;
+                return;
+            }
+            p++;
+        }
+        in_ppcontrol = FALSE;
+        return;
+    } else {
+        /* count leading ws */
+        while (*p == ' ' || *p == '\t') {
+            if (*p++ == ' ') {
+                indent_index++;
+            } else {
+                indent_index = (indent_index + 8) & ~7;
+            }
+        }
+        if (*p == '\0') {
+            del(lineno, lineno);
+            ins(p);
+            return;
+        } else if (in_comment) {
+            shift(text);        /* use previous shi */
+        } else {
+            do_indent = TRUE;
+        }
+    }
+ 
+    /* process this line */
+    start = p;
+    while (*p != '\0') {
+ 
+        /* lexical scanning: find the next token */
+        ident[0] = '\0';
+        if (in_comment) {
+            /* comment */
+            while (*p != '*') {
+                if (*p == '\0') {
+                    return;
+                }
+                p++;
+            }
+            while (*p == '*') {
+                p++;
+            }
+            if (*p == '/') {
+                in_comment = FALSE;
+                p++;
+            }
+            continue;
+ 
+        } else if (quote != '\0') {
+            /* string or character constant */
+            for (;;) {
+                if (*p == quote) {
+                    quote = '\0';
+                    p++;
+                    break;
+                } else if (*p == '\0') {
+                    error("Unterminated string in line %d\n");
+                } else if (*p == '\\' && *++p == '\0') {
+                    break;
+                }
+                p++;
+            }
+            token = TOKEN;
+ 
+        } else {
+            switch (*p++) {
+            case ' ':   /* white space */
+            case '\t':
+                continue;
+ 
+            case '\'':
+                if (*p == '(' && p[1] == '{') {
+                    /* treat quoted array like an aray */
+                    token = TOKEN;
+                    break;
+                }
+                /* fall through */
 
-static int
-strip_buff(line,buff2)
-     int line;
-     char *buff2;
-{
-  int i;
-  int i2;
-  int flag, flagnotif;
-  static char buff[MAXLINE];
-  for (i=0;i<(indent_level+temp_indent)*3;i++) buff[i]=SP;
-  i=(indent_level+temp_indent)*3;
-  flag=flagnotif=0;
-  temp_indent=0;
-  for (i2=0;i2<MAXLINE;i2++) {
-    switch (buff2[i2]) {
-    case PP:
-      if (buff2[i2-1]!='\\') str_on=!str_on;
-      flag=1;
-      buff[i++]=buff2[i2];
-      break;
-    case EOL:
-      if (buff2[i2-1]!='\\') {
-	if (str_on) {add_message("Detected a unterminated string on line %d\n",line);indent_error=1;}
-	str_on=0;
-		
-      }
-      buff[i++]=MAXLINE;
-      i2=1000;
-      break;
-    case SP:
-      if (flag) buff[i++]=buff2[i2];
-      break;
-    case TAB:
-      if (str_on) buff[i++]=buff2[i2];
-      break;
-    case NL:
-      flag=0;
-      if (buff2[i2-1]!='\\') {
-	if (str_on) {
-	  add_message("Detected a unterminated string on line %d\n",line);
-	  indent_error=1;}
-	str_on=0;
-      }
-      buff[i++]=buff2[i2];
-      break;
-    case LB:
-      flag=1;
-      if (!str_on) {
-	codes[++indent_level]=buff[i++]=buff2[i2];
-	ind_occur[indent_level]=line;
-	if (indent_level==1) indent[1]=3;
-      } else buff[i++]=buff2[i2];
-      flagnotif=1;
-      temp_indent=0;
-      break;
-    case ';':
-      flag=1;
-      buff[i++]=buff2[i2];
-      flagnotif=1;
-      temp_indent=0;
-      break;
-    case LC:
-    case LS:
-      flag=1;
-      if (!str_on) {
-	codes[++indent_level]=buff[i++]=buff2[i2];
-	ind_occur[indent_level]=line;
-	indent[indent_level]=i;
-      } else buff[i++]=buff2[i2];
-      break;
-    case RB:
-      if (!str_on) {
-	if (LB!=codes[indent_level]) {
-	  add_message("Mismatched brackets, '%c' on line %d\n",
-		      buff2[i2],line);
-	  add_message("-which doesn't match '%c' on line %d\n",
-		      codes[indent_level],ind_occur[indent_level]);
-	  indent_error=1;}
-	indent_level--;
-	if (indent_level<0) {
-	  indent_level=0;}
-	if (!flag && i) i=indent[indent_level];
-	buff[i++]=buff2[i2];
-      } else buff[i++]=buff2[i2];
-      flag=1;
-      /*	    flagnotif=1; */
-      break;
-    case RC:
-      if (!str_on) {
-	if (LC!=codes[indent_level]) {
-	  add_message("Mismatched brackets, '%c' on line %d\n",
-		      buff2[i2],line);
-	  add_message("-which doesn't match '%c' on line %d\n",
-		      codes[indent_level],ind_occur[indent_level]);
-	  indent_error=1;}
-	indent_level--;
-	if (indent_level<0) {
-	  indent_level=0;}
-	if (!flag && i) i=indent[indent_level];
-	buff[i++]=buff2[i2];
-      } else buff[i++]=buff2[i2];
-      flag=1;
-      /*	    flagnotif=1;*/
-      break;
-    case _RS:
-      if (!str_on) {
-	if (LS!=codes[indent_level]) {
-	  add_message("Mismatched brackets, '%c' on line %d\n",
-		      buff2[i2],line);
-	  add_message("-which doesn't match '%c' on line %d\n",
-		      codes[indent_level],ind_occur[indent_level]);
-	  indent_error=1;}
-	indent_level--;
-	if (indent_level<0) {
-	  indent_level=0;}
-	if (!flag && i) i=indent[indent_level];
-	buff[i++]=buff2[i2];
-      } else buff[i++]=buff2[i2];
-      flag=1;
-      /*	    flagnotif=1;*/
-      break;
-    case '#':
-      if (!flag) i=0;
-      flag=1;
-      buff[i++]=buff2[i2];
-      break;
-    case 'i':
-      if (!str_on && buff2[i2+1]=='f') {temp_indent=1; flagnotif=0;}
-      if (flagnotif) {temp_indent=0; flagnotif=0;}
-      flag=1;
-      buff[i++]=buff2[i2];
-      break;
-    case 'e':
-      if (!str_on && (i2+10)<MAXLINE)
-	if (buff2[i2+1]=='l' && buff2[i2+2]=='s' && buff2[i2+3]=='e') 
-	  {temp_indent=1; flagnotif=0; indent[indent_level+1]=i+3;}
-      /*drop through*/
-    default:
-      if (flagnotif) {temp_indent=0; flagnotif=0;}
-      flag=1;
-      buff[i++]=buff2[i2];
-      break;
+            case '"':   /* start of string */
+                quote = p[-1];
+                continue;
+ 
+            case '/':
+                if (*p == '*' || *p == '/') {   /* start of a comment	 */
+						/* 2nd part of line 	 */
+						/* added by Inspiral to  */
+						/* better handle "//" 	 */
+                    in_comment = TRUE;
+                    if (do_indent) {
+                        /* this line hasn't been indented yet */
+                        shi = *ind - indent_index;
+                        shift(text);
+                        do_indent = FALSE;
+                    } else {
+                        register char *q;
+                        register int index2;
+ 
+                        /*
+                         * find how much the comment has shifted, so the same
+                         * shift can be used if the coment continues on the
+                         * next line
+                         */
+                        index2 = *ind;
+                        for (q = start; q < p - 1;) {
+                            if (*q++ == '\t') {
+                                indent_index = (indent_index + 8) & ~7;
+                                index2 = (index2 + 8) & ~7;
+                            } else {
+                                indent_index++;
+                                index2++;
+                            }
+                        }
+                        shi = index2 - indent_index;
+                    }
+                    p++;
+                    continue;
+                }
+                token = TOKEN;
+                break;
+ 
+            case '{':
+                token = LBRACKET;
+                break;
+ 
+            case '(':
+                if (after_keyword) {
+                    /*
+                     * LOPERATOR & ROPERATOR are a kludge. The operator
+                     * precedence parser that is used could not work if
+                     * parenthesis after keywords was not treated specially.
+                     */
+                    token = LOPERATOR;
+                    break;
+                }
+                if (*p == '{' || *p == '[') {
+                    p++;        /* ({ , ([ each are one token */
+                }
+            case '[':
+                token = LHOOK;
+                break;
+ 
+            case '}':
+                if (*p != ')') {
+                    token = RBRACKET;
+                    break;
+                }
+                /* }) is one token; fall through */
+            case ']':
+                if (*p == ')') {
+                    p++;
+                }
+            case ')':
+                token = RHOOK;
+                break;
+ 
+            case ';':
+                token = SEMICOLON;
+                break;
+ 
+            default:
+                if (isalpha(*--p) || *p == '_') {
+                    register char *q;
+ 
+                    /* Identifier. See if it's a keyword. */
+                    q = ident;
+                    do {
+                        *q++ = *p++;
+                    } while (isalnum(*p) || *p == '_');
+                    *q = '\0';
+ 
+                    if      (strcmp(ident, "if"   ) == 0)       token = IF;
+                    else if (strcmp(ident, "else" ) == 0)       token = ELSE;
+                    else if (strcmp(ident, "for"  ) == 0)       token = FOR;
+                    else if (strcmp(ident, "while") == 0)       token = WHILE;
+                    else if (strcmp(ident, "do"   ) == 0)       token = DO;
+                    else    /* not a keyword */                 token = TOKEN;
+                } else {
+                    /* anything else is a "token" */
+                    p++;
+                    token = TOKEN;
+                }
+                break;
+            }
+        }
+ 
+        /* parse */
+        sp = stack;
+        ip = ind;
+        for (;;) {
+            top = *sp;
+            if (top == LOPERATOR && token == RHOOK) {
+                /* ) after LOPERATOR is ROPERATOR */
+                token = ROPERATOR;
+            }
+ 
+            if (f[top] <= g[token]) {   /* shift the token on the stack */
+                register int i;
+ 
+                if (sp == stackbot) {
+                    /* out of stack */
+                    error("Nesting too deep in line %d\n");
+                }
+ 
+                /* handle indentation */
+                i = *ip;
+                /* if needed, reduce indentation prior to shift */
+                if ((token == LBRACKET &&
+                  (*sp == ROPERATOR || *sp == ELSE || *sp == DO)) ||
+                  token == RBRACKET ||
+                  (token == IF && *sp == ELSE)) {
+                    /* back up */
+                    i -= P_SHIFTWIDTH;
+                } else if (token == RHOOK || token == ROPERATOR) {
+                    i -= P_SHIFTWIDTH / 2;
+                }
+                /* shift the current line, if appropriate */
+                if (do_indent) {
+                    shi = i - indent_index;
+                    if (token == TOKEN && *sp == LBRACKET &&
+                      (strcmp(ident, "case") == 0 ||
+                      strcmp(ident, "default") == 0)) {
+                        /* back up if this is a switch label */
+                        shi -= P_SHIFTWIDTH;
+                    }
+                    shift(text);
+                    do_indent = FALSE;
+                }
+                /* change indentation after current token */
+                switch (token) {
+                  case LBRACKET: case ROPERATOR: case ELSE: case DO:
+                  {
+                    /* add indentation */
+                    i += P_SHIFTWIDTH;
+                    break;
+                  }
+                  case LOPERATOR: case LHOOK:
+                  {
+                    /* half indent after ( [ ({ ([ */
+                    i += P_SHIFTWIDTH / 2;
+                    break;
+                  }
+                  case SEMICOLON:
+                  {
+                    /* in case it is followed by a comment */
+                    if (*sp == ROPERATOR || *sp == ELSE) {
+                        i -= P_SHIFTWIDTH;
+                    }
+                    break;
+                  }
+                }
+ 
+                *--sp = token;
+                *--ip = i;
+                break;
+            }
+ 
+            /* reduce handle */
+            do {
+                top = *sp++;
+                ip++;
+            } while (f[(int)*sp] >= g[top]);
+        }
+        stack = sp;
+        ind = ip;
+        after_keyword = (token >= IF);  /* but not after ELSE */
     }
-  }
-  del(line,line);
-  ins(buff);
-  return 1;
 }
+ 
+static int indent_code()
+{
+    char s[STACKSZ];
+    int i[STACKSZ];
+    int last;
+ 
+    /* setup stacks */
+    stackbot = s;
+    indbot = i;
+    stack = stackbot + STACKSZ - 1;
+    *stack = XEOT;
+    ind = indbot + STACKSZ - 1;
+    *ind = 0;
+ 
+    quote = '\0';
+    in_ppcontrol = FALSE;
+    in_comment = FALSE;
+ 
+    P_FCHANGED = TRUE;
+    last = P_LASTLN;
+    errs = 0;
+ 
+    for (lineno = 1; lineno <= last; lineno++) {
+        setCurLn(lineno);
+        indent(gettxtl(P_CURPTR));
+        if (errs != 0) {
+            return ERR;
+        }
+    }
+ 
+    return 0;
+}
+ 
+# undef bool
+# undef error
+/* end of indent code */
+
 
 /*  docmd.c
  *	Perform the command specified in the input buffer, as pointed to
@@ -1714,9 +1954,9 @@ int docmd(glob)
       return(ERR);
     add_message("Indenting entire code...\n");
     if (indent_code())
-      add_message("Indention halted.\n");
+      add_message("Indentation halted.\n");
     else 
-      add_message("Done indenting.\n");
+      add_message("Indentation complete.\n");
     break;
  
   case 'H':
@@ -2038,7 +2278,7 @@ ed_cmd(str)
     FREE((char *)ED_BUFFER);
     ED_BUFFER= 0;
     add_message("FATAL ERROR\n");
-    set_prompt(PROMPT);
+    set_prompt(":");
     return;
   case CHANGED:
     add_message("File has been changed.\n");

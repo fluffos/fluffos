@@ -21,6 +21,7 @@
 #include "interpret.h"
 #include "object.h"
 #include "mapping.h"
+#include "buffer.h"
 
 extern char *string_copy PROT((char *)), *xalloc PROT((int));
 
@@ -46,8 +47,6 @@ static mudlib_stats_t *insert_stat_entry (entry, list)
   *list = entry;
   return *list;
 }
-
-
 
 /*
  * Return the data for an individual domain, if it exists.
@@ -83,9 +82,7 @@ mudlib_stats_t *add_stat_entry (str, list)
   entry->name = make_shared_string(str);
   entry->length = strlen(str);
   entry->moves = 0;
-  entry->cost = 0;
   entry->heart_beats = 0;
-  entry->total_worth = 0;
   entry->errors = 0;
   entry->objects = 0;
   entry->next = NULL;
@@ -140,19 +137,6 @@ void add_moves(st, moves)
   }
 }
 
-
-INLINE void add_cost (st, cost)
-     statgroup_t *st;
-     int cost;
-{
-  if (st) {
-    if (st->domain)
-      st->domain->cost += cost;
-    if (st->author)
-      st->author->cost += cost;
-  }
-}
-
 INLINE void add_heart_beats (st, hbs)
      statgroup_t *st;
      int hbs;
@@ -162,18 +146,6 @@ INLINE void add_heart_beats (st, hbs)
       st->domain->heart_beats += hbs;
     if (st->author)
       st->author->heart_beats += hbs;
-  }
-}
-
-void add_worth (st, worth)
-     statgroup_t *st;
-     int worth;
-{
-  if (st) {
-    if (st->domain)
-      st->domain->total_worth += worth;
-    if (st->author)
-      st->author->total_worth += worth;
   }
 }
 
@@ -239,8 +211,6 @@ void add_objects (st, objects)
  * gradually at each reset.
  * Here's how the decay breaks down:
  *    moves -= 1%
- *    total_worth -= 1%
- *    cost -= 10%
  *    heart_beats -= 10%
  */
 void mudlib_stats_decay()
@@ -256,15 +226,11 @@ void mudlib_stats_decay()
   for (dl = domains; dl; dl = dl->next)
     {
       dl->moves = dl->moves * 99 / 100;
-      dl->total_worth = dl->total_worth * 99 / 100;
-      dl->cost = dl->cost * 9 / 10;
       dl->heart_beats = dl->heart_beats * 9 / 10;
     }
   for (dl = authors; dl; dl = dl->next)
     {
       dl->moves = dl->moves * 99 / 100;
-      dl->total_worth = dl->total_worth * 99 / 100;
-      dl->cost = dl->cost * 9 / 10;
       dl->heart_beats = dl->heart_beats * 9 / 10;
     }
 }
@@ -465,21 +431,20 @@ void save_stat_list (file, list)
      mudlib_stats_t *list;
 {
   FILE *f;
-  char fname[MAXPATHLEN];
+  char fname_buf[MAXPATHLEN];
+  char *fname = fname_buf;
 
   if (file) 
     {
       if (strchr(file,'/')) 
 	{
-	  if (file[0] == '/')
-	    strcpy (file, file+1);
+	  if (file[0] == '/') file++;
 	  f = fopen (file,"w");
 	}
       else
 	{
 	  sprintf (fname,"%s/%s",LOG_DIR,file);
-	  if (fname[0] == '/')
-	    strcpy (fname, fname+1);
+	  if (fname[0] == '/') fname++;
 	  f = fopen (fname, "w");
 	}
     }
@@ -495,8 +460,8 @@ void save_stat_list (file, list)
       return;
     }
   while (list) {
-    fprintf (f, "%s %d %d %d %d\n", list->name, 
-	     list->moves, list->cost, list->heart_beats, list->total_worth);
+    fprintf (f, "%s %d %d\n", list->name,
+             list->moves, list->heart_beats);
     list = list->next;
   }
   fclose (f);
@@ -507,22 +472,21 @@ void restore_stat_list (file, list)
      mudlib_stats_t **list;
 {
   FILE *f;
-  char fname[MAXPATHLEN];
+  char fname_buf[MAXPATHLEN];
+  char *fname = fname_buf;
   mudlib_stats_t *entry;
 
   if (file) 
     {
       if (strchr(file,'/')) 
 	{
-	  if (file[0] == '/')
-	    strcpy (file, file+1);
+	  if (file[0] == '/') file++;
 	  f = fopen (file,"r");
 	}
       else
 	{
 	  sprintf (fname,"%s/%s",LOG_DIR,file);
-	  if (fname[0] == '/')
-	    strcpy (fname, fname+1);
+	  if (fname[0] == '/') fname++;
 	  f = fopen (fname, "r");
 	}
     }
@@ -540,8 +504,7 @@ void restore_stat_list (file, list)
   while (fscanf (f, "%s", fname) != EOF)
     {
       entry = add_stat_entry (fname, list);
-      fscanf (f, "%d %d %d %d\n", &entry->moves, &entry->cost, 
-	      &entry->heart_beats, &entry->total_worth);
+      fscanf(f, "%d %d\n", &entry->moves, &entry->heart_beats);
     }
   fclose (f);
 }
@@ -573,10 +536,8 @@ mudlib_stats_t *dl;
 
 	ret = allocate_mapping(8);
 	add_mapping_pair(ret, "moves", dl->moves);
-	add_mapping_pair(ret, "cost", dl->cost);
 	add_mapping_pair(ret, "errors", dl->errors);
 	add_mapping_pair(ret, "heart_beats", dl->heart_beats);
-	add_mapping_pair(ret, "worth", dl->total_worth);
 	add_mapping_pair(ret, "array_size", dl->size_array);
 	add_mapping_pair(ret, "objects", dl->objects);
 	return ret;

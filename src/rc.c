@@ -13,7 +13,7 @@
 #include "lint.h"
 
 #define NUM_STRS 15
-#define NUM_INTS 25
+#define NUM_INTS 26
 
 #define MAX_LINE_LENGTH 120
 
@@ -53,7 +53,7 @@ void read_config_file (file)
   buff = (char *)
 	DMALLOC(MAX_LINE_LENGTH * (NUM_INTS + 1) * (NUM_STRS + 1), 92,
 		"read_config_file: 1");
-  strcat(buff,"\n");
+  strcpy(buff,"\n");
   while (1) 
     {
       if (fgets (str,120,file) == NULL)
@@ -144,11 +144,8 @@ void set_defaults (filename)
   scan_config_line(buff,"mudlib directory : %[^\n]",config_str[1],1);
   scan_config_line(buff,"binary directory : %[^\n]",config_str[2],1);
   scan_config_line(buff,"swap file : %[^\n]",config_str[3],1);
-  scan_config_line(buff,"config directory : %[^\n]",config_str[4],1);
   scan_config_line(buff,"log directory : %[^\n]",config_str[5],1);
   scan_config_line(buff,"master file : %[^\n]",config_str[6],1);
-  scan_config_line(buff,"access allow file : %[^\n]",config_str[7],1);
-  scan_config_line(buff,"access log file : %[^\n]",config_str[8],1);
   scan_config_line(buff,"include directories : %[^\n]",config_str[9],1);
   scan_config_line(buff,"simulated efun file : %[^\n]",config_str[10],1);
   scan_config_line(buff,"address server ip : %[^\n]",config_str[11],1);
@@ -161,7 +158,6 @@ void set_defaults (filename)
   scan_config_line(buff,"time to clean up : %d\n",&config_int[0],1);
   scan_config_line(buff,"time to swap : %d\n",&config_int[1],1);
   scan_config_line(buff,"time to reset : %d\n",&config_int[2],1);
-  scan_config_line(buff,"allowed ed commands : %d\n",&config_int[3],1);
   scan_config_line(buff,"evaluator stack size : %d\n",&config_int[4],0);
   scan_config_line(buff,"compiler stack size : %d\n",&config_int[5],0);
   scan_config_line(buff,"maximum call depth : %d\n",&config_int[6],1);
@@ -183,6 +179,9 @@ void set_defaults (filename)
   scan_config_line(buff,"hash table size : %d\n",&config_int[21],1);
   scan_config_line(buff,"object table size : %d\n",&config_int[22],1);
   scan_config_line(buff,"inherit chain size : %d\n",&config_int[23],1);
+#ifndef DISALLOW_BUFFER_TYPE
+  scan_config_line(buff,"maximum buffer size : %d\n",&config_int[24],1);
+#endif
 #if 0 /* not yet used */
   scan_config_line(buff,"maximum efun sockets : %d\n",&config_int[24],0);
 #endif

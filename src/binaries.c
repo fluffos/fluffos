@@ -46,7 +46,8 @@ save_binary(prog, includes, patches)
     struct program *prog;
     struct mem_block *includes, *patches;
 {
-    char file_name[200];
+    char file_name_buf[200];
+    char *file_name = file_name_buf;
     FILE *f;
     int i, tmp;
     short len;
@@ -73,8 +74,7 @@ save_binary(prog, includes, patches)
 	return;
 
     strcpy(file_name, SAVE_BINARIES);
-    if (file_name[0] == '/')
-	strcpy(file_name, file_name+1);
+    if (file_name[0] == '/') file_name++;
     if (stat(file_name, &st) == -1)
 	return;
     strcat(file_name, "/");
@@ -197,7 +197,8 @@ int
 load_binary(name)
     char *name;
 {
-    char file_name[200], *buf, *iname;
+    char file_name_buf[200];
+    char *buf, *iname, *file_name = file_name_buf;
     FILE *f;
     int i, buf_size, ilen;
     time_t mtime;
@@ -210,8 +211,7 @@ load_binary(name)
     prog = 0; num_parse_error = 0;
     
     sprintf(file_name, "%s/%s", SAVE_BINARIES, name);
-    if (file_name[0] == '/')
-	strcpy(file_name, file_name+1);
+    if (file_name[0] == '/') file_name++;
     len = strlen(file_name);
     file_name[len-1] = 'b';   /* change .c ending to .b */
 
@@ -312,16 +312,19 @@ load_binary(name)
 	    if (comp_flag)
 		fprintf(stderr, "out of date.\n");
 	    fclose(f);
+	FREE(p->name);
+	FREE(p);
 	    FREE(buf);
 	    return 0;
 	}
 
-	/* find inherited program (maybe load it here??) */
+	/* find inherited program (maybe load it here?) */
 	ob = find_object2(buf);
 	if (!ob) {
 	    if (comp_flag)
 		fprintf(stderr, "missing inherited prog.\n");
 	    fclose(f);
+		FREE(p->name);
 	    FREE(p);
 	    inherit_file = buf;  /* freed elsewhere */
 	    return 1;  /* not 0 */
@@ -429,10 +432,9 @@ init_binaries(argc, argv)
  * 0 if out of date, and 1 if it's ok.
  */
 static int
-check_times(mtime, nm, flag)
+check_times(mtime, nm)
     time_t mtime;
     char *nm;
-    int flag;
 {
     struct stat st;
     if (stat(nm, &st) == -1)

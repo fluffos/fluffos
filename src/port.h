@@ -5,6 +5,12 @@
  * run on your system, please provide us wth a copy of your modified port.h
  * file and the name of the type of system you are using.
  */
+
+/* NOTE: Do not put anything into this file other than preprocessor
+   directives (#define, #ifdef, #ifndef, etc).  If you must put something
+   other than that, then be sure to put it between #ifdef _FUNC_SPEC_
+   and #endif.  Otherwise make_func will break.
+*/
  
 #ifndef _PORT_H
 #define _PORT_H
@@ -19,14 +25,14 @@
  
 /* hack to figure out if we are being compiled under Solaris or not */
 #ifdef sun
-#ifdef __svr4__
+#if defined(__svr4__) || defined(__sol__) || defined(SVR4)
 #define SunOS_5
 #else
 #define SunOS_4
 #endif
 #endif
  
-#ifdef SunOS_5
+#if defined(SunOS_5) && !defined(SVR4)
 #define SVR4
 #endif
  
@@ -86,7 +92,8 @@
 #define RUSAGE
 #endif
  
-#if defined(hpux) && !defined(OLD_HPUX)
+/* the !defined(_FUNC_SPEC) is needed to allow make_func to work okay. */
+#if defined(hpux) && !defined(OLD_HPUX) && !defined(_FUNC_SPEC_)
 #include <sys/syscall.h>
 #define getrusage(a, b) syscall(SYS_GETRUSAGE, (a), (b))
 #endif
@@ -145,7 +152,7 @@
  * Define FCHMOD_MISSING only if your system doesn't have fchmod().
  */
 /* HP, Sequent, NeXT, Sparc all have fchmod() */
-#if defined(cray) || defined(LATTICE)
+#if defined(cray) || defined(LATTICE) || defined(_AIX)
 #define FCHMOD_MISSING
 #else
 #undef FCHMOD_MISSING
@@ -209,6 +216,19 @@ asking your system adminstrator.
  
 #if defined(cray) && !defined(MAXPATHLEN)
 #define MAXPATHLEN PATH_MAX
+#endif
+
+/* UINT32 should be typedef'd to whatever type provides an unsigned 32-bit
+   integer type
+*/
+#ifndef _FUNC_SPEC_
+
+#if defined(__alpha)
+typedef unsigned int UINT32;
+#else
+typedef unsigned long UINT32;
+#endif
+
 #endif
  
 #endif /* _PORT_H */

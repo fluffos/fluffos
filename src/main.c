@@ -48,6 +48,7 @@ extern int yydebug;
 int port_number;
 int boot_time;
 int max_array_size;
+int max_buffer_size;
 int max_string_length;
 char *master_file_name;
 int reserved_size;
@@ -104,10 +105,6 @@ int main(argc, argv)
   void tzset();
 #endif
   struct lpc_predef_s predefs;
-#ifdef GCMALLOC
-  extern void gc_init();
-  gc_init();
-#endif /* GCMALLOC */
 #ifdef WRAPPEDMALLOC
   wrappedmalloc_init();
 #endif /* WRAPPEDMALLOC */
@@ -224,6 +221,7 @@ int main(argc, argv)
   max_cost = MAX_COST;
   reserved_size = RESERVED_SIZE;
   max_array_size = MAX_ARRAY_SIZE;
+  max_buffer_size = MAX_BUFFER_SIZE;
   max_string_length = MAX_STRING_LENGTH;
   master_file_name = (char *)MASTER_FILE;
   mud_lib = (char *)MUD_LIB;
@@ -416,15 +414,14 @@ void debug_message(va_alist)
   va_dcl
 {
     static FILE *fp = NULL;
-    char deb[100];
+    char deb_buf[100], *deb = deb_buf;
   va_list args;
   char *fmt;
 
     if (fp == NULL) 
       {
 	sprintf(deb,"%s/debug.log",LOG_DIR);
-	if (deb[0] == '/')
-	  strcpy (deb, deb+1);
+	if (deb[0] == '/') deb++;
 	fp = fopen(deb, "w");
 	if (fp == NULL) 
 	  {
@@ -432,6 +429,7 @@ void debug_message(va_alist)
 	    abort();
 	  }
       }
+
   va_start(args);
   fmt = va_arg(args, char *);
   vfprintf(fp, fmt, args);
@@ -587,10 +585,12 @@ void crash_MudOS(str)
 
     fprintf(stderr, "Shutting down: %s\n", str);
     crash_condition++;
+#if 0   /* what is this?  -bobf 9/21/93 */
 {
 	char tmp[10];
 	gets(tmp);
 }
+#endif /* 0 */
     save_stat_files();
     push_string(str, STRING_CONSTANT);
 	if (command_giver) {

@@ -7,11 +7,11 @@
 #include <stdlib.h>
 #endif
 #include "config.h"
+#define _YACC_
+#include "lint.h"
 #include "mudlib_stats.h"
 #include "interpret.h"
 #include "mapping.h"
-#define _YACC_
-#include "lint.h"
 
 #ifndef BUFSIZ
 #define BUFSIZ 		1024
@@ -40,7 +40,7 @@ int min_arg = -1, limit_max = 0;
  * arg_types is the types of all arguments. A 0 is used as a delimiter,
  * marking next argument. An argument can have several types.
  */
-int arg_types[200], last_current_type;
+int arg_types[400], last_current_type;
 /*
  * Store the types of the current efun. They will be copied into the
  * arg_types list if they were not already there (to save memory).
@@ -66,6 +66,7 @@ int toupper PROT((int));
 #define UNKNOWN		7
 #define FLOAT		8
 #define FUNCTION	9
+#define BUFFER     10
 
 struct type {
     char *name;
@@ -79,7 +80,8 @@ struct type {
 { "mixed", MIXED },
 { "unknown", UNKNOWN },
 { "float", FLOAT},
-{ "function", FUNCTION}
+{ "function", FUNCTION},
+{ "buffer", BUFFER}
 };
 
 void fatal(str)
@@ -206,8 +208,11 @@ basic: ID
 		break;
 	    }
 	}
-	if (!$$)
-	    yyerror("Invalid type");
+	if (!$$) {
+		char buf[256];
+		sprintf(buf, "Invalid type: %s", $1);
+	    yyerror(buf);
+	}
     } ;
 
 arg_list: /* empty */		{ $$ = 0; }
@@ -400,6 +405,8 @@ char *etype1(n)
 	return "T_MAPPING";
     case STRING:
 	return "T_STRING";
+    case BUFFER:
+	return "T_BUFFER";
     case MIXED:
 	return "0";	/* 0 means any type */
     default:
@@ -465,6 +472,7 @@ char *ctype(n)
     case INT: p = "TYPE_NUMBER"; break;
     case OBJECT: p = "TYPE_OBJECT"; break;
     case MAPPING: p = "TYPE_MAPPING"; break;
+    case BUFFER: p = "TYPE_BUFFER"; break;
     case MIXED: p = "TYPE_ANY"; break;
     case UNKNOWN: p = "TYPE_UNKNOWN"; break;
     default: yyerror("Bad type!");

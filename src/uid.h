@@ -6,6 +6,9 @@
  *    11-1-92 - Erik Kay - initial creation
  */
 
+#ifndef __UID_H
+#define __UID_H
+
 typedef struct _uid {
   char *name;
   struct _uid *next;
@@ -18,3 +21,4 @@ userid_t *add_uid PROT((char *name));
 userid_t *set_root_uid PROT((char *name));
 userid_t *set_backbone_uid PROT((char *name));
 
+#endif

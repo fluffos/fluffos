@@ -319,7 +319,7 @@ handle_include(name)
 char *name;
 {
     char *p;
-    char buf[1024];
+    static char buf[1024];
     FILE *f;
     struct incstate *is;
     int delim;
@@ -373,7 +373,7 @@ char *name;
 	yyin = f;
 /*fprintf(stderr, "pushed to %s\n", buf);*/
     } else {
-	sprintf(buf, "Cannot #include %s\n", name);
+	sprintf(buf, "Cannot #include %s", name);
 	yyerror(buf);
     }
 }
@@ -1242,6 +1242,9 @@ add_predefines()
 		FREE(dir);
 	}
 	add_define("USE_EUID", -1, "");
+#ifndef DISALLOW_BUFFER_TYPE
+	add_define("HAS_BUFFER_TYPE", -1, "");
+#endif
 #ifdef SOCKET_EFUNS
 	add_define("HAS_SOCKETS", -1, "");
 #endif
@@ -1254,13 +1257,16 @@ add_predefines()
 #ifdef MATH
 	add_define("HAS_MATH", -1, "");
 #endif
+#ifdef PROFILE_FUNCTIONS
+	add_define("HAS_PROFILE_FUNCTIONS", -1, "");
+#endif
 #ifdef MATRIX
 	add_define("HAS_MATRIX", -1, "");
 #endif
-#ifdef ED
+#ifdef F_ED
 	add_define("HAS_ED", -1, "");
 #endif
-#ifdef PRINTF
+#ifdef F_PRINTF
 	add_define("HAS_PRINTF", -1, "");
 #endif
 #ifdef PRIVS
@@ -1336,8 +1342,8 @@ static struct keyword {
     short min_args;	/* Minimum number of arguments. */
     short max_args;	/* Maximum number of arguments. */
     short ret_type;	/* The return type used by the compiler. */
-    unsigned char arg_type1;	/* Type of argument 1 */
-    unsigned char arg_type2;	/* Type of argument 2 */
+    unsigned short arg_type1;	/* Type of argument 1 */
+    unsigned short arg_type2;	/* Type of argument 2 */
     short arg_index;	/* Index pointing to where to find arg type */
     short Default;      /* an efun to use as default for last argument */
 } predefs[] =
@@ -1345,6 +1351,9 @@ static struct keyword {
 
 static struct keyword reswords[] = {
 { "break",		L_BREAK, },
+#ifndef DISALLOW_BUFFER_TYPE
+{ "buffer",     L_BUFFER_DECL },
+#endif
 { "case",		L_CASE, },
 { "catch",		L_CATCH, },
 { "continue",		L_CONTINUE, },
@@ -1473,6 +1482,7 @@ void init_num_args()
     add_instr_name("call_extra", F_CALL_EXTRA);
     add_instr_name("aggregate", F_AGGREGATE);
     add_instr_name("(::)", F_FUNCTION_CONSTRUCTOR);
+    add_instr_name("(:this_object(),:)",F_THIS_FUNCTION_CONSTRUCTOR);
     add_instr_name("(*)", F_FUNCTION_SPLIT);
     add_instr_name("push_identifier_lvalue", F_PUSH_IDENTIFIER_LVALUE);
 	add_instr_name("|", F_OR);
@@ -1771,7 +1781,7 @@ int nargs;
 	if ((p = lookup_define(name))) {
 		if (nargs != p->nargs || strcmp(exps, p->exps) != 0) {
 			char buf[200+NSIZE];
-			sprintf(buf, "Warning: redefinition of #define %s", name);
+			sprintf(buf, "Warning: redefinition of #define %s\n", name);
 			add_message(buf);
 		}
 		p->nargs = nargs;
@@ -2216,4 +2226,15 @@ void set_inc_list (list)
 	}
       inc_list[i] = make_shared_string(p);
     }
+}
+
+char *main_file_name()
+{
+   struct incstate *is;
+   if (inctop == 0)
+     return current_file;
+   is = inctop;
+   while (is->next)
+     is = is->next;
+   return is->file;
 }

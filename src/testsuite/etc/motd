@@ -1,0 +1,7 @@
+The only commands in this little mudlib are:
+
+	dest, update, ed, quit, rm, say, who, efun, and shutdown.
+
+All of update, dest, ed, and rm require full pathnames as arguments.
+
+Have fun.

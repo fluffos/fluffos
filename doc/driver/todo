@@ -1,38 +1,3 @@
-What might be wrong with the idea of adding an optional 2nd argument
-to catch() which would cause any errors caught NOT to be logged to
-debug.log?  One place I want to have a catch(<expr>,1); is in the
-'update' command...after all, a zillion:
-
-caught: Error in loading object
-program: cmds/object/_update.c, object: cmds/object/_update line 125
-'       cmd_hook' in '          std/user.c' ('        std/user#225')line 94
-'     cmd_update' in 'cmds/object/_update.c' (' cmds/object/_update')line 125
-'          CATCH' in 'cmds/object/_update.c' (' cmds/object/_update')line 125
-
-
-certainly doesn't help much does it?
-
-A brief browse in simulate.c and interpret.c indicates to me that
-it shouldn't be too hard or expensive a modification.  Is it?
-
---Tensor@5thDimension|LPCC
-
---
-
-lemay@staff.tc.umn.edu (Lawrence LeMay) writes:
-> The Amylaar parser also contains a new efun called
-> replace-program(). basically, this allows you to write a
-> master-object that inherits ONE file, such as a typical room, and
-> by adding the replace_program("room/room"), you alter the object
-> into essentially a clone. the filename stays the same, but the
-> program space for this master object is discarded, and is replaced
-> with a link to the program space of the inherited object. The space
-> used by each variable is also reduced to that of a clone. I'm not
-> explaining this very well, but you can read the Tubmud (Amylaar
-> parser) LPC Manual for more information...
-
---
-
 The general solution to error handling is actually quite simple.  I have
 thought about adding it, but never got around to it.
 
@@ -136,18 +101,6 @@ Or we could make a call_out2() efun that operates in the desired heartbeat units
 
 --
 
-o     : (admin) 
->From   : Archimedes
-Date   : Fri Feb 26 16:30:50 1993
-Subject: driver improvement
-------------------------------------------------------------------------------
-I was looking at urimud2.3.  They have removed the slow linked lists of 
-sentences.  They hash the action verbs for each user instead of searching
-a linked list.  We could probably implement it into MudOS for a vast
-parsing speed improvement.  
-
---
-
 1) Have the z command in the editor check the user's PAGER settings.
    ie: getenv("LINES")  much like the mudlib's more command does.  If there
    isn't any setting, you can have it default back to the standard z length.
@@ -160,8 +113,6 @@ someone should add support for the telnet go-ahead (GA) thingie so
 that clients can tell what is a prompt and what is not.
 
 --john
-
-
 
 -----
 
@@ -185,3 +136,67 @@ objects.
  - Is it a compat buster?
  
 -----
+
+Note  11  Badlegs      (Sat Sep 11)  MARKERS
+ 
+When using markers within a list, you have to remember to start the line
+after the marker with a comma. Could we possibly have it so that it
+MARKERTEXT end in a comma or semicolon, that those characters are preserved
+, so that
+        ([ "sign" : @END,
+<text>
+END,
+           "box" : @END,
+ 
+would work. Also, if you try to do:
+        string = @END
+<text>
+END
+ 
+You have to remember to put a spare semicolon on the next line, which looks
+silly. Please could we have a cure to this?
+ 
+Badlegs@clootie
+
+-----
+
+From bobf Sun Oct  3 00:31:28 1993
+Received: from actlab.rtf.utexas.edu by feenix.metronet.com with SMTP id AA22687
+ 
+  (5.65c/feenix for <bobf@metronet.com>); Sun, 3 Oct 1993 05:31:48 -0500
+Return-Path: <bobf>
+Received: from feenix.metronet.com by actlab.rtf.utexas.edu (5.0/SMI-SVR4)
+        id AA12770; Sun, 3 Oct 93 05:31:48 CDT
+Received: by feenix.metronet.com id AA22661
+  (5.65c/feenix for mudos-bugs@actlab.rtf.utexas.edu); Sun, 3 Oct 1993 05:31:28 
+-0500
+Date: Sun, 3 Oct 1993 05:31:28 -0500
+From: Bob Farmer <bobf>
+Message-Id: <199310031031.AA22661@feenix.metronet.com>
+To: mudos-bugs@actlab.rtf.utexas.edu
+Subject: save_object()
+Content-Length: 109
+ 
+hmm, save_object() should probably somehow save the subtype of numbers.
+(ie null, undefined, error, etc)
+ 
+bt
+
+---
+
+Note  17  Alexus       (Sun Oct  3)  config settings
+ 
+Driver folks, how about a tool for showing wizards what all the current
+config settings are?  (Or not all, just some useful ones, like what max_eval
+is, etc.)
+ 
+I'd write it, but I dunno how these settings are stored, and my time is
+stretched to the limit anyways, haven't had much driver tinkering time.
+ 
+- Al
+
+---
+
+file_length() efun that returns the number of lines in a file
+
+---

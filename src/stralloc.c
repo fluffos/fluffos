@@ -210,7 +210,9 @@ ref_string(str)
     fatal("stralloc.c: called ref_string on non-shared string: %s.\n",str);
   }
 #endif /* defined(DEBUG) */
-  REFS(b)++;
+  if (REFS(b) < MAXSHORT) {
+    REFS(b)++;
+  }
   allocd_strings++;
   allocd_bytes += SIZE(b);
   return STRING(b);

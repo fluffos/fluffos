@@ -3,16 +3,20 @@
 #ifndef _INTERPRET_H
 #define _INTERPRET_H
 
+#include "uid.h"
+
 
 union u {
     char *string;
     int number;
     float real;
+	struct buffer *buf;
     struct object *ob;
     struct vector *vec;
     struct mapping *map;
     struct funp    *fp;
     struct svalue *lvalue;
+	unsigned char *lvalue_byte;
 };
 
 /*
@@ -36,7 +40,10 @@ struct svalue {
 #define T_MAPPING	0x20
 #define T_FUNCTION  0x40
 #define T_REAL      0x80
-#define T_ANY T_STRING|T_NUMBER|T_POINTER|T_OBJECT|T_MAPPING|T_FUNCTION|T_REAL
+#define T_BUFFER    0x100
+#define T_LVALUE_BYTE     0x200 /* byte-sized lvalue */
+#define T_ANY T_STRING|T_NUMBER|T_POINTER|T_OBJECT|T_MAPPING|T_FUNCTION| \
+	T_REAL|T_BUFFER
 
 /* values for subtype field of svalue struct */
 #define STRING_MALLOC	0x0	   /* Allocated by malloc() */
@@ -49,6 +56,7 @@ struct svalue {
 
 struct funp {
 	struct svalue obj, fun;
+	userid_t *euid;
 	short ref;
 };
 

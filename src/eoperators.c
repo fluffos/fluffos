@@ -5,7 +5,11 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifndef LATTICE
 #include <sys/time.h>
+#else
+#include <time.h>
+#endif
 #ifndef LATTICE
 #include <sys/ioctl.h>
 #include <netdb.h>
@@ -25,6 +29,7 @@
 #include "config.h"
 #include "lint.h"
 #include "interpret.h"
+#include "buffer.h"
 #include "mapping.h"
 #include "object.h"
 #include "exec.h"
@@ -117,26 +122,25 @@ int num_arg, instruction;
 
 INLINE void
 f_parse_command(num_arg, instruction)
-int num_arg, instruction;
+    int num_arg, instruction;
 {
     struct svalue *arg;
-
+	
     num_arg = EXTRACT_UCHAR(pc);
     pc++;
     arg = sp - num_arg + 1;
     if (arg[0].type != T_STRING)
-        bad_arg(1, instruction);
+	bad_arg(1, instruction);
     if (arg[1].type != T_OBJECT && arg[1].type != T_POINTER)
-        bad_arg(2, instruction);
+	bad_arg(2, instruction);
     if (arg[2].type != T_STRING)
-        bad_arg(3, instruction);
+	bad_arg(3, instruction);
     if (arg[1].type == T_POINTER)
-        check_for_destr(arg[1].u.vec);
+	check_for_destr(arg[1].u.vec);
 
-    i = parse(arg[0].u.string, &arg[1], arg[2].u.string, &arg[3],
-          num_arg-3);
-    pop_n_elems(num_arg);   /* Get rid of all arguments */
-    push_number(i);     /* Push the result value */
+    i = parse(arg[0].u.string, &arg[1], arg[2].u.string, &arg[3], num_arg-3); 
+    pop_n_elems(num_arg);	/* Get rid of all arguments */
+    push_number(i);		/* Push the result value */
 }
 
 INLINE void
@@ -555,6 +559,38 @@ int num_arg, instruction;
       pop_n_elems(3);
       push_malloced_string(res);
     }
+  else if (sp[-2].type == T_BUFFER)
+    {
+      int len, from, to;
+      struct buffer *rbuf;
+	    
+      len = sp[-2].u.buf->size;
+      from = sp[-1].u.number;
+      if (from < 0)
+	from = len + from;
+      if (from >= len)
+	{
+	  pop_n_elems(3);
+	  push_buffer(null_buffer());
+	  return;
+	}
+      to = sp[0].u.number;
+      if (to < 0)
+	to = len + to;
+      if (to < from)
+	{
+	  pop_n_elems(3);
+	  push_buffer(null_buffer());
+	  return;
+	}
+      if (to >= len)
+	to = len-1;
+      rbuf = allocate_buffer(to - from + 1);
+      rbuf->ref--;
+      memcpy(rbuf->item, sp[-2].u.buf->item + from, to - from + 1);
+      pop_n_elems(3);
+      push_buffer(rbuf);
+    }
   else
     error("Bad argument to [ .. ] range operand.\n");
 }
@@ -955,6 +991,15 @@ struct svalue *sob, *sfun;
 	struct funp *fp;
 
 	fp = (struct funp *)DMALLOC(sizeof(struct funp), 38, "make_funp");
+	if (current_object) {
+		if (current_object->euid) {
+			fp->euid = current_object->euid;
+		} else {
+			fp->euid = current_object->uid;
+		}
+	} else {
+		fp->euid = NULL;
+	}
 	assign_svalue_no_free(&fp->obj, sob);
 	assign_svalue_no_free(&fp->fun, sfun);
 	fp->ref = 1;
@@ -991,6 +1036,23 @@ int num_arg, instruction;
 	struct funp *fp;
 
 	fp = make_funp(sp - 1, sp);
+	pop_n_elems(2);
+	push_funp(fp);
+	fp->ref--;
+}
+
+INLINE void
+f_this_function_constructor(num_arg, instruction)
+int num_arg, instruction;
+{
+        struct funp *fp;
+
+	if (current_object->flags & O_DESTRUCTED)
+	  push_number(0);
+	else
+	  push_object(current_object);
+/* Note: The stack order is reversed here compared to f_function_constructor */
+	fp = make_funp(sp , sp - 1);
 	pop_n_elems(2);
 	push_funp(fp);
 	fp->ref--;

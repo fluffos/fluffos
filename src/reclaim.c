@@ -10,6 +10,7 @@
 #include "lint.h"
 #include "interpret.h"
 #include "mapping.h"
+#include "buffer.h"
 #include "object.h"
 #include "exec.h"
  

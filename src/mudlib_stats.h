@@ -7,8 +7,8 @@
  * and will be a little more general purpose than wiz_list was
  */
 
-#ifndef _FOO
-#define _FOO
+#ifndef _MUDLIB_STATS_H
+#define _MUDLIB_STATS_H
 
 typedef struct _mstats
 {
@@ -19,9 +19,7 @@ typedef struct _mstats
   struct _mstats *next;
   /* statistics */
   int moves;
-  int cost;
   int heart_beats;
-  int total_worth;
   int size_array;
   int errors;
   int objects;

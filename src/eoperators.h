@@ -25,6 +25,7 @@ INLINE void f_xor PROT((int, int));
 INLINE void f_xor_eq PROT((int, int));
 INLINE void f_aggregate_assoc PROT((int, int));
 INLINE void f_aggregate PROT((int, int));
+INLINE void f_this_function_constructor PROT((int, int));
 INLINE void f_function_constructor PROT((int, int));
 INLINE void f_function_split PROT((int, int));
 INLINE void f_sscanf PROT((int, int));
