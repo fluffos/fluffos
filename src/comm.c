@@ -2774,12 +2774,12 @@ static int flush_compressed_output (interactive_t *ip) {
                 nWrite = send (ip->fd, &ip->compress_buf[iStart], nBlock,
                                ip->out_of_band);
                 if (nWrite < 0) {
-                    fprintf(stderr, "Error sending compressed data (%d)\n",
-                            errno);
+                  //fprintf(stderr, "Error sending compressed data (%d)\n",
+                  //        errno);
                         
-                    if (errno == EAGAIN || errno == ENOSR) {
-                        break;
-                    }
+                  //  if (errno == EAGAIN || errno == ENOSR) {
+                  //      break;
+                  //  }
      
                     return FALSE; /* write error */
                 }
@@ -2807,7 +2807,6 @@ static int flush_compressed_output (interactive_t *ip) {
 
 static int send_compressed (interactive_t *ip, char* data, int length) {
     z_stream* compress;
-  
     compress = ip->compressed_stream;
     compress->next_in = data;
     compress->avail_in = length;
@@ -2819,7 +2818,8 @@ static int send_compressed (interactive_t *ip, char* data, int length) {
             deflate(compress, Z_SYNC_FLUSH);
         }
         
-        flush_compressed_output(ip);
+        if(!flush_compressed_output(ip))
+          return 0;
     }
     return length;
 }

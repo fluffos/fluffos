@@ -373,7 +373,7 @@ int reference_allowed P3(object_t *, referee, object_t *, referrer_obj, char *, 
     playtester_handler = find_object(PLAYTESTER_HANDLER);
     
     if ( playtester_handler ) { 
-        push_shared_string(referrer_name);
+        copy_and_push_string(referrer_name);
         v = apply("query_playtester", playtester_handler, 1, ORIGIN_EFUN);
         
         if (v && v->type == T_NUMBER) { 
@@ -434,7 +434,7 @@ int reference_allowed P3(object_t *, referee, object_t *, referrer_obj, char *, 
         case 2:
             /* Check for Lord Invis */
 
-                      push_shared_string(referrer_name);
+                      copy_and_push_string(referrer_name);
             v = apply("query_lord", master_ob, 1, ORIGIN_EFUN);
             
             if (v && v->type == T_NUMBER) {
@@ -453,7 +453,7 @@ int reference_allowed P3(object_t *, referee, object_t *, referrer_obj, char *, 
             }
             else {
                 player_handler = find_object(PLAYER_HANDLER);
-                push_shared_string(referrer_name);
+                copy_and_push_string(referrer_name);
                 v = apply("test_creator", player_handler, 1, ORIGIN_EFUN);
 
                 if (v && v->type == T_NUMBER) {
