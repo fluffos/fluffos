@@ -103,6 +103,7 @@ int *fluffpage = 0;
 int query_time_used() {
   if(fluffpage)
     return *fluffpage;
+  return 0;
 }
 #endif
 

@@ -39,6 +39,17 @@ f_real_time PROT((void))
 }
 #endif
 
+#ifdef F_COMPRESSEDP
+void f_compressedp PROT((void))
+{
+  int i;
+
+  i = sp->u.ob->interactive && sp->u.ob->interactive->compressed_stream;
+  free_object(sp->u.ob, "f_compressedp");
+  put_number(i != 0);
+}
+#endif
+
 /*
  * This differs from the livings() efun in that this efun only returns
  * objects which have had set_living_name() called as well as 

@@ -38,3 +38,4 @@ mapping memory_summary();
 string query_replaced_program(void|object);
 mapping network_stats();
 int real_time();
+int compressedp(object);
