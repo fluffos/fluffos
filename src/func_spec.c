@@ -1,5 +1,5 @@
 #define _FUNC_SPEC_
-#include "config.h"
+#include "std.h"
 
 #include "op_spec.c"
 /*

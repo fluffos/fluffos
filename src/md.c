@@ -1,10 +1,4 @@
-#include "config.h"
-
-#include <stdio.h>
-
-#include "lint.h"
-#include "interpret.h"
-#include "object.h"
+#include "std.h"
 #include "md.h"
 
 /*

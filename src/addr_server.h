@@ -3,8 +3,11 @@
  *               8-92 : Dwayne Fontenot : original coding.
  */
 
-#ifndef _ADDR_SERVER_H_
-#define _ADDR_SERVER_H_
+#ifndef ADDR_SERVER_H
+#define ADDR_SERVER_H
+
+#include "std.h"
+#include "network_incl.h"
 
 #define DFAULT_PROTO 0		/* use the appropriate protocol    */
 #define MAX_CONNS 4		/* max number of connections       */

@@ -9,33 +9,9 @@
 
 */
 
-#include "config.h"
-
-#include <stdio.h>
-#include <string.h>
-#include <ctype.h>
-#include <time.h>
-#ifdef LATTICE
-#include <stdlib.h>
-#endif
-
-#include "lint.h"
-#include "interpret.h"
-#include "object.h"
-#include "include/origin.h"
-
-extern char *string_copy PROT((char *)), *xalloc PROT((int));
-extern int d_flag;		/* for debugging purposes */
-extern struct object *previous_ob;
-extern struct svalue const0, const1;
-#ifndef NO_UIDS
-extern userid_t *backbone_uid;
-#endif
-
-#ifndef tolower			/* On some systems this is a function */
-extern int tolower PROT((int));
-
-#endif
+#include "std.h"
+#include "lpc_incl.h"
+#include "parse.h"
 
 /*****************************************************
 

@@ -7,30 +7,22 @@
   credits intact.
 */
 
+#include "std.h"
 #include "config.h"
+#include "lpc_incl.h"
+#include "file_incl.h"
+#include "compiler.h"
+#include "binaries.h"
+#include "lex.h"
+#include "backend.h"
+#include "swap.h"
+#include "qsort.h"
+
+#ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
+#include "functab_tree.h"
+#endif
 
 #ifdef SAVE_BINARIES
-
-#include <stdio.h>
-#if defined(LATTICE) || defined(OS2)
-#include <string.h>
-#endif
-#ifdef LATTICE
-#include <stdlib.h>
-#include <dos.h>
-#include <amiga.h>
-#endif
-#include <sys/types.h>
-#include <sys/stat.h>
-
-#include "lint.h"
-#include "interpret.h"
-#include "object.h"
-#include "exec.h"
-#include "opcodes.h"
-#include "incralloc.h"
-#include "switch.h"
-#include "applies.h"
 
 static char *magic_id = "MUDB";
 static time_t driver_id;
@@ -251,12 +243,12 @@ void save_binary P3(struct program *, prog, struct mem_block *, includes, struct
     }
 
     /* line_numbers */
-    if (p->p.i.line_numbers)
-	len = p->p.i.line_numbers[0] * sizeof(short);
+    if (p->p.i.line_info)
+	len = p->p.i.file_info[0];
     else
 	len = 0;
     fwrite((char *) &len, sizeof len, 1, f);
-    fwrite((char *) p->p.i.line_numbers, len, 1, f);
+    fwrite((char *) p->p.i.file_info, len, 1, f);
 
     /*
      * patches
@@ -484,8 +476,9 @@ int load_binary P1(char *, name)
 
     /* line numbers */
     fread((char *) &len, sizeof len, 1, f);
-    p->p.i.line_numbers = (unsigned short *) XALLOC(len);
-    fread((char *) p->p.i.line_numbers, len, 1, f);
+    p->p.i.file_info = (unsigned short *) XALLOC(len);
+    fread((char *) p->p.i.file_info, len, 1, f);
+    p->p.i.line_info = (unsigned char *)&prog->p.i.file_info[prog->p.i.file_info[1]];
 
     /* patches */
     fread((char *) &len, sizeof len, 1, f);
@@ -564,7 +557,6 @@ int load_binary P1(char *, name)
 
 void init_binaries P2(int, argc, char **, argv)
 {
-    extern int current_time;
     struct stat st;
     int arg_id, i;
 
@@ -730,7 +722,7 @@ static void patch_out P3(struct program *, prog, short *, patches, int, len)
 		 * take advantage of fact that s is in strings table to find
 		 * it's index.
 		 */
-		if (s == (int) ZERO_AS_STR_CASE_LABEL)
+		if (s == 0)
 		    s = -1;
 		else
 		    s = store_prog_string((char *) s);
@@ -793,7 +785,7 @@ static void patch_in P3(struct program *, prog, short *, patches, int, len)
 		 * get real pointer from strings table
 		 */
 		if (s == -1)
-		    s = (int) ZERO_AS_STR_CASE_LABEL;
+		    s = 0;
 		else
 		    s = (int) prog->p.i.strings[s];
 		p[offset + 0] = ((char *) &s)[0];

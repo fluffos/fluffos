@@ -132,7 +132,9 @@ CPP=$(CC) -E
 #OSFLAGS=-D_BSD -D_ALL_SOURCE
  
 # Solaris (SunOS 5): for BSD compatible ioctl()
-#OSFLAGS=-DBSD_COMPS
+# If using CC=cc, you can also add:
+#     -w    to turn off warnings, in order to get a cleaner compile.
+#OSFLAGS=-DBSD_COMP -DSunOS_5
 
 # SCO 3.2v4.2
 #OSFLAGS=-DSCO
@@ -235,11 +237,11 @@ LIBS=-lm $(EXTRALIBS)
 
 EFUNS=efuns_main.o efuns_port.o $(EXTRA_EFUNS)
 
-OBJ=compiler.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
+OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   backend.o array.o mapping.o comm.o ed.o regexp.o swap.o buffer.o crc32.o \
   malloc.o call_out.o otable.o dumpstat.o stralloc.o hash.o mudlib_stats.o \
-  port.o reclaim.o parse.o simul_efun.o sprintf.o uid.o \
-  compiler_shared.o avltree.o icode.o trees.o generate.o scratchpad.o \
+  port.o reclaim.o parse.o simul_efun.o sprintf.o uid.o program.o \
+  compiler.o avltree.o icode.o trees.o generate.o scratchpad.o \
   socket_efuns.o socket_ctrl.o qsort.o eoperators.o socket_err.o md.o \
   strstr.o disassembler.o binaries.o $(UALARM) $(STRFUNCS) \
   $(MALLOC) $(EFUNS) replace_program.o functab_tree.o $(EXTRA_OBJS) \
@@ -255,10 +257,10 @@ $(DRIVER_BIN): $(OBJ)
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
 	$(PROOF) $(CC) $(CFLAGS) $(OBJ) -o $(DRIVER_BIN) $(LIBS)
 
-lpc_to_c.h: efuns.h cfuns.h virtual_architecture.h
-	-cat efuns.h cfuns.h virtual_architecture.h > lpc_to_c.h
+lpc_to_c.h: cfuns.h virtual_architecture.h
+	-cat cfuns.h virtual_architecture.h > lpc_to_c.h
 
-depend: opcodes.h efun_protos.h compiler.tab.h cc.h efunctions.h efun_defs.c
+depend: opcodes.h efun_protos.h grammar.tab.h cc.h efunctions.h efun_defs.c
 	makedepend *.c
 
 addr_server:  addr_server.o socket_ctrl.o port.o addr_server.h
@@ -271,9 +273,7 @@ addr_server:  addr_server.o socket_ctrl.o port.o addr_server.h
 packages/*.o: packages/Makefile
 	(cd packages; $(MAKE))
 
-compiler.tab.h: compiler.tab.c
-
-lpc_compiler.tab.h: lpc_compiler.tab.c
+grammar.tab.h: grammar.tab.c
 
 cc.h: Makefile
 	rm -f cc.h
@@ -284,7 +284,7 @@ cc.h: Makefile
 	echo '#define CFLAGS   "$(CFLAGS)"' >> cc.h
 	echo '#define OBJDIR   "$(OBJDIR)"' >> cc.h
 
-lex.o: cc.h lex.c compiler.tab.h
+lex.o: cc.h lex.c grammar.tab.h
 
 interpret.o: interpret.c patchlevel.h
 
@@ -312,27 +312,17 @@ make_malloc: make_malloc.o
 
 make_malloc.o: make_malloc.c config.h
 
-compiler.tab.o: opcodes.h
+grammar.tab.o: opcodes.h
 
-lpc_compiler.tab.o: opcodes.h
+grammar.tab.c: grammar.y
+	$(YACC) $(YFLAGS) grammar.y
+	-rm -f grammar.tab.*
+	sed "s/y.tab.c/grammar.tab.c/g" y.tab.c  > grammar.tab.c
+	-mv y.tab.h grammar.tab.h
 
-compiler.tab.c: compiler.y
-	$(YACC) $(YFLAGS) compiler.y
-	-rm -f compiler.tab.*
-	sed "s/y.tab.c/compiler.tab.c/g" y.tab.c  > compiler.tab.c
-	-mv y.tab.h compiler.tab.h
+grammar.y: comp_warning grammar.pre
 
-lpc_compiler.y: comp_warning lpc_compiler/pre token_defs lpc_compiler/grammar lpc_compiler/post
-
-compiler.y: comp_warning compiler.pre
-
-lpc_compiler.tab.c: lpc_compiler.y
-	$(YACC) $(YFLAGS) lpc_compiler.y
-	-rm -f lpc_compiler.tab.*
-	sed "s/yy/lpcyy/g" y.tab.c | sed "s/y.tab.c/lpc_compiler.tab.c/g" > lpc_compiler.tab.c
-	sed "s/yy/lpcyy/g" y.tab.h > lpc_compiler.tab.h
-
-efun_defs.c opcodes.h compiler.y lpc_compiler.y: malloc.c func_spec.c make_func config.h func_spec.cpp
+efun_defs.c opcodes.h grammar.y: malloc.c func_spec.c make_func config.h func_spec.cpp
 	./make_func > efun_defs.c
 
 malloc.c: config.h make_malloc
@@ -355,14 +345,14 @@ install: $(DRIVER_BIN) addr_server
 
 neat:
 	-(cd packages; $(MAKE) clean)
-	-rm packages/GNUmakefile packages/Makefile
+	-rm packages/GNUmakefile packages/Makefile packages/SMakefile
 	-rm -rf obj *.o *.tab.c *.tab.h
-	-rm -f efun_defs.c
 	-rm -f cc.h
+	-rm -f efun_defs.c option_defs.c
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
 	-rm -f make_func make_malloc malloc.c
 	-rm -f func_spec.cpp
-	-rm -f lpc_compiler.y compiler.y
+	-rm -f grammar.y
 
 clean: neat
 	-rm -f *.orig *.rej

@@ -1,17 +1,9 @@
-#include "efuns.h"
-#include "applies.h"
-#include "stralloc.h"
-#if defined(__386BSD__) || defined(SunOS_5)
-#include <unistd.h>
-#endif
+#include "std.h"
 
 #ifdef LPC_TO_C
 #include "cfuns.h"
 
 static struct object *ob;
-
-extern int using_bsd_malloc, using_smalloc;
-
 
 #ifdef F_ADD_ACTION
 void c_add_action P4(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2)
@@ -378,7 +370,6 @@ void c_set_malloc_mask P2(svalue *, ret, svalue *, s0)
 void c_deep_inherit_list P2(svalue *, ret, svalue *, s0)
 {
     struct vector *vec;
-    extern struct vector *deep_inherit_list PROT((struct object *));
 
     if (!(s0->u.ob->flags & O_SWAPPED)) {
 	vec = deep_inherit_list(s0->u.ob);
@@ -860,8 +851,6 @@ void c_inherits P3(svalue *, ret, svalue *, s0, svalue *, s1)
 void c_inherit_list P2(svalue *, ret, svalue *, s0)
 {
     struct vector *vec;
-    extern struct vector *inherit_list PROT((struct object *));
-
 
     if (!(s0->u.ob->flags & O_SWAPPED)) {
 	vec = inherit_list(s0->u.ob);
@@ -1344,13 +1333,7 @@ void c_move_object P3(svalue *, ret, svalue *, s0, svalue *, s1)
 void c_mud_status P2(svalue *, ret, svalue *, s0)
 {
     int tot, res, verbose = 0;
-    extern char *reserved_area;
-    extern int tot_alloc_object, tot_alloc_sentence, tot_alloc_object_size,
-        num_mappings, num_arrays, total_array_size, total_mapping_size,
-        total_users, total_mapping_nodes;
-    extern int total_num_prog_blocks;
-    extern int total_prog_block_size;
-    extern int add_message_calls, inet_packets, inet_volume;
+
 
     verbose = s0->u.number;
 
@@ -1529,7 +1512,6 @@ void c_previous_object P2(svalue *, ret, svalue *, s0)
 {
     int i;
     struct control_stack *p;
-    extern struct control_stack control_stack[MAX_TRACE];
 
     if (s0) {
 	if ((i = sp->u.number) > 0) {
@@ -1601,9 +1583,6 @@ void c_printf P3(svalue *, ret, svalue *, s0, int, num_arg)
 #ifdef F_PROCESS_STRING
 void c_process_string P2(svalue *, ret, svalue *, s0)
 {
-    extern char
-        *process_string PROT((char *));
-
     char *str;
 
     str = process_string(s0->u.string);
@@ -1614,7 +1593,6 @@ void c_process_string P2(svalue *, ret, svalue *, s0)
 #ifdef F_QUERY_HOST_NAME
 void c_query_host_name P1(svalue *, ret)
 {
-    extern char *query_host_name PROT((void));
     char *tmp;
 
     tmp = query_host_name();
@@ -1635,7 +1613,6 @@ void c_query_idle P2(svalue *, ret, svalue *, s0)
 #ifdef F_QUERY_IP_NAME
 void c_query_ip_name P2(svalue *, ret, svalue *, s0)
 {
-    extern char *query_ip_name PROT((struct object *));
     char *tmp;
 
     tmp = query_ip_name(s0 ? s0->u.ob : 0);
@@ -1649,7 +1626,6 @@ void c_query_ip_name P2(svalue *, ret, svalue *, s0)
 #ifdef F_QUERY_IP_NUMBER
 void c_query_ip_number P2(svalue *, ret, svalue *, s0)
 {
-    extern char *query_ip_number PROT((struct object *));
     char *tmp;
 
     tmp = query_ip_number(s0 ? s0->u.ob : 0);
@@ -2100,8 +2076,6 @@ void c_say P3(svalue *, ret, svalue *, s0, svalue *, s1)
 */
 void c_set_eval_limit P2(svalue *, ret, svalue *, s0)
 {
-    extern int max_cost;
-
     switch (s0->u.number) {
     case 0:
 	C_NUMBER(ret, eval_cost = max_cost);
@@ -2351,10 +2325,6 @@ void c_snoop P3(svalue *, ret, svalue *, s0, svalue *, s1)
 #ifdef F_SORT_ARRAY
 void c_sort_array P4(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2)
 {
-    extern struct vector *sort_array
-           PROT((struct vector *, char *, struct object *));
-    extern struct vector *builtin_sort_array
-           PROT((struct vector *, int));
     struct vector *res;
 
     ob = 0;
@@ -2953,8 +2923,6 @@ void c_dump_file_descriptors P1(svalue *, ret)
 #endif
 
 #ifdef F_RECLAIM_OBJECTS
-extern int reclaim_objects PROT((void));
-
 void c_reclaim_objects P1(svalue *, ret)
 {
     C_NUMBER(ret, reclaim_objects());
@@ -2962,8 +2930,6 @@ void c_reclaim_objects P1(svalue *, ret)
 #endif
 
 #if 0 /* needs to be updated */
-extern struct vector *objects PROT((char *, struct object *));
-
 void c_objects P3(svalue *, ret, svalue *, s0, svalue *, s1)
 {
     char *func;
@@ -2993,12 +2959,6 @@ void c_memory_info P2(svalue *, ret, svalue *, s0)
 {
     struct object *ob;
     int mem;
-    extern int total_prog_block_size;
-    extern int total_array_size;
-    extern int total_mapping_size;
-    extern int tot_alloc_sentence;
-    extern int tot_alloc_object_size;
-    extern char *reserved_area;
 
     if (!s0) {
 	int res, tot;
@@ -3076,8 +3036,6 @@ void c_floatp P2(svalue *, ret, svalue *, s0)
 #ifdef F_FIRST_INVENTORY
 void c_first_inventory P2(svalue *, ret, svalue *, s0)
 {
-    extern struct object *first_inventory PROT((struct svalue *));
-
     ob = first_inventory(s0);
     if (ob)
 	C_OBJECT(ret, ob);

@@ -1,11 +1,9 @@
+#include "std.h"
 #include "config.h"
-
-#include <stdio.h>
-#include <string.h>
-
-#include "lint.h"
-#include "interpret.h"
+#include "otable.h"
 #include "object.h"
+#include "simulate.h"
+#include "comm.h"
 
 /*
  * Object name hash table.  Object names are unique, so no special

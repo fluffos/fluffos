@@ -1,3 +1,39 @@
+Tue Jan  3 10:19:00 EST 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v20.24
+	* various Amiga and Solaris tweaks for cleaner compiles
+	* compiler.c: added Alpha/OSF patch to clean_parser() to properly
+	  handle 64 bit pointers to strings -- crasher reported by Dana
+	* socket_efuns.c: changed send(blah, 0) to write(blah) ... fixes
+	  socket_write() hang reported by Dm for SunOS5/Solaris 486
+	* removed lock_expressions and all related things because it
+	  is no longer needed
+	* fixed make_func.y to properly protect backslahes in defines
+	  in options.h	
+	* second arg to dump_prog: now a set of flags; 1 = do disassembly;
+	  2 = dump line number info
+	* changed code generation to occur at the code block level instead
+	  of the expression level; rewrote switch and loop code generation
+	  to work with this
+	* macro-ized compile node creation (for speed), removed compile
+	  node flags
+	* added a warning for inheriting the same function from two
+	  branches; should be fixed to not give an error if it is
+	  overloaded later ...
+	* fixed a few prototypes for OS/2
+	* fixed several instances in the OS/2 code which used the old
+	  interactive flags, instead of iflags
+	* rewrote line number tracking; the new way handles include files
+	  using a more compact format, and never messes up even if the
+	  mapping lines -> program bytes is not monotonic (i.e. order
+	  preserving).  Fixed line number bugs in things like:
+	  for ( ... ; error ; ... ) { ... several lines ... } 
+	* optimized the memory leak fix from v20.23
+	* removed references to efuns.h from the Makefile
+	* Updated Credits.MudOS; added Symmetry
+	* vastly reorganized the .h files, made compatibility checks more
+	  consistent.
+        * redesigned/optimized the identifier hash table
+	
 Mon Dec  5 12:14:46 EST 1994 (tim@handel.princeton.edu (Beek))
 	* raised patchlevel to v20.23
 	* __DIR__ now has a leading slash; "/u/b/beek/", not "u/b/beek"

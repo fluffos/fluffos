@@ -1,12 +1,6 @@
-#include "efuns.h"
-#include "cfuns.h"
-#include "stralloc.h"
-#include "include/origin.h"
+#include "std.h"
 
 #ifdef LPC_TO_C
-extern int call_origin;
-extern int error_recovery_context_exists;
-
 #define RTN (*ret = *sp--)
 
 #ifdef TRACE
@@ -298,8 +292,6 @@ void c_call_other P4(svalue *, ret, svalue *, s0, svalue *, s1, int, num_arg)
 	ob = s0->u.ob;
     else if (s0->type == T_POINTER) {
 	struct vector *v;
-	extern struct vector *call_all_other PROT((struct vector *, char *, int));
-
 
 	v = call_all_other(s0->u.vec, funcname, num_arg);
 	C_REFED_VECTOR(ret, v);
@@ -327,8 +319,6 @@ void c_call_other P4(svalue *, ret, svalue *, s0, svalue *, s1, int, num_arg)
 void c_simul_efun P3(svalue *, ret, svalue *, s0, int, num_arg)
 {
     char *funcname;
-    extern struct object *simul_efun_ob;
-    extern char *simul_efun_file_name;
 
     if (current_object->flags & O_DESTRUCTED) {	/* No external calls allowed */
 	pop_n_elems(num_arg);
@@ -675,7 +665,6 @@ c_evaluate P3(svalue *, ret, svalue *, s0, int, num_arg) {
     ob = fun->f.obj.u.ob;
   else if (fun->f.obj.type == T_POINTER) {
     struct vector *vec;
-    extern struct vector *call_all_other PROT((struct vector *, char *, int));
     
     vec = call_all_other(fun->f.obj.u.vec, funcname, num_arg);
     remove_fake_frame();
@@ -774,9 +763,6 @@ void c_xor P3(svalue *, ret, svalue *, s0, svalue *, s1)
 void c_and P3(svalue *, ret, svalue *, s0, svalue *, s1)
 {
     if (s1->type == T_POINTER && s0->type == T_POINTER) {
-	extern struct vector *intersect_array
-	       PROT((struct vector *, struct vector *));
-
 	s0->u.vec->ref++;
 	s1->u.vec++;
 	C_VECTOR(ret, intersect_array(s0->u.vec, s1->u.vec));
@@ -1145,8 +1131,6 @@ void c_subtract P3(svalue *, ret, svalue *, s0, svalue *, s1)
 	}
     } else if (s0->type == T_POINTER) {
 	if (s1->type == T_POINTER) {
-	    extern struct vector *subtract_array
-	           PROT((struct vector *, struct vector *));
 	    struct vector *v, *w;
 
 	    v = slice_array(s1->u.vec, 0, s1->u.vec->size - 1);

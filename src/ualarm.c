@@ -33,15 +33,11 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)ualarm.c	5.5 (Berkeley) 2/23/91";
-
 #endif				/* LIBC_SCCS and not lint */
 
-#include "config.h"
+#include "std.h"
 
-#include <sys/time.h>
 #define	USPS	1000000		/* # of microseconds in a second */
-
-#include "lint.h"
 
 /*
  * Generate a SIGALRM signal in ``usecs'' microseconds.

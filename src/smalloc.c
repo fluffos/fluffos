@@ -14,27 +14,11 @@
 **
 ** NeXT Mach support is preliminary and may not work on NeXTStep 3.x.
 */
-#include "config.h"
-
-#include <stdio.h>
-#ifdef OLD_ULTRIX
-#include <stddef.h>
-#define size_t unsigned
-#endif
-
-#if defined(sun) || defined(accel) || defined(hp68k)
-#include <sys/types.h>
-#endif
-
-#ifdef NeXT
-#include <mach.h>
-#endif
-
-#if defined(LATTICE)
-#include <stdlib.h>
-#include <string.h>
-#include <fcntl.h>
-#endif
+#include "std.h"
+#include "efuns_main.h"
+#include "interpret.h"
+#include "simulate.h"
+#include "comm.h"
 
 #if defined(sparc)
 #define MALLOC_ALIGN 8
@@ -42,10 +26,6 @@
 #else
 #define MALLOC_ALIGN 4
 #endif
-
-#include "lint.h"
-
-extern int using_smalloc;
 
 /* #undeffing SBRK_OK will just screw things up, since it tries to
  use malloc() to get memory, and smalloc() is renamed to malloc()  here

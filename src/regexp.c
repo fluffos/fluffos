@@ -55,17 +55,9 @@
 
 /* Headers */
 
-#include "config.h"
-
-#include <stdio.h>
-#include <string.h>
-#ifdef LATTICE
-#include <stdlib.h>
-#endif
-#include <ctype.h>
-
-#include "lint.h"		/* for FREE() */
+#include "std.h"
 #include "regexp.h"
+#include "ed.h"
 
 /*
  * The "internal use only" fields in regexp.h are present to pass info from
@@ -263,7 +255,6 @@ regexp *regcomp P2(char *, exp,
     register int len;
     int flags;
     short *exp2, *dest, c;
-    extern char *xalloc();
 
     if (exp == (char *) NULL)
 	FAIL("NULL argument");

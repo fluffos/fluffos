@@ -1,22 +1,9 @@
+#include "std.h"
 #include "config.h"
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <stdio.h>
-#if defined(SunOS_5) || defined(LATTICE)
-#include <stdlib.h>
-#endif
-#if defined(__386BSD__) || defined(SunOS_5)
-#include <unistd.h>
-#endif
-#if defined(__STDC__) && !defined(LATTICE)
-#include <memory.h>
-#endif
-
-#include "lint.h"
-#include "interpret.h"
-#include "object.h"
-#include "exec.h"
+#include "lpc_incl.h"
+#include "swap.h"
+#include "simul_efun.h"
+#include "comm.h"
 
 /*
  * Swap out programs from objects.
@@ -34,8 +21,6 @@ static char file_name_buf[100];
 static char *file_name = file_name_buf;
 
 static FILE *swap_file;		/* The swap file is opened once */
-
-int total_num_prog_blocks, total_prog_block_size;
 
 static struct sw_block {
     int start;
@@ -359,7 +344,7 @@ int swap P1(struct object *, ob)
     if (d_flag > 1) {		/* marion */
 	debug_message("Swap object %s (ref %d)\n", ob->name, ob->ref);
     }
-    if (ob->prog->p.i.line_numbers)
+    if (ob->prog->p.i.line_info)
 	swap_line_numbers(ob->prog);	/* not always done before we get here */
     if ((ob->flags & O_HEART_BEAT) || (ob->flags & O_CLONE)) {
 	if (d_flag > 1) {
@@ -415,17 +400,18 @@ swap_line_numbers P1(struct program *, prog)
 {
     int size;
 
-    if (!prog || !prog->p.i.line_numbers)
+    if (!prog || !prog->p.i.line_info)
 	return 0;
     if (d_flag > 1) {
 	debug_message("Swap line numbers for %s\n", prog->name);
     }
-    size = prog->p.i.line_numbers[0] * sizeof(short);
-    if (swap_out((char *) prog->p.i.line_numbers, size,
+    size = prog->p.i.file_info[0];
+    if (swap_out((char *) prog->p.i.file_info, size,
 		 &prog->p.i.line_swap_index)) {
 	line_num_bytes_swapped += size;
-	FREE(prog->p.i.line_numbers);
-	prog->p.i.line_numbers = 0;
+	FREE(prog->p.i.file_info);
+	prog->p.i.file_info = 0;
+	prog->p.i.line_info = 0;
 	return 1;
     }
     return 0;
@@ -438,12 +424,13 @@ void load_line_numbers P1(struct program *, prog)
 {
     int size;
 
-    if (prog->p.i.line_numbers)
+    if (prog->p.i.line_info)
 	return;
     if (d_flag > 1) {
 	debug_message("Unswap line numbers for %s\n", prog->name);
     }
-    size = swap_in((char **) &prog->p.i.line_numbers, prog->p.i.line_swap_index);
+    size = swap_in((char **) &prog->p.i.file_info, prog->p.i.line_swap_index);
+    prog->p.i.line_info = (unsigned char *)&prog->p.i.file_info[prog->p.i.file_info[1]];
     line_num_bytes_swapped -= size;
 }
 
@@ -473,11 +460,11 @@ void remove_swap_file P1(struct object *, ob)
 void
 remove_line_swap P1(struct program *, prog)
 {
-    if (!prog->p.i.line_numbers)
+    if (!prog->p.i.line_info)
 	load_line_numbers(prog);
-    if (prog->p.i.line_swap_index != -1 && prog->p.i.line_numbers)
+    if (prog->p.i.line_swap_index != -1 && prog->p.i.line_info)
 	free_swap(prog->p.i.line_swap_index,
-		  prog->p.i.line_numbers[0] * sizeof(short));
+		  prog->p.i.file_info[0]);
     prog->p.i.line_swap_index = -1;
 }
 

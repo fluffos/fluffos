@@ -1,9 +1,10 @@
 /* interpret.h */
 
-#ifndef _INTERPRET_H
-#define _INTERPRET_H
+#ifndef INTERPRET_H
+#define INTERPRET_H
 
 #include "uid.h"
+#include "mudlib_stats.h"
 
 /* Trace defines */
 #ifdef TRACE
@@ -27,6 +28,12 @@
 	      current_object->name))) )
 #  define TRACEHB (current_heart_beat == 0 || (command_giver->interactive->trace_level & TRACE_HEART_BEAT))
 #endif
+
+#ifdef HAS_UNSIGNED_CHAR
+#define EXTRACT_UCHAR(p) (*(unsigned char *)(p))
+#else
+#define EXTRACT_UCHAR(p) (*p < 0 ? *p + 0x100 : *p)
+#endif				/* HAS_UNSIGNED_CHAR */
 
 union u {
     char *string;
@@ -113,11 +120,6 @@ struct funp {
 };
 #endif
 
-union string_or_func {
-    struct funp *f;
-    char *s;
-};
-
 struct vector {
     unsigned short ref;
 #ifdef DEBUG
@@ -129,10 +131,6 @@ struct vector {
 #endif
     struct svalue item[1];
 };
-
-#define ALLOC_VECTOR(nelem) \
-    (struct vector *)DXALLOC(sizeof (struct vector) + \
-	  sizeof(struct svalue) * (nelem - 1), 121, "ALLOC_VECTOR")
 
 /*
  * Control stack element.
@@ -182,6 +180,114 @@ struct control_stack {
 #define free_svalue(x,y) int_free_svalue(x,y)
 #else
 #define free_svalue(x,y) int_free_svalue(x)
+#endif
+
+extern struct program *current_prog;
+extern short caller_type;
+extern char *pc;
+extern struct svalue *sp;
+extern struct svalue *fp;
+extern short *break_sp;
+extern struct svalue catch_value;
+extern struct control_stack control_stack[30];
+extern struct control_stack *csp;
+extern int too_deep_error;
+extern int max_eval_error;
+extern unsigned int apply_low_call_others;
+extern unsigned int apply_low_cache_hits;
+extern unsigned int apply_low_slots_used;
+extern unsigned int apply_low_collisions;
+extern int function_index_offset;
+extern int master_ob_is_loading;
+extern struct function fake_func;
+extern struct program fake_prog;
+
+/* with LPC_TO_C off, these are defines using eval_instruction */
+#ifdef LPC_TO_C
+void call_program PROT((struct program *, int));
+void call_absolute PROT((char *));
+#endif
+void eval_instruction PROT((char *p));
+void assign_svalue PROT((struct svalue *, struct svalue *));
+void assign_svalue_no_free PROT((struct svalue *, struct svalue *));
+void copy_some_svalues PROT((struct svalue *, struct svalue *, int));
+void transfer_push_some_svalues PROT((struct svalue *, int));
+void push_some_svalues PROT((struct svalue *, int));
+#ifdef DEBUG
+void int_free_svalue PROT((struct svalue *, char *));
+#else
+void int_free_svalue PROT((struct svalue *));
+#endif
+void free_string_svalue PROT((struct svalue *));
+void free_some_svalues PROT((struct svalue *, int));
+void push_object PROT((struct object *));
+void push_number PROT((int));
+void push_real PROT((double));
+void push_undefined PROT((void));
+void push_null PROT((void));
+void push_string PROT((char *, int));
+void push_svalue PROT((struct svalue *));
+void push_vector PROT((struct vector *));
+void push_refed_vector PROT((struct vector *));
+void push_buffer PROT((struct buffer *));
+void push_refed_buffer PROT((struct buffer *));
+void push_mapping PROT((struct mapping *));
+void push_refed_mapping PROT((struct mapping *));
+void push_malloced_string PROT((char *));
+void push_constant_string PROT((char *));
+void pop_stack PROT((void));
+void pop_n_elems PROT((int));
+void pop_2_elems PROT((void));
+void pop_3_elems PROT((void));
+void remove_object_from_stack PROT((struct object *));
+
+void setup_fake_frame PROT((struct funp *));
+void remove_fake_frame PROT((void));
+
+char *type_name PROT((int c));
+void bad_arg PROT((int, int));
+void bad_argument PROT((struct svalue *, int, int, int));
+void check_for_destr PROT((struct vector *));
+int is_static PROT((char *, struct object *));
+int apply_low PROT((char *, struct object *, int));
+struct svalue *apply PROT((char *, struct object *, int, int));
+struct svalue *call_function_pointer PROT((struct funp *, int));
+struct svalue *safe_apply PROT((char *, struct object *, int, int));
+struct vector *call_all_other PROT((struct vector *, char *, int));
+char *function_exists PROT((char *, struct object *));
+void call_function PROT((struct program *, struct function *));
+struct svalue *apply_master_ob PROT((char *, int));
+struct svalue *safe_apply_master_ob PROT((char *, int));
+int assert_master_ob_loaded PROT((char *, char *));
+
+void translate_absolute_line PROT((int, unsigned short *, int *, int *));
+char *add_slash PROT((char *));
+int strpref PROT((char *, char *));
+struct vector *get_svalue_trace PROT((void));
+void do_trace PROT((char *, char *, char *));
+char *dump_trace PROT((int));
+void opcdump PROT((char *));
+int inter_sscanf PROT((struct svalue *, struct svalue *, struct svalue *, int));
+char * get_line_number_if_any PROT((void));
+void get_line_number_info PROT((char **, int *));
+void get_version PROT((char *));
+int reset_machine PROT((int));
+
+#ifndef NO_SHADOWS
+int validate_shadowing PROT((struct object *));
+#endif
+
+#ifdef LAZY_RESETS
+void try_reset PROT((struct object *));
+#endif
+
+void push_pop_error_context PROT((int));
+void pop_control_stack PROT((void));
+INLINE struct function *setup_new_frame PROT((struct function *));
+INLINE void push_control_stack PROT((struct function *));
+
+#ifdef DEBUG
+void check_a_lot_ref_counts PROT((struct program *));
 #endif
 
 #endif				/* _INTERPRET_H */

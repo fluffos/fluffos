@@ -1,3 +1,8 @@
+#ifndef ED_H
+#define ED_H
+
+#include "regexp.h"
+
 /* define this if you don't like the ending dollar signs in ed, in n-mode */
 #undef NO_END_DOLLAR_SIGN
 /*
@@ -100,3 +105,13 @@ struct ed_buffer {
     int cur_autoindent;
     int restricted;		/* restricted access ed */
 };
+
+/*
+ * ed.c
+ */
+void ed_start PROT((char *, char *, char *, int, struct object *));
+void ed_cmd PROT((char *));
+void save_ed_buffer PROT((void));
+void regerror PROT((char *));
+
+#endif

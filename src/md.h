@@ -15,7 +15,8 @@ typedef struct node_s {
 #define PTR(x) ((void *)(x + 1))
 
 extern int malloc_mask;
-
+extern unsigned int total_malloced;
+extern unsigned int hiwater;
 void MDinit();
 void MDmalloc PROT((node_t *, int, int, char *));
 int MDfree PROT((void *));

@@ -51,29 +51,11 @@
  *  "X"   the integer arg is printed in hex (in capitals).
  */
 
-#include "config.h"
-
-#include <stdio.h>
-#include <string.h>
-#include <setjmp.h>
-#include <sys/types.h>
-#ifdef LATTICE
-#include <stdlib.h>
-#endif
-
-#include "lint.h"
-#include "opcodes.h"
-#include "stdio.h"
-#include "interpret.h"
-#include "mapping.h"
-#include "buffer.h"
-#include "object.h"
-#include "sent.h"
+#include "std.h"
+#include "lpc_incl.h"
+#include "efuns_incl.h"
+#include "simul_efun.h"
 #include "ignore.h"
-#include "exec.h"
-#include "applies.h"
-#include "include/origin.h"
-#include "instrs.h"
 
 /*
  * If this #define is defined then error messages are returned,
@@ -82,11 +64,6 @@
 #define RETURN_ERROR_MESSAGES
 
 #if defined(F_SPRINTF) || defined(F_PRINTF)
-
-extern char *xalloc(), *string_copy();
-
-extern struct svalue const0n;
-extern struct object *current_object;
 
 typedef unsigned int format_info;
 

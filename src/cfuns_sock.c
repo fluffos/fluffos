@@ -3,13 +3,7 @@
 	inside eval_instruction() in interpret.c.
 */
 
-#include "efuns.h"
-#include "cfuns.h"
-#include "stralloc.h"
-#if defined(__386BSD__) || defined(SunOS_5)
-#include <unistd.h>
-#endif
-#include "applies.h"
+#include "std.h"
 
 #define GET_ADDRESS fd = s0->u.number; get_socket_address(fd, addr, &port)
 #define VALID_SOCKET(x) check_valid_socket((x), fd, get_socket_owner(fd), addr, port)

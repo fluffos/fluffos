@@ -3,6 +3,8 @@
 #ifndef _MAPPING_H
 #define _MAPPING_H
 
+#include "interpret.h"
+
 struct node {
     svalue values[2];
     struct node *next;
@@ -60,5 +62,36 @@ typedef struct minfo_s {
 
 /* used by mapHashStr: do not make larger than the size of the coeff array */
 #define MAX_KEY_LEN 25
+
+/*
+ * mapping.c
+ */
+extern int num_mappings;
+extern int total_mapping_size;
+extern int total_mapping_nodes;
+
+int mapping_save_size PROT((struct mapping *));
+struct mapping *mapTraverse PROT((struct mapping *, int (*) (struct mapping *, struct node *, void *), void *));
+struct mapping *load_mapping_from_aggregate PROT((struct svalue *, int));
+struct mapping *allocate_mapping PROT((int));
+void free_mapping PROT((struct mapping *));
+struct svalue *find_in_mapping PROT((struct mapping *, struct svalue *));
+struct svalue *find_for_insert PROT((struct mapping *, struct svalue *, int));
+void absorb_mapping PROT((struct mapping *, struct mapping *));
+void mapping_delete PROT((struct mapping *, struct svalue *));
+struct mapping *add_mapping PROT((struct mapping *, struct mapping *));
+void map_mapping PROT((struct svalue *, int));
+struct mapping *compose_mapping PROT((struct mapping *, struct mapping *, unsigned short));
+struct vector *mapping_indices PROT((struct mapping *));
+struct vector *mapping_values PROT((struct mapping *));
+struct vector *mapping_each PROT((struct mapping *));
+char *save_mapping PROT((struct mapping *));
+
+void add_mapping_pair PROT((struct mapping *, char *, int));
+void add_mapping_string PROT((struct mapping *, char *, char *));
+void add_mapping_malloced_string PROT((struct mapping *, char *, char *));
+void add_mapping_object PROT((struct mapping *, char *, struct object *));
+void add_mapping_array PROT((struct mapping *, char *, struct vector *));
+void add_mapping_shared_string PROT((struct mapping *, char *, char *));
 
 #endif				/* _MAPPING_H */

@@ -1,12 +1,7 @@
-#include "config.h"
-
-#include <string.h>
-#ifdef LATTICE
-#include <stdlib.h>
-#endif
-
-#include "lint.h"
+#include "std.h"
 #include "scratchpad.h"
+#include "simulate.h"
+#include "compiler.h"
 
 /*
  * This is a first attempt at beating malloc() for allocation of strings

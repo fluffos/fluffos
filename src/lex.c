@@ -13,44 +13,38 @@
  *   Added get_array_block()...using @@ENDMARKER to return array of strings
  */
 
-#include "config.h"
-
-#include <stdio.h>
-#include <ctype.h>
-#include <string.h>
-#if defined(SunOS_5) || defined(LATTICE)
-#include <stdlib.h>
-#endif
-
-#include "instrs.h"
-#include "arch.h"		/* put after config.h */
-#include "lint.h"
-#include "interpret.h"
-#include "compiler_shared.h" /* compiler.tab.h needs this */
-#include "compiler.tab.h"
-#include "opcodes.h"
-#include "string.h"
-#include "exec.h"
+#include "std.h"
 #include "lex.h"
-#ifdef NEW_FUNCTIONS
-#include "fp_defs.h"
-#endif
-#include "cc.h"
-
-#ifndef tolower
-extern int tolower PROT((int));
-
-#endif
+#include "config.h"
+#include "compiler.h"
+#include "grammar.tab.h"
+#include "interpret.h"
+#include "stralloc.h"
+#include "scratchpad.h"
+/* fatal */
+#include "simulate.h"
+/* whashstr */
+#include "hash.h"
+/* legal_path */
+#include "file.h"
 
 #define NELEM(a) (sizeof (a) / sizeof((a)[0]))
 
-int current_line;
+int current_line;               /* line number in this file */
+int current_line_base;          /* number of lines from other files */
+int current_line_saved;         /* last line in this file where line num
+				   info was saved */
+
 int total_lines;		/* Used to compute average compiled lines/s */
 char *current_file;
+int current_file_id;
 
 /* Bit flags for pragmas in effect */
 int pragmas;
 int optimization;
+
+int num_parse_error;		/* Number of errors in the parser. */
+
 
 #define MAX_LINE 1024
 
@@ -68,8 +62,6 @@ static int nexpands;
 #define MAXLINE 1024
 char yytext[MAXLINE];
 
-/* static char partial[MAXLINE];
-char *partp; */
 
 static int slast, lastchar;
 
@@ -97,6 +89,7 @@ static struct incstate {
     FILE *yyin;
     int line;
     char *file;
+    int file_id;
     int slast, lastchar;
 }       *inctop = 0;
 
@@ -169,7 +162,11 @@ static keyword reswords[] =
     {"while", L_WHILE, 0},
 };
 
-struct ident_hash_elem **ident_hash_table;
+static struct ident_hash_elem **ident_hash_table;
+static struct ident_hash_elem **ident_hash_head;
+static struct ident_hash_elem **ident_hash_tail;
+
+static struct ident_hash_elem *ident_dirty_list = 0;
 
 struct instr instrs[MAX_INSTRS];
 static char num_buf[20];
@@ -357,7 +354,6 @@ skip_to P2(char *, token, char *, atoken)
 	    lexerror("Unexpected end of file while skipping");
 	    return 1;
 	}
-	store_line_number_info();
 	current_line++;
 	total_lines++;
     }
@@ -386,7 +382,6 @@ static FILE *
 
     merge(name, buf);
     if ((f = fopen(buf, "r")) != NULL) {
-	save_include(buf);
 	return f;
     }
     /*
@@ -399,7 +394,6 @@ static FILE *
     for (i = 0; i < inc_list_size; i++) {
 	sprintf(buf, "%s/%s", inc_list[i], name);
 	if ((f = fopen(buf, "r"))) {
-	    save_include(buf);
 	    return f;
 	}
     }
@@ -454,12 +448,19 @@ handle_include P1(char *, name)
 	is->yyin = yyin;
 	is->line = current_line;
 	is->file = current_file;
+	is->file_id = current_file_id;
 	is->slast = slast;
 	is->lastchar = lastchar;
 	is->next = inctop;
 	inctop = is;
+	
+	current_line--;
+	save_file_info(current_file_id, current_line  - current_line_saved);
+	current_line_base += current_line;
+	current_line_saved = 0;
 	current_line = 1;
 	current_file = make_shared_string(buf);
+	current_file_id = add_program_file(buf, 0);
 	slast = lastchar = '\n';
 	yyin = f;
 /*fprintf(stderr, "pushed to %s\n", buf);*/
@@ -486,7 +487,6 @@ get_terminator P1(char *, terminator)
 	return 0;
 
     if (c == '\n') {
-	store_line_number_info();
 	current_line++;
     } else {
 	myungetc(c);
@@ -566,7 +566,6 @@ get_array_block P1(char *, term)
 	     * handle lone terminator on line
 	     */
 	    if (strlen(array_line[startchunk] + startpos) == termlen) {
-		store_line_number_info();
 		current_line++;
 	    } else {
 		/*
@@ -603,7 +602,6 @@ get_array_block P1(char *, term)
 		break;
 	    }
 	    if (c == '\n') {
-		store_line_number_info();
 		current_line++;
 	    }
 	    /*
@@ -694,7 +692,6 @@ get_text_block P1(char *, term)
 	    (!isalnum(*(text_line[startchunk] + startpos + termlen))) &&
 	    (*(text_line[startchunk] + startpos + termlen) != '_')) {
 	    if (strlen(text_line[startchunk] + startpos) == termlen) {
-		store_line_number_info();
 		current_line++;
 	    } else {
 		/*
@@ -731,7 +728,6 @@ get_text_block P1(char *, term)
 		break;
 	    }
 	    if (c == '\n') {
-		store_line_number_info();
 		current_line++;
 	    }
 	    /*
@@ -794,7 +790,6 @@ static void skip_comment()
 		return;
 	    }
 	    if (c == '\n') {
-		store_line_number_info();
 		nexpands = 0;
 		current_line++;
 	    }
@@ -805,7 +800,6 @@ static void skip_comment()
 	    if ((c = mygetc()) == '/')
 		return;
 	    if (c == '\n') {
-		store_line_number_info();
 		nexpands = 0;
 		current_line++;
 	    }
@@ -906,11 +900,18 @@ static int yylex1()
 		p = inctop;
 		fclose(yyin);
 /*fprintf(stderr, "popping to %s\n", p->file);*/
+		save_file_info(current_file_id, current_line - current_line_saved);
+		current_line_saved = p->line - 1;
+		/* add the lines from this file, and readjust to be relative
+		   to the file we're returning to */
+		current_line_base += current_line - current_line_saved;
 		free_string(current_file);
 		nexpands = 0;
+		
 		current_file = p->file;
+		current_file_id = p->file_id;
 		current_line = p->line;
-		pop_include();
+		
 		yyin = p->yyin;
 		slast = p->slast;
 		lastchar = p->lastchar;
@@ -932,7 +933,6 @@ static int yylex1()
 	    return -1;
 	case '\n':
 	    {
-		store_line_number_info();
 		nexpands = 0;
 		current_line++;
 		total_lines++;
@@ -989,7 +989,6 @@ static int yylex1()
 	case '(':
             while (((c = mygetc()) != EOF) && isspace(c)) {
                 if (c == '\n') {
-		    store_line_number_info();
                     current_line++;
                 }
             }
@@ -1006,7 +1005,6 @@ static int yylex1()
 #ifdef NEW_FUNCTIONS
 		while ((c = mygetc()) != EOF && isspace(c)){
 		    if (c == '\n'){
-			store_line_number_info();
 			current_line++;
 		    }
 		}
@@ -1060,7 +1058,7 @@ static int yylex1()
 	case ';':
 	case ',':
 	case '~':
-#ifndef TRIGRAPHS
+#ifndef USE_TRIGRAPHS
 	case '?':
 	    return c;
 #else
@@ -1222,7 +1220,6 @@ static int yylex1()
 		    fprintf(stderr, "%s\n", sp);
 		} else if (strcmp("include", yytext) == 0) {
 		    current_line++;
-		    store_line_number_info();
 		    handle_include(sp);
 		    break;
 		} else if (strcmp("pragma", yytext) == 0) {
@@ -1326,7 +1323,6 @@ static int yylex1()
 		    c = mygetc();
 		    if (c == '\n') {
 			yyp--;
-			store_line_number_info();
 			current_line++;
 			total_lines++;
 		    } else if (c == EOF) {
@@ -1662,15 +1658,19 @@ void start_new_file P1(FILE *, f)
     if (current_file) {
 	char *dir;
 	char *tmp;
+	int ln;
 
-	dir = (char *) DMALLOC(strlen(current_file) + 4, 64, "start_new_file");
-	sprintf(dir, "\"/%s\"", current_file);
+	ln = strlen(current_file);
+	dir = (char *) DMALLOC(ln + 4, 64, "start_new_file");
+	dir[0] = '"';
+	dir[1] = '/';
+	memcpy(dir + 2, current_file, ln);
+	dir[ln + 2] = '"';
+	dir[ln + 3] = 0;
 	add_define("__FILE__", -1, dir, 0);
 	tmp = strrchr(dir, '/');
-	if (tmp) {
-	    tmp[1] = '"';
-	    tmp[2] = 0;
-	}
+	tmp[1] = '"';
+	tmp[2] = 0;
 	add_define("__DIR__", -1, dir, 0);
 	FREE(dir);
     }
@@ -1696,6 +1696,8 @@ void start_new_file P1(FILE *, f)
     optimization = 0;
     nexpands = 0;
     current_line = 1;
+    current_line_base = 0;
+    current_line_saved = 0;
     if (strlen(GLOBAL_INCLUDE_FILE)) {
 	/* need a writable copy */
 	gifile = string_copy(GLOBAL_INCLUDE_FILE);
@@ -1760,11 +1762,9 @@ void init_num_args()
     add_instr_name("&", F_AND, T_POINTER | T_NUMBER);
     add_instr_name("&=", F_AND_EQ, T_NUMBER);
     add_instr_name("index", F_INDEX, T_ANY);
-#ifdef LPC_OPTIMIZE_LOOPS
     add_instr_name("loop_cond", F_LOOP_COND, -1);
     add_instr_name("loop_incr", F_LOOP_INCR, -1);
     add_instr_name("while_dec", F_WHILE_DEC, -1);
-#endif
     add_instr_name("indexed_lvalue", F_INDEXED_LVALUE, T_LVALUE);
     add_instr_name("global", F_GLOBAL, T_ANY);
     add_instr_name("local", F_LOCAL, T_ANY);
@@ -1919,7 +1919,6 @@ static void refill()
     } while (c != '\n' && c != EOF);
     p[-1] = ' ';
     *p = 0;
-    store_line_number_info();
     nexpands = 0;
     current_line++;
 }
@@ -2616,20 +2615,43 @@ char *main_file_name()
 #define IDENT_HASH_SIZE 1024
 #define IdentHash(s) (whashstr((s), 20) & (IDENT_HASH_SIZE - 1))
 
+/* The identifier table is hashed for speed.  The hash chains are circular
+ * linked lists, so that we can rotate them, since identifier lookup is
+ * rather irregular (i.e. we're likely to be asked about the same one
+ * quite a number of times in a row).  This isn't as fast as moving entries
+ * to the front but is done this way for two reasons:
+ *
+ * 1. this allows us to keep permanent identifiers consecutive and clean
+ *    up faster
+ * 2. it would only be faster in cases where two identifiers with the same
+ *    hash value are used often within close proximity in the source.
+ *    This should be rare, esp since the hash table is fairly sparse.
+ *
+ * ident_hash_table[hash] points to our current position (last lookup)
+ * ident_hash_head[hash] points to the first permanent identifier
+ * ident_hash_tail[hash] points to the last one
+ * ident_dirty_list is a linked list of identifiers that need to be cleaned
+ * when we're done; this happens if you define a global or function with
+ * the same name as an efun or sefun.
+ */
+
+#define CHECK_ELEM(x, y, z) if (!strcmp((x)->name, (y))) { \
+      if (((x)->token & IHE_RESWORD) || ((x)->sem_value)) { z } \
+      else return 0; }
+
 struct ident_hash_elem *lookup_ident P1(char *, name) {
     int h = IdentHash(name);
-    struct ident_hash_elem *hptr;
+    struct ident_hash_elem *hptr, *hptr2;
 
-    hptr = ident_hash_table[h];
-    while (hptr) {
-	if (!strcmp(hptr->name, name)) {
-	    if ((hptr->token & IHE_RESWORD) || hptr->sem_value)
-		return hptr;
-	    else return 0;
+    if (hptr = ident_hash_table[h]) {
+	CHECK_ELEM(hptr, name, return hptr;);
+	hptr2 = hptr->next;
+	while (hptr2 != hptr) {
+	    CHECK_ELEM(hptr2, name, ident_hash_table[h] = hptr2; return hptr2;);
+	    hptr2 = hptr2->next;
 	}
-	hptr = hptr->next;
     }
-    /* efun and asm are special cases */
+    /* efun and asm are special cases, as they are redefinable keywords */
     if (strcmp("efun", name)==0) return (struct ident_hash_elem *)&efun_keyword;
     if (strcmp("asm", name)==0) return (struct ident_hash_elem *)&asm_keyword;
     return 0;
@@ -2637,25 +2659,29 @@ struct ident_hash_elem *lookup_ident P1(char *, name) {
 
 struct ident_hash_elem *find_or_add_perm_ident P1(char *, name) {
     int h = IdentHash(name);
-    struct ident_hash_elem *hptr;
+    struct ident_hash_elem *hptr, *hptr2;
 
-    hptr = ident_hash_table[h];
-    if (!hptr) {
-	hptr = (ident_hash_table[h] = (struct ident_hash_elem *)DMALLOC(sizeof(struct ident_hash_elem), 0, "find_or_add_perm_ident"));
-    } else while (1) {
-	if (!strcmp(hptr->name, name))
-	    return hptr;
-	if (hptr->next)
-	    hptr = hptr->next;
-	else {
-	    hptr = (hptr->next = (struct ident_hash_elem *)DMALLOC(sizeof(struct ident_hash_elem), 0, "find_or_add_perm_ident: 2"));
-	    break;
+    if (hptr = ident_hash_table[h]) {
+	if (!strcmp(hptr->name, name)) return hptr;
+	hptr2 = hptr->next;
+	while (hptr2 != hptr) {
+	    if (!strcmp(hptr->name, name)) return hptr;
+	    hptr2 = hptr2->next;
 	}
+	hptr = (struct ident_hash_elem *)DMALLOC(sizeof(struct ident_hash_elem), 0, "find_or_add_perm_ident:1");
+	hptr->next = ident_hash_head[h]->next;
+	ident_hash_head[h]->next = hptr;
+	if (ident_hash_head[h] == ident_hash_tail[h])
+	    ident_hash_tail[h] = hptr;
+    } else {
+	hptr = (ident_hash_table[h] = (struct ident_hash_elem *)DMALLOC(sizeof(struct ident_hash_elem), 0, "find_or_add_perm_ident:2"));
+	ident_hash_head[h] = hptr;
+	ident_hash_tail[h] = hptr;
+	hptr->next = hptr;
     }
     hptr->name = name;
     hptr->token = 0;
     hptr->sem_value = 0;
-    hptr->next = 0;
     hptr->dn.simul_num = -1;
     hptr->dn.local_num = -1;
     hptr->dn.global_num = -1;
@@ -2734,7 +2760,7 @@ void dump_ihe P2(struct ident_hash_elem *, ihe, int, noisy) {
 void debug_dump_ident_hash_table P1(int, noisy) {
     int zeros = 0;
     int i;
-    struct ident_hash_elem *ihe;
+    struct ident_hash_elem *ihe, *ihe2;
 
     if (noisy) printf("\n\nIdentifier Hash Table:\n");
     for (i = 0; i < IDENT_HASH_SIZE; i++) {
@@ -2744,9 +2770,11 @@ void debug_dump_ident_hash_table P1(int, noisy) {
 	else {
 	    if (zeros && noisy) printf("<%i zeros>\n", zeros);
 	    zeros = 0;
-	    while (ihe) {
-		dump_ihe(ihe, noisy);
-		ihe = ihe->next;
+	    dump_ihe(ihe, noisy);
+	    ihe2 = ihe->next;
+	    while (ihe2 != ihe) {
+		dump_ihe(ihe2, noisy);
+		ihe2 = ihe2->next;
 	    }
 	    if (noisy) printf("\n");
 	}
@@ -2757,36 +2785,26 @@ void debug_dump_ident_hash_table P1(int, noisy) {
 
 void free_unused_identifiers() {
     struct ident_hash_elem_list *ihel, *next;
-    struct ident_hash_elem *ihe, *pre;
     struct linked_buf *lnb, *lnbn;
     int i;
 
-    for (i = 0; i < IDENT_HASH_SIZE; i++) {
-	ihe = ident_hash_table[i];
-	pre = 0;
-	while (ihe) {
-	    if (ihe->token & IHE_PERMANENT) {
-		pre = ihe;
-		if (!(ihe->token & IHE_RESWORD)) {
-		    if (ihe->dn.global_num != -1) {
-			ihe->dn.global_num = -1;
-			ihe->sem_value--;
-		    }
-		    if (ihe->dn.function_num != -1) {
-			ihe->dn.function_num = -1;
-			ihe->sem_value--;
-		    }
-		}
-	    } else {
-		if (pre) {
-		    pre->next = ihe->next;
-		} else {
-		    ident_hash_table[i] = ihe->next;
-		}
-	    }
-	    ihe = ihe->next;
+    /* clean up dirty idents */
+    while (ident_dirty_list) {
+	if (ident_dirty_list->dn.function_num != -1) {
+	    ident_dirty_list->dn.function_num = -1;
+	    ident_dirty_list->sem_value--;
 	}
+	if (ident_dirty_list->dn.global_num != -1) {
+	    ident_dirty_list->dn.global_num = -1;
+	    ident_dirty_list->sem_value--;
+	}
+	ident_dirty_list = ident_dirty_list->next_dirty;
     }
+
+    for (i = 0; i < IDENT_HASH_SIZE; i++)
+	if (ident_hash_table[i] = ident_hash_head[i])
+	    ident_hash_tail[i]->next = ident_hash_head[i];
+
     ihel = ihe_list;
     while (ihel) {
 	next = ihel->next;
@@ -2824,31 +2842,49 @@ static struct ident_hash_elem *quick_alloc_ident_entry() {
 }
 
 struct ident_hash_elem *
-find_or_add_ident P2(char *, name, int, needs_malloc) {
+find_or_add_ident P2(char *, name, int, flags) {
     int h = IdentHash(name);
-    struct ident_hash_elem *hptr;
+    struct ident_hash_elem *hptr, *hptr2;
 
-    hptr = ident_hash_table[h];
-    if (!hptr) {
-	hptr = (ident_hash_table[h] = quick_alloc_ident_entry());
-    } else while (1) {
-	if (!strcmp(hptr->name, name))
+    if (hptr = ident_hash_table[h]) {
+	if (!strcmp(hptr->name, name)) {
+	    if ((hptr->token & IHE_PERMANENT) && (flags & FOA_GLOBAL_SCOPE)
+		&& (hptr->dn.function_num==-1)&&(hptr->dn.global_num==-1)) {
+		hptr->next_dirty = ident_dirty_list;
+		ident_dirty_list = hptr;
+	    }
 	    return hptr;
-	if (hptr->next)
-	    hptr = hptr->next;
-	else {
-	    hptr = (hptr->next = quick_alloc_ident_entry());
-	    break;
+	}
+	hptr2 = hptr->next;
+	while (hptr2 != hptr) {
+	    if (!strcmp(hptr2->name, name)) {
+		if ((hptr2->token & IHE_PERMANENT)&&(flags & FOA_GLOBAL_SCOPE)
+		 && (hptr2->dn.function_num==-1)&&(hptr2->dn.global_num==-1)){
+		    hptr2->next_dirty = ident_dirty_list;
+		    ident_dirty_list = hptr2;
+		}
+		ident_hash_table[h] = hptr2; /* rotate */
+		return hptr2;
+	    }
+	    hptr2 = hptr2->next;
 	}
     }
-    if (needs_malloc) {
+
+    hptr = quick_alloc_ident_entry();
+    if (!(hptr2 = ident_hash_tail[h]) && !(hptr2 = ident_hash_table[h])) {
+	ident_hash_table[h] = hptr->next = hptr;
+    } else {
+	hptr->next = hptr2->next;
+	hptr2->next = hptr;
+    }
+    
+    if (flags & FOA_NEEDS_MALLOC) {
 	hptr->name = alloc_local_name(name);
     } else {
 	hptr->name = name;
     }
     hptr->token = 0;
     hptr->sem_value = 0;
-    hptr->next = 0;
     hptr->dn.simul_num = -1;
     hptr->dn.local_num = -1;
     hptr->dn.global_num = -1;
@@ -2860,20 +2896,33 @@ find_or_add_ident P2(char *, name, int, needs_malloc) {
 static void add_keyword P2(char *, name, keyword *, entry) {
     int h = IdentHash(name);
 
-    entry->next = ident_hash_table[h];
+    if (ident_hash_table[h]) {
+	entry->next = ident_hash_head[h]->next;
+	ident_hash_head[h]->next = (struct ident_hash_elem *)entry;
+	if (ident_hash_head[h] == ident_hash_tail[h])
+	    ident_hash_tail[h] = (struct ident_hash_elem *)entry;
+    } else {
+	ident_hash_head[h] = (struct ident_hash_elem *)entry;
+	ident_hash_tail[h] = (struct ident_hash_elem *)entry;
+	ident_hash_table[h] = (struct ident_hash_elem *)entry;
+	entry->next = (struct ident_hash_elem *)entry;
+    }
     entry->token |= IHE_RESWORD;
-    ident_hash_table[h] = (struct ident_hash_elem *)entry;
 }
 
 void init_identifiers() {
     int i;
     struct ident_hash_elem *ihe;
     
+    /* allocate all three tables together */
     ident_hash_table = (struct ident_hash_elem **)
-	DMALLOC(sizeof(struct ident_hash_elem *) * IDENT_HASH_SIZE,
+	DMALLOC(sizeof(struct ident_hash_elem *) * IDENT_HASH_SIZE * 3,
 		0, "init_identifiers");
-    
-    for (i=0; i<IDENT_HASH_SIZE; i++) {
+    ident_hash_head = (struct ident_hash_elem **)&ident_hash_table[IDENT_HASH_SIZE];
+    ident_hash_tail = (struct ident_hash_elem **)&ident_hash_table[2*IDENT_HASH_SIZE];
+
+    /* clean all three tables */
+    for (i=0; i<IDENT_HASH_SIZE * 3; i++) {
 	ident_hash_table[i]=0;
     }
     /* add the reserved words */
@@ -2888,3 +2937,4 @@ void init_identifiers() {
 	ihe->dn.efun_num = i;
     }
 }
+

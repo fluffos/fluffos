@@ -2,8 +2,9 @@
 ** A simple and fast generic string hasher based on Peter K. Pearson's
 ** article in CACM 33-6, pp. 677.
 */
-#include "config.h"
-#include "lint.h"
+#define NO_SOCKETS
+#define NO_OPCODES
+#include "std.h"
 
 static int T[] =
 {

@@ -7,16 +7,8 @@
    Algorithm Analysis_ by Cawnthorpe.
 */
 
-#include "config.h"
-
-#ifdef __386BSD__
-#include <sys/types.h>
-#include <string.h>
-#endif
-
-#include "lint.h"
-#include "mudlib_stats.h"
-#include "interpret.h"
+#include "std.h"
+#include "qsort.h"
 
 #define LEN sizeof(struct svalue)
 #define MAX_LEN 1000

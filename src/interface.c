@@ -1,5 +1,3 @@
-#include "efuns.h"
-
 #ifdef LPC_TO_C
 #include "interface.h"
 

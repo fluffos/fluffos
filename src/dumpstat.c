@@ -1,21 +1,10 @@
-#include "config.h"
-
-#include <stdio.h>
-#include <string.h>
-
-#include "lint.h"
-#include "interpret.h"
-#include "mapping.h"
-#include "buffer.h"
-#include "object.h"
-#include "exec.h"
-#include "include/origin.h"
+#include "std.h"
+#include "lpc_incl.h"
+#include "comm.h"
 
 /*
  * Write statistics about objects on file.
  */
-
-extern struct object *obj_list;
 
 static int sumSizes PROT((struct mapping *, struct node *, int *));
 static int svalue_size PROT((struct svalue *));
@@ -100,7 +89,7 @@ void dumpstat P1(char *, tfn)
 	add_message("Unable to open '%s' for writing.\n", fn);
 	return;
     }
-    add_message("Dumping to %s.", fn);
+    add_message("Dumping to %s...", fn);
 
     display_hidden = -1;
     for (ob = obj_list; ob; ob = ob->next_all) {
@@ -116,7 +105,7 @@ void dumpstat P1(char *, tfn)
 	    tmp = ob->prog->p.i.total_size;
 	else
 	    tmp = 0;
-	fprintf(f, "%-20s %lu ref %2d %s %s (%d) %s\n", ob->name,
+	fprintf(f, "%-20s %i ref %2d %s %s (%d) %s\n", ob->name,
 		tmp + data_size(ob) + sizeof(struct object), ob->ref,
 		ob->flags & O_HEART_BEAT ? "HB" : "  ",
 		ob->super ? ob->super->name : "--", /* ob->cpu */ 0,

@@ -7,8 +7,10 @@
  * and will be a little more general purpose than wiz_list was
  */
 
-#if !defined(_MUDLIB_STATS_H) && !defined(NO_MUDLIB_STATS)
-#define _MUDLIB_STATS_H
+#if !defined(MUDLIB_STATS_H) && !defined(NO_MUDLIB_STATS)
+#define MUDLIB_STATS_H
+
+struct object;
 
 typedef struct _mstats {
     /* the name of the stat group */

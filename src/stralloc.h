@@ -17,4 +17,14 @@ typedef struct block_s {
 #define SVALUE_STRLEN(x) (((x)->subtype == STRING_SHARED) ? \
    (SIZE(BLOCK((x)->u.string)) - sizeof(block_t) - 1) : strlen((x)->u.string))
 
+/*
+ * stralloc.c
+ */
+void init_strings PROT((void));
+char *findstring PROT((char *));
+char *make_shared_string PROT((char *));
+char *ref_string PROT((char *));
+void free_string PROT((char *));
+int add_string_status PROT((int));
+
 #endif

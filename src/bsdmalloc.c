@@ -33,7 +33,6 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)malloc.c	5.11 (Berkeley) 2/23/91";
-
 #endif				/* LIBC_SCCS and not lint */
 
 /*
@@ -47,18 +46,8 @@ static char sccsid[] = "@(#)malloc.c	5.11 (Berkeley) 2/23/91";
  * This is designed for use in a virtual memory environment.
  */
 
-#include "config.h"
-
-#include <sys/types.h>
-#ifndef _AUX_SOURCE
-#include <stdlib.h>
-#endif
-#include <string.h>
-#ifndef NeXT
-#include <unistd.h>
-#endif
-
-#include "lint.h"
+#include "std.h"
+#include "efuns_main.h"
 
 #undef NULL
 #define	NULL 0
@@ -72,10 +61,7 @@ typedef unsigned int u_int;
 
 #ifndef MEMPAGESIZE
 extern int getpagesize();
-
 #endif
-
-extern int using_bsd_malloc;
 
 /*
  * The overhead on a block is at least 4 bytes.  When free, this space
@@ -134,7 +120,6 @@ static int findbucket PROT((union overhead *, int));
  */
 static u_int nmalloc[NBUCKETS];
 
-#include <stdio.h>
 #endif
 
 #if defined(DEBUG) || defined(RCHECK)
@@ -143,7 +128,6 @@ static u_int nmalloc[NBUCKETS];
 #else
 #define ASSERT(p)   if (!(p)) botch("?")
 #endif
-#include <stdio.h>
 static int botch P1(char *, s)
 {
     fprintf(stderr, "\r\nassertion botched: %s\r\n", s);

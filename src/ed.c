@@ -44,55 +44,27 @@
  *
  */
 
-#include "config.h"
+#include "std.h"
+#include "lpc_incl.h"
+#include "comm.h"
+#include "regexp.h"
+#include "ed.h"
 
-static int version = 610;	/* used only in the "set" function, for i.d. */
-
-#include <stdio.h>
-#include <string.h>
-
-#if defined(__STDC__)
-#ifndef LATTICE
-#include <memory.h>
-#else
-#include <stdlib.h>
-#endif
-#endif
-
-#include <sys/types.h>		/* need for netinet */
-#include <ctype.h>
 /* Regexp is Henry Spencer's package. WARNING: regsub is modified to return
  * a pointer to the \0 after the destination string, and this program refers
  * to the "private" reganch field in the struct regexp.
  */
-
-#include "lint.h"
-#include "regexp.h"
-#include "interpret.h"
-#include "object.h"
-#include "exec.h"
-#include "comm.h"
-#include "opcodes.h"
-#include "applies.h"
-#include "ed.h"
-#include "include/origin.h"
 
 #ifdef F_ED			/* remove ed() from func_spec.c if you don't
 				 * want this */
 
 /**  Global variables  **/
 
-extern struct program *current_prog;
+static int version = 601;
 
 static int EdErr = 0;
 
-extern struct object *command_giver;
 void set_prompt PROT((char *));
-
-#ifndef toupper
-extern int toupper PROT((int));
-
-#endif
 
 static int append PROT((int, int));
 static int more_append PROT((char *));
@@ -235,13 +207,6 @@ static struct tbl {
     },
 };
 
-
-/*-------------------------------------------------------------------------*/
-
-#if !defined(_AIX) && !defined(LATTICE)
-extern char *strcpy(), *strncpy();
-
-#endif
 
 /*________  Macros  ________________________________________________________*/
 
@@ -1375,7 +1340,7 @@ static void shift P1(register char *, text)
 #define IF             10
 #define FOR            11
 #define WHILE          12
-#define DO             13
+#define XDO            13
 #define XEOT           14
 
 static char *stack, *stackbot;	/* token stack */
@@ -1629,7 +1594,7 @@ static void indent P1(char *, buf)
 		    else if (strcmp(ident, "while") == 0)
 			token = WHILE;
 		    else if (strcmp(ident, "do") == 0)
-			token = DO;
+			token = XDO;
 		    else	/* not a keyword */
 			token = TOKEN;
 		} else {
@@ -1661,7 +1626,7 @@ static void indent P1(char *, buf)
 		i = *ip;
 		/* if needed, reduce indentation prior to shift */
 		if ((token == LBRACKET &&
-		     (*sp == ROPERATOR || *sp == ELSE || *sp == DO)) ||
+		     (*sp == ROPERATOR || *sp == ELSE || *sp == XDO)) ||
 		    token == RBRACKET ||
 		    (token == IF && *sp == ELSE)) {
 		    /* back up */
@@ -1686,7 +1651,7 @@ static void indent P1(char *, buf)
 		case LBRACKET:
 		case ROPERATOR:
 		case ELSE:
-		case DO:
+		case XDO:
 		    {
 			/* add indentation */
 			i += P_SHIFTWIDTH;

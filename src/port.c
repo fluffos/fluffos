@@ -1,39 +1,8 @@
-#include "config.h"
-
-#include <stdio.h>
-#ifndef _AUX_SOURCE
-/* supposedly, memmove is prototyped here but isn't in any lib */
-#include <string.h>
-#endif
-#include <sys/types.h>
-#ifdef OS2
-#include <sys/timeb.h>
-#endif
-#ifdef LATTICE
-#include <time.h>
-#include <times.h>
-#else
-#ifdef _M_UNIX
-#include <time.h>
-#endif
-#include <sys/time.h>
-#endif
-#include <signal.h>
-#ifdef _SEQUENT_
-#include <usclkc.h>
-#endif
-#ifdef LATTICE
-#include <nsignal.h>
-#endif
-
-#include "lint.h"
+#include "std.h"
 
 /* for get_cpu_times() */
 #ifdef GET_PROCESS_STATS
 #include <sys/procstats.h>
-#endif
-#ifdef TIMES
-#include <sys/times.h>
 #endif
 #ifdef RUSAGE
 #include <sys/resource.h>
@@ -47,11 +16,6 @@
 
 #ifdef sun
 time_t time PROT((time_t *));
-
-#endif
-
-#if defined(SunOS_5) || defined(__386BSD__)
-#include <stdlib.h>
 #endif
 
 /*
@@ -77,7 +41,6 @@ int random_number P1(int, n)
 #ifdef DRAND48
         return (int) (drand48() * n);
 #else				/* DRAND48 */
-    extern int current_time;
 
     return current_time % n;	/* You really don't want to use this method */
 #endif				/* DRAND48 */

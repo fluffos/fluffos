@@ -1,28 +1,9 @@
 /* 92/04/18 - cleaned up in accordance with ./src/style.guidelines */
 
-#include <stdio.h>
-#ifdef LATTICE
-#include <stdlib.h>
-#endif
-#include <string.h>
-#ifdef sun
-#include <alloca.h>
-#endif
+#include "std.h"
 #include "config.h"
-#include "lint.h"
-#include "interpret.h"
-#include "mapping.h"
-#include "object.h"
-#include "regexp.h"
-#include "include/origin.h"
-
+#include "lpc_incl.h"
 #include "debug.h" /* added by Truilkan */
-
-extern int sameval PROT((struct svalue *, struct svalue *));
-extern int d_flag;
-extern object_t *master_ob, *current_object;
-extern struct svalue const0u, const0n;
-extern struct svalue *sp;
 
 int num_mappings = 0;
 int total_mapping_size = 0;
@@ -847,7 +828,6 @@ add_mapping P2(struct mapping *,m1, struct mapping *,m2)
 void
 map_mapping P2(struct svalue *, arg, int, num_arg)
 {
-    extern struct svalue *sp;
     struct mapping *m = arg->u.map;
     struct node **a, *elt;
     int j = m->table_size, numex = 0;

@@ -1,12 +1,8 @@
-#include "config.h"
-
-#ifdef LATTICE
-#include <stdlib.h>
-#endif
-
-#include "lint.h"
-#include "efuns.h"
+#include "std.h"
+#include "lpc_incl.h"
 #include "replace_program.h"
+#include "simul_efun.h"
+#include "swap.h"
 
 /*
  * replace_program.c
@@ -177,7 +173,6 @@ f_replace_program P2(int, num_arg, int, instruction)
     char *name, *xname;
     struct program *new_prog;
     int var_offset;
-    extern struct object *simul_efun_ob;
 
     if (sp->type != T_STRING)
 	bad_arg(1, instruction);

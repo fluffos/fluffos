@@ -29,6 +29,8 @@
  */
 #ifdef AMITCP
 
+extern struct Library *SocketBase;
+
 #define close(s) CloseSocket(s)
 #define ioctl(s,t,u) IoctlSocket(s,t,(char *)u)
 #define write(s,b,l) send(s,b,l,0)
@@ -43,6 +45,8 @@
  * AS225
  */
 #ifdef AS225
+
+extern struct Library *SockBase;
 
 #define FD_SETSIZE 256
 #define SOCKET_T int

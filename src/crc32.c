@@ -1,5 +1,4 @@
-#include "config.h"             /* gets UINT32 typedef */
-#include "lint.h"
+#include "std.h"
 #include "crctab.h"		/* see this file for more CRC credits and
 				 * comments */
 

@@ -7,9 +7,9 @@
 #ifndef _SOCKET_EFUNS_H_
 #define _SOCKET_EFUNS_H_
 
-#ifndef OS2
+#include "std.h"
 
-#include <netinet/in.h>
+#ifndef OS2
 
 enum socket_mode {
     MUD, STREAM, DATAGRAM, STREAM_BINARY, DATAGRAM_BINARY

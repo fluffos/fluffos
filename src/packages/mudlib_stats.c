@@ -1,13 +1,12 @@
 #ifdef LATTICE
-#include "/config.h"
-#include "/efuns.h"
-#include "/lint.h"
+#include "/lpc_incl.h"
+#include "/mudlib_stats.h"
 #else
-#include "../config.h"
-#include "../efuns.h"
-#include "../lint.h"
+#include "../lpc_incl.h"
+#include "../mudlib_stats.h"
 #endif
 
+#ifndef NO_MUDLIB_STATS
 #ifdef F_DOMAIN_STATS
 void
 f_domain_stats P2(int, num_arg, int, instruction)
@@ -57,4 +56,4 @@ f_author_stats P2(int, num_arg, int, instruction)
     }
 }
 #endif
-
+#endif

@@ -1,5 +1,9 @@
-#ifndef _OBJECT_H_
-#define _OBJECT_H_
+#ifndef OBJECT_H
+#define OBJECT_H
+
+#include "mapping.h"
+#include "interpret.h"
+#include "program.h"
 
 /*
  * Definition of an object.
@@ -94,5 +98,62 @@ typedef struct object {
 #define ROB_NUMERAL_ERROR 8
 #define ROB_GENERAL_ERROR 16
 #define ROB_ERROR 31
+
+/*
+ * object.c
+ */
+extern struct object *previous_ob;
+extern int tot_alloc_object;
+extern int tot_alloc_object_size;
+extern int save_svalue_depth;
+
+void bufcat PROT((char **, char *));
+void reference_prog PROT((struct program *, char *));
+void free_prog PROT((struct program *, int));
+int svalue_save_size PROT((struct svalue *));
+void save_svalue PROT((struct svalue *, char **));
+int restore_svalue PROT((char *, struct svalue *));
+int save_object PROT((struct object *, char *, int));
+char *save_variable PROT((struct svalue *));
+int restore_object PROT((struct object *, char *, int));
+void restore_variable PROT((struct svalue *, char *));
+struct object *get_empty_object PROT((int));
+void reset_object PROT((struct object *, int));
+void reload_object PROT((struct object *));
+void free_object PROT((struct object *, char *));
+struct object *find_living_object PROT((char *, int));
+int valid_hide PROT((struct object *));
+int object_visible PROT((struct object *));
+void set_living_name PROT((struct object *, char *));
+void remove_living_name PROT((struct object *));
+void stat_living_objects PROT((void));
+int shadow_catch_message PROT((struct object *, char *));
+void tell_npc PROT((struct object *, char *));
+void tell_object PROT((struct object *, char *));
+/*
+ * ed.c
+ */
+void ed_start PROT((char *, char *, char *, int, struct object *));
+void ed_cmd PROT((char *));
+void save_ed_buffer PROT((void));
+void regerror PROT((char *));
+
+/*
+ * hash.c
+ */
+int hashstr PROT((char *, int, int));
+int whashstr PROT((char *, int));
+
+/*
+ * call_out.c
+ */
+void call_out PROT((void));
+void new_call_out PROT((struct object *, char *, int, int, struct svalue *));
+int remove_call_out PROT((struct object *, char *));
+void remove_all_call_out PROT((struct object *));
+int find_call_out PROT((struct object *, char *));
+struct vector *get_all_call_outs PROT((void));
+int print_call_out_usage PROT((int));
+void count_ref_from_call_outs PROT((void));
 
 #endif

@@ -10,6 +10,8 @@
 #if !defined(_UID_H_) && !defined(NO_UIDS)
 #define _UID_H_
 
+#include "std.h"
+
 typedef struct _uid {
     char *name;
 }    userid_t;

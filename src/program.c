@@ -1,0 +1,1 @@
+int total_num_prog_blocks, total_prog_block_size;

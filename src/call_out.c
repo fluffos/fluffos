@@ -1,18 +1,7 @@
-#include "config.h"
-
-#include <stdio.h>
-#include <setjmp.h>
-#ifndef LATTICE
-#include <memory.h>
-#endif
-#include <string.h>
-
-#include "lint.h"
-#include "interpret.h"
-#include "object.h"
-#include "buffer.h"
-#include "mapping.h"
-#include "include/origin.h"
+#include "std.h"
+#include "lpc_incl.h"
+#include "backend.h"
+#include "comm.h"
 
 /*
  * This file implements delayed calls of functions.
@@ -135,11 +124,7 @@ void call_out()
     jmp_buf save_error_recovery_context;
     int save_rec_exists;
     struct object *save_command_giver;
-    extern struct object *command_giver;
-    extern struct object *current_interactive;
-    extern int current_time;
     static int last_time;
-    extern int call_origin;
 
     if (call_list == 0) {
 	last_time = current_time;
@@ -171,8 +156,6 @@ void call_out()
 	    call_list->delta += cop->delta;
 	if (!(cop->ob->flags & O_DESTRUCTED)) {
 	    if (SETJMP(error_recovery_context)) {
-		extern void clear_state();
-
 		clear_state();
 		debug_message("Error in call out.\n");
 	    } else {
@@ -335,7 +318,8 @@ struct vector *get_all_call_outs()
 
 /* Zap all of the dested ones from the array... */
     remove_all_call_out((struct object *) NULL);
-    for (i = 0, cop = call_list; cop; i++, cop = cop->next);
+    for (i = 0, cop = call_list; cop; i++, cop = cop->next)
+	;
     v = allocate_array(i);
     next_time = 0;
     /*

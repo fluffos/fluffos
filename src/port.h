@@ -12,8 +12,10 @@
    and #endif.  Otherwise make_func will break.
 */
 
-#ifndef _PORT_H
-#define _PORT_H
+#ifndef PORT_H
+#define PORT_H
+
+#include "macros.h"
 
 /* define this if you have an Ultrix system that the driver won't otherwise
    compile on (doesn't seem to be needed for DECstations).
@@ -25,15 +27,20 @@
 
 /* hack to figure out if we are being compiled under Solaris or not */
 #ifdef sun
-#if defined(__svr4__) || defined(__sol__) || defined(SVR4)
-#define SunOS_5
-#else
-#define SunOS_4
+#  if defined(__svr4__) || defined(__sol__) || defined(SVR4)
+#    define SunOS_5
+#  else
+#    define SunOS_4
+#  endif
 #endif
+
+/* evidentally, gcc on OS/2 defines virtually nothing of use? */
+#ifdef __EMX__
+#  define OS2
 #endif
 
 #if defined(SunOS_5) && !defined(SVR4)
-#define SVR4
+#  define SVR4
 #endif
 
 /* "hp68k" refers to Motorola 680xx HP's running BSD - not sure if they
@@ -42,28 +49,28 @@
 */
 #if (defined(hp200) || defined(hp300) || defined(hp400) || defined(hp500)) \
         && !defined(hpux)
-#define hp68k
-#define _ANSI_H
+#  define hp68k
+#  define _ANSI_H
 #endif
 
 /* I hear that gcc defines one of these, cc defines the other (w/ OSF/1 1.2)
     -bobf
 */
 #if defined(__osf__) || defined(__OSF__)
-#define OSF
+#  define OSF
 #endif
 
 #if !defined(AMIGA) && ( \
     ((defined(LATTICE) || defined(__SASC)) && defined(_AMIGA)) || \
     (defined(AZTEC_C) && defined(MCH_AMIGA)) )
-#define AMIGA
+#  define AMIGA
 #endif
 
 /* HAS_MONCONTROL: define this if you wish to do profiling of the driver
    on a machine that has the moncontrol() system call.
 */
 #if defined(NeXT)
-#define HAS_MONCONTROL
+#  define HAS_MONCONTROL
 #endif
 
 /* define this if your builtin version of inet_ntoa() works well.  It has a
@@ -72,7 +79,7 @@
  * NOTE: you must define this when compiling on a NeXT or an RS/6000.
  */
 #if (!defined(sparc))
-#define INET_NTOA_OK
+#  define INET_NTOA_OK
 #endif
 
 /* Define what random number generator to use.
@@ -82,9 +89,9 @@
 
 #if defined(NeXT) || defined(__386BSD__) || defined(hp68k) || \
         defined(__bsdi__) || defined(sequent) || defined(OS2)
-#define RANDOM
+#  define RANDOM
 #else				/* Sequent, HP, Sparc, RS/6000 */
-#define DRAND48
+#  define DRAND48
 #endif
 
 /*
@@ -95,20 +102,20 @@
 #if (!defined(_SEQUENT_) && !defined(SVR4) && !defined(LATTICE) \
      && !defined(_AUX_SOURCE) && !defined(cray) && !defined(OLD_HPUX) \
      && !defined(_M_UNIX)) && !defined(OS2)
-#define RUSAGE
+#  define RUSAGE
 #endif
 
 /* the !defined(_FUNC_SPEC) is needed to allow make_func to work okay. */
 #if defined(hpux) && !defined(OLD_HPUX) && !defined(_FUNC_SPEC_)
-#include <sys/syscall.h>
-#define getrusage(a, b) syscall(SYS_GETRUSAGE, (a), (b))
+#  include <sys/syscall.h>
+#  define getrusage(a, b) syscall(SYS_GETRUSAGE, (a), (b))
 #endif
 
 /*
  * Dynix/ptx has a system-call similar to rusage().
  */
 #ifdef _SEQUENT_
-#define GET_PROCESS_STATS
+#  define GET_PROCESS_STATS
 #endif
 
 /*
@@ -118,7 +125,7 @@
 #if defined(hpux) || defined(apollo) || defined(__386BSD__) || \
         defined(SVR4) || defined(_SEQUENT_) || defined(_AUX_SOURCE) || \
         defined(cray) || defined(SunOS_5) || defined(_M_UNIX)
-#define TIMES
+#  define TIMES
 #endif
 
 /*
@@ -126,7 +133,7 @@
  * System V Release 4.
  */
 #if (defined(_SEQUENT_))
-#define SYSV
+#  define SYSV
 #endif
 
 /* define HAS_UALARM if ualarm() system call is available (or if ualarm.c
@@ -134,7 +141,7 @@
 */
 #if !(defined(SYSV) || defined(SVR4) || defined(cray) || defined(LATTICE)) \
     || defined(OS2)
-#define HAS_UALARM
+#  define HAS_UALARM
 #endif
 
 /*
@@ -142,7 +149,7 @@
  * call.
  */
 #if !defined(_SEQUENT_) && !defined(LATTICE)
-#define HAS_GETTIMEOFDAY
+#  define HAS_GETTIMEOFDAY
 #endif
 
 /*
@@ -152,7 +159,7 @@
  * but you do have POSIX signals, then #define USE_POSIX_SIGNALS.
  */
 #if (defined(_SEQUENT_) || defined(_M_UNIX))
-#define USE_POSIX_SIGNALS
+#  define USE_POSIX_SIGNALS
 #endif
 
 /*
@@ -161,9 +168,9 @@
 /* HP, Sequent, NeXT, Sparc all have fchmod() */
 #if defined(cray) || defined(LATTICE) || defined(_AIX) || defined(_M_UNIX) \
     || defined(OS2)
-#define FCHMOD_MISSING
+#  define FCHMOD_MISSING
 #else
-#undef FCHMOD_MISSING
+#  undef FCHMOD_MISSING
 #endif
 
 /*
@@ -176,7 +183,7 @@
  * Amiga's AmiTCP does but has too many usage constraints.
  */
 #if (defined(_SEQUENT_))
-#define HAS_SETDTABLESIZE
+#  define HAS_SETDTABLESIZE
 #endif
 
 /* undefine this if your system doesn't have unsigned chars */
@@ -190,9 +197,9 @@
 #if defined(NeXT) || defined(accel) || defined(apollo) || \
     (defined(__386BSD__) && !(defined(__FreeBSD__) || defined(__NetBSD__))) \
     || defined(hp68k) || defined(sequent)
-#define SIGNAL_ERROR BADSIG
+#  define SIGNAL_ERROR BADSIG
 #else
-#define SIGNAL_ERROR SIG_ERR
+#  define SIGNAL_ERROR SIG_ERR
 #endif
 
 #define SIGNAL_FUNC_TAKES_INT defined(_AIX) || defined(NeXT) \
@@ -211,10 +218,10 @@ asking your system adminstrator.
 #if !defined(linux) && !defined(__386BSD__) && !defined(__FreeBSD__) \
 	&& !defined(OSF) && !defined(SunOS_4) && !defined(sgi)
 #if defined(hpux) || defined(SunOS_5)
-#define MEMPAGESIZE sysconf(_SC_PAGE_SIZE)
+#  define MEMPAGESIZE sysconf(_SC_PAGE_SIZE)
 #else
 /* taken from smalloc.c's CHUNK_SIZE */
-#define MEMPAGESIZE 0x40000
+#  define MEMPAGESIZE 0x40000
 #endif				/* hpux */
 #endif				/* linux */
 
@@ -282,4 +289,16 @@ typedef unsigned long UINT32;
 #define HAS_STDARG_H
 #endif
 
+/*
+ * port.c
+ */
+#ifndef _FUNC_SPEC_
+int random_number PROT((int));
+int get_current_time PROT((void));
+char *time_string PROT((int));
+void init_usec_clock PROT((void));
+void get_usec_clock PROT((long *, long *));
+int get_cpu_times PROT((unsigned long *, unsigned long *));
+char *get_current_dir PROT((char *, int));
+#endif
 #endif				/* _PORT_H */

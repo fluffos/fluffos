@@ -1,11 +1,12 @@
+#include "std.h"
 #include "generate.h"
-#include "opcodes.h"
-#include "compiler_shared.h"
-#include "fp_defs.h"
+#include "compiler.h"
 #include "icode.h"
+#include "lex.h"
+#include "simulate.h"
 
 void dump_tree PROT((struct parse_node *, int));
-static struct parse_node *optimize_expr PROT((struct parse_node *));
+static struct parse_node *optimize PROT((struct parse_node *));
 
 #ifdef LPC_TO_C
 #  define DISPATCH(x) void x() { if (compile_to_c) c_##x(); else i_##x(); }
@@ -21,23 +22,23 @@ static void
 optimize_expr_list P1(struct parse_node *, expr) {
     if (!expr) return;
     do {
-	optimize_expr(expr->v.expr);
+	optimize(expr->v.expr);
     } while (expr = expr->right);
 }
 
 static void
 optimize_lvalue_list P1(struct parse_node *, expr) {
     while (expr = expr->right) {
-	optimize_expr(expr->left);
+	optimize(expr->left);
     }
 }
 
 static struct parse_node *
-optimize_expr P1(struct parse_node *, expr) {
+optimize P1(struct parse_node *, expr) {
     if (!expr) return 0;
     switch (expr->kind) {
     case F_RANGE:
-	expr->v.expr = optimize_expr(expr->v.expr);
+	expr->v.expr = optimize(expr->v.expr);
 	/* fall through */
     case F_LOR:
     case F_LAND:
@@ -74,7 +75,7 @@ optimize_expr P1(struct parse_node *, expr) {
     case F_MOD:
     case NODE_COMMA:
     case NODE_ASSOC:
-	expr->left = optimize_expr(expr->left);
+	expr->left = optimize(expr->left);
 	/* fall through */
     case F_POP_VALUE:
     case F_PRE_INC:
@@ -88,7 +89,7 @@ optimize_expr P1(struct parse_node *, expr) {
     case F_NEGATE:
     case F_CATCH:
     case F_TIME_EXPRESSION:
-	expr->right = optimize_expr(expr->right);
+	expr->right = optimize(expr->right);
 	break;
     case F_AGGREGATE:
     case F_AGGREGATE_ASSOC:
@@ -99,44 +100,44 @@ optimize_expr P1(struct parse_node *, expr) {
 	optimize_expr_list(expr->right);
 	break;
     case NODE_CONDITIONAL:
-	expr->left = optimize_expr(expr->left);
-	expr->right->left = optimize_expr(expr->right->left);
-	expr->right->right = optimize_expr(expr->right->right);
+	expr->left = optimize(expr->left);
+	expr->right->left = optimize(expr->right->left);
+	expr->right->right = optimize(expr->right->right);
 	break;
     case F_SSCANF:
-	expr->left->left = optimize_expr(expr->left->left);
-	expr->left->right = optimize_expr(expr->left->right);
+	expr->left->left = optimize(expr->left->left);
+	expr->left->right = optimize(expr->left->right);
 	optimize_lvalue_list(expr->right);
 	break;
     case F_PARSE_COMMAND:
-	expr->left->left = optimize_expr(expr->left->left);
-	expr->left->right->left = optimize_expr(expr->left->right->left);
-	expr->left->right->right = optimize_expr(expr->left->right->right);
+	expr->left->left = optimize(expr->left->left);
+	expr->left->right->left = optimize(expr->left->right->left);
+	expr->left->right->right = optimize(expr->left->right->right);
 	optimize_lvalue_list(expr->right);
 	break;
     case F_EVALUATE:
 #ifdef NEW_FUNCTIONS
 	optimize_expr_list(expr->right);
 #else
-	expr->left = optimize_expr(expr->left);
-	expr->right = optimize_expr(expr->right);
+	expr->left = optimize(expr->left);
+	expr->right = optimize(expr->right);
 #endif
 	break;
     case F_FUNCTION_CONSTRUCTOR:
 #ifdef NEW_FUNCTIONS
 	if ((expr->v.number & 0xff) == FP_CALL_OTHER) {
-	    expr->left = optimize_expr(expr->left);
-	    expr->right = optimize_expr(expr->right);
+	    expr->left = optimize(expr->left);
+	    expr->right = optimize(expr->right);
 	    break;
 	}
 	if (expr->right)
 	    optimize_expr_list(expr->right);
-	if (expr->v.number & 0xff == FP_FUNCTIONAL)
-	    expr->left = optimize_expr(expr->left);
+	if ((expr->v.number & 0xff) == FP_FUNCTIONAL)
+	    expr->left = optimize(expr->left);
 #else
 	if (expr->left)
-	    expr->left = optimize_expr(expr->left);
-	expr->right = optimize_expr(expr->right);
+	    expr->left = optimize(expr->left);
+	expr->right = optimize(expr->right);
 #endif
 	break;
     default:
@@ -146,26 +147,29 @@ optimize_expr P1(struct parse_node *, expr) {
     return expr;
 }
 
-void
-generate_expr P1(struct parse_node *, node) {
-  if (num_parse_error) return;
-  if (pragmas & PRAGMA_OPTIMIZE) node = optimize_expr(node);
+short
+generate P1(struct parse_node *, node) {
+    short where = CURRENT_PROGRAM_SIZE;
+
+    if (num_parse_error) return 0;
+    if (pragmas & PRAGMA_OPTIMIZE) node = optimize(node);
 #ifdef LPC_TO_C
-  if (compile_to_c)
-    c_generate_node(node);
-  else
+    if (compile_to_c)
+	c_generate_node(node);
+    else
 #endif
-    i_generate_node(node);
-  free_tree();
+    {
+	i_generate_node(node);
+    }
+    free_tree();
+    
+    return where;
 }
 
 int
 node_always_true P1(struct parse_node *, node) {
-    if (node->flags & E_CONST) {
-	if (node->kind == F_NUMBER && node->v.number == 0)
-	    return 0;
-	return 1;
-    }
+    if (node->kind == F_NUMBER)
+	return node->v.number;
     return 0;
 }
 
@@ -187,14 +191,15 @@ generate_conditional_branch P1(struct parse_node *, node) {
 	branch = F_BBRANCH_WHEN_ZERO;
     } else {
 	branch = F_BBRANCH_WHEN_NON_ZERO;
-	if (node->flags & E_CONST) {
-	    if (node->kind == F_NUMBER && node->v.number == 0)
+	if (node->kind == F_NUMBER) {
+	    if (node->v.number == 0)
 		branch = 0;
-	    else branch = F_BBRANCH;
+	    else 
+		branch = F_BBRANCH;
 	    node = 0;
 	}
     }
-    generate_expr(node);
+    generate(node);
     branch_backwards(branch);
 }
 
@@ -202,37 +207,11 @@ DISPATCH2(generate_function_call, short, f, char, num)
 
 DISPATCH(pop_value)
 
+DISPATCH1(branch_backwards, char, b)
+
 DISPATCH(generate___INIT)
 
 DISPATCH1(generate_final_program, int, flag)
-
-DISPATCH1(generate_return, struct parse_node *, node)
-
-DISPATCH(generate_break_point)
-
-DISPATCH(generate_break)
-
-DISPATCH(generate_continue)
-
-DISPATCH(update_continues)
-
-DISPATCH(save_position)
-
-DISPATCH1(branch_backwards, char, b)
-
-DISPATCH(update_breaks)
-
-DISPATCH(save_loop_info)
-
-DISPATCH(restore_loop_info)
-
-DISPATCH(start_switch)
-
-DISPATCH1(generate_forward_branch, char, b)
-
-DISPATCH(update_forward_branch)
-
-DISPATCH(generate_else)
 
 DISPATCH(initialize_parser)
 

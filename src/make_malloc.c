@@ -1,21 +1,9 @@
 /* simple little program to link the right malloc c module to malloc.c */
 /* needs to be a C program so that it can include config.h */
 
-#include "config.h"
-
-#ifdef NeXT
-#include <libc.h>
-#endif
-#ifdef LATTICE
-#include <stdlib.h>
-#endif
-#if defined(__386BSD__) || defined(SunOS_5) || defined(LATTICE)
-#include <sys/types.h>
-#include <stdio.h>
-#include <unistd.h>
-
-#include "lint.h"
-#endif
+#define NO_OPCODES
+#define NO_SOCKETS
+#include "std.h"
 
 #ifdef SYSMALLOC
 #define THE_MALLOC "sysmalloc.c"
@@ -39,7 +27,7 @@ int main(argc, argv)
     } else {
 	printf("Using memory allocation package: %s\n", THE_MALLOC);
     }
-#ifdef LATTICE
+#if defined(LATTICE) || defined(OS2)
     {
 	char cmd[100];
 

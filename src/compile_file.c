@@ -1,45 +1,4 @@
-#include "config.h"
-
-#ifdef SunOS_5
-#include <stdlib.h>
-#endif
-#include <sys/types.h>
-#include <sys/stat.h>
-#if !defined(SunOS_5)
-#include <sys/dir.h>
-#endif
-#include <fcntl.h>
-#include <setjmp.h>
-#include <string.h>
-#include <errno.h>
-#include <stdio.h>
-#if !defined(LATTICE)
-#if !defined(__bsdi__)
-#include <varargs.h>
-#endif
-#include <memory.h>
-#else
-#include <signal.h>
-#include "amiga.h"
-#endif
-#if defined(sun)
-#include <alloca.h>
-#endif
-#if defined(OSF) || defined(M_UNIX)
-#include <dirent.h>
-#endif
-
-#include "lint.h"
-#include "opcodes.h"
-#include "interpret.h"
-#include "object.h"
-#include "sent.h"
-#include "exec.h"
-#include "comm.h"
-#include "debug.h"
-#ifdef LPC_TO_C
-#include "interface.h"
-#endif
+#include "std.h"
 
 #if defined(LPC_TO_C) && defined(RUNTIME_LOADING)
 
@@ -73,7 +32,6 @@
 #include <nlist.h>
 #endif
 
-#include <sys/param.h>
 #include <sys/file.h>
 #endif
 
@@ -522,11 +480,6 @@ int generate_source P2(char *, lname, char *, out_fname)
 {
     FILE *crdir_fopen();
     FILE *f;
-    extern int total_lines;
-    extern int comp_flag;
-    extern char *inherit_file;
-    extern struct program *prog;
-    extern char *current_file;
     struct stat c_st;
     char real_name[200];
     char name[200];
@@ -595,7 +548,7 @@ int generate_source P2(char *, lname, char *, out_fname)
 	    perror(out_fname);
 	    error("Could not open output file '%s'.\n", out_fname);
 	}
-	current_file = make_shared_string(real_name);
+	current_file = string_copy(real_name);
 	generate_identifier(ident, name);
 	compilation_ident = ident;
 	compile_file(f);
@@ -605,7 +558,7 @@ int generate_source P2(char *, lname, char *, out_fname)
 	update_compile_av(total_lines);
 	(void) fclose(f);
 	total_lines = 0;
-	free_string(current_file);
+	FREE(current_file);
 	current_file = 0;
 	if (inherit_file) {
 	    char *tmp = inherit_file;

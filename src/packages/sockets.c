@@ -4,22 +4,17 @@
 */
 
 #ifdef LATTICE
-#include <stdlib.h>
-#include "/config.h"
-#include "/efuns.h"
-#include "/stralloc.h"
-#include "/lint.h"
-#include "/applies.h"
+#include "/lpc_incl.h"
+#include "/socket_err.h"
+#include "/include/socket_err.h"
+#include "/socket_efuns.h"
+#include "/comm.h"
 #else
-#include "../config.h"
-#include "../efuns.h"
-#include "../stralloc.h"
-#include "../lint.h"
-#include "../applies.h"
-#endif
-
-#if defined(__386BSD__) || defined(SunOS_5)
-#include <unistd.h>
+#include "../lpc_incl.h"
+#include "../socket_err.h"
+#include "../include/socket_err.h"
+#include "../socket_efuns.h"
+#include "../comm.h"
 #endif
 
 #define VALID_SOCKET(x) check_valid_socket((x), fd, get_socket_owner(fd), addr, port)

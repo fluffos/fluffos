@@ -1,6 +1,5 @@
-#ifndef _EXEC_H_
-#define _EXEC_H_
-
+#ifndef PROGRAM_H
+#define PROGRAM_H
 /*
  * A compiled program consists of several data blocks, all allocated
  * contiguously in memory to enhance the working set. During compilation,
@@ -68,6 +67,22 @@
 /* a function that isn't 'real' */
 #define NAME_NO_CODE  (NAME_UNDEFINED | NAME_ALIAS)
 
+/*
+ * These are or'ed in on top of the basic type.
+ */
+#define TYPE_MOD_POINTER	0x0040	/* Pointer to a basic type */
+#define TYPE_MOD_HIDDEN         0x0080  /* used by private vars */
+#define TYPE_MOD_STATIC		0x0100	/* Static function or variable */
+#define TYPE_MOD_NO_MASK	0x0200	/* The nomask => not redefineable */
+#define TYPE_MOD_PRIVATE	0x0800	/* Can't be inherited */
+#define TYPE_MOD_PROTECTED	0x1000
+#define TYPE_MOD_PUBLIC		0x2000	/* Force inherit through private */
+#define TYPE_MOD_VARARGS	0x4000	/* Used for type checking */
+
+#define TYPE_MOD_MASK		(~(TYPE_MOD_STATIC | TYPE_MOD_NO_MASK |\
+				   TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED |\
+				   TYPE_MOD_PUBLIC | TYPE_MOD_VARARGS))
+
 struct function {
     char *name;
 #ifndef LPC_TO_C
@@ -121,7 +136,8 @@ struct internal_program {
     int id_number;		/* used to associate information with this
 				 * prog block without needing to increase the
 				 * reference count     */
-    unsigned short *line_numbers;	/* Line number information */
+    unsigned char *line_info;   /* Line number information */
+    unsigned short *file_info;
     int line_swap_index;	/* Where line number info is swapped */
     struct function *functions;
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
@@ -166,61 +182,7 @@ struct program {
     union pu p;
 };
 
-/*
- * Types available. The number '0' is valid as any type. These types
- * are only used by the compiler, when type checks are enabled. Compare with
- * the run-time types, named T_ interpret.h.
- */
+extern int total_num_prog_blocks;
+extern int total_prog_block_size;
 
-#define TYPE_UNKNOWN	0	/* This type must be casted */
-#define TYPE_VOID       1
-#define TYPE_NUMBER     2
-#define TYPE_STRING     3
-#define TYPE_OBJECT     4
-#define TYPE_MAPPING    5
-#define TYPE_FUNCTION   6
-#define TYPE_REAL       7
-#define TYPE_BUFFER     8
-#define TYPE_ANY        9	/* Will match any type */
-
-/*
- * These are or'ed in on top of the basic type.
- */
-#define TYPE_MOD_POINTER	0x0040	/* Pointer to a basic type */
-#define TYPE_MOD_HIDDEN         0x0080  /* used by private vars */
-#define TYPE_MOD_STATIC		0x0100	/* Static function or variable */
-#define TYPE_MOD_NO_MASK	0x0200	/* The nomask => not redefineable */
-#define TYPE_MOD_PRIVATE	0x0800	/* Can't be inherited */
-#define TYPE_MOD_PROTECTED	0x1000
-#define TYPE_MOD_PUBLIC		0x2000	/* Force inherit through private */
-#define TYPE_MOD_VARARGS	0x4000	/* Used for type checking */
-
-#define TYPE_MOD_MASK		(~(TYPE_MOD_STATIC | TYPE_MOD_NO_MASK |\
-				   TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED |\
-				   TYPE_MOD_PUBLIC | TYPE_MOD_VARARGS))
-
-typedef struct {
-  SIGNED short local_num, global_num, efun_num;
-  SIGNED short function_num, simul_num;
-} defined_name;
-
-/* to speed up cleaning the hash table, and identify the union */
-#define IHE_RESWORD    0x8000
-#define IHE_EFUN       0x4000
-#define IHE_SIMUL      0x2000
-#define IHE_PERMANENT  (IHE_RESWORD | IHE_EFUN | IHE_SIMUL)
-#define TOKEN_MASK     0x0fff
-
-#define INDENT_HASH_SIZE 1024 /* must be a power of 2 */
-
-struct ident_hash_elem {
-    char *name;
-    short token; /* only flags */
-    short sem_value; /* for these, a count of the ambiguity */
-    struct ident_hash_elem *next;
-/* the fields above must correspond to struct keyword */
-    defined_name dn;
-};
 #endif
-
-

@@ -2,50 +2,19 @@
  *  comm.c -- communications functions and more.
  *            Dwayne Fontenot (Jacques@TMI)
  */
-#include "config.h"
+#include "std.h"
+#include "network_incl.h"
+#include "lpc_incl.h"
+#include "applies.h"
+#include "main.h"
+#include "comm.h"
+#include "socket_efuns.h"
+#include "backend.h"
+#include "socket_ctrl.h"
+#include "eoperators.h"
+#include "debug.h"
 
-#if defined(SunOS_5) || defined(LATTICE)
-#include <stdlib.h>
-#endif
-#if defined(__386BSD__) || defined(SunOS_5)
-#include <unistd.h>
-#endif
-#include <sys/types.h>
-#ifndef LATTICE
-#include <sys/time.h>
-#else
-#include <time.h>
-#endif
-#ifndef LATTICE
-#include <sys/ioctl.h>
-#endif
-#ifdef __386BSD__
-#include <sys/param.h>
-#endif
 #define TELOPTS
-#if !defined(LATTICE) && !defined(OS2)
-#include <arpa/telnet.h>
-#include <netdb.h>
-#include <fcntl.h>
-#endif
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
-#include <ctype.h>
-#include <signal.h>
-#ifdef __SASC
-#include <nsignal.h>
-#endif
-#if defined(_AUX_SOURCE) || defined(__SASC)
-#include "telnet.h"
-#endif
-#ifndef LATTICE
-#include <memory.h>
-#endif
-#ifdef LATTICE
-#include <amiga.h>
-#include <socket.h>
-#endif
 #ifdef OS2
 #include "os2\\telnet.h"
 
@@ -63,23 +32,6 @@ extern HEV mudos_event_sem;
 #define INBUF_SIZE 2048
 #define TIMEOUT 10000
 #endif
-#include <setjmp.h>
-#ifdef HAS_STDARG_H
-#include <stdarg.h>
-#else
-#include <varargs.h>
-#endif
-
-#include "lint.h"
-#include "interpret.h"
-#include "comm.h"
-#include "socket_efuns.h"
-#include "object.h"
-#include "sent.h"
-#include "debug.h"
-#include "opcodes.h"
-#include "applies.h"
-#include "include/origin.h"
 
 int total_users = 0;
 
@@ -110,23 +62,6 @@ static void got_addr_number PROT((char *, char *));
 static void add_ip_entry PROT((long, char *));
 static void clear_notify PROT((void));
 static void new_user_handler PROT((void));
-
-/*
- * external variables.
- */
-extern int port_number;
-extern int errno;
-extern int d_flag;
-extern int current_time;
-extern struct object *command_giver, *current_interactive;
-
-#ifdef SOCKET_EFUNS
-extern struct lpc_socket lpc_socks[];
-
-#endif
-extern int heart_beat_flag;
-extern char *default_fail_message;
-
 #ifdef RECEIVE_SNOOP
 static void receive_snoop PROT((char *, struct object * ob));
 #endif
@@ -200,7 +135,7 @@ void check_for_data_thread()
 	    AVAILDATA avail;
 	    char buf[3];
 
-	    if (!all_users[i] || all_users[i]->closing || all_users[i]->cmd_in_buf)
+	    if (!all_users[i] || (all_users[i]->iflags & (CLOSING | CMD_IN_BUF))
 		continue;
 	    if (DosPeekNPipe(all_users[i]->named_pipe, buf, 2, &br, &avail, &state)) {
 		continue;
@@ -827,9 +762,9 @@ INLINE void process_io()
 	AVAILDATA avail;
 	char buf[3];
 
-	if (!all_users[i] || all_users[i]->closing || all_users[i]->cmd_in_buf)
+	if (!all_users[i] || (all_users[i] & (CLOSING | CMD_IN_BUF))
 	    continue;
-	if (all_users[i]->net_dead) {
+	if (all_users[i]->iflags & NET_DEAD) {
 	    remove_interactive(all_users[i]->ob);
 	    continue;
 	}
@@ -1190,7 +1125,6 @@ static void hname_handler()
 	    addr_server_fd = -1;
 	    close(tmp);
 	    return;
-	    break;
 	}
 	break;
     case 0:
@@ -1199,7 +1133,6 @@ static void hname_handler()
 	addr_server_fd = -1;
 	close(tmp);
 	return;
-	break;
     default:
 	hname_buf[num_bytes] = '\0';
 	debug(512, ("hname_handler: address server replies: %s", hname_buf));
@@ -1280,7 +1213,6 @@ static void get_user_data P1(struct interactive *, ip)
 	    fprintf(stderr, "get_user_data: tried to read from closing fd.\n");
 	remove_interactive(ip->ob);
 	return;
-	break;
     case -1:
 #ifdef EWOULDBLOCK
 	if (errno == EWOULDBLOCK) {
@@ -1605,11 +1537,11 @@ void remove_interactive P1(struct object *, ob)
 	command_giver = ob;
 	debug(512, ("Closing connection from %s.\n",
 		    inet_ntoa(ob->interactive->addr.sin_addr)));
-	if (ob->interactive->ed_buffer) {
 #ifdef F_ED
+	if (ob->interactive->ed_buffer) {
 	    save_ed_buffer();
-#endif
 	}
+#endif
 	debug(512, ("remove_interactive: closing fd %d\n", ob->interactive->fd));
 #ifdef OS2
 	DosDisConnectNPipe(ob->interactive->named_pipe);
@@ -1970,7 +1902,8 @@ int query_addr_number P2(char *, name, char *, call_back)
 
 /* We put ourselves into the pending name lookup entry table */
 /* Find the first free entry */
-	for (i = 0; i < IPSIZE && ipnumbertable[i].name; i++);
+	for (i = 0; i < IPSIZE && ipnumbertable[i].name; i++)
+	    ;
 	if (i == IPSIZE) {
 /* We need to error...  */
 	    push_constant_string(name);
@@ -2002,7 +1935,8 @@ static void got_addr_number P2(char *, number, char *, name)
 		ipnumbertable[i].name = NULL;
 	    }
 	for (i = 0; i < IPSIZE && (!ipnumbertable[i].name
-				   || (ipnumbertable[i].name && strcmp(name, ipnumbertable[i].name))); i++);
+       || (ipnumbertable[i].name && strcmp(name, ipnumbertable[i].name))); i++)
+	    ;
 	if (i >= IPSIZE) {
 /* Hmm, not in the table. Interesting. */
 	    return;

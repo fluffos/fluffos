@@ -25,3 +25,12 @@ INLINE void f_function_constructor PROT((void));
 INLINE void f_evaluate PROT((void));
 #endif
 INLINE void f_sscanf PROT((void));
+
+/*
+ * eoperators.c
+ */
+struct funp *make_funp PROT((struct svalue *, struct svalue *));
+void push_funp PROT((struct funp *));
+void free_funp PROT((struct funp *));
+int merge_arg_lists PROT((int, struct vector *, int));
+void call_simul_efun PROT((unsigned short, int));

@@ -3,8 +3,10 @@
    Truilkan@TMI - 92/04/17
 */
 
-/* config.h gets INLINE */
-#include "config.h"
+#define NO_OPCODES
+#include "std.h"
+#include "debugmalloc.h"
+#include "md.h"
 
 #undef NOISY_MALLOC
 
@@ -19,17 +21,6 @@
 #define NOISY2(x,y,z) 
 #define NOISY3(w,x,y,z) 
 #endif
-
-#ifdef NeXT
-#include <stdlib.h>
-#endif
-
-#include "lint.h"
-#include "interpret.h"
-#include "md.h"
-
-extern unsigned int total_malloced;
-extern unsigned int hiwater;
 
 typedef struct stats_s {
     unsigned int free_calls, alloc_calls, realloc_calls;

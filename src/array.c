@@ -1,25 +1,9 @@
-#include "config.h"
-
-#include <stdio.h>
-#include <string.h>
-#ifdef sun
-#include <alloca.h>
-#endif
-#ifdef LATTICE
-#include <stdlib.h>
-#endif
-#include <sys/types.h>
-
-#include "lint.h"
-#include "efuns.h"
-#include "interpret.h"
-#include "object.h"
-#include "regexp.h"
-#include "exec.h"
-#include "sent.h"
-#include "debug.h"
+#include "std.h"
+#include "lpc_incl.h"
 #include "comm.h"
-#include "include/origin.h"
+#include "regexp.h"
+#include "backend.h"
+#include "qsort.h"
 
 /*
  * This file contains functions used to manipulate arrays.
@@ -78,7 +62,6 @@ INLINE struct vector *
  */
 struct vector *allocate_array P1(int, n)
 {
-    extern struct svalue const0;
     int i;
     struct vector *p;
 
@@ -354,8 +337,6 @@ struct vector *
        users()
 {
     register struct object *ob;
-    extern int num_user, num_hidden;	/* set by comm1.c */
-    extern struct interactive *all_users[MAX_USERS];
     int i, j;
     int display_hidden = 0;
     struct vector *ret;
@@ -453,7 +434,6 @@ struct vector *commands P1(struct object *, ob)
 void
 f_filter_array P2(int, num_arg, int, instruction)
 {
-    extern struct svalue *sp;
     struct svalue *arg = sp - num_arg + 1;
     struct vector *vec = arg->u.vec, *r;
     int size;
@@ -679,7 +659,7 @@ struct vector *add_array P2(struct vector *, p, struct vector *, r)
 	free_vector(p);
 	if (r->ref > 1) {
 	    res = slice_array(r, 0, r->size - 1);
-	    free_vector(r);
+	    r->ref--;
 	} else
 	    res = r;
 	return res;
@@ -689,7 +669,7 @@ struct vector *add_array P2(struct vector *, p, struct vector *, r)
 	free_vector(r);
 	if (p->ref > 1) {
 	    res = slice_array(p, 0, p->size - 1);
-	    free_vector(p);
+	    p->ref--;
 	} else
 	    res = p;
 	return res;
@@ -808,8 +788,6 @@ struct vector *subtract_array P2(struct vector *, minuend, struct vector *, subt
     difference = allocate_array(minuend->size);
     for (source = minuend->item, dest = difference->item, i = minuend->size;
 	 i--; source++) {
-	extern struct svalue const0;
-
 	if (source->type == T_OBJECT && source->u.ob->flags & O_DESTRUCTED)
 	    assign_svalue(source, &const0);
 	if (assoc(source, subtrahend) < 0)
@@ -873,7 +851,6 @@ struct vector *all_inventory P2(struct object *, ob, int, override)
 void
 map_array P2(struct svalue *, arg, int, num_arg)
 {
-    extern struct svalue *sp;
     struct vector *arr = arg->u.vec;
     struct vector *r;
     int size;
@@ -990,6 +967,7 @@ INLINE static int builtin_sort_array_cmp_fwd P2(struct svalue *, p1, struct sval
 
     }
     error("built-in sort_array() can only handle homogeneous arrays of strings/ints/floats/arrays\n");
+    return 0;
 }
 
 INLINE static int builtin_sort_array_cmp_rev P2(struct svalue *, p1, struct svalue *, p2)
@@ -1042,6 +1020,7 @@ INLINE static int builtin_sort_array_cmp_rev P2(struct svalue *, p1, struct sval
 
     }
     error("built-in sort_array() can only handle homogeneous arrays of strings/ints/floats\n");
+    return 0;
 }
 
 INLINE static
@@ -1070,7 +1049,6 @@ int sort_array_cmp P2(struct svalue *, p1, struct svalue *, p2) {
 void
 f_sort_array P2(int, num_arg, int, instruction)
 {
-    extern struct svalue *sp;
     struct svalue *arg = sp - num_arg + 1;
     struct vector *tmp = arg->u.vec;
 
@@ -1264,8 +1242,6 @@ static struct vector *order_alist P1(struct vector *, inlist)
 	    /* but first ensure that it contains no destructed object */
 	    if (insval[i].type == T_OBJECT
 		&& insval[i].u.ob->flags & O_DESTRUCTED) {
-		extern struct svalue const0;
-
 		free_object(insval[i].u.ob, "order_alist");
 		inlists[i].u.vec->item[j] = insval[i] = const0;
 	    }
@@ -1437,7 +1413,6 @@ struct vector *match_regexp P2(struct vector *, v, char *, pattern)
     char *res;
     int i, num_match;
     struct vector *ret;
-    extern int eval_cost;
 
     if (v->size == 0)
 	return null_array();
@@ -1539,7 +1514,6 @@ struct vector *inherit_list P1(struct object *, ob)
 struct vector *
        children P1(char *, str)
 {
-    extern struct object *obj_list;
     int i, j;
     int t_sz;
     int sl, ol, needs_freed = 0;
@@ -1666,7 +1640,6 @@ struct vector *
 #ifdef F_OBJECTS
 void f_objects P2(int, num_arg, int, instruction)
 {
-    extern struct svalue *sp;
     char *func;
     struct object *ob, **tmp;
     struct vector *ret;

@@ -5,18 +5,10 @@
  * last modified: July 4, 1994 [robo]
  */
 
-#include "config.h"
-
-#include <stdio.h>
-#if defined(__386BSD__) || defined(SunOS_5) || defined(LATTICE)
-#include <string.h>
-#endif
-#if defined(LATTICE)
-#include <stdlib.h>
-#endif
-
-#include "lint.h"
+#include "std.h"
+#include "include/runtime_config.h"
 #include "interpret.h"
+#include "simulate.h"
 
 #define MAX_LINE_LENGTH 120
 

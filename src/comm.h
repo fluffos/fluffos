@@ -3,19 +3,8 @@
  *
  */
 
-#ifndef _COMM_H_
-#define _COMM_H_
-
-#if !defined(OS2)
-#include <sys/socket.h>
-#if !defined(apollo) && !defined(linux) && !defined(_M_UNIX) && !defined(LATTICE)
-#include <sys/socketvar.h>
-#endif
-#ifndef LATTICE
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#endif
-#endif
+#ifndef COMM_H
+#define COMM_H
 
 #define MAX_TEXT                   2048
 #define MAX_SOCKET_PACKET_SIZE     1024
@@ -44,6 +33,12 @@ enum msgtypes {
 #define NOTIFY_FAIL_FUNC  256   /* default_err_mesg is a function pointer  */
 #define USING_TELNET      512   /* they're using telnet, or something that */
                                 /* understands telnet codes                */
+
+union string_or_func {
+    struct funp *f;
+    char *s;
+};
+
 struct interactive {
     struct object *ob;		/* points to the associated object         */
     struct sentence *input_to;	/* to be called with next input line       */
@@ -84,4 +79,46 @@ struct interactive {
 #endif
 };
 
-#endif				/* _COMM_H_ */
+/*
+ * comm.c
+ */
+extern int total_users;
+extern fd_set readmask;
+extern fd_set writemask;
+extern int inet_packets;
+extern int inet_volume;
+extern int num_user;
+extern int num_hidden;
+extern struct interactive *all_users[];
+extern int add_message_calls;
+
+#ifdef SIGNAL_FUNC_TAKES_INT
+void sigalrm_handler PROT((int));
+#else
+void sigalrm_handler PROT((void));
+#endif
+void add_message PROTVARGS(());
+void update_ref_counts_for_users PROT((void));
+void make_selectmasks PROT((void));
+void init_user_conn PROT((void));
+void init_addr_server PROT((char *, int));
+void ipc_remove PROT((void));
+void set_prompt PROT((char *));
+void notify_no_command PROT((void));
+void set_notify_fail_message PROT((char *));
+void process_io PROT((void));
+int process_user_command PROT((void));
+int replace_interactive PROT((struct object *, struct object *));
+int set_call PROT((struct object *, struct sentence *, int));
+void remove_interactive PROT((struct object *));
+int query_addr_number PROT((char *, char *));
+char *query_ip_name PROT((struct object *));
+char *query_ip_number PROT((struct object *));
+char *query_host_name PROT((void));
+int query_idle PROT((struct object *));
+int new_set_snoop PROT((struct object *, struct object *));
+struct object *query_snoop PROT((struct object *));
+struct object *query_snooping PROT((struct object *));
+void set_notify_fail_function PROT((struct funp *));
+
+#endif				/* COMM_H */

@@ -1,11 +1,7 @@
 %{
-#include <stdio.h>
-#include <ctype.h>
-#include <string.h>
-#include <fcntl.h>
-#if defined(__386BSD__) || defined(LATTICE)
-#include <stdlib.h>
-#endif
+#define NO_SOCKETS
+#define NO_OPCODES
+#include "std.h"
 #include "config.h"
 #define _YACC_
 #include "lint.h"
@@ -13,6 +9,7 @@
 #include "mudlib_stats.h"
 #include "interpret.h"
 #include "mapping.h"
+#include "hash.h"
 #include "cc.h"
 
 #ifndef BUFSIZ
@@ -21,10 +18,10 @@
 #define NELEMS(arr) 	(sizeof arr / sizeof arr[0])
 
 #define FUNC_SPEC "func_spec.cpp"
-#define OLD_COMPILER_FILE  "compiler.pre"
+#define OLD_COMPILER_FILE  "grammar.pre"
 #define OPTIONS "options.h"
 #define OPTION_DEFINES "option_defs.c"
-#define COMPILER_FILE "compiler.y"
+#define COMPILER_FILE "grammar.y"
 
 #define MAX_FUNC  	2048  /* If we need more than this we're in trouble! */
 int num_buff;
@@ -465,7 +462,7 @@ static char *protect P1(char *, p) {
     char *bufp = buf;
 
     while (*p) {
-	if (*p=='\"') *bufp++ = '\\';
+	if (*p=='\"' || *p == '\\') *bufp++ = '\\';
 	*bufp++ = *p++;
     }
     *bufp = 0;

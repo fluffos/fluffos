@@ -1,66 +1,27 @@
+#include "std.h"
 #include "config.h"
-
-#include <sys/types.h>
-#if !defined(LATTICE) && !defined(OS2)
-#include <sys/socket.h>
-#endif
-#include <stdio.h>
-#if defined(__386BSD__) || defined(SunOS_5)
-#include <stdlib.h>
-#include <unistd.h>
-#endif
-#include <string.h>
-#include <math.h>
-#include <setjmp.h>
-#include <signal.h>
-#ifdef LATTICE
-#include <stdlib.h>
-#include <fcntl.h>
-#include <amiga.h>
-#include <nsignal.h>
-#include <socket.h>
-#undef write
-#endif
-#if defined(sun)
-#include <alloca.h>
-#endif
-#include <errno.h>
-#ifdef HAS_STDARG_H
-#include <stdarg.h>
-#else
-#include <varargs.h>
-#endif
-
-#include "lint.h"
-#include "interpret.h"
-#include "object.h"
-#include "lex.h"
-#include "sent.h"
-#include "md.h"
-#include "arch.h"		/* after config.h */
+#include "rc.h"
 #include "applies.h"
-#include "exec.h"
-#include "include/origin.h"
-
-extern int current_line;
+#include "lex.h"
+#include "program.h"
+#include "backend.h"
+#include "simul_efun.h"
+#include "simulate.h"
+#include "binaries.h"
+#include "main.h"
+#include "interpret.h"
+#include "stralloc.h"
+#include "otable.h"
+#include "comm.h"
 
 static int e_flag = 0;		/* Load empty, without castles. */
 int d_flag = 0;			/* Run with debug */
 int t_flag = 0;			/* Disable heart beat and reset */
 int comp_flag = 0;		/* Trace compilations */
 int max_cost;
-extern int eval_cost;
 int time_to_swap;
 int time_to_clean_up;
 char *default_fail_message;
-#ifdef NEW_FUNCTIONS
-extern struct program fake_prog;
-#endif
-
-#ifdef YYDEBUG
-extern int yydebug;
-#endif
-
 int port_number;
 int boot_time;
 int max_array_size;
@@ -75,8 +36,6 @@ struct svalue const0, const1, const0u, const0n;
 
 double consts[NUM_CONSTS];
 
-extern jmp_buf error_recovery_context;
-extern int error_recovery_context_exists;
 /* -1 indicates that we have never had a master object.  This is so the
  * simul_efun object can load before the master. */
 struct object *master_ob = (struct object *) -1;
@@ -85,7 +44,6 @@ static void debug_message_svalue PROT((struct svalue * v));
 
 #ifndef NO_IP_DEMON
 void init_addr_server();
-
 #endif				/* NO_IP_DEMON */
 
 #ifdef TRAP_CRASHES
@@ -128,6 +86,10 @@ int debug_level = 32768;
 
 #endif				/* DEBUG_MACRO */
 
+#ifdef LATTICE
+#undef write
+#endif
+
 #ifdef OS2
 int old_argc;
 char **old_argv;
@@ -162,24 +124,22 @@ int main(argc, argv)
     char **argv;
 {
 #endif
-    extern int MudOS_is_being_shut_down;
-    extern int current_time;
     int i, new_mudlib = 0, got_defaults = 0;
     int no_ip_demon = 0;
     char *p;
     char version_buf[80];
     int dtablesize;
 
-#ifdef SAVE_BINARIES
-    void init_binaries();
-
-#endif
-#if !defined(LATTICE) && !defined(OLD_ULTRIX) && !defined(sequent)
+#if !defined(LATTICE) && !defined(OLD_ULTRIX) && !defined(sequent) && \
+    !defined(sgi)
     void tzset();
-
 #endif
     struct lpc_predef_s predefs;
 
+#if !defined(__SASC) && (defined(AMITCP) || defined(AS225))
+    amiga_sockinit();
+    atexit(amiga_sockexit);
+#endif
 #ifdef WRAPPEDMALLOC
     wrappedmalloc_init();
 #endif				/* WRAPPEDMALLOC */
@@ -222,7 +182,7 @@ int main(argc, argv)
     p = (char *) &i;
     *p = -10;
     if (EXTRACT_UCHAR(p) != 0x100 - 10) {
-	fprintf(stderr, "Bad definition of EXTRACT_UCHAR() in config.h.\n");
+	fprintf(stderr, "Bad definition of EXTRACT_UCHAR() in interpret.h.\n");
 	exit(-1);
     }
 
@@ -233,7 +193,7 @@ int main(argc, argv)
     p = (char *) &i;
     (void) EXTRACT_UCHAR(p++);
     if ((p - (char *) &i) != 1) {
-	fprintf(stderr, "EXTRACT_UCHAR() in config.h evaluates its argument more than once.\n");
+	fprintf(stderr, "EXTRACT_UCHAR() in interpret.h evaluates its argument more than once.\n");
 	exit(-1);
     }
 
@@ -246,6 +206,7 @@ int main(argc, argv)
 	fprintf(stderr, "LIVING_HASH_SIZE in options.h must be one of 4, 16, 64, 256, 1024, 4096, ...\n");
 	exit(-1);
     }
+
     /*
      * Check that memmove() works
      */
@@ -522,6 +483,7 @@ char *string_copy P1(char *, str)
     char *p;
     int len;
 
+    DEBUG_CHECK(!str, "Null string passed to string_copy.\n");
     len = strlen(str);
     if (len > max_string_length) {
 	len = max_string_length;
@@ -559,8 +521,14 @@ void debug_message PVARGS(va_alist)
 
     /*
      * re-use stdout's file descriptor if system or process runs out
+     * 
+     * OS/2 doesn't have ENFILE.
      */
-    if (!fp && (errno == EMFILE || errno == ENFILE)) {
+    if (!fp && (errno == EMFILE 
+#ifdef ENFILE
+		|| errno == ENFILE
+#endif
+		)) {
 	fp = freopen(deb, append ? "a" : "w", stdout);
 	append = 2;
     }

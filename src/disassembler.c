@@ -2,21 +2,20 @@
  * Dump information about a program, optionally disassembling it.
  */
 
-#include "efuns.h"
-#include "instrs.h"
-#include "include/origin.h"
-#if defined(SunOS_5) || defined(LATTICE)
-#include <stdlib.h>
-#endif
-
-static struct object *ob;
-extern struct function **simuls;
+#include "std.h"
+#include "lpc_incl.h"
+#include "efuns_incl.h"
+#include "simul_efun.h"
+#include "comm.h"
+#include "swap.h"
+#include "lex.h"
 
 #ifdef F_DUMP_PROG
 void dump_prog PROT((struct program *, char *, int));
 static void disassemble PROT((FILE *, char *, int, int, struct program *));
 static char *disassem_string PROT((char *));
 static int short_compare PROT((unsigned short *, unsigned short *));
+static void dump_line_numbers PROT((FILE *, struct program *));
 
 void
 f_dump_prog P2(int, num_arg, int, instruction)
@@ -24,6 +23,7 @@ f_dump_prog P2(int, num_arg, int, instruction)
     struct program *prog;
     char *where;
     int d;
+    struct object *ob;
 
     if (num_arg == 2) {
 	ob = sp[-1].u.ob;
@@ -50,8 +50,12 @@ f_dump_prog P2(int, num_arg, int, instruction)
     push_number(0);
 }
 
+/* Current flags:
+ * 1 - do disassembly
+ * 2 - dump line number table
+ */
 void
-dump_prog P3(struct program *, prog, char *, fn, int, do_dis)
+dump_prog P3(struct program *, prog, char *, fn, int, flags)
 {
     char *fname;
     FILE *f;
@@ -131,9 +135,13 @@ dump_prog P3(struct program *, prog, char *, fn, int, do_dis)
 	fputc('\n', f);
     }
 
-    if (do_dis) {
+    if (flags & 1) {
 	fprintf(f, "\n;;;  *** Disassembly ***\n");
 	disassemble(f, prog->p.i.program, 0, prog->p.i.program_size, prog);
+    }
+    if (flags & 2) {
+	fprintf(f, "\n;;;  *** Line Number Info ***\n");
+	dump_line_numbers(f, prog);
     }
     add_message("done.\n");
     fclose(f);
@@ -235,12 +243,12 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 
 	switch (instr) {
 	    /* Single numeric arg */
-	case I(F_BRANCH):
-	case I(F_BRANCH_WHEN_ZERO):
-	case I(F_BRANCH_WHEN_NON_ZERO):
+	case F_BRANCH:
+	case F_BRANCH_WHEN_ZERO:
+	case F_BRANCH_WHEN_NON_ZERO:
 #ifdef F_LOR
-	case I(F_LOR):
-	case I(F_LAND):
+	case F_LOR:
+	case F_LAND:
 #endif
 	    ((char *) &sarg)[0] = pc[0];
 	    ((char *) &sarg)[1] = pc[1];
@@ -249,9 +257,9 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	    pc += 2;
 	    break;
 
-	case I(F_BBRANCH_WHEN_ZERO):
-	case I(F_BBRANCH_WHEN_NON_ZERO):
-	case I(F_BBRANCH):
+	case F_BBRANCH_WHEN_ZERO:
+	case F_BBRANCH_WHEN_NON_ZERO:
+	case F_BBRANCH:
 	    ((char *) &sarg)[0] = pc[0];
 	    ((char *) &sarg)[1] = pc[1];
 	    offset = (pc - code) - (unsigned short) sarg;
@@ -260,28 +268,28 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	    break;
 
 #ifdef F_JUMP
-	case I(F_JUMP):
+	case F_JUMP:
 #endif
 #ifdef F_JUMP_WHEN_ZERO
-	case I(F_JUMP_WHEN_ZERO):
-	case I(F_JUMP_WHEN_NON_ZERO):
+	case F_JUMP_WHEN_ZERO:
+	case F_JUMP_WHEN_NON_ZERO:
 #endif
-	case I(F_CATCH):
+	case F_CATCH:
 	    ((char *) &sarg)[0] = pc[0];
 	    ((char *) &sarg)[1] = pc[1];
 	    sprintf(buff, "%04x", (unsigned) sarg);
 	    pc += 2;
 	    break;
 
-	case I(F_AGGREGATE):
-	case I(F_AGGREGATE_ASSOC):
+	case F_AGGREGATE:
+	case F_AGGREGATE_ASSOC:
 	    ((char *) &sarg)[0] = pc[0];
 	    ((char *) &sarg)[1] = pc[1];
 	    sprintf(buff, "%d", (int)sarg);
 	    pc += 2;
 	    break;
 
-	case I(F_CALL_FUNCTION_BY_ADDRESS):
+	case F_CALL_FUNCTION_BY_ADDRESS:
 	    ((char *) &sarg)[0] = pc[0];
 	    ((char *) &sarg)[1] = pc[1];
 	    pc += 2;
@@ -293,8 +301,8 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	    pc++;
 	    break;
 
-	case I(F_GLOBAL_LVALUE):
-	case I(F_GLOBAL):
+	case F_GLOBAL_LVALUE:
+	case F_GLOBAL:
 	    if ((unsigned) (iarg = EXTRACT_UCHAR(pc)) < NUM_VARS)
 		sprintf(buff, "%s", VARS[iarg].name);
 	    else
@@ -302,19 +310,19 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	    pc++;
 	    break;
 
-	case I(F_LOOP_INCR):
+	case F_LOOP_INCR:
 	    sprintf(buff, "LV%d", EXTRACT_UCHAR(pc));
 	    pc++;
 	    break;
-	case I(F_WHILE_DEC):
-	case I(F_LOOP_COND):
-	case I(F_LOCAL):
-	case I(F_LOCAL_LVALUE):
+	case F_WHILE_DEC:
+	case F_LOOP_COND:
+	case F_LOCAL:
+	case F_LOCAL_LVALUE:
 	    sprintf(buff, "LV%d", EXTRACT_UCHAR(pc));
 	    pc++;
 	    break;
 
-	case I(F_STRING):
+	case F_STRING:
 	    ((char *) &sarg)[0] = pc[0];
 	    ((char *) &sarg)[1] = pc[1];
 	    if (sarg < NUM_STRS)
@@ -324,14 +332,14 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	    pc += 2;
 	    break;
 
-	case I(F_SIMUL_EFUN):
+	case F_SIMUL_EFUN:
 	    ((char *) &sarg)[0] = pc[0];
 	    ((char *) &sarg)[1] = pc[1];
 	    sprintf(buff, "\"%s\" %d", simuls[sarg]->name, pc[2]);
 	    pc += 3;
 	    break;
 
-	case I(F_FUNCTION_CONSTRUCTOR):
+	case F_FUNCTION_CONSTRUCTOR:
 	    switch (EXTRACT_UCHAR(pc++)) {
 	    case ORIGIN_CALL_OTHER | 1:
 		strcpy(buff, "<this_object call_other>");
@@ -370,7 +378,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	    }
 	    break;
 
-	case I(F_NUMBER):
+	case F_NUMBER:
 	    ((char *) &iarg)[0] = pc[0];
 	    ((char *) &iarg)[1] = pc[1];
 	    ((char *) &iarg)[2] = pc[2];
@@ -379,7 +387,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	    pc += 4;
 	    break;
 
-	case I(F_REAL):
+	case F_REAL:
 	    {
 		float farg;
 
@@ -392,20 +400,20 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 		break;
 	    }
 
-	case I(F_SSCANF):
-	case I(F_PARSE_COMMAND):
-	case I(F_BYTE):
-	case I(F_POP_BREAK):
+	case F_SSCANF:
+	case F_PARSE_COMMAND:
+	case F_BYTE:
+	case F_POP_BREAK:
 	    sprintf(buff, "%d", EXTRACT_UCHAR(pc));
 	    pc++;
 	    break;
 
-	case I(F_NBYTE):
+	case F_NBYTE:
 	    sprintf(buff, "-%d", EXTRACT_UCHAR(pc));
 	    pc++;
 	    break;
 
-	case I(F_SWITCH):
+	case F_SWITCH:
 	    {
 		unsigned char ttype;
 		unsigned short stable, etable, def;
@@ -488,5 +496,49 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 
     if (offsets)
 	free(offsets);
+}
+
+#define INCLUDE_DEPTH 10
+
+static void
+dump_line_numbers P2(FILE *, f, struct program *, prog) {
+    unsigned short *fi;
+    unsigned char *li_start;
+    unsigned char *li_end;
+    unsigned char *li;
+    int addr;
+    int sz;
+    short s;
+
+    if (!prog->p.i.line_info) {
+	load_line_numbers(prog);
+	if (!prog->p.i.line_info) {
+	    fprintf(f, "Failed to load line numbers\n");
+	    return;
+	}
+    }
+
+    fi = prog->p.i.file_info;
+    li_end = (unsigned char *)(((char *)fi) + fi[0]);
+    li_start = (unsigned char *)(fi + fi[1]);
+    
+    fi += 2;
+    fprintf(f, "\nabsolute line -> (file, line) table:\n");
+    while (fi < (unsigned short *)li_start) {
+	fprintf(f, "%i lines from %i [%s]\n", (int)fi[0], (int)fi[1], 
+		prog->p.i.strings[fi[1]-1]);
+	fi += 2;
+    }
+
+    li = li_start;
+    addr = 0;
+    fprintf(f,"\naddress -> absolute line table:\n");
+    while (li < li_end) {
+	sz = *li++;
+	((char *)&s)[0] = *li++;
+	((char *)&s)[1] = *li++;
+	fprintf(f, "%4x-%4x: %i\n", addr, addr + sz - 1, (int)s);
+	addr += sz;
+    }
 }
 #endif

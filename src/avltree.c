@@ -35,14 +35,7 @@ this code, please leave my name (and Wirth's) in the comments.
 
 **************************************************************************/
 
-#include "config.h"
-
-#include <stdio.h>
-#ifdef LATTICE
-#include <stdlib.h>
-#endif
-
-#include "lint.h"
+#include "std.h"
 #include "avltree.h"
 
 /*

@@ -3,58 +3,13 @@
  *                   8-92 : Dwayne Fontenot : original coding
  */
 
-#include "config.h"
-
-#ifdef NeXT
-#include <libc.h>
-#endif				/* NeXT */
-#ifndef LATTICE
-#include <sys/ioctl.h>
-#endif
-#include <sys/types.h>
-#ifdef __386BSD__
-#include <sys/param.h>
-#endif				/* __386BSD__ */
-#if !defined(NeXT) && !defined(hpux) && !defined(apollo)
-#include <unistd.h>
-#endif				/* NeXT */
-#include <fcntl.h>
-#include <sys/time.h>
-#ifndef LATTICE
-#include <sys/socket.h>
-#if !defined(apollo) && !defined(linux) && !defined(_M_UNIX)
-#include <sys/socketvar.h>
-#endif				/* !apollo && !linux */
-#endif				/* LATTICE */
-#ifndef LATTICE
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#endif
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
-#include <ctype.h>
-#include <signal.h>
-#ifndef LATTICE
-#include <memory.h>
-#endif
-#ifdef LATTICE
-#include <amiga.h>
-#include <socket.h>
-#include <nsignal.h>
-#endif
-#if defined(SunOS_5) || defined(LATTICE)
-#include <stdlib.h>
-#endif
-
-#include "lint.h"
-#include "debug.h"
+#include "std.h"
 #include "addr_server.h"
+#include "socket_ctrl.h"
+#include "debug.h"
 
 #ifdef DEBUG_MACRO
 int debug_level = 512;
-
 #endif				/* DEBUG_MACRO */
 
 /*
@@ -113,7 +68,7 @@ void init_conns()
 /*
  * Initialize connection socket.
  */
-void init_conn_sock P1(int, port_number)
+void init_conn_sock P1(int, port_num)
 {
     struct sockaddr_in sin;
     int sin_len;
@@ -140,7 +95,7 @@ void init_conn_sock P1(int, port_number)
      */
     sin.sin_family = AF_INET;
     sin.sin_addr.s_addr = INADDR_ANY;
-    sin.sin_port = htons((u_short) port_number);
+    sin.sin_port = htons((u_short) port_num);
     /*
      * bind name to socket.
      */
@@ -180,7 +135,7 @@ void init_conn_sock P1(int, port_number)
 	exit(10);
     }
     debug(512, ("addr_server: listening for connections on port %d\n",
-		port_number));
+		port_num));
 }
 
 /*

@@ -1,18 +1,8 @@
 /* buffer.c for MudOS 0.9.x by John Garnett, 1993/11/07 */
 
-#include "config.h"
-
-#include <stdio.h>
-#ifdef LATTICE
-#include <stdlib.h>
-#include <string.h>
-#endif
-
-#include "lint.h"
-#include "buffer.h"
+#include "std.h"
 #include "crctab.h"
-
-extern int max_buffer_size;
+#include "lpc_incl.h"
 
 struct buffer null_buf =
 {

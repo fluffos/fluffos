@@ -18,7 +18,7 @@
 #define SDEBUG(x) 
 #define SDEBUG2(x) 
 
-#define SCRATCH_MAGIC ((char)0xbb)
+#define SCRATCH_MAGIC ((unsigned char)0xbb)
 
 struct sp_block_t {
     struct sp_block_t *next, *prev;
@@ -34,4 +34,18 @@ struct sp_block_t {
         scr_last -= *scr_tail; \
     }
 
+/*
+ *  scratchpad.c
+ */
+void scratch_destroy PROT((void));
+char *scratch_copy PROT((char *));
+char *scratch_alloc PROT((int));
+void scratch_free PROT((char *));
+char *scratch_join PROT((char *, char *));
+char *scratch_join2 PROT((char *, char *));
+char *scratch_realloc PROT((char *, int));
+char *scratch_copy_string PROT((char *));
+char *scratch_large_alloc PROT((int));
+
 #endif
+

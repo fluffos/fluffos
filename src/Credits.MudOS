@@ -58,10 +58,14 @@ David Bennett (Pinkfish) - provided enhancements for parse_command and for the
 
 John Fehr (Wildcard) - provided patches allowing MudOS to run on Amiga
 
-Anthon Pang (Robocoder) - provided various patches
+Anthon Pang (Robocoder) - provided various patches, optimize function
+	table search, amiga support
 
-Tim Hollebeek (Beek) - LPC->C and patches, compiler rewrite, etc
+Tim Hollebeek (Beek) - LPC->C and patches, compiler rewrite, new function
+	pointers, etc
 
+Ti-Ming Chiang (Symmetry) - Countless optimizations; array, mapping and
+	save_object rewrites
 --
 Thanks to Adam Beeman (Buddha) for making numerous suggestions on
 improving the MudOS driver and for providing the TMI site as the original

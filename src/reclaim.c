@@ -5,17 +5,9 @@
  * of references) -- coded by Blackthorn@Genocide Feb. 1993
  */
 
-#include "config.h"
-
-#include <stdio.h>
-
-#include "lint.h"
-#include "interpret.h"
-#include "mapping.h"
-#include "buffer.h"
-#include "object.h"
-#include "exec.h"
-#include "include/origin.h"
+#include "std.h"
+#include "lpc_incl.h"
+#include "reclaim.h"
 
 #define MAX_RECURSION 25
 
@@ -23,8 +15,6 @@ static void gc_indices PROT((struct mapping *));
 static void gc_values PROT((struct mapping *));
 static int gcOne PROT((struct mapping *, struct node *, vinfo_t *));
 static void check_svalue PROT((struct svalue *));
-
-extern struct svalue const0n;
 
 static int cleaned, nested;
 

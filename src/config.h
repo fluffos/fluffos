@@ -6,9 +6,8 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
-#include "port.h"
-#include "options.h"
 #include "include/runtime_config.h"
+#include "rc.h"
 
 /*
  * runtime config strings.  change these values in the runtime configuration
@@ -66,96 +65,9 @@
 #define SYSV_HEARTBEAT_INTERVAL  ((HEARTBEAT_INTERVAL+999999)/1000000)
 #endif
 
-#ifndef INLINE
-#if defined(__GNUC__) && !defined(__STRICT_ANSI__) && !defined(lint)
-#define INLINE inline
-#else
-#ifdef LATTICE
-#define INLINE __inline
-#else
-#define INLINE
-#endif
-#endif
-#endif
-
-/* the compiler can do a better job */
-#undef INLINE
-#define INLINE
-
-#ifdef HAS_UNSIGNED_CHAR
-#define EXTRACT_UCHAR(p) (*(unsigned char *)(p))
-#else
-#define EXTRACT_UCHAR(p) (*p < 0 ? *p + 0x100 : *p)
-#endif				/* HAS_UNSIGNED_CHAR */
-
 #define APPLY_CACHE_SIZE (1 << APPLY_CACHE_BITS)
 
 #define NUM_CONSTS 5
 
 #define NULL_MSG "0"
-
-#define LPC_OPTIMIZE
-#define LPC_OPTIMIZE_LOOPS
-
-#define I(x) (x)
-
-#ifdef DEBUG
-#  define IF_DEBUG(x) x
-#  define DEBUG_CHECK(x, y) if (x) fatal(y)
-#  define DEBUG_CHECK1(x, y, a) if (x) fatal(y, a)
-#  define DEBUG_CHECK2(x, y, a, b) if (x) fatal(y, a, b)
-#else
-#  define IF_DEBUG(x) 
-#  define DEBUG_CHECK(x, y)
-#  define DEBUG_CHECK1(x, y, a)
-#  define DEBUG_CHECK2(x, y, a, b)
-#endif
-
-/*
-   define MALLOC, FREE, REALLOC, and CALLOC depending upon what malloc
-   package is is used.  This technique is used because overlaying system malloc
-   with another function also named malloc doesn't work on most machines
-   that have shared libraries.  It will also let us keep malloc stats even
-   when system malloc is used.
-*/
-
-#ifdef WRAPPEDMALLOC
-#define MALLOC(x)  wrappedmalloc(x)
-#define FREE(x)    wrappedfree(x)
-#define REALLOC(x,y) wrappedrealloc(x,y)
-#define CALLOC(x,y)   wrappedcalloc(x,y)
-#endif
-
-#ifdef SYSMALLOC
-#define MALLOC(x)  malloc(x)
-#define FREE(x)    free(x)
-#define REALLOC(x,y) realloc(x,y)
-#define CALLOC(x,y)   calloc(x,y)
-#endif
-
-#ifdef DEBUGMALLOC
-#define MALLOC(x)  debugmalloc(x,0,(char *)0)
-#define DMALLOC(x,tag,desc)  debugmalloc(x,tag,desc)
-#define XALLOC(x) debugmalloc(x,0,(char *)0)
-#define DXALLOC(x,tag,desc) debugmalloc(x,tag,desc)
-#define FREE(x)    debugfree(x)
-#define REALLOC(x,y) debugrealloc(x,y,0,(char *)0)
-#define DREALLOC(x,y,tag,desc) debugrealloc(x,y,tag,desc)
-#define CALLOC(x,y)   debugcalloc(x,y,0,(char *)0)
-#define DCALLOC(x,y,tag,desc)   debugcalloc(x,y,tag,desc)
-#else
-#define XALLOC(x) xalloc(x)
-#define DXALLOC(x,tag,desc) xalloc(x)
-#define DMALLOC(x,tag,desc)  MALLOC(x)
-#define DREALLOC(x,y,tag,desc) REALLOC(x,y)
-#define DCALLOC(x,y,tag,desc)   CALLOC(x,y)
-#endif
-
-#ifndef MALLOC
-#define MALLOC(x) puts("You need to specify a malloc package in options.h")
-#define FREE(x) puts("You need to specify a malloc package in options.h")
-#define REALLOC(x) puts("You need to specify a malloc package in options.h")
-#define CALLOC(x) puts("You need to specify a malloc package in options.h")
-#endif
-
 #endif

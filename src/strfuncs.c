@@ -3,12 +3,7 @@
  *  (not complete)
  */
 
-#include "config.h"
-
-#include <stdio.h>
-#include <ctype.h>
-
-#include "lint.h"
+#include "std.h"
 
 #define DIGIT(x)	(isdigit(x) ? (x) - '0' : \
 			islower(x) ? (x) + 10 - 'a' : (x) + 10 - 'A')

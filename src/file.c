@@ -3,107 +3,32 @@
  * description: handle all file based efuns
  */
 
-#include "config.h"
+#include "std.h"
+#include "lpc_incl.h"
+#include "file_incl.h"
+#include "comm.h"
+#include "strstr.h"
 
-#if defined(SunOS_5) || defined(LATTICE)
-#include <stdlib.h>
-#endif
-#include <sys/types.h>
 #if (defined(_SEQUENT_) || defined(hpux) || defined(sgi) \
 	|| defined(_AUX_SOURCE) || defined(linux) || defined(cray) \
 	|| defined(SunOS_5) || defined(_M_UNIX))
+#if defined(SunOS_5)
+#undef major
+#undef minor
+#undef makedev
+#endif
 #include <sys/sysmacros.h>
 #endif
-#include <sys/stat.h>
-#ifndef SunOS_5
-#include <sys/dir.h>
-#endif
-#if defined(__386BSD__) || defined(SunOS_5)
-#include <unistd.h>
-#endif
-#include <fcntl.h>
-#include <setjmp.h>
-#include <string.h>
-#include <errno.h>
-#include <stdio.h>
-#ifndef LATTICE
-#include <memory.h>
-#endif
-#ifdef LATTICE
-#include <amiga.h>
-#endif
-#if defined(sun)
-#include <alloca.h>
-#endif
-#if defined(M_UNIX) || defined(OSF) || defined(_SEQUENT_) \
-	|| defined(cray) || defined(SunOS_5)
-#include <dirent.h>
-#endif
-#if defined(SVR4)
-#include <dirent.h>
-#include <sys/filio.h>
-#include <sys/sockio.h>
-#include <sys/mkdev.h>
-#endif
-#include <ctype.h>
 #ifdef OS2
 #define INCL_DOSFILEMGR
 #include <os2.h>
 #define FILE_ATTRS (FILE_DIRECTORY|FILE_ARCHIVED|FILE_READONLY)
 #endif
 
-#include "lint.h"
-#include "opcodes.h"
-#include "interpret.h"
-#include "object.h"
-#include "sent.h"
-#include "exec.h"
-#include "comm.h"
-#include "applies.h"
-
 extern int errno;
 extern int sys_nerr;
 
-#ifndef LATTICE
-extern char *sys_errlist[];
-
-#endif
-extern int comp_flag;
-extern int max_array_size;
-
-#if !defined(NeXT) && !defined(__386BSD__) && !defined(SunOS_5)
-extern int readlink PROT((char *, char *, int));
-extern int symlink PROT((char *, char *));
-
-#if defined(MSDOS) || defined(OS2)
-#define lstat stat
-#else
-#if !defined(hpux) && !defined(SVR4) \
-	&& !defined(linux) && !defined(SunOS_5) && !defined(sgi) \
-	&& !defined(__bsdi__) && !defined(_M_UNIX) && !defined(LATTICE) \
-        && !defined(_AIX)
-extern int lstat PROT((char *, struct stat *));
-#endif
-#endif
-#endif				/* !NeXT && !__386BSD__ */
-
-#if !defined(hpux) && !defined(_AIX) && !defined(__386BSD__)  \
-	&& !defined(linux) && !defined(SunOS_5) && !defined(SVR4) \
-	&& !defined(__bsdi__)
-extern int fchmod PROT((int, int));
-
-#endif				/* !defined(hpux) && !defined(_AIX) */
-
 int legal_path PROT((char *));
-
-extern int d_flag;
-
-extern struct object *current_object;	/* The object interpreting a
-					 * function. */
-extern struct object *command_giver;	/* Where the current command came
-					 * from. */
-extern struct object *current_interactive;	/* The user who caused this
-						 * execution */
 
 static int match_string PROT((char *, char *));
 static int isdir PROT((char *path));
@@ -150,6 +75,7 @@ static void encode_stat P4(struct svalue *, vp, int, flags, char *, str, struct 
 	vp->u.string = string_copy(str);
     }
 }
+
 /*
  * List files in directory. This function do same as standard list_files did,
  * but instead writing files right away to user this returns an array
@@ -288,7 +214,7 @@ struct vector *get_dir P2(char *, path, int, flags)
 			  !strcmp(FindBuffer.achName, ".."))) {
 	    continue;
 	}
-	if (do_match && !match_string(regexp, FindBuffer.achName)) {
+	if (do_match && !match_string(regexppath, FindBuffer.achName)) {
 	    continue;
 	}
 	count++;
@@ -481,7 +407,7 @@ int legal_path P1(char *, path)
 	    if (p[1] == '/' || p[1] == '\0')
 		return 0;	/* check for `./', `..', or `../' */
 	}
-	p = _strstr(p, "/.");	/* search next component */
+	p = (char *)_strstr(p, "/.");	/* search next component */
 	if (p)
 	    p++;		/* step over `/' */
     }

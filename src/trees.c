@@ -7,9 +7,12 @@
  *
  */
 
+#include "std.h"
 #include "trees.h"
-#include "compiler_shared.h"
+#include "compiler.h"
 #include "opcodes.h"
+#include "lex.h"
+#include "simulate.h"
 
 /* our globals */
 static struct parse_node_block *parse_block_list = 0;
@@ -18,61 +21,26 @@ static struct parse_node_block *free_block_list = 0;
 static struct parse_node *next_node = 0;
 static struct parse_node *last_node = 0;
 
-static struct parse_node *current_lock_node = 0;
-static struct parse_node_block *current_lock_block = 0;
+static struct parse_node **line_starts;
+static int line_starts_size = 0, ls_index = -1;
+static int last_prog_size = 1;
 
 /* called by code generation when it is done with the tree */
 void
 free_tree() {
     struct parse_node_block *cur_block;
 
-    if (cur_block = current_lock_block) {
-      if (cur_block->next) {
-	do {
-	  cur_block = cur_block->next;
-	} while (cur_block->next);
-	cur_block->next = free_block_list;
-	free_block_list = current_lock_block->next;
-	current_lock_block->next = 0;
-      }
-      next_node = current_lock_node;
-      last_node = &current_lock_block->nodes[NODES_PER_BLOCK];
-      /* reserve current_lock_node again */
-      new_node();
-    } else {
-      if (!(cur_block = parse_block_list)) return;
+    if (!(cur_block = parse_block_list))
+	return;
+	
+    while (cur_block->next) cur_block = cur_block->next;
 
-      while (cur_block->next) cur_block = cur_block->next;
-
-      /* put all the blocks in the free list */
-      cur_block->next = free_block_list;
-      free_block_list = parse_block_list;
-      parse_block_list = 0;
-      next_node = 0;
-      last_node = 0;
-    }
-}
-
-void
-lock_expressions() {
-  /* save the previous lock info in a node so this is reentrant. */
-  struct parse_node *save_node = new_node();
-  
-  save_node->right = current_lock_node;
-  save_node->v.pnblock = current_lock_block;
-
-  current_lock_node = save_node;
-  current_lock_block = parse_block_list;
-  while (current_lock_block->next)
-    current_lock_block = current_lock_block->next;
-}
-
-void
-unlock_expressions() {
-  struct parse_node *save_node = current_lock_node;
-
-  current_lock_block = save_node->v.pnblock;
-  current_lock_node = save_node->right;
+    /* put all the blocks in the free list */
+    cur_block->next = free_block_list;
+    free_block_list = parse_block_list;
+    parse_block_list = 0;
+    next_node = 0;
+    last_node = 0;
 }
 
 /* called when the parser cleans up */
@@ -81,9 +49,6 @@ release_tree() {
     struct parse_node_block *cur_block;
     struct parse_node_block *next_block;
     
-    current_lock_node = 0;
-    current_lock_block = 0;
-
     free_tree();
     next_block = free_block_list;
     while (cur_block = next_block) {
@@ -91,6 +56,7 @@ release_tree() {
 	FREE(cur_block);
     }
     free_block_list = 0;
+    last_prog_size = 1;
 }
 
 /* get a new node to add to the tree */
@@ -99,8 +65,10 @@ new_node() {
     struct parse_node_block *cur_block;
 
     /* fast case */
-    if (next_node < last_node)
+    if (next_node < last_node) {
+	next_node->line = current_line_base + current_line;
 	return next_node++;
+    }
     
     /* no more nodes in the current block; do we have a free one? */
     if (cur_block = free_block_list) {
@@ -112,21 +80,39 @@ new_node() {
     cur_block->next = parse_block_list;
     parse_block_list = cur_block;
     /* point the nodes correctly */
-    next_node = &cur_block->nodes[1];
+    next_node = &cur_block->nodes[0];
     last_node = &cur_block->nodes[NODES_PER_BLOCK];
-    return &cur_block->nodes[0];
+    next_node->line = current_line_base + current_line;
+    return next_node++;
 }
 
-/* quick routine to make a generic node */
+/* get a new node to add to the tree, but don't count it for line # purposes
+ * This should be used for nodes that hold expressions together but don't
+ * generate any code themselves (NODE_IF, etc)
+ */
 struct parse_node *
-make_node P3(short, kind, char, flags, char, type) {
-    struct parse_node *ret;
+new_node_no_line() {
+    struct parse_node_block *cur_block;
 
-    ret = new_node();
-    ret->kind = kind;
-    ret->flags = flags;
-    ret->type = type;
-    return ret;
+    /* fast case */
+    if (next_node < last_node) {
+	next_node->line = 0;
+	return next_node++;
+    }    
+    /* no more nodes in the current block; do we have a free one? */
+    if (cur_block = free_block_list) {
+	free_block_list = cur_block->next;
+    } else {
+	cur_block = (struct parse_node_block *)DMALLOC(sizeof(struct parse_node_block), 0, "new_node");
+    }
+    /* add to block list */
+    cur_block->next = parse_block_list;
+    parse_block_list = cur_block;
+    /* point the nodes correctly */
+    next_node = &cur_block->nodes[0];
+    last_node = &cur_block->nodes[NODES_PER_BLOCK];
+    next_node->line = 0;
+    return next_node++;
 }
 
 /* quick routine to make a generic branched node */
@@ -137,7 +123,6 @@ make_branched_node P4(short, kind, char, type,
 
     ret = new_node();
     ret->kind = kind;
-    ret->flags = 0;
     ret->type = type;
     ret->left = l;
     ret->right = r;
@@ -166,44 +151,36 @@ binary_int_op P4(struct parse_node *, l, struct parse_node *, r,
 	strcat(buf, "\"");
 	yyerror(buf);
     }
-    if ((l->flags & r->flags & E_CONST)
-	&& BASIC_TYPE(l->type, TYPE_NUMBER)
-	&& BASIC_TYPE(r->type, TYPE_NUMBER)) {
+    if (l->kind == F_NUMBER) {
+	if (r->kind == F_NUMBER) {
+	    switch (op) {
+	    case F_OR: l->v.number |= r->v.number; break;
+	    case F_XOR: l->v.number ^= r->v.number; break;
+	    case F_AND: l->v.number &= r->v.number; break;
+	    case F_LSH: l->v.number <<= r->v.number; break;
+	    case F_RSH: l->v.number >>= r->v.number; break;
+	    case F_MOD:
+		if (r->v.number == 0) {
+		    yyerror("Modulo by zero constant");
+		    break;
+		}
+		l->v.number %= r->v.number; break;
+	    default: fatal("Unknown opcode in binary_int_op()\n");
+	    }
+	    return l;
+	}
 	switch (op) {
-	case F_OR: l->v.number |= r->v.number; break;
-	case F_XOR: l->v.number ^= r->v.number; break;
-	case F_AND: l->v.number &= r->v.number; break;
-	case F_LSH: l->v.number <<= r->v.number; break;
-	case F_RSH: l->v.number >>= r->v.number; break;
-	case F_MOD:
-	    if (r->v.number == 0) {
-		yyerror("Modulo by zero constant");
-		break;
-	    }
-	    l->v.number %= r->v.number; break;
-	default: fatal("Unknown opcode in binary_int_op()\n");
+	case F_OR:
+	case F_XOR:
+	case F_AND:
+	    return make_branched_node(op, TYPE_NUMBER, r, l);
 	}
-	return l;
-    } else {
-	struct parse_node *tmp;
-	tmp = make_branched_node(op, TYPE_NUMBER, l, r);
-	/* if the expression is commutative, move the constant to the right
-	 * node.  This allows constant folding of cases like 1 + x - 1
-	 */
-	if (l->flags & E_CONST) {
-	    switch (l->kind) {
-	    case F_OR:
-	    case F_XOR:
-	    case F_AND:
-		tmp->left = r;
-		tmp->right = l;
-	    }
-	}
-	return tmp;
     }
+    return make_branched_node(op, TYPE_NUMBER, l, r);
 }
 
 struct parse_node *insert_pop_value P1(struct parse_node *, expr) {
+    struct parse_node *replacement;
     switch (expr->kind) {
     case F_ASSIGN: expr->kind = F_VOID_ASSIGN; break;
     case F_ADD_EQ: expr->kind = F_VOID_ADD_EQ; break;
@@ -222,7 +199,9 @@ struct parse_node *insert_pop_value P1(struct parse_node *, expr) {
     case F_LE:
 	yywarn("Value of conditional expression is unused");
     default:
-	expr = make_branched_node(F_POP_VALUE, 0, 0, expr);
+	NODE_NO_LINE(replacement, F_POP_VALUE);
+	replacement->right = expr;
+	return replacement;
     }
     return expr;
 }

@@ -1,13 +1,10 @@
+#include "std.h"
 #include "config.h"
-
-#include <stdio.h>
-#include <string.h>
-#ifdef LATTICE
-#include <stdlib.h>
-#endif
-
-#include "lint.h"
 #include "stralloc.h"
+#include "main.h"
+#include "hash.h"
+#include "simulate.h"
+#include "comm.h"
 
 #undef NOISY_DEBUG
 
@@ -52,8 +49,6 @@
  */
 
 #define	MAXSHORT (unsigned short)((1 << (sizeof(short)*8)) - 1)
-
-extern int max_string_length;
 
 static int num_distinct_strings = 0;
 static int bytes_distinct_strings = 0;

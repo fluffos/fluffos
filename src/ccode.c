@@ -3,11 +3,10 @@
  * 
  * Currently only generates code for expressions
  */
-#include "icode.h"
+#ifndef CCODE_H
+#define CCODE_H
+#include "std.h"
 #include "trees.h"
-#include "opcodes.h"
-#include "compiler_shared.h"
-#include "fp_defs.h"
 
 void c_generate_node PROT((struct parse_node *));
 
@@ -606,3 +605,4 @@ c_initialize_parser() {
     stack_sp = simul_stack;
     ins_string("#include \"lpc_to_c.h\"\n");
 }
+#endif

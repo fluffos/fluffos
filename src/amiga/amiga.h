@@ -61,4 +61,9 @@
 #define mkdir(a,b) mkdir(a)
 
 
+/*
+ * missing from the "standard" include files
+ */
+int gethostname PROT((char *, int));
+
 #endif

@@ -7,12 +7,8 @@
     to #include "efuns.h" in that separate source file.
 */
 
-#include "efuns.h"
-#include "cfuns.h"
-#include "stralloc.h"
-#if defined(__386BSD__) || defined(SunOS_5)
-#include <unistd.h>
-#endif
+#include "std.h"
+#include "debug.h"
 
 /* get a value for CLK_TCK for use by times() */
 #if (defined(TIMES) && !defined(RUSAGE))

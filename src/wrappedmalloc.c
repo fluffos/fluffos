@@ -3,15 +3,7 @@
    Truilkan@TMI - 92/04/17
 */
 
-/* config.h gets INLINE */
-#include "config.h"
-
-#ifdef NeXT
-#include <stdlib.h>
-#endif
-
-#include "lint.h"
-#include "interpret.h"
+#include "std.h"
 
 typedef struct stats_s {
     unsigned int free_calls, alloc_calls, realloc_calls;

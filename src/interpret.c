@@ -1,53 +1,22 @@
-#include "config.h"
-#if !defined(NeXT) && !defined(LATTICE)
-#include <varargs.h>
-#endif
-#if defined(SunOS_5) || defined(LATTICE)
-#include <stdlib.h>
-#endif
-#include <stdio.h>
-#include <setjmp.h>
-#include <string.h>
-#include <ctype.h>
-#ifndef LATTICE
-#include <sys/time.h>
-#else
-#include <time.h>
-#endif
-/* sys/types.h is here to enable include of comm.h below */
-#include <sys/types.h>
-#include <sys/stat.h>
-#ifndef LATTICE
-#include <memory.h>
-#endif
-#ifdef LATTICE
-#include <socket.h>
-#endif
-
-#include "lint.h"
-#include "opcodes.h"
-#include "exec.h"
-#include "interpret.h"
-#include "mapping.h"
-#include "buffer.h"
-#include "object.h"
-#include "instrs.h"
+#include "std.h"
+#include "lpc_incl.h"
+#include "efuns_incl.h"
+#include "uid.h"
 #include "patchlevel.h"
-#include "comm.h"
-#include "switch.h"
-#include "efun_protos.h"
+#include "backend.h"
+#include "simul_efun.h"
+#include "debug.h"
 #include "efunctions.h"
-#include "socket_efuns.h"
+#include "lex.h"
+#include "functab_tree.h"
 #include "eoperators.h"
-#include "stralloc.h"
-#include "include/origin.h"
+#include "sprintf.h"
+#include "swap.h"
+#include "comm.h"
+
 #ifdef OPCPROF
 #include "opc.h"
-#endif
-#include "debug.h"
-#include "applies.h"
 
-#ifdef OPCPROF
 static int opc_eoper[BASE];
 #endif
 
@@ -127,18 +96,9 @@ static void count_inherits PROT((struct program *, struct program *));
 static void count_ref_in_vector PROT((struct svalue *, int));
 #endif
 
-extern void print_svalue PROT((struct svalue *));
 int inter_sscanf PROT((struct svalue *, struct svalue *, struct svalue *, int));
-extern struct object *previous_ob;
-extern char *last_verb;
-extern struct svalue const0, const1, const0u, const0n;
-
 struct program *current_prog;
 short int caller_type;
-
-extern int current_time;
-extern struct object *current_heart_beat, *current_interactive;
-
 static int tracedepth;
 
 /*
@@ -154,9 +114,6 @@ static int tracedepth;
  * If Y isn't loaded when it is needed, X will be discarded, and Y will be
  * loaded separately. X will then be reloaded again.
  */
-extern int d_flag;
-
-extern int current_line, eval_cost;
 
 /*
  * These are the registers used at runtime.
@@ -812,6 +769,254 @@ void remove_fake_frame() {
 }
 #endif
 
+#ifdef NEW_FUNCTIONS
+/* num_arg args are on the stack, and the args from the vector vec should be
+ * put in front of them.  This is so that the order of arguments is logical.
+ * 
+ * evaluate( (: f, a :), b) -> f(a,b) and not f(b, a) which would happen
+ * if we simply pushed the args from vec at this point.  (Note that the
+ * old function pointers are broken in this regard)
+ */
+int merge_arg_lists P3(int, num_arg, struct vector *, vec, int, start) {
+    int num_vec_arg = vec->size - start;
+    struct svalue *sptr;
+    int i;
+
+    if (num_arg && num_vec_arg) {
+	/* We need to do some stack movement so that the order
+	   of arguments is logical */
+	for (i=0; i<num_arg; i++)
+	    *(sp-i+num_vec_arg) = *(sp-i);
+	sptr = sp - num_arg + 1;
+	for (i=start; i < vec->size; i++)
+	    assign_svalue_no_free(sptr++, &vec->item[i]);
+	sp += num_vec_arg;
+    } else {
+	for (i = start; i < vec->size; i++)
+	    push_svalue(&vec->item[i]);
+    }
+    return num_arg + num_vec_arg;
+}
+
+void cfp_error P1(char *, s) {
+    remove_fake_frame();
+    error(s);
+}
+
+struct svalue *
+call_function_pointer P2(struct funp *, funp, int, num_arg)
+{
+    struct object *ob;
+    struct function *func;
+    char *funcname;
+    int i, def;
+    static struct svalue ret = { T_NUMBER };
+
+    setup_fake_frame(funp);
+    
+    switch (funp->type) {
+    case ORIGIN_CALL_OTHER:
+	if (funp->args.type == T_STRING)
+	    funcname = funp->args.u.string;
+	else if (funp->args.type == T_POINTER) {
+	    check_for_destr(funp->args.u.vec);
+	    if ( (funp->args.u.vec->size <1)
+		|| (funp->args.u.vec->item[0].type != T_STRING) )
+		cfp_error("First argument of call_other function pointer must be a string.\n");
+	    funcname = funp->args.u.vec->item[0].u.string;
+	    num_arg = merge_arg_lists(num_arg, funp->args.u.vec, 1);
+	} else cfp_error("Illegal type for function name in function pointer.\n");
+	if (funp->f.obj.type == T_OBJECT)
+	    ob = funp->f.obj.u.ob;
+	else if (funp->f.obj.type == T_POINTER) {
+	    struct vector *vec;
+
+	    vec = call_all_other(funp->f.obj.u.vec, funcname, num_arg);
+	    remove_fake_frame();
+	    free_svalue(&ret, "call_function_pointer");
+	    ret.type = T_POINTER;
+	    ret.u.vec = vec;
+	    return &ret;
+	} else if (funp->f.obj.type == T_STRING) {
+	    ob = (struct object *)find_object(funp->f.obj.u.string);
+	    if (!ob || !object_visible(ob))
+		cfp_error("Function pointer couldn't find object\n");
+	} else cfp_error("Function pointer object must be an object, array or string.\n");
+	
+#ifdef TRACE
+	if (TRACEP(TRACE_CALL_OTHER)) {
+	    do_trace("Call other (function pointer)", funcname, "\n");
+	}
+#endif
+	call_origin = ORIGIN_CALL_OTHER;
+	if (apply_low(funcname, ob, num_arg) == 0) {
+	    remove_fake_frame();
+	    return &const0u;
+	}
+	break;
+    case ORIGIN_SIMUL_EFUN:
+	if (funp->args.type == T_POINTER) {
+	    check_for_destr(funp->args.u.vec);
+	    num_arg = merge_arg_lists(num_arg, funp->args.u.vec, 0);
+	}
+	call_simul_efun(funp->f.index, num_arg);
+	break;
+    case ORIGIN_EFUN:
+	fp = sp - num_arg + 1;
+	if (funp->args.type == T_POINTER) {
+	    check_for_destr(funp->args.u.vec);
+	    num_arg = merge_arg_lists(num_arg, funp->args.u.vec, 0);
+	}
+	i = funp->f.opcodes[0];
+#ifdef NEEDS_CALL_EXTRA
+	if (i == F_CALL_EXTRA) i = 0xff + funp->f.opcodes[1];
+#endif
+	if (num_arg == instrs[i].min_arg - 1 && (def = instrs[i].Default)) {
+	    switch (def) {
+	    case F_CONST0:
+		*(++sp)=const0;
+		break;
+	    case F_CONST1:
+		*(++sp)=const0;
+		break;
+	    case -((F_NBYTE << 8) + 1):
+		sp++;
+		sp->type = T_NUMBER;
+		sp->subtype = 0;
+		sp->u.number = -1;
+		break;
+	    case F_THIS_OBJECT:
+		if (current_object && !(current_object->flags & O_DESTRUCTED))
+		    push_object(current_object);
+		else
+		    *(++sp)=const0;
+		break;
+	    default:
+		fatal("Unsupported type of default argument in efun function pointer.\n");
+	    }
+	    num_arg++;
+	} else
+	if (num_arg < instrs[i].min_arg) {
+	    error("Too few arguments to efun %s in efun pointer.\n", instrs[i].name);
+	} else
+	if (num_arg > instrs[i].max_arg && instrs[i].max_arg != -1) {
+		error("Too many arguments to efun %s in efun pointer.\n", instrs[i].name);
+	    }
+	if (instrs[i].min_arg != instrs[i].max_arg) {
+	    /* need to update the argument count */
+	    funp->f.opcodes[(i > 255 ? 2 : 1)] = num_arg;
+	}
+	eval_instruction((char*)&funp->f.opcodes[0]);
+	free_svalue(&ret, "call_function_pointer");
+	ret = *sp--;
+	return &ret;
+    case ORIGIN_LOCAL: {
+	fp = sp - num_arg + 1;
+	
+	func = &funp->owner->prog->p.i.functions[funp->f.index];
+	
+	if (func->flags & NAME_UNDEFINED)
+	    error("Undefined function: %s\n", func->name);
+	
+	push_control_stack(func);
+	
+	caller_type = ORIGIN_LOCAL;
+	current_prog = funp->owner->prog;
+	
+	if (funp->args.type == T_POINTER) {
+	    struct vector *v = funp->args.u.vec;
+	    
+	    check_for_destr(v);
+	    num_arg = merge_arg_lists(num_arg, v, 0);
+	}
+	
+	csp->num_local_variables = num_arg;
+	func = setup_new_frame(func);
+
+	csp->extern_call = 1;
+	call_program(current_prog, func->offset);
+	break;
+    }
+    case ORIGIN_FUNCTIONAL: {
+	fp = sp - num_arg + 1;
+	fake_func.num_arg = funp->f.a.num_args;
+	
+	push_control_stack(&fake_func);
+	caller_type = ORIGIN_FUNCTIONAL;
+	current_prog = funp->owner->prog;
+	
+	csp->num_local_variables = num_arg;
+	(void) setup_new_frame(&fake_func);
+
+	csp->extern_call = 1;
+	call_absolute(funp->f.a.start);
+	break;
+    }
+    default:
+	error("Unsupported function pointer type.\n");
+    }
+    free_svalue(&ret, "call_function_pointer");
+    ret = *sp--;
+    remove_fake_frame();
+    return &ret;
+}
+#else
+INLINE
+struct svalue *
+call_function_pointer P2(struct funp *, funp, int, num_arg) {
+    static struct svalue ret = { T_NUMBER };
+    struct svalue *arg;
+    char *funcname;
+    int i;
+    struct object *ob;
+
+    if (current_object->flags & O_DESTRUCTED) {	/* No external calls allowed */
+	pop_n_elems(num_arg);
+	return &const0u;
+    }
+    if (funp->fun.type == T_STRING)
+	funcname = funp->fun.u.string;
+    else {			/* must be T_POINTER then */
+	check_for_destr(funp->fun.u.vec);
+	if ((funp->fun.u.vec->size < 1)
+	    || (funp->fun.u.vec->item[0].type != T_STRING))
+	    error("call_other: 1st elem of array for arg 2 must be a string\n");
+	funcname = funp->fun.u.vec->item[0].u.string;	/* complicated huh? */
+	for (i = 1; i < funp->fun.u.vec->size; i++)
+	    push_svalue(&funp->fun.u.vec->item[i]);
+	num_arg += i - 1;
+    }
+    if (funp->obj.type == T_OBJECT)
+	ob = funp->obj.u.ob;
+    else if (funp->obj.type == T_POINTER) {
+	struct vector *v;
+
+	v = call_all_other(funp->obj.u.vec, funcname, num_arg - 2);
+	free_svalue(&ret, "call_function_pointer");
+	ret.type = T_POINTER;
+	ret.u.vec = v;
+	return &ret;
+    } else {
+	ob = find_object(arg[0].u.string);
+	if (!ob || !object_visible(ob))
+	    error("call_other() couldn't find object\n");
+    }
+    /* Send the remaining arguments to the function. */
+#ifdef TRACE
+    if (TRACEP(TRACE_CALL_OTHER)) {
+	do_trace("Call other ", funcname, "\n");
+    }
+#endif
+    call_origin = ORIGIN_CALL_OTHER;
+    if (apply_low(funcname, ob, num_arg) == 0) {	/* Function not found */
+	return &const0u;
+    }
+    free_svalue(&ret, "call_function_pointer");
+    ret = *sp--;
+    return &ret;
+}
+#endif
+
 INLINE void
 push_control_stack P1(struct function *, funp)
 {
@@ -1038,8 +1243,6 @@ static void break_point()
 /* push_pop_error_context: Copied directly from Lars version 3.1.1 */
 void push_pop_error_context P1(int, push)
 {
-    extern jmp_buf error_recovery_context;
-    extern int error_recovery_context_exists;
     static struct error_context_stack {
 	jmp_buf old_error_context;
 	int old_exists_flag;
@@ -1287,7 +1490,7 @@ eval_instruction P1(char *, p)
 	 * instructions, like F_JUMP.
 	 */
 	switch (instruction) {
-	case I(F_INC):
+	case F_INC:
 	    DEBUG_CHECK(sp->type != T_LVALUE,
 			"non-lvalue argument to ++\n");
 	    if (sp->u.lvalue->type == T_NUMBER) {
@@ -1301,8 +1504,7 @@ eval_instruction P1(char *, p)
 	    } else {
 		error("++ of non-numeric argument\n");
 	    }
-#ifdef LPC_OPTIMIZE_LOOPS
-	case I(F_WHILE_DEC):
+	case F_WHILE_DEC:
 	    {
 		struct svalue *s;
 		unsigned short offset;
@@ -1326,14 +1528,13 @@ eval_instruction P1(char *, p)
 		}
 	    }
 	    break;
-#endif
-	case I(F_LOCAL_LVALUE):
+	case F_LOCAL_LVALUE:
 	    sp++;
 	    sp->type = T_LVALUE;
 	    sp->u.lvalue = fp + EXTRACT_UCHAR(pc);
 	    pc++;
 	    break;
-	case I(F_NUMBER):
+	case F_NUMBER:
 	    ((char *) &i)[0] = pc[0];
 	    ((char *) &i)[1] = pc[1];
 	    ((char *) &i)[2] = pc[2];
@@ -1341,7 +1542,7 @@ eval_instruction P1(char *, p)
 	    pc += 4;
 	    push_number(i);
 	    break;
-	case I(F_REAL):
+	case F_REAL:
 	    ((char *) &real)[0] = pc[0];
 	    ((char *) &real)[1] = pc[1];
 	    ((char *) &real)[2] = pc[2];
@@ -1349,18 +1550,18 @@ eval_instruction P1(char *, p)
 	    pc += 4;
 	    push_real(real);
 	    break;
-	case I(F_BYTE):
+	case F_BYTE:
 	    i = EXTRACT_UCHAR(pc);
 	    pc++;
 	    push_number(i);
 	    break;
-	case I(F_NBYTE):
+	case F_NBYTE:
 	    i = EXTRACT_UCHAR(pc);
 	    pc++;
 	    push_number(-i);
 	    break;
 #ifdef F_JUMP_WHEN_NON_ZERO
-	case I(F_JUMP_WHEN_NON_ZERO):
+	case F_JUMP_WHEN_NON_ZERO:
 	    if ((i = (sp->type == T_NUMBER)) && (sp->u.number == 0))
 		pc += 2;
 	    else {
@@ -1376,17 +1577,17 @@ eval_instruction P1(char *, p)
 	    }
 	    break;
 #endif
-	case I(F_BRANCH):	/* relative offset */
+	case F_BRANCH:	/* relative offset */
 	    ((char *) &offset)[0] = pc[0];
 	    ((char *) &offset)[1] = pc[1];
 	    pc += offset;
 	    break;
-	case I(F_BBRANCH):	/* relative offset */
+	case F_BBRANCH:	/* relative offset */
 	    ((char *) &offset)[0] = pc[0];
 	    ((char *) &offset)[1] = pc[1];
 	    pc -= offset;
 	    break;
-	case I(F_BRANCH_WHEN_ZERO):	/* relative offset */
+	case F_BRANCH_WHEN_ZERO:	/* relative offset */
 	    if ((i = (sp->type == T_NUMBER)) && (sp->u.number == 0)) {
 		((char *) &offset)[0] = pc[0];
 		((char *) &offset)[1] = pc[1];
@@ -1402,7 +1603,7 @@ eval_instruction P1(char *, p)
 		pop_stack();
 	    }
 	    break;
-	case I(F_BRANCH_WHEN_NON_ZERO):	/* relative offset */
+	case F_BRANCH_WHEN_NON_ZERO:	/* relative offset */
 	    if (((i = (sp->type != T_NUMBER))) || (sp->u.number != 0)) {
 		((char *) &offset)[0] = pc[0];
 		((char *) &offset)[1] = pc[1];
@@ -1417,7 +1618,7 @@ eval_instruction P1(char *, p)
 	    pc += 2;	/* skip over the offset */
 	    sp--;		/* sp contains an int   */
 	    break;
-	case I(F_BBRANCH_WHEN_ZERO):	/* relative backwards offset */
+	case F_BBRANCH_WHEN_ZERO:	/* relative backwards offset */
 	    if ((i = (sp->type == T_NUMBER)) && (sp->u.number == 0)) {
 		((char *) &offset)[0] = pc[0];
 		((char *) &offset)[1] = pc[1];
@@ -1432,7 +1633,7 @@ eval_instruction P1(char *, p)
 		pop_stack();
 	    }
 	    break;
-	case I(F_BBRANCH_WHEN_NON_ZERO):	/* relative backwards offset */
+	case F_BBRANCH_WHEN_NON_ZERO:	/* relative backwards offset */
 	    if ((i = (sp->type != T_NUMBER)) || (sp->u.number != 0)) {
 		((char *) &offset)[0] = pc[0];
 		((char *) &offset)[1] = pc[1];
@@ -1447,7 +1648,7 @@ eval_instruction P1(char *, p)
 	    pc += 2;
 	    sp--;
 	    break;
-	case I(F_LOR):
+	case F_LOR:
 	    /* replaces F_DUP; F_BRANCH_WHEN_NON_ZERO; F_POP */
 	    if ((i = (sp->type != T_NUMBER)) || (sp->u.number != 0)) {
 		((char *) &offset)[0] = pc[0];
@@ -1459,7 +1660,7 @@ eval_instruction P1(char *, p)
 		sp--;
 	    }
 	    break;
-	case I(F_LAND):
+	case F_LAND:
 	    /* replaces F_DUP; F_BRANCH_WHEN_ZERO; F_POP */
 	    if ((i = (sp->type == T_NUMBER)) && (sp->u.number == 0)) {
 		((char *) &offset)[0] = pc[0];
@@ -1475,8 +1676,7 @@ eval_instruction P1(char *, p)
 		}
 	    }
 	    break;
-#ifdef LPC_OPTIMIZE_LOOPS
-	case I(F_LOOP_INCR):	/* this case must be just prior to
+	case F_LOOP_INCR:	/* this case must be just prior to
 				 * F_LOOP_COND */
 	    {
 		struct svalue *s;
@@ -1496,11 +1696,10 @@ eval_instruction P1(char *, p)
 	    } else {
 		break;
 	    }
-	case I(F_LOOP_COND):
+	case F_LOOP_COND:
 	    do_loop_cond();
 	    break;
-#endif
-	case I(F_LOCAL):
+	case F_LOCAL:
 	    {
 		struct svalue *s;
 		
@@ -1522,7 +1721,7 @@ eval_instruction P1(char *, p)
 		}
 		break;
 	    }
-	case I(F_LT):
+	case F_LT:
 	    {
 		if ((sp - 1)->type == T_NUMBER) {
 		    if (sp->type == T_NUMBER) {	/* optimize this case */
@@ -1553,7 +1752,7 @@ eval_instruction P1(char *, p)
 	    pop_n_elems(2);
 	    push_number(i);
 	    break;
-	case I(F_ADD):
+	case F_ADD:
 	    {
 		switch ((sp - 1)->type) {
 		case T_BUFFER:
@@ -1749,8 +1948,8 @@ eval_instruction P1(char *, p)
 		}
 		break;
 	    }
-	case I(F_VOID_ADD_EQ):
-	case I(F_ADD_EQ):
+	case F_VOID_ADD_EQ:
+	case F_ADD_EQ:
 	    {
 		struct svalue *argp;
 
@@ -1880,21 +2079,21 @@ eval_instruction P1(char *, p)
 		}
 	    }
 	    break;
-	case I(F_AND):
+	case F_AND:
 	    f_and();
 	    break;
-	case I(F_AND_EQ):
+	case F_AND_EQ:
 	    f_and_eq();
 	    break;
-	case I(F_FUNCTION_CONSTRUCTOR):
+	case F_FUNCTION_CONSTRUCTOR:
 	    f_function_constructor();
 	    break;
 #ifndef NEW_FUNCTIONS
-	case I(F_EVALUATE):
+	case F_EVALUATE:
 	    f_evaluate();
 	    break;
 #endif
-	case I(F_AGGREGATE):
+	case F_AGGREGATE:
 	    {
 		struct vector *v;
 		unsigned short num;
@@ -1912,7 +2111,7 @@ eval_instruction P1(char *, p)
 		push_refed_vector(v);
 	    }
 	    break;
-	case I(F_AGGREGATE_ASSOC):
+	case F_AGGREGATE_ASSOC:
             {
 		unsigned short num;
 		struct mapping *m;
@@ -1925,7 +2124,7 @@ eval_instruction P1(char *, p)
 		sp->u.map = m;
 		break;
 	    }
-	case I(F_ASSIGN):
+	case F_ASSIGN:
 	    if (sp->type == T_LVALUE_BYTE) {
 		if ((sp - 1)->type != T_NUMBER) {
 		    *sp->u.lvalue_byte = 0;
@@ -1942,7 +2141,7 @@ eval_instruction P1(char *, p)
 	    sp--;		/* ignore lvalue */
 	    /* rvalue is already in the correct place */
 	    break;
-	case I(F_VOID_ASSIGN):
+	case F_VOID_ASSIGN:
 	    if ((sp - 1)->type == T_STRING) {
 		if ((sp - 1)->subtype == STRING_MALLOC ||
 		    (sp - 1)->subtype == STRING_SHARED) {
@@ -1977,13 +2176,13 @@ eval_instruction P1(char *, p)
 	    }
 	    pop_n_elems(2);
 	    break;
-	case I(F_BREAK_POINT):
+	case F_BREAK_POINT:
 	    break_point();
 	    break;
-	case I(F_BREAK):
+	case F_BREAK:
 	    pc = current_prog->p.i.program + *break_sp++;
 	    break;
-	case I(F_CALL_FUNCTION_BY_ADDRESS):
+	case F_CALL_FUNCTION_BY_ADDRESS:
 	    {
 		unsigned short func_index;
 		struct function *funp;
@@ -2039,18 +2238,18 @@ eval_instruction P1(char *, p)
 #endif
 	    }
 	    break;
-	case I(F_COMPL):
+	case F_COMPL:
 	    if (sp->type != T_NUMBER)
 		error("Bad argument to ~\n");
 	    sp->u.number = ~sp->u.number;
 	    break;
-	case I(F_CONST0):
+	case F_CONST0:
 	    push_number(0);
 	    break;
-	case I(F_CONST1):
+	case F_CONST1:
 	    push_number(1);
 	    break;
-	case I(F_PRE_DEC):
+	case F_PRE_DEC:
 	    DEBUG_CHECK(sp->type != T_LVALUE, 
 			"non-lvalue argument to --\n");
 	    if (sp->u.lvalue->type == T_NUMBER) {
@@ -2065,7 +2264,7 @@ eval_instruction P1(char *, p)
 		error("-- of non-numeric argument\n");
 	    }
 	    break;
-	case I(F_DEC):
+	case F_DEC:
 	    DEBUG_CHECK(sp->type != T_LVALUE,
 			"non-lvalue argument to --\n");
 	    if (sp->u.lvalue->type == T_NUMBER) {
@@ -2077,7 +2276,7 @@ eval_instruction P1(char *, p)
 	    }
 	    sp--;
 	    break;
-	case I(F_DIVIDE):
+	case F_DIVIDE:
 	    { 
 		switch((sp-1)->type|sp->type){
 		    
@@ -2116,13 +2315,13 @@ eval_instruction P1(char *, p)
 		}
 	    }
 	    break;
-	case I(F_DIV_EQ):
+	case F_DIV_EQ:
 	    f_div_eq();
 	    break;
-	case I(F_EQ):
+	case F_EQ:
 	    f_eq();
 	    break;
-	case I(F_GE):
+	case F_GE:
 	    {
 		if ((sp - 1)->type == T_NUMBER) {
 		    if (sp->type == T_NUMBER) {
@@ -2153,7 +2352,7 @@ eval_instruction P1(char *, p)
 	    pop_n_elems(2);
 	    push_number(i);
 	    break;
-	case I(F_GT):
+	case F_GT:
 	    {
 		if ((sp - 1)->type == T_NUMBER) {
 		    if (sp->type == T_NUMBER) {
@@ -2184,7 +2383,7 @@ eval_instruction P1(char *, p)
 	    pop_n_elems(2);
 	    push_number(i);
 	    break;
-	case I(F_GLOBAL):
+	case F_GLOBAL:
 	    {
 		struct svalue *s;
 		
@@ -2204,7 +2403,7 @@ eval_instruction P1(char *, p)
 		}
 		break;
 	    }
-	case I(F_PRE_INC):
+	case F_PRE_INC:
 	    DEBUG_CHECK(sp->type != T_LVALUE,
 			"non-lvalue argument to ++\n");
 	    if (sp->u.lvalue->type == T_NUMBER) {
@@ -2219,7 +2418,7 @@ eval_instruction P1(char *, p)
 		error("++ of non-numeric argument\n");
 	    }
 	    break;
-	case I(F_INDEX):
+	case F_INDEX:
 	    if ((sp - 1)->type == T_MAPPING) {
 		struct svalue *v;
 		struct mapping *m;
@@ -2278,7 +2477,7 @@ eval_instruction P1(char *, p)
 	    }
 	    break;
 #ifdef F_JUMP_WHEN_ZERO
-	case I(F_JUMP_WHEN_ZERO):
+	case F_JUMP_WHEN_ZERO:
 	    if ((i = (sp->type == T_NUMBER)) && sp->u.number == 0) {
 		((char *) &offset)[0] = pc[0];
 		((char *) &offset)[1] = pc[1];
@@ -2295,13 +2494,13 @@ eval_instruction P1(char *, p)
 	    break;
 #endif
 #ifdef F_JUMP
-	case I(F_JUMP):
+	case F_JUMP:
 	    ((char *) &offset)[0] = pc[0];
 	    ((char *) &offset)[1] = pc[1];
 	    pc = current_prog->p.i.program + offset;
 	    break;
 #endif
-	case I(F_LE):
+	case F_LE:
 	    {
 		if ((sp - 1)->type == T_NUMBER) {
 		    if (sp->type == T_NUMBER) {
@@ -2332,13 +2531,13 @@ eval_instruction P1(char *, p)
 	    pop_n_elems(2);
 	    push_number(i);
 	    break;
-	case I(F_LSH):
+	case F_LSH:
 	    f_lsh();
 	    break;
-	case I(F_LSH_EQ):
+	case F_LSH_EQ:
 	    f_lsh_eq();
 	    break;
-	case I(F_MOD):
+	case F_MOD:
 	    {
 		CHECK_TYPES(sp - 1, T_NUMBER, 1, instruction);
 		CHECK_TYPES(sp, T_NUMBER, 2, instruction);
@@ -2349,10 +2548,10 @@ eval_instruction P1(char *, p)
 		sp->u.number = i;
 	    }
 	    break;
-	case I(F_MOD_EQ):
+	case F_MOD_EQ:
 	    f_mod_eq();
 	    break;
-	case I(F_MULTIPLY):
+	case F_MULTIPLY:
 	    {
 		switch((sp-1)->type|sp->type){
 		case T_NUMBER:
@@ -2403,13 +2602,13 @@ eval_instruction P1(char *, p)
 		}
 	    }
 	    break;
-	case I(F_MULT_EQ):
+	case F_MULT_EQ:
 	    f_mult_eq();
 	    break;
-	case I(F_NE):
+	case F_NE:
 	    f_ne();
 	    break;
-	case I(F_NEGATE):
+	case F_NEGATE:
 	    if (sp->type == T_NUMBER)
 		sp->u.number = -sp->u.number;
 	    else if (sp->type == T_REAL)
@@ -2417,30 +2616,30 @@ eval_instruction P1(char *, p)
 	    else
 		error("Bad argument to unary minus\n");
 	    break;
-	case I(F_NOT):
+	case F_NOT:
 	    if (sp->type == T_NUMBER && sp->u.number == 0)
 		sp->u.number = 1;
 	    else
 		assign_svalue(sp, &const0);
 	    break;
-	case I(F_OR):
+	case F_OR:
 	    f_or();
 	    break;
-	case I(F_OR_EQ):
+	case F_OR_EQ:
 	    f_or_eq();
 	    break;
-	case I(F_PARSE_COMMAND):
+	case F_PARSE_COMMAND:
 	    f_parse_command();
 	    break;
-	case I(F_POP_VALUE):
+	case F_POP_VALUE:
 	    pop_stack();
 	    break;
-	case I(F_POP_BREAK):
+	case F_POP_BREAK:
 	    i = EXTRACT_UCHAR(pc);
 	    break_sp += i;
 	    pc++;
 	    break;
-	case I(F_POST_DEC):
+	case F_POST_DEC:
 	    DEBUG_CHECK(sp->type != T_LVALUE,
 			"non-lvalue argument to --\n");
 	    if (sp->u.lvalue->type == T_NUMBER) {
@@ -2457,7 +2656,7 @@ eval_instruction P1(char *, p)
 		error("-- of non-numeric argument\n");
 	    }
 	    break;
-	case I(F_POST_INC):
+	case F_POST_INC:
 	    DEBUG_CHECK(sp->type != T_LVALUE,
 			"non-lvalue argument to ++\n");
 	    if (sp->u.lvalue->type == T_NUMBER) {
@@ -2474,20 +2673,20 @@ eval_instruction P1(char *, p)
 		error("++ of non-numeric argument\n");
 	    }
 	    break;
-	case I(F_GLOBAL_LVALUE):
+	case F_GLOBAL_LVALUE:
 	    sp++;
 	    sp->type = T_LVALUE;
 	    sp->u.lvalue = find_value((int) (EXTRACT_UCHAR(pc) +
 					     variable_index_offset));
 	    pc++;
 	    break;
-	case I(F_INDEXED_LVALUE):
+	case F_INDEXED_LVALUE:
 	    push_indexed_lvalue();
 	    break;
-	case I(F_RANGE):
+	case F_RANGE:
 	    f_range();
 	    break;
-	case I(F_RETURN):
+	case F_RETURN:
 	    {
 		struct svalue sv;
 		
@@ -2519,16 +2718,16 @@ eval_instruction P1(char *, p)
 		    return;
 		break;
 	    }
-	case I(F_RSH):
+	case F_RSH:
 	    f_rsh();
 	    break;
-	case I(F_RSH_EQ):
+	case F_RSH_EQ:
 	    f_rsh_eq();
 	    break;
-	case I(F_SSCANF):
+	case F_SSCANF:
 	    f_sscanf();
 	    break;
-	case I(F_STRING):
+	case F_STRING:
 	    ((char *) &string_number)[0] = pc[0];
 	    ((char *) &string_number)[1] = pc[1];
 	    pc += 2;
@@ -2540,7 +2739,7 @@ eval_instruction P1(char *, p)
 	    sp->subtype = STRING_SHARED;
 	    ref_string(sp->u.string = current_prog->p.i.strings[string_number]);
 	    break;
-	case I(F_SUBTRACT):
+	case F_SUBTRACT:
 	    {
 		i = (sp--)->type;
 		switch (i | sp->type) {
@@ -2589,22 +2788,22 @@ eval_instruction P1(char *, p)
 		}
 		break;
 	    }
-	case I(F_SUB_EQ):
+	case F_SUB_EQ:
 	    f_sub_eq();
 	    break;
-	case I(F_SIMUL_EFUN):
+	case F_SIMUL_EFUN:
 	    f_simul_efun();
 	    break;
-	case I(F_SWITCH):
+	case F_SWITCH:
 	    f_switch();
 	    break;
-	case I(F_XOR):
+	case F_XOR:
 	    f_xor();
 	    break;
-	case I(F_XOR_EQ):
+	case F_XOR_EQ:
 	    f_xor_eq();
 	    break;
-	case I(F_CATCH):
+	case F_CATCH:
 	    {
 		unsigned short new_pc_offset;
 		
@@ -2623,7 +2822,7 @@ eval_instruction P1(char *, p)
 		
 		break;
 	    }
-	case I(F_END_CATCH):
+	case F_END_CATCH:
 	    {
 		pop_stack();/* discard expression value */
 		free_svalue(&catch_value, "F_END_CATCH");
@@ -2635,7 +2834,7 @@ eval_instruction P1(char *, p)
 		push_number(0);
 		return;	/* return to do_catch */
 	    }
-	case I(F_TIME_EXPRESSION):
+	case F_TIME_EXPRESSION:
 	    {
 		long sec, usec;
 		
@@ -2644,7 +2843,7 @@ eval_instruction P1(char *, p)
 		push_number(usec);
 		break;
 	    }
-	case I(F_END_TIME_EXPRESSION):
+	case F_END_TIME_EXPRESSION:
 	    {
 		long sec, usec;
 		
@@ -2656,7 +2855,7 @@ eval_instruction P1(char *, p)
 		break;
 	    }
 #ifdef NEEDS_CALL_EXTRA
-	case I(F_CALL_EXTRA):
+	case F_CALL_EXTRA:
 	    instruction = EXTRACT_UCHAR(pc++) + 0xff;
 #endif
 	default:
@@ -2698,9 +2897,6 @@ eval_instruction P1(char *, p)
 static void
 do_catch P2(char *, pc, unsigned short, new_pc_offset)
 {
-    extern jmp_buf error_recovery_context;
-    extern int error_recovery_context_exists;
-
     push_control_stack(0);
     /* next two probably not necessary... */
     csp->pc = current_prog->p.i.program + new_pc_offset;
@@ -2801,7 +2997,6 @@ int apply_low P3(char *, fun, struct object *, ob, int, num_arg)
     cache_entry_t *entry;
     struct function *pr;
     struct program *progp;
-    extern int num_error;
     int ix;
     static int cache_mask = APPLY_CACHE_SIZE - 1;
     char *funname;
@@ -3080,7 +3275,6 @@ struct svalue *
        safe_apply P4(char *, fun, struct object *, ob, int, num_arg, int, where)
 {
     jmp_buf save_error_recovery_context;
-    extern jmp_buf error_recovery_context;
     struct svalue *ret;
     struct object *save_command_giver = command_giver;
 
@@ -3273,23 +3467,38 @@ void call_function P2(struct program *, progp, struct function *, pr)
     pop_stack();
 }
 
-/*
- * This can be done much more efficiently, but the fix has
- * low priority.
- */
-#define INCLUDE_DEPTH 10
+void translate_absolute_line P4(int, abs_line, unsigned short *, file_info,
+				int *, ret_file, int *, ret_line) {
+    unsigned short *p1, *p2;
+    int file;
+    int line_tmp = abs_line;
+
+    /* two passes: first, find out what file we're interested in */
+    p1 = file_info;
+    while (line_tmp > *p1) {
+	line_tmp -= *p1;
+	p1 += 2;
+    }
+    file = p1[1];
+
+    /* now correct the line number for that file */
+    p2 = file_info;
+    while (p2 < p1) {
+	if (p2[1] == file)
+	    line_tmp += *p2;
+	p2 += 2;
+    }
+    *ret_line = line_tmp;
+    *ret_file = file;
+}
 
 int find_line P4(char *, p, struct program *, progp,
 		 char **, ret_file, int *, ret_line )
 {
     int offset;
-    int i;
-    int which;
-    int filesave[INCLUDE_DEPTH];
-    int linesave[INCLUDE_DEPTH];
-    int linenum;
-    int file;
-    short s;
+    unsigned char *lns;
+    short abs_line;
+    int file_idx;
 
     *ret_file = "";
     *ret_line = 0;
@@ -3310,45 +3519,28 @@ int find_line P4(char *, p, struct program *, progp,
      * look_for_objects_to_swap() swaps them back out, since more errors are
      * likely.
      */
-    if (!progp->p.i.line_numbers) {
+    if (!progp->p.i.line_info) {
 	load_line_numbers(progp);
-	if (!progp->p.i.line_numbers)
+	if (!progp->p.i.line_info)
 	    return 4;
     }
     offset = p - progp->p.i.program;
     DEBUG_CHECK2(offset > (int) progp->p.i.program_size,
 		 "Illegal offset %d in object %s\n", offset, progp->name);
-    which = 0;
-    file = -1;
-    linenum = 1;
-    for (i=1; ; ) {
-	if (s = progp->p.i.line_numbers[i++]) {
-	    if (offset < s)
-		break;
-	    linenum++;
-	} else {
-	    if (s = progp->p.i.line_numbers[i++]) {
-		if (which == 9) 
-		    return 5;
-		filesave[which] = file;
-		linesave[which] = linenum;
-		file = s - 1;
-		linenum = 1;
-		which++;
-	    } else {
-		which--;
-		if (which < 0) break; /* end of file */
-		file = filesave[which];
-		linenum = linesave[which];
-	    }
-	}
+
+    lns = progp->p.i.line_info;
+    while (offset > *lns) {
+	offset -= *lns;
+	lns += 3;
     }
-    if (file == -1) {
-	*ret_file = 0;
-    } else {
-	*ret_file = progp->p.i.strings[file];
-    }
-    *ret_line = linenum;
+
+    ((char *)&abs_line)[0] = lns[1];
+    ((char *)&abs_line)[1] = lns[2];
+
+    translate_absolute_line(abs_line, &progp->p.i.file_info[2], 
+			    &file_idx, ret_line);
+
+    *ret_file = progp->p.i.strings[file_idx - 1];
     return 0;
 }
 
@@ -3647,7 +3839,7 @@ int inter_sscanf P4(struct svalue *, arg, struct svalue *, s0, struct svalue *, 
     /*
      * First get the string to be parsed.
      */
-    CHECK_TYPES(s0, T_STRING, 1, I(F_SSCANF));
+    CHECK_TYPES(s0, T_STRING, 1, F_SSCANF);
     in_string = s0->u.string;
     if (in_string == 0)
 	return 0;
@@ -3655,7 +3847,7 @@ int inter_sscanf P4(struct svalue *, arg, struct svalue *, s0, struct svalue *, 
     /*
      * Now get the format description.
      */
-    CHECK_TYPES(s1, T_STRING, 2, I(F_SSCANF));
+    CHECK_TYPES(s1, T_STRING, 2, F_SSCANF);
     fmt = s1->u.string;
 
     /*
@@ -4033,7 +4225,6 @@ static void clear_vector_refs P2(struct svalue *, svp, int, num)
  */
 void check_a_lot_ref_counts P1(struct program *, search_prog)
 {
-    extern struct object *master_ob;
     struct object *ob;
 
     /*

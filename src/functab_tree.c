@@ -28,13 +28,11 @@
 /*
  * minimal includes here, in case this module isn't used
  */
-#include "config.h"
+#include "std.h"
 
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
-#include <stdio.h>
-
-#include "lint.h"
-#include "exec.h"
+#include "functab_tree.h"
+#include "simulate.h"
 
 /*
  * The function table tree is accomplished by augmenting the function
@@ -105,7 +103,6 @@ int lookup_function P3(struct function *, functab, /* function table to search *
 	 * We have a match!
 	 */
 	return (int) index;
-	break;
     }
 
     return -1;

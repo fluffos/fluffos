@@ -6,13 +6,9 @@
 #include <math.h>
 
 #ifdef LATTICE
-#include "/config.h"
-#include "/lint.h"
-#include "/efuns.h"
+#include "/lpc_incl.h"
 #else
-#include "../config.h"
-#include "../lint.h"
-#include "../efuns.h"
+#include "../lpc_incl.h"
 #endif
 
 #include "matrix.h"

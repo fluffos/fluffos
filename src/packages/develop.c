@@ -1,11 +1,9 @@
 #ifdef LATTICE
-#include "/config.h"
-#include "/efuns.h"
-#include "/lint.h"
+#include "/lpc_incl.h"
+#include "/comm.h"
 #else
-#include "../config.h"
-#include "../efuns.h"
-#include "../lint.h"
+#include "../lpc_incl.h"
+#include "../comm.h"
 #endif
 
 static struct object *ob;

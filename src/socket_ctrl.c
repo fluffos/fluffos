@@ -1,4 +1,5 @@
-#include "config.h"
+#include "std.h"
+#include "network_incl.h"
 
 #ifndef OS2
 /*
@@ -8,28 +9,10 @@
   machines seem to need this done in different ways.
 */
 
-#include <stdio.h>
-#ifdef SunOS_5
-#include <unistd.h>
-#endif
-#include <sys/types.h>
-#if !defined(LATTICE) && !defined(OS2)
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#endif
-#ifdef LATTICE
-#include <amiga.h>
-#include <socket.h>
-#endif
-#if defined(_SEQUENT_) || defined(OLD_ULTRIX)
-#include <fcntl.h>
-#endif
 #if defined(SVR4)
-#include <fcntl.h>
 #include <sys/filio.h>
 #include <sys/sockio.h>
 #endif
-#include "lint.h"
 
 /*
  * set process receiving SIGIO/SIGURG signals to us.

@@ -3,74 +3,13 @@
 	inside eval_instruction() in interpret.c.
 */
 
-#include "config.h"
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#ifndef LATTICE
-#include <sys/time.h>
-#else
-#include <time.h>
-#endif
-#if !defined(LATTICE) && !defined(OS2)
-#include <sys/ioctl.h>
-#include <netdb.h>
-#endif
-#include <fcntl.h>
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
-#include <ctype.h>
-#include <signal.h>
-#ifdef LATTICE
-#include <nsignal.h>
-#include <stdlib.h>
-#endif
-#ifndef LATTICE
-#include <memory.h>
-#endif
-#include <setjmp.h>
-
-#include "lint.h"
+#include "std.h"
+#include "lpc_incl.h"
+#include "efuns_incl.h"
+#include "backend.h"
 #include "eoperators.h"
-#include "interpret.h"
-#include "buffer.h"
-#include "mapping.h"
-#include "object.h"
-#include "exec.h"
-#include "efun_protos.h"
-#include "comm.h"
-#include "opcodes.h"
-#include "switch.h"
-#include "stralloc.h"
-#include "debug.h"
-#include "include/origin.h"
-#include "instrs.h"
-
-extern int d_flag;
-extern char *pc;
-extern int tracedepth;
-extern int current_time;
-extern char *last_verb;
-extern struct svalue *fp;	/* Pointer to first argument. */
-extern int function_index_offset;	/* Needed for inheritance */
-extern int variable_index_offset;	/* Needed for inheritance */
-extern struct object *previous_ob;
-extern struct object *master_ob;
-#ifndef NO_UIDS
-extern userid_t *backbone_uid;
-#endif
-extern struct svalue const0, const1, const0u, const0n;
-extern struct object *current_heart_beat, *current_interactive;
-extern short *break_sp;		/* Points to address to branch to at next
-				 * F_BREAK			 */
-extern struct control_stack *csp;	/* Points to last element pushed */
-
-/* Points to value of last push. */
-extern struct svalue *sp;
-
-extern int eval_cost;
-extern int call_origin;
+#include "parse.h"
+#include "swap.h"
 
 INLINE void f_and()
 {
@@ -689,7 +628,7 @@ f_switch()
 						 * key */
 	if (sp->type == T_NUMBER && !sp->u.number) {
 	    /* special case: 0 as a string */
-	    s = (int) ZERO_AS_STR_CASE_LABEL;
+	    s = 0;
 	} else if (sp->type == T_STRING) {
 	    switch (sp->subtype) {
 	    case STRING_SHARED:
@@ -849,10 +788,7 @@ call_simul_efun P2(unsigned short, index, int, num_arg)
 {
     /* prevent recursion */
     static loading = 0;
-    struct svalue *arg;
     struct function *funp;
-    struct control_stack *save_csp;
-
     extern struct object *simul_efun_ob;
     extern char *simul_efun_file_name;
     extern struct function **simuls;
@@ -862,7 +798,6 @@ call_simul_efun P2(unsigned short, index, int, num_arg)
 	push_undefined();
 	return;
     }
-    arg = sp - num_arg + 1;
 
     if (!simul_efun_ob || (simul_efun_ob->flags & O_DESTRUCTED)) {
 	if (loading)
@@ -896,7 +831,6 @@ call_simul_efun P2(unsigned short, index, int, num_arg)
 #endif
 	    previous_ob = current_object;
 	current_object = simul_efun_ob;
-	save_csp = csp;
 	call_program(current_prog, funp->offset);
     } else error("Function is no longer a simul_efun.");
 }
@@ -1105,7 +1039,7 @@ INLINE void
 f_function_constructor()
 {
     struct funp *fp;
-    int i, kind;
+    int kind;
     unsigned short index;
 
     kind = EXTRACT_UCHAR(pc);
@@ -1114,7 +1048,6 @@ f_function_constructor()
     switch (kind) {
 #ifdef NEW_FUNCTIONS
     case ORIGIN_EFUN:
-	i = 0;
 	kind = EXTRACT_UCHAR(pc);
 	pc++;
 #ifdef NEEDS_CALL_EXTRA
@@ -1169,197 +1102,6 @@ f_function_constructor()
 }
 
 #ifdef NEW_FUNCTIONS
-/* num_arg args are on the stack, and the args from the vector vec should be
- * put in front of them.  This is so that the order of arguments is logical.
- * 
- * evaluate( (: f, a :), b) -> f(a,b) and not f(b, a) which would happen
- * if we simply pushed the args from vec at this point.  (Note that the
- * old function pointers are broken in this regard)
- */
-int merge_arg_lists P3(int, num_arg, struct vector *, vec, int, start) {
-    int num_vec_arg = vec->size - start;
-    struct svalue *sptr;
-    int i;
-
-    if (num_arg && num_vec_arg) {
-	/* We need to do some stack movement so that the order
-	   of arguments is logical */
-	for (i=0; i<num_arg; i++)
-	    *(sp-i+num_vec_arg) = *(sp-i);
-	sptr = sp - num_arg + 1;
-	for (i=start; i < vec->size; i++)
-	    assign_svalue_no_free(sptr++, &vec->item[i]);
-	sp += num_vec_arg;
-    } else {
-	for (i = start; i < vec->size; i++)
-	    push_svalue(&vec->item[i]);
-    }
-    return num_arg + num_vec_arg;
-}
-
-void cfp_error P1(char *, s) {
-    remove_fake_frame();
-    error(s);
-}
-
-struct svalue *
-call_function_pointer P2(struct funp *, funp, int, num_arg)
-{
-    struct object *ob;
-    struct function *func;
-    char *funcname;
-    int i, def;
-    static struct svalue ret = { T_NUMBER };
-
-    setup_fake_frame(funp);
-    
-    switch (funp->type) {
-    case ORIGIN_CALL_OTHER:
-	if (funp->args.type == T_STRING)
-	    funcname = funp->args.u.string;
-	else if (funp->args.type == T_POINTER) {
-	    check_for_destr(funp->args.u.vec);
-	    if ( (funp->args.u.vec->size <1)
-		|| (funp->args.u.vec->item[0].type != T_STRING) )
-		cfp_error("First argument of call_other function pointer must be a string.\n");
-	    funcname = funp->args.u.vec->item[0].u.string;
-	    num_arg = merge_arg_lists(num_arg, funp->args.u.vec, 1);
-	} else cfp_error("Illegal type for function name in function pointer.\n");
-	if (funp->f.obj.type == T_OBJECT)
-	    ob = funp->f.obj.u.ob;
-	else if (funp->f.obj.type == T_POINTER) {
-	    struct vector *vec;
-
-	    vec = call_all_other(funp->f.obj.u.vec, funcname, num_arg);
-	    remove_fake_frame();
-	    free_svalue(&ret, "call_function_pointer");
-	    ret.type = T_POINTER;
-	    ret.u.vec = vec;
-	    return &ret;
-	} else if (funp->f.obj.type == T_STRING) {
-	    ob = (struct object *)find_object(funp->f.obj.u.string);
-	    if (!ob || !object_visible(ob))
-		cfp_error("Function pointer couldn't find object\n");
-	} else cfp_error("Function pointer object must be an object, array or string.\n");
-	
-#ifdef TRACE
-	if (TRACEP(TRACE_CALL_OTHER)) {
-	    do_trace("Call other (function pointer)", funcname, "\n");
-	}
-#endif
-	call_origin = ORIGIN_CALL_OTHER;
-	if (apply_low(funcname, ob, num_arg) == 0) {
-	    remove_fake_frame();
-	    return &const0u;
-	}
-	break;
-    case ORIGIN_SIMUL_EFUN:
-	if (funp->args.type == T_POINTER) {
-	    check_for_destr(funp->args.u.vec);
-	    num_arg = merge_arg_lists(num_arg, funp->args.u.vec, 0);
-	}
-	call_simul_efun(funp->f.index, num_arg);
-	break;
-    case ORIGIN_EFUN:
-	fp = sp - num_arg + 1;
-	if (funp->args.type == T_POINTER) {
-	    check_for_destr(funp->args.u.vec);
-	    num_arg = merge_arg_lists(num_arg, funp->args.u.vec, 0);
-	}
-	i = funp->f.opcodes[0];
-#ifdef NEEDS_CALL_EXTRA
-	if (i == F_CALL_EXTRA) i = 0xff + funp->f.opcodes[1];
-#endif
-	if (num_arg == instrs[i].min_arg - 1 && (def = instrs[i].Default)) {
-	    switch (def) {
-	    case F_CONST0:
-		*(++sp)=const0;
-		break;
-	    case F_CONST1:
-		*(++sp)=const0;
-		break;
-	    case -((F_NBYTE << 8) + 1):
-		sp++;
-		sp->type = T_NUMBER;
-		sp->subtype = 0;
-		sp->u.number = -1;
-		break;
-	    case F_THIS_OBJECT:
-		if (current_object && !(current_object->flags & O_DESTRUCTED))
-		    push_object(current_object);
-		else
-		    *(++sp)=const0;
-		break;
-	    default:
-		fatal("Unsupported type of default argument in efun function pointer.\n");
-	    }
-	    num_arg++;
-	} else
-	if (num_arg < instrs[i].min_arg) {
-	    error("Too few arguments to efun %s in efun pointer.\n", instrs[i].name);
-	} else
-	if (num_arg > instrs[i].max_arg && instrs[i].max_arg != -1) {
-		error("Too many arguments to efun %s in efun pointer.\n", instrs[i].name);
-	    }
-	if (instrs[i].min_arg != instrs[i].max_arg) {
-	    /* need to update the argument count */
-	    funp->f.opcodes[(i > 255 ? 2 : 1)] = num_arg;
-	}
-	eval_instruction((char*)&funp->f.opcodes[0]);
-	free_svalue(&ret, "call_function_pointer");
-	ret = *sp--;
-	return &ret;
-    case ORIGIN_LOCAL: {
-	fp = sp - num_arg + 1;
-	
-	func = &funp->owner->prog->p.i.functions[funp->f.index];
-	
-	if (func->flags & NAME_UNDEFINED)
-	    error("Undefined function: %s\n", func->name);
-	
-	push_control_stack(func);
-	
-	caller_type = ORIGIN_LOCAL;
-	current_prog = funp->owner->prog;
-	
-	if (funp->args.type == T_POINTER) {
-	    struct vector *v = funp->args.u.vec;
-	    
-	    check_for_destr(v);
-	    num_arg = merge_arg_lists(num_arg, v, 0);
-	}
-	
-	csp->num_local_variables = num_arg;
-	func = setup_new_frame(func);
-
-	csp->extern_call = 1;
-	call_program(current_prog, func->offset);
-	break;
-    }
-    case ORIGIN_FUNCTIONAL: {
-	fp = sp - num_arg + 1;
-	fake_func.num_arg = funp->f.a.num_args;
-	
-	push_control_stack(&fake_func);
-	caller_type = ORIGIN_FUNCTIONAL;
-	current_prog = funp->owner->prog;
-	
-	csp->num_local_variables = num_arg;
-	(void) setup_new_frame(&fake_func);
-
-	csp->extern_call = 1;
-	call_absolute(funp->f.a.start);
-	break;
-    }
-    default:
-	error("Unsupported function pointer type.\n");
-    }
-    free_svalue(&ret, "call_function_pointer");
-    ret = *sp--;
-    remove_fake_frame();
-    return &ret;
-}
-
 INLINE void
 f_evaluate P2(int, num_arg, int, instruction)
 {
@@ -1380,61 +1122,6 @@ f_evaluate P2(int, num_arg, int, instruction)
     push_svalue(v);
 }
 #else
-INLINE
-struct svalue *
-call_function_pointer P2(struct funp *, funp, int, num_arg) {
-    static struct svalue ret = { T_NUMBER };
-    struct svalue *arg;
-    char *funcname;
-    int i;
-    struct object *ob;
-
-    if (current_object->flags & O_DESTRUCTED) {	/* No external calls allowed */
-	pop_n_elems(num_arg);
-	return &const0u;
-    }
-    if (funp->fun.type == T_STRING)
-	funcname = funp->fun.u.string;
-    else {			/* must be T_POINTER then */
-	check_for_destr(funp->fun.u.vec);
-	if ((funp->fun.u.vec->size < 1)
-	    || (funp->fun.u.vec->item[0].type != T_STRING))
-	    error("call_other: 1st elem of array for arg 2 must be a string\n");
-	funcname = funp->fun.u.vec->item[0].u.string;	/* complicated huh? */
-	for (i = 1; i < funp->fun.u.vec->size; i++)
-	    push_svalue(&funp->fun.u.vec->item[i]);
-	num_arg += i - 1;
-    }
-    if (funp->obj.type == T_OBJECT)
-	ob = funp->obj.u.ob;
-    else if (funp->obj.type == T_POINTER) {
-	struct vector *v;
-
-	v = call_all_other(funp->obj.u.vec, funcname, num_arg - 2);
-	free_svalue(&ret, "call_function_pointer");
-	ret.type = T_POINTER;
-	ret.u.vec = v;
-	return &ret;
-    } else {
-	ob = find_object(arg[0].u.string);
-	if (!ob || !object_visible(ob))
-	    error("call_other() couldn't find object\n");
-    }
-    /* Send the remaining arguments to the function. */
-#ifdef TRACE
-    if (TRACEP(TRACE_CALL_OTHER)) {
-	do_trace("Call other ", funcname, "\n");
-    }
-#endif
-    call_origin = ORIGIN_CALL_OTHER;
-    if (apply_low(funcname, ob, num_arg) == 0) {	/* Function not found */
-	return &const0u;
-    }
-    free_svalue(&ret, "call_function_pointer");
-    ret = *sp--;
-    return &ret;
-}
-
 INLINE void
 f_evaluate()
 {

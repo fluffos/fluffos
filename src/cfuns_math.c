@@ -4,10 +4,7 @@
     -- coded by Truilkan 93/02/21
 */
 
-#include <math.h>
-
-#include "efuns.h"
-#include "cfuns.h"
+#include "std.h"
 #ifdef LPC_TO_C
 
 #ifdef MATH

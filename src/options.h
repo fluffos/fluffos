@@ -281,7 +281,7 @@
 
 /* APPLY_CACHE_BITS: defines the number of bits to use in the call_other cache
  *   (in interpret.c).  Somewhere between six (6) and ten (10) is probably
- *   sufficient.
+ *   sufficient for small muds.
  */
 #define APPLY_CACHE_BITS 11
 
@@ -441,8 +441,8 @@
  */
 #undef ALWAYS_SAVE_COMPILED_BINARIES
 
-/* TRACE_CODE: define this for to enable code tracing (the driver will print
- *   out the previous lines of code to an error) eval_instruction() runs about
+/* TRACE_CODE: define this to enable code tracing (the driver will print out
+ *   the previous lines of code to an error) -- eval_instruction() runs about
  *   twice as fast when this is not defined (for the most common eoperators).
  */
 #undef TRACE_CODE

@@ -9,19 +9,10 @@
  *                made uids into shared strings
  */
 
-#include "config.h"
-
-#include <stdio.h>
-#ifdef __386BSD__
-#include <string.h>
-#endif
-#ifdef LATTICE
-#include <stdlib.h>
-#endif
-
-#include "lint.h"
-#include "avltree.h"
+#include "std.h"
 #include "uid.h"
+#include "avltree.h"
+#include "stralloc.h"
 
 #ifndef NO_UIDS
 static tree *uids = NULL;

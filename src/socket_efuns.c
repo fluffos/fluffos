@@ -4,58 +4,17 @@
  *   10-92 : Dave Richards (Cynosure) : less original coding.
  */
 
-#include "config.h"
+#include "std.h"
+#include "network_incl.h"
+#include "lpc_incl.h"
+#include "socket_efuns.h"
+#include "socket_err.h"
+#include "include/socket_err.h"
+#include "debug.h"
+#include "socket_ctrl.h"
+#include "comm.h"
 
 #ifdef SOCKET_EFUNS
-
-#if defined(SunOS_5) || defined(LATTICE)
-#include <stdlib.h>
-#endif
-#ifdef SunOS_5
-#include <unistd.h>
-#endif
-#include <sys/types.h>
-#include <sys/time.h>
-#ifndef LATTICE
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#endif
-#ifdef __386BSD__
-#include <sys/param.h>
-#endif
-#if !defined(apollo) && !defined(linux) && !defined(LATTICE) && !defined(_M_UNIX)
-#include <sys/socketvar.h>
-#endif
-#ifndef LATTICE
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#endif
-#include <fcntl.h>
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
-#include <ctype.h>
-#include <signal.h>
-#ifndef LATTICE
-#include <memory.h>
-#endif
-#ifdef LATTICE
-#include <amiga.h>
-#include <socket.h>
-#include <nsignal.h>
-#endif
-
-#include "lint.h"
-#include "buffer.h"
-#include "interpret.h"
-#include "object.h"
-#include "exec.h"
-#include "debug.h"
-#include "socket_efuns.h"
-#include "include/socket_err.h"
-#include "include/origin.h"
-#include "applies.h"
 
 struct lpc_socket lpc_socks[MAX_EFUN_SOCKS];
 static int socket_name_to_sin PROT((char *, struct sockaddr_in *));
@@ -579,7 +538,7 @@ socket_write P3(int, fd, struct svalue *, message, char *, name)
 
 
 	case T_BUFFER:
-	    if (sendto(lpc_socks[fd].fd, message->u.buf->item,
+	    if (sendto(lpc_socks[fd].fd, (char *)message->u.buf->item,
 		       message->u.buf->size, 0,
 		       (struct sockaddr *) & sin, sizeof(sin)) == -1) {
 		perror("socket_write: sendto");
@@ -595,7 +554,7 @@ socket_write P3(int, fd, struct svalue *, message, char *, name)
 	return EEMODENOTSUPP;
     }
 
-    off = send(lpc_socks[fd].fd, buf, len, 0);
+    off = write(lpc_socks[fd].fd, buf, len);
     if (off == -1) {
 	FREE(buf);
 	switch (errno) {
@@ -823,8 +782,8 @@ socket_write_select_handler P1(int, fd)
 	return;
 
     if (lpc_socks[fd].w_buf != NULL) {
-	cc = send(lpc_socks[fd].fd, lpc_socks[fd].w_buf + lpc_socks[fd].w_off,
-		  lpc_socks[fd].w_len, 0);
+	cc = write(lpc_socks[fd].fd, lpc_socks[fd].w_buf + lpc_socks[fd].w_off,
+		  lpc_socks[fd].w_len);
 	if (cc == -1)
 	    return;
 	lpc_socks[fd].w_off += cc;

@@ -1,31 +1,13 @@
+#include "std.h"
 #include "config.h"
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <errno.h>
-#include <stdio.h>
-#include <ctype.h>
-#include <string.h>
-#if defined(LATTICE)
-#include <stdlib.h>
-#endif
-#if defined(__386BSD__) || defined(SunOS_5)
-#include <unistd.h>
-#endif
-#if defined(__STDC__) && !defined(LATTICE)
-#include <memory.h>
-#endif
-
-#include "lint.h"
-#include "interpret.h"
-#include "mapping.h"
-#include "buffer.h"
-#include "object.h"
-#include "sent.h"
-#include "exec.h"
+#include "lpc_incl.h"
+#include "file_incl.h"
+#include "otable.h"
+#include "backend.h"
 #include "debug.h"
-#include "applies.h"
-#include "include/origin.h"
+#include "comm.h"
+#include "swap.h"
+#include "socket_efuns.h"
 
 #define too_deep_save_error() \
     error("Mappings and/or arrays nested too deep (%d) for save_object\n",\
@@ -38,7 +20,7 @@ int tot_alloc_object, tot_alloc_object_size;
 static void remove_all_objects PROT((void));
 #endif
 char *save_mapping PROT ((struct mapping *m));
-static int restore_array PROT((char **str, struct svalue *));
+INLINE static int restore_array PROT((char **str, struct svalue *));
 int restore_hash_string PROT((char **str, int *a, struct svalue *));
 
 INLINE int
@@ -473,8 +455,6 @@ restore_interior_string P2(char **, val, struct svalue *, sv)
     sv->subtype = STRING_MALLOC;
     return 0;
 }
-
-extern int total_mapping_size, total_mapping_nodes;
 
 #define PARSE_NUMERIC(X,Y,Z) \
     { \
@@ -946,7 +926,9 @@ INLINE int
 safe_restore_svalue P2(char *, cp, struct svalue *, v)
 {
     int ret;
-    struct svalue val = { T_NUMBER };
+    struct svalue val;
+
+    val.type = T_NUMBER;
     switch(*cp++) {
     case '\"':
 	if (ret = restore_string(cp, &val)) return ret;
@@ -1372,7 +1354,7 @@ void free_object P2(struct object *, ob, char *, from)
 
     ob->ref--;
     if (d_flag > 1)
-	printf("Subtr ref to ob %s: %d (%s)\n", ob->name,
+	printf("Subtr ref to ob %s: %u (%s)\n", ob->name,
 	       ob->ref, from);
     debug(16384, ("subtr ref to ob %s: %d (%s)\n", ob->name, ob->ref, from));
     if (ob->ref > 0)
@@ -1635,8 +1617,8 @@ void free_prog P2(struct program *, progp, int, free_sub_strings)
 	 */
 	if (progp->p.i.line_swap_index != -1)
 	    remove_line_swap(progp);
-	if (progp->p.i.line_numbers)
-	    FREE(progp->p.i.line_numbers);
+	if (progp->p.i.file_info)
+	    FREE(progp->p.i.file_info);
 
 #ifdef LPC_TO_C
 	/*
@@ -1652,8 +1634,6 @@ void free_prog P2(struct program *, progp, int, free_sub_strings)
 
 void reset_object P2(struct object *, ob, int, arg)
 {
-    extern int current_time;
-
     /* Be sure to update time first ! */
     ob->next_reset = current_time + TIME_TO_RESET / 2 +
 	random_number(TIME_TO_RESET / 2);

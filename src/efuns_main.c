@@ -7,30 +7,28 @@
     to #include "efuns.h" in that separate source file.
 */
 
-#include "config.h"
-
-#include "efuns.h"
-#include "stralloc.h"
-#include "include/origin.h"
+#include "std.h"
+#include "comm.h"
 #include "ed.h"
-
-#if defined(__386BSD__) || defined(SunOS_5)
-#include <unistd.h>
-#endif
-#if defined(LATTICE)
-#include <stdlib.h>
-#include <dos.h>
-#include <amiga.h>
-#endif
-
-#include "lint.h"
-#include "applies.h"
-
-static struct object *ob;
+#include "lpc_incl.h"
+#include "file_incl.h"
+#include "parse.h"
+#include "sprintf.h"
+#include "backend.h"
+#include "swap.h"
+#include "strstr.h"
+#include "otable.h"
+#include "eoperators.h"
+#include "crc32.h"
+#include "reclaim.h"
+#include "dumpstat.h"
+#include "efuns_main.h"
 
 int using_bsd_malloc = 0;
 int using_smalloc = 0;
 int call_origin = 0;
+
+static struct object *ob;
 
 int data_size PROT((struct object * ob));
 void reload_object PROT((struct object * obj));
@@ -126,7 +124,6 @@ f_break_string P2(int, num_arg, int, instruction)
 {
     struct svalue *arg = sp - num_arg + 1;
     char *str;
-    extern char *break_string PROT((char *, int, struct svalue *));
 
     if (arg[0].type == T_STRING) {
 	str = break_string(arg[0].u.string, arg[1].u.number,
@@ -434,7 +431,6 @@ void
 f_deep_inherit_list P2(int, num_arg, int, instruction)
 {
     struct vector *vec;
-    extern struct vector *deep_inherit_list PROT((struct object *));
 
     if (!(sp->u.ob->flags & O_SWAPPED)) {
 	vec = deep_inherit_list(sp->u.ob);
@@ -976,8 +972,6 @@ void
 f_inherit_list P2(int, num_arg, int, instruction)
 {
     struct vector *vec;
-    extern struct vector *inherit_list PROT((struct object *));
-
 
     if (!(sp->u.ob->flags & O_SWAPPED)) {
 	vec = inherit_list(sp->u.ob);
@@ -1499,13 +1493,6 @@ f_move_object P2(int, num_arg, int, instruction)
 void f_mud_status P2(int, num_arg, int, instruction)
 {
     int tot, res, verbose = 0;
-    extern char *reserved_area;
-    extern int tot_alloc_object, tot_alloc_sentence, tot_alloc_object_size,
-        num_mappings, num_arrays, total_array_size, total_mapping_size,
-        total_users, total_mapping_nodes;
-    extern int total_num_prog_blocks;
-    extern int total_prog_block_size;
-    extern int add_message_calls, inet_packets, inet_volume;
 
     verbose = sp->u.number;
     pop_stack();
@@ -1704,7 +1691,6 @@ f_present P2(int, num_arg, int, instruction)
 void
 f_previous_object P2(int, num_arg, int, instruction)
 {
-    extern struct control_stack control_stack[MAX_TRACE];
     struct control_stack *p;
     int i;
 
@@ -1784,7 +1770,6 @@ f_printf P2(int, num_arg, int, instruction)
 void
 f_process_string P2(int, num_arg, int, instruction)
 {
-    extern char *process_string PROT((char *));
     char *str;
 
     str = process_string(sp->u.string);
@@ -1799,7 +1784,6 @@ f_process_string P2(int, num_arg, int, instruction)
 void
 f_process_value P2(int, num_arg, int, instruction)
 {
-    extern struct svalue *process_value PROT((char *));
     struct svalue *ret;
 
     ret = process_value(sp->u.string);
@@ -1814,7 +1798,6 @@ f_process_value P2(int, num_arg, int, instruction)
 void
 f_query_host_name P2(int, num_arg, int, instruction)
 {
-    extern char *query_host_name();
     char *tmp;
 
     tmp = query_host_name();
@@ -1841,7 +1824,6 @@ f_query_idle P2(int, num_arg, int, instruction)
 void
 f_query_ip_name P2(int, num_arg, int, instruction)
 {
-    extern char *query_ip_name PROT((struct object *));
     char *tmp;
 
     tmp = query_ip_name(num_arg ? sp->u.ob : 0);
@@ -1858,7 +1840,6 @@ f_query_ip_name P2(int, num_arg, int, instruction)
 void
 f_query_ip_number P2(int, num_arg, int, instruction)
 {
-    extern char *query_ip_number PROT((struct object *));
     char *tmp;
 
     tmp = query_ip_number(num_arg ? sp->u.ob : 0);
@@ -2382,8 +2363,6 @@ f_say P2(int, num_arg, int, instruction)
 void
 f_set_eval_limit P2(int, num_arg, int, instruction)
 {
-    extern int max_cost;
-
     switch (sp->u.number) {
     case 0:
 	sp->u.number = eval_cost = max_cost;
@@ -2481,13 +2460,15 @@ f_set_light P2(int, num_arg, int, instruction)
 {
     struct object *o1;
 
-#ifndef NO_LIGHT
+#ifdef NO_LIGHT
+    sp->u.number = 1;
+#else
     add_light(current_object, sp->u.number);
-#endif
     o1 = current_object;
     while (o1->super)
 	o1 = o1->super;
     sp->u.number = o1->total_light;
+#endif
 }
 #endif
 
@@ -2741,7 +2722,7 @@ f_strsrch P2(int, num_arg, int, instruction)
 	if (!little[1])		/* 1 char srch pattern */
 	    pos = strchr(big, (int) little[0]);
 	else
-	    pos = _strstr(big, little);
+	    pos = (char *)_strstr(big, little);
 
 	/* start at right */
     } else {			/* XXX: maybe test for -1 */
@@ -2814,7 +2795,6 @@ void
 f_swap P2(int, num_arg, int, instruction)
 {
     struct object *ob = sp->u.ob;
-    extern struct control_stack control_stack[MAX_TRACE];
     struct control_stack *p;
 
     /* a few sanity checks */
@@ -3208,8 +3188,6 @@ f_dump_file_descriptors P2(int, num_arg, int, instruction)
 #endif
 
 #ifdef F_RECLAIM_OBJECTS
-extern int reclaim_objects PROT((void));
-
 void f_reclaim_objects P2(int, num_arg, int, instruction)
 {
     push_number(reclaim_objects());
@@ -3222,12 +3200,6 @@ f_memory_info P2(int, num_arg, int, instruction)
 {
     struct object *ob;
     int mem;
-    extern int total_prog_block_size;
-    extern int total_array_size;
-    extern int total_mapping_size;
-    extern int tot_alloc_sentence;
-    extern int tot_alloc_object_size;
-    extern char *reserved_area;
 
     if (num_arg == 0) {
 	int res, tot;
@@ -3320,8 +3292,6 @@ f_floatp P2(int, num_arg, int, instruction)
 void
 f_first_inventory P2(int, num_arg, int, instruction)
 {
-    extern struct object *first_inventory PROT((struct svalue *));
-
     ob = first_inventory(sp);
     pop_stack();
     if (ob)

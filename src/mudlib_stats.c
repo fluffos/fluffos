@@ -7,29 +7,13 @@
  * and will be a little more general purpose than wiz_list was
  */
 
-#include "config.h"
+#include "std.h"
 
 #ifndef NO_MUDLIB_STATS
-#include <stdio.h>
-#include <string.h>
-#if !defined(NeXT) && !defined(LATTICE)
-#include <sys/param.h>
-#endif
-#ifdef LATTICE
-#include <amiga.h>
-#endif
 
-#include "lint.h"
-#include "interpret.h"
-#include "object.h"
-#include "mapping.h"
-#include "buffer.h"
-#include "applies.h"
-#include "include/origin.h"
-
-extern char *string_copy PROT((char *)), *xalloc PROT((int));
-
-extern struct object *master_ob, *current_object;
+#include "lpc_incl.h"
+#include "mudlib_stats.h"
+#include "backend.h"
 
 static mudlib_stats_t *domains = 0;
 static mudlib_stats_t *backbone_domain = 0;
@@ -211,7 +195,6 @@ void mudlib_stats_decay()
 {
     mudlib_stats_t *dl;
     static int next_time;
-    extern int current_time;
 
     /* Perform this once every hour. */
     if (next_time > current_time)

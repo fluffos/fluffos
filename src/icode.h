@@ -4,7 +4,6 @@
 
 #ifndef _ICODE_H
 #define _ICODE_H
-#include "lint.h"
 #include "trees.h"
 
 /* these should be removed when switch generation moves to icode.c */

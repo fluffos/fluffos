@@ -1,52 +1,17 @@
+#include "std.h"
 #include "config.h"
-
-#if defined(SunOS_5) || defined(LATTICE)
-#include <stdlib.h>
-#endif
-#include <sys/types.h>
-#include <sys/stat.h>
-#if !defined(SunOS_5)
-#include <sys/dir.h>
-#endif
-#include <fcntl.h>
-#include <setjmp.h>
-#include <string.h>
-#include <errno.h>
-#include <stdio.h>
-#ifndef LATTICE
-#include <memory.h>
-#endif
-#ifdef LATTICE
-#include <signal.h>
-#include <nsignal.h>
-#endif
-#if defined(sun)
-#include <alloca.h>
-#endif
-#if defined(OSF) || defined(M_UNIX)
-#include <dirent.h>
-#endif
-#ifdef HAS_STDARG_H
-#include <stdarg.h>
-#else
-#include <varargs.h>
-#endif
-
-#include "lint.h"
-#include "opcodes.h"
-#include "interpret.h"
-#include "object.h"
-#include "sent.h"
-#include "exec.h"
+#include "lpc_incl.h"
+#include "file_incl.h"
+#include "backend.h"
+#include "simul_efun.h"
+#include "compiler.h"
+#include "otable.h"
 #include "comm.h"
-#include "debug.h"
-#include "applies.h"
-#include "mapping.h"
-#include "include/origin.h"
-
-extern int errno;
-extern int current_time;
-extern int comp_flag;
+#include "lex.h"
+#include "binaries.h"
+#include "swap.h"
+#include "socket_efuns.h"
+#include "interpret.h"
 
 /*
  * 'inherit_file' is used as a flag. If it is set to a string
@@ -64,19 +29,9 @@ char *compilation_ident;
    No, mark-and-sweep solution won't work.  Exercise for reader.  */
 static int num_objects_this_thread = 0;
 
-#ifndef NeXT
-extern int readlink PROT((char *, char *, int));
-extern int symlink PROT((char *, char *));
-
-#endif				/* NeXT */
-
-#if !defined(hpux) && !defined(_AIX) && !defined(__386BSD__) && !defined(linux) && !defined(SunOS_5) && !defined(SVR4) && !defined(__bsdi__)
-extern int fchmod PROT((int, int));
-#endif
+static struct object *restrict_destruct;
 
 char *last_verb = 0;
-
-extern int legal_path PROT((char *));
 
 void pre_compile PROT((char *)),
             remove_interactive PROT((struct object *)),
@@ -91,19 +46,10 @@ void pre_compile PROT((char *)),
             debug_message_value(),
             destruct2();
 
-extern int d_flag;
-
 struct object *obj_list, *obj_list_destruct;
-
-#ifndef NO_UIDS
-extern userid_t *backbone_uid;
-#endif
-
 struct object *current_object;	/* The object interpreting a function. */
 struct object *command_giver;	/* Where the current command came from. */
 struct object *current_interactive;	/* The user who caused this execution */
-
-int num_parse_error;		/* Number of errors in the parser. */
 
 #ifdef PRIVS
 static void init_privs_for_object PROT((struct object *));
@@ -118,7 +64,6 @@ static void destruct_object_two PROT((struct object *));
 static void send_say PROT((struct object *, char *, struct vector *));
 static struct sentence *alloc_sentence PROT((void));
 static void remove_sent PROT((struct object *, struct object *));
-static void move_or_destruct PROT((struct object *, struct object *));
 static void remove_sent PROT((struct object *, struct object *));
 static void error_handler PROT((void));
 
@@ -280,7 +225,6 @@ static int init_object P1(struct object *, ob)
 static struct svalue *
        load_virtual_object P1(char *, name)
 {
-    extern char *simul_efun_file_name;
     struct svalue *v;
 
     if (master_ob_is_loading || master_ob == (struct object *)-1) return 0;
@@ -367,13 +311,9 @@ void set_master P1(struct object *, ob) {
 struct object *load_object P2(char *, lname, int, flags)
 {
     FILE *f;
-    extern int total_lines;
 
     struct object *ob, *save_command_giver = command_giver;
-    extern struct program *prog;
-    extern char *simul_efun_file_name;
     struct svalue *mret;
-    extern char *current_file;
     struct stat c_st;
     int name_length;
     char real_name[200], name[200];
@@ -518,9 +458,8 @@ struct object *load_object P2(char *, lname, int, flags)
 		perror(out_ptr);
 		error("Could not open output file '%s'.\n", out_ptr);
 	    }
-	    current_file = make_shared_string(real_name);/* This one is freed below */
 	    compilation_ident = 0;
-	    compile_file(f);
+	    compile_file(f, real_name);
 	    fclose(compilation_output_file);
 	    if (prog) {
 #ifdef RUNTIME_LOADING
@@ -542,8 +481,7 @@ struct object *load_object P2(char *, lname, int, flags)
 		unlink(out_ptr);
 	} else {
 #endif
-	    current_file = make_shared_string(real_name);/* This one is freed below */
-	    compile_file(f);
+	    compile_file(f, real_name);
 #ifdef LPC_TO_C
 	}
 #endif
@@ -552,8 +490,6 @@ struct object *load_object P2(char *, lname, int, flags)
 	update_compile_av(total_lines);
 	total_lines = 0;
 	(void) fclose(f);
-	free_string(current_file);
-	current_file = 0;
 #ifdef SAVE_BINARIES
     }
 #endif
@@ -800,7 +736,6 @@ struct object *environment P1(struct svalue *, arg)
 int command_for_object P2(char *, str, struct object *, ob)
 {
     char buff[1000];
-    extern int eval_cost;
     int save_eval_cost = eval_cost;
 
     if (strlen(str) > sizeof(buff) - 1)
@@ -931,7 +866,10 @@ static void destruct_object_two P1(struct object *, ob)
     struct object *super;
     struct object **pp;
     int removed;
+    struct object *save_restrict_destruct = restrict_destruct;
 
+    if (restrict_destruct && restrict_destruct != ob)
+	error("Only this_object() can be destructed from destruct_object_two.\n");
 #ifdef SOCKET_EFUNS
     /*
      * check if object has an efun socket referencing it for a callback. if
@@ -996,7 +934,6 @@ static void destruct_object_two P1(struct object *, ob)
 
     while (ob->contains) {
 	struct svalue svp;
-	struct svalue *retv;
 	svp.type = T_OBJECT;
 	svp.u.ob = ob->contains;
 	/*
@@ -1008,7 +945,9 @@ static void destruct_object_two P1(struct object *, ob)
 	else
 	    push_number(0);
 	    
-	retv = apply(APPLY_MOVE, ob->contains, 1, ORIGIN_DRIVER);
+	restrict_destruct = ob->contains;
+	(void)apply(APPLY_MOVE, ob->contains, 1, ORIGIN_DRIVER);
+	restrict_destruct = save_restrict_destruct;
 	/* OUCH! we could be dested by this. -Beek */
 	if (ob->flags & O_DESTRUCTED) return;
 	if (svp.u.ob == ob->contains)
@@ -1024,8 +963,6 @@ static void destruct_object_two P1(struct object *, ob)
 	command_giver = ob;
 #ifdef F_ED
 	if (ob->interactive->ed_buffer) {
-	    extern void save_ed_buffer();
-
 	    save_ed_buffer();
 	}
 #endif
@@ -2052,9 +1989,6 @@ static int num_mudlib_error = 0;
 
 void throw_error()
 {
-    extern int error_recovery_context_exists;
-    extern jmp_buf error_recovery_context;
-
     if (error_recovery_context_exists > 1) {
 	LONGJMP(error_recovery_context, 1);
 	fatal("Throw_error failed!");
@@ -2066,11 +2000,6 @@ static char emsg_buf[2000];
 
 static void error_handler()
 {				/* message is in emsg_buf */
-    extern int error_recovery_context_exists;
-    extern jmp_buf error_recovery_context;
-    extern struct object *current_heart_beat;
-    extern struct svalue catch_value;
-
 #ifdef MUDLIB_ERROR_HANDLER
     struct mapping *m;
     struct svalue *mret;
@@ -2082,6 +2011,7 @@ static void error_handler()
 
     /* in case we're going to jump out of load_object */
     master_ob_is_loading = 0;
+    restrict_destruct = 0;
     num_objects_this_thread = 0;/* reset the count */
     if (error_recovery_context_exists > 1) {	/* user catches this error */
 	struct svalue v;
@@ -2341,34 +2271,6 @@ void shutdownMudOS P1(int, exit_code)
     monitor(0, 0, 0, 0, 0);	/* cause gmon.out to be written */
 #endif
     exit(exit_code);
-}
-
-/*
- * Move or destruct one object.
- */
-static void move_or_destruct P2(struct object *, what, struct object *, to)
-{
-    struct svalue v;
-
-    struct svalue *svp;
-
-    /*
-     * This is very dubious, why not just destruct them /JnA
-     */
-    push_object(to);
-    svp = apply(APPLY_MOVE, what, 1, ORIGIN_DRIVER);
-    if (svp && svp->type == T_NUMBER && svp->u.number == 0)
-	return;
-
-    if (what->flags & O_DESTRUCTED)
-	return;
-
-    /*
-     * Failed to move the object. Then, it is destroyed.
-     */
-    v.type = T_OBJECT;
-    v.u.ob = what;
-    destruct_object(&v);
 }
 
 /*

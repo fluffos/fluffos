@@ -168,10 +168,10 @@ YFLAGS = -d -y
  
 # A/UX: may be required for Apple's UNIX (and possibly others).  Try
 # uncommenting this if the make results in link errors seemingly related
-# to yacc (e.g. undefined symbol "yyerror").  May also need -lbsd.
+# to yacc (e.g. undefined symbol "yyerror").  May also need -lbsd
 #EXTRALIBS=-ly
-#EXTRALIBS=-ly -lbsd
- 
+#EXTRALIBS=-ly -lbsd 
+
 # HP-UX: use this EXTRALIBS line for HP-UX (required)
 #EXTRALIBS=-lBSD
  
@@ -208,12 +208,12 @@ LIBS=-lm $(EXTRALIBS) $(MIRELIBS)
 
 EFUNS=efuns_main.c efuns_port.c $(EXTRA_EFUNS)
 
-SRC=compiler.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
+SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   array.c mapping.c comm.c ed.c regexp.c mudlib_stats.c swap.c malloc.c \
   call_out.c otable.c dumpstat.c stralloc.c hash.c port.c buffer.c crc32.c \
   replace_program.c parse.c simul_efun.c sprintf.c reclaim.c backend.c \
-  generate.c scratchpad.c \
-  strstr.c socket_efuns.c socket_ctrl.c qsort.c eoperators.c compiler_shared.c \
+  generate.c scratchpad.c program.c \
+  strstr.c socket_efuns.c socket_ctrl.c qsort.c eoperators.c compiler.c \
   avltree.c trees.c socket_err.c md.c uid.c disassembler.c $(MIRE_C) $(EFUNS) \
   binaries.c functab_tree.c icode.c $(UALARM) $(STRFUNCS) $(MALLOC) $(EXTRA_SRC)
  
@@ -231,15 +231,15 @@ all: $(DRIVER_BIN) addr_server lpc_to_c.h
 
 remake: neat all
 
-lpc_to_c.h: efuns.h cfuns.h virtual_architecture.h
-	-cat efuns.h cfuns.h virtual_architecture.h > lpc_to_c.h
+lpc_to_c.h: cfuns.h virtual_architecture.h
+	-cat cfuns.h virtual_architecture.h > lpc_to_c.h
 
 $(DRIVER_BIN): $(OBJDIR) $(OBJ)
 	-mv $(DRIVER_BIN) $(DRIVER_BIN).old
 	$(CC) $(CFLAGS) $(OBJ) -o $(DRIVER_BIN) $(LIBS)
 
 depend:
-# $(OBJDIR) opcodes.h efun_protos.h compiler.tab.h cc.h efunctions.h \
+# $(OBJDIR) opcodes.h efun_protos.h grammar.tab.h cc.h efunctions.h \
 #	 efun_defs.c
 	-rm tmpdepend Dependencies
 	for i in *.c do $(CPP) -MM $$i; done
@@ -248,9 +248,7 @@ depend:
 
 interpret.o: interpret.c patchlevel.h
 
-compiler.tab.h: compiler.tab.c
-
-lpc_compiler.tab.h: lpc_compiler.tab.c
+grammar.tab.h: grammar.tab.c
 
 cc.h: GNUmakefile
 	rm -f cc.h
@@ -260,7 +258,7 @@ cc.h: GNUmakefile
 	echo '#define CFLAGS   "$(CFLAGS)"' >> cc.h
 	echo '#define OBJDIR   "$(OBJDIR)"' >> cc.h
 
-$(OBJDIR)/lex.o: cc.h lex.c compiler.tab.h
+$(OBJDIR)/lex.o: cc.h lex.c grammar.tab.h
 
 addr_server:  $(OBJDIR)/addr_server.o addr_server.h $(OBJDIR)/socket_ctrl.o $(OBJDIR)/port.o
 	$(CC) $(CFLAGS) $(OBJDIR)/addr_server.o $(OBJDIR)/socket_ctrl.o \
@@ -275,17 +273,11 @@ $(OBJDIR):
 $(OBJDIR)/%.o: %.c
 	$(CC) -I$(OBJDIR) $(CFLAGS) -o $@ -c $<
 
-compiler.tab.c: compiler.y
-	$(YACC) $(YFLAGS) compiler.y
-	-rm -f compiler.tab.*
-	sed "s/y.tab.c/compiler.tab.c/g" y.tab.c > compiler.tab.c
-	-mv y.tab.h compiler.tab.h
-
-lpc_compiler.tab.c: lpc_compiler.y
-	$(YACC) $(YFLAGS) lpc_compiler.y
-	-rm -f lpc_compiler.tab.*
-	sed "s/yy/lpcyy/g" y.tab.c | sed "s/y.tab.c/lpc_compiler.tab.c/g" > lpc_compiler.tab.c
-	sed "s/yy/lpcyy/g" y.tab.h > lpc_compiler.tab.h
+grammar.tab.c: grammar.y
+	$(YACC) $(YFLAGS) grammar.y
+	-rm -f grammar.tab.*
+	sed "s/y.tab.c/grammar.tab.c/g" y.tab.c > grammar.tab.c
+	-mv y.tab.h grammar.tab.h
 
 opc.h: efun_defs.c
 
@@ -308,9 +300,7 @@ malloc.c: config.h make_malloc
 	touch malloc.c
 	$(CC) $(CFLAGS) -c malloc.c -o $(OBJDIR)/malloc.o
 
-compiler.y: opcodes.h
-
-lpc_compiler.y: opcodes.h
+grammar.y: opcodes.h
 
 efun_defs.c opcodes.h: malloc.c func_spec.c op_spec.c $(OBJDIR)/make_func config.h \
 	func_spec.cpp
@@ -337,7 +327,7 @@ neat:
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
 	-rm -f make_func make_malloc malloc.c
 	-rm -f func_spec.cpp
-	-rm -f lpc_compiler.y compiler.y
+	-rm -f grammar.y
 	
 clean: neat
 	-rm -f mon.out gmon.out *.orig *.rej

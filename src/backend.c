@@ -1,38 +1,13 @@
 /* 92/04/18 - cleaned up stylistically by Sulam@TMI */
+#include "std.h"
 #include "config.h"
-
-#include <stdio.h>
-#include <string.h>
-#include <signal.h>
-#ifdef LATTICE
-#include <nsignal.h>
-#endif
-#include <setjmp.h>
-#include <ctype.h>
-#ifndef __386BSD__
-#ifndef LATTICE
-#include <sys/time.h>
-#else
-#include <time.h>
-#endif
-#include <sys/types.h>
-#else
-#include <sys/types.h>
-#include <sys/time.h>
-#endif
-#include <sys/stat.h>
-#if defined(__386BSD__) || defined(SunOS_5)
-#include <unistd.h>
-#endif
-#include <fcntl.h>
-#ifndef LATTICE
-#include <sys/times.h>
-#include <memory.h>
-#endif
-#ifdef LATTICE
-#include <amiga.h>
-#endif
-#include <math.h>
+#include "lpc_incl.h"
+#include "backend.h"
+#include "comm.h"
+#include "replace_program.h"
+#include "debug.h"
+#include "socket_efuns.h"
+#include "swap.h"
 
 #if defined(OS2)
 #define INCL_DOSPROCESS
@@ -40,18 +15,7 @@
 #include <os2.h>
 
 extern HEV mudos_event_sem;
-
 #endif
-
-#include "lint.h"
-#include "interpret.h"
-#include "object.h"
-#include "exec.h"
-#include "comm.h"
-#include "debug.h"
-#include "replace_program.h"
-#include "applies.h"
-#include "include/origin.h"
 
 jmp_buf error_recovery_context;
 int error_recovery_context_exists = 0;
@@ -79,8 +43,6 @@ INLINE static void cycle_hb_list PROT((void));
  */
 void clear_state()
 {
-    extern struct object *previous_ob;
-
     current_object = 0;
     command_giver = 0;
     current_interactive = 0;
@@ -135,13 +97,9 @@ int parse_command P2(char *, str, struct object *, ob)
  * This is the backend. We will stay here for ever (almost).
  */
 int eval_cost;
-extern int max_cost;
 
 void backend()
 {
-    extern fd_set readmask, writemask;
-    extern int MudOS_is_being_shut_down;
-    extern int slow_shut_down_to_do;
     struct timeval timeout;
     int nb;
     int i;
@@ -242,7 +200,8 @@ void backend()
 	/*
 	 * process user commands.
 	 */
-	for (i = 0; process_user_command() && i < NUM_COMMANDS; i++);
+	for (i = 0; process_user_command() && i < NUM_COMMANDS; i++)
+	    ;
 
 	/*
 	 * call heartbeat if appropriate.
@@ -271,8 +230,6 @@ void backend()
 */
 static void look_for_objects_to_swap()
 {
-    extern int time_to_swap;	/* marion - for invocation parameter */
-    extern int time_to_clean_up;
     static int next_time;
     struct object *ob;
     struct object *next_ob;
@@ -307,8 +264,6 @@ static void look_for_objects_to_swap()
 	    ob = obj_list;	/* restart */
 	next_ob = ob->next_all;
 	if (SETJMP(error_recovery_context)) {	/* amylaar */
-	    extern void clear_state();
-
 	    clear_state();
 	    debug_message("Error in " APPLY_CLEAN_UP "() or " APPLY_RESET "().\n");
 	    continue;
@@ -373,7 +328,7 @@ static void look_for_objects_to_swap()
 	     * out.
 	     */
 
-	    if (ob->prog && ob->prog->p.i.line_numbers)
+	    if (ob->prog && ob->prog->p.i.line_info)
 		swap_line_numbers(ob->prog);
 	    if (ob->flags & O_SWAPPED || !ready_for_swap)
 		continue;

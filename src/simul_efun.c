@@ -1,15 +1,9 @@
-#include "config.h"
-
-#include <stdio.h>
-#ifdef LATTICE
-#include <stdlib.h>
-#endif
-#include <string.h>
-
-#include "lint.h"
-#include "interpret.h"
-#include "object.h"
-#include "exec.h"
+#include "std.h"
+#include "program.h"
+#include "lex.h"
+#include "simul_efun.h"
+#include "stralloc.h"
+#include "simulate.h"
 
 /*
  * This file rewritten by Beek because it was inefficient and slow.  We
