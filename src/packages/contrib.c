@@ -880,7 +880,7 @@ static char *pluralize P1(const char *, str) {
     const char * suffix = "s";
     
     sz = strlen(str);
-    if (sz == 0) return 0;
+    if (!sz) return 0;
 
     /* if it is of the form 'X of Y', pluralize the 'X' part */
     if ((p = strstr(str, " of "))) {
@@ -898,7 +898,7 @@ static char *pluralize P1(const char *, str) {
             plen = sz - 2;
             pre = DXALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
             strncpy(pre, str + 2, plen);
-        } else if (str[1] == 'n' && str[2] == ' ') {
+        } else if (sz > 2 && str[1] == 'n' && str[2] == ' ') {
             plen = sz - 3;
             pre = DXALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
             strncpy(pre, str + 3, plen);
@@ -1155,24 +1155,24 @@ static char *pluralize P1(const char *, str) {
 
     /* don't have to set found to PLURAL_SUFFIX in these rules b/c
        found == 0 is interpreted as PLURAL_SUFFIX */
-    if (!found)
+    if (!found && (end != pre))
         switch (end[-1]) {
         case 'E': case 'e':
-            if (end[-2] == 'f' || end[-2] == 'F') {
+            if ((end-pre) > 2 && (end[-2] == 'f' || end[-2] == 'F')) {
                 found = PLURAL_CHOP + 2;
                 suffix = "ves";
             }
             break;
         case 'F': case 'f':
-            if (end[-2] == 'e' || end[-2] == 'E')
+            if ((end-pre) > 2 && (end[-2] == 'e' || end[-2] == 'E'))
                 break;
             found = PLURAL_CHOP + 1;
-            if(end[-2] == 'f' || end[-2] == 'F')
+            if ((end-pre) > 2 && (end[-2] == 'f' || end[-2] == 'F'))
               found++;
             suffix = "ves";
             break;
         case 'H': case 'h':
-            if (end[-2] == 'c' || end[-2]=='s')
+            if ((end-pre) > 2 && (end[-2] == 'c' || end[-2]=='s'))
                 suffix = "es";
             break;
 #if 0
@@ -1186,34 +1186,34 @@ static char *pluralize P1(const char *, str) {
          * -- Marius, 23-Jun-2000
          */
         case 'M': case 'm':
-            if (end[-2] == 'u') {
+            if ((end-pre) > 2 && end[-2] == 'u') {
                 found = PLURAL_CHOP + 2;
                 suffix = "a";
             }
             break;
 #endif
         case 'N': case 'n':
-            if (end[-2] == 'a' && end[-3] == 'm') {
+            if ((end-pre) > 3 && end[-2] == 'a' && end[-3] == 'm') {
                 found = PLURAL_CHOP + 3;
                 suffix = "men";
             }
             break;
         case 'O': case 'o':
-            if (end[-2] != 'o')
+            if ((end-pre) > 2 && end[-2] != 'o')
                 suffix = "es";
             break;
         case 'S': case 's':
-            if (end[-2] == 'i') {
+            if ((end-pre) > 2 && end[-2] == 'i') {
                 found = PLURAL_CHOP + 2;
                 suffix = "es";
                 break;
             }
-            if (end[-2] == 'u') {
+            if ((end-pre) > 2 && end[-2] == 'u') {
                 found = PLURAL_CHOP + 2;
                 suffix = "i";
                 break;
             }
-            if (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o')
+            if ((end-pre) > 2 && (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o'))
                 suffix = "ses";
             else
                 suffix = "es";
@@ -1222,15 +1222,15 @@ static char *pluralize P1(const char *, str) {
             suffix = "es";
             break;
         case 'Y': case 'y':
-            if (end[-2] != 'a' && end[-2] != 'e' && end[-2] != 'i'
+            if ((end-pre) > 2 && end[-2] != 'a' && end[-2] != 'e' && end[-2] != 'i'
                 && end[-2] != 'o' && end[-2] != 'u') {
                 found = PLURAL_CHOP + 1;    
                 suffix = "ies";
             }
             break;
         case 'Z': case 'z':
-            if (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o'
-                || end[-2] == 'i' || end[-2] == 'u')
+            if ((end-pre) > 2 && (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o'
+                || end[-2] == 'i' || end[-2] == 'u'))
                 suffix = "zes";
             else
                 suffix = "es";
@@ -2169,4 +2169,30 @@ void f_base_name PROT((void)) {
   }
 
 } /* f_base_name() */
+#endif
+
+#ifdef F_GET_GARBAGE
+int garbage_check P2(object_t *, ob, void *, data){
+  return (ob->ref == 1) && (ob->flags & O_CLONE) && 
+    !(ob->super || ob->shadowing);
+}
+
+void f_get_garbage PROT((void)){
+  int count, i;
+  object_t **obs;
+  array_t *ret;
+  get_objects(&obs, &count, garbage_check, 0);
+  
+  if (count > max_array_size)
+    count = max_array_size;
+  ret = allocate_empty_array(count);
+  for (i = 0;  i < count;  i++) {
+        ret->item[i].type = T_OBJECT;
+        ret->item[i].u.ob = obs[i];
+        add_ref(obs[i], "f_get_garbage");
+  }
+
+  pop_n_elems(1); 
+  push_refed_array(ret);
+}
 #endif

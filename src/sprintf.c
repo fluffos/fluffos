@@ -976,7 +976,7 @@ char *string_print_formatted P3(const char *, format_str, int, argc, svalue_t *,
                 } else if ((finfo & INFO_T) == INFO_T_NULL) {
                     /* never reached... */
                     fprintf(stderr, "/%s: (s)printf: INFO_T_NULL.... found.\n",
-                            current_object->name);
+                            current_object->obname);
                     ADD_CHAR('%');
 #endif
                 } else if ((finfo & INFO_T) == INFO_T_STRING) {

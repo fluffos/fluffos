@@ -2446,7 +2446,7 @@ static program_t *epilog PROT((void)) {
 
 #ifdef DEBUG
     if (p - (char *)prog != size) {
-        fprintf(stderr, "Program size miscalculated for /%s.\n", prog->name);
+        fprintf(stderr, "Program size miscalculated for /%s.\n", prog->filename);
         fprintf(stderr, "is: %i, expected: %i\n", p-(char *)prog, (int) size);
     }
 #endif

@@ -1150,7 +1150,7 @@ call_simul_efun P2(unsigned short, index, int, num_arg)
     if (simuls[index].func) {
 #ifdef TRACE
         if (TRACEP(TRACE_CALL_OTHER)) {
-            do_trace("simul_efun ", simuls[index].func->name, "\n");
+            do_trace("simul_efun ", simuls[index].func->funcname, "\n");
         }
 #endif
         /* Don't need to use apply() since we have the pointer directly;

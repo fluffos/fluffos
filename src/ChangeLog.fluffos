@@ -1,6 +1,17 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
+new in FluffOS 1.20
+fixed some array size issues
+cleaned up some source (used pointer + x to index instead of pointer[x])
+fixed some lint warnings
+fixed compiling a DEBUG driver
+fixed compiling with TRACE defined
+added check for corrupted objects in debug mode
+fixed buffer overruns and underruns in pluralize
+new get_garbage() efun, return objects with no external references that are
+	not in other objects and not shadowing anything
+
 new in FluffOS 1.19
 unlink the shared function name string in functions() before returning it.
 fixed compile errors with the intel(R) C++ compiler(7.0)

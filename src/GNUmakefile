@@ -1,4 +1,4 @@
-MAKE=make
+MAKE=gmake
 SHELL=/bin/sh
 OBJDIR=obj
 DRIVER_BIN=driver
@@ -6,13 +6,11 @@ PROOF=
 STRFUNCS=
 INSTALL=install -c
 INSTALL_DIR=../bin
-#OPTIMIZE= -g -O2 -fno-strength-reduce -fno-strict-aliasing -fno-gcse -Wdisabled-optimization -Wmissing-noreturn -Wwrite-strings -Wbad-function-cast -Wpointer-arith #-Wshadow -Wall
-OPTIMIZE= -g -O2
+OPTIMIZE=-O2
 CPP=gcc -E
-CFLAGS=-D__USE_FIXED_PROTOTYPES__ -DHAVE_ZLIB 
-#CC=/stuff/gcc/bin/gcc
-#CC=/usr/local/bin/gcc
-CC=icc -wd864,1173
+CFLAGS=-D__USE_FIXED_PROTOTYPES__ -DHAVE_ZLIB -rdynamic
+CC=icc -ip -wd864,1173
+
 YACC=bison -d -y
 RANLIB=ranlib
 A=a
@@ -71,9 +69,9 @@ OVERRIDES=$(MAKEOVERRIDES)
 # **** NOTE: If you add something here, also add it to the OBJ= rule below,
 # **** or non-GNU makes will die
 # **************************************************************************
-SRC=malloc.c grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c \
-  object.c backend.c array.c mapping.c comm.c ed.c regexp.c swap.c \
-  buffer.c crc32.c mallocwrapper.c class.c efuns_main.c efuns_port.c \
+SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
+  backend.c array.c mapping.c comm.c ed.c regexp.c swap.c buffer.c crc32.c \
+  malloc.c mallocwrapper.c class.c efuns_main.c efuns_port.c \
   call_out.c otable.c dumpstat.c stralloc.c hash.c \
   port.c reclaim.c parse.c simul_efun.c sprintf.c program.c \
   compiler.c avltree.c icode.c trees.c generate.c scratchpad.c \

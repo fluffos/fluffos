@@ -1812,7 +1812,7 @@ void dealloc_object P2(object_t *, ob, const char *, from)
         debug(d_flag, ("Free object /%s\n", ob->obname));
 
         DEBUG_CHECK1(lookup_object_hash(ob->obname) == ob,
-                     "Freeing object /%s but name still in name table", ob->name);
+                     "Freeing object /%s but name still in name table", ob->obname);
         FREE((char *)ob->obname);
         SETOBNAME(ob, 0);
     }

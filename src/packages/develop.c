@@ -187,7 +187,7 @@ void f_destructed_objects PROT((void))
         ret->item[i].u.arr = allocate_empty_array(2);
         ret->item[i].u.arr->item[0].type = T_STRING;
         ret->item[i].u.arr->item[0].subtype = STRING_SHARED;
-        ret->item[i].u.arr->item[0].u.string = make_shared_string(ob->name);
+        ret->item[i].u.arr->item[0].u.string = make_shared_string(ob->obname);
         ret->item[i].u.arr->item[1].type = T_NUMBER;
         ret->item[i].u.arr->item[1].u.number = ob->ref;
 

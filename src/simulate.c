@@ -1503,7 +1503,7 @@ void move_object P2(object_t *, item, object_t *, dest)
 #ifdef DEBUG
         if (!okay)
             fatal("Failed to find object /%s in super list of /%s.\n",
-                  item->name, item->super->name);
+                  item->obname, item->super->obname);
 #endif
     }
     /*

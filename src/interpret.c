@@ -24,6 +24,11 @@
 static int opc_eoper[BASE];
 #endif
 
+#ifdef DEBUG
+int checkobs P2(object_t, *ob, void, *data);
+int check_limit = NUM_OPCODES;
+#endif
+
 #ifdef OPCPROF_2D
 /* warning, this is typically 4 * 100 * 100 = 40k */
 static int opc_eoper_2d[BASE+1][BASE+1];
@@ -1339,7 +1344,7 @@ void push_constant_string P1(const char *, p)
 #ifdef TRACE
 static void do_trace_call P1(int, offset)
 {
-  do_trace("Call direct ", current_prog->function_table[offset].name, " ");
+  do_trace("Call direct ", current_prog->function_table[offset].funcname, " ");
   if (TRACEHB) {
     if (TRACETST(TRACE_ARGS)) {
       int i, n;
@@ -2757,7 +2762,7 @@ eval_instruction P1(char *, p)
       switch(sp->u.lvalue->type) {
       case T_LVALUE_BYTE:
         {
-          char c;
+          unsigned char c;
     
           if ((sp - 1)->type != T_NUMBER) {
             error("Illegal rhs to char lvalue\n");
@@ -2865,6 +2870,8 @@ eval_instruction P1(char *, p)
          */
         csp->num_local_variables = EXTRACT_UCHAR(pc++) + num_varargs;
         num_varargs = 0;
+	if(offset > USHRT_MAX)
+	  error("Broken function table");
         funp = setup_new_frame(offset);
         csp->pc = pc; /* The corrected return address */
 
@@ -3487,7 +3494,6 @@ eval_instruction P1(char *, p)
         /* The control stack was popped just before */
         if (csp[1].framekind & (FRAME_EXTERNAL | FRAME_RETURNED_FROM_CATCH))
           return;
-        break;
       }
       break;
     case F_RETURN:
@@ -3746,6 +3752,15 @@ eval_instruction P1(char *, p)
       if (expected_stack != sp)
         fatal("Bad stack after efun. Instruction %d, num arg %d\n",
               instruction, num_arg);
+      instruction += ONEARG_MAX;
+      if(instruction > check_limit){
+        int size;
+        object_t **obj;
+        get_objects(&obj, &size, checkobs, 0);
+        if(size)
+          fatal("Bad object after efun %d\n", instruction);
+        pop_n_elems(1);
+      } 
 #endif
     } /* switch (instruction) */
     DEBUG_CHECK1(sp < fp + csp->num_local_variables - 1,
@@ -3753,6 +3768,14 @@ eval_instruction P1(char *, p)
                  instruction);
   } /* while (1) */
 }
+
+#ifdef DEBUG 
+int checkobs(object_t *ob, void *data){
+  if(ob->prog && strlen(ob->prog->filename)<6)
+    return 1;
+  return 0;
+}
+#endif
 
 static void
 do_catch P2(char *, pc, unsigned short, new_pc_offset)
@@ -4006,7 +4029,7 @@ void check_co_args P4(int, num_arg, const program_t *, prog, function_t *, fun, 
     char buf[1024];
     //if(!current_prog) what do i need this for again?
     // current_prog = master_ob->prog;
-    sprintf(buf, "Wrong number of arguments to %s in %s.\n", fun->funcname, prog->name);
+    sprintf(buf, "Wrong number of arguments to %s in %s.\n", fun->funcname, prog->filename);
 #ifdef CALL_OTHER_WARN
     if(current_prog){
       char *file;
@@ -4023,7 +4046,7 @@ void check_co_args P4(int, num_arg, const program_t *, prog, function_t *, fun, 
   if(num_arg && prog->type_start &&
      prog->type_start[findex] != INDEX_START_NONE)
     check_co_args2(&prog->argument_types[prog->type_start[findex]], num_arg,
-                   fun->funcname, prog->name);
+                   fun->funcname, prog->filename);
 #endif
 }
 
@@ -4070,7 +4093,7 @@ int apply_low P3(const char *, fun, object_t *, ob, int, num_arg)
    */
 #ifndef NO_SHADOWS
   while (ob->shadowed && ob->shadowed != current_object && 
-	 (!(ob->shadowed->flags & O_DESTRUCTED)))
+         (!(ob->shadowed->flags & O_DESTRUCTED)))
     ob = ob->shadowed;
  retry_for_shadow:
 #endif
@@ -4604,7 +4627,7 @@ static int find_line P4(char *, p, const program_t *, progp,
   }
   offset = p - progp->program;
   DEBUG_CHECK2(offset > (int) progp->program_size,
-               "Illegal offset %d in object /%s\n", offset, progp->name);
+               "Illegal offset %d in object /%s\n", offset, progp->filename);
     
   lns = progp->line_info;
   while (offset > *lns) {
@@ -4923,7 +4946,7 @@ array_t *get_svalue_trace()
   const char *file;
   int line;
   char *fname;
-  int num_arg, num_local;
+  int num_arg, num_local = -1;
     
 #if defined(ARGUMENTS_IN_TRACEBACK) || defined(LOCALS_IN_TRACEBACK)
   svalue_t *ptr;
@@ -5643,7 +5666,7 @@ void do_trace P3(char *, msg, char *, fname, char *, post)
 
   if (!TRACEHB)
     return;
-  objname = TRACETST(TRACE_OBJNAME) ? (current_object && current_object->name ? current_object->name : "??") : "";
+  objname = TRACETST(TRACE_OBJNAME) ? (current_object && current_object->obname ? current_object->obname : "??") : "";
   add_vmessage(command_giver, "*** %d %*s %s %s %s%s", tracedepth, tracedepth, "", msg, objname, fname, post);
 }
 #endif

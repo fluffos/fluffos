@@ -15,26 +15,26 @@ function_lookup_info_t *master_applies = 0;
 svalue_t *apply_master_ob P2(int, fun, int, num_arg)
 {
     if (!master_ob) {
-	pop_n_elems(num_arg);
-	return (svalue_t *)-1;
+        pop_n_elems(num_arg);
+        return (svalue_t *)-1;
     }
 
     if (master_applies[fun].func) {
 #ifdef TRACE
-	if (TRACEP(TRACE_APPLY)) {
-	    do_trace("master apply", master_applies[fun].func->name, "\n");
-	}
+        if (TRACEP(TRACE_APPLY)) {
+            do_trace("master apply", master_applies[fun].func->funcname, "\n");
+        }
 #endif
-	DEBUG_CHECK(master_ob->flags & O_SWAPPED, "Master object swapped!\n");
+        DEBUG_CHECK(master_ob->flags & O_SWAPPED, "Master object swapped!\n");
 
-	call_direct(master_ob, master_applies[fun].index,
-		    ORIGIN_DRIVER, num_arg);
-	free_svalue(&apply_ret_value, "apply_master_ob");
-	apply_ret_value = *sp--;
-	return &apply_ret_value;
+        call_direct(master_ob, master_applies[fun].index,
+                    ORIGIN_DRIVER, num_arg);
+        free_svalue(&apply_ret_value, "apply_master_ob");
+        apply_ret_value = *sp--;
+        return &apply_ret_value;
     } else {
-	pop_n_elems(num_arg);
-	return 0;
+        pop_n_elems(num_arg);
+        return 0;
     }
 }
 
@@ -42,8 +42,8 @@ svalue_t *apply_master_ob P2(int, fun, int, num_arg)
 svalue_t *safe_apply_master_ob P2(int, fun, int, num_arg)
 {
     if (!master_ob) {
-	pop_n_elems(num_arg);
-	return (svalue_t *)-1;
+        pop_n_elems(num_arg);
+        return (svalue_t *)-1;
     }
     return safe_apply(applies_table[fun], master_ob, num_arg, ORIGIN_DRIVER);
 }
@@ -56,7 +56,7 @@ void init_master() {
     object_t *new_ob;
 
     if (!strip_name(MASTER_FILE, buf, sizeof buf))
-	error("Illegal master file name '%s'\n", MASTER_FILE);
+        error("Illegal master file name '%s'\n", MASTER_FILE);
     
 #ifdef LPC_TO_C
     compiled_version = (lpc_object_t *)lookup_object_hash(buf);
@@ -64,9 +64,9 @@ void init_master() {
 
     new_ob = load_object(buf, compiled_version);
     if (new_ob == 0) {
-	fprintf(stderr, "The master file %s was not loaded.\n",
-		MASTER_FILE);
-	exit(-1);
+        fprintf(stderr, "The master file %s was not loaded.\n",
+                MASTER_FILE);
+        exit(-1);
     }
     set_master(new_ob);
 }
@@ -76,20 +76,20 @@ static void get_master_applies P1(object_t *, ob) {
     
     /* master_applies will be allocated if we're recompiling master_ob */
     if (master_applies)
-	FREE(master_applies);
+        FREE(master_applies);
     master_applies = CALLOCATE(NUM_MASTER_APPLIES, function_lookup_info_t,
-			       TAG_SIMULS, "get_master_applies");
+                               TAG_SIMULS, "get_master_applies");
 
     for (i = 0; i < NUM_MASTER_APPLIES; i++) {
-	char *name = applies_table[i];
-	int ind, ri;
-	
-	if (find_function_by_name(ob, name, &ind, &ri)) {
-	    master_applies[i].func = find_func_entry(ob->prog, ri);
-	    master_applies[i].index = ri;
-	} else {
-	    master_applies[i].func = 0;
-	}
+        char *name = applies_table[i];
+        int ind, ri;
+        
+        if (find_function_by_name(ob, name, &ind, &ri)) {
+            master_applies[i].func = find_func_entry(ob->prog, ri);
+            master_applies[i].index = ri;
+        } else {
+            master_applies[i].func = 0;
+        }
     }
 }
 
@@ -108,8 +108,8 @@ void set_master P1(object_t *, ob) {
 #ifndef PACKAGE_UIDS
 #  ifdef PACKAGE_MUDLIB_STATS
     if (first_load) {
-	set_backbone_domain("BACKBONE");
-	set_master_author("NONAME");
+        set_backbone_domain("BACKBONE");
+        set_master_author("NONAME");
     }
 #  endif
 #else
@@ -117,33 +117,33 @@ void set_master P1(object_t *, ob) {
     /* can't be -1 or we wouldn't be here */
     if (!ret) {
         debug_message("No function %s() in master object; possibly the mudlib doesn't want PACKAGE_UIDS to be defined.\n",
-		      applies_table[APPLY_GET_ROOT_UID]);
-	exit(-1);
+                      applies_table[APPLY_GET_ROOT_UID]);
+        exit(-1);
     }
     if (ret->type != T_STRING) {
         debug_message("%s() in master object does not work.\n",
-		      applies_table[APPLY_GET_ROOT_UID]);
-	exit(-1);
+                      applies_table[APPLY_GET_ROOT_UID]);
+        exit(-1);
     }
     if (first_load) {
-	master_ob->uid = set_root_uid(ret->u.string);
-	master_ob->euid = master_ob->uid;
+        master_ob->uid = set_root_uid(ret->u.string);
+        master_ob->euid = master_ob->uid;
 #  ifdef PACKAGE_MUDLIB_STATS
-	set_master_author(ret->u.string);
+        set_master_author(ret->u.string);
 #  endif
-	ret = apply_master_ob(APPLY_GET_BACKBONE_UID, 0);
-	if (ret == 0 || ret->type != T_STRING) {
-	    debug_message("%s() in the master file does not work\n",
-			  applies_table[APPLY_GET_BACKBONE_UID]);
-	    exit(-1);
-	}
-	set_backbone_uid(ret->u.string);
+        ret = apply_master_ob(APPLY_GET_BACKBONE_UID, 0);
+        if (ret == 0 || ret->type != T_STRING) {
+            debug_message("%s() in the master file does not work\n",
+                          applies_table[APPLY_GET_BACKBONE_UID]);
+            exit(-1);
+        }
+        set_backbone_uid(ret->u.string);
 #  ifdef PACKAGE_MUDLIB_STATS
-	set_backbone_domain(ret->u.string);
+        set_backbone_domain(ret->u.string);
 #  endif
     } else {
-	master_ob->uid = add_uid(ret->u.string);
-	master_ob->euid = master_ob->uid;
+        master_ob->uid = add_uid(ret->u.string);
+        master_ob->euid = master_ob->uid;
     }
 #endif
 }

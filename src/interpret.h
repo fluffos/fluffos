@@ -35,7 +35,7 @@
     (command_giver && command_giver->interactive && TRACETST(b) && \
      (command_giver->interactive->trace_prefix == 0 || \
       (current_object && strpref(command_giver->interactive->trace_prefix, \
-              current_object->name))) )
+              current_object->obname))) )
 #  define TRACEHB (current_heart_beat == 0 || (command_giver->interactive->trace_level & TRACE_HEART_BEAT))
 #endif
 

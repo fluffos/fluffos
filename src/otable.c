@@ -109,7 +109,7 @@ void enter_object_hash P1(object_t *, ob)
 #else
     DEBUG_CHECK1(s && s != ob,
                  "Duplicate object \"/%s\" in object hash table",
-                 ob->name);
+                 ob->obname);
 #endif
     }
 #endif

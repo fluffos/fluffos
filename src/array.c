@@ -74,7 +74,7 @@ static void ms_setup_stats P1(array_t *, p) {
  * Note that we rely a bit on gcc automatically inlining small routines.
  * Speed maniacs may wish to add INLINE liberally.
  */
-static array_t *int_allocate_empty_array P1(int, n) {
+static array_t *int_allocate_empty_array P1(unsigned short, n) {
     array_t *p;
     
 #ifdef ARRAY_STATS
@@ -180,7 +180,7 @@ void free_empty_array P1(array_t *, p)
 
 /* Finish setting up an array allocated with ALLOC_ARRAY, resizing it to
    size n */
-static array_t *fix_array P2(array_t *, p, int, n) {
+static array_t *fix_array P2(array_t *, p, unsigned short, n) {
 #ifdef ARRAY_STATS
     num_arrays++;
     total_array_size += sizeof(array_t) + sizeof(svalue_t) * (n-1);
@@ -191,7 +191,7 @@ static array_t *fix_array P2(array_t *, p, int, n) {
     return RESIZE_ARRAY(p, n);
 }
 
-INLINE_STATIC array_t *resize_array P2(array_t *, p, int, n) {
+INLINE_STATIC array_t *resize_array P2(array_t *, p, unsigned short, n) {
 #ifdef ARRAY_STATS
     total_array_size += (n - p->size) * sizeof(svalue_t);
 #endif
@@ -211,7 +211,7 @@ array_t *explode_string P4(const char *, str, int, slen, const char *, del, int,
     int num, j, limit;
     array_t *ret;
     char *buff, *tmp;
-    unsigned short sz;
+    int sz;
 
     if (!slen)
         return &the_null_array;
@@ -531,12 +531,15 @@ array_t *slice_array P3(array_t *, p, int, from, int, to)
         }
         cnt = (p->size - 1) - to;
         while (cnt--) free_svalue(sv2++, "slice_array:3");
+	if(to-from+1 > max_array_size)
+	  error("array slice too big"); //can't happen in theory 
         p = resize_array(p, to-from+1);
         p->ref = 1;
         return p;
     } else {
         array_t *d;
-
+	if(to-from+1 > max_array_size)
+	  error("array slice too big"); //can't happen in theory 
         d = int_allocate_empty_array(to - from + 1);
         sv1 = d->item - from;
         sv2 = p->item;
@@ -813,8 +816,8 @@ void f_unique_array PROT((void)) {
         if (fptr) {
             push_svalue(v->item + i);
             sv = call_function_pointer(fptr, 1);
-        } else if ((v->item + i)->type == T_OBJECT) {
-            sv = apply(func, (v->item + i)->u.ob, 0, ORIGIN_EFUN);
+        } else if (v->item[i].type == T_OBJECT) {
+            sv = apply(func, v->item[i].u.ob, 0, ORIGIN_EFUN);
         } else sv = 0;
 
         if (sv && !sameval(sv, skipval)) {
@@ -968,6 +971,9 @@ array_t *all_inventory P2(object_t *, ob, int, override)
 
     if (!cnt)
         return &the_null_array;
+    
+    if(cnt > max_array_size)
+      cnt = max_array_size;
 
     d = int_allocate_empty_array(cnt);
     cur = ob->contains;
@@ -1074,7 +1080,7 @@ map_string P2(svalue_t *, arg, int, num_arg)
          * (3) become ' ' or something
          */
         if (!v) break;
-        if (v->type == T_NUMBER && v->u.number != 0) *p = ((unsigned char)(v->u.number));
+        if (v->type == T_NUMBER && v->u.number != 0) *p = ((char)(v->u.number));
     }
 
     pop_n_elems(num_arg - 1);
@@ -1120,20 +1126,20 @@ INLINE_STATIC int builtin_sort_array_cmp_fwd P2(svalue_t *, p1, svalue_t *, p2)
                 error("Illegal to have empty array in array for sort_array()\n");
 
 
-            switch(v1->item->type | v2->item->type) {
+            switch(v1->item[0].type | v2->item[0].type) {
                 case T_STRING:
                 {
-                    return strcmp(v1->item->u.string, v2->item->u.string);
+                    return strcmp(v1->item[0].u.string, v2->item[0].u.string);
                 }
 
                 case T_NUMBER:
                 {
-                    return COMPARE_NUMS(v1->item->u.number, v2->item->u.number);
+                    return COMPARE_NUMS(v1->item[0].u.number, v2->item[0].u.number);
                 }
 
                 case T_REAL:
                 {
-                    return COMPARE_NUMS(v1->item->u.real, v2->item->u.real);
+                    return COMPARE_NUMS(v1->item[0].u.real, v2->item[0].u.real);
                 }
                 default:
                 {
@@ -1173,20 +1179,20 @@ INLINE_STATIC int builtin_sort_array_cmp_rev P2(svalue_t *, p1, svalue_t *, p2)
                 error("Illegal to have empty array in array for sort_array()\n");
 
 
-            switch(v1->item->type | v2->item->type) {
+            switch(v1->item[0].type | v2->item[0].type) {
                 case T_STRING:
                 {
-                    return strcmp(v2->item->u.string, v1->item->u.string);
+                    return strcmp(v2->item[0].u.string, v1->item[0].u.string);
                 }
 
                 case T_NUMBER:
                 {
-                    return COMPARE_NUMS(v2->item->u.number, v1->item->u.number);
+                    return COMPARE_NUMS(v2->item[0].u.number, v1->item[0].u.number);
                 }
 
                 case T_REAL:
                 {
-                    return COMPARE_NUMS(v2->item->u.real, v1->item->u.real);
+                    return COMPARE_NUMS(v2->item[0].u.real, v1->item[0].u.real);
                 }
                 default:
                 {
@@ -1354,6 +1360,9 @@ array_t *deep_inventory P2(object_t *, ob, int, take_top)
 
     if (i == 0)
         return &the_null_array;
+
+    if (i > max_array_size)
+      i = max_array_size;
 
     /*
      * allocate an array
@@ -2163,6 +2172,9 @@ array_t *reg_assoc P4(const char *, str, array_t *, pat, array_t *, tok, svalue_
         
         rmp = rmph;
         
+	if(!rmp)
+	  error("internal error in reg_assoc");
+
         tmp = str;
         
         while (num_match--) {

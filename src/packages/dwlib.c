@@ -581,6 +581,18 @@ f_shuffle PROT((void))
         push_refed_array(&the_null_array);
     }
 }
+#endif
 
+#ifdef F_SET_CHECK_LIMIT
+extern int check_limit;
+
+void f_set_check_limit PROT((void)){
+  check_limit = sp->u.number;
+  if(check_limit > NUM_OPCODES)
+    check_limit = NUM_OPCODES;
+  if(check_limit < BASE)
+    check_limit = BASE;
+  sp->u.number = check_limit;
+}
 #endif
 

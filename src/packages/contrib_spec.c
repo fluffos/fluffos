@@ -42,3 +42,4 @@ int compressedp(object);
 void event(object|object *, string, ...);
 string query_num(int, int default:0);
 string base_name( string | object );
+object *get_garbage();
