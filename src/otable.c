@@ -17,7 +17,7 @@
 static int otable_size;
 static int otable_size_minus_one;
 
-static object_t *find_obj_n PROT((char *));
+static object_t *find_obj_n PROT((const char *));
 
 /*
  * Object hash function, ripped off from stralloc.c.
@@ -56,7 +56,7 @@ static int obj_searches = 0, obj_probes = 0, objs_found = 0;
 /* A global.  *shhhh* don't tell. */
 static int h;
 
-static object_t *find_obj_n P1(char *, s)
+static object_t *find_obj_n P1(const char *, s)
 {
     object_t *curr, *prev;
 
@@ -190,7 +190,7 @@ void remove_precompiled_hashes P1(char *, name) {
 
 static int user_obj_lookups = 0, user_obj_found = 0;
 
-object_t *lookup_object_hash P1(char *, s)
+object_t *lookup_object_hash P1(const char *, s)
 {
     object_t *ob = find_obj_n(s);
 

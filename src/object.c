@@ -1166,7 +1166,6 @@ int find_global_variable P4(program_t *, prog, char *, name,
 void
 restore_object_from_line P3(object_t *, ob, char *, line, int, noclear)
 {
-    char *tmp;
     char *space;
     svalue_t *v;
     // Put this on the main heap so we don't make it and throw it away all
@@ -1223,10 +1222,9 @@ restore_object_from_gzip P4(object_t *, ob,
                             int, noclear, int, count)
 {
     static char *buff = NULL;
-    char* tmp;
+    char* tmp = "";
     int idx;
     int t;
-    int igloo = 0;
     
     t = 65536 << count; //should be big enough most of the time
     if (buff) {
@@ -1248,7 +1246,7 @@ restore_object_from_gzip P4(object_t *, ob,
         }
         
         if (buff[0]) {
-            tmp = strchr(buff, '\n');
+            char *tmp = strchr(buff, '\n');
             if (tmp) {
                 *tmp = '\0';
                 if (tmp > buff && tmp[-1] == '\r') {
@@ -1402,7 +1400,6 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
 #ifdef HAVE_ZLIB
     gzFile gzf;
     int save_compressed;
-    int pos;
     
     if (save_zeros & 2) {
         save_compressed = 1;
@@ -1585,7 +1582,7 @@ static void clear_non_statics P1(object_t *, ob) {
 int restore_object P3(object_t *, ob, char *, file, int, noclear)
 {
     char *name;
-    int len, i;
+    int len;
     object_t *save = current_object;
     struct stat st;
 #ifdef HAVE_ZLIB
@@ -1738,7 +1735,7 @@ void restore_variable P2(svalue_t *, var, char *, str)
     }
 }
 
-void tell_npc P2(object_t *, ob, char *, str)
+void tell_npc P2(object_t *, ob, const char *, str)
 {
     copy_and_push_string(str);
     apply(APPLY_CATCH_TELL, ob, 1, ORIGIN_DRIVER);
@@ -1754,7 +1751,7 @@ void tell_npc P2(object_t *, ob, char *, str)
  * goes to catch_tell unless the target of tell_object is interactive
  * and is the current_object in which case it is written via add_message().
  */
-void tell_object P3(object_t *, ob, char *, str, int, len)
+void tell_object P3(object_t *, ob, const char *, str, int, len)
 {
     if (!ob || (ob->flags & O_DESTRUCTED)) {
         add_message(0, str, len);
@@ -1809,8 +1806,8 @@ void dealloc_object P2(object_t *, ob, char *, from)
 
         DEBUG_CHECK1(lookup_object_hash(ob->obname) == ob,
                      "Freeing object /%s but name still in name table", ob->name);
-        FREE(ob->obname);
-        ob->obname = 0;
+        FREE((char *)ob->obname);
+        SETOBNAME(ob, 0);
     }
 #ifdef DEBUG
     for (tmp = obj_list_dangling;  tmp != ob;  tmp = tmp->next_all)
@@ -1855,7 +1852,8 @@ object_t *get_empty_object P1(int, num_var)
      * machines have a (char *)0 which is not zero. We have structure
      * assignment, so use it.
      */
-    *ob = NULL_object;
+    //*ob = NULL_object; gives a warning on const pointers
+    memcpy(ob, &NULL_object, sizeof NULL_object);
     ob->ref = 1;
     ob->swap_num = -1;
     for (i = 0; i < num_var; i++)

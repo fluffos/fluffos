@@ -2070,7 +2070,7 @@ void number_as_string P2(char *, buf, int, n){
 
 void f_query_num PROT((void)){
   char ret[100];
-  int size, i;
+  int i;
   int n, limit;
   int changed = 0;
   char *res;

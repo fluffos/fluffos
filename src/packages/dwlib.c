@@ -14,6 +14,7 @@
 #include "../add_action.h"
 #include "../array.h"
 #include "../master.h"
+#include "../port.h"
 
 
 #ifdef F_QUERY_MULTIPLE_SHORT

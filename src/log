@@ -1,1 +1,107 @@
-Initializing internal tables....
+Writing build options to option_defs.c ...
+Building compiler files ...
+Creating 'grammar.y' from 'grammar.y.pre' ...
+Creating 'packages/Makefile' from 'packages/Makefile.pre' ...
+Creating 'packages/GNUmakefile' from 'packages/GNUmakefile.pre' ...
+Creating 'mudlib/Makefile' from 'mudlib/Makefile.pre' ...
+Creating 'mudlib/GNUmakefile' from 'mudlib/GNUmakefile.pre' ...
+Building efun tables ...
+contrib.c: In function `pluralize':
+contrib.c:873: warning: `of_buf' might be used uninitialized in this function
+contrib.c: In function `f_query_num':
+contrib.c:2073: warning: unused variable `size'
+db.c: In function `valid_database':
+db.c:135: warning: control reaches end of non-void function
+db.c: In function `f_db_connect':
+db.c:217: warning: `database' might be used uninitialized in this function
+db.c:217: warning: `host' might be used uninitialized in this function
+db.c: In function `f_db_exec':
+db.c:310: warning: unused variable `errormsg'
+db.c: In function `create_db_conn':
+db.c:518: warning: control reaches end of non-void function
+db.c: In function `MySQL_fetch':
+db.c:586: warning: `target_row' might be used uninitialized in this function
+dwlib.c: In function `shuffle':
+dwlib.c:557: warning: implicit declaration of function `random_number'
+/usr/share/bison/bison.simple: In function `yyparse':
+grammar.y.pre:876: warning: `type' might be used uninitialized in this function
+grammar.y.pre:1530: warning: `op' might be used uninitialized in this function
+lex.c:2234:30: warning: trigraph ??( ignored
+lex.c: In function `extract_args':
+lex.c:2769: warning: unused variable `exp'
+interpret.c: In function `eval_instruction':
+interpret.c:2026: warning: `lval' might be used uninitialized in this function
+interpret.c: In function `check_co_args2':
+interpret.c:3991: warning: implicit declaration of function `find_line'
+interpret.c: At top level:
+interpret.c:4575: warning: `find_line' was declared implicitly `extern' and later `static'
+interpret.c:3991: warning: previous declaration of `find_line'
+interpret.c: In function `push_lvalue_range':
+interpret.c:820: warning: `size' might be used uninitialized in this function
+simulate.c: In function `tell_room':
+simulate.c:1159: warning: `buff' might be used uninitialized in this function
+array.c: In function `f_unique_array':
+array.c:782: warning: `func' might be used uninitialized in this function
+array.c: In function `map_string':
+array.c:1035: warning: `ob' might be used uninitialized in this function
+array.c:1036: warning: `extra' might be used uninitialized in this function
+array.c:1037: warning: `func' might be used uninitialized in this function
+array.c: In function `f_objects':
+array.c:2005: warning: `func' might be used uninitialized in this function
+comm.c: In function `init_user_conn':
+comm.c:184: warning: `fd6_which' might be used uninitialized in this function
+comm.c: In function `get_user_command':
+comm.c:1694: warning: `ip' might be used uninitialized in this function
+comm.c: In function `call_function_interactive':
+comm.c:2034: warning: `funp' might be used uninitialized in this function
+efuns_main.c: In function `f__call_other':
+efuns_main.c:211: warning: `sv' might be used uninitialized in this function
+efuns_main.c: In function `f_crc32':
+efuns_main.c:499: warning: `len' might be used uninitialized in this function
+efuns_main.c:500: warning: `buf' might be used uninitialized in this function
+efuns_main.c: In function `f_environment':
+efuns_main.c:775: warning: `ob' might be used uninitialized in this function
+efuns_main.c: In function `f_explode':
+efuns_main.c:815: warning: operation on `svalue_strlen_size' may be undefined
+efuns_main.c: In function `f_member_array':
+efuns_main.c:1481: warning: `size' might be used uninitialized in this function
+efuns_main.c:1506: warning: `flen' might be used uninitialized in this function
+efuns_main.c: In function `f_message':
+efuns_main.c:1592: warning: `use' might be used uninitialized in this function
+efuns_main.c: In function `f_previous_object':
+efuns_main.c:1862: warning: `ob' might be used uninitialized in this function
+efuns_main.c: In function `f_replace_string':
+efuns_main.c:2355: warning: `slimit' might be used uninitialized in this function
+efuns_main.c:2356: warning: `flimit' might be used uninitialized in this function
+efuns_main.c:2358: warning: `probe' might be used uninitialized in this function
+efuns_main.c: In function `f_next_bit':
+efuns_main.c:3298: warning: `bit' might be used uninitialized in this function
+efuns_main.c: In function `f_write_bytes':
+efuns_main.c:3581: warning: `i' might be used uninitialized in this function
+efuns_main.c: In function `f_write_buffer':
+efuns_main.c:3633: warning: `i' might be used uninitialized in this function
+call_out.c: In function `get_all_call_outs':
+call_out.c:497: warning: implicit declaration of function `svalue_to_string'
+reclaim.c: In function `check_svalue':
+reclaim.c:51: warning: suggest parentheses around comparison in operand of |
+parse.c: In function `parse':
+parse.c:481: warning: `obarr' might be used uninitialized in this function
+simul_efun.c: In function `find_simul_efun':
+simul_efun.c:147: warning: `j' might be used uninitialized in this function
+compiler.c: In function `arrange_call_inherited':
+compiler.c:955: warning: `super_length' might be used uninitialized in this function
+compiler.c:956: warning: `super_name' might be used uninitialized in this function
+compiler.c: In function `define_new_function':
+compiler.c:1033: warning: `num' might be used uninitialized in this function
+compiler.c: In function `add_type_check':
+compiler.c:1753: warning: `type' might be used uninitialized in this function
+eoperators.c: In function `f_switch':
+eoperators.c:959: warning: `s' might be used uninitialized in this function
+eoperators.c: In function `f_function_constructor':
+eoperators.c:1190: warning: `fp' might be used uninitialized in this function
+disassembler.c: In function `disassemble':
+disassembler.c:342: warning: operation on `pc' may be undefined
+binaries.c: In function `patch_in':
+binaries.c:617: warning: implicit declaration of function `quickSort'
+mv: cannot stat `driver': No such file or directory
+make: [driver] Error 1 (ignored)

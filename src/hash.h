@@ -5,6 +5,6 @@
  * hash.c
  */
 int hashstr PROT((char *, int, int));
-int whashstr PROT((char *, int));
+int whashstr PROT((const char *, int));
 
 #endif

@@ -18,6 +18,7 @@
 #include "compile_file.h"
 #include "hash.h"
 #include "master.h"
+#include "qsort.h"
 
 /* This should be a configure check.  What the heck is it needed for, anyway?*/
 #ifdef WIN32

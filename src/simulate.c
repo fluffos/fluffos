@@ -18,6 +18,7 @@
 #include "packages/parser.h"
 #include "master.h"
 #include "add_action.h"
+#include "object.h"
 
 /*
  * 'inherit_file' is used as a flag. If it is set to a string
@@ -55,8 +56,8 @@ static void init_privs_for_object PROT((object_t *));
 static int give_uid_to_object PROT((object_t *));
 #endif
 static int init_object PROT((object_t *));
-static object_t *load_virtual_object PROT((char *, int));
-static char *make_new_name PROT((char *));
+static object_t *load_virtual_object PROT((const char *, int));
+static char *make_new_name PROT((const char *));
 #ifndef NO_ENVIRONMENT
 static void send_say PROT((object_t *, char *, array_t *));
 #endif
@@ -85,7 +86,7 @@ INLINE void check_legal_string P1(char *, s)
  * p = strput(p, end, ...);
  * p = strput(p, end, ...);
  */
-char *strput P3(char *, x, char *, limit, char *, y) {
+char *strput P3(char *, x, char *, limit, const char *, y) {
     while ((*x++ = *y++)) {
         if (x == limit) {
             *(x-1) = 0;
@@ -235,7 +236,7 @@ static int init_object P1(object_t *, ob)
 }
 
 
-static object_t *load_virtual_object P2(char *, name, int, clone)
+static object_t *load_virtual_object P2(const char *, name, int, clone)
 {
     int argc = 2;
     char *new_name;
@@ -291,8 +292,8 @@ static object_t *load_virtual_object P2(char *, name, int, clone)
     /* perform the object rename */
     remove_object_hash(new_ob);
     if (new_ob->obname)
-        FREE(new_ob->obname);
-    new_ob->obname = new_name;
+        FREE((char *)new_ob->obname);
+    SETOBNAME(new_ob, new_name);
     enter_object_hash(new_ob);
 
     /* finish initialization */
@@ -314,7 +315,7 @@ static object_t *load_virtual_object P2(char *, name, int, clone)
     return new_ob;
 }
 
-int strip_name P3(char *, src, char *, dest, int, size) {
+int strip_name P3(const char *, src, char *, dest, int, size) {
     char last_c = 0;
     char *p = dest;
     char *end = dest + size - 1;
@@ -366,9 +367,9 @@ int strip_name P3(char *, src, char *, dest, int, size) {
  *
  */
 #ifdef LPC_TO_C
-object_t *int_load_object P2(char *, lname, lpc_object_t *, lpc_obj)
+object_t *int_load_object P2(const char *, lname, lpc_object_t *, lpc_obj)
 #else
-object_t *int_load_object P1(char *, lname)
+object_t *int_load_object P1(const char *, lname)
 #endif
 {
     int f;
@@ -542,7 +543,7 @@ object_t *int_load_object P1(char *, lname)
     }
     ob = get_empty_object(prog->num_variables_total);
     /* Shared string is no good here */
-    ob->obname = alloc_cstring(name, "load_object");
+    SETOBNAME(ob, alloc_cstring(name, "load_object"));
     SET_TAG(ob->name, TAG_OBJ_NAME);
     ob->prog = prog;
     ob->flags |= O_WILL_RESET;  /* must be before reset is first called */
@@ -576,7 +577,7 @@ object_t *int_load_object P1(char *, lname)
     return ob;
 }
 
-static char *make_new_name P1(char *, str)
+static char *make_new_name P1(const char *, str)
 {
     static int i;
     char *p = DXALLOC(strlen(str) + 10, TAG_OBJ_NAME, "make_new_name");
@@ -634,7 +635,7 @@ object_t *clone_object P2(char *, str1, int, num_arg)
     if (ob->flags & O_HEART_BEAT)
         (void) set_heart_beat(ob, 0);
     new_ob = get_empty_object(ob->prog->num_variables_total);
-    new_ob->obname = make_new_name(ob->obname);
+    SETOBNAME(new_ob, make_new_name(ob->obname));
     new_ob->flags |= (O_CLONE | (ob->flags & (O_WILL_CLEAN_UP | O_WILL_RESET)));
     new_ob->load_time = ob->load_time;
     new_ob->prog = ob->prog;
@@ -771,12 +772,12 @@ static object_t *object_present2 P2(char *, str, object_t *, ob)
 }
 #endif
 
-static char *saved_master_name;
-static char *saved_simul_name;
+static const char *saved_master_name;
+static const char *saved_simul_name;
 
 static void fix_object_names() {
-    master_ob->obname = saved_master_name;
-    simul_efun_ob->obname = saved_simul_name;
+    SETOBNAME(master_ob, saved_master_name);
+    SETOBNAME(simul_efun_ob, saved_simul_name);
 }
 
 /*
@@ -933,7 +934,7 @@ void destruct_object P1(object_t *, ob)
      */
     if (ob == master_ob || ob == simul_efun_ob) {
         object_t *new_ob;
-        char *tmp = ob->obname;
+        const char *tmp = ob->obname;
 #ifdef LPC_TO_C
         lpc_object_t *compiled_version;
 #endif
@@ -946,7 +947,7 @@ void destruct_object P1(object_t *, ob)
         
         /* hack to make sure we don't find ourselves at several points
            in the following process */
-        ob->obname = "";
+        SETOBNAME(ob, "");
 
 #ifdef LPC_TO_C
         compiled_version = (lpc_object_t *)lookup_object_hash(tmp);
@@ -955,7 +956,7 @@ void destruct_object P1(object_t *, ob)
         /* handle these two carefully, since they are rather vital */
         new_ob = load_object(tmp, compiled_version);
         if (!new_ob) {
-            ob->obname = tmp;
+            SETOBNAME(ob, tmp);
             sp--;
             error("Destruct on vital object failed: new copy failed to reload.");
         }
@@ -970,11 +971,11 @@ void destruct_object P1(object_t *, ob)
            Also be careful not to remove the new object, which has
            the same name. */
         sp--; /* error handler */
-        ob->obname = tmp;
+        SETOBNAME(ob, tmp);
         tmp = new_ob->obname;
-        new_ob->obname = "";
+        SETOBNAME(new_ob, "");
         remove_object_hash(ob);
-        new_ob->obname = tmp;
+        SETOBNAME(new_ob, tmp);
     } else
         remove_object_hash(ob);
 
@@ -1156,7 +1157,7 @@ void say P2(svalue_t *, v, array_t *, avoid)
 void tell_room P3(object_t *, room, svalue_t *, v, array_t *, avoid)
 {
     object_t *ob;
-    char *buff;
+    const char *buff;
     int valid, j;
     char txt_buf[LARGEST_PRINTABLE_STRING + 1];
 
@@ -1170,11 +1171,11 @@ void tell_room P3(object_t *, room, svalue_t *, v, array_t *, avoid)
         break;
     case T_NUMBER:
         buff = txt_buf;
-        sprintf(buff, "%d", v->u.number);
+        sprintf(txt_buf, "%d", v->u.number);
         break;
     case T_REAL:
         buff = txt_buf;
-        sprintf(buff, "%f", v->u.real);
+        sprintf(txt_buf, "%f", v->u.real);
         break;
     default:
         bad_argument(v, T_OBJECT | T_NUMBER | T_REAL | T_STRING,
@@ -1429,7 +1430,7 @@ object_t *find_object P1(char *, str)
 }
 
 /* Look for a loaded object. Return 0 if non found. */
-object_t *find_object2 P1(char *, str)
+object_t *find_object2 P1(const char *, str)
 {
     register object_t *ob;
     char p[MAX_OBJECT_NAME_SIZE];
@@ -1743,7 +1744,7 @@ static void mudlib_error_handler P2(char *, err, int, catch) {
 
 void error_handler P1(char *, err)
 {
-    char *object_name;
+    const char *object_name;
 
     /* in case we're going to jump out of load_object */
 #ifndef NO_ENVIRONMENT

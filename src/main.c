@@ -434,9 +434,9 @@ int main P2(int, argc, char **, argv)
 }
 
 #ifdef DEBUGMALLOC
-char *int_string_copy P2(char *, str, char *, desc)
+char *int_string_copy P2(const char * const, str, char *, desc)
 #else
-char *int_string_copy P1(char *, str)
+char *int_string_copy P1(const char * const, str)
 #endif
 {
     char *p;

@@ -1,6 +1,11 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
+new in FluffOS 1.16
+stop parsing after illegal to inherit error (crasher)
+fixed some uninitialised variables
+started using 'const'
+
 new in FluffOS 1.15
 many local buffers (on the stack) are now bigger to avoid overflow
 class names, class member names and function names are no longer stored as 

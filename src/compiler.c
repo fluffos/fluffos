@@ -965,7 +965,8 @@ int arrange_call_inherited P2(char *, name, parse_node_t *, node)
         super_name = name;
         real_name = p+2;
         super_length = real_name - super_name - 2;
-    }
+    } else 
+      fatal("no : in inherit call ???");
 
     num_inherits = NUM_INHERITS;
     /* no need to look for it unless its in the shared string table */

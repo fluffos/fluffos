@@ -307,7 +307,6 @@ void f_db_connect PROT((void))
 void f_db_exec PROT((void))
 {
     int ret = 0;
-    char *errormsg;
     db_t *db;
     array_t *info;
 

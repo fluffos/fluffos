@@ -30,26 +30,26 @@ static int T[] =
 };
 
 INLINE int
-hashstr P3(char *, s,		/* string to hash */
-	           int, maxn,	/* maximum number of chars to consider */
-	           int, hashs)
+hashstr P3(char *, s,           /* string to hash */
+                   int, maxn,   /* maximum number of chars to consider */
+                   int, hashs)
 {
     register unsigned int h;
     register unsigned char *p;
 
     h = (unsigned char) *s;
     if (h) {
-	if (hashs > 256) {
-	    register int oh = T[(unsigned char) *s];
+        if (hashs > 256) {
+            register int oh = T[(unsigned char) *s];
 
-	    for (p = (unsigned char *) s + 1; *p && p <= (unsigned char *) s + maxn; p++) {
-		h = T[h ^ *p];
-		oh = T[oh ^ *p];
-	    }
-	    h |= (oh << 8);
-	} else
-	    for (p = (unsigned char *) s + 1; *p && p <= (unsigned char *) s + maxn; p++)
-		h = T[h ^ *p];
+            for (p = (unsigned char *) s + 1; *p && p <= (unsigned char *) s + maxn; p++) {
+                h = T[h ^ *p];
+                oh = T[oh ^ *p];
+            }
+            h |= (oh << 8);
+        } else
+            for (p = (unsigned char *) s + 1; *p && p <= (unsigned char *) s + maxn; p++)
+                h = T[h ^ *p];
     }
     return (int) (h % hashs);
 }
@@ -61,20 +61,20 @@ hashstr P3(char *, s,		/* string to hash */
  */
 
 INLINE int
-whashstr P2(char *, s, int, maxn)
+whashstr P2(const char *, s, int, maxn)
 {
     register unsigned char oh, h;
     register unsigned char *p;
     register int i;
 
     if (!*s)
-	return 0;
+        return 0;
     p = (unsigned char *) s;
     oh = T[*p];
     h = (*(p++) + 1) & 0xff;
     for (i = maxn - 1; *p && --i >= 0; ) {
-	oh = T[oh ^ *p];
-	h = T[h ^ *(p++)];
+        oh = T[oh ^ *p];
+        h = T[h ^ *(p++)];
     }
 
     return (oh << 8) + h;

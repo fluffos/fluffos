@@ -90,7 +90,7 @@ static int send_compressed PROT((interactive_t *ip, unsigned char* data, int len
 #else
 #  define handle_snoop(str, len, who) if ((who)->snooped_by) receive_snoop(str, len, who->snooped_by)
 
-static void receive_snoop PROT((char *, int, object_t * ob));
+static void receive_snoop PROT((const char *, int, object_t * ob));
 
 #endif
 
@@ -152,7 +152,7 @@ void set_charmode P1(interactive_t *, ip)
 
 #ifndef NO_SNOOP
 static void
-receive_snoop P3(char *, buf, int, len, object_t *, snooper)
+receive_snoop P3(const char *, buf, int, len, object_t *, snooper)
 {
     /* command giver no longer set to snooper */
 #ifdef RECEIVE_SNOOP
@@ -181,7 +181,7 @@ void init_user_conn()
     int optval;
     int i;
     int have_fd6;
-    int fd6_which;
+    int fd6_which = -1;
     
     /* Check for fd #6 open as a valid socket */
     optval = 1;
@@ -396,7 +396,7 @@ void init_addr_server P2(char *, hostname, int, addr_server_port)
 #endif
 
 #ifdef SHADOW_CATCH_MESSAGE
-static int shadow_catch_message P2(object_t *, ob, char *, str)
+static int shadow_catch_message P2(object_t *, ob, const char *, str)
 {
     if (!ob->shadowed)
         return 0;
@@ -418,11 +418,11 @@ static int shadow_catch_message P2(object_t *, ob, char *, str)
  * Send a message to an interactive object. If that object is shadowed,
  * special handling is done.
  */
-void add_message P3(object_t *, who, char *, data, int, len)
+void add_message P3(object_t *, who, const char *, data, int, len)
 {
     interactive_t *ip;
-    char *cp;
-    char *end;
+    const char *cp;
+    const char *end;
     
     /*
      * if who->interactive is not valid, write message on stderr.
@@ -2638,7 +2638,7 @@ int outbuf_extend P2(outbuffer_t *, outbuf, int, l)
     return l;
 }
 
-void outbuf_add P2(outbuffer_t *, outbuf, char *, str)
+void outbuf_add P2(outbuffer_t *, outbuf, const char *, str)
 {
     int l, limit;
     

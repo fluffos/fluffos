@@ -338,8 +338,9 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
                 }
 
                 if (flags & FOREACH_MAPPING) {
+                    char *tmp = pc++;
                     sprintf(buff, "(mapping) %s %i, %s %i", 
-                            left, EXTRACT_UCHAR(pc++), right, EXTRACT_UCHAR(pc++));
+                            left, EXTRACT_UCHAR(tmp), right, EXTRACT_UCHAR(pc++));
                 } else {
                     sprintf(buff, "(array) %s %i", left, EXTRACT_UCHAR(pc++));
                 }

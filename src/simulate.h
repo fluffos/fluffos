@@ -33,7 +33,7 @@ extern object_t *obj_list_dangling;
 extern int tot_dangling_object;
 #endif
 
-char *strput PROT((char *, char *, char *));
+char *strput PROT((char *, char *, const char *));
 char *strput_int PROT((char *, char *, int));
 void CDECL debug_fatal PROT1V(char *);
 void CDECL fatal PROT1V(char *);
@@ -48,21 +48,21 @@ sentence_t *alloc_sentence PROT((void));
 int input_to PROT((svalue_t *, int, int, svalue_t *));
 int get_char PROT((svalue_t *, int, int, svalue_t *));
 
-int strip_name PROT((char *, char *, int));
+int strip_name PROT((const char *, char *, int));
 char *check_name PROT((char *));
 #ifdef LPC_TO_C
 #define load_object(x, y) int_load_object(x, y)
 object_t *int_load_object PROT((char *, lpc_object_t *));
 #else
 #define load_object(x, y) int_load_object(x)
-object_t *int_load_object PROT((char *));
+object_t *int_load_object PROT((const char *));
 #endif
 object_t *clone_object PROT((char *, int));
 object_t *environment PROT((svalue_t *));
 object_t *first_inventory PROT((svalue_t *));
 object_t *object_present PROT((svalue_t *, object_t *));
 object_t *find_object PROT((char *));
-object_t *find_object2 PROT((char *));
+object_t *find_object2 PROT((const char *));
 void move_object PROT((object_t *, object_t *));
 void destruct_object PROT((object_t *));
 void destruct2 PROT((object_t *));

@@ -16,14 +16,14 @@
 #define MAX_TEXT                   2048
 #define MAX_SOCKET_PACKET_SIZE     1024
 #define DESIRED_SOCKET_PACKET_SIZE 800
-#define MESSAGE_BUF_SIZE           MESSAGE_BUFFER_SIZE	/* from options.h */
+#define MESSAGE_BUF_SIZE           MESSAGE_BUFFER_SIZE  /* from options.h */
 #define OUT_BUF_SIZE               2048
-#define DFAULT_PROTO               0	/* use the appropriate protocol */
-#define I_NOECHO                   0x1	/* input_to flag */
-#define I_NOESC                    0x2	/* input_to flag */
+#define DFAULT_PROTO               0    /* use the appropriate protocol */
+#define I_NOECHO                   0x1  /* input_to flag */
+#define I_NOESC                    0x2  /* input_to flag */
 #define I_SINGLE_CHAR              0x4  /* get_char */
 #define I_WAS_SINGLE_CHAR          0x8  /* was get_char */
-#define SB_SIZE			   (NSLC * 3 + 3)
+#define SB_SIZE                    (NSLC * 3 + 3)
 
 #ifdef HAVE_ZLIB
 #define COMPRESS_BUF_SIZE MESSAGE_BUF_SIZE
@@ -33,53 +33,53 @@ enum msgtypes {
     NAMEBYIP = 0, IPBYNAME, DATALEN
 };
 
-#define TS_DATA	    0
-#define TS_IAC	    1
-#define TS_WILL	    2
-#define TS_WONT	    3
-#define TS_DO	    4
-#define TS_DONT	    5
-#define TS_SB	    6
+#define TS_DATA     0
+#define TS_IAC      1
+#define TS_WILL     2
+#define TS_WONT     3
+#define TS_DO       4
+#define TS_DONT     5
+#define TS_SB       6
 #define TS_SB_IAC   7
 
 /* The I_* flags are input_to flags */
-#define NOECHO		    I_NOECHO		/* don't echo lines */
-#define NOESC		    I_NOESC		/* don't allow shell out */
-#define SINGLE_CHAR	    I_SINGLE_CHAR	/* get_char */
-#define WAS_SINGLE_CHAR	    I_WAS_SINGLE_CHAR
-#define HAS_PROCESS_INPUT   0x0010		/* interactive object has process_input()  */
-#define HAS_WRITE_PROMPT    0x0020		/* interactive object has write_prompt()   */
-#define CLOSING		    0x0040		/* true when closing this file descriptor  */
-#define CMD_IN_BUF	    0x0080		/* there is a full command in input buffer */
-#define NET_DEAD	    0x0100
-#define NOTIFY_FAIL_FUNC    0x0200		/* default_err_mesg is a function pointer  */
-#define USING_TELNET	    0x0400		/* they're using telnet, or something that */
-						/* understands telnet codes                */
-#define SKIP_COMMAND	    0x0800		/* skip current command                    */
-#define SUPPRESS_GA	    0x1000		/* suppress go ahead                       */
-#define USING_LINEMODE	    0x2000		/* we've negotiated linemode               */
+#define NOECHO              I_NOECHO            /* don't echo lines */
+#define NOESC               I_NOESC             /* don't allow shell out */
+#define SINGLE_CHAR         I_SINGLE_CHAR       /* get_char */
+#define WAS_SINGLE_CHAR     I_WAS_SINGLE_CHAR
+#define HAS_PROCESS_INPUT   0x0010              /* interactive object has process_input()  */
+#define HAS_WRITE_PROMPT    0x0020              /* interactive object has write_prompt()   */
+#define CLOSING             0x0040              /* true when closing this file descriptor  */
+#define CMD_IN_BUF          0x0080              /* there is a full command in input buffer */
+#define NET_DEAD            0x0100
+#define NOTIFY_FAIL_FUNC    0x0200              /* default_err_mesg is a function pointer  */
+#define USING_TELNET        0x0400              /* they're using telnet, or something that */
+                                                /* understands telnet codes                */
+#define SKIP_COMMAND        0x0800              /* skip current command                    */
+#define SUPPRESS_GA         0x1000              /* suppress go ahead                       */
+#define USING_LINEMODE      0x2000              /* we've negotiated linemode               */
 
 typedef struct interactive_s {
-    object_t *ob;		/* points to the associated object         */
+    object_t *ob;               /* points to the associated object         */
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
-    sentence_t *input_to;	/* to be called with next input line       */
-    svalue_t *carryover;	/* points to args for input_to             */
-    int num_carry;		/* number of args for input_to             */
+    sentence_t *input_to;       /* to be called with next input line       */
+    svalue_t *carryover;        /* points to args for input_to             */
+    int num_carry;              /* number of args for input_to             */
 #endif
     int connection_type;        /* the type of connection this is          */
-    int fd;			/* file descriptor for interactive object  */
-    struct sockaddr_in addr;	/* socket address of interactive object    */
+    int fd;                     /* file descriptor for interactive object  */
+    struct sockaddr_in addr;    /* socket address of interactive object    */
 #ifdef F_QUERY_IP_PORT
-    int local_port;		/* which of our ports they connected to    */
+    int local_port;             /* which of our ports they connected to    */
 #endif
 #ifdef F_NETWORK_STATS
-    int external_port;		/* external port index for connection      */
+    int external_port;          /* external port index for connection      */
 #endif
-    char *prompt;		/* prompt string for interactive object    */
-    char text[MAX_TEXT];	/* input buffer for interactive object     */
-    int text_end;		/* first free char in buffer               */
-    int text_start;		/* where we are up to in user command buffer */
-    int last_time;		/* time of last command executed           */
+    char *prompt;               /* prompt string for interactive object    */
+    char text[MAX_TEXT];        /* input buffer for interactive object     */
+    int text_end;               /* first free char in buffer               */
+    int text_start;             /* where we are up to in user command buffer */
+    int last_time;              /* time of last command executed           */
 #ifndef NO_SNOOP
     object_t *snooped_by;
 #endif
@@ -88,8 +88,8 @@ typedef struct interactive_s {
     union string_or_func default_err_message;
 #endif
 #ifdef TRACE
-    int trace_level;		/* debug flags -- 0 means no debugging     */
-    char *trace_prefix;		/* trace only object which has this as name  */
+    int trace_level;            /* debug flags -- 0 means no debugging     */
+    char *trace_prefix;         /* trace only object which has this as name  */
 #endif
 #ifdef OLD_ED
     struct ed_buffer_s *ed_buffer;  /* local ed                        */
@@ -100,14 +100,14 @@ typedef struct interactive_s {
     unsigned char compress_buf[COMPRESS_BUF_SIZE]; /* compress message buffer*/
 #endif
     
-    int message_producer;	/* message buffer producer index */
-    int message_consumer;	/* message buffer consumer index */
-    int message_length;		/* message buffer length */
-    char message_buf[MESSAGE_BUF_SIZE];	/* message buffer */
+    int message_producer;       /* message buffer producer index */
+    int message_consumer;       /* message buffer consumer index */
+    int message_length;         /* message buffer length */
+    char message_buf[MESSAGE_BUF_SIZE]; /* message buffer */
     int iflags;                 /* interactive flags */
-    int out_of_band;		/* Send a telnet sync operation            */
-    int state;			/* Current telnet state.  Bingly wop       */
-    int sb_pos;			/* Telnet suboption negotiation stuff      */
+    int out_of_band;            /* Send a telnet sync operation            */
+    int state;                  /* Current telnet state.  Bingly wop       */
+    int sb_pos;                 /* Telnet suboption negotiation stuff      */
     char sb_buf[SB_SIZE];
     char slc[NSLC][2];
 } interactive_t;
@@ -169,7 +169,7 @@ extern interactive_t **all_users;
 extern int max_users;
 
 void CDECL add_vmessage PROT2V(object_t *, char *);
-void add_message PROT((object_t *, char *, int));
+void add_message PROT((object_t *, const char *, int));
 void add_binary_message PROT((object_t *, unsigned char *, int));
 
 #ifdef SIGNAL_FUNC_TAKES_INT
@@ -204,4 +204,4 @@ object_t *query_snooping PROT((object_t *));
 void mark_iptable PROT((void));
 #endif
 
-#endif				/* COMM_H */
+#endif                          /* COMM_H */

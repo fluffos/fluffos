@@ -284,6 +284,11 @@ inheritance:
 
 		if (var_defined)
 		    yyerror("Illegal to inherit after defining global variables.");
+		if (func_present || var_defined){
+		  inherit_file = 0;
+		  YYACCEPT;
+		}
+		  
 		ob = find_object2($3);
 		if (ob == 0) {
 		    inherit_file = alloc_cstring($3, "inherit");
@@ -911,7 +916,7 @@ new_name:
 			p = strput(p, end, $2);
 			yyerror(buff);
 		    }
-		}
+		} else type = 0;
 		$4 = do_promotions($4, type);
 
 		CREATE_BINARY_OP(expr, F_VOID_ASSIGN, 0, $4, 0);
@@ -1547,6 +1552,9 @@ expr0:
 			yyerror("Illegal to make reference to range");
 			break;
 		    }
+		    break;
+		default:
+		    fatal("unknown lvalue kind");
 		}
 		CREATE_UNARY_OP_1($$, F_MAKE_REF, TYPE_ANY, $2, op);
 	    }

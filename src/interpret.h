@@ -35,7 +35,7 @@
     (command_giver && command_giver->interactive && TRACETST(b) && \
      (command_giver->interactive->trace_prefix == 0 || \
       (current_object && strpref(command_giver->interactive->trace_prefix, \
-	      current_object->name))) )
+              current_object->name))) )
 #  define TRACEHB (current_heart_beat == 0 || (command_giver->interactive->trace_level & TRACE_HEART_BEAT))
 #endif
 
@@ -64,26 +64,26 @@ typedef struct control_stack_s {
 #endif
     short framekind;
     union {
-	int table_index;
-	funptr_t *funp;
+        int table_index;
+        funptr_t *funp;
     } fr;
-    object_t *ob;		/* Current object */
-    object_t *prev_ob;	/* Save previous object */
-    program_t *prog;	/* Current program */
-    int num_local_variables;	/* Local + arguments */
+    object_t *ob;               /* Current object */
+    object_t *prev_ob;  /* Save previous object */
+    program_t *prog;    /* Current program */
+    int num_local_variables;    /* Local + arguments */
     char *pc;
     svalue_t *fp;
-    int function_index_offset;	/* Used when executing functions in inherited
-				 * programs */
-    int variable_index_offset;	/* Same */
-    short caller_type;		/* was this a locally called function? */
+    int function_index_offset;  /* Used when executing functions in inherited
+                                 * programs */
+    int variable_index_offset;  /* Same */
+    short caller_type;          /* was this a locally called function? */
 } control_stack_t;
 
 typedef struct {
     object_t *ob;
     union {
-	funptr_t *fp;
-	char *str;
+        funptr_t *fp;
+        char *str;
     } f;
     int narg;
     svalue_t *args;
@@ -104,7 +104,7 @@ typedef struct {
 
 #define IS_ZERO(x) (!(x) || (((x)->type == T_NUMBER) && ((x)->u.number == 0)))
 #define IS_UNDEFINED(x) (!(x) || (((x)->type == T_NUMBER) && \
-	((x)->subtype == T_UNDEFINED) && ((x)->u.number == 0)))
+        ((x)->subtype == T_UNDEFINED) && ((x)->u.number == 0)))
 
 #define CHECK_TYPES(val, t, arg, inst) \
   if (!((val)->type & (t))) bad_argument(val, t, arg, inst);
@@ -113,36 +113,36 @@ typedef struct {
 /* add to an svalue */
 #define EXTEND_SVALUE_STRING(x, y, z) \
     SAFE( char *ess_res; \
-	int ess_len; \
-	int ess_r; \
-	ess_len = (ess_r = SVALUE_STRLEN(x)) + strlen(y); \
-	if (ess_len > MAX_STRING_LENGTH) \
-	    error("Maximum string length exceeded in concatenation.\n"); \
-	if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) { \
-	    ess_res = (char *) extend_string((x)->u.string, ess_len); \
-	    if (!ess_res) fatal("Out of memory!\n"); \
-	    strcpy(ess_res + ess_r, (y)); \
-	} else { \
-	    ess_res = new_string(ess_len, z); \
-	    strcpy(ess_res, (x)->u.string); \
-	    strcpy(ess_res + ess_r, (y)); \
-	    free_string_svalue(x); \
-	    (x)->subtype = STRING_MALLOC; \
-	} \
-	(x)->u.string = ess_res; \
+        int ess_len; \
+        int ess_r; \
+        ess_len = (ess_r = SVALUE_STRLEN(x)) + strlen(y); \
+        if (ess_len > MAX_STRING_LENGTH) \
+            error("Maximum string length exceeded in concatenation.\n"); \
+        if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) { \
+            ess_res = (char *) extend_string((x)->u.string, ess_len); \
+            if (!ess_res) fatal("Out of memory!\n"); \
+            strcpy(ess_res + ess_r, (y)); \
+        } else { \
+            ess_res = new_string(ess_len, z); \
+            strcpy(ess_res, (x)->u.string); \
+            strcpy(ess_res + ess_r, (y)); \
+            free_string_svalue(x); \
+            (x)->subtype = STRING_MALLOC; \
+        } \
+        (x)->u.string = ess_res; \
     )
 
 /* <something that needs no free> + string svalue */
 #define SVALUE_STRING_ADD_LEFT(y, z) \
     SAFE( char *pss_res; int pss_r; int pss_len; \
         pss_len = SVALUE_STRLEN(sp) + (pss_r = strlen(y)); \
-	if (pss_len > MAX_STRING_LENGTH) \
-	    error("Maximum string length exceeded in concatenation.\n"); \
+        if (pss_len > MAX_STRING_LENGTH) \
+            error("Maximum string length exceeded in concatenation.\n"); \
         pss_res = new_string(pss_len, z); \
         strcpy(pss_res, y); \
         strcpy(pss_res + pss_r, sp->u.string); \
         free_string_svalue(sp--); \
-	sp->type = T_STRING; \
+        sp->type = T_STRING; \
         sp->u.string = pss_res; \
         sp->subtype = STRING_MALLOC; \
      )
@@ -152,8 +152,8 @@ typedef struct {
     SAFE( char *ssj_res; int ssj_r; int ssj_len; \
         ssj_r = SVALUE_STRLEN(x); \
         ssj_len = ssj_r + SVALUE_STRLEN(y); \
-	if (ssj_len > MAX_STRING_LENGTH) \
-	    error("Maximum string length exceeded in concatenation.\n"); \
+        if (ssj_len > MAX_STRING_LENGTH) \
+            error("Maximum string length exceeded in concatenation.\n"); \
         if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) { \
             ssj_res = (char *) extend_string((x)->u.string, ssj_len); \
             if (!ssj_res) fatal("Out of memory!\n"); \
@@ -161,9 +161,9 @@ typedef struct {
             free_string_svalue(y); \
         } else { \
             ssj_res = (char *) new_string(ssj_len, z); \
-	    strcpy(ssj_res, (x)->u.string); \
-	    strcpy(ssj_res + ssj_r, (y)->u.string); \
-	    free_string_svalue(y); \
+            strcpy(ssj_res, (x)->u.string); \
+            strcpy(ssj_res + ssj_r, (y)->u.string); \
+            free_string_svalue(y); \
             free_string_svalue(x); \
             (x)->subtype = STRING_MALLOC; \
         } \
@@ -186,55 +186,55 @@ typedef struct {
 #define STACK_INC SAFE( CHECK_STACK_OVERFLOW(1); sp++; )
 
 #define push_svalue(x) SAFE( \
-			    STACK_INC;\
-			    assign_svalue_no_free(sp, x);\
-			    )
+                            STACK_INC;\
+                            assign_svalue_no_free(sp, x);\
+                            )
 #define put_number(x) SAFE( \
-			   sp->type = T_NUMBER;\
-			   sp->subtype = 0;\
-			   sp->u.number = (x);\
-			   )
+                           sp->type = T_NUMBER;\
+                           sp->subtype = 0;\
+                           sp->u.number = (x);\
+                           )
 #define put_buffer(x) SAFE( \
-			   sp->type = T_BUFFER;\
-			   sp->u.buf = (x);\
-			   )
+                           sp->type = T_BUFFER;\
+                           sp->u.buf = (x);\
+                           )
 #define put_undested_object(x) SAFE(\
-				    sp->type = T_OBJECT;\
-				    sp->u.ob = (x);\
-				    )
+                                    sp->type = T_OBJECT;\
+                                    sp->u.ob = (x);\
+                                    )
 #define put_object(x) SAFE(\
-			   if (!(x) || (x)->flags & O_DESTRUCTED) *sp = const0u;\
-			   else put_undested_object(x);\
-			   )
+                           if (!(x) || (x)->flags & O_DESTRUCTED) *sp = const0u;\
+                           else put_undested_object(x);\
+                           )
 #define put_unrefed_undested_object(x, y) SAFE(\
-					       sp->type = T_OBJECT;\
-					       sp->u.ob = (x);\
-					       add_ref((x), y);\
-					       )
+                                               sp->type = T_OBJECT;\
+                                               sp->u.ob = (x);\
+                                               add_ref((x), y);\
+                                               )
 #define put_unrefed_object(x,y) SAFE(\
-				     if (!(x) || (x)->flags & O_DESTRUCTED) *sp = const0u;\
-				     else put_unrefed_undested_object(x,y);\
-				     )
+                                     if (!(x) || (x)->flags & O_DESTRUCTED) *sp = const0u;\
+                                     else put_unrefed_undested_object(x,y);\
+                                     )
 /* see comments on push_constant_string */
 #define put_constant_string(x) SAFE(\
-				    sp->type = T_STRING;\
-				    sp->subtype = STRING_SHARED;\
-				    sp->u.string = make_shared_string(x);\
-				    )
+                                    sp->type = T_STRING;\
+                                    sp->subtype = STRING_SHARED;\
+                                    sp->u.string = make_shared_string(x);\
+                                    )
 #define put_malloced_string(x) SAFE(\
-				    sp->type = T_STRING;\
-				    sp->subtype = STRING_MALLOC;\
-				    sp->u.string = (x);\
-				    )
+                                    sp->type = T_STRING;\
+                                    sp->subtype = STRING_MALLOC;\
+                                    sp->u.string = (x);\
+                                    )
 #define put_array(x) SAFE(\
-			  sp->type = T_ARRAY;\
-			  sp->u.arr = (x);\
-			  )
+                          sp->type = T_ARRAY;\
+                          sp->u.arr = (x);\
+                          )
 #define put_shared_string(x) SAFE(\
-				  sp->type = T_STRING;\
-				  sp->subtype = STRING_SHARED;\
-				  sp->u.string = (x);\
-				  )
+                                  sp->type = T_STRING;\
+                                  sp->subtype = STRING_SHARED;\
+                                  sp->u.string = (x);\
+                                  )
 
 #define FOREACH_LEFT_GLOBAL 1
 #define FOREACH_RIGHT_GLOBAL 2
@@ -298,7 +298,7 @@ INLINE void push_object PROT((object_t *));
 INLINE void push_number PROT((int));
 INLINE void push_real PROT((double));
 INLINE void push_undefined PROT((void));
-INLINE void copy_and_push_string PROT((char *));
+INLINE void copy_and_push_string PROT((const char *));
 INLINE void share_and_push_string PROT((char *));
 INLINE void push_array PROT((array_t *));
 INLINE void push_refed_array PROT((array_t *));
@@ -344,11 +344,11 @@ char *function_exists PROT((char *, object_t *, int));
 void call_function PROT((program_t *, int));
 void mark_apply_low_cache PROT((void));
 void translate_absolute_line PROT((int, unsigned short *, int *, int *));
-char *add_slash PROT((char *));
+char *add_slash PROT((const char * const));
 int strpref PROT((char *, char *));
 array_t *get_svalue_trace PROT((void));
 void do_trace PROT((char *, char *, char *));
-char *dump_trace PROT((int));
+const char *dump_trace PROT((int));
 void opcdump PROT((char *));
 int inter_sscanf PROT((svalue_t *, svalue_t *, svalue_t *, int));
 char * get_line_number_if_any PROT((void));
@@ -384,4 +384,4 @@ void mark_svalue PROT((svalue_t *));
 void mark_stack PROT((void));
 #endif
 
-#endif				/* _INTERPRET_H */
+#endif                          /* _INTERPRET_H */

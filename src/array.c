@@ -1028,11 +1028,11 @@ map_array P2(svalue_t *, arg, int, num_arg)
 void
 map_string P2(svalue_t *, arg, int, num_arg)
 {
-    char *arr = arg->u.string;
+    char *arr;
     char *p;
     funptr_t *fp = 0;
     int numex = 0;
-    object_t *ob;
+    object_t *ob = 0;
     svalue_t *extra, *v;
     char *func;
 
@@ -2002,7 +2002,7 @@ array_t *livings()
 void f_objects PROT((void))
 {
     int count, i;
-    char *func;
+    char *func = 0;
     object_t **list;
     array_t *ret;
     funptr_t *f = 0;

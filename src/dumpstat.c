@@ -92,6 +92,7 @@ static int svalue_size P1(svalue_t *, v)
       //some freed value or a reference (!) to one (in all my test cases
       //anyway), it will be removed by reclaim_objects later, Wodan
       //fatal("Illegal type: %d\n", v->type);
+      ;
     }
     /* NOTREACHED */
     return 0;

@@ -811,7 +811,9 @@ f_explode PROT((void))
 {
     array_t *vec;
 
-    vec = explode_string((sp - 1)->u.string, SVALUE_STRLEN(sp-1),
+    int len = SVALUE_STRLEN(sp-1);
+    
+    vec = explode_string((sp - 1)->u.string, len,
                          sp->u.string, SVALUE_STRLEN(sp));
     free_string_svalue(sp--);
     free_string_svalue(sp);
@@ -1493,6 +1495,8 @@ f_member_array PROT((void))
 
     if (sp->type == T_STRING) {
         char *res;
+        if(flag & 2)
+          error("member_array: can not search backwards in strings");
         CHECK_TYPES(sp-1, T_NUMBER, 1, F_MEMBER_ARRAY);
         if (i > SVALUE_STRLEN(sp)) error("Index to start search from in member_array() is > string length.\n");
         if ((res = strchr(sp->u.string + i, (sp-1)->u.number)))

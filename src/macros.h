@@ -14,9 +14,9 @@
  */
 #ifdef BUFSIZ
 #  define PROT_STDIO(x) PROT(x)
-#else				/* BUFSIZ */
+#else                           /* BUFSIZ */
 #  define PROT_STDIO(x) ()
-#endif				/* BUFSIZ */
+#endif                          /* BUFSIZ */
 
 /* ANSI/K&R compatibility stuff;
  *
@@ -41,7 +41,7 @@
 #  define P7(t1, v1, t2, v2, t3, v3, t4, v4, t5, v5, t6, v6, t7, v7) (t1 v1, t2 v2, t3 v3, t4 v4, t5 v5, t6 v6, t7 v7)
 #  define VOLATILE volatile
 #  define SIGNED signed
-#else				/* __STDC__ */
+#else                           /* __STDC__ */
 #  define PROT(x) ()
 #  define P1(t1, v1) (v1) t1 v1;
 #  define P2(t1, v1, t2, v2) (v1, v2) t1 v1; t2 v2;
@@ -52,7 +52,7 @@
 #  define P7(t1, v1, t2, v2, t3, v3, t4, v4, t5, v5, t6, v6, t7, v7) (v1, v2, v3, v4, v5, v6, v7) t1 v1; t2 v2; t3 v3; t4 v4; t5 v5; t6 v6; t7 v7;
 #  define VOLATILE
 #  define SIGNED
-#endif				/* __STDC__ */
+#endif                          /* __STDC__ */
 
 /* do things both ways ... */
 #ifdef INCL_STDARG_H
@@ -248,15 +248,15 @@
 #ifndef _FUNC_SPEC_
    char *xalloc PROT((int));
 #  ifdef DEBUGMALLOC
-      char *int_string_copy PROT((char *, char *));
+      char *int_string_copy PROT((const char * const, char *));
       char *int_string_unlink PROT((char *, char *));
       char *int_new_string PROT((int, char *));
-      char *int_alloc_cstring PROT((char *, char *));
+      char *int_alloc_cstring PROT((const char *, char *));
 #  else
-      char *int_string_copy PROT((char *));
+      char *int_string_copy PROT((const char * const));
       char *int_string_unlink PROT((char *));
       char *int_new_string PROT((int));
-      char *int_alloc_cstring PROT((char *));
+      char *int_alloc_cstring PROT((const char *));
 #  endif
 #endif
 

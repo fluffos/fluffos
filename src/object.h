@@ -91,7 +91,7 @@ typedef struct object_s {
 #ifdef DEBUG
     unsigned int extra_ref;     /* Used to check ref count. */
 #endif
-    char *obname;
+    const char * const obname;
     struct object_s *next_hash;
     /* the fields above must match lpc_object_t */
     int load_time;              /* time when this object was created */
@@ -159,6 +159,8 @@ typedef int (* get_objectsfn_t) PROT((object_t *, void *));
 #define ROB_CLASS_ERROR 32
 #define ROB_ERROR 63
 
+#define SETOBNAME(ob,name) (*(const char **)&(ob->obname) = (char *) name)
+
 extern object_t *previous_ob;
 extern int tot_alloc_object;
 extern int tot_alloc_object_size;
@@ -187,8 +189,8 @@ INLINE int object_visible PROT((object_t *));
 #else
 #define object_visible(x) 1
 #endif
-void tell_npc PROT((object_t *, char *));
-void tell_object PROT((object_t *, char *, int));
+void tell_npc PROT((object_t *, const char *));
+void tell_object PROT((object_t *, const char *, int));
 int find_global_variable PROT((program_t *, char *, unsigned short *, int));
 void dealloc_object PROT((object_t *, char *));
 void get_objects PROT((object_t ***, int *, get_objectsfn_t, void *));

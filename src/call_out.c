@@ -4,6 +4,7 @@
 #include "comm.h"
 #include "port.h"
 #include "eoperators.h"
+#include "sprintf.h"
 
 #define DBG(x) debug(call_out, x)
 

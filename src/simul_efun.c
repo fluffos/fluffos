@@ -137,24 +137,6 @@ void get_simul_efuns P1(program_t *, prog)
 }
 
 /*
- * Test if 'name' is a simul_efun. The string pointer MUST be a pointer to
- * a shared string.
- */
-int find_simul_efun P1(char *, name)
-{
-    int first = 0;
-    int last = num_simul_efun - 1;
-    int j;
-    
-    while (first <= last) {
-        if (name < simul_names[j].name) last = j-1;
-        else if (name > simul_names[j].name) first = j + 1;
-        else return simul_names[j].index;
-    }
-    return -1;
-}
-
-/*
  * Define a new simul_efun
  */
 static void

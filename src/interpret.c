@@ -320,7 +320,7 @@ INLINE_STATIC void push_undefineds P1(int, num)
 }
 
 INLINE
-void copy_and_push_string P1(char *, p) {
+void copy_and_push_string P1(const char *, p) {
     STACK_INC;
     sp->type = T_STRING;
     sp->subtype = STRING_MALLOC;
@@ -554,12 +554,12 @@ INLINE void free_some_svalues P2(svalue_t *, v, int, num)
 /*
  * Prepend a slash in front of a string.
  */
-char *add_slash P1(char *, str)
+char *add_slash P1(const char * const, str)
 {
     char *tmp;
 
     if (str[0] == '<' && strcmp(str + 1, "function>") == 0)
-  return string_copy(str, "add_slash");
+      return string_copy(str, "add_slash");
     tmp = new_string(strlen(str) + 1, "add_slash");
     *tmp = '/';
     strcpy(tmp + 1, str);
@@ -821,38 +821,38 @@ INLINE_STATIC void push_lvalue_range P1(int, code)
     svalue_t *lv;
     
     if (sp->type == T_LVALUE) {
-  switch((lv = global_lvalue_range.owner = sp->u.lvalue)->type) {
-  case T_ARRAY:
-      size = lv->u.arr->size;
-      break;
-  case T_STRING: {
-      size = SVALUE_STRLEN(lv);
-      unlink_string_svalue(lv);
-      break;
-  }
+      switch((lv = global_lvalue_range.owner = sp->u.lvalue)->type) {
+      case T_ARRAY:
+	size = lv->u.arr->size;
+	break;
+      case T_STRING: {
+	size = SVALUE_STRLEN(lv);
+	unlink_string_svalue(lv);
+	break;
+      }
 #ifndef NO_BUFFER_TYPE
-  case T_BUFFER:
-      size = lv->u.buf->size;
-      break;
+      case T_BUFFER:
+	size = lv->u.buf->size;
+	break;
 #endif
-  default:
-      error("Range lvalue on illegal type\n");
-      IF_DEBUG(size = 0);
-  }
+      default:
+	error("Range lvalue on illegal type\n");
+	IF_DEBUG(size = 0);
+      }
     } else
-  error("Range lvalue on illegal type\n");
+      error("Range lvalue on illegal type\n");
     
     if (!((--sp)->type == T_NUMBER)) error("Illegal 2nd index type to range lvalue\n");
     
     ind2 = (code & 0x01) ? (size - sp->u.number) : sp->u.number;
     if (++ind2 < 0 || (ind2 > size))
-  error("The 2nd index to range lvalue must be >= -1 and < sizeof(indexed value)\n");
+      error("The 2nd index to range lvalue must be >= -1 and < sizeof(indexed value)\n");
     
     if (!((--sp)->type == T_NUMBER)) error("Illegal 1st index type to range lvalue\n");
     ind1 = (code & 0x10) ? (size - sp->u.number) : sp->u.number;
     
     if (ind1 < 0 || ind1 > size)
-  error("The 1st index to range lvalue must be >= 0 and <= sizeof(indexed value)\n");
+      error("The 1st index to range lvalue must be >= 0 and <= sizeof(indexed value)\n");
     
     global_lvalue_range.ind1 = ind1;
     global_lvalue_range.ind2 = ind2;
@@ -2026,22 +2026,22 @@ eval_instruction P1(char *, p)
       svalue_t *lval;
       
       if (s->type == T_REF) {
-    lval = s->u.ref->lvalue;
-    if (!lval)
-        error("Reference is invalid.\n");
-    
-    if (lval->type == T_LVALUE_BYTE) {
-        push_number(*global_lvalue_byte.u.lvalue_byte);
-        break;
-    }
+	lval = s->u.ref->lvalue;
+	if (!lval)
+	  error("Reference is invalid.\n");
+	
+	if (lval->type == T_LVALUE_BYTE) {
+	  push_number(*global_lvalue_byte.u.lvalue_byte);
+	  break;
+	}
       } else {
-    error("Non-reference value passed as reference argument.\n");
+	error("Non-reference value passed as reference argument.\n");
       }
     
       if (lval->type == T_OBJECT && (lval->u.ob->flags & O_DESTRUCTED))
-    assign_svalue(lval, &const0u);
+	assign_svalue(lval, &const0u);
       push_svalue(lval);
-
+      
       break;
   }
   case F_REF_LVALUE:
@@ -3986,8 +3986,8 @@ void check_co_args2 P4(unsigned short *, types, int, num_arg, char *, name, char
             type_name(exptype), type_name((sp-argc)->type));
 #ifdef CALL_OTHER_WARN
       if(current_prog){
-	char *file;
-	int line;
+        char *file;
+        int line;
         find_line(pc, current_prog, &file, &line);
         smart_log(file, line, buf, 1);
       } else 
@@ -4670,7 +4670,7 @@ char* get_line_number P2(char *, p, program_t *, progp)
 }
 
 static void dump_trace_line P4(char *, fname, char *, pname,
-             char *, obname, char *, where) {
+             const char * const, obname, char *, where) {
     char line[256];
     char *end = EndOf(line);
     char *p;
@@ -4695,10 +4695,10 @@ static void dump_trace_line P4(char *, fname, char *, pname,
  * Write out a trace. If there is a heart_beat(), then return the
  * object that had that heart beat.
  */
-char *dump_trace P1(int, how)
+const char *dump_trace P1(int, how)
 {
     control_stack_t *p;
-    char *ret = 0;
+    const char * ret = 0;
     char *fname;
     int num_arg = -1, num_local = -1;
     
