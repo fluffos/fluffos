@@ -544,7 +544,7 @@ object_t *int_load_object P1(const char *, lname)
     ob = get_empty_object(prog->num_variables_total);
     /* Shared string is no good here */
     SETOBNAME(ob, alloc_cstring(name, "load_object"));
-    SET_TAG(ob->name, TAG_OBJ_NAME);
+    SET_TAG(ob->obname, TAG_OBJ_NAME);
     ob->prog = prog;
     ob->flags |= O_WILL_RESET;  /* must be before reset is first called */
     ob->next_all = obj_list;

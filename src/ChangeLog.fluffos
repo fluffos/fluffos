@@ -1,6 +1,14 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
+new in FluffOS 1.28
+fixes to compile with other settings than the DW ones (Skullslayer@Realms of the Dragon)
+fix in reverse DNS lookup (Skullslayer@Realms of the Dragon)
+properly do the zlib stuff (Skullslayer@Realms of the Dragon)
+terminal_colour fix (pinkfish)
+new element_of efun which takes a random element from an array
+readded pluralize cases that were accidently lost in the last version
+
 new in FluffOS 1.27
 update to terminal_colour() (Pinkfish)
 added option to use mmap instead of sbrk for included malloc packages

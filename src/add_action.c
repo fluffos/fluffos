@@ -405,9 +405,9 @@ static int user_parser P1(char *, buff)
 	if (illegal_sentence_action) {
 	    switch (illegal_sentence_action) {
 	    case 1:
-		error("Illegal to call remove_action() [caller was /%s] from a verb returning zero.\n", illegal_sentence_ob->name);
+		error("Illegal to call remove_action() [caller was /%s] from a verb returning zero.\n", illegal_sentence_ob->obname);
 	    case 2:
-		error("Illegal to move or destruct an object (/%s) defining actions from a verb function which returns zero.\n", illegal_sentence_ob->name);
+		error("Illegal to move or destruct an object (/%s) defining actions from a verb function which returns zero.\n", illegal_sentence_ob->obname);
 	    }
 	}
     }

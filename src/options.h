@@ -859,6 +859,7 @@
 /* PACKAGE_COMPRESS: Enable MCCP support and compressed save files
    SAVE_GZ_EXTENSION: save extension for compressed files
  */
+#define HAVE_ZLIB
 #define PACKAGE_COMPRESS
 #define SAVE_GZ_EXTENSION ".o.gz"
 

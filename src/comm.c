@@ -2339,6 +2339,7 @@ int query_addr_number P2(const char *, name, svalue_t *, call_back)
     static char *dbuf = &buf[sizeof(int) + sizeof(int) + sizeof(int)];
     int msglen;
     int msgtype;
+    int i;
 
     if ((addr_server_fd < 0) || (strlen(name) >=
                   100 - (sizeof(msgtype) + sizeof(msglen) + sizeof(int)))) {
@@ -2357,7 +2358,14 @@ int query_addr_number P2(const char *, name, svalue_t *, call_back)
     memcpy(buf, (char *) &msgtype, sizeof(msgtype));
     memcpy(&buf[sizeof(int)], (char *) &msglen, sizeof(msglen));
 
-    msgtype = (name[0] >= '0' && name[0] <= '9') ? NAMEBYIP : IPBYNAME;
+    msgtype = NAMEBYIP;
+    for (i = 0; i < strlen(name); i++){
+      if (isalpha(name[i])) {
+	msgtype = IPBYNAME;
+	break;
+      }
+    }
+
     memcpy(&buf[sizeof(int) + sizeof(int)], (char *) &msgtype, sizeof(msgtype));
 
     debug(connections, ("query_addr_number: sent address server %s\n", dbuf));

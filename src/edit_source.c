@@ -1638,6 +1638,9 @@ static void handle_configure() {
     check_library("-lseq");
     check_library("-lm");
 
+    if (lookup_define("HAVE_ZLIB"))
+        check_library("-lz");
+
     fprintf(stderr, "Checking for flaky Linux systems ...\n");
     check_linux_libc();
 

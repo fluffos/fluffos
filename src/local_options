@@ -851,6 +851,7 @@
  */
 #undef GET_CHAR_IS_BUFFERED
 
+#define HAVE_ZLIB
 #define PACKAGE_COMPRESS
 #define SAVE_GZ_EXTENSION ".o.gz"
 #define USE_FLUFF_MOD

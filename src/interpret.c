@@ -452,7 +452,7 @@ INLINE void int_free_svalue P2(svalue_t *, v, char *, tag)
   } else if ((v->type & T_REFED) && !(v->type & T_FREED)) {
 #ifdef DEBUG_MACRO
     if (v->type == T_OBJECT)
-      debug(d_flag, ("Free_svalue %s (%d) from %s\n", v->u.ob->obname, v->u.ob->ref - 1, tag));
+      debug(d_flag, ("Free_svalue %s (%d) from %s\n", v->u.ob->name, v->u.ob->ref - 1, tag));
 #endif
     if (!(--v->u.refed->ref)) {
       switch (v->type) {
@@ -5688,7 +5688,7 @@ void do_trace P3(char *, msg, char *, fname, char *, post)
 
   if (!TRACEHB)
     return;
-  objname = TRACETST(TRACE_OBJNAME) ? (current_object && current_object->obname ? current_object->obname : "??") : "";
+  objname = TRACETST(TRACE_OBJNAME) ? (current_object && current_object->name ? current_object->name : "??") : "";
   add_vmessage(command_giver, "*** %d %*s %s %s %s%s", tracedepth, tracedepth, "", msg, objname, fname, post);
 }
 #endif

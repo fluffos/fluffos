@@ -78,7 +78,7 @@ typedef struct { /* has to be the same as object_t below */
 #ifdef DEBUG
     unsigned int extra_ref;
 #endif
-    char *name;
+    char *obname;
     struct object_s *next_hash;
     void (**jump_table)();
     struct string_switch_entry_s **string_switch_tables;

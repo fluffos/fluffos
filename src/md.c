@@ -274,8 +274,8 @@ static void mark_object P1(object_t *, ob) {
     if (ob->prog)
         ob->prog->extra_ref++;
 
-    if (ob->name) {
-        DO_MARK(ob->name, TAG_OBJ_NAME);
+    if (ob->obname) {
+        DO_MARK(ob->obname, TAG_OBJ_NAME);
     }
 
     if (ob->replaced_program)
@@ -316,7 +316,7 @@ static void mark_object P1(object_t *, ob) {
             mark_svalue(&ob->variables[i]);
     else
         outbuf_addv(&out, "can't mark variables; %s is swapped.\n",
-                    ob->name);
+                    ob->obname);
 }
 
 void mark_svalue P1(svalue_t *, sv) {
@@ -428,7 +428,7 @@ static void md_print_array  P1(array_t *, vec) {
           outbuf_add(&out, "<mapping>");
           break;
       case T_OBJECT:
-          outbuf_addv(&out, "OBJ(%s)", vec->item[i].u.ob->name);
+          outbuf_addv(&out, "OBJ(%s)", vec->item[i].u.ob->obname);
           break;
       }
       if (i != vec->size - 1) outbuf_add(&out, ", ");
@@ -895,18 +895,18 @@ void check_all_blocks P1(int, flag) {
                             if (tmp)
                                 outbuf_addv(&out,
                                         "WARNING: %s is dangling.\n",
-                                        ob->name);
+                                        ob->obname);
                         }
                         if (!tmp)
                             outbuf_addv(&out, 
                                         "WARNING: %s not in object list.\n",
-                                        ob->name);
+                                        ob->obname);
                     }
                     break;
                 case TAG_LPC_OBJECT:
                     ob = NODET_TO_PTR(entry, object_t *);
-                    if (ob->name) {
-                        DO_MARK(ob->name, TAG_OBJ_NAME);
+                    if (ob->obname) {
+                        DO_MARK(ob->obname, TAG_OBJ_NAME);
                     }
                     break;
                 case TAG_PROGRAM:
@@ -920,8 +920,8 @@ void check_all_blocks P1(int, flag) {
                         prog->inherit[i].prog->extra_ref++;
                     
                     for (i = 0; i < (int) prog->num_functions_defined; i++)
-                        if (prog->function_table[i].name)
-                            EXTRA_REF(BLOCK(prog->function_table[i].name))++;
+                        if (prog->function_table[i].funcname)
+                            EXTRA_REF(BLOCK(prog->function_table[i].funcname))++;
                     
                     for (i = 0; i < (int) prog->num_strings; i++)
                         EXTRA_REF(BLOCK(prog->strings[i]))++;
@@ -929,7 +929,7 @@ void check_all_blocks P1(int, flag) {
                     for (i = 0; i < (int) prog->num_variables_defined; i++)
                         EXTRA_REF(BLOCK(prog->variable_table[i]))++;
                     
-                    EXTRA_REF(BLOCK(prog->name))++;
+                    EXTRA_REF(BLOCK(prog->filename))++;
                 }
             }
         }
@@ -944,14 +944,14 @@ void check_all_blocks P1(int, flag) {
                 case TAG_PROGRAM:
                     prog = NODET_TO_PTR(entry, program_t *);
                     if (prog->ref != prog->extra_ref)
-                        outbuf_addv(&out, "Bad ref count for program %s, is %d - should be %d\n", prog->name, prog->ref, prog->extra_ref);
+                        outbuf_addv(&out, "Bad ref count for program %s, is %d - should be %d\n", prog->filename, prog->ref, prog->extra_ref);
                     if (prog->func_ref != prog->extra_func_ref)
-                        outbuf_addv(&out, "Bad function ref count for program %s, is %d - should be %d\n", prog->name, prog->func_ref, prog->extra_func_ref);
+                        outbuf_addv(&out, "Bad function ref count for program %s, is %d - should be %d\n", prog->filename, prog->func_ref, prog->extra_func_ref);
                     break;
                 case TAG_OBJECT:
                     ob = NODET_TO_PTR(entry, object_t *);
                     if (ob->ref != ob->extra_ref)
-                        outbuf_addv(&out, "Bad ref count for object %s, is %d - should be %d\n", ob->name, ob->ref, ob->extra_ref);
+                        outbuf_addv(&out, "Bad ref count for object %s, is %d - should be %d\n", ob->obname, ob->ref, ob->extra_ref);
                     break;
                 case TAG_ARRAY:
                     vec = NODET_TO_PTR(entry, array_t *);
@@ -974,7 +974,7 @@ void check_all_blocks P1(int, flag) {
                 case TAG_FUNP:
                     fp = NODET_TO_PTR(entry, funptr_t *);
                     if (fp->hdr.ref != fp->hdr.extra_ref)
-                        outbuf_addv(&out, "Bad ref count for function pointer (owned by %s), is %d - should be %d\n", (fp->hdr.owner ? fp->hdr.owner->name : "(null)"), fp->hdr.ref, fp->hdr.extra_ref);
+                        outbuf_addv(&out, "Bad ref count for function pointer (owned by %s), is %d - should be %d\n", (fp->hdr.owner ? fp->hdr.owner->obname : "(null)"), fp->hdr.ref, fp->hdr.extra_ref);
                     break;
 #ifndef NO_BUFFER_TYPE
                 case TAG_BUFFER:
@@ -1000,7 +1000,7 @@ void check_all_blocks P1(int, flag) {
                     break;
                 case TAG_SENTENCE:
                     sent = NODET_TO_PTR(entry, sentence_t *);
-                    outbuf_addv(&out, "WARNING: Found orphan sentence: %s:%s - %s %04x\n", sent->ob->name, sent->function, entry->desc, (int)entry->tag);
+                    outbuf_addv(&out, "WARNING: Found orphan sentence: %s:%s - %s %04x\n", sent->ob->obname, sent->function, entry->desc, (int)entry->tag);
                     break;
                 case TAG_PERM_IDENT:
                     outbuf_addv(&out, "WARNING: Found orphan permanent identifier: %s %04x\n", entry->desc, (int)entry->tag);

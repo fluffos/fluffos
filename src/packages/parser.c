@@ -525,7 +525,7 @@ void f_parse_refresh PROT((void)) {
     
     if (!(pi = current_object->pinfo))
         error("/%s is not known by the parser.  Call parse_init() first.\n",
-              current_object->name);
+              current_object->obname);
 
     if (pi->flags & PI_SETUP) {
         pi->flags &= PI_VERB_HANDLER;
@@ -788,7 +788,7 @@ static void interrogate_object P1(object_t *, ob) {
     if (ob->pinfo->flags & PI_SETUP && !(ob->pinfo->flags & PI_REFRESH))
         return;
     
-    DEBUG_P(("Interogating /%s.", ob->name));
+    DEBUG_P(("Interogating /%s.", ob->obname));
     
     DEBUG_PP(("[%s]", APPLY_NOUN));
     ret = apply(APPLY_NOUN, ob, 0, ORIGIN_DRIVER);
@@ -1046,7 +1046,7 @@ static void add_to_hash_table P2(object_t *, ob, int, index) {
     if (!pi) /* woops.  Dested during parse_command_users() or something
                 similarly nasty. */
         return;
-    DEBUG_PP(("add_to_hash_table: /%s", ob->name));
+    DEBUG_PP(("add_to_hash_table: /%s", ob->obname));
     for (i = 0; i < pi->num_ids; i++) {
         he = add_hash_entry(pi->ids[i]);
         he->flags |= HV_NOUN;
@@ -1082,7 +1082,7 @@ static void init_users() {
         if (master_user_list->item[i].type == T_OBJECT
             && (ob = master_user_list->item[i].u.ob)->pinfo
             && NEED_REFRESH(ob)) {
-            DEBUG_PP(("adding: /%s", ob->name));
+            DEBUG_PP(("adding: /%s", ob->obname));
             if (num_objects == MAX_NUM_OBJECTS)
                 return;
             loaded_objects[num_objects++] = ob;
@@ -1945,7 +1945,7 @@ static int check_functions P2(object_t *, obj, parse_state_t *, state) {
             SET_OB(parse_vn->handler);
         args = make_function(func, EndOf(func), 0, state, try % 4, obj);
         args += push_real_names(try % 4, 0);
-        DEBUG_P(("Trying %s ... (/%s)", func, ob->name));
+        DEBUG_P(("Trying %s ... (/%s)", func, ob->obname));
         ret = process_answer(state, apply(func, ob, args, ORIGIN_DRIVER), 0);
         if (ob->flags & O_DESTRUCTED)
             return 0;
@@ -2014,7 +2014,7 @@ static int parallel_check_functions P3(object_t *, obj,
             SET_OB(parse_vn->handler);
         args = make_function(func, EndOf(func), which, state, try % 4, obj);
         args += push_real_names(try % 4, which);
-        DEBUG_P(("Trying %s ... (/%s)", func, ob->name));
+        DEBUG_P(("Trying %s ... (/%s)", func, ob->obname));
         ret = parallel_process_answer(state, apply(func, ob, args, ORIGIN_DRIVER), which);
         if (ob->flags & O_DESTRUCTED)
             return 0;
@@ -2600,7 +2600,7 @@ static void we_are_finished P1(parse_state_t *, state) {
             }
         }
         DEBUG_P(("Saving successful match: %s (%s)", best_result->res[0].func,
-                 best_result->ob->name));
+                 best_result->ob->obname));
     }
     DEBUG_DEC;
 }
@@ -2633,7 +2633,7 @@ static void do_the_call PROT((void)) {
                   best_result->res[i].num, ORIGIN_DRIVER)) return;
     }
     error("Parse accepted, but no do_* function found in object /%s!\n",
-          ob->name);
+          ob->obname);
 }
 
 static void parse_rule P1(parse_state_t *, state) {
@@ -3031,7 +3031,7 @@ static svalue_t * get_the_error P2(parser_error_t *, err, int, obj) {
 void f_parse_sentence PROT((void)) {
     if (!current_object->pinfo)
         error("/%s is not known by the parser.  Call parse_init() first.\n",
-              current_object->name);
+              current_object->obname);
 
     if (pi)
         error("Illegal to call parse_sentence() recursively.\n");
@@ -3106,10 +3106,10 @@ void f_parse_my_rules PROT((void)) {
     
     if (!(sp-1)->u.ob->pinfo)
         error("/%s is not known by the parser.  Call parse_init() first.\n",
-              (sp-1)->u.ob->name);
+              (sp-1)->u.ob->obname);
     if (!current_object->pinfo)
         error("/%s is not known by the parser.  Call parse_init() first.\n",
-              current_object->name);
+              current_object->obname);
 
     if (pi)
         error("Illegal to call parse_sentence() recursively.\n");
@@ -3207,7 +3207,7 @@ void f_parse_add_rule() {
     handler = current_object;
     if (!(handler->pinfo))
         error("/%s is not known by the parser.  Call parse_init() first.\n",
-              handler->name);
+              handler->obname);
 
     /* We need the literals */
     interrogate_master();
@@ -3411,7 +3411,7 @@ void f_parse_dump PROT((void))
                 continue;
             }
             while (vn) {
-                outbuf_addv(&ob, "  (/%s) %s\n", vn->handler->name, rule_string(vn));
+                outbuf_addv(&ob, "  (/%s) %s\n", vn->handler->obname, rule_string(vn));
                 vn = vn->next;
             }
         }

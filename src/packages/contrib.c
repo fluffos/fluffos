@@ -26,6 +26,8 @@
 #include "../add_action.h"
 #endif
 
+#define MAX_COLOUR_STRING 200
+
 /* should be done in configure */
 #ifdef WIN32
 #define strcasecmp(X, Y) stricmp(X, Y)
@@ -529,7 +531,8 @@ f_terminal_colour PROT((void))
 {
     const char *instr, *cp, **parts;
     char *savestr, *deststr, *ncp;
-    char curcolour[100];
+    char curcolour[MAX_COLOUR_STRING];
+    int curcolourlen;
     const char *resetstr;
     char *resetstrname;
     int resetstrlen;
@@ -604,7 +607,7 @@ f_terminal_colour PROT((void))
             // Check and make sure we have an end marker.
             if (newstr) {
                 *newstr = 0;
-                // No idea why this would occur.
+                // %^ at start of the text
                 if (newstr > instr) {
                     if (num && num % NSTRSEGS == 0) {
                         // Increase the size of the parts array.
@@ -647,6 +650,8 @@ f_terminal_colour PROT((void))
 
     // First setup some little things.
     curcolour[0] = 0;
+    curcolourlen = 0;
+
     // Find the reset colour string.
     resetstrname = findstring("RESET");
     k = sp->u.map->table_size;
@@ -684,9 +689,11 @@ f_terminal_colour PROT((void))
                     // Do stuff for continueing colour codes.
                     if (!strcmp(resetstr, parts[i])) {
                         curcolour[0] = 0;
+			curcolourlen =0;
                     } else {
-                        if (strlen(curcolour) + strlen((elt->values + 1)->u.string) < 100) {
+		        if (curcolourlen + strlen((elt->values + 1)->u.string) < MAX_COLOUR_STRING - 1) {
                            strcat(curcolour, (elt->values + 1)->u.string);
+			   curcolourlen += strlen((elt->values + 1)->u.string);
                         }
                     }
                     break;
@@ -744,8 +751,8 @@ f_terminal_colour PROT((void))
                     col = 0;
                     space = space_buflen = 0;
                     start = -1;
-                    j += resetstrlen + strlen(curcolour);
-                    buflen += resetstrlen + strlen(curcolour);
+		    j += resetstrlen + curcolourlen;
+		    buflen += resetstrlen + curcolourlen;
                     max_buflen = (buflen > max_buflen ? buflen : max_buflen);
                     buflen = 0;
                 } else {
@@ -769,17 +776,17 @@ f_terminal_colour PROT((void))
                             }
                             col -= space;
                             space = 0;
-                            j += resetstrlen + strlen(curcolour);
-                            buflen += resetstrlen + strlen(curcolour);
-                            max_buflen = (buflen > max_buflen ? buflen : max_buflen);
+                            j += resetstrlen + curcolourlen;
+			    buflen += resetstrlen + curcolourlen;
+			    max_buflen = (buflen > max_buflen ? buflen : max_buflen);
                             buflen -= space_buflen;
                             space_buflen = 0;
                         } else {
                             j++;
                             col = 1;
-                            j += resetstrlen + strlen(curcolour);
-                            buflen += resetstrlen + strlen(curcolour);
-                            max_buflen = (buflen > max_buflen ? buflen : max_buflen);
+			    j += resetstrlen + curcolourlen;
+			    buflen += resetstrlen + curcolourlen;
+			    max_buflen = (buflen > max_buflen ? buflen : max_buflen);
                             buflen = 1;
                         }
                         start = indent;
@@ -822,7 +829,8 @@ f_terminal_colour PROT((void))
         space = 0;
         buflen = space_buflen = 0;
         curcolour[0] = 0;
-        for (i = 0; i < num; i++) {
+        curcolourlen = 0;
+	for (i = 0; i < num; i++) {
             int kind;
             const char *p = parts[i];
             if (lens[i] < 0) {
@@ -834,10 +842,12 @@ f_terminal_colour PROT((void))
                 // Do stuff for continueing colour codes.
                 if (!strcmp(p, resetstr)) {
                     curcolour[0] = 0;
-                } else {
-                    if (strlen(curcolour) + strlen(p)) {
+		    curcolourlen = 0;
+		} else {
+		    if (curcolourlen + strlen(p) < MAX_COLOUR_STRING) {
                            strcat(curcolour, p);
-                    }
+			   curcolourlen += strlen(p);
+		    }
                 }
                 continue;
             }
@@ -908,8 +918,8 @@ f_terminal_colour PROT((void))
                    ncp += endpad;
                 }
                 *ncp++ = '\n';
-                memcpy(ncp, curcolour, strlen(curcolour));
-                ncp += strlen(curcolour);
+                memcpy(ncp, curcolour, curcolourlen);
+		ncp += curcolourlen;
                 // Back to the normal code again.
                 memmove(tmp, tmp + n, buflen);
                 pt = tmp + buflen;
@@ -1149,6 +1159,16 @@ static char *pluralize P1(const char *, str) {
             suffix = "en";
         }
         break;
+    case 'P':
+    case 'p':
+      if (!strcasecmp(rel + 1, "ants"))
+	found = PLURAL_SAME;
+      break;
+    case 'R':
+    case 'r':
+      if (!strcasecmp(rel + 1, "oof"))
+	found = PLURAL_SUFFIX;
+      break;
     case 'S':
     case 's':
         if (!strcasecmp(rel + 1, "niff")) {

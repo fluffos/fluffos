@@ -115,7 +115,6 @@ INSTALL_DIR="../bin"
 # SCO 3.2v4.2
 # ARCH: *sigh* and this one ...
 #OSFLAGS=-DSCO
-OSFLAGS=-DHAVE_ZLIB
 # try uncommenting this if you are using gcc and at runtime you see socket
 # errors saying that the "set socket nonblocking" operation is not supported.
 # That error is caused by old-style macros (that gcc doesn't normally grok)
@@ -124,7 +123,6 @@ OSFLAGS=-DHAVE_ZLIB
 
 # Location of libmsgql.a, if you are using PACKAGE_DB
 #EXTRALIBS=-L/usr/local/lib -lmsql
-EXTRALIBS=-Lzlib
 ####### END OF USER CONFIGURABLE OPTIONS
 
 echo "Trying out some stuff to see what works; ignore errors ..."

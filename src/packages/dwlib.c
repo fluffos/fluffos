@@ -288,7 +288,7 @@ f_query_multiple_short PROT((void))
     }
 
 
-        query_multiple_short(sv, type, no_dollars, quiet, dark, st_num_arg);
+    query_multiple_short(sv, type, no_dollars, quiet, dark, st_num_arg);
 }
 
 #endif
@@ -537,6 +537,17 @@ f_reference_allowed PROT((void))
 
 #endif
 
+#ifdef F_ELEMENT_OF
+void f_element_of PROT((void)){
+  array_t *arr = sp->u.arr;
+  if(!arr->size){
+    free_array(arr);
+    error("Can't take element from empty array");
+  }
+  assign_svalue_no_free(sp, &arr->item[random_number(arr->size)]);
+  free_array(arr);
+}
+#endif
 #ifdef F_SHUFFLE
 
 /* shuffle efun, based on LPC shuffle simul efun.
