@@ -1715,6 +1715,37 @@ promote_to_int P1(parse_node_t *, node) {
     return expr;
 }
 
+int convert_type P1(int, type){
+    switch(type & (~DECL_MODS)) {
+    case TYPE_UNKNOWN:
+    case TYPE_NOVALUE:
+    case TYPE_VOID:
+        return T_INVALID;
+    case TYPE_ANY:
+        return T_ANY;
+    case TYPE_NUMBER:
+        return T_NUMBER;
+    case TYPE_STRING:
+        return T_STRING;
+    case TYPE_OBJECT:
+        return T_OBJECT;
+    case TYPE_MAPPING:
+        return T_MAPPING;
+    case TYPE_FUNCTION:
+        return T_FUNCTION;
+    case TYPE_REAL:
+        return T_REAL;
+    case TYPE_BUFFER:
+        return T_BUFFER;
+    default:
+        if(type & TYPE_MOD_ARRAY)
+            return T_ARRAY;
+        else if(type & TYPE_MOD_CLASS)
+            return T_CLASS;
+        else
+            return T_ANY; //we probably forgot one then, should we get here
+    }
+}
 
 parse_node_t *add_type_check P2(parse_node_t *, node, int, intype) {
     parse_node_t *expr, *expr2;

@@ -130,7 +130,7 @@
  * The MudOS driver has evolved quite a bit over the years.  These defines  *
  * are mainly to preserve old behavior in case people didn't want to        *
  * rewrite the relevant portions of their code.                             *
- *									    *
+ *                                                                          *
  * In most cases, code which needs these defines should be rewritten when   *
  * possible.  The 'Compat status' field is designed to give an idea how     *
  * likely it is that support for that option will be removed in the near    *
@@ -166,7 +166,7 @@
  * are ever stripped.  So the example above gives
  * ({ "", "", "x", "y", "", "z", "", "" }).
  */
-#define SANE_EXPLODE_STRING
+#undef SANE_EXPLODE_STRING
 #undef REVERSIBLE_EXPLODE_STRING
 
 /* CAST_CALL_OTHERS: define this if you want to require casting of call_other's;
@@ -184,7 +184,7 @@
  * Compat status: Easy to support, and also on the "It's a bug!  No, it's
  * a feature!" religious war list.
  */
-#define NONINTERACTIVE_STDERR_WRITE
+#undef NONINTERACTIVE_STDERR_WRITE
 
 /* NO_LIGHT: define this to disable the set_light() and driver maintenance
  *   of light levels in objects.  You can simulate it via LPC if you want...
@@ -199,11 +199,14 @@
  * Compat status: next to impossible to simulate, hard to replace, and 
  * very, very widely used.
  */
-#undef NO_ADD_ACTION
+#define NO_ADD_ACTION
 
 /* NO_SNOOP: disables the snoop() efun and all related functionality.
  */
 #undef NO_SNOOP
+
+/* NO_ADD_ACTION: define this to remove add_action, commands, livings, etc.
+   process_input() then becomes the only way to deal with player input. */
 
 /* NO_ENVIRONMENT: define this to remove the handling of object containment
  * relationships by the driver 
@@ -357,7 +360,7 @@
  *   always specify a full path to the config file when starting the driver.
  */
 #ifndef LATTICE
-#define CONFIG_FILE_DIR "/u/tim/COMP/bin"
+#define CONFIG_FILE_DIR "/home/atuin/bin"
 #else
 #define CONFIG_FILE_DIR "etc:"
 #endif
@@ -418,14 +421,6 @@
  *   set up to use .o thus we leave .o as the default).
  */
 #define SAVE_EXTENSION ".o"
-
-/* SAVE_GZ_EXTENSION: defines the file extension used by save_object().
- *   and restore_object() when compressing.
- *   Some sysadmins run scripts that periodically
- *   scan for and remove files ending in .o (but many mudlibs are already
- *   set up to use .o thus we leave .o as the default).
- */
-#define SAVE_GZ_EXTENSION ".o.gz"
 
 /* NO_ANSI: define if you wish to disallow users from typing in commands that
  *   contain ANSI escape sequences.  Defining NO_ANSI causes all escapes
@@ -519,7 +514,7 @@
  *   sent directly via add_message()).  This is useful if you want to
  *   build a smart client that does something different with snoop messages.
  */
-#undef RECEIVE_SNOOP
+#define RECEIVE_SNOOP
 
 /* PROFILE_FUNCTIONS: define this to be able to measure the CPU time used by
  *   all of the user-defined functions in each LPC object.  Note: defining
@@ -562,7 +557,7 @@
  *
  * A side effect is that 'array' cannot be a variable or function name.
  */
-#define ARRAY_RESERVED_WORD
+#undef ARRAY_RESERVED_WORD
 
 /* REF_RESERVED_WORD: If this is defined then the word 'ref' can be
  *   used to pass arguments to functions by value.  Example:
@@ -628,11 +623,11 @@
 /* PACKAGE_EXTERNAL: Allows the driver to exec() commands specified in the
  * config file.
  */
-#undef PACKAGE_EXTERNAL
+#define PACKAGE_EXTERNAL
 
 /* NUM_EXTERNAL_CMDS: the number of external commands supported */
 #ifdef PACKAGE_EXTERNAL
-#define NUM_EXTERNAL_CMDS
+#define NUM_EXTERNAL_CMDS 100
 #endif
 
 /* PACKAGE_DB: efuns for external database access using msql */
@@ -642,9 +637,10 @@
  * databases
  */
 #ifdef PACKAGE_DB
-#define USE_MSQL 1		/* MiniSQL, it's small; it's free */
-#undef USE_MYSQL 2		/* MySQL, bigger; it's free */
-#define DEFAULT_DB USE_MSQL	/* default database */
+#undef USE_MSQL 
+#undef MSQL
+#define USE_MYSQL 2
+#define MY_SQL
 #endif
 
 /****************************************************************************
@@ -664,19 +660,19 @@
  * PACKAGE_UIDS: define this if you want a driver that does use uids.
  *
  */
-#undef PACKAGE_UIDS
+#define PACKAGE_UIDS
 
 /* AUTO_SETEUID: when an object is created it's euid is automatically set to
  *   the equivalent of seteuid(getuid(this_object())).  undef AUTO_SETEUID
  *   if you would rather have the euid of the created object be set to 0.
  */
-#undef AUTO_SETEUID
+#define AUTO_SETEUID
 
 /* AUTO_TRUST_BACKBONE: define this if you want objects with the backbone
  *   uid to automatically be trusted and to have their euid set to the uid of
  *   the object that forced the object's creation.
  */
-#define AUTO_TRUST_BACKBONE
+#undef AUTO_TRUST_BACKBONE
 
 /*************************************************************************
  *                       FOR EXPERIENCED USERS                           *
@@ -716,7 +712,7 @@
  * prime to any common call_out lengths.  If all this is too confusing, 32
  * isn't a bad number :-)
  */
-#define CALLOUT_CYCLE_SIZE 32
+#define CALLOUT_CYCLE_SIZE 512
 
 /* LARGEST_PRINTABLE_STRING: defines the size of the vsprintf() buffer in
  *   comm.c's add_message(). Instead of blindly making this value larger,
@@ -743,7 +739,7 @@
  * 14      16384           256k
  * 16      65536             1M
  */
-#define APPLY_CACHE_BITS 12
+#define APPLY_CACHE_BITS 20
 
 /* CACHE_STATS: define this if you want call_other (apply_low) cache 
  * statistics.  Causes HAS_CACHE_STATS to be defined in all LPC objects.
@@ -753,7 +749,7 @@
 /* TRACE: define this to enable the trace() and traceprefix() efuns.
  *   (keeping this undefined will cause the driver to run faster).
  */
-#undef TRACE
+#define TRACE
 
 /* LPC_TO_C: define this to enable LPC->C compilation.
  *
@@ -767,7 +763,7 @@
  *
  * Note: This currently only works on machines that have the dlopen() system
  * call.  SunOS and IRIX do, as do a number of others.  AIX and Ultrix don't.
- * Linux does if you are using ELF.  Versions of FreeBSD prior to 3.0 don't.
+ * Linux does if you are using ELF.
  */
 #undef RUNTIME_LOADING
 
@@ -784,37 +780,37 @@
  */
 #define HEART_BEAT_CHUNK      32
 
-/* GET_CHAR_IS_BUFFERED: Normally get_char() is unbuffered.  That is, once
- * a character is received for get_char(), anything else is in the input
- * stream is immediately thrown away.  This can be very undesirable, especially
- * if you're calling get_char() again from the handler from the previous call.
- * Define this if you want get_char() to be buffered.  In this case, the buffer
- * will only get flushed if get_char() is not called from the first get_char()'s
- * LPC callback handler.
+/* SERVER_IP: For machines with multiple IP addresses, this specifies which
+ * one to use.  This is useful for IP accounting and is necessary to be
+ * able to do ident lookups on such machines.
+ *
+ * example: #define SERVER_IP "194.229.18.27"
  */
-#undef GET_CHAR_IS_BUFFERED
+#undef SERVER_IP
 
 /* Some maximum string sizes
  */
 #define SMALL_STRING_SIZE     100
 #define LARGE_STRING_SIZE     1000
+#define COMMAND_BUF_SIZE      2000
 
 /* Number of levels of nested datastructures allowed -- this limit prevents
  * crashes from occuring when saving objects containing variables containing
  * recursive datastructures (with circular references).
  */
-#define MAX_SAVE_SVALUE_DEPTH 25
+#define MAX_SAVE_SVALUE_DEPTH 100
 
 /* Miscellaneous config options that should probably be in the runtime
  * config file.
  */
 /* MAX_LOCAL: maximum number of local variables allowed per LPC function */
-#define CFG_MAX_LOCAL_VARIABLES		25
+#define CFG_MAX_LOCAL_VARIABLES         50
 
-#define CFG_EVALUATOR_STACK_SIZE 	1000
-#define CFG_MAX_CALL_DEPTH		50
+#define CFG_EVALUATOR_STACK_SIZE        3000
+#define CFG_COMPILER_STACK_SIZE         600
+#define CFG_MAX_CALL_DEPTH              150
 /* This must be one of 4, 16, 64, 256, 1024, 4096 */
-#define CFG_LIVING_HASH_SIZE		256
+#define CFG_LIVING_HASH_SIZE            256
 
 /* NEXT_MALLOC_DEBUG: define this if using a NeXT and you want to enable
  *   the malloc_check() and/or malloc_debug() efuns.  Run the 'man malloc_debug'
@@ -843,4 +839,30 @@
  */
 #define NEXT_MALLOC_DEBUG
 
+
+/* GET_CHAR_IS_BUFFERED: Normally get_char() is unbuffered.  That is, once
+ * a character is received for get_char(), anything else is in the input
+ * stream is immediately thrown away.  This can be very undesirable, especially
+ * if you're calling get_char() again from the handler from the previous call.
+ * Define this if you want get_char() to be buffered.  In this case, the buffer
+ * will only get flushed if get_char() is not called from the first get_char()'s
+ * LPC callback handler.
+ */
+#undef GET_CHAR_IS_BUFFERED
+
+/* PACKAGE_COMPRESS: Enable MCCP support and compressed save files
+   SAVE_GZ_EXTENSION: save extension for compressed files
+ */
+#define PACKAGE_COMPRESS
+#define SAVE_GZ_EXTENSION ".o.gz"
+
+/* USE_FLUFF_MOD: use the fluff kernel module, this cuts most of the overhead
+ * in the evaluation cost calculations (syscalls to get the time)
+ */
+#undef USE_FLUFF_MOD
+
+/* CALL_OTHER_TYPE_CHECK: enable type checking for call_other()
+ * (-> operator on objects)
+ */
+#undef CALL_OTHER_TYPE_CHECK
 #endif

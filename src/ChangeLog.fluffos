@@ -1,0 +1,40 @@
+As MudOS is moving to slow to keep our driver hacks apart, we now call our own FluffOS :)
+changes since MudOS v22.2b11 (as far as i can remember)
+Type warnings added
+compressed save files
+eval limit is now based on time taken, rather than substracting random numbers to account for actions.
+
+Many bug fixes :)
+
+Wodan.
+
+new in FluffOS 1.6:
+this changelog is now in the FluffOS archive!
+fixed crasher in dumpstat (used by mem_info)
+added (optional) type checking for call_other calls
+changed variable assignment type checking from warnings to errors, using the
+	parser's warning system changed the current file/line variables, and
+	this could happen during compilation...
+updated options.h
+
+new in FluffOS 1.5:
+fixed crasher after errors in save_object. (reported by pinkfish)
+fixed crasher in interpret caused by find_line return a pointer to a local var
+fixed crasher with switch statements that only contain a default case, they are no longer allowed (reported by Vashti)
+
+new in FluffOS 1.4:
+added compressedp efun, it shows if an interactive uses MCCP (pinkfish)
+fixed crasher in type checking code during compilation error (reported by sightblinder)
+fixed crasher in compressedp
+
+new in FluffOS 1.3:
+fixed crasher with buffer overflow in output
+fixed loading compressed save files
+
+new in FluffOS 1.2:
+updated with respect to MudOS v22.2b12
+fixed eval cost bug for first object loaded after the preload
+increased line buffer size for loading compressed save files
+
+new in FluffOS 1.1:
+Uses a kernal module to get cpu times.

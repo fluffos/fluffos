@@ -3656,19 +3656,14 @@ eval_instruction P1(char *, p)
     push_number(usec);
     break;
       }
-        case F_TYPE_CHECK:
-            {
-                int type = sp->u.number;
-                pop_stack();
-                if(sp->type != type && !(sp->type == T_NUMBER && sp->u.number == 0))
-                    {
-            char buf[255];
-                        sprintf(buf, "Trying to put %s in %s\n", type_name(sp->type), type_name(type));
-      find_line(pc, current_prog, &current_file, &current_line);
-      yywarn(buf);
-                    }
-            }
-            break;
+  case F_TYPE_CHECK:
+      {
+    int type = sp->u.number;
+    pop_stack();
+    if(sp->type != type && !(sp->type == T_NUMBER && sp->u.number == 0))
+      error("Trying to put %s in %s\n", type_name(sp->type), type_name(type));
+    break;
+      }
 #define Instruction (instruction + ONEARG_MAX)
 #ifdef DEBUG
 #define CALL_THE_EFUN goto call_the_efun
@@ -3963,6 +3958,43 @@ void mark_apply_low_cache() {
 }
 #endif
 
+void check_co_args2 P4(unsigned short *, types, int, num_arg, char *, name, char *, ob_name){
+  int argc = num_arg;
+  int exptype, i = 0;
+  do{
+    argc--;
+    exptype = convert_type(types[i++]);
+    if(exptype == T_ANY)
+      continue;
+    
+    if((sp-argc)->type != exptype){
+      if((sp-argc)->type == T_NUMBER && !(sp-argc)->u.number)
+        continue;
+      if(!current_prog)
+        current_prog = master_ob->prog;
+      error("Bad argument %d in call to %s in %s()\nExpected: %s Got %s.\n",
+            num_arg - argc, name, ob_name, 
+            type_name(exptype), type_name((sp-argc)->type));
+    }
+  } while (argc);
+}
+
+void check_co_args P4(int, num_arg, program_t *, prog, function_t *, fun, int, index) {
+#ifdef CALL_OTHER_TYPE_CHECK
+  if(num_arg != fun->num_arg){
+    if(!current_prog)
+      current_prog = master_ob->prog;
+    error("Wrong number of arguments to %s in %s.\n", fun->name, prog->name);
+  }
+          
+  if(num_arg && prog->type_start &&
+     prog->type_start[index] != INDEX_START_NONE)
+    check_co_args2(&prog->argument_types[prog->type_start[index]], num_arg,
+                   fun->name, prog->name);
+#endif
+}
+
+
 int apply_low P3(char *, fun, object_t *, ob, int, num_arg)
 {
     /*
@@ -4044,6 +4076,9 @@ int apply_low P3(char *, fun, object_t *, ob, int, num_arg)
      * the cache will tell us in which program the function is,
      * and where
      */
+    if(!(funflags & FUNC_VARARGS))
+      check_co_args(num_arg, entry->progp, funp, index);
+
     push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);
     current_prog = entry->progp;
     caller_type = local_call_origin;
@@ -4114,6 +4149,10 @@ int apply_low P3(char *, fun, object_t *, ob, int, num_arg)
       need = (local_call_origin == ORIGIN_DRIVER ? DECL_HIDDEN : ((current_object == ob || local_call_origin == ORIGIN_INTERNAL) ? DECL_PROTECTED : DECL_PUBLIC));
   
       if ((funflags & DECL_ACCESS) >= need) {
+
+    if(!(funflags & FUNC_VARARGS))
+      check_co_args(num_arg, prog, funp, index);
+    
     push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);
     current_prog = prog;
     caller_type = local_call_origin;
