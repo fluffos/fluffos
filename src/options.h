@@ -662,6 +662,11 @@
  */
 #define PACKAGE_UIDS
 
+/*PACKAGE DWLIB: some discworld mudlib simuls coded in C (well just one right
+  now) */
+
+#define PACKAGE_DWLIB
+
 /* AUTO_SETEUID: when an object is created it's euid is automatically set to
  *   the equivalent of seteuid(getuid(this_object())).  undef AUTO_SETEUID
  *   if you would rather have the euid of the created object be set to 0.

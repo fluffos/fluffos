@@ -74,7 +74,7 @@ int call_out(string | function, int,...);
 #else
 void call_out(string | function, int,...);
 #endif
-int member_array(mixed, string | mixed *, void | int);
+int member_array(mixed, string | mixed *, void | int, void | int);
 int input_to(string | function,...);
 int random(int);
 
@@ -129,7 +129,7 @@ void tell_object(object, string);
 void shout(string);
 void receive(string OR_BUFFER);
 void message(mixed, mixed, string | string * | object | object *,
-	          void | object | object *);
+                  void | object | object *);
 
 /* the find_* functions */
 
@@ -307,7 +307,7 @@ void message(mixed, mixed, string | string * | object | object *,
 /* privledge functions */
     string query_privs(object default:F__THIS_OBJECT);
     void set_privs(object, int | string);
-#endif				/* PRIVS */
+#endif                          /* PRIVS */
 
     int get_char(string | function,...);
     object *children(string);
@@ -324,7 +324,7 @@ void message(mixed, mixed, string | string * | object | object *,
 #ifndef WIN32
 #if (defined(RUSAGE) || defined(GET_PROCESS_STATS) || defined(TIMES)) || defined(LATTICE)
     mapping rusage();
-#endif				/* RUSAGE */
+#endif                          /* RUSAGE */
 #endif
 
     void flush_messages(void | object);
@@ -392,7 +392,7 @@ void message(mixed, mixed, string | string * | object | object *,
 #endif
 
 #ifdef DEBUG
-    void swap(object);		/* Only used for debugging */
+    void swap(object);          /* Only used for debugging */
 #endif
     int resolve(string, string|function);
 

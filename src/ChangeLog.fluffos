@@ -8,6 +8,14 @@ Many bug fixes :)
 
 Wodan.
 
+new in FluffOS 1.7:
+return of the event() efun
+member_array extended for partial searches and searching from the end of the
+	array
+query_num(): returns the int argument as a string in the (1 -> one), optional
+	second argument specifies where it starts returning "many" 
+query_multiple_short(): see discworld lib docs, done by Taffyd.
+
 new in FluffOS 1.6:
 this changelog is now in the FluffOS archive!
 fixed crasher in dumpstat (used by mem_info)

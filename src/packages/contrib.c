@@ -1938,3 +1938,193 @@ void f_network_stats PROT((void))
     push_refed_mapping(m);
 }
 #endif
+
+#ifdef F_EVENT
+
+
+/* EVENTS!
+ * Okay. This is pretty simple.
+ * Calls the function "event_"+event_name in the object specified.
+ * If the object is an array, calls it in each.
+ * If the object is a room, call it on its inventory.
+ *  [Incorrect: actually calls it on all_inventory() of any object but
+ *   only if addressed uniquely]
+ * Passes all the parameters too.
+ */
+
+#define EVENT_PREFIX "event_"
+
+void event P4 (svalue_t *, event_ob, char *, event_fun, int, numparam,
+               svalue_t *, event_param){
+
+  object_t *ob, *origin;
+  char *name;
+  int i;
+
+  origin = current_object;
+
+  name = new_string(strlen (event_fun) + strlen (EVENT_PREFIX) + 1,
+                    "newmoon.c: au_event");
+  push_malloced_string (name);
+
+  strcpy (name, EVENT_PREFIX);
+  strcat (name, event_fun);
+
+  if (event_ob->type == T_ARRAY)
+    {
+      int ind;
+
+      for (ind = 0; ind < event_ob->u.arr->size; ind++)
+        {
+          if (event_ob->u.arr->item[ind].type != T_OBJECT ||
+              event_ob->u.arr->item[ind].u.ob->flags &
+              O_DESTRUCTED)
+            continue;
+
+          push_object (origin);
+          for (i = 0; i < numparam; i++)
+            push_svalue (event_param + i);
+
+                    apply (name, event_ob->u.arr->item[ind].u.ob,
+                 numparam + 1, ORIGIN_EFUN);
+        }
+    }
+  else if(event_ob->type == T_OBJECT)
+    {
+      /* First we call the event on the object itself */
+
+      push_object (origin);
+      for (i = 0; i < numparam; i++)
+        push_svalue (event_param + i);
+
+      apply (name, event_ob->u.ob, numparam + 1, ORIGIN_EFUN);
+
+      /* And then call it on it's inventory... */
+
+      for (ob = event_ob->u.ob->contains; ob; ob = ob->next_inv)
+        {
+          if (ob == origin)
+            continue;
+
+          if (ob->flags & O_DESTRUCTED)
+            continue;
+
+          push_object (origin);
+          for (i = 0; i < numparam; i++)
+            push_svalue (event_param + i);
+
+          apply (name, ob, numparam + 1, ORIGIN_EFUN);
+        }
+    }
+  sp--;
+  FREE_MSTR (name);
+}
+
+void f_event PROT ((void)){
+
+  int num;
+
+  num = st_num_arg;
+
+  event ((sp - num + 1), (sp - num + 2)->u.string, num - 2, (sp - num + 3));
+
+  pop_n_elems(num);
+}
+#endif
+
+
+#ifdef F_QUERY_NUM
+void number_as_string P2(char *, buf, int, n){
+  char *low[] =  { "ten", "eleven", "twelve", "thirteen",
+                     "fourteen", "fifteen", "sixteen", "seventeen",
+                     "eighteen", "nineteen" };
+  char *hi[] =  { "", "", "twenty", "thirty", "forty", "fifty", "sixty",
+                    "seventy", "eighty", "ninety"};
+  char *single[] =  { "", "one", "two", "three", "four", "five", "six",
+                       "seven", "eight", "nine"};
+  if(!n){
+    strcat(buf, "zero");
+    return;
+  }
+
+  if(n<20 && n>9){
+    strcat(buf, low[n-10]);
+    return;
+  }
+
+  strcat(buf,hi[n/10]);
+
+  if ((n>20) && (n%10))
+    strcat(buf, "-");
+  n %= 10;
+
+  strcat(buf, single[n]);
+}
+
+void f_query_num PROT((void)){
+  char ret[100];
+  int size, i;
+  int n, limit;
+  int changed = 0;
+  char *res;
+
+  ret[0] = 0;
+  limit = sp->u.number;
+  pop_stack();
+  n = sp->u.number;
+  //  pop_stack();
+  
+  if ((limit && n>limit) || (n<0) || (n>99999)) {
+    strcpy(ret,  "many"); /* this is a little pointless ... */
+    goto q_n_end;
+  } 
+
+  if ((i = n/1000)) {
+    n = n%1000;
+    if (!n){
+      number_as_string(ret, i);
+      strcat(ret, " thousand");
+      goto q_n_end;
+    }
+
+    number_as_string(ret, i);
+    strcat(ret, " thousand");
+    changed = 1;
+  }
+  
+  if ((i = n/100)) {
+    n = n%100;
+    if (changed) {
+      if (!n){
+        strcat(ret, " and ");
+        number_as_string(ret, i);
+        strcat(ret, " hundred");
+        goto q_n_end;
+      }
+      strcat(ret, ", ");
+      number_as_string(ret, i);
+      strcat(ret, " hundred");
+    } else {
+      if (!n){
+        number_as_string(ret, i);
+        strcat(ret, " hundred");
+        goto q_n_end;
+      }
+      number_as_string(ret, i);
+      strcat(ret, " hundred");
+      changed = 1;
+    }
+  }
+  if (changed)
+    strcat(ret, " and ");
+
+  number_as_string(ret, n);
+  q_n_end:
+  n = strlen(ret);
+  res = new_string(n, "query_num");
+  strcpy(res, ret);
+  put_malloced_string(res);
+}
+
+#endif
+      
