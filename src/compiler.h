@@ -64,10 +64,8 @@
 
 extern struct mem_block mem_block[NUMAREAS];
 
-#define CURRENT_PROGRAM_SIZE (mem_block[current_block].current_size)
-
-#define SET_CURRENT_PROGRAM_SIZE(x) \
-        ( CURRENT_PROGRAM_SIZE = (x) )
+#define CURRENT_PROGRAM_SIZE prog_code - mem_block[current_block].block
+#define UPDATE_PROGRAM_SIZE mem_block[current_block].current_size = CURRENT_PROGRAM_SIZE
 
 #define LOOP_CONTEXT            0x1
 #define SWITCH_CONTEXT          0x2
@@ -116,6 +114,8 @@ extern int exact_types;
 extern int approved_object;
 extern int current_type;
 extern int current_block;
+extern char *prog_code;
+extern char *prog_code_max;
 extern struct program NULL_program;
 extern struct program *prog;
 extern unsigned char string_tags[0x20];
@@ -141,7 +141,7 @@ char *the_file_name PROT((char *));
 int add_local_name PROT((char *, int));
 void free_all_local_names PROT((void));
 int get_id_number PROT((void));
-void compile_file PROT((FILE *, char *));
+void compile_file PROT((int, char *));
 void copy_variables PROT((struct program *, int));
 int copy_functions PROT((struct program *, int));
 void type_error PROT((char *, int));
@@ -158,7 +158,7 @@ int dump_function_table PROT((void));
 #endif
 void prepare_cases PROT((struct parse_node *, int));
 
-/* inlines - if we're luckly, they'll get honored. */
+/* inlines - if we're lucky, they'll get honored. */
 INLINE static void realloc_mem_block PROT((struct mem_block *, int));
 INLINE static void add_to_mem_block PROT((int, char *, int));
 INLINE static void insert_in_mem_block PROT((int, int, int));

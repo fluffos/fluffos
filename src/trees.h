@@ -21,9 +21,9 @@
 #define NODE_SWITCH_DIRECT      -11
 #define NODE_SWITCH_STRINGS     -12
 #define NODE_CASE_NUMBER        -13
-#define NODE_DEFAULT            -14
-#define NODE_IF                 -15
-#define NODE_CASE_STRING        -16
+#define NODE_CASE_STRING        -14
+#define NODE_DEFAULT            -15
+#define NODE_IF                 -16
 
 struct parse_node {
     short kind;
@@ -33,7 +33,6 @@ struct parse_node {
 	int number;
 	float real;
 	struct parse_node *expr;
-	struct parse_node_block *pnblock; /* used by lock_expressions() */
     } v;
     struct parse_node *left;
     struct parse_node *right;
@@ -46,8 +45,7 @@ struct parse_node_block {
 
 #define CREATE_NODE(x,y) (x) = new_node(); (x)->kind = y;
 #define NODE_NO_LINE(x,y) (x) = new_node_no_line(); (x)->kind = y;
-#define CREATE_TYPED_NODE(x, y, z) (x) = new_node(); (x)->kind = y; (x)->type = z;
-extern struct parse_node *last_line_node;
+#define CREATE_TYPED_NODE(x, y, z) (x)=new_node(); (x)->kind=y; (x)->type=z
 
 /* tree functions */
 void free_tree PROT((void));
@@ -57,17 +55,11 @@ void unlock_expressions PROT((void));
 /* node functions */
 struct parse_node *new_node PROT((void));
 struct parse_node *new_node_no_line PROT((void));
-struct parse_node *line_number_node PROT((void));
-struct parse_node *make_node PROT((short, char));
 struct parse_node *make_branched_node PROT((short, char, 
 				struct parse_node *, struct parse_node *));
 /* parser grammar functions */
 struct parse_node *binary_int_op PROT((struct parse_node *, 
 				       struct parse_node *, char, char *));
 struct parse_node *insert_pop_value PROT((struct parse_node *));
-/* line number accounting functions */
-void add_line_number_marker PROT((void));
-void add_file_end_marker PROT((void));
-void add_file_start_marker PROT((char *));
 
 #endif

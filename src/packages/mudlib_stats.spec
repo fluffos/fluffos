@@ -5,4 +5,3 @@
     void set_author(string);
     mapping author_stats(void | string);
 #endif
-#endif

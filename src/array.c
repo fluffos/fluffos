@@ -11,29 +11,16 @@
  * by the MudOS driver.
  */
 
-struct unique {
-    int count;
-    struct svalue *val;
-    struct svalue mark;
-    struct unique *same;
-    struct unique *next;
-};
-
 int num_arrays;
 int total_array_size;
+static struct svalue *arg;
 
-static struct vector *shrink_array PROT((struct vector *, int));
-static struct vector *order_alist PROT((struct vector *));
-static int assoc PROT((struct svalue *, struct vector *));
-static struct vector *intersect_alist PROT((struct vector *, struct vector *));
-static int put_in PROT((struct unique **, struct svalue *, struct svalue *));
 INLINE static int builtin_sort_array_cmp_fwd PROT((struct svalue *, struct svalue *));
 INLINE static int builtin_sort_array_cmp_rev PROT((struct svalue *, struct svalue *));
 INLINE static int sort_array_cmp PROT((struct svalue *, struct svalue *));
 static int deep_inventory_count PROT((struct object *));
 static void deep_inventory_collect PROT((struct object *, struct vector *, int *));
 INLINE static int alist_cmp PROT((struct svalue *, struct svalue *));
-static int search_alist PROT((struct svalue *, struct vector *));
 
 /*
  * Make an empty vector for everyone to use, never to be deallocated.
@@ -62,7 +49,6 @@ INLINE struct vector *
  */
 struct vector *allocate_array P1(int, n)
 {
-    int i;
     struct vector *p;
 
     if (n < 0 || n > max_array_size)
@@ -84,8 +70,31 @@ struct vector *allocate_array P1(int, n)
 	null_stats(&p->stats);
     }
 #endif
-    for (i = n; i--;)
-	p->item[i] = const0;
+    while (n--)
+	p->item[n] = const0;
+    return p;
+}
+
+struct vector *allocate_empty_array P1(int, n)
+{
+    struct vector *p;
+    
+    if (n < 0 || n > max_array_size)
+	error("Illegal array size.\n");
+    if (!n) return null_array();
+    num_arrays++;
+    total_array_size += sizeof(struct vector) + sizeof(struct svalue) * (n-1);
+    p = ALLOC_VECTOR(n);
+    p->ref = 1;
+    p->size = n;
+#ifndef NO_MUDLIB_STATS
+    if (current_object) {
+	assign_stats(&p->stats, current_object);
+	add_array_size(&p->stats, n);
+    } else {
+	null_stats(&p->stats);
+    }
+#endif
     return p;
 }
 
@@ -93,12 +102,11 @@ void free_vector P1(struct vector *, p)
 {
     int i;
 
-    p->ref--;
     /*
      * don't keep track of the null vector since many muds reference it
      * enough times to overflow the ref count which is a short int.
      */
-    if ((p->ref > 0) || (p == &null_vector)) {
+    if ((--(p->ref) > 0) || (p == &null_vector)) {
 	return;
     }
     for (i = p->size; i--;)
@@ -110,23 +118,6 @@ void free_vector P1(struct vector *, p)
     total_array_size -= sizeof(struct vector) + sizeof(struct svalue) *
 	(p->size - 1);
     FREE((char *) p);
-}
-
-static struct vector *shrink_array P2(struct vector *, p, int, n)
-{
-    if (n <= p->size >> 1) {
-	struct vector *res;
-
-	res = slice_array(p, 0, n - 1);
-	free_vector(p);
-	return res;
-    }
-    total_array_size += sizeof(struct svalue) * (n - p->size);
-#ifndef NO_MUDLIB_STATS
-    add_array_size(&p->stats, n - p->size);
-#endif
-    p->size = n;
-    return p;
 }
 
 struct vector *explode_string P2(char *, str, char *, del)
@@ -147,7 +138,7 @@ struct vector *explode_string P2(char *, str, char *, del)
 	if (slen > max_array_size) {
 	    slen = max_array_size;
 	}
-	ret = allocate_array(slen);
+	ret = allocate_empty_array(slen);
 	for (j = 0; j < slen; j++) {
 	    ret->item[j].type = T_STRING;
 	    ret->item[j].subtype = STRING_MALLOC;
@@ -198,7 +189,7 @@ struct vector *explode_string P2(char *, str, char *, del)
 	if (num > max_array_size) {
 	    num = max_array_size;
 	}
-	ret = allocate_array(num);
+	ret = allocate_empty_array(num);
 	limit = max_array_size - 1;	/* extra element can be added after
 					 * loop */
 	for (p = str, beg = str, num = 0; *p && (num < limit);) {
@@ -222,7 +213,6 @@ struct vector *explode_string P2(char *, str, char *, del)
 
 	/* Copy last occurence, if there was not a 'del' at the end. */
 	if (*beg != '\0') {
-	    /* free_svalue(&ret->item[num]); */
 	    ret->item[num].type = T_STRING;
 	    ret->item[num].subtype = STRING_MALLOC;
 	    ret->item[num].u.string = string_copy(beg);
@@ -266,14 +256,13 @@ struct vector *explode_string P2(char *, str, char *, del)
     if (num > max_array_size) {
 	num = max_array_size;
     }
-    ret = allocate_array(num);
+    ret = allocate_empty_array(num);
     limit = max_array_size - 1;	/* extra element can be added after loop */
     for (p = str, beg = str, num = 0; *p && (num < limit);) {
 	if (strncmp(p, del, len) == 0) {
 	    if (num >= ret->size)
 		fatal("Index out of bounds in explode!\n");
 
-	    /* free_svalue(&ret->item[num]); Not needed for new array */
 	    ret->item[num].type = T_STRING;
 	    ret->item[num].subtype = STRING_MALLOC;
 	    ret->item[num].u.string = buff =
@@ -291,7 +280,6 @@ struct vector *explode_string P2(char *, str, char *, del)
 
     /* Copy last occurence, if there was not a 'del' at the end. */
     if (*beg != '\0') {
-	/* free_svalue(&ret->item[num]); */
 	ret->item[num].type = T_STRING;
 	ret->item[num].subtype = STRING_MALLOC;
 	ret->item[num].u.string = string_copy(beg);
@@ -304,10 +292,11 @@ char *implode_string P2(struct vector *, arr, char *, del)
     int size, i, num;
     char *p, *q;
     int del_len;
+    struct svalue *sv = arr->item;
 
     for (i = arr->size, size = 0, num = 0; i--;) {
-	if (arr->item[i].type == T_STRING) {
-	    size += strlen(arr->item[i].u.string);
+	if (sv[i].type & T_STRING) {
+	    size += strlen(sv[i].u.string);
 	    num++;
 	}
     }
@@ -318,13 +307,13 @@ char *implode_string P2(struct vector *, arr, char *, del)
     p = DXALLOC(size + (num - 1) * del_len + 1, 8, "implode_string: p");
     q = p;
     for (i = 0, num = 0; i < arr->size; i++) {
-	if (arr->item[i].type == T_STRING) {
+	if (sv[i].type & T_STRING) {
 	    if (num) {
 		strncpy(p, del, del_len);
 		p += del_len;
 	    }
-	    size = strlen(arr->item[i].u.string);
-	    strncpy(p, arr->item[i].u.string, size);
+	    size = strlen(sv[i].u.string);
+	    strncpy(p, sv[i].u.string, size);
 	    p += size;
 	    num++;
 	}
@@ -333,8 +322,7 @@ char *implode_string P2(struct vector *, arr, char *, del)
     return q;
 }
 
-struct vector *
-       users()
+struct vector *users()
 {
     register struct object *ob;
     int i, j;
@@ -348,7 +336,7 @@ struct vector *
 	    display_hidden = valid_hide(current_object);
 	}
     }
-    ret = allocate_array(num_user - (display_hidden ? 0 : num_hidden));
+    ret = allocate_empty_array(num_user - (display_hidden ? 0 : num_hidden));
     for (i = j = 0; i < MAX_USERS; i++) {
 	if (!all_users[i]) {
 	    continue;
@@ -372,20 +360,37 @@ struct vector *slice_array P3(struct vector *, p, int, from, int, to)
 {
     struct vector *d;
     int cnt;
+    struct svalue *sv1, *sv2;
 
     if (from < 0)
 	from = 0;
-    if (from >= p->size)
-	return null_array();	/* Slice starts above array */
     if (to >= p->size)
 	to = p->size - 1;
-    if (to < from)
+    if (from > to)
 	return null_array();
 
-    d = allocate_array(to - from + 1);
+    d = allocate_empty_array(to - from + 1);
+    sv1 = d->item - from;
+    sv2 = p->item;
     for (cnt = from; cnt <= to; cnt++)
-	assign_svalue_no_free(&d->item[cnt - from], &p->item[cnt]);
+	assign_svalue_no_free(sv1 + cnt, sv2 + cnt);
 
+    return d;
+}
+
+/*
+ * Copy of an array
+ */
+struct vector *copy_array P1(struct vector *, p)
+{
+    struct vector *d;
+    int n;
+    struct svalue *sv1 = p->item, *sv2;
+
+    d = allocate_empty_array(n = p->size);
+    sv2 = d->item;
+    while (n--)
+	assign_svalue_no_free(sv2 + n, sv1 + n);
     return d;
 }
 
@@ -393,19 +398,18 @@ struct vector *slice_array P3(struct vector *, p, int, from, int, to)
 struct vector *commands P1(struct object *, ob)
 {
     struct sentence *s;
-    struct vector *v;
+    struct vector *v, *p;
     int cnt = 0;
+    struct svalue *sv;
 
     for (s = ob->sent; s && s->verb; s = s->next) {
 	if (++cnt == max_array_size) break;
     }
-    v = allocate_array(cnt);
-    cnt = 0;
-    for (s = ob->sent; s && s->verb; s = s->next) {
-	struct vector *p;
-
-	v->item[cnt].type = T_POINTER;
-	v->item[cnt].u.vec = p = allocate_array(4);
+    v = allocate_empty_array(cnt);
+    sv = v->item;
+    for (s = ob->sent; cnt-- && s && s->verb; s = s->next) {
+	sv->type = T_POINTER;
+	(sv++)->u.vec = p = allocate_empty_array(4);
 	p->item[0].type = T_STRING;
 	p->item[0].u.string = ref_string(s->verb);	/* the verb is shared */
 	p->item[0].subtype = STRING_SHARED;
@@ -417,7 +421,6 @@ struct vector *commands P1(struct object *, ob)
 	p->item[3].u.string = ref_string(s->function);
 	p->item[3].subtype = STRING_SHARED;
 	add_ref(s->ob, "commands");
-	if (++cnt == max_array_size) break;
     }
     return v;
 }
@@ -432,13 +435,16 @@ struct vector *commands P1(struct object *, ob)
 
 #ifdef F_FILTER_ARRAY
 void
-f_filter_array P2(int, num_arg, int, instruction)
+f_filter_array PROT((void))
 {
-    struct svalue *arg = sp - num_arg + 1;
+    struct svalue *arg = sp - st_num_arg + 1;
     struct vector *vec = arg->u.vec, *r;
-    int size;
+    int size, num_arg = st_num_arg;
 
-    if ((size = vec->size) < 1) r = null_array();
+    if ((size = vec->size) < 1) {
+	pop_n_elems(num_arg - 1);
+	return;
+    }
     else {
 	struct funp *fp;
 	struct object *ob = 0;
@@ -455,12 +461,12 @@ f_filter_array P2(int, num_arg, int, instruction)
 	} else {    
 	    func = (arg+1)->u.string;
 	    if (num_arg < 3) ob = current_object;
-	    else{
+	    else {
 		if ((arg+2)->type == T_OBJECT) ob = (arg+2)->u.ob;
 		else if ((arg+2)->type == T_STRING){
 		    if ((ob = find_object(arg[2].u.string)) && !object_visible(ob)) ob = 0;
 		}
-		if (!ob) bad_argument(arg+2, T_STRING | T_OBJECT, 3, instruction);
+		if (!ob) bad_argument(arg+2, T_STRING | T_OBJECT, 3, F_FILTER_ARRAY);
 		if (num_arg > 3) extra = arg + 3, numex = num_arg - 3;
 	    }
 	}
@@ -475,7 +481,7 @@ f_filter_array P2(int, num_arg, int, instruction)
 		res++;
 	    } else flags[cnt] = 0;
 	}
-	r = allocate_array(res);
+	r = allocate_empty_array(res);
 	if (res){
 	    while (cnt--) {
 		if (flags[cnt])
@@ -485,11 +491,10 @@ f_filter_array P2(int, num_arg, int, instruction)
 
 	FREE(flags);
 	sp--;
+	pop_n_elems(num_arg - 1);
+	free_vector(vec);
+	sp->u.vec = r;
     }
-
-    pop_n_elems(num_arg);
-    (++sp)->type = T_POINTER;
-    sp->u.vec = r;
 }
 
 #ifdef FILTER_ARRAY
@@ -527,121 +532,157 @@ void c_filter_array P5(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2, 
 /* nonstatic, is used in mappings too */
 int sameval P2(struct svalue *, arg1, struct svalue *, arg2)
 {
-    if (!arg1 || !arg2)
-	return 0;
+    DEBUG_CHECK(!arg1 || !arg2, "Null pointer passed to sameval.\n");
 
-    if (arg1->type == arg2->type) {
-	switch (arg1->type) {
-	case T_NUMBER:
-	    return arg1->u.number == arg2->u.number;
-	case T_POINTER:
-	    return arg1->u.vec == arg2->u.vec;
-	case T_STRING:
-	    return !strcmp(arg1->u.string, arg2->u.string);
-	case T_OBJECT:
-	    return arg1->u.ob == arg2->u.ob;
-	case T_MAPPING:
-	    return arg1->u.map == arg2->u.map;
-	case T_FUNCTION:
-	    return arg1->u.fp == arg2->u.fp;
-	}
+    switch (arg1->type | arg2->type) {
+    case T_NUMBER:
+	return arg1->u.number == arg2->u.number;
+    case T_POINTER:
+	return arg1->u.vec == arg2->u.vec;
+    case T_STRING:
+	return !strcmp(arg1->u.string, arg2->u.string);
+    case T_OBJECT:
+	return arg1->u.ob == arg2->u.ob;
+    case T_MAPPING:
+	return arg1->u.map == arg2->u.map;
+    case T_FUNCTION:
+	return arg1->u.fp == arg2->u.fp;
     }
     return 0;
 }
 
+#ifdef F_UNIQUE_ARRAY
 
-static int put_in P3(struct unique **, ulist, struct svalue *, marker, struct svalue *, elem)
-{
-    struct unique *llink, *slink, *tlink;
-    int cnt, fixed;
+struct unique {
+    struct svalue mark;
+    int count;
+    struct unique *next;
+    int *indices;
+};
 
-    llink = *ulist;
-    cnt = 0;
-    fixed = 0;
-    while (llink) {
-	if ((!fixed) && (sameval(marker, &(llink->mark)))) {
-	    for (tlink = llink; tlink->same; tlink = tlink->same)
-		(tlink->count)++;
-	    (tlink->count)++;
-	    slink = (struct unique *) DXALLOC(sizeof(struct unique), 10,
-					      "put_in: slink");
-	    slink->count = 1;
-	    assign_svalue_no_free(&slink->mark, marker);
-	    slink->val = elem;
-	    slink->same = 0;
-	    slink->next = 0;
-	    tlink->same = slink;
-	    fixed = 1;		/* We want the size of the list so do not
-				 * break here */
-	}
-	llink = llink->next;
-	cnt++;
+struct unique_list {
+    struct unique *head;
+    struct unique_list *next;
+};
+
+static struct unique_list *g_u_list = 0;
+
+void unique_array_error_handler PROT((void)) {
+    struct unique_list *unlist = g_u_list;
+    struct unique *uptr = unlist->head, *nptr;
+
+    g_u_list = g_u_list->next;
+    while (uptr) {
+	nptr = uptr->next;
+	FREE((char *) uptr->indices);
+	free_svalue(&uptr->mark, "unique_array_error_handler");
+	FREE((char *) uptr);
+	uptr = nptr;
     }
-    if (fixed)
-	return cnt;
-    llink = (struct unique *) DXALLOC(sizeof(struct unique), 11,
-				      "put_in: llink");
-    llink->count = 1;
-    assign_svalue_no_free(&llink->mark, marker);
-    llink->val = elem;
-    llink->same = 0;
-    llink->next = *ulist;
-    *ulist = llink;
-    return cnt + 1;
+    FREE((char *)unlist);
 }
 
+void f_unique_array PROT((void)){
+    struct vector *v, *ret;
+    int size, i, numkeys = 0, *ind, num_arg = st_num_arg;
+    struct svalue *skipval, *sv, *svp;
+    struct unique_list *unlist;
+    struct unique **head, *uptr, *nptr;
+    struct funp *fp = 0;
+    char *func;
 
-struct vector *
-       make_unique P4(struct vector *, arr, char *, func, struct funp *, fp, struct svalue *, skipnum)
-{
-    struct svalue *v;
-    struct vector *res, *ret;
-    struct unique *head, *nxt, *nxt2;
-
-    int cnt, ant, cnt2;
-
-    if (arr->size < 1)
-	return null_array();
-
-    head = 0;
-    ant = 0;
-    for (cnt = 0; cnt < arr->size; cnt++) {
-	if (fp) {
-	    push_svalue(&arr->item[cnt]);
-	    v = call_function_pointer(fp,1);
-	} else if (arr->item[cnt].type == T_OBJECT) {
-	    v = apply(func, arr->item[cnt].u.ob, 0, ORIGIN_EFUN);
-	} else v = 0;
-	if (v && ((v->type != skipnum->type) || !sameval(v, skipnum)))
-	    ant = put_in(&head, v, &(arr->item[cnt]));
+    size = (v = (sp - num_arg + 1)->u.vec)->size;
+    if (!size) {
+	if (num_arg == 3) free_svalue(sp--, "f_unique_array");
+	free_svalue(sp--, "f_unique_array");
+	return;
     }
-    ret = allocate_array(ant);
+
+    if (num_arg == 3) {
+	skipval = sp;
+	if ((sp-1)->type & T_FUNCTION) fp = (sp-1)->u.fp;
+	else func = (sp-1)->u.string;
+    }
+    else {
+	skipval = &const0;
+	if (sp->type & T_FUNCTION) fp = sp->u.fp;
+	else func = sp->u.string;
+    }
+
+    unlist = (struct unique_list *) DXALLOC(sizeof(struct unique_list),
+					    100, "f_unique_array:1");
+    unlist->next = g_u_list;
+    unlist->head = 0;
+    head = &unlist->head;
+    g_u_list = unlist;
+
+    (++sp)->type = T_ERROR_HANDLER;
+    sp->u.error_handler = unique_array_error_handler;
     
-    for (cnt = ant - 1; cnt >= 0; cnt--) {	/* Reverse to compensate
-						 * put_in */
-	ret->item[cnt].type = T_POINTER;
-	ret->item[cnt].u.vec = res = allocate_array(head->count);
-	nxt2 = head;
-	head = head->next;
-	cnt2 = 0;
-	while (nxt2) {
-	    assign_svalue_no_free(&res->item[cnt2++], nxt2->val);
-	    free_svalue(&nxt2->mark, "make_unique");
-	    nxt = nxt2->same;
-	    FREE((char *) nxt2);
-	    nxt2 = nxt;
+    for (i = 0; i < size; i++) {
+	if (fp) {
+	    push_svalue(v->item + i);
+	    sv = call_function_pointer(fp, 1);
+	} else if ((v->item + i)->type & T_OBJECT) {
+	    sv = apply(func, (v->item + i)->u.ob, 0, ORIGIN_EFUN);
+	} else sv = 0;
+
+	if (sv && !sameval(sv, skipval)) {
+	    uptr = *head;
+	    while (uptr) {
+		if (sameval(sv, &uptr->mark)) {
+		    uptr->indices = (int *) DREALLOC(uptr->indices, sizeof(int) * (uptr->count + 1), 101, "f_unique_array:2");
+		    uptr->indices[uptr->count++] = i;
+		    break;
+		}
+		uptr = uptr->next;
+	    }
+	    if (!uptr) {
+		numkeys++;
+		uptr = (struct unique *)DXALLOC(sizeof(struct unique),
+						102, "f_unique_array:3");
+		uptr->indices = (int *)DXALLOC(sizeof(int), 103, "f_unique_array:4");
+		uptr->count = 1;
+		uptr->indices[0] = i;
+		uptr->next = *head;
+		assign_svalue_no_free(&uptr->mark, sv);
+		*head = uptr;
+	    }
 	}
-	if (!head)
-	    break;		/* It shouldn't but, to avoid skydive just in
-				 * case */
     }
-    return ret;
+
+    ret = allocate_empty_array(numkeys);
+    uptr = *head;
+    svp = v->item;
+    while (numkeys--) {
+	nptr = uptr->next;
+	(sv = ret->item + numkeys)->type = T_POINTER;
+	sv->u.vec = allocate_empty_array(i = uptr->count);
+	skipval = sv->u.vec->item + i;
+	ind = uptr->indices;
+	while (i--) {
+	    assign_svalue_no_free(--skipval, svp + ind[i]);
+	}
+	FREE((char *)ind);
+	free_svalue(&uptr->mark, "f_unique_array");
+	FREE((char *)uptr);
+	uptr = nptr;
+    }
+
+    unlist = g_u_list->next;
+    FREE((char *)g_u_list);
+    g_u_list = unlist;
+    sp--;
+    pop_n_elems(num_arg - 1);
+    free_vector(v);
+    sp->u.vec = ret;
 }
 
 /*
  * End of Unique maker
  *************************
  */
+#endif
 
 /* Concatenation of two arrays into one
  */
@@ -655,31 +696,19 @@ struct vector *add_array P2(struct vector *, p, struct vector *, r)
      * null_vector.  REALLOC(null_vector, ...) is bad :(
      */
     if (p->size == 0) {
-	struct vector *res;
-	free_vector(p);
-	if (r->ref > 1) {
-	    res = slice_array(r, 0, r->size - 1);
-	    r->ref--;
-	} else
-	    res = r;
-	return res;
+	p->ref--;
+	return r->ref > 1 ? (r->ref--, copy_array(r)) : r;
     }
     if (r->size == 0) {
-	struct vector *res;
-	free_vector(r);
-	if (p->ref > 1) {
-	    res = slice_array(p, 0, p->size - 1);
-	    p->ref--;
-	} else
-	    res = p;
-	return res;
+	r->ref--;
+	return p->ref > 1 ? (p->ref--, copy_array(p)) : p;
     }
 
     res = p->size + r->size;
     if (res < 0 || res > max_array_size)
       error("result of array addition is greater than maximum array size.\n");
 
-    /* x + x */
+    /* x += x */
     if ((p == r) && (p->ref == 2)) {
         d = (struct vector *) DREALLOC(p, sizeof(struct vector) +
 		sizeof(struct svalue) * (res - 1), 121, "add_array()");
@@ -699,7 +728,7 @@ struct vector *add_array P2(struct vector *, p, struct vector *, r)
 	}
 #endif
         d->ref = 1;
-        d->size += d->size;
+        d->size <<= 1;
 	
         return d;
     }
@@ -729,11 +758,11 @@ struct vector *add_array P2(struct vector *, p, struct vector *, r)
 	}
 #endif
     } else {
-	d = allocate_array(res);
+	d = allocate_empty_array(res);
 
 	for (cnt = p->size; cnt--;)
 	    assign_svalue_no_free(&d->item[cnt], &p->item[cnt]);
-	free_vector(p);
+	p->ref--;
     }
 
     /* transfer svalues from ref 1 source array */
@@ -750,51 +779,10 @@ struct vector *add_array P2(struct vector *, p, struct vector *, r)
     } else {
 	for (cnt = r->size; cnt--;)
 	    assign_svalue_no_free(&d->item[--res], &r->item[cnt]);
-	free_vector(r);
+	r->ref--;
     }
 
     return d;
-}
-
-/* fix subtract_array to use "cosequential processing" to make this
-   operation order N instead of N^2 (discounting the cost of sorting which
-   is being done anyway) -- Truilkan 1992/07/20
-*/
-
-struct vector *subtract_array P2(struct vector *, minuend, struct vector *, subtrahend)
-{
-    struct vector *order_alist PROT((struct vector *));
-    struct vector *vtmpp;
-    static struct vector vtmp =
-    {1,
-#ifdef DEBUG
-     1,
-#endif
-     1,
-#ifndef NO_MUDLIB_STATS
-     {(mudlib_stats_t *) NULL,
-      (mudlib_stats_t *) NULL},
-#endif
-     {
-	 {T_POINTER}}
-    };
-    struct vector *difference;
-    struct svalue *source, *dest;
-    int i;
-
-    vtmp.item[0].u.vec = subtrahend;
-    vtmpp = order_alist(&vtmp);
-    subtrahend = vtmpp->item[0].u.vec;
-    difference = allocate_array(minuend->size);
-    for (source = minuend->item, dest = difference->item, i = minuend->size;
-	 i--; source++) {
-	if (source->type == T_OBJECT && source->u.ob->flags & O_DESTRUCTED)
-	    assign_svalue(source, &const0);
-	if (assoc(source, subtrahend) < 0)
-	    assign_svalue_no_free(dest++, source);
-    }
-    free_vector(vtmpp);
-    return shrink_array(difference, dest - difference->item);
 }
 
 /* Returns an array of all objects contained in 'ob'
@@ -826,7 +814,7 @@ struct vector *all_inventory P2(struct object *, ob, int, override)
     if (!cnt)
 	return null_array();
 
-    d = allocate_array(cnt);
+    d = allocate_empty_array(cnt);
     cur = ob->contains;
 
     for (res = 0; res < cnt; res++) {
@@ -896,7 +884,6 @@ map_array P2(struct svalue *, arg, int, num_arg)
 	sp--;
     }
 
-    
     pop_n_elems(num_arg);
     (++sp)->type = T_POINTER;
     sp->u.vec = r;
@@ -1047,13 +1034,14 @@ int sort_array_cmp P2(struct svalue *, p1, struct svalue *, p2) {
 
 #ifdef F_SORT_ARRAY
 void
-f_sort_array P2(int, num_arg, int, instruction)
+f_sort_array PROT((void))
 {
-    struct svalue *arg = sp - num_arg + 1;
+    struct svalue *arg = sp - st_num_arg + 1;
     struct vector *tmp = arg->u.vec;
+    int num_arg = st_num_arg;
 
     check_for_destr(tmp);
-    tmp = slice_array(tmp, 0, tmp->size - 1);
+    tmp = copy_array(tmp);
 
     switch(arg[1].type){
 	case T_NUMBER:
@@ -1077,13 +1065,13 @@ f_sort_array P2(int, num_arg, int, instruction)
 	    if (num_arg == 2) {
 		sort_array_cmp_ob = current_object;
 		if (sort_array_cmp_ob->flags & O_DESTRUCTED) sort_array_cmp_ob = 0;
-	    } else if (arg[2].type == T_OBJECT)
+	    } else if (arg[2].type & T_OBJECT)
 		sort_array_cmp_ob = arg[2].u.ob;
-	    else if (arg[2].type == T_STRING) {
+	    else if (arg[2].type & T_STRING) {
 		sort_array_cmp_ob = find_object(arg[2].u.string);
 		if (sort_array_cmp_ob && !object_visible(sort_array_cmp_ob)) sort_array_cmp_ob = 0;
 	    }
-	    if (!sort_array_cmp_ob) bad_arg(3, instruction);
+	    if (!sort_array_cmp_ob) bad_arg(3, F_SORT_ARRAY);
 	    quickSort((char *) tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
 	    break;
 	}
@@ -1183,7 +1171,7 @@ struct vector *deep_inventory P2(struct object *, ob, int, take_top)
     /*
      * allocate an array
      */
-    dinv = allocate_array(i);
+    dinv = allocate_empty_array(i);
     if (take_top) {
 	dinv->item[0].type = T_OBJECT;
 	dinv->item[0].u.ob = ob;
@@ -1193,9 +1181,7 @@ struct vector *deep_inventory P2(struct object *, ob, int, take_top)
      * collect visible inventory objects recursively
      */
     i = 0;
-    push_vector(dinv);		/* in case of error */
     deep_inventory_collect(ob, dinv, &i);
-    pop_stack();
 
     return dinv;
 }
@@ -1211,234 +1197,367 @@ INLINE static int alist_cmp P2(struct svalue *, p1, struct svalue *, p2)
     return 0;
 }
 
-static struct vector *order_alist P1(struct vector *, inlist)
-{
-    struct vector *outlist;
-    struct svalue *inlists, *outlists, *root, *inpnt, *insval;
-    int listnum, keynum, i, j;
+INLINE static struct svalue *alist_sort P1(struct vector *, inlist) {
+    int size, j, curix, parix, child1, child2, flag;
+    struct svalue *sv_tab, *tmp, *table, *sv_ptr, val;
+    char *str;
 
-    listnum = inlist->size;
-    inlists = inlist->item;
-    keynum = inlists[0].u.vec->size;
-    root = inlists[0].u.vec->item;
-    /* transform inlists[i].u.vec->item[j] into a heap, starting at the top */
-    insval = (struct svalue *)
-	DXALLOC(sizeof(struct svalue[1]) * listnum, 13, "order_alist: insval");
-    for (j = 0, inpnt = root; j < keynum; j++, inpnt++) {
-	int curix, parix;
+    if (!(size = inlist->size)) return (struct svalue *)NULL;
+    if (flag = (inlist->ref > 1)) {
+	sv_tab = (struct svalue *) DXALLOC(sizeof(struct svalue[1]) * size,
+					   12, "alist_sort: sv_tab");
+	sv_ptr = inlist->item;
+	for (j = 0; j < size; j++) {
+	    if (((tmp = (sv_ptr + j))->type & T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
+		free_object(tmp->u.ob, "alist_sort");
+		sv_tab[j] = *tmp = const0;
+	    } else if ((tmp->type & T_STRING) && !(tmp->subtype & STRING_SHARED)) {
+		(tmp = sv_tab + j)->u.string = make_shared_string(tmp->u.string);
+		tmp->subtype = STRING_SHARED;
+		tmp->type = T_STRING;
+	    } else assign_svalue_no_free(sv_tab + j, tmp);
 
-	/* make sure that strings can be compared by their pointer */
-	if (inpnt->type == T_STRING && inpnt->subtype != STRING_SHARED) {
-	    char *str = make_shared_string(inpnt->u.string);
+	    if (curix = j){
+		val = *tmp;
 
-	    free_svalue(inpnt,"order_alist");
-	    inpnt->type = T_STRING;
-	    inpnt->subtype = STRING_SHARED;
-	    inpnt->u.string = str;
-	}
-	/* propagate the new element up in the heap as much as necessary */
-	for (i = 0; i < listnum; i++) {
-	    insval[i] = inlists[i].u.vec->item[j];
-	    /* but first ensure that it contains no destructed object */
-	    if (insval[i].type == T_OBJECT
-		&& insval[i].u.ob->flags & O_DESTRUCTED) {
-		free_object(insval[i].u.ob, "order_alist");
-		inlists[i].u.vec->item[j] = insval[i] = const0;
+		do {
+		    parix = (curix - 1) >> 1;
+		    if (alist_cmp(sv_tab + parix, sv_tab + curix) > 0) {
+			sv_tab[curix] = sv_tab[parix];
+			sv_tab[parix] = val;
+		    }
+		} while (curix = parix);
 	    }
 	}
-	for (curix = j; curix; curix = parix) {
-	    parix = (curix - 1) >> 1;
-	    if (alist_cmp(&root[parix], &root[curix]) > 0) {
-		for (i = 0; i < listnum; i++) {
-		    inlists[i].u.vec->item[curix] =
-			inlists[i].u.vec->item[parix];
-		    inlists[i].u.vec->item[parix] = insval[i];
-		}
+    } else {
+	sv_tab = inlist->item;
+	for (j = 0; j < size; j++){
+	    if (((tmp = (sv_tab + j))->type & T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
+		free_object(tmp->u.ob, "alist_sort");
+		*tmp = const0;
+	    } else if ((tmp->type & T_STRING) && !(tmp->subtype & STRING_SHARED)) {
+		str = make_shared_string(tmp->u.string);
+		free_string_svalue(tmp);
+		tmp->u.string = str;
+		tmp->subtype = STRING_SHARED;
+	    }
+
+	    if (curix = j){
+		val = *tmp;
+	    
+		do {
+		    parix = (curix - 1) >> 1;
+		    if (alist_cmp(sv_tab + parix, sv_tab + curix) > 0) {
+			sv_tab[curix] = sv_tab[parix];
+			sv_tab[parix] = val;
+		    }
+		} while (curix = parix);
 	    }
 	}
     }
-    FREE((char *) insval);
-    outlist = allocate_array(listnum);
-    outlists = outlist->item;
-    for (i = 0; i < listnum; i++) {
-	outlists[i].type = T_POINTER;
-	outlists[i].u.vec = allocate_array(keynum);
-    }
-    for (j = 0; j < keynum; j++) {
-	int curix;
 
-	for (i = 0; i < listnum; i++) {
-	    outlists[i].u.vec->item[j] = inlists[i].u.vec->item[0];
-	}
-	for (curix = 0;;) {
-	    int child, child2;
+    table = (struct svalue *) DXALLOC(sizeof(struct svalue[1]) * size,
+					     13, "alist_sort: table");
 
-	    child = curix + curix + 1;
-	    child2 = child + 1;
-	    if (child2 < keynum && root[child2].type != T_INVALID
-		&& (root[child].type == T_INVALID ||
-		    alist_cmp(&root[child], &root[child2]) > 0)) {
-		child = child2;
+    for (j = 0; j < size; j++) {
+	table[j] = sv_tab[0];
+
+	for (curix = 0; ; ) {
+	    child1 = (curix << 1) + 1;
+	    child2 = child1 + 1;
+	    
+	    if (child2 < size && sv_tab[child2].type != T_INVALID &&
+		(sv_tab[child1].type == T_INVALID ||
+		 alist_cmp(sv_tab+child1, sv_tab+child2) > 0)) {
+		child1 = child2;
 	    }
-	    if (child < keynum && root[child].type != T_INVALID) {
-		for (i = 0; i < listnum; i++) {
-		    inlists[i].u.vec->item[curix] =
-			inlists[i].u.vec->item[child];
+	    if (child1 < size && sv_tab[child1].type != T_INVALID) {
+		sv_tab[curix] = sv_tab[child1];
+		curix = child1;
+	    } else break;
+	}
+
+	sv_tab[curix].type = T_INVALID;
+    }
+
+    if (flag) FREE((char *)sv_tab);
+    return table;
+}
+
+struct vector *subtract_array P2(struct vector *, minuend, struct vector *, subtrahend) {
+    struct vector *difference;
+    struct svalue *source, *dest, *svt;
+    int i, size, o, d, l, h, msize;
+
+    if (!(size = subtrahend->size)) {
+	subtrahend->ref--;
+	return minuend->ref > 1 ? (minuend->ref--, copy_array(minuend)) : minuend;
+    }
+    if (!(msize = minuend->size)) {
+	free_vector(subtrahend);
+	return &null_vector;
+    }
+    svt = alist_sort(subtrahend);
+    difference = ALLOC_VECTOR(msize);
+    for (source = minuend->item, dest = difference->item, i = msize;
+	 i--; source++) {
+
+	l = 0;
+	o = (h = size - 1) >> 1;
+
+	if ((source->type & T_OBJECT) && (source->u.ob->flags & O_DESTRUCTED)) {
+	    free_object(source->u.ob, "subtract_array");
+	    *source = const0;
+	} else if ((source->type & T_STRING) && !(source->subtype & STRING_SHARED)) {
+	    static struct svalue stmp = {T_STRING, STRING_SHARED};
+	    
+	    if (!(stmp.u.string = findstring(source->u.string))){
+	        assign_svalue_no_free(dest++, source);
+		continue;
+	    }
+	    while (d = alist_cmp(&stmp, svt + o)){
+		if (d < 0) h = o - 1;
+		else l = o + 1;
+		if (l > h){
+		    assign_svalue_no_free(dest++, source);
+		    break;
 		}
-		curix = child;
-	    } else
+		o = (l + h) >> 1;
+	    }
+	    continue;
+	}
+	
+	while (d = alist_cmp(source, svt + o)) {
+	    if (d < 0) h = o - 1;
+	    else l = o + 1;
+	    if (l > h) {
+		assign_svalue_no_free(dest++, source);
 		break;
-	}
-	for (i = 0; i < listnum; i++) {
-	    inlists[i].u.vec->item[curix].type = T_INVALID;
-	}
-    }
-    return outlist;
-}
-
-static int search_alist P2(struct svalue *, key, struct vector *, keylist)
-{
-    int i, o, d;
-
-    if (!keylist->size)
-	return 0;
-    i = (keylist->size) >> 1;
-    o = (i + 2) >> 1;
-    for (;;) {
-	d = alist_cmp(key, &keylist->item[i]);
-	if (d < 0) {
-	    i -= o;
-	    if (i < 0) {
-		i = 0;
 	    }
-	} else if (d > 0) {
-	    i += o;
-	    if (i >= keylist->size) {
-		i = keylist->size - 1;
-	    }
-	} else {
-	    return i;
+	    o = (l + h) >> 1;
 	}
-	if (o <= 1) {
-	    if (alist_cmp(key, &keylist->item[i]) > 0)
-		return i + 1;
-	    return i;
-	}
-	o = (o + 1) >> 1;
+
     }
-}
-
-static int assoc P2(struct svalue *, key, struct vector *, list)
-{
-    int i;
-
-    if (key->type == T_STRING && key->subtype != STRING_SHARED) {
-	static struct svalue stmp =
-	{T_STRING, STRING_SHARED};
-
-	stmp.u.string = findstring(key->u.string);
-	if (!stmp.u.string)
-	    return -1;
-	key = &stmp;
-    }
-    i = search_alist(key, list);
-    if (i == list->size || alist_cmp(key, &list->item[i]))
-	i = -1;
-    return i;
-}
-
-static struct vector *intersect_alist P2(struct vector *, a1, struct vector *, a2)
-{
-    struct vector *a3;
-    int d, l, i1, i2, a1s, a2s;
-
-    a1s = a1->size;
-    a2s = a2->size;
-    a3 = allocate_array(a1s < a2s ? a1s : a2s);
-    for (i1 = i2 = l = 0; i1 < a1s && i2 < a2s;) {
-	d = alist_cmp(&a1->item[i1], &a2->item[i2]);
-	if (d < 0)
-	    i1++;
-	else if (d > 0)
-	    i2++;
-	else {
-	    assign_svalue_no_free(&a3->item[l++], &a2->item[(i1++, i2++)]);
-	}
-    }
-    return shrink_array(a3, l);
-}
-
-struct vector *intersect_array P2(struct vector *, a1, struct vector *, a2)
-{
-    struct vector *vtmpp1, *vtmpp2, *vtmpp3;
-    static struct vector vtmp =
-    {1,
-#ifdef DEBUG
-     1,
-#endif
-     1,
+    i = size;
+    while (i--) free_svalue(svt + i, "subtract_array");
+    FREE((char *) svt);
+    if (subtrahend->ref > 1) {
+	subtrahend->ref--;
+    } else {
 #ifndef NO_MUDLIB_STATS
-     {(mudlib_stats_t *) NULL,
-      (mudlib_stats_t *) NULL},
+	add_array_size(&subtrahend->stats, -size);
 #endif
-     {
-	 {T_POINTER}}
-    };
-
-    if (a1->ref > 1) {
-	vtmpp1 = a1;
-	a1 = slice_array(a1, 0, a1->size - 1);
-	free_vector(vtmpp1);
+	num_arrays--;
+	total_array_size -= sizeof(struct vector) + sizeof(struct svalue) *
+	    (size - 1);
+	FREE((char *) subtrahend);
     }
-    vtmp.item[0].u.vec = a1;
-    vtmpp1 = order_alist(&vtmp);
-    free_vector(vtmp.item[0].u.vec);
-    if (a2->ref > 1) {
-	vtmpp2 = a2;
-	a2 = slice_array(a2, 0, a2->size - 1);
-	free_vector(vtmpp2);
+    free_vector(minuend);
+    msize = dest - difference->item;
+    if (!msize) {
+	FREE((char *)difference);
+	return null_array();
     }
-    vtmp.item[0].u.vec = a2;
-    vtmpp2 = order_alist(&vtmp);
-    free_vector(vtmp.item[0].u.vec);
-    vtmpp3 = intersect_alist(vtmpp1->item[0].u.vec, vtmpp2->item[0].u.vec);
-    free_vector(vtmpp1);
-    free_vector(vtmpp2);
-    return vtmpp3;
+    difference = (struct vector *) DREALLOC(difference, i = sizeof(struct vector) + sizeof(struct svalue) * (msize - 1), 30, "subtract_array");
+    difference->size = msize;
+    difference->ref = 1;
+    total_array_size += i;
+    num_arrays++;
+#ifndef NO_MUDLIB_STATS
+    if (current_object) {
+	assign_stats(&difference->stats, current_object);
+	add_array_size(&difference->stats, msize);
+    } else {
+	null_stats(&difference->stats);
+    }
+#endif
+    return difference;
 }
 
-struct vector *match_regexp P2(struct vector *, v, char *, pattern)
-{
+struct vector *intersect_array P2(struct vector *, a1, struct vector *, a2) {
+    struct vector *a3;
+    int d, l, j, i, a1s = a1->size, a2s = a2->size, flag, sz;
+    struct svalue *svt_1, *ntab, *sv_tab, *sv_ptr, val, *tmp;
+    int curix, parix, child1, child2;
+    
+    if (!a1s || !a2s) {
+	free_vector(a1);
+	free_vector(a2);
+	return null_array();
+    }
+
+    svt_1 = alist_sort(a1);
+    if (flag = (a2->ref > 1)) {
+	sv_tab = (struct svalue *) DXALLOC(sizeof(struct svalue[1]) * a2s,
+					   16, "intersect_array: sv2_tab");
+	sv_ptr = a2->item;
+	for (j = 0; j < a2s; j++) {
+	    if (((tmp = (sv_ptr + j))->type & T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
+		free_object(tmp->u.ob, "intersect_array");
+		sv_tab[j] = *tmp = const0;
+	    } else if ((tmp->type & T_STRING) && !(tmp->subtype & STRING_SHARED)) {
+		(tmp = sv_tab + j)->u.string = make_shared_string(tmp->u.string);
+		tmp->subtype = STRING_SHARED;
+		tmp->type = T_STRING;
+	    } else assign_svalue_no_free(sv_tab + j, tmp);
+	    
+	    if (curix = j){
+		val = *tmp;
+
+		do {
+		    parix = (curix - 1) >> 1;
+		    if (alist_cmp(sv_tab + parix, sv_tab + curix) > 0) {
+			sv_tab[curix] = sv_tab[parix];
+			sv_tab[parix] = val;
+		    }
+		} while (curix = parix);
+	    } 
+	}
+    } else {
+	char *str;
+
+	sv_tab = a2->item;
+	for (j = 0; j < a2s; j++) {
+	    if (((tmp = (sv_tab + j))->type & T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
+		free_object(tmp->u.ob, "alist_sort");
+		*tmp = const0;
+	    } else if ((tmp->type & T_STRING) && !(tmp->subtype & STRING_SHARED)) {
+		str = make_shared_string(tmp->u.string);
+		free_string_svalue(tmp);
+		tmp->u.string = str;
+		tmp->subtype = STRING_SHARED;
+	    }
+
+	    if (curix = j){
+		val = *tmp;
+
+		do {
+		    parix = (curix - 1) >> 1;
+		    if (alist_cmp(sv_tab + parix, sv_tab + curix) > 0) {
+			sv_tab[curix] = sv_tab[parix];
+			sv_tab[parix] = val;
+		    }
+		} while (curix = parix);
+	    } 	    
+	}
+    }
+
+    a3 = ALLOC_VECTOR(a2s);
+    ntab = a3->item;
+
+    l = i = 0;
+
+    for (j = 0; j < a2s; j++) {
+	val = sv_tab[0];
+
+	while ((d = alist_cmp(&val, &svt_1[i])) > 0) {
+	    if (++i >= a1s) goto settle_business;
+	}
+
+	if (!d) {
+	    ntab[l++] = val;
+	} else {
+	    free_svalue(&val, "intersect_array");
+	}
+
+	for (curix = 0;; ) {
+	    child1 = (curix << 1) + 1;
+	    child2 = child1 + 1;
+	    
+	    if (child2 < a2s && sv_tab[child2].type != T_INVALID &&
+		(sv_tab[child1].type == T_INVALID ||
+		 alist_cmp(sv_tab + child1, sv_tab + child2) > 0)) {
+		child1 = child2;
+	    }
+	    
+	    if (child1 < a2s && sv_tab[child1].type != T_INVALID) {
+		sv_tab[curix] = sv_tab[child1];
+		curix = child1;
+	    } else break;
+	}
+	
+	sv_tab[curix].type = T_INVALID;
+    }
+
+ settle_business:
+    
+    curix = a2s;
+    while (curix--){
+	if (sv_tab[curix].type != T_INVALID) free_svalue(sv_tab + curix, "intersect_array:2");
+    }
+
+    i = a1s;
+    while (i--) free_svalue(svt_1 + i, "intersect_array");
+    
+    if (a1->ref > 1) a1->ref--;
+    else {
+#ifndef NO_MUDLIB_STATS
+	add_array_size(&a1->stats, -a1s);
+#endif
+	num_arrays--;
+	total_array_size -= sizeof(struct vector) + sizeof(struct svalue) * (a1s - 1);
+	FREE((char *) a1);
+    }
+    
+    if (flag) {
+	a2->ref--;
+	FREE((char *) sv_tab);
+    } else {
+#ifndef NO_MUDLIB_STATS
+	add_array_size(&a2->stats, -a2s);
+#endif
+	num_arrays--;
+	total_array_size -= sizeof(struct vector) + sizeof(struct svalue) * (a2s - 1);
+	FREE((char *) a2);
+    }
+    a3 = (struct vector *) DREALLOC(a3, i = sizeof(struct vector) + (l-1) * sizeof(struct svalue), 31, "intersect_array");
+    a3->ref = 1;
+    a3->size = l;
+#ifndef NO_MUDLIB_STATS
+    if (current_object) {
+	assign_stats(&a3->stats, current_object);
+	add_array_size(&a3->stats, l);
+    } else null_stats(&a3->stats);
+#endif
+    total_array_size += i;
+    num_arrays++;
+    return a3;
+}
+
+struct vector *match_regexp P3(struct vector *, v, char *, pattern, int, flag) {
     struct regexp *reg;
     char *res;
-    int i, num_match;
+    int i, num_match, size, match = !(flag & 2);
     struct vector *ret;
-
-    if (v->size == 0)
-	return null_array();
+    
+    if (!(size = v->size)) return null_array();
     reg = regcomp(pattern, 0);
     if (reg == 0)
 	return 0;
-    res = (char *) DMALLOC(v->size, 14, "match_regexp: res");
-    for (num_match = i = 0; i < v->size; i++) {
+    res = (char *)DMALLOC(size, 14, "match_regexp: res");
+    for (num_match = i = 0; i < size; i++) {
 	res[i] = 0;
-	if (v->item[i].type != T_STRING)
+	if (!(v->item[i].type & T_STRING))
 	    continue;
 
-	if ((--eval_cost) <= 0)
-	    return 0;
-
-	if (regexec(reg, v->item[i].u.string) == 0)
-	    continue;
-	res[i] = 1;
-	num_match++;
+	if (regexec(reg, v->item[i].u.string) == match){
+	    res[i] = 1;
+	    num_match++;
+	}
     }
-    ret = allocate_array(num_match);
-    for (num_match = i = 0; i < v->size; i++) {
-	if (res[i] == 0)
-	    continue;
-	assign_svalue_no_free(&ret->item[num_match], &v->item[i]);
-	num_match++;
+
+    flag &= 1;
+    ret = allocate_empty_array(num_match << flag);
+    for (num_match = i = 0; i < size; i++) {
+	if (res[i]) {
+	    if (flag) {
+		ret->item[num_match].type = T_NUMBER;
+		ret->item[num_match].u.number = i + 1;
+		num_match++;
+	    }
+	    assign_svalue_no_free(&ret->item[num_match], &v->item[i]);
+	    num_match++;
+	}
     }
     FREE(res);
     FREE((char *) reg);
@@ -1468,7 +1587,7 @@ struct vector *deep_inherit_list P1(struct object *, ob)
     }
 
     next--;
-    ret = allocate_array(next);
+    ret = allocate_empty_array(next);
 
     for (il = 0; il < next; il++) {
 	pr = plist[il + 1];
@@ -1500,7 +1619,7 @@ struct vector *inherit_list P1(struct object *, ob)
     }
 
     next--;			/* don't count the file itself */
-    ret = allocate_array(next);
+    ret = allocate_empty_array(next);
 
     for (il = 0; il < next; il++) {
 	pr = plist[il + 1];
@@ -1569,11 +1688,10 @@ struct vector *
 	    tmp_children[i] = ob;
 	    if ((++i == t_sz) && (!(tmp_children
 			= (struct object **) DREALLOC((void *) tmp_children,
-				     sizeof(struct object *) * (t_sz += 50),
-				 17, "children: tmp_children: realloc")))) {	/* unable to REALLOC
-										 * more space
-										 * (tmp_children is now
-										 * NULL) */
+			      sizeof(struct object *) * (t_sz += 50),
+			      17, "children: tmp_children: realloc")))) {
+		/* unable to REALLOC more space 
+		 * (tmp_children is now NULL) */
 		if (needs_freed)
 		    FREE(str);
 		return null_array();
@@ -1583,7 +1701,7 @@ struct vector *
     if (i > max_array_size) {
 	i = max_array_size;
     }
-    ret = allocate_array(i);
+    ret = allocate_empty_array(i);
     for (j = 0; j < i; j++) {
 	ret->item[j].type = T_OBJECT;
 	ret->item[j].u.ob = tmp_children[j];
@@ -1625,7 +1743,7 @@ struct vector *
 	obtab[nob++] = ob;
     }
 
-    vec = allocate_array(nob);
+    vec = allocate_empty_array(nob);
     while (--nob >= 0) {
 	vec->item[nob].type = T_OBJECT;
 	vec->item[nob].u.ob = obtab[nob];
@@ -1638,17 +1756,17 @@ struct vector *
 }
 
 #ifdef F_OBJECTS
-void f_objects P2(int, num_arg, int, instruction)
+void f_objects PROT((void))
 {
     char *func;
     struct object *ob, **tmp;
     struct vector *ret;
     struct funp *f = 0;
-    int display_hidden = 0, t_sz, i,j;
+    int display_hidden = 0, t_sz, i,j, num_arg = st_num_arg;
     struct svalue *v;
 
     if (!num_arg) func = 0;
-    else if (sp->type == T_FUNCTION) f = sp->u.fp;
+    else if (sp->type & T_FUNCTION) f = sp->u.fp;
     else func = sp->u.string;
 	
     if (!(tmp = (struct object **) DMALLOC(sizeof(struct object *) * (t_sz = 1000),
@@ -1686,7 +1804,7 @@ void f_objects P2(int, num_arg, int, instruction)
                 *sp = const0;
                 return;
 	    }
-            if (v->type == T_NUMBER && !v->u.number) continue;
+            if ((v->type & T_NUMBER) && !v->u.number) continue;
 	}
 
 	tmp[i] = ob;
@@ -1701,7 +1819,7 @@ void f_objects P2(int, num_arg, int, instruction)
     }
     if (i > max_array_size)
 	i = max_array_size;
-    ret = allocate_array(i);
+    ret = allocate_empty_array(i);
     for (j = 0; j < i; j++) {
 	ret->item[j].type = T_OBJECT;
 	ret->item[j].u.ob = tmp[j];
@@ -1715,3 +1833,164 @@ void f_objects P2(int, num_arg, int, instruction)
     sp->u.vec = ret;
 }
 #endif
+
+#ifdef F_REG_ASSOC
+/*
+ * write(sprintf("%O", reg_assoc("testhahatest", ({ "haha", "te" }),
+ *              ({ 2,3 }), 4)));
+
+ * --------
+ * ({
+ *   ({ "", "te", "st", "haha", "", "te", "st" }),
+ *   ({  4,    3,    4,      2,  4,    3,   4  })
+ * })
+ *
+ */
+struct vector *reg_assoc P4(char *, str, struct vector *, pat, struct vector *, tok, struct svalue *, def) {
+    int i, j, size;
+    char *tmp;
+    struct vector *ret;
+    
+    if ((size = pat->size) != tok->size)
+	error("Pattern and token array sizes must be identical.\n");
+    
+    for (i = 0; i < size; i++) {
+	if (!(pat->item[i].type & T_STRING))
+	    error("Non-string found in pattern array.\n");
+    }
+    
+    ret = allocate_empty_array(2);
+    
+    if (size) {
+	struct regexp **rgpp;
+	struct reg_match {
+ 	    int tok_i;
+	    char *begin, *end;
+	    struct reg_match *next;
+ 	} *rmp = (struct reg_match *) 0, *rmph = (struct reg_match *) 0;
+	int num_match = 0, length;
+	struct vector *matches, *tokens;
+	struct svalue *sv1, *sv2, *sv;
+ 	int flag, index;
+	struct regexp *tmpreg;
+ 	char *laststart, *currstart;
+ 
+	rgpp = (struct regexp **) DXALLOC(sizeof(struct regexp *) * size,
+					  18, "reg_assoc : rgpp");
+	for (i = 0; i < size; i++){
+             rgpp[i] = regcomp(pat->item[i].u.string, 0);
+ 	}
+ 
+         tmp = str;
+         while (*tmp){
+ 
+             /* Sigh - need a kludge here - Randor */
+             /* In the future I may alter regexp.c to include branch info */
+             /* so as to minimize checks here - Randor 5/30/94 */
+ 
+ 	    laststart = 0;
+ 	    index = -1;
+ 
+             for (i = 0; i < size; i++){
+                 if (regexec(tmpreg = rgpp[i], tmp)){
+                     currstart = tmpreg->startp[0];
+                     if (tmp == currstart){
+                         index = i;
+                         break;
+ 		    }
+                     if (!laststart || currstart < laststart){
+                         laststart = currstart;
+ 			index = i;
+ 		    }
+ 		}
+ 	    }
+ 
+            if (index >= 0){
+                 num_match++;
+                 if (rmp){
+                     rmp->next =
+                         (struct reg_match *) DMALLOC(sizeof(struct reg_match),
+                                                      19, "reg_assoc : rmp->next");
+                     rmp = rmp->next;
+ 		}
+                 else rmph = rmp =
+                             (struct reg_match *) DMALLOC(sizeof(struct reg_match),
+                                                          20, "reg_assoc : rmp");
+ 		tmpreg = rgpp[index];
+                 rmp->begin = tmpreg->startp[0];
+                 rmp->end = tmp = tmpreg->endp[0];
+                 rmp->tok_i = index; 
+                 rmp->next = (struct reg_match *) 0;
+ 	    }
+             else break;
+ 
+             /* The following is from regexplode, to prevent i guess infinite */
+             /* loops on "" patterns - Randor 5/29/94 */
+             if (rmp->begin == tmp && (!*++tmp)) break;
+ 	}
+ 
+	sv = ret->item;
+	sv->type = T_POINTER;
+	sv1 = (sv->u.vec = allocate_empty_array(2*num_match + 1))->item;
+	
+	sv++;
+	sv->type = T_POINTER;
+	sv2 = (sv->u.vec = allocate_empty_array(2*num_match + 1))->item;
+	
+	rmp = rmph;
+	
+	tmp = str;
+	
+	while (num_match--) {
+	    char *svtmp;
+	    
+	    length = rmp->begin - tmp;
+	    sv1->type = T_STRING;
+            sv1->subtype = STRING_MALLOC;
+	    svtmp = sv1->u.string =
+		(char *) DXALLOC(length + 1, 21, "reg_assoc : sv1");
+	    strncpy(svtmp, tmp, length);
+	    svtmp[length] = 0;
+	    sv1++;
+	    assign_svalue_no_free(sv2++, def);
+	    tmp += length;
+	    length = rmp->end - rmp->begin;
+	    sv1->type = T_STRING;
+	    sv1->subtype = STRING_MALLOC;
+	    svtmp = sv1->u.string =
+		(char *) DXALLOC(length + 1, 22, "reg_assoc : sv1");
+	    strncpy(svtmp, tmp, length);
+	    svtmp[length] = 0;
+	    sv1++;
+	    assign_svalue_no_free(sv2++, &tok->item[rmp->tok_i]);
+	    tmp += length;
+	    rmp = rmp->next;
+	}
+	sv1->type = T_STRING;
+	sv1->subtype = STRING_MALLOC;
+	sv1->u.string = string_copy(tmp);
+	assign_svalue_no_free(sv2, def);
+	FREE((char *) rgpp);
+	
+	while (rmp = rmph){
+	    rmph = rmp->next;
+	    FREE((char *) rmp);
+ 	}
+	return ret;
+    }
+    else { /* Default match */
+	struct svalue *temp;
+	struct svalue *sv;
+	
+         (sv = ret->item)->type = T_POINTER;
+         temp = (sv->u.vec = allocate_empty_array(1))->item;
+         temp->subtype = STRING_MALLOC;
+         temp->type = T_STRING;
+         temp->u.string = string_copy(str);
+         sv = &ret->item[1];
+         sv->type = T_POINTER;
+         assign_svalue_no_free((sv->u.vec = allocate_empty_array(1))->item, def);
+         return ret;
+     }
+ }
+  #endif

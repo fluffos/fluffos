@@ -18,18 +18,18 @@ static int short_compare PROT((unsigned short *, unsigned short *));
 static void dump_line_numbers PROT((FILE *, struct program *));
 
 void
-f_dump_prog P2(int, num_arg, int, instruction)
+f_dump_prog PROT((void))
 {
     struct program *prog;
     char *where;
     int d;
     struct object *ob;
 
-    if (num_arg == 2) {
+    if (st_num_arg == 2) {
 	ob = sp[-1].u.ob;
 	d = sp->u.number;
 	where = 0;
-    } else if (num_arg == 3) {
+    } else if (st_num_arg == 3) {
 	ob = sp[-2].u.ob;
 	d = sp[-1].u.number;
 	where = (sp->type == T_STRING) ? sp->u.string : 0;
@@ -38,7 +38,7 @@ f_dump_prog P2(int, num_arg, int, instruction)
 	d = 0;
 	where = 0;
     }
-    pop_n_elems(num_arg);
+    pop_n_elems(st_num_arg);
     if (!(prog = ob->prog)) {
 	add_message("No program for object.\n");
     } else {
@@ -250,8 +250,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	case F_LOR:
 	case F_LAND:
 #endif
-	    ((char *) &sarg)[0] = pc[0];
-	    ((char *) &sarg)[1] = pc[1];
+	    COPY_SHORT(&sarg, pc);
 	    offset = (pc - code) + (unsigned short) sarg;
 	    sprintf(buff, "%04x (%04x)", (unsigned) sarg, (unsigned) offset);
 	    pc += 2;
@@ -260,8 +259,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	case F_BBRANCH_WHEN_ZERO:
 	case F_BBRANCH_WHEN_NON_ZERO:
 	case F_BBRANCH:
-	    ((char *) &sarg)[0] = pc[0];
-	    ((char *) &sarg)[1] = pc[1];
+	    COPY_SHORT(&sarg, pc);
 	    offset = (pc - code) - (unsigned short) sarg;
 	    sprintf(buff, "%04x (%04x)", (unsigned) sarg, (unsigned) offset);
 	    pc += 2;
@@ -275,23 +273,20 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	case F_JUMP_WHEN_NON_ZERO:
 #endif
 	case F_CATCH:
-	    ((char *) &sarg)[0] = pc[0];
-	    ((char *) &sarg)[1] = pc[1];
+	    COPY_SHORT(&sarg, pc);
 	    sprintf(buff, "%04x", (unsigned) sarg);
 	    pc += 2;
 	    break;
 
 	case F_AGGREGATE:
 	case F_AGGREGATE_ASSOC:
-	    ((char *) &sarg)[0] = pc[0];
-	    ((char *) &sarg)[1] = pc[1];
+	    COPY_SHORT(&sarg, pc);
 	    sprintf(buff, "%d", (int)sarg);
 	    pc += 2;
 	    break;
 
 	case F_CALL_FUNCTION_BY_ADDRESS:
-	    ((char *) &sarg)[0] = pc[0];
-	    ((char *) &sarg)[1] = pc[1];
+	    COPY_SHORT(&sarg, pc);
 	    pc += 2;
 	    if (sarg < NUM_FUNS)
 		sprintf(buff, "%-12s %5d", FUNS[sarg].name,
@@ -323,8 +318,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	    break;
 
 	case F_STRING:
-	    ((char *) &sarg)[0] = pc[0];
-	    ((char *) &sarg)[1] = pc[1];
+	    COPY_SHORT(&sarg, pc);
 	    if (sarg < NUM_STRS)
 		sprintf(buff, "\"%s\"", disassem_string(STRS[sarg]));
 	    else
@@ -333,8 +327,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	    break;
 
 	case F_SIMUL_EFUN:
-	    ((char *) &sarg)[0] = pc[0];
-	    ((char *) &sarg)[1] = pc[1];
+	    COPY_SHORT(&sarg, pc);
 	    sprintf(buff, "\"%s\" %d", simuls[sarg]->name, pc[2]);
 	    pc += 3;
 	    break;
@@ -348,8 +341,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 		strcpy(buff, "<call_other>");
 		break;
 	    case ORIGIN_SIMUL_EFUN:
-		((char *) &sarg)[0] = pc[0];
-		((char *) &sarg)[1] = pc[1];
+		COPY_SHORT(&sarg, pc);
 		sprintf(buff, "<simul_efun> \"%s\"", simuls[sarg]->name);
 		pc += 2;
 		break;
@@ -364,8 +356,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 		sprintf(buff, "<efun> %s", instrs[sarg].name);
 		break;
 	    case ORIGIN_LOCAL:
-		((char *) &sarg)[0] = pc[0];
-		((char *) &sarg)[1] = pc[1];
+		COPY_SHORT(&sarg, pc);
 		pc += 2;
 		if (sarg < NUM_FUNS)
 		    sprintf(buff, "<local_fun> %s", FUNS[sarg].name);
@@ -379,10 +370,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	    break;
 
 	case F_NUMBER:
-	    ((char *) &iarg)[0] = pc[0];
-	    ((char *) &iarg)[1] = pc[1];
-	    ((char *) &iarg)[2] = pc[2];
-	    ((char *) &iarg)[3] = pc[3];
+	    COPY_INT(&iarg, pc);
 	    sprintf(buff, "%d", iarg);
 	    pc += 4;
 	    break;
@@ -391,10 +379,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	    {
 		float farg;
 
-		((char *) &farg)[0] = pc[0];
-		((char *) &farg)[1] = pc[1];
-		((char *) &farg)[2] = pc[2];
-		((char *) &farg)[3] = pc[3];
+		COPY_FLOAT(&farg, pc);
 		sprintf(buff, "%f", farg);
 		pc += 4;
 		break;
@@ -446,25 +431,17 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 		if (ttype == 0) {
 		    i = 0;
 		    while (pc < code + etable - 4) {
-			((char *) &sarg)[0] = pc[0];
-			((char *) &sarg)[1] = pc[1];
+			COPY_SHORT(&sarg, pc);
 			fprintf(f, "\t%2d: %04x\n", i++, (unsigned) sarg);
 			pc += 2;
 		    }
-		    ((char *) &iarg)[0] = pc[0];
-		    ((char *) &iarg)[1] = pc[1];
-		    ((char *) &iarg)[2] = pc[2];
-		    ((char *) &iarg)[3] = pc[3];
+		    COPY_INT(&iarg, pc);
 		    fprintf(f, "\tminval = %d\n", iarg);
 		    pc += 4;
 		} else {
 		    while (pc < code + etable) {
-			((char *) &iarg)[0] = pc[0];
-			((char *) &iarg)[1] = pc[1];
-			((char *) &iarg)[2] = pc[2];
-			((char *) &iarg)[3] = pc[3];
-			((char *) &sarg)[0] = pc[4];
-			((char *) &sarg)[1] = pc[5];
+			COPY_INT(&iarg, pc);
+			COPY_SHORT(&sarg, pc + 4);
 			if (ttype == 1 || !iarg) {
 			    fprintf(f, "\t%-4d\t%04x\n", iarg, (unsigned) sarg);
 			} else {
@@ -535,8 +512,8 @@ dump_line_numbers P2(FILE *, f, struct program *, prog) {
     fprintf(f,"\naddress -> absolute line table:\n");
     while (li < li_end) {
 	sz = *li++;
-	((char *)&s)[0] = *li++;
-	((char *)&s)[1] = *li++;
+	COPY_SHORT(&s, li);
+	li += 2;
 	fprintf(f, "%4x-%4x: %i\n", addr, addr + sz - 1, (int)s);
 	addr += sz;
     }

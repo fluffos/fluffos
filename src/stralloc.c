@@ -48,7 +48,9 @@
  * next element in the chain (which you specify when you call the functions).
  */
 
+#ifndef MAXSHORT
 #define	MAXSHORT (unsigned short)((1 << (sizeof(short)*8)) - 1)
+#endif
 
 static int num_distinct_strings = 0;
 static int bytes_distinct_strings = 0;

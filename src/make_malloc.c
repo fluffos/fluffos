@@ -6,36 +6,39 @@
 #include "std.h"
 
 #ifdef SYSMALLOC
-#define THE_MALLOC "sysmalloc.c"
+#  define THE_MALLOC "sysmalloc.c"
+#endif
+#ifdef SMALLOC
+#  define THE_MALLOC "smalloc.c"
+#endif
+#ifdef BSDMALLOC
+#  define THE_MALLOC "bsdmalloc.c"
 #endif
 
 #ifdef WRAPPEDMALLOC
-#define THE_MALLOC "wrappedmalloc.c"
+#  define THE_WRAPPER "wrappedmalloc.c"
 #endif
 
 #ifdef DEBUGMALLOC
-#define THE_MALLOC "debugmalloc.c"
+#  define THE_WRAPPER "debugmalloc.c"
 #endif
 
-int main(argc, argv)
-    int argc;
-    char *argv[];
-{
-    unlink("malloc.c");
-    if (argc == 2) {
-	printf("Using memory allocation package: %s\n", argv[1]);
-    } else {
-	printf("Using memory allocation package: %s\n", THE_MALLOC);
-    }
-#if defined(LATTICE) || defined(OS2)
-    {
-	char cmd[100];
-
-	sprintf(cmd, "copy %s malloc.c", THE_MALLOC);
-	system(cmd);
-    }
+#if !defined(THE_MALLOC) && !defined(THE_WRAPPER)
+int main() {
+    puts("Memory package and/or malloc wrapper incorrectly specified in options.h\n");
+}
 #else
-    link(THE_MALLOC, "malloc.c");
+int main() {
+    unlink("malloc.c");
+#ifdef THE_WRAPPER
+    printf("Using memory allocation package: %s\n\t\tWrapped with: %s\n",
+	   THE_MALLOC, THE_WRAPPER);
+    link(THE_WRAPPER, "mallocwrapper.c");
+#else
+    printf("Using memory allocation package: %s\n", THE_MALLOC);
+    link("plainwrapper.c", "mallocwrapper.c");
 #endif
+    link(THE_MALLOC, "malloc.c");
     return 0;
 }
+#endif

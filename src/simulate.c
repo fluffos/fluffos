@@ -40,7 +40,7 @@ void pre_compile PROT((char *)),
 #endif
             add_action PROT((char *, char *, int)),
             ipc_remove(),
-            start_new_file PROT((FILE *)), end_new_file(),
+            start_new_file PROT((int)), end_new_file(),
             load_ob_from_swap PROT((struct object *)), dump_malloc_data(),
             print_svalue PROT((struct svalue *)),
             debug_message_value(),
@@ -80,6 +80,14 @@ struct variable *find_status P2(char *, str, int, must_find)
     error("--Status %s not found in prog for %s\n", str,
 	  current_object->name);
     return 0;
+}
+
+INLINE void check_legal_string P1(char *, s)
+{
+    if (strlen(s) >= LARGEST_PRINTABLE_STRING) {
+	error("Printable strings limited to length of %d.\n",
+	      LARGEST_PRINTABLE_STRING);
+    }
 }
 
 #ifdef PRIVS
@@ -227,13 +235,9 @@ static struct svalue *
 {
     struct svalue *v;
 
-    if (master_ob_is_loading || master_ob == (struct object *)-1) return 0;
-    if (strcmp(name, simul_efun_file_name) == 0) {
-	v = 0;
-    } else {
-	push_string(name, STRING_MALLOC);
-	v = apply_master_ob(APPLY_COMPILE_OBJECT, 1);
-    }
+    if (master_ob == (struct object *)-1) return 0;
+    push_string(name, STRING_MALLOC);
+    v = apply_master_ob(APPLY_COMPILE_OBJECT, 1);
     if (!v || (v->type != T_OBJECT)) {
 	fprintf(stderr, "Could not load file: %s\n", name);
 	error("Failed to load file: %s\n", name);
@@ -310,7 +314,7 @@ void set_master P1(struct object *, ob) {
  */
 struct object *load_object P2(char *, lname, int, flags)
 {
-    FILE *f;
+    int f;
 
     struct object *ob, *save_command_giver = command_giver;
     struct svalue *mret;
@@ -364,7 +368,7 @@ struct object *load_object P2(char *, lname, int, flags)
 	name[name_length - 2] = '\0';
 	name_length -= 2;
     }
-    if (strcmp(name, master_file_name)==0) {
+    if (!master_ob_is_loading && !strcmp(name, master_file_name)) {
 	master_ob_is_loading = 1;
 	is_master_ob = 1;
 	/* free the old copy */
@@ -378,6 +382,9 @@ struct object *load_object P2(char *, lname, int, flags)
      */
     (void) strcpy(real_name, name);
     (void) strcat(real_name, ".c");
+    if (!simul_efun_is_loading && !strcmp(real_name, simul_efun_file_name)){
+        simul_efun_is_loading = 1;
+    }
     if (stat(real_name, &c_st) == -1) {
 #ifdef LPC_TO_C
 	real_name[strlen(real_name) - 1] = 'C';
@@ -405,6 +412,10 @@ struct object *load_object P2(char *, lname, int, flags)
 		master_ob_is_loading = 0;
 		return 0;
 	    }
+	    if (simul_efun_is_loading){
+	        simul_efun_is_loading = 0;
+                return 0;
+	    }
 	    if (!(v = load_virtual_object(name))) {
 		return 0;
 	    }
@@ -430,6 +441,7 @@ struct object *load_object P2(char *, lname, int, flags)
      */
     if (!legal_path(real_name)) {
 	if (is_master_ob) master_ob_is_loading = 0;
+	if (simul_efun_is_loading) simul_efun_is_loading = 0;
 	fprintf(stderr, "Illegal pathname: %s\n", real_name);
 	error("Illegal path name '%s'.\n", real_name);
 	return 0;
@@ -444,9 +456,10 @@ struct object *load_object P2(char *, lname, int, flags)
 	    fflush(stderr);
 #endif
 	}
-	f = fopen(real_name, "r");
+	f = open(real_name, O_RDONLY);
 	if (f == 0) {
 	    if (is_master_ob) master_ob_is_loading = 0;
+	    if (simul_efun_is_loading) simul_efun_is_loading = 0;
 	    perror(real_name);
 	    error("Could not read the file '%s'.\n", real_name);
 	}
@@ -455,6 +468,7 @@ struct object *load_object P2(char *, lname, int, flags)
 	    compilation_output_file = crdir_fopen(out_ptr);
 	    if (compilation_output_file == 0) {
 		if (is_master_ob) master_ob_is_loading = 0;
+		if (simul_efun_is_loading) simul_efun_is_loading = 0;
 		perror(out_ptr);
 		error("Could not open output file '%s'.\n", out_ptr);
 	    }
@@ -489,7 +503,7 @@ struct object *load_object P2(char *, lname, int, flags)
 	    fprintf(stderr, " done\n");
 	update_compile_av(total_lines);
 	total_lines = 0;
-	(void) fclose(f);
+	close(f);
 #ifdef SAVE_BINARIES
     }
 #endif
@@ -497,6 +511,7 @@ struct object *load_object P2(char *, lname, int, flags)
     /* Sorry, can't handle objects without programs yet. */
     if (inherit_file == 0 && (num_parse_error > 0 || prog == 0)) {
 	if (is_master_ob) master_ob_is_loading = 0;
+	if (simul_efun_is_loading) simul_efun_is_loading = 0;
 	if (prog)
 	    free_prog(prog, 1);
 	if (num_parse_error == 0 && prog == 0)
@@ -518,6 +533,7 @@ struct object *load_object P2(char *, lname, int, flags)
 	}
 	if (strcmp(inherit_file, name) == 0) {
 	    if (is_master_ob) master_ob_is_loading = 0;
+	    if (simul_efun_is_loading) simul_efun_is_loading = 0;
 	    FREE(inherit_file);
 	    inherit_file = 0;
 	    error("Illegal to inherit self.\n");
@@ -565,14 +581,15 @@ struct object *load_object P2(char *, lname, int, flags)
     push_object(ob);
     mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
     if (mret && !MASTER_APPROVED(mret)) {
+        if (simul_efun_is_loading) simul_efun_is_loading = 0;
 	destruct_object_two(ob);
 	error("master object: " APPLY_VALID_OBJECT "() denied permission to load %s.\n", name);
     }
-
     /* allow updating of simul_efun and adding of new functions -bobf */
     /* moved to here by Beek so we can set the simul_efun_ob */
-    if (prog && simul_efun_file_name &&
+    if (simul_efun_is_loading && prog && simul_efun_file_name &&
 	(strcmp(prog->name, simul_efun_file_name) == 0)) {
+        simul_efun_is_loading = 0;
 	get_simul_efuns(ob->prog);
 	if (simul_efun_ob)
 	    free_object(simul_efun_ob, "load_object");
@@ -869,7 +886,7 @@ static void destruct_object_two P1(struct object *, ob)
     struct object *save_restrict_destruct = restrict_destruct;
 
     if (restrict_destruct && restrict_destruct != ob)
-	error("Only this_object() can be destructed from destruct_object_two.\n");
+	error("Only this_object() can be destructed from move_or_destruct.\n");
 #ifdef SOCKET_EFUNS
     /*
      * check if object has an efun socket referencing it for a callback. if
@@ -1334,14 +1351,6 @@ int get_char P4(char *, fun, int, flag, int, num_arg, struct svalue *, args)
     }
     free_sentence(s);
     return 0;
-}
-
-INLINE void check_legal_string P1(char *, s)
-{
-    if (strlen(s) >= LARGEST_PRINTABLE_STRING) {
-	error("Printable strings limited to length of %d.\n",
-	      LARGEST_PRINTABLE_STRING);
-    }
 }
 
 void print_svalue P1(struct svalue *, arg)
@@ -2013,7 +2022,8 @@ static void error_handler()
     master_ob_is_loading = 0;
     restrict_destruct = 0;
     num_objects_this_thread = 0;/* reset the count */
-    if (error_recovery_context_exists > 1) {	/* user catches this error */
+    if (error_recovery_context_exists == CATCH_ERROR_CONTEXT) {	
+        /* user catches this error */
 	struct svalue v;
 	
 #ifdef LOG_CATCHES
@@ -2074,8 +2084,9 @@ static void error_handler()
     if (num_error > 1)
 	fatal("Too many simultaneous errors.\n");
 #ifdef MUDLIB_ERROR_HANDLER
-    if (num_mudlib_error) {
-	debug_message("Error in error handler: ");
+    if (num_mudlib_error || (error_recovery_context_exists & SAFE_APPLY_ERROR_CONTEXT)) {
+        if (num_mudlib_error)
+	    debug_message("Error in error handler: ");
 	debug_message("%s", emsg_buf);
 	if (current_object)
 	    debug_message("program: %s, object: %s, file: %s\n",
@@ -2163,7 +2174,9 @@ static void error_handler()
 	 * be used any more. The reason is that some strings may have been on
 	 * the stack machine stack, and has been deallocated.
 	 */
-	reset_machine(0);
+	/* In some cases we will allow the stack to clear afterwards - Sym */
+	if (error_recovery_context_exists != SAFE_APPLY_ERROR_CONTEXT)
+	  reset_machine(0);
 	num_error++;
 	if ((command_giver->flags & O_IS_WIZARD) || !strlen(DEFAULT_ERROR_MESSAGE)) {
 	    add_message("%s", emsg_buf + 1);

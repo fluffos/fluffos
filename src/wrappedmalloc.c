@@ -3,7 +3,10 @@
    Truilkan@TMI - 92/04/17
 */
 
+#define IN_MALLOC_WRAPPER
+#define NO_OPCODES
 #include "std.h"
+#include "malloc.h"
 
 typedef struct stats_s {
     unsigned int free_calls, alloc_calls, realloc_calls;
@@ -21,25 +24,25 @@ void wrappedmalloc_init()
 INLINE void *wrappedrealloc P2(void *, ptr, int, size)
 {
     stats.realloc_calls++;
-    return (void *) realloc(ptr, size);
+    return (void *) REALLOC(ptr, size);
 }
 
 INLINE void *wrappedmalloc P1(int, size)
 {
     stats.alloc_calls++;
-    return (void *) malloc(size);
+    return (void *) MALLOC(size);
 }
 
 INLINE void *wrappedcalloc P2(int, nitems, int, size)
 {
     stats.alloc_calls++;
-    return (void *) calloc(nitems, size);
+    return (void *) CALLOC(nitems, size);
 }
 
 INLINE void wrappedfree P1(void *, ptr)
 {
     stats.free_calls++;
-    free(ptr);
+    FREE(ptr);
 }
 
 void dump_malloc_data()

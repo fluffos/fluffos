@@ -11,8 +11,8 @@
 
 #ifndef NO_MUDLIB_STATS
 
-#include "lpc_incl.h"
 #include "mudlib_stats.h"
+#include "lpc_incl.h"
 #include "backend.h"
 
 static mudlib_stats_t *domains = 0;

@@ -53,14 +53,14 @@
 #define Strncpy(x, y, z) (strncpy((char *)x, (char *)y, z))
 
 /* not strictly ANSI, but should always work ... */
-#define HDR_SIZE ((char *)&scratch_head.block[2] - (char *)&scratch_head.next)
+#define HDR_SIZE ((char *)&scratch_head.block[2] - (char *)&scratch_head)
 #define FIND_HDR(x) ((struct sp_block_t *)(x - HDR_SIZE))
 #define SIZE_WITH_HDR(x) (x + HDR_SIZE)
 
 static unsigned char scratchblock[SCRATCHPAD_SIZE];
 static struct sp_block_t scratch_head = { 0, 0 };
-static unsigned char *scr_last = &scratchblock[2], 
-                     *scr_tail = &scratchblock[2];
+unsigned char *scr_last = &scratchblock[2], *scr_tail = &scratchblock[2];
+unsigned char *scratch_end = scratchblock + SCRATCHPAD_SIZE;
 
 #ifdef DEBUG
 static void scratch_summary PROT((void));
@@ -109,7 +109,7 @@ char *scratch_copy P1(char *, str) {
     /* first, take a wild guess that there is room and save a strlen() :) */
     from = Str;
     to = scr_tail+1;
-    end = SCRATCH_END - 2; /* room for zero and len */
+    end = scratch_end - 2; /* room for zero and len */
     if (end > to + 255) end = to + 255;
     while (*from && to < end)
 	*to++ = *from++;
@@ -164,7 +164,7 @@ char *scratch_large_alloc P1(int, size) {
     SDEBUG(printf("scratch_large_alloc(%i)\n", size));
 
     spt = (struct sp_block_t *)DMALLOC(SIZE_WITH_HDR(size), 0, "scratch_alloc");
-    spt->next = scratch_head.next;
+    if (spt->next = scratch_head.next) spt->next->prev = spt;
     spt->prev = (struct sp_block_t *)&scratch_head;
     spt->block[0] = SCRATCH_MAGIC;
     scratch_head.next = spt;
@@ -176,7 +176,7 @@ char *scratch_realloc P2(char *, ptr, int, size) {
     SDEBUG(printf("scratch_realloc(%s): ", ptr));
 
      if (Ptr == scr_last) {
-	 if (size < 256 && (scr_last + size) < SCRATCH_END) {
+	 if (size < 256 && (scr_last + size) < scratch_end) {
 	     SDEBUG(printf("on scratchpad\n"));
 	     scr_tail = scr_last + size;
 	     *scr_tail = size;
@@ -205,7 +205,7 @@ char *scratch_realloc P2(char *, ptr, int, size) {
 
 	 SDEBUG(printf("interior ... "));
 	 /* ACK!! it's in the middle. */
-	 if (size < 256 && (scr_tail + size + 1) < SCRATCH_END) {
+	 if (size < 256 && (scr_tail + size + 1) < scratch_end) {
 	     SDEBUG(printf("move to end\n"));
 	     scr_last = scr_tail + 1;
 	     Strcpy(scr_last, ptr);
@@ -225,7 +225,7 @@ char *scratch_realloc P2(char *, ptr, int, size) {
 /* the routines above are better than this */
 char *scratch_alloc P1(int, size) {
     SDEBUG(printf("scratch_alloc(%i)\n", size));
-    if (size < 256 && (scr_tail + size + 1) < SCRATCH_END) {
+    if (size < 256 && (scr_tail + size + 1) < scratch_end) {
 	scr_last = scr_tail + 1;
 	scr_tail = scr_last + size;
 	*scr_tail = size;
@@ -255,7 +255,7 @@ char *scratch_join P2(char *, s1, char *, s2) {
 	DEBUG_CHECK(S2 != scr_last, "Argument 2 to scratch_join was not the last allocated string.\n");
 	DEBUG_CHECK(S1 != (scr_last - 1 - (*(scr_last - 1))), "Argument 1 to scratch_join was not the second to last allocated string.\n");
 
-	if ((tmp = (*scr_tail + (scr_last - S1) - 2)) < 256) {
+	if ((tmp = ((scr_tail - S1) - 2)) < 256) {
 	    scr_tail = scr_last - 2;
 	    do {
 		*scr_tail = *(scr_tail + 2);
@@ -276,17 +276,16 @@ char *scratch_join P2(char *, s1, char *, s2) {
 
 char *scratch_copy_string P1(char *,s) {
     int l;
-    unsigned char *to = scr_tail + 1;
+    register unsigned char *to = scr_tail + 1;
     char *res;
 
     SDEBUG2(printf("scratch_copy_string\n"));
-    l = SCRATCH_END - to;
+    l = scratch_end - 1 - to;
     if (l > 255) l = 255;
     s++;
     while (l--) {
 	if (*s == '\\') {
-	    s++;
-	    switch (*s) {
+	    switch (*++s) {
 	    case 'n': *to++ = '\n'; break;
 	    case 't': *to++ = '\t'; break;
 	    case 'r': *to++ = '\r'; break;
@@ -308,14 +307,14 @@ char *scratch_copy_string P1(char *,s) {
 	    *to++ = *s++;
     }
     /* estimate the length we need */
-    l = to - scr_tail + strlen(s);
+    /* Note that the last char is we read is ", not \0 - Sym */
+    l = to - scr_tail + strlen(s) - 1;
     res = scratch_large_alloc(l);
-    Strncpy(res, scr_tail + 1, (to - scr_tail) - 1);
+    Strncpy(res, (scr_tail + 1), (to - scr_tail) - 1);
     to = Res + (to - scr_tail) - 1;
     for (;;) {
 	if (*s == '\\') {
-	    s++;
-	    switch (*s) {
+	    switch (*++s) {
 	    case 'n': *to++ = '\n'; break;
 	    case 't': *to++ = '\t'; break;
 	    case 'r': *to++ = '\r'; break;
@@ -334,3 +333,6 @@ char *scratch_copy_string P1(char *,s) {
 	    *to++ = *s++;
     }
 }
+
+
+

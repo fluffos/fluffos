@@ -938,7 +938,7 @@ mapping_indices P1(struct mapping *,m)
 
 	debug(128,("mapping_indices: size = %d\n",m->count));
 
-	v = allocate_array(m->count);
+	v = allocate_empty_array(m->count);
 	sv = v->item;
 	do {
 	    for (elt = a[j]; elt; elt = elt->next)
@@ -959,7 +959,7 @@ mapping_values P1(struct mapping *,m)
 
 	debug(128,("mapping_indices: size = %d\n",m->count));
 
-	v = allocate_array(m->count);
+	v = allocate_empty_array(m->count);
 	sv = v->item;
 	do {
 	    for (elt = a[j]; elt; elt = elt->next)
@@ -1010,7 +1010,7 @@ mapping_each P1(struct mapping *,m)
 			return null_array();  /* have reached the end */
 		}
 	}
-	v = allocate_array(2);
+	v = allocate_empty_array(2);
 	assign_svalue_no_free(v->item, m->elt->values);
 	assign_svalue_no_free(v->item + 1, m->elt->values + 1);
 	m->elt = m->elt->next;

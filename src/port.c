@@ -36,10 +36,10 @@ int random_number P1(int, n)
     return rand() % n;
 #else
 #ifdef RANDOM
-        return random() % n;
+    return random() % n;
 #else				/* RANDOM */
 #ifdef DRAND48
-        return (int) (drand48() * n);
+    return (int) (drand48() * n);
 #else				/* DRAND48 */
 
     return current_time % n;	/* You really don't want to use this method */

@@ -77,6 +77,7 @@ static void remove_simuls() {
 	    if (ihe->dn.simul_num != -1)
 		ihe->sem_value--;
 	    ihe->dn.simul_num = -1;
+	    ihe->token &= ~IHE_SIMUL;
 	}
     }    
 }

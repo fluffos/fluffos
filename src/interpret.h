@@ -46,6 +46,7 @@ union u {
     struct funp *fp;
     struct svalue *lvalue;
     unsigned char *lvalue_byte;
+    void (*error_handler) PROT((void));
 };
 
 /*
@@ -75,17 +76,18 @@ typedef struct svalue {
 #define T_REAL          0x80
 #define T_BUFFER        0x100
 #define T_LVALUE_BYTE   0x200	/* byte-sized lvalue */
+#define T_ERROR_HANDLER 0x400
 #ifdef DEBUG
-#define T_FREED         0x400
+#define T_FREED         0x800
 #endif
 
 #define T_ANY T_STRING|T_NUMBER|T_POINTER|T_OBJECT|T_MAPPING|T_FUNCTION| \
 	T_REAL|T_BUFFER
 
 /* values for subtype field of svalue struct */
-#define STRING_MALLOC	0x0	/* Allocated by malloc() */
-#define STRING_CONSTANT	0x1	/* Do not has to be freed at all */
-#define STRING_SHARED	0x2	/* Allocated by the shared string library */
+#define STRING_MALLOC	0x1	/* Allocated by malloc() */
+#define STRING_CONSTANT	0x2	/* Do not has to be freed at all */
+#define STRING_SHARED	0x4	/* Allocated by the shared string library */
 #define T_UNDEFINED     0x4	/* undefinedp() returns true */
 #define T_NULLVALUE     0x8	/* nullp() returns true */
 #define T_REMOTE        0x10	/* remote object (subtype of object) */
@@ -182,6 +184,19 @@ struct control_stack {
 #define free_svalue(x,y) int_free_svalue(x)
 #endif
 
+#define push_svalue(x) assign_svalue_no_free(++sp, x)
+#define put_number(x) sp->type = T_NUMBER;sp->subtype = 0;sp->u.number = (x);
+#define put_object(x) sp->type = T_OBJECT; sp->u.ob = (x);
+#define put_unrefed_object(x, y) sp->type = T_OBJECT; sp->u.ob = (x); \
+   add_ref((x), y);
+#define put_constant_string(x) sp->type = T_STRING;sp->subtype = STRING_CONSTANT; \
+                sp->u.string = (x);
+#define put_malloced_string(x) sp->type = T_STRING; sp->subtype = STRING_MALLOC; \
+                sp->u.string = (x);
+#define put_vector(x) sp->type = T_POINTER; sp->u.vec = (x);
+#define put_shared_string(x) sp->type = T_STRING; sp->subtype = STRING_SHARED; \
+                sp->u.string = (x);
+
 extern struct program *current_prog;
 extern short caller_type;
 extern char *pc;
@@ -199,48 +214,50 @@ extern unsigned int apply_low_slots_used;
 extern unsigned int apply_low_collisions;
 extern int function_index_offset;
 extern int master_ob_is_loading;
+extern int simul_efun_is_loading;
 extern struct function fake_func;
 extern struct program fake_prog;
 
 /* with LPC_TO_C off, these are defines using eval_instruction */
 #ifdef LPC_TO_C
 void call_program PROT((struct program *, int));
+
+
 void call_absolute PROT((char *));
 #endif
 void eval_instruction PROT((char *p));
-void assign_svalue PROT((struct svalue *, struct svalue *));
-void assign_svalue_no_free PROT((struct svalue *, struct svalue *));
-void copy_some_svalues PROT((struct svalue *, struct svalue *, int));
-void transfer_push_some_svalues PROT((struct svalue *, int));
-void push_some_svalues PROT((struct svalue *, int));
+INLINE void assign_svalue PROT((struct svalue *, struct svalue *));
+INLINE void assign_svalue_no_free PROT((struct svalue *, struct svalue *));
+INLINE void copy_some_svalues PROT((struct svalue *, struct svalue *, int));
+INLINE void transfer_push_some_svalues PROT((struct svalue *, int));
+INLINE void push_some_svalues PROT((struct svalue *, int));
 #ifdef DEBUG
-void int_free_svalue PROT((struct svalue *, char *));
+INLINE void int_free_svalue PROT((struct svalue *, char *));
 #else
-void int_free_svalue PROT((struct svalue *));
+INLINE void int_free_svalue PROT((struct svalue *));
 #endif
-void free_string_svalue PROT((struct svalue *));
-void free_some_svalues PROT((struct svalue *, int));
-void push_object PROT((struct object *));
-void push_number PROT((int));
-void push_real PROT((double));
-void push_undefined PROT((void));
-void push_null PROT((void));
-void push_string PROT((char *, int));
-void push_svalue PROT((struct svalue *));
-void push_vector PROT((struct vector *));
-void push_refed_vector PROT((struct vector *));
-void push_buffer PROT((struct buffer *));
-void push_refed_buffer PROT((struct buffer *));
-void push_mapping PROT((struct mapping *));
-void push_refed_mapping PROT((struct mapping *));
-void push_malloced_string PROT((char *));
-void push_constant_string PROT((char *));
-void pop_stack PROT((void));
-void pop_n_elems PROT((int));
-void pop_2_elems PROT((void));
-void pop_3_elems PROT((void));
+INLINE void free_string_svalue PROT((struct svalue *));
+INLINE void free_some_svalues PROT((struct svalue *, int));
+INLINE void push_object PROT((struct object *));
+INLINE void push_number PROT((int));
+INLINE void push_real PROT((double));
+INLINE void push_undefined PROT((void));
+INLINE void push_null PROT((void));
+INLINE void push_string PROT((char *, int));
+INLINE void push_svalue PROT((struct svalue *));
+INLINE void push_vector PROT((struct vector *));
+INLINE void push_refed_vector PROT((struct vector *));
+INLINE void push_buffer PROT((struct buffer *));
+INLINE void push_refed_buffer PROT((struct buffer *));
+INLINE void push_mapping PROT((struct mapping *));
+INLINE void push_refed_mapping PROT((struct mapping *));
+INLINE void push_malloced_string PROT((char *));
+INLINE void push_constant_string PROT((char *));
+INLINE void pop_stack PROT((INLINE void));
+INLINE void pop_n_elems PROT((int));
+INLINE void pop_2_elems PROT((void));
+INLINE void pop_3_elems PROT((void));
 void remove_object_from_stack PROT((struct object *));
-
 void setup_fake_frame PROT((struct funp *));
 void remove_fake_frame PROT((void));
 
@@ -271,7 +288,7 @@ int inter_sscanf PROT((struct svalue *, struct svalue *, struct svalue *, int));
 char * get_line_number_if_any PROT((void));
 void get_line_number_info PROT((char **, int *));
 void get_version PROT((char *));
-int reset_machine PROT((int));
+void reset_machine PROT((int));
 
 #ifndef NO_SHADOWS
 int validate_shadowing PROT((struct object *));

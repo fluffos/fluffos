@@ -67,7 +67,7 @@ void push_address()
 	comp_stackp++;
 	return;
     }
-    comp_stack[comp_stackp++] = mem_block[current_block].current_size;
+    comp_stack[comp_stackp++] = CURRENT_PROGRAM_SIZE;
 }
 
 int pop_address()
@@ -85,13 +85,16 @@ static void ins_real P1(double, l)
 {
     float f = (float)l;
 
-    struct mem_block *mbp = &mem_block[current_block];
-    if (mbp->current_size + 4 > mbp->max_size)
-	realloc_mem_block(mbp, mbp->current_size + 4);
-    mbp->block[mbp->current_size++] = ((char *)&f)[0];
-    mbp->block[mbp->current_size++] = ((char *)&f)[1];
-    mbp->block[mbp->current_size++] = ((char *)&f)[2];
-    mbp->block[mbp->current_size++] = ((char *)&f)[3];
+    if (prog_code + 4 > prog_code_max) {
+	struct mem_block *mbp = &mem_block[current_block];
+
+	UPDATE_PROGRAM_SIZE;
+	realloc_mem_block(mbp, mbp->current_size + 100);
+	
+	prog_code = mbp->block + mbp->current_size;
+	prog_code_max = mbp->block + mbp->max_size;
+    }
+    STORE_FLOAT(prog_code, f);
 }
 
 /*
@@ -101,19 +104,22 @@ static void ins_real P1(double, l)
  */
 void ins_short P1(short, l)
 {
-    struct mem_block *mbp = &mem_block[current_block];
-    if (mbp->current_size + 2 > mbp->max_size)
-	realloc_mem_block(mbp, mbp->current_size + 2);
-    mbp->block[mbp->current_size++] = ((char *)&l)[0];
-    mbp->block[mbp->current_size++] = ((char *)&l)[1];
+    if (prog_code + 2 > prog_code_max) {
+	struct mem_block *mbp = &mem_block[current_block];
+	UPDATE_PROGRAM_SIZE;
+	realloc_mem_block(mbp, mbp->current_size + 100);
+	
+	prog_code = mbp->block + mbp->current_size;
+	prog_code_max = mbp->block + mbp->max_size;
+    }
+    STORE_SHORT(prog_code, l);
 }
 
 short read_short P1(int, offset)
 {
     short l;
 
-    ((char *)&l)[0] = mem_block[current_block].block[offset];
-    ((char *)&l)[1] = mem_block[current_block].block[offset + 1];
+    COPY_SHORT(&l, mem_block[current_block].block + offset);
     return l;
 }
 
@@ -123,34 +129,42 @@ short read_short P1(int, offset)
  */
 void ins_long P1(int, l)
 {
-    struct mem_block *mbp = &mem_block[current_block];
-    if (mbp->current_size + 4 > mbp->max_size)
-	realloc_mem_block(mbp, mbp->current_size + 4);
-    mbp->block[mbp->current_size++] = ((char *)&l)[0];
-    mbp->block[mbp->current_size++] = ((char *)&l)[1];
-    mbp->block[mbp->current_size++] = ((char *)&l)[2];
-    mbp->block[mbp->current_size++] = ((char *)&l)[3];
+    if (prog_code + 4 > prog_code_max) {
+	struct mem_block *mbp = &mem_block[current_block];
+	UPDATE_PROGRAM_SIZE;
+	realloc_mem_block(mbp, mbp->current_size + 100);
+	
+	prog_code = mbp->block + mbp->current_size;
+	prog_code_max = mbp->block + mbp->max_size;
+    }
+    STORE_INT(prog_code, l);
 }
 
 void upd_short P2(int, offset, short, l)
 {
+    IF_DEBUG(UPDATE_PROGRAM_SIZE);
     DEBUG_CHECK2(offset > CURRENT_PROGRAM_SIZE,
 		 "patch offset %x larger than current program size %x.\n",
 		 offset, CURRENT_PROGRAM_SIZE);
-    mem_block[current_block].block[offset] = ((char *)&l)[0];
-    mem_block[current_block].block[offset + 1] = ((char *)&l)[1];
+    COPY_SHORT(mem_block[current_block].block + offset, &l);
 }
 
 static void ins_byte P1(unsigned char, b)
 {
-    struct mem_block *mbp = &mem_block[current_block];
-    if (mbp->current_size == mbp->max_size)
-	realloc_mem_block(mbp, mbp->current_size + 1);
-    mbp->block[mbp->current_size++] = b;
+    if (prog_code == prog_code_max) {
+	struct mem_block *mbp = &mem_block[current_block];
+	UPDATE_PROGRAM_SIZE;
+	realloc_mem_block(mbp, mbp->current_size + 100);
+	
+	prog_code = mbp->block + mbp->current_size;
+	prog_code_max = mbp->block + mbp->max_size;
+    }
+    *prog_code++ = b;
 }
 
 static void upd_byte P2(int, offset, unsigned char, b)
 {
+    IF_DEBUG(UPDATE_PROGRAM_SIZE);
     DEBUG_CHECK2(offset > CURRENT_PROGRAM_SIZE,
 		"patch offset %x larger than current program size %x.\n",
 		offset, CURRENT_PROGRAM_SIZE);
@@ -228,14 +242,12 @@ switch_to_line P1(int, line) {
 	while (sz > 255) {
 	    p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS, 3);
 	    *p++ = 255;
-	    *p++ = ((char *)&s)[0];
-	    *p = ((char *)&s)[1];
+	    STORE_SHORT(p, s);
 	    sz -= 255;
 	}
 	p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS, 3);
 	*p++ = sz;
-	*p++ = ((char *)&s)[0];
-	*p = ((char *)&s)[1];
+	STORE_SHORT(p, s);
     }
     line_being_generated = line;
 }
@@ -412,6 +424,17 @@ i_generate_node P1(struct parse_node *, expr) {
 	    i_restore_loop_info();
 	}
 	break;
+    case NODE_DO_WHILE:
+        {
+            i_save_loop_info();
+            i_save_position();
+            i_generate_node(expr->left);
+            i_update_continues();
+            generate_conditional_branch(expr->right);
+            i_update_breaks();
+            i_restore_loop_info();
+	}
+        break;
     case NODE_CASE_NUMBER:
     case NODE_CASE_STRING:
 	if (expr->v.expr) {
@@ -682,11 +705,12 @@ void i_generate_return P1(struct parse_node *, node) {
 }
 
 void i_generate___INIT() {
-    current_block = A_PROGRAM;
+    end_initializer(); /* just in case */
     upd_byte(0, F_BRANCH);
     upd_short(1, CURRENT_PROGRAM_SIZE - 1);
     add_to_mem_block(A_PROGRAM, (char *)mem_block[A_INITIALIZER].block,
 		     mem_block[A_INITIALIZER].current_size);
+    prog_code = mem_block[A_PROGRAM].block + mem_block[A_PROGRAM].current_size;
 }
 
 void i_generate_continue() {
@@ -800,7 +824,11 @@ i_initialize_parser() {
     current_continue_address = 0;
     current_break_address = 0;
     current_forward_branch = 0;
+    
     current_block = A_PROGRAM;
+    prog_code = mem_block[A_PROGRAM].block;
+    prog_code_max = mem_block[A_PROGRAM].block + mem_block[A_PROGRAM].max_size;
+
     ins_byte(0); /* will be changed to an F_BRANCH if an initializer
 		    exists */
     ins_short(0);
@@ -816,6 +844,7 @@ i_initialize_parser() {
 void
 i_generate_final_program P1(int, x) {
     if (!x) {
+	UPDATE_PROGRAM_SIZE;
 	if (pragmas & PRAGMA_OPTIMIZE)
 	    optimize_icode(0, 0, 0);
 	save_file_info(current_file_id, current_line - current_line_saved);
@@ -861,8 +890,7 @@ optimize_icode P3(char *, start, char *, pc, char *, end) {
 		char *tmp;
 		short sarg;
 		/* thread jumps */
-		((char *) &sarg)[0] = pc[0];
-		((char *) &sarg)[1] = pc[1];
+		COPY_SHORT(&sarg, pc);
 		if (instr > F_BRANCH)
 		    tmp = pc - sarg;
 		else 
@@ -870,12 +898,10 @@ optimize_icode P3(char *, start, char *, pc, char *, end) {
 		sarg = 0;
 		while (1) {
 		    if (EXTRACT_UCHAR(tmp) == F_BRANCH) {
-			((char *) &sarg)[0] = tmp[1];
-			((char *) &sarg)[1] = tmp[2];
+			COPY_SHORT(&sarg, tmp + 1);
 			tmp += sarg + 1;
 		    } else if (EXTRACT_UCHAR(tmp) == F_BBRANCH) {
-			((char *) &sarg)[0] = tmp[1];
-			((char *) &sarg)[1] = tmp[2];
+			COPY_SHORT(&sarg, tmp + 1);
 			tmp -= sarg - 1;
 		    } else break;
 		}
@@ -897,8 +923,7 @@ optimize_icode P3(char *, start, char *, pc, char *, end) {
 		    }
 		    sarg = pc - tmp;
 		}
-		*pc++ = ((char *) &sarg)[0];
-		*pc++ = ((char *) &sarg)[1];
+		STORE_SHORT(pc, sarg);
 		break;
 	    }
 #ifdef F_LOR
@@ -908,18 +933,15 @@ optimize_icode P3(char *, start, char *, pc, char *, end) {
 		char *tmp;
 		short sarg;
 		/* thread jumps */
-		((char *) &sarg)[0] = pc[0];
-		((char *) &sarg)[1] = pc[1];
+		COPY_SHORT(&sarg, pc);
 		tmp = pc + sarg;
 		sarg = 0;
 		while (1) {
 		    if (EXTRACT_UCHAR(tmp) == F_BRANCH) {
-			((char *) &sarg)[0] = tmp[1];
-			((char *) &sarg)[1] = tmp[2];
+			COPY_SHORT(&sarg, tmp + 1);
 			tmp += sarg + 1;
 		    } else if (EXTRACT_UCHAR(tmp) == F_BBRANCH) {
-			((char *) &sarg)[0] = tmp[1];
-			((char *) &sarg)[1] = tmp[2];
+			COPY_SHORT(&sarg, tmp + 1);
 			tmp -= sarg - 1;
 		    } else break;
 		}
@@ -938,8 +960,7 @@ optimize_icode P3(char *, start, char *, pc, char *, end) {
 #endif
 		    break;
 		}
-		*pc++ = ((char *) &sarg)[0];
-		*pc++ = ((char *) &sarg)[1];
+		STORE_SHORT(pc, sarg);
 		break;
 	    }
 #endif
@@ -991,10 +1012,8 @@ optimize_icode P3(char *, start, char *, pc, char *, end) {
 	    {
 		unsigned short stable, etable;
 		pc++; /* table type */
-		((char *) &stable)[0] = EXTRACT_UCHAR(pc++);
-		((char *) &stable)[1] = EXTRACT_UCHAR(pc++);
-		((char *) &etable)[0] = EXTRACT_UCHAR(pc++);
-		((char *) &etable)[1] = EXTRACT_UCHAR(pc++);
+		LOAD_SHORT(stable, pc);
+		LOAD_SHORT(etable, pc);
 		pc += 2; /* def */
 		DEBUG_CHECK(stable < pc - start || etable < pc - start 
 			    || etable < stable,

@@ -14,7 +14,6 @@
  */
 
 #define SCRATCHPAD_SIZE  4096
-#define SCRATCH_END &scratchblock[SCRATCHPAD_SIZE]
 #define SDEBUG(x) 
 #define SDEBUG2(x) 
 
@@ -33,6 +32,10 @@ struct sp_block_t {
         scr_tail = --scr_last; \
         scr_last -= *scr_tail; \
     }
+
+extern unsigned char *scr_last;
+extern unsigned char *scr_tail;
+extern unsigned char *scratch_end;
 
 /*
  *  scratchpad.c

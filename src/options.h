@@ -14,33 +14,48 @@
  *  of the code associated with it.
  */
 
-/* You must choose exactly one of these mallocs.
+/* You must choose exactly one of these malloc packages:
+ *     ~~~~
+ * SYSMALLOC:
+ *   * Built-in system malloc.
+ *   * No statistics.
+ *   * SYSMALLOC incurs no additional CPU or memory overhead.
  *
- * SYSMALLOC: builtin system malloc.  No wrappers, no statistics.  Can
- *   be used in conjunction with BSD or SMALLOC (in which case you will get
- *   malloc statistics if DO_MSTATS is also defined).  SYSMALLOC incurs no
- *   additional cpu or memory overhead.
- * WRAPPEDMALLOC: wrapper for builtin system malloc.  Provides limited
- *   statistics, can be used in conjunction with BSDMALLOC/SMALLOC.  Limited
- *   additional cpu overhead and no additional memory overhead.
- * DEBUGMALLOC:  May be used in conjunction with BSDMALLOC/SMALLOC.  Provides
- *   statistics on precisely how much memory has been malloc'd (as well
- *   as the stats provided by WRAPPEDMALLOC).  Incurs a fair amount of
- *   overhead (both memory and cpu usage).
+ * SMALLOC:
+ *   * Satoria's smalloc.
+ *   * Statistics available. (see wrappers and DO_MSTATS)
+ *   * Faster than most system mallocs with modest ammount of memory overhead.
+ *   * Can fall back onto system malloc if sbrk() not ok.
  *
- * [NOTE: BSDMALLOC and SMALLOC are also options however they must be
- *  selected from the Makefile rather than here since they are actual
- *  replacements for system malloc rather than wrappers for system malloc
- *  as are WRAPPEDMALLOC and DEBUGMALLOC.]
+ * BSDMALLOC:
+ *   * BSD (Berkeley Software Distributions) malloc.
+ *   * Statistics available. (see wrappers and DO_MSTATS)
+ *   * Faster than SMALLOC but more memory overhead.
+ *   * Requires sbrk().
  */
 #define SYSMALLOC
+#undef SMALLOC
+#undef BSDMALLOC
+
+/* You may optionally choose one (or none) of these malloc wrappers.  These
+ * can be used in conjunction with any of the above malloc packages.
+ *
+ * WRAPPEDMALLOC:
+ *   * Limited statistics.
+ *   * Limited additional cpu overhead and no additional memory overhead.
+ *
+ * DEBUGMALLOC:
+ *   * Statistics on precisely how much memory has been malloc'd (as well
+ *     as the stats provided by WRAPPEDMALLOC).
+ *   * Incurs a fair ammount of overhead (both memory and CPU)
+ */
 #undef WRAPPEDMALLOC
 #undef DEBUGMALLOC
 
-/* DO_MSTATS: do not define this unless BSDMALLOC or SMALLOC is chosen in the
- *   Makefile.  Defining this causes those replacement mallocs to keep
- *   statistics that the malloc_status() efun will print out (including total
- *   memory allocated/used).
+/* DO_MSTATS: do not define this unless BSDMALLOC or SMALLOC is chosen above.
+ *   Defining this causes those replacement mallocs to keep statistics that
+ *   the malloc_status() efun will print out (including total memory
+ *   allocated/used).
  */
 #undef DO_MSTATS
 
@@ -441,8 +456,8 @@
  */
 #undef ALWAYS_SAVE_COMPILED_BINARIES
 
-/* TRACE_CODE: define this to enable code tracing (the driver will print out
- *   the previous lines of code to an error) -- eval_instruction() runs about
+/* TRACE_CODE: define this to enable code tracing (the driver will print
+ *   out the previous lines of code to an error) eval_instruction() runs about
  *   twice as fast when this is not defined (for the most common eoperators).
  */
 #undef TRACE_CODE

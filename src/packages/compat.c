@@ -6,65 +6,59 @@
 
 #ifdef F_CAT
 void
-f_cat(num_arg, instruction)
-int num_arg, instruction;
+f_cat PROT((void))
 {
-  struct svalue *arg;
-  int i, start = 0, len = 0;
+    struct svalue *arg;
+    int i, start = 0, len = 0;
 
-  arg = sp - num_arg + 1;
-  if (num_arg > 1)
-    start = arg[1].u.number;
-  if (num_arg == 3)
-    {	
-      if (arg[2].type != T_NUMBER)
-	bad_arg(2, instruction);
-      len = arg[2].u.number;
+    arg = sp - st_num_arg + 1;
+    if (st_num_arg > 1){
+	start = arg[1].u.number;
+	if (st_num_arg == 3)
+	{	
+	    if (sp->type != T_NUMBER)
+		bad_arg(2, F_CAT);
+	    len = (sp--)->u.number;
+	}
+	sp--;
     }
-  i = print_file(arg[0].u.string, start, len);
-  pop_n_elems(num_arg);
-  push_number(i);
+    i = print_file(arg[0].u.string, start, len);
+    free_string_svalue(sp);
+    put_number(i);
 }
 #endif
 
 #ifdef F_LOG_FILE
 void
-f_log_file(num_arg, instruction)
-int num_arg, instruction;
+f_log_file PROT((void))
 {
-	if (IS_ZERO(sp)) {
-		bad_arg(2, instruction);
-		pop_stack();
-	} else {
-		log_file((sp-1)->u.string, sp->u.string);
-		pop_stack();
-	}
+    log_file((sp-1)->u.string, sp->u.string);
+    free_string_svalue(sp--);
 }
 #endif
 
 #ifdef F_EXTRACT
 void
-f_extract(num_arg, instruction)
-int num_arg, instruction;
+f_extract PROT((void))
 {
   int len, from, to;
   struct svalue *arg;
   char *res;
 
-  arg = sp - num_arg + 1;
+  arg = sp - st_num_arg + 1;
   len = SVALUE_STRLEN(arg);
-  if (num_arg == 1)
+  if (st_num_arg == 1)
     return;
   from = arg[1].u.number;
   if (from < 0)
     from = len + from;
   if (from >= len)
     {
-      pop_n_elems(num_arg);
+      pop_n_elems(st_num_arg);
       push_string("", STRING_CONSTANT);
       return;
     }
-  if (num_arg == 2)
+  if (st_num_arg == 2)
     {
       res = string_copy(arg->u.string + from);
       pop_2_elems();
@@ -101,57 +95,16 @@ int num_arg, instruction;
 
 #ifdef F_NEXT_LIVING
 void
-f_next_living(num_arg, instruction)
-int num_arg, instruction;
+f_next_living PROT((void))
 {
-  ob = sp->u.ob->next_hashed_living;
-  pop_stack();
-  if (!ob)
-    push_number(0);
-  else
-    push_object(ob);
-}
-#endif
-
-#ifdef F_FIRST_INVENTORY
-void
-f_first_inventory(num_arg, instruction)
-int num_arg, instruction;
-{
-  ob = first_inventory(sp);
-  pop_stack();
-  if (ob)
-    push_object(ob);
-  else
-    push_number(0);
-}
-#endif
-
-#ifdef F_NEXT_INVENTORY
-void
-f_next_inventory(num_arg, instruction)
-int num_arg, instruction;
-{
-  ob = sp->u.ob;
-  pop_stack();
-  ob = ob->next_inv;
-  while (ob)
-  {
-    if (ob->flags & O_HIDDEN)
-    {
-      if (object_visible(ob))
-      {
-        push_object(ob);
-        return;
-      }
-    } else
-    {
-      push_object(ob);
-      return;
+    ob = sp->u.ob->next_hashed_living;
+    free_object(sp->u.ob, "f_next_living");
+    if (!ob) *sp = const0;
+    else {
+      add_ref(ob, "next_living(ob)");
+      sp->u.ob = ob;
     }
-    ob = ob->next_inv;
-  }
-    push_number(0);
 }
 #endif
+
 

@@ -32,7 +32,7 @@ free_tree() {
 
     if (!(cur_block = parse_block_list))
 	return;
-	
+
     while (cur_block->next) cur_block = cur_block->next;
 
     /* put all the blocks in the free list */
@@ -69,7 +69,7 @@ new_node() {
 	next_node->line = current_line_base + current_line;
 	return next_node++;
     }
-    
+
     /* no more nodes in the current block; do we have a free one? */
     if (cur_block = free_block_list) {
 	free_block_list = cur_block->next;
@@ -96,14 +96,14 @@ new_node_no_line() {
 
     /* fast case */
     if (next_node < last_node) {
-	next_node->line = 0;
-	return next_node++;
+      next_node->line = 0;
+      return next_node++;
     }    
     /* no more nodes in the current block; do we have a free one? */
     if (cur_block = free_block_list) {
-	free_block_list = cur_block->next;
+      free_block_list = cur_block->next;
     } else {
-	cur_block = (struct parse_node_block *)DMALLOC(sizeof(struct parse_node_block), 0, "new_node");
+      cur_block = (struct parse_node_block *)DMALLOC(sizeof(struct parse_node_block), 0, "new_node");
     }
     /* add to block list */
     cur_block->next = parse_block_list;
@@ -133,54 +133,57 @@ make_branched_node P4(short, kind, char, type,
 struct parse_node *
 binary_int_op P4(struct parse_node *, l, struct parse_node *, r,
 		 char, op, char *, name) {
-    if (exact_types && !TYPE(l->type, TYPE_NUMBER)) {
-	char buf[256];
-	strcpy(buf, "Bad left argument to '");
-	strcat(buf, name);
-	strcat(buf, "' : \"");
-	strcat(buf, get_type_name(l->type));
-	strcat(buf, "\"");
-	yyerror(buf);
-    }
-    if (exact_types && !TYPE(r->type,TYPE_NUMBER)) {
-	char buf[256];
-	strcpy(buf, "Bad right argument to '");
-	strcat(buf, name);
-	strcat(buf, "' : \"");
-	strcat(buf, get_type_name(r->type));
-	strcat(buf, "\"");
-	yyerror(buf);
+    if (exact_types){
+	if (!BASIC_TYPE(l->type, TYPE_NUMBER)){
+	    char buf[256];
+	    strcpy(buf, "Bad left argument to '");
+	    strcat(buf, name);
+	    strcat(buf, "' : \"");
+	    strcat(buf, get_type_name(l->type));
+	    strcat(buf, "\"");
+	    yyerror(buf);
+	}
+	if (!BASIC_TYPE(r->type,TYPE_NUMBER)) {
+	    char buf[256];
+	    strcpy(buf, "Bad right argument to '");
+	    strcat(buf, name);
+	    strcat(buf, "' : \"");
+	    strcat(buf, get_type_name(r->type));
+	    strcat(buf, "\"");
+	    yyerror(buf);
+	}
     }
     if (l->kind == F_NUMBER) {
-	if (r->kind == F_NUMBER) {
-	    switch (op) {
-	    case F_OR: l->v.number |= r->v.number; break;
-	    case F_XOR: l->v.number ^= r->v.number; break;
-	    case F_AND: l->v.number &= r->v.number; break;
-	    case F_LSH: l->v.number <<= r->v.number; break;
-	    case F_RSH: l->v.number >>= r->v.number; break;
-	    case F_MOD:
-		if (r->v.number == 0) {
-		    yyerror("Modulo by zero constant");
-		    break;
-		}
-		l->v.number %= r->v.number; break;
-	    default: fatal("Unknown opcode in binary_int_op()\n");
-	    }
-	    return l;
-	}
-	switch (op) {
-	case F_OR:
-	case F_XOR:
-	case F_AND:
-	    return make_branched_node(op, TYPE_NUMBER, r, l);
-	}
+      if (r->kind == F_NUMBER) {
+          switch (op) {
+          case F_OR: l->v.number |= r->v.number; break;
+          case F_XOR: l->v.number ^= r->v.number; break;
+          case F_AND: l->v.number &= r->v.number; break;
+          case F_LSH: l->v.number <<= r->v.number; break;
+          case F_RSH: l->v.number >>= r->v.number; break;
+          case F_MOD:
+              if (r->v.number == 0) {
+                  yyerror("Modulo by zero constant");
+                  break;
+              }
+             l->v.number %= r->v.number; break;
+          default: fatal("Unknown opcode in binary_int_op()\n");
+          }
+          return l;
+      }
+      switch (op) {
+      case F_OR:
+      case F_XOR:
+      case F_AND:
+          return make_branched_node(op, TYPE_NUMBER, r, l);
+      }
     }
     return make_branched_node(op, TYPE_NUMBER, l, r);
 }
-
+  
 struct parse_node *insert_pop_value P1(struct parse_node *, expr) {
     struct parse_node *replacement;
+
     switch (expr->kind) {
     case F_ASSIGN: expr->kind = F_VOID_ASSIGN; break;
     case F_ADD_EQ: expr->kind = F_VOID_ADD_EQ; break;

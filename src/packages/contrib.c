@@ -7,7 +7,7 @@
 /* I forgot who wrote this, please claim it :) */
 #ifdef F_REMOVE_SHADOW
 void
-f_remove_shadow P2(int, num_arg, int, instruction)
+f_remove_shadow PROT((void))
 {
     struct object *ob;
     
@@ -35,7 +35,7 @@ f_remove_shadow P2(int, num_arg, int, instruction)
    when I added it (added function support, etc) -Beek */
 #ifdef F_QUERY_NOTIFY_FAIL
 void
-f_query_notify_fail P2(int, num_arg, int, instruction) {
+f_query_notify_fail PROT((void))
     char *p;
 
     if (command_giver && command_giver->interactive) {
@@ -58,9 +58,9 @@ f_query_notify_fail P2(int, num_arg, int, instruction) {
 /* Beek */
 #ifdef F_SET_PROMPT
 void
-f_set_prompt P2(int, num_arg, int, instruction) {
+f_set_prompt PROT((void))
     struct object *who;
-    if (num_arg == 2) {
+    if (st_num_arg == 2) {
 	who = sp->u.ob;
 	pop_stack();
     } else who = command_giver;
@@ -87,7 +87,7 @@ struct vector *deep_copy_vector P1( struct vector *, arg ) {
     struct vector *vec;
     int i;
     
-    vec = allocate_array(arg->size);
+    vec = allocate_empty_array(arg->size);
     for (i = 0; i < arg->size; i++)
 	deep_copy_svalue(&arg->item[i], &vec->item[i]);
     return vec;
@@ -143,7 +143,8 @@ void deep_copy_svalue P2(struct svalue *, from, struct svalue *, to) {
     }
 }
 
-void f_copy P2(int, num_arg, int, instruction) {
+void f_copy PROT((void))
+{
     struct svalue ret;
     
     depth = 0;
@@ -156,7 +157,7 @@ void f_copy P2(int, num_arg, int, instruction) {
 /* Gudu@VR */    
 /* This should have flag and other function info etc -Beek */
 #ifdef F_FUNCTIONS
-void f_functions P2(int, num_arg, int, instruction) {
+void f_functions PROT((void))
     int i, num;
     struct vector *vec;
     struct function *functions;
@@ -164,7 +165,7 @@ void f_functions P2(int, num_arg, int, instruction) {
     num = sp->u.ob->prog->p.i.num_functions;
     functions = sp->u.ob->prog->p.i.functions;
     
-    vec = allocate_array(num);
+    vec = allocate_empty_array(num);
     i = num;
     
     while (i--) {
@@ -178,103 +179,182 @@ void f_functions P2(int, num_arg, int, instruction) {
 }
 #endif
 
-/* Gudu@VR */
-/*
- * efun::map_string() -- Replace all occurrences of mapping keys in a string
- *                       with the corresponding mapping values.  It is similar
- *                       to efun::replace_string() except that it acomplishes
- *                       multiple different replacements in one pass.
- *
- * This scheme first extracts, from the input mapping, arrays of the mapping
- * keys, mapping values, first chars of the mapping keys, and sizes of the
- * mapping keys and values.  The string to map is then iterated over char
- * by char and compared to the array of mapping key first chars.  When a
- * mapping first char is found, the set of mapping keys is iterated over
- * and compared to the proper length of the string to be mapped.  If one of
- * the mapping keys matches, it is copied into the return string in place
- * of the corresponding char from the input string.
- *
- * Notes: It would be more efficient to use a pair of vectors as input
- *        instead of accepting a mapping and then extracting the vectors.
- *        I chose the mapping scheme because I thought it provided a better
- *        interface to the LPC coder.
- *        At present the routine will error if the mapping contains any keys
- *        or values that are not of type T_STRING.  This is somewhat of a
- *        kludge.  A more elegant solution might convert these non-strings
- *        to a string or somehow exclude them.  However, I don't really
- *        know if its worth the extra effort and or overhead.
- *
- * Gudu@VR 2/10/94
- */
-#ifdef F_MAP_STRING
-/* this should come from elsewhere */
-#define MAX_STRING_SIZE 8096
 
-/* This uses malloc() directly.  That's a no-no */
-void f_map_string P2( int, num_arg, int, instruction)
+
+
+
+
+
+
+
+/Aleas@Nightmare */
+#ifdef F_TERMINAL_COLOUR
+/* A fast implementation of the Nightmare color support.
+
+   Rewritten several times, since Beek wants it to be
+   perfect :)
+
+   Takes a string and a mapping as args. The string is
+   exploded using "%^" as delimiter, then all keys of
+   the mapping found in the resulting array are replaced
+   by their values. Afterwards a string imploded from
+   the array is returned.
+
+   No actual string copying is done except for the
+   creation of the final string and a temporary copy of
+   the input string to avoid destruction of shared
+   input strings. An array of pointers to the segments
+   of the string is compared against the mapping keys
+   and replaced with a pointer to the value belonging to
+   that key where matches are found.
+
+   After the replacement pass the result string is created
+   from the pointer array.
+
+   Further speed is gained by the fact that no parsing is
+   done if the input string does not contain any "%^" 
+   delimiter sequence.
+
+   by Aleas@Nightmare, dec-94 */
+
+/* number of input string segments, if more, it still works, but a _slow_ realloc is required */
+#define NSTRSEGS 32
+void 
+f_terminal_colour P2( int, num_arg, int, instruction)
 {
-    int i, *map_key_sizes, *map_val_sizes;
-    struct vector *map_keys, *map_vals;
-    char *search_keys, *ptr1, *ptr2, *ptr3, str[MAX_STRING_SIZE];
-    char *overflow_ptr;
-    
-    /* Setup a workspace. */
-    /* This is to speed and simplify the processing below. */
-    map_keys = mapping_indices( sp->u.map);
-    map_vals = mapping_values( sp->u.map);
-    i = map_keys->size;
-    search_keys = (char *)malloc( i+1);
-    map_key_sizes = (int *)malloc( sizeof( int)*i);
-    map_val_sizes = (int *)malloc( sizeof( int)*i);
-    search_keys[i] = '\0'; /* Null terminate the string */
-    while( i--) {
-	if( map_keys->item[i].type != T_STRING)
-	    /* For now, just bomb. */
-	    error("Mapping index not of type string in map_string().\n");
-	if( map_vals->item[i].type != T_STRING)
-	    /* For now, just bomb. */
-	    error("Mapping value not of type string in map_string().\n");
-	search_keys[i] = map_keys->item[i].u.string[0];
-	map_key_sizes[i] = strlen( map_keys->item[i].u.string);
-	map_val_sizes[i] = strlen( map_vals->item[i].u.string);
-    }
-    
-    /* Doit! */
-    ptr1 = (sp-1)->u.string;
-    ptr2 = str;
-    overflow_ptr = str + MAX_STRING_SIZE - 1;
-    while( *ptr1) {
-	ptr3 = strchr( search_keys, *ptr1);
-	if( !ptr3) {
-	    /* Char not a key; just copy it and go on. */
-	    /* Check for overflow. */
-	    if( ptr2 == overflow_ptr)
-		error("Max string size exceeded in map_string().\n");
-	    *ptr2 = *ptr1;
-	    ptr1++;
-	    ptr2++;
-	    continue;
+    char *instr, *cp, *savestr, *deststr, **parts;
+    int num, i, j, k, *lens;
+    struct node *elt, **mtab;
+
+    cp = instr = (sp-1)->u.string;
+    do {
+	cp = strchr(cp,'%');
+	if (cp) 
+	{
+	    if (cp[1] == '^')
+	    {
+		savestr = string_copy(instr);
+		cp = savestr + ( cp - instr );
+		instr = savestr;
+		break;
+	    }
+	    cp++;
 	}
-	/* We have a key!  Find the full key and copy it. */
-	i = map_keys->size;
-	while( i--) {
-	    if( strncmp( ptr1, map_keys->item[i].u.string, map_key_sizes[i]))
-		continue;
-	    /* Check for overflow */
-	    if( ptr2 + map_val_sizes[i] >= overflow_ptr)
-		error("Max string size exceeded in map_string().\n");
-	    memcpy( ptr2, map_vals->item[i].u.string, map_val_sizes[i]);
-	    ptr1 += map_key_sizes[i] - 1;
-	    ptr2 += map_val_sizes[i] - 1;
+    } while (cp);
+    if (cp == NULL)
+    {
+	pop_stack();	/* no delimiter in string, so return the original */
+	return;
+    }
+    /* here we have something to parse */
+
+    parts = ( char ** ) DMALLOC(sizeof( char * ) * NSTRSEGS, 31, "f_terminal_colour: parts");
+    if (cp - instr) 	/* starting seg, if not delimiter */
+    {
+	num = 1;
+	parts[0] = instr;
+	*cp = 0;
+    } else
+	num = 0;
+    while (cp) 
+    {
+	cp += 2;
+	instr = cp;
+	do {
+	    cp = strchr(cp,'%');
+	    if (cp) 
+	    {
+		if (cp[1] == '^')
+		    break;
+		cp++;
+	    }
+	} while (cp);
+	if (cp)
+	{
+	    *cp = 0;
+	    if (cp > instr)
+	    {
+		parts[num] = instr;
+		num++;
+		if (num % NSTRSEGS == 0)
+		    parts = ( char ** ) DREALLOC(( char *) parts,
+			sizeof( char * ) * (num + NSTRSEGS), 31, "f_terminal_colour: parts realloc");
+	    }
+	}
+    }
+    if (strlen(instr))	/* trailing seg, if not delimiter */
+	parts[num++] = instr;
+
+    lens = ( int * ) DMALLOC(sizeof( int ) * num, 31, "f_terminal_colour: lens");
+
+    /* Do the the pointer replacement and calculate the lengths */
+    if ( ( mtab = sp->u.map->table ) ) /* a mapping with values */
+    {
+	for (j = i = 0, k = sp->u.map->table_size; i < num; i++)
+	{
+	    cp = parts[i];
+	    for (elt = mtab[mapHashstr(cp) & k]; elt; elt = elt->next)
+		if ( elt->values->type == T_STRING && 
+		     (elt->values + 1)->type == T_STRING &&
+		     strcmp(cp,elt->values->u.string) == 0 )
+		     {
+			cp = parts[i] = (elt->values + 1)->u.string;
+			break;
+		     }
+	    lens[i] = strlen(cp);
+	    j += lens[i];
+	}
+    } else {
+	for (j = i = 0; i < num; i++)
+	{
+	    lens[i] = strlen(parts[i]);
+	    j += lens[i];
+	}
+    }
+
+    /* now we have the final string in parts and length in j. let's compose it */
+    if (j > max_string_length) {
+	j = max_string_length;
+	cp = deststr = DXALLOC(j + 1, 31, "f_terminal_colour: deststr");
+	for (j = i = 0; i < num; i++)
+	{
+	    k = lens[i];
+	    if ( (j+k) >= max_string_length )
+	    {
+		strncpy(cp,parts[i], max_string_length-j-k);
+		deststr[max_string_length] = 0;
+		break;
+	    } else {
+		strcpy(cp,parts[i]);
+		j += k;
+		cp += k;
+	    }
+	}
+    } else {
+	cp = deststr = DXALLOC(j + 1, 31, "f_terminal_colour: deststr");
+	for (i = 0; i < num; i++)
+	{
+	    strcpy(cp,parts[i]);
+	    cp += lens[i];
+	}
+    }
+    FREE(lens);
+    FREE(parts);
+    FREE(savestr);
+    /* now we have what we want */
+    pop_stack();
+    switch(sp->subtype)
+    {
+	case STRING_MALLOC:
+	    FREE(sp->u.string);
 	    break;
-	}
-	ptr1++;
-	ptr2++;
+	case STRING_SHARED:
+	    free_string(sp->u.string);
+	    break;
+	default:
+	    break;
     }
-    /* Null terminate the new string */
-    *ptr2 = '\0';
-    
-    pop_n_elems( 2);
-    push_string( str, STRING_MALLOC);
+    sp->subtype = STRING_MALLOC;
+    sp->u.string = deststr;
 }
 #endif

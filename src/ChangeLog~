@@ -1,3 +1,192 @@
+	--- Beek:
+	* changed string *get_dir() to mixed *get_dir() since get_dir
+	  can return an array of arrays
+	* removed contrib efun map_string(); it's slow, and it leaks.
+	* added terminal_colour() contrib efun.
+	* fixed void foo(string str) { string str; ... } to give an
+	  error message
+	* added for (int i = 0; ... 
+	* optimized the insertion of bytes into program blocks
+	* mudlib_stats.c: include std.h before checking NO_MUDLIB_STATS
+	* fixed call_others not to give type errors with CAST_CALL_OTHERS
+	  off
+	* crasher fix/optimized ++, -- (all three forms), +=, assignment
+	* removed some unecessary code from skip_comment()
+	* added COPY_SHORT, COPY_INT, COPY_PTR, COPY_FLOAT, LOAD_SHORT,
+	  STORE_SHORT, etc for code clarity and portability; slight
+	  optimizations in places
+	--- Symmetry:
+	* optimized allocate_array, explode(), implode(), users(), array
+	  copying, commands(), filter_array(), sameval, unique_array(),
+	  array addition, array subtraction, all_inventory(), map_array(),
+	  deep_inventory(), array intersection, regexp(),
+	  deep_inherit_list(), inherit_list(), children(), livings(),
+	  objects(), typeof(), regexp(), each(), keys(), values(),
+	  allocate(), function_profile(), stat(), call_out(),
+	  call_out_list(), get_dir(), localtime()
+	  matrix package efun identity()
+	  contrib package efuns functions() and copy() on arrays
+	* optimized check_valid_socket()
+	* optimized ++x, while_dec, local lvalues, F_BYTE and F_NBYTE,
+	  branches, &&/||, local values, <, +, +=, array constants,
+	  mapping constants, =, --x, >, >=, global values, indexing,
+	  <=, %, !, global lvalues, string constants
+	* optimized array->foo(), removed a memory leak
+	* optimized get_svalue_trace (used by the mudlib error handler)
+	* optimized type name
+	* small optimization to assign_svalue_no_free
+	* optimized add_slash, push_indexed_lvalue, bad_argument
+	* optimized stack overflow checks, made stack overflow an error
+	* optimized function calls (push_nulls, copy_some_svalues, apply_low)
+	* optimized stack pushes:
+	   No STACK_CHECK checks here, because end_of_stack is 5 below
+	   the actual end, and 5 pushes is infrequent.  Anything that
+	   is going to push that many values should check.
+	* optimized setup_new_frame(), check_for_destr()
+	* removed a memory leak in unique_array()
+	* added a flag to regexp() to get line number / index info
+	* added a reg_assoc() efun
+	* introduced an error callback mechanism (used to solve the
+	  unique_array leak)
+        *** Following since v20.25a3 ***
+	* changed to use only one unsigned short local in eval_instruction
+        * fixed crasher in global initialization
+        * optimized copy_variables()
+        * fixed error message for illegal type array indexing of arrays
+        * fixed a crasher in while_dec
+        * added code generation for do-while loops
+        * fixed a memory munger in unique_array
+        * added a prototype for drand48 which otherwise causes random()
+          to behave inappropriately for AIX 
+        * fixed a crasher in call_out_info
+        * optimized efun calling by not passing number of args or 
+          instruction code in eval_instruction().
+        * various optimizations to add_action(), all_inventory(), 
+          allocate_mapping(), break_string(), call_other(), capitalize(), 
+	  children(), clear_bit(), clonep(), commands(), cp(), crc32(), 
+	  creator(), ctime(), deep_inherit_list(), set_debug_level(), 
+	  deep_inventory(), destruct(), dumpallobj(), each(), errorp(), 
+	  environment(), exec(), explode(), file_name(), file_size(), 
+	  find_call_out(), find_living(), find_object(), find_player(), 
+	  function_exists(), function_profile(), get_char(), get_dir(), 
+	  implode(), in_edit(), in_input(), inherits(), inherit_list(), 
+	  input_to(), interactive(), intp(), functionp(), keys(), link(), 
+	  lower_case(), member_array(), mkdir(), move_object(),
+	  new(), notify_fail(), nullp(), objectp(), opcprof(), 
+	  previous_object(), process_string(), process_value(), 
+	  query_host_name(), query_idle(), query_ip_name(), query_privs(), 
+	  query_snooping(), query_snoop(), remove_action(), 
+	  remove_call_out(), rename(), replace_string(), resolve(), 
+	  restore_object(), rm(), rmdir(), restore_variable(), 
+	  save_object(), set_bit(), set_heart_beat(), query_heart_beat(), 
+	  set_privs(), shadow(), shutdown(), snoop(), sprintf(), stat(), 
+	  strsrch(), strcmp(), stringp(), bufferp(), tail(), tell_object(), 
+	  tell_room(), test_bit(), this_player(), to_float(), to_int(), 
+	  typeof(), undefinedp(), userp(), wizardp(), virtualp(), write(), 
+	  write_bytes(), write_buffer(), write_file(), memory_info(), 
+	  reload_object(), query_shadowing(), set_reset(), floatp(), 
+	  first_inventory(), next_inventory(), crypt(), localtime()
+        * optimized all socket and math efuns
+        * optimized uid efuns, domain_stats(), author_stats()
+	* optimized the freeing of arguments in the matrix efuns
+        * optimized refs(), trace(), traceprefix(), evaluate() 
+	* optimized next_living(), cat(), log_file() (in packages/compat.c)
+	* Fixed a crasher in type_name 
+	* Fixed a typo in find_or_add_perm_ident in lex.c which causes
+          some bogus "Unknown efun : ... " errors
+	* Fixed possible crashers in clear_bit and test_bit when the 2nd 
+	  argument passed is negative
+	* Fixed a possible crasher in member_array for searching in strings
+          when the starting index given as 3rd arg is too large
+	* Fixed a possible crasher (typo?) in socket_acquire 
+	* removed first_inventory and next_inventory from packages/compat.c 
+	* remove extra stack for error callbacks, and use the interpreter 
+	  stack instead. This slows down freeing of svalues somewhat, but 
+	  unfortunately is the best way I can think of to allow catching of 
+	  errors from unique_array for e.g. without a memory leak.
+        * no longer do clear_state() if a master apply fails, but rather 
+	  recover the stack conditions before the apply. This fixes some 
+	  crashers if for e.g. master::valid_override has an error.
+	* simul efun is updatable again
+	*** Since v20.25a6 ***
+	* Fixed crashers in previous_object(-1), query_ip_name(), 
+	  query_host_name()
+	* More optimizations to read_file() 
+	* Optimized match_path(), -= for arrays
+	* Fixed bugs in subtract_array(), alist_sort() 
+	* Fixed a memory leak in intersect_array()
+	* Fixed a nasty crasher in scratchpad.c dealing with long strings
+	* Minor scratchpad optimizations
+        * Small optimization to simul_efun calling and call_all_other()
+	* Optimized void_assign in interpret.c
+        * Fixed compilation type checking for: assignments, &, ==, !=, >,
+	  <, >=, <=, +, - (define OLD_TYPE_BEHAVIOR to not check types for
+	  >, <, >=, <=, ==, != and +)
+	* Optimized compilation type checking for: assignments, ?:, |, ^,
+	  <<, >>, %, -, *, /, ++x, --x, ~, -x, x++, x--, a[b..c],
+	  a[b]
+	* The compiler now generates a warning instead of an error
+	  if in a ? b : c, the types of b and c do not match
+        * indexing of sscanf(..), parse_command(..) , time_expression(..),
+	  real or integer constants are no longer syntactically valid at
+	  the parser level 
+	* Compactified grammar a bit by grouping <, >, <= and >= under 
+	  the same L_ORDER token  
+	* Run time defines using the -D flag are now added as 
+	  permanent defines for speed
+	* Fixed a possible crasher in scratchpad when it is almost (or
+	  completely) used up in scratch_copy_string
+        * Fixed a crasher when string literals of "literal length" (\n
+	  counted as 2 for e.g.) greater than 1016 are used
+	* Fixed crashers when errors are reported for unidentified
+	  variables or illegal use of private variables when the 
+	  variable names have length greater than about 236 
+        * Rewrote the lexer to read chunks from the current file at
+	  a time, which allows optimization of lexical parsing
+	* Implement linked buffers in the lexer to allow for larger
+          add_input such as those due to macro expansions
+	* Disallowed newlines right after a # symbol and 
+	  before a preprocessor directive
+	* Added #pragma show_error_context to show approximately
+	  where an error occurs before/around in a line
+	* Corrected line numbers when literal strings with newlines 
+	  not directly after a \ are used
+        * Optimized the generation of string literals by copying to
+	  the scratchpad directly if possible
+        * Made literal strings error only when real length is > 1023
+	* Optimized the check for global include files in lex.c
+	* Added a missing '{' to f_copy in packages/contrib.c (reported
+	  by Artagel)
+	* don't define MAXSHORT in stralloc.c if it's already defined in
+	  math.h (problem reported by Artagel on a NeXT)
+        * Added INLINE to some prototypes in interpret.h 
+	* Changed the interpretation of the 3rd arg in regexp, if it has
+	  bit 1 set, then only non-matches are returned. If bit 0 is
+	  set, indexes to matches/non-matches are returned as well.
+	* Updated doc for regexp and added doc for reg_assoc
+	* crasher in long error messages
+	--- Robocoder:
+	* revamped malloc package and wrapper selection to centralize it
+	  all in options.h; added malloc.h and plainwrapper.c; changed
+	  config.h, options.h, make_malloc.c, debugmalloc.c, wrappedmalloc.c
+	  and Makefile
+	* smalloc.c: removed small bit of text left over from cutting and
+	  pasting from bsdmalloc.c; renamed functions; removed SBRK_OK
+	  requirement...so it'll fall back onto system malloc;
+	  (Note: apparently there is a small leak in accounting stats)
+	  (Beek: I believe it's in restore_array, haven't had time to
+	  check)
+	* bsdmalloc.c: renamed func names to avoid conflict with system
+	  malloc packages; (Note: even though it still only supports
+	  sbrk())
+	* Makefile: renamed references to config.h to options.h instead
+	  (since config.h is static) (Note: out of sync with GNUmakefile)
+	*** Since v20.25a5 ***
+	* Corrected some bad_arg calls in packages/matrix.c and
+	  packages/compat.c
+
+Tue Jan  3 10:19:00 EST 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v20.24
 	* various Amiga and Solaris tweaks for cleaner compiles
 	* compiler.c: added Alpha/OSF patch to clean_parser() to properly
 	  handle 64 bit pointers to strings -- crasher reported by Dana
@@ -31,7 +220,7 @@
 	* vastly reorganized the .h files, made compatibility checks more
 	  consistent.
         * redesigned/optimized the identifier hash table
-
+	
 Mon Dec  5 12:14:46 EST 1994 (tim@handel.princeton.edu (Beek))
 	* raised patchlevel to v20.23
 	* __DIR__ now has a leading slash; "/u/b/beek/", not "u/b/beek"

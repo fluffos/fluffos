@@ -78,6 +78,9 @@
 #define ARCH "HP/UX"
 #endif
 
+#ifndef ARCH_H
+#define ARCH_H
+
 #if !defined(ARCH) && defined(sgi)
 #define ARCH "IRIX"
 #endif
@@ -98,4 +101,5 @@
 #define ARCH "stuf!"
 #endif
 
+#endif
 #endif

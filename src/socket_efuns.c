@@ -28,12 +28,14 @@ int check_valid_socket P5(char *, what, int, fd, struct object *, owner,
     struct vector *info;
     struct svalue *mret;
     
-    info = allocate_array(4);
+    info = allocate_empty_array(4);
+    info->item[0].type = T_NUMBER;
     info->item[0].u.number = fd;
     assign_socket_owner(&info->item[1], owner);
     info->item[2].type = T_STRING;
     info->item[2].subtype = STRING_CONSTANT;
     info->item[2].u.string = addr;
+    info->item[3].type = T_NUMBER;
     info->item[3].u.number = port;
 
     push_object(current_object);
@@ -528,7 +530,7 @@ socket_write P3(int, fd, struct svalue *, message, char *, name)
 	switch (message->type) {
 
 	case T_STRING:
-	    if (sendto(lpc_socks[fd].fd, message->u.string,
+	    if (sendto(lpc_socks[fd].fd, (char *)message->u.string,
 		       strlen(message->u.string) + 1, 0,
 		       (struct sockaddr *) & sin, sizeof(sin)) == -1) {
 		perror("socket_write: sendto");
@@ -538,7 +540,7 @@ socket_write P3(int, fd, struct svalue *, message, char *, name)
 
 
 	case T_BUFFER:
-	    if (sendto(lpc_socks[fd].fd, (char *)message->u.buf->item,
+	    if (sendto(lpc_socks[fd].fd, message->u.buf->item,
 		       message->u.buf->size, 0,
 		       (struct sockaddr *) & sin, sizeof(sin)) == -1) {
 		perror("socket_write: sendto");
@@ -554,7 +556,7 @@ socket_write P3(int, fd, struct svalue *, message, char *, name)
 	return EEMODENOTSUPP;
     }
 
-    off = write(lpc_socks[fd].fd, buf, len);
+    off = write(lpc_socks[fd].fd, buf, len, 0);
     if (off == -1) {
 	FREE(buf);
 	switch (errno) {
@@ -783,7 +785,7 @@ socket_write_select_handler P1(int, fd)
 
     if (lpc_socks[fd].w_buf != NULL) {
 	cc = write(lpc_socks[fd].fd, lpc_socks[fd].w_buf + lpc_socks[fd].w_off,
-		  lpc_socks[fd].w_len);
+		   lpc_socks[fd].w_len, 0);
 	if (cc == -1)
 	    return;
 	lpc_socks[fd].w_off += cc;

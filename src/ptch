@@ -1,0 +1,20 @@
+diff -rc v20.25a6_old/file.c v20.25a6/file.c
+*** v20.25a6_old/file.c	Sun Jan  1 22:03:55 1995
+--- v20.25a6/file.c	Mon Jan  2 20:13:15 1995
+***************
+*** 433,439 ****
+  
+      buff = (char *)
+  	DMALLOC(strlen(error_file) + strlen(what) + 
+! 		(pragmas & PRAGMA_ERROR_CONTEXT) ? 100 : 40, 39, "smart_log: 1");
+  
+      if (pragmas & PRAGMA_ERROR_CONTEXT){
+          char *ls = strrchr(what, '\n');
+--- 433,439 ----
+  
+      buff = (char *)
+  	DMALLOC(strlen(error_file) + strlen(what) + 
+! 		((pragmas & PRAGMA_ERROR_CONTEXT) ? 100 : 40), 39, "smart_log: 1");
+  
+      if (pragmas & PRAGMA_ERROR_CONTEXT){
+          char *ls = strrchr(what, '\n');

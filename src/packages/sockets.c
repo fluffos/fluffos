@@ -21,14 +21,14 @@
 
 #ifdef F_SOCKET_CREATE
 void
-f_socket_create P2(int, num_arg, int, instruction)
+f_socket_create PROT((void))
 {
-    int fd;
+    int fd, num_arg = st_num_arg;
     struct svalue *arg;
 
     arg = sp - num_arg + 1;
     if ((num_arg == 3) && (arg[2].type != T_STRING)) {
-	bad_arg(3, instruction);
+	bad_arg(3, F_SOCKET_CREATE);
     }
     if (check_valid_socket("create", -1, current_object, "N/A", -1)) {
 	if (num_arg == 2)
@@ -36,18 +36,18 @@ f_socket_create P2(int, num_arg, int, instruction)
 	else {
 	    fd = socket_create(arg[0].u.number, arg[1].u.string, arg[2].u.string);
 	}
-	pop_n_elems(num_arg);	/* pop both args off stack    */
-	push_number(fd);	/* push return int onto stack */
+        pop_n_elems(num_arg - 1);
+        sp->u.number = fd;
     } else {
-	pop_n_elems(num_arg);	/* pop both args off stack    */
-	push_number(EESECURITY);/* Security violation attempted */
+        pop_n_elems(num_arg - 1);
+        sp->u.number = EESECURITY;
     }
 }
 #endif
 
 #ifdef F_SOCKET_BIND
 void
-f_socket_bind P2(int, num_arg, int, instruction)
+f_socket_bind PROT((void))
 {
     int i, fd, port;
     char addr[ADDR_BUF_SIZE];
@@ -57,18 +57,16 @@ f_socket_bind P2(int, num_arg, int, instruction)
 
     if (VALID_SOCKET("bind")) {
 	i = socket_bind(fd, sp->u.number);
-	pop_2_elems();		/* pop both args off stack    */
-	push_number(i);		/* push return int onto stack */
+        (--sp)->u.number = i;
     } else {
-	pop_2_elems();		/* pop both args off stack    */
-	push_number(EESECURITY);/* Security violation attempted */
+	(--sp)->u.number = EESECURITY;
     }
 }
 #endif
 
 #ifdef F_SOCKET_LISTEN
 void
-f_socket_listen P2(int, num_arg, int, instruction)
+f_socket_listen PROT((void))
 {
     int i, fd, port;
     char addr[ADDR_BUF_SIZE];
@@ -78,51 +76,47 @@ f_socket_listen P2(int, num_arg, int, instruction)
 
     if (VALID_SOCKET("listen")) {
 	i = socket_listen(fd, sp->u.string);
-	pop_2_elems();		/* pop both args off stack    */
-	push_number(i);		/* push return int onto stack */
+        free_string_svalue(sp--);
+        sp->u.number = i;
     } else {
-	pop_2_elems();		/* pop both args off stack    */
-	push_number(EESECURITY);/* Security violation attempted */
+        free_string_svalue(sp--);
+        sp->u.number = EESECURITY;
     }
 }
 #endif
 
 #ifdef F_SOCKET_ACCEPT
 void
-f_socket_accept P2(int, num_arg, int, instruction)
+f_socket_accept PROT((void))
 {
-    int i, fd, port;
+    int port, fd;
     char addr[ADDR_BUF_SIZE];
 
     if (sp->type != T_STRING) {
-	bad_arg(3, instruction);
+	bad_arg(3, F_SOCKET_ACCEPT);
     }
-    fd = (sp - 2)->u.number;
-    get_socket_address(fd, addr, &port);
+    get_socket_address(fd = (sp-2)->u.number, addr, &port);
 
-    if (VALID_SOCKET("accept")) {
-	i = socket_accept(fd, (sp - 1)->u.string, sp->u.string);
-	pop_3_elems();		/* pop both args off stack    */
-	push_number(i);		/* push return int onto stack */
-    } else {
-	pop_3_elems();		/* pop both args off stack    */
-	push_number(EESECURITY);/* Security violation attempted */
-    }
+    (sp-2)->u.number = VALID_SOCKET("accept") ?
+       socket_accept(fd, (sp - 1)->u.string, sp->u.string) :
+	 EESECURITY;
+    free_string_svalue(sp--);
+    free_string_svalue(sp--);
 }
 #endif
 
 #ifdef F_SOCKET_CONNECT
 void
-f_socket_connect P2(int, num_arg, int, instruction)
+f_socket_connect PROT((void))
 {
     int i, fd, port;
     char addr[ADDR_BUF_SIZE];
 
     if ((sp - 1)->type != T_STRING) {
-	bad_arg(3, instruction);
+	bad_arg(3, F_SOCKET_CONNECT);
     }
     if (sp->type != T_STRING) {
-	bad_arg(4, instruction);
+	bad_arg(4, F_SOCKET_CONNECT);
     }
     fd = (sp - 3)->u.number;
     get_socket_address(fd, addr, &port);
@@ -155,29 +149,27 @@ f_socket_connect P2(int, num_arg, int, instruction)
 #endif
     }
 
-    if (VALID_SOCKET("connect")) {
-	i = socket_connect(fd, (sp - 2)->u.string, (sp - 1)->u.string,
-			   sp->u.string);
-	pop_n_elems(4);		/* pop all args off stack     */
-	push_number(i);		/* push return int onto stack */
-    } else {
-	pop_n_elems(4);		/* pop all args off stack     */
-	push_number(EESECURITY);/* Security violation attempted */
-    }
+    (sp-3)->u.number = VALID_SOCKET("connect") ?
+      socket_connect(fd, (sp - 2)->u.string, (sp - 1)->u.string,
+		     sp->u.string) : EESECURITY;
+    free_string_svalue(sp--);
+    free_string_svalue(sp--);
+    free_string_svalue(sp--);
 }
 #endif
 
 #ifdef F_SOCKET_WRITE
 void
-f_socket_write P2(int, num_arg, int, instruction)
+f_socket_write PROT((void))
 {
     int i, fd, port;
     struct svalue *arg;
     char addr[ADDR_BUF_SIZE];
+    int num_arg = st_num_arg;
 
     arg = sp - num_arg + 1;
     if ((num_arg == 3) && (arg[2].type != T_STRING)) {
-	bad_arg(3, instruction);
+	bad_arg(3, F_SOCKET_WRITE);
     }
     fd = arg[0].u.number;
     get_socket_address(fd, addr, &port);
@@ -185,104 +177,89 @@ f_socket_write P2(int, num_arg, int, instruction)
     if (VALID_SOCKET("write")) {
 	i = socket_write(fd, &arg[1],
 			 (num_arg == 3) ? arg[2].u.string : (char *) NULL);
-	pop_n_elems(num_arg);	/* pop both args off stack    */
-	push_number(i);		/* push return int onto stack */
+        pop_n_elems(num_arg - 1);
+        sp->u.number = i;
     } else {
-	pop_n_elems(num_arg);	/* pop both args off stack    */
-	push_number(EESECURITY);/* Security violation attempted */
+        pop_n_elems(num_arg - 1);
+        sp->u.number = EESECURITY;
     }
 }
 #endif
 
 #ifdef F_SOCKET_CLOSE
 void
-f_socket_close P2(int, num_arg, int, instruction)
+f_socket_close PROT((void))
 {
-    int i, fd, port;
+    int fd, port;
     char addr[ADDR_BUF_SIZE];
 
     fd = sp->u.number;
     get_socket_address(fd, addr, &port);
 
-    if (VALID_SOCKET("close")) {
-	i = socket_close(fd);
-	pop_stack();		/* pop int arg off stack      */
-	push_number(i);		/* push return int onto stack */
-    } else {
-	pop_stack();		/* pop int arg off stack      */
-	push_number(EESECURITY);/* Security violation attempted */
-    }
+    sp->u.number = VALID_SOCKET("close") ? socket_close(fd) : EESECURITY;
 }
 #endif
 
 #ifdef F_SOCKET_RELEASE
 void
-f_socket_release P2(int, num_arg, int, instruction)
+f_socket_release PROT((void))
 {
-    int i, fd, port;
+    int fd, port;
     char addr[ADDR_BUF_SIZE];
 
     if (sp->type != T_STRING) {
-	bad_arg(3, instruction);
+	bad_arg(3, F_SOCKET_RELEASE);
     }
     fd = (sp - 2)->u.number;
     get_socket_address(fd, addr, &port);
 
-    if (VALID_SOCKET("release")) {
-	i = socket_release((sp - 2)->u.number, (sp - 1)->u.ob, sp->u.string);
-	pop_3_elems();		/* pop all args off stack     */
-	push_number(i);		/* push return int onto stack */
-    } else {
-	pop_3_elems();		/* pop all args off stack     */
-	push_number(EESECURITY);/* Security violation attempted */
-    }
+    (sp-2)->u.number = VALID_SOCKET("release") ?
+      socket_release((sp - 2)->u.number, (sp - 1)->u.ob, sp->u.string) :
+	EESECURITY;
+
+    free_string_svalue(sp--);
+    free_object(sp->u.ob, "socket_release()");
+    sp--;
 }
 #endif
 
 #ifdef F_SOCKET_ACQUIRE
 void
-f_socket_acquire P2(int, num_arg, int, instruction)
+f_socket_acquire PROT((void))
 {
     int i, fd, port;
     char addr[ADDR_BUF_SIZE];
 
     if ((sp - 1)->type != T_STRING) {
-	bad_arg(3, instruction);
+	bad_arg(3, F_SOCKET_ACQUIRE);
     }
     if (sp->type != T_STRING) {
-	bad_arg(4, instruction);
+	bad_arg(4, F_SOCKET_ACQUIRE);
     }
-    fd = (sp - 1)->u.number;
+    fd = (sp - 3)->u.number;
     get_socket_address(fd, addr, &port);
 
-    if (VALID_SOCKET("acquire")) {
-	i = socket_acquire((sp - 3)->u.number, (sp - 2)->u.string,
-			   (sp - 1)->u.string, sp->u.string);
-	pop_n_elems(4);		/* pop both args off stack    */
-	push_number(i);		/* push return int onto stack */
-    } else {
-	pop_n_elems(4);		/* pop both args off stack    */
-	push_number(EESECURITY);/* Security violation attempted */
-    }
+    (sp-3)->u.number = VALID_SOCKET("acquire") ?
+      socket_acquire((sp - 3)->u.number, (sp - 2)->u.string,
+		     (sp - 1)->u.string, sp->u.string) : EESECURITY;
+
+    free_string_svalue(sp--);
+    free_string_svalue(sp--);
+    free_string_svalue(sp--);
 }
 #endif
 
 #ifdef F_SOCKET_ERROR
 void
-f_socket_error P2(int, num_arg, int, instruction)
+f_socket_error PROT((void))
 {
-    char *error;
-
-    error = socket_error(sp->u.number);
-    pop_stack();		/* pop int arg off stack      */
-    push_string(error, STRING_CONSTANT);	/* push return string onto
-						 * stack */
+    put_constant_string(socket_error(sp->u.number));
 }
 #endif
 
 #ifdef F_SOCKET_ADDRESS
 void
-f_socket_address P2(int, num_arg, int, instruction)
+f_socket_address PROT((void))
 {
     char *str;
     int port;
@@ -292,36 +269,37 @@ f_socket_address P2(int, num_arg, int, instruction)
  * Ok, we will add in a cute little check thing here to see if it is
  * an object or not...
  */
-    if (sp->type == T_OBJECT) {
-	char *tmp;
+    if (sp->type & T_OBJECT) {
+        char *tmp;
 
 /* This is so we can get the address of interactives as well. */
 
-	if (!sp->u.ob->interactive) {
-	    pop_stack();
-	    push_null();
-	    return;
+        if (!sp->u.ob->interactive) {
+            free_object(sp->u.ob, "f_socket_address:1");
+            *sp = const0n;
+            return;
 	}
-	tmp = inet_ntoa(sp->u.ob->interactive->addr.sin_addr);
-	str = (char *) DMALLOC(strlen(tmp) + 5 + 3, 33, "f_socket_address");
-	sprintf(str, "%s %d", tmp, sp->u.ob->interactive->addr.sin_port);
-	pop_stack();
-	push_malloced_string(str);
-	return;
+        tmp = inet_ntoa(sp->u.ob->interactive->addr.sin_addr);
+        str = (char *) DMALLOC(strlen(tmp) + 5 + 3, 33, "f_socket_address");
+        sprintf(str, "%s %d", tmp, sp->u.ob->interactive->addr.sin_port);
+        free_object(sp->u.ob, "f_socket_address:2");
+        put_malloced_string(str);
+        return;
     }
     get_socket_address(sp->u.number, addr, &port);
     str = (char *) DMALLOC(strlen(addr) + 5 + 3, 33, "f_socket_address");
     sprintf(str, "%s %d", addr, port);
-    pop_stack();
-    push_malloced_string(str);
+    put_malloced_string(str);
 }				/* f_socket_address() */
 #endif
 
 #ifdef F_DUMP_SOCKET_STATUS
 void
-f_dump_socket_status P2(int, num_arg, int, instruction)
+f_dump_socket_status PROT((void))
 {
     dump_socket_status();
-    push_number(0);
+    *++sp = const0;
 }
 #endif
+
+

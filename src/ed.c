@@ -1340,7 +1340,7 @@ static void shift P1(register char *, text)
 #define IF             10
 #define FOR            11
 #define WHILE          12
-#define XDO            13
+#define XDO             13
 #define XEOT           14
 
 static char *stack, *stackbot;	/* token stack */

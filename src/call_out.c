@@ -93,7 +93,7 @@ void new_call_out P5(struct object *, ob, char *, fun, int, delay, int, num_args
     if (num_args > 0) {
 	int j;
 
-	cop->vs = allocate_array(num_args);
+	cop->vs = allocate_empty_array(num_args);
 	for (j = 0; j < num_args; j++) {
 	    assign_svalue_no_free(&cop->vs->item[j], &arg[j + 1]);
 	}
@@ -139,7 +139,7 @@ void call_out()
     memcpy((char *) save_error_recovery_context,
 	   (char *) error_recovery_context, sizeof error_recovery_context);
     save_rec_exists = error_recovery_context_exists;
-    error_recovery_context_exists = 1;
+    error_recovery_context_exists = NORMAL_ERROR_CONTEXT;
     while (call_list && call_list->delta <= 0) {
 	/*
 	 * Move the first call_out out of the chain.
@@ -320,19 +320,16 @@ struct vector *get_all_call_outs()
     remove_all_call_out((struct object *) NULL);
     for (i = 0, cop = call_list; cop; i++, cop = cop->next)
 	;
-    v = allocate_array(i);
+    v = allocate_empty_array(i);
     next_time = 0;
-    /*
-     * Take for granted that all items in an array are initialized to number
-     * 0.
-     */
+
     for (i = 0, cop = call_list; cop; i++, cop = cop->next) {
 	struct vector *vv;
 
 	next_time += cop->delta;
 	if (cop->ob->flags & O_DESTRUCTED)
 	    continue;
-	vv = allocate_array(4);
+	vv = allocate_empty_array(4);
 	vv->item[0].type = T_OBJECT;
 	vv->item[0].u.ob = cop->ob;
 	add_ref(cop->ob, "get_all_call_outs");
@@ -340,6 +337,7 @@ struct vector *get_all_call_outs()
 	vv->item[1].subtype = STRING_SHARED;
 	vv->item[1].u.string = make_shared_string(cop->function);
 	vv->item[2].u.number = next_time;
+	vv->item[2].type = T_NUMBER;
 	assign_svalue_no_free(&vv->item[3], &cop->v);
 
 	v->item[i].type = T_POINTER;

@@ -30,22 +30,6 @@ DRIVER_BIN = driver
 # HP and NeXT don't have it.
 #RESOLV=-lresolv
 
-# uncomment MALLOC* if you wish to use BSD malloc or Smalloc.
-#   Both of these require the sbrk() system call.  Be sure to read the
-#   comments in the bsdmalloc.c file before deciding on BSDMALLOC.
-#   note: These mallocs may not work correctly on the NeXT or other systems
-#   that don't fully support sbrk().  It is okay not to use either of these
-#   two mallocs in which case you will get system malloc (read the comments
-#   in options.h for choices on malloc statistics and debugging).
-#
-# uncomment this line for BSDmalloc
-# (fast but high overhead)
-#MALLOC=bsdmalloc.o
-#
-# uncomment this line for SMALLOC
-# (slower than bsdmalloc, faster than most system mallocs, least overhead)
-MALLOC=smalloc.o
-
 # uncomment STRFUNCS if your machine is missing memcpy(), memset(), strtol(),
 # and strcspn(). (needed by Sequent Dynix/3)
 #STRFUNCS=strfuncs.o
@@ -175,7 +159,7 @@ OSFLAGS=Data=far Code=far NoIcons \
 	Strict Ignore=105 Ignore=120 Ignore=183 \
 	Define=AMITCP
 
-#	GlobalSymbolTable=amiga/lint.gst
+#       GlobalSymbolTable=amiga/lint.gst
 
 # try uncommenting this if you are using gcc and at runtime you see socket
 # errors saying that the "set socket nonblocking" operation is not supported.
@@ -287,12 +271,13 @@ EFUNS=efuns_main.o efuns_port.o $(EXTRA_EFUNS)
 
 OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
 	backend.o array.o mapping.o comm.o ed.o regexp.o swap.o buffer.o crc32.o \
-	malloc.o call_out.o otable.o dumpstat.o stralloc.o hash.o mudlib_stats.o \
+	malloc.o mallocwrapper.o \
+	call_out.o otable.o dumpstat.o stralloc.o hash.o mudlib_stats.o \
 	port.o reclaim.o parse.o simul_efun.o sprintf.o uid.o program.o \
 	compiler.o avltree.o icode.o trees.o generate.o scratchpad.o \
 	socket_efuns.o socket_ctrl.o qsort.o eoperators.o socket_err.o md.o \
 	strstr.o disassembler.o binaries.o $(UALARM) $(STRFUNCS) \
-	$(MALLOC) $(EFUNS) replace_program.o functab_tree.o $(EXTRA_OBJS) \
+	$(EFUNS) replace_program.o functab_tree.o $(EXTRA_OBJS) \
 	$(EXTRA_PORT)
 
 PACKAGES= packages/\#?.o
@@ -386,10 +371,12 @@ make_malloc.o: make_malloc.c options.h
 make_malloc: make_malloc.o
 	$(CC) Link make_malloc.o TO make_malloc $(LFLAGS)
 
-malloc.c: make_malloc options.h
+mallocwrapper.c malloc.c: make_malloc options.h
 	make_malloc $(MALLOC_C)
 	touch malloc.c
 	$(CC) $(CFLAGS) malloc.c
+	touch mallocwrapper.c
+	$(CC) $(CFLAGS) mallocwrapper.c
 
 grammar.y: efun_defs.c comp_warning grammar.pre
 
@@ -424,9 +411,9 @@ amiga/lint.gst: lint.h
 \#include "lint.h"
 <
     $(CC) $(CFLAGS) Define=NO_OPCODES \
-        List Lhead Listincludes Lsys Xref Xhead Xsys \
-        MakeGlobalSymbolTable=amiga/lint.gst \
-        amiga/lint.c
+	List Lhead Listincludes Lsys Xref Xhead Xsys \
+	MakeGlobalSymbolTable=amiga/lint.gst \
+	amiga/lint.c
 
 install: $(DRIVER_BIN) addr_server
 	-$(MKDIR) $(INSTALL_DIR)
@@ -448,6 +435,7 @@ neat:
 	-$(RMF) make_func
 	-$(RMF) make_malloc
 	-$(RMF) malloc.c
+	-$(RMF) mallocwrapper.c
 	-$(RMF) amiga/lint.\#?
 	-$(RMF) amiga/replace
 	-$(RMF) amiga/cstrip

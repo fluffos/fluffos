@@ -3,9 +3,11 @@
    Truilkan@TMI - 92/04/17
 */
 
+#define IN_MALLOC_WRAPPER
 #define NO_OPCODES
 #include "std.h"
 #include "debugmalloc.h"
+#include "malloc.h"
 #include "md.h"
 
 #undef NOISY_MALLOC
@@ -44,7 +46,7 @@ INLINE void *debugrealloc P4(void *, ptr, int, size, int, tag, char *, desc)
     stats.realloc_calls++;
     tmp = (node_t *) ptr - 1;
     if (MDfree(tmp)) {
-	tmp = (void *) realloc(tmp, size + sizeof(node_t));
+	tmp = (void *) REALLOC(tmp, size + sizeof(node_t));
 	MDmalloc(tmp, size, tag, desc);
 	return (node_t *) tmp + 1;
     }
@@ -56,7 +58,7 @@ INLINE void *debugmalloc P3(int, size, int, tag, char *, desc)
     void *tmp;
 
     stats.alloc_calls++;
-    tmp = (void *) malloc(size + sizeof(node_t));
+    tmp = (void *) MALLOC(size + sizeof(node_t));
     MDmalloc(tmp, size, tag, desc);
     NOISY3("malloc: %i (%x), %s\n", size, (node_t *)tmp + 1, desc);
     return (node_t *) tmp + 1;
@@ -67,7 +69,7 @@ INLINE void *debugcalloc P4(int, nitems, int, size, int, tag, char *, desc)
     void *tmp;
 
     stats.alloc_calls++;
-    tmp = (void *) calloc(nitems * size + sizeof(node_t), 1);
+    tmp = (void *) CALLOC(nitems * size + sizeof(node_t), 1);
     MDmalloc(tmp, nitems * size, tag, desc);
     NOISY3("calloc: %i (%x), %s\n", nitems*size, (node_t *)tmp + 1, desc);
     return (node_t *) tmp + 1;
@@ -81,7 +83,7 @@ INLINE void debugfree P1(void *, ptr)
     stats.free_calls++;
     tmp = (node_t *) ptr - 1;
     if (MDfree(tmp)) {
-	free(tmp);		/* only free if safe to do so */
+	FREE(tmp);		/* only free if safe to do so */
     }
 }
 

@@ -15,7 +15,7 @@
 #include <math.h>
 #include <ctype.h>
 #include <errno.h>
-#if !defined(LATTICE) && !defined(_AUX_SOURCE)
+#if !defined(LATTICE) && !defined(OS2) && !defined(_AUX_SOURCE)
 #  include <fcntl.h>
 #endif
 
@@ -50,6 +50,14 @@
 #  include "amiga/nsignal.h"
 #  include "amiga/socket.h"
 #endif
+#endif
+
+#if defined(LATTICE) || defined(OS2)
+#define link(x,y) { \
+    char link_cmd[100]; \
+    sprintf(link_cmd, "copy %s %s", x, y); \
+    system(link_cmd); \
+}
 #endif
 
 #ifdef NeXT

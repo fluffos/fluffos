@@ -46,8 +46,8 @@ static char sccsid[] = "@(#)malloc.c	5.11 (Berkeley) 2/23/91";
  * This is designed for use in a virtual memory environment.
  */
 
+#define NO_OPCODES
 #include "std.h"
-#include "efuns_main.h"
 
 #undef NULL
 #define	NULL 0
@@ -139,8 +139,7 @@ static int botch P1(char *, s)
 #define	ASSERT(p)
 #endif
 
-void *
-     malloc P1(size_t, nbytes)
+void *bsdmalloc_malloc P1(size_t, nbytes)
 {
     register union overhead *op;
     register int bucket, n;
@@ -268,7 +267,7 @@ morecore P1(int, bucket)
 }
 
 INLINE void
-free P1(void *, cp)
+bsdmalloc_free P1(void *, cp)
 {
     register int size;
     register union overhead *op;
@@ -308,8 +307,7 @@ free P1(void *, cp)
  */
 int realloc_srchlen = 4;	/* 4 should be plenty, -1 =>'s whole list */
 
-void *
-     realloc P2(void *, cp, size_t, nbytes)
+void *bsdmalloc_realloc P2(void *, cp, size_t, nbytes)
 {
     register u_int onb;
     register int i;
@@ -318,7 +316,7 @@ void *
     int was_alloced = 0;
 
     if (cp == NULL)
-	return (malloc(nbytes));
+	return (bsdmalloc_malloc(nbytes));
     op = (union overhead *) ((caddr_t) cp - sizeof(union overhead));
     if (op->ov_magic == MAGIC) {
 	was_alloced++;
@@ -361,9 +359,9 @@ void *
 #endif
 	    return (cp);
 	} else
-	    free(cp);
+	    bsdmalloc_free(cp);
     }
-    if ((res = malloc(nbytes)) == NULL)
+    if ((res = bsdmalloc_malloc(nbytes)) == NULL)
 	return (NULL);
     if (cp != res)		/* common optimization if "compacting" */
 	memcpy(res, cp, (nbytes < onb) ? nbytes : onb);
@@ -425,13 +423,12 @@ show_mstats P1(char *, s)
 
 /* calloc was originally in its own source file */
 
-INLINE void *
-     calloc P2(size_t, num, register size_t, size)
+INLINE void *bsdmalloc_calloc P2(size_t, num, register size_t, size)
 {
     register void *p;
 
     size *= num;
-    if (p = malloc(size))
+    if (p = bsdmalloc_malloc(size))
 	memset(p, 0, size);
     return (p);
 }

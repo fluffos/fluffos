@@ -29,22 +29,6 @@ DRIVER_BIN = driver
 # HP and NeXT don't have it.
 #RESOLV=-lresolv
  
-# uncomment MALLOC* if you wish to use BSD malloc or Smalloc.
-#   Both of these require the sbrk() system call.  Be sure to read the
-#   comments in the bsdmalloc.c file before deciding on BSDMALLOC.
-#   note: These mallocs may not work correctly on the NeXT or other systems
-#   that don't fully support sbrk().  It is okay not to use either of these
-#   two mallocs in which case you will get system malloc (read the comments
-#   in options.h for choices on malloc statistics and debugging).
-#
-# uncomment this line for BSDmalloc
-# (fast but high overhead)
-#MALLOC=bsdmalloc.o
-#
-# uncomment this line for SMALLOC
-# (slower than bsdmalloc, faster than most system mallocs, least overhead)
-#MALLOC=smalloc.o
- 
 # uncomment STRFUNCS if your machine is missing memcpy(), memset(), strtol(),
 # and strcspn(). (needed by Sequent Dynix/3)
 #STRFUNCS=strfuncs.o
@@ -82,7 +66,7 @@ INSTALL_DIR = ../bin
 # Enable run time debugging
 #DEBUG=-g
 # With extra driver debug code
-#DEBUG=-g -DDEBUG
+#DEBUG=-g -DDEBUG 
 # Prevent -DDEBUG from aborting the driver (when in -DDEBUG mode)
 #DEBUG_NON_FATAL=-DDEBUG_NON_FATAL
 # Compile in debug() macro code
@@ -133,8 +117,8 @@ CPP=$(CC) -E
  
 # Solaris (SunOS 5): for BSD compatible ioctl()
 # If using CC=cc, you can also add:
-#     -w    to turn off warnings, in order to get a cleaner compile.
-#OSFLAGS=-DBSD_COMP -DSunOS_5
+#      -w     to turn off warnings, in order to get a cleaner compile
+#OSFLAGS=-DBSD_COMPS -DSunOS_5
 
 # SCO 3.2v4.2
 #OSFLAGS=-DSCO
@@ -239,12 +223,13 @@ EFUNS=efuns_main.o efuns_port.o $(EXTRA_EFUNS)
 
 OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   backend.o array.o mapping.o comm.o ed.o regexp.o swap.o buffer.o crc32.o \
-  malloc.o call_out.o otable.o dumpstat.o stralloc.o hash.o mudlib_stats.o \
+  malloc.o mallocwrapper.o \
+  call_out.o otable.o dumpstat.o stralloc.o hash.o mudlib_stats.o \
   port.o reclaim.o parse.o simul_efun.o sprintf.o uid.o program.o \
   compiler.o avltree.o icode.o trees.o generate.o scratchpad.o \
   socket_efuns.o socket_ctrl.o qsort.o eoperators.o socket_err.o md.o \
   strstr.o disassembler.o binaries.o $(UALARM) $(STRFUNCS) \
-  $(MALLOC) $(EFUNS) replace_program.o functab_tree.o $(EXTRA_OBJS) \
+  $(EFUNS) replace_program.o functab_tree.o $(EXTRA_OBJS) \
   packages/*.o
 
 all: $(DRIVER_BIN) addr_server lpc_to_c.h
@@ -296,7 +281,7 @@ efunctions.h: efun_defs.c
 
 opc.h: efun_defs.c
 
-func_spec.cpp: func_spec.c op_spec.c config.h options.h port.h
+func_spec.cpp: func_spec.c op_spec.c options.h options.h port.h
 	$(CPP) $(CFLAGS) func_spec.c > func_spec.cpp
 
 make_func.tab.c: make_func.y cc.h
@@ -310,7 +295,7 @@ make_func: make_func.tab.o hash.o
 make_malloc: make_malloc.o
 	$(CC) $(CFLAGS) make_malloc.o -o make_malloc
 
-make_malloc.o: make_malloc.c config.h
+make_malloc.o: make_malloc.c options.h
 
 grammar.tab.o: opcodes.h
 
@@ -322,13 +307,15 @@ grammar.tab.c: grammar.y
 
 grammar.y: comp_warning grammar.pre
 
-efun_defs.c opcodes.h grammar.y: malloc.c func_spec.c make_func config.h func_spec.cpp
+efun_defs.c opcodes.h grammar.y: malloc.c func_spec.c make_func options.h func_spec.cpp
 	./make_func > efun_defs.c
 
-malloc.c: config.h make_malloc
+malloc.c: options.h make_malloc
 	./make_malloc $(MALLOC_C)
 	touch malloc.c
 	$(CC) $(CFLAGS) -c malloc.c
+	touch mallocwrapper.c
+	$(CC) $(CFLAGS) -c mallocwrapper.c
 
 tags: force
 	ctags *.c *.y
@@ -347,10 +334,10 @@ neat:
 	-(cd packages; $(MAKE) clean)
 	-rm packages/GNUmakefile packages/Makefile packages/SMakefile
 	-rm -rf obj *.o *.tab.c *.tab.h
-	-rm -f cc.h
 	-rm -f efun_defs.c option_defs.c
+	-rm -f cc.h
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
-	-rm -f make_func make_malloc malloc.c
+	-rm -f make_func make_malloc malloc.c malloc_wrapper.c
 	-rm -f func_spec.cpp
 	-rm -f grammar.y
 

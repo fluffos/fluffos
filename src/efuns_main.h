@@ -1,11 +1,10 @@
 #ifndef EFUNS_MAIN_H
 #define EFUNS_MAIN_H
 
+/* These really should be moved somewhere else */
 /*
  * efuns_main.c
  */
-extern int using_bsd_malloc;
-extern int using_smalloc;
 extern int call_origin;
 
 void print_cache_stats PROT((void));

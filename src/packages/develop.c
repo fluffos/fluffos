@@ -10,7 +10,7 @@ static struct object *ob;
 
 #ifdef F_DEBUG_INFO
 void
-f_debug_info P2(int, num_arg, int, instruction)
+f_debug_info PROT((void))
 {
     struct svalue *arg, res;
 
@@ -101,7 +101,7 @@ f_debug_info P2(int, num_arg, int, instruction)
 	    break;
 	}	
     default:
-	bad_arg(1, instruction);
+	bad_arg(1, F_DEBUG_INFO);
     }
     pop_stack();
     free_svalue(sp,"debug_info");
@@ -111,7 +111,7 @@ f_debug_info P2(int, num_arg, int, instruction)
 
 #ifdef F_REFS
 void
-f_refs P2(int, num_arg, int, instruction)
+f_refs PROT((void))
 {
     int r;
 
@@ -135,8 +135,8 @@ f_refs P2(int, num_arg, int, instruction)
 	r = 0;
 	break;
     }
-    pop_stack();
-    push_number(r - 1);		/* minus 1 to compensate for being arg of
+    free_svalue(sp, "f_refs");
+    put_number(r - 1);		/* minus 1 to compensate for being arg of
 				 * refs() */
 }
 #endif
@@ -144,21 +144,20 @@ f_refs P2(int, num_arg, int, instruction)
 #if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
 #ifdef F_DEBUGMALLOC
 void
-f_debugmalloc P2(int, num_arg, int, instruction)
+f_debugmalloc PROT((void))
 {
     dump_debugmalloc((sp - 1)->u.string, sp->u.number);
-    pop_2_elems();
-    push_number(0);
+    free_string_svalue(--sp);
+    *sp = const0;
 }
 #endif
 
 #ifdef F_SET_MALLOC_MASK
 void
-f_set_malloc_mask P2(int, num_arg, int, instruction)
+f_set_malloc_mask PROT((void))
 {
     set_malloc_mask(sp->u.number);
-    pop_stack();
-    push_number(0);
+    sp->u.number = 0;
 }
 #endif
 #endif				/* (defined(DEBUGMALLOC) &&
@@ -166,42 +165,38 @@ f_set_malloc_mask P2(int, num_arg, int, instruction)
 
 #ifdef F_TRACE
 void
-f_trace P2(int, num_arg, int, instruction)
+f_trace PROT((void))
 {
     int ot = -1;
 
     if (command_giver && command_giver->interactive &&
-	command_giver->flags & O_IS_WIZARD) {
-	ot = command_giver->interactive->trace_level;
-	command_giver->interactive->trace_level = sp->u.number;
+        command_giver->flags & O_IS_WIZARD) {
+        ot = command_giver->interactive->trace_level;
+        command_giver->interactive->trace_level = sp->u.number;
     }
-    pop_stack();
-    push_number(ot);
+    sp->u.number = ot;
 }
 #endif
 
 #ifdef F_TRACEPREFIX
 void
-f_traceprefix P2(int, num_arg, int, instruction)
+f_traceprefix PROT((void))
 {
     char *old = 0;
 
     if (command_giver && command_giver->interactive &&
-	command_giver->flags & O_IS_WIZARD) {
-	old = command_giver->interactive->trace_prefix;
-	if (sp->type == T_STRING) {
-	    command_giver->interactive->trace_prefix =
-		make_shared_string(sp->u.string);
+        command_giver->flags & O_IS_WIZARD) {
+        old = command_giver->interactive->trace_prefix;
+        if (sp->type & T_STRING) {
+            command_giver->interactive->trace_prefix =
+                make_shared_string(sp->u.string);
+            free_string_svalue(sp);
 	} else
-	    command_giver->interactive->trace_prefix = 0;
+            command_giver->interactive->trace_prefix = 0;
     }
-    pop_stack();
     if (old) {
-	push_string(old, STRING_SHARED);	/* Will incr ref count */
-	free_string(old);
-    } else {
-	push_number(0);
-    }
+        put_shared_string(old);
+    } else *sp = const0;
 }
 #endif
 

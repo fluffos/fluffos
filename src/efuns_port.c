@@ -21,33 +21,35 @@
 #endif
 
 #ifdef F_CRYPT
-void
-f_crypt P2(int, num_arg, int, instruction)
+f_crypt PROT((void))
 {
     char *res, salt[2];
     char *choice =
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./";
 
     if (sp->type == T_STRING && SVALUE_STRLEN(sp) >= 2) {
-	salt[0] = sp->u.string[0];
-	salt[1] = sp->u.string[1];
+        salt[0] = sp->u.string[0];
+        salt[1] = sp->u.string[1];
+        free_string_svalue(sp--);
     } else {
-	salt[0] = choice[random_number(strlen(choice))];
-	salt[1] = choice[random_number(strlen(choice))];
+        salt[0] = choice[random_number(strlen(choice))];
+        salt[1] = choice[random_number(strlen(choice))];
+        pop_stack();
     }
 #if defined(sun) && !defined(SunOS_5)
-    res = string_copy(_crypt((sp - 1)->u.string, salt));
+    res = string_copy(_crypt(sp->u.string, salt));
 #else
-    res = string_copy(crypt((sp - 1)->u.string, salt));
+    res = string_copy(crypt(sp->u.string, salt));
 #endif
-    pop_2_elems();
-    push_malloced_string(res);
+    free_string_svalue(sp);
+    sp->subtype = STRING_MALLOC;
+    sp->u.string = res;
 }
 #endif
 
 #ifdef F_LOCALTIME
 void
-f_localtime P2(int, num_arg, int, instruction)
+f_localtime PROT((void))
 {
     struct tm *tm;
     struct vector *vec;
@@ -55,13 +57,12 @@ f_localtime P2(int, num_arg, int, instruction)
 
 #ifdef sequent
     struct timezone tz;
-
 #endif
 
     lt = sp->u.number;
     tm = localtime(&lt);
 
-    vec = allocate_array(10);
+    vec = allocate_empty_array(10);
     vec->item[LT_SEC].type = T_NUMBER;
     vec->item[LT_SEC].u.number = tm->tm_sec;
     vec->item[LT_MIN].type = T_NUMBER;
@@ -84,12 +85,12 @@ f_localtime P2(int, num_arg, int, instruction)
 #if defined(BSD42) || defined(apollo) || defined(_AUX_SOURCE) \
 	|| defined(OLD_ULTRIX)
     /* 4.2 BSD doesn't seem to provide any way to get these last two values */
-    vec->item[LT_GMTOFF].type = T_NUMBER;
     vec->item[LT_GMTOFF].u.number = 0;
     vec->item[LT_ZONE].type = T_NUMBER;
     vec->item[LT_ZONE].u.number = 0;
 #else				/* BSD42 */
 #if defined(sequent)
+    vec->item[LT_GMTOFF].u.number = 0;
     gettimeofday(NULL, &tz);
     vec->item[LT_GMTOFF].u.number = tz.tz_minuteswest;
     vec->item[LT_ZONE].u.string =
@@ -118,15 +119,14 @@ f_localtime P2(int, num_arg, int, instruction)
 #endif
 #endif				/* sequent */
 #endif				/* BSD42 */
-    pop_stack();
-    push_refed_vector(vec);
+    put_vector(vec);
 }
 #endif
 
 #ifdef F_RUSAGE
 #ifdef RUSAGE
 void
-f_rusage P2(int, num_arg, int, instruction)
+f_rusage PROT((void))
 {
     struct rusage rus;
     struct mapping *m;
@@ -171,7 +171,7 @@ f_rusage P2(int, num_arg, int, instruction)
 
 #ifdef GET_PROCESS_STATS
 void
-f_rusage P2(int, num_arg, int, instruction)
+f_rusage PROT((void))
 {
     struct process_stats ps;
     struct mapping *m;
@@ -217,7 +217,7 @@ f_rusage P2(int, num_arg, int, instruction)
 */
 
 void
-f_rusage P2(int, num_arg, int, instruction)
+f_rusage PROT((void))
 {
     struct mapping *m;
     struct tms t;
@@ -234,7 +234,7 @@ f_rusage P2(int, num_arg, int, instruction)
 #ifdef LATTICE
 
 void
-f_rusage P2(int, num_arg, int, instruction)
+f_rusage PROT((void))
 {
     struct mapping *m;
     int i;
@@ -263,7 +263,7 @@ f_rusage P2(int, num_arg, int, instruction)
    at some time prior to this calling of this efun.
 */
 void
-f_malloc_check P2(int, num_arg, int, instruction)
+f_malloc_check PROT((void))
 {
     push_number(NXMallocCheck());
 }
@@ -274,20 +274,19 @@ f_malloc_check P2(int, num_arg, int, instruction)
    malloc.
 */
 void
-f_malloc_debug P2(int, num_arg, int, instruction)
+f_malloc_debug PROT((void))
 {
     int level;
 
     level = sp->u.number;
-    pop_stack();
     if (level < 0) {
-	int rc;
+        int rc;
 
-	rc = malloc_debug(0);
-	malloc_singlethreaded();
-	push_number(rc);
+        rc = malloc_debug(0);
+        malloc_singlethreaded();
+        sp->u.number = rc;
     } else {
-	push_number(malloc_debug(level));
+        sp->u.number = malloc_debug(level);
     }
 }
 #endif

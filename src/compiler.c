@@ -14,7 +14,7 @@
 #include "interpret.h"
 
 static void clean_parser PROT((void));
-static void prolog PROT((FILE *, char *));
+static void prolog PROT((int, char *));
 static void epilog PROT((void));
 
 #ifdef DEBUG
@@ -63,6 +63,8 @@ int approved_object;
 int current_type;
 
 int current_block;
+char *prog_code;
+char *prog_code_max;
 
 struct program NULL_program;
 
@@ -116,36 +118,38 @@ void free_all_local_names()
  */
 void copy_variables P2(struct program *, from, int, type)
 {
-    int i;
-    char tmp[2048];
+    int i, numvars = from->p.i.num_variables, n;
+    struct variable *from_vars = from->p.i.variable_names;
+    struct ident_hash_elem *ihe;
+    int new_type;
 
-    for (i = 0; (unsigned) i < from->p.i.num_variables; i++) {
-	int new_type = type;
-	struct ident_hash_elem *ihe;
-	int n;
+    for (i = 0; (unsigned) i < numvars; i++) {
+        new_type = type;
 
-	/*
-	 * 'public' variables should not become private when inherited
-	 * 'private'.
-	 */
-	if (from->p.i.variable_names[i].type & TYPE_MOD_PUBLIC)
-	    new_type &= ~TYPE_MOD_PRIVATE;
+        /*
+         * 'public' variables should not become private when inherited
+         * 'private'.
+         */
+        if (from_vars[i].type & TYPE_MOD_PUBLIC)
+            new_type &= ~TYPE_MOD_PRIVATE;
 
-	n = (ihe = lookup_ident(from->p.i.variable_names[i].name))
-	     ? ihe->dn.global_num : -1;
+        if ((ihe = lookup_ident(from->p.i.variable_names[i].name)) &&
+	    ((n = ihe->dn.global_num) != -1)) {
+            char tmp[2048];
 
-	if (n != -1) {
-	    if (VARIABLE(n)->type & TYPE_MOD_NO_MASK) {
-		sprintf(tmp, "Illegal to redefine 'nomask' variable \"%s\"",
-			VARIABLE(n)->name);
-		yyerror(tmp);
+            if (VARIABLE(n)->type & TYPE_MOD_NO_MASK) {
+                sprintf(tmp, "Illegal to redefine 'nomask' variable \"%s\"",
+                        VARIABLE(n)->name);
+                yyerror(tmp);
 	    }
 	}
-	define_variable(from->p.i.variable_names[i].name,
-			from->p.i.variable_names[i].type | new_type,
-			from->p.i.variable_names[i].type & TYPE_MOD_PRIVATE);
-    }
+        define_variable(from->p.i.variable_names[i].name,
+                        from->p.i.variable_names[i].type | new_type,
+                        from->p.i.variable_names[i].type & TYPE_MOD_PRIVATE);
+     } 
 }
+
+
 
 static void copy_function_details P2(struct function *, to, struct function *, from) {
     to->offset = from->offset;
@@ -938,11 +942,19 @@ validate_efun_call P2(int, f, struct parse_node *, args) {
  * there is a jump to it at address 0.
  */
 void start_initializer() {
-  current_block = A_INITIALIZER;
+    UPDATE_PROGRAM_SIZE;
+
+    prog_code = mem_block[A_INITIALIZER].block + mem_block[A_INITIALIZER].current_size;
+    prog_code_max = mem_block[A_INITIALIZER].block + mem_block[A_INITIALIZER].max_size;
+    current_block = A_INITIALIZER;
 }
 
 void end_initializer() {
-  current_block = A_PROGRAM;
+    UPDATE_PROGRAM_SIZE;
+
+    prog_code = mem_block[A_PROGRAM].block + mem_block[A_PROGRAM].current_size;
+    prog_code_max = mem_block[A_PROGRAM].block + mem_block[A_PROGRAM].max_size;
+    current_block = A_PROGRAM;
 }
 
 void yyerror P1(char *, str)
@@ -989,7 +1001,7 @@ int add_local_name P2(char *, str, int, type)
 /*
  * Compile an LPC file.
  */
-void compile_file P2(FILE *, f, char *, name) {
+void compile_file P2(int, f, char *, name) {
     int yyparse PROT((void));
 
     prolog(f, name);
@@ -1028,10 +1040,12 @@ static void epilog() {
      * Define the __INIT function, but only if there was any code
      * to initialize.
      */
+    UPDATE_PROGRAM_SIZE;
+
     if (mem_block[A_INITIALIZER].current_size) {
 	struct parse_node *pn;
 	/* end the __INIT function */
-	current_block = A_INITIALIZER;
+	start_initializer();
 	CREATE_NODE(pn, F_RETURN);
 	CREATE_NODE(pn->right, F_CONST0);
 	generate(pn);
@@ -1045,6 +1059,7 @@ static void epilog() {
     }
 
     generate_final_program(0);
+    UPDATE_PROGRAM_SIZE;
 
     /*
      * If functions are undefined, replace them by definitions done
@@ -1189,7 +1204,7 @@ static void epilog() {
 /*
  * Initialize the environment that the compiler needs.
  */
-static void prolog P2(FILE *, f, char *, name) {
+static void prolog P2(int, f, char *, name) {
     int i;
 
 #ifdef NEW_FUNCTIONS
@@ -1237,16 +1252,7 @@ static void clean_parser() {
 	    free_string(funp->name);
     }
     for (i = 0; i < mem_block[A_STRINGS].current_size; i += sizeof(char *)) {
-	((char *)&s)[0] = mem_block[A_STRINGS].block[i + 0];
-	((char *)&s)[1] = mem_block[A_STRINGS].block[i + 1];
-	((char *)&s)[2] = mem_block[A_STRINGS].block[i + 2];
-	((char *)&s)[3] = mem_block[A_STRINGS].block[i + 3];
-#ifdef OSF
-	((char *)&s)[4] = mem_block[A_STRINGS].block[i + 4];
-	((char *)&s)[5] = mem_block[A_STRINGS].block[i + 5];
-	((char *)&s)[6] = mem_block[A_STRINGS].block[i + 6];
-	((char *)&s)[7] = mem_block[A_STRINGS].block[i + 7];
-#endif
+	COPY_PTR(&s, mem_block[A_STRINGS].block + i);
 	free_string(s);
     }
     for (i = 0; i < mem_block[A_VARIABLES].current_size; i += sizeof dummy) {

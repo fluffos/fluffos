@@ -18,7 +18,11 @@
 #include "generate.h"
 
 %line
-/* down to one global :)
+/*
+ * This is the grammar definition of LPC, and its parse tree generator.
+ */
+
+/* down to one global :) 
    bits:
       SWITCH_CONTEXT  - we're inside a switch
       LOOP_CONTEXT    - we're inside a loop
@@ -56,7 +60,7 @@ int yyparse PROT((void));
 %token L_ASSIGN
 %token L_LAND L_LOR
 %token L_LSH L_RSH
-%token L_EQ L_NE L_GE L_LE
+%token L_ORDER
 %token L_NOT
 
 %token L_IF L_ELSE
@@ -95,7 +99,7 @@ int yyparse PROT((void));
 %left '^'
 %left '&'
 %left L_EQ L_NE
-%left '>' L_GE '<' L_LE
+%left L_ORDER
 %left L_LSH L_RSH
 %left '+' '-'
 %left '*' '%' '/'
@@ -128,7 +132,7 @@ int yyparse PROT((void));
  */
 
 /* These hold opcodes */
-%type <number> efun_override L_ASSIGN
+%type <number> efun_override L_ASSIGN L_ORDER
 
 /* Holds a variable index */
 %ifdef NEW_FUNCTIONS
@@ -160,16 +164,16 @@ int yyparse PROT((void));
 
 /* holds an identifier or some sort */
 %type <string> L_IDENTIFIER L_EFUN function_name identifier not_efun_ident
-%type <string> new_arg_name
+%type <string> new_local_name
 
 /* The following return a parse node */
 %type <node> number real string expr0 comma_expr for_expr sscanf catch
 %type <node> parse_command time_expression expr_list expr_list2 expr_list3
 %type <node> expr_list4 assoc_pair expr4 lvalue function_call lvalue_list
 %type <node> block local_declarations statements local_name_list
-%type <node> new_local_name statement while cond do for switch case
+%type <node> new_local_def statement while cond do for switch case
 %type <node> default return optional_else_part block_or_semi
-%type <node> case_label
+%type <node> case_label first_for_expr
 
 /* This holds a flag */
 %type <number> new_arg
@@ -365,7 +369,7 @@ def:
     |   inheritance
     ;
 
-new_arg_name:
+new_local_name:
         L_IDENTIFIER
       | L_ASM
             {
@@ -390,13 +394,13 @@ new_arg:
                 $$ = 1;
                 add_local_name("", $1 | $2);
             }
-      | basic_type optional_star new_arg_name
+      | basic_type optional_star new_local_name
 	    {
                 add_local_name($3, $1 | $2);
 		scratch_free($3);
                 $$ = 0;
 	    }
-      | new_arg_name
+      | new_local_name
             {
 		if (exact_types) {
 		    yyerror("Missing type for argument");
@@ -552,15 +556,17 @@ local_declarations:
             }
     ;
 
-new_local_name:
-	optional_star identifier
+ new_local_def:
+	optional_star new_local_name
 	    {
 		add_local_name($2, current_type | $1);
 		scratch_free($2);
 		$$ = 0;
 	    }
-    |   optional_star identifier L_ASSIGN expr0
+    |   optional_star new_local_name L_ASSIGN expr0
 	    {
+		struct parse_node *expr;
+
 		if ($3 != F_ASSIGN)
 		    yyerror("Only '=' is allowed in initializers.");
 		if (!compatible_types((current_type | $1) & TYPE_MOD_MASK, $4->type)) {
@@ -579,8 +585,8 @@ new_local_name:
     ;
 
 local_name_list:
-	new_local_name
-    |   new_local_name ',' local_name_list
+	new_local_def
+    |   new_local_def ',' local_name_list
             {
 		if ($1 && $3) {
 		    NODE_NO_LINE($$, NODE_STATEMENTS);
@@ -701,7 +707,7 @@ do:
     ;
 
 for:
-	L_FOR '(' for_expr ';' for_expr ';' for_expr ')'
+	L_FOR '(' first_for_expr ';' for_expr ';' for_expr ')'
 	    {
 		$<number>1 = context;
 		context = LOOP_CONTEXT;
@@ -743,6 +749,28 @@ for_expr:
 	    }
     |   comma_expr
     ;
+
+first_for_expr:
+        for_expr
+    |   basic_type optional_star new_local_name L_ASSIGN expr0
+            {
+		struct parse_node *expr;
+
+		if ($4 != F_ASSIGN)
+		    yyerror("Only '=' is allowed in initializers.");
+		if (!compatible_types($1 | $2, $5->type)) {
+		    char buff[100];
+
+		    sprintf(buff, "Type mismatch %s when initializing %s",
+			  get_two_types($1 | $2, $5->type), $3);
+		    yyerror(buff);
+		}
+		CREATE_NODE($$, F_ASSIGN);
+		$$->right = $5;
+		CREATE_NODE($$->left, F_LOCAL_LVALUE);
+		$$->left->v.number = add_local_name($3, $1 | $2);
+		scratch_free($3);
+	    }
 
 switch:
 	L_SWITCH '(' comma_expr ')'
@@ -845,21 +873,14 @@ constant:
 	    {
 		$$ = $1 != $3;
 	    }
-    |   constant '>'  constant
+    |   constant L_ORDER constant
 	    {
-		$$ = $1 >  $3;
-	    }
-    |   constant L_GE constant
-	    {
-		$$ = $1 >= $3;
-	    }
-    |   constant '<'  constant
-	    {
-		$$ = $1 <  $3;
-	    }
-    |   constant L_LE constant
-	    {
-		$$ = $1 <= $3;
+	        switch($2){
+		    case F_GE: $$ = $1 >= $3; break;
+		    case F_LE: $$ = $1 <= $3; break;
+		    case F_LT: $$ = $1 <  $3; break;
+		    case F_GT: $$ = $1 >  $3; break;
+		}
 	    }
     |   constant L_LSH constant
 	    {
@@ -943,29 +964,30 @@ comma_expr:
 expr0:
 	lvalue L_ASSIGN expr0
 	    {
+	        struct parse_node *l = $1, *r = $3;
 		/* set this up here so we can change it below */
-		$$ = make_branched_node($2, $3->type, $1, $3);
+		$$ = make_branched_node($2, r->type, l, r);
 
-		if (exact_types && !compatible_types($1->type, $3->type) &&
-		      !($1->type == TYPE_STRING && $3->type == TYPE_NUMBER &&
-		      $2 == F_ADD_EQ)) {
-		    char buf[1000];
-		    sprintf(buf, "Bad assignment %s.", get_two_types($1->type, $3->type));
+		if (exact_types && !compatible_types(l->type, r->type) &&
+		      !($2 == F_ADD_EQ && l->type == TYPE_STRING && 
+			(r->type == TYPE_NUMBER || r->type == TYPE_REAL))) {
+		    char buf[200];
+		    sprintf(buf, "Bad assignment %s.", get_two_types(l->type, r->type));
 		    yyerror(buf);
 		}
 
-                if (($1->type == TYPE_REAL) && ($3->type == TYPE_NUMBER)) {
-		  struct parse_node *expr;
-		  expr = make_branched_node(0, 0, 0, 0);
-		  expr->v.expr = $3;
-		  $$->right = make_branched_node(F_TO_FLOAT, TYPE_REAL, 0, expr);
-		  $$->v.number = 1;
-		} else if (($1->type == TYPE_NUMBER) && ($3->type == TYPE_REAL)) {
-		  struct parse_node *expr;
-		  expr = make_branched_node(0, 0, 0, 0);
-		  expr->v.expr = $3;
-		  $$->right = make_branched_node(F_TO_INT, TYPE_NUMBER, 0, expr);
-		  $$->v.number = 1;
+		if ((l->type == TYPE_REAL) && (r->type == TYPE_NUMBER)) {
+		    struct parse_node *expr;
+		    expr = make_branched_node(0, 0, 0, 0);
+		    expr->v.expr = r;
+		    $$->right = make_branched_node(F_TO_FLOAT, TYPE_REAL, 0, expr);
+		    $$->v.number = 1;
+		} else if ((l->type == TYPE_NUMBER) && (r->type == TYPE_REAL)) {
+		    struct parse_node *expr;
+		    expr = make_branched_node(0, 0, 0, 0);
+		    expr->v.expr = r;
+		    $$->right = make_branched_node(F_TO_INT, TYPE_NUMBER, 0, expr);
+		    $$->v.number = 1;
 		}
 	    }
     |   error L_ASSIGN expr0
@@ -975,27 +997,26 @@ expr0:
 	    }
     |   expr0 '?' expr0 ':' expr0 %prec '?'
 	    {
+		struct parse_node *p1 = $3, *p2 = $5;
+
 		CREATE_TYPED_NODE($$, NODE_CONDITIONAL, TYPE_ANY);
-		if (exact_types && !compatible_types($3->type, $5->type)) {
-		    char buf[1000];
+		if (exact_types && !compatible_types(p1->type, p2->type)) {
+		    char buf[200];
 		    sprintf(buf, "Types in ?: do not match %s.", 
-			    get_two_types($3->type, $5->type));
-		    yyerror(buf);
+			    get_two_types(p1->type, p2->type));
+		    yywarn(buf);
 		}
-		if ($3->type == TYPE_ANY)
-		    $$->type = $5->type;
-		else if (TYPE($3->type, TYPE_MOD_POINTER|TYPE_ANY))
-		    $$->type = $5->type;
-		else
-		    $$->type = $3->type;
+		$$->type = BASIC_TYPE(p1->type, TYPE_MOD_POINTER|TYPE_ANY) ?
+		    p2->type : p1->type;
+
 		/* optimize if last expression did F_NOT */
 		if ($1->kind == F_NOT) {
 		    /* !a ? b : c  --> a ? c : b */
 		    $$->left = $1->right;
-		    $$->right = make_branched_node(0, 0, $5, $3);
+		    $$->right = make_branched_node(0, 0, p2, p1);
 		} else {
 		    $$->left = $1;
-		    $$->right = make_branched_node(0, 0, $3, $5);
+		    $$->right = make_branched_node(0, 0, p1, p2);
 		}
 	    }
     |   expr0 L_LOR expr0
@@ -1012,7 +1033,7 @@ expr0:
 	    }
     |   expr0 '|' expr0
 	    {
-		$$ = binary_int_op($1, $3, F_OR, "|");
+		$$ = binary_int_op($1, $3, F_OR, "|");		
 	    }
     |   expr0 '^' expr0
 	    {
@@ -1020,24 +1041,30 @@ expr0:
 	    }
     |   expr0 '&' expr0
 	    {
-		if ($1->type & $3->type & TYPE_MOD_POINTER) {
-		    $$ = make_branched_node(F_AND, ($1->type == $3->type) ?
-				   $1->type : TYPE_ANY | TYPE_MOD_POINTER,
-					    $1, $3);
-		} else 
-		    $$ = binary_int_op($1, $3, F_AND, "&");
+		int t1 = $1->type, t3 = $3->type;
+		if ((t1 & TYPE_MOD_POINTER) || (t3 & TYPE_MOD_POINTER)){
+		    if (t1 == t3){
+			$$ = make_branched_node(F_AND, t1, $1, $3);
+		    } else if ((t1 == TYPE_ANY) || (t3 == TYPE_ANY) ||
+			       (t1 & t3 & TYPE_MOD_POINTER)){
+			$$ = make_branched_node(F_AND, TYPE_ANY|TYPE_MOD_POINTER, $1, $3);
+		    } else {
+			char buf[200];
+			sprintf(buf, "Incompatible types for & %s.", get_two_types(t1,t3));
+			yyerror(buf);
+			$$ = make_branched_node(F_AND, TYPE_ANY|TYPE_MOD_POINTER, $1, $3);
+		    } 
+		} else $$ = binary_int_op($1, $3, F_AND, "&");
 	    }
     |   expr0 L_EQ expr0
 	    {
-		int t1 = $1->type, t2 = $3->type;
-		if (exact_types && (t1 != t2) &&
-		      !((t1 & (TYPE_NUMBER | TYPE_REAL)) &&
-		      (t2 & (TYPE_NUMBER | TYPE_REAL))) &&
-		      (t1 != TYPE_ANY && t2 != TYPE_ANY)) {
-		    char buf[1000];
+%ifndef OLD_TYPE_BEHAVIOR
+		if (exact_types && !compatible_types($1->type, $3->type)){
+		    char buf[300];
 		    sprintf(buf, "== always false because of incompatible types %s.",get_two_types($1->type, $3->type));
 		    yyerror(buf);
 		}
+%endif
 		/* x == 0  -> !x */
 		if ($1->kind == F_NUMBER && $1->v.number == 0) {
 		    NODE_NO_LINE($$, F_NOT);
@@ -1053,32 +1080,48 @@ expr0:
 	    }
     |   expr0 L_NE expr0
 	    {
-		int t1 = $1->type, t2 = $3->type;
-		if (exact_types && (t1 != t2) &&
-		      !((t1 & (TYPE_NUMBER | TYPE_REAL)) &&
-		      (t2 & (TYPE_NUMBER | TYPE_REAL))) &&
-		      (t1 != TYPE_ANY && t2 != TYPE_ANY)) {
-		    char buf[1000];
+%ifndef OLD_TYPE_BEHAVIOR
+		if (exact_types && !compatible_types($1->type, $3->type)){
+		    char buf[300];
 		    sprintf(buf, "!= always true because of incompatible types %s.",get_two_types($1->type, $3->type));
 		    yyerror(buf);
 		}
+%endif
 		$$ = make_branched_node(F_NE, TYPE_NUMBER, $1, $3);
 	    }
-    |   expr0 '>' expr0
+    |   expr0 L_ORDER expr0
 	    {
-		$$ = make_branched_node(F_GT, TYPE_NUMBER, $1, $3);
-	    }
-    |   expr0 L_GE expr0
-	    {
-		$$ = make_branched_node(F_GE, TYPE_NUMBER, $1, $3);
-	    }
-    |   expr0 '<' expr0
-	    {
-		$$ = make_branched_node(F_LT, TYPE_NUMBER, $1, $3);
-	    }
-    |   expr0 L_LE expr0
-	    {
-		$$ = make_branched_node(F_LE, TYPE_NUMBER, $1, $3);
+%ifndef OLD_TYPE_BEHAVIOR
+		if (exact_types){
+		    int t1 = $1->type, t3 = $3->type;
+
+		    if (!BASIC_TYPE(t1, TYPE_NUMBER) && t1 != TYPE_STRING && 
+			t1 != TYPE_REAL){
+			char buf[200];
+			strcpy(buf, "Bad left argument to '");
+			strcat(buf, get_f_name($2));
+			strcat(buf, "' : \"");
+			strcat(buf, get_type_name(t1));
+			strcat(buf, "\"");
+			yyerror(buf);
+		    } else if (!BASIC_TYPE(t3, TYPE_NUMBER) && t3 != TYPE_STRING &&
+			       t3 != TYPE_REAL){
+                        char buf[200];
+                        strcpy(buf, "Bad right argument to '");
+                        strcat(buf, get_f_name($2));
+                        strcat(buf, "' : \"");
+                        strcat(buf, get_type_name(t3));
+                        strcat(buf, "\"");
+			yyerror(buf);
+		    } else if (!compatible_types(t1,t3)) {
+			char buf[300];
+			sprintf(buf, "Arguments to %s do not have compatible types : %s",
+				get_f_name($2), get_two_types(t1, t3));
+			yyerror(buf);
+		    }
+		}
+%endif
+		$$ = make_branched_node($2, TYPE_NUMBER, $1, $3);
 	    }
     |   expr0 L_LSH expr0
 	    {
@@ -1088,18 +1131,75 @@ expr0:
 	    {
 		$$ = binary_int_op($1, $3, F_RSH, ">>");
 	    }
-    |   expr0 '+' expr0 /* Type checks of this case are incomplete */
+    |   expr0 '+' expr0 
 	    {
 		int result_type;
-		
-		if ($1->type == $3->type)
-		    result_type = $1->type;
-		else if (($1->type & TYPE_ANY) || ($3->type & TYPE_ANY))
-		    result_type = TYPE_ANY;
-		else if ((TYPE($1->type, TYPE_NUMBER) && TYPE($3->type, TYPE_REAL)) ||
-		      (TYPE($1->type, TYPE_REAL) && TYPE($3->type, TYPE_NUMBER)))
-		    result_type = TYPE_REAL;
-		else
+
+%ifndef OLD_TYPE_BEHAVIOR		
+		if (exact_types){
+		    int t1 = $1->type, t3 = $3->type;
+
+		    if (t1 == t3){
+#ifdef CAST_CALL_OTHERS
+			if (t1 == TYPE_UNKNOWN){
+			    yyerror("Bad arguments to '+' (unknown vs unknown)");
+			    result_type = TYPE_ANY;
+			} else
+#endif
+			result_type = t1;
+		    }
+		    else if (t1 == TYPE_ANY){
+			if (t3 == TYPE_FUNCTION){
+			    yyerror("Bad right argument to '+' (function)");
+			    result_type = TYPE_ANY;
+			} else result_type = t3;
+		    } else if (t3 == TYPE_ANY){
+			if (t1 == TYPE_FUNCTION){
+			    yyerror("Bad left argument to '+' (function)");
+			    result_type = TYPE_ANY;
+			} else result_type = t1;
+		    } else {
+			switch(t1){
+			    case TYPE_STRING:
+			    {
+				if (t3 == TYPE_REAL || t3 == TYPE_NUMBER){
+				    result_type = TYPE_STRING;
+				} else goto add_error;
+				break;
+			    }
+			    case TYPE_NUMBER:
+			    {
+				if (t3 == TYPE_REAL || t3 == TYPE_STRING)
+				    result_type = t3;
+				else goto add_error;
+				break;
+			    }
+			    case TYPE_REAL:
+			    {
+				if (t3 == TYPE_NUMBER) result_type = TYPE_REAL;
+				else if (t3 == TYPE_STRING) result_type = TYPE_STRING;
+				else goto add_error;
+				break;
+			    }
+			    default:
+			    {
+				if (t1 & t3 & TYPE_MOD_POINTER) {
+				    result_type = TYPE_ANY|TYPE_MOD_POINTER;
+				    break;
+				}
+add_error:
+				{
+				    char buf[200];
+				    sprintf(buf, "Invalid argument types to '+' %s",
+get_two_types(t1, t3));
+				    yyerror(buf);
+				    result_type = TYPE_ANY;
+				}
+			    }
+			}
+		    }
+		} else 
+%endif
 		    result_type = TYPE_ANY;
 
 		switch ($1->kind) {
@@ -1187,33 +1287,57 @@ expr0:
 		int result_type;
 
 		if (exact_types) {
-		    if (!TYPE($1->type, TYPE_NUMBER) &&
-			  !TYPE($1->type, TYPE_REAL) &&
-			  !($1->type & TYPE_MOD_POINTER)) {
-			type_error("Bad argument number 1 to '-'", $1->type);
-			bad_arg++;
-		    }
-		    if (!TYPE($3->type, TYPE_NUMBER) &&
-			  !TYPE($3->type, TYPE_REAL) &&
-			  !($3->type & TYPE_MOD_POINTER)) {
-			type_error("Bad argument number 2 to '-'", $3->type);
-			bad_arg++;
-		    }
-		}
-		
-		result_type = TYPE_ANY;
-		if (($1->type & TYPE_MOD_POINTER) || ($3->type & TYPE_MOD_POINTER))
-		    result_type = TYPE_MOD_POINTER | TYPE_ANY;
-		if (!($1->type & TYPE_MOD_POINTER) || !($3->type & TYPE_MOD_POINTER)) {
-		    if (exact_types && result_type != TYPE_ANY && !bad_arg)
-			yyerror("Arguments to '-' don't match");
-		    if (($1->type & TYPE_ANY) || ($3->type & TYPE_ANY))
-			result_type = TYPE_ANY;
-		    else if ((TYPE($1->type, TYPE_NUMBER) && TYPE($3->type, TYPE_NUMBER)))
-			result_type = TYPE_NUMBER;
-		    else
+		    int t1 = $1->type, t3 = $3->type;
+
+		    if (t1 == t3){
+			switch(t1){
+			    case TYPE_ANY:
+			    case TYPE_NUMBER:
+			    case TYPE_REAL:
+			        result_type = t1;
+				break;
+			    default:
+				if (!(t1 & TYPE_MOD_POINTER)){
+				    type_error("Bad argument number 1 to '-'", t1);
+				    result_type = TYPE_ANY;
+				} else result_type = t1;
+			}
+		    } else if (t1 == TYPE_ANY){
+			switch(t3){
+			    case TYPE_REAL:
+			    case TYPE_NUMBER:
+			        result_type = t3;
+				break;
+			    default:
+				if (!(t3 & TYPE_MOD_POINTER)){
+				    type_error("Bad argument number 2 to '-'", t3);
+				    result_type = TYPE_ANY;
+				} else result_type = t3;
+			}
+		    } else if (t3 == TYPE_ANY){
+			switch(t1){
+			    case TYPE_REAL:
+			    case TYPE_NUMBER:
+			        result_type = t1;
+				break;
+			    default:
+				if (!(t1 & TYPE_MOD_POINTER)){
+				    type_error("Bad argument number 1 to '-'", t1);
+				    result_type = TYPE_ANY;
+				} else result_type = t1;
+			}
+		    } else if ((t1 == TYPE_REAL && t3 == TYPE_NUMBER) ||
+			       (t3 == TYPE_REAL && t1 == TYPE_NUMBER)){
 			result_type = TYPE_REAL;
-		}
+		    } else if (t1 & t3 & TYPE_MOD_POINTER){
+			result_type = TYPE_MOD_POINTER|TYPE_ANY;
+		    } else {
+			char buf[300];
+			sprintf(buf, "Invalid types to '-' %s", get_two_types(t1, t3));
+			yyerror(buf);
+			result_type = TYPE_ANY;
+		    }
+		} else result_type = TYPE_ANY;
 		
 		switch ($1->kind) {
 		case F_NUMBER:
@@ -1254,17 +1378,46 @@ expr0:
 	    {
 		int result_type;
 
-		if (($1->type != TYPE_MAPPING) || ($3->type != TYPE_MAPPING)) {
-		    if (exact_types && !TYPE($1->type, TYPE_NUMBER) && !TYPE($1->type, TYPE_REAL))
-			type_error("Bad argument number 1 to '*'", $1->type);
-		    if (exact_types && !TYPE($3->type, TYPE_NUMBER) && !TYPE($3->type, TYPE_REAL))
-			type_error("Bad argument number 2 to '*'", $3->type);
-		    if (TYPE($1->type, TYPE_NUMBER) && TYPE($3->type, TYPE_NUMBER))
-			result_type = TYPE_NUMBER;
-		    else
+		if (exact_types){
+		    int t1 = $1->type, t3 = $3->type;
+
+		    if (t1 == t3){
+			switch(t1){
+			    case TYPE_MAPPING:
+			    case TYPE_ANY:
+			    case TYPE_NUMBER:
+			    case TYPE_REAL:
+			        result_type = t1;
+				break;
+			    default:
+				type_error("Bad argument number 1 to '*'", t1);
+				result_type = TYPE_ANY;
+			}
+		    } else if (t1 == TYPE_ANY || t3 == TYPE_ANY){
+			int t = (t1 == TYPE_ANY) ? t3 : t1;
+			switch(t){
+			    case TYPE_NUMBER:
+			    case TYPE_REAL:
+			    case TYPE_MAPPING:
+			        result_type = t;
+				break;
+			    default:
+				type_error((t1 == TYPE_ANY) ?
+					   "Bad argument number 2 to '*'" :
+					   "Bad argument number 1 to '*'",
+					   t);
+				result_type = TYPE_ANY;
+			}
+		    } else if ((t1 == TYPE_NUMBER && t3 == TYPE_REAL) ||
+			       (t1 == TYPE_REAL && t3 == TYPE_NUMBER)){
 			result_type = TYPE_REAL;
-		} else
-		    result_type = TYPE_MAPPING;
+		    } else {
+			char buf[300];
+			sprintf(buf, "Invalid types to '*' %s", get_two_types(t1, t3));
+			yyerror(buf);
+			result_type = TYPE_ANY;
+		    }
+		} else result_type = TYPE_ANY;
 
 		switch ($1->kind) {
 		case F_NUMBER:
@@ -1305,14 +1458,39 @@ expr0:
 	    {
 		int result_type;
 
-		if (exact_types && !TYPE($1->type, TYPE_NUMBER) && !TYPE($1->type, TYPE_REAL))
-		    type_error("Bad left argument to '/'", $1->type);
-		if (exact_types && !TYPE($3->type, TYPE_NUMBER) && !TYPE($3->type, TYPE_REAL))
-		    type_error("Bad right argument to '/'", $3->type);
-		if (TYPE($1->type, TYPE_NUMBER) && TYPE($3->type, TYPE_NUMBER))
-		    result_type = TYPE_NUMBER;
-		else
-		    result_type = TYPE_REAL;
+		if (exact_types){
+		    int t1 = $1->type, t3 = $3->type;
+
+		    if (t1 == t3){
+			switch(t1){
+			    case TYPE_NUMBER:
+			    case TYPE_REAL:
+			    case TYPE_ANY:
+			        result_type = t1;
+				break;
+			    default:
+				type_error("Bad argument 1 to '/'", t1);
+			}
+		    } else if (t1 == TYPE_ANY || t3 == TYPE_ANY){
+			int t = (t1 == TYPE_ANY) ? t3 : t1;
+			if (t == TYPE_REAL || t == TYPE_NUMBER)
+			    result_type = t; 
+			else {
+			    type_error(t1 == TYPE_ANY ?
+				       "Bad argument 2 to '/'" :
+				       "Bad argument 1 to '/'", t);
+			}
+		    } else if ((t1 == TYPE_NUMBER && t3 == TYPE_REAL) ||
+			       (t1 == TYPE_REAL && t3 == TYPE_NUMBER)){
+			result_type = TYPE_REAL;
+		    } else {
+			char buf[300];
+			sprintf(buf, "Invalid types to '*' %s", get_two_types(t1, t3));
+			yyerror(buf);
+			result_type = TYPE_ANY;
+		    }
+		} else result_type = TYPE_ANY;		    
+
 		/* constant expressions */
 		switch ($1->kind) {
 		case F_NUMBER:
@@ -1380,22 +1558,45 @@ expr0:
     |   L_INC lvalue  %prec L_NOT  /* note lower precedence here */
 	    {
 		$$ = make_branched_node(F_PRE_INC, 0, 0, $2);
-		if (exact_types && !TYPE($2->type, TYPE_NUMBER) && !TYPE($2->type, TYPE_REAL))
-		    type_error("Bad argument to ++", $2->type);
-		if (TYPE($2->type, TYPE_NUMBER))
-		    $$->type = TYPE_NUMBER;
-		else
-		    $$->type = TYPE_REAL;
+                if (exact_types){
+                    switch($2->type){
+                        case TYPE_NUMBER:
+                        case TYPE_ANY:
+                        case TYPE_REAL:
+                        {
+                            $$->type = $2->type;
+                            break;
+                        }
+
+                        default:
+                        {
+                            $$->type = TYPE_ANY;
+                            type_error("Bad argument 1 to ++x", $2->type);
+                        }
+                    }
+                } else $$->type = TYPE_ANY;
 	    }
     |   L_DEC lvalue  %prec L_NOT  /* note lower precedence here */
 	    {
 		$$ = make_branched_node(F_PRE_DEC, 0, 0, $2);
-		if (exact_types && !TYPE($2->type, TYPE_NUMBER) && !TYPE($2->type, TYPE_REAL))
-		    type_error("Bad argument to --", $2->type);
-		if (TYPE($2->type, TYPE_NUMBER))
-		    $$->type = TYPE_NUMBER;
-		else
-		    $$->type = TYPE_REAL;
+                if (exact_types){
+                    switch($2->type){
+                        case TYPE_NUMBER:
+                        case TYPE_ANY:
+                        case TYPE_REAL:
+                        {
+                            $$->type = $2->type;
+                            break;
+                        }
+
+                        default:
+                        {
+                            $$->type = TYPE_ANY;
+                            type_error("Bad argument 1 to --x", $2->type);
+                        }
+                    }
+                } else $$->type = TYPE_ANY;
+
 	    }
     |   L_NOT expr0
 	    {
@@ -1410,7 +1611,7 @@ expr0:
 	    }
     |   '~' expr0
 	    {
-		if (exact_types && !TYPE($2->type, TYPE_NUMBER))
+		if (exact_types && !BASIC_TYPE($2->type, TYPE_NUMBER))
 		    type_error("Bad argument to ~", $2->type);
 		if ($2->kind == F_NUMBER) {
 		    $$ = $2;
@@ -1423,8 +1624,15 @@ expr0:
 	    }
     |   '-' expr0  %prec L_NOT
             {
-                if (exact_types && !TYPE($2->type, TYPE_NUMBER) && !TYPE($2->type, TYPE_REAL))
-		    type_error("Bad argument to unary '-'", $2->type);
+		int result_type;
+                if (exact_types){
+		    int t = $2->type;
+		    if (!BASIC_TYPE(t, TYPE_NUMBER) && t != TYPE_REAL){
+			type_error("Bad argument to unary '-'", t);
+			result_type = TYPE_ANY;
+		    } else result_type = t;
+		} else result_type = TYPE_ANY;
+
 		switch ($2->kind) {
 		case F_NUMBER:
 		    $$ = $2;
@@ -1435,31 +1643,57 @@ expr0:
 		    $$->v.real = -$$->v.real;
 		    break;
 		default:
-		    $$ = make_branched_node(F_NEGATE, TYPE($2->type, TYPE_NUMBER)
-					    ? TYPE_NUMBER : TYPE_REAL,
-					    0, $2);
+		    $$ = make_branched_node(F_NEGATE, result_type, 0, $2);
 		}
 	    }
     |   lvalue L_INC   /* normal precedence here */
             {
-		if (exact_types && !TYPE($1->type, TYPE_NUMBER) && !TYPE($1->type, TYPE_REAL))
-		    type_error("Bad argument to ++", $1->type);
-		$$ = make_branched_node(F_POST_INC, TYPE($1->type, TYPE_NUMBER)
-					? TYPE_NUMBER : TYPE_REAL,
-					0, $1);
+		$$ = make_branched_node(F_POST_INC, 0, 0, $1);
+                if (exact_types){
+                    switch($1->type){
+                        case TYPE_NUMBER:
+                        case TYPE_ANY:
+                        case TYPE_REAL:
+                        {
+                            $$->type = $1->type;
+                            break;
+                        }
+
+                        default:
+                        {
+                            $$->type = TYPE_ANY;
+                            type_error("Bad argument 1 to x++", $1->type);
+                        }
+                    }
+                } else $$->type = TYPE_ANY;
 	    }
     |   lvalue L_DEC
 	    {
-		if (exact_types && !TYPE($1->type, TYPE_NUMBER) && !TYPE($1->type, TYPE_REAL))
-		    type_error("Bad argument to --", $1->type);
-		$$ = make_branched_node(F_POST_DEC, TYPE($1->type, TYPE_NUMBER)
-					? TYPE_NUMBER : TYPE_REAL,
-					0, $1);
+		$$ = make_branched_node(F_POST_DEC, 0, 0, $1);
+                if (exact_types){
+                    switch($1->type){
+                        case TYPE_NUMBER:
+                        case TYPE_ANY:
+                        case TYPE_REAL:
+                        {
+                            $$->type = $1->type;
+                            break;
+                        }
+
+                        default:
+                        {
+                            $$->type = TYPE_ANY;
+                            type_error("Bad argument 1 to x--", $1->type);
+                        }
+                    }
+                } else $$->type = TYPE_ANY;
 	    }
     |   expr4
-            {
-	      $$ = $1;
-            }
+    |   sscanf
+    |   parse_command
+    |   time_expression
+    |   number
+    |   real
     ;
 
 return:
@@ -1602,16 +1836,12 @@ expr4:
 		$$ = $1;
 	    }
     |   string
-    |   number
-    |   real
     |   '(' comma_expr ')'
 	    {
 		$$ = $2;
 	    }
+
     |   catch
-    |   sscanf
-    |   parse_command
-    |   time_expression
 %ifdef NEW_FUNCTIONS
     |   L_FUNCTION '(' argument ')' block
             {
@@ -1817,7 +2047,7 @@ lvalue:
 		  CREATE_TYPED_NODE($$, F_GLOBAL_LVALUE, VARIABLE(i)->type & TYPE_MOD_MASK);
 		  $$->v.number = i;
 		  if (VARIABLE(i)->type & TYPE_MOD_HIDDEN) {
-		      char buf[256];
+		      char buf[MAXLINE + 30];
 		
 		      strcpy(buf, "Illegal to use private variable '");
 		      strcat(buf, $1->name);
@@ -1825,7 +2055,7 @@ lvalue:
 		      yyerror(buf);
 		  }
 	      } else {
-		char buf[256];
+		char buf[MAXLINE + 30];
 		
 		strcpy(buf, "Undefined variable '");
 		strcat(buf, $1->name);
@@ -1840,7 +2070,7 @@ lvalue:
 	    }
     |   L_IDENTIFIER
             {
-		char buf[256];
+		char buf[MAXLINE + 30];
 
 		strcpy(buf, "Undefined variable '");
 		strcat(buf, $1);
@@ -1866,29 +2096,30 @@ lvalue:
 %endif
     |   expr4 '[' comma_expr L_RANGE comma_expr ']'
 	    {
-		if (exact_types) {
-		    if (($1->type & TYPE_MOD_POINTER) == 0
-			  && !TYPE($1->type, TYPE_STRING)
-			  && !TYPE($1->type, TYPE_BUFFER))
-			type_error("Bad type to indexed value", $1->type);
-		    if (!TYPE($3->type, TYPE_NUMBER))
-			type_error("Bad type of index", $3->type);
-		    if (!TYPE($5->type, TYPE_NUMBER))
-			type_error("Bad type of index", $5->type);
-		}
-
 		$$ = make_branched_node(F_RANGE, 0, $3, $5);
 		$$->v.expr = $1;
-		if ($1->type == TYPE_ANY)
-		    $$->type = TYPE_ANY;
-		else if (TYPE($1->type, TYPE_STRING))
-		    $$->type = TYPE_STRING;
-		else if (TYPE($1->type, TYPE_BUFFER))
-		    $$->type = TYPE_BUFFER;
-		else if ($1->type & TYPE_MOD_POINTER)
-		    $$->type = $1->type;
-		else if (exact_types)
-		    type_error("Bad type of argument used for range", $1->type);
+
+                if (exact_types){
+                    switch($1->type){
+			case TYPE_ANY:
+			case TYPE_STRING:
+			case TYPE_BUFFER:
+                            $$->type = $1->type;
+                            break;
+
+			default:
+                            if ($1->type & TYPE_MOD_POINTER) $$->type = $1->type;
+                            else{
+                                type_error("Bad type of argument used for range: ", $1->type);
+			        $$->type = TYPE_ANY;
+			    }
+		    }
+
+		    if (!BASIC_TYPE($3->type, TYPE_NUMBER))
+			type_error("Bad type of left index to range operator", $3->type);
+		    if (!BASIC_TYPE($5->type, TYPE_NUMBER))
+                        type_error("Bad type of right index to range operator", $5->type);
+		} else $$->type = TYPE_ANY;
 	    }
     |   expr4 '[' comma_expr ']'
 	    {
@@ -1905,25 +2136,31 @@ lvalue:
 		    }
 		}
 		$$ = make_branched_node(F_INDEXED_LVALUE, 0, $1, $3);
-		if (TYPE($1->type, TYPE_MAPPING) || TYPE($1->type, TYPE_FUNCTION)) {
-		    $$->type = TYPE_ANY;
-		} else {
-		    if (exact_types) {
-			if (!($1->type & TYPE_MOD_POINTER) &&
-			      !TYPE($1->type, TYPE_STRING) &&
-			      !TYPE($1->type, TYPE_BUFFER))
-			    type_error("Bad type to indexed value", $1->type);
-			if (!TYPE($3->type, TYPE_NUMBER))
-			    type_error("Bad type of index", $3->type);
+                if (exact_types){
+                    if ($1->type ==  TYPE_MAPPING || $1->type == TYPE_ANY) {
+                        $$->type = TYPE_ANY;
+                    } else {
+                        switch($1->type){
+                            case TYPE_FUNCTION:
+                                $$->type = TYPE_ANY;
+                                break;
+
+			    case TYPE_STRING:
+			    case TYPE_BUFFER:
+                                $$->type = TYPE_NUMBER;
+                                break;
+
+			    default:
+                                if ($1->type & TYPE_MOD_POINTER) 
+				    $$->type = $1->type & ~TYPE_MOD_POINTER;
+                                else{
+                                    type_error("Value indexed has a bad type : ", $1->type);
+                                    $$->type = TYPE_ANY;
+                                }
+			}
+                        if (!BASIC_TYPE($3->type,TYPE_NUMBER))
+                            type_error("Bad type of index", $3->type);
 		    }
-		    if ($1->type == TYPE_ANY)
-			$$->type = TYPE_ANY;
-		    else if (TYPE($1->type, TYPE_STRING))
-			$$->type = TYPE_NUMBER;
-		    else if (TYPE($1->type, TYPE_BUFFER))
-			$$->type = TYPE_NUMBER;
-		    else
-			$$->type = $1->type & TYPE_MOD_MASK & ~TYPE_MOD_POINTER;
 		}
 	    }
     ;
@@ -2073,8 +2310,11 @@ function_call:
 		$$ = $5;
 		$$->kind = F_CALL_OTHER;
 		$$->v.number += 2;
+#ifdef CAST_CALL_OTHERS
 		$$->type = TYPE_UNKNOWN;
-		  
+#else
+                $$->type = TYPE_ANY;
+#endif		  
 		expr = new_node_no_line();
 		expr->v.expr = $1;
 

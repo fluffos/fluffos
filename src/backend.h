@@ -1,6 +1,11 @@
 #ifndef BACKEND_H
 #define BACKEND_H
 
+#define NULL_ERROR_CONTEXT       0
+#define NORMAL_ERROR_CONTEXT     1
+#define CATCH_ERROR_CONTEXT      2
+#define SAFE_APPLY_ERROR_CONTEXT 4
+
 /*
  * backend.c
  */

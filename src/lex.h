@@ -4,6 +4,7 @@
 #include "std.h"
 
 #define DEFMAX 10000
+#define MAXLINE 1024
 #define MLEN 4096
 #define NSIZE 256
 #define MAX_INSTRS 512
@@ -11,13 +12,14 @@
 #define NARGS 25
 #define MARKS '@'
 
-#define SKIPWHITE while (isspace(*p)) p++
+#define SKIPWHITE while (isspace(*p) && (*p != '\n')) p++
 
 #define PRAGMA_STRICT_TYPES    1
 #define PRAGMA_WARNINGS        2
 #define PRAGMA_SAVE_TYPES      4
 #define PRAGMA_SAVE_BINARY     8
 #define PRAGMA_OPTIMIZE       16
+#define PRAGMA_ERROR_CONTEXT  32
 
 /* With this on, compiler is allowed to
  * assume types are correct
@@ -104,7 +106,7 @@ void init_num_args PROT((void));
 char *query_instr_name PROT((int));
 char *get_f_name PROT((int));
 void set_inc_list PROT((char *));
-void start_new_file PROT((FILE *));
+void start_new_file PROT((int));
 void end_new_file PROT((void));
 int lookup_predef PROT((char *));
 void add_predefines PROT((void));
@@ -115,5 +117,6 @@ struct ident_hash_elem *find_or_add_perm_ident PROT((char *));
 struct ident_hash_elem *lookup_ident PROT((char *));
 void free_unused_identifiers PROT((void));
 void init_identifiers PROT((void));
+char *show_error_context PROT((void));
 
 #endif

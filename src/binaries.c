@@ -708,16 +708,12 @@ static void patch_out P3(struct program *, prog, short *, patches, int, len)
 	    int s;
 
 	    /* replace strings in table with string table indices */
-	    ((char *) &offset)[0] = p[i + 2];
-	    ((char *) &offset)[1] = p[i + 3];
-	    ((char *) &break_addr)[0] = p[i + 4];
-	    ((char *) &break_addr)[1] = p[i + 5];
+	    COPY_SHORT(&offset, p + i + 2);
+	    COPY_SHORT(&break_addr, p + i + 4);
 
 	    while (offset < break_addr) {
-		((char *) &s)[0] = p[offset + 0];
-		((char *) &s)[1] = p[offset + 1];
-		((char *) &s)[2] = p[offset + 2];
-		((char *) &s)[3] = p[offset + 3];
+		/* ALPHA: assumes (int) and (char *) same size */
+		COPY_INT(&s, p + offset);
 		/*
 		 * take advantage of fact that s is in strings table to find
 		 * it's index.
@@ -726,10 +722,7 @@ static void patch_out P3(struct program *, prog, short *, patches, int, len)
 		    s = -1;
 		else
 		    s = store_prog_string((char *) s);
-		p[offset + 0] = ((char *) &s)[0];
-		p[offset + 1] = ((char *) &s)[1];
-		p[offset + 2] = ((char *) &s)[2];
-		p[offset + 3] = ((char *) &s)[3];
+		COPY_INT(p + offset, &s);
 		offset += 6;
 	    }
 	}
@@ -740,15 +733,9 @@ static int str_case_cmp P2(char *, a, char *, b)
 {
     char *s1, *s2;
 
-    ((char *) &s1)[0] = a[0];
-    ((char *) &s1)[1] = a[1];
-    ((char *) &s1)[2] = a[2];
-    ((char *) &s1)[3] = a[3];
-
-    ((char *) &s2)[0] = b[0];
-    ((char *) &s2)[1] = b[1];
-    ((char *) &s2)[2] = b[2];
-    ((char *) &s2)[3] = b[3];
+    /* ALPHA: assumes (int) and (char *) same size */
+    COPY_INT(&s1, a);
+    COPY_INT(&s2, b);
 
     return s1 - s2;
 }				/* str_case_cmp() */
@@ -770,17 +757,12 @@ static void patch_in P3(struct program *, prog, short *, patches, int, len)
 	    int s;
 
 	    /* replace string indices with string pointers */
-	    ((char *) &offset)[0] = p[i + 2];
-	    ((char *) &offset)[1] = p[i + 3];
-	    ((char *) &break_addr)[0] = p[i + 4];
-	    ((char *) &break_addr)[1] = p[i + 5];
+	    COPY_SHORT(&offset, p + i + 2);
+	    COPY_SHORT(&break_addr, p + i + 4);
 
 	    start = offset;
 	    while (offset < break_addr) {
-		((char *) &s)[0] = p[offset + 0];
-		((char *) &s)[1] = p[offset + 1];
-		((char *) &s)[2] = p[offset + 2];
-		((char *) &s)[3] = p[offset + 3];
+		COPY_INT(&s, p + offset);
 		/*
 		 * get real pointer from strings table
 		 */
@@ -788,10 +770,7 @@ static void patch_in P3(struct program *, prog, short *, patches, int, len)
 		    s = 0;
 		else
 		    s = (int) prog->p.i.strings[s];
-		p[offset + 0] = ((char *) &s)[0];
-		p[offset + 1] = ((char *) &s)[1];
-		p[offset + 2] = ((char *) &s)[2];
-		p[offset + 3] = ((char *) &s)[3];
+		COPY_INT(p + offset, &s);
 		offset += 6;
 	    }
 	    /* sort so binary search still works */

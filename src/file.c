@@ -3,20 +3,21 @@
  * description: handle all file based efuns
  */
 
+#include "lex.h"
 #include "std.h"
 #include "lpc_incl.h"
 #include "file_incl.h"
 #include "comm.h"
 #include "strstr.h"
 
-#if (defined(_SEQUENT_) || defined(hpux) || defined(sgi) \
-	|| defined(_AUX_SOURCE) || defined(linux) || defined(cray) \
-	|| defined(SunOS_5) || defined(_M_UNIX))
 #if defined(SunOS_5)
 #undef major
 #undef minor
 #undef makedev
 #endif
+#if (defined(_SEQUENT_) || defined(hpux) || defined(sgi) \
+	|| defined(_AUX_SOURCE) || defined(linux) || defined(cray) \
+	|| defined(SunOS_5) || defined(_M_UNIX))
 #include <sys/sysmacros.h>
 #endif
 #ifdef OS2
@@ -57,7 +58,7 @@ static int parrcmp P2(struct svalue *, p1, struct svalue *, p2)
 static void encode_stat P4(struct svalue *, vp, int, flags, char *, str, struct stat *, st)
 {
     if (flags == -1) {
-	struct vector *v = allocate_array(3);
+	struct vector *v = allocate_empty_array(3);
 
 	v->item[0].type = T_STRING;
 	v->item[0].subtype = STRING_MALLOC;
@@ -185,7 +186,7 @@ struct vector *get_dir P2(char *, path, int, flags)
 	if (*p == '/' && *(p + 1) != '\0')
 #endif
 	    p++;
-	v = allocate_array(1);
+	v = allocate_empty_array(1);
 	encode_stat(&v->item[0], flags, p, &st);
 	return v;
     }
@@ -245,7 +246,7 @@ struct vector *get_dir P2(char *, path, int, flags)
     /*
      * Make array and put files on it.
      */
-    v = allocate_array(count);
+    v = allocate_empty_array(count);
     if (count == 0) {
 	/* This is the easy case :-) */
 #ifndef OS2
@@ -435,14 +436,28 @@ void smart_log P4(char *, error_file, int, line, char *, what, int, flag)
 {
     char *buff;
     struct svalue *mret;
-
+    extern int pragmas;
 
     buff = (char *)
-	DMALLOC(strlen(error_file) + strlen(what) + 40, 39, "smart_log: 1");
-    if (flag)
-	sprintf(buff, "%s line %d: Warning: %s\n", error_file, line, what);
+	DMALLOC(strlen(error_file) + strlen(what) + 
+		((pragmas & PRAGMA_ERROR_CONTEXT) ? 100 : 40), 39, "smart_log: 1");
+
+    if (pragmas & PRAGMA_ERROR_CONTEXT){
+        char *ls = strrchr(what, '\n');
+	char *tmp;
+	if (ls) {
+	    tmp = ls + 1;
+	    while (*tmp && isspace(*tmp)) tmp++;
+	    if (!*tmp) *ls = 0;
+	}
+    }
+
+    if (flag) 
+	sprintf(buff, "%s line %d: Warning: %s%s", error_file, line, what,
+		(pragmas & PRAGMA_ERROR_CONTEXT) ? show_error_context() : "\n");
     else
-	sprintf(buff, "%s line %d: %s\n", error_file, line, what);
+	sprintf(buff, "%s line %d: %s%s", error_file, line, what,
+		(pragmas & PRAGMA_ERROR_CONTEXT) ? show_error_context() : "\n");
     
     push_constant_string(error_file);
     push_constant_string(buff);
@@ -481,7 +496,8 @@ char *read_file P3(char *, file, int, start, int, len)
 {
     struct stat st;
     FILE *f;
-    char *str, *p, *p2, *end, c;
+    char *str, *end;
+    register char *p, *p2;
     int size;
 
     if (len < 0)
@@ -522,8 +538,6 @@ char *read_file P3(char *, file, int, start, int, len)
     str = DXALLOC(size + 1, 41, "read_file: str");
     str[size] = '\0';
     do {
-	if (size > st.st_size)
-	    size = st.st_size;
 #ifdef OS2
 	/* It does \n mangleing.  Sigh.... */
 	if (((st.st_size = fread(str, 1, size, f)) <= 0) || !size) {
@@ -534,50 +548,53 @@ char *read_file P3(char *, file, int, start, int, len)
 	    FREE(str);
 	    return 0;
 	}
-#ifdef OS2
+
 	if (size > st.st_size) {
 	    size = st.st_size;
-	}			/* endif */
-#endif
+	}		
+
 	st.st_size -= size;
 	end = str + size;
-	for (p = str; (p2 = (char *) memchr(p, '\n', end - p)) && --start;) {
+	for (p = str; --start && (p2 = (char *) memchr(p, '\n', end - p));) {
 	    p = p2 + 1;
 	}
     } while (start > 1);
-    for (p2 = str; p != end;) {
-	c = *p++;
-	*p2++ = c;
-	if (c == '\n')
-	    if (!--len)
-		break;
-    }
-    if (len && st.st_size) {
-	size -= (p2 - str);
-	if (size > st.st_size)
-	    size = st.st_size;
-	if ((fread(p2, size, 1, f) != 1) || !size) {
-	    fclose(f);
-	    FREE(str);
-	    return 0;
-	}
-	st.st_size -= size;
-	end = p2 + size;
-	for (; p2 != end;) {
-	    c = *p2;
-	    p2++;
-	    if (c == '\n')
-		if (!--len)
+    
+    if (len != READ_FILE_MAX_SIZE || st.st_size){
+        for (p2 = str; p != end;) {
+	    if ((*p2++ = *p++) == '\n')
+	        if (!--len)
 		    break;
 	}
-	if (st.st_size && len) {
-	    /* tried to read more than READ_MAX_FILE_SIZE */
-	    fclose(f);
-	    FREE(str);
-	    return 0;
+	if (len && st.st_size) {
+	    size -= (p2 - str);
+	    
+	    if (size > st.st_size)
+		size = st.st_size;
+
+	    if ((fread(p2, size, 1, f) != 1) || !size) {
+		fclose(f);
+		FREE(str);
+		return 0;
+	    }
+	    st.st_size -= size;
+	    end = p2 + size;
+	    for (; p2 != end;) {
+		if (*p2++ == '\n')
+		    if (!--len)
+			break;
+	    }
+
+	    if (st.st_size && len) {
+		/* tried to read more than READ_MAX_FILE_SIZE */
+		fclose(f);
+		FREE(str);
+		return 0;
+	    }
 	}
-    }
-    *p2 = '\0';
+	*p2 = '\0';
+    } 
+	
     fclose(f);
     return str;
 }				/* read_file() */

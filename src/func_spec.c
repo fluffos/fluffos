@@ -60,7 +60,7 @@ int save_object(string, void | int);
 string save_variable(mixed);
 mixed restore_variable(string);
 object *users();
-string *get_dir(string, int default:F_CONST0);
+mixed *get_dir(string, int default:F_CONST0);
 int strsrch(string, string | int, int default:F_CONST0);
 
 /* communication functions */
@@ -119,7 +119,8 @@ void message(mixed, string, string | string * | object | object *,
 #ifndef DISALLOW_BUFFER_TYPE
     buffer allocate_buffer(int);
 #endif
-    string *regexp(string *, string);
+    string *regexp(string *, string, void | int);
+    mixed *reg_assoc(string, string *, mixed *, mixed | void);
     mixed *allocate(int);
 
 /* do not remove to_int(), to_float() because they are also used by

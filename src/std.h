@@ -5,15 +5,14 @@
 
 #include "arch.h"
 #include "options.h"
-#include "port.h"
+#include "portability.h"
 #include "macros.h"
 #ifndef _FUNC_SPEC_
 #   include "std_incl.h"
+#   include "malloc_incl.h"
 #   ifndef NO_OPCODES
 #      include "opcodes.h"
 #   endif
-/* TEMP HACK - v20.25 won't need this */
-#include "debugmalloc.h"
 #endif
 
 #endif

@@ -528,18 +528,8 @@ f_sub_eq()
 
 	case T_POINTER:
 	{
-	    struct vector *subtract_array PROT((struct vector *, struct vector *));
-	    struct vector *v = sp->u.vec, *w;
-
-	    if (v->ref > 1) {
-		v = slice_array(v, 0, v->size - 1);
-		free_vector(sp->u.vec);
-	    }
-	    w = subtract_array(argp->u.vec, v);
-	    free_vector(argp->u.vec);
-	    free_vector(v);	/* no longer freed in subtract_array() */
-	    argp->u.vec = w;
-	    assign_svalue_no_free(sp, argp);
+	    sp->u.vec = argp->u.vec = subtract_array(argp->u.vec, sp->u.vec);
+	    sp->u.vec->ref++;
 	    break;
 	}
 
@@ -596,15 +586,6 @@ f_sub_eq()
 #define U_TYPE	-2
 #define U_UPPER	0
 #define U_ADDR	4
-
-#define COPY_SHORT(dst, src) \
-    { ((char *)(dst))[0] = ((char *)(src))[0]; \
-      ((char *)(dst))[1] = ((char *)(src))[1]; }
-#define COPY_LONG(dst, src) \
-    { ((char *)(dst))[0] = ((char *)(src))[0]; \
-      ((char *)(dst))[1] = ((char *)(src))[1]; \
-      ((char *)(dst))[2] = ((char *)(src))[2]; \
-      ((char *)(dst))[3] = ((char *)(src))[3]; }
 
 INLINE void
 f_switch()
@@ -666,7 +647,7 @@ f_switch()
 	if (i == 14) {
 	    /* fastest switch format : lookup table */
 	    l = current_prog->p.i.program + offset;
-	    COPY_LONG(&d, end_tab - 4);
+	    COPY_INT(&d, end_tab - 4);
 	    /* d is minimum value - see if in range or not */
 	    if (s >= d && l + (s = (s - d) * sizeof(short)) < (end_tab - 4)) {
 		COPY_SHORT(&offset, &l[s]);
@@ -691,14 +672,14 @@ f_switch()
     if (d < ENTRY_SIZE)
 	d = 0;
     for (;;) {
-	COPY_LONG(&r, l);
+	COPY_INT(&r, l);
 	if (s < r) {
 	    if (d < ENTRY_SIZE) {
 		/* test if entry is part of a range */
 		/* Don't worry about reading from F_BREAK (byte before table) */
 		COPY_SHORT(&offset, l + U_TYPE);
 		if (offset <= 1) {
-		    COPY_LONG(&r, l + U_LOWER);
+		    COPY_INT(&r, l + U_LOWER);
 		    if (s >= r) {
 			/* s is in the range */
 			COPY_SHORT(&offset, l + U_ADDR);
@@ -724,7 +705,7 @@ f_switch()
 		/* test if entry is part of a range */
 		COPY_SHORT(&offset, l + L_TYPE);
 		if (offset <= 1) {
-		    COPY_LONG(&r, l + L_UPPER);
+		    COPY_INT(&r, l + L_UPPER);
 		    if (s <= r) {
 			/* s is in the range */
 			COPY_SHORT(&offset, l + L_ADDR);
@@ -764,7 +745,7 @@ f_switch()
 	    /* found the key - but could be part of a range... */
 	    if (!l[U_TYPE] && !l[U_TYPE + 1]) {
 		/* end of range with lookup table */
-		COPY_LONG(&r, l + U_LOWER);
+		COPY_INT(&r, l + U_LOWER);
 		l = current_prog->p.i.program + offset + (s - r) * sizeof(short);
 		COPY_SHORT(&offset, l);
 	    }
@@ -783,6 +764,8 @@ f_switch()
     pc = current_prog->p.i.program + offset;
 }
 
+int simul_efun_is_loading = 0;
+
 void
 call_simul_efun P2(unsigned short, index, int, num_arg)
 {
@@ -800,11 +783,9 @@ call_simul_efun P2(unsigned short, index, int, num_arg)
     }
 
     if (!simul_efun_ob || (simul_efun_ob->flags & O_DESTRUCTED)) {
-	if (loading)
+	if (simul_efun_is_loading)
 	    error("Attempt to call a simul_efun while compiling the simul_efun object.\n");
-	loading = 1;
 	(void) load_object(simul_efun_file_name, 0);
-	loading = 0;
 	/* if it didn't load we're in trouble. */
 	if (!simul_efun_ob || (simul_efun_ob->flags & O_DESTRUCTED))
 	    error("No simul_efun object for simul_efun.\n");
@@ -839,13 +820,9 @@ void
 f_simul_efun()
 {
     unsigned short index;
-    int num_arg;
 
-    ((char*)&index)[0] = pc[0];
-    ((char*)&index)[1] = pc[1];
-    num_arg = EXTRACT_UCHAR(pc+2);
-    pc += 3;
-    call_simul_efun(index, num_arg);
+    LOAD_SHORT(index, pc);
+    call_simul_efun(index, EXTRACT_UCHAR(pc++));
 }
 
 INLINE void
@@ -1074,24 +1051,18 @@ f_function_constructor()
 	break;
 #ifdef NEW_FUNCTIONS
     case ORIGIN_LOCAL:
-	((char *)&index)[0] = pc[0];
-	((char *)&index)[1] = pc[1];
-	pc += 2;
+	LOAD_SHORT(index, pc);
 	fp = make_lfun_funp(index, sp); 
 	pop_stack();
 	break;
     case ORIGIN_SIMUL_EFUN:
-	((char *)&index)[0] = pc[0];
-	((char *)&index)[1] = pc[1];
-	pc += 2;
+	LOAD_SHORT(index, pc);
 	fp = make_simul_funp(index, sp); 
 	pop_stack();
 	break;
     case ORIGIN_FUNCTIONAL:
 	kind = EXTRACT_UCHAR(pc++);  /* number of arguments */
-	((char *)&index)[0] = pc[0];
-	((char *)&index)[1] = pc[1]; /* length of functional */
-	pc += 2;
+	LOAD_SHORT(index, pc);       /* length of functional */
 	fp = make_functional_funp(kind, index);
 	break;
 #endif
@@ -1103,23 +1074,23 @@ f_function_constructor()
 
 #ifdef NEW_FUNCTIONS
 INLINE void
-f_evaluate P2(int, num_arg, int, instruction)
+f_evaluate PROT((void))
 {
     struct svalue *v;
-    struct svalue *arg = sp - num_arg + 1;
+    struct svalue *arg = sp - st_num_arg + 1;
 
     if (arg->type != T_FUNCTION) {
-	pop_n_elems(num_arg-1);
+	pop_n_elems(st_num_arg-1);
 	return;
     }
     if (current_object->flags & O_DESTRUCTED) {
-	pop_n_elems(num_arg);
+	pop_n_elems(st_num_arg);
 	push_undefined();
 	return;
     }
-    v = call_function_pointer(arg->u.fp, num_arg - 1);
-    pop_stack();
-    push_svalue(v);
+    v = call_function_pointer(arg->u.fp, st_num_arg - 1);
+    free_funp(arg->u.fp);
+    assign_svalue_no_free(sp, v);
 }
 #else
 INLINE void

@@ -17,7 +17,7 @@ int c_catch_start()
     csp->num_local_variables = (csp - 1)->num_local_variables;	/* marion */
     push_pop_error_context(1);
 
-    error_recovery_context_exists = 2;
+    error_recovery_context_exists = CATCH_ERROR_CONTEXT;
 }
 
 int c_catch_error()

@@ -12,10 +12,11 @@
 **
 ** Amiga Lattice support added by Robocoder@TMI-2
 **
-** NeXT Mach support is preliminary and may not work on NeXTStep 3.x.
+** NeXT Mach support is preliminary. NeXTStep 3.x users should #undef SBRK_OK.
 */
+
+#define NO_OPCODES
 #include "std.h"
-#include "efuns_main.h"
 #include "interpret.h"
 #include "simulate.h"
 #include "comm.h"
@@ -27,10 +28,20 @@
 #define MALLOC_ALIGN 4
 #endif
 
-/* #undeffing SBRK_OK will just screw things up, since it tries to
- use malloc() to get memory, and smalloc() is renamed to malloc()  here
- to be compatible with MudOS...hmm   -Blackthorn */
+/*
+ * #define SBRK_OK to use low level memory allocation routines;
+ * conversely, #undef SBRK_OK to use the system malloc routines, eg malloc(),
+ * in which case, smalloc becomes a wrapper...
+ */
 #define SBRK_OK
+
+/* SGI IRIX stupidly calls malloc() all over the place, effectively rendering
+   sbrk() useless ...
+ */
+#ifdef sgi
+#undef SBRK_OK
+#endif
+
 #define POINTER void *
 #define FREE_RETURN_TYPE void
 #define FREE_RETURN return;
@@ -42,10 +53,6 @@
 #undef LARGE_TRACE
 
 #define fake(s)
-
-#define smalloc malloc
-#define sfree   free
-#define srealloc realloc
 
 #define SMALL_BLOCK_MAX_BYTES	32
 #define SMALL_CHUNK_SIZE	0x4000
@@ -118,7 +125,9 @@ static void build_block PROT((u *, u));
 static void mark_block PROT((u *));
 static char *esbrk PROT((u));
 static int resort_free_list PROT((void));
+#ifdef DEBUG
 static void walk_new_small_malloced PROT((void (*) ()));
+#endif
 
 #define s_size_ptr(p)	(p)
 #define s_next_ptr(p)	((u **) (p+1))
@@ -131,15 +140,14 @@ t_stat small_chunk_stat =
 {0, 0};
 
 #ifdef OS2
-POINTER smalloc P1(unsigned int, size)
+POINTER smalloc_malloc P1(unsigned int, size)
 #else
-POINTER smalloc P1(size_t, size)
+POINTER smalloc_malloc P1(size_t, size)
 #endif
 {
     /* int i; */
     u *temp;
 
-    using_smalloc = 1;
 #ifdef DEBUG
     if (size == 0)
 	fatal("Malloc size 0.\n");
@@ -214,7 +222,7 @@ static int malloced_size P1(POINTER, ptr)
     return (int) (((u *) ptr)[-1] & MASK);
 }
 
-SFREE_RETURN_TYPE sfree P1(POINTER, ptr)
+SFREE_RETURN_TYPE smalloc_free P1(POINTER, ptr)
 {
     u *block;
     u i;
@@ -1039,7 +1047,6 @@ static char *esbrk P1(u, size)
 
 #ifndef linux
     extern char *sbrk();
-
 #endif				/* linux */
 
     extern int brk();
@@ -1058,8 +1065,8 @@ static char *esbrk P1(u, size)
 #endif				/* NeXT */
 #else				/* not SBRK_OK */
 
-         count_up(sbrk_stat, size);
-    return malloc(size);
+    count_up(sbrk_stat, size);
+    return (char *)malloc(size);
 
 #endif				/* SBRK_OK */
 }
@@ -1257,7 +1264,7 @@ static char *large_malloc P2(u, size, int, force_more)
 	    if (going_to_exit)
 		exit(3);
 	    if (reserved_area) {
-		sfree(reserved_area);
+		smalloc_free(reserved_area);
 		reserved_area = 0;
 		write(1, mess1, sizeof(mess1) - 1);
 		slow_shut_down_to_do = 6;
@@ -1343,9 +1350,9 @@ static void large_free P1(char *, ptr)
 }
 
 #ifdef OS2
-POINTER srealloc P2(POINTER, p, unsigned int, size)
+POINTER smalloc_realloc P2(POINTER, p, unsigned int, size)
 #else
-POINTER srealloc P2(POINTER, p, size_t, size)
+POINTER smalloc_realloc P2(POINTER, p, size_t, size)
 #endif
 {
     unsigned *q, old_size;
@@ -1363,12 +1370,12 @@ POINTER srealloc P2(POINTER, p, size_t, size)
     if (old_size >= size)
 	return p;
 
-    t = malloc(size);
+    t = smalloc_malloc(size);
     if (t == 0)
 	return (char *) 0;
 
     memcpy(t, p, old_size);
-    free(p);
+    smalloc_free(p);
     return t;
 }
 
@@ -1376,10 +1383,11 @@ static int resort_free_list()
 {
     return 0;
 }
+#ifdef DO_MSTATS
 #define dump_stat(str,stat) add_message(str,stat.counter,stat.size)
 void show_mstats P1(char *, s)
 {
-    add_message("Memory allocation statistics %s\nfree:\t", s);
+    add_message("Memory allocation statistics %s\n", s);
     add_message("Type                   Count      Space (bytes)\n");
     dump_stat("sbrk requests:     %8d        %10d (a)\n", sbrk_stat);
     dump_stat("large blocks:      %8d        %10d (b)\n", large_alloc_stat);
@@ -1388,7 +1396,7 @@ void show_mstats P1(char *, s)
     dump_stat("small blocks:      %8d        %10d (e)\n", small_alloc_stat);
     dump_stat("small free blocks: %8d        %10d (f)\n", small_free_stat);
     add_message(
-	    "unused from current chunk          %10d (g)\n\n", unused_size);
+       "unused from current chunk          %10d (g)\n\n", unused_size);
     add_message(
     "    Small blocks are stored in small chunks, which are allocated as\n");
     add_message(
@@ -1400,23 +1408,25 @@ void show_mstats P1(char *, s)
     add_message(
     "wasted is (c) + (f) + (g); the amount allocated is (b) - (f) - (g).\n");
 }
+#endif
 
 /*
  * calloc() is provided because some stdio packages uses it.
  */
-POINTER calloc P2(size_t, nelem, size_t, sizel)
+POINTER smalloc_calloc P2(size_t, nelem, size_t, sizel)
 {
     char *p;
 
     if (nelem == 0 || sizel == 0)
 	return 0;
-    p = malloc(nelem * sizel);
+    p = smalloc_malloc(nelem * sizel);
     if (p == 0)
 	return 0;
     (void) memset(p, '\0', nelem * sizel);
     return p;
 }
 
+#ifdef DEBUG
 /*
  * Functions below can be used to debug malloc.
  */
@@ -1456,6 +1466,7 @@ static void walk_new_small_malloced(func)
 	}
     }
 }
+#endif
 
 #if 0
 

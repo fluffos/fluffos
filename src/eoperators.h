@@ -34,3 +34,4 @@ void push_funp PROT((struct funp *));
 void free_funp PROT((struct funp *));
 int merge_arg_lists PROT((int, struct vector *, int));
 void call_simul_efun PROT((unsigned short, int));
+

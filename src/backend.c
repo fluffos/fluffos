@@ -18,7 +18,7 @@ extern HEV mudos_event_sem;
 #endif
 
 jmp_buf error_recovery_context;
-int error_recovery_context_exists = 0;
+int error_recovery_context_exists = NULL_ERROR_CONTEXT;
 
 /*
  * The 'current_time' is updated at every heart beat.
@@ -49,7 +49,7 @@ void clear_state()
     previous_ob = 0;
     current_prog = 0;
     caller_type = 0;
-    error_recovery_context_exists = 1;
+    error_recovery_context_exists = NORMAL_ERROR_CONTEXT;
     reset_machine(0);		/* Pop down the stack. */
 }				/* clear_state() */
 
@@ -579,10 +579,10 @@ void preload_objects P1(int, eflag)
     if (SETJMP(error_recovery_context)) {
 	clear_state();
 	debug_message("error in epilog() in the master object.\n");
-	error_recovery_context_exists = 0;
+	error_recovery_context_exists = NULL_ERROR_CONTEXT;
 	return;
     }
-    error_recovery_context_exists = 1;
+    error_recovery_context_exists = NORMAL_ERROR_CONTEXT;
     push_number(eflag);
     ret = apply_master_ob(APPLY_EPILOG, 1);
     if ((ret == 0) || (ret == (svalue *)-1) || (ret->type != T_POINTER))
@@ -607,7 +607,7 @@ void preload_objects P1(int, eflag)
 	(void) apply_master_ob(APPLY_PRELOAD, 1);
     }
     free_vector(prefiles);
-    error_recovery_context_exists = 0;
+    error_recovery_context_exists = NULL_ERROR_CONTEXT;
 }				/* preload_objects() */
 
 /* All destructed objects are moved into a sperate linked list,

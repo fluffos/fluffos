@@ -13,6 +13,7 @@ extern int total_array_size;
 int sameval PROT((struct svalue *, struct svalue *));
 struct vector *null_array PROT((void));
 struct vector *allocate_array PROT((int));
+struct vector *allocate_empty_array PROT((int));
 void free_vector PROT((struct vector *));
 struct vector *add_array PROT((struct vector *, struct vector *));
 struct vector *subtract_array PROT((struct vector *, struct vector *));
@@ -35,10 +36,10 @@ struct vector *sort_array PROT((struct vector *, char *, struct object *));
 struct vector *make_unique PROT((struct vector *, char *, struct funp *, struct svalue *));
 void map_array PROT((struct svalue *arg, int num_arg));
 struct vector *intersect_array PROT((struct vector *, struct vector *));
-struct vector *match_regexp PROT((struct vector *, char *));
+struct vector *match_regexp PROT((struct vector *, char *, int));
+struct vector *reg_assoc PROT((char *, struct vector *, struct vector *, struct svalue *));
 
 #define ALLOC_VECTOR(nelem) \
     (struct vector *)DXALLOC(sizeof (struct vector) + \
 	  sizeof(struct svalue) * (nelem - 1), 121, "ALLOC_VECTOR")
-
 #endif

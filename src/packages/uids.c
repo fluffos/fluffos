@@ -9,108 +9,99 @@ static struct svalue *argp;
 
 #ifdef F_EXPORT_UID
 void
-f_export_uid P2(int, num_arg, int, instruction)
+f_export_uid PROT((void))
 {
     if (current_object->euid == NULL)
-	error("Illegal to export uid 0\n");
+        error("Illegal to export uid 0\n");
     ob = sp->u.ob;
-    pop_stack();
-    if (ob->euid)
-	push_number(0);
+    if (ob->euid){
+        free_object(ob, "f_export_uid:1");
+        *sp = const0;
+    }
     else {
-	ob->uid = current_object->euid;
-	push_number(1);
+        ob->uid = current_object->euid;
+        free_object(ob, "f_export_uid:2");
+        *sp = const1;
     }
 }
 #endif
 
 #ifdef F_GETEUID
 void
-f_geteuid P2(int, num_arg, int, instruction)
+f_geteuid PROT((void))
 {
-    if (sp->type == T_OBJECT) {
-	ob = sp->u.ob;
-	if (ob->euid) {
-	    char *tmp;
-	    
-	    tmp = ob->euid->name;
-	    pop_stack();
-	    push_string(tmp, STRING_CONSTANT);
-	    return;
+    if (sp->type & T_OBJECT) {
+        ob = sp->u.ob;
+        if (ob->euid) {
+            put_constant_string(ob->euid->name);
+            free_object(ob, "f_geteuid:1");
+            return;
 	} else {
-	    pop_stack();
-	    push_number(0);
-	    return;
+            free_object(ob, "f_geteuid:2");
+            *sp = const0;
+            return;
 	}
-    } else if (sp->type == T_FUNCTION) {
+    } else if (sp->type & T_FUNCTION) {
+        struct funp *fp;
 #ifdef NEW_FUNCTIONS
-	if (sp->u.fp->owner && sp->u.fp->owner->euid) {
-	    char *tmp;
-	    
-	    tmp = sp->u.fp->owner->euid->name;
-	    pop_stack();
-	    push_string(tmp, STRING_CONSTANT);
-	    return;
-	} else {
-	    pop_stack();
-	    push_number(0);
-	    return;
-	}
+        if ((fp = sp->u.fp)->owner && fp->owner->euid) {
+            put_constant_string(fp->owner->euid->name);
+            free_funp(fp);
+            return;
+	} 
 #else
-	if (sp->u.fp->euid) {
-	    pop_stack();
-	    push_string(sp->u.fp->euid->name, STRING_CONSTANT);
-	    return;
+        if ((fp = sp->u.fp)->euid) {
+            put_constant_string(fp->euid->name);
+            free_funp(fp);
+            return;
 	}
 #endif
+	free_funp(fp);
+	*sp = const0;
     }
-    pop_stack();
-    push_number(0);
 }
 #endif
 
 #ifdef F_GETUID
 void
-f_getuid P2(int, num_arg, int, instruction)
+f_getuid PROT((void))
 {
-    char *tmp;
-
     ob = sp->u.ob;
 #ifdef DEBUG
     if (ob->uid == NULL)
-	fatal("UID is a null pointer\n");
+        fatal("UID is a null pointer\n");
 #endif
-    tmp = ob->uid->name;
-    pop_stack();
-    push_string(tmp, STRING_CONSTANT);
+    put_constant_string(ob->uid->name);
+    free_object(ob, "f_getuid");
 }
 #endif
 
 #ifdef F_SETEUID
 void
-f_seteuid P2(int, num_arg, int, instruction)
+f_seteuid PROT((void))
 {
     struct svalue *ret;
+    char *tmp;
 
-    if (sp->type == T_NUMBER) {
-	if (sp->u.number != 0)
-	    bad_arg(1, instruction);
-	current_object->euid = NULL;
-	*sp = const1;
-	return;
+    if (sp->type & T_NUMBER) {
+        if (sp->u.number)
+            bad_arg(1, F_SETEUID);
+        current_object->euid = NULL;
+	sp->u.number = 1;
+        return;
     }
-    argp = sp;
-    CHECK_TYPES(argp, T_STRING, 1, instruction);
+    tmp = sp->u.string;
     push_object(current_object);
-    push_string(argp->u.string, STRING_CONSTANT);
+    push_constant_string(tmp);
     ret = apply_master_ob(APPLY_VALID_SETEUID, 2);
     if (!MASTER_APPROVED(ret)) {
-	pop_stack();
-	push_number(0);
-	return;
+        free_string_svalue(sp);
+        *sp = const0;
+        return;
     }
-    current_object->euid = add_uid(argp->u.string);
+    current_object->euid = add_uid(tmp);
     free_string_svalue(sp);
     *sp = const1;
 }
 #endif
+

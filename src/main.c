@@ -83,7 +83,6 @@ static void sig_hup PROT((void)),
    value if you like).
 */
 int debug_level = 32768;
-
 #endif				/* DEBUG_MACRO */
 
 #ifdef LATTICE
@@ -393,11 +392,11 @@ int main(argc, argv)
 		simul_efun_file_name, master_file_name);
 	exit(-1);
     } else {
-	error_recovery_context_exists = 1;
+	error_recovery_context_exists = NORMAL_ERROR_CONTEXT;
 	set_simul_efun(SIMUL_EFUN);
 	(void) load_object(master_file_name, 0);
     }
-    error_recovery_context_exists = 0;
+    error_recovery_context_exists = NULL_ERROR_CONTEXT;
 
     for (i = 1; i < argc; i++) {
 	if (argv[i][0] != '-') {

@@ -27,20 +27,21 @@ static Vector *normalize_vector PROT((Vector *));
 static Vector *cross_product PROT((Vector *, Vector *, Vector *));
 static Vector *points_to_vector PROT((Vector *, Vector *, Vector *));
 
-void f_id_matrix P2(int, num_arg, int, instruction)
+void f_id_matrix PROT((void))
 {
     struct vector *matrix;
     int i;
 
-    matrix = allocate_array(16);
+    matrix = allocate_empty_array(16);
     for (i = 0; i < 16; i++) {
-	matrix->item[i].type = T_REAL;
-	matrix->item[i].u.real = identity[i];
+        matrix->item[i].type = T_REAL;
+        matrix->item[i].u.real = identity[i];
     }
-    push_refed_vector(matrix);
+    (++sp)->u.vec = matrix;
+    sp->type = T_POINTER;
 }
 
-void f_translate P2(int, num_arg, int, instruction)
+void f_translate PROT((void))
 {
     struct vector *matrix;
     double x, y, z;
@@ -50,10 +51,10 @@ void f_translate P2(int, num_arg, int, instruction)
     int i;
 
     if ((sp - 1)->type != T_REAL) {
-	bad_arg(3, instruction);
+	bad_arg(3, F_TRANSLATE);
     }
     if (sp->type != T_REAL) {
-	bad_arg(4, instruction);
+	bad_arg(4, F_TRANSLATE);
     }
     /*
      * get arguments from stack.
@@ -62,7 +63,8 @@ void f_translate P2(int, num_arg, int, instruction)
     x = (sp - 2)->u.real;
     y = (sp - 1)->u.real;
     z = sp->u.real;
-    pop_3_elems();
+    sp -= 3;
+
     /*
      * convert vec matrix to float matrix.
      */
@@ -85,7 +87,7 @@ void f_translate P2(int, num_arg, int, instruction)
     }
 }
 
-void f_scale P2(int, num_arg, int, instruction)
+void f_scale PROT((void))
 {
     struct vector *matrix;
     double x, y, z;
@@ -95,10 +97,10 @@ void f_scale P2(int, num_arg, int, instruction)
     int i;
 
     if ((sp - 1)->type != T_REAL) {
-	bad_arg(3, instruction);
+	bad_arg(3, F_SCALE);
     }
     if (sp->type != T_REAL) {
-	bad_arg(4, instruction);
+	bad_arg(4, F_SCALE);
     }
     /*
      * get arguments from stack.
@@ -107,7 +109,7 @@ void f_scale P2(int, num_arg, int, instruction)
     x = (sp - 2)->u.real;
     y = (sp - 1)->u.real;
     z = sp->u.real;
-    pop_3_elems();
+    sp -= 3;
     /*
      * convert vec matrix to float matrix.
      */
@@ -130,7 +132,7 @@ void f_scale P2(int, num_arg, int, instruction)
     }
 }
 
-void f_rotate_x P2(int, num_arg, int, instruction)
+void f_rotate_x PROT((void))
 {
     struct vector *matrix;
     double angle;
@@ -143,8 +145,7 @@ void f_rotate_x P2(int, num_arg, int, instruction)
      * get arguments from stack.
      */
     matrix = (sp - 1)->u.vec;
-    angle = sp->u.real;
-    pop_stack();
+    angle = (sp--)->u.real;
     /*
      * convert vec matrix to float matrix.
      */
@@ -167,7 +168,7 @@ void f_rotate_x P2(int, num_arg, int, instruction)
     }
 }
 
-void f_rotate_y P2(int, num_arg, int, instruction)
+void f_rotate_y PROT((void))
 {
     struct vector *matrix;
     double angle;
@@ -180,8 +181,7 @@ void f_rotate_y P2(int, num_arg, int, instruction)
      * get arguments from stack.
      */
     matrix = (sp - 1)->u.vec;
-    angle = sp->u.real;
-    pop_stack();
+    angle = (sp--)->u.real;
     /*
      * convert vec matrix to float matrix.
      */
@@ -204,7 +204,7 @@ void f_rotate_y P2(int, num_arg, int, instruction)
     }
 }
 
-void f_rotate_z P2(int, num_arg, int, instruction)
+void f_rotate_z PROT((void))
 {
     struct vector *matrix;
     double angle;
@@ -217,8 +217,7 @@ void f_rotate_z P2(int, num_arg, int, instruction)
      * get arguments from stack.
      */
     matrix = (sp - 1)->u.vec;
-    angle = sp->u.real;
-    pop_stack();
+    angle = (sp--)->u.real;
     /*
      * convert vec matrix to float matrix.
      */
@@ -241,7 +240,7 @@ void f_rotate_z P2(int, num_arg, int, instruction)
     }
 }
 
-void f_lookat_rotate P2(int, num_arg, int, instruction)
+void f_lookat_rotate PROT((void))
 {
     struct vector *matrix;
     double x, y, z;
@@ -250,10 +249,10 @@ void f_lookat_rotate P2(int, num_arg, int, instruction)
     int i;
 
     if ((sp - 1)->type != T_REAL) {
-	bad_arg(3, instruction);
+	bad_arg(3, F_LOOKAT_ROTATE);
     }
     if (sp->type != T_REAL) {
-	bad_arg(4, instruction);
+	bad_arg(4, F_LOOKAT_ROTATE);
     }
     /*
      * get arguments from stack.
@@ -262,7 +261,7 @@ void f_lookat_rotate P2(int, num_arg, int, instruction)
     x = (sp - 2)->u.real;
     y = (sp - 1)->u.real;
     z = sp->u.real;
-    pop_3_elems();
+    sp -= 3;
     /*
      * convert vec matrix to float matrix.
      */
@@ -281,7 +280,7 @@ void f_lookat_rotate P2(int, num_arg, int, instruction)
     }
 }
 
-void f_lookat_rotate2 P2(int, num_arg, int, instruction)
+void f_lookat_rotate2 PROT((void))
 {
     struct vector *matrix;
     double ex, ey, ez, lx, ly, lz;
@@ -291,7 +290,7 @@ void f_lookat_rotate2 P2(int, num_arg, int, instruction)
 
     for (j = 4; j >= 0; j--) {
 	if ((sp - j)->type != T_REAL) {
-	    bad_arg(7 - j, instruction);
+	    bad_arg(7 - j, F_LOOKAT_ROTATE2);
 	}
     }
     /*
@@ -304,7 +303,9 @@ void f_lookat_rotate2 P2(int, num_arg, int, instruction)
     lx = (sp - 2)->u.real;
     ly = (sp - 1)->u.real;
     lz = sp->u.real;
-    pop_n_elems(6);
+    sp -= 5;
+    free_vector((sp--)->u.vec);
+
     /*
      * convert vec matrix to float matrix.
      */

@@ -50,7 +50,6 @@
    int mkdir PROT((const char *, unsigned short));
    int system PROT((char *));
    int atoi PROT((const char *));
-   void srandom PROT((int));
    void abort PROT(());
    void qsort PROT((char *, int, int, int (*) ()));
    int setsockopt PROT((int, int, int, char *, int));

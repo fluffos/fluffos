@@ -24,6 +24,7 @@ extern struct svalue const0;
 extern struct svalue const1;
 extern struct svalue const0u;
 extern struct svalue const0n;
+extern int st_num_arg;
 extern double consts[];
 extern int slow_shut_down_to_do;
 extern struct object *master_ob;
