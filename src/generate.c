@@ -112,9 +112,16 @@ optimize P1(parse_node_t *, expr) {
 	break;
     case NODE_LAND_LOR:
     case NODE_BRANCH_LINK:
+      {
+	int in_cond = (optimizer_state & OPTIMIZER_IN_COND);
+
 	OPT(expr->l.expr);
+	optimizer_state |= OPTIMIZER_IN_COND;
 	OPT(expr->r.expr);
+	optimizer_state &= ~OPTIMIZER_IN_COND;
+	optimizer_state |= in_cond;
 	break;
+      }
     case NODE_CALL_2:
     case NODE_CALL_1:
     case NODE_CALL:

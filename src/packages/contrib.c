@@ -387,7 +387,7 @@ void f_functions PROT((void)) {
             
             subvec->item[0].type = T_STRING;
             subvec->item[0].subtype = STRING_SHARED;
-            subvec->item[0].u.string = string_unlink(ref_string(funp->funcname), "functions");
+            subvec->item[0].u.string = make_shared_string(funp->funcname);
 
             subvec->item[1].type = T_NUMBER;
             subvec->item[1].subtype = 0;
@@ -412,7 +412,7 @@ void f_functions PROT((void)) {
         } else {
             vec->item[i].type = T_STRING;
             vec->item[i].subtype = STRING_SHARED;
-            vec->item[i].u.string = string_unlink(ref_string(funp->funcname), "functions");
+            vec->item[i].u.string = make_shared_string(funp->funcname);
         }
     }
     

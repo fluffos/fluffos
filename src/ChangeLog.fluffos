@@ -1,7 +1,12 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
-new in FluffOs 1.29
+new in FluffOS 1.30
+added driver apply for mxp reply tags received from clients
+fixed crasher in functions() (DEBUG mode, probably corrupted memory) 
+fixed optimizer bug (Pelle Johansson peljo105 at student.liu.se) (from the mudos develop mailing list)
+
+new in FluffOS 1.29
 fixed bug in terminal_colour
 can now be compiled with tcc (you need to add a -DTCC flag)
 no longer use alloca in bison

@@ -1827,7 +1827,15 @@ int process_user_command()
     clear_notify(ip->ob);
     update_load_av();
     debug(connections, ("process_user_command: command_giver = /%s\n", command_giver->obname));
+    if(ip->iflags & USING_MXP && user_command[0] == ' ' && user_command[1] == '[' && user_command[3] == 'z' ){
+      svalue_t *ret;
+      copy_and_push_string(user_command);
 
+      ret=apply(APPLY_MXP_TAG, ip->ob, 1, ORIGIN_DRIVER);
+      if(ret && ret->type==T_NUMBER && ret->u.number){
+	goto exit;
+      }
+    }
     if (escape_command(ip, user_command)) {
         if (ip->iflags & SINGLE_CHAR) {
             /* only 1 char ... switch to line buffer mode */
