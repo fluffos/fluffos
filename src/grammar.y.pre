@@ -1314,9 +1314,15 @@ first_for_expr:
                     NODE_NO_LINE(node2, NODE_SWITCH_STRINGS);
                 } else if (context & SWITCH_RANGES) {
 		    NODE_NO_LINE(node2, NODE_SWITCH_RANGES);
-		} else {
+		} else if ((context & SWITCH_NUMBERS) ||
+			   (context & SWITCH_NOT_EMPTY)) {
                     NODE_NO_LINE(node2, NODE_SWITCH_NUMBERS);
-                }
+                } else {
+		    // to prevent crashing during the remaining parsing bits
+		    NODE_NO_LINE(node2, NODE_SWITCH_NUMBERS);
+
+		    yyerror("need case statements in switch/case, not just default:"); //just a default case present
+		}
 
                 node2->l.expr = $3;
                 node2->r.expr = node1;
@@ -1390,7 +1396,10 @@ first_for_expr:
                 if ((context & SWITCH_STRINGS) && $1)
                     yyerror("Mixed case label list not allowed");
 
-                if ($1) context |= SWITCH_NUMBERS;
+                if ($1)
+		  context |= SWITCH_NUMBERS;
+		else
+		  context |= SWITCH_NOT_EMPTY;
 
 		$$ = new_node();
 		$$->kind = NODE_CASE_NUMBER;

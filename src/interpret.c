@@ -4507,7 +4507,7 @@ static int find_line P4(char *, p, program_t *, progp,
     ADDRESS_TYPE abs_line;
     int file_idx;
     
-    *ret_file = "";
+    *ret_file = 0;
     *ret_line = 0;
     
     if (!progp) return 1;

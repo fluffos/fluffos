@@ -66,6 +66,7 @@ INLINE int svalue_save_size P1(svalue_t *, v)
             int i = v->u.arr->size, size = 0;
 
             if (++save_svalue_depth > MAX_SAVE_SVALUE_DEPTH) {
+                save_svalue_depth = 0;
                 too_deep_save_error();
             }
             while (i--) size += svalue_save_size(sv++);
@@ -79,6 +80,7 @@ INLINE int svalue_save_size P1(svalue_t *, v)
             int i = v->u.arr->size, size = 0;
 
             if (++save_svalue_depth > MAX_SAVE_SVALUE_DEPTH) {
+                save_svalue_depth = 0;
                 too_deep_save_error();
             }
             while (i--) size += svalue_save_size(sv++);
@@ -92,6 +94,7 @@ INLINE int svalue_save_size P1(svalue_t *, v)
             int j = v->u.map->table_size, size = 0;
 
             if (++save_svalue_depth > MAX_SAVE_SVALUE_DEPTH) {
+                save_svalue_depth = 0;
                 too_deep_save_error();
             }
             do {
