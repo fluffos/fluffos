@@ -12,6 +12,8 @@
 #include "swap.h"
 #include "socket_efuns.h"
 #include "interpret.h"
+#include "md.h"
+#include "eoperators.h"
 
 /*
  * 'inherit_file' is used as a flag. If it is set to a string
@@ -32,19 +34,6 @@ static int num_objects_this_thread = 0;
 static struct object *restrict_destruct;
 
 char *last_verb = 0;
-
-void pre_compile PROT((char *)),
-            remove_interactive PROT((struct object *)),
-#ifndef NO_LIGHT
-            add_light PROT((struct object *, int)),
-#endif
-            add_action PROT((char *, char *, int)),
-            ipc_remove(),
-            start_new_file PROT((int)), end_new_file(),
-            load_ob_from_swap PROT((struct object *)), dump_malloc_data(),
-            print_svalue PROT((struct svalue *)),
-            debug_message_value(),
-            destruct2();
 
 struct object *obj_list, *obj_list_destruct;
 struct object *current_object;	/* The object interpreting a function. */
@@ -128,11 +117,12 @@ init_privs_for_object P1(struct object *, ob)
  * Give the correct uid and euid to a created object.
  */
 #ifndef NO_UIDS
+static char *creator_file_fname = (char *) 0;
+
 static int give_uid_to_object P1(struct object *, ob)
 {
     struct svalue *ret;
     char *creator_name;
-    static char *creator_file_fname = (char *) 0;
     int err;
 
     err = assert_master_ob_loaded("[internal] give_uid_to_object", "");
@@ -424,7 +414,8 @@ struct object *load_object P2(char *, lname, int, flags)
 	    remove_object_hash(ob);
 	    if (ob->name)
 		FREE(ob->name);
-	    ob->name = string_copy(name);
+	    ob->name = string_copy(name, "load_object");
+	    SET_TAG(ob->name, TAG_OBJ_NAME);
 	    enter_object_hash(ob);
 	    ob->flags |= O_VIRTUAL;
 	    ob->load_time = current_time;
@@ -572,7 +563,9 @@ struct object *load_object P2(char *, lname, int, flags)
 	return ob;
     }
     ob = get_empty_object(prog->p.i.num_variables);
-    ob->name = string_copy(name);	/* Shared string is no good here */
+    /* Shared string is no good here */
+    ob->name = string_copy(name, "load_object");
+    SET_TAG(ob->name, TAG_OBJ_NAME);
     ob->prog = prog;
     ob->flags |= O_WILL_RESET;	/* must be before reset is first called */
     ob->next_all = obj_list;
@@ -604,8 +597,10 @@ struct object *load_object P2(char *, lname, int, flags)
 	ob->flags |= O_WILL_CLEAN_UP;
     }
     command_giver = save_command_giver;
+#ifdef DEBUG
     if (d_flag > 1 && ob)
 	debug_message("--%s loaded\n", ob->name);
+#endif
     ob->load_time = current_time;
     num_objects_this_thread--;
     if (is_master_ob) {
@@ -621,7 +616,7 @@ struct object *load_object P2(char *, lname, int, flags)
 static char *make_new_name P1(char *, str)
 {
     static int i;
-    char *p = DXALLOC(strlen(str) + 10, 97, "make_new_name");
+    char *p = DXALLOC(strlen(str) + 10, TAG_OBJ_NAME, "make_new_name");
 
     (void) sprintf(p, "%s#%d", str, i);
     i++;
@@ -839,7 +834,7 @@ static struct object *object_present2 P2(char *, str, struct object *, ob)
     int count = 0, length;
     char *item;
 
-    item = string_copy(str);
+    item = string_copy(str, "object_present2");
     length = strlen(item);
     p = item + length - 1;
     if (*p >= '0' && *p <= '9') {
@@ -943,8 +938,10 @@ static void destruct_object_two P1(struct object *, ob)
     ob->shadowed = 0;
 #endif
 
+#ifdef DEBUG
     if (d_flag > 1)
 	debug_message("Destruct object %s (ref %d)\n", ob->name, ob->ref);
+#endif
 
     /* try to move our contents somewhere */
     super = ob->super;
@@ -1053,9 +1050,11 @@ void destruct_object P1(struct svalue *, v)
  */
 void destruct2 P1(struct object *, ob)
 {
+#ifdef DEBUG
     if (d_flag > 1) {
 	debug_message("Destruct-2 object %s (ref %d)\n", ob->name, ob->ref);
     }
+#endif
 #if 0
     /*
      * moved this into destruct_object() to deal with the 0 in users() efun
@@ -1251,10 +1250,12 @@ void enable_commands P1(int, num)
 
     if (current_object->flags & O_DESTRUCTED)
 	return;
+#ifdef DEBUG
     if (d_flag > 1) {
 	debug_message("Enable commands %s (ref %d)\n",
 		      current_object->name, current_object->ref);
     }
+#endif
     if (num) {
 	current_object->flags |= O_ENABLE_COMMANDS;
 	command_giver = current_object;
@@ -1281,7 +1282,7 @@ void enable_commands P1(int, num)
  * Set up a function in this object to be called with the next
  * user input string.
  */
-int input_to P4(char *, fun, int, flag, int, num_arg, struct svalue *, args)
+int input_to P4(struct svalue *, fun, int, flag, int, num_arg, struct svalue *, args)
 {
     struct sentence *s;
     struct svalue *x;
@@ -1298,7 +1299,7 @@ int input_to P4(char *, fun, int, flag, int, num_arg, struct svalue *, args)
 	if (num_arg) {
 	    i = num_arg * sizeof(struct svalue);
 	    if ((x = (struct svalue *)
-		 DMALLOC(i, 102, "input_to: 1")) == NULL)
+		 DMALLOC(i, TAG_TEMPORARY, "input_to: 1")) == NULL)
 		fatal("Out of memory!\n");
 	    memcpy(x, args, i);
 	} else
@@ -1306,7 +1307,14 @@ int input_to P4(char *, fun, int, flag, int, num_arg, struct svalue *, args)
 
 	command_giver->interactive->carryover = x;
 	command_giver->interactive->num_carry = num_arg;
-	s->function = make_shared_string(fun);
+	if (fun->type == T_STRING) {
+	    s->function.s = make_shared_string(fun->u.string);
+	    s->flags = 0;
+	} else {
+	    s->function.f = fun->u.fp;
+	    fun->u.fp->ref++;
+	    s->flags = V_FUNCTION;
+	}
 	s->ob = current_object;
 	add_ref(current_object, "input_to");
 	return 1;
@@ -1319,7 +1327,7 @@ int input_to P4(char *, fun, int, flag, int, num_arg, struct svalue *, args)
  * Set up a function in this object to be called with the next
  * user input character.
  */
-int get_char P4(char *, fun, int, flag, int, num_arg, struct svalue *, args)
+int get_char P4(struct svalue *, fun, int, flag, int, num_arg, struct svalue *, args)
 {
     struct sentence *s;
     struct svalue *x;
@@ -1336,7 +1344,7 @@ int get_char P4(char *, fun, int, flag, int, num_arg, struct svalue *, args)
 	if (num_arg) {
 	    i = num_arg * sizeof(struct svalue);
 	    if ((x = (struct svalue *)
-		 DMALLOC(i, 102, "get_char: 1")) == NULL)
+		 DMALLOC(i, TAG_TEMPORARY, "get_char: 1")) == NULL)
 		fatal("Out of memory!\n");
 	    memcpy(x, args, i);
 	} else
@@ -1344,7 +1352,14 @@ int get_char P4(char *, fun, int, flag, int, num_arg, struct svalue *, args)
 
 	command_giver->interactive->carryover = x;
 	command_giver->interactive->num_carry = num_arg;
-	s->function = make_shared_string(fun);
+	if (fun->type == T_STRING) {
+           s->function.s = make_shared_string(fun->u.string);
+           s->flags = 0;
+	} else {
+	    s->function.f = fun->u.fp;
+	    fun->u.fp->ref++;
+	    s->flags = V_FUNCTION;
+	}
 	s->ob = current_object;
 	add_ref(current_object, "get_char");
 	return 1;
@@ -1624,14 +1639,14 @@ static struct sentence *alloc_sentence()
     struct sentence *p;
 
     if (sent_free == 0) {
-	p = (struct sentence *) DXALLOC(sizeof *p, 103, "alloc_sentence");
+	p = ALLOCATE(struct sentence, TAG_SENTENCE, "alloc_sentence");
 	tot_alloc_sentence++;
     } else {
 	p = sent_free;
 	sent_free = sent_free->next;
     }
     p->verb = 0;
-    p->function = 0;
+    p->function.s = 0;
     p->next = 0;
     return p;
 }
@@ -1648,11 +1663,43 @@ void free_all_sent()
 }
 #endif
 
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_free_sentences() {
+    struct sentence *sent = sent_free;
+
+#ifndef NO_UIDS
+    if (creator_file_fname)
+	EXTRA_REF(BLOCK(creator_file_fname))++;
+#endif
+#ifdef PRIVS
+    if (privs_file_fname)
+	EXTRA_REF(BLOCK(privs_file_fname))++;
+#endif
+
+    while (sent) {
+	DO_MARK(sent, TAG_SENTENCE);
+/* Freed sentences should have been freed.  right?
+	if (sent->function)
+	    EXTRA_REF(BLOCK(sent->function))++;
+	if (sent->verb)
+	    EXTRA_REF(BLOCK(sent->verb))++;
+*/
+	sent = sent->next;
+    }
+}
+#endif
+
 void free_sentence P1(struct sentence *, p)
 {
-    if (p->function)
-	free_string(p->function);
-    p->function = 0;
+    if (p->flags & V_FUNCTION) {
+      if (p->function.f)
+          free_funp(p->function.f);
+      else p->function.f = 0;
+    } else {
+      if (p->function.s)
+          free_string(p->function.s);
+      else p->function.s = 0;
+    }
     if (p->verb)
 	free_string(p->verb);
     p->verb = 0;
@@ -1678,8 +1725,10 @@ int user_parser P1(char *, buff)
     char *user_verb = 0;
     int where;
 
+#ifdef DEBUG
     if (d_flag > 1)
 	debug_message("cmd [%s]: %s\n", command_giver->name, buff);
+#endif
     /* strip trailing spaces. */
     for (p = buff + strlen(buff) - 1; p >= buff; p--) {
 	if (*p != ' ')
@@ -1734,9 +1783,11 @@ int user_parser P1(char *, buff)
 	/*
 	 * Now we have found a special sentence !
 	 */
+#ifdef DEBUG
 	if (d_flag > 1)
 	    debug_message("Local command %s on %s\n",
 			  s->function, s->ob->name);
+#endif
 	last_verb = verb_buff;
 	if (s->verb && s->verb[0]) {
 	    strcpy(verb_buff, s->verb);
@@ -1761,15 +1812,19 @@ int user_parser P1(char *, buff)
 	 */
 	command_object = s->ob;
 	super = command_object->super;
-	if (s->flags & V_NOSPACE) {
-	    push_constant_string(&buff[strlen(s->verb)]);
-	    ret = apply(s->function, s->ob, 1, where);
-	} else if (buff[length] == ' ') {
-	    push_constant_string(&buff[length + 1]);
-	    ret = apply(s->function, s->ob, 1, where);
-	} else {
-	    ret = apply(s->function, s->ob, 0, where);
+        if (s->flags & V_NOSPACE) {
+            push_constant_string(&buff[strlen(s->verb)]);
+        } else if (buff[length] == ' ') {
+            push_constant_string(&buff[length + 1]);
+        } else {
+	    push_null();
 	}
+        if (s->flags & V_FUNCTION) {
+            ret = call_function_pointer(s->function.f, 1);
+        } else {
+            ret = apply(s->function.s, s->ob, 1, where);
+        }
+ 
 	/*
 	 * prevent an action from moving its associated object into another
 	 * another object prior to returning 0.  closes a security hole which
@@ -1830,7 +1885,7 @@ int user_parser P1(char *, buff)
  * If the call is from a shadow, make it look like it is really from
  * the shadowed object.
  */
-void add_action P3(char *, str, char *, cmd, int, flag)
+void add_action P3(struct svalue *, str, char *, cmd, int, flag)
 {
     struct sentence *p;
     struct object *ob;
@@ -1843,7 +1898,7 @@ void add_action P3(char *, str, char *, cmd, int, flag)
 	ob = ob->shadowing;
     }
     /* don't allow add_actions of a static function from a shadowing object */
-    if ((ob != current_object) && is_static(str, ob)) {
+    if ((ob != current_object) && str->type == T_STRING && is_static(str->u.string, ob)) {
 	return;
     }
 #endif
@@ -1853,13 +1908,21 @@ void add_action P3(char *, str, char *, cmd, int, flag)
 	ob->super != command_giver->super && ob != command_giver->super)
 	return;			/* No need for an error, they know what they
 				 * did wrong. */
+#ifdef DEBUG
     if (d_flag > 1)
 	debug_message("--Add action %s\n", str);
+#endif
     p = alloc_sentence();
-    p->function = make_shared_string(str);
+    if (str->type == T_STRING) {
+      p->function.s = make_shared_string(str->u.string);
+      p->flags = flag;
+    } else {
+      p->function.f = str->u.fp;
+      str->u.fp->ref++;
+      p->flags = flag | V_FUNCTION;
+    }
     p->ob = ob;
     p->next = command_giver->sent;
-    p->flags = flag;
     if (cmd)
 	p->verb = make_shared_string(cmd);
     else
@@ -1886,7 +1949,8 @@ int remove_action P2(char *, act, char *, verb)
 	for (s = &ob->sent; *s; s = &((*s)->next)) {
 	    struct sentence *tmp;
 
-	    if (((*s)->ob == current_object) && !strcmp((*s)->function, act) &&
+	    if (((*s)->ob == current_object) && (!((*s)->flags & V_FUNCTION))
+		&& !strcmp((*s)->function.s, act) &&
 		!strcmp((*s)->verb, verb)) {
 		tmp = *s;
 		*s = tmp->next;
@@ -1910,8 +1974,10 @@ static void remove_sent P2(struct object *, ob, struct object *, user)
 	struct sentence *tmp;
 
 	if ((*s)->ob == ob) {
+#ifdef DEBUG
 	    if (d_flag > 1)
 		debug_message("--Unlinking sentence %s\n", (*s)->function);
+#endif
 	    tmp = *s;
 	    *s = tmp->next;
 	    free_sentence(tmp);
@@ -2367,9 +2433,11 @@ void do_message P5(struct svalue *, class, char *, msg, struct vector *, scope, 
 INLINE void try_reset P1(struct object *, ob)
 {
     if ((ob->next_reset < current_time) && !(ob->flags & O_RESET_STATE)) {
+#ifdef DEBUG
 	if (d_flag) {
 	    fprintf(stderr, "(lazy) RESET %s\n", ob->name);
 	}
+#endif
 	/* need to set the flag here to prevent infinite loops in apply_low */
 	ob->flags |= O_RESET_STATE;
 	reset_object(ob, 1);

@@ -355,7 +355,7 @@ load_lpc_info P2(int, ix, struct object *, ob)
 			str = parse_to_plural(sing->item[il].u.string);
 			tmp->item[il].type = T_STRING;
 			tmp->item[il].subtype = STRING_MALLOC;
-			tmp->item[il].u.string = string_copy(str);
+			tmp->item[il].u.string = string_copy(str, "load_lpc_info");
 		    }
 		}
 		gPluid_list->item[ix].type = T_POINTER;
@@ -500,7 +500,7 @@ parse P5(char *, cmd,		/* Command to parse */
 
     pval = apply_master_ob(QGET_ALLWORD, 0);
     if (pval && pval->type == T_STRING)
-	gAllword = string_copy(pval->u.string);
+	gAllword = string_copy(pval->u.string, "parse");
     else
 	gAllword = 0;
 
@@ -1229,7 +1229,7 @@ static struct svalue *
     } else {
 	stmp.type = T_STRING;
 	stmp.subtype = STRING_MALLOC;
-	stmp.u.string = string_copy(pvec->item[pix].u.string);
+	stmp.u.string = string_copy(pvec->item[pix].u.string, "parse");
 	*fail = 0;
     }
 
@@ -1505,7 +1505,7 @@ static char *
 	    if (sp != words->item[il - 1].u.string) {
 		stmp.type = T_STRING;
 		stmp.subtype = STRING_MALLOC;
-		stmp.u.string = string_copy(sp);
+		stmp.u.string = string_copy(sp, "parse_to_plural");
 		assign_svalue(&words->item[il - 1], &stmp);
 		changed = 1;
 	    }
@@ -1727,7 +1727,7 @@ static char *
     ret = process_value(str);
 
     if ((ret) && (ret->type == T_STRING))
-	return string_copy(ret->u.string);
+	return string_copy(ret->u.string, "process_part");
     else
 	return str;
 }
@@ -1750,7 +1750,7 @@ struct svalue *
     if ((strlen(str) < 1) || (str[0] < 'A') || (str[0] > 'z'))
 	return &const0;
 
-    func = string_copy(str);
+    func = string_copy(str, "process_value");
 
     arg = strchr(func, '|');
     if (arg) {
@@ -1825,7 +1825,7 @@ char *
 
     int il, l, nchar, space, indlen;
 
-    fstr = string_copy(str);
+    fstr = string_copy(str, "break_string");
 
     if (!indent)
 	istr = 0;
@@ -1836,7 +1836,7 @@ char *
 	    istr[il] = ' ';
 	istr[il] = 0;
     } else if (indent->type == T_STRING)
-	istr = string_copy(indent->u.string);
+	istr = string_copy(indent->u.string, "break_string");
     else
 	return fstr;
 

@@ -62,7 +62,7 @@ static void encode_stat P4(struct svalue *, vp, int, flags, char *, str, struct 
 
 	v->item[0].type = T_STRING;
 	v->item[0].subtype = STRING_MALLOC;
-	v->item[0].u.string = string_copy(str);
+	v->item[0].u.string = string_copy(str, "encode_stat");
 	v->item[1].type = T_NUMBER;
 	v->item[1].u.number =
 	    ((st->st_mode & S_IFDIR) ? -2 : st->st_size);
@@ -73,7 +73,7 @@ static void encode_stat P4(struct svalue *, vp, int, flags, char *, str, struct 
     } else {
 	vp->type = T_STRING;
 	vp->subtype = STRING_MALLOC;
-	vp->u.string = string_copy(str);
+	vp->u.string = string_copy(str, "encode_stat");
     }
 }
 
@@ -440,7 +440,7 @@ void smart_log P4(char *, error_file, int, line, char *, what, int, flag)
 
     buff = (char *)
 	DMALLOC(strlen(error_file) + strlen(what) + 
-		((pragmas & PRAGMA_ERROR_CONTEXT) ? 100 : 40), 39, "smart_log: 1");
+		((pragmas & PRAGMA_ERROR_CONTEXT) ? 100 : 40), TAG_TEMPORARY, "smart_log: 1");
 
     if (pragmas & PRAGMA_ERROR_CONTEXT){
         char *ls = strrchr(what, '\n');
@@ -535,7 +535,7 @@ char *read_file P3(char *, file, int, start, int, len)
 	start = 1;
     if (!len)
 	len = READ_FILE_MAX_SIZE;
-    str = DXALLOC(size + 1, 41, "read_file: str");
+    str = DXALLOC(size + 1, TAG_STRING, "read_file: str");
     str[size] = '\0';
     do {
 #ifdef OS2
@@ -644,7 +644,7 @@ char *read_bytes P4(char *, file, int, start, int, len, int *, rlen)
     if ((size = fseek(fp, start, 0)) < 0)
 	return 0;
 
-    str = DXALLOC(len + 1, 42, "read_bytes: str");
+    str = DXALLOC(len + 1, TAG_STRING, "read_bytes: str");
 
     size = fread(str, 1, len, fp);
 

@@ -6,8 +6,26 @@
 #include "simulate.h"
 #include "comm.h"
 
+/* ref-count debugging code */
 #undef NOISY_DEBUG
+#define NOISY_STRING "Root"
 
+/* implementation */
+#ifdef NOISY_DEBUG
+#  ifdef NOISY_STRING
+#    define NDBG(x) if (strcmp(STRING(x), NOISY_STRING)==0) \
+                    fprintf(stderr, "%s - %d\n", STRING(x), REFS(x)), bp()
+#  else
+#    define NDBG(x) fprintf(stderr, "%s - %d\n", STRING(x), REFS(x)), bp()
+#  endif
+#else
+#  define NDBG(x)
+#endif
+
+#ifdef NOISY_DEBUG
+static void bp() {
+}
+#endif
 /*
    this code is not the same as the original code.  I cleaned it up to
    use structs to: 1) make it easier to check the driver for memory leaks
@@ -89,8 +107,7 @@ void init_strings()
     /* ensure that htable size is a power of 2 */
     for (htable_size = 1; htable_size <= HTABLE_SIZE; htable_size *= 2);
     htable_size_minus_one = htable_size - 1;
-    base_table = (block_t **)
-	DXALLOC(sizeof(block_t *) * htable_size, 116, "init_strings");
+    base_table = CALLOCATE(htable_size, block_t *, TAG_STR_TBL, "init_strings");
     overhead_bytes += (sizeof(block_t *) * htable_size);
 
     for (x = 0; x < htable_size; x++) {
@@ -155,7 +172,7 @@ INLINE static block_t *
 	len = max_string_length;
     }
     size = sizeof(block_t) + len + 1;
-    b = (block_t *) DXALLOC(size, 117, "alloc_new_string");
+    b = (block_t *) DXALLOC(size, TAG_SHARED_STRING, "alloc_new_string");
     strncpy(STRING(b), string, len);
     STRING(b)[len] = '\0';	/* strncpy doesn't put on \0 if 'from' too
 				 * long */
@@ -186,9 +203,7 @@ char *
     if (REFS(b) < MAXSHORT) {
 	REFS(b)++;
     }
-#ifdef NOISY_DEBUG
-    fprintf(stderr, "%s - %d\n", STRING(b), REFS(b));
-#endif
+    NDBG(b);
     allocd_strings++;
     allocd_bytes += SIZE(b);
     return (STRING(b));
@@ -212,9 +227,7 @@ ref_string P1(char *, str)
     if (REFS(b) < MAXSHORT) {
 	REFS(b)++;
     }
-#ifdef NOISY_DEBUG
-    fprintf(stderr, "%s - %d\n", STRING(b), REFS(b));
-#endif
+    NDBG(b);
     allocd_strings++;
     allocd_bytes += SIZE(b);
     return str;
@@ -256,9 +269,7 @@ free_string P1(char *, str)
 	return;
 
     REFS(b)--;
-#ifdef NOISY_DEBUG
-    fprintf(stderr, "%s - %d\n", STRING(b), REFS(b));
-#endif
+    NDBG(b);
     if (REFS(b) > 0)
 	return;
 

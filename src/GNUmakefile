@@ -325,7 +325,7 @@ neat:
 	-rm -f cc.h
 	-rm -f efun_defs.c option_defs.c
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
-	-rm -f make_func make_malloc malloc.c
+	-rm -f make_func make_malloc malloc.c mallocwrapper.c
 	-rm -f func_spec.cpp
 	-rm -f grammar.y
 	

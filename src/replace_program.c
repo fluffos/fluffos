@@ -185,7 +185,7 @@ f_replace_program P2(int, num_arg, int, instruction)
     if (current_object == simul_efun_ob)
 	error("replace_program on simul_efun object\n");
     name_len = strlen(sp->u.string);
-    name = (char *) DMALLOC(name_len + 3, 0, "replace_program");
+    name = (char *) DMALLOC(name_len + 3, TAG_TEMPORARY, "replace_program");
     xname = name;
     strcpy(name, sp->u.string);
     if (name[name_len - 2] != '.' || name[name_len - 1] != 'c')
@@ -198,7 +198,7 @@ f_replace_program P2(int, num_arg, int, instruction)
 	error("program to replace the current with has to be inherited\n");
     }
     if (!(tmp = retrieve_replace_program_entry())) {
-	tmp = (struct replace_ob *) XALLOC(sizeof *tmp);
+	tmp = ALLOCATE(struct replace_ob, TAG_TEMPORARY, "replace_program");
 	tmp->ob = current_object;
 	tmp->next = obj_list_replace;
 	obj_list_replace = tmp;

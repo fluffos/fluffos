@@ -14,6 +14,7 @@
 #include "mudlib_stats.h"
 #include "lpc_incl.h"
 #include "backend.h"
+#include "md.h"
 
 static mudlib_stats_t *domains = 0;
 static mudlib_stats_t *backbone_domain = 0;
@@ -33,6 +34,27 @@ static struct mapping *get_stats PROT((char *, mudlib_stats_t *));
 static mudlib_stats_t *insert_stat_entry PROT((mudlib_stats_t *, mudlib_stats_t **));
 #ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
 static void free_mudlib_stats PROT((void));
+#endif
+
+static char *domain_file_fname = NULL;
+
+#ifdef DEBUGMALLOC_EXTENSIONS
+/* debugging */
+int check_valid_stat_entry P1(mudlib_stats_t *, se) {
+    mudlib_stats_t *tmp;
+
+    tmp = domains;
+    while (tmp) {
+	if (tmp == se) return 1;
+	tmp = tmp->next;
+    }
+    tmp = authors;
+    while (tmp) {
+	if (tmp == se) return 1;
+	tmp = tmp->next;
+    }
+    return 0;
+}
 #endif
 
 /**************************
@@ -71,8 +93,7 @@ static mudlib_stats_t *add_stat_entry P2(char *, str, mudlib_stats_t **, list)
 
     if ((entry = find_stat_entry(str, *list)))
 	return entry;
-    entry = (mudlib_stats_t *) DXALLOC(sizeof(mudlib_stats_t), 78,
-				       "add_stat_entry");
+    entry = ALLOCATE(mudlib_stats_t, TAG_MUDLIB_STATS, "add_stat_entry");
     entry->name = make_shared_string(str);
     entry->length = strlen(str);
     entry->moves = 0;
@@ -210,6 +231,24 @@ void mudlib_stats_decay()
     }
 }
 
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_mudlib_stats() {
+    mudlib_stats_t *dl;
+
+    if (domain_file_fname)
+	EXTRA_REF(BLOCK(domain_file_fname))++;
+
+    for (dl = domains; dl; dl = dl->next) {
+	DO_MARK(dl, TAG_MUDLIB_STATS);
+	EXTRA_REF(BLOCK(dl->name))++;
+    }
+    for (dl = authors; dl; dl = dl->next) {
+	DO_MARK(dl, TAG_MUDLIB_STATS);
+	EXTRA_REF(BLOCK(dl->name))++;
+    }
+}
+#endif
+
 /*
  * free all of the mudlib statistics structures
  */
@@ -303,7 +342,6 @@ static void init_domain_for_ob P1(struct object *, ob)
     struct svalue *ret;
     char *domain_name;
     struct object *tmp_ob;
-    static char *domain_file_fname = NULL;
     int err;
 
     err = assert_master_ob_loaded("[internal] init_domain_for_ob","");

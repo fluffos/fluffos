@@ -1,14 +1,30 @@
 #ifndef SIMULATE_H
 #define SIMULATE_H
 
-#include "sent.h"
 #include "object.h"
 #include "interpret.h"
 #include "array.h"
 
+union string_or_func {
+    struct funp *f;
+    char *s;
+};
+
+struct sentence {
+    char *verb;
+    struct object *ob;
+    union string_or_func function;
+    struct sentence *next;
+    int flags;
+};
+
+#define V_SHORT         1
+#define V_NOSPACE     2
+#define V_FUNCTION      4
 /*
  * simulate.c
  */
+
 extern struct object *obj_list;
 extern struct object *obj_list_destruct;
 extern struct object *current_object;
@@ -30,14 +46,16 @@ void fatal PROTVARGS(());
 void error PROTVARGS(());
 INLINE void check_legal_string PROT((char *));
 int command_for_object PROT((char *, struct object *));
+#ifndef NO_LIGHT
 void add_light PROT((struct object *, int));
+#endif
 void free_sentence PROT((struct sentence *));
 int user_parser PROT((char *));
 
 void enable_commands PROT((int));
-int input_to PROT((char *, int, int, struct svalue *));
-int get_char PROT((char *, int, int, struct svalue *));
-void add_action PROT((char *, char *, int));
+int input_to PROT((struct svalue *, int, int, struct svalue *));
+int get_char PROT((struct svalue *, int, int, struct svalue *));
+void add_action PROT((struct svalue *, char *, int));
 int remove_action PROT((char *, char *));
 
 struct object *load_object PROT((char *, int));
@@ -65,9 +83,12 @@ void throw_error PROT((void));
 void startshutdownMudOS PROT((int));
 #else
 void startshutdownMudOS PROT((void));
-
 #endif
 void shutdownMudOS PROT((int));
 void slow_shut_down PROT((int));
+
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_free_sentences PROT((void));
+#endif
 
 #endif

@@ -466,7 +466,7 @@ socket_write P3(int, fd, struct svalue *, message, char *, name)
 		return EEBADDATA;
 	    }
 	    buf = (char *)
-		DMALLOC(sizeof(long) + len + 1, 104, "socket_write: default");
+		DMALLOC(sizeof(long) + len + 1, TAG_TEMPORARY, "socket_write: default");
 	    if (buf == NULL)
 		crash_MudOS("Out of memory");
 	    *(long *) buf = htonl((long) len);
@@ -482,14 +482,14 @@ socket_write P3(int, fd, struct svalue *, message, char *, name)
 	switch (message->type) {
 	case T_BUFFER:
 	    len = message->u.buf->size;
-	    buf = (char *) DMALLOC(len, 105, "socket_write: T_BUFFER");
+	    buf = (char *) DMALLOC(len, TAG_TEMPORARY, "socket_write: T_BUFFER");
 	    if (buf == NULL)
 		crash_MudOS("Out of memory");
 	    memcpy(buf, message->u.buf->item, len);
 	    break;
 	case T_STRING:
 	    len = strlen(message->u.string);
-	    buf = (char *) DMALLOC(len + 1, 105, "socket_write: T_STRING");
+	    buf = (char *) DMALLOC(len + 1, TAG_TEMPORARY, "socket_write: T_STRING");
 	    if (buf == NULL)
 		crash_MudOS("Out of memory");
 	    strcpy(buf, message->u.string);
@@ -500,7 +500,7 @@ socket_write P3(int, fd, struct svalue *, message, char *, name)
 		struct svalue *el;
 
 		len = message->u.vec->size * sizeof(int);
-		buf = (char *) DMALLOC(len + 1, 105, "socket_write: T_POINTER");
+		buf = (char *) DMALLOC(len + 1, TAG_TEMPORARY, "socket_write: T_POINTER");
 		if (buf == NULL)
 		    crash_MudOS("Out of memory");
 		el = message->u.vec->item;
@@ -556,7 +556,7 @@ socket_write P3(int, fd, struct svalue *, message, char *, name)
 	return EEMODENOTSUPP;
     }
 
-    off = write(lpc_socks[fd].fd, buf, len, 0);
+    off = write(lpc_socks[fd].fd, buf, len);
     if (off == -1) {
 	FREE(buf);
 	switch (errno) {
@@ -678,7 +678,7 @@ socket_read_select_handler P1(int, fd)
 		lpc_socks[fd].r_off = 0;
 		lpc_socks[fd].r_len = ntohl(lpc_socks[fd].r_len);
 		lpc_socks[fd].r_buf = (char *)
-		    DMALLOC(lpc_socks[fd].r_len + 1, 106, "socket_read_select_handler");
+		    DMALLOC(lpc_socks[fd].r_len + 1, TAG_TEMPORARY, "socket_read_select_handler");
 		if (lpc_socks[fd].r_buf == NULL)
 		    crash_MudOS("Out of memory");
 		debug(8192, ("read_socket_handler: svalue len is %d\n",
@@ -785,7 +785,7 @@ socket_write_select_handler P1(int, fd)
 
     if (lpc_socks[fd].w_buf != NULL) {
 	cc = write(lpc_socks[fd].fd, lpc_socks[fd].w_buf + lpc_socks[fd].w_off,
-		   lpc_socks[fd].w_len, 0);
+		   lpc_socks[fd].w_len);
 	if (cc == -1)
 	    return;
 	lpc_socks[fd].w_off += cc;

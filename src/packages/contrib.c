@@ -1,7 +1,9 @@
 #ifdef LATTICE
 #include "/lpc_incl.h"
+#include "/comm.h"
 #else
 #include "../lpc_incl.h"
+#include "../comm.h"
 #endif
 
 /* I forgot who wrote this, please claim it :) */
@@ -12,7 +14,7 @@ f_remove_shadow PROT((void))
     struct object *ob;
     
     ob = current_object;
-    if ( num_arg )
+    if ( st_num_arg )
 	{
 	    ob = sp->u.ob;
 	    pop_stack();
@@ -35,7 +37,7 @@ f_remove_shadow PROT((void))
    when I added it (added function support, etc) -Beek */
 #ifdef F_QUERY_NOTIFY_FAIL
 void
-f_query_notify_fail PROT((void))
+f_query_notify_fail PROT((void)) {
     char *p;
 
     if (command_giver && command_giver->interactive) {
@@ -58,7 +60,7 @@ f_query_notify_fail PROT((void))
 /* Beek */
 #ifdef F_SET_PROMPT
 void
-f_set_prompt PROT((void))
+f_set_prompt PROT((void)) {
     struct object *who;
     if (st_num_arg == 2) {
 	who = sp->u.ob;
@@ -157,7 +159,7 @@ void f_copy PROT((void))
 /* Gudu@VR */    
 /* This should have flag and other function info etc -Beek */
 #ifdef F_FUNCTIONS
-void f_functions PROT((void))
+void f_functions PROT((void)) {
     int i, num;
     struct vector *vec;
     struct function *functions;
@@ -187,7 +189,7 @@ void f_functions PROT((void))
 
 
 
-/Aleas@Nightmare */
+/*Aleas@Nightmare */
 #ifdef F_TERMINAL_COLOUR
 /* A fast implementation of the Nightmare color support.
 
@@ -233,7 +235,7 @@ f_terminal_colour P2( int, num_arg, int, instruction)
 	{
 	    if (cp[1] == '^')
 	    {
-		savestr = string_copy(instr);
+		savestr = string_copy(instr, "f_terminal_colour");
 		cp = savestr + ( cp - instr );
 		instr = savestr;
 		break;
@@ -248,7 +250,7 @@ f_terminal_colour P2( int, num_arg, int, instruction)
     }
     /* here we have something to parse */
 
-    parts = ( char ** ) DMALLOC(sizeof( char * ) * NSTRSEGS, 31, "f_terminal_colour: parts");
+    parts = ( char ** ) DMALLOC(sizeof( char * ) * NSTRSEGS, TAG_TEMPORARY, "f_terminal_colour: parts");
     if (cp - instr) 	/* starting seg, if not delimiter */
     {
 	num = 1;
@@ -278,14 +280,14 @@ f_terminal_colour P2( int, num_arg, int, instruction)
 		num++;
 		if (num % NSTRSEGS == 0)
 		    parts = ( char ** ) DREALLOC(( char *) parts,
-			sizeof( char * ) * (num + NSTRSEGS), 31, "f_terminal_colour: parts realloc");
+			sizeof( char * ) * (num + NSTRSEGS), TAG_TEMPORARY, "f_terminal_colour: parts realloc");
 	    }
 	}
     }
     if (strlen(instr))	/* trailing seg, if not delimiter */
 	parts[num++] = instr;
 
-    lens = ( int * ) DMALLOC(sizeof( int ) * num, 31, "f_terminal_colour: lens");
+    lens = ( int * ) DMALLOC(sizeof( int ) * num, TAG_TEMPORARY, "f_terminal_colour: lens");
 
     /* Do the the pointer replacement and calculate the lengths */
     if ( ( mtab = sp->u.map->table ) ) /* a mapping with values */
@@ -315,7 +317,7 @@ f_terminal_colour P2( int, num_arg, int, instruction)
     /* now we have the final string in parts and length in j. let's compose it */
     if (j > max_string_length) {
 	j = max_string_length;
-	cp = deststr = DXALLOC(j + 1, 31, "f_terminal_colour: deststr");
+	cp = deststr = DXALLOC(j + 1, TAG_STRING, "f_terminal_colour: deststr");
 	for (j = i = 0; i < num; i++)
 	{
 	    k = lens[i];
@@ -331,7 +333,7 @@ f_terminal_colour P2( int, num_arg, int, instruction)
 	    }
 	}
     } else {
-	cp = deststr = DXALLOC(j + 1, 31, "f_terminal_colour: deststr");
+	cp = deststr = DXALLOC(j + 1, TAG_STRING, "f_terminal_colour: deststr");
 	for (i = 0; i < num; i++)
 	{
 	    strcpy(cp,parts[i]);

@@ -113,7 +113,7 @@ static void sprout(ppr, pc_data, pi_balance, pfi_compare, pfi_delete)
      * flag, then exit.
      */
     if (!*ppr) {
-	*ppr = (tree *) DXALLOC(sizeof(tree), 203, "sprout");
+	*ppr = ALLOCATE(tree, TAG_UID, "sprout");
 	(*ppr)->tree_l = NULL;
 	(*ppr)->tree_r = NULL;
 	(*ppr)->tree_b = 0;

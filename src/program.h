@@ -50,9 +50,6 @@
 			 we'll use that one
  * NAME_ALIAS     - This entry refers us to another entry, usually because
                     this function was overloaded by that function
- * NAME_COLON_COLON - has a :: in it.  Don't allow call_others to it, etc
-                      This function is propagated up the tree for technical
-		      reasons.
  */
 #define NAME_INHERITED		0x1
 #define NAME_UNDEFINED		0x2
@@ -60,13 +57,13 @@
 #define NAME_PROTOTYPE		0x10
 #define NAME_DEF_BY_INHERIT     0x20
 #define NAME_ALIAS              0x40
-#define NAME_COLON_COLON        0x80
 
 /* only the flags that should be copied up through inheritance levels */
-#define NAME_MASK (NAME_UNDEFINED | NAME_STRICT_TYPES | NAME_PROTOTYPE | NAME_COLON_COLON)
+#define NAME_MASK (NAME_UNDEFINED | NAME_STRICT_TYPES | NAME_PROTOTYPE)
 /* a function that isn't 'real' */
-#define NAME_NO_CODE  (NAME_UNDEFINED | NAME_ALIAS)
-
+#define NAME_NO_CODE  (NAME_UNDEFINED | NAME_ALIAS | NAME_PROTOTYPE)
+#define REAL_FUNCTION(x) (!((x)->flags & (NAME_ALIAS | NAME_PROTOTYPE)) && \
+                         (((x)->flags & NAME_DEF_BY_INHERIT) || (!((x)->flags & NAME_UNDEFINED))))
 /*
  * These are or'ed in on top of the basic type.
  */
@@ -81,10 +78,17 @@
 
 #define TYPE_MOD_MASK		(~(TYPE_MOD_STATIC | TYPE_MOD_NO_MASK |\
 				   TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED |\
-				   TYPE_MOD_PUBLIC | TYPE_MOD_VARARGS))
+				   TYPE_MOD_PUBLIC | TYPE_MOD_VARARGS |\
+				   TYPE_MOD_HIDDEN))
 
 struct function {
+    /* these two must come first */
+    unsigned char num_arg;    /* Number of arguments needed. -1 arguments
+                               * means function not defined in this object.
+                               * Probably inherited */
+    unsigned char num_local;  /* Number of local variables */
     char *name;
+    unsigned short type;      /* Return type of function. See below. */
 #ifndef LPC_TO_C
     unsigned short offset;	/* Address of function, or inherit table
 				 * index when inherited. */
@@ -96,11 +100,6 @@ struct function {
      * inherited program.
      */
     unsigned short function_index_offset;
-    unsigned short type;	/* Return type of function. See below. */
-    unsigned char num_local;	/* Number of local variables */
-    unsigned char num_arg;	/* Number of arguments needed. -1 arguments
-				 * means function not defined in this object.
-				 * Probably inherited */
 #ifdef PROFILE_FUNCTIONS
     unsigned long calls, self, children;
 #endif

@@ -74,7 +74,7 @@ new_node() {
     if (cur_block = free_block_list) {
 	free_block_list = cur_block->next;
     } else {
-	cur_block = (struct parse_node_block *)DMALLOC(sizeof(struct parse_node_block), 0, "new_node");
+	cur_block = ALLOCATE(struct parse_node_block, TAG_COMPILER, "new_node");
     }
     /* add to block list */
     cur_block->next = parse_block_list;
@@ -103,7 +103,7 @@ new_node_no_line() {
     if (cur_block = free_block_list) {
       free_block_list = cur_block->next;
     } else {
-      cur_block = (struct parse_node_block *)DMALLOC(sizeof(struct parse_node_block), 0, "new_node");
+	cur_block = ALLOCATE(struct parse_node_block, TAG_COMPILER, "new_node");
     }
     /* add to block list */
     cur_block->next = parse_block_list;
@@ -180,7 +180,39 @@ binary_int_op P4(struct parse_node *, l, struct parse_node *, r,
     }
     return make_branched_node(op, TYPE_NUMBER, l, r);
 }
-  
+
+struct parse_node *make_range_node P4(int, code, struct parse_node *, expr,
+                                      struct parse_node *, l,
+                                      struct parse_node *, r) {
+    struct parse_node *newnode;
+
+    newnode = make_branched_node(code, 0, l, r);
+    newnode->v.expr = expr;
+
+    if (exact_types){
+        switch(expr->type){
+            case TYPE_ANY:
+            case TYPE_STRING:
+            case TYPE_BUFFER:
+                newnode->type = expr->type;
+                break;
+
+            default:
+                if (expr->type & TYPE_MOD_POINTER) newnode->type = expr->type;
+                else{
+                    type_error("Bad type of argument used for range: ", expr->type);
+                    newnode->type = TYPE_ANY;
+                }
+        }
+
+        if (!BASIC_TYPE(l->type, TYPE_NUMBER))
+            type_error("Bad type of left index to range operator", l->type);
+        if (r && !BASIC_TYPE(r->type, TYPE_NUMBER))
+            type_error("Bad type of right index to range operator", r->type);
+    } else newnode->type = TYPE_ANY;
+    return newnode;
+}
+
 struct parse_node *insert_pop_value P1(struct parse_node *, expr) {
     struct parse_node *replacement;
 

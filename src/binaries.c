@@ -30,7 +30,9 @@ static time_t config_id;
 
 char driver_name[512];
 
+#ifndef MAXSHORT
 #define MAXSHORT ((1 << (sizeof(short)*8)) - 1)
+#endif
 
 static void patch_out PROT((struct program *, short *, int));
 static void patch_in PROT((struct program *, short *, int));
@@ -183,7 +185,7 @@ void save_binary P3(struct program *, prog, struct mem_block *, includes, struct
     /*
      * copy and patch program
      */
-    p = (struct program *) DXALLOC(prog->p.i.total_size, 56, "save_binary");
+    p = (struct program *) DXALLOC(prog->p.i.total_size, TAG_TEMPORARY, "save_binary");
     /* convert to relative pointers, copy, then convert back */
     locate_out(prog);
     memcpy(p, prog, prog->p.i.total_size);
@@ -261,7 +263,7 @@ void save_binary P3(struct program *, prog, struct mem_block *, includes, struct
 }				/* save_binary() */
 
 #define ALLOC_BUF(size) \
-    if ((size) > buf_size) { FREE(buf); buf = XALLOC(size); }
+    if ((size) > buf_size) { FREE(buf); buf = DXALLOC(size, TAG_TEMPORARY, "ALLOC_BUF"); }
 
 int load_binary P1(char *, name)
 {
@@ -330,7 +332,7 @@ int load_binary P1(char *, name)
 	fclose(f);
 	return 0;
     }
-    buf = XALLOC(buf_size = SMALL_STRING_SIZE);
+    buf = DXALLOC(buf_size = SMALL_STRING_SIZE, TAG_TEMPORARY, "ALLOC_BUF");
 
     /*
      * Read preamble.  This must match, or we assume a different driver or
@@ -390,10 +392,10 @@ int load_binary P1(char *, name)
      * Read program structure.
      */
     fread((char *) &ilen, sizeof ilen, 1, f);
-    p = (struct program *) DXALLOC(ilen, 56, "load_binary");
+    p = (struct program *) DXALLOC(ilen, TAG_PROGRAM, "load_binary");
     fread((char *) p, ilen, 1, f);
     locate_in(p);		/* from swap.c */
-    p->name = string_copy(name);
+    p->name = string_copy(name, "load_binary");
 
     /* Read inherit names and find prog.  Check mod times also. */
     for (i = 0; i < (int) p->p.i.num_inherited; i++) {
@@ -469,14 +471,14 @@ int load_binary P1(char *, name)
 
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
 	/* rebuild function table tree */
-	if (!(p->p.i.functions[i].flags & (NAME_COLON_COLON | NAME_ALIAS)))
+	if (!(p->p.i.functions[i].flags & NAME_ALIAS))
 	    add_function(p->p.i.functions, &p->p.i.tree_r, i);
 #endif
     }
 
     /* line numbers */
     fread((char *) &len, sizeof len, 1, f);
-    p->p.i.file_info = (unsigned short *) XALLOC(len);
+    p->p.i.file_info = (unsigned short *) DXALLOC(len, TAG_LINENUMBERS, "load binary");
     fread((char *) p->p.i.file_info, len, 1, f);
     p->p.i.line_info = (unsigned char *)&prog->p.i.file_info[prog->p.i.file_info[1]];
 
@@ -596,7 +598,7 @@ static int check_times P2(time_t, mtime, char *, nm)
 #ifdef OS2
     char *tmp, *c;
 
-    tmp = string_copy(nm);
+    tmp = string_copy(nm, "check_times");
     while ((c = strchr(tmp, '/')))
 	*c = '\\';
     if (stat(tmp, &st) == -1)
@@ -630,8 +632,8 @@ FILE *crdir_fopen P1(char *, file_name)
 #ifdef OS2
     char *newy;
 
-    newy = string_copy(file_name);	/* Take a copy as it could be a
-					 * shared string */
+    /* Take a copy as it could be a shared string */
+    newy = string_copy(file_name, "crdir_fopen");
 #endif
 
     /*

@@ -287,15 +287,28 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 
 	case F_CALL_FUNCTION_BY_ADDRESS:
 	    COPY_SHORT(&sarg, pc);
-	    pc += 2;
+	    pc += 3;
 	    if (sarg < NUM_FUNS)
 		sprintf(buff, "%-12s %5d", FUNS[sarg].name,
 			(int)sarg);
 	    else
 		sprintf(buff, "<out of range %d>", (int)sarg);
-	    pc++;
 	    break;
 
+	case F_CALL_INHERITED:
+	{
+	    struct program *newprog;
+
+	    newprog = (prog->p.i.inherit + EXTRACT_UCHAR(pc++))->prog;
+	    COPY_SHORT(&sarg, pc);
+	    pc += 3;
+	    if (sarg < newprog->p.i.num_functions)
+		sprintf(buff, "%30s::%-12s %5d", newprog->name,
+			newprog->p.i.functions[sarg].name, (int) sarg);
+	    else sprintf(buff, "<out of range in %30s - %d>", newprog->name,
+			 (int) sarg);
+	    break;
+	}
 	case F_GLOBAL_LVALUE:
 	case F_GLOBAL:
 	    if ((unsigned) (iarg = EXTRACT_UCHAR(pc)) < NUM_VARS)
@@ -310,13 +323,30 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	    pc++;
 	    break;
 	case F_WHILE_DEC:
-	case F_LOOP_COND:
 	case F_LOCAL:
 	case F_LOCAL_LVALUE:
 	    sprintf(buff, "LV%d", EXTRACT_UCHAR(pc));
 	    pc++;
 	    break;
-
+	case F_LOOP_COND:
+	    i = EXTRACT_UCHAR(pc++);
+	    if (*pc++ == F_LOCAL) {
+	        iarg = *pc++;
+	        COPY_SHORT(&sarg, pc);
+		offset = (pc - code) - (unsigned short) sarg;
+		pc += 2;
+		sprintf(buff, "LV%d < LV%d bbranch_when_non_zero %04x (%04x)",
+			i, iarg, sarg, offset);
+	    } else {
+	        COPY_INT(&iarg, pc);
+		pc += 4;
+		COPY_SHORT(&sarg, pc);
+		offset = (pc - code) - (unsigned short) sarg;
+		pc += 2;
+		sprintf(buff, "LV%d < %d bbranch_when_non_zero %04x (%04x)",
+			i, iarg, sarg, offset);
+	    }
+	    break;
 	case F_STRING:
 	    COPY_SHORT(&sarg, pc);
 	    if (sarg < NUM_STRS)
@@ -325,7 +355,13 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 		sprintf(buff, "<out of range %d>", (int)sarg);
 	    pc += 2;
 	    break;
-
+	case F_SHORT_STRING:
+	    if (*pc < NUM_STRS)
+	        sprintf(buff, "\"%s\"", disassem_string(STRS[*pc]));
+	    else 
+	        sprintf(buff, "<out of range %d>", (int) *pc);
+	    pc++;
+	    break;
 	case F_SIMUL_EFUN:
 	    COPY_SHORT(&sarg, pc);
 	    sprintf(buff, "\"%s\" %d", simuls[sarg]->name, pc[2]);
@@ -364,8 +400,15 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 		    sprintf(buff, "<local_fun> <out of range %d>", (int)sarg);
 		break;
 	    case ORIGIN_FUNCTIONAL:
-		strcpy(buff, "<functional, code follows>");
-		pc+=3;
+		sprintf(buff, "<functional, %d args>\nCode:", (int)pc[0]);
+		pc += 3;
+		break;
+	    case ORIGIN_FUNCTIONAL | 1:
+		COPY_SHORT(&sarg, &pc[2]);
+		sprintf(buff, "<anonymous function, %d args, %d locals, ends at %04x>\nCode:",
+			(int)pc[0], (int)pc[1], (int) (pc + 3 + sarg - code));
+		pc += 4;
+		break;
 	    }
 	    break;
 

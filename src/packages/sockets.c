@@ -227,7 +227,7 @@ f_socket_release PROT((void))
 void
 f_socket_acquire PROT((void))
 {
-    int i, fd, port;
+    int fd, port;
     char addr[ADDR_BUF_SIZE];
 
     if ((sp - 1)->type != T_STRING) {
@@ -280,14 +280,14 @@ f_socket_address PROT((void))
             return;
 	}
         tmp = inet_ntoa(sp->u.ob->interactive->addr.sin_addr);
-        str = (char *) DMALLOC(strlen(tmp) + 5 + 3, 33, "f_socket_address");
+        str = (char *) DMALLOC(strlen(tmp) + 5 + 3, TAG_STRING, "f_socket_address");
         sprintf(str, "%s %d", tmp, sp->u.ob->interactive->addr.sin_port);
         free_object(sp->u.ob, "f_socket_address:2");
         put_malloced_string(str);
         return;
     }
     get_socket_address(sp->u.number, addr, &port);
-    str = (char *) DMALLOC(strlen(addr) + 5 + 3, 33, "f_socket_address");
+    str = (char *) DMALLOC(strlen(addr) + 5 + 3, TAG_STRING, "f_socket_address");
     sprintf(str, "%s %d", addr, port);
     put_malloced_string(str);
 }				/* f_socket_address() */

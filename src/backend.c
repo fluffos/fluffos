@@ -8,6 +8,7 @@
 #include "debug.h"
 #include "socket_efuns.h"
 #include "swap.h"
+#include "port.h"
 
 #if defined(OS2)
 #define INCL_DOSPROCESS
@@ -281,9 +282,11 @@ static void look_for_objects_to_swap()
 	 */
 	if ((ob->flags & O_WILL_RESET) && (ob->next_reset < current_time)
 	    && !(ob->flags & O_RESET_STATE)) {
+#ifdef DEBUG
 	    if (d_flag) {
 		fprintf(stderr, "RESET %s\n", ob->name);
 	    }
+#endif
 	    reset_object(ob, 1);
 	}
 #endif
@@ -303,8 +306,10 @@ static void look_for_objects_to_swap()
 		int save_reset_state = ob->flags & O_RESET_STATE;
 		struct svalue *svp;
 
+#ifdef DEBUG
 		if (d_flag)
 		    fprintf(stderr, "clean up %s\n", ob->name);
+#endif
 		/*
 		 * Supply a flag to the object that says if this program is
 		 * inherited by other objects. Cloned objects might as well
@@ -334,8 +339,10 @@ static void look_for_objects_to_swap()
 		continue;
 	    if (ob->flags & O_HEART_BEAT)
 		continue;
+#ifdef DEBUG
 	    if (d_flag)
 		fprintf(stderr, "swap %s\n", ob->name);
+#endif
 	    swap(ob);		/* See if it is possible to swap out to disk */
 	}
     }

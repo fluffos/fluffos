@@ -65,9 +65,8 @@ void new_call_out P5(struct object *, ob, char *, fun, int, delay, int, num_args
     if (!call_list_free) {
 	int i;
 
-	call_list_free =
-	    (struct call *) DXALLOC(CHUNK_SIZE * sizeof(struct call),
-				    19, "new_call_out: call_list_free");
+	call_list_free = CALLOCATE(CHUNK_SIZE, struct call,
+				   TAG_CALL_OUT, "new_call_out: call_list_free");
 	for (i = 0; i < CHUNK_SIZE - 1; i++)
 	    call_list_free[i].next = &call_list_free[i + 1];
 	call_list_free[CHUNK_SIZE - 1].next = 0;
@@ -254,6 +253,7 @@ int print_call_out_usage P1(int, verbose)
 
     for (i = 0, cop = call_list; cop; cop = cop->next)
 	i++;
+
     if (verbose == 1) {
 	add_message("Call out information:\n");
 	add_message("---------------------\n");
@@ -268,36 +268,20 @@ int print_call_out_usage P1(int, verbose)
     return (int) (num_call * sizeof(struct call));
 }
 
-#ifdef DEBUG
-INLINE static void
-count_refs P1(struct svalue *, v)
-{
-    switch (v->type) {
-	case T_POINTER:
-	v->u.vec->extra_ref++;
-	break;
-    case T_MAPPING:
-	v->u.map->extra_ref++;
-	break;
-    case T_OBJECT:
-	v->u.ob->extra_ref++;
-	break;
-    }
-}
-
-void count_ref_from_call_outs()
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_call_outs()
 {
     struct call *cop;
     int j;
 
     for (cop = call_list; cop; cop = cop->next) {
-	count_refs(&cop->v);
-	if (cop->vs) {
-	    for (j = 0; j < cop->vs->size; j++) {
-		count_refs(&cop->vs->item[j]);
-	    }
-	}
+	mark_svalue(&cop->v);
 	cop->ob->extra_ref++;
+	EXTRA_REF(BLOCK(cop->function))++;
+#ifdef THIS_PLAYER_IN_CALL_OUT
+    if (cop->command_giver)
+	cop->command_giver->extra_ref++;
+#endif
     }
 }
 #endif

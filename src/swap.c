@@ -4,6 +4,7 @@
 #include "swap.h"
 #include "simul_efun.h"
 #include "comm.h"
+#include "md.h"
 
 /*
  * Swap out programs from objects.
@@ -103,7 +104,7 @@ static int alloc_swap P1(int, length)
 		swap_free = ptr->next;
 	    else
 		prev->next = ptr->next;
-	    free(ptr);
+	    FREE(ptr);
 	}
 	return ret;
     }
@@ -116,7 +117,6 @@ static int alloc_swap P1(int, length)
 
 /*
  * Free up a chunk of swap space, coalescing free blocks if necessary.
- * (xalloc/free need to be converted to DXALLOC/FREE
  *
  * Todo - think about tradeoff of storing the free block
  * info in the swap file itself.
@@ -130,7 +130,7 @@ static void free_swap P2(int, start, int, length)
     /*
      * Construct and insert new free block
      */
-    m = (struct sw_block *) xalloc(sizeof(struct sw_block));
+    m = (struct sw_block *) DXALLOC(sizeof(struct sw_block), TAG_SWAP, "free_swap");
     m->start = start;
     m->length = length;
 
@@ -151,12 +151,12 @@ static void free_swap P2(int, start, int, length)
     if (ptr && m->start + m->length == ptr->start) {
 	m->length += ptr->length;
 	m->next = ptr->next;
-	free(ptr);
+	FREE(ptr);
     }
     if (prev && prev->start + prev->length == m->start) {
 	prev->length += m->length;
 	prev->next = m->next;
-	free(m);
+	FREE(m);
 	m = prev;
     }
     /*
@@ -165,12 +165,11 @@ static void free_swap P2(int, start, int, length)
      * found again (or use doubly linked list, etc).
      */
     if (m->start + m->length == last_data) {
-	if (m->next)
-	    fatal("extraneous free swap blocks!\n");
+	DEBUG_CHECK(m->next, "extraneous free swap blocks!\n");
 	/* find prev pointer again *sigh* */
 	for (ptr = swap_free, prev = 0; ptr != m; prev = ptr, ptr = ptr->next);
 	last_data = m->start;
-	free(m);
+	FREE(m);
 	if (!prev)
 	    swap_free = 0;
 	else
@@ -232,7 +231,7 @@ swap_in P2(char **, blockp, int, loc)
     /* find out size */
     if (fread((char *) &size, sizeof size, 1, swap_file) == -1)
 	fatal("Couldn't read the swap file.\n");
-    *blockp = DXALLOC(size, 118, "swap_in");
+    *blockp = DXALLOC(size, TAG_SWAP, "swap_in");
     if (fread(*blockp, size, 1, swap_file) == -1)
 	fatal("Couldn't read the swap file.\n");
     total_bytes_swapped -= size;
@@ -260,12 +259,14 @@ locate_out P1(struct program *, prog)
 
     if (!prog)
 	return 0;
+#ifdef DEBUG
     if (d_flag > 1) {
 	debug_message("locate_out: %lX %lX %lX %lX %lX %lX %lX\n",
 		      prog->p.i.program, prog->p.i.functions,
 	     prog->p.i.strings, prog->p.i.variable_names, prog->p.i.inherit,
 		      prog->p.i.argument_types, prog->p.i.type_start);
     }
+#endif
     prog->p.i.program = &p[prog->p.i.program - (char *) prog];
     prog->p.i.functions = (struct function *)
 	& p[(char *) prog->p.i.functions - (char *) prog];
@@ -317,12 +318,14 @@ locate_in P1(struct program *, prog)
 	prog->p.i.type_start = (unsigned short *)
 	    &p[(char *) prog->p.i.type_start - (char *) 0];
     }
+#ifdef DEBUG
     if (d_flag > 1) {
 	debug_message("locate_in: %lX %lX %lX %lX %lX %lX\n",
 		      prog->p.i.program, prog->p.i.functions,
 	     prog->p.i.strings, prog->p.i.variable_names, prog->p.i.inherit,
 		      prog->p.i.argument_types, prog->p.i.type_start);
     }
+#endif
     return 1;
 }
 
@@ -341,21 +344,27 @@ int swap P1(struct object *, ob)
     if (ob == simul_efun_ob) return 0;
     if (ob->flags & O_DESTRUCTED)
 	return 0;
+#ifdef DEBUG
     if (d_flag > 1) {		/* marion */
 	debug_message("Swap object %s (ref %d)\n", ob->name, ob->ref);
     }
+#endif
     if (ob->prog->p.i.line_info)
 	swap_line_numbers(ob->prog);	/* not always done before we get here */
     if ((ob->flags & O_HEART_BEAT) || (ob->flags & O_CLONE)) {
+#ifdef DEBUG
 	if (d_flag > 1) {
 	    debug_message("  object not swapped - heart beat or cloned.\n");
 	}
+#endif
 	return 0;
     }
     if (ob->prog->p.i.ref > 1 || ob->interactive) {
+#ifdef DEBUG
 	if (d_flag > 1) {
 	    debug_message("  object not swapped - inherited or interactive.\n");
 	}
+#endif
 	return 0;
     }
     locate_out(ob->prog);	/* relocate the internal pointers */
@@ -375,10 +384,13 @@ void load_ob_from_swap P1(struct object *, ob)
 {
     if (ob->swap_num == -1)
 	fatal("Loading not swapped object.\n");
+#ifdef DEBUG
     if (d_flag > 1) {		/* marion */
 	debug_message("Unswap object %s (ref %d)\n", ob->name, ob->ref);
     }
+#endif
     swap_in((char **) &ob->prog, ob->swap_num);
+    SET_TAG(ob->prog, TAG_PROGRAM);
     /*
      * to be relocated: program functions strings variable_names inherit
      * argument_types type_start
@@ -402,9 +414,11 @@ swap_line_numbers P1(struct program *, prog)
 
     if (!prog || !prog->p.i.line_info)
 	return 0;
+#ifdef DEBUG
     if (d_flag > 1) {
 	debug_message("Swap line numbers for %s\n", prog->name);
     }
+#endif
     size = prog->p.i.file_info[0];
     if (swap_out((char *) prog->p.i.file_info, size,
 		 &prog->p.i.line_swap_index)) {
@@ -426,9 +440,11 @@ void load_line_numbers P1(struct program *, prog)
 
     if (prog->p.i.line_info)
 	return;
+#ifdef DEBUG
     if (d_flag > 1) {
 	debug_message("Unswap line numbers for %s\n", prog->name);
     }
+#endif
     size = swap_in((char **) &prog->p.i.file_info, prog->p.i.line_swap_index);
     prog->p.i.line_info = (unsigned char *)&prog->p.i.file_info[prog->p.i.file_info[1]];
     line_num_bytes_swapped -= size;

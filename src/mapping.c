@@ -52,8 +52,7 @@ INLINE int growMap P1(struct mapping *, m)
 	if (newsize > MAX_TABLE_SIZE) 
 		return 0;
 	/* resize the hash table to be twice the old size */
-	m->table = a = (struct node **)
-	DREALLOC(m->table, newsize * sizeof(struct node *), 72, "growMap");
+	m->table = a = RESIZE(m->table, newsize, struct node *, TAG_MAP_TBL, "growMap");
 	if (!a) {
 		/*
 		  We couldn't grow the hash table.  Rather than die, we just
@@ -173,8 +172,7 @@ allocate_mapping P1(int, n)
 	struct node **a;
 
 	if (n > MAX_MAPPING_SIZE) n = MAX_MAPPING_SIZE;
-	newmap = (struct mapping *)DXALLOC(sizeof(struct mapping), 73, 
-					   "allocate_mapping: 1");
+	newmap = ALLOCATE(struct mapping, TAG_MAPPING, "allocate_mapping: 1");
 	debug(1024,("mapping.c: allocate_mapping begin, newmap = %x\n", newmap));
 	if (newmap == NULL) 
 	    error("Allocate_mapping - out of memory.\n");
@@ -191,7 +189,7 @@ allocate_mapping P1(int, n)
 	newmap->unfilled = n * (unsigned)FILL_PERCENT /(unsigned)100;
 	a = newmap->table = 
 	    (struct node **)DXALLOC(n *= sizeof(struct node *),
-				    75, "allocate_mapping: 3");
+				    TAG_MAP_TBL, "allocate_mapping: 3");
 	if (!a)
 	    error("Allocate_mapping 2 - out of memory.\n");
 	/* zero out the hash table */
@@ -228,14 +226,12 @@ copyMapping P1(struct mapping *,m)
     int k = m->table_size;
     struct node *elt, *nelt, **a, **b = m->table, **c;
 
-    newmap = (struct mapping *)DXALLOC(sizeof(struct mapping),78, 
-				       "copy_mapping: 1");
+    newmap = ALLOCATE(struct mapping, TAG_MAPPING, "copy_mapping: 1");
     if (newmap == NULL) error("copyMapping - out of memory.\n");
     newmap->table_size = k++;
     newmap->unfilled = m->unfilled;
     newmap->ref = 1;
-    c = newmap->table = (struct node **)DXALLOC(sizeof(struct node *)*k, 79, 
-						"copy_mapping: 2");
+    c = newmap->table = CALLOCATE(k, struct node *, TAG_MAP_TBL, "copy_mapping: 2");
     if (!c){
 	FREE((char *) newmap);
 	error("copyMapping 2 - out of memory.\n");
@@ -263,8 +259,7 @@ copyMapping P1(struct mapping *,m)
 	if (elt = b[k]){
 	    a = c + k;
 	    do {
-		nelt = (struct node *) DXALLOC(sizeof(struct node), 80,
-					       "copy_mapping:3");
+		nelt = ALLOCATE(struct node, TAG_MAP_NODE, "copy_mapping:3");
 		assign_svalue_no_free(nelt->values, elt->values);
 		assign_svalue_no_free(nelt->values + 1, elt->values + 1);
 		nelt->hashval = elt->hashval;
@@ -335,7 +330,7 @@ restore_hash_string P3(char **, val, int *, a, struct svalue *, sv)
 			hash += c * coeff[i++];
 			hash *= 5;
 		    }
-                    while ((c = *cp++) && (c != '"')){
+                    while ((c = *cp++) != '"'){
                         if (c == '\\'){
                             if (!(c = *new++ = *cp++)) return ROB_STRING_ERROR;
 			}
@@ -384,7 +379,7 @@ restore_hash_string P3(char **, val, int *, a, struct svalue *, sv)
     *val = cp;
     *--cp = '\0';
     len = cp - start;
-    sv->u.string = DXALLOC(len + 1, 100, "restore_string");
+    sv->u.string = DXALLOC(len + 1, TAG_STRING, "restore_string");
     strcpy(sv->u.string, start);
     *a = hash;
     sv->type = T_STRING;
@@ -401,21 +396,27 @@ svalue_to_int P1(struct svalue *, v)
 {
 	debug(1,("mapping.c: struct svalue_to_int\n"));
 	switch (v->type) {
-	    case T_NUMBER:
+	case T_NUMBER:
 	    {
 		int i;
 		return ((i = v->u.number) < 0) ? -i : i;
 	    }
-	    case T_STRING:
-		return mapHashstr(v->u.string);
-	    case T_OBJECT:
-		return mapHashstr(v->u.ob->name);
-	    case T_MAPPING :
-		return (int)v->u.map;
-	    case T_POINTER :
-		return (int)v->u.vec;
-	    default:
-		return 0;  /* so much for our precious distribution */
+	case T_STRING:
+	    return mapHashstr(v->u.string);
+	case T_OBJECT:
+	    return mapHashstr(v->u.ob->name);
+	case T_MAPPING :
+	    return (int)v->u.map;
+	case T_POINTER :
+	    return (int)v->u.vec;
+	case T_FUNCTION:
+	    return (int)v->u.fp;
+	case T_REAL:
+	    return (int)v->u.real;
+	case T_BUFFER:
+	    return (int)v->u.buf;
+	default:
+	    return 0;  /* so much for our precious distribution */
 	}
 }
 
@@ -530,8 +531,7 @@ find_for_insert P3(struct mapping *, m, struct svalue *, lv, int, doTheFree)
 #endif
 	total_mapping_size += sizeof(struct node);
 	debug(128,("mapping.c: allocated a node\n"));
-	newnode = (struct node *) DXALLOC(sizeof(struct node), 76,
-		"find_for_insert");
+	newnode = ALLOCATE(struct node, TAG_MAP_NODE, "find_for_insert");
 	assign_svalue_no_free(newnode->values, lv);
 	newnode->hashval = oi;
 	/* insert at head of bucket */
@@ -600,8 +600,7 @@ load_mapping_from_aggregate P2(struct svalue *,sp, int, n)
 		mapping_too_large();
 	    }
 
-	    elt = (struct node *) DXALLOC(sizeof(struct node), 81,
-					  "load_mapping_from_aggregate");
+	    elt = ALLOCATE(struct node, TAG_MAP_NODE, "load_mapping_from_aggregate");
 	    *elt->values = *sp++;
 	    *(elt->values + 1) = *sp;
 	    elt->hashval = oi;
@@ -689,8 +688,7 @@ add_to_mapping P3(struct mapping *,m1, struct mapping *,m2, int, free_flag)
 		mapping_too_large();
 	    }
 
-	    newnode = (struct node *) DXALLOC(sizeof(struct node),
-					      81, "add_to_mapping");
+	    newnode = ALLOCATE(struct node, TAG_MAP_NODE, "add_to_mapping");
 	    assign_svalue_no_free(newnode->values, elt2->values);
 	    assign_svalue_no_free(newnode->values+1,elt2->values+1);
 	    newnode->hashval = oi;
@@ -768,7 +766,7 @@ unique_add_to_mapping P3(struct mapping *,m1, struct mapping *,m2, int,free_flag
 	    }
 
 	    newnode = (struct node *) DXALLOC(sizeof(struct node),
-					      81, "add_to_mapping");
+					      TAG_MAP_NODE, "add_to_mapping");
 	    assign_svalue_no_free(newnode->values, elt2->values);
 	    assign_svalue_no_free(newnode->values+1,elt2->values+1);
 	    newnode->hashval = oi;

@@ -37,7 +37,12 @@ static struct parse_node *
 optimize P1(struct parse_node *, expr) {
     if (!expr) return 0;
     switch (expr->kind) {
-    case F_RANGE:
+    case F_NN_RANGE:
+    case F_RN_RANGE:
+    case F_RR_RANGE:
+    case F_NR_RANGE:
+    case F_NE_RANGE:
+    case F_RE_RANGE:
 	expr->v.expr = optimize(expr->v.expr);
 	/* fall through */
     case F_LOR:
@@ -55,8 +60,10 @@ optimize P1(struct parse_node *, expr) {
     case F_MULT_EQ:
     case F_MOD_EQ:
     case F_DIV_EQ:
-    case F_INDEXED_LVALUE:
+    case F_INDEX_LVALUE:
     case F_INDEX:
+    case F_RINDEX:
+    case F_RINDEX_LVALUE:
     case F_OR:
     case F_XOR:
     case F_AND:
@@ -173,7 +180,7 @@ node_always_true P1(struct parse_node *, node) {
     return 0;
 }
 
-void
+int
 generate_conditional_branch P1(struct parse_node *, node) {
     int branch;
 
@@ -200,14 +207,12 @@ generate_conditional_branch P1(struct parse_node *, node) {
 	}
     }
     generate(node);
-    branch_backwards(branch);
+    return branch;
 }
 
 DISPATCH2(generate_function_call, short, f, char, num)
 
 DISPATCH(pop_value)
-
-DISPATCH1(branch_backwards, char, b)
 
 DISPATCH(generate___INIT)
 
@@ -260,14 +265,21 @@ dump_tree P2(struct parse_node *, expr, int, indent) {
       dump_tree(expr->left, indent + 2);
       dump_tree(expr->right, indent + 2);
       break;
-    case F_RANGE:
+    case F_NN_RANGE:
+    case F_RN_RANGE:
+    case F_RR_RANGE:
+    case F_NR_RANGE:
+    case F_NE_RANGE:
+    case F_RE_RANGE:
       printf("%s\n", instrs[expr->kind].name);
       dump_tree(expr->v.expr, indent + 2);
       dump_tree(expr->left, indent + 2);
       dump_tree(expr->right, indent + 2);
       break;
+    case F_INDEX_LVALUE:
     case F_INDEX:
-    case F_INDEXED_LVALUE:
+    case F_RINDEX:
+    case F_RINDEX_LVALUE:
     case F_ADD:
     case F_SUBTRACT:
     case F_MULTIPLY:

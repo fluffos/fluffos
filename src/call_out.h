@@ -11,6 +11,6 @@ void remove_all_call_out PROT((struct object *));
 int find_call_out PROT((struct object *, char *));
 struct vector *get_all_call_outs PROT((void));
 int print_call_out_usage PROT((int));
-void count_ref_from_call_outs PROT((void));
+void mark_call_outs PROT((void));
 
 #endif

@@ -24,7 +24,8 @@
 #undef OLD_HPUX
 
 /* hack to figure out if we are being compiled under Solaris or not */
-#ifdef sun
+/* newer versions of gcc are smart enough to tell us */
+#if defined(sun) && !defined(SunOS_5)
 #  if defined(__svr4__) || defined(__sol__) || defined(SVR4)
 #    define SunOS_5
 #  else
@@ -86,7 +87,7 @@
  */
 
 #if defined(NeXT) || defined(__386BSD__) || defined(hp68k) || \
-        defined(__bsdi__) || defined(sequent) || defined(OS2)
+        defined(__bsdi__) || defined(sequent) || defined(OS2) || defined(linux)
 #  define RANDOM
 #else				/* Sequent, HP, Sparc, RS/6000 */
 #  define DRAND48
@@ -283,7 +284,7 @@ typedef unsigned long UINT32;
 /*
  * stdarg.h (ANSI C) vs varargs.h (defacto Unix standard)
  */
-#if defined(LATTICE) || defined(__bsdi__)
+#if defined(LATTICE) 
 #define HAS_STDARG_H
 #endif
 

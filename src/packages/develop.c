@@ -160,6 +160,15 @@ f_set_malloc_mask PROT((void))
     sp->u.number = 0;
 }
 #endif
+
+#ifdef F_CHECK_MEMORY
+void
+f_check_memory PROT((void))
+{
+    check_all_blocks(sp->u.number);
+    sp->u.number = 0;
+}
+#endif
 #endif				/* (defined(DEBUGMALLOC) &&
 				 * defined(DEBUGMALLOC_EXTENSIONS)) */
 

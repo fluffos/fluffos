@@ -6,6 +6,9 @@
 #ifndef COMM_H
 #define COMM_H
 
+/* union string_or_func */
+#include "simulate.h"
+
 #define MAX_TEXT                   2048
 #define MAX_SOCKET_PACKET_SIZE     1024
 #define DESIRED_SOCKET_PACKET_SIZE 800
@@ -33,12 +36,6 @@ enum msgtypes {
 #define NOTIFY_FAIL_FUNC  256   /* default_err_mesg is a function pointer  */
 #define USING_TELNET      512   /* they're using telnet, or something that */
                                 /* understands telnet codes                */
-
-union string_or_func {
-    struct funp *f;
-    char *s;
-};
-
 struct interactive {
     struct object *ob;		/* points to the associated object         */
     struct sentence *input_to;	/* to be called with next input line       */

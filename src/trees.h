@@ -24,6 +24,13 @@
 #define NODE_CASE_STRING        -14
 #define NODE_DEFAULT            -15
 #define NODE_IF                 -16
+#define NODE_ANON_FUNC          -17
+#define NODE_PARAMETER          -18
+#define NODE_VALUE              -19
+#define NODE_PARAMETER_LVALUE   -20
+#define NODE_NE_RANGE_LVALUE    -21
+#define NODE_RE_RANGE_LVALUE    -22
+#define NODE_BRANCH_LINK        -23
 
 struct parse_node {
     short kind;
@@ -60,6 +67,9 @@ struct parse_node *make_branched_node PROT((short, char,
 /* parser grammar functions */
 struct parse_node *binary_int_op PROT((struct parse_node *, 
 				       struct parse_node *, char, char *));
+struct parse_node *make_range_node PROT((int, struct parse_node *,
+					 struct parse_node *,
+					 struct parse_node *));
 struct parse_node *insert_pop_value PROT((struct parse_node *));
 
 #endif

@@ -7,8 +7,7 @@
 #ifndef APPLIES_H
 #define APPLIES_H
 
-/* the folowing must be the first character of __INIT, although it's not
-   used if OPTIMIZE_FUNCTION_TABLE_SEARCH is on. */
+/* the folowing must be the first character of __INIT */
 #define APPLY___INIT_SPECIAL_CHAR           '#'
 #define APPLY___INIT                        "#global_init#"
 #define APPLY_AUTHOR_FILE                   "author_file"

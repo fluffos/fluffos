@@ -12,7 +12,7 @@
 
 #include "std.h"
 
-#if defined(_SEQUENT_) || defined(linux) || defined(SVR4)
+#if defined(_SEQUENT_) || defined(SVR4)
 #  include <malloc.h>
 #endif
 
@@ -119,8 +119,10 @@
      long random PROT((void));
 #  endif
 
+/* Beek - Ok, who *does* need this??? */
 #  if !defined(sgi) && !defined(NeXT) && !defined(hpux) && !defined(sun) && \
-	   !defined(_AIX) && !defined(LATTICE) && !defined(OS2)
+   !defined(_AIX) && !defined(LATTICE) && !defined(OS2) && !defined(__bsdi__)\
+   && !defined(linux)
     int getpeername PROT((int, struct sockaddr *, int *));
     int shutdown PROT((int, int));
 #  endif

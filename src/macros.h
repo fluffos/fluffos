@@ -118,6 +118,10 @@
 #  define CALLOC(x)  puts("You need to specify a malloc package in options.h")
 #endif
 
+#define ALLOCATE(type, tag, desc) ((type *)DXALLOC(sizeof(type), tag, desc))
+#define CALLOCATE(num, type, tag, desc) ((type *)DXALLOC(sizeof(type[1]) * (num), tag, desc))
+#define RESIZE(ptr, num, type, tag, desc) ((type *)DREALLOC((void *)ptr, sizeof(type) * (num), tag, desc))
+
 #ifdef DEBUG
 #  define IF_DEBUG(x) x
 #  define DEBUG_CHECK(x, y) if (x) fatal(y)
@@ -212,8 +216,18 @@ pointers of size other than 4 or 8 not implemented
 #endif
 
 #ifndef _FUNC_SPEC_
-char *string_copy PROT((char *));
-char *xalloc PROT((int));
+   char *xalloc PROT((int));
+#  ifdef DEBUGMALLOC
+      char *int_string_copy PROT((char *, char *));
+#  else
+      char *int_string_copy PROT((char *));
+#  endif
+#endif
+
+#ifdef DEBUGMALLOC
+#   define string_copy(x, y) int_string_copy(x, y)
+#else
+#   define string_copy(x, y) int_string_copy(x)
 #endif
 
 #endif

@@ -118,5 +118,8 @@ struct ident_hash_elem *lookup_ident PROT((char *));
 void free_unused_identifiers PROT((void));
 void init_identifiers PROT((void));
 char *show_error_context PROT((void));
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_all_defines();
+#endif
 
 #endif

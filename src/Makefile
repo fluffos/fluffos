@@ -118,7 +118,7 @@ CPP=$(CC) -E
 # Solaris (SunOS 5): for BSD compatible ioctl()
 # If using CC=cc, you can also add:
 #      -w     to turn off warnings, in order to get a cleaner compile
-#OSFLAGS=-DBSD_COMPS -DSunOS_5
+#OSFLAGS=-DBSD_COMP -DSunOS_5
 
 # SCO 3.2v4.2
 #OSFLAGS=-DSCO
@@ -337,7 +337,7 @@ neat:
 	-rm -f efun_defs.c option_defs.c
 	-rm -f cc.h
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
-	-rm -f make_func make_malloc malloc.c malloc_wrapper.c
+	-rm -f make_func make_malloc malloc.c mallocwrapper.c
 	-rm -f func_spec.cpp
 	-rm -f grammar.y
 

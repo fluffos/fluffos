@@ -48,9 +48,9 @@ object next_inventory(object default: F_THIS_OBJECT);
 void call_out(string, int,...);
 int member_array(mixed, string | mixed *, void | int);
 int notify_fail(string | function);
-int input_to(string,...);
+int input_to(string | function,...);
 int random(int);
-void add_action(string, string | string *, void | int);
+void add_action(string | function, string | string *, void | int);
 string query_verb();
 string lower_case(string);
 int command(string, void | object);
@@ -248,7 +248,7 @@ void message(mixed, string, string | string * | object | object *,
     void set_privs(object, int | string);
 #endif				/* PRIVS */
 
-    void get_char(string,...);
+    void get_char(string | function,...);
     object *children(string);
 
     void reload_object(object);
@@ -291,7 +291,7 @@ void message(mixed, string, string | string * | object | object *,
 #endif
 
     mixed filter_array(mixed *, string | function, void | object | string, ...);
-    mixed map(mapping | mixed *, string | function, object | string | void, ...);
+    mixed map(string | mapping | mixed *, string | function, object | string | void, ...);
     mapping map_mapping map(mapping, string | function, object | string | void, ...);
     mixed *map_array map(mixed *, string | function, object | string | void, ...);
 /*

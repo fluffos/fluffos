@@ -24,7 +24,7 @@ void generate_forward_branch PROT((char));
 void update_forward_branch PROT((void));
 void generate_else PROT((void));
 void initialize_parser PROT((void));
-void generate_conditional_branch PROT((struct parse_node *));
+int generate_conditional_branch PROT((struct parse_node *));
 int node_always_true PROT((struct parse_node *));
 short generate PROT((struct parse_node *));
 void generate_return PROT((struct parse_node *));

@@ -8,6 +8,7 @@
 #include "comm.h"
 #include "swap.h"
 #include "socket_efuns.h"
+#include "port.h"
 
 #define too_deep_save_error() \
     error("Mappings and/or arrays nested too deep (%d) for save_object\n",\
@@ -90,7 +91,7 @@ INLINE int svalue_save_size P1(struct svalue *, v)
     case T_NUMBER:
 	{
 	    int res = v->u.number, len;
-	    len = res < 0 ? (res = -res,3) : 2;
+	    len = res < 0 ? (res = (-res) & 0x7fffffff,3) : 2;
 	    while (res>9) { res /= 10; len++; }
 	    return len;
 	}
@@ -157,7 +158,7 @@ INLINE void save_svalue P2(struct svalue *, v, char **, buf)
 	    int res = v->u.number, fact, len = 1, neg = 0;
 	    register char *cp;
 
-	    if (res < 0) { len++, neg = 1, res = -res; }
+	    if (res < 0) { len++, neg = 1, res = (-res) & 0x7fffffff; }
 	    fact = res;
 	    while (fact > 9) { fact /= 10; len++; }
 	    *(cp = (*buf += len)) = '\0';
@@ -248,14 +249,13 @@ restore_internal_size P3(char **, str, int, is_mapping, int, depth)
 		    if (!sizes){
 			max_depth = 128;
 			while (max_depth <= depth) max_depth <<= 1;
-			sizes = (int *) DXALLOC(max_depth * sizeof(int),
-						126, "restore_internal_size");
-			
+			sizes = CALLOCATE(max_depth, int, TAG_TEMPORARY,
+					  "restore_internal_size");
 		    }
 		    else if (depth >= max_depth){
 			while ((max_depth <<= 1) <= depth);
-			sizes = (int *) DREALLOC(sizes, max_depth * sizeof(int),
-						 127, "restore_internal_size");
+			sizes = RESIZE(sizes, max_depth, int, TAG_TEMPORARY,
+				       "restore_internal_size");
 		    }
 		    sizes[depth] = size;
 		    return 1;
@@ -270,14 +270,13 @@ restore_internal_size P3(char **, str, int, is_mapping, int, depth)
                     if (!sizes){
                         max_depth = 128;
                         while (max_depth <= depth) max_depth <<= 1;
-                        sizes = (int *) DXALLOC(max_depth * sizeof(int),
-						126, "restore_internal_size");
-
+			sizes = CALLOCATE(max_depth, int, TAG_TEMPORARY,
+					  "restore_internal_size");
 		    }
                     else if (depth >= max_depth){
                         while ((max_depth <<= 1) <= depth);
-                        sizes = (int *) DREALLOC(sizes, max_depth * sizeof(int),
-						 127, "restore_internal_size");
+			sizes = RESIZE(sizes, max_depth, int, TAG_TEMPORARY,
+				       "restore_internal_size");
 		    }
                     sizes[depth] = size;
 		    return 1;
@@ -411,7 +410,7 @@ restore_interior_string P2(char **, val, struct svalue *, sv)
 		char *new = cp - 1;
 
 		if (*new++ = *cp++){
-		    while ((c = *cp++) && (c != '"')){
+		    while ((c = *cp++) != '"'){
 			if (c == '\\'){
 			    if (!(*new++ = *cp++)) return ROB_STRING_ERROR;
 			}
@@ -428,7 +427,7 @@ restore_interior_string P2(char **, val, struct svalue *, sv)
 		    if (c == '\0') return ROB_STRING_ERROR;
 		    *new = '\0';
 		    *val = cp;
-		    sv->u.string = DXALLOC((len = (new - start)) + 1, 102,
+		    sv->u.string = DXALLOC((len = (new - start)) + 1, TAG_STRING,
 				"restore_string");
 		    strcpy(sv->u.string, start);
 		    sv->type = T_STRING;
@@ -449,7 +448,7 @@ restore_interior_string P2(char **, val, struct svalue *, sv)
     *val = cp;
     *--cp = '\0';
     len = cp - start;
-    sv->u.string = DXALLOC(len + 1, 100, "restore_string");
+    sv->u.string = DXALLOC(len + 1, TAG_STRING, "restore_string");
     strcpy(sv->u.string, start);
     sv->type = T_STRING;
     sv->subtype = STRING_MALLOC;
@@ -683,8 +682,7 @@ restore_mapping P2(char **,str, struct svalue *, sv)
 	    mapping_too_large();
 	}
 	
-	elt = (struct node *) DXALLOC(sizeof(struct node), 81,
-				      "restore_mapping");
+	elt = ALLOCATE(struct node, TAG_MAP_NODE, "restore_mapping");
 	*elt->values = key;
 	*(elt->values + 1) = value;
 	elt->hashval = oi;
@@ -830,7 +828,7 @@ restore_string P2(char *, val, struct svalue *, sv)
                 char *new = cp - 1;
 
                 if (*new++ = *cp++){
-                    while ((c = *cp++) && (c != '"')){
+                    while ((c = *cp++) != '"'){
                         if (c == '\\'){
                             if (!(*new++ = *cp++)) return ROB_STRING_ERROR;
 			}
@@ -846,7 +844,7 @@ restore_string P2(char *, val, struct svalue *, sv)
 		    }
                     if ((c == '\0') || (*cp != '\0')) return ROB_STRING_ERROR;
                     *new = '\0';
-                    sv->u.string = DXALLOC(new - start + 1, 102,
+                    sv->u.string = DXALLOC(new - start + 1, TAG_STRING,
 					   "restore_string");
                     strcpy(sv->u.string, start);
 		    sv->type = T_STRING;
@@ -867,7 +865,7 @@ restore_string P2(char *, val, struct svalue *, sv)
     if (*cp--) return ROB_STRING_ERROR;
     *cp = '\0';
     len = cp - start;
-    sv->u.string = DXALLOC(len + 1, 100, "restore_string");
+    sv->u.string = DXALLOC(len + 1, TAG_STRING, "restore_string");
     strcpy(sv->u.string, start);
     sv->type = T_STRING;
     sv->subtype = STRING_MALLOC;
@@ -1085,7 +1083,7 @@ save_object P3(struct object *, ob, char *, file, int, save_zeros)
         return 0;
     if (file[0] != '/')
     {
-	use_name = DXALLOC((len = strlen(file)) + 2, 80, "save_object: 1");
+	use_name = DXALLOC((len = strlen(file)) + 2, TAG_TEMPORARY, "save_object: 1");
 	strcpy(use_name, "/");
 	strcpy(use_name+1, file);
 	free_use_name = 1;
@@ -1102,7 +1100,7 @@ save_object P3(struct object *, ob, char *, file, int, save_zeros)
     if (file == 0)
         error("Denied write permission in save_object().\n");
     if (!len) len = strlen(file);
-    name = DXALLOC(len + strlen(SAVE_EXTENSION) + 1, 80, "save_object: 1");
+    name = DXALLOC(len + strlen(SAVE_EXTENSION) + 1, TAG_TEMPORARY, "save_object: 1");
     (void)strcpy(name, file);
 #ifndef MSDOS
     (void)strcat(name + len, SAVE_EXTENSION);
@@ -1127,7 +1125,7 @@ save_object P3(struct object *, ob, char *, file, int, save_zeros)
 
 	save_svalue_depth = 0;
 	theSize = svalue_save_size(v);
-	new_string = (char *)DXALLOC(theSize, 81, "save_object: 2");
+	new_string = (char *)DXALLOC(theSize, TAG_TEMPORARY, "save_object: 2");
 	*new_string = '\0';
 	p = new_string;	
 	save_svalue(v++, &p);
@@ -1181,7 +1179,7 @@ save_variable P1(struct svalue *, var)
     
     save_svalue_depth = 0;
     theSize = svalue_save_size(var);
-    new_string = (char *)DXALLOC(theSize, 81, "save_object: 2");
+    new_string = (char *)DXALLOC(theSize, TAG_STRING, "save_object: 2");
     *new_string = '\0';
     p = new_string;
     save_svalue(var, &p);
@@ -1204,7 +1202,7 @@ int restore_object P3(struct object *, ob, char *, file, int, noclear)
     if (!file) error("Denied read permission in restore_object().\n");
 
     len = strlen(file);
-    name = DXALLOC(len + strlen(SAVE_EXTENSION) + 1, 83, "restore_object: 2");
+    name = DXALLOC(len + strlen(SAVE_EXTENSION) + 1, TAG_TEMPORARY, "restore_object: 2");
     (void)strcpy(name, file);
     if (name[len-2] == '.' &&
 #ifndef LPC_TO_C
@@ -1232,7 +1230,7 @@ int restore_object P3(struct object *, ob, char *, file, int, noclear)
         FREE(name);
         return 0;
     }
-    theBuff = DXALLOC(i + 1, 85, "restore_object: 4");
+    theBuff = DXALLOC(i + 1, TAG_TEMPORARY, "restore_object: 4");
     fread(theBuff, 1, i, f);
     fclose(f);
     theBuff[i] = '\0';
@@ -1256,8 +1254,10 @@ int restore_object P3(struct object *, ob, char *, file, int, noclear)
     
     restore_object_from_buff(ob, theBuff, name, noclear);
     current_object = save;
+#ifdef DEBUg
     if (d_flag > 1)
         debug_message("Object %s restored from %s.\n", ob->name, name);
+#endif
     FREE(name);
     FREE(theBuff);
     return 1;
@@ -1353,14 +1353,18 @@ void free_object P2(struct object *, ob, char *, from)
     struct sentence *s;
 
     ob->ref--;
+#ifdef DEBUG
     if (d_flag > 1)
 	printf("Subtr ref to ob %s: %u (%s)\n", ob->name,
 	       ob->ref, from);
+#endif
     debug(16384, ("subtr ref to ob %s: %d (%s)\n", ob->name, ob->ref, from));
     if (ob->ref > 0)
 	return;
+#ifdef DEBUG
     if (d_flag)
 	printf("free_object: %s.\n", ob->name);
+#endif
     if (!(ob->flags & O_DESTRUCTED)) {
 	/* This is fatal, and should never happen. */
 	fatal("FATAL: Object 0x%x %s ref count 0, but not destructed (from %s).\n",
@@ -1389,8 +1393,10 @@ void free_object P2(struct object *, ob, char *, from)
 	s = next;
     }
     if (ob->name) {
+#ifdef DEBUG
 	if (d_flag > 1)
 	    debug_message("Free object %s\n", ob->name);
+#endif
 	if (lookup_object_hash(ob->name) == ob)
 	    fatal("Freeing object %s but name still in name table", ob->name);
 	FREE(ob->name);
@@ -1416,7 +1422,7 @@ struct object *get_empty_object P1(int, num_var)
 
     tot_alloc_object++;
     tot_alloc_object_size += size;
-    ob = (struct object *) DXALLOC(size, 86, "get_empty_object");
+    ob = (struct object *) DXALLOC(size, TAG_OBJECT, "get_empty_object");
     /*
      * marion Don't initialize via memset, this is incorrect. E.g. the bull
      * machines have a (char *)0 which is not zero. We have structure
@@ -1570,9 +1576,11 @@ void stat_living_objects()
 void reference_prog P2(struct program *, progp, char *, from)
 {
     progp->p.i.ref++;
+#ifdef DEBUG
     if (d_flag)
 	printf("reference_prog: %s ref %d (%s)\n",
 	       progp->name, progp->p.i.ref, from);
+#endif
 }
 
 /*
@@ -1587,8 +1595,10 @@ void free_prog P2(struct program *, progp, int, free_sub_strings)
     progp->p.i.ref--;
     if (progp->p.i.ref > 0)
 	return;
+#ifdef DEBUG
     if (d_flag)
 	printf("free_prog: %s\n", progp->name);
+#endif
     if (progp->p.i.ref < 0)
 	fatal("Negative ref count for prog ref.\n");
     total_prog_block_size -= progp->p.i.total_size;
@@ -1609,7 +1619,7 @@ void free_prog P2(struct program *, progp, int, free_sub_strings)
 	/* Free all inherited objects */
 	for (i = 0; i < (int) progp->p.i.num_inherited; i++)
 	    free_prog(progp->p.i.inherit[i].prog, 1);
-	FREE(progp->name);
+	free_string(progp->name);
 
 	/*
 	 * We're going away for good, not just being swapped, so free up
@@ -1638,7 +1648,7 @@ void reset_object P2(struct object *, ob, int, arg)
     ob->next_reset = current_time + TIME_TO_RESET / 2 +
 	random_number(TIME_TO_RESET / 2);
     if (arg == 0) {
-	apply(APPLY___INIT, ob, 0, ORIGIN_DRIVER);
+        call___INIT(ob);
 	if (ob->flags & O_DESTRUCTED) return; /* sigh */
 	apply(APPLY_CREATE, ob, 0, ORIGIN_DRIVER);
     } else {			/* check for O_WILL_RESET in backend */

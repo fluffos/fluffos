@@ -12,4 +12,8 @@ void set_simul_efun PROT((char *));
 void get_simul_efuns PROT((struct program *));
 int find_simul_efun PROT((char *));
 
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_simuls PROT((void));
+#endif
+
 #endif

@@ -120,6 +120,20 @@ void free_vector P1(struct vector *, p)
     FREE((char *) p);
 }
 
+void free_empty_vector P1(struct vector *, p)
+{
+    if ((--(p->ref) > 0) || (p == &null_vector)) {
+        return;
+      }
+#ifndef NO_MUDLIB_STATS
+    add_array_size(&p->stats, -((int)p->size));
+#endif
+    num_arrays--;
+    total_array_size -= sizeof(struct vector) + sizeof(struct svalue) *
+        (p->size - 1);
+    FREE((char *) p);
+}
+
 struct vector *explode_string P2(char *, str, char *, del)
 {
     char *p, *beg, *lastdel = (char *) NULL;
@@ -142,7 +156,7 @@ struct vector *explode_string P2(char *, str, char *, del)
 	for (j = 0; j < slen; j++) {
 	    ret->item[j].type = T_STRING;
 	    ret->item[j].subtype = STRING_MALLOC;
-	    tmp = (char *) DXALLOC(2, 6, "explode_string: tmp");
+	    tmp = (char *) DXALLOC(2, TAG_STRING, "explode_string: tmp");
 	    tmp[0] = str[j];
 	    tmp[1] = '\0';
 	    ret->item[j].u.string = tmp;
@@ -194,13 +208,11 @@ struct vector *explode_string P2(char *, str, char *, del)
 					 * loop */
 	for (p = str, beg = str, num = 0; *p && (num < limit);) {
 	    if (*p == delimeter) {
-		if (num >= ret->size) {
-		    fatal("Index out of bounds in explode!\n");
-		}
+		DEBUG_CHECK(num >= ret->size, "Index out of bounds in explode!\n");
 		ret->item[num].type = T_STRING;
 		ret->item[num].subtype = STRING_MALLOC;
 		ret->item[num].u.string = buff =
-		    DXALLOC(p - beg + 1, 7, "explode_string: buff");
+		    DXALLOC(p - beg + 1, TAG_STRING, "explode_string: buff");
 
 		strncpy(buff, beg, p - beg);
 		buff[p - beg] = '\0';
@@ -215,7 +227,7 @@ struct vector *explode_string P2(char *, str, char *, del)
 	if (*beg != '\0') {
 	    ret->item[num].type = T_STRING;
 	    ret->item[num].subtype = STRING_MALLOC;
-	    ret->item[num].u.string = string_copy(beg);
+	    ret->item[num].u.string = string_copy(beg, "explode_string");
 	}
 	return ret;
     }				/* len == 1 */
@@ -266,7 +278,7 @@ struct vector *explode_string P2(char *, str, char *, del)
 	    ret->item[num].type = T_STRING;
 	    ret->item[num].subtype = STRING_MALLOC;
 	    ret->item[num].u.string = buff =
-		DXALLOC(p - beg + 1, 7, "explode_string: buff");
+		DXALLOC(p - beg + 1, TAG_STRING, "explode_string: buff");
 
 	    strncpy(buff, beg, p - beg);
 	    buff[p - beg] = '\0';
@@ -282,7 +294,7 @@ struct vector *explode_string P2(char *, str, char *, del)
     if (*beg != '\0') {
 	ret->item[num].type = T_STRING;
 	ret->item[num].subtype = STRING_MALLOC;
-	ret->item[num].u.string = string_copy(beg);
+	ret->item[num].u.string = string_copy(beg, "explode_string");
     }
     return ret;
 }
@@ -301,10 +313,10 @@ char *implode_string P2(struct vector *, arr, char *, del)
 	}
     }
     if (num == 0)
-	return string_copy("");
+	return string_copy("", "implode_string");
 
     del_len = strlen(del);
-    p = DXALLOC(size + (num - 1) * del_len + 1, 8, "implode_string: p");
+    p = DXALLOC(size + (num - 1) * del_len + 1, TAG_STRING, "implode_string: p");
     q = p;
     for (i = 0, num = 0; i < arr->size; i++) {
 	if (sv[i].type & T_STRING) {
@@ -418,8 +430,13 @@ struct vector *commands P1(struct object *, ob)
 	p->item[2].type = T_OBJECT;
 	p->item[2].u.ob = s->ob;
 	p->item[3].type = T_STRING;
-	p->item[3].u.string = ref_string(s->function);
-	p->item[3].subtype = STRING_SHARED;
+        if (s->flags & V_FUNCTION) {
+            p->item[3].u.string = "<function>";
+            p->item[3].subtype = STRING_CONSTANT;
+        } else {
+            p->item[3].u.string = ref_string(s->function.s);
+            p->item[3].subtype = STRING_SHARED;
+        }
 	add_ref(s->ob, "commands");
     }
     return v;
@@ -449,7 +466,8 @@ f_filter_array PROT((void))
 	struct funp *fp;
 	struct object *ob = 0;
 	char *func;
-	char *flags = DXALLOC(size+1, 9, "filter: flags");
+
+	char *flags = DXALLOC(size+1, TAG_TEMPORARY, "filter: flags");
 	struct svalue *extra, *v;
 	int res = 0, cnt, numex = 0;
 
@@ -547,6 +565,10 @@ int sameval P2(struct svalue *, arg1, struct svalue *, arg2)
 	return arg1->u.map == arg2->u.map;
     case T_FUNCTION:
 	return arg1->u.fp == arg2->u.fp;
+    case T_REAL:
+	return arg1->u.real == arg2->u.real;
+    case T_BUFFER:
+	return arg1->u.buf == arg2->u.buf;
     }
     return 0;
 }
@@ -609,8 +631,7 @@ void f_unique_array PROT((void)){
 	else func = sp->u.string;
     }
 
-    unlist = (struct unique_list *) DXALLOC(sizeof(struct unique_list),
-					    100, "f_unique_array:1");
+    unlist = ALLOCATE(struct unique_list, TAG_TEMPORARY, "f_unique_array:1");
     unlist->next = g_u_list;
     unlist->head = 0;
     head = &unlist->head;
@@ -631,7 +652,8 @@ void f_unique_array PROT((void)){
 	    uptr = *head;
 	    while (uptr) {
 		if (sameval(sv, &uptr->mark)) {
-		    uptr->indices = (int *) DREALLOC(uptr->indices, sizeof(int) * (uptr->count + 1), 101, "f_unique_array:2");
+		    uptr->indices = RESIZE(uptr->indices, uptr->count + 1, int,
+					   TAG_TEMPORARY, "f_unique_array:2");
 		    uptr->indices[uptr->count++] = i;
 		    break;
 		}
@@ -639,9 +661,8 @@ void f_unique_array PROT((void)){
 	    }
 	    if (!uptr) {
 		numkeys++;
-		uptr = (struct unique *)DXALLOC(sizeof(struct unique),
-						102, "f_unique_array:3");
-		uptr->indices = (int *)DXALLOC(sizeof(int), 103, "f_unique_array:4");
+		uptr = ALLOCATE(struct unique, TAG_TEMPORARY, "f_unique_array:3");
+		uptr->indices = ALLOCATE(int, TAG_TEMPORARY, "f_unique_array:4");
 		uptr->count = 1;
 		uptr->indices[0] = i;
 		uptr->next = *head;
@@ -710,8 +731,7 @@ struct vector *add_array P2(struct vector *, p, struct vector *, r)
 
     /* x += x */
     if ((p == r) && (p->ref == 2)) {
-        d = (struct vector *) DREALLOC(p, sizeof(struct vector) +
-		sizeof(struct svalue) * (res - 1), 121, "add_array()");
+	d = RESIZE_VECTOR(p, res);
         if (!d)
 	    fatal("Out of memory.\n");
         /* copy myself */
@@ -739,8 +759,7 @@ struct vector *add_array P2(struct vector *, p, struct vector *, r)
 	 * realloc(p) to try extending block; this will save an
 	 * allocate_array(), copying the svalues over, and free()'ing p
 	 */
-	d = (struct vector *) DREALLOC(p, sizeof(struct vector) +
-		     sizeof(struct svalue) * (res - 1), 121, "add_array()");
+	d = RESIZE_VECTOR(p, res);
 	if (!d)
 	    fatal("Out of memory.\n");
 
@@ -887,6 +906,65 @@ map_array P2(struct svalue *, arg, int, num_arg)
     pop_n_elems(num_arg);
     (++sp)->type = T_POINTER;
     sp->u.vec = r;
+}
+
+void
+map_string P2(struct svalue *, arg, int, num_arg)
+{
+    char *arr = arg->u.string;
+    char *p;
+    struct funp *fp = 0;
+    int numex = 0;
+    struct object *ob;
+    struct svalue *extra, *v;
+    char *func;
+
+    /* get a modifiable string */
+    /* do not use arg after this; it has been copied or freed.
+       Put our result string on the stack where it belongs in case of an
+       error (note it is also in the right spot for the return value).
+     */
+    if (arg->subtype != STRING_MALLOC) {
+	arr = string_copy(arr, "map_string");
+	free_string_svalue(arg);
+	arg->subtype = STRING_MALLOC;
+	arg->u.string = arr;
+    }
+
+    if (arg[1].type == T_FUNCTION) {
+	fp = arg[1].u.fp;
+	if (num_arg > 2) extra = arg + 2, numex = num_arg - 2;
+    }
+    else {
+	func = arg[1].u.string;
+	if (num_arg < 3) ob = current_object;
+	else{
+	    if (arg[2].type == T_OBJECT) ob = arg[2].u.ob;
+	    else if (arg[2].type == T_STRING){
+		if ((ob = find_object(arg[2].u.string)) && !object_visible(ob))
+		    ob = 0;
+	    }
+	    if (num_arg > 3) extra = arg + 3, numex = num_arg - 3;
+	    if (!ob) error("Bad argument 3 to map_string.\n");
+	}
+    }
+
+    for (p = arr; *p; p++) {
+	push_number((unsigned char)*p);
+	if (numex) push_some_svalues(extra, numex);
+	v = fp ? call_function_pointer(fp, numex + 1) : apply(func, ob, 1 + numex, ORIGIN_EFUN);
+	/* no function or illegal return value becomes a ' '.
+	 * Anyone got a better idea?  A few idea:
+	 * (1) insert strings? - algorithm needs changing
+	 * (2) ignore them? - again, could require a realloc, since size would
+	 *                    change
+	 */
+	if (!v) break;
+	if (v->type == T_NUMBER && v->u.number != 0) *p = ((unsigned char)(v->u.number));
+    }
+
+    pop_n_elems(num_arg - 1);
+    /* return value on stack */
 }
 #endif
 
@@ -1204,8 +1282,7 @@ INLINE static struct svalue *alist_sort P1(struct vector *, inlist) {
 
     if (!(size = inlist->size)) return (struct svalue *)NULL;
     if (flag = (inlist->ref > 1)) {
-	sv_tab = (struct svalue *) DXALLOC(sizeof(struct svalue[1]) * size,
-					   12, "alist_sort: sv_tab");
+	sv_tab = CALLOCATE(size, struct svalue, TAG_TEMPORARY, "alist_sort: sv_tab");
 	sv_ptr = inlist->item;
 	for (j = 0; j < size; j++) {
 	    if (((tmp = (sv_ptr + j))->type & T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
@@ -1256,8 +1333,7 @@ INLINE static struct svalue *alist_sort P1(struct vector *, inlist) {
 	}
     }
 
-    table = (struct svalue *) DXALLOC(sizeof(struct svalue[1]) * size,
-					     13, "alist_sort: table");
+    table = CALLOCATE(size, struct svalue, TAG_TEMPORARY, "alist_sort: table");
 
     for (j = 0; j < size; j++) {
 	table[j] = sv_tab[0];
@@ -1358,10 +1434,10 @@ struct vector *subtract_array P2(struct vector *, minuend, struct vector *, subt
 	FREE((char *)difference);
 	return null_array();
     }
-    difference = (struct vector *) DREALLOC(difference, i = sizeof(struct vector) + sizeof(struct svalue) * (msize - 1), 30, "subtract_array");
+    difference = RESIZE_VECTOR(difference, msize);
     difference->size = msize;
     difference->ref = 1;
-    total_array_size += i;
+    total_array_size += sizeof(struct vector) + sizeof(struct svalue[1]) * (msize - 1);
     num_arrays++;
 #ifndef NO_MUDLIB_STATS
     if (current_object) {
@@ -1376,7 +1452,7 @@ struct vector *subtract_array P2(struct vector *, minuend, struct vector *, subt
 
 struct vector *intersect_array P2(struct vector *, a1, struct vector *, a2) {
     struct vector *a3;
-    int d, l, j, i, a1s = a1->size, a2s = a2->size, flag, sz;
+    int d, l, j, i, a1s = a1->size, a2s = a2->size, flag;
     struct svalue *svt_1, *ntab, *sv_tab, *sv_ptr, val, *tmp;
     int curix, parix, child1, child2;
     
@@ -1388,8 +1464,7 @@ struct vector *intersect_array P2(struct vector *, a1, struct vector *, a2) {
 
     svt_1 = alist_sort(a1);
     if (flag = (a2->ref > 1)) {
-	sv_tab = (struct svalue *) DXALLOC(sizeof(struct svalue[1]) * a2s,
-					   16, "intersect_array: sv2_tab");
+	sv_tab = CALLOCATE(a2s, struct svalue, TAG_TEMPORARY, "intersect_array: sv2_tab");
 	sv_ptr = a2->item;
 	for (j = 0; j < a2s; j++) {
 	    if (((tmp = (sv_ptr + j))->type & T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
@@ -1510,7 +1585,7 @@ struct vector *intersect_array P2(struct vector *, a1, struct vector *, a2) {
 	total_array_size -= sizeof(struct vector) + sizeof(struct svalue) * (a2s - 1);
 	FREE((char *) a2);
     }
-    a3 = (struct vector *) DREALLOC(a3, i = sizeof(struct vector) + (l-1) * sizeof(struct svalue), 31, "intersect_array");
+    a3 = RESIZE_VECTOR(a3, l);
     a3->ref = 1;
     a3->size = l;
 #ifndef NO_MUDLIB_STATS
@@ -1519,7 +1594,7 @@ struct vector *intersect_array P2(struct vector *, a1, struct vector *, a2) {
 	add_array_size(&a3->stats, l);
     } else null_stats(&a3->stats);
 #endif
-    total_array_size += i;
+    total_array_size += sizeof(struct vector) + (l-1) * sizeof(struct svalue);
     num_arrays++;
     return a3;
 }
@@ -1527,36 +1602,52 @@ struct vector *intersect_array P2(struct vector *, a1, struct vector *, a2) {
 struct vector *match_regexp P3(struct vector *, v, char *, pattern, int, flag) {
     struct regexp *reg;
     char *res;
-    int i, num_match, size, match = !(flag & 2);
+    int num_match, size, match = !(flag & 2);
     struct vector *ret;
-    
+    struct svalue *sv1, *sv2;
+
     if (!(size = v->size)) return null_array();
     reg = regcomp(pattern, 0);
-    if (reg == 0)
-	return 0;
-    res = (char *)DMALLOC(size, 14, "match_regexp: res");
-    for (num_match = i = 0; i < size; i++) {
-	res[i] = 0;
-	if (!(v->item[i].type & T_STRING))
-	    continue;
-
-	if (regexec(reg, v->item[i].u.string) == match){
-	    res[i] = 1;
+    if (!reg) return 0;
+    res = (char *)DMALLOC(size, TAG_TEMPORARY, "match_regexp: res");
+    sv1 = v->item + size;
+    num_match = 0;
+    while (size--){
+        if (!((--sv1)->type & T_STRING) || (regexec(reg, sv1->u.string) != match)){
+            res[size] = 0;
+	} else {
+	    res[size] = 1;
 	    num_match++;
 	}
     }
-
+    
     flag &= 1;
     ret = allocate_empty_array(num_match << flag);
-    for (num_match = i = 0; i < size; i++) {
-	if (res[i]) {
-	    if (flag) {
-		ret->item[num_match].type = T_NUMBER;
-		ret->item[num_match].u.number = i + 1;
-		num_match++;
+    sv2 = ret->item + (num_match << flag);
+    size = v->size;
+    while (size--){
+        if (res[size]){
+            if (flag) {
+                (--sv2)->type = T_NUMBER;
+                sv2->u.number = size + 1;
 	    }
-	    assign_svalue_no_free(&ret->item[num_match], &v->item[i]);
-	    num_match++;
+            (--sv2)->type = T_STRING;
+            sv1 = v->item + size;
+            switch(sv1->subtype){
+		case STRING_MALLOC:
+		    sv2->subtype = STRING_MALLOC;
+		    sv2->u.string = string_copy(sv1->u.string, "match_regexp");
+                    break;
+	        case STRING_SHARED:
+                    sv2->subtype = STRING_SHARED;
+                    sv2->u.string = ref_string(sv1->u.string);
+                    break;
+	        case STRING_CONSTANT:
+                    sv2->subtype = STRING_SHARED;
+                    sv2->u.string = make_shared_string(sv1->u.string);
+                    break;
+		}
+            if (!--num_match) break;
 	}
     }
     FREE(res);
@@ -1660,7 +1751,7 @@ struct vector *
 	 * A new writable copy of the name is needed.
 	 */
 	/* (sl - 1) == minus ".c" plus "\0" */
-	p = (char *) DMALLOC(sl - 1, 15, "children: p");
+	p = (char *) DMALLOC(sl - 1, TAG_TEMPORARY, "children: p");
 	strncpy(p, str, sl - 2);
 	p[sl - 2] = '\0';
 	sl -= 2;		/* removed the ".c" */
@@ -1669,7 +1760,7 @@ struct vector *
     }
     if (!(tmp_children = (struct object **)
 	  DMALLOC(sizeof(struct object *) * (t_sz = 50),
-		  16, "children: tmp_children"))) {
+		  TAG_TEMPORARY, "children: tmp_children"))) {
 	if (needs_freed)
 	    FREE(str);
 	return null_array();	/* unable to malloc enough temp space */
@@ -1687,9 +1778,8 @@ struct vector *
 	    }
 	    tmp_children[i] = ob;
 	    if ((++i == t_sz) && (!(tmp_children
-			= (struct object **) DREALLOC((void *) tmp_children,
-			      sizeof(struct object *) * (t_sz += 50),
-			      17, "children: tmp_children: realloc")))) {
+			= RESIZE(tmp_children, (t_sz += 50), struct object *,
+				 TAG_TEMPORARY, "children: tmp_children: realloc")))) {
 		/* unable to REALLOC more space 
 		 * (tmp_children is now NULL) */
 		if (needs_freed)
@@ -1724,8 +1814,7 @@ struct vector *
     nob = 0;
     apply_valid_hide = 1;
 
-    obtab = (struct object **)
-	DMALLOC(max_array_size * sizeof(struct object **), 18, "livings");
+    obtab = CALLOCATE(max_array_size, struct object *, TAG_TEMPORARY, "livings");
 
     for (ob = obj_list; ob != NULL; ob = ob->next_all) {
 	if ((ob->flags & O_ENABLE_COMMANDS) == 0)
@@ -1769,8 +1858,7 @@ void f_objects PROT((void))
     else if (sp->type & T_FUNCTION) f = sp->u.fp;
     else func = sp->u.string;
 	
-    if (!(tmp = (struct object **) DMALLOC(sizeof(struct object *) * (t_sz = 1000),
-					   16, "objects: tmp")))
+    if (!(tmp = CALLOCATE(t_sz = 1000, struct object *, TAG_TEMPORARY, "objects: tmp")))
 	fatal("Out of memory!\n");
 
     /* disguise DMALLOC()'d vector */
@@ -1809,9 +1897,8 @@ void f_objects PROT((void))
 
 	tmp[i] = ob;
 	if (++i == t_sz) {
-	    if (!(tmp = (struct object **) DREALLOC((void *) tmp,
-				   sizeof(struct object *) * (t_sz += 1000),
-					      17, "objects: tmp: realloc")))
+	    if (!(tmp = RESIZE(tmp, t_sz += 1000, struct object *,
+			       TAG_TEMPORARY, "objects: tmp: realloc")))
 		fatal("Out of memory!\n");
 	    else
 		sp->u.string = (char *) tmp;
@@ -1847,7 +1934,7 @@ void f_objects PROT((void))
  *
  */
 struct vector *reg_assoc P4(char *, str, struct vector *, pat, struct vector *, tok, struct svalue *, def) {
-    int i, j, size;
+    int i, size;
     char *tmp;
     struct vector *ret;
     
@@ -1869,16 +1956,17 @@ struct vector *reg_assoc P4(char *, str, struct vector *, pat, struct vector *, 
 	    struct reg_match *next;
  	} *rmp = (struct reg_match *) 0, *rmph = (struct reg_match *) 0;
 	int num_match = 0, length;
-	struct vector *matches, *tokens;
 	struct svalue *sv1, *sv2, *sv;
- 	int flag, index;
+ 	int index;
 	struct regexp *tmpreg;
  	char *laststart, *currstart;
  
-	rgpp = (struct regexp **) DXALLOC(sizeof(struct regexp *) * size,
-					  18, "reg_assoc : rgpp");
+	rgpp = CALLOCATE(size, struct regexp *, TAG_TEMPORARY, "reg_assoc : rgpp");
 	for (i = 0; i < size; i++){
-             rgpp[i] = regcomp(pat->item[i].u.string, 0);
+             if (!(rgpp[i] = regcomp(pat->item[i].u.string, 0))){
+	       FREE((char *) rgpp);
+	       return null_array();
+	     }
  	}
  
          tmp = str;
@@ -1908,15 +1996,13 @@ struct vector *reg_assoc P4(char *, str, struct vector *, pat, struct vector *, 
             if (index >= 0){
                  num_match++;
                  if (rmp){
-                     rmp->next =
-                         (struct reg_match *) DMALLOC(sizeof(struct reg_match),
-                                                      19, "reg_assoc : rmp->next");
+		     rmp->next = ALLOCATE(struct reg_match, 
+					  TAG_TEMPORARY, "reg_assoc : rmp->next");
                      rmp = rmp->next;
  		}
                  else rmph = rmp =
-                             (struct reg_match *) DMALLOC(sizeof(struct reg_match),
-                                                          20, "reg_assoc : rmp");
- 		tmpreg = rgpp[index];
+		     ALLOCATE(struct reg_match, TAG_TEMPORARY, "reg_assoc : rmp");
+		 tmpreg = rgpp[index];
                  rmp->begin = tmpreg->startp[0];
                  rmp->end = tmp = tmpreg->endp[0];
                  rmp->tok_i = index; 
@@ -1948,7 +2034,7 @@ struct vector *reg_assoc P4(char *, str, struct vector *, pat, struct vector *, 
 	    sv1->type = T_STRING;
             sv1->subtype = STRING_MALLOC;
 	    svtmp = sv1->u.string =
-		(char *) DXALLOC(length + 1, 21, "reg_assoc : sv1");
+		(char *) DXALLOC(length + 1, TAG_STRING, "reg_assoc : sv1");
 	    strncpy(svtmp, tmp, length);
 	    svtmp[length] = 0;
 	    sv1++;
@@ -1958,7 +2044,7 @@ struct vector *reg_assoc P4(char *, str, struct vector *, pat, struct vector *, 
 	    sv1->type = T_STRING;
 	    sv1->subtype = STRING_MALLOC;
 	    svtmp = sv1->u.string =
-		(char *) DXALLOC(length + 1, 22, "reg_assoc : sv1");
+		(char *) DXALLOC(length + 1, TAG_STRING, "reg_assoc : sv1");
 	    strncpy(svtmp, tmp, length);
 	    svtmp[length] = 0;
 	    sv1++;
@@ -1968,7 +2054,7 @@ struct vector *reg_assoc P4(char *, str, struct vector *, pat, struct vector *, 
 	}
 	sv1->type = T_STRING;
 	sv1->subtype = STRING_MALLOC;
-	sv1->u.string = string_copy(tmp);
+	sv1->u.string = string_copy(tmp, "reg_assoc");
 	assign_svalue_no_free(sv2, def);
 	FREE((char *) rgpp);
 	
@@ -1986,7 +2072,7 @@ struct vector *reg_assoc P4(char *, str, struct vector *, pat, struct vector *, 
          temp = (sv->u.vec = allocate_empty_array(1))->item;
          temp->subtype = STRING_MALLOC;
          temp->type = T_STRING;
-         temp->u.string = string_copy(str);
+         temp->u.string = string_copy(str, "reg_assoc");
          sv = &ret->item[1];
          sv->type = T_POINTER;
          assign_svalue_no_free((sv->u.vec = allocate_empty_array(1))->item, def);

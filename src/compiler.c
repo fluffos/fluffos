@@ -16,6 +16,7 @@
 static void clean_parser PROT((void));
 static void prolog PROT((int, char *));
 static void epilog PROT((void));
+static void show_overload_warnings PROT((void));
 
 #ifdef DEBUG
 int dump_function_table() {
@@ -74,12 +75,18 @@ static short string_idx[0x100];
 unsigned char string_tags[0x20];
 short freed_string;
 
-unsigned short type_of_locals[MAX_LOCAL];
-struct ident_hash_elem *locals[MAX_LOCAL];
+unsigned short *type_of_locals;
+struct ident_hash_elem **locals;
+char *runtime_locals;
 
+unsigned short *type_of_locals_ptr;
+struct ident_hash_elem **locals_ptr;
+char *runtime_locals_ptr;
+
+int locals_size = 0;
+int type_of_locals_size = 0; 
 int current_number_of_locals = 0;
-
-int current_break_stack_need = 0, max_break_stack_need = 0;
+int max_num_locals = 0;
 
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
 unsigned short a_functions_root = (unsigned short) 0xffff;
@@ -97,18 +104,104 @@ char *get_two_types P2(int, type1, int, type2)
     return buff;
 }
 
+void init_locals()
+{
+    type_of_locals = CALLOCATE(MAX_LOCAL,unsigned short, 
+			       TAG_LOCALS, "init_locals:1");
+    locals = CALLOCATE(MAX_LOCAL, struct ident_hash_elem *, 
+		       TAG_LOCALS, "init_locals:2");
+    runtime_locals = CALLOCATE(MAX_LOCAL, char, 
+			       TAG_LOCALS, "init_locals:3");
+    type_of_locals_ptr = type_of_locals;
+    locals_ptr = locals;
+    runtime_locals_ptr = runtime_locals;
+    locals_size = type_of_locals_size = MAX_LOCAL;
+    current_number_of_locals = max_num_locals = 0;
+}
+
 void free_all_local_names()
 {
     int i;
 
     for (i=0; i < current_number_of_locals; i++) {
-	if (locals[i]->dn.local_num != -1)
-	    locals[i]->sem_value--;
-	locals[i]->dn.local_num = -1;
+	locals_ptr[i]->sem_value--;
+	locals_ptr[i]->dn.local_num = -1;
     }
     current_number_of_locals = 0;
-    current_break_stack_need = 0;
-    max_break_stack_need = 0;
+    max_num_locals = 0;
+}
+
+void deactivate_current_locals(){
+    int i;
+
+    for (i = 0; i < current_number_of_locals; i++){
+	runtime_locals_ptr[i] = locals_ptr[i]->dn.local_num;
+	locals_ptr[i]->dn.local_num = -1;
+    }
+}
+
+void reactivate_current_locals(){
+    int i;
+
+    for (i = 0; i < current_number_of_locals; i++){
+	locals_ptr[i]->dn.local_num = runtime_locals_ptr[i];
+	locals_ptr[i]->sem_value++;
+    }
+}
+
+void clean_up_locals()
+{
+    int offset;
+
+    offset = locals_ptr - locals;
+    while (offset--){
+	locals[offset]->sem_value--;
+	locals[offset]->dn.local_num = -1;
+    }
+    current_number_of_locals = 0;
+    max_num_locals = 0;
+    locals_ptr = locals;
+    type_of_locals_ptr = type_of_locals;
+    runtime_locals_ptr = runtime_locals;
+}
+
+void pop_n_locals(int num){
+    while (num--) {
+	locals_ptr[--current_number_of_locals]->sem_value--;
+	locals_ptr[current_number_of_locals]->dn.local_num = -1;
+    }
+}
+
+int add_local_name P2(char *, str, int, type)
+{
+    if (max_num_locals == MAX_LOCAL) {
+	yyerror("Too many local variables");
+	return 0;
+    } else {
+	struct ident_hash_elem *ihe;
+
+	ihe = find_or_add_ident(str,FOA_NEEDS_MALLOC);
+	type_of_locals_ptr[max_num_locals] = type;
+	locals_ptr[current_number_of_locals++] = ihe;
+	if (ihe->dn.local_num == -1)
+	    ihe->sem_value++;
+	return ihe->dn.local_num = max_num_locals++;
+    }
+}
+
+void reallocate_locals(){
+    int offset;
+    offset = type_of_locals_ptr - type_of_locals;
+    type_of_locals = RESIZE(type_of_locals, type_of_locals_size += MAX_LOCAL,
+			    unsigned short, TAG_LOCALS, "reallocate_locals:1");
+    type_of_locals_ptr = type_of_locals + offset;
+    offset = locals_ptr - locals;
+    locals = RESIZE(locals, locals_size, 
+		    struct ident_hash_elem *, TAG_LOCALS, "reallocate_locals:2");
+    locals_ptr = locals + offset;
+    runtime_locals = RESIZE(runtime_locals, locals_size, char,
+			    TAG_LOCALS, "reallocate_locals:3");
+    runtime_locals_ptr = runtime_locals + offset;
 }
 
 /*
@@ -195,12 +288,47 @@ static char *get_inherit_name(int index) {
     int num_inherits = mem_block[A_INHERITS].current_size /
 	sizeof(struct inherit);
     
-    ip = (struct inherit *) mem_block[A_INHERITS].block;
-    for (; num_inherits > 0; ip++, num_inherits--) {
-	if (ip->function_index_offset < index)
-	    return ip->prog->name;
+    ip = (struct inherit *) mem_block[A_INHERITS].block + num_inherits;
+    while (num_inherits--){
+        ip--;
+        if (ip->function_index_offset <= index) return ip->prog->name;
     }
     IF_DEBUG(fatal("dropped off the end of get_inherit_name"));
+}
+
+struct ovlwarn {
+    struct ovlwarn *next;
+    char *func;
+    char *warn;
+} *overload_warnings = 0;
+
+static void remove_overload_warnings P1(char *, func) {
+    struct ovlwarn **p;
+    struct ovlwarn *tmp;
+
+    p = &overload_warnings;
+    while (*p) {
+	if (!func || (*p)->func == func) {
+	    FREE((*p)->warn);
+	    tmp = *p;
+	    *p = (*p)->next;
+	    FREE(tmp);
+	} else
+	    p = &(*p)->next;
+    }
+}
+
+static void show_overload_warnings() {
+    struct ovlwarn *p, *next;
+    p = overload_warnings;
+    while (p) {
+	yywarn(p->warn);
+	FREE(p->warn);
+	next = p->next;
+	FREE(p);
+	p = next;
+    }
+    overload_warnings = 0;
 }
 
 /* Overload the function index with the new definition */
@@ -212,13 +340,9 @@ static struct function *overload_function P3(int, index, struct program *, prog,
     funp = (struct function *)mem_block[A_FUNCTIONS].block + index;
     /* Be careful with nomask; if both functions exists and either is nomask,
        we error.  */
-    if (
-	((funp->type & TYPE_MOD_NO_MASK) && (funp->flags & NAME_DEF_BY_INHERIT)
-	&& (!(new->flags & NAME_NO_CODE)))
-	||
-	((new->type & TYPE_MOD_NO_MASK) && (!(funp->flags & NAME_NO_CODE ||
-				    funp->flags & NAME_DEF_BY_INHERIT)))
-	 ) {
+    if (!(new->flags & NAME_NO_CODE) && REAL_FUNCTION(funp)
+        && ((new->type & TYPE_MOD_NO_MASK) || (funp->type & TYPE_MOD_NO_MASK))
+       ) {
 	char buf[2048];
 	sprintf(buf, "Illegal to redefine 'nomask' function \"%s\"",
 		funp->name);
@@ -227,15 +351,35 @@ static struct function *overload_function P3(int, index, struct program *, prog,
     /* Try to prevent some confusion re: overloading.
      * Warn them about the behavior of inheriting the same function
      * from two branches.
+     * 
+     * Note that we don't want to scream now, b/c if the function is 
+     * overloaded later this becomes irrelevant.
+     *
+     * Note also that this is real spammy if you inherit the same object
+     * twice.  Something should be done about that.
      */
-    if ((funp->flags & NAME_DEF_BY_INHERIT) && !(funp->flags & NAME_NO_CODE)
-	&& !(new->flags & NAME_NO_CODE)) {
-	char buf[1024];
-	char *from1;
-
-	from1 = get_inherit_name(index);
-	sprintf(buf, "%s() inherited from both %s and %s; using the definition in %s.", funp->name, from1, prog->name, prog->name);
-	yywarn(buf);
+    if ((pragmas & PRAGMA_WARNINGS) 
+	&& REAL_FUNCTION(funp) && !(new->flags & NAME_NO_CODE)) {
+	/* don't scream if one is private.  Why not?  Because I said so.
+	 * private is pretty screwed up anyway.  In the future there
+	 * won't be such a clash b/c private won't come up the tree.
+	 * This also give the coder a way to shut the compiler up when
+	 * you do inherit the same object twice in different branches :)
+	 */
+	if (!(funp->type & TYPE_MOD_PRIVATE) && !(new->type & TYPE_MOD_PRIVATE)) {
+	    char buf[1024];
+	    char *from1 ;
+	    struct ovlwarn *ow;
+	    
+	    from1 = ((struct inherit *) mem_block[A_INHERITS].block + funp->offset)->prog->name;
+	    sprintf(buf, "%s() inherited from both %s and %s; using the definition in %s.", funp->name, from1, prog->name, prog->name);
+	
+	    ow = ALLOCATE(struct ovlwarn, TAG_COMPILER, "overload warning");
+	    ow->next = overload_warnings;
+	    ow->func = funp->name;
+	    ow->warn = string_copy(buf, "overload warning");
+	    overload_warnings = ow;
+	}
     }
 
     /* A new function also has to be inserted, since this spot will be
@@ -273,31 +417,29 @@ static struct function *overload_function P3(int, index, struct program *, prog,
  */
 int copy_functions P2(struct program *, from, int, type)
 {
-    int i, initializer = -1;
+    int i, initializer = -1, num_functions = from->p.i.num_functions;
     unsigned short tmp_short;
+    struct function *from_funcs = from->p.i.functions;
+    struct function *funp;
+    int new_type;
+    struct ident_hash_elem *ihe;
+    int num;
 
-    for (i = 0; (unsigned) i < from->p.i.num_functions; i++) {
-	struct function *funp;
-	int new_type;
-	struct ident_hash_elem *ihe;
 
-	if (from->p.i.functions[i].flags & NAME_COLON_COLON) { 
-	    /* we need to propagate this entry up the inherit tree
-	       b/c of the way overloading in implemented */
-	    funp = copy_function(&from->p.i.functions[i], 0);
-	    funp->flags |= NAME_INHERITED;
-	} else {
-	    int num;
+    if (num_functions && (*from_funcs[num_functions-1].name == APPLY___INIT_SPECIAL_CHAR)){
+        initializer = --num_functions;
+    }
+	
+    for (i = 0; i < num_functions; i++) {
 	    
-	    ihe = lookup_ident(from->p.i.functions[i].name);
-	    if (ihe && ((num = ihe->dn.function_num)!=-1)) {
-		/* The function has already been defined in this object */
-		funp = overload_function(num, from, i);
-	    } else {
-		funp = copy_function(&from->p.i.functions[i], 1);
-		/* the function hasn't been defined at this level yet */
-		funp->flags |= NAME_UNDEFINED;
-	    }
+	ihe = lookup_ident(from_funcs[i].name);
+	if (ihe && ((num = ihe->dn.function_num)!=-1)) {
+	  /* The function has already been defined in this object */
+	  funp = overload_function(num, from, i);
+	} else {
+	  funp = copy_function(&from_funcs[i], 1);
+	  /* the function hasn't been defined at this level yet */
+	  funp->flags |= NAME_UNDEFINED;
 	}
 
 	if (funp) {
@@ -320,9 +462,6 @@ int copy_functions P2(struct program *, from, int, type)
 	    if (funp->type & TYPE_MOD_PUBLIC)
 		new_type &= ~TYPE_MOD_PRIVATE;
 	    funp->type |= new_type;
-
-	    if (strcmp(funp->name, APPLY___INIT) == 0)
-		initializer = i;
 	}
 
 	/* Beek - some of this stuff below belongs above where we decide
@@ -338,19 +477,15 @@ int copy_functions P2(struct program *, from, int, type)
 	 */
 	tmp_short = INDEX_START_NONE;	/* Presume not available. */
 	if (from->p.i.type_start != 0 && from->p.i.type_start[i] != INDEX_START_NONE) {
-	    int arg;
-	    
 	    /*
 	     * They are available for function number 'i'. Copy types of
 	     * all arguments, and remember where they started.
 	     */
 	    tmp_short = mem_block[A_ARGUMENT_TYPES].current_size /
 		sizeof from->p.i.argument_types[0];
-	    for (arg = 0; (unsigned) arg < from->p.i.functions[i].num_arg; arg++) {
-		add_to_mem_block(A_ARGUMENT_TYPES,
-				 (char *) &from->p.i.argument_types[from->p.i.type_start[i]],
-				 sizeof(unsigned short));
-	    }
+	    add_to_mem_block(A_ARGUMENT_TYPES, 
+			     (char *) &from->p.i.argument_types[from->p.i.type_start[i]],
+			     sizeof(unsigned short) * from->p.i.functions[i].num_arg);
 	}
 	/*
 	 * Save the index where they started. Every function will have an
@@ -417,21 +552,20 @@ int compatible_types P2(int, t1, int, t2)
  *
  * Note: this function is now only used for resolving :: references
  */
-void find_inherited P1(struct function *, funp)
+void arrange_call_inherited P2(char *, name, struct parse_node *, node)
 {
     int i;
     struct inherit *ip;
     int num_inherits, super_length = 0;
-    char *real_name, *super_name = 0, *p;
+    char *super_name = 0, *p, *real_name = name;
     char *shared_string;
 
-    real_name = funp->name;
     if (real_name[0] == ':')
-	real_name = real_name + 2;	/* There will be exactly two ':' */
+	real_name += 2; 	/* There will be exactly two ':' */
     else if ((p = strchr(real_name, ':'))) {
-	real_name = p + 2;
-	super_name = funp->name;
-	super_length = real_name - super_name - 2;
+        super_name = name;
+        real_name = p+2;
+        super_length = real_name - super_name - 2;
     }
     num_inherits = mem_block[A_INHERITS].current_size /
 	sizeof(struct inherit);
@@ -444,9 +578,11 @@ void find_inherited P1(struct function *, funp)
 
 		if (l - 2 < super_length)
 		    continue;
-		if (strncmp(super_name, ip->prog->name + l - 2 - super_length,
-			    super_length) != 0)
-		    continue;
+		if (strncmp(super_name, ip->prog->name + l - 2 -super_length,
+			    super_length) != 0 ||
+                    !((l - 2 == super_length) ||
+                     ((ip->prog->name + l - 3 - super_length)[0] == '/')))
+                    continue;
 	    }
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
 	    i = lookup_function(ip->prog->p.i.functions,
@@ -457,21 +593,25 @@ void find_inherited P1(struct function *, funp)
 	    for (i = 0; (unsigned) i < ip->prog->p.i.num_functions; i++) {
 		if (ip->prog->p.i.functions[i].flags & NAME_UNDEFINED)
 		    continue;
-		/* can use pointer compare because both are shared */
+		    /* can use pointer compare because both are shared */
 		if (ip->prog->p.i.functions[i].name != shared_string)
 		    continue;
 #endif
-		funp->offset = ip - (struct inherit *) mem_block[A_INHERITS].block;
-		funp->flags = NAME_INHERITED | NAME_COLON_COLON |
-		    (ip->prog->p.i.functions[i].flags & NAME_MASK);
-		funp->num_local = ip->prog->p.i.functions[i].num_local;
-		funp->num_arg = ip->prog->p.i.functions[i].num_arg;
-		funp->type = ip->prog->p.i.functions[i].type;
-		funp->function_index_offset = i;
+		node->kind = F_CALL_INHERITED;
+	        node->v.number = (ip - (struct inherit *) mem_block[A_INHERITS].block) | (i << 8);
+		node->type = ip->prog->p.i.functions[i].type;
 		return;
 	    }
 	}
     }				/* if in shared string table */
+    {
+	char buff[MAXLINE + 30];
+	sprintf(buff, "No such inherited function %.50s", name);
+	yyerror(buff);
+	node->kind = F_CALL_INHERITED;
+	node->v.number = 0;
+	node->type = TYPE_ANY;
+    }
 }
 
 /*
@@ -549,6 +689,10 @@ int define_new_function P6(char *, name, int, num_arg, int, num_local,
 	if (flags & NAME_PROTOTYPE) {
 	    return num;
 	}
+
+	if (pragmas & PRAGMA_WARNINGS)
+	    remove_overload_warnings(funp->name);
+	
 	funp->num_arg = num_arg;
 	funp->num_local = num_local;
 	funp->flags = flags;
@@ -594,8 +738,9 @@ int define_new_function P6(char *, name, int, num_arg, int, num_local,
 	    mem_block[A_ARGUMENT_TYPES].current_size /
 	    sizeof(unsigned short);
 	for (i = 0; i < num_arg; i++) {
-	    add_to_mem_block(A_ARGUMENT_TYPES, (char *) &type_of_locals[i],
-			     sizeof type_of_locals[i]);
+	    add_to_mem_block(A_ARGUMENT_TYPES, 
+			     (char *) &type_of_locals_ptr[i],
+			     sizeof type_of_locals_ptr[i]);
 	}
     }
     add_to_mem_block(A_ARGUMENT_INDEX, (char *) &argument_start_index,
@@ -696,7 +841,7 @@ short store_prog_string P1(char *, str)
     mask = 1 << (hash & 7);
     tagp = &string_tags[hash >> 3];
 
-    p = (char **) mem_block[A_STRINGS].block;
+    p = (char **)&PROG_STRING(0);
     next_tab = (short *) mem_block[A_STRING_NEXT].block;
 
     if (*tagp & mask) {
@@ -740,7 +885,7 @@ short store_prog_string P1(char *, str)
 	/* test if number of strings isn't too large ? */
 	i = mem_block[A_STRINGS].current_size / sizeof str - 1;
     }
-    ((char **) mem_block[A_STRINGS].block)[i] = str;
+    PROG_STRING(i) = str;
     ((short *) mem_block[A_STRING_NEXT].block)[i] = next;
     ((short *) mem_block[A_STRING_REFS].block)[i] = 1;
     *idxp = i;
@@ -980,24 +1125,6 @@ void yywarn P1(char *, str) {
     smart_log(current_file, current_line, str, 1);
 }
 
-int add_local_name P2(char *, str, int, type)
-{
-    if (current_number_of_locals == MAX_LOCAL) {
-	yyerror("Too many local variables");
-	return 0;
-    } else {
-	struct ident_hash_elem *ihe;
-
-	ihe = find_or_add_ident(str,FOA_NEEDS_MALLOC);
-	type_of_locals[current_number_of_locals] = type;
-	locals[current_number_of_locals] = ihe;
-	if (ihe->dn.local_num == -1)
-	    ihe->sem_value++;
-	ihe->dn.local_num = current_number_of_locals;
-	return (current_number_of_locals++);
-    }
-}
-
 /*
  * Compile an LPC file.
  */
@@ -1029,13 +1156,20 @@ static void epilog() {
     release_tree();
     
     if (num_parse_error > 0 || inherit_file) {
+	/* don't print these; they can be wrong, since we didn't parse the
+	   entire file */
+	if (pragmas & PRAGMA_WARNINGS)
+	    remove_overload_warnings(0);
 	clean_parser();
 	end_new_file();
-	FREE(current_file);
+	free_string(current_file);
 	current_file = 0;
 	return;
     }
 
+    if (pragmas & PRAGMA_WARNINGS)
+	show_overload_warnings();
+    
     /*
      * Define the __INIT function, but only if there was any code
      * to initialize.
@@ -1049,12 +1183,9 @@ static void epilog() {
 	CREATE_NODE(pn, F_RETURN);
 	CREATE_NODE(pn->right, F_CONST0);
 	generate(pn);
-	/* NAME_COLON_COLON makes it get copied correctly and not show
-	 * up in the symbol table of the object that inherits us.
-	 */
-	define_new_function(APPLY___INIT, 0, 0, 0, 
-			    NAME_COLON_COLON | NAME_STRICT_TYPES, 
-			    TYPE_VOID | TYPE_MOD_PRIVATE);
+	end_initializer();
+	define_new_function(APPLY___INIT, 0, 0, CURRENT_PROGRAM_SIZE,
+			    NAME_STRICT_TYPES, TYPE_VOID | TYPE_MOD_PRIVATE);
 	generate___INIT();
     }
 
@@ -1087,7 +1218,7 @@ static void epilog() {
 
     ihe = lookup_ident("heart_beat");
 
-    p = (char *)DXALLOC(size, 56, "epilog: 1");
+    p = (char *)DXALLOC(size, TAG_PROGRAM, "epilog: 1");
     prog = (struct program *)p;
     *prog = NULL_program;
     prog->p.i.total_size = size;
@@ -1107,7 +1238,8 @@ static void epilog() {
     lnoff = 2 + (mem_block[A_FILE_INFO].current_size / sizeof(short));
     lnsz = lnoff * sizeof(short) + mem_block[A_LINENUMBERS].current_size;
 
-    prog->p.i.file_info = (unsigned short *) XALLOC(lnsz);
+    prog->p.i.file_info = (unsigned short *)DXALLOC(lnsz, TAG_LINENUMBERS
+						    , "epilog");
     prog->p.i.file_info[0] = (unsigned short)lnsz;
     prog->p.i.file_info[1] = (unsigned short)lnoff;
 
@@ -1213,7 +1345,7 @@ static void prolog P2(int, f, char *, name) {
     approved_object = 0;
     prog = 0;   /* 0 means fail to load. */
     num_parse_error = 0;
-    free_all_local_names();     /* In case of earlier error */
+    clean_up_locals();     /* In case of earlier error */
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
     a_functions_root = (unsigned short)0xffff;
 #endif
@@ -1221,7 +1353,7 @@ static void prolog P2(int, f, char *, name) {
      * will be stored.
      */
     for (i=0; i < NUMAREAS; i++) {
-	mem_block[i].block = DXALLOC(START_BLOCK_SIZE, 58, "prolog: 2");
+	mem_block[i].block = DXALLOC(START_BLOCK_SIZE, TAG_COMPILER, "prolog: 2");
 	mem_block[i].current_size = 0;
 	mem_block[i].max_size = START_BLOCK_SIZE;
     }
@@ -1229,7 +1361,7 @@ static void prolog P2(int, f, char *, name) {
     freed_string = -1;
     initialize_parser();
 
-    current_file = string_copy(name);
+    current_file = make_shared_string(name);
     current_file_id = add_program_file(name, 1);
     start_new_file(f);
 }
@@ -1275,11 +1407,11 @@ the_file_name P1(char *, name)
 
     len = strlen(name);
     if (len < 3) {
-	return string_copy(name);
+	return string_copy(name, "the_file_name");
     }
-    tmp = (char *)DXALLOC(len, 59, "the_file_name");
+    tmp = (char *)DXALLOC(len, TAG_STRING, "the_file_name");
     if (!tmp) {
-	return string_copy(name);
+	return string_copy(name, "the_file_name");
     }
     tmp[0] = '/';
     strncpy(tmp + 1, name, len - 2);
@@ -1351,8 +1483,8 @@ void prepare_cases P2(struct parse_node *, pn, int, start) {
 	    translate_absolute_line((*(ce-1))->line, 
 				    (unsigned short *)mem_block[A_FILE_INFO].block,
 				    &fi2, &l2);
-	    f1 = ((char **)mem_block[A_STRINGS].block)[fi1];
-	    f2 = ((char **)mem_block[A_STRINGS].block)[fi2];
+	    f1 = PROG_STRING(fi1);
+	    f2 = PROG_STRING(fi2);
 
 	    sprintf(buf, "Overlapping cases: %s%s%d and %s%s%d.",
 		    f1 ? f1 : "", f1 ? ":" : "line ", l1,

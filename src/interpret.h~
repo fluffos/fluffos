@@ -214,7 +214,6 @@ struct error_context_stack {
 #define free_svalue(x,y) int_free_svalue(x)
 #endif
 
-#define push_svalue(x) assign_svalue_no_free(++sp, x)
 #define put_number(x) do { sp->type = T_NUMBER;sp->subtype = 0;sp->u.number = (x); } while (0)
 #define put_buffer(x) do { sp->type = T_BUFFER; sp->u.buf = (x); } while (0)
 #define put_undested_object(x) do { sp->type = T_OBJECT; sp->u.ob = (x); } while (0)

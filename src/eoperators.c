@@ -142,6 +142,20 @@ f_eq()
 	    break;
 	}
 	
+    case T_FUNCTION:
+	{
+	    i = (sp-1)->u.fp == sp->u.fp;
+	    free_funp((sp--)->u.fp);
+	    free_funp(sp->u.fp);
+	    break;
+	}
+    case T_BUFFER:
+	{
+	    i = (sp-1)->u.buf == sp->u.buf;
+	    free_buffer((sp--)->u.buf);
+	    free_buffer(sp->u.buf);
+	    break;
+	}
     default:
 	pop_stack();
 	free_svalue(sp, "f_eq");
@@ -302,6 +316,22 @@ f_ne()
             break;
 	}
 
+    case T_FUNCTION:
+        {
+            i = (sp-1)->u.fp != sp->u.fp;
+	    free_funp((sp--)->u.fp);
+	    free_funp(sp->u.fp);
+            break;
+	}
+
+    case T_BUFFER:
+        {
+            i = (sp-1)->u.buf != sp->u.buf;
+	    free_buffer((sp--)->u.buf);
+	    free_buffer(sp->u.buf);
+            break;
+	}
+
     default:
 	pop_stack();
 	free_svalue(sp, "f_ne");
@@ -394,88 +424,167 @@ f_parse_command()
 }
 
 INLINE void
-f_range()
+f_range(int code)
 {
-    if (sp[-1].type != T_NUMBER)
-	error("Start of range [ .. ] interval must be a number.\n");
-    if (sp[0].type != T_NUMBER)
-	error("End of range [ .. ] interval must be a number.\n");
-    if (sp[-2].type == T_STRING) {
-	int len, from, to;
-	char *res;
+    int from, to, len;
 
-	len = strlen(sp[-2].u.string);
-	from = sp[-1].u.number;
-	if (from < 0)
-	    from = len + from;
-	if (from < 0)
-	    from = 0;
-	if (from >= len) {
-	    pop_3_elems();
-	    push_string("", STRING_CONSTANT);
-	    return;
-	}
-	to = sp[0].u.number;
-	if (to < 0)
-	    to = len + to;
-	if (to < 0)
-	    to = 0;
-	if (to < from) {
-	    pop_3_elems();
-	    push_string("", STRING_CONSTANT);
-	    return;
-	}
-	if (to >= len)
-	    to = len - 1;
-	if (to == len - 1) {
-	    res = string_copy(sp[-2].u.string + from);
-	    pop_3_elems();
-	    push_malloced_string(res);
-	    return;
-	}
-	res = DXALLOC(to - from + 2, 37, "f_range");
-	strncpy(res, sp[-2].u.string + from, to - from + 1);
-	res[to - from + 1] = '\0';
-	pop_3_elems();
-	push_malloced_string(res);
-    } else if (sp[-2].type == T_BUFFER) {
-	int len, from, to;
-	struct buffer *rbuf;
+    if ((sp-2)->type != T_NUMBER)
+        error("Start of range [ .. ] interval must be a number.\n");
+    if ((sp-1)->type != T_NUMBER)
+        error("End of range [ .. ] interval must be a number.\n");
 
-	len = sp[-2].u.buf->size;
-	from = sp[-1].u.number;
-	if (from < 0)
-	    from = len + from;
-	if (from >= len) {
-	    pop_3_elems();
-	    push_buffer(null_buffer());
-	    return;
-	}
-	to = sp[0].u.number;
-	if (to < 0)
-	    to = len + to;
-	if (to < from) {
-	    pop_3_elems();
-	    push_buffer(null_buffer());
-	    return;
-	}
-	if (to >= len)
-	    to = len - 1;
-	rbuf = allocate_buffer(to - from + 1);
-	memcpy(rbuf->item, sp[-2].u.buf->item + from, to - from + 1);
-	pop_3_elems();
-	push_refed_buffer(rbuf);
-    } else if (sp[-2].type == T_POINTER) {
-	struct vector *v;
+    switch(sp->type){
+        case T_STRING:
+        {
+            char *res = sp->u.string;
 
-	v = slice_array(sp[-2].u.vec, sp[-1].u.number, sp[0].u.number);
-	pop_3_elems();
-	if (v) {
-	    push_refed_vector(v);
-	} else
-	    push_number(0);
-    } else
-	error("Bad argument to [ .. ] range operator.\n");
+            len = SVALUE_STRLEN(sp);
+            to = (--sp)->u.number;
+            if (code & 0x01) to = len - to;
+#ifdef OLD_RANGE_BEHAVIOR
+            if (to < 0) to += len;
+#endif
+            from = (--sp)->u.number;
+            if (code & 0x10) from = len - from;
+#ifdef OLD_RANGE_BEHAVIOR
+            if (from < 0){
+                if ((from += len) < 0) from = 0;
+            }
+#else
+            if (from < 0) from = 0;
+#endif
+            if (to < from || from >= len){
+                free_string_svalue(sp+2);
+                put_constant_string("");
+                return;
+            }
+
+            if (to >= len - 1){
+                put_malloced_string(string_copy(res + from, "f_range"));
+            } else {
+                char *tmp;
+                tmp = DXALLOC(to - from + 2, TAG_STRING, "f_range");
+                strncpy(tmp, res + from, to - from + 1);
+                tmp[to - from + 1] = '\0';
+                put_malloced_string(tmp);
+            }
+            free_string_svalue(sp + 2);
+            break;
+        }
+        case T_BUFFER:
+        {
+            struct buffer *rbuf = sp->u.buf;
+
+            len = rbuf->size;
+            to = (--sp)->u.number;
+            if (code & 0x01) to = len - to;
+#ifdef OLD_RANGE_BEHAVIOR
+            if (to < 0) to += len;
+#endif
+            from = (--sp)->u.number;
+            if (code & 0x10) from = len - from;
+#ifdef OLD_RANGE_BEHAVIOR
+            if (from < 0){
+                if ((from += len) < 0) from = 0;
+            }
+#else
+            if (from < 0) from = 0;
+#endif
+            if (to < from || from >= len){
+                free_buffer(rbuf);
+                put_buffer(null_buffer());
+                return;
+            }
+            if (to >= len) to = len - 1;
+            {
+                struct buffer *nbuf = allocate_buffer(to - from + 1);
+                memcpy(nbuf->item, rbuf->item + from, to - from + 1);
+                free_buffer(rbuf);
+                put_buffer(nbuf);
+            }
+            break;
+        }
+
+        case T_POINTER:
+        {
+            struct vector *v = sp->u.vec;
+            to = (--sp)->u.number;
+            if (code & 0x01) to = v->size - to;
+            from = (--sp)->u.number;
+            if (code & 0x10) from = v->size - from;
+            put_vector(slice_array(v, from, to));
+            free_vector(v);
+            break;
+        }
+
+        default:
+            error("Bad argument to [ .. ] range operator.\n");
+    }
+}
+
+INLINE void
+f_extract_range(int code)
+{
+    int from,  len;
+
+    if ((sp-1)->type != T_NUMBER)
+        error("Start of range [ .. ] interval must be a number.\n");
+
+    switch(sp->type){
+        case T_STRING:
+        {
+            char *res = sp->u.string;
+
+            len = SVALUE_STRLEN(sp);
+            from = (--sp)->u.number;
+            if (code) from = len - from;
+#ifdef OLD_RANGE_BEHAVIOR
+            if (from < 0){
+                if ((from += len) < 0) from = 0;
+            }
+#else
+            if (from < 0) from = 0;
+#endif
+            put_malloced_string(string_copy(res + from, "f_extract_range"));
+            free_string_svalue(sp + 1);
+            break;
+        }
+        case T_BUFFER:
+        {
+            struct buffer *rbuf = sp->u.buf;
+            struct buffer *nbuf;
+
+
+            len = rbuf->size;
+            from = (--sp)->u.number;
+            if (code) from = len - from;
+#ifdef OLD_RANGE_BEHAVIOR
+            if (from < 0){
+                if ((from += len) < 0) from = 0;
+            }
+#else
+            if (from < 0) from = 0;
+#endif
+            nbuf = allocate_buffer(len - from);
+            memcpy(nbuf->item, rbuf->item + from, len - from);
+            free_buffer(rbuf);
+            put_buffer(nbuf);
+            break;
+        }
+
+        case T_POINTER:
+        {
+            struct vector *v = sp->u.vec;
+            from = (--sp)->u.number;
+            if (code) from = v->size - from;
+            put_vector(slice_array(v, from, v->size - 1));
+            free_vector(v);
+            break;
+        }
+
+        default:
+            error("Bad argument to [ .. ] range operator.\n");
+    }
 }
 
 INLINE void
@@ -604,7 +713,9 @@ f_switch()
 
     COPY_SHORT(&offset, pc + SW_TABLE);
     COPY_SHORT(&break_adr, pc + SW_BREAK);
-    *--break_sp = break_adr;
+    if (--break_sp == start_of_switch_stack) fatal("Switch stack underflow!\n"\
+);
+    *break_sp = break_adr;
     if ((i = EXTRACT_UCHAR(pc) >> 4) != 0xf) {	/* String table, find correct
 						 * key */
 	if (sp->type == T_NUMBER && !sp->u.number) {
@@ -770,7 +881,6 @@ void
 call_simul_efun P2(unsigned short, index, int, num_arg)
 {
     /* prevent recursion */
-    static loading = 0;
     struct function *funp;
     extern struct object *simul_efun_ob;
     extern char *simul_efun_file_name;
@@ -802,7 +912,7 @@ call_simul_efun P2(unsigned short, index, int, num_arg)
 	if (simul_efun_ob->flags & O_SWAPPED)
 	    load_ob_from_swap(simul_efun_ob);
 	simul_efun_ob->time_of_ref = current_time;
-	push_control_stack(simuls[index]);
+	push_control_stack(FRAME_FUNCTION, simuls[index]);
 	caller_type = ORIGIN_SIMUL_EFUN;
 	csp->num_local_variables = num_arg;
 	current_prog = simul_efun_ob->prog;
@@ -853,7 +963,7 @@ make_efun_funp P2(int, opcode, svalue *, args)
     struct funp *fp;
     int i=0;
     
-    fp = (struct funp *)DMALLOC(sizeof(struct funp), 38, "make_efun_funp");
+    fp = ALLOCATE(struct funp, TAG_FUNP, "make_efun_funp");
     fp->owner = current_object;
     add_ref( current_object, "make_efun_funp" );
     fp->type = ORIGIN_EFUN;
@@ -888,7 +998,7 @@ make_lfun_funp P2(int, index, svalue *, args)
 {
     struct funp *fp;
     
-    fp = (struct funp *)DMALLOC(sizeof(struct funp), 38, "make_efun_funp");
+    fp = ALLOCATE(struct funp, TAG_FUNP, "make_efun_funp");
     fp->owner = current_object;
     add_ref( current_object, "make_efun_funp" );
     fp->type = ORIGIN_LOCAL;
@@ -909,7 +1019,7 @@ make_simul_funp P2(int, index, svalue *, args)
 {
     struct funp *fp;
     
-    fp = (struct funp *)DMALLOC(sizeof(struct funp), 38, "make_efun_funp");
+    fp = ALLOCATE(struct funp, TAG_FUNP, "make_efun_funp");
     fp->owner = current_object;
     add_ref( current_object, "make_efun_funp" );
     fp->type = ORIGIN_SIMUL_EFUN;
@@ -926,19 +1036,28 @@ make_simul_funp P2(int, index, svalue *, args)
 }
 
 INLINE struct funp *
-make_functional_funp P2(short, num_arg, short, len)
+make_functional_funp P4(short, num_arg, short, num_local, short, len, svalue *, args)
 {
     struct funp *fp;
     
-    fp = (struct funp *)DMALLOC(sizeof(struct funp), 38, "make_functional_funp");
+    fp = ALLOCATE(struct funp, TAG_FUNP, "make_functional_funp");
     fp->owner = current_object;
     add_ref( current_object, "make_functional_funp" );
     fp->type = ORIGIN_FUNCTIONAL;
     
-    fp->f.a.start = pc;
+    fp->f.a.prog = current_prog;
+    fp->f.a.offset = pc - current_prog->p.i.program;
     fp->f.a.num_args = num_arg;
+    fp->f.a.num_locals = num_local;
     pc += len;
-    fp->args.type = T_NUMBER;
+    
+    if (args) {
+	assign_svalue_no_free(&fp->args, args);
+	if (args->type == T_POINTER)
+	    fp->f.a.num_args += args->u.vec->size;
+    } else
+	fp->args.type = T_NUMBER;
+
     fp->ref = 1;
     return fp;
 }
@@ -949,7 +1068,7 @@ make_funp P2(struct svalue *,sobj, struct svalue *,sfun)
 {
     struct funp *fp;
     
-    fp = (struct funp *)DMALLOC(sizeof(struct funp), 38, "make_funp");
+    fp = ALLOCATE(struct funp, TAG_FUNP, "make_funp");
 #ifdef NEW_FUNCTIONS
     fp->owner = current_object;
     add_ref( current_object, "make_funp" );
@@ -1019,14 +1138,12 @@ f_function_constructor()
     int kind;
     unsigned short index;
 
-    kind = EXTRACT_UCHAR(pc);
-    pc++;
+    kind = EXTRACT_UCHAR(pc++);
 
     switch (kind) {
 #ifdef NEW_FUNCTIONS
     case ORIGIN_EFUN:
-	kind = EXTRACT_UCHAR(pc);
-	pc++;
+	kind = EXTRACT_UCHAR(pc++);
 #ifdef NEEDS_CALL_EXTRA
 	if (kind == F_CALL_EXTRA) {
 	    kind = EXTRACT_UCHAR(pc) + 0xff;
@@ -1063,8 +1180,19 @@ f_function_constructor()
     case ORIGIN_FUNCTIONAL:
 	kind = EXTRACT_UCHAR(pc++);  /* number of arguments */
 	LOAD_SHORT(index, pc);       /* length of functional */
-	fp = make_functional_funp(kind, index);
+	fp = make_functional_funp(kind, 0, index, sp);
+	pop_stack();
 	break;
+    case ORIGIN_FUNCTIONAL | 1:
+	{
+	    int num_arg, locals;
+	    
+	    num_arg = EXTRACT_UCHAR(pc++);
+	    locals = EXTRACT_UCHAR(pc++);
+	    LOAD_SHORT(index, pc); /* length */
+	    fp = make_functional_funp(num_arg, locals, index, 0);
+	    break;
+	}
 #endif
     default:
 	fatal("Tried to make unknown type of function pointer.\n");

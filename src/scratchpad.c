@@ -163,7 +163,7 @@ char *scratch_large_alloc P1(int, size) {
 
     SDEBUG(printf("scratch_large_alloc(%i)\n", size));
 
-    spt = (struct sp_block_t *)DMALLOC(SIZE_WITH_HDR(size), 0, "scratch_alloc");
+    spt = (struct sp_block_t *)DMALLOC(SIZE_WITH_HDR(size), TAG_COMPILER, "scratch_alloc");
     if (spt->next = scratch_head.next) spt->next->prev = spt;
     spt->prev = (struct sp_block_t *)&scratch_head;
     spt->block[0] = SCRATCH_MAGIC;
@@ -192,10 +192,11 @@ char *scratch_realloc P2(char *, ptr, int, size) {
      } else if (*(Ptr - 2)) {
 	 struct sp_block_t *sbt, *newsbt;
 
-	DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC, "scratch_free realloc on non-scratchpad string.\n");
+	DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC, "scratch_realloc on non-scratchpad string.\n");
 	 SDEBUG(printf("block\n"));
 	 sbt = FIND_HDR(ptr);
-	 newsbt = (struct sp_block_t *)REALLOC(sbt, SIZE_WITH_HDR(size));
+	 newsbt = (struct sp_block_t *)DREALLOC(sbt, SIZE_WITH_HDR(size),
+						TAG_COMPILER, "scratch_realloc");
 	 newsbt->prev->next = newsbt;
 	 if (newsbt->next)
 	     newsbt->next->prev = newsbt;

@@ -1,4 +1,6 @@
 #include "std.h"
+#include "port.h"
+#include "lint.h"
 
 /* for get_cpu_times() */
 #ifdef GET_PROCESS_STATS

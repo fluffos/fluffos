@@ -46,7 +46,7 @@ INLINE void *debugrealloc P4(void *, ptr, int, size, int, tag, char *, desc)
     stats.realloc_calls++;
     tmp = (node_t *) ptr - 1;
     if (MDfree(tmp)) {
-	tmp = (void *) REALLOC(tmp, size + sizeof(node_t));
+	tmp = (void *) REALLOC(tmp, size + MD_OVERHEAD);
 	MDmalloc(tmp, size, tag, desc);
 	return (node_t *) tmp + 1;
     }
@@ -58,7 +58,7 @@ INLINE void *debugmalloc P3(int, size, int, tag, char *, desc)
     void *tmp;
 
     stats.alloc_calls++;
-    tmp = (void *) MALLOC(size + sizeof(node_t));
+    tmp = (void *) MALLOC(size + MD_OVERHEAD);
     MDmalloc(tmp, size, tag, desc);
     NOISY3("malloc: %i (%x), %s\n", size, (node_t *)tmp + 1, desc);
     return (node_t *) tmp + 1;
@@ -69,7 +69,7 @@ INLINE void *debugcalloc P4(int, nitems, int, size, int, tag, char *, desc)
     void *tmp;
 
     stats.alloc_calls++;
-    tmp = (void *) CALLOC(nitems * size + sizeof(node_t), 1);
+    tmp = (void *) CALLOC(nitems * size + MD_OVERHEAD, 1);
     MDmalloc(tmp, nitems * size, tag, desc);
     NOISY3("calloc: %i (%x), %s\n", nitems*size, (node_t *)tmp + 1, desc);
     return (node_t *) tmp + 1;
@@ -96,7 +96,7 @@ void dump_malloc_data()
     add_message("total malloc'd:   %10lu\n", total_malloced);
     add_message("high water mark:  %10lu\n", hiwater);
     add_message("overhead:         %10lu\n",
-		(TABLESIZE * sizeof(node_t *)) + (net * sizeof(node_t)));
+		(TABLESIZE * sizeof(node_t *)) + (net * MD_OVERHEAD));
     add_message("#alloc calls:     %10lu\n", stats.alloc_calls);
     add_message("#free calls:      %10lu\n", stats.free_calls);
     add_message("#alloc - #free:   %10lu\n", net);

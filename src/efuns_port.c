@@ -13,6 +13,7 @@
 #include "debug.h"
 #include "lint.h"
 #include "include/localtime.h"
+#include "port.h"
 
 /* get a value for CLK_TCK for use by times() */
 #if (defined(TIMES) && !defined(RUSAGE))
@@ -21,6 +22,7 @@
 #endif
 
 #ifdef F_CRYPT
+void
 f_crypt PROT((void))
 {
     char *res, salt[2];
@@ -37,9 +39,9 @@ f_crypt PROT((void))
         pop_stack();
     }
 #if defined(sun) && !defined(SunOS_5)
-    res = string_copy(_crypt(sp->u.string, salt));
+    res = string_copy(_crypt(sp->u.string, salt), "f_crypt");
 #else
-    res = string_copy(crypt(sp->u.string, salt));
+    res = string_copy(crypt(sp->u.string, salt), "f_crypt");
 #endif
     free_string_svalue(sp);
     sp->subtype = STRING_MALLOC;
@@ -94,14 +96,14 @@ f_localtime PROT((void))
     gettimeofday(NULL, &tz);
     vec->item[LT_GMTOFF].u.number = tz.tz_minuteswest;
     vec->item[LT_ZONE].u.string =
-	string_copy(timezone(tz.tz_minuteswest, tm->tm_isdst));
+	string_copy(timezone(tz.tz_minuteswest, tm->tm_isdst), "f_localtime");
 #else				/* sequent */
 #if (defined(hpux) || defined(_SEQUENT_) || defined(_AIX) || defined(SunOS_5) \
 	|| defined(SVR4) || defined(sgi) || defined(linux) || defined(cray) \
 	|| defined(LATTICE) || defined(SCO))
     if (!tm->tm_isdst) {
 	vec->item[LT_GMTOFF].u.number = timezone;
-	vec->item[LT_ZONE].u.string = string_copy(tzname[0]);
+	vec->item[LT_ZONE].u.string = string_copy(tzname[0], "f_localtime");
     } else {
 #if (defined(_AIX) || defined(hpux) || defined(linux) || defined(cray) \
 	|| defined(LATTICE))
@@ -109,12 +111,12 @@ f_localtime PROT((void))
 #else
 	vec->item[LT_GMTOFF].u.number = altzone;
 #endif
-	vec->item[LT_ZONE].u.string = string_copy(tzname[1]);
+	vec->item[LT_ZONE].u.string = string_copy(tzname[1], "f_localtime");
     }
 #else
 #ifndef OS2
     vec->item[LT_GMTOFF].u.number = tm->tm_gmtoff;
-    vec->item[LT_ZONE].u.string = string_copy(tm->tm_zone);
+    vec->item[LT_ZONE].u.string = string_copy(tm->tm_zone, "f_localtime");
 #endif
 #endif
 #endif				/* sequent */

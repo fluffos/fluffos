@@ -5,11 +5,13 @@
 
 operator pop_value;
 
-operator number, real, byte, nbyte, string, const0, const1;
+operator number, real, byte, nbyte, string, short_string, const0, const1;
 
-operator index, range;
+operator index, rindex, nn_range, rn_range, rr_range, nr_range, ne_range, re_range;
 operator aggregate, aggregate_assoc;
+#ifdef DEBUG
 operator break_point;
+#endif
 
 /* these must be set up so that F_BRANCH is the last foward branch and
  * F_BRANCH_X + 3 == F_BBRANCH_X
@@ -28,7 +30,7 @@ operator time_expression, end_time_expression;
 
 operator switch, break, pop_break;
 
-operator call_function_by_address, return;
+operator call_function_by_address, call_inherited, return;
 
 operator eq, ne, le, lt, ge, gt;
 
@@ -36,7 +38,7 @@ operator inc, dec, pre_inc, post_inc, pre_dec, post_dec;
 
 operator local, global;
 operator local_lvalue, global_lvalue;
-operator indexed_lvalue;
+operator index_lvalue, rindex_lvalue;
 
 operator add, void_add_eq, add_eq;
 operator subtract, sub_eq;
@@ -61,4 +63,5 @@ operator simul_efun;
 operator sscanf;
 operator parse_command;
 
+operator nn_range_lvalue, rn_range_lvalue, nr_range_lvalue, rr_range_lvalue;
 operator call_extra;

@@ -183,11 +183,18 @@
 #define ISMULT(c)       ((c) == ASTERIX || (c) == PLUSS || (c) == QMARK)
 #define META	"^$.[()|?+*\\"
 
+#if defined(linux)
 #ifndef CHARBITS
-#define CHARBITS	0xff
-#define	UCHARAT(p)	((int)*(unsigned char *)(p))
+#define CHARBITS      0xff
+#endif
+#define UCHARAT(p)    ((int)*(unsigned char *)(p))
 #else
-#define	UCHARAT(p)	((int)*(p)&CHARBITS)
+#ifndef CHARBITS
+#define CHARBITS      0xff
+#define       UCHARAT(p)      ((int)*(unsigned char *)(p))
+#else
+#define       UCHARAT(p)      ((int)*(p)&CHARBITS)
+#endif
 #endif
 
 #define ISWORDPART(c) ( isalnum(c) || (c) == '_' )
@@ -260,8 +267,8 @@ regexp *regcomp P2(char *, exp,
 	FAIL("NULL argument");
 
     exp2 = (short *)
-	DXALLOC((strlen(exp) + 1) * (sizeof(short[8]) / sizeof(char[8])), 94,
-		"regcomp: 1");
+	DXALLOC((strlen(exp) + 1) * (sizeof(short[8]) / sizeof(char[8])), 
+		TAG_TEMPORARY, "regcomp: 1");
     for (scan = exp, dest = exp2; (c = *scan++);) {
 	switch (c) {
 	case '(':
@@ -324,8 +331,8 @@ regexp *regcomp P2(char *, exp,
 	FAIL("regexp too big");
 
     /* Allocate space. */
-    r = (regexp *) DXALLOC(sizeof(regexp) + (unsigned) regsize, 95,
-			   "regcomp: 2");
+    r = (regexp *) DXALLOC(sizeof(regexp) + (unsigned) regsize, 
+			   TAG_TEMPORARY, "regcomp: 2");
     if (r == (regexp *) NULL)
 	FAIL("out of space");
 

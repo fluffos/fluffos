@@ -176,6 +176,7 @@ op: ID
 	}
 	oper_codes[op_code] = (char *) malloc(i+1);
 	strcpy(oper_codes[op_code], f_name);
+        free($1);
 
 	op_code++;
     } ;
@@ -183,7 +184,10 @@ op: ID
 optional_ID: ID | /* empty */ { $$ = ""; } ;
 
 optional_default: /* empty */ { $$="0"; } 
-                | DEFAULT ':' ID { $$ = $3; }
+                | DEFAULT ':' ID { 
+                        static char buf[40];
+                        sprintf(buf, $3);
+                        free($3); $$ = buf; }
                 | DEFAULT ':' ID ID { 
     /* Static buffer is safe here */
     static char buf[40];
@@ -193,6 +197,8 @@ optional_default: /* empty */ { $$="0"; }
     strcat(buf, " << 8) + ");
     strcat(buf, $4);
     strcat(buf, ")");
+    free($3);
+    free($4);
     $$ = buf;
 } ;
 
@@ -234,6 +240,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 		    f_name[i] = toupper(f_name[i]);
 	    }
 	    has_token[num_buff]=0;
+	    free($3);
 	}
 	for(i=0; i < last_current_type; i++) {
 	    int j;
@@ -253,16 +260,18 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 		    yyerror("Array 'arg_types' is too small");
 	    }
 	}
-	sprintf(buff, "{\"%s\",%s,0,0,%d,%d,%s,%s,%s,%d,%s},\n",
+        if (!strcmp($2, "call_other") && !lookup_define("CAST_CALL_OTHERS")){
+	    $1 = MIXED;
+	}
+     	sprintf(buff, "{\"%s\",%s,0,0,%d,%d,%s,%s,%s,%d,%s},\n",
 		$2, f_name, min_arg, limit_max ? -1 : $5, ctype($1),
 		etype(0), etype(1), i, $6);
 	if (strlen(buff) > sizeof buff)
 	    mf_fatal("Local buffer overwritten !\n");
-	key[num_buff] = (char *) malloc(strlen($2) + 1);
-	strcpy(key[num_buff], $2);
+	key[num_buff] = $2;
 	buf[num_buff] = (char *) malloc(strlen(buff) + 1);
-     strcpy(buf[num_buff], buff);
-     num_buff++;
+        strcpy(buf[num_buff], buff);
+        num_buff++;
 	min_arg = -1;
 	limit_max = 0;
 	curr_arg_type_size = 0;
@@ -285,6 +294,7 @@ basic: ID
 		sprintf(buf, "Invalid type: %s", $1);
 		yyerror(buf);
 	}
+        free($1);
     };
 
 arg_list: /* empty */		{ $$ = 0; }
@@ -321,6 +331,10 @@ int current_line = 0, nexpands = 0, buffered = 0;
 char yytext[MAXLINE];
 static char defbuf[DEFMAX]; /* DEFMAX should be at least 2 * MAXLINE */
 char *outp, ppchar = 0;
+int in_c_case, cquote, pragmas, block_nest;
+#define CHAR_QUOTE 1
+#define STRING_QUOTE 2
+#define PRAGMA_NOTE_CASE_START 1
 
 int grammar_mode = 0;
 
@@ -330,11 +344,24 @@ int main P2(int, argc, char **, argv)
 
     num_buff = op_code = efun_code = 0;
 
+    ppchar = '#';
+    if ((yyin = fopen(OPTIONS, "r")) == NULL){
+      perror(OPTIONS);
+      exit(1);
+    }
+
+    current_file = (char *) malloc(strlen(OPTIONS) + 1);
+    current_line = 0;
+    strcpy(current_file, OPTIONS);
+    llparse();
+    create_option_defines();
+
     if ((yyin = fopen(FUNC_SPEC, "r")) == NULL) { 
 	perror(FUNC_SPEC);
 	exit(1);
     }
 
+    current_line = 0;
     current_file = (char *) malloc(strlen(FUNC_SPEC)+1);
     strcpy(current_file, FUNC_SPEC);
 
@@ -373,21 +400,8 @@ int main P2(int, argc, char **, argv)
     fflush(stdout);
     fclose(yyin);
 
-    current_line = 0;
-    ppchar = '#';
-    braces = 0;
-    if ((yyin = fopen(OPTIONS, "r")) == NULL){
-      perror(OPTIONS);
-      exit(1);
-    }
-
-    current_file = (char *) malloc(strlen(OPTIONS) + 1);
-    current_line = 0;
-    strcpy(current_file, OPTIONS);
-    llparse();
-    create_option_defines();
-
     ppchar = '%';
+    in_c_case = block_nest = cquote = pragmas = 0;
     if ((yyin = fopen(OLD_COMPILER_FILE, "r")) == NULL){
       perror(OLD_COMPILER_FILE);
       exit(1);
@@ -536,6 +550,17 @@ handle_include P1(char *, name)
     }
 }
 
+static void
+handle_pragma P1(char *, name)
+{
+    if (!strcmp(name, "auto_note_compiler_case_start"))
+        pragmas |= PRAGMA_NOTE_CASE_START;
+    else if (!strcmp(name, "no_auto_note_compiler_case_start"))
+        pragmas &= ~PRAGMA_NOTE_CASE_START;
+    else if (!strncmp(name, "ppchar:", 7) && *(name + 8))
+        ppchar = *(name + 8);
+    else yyerrorp("Unidentified %cpragma");
+}
 
 static char *skip_comment(tmp, flag)
     char *tmp;
@@ -627,133 +652,209 @@ llparse() {
     int c;
     int cond;
 
-    while (buffered ? (buffered = 0,yyp = yyp2 = outp) : fgets(yyp = yyp2 = defbuf + (DEFMAX >> 1), MAXLINE-1, yyin)){
-      current_line++;
-      while (isspace(*yyp2)) yyp2++;
-      if ((c = *yyp2) == ppchar){
-          int quote = 0;
-          char sp_buf = 0, *oldoutp;
+    while (buffered ? (yyp = yyp2 = outp) : fgets(yyp = yyp2 = defbuf + (DEFMAX >> 1), MAXLINE-1, yyin)){
+	if (!buffered) current_line++;
+	else buffered = 0;
+	while (isspace(*yyp2)) yyp2++;
+	if ((c = *yyp2) == ppchar){
+	    int quote = 0;
+	    char sp_buf = 0, *oldoutp;
 
-	  if (c == '%' && yyp2[1] == '%')
-	      grammar_mode++;
-          outp = 0;
-          if (yyp != yyp2) yyerrorp("Misplaced '%c'.\n");
-          while (isspace(*++yyp2));
-          yyp++;
-          for (;;){
-              if ((c = *yyp2++) == '"') quote ^= 1;
-              else{
-                  if (!quote && c == '/'){
-                      if (*yyp2 == '*'){
-                          yyp2 = skip_comment(yyp2, 0);
-                          continue;
-                      }
-                      else if (*yyp2 == '/') break;
-                  }
-                  if (!outp && isspace(c)) outp = yyp;
-                  if (c == '\n' || c == EOF) break;
-              }
-              *yyp++ = c;
-          }
+	    if (c == '%' && yyp2[1] == '%')
+		grammar_mode++;
+	    outp = 0;
+	    if (yyp != yyp2) yyerrorp("Misplaced '%c'.\n");
+	    while (isspace(*++yyp2));
+	    yyp++;
+	    for (;;){
+		if ((c = *yyp2++) == '"') quote ^= 1;
+		else{
+		    if (!quote && c == '/'){
+			if (*yyp2 == '*'){
+			    yyp2 = skip_comment(yyp2, 0);
+			    continue;
+			}
+			else if (*yyp2 == '/') break;
+		    }
+		    if (!outp && isspace(c)) outp = yyp;
+		    if (c == '\n' || c == EOF) break;
+		}
+		*yyp++ = c;
+	    }
+	    
+	    if (outp) {
+		if (yyout) sp_buf = *(oldoutp = outp);
+		*outp++ = 0;
+		while (isspace(*outp)) outp++;
+	    }
+	    else outp = yyp;
+	    *yyp = 0;
+	    yyp = defbuf + (DEFMAX >> 1) + 1;
 
-          if (outp) {
-              if (yyout) sp_buf = *(oldoutp = outp);
-              *outp++ = 0;
-              while (isspace(*outp)) outp++;
-          }
-          else outp = yyp;
-          *yyp = 0;
-          yyp = defbuf + (DEFMAX >> 1) + 1;
-
-          if (!strcmp("define", yyp)){
-              handle_define();
-          } else if (!strcmp("if", yyp)) {
-              cond = cond_get_exp(0);
-              if (*outp != '\n') yyerrorp("Condition too complex in %cif");
-              else handle_cond(cond);
-          } else if (!strcmp("ifdef", yyp)) {
-              deltrail();
-              handle_cond(lookup_define(outp) != 0);
-          } else if (!strcmp("ifndef", yyp)) {
-              deltrail();
-              handle_cond(!lookup_define(outp));
-          } else if (!strcmp("elif", yyp)) {
-              if (iftop) {
-                  if (iftop->state == EXPECT_ELSE) {
-                      /* last cond was false... */
-                      int cond;
-                      struct ifstate *p = iftop;
-
-                      /* pop previous condition */
-                      iftop = p->next;
-                      free((char *) p);
-
-                      cond = cond_get_exp(0);
-                      if (*outp != '\n') {
-                          yyerror("Condition too complex in #elif");
-                      } else handle_cond(cond);
-                  } else {/* EXPECT_ENDIF */
-                      /*
-                       * last cond was true...skip to end of
-                       * conditional
-                       */
-                      skip_to("endif", (char *) 0);
-                  }
-              } else yyerrorp("Unexpected %celif");
-          } else if (!strcmp("else", yyp)) {
-              if (iftop) {
-                  if (iftop->state == EXPECT_ELSE) {
-                      iftop->state = EXPECT_ENDIF;
+	    if (!strcmp("define", yyp)){
+		handle_define();
+	    } else if (!strcmp("if", yyp)) {
+		cond = cond_get_exp(0);
+		if (*outp != '\n') yyerrorp("Condition too complex in %cif");
+		else handle_cond(cond);
+	    } else if (!strcmp("ifdef", yyp)) {
+		deltrail();
+		handle_cond(lookup_define(outp) != 0);
+	    } else if (!strcmp("ifndef", yyp)) {
+		deltrail();
+		handle_cond(!lookup_define(outp));
+	    } else if (!strcmp("elif", yyp)) {
+		if (iftop) {
+		    if (iftop->state == EXPECT_ELSE) {
+			/* last cond was false... */
+			int cond;
+			struct ifstate *p = iftop;
+			
+			/* pop previous condition */
+			iftop = p->next;
+			free((char *) p);
+			
+			cond = cond_get_exp(0);
+			if (*outp != '\n') {
+			    yyerror("Condition too complex in #elif");
+			} else handle_cond(cond);
+		    } else {/* EXPECT_ENDIF */
+			/*
+			 * last cond was true...skip to end of
+			 * conditional
+			 */
+			skip_to("endif", (char *) 0);
+		    }
+		} else yyerrorp("Unexpected %celif");
+	    } else if (!strcmp("else", yyp)) {
+		if (iftop) {
+		    if (iftop->state == EXPECT_ELSE) {
+			iftop->state = EXPECT_ENDIF;
                   } else {
                       skip_to("endif", (char *) 0);
                   }
-              } else yyerrorp("Unexpected %celse");
-          } else if (!strcmp("endif", yyp)) {
-              if (iftop && (iftop->state == EXPECT_ENDIF ||
-                            iftop->state == EXPECT_ELSE)) {
-                  struct ifstate *p = iftop;
+		} else yyerrorp("Unexpected %celse");
+	    } else if (!strcmp("endif", yyp)) {
+		if (iftop && (iftop->state == EXPECT_ENDIF ||
+			      iftop->state == EXPECT_ELSE)) {
+		    struct ifstate *p = iftop;
+		    
+		    iftop = p->next;
+		    free((char *) p);
+		} else {
+		    yyerrorp("Unexpected %cendif");
+		}
+	    } else if (!strcmp("undef", yyp)) {
+		struct defn *d;
+		
+		deltrail();
+		if ((d = lookup_define(outp)))
+		    d->undef++;
+	    } else if (!strcmp("echo", yyp)) {
+		fprintf(stderr, "echo at line %d of %s: %s\n", current_line, current_file, outp);
+	    } else if (!strcmp("include", yyp)) {
+		handle_include(outp);
+	    } else if (!strcmp("pragma", yyp)) {
+		handle_pragma(outp);
+	    } else if (yyout){
+		if (!strcmp("line", yyp)){
+		    fprintf(yyout, "#line %d \"%s\"\n", current_line,
+			    current_file);
+		} else {
+		    if (sp_buf) *oldoutp = sp_buf;
+		    if (pragmas & PRAGMA_NOTE_CASE_START){
+			if (*yyp == '%') pragmas &= ~PRAGMA_NOTE_CASE_START;
+		    }
+		    fprintf(yyout, "%s\n", yyp-1);
+		}
+	    } else {
+		char buff[200];
+		sprintf(buff, "Unrecognised %c directive : %s\n", ppchar, yyp);
+		yyerror(buff);
+	    }
+	}
+	else if (c == '/'){
+	    if ((c = *++yyp2) == '*'){
+		if (yyout) fputs(yyp, yyout);
+		yyp2 = skip_comment(yyp2, 1);
+	    } else if (c == '/' && !yyout) continue;
+	    else if (yyout){
+		fprintf(yyout, "%s", yyp);
+	    }
+	}
+	else if (yyout){
+	    fprintf(yyout, "%s", yyp);
+	    if (pragmas & PRAGMA_NOTE_CASE_START){
+		static int line_to_print;
+		
+		line_to_print = 0;
+		
+		if (!in_c_case){
+		    while (isalunum(*yyp2)) yyp2++;
+		    while (isspace(*yyp2)) yyp2++;
+		    if (*yyp2 == ':'){
+			in_c_case = 1;
+			yyp2++;
+		    }
+		}
+		
+		if (in_c_case){
+		    while (c = *yyp2++){
+			switch(c){
+			  case '{':
+			    {
+				if (!cquote && (++block_nest == 1))
+				    line_to_print = 1;
+				break;
+			    }
+			    
+			  case '}':
+			    {
+				if (!cquote){
+				    if (--block_nest < 0) yyerror("Too many }'s");
+				}
+				break;
+			    }
+			    
+			  case '"':
+                            if (!(cquote & CHAR_QUOTE)) cquote ^= STRING_QUOTE;
+                            break;
+			    
+			  case '\'':
+                            if (!(cquote & STRING_QUOTE)) cquote ^= CHAR_QUOTE;
+                            break;
+			    
+			  case '\\':
+                            if (cquote && *yyp2) yyp2++;
+                            break;
+			    
+			  case '/':
+                            if (!cquote){
+                                if ((c = *yyp2) == '*'){
+                                    yyp2 = skip_comment(yyp2, 1);
+                                } else if (c == '/'){
+                                    *(yyp2-1) = '\n';
+                                    *yyp2 = '\0';
+                                }
+                            }
+                            break;
+			    
+			  case ':':
+                            if (!cquote && !block_nest)
+                                yyerror("Case started before ending previous case with ;");
+                            break;
+			    
+			  case ';':
+                            if (!cquote && !block_nest) in_c_case = 0;
+			}
+		    }
+		}
+		
+		if (line_to_print)
+		    fprintf(yyout, "#line %d \"%s\"\n", current_line + 1,current_file);
 
-                  iftop = p->next;
-                  free((char *) p);
-              } else {
-                  yyerrorp("Unexpected %cendif");
-              }
-          } else if (!strcmp("undef", yyp)) {
-              struct defn *d;
-
-              deltrail();
-              if ((d = lookup_define(outp)))
-                  d->undef++;
-          } else if (!strcmp("echo", yyp)) {
-              fprintf(stderr, "%s", outp);
-          } else if (!strcmp("include", yyp)) {
-              handle_include(outp);
-          } else if (yyout){
-              if (!strcmp("line", yyp)){
-                  fprintf(yyout, "#line %d \"%s\"\n", current_line,
-                      current_file);
-              } else {
-                  if (sp_buf) *oldoutp = sp_buf;
-                  fprintf(yyout, "%s\n", yyp-1);
-              }
-          } else {
-              char buff[200];
-              sprintf(buff, "Unrecognised %c directive : %s\n", ppchar, yyp);
-              yyerror(buff);
-          }
-      }
-      else if (c == '/'){
-          if ((c = *++yyp2) == '*'){
-              if (yyout) fputs(yyp, yyout);
-              yyp2 = skip_comment(yyp2, 1);
-          } else if (c == '/' && !yyout) continue;
-          else if (yyout){
-              echo_line(yyout, yyp, grammar_mode);
-          }
-      }
-      else if (yyout){
-          echo_line(yyout, yyp, grammar_mode);
-      }
+	    }
+	}
     }
     if (iftop){
       struct ifstate *p = iftop;
@@ -772,7 +873,7 @@ llparse() {
       incstate *p = inctop;
 
       current_file = p->file;
-      current_line = p->line + 1;
+      current_line = p->line;
       yyin = p->yyin;
       inctop = p->next;
       free((char *) p);
@@ -790,42 +891,42 @@ static int skip_to(token, atoken)
     for (nest = 0;;) {
         if (!fgets(outp = defbuf + (DEFMAX >> 1), MAXLINE-1,yyin)) {
             yyerror("Unexpected end of file while skipping");
-      }
+	}
         current_line++;
         if ((c = *outp++) == ppchar) {
-          while (isspace(*outp)) outp++;
-          end = b + sizeof b - 1;
+	    while (isspace(*outp)) outp++;
+	    end = b + sizeof b - 1;
             for (p = b; (c = *outp++) != '\n' && !isspace(c) && c != EOF;) {
-              if (p < end) *p++ = c;
-          }
+		if (p < end) *p++ = c;
+	    }
             *p = 0;
             if (!strcmp(b, "if") || !strcmp(b, "ifdef") || !strcmp(b, "ifndef")) {
                 nest++;
-          } else if (nest > 0) {
+	    } else if (nest > 0) {
                 if (!strcmp(b, "endif"))
                     nest--;
-          } else {
+	    } else {
                 if (!strcmp(b, token)) {
-                  *--outp = c;
+		    *--outp = c;
                     add_input(b);
-                  *--outp = ppchar;
-                  buffered = 1;
+		    *--outp = ppchar;
+		    buffered = 1;
                     return 1;
-              } else if (atoken && !strcmp(b, atoken)) {
-                  *--outp = c;
+		} else if (atoken && !strcmp(b, atoken)) {
+		    *--outp = c;
                     add_input(b);
-                  *--outp = ppchar;
-                  buffered = 1;
-                  return 0;
-              } else if (!strcmp(b, "elif")) {
-                  *--outp = c;
+		    *--outp = ppchar;
+		    buffered = 1;
+		    return 0;
+		} else if (!strcmp(b, "elif")) {
+		    *--outp = c;
                     add_input(b);
-                  *--outp = ppchar;
-                  buffered = 1;
+		    *--outp = ppchar;
+		    buffered = 1;
                     return !atoken;
-              }
-          }
-      }
+		}
+	    }
+	}
     }
 }
 

@@ -13,6 +13,7 @@
 #include "sprintf.h"
 #include "swap.h"
 #include "comm.h"
+#include "port.h"
 
 #ifdef OPCPROF
 #include "opc.h"
@@ -53,7 +54,7 @@ extern userid_t *backbone_uid;
 extern int max_cost;
 extern int call_origin;
 
-static void push_indexed_lvalue PROT((void));
+static void push_indexed_lvalue PROT((int));
 static struct svalue *find_value PROT((int));
 #ifdef TRACE
 static void do_trace_call PROT((struct function *));
@@ -66,17 +67,12 @@ static int cmpopc PROT((opc_t *, opc_t *));
 #endif
 #ifdef DEBUG
 int last_instructions PROT((void));
-static void clear_vector_refs PROT((struct svalue *, int));
 #endif
 static float _strtof PROT((char *, char **));
 static struct svalue *sapply PROT((char *, struct object *, int));
 static char *get_line_number PROT((char *, struct program *));
 #ifdef TRACE_CODE
 static char *get_arg PROT((int, int));
-#endif
-#ifdef DEBUG
-static void count_inherits PROT((struct program *, struct program *));
-static void count_ref_in_vector PROT((struct svalue *, int));
 #endif
 
 int inter_sscanf PROT((struct svalue *, struct svalue *, struct svalue *, int));
@@ -109,18 +105,23 @@ struct svalue *fp;		/* Pointer to first argument. */
 
 struct svalue *sp;
 
-short *break_sp;		/* Points to address to branch to at next
-				 * F_BREAK			 */
 int function_index_offset;	/* Needed for inheritance */
 static int variable_index_offset;	/* Needed for inheritance */
 int st_num_arg;
 
 static struct svalue start_of_stack[EVALUATOR_STACK_SIZE];
 struct svalue *end_of_stack = start_of_stack + EVALUATOR_STACK_SIZE - 5;
+static short switch_stack[RUNTIME_SWITCH_STACK_SIZE];
+short *break_sp = switch_stack + RUNTIME_SWITCH_STACK_SIZE;
+/* Points to address to branch to at next F_BREAK */
+short *start_of_switch_stack = switch_stack;
 
 /* Used to throw an error to a catch */
 struct svalue catch_value =
 {T_NUMBER};
+
+/* used by routines that want to return a pointer to an svalue */
+struct svalue apply_ret_value = {T_NUMBER};
 
 struct control_stack control_stack[MAX_TRACE];
 struct control_stack *csp;	/* Points to last element pushed */
@@ -175,7 +176,14 @@ char * type_name P1(int, c) {
 	if (c & limit) return type_names[j];
 	j++;
     } while (!((limit <<= 1) & TYPE_CODES_END));
-    return "unknown";
+    /* Oh crap.  Take some time and figure out what we have. */
+    if (c == T_INVALID) return "*invalid*";
+    if (c == T_LVALUE) return "*lvalue*";
+    if (c == T_LVALUE_BYTE) return "*lvalue_byte*";
+    if (c == T_LVALUE_RANGE) return "*lvalue_range*";
+    if (c == T_ERROR_HANDLER) return "*error_handler*";
+    IF_DEBUG(if (c == T_FREED) return "*freed*");
+    return "*unknown*";
 }
 
 /*
@@ -300,7 +308,7 @@ void push_string P2(char *, p, int, type)
     sp->subtype = type;
     switch (type) {
     case STRING_MALLOC:
-	sp->u.string = string_copy(p);
+	sp->u.string = string_copy(p, "push_string");
 	break;
     case STRING_SHARED:
 	sp->u.string = make_shared_string(p);
@@ -407,7 +415,7 @@ char *add_slash P1(char *, str)
 {
     char *tmp;
 
-    tmp = DXALLOC(strlen(str) + 2, 43, "add_slash");
+    tmp = DXALLOC(strlen(str) + 2, TAG_STRING, "add_slash");
     *tmp = '/';
     strcpy(tmp + 1, str);
     return tmp;
@@ -429,7 +437,7 @@ INLINE void assign_svalue_no_free P2(struct svalue *, to, struct svalue *, from)
     case T_STRING:
 	switch (from->subtype) {
 	case STRING_MALLOC:	/* No idea to make the string shared */
-	    to->u.string = string_copy(from->u.string);
+	    to->u.string = string_copy(from->u.string, "assign_svalue_no_free");
 	    break;
 	case STRING_CONSTANT:	/* Good idea to make it shared */
 	    to->subtype = STRING_SHARED;
@@ -502,81 +510,444 @@ INLINE void pop_stack()
     free_svalue(sp--, "pop_stack");
 }
 
+struct svalue glb = { T_LVALUE_BYTE };
+
 /*
  * Compute the address of an array element.
  */
-static INLINE void push_indexed_lvalue()
+static INLINE void push_indexed_lvalue(int code)
 {
     int ind;
+    struct svalue *lv;
 
-    if ((sp-1)->type & T_MAPPING) {
-	struct svalue *vec = sp - 1;
+    if (sp->type == T_LVALUE){
+        lv = sp->u.lvalue;
+        if (!code && lv->type & T_MAPPING){
+            sp--;
+            if (!(lv = find_for_insert(lv->u.map, sp, 0)))
+                mapping_too_large();
+            free_svalue(sp, "push_indexed_lvalue: 1");
+            sp->type = T_LVALUE;
+            sp->u.lvalue = lv;
+            return;
+	}
+	
+        if (!((--sp)->type & T_NUMBER))
+            error("Illegal type of index\n");
 
-	vec = find_for_insert(vec->u.map, sp, 0);
-	if (!vec) mapping_too_large();
-	pop_stack();
-	free_svalue(sp, "push_indexed_lvalue");
-	sp->type = T_LVALUE;
-	sp->u.lvalue = vec;
-	return;
-    }
+        ind = sp->u.number;
 
-    if (!(sp->type & T_NUMBER) || ((ind = sp->u.number) < 0))
-	error("Illegal index\n");
-
-    sp--;
-    
-    switch (sp->type) {
+        switch(lv->type){
 #ifndef NEW_FUNCTIONS
-    case T_FUNCTION:
-	{
-	    struct svalue *item;
-
-	    if (ind > 1)
-		error("Function variables may only be indexed with 0 or 1.\n");
-	    item = ind ? &sp->u.fp->fun : &sp->u.fp->obj;
-	    if (sp->u.fp->ref == 1) {	/* kludge */
-		static struct svalue quickfix = {T_NUMBER};
-
-		assign_svalue(&quickfix, item);
-		item = &quickfix;
+	    case T_FUNCTION:
+	    {
+                if (code) ind = 2  - ind;
+                if (ind > 1 || ind < 0)
+                    error("Function variables may only be indexed with 0 or 1.\n");
+                sp->type = T_LVALUE;
+                sp->u.lvalue = ind ? &lv->u.fp->fun : &lv->u.fp->obj;
+                break;
 	    }
-	    free_svalue(sp, "push_indexed_lvalue");
-	    sp->type = T_LVALUE;
-	    sp->u.lvalue = item;
-	    break;
-	}
 #endif
-    case T_STRING:
-	error("LPC strings (in MudOS) are not mutable (maybe later).\n");
-	return;
-    case T_BUFFER:
-	if (ind >= sp->u.buf->size)
-	    error("Buffer index out of bounds.\n");
-	free_svalue(sp, "push_indexed_lvalue");
-	sp->type = T_LVALUE_BYTE;
-	sp->u.lvalue_byte = &sp->u.buf->item[ind];
-	break;
-    case T_POINTER:
-	{
-	    struct svalue *item;
+	    case T_STRING:
+	    {
+                char *tmp = lv->u.string;
+                int len = SVALUE_STRLEN(lv);
 
-	    if (ind >= sp->u.vec->size)
-		error("Index out of bounds\n");
-	    item = &sp->u.vec->item[ind];
-	    if (sp->u.vec->ref == 1) {
-		static struct svalue quickfix =	{T_NUMBER};
-
-		assign_svalue(&quickfix, item);
-		item = &quickfix;
+                if (code) ind = len - ind;
+                if (ind >= len || ind < 0)
+                    error("Index out of bounds in string index lvalue.\n");
+                if (lv->subtype != STRING_MALLOC){
+                    tmp = string_copy(tmp, "push_indexed_lvalue: 1");
+                    if (lv->subtype & STRING_SHARED) free_string(lv->u.string);
+                    lv->u.string = tmp;
+                    lv->subtype = STRING_MALLOC;
+		  }
+                sp->type = T_LVALUE;
+                sp->u.lvalue = &glb;
+                glb.u.lvalue_byte = (unsigned char *)&tmp[ind];
+                break;
 	    }
-	    free_svalue(sp, "push_indexed_lvalue");
-	    sp->type = T_LVALUE;
-	    sp->u.lvalue = item;
-	    break;
+
+	    case T_BUFFER:
+	    {
+                if (code) ind = lv->u.buf->size - ind;
+                if (ind >= lv->u.buf->size || ind < 0)
+                    error("Buffer index out of bounds.\n");
+                sp->type = T_LVALUE;
+                sp->u.lvalue = &glb;
+                glb.u.lvalue_byte = &lv->u.buf->item[ind];
+                break;
+	    }
+	    
+	    case T_POINTER:
+	    {
+                if (code) ind = lv->u.vec->size - ind;
+                if (ind >= lv->u.vec->size || ind < 0)
+                    error("Array index out of bounds\n");
+                sp->type = T_LVALUE;
+                sp->u.lvalue = lv->u.vec->item + ind;
+                break;
+	    }
+
+	    default:
+                error("Indexing on illegal type.\n");
+        }
+    } else {
+        /* It is now coming from (x <assign_type> y)[index]... = rhs */
+        /* Where x is a _valid_ lvalue */
+        /* Hence the reference to sp is at least 2 :) */
+
+        if (!code && (sp->type & T_MAPPING)){
+            if (!(lv = find_for_insert(sp->u.map, sp-1, 0)))
+                mapping_too_large();
+            sp->u.map->ref--;
+            free_svalue(--sp, "push_indexed_lvalue: 2");
+            sp->type = T_LVALUE;
+            sp->u.lvalue = lv;
+            return;
 	}
-    default:
-	error("Indexing on illegal type.\n");
+	
+        if (!((sp-1)->type & T_NUMBER))
+            error("Illegal type of index\n");
+	
+        ind = (sp-1)->u.number;
+
+        switch (sp->type){
+#ifndef NEW_FUNCTIONS
+	    case T_FUNCTION:
+	    {
+                if (code) ind = 2 - ind;
+                if (ind > 1 || ind < 0)
+                    error("Function variables may only be indexed with 0 or 1.\n");
+                lv = ind ? &sp->u.fp->fun : &sp->u.fp->obj;
+                sp->u.funp->ref--;
+                (--sp)->type = T_LVALUE;
+                sp->u.lvalue = lv;
+                break;
+	    }
+#endif
+	    case T_STRING:
+	    {
+                error("Illegal to make char lvalue from assigned string\n");
+                break;
+	    }
+
+	    case T_BUFFER:
+	    {
+                if (code) ind = sp->u.buf->size - ind;
+                if (ind >= sp->u.buf->size || ind < 0)
+                    error("Buffer index out of bounds.\n");
+                sp->u.buf->ref--;
+                (--sp)->type = T_LVALUE;
+                sp->u.lvalue = &glb;
+                glb.u.lvalue_byte = (sp+1)->u.buf->item + ind;
+                break;
+	    }
+
+	    case T_POINTER:
+	    {
+		if (code) ind = sp->u.vec->size - ind;
+		if (ind >= sp->u.vec->size || ind < 0)
+                    error("Array index out of bounds.\n");
+                sp->u.vec->ref--;
+                (--sp)->type = T_LVALUE;
+                sp->u.lvalue = (sp+1)->u.vec->item + ind;
+                break;
+	    }
+
+	    default:
+	        error("Indexing on illegal type.\n");
+        }
+    }
+}
+
+static struct lvalue_range {
+    int ind1, ind2, size;
+    struct svalue *owner;
+} glr;
+
+static struct svalue glr_sv = { T_LVALUE_RANGE };
+
+static INLINE void push_lvalue_range(int code)
+{
+    int ind1, ind2, size;
+    struct svalue *lv;
+
+    if (sp->type == T_LVALUE){
+        switch((lv = glr.owner = sp->u.lvalue)->type){
+            case T_POINTER:
+                size = lv->u.vec->size;
+                break;
+		case T_STRING: {
+                char *tmp = lv->u.string;
+                size = SVALUE_STRLEN(lv);
+                if (lv->subtype != STRING_MALLOC){
+                    tmp = string_copy(tmp, "push_lvalue_range");
+                    if (lv->subtype & STRING_SHARED) free_string(lv->u.string);
+                    lv->u.string = tmp;
+                    lv->subtype = STRING_MALLOC;
+                }
+                break;
+            }
+	    case T_BUFFER:
+                size = lv->u.buf->size;
+                break;
+	    default: error("Range lvalue on illegal type\n");
+        }
+    } else error("Range lvalue on illegal type\n");
+
+    if (!((--sp)->type & T_NUMBER)) error("Illegal 2nd index type to range lvalue\n");
+
+    ind2 = (code & 0x01) ? (size - sp->u.number) : sp->u.number;
+    if (++ind2 < 0 || (ind2 > size))
+        error("The 2nd index to range lvalue must be >= -1 and < sizeof(indexed value)\n");
+
+
+    if (!((--sp)->type & T_NUMBER)) error("Illegal 1st index type to range lvalue\n");
+    ind1 = (code & 0x10) ? (size - sp->u.number) : sp->u.number;
+
+    if (ind1 < 0 || ind1 > size)
+        error("The 1st index to range lvalue must be >= 0 and <= sizeof(indexed value)\n");
+
+    glr.ind1 = ind1;
+    glr.ind2 = ind2;
+    glr.size = size;
+    sp->type = T_LVALUE;
+    sp->u.lvalue = &glr_sv;
+}
+
+INLINE void copy_lvalue_range(struct svalue *from)
+{
+    int ind1, ind2, size, fsize;
+    struct svalue *owner;
+
+    ind1 = glr.ind1;
+    ind2 = glr.ind2;
+    size = glr.size;
+    owner = glr.owner;
+
+    switch(owner->type){
+        case T_POINTER:
+        {
+            struct vector *fv, *dv;
+            struct svalue *fptr, *dptr;
+            if (from->type != T_POINTER) error("Illegal rhs to array range lvalue\n");
+
+            fv = from->u.vec;
+            fptr = fv->item;
+
+            if ((fsize = fv->size) == ind2 - ind1){
+                dptr = (owner->u.vec)->item + ind1;
+
+                if (fv->ref == 1){
+                    /* Transfer the svalues */
+                    while (fsize--){
+                        free_svalue(dptr, "copy_lvalue_range : 1");
+                        *dptr++ = *fptr++;
+                    }
+                    free_empty_vector(fv);
+                } else {
+                    while (fsize--) assign_svalue(dptr++, fptr++);
+                    fv->ref--;
+                }
+            } else {
+                struct vector *old_dv = owner->u.vec;
+                struct svalue *old_dptr = old_dv->item;
+
+                /* Need to reallocate the array */
+                dv = allocate_empty_array(size - ind2 + ind1 + fsize);
+                dptr = dv->item;
+
+                /* ind1 can range from 0 to sizeof(old_dv) */
+                while (ind1--) assign_svalue_no_free(dptr++, old_dptr++);
+
+                if (fv->ref == 1){
+                    while (fsize--) *dptr++ = *fptr++;
+                    free_empty_vector(fv);
+                } else {
+                    while (fsize--) assign_svalue_no_free(dptr++, fptr++);
+                    fv->ref--;
+                }
+
+                /* ind2 can range from 0 to sizeof(old_dv) */
+                old_dptr = old_dv->item + ind2;
+                size -= ind2;
+
+                while (size--) assign_svalue_no_free(dptr++, old_dptr++);
+                free_vector(old_dv);
+
+                owner->u.vec = dv;
+            }
+            break;
+        }
+
+        case T_STRING:
+        {
+            if (from->type != T_STRING) error("Illegal rhs to string range lvalue.\n");
+
+            if ((fsize = SVALUE_STRLEN(from)) == ind2 - ind1){
+                /* since fsize >= 0, ind2 - ind1 <= strlen(orig string) */
+                /* because both of them can only range from 0 to len */
+
+                strncpy(owner->u.string + ind1, from->u.string, fsize);
+            } else {
+                char *tmp, *dstr = owner->u.string;
+
+                owner->u.string = tmp = DXALLOC(size - ind2 + ind1 + fsize + 1, TAG_STRING, "copy_lvalue_range");
+                if (ind1 >= 1){
+                    strncpy(tmp, dstr, ind1);
+                    tmp += ind1;
+                }
+                strcpy(tmp, from->u.string);
+                tmp += fsize;
+
+                size -= ind2;
+                if (size >= 1){
+                    strncpy(tmp, dstr + ind2, size);
+                    *(tmp + size) = 0;
+                }
+                FREE(dstr);
+            }
+            free_string_svalue(from);
+            break;
+        }
+
+        case T_BUFFER:
+        {
+            if (from->type != T_BUFFER) error("Illegal rhs to buffer range lvalue.\n");
+
+            if ((fsize = from->u.buf->size) == ind2 - ind1){
+                memcpy((owner->u.buf)->item + ind1, from->u.buf->item, fsize);
+            } else {
+                struct buffer *b;
+                unsigned char *old_item = (owner->u.buf)->item;
+                unsigned char *new_item;
+
+                b = allocate_buffer(size - ind2 + ind1 + fsize);
+                new_item = b->item;
+                if (ind1 >= 1){
+                    memcpy(b->item, old_item, ind1);
+                    new_item += ind1;
+                }
+                memcpy(new_item, from->u.buf, fsize);
+                new_item += fsize;
+
+                if ((size -= ind2) >= 1)
+                    memcpy(new_item, old_item + ind2, size);
+                free_buffer(owner->u.buf);
+                owner->u.buf = b;
+            }
+            free_buffer(from->u.buf);
+            break;
+        }
+    }
+}
+INLINE void assign_lvalue_range(struct svalue *from)
+{
+    int ind1, ind2, size, fsize;
+    struct svalue *owner;
+
+    ind1 = glr.ind1;
+    ind2 = glr.ind2;
+    size = glr.size;
+    owner = glr.owner;
+
+    switch(owner->type){
+        case T_POINTER:
+        {
+            struct vector *fv, *dv;
+            struct svalue *fptr, *dptr;
+            if (from->type != T_POINTER) error("Illegal rhs to array range lvalue\n");
+
+            fv = from->u.vec;
+            fptr = fv->item;
+
+            if ((fsize = fv->size) == ind2 - ind1){
+                dptr = (owner->u.vec)->item + ind1;
+                while (fsize--) assign_svalue(dptr++, fptr++);
+            } else {
+                struct vector *old_dv = owner->u.vec;
+                struct svalue *old_dptr = old_dv->item;
+
+                /* Need to reallocate the array */
+                dv = allocate_empty_array(size - ind2 + ind1 + fsize);
+                dptr = dv->item;
+
+                /* ind1 can range from 0 to sizeof(old_dv) */
+                while (ind1--) assign_svalue_no_free(dptr++, old_dptr++);
+
+                while (fsize--) assign_svalue_no_free(dptr++, fptr++);
+
+                /* ind2 can range from 0 to sizeof(old_dv) */
+                old_dptr = old_dv->item + ind2;
+                size -= ind2;
+
+                while (size--) assign_svalue_no_free(dptr++, old_dptr++);
+                free_vector(old_dv);
+
+                owner->u.vec = dv;
+            }
+            break;
+        }
+
+        case T_STRING:
+        {
+            if (from->type != T_STRING) error("Illegal rhs to string range lvalue.\n");
+
+            if ((fsize = SVALUE_STRLEN(from)) == ind2 - ind1){
+                /* since fsize >= 0, ind2 - ind1 <= strlen(orig string) */
+                /* because both of them can only range from 0 to len */
+
+                strncpy(owner->u.string + ind1, from->u.string, fsize);
+            } else {
+                char *tmp, *dstr = owner->u.string;
+
+                owner->u.string = tmp = DXALLOC(size - ind2 + ind1 + fsize + 1, TAG_STRING, "assign_lvalue_range");
+                if (ind1 >= 1){
+                    strncpy(tmp, dstr, ind1);
+                    tmp += ind1;
+                }
+                strcpy(tmp, from->u.string);
+                tmp += fsize;
+
+                size -= ind2;
+                if (size >= 1){
+                    strncpy(tmp, dstr + ind2, size);
+                    *(tmp + size) = 0;
+                }
+                FREE((char *) dstr);
+            }
+            break;
+        }
+
+        case T_BUFFER:
+        {
+            if (from->type != T_BUFFER) error("Illegal rhs to buffer range lvalue.\n");
+
+            if ((fsize = from->u.buf->size) == ind2 - ind1){
+                memcpy((owner->u.buf)->item + ind1, from->u.buf->item, fsize);
+            } else {
+                struct buffer *b;
+                unsigned char *old_item = (owner->u.buf)->item;
+                unsigned char *new_item;
+
+                b = allocate_buffer(size - ind2 + ind1 + fsize);
+                new_item = b->item;
+                if (ind1 >= 1){
+                    memcpy(b->item, old_item, ind1);
+                    new_item += ind1;
+                }
+                memcpy(new_item, from->u.buf, fsize);
+                new_item += fsize;
+
+                if ((size -= ind2) >= 1)
+                    memcpy(new_item, old_item + ind2, size);
+                free_buffer(owner->u.buf);
+                owner->u.buf = b;
+            }
+            break;
+        }
     }
 }
 
@@ -627,7 +998,7 @@ void bad_argument P4(struct svalue *, val, int, type, int, arg, int, instr)
     int j = TYPE_CODES_START;
     int k = 0;
 
-    buf = (char *) DMALLOC(300, 0,"bad_argument");
+    buf = (char *) DMALLOC(300, TAG_TEMPORARY, "bad_argument");
     sprintf(buf, "Bad argument %d to %s%s\nExpected: ", arg, 
 	    get_f_name(instr), (instr < BASE ? "" : "()"));
 
@@ -647,7 +1018,7 @@ void bad_argument P4(struct svalue *, val, int, type, int, arg, int, instr)
 }
 
 INLINE void
-push_control_stack P1(struct function *, funp)
+push_control_stack P2(int, frkind, void *, funp)
 {
     if (csp == &control_stack[MAX_TRACE - 1]) {
 	too_deep_error = 1;
@@ -656,7 +1027,8 @@ push_control_stack P1(struct function *, funp)
     csp++;
     csp->caller_type = caller_type;
     csp->ob = current_object;
-    csp->funp = funp;		/* Only used for tracebacks */
+    csp->framekind = frkind;          /* Only used for tracebacks */
+    csp->fr.func = (struct function *)funp;
     csp->prev_ob = previous_ob;
     csp->fp = fp;
     csp->prog = current_prog;
@@ -815,13 +1187,23 @@ static void do_trace_call P1(struct function *, funp)
  * There is a number of arguments on the stack. Normalize them and initialize
  * local variables, so that the called function is pleased.
  */
+INLINE void setup_variables P3(int, actual, int, local, int, num_arg) {
+    if (actual > num_arg) {
+      /* Remove excessive arguments */
+      pop_n_elems(actual - num_arg);
+      push_nulls(local);
+      fp = sp - (csp->num_local_variables = local + num_arg) + 1;
+    } else {
+      /* Correct number of arguments and local variables */
+      push_nulls(local + num_arg - actual);
+      fp = sp - (csp->num_local_variables = local + num_arg) + 1;
+    }
+}
+
 INLINE struct function *
          setup_new_frame P1(struct function *, funp)
 {
-    int i, j;
-
-    function_index_offset = 0;
-    variable_index_offset = 0;
+    function_index_offset = variable_index_offset = 0;
     while (funp->flags & NAME_INHERITED) {
 	function_index_offset +=
 	    current_prog->p.i.inherit[funp->offset].function_index_offset;
@@ -831,25 +1213,37 @@ INLINE struct function *
 	funp = &current_prog->p.i.functions[funp->function_index_offset];
     }
     /* Remove excessive arguments */
-    if ((i = csp->num_local_variables) > (j = funp->num_arg)) {
-	pop_n_elems(i - j);
-	push_nulls(i = funp->num_local);
-	fp = sp - (csp->num_local_variables = i + j) + 1;
-    } else {
-	/* Correct number of arguments and local variables */
-	push_nulls(funp->num_local + j - i);
-	fp = sp - (csp->num_local_variables = funp->num_local + j) + 1;
-    }
-
-#ifdef TRACE
+    setup_variables(csp->num_local_variables, funp->num_local, funp->num_arg);
+ #ifdef TRACE
     tracedepth++;
     if (TRACEP(TRACE_CALL)) {
 	do_trace_call(funp);
     }
 #endif
-    break_sp = (short *) (sp + 1);
     return funp;
 }
+
+INLINE struct function *setup_inherited_frame P1(struct function *, funp)
+{
+    while (funp->flags & NAME_INHERITED) {
+        function_index_offset +=
+            current_prog->p.i.inherit[funp->offset].function_index_offset;
+        variable_index_offset +=
+            current_prog->p.i.inherit[funp->offset].variable_index_offset;
+        current_prog = current_prog->p.i.inherit[funp->offset].prog;
+        funp = &current_prog->p.i.functions[funp->function_index_offset];
+    }
+    /* Remove excessive arguments */
+    setup_variables(csp->num_local_variables, funp->num_local, funp->num_arg);
+#ifdef TRACE
+    tracedepth++;
+    if (TRACEP(TRACE_CALL)) {
+        do_trace_call(funp);
+    }
+#endif
+    return funp;
+}
+
 
 static void break_point()
 {
@@ -858,7 +1252,6 @@ static void break_point()
 }
 
 #ifdef NEW_FUNCTIONS
-struct function fake_func = { "<function>" };
 struct program fake_prog = { "<function>" };
 unsigned char fake_program = F_RETURN;
 
@@ -871,7 +1264,8 @@ void setup_fake_frame P1(struct funp *, fun) {
       error("Owner of function pointer has been destructed.\n");
   csp++;
   csp->caller_type = caller_type;
-  csp->funp = &fake_func;
+  csp->framekind = FRAME_FAKE;
+  csp->fr.funp = fun;
   csp->ob = current_object;
   csp->extern_call = 1;
   csp->prev_ob = previous_ob;
@@ -946,7 +1340,6 @@ call_function_pointer P2(struct funp *, funp, int, num_arg)
     struct function *func;
     char *funcname;
     int i, def;
-    static struct svalue ret = { T_NUMBER };
 
     setup_fake_frame(funp);
     
@@ -969,10 +1362,10 @@ call_function_pointer P2(struct funp *, funp, int, num_arg)
 
 	    vec = call_all_other(funp->f.obj.u.vec, funcname, num_arg);
 	    remove_fake_frame();
-	    free_svalue(&ret, "call_function_pointer");
-	    ret.type = T_POINTER;
-	    ret.u.vec = vec;
-	    return &ret;
+	    free_svalue(&apply_ret_value, "call_function_pointer");
+	    apply_ret_value.type = T_POINTER;
+	    apply_ret_value.u.vec = vec;
+	    return &apply_ret_value;
 	} else if (funp->f.obj.type == T_STRING) {
 	    ob = (struct object *)find_object(funp->f.obj.u.string);
 	    if (!ob || !object_visible(ob))
@@ -1013,7 +1406,7 @@ call_function_pointer P2(struct funp *, funp, int, num_arg)
 		*(++sp)=const0;
 		break;
 	    case F_CONST1:
-		*(++sp)=const0;
+		*(++sp)=const1;
 		break;
 	    case -((F_NBYTE << 8) + 1):
 		sp++;
@@ -1043,9 +1436,9 @@ call_function_pointer P2(struct funp *, funp, int, num_arg)
 	    funp->f.opcodes[(i > 255 ? 2 : 1)] = num_arg;
 	}
 	eval_instruction((char*)&funp->f.opcodes[0]);
-	free_svalue(&ret, "call_function_pointer");
-	ret = *sp--;
-	return &ret;
+	free_svalue(&apply_ret_value, "call_function_pointer");
+	apply_ret_value = *sp--;
+	return &apply_ret_value;
     case ORIGIN_LOCAL: {
 	fp = sp - num_arg + 1;
 	
@@ -1054,7 +1447,7 @@ call_function_pointer P2(struct funp *, funp, int, num_arg)
 	if (func->flags & NAME_UNDEFINED)
 	    error("Undefined function: %s\n", func->name);
 	
-	push_control_stack(func);
+        push_control_stack(FRAME_FUNCTION, func);
 	
 	caller_type = ORIGIN_LOCAL;
 	current_prog = funp->owner->prog;
@@ -1075,32 +1468,36 @@ call_function_pointer P2(struct funp *, funp, int, num_arg)
     }
     case ORIGIN_FUNCTIONAL: {
 	fp = sp - num_arg + 1;
-	fake_func.num_arg = funp->f.a.num_args;
-	
-	push_control_stack(&fake_func);
+
+        push_control_stack(FRAME_FUNP, funp);
 	caller_type = ORIGIN_FUNCTIONAL;
-	current_prog = funp->owner->prog;
+	current_prog = funp->f.a.prog;
 	
-	csp->num_local_variables = num_arg;
-	(void) setup_new_frame(&fake_func);
+	if (funp->args.type == T_POINTER) {
+	    struct vector *v = funp->args.u.vec;
+	    
+	    check_for_destr(v);
+	    num_arg = merge_arg_lists(num_arg, v, 0);
+	}
+
+	setup_variables(num_arg, funp->f.a.num_locals, funp->f.a.num_args);
 
 	csp->extern_call = 1;
-	call_absolute(funp->f.a.start);
+	call_program(funp->f.a.prog, funp->f.a.offset);
 	break;
     }
     default:
 	error("Unsupported function pointer type.\n");
     }
-    free_svalue(&ret, "call_function_pointer");
-    ret = *sp--;
+    free_svalue(&apply_ret_value, "call_function_pointer");
+    apply_ret_value = *sp--;
     remove_fake_frame();
-    return &ret;
+    return &apply_ret_value;
 }
 #else
 INLINE
 struct svalue *
 call_function_pointer P2(struct funp *, funp, int, num_arg) {
-    static struct svalue ret = { T_NUMBER };
     struct svalue *arg;
     char *funcname;
     int i;
@@ -1128,10 +1525,10 @@ call_function_pointer P2(struct funp *, funp, int, num_arg) {
 	struct vector *v;
 
 	v = call_all_other(funp->obj.u.vec, funcname, num_arg - 2);
-	free_svalue(&ret, "call_function_pointer");
-	ret.type = T_POINTER;
-	ret.u.vec = v;
-	return &ret;
+	free_svalue(&apply_ret_value, "call_function_pointer");
+	apply_ret_value.type = T_POINTER;
+	apply_ret_value.u.vec = v;
+	return &apply_ret_value;
     } else {
 	ob = find_object(arg[0].u.string);
 	if (!ob || !object_visible(ob))
@@ -1147,9 +1544,9 @@ call_function_pointer P2(struct funp *, funp, int, num_arg) {
     if (apply_low(funcname, ob, num_arg) == 0) {	/* Function not found */
 	return &const0u;
     }
-    free_svalue(&ret, "call_function_pointer");
-    ret = *sp--;
-    return &ret;
+    free_svalue(&apply_ret_value, "call_function_pointer");
+    apply_ret_value = *sp--;
+    return &apply_ret_value;
 }
 #endif
 
@@ -1160,11 +1557,11 @@ call_function_pointer P2(struct funp *, funp, int, num_arg) {
       int ess_len, ess_r; \
       ess_len = (ess_r = SVALUE_STRLEN(x)) + strlen(y) + 1; \
       if (sp->subtype == STRING_MALLOC) { \
-          ess_res = (char *) DREALLOC(x->u.string, ess_len, 35, z); \
+          ess_res = (char *) DREALLOC(x->u.string, ess_len, TAG_STRING, z); \
           if (!ess_res) fatal("Out of memory!\n"); \
           strcpy(ess_res + ess_r, (y)); \
       } else { \
-	  ess_res = DXALLOC(ess_len, 35, z); \
+	  ess_res = DXALLOC(ess_len, TAG_STRING, z); \
 	  strcpy(ess_res, x->u.string); \
 	  strcpy(ess_res + ess_r, (y)); \
 	  free_string_svalue(x); \
@@ -1176,7 +1573,7 @@ call_function_pointer P2(struct funp *, funp, int, num_arg) {
 #define SVALUE_STRING_ADD_LEFT(y, z) \
     do { char *pss_res; int pss_r, pss_len; \
         pss_len = SVALUE_STRLEN(sp) + (pss_r = strlen(y)) + 1; \
-        pss_res = DXALLOC(pss_len, 37, z); \
+        pss_res = DXALLOC(pss_len, TAG_STRING, z); \
         strcpy(pss_res, y); \
         strcpy(pss_res + pss_r, sp->u.string); \
         free_string_svalue(sp--); \
@@ -1191,12 +1588,12 @@ call_function_pointer P2(struct funp *, funp, int, num_arg) {
         ssj_r = SVALUE_STRLEN(x); \
         ssj_len = ssj_r + SVALUE_STRLEN(y) + 1; \
         if ((x)->subtype == STRING_MALLOC) { \
-            ssj_res = (char *) DREALLOC((x)->u.string, ssj_len, 34, z); \
+            ssj_res = (char *) DREALLOC((x)->u.string, ssj_len, TAG_STRING, z); \
             if (!ssj_res) fatal("Out of memory!\n"); \
             (void) strcpy(ssj_res + ssj_r, (y)->u.string); \
             free_string_svalue(y); \
         } else { \
-            ssj_res = (char *) DXALLOC(ssj_len, 34, z); \
+            ssj_res = (char *) DXALLOC(ssj_len, TAG_STRING, z); \
 	    strcpy(ssj_res, (x)->u.string); \
 	    strcpy(ssj_res + ssj_r, (y)->u.string); \
 	    free_string_svalue(y); \
@@ -1220,16 +1617,11 @@ call_function_pointer P2(struct funp *, funp, int, num_arg) {
  */
 
 /* push_pop_error_context: Copied directly from Lars version 3.1.1 */
+struct error_context_stack *ecsp = 0;
+
 void push_pop_error_context P1(int, push)
 {
-    static struct error_context_stack {
-	jmp_buf old_error_context;
-	int old_exists_flag;
-	struct control_stack *save_csp;
-	struct object *save_command_giver;
-	struct svalue *save_sp;
-	struct error_context_stack *next;
-    }                  *ecsp = 0, *p;
+    struct error_context_stack *p;
 
     if (push == 1) {
 	/*
@@ -1237,7 +1629,7 @@ void push_pop_error_context P1(int, push)
 	 * a longjmp. The stack will have to be manually popped all the way.
 	 */
 	p = (struct error_context_stack *)
-	    DXALLOC(sizeof(struct error_context_stack), 44, "push_pop_error_context");
+	    DXALLOC(sizeof(struct error_context_stack), TAG_ERROR_CONTEXT, "push_pop_error_context");
 	p->save_sp = sp;
 	p->save_csp = csp;
 	p->save_command_giver = command_giver;
@@ -1314,50 +1706,63 @@ void check_for_destr P1(struct vector *, v)
 static INLINE void do_loop_cond()
 {
     struct svalue *s1, *s2;
-    int is_local, arg2;
+    int i;
     
-    s1 = fp + EXTRACT_UCHAR(pc);    /* a from (a < b) */
-    pc++;
-    if ((is_local = (*pc == F_LOCAL))) {
-	char *tpc;
-	
-	tpc = pc + 1;
-	s2 = fp + EXTRACT_UCHAR(tpc);
-    }
-    /*
-     * we don't want to optimize the case in which 'a' and 'b' from (a < b)
-     * are not both of type 'int' but we don't know the type of 'a' until
-     * runtime. Here, we notice the type is not 'int' and proceed as if the
-     * last opcode was F_LOCAL_NAME instead of F_FOR_COND.
-     */
-    if ((s1->type != T_NUMBER) || (is_local && (s2->type != T_NUMBER))) {
-	sp++;
-	assign_svalue_no_free(sp, s1);
-	if ((sp->type == T_OBJECT) && (sp->u.ob->flags & O_DESTRUCTED)) {
-	    free_svalue(sp, "do_loop_cond");
-	    *sp = const0;
-	}
-	return;
-    }
-    if (is_local) {		/* b from (a < b) was a variable rather than
-				 * a constant */
-	pc += 4;		/* skip LV(index) plus the < and the
-				 * F_BBRANCH... */
-	arg2 = s2->u.number;
-    } else {			/* extract the integer constant */
-	pc++; /* F_NUMBER */
-	LOAD_INT(arg2, pc);
-	pc += 2; /* skip the < and the bbranch */
-    }
-    /* do the branch if (arg1 < arg2) */
-    if (s1->u.number < arg2) {
-	unsigned short offset;
-	
-	COPY_SHORT(&offset, pc);
-	pc -= offset;
-    } else {			/* skip past the offset to the next
-				 * instruction */
-	pc += 2;
+    s1 = fp + EXTRACT_UCHAR(pc++);    /* a from (a < b) */
+    if (*pc++ == F_LOCAL){
+	s2 = fp + EXTRACT_UCHAR(pc++);
+	switch(s1->type | s2->type){
+	    case T_NUMBER: 
+	        i = s1->u.number < s2->u.number;
+	        break;
+	    case T_REAL:
+		i = s1->u.real < s2->u.real;
+		break;
+	    case T_STRING:
+		i = (strcmp(s1->u.string, s2->u.string) < 0);
+		break;
+	    case T_NUMBER|T_REAL:
+		if (s1->type == T_NUMBER) i = s1->u.number < s2->u.real;
+		else i = s1->u.real < s2->u.number;
+		break;
+	    default:
+		if (s1->type == T_OBJECT && (s1->u.ob->flags & O_DESTRUCTED)){
+		    free_object(s1->u.ob, "do_loop_cond:1");
+		    *s1 = const0;
+		}
+		if (s2->type == T_OBJECT && (s2->u.ob->flags & O_DESTRUCTED)){
+		    free_object(s2->u.ob, "do_loop_cond:2");
+		    *s2 = const0;
+		}
+		if (s1->type == T_NUMBER && s2->type == T_NUMBER){
+		    i = 0;
+		    break;
+		}
+		switch(s1->type){
+		    case T_NUMBER:
+		    case T_REAL:
+		        error("2nd argument to < is not numeric when the 1st is.\n");
+		    case T_STRING:
+   		        error("2nd argument to < is not string when the 1st is.\n");
+		    default:
+			error("Bad 1st argument to <.\n");
+	        }
+        }
+	if (i) {
+	    unsigned short offset;
+
+	    COPY_SHORT(&offset, pc);
+	    pc -= offset;
+	} else pc += 2;
+
+    } else {
+	LOAD_INT(i, pc);
+	if (s1->u.number < i){
+	    unsigned short offset;
+
+	    COPY_SHORT(&offset, pc);
+	    pc -= offset;
+	} else pc += 2;
     }
 }
 
@@ -1477,6 +1882,9 @@ call_absolute P1(char *, pc) {
 	     case T_REAL:
 		 lval->u.real++;
 		 break;
+	     case T_LVALUE_BYTE:
+		 ++*glb.u.lvalue_byte;
+		 break;
 	     default:
 		 error("++ of non-numeric argument\n");
 	     }
@@ -1518,7 +1926,7 @@ call_absolute P1(char *, pc) {
 	     push_number(EXTRACT_UCHAR(pc++));
 	     break;
 	 case F_NBYTE:
-	     push_number(-EXTRACT_UCHAR(pc++));
+	     push_number(-((int)EXTRACT_UCHAR(pc++)));
 	     break;
  #ifdef F_JUMP_WHEN_NON_ZERO
 	 case F_JUMP_WHEN_NON_ZERO:
@@ -1897,6 +2305,11 @@ call_absolute P1(char *, pc) {
 		     /* LHS not freed because its being reused */
 		 }
 		 break;
+	     case T_LVALUE_BYTE:
+                 if (sp->type != T_NUMBER)
+                     error("Bad right type to += of char lvalue.\n");
+                 else *glb.u.lvalue_byte += sp->u.number;
+                 break;
 	     default:
 		 bad_arg(1, instruction);
 	     }
@@ -1952,62 +2365,81 @@ call_absolute P1(char *, pc) {
 		break;
 	    }
 	case F_ASSIGN:
-	     if (sp->type & T_LVALUE_BYTE) {
-		 if ((sp - 1)->type != T_NUMBER) {
-		     *sp->u.lvalue_byte = 0;
-		 } else {
-		     *sp->u.lvalue_byte = ((sp - 1)->u.number & 0xff);
-		 }
-	     } else if (sp->type == T_LVALUE) {
-		 assign_svalue(sp->u.lvalue, sp - 1);
 #ifdef DEBUG
-	     } else {
-		 fatal("Bad argument to F_ASSIGN\n");
+             if (sp->type != T_LVALUE) fatal("Bad argument to F_ASSIGN\n");
 #endif
+             switch(sp->u.lvalue->type){
+                 case T_LVALUE_BYTE:
+                     if ((sp - 1)->type != T_NUMBER) {
+                         error("Illegal rhs to char lvalue\n");
+                     } else {
+                         *glb.u.lvalue_byte = ((sp - 1)->u.number & 0xff);
+                     }
+                     break;
+		 default:
+                     assign_svalue(sp->u.lvalue, sp - 1);
+                     break;
+		 case T_LVALUE_RANGE:
+                     assign_lvalue_range(sp - 1);
+                     break;
 	     }
-	     sp--;		/* ignore lvalue */
-	     /* rvalue is already in the correct place */
-	     break;
-	case F_VOID_ASSIGN:
-	     i = sp->type;
-	     lval = (sp--)->u.lvalue;
-	     if (sp->type == T_STRING) {
-		free_svalue(lval, "F_VOID_ASSIGN : 1");
-		if (sp->subtype != STRING_CONSTANT) {
-		    /*
-		     * avoid unnecessary (and costly)
-		     * string_copy()...FREE() or
-		     * ref_string()...free_string()
-		     */
-		    *lval = *sp--;	/* copy string directly */
-		} else {
-		    lval->type = T_STRING;
-		    lval->subtype = STRING_SHARED;
-		    lval->u.string = make_shared_string(sp->u.string);
-		    sp--;
-		}
-	    } else if (sp->type != T_INVALID) {
-		if (i == T_LVALUE_BYTE) {
-		    if (sp->type != T_NUMBER) {
-			*((sp+1)->u.lvalue_byte) = 0;
-			free_svalue(sp--, "F_VOID_ASSIGN : 2");
-		    } else {
-			*((sp+1)->u.lvalue_byte) = sp->u.number & 0xff;
-			sp--;
-		    }
-		} else if (i == T_LVALUE) {
-		    free_svalue(lval, "F_VOID_ASSIGN : 3");
-		    *lval = *sp--;
+             sp--;              /* ignore lvalue */
+             /* rvalue is already in the correct place */
+             break;
+	 case F_VOID_ASSIGN:
 #ifdef DEBUG
-		} else {
-		    fatal("Bad argument to F_VOID_ASSIGN\n");
+             if (sp->type != T_LVALUE) fatal("Bad argument to F_VOID_ASSIGN\n");
 #endif
-		}
-	    } else sp--;
-	    break;
+             lval = (sp--)->u.lvalue;
+             if (sp->type != T_INVALID){
+                 switch(lval->type){
+                     case T_LVALUE_BYTE:
+                     {
+                         if (sp->type != T_NUMBER){
+                             error("Illegal rhs to char lvalue\n");
+                         } else {
+                             *glb.u.lvalue_byte = (sp--)->u.number & 0xff;
+                         }
+                         break;
+                     }
+
+                     case T_STRING:
+                     {
+                         free_svalue(lval, "F_VOID_ASSIGN : 2");
+                         if (sp->subtype != STRING_CONSTANT) {
+                             /*
+                              * avoid unnecessary (and costly)
+                              * string_copy()...FREE() or
+                              * ref_string()...free_string()
+                              */
+                             *lval = *sp--;     /* copy string directly */
+                         } else {
+                             lval->type = T_STRING;
+                             lval->subtype = STRING_SHARED;
+                             lval->u.string = make_shared_string((sp--)->u.string);
+                         }
+                         break;
+                     }
+
+                     case T_LVALUE_RANGE:
+                     {
+                         copy_lvalue_range(sp--);
+                         break;
+                     }
+
+                     default:
+                     {
+                         free_svalue(lval, "F_VOID_ASSIGN : 3");
+                         *lval = *sp--;
+                     }
+                 }
+             } else sp--;
+             break;
+#ifdef DEBUG
 	case F_BREAK_POINT:
 	    break_point();
 	    break;
+#endif
 	case F_BREAK:
 	    pc = current_prog->p.i.program + *break_sp++;
 	    break;
@@ -2031,8 +2463,7 @@ call_absolute P1(char *, pc) {
 		if (funp->flags & NAME_UNDEFINED)
 		    error("Undefined function: %s\n", funp->name);
 		/* Save all important global stack machine registers */
-		push_control_stack(funp);	/* return pc is adjusted
-						 * later */
+		push_control_stack(FRAME_FUNCTION, funp);
 		
 		caller_type = ORIGIN_LOCAL;
 		/* This assigment must be done after push_control_stack() */
@@ -2041,8 +2472,8 @@ call_absolute P1(char *, pc) {
 		 * If it is an inherited function, search for the real
 		 * definition.
 		 */
-		csp->num_local_variables = EXTRACT_UCHAR(pc);
-		pc++;
+		csp->num_local_variables = EXTRACT_UCHAR(pc++);
+		function_index_offset = variable_index_offset = 0;
 		funp = setup_new_frame(funp);
 		csp->pc = pc;	/* The corrected return address */
 #ifdef LPC_TO_C
@@ -2062,6 +2493,32 @@ call_absolute P1(char *, pc) {
 		    *sp++ = ret;
 		}
 #endif
+	    }
+	    break;
+       case F_CALL_INHERITED:
+	    {
+		struct inherit *ip = current_prog->p.i.inherit + *pc++;
+		struct program *temp_prog = ip->prog;
+		struct function *funp;
+		
+		LOAD_SHORT(offset, pc);
+
+		funp = &temp_prog->p.i.functions[offset];
+		
+		push_control_stack(FRAME_FUNCTION, funp);
+
+		caller_type = ORIGIN_LOCAL;
+		current_prog = temp_prog;
+		
+		csp->num_local_variables = EXTRACT_UCHAR(pc++);
+		
+		function_index_offset += ip->function_index_offset;
+		variable_index_offset += ip->variable_index_offset;
+		
+		funp = setup_inherited_frame(funp);
+		csp->pc = pc;
+		pc = current_prog->p.i.program + funp->offset;
+		csp->extern_call = 0;
 	    }
 	    break;
 	case F_COMPL:
@@ -2088,6 +2545,10 @@ call_absolute P1(char *, pc) {
 		 sp->type = T_REAL;
 		 sp->u.real = --(lval->u.real);
 		 break;
+	     case T_LVALUE_BYTE:
+		 sp->type = T_NUMBER;
+		 sp->u.number = --(*glb.u.lvalue_byte);
+		 break;
 	     default:
 		error("-- of non-numeric argument\n");
 	     }
@@ -2102,6 +2563,9 @@ call_absolute P1(char *, pc) {
 		 break;
 	     case T_REAL:
 		 lval->u.real--;
+		 break;
+	     case T_LVALUE_BYTE:
+		 --(*glb.u.lvalue_byte);
 		 break;
 	     default:
 		 error("-- of non-numeric argument\n");
@@ -2128,8 +2592,10 @@ call_absolute P1(char *, pc) {
 		case T_NUMBER|T_REAL:
 		    {
 			if ((sp--)->type & T_NUMBER){
+			    if (!((sp+1)->u.number)) error("Division by zero\n");
 			    sp->u.real /= (sp+1)->u.number;
 			} else {
+			    if ((sp+1)->u.real == 0.0) error("Division by 0.0\n");
 			    sp->type = T_REAL;
 			    sp->u.real = sp->u.number / (sp+1)->u.real;
 			}
@@ -2261,99 +2727,172 @@ call_absolute P1(char *, pc) {
 		 sp->type = T_REAL;
 		 sp->u.real = ++lval->u.number;
 		 break;
+	     case T_LVALUE_BYTE:
+		 sp->type = T_NUMBER;
+		 sp->u.number = ++*glb.u.lvalue_byte;
+		 break;
 	     default:
 		 error("++ of non-numeric argument\n");
 	     }
 	     break;
-	case F_INDEX:
-	     switch ((sp-1)->type) {
-	     case T_MAPPING:
-		 {
-		     struct svalue *v;
-		     struct mapping *m;
-		
-		     v = find_in_mapping((sp - 1)->u.map, sp);
-		     pop_stack();/* free b from a[b] */
-		     m = sp->u.map;
-		     assign_svalue_no_free(sp, v);	/* v will always have a
-							 * value */
-		     free_mapping(m);
-		     break;
-		 }
-	     case T_BUFFER:
-		 {
-		     if (sp->type != T_NUMBER) 
-			 error("Indexing a buffer with an illegal type.\n");
-		
-		     i = (sp--)->u.number;
-		     if ((i > sp->u.buf->size) || (i < 0))
-			 error("Buffer index out of bounds.\n");
+	 case F_INDEX:
+             switch (sp->type) {
+		 case T_MAPPING:
+                 {
+                     struct svalue *v;
+                     struct mapping *m;
 
-		     i = sp->u.buf->item[i];
-		     free_buffer(sp->u.buf);
-		     sp->type = T_NUMBER;
-		     sp->u.number = i;
-		     break;
-		 }
-	     case T_STRING:
-		 {
-		     if (sp->type != T_NUMBER) {
-			 error("Indexing a string with an illegal type.\n");
-		     }
-		     i = (sp--)->u.number;
-		     if ((i > SVALUE_STRLEN(sp)) || (i < 0)) 
-			 error("String index out of bounds.\n");
-		     i = (unsigned char) sp->u.string[i];
-		     free_string_svalue(sp);
-		     sp->type = T_NUMBER;
-		     sp->u.number = i;
-		     break;
-		 }
+                     v = find_in_mapping(m = sp->u.map, sp - 1);
+                     assign_svalue(--sp, v);    /* v will always have a
+                                                 * value */
+                     free_mapping(m);
+                     break;
+                 }
+		 case T_BUFFER:
+                 {
+                     if ((sp-1)->type != T_NUMBER)
+                         error("Indexing a buffer with an illegal type.\n");
+
+                     i = (sp - 1)->u.number;
+                     if ((i > sp->u.buf->size) || (i < 0))
+                         error("Buffer index out of bounds.\n");
+                     i = sp->u.buf->item[i];
+                     free_buffer(sp->u.buf);
+                     (--sp)->u.number = i;
+                     break;
+                 }
+		 case T_STRING:
+                 {
+                     if ((sp-1)->type != T_NUMBER) {
+                         error("Indexing a string with an illegal type.\n");
+                     }
+                     i = (sp - 1)->u.number;
+                     if ((i > SVALUE_STRLEN(sp)) || (i < 0))
+                         error("String index out of bounds.\n");
+                     i = (unsigned char) sp->u.string[i];
+                     free_string_svalue(sp);
+                     (--sp)->u.number = i;
+                     break;
+                 }
 #ifndef NEW_FUNCTIONS
-	     case T_FUNCTION:
-		 {
-		     struct funp *f;
+		 case T_FUNCTION:
+                 {
+                     struct funp *f;
 
-		     if (sp->type != T_NUMBER) 
-			 error("Indexing a function with an illegal type\n");
-		     i = (sp--)->u.number;
-		     if (i<0 || i>1)
-			 error("Function variables may only be indexed with 0 or 1.\n");
-		     f = sp->u.fp;
-		     assign_svalue_no_free(sp, i ? &f->fun : &f->obj);
-		     free_funp(f);
-		     break;
-		 }
+                     if ((sp-1)->type != T_NUMBER)
+                         error("Indexing a function with an illegal type\n");
+                     i = (sp - 1)->u.number;
+                     if (i<0 || i>1)
+                         error("Function variables may only be indexed with 0 or 1.\n");
+                     f = sp->u.fp;
+                     assign_svalue_no_free(--sp, i ? &f->fun : &f->obj);
+                     free_funp(f);
+                     break;
+                 }
 #endif
-	     case T_POINTER:
-		 {
-		     struct vector *vec;
+		 case T_POINTER:
+                 {
+                     struct vector *vec;
 
-		     if (sp->type != T_NUMBER)
-			 error("Indexing an array with an illegal type\n");
-		     i = (sp--)->u.number;
-		     if (i<0) error("Illegal index.\n");
-		     vec = sp->u.vec;
-		     if (i >= vec->size) error("Index out of bounds.\n");
-		     assign_svalue_no_free(sp, &vec->item[i]);
-		     free_vector(vec);
-		     break;
-		 }
-	     default:
-		 error("Indexing on illegal type.\n");
-	     }
+                     if ((sp-1)->type != T_NUMBER)
+                         error("Indexing an array with an illegal type\n");
+                     i = (sp - 1)->u.number;
+                     if (i<0) error("Negative index passed to array.\n");
+                     vec = sp->u.vec;
+                     if (i >= vec->size) error("Array index out of bounds.\n");
+                     assign_svalue_no_free(--sp, &vec->item[i]);
+                     free_vector(vec);
+                     break;
+                 }
+		 default:
+                 error("Indexing on illegal type.\n");
+             }
 
-	     /*
-	      * Fetch value of a variable. It is possible that it is a
-	      * variable that points to a destructed object. In that case,
-	      * it has to be replaced by 0.
-	      */
-	     if (sp->type == T_OBJECT && (sp->u.ob->flags & O_DESTRUCTED)) {
-		 free_object(sp->u.ob, "F_INDEX");
-		 sp->type = T_NUMBER;
-		 sp->u.number = 0;
-	     }
-	     break;
+             /*
+              * Fetch value of a variable. It is possible that it is a
+              * variable that points to a destructed object. In that case,
+              * it has to be replaced by 0.
+              */
+             if (sp->type == T_OBJECT && (sp->u.ob->flags & O_DESTRUCTED)) {
+                 free_object(sp->u.ob, "F_INDEX");
+                 sp->type = T_NUMBER;
+                 sp->u.number = 0;
+             }
+             break;
+	 case F_RINDEX:
+             switch (sp->type) {
+		 case T_BUFFER:
+                 {
+                     if ((sp-1)->type != T_NUMBER)
+                         error("Indexing a buffer with an illegal type.\n");
+
+                     i = sp->u.buf->size - (sp - 1)->u.number;
+                     if ((i > sp->u.buf->size) || (i < 0))
+                         error("Buffer index out of bounds.\n");
+
+                     i = sp->u.buf->item[i];
+                     free_buffer(sp->u.buf);
+                     (--sp)->u.number = i;
+                     break;
+                 }
+		 case T_STRING:
+                 {
+                     int len = SVALUE_STRLEN(sp);
+                     if ((sp-1)->type != T_NUMBER) {
+                         error("Indexing a string with an illegal type.\n");
+                     }
+                     i = len - (sp - 1)->u.number;
+                     if ((i > len) || (i < 0))
+                         error("String index out of bounds.\n");
+                     i = (unsigned char) sp->u.string[i];
+                     free_string_svalue(sp);
+                     (--sp)->u.number = i;
+                     break;
+                 }
+#ifndef NEW_FUNCTIONS
+		 case T_FUNCTION:
+                 {
+                     struct funp *f;
+
+                     if ((sp-1)->type != T_NUMBER)
+                         error("Indexing a function with an illegal type\n");
+                     i = 2 - (sp - 1)->u.number;
+                     if (i<0 || i>1)
+                         error("Function variables may only be indexed with 0 or 1.\n");
+                     f = sp->u.fp;
+                     assign_svalue_no_free(--sp, i ? &f->fun : &f->obj);
+                     free_funp(f);
+                     break;
+                 }
+#endif
+		 case T_POINTER:
+                 {
+                     struct vector *vec = sp->u.vec;
+
+                     if ((sp-1)->type != T_NUMBER)
+                         error("Indexing an array with an illegal type\n");
+                     i = vec->size - (sp - 1)->u.number;
+                     if (i<0) error("Negative index passed to array.\n");
+                     if (i >= vec->size) error("Array index out of bounds.\n");
+                     assign_svalue_no_free(--sp, &vec->item[i]);
+                     free_vector(vec);
+                     break;
+                 }
+		 default:
+                 error("Indexing from the right on illegal type.\n");
+             }
+
+             /*
+              * Fetch value of a variable. It is possible that it is a
+              * variable that points to a destructed object. In that case,
+              * it has to be replaced by 0.
+              */
+             if (sp->type == T_OBJECT && (sp->u.ob->flags & O_DESTRUCTED)) {
+                 free_object(sp->u.ob, "F_RINDEX");
+                 sp->type = T_NUMBER;
+                 sp->u.number = 0;
+             }
+             break;
 #ifdef F_JUMP_WHEN_ZERO
 	case F_JUMP_WHEN_ZERO:
 	    if ((i = (sp->type == T_NUMBER)) && sp->u.number == 0) {
@@ -2503,8 +3042,8 @@ call_absolute P1(char *, pc) {
 		 error("Bad argument to unary minus\n");
 	     break;
 	case F_NOT:
-	    if (sp->type == T_NUMBER && sp->u.number == 0)
-		sp->u.number = 1;
+	    if (sp->type == T_NUMBER)
+		sp->u.number = !sp->u.number;
 	    else
 		assign_svalue(sp, &const0);
 	    break;
@@ -2536,6 +3075,10 @@ call_absolute P1(char *, pc) {
 		 sp->type = T_REAL;
 		 sp->u.real = lval->u.real--;
 		 break;
+	     case T_LVALUE_BYTE:
+		 sp->type = T_NUMBER;
+		 sp->u.number = (*glb.u.lvalue_byte)--;
+		 break;
 	     default:
 		error("-- of non-numeric argument\n");
 	     }
@@ -2553,6 +3096,10 @@ call_absolute P1(char *, pc) {
 		 sp->type = T_REAL;
 		 sp->u.real = lval->u.real++;
 		 break;
+	     case T_LVALUE_BYTE:
+		 sp->type = T_NUMBER;
+		 sp->u.number = (*glb.u.lvalue_byte)++;
+		 break;
 	     default:
 		 error("++ of non-numeric argument\n");
 	     }
@@ -2562,12 +3109,42 @@ call_absolute P1(char *, pc) {
 	     sp->u.lvalue = find_value((int) (EXTRACT_UCHAR(pc++) +
 					      variable_index_offset));
 	     break;
-	case F_INDEXED_LVALUE:
-	    push_indexed_lvalue();
-	    break;
-	case F_RANGE:
-	    f_range();
-	    break;
+	case F_INDEX_LVALUE:
+             push_indexed_lvalue(0);
+             break;
+	case F_RINDEX_LVALUE:
+             push_indexed_lvalue(1);
+             break;
+	case F_NN_RANGE_LVALUE:
+             push_lvalue_range(0x00);
+             break;
+	case F_RN_RANGE_LVALUE:
+             push_lvalue_range(0x10);
+             break;
+	case F_RR_RANGE_LVALUE:
+             push_lvalue_range(0x11);
+             break;
+	case F_NR_RANGE_LVALUE:
+             push_lvalue_range(0x01);
+             break;
+	case F_NN_RANGE:
+             f_range(0x00);
+             break;
+	case F_RN_RANGE:
+             f_range(0x10);
+             break;
+	case F_NR_RANGE:
+             f_range(0x01);
+             break;
+	case F_RR_RANGE:
+             f_range(0x11);
+             break;
+	case F_NE_RANGE:
+             f_extract_range(0);
+             break;
+	case F_RE_RANGE:
+             f_extract_range(1);
+             break;
 	case F_RETURN:
 	    {
 		struct svalue sv;
@@ -2617,6 +3194,14 @@ call_absolute P1(char *, pc) {
 	     (++sp)->type = T_STRING;
 	     sp->subtype = STRING_SHARED;
 	     sp->u.string = ref_string(current_prog->p.i.strings[offset]);
+	     break;
+	case F_SHORT_STRING:
+	     DEBUG_CHECK1(EXTRACT_UCHAR(pc) >= current_prog->p.i.num_strings,
+                          "string %d out of range in F_STRING!\n",
+			  EXTRACT_UCHAR(pc));
+	     (++sp)->type = T_STRING;
+	     sp->subtype = STRING_SHARED;
+	     sp->u.string = ref_string(current_prog->p.i.strings[EXTRACT_UCHAR(pc++)]);
 	     break;
 	case F_SUBTRACT:
 	    {
@@ -2768,7 +3353,7 @@ call_absolute P1(char *, pc) {
 static void
 do_catch P2(char *, pc, unsigned short, new_pc_offset)
 {
-    push_control_stack(0);
+    push_control_stack(FRAME_CATCH, 0);
     /* next two probably not necessary... */
     csp->pc = current_prog->p.i.program + new_pc_offset;
     csp->num_local_variables = (csp - 1)->num_local_variables;	/* marion */
@@ -2858,13 +3443,24 @@ typedef struct cache_entry_s {
     int variable_index_offset;
 }             cache_entry_t;
 
+static cache_entry_t cache[APPLY_CACHE_SIZE];
+
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_apply_low_cache() {
+    int i;
+    for (i = 0; i < APPLY_CACHE_SIZE; i++) {
+	if (cache[i].id && !cache[i].progp)
+	    EXTRA_REF(BLOCK(cache[i].name))++;
+    }
+}
+#endif
+
 int apply_low P3(char *, fun, struct object *, ob, int, num_arg)
 {
     /*
      * static memory is initialized to zero by the system or so Jacques says
      * :)
      */
-    static cache_entry_t cache[APPLY_CACHE_SIZE];
     cache_entry_t *entry;
     struct function *pr;
     struct program *progp;
@@ -2935,7 +3531,7 @@ int apply_low P3(char *, fun, struct object *, ob, int, num_arg)
 		 * the cache will tell us in which program the function is,
 		 * and where
 		 */
-		push_control_stack(entry->pr);
+	        push_control_stack(FRAME_FUNCTION, entry->pr);
 		caller_type = local_call_origin;
 		csp->num_local_variables = num_arg;
 		current_prog = entry->progp;
@@ -2958,7 +3554,7 @@ int apply_low P3(char *, fun, struct object *, ob, int, num_arg)
 		    do_trace_call(pr);
 		}
 #endif
-		break_sp = (short *) (sp + 1);
+
 #ifdef OLD_PREVIOUS_OBJECT_BEHAVIOUR
 		/*
 		 * Now, previous_object() is always set, even by
@@ -2987,9 +3583,9 @@ int apply_low P3(char *, fun, struct object *, ob, int, num_arg)
 	    if (!entry->progp && entry->id) {
 		/*
 		 * The old cache entry was for an undefined function, so the
-		 * name had to be malloced
+		 * name had to be allocated
 		 */
-		FREE(entry->name);
+		free_string(entry->name);
 	    }
 #ifdef CACHE_STATS
 	    if (!entry->id) {
@@ -3012,8 +3608,6 @@ int apply_low P3(char *, fun, struct object *, ob, int, num_arg)
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
 		i = lookup_function(progp->p.i.functions,
 				    progp->p.i.tree_r, funname);
-		/* check for NAME_COLON_COLON unnecessary b/c those names
-		   don't get into the function table. */
 		if (i == -1 || 
 		    (progp->p.i.functions[i].flags & NAME_UNDEFINED)
 		    || ((progp->p.i.functions[i].type & (TYPE_MOD_STATIC | TYPE_MOD_PRIVATE))
@@ -3031,15 +3625,13 @@ int apply_low P3(char *, fun, struct object *, ob, int, num_arg)
 			continue;
 		    if (pr->flags & NAME_UNDEFINED)
 			continue;
-		    if ((pr->flags & NAME_COLON_COLON) && *funname != APPLY___INIT_SPECIAL_CHAR)
-			continue;
 		    /* Static functions may not be called from outside. */
 		    if ((pr->type & (TYPE_MOD_STATIC | TYPE_MOD_PRIVATE)) &&
 			current_object != ob && !(local_call_origin & (ORIGIN_DRIVER | ORIGIN_CALL_OUT))) {
 			continue;
 		    }
 #endif
-		    push_control_stack(pr);
+		    push_control_stack(FRAME_FUNCTION, pr);
 		    caller_type = local_call_origin;
 		    /* The searched function is found */
 		    entry->id = progp->p.i.id_number;
@@ -3073,7 +3665,8 @@ int apply_low P3(char *, fun, struct object *, ob, int, num_arg)
 	    }
 	    /* We have to mark a function not to be in the object */
 	    entry->id = progp->p.i.id_number;
-	    entry->name = string_copy(fun);
+	    /* Beek - 99% of the time it's a shared string already */
+	    entry->name = make_shared_string(fun);
 	    entry->progp = (struct program *) 0;
 	}
 #ifndef NO_SHADOWS
@@ -3104,7 +3697,6 @@ int apply_low P3(char *, fun, struct object *, ob, int, num_arg)
 
 static struct svalue *sapply P3(char *, fun, struct object *, ob, int, num_arg)
 {
-    static struct svalue ret_value = {T_NUMBER};
     IF_DEBUG(struct svalue *expected_sp);
 
 #ifdef TRACE
@@ -3116,11 +3708,11 @@ static struct svalue *sapply P3(char *, fun, struct object *, ob, int, num_arg)
     IF_DEBUG(expected_sp = sp - num_arg);
     if (apply_low(fun, ob, num_arg) == 0)
 	return 0;
-    free_svalue(&ret_value, "sapply");
-    ret_value = *sp--;
+    free_svalue(&apply_ret_value, "sapply");
+    apply_ret_value = *sp--;
     DEBUG_CHECK(expected_sp != sp,
 		"Corrupt stack pointer.\n");
-    return &ret_value;
+    return &apply_ret_value;
 }
 
 struct svalue *apply P4(char *, fun, struct object *, ob, int, num_arg,
@@ -3129,6 +3721,61 @@ struct svalue *apply P4(char *, fun, struct object *, ob, int, num_arg,
     tracedepth = 0;
     call_origin = where;
     return sapply(fun, ob, num_arg);
+}
+
+/* Reason for the following 1. save cache space 2. speed :) */
+/* The following is to be called only from reset_object for */
+/* otherwise extra checks are needed - Sym                  */
+
+void call___INIT P1(struct object *, ob)
+{
+    struct function *pr;
+    struct program *progp;
+    int num_functions;
+    IF_DEBUG(struct svalue *expected_sp);
+    IF_DEBUG(struct control_stack *save_csp);
+
+    tracedepth = 0;
+    
+#ifdef TRACE
+    if (TRACEP(TRACE_APPLY)) {
+        do_trace("Apply", "", "\n");
+    }
+#endif
+
+    IF_DEBUG(expected_sp = sp);
+    
+    /* No try_reset here for obvious reasons :) */
+
+    ob->flags &= ~O_RESET_STATE;
+
+    progp = ob->prog;
+    num_functions = progp->p.i.num_functions;
+    if (!num_functions) return;
+
+    /* ___INIT turns out to be always the last function */
+    pr = progp->p.i.functions + num_functions - 1;
+    if (*pr->name != APPLY___INIT_SPECIAL_CHAR) return;
+    push_control_stack(FRAME_FUNCTION, pr);
+    caller_type = ORIGIN_DRIVER;
+    csp->num_local_variables = 0;
+    current_prog = progp;
+
+    pr = setup_new_frame(pr);
+#ifdef OLD_PREVIOUS_OBJECT_BEHAVIOUR
+    if (current_object != ob)
+#endif
+	previous_ob = current_object;
+    
+    current_object = ob;
+    IF_DEBUG(save_csp = csp);
+    call_program(current_prog, pr->offset);
+
+    DEBUG_CHECK(save_csp - 1 != csp,
+		"Bad csp after execution in apply_low\n");
+    sp--;
+    DEBUG_CHECK(expected_sp != sp,
+                "Corrupt stack pointer.\n");
 }
 
 /*
@@ -3340,7 +3987,7 @@ void call_function P2(struct program *, progp, struct function *, pr)
 {
     if (pr->flags & NAME_UNDEFINED)
 	return;
-    push_control_stack(pr);
+    push_control_stack(FRAME_FUNCTION, pr);
     caller_type = ORIGIN_DRIVER;
     DEBUG_CHECK(csp != control_stack,
 		"call_function with bad csp\n");
@@ -3483,6 +4130,7 @@ char *dump_trace P1(int, how)
 {
     struct control_stack *p;
     char *ret = 0;
+    struct function *funp;
 
 #if defined(ARGUMENTS_IN_TRACEBACK) || defined(LOCALS_IN_TRACEBACK)
     struct svalue *ptr;
@@ -3500,65 +4148,110 @@ char *dump_trace P1(int, how)
 	(void) last_instructions();
 #endif
     for (p = &control_stack[0]; p < csp; p++) {
-	debug_message("'%15s' in '%20s' ('%20s') %s\n",
-		      p[0].funp ? p[0].funp->name : "CATCH",
-		      p[1].prog->name, p[1].ob->name,
+      switch (p[0].framekind) {
+      case FRAME_FUNCTION:
+          debug_message("'%15s' in '%20s' ('%20s') %s\n",
+		      p[0].fr.func->name, p[1].prog->name, p[1].ob->name,
 		      get_line_number(p[1].pc, p[1].prog));
+	  if (strcmp(p[0].fr.func->name, "heart_beat") == 0)
+              ret = p->ob ? p->ob->name : 0;
+          funp = p[0].fr.func;
+          break;
+      case FRAME_FUNP:
+          debug_message("'     <function>' in '%20s' ('%20s') %s\n",
+                        p[1].prog->name, p[1].ob->name,
+                        get_line_number(p[1].pc, p[1].prog));
+          funp = (struct function *)&p[0].fr.funp->f.a;
+          break;
+      case FRAME_FAKE:
+          debug_message("'     <function>' in '%20s' ('%20s') %s\n",
+                        p[1].prog->name, p[1].ob->name,
+                        get_line_number(p[1].pc, p[1].prog));
+          funp = 0;
+          break;
+      case FRAME_CATCH:
+          debug_message("'          CATCH' in '%20s' ('%20s') %s\n",
+                        p[1].prog->name, p[1].ob->name,
+                        get_line_number(p[1].pc, p[1].prog));
+          funp = 0;
+          break;
+      }
 #ifdef ARGUMENTS_IN_TRACEBACK
-	if (p[0].funp) {
-	    ptr = p[1].fp;
-	    debug_message("arguments were (");
-	    for (i = 0; i < p[0].funp->num_arg; i++) {
+      if (funp) {
+	  ptr = p[1].fp;
+          debug_message("arguments were (");
+          for (i = 0; i < funp->num_arg; i++) {
 		char *buf;
 
 		if (i) {
 		    debug_message(",");
 		}
-		buf = (char *) DMALLOC(50, 0, "dump_trace:1");
+		buf = (char *) DMALLOC(50, TAG_TEMPORARY, "dump_trace:1");
 		*buf = 0;
 		svalue_to_string(&ptr[i], &buf, 50, 0, 0, 0);
 		debug_message("%s", buf);
 		FREE(buf);
 	    }
 	    debug_message(")\n");
-	}
+      }
 #endif
 #ifdef LOCALS_IN_TRACEBACK
-	if (p[0].funp && p[0].funp->num_local) {
-	    ptr = p[1].fp + p[0].funp->num_arg;
-	    debug_message("locals were: ");
-	    for (i = 0; i < p[0].funp->num_local; i++) {
-		char *buf;
-
-		if (i) {
-		    debug_message(",");
-		}
-		buf = (char *) DMALLOC(50, 0, "dump_trace:2");
-		*buf = 0;
+      if (funp && funp->num_local) {
+	  ptr = p[1].fp + funp->num_arg;
+	  debug_message("locals were: ");
+	  for (i = 0; i < funp->num_local; i++) {
+	      char *buf;
+	      
+	      if (i) {
+		  debug_message(",");
+	      }
+	      buf = (char *) DMALLOC(50, TAG_TEMPORARY, "dump_trace:2");
+	      *buf = 0;
 		svalue_to_string(&ptr[i], &buf, 50, 0, 0, 0);
-		debug_message("%s", buf);
-		FREE(buf);
-	    }	
-	    debug_message("\n");
-	}
+	      debug_message("%s", buf);
+	      FREE(buf);
+	  }	
+	  debug_message("\n");
+      }
 #endif
-	if (p->funp && strcmp(p->funp->name, "heart_beat") == 0)
-	    ret = p->ob ? p->ob->name : 0;	/* crash unliked gc */
     }
-    debug_message("'%15s' in '%20s' ('%20s') %s\n",
-		  p[0].funp ? p[0].funp->name : "CATCH",
-		  current_prog->name, current_object->name,
-		  get_line_number(pc, current_prog));
+    switch (p[0].framekind) {
+    case FRAME_FUNCTION:
+      debug_message("'%15s' in '%20s' ('%20s') %s\n",
+                    p[0].fr.func->name,
+                    current_prog->name, current_object->name,
+                    get_line_number(pc, current_prog));
+      funp = p[0].fr.func;
+      break;
+    case FRAME_FUNP:
+      debug_message("'     <function>' in '%20s' ('%20s') %s\n",
+                    current_prog->name, current_object->name,
+                    get_line_number(pc, current_prog));
+      funp = (struct function *)&p[0].fr.funp->f.a;
+      break;
+    case FRAME_FAKE:
+      debug_message("'     <function>' in '%20s' ('%20s') %s\n",
+                    current_prog->name, current_object->name,
+                    get_line_number(pc, current_prog));
+      funp = 0;
+      break;
+    case FRAME_CATCH:
+      debug_message("'          CATCH' in '%20s' ('%20s') %s\n",
+                    current_prog->name, current_object->name,
+                    get_line_number(pc, current_prog));
+      funp = 0;
+      break;
+    }
 #ifdef ARGUMENTS_IN_TRACEBACK
-    if (p[0].funp) {
+    if (funp) {
 	debug_message("arguments were (");
-	for (i = 0; i < p[0].funp->num_arg; i++) {
+	for (i = 0; i < funp->num_arg; i++) {
 	    char *buf;
 
 	    if (i) {
 		debug_message(",");
 	    }
-	    buf = (char *) DMALLOC(50, 0, "dump_trace:3");
+	    buf = (char *) DMALLOC(50, TAG_TEMPORARY, "dump_trace:3");
 	    *buf = 0;
 	    svalue_to_string(&fp[i], &buf, 50, 0, 0, 0);
 	    debug_message("%s", buf);
@@ -3568,16 +4261,16 @@ char *dump_trace P1(int, how)
     }
 #endif
 #ifdef LOCALS_IN_TRACEBACK
-    if (p[0].funp && p[0].funp->num_local) {
-	ptr = fp + p[0].funp->num_arg;
+    if (funp && funp->num_local) {
+	ptr = fp + funp->num_arg;
 	debug_message("locals were: ");
-	for (i = 0; i < p[0].funp->num_local; i++) {
+	for (i = 0; i < funp->num_local; i++) {
 	    char *buf;
 
 	    if (i) {
 		debug_message(",");
 	    }
-	    buf = (char *) DMALLOC(50, 0, "dump_trace:4");
+	    buf = (char *) DMALLOC(50, TAG_TEMPORARY, "dump_trace:4");
 	    *buf = 0;
 	    svalue_to_string(&ptr[i], &buf, 50, 0, 0, 0);
 	    debug_message("%s", buf);
@@ -3596,6 +4289,7 @@ struct vector *get_svalue_trace()
     struct mapping *m;
     char *file;
     int line;
+    struct function *funp;
 
 #if defined(ARGUMENTS_IN_TRACEBACK) || defined(LOCALS_IN_TRACEBACK)
     struct svalue *ptr;
@@ -3613,17 +4307,34 @@ struct vector *get_svalue_trace()
     v = allocate_empty_array((csp - &control_stack[0]) + 1);
     for (p = &control_stack[0]; p < csp; p++) {
 	m = allocate_mapping(6);
-	add_mapping_string(m, "function", (p[0].funp ? p[0].funp->name : "CATCH"));
+        switch (p[0].framekind) {
+	  case FRAME_FUNCTION:
+	    add_mapping_string(m, "function", p[0].fr.func->name);
+	    funp = p[0].fr.func;
+	    break;
+	  case FRAME_CATCH:
+	    add_mapping_string(m, "function", "CATCH");
+	    funp = 0;
+	    break;
+	  case FRAME_FAKE:
+	    add_mapping_string(m, "function", "<function>");
+	    funp = 0;
+	    break;
+	  case FRAME_FUNP:
+	    add_mapping_string(m, "function", "<function>");
+	    funp = (struct function *)&p[0].fr.funp->f.a;
+	    break;
+        }
 	add_mapping_string(m, "program", p[1].prog->name);
 	add_mapping_object(m, "object", p[1].ob);
 	get_explicit_line_number_info(p[1].pc, p[1].prog, &file, &line);
 	add_mapping_string(m, "file", file);
 	add_mapping_pair(m, "line", line);
 #ifdef ARGUMENTS_IN_TRACEBACK
-	if (p[0].funp) {
+	if (funp) {
 	    struct vector *v2;
 
-	    n = p[0].funp->num_arg;
+	    n = funp->num_arg;
 	    ptr = p[1].fp;
 	    v2 = allocate_empty_array(n);
 	    for (i = 0; i < n; i++) {
@@ -3634,11 +4345,11 @@ struct vector *get_svalue_trace()
 	}
 #endif
 #ifdef LOCALS_IN_TRACEBACK
-	if (p[0].funp) {
+	if (funp) {
 	    struct vector *v2;
 
-	    n = p[0].funp->num_arg;
-	    n2 = p[0].funp->num_local;
+	    n = funp->num_arg;
+	    n2 = funp->num_local;
 	    ptr = p[1].fp;
 	    v2 = allocate_empty_array(n2);
 	    for (i = 0; i < n2; i++) {
@@ -3652,18 +4363,35 @@ struct vector *get_svalue_trace()
 	v->item[(p - &control_stack[0])].u.map = m;
     }
     m = allocate_mapping(6);
-    add_mapping_string(m, "function", (p[0].funp ? p[0].funp->name : "CATCH"));
+    switch (p[0].framekind) {
+    case FRAME_FUNCTION:
+      add_mapping_string(m, "function", p[0].fr.func->name);
+      funp = p[0].fr.func;
+      break;
+    case FRAME_CATCH:
+      add_mapping_string(m, "function", "CATCH");
+      funp = 0;
+      break;
+    case FRAME_FAKE:
+      add_mapping_string(m, "function", "<function>");
+      funp = 0;
+      break;
+    case FRAME_FUNP:
+      add_mapping_string(m, "function", "<function>");
+      funp = (struct function *)&p[0].fr.funp->f.a;
+      break;
+    }
     add_mapping_string(m, "program", current_prog->name);
     add_mapping_object(m, "object", current_object);
     get_line_number_info(&file, &line);
     add_mapping_string(m, "file", file);
     add_mapping_pair(m, "line", line);
 #ifdef ARGUMENTS_IN_TRACEBACK
-    if (p[0].funp) {
+    if (funp) {
 	struct vector *v2;
 
-	n = p[0].funp->num_arg;
-	v2 = allocate_array(n);
+	n = funp->num_arg;
+	v2 = allocate_empty_array(n);
 	for (i = 0; i < n; i++) {
 	    assign_svalue_no_free(&v2->item[i], &fp[i]);
 	}
@@ -3672,12 +4400,12 @@ struct vector *get_svalue_trace()
     }
 #endif
 #ifdef LOCALS_IN_TRACEBACK
-    if (p[0].funp) {
+    if (funp) {
 	struct vector *v2;
 
-	n = p[0].funp->num_arg;
-	n2 = p[0].funp->num_local;
-	v2 = allocate_array(n2);
+	n = funp->num_arg;
+	n2 = funp->num_local;
+	v2 = allocate_empty_array(n2);
 	for (i = 0; i < n2; i++) {
 	    assign_svalue_no_free(&v2->item[i], &fp[i + n]);
 	}
@@ -3765,7 +4493,7 @@ int inter_sscanf P4(struct svalue *, arg, struct svalue *, s0, struct svalue *, 
 	     */
 	    if (in_string[0] && num_arg > 0) {
 		number_of_matches++;
-		SSCANF_ASSIGN_SVALUE_STRING(string_copy(in_string));
+		SSCANF_ASSIGN_SVALUE_STRING(string_copy(in_string, "sscanf"));
 	    }
 	    break;
 	}
@@ -3843,7 +4571,7 @@ int inter_sscanf P4(struct svalue *, arg, struct svalue *, s0, struct svalue *, 
 	if (fmt[0] == '\0') {
 	    number_of_matches++;
 	    if (!skipme) {
-		SSCANF_ASSIGN_SVALUE_STRING(string_copy(in_string));
+		SSCANF_ASSIGN_SVALUE_STRING(string_copy(in_string, "sscanf"));
 	    }
 	    break;
 	}
@@ -3881,7 +4609,7 @@ int inter_sscanf P4(struct svalue *, arg, struct svalue *, s0, struct svalue *, 
 	    if (!skipme) {
 		char *match;
 
-		match = DXALLOC(i + 1, 47, "inter_scanf");
+		match = DXALLOC(i + 1, TAG_STRING, "inter_scanf");
 		(void) strncpy(match, in_string, i);
 		match[i] = '\0';
 		SSCANF_ASSIGN_SVALUE_STRING(match);
@@ -3900,7 +4628,7 @@ int inter_sscanf P4(struct svalue *, arg, struct svalue *, s0, struct svalue *, 
 		 * Found a match !
 		 */
 		if (!skipme) {
-		    match = DXALLOC(i + 1, 47, "inter_scanf");
+		    match = DXALLOC(i + 1, TAG_STRING, "inter_scanf");
 		    (void) strncpy(match, in_string, i);
 		    match[i] = '\0';
 		    SSCANF_ASSIGN_SVALUE_STRING(match);
@@ -3992,6 +4720,7 @@ void reset_machine P1(int, first)
     else {
 	pop_n_elems(sp - start_of_stack + 1);
     }
+    break_sp = start_of_switch_stack + RUNTIME_SWITCH_STACK_SIZE;
 }
 
 #ifdef TRACE_CODE
@@ -4045,126 +4774,6 @@ int last_instructions()
 
 #endif				/* TRACE_CODE */
 
-
-#ifdef DEBUG
-
-static void count_inherits P2(struct program *, progp, struct program *, search_prog)
-{
-    int i;
-
-    /* Clones will not add to the ref count of inherited progs */
-    if (progp->p.i.extra_ref != 1)
-	return;			/* marion */
-    for (i = 0; i < (int) progp->p.i.num_inherited; i++) {
-	progp->p.i.inherit[i].prog->p.i.extra_ref++;
-	if (progp->p.i.inherit[i].prog == search_prog)
-	    printf("Found prog, inherited by %s\n", progp->name);
-	count_inherits(progp->p.i.inherit[i].prog, search_prog);
-    }
-}
-
-static void count_ref_in_vector P2(struct svalue *, svp, int, num)
-{
-    struct svalue *p;
-
-    for (p = svp; p < svp + num; p++) {
-	switch (p->type) {
-	case T_OBJECT:
-	    p->u.ob->extra_ref++;
-	    continue;
-	case T_POINTER:
-	    count_ref_in_vector(&p->u.vec->item[0], p->u.vec->size);
-	    p->u.vec->extra_ref++;
-	    continue;
-	}
-    }
-}
-
-/*
- * Clear the extra debug ref count for vectors
- */
-static void clear_vector_refs P2(struct svalue *, svp, int, num)
-{
-    struct svalue *p;
-
-    for (p = svp; p < svp + num; p++) {
-	switch (p->type) {
-	case T_POINTER:
-	    clear_vector_refs(&p->u.vec->item[0], p->u.vec->size);
-	    p->u.vec->extra_ref = 0;
-	    continue;
-	}
-    }
-}
-
-/*
- * Loop through every object and variable in MudOS and check
- * all reference counts. This will surely take some time, and should
- * only be used for debugging.
- */
-void check_a_lot_ref_counts P1(struct program *, search_prog)
-{
-    struct object *ob;
-
-    /*
-     * Pass 1: clear the ref counts.
-     */
-    for (ob = obj_list; ob; ob = ob->next_all) {
-	ob->extra_ref = 0;
-	ob->prog->p.i.extra_ref = 0;
-	clear_vector_refs(ob->variables, ob->prog->p.i.num_variables);
-    }
-    clear_vector_refs(start_of_stack, sp - start_of_stack + 1);
-
-    /*
-     * Pass 2: Compute the ref counts.
-     */
-
-    /*
-     * List of all objects.
-     */
-    for (ob = obj_list; ob; ob = ob->next_all) {
-	ob->extra_ref++;
-	count_ref_in_vector(ob->variables, ob->prog->p.i.num_variables);
-	ob->prog->p.i.extra_ref++;
-	if (ob->prog == search_prog)
-	    printf("Found program for object %s\n", ob->name);
-	/* Clones will not add to the ref count of inherited progs */
-	if (ob->prog->p.i.extra_ref == 1)
-	    count_inherits(ob->prog, search_prog);
-    }
-
-    /*
-     * The current stack.
-     */
-    count_ref_in_vector(start_of_stack, sp - start_of_stack + 1);
-    update_ref_counts_for_users();
-    count_ref_from_call_outs();
-    /* Special objects */
-    if (master_ob)
-	master_ob->extra_ref++;
-    if (simul_efun_ob)
-	simul_efun_ob->extra_ref++;
-
-    if (search_prog)
-	return;
-
-    /*
-     * Pass 3: Check the ref counts.
-     */
-    for (ob = obj_list; ob; ob = ob->next_all) {
-	if (ob->ref != ob->extra_ref)
-	    printf("Bad ref count in object %s, is %d - should be %d\n", ob->name,
-		   ob->ref, ob->extra_ref);
-	if (ob->prog->p.i.ref != ob->prog->p.i.extra_ref) {
-	    check_a_lot_ref_counts(ob->prog);
-	    printf("Bad ref count in prog %s, is %d - should be %d\n", ob->prog->name,
-		   ob->prog->p.i.ref, ob->prog->p.i.extra_ref);
-	}
-    }
-}
-
-#endif				/* DEBUG */
 
 #ifdef TRACE
 /* Generate a debug message to the user */
@@ -4300,3 +4909,11 @@ static float _strtof P2(char *, nptr, char **, endptr)
 
     return acc;
 }
+
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_stack() {
+    struct svalue *sv;
+
+    for (sv = start_of_stack; sv <= sp; sv++) mark_svalue(sv);
+}
+#endif

@@ -48,19 +48,18 @@ f_add_action PROT((void))
 	if (sp->type == T_POINTER){
 	    int i, n = sp->u.vec->size;
 	    struct svalue *sv = sp->u.vec->item;
-	    char *func_name = (sp-1)->u.string;
 
 	    for (i = 0; i < n; i++){
 		if (sv[i].type == T_STRING){
-		    add_action(func_name, sv[i].u.string, flag);
+		    add_action(sp-1, sv[i].u.string, flag);
 		}
 	    }
 	    free_vector((sp--)->u.vec);
 	} else {
-	    add_action((sp-1)->u.string, sp->u.string, flag);
+	    add_action((sp-1), sp->u.string, flag);
 	    free_string_svalue(sp--);
 	}
-    } else add_action(sp->u.string, 0, 0);
+    } else add_action(sp, 0, 0);
 }
 #endif
 
@@ -263,7 +262,7 @@ f_capitalize PROT((void))
         if (sp->subtype & STRING_MALLOC) {
             str[0] += 'A' - 'a';
 	} else {
-            str = string_copy(str);
+            str = string_copy(str, "capitalize");
             str[0] += 'A' - 'a';
             free_string_svalue(sp);
             sp->subtype = STRING_MALLOC;
@@ -299,7 +298,7 @@ f_clear_bit PROT((void))
     if (ind >= len) return;         /* return first arg unmodified */
     if (ind < 0) error("clear_bit :: negative bit argument.\n");
     if (!(sp->subtype & STRING_MALLOC)){
-        str = DXALLOC(len + 1, 29, "f_clear_bit: str");
+        str = DXALLOC(len + 1, TAG_STRING, "f_clear_bit: str");
         memcpy(str, sp->u.string, len + 1);       /* including null byte */
     } else str = sp->u.string;
     if (str[ind] > 0x3f + ' ' || str[ind] < ' ')
@@ -414,7 +413,7 @@ f_ctime PROT((void))
 {
     char *cp;
 
-    cp = string_copy(time_string(sp->u.number));
+    cp = string_copy(time_string(sp->u.number), "ctime");
     put_malloced_string(cp);
     /* Now strip the newline. */
     cp = strchr(cp, '\n');
@@ -706,7 +705,8 @@ f_find_living PROT((void))
 {
     ob = find_living_object(sp->u.string, 0);
     free_string_svalue(sp);
-    if (ob) { put_unrefed_object(ob, "find_living"); }
+    /* safe b/c destructed objects have had their living names removed */
+    if (ob) { put_unrefed_undested_object(ob, "find_living"); }
     else *sp = const0;
 }
 #endif
@@ -724,7 +724,8 @@ f_find_object PROT((void))
 	struct object *old_ob = ob;
 	/* object_visible might change ob, a global - Sym */
         if (object_visible(ob)) { 
-	  put_unrefed_object(old_ob, "find_object"); 
+	  /* find_object only returns undested objects */
+	  put_unrefed_undested_object(old_ob, "find_object"); 
 	}
         else *sp = const0;
     } else *sp = const0;
@@ -738,7 +739,7 @@ f_find_player PROT((void))
     ob = find_living_object(sp->u.string, 1);
     free_string_svalue(sp);
     if (ob) { 
-      put_unrefed_object(ob, "find_player"); 
+      put_unrefed_undested_object(ob, "find_player"); 
     }
     else *sp = const0;
 }
@@ -829,8 +830,8 @@ f_get_char PROT((void))
         flag = arg[1].u.number;
     }
     st_num_arg--;
-    i = get_char(arg[0].u.string, flag, st_num_arg, &arg[1 + tmp]);
-    free_string_svalue(arg);
+    i = get_char(arg, flag, st_num_arg, &arg[1 + tmp]);
+    free_svalue(arg, "f_get_char");
     (sp = arg)->type = T_NUMBER;
     sp->u.number = i;
 }
@@ -974,8 +975,8 @@ f_input_to PROT((void))
         flag = arg[1].u.number;
     }
     st_num_arg--;               /* Don't count the name of the func either. */
-    i = input_to(arg[0].u.string, flag, st_num_arg, &arg[1 + tmp]);
-    free_string_svalue(arg);
+    i = input_to(arg, flag, st_num_arg, &arg[1 + tmp]);
+    free_svalue(arg, "f_input_to");
     (sp = arg)->type = T_NUMBER;
     sp->u.number = i;
 }
@@ -1120,7 +1121,7 @@ f_lower_case PROT((void))
     } else {
         char *result;
 
-        result = str = string_copy(sp->u.string);
+        result = str = string_copy(sp->u.string, "lowercase");
         for (; *str; str++)
             if (isalpha(*str))
                 *str |= 'a' - 'A';
@@ -1195,7 +1196,8 @@ f_map PROT((void))
     struct svalue *arg = sp - st_num_arg + 1;
 
     if (arg->type & T_MAPPING) map_mapping(arg, st_num_arg);
-    else map_array(arg, st_num_arg);
+    else if (arg->type & T_POINTER) map_array(arg, st_num_arg);
+    else map_string(arg, st_num_arg);
 }
 #endif
 
@@ -1239,7 +1241,7 @@ f_match_path PROT((void))
 
     string.type = T_STRING;
     string.subtype = STRING_MALLOC;
-    string.u.string = (char *) DMALLOC(strlen(sp->u.string) + 1, 0, "match_path");
+    string.u.string = (char *) DMALLOC(strlen(sp->u.string) + 1, TAG_STRING, "match_path");
 
     src = sp->u.string;
     dst = string.u.string;
@@ -1285,7 +1287,7 @@ f_member_array PROT((void))
     if (sp->type & T_STRING) {
         char *res;
         CHECK_TYPES(sp-1, T_NUMBER, 1, F_MEMBER_ARRAY);
-        if (i >= SVALUE_STRLEN(sp)) error("Index to start search from in member_array() is >= string length.\n");
+        if (i > SVALUE_STRLEN(sp)) error("Index to start search from in member_array() is > string length.\n");
         if (res = strchr(sp->u.string + i, (sp-1)->u.number))
             i = res - sp->u.string;
         else
@@ -1465,6 +1467,7 @@ f_move_object PROT((void))
         if ((o1 = current_object)->flags & O_DESTRUCTED)
             error("move_object(): can't move a destructed object\n");
 
+	move_object(o1, o2);
     } else {
         if ((sp - 1)->type & T_OBJECT)
             o1 = (sp - 1)->u.ob;
@@ -1472,11 +1475,10 @@ f_move_object PROT((void))
             if (!(o1 = find_object((sp - 1)->u.string)))
                 error("move_object(): can't move non-existent object\n");
 	}
-        free_object(o2, "f_move_object");
-        sp--;
+	move_object(o1, o2);
+	pop_stack();
     }
 
-    move_object(o1, o2);
 }
 #endif
 
@@ -1575,9 +1577,7 @@ f_new PROT((void))
     ob = clone_object(sp->u.string);
     free_string_svalue(sp);
     if (ob) {
-        sp->type = T_OBJECT;
-        sp->u.ob = ob;
-        add_ref(ob, "F_NEW");
+	put_unrefed_undested_object(ob, "F_NEW");
     } else *sp = const0;
 }
 #endif
@@ -1740,7 +1740,7 @@ f_previous_object PROT((void))
     if (!ob || (ob->flags & O_DESTRUCTED))
         sp->u.number = 0;
     else {
-        put_unrefed_object(ob, "previous_object()");
+        put_unrefed_undested_object(ob, "previous_object()");
     }
 }
 #endif
@@ -1866,7 +1866,7 @@ f_query_snooping PROT((void))
 {
     ob = query_snooping(sp->u.ob);
     free_object(sp->u.ob, "f_query_snooping");
-    if (ob) { put_unrefed_object(ob, "query_snooping"); }
+    if (ob) { put_unrefed_undested_object(ob, "query_snooping"); }
     else *sp = const0;
 }
 #endif
@@ -1877,7 +1877,7 @@ f_query_snoop PROT((void))
 {
     ob = query_snoop(sp->u.ob);
     free_object(sp->u.ob, "f_query_snoop");
-    if (ob) { put_unrefed_object(ob, "query_snoop"); }
+    if (ob) { put_unrefed_undested_object(ob, "query_snoop"); }
     else *sp = const0;
 }
 #endif
@@ -1975,20 +1975,20 @@ void
 f_read_file PROT((void))
 {
     char *str;
-    int start = 0, len = 0, num_arg = st_num_arg;
-    struct svalue *arg = sp - num_arg + 1;
+    int start,len;
 
-    if (num_arg > 1)
-        start = arg[1].u.number;
-    if (num_arg == 3) {
-        CHECK_TYPES(&arg[2], T_NUMBER, 2, F_READ_FILE);
-        len = arg[2].u.number;
-    }
-    str = read_file(arg[0].u.string, start, len);
-    pop_n_elems(num_arg);
-    if (str == 0)
-        push_number(0);
-    else push_malloced_string(str);
+    if (st_num_arg == 3) {
+        CHECK_TYPES(sp, T_NUMBER, 2, F_READ_FILE);
+        len = (sp--)->u.number;
+    } else len = 0;
+    if (st_num_arg > 1)
+        start = (sp--)->u.number;
+    else start = 0;
+
+    str = read_file(sp->u.string, start, len);
+    free_string_svalue(sp);
+    if (!str) *sp = const0;
+    else { sp->subtype = STRING_MALLOC; sp->u.string = str; }
 }
 #endif
 
@@ -2040,7 +2040,10 @@ f_regexp PROT((void))
     struct vector *v;
     int flag;
     
-    flag = (st_num_arg > 2) ? (sp--)->u.number : 0;
+    if (st_num_arg > 2){
+        if (!(sp->type & T_NUMBER)) error("Bad argument 3 to regexp()\n");
+	flag = (sp--)->u.number;
+    } else flag = 0;
     v = match_regexp((sp - 1)->u.vec, sp->u.string, flag);
 
     free_string_svalue(sp--);
@@ -2161,7 +2164,7 @@ f_replace_string PROT((void))
     dlen = 0;
     cur = 0;
 
-    if (arg->subtype & STRING_MALLOC && rlen <= plen) {
+    if ((arg->subtype & STRING_MALLOC) && rlen <= plen) {
         /* in string replacement */
         dst2 = dst1 = src;
 
@@ -2186,11 +2189,11 @@ f_replace_string PROT((void))
          */
         if (rlen < plen) {
             *dst2 = '\0';
-            arg->u.string = (char *) DREALLOC(dst1, dst2 - dst1 + 2, 200, "f_replace_string: 1");
+            arg->u.string = (char *) DREALLOC(dst1, dst2 - dst1 + 2, TAG_STRING, "f_replace_string: 1");
 	}
         pop_n_elems(st_num_arg - 1);
     } else {
-        dst2 = dst1 = (char *) DMALLOC(max_string_length, 31, "f_replace_string: 2");
+        dst2 = dst1 = (char *) DMALLOC(max_string_length, TAG_STRING, "f_replace_string: 2");
 
         while (*src != '\0') {
             if (strncmp(src, pattern, plen) == 0) {
@@ -2225,7 +2228,7 @@ f_replace_string PROT((void))
         /*
          * shrink block or make a copy of exact size
          */
-        push_malloced_string((char *) DREALLOC(dst1, dst2 - dst1 + 2, 201, "f_replace_string: 3"));
+        push_malloced_string((char *) DREALLOC(dst1, dst2 - dst1 + 2, TAG_STRING, "f_replace_string: 3"));
     }
 }
 #endif
@@ -2260,7 +2263,7 @@ f_restore_object PROT((void))
 void
 f_restore_variable PROT((void)) {
     struct svalue v = { T_NUMBER };
-    char *s = string_copy(sp->u.string);
+    char *s = string_copy(sp->u.string, "restore_variable");
 
     restore_variable(&v, s);
     free_string_svalue(sp);
@@ -2396,7 +2399,7 @@ f_set_bit PROT((void))
     if (ind >= len)
         len = ind + 1;
     if (ind >= old_len || !(sp->subtype & STRING_MALLOC)){
-        str = DXALLOC(len + 1, 32, "f_set_bit");
+        str = DXALLOC(len + 1, TAG_STRING, "f_set_bit");
         str[len] = '\0';
         if (old_len)
             memcpy(str, (sp - 1)->u.string, old_len);
@@ -2633,7 +2636,7 @@ f_sprintf PROT((void))
     if (!s)
         push_number(0);
     else
-        push_malloced_string(string_copy(s));
+        push_malloced_string(string_copy(s, "f_sprintf"));
 }
 #endif
 
@@ -2838,7 +2841,7 @@ f_tell_room PROT((void))
     struct vector *avoid;
     int num_arg = st_num_arg;
     struct svalue *arg = sp - num_arg + 1;
-
+    
     if (arg->type & T_OBJECT) {
         ob = arg[0].u.ob;
     } else {                    /* must be a string... */
@@ -2857,7 +2860,7 @@ f_tell_room PROT((void))
     tell_room(ob, &arg[1], avoid);
     free_vector(avoid);
     free_svalue(arg + 1, "f_tell_room");
-    free_object(ob, "f_tell_room");
+    free_svalue(arg, "f_tell_room");
     *(sp = arg) = const0;
 }
 #endif
@@ -2899,17 +2902,15 @@ f_this_object PROT((void))
 void
 f_this_player PROT((void))
 {
-    if (sp->u.number && current_interactive &&
-        !(current_interactive->flags & O_DESTRUCTED))
-    {
-        put_unrefed_object(current_interactive, "this_player(1)");
+    if (sp->u.number) {
+	if (current_interactive)
+	    put_unrefed_object(current_interactive, "this_player(1)");
+	else sp->u.number = 0;
+    } else {
+	if (command_giver)
+	    put_unrefed_object(command_giver, "this_player(0)");
+	/* else zero is on stack already */
     }
-    else if (command_giver && !(command_giver->flags & O_DESTRUCTED))
-    {
-        put_unrefed_object(command_giver, "this_player(0)");
-    }
-    else
-        sp->u.number = 0;
 }
 #endif
 
@@ -3304,7 +3305,7 @@ f_first_inventory PROT((void))
 {
     ob = first_inventory(sp);
     free_svalue(sp, "f_first_inventory");
-    if (ob) { put_unrefed_object(ob, "first_inventory"); }
+    if (ob) { put_unrefed_undested_object(ob, "first_inventory"); }
     else *sp = const0;
 }
 #endif

@@ -902,7 +902,7 @@ static void new_user_handler()
 	command_giver = master_ob;
 	master_ob->interactive =
 	    (struct interactive *)
-	    DXALLOC(sizeof(struct interactive), 20, "new_user_handler");
+	    DXALLOC(sizeof(struct interactive), TAG_INTERACTIVE, "new_user_handler");
 	total_users++;
 	master_ob->interactive->default_err_message.s = 0;
 	master_ob->flags |= O_ONCE_INTERACTIVE;
@@ -1581,8 +1581,9 @@ void remove_interactive P1(struct object *, ob)
 
 static int call_function_interactive P2(struct interactive *, i, char *, str)
 {
-    char *function;
     struct object *ob;
+    struct funp *funp;
+    char *function;
     struct svalue *args;
     struct sentence *sent;
     int num_arg;
@@ -1611,7 +1612,19 @@ static int call_function_interactive P2(struct interactive *, i, char *, str)
      * because someone might want to set up a new input_to().
      */
     free_object(sent->ob, "call_function_interactive");
-    function = string_copy(command_giver->interactive->input_to->function);
+    /* we put the function on the stack in case of an error */
+    sp++;
+    if (sent->flags & V_FUNCTION) {
+      function = 0;
+      sp->type = T_FUNCTION;
+      sp->u.fp = funp = sent->function.f;
+      funp->ref++;
+    } else {
+      sp->type = T_STRING;
+      sp->subtype = STRING_SHARED;
+      sp->u.string = function = sent->function.s;
+      ref_string(function);
+    }
     ob = sent->ob;
     free_sentence(sent);
 
@@ -1635,20 +1648,22 @@ static int call_function_interactive P2(struct interactive *, i, char *, str)
 	i->iflags &= ~SINGLE_CHAR;
 	add_message("%c%c%c", IAC, WONT, TELOPT_SGA);
     }
-    push_malloced_string(function);	/* push, in case of error */
 
+    push_constant_string(str);
     /*
      * If we have args, we have to push them onto the stack in the order they
      * were in when we got them.  They will be popped off by the called
      * function.
      */
-    push_constant_string(str);
     if (args) {
 	transfer_push_some_svalues(args, num_arg);
 	FREE(args);
     }
     /* current_object no longer set */
-    (void) apply(function, ob, num_arg + 1, ORIGIN_DRIVER);
+    if (function)
+       (void) apply(function, ob, num_arg + 1, ORIGIN_DRIVER);
+    else
+       call_function_pointer(funp, num_arg + 1);
 
     pop_stack();		/* remove `function' from stack */
 

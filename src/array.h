@@ -15,6 +15,7 @@ struct vector *null_array PROT((void));
 struct vector *allocate_array PROT((int));
 struct vector *allocate_empty_array PROT((int));
 void free_vector PROT((struct vector *));
+void free_empty_vector PROT((struct vector *));
 struct vector *add_array PROT((struct vector *, struct vector *));
 struct vector *subtract_array PROT((struct vector *, struct vector *));
 struct vector *slice_array PROT((struct vector *, int, int));
@@ -34,6 +35,7 @@ struct vector *builtin_sort_array PROT((struct vector *, int));
 struct vector *fp_sort_array PROT((struct vector *, struct funp *));
 struct vector *sort_array PROT((struct vector *, char *, struct object *));
 struct vector *make_unique PROT((struct vector *, char *, struct funp *, struct svalue *));
+void map_string PROT((struct svalue *arg, int num_arg));
 void map_array PROT((struct svalue *arg, int num_arg));
 struct vector *intersect_array PROT((struct vector *, struct vector *));
 struct vector *match_regexp PROT((struct vector *, char *, int));
@@ -41,5 +43,8 @@ struct vector *reg_assoc PROT((char *, struct vector *, struct vector *, struct 
 
 #define ALLOC_VECTOR(nelem) \
     (struct vector *)DXALLOC(sizeof (struct vector) + \
-	  sizeof(struct svalue) * (nelem - 1), 121, "ALLOC_VECTOR")
+	  sizeof(struct svalue) * (nelem - 1), TAG_VECTOR, "ALLOC_VECTOR")
+#define RESIZE_VECTOR(vec, nelem) \
+    (struct vector *)DREALLOC(vec, sizeof (struct vector) + \
+	  sizeof(struct svalue) * (nelem - 1), TAG_VECTOR, "RESIZE_VECTOR")
 #endif

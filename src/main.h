@@ -6,7 +6,9 @@
 /*
  * main.c
  */
+#ifdef DEBUG
 extern int d_flag;
+#endif
 extern int t_flag;
 extern int comp_flag;
 extern int time_to_swap;
@@ -29,8 +31,6 @@ extern double consts[];
 extern int slow_shut_down_to_do;
 extern struct object *master_ob;
 
-char *xalloc PROT((int));
-char *string_copy PROT((char *));
 void debug_message PROTVARGS(());
 
 #ifdef TRAP_CRASHES

@@ -13,11 +13,32 @@
 #include "uid.h"
 #include "avltree.h"
 #include "stralloc.h"
+#ifdef DEBUGMALLOC_EXTENSIONS
+#include "md.h"
+#endif
 
 #ifndef NO_UIDS
 static tree *uids = NULL;
 userid_t *backbone_uid = NULL;
 userid_t *root_uid = NULL;
+
+#ifdef DEBUGMALLOC_EXTENSIONS
+static void mark_uid_tree P1(tree *, tr) {
+    DO_MARK(tr, TAG_UID);
+    DO_MARK(tr->tree_p, TAG_UID);
+    
+    EXTRA_REF(BLOCK(((userid_t *)tr->tree_p)->name))++;
+    if (tr->tree_l)
+	mark_uid_tree(tr->tree_l);
+    if (tr->tree_r)
+	mark_uid_tree(tr->tree_r);
+}
+
+void mark_all_uid_nodes() {
+    if (uids)
+	mark_uid_tree(uids);
+}
+#endif
 
 static int uidcmp PROT((userid_t *, userid_t *));
 
@@ -37,9 +58,10 @@ userid_t *add_uid P1(char *, name)
 
     sname = make_shared_string(name);
     t_uid.name = sname;
-    uid = (userid_t *) tree_srch(uids, uidcmp, (char *) &t_uid);
-    if (!uid) {
-	uid = (userid_t *) DMALLOC(sizeof(userid_t), 119, "add_uid");
+    if (uid = (userid_t *) tree_srch(uids, uidcmp, (char *) &t_uid)) {
+	free_string(sname);
+    } else {
+	uid = ALLOCATE(userid_t, TAG_UID, "add_uid");
 	uid->name = sname;
 	tree_add(&uids, uidcmp, (char *) uid, NULL);
     }

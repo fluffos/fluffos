@@ -1,7 +1,9 @@
 #ifdef LATTICE
 #include "/lpc_incl.h"
+#include "/eoperators.h"
 #else
 #include "../lpc_incl.h"
+#include "../eoperators.h"
 #endif
 
 static struct object *ob;

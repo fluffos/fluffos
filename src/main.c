@@ -13,9 +13,13 @@
 #include "stralloc.h"
 #include "otable.h"
 #include "comm.h"
+#include "compiler.h"
+#include "port.h"
 
 static int e_flag = 0;		/* Load empty, without castles. */
+#ifdef DEBUG
 int d_flag = 0;			/* Run with debug */
+#endif
 int t_flag = 0;			/* Disable heart beat and reset */
 int comp_flag = 0;		/* Trace compilations */
 int max_cost;
@@ -39,8 +43,6 @@ double consts[NUM_CONSTS];
 /* -1 indicates that we have never had a master object.  This is so the
  * simul_efun object can load before the master. */
 struct object *master_ob = (struct object *) -1;
-
-static void debug_message_svalue PROT((struct svalue * v));
 
 #ifndef NO_IP_DEMON
 void init_addr_server();
@@ -106,7 +108,7 @@ int main(argc, argv)
 	getcwd(bing, 80);
 	strcat(bing, "\\");
 	strcat(bing, argv[0]);
-	argv[0] = string_copy(bing);
+	argv[0] = string_copy(bing, "main");
     }
     startup_windows(argc, argv);
 }				/* main() */
@@ -256,6 +258,7 @@ int main(argc, argv)
     init_strings();		/* in stralloc.c */
     init_otable();		/* in otable.c */
     init_identifiers();		/* in lex.c */
+    init_locals();              /* in compiler.c */
     /*
      * We estimate that we will need MAX_USERS + MAX_EFUN_SOCKS + 10 file
      * descriptors if the maximum number of users were to log in and all LPC
@@ -323,7 +326,7 @@ int main(argc, argv)
     mud_lib = (char *) MUD_LIB;
     set_inc_list(INCLUDE_DIRS);
     if (reserved_size > 0)
-	reserved_area = (char *) DMALLOC(reserved_size, 69, "main.c: reserved_area");
+	reserved_area = (char *) DMALLOC(reserved_size, TAG_RESERVED, "main.c: reserved_area");
     for (i = 0; i < sizeof consts / sizeof consts[0]; i++)
 	consts[i] = exp(-i / 900.0);
     init_num_args();
@@ -359,7 +362,7 @@ int main(argc, argv)
 	    continue;
 #endif				/* YYDEBUG */
 	case 'm':
-	    mud_lib = string_copy(argv[i] + 2);
+	    mud_lib = string_copy(argv[i] + 2, "mudlib dir");
 	    if (chdir(mud_lib) == -1) {
 		fprintf(stderr, "Bad mudlib directory: %s\n", mud_lib);
 		exit(-1);
@@ -425,9 +428,12 @@ int main(argc, argv)
 	    case 'p':
 		port_number = atoi(argv[i] + 2);
 		continue;
-	    case 'd':
-		d_flag++;
-		continue;
+#ifdef DEBUG
+            case 'd':
+                d_flag++;
+#else
+                fprintf(stderr, "Driver must be compiled with DEBUG on to use -d.\n");
+#endif
 	    case 'c':
 		comp_flag++;
 		continue;
@@ -477,7 +483,11 @@ int main(argc, argv)
     return 0;
 }
 
-char *string_copy P1(char *, str)
+#ifdef DEBUGMALLOC
+char *int_string_copy P2(char *, str, char *, desc)
+#else
+char *int_string_copy P1(char *, str)
+#endif
 {
     char *p;
     int len;
@@ -486,11 +496,11 @@ char *string_copy P1(char *, str)
     len = strlen(str);
     if (len > max_string_length) {
 	len = max_string_length;
-	p = DXALLOC(len + 1, 70, "string_copy");
+	p = DXALLOC(len + 1, TAG_STRING, desc);
 	(void) strncpy(p, str, len);
 	p[len] = '\0';
     } else {
-	p = DXALLOC(len + 1, 70, "string_copy");
+	p = DXALLOC(len + 1, TAG_STRING, desc);
 	(void) strncpy(p, str, len + 1);
     }
     return p;
@@ -559,32 +569,6 @@ void debug_message PVARGS(va_alist)
 	append = 1;
 }
 
-static void debug_message_svalue P1(struct svalue *, v)
-{
-    if (v == 0) {
-	debug_message("<NULL>");
-	return;
-    }
-    switch (v->type) {
-    case T_NUMBER:
-	debug_message("%d", v->u.number);
-	return;
-    case T_STRING:
-	debug_message("\"%s\"", v->u.string);
-	return;
-    case T_OBJECT:
-	debug_message("OBJ(%s)", v->u.ob->name);
-	return;
-    case T_LVALUE:
-	debug_message("Pointer to ");
-	debug_message_svalue(v->u.lvalue);
-	return;
-    default:
-	debug_message("<INVALID>\n");
-	return;
-    }
-}
-
 int slow_shut_down_to_do = 0;
 
 char *xalloc P1(int, size)
@@ -594,9 +578,11 @@ char *xalloc P1(int, size)
 
     if (going_to_exit)
 	exit(3);
+#ifdef DEBUG
     if (size == 0)
 	fatal("Tried to allocate 0 bytes.\n");
-    p = (char *) DMALLOC(size, 71, "main.c: xalloc");
+#endif
+    p = (char *) DMALLOC(size, TAG_MISC, "main.c: xalloc");
     if (p == 0) {
 	if (reserved_area) {
 	    FREE(reserved_area);

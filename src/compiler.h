@@ -77,7 +77,9 @@ extern struct mem_block mem_block[NUMAREAS];
 struct function_context_t {
     short num_parameters;
     short num_locals;
+    struct parse_node *values_list;
 };
+
 extern struct function_context_t function_context;
 #endif
 
@@ -97,6 +99,7 @@ extern struct function_context_t function_context;
 #define FUNCTION(n) ((struct function *)mem_block[A_FUNCTIONS].block + (n))
 #define VARIABLE(n) ((struct variable *)mem_block[A_VARIABLES].block + (n))
 #define SIMUL(n)    (simuls[n])
+#define PROG_STRING(n)   (((char **)mem_block[A_STRINGS].block)[n])
 
 #if !defined(__alpha) && !defined(cray)
 #define align(x) (((x) + 3) & ~3)
@@ -120,16 +123,26 @@ extern struct program NULL_program;
 extern struct program *prog;
 extern unsigned char string_tags[0x20];
 extern short freed_string;
-extern struct ident_hash_elem *locals[];
-extern unsigned short type_of_locals[];
+extern struct ident_hash_elem **locals;
+extern unsigned short *type_of_locals;
+extern char *runtime_locals;
 extern int current_number_of_locals;
-extern int current_break_stack_need;
-extern int max_break_stack_need;
+extern int max_num_locals;
+extern unsigned short *type_of_locals_ptr;
+extern struct ident_hash_elem **locals_ptr;
+extern char *runtime_locals_ptr;
+
+extern int type_of_locals_size;
+extern int locals_size;
+extern int current_number_of_locals;
+extern int max_num_locals;
 extern unsigned short a_functions_root;
 extern struct mem_block type_of_arguments;
+extern struct function_block_info_t *func_block;
 
 char *get_two_types PROT((int, int));
 char *get_type_name PROT((int));
+void init_locals PROT((void));
 
 void save_file_info PROT((int, int));
 int add_program_file PROT((char *, int));
@@ -138,14 +151,22 @@ void yywarn PROT((char *));
 void start_initializer PROT((void));
 void end_initializer PROT((void));
 char *the_file_name PROT((char *));
-int add_local_name PROT((char *, int));
 void free_all_local_names PROT((void));
+void pop_n_locals PROT((int));
+void reactivate_current_locals PROT((void));
+void clean_up_locals PROT((void));
+void deactivate_current_locals PROT((void));
+int add_local_name PROT((char *, int));
+void reallocate_locals PROT((void));
+void initialize_locals PROT((void));
 int get_id_number PROT((void));
 void compile_file PROT((int, char *));
+void reset_function_blocks PROT((void));
 void copy_variables PROT((struct program *, int));
 int copy_functions PROT((struct program *, int));
 void type_error PROT((char *, int));
 int compatible_types PROT((int, int));
+void arrange_call_inherited PROT((char *, struct parse_node *));
 void add_arg_type PROT((unsigned short));
 int find_in_table PROT((struct function *, int));
 void find_inherited PROT((struct function *));
@@ -157,6 +178,8 @@ void free_prog_string PROT((short));
 int dump_function_table PROT((void));
 #endif
 void prepare_cases PROT((struct parse_node *, int));
+void push_func_block PROT((void));
+void pop_func_block PROT((void));
 
 /* inlines - if we're lucky, they'll get honored. */
 INLINE static void realloc_mem_block PROT((struct mem_block *, int));
@@ -172,7 +195,7 @@ void realloc_mem_block(m, size)
     while (size > m->max_size) {
 	m->max_size <<= 1;
 	m->block = (char *)
-	    DREALLOC((char *) m->block, m->max_size, 49, "realloc_mem_block");
+	    DREALLOC((char *) m->block, m->max_size, TAG_COMPILER, "realloc_mem_block");
     }
 }
 

@@ -42,7 +42,8 @@ struct buffer *
 	return null_buffer();
     }
     /* using calloc() so that memory will be zero'd out when allocated */
-    buf = (struct buffer *) CALLOC(sizeof(struct buffer) + size - 1, 1);
+    buf = (struct buffer *) DCALLOC(sizeof(struct buffer) + size - 1, 1,
+				    TAG_BUFFER, "allocate_buffer");
     buf->size = size;
     buf->ref = 1;
     return buf;
@@ -98,7 +99,7 @@ char *
     if ((start + len) > size) {
 	len = (size - start);
     }
-    str = (char *) DXALLOC(len + 1, 42, "read_buffer: str");
+    str = (char *) DXALLOC(len + 1, TAG_STRING, "read_buffer: str");
     memcpy(str, b->item + start, len);
 
     /*
@@ -109,7 +110,7 @@ char *
 	char *p;
 
 	p = str;
-	str = string_copy(p);
+	str = string_copy(p, "read_buffer");
 	*rlen = strlen(str);
 	FREE(p);
     }

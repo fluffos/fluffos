@@ -107,30 +107,36 @@ static void print_help2 PROT((void));
 static void count_blanks PROT((int line));
 static void _count_blanks PROT((char *str, int blanks));
 
-#define P_INTERACTIVE 	(command_giver->interactive)
-#define P_NET_DEAD 	(P_INTERACTIVE->iflags & NET_DEAD)
-#define P_DIAG		(P_INTERACTIVE->ed_buffer->diag)
-#define P_TRUNCFLG	(P_INTERACTIVE->ed_buffer->truncflg)
-#define P_NONASCII	(P_INTERACTIVE->ed_buffer->nonascii)
-#define P_NULLCHAR	(P_INTERACTIVE->ed_buffer->nullchar)
-#define P_TRUNCATED	(P_INTERACTIVE->ed_buffer->truncated)
-#define P_FNAME		(P_INTERACTIVE->ed_buffer->fname)
-#define P_FCHANGED	(P_INTERACTIVE->ed_buffer->fchanged)
-#define P_NOFNAME	(P_INTERACTIVE->ed_buffer->nofname)
-#define P_MARK		(P_INTERACTIVE->ed_buffer->mark)
-#define P_OLDPAT	(P_INTERACTIVE->ed_buffer->oldpat)
-#define P_LINE0		(P_INTERACTIVE->ed_buffer->Line0)
-#define P_LINE0		(P_INTERACTIVE->ed_buffer->Line0)
-#define P_CURLN		(P_INTERACTIVE->ed_buffer->CurLn)
-#define P_CURPTR	(P_INTERACTIVE->ed_buffer->CurPtr)
-#define P_LASTLN	(P_INTERACTIVE->ed_buffer->LastLn)
-#define P_LINE1		(P_INTERACTIVE->ed_buffer->Line1)
-#define P_LINE2		(P_INTERACTIVE->ed_buffer->Line2)
-#define P_NLINES	(P_INTERACTIVE->ed_buffer->nlines)
-#define P_SHIFTWIDTH	(P_INTERACTIVE->ed_buffer->shiftwidth)
+static struct ed_buffer *current_ed_buffer;
+static struct object *current_user;          /* the user for ed_setup */
+static struct object *current_editor;        /* the object responsible */
+
+#define ED_BUFFER       (current_ed_buffer)
+#ifdef OLD_ED
+#define P_NET_DEAD      (command_giver->interactive->iflags & NET_DEAD)
+#endif
+#define P_DIAG		(ED_BUFFER->diag)
+#define P_TRUNCFLG	(ED_BUFFER->truncflg)
+#define P_NONASCII	(ED_BUFFER->nonascii)
+#define P_NULLCHAR	(ED_BUFFER->nullchar)
+#define P_TRUNCATED	(ED_BUFFER->truncated)
+#define P_FNAME		(ED_BUFFER->fname)
+#define P_FCHANGED	(ED_BUFFER->fchanged)
+#define P_NOFNAME	(ED_BUFFER->nofname)
+#define P_MARK		(ED_BUFFER->mark)
+#define P_OLDPAT	(ED_BUFFER->oldpat)
+#define P_LINE0		(ED_BUFFER->Line0)
+#define P_LINE0		(ED_BUFFER->Line0)
+#define P_CURLN		(ED_BUFFER->CurLn)
+#define P_CURPTR	(ED_BUFFER->CurPtr)
+#define P_LASTLN	(ED_BUFFER->LastLn)
+#define P_LINE1		(ED_BUFFER->Line1)
+#define P_LINE2		(ED_BUFFER->Line2)
+#define P_NLINES	(ED_BUFFER->nlines)
 /* shiftwidth is meant to be a 4-bit-value that can be packed into an int
    along with flags, therefore masks 0x1 ... 0x8 are reserved.           */
-#define P_FLAGS 	(P_INTERACTIVE->ed_buffer->flags)
+#define P_SHIFTWIDTH	(ED_BUFFER->shiftwidth)
+#define P_FLAGS 	(ED_BUFFER->flags)
 #define NFLG_MASK	0x0010
 #define P_NFLG		( P_FLAGS & NFLG_MASK )
 #define LFLG_MASK	0x0020
@@ -147,12 +153,11 @@ static void _count_blanks PROT((char *str, int blanks));
 #define P_DPRINT        ( P_FLAGS & DPRINT_MASK )
 #define SHIFTWIDTH_MASK	0x000f
 #define ALL_FLAGS_MASK	0x07f0
-#define ED_BUFFER       (command_giver->interactive->ed_buffer)
 #define P_APPENDING	(ED_BUFFER->appending)
 #define P_MORE		(ED_BUFFER->moring)
 #define P_LEADBLANKS	(ED_BUFFER->leading_blanks)
 #define P_CUR_AUTOIND   (ED_BUFFER->cur_autoindent)
-#define P_RESTRICT	(command_giver->interactive->ed_buffer->restricted)
+#define P_RESTRICT	(ED_BUFFER->restricted)
 
 
 static char inlin[MAXLINE];
@@ -163,48 +168,20 @@ static struct tbl {
     int t_and_mask;
     int t_or_mask;
 }  *t, tbl[] = {
-    {
-	"number", ~FALSE, NFLG_MASK
-    },
-    {
-	"nonumber", ~NFLG_MASK, FALSE
-    },
-    {
-	"list", ~FALSE, LFLG_MASK
-    },
-    {
-	"nolist", ~LFLG_MASK, FALSE
-    },
-    {
-	"print", ~FALSE, PFLG_MASK
-    },
-    {
-	"noprint", ~PFLG_MASK, FALSE
-    },
-    {
-	"eightbit", ~FALSE, EIGHTBIT_MASK
-    },
-    {
-	"noeightbit", ~EIGHTBIT_MASK, FALSE
-    },
-    {
-	"autoindent", ~FALSE, AUTOINDFLG_MASK
-    },
-    {
-	"noautoindent", ~AUTOINDFLG_MASK, FALSE
-    },
-    {
-	"excompatible", ~FALSE, EXCOMPAT_MASK
-    },
-    {
-	"noexcompatible", ~EXCOMPAT_MASK, FALSE
-    },
-    {
-	"dprint", ~FALSE, DPRINT_MASK
-    },
-    {
-	"nodprint", ~DPRINT_MASK, FALSE
-    },
+    { "number",               ~FALSE,                 NFLG_MASK       },
+    { "nonumber",             ~NFLG_MASK,             FALSE           },
+    { "list",                 ~FALSE,                 LFLG_MASK       },
+    { "nolist",               ~LFLG_MASK,             FALSE           },
+    { "print",                ~FALSE,                 PFLG_MASK       },
+    { "noprint",              ~PFLG_MASK,             FALSE           },
+    { "eightbit",             ~FALSE,                 EIGHTBIT_MASK   },
+    { "noeightbit",           ~EIGHTBIT_MASK,         FALSE           },
+    { "autoindent",           ~FALSE,                 AUTOINDFLG_MASK },
+    { "noautoindent",         ~AUTOINDFLG_MASK,       FALSE           },
+    { "excompatible",         ~FALSE,                 EXCOMPAT_MASK   },
+    { "noexcompatible",       ~EXCOMPAT_MASK,         FALSE           },
+    { "dprint",               ~FALSE,                 DPRINT_MASK     },
+    { "nodprint",             ~DPRINT_MASK,           FALSE           },
 };
 
 
@@ -468,7 +445,7 @@ static int esc P1(char **, s)
 */
 
 /*	doprnt.c	*/
-
+#ifdef OLD_ED
 static int doprnt P2(int, from, int, to)
 {
     from = (from < 1) ? 1 : from;
@@ -500,16 +477,17 @@ static void free_ed_buffer()
 	FREE(ED_BUFFER->exit_fn);
 	free_object(ED_BUFFER->exit_ob, "ed EOF");
 	FREE((char *) ED_BUFFER);
-	ED_BUFFER = 0;
+	command_giver->interactive->ed_buffer = 0;
 	set_prompt("> ");
 	return;
     }
     FREE((char *) ED_BUFFER);
-    ED_BUFFER = 0;
+    command_giver->interactive->ed_buffer = 0;
     add_message("Exit from ed.\n");
     set_prompt("> ");
     return;
 }
+#endif
 
 #define putcntl(X) *line++ = '^'; *line++ = (X) ? ((*str&31)|'@') : '?'
 
@@ -762,8 +740,7 @@ static char *getfn P1(int, writeflg)
     }
 
     /* valid_read/valid_write done here */
-    file2 = check_valid_path(file, command_giver,
-			     "ed_start", writeflg);
+    file2 = check_valid_path(file, current_editor, "ed_start", writeflg);
     if (!file2)
 	return (NULL);
     strncpy(file, file2, MAXFNAME - 1);
@@ -982,7 +959,7 @@ static int ins P1(char *, str)
 	len = cp - str;
 	/* cp now points to end of first or only line */
 
-	if ((new = (LINE *) DXALLOC(sizeof(LINE) + len, 27, "ins: new")) == NULL)
+	if ((new = (LINE *) DXALLOC(sizeof(LINE) + len, TAG_ED, "ins: new")) == NULL)
 	    return (MEM_FAIL);	/* no memory */
 
 	new->l_stat = 0;
@@ -1166,7 +1143,7 @@ static int set()
 
 	if (P_RESTRICT)
 	    return (SET_FAIL);
-	push_object(command_giver);
+	push_object(current_user);
 	push_number(P_SHIFTWIDTH | P_FLAGS);
 	ret = apply_master_ob(APPLY_SAVE_ED_SETUP, 2);
 	if (MASTER_APPROVED(ret))
@@ -2138,28 +2115,32 @@ void ed_start P5(char *, file_arg, char *, write_fn, char *, exit_fn, int, restr
 {
     struct svalue *setup;
 
+    if (!command_giver)
+	error("No current user for ed().\n");
     if (!command_giver->interactive)
-	error("Tried to start an ed session on a non-interative user.\n");
-    if (ED_BUFFER)
+	error("Tried to start an ed session on a non-interactive user.\n");
+    if (command_giver->interactive->ed_buffer)
 	error("Tried to start an ed session, when already active.\n");
-    ED_BUFFER = (struct ed_buffer *)
-	DXALLOC(sizeof(struct ed_buffer), 28, "ed_start: ED_BUFFER");
-    memset((char *) command_giver->interactive->ed_buffer, '\0',
-	   sizeof(struct ed_buffer));
+
+    current_ed_buffer = command_giver->interactive->ed_buffer =
+	ALLOCATE(struct ed_buffer, TAG_ED, "ed_start: ED_BUFFER");
+    memset((char *) ED_BUFFER, '\0', sizeof(struct ed_buffer));
+
+    current_user = current_editor = command_giver;
+
     ED_BUFFER->truncflg = 1;
     ED_BUFFER->flags |= EIGHTBIT_MASK;
     ED_BUFFER->shiftwidth = 4;
-    push_object(command_giver);
+    push_object(current_user);
     setup = apply_master_ob(APPLY_RETRIEVE_ED_SETUP, 1);
     if (setup && setup != (struct svalue *)-1 && setup->type == T_NUMBER && setup->u.number) {
 	ED_BUFFER->flags = setup->u.number & ALL_FLAGS_MASK;
 	ED_BUFFER->shiftwidth = setup->u.number & SHIFTWIDTH_MASK;
     }
-    ED_BUFFER->CurPtr =
-	&command_giver->interactive->ed_buffer->Line0;
+    ED_BUFFER->CurPtr = &ED_BUFFER->Line0;
 
 #ifdef RESTRICTED_ED
-    if (command_giver->flags & O_IS_WIZARD) {
+    if (current_user->flags & O_IS_WIZARD) {
 	P_RESTRICT = 0;
     } else {
 	P_RESTRICT = 1;
@@ -2169,13 +2150,13 @@ void ed_start P5(char *, file_arg, char *, write_fn, char *, exit_fn, int, restr
 	P_RESTRICT = 1;
     }
     if (write_fn) {
-        ED_BUFFER->write_fn = string_copy(exit_fn);
+        ED_BUFFER->write_fn = string_copy(exit_fn, "ed_start");
         exit_ob->ref++;
     } else {
         ED_BUFFER->write_fn = 0;
     }
     if (exit_fn) {
-	ED_BUFFER->exit_fn = string_copy(exit_fn);
+	ED_BUFFER->exit_fn = string_copy(exit_fn, "ed_start");
 	exit_ob->ref++;
     } else {
 	ED_BUFFER->exit_fn = 0;
@@ -2185,13 +2166,11 @@ void ed_start P5(char *, file_arg, char *, write_fn, char *, exit_fn, int, restr
 
     /*
      * Check for read on startup, since the buffer is read in. But don't
-     * check for write, since we may want to change the file name. When in
-     * compatibility mode, we assume that the test of valid read is done by
-     * the caller of ed().
+     * check for write, since we may want to change the file name. 
      */
     if (file_arg
 	&& (file_arg =
-	    check_valid_path(file_arg, command_giver,
+	    check_valid_path(file_arg, current_editor,
 			     "ed_start", 0))
 	&& !doread(0, file_arg)) {
 	setCurLn(1);
@@ -2209,6 +2188,9 @@ void ed_start P5(char *, file_arg, char *, write_fn, char *, exit_fn, int, restr
 void ed_cmd P1(char *, str)
 {
     int status = 0;
+
+    current_ed_buffer = command_giver->interactive->ed_buffer;
+    current_editor = current_user = command_giver;
 
     if (P_MORE) {
 	print_help2();
@@ -2241,16 +2223,18 @@ void ed_cmd P1(char *, str)
     case EOF:
 	free_ed_buffer();
 	return;
+#if 0
     case FATAL:
 	if (ED_BUFFER->exit_fn) {
 	    FREE(ED_BUFFER->exit_fn);
 	    free_object(ED_BUFFER->exit_ob, "ed FATAL");
 	}
 	FREE((char *) ED_BUFFER);
-	ED_BUFFER = 0;
+	command_giver->interactive->ed_buffer = 0;
 	add_message("FATAL ERROR\n");
 	set_prompt(":");
 	return;
+#endif
     case CHANGED:
 	add_message("File has been changed.\n");
 	break;
@@ -2526,3 +2510,7 @@ void regerror P1(char *, s)
 {
     add_message("ed: %s\n", s);
 }
+
+/****************************************************************
+  Stuff below here is for the new ed() interface. -Beek 
+ ****************************************************************/

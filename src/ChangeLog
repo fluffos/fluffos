@@ -1,7 +1,191 @@
+Sat Jan 21 20:25:44 EST 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v20.26
+	* fixed a problem that would sometimes claim the maximum include
+	  depth was exceeded
+	* fixed the tags on a bunch of memory allocations
+	* removed a memory leak in function overloading warnings
+	* fixed ref count problems/crashers in move_object()/tell_room()
+	* fixed a crasher in the illegal use of private variables
+	* added buffer and function support to sameval(), this means
+	  functions and buffers compare equal to themselves for the
+	  purposes of unique_array() and also match themselves as
+	  mapping keys
+	* added function and buffer support to svalue_to_int(); this makes
+	  buffers and functions as mapping keys more efficient
+	* == and != can now be used to tell if two buffers or functions
+	  are in fact the same buffer/function
+	* removed debug_message_svalue(); unused and obviously a throwback
+	  to Larsian days
+	* Solaris compilation tweaks from Robocoder:
+	  . gcc defines SunOS_5 so we don't have to
+	  . M_ERROR is used; used SPRINTF_ERROR() instead
+	* Fixed the contrib efuns to compile again
+	* Added some Linux compilation fixes received from marius (?)
+	* removed a redundant apply to #global_init#
+	* Fixed a compilation problem with call___INIT
+	* Fixed a crasher using the 128th thru 255th string constant
+	  in an object
+	* Fixed a crasher in $() outside function pointers
+	* Fixed warnings for clashes between functions inherited at
+	  different branches to not be printed if the function is
+	  overloaded, or either of the inherited functions is private.
+	* Fixed nomask to give errors correctly regardless of inheritance
+	  order
+	* Fixed a bug in member_array() that caused member_array(x, "")
+	  to give an error
+	* Fixed the undefined function error message to not give a
+	  redeclaration error if the function is defined later
+        * Fix a crasher on evaluation of anonymous functions in an
+	  inherited program
+	* Fixed a crasher in make_range_node
+	* added map(string, ...) works just like map_array, except it
+	  works on the characters that make up the string.  If the return
+	  value is not an integer or is zero, that character is left
+	  unchanged.
+	* removed the ancient ref count checking code
+        * the -d option is now only available when the driver is compiled
+          with DEBUG on
+        * added add_action( function, string ), updated commands() to
+          return "<function>" for function pointer commands
+        * added input_to( function ) and get_char( function )
+        * fixed the inherit from multiple branches warning o actually work
+        * fixed a bug in inheriting nomask functions
+        * fixed a few problems with nested calls to expression or
+          functional function pointers, and dangling of pointers when
+          the associated program objects swap.
+	* fixed a ref count bug in string constants for string cases
+	* added check_memory(1) which also prints out a summary of all
+	  allocated memory
+	* changed shared string ref count debugging code to allow tracking
+	  of a particular string
+	* several changes to DEBUGMALLOC:
+	  . changed the tag numbers to be meaningful
+	  . use temporary tag info to find leaked blocks with the
+	    memory_check() efun (available with DEBUGMALLOC_EXTENSIONS)
+	  . added magic numbers to start and end of blocks to catch
+	    corrupted blocks
+	  . added code to check all ref counts and allocated blocks
+	* changed program names to be shared strings
+	* changed call_other cache entry names for missing functions
+	  to be shared strings
+	* Fixed a memory leak in (s)printf which leaked 8 bytes per %O
+	  and per (null)
+	* converted swap.c to use DXALLOC and FREE
+	* added ALLOCATE, CALLOCATE, RESIZE, RESIZE_VECTOR defines to
+	  simplify code; note that CALLOCATE does *not* zero the memory
+	* move compilation info about functions to a stack so they can
+	  be pushed so we can do anonymous functions
+	* added support for pass-by-value to function pointers.  The
+	  syntax is $(expression), where "expression" will be run when
+	  the function pointer is made, not when it is evaluated.
+	  Note the difference between (: this_object() :) and
+	  (: $(this_object()) :)
+	* added anonymous functions.  The syntax is:
+	   function( <argument list> ) { <code> }
+	   for example:
+	   create() {
+	     function f;
+
+	     f = function(int x) {
+	       int i;
+	       for (i = 0; i < x; i++) { write(i+""); }
+	     };
+	     evaluate(f, 10);
+	   }
+	* fixed a few bugs/crashers regarding the number 0x80000000
+	--- Symmetry:
+	*** Since v20.26a5 ***
+        * Check the type of 3rd argument passed to regexp, optimized
+          match_regexp
+        * Free some unused memory, added some %pragmas in make_func
+        * Rewrote the automatic echo_line to be more robust, added
+          check for starting a new compiler case before ending the
+          previous when echo_line mode is on and fixed some line number
+          bugs associated with reading from buffered input in
+          make_func
+        * The compiler return type of the efun call_other is now
+          TYPE_ANY if CAST_CALL_OTHERS is not defined
+        * If __bsdi__ is defined, don't define HAS_STDARG_H in
+          portability.h
+        * Introduced range lvalues and limited the possible lvalues
+          syntactically
+        * Introduced ranging/indexing from the end
+        * Added some missing checks for division by 0 or 0.0
+        * L_BASIC_TYPE now covers all basic types in grammar.pre
+        * Removed some unused fields in YYSTYPE
+        * Local variables now have proper (block) scope
+	* Switch grammar is more restrictive, but make more sense
+	* Don't include getpeername and shutdown prototypes in lint.h
+	  for bsdi
+        * Optimized the array allocation is get_svalue_trace() for
+	  trace information on the topmost control stack 
+	* Fixed crasher in get_inherit_index
+	* Included port.h in port.c to fix the random() bug again for
+	  AIX
+	* Fix crasher/memory leak in sprintf when buffer size is 
+	  overflowed (in some cases, the fix actually amounts to
+	  truncation of the input string near the end of the buffer)
+        * Optimized read_file() a little bit more
+        * Fixed restore_string and restore_hash_string to work for
+	  AIX 3.1.5 (bug reported by Chuck@IdeaExchange)
+	* Added an options.h define OLD_RANGE_BEHAVIOR for string/buffer
+	  range values with negative indexes to mean counting from the 
+	  end
+	* Added a doc 'substructures' describing the new lvalue,
+	  indexing and ranging features
+	* Generate the opcode F_BREAK_POINT only on DEBUG mode
+	* Fixed a crasher when a prototype is used before inheriting
+	  a function of the same name when that function is overloaded
+	  by inheritance again later
+	* Optimized the addition of argument type information during
+	  compile time
+        *** Since v20.26a7 ***
+	* Implement the restore_string change (apparently I forgot it
+	  in v20.26a5 even though it was done in restore_hash_string)
+	* Small optimization to byte insertion for function pointer
+	  construction at compile time 
+	* Minimal jump threading for a && b && c and a || b || c is 
+	  always supported at compile-time
+	* Fixed the compile-time assigned return type of a ? b : c
+        * Optimized the handling of break and continue jumps in compile
+	  time, and removed the compiler stack
+	* Fixed a typo in passing a default of 1 for efun function
+	  pointers during runtime
+        * COMPAT BUSTER: No longer allow foo::bar() to work if foo 
+	  is actually only part the ending of an inherited program 
+	  whose name can be e.g. "/.../abcfoo.c" 
+	* COMPAT BUSTER: No longer allow foo::bar() to work if foo
+	  is inherited later than when the function was called
+	* Some small changes to the substructures doc
+        * Removed the runtime pushing of nulls for local variables
+	  defined within blocks
+	* explicit calls to inherited functions (i.e. foo::bar()) no 
+	  longer create a new function in the current function table
+        * Slight optimization to !x
+        * Less opcodes generated for F_LOOP_COND optimization of
+	  while or for loops
+	* Introduced F_SHORT_STRING as a first attempt at getting less
+	  program size
+	* Fast ___INIT calls and checks for ___INIT's existence in
+	  inherited function tables, no longer copy ___INIT in inherited
+	  programs to the current function table 
+	* Fixed a compiler type-checking problem associated with local
+	  vars in blocks after other complete blocks with local vars in
+	  them e.g. foo() { int a; { int b; } { int c; c = a; } }, the type
+	  of c was wrong
+	* Fixed a compiler type-checking problem for anonymous functions
+	  E.g. in 
+	  	   string foo() { 
+		      function f = function() { return 5; }; 
+		   }
+	  an error was produced because the function pointer was assumed to 
+	  return a string. Anonymous functions are now taken to return type 
+	  mixed instead.
+
 Fri Jan 13 20:17:20 EST 1995 (tim@handel.princeton.edu (Beek))
 	* raised patchlevel to v20.25
 	--- Beek:
-	* changed string *get_dir() to mixed *get_dir() since get_dir
+	* changed string *get_dir() to mixed *get_dir() since get_dir()
 	  can return an array of arrays
 	* removed contrib efun map_string(); it's slow, and it leaks.
 	* added terminal_colour() contrib efun.

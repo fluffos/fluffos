@@ -37,8 +37,7 @@ void init_otable()
 
     otable_size = OTABLE_SIZE;
     otable_size_minus_one = OTABLE_SIZE - 1;
-    obj_table = (struct object **)
-	DXALLOC(sizeof(struct object *) * otable_size, 8192, "init_otable");
+    obj_table = CALLOCATE(otable_size, struct object *, TAG_OBJ_TBL, "init_otable");
 
     for (x = 0; x < otable_size; x++)
 	obj_table[x] = 0;

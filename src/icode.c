@@ -1,3 +1,4 @@
+
 /* 
  * code generator for runtime LPC code
  * 
@@ -35,51 +36,21 @@ void i_generate_node PROT((struct parse_node *));
    the event a 'continue' statement is issued from inside a 'switch'.
 */
 short switches = 0;
-int switch_sptr = 0;
 
-int current_break_address;
-int current_continue_address;
 int current_forward_branch;
 int current_case_number_heap;
 int current_case_string_heap;
 int zero_case_label;
+int current_num_values;
 
 static int last_size_generated;
 static int line_being_generated;
 
-static int comp_stackp;
-static int comp_stack[COMPILER_STACK_SIZE];
+struct parse_node break_dummy = { NODE_BREAK, 0, 1 };
+struct parse_node cont_dummy = { NODE_CONTINUE, 0, 1 };
 
-void push_explicit P1(int, address)
-{
-    if (comp_stackp >= COMPILER_STACK_SIZE) {
-	yyerror("Compiler stack overflow");
-	comp_stackp++;
-	return;
-    }
-    comp_stack[comp_stackp++] = address;
-}
-
-void push_address()
-{
-    if (comp_stackp >= COMPILER_STACK_SIZE) {
-	yyerror("Compiler stack overflow");
-	comp_stackp++;
-	return;
-    }
-    comp_stack[comp_stackp++] = CURRENT_PROGRAM_SIZE;
-}
-
-int pop_address()
-{
-    if (comp_stackp == 0)
-	fatal("Compiler stack underflow.\n");
-    if (comp_stackp > COMPILER_STACK_SIZE) {
-	--comp_stackp;
-	return 0;
-    }
-    return comp_stack[--comp_stackp];
-}
+struct parse_node *break_ptr;
+struct parse_node *cont_ptr;
 
 static void ins_real P1(double, l)
 {
@@ -259,8 +230,6 @@ i_generate_node P1(struct parse_node *, expr) {
     if (expr->line && expr->line != line_being_generated)
 	switch_to_line(expr->line);
     switch (expr->kind) {
-    case F_INDEXED_LVALUE:
-    case F_INDEX:
     case F_OR:
     case F_XOR:
     case F_AND:
@@ -294,7 +263,9 @@ i_generate_node P1(struct parse_node *, expr) {
 	/* fall through */
     case F_CONST0:
     case F_CONST1:
+#ifdef DEBUG
     case F_BREAK_POINT:
+#endif
     case F_BREAK:
 	ins_f_byte(expr->kind);
 	break;
@@ -311,19 +282,53 @@ i_generate_node P1(struct parse_node *, expr) {
     case F_MULT_EQ:
     case F_MOD_EQ:
     case F_DIV_EQ:
+    case F_INDEX_LVALUE:
+    case F_INDEX:
+    case F_RINDEX:
+    case F_RINDEX_LVALUE:
 	i_generate_node(expr->right);
 	i_generate_node(expr->left);
 	ins_f_byte(expr->kind);
 	break;
-    case F_RANGE:
+    case F_NN_RANGE:
+    case F_RN_RANGE:
+    case F_RR_RANGE:
+    case F_NR_RANGE:
+    case F_NN_RANGE_LVALUE:
+    case F_RN_RANGE_LVALUE:
+    case F_NR_RANGE_LVALUE:
+    case F_RR_RANGE_LVALUE:
+	i_generate_node(expr->left);
+	i_generate_node(expr->right);
 	i_generate_node(expr->v.expr);
-	i_generate_node(expr->left);
-	i_generate_node(expr->right);
-	ins_f_byte(F_RANGE);
-	break;
-    case F_STRING:
 	ins_f_byte(expr->kind);
-	ins_short(expr->v.number);
+	break;
+    case NODE_NE_RANGE_LVALUE:
+        i_generate_node(expr->left);
+        ins_f_byte(F_CONST1);
+        i_generate_node(expr->v.expr);
+        ins_f_byte(F_NR_RANGE_LVALUE);
+        break;
+    case NODE_RE_RANGE_LVALUE:
+        i_generate_node(expr->left);
+        ins_f_byte(F_CONST1);
+        i_generate_node(expr->v.expr);
+        ins_f_byte(F_RR_RANGE_LVALUE);
+        break;
+    case F_RE_RANGE:
+    case F_NE_RANGE:
+        i_generate_node(expr->left);
+        i_generate_node(expr->v.expr);
+        ins_f_byte(expr->kind);
+        break;
+    case F_STRING:
+	if (expr->v.number <= 0xff) {
+	    ins_f_byte(F_SHORT_STRING);
+	    ins_byte(expr->v.number);
+	} else {
+	    ins_f_byte(F_STRING);
+	    ins_short(expr->v.number);
+	}
 	break;
     case F_REAL:
 	ins_f_byte(F_REAL);
@@ -342,8 +347,18 @@ i_generate_node P1(struct parse_node *, expr) {
 	i_generate_node(expr->left);
 	i_generate_forward_branch(expr->kind);
 	i_generate_node(expr->right);
-	i_update_forward_branch();
+	if (expr->left->kind == NODE_BRANCH_LINK){
+	    i_update_forward_branch_links(expr->kind,expr->left);
+	}
+	else i_update_forward_branch();
 	break;
+    case NODE_BRANCH_LINK:
+	i_generate_node(expr->left);
+	ins_byte(0);
+	expr->line = CURRENT_PROGRAM_SIZE;
+	ins_short(0);
+	i_generate_node(expr->right);
+        break;
     case F_AGGREGATE:
     case F_AGGREGATE_ASSOC:
 	generate_expr_list(expr->right);
@@ -357,8 +372,11 @@ i_generate_node P1(struct parse_node *, expr) {
 	break;
     case NODE_BREAK:
 	ins_f_byte(F_BRANCH);
-	ins_short(current_break_address);
-	current_break_address = CURRENT_PROGRAM_SIZE -2;
+	expr->v.expr = break_ptr;
+	expr->line = CURRENT_PROGRAM_SIZE;
+	expr->type = 0;
+	ins_short(0);
+	break_ptr = expr;
 	break;
     case NODE_CONTINUE:
 	if (switches) {
@@ -366,12 +384,27 @@ i_generate_node P1(struct parse_node *, expr) {
 	    ins_byte(switches);
 	}
 	ins_f_byte(F_BRANCH);
-	ins_short(current_continue_address);
-	current_continue_address = CURRENT_PROGRAM_SIZE - 2;
+	expr->v.expr = cont_ptr;
+	expr->line = CURRENT_PROGRAM_SIZE;
+	expr->type = 0;
+	ins_short(0);
+	cont_ptr = expr;
 	break;
     case NODE_STATEMENTS:
 	i_generate_node(expr->left);
 	i_generate_node(expr->right);
+	break;
+    case NODE_PARAMETER:
+	ins_f_byte(F_LOCAL);
+	ins_byte(expr->v.number + current_num_values);
+	break;
+    case NODE_PARAMETER_LVALUE:
+	ins_f_byte(F_LOCAL_LVALUE);
+	ins_byte(expr->v.number + current_num_values);
+	break;
+    case NODE_VALUE:
+	ins_f_byte(F_LOCAL);
+	ins_byte(expr->v.number);
 	break;
     case NODE_IF:
 	if (expr->v.expr->kind == F_NOT) {
@@ -390,47 +423,55 @@ i_generate_node P1(struct parse_node *, expr) {
 	break;
     case NODE_FOR:
 	{
-	    int forever = node_always_true(expr->left->v.expr);
+	    int forever = node_always_true(expr->left->v.expr), pos;
 	    
 	    i_save_loop_info();
 	    i_generate_node(expr->left->left);
 	    if (!forever) 
 		i_generate_forward_branch(F_BRANCH);
-	    i_save_position();
+	    pos = CURRENT_PROGRAM_SIZE;
 	    i_generate_node(expr->right);
 	    i_update_continues();
 	    i_generate_node(expr->left->right);
 	    if (!forever)
 		i_update_forward_branch();
-	    generate_conditional_branch(expr->left->v.expr);
+	    if (expr->left->v.expr->kind == F_LOOP_COND){
+	        i_generate_node(expr->left->v.expr);
+		ins_short(CURRENT_PROGRAM_SIZE - pos);
+	    } else
+	        i_branch_backwards(generate_conditional_branch(expr->left->v.expr), pos);
 	    i_update_breaks();
 	    i_restore_loop_info();
 	}
 	break;
     case NODE_WHILE:
 	{
-	    int forever = node_always_true(expr->left);
+	    int forever = node_always_true(expr->left), pos;
 	    i_save_loop_info();
 	    if (!forever)
 		i_generate_forward_branch(F_BRANCH);
-	    i_save_position();
-	    
+	    pos =  CURRENT_PROGRAM_SIZE;
 	    i_generate_node(expr->right);
 	    if (!forever)
 		i_update_forward_branch();
 	    i_update_continues();
-	    generate_conditional_branch(expr->left);
+	    if (expr->left->kind == F_LOOP_COND){
+	        i_generate_node(expr->left);
+		ins_short(CURRENT_PROGRAM_SIZE - pos);
+	    } else 
+	        i_branch_backwards(generate_conditional_branch(expr->left), pos);
 	    i_update_breaks();
 	    i_restore_loop_info();
 	}
 	break;
     case NODE_DO_WHILE:
         {
+	    int pos;
             i_save_loop_info();
-            i_save_position();
+	    pos = CURRENT_PROGRAM_SIZE;
             i_generate_node(expr->left);
             i_update_continues();
-            generate_conditional_branch(expr->right);
+            i_branch_backwards(generate_conditional_branch(expr->right), pos);
             i_update_breaks();
             i_restore_loop_info();
 	}
@@ -602,7 +643,6 @@ i_generate_node P1(struct parse_node *, expr) {
 		}
 		ins_long(i);
 	    }
-	    ins_f_byte(F_LT);
 	    break;
 	}
     case F_SIMUL_EFUN:
@@ -610,6 +650,13 @@ i_generate_node P1(struct parse_node *, expr) {
 	generate_expr_list(expr->right);
 	ins_f_byte(expr->kind);
 	ins_short(expr->v.number);
+	ins_byte((expr->right ? expr->right->kind : 0));
+	break;
+    case F_CALL_INHERITED:
+	generate_expr_list(expr->right);
+	ins_f_byte(F_CALL_INHERITED);
+	ins_byte(expr->v.number & 0xff);
+	ins_short(expr->v.number >> 8);
 	ins_byte((expr->right ? expr->right->kind : 0));
 	break;
     case F_EVALUATE:
@@ -637,32 +684,35 @@ i_generate_node P1(struct parse_node *, expr) {
 	    generate_expr_list(expr->right);
 	    ins_f_byte(F_AGGREGATE);
 	    ins_short(expr->right->kind);
-	} else if ((expr->v.number & 0xff) != FP_FUNCTIONAL)
+	} else 
 	    ins_f_byte(F_CONST0);
 	ins_f_byte(F_FUNCTION_CONSTRUCTOR);
 	switch (expr->v.number & 0xff) {
 	case FP_SIMUL_EFUN:
 	    ins_byte(ORIGIN_SIMUL_EFUN);
-	    ins_short((expr->v.number & ~0xff) >> 8);
+	    ins_short(expr->v.number >> 8);
 	    break;
 	case FP_EFUN:
 	    ins_byte(ORIGIN_EFUN);
-	    ins_f_byte(predefs[(expr->v.number & ~0xff) >> 8].token);
+	    ins_f_byte(predefs[expr->v.number >> 8].token);
 	break;
 	case FP_LFUN:
 	    ins_byte(ORIGIN_LOCAL);
-	    ins_short((expr->v.number & ~0xff) >> 8);
+	    ins_short(expr->v.number >> 8);
 	    break;
 	case FP_FUNCTIONAL:
 	    {
-		int addr;
+		int addr, save_current_num_values = current_num_values;
 		ins_byte(ORIGIN_FUNCTIONAL);
-		ins_byte((expr->v.number & ~0xff) >> 8);
+		ins_byte(expr->v.number >> 8);
 		addr = CURRENT_PROGRAM_SIZE;
 		ins_short(0);
+		current_num_values = expr->right ? expr->right->kind : 0;
 		i_generate_node(expr->left);
+		current_num_values = save_current_num_values;
 		ins_f_byte(F_RETURN);
 		upd_short(addr, CURRENT_PROGRAM_SIZE - addr - 2);
+		break;
 	    }
 	}
 #else
@@ -672,6 +722,22 @@ i_generate_node P1(struct parse_node *, expr) {
 	ins_byte(expr->v.number);
 #endif
 	break;
+#ifdef NEW_FUNCTIONS
+    case NODE_ANON_FUNC:
+	{
+	    int addr;
+	    
+	    ins_f_byte(F_FUNCTION_CONSTRUCTOR);
+	    ins_byte(ORIGIN_FUNCTIONAL | 1);
+	    ins_byte(expr->v.number);
+	    ins_byte((int)expr->left);
+	    addr = CURRENT_PROGRAM_SIZE;
+	    ins_short(0);
+	    i_generate_node(expr->right);
+	    upd_short(addr, CURRENT_PROGRAM_SIZE - addr - 2);
+	    break;
+	}
+#endif
     default:
 	DEBUG_CHECK1(expr->kind < BASE,
 		     "Unknown eoperator %s in i_generate_node.\n",
@@ -680,7 +746,7 @@ i_generate_node P1(struct parse_node *, expr) {
 	ins_f_byte(expr->kind);
 	if (expr->v.number != -1)
 	    ins_byte(expr->v.number);
-    }
+   }
 }
 
 void
@@ -688,6 +754,15 @@ i_generate_function_call P2(short, f, char, num) {
   ins_f_byte(F_CALL_FUNCTION_BY_ADDRESS);
   ins_short(f);
   ins_byte(0);
+}
+
+void
+generate_inherited_init_call P2(int, index, short, f) {
+  ins_f_byte(F_CALL_INHERITED);
+  ins_byte(index);
+  ins_short(f);
+  ins_byte(0);
+  ins_f_byte(F_POP_VALUE);
 }
 
 void
@@ -705,9 +780,6 @@ void i_generate_return P1(struct parse_node *, node) {
 }
 
 void i_generate___INIT() {
-    end_initializer(); /* just in case */
-    upd_byte(0, F_BRANCH);
-    upd_short(1, CURRENT_PROGRAM_SIZE - 1);
     add_to_mem_block(A_PROGRAM, (char *)mem_block[A_INITIALIZER].block,
 		     mem_block[A_INITIALIZER].current_size);
     prog_code = mem_block[A_PROGRAM].block + mem_block[A_PROGRAM].current_size;
@@ -720,85 +792,85 @@ void i_generate_continue() {
   }
   /* form a linked list of the continue addresses */
   ins_f_byte(F_BRANCH);
-  ins_short(current_continue_address);
-  current_continue_address = CURRENT_PROGRAM_SIZE - 2;
+  ins_short(cont_ptr->line);
+  cont_ptr = cont_ptr->v.expr;
 }
 
 void i_generate_forward_branch P1(char, b) {
-  ins_f_byte(b);
-  ins_short(current_forward_branch);
-  current_forward_branch = CURRENT_PROGRAM_SIZE - 2;
+    ins_f_byte(b);
+    ins_short(current_forward_branch);
+    current_forward_branch = CURRENT_PROGRAM_SIZE - 2;
 }
 
 void
 i_update_forward_branch() {
-  int i = read_short(current_forward_branch);
-  upd_short(current_forward_branch, CURRENT_PROGRAM_SIZE - current_forward_branch);
-  current_forward_branch = i;
+    int i = read_short(current_forward_branch);
+    upd_short(current_forward_branch, CURRENT_PROGRAM_SIZE - current_forward_branch);
+    current_forward_branch = i;
+}
+
+void i_update_forward_branch_links P2(char, kind, struct parse_node *, link_start){
+    int i;
+    i = read_short(current_forward_branch);
+    upd_short(current_forward_branch, CURRENT_PROGRAM_SIZE - current_forward_branch);
+    current_forward_branch = i;
+    do {
+	i = link_start->line;
+	upd_byte(i-1, kind);
+	upd_short(i, CURRENT_PROGRAM_SIZE - i);
+	link_start = link_start->left;
+    } while (link_start->kind == NODE_BRANCH_LINK);
 }
 
 void
-i_save_position() {
-  push_address();
-}
-
-void
-i_branch_backwards P1(char, b) {
+i_branch_backwards P2(char, b, int, addr) {
     if (b) {
 	ins_f_byte(b);
-	ins_short(CURRENT_PROGRAM_SIZE - pop_address());
-    } else pop_address();
+	ins_short(CURRENT_PROGRAM_SIZE - addr);
+    } 
 }
 
 void
 i_update_breaks() {
-  int next_addr;
+  int current_size = CURRENT_PROGRAM_SIZE;
 
-  /* traverse the linked list filling in the current_break_address
+  /* traverse the list of nodes filling in the break address
      required by each "break" statement.
      */
-  for (;current_break_address > 0; current_break_address = next_addr) {
-    next_addr = read_short(current_break_address);
-    upd_short(current_break_address, CURRENT_PROGRAM_SIZE - current_break_address);
+  while (!break_ptr->type){
+      upd_short(break_ptr->line, current_size - break_ptr->line);
+      break_ptr = break_ptr->v.expr;
   }
 }
 
 void
 i_update_continues() {
-  int next_addr;
+  int current_size = CURRENT_PROGRAM_SIZE;
 
-  /* traverse the linked list filling in the current_continue_address
+  /* traverse the linked list filling in the continue address
      required by each "continue" statement.
      */
-  for (;current_continue_address > 0; current_continue_address = next_addr) {
-    next_addr = read_short(current_continue_address);
-    upd_short(current_continue_address, CURRENT_PROGRAM_SIZE - current_continue_address);
+  while (!cont_ptr->type){
+      upd_short(cont_ptr->line, current_size - cont_ptr->line);
+      cont_ptr = cont_ptr->v.expr;
   }
 }
 
 void
 i_save_loop_info() {
-  /* each 'continue' statement will add to a linked list of slots that
-     need filled in once the continue_address is known.  The delimeters
-     serve as markers for the ends of the lists.
-     */
-  push_explicit(current_continue_address);
-  current_continue_address = 0;
-  push_explicit(current_break_address);
-  current_break_address = 0;
-  /* keep track of # of nested switches prior to this while
-     so that we'll know how many to pop from the break stack in
-     the event of a "continue;" in the body of a switch().
-     */
-  push_explicit(switches);
-  switches = 0;
+    /* Deactivate the current break and cont pointers */
+    break_ptr->type = 1;
+    if (switches >= 255) yyerror("Too many nested switches. Maximum is 254.\n");
+    cont_ptr->type = 1 + switches;
+    switches = 0;
 }
 
 void
 i_restore_loop_info() {
-    switches = pop_address();
-    current_break_address = pop_address();
-    current_continue_address = pop_address();
+    switches = cont_ptr->type - 1;
+    /* Reactivate the current break and cont pointers */
+    if (cont_ptr != &cont_dummy){ switches = cont_ptr->type - 1; cont_ptr->type = 0; }
+    if (break_ptr != &break_dummy) break_ptr->type = 0;
 }
 
 void
@@ -815,30 +887,17 @@ i_generate_else() {
 
 void
 i_initialize_parser() {
-    short s = 0;
-    unsigned char *p;
-
     switches = 0;
-    switch_sptr = 0;
-    comp_stackp = 0;
-    current_continue_address = 0;
-    current_break_address = 0;
+    break_ptr = &break_dummy;
+    cont_ptr = &cont_dummy;
     current_forward_branch = 0;
-    
+
     current_block = A_PROGRAM;
     prog_code = mem_block[A_PROGRAM].block;
     prog_code_max = mem_block[A_PROGRAM].block + mem_block[A_PROGRAM].max_size;
 
-    ins_byte(0); /* will be changed to an F_BRANCH if an initializer
-		    exists */
-    ins_short(0);
-    
     line_being_generated = 0;
-    last_size_generated = 3;
-    p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS, 3);
-    *p++ = 3;
-    *p++ = ((char *)&s)[0];
-    *p = ((char *)&s)[1];
+    last_size_generated = 0;
 }
 
 void
@@ -874,6 +933,7 @@ optimize_icode P3(char *, start, char *, pc, char *, end) {
 	switch (instr = EXTRACT_UCHAR(pc++)) {
 	case F_NUMBER:
 	case F_REAL:
+	case F_CALL_INHERITED:
 	    pc += 4;
 	    break;
 	case F_SIMUL_EFUN:
@@ -958,6 +1018,7 @@ optimize_icode P3(char *, start, char *, pc, char *, end) {
 #ifdef DEBUG
 		    fprintf(stderr,"Optimization failed; can't || or && backwards.\n");
 #endif
+		    pc += 2;
 		    break;
 		}
 		STORE_SHORT(pc, sarg);
@@ -981,7 +1042,6 @@ optimize_icode P3(char *, start, char *, pc, char *, end) {
 	case F_GLOBAL:
 	case F_LOOP_INCR:
 	case F_WHILE_DEC:
-	case F_LOOP_COND:
 	case F_LOCAL:
 	case F_LOCAL_LVALUE:
 	case F_SSCANF:
@@ -1000,13 +1060,21 @@ optimize_icode P3(char *, start, char *, pc, char *, end) {
 	    case ORIGIN_FUNCTIONAL:
 		pc += 3;
 		break;
+	    case ORIGIN_FUNCTIONAL|1:
+		pc += 4;
+		break;
 	    case ORIGIN_EFUN:
 #ifdef NEEDS_CALL_EXTRA
-		if (EXTRACT_UCHAR(pc++) == F_CALL_EXTRA)
+		if (EXTRACT_UCHAR(pc++) == F_CALL_EXTRA) 
 #endif
+		
 		    pc++;
 		break;
 	    }
+	    break;
+	case F_LOOP_COND:
+	    if (*pc++ == F_LOCAL) pc += 3;
+	    else pc += 7;
 	    break;
 	case F_SWITCH:
 	    {
@@ -1032,4 +1100,8 @@ optimize_icode P3(char *, start, char *, pc, char *, end) {
 	}
     }
 }
+	    
+		
+
+
 

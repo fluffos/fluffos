@@ -21,6 +21,7 @@
 #include "interpret.h"
 #include "stralloc.h"
 #include "scratchpad.h"
+#include "md.h"
 /* fatal */
 #include "simulate.h"
 /* whashstr */
@@ -147,14 +148,14 @@ static keyword reswords[] =
     {"else", L_ELSE, 0},
     {"float", L_BASIC_TYPE, TYPE_REAL},
     {"for", L_FOR, 0},
-    {"function", L_FUNCTION, TYPE_FUNCTION},
+    {"function", L_BASIC_TYPE, TYPE_FUNCTION},
     {"if", L_IF, 0},
     {"inherit", L_INHERIT, 0},
     {"int", L_BASIC_TYPE, TYPE_NUMBER},
     {"mapping", L_BASIC_TYPE, TYPE_MAPPING},
     {"mixed", L_BASIC_TYPE, TYPE_ANY},
     {"nomask", L_TYPE_MODIFIER, TYPE_MOD_NO_MASK},
-    {"object", L_OBJECT, TYPE_OBJECT},
+    {"object", L_BASIC_TYPE, TYPE_OBJECT},
     {"parse_command", L_PARSE_COMMAND, 0},
     {"private", L_TYPE_MODIFIER, TYPE_MOD_PRIVATE},
     {"protected", L_TYPE_MODIFIER, TYPE_MOD_PROTECTED},
@@ -201,12 +202,14 @@ static char *outp;
 
 static void handle_define PROT((char *));
 static void free_defines PROT((void));
-static void add_define PROT((char *, int, char *, int));
+static void add_define PROT((char *, int, char *));
+static void add_predefine PROT((char *, int, char *));
 static int expand_define PROT((void));
 static void add_input PROT((char *));
 static int cond_get_exp PROT((int));
 static void merge PROT((char *name, char *dest));
-static void add_quoted_define PROT((char *, char *, int));
+static void add_quoted_define PROT((char *, char *));
+static void add_quoted_predefine PROT((char *, char *));
 static struct defn *lookup_define PROT((char *s));
 static INLINE int mygetc PROT((void));
 static void lexerror PROT((char *));
@@ -225,13 +228,10 @@ static void add_instr_name PROT((char *, int, short));
 static int cmygetc PROT((void));
 static void refill PROT((void));
 static void refill_buffer PROT((void));
+static INLINE void reset_function_context PROT((void));
 static int exgetc PROT((void));
 static old_func PROT((void));
 static struct ident_hash_elem *quick_alloc_ident_entry PROT((void));
-
-/* macro functions */
-#define add_predefine(x, y, z) add_define(x, y, z, DEF_IS_PREDEF)
-#define add_quoted_predefine(x, y) add_quoted_define(x, y, DEF_IS_PREDEF)
 
 static void merge P2(char *, name, char *, dest)
 {
@@ -360,7 +360,7 @@ handle_cond P1(int, c)
 
     if (!c)
 	skip_to("else", "endif");
-    p = (struct ifstate *) DXALLOC(sizeof(struct ifstate), 60, "handle_cond");
+    p = ALLOCATE(struct ifstate, TAG_COMPILER, "handle_cond");
     p->next = iftop;
     iftop = p;
     p->state = c ? EXPECT_ENDIF : EXPECT_ELSE;
@@ -435,8 +435,7 @@ handle_include P1(char *, name)
     if (++incnum == MAX_INCLUDE_DEPTH) {
 	yyerror("Maximum include depth exceeded.");
     } else if ((f = inc_open(buf, name)) != -1) {
-	is = (struct incstate *)
-	    DXALLOC(sizeof(struct incstate), 61, "handle_include: 1");
+	is = ALLOCATE(struct incstate, TAG_COMPILER, "handle_include: 1");
 	is->yyin_desc = yyin_desc;
 	is->line = current_line;
 	is->file = current_file;
@@ -497,7 +496,7 @@ get_terminator P1(char *, terminator)
             break; \
         } \
         line[++curchunk] = \
-              (char *)DXALLOC(MAXCHUNK, 124, "array/text chunk"); \
+              (char *)DXALLOC(MAXCHUNK, TAG_COMPILER, "array/text chunk"); \
         len = 0; \
     }
 
@@ -518,7 +517,7 @@ get_array_block P1(char *, term)
     /*
      * initialize
      */
-    array_line[0] = (char *) DXALLOC(MAXCHUNK, 125, "array_block");
+    array_line[0] = (char *) DXALLOC(MAXCHUNK, TAG_COMPILER, "array_block");
     array_line[0][0] = '(';
     array_line[0][1] = '{';
     array_line[0][2] = '"';
@@ -617,7 +616,7 @@ get_array_block P1(char *, term)
 		    break;
 		}
 		array_line[++curchunk] =
-		    (char *) DXALLOC(MAXCHUNK, 126, "array_block");
+		    (char *) DXALLOC(MAXCHUNK, TAG_COMPILER, "array_block");
 		len = 0;
 	    }
 	    /*
@@ -660,7 +659,7 @@ get_text_block P1(char *, term)
     /*
      * initialize
      */
-    text_line[0] = (char *) DXALLOC(MAXCHUNK, 127, "text_block");
+    text_line[0] = (char *) DXALLOC(MAXCHUNK, TAG_COMPILER, "text_block");
     text_line[0][0] = '"';
     text_line[0][1] = '\0';
     len = 1;
@@ -756,7 +755,7 @@ get_text_block P1(char *, term)
 		    break;
 		}
 		text_line[++curchunk] =
-		    (char *) DXALLOC(MAXCHUNK, 128, "text_block");
+		    (char *) DXALLOC(MAXCHUNK, TAG_COMPILER, "text_block");
 		len = 0;
 	    }
 	    /*
@@ -986,7 +985,7 @@ static void refill_buffer(){
 		struct linked_buf *new_lbuf;
 		char *new_outp;
 
-		if (!(new_lbuf = (struct linked_buf *) DXALLOC(sizeof(struct linked_buf), 50, "refill_bufer"))){
+		if (!(new_lbuf = ALLOCATE(struct linked_buf, TAG_COMPILER, "refill_bufer"))){
 		    lexerror("Out of memory when allocating new buffer.\n");
 		    return;
 		}
@@ -1023,11 +1022,22 @@ static void refill_buffer(){
 #ifdef NEW_FUNCTIONS
 static int function_flag = 0;
 
+static INLINE void reset_function_context() {
+    struct parse_node *node;
+
+    function_context.num_parameters = 0;
+    function_context.num_locals = 0;
+    node = new_node_no_line();
+    node->left = node;
+    node->right = 0;
+    node->kind = 0;
+    function_context.values_list = node;
+}
+
 static int old_func() {
     add_input(yytext);
     yylval.context = function_context;
-    function_context.num_parameters = 0;
-    function_context.num_locals = 0;
+    reset_function_context();
     return L_FUNCTION_OPEN;
 }
 #endif
@@ -1161,7 +1171,7 @@ int yylex()
 		    return L_LSH;
 		}
 		case '=': return_order(F_LE);
-		default: outp--; return_order(F_LT);
+		default: outp--; return '<';
 	    }
 	}
 	case '>':
@@ -1185,7 +1195,7 @@ int yylex()
 	}
 	case '%':
 	{
-            if (*outp++ == '=') return_assign(F_MULT_EQ);
+            if (*outp++ == '=') return_assign(F_MOD_EQ);
             outp--;
             return '%';
 	}
@@ -1246,8 +1256,7 @@ int yylex()
 
 			outp--;
 			yylval.context = function_context;
-			function_context.num_parameters = 0;
-			function_context.num_locals = 0;
+			reset_function_context();
 #endif
 			return L_FUNCTION_OPEN;
 		    }
@@ -1262,11 +1271,11 @@ int yylex()
 
 #ifdef NEW_FUNCTIONS
 	case '$':
-	    if (function_context.num_parameters == -1) {
+	    if (function_context.num_parameters < 0) {
 		yyerror("$var illegal outside of function.");
 		return '$';
 	    } else {
-		if (!isdigit(*outp++)) {
+		if (!isdigit(c = *outp++)) {
 		    outp--;
 		    return '$';
 		}
@@ -1503,7 +1512,7 @@ int yylex()
 		int rc;
 		int tmp;
 
-		if (*outp++ != '@') {
+		if ((tmp = *outp++) != '@') {
 		    /* check for Robocoder's @@ block */
 		    outp--;
 		}
@@ -1776,8 +1785,7 @@ parse_identifier:
 				    function_flag = 0;
 				    add_input(yytext);
 				    yylval.context = function_context;
-				    function_context.num_parameters = 0;
-				    function_context.num_locals = 0;
+				    reset_function_context();
 				    return L_FUNCTION_OPEN;
 				}
 #endif
@@ -1793,7 +1801,7 @@ parse_identifier:
 				outp--;
 				if (c != ':' && c != ',')
 				    return old_func();
-				if ((val=ihe->dn.local_num) >= 0) {
+				if ((val=ihe->dn.local_num) >= 0){
 				    if (c == ',') return old_func();
 				    yylval.number = (val << 8) | FP_L_VAR;
 				} else if ((val=ihe->dn.global_num) >= 0) {
@@ -1878,14 +1886,24 @@ void end_new_file()
     }
 }
 
-static void add_quoted_define P3(char *, def, char *, val, int, flags)
+static void add_quoted_define P2(char *, def, char *, val)
 {
     char save_buf[1024];
 
     strcpy(save_buf, "\"");
     strcat(save_buf, val);
     strcat(save_buf, "\"");
-    add_define(def, -1, save_buf, flags);
+    add_define(def, -1, save_buf);
+}
+
+static void add_quoted_predefine P2(char *, def, char *, val)
+{
+    char save_buf[1024];
+
+    strcpy(save_buf, "\"");
+    strcat(save_buf, val);
+    strcat(save_buf, "\"");
+    add_predefine(def, -1, save_buf);
 }
 
 void add_predefines()
@@ -1998,17 +2016,17 @@ void start_new_file P1(int, f)
 	int ln;
 
 	ln = strlen(current_file);
-	dir = (char *) DMALLOC(ln + 4, 64, "start_new_file");
+	dir = (char *) DMALLOC(ln + 4, TAG_COMPILER, "start_new_file");
 	dir[0] = '"';
 	dir[1] = '/';
 	memcpy(dir + 2, current_file, ln);
 	dir[ln + 2] = '"';
 	dir[ln + 3] = 0;
-	add_define("__FILE__", -1, dir, 0);
+	add_define("__FILE__", -1, dir);
 	tmp = strrchr(dir, '/');
 	tmp[1] = '"';
 	tmp[2] = 0;
-	add_define("__DIR__", -1, dir, 0);
+	add_define("__DIR__", -1, dir);
 	FREE(dir);
     }
     yyin_desc = f;
@@ -2019,6 +2037,7 @@ void start_new_file P1(int, f)
     pragmas = DEFAULT_PRAGMAS;
     optimization = 0;
     nexpands = 0;
+    incnum = 0;
     current_line = 1;
     current_line_base = 0;
     current_line_saved = 0;
@@ -2026,7 +2045,7 @@ void start_new_file P1(int, f)
 	char *gifile;
 
 	/* need a writable copy */
-	gifile = string_copy(GLOBAL_INCLUDE_FILE);
+	gifile = string_copy(GLOBAL_INCLUDE_FILE, "global include");
 	handle_include(gifile);
 	FREE(gifile);
     } else refill_buffer();
@@ -2088,10 +2107,21 @@ void init_num_args()
     add_instr_name("&", F_AND, T_POINTER | T_NUMBER);
     add_instr_name("&=", F_AND_EQ, T_NUMBER);
     add_instr_name("index", F_INDEX, T_ANY);
+    add_instr_name("rindex", F_RINDEX, T_ANY);
     add_instr_name("loop_cond", F_LOOP_COND, -1);
     add_instr_name("loop_incr", F_LOOP_INCR, -1);
-    add_instr_name("while_dec", F_WHILE_DEC, -1);
-    add_instr_name("indexed_lvalue", F_INDEXED_LVALUE, T_LVALUE);
+    add_instr_name("index_lvalue", F_INDEX_LVALUE, T_LVALUE|T_LVALUE_BYTE);
+    add_instr_name("rindex_lvalue", F_RINDEX_LVALUE, T_LVALUE|T_LVALUE_BYTE);
+    add_instr_name("nn_range_lvalue", F_NN_RANGE_LVALUE, T_LVALUE_RANGE);
+    add_instr_name("nr_range_lvalue", F_NR_RANGE_LVALUE, T_LVALUE_RANGE);
+    add_instr_name("rr_range_lvalue", F_RR_RANGE_LVALUE, T_LVALUE_RANGE);
+    add_instr_name("rn_range_lvalue", F_RN_RANGE_LVALUE, T_LVALUE_RANGE);
+    add_instr_name("nn_range", F_NN_RANGE, T_BUFFER|T_POINTER|T_STRING);
+    add_instr_name("rr_range", F_RR_RANGE, T_BUFFER|T_POINTER|T_STRING);
+    add_instr_name("nr_range", F_NR_RANGE, T_BUFFER|T_POINTER|T_STRING);
+    add_instr_name("rn_range", F_RN_RANGE, T_BUFFER|T_POINTER|T_STRING);
+    add_instr_name("re_range", F_RE_RANGE, T_BUFFER|T_POINTER|T_STRING);
+    add_instr_name("ne_range", F_NE_RANGE, T_BUFFER|T_POINTER|T_STRING);
     add_instr_name("global", F_GLOBAL, T_ANY);
     add_instr_name("local", F_LOCAL, T_ANY);
     add_instr_name("number", F_NUMBER, T_NUMBER);
@@ -2127,9 +2157,13 @@ void init_num_args()
     add_instr_name("sscanf", F_SSCANF, T_NUMBER);
     add_instr_name("parse_command", F_PARSE_COMMAND, T_NUMBER);
     add_instr_name("string", F_STRING, T_STRING);
+    add_instr_name("short_string", F_SHORT_STRING, T_STRING);
     add_instr_name("call", F_CALL_FUNCTION_BY_ADDRESS, T_ANY);
+    add_instr_name("call_inherited", F_CALL_INHERITED, T_ANY);
     add_instr_name("aggregate_assoc", F_AGGREGATE_ASSOC, T_MAPPING);
+#ifdef DEBUG
     add_instr_name("break_point", F_BREAK_POINT, -1);
+#endif
     add_instr_name("call_extra", F_CALL_EXTRA, -1);
     add_instr_name("aggregate", F_AGGREGATE, T_POINTER);
     add_instr_name("(::)", F_FUNCTION_CONSTRUCTOR, T_FUNCTION);
@@ -2167,10 +2201,8 @@ void init_num_args()
     add_instr_name("switch", F_SWITCH, -1);
     add_instr_name("break", F_BREAK, -1);
     add_instr_name("pop_break", F_POP_BREAK, -1);
-    add_instr_name("range", F_RANGE, T_STRING | T_BUFFER | T_POINTER | T_NUMBER);
     add_instr_name("time_expression", F_TIME_EXPRESSION, -1);
     add_instr_name("end_time_expression", F_END_TIME_EXPRESSION, T_NUMBER);
-    instrs[F_RANGE].type[0] = T_POINTER | T_STRING;
 }
 
 char *get_f_name P1(int, n)
@@ -2331,7 +2363,7 @@ static void handle_define P1(char *, yyt)
 	    }
 	}
 	*--q = 0;
-	add_define(namebuf, arg, mtext, 0);
+	add_define(namebuf, arg, mtext);
     } else if (is_wspace(*p)) {
 	for (q = mtext; *p;) {
 	    *q = *p++;
@@ -2348,7 +2380,7 @@ static void handle_define P1(char *, yyt)
 	    }
 	}
 	*--q = 0;
-	add_define(namebuf, -1, mtext, 0);
+	add_define(namebuf, -1, mtext);
     } else {
 	lexerror("Illegal macro symbol");
     }
@@ -2383,8 +2415,7 @@ static void add_input P1(char *, p)
 	cur_lbuf->outp = q + 1;
 	cur_lbuf->last_nl = last_nl;
 
-	new_lbuf = (struct linked_buf *) DXALLOC(sizeof(struct linked_buf), 90,
-						 "add_input");
+	new_lbuf = ALLOCATE(struct linked_buf, TAG_COMPILER, "add_input");
 	new_lbuf->term_type = TERM_ADD_INPUT;
 	new_lbuf->prev = cur_lbuf;
 	buf = new_lbuf->buf;
@@ -2408,7 +2439,27 @@ static struct defn *defns[DEFHASH];
 
 #define defhash(s) (whashstr((s), 10) & (DEFHASH - 1))
 
-static void add_define P4(char *, name, int, nargs, char *, exps, int, flags)
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_all_defines() {
+    int i;
+    struct defn *tmp;
+
+    for (i = 0; i < inc_list_size; i++) 
+	EXTRA_REF(BLOCK(inc_list[i]))++;
+
+    for (i = 0; i < DEFHASH; i++) {
+	tmp = defns[i];
+	while (tmp) {
+	    DO_MARK(tmp, TAG_PREDEFINES);
+	    DO_MARK(tmp->name, TAG_PREDEFINES);
+	    DO_MARK(tmp->exps, TAG_PREDEFINES);
+	    tmp = tmp->next;
+	}
+    }
+}
+#endif
+
+static void add_define P3(char *, name, int, nargs, char *, exps)
 {
     struct defn *p;
     int h;
@@ -2420,16 +2471,45 @@ static void add_define P4(char *, name, int, nargs, char *, exps, int, flags)
 	    sprintf(buf, "Warning: redefinition of #define %s\n", name);
 	    yywarn(buf);
 	}
-	p->exps = (char *)DREALLOC(p->exps, strlen(exps) + 1, 65, "add_define: redef");
+	p->exps = (char *)DREALLOC(p->exps, strlen(exps) + 1, TAG_COMPILER, "add_define: redef");
 	strcpy(p->exps, exps);
 	p->nargs = nargs;
     } else {
-	p = (struct defn *) DXALLOC(sizeof(struct defn), 65, "add_define: def");
-	p->name = (char *) DXALLOC(strlen(name) + 1, 65, "add_define: def name");
+	p = ALLOCATE(struct defn, TAG_COMPILER, "add_define: def");
+	p->name = (char *) DXALLOC(strlen(name) + 1, TAG_COMPILER, "add_define: def name");
 	strcpy(p->name, name);
-	p->exps = (char *) DXALLOC(strlen(exps) + 1, 65, "add_define: def exps");
+	p->exps = (char *) DXALLOC(strlen(exps) + 1, TAG_COMPILER, "add_define: def exps");
 	strcpy(p->exps, exps);
-	p->flags = flags;
+	p->flags = 0;
+	p->nargs = nargs;
+	h = defhash(name);
+	p->next = defns[h];
+	defns[h] = p;
+    }
+}
+
+static void add_predefine P3(char *, name, int, nargs, char *, exps)
+{
+    struct defn *p;
+    int h;
+
+    if ((p = lookup_define(name))) {
+	if (nargs != p->nargs || strcmp(exps, p->exps)) {
+	    char buf[200 + NSIZE];
+
+	    sprintf(buf, "Warning: redefinition of #define %s\n", name);
+	    yywarn(buf);
+	}
+	p->exps = (char *)DREALLOC(p->exps, strlen(exps) + 1, TAG_PREDEFINES, "add_define: redef");
+	strcpy(p->exps, exps);
+	p->nargs = nargs;
+    } else {
+	p = ALLOCATE(struct defn, TAG_PREDEFINES, "add_define: def");
+	p->name = (char *) DXALLOC(strlen(name) + 1, TAG_PREDEFINES, "add_define: def name");
+	strcpy(p->name, name);
+	p->exps = (char *) DXALLOC(strlen(exps) + 1, TAG_PREDEFINES, "add_define: def exps");
+	strcpy(p->exps, exps);
+	p->flags = DEF_IS_PREDEF;
 	p->nargs = nargs;
 	h = defhash(name);
 	p->next = defns[h];
@@ -2925,7 +3005,7 @@ void set_inc_list P1(char *, list)
 	size++;
 	p++;
     }
-    inc_list = (char **) DXALLOC(size * sizeof(char *), 68, "set_inc_list");
+    inc_list = CALLOCATE(size, char *, TAG_INC_LIST, "set_inc_list");
     inc_list_size = size;
     for (i = size - 1; i >= 0; i--) {
 	p = strrchr(list, ':');
@@ -3021,13 +3101,14 @@ struct ident_hash_elem *find_or_add_perm_ident P1(char *, name) {
 	    if (!strcmp(hptr2->name, name)) return hptr2;
 	    hptr2 = hptr2->next;
 	}
-	hptr = (struct ident_hash_elem *)DMALLOC(sizeof(struct ident_hash_elem), 0, "find_or_add_perm_ident:1");
+	hptr = ALLOCATE(struct ident_hash_elem, TAG_PERM_IDENT, "find_or_add_perm_ident:1");
 	hptr->next = ident_hash_head[h]->next;
 	ident_hash_head[h]->next = hptr;
 	if (ident_hash_head[h] == ident_hash_tail[h])
 	    ident_hash_tail[h] = hptr;
     } else {
-	hptr = (ident_hash_table[h] = (struct ident_hash_elem *)DMALLOC(sizeof(struct ident_hash_elem), 0, "find_or_add_perm_ident:2"));
+	hptr = (ident_hash_table[h] = ALLOCATE(struct ident_hash_elem, TAG_PERM_IDENT,
+					       "find_or_add_perm_ident:2"));
 	ident_hash_head[h] = hptr;
 	ident_hash_tail[h] = hptr;
 	hptr->next = hptr;
@@ -3056,7 +3137,7 @@ static char *alloc_local_name P1(char *, name) {
 
     if (lb_index + len > 4096) {
 	struct lname_linked_buf *new_buf;
-	new_buf = (struct lname_linked_buf *)DMALLOC(sizeof(struct linked_buf), 0, "alloc_local_name");
+	new_buf = ALLOCATE(struct lname_linked_buf, TAG_COMPILER, "alloc_local_name");
 	new_buf->next = lnamebuf;
 	lnamebuf = new_buf;
 	lb_index = 0;
@@ -3186,7 +3267,8 @@ static struct ident_hash_elem *quick_alloc_ident_entry() {
 	return &(ihe_list->items[num_free]);
     } else {
 	struct ident_hash_elem_list *ihel;
-	ihel = (struct ident_hash_elem_list *)DMALLOC(sizeof(struct ident_hash_elem_list), 0, "quick_alloc_ident_entry");
+	ihel = ALLOCATE(struct ident_hash_elem_list, TAG_COMPILER,
+			"quick_alloc_ident_entry");
 	ihel->next = ihe_list;
 	ihe_list = ihel;
 	num_free = 127;
@@ -3268,9 +3350,8 @@ void init_identifiers() {
     struct ident_hash_elem *ihe;
     
     /* allocate all three tables together */
-    ident_hash_table = (struct ident_hash_elem **)
-	DMALLOC(sizeof(struct ident_hash_elem *) * IDENT_HASH_SIZE * 3,
-		0, "init_identifiers");
+    ident_hash_table = CALLOCATE(IDENT_HASH_SIZE * 3, struct ident_hash_elem *,
+				 TAG_IDENT_TABLE, "init_identifiers");
     ident_hash_head = (struct ident_hash_elem **)&ident_hash_table[IDENT_HASH_SIZE];
     ident_hash_tail = (struct ident_hash_elem **)&ident_hash_table[2*IDENT_HASH_SIZE];
 

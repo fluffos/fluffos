@@ -1,9 +1,15 @@
 /*
- * options.h: defines for the compile-time configuration of MudOS
+ * options.h: defines for the compile-time configuration of the MudOS driver
  */
 
 #ifndef _OPTIONS_H_
 #define _OPTIONS_H_
+
+/****************************************************************************
+ * EVERY time you change ANYTHING in this file, RECOMPILE from scratch.     *
+ * (type "make clean" then "make" on a UNIX system) Failure to do so may    *
+ * cause the driver to behave oddly.                                        *
+ ****************************************************************************/
 
 /* NOTES:
  * Many of the configurable options are now set via the configuration file
@@ -13,6 +19,14 @@
  * Removing an efun from func_spec.c usually removes most, if not all,
  *  of the code associated with it.
  */
+
+/****************************************************************************
+ *                              MALLOC                                      *
+ *                             --------                                     *
+ * for performance reasons, LP drivers have a variety of memory allocation  *
+ * packages.  If you don't care, use the default one on your system:        *
+ * #define SYSMALLOC, #undef the others.                                    *
+ ****************************************************************************/
 
 /* You must choose exactly one of these malloc packages:
  *     ~~~~
@@ -52,6 +66,8 @@
 #undef WRAPPEDMALLOC
 #undef DEBUGMALLOC
 
+/* The following add certain bells and whistles to malloc: */
+
 /* DO_MSTATS: do not define this unless BSDMALLOC or SMALLOC is chosen above.
  *   Defining this causes those replacement mallocs to keep statistics that
  *   the malloc_status() efun will print out (including total memory
@@ -70,10 +86,123 @@
  */
 #undef DEBUGMALLOC_EXTENSIONS
 
+/* CHECK_MEMORY: defining this (in addition to DEBUGMALLOC) causes the driver
+ * to check for memory corruption due to writing before the start or end
+ * of a block.  This also adds the check_memory() efun.  Takes a considerable
+ * ammount more memory.  Mainly for debugging.
+ */
+#define CHECK_MEMORY
+
+/****************************************************************************
+ *                          COMPATIBILITY                                   *
+ *                         ---------------                                  *
+ * The MudOS driver has evolved quite a bit over the years.  These defines  *
+ * are mainly to preserve old behavior in case people didn't want to        *
+ * rewrite the relevant portions of their code.                             *
+ *                                                                          *
+ * WARNING: If you are using software designed to run with the MudOS driver *
+ *          it may assume certain settings of these options.  Check the     *
+ *          instructions for details.                                       *
+ ****************************************************************************/
+
+/* HAS_STATUS_TYPE: old MudOS drivers had a 'status' type which was
+ * identical to the 'int' type.  Define this to bring it back.
+ */
+#undef HAS_STATUS_TYPE
+
+/* OLD_COMMAND: if this is defined, then the command() efun may take a 2nd
+ *   argument specifying on which object to perform the command.
+ *
+ * It was removed for security reasons, as this allows any object to mimic
+ * a user typing a command.
+ */
+#undef OLD_COMMAND
+
+/* SANE_EXPLODE_STRING: define this if you want to prevent explode_string
+ *   from stripping off more than one leading delimeters.  #undef it for the
+ *   old behavior.
+ */
+#undef SANE_EXPLODE_STRING
+
+/* EACH: define this if you want the each() operator for mappings.  Undefining
+ *   EACH save about 12 bytes per allocated mapping but will make the each()
+ *   efun unavailable.  Many people think each() is a bad efun to have but
+ *   its here because people use it and would gripe if I took it away.  The
+ *   alternative to each() is to use keys() and iterate over the returned
+ *   array.
+ */
+#undef EACH
+
+/* OLD_HEARTBEAT: define this if you want the old heartbeat semantics.
+ *   In the new semantics, set_heart_beat(ticks), specifies the number of
+ *   HEARTBEAT_INTERVAL ticks to be used, where ticks can be > 1 for
+ *   multiple tick intervals.  If you define this all values for ticks > 1
+ *   will be mapped to ticks = 1.
+ */
+#undef OLD_HEARTBEAT
+
+/* CAST_CALL_OTHERS: define this if you want to require casting of call_other's;
+ *   this was the default behavior of the driver prior to this addition.
+ */
+#undef CAST_CALL_OTHERS
+
+/* NONINTERACTIVE_STDERR_WRITE: if defined, all writes/tells/etc to
+ *   noninteractive objects will be written to stderr prefixed with a ']'
+ *   (old behavior).
+ */
+#define NONINTERACTIVE_STDERR_WRITE
+
+/* NO_LIGHT: define this to disable the set_light() and driver maintenance
+ *   of light levels in objects.  You can simulate it via LPC if you want...
+ */
+#undef NO_LIGHT
+
+/* NO_MUDLIB_STATS: define this to disable domain and author stats
+ *   maintenance by the driver.  These mudlib stats are more domain
+ *   based than user based, and replaces the traditional wiz_list stats.
+ */
+#undef NO_MUDLIB_STATS
+
+/*
+ * NEW_FUNCTIONS: define this to allow the extended function pointers
+ * introduced in v20.
+ */
+#define NEW_FUNCTIONS
+
+/* OLD_TYPE_BEHAVIOR: reintroduces a bug in type-checking that effectively
+ * renders compile time type checking useless.  For backwards compatibility.
+ */
+#undef OLD_TYPE_BEHAVIOR
+
+/* OLD_RANGE_BEHAVIOR: define this if you want negative indexes in string
+ * or buffer range values (not lvalue, i.e. x[-2..-1]; for e.g. not 
+ * x[-2..-1] = foo, the latter is always illegal) to mean counting from the 
+ * end 
+ */
+#undef OLD_RANGE_BEHAVIOR
+
+/* OLD_ED: ed() efun backwards compatible with the old version.  The new
+ * version requires/allows a mudlib front end.
+ */
+#define OLD_ED
+
+/****************************************************************************
+ *                           MISCELLANEOUS                                  *
+ *                          ---------------                                 *
+ * Various options that affect the way the driver behaves.                  *
+ *                                                                          *
+ * WARNING: If you are using software designed to run with the MudOS driver *
+ *          it may assume certain settings of these options.  Check the     *
+ *          instructions for details.                                       *
+ ****************************************************************************/
+
 /* LOG_CATCHES: define this to cause errors that are catch()'d to be
  *   sent to the debug log anyway.
+ *
+ * On by default, because newer libs use catch() alot, and it's confusing
+ * if the errors don't show up in the logs.
  */
-#undef LOG_CATCHES
+#define LOG_CATCHES
 
 /* ARGUMENTS_IN_TRACEBACK: prints out function call arguments in error
  *   tracebacks, to aid in debugging.  Note: it prints the values of
@@ -86,6 +215,9 @@
  * arguments were ("/read_buffer.c")
  * '           main' in '    command/update.c' ('      command/update')line 15
  * arguments were ("/read_buffer.c")
+ *
+ * Off by default because it produces somewhat longer error logs (that can
+ * be a good thing, tho ...)
  */
 #undef ARGUMENTS_IN_TRACEBACK
 
@@ -93,6 +225,9 @@
  *   variables.  The output looks more or less like:
  *
  * locals: 1, "local_value"
+ *
+ * Same as above.  Tends to produce even longer logs, but very useful for
+ * tracking errors.
  */
 #undef LOCALS_IN_TRACEBACK
 
@@ -101,6 +236,10 @@
  *   objects off.  Information about the error is passed in a mapping
  *   to the error_handler() function in the master object.  Whatever is
  *   returned is put in the debug.log.
+ *
+ * A good mudlib error handler is one of the best tools for tracking down
+ * errors.  Unfortunately, you need to have one.  Check the testsuite or
+ * other libs for an example.
  */
 #undef MUDLIB_ERROR_HANDLER
 
@@ -112,9 +251,6 @@
 /* OPTIMIZE_FUNCTION_TABLE_SEARCH: define this if you want the function
  *   table to be sorted for faster lookups (ie binary search).  The flipside
  *   of this is that there is some overhead in maintaining the sorted table.
- *
- * WARNING: Currently broken, I think.  -Beek
- *          I think I fixed it in 0.9.19.12.  -Robo
  */
 #define OPTIMIZE_FUNCTION_TABLE_SEARCH
 
@@ -139,18 +275,13 @@
  * will make every LPC file behave as if it had the lines:
  * #pragma strict_types
  * #pragma save_types
+ *
+ * If you don't know what these are, 0 is a good choice, although
+ * PRAGMA_WARNINGS is quite useful too.  Use PRAGMA_STRICT_TYPES if
+ * you prefer strongly typed languages; leave it off if you like compiling
+ * spaghetti.
  */
 #define DEFAULT_PRAGMAS 0
-
-/* HAS_STATUS_TYPE: old MudOS drivers had a 'status' type which was
- * identical to the 'int' type.  Define this to bring it back.
- */
-#undef HAS_STATUS_TYPE
-
-/* OLD_COMMAND: if this is defined, then the command() efun may take a 2nd
- *   argument specifying on which object to perform the command.
- */
-#undef OLD_COMMAND
 
 /* MATH: determines whether or not the math efuns (for floats) are included.
  */
@@ -179,21 +310,6 @@
  */
 #define SAVE_EXTENSION ".o"
 
-/* SANE_EXPLODE_STRING: define this if you want to prevent explode_string
- *   from stripping off more than one leading delimeters.  #undef it for the
- *   old behavior.
- */
-#undef SANE_EXPLODE_STRING
-
-/* EACH: define this if you want the each() operator for mappings.  Undefining
- *   EACH save about 12 bytes per allocated mapping but will make the each()
- *   efun unavailable.  Many people think each() is a bad efun to have but
- *   its here because people use it and would gripe if I took it away.  The
- *   alternative to each() is to use keys() and iterate over the returned
- *   array.
- */
-#undef EACH
-
 /* STRICT_TYPE_CHECKING: define this if you wish to force formal parameter
  *   to include types.  If this is undef'd, then grossnesses like:
  *   func(obj) { string foo;  foo = allocate(3); } are allowed.
@@ -209,6 +325,9 @@
 /* NO_ANSI: define if you wish to disallow users from typing in commands that
  *   contain ANSI escape sequences.  Defining NO_ANSI causes all escapes
  *   (ASCII 27) to be replaced with a space ' '.
+ *
+ * If you anticipate problems with users intentionally typing in ANSI codes
+ * to make your terminal flash, etc define this.
  */
 #define NO_ANSI
 
@@ -239,18 +358,6 @@
  */
 #undef THIS_PLAYER_IN_CALL_OUT
 
-/* AUTO_SETEUID: when an object is created it's euid is automatically set to
- *   the equivalent of seteuid(getuid(this_object())).  undef AUTO_SETEUID
- *   if you would rather have the euid of the created object be set to 0.
- */
-#undef AUTO_SETEUID
-
-/* AUTO_TRUST_BACKBONE: define this if you want objects with the backbone
- *   uid to automatically be trusted and to have their euid set to the uid of
- *   the object that forced the object's creation.
- */
-#define AUTO_TRUST_BACKBONE
-
 /* PRIVS: define this if you want object privledges.  Your mudlib must
  *   explicitly make use of this functionality to be useful.  Defining this
  *   this will increase the size of the object structure by 4 bytes (8 bytes
@@ -263,69 +370,11 @@
  */
 #undef PRIVS
 
-/* HEARTBEAT_INTERVAL: define heartbeat interval in microseconds (us).
- *   1,000,000 us = 1 second.  The value of this macro specifies
- *   the frequency with which the heart_beat method will be called in
- *   those LPC objects which have called set_heart_beat(1).
- *
- * [NOTE: if SYSV is defined, alarm() is used instead of ualarm().  Since
- *  alarm() requires its argument in units of a second, we map 1 - 1,000,000 us
- *  to an actual interval of one (1) second and 1,000,001 - 2,000,000 maps to
- *  an actual interval of two (2) seconds, etc.]
- */
-#define HEARTBEAT_INTERVAL 2000000
-
-/* OLD_HEARTBEAT: define this if you want the old heartbeat semantics.
- *   In the new semantics, set_heart_beat(ticks), specifies the number of
- *   HEARTBEAT_INTERVAL ticks to be used, where ticks can be > 1 for
- *   multiple tick intervals.  If you define this all values for ticks > 1
- *   will be mapped to ticks = 1.
- */
-#undef OLD_HEARTBEAT
-
-/* LARGEST_PRINTABLE_STRING: defines the size of the vsprintf() buffer in
- *   comm.c's add_message(). Instead of blindly making this value larger,
- *   mudlib should be coded to not send huge strings to users.
- */
-#define LARGEST_PRINTABLE_STRING 8192
-
-/* MESSAGE_BUFFER_SIZE: determines the size of the buffer for output that
- *   is sent to users.
- */
-#define MESSAGE_BUFFER_SIZE 4096
-
-/* APPLY_CACHE_BITS: defines the number of bits to use in the call_other cache
- *   (in interpret.c).  Somewhere between six (6) and ten (10) is probably
- *   sufficient for small muds.
- */
-#define APPLY_CACHE_BITS 11
-
-/* CACHE_STATS: define this if you want call_other (apply_low) cache 
- * statistics.  Causes HAS_CACHE_STATS to be defined in all LPC objects.
- */
-#define CACHE_STATS
-
-/* CAST_CALL_OTHERS: define this if you want to require casting of call_other's;
- *   this was the default behavior of the driver prior to this addition.
- */
-#undef CAST_CALL_OTHERS
-
 /* INTERACTIVE_CATCH_TELL: define this if you want catch_tell called on
  *   interactives as well as NPCs.  If this is defined, user.c will need a
  *   catch_tell(msg) method that calls receive(msg);
 */
 #undef INTERACTIVE_CATCH_TELL
-
-/* NONINTERACTIVE_STDERR_WRITE: if defined, all writes/tells/etc to
- *   noninteractive objects will be written to stderr prefixed with a ']'
- *   (old behavior).
- */
-#define NONINTERACTIVE_STDERR_WRITE
-
-/* TRACE: define this to enable the trace() and traceprefix() efuns.
- *   (keeping this undefined will cause the driver to run faster).
- */
-#undef TRACE
 
 /* RESTRICTED_ED: define this if you want restricted ed mode enabled.
  */
@@ -334,17 +383,6 @@
 /* NO_SHADOWS: define this if you want to disable shadows in your driver.
  */
 #undef NO_SHADOWS
-
-/* NO_LIGHT: define this to disable the set_light() and driver maintenance
- *   of light levels in objects.  You can simulate it via LPC if you want...
- */
-#undef NO_LIGHT
-
-/* NO_MUDLIB_STATS: define this to disable domain and author stats
- *   maintenance by the driver.  These mudlib stats are more domain
- *   based than user based, and replaces the traditional wiz_list stats.
- */
-#undef NO_MUDLIB_STATS
 
 /* SNOOP_SHADOWED: define this if you want snoop to report what is
  *   sent to the player even in the event that the player's catch_tell() is
@@ -403,17 +441,90 @@
 */
 #undef ALWAYS_SAVE_BINARIES
 
-/*
- * NEW_FUNCTIONS: define this to allow the extended function pointers
- * introduced in v20.
+/* ARRAY_RESERVED_WORD: If this is defined then the word 'array' can
+ *   be used to define arrays, as in:
+ *
+ * int array x = ({ .... });
+ *
+ * A side effect is that array cannot be a variable or function name.
  */
-#define NEW_FUNCTIONS
+#undef ARRAY_RESERVED_WORD
+
+/****************************************************************************
+ *                                UIDS                                      *
+ *                               ------                                     *
+ * UIDS are the basis for some mudlib security systems.  Basically, they're *
+ * preserved for backwards compatibility, as several ways of breaking       *
+ * almost any system which relies on them are known.  (No, it's not a flaw  *
+ * of uids; only that b/c of the ease with which LPC objects can call       *
+ * each other, it's far to easy to leave holes)                             *
+ *                                                                          *
+ * If you don't care about security, the first option is probably what you  *
+ * want.                                                                    *
+ ****************************************************************************
 
 /*
  * NO_UIDS: define this if you want a driver that doesn't use uids.
  *
  */
 #undef NO_UIDS
+
+/* AUTO_SETEUID: when an object is created it's euid is automatically set to
+ *   the equivalent of seteuid(getuid(this_object())).  undef AUTO_SETEUID
+ *   if you would rather have the euid of the created object be set to 0.
+ */
+#undef AUTO_SETEUID
+
+/* AUTO_TRUST_BACKBONE: define this if you want objects with the backbone
+ *   uid to automatically be trusted and to have their euid set to the uid of
+ *   the object that forced the object's creation.
+ */
+#define AUTO_TRUST_BACKBONE
+
+/*************************************************************************
+ *                       FOR EXPERIENCED USERS                           *
+ *                      -----------------------                          *
+ * Most of these options will probably be of no interest to many users.  *
+ *************************************************************************
+
+/* HEARTBEAT_INTERVAL: define heartbeat interval in microseconds (us).
+ *   1,000,000 us = 1 second.  The value of this macro specifies
+ *   the frequency with which the heart_beat method will be called in
+ *   those LPC objects which have called set_heart_beat(1).
+ *
+ * [NOTE: if SYSV is defined, alarm() is used instead of ualarm().  Since
+ *  alarm() requires its argument in units of a second, we map 1 - 1,000,000 us
+ *  to an actual interval of one (1) second and 1,000,001 - 2,000,000 maps to
+ *  an actual interval of two (2) seconds, etc.]
+ */
+#define HEARTBEAT_INTERVAL 2000000
+
+/* LARGEST_PRINTABLE_STRING: defines the size of the vsprintf() buffer in
+ *   comm.c's add_message(). Instead of blindly making this value larger,
+ *   mudlib should be coded to not send huge strings to users.
+ */
+#define LARGEST_PRINTABLE_STRING 8192
+
+/* MESSAGE_BUFFER_SIZE: determines the size of the buffer for output that
+ *   is sent to users.
+ */
+#define MESSAGE_BUFFER_SIZE 4096
+
+/* APPLY_CACHE_BITS: defines the number of bits to use in the call_other cache
+ *   (in interpret.c).  Somewhere between six (6) and ten (10) is probably
+ *   sufficient for small muds.
+ */
+#define APPLY_CACHE_BITS 11
+
+/* CACHE_STATS: define this if you want call_other (apply_low) cache 
+ * statistics.  Causes HAS_CACHE_STATS to be defined in all LPC objects.
+ */
+#define CACHE_STATS
+
+/* TRACE: define this to enable the trace() and traceprefix() efuns.
+ *   (keeping this undefined will cause the driver to run faster).
+ */
+#undef TRACE
 
 /* LPC_TO_C: define this to enable LPC->C compilation.
  *
@@ -434,20 +545,6 @@
  *          following architectures:  SunOS 4.1, Linux, and SGI.
  */
 #undef RUNTIME_LOADING
-
-/* ARRAY_RESERVED_WORD: If this is defined then the word 'array' can
- *   be used to define arrays, as in:
- *
- * int array x = ({ .... });
- *
- * A side effect is that array cannot be a variable or function name.
- */
-#undef ARRAY_RESERVED_WORD
-
-/* OLD_TYPE_BEHAVIOR: reintroduces a bug in type-checking that effectively
- * renders compile time type checking useless.  For backwards compatibility.
- */
-#undef OLD_TYPE_BEHAVIOR
 
 /* ALWAYS_SAVE_COMPILED_BINARIES: define this to cause every file that
  *   is compiled to C code to behave as if it contains a line
@@ -488,6 +585,7 @@
 #define COMPILER_STACK_SIZE 200	/* get_config_int(5)  */
 #define MAX_TRACE 30		/* get_config_int(6)  */
 #define LIVING_HASH_SIZE 256	/* get_config_int(20) */
+#define RUNTIME_SWITCH_STACK_SIZE 200
 
 /* NEXT_MALLOC_DEBUG: define this if using a NeXT and you want to enable
  *   the malloc_check() and/or malloc_debug() efuns.  Run the 'man malloc_debug'

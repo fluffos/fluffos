@@ -37,6 +37,16 @@ char *simul_efun_file_name = 0;
 static void find_or_add_simul_efun PROT((struct function *));
 static void remove_simuls PROT((void));
 
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_simuls() {
+    int i;
+
+    EXTRA_REF(BLOCK(simul_efun_file_name))++;
+    for (i = 0; i < num_simul_efun; i++) 
+	EXTRA_REF(BLOCK(simul_names[i].name))++;
+}
+#endif
+
 /*
  * If there is a simul_efun file, then take care of it and extract all
  * information we need.
@@ -86,34 +96,29 @@ void get_simul_efuns P1(struct program *, prog)
 {
     struct function *funp;
     int i;
-    
+    int num_new = prog->p.i.num_functions;
+
     funp = prog->p.i.functions;
     if (num_simul_efun) {
 	remove_simuls();
 	/* will be resized later */
-	simul_names = (simul_entry *) DREALLOC(
-	     simul_names, 
-	     sizeof(simul_entry) * (num_simul_efun + prog->p.i.num_functions),
-	     96, "get_simul_efuns");
-	simuls = (struct function **) DREALLOC(
-             simuls,
-             sizeof(struct function *) * (num_simul_efun + prog->p.i.num_functions),
-             96, "get_simul_efuns");
+	simul_names = RESIZE(simul_names, num_simul_efun + num_new,
+			     simul_entry, TAG_SIMULS, "get_simul_efuns");
+	simuls = RESIZE(simuls, num_simul_efun + num_new,
+			struct function *, TAG_SIMULS, "get_simul_efuns: 2");
     } else {
-	simul_names = (simul_entry *)
-	    DMALLOC(sizeof(simul_entry) * prog->p.i.num_functions, 96, "get_simul_efuns");
-	simuls = (struct function **)
-	    DMALLOC(sizeof(struct function *) * prog->p.i.num_functions, 96, "get_simul_efuns");
+	simul_names = CALLOCATE(num_new, simul_entry, TAG_SIMULS, "get_simul_efuns");
+	simuls = CALLOCATE(num_new, struct function *, TAG_SIMULS, "get_simul_efuns: 2");
     }
     for (i=0; i < (int)prog->p.i.num_functions; i++)
 	if ((funp[i].type & (TYPE_MOD_STATIC | TYPE_MOD_PRIVATE)) == 0)
 	    find_or_add_simul_efun(&funp[i]);
     
     /* shrink to fit */
-    simul_names = (simul_entry *)
-	DREALLOC(simul_names, sizeof(simul_entry) * num_simul_efun, 96, "get_simul_efuns");
-    simuls = (struct function **)
-	DREALLOC(simuls, sizeof(struct function *) * num_simul_efun, 96, "get_simul_efuns");
+    simul_names = RESIZE(simul_names, num_simul_efun, simul_entry,
+			 TAG_SIMULS, "get_simul_efuns");
+    simuls = RESIZE(simuls, num_simul_efun, struct function *,
+		    TAG_SIMULS, "get_simul_efuns");
 }
 
 #define compare_addrs(x,y) (x < y ? -1 : (x > y ? 1 : 0))

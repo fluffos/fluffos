@@ -121,6 +121,9 @@ typedef unsigned int format_info;
 #define BUFF_SIZE LARGEST_PRINTABLE_STRING
 
 #define ERROR(x) LONGJMP(error_jmp, x)
+#define SPRINTF_ERROR(x)  { if (clean) { free_svalue(clean, "sprintf error"); \
+				  FREE(clean); clean = 0;  } ERROR(x); }
+
 #define ERR_BUFF_OVERFLOW	0x1	/* buffer overflowed */
 #define ERR_TO_FEW_ARGS		0x2	/* more arguments spec'ed than passed */
 #define ERR_INVALID_STAR	0x3	/* invalid arg to * */
@@ -149,9 +152,38 @@ typedef unsigned int format_info;
       startignore = 1; \
     else \
       curpos += !inignore; \
-  if (bpos>BUFF_SIZE) ERROR(ERR_BUFF_OVERFLOW); \
+  if (bpos>= BUFF_SIZE) ERROR(ERR_BUFF_OVERFLOW); \
 }
 
+#define M_ADD_CHAR(x) {\
+  buff[bpos] = x;\
+  if (startignore) \
+    if (buff[bpos++] == '^') \
+      inignore = !inignore; \
+    else \
+      curpos += 2*!inignore; \
+  else \
+    if (buff[bpos++] == '%') \
+      startignore = 1; \
+    else \
+      curpos += !inignore; \
+  if (bpos>= BUFF_SIZE) { SPRINTF_ERROR(ERR_BUFF_OVERFLOW); } \
+}
+
+#define T_ADD_CHAR(x) {\
+  buff[bpos] = x;\
+  if (startignore) \
+    if (buff[bpos++] == '^') \
+      inignore = !inignore; \
+    else \
+      curpos += 2*!inignore; \
+  else \
+    if (buff[bpos++] == '%') \
+      startignore = 1; \
+    else \
+      curpos += !inignore; \
+  if (bpos>= BUFF_SIZE) bpos--; \
+}
 #define GET_NEXT_ARG {\
   if (++arg >= argc) ERROR(ERR_TO_FEW_ARGS); \
   carg = (argv+arg);\
@@ -159,7 +191,7 @@ typedef unsigned int format_info;
 
 #define SAVE_CHAR(pointer) {\
   savechars *new;\
-  new = (savechars *)DXALLOC(sizeof(savechars), 107, "SAVE_CHAR");\
+  new = ALLOCATE(savechars, TAG_TEMPORARY, "SAVE_CHAR"); \
   new->what = *(pointer);\
   new->where = pointer;\
   new->next = saves;\
@@ -189,7 +221,7 @@ typedef struct ColumnSlashTable {
     struct ColumnSlashTable *next;
 }                cst;		/* Columns Slash Tables */
 
-static char buff[BUFF_SIZE];	/* buffer for returned string */
+static char buff[BUFF_SIZE + 1];	/* buffer for returned string */
 static unsigned int bpos;	/* position in buff */
 static unsigned int curpos;	/* cursor position */
 static unsigned int inignore;	/* are we not counting these characters */
@@ -214,7 +246,7 @@ static void stradd P3(char **, dst, int *, size, char *, add)
 
     if ((i = (strlen(*dst) + strlen(add))) >= *size) {
 	*size += i + 1;
-	*dst = (char *) DREALLOC(*dst, *size, 108, "stradd");
+	*dst = (char *) DREALLOC(*dst, *size, TAG_STRING, "stradd");
     }
     strcat(*dst, add);
 }				/* end of stradd() */
@@ -225,7 +257,8 @@ static void numadd P3(char **, dst, int *, size, int, num)
         nve;			/* true if num negative */
 
     if (num < 0) {
-	num *= -1;
+	/* Beek: yes, it's possible for num < 0, and num * -1 < 0. */
+	num = (num * -1) & 0x7fffffff;
 	nve = 1;
     } else
 	nve = 0;
@@ -233,7 +266,7 @@ static void numadd P3(char **, dst, int *, size, int, num)
     i = strlen(*dst);		/* i = length of constructed string so far */
     if ((i + num_l) >= *size) {
 	*size += i + num_l + 2;
-	*dst = (char *) DREALLOC(*dst, *size, 109, "stradd");
+	*dst = (char *) DREALLOC(*dst, *size, TAG_STRING, "stradd");
     }
     (*dst)[i + num_l] = '\0';
     if (nve)
@@ -256,7 +289,7 @@ static void floatadd P3(char **, dst, int *, size, double, flt)
     i = strlen(*dst);		/* i = length of constructed string so far */
     if ((i + flt_l) >= *size) {
 	*size += i + flt_l + 2;
-	*dst = (char *) DREALLOC(*dst, *size, 109, "stradd");
+	*dst = (char *) DREALLOC(*dst, *size, TAG_STRING, "stradd");
     }
     sprintf(*dst + i, "%s", buf);
 }				/* end of floatadd() */
@@ -272,7 +305,7 @@ static void add_indent P3(char **, dst, int *, size, int, indent)
     i = strlen(*dst);
     if ((i + indent) >= *size) {
 	*size += i + indent + 1;
-	*dst = (char *) DREALLOC(*dst, *size, 110, "add_indent");
+	*dst = (char *) DREALLOC(*dst, *size, TAG_STRING, "add_indent");
     }
     for (; indent; indent--)
 	(*dst)[i++] = ' ';
@@ -428,18 +461,15 @@ void svalue_to_string P6(struct svalue *, obj, char **, str, int, size, int, ind
 	     * These flags aren't that useful...
 	     * 
 	     * if (obj->u.ob->flags & O_HEART_BEAT) stradd(str,&size," (hb)");
-	     * if (obj->u.ob->flags & O_IS_WIZARD) stradd(str,&size,"
-	     * (wiz)"); if (obj->u.ob->flags & O_ENABLE_COMMANDS)
-	     * stradd(str,&size," (enabled)"); if (obj->u.ob->flags &
-	     * O_CLONE) stradd(str,&size," (clone)"); if (obj->u.ob->flags &
-	     * O_DESTRUCTED) stradd(str,&size," (destructed)"); if
-	     * (obj->u.ob->flags & O_SWAPPED) stradd(str,&size," (swapped)");
-	     * if (obj->u.ob->flags & O_ONCE_INTERACTIVE) stradd(str,&size,"
-	     * (x-activ)"); if (obj->u.ob->flags & O_APPROVED)
-	     * stradd(str,&size," (ok)"); if (obj->u.ob->flags &
-	     * O_RESET_STATE) stradd(str,&size," (reset)"); if
-	     * (obj->u.ob->flags & O_WILL_CLEAN_UP) stradd(str,&size," (clean
-	     * up)");
+	     * if (obj->u.ob->flags & O_IS_WIZARD) stradd(str,&size," (wiz)");
+	     * if (obj->u.ob->flags & O_ENABLE_COMMANDS) stradd(str,&size," (enabled)");
+	     * if (obj->u.ob->flags & O_CLONE) stradd(str,&size," (clone)");
+	     * if (obj->u.ob->flags & O_DESTRUCTED) stradd(str,&size," (destructed)");
+	     * if (obj->u.ob->flags & O_SWAPPED) stradd(str,&size," (swapped)");
+	     * if (obj->u.ob->flags & O_ONCE_INTERACTIVE) stradd(str,&size," (x-activ)");
+	     * if (obj->u.ob->flags & O_APPROVED) stradd(str,&size," (ok)");
+	     * if (obj->u.ob->flags & O_RESET_STATE) stradd(str,&size," (reset)");
+	     * if (obj->u.ob->flags & O_WILL_CLEAN_UP) stradd(str,&size," (clean up)");
 	     */
 	    break;
 	}
@@ -479,6 +509,10 @@ static int ignorestrlen P1(char *, str)
  * "str" is unmodified.  trailing is, of course, ignored in the case
  * of right justification.
  */
+/* In the following actually use T_ADD_CHAR (truncating if length is too long :)) */
+/* It's better to be consistent to free clean maybe, but that requires passing */
+/* it to add_justified. It's even better to rewrite it - volunteers? :)  */
+/* Sym */
 static void add_justified P5(char *, str, char *, pad, int, fs, format_info, finfo, short int, trailing)
 {
     int i, len, len2;
@@ -488,14 +522,14 @@ static void add_justified P5(char *, str, char *, pad, int, fs, format_info, fin
     switch (finfo & INFO_J) {
     case INFO_J_LEFT:
 	for (i = 0; i < len; i++)
-	    ADD_CHAR(str[i]);
+	    T_ADD_CHAR(str[i]);
 	fs -= len;
 	len = strlen(pad);
 	if (trailing)
 	    for (i = 0; fs > 0; i++, fs--) {
 		if (pad[i % len] == '\\')
 		    i++;
-		ADD_CHAR(pad[i % len]);
+		T_ADD_CHAR(pad[i % len]);
 	    }
 	break;
     case INFO_J_CENTRE:{
@@ -513,10 +547,10 @@ static void add_justified P5(char *, str, char *, pad, int, fs, format_info, fin
 		    i++;
 		    j++;
 		}
-		ADD_CHAR(pad[i % l]);
+		T_ADD_CHAR(pad[i % l]);
 	    }
 	    for (i = 0; i < len; i++)
-		ADD_CHAR(str[i]);
+		T_ADD_CHAR(str[i]);
 	    j = (fs - len2) / 2;
 	    if (trailing)
 		for (i = 0; i < j; i++) {
@@ -524,7 +558,7 @@ static void add_justified P5(char *, str, char *, pad, int, fs, format_info, fin
 			i++;
 			j++;
 		    }
-		    ADD_CHAR(pad[i % l]);
+		    T_ADD_CHAR(pad[i % l]);
 		}
 	    break;
 	}
@@ -539,10 +573,10 @@ static void add_justified P5(char *, str, char *, pad, int, fs, format_info, fin
 		    i++;
 		    fs++;
 		}
-		ADD_CHAR(pad[i % l]);
+		T_ADD_CHAR(pad[i % l]);
 	    }
 	    for (i = 0; i < len; i++)
-		ADD_CHAR(str[i]);
+		T_ADD_CHAR(str[i]);
 	}
     }
 }				/* end of add_justified() */
@@ -992,14 +1026,13 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 		nelemno = 1;	/* next element number */
 	    }
 	    while (1) {
-		struct svalue *clean = 0;
+	        struct svalue *clean = 0;
 
 		if ((finfo & INFO_T) == INFO_T_LPC) {
-		    clean = (struct svalue *)
-			DXALLOC(sizeof(struct svalue), 111, "string_print: 1");
+		    clean = ALLOCATE(struct svalue, TAG_TEMPORARY, "string_print: 1");
 		    clean->type = T_STRING;
 		    clean->subtype = STRING_MALLOC;
-		    clean->u.string = (char *) DXALLOC(500, 112, "string_print: 2");
+		    clean->u.string = (char *) DXALLOC(500, TAG_STRING, "string_print: 2");
 		    clean->u.string[0] = '\0';
 		    svalue_to_string(carg, &(clean->u.string), 500, 0, 0, 0);
 		    carg = clean;
@@ -1012,7 +1045,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 		    /* never reached... */
 		    fprintf(stderr, "%s: (s)printf: INFO_T_NULL.... found.\n",
 			    current_object->name);
-		    ADD_CHAR('%');
+		    M_ADD_CHAR('%');
 		} else if ((finfo & INFO_T) == INFO_T_STRING) {
 		    int slen;
 
@@ -1022,29 +1055,30 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 		     * <zak@rmit.oz.au>
 		     */
 		    if (carg->type == T_NUMBER && carg->u.number == 0) {
-			clean = (struct svalue *)
-			    DXALLOC(sizeof(struct svalue), 121, "string_print: z1");
+			clean = ALLOCATE(struct svalue, TAG_TEMPORARY, "string_print: z1");
 			clean->type = T_STRING;
 			clean->subtype = STRING_MALLOC;
 			clean->u.string = (char *) DXALLOC(sizeof(NULL_MSG),
-						   122, "string_print: z2");
+						   TAG_STRING, "string_print: z2");
 			strcpy(clean->u.string, NULL_MSG);
 			carg = clean;
 		    }
-		    if (carg->type != T_STRING)
-			ERROR(ERR_INCORRECT_ARG_S);
+		    if (carg->type != T_STRING) {
+			SPRINTF_ERROR(ERR_INCORRECT_ARG_S);
+		    }
 		    slen = strlen(carg->u.string);
 		    if ((finfo & INFO_COLS) || (finfo & INFO_TABLE)) {
 			cst **temp;
 
-			if (!fs)
-			    ERROR(ERR_CST_REQUIRES_FS);
+			if (!fs) {
+			    SPRINTF_ERROR(ERR_CST_REQUIRES_FS);
+			}
 
 			temp = &csts;
 			while (*temp)
 			    temp = &((*temp)->next);
 			if (finfo & INFO_COLS) {
-			    *temp = (cst *) DXALLOC(sizeof(cst), 113, "string_print: 3");
+			    *temp = ALLOCATE(cst, TAG_TEMPORARY, "string_print: 3");
 			    (*temp)->next = 0;
 			    (*temp)->d.col = carg->u.string;
 			    (*temp)->pad = pad;
@@ -1056,13 +1090,13 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 						    && (format_str[fpos] != '\0')) || ((finfo & INFO_ARRAY)
 			    && (nelemno < (argv + arg)->u.vec->size)))) == 2)
 				&& !format_str[fpos]) {
-				ADD_CHAR('\n');
+				M_ADD_CHAR('\n');
 			    }
 			} else {/* (finfo & INFO_TABLE) */
 			    unsigned int n, len, max_len;
 
 #define TABLE carg->u.string
-			    (*temp) = (cst *) DXALLOC(sizeof(cst), 114, "string_print: 4");
+			    (*temp) = ALLOCATE(cst, TAG_TEMPORARY, "string_print: 4");
 			    (*temp)->pad = pad;
 			    (*temp)->info = finfo;
 			    (*temp)->start = curpos;
@@ -1098,8 +1132,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 				len++;
 			    if (len > 1 && n % pres)
 				pres -= (pres - n % pres) / len;
-			    (*temp)->d.tab = (char **)
-				DXALLOC(pres * sizeof(char *), 115, "string_print: 5");
+			    (*temp)->d.tab = CALLOCATE(pres, char *, TAG_TEMPORARY, "string_print: 5");
 			    (*temp)->nocols = pres;	/* heavy sigh */
 			    (*temp)->d.tab[0] = TABLE;
 			    if (pres == 1)
@@ -1138,7 +1171,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 				       || carg->u.string[slen - 1] != '\n');
 			} else {
 			    for (i = 0; i < slen; i++)
-				ADD_CHAR(carg->u.string[i]);
+				M_ADD_CHAR(carg->u.string[i]);
 			}
 		    }
 		} else if (finfo & INFO_T_INT) {	/* one of the integer
@@ -1228,7 +1261,8 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 		    ERROR(ERR_UNDEFINED_TYPE);
 		if (clean) {
 		    free_svalue(clean, "string_print_formatted");
-		    *clean = const0n;
+		    FREE(clean);
+		    clean = 0;
 		}
 		if (!(finfo & INFO_ARRAY))
 		    break;
