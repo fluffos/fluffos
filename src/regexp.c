@@ -288,6 +288,10 @@ regexp *regcomp P2(char *, exp,
 	    break;
 	case '\\':
 	    switch (c = *scan++) {
+	    case 0:
+		FREE(exp2);
+		FAIL("Regular expression cannot end with '\\'.  Use \"\\\\\".");
+		break;
 	    case '(':
 	    case ')':
 		*dest++ = excompat ? c | SPECIAL : c;

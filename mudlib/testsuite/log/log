@@ -1,0 +1,14 @@
+clone/login.c line 11:Undefined function cat
+command/update.c line 11:Bad argument 1 type to efun destruct()
+single/efuns/read_buffer.c line 39:Bad type to indexed value: "mixed "
+single/efuns/read_buffer.c line 39:Bad assignment. Rhs: "int "
+single/efuns/read_buffer.c line 41:Bad type to indexed value: "mixed "
+single/efuns/read_buffer.c line 41:Bad assignment. Rhs: "int "
+single/efuns/read_buffer.c line 41:Bad type to indexed value: "mixed "
+single/efuns/read_buffer.c line 41:Bad assignment. Rhs: "int "
+single/efuns/read_buffer.c line 41:Bad type to indexed value: "mixed "
+single/efuns/read_buffer.c line 42:Bad assignment. Rhs: "int "
+single/efuns/read_buffer.c line 41:Bad type to indexed value: "mixed "
+single/efuns/read_buffer.c line 42:Bad assignment. Rhs: "int "
+single/efuns/read_buffer.c line 41:Bad type to indexed value: "mixed "
+single/efuns/read_buffer.c line 39:Bad assignment. Rhs: "int "

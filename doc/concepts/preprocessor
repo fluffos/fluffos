@@ -199,6 +199,11 @@ At this time the following control keywords are recognized:
     o   strict_types
     o   save_binary
     o   save_types
+    o   warnings
+    o   optimize
+    o   error_context
+
+Also, #pragma no_keyword can be used to turn a pragma off.
 
 Notes:
     'strict_types' informs the compiler that the return value from
@@ -210,6 +215,14 @@ Notes:
 
     'save_types' is currently unused
 
+    'warnings' enables certain warnings about things in your LPC code which
+     probably won't behave the way you intended
+
+    'optimize' takes a second pass over the compiled code to improve it
+     slightly
+    
+    'error_context' adds more text to error messages indicating where on
+     the line the error occured
 
 Text Formatting Shortcuts
 ~~~~~~~~~~~~~~~~~~~~~~~~~

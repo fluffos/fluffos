@@ -1,0 +1,16 @@
+.\"return the number of elements in an array, mapping, buffer or string
+.TH sizeof 3 "5 Sep 1994" MudOS "LPC Library Functions"
+
+.SH NAME
+sizeof() - return the number of elements in an array, mapping, buffer or string
+
+.SH SYNOPSIS
+int sizeof( mixed var );
+
+.SH DESCRIPTION
+Return the number of elements in an array, mapping, string or buffer 'var'.  
+If `var' is not an array, mapping, string, or buffer, then zero (0) is
+returned.
+
+.SH SEE ALSO
+allocate(3), allocate_mapping(3), strlen(3)

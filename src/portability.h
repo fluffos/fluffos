@@ -195,7 +195,7 @@
 */
 #if defined(NeXT) || defined(accel) || defined(apollo) || \
     (defined(__386BSD__) && !(defined(__FreeBSD__) || defined(__NetBSD__))) \
-    || defined(hp68k) || defined(sequent)
+    || defined(hp68k) || defined(sequent) || defined(_CX_UX)
 #  define SIGNAL_ERROR BADSIG
 #else
 #  define SIGNAL_ERROR SIG_ERR
@@ -268,7 +268,8 @@ typedef unsigned long UINT32;
  */
 #if !defined(LATTICE) && !defined(SunOS_5) && !defined(OSF) && \
     !defined(_AIX) && !defined(linux) && !defined(ultrix) && \
-    !defined(hpux) && !defined(sgi) && !defined(NeXT)
+    !defined(hpux) && !defined(sgi) && !defined(NeXT) && \
+    !defined(_CX_UX)
 #if defined(_AUX_SOURCE)
 #define MEMMOVE_MISSING
 #else

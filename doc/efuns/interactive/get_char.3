@@ -5,10 +5,10 @@
 get_char - causes next character of input to be sent to a specified function
 
 .SH SYNOPSIS
-varargs void get_char( string fun, int flag, ... );
+varargs void get_char( string | function fun, int flag, ... );
 
 .SH DESCRIPTION
-Enable next character of user input to be sent to the local function `fun' as
+Enable next character of user input to be sent to the function `fun' as
 an argument. The input character will not be parsed by the driver.
 .PP
 Note that get_char is non-blocking which means that the object calling

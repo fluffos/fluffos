@@ -1,0 +1,16 @@
+.\"returns the evaluation cost remaining
+.TH eval_cost 3 "5 Sep 1994" MudOS "LPC Library Functions"
+
+.SH NAME
+eval_cost() - returns the evaluation cost remaining
+
+.SH SYNOPSIS
+void eval_cost()
+
+.SH DESCRIPTION
+eval_cost() returns the number of instructions that can be executed
+before the driver decides it is in an infinite loop.
+
+.SH SEE ALSO
+catch(3), error(3), throw(3), error_handler(4), set_eval_limit(3),
+reset_eval_cost()

@@ -1,0 +1,15 @@
+.\"find or load an object
+.TH load_object 3 "5 Sep 1994" MudOS "LPC Library Functions"
+
+.SH NAME
+load_object() - find or load an object by file name
+
+.SH SYNOPSIS
+object load_object( string str );
+
+.SH DESCRIPTION
+Find the object with the file name <str>.  If the file exists and the
+object hasn't been loaded yet, it is loaded.  Otherwise zero is returned.
+
+.SH SEE ALSO
+file_name(3), stat(3), find_object(3)

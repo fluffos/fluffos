@@ -1,0 +1,13 @@
+.\"evaluate a function pointer
+.TH evaluate 3 "5 Sep 1994" MudOS "LPC Library Functions"
+
+.SH NAME
+evaluate() - evaluate a function pointer
+
+.SH SYNOPSIS
+.nf
+mixed evaluate(mixed f, ...)
+
+.SH DESCRIPTION
+If f is a function, f is called with the rest of the arguments.
+Otherwise, f is returned.  evaluate(f, ...) is the same as (*f)(...).

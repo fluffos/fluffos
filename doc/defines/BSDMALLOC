@@ -1,0 +1,6 @@
+BSD malloc is a very fast memory allocator; the down side is that it uses
+alot of extra memory to keep track of blocks.  If speed is more important
+that memory usage, tho, this might be best.  It also keeps track of
+memory usage statistics.
+
+BSD malloc requires the sbrk() system call work on your system.

@@ -25,7 +25,8 @@ free_funp P1(struct funp *, fp)
     free_object(fp->owner, "free_funp");
     if (fp->type == FP_CALL_OTHER)
 	free_svalue(&fp->f.obj, "free_funp");
-    else if (fp->type == FP_FUNCTIONAL) {
+    else if (fp->type == FP_FUNCTIONAL 
+	  || fp->type == (FP_FUNCTIONAL | FP_NOT_BINDABLE)) {
 	fp->f.a.prog->p.i.func_ref--;
 	if (fp->f.a.prog->p.i.func_ref == 0 && fp->f.a.prog->p.i.ref == 0)
 	    deallocate_program(fp->f.a.prog);

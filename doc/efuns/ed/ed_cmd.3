@@ -1,0 +1,15 @@
+.\"send a command to an ed session
+.TH ed_cmd 3 "22 Jan 1995" MudOS "LPC Library Functions"
+
+.SH NAME
+ed_cmd() - send a command to an ed session
+
+.SH SYNOPSIS
+.nf
+string ed_cmd(string cmd)
+
+.SH DESCRIPTION
+This efun is available only if __OLD_ED__ is not defined.
+
+The command 'cmd' is sent to the active ed session, and the resulting
+output is returned.

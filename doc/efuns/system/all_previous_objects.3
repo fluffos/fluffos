@@ -1,0 +1,17 @@
+.\"returns an array of objects that called the current function
+.TH all_previous_objects 3 "5 Sep 1994" MudOS "LPC Library Functions"
+
+.SH NAME
+all_previous_objects() - returns an array of objects that called the
+current function
+
+.SH SYNOPSIS
+object *all_previous_objects();
+
+.SH DESCRIPTION
+Returns an array of objects that called current function.
+Note that local function calls do not set previous_object() to the current
+object, but leave it unchanged.
+
+.SH SEE ALSO
+call_other(3), call_out(3), origin(3), previous_object(3)

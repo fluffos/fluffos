@@ -1,0 +1,16 @@
+.\"concatenate strings
+.TH implode 3 "5 Sep 1994" MudOS "LPC Library Functions"
+
+.SH NAME
+implode() - concatenate strings
+
+.SH SYNOPSIS
+string implode( mixed *arr, string del );
+
+.SH DESCRIPTION
+Concatenate all strings found in array `arr', with the string `del' between
+each element. Only strings are used from the array.
+elements that are not strings are ignored.
+
+.SH SEE ALSO
+explode(3), sprintf(3)

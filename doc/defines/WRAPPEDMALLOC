@@ -1,0 +1,2 @@
+WRAPPEDMALLOC adds some extra code to whatever memory allocator you have
+chosen to keep some memory allocation statistics.

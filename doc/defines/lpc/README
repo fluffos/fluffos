@@ -1,0 +1,3 @@
+Note: Every define in options.h is now passed to the mudlib surrounded by
+"__", so if #define XYZZY appears in options.h, then the mudlib will see
+__XYZZY__ defined.

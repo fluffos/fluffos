@@ -1,44 +1,13 @@
-.\"function added to objects to handle initialization of variables.
+.\"obsolete apply
 .TH __INIT 4 "5 Sep 1994" MudOS "Driver Applies"
 
 .SH NAME
-__INIT - function added to objects to handle initialization of variables.
+__INIT - obsolete apply
 
 .SH SYNOPSIS
 __INIT( void );
 
 .SH DESCRIPTION
-When the driver compiles an object that contains variable declarations that
-initialize the variables, then the driver inserts a function named __INIT()
-in the compiled object in which the initializations are performed.  For
-example, in the following object:
-.PP
-  int x = 3;
-
-  void
-  create()
-  {
-     write(x + "\\n");
-  }
-
-.PP
-the driver would translate it into the following internal form before compiling
-the object:
-.PP
-  int x;
-
-  __INIT()
-  {
-     x = 3;
-  }
-
-  void
-  create()
-  {
-     write(x + "\\n");
-  }
-.PP
-If you add a function named __INIT() to one of your objects, then the
-driver will call it at object-load-time just as if the driver had inserted
-the function on its own.  Be aware that if you do this and the driver needs
-to add __INIT in order to initialize variables, then there will be a conflict.
+This function used to be called in objects right before create.
+global variable initialization is now handled by another function that
+cannot be interfered with, so this is no longer called.

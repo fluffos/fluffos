@@ -1,0 +1,7 @@
+defining HAS_STATUS_TYPE adds a type 'status' which is exactly the same as
+'int'.  This is provided to allow older code which uses the 'status' type
+to compile.  Another option is to just put the line:
+
+#define status int
+
+in the global include file.

@@ -1,0 +1,3 @@
+Every identifier defined in options.h becomes an LPC define as well, after
+having __ added to the front and back.  For example, if SYSMALLOC is defined
+in options.h, then __SYSMALLOC__ will be defined in all LPC objects.

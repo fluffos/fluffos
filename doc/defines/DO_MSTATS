@@ -1,0 +1,3 @@
+DO_MSTATS adds the malloc_status() efun which will print out the total
+ammount of memory allocated and other statistics.  Does not work with
+SYSMALLOC.

@@ -1,0 +1,3 @@
+SMALLOC is a memory allocator written specifically for LPmuds.  It is faster
+than most system mallocs because it was designed to work with LP drivers,
+and also provides statistics on how much memory is being used.

@@ -40,8 +40,9 @@ compile_object(string file)
 static void
 crash(string error, object command_giver, object current_object)
 {
-	efun::shout("Master object shouts: Damn!\n");
-	efun::shout("Master object tells you: The game is crashing.\n");
+	shout("Master object shouts: Damn!\n");
+	shout("Master object tells you: The game is crashing.\n");
+#if 0
 	log_file("crashes", MUD_NAME + " crashed on: " + ctime(time()) +
 		", error: " + error + "\n");
 	if (command_giver) {
@@ -50,6 +51,7 @@ crash(string error, object command_giver, object current_object)
 	if (current_object) {
 		log_file("crashes", "this_object: " + file_name(current_object) + "\n");
 	}
+#endif
 }
 
 // Function name:   update_file
@@ -167,7 +169,7 @@ retrieve_ed_setup(object who)
 // item in that room.  We get the chance to save users from being destructed.
 
 void
-destruct_env_of(object ob)
+destruct_environment_of(object ob)
 {
 	if (!interactive(ob)) {
 		return;
@@ -183,14 +185,6 @@ make_path_absolute(string file)
 {
 	file = resolve_path((string)this_player()->query_cwd(), file);
 	return file;
-}
-
-// called if a user connection is broken while in the editor; allows
-// the mudlib to save the changes in an alternate file without modifying
-// the original
-
-string get_save_file_name(string fname) {
-    return fname + "." + time();
 }
 
 string
@@ -221,38 +215,4 @@ string
 author_file(string str)
 {
 	return (string)call_other(SINGLE_DIR + "/simul_efun", "author_file", str);
-}
-
-// simulate the old behavior of the driver
-string
-standard_trace(mapping error, int caught) {
-    int i, s;
-    string res;
-
-    /* keep track of number of errors per object...if you're into that */
-
-    res = (caught) ? "caught: " : "";
-    res += sprintf("program: %s, object: %s line %i\n",
-          error["program"],
-          file_name(error["object"]),
-          error["line"]);
-
-    for (i=0, s = sizeof(error["trace"]); i < s; i++) {
-        res += sprintf("'%s' in '%s' ('%s')line %i\n",
-              error["trace"][i]["function"],
-              error["trace"][i]["program"],
-              dump_variable(error["trace"][i]["object"]),
-              error["trace"][i]["line"]);
-    }
-    return res;
-}
-
-void error_handler( mapping error, int caught ) {
-    if (this_player(1)) {
-        this_player(1)->set_error(error);
-        tell_object(this_player(1), standard_trace(error, caught));
-    }
-
-    // whatever we return goes to the debug.log
-    return standard_trace(error, caught);
 }

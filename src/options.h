@@ -355,7 +355,7 @@
 
 /* NO_ANSI: define if you wish to disallow users from typing in commands that
  *   contain ANSI escape sequences.  Defining NO_ANSI causes all escapes
- *   (ASCII 27) to be replaced with a space ' '.
+ *   (ASCII 27) in user input to be replaced with a space ' '.
  *
  * If you anticipate problems with users intentionally typing in ANSI codes
  * to make your terminal flash, etc define this.
@@ -556,33 +556,6 @@
  *   (keeping this undefined will cause the driver to run faster).
  */
 #undef TRACE
-
-/* LPC_TO_C: define this to enable LPC->C compilation.
- *
- * [NOTE: In addition, you must uncomment the C_EFUNS line in your
- *  Makefile or GNUmakefile.  This is done separately to save non-LPC_TO_C
- *  users from having to yacc & compile unused files.]
- * [NOTE: BINARIES must also be defined for LPC->C to work.  Actually
- *  using binaries is not required, though.]
- *
- *   Don't define this for now, work in progress -Beek
- */
-#undef LPC_TO_C
-
-/*
- * RUNTIME_LOADING: define this to enable runtime loading of LPC->C
- *   objects.  Has no effect if LPC_TO_C is off.
- * WARNING: This is experimental code.  It is known to work on the
- *          following architectures:  SunOS 4.1, Linux, and SGI.
- */
-#undef RUNTIME_LOADING
-
-/* ALWAYS_SAVE_COMPILED_BINARIES: define this to cause every file that
- *   is compiled to C code to behave as if it contains a line
- *   '#pragma save_binary'.  This #define has no affect if BINARIES and
- *   LPC_TO_C are not defined.
- */
-#undef ALWAYS_SAVE_COMPILED_BINARIES
 
 /* TRACE_CODE: define this to enable code tracing (the driver will print
  *   out the previous lines of code to an error) eval_instruction() runs about

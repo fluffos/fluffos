@@ -7,7 +7,6 @@
 inherit BASE;
 
 private string name;
-private mapping last_error;
 
 // replace this with a functioning version.
 
@@ -61,14 +60,11 @@ int
 commandHook(string arg)
 {
     string cmd_path;
-	object cobj;
+    object cobj;
 
-	cmd_path = COMMAND_PREFIX + query_verb();
-    cobj = find_object(cmd_path);
-	if (!cobj) {
-		catch(call_other(cmd_path, "???"));
-		cobj = find_object(cmd_path);
-	}
+    cmd_path = COMMAND_PREFIX + query_verb();
+
+    cobj = load_object(cmd_path);
     if (cobj) {
 		return (int)cobj->main(arg);
     } else {
@@ -141,18 +137,4 @@ reconnect()
 	set_heart_beat(1);
     tell_room(environment(), "Reconnected.\n");
     tell_room(environment(), query_name() + " has reconnected.\n");
-}
-
-// error handler support for dbxwhere & dbxframe
-
-void
-set_error(mapping e)
-{
-    last_error = e;
-}
-
-mapping
-query_error()
-{
-    return last_error;
 }

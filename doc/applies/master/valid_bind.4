@@ -1,0 +1,14 @@
+.\"controls the use of the bind() efun
+.TH valid_bind 4 "22 Jan 1995" MudOS "Driver Applies"
+
+.SH NAME
+valid_bind - controls the use of the bind() efun
+
+.SH SYNOPSIS
+int valid_bind(object binder, object old_owner, object new_owner)
+
+.SH DESCRIPTION
+This routine is called with 'binder' attempts to use the bind() efun
+to make a function pointer which belongs to 'old_owner' belong to
+'new_owner'.  If this routine returns 1, the call is allowed,
+otherwise an error is generated.

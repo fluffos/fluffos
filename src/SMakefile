@@ -170,11 +170,6 @@ OSFLAGS=Data=far Code=far NoIcons \
 CFLAGS= $(OSFLAGS) $(OPTIMIZE) $(WARN) $(PROFIL) $(DEBUG) $(DEBUG_MACRO) \
 	$(DEBUG_NON_FATAL) $(STR) $(PIPE) $(NEED_OLD_CPP)
 
-# Flags to be used by the LPC->C compiler
-# remove optimization or make other modifications here
-CFLAGS2= $(STATIC) $(OSFLAGS) $(OPTIMIZE) $(WARN) $(DEBUG) \
-	$(DEBUG_MACRO) $(DEBUG_NON_FATAL) $(STR) $(PIPE) $(NEED_OLD_CPP)
-
 # set CC=cc on a NeXT and to gcc on other machines (if possible)
 # You may want to use xlc on an RS/6000 (produces faster code).
 #
@@ -259,10 +254,6 @@ LIBS=LIB $(EXTRALIBS)
 EXTRA_PORT=amiga/signal.o amiga/signal_rr.o amiga/socket.o amiga/crypt.o
 AMIGA_BIN=amiga/cstrip amiga/replace
 
-# Define these for LPC->C support
-#EXTRA_EFUNS=cfuns.o cfuns_main.o cfuns_port.o cfuns_math.o cfuns_sock.o
-#EXTRA_OBJS=lpc_compiler.tab.o compile_file.o interface.o
-
 #################################################
 # the meat of things                            #
 # don't change anything below this section      #
@@ -283,7 +274,7 @@ OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
 
 PACKAGES= packages/\#?.o
 
-all: $(AMIGA_BIN) $(DRIVER_BIN) addr_server lpc_to_c.h
+all: $(AMIGA_BIN) $(DRIVER_BIN) addr_server
 
 remake: neat all
 
@@ -300,9 +291,6 @@ TO $(DRIVER_BIN)
 $(LIBS) $(LFLAGS)
 <
 	-$(RM) objlist
-
-lpc_to_c.h: cfuns.h virtual_architecture.h
-	-$(CAT) cfuns.h virtual_architecture.h > lpc_to_c.h
 
 depend: opcodes.h efun_protos.h grammar.tab.h cc.h efunctions.h efun_defs.c
 	makedepend \#?.c

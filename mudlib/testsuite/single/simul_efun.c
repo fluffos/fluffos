@@ -9,12 +9,6 @@ cat(string file)
 	write(read_file(file));
 }
 
-void
-log_file(string file, string text)
-{
-	write_file(LOG_DIR + "/" + file, text);
-}
-
 varargs int
 getoid(object ob)
 {
@@ -64,15 +58,9 @@ dump_variable(mixed arg)
    string rtn;
    int i;
    
-   if (objectp(arg)) {
-      rtn = arg->query_name();
-      if (rtn)
-          rtn += " ";
-      else
-          rtn = "";
-      return "("+rtn+file_name(arg)+")";
-   }
-
+   if (objectp(arg))
+      return "("+file_name(arg)+")";
+   
    if (stringp(arg))
       return "\""+arg+"\"";
    

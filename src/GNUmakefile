@@ -113,16 +113,8 @@ OPTIMIZE=-O
 # used by ioctl on some systems.
 #NEED_OLD_CPP=-traditional-cpp
 
-# May be needed by SunOS for LPC->C support
-#STATIC=-static
- 
 DEFINES=$(DEBUG) $(DEBUG_MACRO) $(DEBUG_NON_FATAL) $(OSFLAGS) $(MIRE)
 CFLAGS= $(STATIC) $(WARN) $(OPTIMIZE) $(PROFIL) $(STR) $(PIPE) $(DEFINES) \
-	$(NEED_OLD_CPP)
- 
-# These are the flags used by the LPC->C compiler.  Make any modifications
-# you want here
-CFLAGS2= $(STATIC) $(WARN) $(OPTIMIZE) $(STR) $(PIPE) $(DEFINES) \
 	$(NEED_OLD_CPP)
  
 # set CC=cc on a NeXT (or gcc if you have a newer version than the NeXT
@@ -193,10 +185,6 @@ YFLAGS = -d -y
 # wish to add any libraries.
 LIBS=-lm $(EXTRALIBS) $(MIRELIBS)
  
-# use these lines when enabling the LPC->C option
-#EXTRA_EFUNS=cfuns.c cfuns_main.c cfuns_port.c cfuns_math.c cfuns_sock.c
-#EXTRA_SRC=compile_file.c lpc_compiler.tab.c interface.c
-
 EFUNS=efuns_main.c efuns_port.c $(EXTRA_EFUNS)
 
 SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
@@ -218,12 +206,9 @@ VPATH = $(OBJDIR)
 
 OBJ=$(addprefix $(OBJDIR)/,$(subst .c,.o,$(SRC))) $(OBJDIR)/packages/*.o
 
-all: $(DRIVER_BIN) addr_server lpc_to_c.h
+all: $(DRIVER_BIN) addr_server
 
 remake: neat all
-
-lpc_to_c.h: cfuns.h virtual_architecture.h
-	-cat cfuns.h virtual_architecture.h > lpc_to_c.h
 
 $(DRIVER_BIN): $(OBJDIR) $(OBJ)
 	-mv $(DRIVER_BIN) $(DRIVER_BIN).old

@@ -5,10 +5,11 @@
 in_edit() - determine if a player is in the editor
  
 .SH SYNOPSIS
-int in_edit( object default : F_THIS_OBJECT );
+string in_edit( object default : F_THIS_OBJECT );
  
 .SH DESCRIPTION
-Returns 1 if the given object is in the editor.
+If the given object is in the editor, the file being edited is
+returned, else zero.
  
 .SH SEE ALSO
 ed(3), in_input(3)

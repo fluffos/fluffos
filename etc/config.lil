@@ -18,7 +18,7 @@ address server ip : localhost
 address server port : 7374
  
 # absolute pathname of mudlib
-mudlib directory : /usr/local/src/mud/MudOS_0.9.20/mudlib/testsuite
+mudlib directory : /usr/local/src/mud/MudOS_v21/mudlib/testsuite
  
 # absolute pathname of driver/config dir
 binary directory : /usr/local/bin/mud
@@ -42,7 +42,7 @@ simulated efun file : /single/simul_efun
 # file to swap out objects; not used if time to swap is 0
 swap file : /adm/tmp/swapfile
  
-# alternate debug.log file name (assumed to be in specified 'log directory')
+# debug.log file name (assumed to be in specified 'log directory')
 debug log file : debug.log
 
 # if an object is left alone for a certain time, then the
@@ -50,13 +50,13 @@ debug log file : debug.log
 # like destructing the object. If the function isn't defined by the
 # object, then nothing will happen.
 # This time should be substantially longer than the swapping time.
-time to clean up : 180
+time to clean up : 1800
  
 # How long time until an unused object is swapped out.
 # Machine with too many players and too little memory: 900 (15 minutes)
 # Machine with few players and lot of memory: 10000
 # Machine with infinite memory: 0 (never swap).
-time to swap : 120
+time to swap : 1200
  
 # How many seconds until an object is reset again.
 time to reset : 1800
@@ -64,9 +64,6 @@ time to reset : 1800
 # Maximum number of bits in a bit field. They are stored in printable
 # strings, 6 bits per byte.
 maximum bits in a bitfield : 1200
- 
-# Max number of local variables in a function.
-maximum local variables : 30
  
 # Maximum amount of "eval cost" per thread - execution is halted when 
 # it is exceeded.
@@ -83,7 +80,7 @@ maximum mapping size : 15000
  
 # Max inherit chain size
 inherit chain size : 30
- 
+
 # maximum length of a string variable
 maximum string length : 200000
  
@@ -95,7 +92,7 @@ maximum read file size : 200000
 maximum byte transfer : 10000
  
 # Reserve an extra memory area from malloc(), to free when we run out
-# of memory; so begins Armageddon.
+# of memory.
 # If this value is 0, no area will be reserved.
 reserved size : 0
  
@@ -117,7 +114,10 @@ object table size : 1501
 default fail message : What?
 
 # default message when error() occurs (optional)
-default error message :
+default error message : Something *REALLY* bad just happened.
+
+# file to include in all LPC objects (optional)
+global include file : <global.h>
 
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #
@@ -126,6 +126,9 @@ default error message :
 # maximum number of users in the game (unused currently)
 maximum users : 40
 
+# Max number of local variables in a function.
+maximum local variables : 30
+ 
 # Define the maximum stack size of the stack machine. This stack will also
 # contain all local variables and arguments.  (unused currently)
 evaluator stack size : 1000
@@ -140,3 +143,5 @@ maximum call depth : 30
 # There is a hash table for living objects, used by find_living().
 # (unused currently)
 living hash table size : 100
+
+ 

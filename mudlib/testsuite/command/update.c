@@ -11,9 +11,7 @@ main(string file)
 	}
 	if (obj = find_object(file)) {
 		destruct(obj);
-                if (obj)  return 1;
-                file_size("???");
-        }
-        catch(file->dummy_apply_load());
+	}
+	call_other(file, "???");
 	return 1;
 }

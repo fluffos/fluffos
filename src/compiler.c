@@ -672,12 +672,12 @@ int define_new_function P6(char *, name, int, num_arg, int, num_local,
 	    sprintf(p, "Illegal to redefine 'nomask' function \"%s\"", name);
 	    yyerror(p);
 	}
-	if (exact_types && funp->type != TYPE_UNKNOWN) {
+	if (exact_types && funp->type == NAME_PROTOTYPE && funp->type != TYPE_UNKNOWN) {
 	    int i;
 
 	    if (funp->num_arg != num_arg && !(funp->type & TYPE_MOD_VARARGS)
 		&& !(flags & NAME_PROTOTYPE))
-		yyerror("Incorrect number of arguments.");
+		yyerror("Number of arguments disagrees with previous definition.");
 	    else if (!(funp->flags & NAME_STRICT_TYPES) && !(flags & NAME_PROTOTYPE))
 		yyerror("Called function not compiled with type testing.");
 	    else {

@@ -6,12 +6,16 @@
 regexp() - regular expression handler
 
 .SH SYNOPSIS
-string *regexp( string *lines, string pattern );
+string *regexp( string *lines, string pattern, void | int flag );
 
 .SH DESCRIPTION
-When presented with an array of lines of test and a regular expression,
-regexp(3) returns an array containing those lines which match the pattern
-specified by the regular expression.
+Typically when presented with an array of lines of text and a regular 
+expression, regexp(3) returns an array containing those lines which 
+match the pattern specified by the regular expression. If the flag 
+(default 0) has bit 2 set, then non-matches will be returned instead of 
+matches. If the flag  has bit 1 set, the array returned will be of 
+the form ({ index1 + 1, match1, ..., indexn + 1, matchn }) where index1 
+is the index of 1st match/non match in the array lines.
 
 .SH "REGULAR EXPRESSION SYNTAX"
 A regular expression is zero or more \fIbranches\fR, separated by `|'.

@@ -1,0 +1,21 @@
+.\"create a mapping from an array
+.TH unique_mapping 3 "5 Sep 1994" MudOS "LPC Library Functions"
+
+.SH NAME
+unique_mapping() - create a mapping from an array based on a function
+
+.SH SYNOPSIS
+.nf
+mapping unique_mapping( mixed *arr, string fun, object ob,
+      	                mixed extra, ... );
+mapping unique_mapping( mixed *arr, function f, mixed extra, ... );
+
+.SH DESCRIPTION
+Returns a mapping built in the following manner:
+
+'ob->fun()' or 'f' is evaluated for each member of the array.  The
+members for which the function returns the same value are grouped
+together, and associated with the return value as the key.
+
+.SH SEE ALSO
+filter_array(3), sort_array(3), map(3)

@@ -8,9 +8,9 @@ generic and to provide a standard way of talking to clients intelligently.
 Here is the manual page for message:
 
 =====================================================================
-void message (string msg, string class, mixed targets, mixed exclude);
+void message (mixed class, string message, mixed targets, mixed exclude);
 
-message calls receive_message(string message, string class) in all message
+message calls receive_message(mixed class, string message) in all message
 recipients (derived from the target list) excluding those in the exclude list.
 This basically tells the object the message.
 
@@ -42,7 +42,7 @@ earmuff ability. (the ability to mask shouts) In your user (player)
 object, you would have the function receive_message.  Here's the
 simplest implementation possible:
 
-void receive_message (string msg, string class)
+void receive_message (string msg, mixed class)
 {
 	receive(msg);
 }

@@ -1516,6 +1516,7 @@ get_two_types(t1, t3));
 				break;
 			    default:
 				type_error("Bad argument 1 to '/'", t1);
+				result_type = TYPE_ANY;
 			}
 		    } else if (t1 == TYPE_ANY || t3 == TYPE_ANY){
 			int t = (t1 == TYPE_ANY) ? t3 : t1;
@@ -1525,13 +1526,14 @@ get_two_types(t1, t3));
 			    type_error(t1 == TYPE_ANY ?
 				       "Bad argument 2 to '/'" :
 				       "Bad argument 1 to '/'", t);
+			    result_type = TYPE_ANY;
 			}
 		    } else if ((t1 == TYPE_NUMBER && t3 == TYPE_REAL) ||
 			       (t1 == TYPE_REAL && t3 == TYPE_NUMBER)){
 			result_type = TYPE_REAL;
 		    } else {
 			char buf[300];
-			sprintf(buf, "Invalid types to '*' %s", get_two_types(t1, t3));
+			sprintf(buf, "Invalid types to '/' %s", get_two_types(t1, t3));
 			yyerror(buf);
 			result_type = TYPE_ANY;
 		    }
@@ -1998,7 +2000,7 @@ expr4:
             {
               int i;
               if ((i = $1->dn.local_num) != -1) {
-                  CREATE_TYPED_NODE($$, F_LOCAL, type_of_locals[i]);
+                  CREATE_TYPED_NODE($$, F_LOCAL, type_of_locals_ptr[i]);
                   $$->v.number = i & 0xff;
 #ifdef NEW_FUNCTIONS
 		  if (function_context.num_parameters >= 0)
@@ -2205,7 +2207,7 @@ expr4:
 %ifdef NEW_FUNCTIONS
     |   L_BASIC_TYPE
             {
-	        if ($1 != TYPE_FUNCTION) yyerror("Syntax error in anonymous function pointer initialization\n");
+	        if ($1 != TYPE_FUNCTION) yyerror("A reserved type name cannot be used as a function name.\n");
 		$<func_block>$.num_local = current_number_of_locals;
 		$<func_block>$.max_num_locals = max_num_locals;
 		$<func_block>$.context = context;

@@ -1,0 +1,6 @@
+DEBUGMALLOC_EXTENSIONS not only keeps track of how much is allocated, but
+also associates a numeric tag and a string label with each block, allowing
+it to check memory for consistency and determine where any given block
+was allocated from.
+
+Useful for tracking and removing memory leaks from the driver.

@@ -730,7 +730,7 @@ struct object *clone_object P2(char *, str1, int, num_arg)
     new_ob->load_time = ob->load_time;
     new_ob->prog = ob->prog;
     reference_prog(ob->prog, "clone_object");
-    DEBUG_CHECK(current_object, "clone_object() from no current_object !\n");
+    DEBUG_CHECK(!current_object, "clone_object() from no current_object !\n");
 
     init_object(new_ob);
 

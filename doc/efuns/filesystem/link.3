@@ -14,5 +14,7 @@ valid_link() returns 0, the link() call fails.  If valid_link() returns 1
 then the link() suceeds iff rename() would succeed if called with the same
 arguments.
 
+Note: This efun creates a hard link, not a symbolic one.
+
 .SH SEE ALSO
 rm(3), rmdir(3), rename(3), mkdir(3), cp(3)

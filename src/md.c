@@ -14,8 +14,7 @@
 
    This module introduces quite a lot of overhead but it can be useful
    for tracking down memory leaks or for catching the freeing on non-malloc'd
-   data.  This module could easily be extended to allow the malloced memory
-   chunks to be tagged with a string label.
+   data.
 */
 
 #ifdef DEBUGMALLOC
@@ -683,6 +682,8 @@ void check_all_blocks P1(int, flag) {
 		prog = NODET_TO_PTR(entry, struct program *);
 		if (prog->p.i.ref != prog->p.i.extra_ref)
 		    add_vmessage("Bad ref count for program %s, is %d - should be %d\n", prog->name, prog->p.i.ref, prog->p.i.extra_ref);
+		if (prog->p.i.func_ref != prog->p.i.extra_func_ref)
+		    add_vmessage("Bad function ref count for program %s, is %d - should be %d\n", prog->name, prog->p.i.func_ref, prog->p.i.extra_func_ref);
 		break;
 	    case TAG_OBJECT:
 		ob = NODET_TO_PTR(entry, struct object *);

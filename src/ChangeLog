@@ -1,3 +1,7 @@
+Fri Mar 10 11:03:09 EST 1995 (tim@handel.princeton.edu (Beek))
+	* bumped version number to v21
+	* In addition, many of the beta bug fixes up to v21.1b4 are added
+	  in here
 	--- Robocoder
 	* fixed smalloc accounting stats, and small leak in small block handler
 	* more amiga fixes, and compilation tweaks

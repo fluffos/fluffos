@@ -1,0 +1,17 @@
+.\"checks if a user should see error messages
+.TH view_errors 4 "5 Sep 1994" MudOS "Driver Applies"
+
+.SH NAME
+view_errors - checks if a user should see error messages
+
+.SH SYNOPSIS
+int view_errors(object user)
+
+.SH DESCRIPTION
+if MUDLIB_ERROR_HANDLER is off, view_errors(user) is called when a
+user encounters an error.  If it returns non-zero, the user is given a
+detailed error message.  If not, the default error message is printed.
+
+.SH SEE ALSO
+MUDLIB_ERROR_HANDER(3)
+

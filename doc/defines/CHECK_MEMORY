@@ -1,0 +1,4 @@
+CHECK_MEMORY adds a special series of bytes before and after any allocated
+block of memory, and checks them periodically to see if any routine is
+writing outside of block boundaries.  It also adds the check_memory() efun
+which checks every allocated block to see if it really should be allocated.

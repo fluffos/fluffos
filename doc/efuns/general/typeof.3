@@ -1,0 +1,24 @@
+.\"return the type of an expression
+.TH typeof 3 "5 Sep 1994" MudOS "LPC Library Functions"
+
+.SH NAME
+typeof() - return the type of an expression
+
+.SH SYNOPSIS
+int typeof( mixed var );
+
+.SH DESCRIPTION
+Return the type of an expression.  The return values are given in
+<typeof.h>.  They are:
+
+INT             2
+STRING  	4
+ARRAY   	8
+OBJECT  	16
+MAPPING         32
+FUNCTION        64
+FLOAT           128
+BUFFER          256
+
+.SH SEE ALSO
+allocate(3), allocate_mapping(3), strlen(3)

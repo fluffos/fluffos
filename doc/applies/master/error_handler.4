@@ -1,0 +1,41 @@
+.\"master apply for mudlib error handler
+.TH error_handler 4 "18 Sep 1994" MudOS "Driver Applies"
+
+.SH NAME
+error_handler - function in master object to handle errors
+
+.SH SYNOPSIS
+void error_handler( mapping error, int caught );
+
+.SH DESCRIPTION
+This function allows the mudlib to handle errors instead of the driver.
+The contents of the 'error' mapping are:
+.PP
+.nf
+    ([
+        "error"   : string,     // the error
+        "program" : string,     // the program
+        "object"  : object,     // the current object
+        "line"    : int,        // the line number
+        "trace"   : mapping*    // a trace back
+    ])
+.fi
+.PP
+Each line of traceback is a mapping containing the following:
+.PP
+.nf
+    ([
+        "function"  : string,   // the function name
+        "program"   : string,   // the program
+        "object"    : object,   // the object
+	"file"      : string,   // the file to which the line number refers
+        "line"      : int       // the line number
+    ])
+.fi
+The 'caught' flag is 1 if the error was trapped by catch().
+
+.SH SEE ALSO
+catch(3), error(3), throw(3), log_error(4)
+
+.SH AUTHOR
+Beek

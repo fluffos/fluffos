@@ -1,0 +1,17 @@
+.\"ask an object to move to the specified destination
+.TH move_or_destruct 4 "5 Sep 1994" MudOS "Driver Applies"
+
+.SH NAME
+move_or_destruct - ask an object to move to the specified destination
+
+.SH SYNOPSIS
+int move_or_destruct( object dest );
+
+.SH DESCRIPTION
+If an object's environment is destructed, this apply is called on it's
+contents.  'dest' will be the environment of the destructing object,
+or zero if it has none.  If the object does not move itself out of
+the object being destructed, it will be destructed as well.
+
+.SH SEE ALSO
+destruct(3), move_object(3), init(4)

@@ -1,0 +1,9 @@
+SYSMALLOC means use the standard memory allocation routines for your system.
+How good it actually is depends on your system.
+
+Since it is the allocator that comes with your operating system, it is the
+most reliable one; the down side is that the alternate allocators included
+with this package are faster than most system memory allocators.
+
+Also, SYSMALLOC provides no statistics about memory usage.
+

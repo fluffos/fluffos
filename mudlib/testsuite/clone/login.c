@@ -1,6 +1,6 @@
 #include <globals.h>
 
-// needs to be fixed to handle passwords
+// needs fixed to handle passwords
 
 void
 logon()

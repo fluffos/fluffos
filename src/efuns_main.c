@@ -1059,18 +1059,18 @@ f_inherits PROT((void))
     struct object *ob, *base;
     int i;
 
-    ob = find_object2((sp - 1)->u.string);
-    base = sp->u.ob;
+    base = (sp--)->u.ob;
+    ob = find_object2(sp->u.string);
     if (!ob || (ob->flags & O_SWAPPED)) {
-        pop_stack();
+	free_object(base, "f_inherits");
         assign_svalue(sp, &const0);
         return;
     }
     if (base->flags & O_SWAPPED)
         load_ob_from_swap(base);
     i = inherits(base->prog, ob->prog);
-    pop_stack();
     free_object(base, "f_inherits");
+    free_string_svalue(sp);
     put_number(i);
 }
 #endif

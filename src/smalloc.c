@@ -176,7 +176,7 @@ POINTER smalloc_malloc P1(size_t, size)
 	
 	*next_unused = (u) last_small_chunk;
 	last_small_chunk = next_unused++;
-	count_up(small_chunk_stat, SMALL_CHUNK_SIZE + SINT + SIZEOF_PTR);
+	count_up(small_chunk_stat, SMALL_CHUNK_SIZE + SIZEOF_PTR);
 	unused_size = SMALL_CHUNK_SIZE;
     } else
 	fake("Allocated from chunk.");

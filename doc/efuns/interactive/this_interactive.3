@@ -1,0 +1,13 @@
+.\"return the object representing the current player
+.TH this_interactive 3 "5 Sep 1994" MudOS "LPC Library Functions"
+
+.SH SYNOPSIS
+object this_interactive();
+
+.SH DESCRIPTION
+Return the object representing the player that caused the calling function
+to be called.  This returns what this_player() was originally even if
+it changed later due to enable_commands() or command()
+
+.SH SEE ALSO
+this_object(3), this_player()

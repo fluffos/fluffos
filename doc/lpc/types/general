@@ -5,15 +5,23 @@ Types can be used in four places:
  Declaring type of arguments to functions.
  Declaring type of local variables in functions.
  
-Normally, the type information is completely ignored, and can be regarded 
-purely as documentation. However, when the basic type of a function is 
-declared, then a more strict type checking will be enforced inside of that 
-function.  That means that the type of all arguments must be defined, and the 
-variables can only be used to store values of the declared type.  The 
-function call_other() is defined to return an unknown type, as the compiler 
-has no way of knowing the return type.  This value must be casted (when 
-strict type checking is enabled).  Casting a type is done by putting the type 
-name inside a pair of '(' and ')'.
+Normally, the type information is completely ignored, and can be
+regarded purely as documentation. The exception is that certain
+optimizations can use it, so the compiler is allowed to treat 'x + 0'
+as the same as 'x' if 'x' has been declared to be a int variable, but
+will not use this trick if 'x' is declared to be a string variable,
+since the results would then be different.  Also, when the basic type
+of a function is declared, then a more strict type checking will be
+enforced inside of that function.  #pragma strict_types forces
+functions to have return values, and hence strict type checking inside
+functions is unavoidable.  That means that the type of all arguments
+must be defined, and the variables can only be used to store values of
+the declared type.  The function call_other() is defined to return an
+unknown type, as the compiler has no way of knowing the return type.
+If CAST_CALL_OTHERS is defined, this value must be casted, otherwise
+it is assumed to be of type 'mixed'.  Casting a type is done by
+putting the type name inside a pair of '(' and ')'.  Casting has no
+effect, except for pacifying the compiler.
  
 An example when querying the short description of an object:
  
@@ -28,10 +36,13 @@ must be used to allow the current function to call them.
 An example of a prototype:
  
   string func(int arg);
- 
-Note the ';' instead of a body to the function.  All arguments must be given
+
+Note the ';' instead of a body to the function.  All arguments can be given
 by names, but do not have to have the same names as in the real definition. 
-All types must of course be the same.
+All types must of course be the same.  The name of the argument can also
+be omitted:
+
+string func(int);
  
 There are two kinds of types.  Basic types, and special types.  There can be 
 at most one basic type, but any number of special types assigned to a 
@@ -45,19 +56,21 @@ Why use strict type checking?  It is really recommended, because the compiler
 will find many errors at compile time, which will save a lot of hard work. It
 is in general much harder to trace an error occuring at run time. 
  
-The basic types can be divided into groups.  Those that are referenced by 
-value, and those that are referenced by address.  The types int, string,
-and float are referenced by value.  The types mapping, function, object, 
-and pointers ('<type> *') are referenced by address.  If a value of this type 
-is assigned to a variable or passed as argument, they will all point to the 
-same actual data.  That means that if the value of an element in an array is 
-changed, then it can modify all other variables pointing to the same array. 
-Changing the size of the array will always allocate a new one though. The 
-comparison operator, ==, will compare the actual value for the group of 
-value-referenced types above.  But for arrays, mappings, etc, it will simply 
-check if it is the same array, mapping, etc. That has the very important 
-implication that the expression ({}) == ({}) will evaluate to false because
-the array construction operator-pair, ({}) always generates a new array.
+The basic types can be divided into groups.  Those that are referenced
+by value, and those that are referenced by address.  The types int,
+string, and float are referenced by value.  The types mapping,
+function, object, and pointers ('<type> *') are referenced by address.
+If a value of this type is assigned to a variable or passed as
+argument, they will all point to the same actual data.  That means
+that if the value of an element in an array is changed, then it can
+modify all other variables pointing to the same array.  Changing the
+size of the array will always allocate a new one though. The
+comparison operator, ==, will compare the actual value for the group
+of value-referenced types above.  But for arrays, mappings, etc, it
+will simply check if it is the same array, mapping, etc. That has the
+very important implication that the expression ({ 1 }) == ({ 1 }) will
+evaluate to false because the array construction operator-pair, 
+({ ... }) always generates a new array.
  
 Basic types
  
@@ -68,16 +81,16 @@ float
  A floating point number (32 bit).
  
 string
- An unlimited string of characters. 
+ An unlimited string of characters (no '\0' allowed tho). 
  
 object
  A pointer to an object.  
  
 mapping
- A form of associative array, see separate documentation.
+ A form of associative array; see separate documentation.
  
 function
- A special type that points to (object, function name) pairs, see
+ A special type that points to a function of some sort;  see
  separate documentation.
  
 Arrays

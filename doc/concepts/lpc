@@ -46,9 +46,6 @@ strcpy(ack,foo);
 ack = (char *)realloc(strlen(ack) + strlen(bar) + 1);
 strcat(ack,bar);
 
-Note: ack[i] may not appear as an lvalue (i.e. ack[i] = 'a'; will not
-work as expected).
-
 LPC is an interpreted language (however it is compiled into an internal
 compact tokenized form before being interpreted).
 

@@ -1,0 +1,15 @@
+.\"initialize a login connection
+.TH logon 4 "5 Sep 1994" MudOS "Driver Applies"
+
+.SH NAME
+logon - initialize a login connection
+
+.SH SYNOPSIS
+object logon( void );
+
+.SH DESCRIPTION
+This apply is called on the object returned by the connect() master
+apply.  It should set up the new user.
+
+.SH SEE ALSO
+connect(4)
