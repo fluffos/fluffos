@@ -5717,7 +5717,10 @@ void pop_context P1(error_context_t *, econ) {
 /* can the error handler do this ? */
 void restore_context P1(error_context_t *, econ) {
     ref_t **refp;
-    
+#ifdef PACKAGE_DWLIB
+    extern int _in_reference_allowed;
+    _in_reference_allowed = 0;
+#endif
     /* unwind the command_giver stack to the saved position */
     while (cgsp != econ->save_cgsp)
   restore_command_giver();

@@ -1309,22 +1309,25 @@ static int save_object_recurse P5(program_t *, prog, svalue_t **,
 #endif
 {
     int i;
+    int textsize = 1;
+    int tmp;
     int theSize;
     int oldSize;
     char *new_str, *p;
     
     for (i = 0; i < prog->num_inherited; i++) {
 #ifdef HAVE_ZLIB
-        if (!save_object_recurse(prog->inherit[i].prog, svp,
+        if (!(tmp = save_object_recurse(prog->inherit[i].prog, svp,
                                  prog->inherit[i].type_mod | type,
-                                 save_zeros, f, gzf))
+                                 save_zeros, f, gzf)))
 #else
 
-        if (!save_object_recurse(prog->inherit[i].prog, svp, 
+        if (!(tmp = save_object_recurse(prog->inherit[i].prog, svp, 
                                  prog->inherit[i].type_mod | type,
-                                 save_zeros, f))
+                                 save_zeros, f)))
 #endif
             return 0;
+        textsize += tmp;
     }
     if (type & DECL_NOSAVE) {
         (*svp) += prog->num_variables_defined;
@@ -1339,6 +1342,7 @@ static int save_object_recurse P5(program_t *, prog, svalue_t **,
         }
         save_svalue_depth = 0;
         theSize = svalue_save_size(*svp);
+
         // Try not to malloc/free too much.
         if (theSize > oldSize) {
             if (new_str) {
@@ -1354,6 +1358,9 @@ static int save_object_recurse P5(program_t *, prog, svalue_t **,
         DEBUG_CHECK(p - new_str != theSize - 1, "Length miscalculated in save_object!");
         /* FIXME: shouldn't use fprintf() */
         if (save_zeros || new_str[0] != '0' || new_str[1] != 0) { /* Armidale */
+            textsize += theSize;
+            textsize += strlen(prog->variable_table[i]);
+            textsize += 2;
 #ifdef HAVE_ZLIB
             if (gzf) {
                 gzputs(gzf, prog->variable_table[i]);
@@ -1374,7 +1381,7 @@ static int save_object_recurse P5(program_t *, prog, svalue_t **,
     if (new_str) {
         FREE(new_str);
     }
-    return 1;
+    return textsize;
 }
 
 int sel = -1;
@@ -1500,7 +1507,7 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
             if (errno == EEXIST) {
                 unlink(file);
                 if (rename(tmp_name, file) >= 0) {
-                    return 1;
+                    return success;
                 }
             }
 #endif
@@ -1520,7 +1527,7 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
 
     }
 
-    return 1;
+    return success;
 }
 
 
