@@ -1,0 +1,46 @@
+recursive inheritance causes the GD to hang, and swell up in memory usage
+until the process is killed.
+
+there is a bug in restore_object that crashes the game when a truncated 
+array is restored.
+
+
+some of the RCS features in file.c don't port well.
+
+editor dumps GD when line displayed that is too long.
+
+The mods to make receive() work don't work as they should yet. 
+
+F_ED uses query_real_name(), which maybe does not exist in native mode.
+
+shadowing should check arguments etc.
+
+Pattern matching doesn't seem to work any longer.
+
+When resolving functions in find_inherited(), types and arguments should
+be tested.
+
+A lot of calls to xalloc() should be replaced with alloca().
+
+Objects that has been swapped will forever allocate swap space (until reboot).
+
+access_check.c uses time(0), which is unportable. It would be better
+to use functions in port.c.
+
+Destructing and reloading the master object does not work as wanted. Should
+it be allowed ?
+
+Are sentences freed twice when destructing objects ? Second time,
+no sentences will remain.
+
+Only the first two arguments to efuns have their types checked, and only
+at run time. Not at compile time. The data structure should be enhanced.
+
+Can 'user' for a player object be 0 ?
+
+Memory is lost when compilation gives errors.
+
+Should be able to handle empty objects (without programs). Maybe it can ?
+
+Will there be an error in the case of inherit_file != but
+num_parse_error > 0 ?

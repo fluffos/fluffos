@@ -1,0 +1,10 @@
+Configure file for MudOS enhanced LPmud driver.
+
+With respect to configuring this distribution and getting it up and running,
+the biggest change is that you must create a configuration file and specify
+its filename as the first argument to the driver.  An example configuration
+file name config.example is contained in the included ./mudlib directory.
+Make sure that the pathname you specify for the "access allow file" exists.
+The easiest thing to do is use the default provided in the example config
+file and copy ACCESS.ALLOW from this directory to MUD_LIB/etc/access.allow.
+Where MUD_LIB stands for the path to your mud library.

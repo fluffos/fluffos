@@ -1,0 +1,94 @@
+consider adding line-mode negotiation to the driver so that we will stop 
+puting out so many packets on the Internet.
+
+hack a new version of smalloc.c (call it smalloc2.c) that uses malloc()
+instead of sbrk().  So that the benefits of smalloc.c (assuming there are
+some :)) are available on machines that don't allow system malloc to be
+redefined (like the NeXT and RS/6000) and on machines that don't support
+sbrk() (like the NeXT).  Read the ./doc/README.malloc file for more
+information.  Note, that it isn't enough to simply replace the esbrk()
+calls with malloc calls.  The reason is that smalloc.c assumes the memory
+chunks returned by consecutive calls to esbrk() to be contiguous (this
+isn't necessarily the case with malloc()).
+
+why does typing control-C in telnet when connected to mud, hang the connection?
+
+put a struct in interactive for recording info on player terminal
+characteristics (lines, cols, etc).  add an efun for setting those values.
+
+see why interpret.c has problems in DEBUG mode using gcc 2.1 (compile probs)
+
+implement auto line wrap.
+
+consider making present return the return value of id if id happens to
+return an object (so you can attack the horse and fight the rider who is
+in the horse).
+
+Implement privileged efuns that can only be called from certain mud.conf-
+specified files.  Catch illegal uses during the compile phase.  (this will
+allow the uses of move_object and destruct to be controlled).
+
+implement support for linking muds (metamud) -- possible that jacques's
+comm1.c mods will be useful for this.
+
+add runtime type checking to call_other
+
+fix the sprintf to do more intelligent things when types don't match
+
+add another version of __INIT that doesn't get used for anything by the
+driver itself (so that wizzes can safely use it)
+
+add floating point support to LPC ('float' type)
+
+consider putting ls back into the GD
+
+figure out why this LPC function from Pinkfish won't compile:
+object bing(mixed *arr) { (arr[0]*arr[1])/arr[2]; }
+
+check out Michael's malloc patch that lets getrusage report memory
+usage via sbrk (or something like that).  /u/m/michael/memused.add @ TMI
+
+fix sscanf using %*s so that it reports the correct number of items matched
+
+make the massive switch/case statement in interpret.c smaller by breaking out
+cases into functions.  this will make it easier to compile on vaxen and other
+machines that complain about jumps that are too long.
+
+make the compile handle #include correctly with respect to line numbers
+in error reports
+
+check out the object loading code in Amylaar's driver (up to 2x faster than
+lars apparently -- according to Buddha).
+
+implement true invisibilty with driver support (maybe)
+
+maybe change driver so that clean_up also checks for zombied objects
+(objects that aren't referenced by another object (ref count = 0)
+and have no pending call_outs and don't have an init() function can
+be nuked.
+
+implement removal of dested objects from the swapfile
+
+make sure restore_object isn't crashing in the mappings code
+
+drop in Perl's implementation of assoc arrays (for now make sure we have
+delete(map,element) implemented).
+
+identify objects internally with filename and timestamp so we can do the
+persistent mud.  modify find_object and restore_object.  cause save_object
+to save a value for variables of type object.
+
+extend dumpstat.c to handle mappings
+
+modify input_to efun to work the way call_other does (allowing variable number
+of arguments which will be passed on to the called function).
+
+Eventually all calls to malloc should be replaced by MALLOC and all calls
+to free with FREE and all calls to realloc with REALLOC.  Then MALLOC
+should be #defined to be the appropriate function (malloc, smalloc, etc.)
+depending upon which malloc package is chosen in the make file.  This would
+let machines that choke when the programmer attempts to add his own malloc
+(named malloc) also use smalloc and the other substitute malloc packages.
+
+stat probably shouldn't be a synonym for get_dir.  It should be restricted for
+operations on a single file (like in UNIX(tm)).

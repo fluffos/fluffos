@@ -1,0 +1,12 @@
+MudOS 0.8.14 should compile and run on NeXTs, SPARCstations, VAXen and
+DECstations running Ultrix (if you compile with GCC 1.39 or newer, some
+VAXen may require GCC 2.1), RS/6000s, and possibly other machines.
+
+Sun3 running SunOS 4.1.1 (not recently)
+Sun4 running SunOS 4.1.1 (0.8.14)
+NeXT running NeXTOS 2.1 and NeXTOS 3.0 (0.8.14)
+RS/6000 running AIX 3.1 (fails on some RS/6000's and not others -- weird!)
+HP-UX systems (not tested recently)
+VAX running Ultrix (3.x and 4.x)
+DECStations running Ultrix 4.1 (gcc 1.39)
+* someone should work on Apollos

@@ -1,0 +1,88 @@
+/* style guidelines:  04/12/92
+
+In general, follow the style used in "Kerninghan and Ritchie's
+_The C Programming Language_".  The file "Gnu.Standards" in this
+directory contains style guidelines put forth by GNU.  Most of the
+information in there is quite good.  However, I really don't like
+the code formatting style they adovocate.  In particular the way they
+place the curly brackets in whiles, fors, and other constructs looks
+grody (IMHO).
+
+Always indent using tabs (NOT SPACES, set your tabstops to be four spaces).
+
+There are several reasons for using tabs instead of spaces:
+
+1) Its much easier to hit the tab key once than it is to hit the space
+bar four times.
+2) Some editors (such as Vi) have special features that let groups of lines
+be indented all at once in terms of tab stops (e.g. 5>> would indent the
+next file lines by one tab stop).  This can be very useful when you need
+to move existing code inside an if statement or other nested construct.
+3) I like it that way.
+
+If you use Vi, you will want to create a file called .exrc in your home
+directory that contains the following line:
+set ts=4 sw=4
+
+This will set your tabs to be four spaces wide and will cause the >> command
+to indent by one tab stop.
+
+Indent inside for loops, if statements, while loops, do loops.
+In general, use indention to show structure of the program.
+
+Put one blank line following variable declarations.
+
+*/
+
+/*
+	note: if a single comment is more than one line long, you should still
+	enclose it using a single comment rather than using multiple comments
+	per line.
+*/
+
+/*
+if a line of code needs to be commented out, surround it with "#if 0" and
+"#endif" instead of using C comments.
+
+e.g.
+#if 0
+	while (1) ;
+#endif
+*/
+
+int
+foobar(i,j)
+int i, j;  /* no indention on this line */
+{
+	int j, k, m;
+	/* one blank lines follows declarations */
+
+	k = m = 0;
+	/* include a space between the "for" and the "(" */
+	for (j = 0; j < 10; j++) {
+		k = j + k;
+		m = k + m;
+	}
+	/* include a space between the "if" and the "(" */
+	if (k == m) {
+		for (j = 0; j < 10; j++) {
+			/* don't include a space between functions and the argument list */
+			printf("hello, world %d\n",j);
+		}
+	}
+	/* include a space between the "while" and the "(" */
+	while (1) {
+		/* do something forever */
+	}
+
+	/*
+	 if you prefer, you can use the following form - but do be consistent
+	 within a single C module.
+	*/
+
+	while (1)
+	{
+		/* do something */
+	}
+	return 1;
+}

@@ -1,0 +1,72 @@
+92/04/20:
+
+This is a brief description of how to install MudOS 0.8.13 (or later)
+using native mode (NOT 2.4.5 compatibility mode).
+
+The remainder of this document assumes that you are installing the
+mud in $HOME (you can install it wherever you like).
+
+Make a the following directories in $HOME: bin, MudOS, and MudOS/src.
+
+Get a native mudlib.  The easiest way to do this is copy the TMI mudlib from
+dogstar.colorado.edu.  You can ftp it from port 5554 (e.g. type:
+ftp dogstar.colrado.edu 5554).  Login under your game character name (using
+your game character password) or as ftp or anonymous.  Switch (cd) to
+the /pub/mudlibs/tmi directory.  The latest version of the TMI mudlib
+will be in this directory.  Switch to binary mode (type: binary) and
+then type: get filename.  The file will be in tar.Z format.  Make sure
+you have the tar.Z file saved in the $HOME directory.  To extract
+the mudlib from this file, type:
+
+zcat filename.tar.Z | tar -xvf -
+
+Move the gamedriver source (the code accompanying this file)
+to the MudOS/src directory.  Move the example access.allow file from the
+./mudlib directory to $HOME/MudOS/d/TMI/local/adm/etc/access.allow.
+
+Edit the Makefile to define where the mud bin directory is by setting a
+value for INSTALL_DIR.  Again you should specify the full path
+$HOME/bin.
+
+Specify in config.h which malloc package you would like to use.
+If you are using a NeXT or an RS/6000, do not choose SMALLOC (it won't
+link, you'll be wasting your time... hack away if you like but consider
+yourself forewarned).  Also, be sure to read README.malloc if you
+decide to hack on any of the malloc code.  The SYSMALLOC choice should
+work on any machine.
+
+An example defaults file may be found in ./mudlib directory (created when
+MudOS is untarred) under the name config.example.  The TMI mudlib will
+come with its own example config file.  You should be able to use that
+config file by making minor modifications.  The config file should be
+stored in $HOME/MudOS/d/TMI/local/adm/etc/config.
+
+You may use CONFIG_FILE_DIR in config.h specify a directory in which the
+driver will search for config files.
+
+Also, check the rest of the definitions in config.h; most are probably good
+as they are but you will probably need to change some of them.
+
+Cd to the $HOME/MudOS/src/MudOS-0.8.13/src directory and type:
+
+make install
+
+This will build the gamedriver binary and it will move it to the
+$HOME/bin directory.
+
+Start the mud by typing:
+
+./driver $HOME/d/TMI/local/adm/etc/config.example
+
+[or start it by typing: "./driver config.example" if you used CONFIG_FILE_DIR]
+
+You should see something like this:
+
+MudOS driver 0.8.13
+Setting up IPC.
+
+Test with 'telnet localhost 3000'.
+
+If you want the game to restart automatically after it is shutdown or
+crashes (nah.. it never crashes, does it? *grin*), start the mud with
+'bin/restart_mud' instead of "./driver".

@@ -1,0 +1,4 @@
+If your system doesn't have RCS and you'd like to get it, you can get
+it via anonymous ftp from prep.ai.mit.edu in /pub/gnu.   RCS is a source
+code control system which helps keep track of changes that have been
+made to the source code of a particular system (such as the gamedriver).

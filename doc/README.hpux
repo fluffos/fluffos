@@ -1,0 +1,4 @@
+The file func_spec.c doesn't seem to be dealt with very well on hpux
+machines. Specifically, in the two places where there's an #ifdef
+(PRINTF and RUSAGE), cpp seems to choke.  Simply hand edit that
+section rather than relying on the ifdef's to do the work.

@@ -1,0 +1,150 @@
+This file is intended to provide some advice to the LPC coder trying
+to convert an object from 2.4.5 to 3.0.
+
+MOVE_OBJECT:
+
+In 2.4.5 any object could use the move_object(source,target) efun with
+no restrictions.  In 3.0, an only is only allowed to use move_object
+on itself.  If an object wants to move some other object, then it must
+send a move message to that other object.  Thus, the previous move_object
+example becomes: source->move(target) or call_other(source,"move",target)
+
+Note, the move method is usually defined in /std/move (or /basic/move
+depending on your muds directory heirarchy.  This means that in order
+for your object to be moveable (including having the ability to be
+cloned into your inventory), your object must inherit /std/move or
+some other object which in turn inherits /std/move.  On some muds,
+this object is called /std/Object and on others it is called something
+else.  Ask the local mud guru.
+
+DESTRUCT:
+
+It is now considered impolite for objects to destruct using destruct
+directly.  In fact some muds are explicitly disallowing using destruct.  The
+preferred way to destruct an object (including this_object()) is to
+call the remove method on it.  Thus this_object()->remove() is the proper
+way for an object to destruct itself.  To destruct another object
+(say monst), do: monst->remove() or call_other(monst,"remove").
+Calling the remove method insures that the encumbrance of the containing
+object gets properly updated.
+
+RESET:
+
+The reset function has been split into two functions: create and reset.
+
+In 2.4.5 the gamedriver called reset with an argument of 0 whenever
+the object was updated and it called reset with an argument of 1 at
+periodic intervals after that.
+
+In 3.0 the gamedriver calls create with no args instead of reset(0).
+It calls reset() (with no args) instead of reset(1).
+
+PROTOTYPES:
+
+In 2.4.5 it wasn't necessary to define the types of parameters to
+functions and the return types of functions.  In 3.0, it is.
+
+Thus in 2.4.5, you might have defined a function as follows:
+
+do_something(a,str,ob)
+{
+   return 1;
+}
+
+whereas in 3.0 you must define it as follows:
+
+int do_something(int a, string str, object ob)
+{
+   return 1;
+}
+
+If a function doesn't return a value, you should give it a type of
+void.  E.g.
+
+void do_something(int a)
+{
+  /* do something that doesn't require returning a value */
+}
+
+CALL_OTHER:
+
+In 2.4.5, a statement that looked like this was fine:
+
+x = call_other(this_player(),"query_name");
+
+In 3.0, you must specify the type using a typecast:
+
+x = (string) call_other(this_player(),"query_name");
+
+The same holds for the -> syntax.
+
+QUERY_LONG and QUERY_SHORT:
+
+In 2.4.5, you were allowed to define a long() function that used write()
+to give the description.
+
+In 3.0, you must define a query_long() that returns the long description
+as a string.  query_short is the same way.  Note that query_long
+requires a single parameter (of type string).
+
+ID:
+
+To set the id of an object in 3.0, you should use the set_id function
+in your create() function.  Thus to give an object an id of "toy", "boy",
+and "slime", you would use the following:
+
+create()
+{
+   set_id( ({ "toy", "boy", "slime" }) );
+}
+
+WEIGHT:
+
+set_weight has been replaced by set_encumbrance (for now).
+
+INHERITANCE:
+
+3.0 objects may inherit more than one file.  In 2.4.5, if you wanted
+to refer to a method in the file you were inheriting you just prefixed
+the method with :: (e.g. init() { ::init(); /* do other stuff here */ }
+
+In 3.0, there is the possibility that ::init(); could be ambiguous since
+more than one of the files being inherited may contain init().  In that
+case you should prefix the :: with the filename containing the method
+(e.g. monster::init();).  Note you should not use the full path of the
+filename but rather just the last part of the path.
+
+ARRAYS:
+
+3.0 has improved array handling.  You can instantiate arrays as follows:
+
+int *list1, *list2, *list;
+
+list1 = ({ 1, 2, 3});
+list2 = ({ 3, 2, 1});
+
+You can concatenate arrays like this:
+
+list = list1 + list2;
+
+or
+
+list = list1 + ({ 3, 2, 1});
+
+You can remove elements from arrays like this:
+
+list1 = list - ({1});
+
+The empty array is represented by ({})
+
+COMMAND:
+
+The 2.4.5 command() efun took an optional second argument which specified
+which player to make do the command.  3.0 disallows this argument.
+Thus command() can only be executed from inside the player object that
+is to do the command.
+
+--Truilkan@TMI -- 92/02/04
+
+[btw, if you know of any more things that should go on this list, please
+let me know via mud email]
