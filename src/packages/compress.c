@@ -38,7 +38,6 @@ void f_compress_file PROT((void))
    // Not a string?  Error!
    if ((sp - num_arg + 1)->type != T_STRING) {
       pop_n_elems(num_arg);
-      printf("not reached? (1)");
       push_number(0);
       return ;
    }
@@ -56,7 +55,6 @@ void f_compress_file PROT((void))
       if (!strcmp(input_file + len - strlen(GZ_EXTENSION), GZ_EXTENSION)) {
          // Already compressed...
          pop_n_elems(num_arg);
-         printf("not reached? (2)");
          push_number(0);
          return ;
       }
@@ -70,7 +68,6 @@ void f_compress_file PROT((void))
    real_output_file = check_valid_path(output_file, current_object, "compress_file", 1);
    if (!real_output_file) {
       pop_n_elems(num_arg);
-      printf("not reached? (3)");
       push_number(0);
       return ;
    }
@@ -136,7 +133,6 @@ void f_uncompress_file PROT((void))
    // Not a string?  Error!
    if ((sp - num_arg + 1)->type != T_STRING) {
       pop_n_elems(num_arg);
-      printf("not reached? (4)");
       push_number(0);
       return ;
    }

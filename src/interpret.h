@@ -296,7 +296,7 @@ INLINE void free_string_svalue PROT((svalue_t *));
 INLINE void free_some_svalues PROT((svalue_t *, int));
 INLINE void push_object PROT((object_t *));
 INLINE void push_number PROT((int));
-INLINE void push_real PROT((double));
+INLINE void push_real PROT((float));
 INLINE void push_undefined PROT((void));
 INLINE void copy_and_push_string PROT((const char *));
 INLINE void share_and_push_string PROT((const char *));

@@ -2172,8 +2172,8 @@ array_t *reg_assoc P4(const char *, str, array_t *, pat, array_t *, tok, svalue_
         
         rmp = rmph;
         
-	if(!rmp)
-	  error("internal error in reg_assoc");
+	if(!rmp && num_match)
+	  error("internal error in reg_assoc\n");
 
         tmp = str;
         

@@ -9,8 +9,8 @@ INSTALL_DIR=../bin
 OPTIMIZE=-O2
 CPP=gcc -E
 CFLAGS=-D__USE_FIXED_PROTOTYPES__ -DHAVE_ZLIB -rdynamic
-CC=icc -ip -wd864,1173
-
+CC=icc -ip -wd864,1173 -xiM
+#CC=gcc -g
 YACC=bison -d -y
 RANLIB=ranlib
 A=a

@@ -1,6 +1,14 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
+new in FluffOS 1.21
+changed allocating structure for efun function pointers to allocate space for
+	a full function pointer struct
+fixed the bug in mapping *map=({([])}); map[0]["bing"] = 1;
+no longer convert floats to doubles and back when they go on the LPC stack
+warn for tabs and MSDOS ^M chars in source code
+removed some debugging printfs 
+
 new in FluffOS 1.20
 fixed some array size issues
 cleaned up some source (used pointer + x to index instead of pointer[x])

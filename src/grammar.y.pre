@@ -2561,6 +2561,12 @@ lvalue:
 			    case NODE_OPCODE_1:
 			    case NODE_UNARY_OP_1:
 			    case NODE_BINARY_OP:
+			        if(node->kind == NODE_BINARY_OP && 
+				   node->v.number == F_TYPE_CHECK) {
+				    node = node->l.expr;
+				    continue;
+				}
+
 				if (node->v.number >= F_LOCAL 
 				    && node->v.number <= F_MEMBER) {
 				    node->v.number++;

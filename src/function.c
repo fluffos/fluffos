@@ -101,7 +101,7 @@ make_efun_funp P2(int, opcode, svalue_t *, args)
 {
     funptr_t *fp;
     
-    fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(efun_ptr_t),
+    fp = (funptr_t *)DXALLOC(sizeof(funptr_t),
                              TAG_FUNP, "make_efun_funp");
     fp->hdr.owner = current_object;
     add_ref( current_object, "make_efun_funp" );

@@ -1220,6 +1220,12 @@ int yylex()
             }
             outp--;
             return -1;
+        case '\r':
+	    yywarn("^M");
+	    if(0)
+        case '\t':
+	    yywarn("<TAB>");
+	    else if(0)
         case '\n':
             {
                 nexpands = 0;
@@ -1228,10 +1234,8 @@ int yylex()
                 if (outp == last_nl + 1) refill_buffer();
             }
         case ' ':
-        case '\t':
         case '\f':
         case '\v':
-        case '\r':
             break;
         case '+':
         {

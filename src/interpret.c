@@ -301,7 +301,7 @@ push_number P1(int, n)
 }
 
 INLINE void
-push_real P1(double, n)
+push_real P1(float, n)
 {
   STACK_INC;
   sp->type = T_REAL;
@@ -3677,7 +3677,8 @@ eval_instruction P1(char *, p)
       {
         int type = sp->u.number;
         pop_stack();
-        if(sp->type != type && !(sp->type == T_NUMBER && sp->u.number == 0))
+        if(sp->type != type && !(sp->type == T_NUMBER && sp->u.number == 0) &&
+	   !(sp->type == T_LVALUE))
           error("Trying to put %s in %s\n", type_name(sp->type), type_name(type));
         break;
       }
