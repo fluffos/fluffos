@@ -5225,7 +5225,7 @@ int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_ar
     case 'd':
       {
         tmp = in_string;
-        num = (int) strtol(in_string, &in_string, base);
+        num = (int) strtol((char *)in_string, (char **)&in_string, base);
         if (tmp == in_string) return number_of_matches;
         if (!skipme) {
           SSCANF_ASSIGN_SVALUE_NUMBER(num);
@@ -5238,7 +5238,7 @@ int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_ar
         float tmp_num;
     
         tmp = in_string;
-        tmp_num = _strtof(in_string, &in_string);
+        tmp_num = _strtof((char *)in_string, (char **)&in_string);
         if (tmp == in_string)return number_of_matches;
         if (!skipme) {
           SSCANF_ASSIGN_SVALUE(T_REAL, u.real, tmp_num);
@@ -5446,7 +5446,7 @@ int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_ar
         base = 16;
       case 'd':
         {
-          num = (int) strtol(in_string, &in_string, base);
+          num = (int) strtol((char *)in_string, (char **)&in_string, base);
           /* We already knew it would be matched - Sym */
           if (!skipme2) {
             SSCANF_ASSIGN_SVALUE_NUMBER(num);
@@ -5456,7 +5456,7 @@ int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_ar
         }
       case 'f':
         {
-          float tmp_num = _strtof(in_string, &in_string);
+          float tmp_num = _strtof((char *)in_string, (char **)&in_string);
           if (!skipme2) {
             SSCANF_ASSIGN_SVALUE(T_REAL, u.real, tmp_num);
           }

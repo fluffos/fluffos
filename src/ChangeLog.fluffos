@@ -1,6 +1,11 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
+new in FluffOs 1.29
+fixed bug in terminal_colour
+can now be compiled with tcc (you need to add a -DTCC flag)
+no longer use alloca in bison
+
 new in FluffOS 1.28
 fixes to compile with other settings than the DW ones (Skullslayer@Realms of the Dragon)
 fix in reverse DNS lookup (Skullslayer@Realms of the Dragon)

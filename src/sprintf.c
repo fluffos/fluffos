@@ -985,7 +985,6 @@ char *string_print_formatted P3(const char *, format_str, int, argc, svalue_t *,
 #endif
                 } else if ((finfo & INFO_T) == INFO_T_STRING) {
                     int slen;
-
                     /*
                      * %s null handling added 930709 by Luke Mewburn
                      * <zak@rmit.oz.au>
@@ -1021,6 +1020,9 @@ char *string_print_formatted P3(const char *, format_str, int, argc, svalue_t *,
                             (*temp)->pres = (pres) ? pres : fs;
                             (*temp)->info = finfo;
                             (*temp)->start = get_curpos();
+#ifdef TCC
+			    puts("tcc has some bugs");
+#endif
                             tmp = ((format_str[fpos] != '\n') 
                                    && (format_str[fpos] != '\0'))
                                 || ((finfo & INFO_ARRAY)
@@ -1119,7 +1121,8 @@ char *string_print_formatted P3(const char *, format_str, int, argc, svalue_t *,
                     } else {    /* not column or table */
                         if (pres && pres < slen)
                             slen = pres;
-                        add_justified(carg->u.string, slen, &pad, fs, finfo,
+			char *tmp = carg->u.string; //work around tcc bug;
+                        add_justified(tmp, slen, &pad, fs, finfo,
                                       (((format_str[fpos] != '\n') && (format_str[fpos] != '\0'))
                                        || ((finfo & INFO_ARRAY) && (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size)))
                                       || carg->u.string[slen - 1] != '\n');

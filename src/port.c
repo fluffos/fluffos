@@ -294,7 +294,7 @@ void * sbrkx(long size){
       return NULL;
   }
   
-  newsize = end + size;
+  newsize = (long)end + size;
   result = end;
   end = newsize;
   newsize &= 0xFFFFF000;

@@ -32,8 +32,8 @@ static char *inet_address PROT((struct sockaddr_in *));
 /*
  * check permission
  */
-int check_valid_socket P5(const char *, what, int, fd, object_t *, owner,
-                          const char *, addr, int, port)
+int check_valid_socket P5(const char * const, what, int, fd, object_t *, owner,
+                          const char * const, addr, int, port)
 {
     array_t *info;
     svalue_t *mret;
@@ -1195,7 +1195,7 @@ int get_socket_address P4(int, fd, char *, addr, int *, port, int, local)
         *port = 0;
         return EEFDRANGE;
     }
-    addr_in = &(local ? lpc_socks[fd].l_addr : lpc_socks[fd].r_addr);
+    addr_in = (local ? &lpc_socks[fd].l_addr : &lpc_socks[fd].r_addr);
     *port = (int) ntohs(addr_in->sin_port);
     strcpy(addr, inet_ntoa(addr_in->sin_addr));
     return EESUCCESS;

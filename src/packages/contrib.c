@@ -532,7 +532,9 @@ f_terminal_colour PROT((void))
     const char *instr, *cp, **parts;
     char *savestr, *deststr, *ncp;
     char curcolour[MAX_COLOUR_STRING];
+    char colouratstartword[MAX_COLOUR_STRING];
     int curcolourlen;
+    int colourstartlen;
     const char *resetstr;
     char *resetstrname;
     int resetstrlen;
@@ -768,6 +770,8 @@ f_terminal_colour PROT((void))
                     if (c == ' ' || c == '\t') {
                         space = col;
                         space_buflen = buflen;
+			strncpy(colouratstartword, curcolour, MAX_COLOUR_STRING-1);
+			colourstartlen = curcolourlen;
                     }
                     if (col == wrap+1) {
                         if (space) {
@@ -776,8 +780,8 @@ f_terminal_colour PROT((void))
                             }
                             col -= space;
                             space = 0;
-                            j += resetstrlen + curcolourlen;
-			    buflen += resetstrlen + curcolourlen;
+                            j += resetstrlen + colourstartlen;
+			    buflen += resetstrlen + colourstartlen;
 			    max_buflen = (buflen > max_buflen ? buflen : max_buflen);
                             buflen -= space_buflen;
                             space_buflen = 0;
@@ -864,7 +868,9 @@ f_terminal_colour PROT((void))
                     space = space_garbage = 0;
                     start = -1;
                     buflen = 0;
-                } else {
+		    strncpy(colouratstartword, curcolour, MAX_COLOUR_STRING-1);
+		    colourstartlen = curcolourlen;
+		} else {
                     if (col > start || (c != ' ' && c != '\t'))
                         col++;
                     else {
@@ -878,6 +884,8 @@ f_terminal_colour PROT((void))
                         space = col;
                         space_garbage = 0;
                         space_buflen = buflen;
+			strncpy(colouratstartword, curcolour, MAX_COLOUR_STRING-1);
+			colourstartlen = curcolourlen;
                     }
                     if (col == wrap+1) {
                         if (space) {
@@ -891,6 +899,8 @@ f_terminal_colour PROT((void))
                             col = 1;
                             kind = 2;
                             buflen = 1;
+			    strncpy(colouratstartword, curcolour, MAX_COLOUR_STRING-1);
+			    colourstartlen = curcolourlen;
                         }
                         start = indent;
                     } else
@@ -918,8 +928,8 @@ f_terminal_colour PROT((void))
                    ncp += endpad;
                 }
                 *ncp++ = '\n';
-                memcpy(ncp, curcolour, curcolourlen);
-		ncp += curcolourlen;
+                memcpy(ncp, colouratstartword, colourstartlen);
+		ncp += colourstartlen;
                 // Back to the normal code again.
                 memmove(tmp, tmp + n, buflen);
                 pt = tmp + buflen;
@@ -946,7 +956,7 @@ f_terminal_colour PROT((void))
         FREE_MSTR(savestr);
     /* now we have what we want */
     pop_stack();
-#ifdef DEBUG
+#ifndef DEBUG
     if (ncp - deststr != j) {
         fatal("Length miscalculated in terminal_colour()\n    Expected: %i Was: %i\n    String: %s\n    Indent: %i Wrap: %i\n", j, ncp - deststr, sp->u.string, indent, wrap);
     }

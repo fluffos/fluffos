@@ -22,6 +22,7 @@
 #endif
 
 #ifdef USE_MYSQL
+#ifndef TCC
 #ifdef INCL_LOCAL_MYSQL_H
 #include "/usr/local/include/mysql.h"
 #endif
@@ -33,6 +34,20 @@
 #endif
 #ifdef INCL_MYSQL_MYSQL_H
 #include "/usr/include/mysql/mysql.h"
+#endif
+#else
+#ifdef INCL_LOCAL_MYSQL_H
+#include <mysql.h>
+#endif
+#ifdef INCL_LOCAL_INCLUDE_MYSQL_MYSQL_H
+#include <mysql/mysql.h>
+#endif
+#ifdef INCL_LOCAL_MYSQL_MYSQL_H
+#include "/usr/local/mysql/include/mysql.h"
+#endif
+#ifdef INCL_MYSQL_MYSQL_H
+#include <mysql/mysql.h>
+#endif
 #endif
 #endif
 

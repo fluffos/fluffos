@@ -15,6 +15,7 @@
 #ifdef WIN32
 #define MSDOS
 #endif
+#define YYSTACK_USE_ALLOCA 0
 %line
 /*
  * This is the grammar definition of LPC, and its parse tree generator.

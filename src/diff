@@ -1,0 +1,354 @@
+diff -ur fluffos-1.24/add_action.c fluffos-1.24.new/add_action.c
+--- fluffos-1.24/add_action.c	2001-03-12 04:19:09.000000000 +1100
++++ fluffos-1.24.new/add_action.c	2004-01-26 12:32:36.000000000 +1100
+@@ -405,9 +405,9 @@
+ 	if (illegal_sentence_action) {
+ 	    switch (illegal_sentence_action) {
+ 	    case 1:
+-		error("Illegal to call remove_action() [caller was /%s] from a verb returning zero.\n", illegal_sentence_ob->name);
++		error("Illegal to call remove_action() [caller was /%s] from a verb returning zero.\n", illegal_sentence_ob->obname);
+ 	    case 2:
+-		error("Illegal to move or destruct an object (/%s) defining actions from a verb function which returns zero.\n", illegal_sentence_ob->name);
++		error("Illegal to move or destruct an object (/%s) defining actions from a verb function which returns zero.\n", illegal_sentence_ob->obname);
+ 	    }
+ 	}
+     }
+diff -ur fluffos-1.24/build.MudOS fluffos-1.24.new/build.MudOS
+--- fluffos-1.24/build.MudOS	2003-12-30 03:09:56.000000000 +1100
++++ fluffos-1.24.new/build.MudOS	2004-01-26 14:06:45.000000000 +1100
+@@ -115,7 +115,6 @@
+ # SCO 3.2v4.2
+ # ARCH: *sigh* and this one ...
+ #OSFLAGS=-DSCO
+-OSFLAGS=-DHAVE_ZLIB
+ # try uncommenting this if you are using gcc and at runtime you see socket
+ # errors saying that the "set socket nonblocking" operation is not supported.
+ # That error is caused by old-style macros (that gcc doesn't normally grok)
+@@ -124,7 +123,6 @@
+ 
+ # Location of libmsgql.a, if you are using PACKAGE_DB
+ #EXTRALIBS=-L/usr/local/lib -lmsql
+-EXTRALIBS=-Lzlib
+ ####### END OF USER CONFIGURABLE OPTIONS
+ 
+ echo "Trying out some stuff to see what works; ignore errors ..."
+diff -ur fluffos-1.24/comm.c fluffos-1.24.new/comm.c
+--- fluffos-1.24/comm.c	2003-10-25 06:33:53.000000000 +1000
++++ fluffos-1.24.new/comm.c	2004-01-26 12:28:04.000000000 +1100
+@@ -2339,6 +2339,7 @@
+     static char *dbuf = &buf[sizeof(int) + sizeof(int) + sizeof(int)];
+     int msglen;
+     int msgtype;
++    int i;
+ 
+     if ((addr_server_fd < 0) || (strlen(name) >=
+                   100 - (sizeof(msgtype) + sizeof(msglen) + sizeof(int)))) {
+@@ -2357,7 +2358,12 @@
+     memcpy(buf, (char *) &msgtype, sizeof(msgtype));
+     memcpy(&buf[sizeof(int)], (char *) &msglen, sizeof(msglen));
+ 
+-    msgtype = (name[0] >= '0' && name[0] <= '9') ? NAMEBYIP : IPBYNAME;
++    msgtype = NAMEBYIP;
++    for (i = 0; i < strlen(name); i++)
++        if (isalpha(name[i])) {
++            msgtype = IPBYNAME;
++            break;
++        }
+     memcpy(&buf[sizeof(int) + sizeof(int)], (char *) &msgtype, sizeof(msgtype));
+ 
+     debug(connections, ("query_addr_number: sent address server %s\n", dbuf));
+diff -ur fluffos-1.24/edit_source.c fluffos-1.24.new/edit_source.c
+--- fluffos-1.24/edit_source.c	2003-12-30 03:11:45.000000000 +1100
++++ fluffos-1.24.new/edit_source.c	2004-01-26 11:28:51.000000000 +1100
+@@ -1636,6 +1636,9 @@
+     check_library("-lseq");
+     check_library("-lm");
+ 
++    if (lookup_define("HAVE_ZLIB"))
++        check_library("-lz");
++
+     fprintf(stderr, "Checking for flaky Linux systems ...\n");
+     check_linux_libc();
+ 
+diff -ur fluffos-1.24/interpret.c fluffos-1.24.new/interpret.c
+--- fluffos-1.24/interpret.c	2003-03-25 20:16:10.000000000 +1100
++++ fluffos-1.24.new/interpret.c	2004-01-26 12:27:01.000000000 +1100
+@@ -452,7 +452,7 @@
+   } else if ((v->type & T_REFED) && !(v->type & T_FREED)) {
+ #ifdef DEBUG_MACRO
+     if (v->type == T_OBJECT)
+-      debug(d_flag, ("Free_svalue %s (%d) from %s\n", v->u.ob->obname, v->u.ob->ref - 1, tag));
++      debug(d_flag, ("Free_svalue %s (%d) from %s\n", v->u.ob->name, v->u.ob->ref - 1, tag));
+ #endif
+     if (!(--v->u.refed->ref)) {
+       switch (v->type) {
+@@ -5688,7 +5688,7 @@
+ 
+   if (!TRACEHB)
+     return;
+-  objname = TRACETST(TRACE_OBJNAME) ? (current_object && current_object->obname ? current_object->obname : "??") : "";
++  objname = TRACETST(TRACE_OBJNAME) ? (current_object && current_object->name ? current_object->name : "??") : "";
+   add_vmessage(command_giver, "*** %d %*s %s %s %s%s", tracedepth, tracedepth, "", msg, objname, fname, post);
+ }
+ #endif
+diff -ur fluffos-1.24/md.c fluffos-1.24.new/md.c
+--- fluffos-1.24/md.c	2002-09-17 08:07:38.000000000 +1000
++++ fluffos-1.24.new/md.c	2004-01-26 14:52:39.000000000 +1100
+@@ -274,8 +274,8 @@
+     if (ob->prog)
+         ob->prog->extra_ref++;
+ 
+-    if (ob->name) {
+-        DO_MARK(ob->name, TAG_OBJ_NAME);
++    if (ob->obname) {
++        DO_MARK(ob->obname, TAG_OBJ_NAME);
+     }
+ 
+     if (ob->replaced_program)
+@@ -316,7 +316,7 @@
+             mark_svalue(&ob->variables[i]);
+     else
+         outbuf_addv(&out, "can't mark variables; %s is swapped.\n",
+-                    ob->name);
++                    ob->obname);
+ }
+ 
+ void mark_svalue P1(svalue_t *, sv) {
+@@ -428,7 +428,7 @@
+           outbuf_add(&out, "<mapping>");
+           break;
+       case T_OBJECT:
+-          outbuf_addv(&out, "OBJ(%s)", vec->item[i].u.ob->name);
++          outbuf_addv(&out, "OBJ(%s)", vec->item[i].u.ob->obname);
+           break;
+       }
+       if (i != vec->size - 1) outbuf_add(&out, ", ");
+@@ -895,18 +895,18 @@
+                             if (tmp)
+                                 outbuf_addv(&out,
+                                         "WARNING: %s is dangling.\n",
+-                                        ob->name);
++                                        ob->obname);
+                         }
+                         if (!tmp)
+                             outbuf_addv(&out, 
+                                         "WARNING: %s not in object list.\n",
+-                                        ob->name);
++                                        ob->obname);
+                     }
+                     break;
+                 case TAG_LPC_OBJECT:
+                     ob = NODET_TO_PTR(entry, object_t *);
+-                    if (ob->name) {
+-                        DO_MARK(ob->name, TAG_OBJ_NAME);
++                    if (ob->obname) {
++                        DO_MARK(ob->obname, TAG_OBJ_NAME);
+                     }
+                     break;
+                 case TAG_PROGRAM:
+@@ -920,8 +920,8 @@
+                         prog->inherit[i].prog->extra_ref++;
+                     
+                     for (i = 0; i < (int) prog->num_functions_defined; i++)
+-                        if (prog->function_table[i].name)
+-                            EXTRA_REF(BLOCK(prog->function_table[i].name))++;
++                        if (prog->function_table[i].funcname)
++                            EXTRA_REF(BLOCK(prog->function_table[i].funcname))++;
+                     
+                     for (i = 0; i < (int) prog->num_strings; i++)
+                         EXTRA_REF(BLOCK(prog->strings[i]))++;
+@@ -929,7 +929,7 @@
+                     for (i = 0; i < (int) prog->num_variables_defined; i++)
+                         EXTRA_REF(BLOCK(prog->variable_table[i]))++;
+                     
+-                    EXTRA_REF(BLOCK(prog->name))++;
++                    EXTRA_REF(BLOCK(prog->filename))++;
+                 }
+             }
+         }
+@@ -944,14 +944,14 @@
+                 case TAG_PROGRAM:
+                     prog = NODET_TO_PTR(entry, program_t *);
+                     if (prog->ref != prog->extra_ref)
+-                        outbuf_addv(&out, "Bad ref count for program %s, is %d - should be %d\n", prog->name, prog->ref, prog->extra_ref);
++                        outbuf_addv(&out, "Bad ref count for program %s, is %d - should be %d\n", prog->filename, prog->ref, prog->extra_ref);
+                     if (prog->func_ref != prog->extra_func_ref)
+-                        outbuf_addv(&out, "Bad function ref count for program %s, is %d - should be %d\n", prog->name, prog->func_ref, prog->extra_func_ref);
++                        outbuf_addv(&out, "Bad function ref count for program %s, is %d - should be %d\n", prog->filename, prog->func_ref, prog->extra_func_ref);
+                     break;
+                 case TAG_OBJECT:
+                     ob = NODET_TO_PTR(entry, object_t *);
+                     if (ob->ref != ob->extra_ref)
+-                        outbuf_addv(&out, "Bad ref count for object %s, is %d - should be %d\n", ob->name, ob->ref, ob->extra_ref);
++                        outbuf_addv(&out, "Bad ref count for object %s, is %d - should be %d\n", ob->obname, ob->ref, ob->extra_ref);
+                     break;
+                 case TAG_ARRAY:
+                     vec = NODET_TO_PTR(entry, array_t *);
+@@ -974,7 +974,7 @@
+                 case TAG_FUNP:
+                     fp = NODET_TO_PTR(entry, funptr_t *);
+                     if (fp->hdr.ref != fp->hdr.extra_ref)
+-                        outbuf_addv(&out, "Bad ref count for function pointer (owned by %s), is %d - should be %d\n", (fp->hdr.owner ? fp->hdr.owner->name : "(null)"), fp->hdr.ref, fp->hdr.extra_ref);
++                        outbuf_addv(&out, "Bad ref count for function pointer (owned by %s), is %d - should be %d\n", (fp->hdr.owner ? fp->hdr.owner->obname : "(null)"), fp->hdr.ref, fp->hdr.extra_ref);
+                     break;
+ #ifndef NO_BUFFER_TYPE
+                 case TAG_BUFFER:
+@@ -1000,7 +1000,7 @@
+                     break;
+                 case TAG_SENTENCE:
+                     sent = NODET_TO_PTR(entry, sentence_t *);
+-                    outbuf_addv(&out, "WARNING: Found orphan sentence: %s:%s - %s %04x\n", sent->ob->name, sent->function, entry->desc, (int)entry->tag);
++                    outbuf_addv(&out, "WARNING: Found orphan sentence: %s:%s - %s %04x\n", sent->ob->obname, sent->function, entry->desc, (int)entry->tag);
+                     break;
+                 case TAG_PERM_IDENT:
+                     outbuf_addv(&out, "WARNING: Found orphan permanent identifier: %s %04x\n", entry->desc, (int)entry->tag);
+diff -ur fluffos-1.24/object.h fluffos-1.24.new/object.h
+--- fluffos-1.24/object.h	2002-11-27 08:42:06.000000000 +1100
++++ fluffos-1.24.new/object.h	2004-01-26 12:05:39.000000000 +1100
+@@ -78,7 +78,7 @@
+ #ifdef DEBUG
+     unsigned int extra_ref;
+ #endif
+-    char *name;
++    char *obname;
+     struct object_s *next_hash;
+     void (**jump_table)();
+     struct string_switch_entry_s **string_switch_tables;
+diff -ur fluffos-1.24/options.h fluffos-1.24.new/options.h
+--- fluffos-1.24/options.h	2004-01-26 16:17:07.000000000 +1100
++++ fluffos-1.24.new/options.h	2004-01-26 11:48:44.000000000 +1100
+@@ -859,6 +859,7 @@
+ /* PACKAGE_COMPRESS: Enable MCCP support and compressed save files
+    SAVE_GZ_EXTENSION: save extension for compressed files
+  */
++#define HAVE_ZLIB
+ #define PACKAGE_COMPRESS
+ #define SAVE_GZ_EXTENSION ".o.gz"
+ 
+diff -ur fluffos-1.24/packages/parser.c fluffos-1.24.new/packages/parser.c
+--- fluffos-1.24/packages/parser.c	2002-09-17 08:19:40.000000000 +1000
++++ fluffos-1.24.new/packages/parser.c	2004-01-26 14:11:41.000000000 +1100
+@@ -525,7 +525,7 @@
+     
+     if (!(pi = current_object->pinfo))
+         error("/%s is not known by the parser.  Call parse_init() first.\n",
+-              current_object->name);
++              current_object->obname);
+ 
+     if (pi->flags & PI_SETUP) {
+         pi->flags &= PI_VERB_HANDLER;
+@@ -788,7 +788,7 @@
+     if (ob->pinfo->flags & PI_SETUP && !(ob->pinfo->flags & PI_REFRESH))
+         return;
+     
+-    DEBUG_P(("Interogating /%s.", ob->name));
++    DEBUG_P(("Interogating /%s.", ob->obname));
+     
+     DEBUG_PP(("[%s]", APPLY_NOUN));
+     ret = apply(APPLY_NOUN, ob, 0, ORIGIN_DRIVER);
+@@ -1046,7 +1046,7 @@
+     if (!pi) /* woops.  Dested during parse_command_users() or something
+                 similarly nasty. */
+         return;
+-    DEBUG_PP(("add_to_hash_table: /%s", ob->name));
++    DEBUG_PP(("add_to_hash_table: /%s", ob->obname));
+     for (i = 0; i < pi->num_ids; i++) {
+         he = add_hash_entry(pi->ids[i]);
+         he->flags |= HV_NOUN;
+@@ -1082,7 +1082,7 @@
+         if (master_user_list->item[i].type == T_OBJECT
+             && (ob = master_user_list->item[i].u.ob)->pinfo
+             && NEED_REFRESH(ob)) {
+-            DEBUG_PP(("adding: /%s", ob->name));
++            DEBUG_PP(("adding: /%s", ob->obname));
+             if (num_objects == MAX_NUM_OBJECTS)
+                 return;
+             loaded_objects[num_objects++] = ob;
+@@ -1945,7 +1945,7 @@
+             SET_OB(parse_vn->handler);
+         args = make_function(func, EndOf(func), 0, state, try % 4, obj);
+         args += push_real_names(try % 4, 0);
+-        DEBUG_P(("Trying %s ... (/%s)", func, ob->name));
++        DEBUG_P(("Trying %s ... (/%s)", func, ob->obname));
+         ret = process_answer(state, apply(func, ob, args, ORIGIN_DRIVER), 0);
+         if (ob->flags & O_DESTRUCTED)
+             return 0;
+@@ -2014,7 +2014,7 @@
+             SET_OB(parse_vn->handler);
+         args = make_function(func, EndOf(func), which, state, try % 4, obj);
+         args += push_real_names(try % 4, which);
+-        DEBUG_P(("Trying %s ... (/%s)", func, ob->name));
++        DEBUG_P(("Trying %s ... (/%s)", func, ob->obname));
+         ret = parallel_process_answer(state, apply(func, ob, args, ORIGIN_DRIVER), which);
+         if (ob->flags & O_DESTRUCTED)
+             return 0;
+@@ -2600,7 +2600,7 @@
+             }
+         }
+         DEBUG_P(("Saving successful match: %s (%s)", best_result->res[0].func,
+-                 best_result->ob->name));
++                 best_result->ob->obname));
+     }
+     DEBUG_DEC;
+ }
+@@ -2633,7 +2633,7 @@
+                   best_result->res[i].num, ORIGIN_DRIVER)) return;
+     }
+     error("Parse accepted, but no do_* function found in object /%s!\n",
+-          ob->name);
++          ob->obname);
+ }
+ 
+ static void parse_rule P1(parse_state_t *, state) {
+@@ -3031,7 +3031,7 @@
+ void f_parse_sentence PROT((void)) {
+     if (!current_object->pinfo)
+         error("/%s is not known by the parser.  Call parse_init() first.\n",
+-              current_object->name);
++              current_object->obname);
+ 
+     if (pi)
+         error("Illegal to call parse_sentence() recursively.\n");
+@@ -3106,10 +3106,10 @@
+     
+     if (!(sp-1)->u.ob->pinfo)
+         error("/%s is not known by the parser.  Call parse_init() first.\n",
+-              (sp-1)->u.ob->name);
++              (sp-1)->u.ob->obname);
+     if (!current_object->pinfo)
+         error("/%s is not known by the parser.  Call parse_init() first.\n",
+-              current_object->name);
++              current_object->obname);
+ 
+     if (pi)
+         error("Illegal to call parse_sentence() recursively.\n");
+@@ -3207,7 +3207,7 @@
+     handler = current_object;
+     if (!(handler->pinfo))
+         error("/%s is not known by the parser.  Call parse_init() first.\n",
+-              handler->name);
++              handler->obname);
+ 
+     /* We need the literals */
+     interrogate_master();
+@@ -3411,7 +3411,7 @@
+                 continue;
+             }
+             while (vn) {
+-                outbuf_addv(&ob, "  (/%s) %s\n", vn->handler->name, rule_string(vn));
++                outbuf_addv(&ob, "  (/%s) %s\n", vn->handler->obname, rule_string(vn));
+                 vn = vn->next;
+             }
+         }
+diff -ur fluffos-1.24/simulate.c fluffos-1.24.new/simulate.c
+--- fluffos-1.24/simulate.c	2003-03-03 23:44:41.000000000 +1100
++++ fluffos-1.24.new/simulate.c	2004-01-26 14:44:28.000000000 +1100
+@@ -544,7 +544,7 @@
+     ob = get_empty_object(prog->num_variables_total);
+     /* Shared string is no good here */
+     SETOBNAME(ob, alloc_cstring(name, "load_object"));
+-    SET_TAG(ob->name, TAG_OBJ_NAME);
++    SET_TAG(ob->obname, TAG_OBJ_NAME);
+     ob->prog = prog;
+     ob->flags |= O_WILL_RESET;  /* must be before reset is first called */
+     ob->next_all = obj_list;
