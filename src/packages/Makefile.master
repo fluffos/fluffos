@@ -16,10 +16,10 @@ all: $(OBJ)
 
 %ifdef GNU
 $(OBJDIR)/db.o: db.c
-	$(CC) -I$(OBJDIR) -I.. -I/usr/local/mysql/include $(CFLAGS) -o $@ -c $<
+	$(CC) -I$(OBJDIR) -I.. -I/usr/include/mysql $(CFLAGS) -o $@ -c $<
 %else
 db.$(O): db.c
-	$(CC) $(CFLAGS) -I.. -I/usr/local/mysql/include -c $*.c
+	$(CC) $(CFLAGS) -I.. -I/usr/include/mysql -c $*.c
 %endif
 
 clean:

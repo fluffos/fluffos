@@ -130,7 +130,7 @@ void kill_ref P1(ref_t *, ref) {
        locked */
     while (r) {
       if (r->sv.u.map == ref->sv.u.map)
-	break;
+        break;
       r = r->next;
     }
     if (!r)
@@ -1892,7 +1892,7 @@ eval_instruction P1(char *, p)
   
   if (eval_cost == 0) {
       debug_message("object /%s: eval_cost too big %d %d\n", 
-        current_object->name, eval_cost, max_cost);
+        current_object->obname, eval_cost, max_cost);
       eval_cost = max_cost;
       max_eval_error = 1;
       error("Too long evaluation. Execution aborted.\n");
@@ -2016,7 +2016,7 @@ eval_instruction P1(char *, p)
   {
       int num = EXTRACT_UCHAR(pc++);
       //TODO check if num is really wrong, or something else is borken
-      while (--num) 
+      while (num--) 
          kill_ref(global_ref_list);
       break;
   }
@@ -4741,10 +4741,10 @@ char *dump_trace P1(int, how)
   case FRAME_FUNCTION:
       get_trace_details(p[1].prog, p[0].fr.table_index,
             &fname, &num_arg, &num_local);
-      dump_trace_line(fname, p[1].prog->name, p[1].ob->name,
+      dump_trace_line(fname, p[1].prog->name, p[1].ob->obname,
           get_line_number(p[1].pc, p[1].prog));
       if (strcmp(fname, "heart_beat") == 0)
-    ret = p->ob ? p->ob->name : 0;
+    ret = p->ob ? p->ob->obname : 0;
       break;
   case FRAME_FUNP:
     {
@@ -4759,7 +4759,7 @@ char *dump_trace P1(int, how)
 
       svalue_to_string(&tmpval, &tmpbuf, 0, 0, 0);
 
-      dump_trace_line(tmpbuf.buffer, p[1].prog->name, p[1].ob->name,
+      dump_trace_line(tmpbuf.buffer, p[1].prog->name, p[1].ob->obname,
           get_line_number(p[1].pc, p[1].prog));
 
       FREE_MSTR(tmpbuf.buffer);
@@ -4768,12 +4768,12 @@ char *dump_trace P1(int, how)
     }
       break;
   case FRAME_FAKE:
-      dump_trace_line("<fake>", p[1].prog->name, p[1].ob->name,
+      dump_trace_line("<fake>", p[1].prog->name, p[1].ob->obname,
           get_line_number(p[1].pc, p[1].prog));
       num_arg = -1;
       break;
   case FRAME_CATCH:
-      dump_trace_line("<catch>", p[1].prog->name, p[1].ob->name,
+      dump_trace_line("<catch>", p[1].prog->name, p[1].ob->obname,
         get_line_number(p[1].pc, p[1].prog));
       num_arg = -1;
       break;
@@ -4826,7 +4826,7 @@ char *dump_trace P1(int, how)
   get_trace_details(current_prog, p[0].fr.table_index,
         &fname, &num_arg, &num_local);
   debug_message("'%15s' in '/%20s' ('/%20s') %s\n",
-          fname, current_prog->name, current_object->name,
+          fname, current_prog->name, current_object->obname,
           get_line_number(pc, current_prog));
   break;
     case FRAME_FUNP:
@@ -4844,7 +4844,7 @@ char *dump_trace P1(int, how)
 
       debug_message("'%s' in '/%20s' ('/%20s') %s\n",
         tmpbuf.buffer,
-          current_prog->name, current_object->name,
+          current_prog->name, current_object->obname,
           get_line_number(pc, current_prog));
       FREE_MSTR(tmpbuf.buffer);
   num_arg = p[0].fr.funp->f.functional.num_arg;
@@ -4853,13 +4853,13 @@ char *dump_trace P1(int, how)
   break;
     case FRAME_FAKE:
   debug_message("'     <fake>' in '/%20s' ('/%20s') %s\n",
-          current_prog->name, current_object->name,
+          current_prog->name, current_object->obname,
           get_line_number(pc, current_prog));
   num_arg = -1;
   break;
     case FRAME_CATCH:
   debug_message("'          CATCH' in '/%20s' ('/%20s') %s\n",
-          current_prog->name, current_object->name,
+          current_prog->name, current_object->obname,
           get_line_number(pc, current_prog));
   num_arg = -1;
   break;

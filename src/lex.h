@@ -54,10 +54,10 @@ typedef struct defn_s {
 #define DEF_IS_NOT_LOCAL 4
 
 /* to speed up cleaning the hash table, and identify the union */
-#define IHE_RESWORD    0x8000	/* reserved word */
-#define IHE_EFUN       0x4000	/* efun name */
-#define IHE_SIMUL      0x2000	/* active simul efun name */
-#define IHE_ORPHAN     0x1000	/* old and unused simul efun name */
+#define IHE_RESWORD    0x8000   /* reserved word */
+#define IHE_EFUN       0x4000   /* efun name */
+#define IHE_SIMUL      0x2000   /* active simul efun name */
+#define IHE_ORPHAN     0x1000   /* old and unused simul efun name */
 #define IHE_PERMANENT  (IHE_RESWORD | IHE_EFUN | IHE_SIMUL | IHE_ORPHAN)
 #define TOKEN_MASK     0x0fff
 
@@ -79,16 +79,16 @@ typedef struct {
     unsigned short sem_value;   /* semantic value for predefined tokens */
     ident_hash_elem_t *next;
 /* the fields above must correspond to struct ident_hash_elem */
-    short min_args;		/* Minimum number of arguments. */
-    short max_args;		/* Maximum number of arguments. */
-    short ret_type;		/* The return type used by the compiler. */
-    unsigned short arg_type1;	/* Type of argument 1 */
-    unsigned short arg_type2;	/* Type of argument 2 */
-    unsigned short arg_type3;	/* Type of argument 1 */
-    unsigned short arg_type4;	/* Type of argument 2 */
-    short arg_index;		/* Index pointing to where to find arg type */
-    short Default;		/* an efun to use as default for last
-				 * argument */
+    short min_args;             /* Minimum number of arguments. */
+    short max_args;             /* Maximum number of arguments. */
+    short ret_type;             /* The return type used by the compiler. */
+    unsigned short arg_type1;   /* Type of argument 1 */
+    unsigned short arg_type2;   /* Type of argument 2 */
+    unsigned short arg_type3;   /* Type of argument 1 */
+    unsigned short arg_type4;   /* Type of argument 2 */
+    short arg_index;            /* Index pointing to where to find arg type */
+    short Default;              /* an efun to use as default for last
+                                 * argument */
 } keyword_t;
 
 typedef struct lpc_predef_s {
@@ -113,7 +113,7 @@ extern lpc_predef_t *lpc_predefs;
 
 typedef struct {
     short max_arg, min_arg;  /* Can't use char to represent -1 */
-    short type[4];	     /* need a short to hold the biggest type flag */
+    short type[4];           /* need a short to hold the biggest type flag */
     short Default;
     short ret_type;
     char *name;

@@ -490,7 +490,7 @@ static FILE *debug_message_fp = 0;
 
 void debug_message P1V(char *, fmt)
 {
-    static char deb_buf[100];
+    static char deb_buf[1024];
     static char *deb = deb_buf;
     va_list args;
     V_DCL(char *fmt);

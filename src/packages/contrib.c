@@ -2146,7 +2146,7 @@ void f_base_name PROT((void)) {
       *sp = const0;
       return;
     }
-    name = (char *)add_slash(sp->u.ob->name);
+    name = (char *)add_slash(sp->u.ob->obname);
   } else {
     name = string_copy( sp->u.string, "f_base_name: name");
   }

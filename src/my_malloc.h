@@ -5,8 +5,7 @@
  * to use sysmalloc or malloc replacements
  */
 #if defined(SYSMALLOC) || \
-    (defined(SMALLOC) && defined(SBRK_OK)) || \
-    defined(BSDMALLOC) || defined(MMALLOC)
+    (defined(SMALLOC) && defined(SBRK_OK)) 
 #define MALLOC(x)       malloc(x)
 #define FREE(x)         free(x)
 #define REALLOC(x,y)    realloc(x,y)
@@ -31,17 +30,19 @@
 
 /* bsdmalloc - always a replacement */
 #if defined(BSDMALLOC) && !defined(SYSMALLOC)
-#  define bsdmalloc_malloc      malloc
-#  define bsdmalloc_free        free
-#  define bsdmalloc_realloc     realloc
-#  define bsdmalloc_calloc      calloc
+#define MALLOC(x)       bsdmalloc_malloc(x)
+#define FREE(x)         bsdmalloc_free(x)
+#define REALLOC(x,y)    bsdmalloc_realloc(x,y)
+#define CALLOC(x,y)     bsdmalloc_calloc(x,y)
+
 #endif
 
 #ifdef MMALLOC
-#  define mmalloc      malloc
-#  define mfree        free
-#  define mrealloc     realloc
-#  define mcalloc      calloc
+#define MALLOC(x)       mmalloc(x)
+#define FREE(x)         mfree(x)
+#define REALLOC(x,y)    mrealloc(x,y)
+#define CALLOC(x,y)     mcalloc(x,y)
+
 #endif
 
 #define DXALLOC(x,tag,desc)     xalloc(x)

@@ -1445,7 +1445,7 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
     if (!file) 
         error("Denied write permission in save_object().\n");
 
-    strcpy(save_name, ob->name);
+    strcpy(save_name, ob->obname);
     if ((p = strrchr(save_name, '#')) != 0)
         *p = '\0';
     p = save_name + strlen(save_name) - 1;
@@ -1780,7 +1780,7 @@ void dealloc_object P2(object_t *, ob, char *, from)
     if (!(ob->flags & O_DESTRUCTED)) {
         /* This is fatal, and should never happen. */
         fatal("FATAL: Object 0x%x /%s ref count 0, but not destructed (from %s).\n",
-              ob, ob->name, from);
+              ob, ob->obname, from);
     }
     DEBUG_CHECK(ob->interactive, "Tried to free an interactive object.\n");
     /*
@@ -1804,13 +1804,13 @@ void dealloc_object P2(object_t *, ob, char *, from)
     if (ob->privs)
         free_string(ob->privs);
 #endif
-    if (ob->name) {
-        debug(d_flag, ("Free object /%s\n", ob->name));
+    if (ob->obname) {
+        debug(d_flag, ("Free object /%s\n", ob->obname));
 
-        DEBUG_CHECK1(lookup_object_hash(ob->name) == ob,
+        DEBUG_CHECK1(lookup_object_hash(ob->obname) == ob,
                      "Freeing object /%s but name still in name table", ob->name);
-        FREE(ob->name);
-        ob->name = 0;
+        FREE(ob->obname);
+        ob->obname = 0;
     }
 #ifdef DEBUG
     for (tmp = obj_list_dangling;  tmp != ob;  tmp = tmp->next_all)

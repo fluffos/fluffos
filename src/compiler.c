@@ -1412,7 +1412,7 @@ char *get_type_name P3(char *, where, char *, end, int, type)
         /* we're sometimes called from outside the compiler * /
         if (current_file)
             where = strput(where, end, PROG_STRING(CLASS(type & ~TYPE_MOD_CLASS)->name));
-	    and that just doesn't work */
+            and that just doesn't work */
     } else {
         DEBUG_CHECK(type >= sizeof compiler_type_names / sizeof compiler_type_names[0], "Bad type\n");
         where = strput(where, end, compiler_type_names[type]);
@@ -2531,7 +2531,7 @@ static void prolog P2(int, f, char *, name) {
      * if we've got a simul_efun object and we're not reloading it, make a copy
      * of its class definitions in the object we're compiling now.
      */
-    if (simul_efun_ob && *simul_efun_ob->name)
+    if (simul_efun_ob && *simul_efun_ob->obname)
         copy_structures(simul_efun_ob->prog);
 
     start_new_file(f);

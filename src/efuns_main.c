@@ -826,7 +826,7 @@ f_file_name PROT((void))
     char *res;
 
     /* This function now returns a leading '/' */
-    res = (char *) add_slash(sp->u.ob->name);
+    res = (char *) add_slash(sp->u.ob->obname);
     free_object(sp->u.ob, "f_file_name");
     put_malloced_string(res);
 }

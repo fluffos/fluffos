@@ -488,7 +488,7 @@ void svalue_to_string P5(svalue_t *, obj, outbuffer_t *, outbuf, int, indent, in
             }
 
             outbuf_addchar(outbuf, '/');
-            outbuf_add(outbuf, obj->u.ob->name);
+            outbuf_add(outbuf, obj->u.ob->obname);
 
             if (!max_eval_error && !too_deep_error) {
                 push_object(obj->u.ob);

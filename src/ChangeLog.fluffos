@@ -1,6 +1,14 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
+new in FluffOS 1.14
+changed size of a local sprintf buffer from 100 to 1024 (100 must be really 
+	easy to reach)
+changed object struct name field to obname, there are too many struct fields
+	called name.
+fixed malloc selecting code
+removed part of the crasher fix of 1.13
+
 new in FluffOS 1.13
 fixed crasher in global_ref_list cleanup (just the crasher, i suspect the 
 	list is borken as well

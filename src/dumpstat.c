@@ -149,11 +149,11 @@ void dumpstat P1(char *, tfn)
             tmp = ob->prog->total_size;
         else
             tmp = 0;
-        fprintf(f, "%-20s %i ref %2d %s %s (%d) %s\n", ob->name,
+        fprintf(f, "%-20s %i ref %2d %s %s (%d) %s\n", ob->obname,
                 tmp + data_size(ob) + sizeof(object_t), ob->ref,
                 ob->flags & O_HEART_BEAT ? "HB" : "  ",
 #ifndef NO_ENVIRONMENT
-                ob->super ? ob->super->name : "--",
+                ob->super ? ob->super->obname : "--",
 #else
                 "--",
 #endif
