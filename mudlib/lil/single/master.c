@@ -42,7 +42,7 @@ crash(string error, object command_giver, object current_object)
 {
 	efun::shout("Master object shouts: Damn!\n");
 	efun::shout("Master object tells you: The game is crashing.\n");
-	log_file("crashes", mud_name() + " crashed on: " + ctime(time()) +
+	log_file("crashes", MUD_NAME + " crashed on: " + ctime(time()) +
 		", error: " + error + "\n");
 	if (command_giver) {
 		log_file("crashes", "this_player: " + file_name(command_giver) + "\n");

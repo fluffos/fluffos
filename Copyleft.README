@@ -1,3 +1,0 @@
-The GNU Copyleft is included because mapping.c uses a small section of
-code (the hashing stuff) from Larry Wall's Perl version 4 which is covered
-under the GNU Copyleft.

@@ -5,6 +5,12 @@
 #ifdef NeXT
 #include <libc.h>
 #endif
+#ifdef __386BSD__
+#include <sys/types.h>
+#include <stdio.h>
+#include <unistd.h>
+#include "lint.h"
+#endif
 
 #ifdef SYSMALLOC
 #define THE_MALLOC "sysmalloc.c"

@@ -27,6 +27,7 @@ check_svalue(v)
 struct svalue *v;
 {
   register int idx;
+
   nested++;
   if (nested > MAX_RECURSION)
   {
@@ -50,8 +51,8 @@ struct svalue *v;
         check_svalue(&v->u.vec->item[idx]);
       break;
     case T_FUNCTION:
-      check_svalue(v->u.fp->obj);
-      check_svalue(v->u.fp->fun);
+      check_svalue(&v->u.fp->obj);
+      check_svalue(&v->u.fp->fun);
       break;
   }
   nested--;
@@ -90,6 +91,7 @@ reclaim_objects()
 {
   int i;
   struct object *ob;
+
   cleaned = nested = 0;
   for (ob = obj_list; ob; ob = ob->next_all)
     if (ob->prog)

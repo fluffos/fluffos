@@ -1,5 +1,5 @@
 ###############################################################################
-#                  Customizable runtime config file for MudOS                 #
+#              Customizable runtime config file for MudOS 0.9.16              #
 ###############################################################################
 # NOTE: All paths specified here are relative to the mudlib directory except  #
 #       for mudlib directory, and binary directory.                           #

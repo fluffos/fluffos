@@ -40,7 +40,7 @@ void set_simul_efun(file)
 	{
 	  fprintf(stderr, "The simul_efun file %s was not loaded.\n",
 		  simul_efun_file_name);
-	  exit(1);
+	  exit(-1);
 	}
     }
   num_simul_efun = ob->prog->p.i.num_functions;

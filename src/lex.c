@@ -4,9 +4,11 @@
 
 #include "instrs.h"
 #include "config.h"
+#include "arch.h" /* put after config.h */
 #include "lint.h"
 #include "interpret.h"
-#include "lang.tab.h"
+#include "compiler.tab.h"
+#include "opcodes.h"
 #include "string.h"
 #include "exec.h"
 #include "lex.h"
@@ -570,44 +572,44 @@ yylex1()
     case '\v':
 	break;
     case '+':
-	TRY('+', F_PRE_INC);
-	TRY('=', F_ADD_EQ);
+	TRY('+', L_INC);
+	TRY('=', L_ADD_EQ);
 	return c;
     case '-':
-	TRY('>', F_ARROW);
-	TRY('-', F_PRE_DEC);
-	TRY('=', F_SUB_EQ);
+	TRY('>', L_ARROW);
+	TRY('-', L_DEC);
+	TRY('=', L_SUB_EQ);
 	return c;
     case '&':
-	TRY('&', F_LAND);
-	TRY('=', F_AND_EQ);
+	TRY('&', L_LAND);
+	TRY('=', L_AND_EQ);
 	return c;
     case '|':
-	TRY('|', F_LOR);
-	TRY('=', F_OR_EQ);
+	TRY('|', L_LOR);
+	TRY('=', L_OR_EQ);
 	return c;
     case '^':
-	TRY('=', F_XOR_EQ);
+	TRY('=', L_XOR_EQ);
 	return c;
     case '<':
 	if (gobble('<')) {
-	    TRY('=', F_LSH_EQ);
-	    return F_LSH;
+	    TRY('=', L_LSH_EQ);
+	    return L_LSH;
 	}
-	TRY('=', F_LE);
+	TRY('=', L_LE);
 	return c;
     case '>':
 	if (gobble('>')) {
-	    TRY('=', F_RSH_EQ);
-	    return F_RSH;
+	    TRY('=', L_RSH_EQ);
+	    return L_RSH;
 	}
-	TRY('=', F_GE);
+	TRY('=', L_GE);
 	return c;
     case '*':
-	TRY('=', F_MULT_EQ);
+	TRY('=', L_MULT_EQ);
 	return c;
     case '%':
-	TRY('=', F_MOD_EQ);
+	TRY('=', L_MOD_EQ);
 	return c;
     case '/':
 	if (gobble('*')) {
@@ -618,10 +620,10 @@ yylex1()
 		skip_line();
 		break;
 	}
-	TRY('=', F_DIV_EQ);
+	TRY('=', L_DIV_EQ);
 	return c;
     case '=':
-	TRY('=', F_EQ);
+	TRY('=', L_EQ);
 	return c;
     case ';':
     case '(':
@@ -635,13 +637,13 @@ yylex1()
     case '?':
 	return c;
     case '!':
-	TRY('=', F_NE);
-	return F_NOT;
+	TRY('=', L_NE);
+	return L_NOT;
     case ':':
-	TRY(':', F_COLON_COLON);
+	TRY(':', L_COLON_COLON);
 	return ':';
     case '.':
-	TRY('.',F_RANGE);
+	TRY('.',L_RANGE);
 	goto badlex;
     case '#':
 	if (lastchar == '\n') {
@@ -762,7 +764,7 @@ yylex1()
 	}
 	if (!gobble('\''))
 	    yyerror("Illegal character constant");
-	return F_NUMBER;
+	return L_NUMBER;
     case '@':
 	{
 		int rc;
@@ -869,7 +871,9 @@ yylex1()
 		    break;
 		SAVEC;
 	      }
+#ifdef WANT_MISSING_SPACE_BUG
         while (c==' ') c=mygetc();
+#endif
 	if (c=='#') {
 		if (mygetc()!='#')
 		  lexerror("Single '#' in identifier -- use '##' for token pasting");
@@ -914,7 +918,7 @@ yylex1()
 		    return r;
 		} else
 		    return ident(yytext);
-	      }
+	    }
 	  }
           break;
 	  }
@@ -922,10 +926,15 @@ yylex1()
     }
   }
  badlex:
-  { char buff[100];
+  {
+#ifdef DEBUG
+    char buff[100];
+
     sprintf(buff, "Illegal character (hex %02x) '%c'", (unsigned)c, (char)c);
     fprintf(stderr,"partial = %s\n",partial);
-    yyerror(buff); return ' '; }
+    yyerror(buff);
+#endif
+    return ' '; }
   }
 
 int
@@ -961,10 +970,10 @@ static int ident(str)
     i = islocal(str);
     if (i >= 0) {
         yylval.number = i;
-        return F_LOCAL_NAME;
+        return L_LOCAL_NAME;
     }
     yylval.string = string_copy(str);
-    return F_IDENTIFIER;
+    return L_IDENTIFIER;
 }
 
 static int string(str)
@@ -994,21 +1003,21 @@ static int string(str)
 	    *p = *str;
     }
     *p = '\0';
-    return F_STRING;
+    return L_STRING;
 }
 
 static int number(i)
     int i;
 {
     yylval.number = i;
-    return F_NUMBER;
+    return L_NUMBER;
 }
 
 static int real(i)
     double i;
 {
     yylval.real = (float)i;
-    return F_REAL;
+    return L_REAL;
 }
 
 void end_new_file()
@@ -1036,6 +1045,18 @@ void end_new_file()
 	}
 }
 
+void
+add_quoted_define(def, val)
+char *def, *val;
+{
+	char save_buf[20];
+
+    strcpy(save_buf, "\"");
+    strcat(save_buf, val);
+    strcat(save_buf, "\"");
+    add_define(def, -1, save_buf);
+}
+
 void start_new_file(f)
     FILE *f;
 {
@@ -1048,10 +1069,13 @@ void start_new_file(f)
 	defines_need_freed = 1;
     add_define("LPC3", -1, "");
     add_define("MUDOS", -1, "");
-    strcpy(save_buf, "\"");
-    strcat(save_buf, SAVE_EXTENSION);
-    strcat(save_buf, "\"");
-    add_define("SAVE_EXTENSION", -1, save_buf);
+	add_quoted_define("SAVE_EXTENSION", SAVE_EXTENSION);
+	add_quoted_define("MUDOS_ARCH", ARCH);
+	add_quoted_define("MUD_NAME", MUD_NAME);
+	get_version(save_buf);
+	add_quoted_define("MUDOS_VERSION", save_buf);
+	sprintf(save_buf,"%d", PORTNO);
+	add_define("MUDOS_PORT", -1, save_buf);
     if (current_file)
       {
 	dir = (char *)DMALLOC(strlen(current_file)+3, 64, "start_new_file");
@@ -1062,7 +1086,7 @@ void start_new_file(f)
 	    tmp[2] = 0;
 	}
 #if 1	
-	add_define("DIR",-1,dir);
+	add_define("MUDOS_DIR",-1,dir);
 #endif
 	FREE(dir);
       }
@@ -1110,44 +1134,45 @@ static struct keyword {
     short min_args;	/* Minimum number of arguments. */
     short max_args;	/* Maximum number of arguments. */
     short ret_type;	/* The return type used by the compiler. */
-    char arg_type1;	/* Type of argument 1 */
-    char arg_type2;	/* Type of argument 2 */
+    unsigned char arg_type1;	/* Type of argument 1 */
+    unsigned char arg_type2;	/* Type of argument 2 */
     short arg_index;	/* Index pointing to where to find arg type */
     short Default;      /* an efun to use as default for last argument */
 } predefs[] =
 #include "efun_defs.c"
 
 static struct keyword reswords[] = {
-{ "break",		F_BREAK, },
-{ "case",		F_CASE, },
-{ "catch",		F_CATCH, },
-{ "continue",		F_CONTINUE, },
-{ "default",		F_DEFAULT, },
-{ "do",			F_DO, },
-{ "else",		F_ELSE, },
-{ "float",      F_FLOAT, },
-{ "for",		F_FOR, },
-{ "function",   F_FUNCTION, },
-{ "if",			F_IF, },
-{ "inherit",		F_INHERIT, },
-{ "int",		F_INT, },
-{ "mapping",            F_MAPPING, },
-{ "mixed",		F_MIXED, },
-{ "nomask",		F_NO_MASK, },
-{ "object",		F_OBJECT, },
-{ "parse_command",	F_PARSE_COMMAND, },
-{ "private",		F_PRIVATE, },
-{ "protected",		F_PROTECTED, },
-{ "public",		F_PUBLIC, },
-{ "return",		F_RETURN, },
-{ "sscanf",		F_SSCANF, },
-{ "static",		F_STATIC, },
-{ "status",		F_STATUS, },
-{ "string",		F_STRING_DECL, },
-{ "switch",		F_SWITCH, },
-{ "varargs",		F_VARARGS, },
-{ "void",		F_VOID, },
-{ "while",		F_WHILE, },
+{ "break",		L_BREAK, },
+{ "case",		L_CASE, },
+{ "catch",		L_CATCH, },
+{ "continue",		L_CONTINUE, },
+{ "default",		L_DEFAULT, },
+{ "do",			L_DO, },
+{ "else",		L_ELSE, },
+{ "float",      L_FLOAT, },
+{ "for",		L_FOR, },
+{ "function",   L_FUNCTION, },
+{ "if",			L_IF, },
+{ "inherit",		L_INHERIT, },
+{ "int",		L_INT, },
+{ "mapping",            L_MAPPING, },
+{ "mixed",		L_MIXED, },
+{ "nomask",		L_NO_MASK, },
+{ "object",		L_OBJECT, },
+{ "parse_command",	L_PARSE_COMMAND, },
+{ "private",		L_PRIVATE, },
+{ "protected",		L_PROTECTED, },
+{ "public",		L_PUBLIC, },
+{ "return",		L_RETURN, },
+{ "sscanf",		L_SSCANF, },
+{ "static",		L_STATIC, },
+{ "status",		L_STATUS, },
+{ "string",		L_STRING_DECL, },
+{ "switch",		L_SWITCH, },
+{ "time_expression",	L_TIME_EXPRESSION, },
+{ "varargs",		L_VARARGS, },
+{ "void",		L_VOID, },
+{ "while",		L_WHILE, },
 };
 
 struct instr instrs[MAX_INSTRS];
@@ -1158,7 +1183,7 @@ int instr;
 {
 	char *name;
 
-	name = instrs[instr - F_OFFSET].name;
+	name = instrs[instr].name;
 	if (name) {
 		return name;
 	} else {
@@ -1171,7 +1196,7 @@ static void add_instr_name(name, n)
     char *name;
     int n;
 {
-    instrs[n - F_OFFSET].name = name;
+    instrs[n].name = name;
 }
 
 void init_num_args()
@@ -1179,7 +1204,7 @@ void init_num_args()
     int i, n;
 
     for(i=0; i<NELEM(predefs); i++) {
-	n = predefs[i].token - F_OFFSET;
+	n = predefs[i].token;
 	if (n < 0 || n > NELEM(instrs))
 	    fatal("Token %s has illegal value %d.\n", predefs[i].word, n);
 	instrs[n].min_arg = predefs[i].min_args;
@@ -1199,47 +1224,70 @@ void init_num_args()
     add_instr_name("+=", F_ADD_EQ);
     add_instr_name("(void)+=", F_VOID_ADD_EQ);
     add_instr_name("!", F_NOT);
+    add_instr_name("&", F_AND);
+    add_instr_name("&=", F_AND_EQ);
     add_instr_name("index", F_INDEX);
     add_instr_name("push_indexed_lvalue", F_PUSH_INDEXED_LVALUE);
     add_instr_name("identifier", F_IDENTIFIER);
     add_instr_name("local", F_LOCAL_NAME);
     add_instr_name("number", F_NUMBER);
+    add_instr_name("real", F_REAL);
     add_instr_name("push_local_variable_lvalue", F_PUSH_LOCAL_VARIABLE_LVALUE);
     add_instr_name("const1", F_CONST1);
     add_instr_name("subtract", F_SUBTRACT);
-    add_instr_name("assign", F_ASSIGN);
     add_instr_name("(void)assign", F_VOID_ASSIGN);
     add_instr_name("assign", F_ASSIGN);
     add_instr_name("branch", F_BRANCH);
     add_instr_name("byte", F_BYTE);
     add_instr_name("-byte", F_NBYTE);
+    add_instr_name("bbranch_when_zero", F_BBRANCH_WHEN_ZERO);
     add_instr_name("bbranch_when_non_zero", F_BBRANCH_WHEN_NON_ZERO);
     add_instr_name("branch_when_zero", F_BRANCH_WHEN_ZERO);
     add_instr_name("branch_when_non_zero", F_BRANCH_WHEN_NON_ZERO);
     add_instr_name("pop", F_POP_VALUE);
     add_instr_name("const0", F_CONST0);
+#ifdef F_JUMP_WHEN_ZERO
     add_instr_name("jump_when_zero", F_JUMP_WHEN_ZERO);
     add_instr_name("jump_when_non_zero", F_JUMP_WHEN_NON_ZERO);
+#endif
+#ifdef F_LOR
     add_instr_name("||", F_LOR);
     add_instr_name("&&", F_LAND);
+#endif
     add_instr_name("-=", F_SUB_EQ);
     add_instr_name("jump", F_JUMP);
     add_instr_name("return", F_RETURN);
     add_instr_name("sscanf", F_SSCANF);
+    add_instr_name("parse_command", F_PARSE_COMMAND);
     add_instr_name("string", F_STRING);
     add_instr_name("call", F_CALL_FUNCTION_BY_ADDRESS);
     add_instr_name("aggregate", F_AGGREGATE);
     add_instr_name("(::)", F_FUNCTION_CONSTRUCTOR);
     add_instr_name("(*)", F_FUNCTION_SPLIT);
     add_instr_name("push_identifier_lvalue", F_PUSH_IDENTIFIER_LVALUE);
+	add_instr_name("|", F_OR);
+	add_instr_name("<<", F_LSH);
+	add_instr_name(">>", F_RSH);
+	add_instr_name(">>=", F_RSH_EQ);
+	add_instr_name("<<=", F_LSH_EQ);
+	add_instr_name("^", F_XOR);
+	add_instr_name("^=", F_XOR_EQ);
+	add_instr_name("|=", F_OR_EQ);
     add_instr_name("+", F_ADD);
     add_instr_name("!=", F_NE);
     add_instr_name("dup", F_DUP);
     add_instr_name("catch", F_CATCH);
-    add_instr_name("neg", F_NEGATE);
+    add_instr_name("end_catch", F_END_CATCH);
+    add_instr_name("!", F_NEGATE);
+    add_instr_name("~", F_COMPL);
 	add_instr_name("++x", F_PRE_INC);
 	add_instr_name("--x", F_PRE_DEC);
 	add_instr_name("*", F_MULTIPLY);
+	add_instr_name("*=", F_MULT_EQ);
+	add_instr_name("/", F_DIVIDE);
+	add_instr_name("/=", F_DIV_EQ);
+	add_instr_name("%", F_MOD);
+	add_instr_name("%=", F_MOD_EQ);
 	add_instr_name("inc(x)", F_INC);
 	add_instr_name("dec(x)", F_DEC);
     add_instr_name("x++", F_POST_INC);
@@ -1248,7 +1296,9 @@ void init_num_args()
     add_instr_name("break",F_BREAK);
     add_instr_name("pop_break",F_POP_BREAK);
     add_instr_name("range",F_RANGE);
-    instrs[F_RANGE-F_OFFSET].type[0] = T_POINTER|T_STRING;
+    add_instr_name("time_expression",F_TIME_EXPRESSION);
+    add_instr_name("end_time_expression",F_END_TIME_EXPRESSION);
+    instrs[F_RANGE].type[0] = T_POINTER|T_STRING;
 }
 
 char *get_f_name(n)
@@ -1258,7 +1308,7 @@ char *get_f_name(n)
 	return instrs[n].name;
     else {
 	static char buf[30];
-	sprintf(buf, "<OTHER %d>", n + F_OFFSET);
+	sprintf(buf, "<OTHER %d>", n);
 	return buf;
     }
 }
@@ -1385,7 +1435,8 @@ char *yyt;
     if (*p == '(') {		/* if "function macro" */
 	int arg;
 	int inid;
-	char *ids;
+	char *ids = (char *)NULL;
+
 	p++;			/* skip '(' */
 	SKIPWHITE;
 	if (*p == ')') {
@@ -1909,7 +1960,7 @@ void set_inc_list (list)
     fprintf(stderr, "The config string 'include dirs' must bet set.\n");
     fprintf(stderr, "It should contain a list of all directories to be searched\n");
     fprintf(stderr, "for include files, separated by a ':'.\n");
-    exit(1);
+    exit(-1);
   }
   size = 1;
   p = list;
@@ -1948,7 +1999,7 @@ void set_inc_list (list)
       if (!legal_path(p)) 
 	{
 	  fprintf(stderr, "'include dirs' must give paths without any '..'\n");
-	  exit(1);
+	  exit(-1);
 	}
       inc_list[i] = make_shared_string(p);
     }

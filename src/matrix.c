@@ -40,6 +40,12 @@ void f_translate(num_arg, instruction)
   Matrix final_matrix;
   int i;
 
+  if ((sp-1)->type != T_REAL) {
+      bad_arg(3, instruction);
+  }
+  if (sp->type != T_REAL) {
+      bad_arg(4, instruction);
+  }
   /*
    * get arguments from stack.
    */
@@ -80,6 +86,12 @@ void f_scale(num_arg, instruction)
   Matrix final_matrix;
   int i;
 
+  if ((sp-1)->type != T_REAL) {
+      bad_arg(3, instruction);
+  }
+  if (sp->type != T_REAL) {
+      bad_arg(4, instruction);
+  }
   /*
    * get arguments from stack.
    */
@@ -233,6 +245,12 @@ void f_lookat_rotate(num_arg, instruction)
   Matrix lookat_matrix;
   int i;
 
+  if ((sp-1)->type != T_REAL) {
+      bad_arg(3, instruction);
+  }
+  if (sp->type != T_REAL) {
+      bad_arg(4, instruction);
+  }
   /*
    * get arguments from stack.
    */
@@ -266,8 +284,13 @@ void f_lookat_rotate2(num_arg, instruction)
   double ex, ey, ez, lx, ly, lz;
   Matrix current_matrix;
   Matrix lookat_matrix;
-  int i;
+  int i, j;
 
+  for (j = 4; j >= 0; j--) {
+     if ((sp-j)->type != T_REAL) {
+         bad_arg(7 - j, instruction);
+     }
+  }
   /*
    * get arguments from stack.
    */

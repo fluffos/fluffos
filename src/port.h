@@ -6,6 +6,17 @@
  * file and the name of the type of system you are using.
  */
 
+#ifndef _PORT_H
+#define _PORT_H
+
+/* define this if you have an Ultrix system that the driver won't otherwise
+   compile on (doesn't seem to be needed for DECstations).
+*/
+#undef OLD_ULTRIX
+
+/* define this if you're using hp-ux 7.x (or below?) */
+#undef OLD_HPUX
+
 /* hack to figure out if we are being compiled under Solaris or not */
 #ifdef sun
 #ifdef __svr4__
@@ -20,14 +31,18 @@
 #endif
 
 /*
- * setup simpler defines to use to refer to some system types
- */
-#if (defined(hp200) || defined(hp300) || defined(hp400) || defined(hp500)) && !defined(hpux)
+   "hp68k" is actually used to refer to any HP running BSD
+*/
+#if (defined(hp200) || defined(hp300) || defined(hp400) || defined(hp500)) \
+	&& !defined(hpux)
 #define hp68k
 #endif
 
+/* I hear that gcc defines one of these, cc defines the other (on OSF/1
+   1.2 on a DEC Alpha field model)
+*/
 #if defined(__osf__) || defined(__OSF__)
-#define M_UNIX
+#define OSF
 #endif
 
 /* define this if your builtin version of inet_ntoa() works well.  It has a
@@ -44,7 +59,7 @@
  * use drand48 if you have it (it is the better random # generator)
  */
 
-#if defined(NeXT) || defined(__386BSD__) || defined(hp68k)
+#if defined(NeXT) || defined(__386BSD__) || defined(hp68k) || defined(__bsdi__)
 #define RANDOM
 #else /* Sequent, HP, Sparc, RS/6000 */
 #define DRAND48
@@ -52,11 +67,24 @@
 
 /*
  * Does the system have a getrusage() system call?
- * Sequent and HP don't have it.
+ * Sequent doesn't have it.  Solaris 2.1 (SunOS 5.1) has it in a compat
+ * library but had trouble making it work correctly.
  */
-#if !defined(_SEQUENT_) && !defined(hpux) && !defined(SVR4) \
-	&& !defined(_AUX_SOURCE) && !defined(cray)
+#if (!defined(_SEQUENT_) && !defined(SVR4) \
+     && !defined(_AUX_SOURCE) && !defined(cray) && !defined(OLD_HPUX))
 #define RUSAGE
+#endif
+
+#if defined(hpux) && !defined(OLD_HPUX)
+#include <sys/syscall.h>
+#define getrusage(a, b) syscall(SYS_GETRUSAGE, (a), (b))
+#endif
+
+/*
+ * Dynix/ptx has a system-call similar to rusage().
+ */
+#ifdef _SEQUENT_
+#define	GET_PROCESS_STATS
 #endif
 
 /*
@@ -64,7 +92,7 @@
  * defined.
  */
 #if defined(hpux) || defined(apollo) || defined(__386BSD__) || \
-	defined(_AUX_SOURCE) || defined(cray)
+	defined(_AUX_SOURCE) || defined(cray) || defined(SunOS_5)
 #define TIMES
 #endif
 
@@ -74,6 +102,14 @@
  */
 #if (defined(_SEQUENT_))
 #define SYSV
+#endif
+
+/*
+ * Define this if your operating system supports the gettimeofday() system
+ * call.
+ */
+#if !defined(_SEQUENT_)
+#define HAS_GETTIMEOFDAY
 #endif
 
 /*
@@ -133,14 +169,6 @@ asking your system adminstrator.
 #define MEMPAGESIZE sysconf(_SC_PAGE_SIZE)
 #endif
 
-/*
- * What is the value of the first constant defined by yacc ? If you do not
- * know, compile, and look at y.tab.h.
- *
- * NeXT, Sparc, HP, Sequent, and RS/6000 all start at 257
- */
-#define F_OFFSET		257
-
 /* define this if you system is BSD 4.2 (not 4.3) */
 #undef BSD42
 
@@ -154,59 +182,8 @@ asking your system adminstrator.
 #endif
 #endif
 
-/* ARCH for the arch() efun */
-
-#ifdef __SEQUENT__
-#define ARCH "sequent"
-#endif
-#ifdef NeXT
-#define ARCH "NeXT"
-#endif
-#ifdef _AIX
-#define ARCH "AIX"
-#endif
-#ifdef hpux
-#define ARCH "HPUX"
-#endif
-#ifdef accel
-#define ARCH "Accel"
-#endif
-#ifdef sun
-#define ARCH "Sun"
-#endif
-#ifdef ultrix
-#define ARCH "Ultrix"
-#endif
-#ifdef __386BSD__
-#define ARCH "386bsd"
-#endif
-#ifdef _AUX_SOURCE
-#define ARCH "A/UX"
-#endif
-#ifdef linux
-#define ARCH "Linux"
-#endif
-#ifdef hp68k
-#define ARCH "HP"
-#endif
-#ifdef cray
-#define ARCH "Cray"
-#endif
-#if defined(__osf__) || defined(__OSF__)
-#define ARCH "OSF/1"
-#endif
-
-#if (!defined(ARCH) && defined(SVR4))
-#define ARCH "SVR4"
-#endif
-
-#ifndef ARCH
-#define ARCH "unknown"
-#endif
-
-/* undef this if your compiler doesn't support varargs */
-#define VARARGS
-
 #if defined(cray) && !defined(MAXPATHLEN)
 #define MAXPATHLEN PATH_MAX
 #endif
+
+#endif /* _PORT_H */

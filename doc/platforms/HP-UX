@@ -8,10 +8,5 @@ in the Makefile,
  
 PA-RISC machines (at least):
  MudOS runs fine compiled with cc under HP-UX 7.x and 8.x.  It does not work
-  with 9.0x's cc.  
+  with 9.0x's cc (might be OK if you turn off optimization?).
  With cc, use OPTIMIZE=+O3 +Obb3000 for maximum optimization.
- gcc (as of 2.2.x) does not support varargs on the HP--the file that uses
-  varargs, comm.c, must be compiled _separately_ with cc (comm.c is OK
-  with 9.0x's cc).  Ignore this if you have a newer version of gcc that
-  is OK with varargs on HP-UX.  You know you don't if you get an error
-  at link time mentioning something like "__builtin_varargs undefined".

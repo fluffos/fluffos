@@ -24,7 +24,7 @@
 #include "exec.h"
 #include "efun_protos.h"
 #include "comm.h"
-#include "lang.tab.h"
+#include "opcodes.h"
 #include "switch.h"
 #include "stralloc.h"
 #include "debug.h"
@@ -62,7 +62,9 @@ extern short *break_sp;		/* Points to address to branch to
 				 * at next F_BREAK			*/
 extern struct control_stack *csp;	/* Points to last element pushed */
 
+/* Points to value of last push. */
 extern struct svalue *sp;
+
 extern int eval_cost;
 
 static int i;
@@ -413,21 +415,6 @@ int num_arg, instruction;
   else {
     error("Bad left type to /=\n");
   }
-}
-
-INLINE void
-f_end_catch(num_arg, instruction)
-int num_arg, instruction;
-{
-	/* this code from Amylaar's driver version 3.1.2i */
-	pop_stack();
-	free_svalue(&catch_value);
-	catch_value.type = T_NUMBER;
-	catch_value.u.number = 0;
-	/* We come here when no longjmp() was executed. */
-	pop_control_stack();
-	push_pop_error_context(0);
-	push_number(0);
 }
 
 INLINE void
@@ -1014,7 +1001,7 @@ int num_arg, instruction;
 {
   extern char* findstring PROT((char*));
   unsigned short offset, break_adr;
-  int d,s,r;
+  int d, s = 0, r;
   char *l,*end_tab;
   static unsigned short off_tab[] = {
     0*6,1*6,3*6,7*6,15*6,31*6,63*6,127*6,255*6,
@@ -1074,11 +1061,14 @@ int num_arg, instruction;
 	if (offset) {
 	  pc = current_prog->p.i.program + offset;
 	}
+      } else
+      {
+        /* default */
+        ((char *)&offset)[0] = pc[5];
+        ((char *)&offset)[1] = pc[6];
+        pc = current_prog->p.i.program + offset;
       }
-      /* default */
-      ((char *)&offset)[0] = pc[5];
-      ((char *)&offset)[1] = pc[6];
-      pc = current_prog->p.i.program + offset;
+      return;
     }
     else
       fatal("unsupported switch table format.\n");

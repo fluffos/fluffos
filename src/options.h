@@ -51,11 +51,21 @@
 */
 #undef DEBUGMALLOC_EXTENSIONS
 
+/* LPC_OPTIMIZE: define this to enable constant expression elimination
+   optimizations in compiler.y.  Not fully tested.
+*/
+#undef LPC_OPTIMIZE
+
 /* CONFIG_FILE_DIR specifies a directory in which the driver will search for
  * defaults config files.  If you don't wish to use this MACRO, you may
  * always specific a full path to the config file when starting the driver.
  */
 #define CONFIG_FILE_DIR "/usr/local/mud/mudos/etc"
+
+/* OLD_COMMAND: if this is defined, then command() efun may take a 2nd
+   argument specifying on which object to perform the command.
+*/
+#undef OLD_COMMAND
 
 /* MATH: determines whether or not the math efuns (for floats) are defined -
  * see func_spec.c for a list.
@@ -65,7 +75,7 @@
 /* MATRIX: determines whether or not the 3d graphics efuns (for floats)
  * are defined - see func_spec.c for a list.
  */
-#undef MATRIX
+#define MATRIX
 
 /* LAZY_RESETS: if this is defined, an object will only have reset()
    called in it when it is touched via apply_low() or move_object()
@@ -126,7 +136,7 @@
    Allow a dump of the # of times each efun is invoked (via the opcprof() efun)
    Also enables the opcprof() efun.
 */
-#undef OPCPROF
+#define OPCPROF
 
 /* HAS_MONCONTROL: define this if you wish to do profiling of the driver
    on a machine that has the moncontrol() system call.
@@ -173,6 +183,19 @@
  */
 #define AUTO_TRUST_BACKBONE
 
+/*
+ * PRIVS: define this if you want object privledges.  Your mudlib must
+ * explicitly make use of this functionality to be useful.  Defining this
+ * this will increase the size of the object structure by 4 bytes (8 bytes
+ * on the DEC Alpha) and will add a new master apply during object creation
+ * to "privs_file".  In general, privleges can be used to increase the
+ * granularity of security beyond the current root uid mechanism, (for
+ * those like Cygnus who tend to be paranoid).  Note for those who'd rather
+ * do such things at the mudlib level, look at the inherits() efun and
+ * the 'valid_object' apply to master.
+ */
+#undef PRIVS
+
 /* HEARTBEAT_INTERVAL: define heartbeat interval in microseconds (us).
  * 1,000,000 us = 1 second.  The value of this macro specifies
  * the frequency with which the heart_beat method will be called in
@@ -183,6 +206,16 @@
  * an actual interval of two (2) seconds, etc.
  */
 #define HEARTBEAT_INTERVAL 2000000
+
+/*
+ * OLD_HEARTBEAT: define this if you want the old heartbeat semantics.
+ * In the new semantics, set_heart_beat(ticks), specifies the number of
+ * HEARTBEAT_INTERVAL ticks to be used, where ticks can be > 1 for
+ * multiple tick intervals.  If you define this all values for ticks > 1
+ * will be mapped to ticks = 1.  Note: don't confuse this with the
+ * OLD_HB_BEHAVIOR define (can anyone say 'we have _too_ many defines! :)'?
+ */
+#define OLD_HEARTBEAT
 
 /*
  * LARGEST_PRINTABLE_STRING is the size of the vsprintf() buffer in comm.c
@@ -203,7 +236,7 @@
 
 /* number of bits to use in the call_other cache (in interpret.c).  Somewhere
    between six (6) and ten (10) is probably sufficient  */
-#define APPLY_CACHE_BITS 10
+#define APPLY_CACHE_BITS 11
 
 /* define this if you want call_other (apply_low) cache statistics */
 #define CACHE_STATS
@@ -243,6 +276,12 @@
 #undef INTERACTIVE_CATCH_TELL
 
 /*
+ * if defined, all writes/tells/etc to noninteractive objects will be written
+ * to stderr prefixed with a ']' (old behavior)
+ */
+#define NONINTERACTIVE_STDERR_WRITE
+
+/*
  * TRACE_CODE
  * define this for to enable code tracing
  * (the driver will print out the previous lines of code to an error)
@@ -277,6 +316,13 @@
    of this sort will be prefixed with $$.
 */
 #undef SNOOP_SHADOWED
+
+/* RECEIVE_SNOOP: define this if you want snoop text to be sent to
+   the receive_snoop() function in the snooper object (instead of being
+   sent directly via add_message()).  This is useful if you want to
+   build a smart client that does something different with snoop messages.
+*/
+#undef RECEIVE_SNOOP
 
 /*
  * Define LOG_SHOUT if you want all shouts to be logged in
@@ -313,9 +359,9 @@
  */
 
 /* MAX_LOCAL: maximum number of local variables allowed per LPC function */
-#define MAX_LOCAL 20	          /* get_config_int(8) */
+#define MAX_LOCAL 25	          /* get_config_int(8) */
 /* MAX_USERS: maximum number of simultaneous interactive users allowed */
-#define MAX_USERS 40	          /* get_config_int(12) */
+#define MAX_USERS 50          /* get_config_int(12) */
 /* MAX_EFUN_SOCKS: maximum number of efun sockets */
 #define MAX_EFUN_SOCKS 16	  /* get_config_int(24) */
 

@@ -1,23 +1,27 @@
 .\"returns information pertaining to a filesystem directory
 .TH get_dir 3
-
+ 
 .SH NAME
 get_dir() - returns information pertaining to a filesystem directory
-
+ 
 .SH SYNOPSIS
-string *get_dir(string dir, int default: F_CONST0);
-
+string *get_dir(string dir, int default: 0);
+ 
 .SH DESCRIPTION
-If called with a single argument (the name of a directory), get_dir()
-will returns an array of strings with each element corresponding to
-the name of a file in the directory.  If called with two arguments
-with the second argument equal to -1, get_dir will return an array of
-arrays with the sub-arrays having the following form:
+If `dir' is a filename ('*' and '?' wildcards are supported), an array of 
+strings is returned containing all filenames that match the specification. 
+If `dir' is a directory name (ending with a slash--ie: "/u/", "/adm/", etc),
+all filenames in that directory are returned.  
+ 
+If called with a second argument equal to -1, get_dir will return an array
+of subarrays, where the format of each subarray is:
 .IP
   ({ filename, last_time_file_touched, size_of_file })
 .PP
-Where filename is a string and last_time_file_touched is an integer
-number of seconds since January 1, 1970.  The size_of_file element is
-the same value that is returned by file_size(3): the size of the file
-in bytes, or -2 if it's a directory.  Note that get_dir can handle a
-limited set of wildcards consisting of '?' and '*'.
+Where filename is a string and last_time_file_touched is an integer being
+number of seconds since January 1, 1970 (same format as time(3)).  The 
+size_of_file element is the same value that is returned by file_size(3); the 
+size of the file in bytes, or -2 if it's a directory.  
+ 
+.SH SEE ALSO
+file_size(3), stat(3)

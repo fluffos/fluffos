@@ -13,5 +13,8 @@ pointers are variables of type 'function' and are constructed as follows:
 
 f = (: obj, func :);
 
+Note that functionp() will return 0 if obj is not either a valid object
+pointer or string, and if func is not a string.
+
 .SH SEE ALSO
 stringp(3), pointerp(3), objectp(3), lpc/types/function

@@ -49,13 +49,16 @@ DRIVER_BIN = driver
 #STRFUNCS_O=strfuncs.o
 
 # uncomment UALARM* if your machine is missing ualarm().
-# uncomment for the HP and Solaris (and other machines missing ualarm)
+# uncomment for the HP (and other machines missing ualarm)
 #UALARM_C=ualarm.c
 #UALARM_O=ualarm.o
 
 # Command used to install executables in the INSTALL_DIR
-INSTALL = install -c
-#INSTALL = cp
+#Use the -f version for HP/UX
+#INSTALL = install -f
+#INSTALL = install -c
+# Use cp if all else fails
+INSTALL = cp
 
 # Set INSTALL_DIR to the directory where you want to install the executables.
 INSTALL_DIR = ../bin
@@ -91,13 +94,13 @@ INSTALL_DIR = ../bin
 # Uncomment one or none of the following optimization lines.
 # 
 # -O is usually a safe level of optimization for most compilers
-#OPTIMIZE=-O
-# uncomment for gcc
+OPTIMIZE=-O
+# high optimization for gcc:
 #OPTIMIZE=-O2 -fomit-frame-pointer -fstrength-reduce
 # uncomment below for RS/6000(AIX) xlc compiler only.
 # remove the -Q if xlc complains.
 #OPTIMIZE=-O -Q
-# uncomment for HP-UX's 7.x/8.x's cc
+# high optimization for HP-UX 7.x/8.x's cc (don't use with 9.x)
 #OPTIMIZE=+O3 +Obb3000
 
 # RS/6000 AIX: use this OSFLAGS line (required).
@@ -110,22 +113,34 @@ INSTALL_DIR = ../bin
 #  this for speedier compiles:
 #PIPE=-pipe
 
+# try uncommenting this if you are using gcc and at runtime you see socket
+# errors saying that the "set socket nonblocking" operation is not supported.
+# That error is caused by old-style macros (that gcc doesn't normally grok)
+# used by ioctl on some systems.
+#NEED_OLD_CPP=-traditional-cpp
+
 CFLAGS= $(OSFLAGS) $(OPTIMIZE) $(WARN) $(PROFIL) $(DEBUG) $(DEBUG_MACRO) \
-   $(DEBUG_NON_FATAL) $(STR) $(PIPE)
+   $(DEBUG_NON_FATAL) $(STR) $(PIPE) $(NEED_OLD_CPP)
 
 # set CC=cc on a NeXT and to gcc on other machines (if possible)
-# Note: at this time gcc (2.2.2) for HP doesn't implement varargs properly;
-# if you have problems compiling on an HP, try using cc instead of gcc.
 # You may want to use xlc on an RS/6000 (produces faster code).
-#CC=cc
-CC=gcc
+#
+# NOTE: If you are using gcc (especially on a sun4), and the driver gives
+# a runtime error regarding "operation not supported on socket", then
+# try using cc instead (some installations of gcc have an error in one of
+# the system include (.h) files that prevents some socket ioctl operations
+# from working correctly).
+#
+CC=cc
+#CC=gcc
 #CC=xlc
 
 # define this to be bison if you have it, and yacc otherwise.
-# The yaccs on SunOS and A/UX both have problems with lang.y
+# The yaccs on SunOS and A/UX both have problems with compiler.y
 # because of hardcoded limits on the number of symbols.  You
-# can either build lang.tab.* on another machine and move them
-# over or you can get bison from prep.ai.mit.edu:/pub/gnu.
+# can either build compiler.tab.* on another machine and move them
+# over or you can get bison from prep.ai.mit.edu:/pub/gnu.  Expect
+# one shift/reduce conflict if using Bison (from the IF ELSE construct).
 #YACC=bison
 #YFLAGS=-d -y
 YACC=yacc
@@ -153,9 +168,7 @@ YFLAGS = -d
 #EXTRALIBS=-lsocket -lnsl
 
 # Solaris (SunOS 5.1)
-# -Xlinker and -R/usr/ucblib are to get "getrusage" and "ualarm" from
-# compat lib
-#EXTRALIBS=-lnsl -lsocket -lresolv -Xlinker -R/usr/ucblib
+#EXTRALIBS=-lnsl -lsocket -lresolv
 
 # Don't change this line.  Define EXTRALIBS before this line if you
 # wish to add any libraries.
@@ -169,17 +182,18 @@ LIBS=-lm $(EXTRALIBS)
 SRC=lex.c main.c rc.c interpret.c simulate.c object.c backend.c file.c\
   array.c mapping.c comm.c ed.c regexp.c swap.c malloc.c\
   call_out.c otable.c dumpstat.c stralloc.c hash.c port.c\
-  reclaim.c access_check.c parse.c prelang.y postlang.y mudlib_stats.c \
+  reclaim.c access_check.c parse.c compiler.y mudlib_stats.c \
   simul_efun.c sprintf.c uid.c socket_efuns.c efunctions.c eoperators.c \
   socket_ctrl.c socket_err.c qsort.c math.c matrix.c\
-  md.c $(UALARM_C) $(STRFUNCS_C) $(MALLOC_C)
+  md.c disassembler.c $(UALARM_C) $(STRFUNCS_C) $(MALLOC_C)
 
-OBJ=lang.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
+OBJ=compiler.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   backend.o array.o mapping.o comm.o ed.o regexp.o swap.o \
   malloc.o call_out.o otable.o dumpstat.o stralloc.o hash.o mudlib_stats.o \
   port.o reclaim.o access_check.o parse.o simul_efun.o sprintf.o uid.o \
-  socket_efuns.o efunctions.o eoperators.o socket_ctrl.o qsort.o math.o \
-  matrix.o socket_err.o md.o $(UALARM_O) $(STRFUNCS_O) $(MALLOC_O)
+  socket_efuns.o efunctions.o socket_ctrl.o qsort.o math.o eoperators.o \
+  matrix.o socket_err.o md.o \
+  disassembler.o $(UALARM_O) $(STRFUNCS_O) $(MALLOC_O)
 
 all: $(DRIVER_BIN) addr_server
 
@@ -201,7 +215,7 @@ addr_server:  addr_server.o socket_ctrl.o port.o addr_server.h
 .c.o:
 	$(CC) $(CFLAGS) -c $*.c
 
-lang.tab.h: lang.tab.c
+compiler.tab.h: compiler.tab.c
 
 base.h: efun_defs.c
 
@@ -211,8 +225,8 @@ efunctions.h: efun_defs.c
 
 opc.h: efun_defs.c
 
-list_funcs:
-	@$(CC) -E $(CFLAGS) func_spec.c
+func_spec.cpp: func_spec.c op_spec.c config.h options.h port.h
+	@$(CC) -E $(CFLAGS) func_spec.c > func_spec.cpp
 
 make_func.tab.c: make_func.y
 	$(YACC) $(YFLAGS) make_func.y
@@ -226,14 +240,15 @@ make_malloc: make_malloc.o
 
 make_malloc.c: config.h
 
-lang.tab.c lang.h: lang.y
-	$(YACC) $(YFLAGS) lang.y
-	rm -f lang.tab.*
-	ln y.tab.c lang.tab.c
-	ln y.tab.h lang.tab.h
+compiler.tab.o: opcodes.h
 
-lang.y efun_defs.c: malloc.c func_spec.c make_func prelang.y \
-	postlang.y config.h
+compiler.tab.c: compiler.y
+	$(YACC) $(YFLAGS) compiler.y
+	rm -f compiler.tab.*
+	ln y.tab.c compiler.tab.c
+	ln y.tab.h compiler.tab.h
+
+efun_defs.c opcodes.h: malloc.c func_spec.c make_func config.h func_spec.cpp
 	./make_func > efun_defs.c
 
 malloc.c: config.h make_malloc
@@ -248,13 +263,15 @@ TAGS: $(SRC)
 	etags $(SRC)
 
 install: $(DRIVER_BIN) addr_server
-	$(INSTALL) $(DRIVER_BIN) $(INSTALL_DIR)/$(DRIVER_BIN)
-	$(INSTALL) addr_server $(INSTALL_DIR)/addr_server
+	-mkdir $(INSTALL_DIR)
+	$(INSTALL) $(DRIVER_BIN) $(INSTALL_DIR)
+	$(INSTALL) addr_server $(INSTALL_DIR)
 
 clean:
 	-rm -rf obj *.o mon.out gmon.out *.tab.c *.tab.h *.orig *.rej
-	-rm -f lang.h lang.y efun_defs.c *.ln tags *~ TAGS
-	-rm -f efunctions.h opc.h base.h efun_protos.h
+	-rm -f efun_defs.c *.ln tags *~ TAGS
+	-rm -f opcodes.h efunctions.h opc.h base.h efun_protos.h
 	-rm -f make_func make_malloc $(DRIVER_BIN) $(DRIVER_BIN).old addr_server
+	-rm -f func_spec.cpp
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.

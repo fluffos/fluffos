@@ -24,7 +24,7 @@ whenever this file mentions the word 'lil'.
 
 4) Move (if necessary) your mudlib subdirectory so that the value
    you specified for "mudlib directory" in config.lil is correct.  If
-   you have ftp'd an existing mudlib that is meant to work with MudOS 0.9.15,
+   you have ftp'd an existing mudlib that is meant to work with MudOS 0.9.x,
    then you should follow the instructions included with that mudlib.  In
    general, just make sure that the value for "mudlib directory" in
    config.lil is correct.  The TMI-2 beta mudlib release and Nightmare

@@ -8,7 +8,9 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
+#ifndef accel
 #include <time.h>
+#endif
 #include <netinet/in.h>
 
 #include "lint.h"

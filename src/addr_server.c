@@ -8,6 +8,9 @@
 #endif /* NeXT */
 #include <sys/ioctl.h>
 #include <sys/types.h>
+#ifdef __386BSD__
+#include <sys/param.h>
+#endif /* __386BSD__ */
 #if (!defined(NeXT) && !defined(hpux) && !defined(apollo))
 #include <unistd.h>
 #endif /* NeXT */
@@ -16,7 +19,7 @@
 #include <sys/socket.h>
 #if !defined(apollo) && !defined(linux)
 #include <sys/socketvar.h>
-#endif
+#endif /* !apollo && !linux */
 #ifdef _AIX
 #include <sys/select.h>
 #endif /* _AIX */
@@ -49,9 +52,11 @@ static queue_element_ptr queue_tail = NULL;
 static queue_element_ptr stack_head = NULL;
 static int queue_length = 0;
 static int conn_fd;
-static int block_signal_mask;
+
+fd_set readmask;
 
 int name_by_ip PROT((int, char *));
+int ip_by_name PROT((int, char *));
 
 void init_conns()
 {
@@ -119,30 +124,11 @@ void init_conn_sock(port_number)
     exit(5);
   }
   /*
-   * register signal handler for SIGIO.
-   */
-  if(signal(SIGIO,sigio_handler) == SIGNAL_ERROR){
-    perror("init_conn_sock: signal SIGIO");
-    exit(6);
-  }
-  /*
-   * set process receiving SIGIO/SIGURG signals to us.
-   */
-  if(set_socket_owner(conn_fd, getpid()) == -1){
-    perror("init_user_conn: set_socket_owner");
-    exit(7);
-  }
-  /*
-   * set socket non-blocking and
-   * allow receipt of asynchronous I/O signals.
+   * set socket non-blocking
    */
   if(set_socket_nonblocking(conn_fd, 1) == -1){
     perror("init_user_conn: set_socket_nonblocking 1");
     exit(8);
-  }
-  if(set_socket_async(conn_fd, 1) == -1){
-    perror("init_user_conn: set_socket_async 1");
-    exit(9);
   }
   /*
    * listen on socket for connections.
@@ -164,38 +150,13 @@ void sigpipe_handler()
 }
 
 /*
- * SIGIO handler.
+ * I/O handler.
  */
-void sigio_handler()
+void process_io(nb)
+int nb;
 {
-  fd_set readmask;
   int i;
-  struct timeval timeout;
-  int nb;
 
-  /*
-   * generate readmask for select() call.
-   */
-  FD_ZERO(&readmask);
-  /*
-   * set new connection accept fd in readmask.
-   */
-  FD_SET(conn_fd,&readmask);
-  /*
-   * set already connected fds in readmask.
-   */
-  for(i=0;i<MAX_CONNS;i++){
-    if(all_conns[i].state == OPEN)
-      FD_SET(all_conns[i].fd,&readmask);
-  }
-  /*
-   * set the select() timeout.
-   * timeout should always be 0 in the asynchronous version.
-   */
-  timeout.tv_sec = 0;
-  timeout.tv_usec = 0;
-  nb = select(FD_SETSIZE,&readmask,(fd_set *)0,(fd_set *)0,&timeout);
-  debug(512,("sigio_handler: select: nb == %d\n",nb));
   switch(nb){
   case -1:
     perror("sigio_handler: select");
@@ -238,12 +199,7 @@ void enqueue_datapending(fd, fd_type)
      int fd_type;
 {
   queue_element_ptr new_queue_element;
-  int save_signal_mask;
 
-  save_signal_mask = sigsetmask(block_signal_mask);
-  /*
-   * begin critical code.
-   */
   pop_queue_element(&new_queue_element);
   new_queue_element->event_type = fd_type;
   new_queue_element->fd = fd;
@@ -255,21 +211,11 @@ void enqueue_datapending(fd, fd_type)
     queue_head = new_queue_element;
   }
   queue_tail = new_queue_element;
-  /*
-   * end critical code.
-   */
-  sigsetmask(save_signal_mask);
 }
 
 void dequeue_top_event()
 {
   queue_element_ptr top_queue_element;
-  int save_signal_mask;
-
-  save_signal_mask = sigsetmask(block_signal_mask);
-  /*
-   * begin critical code.
-   */
   if(queue_head){
     top_queue_element = queue_head;
     queue_head = queue_head->next;
@@ -278,10 +224,6 @@ void dequeue_top_event()
   else {
     fprintf(stderr,"dequeue_top_event: tried to dequeue from empty queue!\n");
   }
-  /*
-   * end critical code.
-   */
-  sigsetmask(save_signal_mask);
 }
 
 void pop_queue_element(the_queue_element)
@@ -410,6 +352,10 @@ void conn_data_handler(fd)
       case NAMEBYIP:
 	buf_index += name_by_ip(conn_index,&buf[buf_index]);
 	break;
+/* The reverse to the above... */
+      case IPBYNAME:
+        buf_index += ip_by_name(conn_index,&buf[buf_index]);
+        break;
       default:
 	fprintf(stderr,"conn_data_handler: unknown message type %d\n",msgtype);
 	buf_index++;
@@ -421,6 +367,31 @@ void conn_data_handler(fd)
 }
 
 #define OUT_BUF_SIZE 80
+
+int ip_by_name(conn_index, buf)
+     int conn_index;
+     char *buf;
+{
+  struct hostent *hp;
+  struct in_addr my_in_addr;
+  static char out_buf[OUT_BUF_SIZE];
+
+  hp = gethostbyname(&buf[sizeof(int)]);
+  if (hp == NULL) {
+/* Failed :( */
+    sprintf(out_buf, "%s %s\n",&buf[sizeof(int)],"0");
+    debug(512,("%s",out_buf));
+    write(all_conns[conn_index].fd, out_buf, strlen(out_buf));
+  } else {
+/* Success! */
+    memcpy(&my_in_addr, hp->h_addr, sizeof(struct in_addr));
+    sprintf(out_buf, "%s %s\n", &buf[sizeof(int)],
+                                inet_ntoa(my_in_addr));
+    debug(512,("%s",out_buf));
+    write(all_conns[conn_index].fd, out_buf, strlen(out_buf));
+  }
+  return(sizeof(int) + strlen(&buf[sizeof(int)]) + 1);
+} /* ip_by_name() */
 
 int name_by_ip(conn_index, buf)
      int conn_index;
@@ -438,8 +409,10 @@ int name_by_ip(conn_index, buf)
     sprintf(out_buf,"%s %s\n",&buf[sizeof(int)],hp->h_name);
     debug(512,("%s",out_buf));
     write(all_conns[conn_index].fd,out_buf,strlen(out_buf));
-  }
-  else {
+  } else {
+    sprintf(out_buf,"%s 0\n",&buf[sizeof(int)]);
+    debug(512,("%s",out_buf));
+    write(all_conns[conn_index].fd,out_buf,strlen(out_buf));
     debug(512,("name_by_ip: unable to resolve address.\n"));
   }
   return(sizeof(int) + strlen(&buf[sizeof(int)]) + 1);
@@ -459,8 +432,6 @@ int index_by_fd(fd)
 void terminate(conn_index)
      int conn_index;
 {
-  int save_signal_mask;
-
   if(conn_index < 0 || conn_index >= MAX_CONNS){
     fprintf(stderr,"terminate: conn_index %d out of range.\n",conn_index);
     return;
@@ -470,20 +441,13 @@ void terminate(conn_index)
     return;
   }
   debug(512,("terminating connection %d\n",conn_index));
-  save_signal_mask = sigsetmask(block_signal_mask);
-  /*
-   * begin critical code.
-   */
+
   if(close(all_conns[conn_index].fd) == -1){
     perror("terminate: close");
     return;
   }
   all_conns[conn_index].state = CLOSED;
   total_conns--;
-  /*
-   * end critical code.
-   */
-  sigsetmask(save_signal_mask);
 }
 
 int main(argc,argv)
@@ -491,6 +455,9 @@ int main(argc,argv)
      char *argv[];
 {
   int addr_server_port;
+  struct timeval timeout;
+  int i;
+  int nb;
 
   if(argc > 1){
     if((addr_server_port = atoi(argv[1])) == 0){
@@ -502,10 +469,31 @@ int main(argc,argv)
     fprintf(stderr,"addr_server: first arg must be port number.\n");
     exit(1);
   }
-  block_signal_mask = sigmask(SIGIO) | sigmask(SIGALRM);
   init_conn_sock(addr_server_port);
   while(1){
-    pause();
+    /*
+     * use finite timeout for robustness.
+     */
+    timeout.tv_sec = 2;
+    timeout.tv_usec = 0;
+    /*
+     * clear selectmasks.
+     */
+    FD_ZERO(&readmask);
+    /*
+     * set new connection accept fd in readmask.
+     */
+    FD_SET(conn_fd,&readmask);
+    /*
+     * set active fds in readmask.
+     */
+    for(i=0;i<MAX_CONNS;i++){
+      if(all_conns[i].state == OPEN)
+	FD_SET(all_conns[i].fd,&readmask);
+    }
+    nb = select(FD_SETSIZE, &readmask, (fd_set *)0, (fd_set *)0, &timeout);
+    if(nb != 0)
+      process_io(nb);
     process_queue();
   }
 }

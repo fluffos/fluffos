@@ -376,7 +376,7 @@ void init_domain_for_ob (ob)
       tmp_ob = master_ob;
     }
   
-  if (!current_object || !current_object->uid)
+  if (!master_ob || !current_object || !current_object->uid)
     {
       /*
        * Only for the master and void object. Note that

@@ -2,10 +2,16 @@
  *  comm.c -- communications functions and more.
  *            Dwayne Fontenot (Jacques@TMI)
  */
+#ifdef __386BSD__
+#include <unistd.h>
+#endif
 #include <varargs.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
+#ifdef __386BSD__
+#include <sys/param.h>
+#endif
 #define TELOPTS
 #include <arpa/telnet.h>
 #include <fcntl.h>
@@ -72,6 +78,7 @@ void print_prompt();
 int new_set_snoop();
 void telnet_neg PROT((char *, char *));
 void query_addr_name PROT((struct object *));
+void got_addr_number PROT((char *, char *));
 char *query_ip_name();
 static void add_ip_entry PROT((long, char *));
 char *query_ip_number PROT((struct object *));
@@ -95,6 +102,10 @@ extern struct lpc_socket lpc_socks[];
 extern int heart_beat_flag;
 extern char *default_fail_message;
 
+#ifdef RECEIVE_SNOOP
+void receive_snoop PROT((char *, struct object *ob));
+#endif
+
 /*
  * public local variables.
  */
@@ -115,6 +126,17 @@ struct interactive *all_users[MAX_USERS];
  */
 static int new_user_fd;
 static int addr_server_fd = 0;
+
+#ifdef RECEIVE_SNOOP
+void
+receive_snoop(buf, ob)
+char *buf;
+struct object *ob;
+{
+	push_constant_string(buf);
+	apply("receive_snoop", ob, 1);
+}
+#endif
 
 /*
  * Initialize new user connection socket.
@@ -271,42 +293,31 @@ void init_addr_server(hostname,addr_server_port)
  * special handling is done.
  */
 void
-#ifdef VARARGS
 add_message(va_alist)
      va_dcl
-#else
-add_message(format, t1, t2, t3, t4, t5, t6, t7, t8, t9)
-    char *format;
-    char *t1, t2, t3, t4, t5, t6, t7, t8, t9;
-#endif
 {
-#ifdef VARARGS
 	va_list args;
 	char *format;
-#endif
 	struct interactive *ip;
 	char *cp, new_string_data[LARGEST_PRINTABLE_STRING];
 	struct object *save_command_giver;
 
-#ifdef VARARGS
 	va_start(args);
 	format = va_arg(args, char *);
-#endif
   /*
    * if command_giver->interactive is not valid, write message on stderr.
+   * (maybe)
    */
 	if ((command_giver == 0) || (command_giver->flags & O_DESTRUCTED)
 		|| (command_giver->interactive == 0)
 		|| command_giver->interactive->net_dead
 		|| command_giver->interactive->closing)
 	{
+#ifdef NONINTERACTIVE_STDERR_WRITE
 		putc(']',stderr);
-#ifdef VARARGS
 		vfprintf(stderr,format,args);
-		va_end(args);
-#else
-		fprintf(stderr,format,t1,t2,t3,t4,t5,t6,t7,t8,t9);
 #endif
+		va_end(args);
 		return;
 	}
 	ip = command_giver->interactive;
@@ -317,12 +328,8 @@ add_message(format, t1, t2, t3, t4, t5, t6, t7, t8, t9)
 	  could rewrite vsprintf to accept a maximum length (like strncpy) --
 	  have fun!
 	*/
-#ifdef VARARGS
 	vsprintf(new_string_data, format, args);
 	va_end(args);
-#else
-	sprintf(new_string_data, format, t1,t2,t3,t4,t5,t6,t7,t8,t9);
-#endif
 #ifndef NO_SHADOWS
   /*
    * shadow handling.
@@ -335,7 +342,11 @@ add_message(format, t1, t2, t3, t4, t5, t6, t7, t8, t9)
 		if (ip->snoop_by) {
 			save_command_giver = command_giver;
 			command_giver = ip->snoop_by->ob;
+#ifdef RECEIVE_SNOOP
+            receive_snoop(new_string_data, command_giver);
+#else
 			add_message("$$ %s",new_string_data);
+#endif
 			command_giver = save_command_giver;
 		}
 #endif
@@ -385,7 +396,11 @@ add_message(format, t1, t2, t3, t4, t5, t6, t7, t8, t9)
 	if (ip->snoop_by) {
 		save_command_giver = command_giver;
 		command_giver = ip->snoop_by->ob;
+#ifdef RECEIVE_SNOOP
+        receive_snoop(new_string_data, command_giver);
+#else
 		add_message("%% %s",new_string_data);
+#endif
 		command_giver = save_command_giver;
 	}
 #ifdef COMM_STAT
@@ -421,7 +436,11 @@ int flush_message()
 		} else {
 			length = MESSAGE_BUF_SIZE - ip->message_consumer;
 		}
+/* Need to use send to get out of band data 
 		num_bytes = write(ip->fd,ip->message_buf + ip->message_consumer,length);
+ */
+                num_bytes = send(ip->fd,ip->message_buf + ip->message_consumer,
+                                  length, ip->out_of_band);
 		if (num_bytes == -1) {
 			if (errno == EWOULDBLOCK) {
 				debug(512,("flush_message: write: Operation would block\n"));
@@ -436,6 +455,7 @@ int flush_message()
 		ip->message_consumer = (ip->message_consumer + num_bytes) %
 			MESSAGE_BUF_SIZE;
 		ip->message_length -= num_bytes;
+                ip->out_of_band = 0;
 #ifdef COMM_STAT
 		inet_packets++;
 		inet_volume += num_bytes;
@@ -444,34 +464,162 @@ int flush_message()
 	return 1;
 }
 
+#define TS_DATA         0
+#define TS_IAC          1
+#define TS_WILL         2
+#define TS_WONT         3
+#define TS_DO           4
+#define TS_DONT         5
+#define TS_SB		6
 /*
  * Copy a string, replacing newlines with '\0'. Also add an extra
  * space and back space for every newline. This trick will allow
  * otherwise empty lines, as multiple newlines would be replaced by
  * multiple zeroes only.
+ *
+ * Also handle the telnet stuff.  So instead of this being a direct
+ * copy it is a small state thingy.
+ *
+ * In fact, it is telnet_neg conglomerated into this.  This is mostly
+ * done so we can sanely remove the telnet sub option negotation stuff
+ * out of the input stream.  Need this for terminal types.
+ * (Pinkfish change)
  */
 static int copy_chars(from, to, n, ip)
-     char *from, *to;
+     unsigned char *from, *to;
      int n;
      struct interactive *ip;
 {
   int i;
-  char *start = to;
+  struct object *save_command_giver;
+  unsigned char *start = to;
 
-  for(i=0; i<n; i++){
-    if(from[i] == '\r')
-      continue;
-    if(from[i] == '\n'){
-      *to++ = ' ';
-      *to++ = '\b';
-      *to++ = '\0';
-      continue;
+  for (i=0;i<n;i++) {
+    switch (ip->state) {
+      case TS_DATA :
+        switch (from[i]) {
+          case IAC :
+            ip->state = TS_IAC;
+            break;
+          case '\r' :
+            if (ip->single_char)
+              *to++ = from[i];
+            break;
+          case '\n' :
+            if (ip->single_char)
+              *to++ = from[i];
+            else {
+              *to++ = ' ';
+              *to++ = '\b';
+              *to++ = '\0';
+            }
+            break;
+          default :
+            *to++ = from[i];
+            /* single character mode */
+            /* ack! special case so we don't pick up flow control chars */
+            break;
+        }
+        break;
+      case TS_IAC :
+        switch (from[i]) {
+          case DO :
+            ip->state = TS_DO;
+            break;
+          case DONT :
+            ip->state = TS_DONT;
+            break;
+          case WILL :
+            ip->state = TS_WILL;
+            break;
+          case WONT :
+            ip->state = TS_WONT;
+            break;
+          case BREAK :
+/* Send back a break character. */
+            save_command_giver = command_giver;
+            command_giver = ip->ob;
+            add_message("%c", '\34');
+            add_message("%c%c%c", IAC, WILL, TELOPT_TM);
+            flush_message();
+            command_giver = save_command_giver;
+            break;
+          case IP :
+/* Send back an interupt process character. */
+            save_command_giver = command_giver;
+            command_giver = ip->ob;
+            add_message("%c", '\177');
+            add_message("%c%c%c", IAC, WILL, TELOPT_TM);
+            flush_message();
+            command_giver = save_command_giver;
+            break;
+          case AYT :
+/* Are you there signal.  Yep we are. */
+            save_command_giver = command_giver;
+            command_giver = ip->ob;
+            add_message("\n[Yes]\n");
+            command_giver = save_command_giver;
+            break;
+          case AO :
+/* Abort output. Do a telnet sync operation. */
+            save_command_giver = command_giver;
+            command_giver = ip->ob;
+            ip->out_of_band = MSG_OOB;
+            add_message("%c%c", IAC, DM);
+            flush_message();
+            command_giver = save_command_giver;
+            break;
+          case SB :
+            ip->state = TS_SB;
+            ip->sb_pos = 0;
+            break;
+/* SE counts as going back into data mode */
+          case SE :
+/*
+ * Ok...  need to call a function on the interactive object, passing the
+ * buffer as a paramater.
+ */
+            save_command_giver = command_giver;
+            command_giver = ip->ob;
+            ip->sb_buf[ip->sb_pos] = 0;
+            push_constant_string(ip->sb_buf);
+            apply("telnet_suboption", ip->ob, 1);
+            command_giver = save_command_giver;
+            ip->state = TS_DATA;
+            break;
+          case DM :
+          default :
+            ip->state = TS_DATA;
+            break;
+        }
+        break;
+      case TS_DO :
+        if (from[i] == TELOPT_TM) {
+            save_command_giver = command_giver;
+            command_giver = ip->ob;
+            add_message("%c%c%c", IAC, WILL, TELOPT_TM);
+            flush_message();
+            command_giver = save_command_giver;
+        }
+      case TS_DONT :
+      case TS_WILL :
+      case TS_WONT :
+        ip->state = TS_DATA;
+        break;
+      case TS_SB :
+        if ((unsigned char)from[i] == IAC) {
+          ip->state = TS_IAC;
+          break;
+        }
+/* Ok, put all the suboption stuff into the buffer on the interactive */
+        if (ip->sb_pos >= SB_SIZE)
+          break; /* Ignore stuff outside the range */
+        if (from[i])
+          ip->sb_buf[ip->sb_pos++] = from[i];
+        else
+          ip->sb_buf[ip->sb_pos++] = 'I'; /* Turn 0's into I's */
+        break;
     }
-    *to++ = from[i];
-    /* single character mode */
-    /* ack! special case so we don't pick up flow control chars */
-    if(ip->single_char && from[0] != '\377')
-      *to++ = '\0';
   }
   return(to - start);
 }
@@ -677,6 +825,8 @@ void new_user_handler()
     master_ob->interactive->message_length = 0;
     master_ob->interactive->num_carry = 0;
     master_ob->interactive->net_dead = 0;
+    master_ob->interactive->state = TS_DATA;
+    master_ob->interactive->out_of_band = 0;
     master_ob->interactive->single_char = 0;
     all_users[i] = master_ob->interactive;
     all_users[i]->fd = new_socket_fd;
@@ -757,8 +907,10 @@ int process_user_command()
     debug(512,("process_user_command: command_giver = %s\n",
 	       command_giver->name));
     tbuf = user_command;
-    if(user_command[0] == '!' && (command_giver->interactive->ed_buffer ||
-				  command_giver->interactive->input_to)) {
+    if ((user_command[0] == '!') && (command_giver->interactive->ed_buffer
+           || (command_giver->interactive->input_to
+               && !command_giver->interactive->noesc)))
+    {
       if(command_giver->interactive->has_process_input){
 	push_constant_string(user_command + 1); /* not malloc'ed */
 	ret = apply("process_input",command_giver,1);
@@ -858,23 +1010,43 @@ void hname_handler()
   default:
     hname_buf[num_bytes] = '\0';
     debug(512,("hname_handler: address server replies: %s",hname_buf));
-    laddr = inet_addr(hname_buf);
-    if(laddr != -1){
-      pp = strchr(hname_buf,' ');
-      if(pp){
-	pp++;
-	q = strchr(hname_buf,'\n');
-	if(q){
-	  *q = 0;
-	  add_ip_entry(laddr,pp);
-	}
+    if (hname_buf[0] >= '0' && hname_buf[0] <= '9') {
+      laddr = inet_addr(hname_buf);
+      if(laddr != -1){
+        pp = strchr(hname_buf,' ');
+        if(pp){
+	  q = strchr(hname_buf,'\n');
+          *pp = 0;
+	  pp++;
+	  if(q) {
+	    *q = 0;
+            if (strcmp(pp, "0"))
+	      add_ip_entry(laddr,pp);
+          got_addr_number(pp, hname_buf); /* Recognises this as failure. */
+	  }
+        }
+      }
+    } else {
+      char *r;
+
+/* This means it was a name lookup... */
+      pp = strchr(hname_buf, ' ');
+      if (pp) {
+        *pp = 0;
+        pp++;
+        r = strchr(pp, '\n');
+        if (r)
+          *r = 0;
+        got_addr_number(pp, hname_buf);
       }
     }
     break;
   }
 }
+
 /*
  * Read pending data for a user into user->interactive->text.
+ * This also does telnet negotiation.
  */
 void get_user_data(ip)
      struct interactive *ip;
@@ -917,6 +1089,9 @@ void get_user_data(ip)
     buf[num_bytes] = '\0';
     /*
      * replace newlines with nulls and catenate to buffer.
+     * Also do all the useful telnet negotation at this point too.
+     * Rip out the sub option stuff and send back anything non useful
+     * we feel we have to.
      */
     ip->text_end += copy_chars(buf,ip->text + ip->text_end,num_bytes,ip);
     /*
@@ -931,7 +1106,11 @@ void get_user_data(ip)
     if(ip->snoop_by && !ip->noecho){
       save_command_giver = command_giver;
       command_giver = ip->snoop_by->ob;
+#ifdef RECEIVE_SNOOP
+      receive_snoop(buf, command_giver);
+#else
       add_message("%%%s",buf);
+#endif
       command_giver = save_command_giver;
     }
     /*
@@ -947,6 +1126,8 @@ void get_user_data(ip)
  * in their buffer.
  * CmdsGiven is used to allow users in ED to send more cmds (if they have
  * them queued up) than users not in ED.
+ * This should also return a value if there is something in the
+ * buffer and we are supposed to be in single character mode.
  */
 #define StartCmdGiver   (MAX_USERS-1)
 #define IncCmdGiver     NextCmdGiver = (NextCmdGiver == 0? StartCmdGiver: \
@@ -1011,6 +1192,8 @@ char *get_user_command()
  * text_start and text_end.  Zero length commands are discarded (as occur
  * between <cr> and <lf>).  Update text_start if we have to skip leading
  * nulls.
+ * This should return true when in single char mode and there is
+ * Anything at all in the buffer.
  */
 char *first_cmd_in_buf(ip)
      struct interactive *ip;
@@ -1031,6 +1214,11 @@ char *first_cmd_in_buf(ip)
     ip->text_start = ip->text_end = 0;
     ip->text[0] = '\0';
     return((char *)NULL);
+  }
+  /* If we got here, must have something in the array */
+  if (ip->single_char) {
+    /* We need to return true here... */
+    return (ip->text + ip->text_start);
   }
   /*
    * find end of cmd.
@@ -1083,6 +1271,10 @@ int cmd_in_buf(ip)
 
   if((p - ip->text) >= ip->text_end){
     return(0);
+  }
+  /* If we get here, must have something in the buffer */
+  if (ip->single_char) {
+    return (1);
   }
   /*
    * find end of cmd.
@@ -1521,28 +1713,20 @@ int new_set_snoop(me, you)
   return(1);
 }
 
-#define TS_DATA         0
-#define TS_IAC          1
-#define TS_WILL         2
-#define TS_WONT         3
-#define TS_DO           4
-#define TS_DONT         5
-
+/*
+ * Bit of a misnomer now.  But I can't be bothered changeing the
+ * name.  This will handle backspace resolution amongst other things,
+ * (Pinkfish change)
+ */
 void telnet_neg(to, from)
      char *to, *from;
 {
-  int state = TS_DATA;
   int ch;
   char *first = to;
 
   while(1){
     ch = (*from++ & 0xff);
-    switch(state){
-    case TS_DATA:
-      switch(ch){
-      case IAC:
-	state = TS_IAC;
-	continue;
+    switch(ch){
       case '\b':  /* Backspace */
       case 0x7f:  /* Delete */
 	if(to <= first)
@@ -1557,47 +1741,9 @@ void telnet_neg(to, from)
 	if(ch == 0)
 	  return;
 	continue;
-      }
-    case TS_IAC:
-      switch(ch){
-      case WILL:
-	state = TS_WILL;
-	continue;
-      case WONT:
-	state = TS_WONT;
-	continue;
-      case DO:
-	state = TS_DO;
-	continue;
-      case DONT:
-	state = TS_DONT;
-	continue;
-      case DM:
-      case NOP:
-      case GA:
-      default:
-	break;
-      }
-      state = TS_DATA;
-      continue;
-    case TS_WILL:
-      state = TS_DATA;
-      continue;
-    case TS_WONT:
-      state = TS_DATA;
-      continue;
-    case TS_DO:
-      state = TS_DATA;
-      continue;
-    case TS_DONT:
-      state = TS_DATA;
-      continue;
-    default:
-      state = TS_DATA;
-      continue;
-    }
-  }
-}
+    } /* switch() */
+  } /* while() */
+} /* telnet_neg() */
 
 void query_addr_name(ob)
      struct object *ob;
@@ -1622,6 +1768,123 @@ void query_addr_name(ob)
   }
 }
 
+#define IPSIZE 200
+static struct ipnumberentry {
+  char *name,
+       *call_back;
+  struct object *ob_to_call;
+} ipnumbertable[IPSIZE];
+
+/*
+ * Does a call back on the current_object with the function call_back.
+ */
+int query_addr_number(name, call_back)
+char *name, *call_back;
+{
+  static char buf[80];
+  int msgtype = IPBYNAME;
+
+  if (name[0] >= '0' && name[0] <= '9')
+    msgtype = NAMEBYIP;
+  memcpy(buf,(char *)&msgtype,sizeof(msgtype));
+  if (!addr_server_fd || strlen(name) > 80-sizeof(msgtype)) {
+    push_constant_string(name);
+    push_null();
+    apply(call_back, current_object, 2);
+    return 0;
+  }
+  sprintf(&buf[sizeof(int)],"%s",name);
+  debug(512,("query_addr_number: sent address server %s\n",&buf[sizeof(int)]));
+  if(write(addr_server_fd,buf,sizeof(int) + strlen(&buf[sizeof(int)]) + 1)
+     == -1){
+    switch(errno){
+    case EBADF:
+      fprintf(stderr,"Address server has closed connection.\n");
+      addr_server_fd = 0;
+      break;
+    default:
+      perror("query_addr_name: write");
+      break;
+    }
+    push_constant_string(name);
+    push_null();
+    apply(call_back, current_object, 2);
+    return 0;
+  } else {
+    int i;
+
+/* We put ourselves into the pending name lookup entry table */
+/* Find the first free entry */
+    for (i=0;i < IPSIZE && ipnumbertable[i].name;i++);
+    if (i == IPSIZE) {
+/* We need to error...  */
+      push_constant_string(name);
+      push_null();
+      apply(call_back, current_object, 2);
+      return 0;
+    }
+/* Create our entry... */
+    ipnumbertable[i].name = make_shared_string(name);
+    ipnumbertable[i].call_back = make_shared_string(call_back);
+    ipnumbertable[i].ob_to_call = current_object;
+    add_ref(current_object, "query_addr_number: ");
+    return i+1;
+  }
+} /* query_addr_number() */
+
+void got_addr_number(number, name)
+char *number, *name;
+{
+  int i;
+
+  while (1) {
+/* First remove all the dested ones... */
+    for (i=0;i < IPSIZE;i++)
+      if (ipnumbertable[i].name
+          && ipnumbertable[i].ob_to_call->flags&O_DESTRUCTED) {
+        free_string(ipnumbertable[i].call_back);
+        free_string(ipnumbertable[i].name);
+        free_object(ipnumbertable[i].ob_to_call, "got_addr_number: ");
+        ipnumbertable[i].name = NULL;
+      }
+    for (i=0;i < IPSIZE && (!ipnumbertable[i].name
+        || (ipnumbertable[i].name && strcmp(name, ipnumbertable[i].name)));i++);
+    if (i >= IPSIZE) {
+/* Hmm, not in the table. Interesting. */
+      return ;
+    }
+/* Got it, do the call back... */
+	if (!(ipnumbertable[i].ob_to_call->flags&O_DESTRUCTED)) {
+		char *theName, *theNumber;
+
+		theName = ipnumbertable[i].name;
+		theNumber = number;
+		if (isdigit(theName[0])) {
+			char *tmp;
+
+			tmp = theName; theName = theNumber; theNumber = tmp;
+		}
+		if (strcmp(theName, "0")) {
+			push_string(theName, STRING_SHARED);
+		} else {
+			push_null();
+		}
+		if (strcmp(number, "0")) {
+			push_string(theNumber, STRING_SHARED);
+		} else {
+			push_null();
+		}
+		push_number(i+1);
+		safe_apply(ipnumbertable[i].call_back, ipnumbertable[i].ob_to_call, 3);
+	}
+	free_string(ipnumbertable[i].call_back);
+	free_string(ipnumbertable[i].name);
+	free_object(ipnumbertable[i].ob_to_call, "got_addr_number: ");
+	ipnumbertable[i].name = NULL;
+  }
+} /* got_addr_number() */
+
+#undef IPSIZE
 #define IPSIZE 200
 static struct ipentry {
   long addr;
@@ -1712,6 +1975,14 @@ struct object *query_snoop(ob)
   if (!ob->interactive || (ob->interactive->snoop_by == 0))
     return(0);
   return(ob->interactive->snoop_by->ob);
+}
+
+struct object *query_snooping(ob)
+     struct object *ob;
+{
+  if (!ob->interactive || (ob->interactive->snoop_on == 0))
+    return(0);
+  return(ob->interactive->snoop_on->ob);
 }
 
 int query_idle(ob)

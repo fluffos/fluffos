@@ -2,7 +2,7 @@
  * Some structure forward declarations are needed.
  */
 
-#if defined(_SEQUENT_) || defined(linux)
+#if defined(_SEQUENT_) || defined(linux) || defined(SVR4)
 #include <malloc.h>
 #endif
 
@@ -23,8 +23,10 @@ struct node;
 
 #ifdef __STDC__
 #    define PROT(x) x
+#    define VOLATILE volatile
 #else /* __STDC__ */
 #    define PROT(x) ()
+#    define VOLATILE
 #endif /* __STDC */
 
 #ifdef USE_POSIX_SIGNALS
@@ -61,8 +63,12 @@ int sscanf(char *, char *, ...);
 void perror(char *);
 #endif
 
+#if defined(SVR4) || defined(__386BSD__)
+void exit PROT((int));
+#endif
+
 #if !defined(_SEQUENT_) && !defined(_AIX) && !defined(__386BSD__) && \
-	!defined(linux) && !defined(cray)
+	!defined(linux) && !defined(cray) && !defined(sgi) && !defined(__bsdi__)
 int read PROT((int, char *, int));
 #endif /* !defined(_SEQUENT_) && !defined(_AIX) */
 #if !defined(_AIX) && !defined(_SEQUENT_) && !defined(_YACC_) && \
@@ -73,43 +79,47 @@ void free PROT((void *));
 #endif
 #if !defined(sgi) && !defined(hpux) && !defined(_AIX) && \
 	!defined(_SEQUENT_) && !defined(SVR4) && \
-        !defined(__386BSD__) && !defined(linux) && !defined(hp68k)
+        !defined(__386BSD__) && !defined(linux) && !defined(hp68k) && \
+	!defined(__bsdi__)
 int mkdir PROT((char *, int));
 #endif
 int fclose PROT_STDIO((FILE *));
 int pclose PROT_STDIO((FILE *));
 #ifndef _AIX
-#ifdef _SEQUENT_
+#if defined(_SEQUENT_) || defined(sgi) || defined(SVR4) || defined(__386BSD__)
 int atoi PROT((const char *));
 #else
 int atoi PROT((char *));
 #endif
 #endif
-#if !defined(sgi) && !defined(hpux)
+#if !defined(sgi) && !defined(hpux) && !defined(__386BSD__)
 void srandom PROT((int));
 #endif
-#if !defined(_SEQUENT_) && !defined(__386BSD__) && !defined(linux)
+#if !defined(_SEQUENT_) && !defined(__386BSD__) && !defined(linux) \
+	&& !defined(sgi) && !defined(__bsdi__)
 int chdir PROT((char *));
 #endif
 int gethostname PROT((char *, int));
 void abort PROT((void));
 int fflush PROT_STDIO((FILE *));
-#if !defined(_SEQUENT_) && !defined(__386BSD__) && !defined(linux)
+#if !defined(_SEQUENT_) && !defined(__386BSD__) && !defined(linux) \
+	&& !defined(sgi) && !defined(__bsdi__)
 int rmdir PROT((char *));
 int unlink PROT((char *));
 #endif
 int fclose PROT_STDIO((FILE *));
-#if !defined(sgi) && !defined(hpux) && !defined(_AIX) && !defined(M_UNIX) && !defined(_SEQUENT_) && !defined(SVR4)
+#if !defined(sgi) && !defined(hpux) && !defined(_AIX) && !defined(M_UNIX) && !defined(_SEQUENT_) && !defined(SVR4) && !defined(OSF) && !defined(__386BSD__)
 int system PROT((char *));
 #endif
-#ifndef _AIX
-#ifdef _SEQUENT_
+#if !defined(_AIX) && !defined(sgi)
+#if defined(_SEQUENT_) || defined(SVR4) || defined(__386BSD__)
 void qsort PROT((void *, size_t, size_t, int(*)(const void *, const void *)));
 #else
 void qsort PROT((char *, int, int, int (*)()));
 #endif
 #endif
-#if !defined(hpux) && !defined(__386BSD__) && !defined(linux)
+#if !defined(hpux) && !defined(__386BSD__) && !defined(linux) && !defined(sgi) \
+	&& !defined(__bsdi__)
 int setsockopt PROT((int, int, int, char *, int));
 #endif /* !defined(hpux) */
 #if !defined(linux)
@@ -121,16 +131,18 @@ int dup2 PROT((int, int));
 #if !defined(linux)
 unsigned int alarm PROT((unsigned int));
 #endif
-#if !defined(hpux) && !defined(__386BSD__) && !defined(linux)
+#if !defined(hpux) && !defined(__386BSD__) && !defined(linux) \
+	&& !defined(__bsdi__)
 int ioctl PROT((int, ...));
 #endif /* !defined(hpux) */
 int close PROT((int));
 #if !defined(_SEQUENT_) && !defined(_AIX) && !defined(__386BSD__) && \
-	!defined(linux) && !defined(cray)
+	!defined(linux) && !defined(cray) && !defined(sgi) && \
+	!defined(__bsdi__)
 int write PROT((int, char *, int));
 #endif /* !defined(_SEQUENT_) && !defined(_AIX) */
 int _filbuf();
-#if defined(__386BSD__) || defined(linux)
+#if defined(__386BSD__) || defined(linux) || defined(__bsdi__)
 char *crypt PROT((const char *, const char *));
 #else
 char *crypt PROT((char *, char *));
@@ -148,13 +160,14 @@ long random PROT((void));
 #endif
 
 #ifndef _AIX
-#ifdef _SEQUENT_
+#if defined(_SEQUENT_) || defined(sgi) || defined(SVR4) || defined(__386BSD__)
 long strtol PROT((const char *, char **, int));
 #else
 long strtol PROT((char *, char **, int));
 #endif
 #endif
-#if !defined(_SEQUENT_) && !defined(__386BSD__) && !defined(linux)
+#if !defined(_SEQUENT_) && !defined(__386BSD__) && !defined(linux) \
+	&& !defined(sgi) && !defined(__bsdi__)
 int link PROT((char *, char *));
 int unlink PROT((char *));
 #endif
@@ -198,10 +211,10 @@ void io_mode_stats();
 void dumpstat PROT((char *));
 void free_mapping PROT((struct mapping *));
 INLINE struct vector *mapping_each PROT((struct mapping *));
-INLINE struct svalue *find_in_mapping PROT((struct mapping *, struct svalue *));
+struct svalue *find_in_mapping PROT((struct mapping *, struct svalue *));
 struct svalue *find_for_insert PROT((struct mapping *, struct svalue *, int));
 struct mapping *load_mapping_from_aggregate PROT((struct svalue *, int));
-INLINE struct mapping *add_mapping PROT((struct mapping *, struct mapping *));
+struct mapping *add_mapping PROT((struct mapping *, struct mapping *));
 struct mapping *map_mapping 
    PROT((struct mapping *, char *, struct object *, struct svalue *));
 struct mapping *compose_mapping PROT((struct mapping *, struct mapping *));
@@ -263,13 +276,16 @@ struct vector *slice_array PROT((struct vector *,int,int));
 int query_idle PROT((struct object *));
 char *implode_string PROT((struct vector *, char *));
 struct object *query_snoop PROT((struct object *));
+struct object *query_snooping PROT((struct object *));
 struct vector *all_inventory PROT((struct object *, int override));
 struct vector *deep_inventory PROT((struct object *, int));
 struct object *environment PROT((struct svalue *));
 struct vector *add_array PROT((struct vector *, struct vector *));
 char *get_f_name PROT((int));
 #if !defined(_AIX) && !defined(NeXT) && !defined(_SEQUENT_) && !defined(SVR4) \
-	&& !defined(apollo) && !defined(cray) && !defined(SunOS_5)
+	&& !defined(__386BSD__) \
+	&& !defined(apollo) && !defined(cray) && !defined(SunOS_5) \
+	&& !defined(__bsdi__)
 void startshutdownMudOS PROT((void));
 #else
 void startshutdownMudOS PROT((int));
@@ -378,7 +394,7 @@ int get_char PROT((char *fun, int flag));
 void dump_file_descriptors();
 INLINE void copy_some_svalues PROT((struct svalue *, struct svalue *, int));
 int svalue_save_size PROT((struct svalue *));
-void save_svalue PROT((struct svalue *, char *buf));
+void save_svalue PROT((struct svalue *, char **buf));
 
 char *string_print_formatted PROT((char *format_str, int argc, struct svalue *argv));
 struct vector *children PROT((char *obj));
@@ -518,4 +534,7 @@ INLINE void free_funp PROT((struct funp *fp));
 INLINE void push_funp PROT((struct funp *fp));
 INLINE int valid_hide PROT((struct object *obj));
 INLINE void free_string_svalue PROT((struct svalue *));
-INLINE void absorb_mapping PROT((struct mapping *, struct mapping *));
+void absorb_mapping PROT((struct mapping *, struct mapping *));
+void init_usec_clock();
+void get_usec_clock PROT((long *sec, long *usec));
+void bufcat PROT((char **buf, char *str));

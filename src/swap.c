@@ -1,6 +1,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdio.h>
+#ifdef __386BSD__
+#include <unistd.h>
+#endif
 #ifdef __STDC__
 #include <memory.h>
 #endif

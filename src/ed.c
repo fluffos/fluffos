@@ -98,7 +98,7 @@ int	version = 6;	/* used only in the "set" function, for i.d. */
 #define ESC	0x1b	/* ^[ */
 #define FS	0x1c	/* ^\ */
 #define GS	0x1d	/* ^] */
-/*#define RS	0x1e	   ^^ */
+/*#define _RS	0x1e	   ^^ */
 #define US	0x1f	/* ^_ */
 #define SP	0x20	/* space */
 #define DEL	0x7f	/* DEL*/
@@ -110,7 +110,7 @@ int	version = 6;	/* used only in the "set" function, for i.d. */
 #define LC '('
 #define RC ')'
 #define LS '['
-#define RS ']'
+#define _RS ']'
 #define PP '\"'
 #define EOL '\0'
 
@@ -457,6 +457,7 @@ int deflt(def1, def2)
  * to me what errors might be detectable/reportable.  To silence a warning
  * message, I've added a constant return statement. -- RAM
  * ... It could check to<=P_LASTLN ... igp
+ * ... Ok...and it corrects from (or to) > P_LASTLN also -- robo
  */
 
 int del(from, to)
@@ -464,8 +465,15 @@ int del(from, to)
 {
   LINE	*first, *last, *next, *tmp;
   
-  if(from < 1)
+  if (P_LASTLN == 0) return (0); /* nothing to delete */
+  if (from >P_LASTLN)
+    from = P_LASTLN;
+  if (to > P_LASTLN)
+    to = P_LASTLN;
+  if (from < 1)
     from = 1;
+  if (to < 1)
+    to = 1;
   first = getprevptr( getptr( from ) );
   last = getnextptr( getptr( to ) );
   next = first->l_next;
@@ -616,7 +624,7 @@ int egets(str,size,stream)
      int	size;
      FILE	*stream;
 {
-  int	c, count;
+  int	c = 0, count;
   char	*cp;
 
   for(count = 0, cp = str; size > count;) {
@@ -1462,7 +1470,7 @@ strip_buff(line,buff2)
       flag=1;
       /*	    flagnotif=1;*/
       break;
-    case RS:
+    case _RS:
       if (!str_on) {
 	if (LS!=codes[indent_level]) {
 	  add_message("Mismatched brackets, '%c' on line %d\n",
@@ -1869,7 +1877,7 @@ int docmd(glob)
 /*	doglob.c	*/
 int doglob()
 {
-  int	lin, status;
+  int	lin, status = 0;
   char	*cmd;
   LINE	*ptr;
 
@@ -1981,7 +1989,7 @@ void
 ed_cmd(str)
      char *str;
 {
-  int status;
+  int status = 0;
 
   if (P_MORE) {
     print_help2();

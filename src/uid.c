@@ -7,6 +7,9 @@
  */
 
 #include <stdio.h>  /* to get NULL */
+#ifdef __386BSD__
+#include <string.h>
+#endif
 #include "config.h"
 #include "lint.h"
 #include "uid.h"

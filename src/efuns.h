@@ -4,6 +4,12 @@
 
 #include "config.h" /* must be included before the #ifdef TIMES */
 #include <sys/types.h>
+#ifdef GET_PROCESS_STATS
+#include <sys/procstats.h>
+#endif
+#ifdef __bsdi__
+#include <sys/time.h>
+#endif
 #ifdef TIMES
 #include <sys/times.h>
 #endif
@@ -40,7 +46,7 @@
 #include "localtime.h"
 #include "socket_efuns.h"
 #include "socket_err.h"
-#include "lang.tab.h"
+#include "opcodes.h"
 #include "switch.h"
 #include "sent.h"
 #include "debug.h" /* needed by f_set_debug_level() */
@@ -90,6 +96,3 @@ extern unsigned int apply_low_slots_used;
 extern unsigned int apply_low_collisions;
 #endif
 
-static int i;
-static struct svalue *argp;
-static struct object *ob;

@@ -24,6 +24,7 @@
 #define DFAULT_PROTO               0   /* use the appropriate protocol */
 #define I_NOECHO                   0x1 /* input_to flag */
 #define I_NOESC                    0x2 /* input_to flag */
+#define SB_SIZE			   100 /* More than enough */
 
 enum msgtypes {NAMEBYIP, IPBYNAME};
 
@@ -60,6 +61,10 @@ struct interactive {
   struct svalue *carryover;   /* points to args for input_to                 */
   int num_carry;              /* number of args for input_to                 */
   int net_dead;
+  int out_of_band;            /* Send a telnet sync operation                */
+  int state;                  /* Current telnet state.  Bingly wop           */
+  int sb_pos;                 /* Telnet suboption negotiation stuff          */
+  char sb_buf[SB_SIZE];
 };
 
 #endif /* _COMM_H_ */

@@ -339,7 +339,7 @@ struct svalue *v;
  * necessarily have any meaningful value.
  */
 
-struct node *
+INLINE struct node *
 node_find_in_mapping(m, lv)
 struct mapping *m;
 struct svalue *lv;
@@ -492,7 +492,7 @@ int n;
 
 /* is ok */
 
-INLINE struct svalue *
+struct svalue *
 find_in_mapping(m, lv)
 struct mapping *m;
 struct svalue *lv;
@@ -505,7 +505,7 @@ struct svalue *lv;
 	return &n->values[1];
 }
 
-INLINE void
+void
 absorb_mapping(m1, m2)
 struct mapping *m1, *m2;
 {
@@ -519,7 +519,7 @@ struct mapping *m1, *m2;
    in two old mappings.  (uses hash table)
 */
 
-INLINE struct mapping *
+struct mapping *
 add_mapping(m1, m2)
 struct mapping *m1, *m2;
 {
@@ -690,7 +690,7 @@ struct mapping *m;
 	  If each() being called by a different object than previous object,
 	  then reset so that each begins again at top of map.  This is necessary
 	  so that things aren't left in a bad state of an object errors out
-	  in the middle of traversing a map (or just doesn't traverse to the end.
+	  in the middle of traversing a map (or just doesn't traverse to the end).
 	*/
 	if (current_object != m->eachObj) {
 		m->eachObj = current_object;
@@ -752,25 +752,26 @@ struct mapping *m;
 int doEncode(m, elt, buf)
 struct mapping *m;
 struct node *elt;
-char *buf;
+char **buf;
 {
 	save_svalue(&elt->values[0], buf);
-	strcat(buf, ":");
+	bufcat(buf, ":");
 	save_svalue(&elt->values[1], buf);
-	strcat(buf, ",");
+	bufcat(buf, ",");
 	return 0;
 }
 
 char *save_mapping(m)
 struct mapping *m;
 {
-	char *buf;
+	char *buf, *p;
 
 	/* 5 == strlen("([])") */
 	buf = DXALLOC(mapping_save_size(m) + 5, 77, "save_mapping");
 
-	strcpy(buf, "([");
-	mapTraverse(m, (int (*)())doEncode, buf);
-	strcat(buf, "])");
+	p = buf;
+	bufcat(&p, "([");
+	mapTraverse(m, (int (*)())doEncode, &p);
+	bufcat(&p, "])");
 	return buf;
 }

@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#ifdef __386BSD__
+#include <unistd.h>
+#endif
 #ifdef __STDC__
 #include <memory.h>
 #endif
@@ -102,12 +105,26 @@ static int my_strlen(str)
 }
 
 /*
+ * Does a strcpy, but also advances the buffer to point to the
+ * end of the string so extra searches are unnecessary for later
+ * catenation.
+ */
+void bufcat(buf, str)
+   char **buf;
+   char *str;
+{
+    /* this could be optimized further :-) */
+    strcpy(*buf, str);
+    *buf += strlen(*buf);
+}
+
+/*
  * Similar to strcat(), but escapes all funny characters.
  * Used by save_object().
  * src is modified temporarily, but restored again :-(
  */
 static void my_strcat(dest,src)
-    char *dest,*src;
+    char **dest,*src;
 {
     char *pt,*pt2,ch[2];
 
@@ -117,16 +134,16 @@ static void my_strcat(dest,src)
 	pt = pt2;
     while (pt) {
 	ch[0] = *pt; *pt = 0; 
-	strcat(dest,src); strcat(dest,"\\"); strcat(dest,ch);
+	bufcat(dest,src); bufcat(dest,"\\"); bufcat(dest,ch);
 	src = pt+1; *pt = ch[0];
 	pt = strchr(src,'\\'); 
 	pt2 = strchr(src,'\"');
 	if ((pt2 && pt2 < pt) || (pt == 0))
 	    pt = pt2;
     }
-    strcat(dest,src);
+    bufcat(dest,src);
 }
-	
+
 int svalue_save_size(v)
    struct svalue *v;
 {
@@ -177,23 +194,25 @@ struct vector *v;
 
 void save_svalue(v, buf)
 struct svalue *v;
-char *buf;
+char **buf;
 {
     char *tbuf;
 
     if (v->type == T_STRING) {
-       strcat(buf, "\""); my_strcat(buf, v->u.string);   /* my_ */
-       strcat(buf, "\""); 
+       bufcat(buf, "\""); my_strcat(buf, v->u.string);   /* my_ */
+       bufcat(buf, "\""); 
     } else if (v->type == T_POINTER) {
        tbuf = save_array(v->u.vec);
-       strcat(buf, tbuf);  FREE(tbuf);
+       bufcat(buf, tbuf);  FREE(tbuf);
     } else if (v->type == T_NUMBER) {
-       sprintf(buf + strlen(buf), "%d", v->u.number);
-	} else if (v->type == T_REAL) {
-       sprintf(buf + strlen(buf), "%f", v->u.real);
-	} else if (v->type == T_MAPPING) {
+       sprintf(*buf, "%d", v->u.number);
+       *buf += strlen(*buf);
+    } else if (v->type == T_REAL) {
+       sprintf(*buf, "%f", v->u.real);
+       *buf += strlen(*buf);
+    } else if (v->type == T_MAPPING) {
        tbuf = save_mapping(v->u.map);
-       strcat(buf,tbuf);   FREE(tbuf);
+       bufcat(buf,tbuf);   FREE(tbuf);
     }
 }
 
@@ -204,17 +223,18 @@ static char *
 save_array(v)
      struct vector *v;
 {
-    char *buf;
+    char *buf, *p;
     int i;
     
     buf = DXALLOC(2+vector_save_size(v)+2+1, 79, "save_array");
-    
-    strcpy(buf,"({");
+
+    p = buf;
+    bufcat(&p, "({");
     for (i=0; i < v->size; i++) {
-        save_svalue(&v->item[i], buf);
-        strcat(buf, ",");
+        save_svalue(&v->item[i], &p);
+	bufcat(&p, ",");
     }
-    strcat(buf,"})");
+    bufcat(&p,"})");
     return buf;
 }
 
@@ -484,8 +504,8 @@ char *theBuff, *name, *val;
 	} else {
 		nextBuff = 0;
 	}
-        if (buff[0] == '#')
-            continue;
+	if (buff[0] == '#') /* ignore 'comments' in savefiles */
+		continue;
 	space = strchr(buff, ' ');
 	if ((space == 0) || ((space - buff) >= sizeof(var))) {
             FREE(val);
@@ -536,7 +556,7 @@ void save_object(ob, file, save_zeros)
     if (file == 0)
         error("Denied write permission in save_object().\n");
     len = strlen(file);
-    name = DXALLOC(len + 3, 80, "save_object: 1");
+    name = DXALLOC(len + strlen(SAVE_EXTENSION) + 1, 80, "save_object: 1");
     (void)strcpy(name, file);
 #ifndef MSDOS
     (void)strcat(name, SAVE_EXTENSION);
@@ -554,9 +574,10 @@ void save_object(ob, file, save_zeros)
         FREE(name);
         error("Could not open %s for a save.\n", tmp_name);
     }
+	fprintf(f, "#%s\n", ob->prog->name);
 	for (i=0; (unsigned)i < ob->prog->p.i.num_variables; i++) {
 		struct svalue *v = &ob->variables[i];
-		char *new_string;
+		char *new_string, *p;
 		int theSize;
 
 		if (ob->prog->p.i.variable_names[i].type & TYPE_MOD_STATIC)
@@ -570,7 +591,8 @@ void save_object(ob, file, save_zeros)
 		}
 		new_string = (char *)DXALLOC(theSize, 81, "save_object: 2");
 		*new_string = '\0';
-		save_svalue(v, new_string);
+		p = new_string;
+		save_svalue(v, &p);
 		replace_newline(new_string);
 		if (save_zeros || strcmp(new_string,"0")) /* Armidale */
 			if (fprintf(f, "%s %s\n", ob->prog->p.i.variable_names[i].name,
@@ -623,12 +645,11 @@ int restore_object(ob, file, noclear)
         error("Denied read permission in restore_object().\n");
 
     len = strlen(file);
-    name = DXALLOC(len + 3, 83, "restore_object: 2");
+    name = DXALLOC(len + strlen(SAVE_EXTENSION) + 1, 83, "restore_object: 2");
     (void)strcpy(name, file);
     if (name[len-2] == '.' && name[len-1] == 'c')
-        name[len-1] = SAVE_EXTENSION[1];
-    else
-        (void)strcat(name, SAVE_EXTENSION);
+        name[len-2] = 0;
+    (void)strcat(name, SAVE_EXTENSION);
     f = fopen(name, "r");
     if (!f || fstat(fileno(f), &st) == -1) {
         FREE(name);
@@ -1108,5 +1129,10 @@ struct object *obj;
   set_heart_beat(obj, 0);
   remove_all_call_out(obj);
   add_light(obj, -(obj->total_light));
+#ifdef AUTO_SETEUID
+  obj->euid = obj->uid;
+#else
+  obj->euid = NULL;
+#endif
   reset_object(obj, 0);
 }

@@ -536,10 +536,16 @@ int parse (cmd, ob_or_array, pattern, stack_args, num_arg)
 	      } while ((fail) && (cix<wvec->size));
 	      
 	      if (!fail) {
-		 stack_put(pval,stack_args,six+1,num_arg);
-		 pval = slice_words(wvec,fword,ocix-1);
-		 stack_put(pval,stack_args,six,num_arg);
-		 six += 2;
+                 if (pval) {
+		   stack_put(pval,stack_args,six+1,num_arg);
+		   pval = slice_words(wvec,fword,ocix-1);
+		   stack_put(pval,stack_args,six,num_arg);
+		   six += 2;
+                 } else {
+		   pval = slice_words(wvec,fword,ocix-1);
+		   stack_put(pval,stack_args,six,num_arg);
+		   six ++;
+                 }
 		 pval = 0; 
 	      }
 	   }
@@ -1546,7 +1552,7 @@ char *parse_to_plural(str)
 char *parse_one_plural(str)
      char*str;
 {
-   char ch, ch2;
+   char ch, ch2, ch3;
    int sl;
    static char pbuf[100];   /* Only stupid people finds words > 100 letters */
    
@@ -1556,16 +1562,27 @@ char *parse_one_plural(str)
    
    ch = str[sl];
    ch2 = str[sl-1];
+   ch3 = str[sl-2];
    strcpy(pbuf, str); pbuf[sl] = 0;
    
    switch (ch)
      {
-      case 's':
-      case 'x':
       case 'h':
+	if (ch2 == 's' || ch2 == 'c')
+	  return strcat(pbuf, "hes");
+      case 'f':
+	return strcat(pbuf, "ves");
+      case 's':
 	return strcat(pbuf, "ses");
+      case 'x':
+	if (EQ(str,"ox"))
+	  return "oxen";
+	else
+	  return strcat(pbuf, "xes");
       case 'y':
-	return strcat(pbuf, "ies");
+	if ((ch2 != 'a' && ch2 != 'e' && ch2 != 'i' && ch2 != 'o' &&
+	     ch2 != 'u') || (ch2 == 'u' && ch3 == 'q'))
+	  return strcat(pbuf, "ies");
       case 'e':
 	if (ch2 == 'f')
 	  {
@@ -1573,13 +1590,17 @@ char *parse_one_plural(str)
 	     return strcat(pbuf, "ves");
 	  }
      }
-   
+
    if (EQ(str,"corpse")) return "corpses";
-   if (EQ(str,"tooth")) return "tooth";
-   if (EQ(str,"foot")) return "foot";
+   if (EQ(str,"tooth")) return "teeth";
+   if (EQ(str,"foot")) return "feet";
    if (EQ(str,"man")) return "men";
    if (EQ(str,"woman")) return "women";
    if (EQ(str,"child")) return "children";
+   if (EQ(str,"goose")) return "geese";   
+   if (EQ(str,"mouse")) return "mice";
+   if (EQ(str,"deer")) return "deer";
+   if (EQ(str,"moose")) return "moose";
    if (EQ(str,"sheep")) return "sheep";
    
    pbuf[sl] = ch;

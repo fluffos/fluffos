@@ -1,0 +1,9 @@
+The file "Artistic" is included because a small part of the driver source
+is derived from Larry Wall's Perl package (namely the hashing code
+used in the mappings implementation).  Previously, we used the GNU Copyleft
+because the "Artistic" option wasn't then available.  Since the "Artistic"
+license is more similar to Lars Pensk|'s original Copyright than is the GNU
+Copyleft, we have chosen to use Artistic instead of the Copyleft (as
+is allowed by the terms Larry Wall sets forth in the Perl 4.036 README).
+Where there is any conflict between Lars' copyright and the Artistic license,
+Lars' copyright should take precedence.

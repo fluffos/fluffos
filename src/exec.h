@@ -49,16 +49,16 @@ struct function {
     char *name;
     unsigned short offset;	/* Address of function,
 				 * or inherit table index when inherited. */
-    unsigned short flags;	/* NAME_ . See above. */
-    unsigned short num_local;	/* Number of local variables */
-    unsigned short num_arg;	/* Number of arguments needed.
-				   -1 arguments means function not defined
-				   in this object. Probably inherited */
-    unsigned short function_index_offset;
     /* Used so that it is possible to quickly find this function
      * in the inherited program.
      */
+    unsigned short function_index_offset;
     unsigned short type;	/* Return type of function. See below. */
+    unsigned char num_local;	/* Number of local variables */
+    unsigned char num_arg;	/* Number of arguments needed.
+				   -1 arguments means function not defined
+				   in this object. Probably inherited */
+    unsigned char flags;	/* NAME_ . See above. */
 };
 
 struct variable {
@@ -137,15 +137,15 @@ extern struct program *current_prog;
  * the run-time types, named T_ interpret.h.
  */
 
-#define TYPE_UNKNOWN	0	/* This type must be casted */
-#define TYPE_NUMBER	1
-#define TYPE_STRING	2
-#define TYPE_VOID	3
-#define TYPE_OBJECT	4
-#define TYPE_MAPPING	5
-#define TYPE_FUNCTION 6
-#define TYPE_REAL     7
-#define TYPE_ANY	8	/* Will match any type */
+#define TYPE_UNKNOWN	0   /* This type must be casted */
+#define TYPE_VOID       1
+#define TYPE_NUMBER     2
+#define TYPE_STRING     3
+#define TYPE_OBJECT     4
+#define TYPE_MAPPING    5
+#define TYPE_FUNCTION   6
+#define TYPE_REAL       7
+#define TYPE_ANY        8  /* Will match any type */
 
 /*
  * These are or'ed in on top of the basic type.

@@ -4,9 +4,17 @@
 #include <signal.h>
 #include <setjmp.h>
 #include <ctype.h>
+#ifndef __386BSD__
 #include <sys/time.h>
 #include <sys/types.h>
+#else
+#include <sys/types.h>
+#include <sys/time.h>
+#endif
 #include <sys/stat.h>
+#ifdef __386BSD__
+#include <unistd.h>
+#endif
 #include <fcntl.h>
 #include <sys/times.h>
 #include <math.h>
@@ -33,6 +41,7 @@ static void cycle_hb_list PROT((void));
 extern struct object *command_giver, *current_interactive, *obj_list_destruct;
 extern struct object *previous_ob, *master_ob;
 extern int num_user, d_flag;
+extern double consts[];
 
 extern INLINE void make_selectmasks();
 extern int process_user_command();
@@ -340,69 +349,75 @@ static int num_hb_objs = 0;  /* so we know when to stop! */
 static int num_hb_calls = 0; /* stats */
 static float perc_hb_probes = 100.0; /* decaying avge of how many complete */
 
-void call_heart_beat() {
-  struct object *ob;
-  struct object *save_current_object = current_object;
-  struct object *save_command_giver = command_giver;
-  int num_done = 0;
+void call_heart_beat()
+{
+	struct object *ob;
+	struct object *save_current_object = current_object;
+	struct object *save_command_giver = command_giver;
+	int num_done = 0;
 
-  heart_beat_flag = 0;
+	heart_beat_flag = 0;
 
-  signal(SIGALRM, sigalrm_handler);
+	signal(SIGALRM, sigalrm_handler);
 #if defined(SYSV) || defined(SVR4) || defined(cray)
-  alarm(SYSV_HEARTBEAT_INTERVAL); /* defined in config.h */
+	alarm(SYSV_HEARTBEAT_INTERVAL); /* defined in config.h */
 #else
-  ualarm(HEARTBEAT_INTERVAL,0);
+	ualarm(HEARTBEAT_INTERVAL,0);
 #endif
 
-  debug(256,("."));
+	debug(256,("."));
 
-  current_time = get_current_time();
-  current_interactive = 0;
+	current_time = get_current_time();
+	current_interactive = 0;
 
-  if(hb_list
+	if (hb_list
 #ifdef OLD_HB_BEHAVIOR
-     && (num_user > 0)
+		&& (num_user > 0)
 #endif /* OLD_HB_BEHAVIOR */
-     ){
-    num_hb_calls++;
-    while(hb_list && !heart_beat_flag  && (num_done < num_hb_objs)){
-      num_done++;
-      cycle_hb_list();
-      ob = hb_tail; /* now at end */
-      if(!(ob->flags & O_HEART_BEAT))
-	fatal("Heart beat not set in object on heart beat list!");
-      if(ob->flags & O_SWAPPED)
-	fatal("Heart beat in swapped object.\n");
-      /* move ob to end of list, do ob */
-      if(ob->prog->p.i.heart_beat == -1)
-	continue;
-      current_prog = ob->prog;
-      current_object = ob;
-      current_heart_beat = ob;
-      command_giver = ob;
+	) {
+		num_hb_calls++;
+		while(hb_list && !heart_beat_flag  && (num_done < num_hb_objs)){
+			num_done++;
+			cycle_hb_list();
+			ob = hb_tail; /* now at end */
+			if (!(ob->flags & O_HEART_BEAT))
+				fatal("Heartbeat not set in object on heart beat list!");
+			if (ob->flags & O_SWAPPED)
+				fatal("Heart beat in swapped object.\n");
+			/* is it time to do a heartbeat ? */
+			ob->heart_beat_ticks--;
+			/* move ob to end of list, do ob */
+			if (ob->prog->p.i.heart_beat == -1)
+				continue;
+			if (ob->heart_beat_ticks < 1) {
+				ob->heart_beat_ticks = ob->time_to_heart_beat;
+				current_prog = ob->prog;
+				current_object = ob;
+				current_heart_beat = ob;
+				command_giver = ob;
 #ifndef NO_SHADOWS
-      while(command_giver->shadowing)
-	command_giver = command_giver->shadowing;
+				while (command_giver->shadowing)
+					command_giver = command_giver->shadowing;
 #endif /* NO_SHADOWS */
-      if(!(command_giver->flags & O_ENABLE_COMMANDS))
-	command_giver = 0;
-      add_heart_beats(&ob->stats, 1);
-      eval_cost = 0;
-      call_function(ob->prog,
-		    &ob->prog->p.i.functions[ob->prog->p.i.heart_beat]);
-    }
-    if(num_hb_objs)
-      perc_hb_probes = 100 * (float) num_done / num_hb_objs;
-    else
-      perc_hb_probes = 100.0;
-  }
-  current_object = save_current_object;
-  current_heart_beat = 0;
-  look_for_objects_to_swap();
-  call_out();	/* some things depend on this, even without users! */
-  mudlib_stats_decay();
-  command_giver = save_command_giver;
+				if (!(command_giver->flags & O_ENABLE_COMMANDS))
+					command_giver = 0;
+				add_heart_beats(&ob->stats, 1);
+				eval_cost = 0;
+				call_function(ob->prog,
+					&ob->prog->p.i.functions[ob->prog->p.i.heart_beat]);
+			}
+		}
+		if (num_hb_objs)
+			perc_hb_probes = 100 * (float) num_done / num_hb_objs;
+		else
+			perc_hb_probes = 100.0;
+	}
+	current_object = save_current_object;
+	current_heart_beat = 0;
+	look_for_objects_to_swap();
+	call_out();	/* some things depend on this, even without users! */
+	mudlib_stats_decay();
+	command_giver = save_command_giver;
 }
 
 /* Take the first object off the heart beat list, place it at the end
@@ -436,8 +451,10 @@ int set_heart_beat(ob, to)
 
   if(ob->flags & O_DESTRUCTED)
     return(0);
+#ifdef OLD_HEARTBEAT
   if(to)
     to = 1;
+#endif
   while(o && o != ob){
     if(!(o->flags & O_HEART_BEAT))
       fatal("Found disabled object in the active heart beat list!\n");
@@ -446,8 +463,14 @@ int set_heart_beat(ob, to)
   }
   if(!o && (ob->flags & O_HEART_BEAT))
     fatal("Couldn't find enabled object in heart beat list!");
-  if(to == (ob->flags & O_HEART_BEAT))
+  if(!to&&!(ob->flags & O_HEART_BEAT))  /* if set_heart_beat(0) and O_HEART_BEAT is 0 */
     return(0);
+  if (to && (ob->flags & O_HEART_BEAT)) { /* change to intervals for heart_beat */
+    if (to<0) return 0;
+    ob->time_to_heart_beat=to;
+    ob->heart_beat_ticks=to;
+    return to;
+  }
   if(to){
     ob->flags |= O_HEART_BEAT;
     if(ob->next_heart_beat)
@@ -457,6 +480,8 @@ int set_heart_beat(ob, to)
     if(!hb_tail)
       hb_tail = ob;
     num_hb_objs++;
+    ob->time_to_heart_beat=to;
+    ob->heart_beat_ticks=to;
     cycle_hb_list();     /* Added by Linus. 911104 */
   }
   else{ /* remove all refs */
@@ -501,7 +526,7 @@ void preload_objects(eflag)
 {
     struct vector *prefiles;
     struct svalue *ret;
-    int ix;
+    VOLATILE int ix;
 
     push_number(eflag);
     ret = apply_master_ob("epilog", 1);
@@ -549,7 +574,6 @@ static double load_av = 0.0;
 
 void update_load_av()
 {
-  extern double consts[];
   static int last_time;
   int n;
   double c;
@@ -570,10 +594,10 @@ void update_load_av()
 
 static double compile_av = 0.0;
 
-void update_compile_av(lines)
+void
+update_compile_av(lines)
      int lines;
 {
-  extern double consts[];
   static int last_time;
   int n;
   double c;

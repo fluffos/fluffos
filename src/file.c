@@ -14,6 +14,9 @@
 #ifndef SunOS_5
 #include <sys/dir.h>
 #endif
+#ifdef __386BSD__
+#include <unistd.h>
+#endif
 #include <fcntl.h>
 #include <setjmp.h>
 #include <string.h>
@@ -23,7 +26,8 @@
 #if defined(sun)
 #include <alloca.h>
 #endif
-#if defined(M_UNIX) || defined(_SEQUENT_) || defined(cray) || defined(SunOS_5)
+#if defined(M_UNIX) || defined(OSF) || defined(_SEQUENT_) \
+	|| defined(cray) || defined(SunOS_5)
 #include <dirent.h>
 #endif
 #if defined(SVR4)
@@ -35,7 +39,7 @@
 #include <ctype.h>
 
 #include "lint.h"
-#include "lang.tab.h"
+#include "opcodes.h"
 #include "interpret.h"
 #include "object.h"
 #include "sent.h"
@@ -48,21 +52,23 @@ extern int max_array_size;
 
 char *inherit_file;
 
-#ifndef NeXT
+#if !defined(NeXT) && !defined(__386BSD__)
 extern int readlink PROT((char *, char *, int));
 extern int symlink PROT((char *, char *));
 #ifdef MSDOS
 #define lstat stat
 #else
-#if !defined(hpux) && !defined(SVR4) && !defined(__386BSD__) \
-	&& !defined(linux) && !defined(SunOS_5)
+#if !defined(hpux) && !defined(SVR4) \
+	&& !defined(linux) && !defined(SunOS_5) && !defined(sgi) \
+	&& !defined(__bsdi__)
 extern int lstat PROT((char *, struct stat *));
 #endif
 #endif
-#endif /* NeXT */
+#endif /* !NeXT && !__386BSD__ */
 
 #if !defined(hpux) && !defined(_AIX) && !defined(__386BSD__)  \
-	&& !defined(linux) && !defined(SunOS_5)
+	&& !defined(linux) && !defined(SunOS_5) && !defined(SVR4) \
+	&& !defined(__bsdi__)
 extern int fchmod PROT((int, int));
 #endif /* !defined(hpux) && !defined(_AIX) */
 
@@ -147,8 +153,8 @@ struct vector *get_dir(path, flags)
     int i, count = 0;
     DIR *dirp;
     int namelen, do_match = 0;
-#if defined(_AIX) || defined(M_UNIX) || defined(_SEQUENT_) || defined(SVR4) \
-	|| defined(cray) || defined(SunOS_5)
+#if defined(_AIX) || defined(M_UNIX) || defined(OSF) || defined(_SEQUENT_) \
+	|| defined(SVR4) || defined(cray) || defined(SunOS_5)
     struct dirent *de;
 #else
     struct direct *de;
@@ -208,8 +214,8 @@ struct vector *get_dir(path, flags)
      *  Count files
      */
     for (de = readdir(dirp); de; de = readdir(dirp)) {
-#if defined(M_UNIX) || defined(_SEQUENT_) || defined(SVR4) || defined(linux) \
-	|| defined(cray) || defined(SunOS_5)
+#if defined(OSF) || defined(M_UNIX) || defined(_SEQUENT_) || defined(SVR4) \
+	|| defined(linux) || defined(cray) || defined(SunOS_5)
 	namelen = strlen(de->d_name);
 #else
 	namelen = de->d_namlen;
@@ -236,8 +242,8 @@ struct vector *get_dir(path, flags)
     endtemp = temppath + strlen(temppath);
     strcat(endtemp++, "/");
     for(i = 0, de = readdir(dirp); i < count; de = readdir(dirp)) {
-#if defined(M_UNIX) || defined(_SEQUENT_) || defined(SVR4) || defined(linux) \
-	|| defined(cray) || defined(SunOS_5)
+#if defined(OSF) || defined(_SEQUENT_) || defined(SVR4) || defined(linux) \
+     || defined(M_UNIX) || defined(cray) || defined(SunOS_5)
         namelen = strlen(de->d_name);
 #else
 	namelen = de->d_namlen;

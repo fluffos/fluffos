@@ -1,0 +1,7 @@
+MudOS hints for the RS/6000:
+
+Don't use bsdmalloc or smalloc.
+
+Some earlier versions of AIX (e.g. 3.1) have problems which affect MudOS.
+
+Read the Makefile for comments referring to the RS/6000

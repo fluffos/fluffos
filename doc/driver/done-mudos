@@ -1,3 +1,104 @@
+0.9.16 to 0.9.17
+ 
+. MudOS now compiles and runs on the DEC Alpha running OSF/1
+ 
+. prelang.y and postlang.y combined into compiler.y - the changes in this
+  area should allow the .y files to compile with many more yacc's than
+  before (Ultrix, Sun?)
+ 
+. addr_server made more robust and compilable on more machines
+ 
+. Added an OLD_ULTRIX define in port.h for some VAXes running old versions
+  of Ultrix; should allow the driver to compile/run on them
+ 
+. Anytime an object is compiled now, valid_object(ob) is called in master.
+  If valid_object _exists_, and returns 0, then ob is destructed before
+  create() is called and the efun that caused the load errors.  (usage
+  of this, along with inherits() and 'nomask', could allow usage of things 
+  such as destruct() to be safely restricted through simul_efuns and
+  valid_override() in master)
+ 
+. Basic optimization of numeric constants in LPC code is now done (if
+  LPC_OPTIMIZE is defined in options.h)
+ 
+. call_other() can now take an array as a second argument, where the first 
+  item of the array is the function to call, and all following items will be 
+  passed as arguments in the order which they occur
+ 
+. Added an LPC object disassembler (dump_prog() efun)
+ 
+. New resolve() efun which can translate ip names to numbers and vice-versa
+  (see efun docs)
+ 
+. Snoops will be sent to receive_snoop(msg) in the receiver object now if
+  RECEIVE_SNOOP is defined in options.h
+ 
+. Extension to set_heart_beat(x), where if x > 1, x is used as the number
+  of heart beats inbetween heart_beat() calls (can be disabled in options.h)
+ 
+. Extension (3rd argument) to member_array(), which, if set to 1 and using
+  a string as 1st arg, checks only the prefix of the strings in the array 
+  (similar to xverbs vs verbs)
+ 
+. Added a new efun inherits(string filename, object base) which returns 1
+  if base inherits the latest copy of filename, 2 if it inherits an old copy,
+  and 0 if it does not inherit filename.  This efun avoids the cost of
+  creating an array via deep_inherit()
+ 
+. Added OLD_COMMAND to options.h - if defined, the old second argument to 
+  command() will again be available
+ 
+. Added query_shadowing(), a preferred synonym for the shadowp() efun
+ 
+. replace_string() efun expanded to support an optional 4th and 5th 
+  argument (see efun docs)
+ 
+. Added query_snooping() efun (inverse of query_snoop()) - might want to
+  add a simul_efun override for this
+ 
+. Added query_privs(), set_privs() efuns and privs_file() apply in master 
+  if PRIVS is defined in options.h - read the comments there for information
+ 
+. Added a new "function" called time_expression() that returns the number
+  of microseconds realtime that occurred during execution of the expression
+  passed to it
+
+. Added rusage() support for HP-UX 8.x/9.x (if using 7.x, define OLD_HPUX
+  in port.h) and SunOS 5
+ 
+. The writing of text (prefixed with ']') to stderr is no longer done by
+  default; can be enabled in options.h (NONINTERACTIVE_STDERR_WRITE)
+ 
+. save_object() now inserts a "#filename" at the top of savefiles 
+  (restore_object() ignores such lines; this is useful for virtual object
+  compilers that want to figure out how to compile .o files)
+ 
+. functionp(funp) now returns 0 if funp[0] is a destructed object
+ 
+. Driver now calls crash() in master.c with "Host machine shutting down"
+  when SIGUSR1 is received
+ 
+. Caught errors (via catch()) are now written to debug.log, prefixed with
+  "caught:"
+ 
+. object::func_name() is now allowed (previously, the existence of the 
+  'object' type caused conflicts when trying to use object::)
+ 
+. Compat buster: Fixed a bug in multiple inheritance semantics.
+   object a: bingme() { bing(); } bing() { write("bingAAA\n"); }
+   object b: bingme() { bing(); } bing() { write("bingBBB\n"); }
+   object c: inherit a; inherit b;
+             bing() { write("bingCCC\n"); }
+             create() { a::bingme(); b::bingme() }
+  The old behavior would have been to write bingCCC then bingAAA.
+  The new behavior is to write bingCCC then bingCCC.
+ 
+. Compat buster: removed arch(), version(), and mud_name() functions.  Added
+  MUDOS_ARCH, MUDOS_VERSION, and MUD_NAME defines that are exported to all
+  LPC objects - also, the DIR define was changed to MUDOS_DIR
+ 
+. Plenty of bug fixes and optimizations
+
 0.9.15 to 0.9.16                                   
  
 . Brought the documentation up-to-date.

@@ -7,7 +7,9 @@ logon()
 {
 	object user;
 
-	write("Welcome to Lil!\n> ");
+	write("Welcome to Lil!\n\n");
+	cat("/etc/motd");
+	write("\n> ");
     seteuid(getuid(this_object()));
     user= new("/clone/user");
     user->set_name("stuf" + getoid(user));

@@ -4,7 +4,7 @@ by Lars Pensj|, April 1989.
  
 The following information is not guaranteed to be complete.  (I
 apologize in advance if I have forgotten anyone).  For more information
-read the various 'done' and 'ChangeLog' files.
+read the './doc/driver/done-mudos' and './src/ChangeLog' files.
  
 We would like to thank the following muds for extensive testing and numerous
 bug reports:
@@ -20,15 +20,16 @@ Jeremy Radlow (Whiplash) - original mappings implementation, virtual objects,
 Erik Kay (Wayfarer) - runtime config system, message() efun, and others.
  
 John Garnett (Truilkan) - improved mappings implementation, process_input
-   and write_prompt callbacks, DEBUGMALLOC, C++ style comments, lazy resets,
+   and write_prompt callbacks, C++ style comments, lazy resets,
    master::valid_override callback, improved shared string management, and
    others.
  
 Dwayne Fontenot (Jacques) - major rewrite of comm.c, TCP socket efuns,
    ported to AIX 3.2.
  
-Dave Richards (Cynosure) - UDP socket efuns, enhanced TCP socket efuns,
-   ported MudOS to the Sequent Symmetry (System V Release 3).
+Dave Richards (Cynosure/Cygnus) - UDP socket efuns, enhanced TCP socket efuns,
+   ported MudOS to the Sequent Symmetry (System V Release 3),
+   and the time_expression() efun.
  
 Stephen Iannce (Huthar) - children() and message() efuns, extensive testing of
    the socket efunctions.
@@ -37,7 +38,8 @@ Joel York (Shadowhawk) - multiple arguments version of input_to(), dprint
    option to ed.
  
 Bob Farmer (Blackthorn) - fixed various efuns to honor the hidden object 
-   flags, several new efuns, porting, bug fixes, and others.
+   flags, several new efuns, porting to DEC Alpha and others, bug fixes,
+   and others.
  
 James Waldrop (Sulam) - helped with reorganizing the huge switch in
    interpret.c into efunctions.c.
@@ -49,8 +51,13 @@ Luke Mewborn (Zak) - provided patches allowing MudOS to run on 386BSD
  
 Olav Kolbu (Aragorn) - provided patches allowing MudOS to run on Linux 0.99.3
 
-Darin Johnson - provided various patches and optimizations.
- 
+Darin Johnson (Darin) - provided various patches and optimizations (including
+   combining prelang.y and postlang.y into compiler.y).
+
+David Bennett (Pinkfish) - provided enhancements for parse_command and for the
+   telnet negotiation code in comm.c (as well as various other small bug fixes),
+   and the resolve() efun. 
+
 --
 Thanks to Adam Beeman (Buddha) for making numerous suggestions on
 improving the MudOS driver and for providing the TMI site as the original

@@ -1,0 +1,14 @@
+MudOS is an enhanced LPmud 3.x (native mode only) MUD* server (driver).
+
+This distribution contains the source code (written in C) to MudOS
+in the ./src subdirectory, documentation in ./doc, configuration
+files in ./etc, a small sample mudlib in ./mudlib, and a few utility
+scripts in ./bin.
+
+Begin by reading all of the remaining files in this directory
+(most importantly, the "Copyright" file).  Continue by reading the
+information in the ./doc subdirectory (i.e. Install and Run).
+
+*For more information on MUD itself, try the rec.games.mud.* USENET
+newsgroups or the "Virtual Spaces: MUD" menu of the ACTLab Internet Gopher
+(actlab.rtf.utexas.edu).

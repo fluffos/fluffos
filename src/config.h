@@ -81,7 +81,7 @@
 
 #define NUM_CONSTS 5
 
-#define I(x) (x - F_OFFSET)
+#define I(x) (x)
 
 /*
    define MALLOC, FREE, REALLOC, and CALLOC depending upon what malloc

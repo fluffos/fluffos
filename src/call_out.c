@@ -38,6 +38,7 @@ struct call {
 static struct call *call_list, *call_list_free;
 static int num_call;
 extern int d_flag;
+void remove_all_call_out PROT((struct object *obj));
 
 /*
  * Free a call out structure.
@@ -335,8 +336,10 @@ struct vector *get_all_call_outs() {
     struct call *cop;
     struct vector *v;
 
+/* Zap all of the dested ones from the array... */
+    remove_all_call_out((struct object *)NULL);
     for (i=0, cop = call_list; cop; i++, cop = cop->next)
-	;
+      ;
     v = allocate_array(i);
     next_time = 0;
     /*
@@ -370,10 +373,11 @@ remove_all_call_out(obj)
 struct object *obj;
 {
   struct call **copp, *cop;
+
   copp = &call_list;
   while (*copp)
   {
-    if ((*copp)->ob == obj)
+    if (((*copp)->ob == obj) || ((*copp)->ob->flags & O_DESTRUCTED))
     {
       cop = *copp;
       if (cop->next)

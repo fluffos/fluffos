@@ -58,7 +58,7 @@
 
 #include "config.h"
 #include "lint.h"
-#include "lang.tab.h"
+#include "opcodes.h"
 #include "stdio.h"
 #include "interpret.h"
 #include "mapping.h"
@@ -303,7 +303,7 @@ void svalue_to_string(obj, str, size, indent, trailing, indent2)
       break;
     case T_LVALUE:
       stradd(str, &size, "lvalue: ");
-      svalue_to_string(obj->u.lvalue, str, size, indent+2, trailing);
+      svalue_to_string(obj->u.lvalue, str, size, indent+2, trailing, 0);
       break;
     case T_NUMBER:
       numadd(str, &size, obj->u.number);
@@ -333,9 +333,9 @@ void svalue_to_string(obj, str, size, indent, trailing, indent2)
       break;
     case T_FUNCTION:
       stradd(str, &size, "(: ");
-      svalue_to_string(&(obj->u.fp->obj), str, size, indent+2, trailing);
+      svalue_to_string(&(obj->u.fp->obj), str, size, indent+2, trailing, 0);
       stradd(str, &size, ", ");
-      svalue_to_string(&(obj->u.fp->fun), str, size, indent+2, trailing);
+      svalue_to_string(&(obj->u.fp->fun), str, size, indent+2, trailing, 0);
       stradd(str, &size, " :)");
       break;
     case T_MAPPING:
@@ -343,7 +343,7 @@ void svalue_to_string(obj, str, size, indent, trailing, indent2)
         stradd(str, &size, "([ ])");
       } else {
         stradd(str, &size, "([ /* sizeof() == ");
-        numadd(str, &str, obj->u.map->count);
+        numadd(str, &size, obj->u.map->count);
         stradd(str, &size, " */\n");
         for (i=0;i<(obj->u.map->table_size)-1;i++) {
           struct node *elm;
@@ -591,9 +591,9 @@ char *string_print_formatted(format_str, argc, argv)
   savechars *saves;	/* chars to restore */
   cst *csts;		/* list of columns/tables to be done */
   struct svalue *carg;	/* current arg */
-  unsigned int nelemno;	/* next offset into array */
+  VOLATILE unsigned int nelemno = 0;	/* next offset into array */
   unsigned int fpos;	/* position in format_str */
-  unsigned int arg = 0;	/* current arg number */
+  VOLATILE unsigned int arg = 0;	/* current arg number */
   unsigned int fs;	/* field size */
   int pres;		/* presision */
   unsigned int i;
@@ -605,7 +605,7 @@ char *string_print_formatted(format_str, argc, argv)
 
     i = -1;
 #else
-  if (i = SETJMP(error_jmp)) { /* error handling */
+  if ((i = SETJMP(error_jmp))) { /* error handling */
     char *err;
 #endif
 
@@ -852,7 +852,7 @@ char *string_print_formatted(format_str, argc, argv)
           clean->subtype = STRING_MALLOC;
           clean->u.string = (char *)DXALLOC(500, 112, "string_print: 2");
           clean->u.string[0] = '\0';
-          svalue_to_string(carg, &(clean->u.string), 500, 0, 0);
+          svalue_to_string(carg, &(clean->u.string), 500, 0, 0, 0);
           carg = clean;
           finfo ^= INFO_T_LPC;
           finfo |= INFO_T_STRING;
@@ -951,7 +951,8 @@ add_table_now:
             }
           } else { /* not column or table */
             if (pres && pres<slen) {
-              SAVE_CHAR(((carg->u.string)+pres));
+	      if (carg != clean)
+		SAVE_CHAR(((carg->u.string)+pres));
               carg->u.string[pres] = '\0';
               slen = pres;
             }

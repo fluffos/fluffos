@@ -9,5 +9,3 @@ MudOS seems to compile fine with the system's cc.  Use -O2 for maximum
 optimization.
 
 Not tested (by me) with gcc.
-
-Ultrix 4.2 (at least) yacc won't work.  You'll need bison.

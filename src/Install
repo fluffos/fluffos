@@ -9,6 +9,6 @@ Short instructions:
 3) type: make (to build 'driver' and 'addr_server')
 4) you will need a runtime config file and a mudlib in order to use the driver.
 5) look at the example config file in this directory (Config.example)
-6) get a MudOS-compatible mudlib such as the TMI-2, Nightmare,
-   or Basis mudlib, and read the instructions that come with it.
+6) get a MudOS-compatible mudlib such as the TMI-2 or Nightmare and read the
+   instructions that come with it.
 7) have fun.

@@ -3,6 +3,9 @@
 #include <ctype.h>
 #include <string.h>
 #include <fcntl.h>
+#ifdef __386BSD__
+#include <stdlib.h>
+#endif
 #include "config.h"
 #include "mudlib_stats.h"
 #include "interpret.h"
@@ -10,27 +13,26 @@
 #define _YACC_
 #include "lint.h"
 
-#ifndef FUNC_SPEC
-#define FUNC_SPEC 	"make list_funcs"
-#endif
-#define FUNC_TOKENS 	"efun_tokens.y"
-#define PRE_LANG        "prelang.y"
-#define POST_LANG       "postlang.y"
-#define THE_LANG        "lang.y"
 #ifndef BUFSIZ
 #define BUFSIZ 		1024
 #endif
 #define NELEMS(arr) 	(sizeof arr / sizeof arr[0])
 
+#define FUNC_SPEC "func_spec.cpp"
+
 #define MAX_FUNC  	2048  /* If we need more than this we're in trouble! */
 int num_buff;
+int op_code, efun_code;
 
 /* For quick sort purposes : */
 char *key[MAX_FUNC], *buf[MAX_FUNC], has_token[MAX_FUNC];
 
+char *oper_codes[MAX_FUNC], *efun_codes[MAX_FUNC];
+
 #define EFUN_TABLE "efunctions.h"
 #define EFUN_PROTO "efun_protos.h"
-#define OPC_TABLE "opc.h"
+#define OPC_PROF "opc.h"
+#define OPCODES "opcodes.h"
 
 int min_arg = -1, limit_max = 0;
 
@@ -55,6 +57,31 @@ char *type_str PROT((int)), *etype PROT((int)), *etype1 PROT((int)),
 int toupper PROT((int));
 #endif
 
+#define VOID		1
+#define INT		2
+#define STRING		3
+#define OBJECT		4
+#define MAPPING		5
+#define MIXED		6
+#define UNKNOWN		7
+#define FLOAT		8
+#define FUNCTION	9
+
+struct type {
+    char *name;
+    int num;
+} types[] = {
+{ "void", VOID },
+{ "int", INT },
+{ "string", STRING },
+{ "object", OBJECT },
+{ "mapping", MAPPING },
+{ "mixed", MIXED },
+{ "unknown", UNKNOWN },
+{ "float", FLOAT},
+{ "function", FUNCTION}
+};
+
 void fatal(str)
     char *str;
 {
@@ -68,20 +95,36 @@ void fatal(str)
     char *string;
 }
 
-%token ID
+%token ID DEFAULT OPERATOR
 
-%token VOID INT STRING OBJECT MAPPING MIXED UNKNOWN FLOAT FUNCTION
-
-%token DEFAULT
-
-%type <number> type VOID INT STRING OBJECT MAPPING MIXED UNKNOWN arg_list basic typel
-%type <number> arg_type typel2 FLOAT FUNCTION
+%type <number> type arg_list basic typel arg_type typel2
 
 %type <string> ID optional_ID optional_default
 
 %%
 
-funcs: /* empty */ | funcs func ;
+specs: /* empty */ | specs spec ;
+
+spec: operator | func ;
+    
+operator: OPERATOR op_list ';' ;
+    
+op_list: op | op_list ',' op ;
+
+op: ID
+    {
+	char f_name[500];
+	int len, i;
+	sprintf(f_name, "F_%s", $1);
+	len = strlen(f_name);
+	for (i=0; i < len; i++) {
+	    if (islower(f_name[i]))
+		f_name[i] = toupper(f_name[i]);
+	}
+	oper_codes[op_code] = (char *) malloc(len + 1);
+	strcpy(oper_codes[op_code], f_name);
+	op_code++;
+    } ;
 
 optional_ID: ID | /* empty */ { $$ = ""; } ;
 
@@ -91,11 +134,10 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
     {
 	char buff[500];
 	char f_name[500];
-	int i;
+	int i, len;
 	if (min_arg == -1)
 	    min_arg = $5;
 	if ($3[0] == '\0') {
-	    int len;
 	    if (strlen($2) + 1 + 2 > sizeof f_name)
 		fatal("A local buffer was too small!(1)\n");
 	    sprintf(f_name, "F_%s", $2);
@@ -105,10 +147,18 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 		    f_name[i] = toupper(f_name[i]);
 	    }
 	    has_token[num_buff]=1;
+	    efun_codes[efun_code] = (char *) malloc(len + 1);
+	    strcpy(efun_codes[efun_code], f_name);
+	    efun_code++;
 	} else {
 	    if (strlen($3) + 1 > sizeof f_name)
 		fatal("A local buffer was too small(2)!\n");
-	    strcpy(f_name, $3);
+	    sprintf(f_name, "F_%s", $3);
+	    len = strlen(f_name);
+	    for (i=0; i < len; i++) {
+		if (islower(f_name[i]))
+		    f_name[i] = toupper(f_name[i]);
+	    }
 	    has_token[num_buff]=0;
 	}
 	for(i=0; i < last_current_type; i++) {
@@ -132,9 +182,9 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 	sprintf(buff, "{\"%s\",%s,%d,%d,%s,%s,%s,%d,%s},\n",
 		$2, f_name, min_arg, limit_max ? -1 : $5, ctype($1),
 		etype(0), etype(1), i, $6);
-        if (strlen(buff) > sizeof buff)
-     	    fatal("Local buffer overwritten !\n");
-        key[num_buff] = (char *) malloc(strlen($2) + 1);
+	if (strlen(buff) > sizeof buff)
+	    fatal("Local buffer overwritten !\n");
+	key[num_buff] = (char *) malloc(strlen($2) + 1);
 	strcpy(key[num_buff], $2);
 	buf[num_buff] = (char *) malloc(strlen(buff) + 1);
 	strcpy(buf[num_buff], buff);
@@ -146,8 +196,19 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 
 type: basic | basic '*' { $$ = $1 | 0x10000; };
 
-basic: VOID | FLOAT | FUNCTION | INT | STRING | MIXED | UNKNOWN | OBJECT
-   | MAPPING ;
+basic: ID
+    {
+	int i;
+	$$ = 0;
+	for (i=0; i < NELEMS(types); i++) {
+	    if (strcmp($1, types[i].name) == 0) {
+		$$ = types[i].num;
+		break;
+	    }
+	}
+	if (!$$)
+	    yyerror("Invalid type");
+    } ;
 
 arg_list: /* empty */		{ $$ = 0; }
 	| typel2			{ $$ = 1; if ($1) min_arg = 0; }
@@ -177,21 +238,6 @@ typel: arg_type			{ $$ = ($1 == VOID && min_arg == -1); }
 
 %%
 
-struct type {
-    char *name;
-    int num;
-} types[] = {
-{ "void", VOID },
-{ "int", INT },
-{ "string", STRING },
-{ "object", OBJECT },
-{ "mapping", MAPPING },
-{ "mixed", MIXED },
-{ "unknown", UNKNOWN },
-{ "float", FLOAT},
-{ "function", FUNCTION}
-};
-
 FILE *f;
 int current_line = 1;
 
@@ -199,15 +245,20 @@ int main(argc, argv)
     int argc;
     char **argv;
 {
-    int i, fdr, fdw;
-    char buffer[BUFSIZ + 1];
-	void make_efun_table();
+    int i;
+    void make_efun_tables();
 
-    if ((f = popen(FUNC_SPEC, "r")) == NULL) { 
+    num_buff = op_code = efun_code = 0;
+
+    if ((f = fopen(FUNC_SPEC, "r")) == NULL) { 
 	perror(FUNC_SPEC);
 	exit(1);
     }
+
     yyparse();
+
+    make_efun_tables();
+
     /* Now sort the main_list */
     for (i = 0; i < num_buff; i++) {
        int j;
@@ -219,9 +270,8 @@ int main(argc, argv)
 	      tmp = buf[i]; buf[i] = buf[j]; buf[j] = tmp;
 	      tmpi = has_token[i];
 	      has_token[i] = has_token[j]; has_token[j] = tmpi;
-           }
+	   }
     }
-	make_efun_table(key,num_buff);
     /* Now display it... */
     printf("{\n");
     for (i = 0; i < num_buff; i++)
@@ -234,42 +284,7 @@ int main(argc, argv)
 	    printf("%s,", ctype(arg_types[i]));
     }
     printf("};\n");
-    pclose(f);
-    /*
-     * Write all the tokens out.  Do this by copying the
-     * pre-include portion of lang.y to lang.y, appending
-     * this information, then appending the post-include
-     * portion of lang.y.  It's done this way because I don't
-     * know how to get YACC to #include %token files.  *grin*
-     */
-    if ((fdr = open(PRE_LANG, O_RDONLY)) < 0) {
-       perror(PRE_LANG);
-       exit(1);
-    }
-    unlink(THE_LANG);
-    if ((fdw = open(THE_LANG, O_CREAT | O_WRONLY, 0600)) < 0) {
-       perror(THE_LANG);
-       exit(1);
-    }
-    while ((i = read(fdr, buffer, BUFSIZ)))
-       write(fdw, buffer, i);
-    close(fdr);
-    for (i = 0; i < num_buff; i++) {
-       if (has_token[i]) {
-          char *str;   /* It's okay to mung key[*] now */
-          for (str = key[i]; *str; str++)
-   	     if (islower(*str)) *str = toupper(*str);
-          sprintf(buffer, "%%token F_%s\n", key[i]);
-          write(fdw, buffer, strlen(buffer));
-       }
-    }
-    if ((fdr = open(POST_LANG, O_RDONLY)) < 0) {
-       perror(POST_LANG);
-       exit(1);
-    }
-    while ((i = read(fdr, buffer, BUFSIZ)))
-       write(fdw, buffer, i);
-    close(fdr), close(fdw);
+    fclose(f);
     return 0;
 }
 
@@ -284,7 +299,7 @@ int ident(c)
     int c;
 {
     char buff[100];
-    int len, i;
+    int len;
 
     for (len=0; isalnum(c) || c == '_'; c = getc(f)) {
 	buff[len++] = c;
@@ -297,14 +312,10 @@ int ident(c)
     }
     (void)ungetc(c, f);
     buff[len] = '\0';
-    for (i=0; i < NELEMS(types); i++) {
-	if (strcmp(buff, types[i].name) == 0) {
-	    yylval.number = types[i].num;
-	    return types[i].num;
-	}
-    }
     if (strcmp(buff, "default") == 0)
 	return DEFAULT;
+    if (strcmp(buff, "operator") == 0)
+	return OPERATOR;
     yylval.string = (char *)malloc(strlen(buff)+1);
     strcpy(yylval.string, buff);
     return ID;
@@ -386,7 +397,7 @@ char *etype1(n)
     case OBJECT:
 	return "T_OBJECT";
     case MAPPING:
-        return "T_MAPPING";
+	return "T_MAPPING";
     case STRING:
 	return "T_STRING";
     case MIXED:
@@ -439,7 +450,7 @@ char *ctype(n)
     int n;
 {
     static char buff[100];	/* 100 is such a comfortable size :-) */
-    char *p;
+    char *p = (char *)NULL;
 
     if (n & 0x10000)
 	strcpy(buff, "TYPE_MOD_POINTER|");
@@ -464,12 +475,9 @@ char *ctype(n)
     return buff;
 }
 
-void make_efun_table(key,num_buff)
-char *key[];
-int num_buff;
+void make_efun_tables()
 {
 	FILE *fp, *fp2, *fp3;
-	char buffer[100];
 	int i;
 
 	fp = fopen(EFUN_TABLE,"w");
@@ -477,39 +485,51 @@ int num_buff;
 		fprintf(stderr,"make_func: unable to open %s\n",EFUN_TABLE);
 		exit(-1);
 	}
-	fp2 = fopen(OPC_TABLE, "w");
+	fp2 = fopen(OPC_PROF, "w");
 	if (!fp2) {
-		fprintf(stderr,"make_func: unable to open %s\n",OPC_TABLE);
+		fprintf(stderr,"make_func: unable to open %s\n",OPC_PROF);
 		exit(-2);
 	}
+	fp3 = fopen(OPCODES, "w");
+	if (!fp3) {
+		fprintf(stderr,"make_func: unable to open %s\n",OPCODES);
+		exit(-3);
+	}
+	
 	fprintf(fp,"/*\n\tThis file is automatically generated by make_func.\n");
 	fprintf(fp,"\tdo not make any manual changes to this file.\n*/\n\n");
 	fprintf(fp2,"/*\n\tThis file is automatically generated by make_func.\n");
 	fprintf(fp2,"\tdo not make any manual changes to this file.\n*/\n\n");
-	fprintf(fp,
-		"\ntypedef void (*func_t) PROT((int, int));\n\n");
+	fprintf(fp3,"/*\n\tThis file is automatically generated by make_func.\n");
+	fprintf(fp3,"\tdo not make any manual changes to this file.\n*/\n\n");
+	
+	fprintf(fp, "\ntypedef void (*func_t) PROT((int, int));\n\n");
 	fprintf(fp2,"\ntypedef struct opc_s { char *name; int count; } opc_t;\n\n");
-	strcpy(buffer,key[0]);
-	for (i = 0; buffer[i]; i++)
-		buffer[i] = (buffer[i] == '_') ? '_' : toupper(buffer[i]);
-	fp3 = fopen("base.h", "w");
-	fprintf(fp3,"#define BASE F_%s\n\n",buffer); 
-	fclose(fp3);
-	fprintf(fp,"#include \"base.h\"\n\n");
-	fprintf(fp2,"#include \"base.h\"\n\n");
 	fprintf(fp,"func_t efun_table[] = {\n");
 	fprintf(fp2,"opc_t opc_efun[] = {\n");
 	for (i = 0; i < (num_buff - 1); i++) {
-		fprintf(fp,"\tf_%s,\n",key[i]);
-		fprintf(fp2,"{\"%s\", 0},\n",key[i]);
+		if (has_token[i]) {
+			fprintf(fp,"\tf_%s,\n",key[i]);
+			fprintf(fp2,"{\"%s\", 0},\n",key[i]);
+		}
 	}
 	fprintf(fp,"\tf_%s};\n",key[num_buff - 1]);
 	fprintf(fp2,"{\"%s\", 0}};\n",key[num_buff - 1]);
 	for (i = 0; i < num_buff; i++) {
-		fprintf(fp,"void f_%s PROT((int, int));\n",key[i]);
+		if (has_token[i])
+			fprintf(fp,"void f_%s PROT((int, int));\n",key[i]);
+	}
+	fprintf(fp3, "\n/* operators */\n\n");
+	for (i = 0; i < op_code; i++) {
+		fprintf(fp3,"#define %-30s %d\n", oper_codes[i], i+1);
+	}
+	fprintf(fp3,"\n/* efuns */\n#define BASE %d\n\n", op_code+1);
+	for (i = 0; i < efun_code; i++) {
+		fprintf(fp3,"#define %-30s %d\n", efun_codes[i], i+op_code+1);
 	}
 	fclose(fp);
 	fclose(fp2);
+	fclose(fp3);
 	fp = fopen(EFUN_PROTO,"w");
 	fprintf(fp,"/*\n\tThis file is automatically generated by make_func.\n");
 	fprintf(fp,"\tdo not make any manual changes to this file.\n*/\n\n");
@@ -518,7 +538,8 @@ int num_buff;
 		exit(-1);
 	}
 	for (i = 0; i < num_buff; i++) {
-		fprintf(fp,"void f_%s PROT((int, int));\n",key[i]);
+		if (has_token[i])
+			fprintf(fp,"void f_%s PROT((int, int));\n",key[i]);
 	}
 	fclose(fp);
 }

@@ -1,20 +1,19 @@
-.\"execute a command as if given by the player
+.\"execute a command as if given by the object
 .TH command 3
 
 .SH NAME
-command() - exectue a command as if given by the player
+command() - execute a command as if given by the object
 
 .SH SYNOPSIS
-int command( string str );
+int command(string str, object ob);
 
 .SH DESCRIPTION
-Execute <str> as a command given directly by the player.
-Any effects of the command will apply to the current object.
-There was a second argument, which is not supported any longer.
-.PP
-Return value is 0 for failure.  Otherwise, a numeric value is returned, which
-tells the LPC evaluation cost.  Bigger number means higher cost, though
-the whole scale is somewhat subjective.
+Execute `str' for object `ob', or this_object() if `ob' is omitted.  Note that
+the usability of the second argument is determined by the local administrator
+and will usually not be available, in which case an error will result.
+In case of failure, 0 is returned, otherwise a numeric value is returned,
+which is the LPC "evaluation cost" of the command.  Bigger numbers mean
+higher cost, but the whole scale is subjective and unreliable.
 
 .SH SEE ALSO
-enable_commands(3)
+add_action(3), enable_commands(3)

@@ -33,7 +33,21 @@ eval_instruction()) by a factor of two.
 
 5) Don't give objects heartbeats (set_heart_beat(1)) unless really
 necessary.  Do as little in heart_beat() functions as reasonable.
+Consider turning off heartbeats when not needed and then restarting
+them when again needed.
 
 6) Read the comments in the example config file about hash table size, and
 object hash table size--setting proper (large enough) values for these
 two hash tables greatly increases overall speed.
+
+7) The opcprof() efun can be used to find out which efunctions are being used
+the most.  Rewriting mudlib code that makes extensive use of expensive efuns
+can improve performance somewhat.  In order to find out which efuns are
+expensive, compile the driver with the profiling flags (-pg if using gcc)
+and produce a gmon.out file.  This file can be processed with the gprof
+command to find out the percentage of cpu time spent in various different
+driver functions.
+
+8) try using the time_expression(expr) function to measure the cpu time used
+by various different expressions (time_expression uses the same syntax as
+catch()).

@@ -1,22 +1,24 @@
 .\"replace all instances of a string within a string
 .TH replace_string 3
-
+ 
 .SH NAME
 replace_string() - replace all instances of a string within a string
-
+ 
 .SH SYNOPSIS
-string replace_string( string str, string pattern, string replace );
-
+string replace_string(string str, string pat, string rep, int x, int y);
+ 
 .SH DESCRIPTION
-replace_string() returns str with all instances of pattern replaced with
-replace.  If pattern has zero length then str is returned unmodified.
-If the resultant string would exceed the maximum string length then
-replace_string() returns an undefinedp(), non-stringp() value.
-.PP
-replace_string() can be used to remove characters from a string by
-specifying a pattern and a zero-length replace parameter.  For example,
-replace_string(" 1 2 3 ", " ", "") would return "123".  replace_string()
-executes faster this way then explode()/implode().
-
+With 3 arguments given, replace_string() returns `str' with all instances of 
+`pat' replaced with `rep'.  If `pat' is zero length then `str' is returned 
+unmodified.  If `rep' is zero length then all occurrences of `pat' are simply
+deleted.   If the resultant string would exceed the maximum string length 
+then replace_string() returns an undefinedp(), non-stringp() value.  If `x'
+is given and `y' is not, then replace_string() will replace up to `x'
+occurrences of the string starting at the beginning of the string; an `x'
+value of 0 means replace all occurrences.  If both `x' and `y' are given,
+then `x' indicates the match number to start replacing at (first match is 0),
+and `y' indicates the number of matches to replace (0 would mean replace 
+until the end is reached).
+ 
 .SH SEE ALSO
 extract(3), sscanf(3), explode(3)

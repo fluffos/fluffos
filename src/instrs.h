@@ -1,6 +1,6 @@
 /*
  * Information about all instructions. This is not really needed as the
- * automatially generated efun_arg_types[] should be used.
+ * automatically generated efun_arg_types[] should be used.
  */
 
 struct instr {

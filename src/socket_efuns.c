@@ -8,6 +8,9 @@
 #include <sys/time.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#ifdef __386BSD__
+#include <sys/param.h>
+#endif
 #if !defined(apollo) && !defined(linux)
 #include <sys/socketvar.h>
 #endif
@@ -407,7 +410,7 @@ socket_write(fd, message, name)
     char *name;
 {
     int len, off;
-    char *buf;
+    char *buf, *p;
     struct sockaddr_in sin;
 
     if (fd < 0 || fd >= MAX_EFUN_SOCKS)
@@ -451,7 +454,8 @@ socket_write(fd, message, name)
 	    *(long *)buf = htonl((long)len);
 	    len += sizeof (long);
 	    buf[sizeof(long)] = '\0';
-	    save_svalue(message, buf + sizeof (long));
+	    p = buf + sizeof(long);
+	    save_svalue(message, &p);
 	    break;
 	}
 	break;
@@ -553,7 +557,7 @@ void
 socket_read_select_handler(fd)
     int fd;
 {
-    int cc, addrlen;
+    int cc = 0, addrlen;
     char buf[BUF_SIZE], addr[ADDR_BUF_SIZE];
     struct svalue value;
     struct sockaddr_in sin;
@@ -578,7 +582,7 @@ socket_read_select_handler(fd)
 	case DATAGRAM:
 	    debug(8192,("read_socket_handler: DATA_XFER DATAGRAM\n"));
 	    addrlen = sizeof (sin);
-	    cc = recvfrom(lpc_socks[fd].fd, buf, sizeof (buf), 0,
+	    cc = recvfrom(lpc_socks[fd].fd, buf, sizeof (buf) - 1, 0,
 		(struct sockaddr *)&sin, &addrlen);
 	    if (cc <= 0)
 		break;
@@ -661,7 +665,7 @@ socket_read_select_handler(fd)
 
 	case STREAM:
 	    debug(8192,("read_socket_handler: DATA_XFER STREAM\n"));
-	    cc = recv(lpc_socks[fd].fd, buf, sizeof (buf), 0);
+	    cc = recv(lpc_socks[fd].fd, buf, sizeof (buf) - 1, 0);
 	    if (cc <= 0)
 		break;
 	    debug(8192,("read_socket_handler: read %d bytes\n", cc));
@@ -743,8 +747,13 @@ socket_close(fd)
 	return EEBADF;
     if (lpc_socks[fd].owner_ob != current_object)
 	return EESECURITY;
+#ifndef SunOS_5
+	/* this sometimes hangs the driver on the SPARC Classic
+	   running Solaris 2.1 (and doesn't seem to be necessary).
+	*/
     if (lpc_socks[fd].mode != DATAGRAM)
 	shutdown(lpc_socks[fd].fd, 2);
+#endif
     while (close(lpc_socks[fd].fd) == -1 && errno == EINTR)
 	; /* empty while */
     lpc_socks[fd].state = CLOSED;

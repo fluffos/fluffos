@@ -5,25 +5,31 @@
 call_other() - call a function in another object
 
 .SH SYNOPSIS
-unknown call_other( object ob, string str, mixed arg );
+unknown call_other(object ob | object *obs, string func | mixed *args, ...);
 
 .SH DESCRIPTION
-Call function in another object with an argument. The return value is
-returned from the other object. The compiler don't know the return type,
-so it must be cast.
-.PP
-There is a syntactically more attractive way to do call_others:
-.IP
-ob -> func( args... );
-.PP
-Which is equivalent to call_other( "func", args... );
-If the first argument passed to call_other() is an array, then "func"
-will be called on each element of the array which is an object.  Here
-are some example usages of this MudOS feature:
-.PP
-all_inventory(ob)->move(dest);
-.PP
-users()->quit();
+Calls a function in another object, with [optional] argument(s).  The return
+value is returned from the other object, so it cannot be known at compile
+time and may need to be cast if using type checking.  The function named
+`func' will be called in `ob', with arguments 3, 4, etc given as arguments
+1, 2, etc to `func' in `ob'.  call_other will return the return value of
+`func'.  If the first argument is an array instead of an object, then
+the call will be done in all elements of that array (all elements should be
+of type object), and no value will be returned.  If argument 2 is an array
+instead of a string, then the first element in the array should be a string,
+the function to call, and all other elements will be passed to the function
+in the order they appear in the array.
 
-.SH SEE ALSO
-present(3), find_living(3)
+There is a much more attractive way to do call_others:
+object ob | object *obs -> func ( ... );
+
+ie,
+call_other(ob, "query", "name");
+could be written as:
+ob->query("name");
+
+Using an array as second argument, the same call could be written:
+call_other(ob, ({ "query", "name" }));
+
+An example of using an array as the first argument:
+users()->quit();

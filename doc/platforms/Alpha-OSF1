@@ -1,0 +1,3 @@
+MudOS hints for the DEC Alpha running OSF/1:
+
+Don't try to use smalloc, and probably not bsdmalloc either.

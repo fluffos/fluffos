@@ -6,6 +6,9 @@
  */
 
 #include <stdio.h>
+#ifdef __386BSD__
+#include <string.h>
+#endif
 #include "config.h"
 #include "lint.h"
 

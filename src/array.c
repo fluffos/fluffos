@@ -118,7 +118,7 @@ struct vector *shrink_array(p, n)
 struct vector *explode_string(str, del)
     char *str, *del;
 {
-	char *p, *beg, *lastdel;
+	char *p, *beg, *lastdel = (char *)NULL;
 	int num, len, j, slen, limit;
 	struct vector *ret;
 	char *buff, *tmp;
@@ -246,7 +246,7 @@ users()
 	extern int num_user, num_hidden; /* set by comm1.c */
 	extern struct interactive *all_users[MAX_USERS];
 	int i, j;
-	int display_hidden;
+	int display_hidden = 0;
 	struct vector *ret;
 
 	if (num_hidden > 0) {
@@ -1268,7 +1268,7 @@ char *str;
 struct vector *
 livings()
 {
-    int nob, apply_valid_hide, hide_is_valid;
+    int nob, apply_valid_hide, hide_is_valid = 0;
     struct object *ob, **obtab;
     struct vector *vec;
 

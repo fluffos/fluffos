@@ -1,6 +1,10 @@
+#include <stdio.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <signal.h>
+#ifdef _SEQUENT_
+#include <usclkc.h>
+#endif
 
 #include "config.h"
 #include "lint.h"
@@ -9,7 +13,7 @@
 time_t time PROT((time_t *));
 #endif
 
-#ifdef SunOS_5
+#if defined(SunOS_5) || defined(__386BSD__)
 #include <stdlib.h>
 #endif
 
@@ -56,6 +60,40 @@ char *time_string(t)
     int t;
 {
     return (char *)ctime((time_t *)&t);
+}
+
+/*
+ * Initialize the microsecond clock.
+ */
+void
+init_usec_clock()
+{
+#ifdef _SEQUENT_
+	usclk_init();
+#endif
+}
+
+/*
+ * Get a microsecond clock sample.
+ */
+void
+get_usec_clock(sec, usec)
+	long *sec, *usec;
+{
+#ifdef HAS_GETTIMEOFDAY
+	struct timeval tv;
+        gettimeofday(&tv, NULL);
+	*sec = tv.tv_sec;
+	*usec = tv.tv_usec;
+#else
+#ifdef _SEQUENT_
+	*sec = 0;
+	*usec = GETUSCLK();
+#else
+	*sec = time(0);
+	*usec = 0;
+#endif
+#endif
 }
 
 #ifdef USE_POSIX_SIGNALS

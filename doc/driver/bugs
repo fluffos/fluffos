@@ -1,29 +1,3 @@
-Updating master.c causes the mud to crash again. What seems to be happening 
-is that when init_object() is called on the new master object (from 
-assert_master_ob_loaded), a reset() gets called on the object.  Other than 
-being something incorrect, on our mud, this reset uses a file operation, 
-which causes assert_master_ob_loaded to be called again, causing the crash.
- 
-The reset is being called because:
-  init_object() calls init_stats_for_object()
-  init_stats_for_object() calls init_domain_for_ob()
-    tmp_ob gets set to the new master object
-    there is a current object, so the NONAME part is skipped
-    apply(domain_file, new_ob) is called
-      this does a try_reset()
-      try_reset() actually calls the reset, because the new
-        object has not been fully initialized - reset() is being
-        called before create() even - the time_to_next_reset is
-        still 0...  The line after the init_object() is what
-        should be doing the create, but it doesn't make it that far.
- 
-So, solutions...  Maybe have assert_master_ob_loaded temporarily reset 
-current_object to 0 when it is loading the object?  Or have special checks 
-in init_domain_for_ob, init_author_for_ob, and maybe in give_uid_to_object? 
-(djohnson@cs.ucsd.edu)
- 
------
- 
 In compile_object, it is possible for the object to get loaded twice, 
 causing the game to crash.  The sequence of events on our mud was to call 
 an external object to create the virtual object; when created, this 
@@ -81,23 +55,6 @@ which caused the second intendation to barf about the unterminated string.
  
 -----
  
-using save_object() with large mapping variables is very very very very 
-slow.  
-(bobf@metronet.com)
- 
-it's because of all the strcat()'s being done.  these could be optimized 
-away with proper coding :)
-(garnett@gestalt.austin.tx.us)
- 
------
- 
-in item_parse(), the %p doesnt seem to work correctly.  it returns 0, instead 
-of an array of prepositions, when it is passed such.  it works fine if it's 
-not passed anything.
-(rickert@cco.caltech.edu)
- 
------
- 
 following code crashed Genocide multiple times:
   string *stuff; 
   stuff = ({ "test1", "test2", "test3"}); 
@@ -105,9 +62,7 @@ following code crashed Genocide multiple times:
   write(stuff[0]);
 (maurg@csv.warwick.ac.uk)
  
------
- 
-following code crashes NannyMUD:
+following code crashes NannyMUD apparently:
   ({ 1, 2, 3 })[1..0] = ({ 1, 2 });
  
 -----
@@ -117,25 +72,13 @@ argument, it doesnt seem to exclude any of them but instead both objects gets
 the message, even worse, when I got the first of the two items in the 
 array = 0 the GD just crashes.
 (Ged)
- 
------
- 
-the error(), fatal(), and debug_fatal() functions in simulate.c need to be 
-done with proper varargs stuff.  one reason: to support 64-bit systems in 
-the future, where strings and ints aren't of the same size.
-(bobf@metronet.com)
+
+hence,   crasher: say("hello", ({ 0 })); 
  
 -----
  
 printf("%.5ftest", 1.0);
 prints 1.000, but it should print 1.000test
-(maurg@csv.warwick.ac.uk)
- 
------
- 
-printf("%O", large_array)
-ERROR: (s)printf(): BUFF_SIZE overflowed... in arg 0
-couple of seconds later it crashes
 (maurg@csv.warwick.ac.uk)
  
 -----
@@ -148,29 +91,14 @@ function and then update the simul_efun object.
  
 -----
  
-do we really want RETURN_ERROR_MESSAGES defined in sprintf.c?
-(bobf@metronet.com)
- 
------
- 
-the following crashed CyberMUD:
-  string *test;
-  test = ({ "Decker" });
-  printf( "Array is: %-15.15O\n", test );
-(Decker)
- 
------
- 
-Should all the d_flag checks only be present if DEBUG is defined?
-(djohnson@cs.ucsd.edu)
- 
------
- 
 crasher: message("say", "hello", ({ 0 }))
+(same problem as say()?)
  
 -----
- 
-save_object() doesn't prepend a "/" to the filename passed to valid_write()?
+
+save_object doesn't prepend a "/" to the filename before passing to 
+valid_write()
+(bobf@metronet.com)
  
 -----
  
@@ -182,5 +110,33 @@ especially nasty effects if you do something more on the right hand side,
 i.e. a function call which deallocates a and then loads an object into the 
 free space - has rather devastating effects, I assure you. Fixing that 
 means major changes in the gamedriver.
- 
+
+-----
+
+Lots of places in the code that do an apply and don't free the ret value.
+Here, Amylaar seems to be saying that we should.  This could be the source
+of some memory leaks... yes?
+
+   d = apply(sort_array_cmp_func, sort_array_cmp_ob, 2);
+    if (!d) {
+        return 0;
+    }
+    if (d->type != T_NUMBER) {    /* In case it's not a number --Amylaar */
+        free_svalue(d);
+        ret = 0;
+
+(garnett@gestalt.austin.tx.us)
+
+-----
+
+need a way to tell the driver to try reconnecting to the addr_server
+after it has gone down and come back up (the addr_server).  maybe
+the driver could just retry every now and then?
+(garnett@gestalt.austin.tx.us)
+
+-----
+
+Overflowing (s)printf() buffers can cause a crash.
+(bobf@metronet.com)
+
 -----

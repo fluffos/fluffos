@@ -7,6 +7,10 @@
    Algorithm Analysis_ by Cawnthorpe.
 */
 
+#ifdef __386BSD__
+#include <sys/types.h>
+#include <string.h>
+#endif
 #include "config.h"
 #include "lint.h"
 #include "mudlib_stats.h"

@@ -29,6 +29,7 @@
 
 typedef struct object {
     unsigned short flags;	/* Bits or'ed together from above */
+    short heart_beat_ticks, time_to_heart_beat;
     short total_light;
 	int load_time;    /* time when this object was created */
     int next_reset;		/* Time of next reset of this object */
@@ -51,6 +52,9 @@ typedef struct object {
     struct sentence *sent;
     userid_t *uid;                      /* the "owner" of this object */
     userid_t *euid;                     /* the effective "owner" */
+#ifdef PRIVS
+    char *privs;          /* object's privledges */
+#endif /* PRIVS */
     statgroup_t stats;                  /* mudlib stats */
     struct object *next_hashed_living;
     char *living_name;			/* Name of living object if in hash */
@@ -79,8 +83,9 @@ void tell_object PROT((struct object *, char *));
 int restore_object PROT((struct object *, char *, int));
 
 #ifdef DEBUG
-#define add_ref(ob, str) ob->ref++; \
-    if (d_flag > 1) printf("Add_ref %s (%d) from %s\n", ob->name, ob->ref, str)
+#define add_ref(ob, str) do { ob->ref++; \
+    if (d_flag > 1) \
+     printf("Add_ref %s (%d) from %s\n", ob->name, ob->ref, str); } while (0)
 #else
 #define add_ref(ob, str) ob->ref++
 #endif

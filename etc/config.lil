@@ -16,7 +16,7 @@ port number : 4444
 # (currently this option is unused)
 maximum users : 40
 
-mudlib directory : /export/home/garnett/MudOS_0.9/mudlib/lil
+mudlib directory : /usr/local/src/mud/MudOS_0.9.17/mudlib/lil
 binary directory : /usr/local/mud/bin
 
 # This is the subdirectory where all the domain directorys are placed.
@@ -143,7 +143,6 @@ reserved size : 0
 hash table size : 7001
 
 # There is a hash table for living objects, used by find_living().
-# THIS IS NOT IMPLEMENTED YET.
 living hash table size : 100
 
 # Object hash table size.

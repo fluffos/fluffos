@@ -1,32 +1,12 @@
 Wish list for MudOS 1.0
 -----------------------
  
-change postlang.y and prelang.y so that efunctions aren't represented as 
-terminals in the yacc grammer.  The reason why is that many yaccs are 
-puking because of too many terminals (%token XYZ) in the grammar.  Bison 
-doesn't have this problem but bison has the problem of producing code that 
-uses alloca() and not every system has alloca() (although gcc does have 
-alloca builtin).  Making this change should let us combine prelang.y and 
-postlang.y into one file.
- 
 find some way to reduce memory overhead incurred by inheritance.
- 
-Cygnus's access control list idea?
  
 support indexed strings as lvalues (e.g. str[i] = 'x') (Wing)
  
-fix inheritance so that if you have an object c that inherits objects a and 
-b (in that order), and a, b, and c all have a function with the same name, 
-then when that function is called from inside b, it should call the one in 
-c and not the one in a.  (this may be a problem in find_inherited()) (?)
- 
 make ~username work in #include statements e.g. 
 #include "~truilkan/include/config.h" (Shadowhawk)
- 
-make a version of call_other that accepts an array as the argument list. it 
-should copy the array into a temp variable and then pop the array from the 
-stack.  it should then push each element of the array onto the stack as a 
-separate parameter.  it should then call the normal call_other.
  
 fix sprintf() to do more intelligent things when types don't match e.g. 
 printf("%s", 24) should convert 24 to a string like write("number: " + 24 
@@ -53,11 +33,6 @@ remove wizardp(), enable_wizard(), and disable_wizard() from driver and
 split into functions that allow error messages, unrestricted ed, and trace 
 (which are the only two current uses of enable_wizard (other than mudlib 
 uses)).
- 
-fix driver not to lock player up when ^C is received (Telnet DO TIMING)
- 
-consider adding an unshadow efun so that a shadow can be removed and 
-reused (without recloning)
  
 disallow new logins during a shutdown
  

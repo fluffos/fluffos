@@ -13,7 +13,7 @@
 
 #include "config.h"
 #include "lint.h"
-#include "lang.tab.h"
+#include "opcodes.h"
 #include "exec.h"
 #include "interpret.h"
 #include "mapping.h"
@@ -33,8 +33,7 @@
 #include "debug.h"
 
 #ifdef OPCPROF
-#define MAXOPC 512
-static int opc_eoper[MAXOPC];
+static int opc_eoper[BASE];
 #endif
 
 #ifdef RUSAGE			/* Defined in config.h */
@@ -42,7 +41,6 @@ static int opc_eoper[MAXOPC];
 #ifdef SunOS_5
 #include <sys/rusage.h>
 #endif
-extern int getrusage PROT((int, struct rusage *));
 #ifdef sun
 extern int getpagesize();
 #endif
@@ -111,7 +109,9 @@ extern int current_line, eval_cost;
  */
 char *pc;		/* Program pointer. */
 struct svalue *fp;	/* Pointer to first argument. */
-struct svalue *sp;	/* Points to value of last push. */
+
+struct svalue *sp;
+
 short *break_sp;		/* Points to address to branch to
 				 * at next F_BREAK			*/
 int function_index_offset; /* Needed for inheritance */
@@ -130,6 +130,47 @@ void get_version(buff)
 {
   sprintf(buff, "MudOS %s%s", 
 	  VERSION, PATCH_LEVEL);
+}
+
+/*
+ * Information about assignments of values:
+ *
+ * There are three types of l-values: Local variables, global variables
+ * and vector elements.
+ *
+ * The local variables are allocated on the stack together with the arguments.
+ * the register 'frame_pointer' points to the first argument.
+ *
+ * The global variables must keep their values between executions, and
+ * have space allocated at the creation of the object.
+ *
+ * Elements in vectors are similar to global variables. There is a reference
+ * count to the whole vector, that states when to deallocate the vector.
+ * The elements consists of 'struct svalue's, and will thus have to be freed
+ * immediately when over written.
+ */
+
+/*
+ * Push an object pointer on the stack. Note that the reference count is
+ * incremented.
+ * A destructed object must never be pushed onto the stack.
+ */
+INLINE
+  void push_object(ob)
+struct object *ob;
+{
+  sp++;
+  if (sp == &start_of_stack[EVALUATOR_STACK_SIZE])
+    fatal("stack overflow\n");
+  if (ob) {
+    sp->type = T_OBJECT;
+    sp->u.ob = ob;
+    add_ref(ob, "push_object");
+  } else {
+    sp->type = T_NUMBER;
+    sp->subtype = T_NULLVALUE;
+    sp->u.number = 0;
+  }
 }
 
 /*
@@ -172,47 +213,6 @@ int validate_shadowing(ob)
   return 0;
 }
 #endif
-
-/*
- * Information about assignments of values:
- *
- * There are three types of l-values: Local variables, global variables
- * and vector elements.
- *
- * The local variables are allocated on the stack together with the arguments.
- * the register 'frame_pointer' points to the first argument.
- *
- * The global variables must keep their values between executions, and
- * have space allocated at the creation of the object.
- *
- * Elements in vectors are similar to global variables. There is a reference
- * count to the whole vector, that states when to deallocate the vector.
- * The elements consists of 'struct svalue's, and will thus have to be freed
- * immediately when over written.
- */
-
-/*
- * Push an object pointer on the stack. Note that the reference count is
- * incremented.
- * A destructed object must never be pushed onto the stack.
- */
-INLINE
-  void push_object(ob)
-struct object *ob;
-{
-  sp++;
-  if (sp == &start_of_stack[EVALUATOR_STACK_SIZE])
-    fatal("stack overflow\n");
-  if (ob) {
-    sp->type = T_OBJECT;
-    sp->u.ob = ob;
-    add_ref(ob, "push_object");
-  } else {
-    sp->type = T_NUMBER;
-    sp->subtype = T_NULLVALUE;
-    sp->u.number = 0;
-  }
-}
 
 /*
  * Push a number on the value stack.
@@ -883,24 +883,24 @@ static void
 eval_instruction(p)
 char *p;
 {
-  int i, num_arg;
+  int i, num_arg = -1;
   float real;
   int instruction, is_efun;
   unsigned short offset;
   unsigned short string_number;
-  static func_t *oefun_table = efun_table - (BASE - F_OFFSET);
+  static func_t *oefun_table = efun_table - BASE;
   
   /* Next F_RETURN at this level will return out of eval_instruction() */
   csp->extern_call = 1;
   too_deep_error = max_eval_error = 0;
   pc = p;
   while (1) { /* used to be the 'again' label */
-    if ((instruction = EXTRACT_UCHAR(pc)) == (F_CALL_EXTRA - F_OFFSET)) {
+    if ((instruction = EXTRACT_UCHAR(pc)) == F_CALL_EXTRA) {
         pc++;
         instruction = EXTRACT_UCHAR(pc) + 0xff;
         is_efun = 1; /* assume less than 256 eoperators */
     } else {
-	    is_efun = (instruction >= (BASE - F_OFFSET));
+	    is_efun = (instruction >= BASE);
     }
 #ifdef TRACE_CODE
     previous_instruction[last] = instruction;
@@ -971,7 +971,7 @@ char *p;
 #endif
 #ifdef OPCPROF
     if (is_efun) {
-      opc_efun[instruction - (BASE - F_OFFSET)].count++;
+      opc_efun[instruction - BASE].count++;
     } else if (instruction >= 0) {
       opc_eoper[instruction]++;
     }
@@ -1034,6 +1034,7 @@ char *p;
       pc++;
       push_number(-i);
       break;
+#ifdef F_JUMP_WHEN_NON_ZERO
       case I(F_JUMP_WHEN_NON_ZERO) :
      if ((i = (sp->type == T_NUMBER)) && (sp->u.number == 0))
         pc += 2;
@@ -1048,6 +1049,7 @@ char *p;
         pop_stack();
      }
 	break;
+#endif
 	case I(F_BRANCH) : /* relative offset */
 		((char *)&offset)[0] = pc[0];
 		((char *)&offset)[1] = pc[1];
@@ -1113,6 +1115,34 @@ char *p;
 		pc += 2;
 		sp--;
  	break;
+    case I(F_LOR) :
+		/* replaces F_DUP; F_BRANCH_WHEN_NON_ZERO; F_POP */
+		if ((i = (sp->type != T_NUMBER)) || (sp->u.number != 0)) {
+			((char *)&offset)[0] = pc[0];
+			((char *)&offset)[1] = pc[1];
+			pc += offset;
+			break;
+		} else {
+		    pc += 2;
+		    sp--;
+		}
+      break;
+    case I(F_LAND) :
+		/* replaces F_DUP; F_BRANCH_WHEN_ZERO; F_POP */
+		if ((i = (sp->type == T_NUMBER)) && (sp->u.number == 0)) {
+			((char *)&offset)[0] = pc[0];
+			((char *)&offset)[1] = pc[1];
+			pc += offset;
+			break;
+		} else {
+		    pc += 2;
+		    if (i) {
+			sp--;
+		    } else {
+			pop_stack();
+		    }
+		}
+      break;
     case I(F_LOCAL_NAME) :
       sp++;
       assign_svalue_no_free(sp, fp + EXTRACT_UCHAR(pc));
@@ -1129,9 +1159,11 @@ char *p;
 	break;
     case I(F_LT) :
       {
-        if((sp - 1)->type == T_NUMBER){
-          if(sp->type == T_NUMBER){
-            i = ((sp - 1)->u.number < sp->u.number);
+        if ((sp - 1)->type == T_NUMBER){
+          if (sp->type == T_NUMBER){ /* optimize this case */
+            sp--;
+            sp->u.number = (sp->u.number < (sp + 1)->u.number);
+            break;
           }
           else if(sp->type == T_REAL){
             i = ((sp - 1)->u.number < sp->u.real);
@@ -1180,7 +1212,7 @@ char *p;
 	switch(argp->type) {
 	case T_STRING:
 	  {
-	    char *new_str;
+	    char *new_str = 0;
 
 	    if(sp->type == T_STRING){
 	      int l = SVALUE_STRLEN(argp);
@@ -1279,7 +1311,7 @@ char *p;
 	  bad_arg(1, instruction);
 	}
 	/* if (void)add_eq then no need to produce an rvalue */
-	if (instruction == (F_ADD_EQ - F_OFFSET)) { /* not void add_eq */
+	if (instruction == F_ADD_EQ) { /* not void add_eq */
 	  sp++;
 	  assign_svalue_no_free(sp, argp);
 	}
@@ -1304,8 +1336,10 @@ char *p;
       f_aggregate_assoc(num_arg, instruction);
       break;
     case I(F_ASSIGN) :
+#ifdef DEBUG
       if ((sp - 1)->type != T_LVALUE)
 	fatal("Bad argument to F_ASSIGN\n");
+#endif
       assign_svalue((sp - 1)->u.lvalue, sp);
       assign_svalue(sp - 1, sp);
       pop_stack();
@@ -1414,21 +1448,12 @@ char *p;
     case I(F_DIV_EQ) :
       f_div_eq(num_arg, instruction);
       break;
-    case I(F_DO) :
-      fatal("F_DO should not appear.\n");
-      break;
     case I(F_DUP) :
       sp++;
       assign_svalue_no_free(sp, sp-1);
       break;
-    case I(F_END_CATCH) :
-      f_end_catch(num_arg, instruction);
-      break;
     case I(F_EQ) :
       f_eq(num_arg, instruction);
-      break;
-    case I(F_FOR) :
-      fatal("F_FOR should not appear.\n");
       break;
     case I(F_GE) :
       {
@@ -1567,6 +1592,7 @@ char *p;
           sp->u.number = 0;
         }
 	break;
+#ifdef F_JUMP_WHEN_ZERO
     case I(F_JUMP_WHEN_ZERO) :
       if ((i = (sp->type == T_NUMBER)) && sp->u.number == 0) {
         ((char *)&offset)[0] = pc[0];
@@ -1581,6 +1607,7 @@ char *p;
 	pop_stack();
       }
       break;
+#endif
     case I(F_JUMP) :
       ((char *)&offset)[0] = pc[0];
       ((char *)&offset)[1] = pc[1];
@@ -1671,10 +1698,9 @@ char *p;
       pop_stack();
 	break;
       case I(F_POP_BREAK) :
-      ((char *)&offset)[0] = pc[0];
-      ((char *)&offset)[1] = pc[1];
-      break_sp += offset;
-      pc += 2;
+	i = EXTRACT_UCHAR(pc);
+	break_sp += i;
+	pc++;
 	break;
     case I(F_POST_DEC) :
 #ifdef DEBUG
@@ -1780,9 +1806,6 @@ char *p;
         push_string(current_prog->p.i.strings[string_number],
                 STRING_CONSTANT);
 	break;
-      case I(F_SUBSCRIPT) :
-      fatal("F_SUBSCRIPT should not appear.\n");
-	break;
       case I(F_SUBTRACT) :
 	f_subtract(num_arg, instruction);
 	break;
@@ -1792,9 +1815,6 @@ char *p;
       case I(F_SWITCH) :
 	f_switch(num_arg, instruction);
 	break;
-      case I(F_WHILE) :
-      fatal("F_WHILE should not appear.\n");
-	break;
       case I(F_XOR) :
 	f_xor(num_arg, instruction);
 	break;
@@ -1803,15 +1823,8 @@ char *p;
 	break;
       case I(F_CATCH) :
 	{
-	  /*
-	   * WARNING! WARNING! WARNING!
-	   * Because of restrictions on how setjmp and longjmp may be
-	   * used, the F_CATCH case must not be separated out into a function.
-	   */
+      void do_catch();
 	  unsigned short new_pc_offset;
-	  extern jmp_buf error_recovery_context;
-	  extern int error_recovery_context_exists;
-	  
 	  /*
 	   * Compute address of next instruction after the CATCH statement.
 	   */
@@ -1826,44 +1839,49 @@ char *p;
 		break;
 	  }
 	  pc += 2;
-	  
-	  push_control_stack(0);
-	  csp->num_local_variables = 0; /* No extra variables */
-	  csp->pc = current_prog->p.i.program + new_pc_offset;
-	  csp->num_local_variables = (csp-1)->num_local_variables; /* marion */
-	  /*
-	   * Save some global variables that must be restored separately
-	   * after a longjmp. The stack will have to be manually popped all
-	   * the way.
-	   */
-	  push_pop_error_context (1);
-	  
-	  /* signal catch OK - print no err msg */
-	  error_recovery_context_exists = 2;
-	  if (SETJMP(error_recovery_context)) {
-	    /*
-	     * They did a throw() or error. That means that the control
-	     * stack must be restored manually here.
-	     * Restore the value of expected_stack also. It is always 0
-	     * for catch().
-	     */
-	    expected_stack = 0;
-	    push_pop_error_context (-1);
-	    pop_control_stack();
-	    assign_svalue_no_free(++sp, &catch_value);
-	  }
-	  
-	  /* next error will return 1 by default */
-	  assign_svalue(&catch_value, &const1);
+	  do_catch(pc, new_pc_offset);
+
+	  pc = current_prog->p.i.program + new_pc_offset;
+
 	  break;
 	}
-	default :
+      case I(F_END_CATCH):
+	{
+	  pop_stack(); /* discard expression value */
+	  free_svalue(&catch_value);
+	  catch_value.type = T_NUMBER;
+	  catch_value.u.number = 0;
+	  /* We come here when no longjmp() was executed */
+	  pop_control_stack();
+	  push_pop_error_context(0);
+	  push_number(0);
+	  return;  /* return to do_catch */
+	}
+      case I(F_TIME_EXPRESSION):
+	{
+	  long sec, usec;
+	  get_usec_clock(&sec, &usec);
+	  push_number(sec);
+	  push_number(usec);
+	  break;
+	}
+      case I(F_END_TIME_EXPRESSION):
+	{
+	  long sec, usec;
+	  get_usec_clock(&sec, &usec);
+	  usec = (sec - (sp-2)->u.number) * 1000000 + (usec - (sp-1)->u.number);
+	  pop_stack();
+	  sp -= 2;
+	  push_number(usec);
+	  break;
+	}
+      default :
 		if (is_efun) {
 			(*oefun_table[instruction])(num_arg, instruction);
 		} else {
 			dump_trace(1);
-			fatal("Undefined instruction %s (%d)\n", get_f_name(instruction),
-				instruction + F_OFFSET);
+			fatal("Undefined instruction %s (%d)\n",
+				get_f_name(instruction), instruction);
 			return;
 		}
 		break;
@@ -1877,6 +1895,46 @@ char *p;
       }
 #endif /* DEBUG */
   } /* end while: used to be goto again */
+}
+
+void
+do_catch(pc, new_pc_offset)
+char *pc;
+unsigned short new_pc_offset;
+{
+    extern jmp_buf error_recovery_context;
+    extern int error_recovery_context_exists;
+    
+    push_control_stack(0);
+    /* next two probably not necessary... */
+    csp->pc = current_prog->p.i.program + new_pc_offset;
+    csp->num_local_variables = (csp-1)->num_local_variables; /* marion */
+    /*
+     * Save some global variables that must be restored separately
+     * after a longjmp. The stack will have to be manually popped all
+     * the way.
+     */
+    push_pop_error_context (1);
+    
+    /* signal catch OK - print no err msg */
+    error_recovery_context_exists = 2;
+    if (SETJMP(error_recovery_context)) {
+	/*
+	 * They did a throw() or error. That means that the control
+	 * stack must be restored manually here.
+	 * Restore the value of expected_stack also. It is always 0
+	 * for catch().
+	 */
+	expected_stack = 0;
+	push_pop_error_context (-1);
+	pop_control_stack();
+	assign_svalue_no_free(++sp, &catch_value);
+	assign_svalue(&catch_value, &const1);
+    } else {
+	assign_svalue(&catch_value, &const1);
+	/* note, this will work, since csp->extern_call won't be used */
+	eval_instruction(pc);
+    }
 }
 
 /*
@@ -1955,6 +2013,9 @@ int apply_low(fun, ob, num_arg)
    */
 #ifdef LAZY_RESETS
   try_reset(ob);
+  if ((ob->flags & O_DESTRUCTED) && (num_error <= 0)) {
+    error("apply() on destructed object because of destruct from reset().\n");
+  }
 #endif
   ob->flags &= ~O_RESET_STATE;
 #ifdef DEBUG
@@ -2200,10 +2261,13 @@ struct svalue *apply(fun, ob, num_arg)
  * this allows you to have dangerous driver mudlib dependencies
  * and not have to worry about causing serious bugs when errors occur in the
  * applied function and the driver depends on being able to do something
- * after the apply. (such as the ed exit function, and the net_dead function)
+ * after the apply. (such as the ed exit function, and the net_dead function).
+ * note: this function uses setjmp() and thus is fairly expensive when
+ * compared to a normal apply().  Use sparingly.
  */
 
-struct svalue *safe_apply (fun, ob, num_arg)
+struct svalue *
+safe_apply (fun, ob, num_arg)
      char *fun;
      struct object *ob;
      int num_arg;
@@ -2671,11 +2735,9 @@ void opcdump(tfn)
     add_message("Unable to open %s for writing.\n", fn);
     return;
   }
-  /* F_JUMP is (should be) the first opcode in lang.tab.h */
-  limit = BASE - F_JUMP;
-  for (i = 0; i < limit; i++) {
+  for (i = 0; i < BASE; i++) {
     fprintf(fp, "%-30s: %10d\n",
-	    query_instr_name(i + F_OFFSET), opc_eoper[i]);
+	    query_instr_name(i), opc_eoper[i]);
   }
   fclose(fp);
   add_message("done.\n");
@@ -2735,7 +2797,7 @@ int last_instructions() {
   do {
     if (previous_instruction[i] != 0)
       printf("%6x: %3d %8s %-25s (%d)\n", previous_pc[i],
-	     previous_instruction[i] + F_OFFSET,
+	     previous_instruction[i],
 	     get_arg(i, (i+1) %
 		     (sizeof previous_instruction / sizeof (int))),
 	     get_f_name(previous_instruction[i]),

@@ -1,0 +1,17 @@
+.\"dump/disassemble an LPC object
+.TH dump_prog 3
+
+.SH NAME
+dump_prog() - dump/disassemble an LPC object
+
+.SH SYNOPSIS
+void dump_prog(object obj, int default: 0);
+
+.SH DESCRIPTION
+dump_prog() dumps information about the program of `obj' to a file,
+/PROG_DUMP.  If the current object does not have write access to /PROG_DUMP,
+it will fail.  If the optional second argument is supplied, and is 1, a full
+disassembly of the program of `obj' will be dumped in the file.
+
+.SH SEE ALSO
+debug_info(3), dumpallobj(3)

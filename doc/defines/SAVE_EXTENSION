@@ -1,0 +1,2 @@
+Defined to whatever the savefile extension (as used by save_object() and
+restore_object()) is configured as (at driver compile time).

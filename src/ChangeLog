@@ -1,3 +1,480 @@
+Fri May 21 00:48:32 CDT 1993 (bobf@metronet.com (Blackthorn))
+	* raised the patchlevel to 0.9.17
+	* fixed a line deletion bug in the editor that is reproduceable on the
+	  hp750 and the sun that runs TMI-2 (Anthon Pang).
+
+
+Thu May 20 14:06:09 CDT 1993 (John Garnett (Truilkan))
+	* raised the patchlevel to 0.9.16.31
+	* added Dave's patches for BSDI's commercial 386BSD
+	* changed an 'i' to a 'j' in inherits() in efunctions.c
+	* removed the global variable 'i' from efunctions.c
+	* applied a Pinkfish patch to make get_char() understand CR (\r) again
+	* fixed a parameter of a function in addr_server to be non-ANSI
+
+Wed May 19 01:23:53 CDT 1993 (John Garnett (Truilkan))
+	* raised the patchlevel to 0.9.16.30
+	* changed socket_close() in socket_efuns.c so that shutdown() isn't
+	  called on the socket if compiled under Solaris 2.1 (close() alone should
+	  be good enough, yes?).  Hopefully this will fix the socket-related
+	  hangs that Actuator is seeing (fixes some of them anyway).
+	* gave Dave credit in 0.9.16.27 ChangeLog for the time_expression()
+	  "function".
+	* compat buster: changed resolve() efun so that the callback function is
+	  always called with the domain style address as the first arg and the
+	  dotted decimal style address as the second arg.
+
+Tue May 18 06:18:09 CDT 1993 (John Garnett (Truilkan))
+	* raised the patchlevel to 0.9.16.29
+	* fixed a few prototypes
+	* added a MUDOS_PORT #define to all LPC objects (MUDOS_PORT of type integer)
+	  that is equal to the socket port MudOS listens on for player connects.
+	* fixed bugs in the message() efun that were causing objects to
+	  have their ref counts increased but not later decreased.  This
+	  could be a big reason behind why mud_status() reports more objects
+	  than does sizeof(objects()) on MudOS mudlibs that use message() efun
+	  extensively.
+
+Mon May 17 17:35:09 CDT 1993 (bobf@metronet.com (Blackthorn))
+	* raised the patchlevel to 0.9.16.28
+	* sped up save_object() considerably for large mappings and arrays
+	  (patch from Darin)
+	* added include of stdio.h to top of port.c to fix a reference to
+	  NULL on some machines (note from Darin)
+	* hopefully fixed yet another GNUmakefile bug (compiler.y: opcodes.h)
+	  (reported by Darin)
+	* fixed get_char() efun, was broken by earler telnet negotiation mods
+          (Pinkfish patch)
+
+Fri May 14 02:21:58 CDT 1993 (bobf@metronet.com)
+	* bumped the patchlevel up to 0.9.16.27
+	* added a time_expression() "function", that given an expression,
+	  returns the amount of time in microseconds that were required
+	  to evaluate it.  special clock functions are used for Sequent,
+	  and gettimeofday() is used for everything else.  if your system
+	  doesn't have gettimeofday() (and isn't a Sequent :) let us know
+	  so we can properly disable it for that system type  -- coded by
+	  Dave Richards (Cygnus).
+	* fixed a typo of _AIX in lint.h
+	* fixed object.c so SAVE_EXTENSIONS with more than two chars work
+
+Tue May 11 04:45:00 CDT 1993 (Dwayne Fontenot (Jacques))
+	* bumped the patchlevel up to 0.9.16.26
+	* converted addr_server.c to be synchronous (like the driver).
+	  This should both make it more robust and allow it to compile
+	  on machines where the async version would not (Solaris).
+
+Mon May 10 14:57:46 CDT 1993 (John Garnett (Truilkan))
+	* bumped the patchlevel up to 0.9.16.25
+	* removed the "compiler.y: s.h" line from GNUmakefile.  Why was it there?
+	* fixed the problem with the 0 added to strings being optimized away.
+	  Also added another minor change. (dj)
+	* fixed resolve() efun to return 'key' instead of always 0.
+	* now trapping SIGUSR1 and calling crash() in master with a string
+	  "Host machine shutting down" when its received.  This will allow
+	  the MUD to be automatically shutdown when the machine is rebooted
+	  (assuming the machine shutdown script is modified to send the signal).
+	  Didn't use SIGTERM or SIGHUP because I wanted to be able to use
+	  exit(-1) which indicates to the controlling script not to restart
+	  the MUD but I didn't want to have to use exit(-1) in either of the
+	  SIGTERM or SIGHUP handlers.
+	* fixed several places to exit(-1) instead of exit(1).
+	* added Pinkfish's patch that causes caught errors (via catch()) to
+	  be written to the debug.log as well (prefixed with "caught: ").
+
+Sun May  9 15:24:39 CDT 1993 (John Garnett (Truilkan))
+	* bumped the patchlevel up to 0.9.16.24
+	* added Dave's latest patches.  OLD_HEARTBEAT define in options.h
+	  for those wanting to restrict set_heart_beat(x) to x == 0 or 1. (Dave)
+	* Added query_privs() efun, set_privs() efun, privs_file apply in master
+	  (done at object creation time).  Read the PRIVS comment in options.h.
+	  (Dave)
+	* Changed a bcopy in addr_server to memcpy(). (Dave)
+	* added Pinkfish's patches to the new resolve() efun.  These fix a bug
+	  and enable reverse lookups to be done as well (domain_name -> ip_number
+	  and ip_number -> domain_name).  The callback routine now looks
+	  like this:
+	    void callback(string name, string looked_up, int index);
+	  looked_up is 0 if it fails.  index is a key differentiating 'name'
+	  from other responses to other queries for the same info.  The
+	  resolve(name, callback) routine now returns an int which is the same
+	  as 'index' will be on the callback.
+
+Sun May  9 07:39:48 CDT 1993 (John Garnett (Truilkan))
+	* bumped the patchlevel up to 0.9.16.23
+	* added Pinkfish's resolve(string name, string callback) routine
+	  which calls the addr_server to resolve 'name' into the dotted
+	  decimal form.  Pinkfish is likely losing (non-long distance)
+	  net access for six months or so, so I want to take this opportunity to
+	  thank him for all the patches and nifty things he's shared with us.
+	  Bingle on.
+	* added the LPC_OPTIMIZE option to options.h (not yet bugfree)
+	* fixed message() efun that I broke in 0.9.16.22 (oops)
+
+Sat May  8 20:07:22 CDT 1993 (John Garnett (Truilkan))
+	* bumped the patchlevel up to 0.9.16.22
+	* fixed a prototyping bug in call_out.c that was bombing non-ANSI
+	  compilers.
+	* moved set_heart_beat(0) back to the bottom of destruct_object()
+	  (but before setting the DESTRUCTED flag).
+	* added Stig S{ther Bakken's patch to the functionp() efun so that
+	  functionp() returns 0 if funp[0] is a destructed object.
+	* changed the inherits(file, obj) efun to return 1 if obj inherits
+	  the most recent clone of file and 2 if obj inherits some older
+	  version of file.
+	* added support for reals (floats) to disassembler.c (dj)
+	* applied Dave's (Cygnus's) patches for various and sundry things
+	  (typecasts for the Sequent, an enhancement to rusage, etc).
+	* applied Darin's additional patches for evaluating (some) constant
+	  expressions at compile time.
+	* save_object now inserts a "#filename" as the first line of
+	  the savefiles.  restore_object ignores such lines.  This patch
+	  is useful for virtual object compilers that want to figure out
+	  how to compile .o files.
+	* added a check for master_ob in init_domain_for_object() in
+	  mudlib_stats.c to try to fix problem with updating master
+	  in some mudlibs.
+	* attempted to fix crasher bug in message() caused by use and exclude
+	  arrays containing 0-valued elements (not tested yet).
+
+Tue May  4 01:06:42 CDT 1993 (Blackthorn (bobf@metronet.com))
+        * bumped the patchlevel up to 0.9.16.21
+        * added IRIX case to arch.h (note from stigb@pvv.unit.no)
+        * made it so that the writing of various text prefixed by ']' (text
+          that was sent to noninteractive objects) to stderr is definable
+          in options.h; see NONINTERACTIVE_STDERR_WRITE
+        * fixed usage of OLD_HPUX define in port.h (report from Decker)
+        * changed PROFILE_OFF define in GNUmakefile to PROFILE_ON (was fixed
+          in Makefile a while back) - reported by Tyr
+        * made changes throughout the code to allow latest version to compile
+          under 386BSD; shouldn't affect any other systems (patches from
+          zak@rmit.edu.au)
+        * made changes to lint.h for SGI systems (patches from
+          stigb@pvv.unit.no)
+
+Sun May  2 02:46:03 CDT 1993 (John Garnett (Truilkan))
+	* bumped the patchlevel up to 0.9.16.20
+	* changed type of arg of socket_address in func_spec.c to be int|object
+	  to go along with the earlier change of f_socket_address (Watcher)
+	* fixed f_query_snooping to call query_snooping instead of query_snoop
+	  (a mistake on my part when I added it the first time). (Watcher)
+	* fixed a few defines and prototypes for SGI boxes (Stig Bakken)
+	* fixed a few defines and prototypes for SVR4.2 (Consensys).  Still
+	  need to handle (and clean up) the dirent stuff in file.c so that its
+	  not such a mess.  patchfile submitted by Edward T. Shiobara.
+
+Sat May  1 03:27:57 CDT 1993 (John Garnett (Truilkan))
+	* bumped the patchlevel up to 0.9.16.19
+	* added a new efun inherits(string filename, object base) which returns 1
+	  if base inherits filename and 0 otherwise.  This efun is equivalent to
+	  (member_array(filename, deep_inherit_list(base)) != -1) but it avoids
+	  the overhead of creating the array of filenames of inherited objects.
+	* changed the load_object() code in the driver so that anytime the
+	  driver compiles an object ob, it asks master:valid_object(object ob)
+	  whether or not the object should live past compilation. If valid_object
+	  does not exist in master or if it exists and returns 1, then everything
+	  works as it did before this release.  If valid_object exists
+	  and returns 0 then the object is destructed before "create" is called
+	  in the object and the efun that caused the load returns an error.
+	  Note: this feature in combination with the use of inherits() and the
+	  'nomask' keyword can be used to implement object security at the mudlib
+	  level and to allow usage of destruct etc. to be restricted without
+	  worrying about the creation of indestructible objects (this latter
+	  example requires use of simul_efuns and valid_override in master
+	  as well).
+
+Wed Apr 28 15:08:16 CDT 1993 (John Garnett (Truilkan))
+	* bumped the patchlevel up to 0.9.16.18
+	* fixed debug_info(1, ob) to not crash on swapped objects.
+	* fixed inherit_list and deep_inherit_list to not crash on swapped
+	  objects.  (these two reported by Ellery@TMI-2).
+	* moved arch.h to be after config.h in lex.c
+	* compat buster: changed the VERSION define to be MUDOS_VERSION and
+	  the ARCH define to be MUDOS_ARCH and DIR to be MUDOS_DIR.  These
+	  defines are visible to LPC code.  They were changed so that converting
+	  mudlibs to MudOS will be easier (less likely to have defines that
+	  conflict with these).
+	* added OLD_COMMAND define to options.h that optionally brings back the
+	  2nd (optional) arg to command() that allows the target object to be
+	  specified.
+	* added RECEIVE_SNOOP to options.h.  This optionally causes snoops
+	  to be sent to receive_snoop(string msg) in the snooper object.
+	* fixed the security hole that allowed static actions to be
+	  executed by other objects (user_parser() in simulate.c).
+	* fixed destruct_object() so that it shuts off the heart_beat _before_
+	  it actually marks the object as destructed.  set_heart_beat(ob, 0)
+	  has no affect on destructed objects; hence, heartbeats were continuing
+	  to run on destructed objects (pretty silly, eh?).
+	* added a patch by Arthur@GodsHome (Joakim Berglund: jocke@solace.hsh.se)
+	  which allows the heartbeat interval for a given object to be specified
+	  in terms of ticks.  The new way to set a heart beats is:
+		set_heart_beat(int t) and t is in ticks.
+	  The length of a tick is HEARTBEAT_INTERVAL long (by default 2 seconds).
+	  This lets different objects experience heartbeats at different rates.
+	  Note: this patch is also very useful for those objects that only
+	  need do something every two or three heartbeats (e.g. just use
+	  set_heart_beat(3)).  Note: set_heart_beat(1) still means the same
+	  thing as it always has (so this isn't a compat buster).
+	* fixed the ./src/efuns subdir to be up to date with the ./src dir.
+
+Sat Apr 24 13:55:12 CDT 1993 (John Garnett (Truilkan))
+	* bumped the patchlevel up to 0.9.16.17
+	* added cases to lex.c for the ascii names of the various missing
+	  eoperators (so that the disassembler won't fail to decode some
+	  instructions).
+	* separated out the ARCH stuff into arch.h from port.h
+	* fixed shadowp() in func_spec.c to return object instead of int.
+	* added efun query_shadowing() to replace shadowp().  Made shadowp()
+	  into a synonym for query_shadowing().  shadowp() should go away at
+	  some point (because it really doesn't fit the model of the *p()
+	  functions).
+	* added Pinkfish's patch to allow optional 3rd arg to member_array
+	  which instructs member_array to use strncmp instead of strcmp
+	  (searches for any string with the specified prefix).
+	* added Pinkfish's patch to change socket_address efun to work on
+	  interactives in addition to socket descriptors.  Useful for
+	  people wanting to write IDENT clients in LPC.
+	* patches to comm.c that make the telnet protocol handling
+	  more understandable.  It handles a larger range of the sub-
+	  option stuff.  It also recovers when the client sends control-C
+	  or BREAK when in telnet (Pinkfish).
+	* added Darin Johnson's patches to compiler.y that are an intermediate
+	  step toward supporting constant folding.
+	* added Robocoder's fix for the socket efun read overflow problem
+	  (what we think was causing the crashes when fingering Genocide).
+	* removed ANSI prototype from do_catch() in interpret.c so that
+	  xlc with optimization on AIX 3.x would stop complaining.
+	* Changed the call_out_info call to recover destructed objects.
+	  Well... the remove_all_call_outs does actually. (Pinkfish)
+
+
+Tue Apr 13 20:30:23 CDT 1993 (Blackthorn (bobf@metronet.com))
+        * bumped the patchlevel up to 0.9.16.16
+        * changed the align() macro to use 8 byte alignment instead of 4
+          byte alignment if __alpha or cray are defined
+        * added OSF/1 detection into port.h, and appropriate #ifdef's in
+          file.c, simulate.c, and lint.h
+        * changed debug_message(), debug_fatal(), fatal(), and error() to
+          use proper [portable] varargs
+        * removed VARARGS defined from port.h, and recognition of it not being
+          defined from comm.c's add_message(); none of the above four functions
+          honored it anyway, and properly insrtalled gcc's support VARARGS on
+          HP-UX
+        * after the above changes, MudOS now runs on the DEC Alpha machine
+          running OSF/1 (tested with version 1.2).  might help with Cray
+          also if someone has one available
+        * added some patches to get_one_plural() in parse.c to improve it
+          somewhat (from Anthon Pang)
+        * fixed a crasher in localtime() for some system types (including
+          Ultrix) - needed a string_copy() in f_localtime() 
+        * added an OLD_HPUX define to port.h (for HP-UX 7.x or below) that
+          prevents the driver from trying to use getrusage() (which doesn't
+          exist in 7.x)
+
+Sun Apr 11 14:40:01 CDT 1993 (John Garnett (Truilkan))
+	* bumped the patchlevel up to 0.9.16.15
+	* scrapped 0.9.16.11-0.9.16.14 intermediate releases because of crashes.
+	  Will add back the patches one at a time I expect.
+	* changed process_user_command() in comm.c to pay attention to the
+	  "no escape" (noesc) flag set by input_to() (reported by Anthon Pang).
+	* removed all usage of GCC global registers since we were never able
+	  to get them to work reliabably (perhaps not using them correctly).
+	* changed port.h so that SunOS 5.1 doesn't try to use getrusage().
+	* renamed RS in ed.c to _RS since HP syscall.h defines an RS of its own.
+	* fixed check in apply_low for dested object after try_reset to
+	  call error() rather than just returning.
+	* fixed user_parser() in simulate.c so that it calls findstring()
+	  rather than make_shared_string().  Also fixed so that query_verb()
+	  efun will now return the right verb even when an xverb.
+
+Sat Apr  4 16:27:53 CST 1993 (John Garnett (Truilkan))
+	* bumped the patchlevel up to 0.9.16.10
+	* fixed #include <syscal.h> in port.h to be #include <syscall.h>
+	* fixed port.h so that RUSAGE is defined for SunOS_5
+	* fixed f_socket_address() to call pop_stack() (reported by Pinkfish).
+	* fixed socket_create() efun so that 3rd arg is once again optional
+	  (broke this in 0.9.16.9).
+	* fixed some warnings in disassembler.c about unsigned formats and
+	  signed args (mismatched).
+	* added defs for SP_REG and PC_REG for sparc and changed for hppa
+	* added query_snooping() efun which is the inverse of query_snoop().
+	* fixed security hole (i think) add_action() having to do with
+	  shadows and static functions (reported by Ellery).
+
+Sat Apr  3 16:27:53 CST 1993 (John Garnett (Truilkan))
+	* bumped the patchlevel up to 0.9.16.9
+	* added a Pinkfish patch to compiler.y to allow object::func_name()
+	  and so that reals aren't assumed as the default type.  Also fixed
+	  a bug in get_type_name().
+	* fixed socket_* efuns that take more than two arguments to do type
+	  checking on 3rd plus args (fixes potential crashers) -- Aragorn
+	* fixed reload_object() to set euid to uid if AUTO_SETEUID defined.
+
+Sat Apr  3 04:03:47 CST 1993 (John Garnett (Truilkan))
+	* bumped the patchlevel up to 0.9.16.8
+	* changed arg_type1 and arg_type1 from char to unsigned char in
+	  "struct keyword" in lex.c
+	* changed F_NOT so that float x = 0.0; if (!x) { write("0.0\n"); } works
+	  as expected (!x == 1).
+	* changed reload_object() efun to reset the euid to 0.
+	* added #ifdef WANT_MISSING_SPACE_BUG to lex.c to remove a bit of
+	  code that was causing things like this to fail:
+	  #define RUSAGE mapping
+	  void func(RUSAGE x) { /* do something here */ }.  The reason I left
+	  the bit of code in is because it may be used by the token pasting
+	  code (##).  Someone knowing more about this will have to take a look	
+	  at it (Xeno?).
+	* fixed bug in T_FUNCTION case of reclaim_objects() efun.
+	* added getrusage stuff to port.h for HP/UX
+	* applied another parse_command() fix from Pinkfish (I think parse_command
+	  and printf had as many bugs as the rest of 3.1.2 put together :).
+	* added a change that allows sp and pc to be put into global registers
+	  if using GCC on a motorola 68k chip.  This optimization will also work
+	  for other architectures as soon as people tell me what two registers
+	  are free on the various machines (e.g. a5 and a4 are okay to use on
+	  m68k but a6 is not since its reserved).  Define USE_GLOBAL_REGS in
+	  options.h.  For those interested in benchmarks, this change together with
+	  the change to F_LT, improved the empty for loop performance by about
+	  18% (on the NeXT 68040 with gcc -O2).
+
+Mon Mar 29 15:11:47 CST 1993 (John Garnett (Truilkan))
+	* bumped the patchlevel up to 0.9.16.7
+	* cleaned up the source a bit so that gcc 2.3.2 doesn't complain when
+	  both the -O and -Wall flags are used (unused variables, uninitialized
+	  variables, etc).
+	* replaced Copyleft with Larry Wall's "Artistic license".  Read the
+	  Artistic.README file for more information on why.
+
+Sun Mar 28 22:31:59 CST 1993 (John Garnett (Truilkan))
+	* bumped the patchlevel up to 0.9.16.6
+	* redid an optimization to F_LT that was lost when floats were added
+	  (this has a big affect on the all-important empty for loop benchmark :)
+	* changed short_compare in disassembler.c to non-ANSI prototype
+	* fixed the makefiles once again (hopefully most all machines will be
+	  able to use them now).  Changed func_spec.c to include op_spec.c etc.
+	* Well, for people that still use add_action's, here's a patch that
+	  makes user_parser use shared strings, so that == can be used instead
+	  of strcmp().  Also allows query_verb to use a shared string as a
+	  side effect, which may help elsewhere.  Strncmp is still used for
+	  short verbs, etc.  (the cost of creating the shared string should be
+	  offset by the removal of the strncmp of buff and the strcpy of verb_copy.
+	  (patch from Darin Johnson).
+	* These patches change eval_instruction so that the setjmp() used for
+	  F_CATCH is called from a separate function.  The advantage is that for
+	  many compilers, a setjmp() reduces the amount of optimization performed
+	  (some will not put local vars in registers, others turn off all
+	  optimization).  What this patch does, is create a function that calls
+	  the setjmp(), and then recursively calls eval_instruction() (and
+	  F_END_CATCH does an extra return) - so that there is nothing in
+	  eval_instruction() to inhibit optimizations.  Performance improvement
+	  seems to vary a lot depending upon the machine/compiler.  For sun3's,
+	  a rough conservative estimate showed 3% improvement, a sparc
+	  about 5%, and our slow dog of a Celerity showed 10%. (with a somewhat
+	  contrived benchmark). (patch from Darin Johnson).
+
+Sun Mar 28 19:59:43 CST 1993 (John Garnett (Truilkan))
+	* bumped the patchlevel up to 0.9.16.5
+	* fixed the matrix efuns to do runtime type checking on the 3rd+ arguments.
+	* added comment to the makefiles about gcc and "operation not
+	  supported on socket" runtime error.
+	* changed make_func.y and the makefiles so that the makefiles so that
+	  FUNC_SPEC can be "list_funcs" rather than "$(MAKE) list_funcs".
+	* ASSIGN+POP changed to VOID_ASSIGN in initializer
+	  Added F_LOR and F_LAND, used by || and && expressions
+	  (replaces DUP+BRANCH+POP)
+	* Optimized ins_byte, ins_short, ins_long, ins_real. (darin)
+	* Changed F_POP_BREAK to use byte argument instead of short (darin)
+	* Changed all F_JUMP_WHEN... to F_BRANCH_WHEN... (darin)
+	* Optimized conditionals so that if last expression was F_NOT, (darin)
+	  then remove F_NOT and switch the type of branch.
+
+Sun Mar 28 07:04:26 CST 1993 (John Garnett (Truilkan))
+	* bumped the patchlevel up to 0.9.16.4
+	* fixed up the flags field of FUNCTIONS in disassembler.c to be nicer.
+	* extended the shared string optimization used by apply_low() to be
+	  used in a few places in compiler.y as well.  This should speed up
+	  compilation a bit.
+	* COMPAT BUSTER: fixed a gross multiple inheritance semantics bug.
+	  Only problem is that it may cause some existing code which relies on
+	  buggy behavior to not work as it did before (that is, now it will
+	  work as it should instead of how it has been).  Here is an example
+	  program demonstrating the behavior in question:
+        object a: bingme() { bing(); } bing() { write("bingAAA\n"); }
+        object b: bingme() { bing(); } bing() { write("bingBBB\n"); }
+        object c: inherit a; inherit b;
+                  bing() { write("bingCCC\n"); }
+                  create() { a::bingme(); b::bingme() }
+      The old behavior would have been to write bingCCC then bingAAA.
+      The new behavior is to write bingCCC then bingCCC.
+      This fix will slow down LPC compilation a bit (hopefully offset by
+      the above mentioned optimizations).  Bug report (indirectly) from
+	  Roar Brekken.
+
+Sat Mar 27 17:42:26 CST 1993 (Darin Johnson)
+	* bumped the patchlevel up to 0.9.16.3
+	* fixed %O in printf.c (fixes a crasher)
+	* reordered functions in func_spec.c so that most frequent ones are
+	  at the top and least frequent at the bottom (some guessing involved :).
+	  (make_func changed so that this ordering makes a difference).
+	* these changes should make it so that yacc once again can handle the
+	  lang.y (now compiler.y) file even if the internal tables are small.
+	* created op_spec.c
+	* make_func.y changed. now generates opcodes.h also. Can handle the
+	  "object clone_object new(blah blah)" case.
+	  (ie, clone_object is a synonym, so real efun not needed)
+	* prelang.y and postlang.y combined into compiler.y
+	* tokens are now L_blah instead of F_blah (opcodes still F_blah)
+	* Makefiles modified to handle op_spec (analog of func_spec)
+	* Makefiles modified to handle compiler.y
+	* Changed so that base.h not included
+	* Changed so that opcodes.h used instead of lang.tab.h
+	* Removed base_code, call_extra_code from main.c
+	* Removed F_OFFSET
+	* The I() macro no longer needed, but left in.
+	* Changed clone_object() to be an alias for new(), since
+	  this feature now works correctly in make_func.  Removed
+	  clone_object from around.
+
+Sat Mar 27 05:13:56 CST 1993 (John Garnett (Truilkan))
+	* bumped the patchlevel up to 0.9.16.2
+	* ifdef'd the qsort in disassembler.c
+	* changed num_arg and num_local in exec.h function struct to unsigned
+	  char from unsigned short.  may save 2 bytes of memory per
+	  inherited function on some machines (depends on struct alignments reqs).
+	* fixed small bug in disassem_string() in disassembler.c (made buff static)
+	* fixed F_CALL_FUNCTION_BY_ADDRESS case in disassembler.c to print
+	  function index as a short.
+	* ifdef DEBUG'd print of "partial =" in lex.c
+
+Thu Mar 25 21:55:42 CST 1993 (John Garnett (Truilkan))
+	* bumped the patchlevel up to 0.9.16.1
+	* COMPAT BUSTER: changed arch(), version(), and mud_name() efuns into
+	  #defines ARCH, VERSION, and MUD_NAME for LPC objects instead of
+	  efuns.
+	* fixed postlang.y so that a F_TO_INT is not generated when this
+	  code is compiled: foobar(arg) { int x; x = arg * 2; }.
+	* added an OLD_ULTRIX define to port.h for those people running
+	  older versions of Ultrix (added for the mud named "Cosmos").
+	  This doesn't seem to be necessary for DECstations running Ultrix.
+	* #ifdef'd the #include of <time.h> in access_check.c for accel
+	* Added Darin Johnson's patches to fix up a shared string leak in the
+	  parser.  This happens when there is an error, in which case epilog
+	  didn't free_string the function names, variable names, and program
+	  strings.
+	* added Luke Mewburn's patches to replace_string which allow
+	  it to take optional 4th and 5th args.  read comments in
+	  efunctions.c for f_replace_string
+	* added Luke's patches to call_other(). The enhancement is the option
+	  of having the second argument as a mixed array instead of a string.
+	  The first element of the array must contain a string which is the
+	  function to call. All other elements are treated as arguments
+	  (which get pushed onto the stack AFTER the normal arguments to
+	  call_other).
+	* added Darin Johnson's LPC disassembler (disassembler.c) dump_prog()
+	  efun.
+	* added Darin Johnson's patch to switch() to implement the "missing"
+	  optimized case in which the case labels are consecutive.
+
 Sun Mar 21 02:55:08 CST 1993 (Blackthorn)
         * bumped the patchlevel up to 0.9.16
 

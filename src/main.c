@@ -1,6 +1,10 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <stdio.h>
+#ifdef __386BSD__
+#include <stdlib.h>
+#include <unistd.h>
+#endif
 #include <string.h>
 #include <math.h>
 #include <setjmp.h>
@@ -8,6 +12,7 @@
 #if defined(sun)
 #include <alloca.h>
 #endif
+#include <varargs.h>
 #include "config.h"
 #include "lint.h"
 #include "interpret.h"
@@ -15,11 +20,7 @@
 #include "lex.h"
 #include "sent.h"
 #include "md.h"
-#include "base.h"
-#include "lang.tab.h"
-
-int base_code = BASE;
-int call_extra_code = F_CALL_EXTRA - F_OFFSET;
+#include "arch.h" /* after config.h */
 
 extern char *prog;
 
@@ -61,6 +62,7 @@ void init_addr_server();
 #endif /* NO_IP_DEMON */
 
 #ifdef TRAP_CRASHES
+static void sig_usr1();
 static void sig_term();
 static void sig_int();
 #ifndef DEBUG
@@ -105,10 +107,12 @@ int main(argc, argv)
 #if (defined(PROFILING) && !defined(PROFILE_ON) && defined(HAS_MONCONTROL))
   moncontrol(0);
 #endif
+#ifndef OLD_ULTRIX
   tzset();
+#endif
   boot_time = get_current_time();
   get_version(version_buf);
-  printf("%s\n",version_buf);
+  printf("%s (%s)\n",version_buf, ARCH);
 
   const0.type = T_NUMBER; const0.u.number = 0;
   const1.type = T_NUMBER; const1.u.number = 1;
@@ -125,7 +129,7 @@ int main(argc, argv)
   *p = -10;
   if(EXTRACT_UCHAR(p) != 0x100 - 10){
     fprintf(stderr, "Bad definition of EXTRACT_UCHAR() in config.h.\n");
-    exit(1);
+    exit(-1);
   }
 #ifdef DRAND48
   srand48(get_current_time());
@@ -137,6 +141,10 @@ int main(argc, argv)
 #endif
 #endif /* DRAND48 */
   current_time = get_current_time();;
+  /*
+   * Initialize the microsecond clock.
+   */
+  init_usec_clock();
 
   /* read in the configuration file */
 
@@ -150,7 +158,7 @@ int main(argc, argv)
   if(!got_defaults){
     fprintf(stderr,
 	    "You must specify the configuration filename as an argument.\n");
-    exit(1);
+    exit(-1);
   }
   init_strings(); /* in stralloc.c */
   init_otable();  /* in otable.c */
@@ -239,14 +247,14 @@ int main(argc, argv)
 	continue;
       }
       fprintf(stderr, "Illegal flag syntax: %s\n", argv[i]);
-      exit(1);
+      exit(-1);
     case 'N':
       no_ip_demon++; continue;
     case 'm':
       mud_lib = string_copy(argv[i]+2);
       if (chdir(mud_lib) == -1) {
 	fprintf(stderr, "Bad mudlib directory: %s\n", mud_lib);
-	exit(1);
+	exit(-1);
       }
       new_mudlib = 1;
       break;
@@ -254,7 +262,7 @@ int main(argc, argv)
   }
   if (!new_mudlib && chdir(mud_lib) == -1) {
     fprintf(stderr, "Bad mudlib directory: %s\n", mud_lib);
-    exit(1);
+    exit(-1);
   }
 
 #ifndef NO_IP_DEMON
@@ -274,7 +282,7 @@ int main(argc, argv)
   error_recovery_context_exists = 0;
   if (master_ob == 0) {
     fprintf(stderr, "The file master file must be loadable.\n");
-    exit(1);
+    exit(-1);
   }
       /*
 	* Make sure master_ob is never made a dangling pointer.
@@ -284,7 +292,7 @@ int main(argc, argv)
   ret = apply_master_ob("get_root_uid", 0);
   if (ret == 0 || ret->type != T_STRING) {
     fprintf(stderr, "get_root_uid() in the master file does not work\n");
-    exit(1);
+    exit(-1);
   }
   master_ob->uid = set_root_uid (ret->u.string);
   master_ob->euid = master_ob->uid;
@@ -293,7 +301,7 @@ int main(argc, argv)
   ret = apply_master_ob("get_bb_uid", 0);
   if (ret == 0 || ret->type != T_STRING) {
     fprintf(stderr, "get_bb_uid() in the master file does not work\n");
-    exit(1);
+    exit(-1);
   }
   set_backbone_uid(ret->u.string);
   set_backbone_domain(ret->u.string);
@@ -336,7 +344,7 @@ int main(argc, argv)
 #endif /* YYDEBUG */
 	  default:
 	    fprintf(stderr, "Unknown flag: %s\n", argv[i]);
-	    exit(1);
+	    exit(-1);
 	  }
 	}
       }
@@ -349,6 +357,7 @@ int main(argc, argv)
   restore_stat_files();
   preload_objects(e_flag);
 #ifdef TRAP_CRASHES
+    signal(SIGUSR1, sig_usr1);
     signal(SIGTERM, sig_term);
     signal(SIGINT, sig_int);
 #ifndef DEBUG
@@ -386,13 +395,13 @@ char *string_copy(str)
   return p;
 }
 
-/*VARARGS1*/
-void debug_message(a, b, c, d, e, f, g, h, i, j)
-    char *a;
-    int b, c, d, e, f, g, h, i, j;
+void debug_message(va_alist)
+  va_dcl
 {
     static FILE *fp = NULL;
     char deb[100];
+  va_list args;
+  char *fmt;
 
     if (fp == NULL) 
       {
@@ -406,7 +415,10 @@ void debug_message(a, b, c, d, e, f, g, h, i, j)
 	    abort();
 	  }
       }
-    (void)fprintf(fp, a, b, c, d, e, f, g, h, i, j);
+  va_start(args);
+  fmt = va_arg(args, char *);
+  vfprintf(fp, fmt, args);
+  va_end(args);
     (void)fflush(fp);
 }
 
@@ -469,6 +481,23 @@ char *xalloc(size)
 }
 
 #ifdef TRAP_CRASHES
+
+/* send this signal when the machine is about to reboot.  The script
+   which restarts the MUD should take an exit code of 1 to mean don't
+   restart
+ */
+
+static void
+sig_usr1()
+{
+	push_string("Host machine shutting down", STRING_CONSTANT);
+	push_undefined();
+	push_undefined();
+	current_object = master_ob;
+	apply_master_ob("crash", 3);
+	fprintf(stderr,"Received SIGUSR1, calling exit(-1)\n");
+	exit(-1);
+}
 
 static void sig_term() {
     crash_MudOS("Process terminated");
