@@ -9,7 +9,7 @@
 
 #include "std.h"
 
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
 
 #include "lpc_incl.h"
 #include "mudlib_stats.h"
@@ -352,7 +352,7 @@ static void init_domain_for_ob P1(object_t *, ob)
     }
 
     if (!master_ob || !current_object
-#ifndef NO_UIDS
+#ifdef PACKAGE_UIDS
 	|| !current_object->uid
 #endif
 	) {

@@ -36,6 +36,7 @@
    void _longjmp();
 #endif
 
+/* SunOS is missing alot of prototypes ... */
 #if defined(sun) && !defined(SunOS_5) && defined(__STDC__)
 #  ifdef BUFSIZ
      int fprintf(FILE *, char *,...);
@@ -53,7 +54,9 @@
    int system PROT((char *));
    int atoi PROT((const char *));
    void abort PROT(());
+/* configure now finds the qsort prototype for sun
    void qsort PROT((char *, int, int, int (*) ()));
+*/
    int setsockopt PROT((int, int, int, char *, int));
    int fseek PROT_STDIO((FILE *, long, int));
    int wait PROT((int *));
@@ -77,9 +80,6 @@
      int pclose PROT_STDIO((FILE *));
 #  endif
 
-#  if !defined(linux) && !defined(LATTICE)
-     int gethostname PROT((char *, int));
-#  endif
 #  if !defined(LATTICE) && !defined(sgi)
      void abort PROT(());
      int fflush PROT_STDIO((FILE *));
@@ -96,11 +96,6 @@
      int _filbuf();
 #  endif
 
-#  if defined(__386BSD__) || defined(linux) || defined(__bsdi__)
-     char *crypt PROT((const char *, const char *));
-#  else
-     char *crypt PROT((char *, char *));
-#  endif
 #  ifdef sun
      char *_crypt PROT((char *, char *));
 #  endif

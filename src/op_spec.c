@@ -3,7 +3,7 @@
  * Normally, these should not be commented out.
  */
 
-operator pop_value;
+operator pop_value, push;
 
 operator number, real, byte, nbyte, string, short_string, const0, const1;
 
@@ -19,6 +19,8 @@ operator break_point;
 operator branch_when_zero, branch_when_non_zero, branch;
 operator bbranch_when_zero, bbranch_when_non_zero, bbranch;
 
+operator branch_ne, branch_ge, branch_le, branch_eq, bbranch_lt;
+
 operator loop_cond;
 operator loop_incr;
 operator while_dec;
@@ -30,7 +32,7 @@ operator time_expression, end_time_expression;
 
 operator switch, break, pop_break;
 
-operator call_function_by_address, call_inherited, return;
+operator call_function_by_address, call_inherited, return, return_zero;
 
 operator eq, ne, le, lt, ge, gt;
 
@@ -53,7 +55,7 @@ operator xor, xor_eq;
 operator lsh, lsh_eq, rsh, rsh_eq;
 operator negate, compl;
 
-operator assign, void_assign;
+operator assign, void_assign, void_assign_local;
 
 operator function_constructor;
 operator simul_efun;

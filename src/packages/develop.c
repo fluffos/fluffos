@@ -126,6 +126,7 @@ f_refs PROT((void))
     case T_MAPPING:
 	r = sp->u.map->ref;
 	break;
+    case T_CLASS:
     case T_ARRAY:
 	r = sp->u.arr->ref;
 	break;

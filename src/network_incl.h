@@ -1,29 +1,32 @@
 #ifndef NETWORK_INCL_H
 #define NETWORK_INCL_H
 
-#if !defined(LATTICE) && !defined(OS2)
-#  include <sys/ioctl.h>
-#  include <sys/socket.h>
-#  include <netdb.h>
-#  ifndef _AUX_SOURCE
-#    include <arpa/telnet.h>
-#  endif
-#  ifdef _CX_UX
-#    include <sys/sema.h>
-#  endif
-#  if !defined(appolo) && !defined(linux) && !defined(_M_UNIX)
-#    include <sys/socketvar.h>
-#  endif
-#endif
-#ifdef LATTICE
-#  include <socket.h>
-#endif
+#include "configure.h"
 
-#if defined(_AUX_SOURCE) || defined(__SASC)
+#ifdef INCL_SYS_IOCTL_H
+#  include <sys/ioctl.h>
+#endif
+#ifdef INCL_SYS_SOCKET_H
+#  include <sys/socket.h>
+#endif
+#ifdef INCL_NETDB_H
+#  include <netdb.h>
+#endif
+#ifdef INCL_ARPA_TELNET_H
+#  include <arpa/telnet.h>
+#else
 #  include "telnet.h"
 #endif
-
-#ifdef _AUX_SOURCE
+#ifdef INCL_SYS_SEMA_H
+#  include <sys/sema.h>
+#endif
+#ifdef INCL_SYS_SOCKETVAR_H
+#    include <sys/socketvar.h>
+#endif
+#ifdef INCL_SOCKET_H
+#  include <socket.h>
+#endif
+#ifdef INCL_RESOLVE_H
 #  include <resolv.h>
 #endif
 

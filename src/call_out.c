@@ -31,18 +31,14 @@ static pending_call_t *call_list, *call_list_free;
 static int num_call;
 
 static void free_call PROT((pending_call_t *));
+static void free_called_call PROT((pending_call_t *));
 void remove_all_call_out PROT((object_t *));
 
 /*
  * Free a call out structure.
  */
-static void free_call P1(pending_call_t *, cop)
+static void free_called_call P1(pending_call_t *, cop)
 {
-    if (cop->vs) {
-	free_array(cop->vs);
-    }
-    free_svalue(&cop->v, "free_call");
-    cop->v = const0n;
     cop->next = call_list_free;
     if (cop->ob) {
 	free_string(cop->function.s);
@@ -57,6 +53,15 @@ static void free_call P1(pending_call_t *, cop)
 #endif
     cop->ob = 0;
     call_list_free = cop;
+}
+
+static void free_call P1(pending_call_t *, cop)
+{
+    if (cop->vs) {
+	free_array(cop->vs);
+    }
+    free_svalue(&cop->v, "free_call");
+    free_called_call(cop);
 }
 
 /*
@@ -95,12 +100,10 @@ void new_call_out P5(object_t *, ob, svalue_t *, fun, int, delay, int, num_args,
     if (command_giver)
 	add_ref(command_giver, "new_call_out");	/* Bump its ref */
 #endif
-    cop->v.type = T_NUMBER;
-    cop->v.subtype = 0;
-    cop->v.u.number = 0;
-    cop->vs = NULL;
     if (arg) {
-	assign_svalue(&cop->v, arg);
+	assign_svalue_no_free(&cop->v, arg);
+    } else {
+	cop->v = const0;
     }
     if (num_args > 0) {
 	int j;
@@ -109,7 +112,8 @@ void new_call_out P5(object_t *, ob, svalue_t *, fun, int, delay, int, num_args,
 	for (j = 0; j < num_args; j++) {
 	    assign_svalue_no_free(&cop->vs->item[j], &arg[j + 1]);
 	}
-    }
+    } else
+	cop->vs = 0;
     for (copp = &call_list; *copp; copp = &(*copp)->next) {
 	if ((*copp)->delta >= delay) {
 	    (*copp)->delta -= delay;
@@ -166,12 +170,13 @@ void call_out()
 	 */
 	if (call_list && cop->delta < 0)
 	    call_list->delta += cop->delta;
-	if (!(cop->ob && cop->ob->flags & O_DESTRUCTED)) {
+	if (cop->ob && cop->ob->flags & O_DESTRUCTED) {
+	    free_call(cop);
+	} else {
 	    if (SETJMP(error_recovery_context)) {
 		clear_state();
 		debug_message("Error in call out.\n");
 	    } else {
-		svalue_t v;
 		object_t *ob;
 
 		ob = cop->ob;
@@ -189,24 +194,26 @@ void call_out()
 		    command_giver = ob;
 		}
 #endif
-		v.type = cop->v.type;
-		v.subtype = 0;
-		v.u = cop->v.u;
-		v.subtype = cop->v.subtype;	/* Not always used */
-		if (v.type == T_OBJECT && (v.u.ob->flags & O_DESTRUCTED)) {
-		    v.type = T_NUMBER;
-		    v.subtype = 0;
-		    v.u.number = 0;
-		}
 		/* current object no longer set */
-		push_svalue(&v);
-		if (cop->vs) {
-		    int j;
 
-		    check_for_destr(cop->vs);
-		    for (j = 0; j < cop->vs->size; j++) {
-			push_svalue(&cop->vs->item[j]);
+		*(++sp) = cop->v;
+		if (sp->type == T_OBJECT && (sp->u.ob->flags & O_DESTRUCTED)) {
+		    put_number(0);
+		}
+
+		if (cop->vs) {
+		    array_t *vec = cop->vs;
+		    svalue_t *svp = vec->item + vec->size;
+
+		    while (svp-- > vec->item) {
+			if (svp->type == T_OBJECT && 
+			    (svp->u.ob->flags & O_DESTRUCTED)) {
+			    free_object(svp->u.ob, "call_out");
+			    *svp = const0;
+			}
 		    }
+		    /* cop->vs is ref one */
+		    transfer_push_some_svalues(cop->vs->item, cop->vs->size);
 		}
 		if (cop->ob) {
 		    (void) apply(cop->function.s, cop->ob, 
@@ -216,8 +223,8 @@ void call_out()
 		    (void) call_function_pointer(cop->function.f, 1 + (cop->vs ? cop->vs->size : 0));
 		}
 	    }
+	    free_called_call(cop);
 	}
-	free_call(cop);
     }
     memcpy((char *) error_recovery_context,
 	   (char *) save_error_recovery_context,
@@ -321,17 +328,19 @@ array_t *get_all_call_outs()
     pending_call_t *cop;
     array_t *v;
 
-    for (i = 0, cop = call_list; cop; i++, cop = cop->next)
-	;
+    for (i = 0, cop = call_list; cop; cop = cop->next)
+	if (!cop->ob || !(cop->ob->flags & O_DESTRUCTED))
+	    i++;
+
     v = allocate_empty_array(i);
     next_time = 0;
 
-    for (i = 0, cop = call_list; cop; i++, cop = cop->next) {
+    for (i = 0, cop = call_list; cop; cop = cop->next) {
 	array_t *vv;
 
 	next_time += cop->delta;
 	if (cop->ob && cop->ob->flags & O_DESTRUCTED)
-	    continue;  /* This should be smarter.  -Beek */
+	    continue;
 	vv = allocate_empty_array(4);
 	if (cop->ob) {
 	    vv->item[0].type = T_OBJECT;
@@ -353,7 +362,7 @@ array_t *get_all_call_outs()
 	assign_svalue_no_free(&vv->item[3], &cop->v);
 
 	v->item[i].type = T_ARRAY;
-	v->item[i].u.arr = vv;	/* Ref count is already 1 */
+	v->item[i++].u.arr = vv;	/* Ref count is already 1 */
     }
     return v;
 }

@@ -113,6 +113,8 @@ extern function_context_t function_context;
 #define SOME_NUMERIC_CASE_LABELS 0x40000
 #define NO_STRING_CASE_LABELS    0x80000
 
+extern char *type_names[];
+
 int validate_function_call PROT((function_t *, int, parse_node_t *));
 parse_node_t *validate_efun_call PROT((int, parse_node_t *));
 extern mem_block_t mem_block[];

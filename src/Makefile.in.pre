@@ -1,0 +1,3 @@
+%define NORMAL
+
+%include "Makefile.master"

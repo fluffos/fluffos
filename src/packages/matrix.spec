@@ -1,5 +1,3 @@
-package matrix;
-
 /*
  * Matrix efuns for Jacques' 3d mud etc.
  */

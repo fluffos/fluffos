@@ -7,7 +7,7 @@
  *    94.07.09 - Robocoder - modified to use AVL tree
  */
 
-#if !defined(_UID_H_) && !defined(NO_UIDS)
+#if !defined(_UID_H_) && defined(PACKAGE_UIDS)
 #define _UID_H_
 
 #include "std.h"

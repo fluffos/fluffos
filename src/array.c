@@ -62,7 +62,7 @@ array_t *allocate_array P1(int, n)
     p = ALLOC_ARRAY(n);
     p->ref = 1;
     p->size = n;
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     if (current_object) {
 	assign_stats(&p->stats, current_object);
 	add_array_size(&p->stats, n);
@@ -87,7 +87,7 @@ array_t *allocate_empty_array P1(int, n)
     p = ALLOC_ARRAY(n);
     p->ref = 1;
     p->size = n;
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     if (current_object) {
 	assign_stats(&p->stats, current_object);
 	add_array_size(&p->stats, n);
@@ -111,7 +111,7 @@ void free_array P1(array_t *, p)
     }
     for (i = p->size; i--;)
 	free_svalue(&p->item[i], "free_array");
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     add_array_size(&p->stats, -((int)p->size));
 #endif
     num_arrays--;
@@ -125,7 +125,7 @@ void free_empty_array P1(array_t *, p)
     if ((--(p->ref) > 0) || (p == &the_null_array)) {
         return;
       }
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     add_array_size(&p->stats, -((int)p->size));
 #endif
     num_arrays--;
@@ -384,7 +384,7 @@ array_t *slice_array P3(array_t *, p, int, from, int, to)
     }
 
     if (!(--p->ref)){
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
 	add_array_size(&p->stats, -((int)p->size));
 #endif
 	total_array_size += (to - from + 1 - p->size) * sizeof(svalue_t);
@@ -400,7 +400,7 @@ array_t *slice_array P3(array_t *, p, int, from, int, to)
 	    while (cnt--) free_svalue(sv2++, "slice_array:3");
 	}
 	p = RESIZE_ARRAY(p, to-from+1);
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
 	if (current_object) {
 	    assign_stats(&p->stats, current_object);
 	    add_array_size(&p->stats, to - from + 1);
@@ -769,7 +769,7 @@ array_t *add_array P2(array_t *, p, array_t *, r)
 	for (cnt = d->size; cnt--;)
 	    assign_svalue_no_free(&d->item[--res], &d->item[cnt]);
         total_array_size += sizeof(svalue_t) * (d->size);
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
 	/* mudlib_stats stuff */
 	if (current_object) {
 	    assign_stats(&d->stats, current_object);
@@ -798,7 +798,7 @@ array_t *add_array P2(array_t *, p, array_t *, r)
 	/* d->ref = 1;     d is p, and p's ref was already one -Beek */
 	d->size = res;
 
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
 	/* mudlib_stats stuff */
 	if (current_object) {
 	    assign_stats(&d->stats, current_object);
@@ -819,7 +819,7 @@ array_t *add_array P2(array_t *, p, array_t *, r)
     if (r->ref == 1) {
 	for (cnt = r->size; cnt--;)
 	    d->item[--res] = r->item[cnt];
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
 	add_array_size(&r->stats, -((int)r->size));
 #endif
 	num_arrays--;
@@ -1451,7 +1451,7 @@ array_t *subtract_array P2(array_t *, minuend, array_t *, subtrahend) {
     if (subtrahend->ref > 1) {
 	subtrahend->ref--;
     } else {
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
 	add_array_size(&subtrahend->stats, -size);
 #endif
 	num_arrays--;
@@ -1470,7 +1470,7 @@ array_t *subtract_array P2(array_t *, minuend, array_t *, subtrahend) {
     difference->ref = 1;
     total_array_size += sizeof(array_t) + sizeof(svalue_t[1]) * (msize - 1);
     num_arrays++;
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     if (current_object) {
 	assign_stats(&difference->stats, current_object);
 	add_array_size(&difference->stats, msize);
@@ -1598,7 +1598,7 @@ array_t *intersect_array P2(array_t *, a1, array_t *, a2) {
 
     if (a1->ref > 1) a1->ref--;
     else {
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
 	add_array_size(&a1->stats, -a1s);
 #endif
 	num_arrays--;
@@ -1610,7 +1610,7 @@ array_t *intersect_array P2(array_t *, a1, array_t *, a2) {
 	a2->ref--;
 	FREE((char *) sv_tab);
     } else {
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
 	add_array_size(&a2->stats, -a2s);
 #endif
 	num_arrays--;
@@ -1620,7 +1620,7 @@ array_t *intersect_array P2(array_t *, a1, array_t *, a2) {
     a3 = RESIZE_ARRAY(a3, l);
     a3->ref = 1;
     a3->size = l;
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     if (current_object) {
 	assign_stats(&a3->stats, current_object);
 	add_array_size(&a3->stats, l);

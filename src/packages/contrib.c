@@ -2,10 +2,16 @@
 #include "/lpc_incl.h"
 #include "/mapping.h"
 #include "/comm.h"
+#include "/file_incl.h"
+#include "/file.h"
+#include "/object.h"
 #else
 #include "../lpc_incl.h"
 #include "../mapping.h"
 #include "../comm.h"
+#include "../file_incl.h"
+#include "../file.h"
+#include "../object.h"
 #endif
 
 /* I forgot who wrote this, please claim it :) */
@@ -56,6 +62,38 @@ f_query_notify_fail PROT((void)) {
 	}
     }
     push_number(0);
+}
+#endif
+
+/* Beek again */
+#ifdef F_STORE_VARIABLE
+void
+f_store_variable PROT((void)) {
+    variable_t *var;
+    svalue_t *sv;
+
+    var = find_status((sp-1)->u.string);
+    if (!var)
+	error("No variable named '%s'!", (sp-1)->u.string);
+    sv = &current_object->variables[var - current_object->prog->variable_names];
+    free_svalue(sv, "f_store_variable");
+    *sv = *sp--;
+    free_string_svalue(sp--);
+}
+#endif
+
+#ifdef F_FETCH_VARIABLE
+void
+f_fetch_variable PROT((void)) {
+    variable_t *var;
+    svalue_t *sv;
+
+    var = find_status(sp->u.string);
+    if (!var)
+	error("No variable named '%s'!", sp->u.string);
+    sv = &current_object->variables[var - current_object->prog->variable_names];
+    free_string_svalue(sp--);
+    push_svalue(sv);
 }
 #endif
 
@@ -166,8 +204,8 @@ void f_functions PROT((void)) {
     array_t *vec;
     function_t *functions;
     
-    num = sp->u.ob->prog->p.i.num_functions;
-    functions = sp->u.ob->prog->p.i.functions;
+    num = sp->u.ob->prog->num_functions;
+    functions = sp->u.ob->prog->functions;
     
     vec = allocate_empty_array(num);
     i = num;
@@ -358,6 +396,7 @@ f_terminal_colour P2( int, num_arg, int, instruction)
 #ifdef F_PLURALIZE
 
 #define PLURAL_IS(x) { x; return rel; }
+#define PLURAL_IS_SAME { return rel; }
 
 /* This should handle 'of' */
 char *pluralize P1(char *, str) {
@@ -395,7 +434,7 @@ char *pluralize P1(char *, str) {
 	    pre[sz] = 0;
 	}
     } else {
-	strcpy(pre, str, sz);
+	strncpy(pre, str, sz);
 	pre[sz] = 0;
     }
 
@@ -428,7 +467,7 @@ char *pluralize P1(char *, str) {
 	if (!strcasecmp(rel + 1, "ie"))
 	    PLURAL_IS(strcpy(rel + 2, "ce"));
 	if (!strcasecmp(rel + 1, "eer"))
-	    PLURAL_IS();
+	    PLURAL_IS_SAME;
 	if (!strcasecmp(rel + 1, "ynamo"))
 	    PLURAL_IS(strcpy(end, "s"));
 	break;
@@ -436,6 +475,10 @@ char *pluralize P1(char *, str) {
     case 'f':
 	if (!strcasecmp(rel + 1, "oot"))
 	    PLURAL_IS( rel[1] = 'e'; rel[2] = 'e'; );
+	if (!strcasecmp(rel + 1, "ish"))
+	    PLURAL_IS_SAME;
+	if (!strcasecmp(rel + 1, "ife"))
+	    PLURAL_IS(strcpy(end, "s"));
 	break;
     case 'G':
     case 'g':
@@ -452,13 +495,6 @@ char *pluralize P1(char *, str) {
 	if (!strcasecmp(rel + 1, "ndex"))
 	    PLURAL_IS(strcpy(rel + 3, "ices"));
 	break;
-    case 'F':
-    case 'f':
-	if (!strcasecmp(rel + 1, "ish"))
-	    PLURAL_IS();
-	if (!strcasecmp(rel + 1, "ife"))
-	    PLURAL_IS(strcpy(end, "s"));
-	break;
     case 'L':
     case 'l':
 	if (!strcasecmp(rel + 1, "ouse"))
@@ -467,7 +503,7 @@ char *pluralize P1(char *, str) {
     case 'M':
     case 'm':
 	if (!strcasecmp(rel + 1, "oose"))
-	    PLURAL_IS();
+	    PLURAL_IS_SAME;
 	if (!strcasecmp(rel + 1, "ouse"))
 	    PLURAL_IS(strcpy(rel + 1, "ice"));
 	if (!strcasecmp(rel + 1, "atrix"))
@@ -481,7 +517,7 @@ char *pluralize P1(char *, str) {
     case 'S':
     case 's':
 	if (!strcasecmp(rel + 1, "heep"))
-	    PLURAL_IS();
+	    PLURAL_IS_SAME;
 	if (!strcasecmp(rel + 1, "phinx"))
 	    PLURAL_IS(strcpy(end - 1, "ges"));
 	break;
@@ -622,7 +658,7 @@ int file_length P1(char *, file)
       end = buf + fread(buf, 2048, 1, f);
       *end = 0;
       p = buf - 1;
-      while (p = strchr(p + 1, ' ') && p < n)
+      while ((p = strchr(p + 1, '\n')) && p < end)
 	  ret++;
   } while (!feof(f));
 
@@ -669,12 +705,12 @@ f_upper_case PROT((void))
 
 #ifdef F_REPLACEABLE
 void f_replaceable PROT((void)) {
-    struct program *prog = sp->u.ob->prog;
+    program_t *prog = sp->u.ob->prog;
     int i, num;
-    struct function *functions;
+    function_t *functions;
     
-    num = prog->p.i.num_functions;
-    functions = prog->p.i.functions;
+    num = prog->num_functions;
+    functions = prog->functions;
     
     for (i = 0; i < num; i++) {
 	if (functions[i].flags & (NAME_INHERITED | NAME_NO_CODE)) continue;
@@ -694,19 +730,26 @@ void f_program_info PROT((void)) {
     int inherit_size = 0;
     int prog_size = 0;
     int hdr_size;
-    struct object *ob;
-    
+    object_t *ob;
+    int num_pushes[100];
+    int i;
+
+    for (i=0; i < 10; i++)
+	num_pushes[i]=0;
     for (ob = obj_list; ob; ob = ob->next_all) {
 	if (ob->flags & O_CLONE) continue;
-	hdr_size += sizeof(struct program);
-	prog_size += ob->prog->p.i.program_size;
-	func_size += ob->prog->p.i.num_functions * sizeof(struct function);
-	string_size += ob->prog->p.i.num_strings * sizeof(char *);
-	var_size += ob->prog->p.i.num_variables * sizeof(struct variable);
-	inherit_size += ob->prog->p.i.num_inherited * sizeof(struct inherit);
+	hdr_size += sizeof(program_t);
+	prog_size += ob->prog->program_size;
+	func_size += ob->prog->num_functions * sizeof(function_t);
+	string_size += ob->prog->num_strings * sizeof(char *);
+	var_size += ob->prog->num_variables * sizeof(variable_t);
+	inherit_size += ob->prog->num_inherited * sizeof(inherit_t);
+	walk_program_code(num_pushes, ob->prog);
     }
+    for (i=0; i <10; i++)
+	add_vmessage("%i ", num_pushes[i]);
     
-    add_vmessage("header size: %i\n", hdr_size);
+    add_vmessage("\nheader size: %i\n", hdr_size);
     add_vmessage("code size: %i\n", prog_size);
     add_vmessage("function size: %i\n", func_size);
     add_vmessage("string size: %i\n", string_size);

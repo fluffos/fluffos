@@ -834,13 +834,13 @@ int define_variable P3(char *, name, int, type, int, hide)
     return n;
 }
 
+char *type_names[] = {"unknown", "mixed", "void", "void", 
+		      "int", "string", "object", "mapping",
+		      "function", "float", "buffer" };
+
 char *get_type_name P1(int, type)
 {
     static char buff[100];
-    static char *type_name[] =
-    {"unknown", "mixed", "void", "void", 
-     "int", "string", "object", "mapping",
-     "function", "float", "buffer" };
     int pointer = 0;
 
     buff[0] = 0;
@@ -865,9 +865,9 @@ char *get_type_name P1(int, type)
 	strcat(buff, "class ");
 	strcat(buff, PROG_STRING(CLASS(type & ~TYPE_MOD_CLASS)->name));
     } else {
-	if (type >= sizeof type_name / sizeof type_name[0])
+	if (type >= sizeof type_names / sizeof type_names[0])
 	    fatal("Bad type\n");
-	strcat(buff, type_name[type]);
+	strcat(buff, type_names[type]);
     }
     strcat(buff, " ");
     if (pointer)
@@ -1089,7 +1089,7 @@ validate_efun_call P2(int, f, parse_node_t *, args) {
     int num = args->v.number;
     int min_arg, max_arg, def, *argp;
     
-    if (f != 0) {
+    if (f != -1) {
 	/* should this move out of here? */
 	switch (predefs[f].token) {
 	case F_SIZEOF:
@@ -1114,11 +1114,11 @@ validate_efun_call P2(int, f, parse_node_t *, args) {
 	    tmp->r.expr = 0;
 	    args->l.expr->r.expr = tmp;
 	    if (def > 0) {
-		CREATE_NODE(tmp->v.expr, def);
+		CREATE_TYPED_NODE(tmp->v.expr, def, TYPE_ANY);
 		tmp->v.expr->v.number = -1;
 		tmp->r.expr = 0;
 	    } else {
-		CREATE_NODE(tmp->v.expr, -(def) >> 8);
+		CREATE_TYPED_NODE(tmp->v.expr, -(def) >> 8, TYPE_ANY);
 		tmp->v.expr->v.number = (-def) & 0xff;
 	    }
 	    tmp->v.expr->r.expr = 0;
@@ -1213,7 +1213,7 @@ void yyerror P1(char *, str)
     if (num_parse_error > 5)
 	return;
     smart_log(current_file, current_line, str, 0);
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     add_errors_for_file (current_file, 1);
 #endif
     num_parse_error++;

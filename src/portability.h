@@ -81,18 +81,6 @@
 #  define INET_NTOA_OK
 #endif
 
-/* Define what random number generator to use.
- * If no one is specified, a guaranteed bad one will be used.
- * use drand48 if you have it (it is the better random # generator)
- */
-
-#if defined(NeXT) || defined(__386BSD__) || defined(hp68k) || \
-        defined(__bsdi__) || defined(sequent) || defined(OS2) || defined(linux)
-#  define RANDOM
-#else				/* Sequent, HP, Sparc, RS/6000 */
-#  define DRAND48
-#endif
-
 /*
  * Does the system have a getrusage() system call?
  * Sequent doesn't have it.  Solaris 2.1 (SunOS 5.1) has it in a compat
@@ -133,14 +121,6 @@
  */
 #if (defined(_SEQUENT_))
 #  define SYSV
-#endif
-
-/* define HAS_UALARM if ualarm() system call is available (or if ualarm.c
-   will work)
-*/
-#if !(defined(SYSV) || defined(SVR4) || defined(cray) || defined(LATTICE)) \
-    || defined(OS2)
-#  define HAS_UALARM
 #endif
 
 /*
@@ -285,12 +265,4 @@ typedef unsigned long UINT32;
 #define HAS_STDARG_H
 #endif
 
-#define SIZEOF_SHORT     2
-#define SIZEOF_INT       4
-#define SIZEOF_FLOAT     4
-#ifndef __alpha
-#define SIZEOF_PTR       4
-#else
-#define SIZEOF_PTR       8
-#endif
 #endif				/* _PORT_H */

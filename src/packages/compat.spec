@@ -1,5 +1,3 @@
-package compat;
-
 int cat(string, void|int, void|int);
 void log_file(string, string);
 string extract(string, void|int, void|int);

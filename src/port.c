@@ -25,7 +25,7 @@ time_t time PROT((time_t *));
  */
 int random_number P1(int, n)
 {
-#ifdef OS2
+#ifdef RAND
     static char called = 0;
 
     if (!called) {
@@ -43,11 +43,10 @@ int random_number P1(int, n)
 #ifdef DRAND48
     return (int) (drand48() * n);
 #else				/* DRAND48 */
-
     return current_time % n;	/* You really don't want to use this method */
 #endif				/* DRAND48 */
 #endif				/* RANDOM */
-#endif				/* OS2 */
+#endif				/* RAND */
 }
 
 /*

@@ -1,3 +1,4 @@
+#ifndef HAS_UALARM
 /*
  * Copyright (c) 1985 Regents of the University of California.
  * All rights reserved.
@@ -59,3 +60,4 @@ unsigned ualarm P2(register unsigned, usecs, register unsigned, reload)
     /* else */
     return (-1);
 }
+#endif

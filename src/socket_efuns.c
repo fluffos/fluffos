@@ -14,7 +14,7 @@
 #include "socket_ctrl.h"
 #include "comm.h"
 
-#ifdef SOCKET_EFUNS
+#ifdef PACKAGE_SOCKETS
 
 struct lpc_socket lpc_socks[MAX_EFUN_SOCKS];
 static int socket_name_to_sin PROT((char *, struct sockaddr_in *));
@@ -748,6 +748,16 @@ socket_read_select_handler P1(int, fd)
     }
     if (cc == -1) {
 	switch (errno) {
+	case ECONNREFUSED:
+	    /* Evidentally, on Linux 1.2.1, ECONNREFUSED gets returned
+	     * if an ICMP_PORT_UNREACHED error happens internally.  Why
+	     * they use this error message, I have no idea, but this seems
+	     * to work.
+	     */
+	    if (lpc_socks[fd].state == BOUND
+		&& lpc_socks[fd].mode == DATAGRAM)
+		return;
+	    break;
 	case EINTR:
 	case EWOULDBLOCK:
 	    return;
@@ -1000,7 +1010,7 @@ close_referencing_sockets P1(object_t *, ob)
 static char *
      inet_address P1(struct sockaddr_in *, sin)
 {
-    char addr[23], port[7];
+    static char addr[23], port[7];
 
     if (ntohl(sin->sin_addr.s_addr) == INADDR_ANY)
 	strcpy(addr, "*");

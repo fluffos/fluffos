@@ -1,6 +1,10 @@
 #ifndef MACROS_H
 #define MACROS_H
 
+#ifndef EDIT_SOURCE
+#include "configure.h"
+#endif
+
 /*
  * Some useful macros...
  */
@@ -134,6 +138,7 @@
 #  define DEBUG_CHECK2(x, y, a, b)
 #endif
 
+#ifndef EDIT_SOURCE
 #define COPY2(x, y)      ((char *)(x))[0] = ((char *)(y))[0]; \
                          ((char *)(x))[1] = ((char *)(y))[1]
 #define LOAD2(x, y)      ((char *)&(x))[0] = *y++; \
@@ -221,6 +226,7 @@ floats of size other than 4 not implemented
 #  else
 pointers of size other than 4 or 8 not implemented
 #  endif
+#endif
 #endif
 
 #ifndef _FUNC_SPEC_

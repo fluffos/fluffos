@@ -3,52 +3,43 @@
  * description: runtime configuration for lpmud
  * author: erikkay@mit.edu
  * last modified: July 4, 1994 [robo]
+ * Mar 26, 1995: edited heavily by Beek
  */
 
 #include "std.h"
 #include "include/runtime_config.h"
 #include "lpc_incl.h"
+#include "main.h"
 
 #define MAX_LINE_LENGTH 120
 
-static char config_str[NUM_CONFIG_STRS][MAX_LINE_LENGTH];
-static int config_int[NUM_CONFIG_INTS];
+char *config_str[NUM_CONFIG_STRS];
+int config_int[NUM_CONFIG_INTS];
+
 static char *buff;
 
-#define CONFIG_STR(x) config_str[x - BASE_CONFIG_STR]
-#define CONFIG_INT(x) &config_int[x - BASE_CONFIG_INT]
-
 static void read_config_file PROT((FILE *));
-static void scan_config_line PROT((char *, char *, void *, int));
+static int scan_config_line PROT((char *, void *, int));
 
-INLINE int get_config_int P1(int, num)
-{
-#ifdef DEBUG
-    if (num > NUM_CONFIG_INTS || num < 0) {
-	fatal("Bounds error in get_config_int\n");
-    }
-#endif
-    return config_int[num];
-}
+static void config_init() {
+    int i;
 
-INLINE char *get_config_str P1(int, num)
-{
-#ifdef DEBUG
-    if (num > NUM_CONFIG_STRS || num < 0) {
-	fatal("Bounds error in get_config_str\n");
+    for (i = 0; i < NUM_CONFIG_INTS; i++) {
+	config_int[i] = 0;
     }
-#endif
-    return config_str[num];
+    for (i = 0; i < NUM_CONFIG_STRS; i++) {
+	config_str[i] = "";
+    }
+    
 }
 
 static void read_config_file P1(FILE *, file)
 {
-    char str[120];
+    char str[MAX_LINE_LENGTH];
     int size = 0, len;
 
     buff = (char *)
-	DMALLOC(MAX_LINE_LENGTH * (NUM_CONFIG_INTS + 1) * (NUM_CONFIG_STRS + 1), TAG_CONFIG,
-		"read_config_file: 1");
+	DMALLOC(MAX_LINE_LENGTH * (NUM_CONFIG_INTS + 1) * (NUM_CONFIG_STRS + 1), TAG_CONFIG, "read_config_file: 1");
     strcpy(buff, "\n");
     while (1) {
 	if (fgets(str, 120, file) == NULL)
@@ -57,7 +48,7 @@ static void read_config_file P1(FILE *, file)
 	    break;
 	len = strlen(str);
 	if (len > MAX_LINE_LENGTH) {
-	    fprintf(stderr, "*Error in config file: line too long.\n");
+	    fprintf(stderr, "*Error in config file: line too long:\n%s...\n, str");
 	    exit(-1);
 	}
 	if (str[0] != '#' && str[0] != '\n') {
@@ -76,21 +67,26 @@ static void read_config_file P1(FILE *, file)
  * missing from the config file.  Otherwise, it will give an error and exit
  * if the line isn't there.
  */
-static void scan_config_line P4(char *, start, char *, fmt, void *, dest, int, required)
+/* required:
+      1  : Must have
+      0  : optional
+      -1 : warn if missing */
+static int scan_config_line P3(char *, fmt, void *, dest, int, required)
 {
     char *tmp, *end;
     char missing_line[MAX_LINE_LENGTH];
 
-    tmp = start;
+    /* zero the destination.  It is either a pointer to an int or a char
+       buffer, so this will work */
+    *((int *)dest) = 0;
+    tmp = buff;
     while (tmp) {
 	while (tmp = (char *) strchr(tmp, '\n')) {
 	    if (*(++tmp) == fmt[0]) break;
 	}
 	/* don't allow sscanf() to scan to next line for blank entries */
-	if (tmp) {
-	    end = strchr(tmp, '\n');
-	    if (end) *end = '\0';
-	} else end = 0;
+	end = (tmp ? strchr(tmp, '\n') : 0);
+	if (end) *end = '\0';
 	if (tmp && sscanf(tmp, fmt, dest) == 1) {
 	    if (end) *end = '\n';
 	    break;
@@ -101,12 +97,12 @@ static void scan_config_line P4(char *, start, char *, fmt, void *, dest, int, r
 	strcpy(missing_line, fmt);
 	tmp = (char *) strchr(missing_line, ':');
 	*tmp = '\0';
-	if (!required) {
+	if (required == -1) {
 	    fprintf(stderr, "*Warning: Missing line in config file:\n\t%s\n",
 		    missing_line);
-	    memset(dest, 0, 1);
-	    return;
+	    return 0;
 	}
+	if (!required) return 0;
 	fprintf(stderr, "*Error in config file.  Missing line:\n\t%s\n",
 		missing_line);
 	exit(-1);
@@ -118,7 +114,12 @@ void set_defaults P1(char *, filename)
     FILE *def;
     char defaults[SMALL_STRING_SIZE];
     char *p;
+    char tmp[MAX_LINE_LENGTH];
+    char kind[MAX_LINE_LENGTH];
+    int i, port, port_start = 0;
 
+    max_string_length = 120; /* needed for string_copy() below */
+    config_init();
     def = fopen(filename, "r");
     if (def) {
 	fprintf(stderr, "loading config file: %s\n", filename);
@@ -145,9 +146,10 @@ void set_defaults P1(char *, filename)
     }
     read_config_file(def);
 
-    scan_config_line(buff, "global include file : %[^\n]", CONFIG_STR(__GLOBAL_INCLUDE_FILE__), 0);
+    scan_config_line("global include file : %[^\n]", tmp, 0);
+    p = CONFIG_STR(__GLOBAL_INCLUDE_FILE__) = string_copy(tmp, "config file");
+
     /* check if the global include file is quoted */
-    p = CONFIG_STR(__GLOBAL_INCLUDE_FILE__);
     if (*p && *p != '\"' && *p != '<') {
 	char *ptr;
 
@@ -162,65 +164,133 @@ void set_defaults P1(char *, filename)
 	}
 	*p = '\"';
     }
-    scan_config_line(buff, "name : %[^\n]", CONFIG_STR(__MUD_NAME__), 1);
-    scan_config_line(buff, "address server ip : %[^\n]", CONFIG_STR(__ADDR_SERVER_IP__), 1);
 
-    scan_config_line(buff, "mudlib directory : %[^\n]", CONFIG_STR(__MUD_LIB_DIR__), 1);
-    scan_config_line(buff, "binary directory : %[^\n]", CONFIG_STR(__BIN_DIR__), 1);
+    scan_config_line("name : %[^\n]", tmp, 1);
+    CONFIG_STR(__MUD_NAME__) = string_copy(tmp, "config file");
+    scan_config_line("address server ip : %[^\n]", tmp, 1);
+    CONFIG_STR(__ADDR_SERVER_IP__) = string_copy(tmp, "config file");
 
-    scan_config_line(buff, "log directory : %[^\n]", CONFIG_STR(__LOG_DIR__), 1);
-    scan_config_line(buff, "include directories : %[^\n]", CONFIG_STR(__INCLUDE_DIRS__), 1);
+    scan_config_line("mudlib directory : %[^\n]", tmp, 1);
+    CONFIG_STR(__MUD_LIB_DIR__) = string_copy(tmp, "config file");
+    scan_config_line("binary directory : %[^\n]", tmp, 1);
+    CONFIG_STR(__BIN_DIR__) = string_copy(tmp, "config file");
+
+    scan_config_line("log directory : %[^\n]", tmp, 1);
+    CONFIG_STR(__LOG_DIR__) = string_copy(tmp, "config file");
+    scan_config_line("include directories : %[^\n]", tmp, 1);
+    CONFIG_STR(__INCLUDE_DIRS__) = string_copy(tmp, "config file");
 #ifdef BINARIES
-    scan_config_line(buff, "save binaries directory : %[^\n]", CONFIG_STR(__SAVE_BINARIES_DIR__), 0);
+    scan_config_line("save binaries directory : %[^\n]", tmp, 1);
+    CONFIG_STR(__SAVE_BINARIES_DIR__) = string_copy(tmp, "config file");
 #endif
 
-    scan_config_line(buff, "master file : %[^\n]", CONFIG_STR(__MASTER_FILE__), 1);
-    scan_config_line(buff, "simulated efun file : %[^\n]", CONFIG_STR(__SIMUL_EFUN_FILE__), 1);
-    scan_config_line(buff, "swap file : %[^\n]", CONFIG_STR(__SWAP_FILE__), 1);
-    scan_config_line(buff, "debug log file : %[^\n]", CONFIG_STR(__DEBUG_LOG_FILE__), 0);
+    scan_config_line("master file : %[^\n]", tmp, 1);
+    CONFIG_STR(__MASTER_FILE__) = string_copy(tmp, "config file");
+    scan_config_line("simulated efun file : %[^\n]", tmp, 0);
+    CONFIG_STR(__SIMUL_EFUN_FILE__) = string_copy(tmp, "config file");
+    scan_config_line("swap file : %[^\n]", tmp, 1);
+    CONFIG_STR(__SWAP_FILE__) = string_copy(tmp, "config file");
+    scan_config_line("debug log file : %[^\n]", tmp, -1);
+    CONFIG_STR(__DEBUG_LOG_FILE__) = string_copy(tmp, "config file");
 
-    scan_config_line(buff, "default error message : %[^\n]", CONFIG_STR(__DEFAULT_ERROR_MESSAGE__), 0);
-    scan_config_line(buff, "default fail message : %[^\n]", CONFIG_STR(__DEFAULT_FAIL_MESSAGE__), 0);
+    scan_config_line("default error message : %[^\n]", tmp, 0);
+    CONFIG_STR(__DEFAULT_ERROR_MESSAGE__) = string_copy(tmp, "config file");
+    scan_config_line("default fail message : %[^\n]", tmp, 0);
+    CONFIG_STR(__DEFAULT_FAIL_MESSAGE__) = string_copy(tmp, "config file");
 
-    scan_config_line(buff, "port number : %d\n", CONFIG_INT(__MUD_PORT__), 1);
-    scan_config_line(buff, "address server port : %d\n", CONFIG_INT(__ADDR_SERVER_PORT__), 1);
+    if (scan_config_line("port number : %d\n", &CONFIG_INT(__MUD_PORT__), 0)) {
+	external_port[0].port = PORTNO;
+	external_port[0].kind = PORT_TELNET;
+	port_start = 1;
+    }
+    
+    scan_config_line("address server port : %d\n",
+		     &CONFIG_INT(__ADDR_SERVER_PORT__), 0);
 
-    scan_config_line(buff, "time to clean up : %d\n", CONFIG_INT(__TIME_TO_CLEAN_UP__), 1);
-    scan_config_line(buff, "time to reset : %d\n", CONFIG_INT(__TIME_TO_RESET__), 1);
-    scan_config_line(buff, "time to swap : %d\n", CONFIG_INT(__TIME_TO_SWAP__), 1);
+    scan_config_line("time to clean up : %d\n",
+		     &CONFIG_INT(__TIME_TO_CLEAN_UP__), 1);
+    scan_config_line("time to reset : %d\n", 
+		     &CONFIG_INT(__TIME_TO_RESET__), 1);
+    scan_config_line("time to swap : %d\n",
+		     &CONFIG_INT(__TIME_TO_SWAP__), 1);
 
 #if 0
     /*
      * not currently used...see options.h
      */
-    scan_config_line(buff, "maximum users : %d\n", CONFIG_INT(__MAX_USERS__), 0);
-    scan_config_line(buff, "maximum efun sockets : %d\n", CONFIG_INT(__MAX_EFUN_SOCKS__), 0);
-    scan_config_line(buff, "compiler stack size : %d\n", CONFIG_INT(__COMPILER_STACK_SIZE__), 0);
-    scan_config_line(buff, "evaluator stack size : %d\n", CONFIG_INT(__EVALUATOR_STACK_SIZE__), 0);
-    scan_config_line(buff, "maximum local variables : %d\n", CONFIG_INT(__MAX_LOCAL_VARIABLES__), 0);
-    scan_config_line(buff, "maximum call depth : %d\n", CONFIG_INT(__MAX_CALL_DEPTH__), 0);
-    scan_config_line(buff, "living hash table size : %d\n", CONFIG_INT(__LIVING_HASH_TABLE_SIZE__), 0);
+    scan_config_line("maximum users : %d\n",
+		     &CONFIG_INT(__MAX_USERS__), 0);
+    scan_config_line("maximum efun sockets : %d\n",
+		     &CONFIG_INT(__MAX_EFUN_SOCKS__), 0);
+    scan_config_line("compiler stack size : %d\n",
+		     &CONFIG_INT(__COMPILER_STACK_SIZE__), 0);
+    scan_config_line("evaluator stack size : %d\n", 
+		     &CONFIG_INT(__EVALUATOR_STACK_SIZE__), 0);
+    scan_config_line("maximum local variables : %d\n",
+		     &CONFIG_INT(__MAX_LOCAL_VARIABLES__), 0);
+    scan_config_line("maximum call depth : %d\n",
+		     &CONFIG_INT(__MAX_CALL_DEPTH__), 0);
+    scan_config_line("living hash table size : %d\n",
+		     &CONFIG_INT(__LIVING_HASH_TABLE_SIZE__), 0);
 #endif
 
-    scan_config_line(buff, "inherit chain size : %d\n", CONFIG_INT(__INHERIT_CHAIN_SIZE__), 1);
-    scan_config_line(buff, "maximum evaluation cost : %d\n", CONFIG_INT(__MAX_EVAL_COST__), 1);
+    scan_config_line("inherit chain size : %d\n",
+		     &CONFIG_INT(__INHERIT_CHAIN_SIZE__), 1);
+    scan_config_line("maximum evaluation cost : %d\n", 
+		     &CONFIG_INT(__MAX_EVAL_COST__), 1);
 
-    scan_config_line(buff, "maximum array size : %d\n", CONFIG_INT(__MAX_ARRAY_SIZE__), 1);
+    scan_config_line("maximum array size : %d\n",
+		     &CONFIG_INT(__MAX_ARRAY_SIZE__), 1);
 #ifndef DISALLOW_BUFFER_TYPE
-    scan_config_line(buff, "maximum buffer size : %d\n", CONFIG_INT(__MAX_BUFFER_SIZE__), 1);
+    scan_config_line("maximum buffer size : %d\n", 
+		     &CONFIG_INT(__MAX_BUFFER_SIZE__), 1);
 #endif
-    scan_config_line(buff, "maximum mapping size : %d\n", CONFIG_INT(__MAX_MAPPING_SIZE__), 1);
-    scan_config_line(buff, "maximum string length : %d\n", CONFIG_INT(__MAX_STRING_LENGTH__), 1);
-    scan_config_line
-	(buff, "maximum bits in a bitfield : %d\n", CONFIG_INT(__MAX_BITFIELD_BITS__), 1);
+    scan_config_line("maximum mapping size : %d\n", 
+		     &CONFIG_INT(__MAX_MAPPING_SIZE__), 1);
+    scan_config_line("maximum string length : %d\n",
+		     &CONFIG_INT(__MAX_STRING_LENGTH__), 1);
+    scan_config_line("maximum bits in a bitfield : %d\n",
+		     &CONFIG_INT(__MAX_BITFIELD_BITS__), 1);
 
-    scan_config_line(buff, "maximum byte transfer : %d\n", CONFIG_INT(__MAX_BYTE_TRANSFER__), 1);
-    scan_config_line(buff, "maximum read file size : %d\n", CONFIG_INT(__MAX_READ_FILE_SIZE__), 1);
+    scan_config_line("maximum byte transfer : %d\n", 
+		     &CONFIG_INT(__MAX_BYTE_TRANSFER__), 1);
+    scan_config_line("maximum read file size : %d\n",
+		     &CONFIG_INT(__MAX_READ_FILE_SIZE__), 1);
 
-    scan_config_line(buff, "reserved size : %d\n", CONFIG_INT(__RESERVED_MEM_SIZE__), 1);
+    scan_config_line("reserved size : %d\n",
+		     &CONFIG_INT(__RESERVED_MEM_SIZE__), 0);
 
-    scan_config_line(buff, "hash table size : %d\n", CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__), 1);
-    scan_config_line(buff, "object table size : %d\n", CONFIG_INT(__OBJECT_HASH_TABLE_SIZE__), 1);
+    scan_config_line("hash table size : %d\n",
+		     &CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__), 1);
+    scan_config_line("object table size : %d\n",
+		     &CONFIG_INT(__OBJECT_HASH_TABLE_SIZE__), 1);
+
+    for (i = port_start; i < 5; i++) {
+	external_port[i].kind = 0;
+	external_port[i].fd = -1;
+	sprintf(kind, "external_port_%i : %%[^\n]", i + 1);
+	if (scan_config_line(kind, tmp, 0)) {
+	    if (sscanf(tmp, "%s %d", kind, &port) == 2) {
+		external_port[i].port = port;
+		if (!strcmp(kind, "telnet")) 
+		    external_port[i].kind = PORT_TELNET;
+		else
+		if (!strcmp(kind, "binary"))
+		    external_port[i].kind = PORT_BINARY;
+		else
+		if (!strcmp(kind, "ascii"))
+		    external_port[i].kind = PORT_ASCII;
+		else {
+		    fprintf(stderr, "Unknown kind of external port: %s\n",
+			    kind);
+		    exit(-1);
+		}
+	    } else {
+		fprintf(stderr, "Syntax error in port specification\n");
+		exit(-1);
+	    }
+	}
+    }		    
 
     FREE(buff);
     fclose(def);
@@ -243,7 +313,7 @@ int get_config_item P2(svalue_t *, res, svalue_t *, arg)
 
     num = arg->u.number;
 
-    if (num < RUNTIME_CONFIG_BASE || num >= RUNTIME_CONFIG_NEXT) {
+    if (num < 0 || num >= RUNTIME_CONFIG_NEXT) {
 	return 0;
     }
     if (num >= BASE_CONFIG_INT) {

@@ -194,6 +194,11 @@ generate_conditional_branch P1(parse_node_t *, node) {
 		branch = F_BBRANCH;
 	    node = 0;
 	}
+	if (node && node->kind == F_LT) {
+	    generate(node->l.expr);
+	    generate(node->r.expr);
+	    return F_BBRANCH_LT;
+	}
     }
     generate(node);
     return branch;

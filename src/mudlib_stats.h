@@ -7,7 +7,7 @@
  * and will be a little more general purpose than wiz_list was
  */
 
-#if !defined(MUDLIB_STATS_H) && !defined(NO_MUDLIB_STATS)
+#if !defined(MUDLIB_STATS_H) && defined(PACKAGE_MUDLIB_STATS)
 #define MUDLIB_STATS_H
 
 typedef struct _mstats {

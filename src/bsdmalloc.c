@@ -46,6 +46,7 @@ static char sccsid[] = "@(#)malloc.c	5.11 (Berkeley) 2/23/91";
  * This is designed for use in a virtual memory environment.
  */
 
+#define IN_MALLOC_WRAPPER
 #define NO_OPCODES
 #include "std.h"
 

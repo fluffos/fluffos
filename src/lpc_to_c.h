@@ -36,8 +36,11 @@ void c_efun_return PROT((int));
 
 #endif
 
-#endif
+/* these should really all be in one place */
 static int i;
 static array_t *vec;
 static mapping_t *map;
-svalue_t *svp;
+static svalue_t *svp;
+
+#endif
+

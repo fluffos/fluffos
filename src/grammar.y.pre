@@ -1,5 +1,4 @@
 /* This is to make emacs edit this in C mode: -*-C-*- */
-%include "comp_warning"
 
 %{
 #include "std.h"
@@ -161,7 +160,7 @@ int yyparse PROT((void));
 %type <number> L_NEW_FUNCTION_OPEN
 
 /* holds an identifier or some sort */
-%type <string> L_IDENTIFIER L_EFUN function_name identifier not_efun_ident
+%type <string> L_IDENTIFIER L_EFUN function_name identifier
 %type <string> new_local_name
 
 /* The following return a parse node */
@@ -271,8 +270,7 @@ block_or_semi:
             {
 		$$ = $1.node;
 		if (!$$) {
-		    NODE_NO_LINE($$, F_RETURN);
-		    NODE_NO_LINE($$->r.expr, F_CONST0);
+		    NODE_NO_LINE($$, F_RETURN_ZERO);
 		}
             }
     |   ';'
@@ -285,28 +283,12 @@ block_or_semi:
             }
     ;
 
-not_efun_ident: 
+identifier: 
         L_DEFINED_NAME
             {
 	      $$ = scratch_copy($1->name);
 	    }
      |  L_IDENTIFIER
-     |  L_ASM
-            {
-              $$ = scratch_copy("asm");
-            }
-     |  L_NEW
-            {
-	      $$ = scratch_copy("new");
-	    }
-     ;
-
-identifier:
-        not_efun_ident
-     |  L_EFUN
-            {
-              $$ = scratch_copy("efun");
-            }
      ;
 
 def:
@@ -350,8 +332,7 @@ def:
 			  && $8->r.expr->kind == F_RETURN)) {
 			parse_node_t *replacement;
 			parse_node_t *sub_node;
-			NODE_NO_LINE(sub_node, F_RETURN);
-			NODE_NO_LINE(sub_node->r.expr, F_CONST0);
+			NODE_NO_LINE(sub_node, F_RETURN_ZERO);
 			NODE_NO_LINE(replacement, NODE_STATEMENTS);
 			replacement->l.expr = $8;
 			replacement->r.expr = sub_node;
@@ -395,26 +376,13 @@ member_list:
     ;
 
 type_decl:
-      type_modifier_list L_CLASS identifier '{' member_list '}'
+      type_modifier_list L_CLASS identifier '{' 
             {
-		class_def_t *sd;
-		class_member_entry_t *sme;
 		ident_hash_elem_t *ihe;
-		int index, i;
 
-		index = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
-		sd = (class_def_t *)allocate_in_mem_block(A_CLASS_DEF, sizeof(class_def_t));
-		sd->size = current_number_of_locals;
-		sd->index = mem_block[A_CLASS_MEMBER].current_size / sizeof(class_member_entry_t);
-		sd->name = store_prog_string($3);
-
-		sme = (class_member_entry_t *)allocate_in_mem_block(A_CLASS_MEMBER, sizeof(class_member_entry_t) * current_number_of_locals);
-
-		for (i = 0; i < current_number_of_locals; i++) {
-		    sme[i].name = store_prog_string(locals_ptr[i]->name);
-		    sme[i].type = type_of_locals_ptr[i];
-		}
-		ihe = find_or_add_ident(PROG_STRING(sd->name), FOA_GLOBAL_SCOPE);
+		ihe = find_or_add_ident(
+			   PROG_STRING($<number>$ = store_prog_string($3)),
+			   FOA_GLOBAL_SCOPE);
 		if (ihe->dn.class_num == -1)
 		    ihe->sem_value++;
 		else {
@@ -424,7 +392,25 @@ type_decl:
 		    sprintf(buf,"Illegal to redefine class %s", $3);
 		    yyerror(buf);
 		}
-		ihe->dn.class_num = index;
+		ihe->dn.class_num = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
+	    }
+    member_list '}'
+            {
+		class_def_t *sd;
+		class_member_entry_t *sme;
+		int i;
+
+		sd = (class_def_t *)allocate_in_mem_block(A_CLASS_DEF, sizeof(class_def_t));
+		i = sd->size = current_number_of_locals;
+		sd->index = mem_block[A_CLASS_MEMBER].current_size / sizeof(class_member_entry_t);
+		sd->name = $<number>5;
+
+		sme = (class_member_entry_t *)allocate_in_mem_block(A_CLASS_MEMBER, sizeof(class_member_entry_t) * current_number_of_locals);
+
+		while (i--) {
+		    sme[i].name = store_prog_string(locals_ptr[i]->name);
+		    sme[i].type = type_of_locals_ptr[i];
+		}
 
 		free_all_local_names();
 		scratch_free($3);
@@ -433,18 +419,6 @@ type_decl:
 
 new_local_name:
         L_IDENTIFIER
-      | L_ASM
-            {
-		$$ = scratch_copy("asm");
-            }
-      | L_EFUN
-            {
-		$$ = scratch_copy("efun");
-	    }
-      | L_NEW
-            {
-		$$ = scratch_copy("new");
-	    }
       | L_DEFINED_NAME
             {
 		if ($1->dn.local_num != -1) {
@@ -1816,9 +1790,7 @@ return:
 	    {
 		if (exact_types && !IS_TYPE(exact_types, TYPE_VOID))
 		    yyerror("Non-void functions must return a value.");
-		CREATE_NODE($$, F_RETURN);
-		CREATE_TYPED_NODE($$->r.expr, F_NUMBER, TYPE_NUMBER);
-		$$->r.expr->v.number = 0;
+		CREATE_NODE($$, F_RETURN_ZERO);
 	    }
     |   L_RETURN comma_expr ';'
 	    {
@@ -1827,8 +1799,13 @@ return:
 		    sprintf(buf, "Type of returned value doesn't match function return type %s.", get_two_types($2->type, exact_types & TYPE_MOD_MASK));
 		    yyerror(buf);
 		}
-		CREATE_NODE($$, F_RETURN);
-		$$->r.expr = $2;
+		if (($2->kind == F_NUMBER && $2->v.number == 0)
+		    || ($2->kind == F_CONST0)) {
+		    CREATE_NODE($$, F_RETURN_ZERO);
+		} else {
+		    CREATE_NODE($$, F_RETURN);
+		    $$->r.expr = $2;
+		}
 	    }
     ;
 
@@ -2330,13 +2307,14 @@ expr4:
 		if ($4.is_proto) {
 		    yyerror("Missing name for function argument");
 		}
-		if (!($6.node->kind == F_RETURN) &&
-		    !(($6.node->kind == NODE_STATEMENTS)
-		      && $6.node->r.expr->kind == F_RETURN)) {
+		if (!$6.node) {
+		    NODE_NO_LINE($$, F_RETURN_ZERO);
+		} else if (!($6.node->kind == F_RETURN) &&
+			   !(($6.node->kind == NODE_STATEMENTS)
+			     && $6.node->r.expr->kind == F_RETURN)) {
 		    parse_node_t *replacement;
 		    parse_node_t *sub_node;
-		    NODE_NO_LINE(sub_node, F_RETURN);
-		    NODE_NO_LINE(sub_node->r.expr, F_CONST0);
+		    NODE_NO_LINE(sub_node, F_RETURN_ZERO);
 		    NODE_NO_LINE(replacement, NODE_STATEMENTS);
 		    replacement->l.expr = $6.node;
 		    replacement->r.expr = sub_node;
@@ -2800,17 +2778,20 @@ function_name:
 	    }
     |   L_BASIC_TYPE L_COLON_COLON identifier
 	    {
-		int l = strlen($3) + 1;
+		int z, l = strlen($3) + 1;
 		char *p;
-		/* "name" -> ":object::name" */
-		if ($1 != TYPE_OBJECT) yyerror("Illegal inheritance header in function call\n");
-		$$ = scratch_realloc($3, l + 9);
+		/* <type> and "name" -> ":type::name" */
+		z = strlen(type_names[$1]) + 3; /* length of :type:: */
+		$$ = scratch_realloc($3, l + z);
 		p = $$ + l;
 		while (p--,l--)
-		    *(p+9) = *p;
-		strncpy($$, ":object::", 9);
+		    *(p+z) = *p;
+		$$[0] = ':';
+		strncpy($$ + 1, type_names[$1], z - 3);
+		$$[z-2] = ':';
+		$$[z-1] = ':';
 	    }
-    |   not_efun_ident L_COLON_COLON identifier
+    |   identifier L_COLON_COLON identifier
 	    {
 		int l = strlen($1);
 		/* "ob" and "name" -> ":ob::name" */

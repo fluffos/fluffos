@@ -30,7 +30,7 @@ free_buffer P1(buffer_t *, b)
 }				/* free_buffer() */
 
 buffer_t *
-       allocate_buffer P1(int, size)
+allocate_buffer P1(int, size)
 {
     buffer_t *buf;
 

@@ -103,7 +103,7 @@
  * of a block.  This also adds the check_memory() efun.  Takes a considerable
  * ammount more memory.  Mainly for debugging.
  */
-#define CHECK_MEMORY
+#undef CHECK_MEMORY
 
 /****************************************************************************
  *                          COMPATIBILITY                                   *
@@ -152,12 +152,6 @@
  *   of light levels in objects.  You can simulate it via LPC if you want...
  */
 #define NO_LIGHT
-
-/* NO_MUDLIB_STATS: define this to disable domain and author stats
- *   maintenance by the driver.  These mudlib stats are more domain
- *   based than user based, and replaces the traditional wiz_list stats.
- */
-#undef NO_MUDLIB_STATS
 
 /* NO_ADD_ACTION: define this to remove add_action, commands, livings, etc.
    process_input() then becomes the only way to deal with player input. */
@@ -240,11 +234,6 @@
  */
 #undef MUDLIB_ERROR_HANDLER
 
-/* SOCKET_EFUNS: define this to enable the socket efunctions.  This
- *   causes HAS_SOCKETS to be defined for all LPC objects.
- */
-#define SOCKET_EFUNS
-
 /* OPTIMIZE_FUNCTION_TABLE_SEARCH: define this if you want the function
  *   table to be sorted for faster lookups (ie binary search).  The flipside
  *   of this is that there is some overhead in maintaining the sorted table.
@@ -291,16 +280,7 @@
  * PRAGMA_EFUN:         when using generate_source(), generate efun code
  *                      instead of object code
  */
-#define DEFAULT_PRAGMAS 0
-
-/* MATH: determines whether or not the math efuns (for floats) are included.
- */
-#define MATH
-
-/* MATRIX: determines whether or not the 3d graphics efuns (for floats)
- *   are included - see func_spec.c for a list.
- */
-#undef MATRIX
+#define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_STRICT_TYPES
 
 /* LAZY_RESETS: if this is defined, an object will only have reset()
  *   called in it when it is touched via call_other() or move_object()
@@ -329,7 +309,7 @@
  */
 #define NO_ANSI
 
-/* OPC_PROF: define this if you wish to enable OPC profiling. Allows a dump
+/* OPCPROF: define this if you wish to enable OPC profiling. Allows a dump
  *   of the # of times each efun is invoked (via the opcprof() efun).
  */
 #undef OPCPROF
@@ -414,11 +394,11 @@
  */
 #undef PROFILE_FUNCTIONS
 
-/* DISALLOW_BUFFER_TYPE: if this is #define'd then LPC code using the 'buffer'
+/* NO_BUFFER_TYPE: if this is #define'd then LPC code using the 'buffer'
  *   type won't be allowed to compile (since the 'buffer' type won't be
  *   recognized by the lexer.
  */
-#undef DISALLOW_BUFFER_TYPE
+#undef NO_BUFFER_TYPE
 
 /* BINARIES: define this to enable the 'save_binary' pragma.
  *   This pragma, when set in a program, will cause it to save a
@@ -450,8 +430,49 @@
 #undef ARRAY_RESERVED_WORD
 
 /****************************************************************************
- *                                UIDS                                      *
- *                               ------                                     *
+ *                              PACKAGES                                    *
+ *                              --------                                    *
+ * Defining some/all of the following add certain efuns, and sometimes      *
+ * add/remove code from the driver.                                         *
+ *                                                                          *
+ * if PACKAGE_XYZZY is defined here, then the code in packages/xyzzy.c      *
+ * and the efuns in packages/xyzzy.spec will be added to the driver.        *
+ ****************************************************************************/
+
+/* 0.9.18 compatibility efuns */
+#undef PACKAGE_COMPAT
+
+/* various miscellaneous efuns */
+#undef PACKAGE_CONTRIB
+
+/* efuns that are only of use to those that know something about driver
+   internals */
+#define PACKAGE_DEVELOP
+
+/* PACKAGE_MATH: determines whether or not the math efuns (for floats) are
+   included.
+ */
+#define PACKAGE_MATH
+
+/* PACKAGE_MATRIX: determines whether or not the 3d graphics efuns (for floats)
+ *   are included - see packages/matrix.spec for a list.
+ */
+#undef PACKAGE_MATRIX
+
+/* PACKAGE_MUDLIB_STATS: define this to enable domain and author stats
+ *   maintenance by the driver.  These mudlib stats are more domain
+ *   based than user based, and replaces the traditional wiz_list stats.
+ */
+#undef PACKAGE_MUDLIB_STATS
+
+/* PACKAGE_SOCKETS: define this to enable the socket efunctions.  This
+ *   causes HAS_SOCKETS to be defined for all LPC objects.
+ */
+#define PACKAGE_SOCKETS
+
+/****************************************************************************
+ *                            UID PACKAGE                                   *
+ *                            -----------                                   *
  * UIDS are the basis for some mudlib security systems.  Basically, they're *
  * preserved for backwards compatibility, as several ways of breaking       *
  * almost any system which relies on them are known.  (No, it's not a flaw  *
@@ -463,10 +484,10 @@
  ****************************************************************************/
 
 /*
- * NO_UIDS: define this if you want a driver that doesn't use uids.
+ * PACKAGE_UIDS: define this if you want a driver that does use uids.
  *
  */
-#undef NO_UIDS
+#undef PACKAGE_UIDS
 
 /* AUTO_SETEUID: when an object is created it's euid is automatically set to
  *   the equivalent of seteuid(getuid(this_object())).  undef AUTO_SETEUID
@@ -535,7 +556,7 @@
  *
  *   Don't define this for now, work in progress -Beek
  */
-#undef LPC_TO_C
+#define LPC_TO_C
 
 /* ALWAYS_SAVE_COMPILED_BINARIES: define this to cause every file that
  *   is compiled to C code to behave as if it contains a line

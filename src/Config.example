@@ -9,9 +9,6 @@
 # name of this mud
 name : Basis
 
-# port number to accept users on
-port number : 4000
-
 # the address server is an external program that lets the mud translate
 # internet names to numbers (and vice versa).  select an unused port.
 address server ip : localhost
@@ -121,6 +118,10 @@ default fail message : What?
 
 # default message when error() occurs (optional)
 default error message :
+
+# the external ports we support
+external_port_1 : telnet 4000
+external_port_2 : binary 4001
 
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #

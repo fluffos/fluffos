@@ -38,6 +38,7 @@ enum msgtypes {
 typedef struct interactive_s {
     object_t *ob;		/* points to the associated object         */
     sentence_t *input_to;	/* to be called with next input line       */
+    int connection_type;        /* the type of connection this is          */
 #ifdef OS2
     long named_pipe;
 #else

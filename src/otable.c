@@ -96,11 +96,11 @@ void enter_object_hash P1(object_t *, ob)
 
 #ifdef LPC_TO_C
     DEBUG_CHECK1(s && s != ob && (!(s->flags & O_COMPILED_PROGRAM)),
-		 "Duplicate object \"%s\" in object hash table",
+		 "Duplicate object \"/%s\" in object hash table",
 		 ob->name);
 #else
     DEBUG_CHECK1(s && s != ob,
-		 "Duplicate object \"%s\" in object hash table",
+		 "Duplicate object \"/%s\" in object hash table",
 		 ob->name);
 #endif
 
@@ -121,7 +121,7 @@ void remove_object_hash P1(object_t *, ob)
 
     s = find_obj_n(ob->name); /* this sets h, and cycles the ob to the front */
 
-    DEBUG_CHECK1(s != ob, "Remove object \"%s\": found a different object!",
+    DEBUG_CHECK1(s != ob, "Remove object \"/%s\": found a different object!",
 		 ob->name);
 
     obj_table[h] = ob->next_hash;

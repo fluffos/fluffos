@@ -17,7 +17,7 @@
 #include "md.h"
 #endif
 
-#ifndef NO_UIDS
+#ifdef PACKAGE_UIDS
 static tree *uids = NULL;
 userid_t *backbone_uid = NULL;
 userid_t *root_uid = NULL;

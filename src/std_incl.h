@@ -1,10 +1,14 @@
 #if !defined(STD_INCL_H) && !defined(_FUNC_SPEC_)
 #define STD_INCL_H
 
-#if defined(NeXT) || defined(__386BSD__) || defined(LATTICE) || defined(SunOS_5)
+#ifndef EDIT_SOURCE
+#  include "configure.h"
+#endif
+
+#ifdef INCL_STDLIB_H
 #  include <stdlib.h>
 #endif
-#if defined(__386BSD__) || defined(LATTICE) || defined(SunOS_5) || defined(sgi)
+#ifdef INCL_UNISTD_H
 #  include <unistd.h>
 #endif
 
@@ -15,24 +19,28 @@
 #include <math.h>
 #include <ctype.h>
 #include <errno.h>
-#if !defined(LATTICE) && !defined(OS2) && !defined(_AUX_SOURCE)
+#ifdef INCL_FCNTL_H
 #  include <fcntl.h>
 #endif
 
-#if !defined(hp68k)
+#ifdef INCL_TIME_H
 #  include <time.h>
 #endif
-#ifdef LATTICE
-#  include <dos.h>
-#  undef VOID
-#else
+#ifdef INCL_SYS_TIME_H
 #  include <sys/time.h>
-#  ifdef TIMES
-#    include <sys/times.h>
-#  endif
 #endif
-#ifdef _SEQUENT_
+#ifdef INCL_DOS_H
+#  include <dos.h>
+#endif
+#ifdef INCL_SYS_TIMES_H
+#  include <sys/times.h>
+#endif
+#ifdef INCL_USCLKC_H
 #  include <usclkc.h>
+#endif
+
+#ifdef LATTICE
+#  undef VOID
 #endif
 
 #ifndef _AUX_SOURCE
@@ -41,15 +49,17 @@
 #endif
 
 #ifndef NO_SOCKETS
-#if !defined(OS2)
-#  include <netinet/in.h>
-#  include <arpa/inet.h>
+#  ifdef INCL_NETINET_IN_H
+#    include <netinet/in.h>
+#  endif
+#  ifdef INCL_ARPA_INET_H
+#    include <arpa/inet.h>
+#  endif
 #endif
 #if defined(LATTICE) || defined(__SASC)
 #  include "amiga/amiga.h"
 #  include "amiga/nsignal.h"
 #  include "amiga/socket.h"
-#endif
 #endif
 
 #if defined(LATTICE) || defined(OS2)

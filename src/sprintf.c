@@ -423,9 +423,10 @@ void svalue_to_string P6(svalue_t *, obj, char **, str, int, size, int, indent, 
 		}
 	    }
 	    if (obj->u.fp->hdr.args) {
-		stradd(str, &size, ", ");
-		for (i=0; i<obj->u.fp->hdr.args->size; i++)
+		for (i=0; i<obj->u.fp->hdr.args->size; i++) {
+		    stradd(str, &size, ", ");
 		    svalue_to_string(&(obj->u.fp->hdr.args->item[i]), str, size, indent, 0, 0);
+		}
 	    } 
 	}
 	stradd(str, &size, " :)");

@@ -61,7 +61,7 @@ static void add_ip_entry PROT((long, char *));
 #ifndef NO_ADD_ACTION
 static void clear_notify PROT((void));
 #endif
-static void new_user_handler PROT((void));
+static void new_user_handler PROT((int));
 #ifdef RECEIVE_SNOOP
 static void receive_snoop PROT((char *, object_t * ob));
 #endif
@@ -87,7 +87,6 @@ interactive_t *all_users[MAX_USERS];
 #ifdef OS2
 static HPIPE new_user_handle = 0;
 #else
-static int new_user_fd;
 static int addr_server_fd = -1;
 #endif
 #ifdef RECEIVE_SNOOP
@@ -164,43 +163,63 @@ void init_user_conn()
     struct sockaddr_in sin;
     int sin_len;
     int optval;
+    int i;
 
-    /*
-     * create socket of proper type.
-     */
-    if ((new_user_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-	perror("init_user_conn: socket");
-	exit(1);
-    }
-    /*
-     * enable local address reuse.
-     */
-    optval = 1;
-    if (setsockopt(new_user_fd, SOL_SOCKET, SO_REUSEADDR, (char *) &optval,
-		   sizeof(optval)) == -1) {
-	perror("init_user_conn: setsockopt");
-	exit(2);
-    }
-    /*
-     * fill in socket address information.
-     */
-    sin.sin_family = AF_INET;
-    sin.sin_addr.s_addr = INADDR_ANY;
-    sin.sin_port = htons((u_short) port_number);
-    /*
-     * bind name to socket.
-     */
-    if (bind(new_user_fd, (struct sockaddr *) & sin, sizeof(sin)) == -1) {
-	perror("init_user_conn: bind");
-	exit(3);
-    }
-    /*
-     * get socket name.
-     */
-    sin_len = sizeof(sin);
-    if (getsockname(new_user_fd, (struct sockaddr *) & sin, &sin_len) == -1) {
-	perror("init_user_conn: getsockname");
-	exit(4);
+    for (i=0; i < 5; i++) {
+	if (!external_port[i].port) continue;
+	/*
+	 * create socket of proper type.
+	 */
+	if ((external_port[i].fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+	    perror("init_user_conn: socket");
+	    exit(1);
+	}
+	/*
+	 * enable local address reuse.
+	 */
+	optval = 1;
+	if (setsockopt(external_port[i].fd, SOL_SOCKET, SO_REUSEADDR,
+		       (char *) &optval, sizeof(optval)) == -1) {
+	    perror("init_user_conn: setsockopt");
+	    exit(2);
+	}
+	/*
+	 * fill in socket address information.
+	 */
+	sin.sin_family = AF_INET;
+	sin.sin_addr.s_addr = INADDR_ANY;
+	sin.sin_port = htons((u_short) external_port[i].port);
+	/*
+	 * bind name to socket.
+	 */
+	if (bind(external_port[i].fd, (struct sockaddr *) & sin,
+		 sizeof(sin)) == -1) {
+	    perror("init_user_conn: bind");
+	    exit(3);
+	}
+	/*
+	 * get socket name.
+	 */
+	sin_len = sizeof(sin);
+	if (getsockname(external_port[i].fd, (struct sockaddr *) & sin,
+			&sin_len) == -1) {
+	    perror("init_user_conn: getsockname");
+	    exit(4);
+	}
+	/*
+	 * set socket non-blocking,
+	 */
+	if (set_socket_nonblocking(external_port[i].fd, 1) == -1) {
+	    perror("init_user_conn: set_socket_nonblocking 1");
+	    exit(8);
+	}
+	/*
+	 * listen on socket for connections.
+	 */
+	if (listen(external_port[i].fd, SOMAXCONN) == -1) {
+	    perror("init_user_conn: listen");
+	    exit(10);
+	}
     }
     /*
      * register signal handler for SIGPIPE.
@@ -211,20 +230,6 @@ void init_user_conn()
 	exit(5);
     }
 #endif
-    /*
-     * set socket non-blocking,
-     */
-    if (set_socket_nonblocking(new_user_fd, 1) == -1) {
-	perror("init_user_conn: set_socket_nonblocking 1");
-	exit(8);
-    }
-    /*
-     * listen on socket for connections.
-     */
-    if (listen(new_user_fd, SOMAXCONN) == -1) {
-	perror("init_user_conn: listen");
-	exit(10);
-    }
 #endif
 }
 
@@ -233,15 +238,20 @@ void init_user_conn()
  */
 void ipc_remove()
 {
+    int i;
+
 #ifdef OS2
     DosDisConnectNPipe(new_user_handle);
     DosClose(new_user_handle);
 #else
-    if (close(new_user_fd) == -1) {
-	perror("ipc_remove: close");
+    for (i = 0; i < 5; i++) {
+	if (!external_port[i].port) continue;
+	if (close(external_port[i].fd) == -1) {
+	    perror("ipc_remove: close");
+	}
     }
 #endif
-    printf("closed new user port\n");
+    printf("closed external ports\n");
 }
 
 void init_addr_server P2(char *, hostname, int, addr_server_port)
@@ -566,7 +576,7 @@ static int flush_message()
 	    length = MESSAGE_BUF_SIZE - ip->message_consumer;
 	}
 /* Need to use send to get out of band data
-		num_bytes = write(ip->fd,ip->message_buf + ip->message_consumer,length);
+   num_bytes = write(ip->fd,ip->message_buf + ip->message_consumer,length);
  */
 #ifdef OS2
 	if (DosWrite(ip->named_pipe, ip->message_buf + ip->message_consumer, length,
@@ -638,6 +648,10 @@ static char telnet_abort_response[] =
     { (SCHAR)IAC, (SCHAR)DM, 0 };
 static char telnet_do_tm_response[] = 
     { (SCHAR)IAC, (SCHAR)WILL, TELOPT_TM, 0 };
+static char telnet_do_naws[] =
+    { (SCHAR)IAC, (SCHAR)DO, TELOPT_NAWS, 0 };
+static char telnet_do_ttype[] =
+    { (SCHAR)IAC, (SCHAR)DO, TELOPT_TTYPE, 0 };
 static char telnet_term_query[] = 
     { (SCHAR)IAC, (SCHAR)SB, TELOPT_TTYPE, TELQUAL_SEND, 
 	  (SCHAR)IAC, (SCHAR)SE, 0 };
@@ -748,6 +762,17 @@ static int copy_chars P4(unsigned char *, from, unsigned char *, to, int, n, int
 		    push_constant_string(ip->sb_buf + 2);
 		    apply(APPLY_TERMINAL_TYPE, ip->ob, 1, ORIGIN_DRIVER);
 		    ip->iflags |= USING_TELNET;
+		} else
+		if (ip->sb_buf[0]==TELOPT_NAWS) {
+		    int w, h;
+
+		    w = ((unsigned char)ip->sb_buf[1]) * 256
+			+ ((unsigned char)ip->sb_buf[2]);
+		    h = ((unsigned char)ip->sb_buf[3]) * 256
+			+ ((unsigned char)ip->sb_buf[4]);
+		    push_number(w);
+		    push_number(h);
+		    apply(APPLY_WINDOW_SIZE, ip->ob, 2, ORIGIN_DRIVER);
 		} else {
 		    push_constant_string(ip->sb_buf);
 		    apply(APPLY_TELNET_SUBOPTION, ip->ob, 1, ORIGIN_DRIVER);
@@ -769,8 +794,17 @@ static int copy_chars P4(unsigned char *, from, unsigned char *, to, int, n, int
 		flush_message();
 		command_giver = save_command_giver;
 	    }
-	case TS_DONT:
+	    ip->state = TS_DATA;
+	    break;
 	case TS_WILL:
+	    if (from[i] == TELOPT_TTYPE) {
+		save_command_giver = command_giver;
+		command_giver = ip->ob;
+		add_message(telnet_term_query);
+		flush_message();
+		command_giver = save_command_giver;
+	    }
+	case TS_DONT:
 	case TS_WONT:
 	    ip->state = TS_DATA;
 	    break;
@@ -833,7 +867,10 @@ INLINE void make_selectmasks()
     /*
      * set new user accept fd in readmask.
      */
-    FD_SET(new_user_fd, &readmask);
+    for (i = 0; i < 5; i++) {
+	if (!external_port[i].port) continue;
+	FD_SET(external_port[i].fd, &readmask);
+    }
     /*
      * set user fds in readmask.
      */
@@ -854,7 +891,7 @@ INLINE void make_selectmasks()
     if (addr_server_fd >= 0) {
 	FD_SET(addr_server_fd, &readmask);
     }
-#ifdef SOCKET_EFUNS
+#ifdef PACKAGE_SOCKETS
     /*
      * set fd's for efun sockets.
      */
@@ -916,9 +953,12 @@ INLINE void process_io()
     /*
      * check for new user connection.
      */
-    if (FD_ISSET(new_user_fd, &readmask)) {
-	debug(512, ("process_io: NEW_USER\n"));
-	new_user_handler();
+    for (i = 0; i < 5; i++) {
+	if (!external_port[i].port) continue;
+	if (FD_ISSET(external_port[i].fd, &readmask)) {
+	    debug(512, ("process_io: NEW_USER\n"));
+	    new_user_handler(i);
+	}
     }
     /*
      * check for data pending on user connections.
@@ -943,7 +983,7 @@ INLINE void process_io()
 	    command_giver = save_command_giver;
 	}
     }
-#ifdef SOCKET_EFUNS
+#ifdef PACKAGE_SOCKETS
     /*
      * check for data pending on efun socket connections.
      */
@@ -974,13 +1014,11 @@ INLINE void process_io()
  * If space is available, an interactive data structure is initialized and
  * the user is connected.
  */
-static void new_user_handler()
+static void new_user_handler P1(int, which)
 {
     int new_socket_fd;
-
 #ifndef OS2
     struct sockaddr_in addr;
-
 #endif
     int length;
     int i;
@@ -992,7 +1030,8 @@ static void new_user_handler()
 #ifndef OS2
     length = sizeof(addr);
     debug(512, ("new_user_handler: accept on fd %d\n", new_user_fd));
-    new_socket_fd = accept(new_user_fd, (struct sockaddr *) & addr, (int *) &length);
+    new_socket_fd = accept(external_port[which].fd,
+			   (struct sockaddr *) & addr, (int *) &length);
     if (new_socket_fd < 0) {
 	if (errno == EWOULDBLOCK) {
 	    debug(512, ("new_user_handler: accept: Operation would block\n"));
@@ -1027,11 +1066,13 @@ static void new_user_handler()
 	command_giver = master_ob;
 	master_ob->interactive =
 	    (interactive_t *)
-	    DXALLOC(sizeof(interactive_t), TAG_INTERACTIVE, "new_user_handler");
+	    DXALLOC(sizeof(interactive_t), TAG_INTERACTIVE,
+		    "new_user_handler");
 	total_users++;
 #ifndef NO_ADD_ACTION
 	master_ob->interactive->default_err_message.s = 0;
 #endif
+	master_ob->interactive->connection_type = external_port[which].kind;
 	master_ob->flags |= O_ONCE_INTERACTIVE;
 	/*
 	 * initialize new user interactive data structure.
@@ -1078,7 +1119,8 @@ static void new_user_handler()
 	 * master_ob is loaded.
 	 */
 	add_ref(master_ob, "new_user");
-	ret = apply_master_ob(APPLY_CONNECT, 0);
+	push_number(external_port[which].port);
+	ret = apply_master_ob(APPLY_CONNECT, 1);
 	if (ret == 0 || ret == (svalue_t *)-1 || ret->type != T_OBJECT) {
 	    remove_interactive(master_ob);
 #ifndef OS2
@@ -1113,8 +1155,12 @@ static void new_user_handler()
 	}
 #endif
 
-	/* Ask for their terminal type */
-	add_message(telnet_term_query);
+	if (external_port[which].kind == PORT_TELNET) {
+	    /* Ask permission to ask them for their terminal type */
+	    add_message(telnet_do_ttype);
+	    /* Ask them for their window size */
+	    add_message(telnet_do_naws);
+	}
 
 	logon(ob);
 	debug(512, ("new_user_handler: end\n"));
@@ -1348,18 +1394,22 @@ static void get_user_data P1(interactive_t *, ip)
 #ifdef DEBUG_COMM_FREEZE
     int i;
 #endif
-
+    
     /*
      * this /3 is here because of the trick copy_chars() uses to allow empty
      * commands. it needs to be fixed right. later.
      */
-    text_space = (MAX_TEXT - ip->text_end - 1) / 3;
+    if (ip->connection_type == PORT_TELNET) {
+	text_space = (MAX_TEXT - ip->text_end - 1) / 3;
+    } else {
+	text_space = sizeof(buf) - 1;
+    }
     /*
      * Check if we need more space.
      */
     if (text_space < MAX_TEXT/16) {
 	int l = ip->text_end - ip->text_start;
-
+	
 	memmove(ip->text, ip->text + ip->text_start, l + 1);
 	ip->text_start = 0;
 	ip->text_end = l;
@@ -1382,7 +1432,7 @@ static void get_user_data P1(interactive_t *, ip)
     num_bytes = read(ip->fd, buf, text_space);
 #endif
 #ifdef DEBUG_COMM_FREEZE
-/* slow, but it's debugging code */
+    /* slow, but it's debugging code */
     for (i=0; i<1024; i++) {
 	ip->debug_block[i] = buf[i];
     }
@@ -1414,38 +1464,80 @@ static void get_user_data P1(interactive_t *, ip)
 	break;
     default:
 	buf[num_bytes] = '\0';
-	/*
-	 * replace newlines with nulls and catenate to buffer. Also do all
-	 * the useful telnet negotation at this point too. Rip out the sub
-	 * option stuff and send back anything non useful we feel we have to.
-	 */
-	ip->text_end += copy_chars((unsigned char *)buf, (unsigned char *)ip->text + ip->text_end, num_bytes, ip);
-	/*
-	 * now, text->end is just after the last char read. If last char was
-	 * a nl, char *before* text_end will be null.
-	 */
-	ip->text[ip->text_end] = '\0';
-	/*
-	 * handle snooping - snooper does not see type-ahead. seems like that
-	 * would be very inefficient, for little functional gain.
-	 */
-	if (ip->snoop_by && !(ip->iflags & NOECHO)) {
-	    save_command_giver = command_giver;
-	    command_giver = ip->snoop_by->ob;
+	switch (ip->connection_type) {
+	case PORT_TELNET:
+	    /*
+	     * replace newlines with nulls and catenate to buffer. Also do all
+	     * the useful telnet negotation at this point too. Rip out the sub
+	     * option stuff and send back anything non useful we feel we have
+	     * to.
+	     */
+	    ip->text_end += copy_chars((unsigned char *)buf, (unsigned char *)ip->text + ip->text_end, num_bytes, ip);
+	    /*
+	     * now, text->end is just after the last char read. If last char
+	     was a nl, char *before* text_end will be null.
+	     */
+	    ip->text[ip->text_end] = '\0';
+	    /*
+	     * handle snooping - snooper does not see type-ahead. seems like
+	     * that would be very inefficient, for little functional gain.
+	     */
+	    if (ip->snoop_by && !(ip->iflags & NOECHO)) {
+		save_command_giver = command_giver;
+		command_giver = ip->snoop_by->ob;
 #ifdef RECEIVE_SNOOP
-	    receive_snoop(buf, command_giver);
+		receive_snoop(buf, command_giver);
 #else
-	    add_message("%");
-	    add_message(buf);
+		add_message("%");
+		add_message(buf);
 #endif
-	    command_giver = save_command_giver;
+		command_giver = save_command_giver;
+	    }
+	    /*
+	     * set flag if new data completes command.
+	     */
+	    if (cmd_in_buf(ip))
+		ip->iflags |= CMD_IN_BUF;
+	    break;
+	case PORT_ASCII:
+	    {
+		char temp[2 * MESSAGE_BUF_SIZE];
+		int old_num = ip->text_end - ip->text_start;
+		char *p, *nl;
+		svalue_t *ret;
+
+		memcpy(temp, ip->text + ip->text_start, old_num);
+		memcpy(temp + old_num, buf, num_bytes);
+		temp[num_bytes + old_num] = 0;
+		p = temp;
+		while (nl = strchr(p, '\n')) {
+		    *nl = 0;
+		    if (!(command_giver->flags & O_DESTRUCTED)) {
+			push_string(p, STRING_MALLOC);
+			ret = apply(APPLY_PROCESS_INPUT, command_giver,
+				    1, ORIGIN_DRIVER);
+		    }
+		    p = nl + 1;
+		}
+		num_bytes = strlen(p);
+		ip->text_start = 0;
+		ip->text_end = num_bytes;
+		memcpy(ip->text, p, num_bytes);
+		break;
+	    }
+	case PORT_BINARY:
+	    {
+		buffer_t *buffer;
+		svalue_t *ret;
+		
+		buffer = allocate_buffer(num_bytes);
+		memcpy(buffer->item, buf, num_bytes);
+		
+		push_refed_buffer(buffer);
+		ret = apply(APPLY_PROCESS_INPUT, command_giver, 1, ORIGIN_DRIVER);
+		break;
+	    }
 	}
-	/*
-	 * set flag if new data completes command.
-	 */
-	if (cmd_in_buf(ip))
-	    ip->iflags |= CMD_IN_BUF;
-	break;
     }
 }				/* get_user_data() */
 
@@ -1460,6 +1552,7 @@ static void get_user_data P1(interactive_t *, ip)
 #define StartCmdGiver   (MAX_USERS-1)
 #define IncCmdGiver     NextCmdGiver = (NextCmdGiver == 0? StartCmdGiver: \
                                         NextCmdGiver - 1)
+
 static int NextCmdGiver = StartCmdGiver;
 
 #ifdef DEBUG_COMM_FREEZE

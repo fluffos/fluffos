@@ -78,7 +78,7 @@ void logon P1(object_t *, ob)
     ret = apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
     if (ret == 0) {
 	add_vmessage("prog %s:\n", ob->name);
-	fatal("Could not find logon on the user %s\n", ob->name);
+	fatal("Could not find logon() in the user object /%s\n", ob->name);
     }
 }				/* logon() */
 
@@ -123,11 +123,12 @@ void backend()
     int nb;
     int i;
 
-    fprintf(stderr, "Accepting user connections on port %d.\n", (int) PORTNO);
+    for (i = 0; i < 5; i++) {
+	if (external_port[i].port)
+	    fprintf(stderr, "Accepting connections on port %d.\n",
+		    external_port[i].port);
+    }
     init_user_conn();		/* initialize user connection socket */
-#ifdef SOCKET_EFUNS
-    init_sockets();		/* initialize efun sockets           */
-#endif
     signal(SIGHUP, startshutdownMudOS);
     if (!t_flag)
 	call_heart_beat();
@@ -469,7 +470,7 @@ static void call_heart_beat()
 		if (!(command_giver->flags & O_ENABLE_COMMANDS))
 		    command_giver = 0;
 #endif
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
 		add_heart_beats(&ob->stats, 1);
 #endif
 		eval_cost = max_cost;
@@ -487,7 +488,7 @@ static void call_heart_beat()
     current_heart_beat = 0;
     look_for_objects_to_swap();
     call_out();
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     mudlib_stats_decay();
 #endif
     command_giver = save_command_giver;

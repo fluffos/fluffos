@@ -1,0 +1,18 @@
+%pragma insert_packages
+
+%ifdef GNU
+OBJ=$(addprefix $(OBJDIR)/,$(subst .c,.o,$(SRC)))
+
+$(OBJDIR)/%.o: %.c $(OBJDIR)
+	$(CC) -I$(OBJDIR) $(CFLAGS) -o $@ -c $<
+%else
+.c.o:
+	$(CC) $(CFLAGS) -c $*.c
+%endif
+
+all: $(OBJ)
+	ar rlcu packages.a $(OBJ)
+
+clean:
+	-rm -f *.o
+	-rm -f packages.a

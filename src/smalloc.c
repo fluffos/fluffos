@@ -13,6 +13,7 @@
 ** Amiga Lattice support added by Robocoder@TMI-2
 */
 
+#define IN_MALLOC_WRAPPER
 #define NO_OPCODES
 #include "std.h"
 #include "file_incl.h"
@@ -42,8 +43,7 @@
 #define SMALL_CHUNK_SIZE	0x4000
 #define CHUNK_SIZE		0x40000
 
-#define SINT SIZEOF_INT
-#define SMALL_BLOCK_MAX (SMALL_BLOCK_MAX_BYTES/SINT)
+#define SMALL_BLOCK_MAX (SMALL_BLOCK_MAX_BYTES/SIZEOF_INT)
 
 #define PREV_BLOCK	0x80000000
 #define THIS_BLOCK	0x40000000
@@ -176,7 +176,7 @@ POINTER smalloc_malloc P1(size_t, size)
 	
 	*next_unused = (u) last_small_chunk;
 	last_small_chunk = next_unused++;
-	count_up(small_chunk_stat, SMALL_CHUNK_SIZE + SIZEOF_PTR);
+	count_up(small_chunk_stat, SMALL_CHUNK_SIZE +  SIZEOF_PTR);
 	count_up(small_alloc_stat, SIZEOF_PTR);
 	unused_size = SMALL_CHUNK_SIZE;
     } else
@@ -185,9 +185,9 @@ POINTER smalloc_malloc P1(size_t, size)
     temp = (u *) s_next_ptr(next_unused);
     *s_size_ptr(next_unused) = size >> 2;
     unused_size -= size;
-    if (unused_size < (SINT + SIZEOF_PTR)) {
+    if (unused_size < (SIZEOF_INT + SIZEOF_PTR)) {
 	count_up(small_alloc_stat, unused_size);
-	if ((size + unused_size) < (SMALL_BLOCK_MAX_BYTES + SINT)) {
+	if ((size + unused_size) < (SMALL_BLOCK_MAX_BYTES + SIZEOF_INT)) {
 	    /*
 	     * try to avoid waste
 	     */
@@ -1242,7 +1242,7 @@ static char *large_malloc P2(u, size, int, force_more)
     if (!ptr) {			/* no match, allocate more memory */
 	u chunk_size, block_size;
 
-	block_size = size * SINT;
+	block_size = size * SIZEOF_INT;
 	if (force_more || (block_size > CHUNK_SIZE))
 	    chunk_size = block_size;
 	else
@@ -1250,8 +1250,8 @@ static char *large_malloc P2(u, size, int, force_more)
 
 #ifdef SBRK_OK
 	if (!start_next_block) {
-	    count_up(large_alloc_stat, SINT);
-	    start_next_block = (u *) esbrk(SINT);
+	    count_up(large_alloc_stat, SIZEOF_INT);
+	    start_next_block = (u *) esbrk(SIZEOF_INT);
 	    if (!start_next_block)
 		fatal("Couldn't malloc anything");
 	    *(start_next_block) = PREV_BLOCK;
@@ -1259,7 +1259,7 @@ static char *large_malloc P2(u, size, int, force_more)
 	}
 	ptr = (u *) esbrk(chunk_size);
 #else				/* not SBRK_OK */
-	ptr = (u *) esbrk(chunk_size + SINT);
+	ptr = (u *) esbrk(chunk_size + SIZEOF_INT);
 #endif				/* SBRK_OK */
 	if (ptr == 0) {
 	    extern char *reserved_area;
@@ -1292,12 +1292,12 @@ static char *large_malloc P2(u, size, int, force_more)
 #else				/* not SBRK_OK */
 	if (start_next_block == ptr) {
 	    ptr -= 1;		/* overlap old memory block */
-	    chunk_size += SINT;
+	    chunk_size += SIZEOF_INT;
 	} else
 	    *ptr = PREV_BLOCK;
 	start_next_block = (u *) ((char *) ptr + chunk_size);
 #endif				/* SBRK_OK */
-	block_size = chunk_size / SINT;
+	block_size = chunk_size / SIZEOF_INT;
 
 	/* configure header info on chunk */
 
@@ -1369,10 +1369,10 @@ POINTER smalloc_realloc P2(POINTER, p, size_t, size)
 
 #if MALLOC_ALIGN > 4
     while (!(old_size = *--q));
-    old_size = ((old_size & MASK) - 1) * SINT;
+    old_size = ((old_size & MASK) - 1) * SIZEOF_INT;
 #else
     --q;
-    old_size = ((*q & MASK) - 1) * SINT;
+    old_size = ((*q & MASK) - 1) * SIZEOF_INT;
 #endif
     if (old_size >= size)
 	return p;

@@ -11,8 +11,6 @@
 #include "../lpc_incl.h"
 #endif
 
-#ifdef MATH
-
 #ifdef F_COS
 void
 f_cos PROT((void))
@@ -132,6 +130,4 @@ f_ceil PROT((void))
 {
     sp->u.real = ceil(sp->u.real);
 }
-#endif
-
 #endif

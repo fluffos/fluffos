@@ -148,7 +148,8 @@ f_bind PROT((void))
     new_fp = ALLOCATE(funptr_t, TAG_FUNP, "f_bind");
     *new_fp = *old_fp;
     new_fp->hdr.owner = ob; /* one ref from being on stack */
-    new_fp->hdr.args->ref++;
+    if (new_fp->hdr.args)
+	new_fp->hdr.args->ref++;
     if (old_fp->hdr.type & 0x0f == FP_FUNCTIONAL)
 	new_fp->f.functional.prog->func_ref++;
 
@@ -1479,7 +1480,7 @@ f_message PROT((void))
      1,
 #endif
      1,
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
      {(mudlib_stats_t *) NULL, (mudlib_stats_t *) NULL}
 #endif
     };
@@ -1489,7 +1490,7 @@ f_message PROT((void))
      1,
 #endif
      1,
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
      {(mudlib_stats_t *) NULL, (mudlib_stats_t *) NULL}
 #endif
     };
@@ -2438,7 +2439,7 @@ f_say PROT((void))
      1,
 #endif
      1,
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
      {(mudlib_stats_t *) NULL, (mudlib_stats_t *) NULL}
 #endif
     };
@@ -2541,8 +2542,10 @@ f_query_heart_beat PROT((void))
 void
 f_set_hide PROT((void))
 {
-    if (!valid_hide(current_object))
+    if (!valid_hide(current_object)) {
+	sp--;
 	return;
+    }
     if ((sp--)->u.number) {
 	if (!(current_object->flags & O_HIDDEN) && current_object->interactive)
 	    num_hidden++;
@@ -2829,7 +2832,7 @@ f_strsrch PROT((void))
 
             pos = big + blen;   /* find end */
             pos -= llen;        /* find rightmost pos it _can_ be */
-            while (1) {
+            do {
                 do {
                     if (*pos == c) break;
 		} while (--pos >= big);
@@ -2840,7 +2843,7 @@ f_strsrch PROT((void))
                 for (i = 1; little[i] && (pos[i] == little[i]); i++);   /* scan all chars */
                 if (!little[i])
                     break;
-	    }
+	    } while (--pos >= big);
 	}
     }
 
@@ -3110,9 +3113,12 @@ f_to_int PROT((void))
 void
 f_typeof PROT((void))
 {
-    /* The sp itself is not freed so can do this - Sym */
+    /* Yes this is necessary.  put_number is a macro, and smashes sp->type
+       before evaluating it's arg */
+    int i = sp->type;
+
     free_svalue(sp, "f_typeof");
-    put_number(sp->type);
+    put_number(i);
 }
 #endif
 

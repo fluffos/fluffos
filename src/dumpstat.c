@@ -102,10 +102,10 @@ void dumpstat P1(char *, tfn)
     }
     f = fopen(fn, "w");
     if (!f) {
-	add_vmessage("Unable to open '%s' for writing.\n", fn);
+	add_vmessage("Unable to open '/%s' for writing.\n", fn);
 	return;
     }
-    add_vmessage("Dumping to %s...", fn);
+    add_vmessage("Dumping to /%s...", fn);
 
     display_hidden = -1;
     for (ob = obj_list; ob; ob = ob->next_all) {

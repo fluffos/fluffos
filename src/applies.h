@@ -58,6 +58,7 @@
 #define APPLY_VALID_SHADOW                  "valid_shadow"
 #define APPLY_VALID_SOCKET                  "valid_socket"
 #define APPLY_VALID_WRITE                   "valid_write"
+#define APPLY_WINDOW_SIZE                   "window_size"
 #define APPLY_WRITE_PROMPT                  "write_prompt"
 
 #endif				/* APPLIES_H */

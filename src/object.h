@@ -37,7 +37,7 @@
 #define O_WILL_CLEAN_UP		0x100	/* clean_up will be called next time */
 #define O_VIRTUAL		0x200	/* We're a virtual object            */
 #define O_HIDDEN		0x400	/* We're hidden from nonprived objs  */
-#ifdef SOCKET_EFUNS
+#ifdef PACKAGE_SOCKETS
 #define O_EFUN_SOCKET           0x800	/* efun socket references object     */
 #endif
 #define O_WILL_RESET            0x1000	/* reset will be called next time    */
@@ -109,14 +109,14 @@ typedef struct object_s {
     struct object_s *next_hashed_living;
     char *living_name;		/* Name of living object if in hash */
 #endif
-#ifndef NO_UIDS
+#ifdef PACKAGE_UIDS
     userid_t *uid;		/* the "owner" of this object */
     userid_t *euid;		/* the effective "owner" */
 #endif
 #ifdef PRIVS
     char *privs;		/* object's privledges */
 #endif				/* PRIVS */
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     statgroup_t stats;		/* mudlib stats */
 #endif
     svalue_t variables[1];	/* All variables to this program */
@@ -168,6 +168,7 @@ void stat_living_objects PROT((void));
 int shadow_catch_message PROT((object_t *, char *));
 void tell_npc PROT((object_t *, char *));
 void tell_object PROT((object_t *, char *));
+variable_t *find_status PROT((char *));
 /*
  * ed.c
  */

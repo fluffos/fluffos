@@ -4,6 +4,19 @@
 /*
  * main.c
  */
+
+#define PORT_TELNET      1
+#define PORT_BINARY      2
+#define PORT_ASCII       3
+
+typedef struct {
+    int kind;
+    int port;
+    int fd;
+} port_def_t;
+
+extern port_def_t external_port[5];
+
 #ifdef DEBUG
 extern int d_flag;
 #endif
@@ -12,7 +25,6 @@ extern int comp_flag;
 extern int time_to_swap;
 extern int time_to_clean_up;
 extern char *default_fail_message;
-extern int port_number;
 extern int boot_time;
 extern int max_cost;
 extern int max_array_size;

@@ -13,8 +13,6 @@
 
 #include "matrix.h"
 
-#ifdef MATRIX
-
 static Matrix identity =
 {1., 0., 0., 0.,
  0., 1., 0., 0.,
@@ -651,5 +649,3 @@ void mult_matrix P3(Matrix, ma, Matrix, mb, Matrix, m)
 
     m[15] = ma[12] * mb[3] + ma[13] * mb[7] + ma[14] * mb[11] + ma[15] * mb[15];
 }
-
-#endif				/* MATRIX */

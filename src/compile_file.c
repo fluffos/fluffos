@@ -140,19 +140,19 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
 	done = 0;
 	while (!done) {
 	    if (comp_flag)
-		fprintf(stderr, " compiling %s ...", real_name);
+		fprintf(stderr, " compiling /%s ...", real_name);
 	    f = open(real_name, O_RDONLY);
 	    if (f == -1) {
 		if (arg1->type == T_ARRAY)
 		    fclose(compilation_output_file);
 		perror(real_name);
-		error("Could not read the file '%s'.\n", real_name);
+		error("Could not read the file '/%s'.\n", real_name);
 	    }
 	    if (arg1->type == T_STRING) {
 		compilation_output_file = crdir_fopen(out_fname);
 		if (compilation_output_file == 0) {
 		    perror(out_fname);
-		    error("Could not open output file '%s'.\n", out_fname);
+		    error("Could not open output file '/%s'.\n", out_fname);
 		}
 	    }
 	    generate_identifier(ident, name);
@@ -206,7 +206,7 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
 			if (arg1->type == T_ARRAY)
 			    fclose(compilation_output_file);
 			perror(out_fname);
-			error("Could not open output file '%s.'\n", out_fname);
+			error("Could not open output file '/%s.'\n", out_fname);
 		    }
 		    out_name[len] = '\0';
 		    fprintf(specfile, "package %s;\n\n", out_name);

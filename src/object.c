@@ -515,7 +515,7 @@ INLINE static void add_map_stats P2(mapping_t *, m, int, count)
 {
     total_mapping_nodes += count;
     total_mapping_size += count * sizeof(mapping_node_t);
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     add_array_size(&m->stats, count << 1);
 #endif
     m->count = count;
@@ -1031,7 +1031,7 @@ safe_restore_svalue P2(char *, cp, svalue_t *, v)
 
 static int var_index = 0;
 
-static variable_t *find_status P1(char *, str) {
+variable_t *find_status P1(char *, str) {
     int i;
     variable_t *vars = current_object->prog->variable_names;
     int n = current_object->prog->num_variables;
@@ -1151,18 +1151,23 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
     }
 
     file = check_valid_path(use_name, ob, "save_object", 1);
+    /* WARNING: file may point at use_name */
 
-    if (free_use_name)
-      FREE(use_name);
-
-    if (file == 0)
+    if (file == 0) {
+	if (free_use_name)
+	    FREE(use_name);
         error("Denied write permission in save_object().\n");
+    }
     if (!len) len = strlen(file);
     name = DXALLOC(len + strlen(SAVE_EXTENSION) + 1, TAG_TEMPORARY, "save_object: 1");
     (void)strcpy(name, file);
 #ifndef MSDOS
     (void)strcat(name + len, SAVE_EXTENSION);
 #endif
+
+    /* we don't use file after this.  It's safe to free it. */
+    if (free_use_name)
+	FREE(use_name);
     /*
      * Write the save-files to different directories, just in case
      * they are on different file systems.
@@ -1173,7 +1178,7 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
 #endif
     if (!(f = fopen(tmp_name, "w"))){
 	FREE(name);
-        error("Could not open %s for a save.\n", tmp_name);
+        error("Could not open /%s for a save.\n", tmp_name);
     }
     fprintf(f, "#%s\n", ob->prog->name);
 
@@ -1212,7 +1217,7 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
                 }
 #endif
 		perror(name);
-		printf("Failed to rename %s to %s\n", tmp_name, name);
+		printf("Failed to rename /%s to /%s\n", tmp_name, name);
 		add_message("Failed to save object!\n");
 	}
     }
@@ -1309,7 +1314,7 @@ int restore_object P3(object_t *, ob, char *, file, int, noclear)
     current_object = save;
 #ifdef DEBUg
     if (d_flag > 1)
-        debug_message("Object %s restored from %s.\n", ob->name, name);
+        debug_message("Object /%s restored from /%s.\n", ob->name, name);
 #endif
     FREE(name);
     FREE(theBuff);
@@ -1609,17 +1614,16 @@ void remove_living_name P1(object_t *, ob)
     object_t **hl;
 
     num_living_names--;
-    if (!ob->living_name)
-	fatal("remove_living_name: no living name set.\n");
+    DEBUG_CHECK(!ob->living_name, "remove_living_name: no living name set.\n");
     hl = &hashed_living[hash_living_name(ob->living_name)];
     while (*hl) {
 	if (*hl == ob)
 	    break;
 	hl = &(*hl)->next_hashed_living;
     }
-    if (*hl == 0)
-	fatal("remove_living_name: Object named %s no in hash list.\n",
-	      ob->living_name);
+    DEBUG_CHECK1(*hl == 0, 
+		 "remove_living_name: Object named %s no in hash list.\n",
+		 ob->living_name);
     *hl = ob->next_hashed_living;
     free_string(ob->living_name);
     ob->next_hashed_living = 0;
@@ -1721,7 +1725,7 @@ void reload_object P1(object_t *, obj)
 	free_svalue(&obj->variables[i], "reload_object");
 	obj->variables[i] = const0n;
     }
-#ifdef SOCKET_EFUNS
+#ifdef PACKAGE_SOCKETS
     if (obj->flags & O_EFUN_SOCKET) {
 	close_referencing_sockets(obj);
     }
@@ -1765,7 +1769,7 @@ void reload_object P1(object_t *, obj)
 #ifndef NO_LIGHT
     add_light(obj, -(obj->total_light));
 #endif
-#ifndef NO_UIDS
+#ifdef PACKAGE_UIDS
 #ifdef AUTO_SETEUID
     obj->euid = obj->uid;
 #else

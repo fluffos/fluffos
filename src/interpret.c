@@ -57,7 +57,7 @@ static char *type_names[] = {
 #define TYPE_CODES_START 0x2
 
 int master_ob_is_loading;
-#ifndef NO_UIDS
+#ifdef PACKAGE_UIDS
 extern userid_t *backbone_uid;
 #endif
 extern int max_cost;
@@ -79,7 +79,6 @@ int last_instructions PROT((void));
 #endif
 static float _strtof PROT((char *, char **));
 static svalue_t *sapply PROT((char *, object_t *, int));
-static char *get_line_number PROT((char *, program_t *));
 #ifdef TRACE_CODE
 static char *get_arg PROT((int, int));
 #endif
@@ -137,8 +136,8 @@ control_stack_t *csp;	/* Points to last element pushed */
 
 int too_deep_error = 0, max_eval_error = 0;
 #define STACK_CHECK if (++sp >= end_of_stack) do { \
-		    too_deep_error = 1; error("stack overflow\n"); } \
-                    while (0)
+			too_deep_error = 1; error("stack overflow\n"); } \
+		        while (0)
 
 void get_version P1(char *, buff)
 {
@@ -217,7 +216,7 @@ int validate_shadowing P1(object_t *, ob)
 	error("shadow: cannot shadow the master object.\n");
     if (ob->shadowing)
 	error("shadow: Can't shadow a shadow.\n");
-#ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
+ #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
     /*
      * Want to iterate over the smaller function table, and use binary search
      * on the larger one for faster operation, ie O(m lg n), where m < n,
@@ -240,7 +239,7 @@ int validate_shadowing P1(object_t *, ob)
 		      victim->functions[i].name);
 	}
     }
-#else
+ #else
     for (i = 0; i < (int) shadow->num_functions; i++) {
 	for (j = 0; j < (int) victim->num_functions; j++) {
 	    if (shadow->functions[i].name != victim->functions[j].name)
@@ -250,7 +249,7 @@ int validate_shadowing P1(object_t *, ob)
 		      victim->functions[j].name);
 	}
     }
-#endif
+ #endif
     push_object(ob);
     ret = apply_master_ob(APPLY_VALID_SHADOW, 1);
     if (!(ob->flags & O_DESTRUCTED) && MASTER_APPROVED(ret)) {
@@ -347,7 +346,7 @@ INLINE void
 free_string_svalue P1(svalue_t *, v)
 {
     switch (v->subtype) {
-	case STRING_MALLOC:
+    case STRING_MALLOC:
 	FREE(v->u.string);
 	break;
     case STRING_SHARED:
@@ -364,13 +363,13 @@ free_string_svalue P1(svalue_t *, v)
 #ifdef DEBUG
 INLINE void int_free_svalue P2(svalue_t *, v, char *, tag)
 #else
-INLINE void int_free_svalue P1(svalue_t *, v)
+     INLINE void int_free_svalue P1(svalue_t *, v)
 #endif
 {
     switch (v->type) {
-	case T_STRING:
+    case T_STRING:
 	switch (v->subtype) {
-	    case STRING_MALLOC:
+	case STRING_MALLOC:
 	    FREE(v->u.string);
 	    break;
 	case STRING_SHARED:
@@ -395,13 +394,13 @@ INLINE void int_free_svalue P1(svalue_t *, v)
 	free_funp(v->u.fp);
 	break;
     case T_ERROR_HANDLER:
-        (*v->u.error_handler)();
+	(*v->u.error_handler)();
 	break;
-#ifdef DEBUG
+ #ifdef DEBUG
     case T_FREED:
 	fatal("T_FREED svalue freed.  Previously freed by %s.\n", v->u.string);
 	break;
-#endif
+ #endif
     }
     IF_DEBUG(v->type = T_FREED);
     IF_DEBUG(v->u.string = tag);
@@ -456,10 +455,10 @@ INLINE void assign_svalue_no_free P2(svalue_t *, to, svalue_t *, from)
 	case STRING_SHARED:	/* It already is shared */
 	    to->u.string = ref_string(from->u.string);
 	    break;
-#ifdef DEBUG
+ #ifdef DEBUG
 	default:
 	    fatal("Bad string type %d\n", from->subtype);
-#endif
+ #endif
 	}
 	break;
     case T_OBJECT:
@@ -514,434 +513,434 @@ INLINE void transfer_push_some_svalues P2(svalue_t *, v, int, num)
 /*
  * Pop the top-most value of the stack.
  * Don't do this if it is a value that will be used afterwards, as the
- * data may be sent to FREE(), and destroyed.
- */
-INLINE void pop_stack()
-{
-    DEBUG_CHECK(sp < start_of_stack, "Stack underflow.\n");
-    free_svalue(sp--, "pop_stack");
-}
-
-svalue_t glb = { T_LVALUE_BYTE };
-
-/*
- * Compute the address of an array element.
- */
-INLINE void push_indexed_lvalue P1(int, code)
-{
-    int ind;
-    svalue_t *lv;
-
-    if (sp->type == T_LVALUE){
-        lv = sp->u.lvalue;
-        if (!code && lv->type & T_MAPPING){
-            sp--;
-            if (!(lv = find_for_insert(lv->u.map, sp, 0)))
-                mapping_too_large();
-            free_svalue(sp, "push_indexed_lvalue: 1");
-            sp->type = T_LVALUE;
-            sp->u.lvalue = lv;
-            return;
-	}
-	
-        if (!((--sp)->type & T_NUMBER))
-            error("Illegal type of index\n");
-
-        ind = sp->u.number;
-
-        switch(lv->type){
-	    case T_STRING:
-	    {
-                char *tmp = lv->u.string;
-                int len = SVALUE_STRLEN(lv);
-
-                if (code) ind = len - ind;
-                if (ind >= len || ind < 0)
-                    error("Index out of bounds in string index lvalue.\n");
-                if (lv->subtype != STRING_MALLOC){
-                    tmp = string_copy(tmp, "push_indexed_lvalue: 1");
-                    if (lv->subtype & STRING_SHARED) free_string(lv->u.string);
-                    lv->u.string = tmp;
-                    lv->subtype = STRING_MALLOC;
-		  }
-                sp->type = T_LVALUE;
-                sp->u.lvalue = &glb;
-                glb.u.lvalue_byte = (unsigned char *)&tmp[ind];
-                break;
-	    }
-
-	    case T_BUFFER:
-	    {
-                if (code) ind = lv->u.buf->size - ind;
-                if (ind >= lv->u.buf->size || ind < 0)
-                    error("Buffer index out of bounds.\n");
-                sp->type = T_LVALUE;
-                sp->u.lvalue = &glb;
-                glb.u.lvalue_byte = &lv->u.buf->item[ind];
-                break;
-	    }
-	    
-	    case T_ARRAY:
-	    {
-                if (code) ind = lv->u.arr->size - ind;
-                if (ind >= lv->u.arr->size || ind < 0)
-                    error("Array index out of bounds\n");
-                sp->type = T_LVALUE;
-                sp->u.lvalue = lv->u.arr->item + ind;
-                break;
-	    }
-
-	    default:
-                error("Indexing on illegal type.\n");
-        }
-    } else {
-        /* It is now coming from (x <assign_type> y)[index]... = rhs */
-        /* Where x is a _valid_ lvalue */
-        /* Hence the reference to sp is at least 2 :) */
-
-        if (!code && (sp->type & T_MAPPING)){
-            if (!(lv = find_for_insert(sp->u.map, sp-1, 0)))
-                mapping_too_large();
-            sp->u.map->ref--;
-            free_svalue(--sp, "push_indexed_lvalue: 2");
-            sp->type = T_LVALUE;
-            sp->u.lvalue = lv;
-            return;
-	}
-	
-        if (!((sp-1)->type & T_NUMBER))
-            error("Illegal type of index\n");
-	
-        ind = (sp-1)->u.number;
-
-        switch (sp->type){
-	    case T_STRING:
-	    {
-                error("Illegal to make char lvalue from assigned string\n");
-                break;
-	    }
-
-	    case T_BUFFER:
-	    {
-                if (code) ind = sp->u.buf->size - ind;
-                if (ind >= sp->u.buf->size || ind < 0)
-                    error("Buffer index out of bounds.\n");
-                sp->u.buf->ref--;
-                (--sp)->type = T_LVALUE;
-                sp->u.lvalue = &glb;
-                glb.u.lvalue_byte = (sp+1)->u.buf->item + ind;
-                break;
-	    }
-
-	    case T_ARRAY:
-	    {
-		if (code) ind = sp->u.arr->size - ind;
-		if (ind >= sp->u.arr->size || ind < 0)
-                    error("Array index out of bounds.\n");
-                sp->u.arr->ref--;
-                (--sp)->type = T_LVALUE;
-                sp->u.lvalue = (sp+1)->u.arr->item + ind;
-                break;
-	    }
-
-	    default:
-	        error("Indexing on illegal type.\n");
-        }
-    }
-}
-
-static struct lvalue_range {
-    int ind1, ind2, size;
-    svalue_t *owner;
-} glr;
-
-static svalue_t glr_sv = { T_LVALUE_RANGE };
-
-static INLINE void push_lvalue_range P1(int, code)
-{
-    int ind1, ind2, size;
-    svalue_t *lv;
-
-    if (sp->type == T_LVALUE){
-        switch((lv = glr.owner = sp->u.lvalue)->type){
-            case T_ARRAY:
-                size = lv->u.arr->size;
-                break;
-		case T_STRING: {
-                char *tmp = lv->u.string;
-                size = SVALUE_STRLEN(lv);
-                if (lv->subtype != STRING_MALLOC){
-                    tmp = string_copy(tmp, "push_lvalue_range");
-                    if (lv->subtype & STRING_SHARED) free_string(lv->u.string);
-                    lv->u.string = tmp;
-                    lv->subtype = STRING_MALLOC;
-                }
-                break;
-            }
-	    case T_BUFFER:
-                size = lv->u.buf->size;
-                break;
-	    default: error("Range lvalue on illegal type\n");
-        }
-    } else error("Range lvalue on illegal type\n");
-
-    if (!((--sp)->type & T_NUMBER)) error("Illegal 2nd index type to range lvalue\n");
-
-    ind2 = (code & 0x01) ? (size - sp->u.number) : sp->u.number;
-    if (++ind2 < 0 || (ind2 > size))
-        error("The 2nd index to range lvalue must be >= -1 and < sizeof(indexed value)\n");
-
-
-    if (!((--sp)->type & T_NUMBER)) error("Illegal 1st index type to range lvalue\n");
-    ind1 = (code & 0x10) ? (size - sp->u.number) : sp->u.number;
-
-    if (ind1 < 0 || ind1 > size)
-        error("The 1st index to range lvalue must be >= 0 and <= sizeof(indexed value)\n");
-
-    glr.ind1 = ind1;
-    glr.ind2 = ind2;
-    glr.size = size;
-    sp->type = T_LVALUE;
-    sp->u.lvalue = &glr_sv;
-}
-
-INLINE void copy_lvalue_range P1(svalue_t *, from)
-{
-    int ind1, ind2, size, fsize;
-    svalue_t *owner;
-
-    ind1 = glr.ind1;
-    ind2 = glr.ind2;
-    size = glr.size;
-    owner = glr.owner;
-
-    switch(owner->type){
-        case T_ARRAY:
-        {
-            array_t *fv, *dv;
-            svalue_t *fptr, *dptr;
-            if (from->type != T_ARRAY) error("Illegal rhs to array range lvalue\n");
-
-            fv = from->u.arr;
-            fptr = fv->item;
-
-            if ((fsize = fv->size) == ind2 - ind1){
-                dptr = (owner->u.arr)->item + ind1;
-
-                if (fv->ref == 1){
-                    /* Transfer the svalues */
-                    while (fsize--){
-                        free_svalue(dptr, "copy_lvalue_range : 1");
-                        *dptr++ = *fptr++;
-                    }
-                    free_empty_array(fv);
-                } else {
-                    while (fsize--) assign_svalue(dptr++, fptr++);
-                    fv->ref--;
-                }
-            } else {
-                array_t *old_dv = owner->u.arr;
-                svalue_t *old_dptr = old_dv->item;
-
-                /* Need to reallocate the array */
-                dv = allocate_empty_array(size - ind2 + ind1 + fsize);
-                dptr = dv->item;
-
-                /* ind1 can range from 0 to sizeof(old_dv) */
-                while (ind1--) assign_svalue_no_free(dptr++, old_dptr++);
-
-                if (fv->ref == 1){
-                    while (fsize--) *dptr++ = *fptr++;
-                    free_empty_array(fv);
-                } else {
-                    while (fsize--) assign_svalue_no_free(dptr++, fptr++);
-                    fv->ref--;
-                }
-
-                /* ind2 can range from 0 to sizeof(old_dv) */
-                old_dptr = old_dv->item + ind2;
-                size -= ind2;
-
-                while (size--) assign_svalue_no_free(dptr++, old_dptr++);
-                free_array(old_dv);
-
-                owner->u.arr = dv;
-            }
-            break;
-        }
-
-        case T_STRING:
-        {
-            if (from->type != T_STRING) error("Illegal rhs to string range lvalue.\n");
-
-            if ((fsize = SVALUE_STRLEN(from)) == ind2 - ind1){
-                /* since fsize >= 0, ind2 - ind1 <= strlen(orig string) */
-                /* because both of them can only range from 0 to len */
-
-                strncpy(owner->u.string + ind1, from->u.string, fsize);
-            } else {
-                char *tmp, *dstr = owner->u.string;
-
-                owner->u.string = tmp = DXALLOC(size - ind2 + ind1 + fsize + 1, TAG_STRING, "copy_lvalue_range");
-                if (ind1 >= 1){
-                    strncpy(tmp, dstr, ind1);
-                    tmp += ind1;
-                }
-                strcpy(tmp, from->u.string);
-                tmp += fsize;
-
-                size -= ind2;
-                if (size >= 1){
-                    strncpy(tmp, dstr + ind2, size);
-                    *(tmp + size) = 0;
-                }
-                FREE(dstr);
-            }
-            free_string_svalue(from);
-            break;
-        }
-
-        case T_BUFFER:
-        {
-            if (from->type != T_BUFFER) error("Illegal rhs to buffer range lvalue.\n");
-
-            if ((fsize = from->u.buf->size) == ind2 - ind1){
-                memcpy((owner->u.buf)->item + ind1, from->u.buf->item, fsize);
-            } else {
-                buffer_t *b;
-                unsigned char *old_item = (owner->u.buf)->item;
-                unsigned char *new_item;
-
-                b = allocate_buffer(size - ind2 + ind1 + fsize);
-                new_item = b->item;
-                if (ind1 >= 1){
-                    memcpy(b->item, old_item, ind1);
-                    new_item += ind1;
-                }
-                memcpy(new_item, from->u.buf, fsize);
-                new_item += fsize;
-
-                if ((size -= ind2) >= 1)
-                    memcpy(new_item, old_item + ind2, size);
-                free_buffer(owner->u.buf);
-                owner->u.buf = b;
-            }
-            free_buffer(from->u.buf);
-            break;
-        }
-    }
-}
-INLINE void assign_lvalue_range P1(svalue_t *, from)
-{
-    int ind1, ind2, size, fsize;
-    svalue_t *owner;
-
-    ind1 = glr.ind1;
-    ind2 = glr.ind2;
-    size = glr.size;
-    owner = glr.owner;
-
-    switch(owner->type){
-        case T_ARRAY:
-        {
-            array_t *fv, *dv;
-            svalue_t *fptr, *dptr;
-            if (from->type != T_ARRAY) error("Illegal rhs to array range lvalue\n");
-
-            fv = from->u.arr;
-            fptr = fv->item;
-
-            if ((fsize = fv->size) == ind2 - ind1){
-                dptr = (owner->u.arr)->item + ind1;
-                while (fsize--) assign_svalue(dptr++, fptr++);
-            } else {
-                array_t *old_dv = owner->u.arr;
-                svalue_t *old_dptr = old_dv->item;
-
-                /* Need to reallocate the array */
-                dv = allocate_empty_array(size - ind2 + ind1 + fsize);
-                dptr = dv->item;
-
-                /* ind1 can range from 0 to sizeof(old_dv) */
-                while (ind1--) assign_svalue_no_free(dptr++, old_dptr++);
-
-                while (fsize--) assign_svalue_no_free(dptr++, fptr++);
-
-                /* ind2 can range from 0 to sizeof(old_dv) */
-                old_dptr = old_dv->item + ind2;
-                size -= ind2;
-
-                while (size--) assign_svalue_no_free(dptr++, old_dptr++);
-                free_array(old_dv);
-
-                owner->u.arr = dv;
-            }
-            break;
-        }
-
-        case T_STRING:
-        {
-            if (from->type != T_STRING) error("Illegal rhs to string range lvalue.\n");
-
-            if ((fsize = SVALUE_STRLEN(from)) == ind2 - ind1){
-                /* since fsize >= 0, ind2 - ind1 <= strlen(orig string) */
-                /* because both of them can only range from 0 to len */
-
-                strncpy(owner->u.string + ind1, from->u.string, fsize);
-            } else {
-                char *tmp, *dstr = owner->u.string;
-
-                owner->u.string = tmp = DXALLOC(size - ind2 + ind1 + fsize + 1, TAG_STRING, "assign_lvalue_range");
-                if (ind1 >= 1){
-                    strncpy(tmp, dstr, ind1);
-                    tmp += ind1;
-                }
-                strcpy(tmp, from->u.string);
-                tmp += fsize;
-
-                size -= ind2;
-                if (size >= 1){
-                    strncpy(tmp, dstr + ind2, size);
-                    *(tmp + size) = 0;
-                }
-                FREE((char *) dstr);
-            }
-            break;
-        }
-
-        case T_BUFFER:
-        {
-            if (from->type != T_BUFFER) error("Illegal rhs to buffer range lvalue.\n");
-
-            if ((fsize = from->u.buf->size) == ind2 - ind1){
-                memcpy((owner->u.buf)->item + ind1, from->u.buf->item, fsize);
-            } else {
-                buffer_t *b;
-                unsigned char *old_item = (owner->u.buf)->item;
-                unsigned char *new_item;
-
-                b = allocate_buffer(size - ind2 + ind1 + fsize);
-                new_item = b->item;
-                if (ind1 >= 1){
-                    memcpy(b->item, old_item, ind1);
-                    new_item += ind1;
-                }
-                memcpy(new_item, from->u.buf, fsize);
-                new_item += fsize;
-
-                if ((size -= ind2) >= 1)
-                    memcpy(new_item, old_item + ind2, size);
-                free_buffer(owner->u.buf);
-                owner->u.buf = b;
-            }
-            break;
-        }
-    }
-}
-
-/*
- * Deallocate 'n' values from the stack.
- */
+  * data may be sent to FREE(), and destroyed.
+  */
+ INLINE void pop_stack()
+ {
+     DEBUG_CHECK(sp < start_of_stack, "Stack underflow.\n");
+     free_svalue(sp--, "pop_stack");
+ }
+
+ svalue_t glb = { T_LVALUE_BYTE };
+
+ /*
+  * Compute the address of an array element.
+  */
+ INLINE void push_indexed_lvalue P1(int, code)
+ {
+     int ind;
+     svalue_t *lv;
+
+     if (sp->type == T_LVALUE){
+	 lv = sp->u.lvalue;
+	 if (!code && lv->type & T_MAPPING){
+	     sp--;
+	     if (!(lv = find_for_insert(lv->u.map, sp, 0)))
+		 mapping_too_large();
+	     free_svalue(sp, "push_indexed_lvalue: 1");
+	     sp->type = T_LVALUE;
+	     sp->u.lvalue = lv;
+	     return;
+	 }
+
+	 if (!((--sp)->type & T_NUMBER))
+	     error("Illegal type of index\n");
+
+	 ind = sp->u.number;
+
+	 switch(lv->type){
+	     case T_STRING:
+	     {
+		 char *tmp = lv->u.string;
+		 int len = SVALUE_STRLEN(lv);
+
+		 if (code) ind = len - ind;
+		 if (ind >= len || ind < 0)
+		     error("Index out of bounds in string index lvalue.\n");
+		 if (lv->subtype != STRING_MALLOC){
+		     tmp = string_copy(tmp, "push_indexed_lvalue: 1");
+		     if (lv->subtype & STRING_SHARED) free_string(lv->u.string);
+		     lv->u.string = tmp;
+		     lv->subtype = STRING_MALLOC;
+		   }
+		 sp->type = T_LVALUE;
+		 sp->u.lvalue = &glb;
+		 glb.u.lvalue_byte = (unsigned char *)&tmp[ind];
+		 break;
+	     }
+
+	     case T_BUFFER:
+	     {
+		 if (code) ind = lv->u.buf->size - ind;
+		 if (ind >= lv->u.buf->size || ind < 0)
+		     error("Buffer index out of bounds.\n");
+		 sp->type = T_LVALUE;
+		 sp->u.lvalue = &glb;
+		 glb.u.lvalue_byte = &lv->u.buf->item[ind];
+		 break;
+	     }
+
+	     case T_ARRAY:
+	     {
+		 if (code) ind = lv->u.arr->size - ind;
+		 if (ind >= lv->u.arr->size || ind < 0)
+		     error("Array index out of bounds\n");
+		 sp->type = T_LVALUE;
+		 sp->u.lvalue = lv->u.arr->item + ind;
+		 break;
+	     }
+
+	     default:
+		 error("Indexing on illegal type.\n");
+	 }
+     } else {
+	 /* It is now coming from (x <assign_type> y)[index]... = rhs */
+	 /* Where x is a _valid_ lvalue */
+	 /* Hence the reference to sp is at least 2 :) */
+
+	 if (!code && (sp->type & T_MAPPING)){
+	     if (!(lv = find_for_insert(sp->u.map, sp-1, 0)))
+		 mapping_too_large();
+	     sp->u.map->ref--;
+	     free_svalue(--sp, "push_indexed_lvalue: 2");
+	     sp->type = T_LVALUE;
+	     sp->u.lvalue = lv;
+	     return;
+	 }
+
+	 if (!((sp-1)->type & T_NUMBER))
+	     error("Illegal type of index\n");
+
+	 ind = (sp-1)->u.number;
+
+	 switch (sp->type){
+	     case T_STRING:
+	     {
+		 error("Illegal to make char lvalue from assigned string\n");
+		 break;
+	     }
+
+	     case T_BUFFER:
+	     {
+		 if (code) ind = sp->u.buf->size - ind;
+		 if (ind >= sp->u.buf->size || ind < 0)
+		     error("Buffer index out of bounds.\n");
+		 sp->u.buf->ref--;
+		 (--sp)->type = T_LVALUE;
+		 sp->u.lvalue = &glb;
+		 glb.u.lvalue_byte = (sp+1)->u.buf->item + ind;
+		 break;
+	     }
+
+	     case T_ARRAY:
+	     {
+		 if (code) ind = sp->u.arr->size - ind;
+		 if (ind >= sp->u.arr->size || ind < 0)
+		     error("Array index out of bounds.\n");
+		 sp->u.arr->ref--;
+		 (--sp)->type = T_LVALUE;
+		 sp->u.lvalue = (sp+1)->u.arr->item + ind;
+		 break;
+	     }
+
+	     default:
+		 error("Indexing on illegal type.\n");
+	 }
+     }
+ }
+
+ static struct lvalue_range {
+     int ind1, ind2, size;
+     svalue_t *owner;
+ } glr;
+
+ static svalue_t glr_sv = { T_LVALUE_RANGE };
+
+ static INLINE void push_lvalue_range P1(int, code)
+ {
+     int ind1, ind2, size;
+     svalue_t *lv;
+
+     if (sp->type == T_LVALUE){
+	 switch((lv = glr.owner = sp->u.lvalue)->type){
+	     case T_ARRAY:
+		 size = lv->u.arr->size;
+		 break;
+		 case T_STRING: {
+		 char *tmp = lv->u.string;
+		 size = SVALUE_STRLEN(lv);
+		 if (lv->subtype != STRING_MALLOC){
+		     tmp = string_copy(tmp, "push_lvalue_range");
+		     if (lv->subtype & STRING_SHARED) free_string(lv->u.string);
+		     lv->u.string = tmp;
+		     lv->subtype = STRING_MALLOC;
+		 }
+		 break;
+	     }
+	     case T_BUFFER:
+		 size = lv->u.buf->size;
+		 break;
+	     default: error("Range lvalue on illegal type\n");
+	 }
+     } else error("Range lvalue on illegal type\n");
+
+     if (!((--sp)->type & T_NUMBER)) error("Illegal 2nd index type to range lvalue\n");
+
+     ind2 = (code & 0x01) ? (size - sp->u.number) : sp->u.number;
+     if (++ind2 < 0 || (ind2 > size))
+	 error("The 2nd index to range lvalue must be >= -1 and < sizeof(indexed value)\n");
+
+
+     if (!((--sp)->type & T_NUMBER)) error("Illegal 1st index type to range lvalue\n");
+     ind1 = (code & 0x10) ? (size - sp->u.number) : sp->u.number;
+
+     if (ind1 < 0 || ind1 > size)
+	 error("The 1st index to range lvalue must be >= 0 and <= sizeof(indexed value)\n");
+
+     glr.ind1 = ind1;
+     glr.ind2 = ind2;
+     glr.size = size;
+     sp->type = T_LVALUE;
+     sp->u.lvalue = &glr_sv;
+ }
+
+ INLINE void copy_lvalue_range P1(svalue_t *, from)
+ {
+     int ind1, ind2, size, fsize;
+     svalue_t *owner;
+
+     ind1 = glr.ind1;
+     ind2 = glr.ind2;
+     size = glr.size;
+     owner = glr.owner;
+
+     switch(owner->type){
+	 case T_ARRAY:
+	 {
+	     array_t *fv, *dv;
+	     svalue_t *fptr, *dptr;
+	     if (from->type != T_ARRAY) error("Illegal rhs to array range lvalue\n");
+
+	     fv = from->u.arr;
+	     fptr = fv->item;
+
+	     if ((fsize = fv->size) == ind2 - ind1){
+		 dptr = (owner->u.arr)->item + ind1;
+
+		 if (fv->ref == 1){
+		     /* Transfer the svalues */
+		     while (fsize--){
+			 free_svalue(dptr, "copy_lvalue_range : 1");
+			 *dptr++ = *fptr++;
+		     }
+		     free_empty_array(fv);
+		 } else {
+		     while (fsize--) assign_svalue(dptr++, fptr++);
+		     fv->ref--;
+		 }
+	     } else {
+		 array_t *old_dv = owner->u.arr;
+		 svalue_t *old_dptr = old_dv->item;
+
+		 /* Need to reallocate the array */
+		 dv = allocate_empty_array(size - ind2 + ind1 + fsize);
+		 dptr = dv->item;
+
+		 /* ind1 can range from 0 to sizeof(old_dv) */
+		 while (ind1--) assign_svalue_no_free(dptr++, old_dptr++);
+
+		 if (fv->ref == 1){
+		     while (fsize--) *dptr++ = *fptr++;
+		     free_empty_array(fv);
+		 } else {
+		     while (fsize--) assign_svalue_no_free(dptr++, fptr++);
+		     fv->ref--;
+		 }
+
+		 /* ind2 can range from 0 to sizeof(old_dv) */
+		 old_dptr = old_dv->item + ind2;
+		 size -= ind2;
+
+		 while (size--) assign_svalue_no_free(dptr++, old_dptr++);
+		 free_array(old_dv);
+
+		 owner->u.arr = dv;
+	     }
+	     break;
+	 }
+
+	 case T_STRING:
+	 {
+	     if (from->type != T_STRING) error("Illegal rhs to string range lvalue.\n");
+
+	     if ((fsize = SVALUE_STRLEN(from)) == ind2 - ind1){
+		 /* since fsize >= 0, ind2 - ind1 <= strlen(orig string) */
+		 /* because both of them can only range from 0 to len */
+
+		 strncpy(owner->u.string + ind1, from->u.string, fsize);
+	     } else {
+		 char *tmp, *dstr = owner->u.string;
+
+		 owner->u.string = tmp = DXALLOC(size - ind2 + ind1 + fsize + 1, TAG_STRING, "copy_lvalue_range");
+		 if (ind1 >= 1){
+		     strncpy(tmp, dstr, ind1);
+		     tmp += ind1;
+		 }
+		 strcpy(tmp, from->u.string);
+		 tmp += fsize;
+
+		 size -= ind2;
+		 if (size >= 1){
+		     strncpy(tmp, dstr + ind2, size);
+		     *(tmp + size) = 0;
+		 }
+		 FREE(dstr);
+	     }
+	     free_string_svalue(from);
+	     break;
+	 }
+
+	 case T_BUFFER:
+	 {
+	     if (from->type != T_BUFFER) error("Illegal rhs to buffer range lvalue.\n");
+
+	     if ((fsize = from->u.buf->size) == ind2 - ind1){
+		 memcpy((owner->u.buf)->item + ind1, from->u.buf->item, fsize);
+	     } else {
+		 buffer_t *b;
+		 unsigned char *old_item = (owner->u.buf)->item;
+		 unsigned char *new_item;
+
+		 b = allocate_buffer(size - ind2 + ind1 + fsize);
+		 new_item = b->item;
+		 if (ind1 >= 1){
+		     memcpy(b->item, old_item, ind1);
+		     new_item += ind1;
+		 }
+		 memcpy(new_item, from->u.buf, fsize);
+		 new_item += fsize;
+
+		 if ((size -= ind2) >= 1)
+		     memcpy(new_item, old_item + ind2, size);
+		 free_buffer(owner->u.buf);
+		 owner->u.buf = b;
+	     }
+	     free_buffer(from->u.buf);
+	     break;
+	 }
+     }
+ }
+ INLINE void assign_lvalue_range P1(svalue_t *, from)
+ {
+     int ind1, ind2, size, fsize;
+     svalue_t *owner;
+
+     ind1 = glr.ind1;
+     ind2 = glr.ind2;
+     size = glr.size;
+     owner = glr.owner;
+
+     switch(owner->type){
+	 case T_ARRAY:
+	 {
+	     array_t *fv, *dv;
+	     svalue_t *fptr, *dptr;
+	     if (from->type != T_ARRAY) error("Illegal rhs to array range lvalue\n");
+
+	     fv = from->u.arr;
+	     fptr = fv->item;
+
+	     if ((fsize = fv->size) == ind2 - ind1){
+		 dptr = (owner->u.arr)->item + ind1;
+		 while (fsize--) assign_svalue(dptr++, fptr++);
+	     } else {
+		 array_t *old_dv = owner->u.arr;
+		 svalue_t *old_dptr = old_dv->item;
+
+		 /* Need to reallocate the array */
+		 dv = allocate_empty_array(size - ind2 + ind1 + fsize);
+		 dptr = dv->item;
+
+		 /* ind1 can range from 0 to sizeof(old_dv) */
+		 while (ind1--) assign_svalue_no_free(dptr++, old_dptr++);
+
+		 while (fsize--) assign_svalue_no_free(dptr++, fptr++);
+
+		 /* ind2 can range from 0 to sizeof(old_dv) */
+		 old_dptr = old_dv->item + ind2;
+		 size -= ind2;
+
+		 while (size--) assign_svalue_no_free(dptr++, old_dptr++);
+		 free_array(old_dv);
+
+		 owner->u.arr = dv;
+	     }
+	     break;
+	 }
+
+	 case T_STRING:
+	 {
+	     if (from->type != T_STRING) error("Illegal rhs to string range lvalue.\n");
+
+	     if ((fsize = SVALUE_STRLEN(from)) == ind2 - ind1){
+		 /* since fsize >= 0, ind2 - ind1 <= strlen(orig string) */
+		 /* because both of them can only range from 0 to len */
+
+		 strncpy(owner->u.string + ind1, from->u.string, fsize);
+	     } else {
+		 char *tmp, *dstr = owner->u.string;
+
+		 owner->u.string = tmp = DXALLOC(size - ind2 + ind1 + fsize + 1, TAG_STRING, "assign_lvalue_range");
+		 if (ind1 >= 1){
+		     strncpy(tmp, dstr, ind1);
+		     tmp += ind1;
+		 }
+		 strcpy(tmp, from->u.string);
+		 tmp += fsize;
+
+		 size -= ind2;
+		 if (size >= 1){
+		     strncpy(tmp, dstr + ind2, size);
+		     *(tmp + size) = 0;
+		 }
+		 FREE((char *) dstr);
+	     }
+	     break;
+	 }
+
+	 case T_BUFFER:
+	 {
+	     if (from->type != T_BUFFER) error("Illegal rhs to buffer range lvalue.\n");
+
+	     if ((fsize = from->u.buf->size) == ind2 - ind1){
+		 memcpy((owner->u.buf)->item + ind1, from->u.buf->item, fsize);
+	     } else {
+		 buffer_t *b;
+		 unsigned char *old_item = (owner->u.buf)->item;
+		 unsigned char *new_item;
+
+		 b = allocate_buffer(size - ind2 + ind1 + fsize);
+		 new_item = b->item;
+		 if (ind1 >= 1){
+		     memcpy(b->item, old_item, ind1);
+		     new_item += ind1;
+		 }
+		 memcpy(new_item, from->u.buf, fsize);
+		 new_item += fsize;
+
+		 if ((size -= ind2) >= 1)
+		     memcpy(new_item, old_item + ind2, size);
+		 free_buffer(owner->u.buf);
+		 owner->u.buf = b;
+	     }
+	     break;
+	 }
+     }
+ }
+
+ /*
+  * Deallocate 'n' values from the stack.
+  */
 INLINE void
 pop_n_elems P1(int, n)
 {
@@ -1015,7 +1014,7 @@ push_control_stack P2(int, frkind, void *, funp)
     csp++;
     csp->caller_type = caller_type;
     csp->ob = current_object;
-    csp->framekind = frkind;          /* Only used for tracebacks */
+    csp->framekind = frkind;	/* Only used for tracebacks */
     csp->fr.func = (function_t *)funp;
     csp->prev_ob = previous_ob;
     csp->fp = fp;
@@ -1025,12 +1024,12 @@ push_control_stack P2(int, frkind, void *, funp)
     csp->function_index_offset = function_index_offset;
     csp->variable_index_offset = variable_index_offset;
     csp->break_sp = break_sp;
-#ifdef PROFILE_FUNCTIONS
+ #ifdef PROFILE_FUNCTIONS
     if (frkind == FRAME_FUNCTION) {
 	get_cpu_times(&(csp->entry_secs), &(csp->entry_usecs));
 	((function_t *)funp)->calls++;
     }
-#endif
+ #endif
 }
 
 /*
@@ -1041,7 +1040,7 @@ void pop_control_stack()
 {
     DEBUG_CHECK(csp == (control_stack - 1),
 		"Popped out of the control stack\n");
-#ifdef PROFILE_FUNCTIONS
+ #ifdef PROFILE_FUNCTIONS
     if (csp->framekind == FRAME_FUNCTION) {
 	long secs, usecs, dsecs;
 
@@ -1057,7 +1056,7 @@ void pop_control_stack()
 	    }
 	}
     }
-#endif
+ #endif
     current_object = csp->ob;
     current_prog = csp->prog;
     previous_ob = csp->prev_ob;
@@ -1197,19 +1196,19 @@ static void do_trace_call P1(function_t *, funp)
  */
 INLINE void setup_variables P3(int, actual, int, local, int, num_arg) {
     if (actual > num_arg) {
-      /* Remove excessive arguments */
-      pop_n_elems(actual - num_arg);
-      push_nulls(local);
-      fp = sp - (csp->num_local_variables = local + num_arg) + 1;
+	/* Remove excessive arguments */
+	pop_n_elems(actual - num_arg);
+	push_nulls(local);
+	fp = sp - (csp->num_local_variables = local + num_arg) + 1;
     } else {
-      /* Correct number of arguments and local variables */
-      push_nulls(local + num_arg - actual);
-      fp = sp - (csp->num_local_variables = local + num_arg) + 1;
+	/* Correct number of arguments and local variables */
+	push_nulls(local + num_arg - actual);
+	fp = sp - (csp->num_local_variables = local + num_arg) + 1;
     }
 }
 
 INLINE function_t *
-         setup_new_frame P1(function_t *, funp)
+setup_new_frame P1(function_t *, funp)
 {
     function_index_offset = variable_index_offset = 0;
     while (funp->flags & NAME_INHERITED) {
@@ -1222,33 +1221,33 @@ INLINE function_t *
     }
     /* Remove excessive arguments */
     setup_variables(csp->num_local_variables, funp->num_local, funp->num_arg);
-#ifdef TRACE
+ #ifdef TRACE
     tracedepth++;
     if (TRACEP(TRACE_CALL)) {
 	do_trace_call(funp);
     }
-#endif
+ #endif
     return funp;
 }
 
 INLINE function_t *setup_inherited_frame P1(function_t *, funp)
 {
     while (funp->flags & NAME_INHERITED) {
-        function_index_offset +=
-            current_prog->inherit[funp->offset].function_index_offset;
-        variable_index_offset +=
-            current_prog->inherit[funp->offset].variable_index_offset;
-        current_prog = current_prog->inherit[funp->offset].prog;
-        funp = &current_prog->functions[funp->function_index_offset];
+	function_index_offset +=
+	    current_prog->inherit[funp->offset].function_index_offset;
+	variable_index_offset +=
+	    current_prog->inherit[funp->offset].variable_index_offset;
+	current_prog = current_prog->inherit[funp->offset].prog;
+	funp = &current_prog->functions[funp->function_index_offset];
     }
     /* Remove excessive arguments */
     setup_variables(csp->num_local_variables, funp->num_local, funp->num_arg);
-#ifdef TRACE
+ #ifdef TRACE
     tracedepth++;
     if (TRACEP(TRACE_CALL)) {
-        do_trace_call(funp);
+	do_trace_call(funp);
     }
-#endif
+ #endif
     return funp;
 }
 
@@ -1263,46 +1262,46 @@ program_t fake_prog = { "<function>" };
 unsigned char fake_program = F_RETURN;
 
 void setup_fake_frame P1(funptr_t *, fun) {
-  if (csp == &control_stack[MAX_TRACE-1]) {
-    too_deep_error = 1;
-    error("Too deep recursion.\n");
-  }
-  if (fun->hdr.owner->flags & O_DESTRUCTED)
-      error("Owner of function pointer has been destructed.\n");
-  csp++;
-  csp->caller_type = caller_type;
-  csp->framekind = FRAME_FAKE;
-  csp->fr.funp = fun;
-  csp->ob = current_object;
-  csp->extern_call = 1;
-  csp->prev_ob = previous_ob;
-  csp->fp = fp;
-  csp->prog = current_prog;
-  csp->pc = pc;
-  pc = (char *)&fake_program;
-  csp->function_index_offset = function_index_offset;
-  csp->variable_index_offset = variable_index_offset;
-  csp->break_sp = break_sp;
-  caller_type = ORIGIN_FUNCTION_POINTER;
-  csp->num_local_variables = 0;
-  current_prog = &fake_prog;
-  previous_ob = current_object;
-  current_object = fun->hdr.owner;
+    if (csp == &control_stack[MAX_TRACE-1]) {
+	too_deep_error = 1;
+	error("Too deep recursion.\n");
+    }
+    if (fun->hdr.owner->flags & O_DESTRUCTED)
+	error("Owner of function pointer has been destructed.\n");
+    csp++;
+    csp->caller_type = caller_type;
+    csp->framekind = FRAME_FAKE;
+    csp->fr.funp = fun;
+    csp->ob = current_object;
+    csp->extern_call = 1;
+    csp->prev_ob = previous_ob;
+    csp->fp = fp;
+    csp->prog = current_prog;
+    csp->pc = pc;
+    pc = (char *)&fake_program;
+    csp->function_index_offset = function_index_offset;
+    csp->variable_index_offset = variable_index_offset;
+    csp->break_sp = break_sp;
+    caller_type = ORIGIN_FUNCTION_POINTER;
+    csp->num_local_variables = 0;
+    current_prog = &fake_prog;
+    previous_ob = current_object;
+    current_object = fun->hdr.owner;
 }
 
 void remove_fake_frame() {
     DEBUG_CHECK(csp == (control_stack - 1),
 		"Popped out of the control stack\n");
-  current_object = csp->ob;
-  current_prog = csp->prog;
-  previous_ob = csp->prev_ob;
-  caller_type = csp->caller_type;
-  pc = csp->pc;
-  fp = csp->fp;
-  function_index_offset = csp->function_index_offset;
-  variable_index_offset = csp->variable_index_offset;
-  break_sp = csp->break_sp;
-  csp--;
+    current_object = csp->ob;
+    current_prog = csp->prog;
+    previous_ob = csp->prev_ob;
+    caller_type = csp->caller_type;
+    pc = csp->pc;
+    fp = csp->fp;
+    function_index_offset = csp->function_index_offset;
+    variable_index_offset = csp->variable_index_offset;
+    break_sp = csp->break_sp;
+    csp--;
 }
 
 /* num_arg args are on the stack, and the args from the array vec should be
@@ -1312,25 +1311,25 @@ void remove_fake_frame() {
  * if we simply pushed the args from vec at this point.  (Note that the
  * old function pointers are broken in this regard)
  */
-int merge_arg_lists P3(int, num_arg, array_t *, vec, int, start) {
-    int num_vec_arg = vec->size - start;
+int merge_arg_lists P3(int, num_arg, array_t *, arr, int, start) {
+    int num_arr_arg = arr->size - start;
     svalue_t *sptr;
     int i;
 
-    if (num_arg && num_vec_arg) {
+    if (num_arg && num_arr_arg) {
 	/* We need to do some stack movement so that the order
 	   of arguments is logical */
 	for (i=0; i<num_arg; i++)
-	    *(sp-i+num_vec_arg) = *(sp-i);
+	    *(sp-i+num_arr_arg) = *(sp-i);
 	sptr = sp - num_arg + 1;
-	for (i=start; i < vec->size; i++)
-	    assign_svalue_no_free(sptr++, &vec->item[i]);
-	sp += num_vec_arg;
+	for (i=start; i < arr->size; i++)
+	    assign_svalue_no_free(sptr++, &arr->item[i]);
+	sp += num_arr_arg;
     } else {
-	for (i = start; i < vec->size; i++)
-	    push_svalue(&vec->item[i]);
+	for (i = start; i < arr->size; i++)
+	    push_svalue(&arr->item[i]);
     }
-    return num_arg + num_vec_arg;
+    return num_arg + num_arr_arg;
 }
 
 void cfp_error P1(char *, s) {
@@ -1347,7 +1346,7 @@ call_function_pointer P2(funptr_t *, funp, int, num_arg)
     int i, def;
 
     setup_fake_frame(funp);
-    
+
     switch (funp->hdr.type) {
     case FP_SIMUL:
 	if (funp->hdr.args) {
@@ -1363,9 +1362,9 @@ call_function_pointer P2(funptr_t *, funp, int, num_arg)
 	    num_arg = merge_arg_lists(num_arg, funp->hdr.args, 0);
 	}
 	i = funp->f.efun.opcodes[0];
-#ifdef NEEDS_CALL_EXTRA
+ #ifdef NEEDS_CALL_EXTRA
 	if (i == F_CALL_EXTRA) i = 0xff + funp->f.efun.opcodes[1];
-#endif
+ #endif
 	if (num_arg == instrs[i].min_arg - 1 && (def = instrs[i].Default)) {
 	    switch (def) {
 	    case F_CONST0:
@@ -1391,40 +1390,42 @@ call_function_pointer P2(funptr_t *, funp, int, num_arg)
 	    }
 	    num_arg++;
 	} else
-	if (num_arg < instrs[i].min_arg) {
-	    error("Too few arguments to efun %s in efun pointer.\n", instrs[i].name);
-	} else
-	if (num_arg > instrs[i].max_arg && instrs[i].max_arg != -1) {
-		error("Too many arguments to efun %s in efun pointer.\n", instrs[i].name);
-	    }
+	    if (num_arg < instrs[i].min_arg) {
+		error("Too few arguments to efun %s in efun pointer.\n", instrs[i].name);
+	    } else
+		if (num_arg > instrs[i].max_arg && instrs[i].max_arg != -1) {
+		    error("Too many arguments to efun %s in efun pointer.\n", instrs[i].name);
+		}
 	if (instrs[i].min_arg != instrs[i].max_arg) {
 	    /* need to update the argument count */
 	    funp->f.efun.opcodes[(i > 255 ? 2 : 1)] = num_arg;
 	}
 	eval_instruction((char*)&funp->f.efun.opcodes[0]);
+	if (instrs[i].ret_type == TYPE_NOVALUE) 
+	    return &const0;
 	free_svalue(&apply_ret_value, "call_function_pointer");
 	apply_ret_value = *sp--;
 	return &apply_ret_value;
     case FP_LOCAL | FP_NOT_BINDABLE: {
 	fp = sp - num_arg + 1;
-	
+
 	func = &funp->hdr.owner->prog->functions[funp->f.local.index];
-	
+
 	if (func->flags & NAME_UNDEFINED)
 	    error("Undefined function: %s\n", func->name);
-	
-        push_control_stack(FRAME_FUNCTION, func);
-	
+
+	push_control_stack(FRAME_FUNCTION, func);
+
 	caller_type = ORIGIN_LOCAL;
 	current_prog = funp->hdr.owner->prog;
-	
+
 	if (funp->hdr.args) {
 	    array_t *v = funp->hdr.args;
-	    
+
 	    check_for_destr(v);
 	    num_arg = merge_arg_lists(num_arg, v, 0);
 	}
-	
+
 	csp->num_local_variables = num_arg;
 	func = setup_new_frame(func);
 
@@ -1436,13 +1437,13 @@ call_function_pointer P2(funptr_t *, funp, int, num_arg)
     case FP_FUNCTIONAL | FP_NOT_BINDABLE: {
 	fp = sp - num_arg + 1;
 
-        push_control_stack(FRAME_FUNP, funp);
+	push_control_stack(FRAME_FUNP, funp);
 	caller_type = ORIGIN_FUNCTIONAL;
 	current_prog = funp->f.functional.prog;
-	
+
 	if (funp->hdr.args) {
 	    array_t *v = funp->hdr.args;
-	    
+
 	    check_for_destr(v);
 	    num_arg = merge_arg_lists(num_arg, v, 0);
 	}
@@ -1495,9 +1496,9 @@ void push_pop_error_context P1(int, push)
 	p->save_csp = csp;
 	p->save_command_giver = command_giver;
 	memcpy(
-		  (char *) p->old_error_context,
-		  (char *) error_recovery_context,
-		  sizeof error_recovery_context);
+	       (char *) p->old_error_context,
+	       (char *) error_recovery_context,
+	       sizeof error_recovery_context);
 	p->old_exists_flag = error_recovery_context_exists;
 	p->next = ecsp;
 	ecsp = p;
@@ -1545,7 +1546,7 @@ void push_pop_error_context P1(int, push)
 void check_for_destr P1(array_t *, v)
 {
     int i = v->size;
-
+    
     while (i--) {
 	if ((v->item[i].type & T_OBJECT) && (v->item[i].u.ob->flags & O_DESTRUCTED)) {
 	    free_svalue(&v->item[i], "check_for_destr");
@@ -1554,61 +1555,61 @@ void check_for_destr P1(array_t *, v)
     }
 }
 
- /* do_loop_cond() coded by John Garnett, 1993/06/01
-
-    Optimizes these four cases (with 'int i'):
-
-    1) for (expr0; i < integer_variable; expr2) statement;
-    2) for (expr0; i < integer_constant; expr2) statement;
-    3) while (i < integer_variable) statement;
-    4) while (i < integer_constant) statement;
- */
+/* do_loop_cond() coded by John Garnett, 1993/06/01
+   
+   Optimizes these four cases (with 'int i'):
+   
+   1) for (expr0; i < integer_variable; expr2) statement;
+   2) for (expr0; i < integer_constant; expr2) statement;
+   3) while (i < integer_variable) statement;
+   4) while (i < integer_constant) statement;
+   */
 
 static INLINE void do_loop_cond()
 {
     svalue_t *s1, *s2;
     int i;
     
-    s1 = fp + EXTRACT_UCHAR(pc++);    /* a from (a < b) */
+    s1 = fp + EXTRACT_UCHAR(pc++); /* a from (a < b) */
     if (*pc++ == F_LOCAL){
 	s2 = fp + EXTRACT_UCHAR(pc++);
 	switch(s1->type | s2->type){
-	    case T_NUMBER: 
-	        i = s1->u.number < s2->u.number;
-	        break;
+	case T_NUMBER: 
+	    i = s1->u.number < s2->u.number;
+	    break;
+	case T_REAL:
+	    i = s1->u.real < s2->u.real;
+	    break;
+	case T_STRING:
+	    i = (strcmp(s1->u.string, s2->u.string) < 0);
+	    break;
+	case T_NUMBER|T_REAL:
+	    if (s1->type == T_NUMBER) i = s1->u.number < s2->u.real;
+	    else i = s1->u.real < s2->u.number;
+	    break;
+	default:
+	    if (s1->type == T_OBJECT && (s1->u.ob->flags & O_DESTRUCTED)){
+		free_object(s1->u.ob, "do_loop_cond:1");
+		*s1 = const0;
+	    }
+	    if (s2->type == T_OBJECT && (s2->u.ob->flags & O_DESTRUCTED)){
+		free_object(s2->u.ob, "do_loop_cond:2");
+		*s2 = const0;
+	    }
+	    if (s1->type == T_NUMBER && s2->type == T_NUMBER){
+		i = 0;
+		break;
+	    }
+	    switch(s1->type){
+	    case T_NUMBER:
 	    case T_REAL:
-		i = s1->u.real < s2->u.real;
-		break;
+		error("2nd argument to < is not numeric when the 1st is.\n");
 	    case T_STRING:
-		i = (strcmp(s1->u.string, s2->u.string) < 0);
-		break;
-	    case T_NUMBER|T_REAL:
-		if (s1->type == T_NUMBER) i = s1->u.number < s2->u.real;
-		else i = s1->u.real < s2->u.number;
-		break;
+		error("2nd argument to < is not string when the 1st is.\n");
 	    default:
-		if (s1->type == T_OBJECT && (s1->u.ob->flags & O_DESTRUCTED)){
-		    free_object(s1->u.ob, "do_loop_cond:1");
-		    *s1 = const0;
-		}
-		if (s2->type == T_OBJECT && (s2->u.ob->flags & O_DESTRUCTED)){
-		    free_object(s2->u.ob, "do_loop_cond:2");
-		    *s2 = const0;
-		}
-		if (s1->type == T_NUMBER && s2->type == T_NUMBER){
-		    i = 0;
-		    break;
-		}
-		switch(s1->type){
-		    case T_NUMBER:
-		    case T_REAL:
-		        error("2nd argument to < is not numeric when the 1st is.\n");
-		    case T_STRING:
-   		        error("2nd argument to < is not string when the 1st is.\n");
-		    default:
-			error("Bad 1st argument to <.\n");
-	        }
-        }
+		error("Bad 1st argument to <.\n");
+	    }
+	}
 	if (i) {
 	    unsigned short offset;
 
@@ -1621,14 +1622,14 @@ static INLINE void do_loop_cond()
 	if (s1->type == T_NUMBER) {
 	    if (s1->u.number < i){
 		unsigned short offset;
-		
+
 		COPY_SHORT(&offset, pc);
 		pc -= offset;
 	    } else pc += 2;
 	} else if (s1->type == T_REAL) {
 	    if (s1->u.real < i){
 		unsigned short offset;
-		
+
 		COPY_SHORT(&offset, pc);
 		pc -= offset;
 	    } else pc += 2;
@@ -1644,238 +1645,317 @@ call_program P2(program_t *, prog, int, offset) {
     else {
 	DEBUG_CHECK(!offset, "Null function pointer in jump_table.\n");
 	(*
-	 ( void (*)() ) offset     /* cast to a function pointer */
+	 ( void (*)() ) offset	/* cast to a function pointer */
 	 )();
     }
 }
 #endif
 
- /*
-  * Evaluate instructions at address 'p'. All program offsets are
-  * to current_prog->program. 'current_prog' must be setup before
-  * call of this function.
-  *
-  * There must not be destructed objects on the stack. The destruct_object()
-  * function will automatically remove all occurences. The effect is that
-  * all called efuns knows that they won't have destructed objects as
-  * arguments.
-  */
+/*
+ * Evaluate instructions at address 'p'. All program offsets are
+ * to current_prog->program. 'current_prog' must be setup before
+ * call of this function.
+ *
+ * There must not be destructed objects on the stack. The destruct_object()
+ * function will automatically remove all occurences. The effect is that
+ * all called efuns knows that they won't have destructed objects as
+ * arguments.
+ */
 #ifdef TRACE_CODE
- static int previous_instruction[60];
- static int stack_size[60];
- static char *previous_pc[60];
- static int last;
+static int previous_instruction[60];
+static int stack_size[60];
+static char *previous_pc[60];
+static int last;
 #endif
 
- void
- eval_instruction P1(char *, p)
- {
+void
+eval_instruction P1(char *, p)
+{
 #ifdef DEBUG
-     int num_arg;
+    int num_arg;
 #endif
-     int i;
-     float real;
-     svalue_t *lval;
-     int instruction;
-     unsigned short offset;
-     static func_t *oefun_table = efun_table - BASE;
-     IF_DEBUG(svalue_t *expected_stack);
+    int i, n;
+    float real;
+    svalue_t *lval;
+    int instruction;
+    unsigned short offset;
+    static func_t *oefun_table = efun_table - BASE;
+    IF_DEBUG(svalue_t *expected_stack);
 
-     /* Next F_RETURN at this level will return out of eval_instruction() */
-     csp->extern_call = 1;
-     pc = p;
-     while (1) {
-	 instruction = EXTRACT_UCHAR(pc++);
-	 /* These defines can't handle the F_CALL_EXTRA optimization */
+    /* Next F_RETURN at this level will return out of eval_instruction() */
+    csp->extern_call = 1;
+    pc = p;
+    while (1) {
+	instruction = EXTRACT_UCHAR(pc++);
+	/* These defines can't handle the F_CALL_EXTRA optimization */
 #if defined(TRACE_CODE) || defined(TRACE) || defined(OPCPROF) || defined(OPCPROF_2D)
 #  ifdef NEEDS_CALL_EXTRA
-	 if (instruction == F_CALL_EXTRA)
-	     instruction = EXTRACT_UCHAR(pc++) + 0xff;
+	if (instruction == F_CALL_EXTRA)
+	    instruction = EXTRACT_UCHAR(pc++) + 0xff;
 #  endif
 #  ifdef TRACE_CODE
-	 previous_instruction[last] = instruction;
-	 previous_pc[last] = pc - 1;
-	 stack_size[last] = sp - fp - csp->num_local_variables;
-	 last = (last + 1) % (sizeof previous_instruction / sizeof(int));
+	previous_instruction[last] = instruction;
+	previous_pc[last] = pc - 1;
+	stack_size[last] = sp - fp - csp->num_local_variables;
+	last = (last + 1) % (sizeof previous_instruction / sizeof(int));
 #  endif
 #  ifdef TRACE
-	 if (TRACEP(TRACE_EXEC)) {
-	     do_trace("Exec ", get_f_name(instruction), "\n");
-	 }
+	if (TRACEP(TRACE_EXEC)) {
+	    do_trace("Exec ", get_f_name(instruction), "\n");
+	}
 #  endif
 #  ifdef OPCPROF
-	 if (instruction < BASE)
-	     opc_eoper[instruction]++;
-	 else
-	     opc_efun[instruction-BASE].count++;
+	if (instruction < BASE)
+	    opc_eoper[instruction]++;
+	else
+	    opc_efun[instruction-BASE].count++;
 #  endif
 #  ifdef OPCPROF_2D
-	 if (instruction < BASE) {
-	     if (last_eop) opc_eoper_2d[last_eop][instruction]++;
-	     last_eop = instruction;
-	 } else {
-	     if (last_eop) opc_eoper_2d[last_eop][BASE + 1]++;
-	     last_eop = BASE + 1;
-	 }
+	if (instruction < BASE) {
+	    if (last_eop) opc_eoper_2d[last_eop][instruction]++;
+	    last_eop = instruction;
+	} else {
+	    if (last_eop) opc_eoper_2d[last_eop][BASE]++;
+	    last_eop = BASE;
+	}
 #  endif
 #endif
-	 if (!--eval_cost) {
-	     fprintf(stderr, "eval_cost too big %d\n", max_cost);
-	     eval_cost = max_cost;
-	     max_eval_error = 1;
-	     error("Too long evaluation. Execution aborted.\n");
-	 }
-	 /*
-	  * Execute current instruction. Note that all functions callable from
-	  * LPC must return a value. This does not apply to control
-	  * instructions, like F_JUMP.
-	  */
-	 switch (instruction) {
-	 case F_INC:
-	     DEBUG_CHECK(sp->type != T_LVALUE,
-			 "non-lvalue argument to ++\n");
-	     lval = (sp--)->u.lvalue;
-	     switch (lval->type) {
-	     case T_NUMBER:
-		 lval->u.number++;
-		 break;
-	     case T_REAL:
-		 lval->u.real++;
-		 break;
-	     case T_LVALUE_BYTE:
-		 ++*glb.u.lvalue_byte;
-		 break;
-	     default:
-		 error("++ of non-numeric argument\n");
-	     }
-	     break;
-	 case F_WHILE_DEC:
-	     {
-		 svalue_t *s;
+	if (!--eval_cost) {
+	    fprintf(stderr, "eval_cost too big %d\n", max_cost);
+	    eval_cost = max_cost;
+	    max_eval_error = 1;
+	    error("Too long evaluation. Execution aborted.\n");
+	}
+	/*
+	 * Execute current instruction. Note that all functions callable from
+	 * LPC must return a value. This does not apply to control
+	 * instructions, like F_JUMP.
+	 */
+	switch (instruction) {
+	case F_PUSH:		/* Push a number of things onto the stack */
+	    n = EXTRACT_UCHAR(pc++);
+	    while (n--) {
+		i = EXTRACT_UCHAR(pc++);
+		switch (i & PUSH_WHAT) {
+		case PUSH_STRING:
+		    DEBUG_CHECK1((i & PUSH_MASK) >= current_prog->num_strings,
+				 "string %d out of range in F_STRING!\n",
+				 i & PUSH_MASK);
+		    (++sp)->type = T_STRING;
+		    sp->subtype = STRING_SHARED;
+		    sp->u.string = ref_string(current_prog->strings[i & PUSH_MASK]);
+		    break;
+		case PUSH_LOCAL:
+		    lval = fp + (i & PUSH_MASK);
+		    DEBUG_CHECK((fp - lval) >= csp->num_local_variables,
+				"Tried to push non-existent local\n");
+		    if ((lval->type == T_OBJECT) && (lval->u.ob->flags & O_DESTRUCTED)) {
+			*++sp = const0;
+			assign_svalue(lval, &const0);
+		    } else {
+			push_svalue(lval);
+		    }
+		    break;
+		case PUSH_GLOBAL:
+		    lval = find_value((int)((i & PUSH_MASK) + variable_index_offset));
+		    if ((lval->type == T_OBJECT) && (lval->u.ob->flags & O_DESTRUCTED)) {
+			*++sp = const0;
+			assign_svalue(lval, &const0);
+		    } else {
+			push_svalue(lval);
+		    }
+		    break;
+		case PUSH_NUMBER:
+		    push_number(i & PUSH_MASK);
+		    break;
+		}
+	    }
+	    break;
+	case F_INC:
+	    DEBUG_CHECK(sp->type != T_LVALUE,
+			"non-lvalue argument to ++\n");
+	    lval = (sp--)->u.lvalue;
+	    switch (lval->type) {
+	    case T_NUMBER:
+		lval->u.number++;
+		break;
+	    case T_REAL:
+		lval->u.real++;
+		break;
+	    case T_LVALUE_BYTE:
+		++*glb.u.lvalue_byte;
+		break;
+	    default:
+		error("++ of non-numeric argument\n");
+	    }
+	    break;
+	case F_WHILE_DEC:
+	    {
+		svalue_t *s;
 
-		 s = fp + EXTRACT_UCHAR(pc);
-		 pc += 2;	/* skip the BBRANCH */
-		 if (s->type & T_NUMBER) {
-		     i = s->u.number--;
-		 } else if (s->type & T_REAL) {
-		     i = s->u.real--;
-		 } else {
-		     error("-- of non-numeric argument\n");
-		 }
-		 if (i) {
-		     COPY_SHORT(&offset, pc);
-		     pc -= offset;
-		 } else {
-		     pc += 2;
-		 }
-	     }
-	     break;
-	 case F_LOCAL_LVALUE:
-	     (++sp)->type = T_LVALUE;
-	     sp->u.lvalue = fp + EXTRACT_UCHAR(pc++);
-	     break;
-	 case F_NUMBER:
-	     LOAD_INT(i, pc);
-	     push_number(i);
-	     break;
-	 case F_REAL:
-	     LOAD_FLOAT(real, pc);
-	     push_real(real);
-	     break;
-	 case F_BYTE:
-	     push_number(EXTRACT_UCHAR(pc++));
-	     break;
-	 case F_NBYTE:
-	     push_number(-((int)EXTRACT_UCHAR(pc++)));
-	     break;
+		s = fp + EXTRACT_UCHAR(pc);
+		pc += 2;	/* skip the BBRANCH */
+		if (s->type & T_NUMBER) {
+		    i = s->u.number--;
+		} else if (s->type & T_REAL) {
+		    i = s->u.real--;
+		} else {
+		    error("-- of non-numeric argument\n");
+		}
+		if (i) {
+		    COPY_SHORT(&offset, pc);
+		    pc -= offset;
+		} else {
+		    pc += 2;
+		}
+	    }
+	    break;
+	case F_LOCAL_LVALUE:
+	    (++sp)->type = T_LVALUE;
+	    sp->u.lvalue = fp + EXTRACT_UCHAR(pc++);
+	    break;
+	case F_NUMBER:
+	    LOAD_INT(i, pc);
+	    push_number(i);
+	    break;
+	case F_REAL:
+	    LOAD_FLOAT(real, pc);
+	    push_real(real);
+	    break;
+	case F_BYTE:
+	    push_number(EXTRACT_UCHAR(pc++));
+	    break;
+	case F_NBYTE:
+	    push_number(-((int)EXTRACT_UCHAR(pc++)));
+	    break;
 #ifdef F_JUMP_WHEN_NON_ZERO
-	 case F_JUMP_WHEN_NON_ZERO:
-	     if ((i = (sp->type == T_NUMBER)) && (sp->u.number == 0))
-		 pc += 2;
-	     else {
-		 COPY_SHORT(&offset, pc);
-		 pc = current_prog->program + offset;
-	     }
-	     if (i) {
-		 sp--;	/* when sp is an integer svalue, its cheaper
-			  * to do this */
-	     } else {
-		 pop_stack();
-	     }
-	     break;
+	case F_JUMP_WHEN_NON_ZERO:
+	    if ((i = (sp->type == T_NUMBER)) && (sp->u.number == 0))
+		pc += 2;
+	    else {
+		COPY_SHORT(&offset, pc);
+		pc = current_prog->program + offset;
+	    }
+	    if (i) {
+		sp--;		/* when sp is an integer svalue, its cheaper
+				 * to do this */
+	    } else {
+		pop_stack();
+	    }
+	    break;
 #endif
-	 case F_BRANCH:	/* relative offset */
-	     COPY_SHORT(&offset, pc);
-	     pc += offset;
-	     break;
-	 case F_BBRANCH:	/* relative offset */
-	     COPY_SHORT(&offset, pc);
-	     pc -= offset;
-	     break;
-	 case F_BRANCH_WHEN_ZERO:	/* relative offset */
-	     if (sp->type & T_NUMBER) {
-		 if (!((sp--)->u.number)) {
-		     COPY_SHORT(&offset, pc);
-		     pc += offset;
-		     break;
-		 }
-	     } else pop_stack();
-	     pc += 2;	/* skip over the offset */
-	     break;
-	 case F_BRANCH_WHEN_NON_ZERO:	/* relative offset */
-	     if (sp->type & T_NUMBER) {
-		 if (!((sp--)->u.number)) {
-		     pc += 2;
-		     break;
-		 }
-	     } else pop_stack();
-	     COPY_SHORT(&offset, pc);
-	     pc += offset;
-	     break;
-	 case F_BBRANCH_WHEN_ZERO:	/* relative backwards offset */
-	     if (sp->type & T_NUMBER) {
-		 if (!((sp--)->u.number)) {
-		     COPY_SHORT(&offset, pc);
-		     pc -= offset;
-		     break;
-		 }
-	     } else pop_stack();
-	     pc += 2;
-	     break;
-	 case F_BBRANCH_WHEN_NON_ZERO:	/* relative backwards offset */
-	     if (sp->type & T_NUMBER) {
-		 if (!((sp--)->u.number)) {
-		     pc += 2;
-		     break;
-		 }
-	     } else pop_stack();
-	     COPY_SHORT(&offset, pc);
-	     pc -= offset;
-	     break;
-	 case F_LOR:
-	     /* replaces F_DUP; F_BRANCH_WHEN_NON_ZERO; F_POP */
-	     if (sp->type & T_NUMBER) {
-		 if (!sp->u.number) {
-		     pc += 2;
-		     sp--;
-		     break;
-		 }
-	     }
-	     COPY_SHORT(&offset, pc);
-	     pc += offset;
-	     break;
+	case F_BRANCH:		/* relative offset */
+	    COPY_SHORT(&offset, pc);
+	    pc += offset;
+	    break;
+	case F_BBRANCH:		/* relative offset */
+	    COPY_SHORT(&offset, pc);
+	    pc -= offset;
+	    break;
+	case F_BRANCH_NE:
+	    f_ne();
+	    if ((sp--)->u.number) {
+		COPY_SHORT(&offset, pc);
+		pc += offset;
+	    } else
+		pc += 2;
+	    break;
+	case F_BRANCH_GE:
+	    f_ge();
+	    if ((sp--)->u.number) {
+		COPY_SHORT(&offset, pc);
+		pc += offset;
+	    } else
+		pc += 2;
+	    break;
+	case F_BRANCH_LE:
+	    f_le();
+	    if ((sp--)->u.number) {
+		COPY_SHORT(&offset, pc);
+		pc += offset;
+	    } else
+		pc += 2;
+	    break;
+	case F_BRANCH_EQ:
+	    f_eq();
+	    if ((sp--)->u.number) {
+		COPY_SHORT(&offset, pc);
+		pc += offset;
+	    } else
+		pc += 2;
+	    break;
+	case F_BBRANCH_LT:
+	    f_lt();
+	    if ((sp--)->u.number) {
+		COPY_SHORT(&offset, pc);
+		pc -= offset;
+	    } else
+		pc += 2;
+	    break;
+	case F_BRANCH_WHEN_ZERO: /* relative offset */
+	    if (sp->type & T_NUMBER) {
+		if (!((sp--)->u.number)) {
+		    COPY_SHORT(&offset, pc);
+		    pc += offset;
+		    break;
+		}
+	    } else pop_stack();
+	    pc += 2;		/* skip over the offset */
+	    break;
+	case F_BRANCH_WHEN_NON_ZERO: /* relative offset */
+	    if (sp->type & T_NUMBER) {
+		if (!((sp--)->u.number)) {
+		    pc += 2;
+		    break;
+		}
+	    } else pop_stack();
+	    COPY_SHORT(&offset, pc);
+	    pc += offset;
+	    break;
+	case F_BBRANCH_WHEN_ZERO: /* relative backwards offset */
+	    if (sp->type & T_NUMBER) {
+		if (!((sp--)->u.number)) {
+		    COPY_SHORT(&offset, pc);
+		    pc -= offset;
+		    break;
+		}
+	    } else pop_stack();
+	    pc += 2;
+	    break;
+	case F_BBRANCH_WHEN_NON_ZERO: /* relative backwards offset */
+	    if (sp->type & T_NUMBER) {
+		if (!((sp--)->u.number)) {
+		    pc += 2;
+		    break;
+		}
+	    } else pop_stack();
+	    COPY_SHORT(&offset, pc);
+	    pc -= offset;
+	    break;
+	case F_LOR:
+	    /* replaces F_DUP; F_BRANCH_WHEN_NON_ZERO; F_POP */
+	    if (sp->type & T_NUMBER) {
+		if (!sp->u.number) {
+		    pc += 2;
+		    sp--;
+		    break;
+		}
+	    }
+	    COPY_SHORT(&offset, pc);
+	    pc += offset;
+	    break;
 	case F_LAND:
-	     /* replaces F_DUP; F_BRANCH_WHEN_ZERO; F_POP */
-	     if (sp->type & T_NUMBER) {
-		 if (!sp->u.number) {
-		     COPY_SHORT(&offset, pc);
-		     pc += offset;
-		     break;
-		 }
-		 sp--;
-	     } else pop_stack();
-	     pc += 2;
-	     break;
+	    /* replaces F_DUP; F_BRANCH_WHEN_ZERO; F_POP */
+	    if (sp->type & T_NUMBER) {
+		if (!sp->u.number) {
+		    COPY_SHORT(&offset, pc);
+		    pc += offset;
+		    break;
+		}
+		sp--;
+	    } else pop_stack();
+	    pc += 2;
+	    break;
 	case F_LOOP_INCR:	/* this case must be just prior to
 				 * F_LOOP_COND */
 	    {
@@ -1894,9 +1974,9 @@ call_program P2(program_t *, prog, int, offset) {
 		pc++;
 	    else
 		break;
-	 case F_LOOP_COND:
-	     do_loop_cond();
-	     break;
+	case F_LOOP_COND:
+	    do_loop_cond();
+	    break;
 	case F_LOCAL:
 	    {
 		svalue_t *s;
@@ -1917,290 +1997,256 @@ call_program P2(program_t *, prog, int, offset) {
 		}
 		break;
 	    }
-	 case F_LT:
-	     {
-		 i = sp->type;
-		 switch (i | (--sp)->type) {
-		 case T_NUMBER:
-		     sp->u.number = sp->u.number < (sp+1)->u.number;
-		     break;
-		 case T_REAL:
-		     sp->u.number = sp->u.real < (sp+1)->u.real;
-		     sp->type = T_NUMBER;
-		     break;
-		 case T_NUMBER|T_REAL:
-		     if (i & T_NUMBER) {
-			 sp->type = T_NUMBER;
-			 sp->u.number = sp->u.real < (sp+1)->u.number;
-		     } else sp->u.number = sp->u.number < (sp+1)->u.real;
-		     break;
-		 case T_STRING:
-		     i = (strcmp(sp->u.string, (sp + 1)->u.string) < 0);
-		     free_string_svalue(sp+1);
-		     free_string_svalue(sp);
-		     sp->type = T_NUMBER;
-		     sp->u.number = i;
-		     break;
-		 default:
-		     switch ((sp++)->type) {
-		     case T_NUMBER:
-		     case T_REAL:
-			 bad_argument(sp, T_NUMBER | T_REAL, 2, instruction);
-		     case T_STRING:
-			 bad_argument(sp, T_STRING, 2, instruction);
-		     default:
-			 bad_argument(sp-1, T_NUMBER | T_STRING | T_REAL, 1, instruction);
-		     }
-		 }
-	     }
-	     break;
-	 case F_ADD:
-	     {
-		 switch (sp->type) {
-		 case T_BUFFER:
-		     {
-			 if (!((sp-1)->type & T_BUFFER)) {
-			     error("Bad type argument to +. Had %s and %s.\n",
-				   type_name((sp - 1)->type), type_name(sp->type));
-			 } else {
-			     buffer_t *b;
+	case F_LT:
+	    f_lt();
+	    break;
+	case F_ADD:
+	    {
+		switch (sp->type) {
+		case T_BUFFER:
+		    {
+			if (!((sp-1)->type & T_BUFFER)) {
+			    error("Bad type argument to +. Had %s and %s.\n",
+				  type_name((sp - 1)->type), type_name(sp->type));
+			} else {
+			    buffer_t *b;
 			     
-			     b = allocate_buffer(sp->u.buf->size + (sp - 1)->u.buf->size);
-			     memcpy(b->item, (sp - 1)->u.buf->item, (sp - 1)->u.buf->size);
-			     memcpy(b->item + (sp - 1)->u.buf->size, sp->u.buf->item,
-				    sp->u.buf->size);
-			     free_buffer((sp--)->u.buf);
-			     free_buffer(sp->u.buf);
-			     sp->u.buf = b;
-			 }
-			 break;
-		     } /* end of x + T_BUFFER */
-		 case T_NUMBER:
-		     {
-			 switch ((--sp)->type) {
-			 case T_NUMBER:
-			     sp->u.number += (sp+1)->u.number;
-			     break;
-			 case T_REAL:
-			     sp->u.real += (sp+1)->u.number;
-			     break;
-			 case T_STRING:
-			     {
-				 char buff[20];
+			    b = allocate_buffer(sp->u.buf->size + (sp - 1)->u.buf->size);
+			    memcpy(b->item, (sp - 1)->u.buf->item, (sp - 1)->u.buf->size);
+			    memcpy(b->item + (sp - 1)->u.buf->size, sp->u.buf->item,
+				   sp->u.buf->size);
+			    free_buffer((sp--)->u.buf);
+			    free_buffer(sp->u.buf);
+			    sp->u.buf = b;
+			}
+			break;
+		    } /* end of x + T_BUFFER */
+		case T_NUMBER:
+		    {
+			switch ((--sp)->type) {
+			case T_NUMBER:
+			    sp->u.number += (sp+1)->u.number;
+			    break;
+			case T_REAL:
+			    sp->u.real += (sp+1)->u.number;
+			    break;
+			case T_STRING:
+			    {
+				char buff[20];
 
-				 sprintf(buff, "%d", (sp+1)->u.number);
-				 EXTEND_SVALUE_STRING(sp, buff, "f_add: 2");
-				 break;
-			     }
-			 default:
-			     error("Bad type argument to +.  Had %s and %s.\n",
-				   type_name(sp->type), type_name((sp+1)->type));
-			 }
-			 break;
-		     } /* end of x + NUMBER */
-		 case T_REAL:
-		     {
-			 switch ((--sp)->type) {
-			 case T_NUMBER:
-			     sp->type = T_REAL;
-			     sp->u.real = sp->u.number + (sp+1)->u.real;
-			     break;
-			 case T_REAL:
-			     sp->u.real += (sp+1)->u.real;
-			     break;
-			 case T_STRING:
-			     {
-				 char buff[40];
-
-				 sprintf(buff, "%f", (sp+1)->u.real);
-				 EXTEND_SVALUE_STRING(sp, buff, "f_add: 2");
-				 break;
-			     }
-			 default:
-			     error("Bad type argument to +. Had %s and %s\n",
+				sprintf(buff, "%d", (sp+1)->u.number);
+				EXTEND_SVALUE_STRING(sp, buff, "f_add: 2");
+				break;
+			    }
+			default:
+			    error("Bad type argument to +.  Had %s and %s.\n",
 				  type_name(sp->type), type_name((sp+1)->type));
-			 }
-			 break;
-		     } /* end of x + T_REAL */
-		 case T_ARRAY:
-		     {
-			 if (!((sp-1)->type & T_ARRAY)) {
-			     error("Bad type argument to +. Had %s and %s\n",
-			      type_name((sp - 1)->type), type_name(sp->type));
-			 } else {
-			     /* add_array now free's the arrays */
-			     (sp-1)->u.arr = add_array((sp - 1)->u.arr, sp->u.arr);
-			     sp--;
-			     break;
-			 }
-		     } /* end of x + T_ARRAY */
-		 case T_MAPPING:
-		     {
-			 if ((sp-1)->type & T_MAPPING) {
-			     mapping_t *map;
-			
-			     map = add_mapping((sp - 1)->u.map, sp->u.map);
-			     free_mapping((sp--)->u.map);
-			     free_mapping(sp->u.map);
-			     sp->u.map = map;
-			     break;
-			 } else
-			     error("Bad type argument to +. Had %s and %s\n",
-			      type_name((sp - 1)->type), type_name(sp->type));
-		     } /* end of x + T_MAPPING */
-		 case T_STRING:
-		     {
-			 switch ((sp-1)->type) {
-			 case T_NUMBER:
-			     {
-				 char buff[20];
+			}
+			break;
+		    } /* end of x + NUMBER */
+		case T_REAL:
+		    {
+			switch ((--sp)->type) {
+			case T_NUMBER:
+			    sp->type = T_REAL;
+			    sp->u.real = sp->u.number + (sp+1)->u.real;
+			    break;
+			case T_REAL:
+			    sp->u.real += (sp+1)->u.real;
+			    break;
+			case T_STRING:
+			    {
+				char buff[40];
 
-				 sprintf(buff, "%d", (sp-1)->u.number);
-				 SVALUE_STRING_ADD_LEFT(buff, "f_add: 3");
-				 break;
-			     } /* end of T_NUMBER + T_STRING */
-			 case T_REAL:
-			     {
-				 char buff[40];
+				sprintf(buff, "%f", (sp+1)->u.real);
+				EXTEND_SVALUE_STRING(sp, buff, "f_add: 2");
+				break;
+			    }
+			default:
+			    error("Bad type argument to +. Had %s and %s\n",
+				  type_name(sp->type), type_name((sp+1)->type));
+			}
+			break;
+		    } /* end of x + T_REAL */
+		case T_ARRAY:
+		    {
+			if (!((sp-1)->type & T_ARRAY)) {
+			    error("Bad type argument to +. Had %s and %s\n",
+				  type_name((sp - 1)->type), type_name(sp->type));
+			} else {
+			    /* add_array now free's the arrays */
+			    (sp-1)->u.arr = add_array((sp - 1)->u.arr, sp->u.arr);
+			    sp--;
+			    break;
+			}
+		    } /* end of x + T_ARRAY */
+		case T_MAPPING:
+		    {
+			if ((sp-1)->type & T_MAPPING) {
+			    mapping_t *map;
+			
+			    map = add_mapping((sp - 1)->u.map, sp->u.map);
+			    free_mapping((sp--)->u.map);
+			    free_mapping(sp->u.map);
+			    sp->u.map = map;
+			    break;
+			} else
+			    error("Bad type argument to +. Had %s and %s\n",
+				  type_name((sp - 1)->type), type_name(sp->type));
+		    } /* end of x + T_MAPPING */
+		case T_STRING:
+		    {
+			switch ((sp-1)->type) {
+			case T_NUMBER:
+			    {
+				char buff[20];
+
+				sprintf(buff, "%d", (sp-1)->u.number);
+				SVALUE_STRING_ADD_LEFT(buff, "f_add: 3");
+				break;
+			    } /* end of T_NUMBER + T_STRING */
+			case T_REAL:
+			    {
+				char buff[40];
 				 
-				 sprintf(buff, "%f", (sp - 1)->u.real);
-				 SVALUE_STRING_ADD_LEFT(buff, "f_add: 3");
-				 break;
-			     } /* end of T_REAL + T_STRING */
-			 case T_STRING:
-			     {
-				 SVALUE_STRING_JOIN(sp-1, sp, "f_add: 1");
-				 sp--;
-				 break;
-			     } /* end of T_STRING + T_STRING */
-			 default:
-			     error("Bad type argument to +. Had %s and %s\n",
-				   type_name((sp - 1)->type), type_name(sp->type));
-			 }
-			 break;
-		     } /* end of x + T_STRING */
+				sprintf(buff, "%f", (sp - 1)->u.real);
+				SVALUE_STRING_ADD_LEFT(buff, "f_add: 3");
+				break;
+			    } /* end of T_REAL + T_STRING */
+			case T_STRING:
+			    {
+				SVALUE_STRING_JOIN(sp-1, sp, "f_add: 1");
+				sp--;
+				break;
+			    } /* end of T_STRING + T_STRING */
+			default:
+			    error("Bad type argument to +. Had %s and %s\n",
+				  type_name((sp - 1)->type), type_name(sp->type));
+			}
+			break;
+		    } /* end of x + T_STRING */
 		     
-		 default:
-		     error("Bad type argument to +.  Had %s and %s.\n",
-			   type_name((sp-1)->type), type_name(sp->type));
-		 }
-		 break;
-	     }
+		default:
+		    error("Bad type argument to +.  Had %s and %s.\n",
+			  type_name((sp-1)->type), type_name(sp->type));
+		}
+		break;
+	    }
 	case F_VOID_ADD_EQ:
 	case F_ADD_EQ:
-	     DEBUG_CHECK(sp->type != T_LVALUE,
-			 "non-lvalue argument to +=\n");
-	     lval = sp->u.lvalue;
-	     sp--; /* points to the RHS */
-	     switch (lval->type) {
-	     case T_STRING:
-		 if (sp->type == T_STRING) {
-		     SVALUE_STRING_JOIN(lval, sp, "f_add_eq: 1");
-		 } else if (sp->type & T_NUMBER) {
-		     char buff[20];
+	    DEBUG_CHECK(sp->type != T_LVALUE,
+			"non-lvalue argument to +=\n");
+	    lval = sp->u.lvalue;
+	    sp--;		/* points to the RHS */
+	    switch (lval->type) {
+	    case T_STRING:
+		if (sp->type == T_STRING) {
+		    SVALUE_STRING_JOIN(lval, sp, "f_add_eq: 1");
+		} else if (sp->type & T_NUMBER) {
+		    char buff[20];
 		     
-		     sprintf(buff, "%d", sp->u.number);
-		     EXTEND_SVALUE_STRING(lval, buff, "f_add_eq: 2");
-		 } else if (sp->type & T_REAL) {
-		     char buff[40];
+		    sprintf(buff, "%d", sp->u.number);
+		    EXTEND_SVALUE_STRING(lval, buff, "f_add_eq: 2");
+		} else if (sp->type & T_REAL) {
+		    char buff[40];
 		     
-		     sprintf(buff, "%f", sp->u.real);
-		     EXTEND_SVALUE_STRING(lval, buff, "f_add_eq: 2");
-		 } else {
-		     bad_argument(sp, T_STRING | T_NUMBER | T_REAL, 2, instruction);
-		 }
-		 break;
-	     case T_NUMBER:
-		 if (sp->type & T_NUMBER) {
-		     lval->u.number += sp->u.number;
-		     /* both sides are numbers, no freeing required */
-		 } else if (sp->type & T_REAL) {
-		     lval->u.number += sp->u.real;
-		     /* both sides are numbers, no freeing required */
-		 } else {
-		     error("Left hand side of += is a number (or zero); right side is not a number.\n");
-		 }
-		 break;
-	     case T_REAL:
-		 if (sp->type & T_NUMBER) {
-		     lval->u.real += sp->u.number;
-		     /* both sides are numerics, no freeing required */
-		 }
-		 if (sp->type & T_REAL) {
-		     lval->u.real += sp->u.real;
-		     /* both sides are numerics, no freeing required */
-		 } else {
-		     error("Left hand side of += is a number (or zero); right side is not a number.\n");
-		 }
-		 break;
-	     case T_BUFFER:
-		 if (sp->type != T_BUFFER) {
-		     bad_argument(sp, T_BUFFER, 2, instruction);
-		 } else {
-		     buffer_t *b;
+		    sprintf(buff, "%f", sp->u.real);
+		    EXTEND_SVALUE_STRING(lval, buff, "f_add_eq: 2");
+		} else {
+		    bad_argument(sp, T_STRING | T_NUMBER | T_REAL, 2, instruction);
+		}
+		break;
+	    case T_NUMBER:
+		if (sp->type & T_NUMBER) {
+		    lval->u.number += sp->u.number;
+		    /* both sides are numbers, no freeing required */
+		} else if (sp->type & T_REAL) {
+		    lval->u.number += sp->u.real;
+		    /* both sides are numbers, no freeing required */
+		} else {
+		    error("Left hand side of += is a number (or zero); right side is not a number.\n");
+		}
+		break;
+	    case T_REAL:
+		if (sp->type & T_NUMBER) {
+		    lval->u.real += sp->u.number;
+		    /* both sides are numerics, no freeing required */
+		}
+		if (sp->type & T_REAL) {
+		    lval->u.real += sp->u.real;
+		    /* both sides are numerics, no freeing required */
+		} else {
+		    error("Left hand side of += is a number (or zero); right side is not a number.\n");
+		}
+		break;
+	    case T_BUFFER:
+		if (sp->type != T_BUFFER) {
+		    bad_argument(sp, T_BUFFER, 2, instruction);
+		} else {
+		    buffer_t *b;
 		     
-		     b = allocate_buffer(lval->u.buf->size + sp->u.buf->size);
-		     memcpy(b->item, lval->u.buf->item, lval->u.buf->size);
-		     memcpy(b->item + lval->u.buf->size, sp->u.buf->item,
-			    sp->u.buf->size);
-		     free_buffer(sp->u.buf);
-		     free_buffer(lval->u.buf);
-		     lval->u.buf = b;
-		 }
-		 break;
-	     case T_ARRAY:
-		 if (sp->type != T_ARRAY)
-		     bad_argument(sp, T_ARRAY, 2, instruction);
-		 else {
-		     /* add_array now frees the arrays */
-		     lval->u.arr = add_array(lval->u.arr, sp->u.arr);
-		 }
-		 break;
-	     case T_MAPPING:
-		 if (sp->type != T_MAPPING)
-		     bad_argument(sp, T_MAPPING, 2, instruction);
-		 else {
-		     absorb_mapping(lval->u.map, sp->u.map);
-		     free_mapping(sp->u.map);	/* free RHS */
-		     /* LHS not freed because its being reused */
-		 }
-		 break;
-	     case T_LVALUE_BYTE:
-                 if (sp->type != T_NUMBER)
-                     error("Bad right type to += of char lvalue.\n");
-                 else *glb.u.lvalue_byte += sp->u.number;
-                 break;
-	     default:
-		 bad_arg(1, instruction);
-	     }
+		    b = allocate_buffer(lval->u.buf->size + sp->u.buf->size);
+		    memcpy(b->item, lval->u.buf->item, lval->u.buf->size);
+		    memcpy(b->item + lval->u.buf->size, sp->u.buf->item,
+			   sp->u.buf->size);
+		    free_buffer(sp->u.buf);
+		    free_buffer(lval->u.buf);
+		    lval->u.buf = b;
+		}
+		break;
+	    case T_ARRAY:
+		if (sp->type != T_ARRAY)
+		    bad_argument(sp, T_ARRAY, 2, instruction);
+		else {
+		    /* add_array now frees the arrays */
+		    lval->u.arr = add_array(lval->u.arr, sp->u.arr);
+		}
+		break;
+	    case T_MAPPING:
+		if (sp->type != T_MAPPING)
+		    bad_argument(sp, T_MAPPING, 2, instruction);
+		else {
+		    absorb_mapping(lval->u.map, sp->u.map);
+		    free_mapping(sp->u.map); /* free RHS */
+		    /* LHS not freed because its being reused */
+		}
+		break;
+	    case T_LVALUE_BYTE:
+		if (sp->type != T_NUMBER)
+		    error("Bad right type to += of char lvalue.\n");
+		else *glb.u.lvalue_byte += sp->u.number;
+		break;
+	    default:
+		bad_arg(1, instruction);
+	    }
 	     
-	     if (instruction == F_ADD_EQ) {	/* not void add_eq */
-		 assign_svalue_no_free(sp, lval);
-	     } else {
-		 /*
-		  * but if (void)add_eq then no need to produce an
-		  * rvalue
-		  */
-		 sp--;
-	     }
-	     break;
-	 case F_AND:
-	     f_and();
-	     break;
-	 case F_AND_EQ:
-	     f_and_eq();
-	     break;
+	    if (instruction == F_ADD_EQ) { /* not void add_eq */
+		assign_svalue_no_free(sp, lval);
+	    } else {
+		/*
+		 * but if (void)add_eq then no need to produce an
+		 * rvalue
+		 */
+		sp--;
+	    }
+	    break;
+	case F_AND:
+	    f_and();
+	    break;
+	case F_AND_EQ:
+	    f_and_eq();
+	    break;
 	case F_FUNCTION_CONSTRUCTOR:
 	    f_function_constructor();
 	    break;
-	 case F_NEW_CLASS:
-	     {
-		 array_t *cl;
+	case F_NEW_CLASS:
+	    {
+		array_t *cl;
 
-		 cl = allocate_class(&current_prog->classes[EXTRACT_UCHAR(pc++)]);
-		 push_refed_class(cl);
-	     }
-	     break;
+		cl = allocate_class(&current_prog->classes[EXTRACT_UCHAR(pc++)]);
+		push_refed_class(cl);
+	    }
+	    break;
 	case F_AGGREGATE:
 	    {
 		array_t *v;
@@ -2217,7 +2263,7 @@ call_program P2(program_t *, prog, int, offset) {
 	    }
 	    break;
 	case F_AGGREGATE_ASSOC:
-            {
+	    {
 		mapping_t *m;
 		
 		LOAD_SHORT(offset, pc);
@@ -2229,75 +2275,67 @@ call_program P2(program_t *, prog, int, offset) {
 	    }
 	case F_ASSIGN:
 #ifdef DEBUG
-             if (sp->type != T_LVALUE) fatal("Bad argument to F_ASSIGN\n");
+	    if (sp->type != T_LVALUE) fatal("Bad argument to F_ASSIGN\n");
 #endif
-             switch(sp->u.lvalue->type){
-                 case T_LVALUE_BYTE:
-                     if ((sp - 1)->type != T_NUMBER) {
-                         error("Illegal rhs to char lvalue\n");
-                     } else {
-                         *glb.u.lvalue_byte = ((sp - 1)->u.number & 0xff);
-                     }
-                     break;
-		 default:
-                     assign_svalue(sp->u.lvalue, sp - 1);
-                     break;
-		 case T_LVALUE_RANGE:
-                     assign_lvalue_range(sp - 1);
-                     break;
-	     }
-             sp--;              /* ignore lvalue */
-             /* rvalue is already in the correct place */
-             break;
-	 case F_VOID_ASSIGN:
+	    switch(sp->u.lvalue->type){
+	    case T_LVALUE_BYTE:
+		if ((sp - 1)->type != T_NUMBER) {
+		    error("Illegal rhs to char lvalue\n");
+		} else {
+		    *glb.u.lvalue_byte = ((sp - 1)->u.number & 0xff);
+		}
+		break;
+	    default:
+		assign_svalue(sp->u.lvalue, sp - 1);
+		break;
+	    case T_LVALUE_RANGE:
+		assign_lvalue_range(sp - 1);
+		break;
+	    }
+	    sp--;		/* ignore lvalue */
+	    /* rvalue is already in the correct place */
+	    break;
+	case F_VOID_ASSIGN_LOCAL:
+	    if (sp->type != T_INVALID) {
+		lval = fp + EXTRACT_UCHAR(pc++);
+		free_svalue(lval, "F_VOID_ASSIGN_LOCAL");
+		*lval = *sp--;
+	    } else {
+		sp--;
+		pc++;
+	    }
+	    break;
+	case F_VOID_ASSIGN:
 #ifdef DEBUG
-             if (sp->type != T_LVALUE) fatal("Bad argument to F_VOID_ASSIGN\n");
+	    if (sp->type != T_LVALUE) fatal("Bad argument to F_VOID_ASSIGN\n");
 #endif
-             lval = (sp--)->u.lvalue;
-             if (sp->type != T_INVALID){
-                 switch(lval->type){
-                     case T_LVALUE_BYTE:
-                     {
-                         if (sp->type != T_NUMBER){
-                             error("Illegal rhs to char lvalue\n");
-                         } else {
-                             *glb.u.lvalue_byte = (sp--)->u.number & 0xff;
-                         }
-                         break;
-                     }
+	    lval = (sp--)->u.lvalue;
+	    if (sp->type != T_INVALID){
+		switch(lval->type){
+		case T_LVALUE_BYTE:
+		    {
+			if (sp->type != T_NUMBER){
+			    error("Illegal rhs to char lvalue\n");
+			} else {
+			    *glb.u.lvalue_byte = (sp--)->u.number & 0xff;
+			}
+			break;
+		    }
 
-                     case T_STRING:
-                     {
-                         free_svalue(lval, "F_VOID_ASSIGN : 2");
-                         if (sp->subtype != STRING_CONSTANT) {
-                             /*
-                              * avoid unnecessary (and costly)
-                              * string_copy()...FREE() or
-                              * ref_string()...free_string()
-                              */
-                             *lval = *sp--;     /* copy string directly */
-                         } else {
-                             lval->type = T_STRING;
-                             lval->subtype = STRING_SHARED;
-                             lval->u.string = make_shared_string((sp--)->u.string);
-                         }
-                         break;
-                     }
+		case T_LVALUE_RANGE:
+		    {
+			copy_lvalue_range(sp--);
+			break;
+		    }
 
-                     case T_LVALUE_RANGE:
-                     {
-                         copy_lvalue_range(sp--);
-                         break;
-                     }
-
-                     default:
-                     {
-                         free_svalue(lval, "F_VOID_ASSIGN : 3");
-                         *lval = *sp--;
-                     }
-                 }
-             } else sp--;
-             break;
+		default:
+		    {
+			free_svalue(lval, "F_VOID_ASSIGN : 3");
+			*lval = *sp--;
+		    }
+		}
+	    } else sp--;
+	    break;
 #ifdef DEBUG
 	case F_BREAK_POINT:
 	    break_point();
@@ -2355,7 +2393,7 @@ call_program P2(program_t *, prog, int, offset) {
 #endif
 	    }
 	    break;
-       case F_CALL_INHERITED:
+	case F_CALL_INHERITED:
 	    {
 		inherit_t *ip = current_prog->inherit + EXTRACT_UCHAR(pc++);
 		program_t *temp_prog = ip->prog;
@@ -2407,42 +2445,42 @@ call_program P2(program_t *, prog, int, offset) {
 	case F_PRE_DEC:
 	    DEBUG_CHECK(sp->type != T_LVALUE, 
 			"non-lvalue argument to --\n");
-	     lval = sp->u.lvalue;
-	     switch (lval->type) {
-	     case T_NUMBER:
-		 sp->type = T_NUMBER;
-		 sp->u.number = --(lval->u.number);
-		 break;
-	     case T_REAL:
-		 sp->type = T_REAL;
-		 sp->u.real = --(lval->u.real);
-		 break;
-	     case T_LVALUE_BYTE:
-		 sp->type = T_NUMBER;
-		 sp->u.number = --(*glb.u.lvalue_byte);
-		 break;
-	     default:
+	    lval = sp->u.lvalue;
+	    switch (lval->type) {
+	    case T_NUMBER:
+		sp->type = T_NUMBER;
+		sp->u.number = --(lval->u.number);
+		break;
+	    case T_REAL:
+		sp->type = T_REAL;
+		sp->u.real = --(lval->u.real);
+		break;
+	    case T_LVALUE_BYTE:
+		sp->type = T_NUMBER;
+		sp->u.number = --(*glb.u.lvalue_byte);
+		break;
+	    default:
 		error("-- of non-numeric argument\n");
-	     }
-	     break;
-	 case F_DEC:
-	     DEBUG_CHECK(sp->type != T_LVALUE,
-			 "non-lvalue argument to --\n");
-	     lval = (sp--)->u.lvalue;
-	     switch (lval->type) {
-	     case T_NUMBER:
-		 lval->u.number--;
-		 break;
-	     case T_REAL:
-		 lval->u.real--;
-		 break;
-	     case T_LVALUE_BYTE:
-		 --(*glb.u.lvalue_byte);
-		 break;
-	     default:
-		 error("-- of non-numeric argument\n");
-	     }
-	     break;
+	    }
+	    break;
+	case F_DEC:
+	    DEBUG_CHECK(sp->type != T_LVALUE,
+			"non-lvalue argument to --\n");
+	    lval = (sp--)->u.lvalue;
+	    switch (lval->type) {
+	    case T_NUMBER:
+		lval->u.number--;
+		break;
+	    case T_REAL:
+		lval->u.real--;
+		break;
+	    case T_LVALUE_BYTE:
+		--(*glb.u.lvalue_byte);
+		break;
+	    default:
+		error("-- of non-numeric argument\n");
+	    }
+	    break;
 	case F_DIVIDE:
 	    { 
 		switch((sp-1)->type|sp->type){
@@ -2491,83 +2529,11 @@ call_program P2(program_t *, prog, int, offset) {
 	    f_eq();
 	    break;
 	case F_GE:
-	    {
-		i = sp->type;
-		switch ((--sp)->type | i) {
-		case T_NUMBER:
-		    sp->u.number = sp->u.number >= (sp+1)->u.number;
-		    break;
-		case T_REAL:
-		    sp->u.number = sp->u.real >= (sp+1)->u.real;
-		    sp->type = T_NUMBER;
-		    break;
-		case T_NUMBER | T_REAL:
-		    if (i & T_NUMBER) {
-			sp->type = T_NUMBER;
-			sp->u.number = sp->u.real >= (sp+1)->u.number;
-		    } else sp->u.number = sp->u.number >= (sp+1)->u.real;
-		    break;
-		case T_STRING:
-		    i = strcmp(sp->u.string, (sp+1)->u.string) >= 0;
-		    free_string_svalue(sp + 1);
-		    free_string_svalue(sp);
-		    sp->type = T_NUMBER;
-		    sp->u.number = i;
-		    break;
-		default:
-		    {
-			switch ((sp++)->type) {
-			case T_NUMBER:
-			case T_REAL:
-			    bad_argument(sp, T_NUMBER | T_REAL, 2, instruction);
-			case T_STRING:
-			    bad_argument(sp, T_STRING, 2, instruction);
-			default:
-			    bad_argument(sp - 1, T_NUMBER | T_STRING | T_REAL, 1, instruction);
-			}
-		    }
-		}
-	    }
+	    f_ge();
 	    break;
 	case F_GT:
-	    {
-		i = sp->type;
-		switch ((--sp)->type | i) {
-		case T_NUMBER:
-		    sp->u.number = sp->u.number > (sp+1)->u.number;
-		    break;
-		case T_REAL:
-		    sp->u.number = sp->u.real > (sp+1)->u.real;
-		    sp->type = T_NUMBER;
-		    break;
-		case T_NUMBER | T_REAL:
-		    if (i & T_NUMBER) {
-			sp->type = T_NUMBER;
-			sp->u.number = sp->u.real > (sp+1)->u.number;
-		    } else sp->u.number = sp->u.number > (sp+1)->u.real;
-		    break;
-		case T_STRING:
-		    i = strcmp(sp->u.string, (sp+1)->u.string) > 0;
-		    free_string_svalue(sp+1);
-		    free_string_svalue(sp);
-		    sp->type = T_NUMBER;
-		    sp->u.number = i;
-		    break;
-		default:
-		    {
-			switch ((sp++)->type) {
-			case T_NUMBER:
-			case T_REAL:
-			    bad_argument(sp, T_NUMBER | T_REAL, 2, instruction);
-			case T_STRING:
-			    bad_argument(sp, T_STRING, 2, instruction);
-			default:
-			    bad_argument(sp-1, T_NUMBER | T_REAL | T_STRING, 1, instruction);
-			}
-		    }
-		}
-		break;
-	    }
+	    f_gt();
+	    break;
 	case F_GLOBAL:
 	    {
 		svalue_t *s;
@@ -2587,177 +2553,178 @@ call_program P2(program_t *, prog, int, offset) {
 		break;
 	    }
 	case F_PRE_INC:
-	     DEBUG_CHECK(sp->type != T_LVALUE,
-			 "non-lvalue argument to ++\n");
-	     lval = sp->u.lvalue;
-	     switch (lval->type) {
-	     case T_NUMBER:
-		 sp->type = T_NUMBER;
-		 sp->u.number = ++lval->u.number;
-		 break;
-	     case T_REAL:
-		 sp->type = T_REAL;
-		 sp->u.real = ++lval->u.number;
-		 break;
-	     case T_LVALUE_BYTE:
-		 sp->type = T_NUMBER;
-		 sp->u.number = ++*glb.u.lvalue_byte;
-		 break;
-	     default:
-		 error("++ of non-numeric argument\n");
-	     }
-	     break;
-	 case F_MEMBER:
-	     { 
-		 array_t *vec;
+	    DEBUG_CHECK(sp->type != T_LVALUE,
+			"non-lvalue argument to ++\n");
+	    lval = sp->u.lvalue;
+	    switch (lval->type) {
+	    case T_NUMBER:
+		sp->type = T_NUMBER;
+		sp->u.number = ++lval->u.number;
+		break;
+	    case T_REAL:
+		sp->type = T_REAL;
+		sp->u.real = ++lval->u.number;
+		break;
+	    case T_LVALUE_BYTE:
+		sp->type = T_NUMBER;
+		sp->u.number = ++*glb.u.lvalue_byte;
+		break;
+	    default:
+		error("++ of non-numeric argument\n");
+	    }
+	    break;
+	case F_MEMBER:
+	    { 
+		array_t *arr;
 		 
-		 if (sp->type != T_CLASS)
-		     error("Tried to take a member of something that isn't a class.\n");
-		 i = EXTRACT_UCHAR(pc++);
-		 vec = sp->u.arr;
-		 if (i >= vec->size) error("Class has no corresponding member.\n");
-		 assign_svalue_no_free(sp, &vec->item[i]);
-		 free_array(vec);
-		 break;
-	     }
-	 case F_MEMBER_LVALUE:
-	     { 
-		 array_t *vec;
+		if (sp->type != T_CLASS)
+		    error("Tried to take a member of something that isn't a class.\n");
+		i = EXTRACT_UCHAR(pc++);
+		arr = sp->u.arr;
+		if (i >= arr->size) error("Class has no corresponding member.\n");
+		assign_svalue_no_free(sp, &arr->item[i]);
+		free_array(arr);
+		break;
+	    }
+	case F_MEMBER_LVALUE:
+	    { 
+		array_t *arr;
 		 
-		 if (sp->type != T_CLASS)
-		     error("Tried to take a member of something that isn't a class.\n");
-		 i = EXTRACT_UCHAR(pc++);
-		 vec = sp->u.arr;
-		 if (i >= vec->size) error("Class has no corresponding member.\n");
-		 sp->type = T_LVALUE;
-		 sp->u.lvalue = vec->item + i;
-		 break;
-	     }
-	 case F_INDEX:
-             switch (sp->type) {
-		 case T_MAPPING:
-                 {
-                     svalue_t *v;
-                     mapping_t *m;
+		if (sp->type != T_CLASS)
+		    error("Tried to take a member of something that isn't a class.\n");
+		i = EXTRACT_UCHAR(pc++);
+		arr = sp->u.arr;
+		if (i >= arr->size) error("Class has no corresponding member.\n");
+		sp->type = T_LVALUE;
+		sp->u.lvalue = arr->item + i;
+		free_array(arr);
+		break;
+	    }
+	case F_INDEX:
+	    switch (sp->type) {
+	    case T_MAPPING:
+		{
+		    svalue_t *v;
+		    mapping_t *m;
 
-                     v = find_in_mapping(m = sp->u.map, sp - 1);
-                     assign_svalue(--sp, v);    /* v will always have a
-                                                 * value */
-                     free_mapping(m);
-                     break;
-                 }
-		 case T_BUFFER:
-                 {
-                     if ((sp-1)->type != T_NUMBER)
-                         error("Indexing a buffer with an illegal type.\n");
+		    v = find_in_mapping(m = sp->u.map, sp - 1);
+		    assign_svalue(--sp, v); /* v will always have a
+					     * value */
+		    free_mapping(m);
+		    break;
+		}
+	    case T_BUFFER:
+		{
+		    if ((sp-1)->type != T_NUMBER)
+			error("Indexing a buffer with an illegal type.\n");
 
-                     i = (sp - 1)->u.number;
-                     if ((i > sp->u.buf->size) || (i < 0))
-                         error("Buffer index out of bounds.\n");
-                     i = sp->u.buf->item[i];
-                     free_buffer(sp->u.buf);
-                     (--sp)->u.number = i;
-                     break;
-                 }
-		 case T_STRING:
-                 {
-                     if ((sp-1)->type != T_NUMBER) {
-                         error("Indexing a string with an illegal type.\n");
-                     }
-                     i = (sp - 1)->u.number;
-                     if ((i > SVALUE_STRLEN(sp)) || (i < 0))
-                         error("String index out of bounds.\n");
-                     i = (unsigned char) sp->u.string[i];
-                     free_string_svalue(sp);
-                     (--sp)->u.number = i;
-                     break;
-                 }
-		 case T_ARRAY:
-                 {
-                     array_t *vec;
+		    i = (sp - 1)->u.number;
+		    if ((i > sp->u.buf->size) || (i < 0))
+			error("Buffer index out of bounds.\n");
+		    i = sp->u.buf->item[i];
+		    free_buffer(sp->u.buf);
+		    (--sp)->u.number = i;
+		    break;
+		}
+	    case T_STRING:
+		{
+		    if ((sp-1)->type != T_NUMBER) {
+			error("Indexing a string with an illegal type.\n");
+		    }
+		    i = (sp - 1)->u.number;
+		    if ((i > SVALUE_STRLEN(sp)) || (i < 0))
+			error("String index out of bounds.\n");
+		    i = (unsigned char) sp->u.string[i];
+		    free_string_svalue(sp);
+		    (--sp)->u.number = i;
+		    break;
+		}
+	    case T_ARRAY:
+		{
+		    array_t *arr;
 
-                     if ((sp-1)->type != T_NUMBER)
-                         error("Indexing an array with an illegal type\n");
-                     i = (sp - 1)->u.number;
-                     if (i<0) error("Negative index passed to array.\n");
-                     vec = sp->u.arr;
-                     if (i >= vec->size) error("Array index out of bounds.\n");
-                     assign_svalue_no_free(--sp, &vec->item[i]);
-                     free_array(vec);
-                     break;
-                 }
-		 default:
-                 error("Indexing on illegal type.\n");
-             }
+		    if ((sp-1)->type != T_NUMBER)
+			error("Indexing an array with an illegal type\n");
+		    i = (sp - 1)->u.number;
+		    if (i<0) error("Negative index passed to array.\n");
+		    arr = sp->u.arr;
+		    if (i >= arr->size) error("Array index out of bounds.\n");
+		    assign_svalue_no_free(--sp, &arr->item[i]);
+		    free_array(arr);
+		    break;
+		}
+	    default:
+		error("Indexing on illegal type.\n");
+	    }
 
-             /*
-              * Fetch value of a variable. It is possible that it is a
-              * variable that points to a destructed object. In that case,
-              * it has to be replaced by 0.
-              */
-             if (sp->type == T_OBJECT && (sp->u.ob->flags & O_DESTRUCTED)) {
-                 free_object(sp->u.ob, "F_INDEX");
-                 sp->type = T_NUMBER;
-                 sp->u.number = 0;
-             }
-             break;
-	 case F_RINDEX:
-             switch (sp->type) {
-		 case T_BUFFER:
-                 {
-                     if ((sp-1)->type != T_NUMBER)
-                         error("Indexing a buffer with an illegal type.\n");
+	    /*
+	     * Fetch value of a variable. It is possible that it is a
+	     * variable that points to a destructed object. In that case,
+	     * it has to be replaced by 0.
+	     */
+	    if (sp->type == T_OBJECT && (sp->u.ob->flags & O_DESTRUCTED)) {
+		free_object(sp->u.ob, "F_INDEX");
+		sp->type = T_NUMBER;
+		sp->u.number = 0;
+	    }
+	    break;
+	case F_RINDEX:
+	    switch (sp->type) {
+	    case T_BUFFER:
+		{
+		    if ((sp-1)->type != T_NUMBER)
+			error("Indexing a buffer with an illegal type.\n");
 
-                     i = sp->u.buf->size - (sp - 1)->u.number;
-                     if ((i > sp->u.buf->size) || (i < 0))
-                         error("Buffer index out of bounds.\n");
+		    i = sp->u.buf->size - (sp - 1)->u.number;
+		    if ((i > sp->u.buf->size) || (i < 0))
+			error("Buffer index out of bounds.\n");
 
-                     i = sp->u.buf->item[i];
-                     free_buffer(sp->u.buf);
-                     (--sp)->u.number = i;
-                     break;
-                 }
-		 case T_STRING:
-                 {
-                     int len = SVALUE_STRLEN(sp);
-                     if ((sp-1)->type != T_NUMBER) {
-                         error("Indexing a string with an illegal type.\n");
-                     }
-                     i = len - (sp - 1)->u.number;
-                     if ((i > len) || (i < 0))
-                         error("String index out of bounds.\n");
-                     i = (unsigned char) sp->u.string[i];
-                     free_string_svalue(sp);
-                     (--sp)->u.number = i;
-                     break;
-                 }
-		 case T_ARRAY:
-                 {
-                     array_t *vec = sp->u.arr;
+		    i = sp->u.buf->item[i];
+		    free_buffer(sp->u.buf);
+		    (--sp)->u.number = i;
+		    break;
+		}
+	    case T_STRING:
+		{
+		    int len = SVALUE_STRLEN(sp);
+		    if ((sp-1)->type != T_NUMBER) {
+			error("Indexing a string with an illegal type.\n");
+		    }
+		    i = len - (sp - 1)->u.number;
+		    if ((i > len) || (i < 0))
+			error("String index out of bounds.\n");
+		    i = (unsigned char) sp->u.string[i];
+		    free_string_svalue(sp);
+		    (--sp)->u.number = i;
+		    break;
+		}
+	    case T_ARRAY:
+		{
+		    array_t *arr = sp->u.arr;
 
-                     if ((sp-1)->type != T_NUMBER)
-                         error("Indexing an array with an illegal type\n");
-                     i = vec->size - (sp - 1)->u.number;
-                     if (i < 0 || i >= vec->size) error("Array index out of bounds.\n");
-                     assign_svalue_no_free(--sp, &vec->item[i]);
-                     free_array(vec);
-                     break;
-                 }
-		 default:
-                 error("Indexing from the right on illegal type.\n");
-             }
+		    if ((sp-1)->type != T_NUMBER)
+			error("Indexing an array with an illegal type\n");
+		    i = arr->size - (sp - 1)->u.number;
+		    if (i < 0 || i >= arr->size) error("Array index out of bounds.\n");
+		    assign_svalue_no_free(--sp, &arr->item[i]);
+		    free_array(arr);
+		    break;
+		}
+	    default:
+		error("Indexing from the right on illegal type.\n");
+	    }
 
-             /*
-              * Fetch value of a variable. It is possible that it is a
-              * variable that points to a destructed object. In that case,
-              * it has to be replaced by 0.
-              */
-             if (sp->type == T_OBJECT && (sp->u.ob->flags & O_DESTRUCTED)) {
-                 free_object(sp->u.ob, "F_RINDEX");
-                 sp->type = T_NUMBER;
-                 sp->u.number = 0;
-             }
-             break;
+	    /*
+	     * Fetch value of a variable. It is possible that it is a
+	     * variable that points to a destructed object. In that case,
+	     * it has to be replaced by 0.
+	     */
+	    if (sp->type == T_OBJECT && (sp->u.ob->flags & O_DESTRUCTED)) {
+		free_object(sp->u.ob, "F_RINDEX");
+		sp->type = T_NUMBER;
+		sp->u.number = 0;
+	    }
+	    break;
 #ifdef F_JUMP_WHEN_ZERO
 	case F_JUMP_WHEN_ZERO:
 	    if ((i = (sp->type == T_NUMBER)) && sp->u.number == 0) {
@@ -2767,8 +2734,8 @@ call_program P2(program_t *, prog, int, offset) {
 		pc += 2;
 	    }
 	    if (i) {
-		sp--;	/* cheaper to do this when sp is an integer
-			 * svalue */
+		sp--;		/* cheaper to do this when sp is an integer
+				 * svalue */
 	    } else {
 		pop_stack();
 	    }
@@ -2776,136 +2743,93 @@ call_program P2(program_t *, prog, int, offset) {
 #endif
 #ifdef F_JUMP
 	case F_JUMP:
-	     COPY_SHORT(&offset, pc);
-	     pc = current_prog->program + offset;
-	     break;
+	    COPY_SHORT(&offset, pc);
+	    pc = current_prog->program + offset;
+	    break;
 #endif
-	 case F_LE:
-	     {
-                 i = sp->type;
-                 switch((--sp)->type|i){
-		 case T_NUMBER:
-		     sp->u.number = sp->u.number <= (sp+1)->u.number;
-		     break;
+	case F_LE:
+	    f_le();
+	    break;
+	case F_LSH:
+	    f_lsh();
+	    break;
+	case F_LSH_EQ:
+	    f_lsh_eq();
+	    break;
+	case F_MOD:
+	    {
+		CHECK_TYPES(sp - 1, T_NUMBER, 1, instruction);
+		CHECK_TYPES(sp, T_NUMBER, 2, instruction);
+		if ((sp--)->u.number == 0)
+		    error("Modulus by zero.\n");
+		sp->u.number %= (sp+1)->u.number;
+	    }
+	    break;
+	case F_MOD_EQ:
+	    f_mod_eq();
+	    break;
+	case F_MULTIPLY:
+	    {
+		switch((sp-1)->type|sp->type){
+		case T_NUMBER:
+		    {
+			sp--;
+			sp->u.number *= (sp+1)->u.number;
+			break;
+		    }
 		     
-		 case T_REAL:
-		     sp->u.number = sp->u.real <= (sp+1)->u.real;
-		     sp->type = T_NUMBER;
-		     break;
+		case T_REAL:
+		    {
+			sp--;
+			sp->u.real *= (sp+1)->u.real;
+			break;
+		    }
 		     
-		 case T_NUMBER|T_REAL:
-		     if (i & T_NUMBER){
-			 sp->type = T_NUMBER;
-			 sp->u.number = sp->u.real <= (sp+1)->u.number;
-		     } else sp->u.number = sp->u.number <= (sp+1)->u.real;
-		     break;
+		case T_NUMBER|T_REAL:
+		    {
+			if ((--sp)->type & T_NUMBER){
+			    sp->type = T_REAL;
+			    sp->u.real = sp->u.number * (sp+1)->u.real;
+			}
+			else sp->u.real *= (sp+1)->u.number;
+			break;
+		    }
 		     
-		 case T_STRING:
-		     i = strcmp(sp->u.string, (sp+1)->u.string) <= 0;
-		     free_string_svalue(sp+1);
-		     free_string_svalue(sp);
-		     sp->type = T_NUMBER;
-		     sp->u.number = i;
-		     break;
+		case T_MAPPING:
+		    {
+			mapping_t *m;
+			m = compose_mapping((sp-1)->u.map, sp->u.map, 1);
+			pop_2_elems();
+			(++sp)->type = T_MAPPING;
+			sp->u.map = m;
+			break;
+		    }
 		     
-		 default:
-		     {
-			 switch((sp++)->type){
-			 case T_NUMBER:
-			 case T_REAL:
-			     bad_argument(sp, T_NUMBER | T_REAL, 2, instruction);
-			     
-			 case T_STRING:
-			     bad_argument(sp, T_STRING, 2, instruction);
-			     
-			 default:
-			     bad_argument(sp - 1, T_NUMBER | T_STRING | T_REAL, 1, instruction);
-			 }
-		     }
-		 }
-		 break;
-	     }
-	     break;
-	 case F_LSH:
-	     f_lsh();
-	     break;
-	 case F_LSH_EQ:
-	     f_lsh_eq();
-	     break;
-	 case F_MOD:
-	     {
-		 CHECK_TYPES(sp - 1, T_NUMBER, 1, instruction);
-		 CHECK_TYPES(sp, T_NUMBER, 2, instruction);
-		 if ((sp--)->u.number == 0)
-		     error("Modulus by zero.\n");
-		 sp->u.number %= (sp+1)->u.number;
-	     }
-	     break;
-	 case F_MOD_EQ:
-	     f_mod_eq();
-	     break;
-	 case F_MULTIPLY:
-	     {
-		 switch((sp-1)->type|sp->type){
-		 case T_NUMBER:
-		     {
-			 sp--;
-			 sp->u.number *= (sp+1)->u.number;
-			 break;
-		     }
-		     
-		 case T_REAL:
-		     {
-			 sp--;
-			 sp->u.real *= (sp+1)->u.real;
-			 break;
-		     }
-		     
-		 case T_NUMBER|T_REAL:
-		     {
-			 if ((--sp)->type & T_NUMBER){
-			     sp->type = T_REAL;
-			     sp->u.real = sp->u.number * (sp+1)->u.real;
-			 }
-			 else sp->u.real *= (sp+1)->u.number;
-			 break;
-		     }
-		     
-		 case T_MAPPING:
-		     {
-			 mapping_t *m;
-			 m = compose_mapping((sp-1)->u.map, sp->u.map, 1);
-			 pop_2_elems();
-			 (++sp)->type = T_MAPPING;
-			 sp->u.map = m;
-			 break;
-		     }
-		     
-		 default:
-		     {
-			 if (!((sp-1)->type & (T_NUMBER|T_REAL|T_MAPPING)))
-			     bad_argument(sp-1, T_NUMBER|T_REAL|T_MAPPING,1, instruction);
-			 if (!(sp->type & (T_NUMBER|T_REAL|T_MAPPING)))
-			     bad_argument(sp, T_NUMBER|T_REAL|T_MAPPING,2, instruction);
-			 error("Args to * are not compatible.\n");
-		     }
-		 }
-	     }
-	     break;
-	 case F_MULT_EQ:
-	     f_mult_eq();
-	     break;
-	 case F_NE:
-	     f_ne();
-	     break;
-	 case F_NEGATE:
-	     if (sp->type == T_NUMBER)
-		 sp->u.number = -sp->u.number;
-	     else if (sp->type == T_REAL)
-		 sp->u.real = -sp->u.real;
-	     else
-		 error("Bad argument to unary minus\n");
-	     break;
+		default:
+		    {
+			if (!((sp-1)->type & (T_NUMBER|T_REAL|T_MAPPING)))
+			    bad_argument(sp-1, T_NUMBER|T_REAL|T_MAPPING,1, instruction);
+			if (!(sp->type & (T_NUMBER|T_REAL|T_MAPPING)))
+			    bad_argument(sp, T_NUMBER|T_REAL|T_MAPPING,2, instruction);
+			error("Args to * are not compatible.\n");
+		    }
+		}
+	    }
+	    break;
+	case F_MULT_EQ:
+	    f_mult_eq();
+	    break;
+	case F_NE:
+	    f_ne();
+	    break;
+	case F_NEGATE:
+	    if (sp->type == T_NUMBER)
+		sp->u.number = -sp->u.number;
+	    else if (sp->type == T_REAL)
+		sp->u.real = -sp->u.real;
+	    else
+		error("Bad argument to unary minus\n");
+	    break;
 	case F_NOT:
 	    if (sp->type == T_NUMBER)
 		sp->u.number = !sp->u.number;
@@ -2925,91 +2849,119 @@ call_program P2(program_t *, prog, int, offset) {
 	    pop_stack();
 	    break;
 	case F_POP_BREAK:
-	     break_sp += EXTRACT_UCHAR(pc++);
-	     break;
+	    break_sp += EXTRACT_UCHAR(pc++);
+	    break;
 	case F_POST_DEC:
-	     DEBUG_CHECK(sp->type != T_LVALUE,
-			 "non-lvalue argument to --\n");
-	     lval = sp->u.lvalue;
-	     switch(lval->type) {
-	     case T_NUMBER:
-		 sp->type = T_NUMBER;
-		 sp->u.number = lval->u.number--;
-		 break;
-	     case T_REAL:
-		 sp->type = T_REAL;
-		 sp->u.real = lval->u.real--;
-		 break;
-	     case T_LVALUE_BYTE:
-		 sp->type = T_NUMBER;
-		 sp->u.number = (*glb.u.lvalue_byte)--;
-		 break;
-	     default:
+	    DEBUG_CHECK(sp->type != T_LVALUE,
+			"non-lvalue argument to --\n");
+	    lval = sp->u.lvalue;
+	    switch(lval->type) {
+	    case T_NUMBER:
+		sp->type = T_NUMBER;
+		sp->u.number = lval->u.number--;
+		break;
+	    case T_REAL:
+		sp->type = T_REAL;
+		sp->u.real = lval->u.real--;
+		break;
+	    case T_LVALUE_BYTE:
+		sp->type = T_NUMBER;
+		sp->u.number = (*glb.u.lvalue_byte)--;
+		break;
+	    default:
 		error("-- of non-numeric argument\n");
-	     }
-	     break;
-	 case F_POST_INC:
-	     DEBUG_CHECK(sp->type != T_LVALUE,
-			 "non-lvalue argument to ++\n");
-	     lval = sp->u.lvalue;
-	     switch (lval->type) {
-	     case T_NUMBER:
-		 sp->type = T_NUMBER;
-		 sp->u.number = lval->u.number++;
-		 break;
-	     case T_REAL:
-		 sp->type = T_REAL;
-		 sp->u.real = lval->u.real++;
-		 break;
-	     case T_LVALUE_BYTE:
-		 sp->type = T_NUMBER;
-		 sp->u.number = (*glb.u.lvalue_byte)++;
-		 break;
-	     default:
-		 error("++ of non-numeric argument\n");
-	     }
-	     break;
+	    }
+	    break;
+	case F_POST_INC:
+	    DEBUG_CHECK(sp->type != T_LVALUE,
+			"non-lvalue argument to ++\n");
+	    lval = sp->u.lvalue;
+	    switch (lval->type) {
+	    case T_NUMBER:
+		sp->type = T_NUMBER;
+		sp->u.number = lval->u.number++;
+		break;
+	    case T_REAL:
+		sp->type = T_REAL;
+		sp->u.real = lval->u.real++;
+		break;
+	    case T_LVALUE_BYTE:
+		sp->type = T_NUMBER;
+		sp->u.number = (*glb.u.lvalue_byte)++;
+		break;
+	    default:
+		error("++ of non-numeric argument\n");
+	    }
+	    break;
 	case F_GLOBAL_LVALUE:
-	     (++sp)->type = T_LVALUE;
-	     sp->u.lvalue = find_value((int) (EXTRACT_UCHAR(pc++) +
-					      variable_index_offset));
-	     break;
+	    (++sp)->type = T_LVALUE;
+	    sp->u.lvalue = find_value((int) (EXTRACT_UCHAR(pc++) +
+					     variable_index_offset));
+	    break;
 	case F_INDEX_LVALUE:
-             push_indexed_lvalue(0);
-             break;
+	    push_indexed_lvalue(0);
+	    break;
 	case F_RINDEX_LVALUE:
-             push_indexed_lvalue(1);
-             break;
+	    push_indexed_lvalue(1);
+	    break;
 	case F_NN_RANGE_LVALUE:
-             push_lvalue_range(0x00);
-             break;
+	    push_lvalue_range(0x00);
+	    break;
 	case F_RN_RANGE_LVALUE:
-             push_lvalue_range(0x10);
-             break;
+	    push_lvalue_range(0x10);
+	    break;
 	case F_RR_RANGE_LVALUE:
-             push_lvalue_range(0x11);
-             break;
+	    push_lvalue_range(0x11);
+	    break;
 	case F_NR_RANGE_LVALUE:
-             push_lvalue_range(0x01);
-             break;
+	    push_lvalue_range(0x01);
+	    break;
 	case F_NN_RANGE:
-             f_range(0x00);
-             break;
+	    f_range(0x00);
+	    break;
 	case F_RN_RANGE:
-             f_range(0x10);
-             break;
+	    f_range(0x10);
+	    break;
 	case F_NR_RANGE:
-             f_range(0x01);
-             break;
+	    f_range(0x01);
+	    break;
 	case F_RR_RANGE:
-             f_range(0x11);
-             break;
+	    f_range(0x11);
+	    break;
 	case F_NE_RANGE:
-             f_extract_range(0);
-             break;
+	    f_extract_range(0);
+	    break;
 	case F_RE_RANGE:
-             f_extract_range(1);
-             break;
+	    f_extract_range(1);
+	    break;
+	case F_RETURN_ZERO:
+	    {
+		/*
+		 * Deallocate frame and return.
+		 */
+		pop_n_elems(csp->num_local_variables);
+		sp++;
+		DEBUG_CHECK(sp != fp, "Bad stack at F_RETURN\n");
+		*sp = const0;
+		pop_control_stack();
+#ifdef TRACE
+		tracedepth--;
+		if (TRACEP(TRACE_RETURN)) {
+		    do_trace("Return", "", "");
+		    if (TRACEHB) {
+			if (TRACETST(TRACE_ARGS)) {
+			    add_message(" with value: 0");
+			}
+			add_message("\n");
+		    }
+		}
+#endif
+		/* The control stack was popped just before */
+		if (csp[1].extern_call)
+		    return;
+		break;
+	    }
+	    break;
 	case F_RETURN:
 	    {
 		svalue_t sv;
@@ -3052,22 +3004,22 @@ call_program P2(program_t *, prog, int, offset) {
 	    f_sscanf();
 	    break;
 	case F_STRING:
-	     LOAD_SHORT(offset, pc);
-	     DEBUG_CHECK1(offset >= current_prog->num_strings,
-			  "string %d out of range in F_STRING!\n",
-			  offset);
-	     (++sp)->type = T_STRING;
-	     sp->subtype = STRING_SHARED;
-	     sp->u.string = ref_string(current_prog->strings[offset]);
-	     break;
+	    LOAD_SHORT(offset, pc);
+	    DEBUG_CHECK1(offset >= current_prog->num_strings,
+			 "string %d out of range in F_STRING!\n",
+			 offset);
+	    (++sp)->type = T_STRING;
+	    sp->subtype = STRING_SHARED;
+	    sp->u.string = ref_string(current_prog->strings[offset]);
+	    break;
 	case F_SHORT_STRING:
-	     DEBUG_CHECK1(EXTRACT_UCHAR(pc) >= current_prog->num_strings,
-                          "string %d out of range in F_STRING!\n",
-			  EXTRACT_UCHAR(pc));
-	     (++sp)->type = T_STRING;
-	     sp->subtype = STRING_SHARED;
-	     sp->u.string = ref_string(current_prog->strings[EXTRACT_UCHAR(pc++)]);
-	     break;
+	    DEBUG_CHECK1(EXTRACT_UCHAR(pc) >= current_prog->num_strings,
+			 "string %d out of range in F_STRING!\n",
+			 EXTRACT_UCHAR(pc));
+	    (++sp)->type = T_STRING;
+	    sp->subtype = STRING_SHARED;
+	    sp->u.string = ref_string(current_prog->strings[EXTRACT_UCHAR(pc++)]);
+	    break;
 	case F_SUBTRACT:
 	    {
 		i = (sp--)->type;
@@ -3141,7 +3093,7 @@ call_program P2(program_t *, prog, int, offset) {
 	    }
 	case F_END_CATCH:
 	    {
-		pop_stack();/* discard expression value */
+		pop_stack();	/* discard expression value */
 		free_svalue(&catch_value, "F_END_CATCH");
 		catch_value.type = T_NUMBER;
 		catch_value.u.number = 0;
@@ -3149,7 +3101,7 @@ call_program P2(program_t *, prog, int, offset) {
 		pop_control_stack();
 		push_pop_error_context(0);
 		push_number(0);
-		return;	/* return to do_catch */
+		return;		/* return to do_catch */
 	    }
 	case F_TIME_EXPRESSION:
 	    {
@@ -3192,10 +3144,10 @@ call_program P2(program_t *, prog, int, offset) {
 		debug_fatal("No case for eoperator %s (%d)\n",
 			    get_f_name(instruction), instruction);
 	    }
-	     if (instrs[instruction].ret_type == TYPE_NOVALUE)
-		     expected_stack = sp - st_num_arg;
-		 else
-		     expected_stack = sp - st_num_arg + 1;
+	    if (instrs[instruction].ret_type == TYPE_NOVALUE)
+		expected_stack = sp - st_num_arg;
+	    else
+		expected_stack = sp - st_num_arg + 1;
 #endif
 	    if (st_num_arg > 0) {
 		CHECK_TYPES(sp - st_num_arg + 1, instrs[instruction].type[0], 1, instruction);
@@ -3209,13 +3161,13 @@ call_program P2(program_t *, prog, int, offset) {
 
 	    (*oefun_table[instruction]) ();
 	    DEBUG_CHECK2(expected_stack != sp,
-		 "Bad stack after evaluation. Instruction %d, num arg %d\n",
+			 "Bad stack after evaluation. Instruction %d, num arg %d\n",
 			 instruction, num_arg);
-	}  /* switch (instruction) */
+	} /* switch (instruction) */
 	DEBUG_CHECK2(sp < fp + csp->num_local_variables - 1,
-		 "Bad stack after evaluation. Instruction %d, num arg %d\n",
+		     "Bad stack after evaluation. Instruction %d, num arg %d\n",
 		     instruction, num_arg);
-    }   /* while (1) */
+    } /* while (1) */
 }
 
 static void
@@ -3224,7 +3176,7 @@ do_catch P2(char *, pc, unsigned short, new_pc_offset)
     push_control_stack(FRAME_CATCH, 0);
     /* next two probably not necessary... */
     csp->pc = current_prog->program + new_pc_offset;
-    csp->num_local_variables = (csp - 1)->num_local_variables;	/* marion */
+    csp->num_local_variables = (csp - 1)->num_local_variables; /* marion */
     /*
      * Save some global variables that must be restored separately after a
      * longjmp. The stack will have to be manually popped all the way.
@@ -3338,7 +3290,7 @@ int apply_low P3(char *, fun, object_t *, ob, int, num_arg)
     int i, j;
     int local_call_origin = call_origin;
     IF_DEBUG(control_stack_t *save_csp);
-
+    
     if (!local_call_origin)
 	local_call_origin = ORIGIN_DRIVER;
     call_origin = 0;
@@ -3368,7 +3320,7 @@ int apply_low P3(char *, fun, object_t *, ob, int, num_arg)
 	while (ob->shadowed && ob->shadowed != current_object)
 	    ob = ob->shadowed;
 #endif
-      retry_for_shadow:
+    retry_for_shadow:
 	if (ob->flags & O_SWAPPED)
 	    load_ob_from_swap(ob);
 	progp = ob->prog;
@@ -3443,9 +3395,9 @@ int apply_low P3(char *, fun, object_t *, ob, int, num_arg)
 		 * resulting value is always returned on the stack.
 		 */
 		return 1;
-	    }			/* when we come here, the cache has told us
-				 * that the function isn't defined in the
-				 * object */
+	    } /* when we come here, the cache has told us
+	       * that the function isn't defined in the
+	       * object */
 	} else {
 	    /* we have to search the function */
 	    if (!entry->progp && entry->id) {
@@ -3507,8 +3459,8 @@ int apply_low P3(char *, fun, object_t *, ob, int, num_arg)
 		    entry->name = pr->name;
 		    csp->num_local_variables = num_arg;
 		    current_prog = progp;
-		    entry->oprogp = current_prog;	/* before
-							 * setup_new_frame */
+		    entry->oprogp = current_prog; /* before
+						   * setup_new_frame */
 		    pr = setup_new_frame(pr);
 		    entry->pr_inherited = pr;
 		    entry->progp = current_prog;
@@ -3521,7 +3473,7 @@ int apply_low P3(char *, fun, object_t *, ob, int, num_arg)
 		    current_object = ob;
 		    IF_DEBUG(save_csp = csp);
 		    call_program(current_prog, pr->offset);
-
+		    
 		    DEBUG_CHECK(save_csp - 1 != csp,
 				"Bad csp after execution in apply_low\n");
 		    /*
@@ -3547,12 +3499,12 @@ int apply_low P3(char *, fun, object_t *, ob, int, num_arg)
 	    goto retry_for_shadow;
 	}
 #endif
-    }				/* !failure */
+    } /* !failure */
     /* Failure. Deallocate stack. */
     pop_n_elems(num_arg);
     return 0;
 }
-
+    
 /*
  * Arguments are supposed to be
  * pushed (using push_string() etc) before the call. A pointer to a
@@ -3562,21 +3514,21 @@ int apply_low P3(char *, fun, object_t *, ob, int, num_arg)
  * Reference counts will be updated for this value, to ensure that no pointers
  * are deallocated.
  */
-
+    
 svalue_t *apply P4(char *, fun, object_t *, ob, int, num_arg,
-			int, where)
+		   int, where)
 {
     IF_DEBUG(svalue_t *expected_sp);
-
+    
     tracedepth = 0;
     call_origin = where;
-
+    
 #ifdef TRACE
     if (TRACEP(TRACE_APPLY)) {
 	do_trace("Apply", "", "\n");
     }
 #endif
-
+    
     IF_DEBUG(expected_sp = sp - num_arg);
     if (apply_low(fun, ob, num_arg) == 0)
 	return 0;
@@ -3599,25 +3551,25 @@ void call___INIT P1(object_t *, ob)
     int num_functions;
     IF_DEBUG(svalue_t *expected_sp);
     IF_DEBUG(control_stack_t *save_csp);
-
+    
     tracedepth = 0;
     
 #ifdef TRACE
     if (TRACEP(TRACE_APPLY)) {
-        do_trace("Apply", "", "\n");
+	do_trace("Apply", "", "\n");
     }
 #endif
-
+    
     IF_DEBUG(expected_sp = sp);
     
     /* No try_reset here for obvious reasons :) */
-
+    
     ob->flags &= ~O_RESET_STATE;
-
+    
     progp = ob->prog;
     num_functions = progp->num_functions;
     if (!num_functions) return;
-
+    
     /* ___INIT turns out to be always the last function */
     pr = progp->functions + num_functions - 1;
     if (*pr->name != APPLY___INIT_SPECIAL_CHAR) return;
@@ -3625,7 +3577,7 @@ void call___INIT P1(object_t *, ob)
     caller_type = ORIGIN_DRIVER;
     csp->num_local_variables = 0;
     current_prog = progp;
-
+    
     pr = setup_new_frame(pr);
 #ifdef OLD_PREVIOUS_OBJECT_BEHAVIOUR
     if (current_object != ob)
@@ -3635,12 +3587,12 @@ void call___INIT P1(object_t *, ob)
     current_object = ob;
     IF_DEBUG(save_csp = csp);
     call_program(current_prog, pr->offset);
-
+    
     DEBUG_CHECK(save_csp - 1 != csp,
 		"Bad csp after execution in apply_low\n");
     sp--;
     DEBUG_CHECK(expected_sp != sp,
-                "Corrupt stack pointer.\n");
+		"Corrupt stack pointer.\n");
 }
 
 /*
@@ -3654,7 +3606,7 @@ void call___INIT P1(object_t *, ob)
  */
 
 svalue_t *
-       safe_apply P4(char *, fun, object_t *, ob, int, num_arg, int, where)
+safe_apply P4(char *, fun, object_t *, ob, int, num_arg, int, where)
 {
     jmp_buf save_error_recovery_context;
     svalue_t *ret;
@@ -3699,7 +3651,7 @@ svalue_t *
     debug(32768, ("safe_apply: after csp = %d\n", csp));
     error_recovery_context_exists = old_error_context_exists;
     memcpy((char *) error_recovery_context,
-      (char *) save_error_recovery_context, sizeof(error_recovery_context));
+	   (char *) save_error_recovery_context, sizeof(error_recovery_context));
     command_giver = save_command_giver;
     return ret;
 }
@@ -3754,15 +3706,14 @@ char *function_exists P2(char *, fun, object_t *, ob)
 {
     function_t *pr;
     char *funname;
-
+    
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
     int i;
-
 #endif
-
+    
     DEBUG_CHECK(ob->flags & O_DESTRUCTED,
 		"function_exists() on destructed object\n");
-
+    
     if (ob->flags & O_SWAPPED)
 	load_ob_from_swap(ob);
     pr = ob->prog->functions;
@@ -3773,7 +3724,7 @@ char *function_exists P2(char *, fun, object_t *, ob)
 			    ob->prog->tree_r, funname);
 	if (i != -1) {
 	    program_t *progp;
-
+	    
 	    pr = (function_t *) & ob->prog->functions[i];
 	    if ((pr->flags & NAME_UNDEFINED) ||
 		((pr->type & TYPE_MOD_STATIC) && current_object != ob))
@@ -3781,7 +3732,7 @@ char *function_exists P2(char *, fun, object_t *, ob)
 #else
 	for (; pr < ob->prog->functions + ob->prog->num_functions; pr++) {
 	    program_t *progp;
-
+	    
 	    /* okay to compare pointers since both are shared strings */
 	    if (funname != pr->name)
 		continue;
@@ -3800,19 +3751,17 @@ char *function_exists P2(char *, fun, object_t *, ob)
     }
     return 0;
 }
-
+    
 #ifndef NO_SHADOWS
 /*
-  is_static: returns 1 if a function named 'fun' is declared 'static' in 'ob';
-  0 otherwise.
-*/
-
-int is_static(fun, ob)
-    char *fun;
-    object_t *ob;
+   is_static: returns 1 if a function named 'fun' is declared 'static' in 'ob';
+   0 otherwise.
+   */
+    
+int is_static P2(char *, fun, object_t *, ob)
 {
     char *funname;
-
+    
     DEBUG_CHECK(ob->flags & O_DESTRUCTED,
 		"is_static() on destructed object\n");
     if (ob->flags & O_SWAPPED)
@@ -3820,17 +3769,17 @@ int is_static(fun, ob)
     /* all function names are in the shared string table */
     if ((funname = findstring(fun))) {
 	function_t *pr;
-
+	
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
 	int i;
-
+	
 	i = lookup_function(ob->prog->functions,
 			    ob->prog->tree_r, funname);
 	if (i != -1) {
 	    pr = (function_t *) & ob->prog->functions[i];
 #else
 	function_t *limit;
-
+	    
 	limit = ob->prog->functions + ob->prog->num_functions;
 	for (pr = ob->prog->functions; pr < limit; pr++) {
 	    /* okay to compare pointers since both are shared strings */
@@ -3846,13 +3795,13 @@ int is_static(fun, ob)
     return 0;
 }
 #endif
-
+	
 /*
  * Call a specific function address in an object. This is done with no
  * frame set up. It is expected that there are no arguments. Returned
  * values are removed.
  */
-
+    
 void call_function P2(program_t *, progp, function_t *, pr)
 {
     if (pr->flags & NAME_UNDEFINED)
@@ -3875,7 +3824,7 @@ void translate_absolute_line P4(int, abs_line, unsigned short *, file_info,
     unsigned short *p1, *p2;
     int file;
     int line_tmp = abs_line;
-
+    
     /* two passes: first, find out what file we're interested in */
     p1 = file_info;
     while (line_tmp > *p1) {
@@ -3883,7 +3832,7 @@ void translate_absolute_line P4(int, abs_line, unsigned short *, file_info,
 	p1 += 2;
     }
     file = p1[1];
-
+    
     /* now correct the line number for that file */
     p2 = file_info;
     while (p2 < p1) {
@@ -3902,19 +3851,19 @@ int find_line P4(char *, p, program_t *, progp,
     unsigned char *lns;
     short abs_line;
     int file_idx;
-
+    
     *ret_file = "";
     *ret_line = 0;
-
+    
     if (!progp) return 1;
     if (progp == &fake_prog) return 2;
-
+    
 #if defined(LPC_TO_C)
     /* currently no line number info for compiled programs */
     if (progp->program_size == 0) 
 	return 3;
 #endif
-	
+    
     /*
      * Load line numbers from swap if necessary.  Leave them in memory until
      * look_for_objects_to_swap() swaps them back out, since more errors are
@@ -3927,19 +3876,19 @@ int find_line P4(char *, p, program_t *, progp,
     }
     offset = p - progp->program;
     DEBUG_CHECK2(offset > (int) progp->program_size,
-		 "Illegal offset %d in object %s\n", offset, progp->name);
-
+		 "Illegal offset %d in object /%s\n", offset, progp->name);
+    
     lns = progp->line_info;
     while (offset > *lns) {
 	offset -= *lns;
 	lns += 3;
     }
-
+    
     COPY_SHORT(&abs_line, lns + 1);
-
+    
     translate_absolute_line(abs_line, &progp->file_info[2], 
 			    &file_idx, ret_line);
-
+    
     *ret_file = progp->strings[file_idx - 1];
     return 0;
 }
@@ -3958,7 +3907,7 @@ void get_line_number_info P2(char **, ret_file, int *, ret_line)
 	*ret_file = current_prog->name;
 }
 
-static char* get_line_number P2(char *, p, program_t *, progp)
+char* get_line_number P2(char *, p, program_t *, progp)
 {
     static char buf[256];
     int i;
@@ -4016,39 +3965,39 @@ char *dump_trace P1(int, how)
 	(void) last_instructions();
 #endif
     for (p = &control_stack[0]; p < csp; p++) {
-      switch (p[0].framekind) {
-      case FRAME_FUNCTION:
-          debug_message("'%15s' in '%20s' ('%20s') %s\n",
-		      p[0].fr.func->name, p[1].prog->name, p[1].ob->name,
-		      get_line_number(p[1].pc, p[1].prog));
-	  if (strcmp(p[0].fr.func->name, "heart_beat") == 0)
-              ret = p->ob ? p->ob->name : 0;
-          funp = p[0].fr.func;
-          break;
-      case FRAME_FUNP:
-          debug_message("'     <function>' in '%20s' ('%20s') %s\n",
-                        p[1].prog->name, p[1].ob->name,
-                        get_line_number(p[1].pc, p[1].prog));
-          funp = (function_t *)&p[0].fr.funp->f.functional;
-          break;
-      case FRAME_FAKE:
-          debug_message("'     <function>' in '%20s' ('%20s') %s\n",
-                        p[1].prog->name, p[1].ob->name,
-                        get_line_number(p[1].pc, p[1].prog));
-          funp = 0;
-          break;
-      case FRAME_CATCH:
-          debug_message("'          CATCH' in '%20s' ('%20s') %s\n",
-                        p[1].prog->name, p[1].ob->name,
-                        get_line_number(p[1].pc, p[1].prog));
-          funp = 0;
-          break;
-      }
+	switch (p[0].framekind) {
+	case FRAME_FUNCTION:
+	    debug_message("'%15s' in '%20s' ('%20s') %s\n",
+			  p[0].fr.func->name, p[1].prog->name, p[1].ob->name,
+			  get_line_number(p[1].pc, p[1].prog));
+	    if (strcmp(p[0].fr.func->name, "heart_beat") == 0)
+		ret = p->ob ? p->ob->name : 0;
+	    funp = p[0].fr.func;
+	    break;
+	case FRAME_FUNP:
+	    debug_message("'     <function>' in '%20s' ('%20s') %s\n",
+			  p[1].prog->name, p[1].ob->name,
+			  get_line_number(p[1].pc, p[1].prog));
+	    funp = (function_t *)&p[0].fr.funp->f.functional;
+	    break;
+	case FRAME_FAKE:
+	    debug_message("'     <function>' in '%20s' ('%20s') %s\n",
+			  p[1].prog->name, p[1].ob->name,
+			  get_line_number(p[1].pc, p[1].prog));
+	    funp = 0;
+	    break;
+	case FRAME_CATCH:
+	    debug_message("'          CATCH' in '%20s' ('%20s') %s\n",
+			  p[1].prog->name, p[1].ob->name,
+			  get_line_number(p[1].pc, p[1].prog));
+	    funp = 0;
+	    break;
+	}
 #ifdef ARGUMENTS_IN_TRACEBACK
-      if (funp) {
-	  ptr = p[1].fp;
-          debug_message("arguments were (");
-          for (i = 0; i < funp->num_arg; i++) {
+	if (funp) {
+	    ptr = p[1].fp;
+	    debug_message("arguments were (");
+	    for (i = 0; i < funp->num_arg; i++) {
 		char *buf;
 
 		if (i) {
@@ -4061,54 +4010,54 @@ char *dump_trace P1(int, how)
 		FREE(buf);
 	    }
 	    debug_message(")\n");
-      }
+	}
 #endif
 #ifdef LOCALS_IN_TRACEBACK
-      if (funp && funp->num_local) {
-	  ptr = p[1].fp + funp->num_arg;
-	  debug_message("locals were: ");
-	  for (i = 0; i < funp->num_local; i++) {
-	      char *buf;
+	if (funp && funp->num_local) {
+	    ptr = p[1].fp + funp->num_arg;
+	    debug_message("locals were: ");
+	    for (i = 0; i < funp->num_local; i++) {
+		char *buf;
 	      
-	      if (i) {
-		  debug_message(",");
-	      }
-	      buf = (char *) DMALLOC(50, TAG_TEMPORARY, "dump_trace:2");
-	      *buf = 0;
-	      svalue_to_string(&ptr[i], &buf, 50, 0, 0, 0);
-	      debug_message("%s", buf);
-	      FREE(buf);
-	  }	
-	  debug_message("\n");
-      }
+		if (i) {
+		    debug_message(",");
+		}
+		buf = (char *) DMALLOC(50, TAG_TEMPORARY, "dump_trace:2");
+		*buf = 0;
+		svalue_to_string(&ptr[i], &buf, 50, 0, 0, 0);
+		debug_message("%s", buf);
+		FREE(buf);
+	    }	
+	    debug_message("\n");
+	}
 #endif
     }
     switch (p[0].framekind) {
     case FRAME_FUNCTION:
-      debug_message("'%15s' in '%20s' ('%20s') %s\n",
-                    p[0].fr.func->name,
-                    current_prog->name, current_object->name,
-                    get_line_number(pc, current_prog));
-      funp = p[0].fr.func;
-      break;
+	debug_message("'%15s' in '%20s' ('%20s') %s\n",
+		      p[0].fr.func->name,
+		      current_prog->name, current_object->name,
+		      get_line_number(pc, current_prog));
+	funp = p[0].fr.func;
+	break;
     case FRAME_FUNP:
-      debug_message("'     <function>' in '%20s' ('%20s') %s\n",
-                    current_prog->name, current_object->name,
-                    get_line_number(pc, current_prog));
-      funp = (function_t *)&p[0].fr.funp->f.functional;
-      break;
+	debug_message("'     <function>' in '%20s' ('%20s') %s\n",
+		      current_prog->name, current_object->name,
+		      get_line_number(pc, current_prog));
+	funp = (function_t *)&p[0].fr.funp->f.functional;
+	break;
     case FRAME_FAKE:
-      debug_message("'     <function>' in '%20s' ('%20s') %s\n",
-                    current_prog->name, current_object->name,
-                    get_line_number(pc, current_prog));
-      funp = 0;
-      break;
+	debug_message("'     <function>' in '%20s' ('%20s') %s\n",
+		      current_prog->name, current_object->name,
+		      get_line_number(pc, current_prog));
+	funp = 0;
+	break;
     case FRAME_CATCH:
-      debug_message("'          CATCH' in '%20s' ('%20s') %s\n",
-                    current_prog->name, current_object->name,
-                    get_line_number(pc, current_prog));
-      funp = 0;
-      break;
+	debug_message("'          CATCH' in '%20s' ('%20s') %s\n",
+		      current_prog->name, current_object->name,
+		      get_line_number(pc, current_prog));
+	funp = 0;
+	break;
     }
 #ifdef ARGUMENTS_IN_TRACEBACK
     if (funp) {
@@ -4175,24 +4124,24 @@ array_t *get_svalue_trace()
     v = allocate_empty_array((csp - &control_stack[0]) + 1);
     for (p = &control_stack[0]; p < csp; p++) {
 	m = allocate_mapping(6);
-        switch (p[0].framekind) {
-	  case FRAME_FUNCTION:
+	switch (p[0].framekind) {
+	case FRAME_FUNCTION:
 	    add_mapping_string(m, "function", p[0].fr.func->name);
 	    funp = p[0].fr.func;
 	    break;
-	  case FRAME_CATCH:
+	case FRAME_CATCH:
 	    add_mapping_string(m, "function", "CATCH");
 	    funp = 0;
 	    break;
-	  case FRAME_FAKE:
+	case FRAME_FAKE:
 	    add_mapping_string(m, "function", "<function>");
 	    funp = 0;
 	    break;
-	  case FRAME_FUNP:
+	case FRAME_FUNP:
 	    add_mapping_string(m, "function", "<function>");
 	    funp = (function_t *)&p[0].fr.funp->f.functional;
 	    break;
-        }
+	}
 	add_mapping_string(m, "program", p[1].prog->name);
 	add_mapping_object(m, "object", p[1].ob);
 	get_explicit_line_number_info(p[1].pc, p[1].prog, &file, &line);
@@ -4233,21 +4182,21 @@ array_t *get_svalue_trace()
     m = allocate_mapping(6);
     switch (p[0].framekind) {
     case FRAME_FUNCTION:
-      add_mapping_string(m, "function", p[0].fr.func->name);
-      funp = p[0].fr.func;
-      break;
+	add_mapping_string(m, "function", p[0].fr.func->name);
+	funp = p[0].fr.func;
+	break;
     case FRAME_CATCH:
-      add_mapping_string(m, "function", "CATCH");
-      funp = 0;
-      break;
+	add_mapping_string(m, "function", "CATCH");
+	funp = 0;
+	break;
     case FRAME_FAKE:
-      add_mapping_string(m, "function", "<function>");
-      funp = 0;
-      break;
+	add_mapping_string(m, "function", "<function>");
+	funp = 0;
+	break;
     case FRAME_FUNP:
-      add_mapping_string(m, "function", "<function>");
-      funp = (function_t *)&p[0].fr.funp->f.functional;
-      break;
+	add_mapping_string(m, "function", "<function>");
+	funp = (function_t *)&p[0].fr.funp->f.functional;
+	break;
     }
     add_mapping_string(m, "program", current_prog->name);
     add_mapping_object(m, "object", current_object);
@@ -4296,24 +4245,24 @@ char * get_line_number_if_any()
 }
 
 #define SSCANF_ASSIGN_SVALUE_STRING(S) \
-    arg->type = T_STRING; \
-    arg->u.string = S; \
-    arg->subtype = STRING_MALLOC; \
-    arg--; \
-    num_arg--
+arg->type = T_STRING; \
+arg->u.string = S; \
+arg->subtype = STRING_MALLOC; \
+arg--; \
+num_arg--
 
 #define SSCANF_ASSIGN_SVALUE_NUMBER(N) \
-    arg->type = T_NUMBER; \
-    arg->subtype = 0; \
-    arg->u.number = N; \
-    arg--; \
-    num_arg--
+arg->type = T_NUMBER; \
+arg->subtype = 0; \
+arg->u.number = N; \
+arg--; \
+num_arg--
 
 #define SSCANF_ASSIGN_SVALUE(T,U,V) \
-    arg->type = T; \
-    arg->U = V; \
-    arg--; \
-    num_arg--
+arg->type = T; \
+arg->U = V; \
+arg--; \
+num_arg--
 
 /* arg points to the same place it used to */
 int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_arg)
@@ -4410,7 +4359,7 @@ int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_ar
 	    int tmp_num;
 
 	    tmp_num = (int) strtol(in_string, &in_string, 10);
-	    if (tmp == in_string)	/* No match */
+	    if (tmp == in_string) /* No match */
 		break;
 
 	    if (!skipme) {
@@ -4427,7 +4376,7 @@ int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_ar
 	    float tmp_num;
 
 	    tmp_num = _strtof(in_string, &in_string);
-	    if (tmp == in_string)	/* No match */
+	    if (tmp == in_string) /* No match */
 		break;
 
 	    if (!skipme) {
@@ -4724,9 +4673,9 @@ int assert_master_ob_loaded P2(char *, fun, char *, arg) {
     if (master_ob_is_loading || (master_ob == (object_t *)-1))
 	return -1;
     if (!master_ob || (master_ob->flags & O_DESTRUCTED)) {
-        object_t *ob;
+	object_t *ob;
 
-        ob = load_object(master_file_name, 0);
+	ob = load_object(master_file_name, 0);
 	if (!ob) {
 	    fprintf(stderr, "%s(%s) failed: Master failed to load.\n", fun, arg);
 	    return 0;
@@ -4857,3 +4806,6 @@ void mark_stack() {
     for (sv = start_of_stack; sv <= sp; sv++) mark_svalue(sv);
 }
 #endif
+
+
+

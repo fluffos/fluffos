@@ -1,5 +1,3 @@
-package sockets;
-
 /*
  * socket efuns
  */

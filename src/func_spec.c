@@ -1,4 +1,5 @@
 #define _FUNC_SPEC_
+#define EDIT_SOURCE
 #include "std.h"
 
 #include "op_spec.c"
@@ -241,16 +242,8 @@ void message(mixed, string, string | string * | object | object *,
 /*
  * various mudlib statistics
  */
-#ifndef NO_MUDLIB_STATS
-#include "packages/mudlib_stats.spec"
-#endif
     int memory_info(object | void);
     mixed get_config(int);
-
-/* uid functions */
-#ifndef NO_UIDS
-#include "packages/uids.spec"
-#endif
 
 #ifdef PRIVS
 /* privledge functions */
@@ -262,10 +255,6 @@ void message(mixed, string, string | string * | object | object *,
     object *children(string);
 
     void reload_object(object);
-
-#ifdef SOCKET_EFUNS
-#include "packages/sockets.spec"
-#endif				/* SOCKET_EFUNS */
 
     void error(string);
     int uptime();
@@ -283,27 +272,11 @@ void message(mixed, string, string | string * | object | object *,
     int query_ed_mode();
 #endif
 
-#ifdef MATH
-#include "packages/math.spec"
-#endif
-
-#ifdef MATRIX
-#include "packages/matrix.spec"
-#endif
-
 #ifdef CACHE_STATS
     void cache_stats();
 #endif
 
     object *deep_inventory(object);
-
-/*
- * MIRE efuns for the MIRE project at MIT
- */
-
-#ifdef MIRE
-#include "packages/mire.spec"
-#endif
 
     mixed filter(mixed * | mapping, string | function, object | string | void, ...);
     mixed filter_array filter(mixed *, string | function, void | object | string, ...);
@@ -348,27 +321,6 @@ void message(mixed, string, string | string * | object | object *,
 
 #ifdef PROFILE_FUNCTIONS
     mapping *function_profile(object default:F_THIS_OBJECT);
-#endif
-
-/*
- * Change 0 to 1 on the next line for 0.9.18 compatibility efuns
- */
-#if 0
-#include "packages/compat.spec"
-#endif
-
-/* Efuns that are only useful to people who know something about driver
- * internals
- */
-#if 1
-#include "packages/develop.spec"
-#endif
-
-/*  To some one of the contributed efuns, change 0 to 1 on the next line
- *  and comment the efuns you don't want out of packages/contrib.spec
- */
-#if 0
-#include "packages/contrib.spec"
 #endif
 
 #ifdef DEBUG

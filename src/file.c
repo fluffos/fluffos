@@ -109,13 +109,10 @@ array_t *get_dir P2(char *, path, int, flags)
     DIR *dirp;
     int namelen, do_match = 0;
 
-#if defined(_AIX) || defined(M_UNIX) || defined(OSF) || defined(_SEQUENT_) \
-	|| defined(SVR4) || defined(cray) || defined(SunOS_5) || defined(LATTICE)
+#ifdef USE_STRUCT_DIRENT
     struct dirent *de;
-
 #else
     struct direct *de;
-
 #endif
     struct stat st;
     char *endtemp;
@@ -227,8 +224,7 @@ array_t *get_dir P2(char *, path, int, flags)
     DosFindClose(FileHandle);
 #else				/* OS2 */
     for (de = readdir(dirp); de; de = readdir(dirp)) {
-#if defined(OSF) || defined(M_UNIX) || defined(_SEQUENT_) || defined(SVR4) \
-	|| defined(linux) || defined(cray) || defined(SunOS_5)
+#ifdef USE_STRUCT_DIRENT
 	namelen = strlen(de->d_name);
 #else
 	namelen = de->d_namlen;
@@ -291,8 +287,7 @@ array_t *get_dir P2(char *, path, int, flags)
 	strcat(endtemp++, "/");
 
     for (i = 0, de = readdir(dirp); i < count; de = readdir(dirp)) {
-#if defined(OSF) || defined(_SEQUENT_) || defined(SVR4) || defined(linux) \
-     || defined(M_UNIX) || defined(cray) || defined(SunOS_5)
+#ifdef USE_STRUCT_DIRENT
 	namelen = strlen(de->d_name);
 #else
 	namelen = de->d_namlen;
@@ -318,8 +313,7 @@ array_t *get_dir P2(char *, path, int, flags)
 #endif				/* OS2 */
 
     /* Sort the names. */
-#if defined(_SEQUENT_) || defined(SVR4) || \
-    (defined(__386BSD__) && defined(__FreeBSD__))
+#if 1
     qsort((void *) v->item, count, sizeof v->item[0],
 	  (int (*) ()) ((flags == -1) ? parrcmp : pstrcmp));
 #else
@@ -488,10 +482,10 @@ int write_file P3(char *, file, char *, str, int, flags)
     f = fopen(file, (flags & 1) ? "w" : "a");
     if (f == 0) {
 	if (errno < sys_nerr) {
-	    error("Wrong permissions for opening file %s for %s.\n\"%s\"\n",
+	    error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n",
 		  file, (flags & 1) ? "overwrite" : "append", sys_errlist[errno]);
 	} else {
-	    error("Wrong permissions for opening file %s for %s.\n", file, (flags & 1) ? "overwrite" : "append");
+	    error("Wrong permissions for opening file /%s for %s.\n", file, (flags & 1) ? "overwrite" : "append");
 	}
     }
     fwrite(str, strlen(str), 1, f);
@@ -947,7 +941,7 @@ static int copy P2(char *, from, char *, to)
 static int do_move P3(char *, from, char *, to, int, flag)
 {
     if (lstat(from, &from_stats) != 0) {
-	error("%s: lstat failed\n", from);
+	error("/%s: lstat failed\n", from);
 	return 1;
     }
     if (lstat(to, &to_stats) == 0) {
@@ -958,15 +952,15 @@ static int do_move P3(char *, from, char *, to, int, flag)
 	if (same_file(from, to))
 #endif
 	{
-	    error("`%s' and `%s' are the same file", from, to);
+	    error("`/%s' and `/%s' are the same file", from, to);
 	    return 1;
 	}
 	if (S_ISDIR(to_stats.st_mode)) {
-	    error("%s: cannot overwrite directory", to);
+	    error("/%s: cannot overwrite directory", to);
 	    return 1;
 	}
     } else if (errno != ENOENT) {
-	error("%s: unknown error\n", to);
+	error("/%s: unknown error\n", to);
 	return 1;
     }
 #if defined(SYSV) && !defined(_SEQUENT_)
@@ -986,9 +980,9 @@ static int do_move P3(char *, from, char *, to, int, flag)
 
     if (errno != EXDEV) {
 	if (flag == F_RENAME)
-	    error("cannot move `%s' to `%s'\n", from, to);
+	    error("cannot move `/%s' to `/%s'\n", from, to);
 	else
-	    error("cannot link `%s' to `%s'\n", from, to);
+	    error("cannot link `/%s' to `/%s'\n", from, to);
 	return 1;
     }
     /* rename failed on cross-filesystem link.  Copy the file instead. */
@@ -997,7 +991,7 @@ static int do_move P3(char *, from, char *, to, int, flag)
 	if (copy(from, to))
 	    return 1;
 	if (unlink(from)) {
-	    error("cannot remove `%s'", from);
+	    error("cannot remove `/%s'", from);
 	    return 1;
 	}
     }

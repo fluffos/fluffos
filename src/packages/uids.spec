@@ -1,5 +1,3 @@
-package uids;
-
 int export_uid(object);
 string geteuid(function | object default:F_THIS_OBJECT);
 string getuid(object default:F_THIS_OBJECT);

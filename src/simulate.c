@@ -42,7 +42,7 @@ object_t *current_interactive;	/* The user who caused this execution */
 #ifdef PRIVS
 static void init_privs_for_object PROT((object_t *));
 #endif
-#ifndef NO_UIDS
+#ifdef PACKAGE_UIDS
 static int give_uid_to_object PROT((object_t *));
 #endif
 static int init_object PROT((object_t *));
@@ -55,21 +55,6 @@ static sentence_t *alloc_sentence PROT((void));
 static void remove_sent PROT((object_t *, object_t *));
 #endif
 static void error_handler PROT((char *));
-
-variable_t *find_status P2(char *, str, int, must_find)
-{
-    int i;
-
-    for (i = 0; i < (int) current_object->prog->num_variables; i++) {
-	if (strcmp(current_object->prog->variable_names[i].name, str) == 0)
-	    return &current_object->prog->variable_names[i];
-    }
-    if (!must_find)
-	return 0;
-    error("--Status %s not found in prog for %s\n", str,
-	  current_object->name);
-    return 0;
-}
 
 INLINE void check_legal_string P1(char *, s)
 {
@@ -96,7 +81,7 @@ init_privs_for_object P1(object_t *, ob)
 	tmp_ob = master_ob;
     }
     if (!current_object
-#ifndef NO_UIDS
+#ifdef PACKAGE_UIDS
 	|| !current_object->uid
 #endif
     ) {
@@ -117,7 +102,7 @@ init_privs_for_object P1(object_t *, ob)
 /*
  * Give the correct uid and euid to a created object.
  */
-#ifndef NO_UIDS
+#ifdef PACKAGE_UIDS
 static char *creator_file_fname = (char *) 0;
 
 static int give_uid_to_object P1(object_t *, ob)
@@ -206,20 +191,20 @@ static int give_uid_to_object P1(object_t *, ob)
 
 static int init_object P1(object_t *, ob)
 {
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     init_stats_for_object(ob);
 #endif
 #ifdef PRIVS
     init_privs_for_object(ob);
 #endif				/* PRIVS */
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     add_objects(&ob->stats, 1);
 #endif
 #ifdef NO_ADD_ACTION
     if (function_exists("catch_tell", ob))
 	ob->flags |= O_LISTENER;
 #endif
-#ifndef NO_UIDS
+#ifdef PACKAGE_UIDS
     return give_uid_to_object(ob);
 #else
     return 1;
@@ -236,26 +221,26 @@ static svalue_t *
     push_string(name, STRING_MALLOC);
     v = apply_master_ob(APPLY_COMPILE_OBJECT, 1);
     if (!v || (v->type != T_OBJECT)) {
-	fprintf(stderr, "Could not load file: %s\n", name);
-	error("Failed to load file: %s\n", name);
+	fprintf(stderr, "Could not load file: /%s\n", name);
+	error("Failed to load file: /%s\n", name);
 	return 0;
     }
     return v;
 }
 
 void set_master P1(object_t *, ob) {
-#if !defined(NO_UIDS) || !defined(NO_MUDLIB_STATS)
+#if defined(PACKAGE_UIDS) || defined(PACKAGE_MUDLIB_STATS)
     int first_load = (master_ob == (object_t *)-1);
 #endif
-#ifndef NO_UIDS
+#ifdef PACKAGE_UIDS
     svalue_t *ret;
 #endif
 
     master_ob = ob;
     /* Make sure master_ob is never made a dangling pointer. */
     add_ref(master_ob, "set_master");
-#ifdef NO_UIDS
-#  ifndef NO_MUDLIB_STATS
+#ifndef PACKAGE_UIDS
+#  ifdef PACKAGE_MUDLIB_STATS
     if (first_load) {
       set_backbone_domain("BACKBONE");
       set_master_author("NONAME");
@@ -265,21 +250,24 @@ void set_master P1(object_t *, ob) {
     ret = apply_master_ob(APPLY_GET_ROOT_UID, 0);
     /* can't be -1 or we wouldn't be here */
     if (ret == 0 || ret->type != T_STRING) {
-        debug_fatal("%s() in master object does not work\n",
+        fprintf("%s() in master object does not work\n",
 		    APPLY_GET_ROOT_UID);
+	exit(-1);
     }
     if (first_load) {
       master_ob->uid = set_root_uid(ret->u.string);
       master_ob->euid = master_ob->uid;
-#  ifndef NO_MUDLIB_STATS
+#  ifdef PACKAGE_MUDLIB_STATS
       set_master_author(ret->u.string);
 #  endif
       ret = apply_master_ob(APPLY_GET_BACKBONE_UID, 0);
       if (ret == 0 || ret->type != T_STRING) {
-        fatal("%s() in the master file does not work\n", APPLY_GET_BACKBONE_UID);
+	  fprintf("%s() in the master file does not work\n",
+		  APPLY_GET_BACKBONE_UID);
+	  exit(-1);
       }
       set_backbone_uid(ret->u.string);
-#  ifndef NO_MUDLIB_STATS
+#  ifdef PACKAGE_MUDLIB_STATS
       set_backbone_domain(ret->u.string);
 #  endif
     } else {
@@ -302,7 +290,7 @@ char *check_name P1(char *, src) {
 }
 
 int strip_name P3(char *, src, char *, dest, int, size) {
-    char last_c;
+    char last_c = 0;
     char *p = dest;
     char *end = dest + size - 1;
 
@@ -310,7 +298,7 @@ int strip_name P3(char *, src, char *, dest, int, size) {
 
     while (*src && p < end) {
 	if (last_c == '/' && *src == '/') return 0;
-	*p++ = *src++;
+	last_c = (*p++ = *src++);
     }
     if (p - dest > 2 && p[-1] == 'c' && p[-2] == '.') 
 	p[-2] = 0;
@@ -359,12 +347,13 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 
     if (++num_objects_this_thread > INHERIT_CHAIN_SIZE)
 	error("Inherit chain too deep: > %d\n", INHERIT_CHAIN_SIZE);
-#ifndef NO_UIDS
+#ifdef PACKAGE_UIDS
     if (current_object && current_object->euid == NULL)
 	error("Can't load objects when no effective user.\n");
 #endif
     if (!strip_name(lname, name, sizeof name))
-	error("Filenames with consecutive /'s in them aren't allowed.\n");
+	error("Filenames with consecutive /'s in them aren't allowed (%s).\n",
+	      lname);
 
     if (!master_ob_is_loading && !strcmp(name, master_file_name)) {
 	master_ob_is_loading = 1;
@@ -410,6 +399,10 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 #ifdef LPC_TO_C
 	compile_to_c = save_compile_to_c;
 #endif
+#ifdef PRIVS
+	if (ob->privs) free_string(ob->privs);
+	init_privs_for_object(ob);
+#endif
 	return ob;
     }
     /*
@@ -418,8 +411,8 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
     if (!legal_path(real_name)) {
 	if (is_master_ob) master_ob_is_loading = 0;
 	if (simul_efun_is_loading) simul_efun_is_loading = 0;
-	fprintf(stderr, "Illegal pathname: %s\n", real_name);
-	error("Illegal path name '%s'.\n", real_name);
+	fprintf(stderr, "Illegal pathname: /%s\n", real_name);
+	error("Illegal path name '/%s'.\n", real_name);
 	return 0;
     }
 #ifdef BINARIES
@@ -427,7 +420,7 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 #endif
 	/* maybe move this section into compile_file? */
 	if (comp_flag) {
-	    fprintf(stderr, " compiling %s ...", real_name);
+	    fprintf(stderr, " compiling /%s ...", real_name);
 #ifdef LATTICE
 	    fflush(stderr);
 #endif
@@ -437,7 +430,7 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 	    if (is_master_ob) master_ob_is_loading = 0;
 	    if (simul_efun_is_loading) simul_efun_is_loading = 0;
 	    perror(real_name);
-	    error("Could not read the file '%s'.\n", real_name);
+	    error("Could not read the file '/%s'.\n", real_name);
 	}
 #ifdef LPC_TO_C
 	if (compile_to_c) {
@@ -446,7 +439,7 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 		if (is_master_ob) master_ob_is_loading = 0;
 		if (simul_efun_is_loading) simul_efun_is_loading = 0;
 		perror(out_ptr);
-		error("Could not open output file '%s'.\n", out_ptr);
+		error("Could not open output file '/%s'.\n", out_ptr);
 	    }
 	    compilation_ident = 0;
 	    compile_file(f, real_name);
@@ -478,8 +471,8 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 	if (prog)
 	    free_prog(prog, 1);
 	if (num_parse_error == 0 && prog == 0)
-	    error("No program in object '%s'!\n", lname);
-	error("Error in loading object '%s'\n", lname);
+	    error("No program in object '/%s'!\n", name);
+	error("Error in loading object '/%s'\n", name);
     }
     /*
      * This is an iterative process. If this object wants to inherit an
@@ -550,7 +543,7 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
     if (mret && !MASTER_APPROVED(mret)) {
         if (simul_efun_is_loading) simul_efun_is_loading = 0;
 	destruct_object_two(ob);
-	error("master object: " APPLY_VALID_OBJECT "() denied permission to load %s.\n", name);
+	error("master object: " APPLY_VALID_OBJECT "() denied permission to load '/%s'.\n", name);
     }
     /* allow updating of simul_efun and adding of new functions -bobf */
     /* moved to here by Beek so we can set the simul_efun_ob */
@@ -573,7 +566,7 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
     command_giver = save_command_giver;
 #ifdef DEBUG
     if (d_flag > 1 && ob)
-	debug_message("--%s loaded\n", ob->name);
+	debug_message("--/%s loaded\n", ob->name);
 #endif
     ob->load_time = current_time;
     num_objects_this_thread--;
@@ -607,7 +600,7 @@ object_t *clone_object P2(char *, str1, int, num_arg)
     object_t *ob, *new_ob;
     object_t *save_command_giver = command_giver;
 
-#ifndef NO_UIDS
+#ifdef PACKAGE_UIDS
     if (current_object && current_object->euid == 0) {
 	error("Object must call seteuid() prior to calling clone_object().\n");
     }
@@ -645,7 +638,7 @@ object_t *clone_object P2(char *, str1, int, num_arg)
 				     -Beek */
 
 	    if (!(str1 = check_name(str1))) 
-		error("Filenames with consecutive /'s in them aren't allowed.\n");
+		error("Filenames with consecutive /'s in them aren't allowed (%s).\n", str1);
 
 	    if (ob->ref == 1 && !ob->super && !ob->contains) {
 		/*
@@ -859,7 +852,7 @@ static void destruct_object_two P1(object_t *, ob)
 
     if (restrict_destruct && restrict_destruct != ob)
 	error("Only this_object() can be destructed from move_or_destruct.\n");
-#ifdef SOCKET_EFUNS
+#ifdef PACKAGE_SOCKETS
     /*
      * check if object has an efun socket referencing it for a callback. if
      * so, close the efun socket.
@@ -945,7 +938,7 @@ static void destruct_object_two P1(object_t *, ob)
 	    destruct_object(&svp);
     }
     
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     add_objects(&ob->stats, -1);
 #endif
 #ifdef OLD_ED
@@ -1368,7 +1361,7 @@ void print_svalue P1(svalue_t *, arg)
 	    tell_object(command_giver, arg->u.string);
 	    break;
 	case T_OBJECT:
-	    sprintf(tbuf, "OBJ(%s)", arg->u.ob->name);
+	    sprintf(tbuf, "OBJ(/%s)", arg->u.ob->name);
 	    tell_object(command_giver, tbuf);
 	    break;
 	case T_NUMBER:
@@ -1657,7 +1650,7 @@ void free_all_sent()
 void mark_free_sentences() {
     sentence_t *sent = sent_free;
 
-#ifndef NO_UIDS
+#ifdef PACKAGE_UIDS
     if (creator_file_fname)
 	EXTRA_REF(BLOCK(creator_file_fname))++;
 #endif
@@ -1829,7 +1822,7 @@ int user_parser P1(char *, buff)
 	 */
 	if (IS_ZERO(ret) && (super != command_object->super)) {
 	    fprintf(stderr,
-	    "** Check '%s' as a possible attempted breach of security **\n",
+	    "** Check '/%s' as a possible attempted breach of security **\n",
 		    s->ob->name);
 	    current_object = save_current_object;
 	    break;
@@ -1850,7 +1843,7 @@ int user_parser P1(char *, buff)
 	if (ret && ret->type == T_NUMBER && ret->u.number == 0)
 	    continue;
 	if (command_giver) {
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
 	    if (s && command_giver->interactive
 #ifndef NO_WIZARDS
 		&& !(command_giver->flags & O_IS_WIZARD)
@@ -2004,11 +1997,11 @@ void debug_fatal PVARGS(va_alist)
 	(void) fprintf(stderr, "Compilation in progress: %s:%d\n",
 		       current_file, current_line);
     if (current_object)
-	(void) fprintf(stderr, "Current object was %s\n",
+	(void) fprintf(stderr, "Current object was /%s\n",
 		       current_object->name);
     debug_message("%s", msg_buf);
     if (current_object)
-	debug_message("Current object was %s\n", current_object->name);
+	debug_message("Current object was /%s\n", current_object->name);
     debug_message("Dump of variables:\n");
     (void) dump_trace(1);
 }
@@ -2063,6 +2056,40 @@ void throw_error()
     error("Throw with no catch.\n");
 }
 
+static void debug_message_with_location P1(char *, err) {
+    if (current_object && current_prog) {
+	debug_message("%sprogram: /%s, object: /%s, file: %s\n",
+		      err,
+		      current_prog->name,
+		      current_object->name,
+		      get_line_number(pc, current_prog));
+    } else if (current_object) {
+	debug_message("%sprogram: (none), object: /%s, file: (none)\n",
+		      err,
+		      current_object->name);
+    } else {
+	debug_message("%sprogram: (none), object: (none), file: (none)\n",
+		      err);
+    }
+}
+
+static void add_message_with_location P1(char *, err) {
+    if (current_object && current_prog) {
+	add_vmessage("%sprogram: /%s, object: /%s, file: %s\n",
+		     err,
+		     current_prog->name,
+		     current_object->name,
+		     get_line_number(pc, current_prog));
+    } else if (current_object) {
+	add_vmessage("%sprogram: (none), object: /%s, file: (none)\n",
+		     err,
+		     current_object->name);
+    } else {
+	add_vmessage("%sprogram: (none), object: (none), file: (none)\n",
+		     err);
+    }
+}
+
 static void error_handler P1(char *, err)
 {
 #ifdef MUDLIB_ERROR_HANDLER
@@ -2088,12 +2115,7 @@ static void error_handler P1(char *, err)
 	if (num_mudlib_error) {
 	    debug_message("Error in error handler: ");
 #endif
-	    debug_message(err);
-	    if (current_object)
-		debug_message("program: %s, object: %s, file: %s\n",
-			      current_prog ? current_prog->name : "",
-			      current_object->name,
-			      get_line_number_if_any());
+	    debug_message_with_location(err);
 	    (void) dump_trace(0);
 #ifdef MUDLIB_ERROR_HANDLER
 	    num_mudlib_error = 0;
@@ -2114,13 +2136,8 @@ static void error_handler P1(char *, err)
 	    mret = apply_master_ob(APPLY_ERROR_HANDLER,2);
 	    if ((mret == (svalue_t *)-1) || !mret) {
 		debug_message("No error handler for error: ");
-		debug_message(err);
-		if (current_object)
-		    debug_message("program: %s, object: %s, file: %s\n",
-				  current_prog ? current_prog->name : "",
-				  current_object->name,
-				  get_line_number_if_any());
-		(void) dump_trace(0);
+		debug_message_with_location(err);
+		dump_trace(0);
 	    } else if (mret->type == T_STRING) {
 		debug_message("caught: %s", mret->u.string);
 	    }
@@ -2143,12 +2160,7 @@ static void error_handler P1(char *, err)
     if (num_mudlib_error || (error_recovery_context_exists & SAFE_APPLY_ERROR_CONTEXT)) {
         if (num_mudlib_error)
 	    debug_message("Error in error handler: ");
-	debug_message("%s", err);
-	if (current_object)
-	    debug_message("program: %s, object: %s, file: %s\n",
-			  current_prog ? current_prog->name : "",
-			  current_object->name,
-			  get_line_number_if_any());
+	debug_message_with_location(err);
 	(void) dump_trace(0);
 	num_mudlib_error = 0;
     } else {
@@ -2170,12 +2182,7 @@ static void error_handler P1(char *, err)
 	mret = apply_master_ob(APPLY_ERROR_HANDLER, 1);
 	if ((mret == (svalue_t *)-1) || !mret) {
 	    debug_message("No error handler for error: ");
-	    debug_message(err);
-	    if (current_object)
-		debug_message("program: %s, object: %s, file: %s\n",
-			      current_prog ? current_prog->name : "",
-			      current_object->name,
-			      get_line_number_if_any());
+	    debug_message_with_location(err);
 	} else if (mret->type == T_STRING)
 	    debug_message("%s", mret->u.string);
 	num_mudlib_error--;
@@ -2195,16 +2202,12 @@ static void error_handler P1(char *, err)
     }
     num_error--;
 #else
-    debug_message("%s", err + 1);
     if (current_object) {
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
 	add_errors(&current_object->stats, 1);
 #endif
-	debug_message("program: %s, object: %s, file: %s\n",
-		      current_prog ? current_prog->name : "",
-		      current_object->name,
-		      get_line_number_if_any());
     }
+    debug_message_with_location(err + 1);
 #if defined(DEBUG) && defined(TRACE_CODE)
     object_name = dump_trace(1);
 #else
@@ -2216,9 +2219,9 @@ static void error_handler P1(char *, err)
 	ob = find_object2(object_name);
 	if (!ob) {
 	    if (command_giver)
-		add_vmessage("error when executing program in destroyed object %s\n",
+		add_vmessage("error when executing program in destroyed object /%s\n",
 			    object_name);
-	    debug_message("error when executing program in destroyed object %s\n",
+	    debug_message("error when executing program in destroyed object /%s\n",
 			  object_name);
 	}
     }
@@ -2237,12 +2240,7 @@ static void error_handler P1(char *, err)
 #ifndef NO_WIZARDS
 	if ((command_giver->flags & O_IS_WIZARD) || !strlen(DEFAULT_ERROR_MESSAGE)) {
 #endif
-	    add_message(err + 1);
-	    if (current_object)
-		add_vmessage("program: %s, object: %s, file: %s\n",
-			    current_prog ? current_prog->name : "",
-			    current_object->name,
-			    get_line_number_if_any());
+	    add_message_with_location(err + 1);
 #ifndef NO_WIZARDS
 	} else {
 	    add_vmessage("%s\n", DEFAULT_ERROR_MESSAGE);
@@ -2251,7 +2249,7 @@ static void error_handler P1(char *, err)
     }
     if (current_heart_beat) {
 	set_heart_beat(current_heart_beat, 0);
-	debug_message("Heart beat in %s turned off.\n", current_heart_beat->name);
+	debug_message("Heart beat in /%s turned off.\n", current_heart_beat->name);
 	if (current_heart_beat->interactive) {
 	    object_t *save_cmd = command_giver;
 
@@ -2322,11 +2320,11 @@ void shutdownMudOS P1(int, exit_code)
 {
     int i;
     shout_string("MudOS driver shouts: shutting down immediately.\n");
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     save_stat_files();
 #endif
     ipc_remove();
-#ifdef SOCKET_EFUNS
+#ifdef PACKAGE_SOCKETS
     for (i = 0; i < MAX_EFUN_SOCKS; i++) {
 	if (lpc_socks[i].state == CLOSED) continue;
 	while (close(lpc_socks[i].fd) == -1 && errno == EINTR)
@@ -2344,7 +2342,7 @@ void shutdownMudOS P1(int, exit_code)
 #ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
     remove_all_objects();
     free_all_sent();
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     free_mudlib_stats();
 #endif
     dump_malloc_data();

@@ -143,6 +143,8 @@ char *object_ed_start PROT((object_t *, char *, int));
 int object_ed_mode PROT((object_t *));
 void object_save_ed_buffer PROT((object_t *));
 ed_buffer_t *find_ed_buffer PROT((object_t *));
+void object_ed_output PROT((char *));
+void object_ed_outputv PROTVARGS(());
 #endif
 
 #endif

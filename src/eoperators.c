@@ -192,6 +192,168 @@ f_eq()
 }
 
 INLINE void
+f_ge()
+{
+    int i = sp->type;
+    switch ((--sp)->type | i) {
+    case T_NUMBER:
+	sp->u.number = sp->u.number >= (sp+1)->u.number;
+	break;
+    case T_REAL:
+	sp->u.number = sp->u.real >= (sp+1)->u.real;
+	sp->type = T_NUMBER;
+	break;
+    case T_NUMBER | T_REAL:
+	if (i & T_NUMBER) {
+	    sp->type = T_NUMBER;
+	    sp->u.number = sp->u.real >= (sp+1)->u.number;
+	} else sp->u.number = sp->u.number >= (sp+1)->u.real;
+	break;
+    case T_STRING:
+	i = strcmp(sp->u.string, (sp+1)->u.string) >= 0;
+	free_string_svalue(sp + 1);
+	free_string_svalue(sp);
+	sp->type = T_NUMBER;
+	sp->u.number = i;
+	break;
+    default:
+	{
+	    switch ((sp++)->type) {
+	    case T_NUMBER:
+	    case T_REAL:
+		bad_argument(sp, T_NUMBER | T_REAL, 2, F_GE);
+	    case T_STRING:
+		bad_argument(sp, T_STRING, 2, F_GE);
+	    default:
+		bad_argument(sp - 1, T_NUMBER | T_STRING | T_REAL, 1, F_GE);
+	    }
+	}
+    }
+}
+
+INLINE void
+f_gt() {
+    int i = sp->type;
+    switch ((--sp)->type | i) {
+    case T_NUMBER:
+	sp->u.number = sp->u.number > (sp+1)->u.number;
+	break;
+    case T_REAL:
+	sp->u.number = sp->u.real > (sp+1)->u.real;
+	sp->type = T_NUMBER;
+	break;
+    case T_NUMBER | T_REAL:
+	if (i & T_NUMBER) {
+	    sp->type = T_NUMBER;
+	    sp->u.number = sp->u.real > (sp+1)->u.number;
+	} else sp->u.number = sp->u.number > (sp+1)->u.real;
+	break;
+    case T_STRING:
+	i = strcmp(sp->u.string, (sp+1)->u.string) > 0;
+	free_string_svalue(sp+1);
+	free_string_svalue(sp);
+	sp->type = T_NUMBER;
+	sp->u.number = i;
+	break;
+    default:
+	{
+	    switch ((sp++)->type) {
+	    case T_NUMBER:
+	    case T_REAL:
+		bad_argument(sp, T_NUMBER | T_REAL, 2, F_GT);
+	    case T_STRING:
+		bad_argument(sp, T_STRING, 2, F_GT);
+	    default:
+		bad_argument(sp-1, T_NUMBER | T_REAL | T_STRING, 1, F_GT);
+	    }
+	}
+    }
+}
+
+INLINE void
+f_le()
+{
+    int i = sp->type;
+    switch((--sp)->type|i){
+    case T_NUMBER:
+	sp->u.number = sp->u.number <= (sp+1)->u.number;
+	break;
+	
+    case T_REAL:
+	sp->u.number = sp->u.real <= (sp+1)->u.real;
+	sp->type = T_NUMBER;
+	break;
+	
+    case T_NUMBER|T_REAL:
+	if (i & T_NUMBER){
+	    sp->type = T_NUMBER;
+	    sp->u.number = sp->u.real <= (sp+1)->u.number;
+	} else sp->u.number = sp->u.number <= (sp+1)->u.real;
+	break;
+	
+    case T_STRING:
+	i = strcmp(sp->u.string, (sp+1)->u.string) <= 0;
+	free_string_svalue(sp+1);
+	free_string_svalue(sp);
+	sp->type = T_NUMBER;
+	sp->u.number = i;
+	break;
+	
+    default:
+	{
+	    switch((sp++)->type){
+	    case T_NUMBER:
+	    case T_REAL:
+		bad_argument(sp, T_NUMBER | T_REAL, 2, F_LE);
+		
+	    case T_STRING:
+		bad_argument(sp, T_STRING, 2, F_LE);
+		
+	    default:
+		bad_argument(sp - 1, T_NUMBER | T_STRING | T_REAL, 1, F_LE);
+	    }
+	}
+    }
+}
+
+INLINE void
+f_lt() {
+    int i = sp->type;
+    switch (i | (--sp)->type) {
+    case T_NUMBER:
+	sp->u.number = sp->u.number < (sp+1)->u.number;
+	break;
+    case T_REAL:
+	sp->u.number = sp->u.real < (sp+1)->u.real;
+	sp->type = T_NUMBER;
+	break;
+    case T_NUMBER|T_REAL:
+	if (i & T_NUMBER) {
+	    sp->type = T_NUMBER;
+	    sp->u.number = sp->u.real < (sp+1)->u.number;
+	} else sp->u.number = sp->u.number < (sp+1)->u.real;
+	break;
+    case T_STRING:
+	i = (strcmp(sp->u.string, (sp + 1)->u.string) < 0);
+	free_string_svalue(sp+1);
+	free_string_svalue(sp);
+	sp->type = T_NUMBER;
+	sp->u.number = i;
+	break;
+    default:
+	switch ((sp++)->type) {
+	case T_NUMBER:
+	case T_REAL:
+	    bad_argument(sp, T_NUMBER | T_REAL, 2, F_LT);
+	case T_STRING:
+	    bad_argument(sp, T_STRING, 2, F_LT);
+	default:
+	    bad_argument(sp-1, T_NUMBER | T_STRING | T_REAL, 1, F_LT);
+	}
+    }
+}
+
+INLINE void
 f_lsh()
 {
     CHECK_TYPES((sp - 1), T_NUMBER, 1, F_LSH);
@@ -945,7 +1107,7 @@ call_simul_efun P2(unsigned short, index, int, num_arg)
 	    previous_ob = current_object;
 	current_object = simul_efun_ob;
 	call_program(current_prog, funp->offset);
-    } else error("Function is no longer a simul_efun.");
+    } else error("Function is no longer a simul_efun.\n");
 }
 
 INLINE void
@@ -1031,7 +1193,7 @@ make_lfun_funp P2(int, index, svalue_t *, args)
     
     if (args->type == T_ARRAY) {
 	fp->hdr.args = args->u.arr;
-	args->u.arr++;
+	args->u.arr->ref++;
     } else
 	fp->hdr.args = 0;
     
@@ -1054,7 +1216,7 @@ make_simul_funp P2(int, index, svalue_t *, args)
     
     if (args->type == T_ARRAY) {
 	fp->hdr.args = args->u.arr;
-	args->u.arr++;
+	args->u.arr->ref++;
     } else
 	fp->hdr.args = 0;
     
@@ -1083,7 +1245,7 @@ make_functional_funp P5(short, num_arg, short, num_local, short, len, svalue_t *
     fp->f.functional.vio = variable_index_offset;
     pc += len;
     
-    if (args->type == T_ARRAY) {
+    if (args && args->type == T_ARRAY) {
 	fp->hdr.args = args->u.arr;
 	args->u.arr->ref++;
 	fp->f.functional.num_arg += args->u.arr->size;

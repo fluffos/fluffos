@@ -1,0 +1,3 @@
+%define GNU
+
+%include "Makefile.master"

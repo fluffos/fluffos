@@ -6,7 +6,6 @@
 #include "../mudlib_stats.h"
 #endif
 
-#ifndef NO_MUDLIB_STATS
 #ifdef F_DOMAIN_STATS
 void
 f_domain_stats PROT((void))
@@ -56,5 +55,4 @@ f_author_stats PROT((void))
         push_mapping(m);
     }
 }
-#endif
 #endif

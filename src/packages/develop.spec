@@ -1,5 +1,3 @@
-package develop;
-
     mixed debug_info(int, object);
     int refs(mixed);
 

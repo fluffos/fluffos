@@ -11,8 +11,11 @@
 #include "compiler.h"
 #include "port.h"
 #include "md.h"
+#include "main.h"
 
-static int e_flag = 0;		/* Load empty, without castles. */
+port_def_t external_port[5];
+
+static int e_flag = 0;		/* Load empty, without preloads. */
 #ifdef DEBUG
 int d_flag = 0;			/* Run with debug */
 #endif
@@ -22,7 +25,6 @@ int max_cost;
 int time_to_swap;
 int time_to_clean_up;
 char *default_fail_message;
-int port_number;
 int boot_time;
 int max_array_size;
 int max_buffer_size;
@@ -212,7 +214,7 @@ int main(argc, argv)
 	fprintf(stderr, "Bad definition of memmove() for your system.\n");
 	exit(-1);
     }
-#ifdef OS2
+#ifdef RAND
     srand(get_current_time());
 #else
 #ifdef DRAND48
@@ -273,7 +275,7 @@ int main(argc, argv)
 	 "Warning: File descriptor requirements exceed system capacity!\n");
 	fprintf(stderr,
 		"         Configuration exceeds system capacity by %d descriptor(s).\n",
-		FD_SETSIZE - dtablesize);
+		dtablesize - FD_SETSIZE);
     }
 #ifdef HAS_SETDTABLESIZE
     /*
@@ -299,7 +301,6 @@ int main(argc, argv)
 	    getdtablesize(), dtablesize);
 #endif
     time_to_clean_up = TIME_TO_CLEAN_UP;
-    port_number = PORTNO;
     time_to_swap = TIME_TO_SWAP;
     max_cost = MAX_COST;
     reserved_size = RESERVED_SIZE;
@@ -374,7 +375,7 @@ int main(argc, argv)
     add_predefines();
 
 #ifndef NO_IP_DEMON
-    if (!no_ip_demon)
+    if (!no_ip_demon && ADDR_SERVER_IP)
 	init_addr_server(ADDR_SERVER_IP, ADDR_SERVER_PORT);
 #endif				/* NO_IP_DEMON */
 
@@ -416,7 +417,7 @@ int main(argc, argv)
 		e_flag++;
 		continue;
 	    case 'p':
-		port_number = atoi(argv[i] + 2);
+		external_port[0].port = atoi(argv[i] + 2);
 		continue;
             case 'd':
 #ifdef DEBUG
@@ -442,8 +443,11 @@ int main(argc, argv)
 	default_fail_message = DEFAULT_FAIL_MESSAGE;
     else
 	default_fail_message = "What?";
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     restore_stat_files();
+#endif
+#ifdef PACKAGE_SOCKETS
+    init_sockets();		/* initialize efun sockets           */
 #endif
     preload_objects(e_flag);
 #ifdef TRAP_CRASHES
@@ -742,7 +746,7 @@ void crash_MudOS P1(char *, str)
 
 	fprintf(stderr, "Shutting down: %s\n", str);
 	crash_condition++;
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
 	save_stat_files();
 #endif
 	push_string(str, STRING_CONSTANT);

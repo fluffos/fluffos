@@ -105,8 +105,6 @@ static int indent_code PROT((void));
 static void report_status PROT((int));
 
 #ifndef OLD_ED
-static void object_ed_output PROT((char *));
-static void object_ed_outputv PROTVARGS(());
 static char *object_ed_results PROT((void));
 static ed_buffer_t *add_ed_buffer PROT((object_t *));
 static void object_free_ed_buffer PROT((void));
@@ -2613,7 +2611,7 @@ static char *current_results;
 static int max_size;
 static int size;
 
-static void object_ed_outputv PVARGS(va_alist)
+void object_ed_outputv PVARGS(va_alist)
 {
     va_list args;
     char *format;
@@ -2651,7 +2649,7 @@ static void object_ed_outputv PVARGS(va_alist)
     size += l;
 }
 
-static void object_ed_output P1(char *, str)
+void object_ed_output P1(char *, str)
 {
     int l;
 

@@ -1,5 +1,3 @@
-package math;
-
     float cos(float);
     float sin(float);
     float tan(float);

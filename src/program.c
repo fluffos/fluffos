@@ -70,11 +70,6 @@ void free_prog P2(program_t *, progp, int, free_sub_strings)
     if (progp->func_ref > 0)
 	return;
 
-#ifdef DEBUG
-    if (progp->ref < 0)
-	fatal("Negative ref count for prog ref.\n");
-#endif
-
     if (free_sub_strings) 
 	deallocate_program(progp);
     else {

@@ -1,0 +1,305 @@
+#!/bin/sh
+
+# define this to be where you want the temporary compiled files to go
+# (only used with GNU make)
+OBJDIR=obj
+
+# change this if you wish the driver binary to be named something else
+DRIVER_BIN=driver
+
+# uncomment PROOF if using CenterLine's TestCenter to debug the driver.
+#PROOF=proof
+
+# Set INSTALL_DIR to the directory where you want to install the executables.
+INSTALL_DIR="../bin"
+
+#Enable warnings from the compiler (gcc), if wanted.
+#WARN=-Wall
+ 
+#Use this with gcc if you have lots of RAM, speeds up compile
+#PIPE=-pipe
+
+# define profiling if you want it
+# note: the gmon.out file will likely be written in the mudlib dir.
+# PROFILE_ON controls whether or not monitoring is active at driver
+# startup.  Comment PROFILE_ON to make profiling not active at startup.
+# Use moncontrol(1) efun to enable profiling and moncontrol(0) to turn
+# it off.
+#PROFILE_ON="-DPROFILE_ON"
+# Uncomment this if you want to enable profiling of the driver (gcc)
+#PROFIL="-pg -DPROFILING $(PROFILE_ON)"
+ 
+# Enable run time debugging
+#DEBUG="-g"
+# With extra driver debug code
+#DEBUG="-g -DDEBUG" 
+# For DEC Alpha: to have optimization and debugging
+#DEBUG="-g3 -DDEBUG"
+# Prevent -DDEBUG from aborting the driver (when in -DDEBUG mode)
+#DEBUG_NON_FATAL="-DDEBUG_NON_FATAL"
+# Compile in debug() macro code
+#DEBUG_MACRO="-DDEBUG_MACRO"
+ 
+# define this if you want (compiler) optimization enabled.
+#
+# *WARNING* using high levels of optimization (e.g. -O3) can cause some
+# compilers to produce incorrect code.  If the driver is behaving
+# inexplicably, try using a lower level of optimization (or none).
+#
+# Uncomment one or none of the following optimization lines.
+#
+# -O is usually a safe level of optimization for most compilers
+#OPTIMIZE="-O"
+# high optimization for gcc:
+#OPTIMIZE=-O2 -fomit-frame-pointer -fstrength-reduce
+# uncomment below for RS/6000(AIX) xlc compiler only.
+# remove the -Q if xlc complains.
+#OPTIMIZE=-O -Q
+# might need this one with newer versions of AIX (ie 3.2.4)
+#OPTIMIZE=-O -Q -qMAXMEM=16000
+# high optimization for HP-UX 7.x/8.x's cc (don't use with 9.x)
+#OPTIMIZE=+O3 +Obb3000
+# MIPS R3000 running EP/IX Version 1.4.3. Compiler is RISCompiler C 2.11 (cc).
+#OPTIMIZE=-Olimit 1802
+# DEC Alpha's cc's highest optimization: -O5
+#OPTIMIZE=-O -Olimit 2000
+# DEC Ultrix's cc's highest optimization:
+#OPTIMIZE=-O2 -Olimit 5000
+# high optimization for cc on SGI
+#OPTIMIZE=-O2 -Olimit 2500
+ 
+# System V Release 4 (386/486 or if using Sun's cc under Solaris 2.x)
+# ARCH: need a way to detect this
+#OSFLAGS=-DSVR4
+
+# MIPS R3000 running EP/IX Version 1.4.3. Compiler is RISCompiler C 2.11 (cc).
+# ARCH: this one too
+#OSFLAGS=-I/usr/include/bsd
+
+# Solaris (SunOS 5): for BSD compatible ioctl()
+# If using CC=cc, you can also add:
+#      -w     to turn off warnings, in order to get a cleaner compile
+# For 5.4, also add the following:
+#      -I/usr/bsdinclude
+# ARCH: anyone figured a good hack to detect this one yet?
+#OSFLAGS="-DBSD_COMP -DSunOS_5"
+
+# SCO 3.2v4.2
+# ARCH: *sigh* and this one ...
+#OSFLAGS=-DSCO
+
+# try uncommenting this if you are using gcc and at runtime you see socket
+# errors saying that the "set socket nonblocking" operation is not supported.
+# That error is caused by old-style macros (that gcc doesn't normally grok)
+# used by ioctl on some systems.
+#NEED_OLD_CPP=-traditional-cpp
+
+####### END OF USER CONFIGURABLE OPTIONS
+
+echo "Trying out some stuff to see what works; ignore errors ..."
+
+# 
+# Figure out what make is, and how to invoke it
+# 
+gmake nothing
+if test $? -eq 0; then
+    MAKE=gmake
+    MAKEFILE=GNUmakefile
+else
+    make nothing
+    if test -eq 0; then
+        MAKE=make
+        tmp=`make which_makefile 2>/dev/null | grep -v echo`
+        if test "x$tmp" = "xMakeIsGNU"; then
+            MAKEFILE=GNUmakefile
+        else
+            MAKEFILE=Makefile
+        fi
+    else
+        echo 'FATAL ERROR: Cannot find make or gmake'
+        exit
+    fi
+fi
+echo MAKE=$MAKE >Makefile.tmp
+
+#
+# Figure out what to use for CC
+#
+cat >comptest.c <<END
+int main() {
+}
+END
+xlc comptest.c
+if test $? -eq 0; then
+    CC=xlc
+    if test "${DEBUG-x}" = "x"; then
+        OPTIMIZE=${OPTIMIZE-"-O -Q -qMAXMEM=16000"}
+    fi
+else
+    gcc comptest.c
+    if test $? -eq 0; then
+        CC=gcc
+        if test "${DEBUG-x}" = "x"; then
+            OPTIMIZE=${OPTIMIZE-"-O2 -fomit-frame-pointer -fstrength-reduce"}
+        fi
+    else
+        clcc comptest.c
+        if test $? -eq 0; then
+            CC=clcc
+            if test "${DEBUG-x}" = "x"; then
+                OPTIMIZE=${OPTIMIZE-"-O"}
+            fi
+        else
+            cc comptest.c
+            if test $? -eq 0; then
+                CC=cc
+                if test "${DEBUG-x}" = "x"; then
+                    OPTIMIZE=${OPTIMIZE-"-O"}
+                fi
+            else
+                echo "FATAL ERROR: Cannot find a C compiler"
+                exit
+            fi
+        fi
+    fi
+fi
+
+#
+# Figure out how to run CPP
+#
+
+cat >comptest.c <<END
+#define foo
+Make this fail if we actually get compiled
+END
+$CC -E comptest.c >/dev/null
+if test $? -eq 0; then
+    CPP="$CC -E $NEED_OLD_CPP"
+else
+    cpp comptest.c >/dev/null
+    if test $? -eq 0; then
+        CPP="cpp"
+    else
+        echo "FATAL ERROR: Can't figure out how to run the C preprocessor"
+        exit
+    fi
+fi
+
+#
+# Figure out what to use for install
+#
+mkdir tmp
+cat >insttest <<END
+whatever
+END
+rm tmp/insttest
+install -f insttest tmp
+if test $? -eq 0 && test -f tmp/insttest; then
+    INSTALL="install -f"
+else
+    rm tmp/insttest
+    install -c insttest tmp
+    if test $? -eq 0 && test -f tmp/insttest; then
+       INSTALL="install -c"
+    else
+       INSTALL="cp"
+    fi
+fi
+
+#
+# Find yacc/bison/byacc
+#
+cat >comptest.y <<END
+%token FOO
+%%
+all: FOO
+END
+bison comptest.y
+if test $? -eq 0; then
+    YACC="bison -d -y"
+else
+    byacc comptest.y
+    if test $? -eq 0; then
+        YACC="byacc -d"
+    else
+        yacc comptest.y
+        if test $? -eq 0; then
+            YACC="yacc -d"
+        else
+            echo "FATAL ERROR: Could not find bison or yacc."
+            exit
+        fi
+    fi
+fi
+
+# Some of these are probably unnecessary
+CFLAGS="$OSFLAGS $WARN $PROFIL $DEBUG $DEBUG_MACRO $DEBUG_NON_FATAL $STR $PIPE $NEED_OLD_CPP"
+
+#
+# Determine system type
+#
+cat >comptest.c <<END
+#include <stdio.h>
+#include "arch.h"
+int main() {
+    printf("%s\n", ARCH);
+}
+END
+$CC $CFLAGS comptest.c
+ARCH=`a.out`
+
+case $ARCH in
+    AIX)
+        OSFLAGS="$OSFLAGS -D_BSD -D_ALL_SOURCE"
+        ;;    
+esac
+
+#
+# check for some missing functions
+#
+cat >comptest.c <<END
+int main() {
+strchr(0,0); strrchr(0,0);
+}
+END
+$CC $CFLAGS comptest.c
+if test $? -ne 0; then
+    STR="-Dstrchr=index -Dstrrchr=rindex"
+fi
+
+cat >comptest.c <<END
+int main() {
+memcpy(0,0,0);memset(0,0,0);strtol(0,0,0);strcspn(0,0);
+}
+END
+$CC $CFLAGS comptest.c
+if test $? -ne 0; then
+    STRFUNCS=strfuncs.o
+fi
+
+echo SHELL=/bin/sh >>Makefile.tmp
+echo OBJDIR=$OBJDIR >>Makefile.tmp
+echo DRIVER_BIN=$DRIVER_BIN >>Makefile.tmp
+echo PROOF=$PROOF >>Makefile.tmp
+echo STRFUNCS=$STRFUNCS >>Makefile.tmp
+echo INSTALL=$INSTALL >>Makefile.tmp
+echo INSTALL_DIR=$INSTALL_DIR >>Makefile.tmp
+echo OPTIMIZE=$OPTIMIZE >>Makefile.tmp
+echo CPP=$CPP >>Makefile.tmp
+echo CFLAGS=$CFLAGS >>Makefile.tmp
+echo CC=$CC >>Makefile.tmp
+echo YACC=$YACC >>Makefile.tmp
+
+echo "***************** Configuration completed **************"
+echo "Installing MudOS on $ARCH"
+echo
+echo "Using $INSTALL to install binaries in $INSTALL_DIR."
+echo "Using $CPP for preprocessing."
+echo "Using $CC $CFLAGS $OPTIMIZE to compile."
+echo "Using $YACC $YFLAGS to make the compiler."
+echo "Edit $MAKEFILE if this is not what you want"
+echo
+echo "Otherwise, type '$MAKE' to build MudOS, then '$MAKE install'."
+
+cat Makefile.tmp ${MAKEFILE}.in >$MAKEFILE
+rm Makefile.tmp

@@ -1,4 +1,189 @@
 ----------------------------------------------------------------------------
+Thu Mar 30 15:45:30 EST 1995
+	* promoted to beta status (see v21.1b1)
+	* updated with respect to v21
+	* Two new contrib efuns:
+	  . void store_variable(string name, mixed value)
+	  . mixed fetch_variable(string name)
+	  These can be used for simulating set(), implementing debuggers,
+	  etc:
+	       foo = bar <-> store_variable("foo", bar)
+	       return foo <-> return fetch_variable("foo")
+	  set(string foo, mixed bar) {
+	      switch (foo) {
+	      case "name": case "hp":
+	            store_variable(foo, bar);
+	            break;
+	      default:
+	            ...
+	* fixed a number of typos/problems with the Makefile/GNUmakefile
+	  that would cause compilation to fail
+	* Added an option to have up to 5 external ports
+	  These can be specified in the config file.  The format is:
+	  external_port_x : kind #
+	  where x is 1, 2, 3, 4, 5; kind is telnet, binary, or ascii
+	  and # is the port number.  For compatibility, the line:
+		mud port : 5555
+	  is the same as
+		external_port_1 : telnet 5555
+	  'telnet' ports act the same as previously.  'ascii' ports
+	  send no telnet characters, and don't do any interpretation of
+	  the text they receive except to pass it one line at a time
+	  to process_input().  'binary' ports act very much like 'ascii'
+	  ports, except that buffers are passed to process_input()
+	* Added in a fix from Robocoder for using smalloc or bsdmalloc
+	  with debugmalloc or wrappedmalloc; previous smalloc or bsdmalloc
+	  was erroneously ignored and sysmalloc used
+	* Added in a fix from Jeearr for build.MudOS which would cause
+	  it to die if GNU make wasn't present
+	* optimizations:
+	    return 0 is now 1 opcode
+	    loop conditions involving <
+	    multiple pushes in a row compressed into a quick format
+	    x == y, !(x != y), x < y, !(x >= y), x > y, !(x <= y),
+	    x != y, !(x == y) in if statements and ( ? : )
+	    !x, x==0, etc in ( ? : )
+	* connect() is now passed the port # to which the user connected
+	* reworked rc.c a bit
+	* changed all the references to NO_UIDS to PACKAGE_UIDS; this was
+	  causing compilation to fail with NO_UIDS off
+	* re-indented interpret.c
+	* fixed compilation of functions(), replaceable() and pluralize()
+	  (contrib)
+	* COMPAT_BUSTER: "efun", "new", and "asm" are no longer valid
+	  function/variable names
+	* all type names are now valid in foo::bar
+	
+Fri Mar 24 20:59:08 EST 1995 (tim@handel.princeton.edu (Beek))
+	* bumped patchlevel to v21.2a6
+	* updated with respect to v21.1b7
+	* The build procedure has changed drastically:
+	  (1) edit the top of build.MudOS to configure a few things.
+	      You should only have to do this if you have an obscure
+	      operating system or want to change INSTALL_DIR, etc
+	  (2) "./build.MudOS"
+	      The script will munge for a while, then print out the
+	      configuration it determines.
+	  (3) if you don't like what build.MudOS decided, edit the top
+	      of Makefile/GNUmakefile.
+	  (4) type make/gmake, as appropriate
+	  (5) type make install, or move the binary to whereever you want it
+	* technical details:
+	  The build process goes more or less as follows:
+	  (1) ./build.MudOS determines enough system parameters to allow the
+	      compilation of edit_source
+	  (2) edit_source is built, then run to process options, configure
+	      malloc, create various makefiles and check which libraries
+	      and include files exist
+	  (3) Makefile.MudOS is then executed in order to build the main
+	      driver executable
+	* stage (2) of the compilation is run with optimization off, as
+	  edit_source takes longer to compile than to run ...
+	* Both GNUmakefiles and Makefiles are generated from a common file.
+	  developers should edit Makefile.master and then run 'make Makefiles'
+	  if changes to the build process are wanted.
+	  (This was actually added last pl, but now applies to 3 makefiles)
+	* modified terminal_type negotiation to comply with the relevant RFC's;
+	  this may increase the number of systems it works with.
+	* added NAWS window size automatic negotiation; the callback is:
+	  void window_size(int width, int height)
+	* optimized the pushing of call_out arguments
+	* added a missing prototype for c_generate_node()
+	* fixed/kludged errors in #include to report the right line number
+	* renamed DISALLOW_BUFFER_TYPE to NO_BUFFER_TYPE
+
+Wed Mar 22 23:37:55 EST 1995 (tim@handel.princeton.edu (Beek))
+	* bumped patchlevel to v21.2a5
+	* added a mudlib/ directory to hold LPC->C compiled code
+	* mudlib/ and packages/ compilation now use libaries to
+	  avoid packages/*.c kludges and the like
+	* added Symmetry's diffs to allow for recursive class definitions,
+	  allowing linked lists, etc to be constructed
+	* packages are now specified in options.h instead of fooling with
+	  func_spec.c.  This will work for any package, even ones not
+	  included with MudOS (PACKAGE_AURORA, for example, will automatically
+	  compile and use packages/aurora.c and packages/aurora.spec)
+	  in addition, a #include in func_spec is no longer necessary
+	* removed all references to the MIRE package
+	* in the driver source:
+	     NO_MUDLIB_STATS -> !PACKAGE_MUDLIB_STATS
+	     SOCKET_EFUNS    -> PACKAGE_SOCKETS
+	* Fixed a number of instances where messages including filenames
+	  had no leading '/'
+	* added F_VOID_ASSIGN_LOCAL: x = ... is now a single opcode
+	* applied Robocoder's fix for a problem where 'continue' would
+	  get confused in nested loops
+	* removed some useless code from F_VOID_ASSIGN
+	* removed make_malloc and make_func and replaced them with
+	  edit_source; cleaned up the associated code
+	* added preprocess.c which centralizes some of the code used by
+	  both lex.c and edit_source.c; more work needed here.  Unfortunately,
+	  it has to be #included since edit_source.c can't stand MALLOC
+	* COMPAT_BUSTER: removed a bunch of LPC predefines
+	    SAVE_EXTENSION:  use __SAVE_EXTENSION__
+	    USE_EUID:        use ! __NO_UIDS__
+            HAS_BUFFER_TYPE: use ! __DISALLOW_BUFFER_TYPE__
+	    HAS_SOCKETS:     use __PACKAGE_SOCKETS__
+	    HAS_SHADOWS:     use ! __NO_SHADOWS__
+	    HAS_DEBUGMALLOC: use __DEBUGMALLOC__ && __DEBUGMALLOC_EXTENSIONS__
+	    HAS_MATH:        use __PACKAGE_MATH__
+	    HAS_PROFILE_FUNCTIONS:  use __PROFILE_FUNCTIONS__
+	    HAS_MATRIX:      use __PACKAGE_MATRIX__
+	    HAS_PRIVS:       use __PRIVS__
+	    HAS_EACH:        use __EACH__
+	    HAS_CACHE_STATS: use __CACHE_STATS__
+	    HAS_OPCPROF:     use __OPCPROF__
+	    HAS_MUDLIB_ERROR_HANDER: use __MUDLIB_ERROR_HANDLER
+	    HAS_MUDLIB_STATS:use ! __NO_MUDLIB_STATS__
+	    HAS_LIGHT:       use ! __NO_LIGHT__
+	* removed the debugging code from the identifier hash table code
+	  since it appears to be bug free
+	* fixed a crasher in Robocoder's config file fix when lines were
+	  missing from the config file
+	* consolidated some of the error reporting code
+	* both GNUmakefile and Makefile are now generated from Makefile.master
+	  via GNUmakefile.pre and Makefile.pre; one side effect of this is
+	  that you can use 'make Makefiles' to return your Makefile to
+	  it's unedited state
+	  
+Sun Mar 19 02:32:56 EST 1995 (tim@handel.princeton.edu (Beek))
+	* bumped patchlevel to v21.2a4
+	* updated with respect to v21.1b6
+	* REALLY added in the diffs from v21.1b5 (I forgot to run patch
+	  last patchlevel)
+
+Sun Mar 19 02:32:56 EST 1995 (tim@handel.princeton.edu (Beek))
+	* bumped patchlevel to v21.2a3
+	* updated with respect to v21.1b5
+
+Sat Mar  4 16:14:17 EST 1995 (tim@handel.princeton.edu (Beek))
+	* bumped patchlevel to v21.2a2
+	* updated with respect to v21.1b4
+	* fixed compilation with #undef OLD_ED (object_ed_output() changed
+	  to global scope; it's used by regexp_error())
+	* fixed a bug that would incorrectly claim filenames had // in them
+	  on some operating systems
+	* changed the above error message to say what the filename was :)
+	* COMPAT_BUSTER: privs_file is now called to get new privs for
+	  virtual objects which are loaded.  This is a bit of an oddity;
+	  virtual objects actually get created twice, so it's hard to say
+	  what should be done when.  Possibly, mudlib_stats should be
+	  also be reinitialized.  Currently, they behave the same way
+	  as the object returned from compile_file() which is inconsistent
+	  with their filename (which was the old behavior of PRIVS as well)
+	  The same problem exists with UIDS.  This may change in the future.
+
+Sat Mar  4 16:14:17 EST 1995 (tim@handel.princeton.edu (Beek))
+	* v21.2a1 created from v21.1b3
+	* added code to not generate unreachable code in LPC->C generation
+	  since SGI cc is very noisy about that and it happens alot.
+	* protect special characters string constant case labels with '\'
+	  when generating switch tables (LPC->C)
+	* fixed a cases for int switches to use the correct field (LPC->C)
+	* added more name mangling for switch table names so they don't
+	  collide (LPC->C)
+
+----------------------------------------------------------------------------
 Wed Mar  1 18:14:01 EST 1995 (tim@handel.princeton.edu (Beek))
 	* v21.1a5 promoted to beta status (see v21.1b1)
 
@@ -7,7 +192,7 @@ Fri Feb 24 23:48:38 EST 1995 (tim@handel.princeton.edu (Beek))
 	* brought up to date with respect to v21b15
 	* MASSIVE source cleanup
 	  . 'arrays' are always refered to as arrays and never vectors/pointers
-	  . all types now use foo_t syntax instead of struct foo
+	  . all types now use foo_t syntax instead of struct foo 
 	  . several header files cleaned up and includes reorganized
 	  . removed internal distinction between internal and external
 	    programs (i.e. foo->p.i.bar is now foo->bar)

@@ -31,6 +31,26 @@ typedef struct {
   SIGNED short function_num, simul_num, class_num;
 } defined_name_t;
 
+typedef struct ifstate_s {
+    struct ifstate_s *next;
+    int state;
+} ifstate_t;
+
+typedef struct defn_s {
+    struct defn_s *next;
+    char *name;
+    char *exps;
+    int flags;
+    int nargs;
+} defn_t;
+
+/* must be a power of 4 */
+#define DEFHASH 64
+#define defhash(s) (whashstr((s), 10) & (DEFHASH - 1))
+
+#define DEF_IS_UNDEFINED 1
+#define DEF_IS_PREDEF    2
+
 /* to speed up cleaning the hash table, and identify the union */
 #define IHE_RESWORD    0x8000
 #define IHE_EFUN       0x4000

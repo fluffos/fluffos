@@ -383,9 +383,14 @@ static void md_print_array  P1(array_t *, vec) {
     print_depth--;
 }
 
-/* The following types of blocks aren't checked for leaks yet:
-   TAG_SWAP
- */
+static void mark_config() {
+    int i;
+
+    for (i = 0; i < NUM_CONFIG_STRS; i++) {
+	if (*config_str[i])
+	    DO_MARK(config_str[i], TAG_STRING);
+    }
+}
 
 void check_all_blocks P1(int, flag) {
     int i, j, hsh;
@@ -565,10 +570,10 @@ void check_all_blocks P1(int, flag) {
 #endif
 	}
     
-#ifndef NO_UIDS
+#ifdef PACKAGE_UIDS
     mark_all_uid_nodes();
 #endif
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     mark_mudlib_stats();
 #endif
     mark_all_defines();
@@ -579,6 +584,7 @@ void check_all_blocks P1(int, flag) {
     mark_simuls();
     mark_apply_low_cache();
     mark_mapping_node_blocks();
+    mark_config();
 
     mark_svalue(&apply_ret_value);
 

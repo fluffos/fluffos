@@ -3,6 +3,14 @@
 #ifndef INTERPRET_H
 #define INTERPRET_H
 
+#define PUSH_STRING    (0 << 6)
+#define PUSH_NUMBER    (1 << 6)
+#define PUSH_GLOBAL    (2 << 6)
+#define PUSH_LOCAL     (3 << 6)
+
+#define PUSH_WHAT      (3 << 6)
+#define PUSH_MASK      (0xff ^ (PUSH_WHAT))
+
 #define SWITCH_CASE_SIZE ((int)(2 + sizeof(char *)))
 
 /* Trace defines */
@@ -265,6 +273,7 @@ char *dump_trace PROT((int));
 void opcdump PROT((char *));
 int inter_sscanf PROT((svalue_t *, svalue_t *, svalue_t *, int));
 char * get_line_number_if_any PROT((void));
+char *get_line_number PROT((char *, program_t *));
 void get_line_number_info PROT((char **, int *));
 void get_version PROT((char *));
 void reset_machine PROT((int));

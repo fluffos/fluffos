@@ -1629,14 +1629,14 @@ char *
     int pr_start, il, changed;
     char *p1, *p2, *p3, *buf;
     char *process_part();
-#ifndef NO_UIDS
+#ifdef PACKAGE_UIDS
     userid_t *old_euid;
 #endif
 
     if ((!str) || (!(p1 = strchr(str, '@'))))
 	return str;
 
-#ifndef NO_UIDS
+#ifdef PACKAGE_UIDS
     old_euid = 0;
 #endif
 
@@ -1647,7 +1647,7 @@ char *
     if (!current_object) {
 	current_object = command_giver;
 
-#ifndef NO_UIDS
+#ifdef PACKAGE_UIDS
 	if (!backbone_uid)
 	    return str;
 
@@ -1697,7 +1697,7 @@ char *
 
     free_array(arr);
 
-#ifndef NO_UIDS
+#ifdef PACKAGE_UIDS
     if (old_euid) {
 	current_object->euid = old_euid;
     }

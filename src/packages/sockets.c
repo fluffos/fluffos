@@ -281,7 +281,8 @@ f_socket_address PROT((void))
 	}
         tmp = inet_ntoa(sp->u.ob->interactive->addr.sin_addr);
         str = (char *) DMALLOC(strlen(tmp) + 5 + 3, TAG_STRING, "f_socket_address");
-        sprintf(str, "%s %d", tmp, sp->u.ob->interactive->addr.sin_port);
+        sprintf(str, "%s %d", tmp, 
+		ntohs(sp->u.ob->interactive->addr.sin_port));
         free_object(sp->u.ob, "f_socket_address:2");
         put_malloced_string(str);
         return;

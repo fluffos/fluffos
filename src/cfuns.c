@@ -1,4 +1,6 @@
 #include "std.h"
+
+#ifdef LPC_TO_C
 #include "lpc_incl.h"
 #include "backend.h"
 #include "cfuns.h"
@@ -16,6 +18,14 @@ void c_return() {
     sp++;
     DEBUG_CHECK(sp != fp, "Bad stack at c_return\n");
     *sp =sv;
+    pop_control_stack();
+}
+
+void c_return_zero() {
+    pop_n_elems(csp->num_local_variables);
+    sp++;
+    DEBUG_CHECK(sp != fp, "Bad stack at c_return\n");
+    *sp = const0;
     pop_control_stack();
 }
 
@@ -974,3 +984,4 @@ int c_string_switch_lookup P2(svalue_t *, str, string_switch_entry_t *, table) {
 int c_range_switch_lookup P2(int, num, range_switch_entry_t *, table) {
     /* future work */
 }
+#endif

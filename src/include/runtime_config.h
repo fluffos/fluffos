@@ -16,9 +16,7 @@
 #ifndef RUNTIME_CONFIG_H
 #define RUNTIME_CONFIG_H
 
-#define RUNTIME_CONFIG_BASE 0
-
-#define BASE_CONFIG_STR RUNTIME_CONFIG_BASE
+#define BASE_CONFIG_STR        0
 #define CFG_STR(x) ((x) + BASE_CONFIG_STR)
 /*
  * These config settings return a string
@@ -49,7 +47,7 @@
  */
 
 #define BASE_CONFIG_INT (BASE_CONFIG_STR + 14)
-#define CFG_INT(x) ((x) + BASE_CONFIG_INT)
+#define CFG_INT(x)  ((x) + BASE_CONFIG_INT)
 
 #define __MUD_PORT__                CFG_INT(0)
 #define __ADDR_SERVER_PORT__        CFG_INT(1)
@@ -107,8 +105,5 @@
 
 #define NUM_CONFIG_STRS (BASE_CONFIG_INT - BASE_CONFIG_STR)
 #define NUM_CONFIG_INTS (RUNTIME_CONFIG_NEXT - BASE_CONFIG_INT)
-
-#define GET_CONFIG_STR(x) get_config_str(x - BASE_CONFIG_STR)
-#define GET_CONFIG_INT(x) get_config_int(x - BASE_CONFIG_INT)
 
 #endif				/* RUNTIME_CONFIG_H */

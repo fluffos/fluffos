@@ -186,18 +186,28 @@
 #define ISMULT(c)       ((c) == ASTERIX || (c) == PLUSS || (c) == QMARK)
 #define META	"^$.[()|?+*\\"
 
+/* Linux seems to define CHARBITS to 8 in values.h; not sure what system
+ * defines CHARBITS in a form we can use or how to tell (check in configure?)
+ * Just use 8 bits for now.
+ */
+#if 0
 #if defined(linux)
-#ifndef CHARBITS
-#define CHARBITS      0xff
-#endif
-#define UCHARAT(p)    ((int)*(unsigned char *)(p))
+#  ifndef CHARBITS
+#    define CHARBITS      0xff
+#  endif
+#  define UCHARAT(p)    ((int)*(unsigned char *)(p))
 #else
-#ifndef CHARBITS
-#define CHARBITS      0xff
-#define       UCHARAT(p)      ((int)*(unsigned char *)(p))
-#else
-#define       UCHARAT(p)      ((int)*(p)&CHARBITS)
+#  ifndef CHARBITS
+#    define CHARBITS      0xff
+#    define       UCHARAT(p)      ((int)*(unsigned char *)(p))
+#  else
+#    define       UCHARAT(p)      ((int)*(p)&CHARBITS)
+#  endif
 #endif
+#else
+#  undef CHARBITS
+#  define CHARBITS 0xff
+#  define UCHARAT(p)      ((int) *(unsigned char *)(p))
 #endif
 
 #define ISWORDPART(c) ( isalnum(c) || (c) == '_' )

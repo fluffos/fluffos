@@ -7,7 +7,7 @@ typedef struct array_s {
     int extra_ref;
 #endif
     unsigned short size;
-#ifndef NO_MUDLIB_STATS
+#ifdef PACKAGE_MUDLIB_STATS
     statgroup_t stats;		/* creator of the array */
 #endif
     svalue_t item[1];

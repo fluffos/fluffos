@@ -63,7 +63,8 @@ static int assert_swap_file()
 	char host[50];
 
 	gethostname(host, sizeof host);
-	sprintf(file_name_buf, "%s.%s.%d", SWAP_FILE, host, port_number);
+	sprintf(file_name_buf, "%s.%s.%d", SWAP_FILE, host, 
+		external_port[0].port);
 	file_name = file_name_buf;
 	if (file_name[0] == '/')
 	    file_name++;
@@ -77,7 +78,8 @@ static int assert_swap_file()
 	char host[50];
 
 	gethostname(host, sizeof host);
-	sprintf(file_name_buf, "%s.%s.%d", SWAP_FILE, host, port_number);
+	sprintf(file_name_buf, "%s.%s.%d", SWAP_FILE, host, 
+		external_port[0].port);
 	file_name = file_name_buf;
 	if (file_name[0] == '/')
 	    file_name++;

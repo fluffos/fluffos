@@ -16,10 +16,10 @@
 #include "std.h"
 #include "file_incl.h"
 #include "lpc_incl.h"
-#include "lex.h"
 #include "compiler.h"
 #include "grammar.tab.h"
 #include "scratchpad.h"
+#include "preprocess.h"
 #include "md.h"
 /* whashstr */
 #include "hash.h"
@@ -28,7 +28,6 @@
 
 #define NELEM(a) (sizeof (a) / sizeof((a)[0]))
 #define LEX_EOF ((char) EOF)
-#define LEX_FILE "save.c"
 
 char lex_ctype[256] = {0,0,0,0,0,0,0,0,0,1,0,1,1,1,0,0,0,0,0,0,0,0,0,
                        0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -66,32 +65,13 @@ static char **inc_list;
 static int inc_list_size;
 static int defines_need_freed = 0;
 static char *last_nl;
+static int nexpands = 0;
 
 #define EXPANDMAX 25000
-static int nexpands;
 
 char yytext[MAXLINE];
-
-typedef struct defn_s {
-    struct defn_s *next;
-    char *name;
-    char *exps;
-    int flags;
-    int nargs;
-} defn_t;
-
-#define DEF_IS_UNDEFINED 1
-#define DEF_IS_PREDEF    2
-
-typedef struct ifstate_s {
-    struct ifstate_s *next;
-    int state;
-} ifstate_t;
-
-static ifstate_t *iftop = 0;
-
-#define EXPECT_ELSE 1
-#define EXPECT_ENDIF 2
+static char defbuf[DEFMAX];
+static char *outp;
 
 typedef struct incstate_s {
     struct incstate_s *next;
@@ -128,16 +108,12 @@ keyword_t predefs[] =
 char *option_defs[] = 
 #include "option_defs.c"
 
-static keyword_t efun_keyword_t = { "efun", L_EFUN | IHE_RESWORD, 0};
-static keyword_t asm_keyword_t = { "asm", L_ASM | IHE_RESWORD, 0};
-static keyword_t new_keyword_t = { "new", L_NEW | IHE_RESWORD, 0};
-static int efun_hash, asm_hash, new_hash;
-
 static keyword_t reswords[] =
 {
 #ifdef ARRAY_RESERVED_WORD
     {"array", '*', 0},
 #endif
+    {"asm", L_ASM, 0},
     {"break", L_BREAK, 0},
 #ifndef DISALLOW_BUFFER_TYPE
     {"buffer", L_BASIC_TYPE, TYPE_BUFFER},
@@ -148,6 +124,7 @@ static keyword_t reswords[] =
     {"continue", L_CONTINUE, 0},
     {"default", L_DEFAULT, 0},
     {"do", L_DO, 0},
+    {"efun", L_EFUN, 0},
     {"else", L_ELSE, 0},
     {"float", L_BASIC_TYPE, TYPE_REAL},
     {"for", L_FOR, 0},
@@ -157,6 +134,7 @@ static keyword_t reswords[] =
     {"int", L_BASIC_TYPE, TYPE_NUMBER},
     {"mapping", L_BASIC_TYPE, TYPE_MAPPING},
     {"mixed", L_BASIC_TYPE, TYPE_ANY},
+    {"new", L_NEW, 0},
     {"nomask", L_TYPE_MODIFIER, TYPE_MOD_NO_MASK},
     {"object", L_BASIC_TYPE, TYPE_OBJECT},
     {"parse_command", L_PARSE_COMMAND, 0},
@@ -201,7 +179,6 @@ typedef struct linked_buf_s {
 
 static linked_buf_t head_lbuf = { NULL, TERM_START };
 static linked_buf_t *cur_lbuf;
-static char *outp;
 
 static void handle_define PROT((char *));
 static void free_defines PROT((void));
@@ -213,7 +190,6 @@ static int cond_get_exp PROT((int));
 static void merge PROT((char *name, char *dest));
 static void add_quoted_define PROT((char *, char *));
 static void add_quoted_predefine PROT((char *, char *));
-static defn_t *lookup_define PROT((char *s));
 static INLINE int mygetc PROT((void));
 static void lexerror PROT((char *));
 static int skip_to PROT((char *, char *));
@@ -234,6 +210,10 @@ static INLINE void reset_function_context PROT((void));
 static int exgetc PROT((void));
 static old_func PROT((void));
 static ident_hash_elem_t *quick_alloc_ident_entry PROT((void));
+static void yyerrorp PROT((char *));
+
+#define LEXER
+#include "preprocess.c"
 
 static void merge P2(char *, name, char *, dest)
 {
@@ -294,17 +274,26 @@ static INLINE int mygetc()
 }
 
 static void
+yyerrorp P1(char *, s) {
+    char buf[200];
+    sprintf(buf, s, '#');
+    yyerror(buf);
+    lex_fatal++;
+}
+
+static void
 lexerror P1(char *, s)
 {
     yyerror(s);
     lex_fatal++;
 }
 
-static int 
+static int
 skip_to P2(char *, token, char *, atoken)
 {
-    char b[20], c;
-    register char *yyp = outp, *p, *startp;
+    char b[20], *p;
+    char c;
+    register char *yyp = outp,  *startp;
     char *b_end = b + 19;
     int nest;
 
@@ -354,20 +343,6 @@ skip_to P2(char *, token, char *, atoken)
     }
 }
 
-static void
-handle_cond P1(int, c)
-{
-    ifstate_t *p;
-
-
-    if (!c)
-	skip_to("else", "endif");
-    p = ALLOCATE(ifstate_t, TAG_COMPILER, "handle_cond");
-    p->next = iftop;
-    iftop = p;
-    p->state = c ? EXPECT_ENDIF : EXPECT_ELSE;
-}
-
 static int
      inc_open P2(char *, buf, char *, name)
 {
@@ -394,6 +369,8 @@ static int
     return -1;
 }
 
+#define include_error(x) do { current_line--; yyerror(x); current_line++; } while (0);
+
 static void
 handle_include P1(char *, name)
 {
@@ -419,23 +396,23 @@ handle_include P1(char *, name)
 		q++;
 	    handle_include(q);
 	} else {
-	    yyerror("Missing leading \" or < in #include");
+	    include_error("Missing leading \" or < in #include");
 	}
 	return;
     }
     delim = *name++ == '"' ? '"' : '>';
     for (p = name; *p && *p != delim; p++);
     if (!*p) {
-	yyerror("Missing trailing \" or > in #include");
+	include_error("Missing trailing \" or > in #include");
 	return;
     }
     if (strlen(name) > sizeof(buf) - 100) {
-	yyerror("Include name too long.");
+	include_error("Include name too long.");
 	return;
     }
     *p = 0;
     if (++incnum == MAX_INCLUDE_DEPTH) {
-	yyerror("Maximum include depth exceeded.");
+	include_error("Maximum include depth exceeded.");
     } else if ((f = inc_open(buf, name)) != -1) {
 	is = ALLOCATE(incstate_t, TAG_COMPILER, "handle_include: 1");
 	is->yyin_desc = yyin_desc;
@@ -457,7 +434,7 @@ handle_include P1(char *, name)
 	refill_buffer();
     } else {
 	sprintf(buf, "Cannot #include %s", name);
-	yyerror(buf);
+	include_error(buf);
     }
 }
 
@@ -1445,53 +1422,11 @@ int yylex()
 			deltrail(sp);
 			handle_cond(lookup_define(sp) == 0);
 		    } else if (strcmp("elif", yytext) == 0) {
-			if (iftop) {
-			    if (iftop->state == EXPECT_ELSE) {
-				/* last cond was false... */
-				int cond;
-				ifstate_t *p = iftop;
-
-				/* pop previous condition */
-				iftop = p->next;
-				FREE((char *) p);
-
-				*--outp = '\0';
-				add_input(sp);
-				cond = cond_get_exp(0);
-				if (*outp++) {
-				    yyerror("Condition too complex in #elif");
-				    while (*outp++);
-				} else handle_cond(cond);
-			    } else {/* EXPECT_ENDIF */
-				/*
-				 * last cond was true...skip to end of
-				 * conditional
-				 */
-				skip_to("endif", (char *) 0);
-			    }
-			} else {
-			    yyerror("Unexpected #elif");
-			}
+			handle_elif(sp);
 		    } else if (strcmp("else", yytext) == 0) {
-			if (iftop) {
-			    if (iftop->state == EXPECT_ELSE) {
-				iftop->state = EXPECT_ENDIF;
-			    } else {
-				skip_to("endif", (char *) 0);
-			    }
-			} else {
-			    yyerror("Unexpected #else");
-			}
+			handle_else();
 		    } else if (strcmp("endif", yytext) == 0) {
-			if (iftop && (iftop->state == EXPECT_ENDIF ||
-				      iftop->state == EXPECT_ELSE)) {
-			    ifstate_t *p = iftop;
-
-			    iftop = p->next;
-			    FREE((char *) p);
-			} else {
-			    yyerror("Unexpected #endif");
-			}
+			handle_endif();
 		    } else if (strcmp("undef", yytext) == 0) {
 			defn_t *d;
 
@@ -1925,7 +1860,6 @@ void add_predefines()
     int i;
     struct lpc_predef_s *tmpf;
 
-    add_predefine("LPC3", -1, "");
     add_predefine("MUDOS", -1, "");
     get_version(save_buf);
     add_quoted_predefine("__VERSION__", save_buf);
@@ -1942,33 +1876,8 @@ void add_predefines()
     add_quoted_predefine("__OPTIMIZATION__", OPTIMIZE);
 #endif
     /* Backwards Compat */
-    add_quoted_predefine("SAVE_EXTENSION", SAVE_EXTENSION);
 #ifndef CDLIB
     add_quoted_predefine("MUD_NAME", MUD_NAME);
-#endif
-#ifndef NO_UIDS
-    add_predefine("USE_EUID", -1, "");
-#endif
-#ifndef DISALLOW_BUFFER_TYPE
-    add_predefine("HAS_BUFFER_TYPE", -1, "");
-#endif
-#ifdef SOCKET_EFUNS
-    add_predefine("HAS_SOCKETS", -1, "");
-#endif
-#ifndef NO_SHADOWS
-    add_predefine("HAS_SHADOWS", -1, "");
-#endif
-#if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
-    add_predefine("HAS_DEBUGMALLOC", -1, "");
-#endif
-#ifdef MATH
-    add_predefine("HAS_MATH", -1, "");
-#endif
-#ifdef PROFILE_FUNCTIONS
-    add_predefine("HAS_PROFILE_FUNCTIONS", -1, "");
-#endif
-#ifdef MATRIX
-    add_predefine("HAS_MATRIX", -1, "");
 #endif
 #ifdef F_ED
     add_predefine("HAS_ED", -1, "");
@@ -1976,32 +1885,11 @@ void add_predefines()
 #ifdef F_PRINTF
     add_predefine("HAS_PRINTF", -1, "");
 #endif
-#ifdef PRIVS
-    add_predefine("HAS_PRIVS", -1, "");
-#endif
-#ifdef EACH
-    add_predefine("HAS_EACH", -1, "");
-#endif
-#ifdef CACHE_STATS
-    add_predefine("HAS_CACHE_STATS", -1, "");
-#endif
 #if (defined(RUSAGE) || defined(GET_PROCESS_STATS) || defined(TIMES)) || defined(LATTICE)
     add_predefine("HAS_RUSAGE", -1, "");
 #endif
 #ifdef DEBUG_MACRO
     add_predefine("HAS_DEBUG_LEVEL", -1, "");
-#endif
-#ifdef OPCPROF
-    add_predefine("HAS_OPCPROF", -1, "");
-#endif
-#ifdef MUDLIB_ERROR_HANDLER
-    add_predefine("HAS_MUDLIB_ERROR_HANDLER", -1, "");
-#endif
-#ifndef NO_MUDLIB_STATS
-    add_predefine("HAS_MUDLIB_STATS", -1, "");
-#endif
-#ifndef NO_LIGHT
-    add_predefine("HAS_LIGHT", -1, "");
 #endif
     for (tmpf = lpc_predefs; tmpf; tmpf = tmpf->next) {
 	char namebuf[NSIZE];
@@ -2172,11 +2060,17 @@ void init_num_args()
     add_instr_name("const1", "push_number(1);\n", F_CONST1, T_NUMBER);
     add_instr_name("subtract", "c_subtract();\n", F_SUBTRACT, T_NUMBER | T_REAL | T_ARRAY);
     add_instr_name("(void)assign", "c_void_assign();\n", F_VOID_ASSIGN, T_NUMBER);
+    add_instr_name("(void)assign_local", "c_void_assign_local();\n", F_VOID_ASSIGN_LOCAL, T_NUMBER);
     add_instr_name("assign", "c_assign();\n", F_ASSIGN, T_ANY);
     add_instr_name("branch", 0, F_BRANCH, -1);
     add_instr_name("bbranch", 0, F_BBRANCH, -1);
     add_instr_name("byte", 0, F_BYTE, T_NUMBER);
     add_instr_name("-byte", 0, F_NBYTE, T_NUMBER);
+    add_instr_name("branch_ne", 0, F_BRANCH_NE, -1);
+    add_instr_name("branch_ge", 0, F_BRANCH_GE, -1);
+    add_instr_name("branch_le", 0, F_BRANCH_LE, -1);
+    add_instr_name("branch_eq", 0, F_BRANCH_EQ, -1);
+    add_instr_name("bbranch_lt", 0, F_BBRANCH_LT, -1);
     add_instr_name("bbranch_when_zero", 0, F_BBRANCH_WHEN_ZERO, -1);
     add_instr_name("bbranch_when_non_zero", 0, F_BBRANCH_WHEN_NON_ZERO, -1);
     add_instr_name("branch_when_zero", 0, F_BRANCH_WHEN_ZERO, -1);
@@ -2195,6 +2089,7 @@ void init_num_args()
 #ifdef F_JUMP
     add_instr_name("jump", F_JUMP, -1);
 #endif
+    add_instr_name("return_zero", 0, F_RETURN_ZERO, -1);
     add_instr_name("return", 0, F_RETURN, -1);
     add_instr_name("sscanf", 0, F_SSCANF, T_NUMBER);
     add_instr_name("parse_command", 0, F_PARSE_COMMAND, T_NUMBER);
@@ -2472,12 +2367,6 @@ static void add_input P1(char *, p)
     strncpy(outp, p, l);
 }
 
-/* must be a power of four */
-#define DEFHASH 64
-static defn_t *defns[DEFHASH];
-
-#define defhash(s) (whashstr((s), 10) & (DEFHASH - 1))
-
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_all_defines() {
     int i;
@@ -2497,35 +2386,6 @@ void mark_all_defines() {
     }
 }
 #endif
-
-static void add_define P3(char *, name, int, nargs, char *, exps)
-{
-    defn_t *p;
-    int h;
-
-    if ((p = lookup_define(name))) {
-	if (nargs != p->nargs || strcmp(exps, p->exps)) {
-	    char buf[200 + NSIZE];
-
-	    sprintf(buf, "Warning: redefinition of #define %s\n", name);
-	    yywarn(buf);
-	}
-	p->exps = (char *)DREALLOC(p->exps, strlen(exps) + 1, TAG_COMPILER, "add_define: redef");
-	strcpy(p->exps, exps);
-	p->nargs = nargs;
-    } else {
-	p = ALLOCATE(defn_t, TAG_COMPILER, "add_define: def");
-	p->name = (char *) DXALLOC(strlen(name) + 1, TAG_COMPILER, "add_define: def name");
-	strcpy(p->name, name);
-	p->exps = (char *) DXALLOC(strlen(exps) + 1, TAG_COMPILER, "add_define: def exps");
-	strcpy(p->exps, exps);
-	p->flags = 0;
-	p->nargs = nargs;
-	h = defhash(name);
-	p->next = defns[h];
-	defns[h] = p;
-    }
-}
 
 static void add_predefine P3(char *, name, int, nargs, char *, exps)
 {
@@ -2580,19 +2440,6 @@ static void free_defines()
 	}
     }
     nexpands = 0;
-}
-
-static defn_t *
-     lookup_define P1(char *, s)
-{
-    defn_t *p;
-    int h;
-
-    h = defhash(s);
-    for (p = defns[h]; p; p = p->next)
-	if (!(p->flags & DEF_IS_UNDEFINED) && strcmp(s, p->name) == 0)
-	    return p;
-    return 0;
 }
 
 #define SKIPW \
@@ -2796,234 +2643,6 @@ static int exgetc()
     return c;
 }
 
-#define BNOT   1
-#define LNOT   2
-#define UMINUS 3
-#define UPLUS  4
-
-#define MULT   1
-#define DIV    2
-#define MOD    3
-#define BPLUS  4
-#define BMINUS 5
-#define LSHIFT 6
-#define RSHIFT 7
-#define LESS   8
-#define LEQ    9
-#define GREAT 10
-#define GEQ   11
-#define EQ    12
-#define NEQ   13
-#define BAND  14
-#define XOR   15
-#define BOR   16
-#define LAND  17
-#define LOR   18
-#define QMARK 19
-
-static char _optab[] =
-{0, 4, 0, 0, 0, 26, 56, 0, 0, 0, 18, 14, 0, 10, 0, 22, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30, 50, 40, 74,
- 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 70, 0,
- 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 63, 0, 1};
-static char optab2[] =
-{BNOT, 0, 0, LNOT, '=', NEQ, 7, 0, 0, UMINUS, 0, BMINUS, 10, UPLUS, 0, BPLUS, 10,
- 0, 0, MULT, 11, 0, 0, DIV, 11, 0, 0, MOD, 11,
- 0, '<', LSHIFT, 9, '=', LEQ, 8, 0, LESS, 8, 0, '>', RSHIFT, 9, '=', GEQ, 8, 0, GREAT, 8,
- 0, '=', EQ, 7, 0, 0, 0, '&', LAND, 3, 0, BAND, 6, 0, '|', LOR, 2, 0, BOR, 4,
- 0, 0, XOR, 5, 0, 0, QMARK, 1};
-
-#define optab1 (_optab-' ')
-
-static int cond_get_exp P1(int, priority)
-{
-    int c;
-    int value, value2, x;
-
-    do
-	c = exgetc();
-    while (is_wspace(c));
-    if (c == '(') {
-
-	value = cond_get_exp(0);
-	do
-	    c = exgetc();
-	while (is_wspace(c));
-	if (c != ')') {
-	    yyerror("bracket not paired in #if");
-	    if (!c) *--outp = '\0';
-	}
-    } else if (ispunct(c)) {
-	x = optab1[c];
-	if (!x) {
-	    yyerror("illegal character in #if");
-	    return 0;
-	}
-	value = cond_get_exp(12);
-	switch (optab2[x - 1]) {
-	case BNOT:
-	    value = ~value;
-	    break;
-	case LNOT:
-	    value = !value;
-	    break;
-	case UMINUS:
-	    value = -value;
-	    break;
-	case UPLUS:
-	    value = value;
-	    break;
-	default:
-	    yyerror("illegal unary operator in #if");
-	    return 0;
-	}
-    } else {
-	int base;
-
-	if (!isdigit(c)) {
-	    if (!c) {
-		yyerror("missing expression in #if");
-		*--outp = '\0';
-	    } else
-		yyerror("illegal character in #if");
-	    return 0;
-	}
-	value = 0;
-	if (c != '0')
-	    base = 10;
-	else {
-	    c = *outp++;
-	    if (c == 'x' || c == 'X') {
-		base = 16;
-		c = *outp++;
-	    } else
-		base = 8;
-	}
-	for (;;) {
-	    if (isdigit(c))
-		x = -'0';
-	    else if (isupper(c))
-		x = -'A' + 10;
-	    else if (islower(c))
-		x = -'a' + 10;
-	    else
-		break;
-	    x += c;
-	    if (x > base)
-		break;
-	    value = value * base + x;
-	    c = *outp++;
-	}
-	outp--;
-    }
-    for (;;) {
-	do
-	    c = exgetc();
-	while (is_wspace(c));
-	if (!ispunct(c))
-	    break;
-	x = optab1[c];
-	if (!x)
-	    break;
-	value2 = *outp++;
-	for (;; x += 3) {
-	    if (!optab2[x]) {
-		*--outp = value2;
-		if (!optab2[x + 1]) {
-		    yyerror("illegal operator use in #if");
-		    return 0;
-		}
-		break;
-	    }
-	    if (value2 == optab2[x])
-		break;
-	}
-	if (priority >= optab2[x + 2]) {
-	    if (optab2[x]) *--outp = value2;
-	    break;
-	}
-	value2 = cond_get_exp(optab2[x + 2]);
-	switch (optab2[x + 1]) {
-	case MULT:
-	    value *= value2;
-	    break;
-	case DIV:
-	    if (value2)
-		value /= value2;
-	    else
-		yyerror("division by 0 in #if");
-	    break;
-	case MOD:
-	    if (value2)
-		value %= value2;
-	    else
-		yyerror("modulo by 0 in #if");
-	    break;
-	case BPLUS:
-	    value += value2;
-	    break;
-	case BMINUS:
-	    value -= value2;
-	    break;
-	case LSHIFT:
-	    value <<= value2;
-	    break;
-	case RSHIFT:
-	    value >>= value2;
-	    break;
-	case LESS:
-	    value = value < value2;
-	    break;
-	case LEQ:
-	    value = value <= value2;
-	    break;
-	case GREAT:
-	    value = value > value2;
-	    break;
-	case GEQ:
-	    value = value >= value2;
-	    break;
-	case EQ:
-	    value = value == value2;
-	    break;
-	case NEQ:
-	    value = value != value2;
-	    break;
-	case BAND:
-	    value &= value2;
-	    break;
-	case XOR:
-	    value ^= value2;
-	    break;
-	case BOR:
-	    value |= value2;
-	    break;
-	case LAND:
-	    value = value && value2;
-	    break;
-	case LOR:
-	    value = value || value2;
-	    break;
-	case QMARK:
-	    do
-		c = exgetc();
-	    while (isspace(c));
-	    if (c != ':') {
-		yyerror("'?' without ':' in #if");
-		outp--;
-		return 0;
-	    }
-	    if (value) {
-		cond_get_exp(1);
-		value = value2;
-	    } else
-		value = cond_get_exp(1);
-	    break;
-	}
-    }
-    outp--;
-    return value;
-}
-
 void set_inc_list P1(char *, list)
 {
     int i, size;
@@ -3123,13 +2742,6 @@ ident_hash_elem_t *lookup_ident P1(char *, name) {
 	    hptr2 = hptr2->next;
 	}
     }
-    /* efun, new and asm are special cases, as they are redefinable keyword_ts */
-    if (h == efun_hash && strcmp("efun", name)==0) 
-	return (ident_hash_elem_t *)&efun_keyword_t;
-    if (h == asm_hash && strcmp("asm", name)==0)
-	return (ident_hash_elem_t *)&asm_keyword_t;
-    if (h == new_hash && strcmp("new", name)==0)
-	return (ident_hash_elem_t *)&new_keyword_t;
     return 0;
 }
 
@@ -3203,7 +2815,7 @@ typedef struct ident_hash_elem_list_s {
 
 ident_hash_elem_list_t *ihe_list = 0;
 
-#ifdef DEBUG
+#if 0
 void dump_ihe P2(ident_hash_elem_t *, ihe, int, noisy) {
     int sv = 0;
     if (ihe->token & IHE_RESWORD) {
@@ -3308,7 +2920,7 @@ void free_unused_identifiers() {
     }
     lnamebuf = 0;
     lb_index = 4096;
-#ifdef DEBUG
+#if 0
     debug_dump_ident_hash_table(0);
 #endif
 }
@@ -3425,9 +3037,5 @@ void init_identifiers() {
 	ihe->sem_value++;
 	ihe->dn.efun_num = i;
     }
-    /* add the three special ones ... */
-    efun_hash = IdentHash("efun");
-    asm_hash = IdentHash("asm");
-    new_hash = IdentHash("new");
 }
 
