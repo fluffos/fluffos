@@ -57,6 +57,7 @@
 #define NAME_PROTOTYPE		0x10
 #define NAME_DEF_BY_INHERIT     0x20
 #define NAME_ALIAS              0x40
+#define NAME_TRUE_VARARGS       0x80
 
 /* only the flags that should be copied up through inheritance levels */
 #define NAME_MASK (NAME_UNDEFINED | NAME_STRICT_TYPES | NAME_PROTOTYPE)

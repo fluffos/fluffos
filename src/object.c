@@ -280,7 +280,7 @@ restore_internal_size P3(char **, str, int, is_mapping, int, depth)
 	    {
 		if (*cp++ == ')' && is_mapping){
 		    *str = cp;
-		    if (!sizes){
+		    if (!sizes) {
 			max_depth = 128;
 			while (max_depth <= depth) max_depth <<= 1;
 			sizes = CALLOCATE(max_depth, int, TAG_TEMPORARY,
@@ -1047,7 +1047,8 @@ restore_svalue P2(char *, cp, svalue_t *, v)
 
 	if (save_svalue_depth) {
 	    save_svalue_depth = max_depth = 0;
-	    FREE((char *) sizes);
+	    if (sizes)
+		FREE((char *) sizes);
 	    sizes = (int *) 0;
 	}
 	return ret;
@@ -1108,7 +1109,8 @@ safe_restore_svalue P2(char *, cp, svalue_t *, v)
 
 	    if (save_svalue_depth) {
 		save_svalue_depth = max_depth = 0;
-		FREE((char *) sizes);
+		if (sizes)
+		    FREE((char *) sizes);
 		sizes = (int *) 0;
 	    }
 	    if (ret) 

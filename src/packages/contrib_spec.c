@@ -10,8 +10,8 @@ mixed query_notify_fail();
 void set_prompt(string, void|object);
 #endif
 mixed copy(mixed);
-string *functions(object, int default: F_CONST0);
-string *variables(object);
+string *functions(object, int default: 0);
+string *variables(object, int default: 0);
 object *heart_beats();
 string terminal_colour(string, mapping);
 string pluralize(string);

@@ -26,7 +26,7 @@ array_t *allocate_empty_array PROT((int));
 void free_array PROT((array_t *));
 void free_empty_array PROT((array_t *));
 array_t *add_array PROT((array_t *, array_t *));
-svalue_t *implode_array PROT((funptr_t *, array_t *));
+void implode_array PROT((funptr_t *, array_t *, svalue_t *, int));
 array_t *subtract_array PROT((array_t *, array_t *));
 array_t *slice_array PROT((array_t *, int, int));
 array_t *explode_string PROT((char *, int, char *, int));

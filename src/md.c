@@ -28,13 +28,17 @@
 #ifdef DEBUGMALLOC
 
 #define LEFT_MAGIC(node) ((node)->magic)
-#define RIGHT_MAGIC_ADDR(node) ((char *)(node) + sizeof(md_node_t) + (node)->size)
+#define RIGHT_MAGIC_ADDR(node) ((unsigned char *)(node) + sizeof(md_node_t) + (node)->size)
 #define STORE_RIGHT_MAGIC(node) \
      *(RIGHT_MAGIC_ADDR(node)) = (char)(MD_MAGIC >> 24) & 0xff; \
      *(RIGHT_MAGIC_ADDR(node)+1) = (char)(MD_MAGIC >> 16) & 0xff; \
      *(RIGHT_MAGIC_ADDR(node)+2) = (char)(MD_MAGIC >> 8) & 0xff; \
      *(RIGHT_MAGIC_ADDR(node)+3) = (char)MD_MAGIC & 0xff
-                               
+#define FETCH_RIGHT_MAGIC(l, node) \
+     l = (*(RIGHT_MAGIC_ADDR(node)) << 24) + \
+         (*(RIGHT_MAGIC_ADDR(node) + 1) << 16) + \
+         (*(RIGHT_MAGIC_ADDR(node) + 2) << 8) + \
+         (*(RIGHT_MAGIC_ADDR(node) + 3))
 
 static totals[MAX_CATEGORY];
 static blocks[MAX_CATEGORY];
@@ -79,6 +83,13 @@ MDmalloc P4(md_node_t *, node, int, size, int, tag, char *, desc)
     unsigned int h;
     static int count = 0;
 
+    if (!size) {
+	debug_message("md: debugmalloc: attempted to allocate zero bytes\n");
+#ifdef DEBUG
+	abort();
+#endif
+	return 0;
+    }
     total_malloced += size;
     if (total_malloced > hiwater) {
 	hiwater = total_malloced;
@@ -155,7 +166,7 @@ MDfree P1(void *, ptr)
 	if (LEFT_MAGIC(entry) != MD_MAGIC) {
 	    debug_message("MDfree: left side of entry corrupt: %s %04x\n", entry->desc, (int)entry->tag);
 	}
-	COPY_INT(&tmp, RIGHT_MAGIC_ADDR(entry));
+	FETCH_RIGHT_MAGIC(tmp, entry);
 	if (tmp != MD_MAGIC) {
 	    debug_message("MDfree: right side of entry corrupt: %s %04x\n", entry->desc, (int)entry->tag);
 	}
@@ -240,7 +251,9 @@ void set_malloc_mask P1(int, mask)
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 static void mark_object P1(object_t *, ob) {
+#ifndef NO_ADD_ACTION
     sentence_t *sent;
+#endif
     int i;
 
     if (ob->prog)
@@ -409,19 +422,19 @@ void mark_sockets PROT((void)) {
 	if (lpc_socks[i].flags & S_READ_FP) {
 	    mark_funp(lpc_socks[i].read_callback.f);
 	} else 
-	if (s = lpc_socks[i].read_callback.s) {
+	if ((s = lpc_socks[i].read_callback.s)) {
 	    EXTRA_REF(BLOCK(s))++;
 	}
 	if (lpc_socks[i].flags & S_WRITE_FP) {
 	    mark_funp(lpc_socks[i].write_callback.f);
 	} else 
-	if (s = lpc_socks[i].write_callback.s) {
+	if ((s = lpc_socks[i].write_callback.s)) {
 	    EXTRA_REF(BLOCK(s))++;
 	}
 	if (lpc_socks[i].flags & S_CLOSE_FP) {
 	    mark_funp(lpc_socks[i].close_callback.f);
 	} else 
-	if (s = lpc_socks[i].close_callback.s) {
+	if ((s = lpc_socks[i].close_callback.s)) {
 	    EXTRA_REF(BLOCK(s))++;
 	}
     }
@@ -478,7 +491,7 @@ void check_all_blocks P1(int, flag) {
 	    if (LEFT_MAGIC(entry) != MD_MAGIC) {
 		outbuf_addv(&out, "WARNING: left side of entry corrupt: %s %04x\n", entry->desc, (int)entry->tag);
 	    }
-	    COPY_INT(&tmp, RIGHT_MAGIC_ADDR(entry));
+	    FETCH_RIGHT_MAGIC(tmp, entry);
 	    if (tmp != MD_MAGIC) {
 		outbuf_addv(&out, "WARNING: right side of entry corrupt: %s %04x\n", entry->desc, (int)entry->tag);
 	    }

@@ -1,3 +1,4 @@
+#define SUPPRESS_COMPILER_INLINES
 #include "std.h"
 #include "lpc_incl.h"
 #include "scratchpad.h"

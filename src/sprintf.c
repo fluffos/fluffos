@@ -253,7 +253,7 @@ static void numadd P2(outbuffer_t *, outbuf, int, num)
     } else
 	nve = 0;
     for (i = num / 10, num_l = nve + 1; i; i /= 10, num_l++);
-    if (space = outbuf_extend(outbuf, num_l)) {
+    if ((space = outbuf_extend(outbuf, num_l))) {
 	chop = num_l - space;
 	while (chop--) 
 	    num /= 10; /* lose that last digits that got chopped */
@@ -275,7 +275,7 @@ static void add_indent P2(outbuffer_t *, outbuf, int, indent)
 {
     int l;
     
-    if (l = outbuf_extend(outbuf, indent)) {
+    if ((l = outbuf_extend(outbuf, indent))) {
 	memset(outbuf->buffer + outbuf->real_size, ' ', l);
 	*(outbuf->buffer + outbuf->real_size + l) = 0;
 	outbuf->real_size += l;
@@ -319,16 +319,21 @@ void svalue_to_string P5(svalue_t *, obj, outbuffer_t *, outbuf, int, indent, in
 	outbuf_add(outbuf, "\"");
 	break;
     case T_CLASS:
-	outbuf_add(outbuf, "CLASS( ");
-	numadd(outbuf, obj->u.arr->size);
-	outbuf_add(outbuf, " elements\n");
-	for (i = 0; i < (obj->u.arr->size) - 1; i++)
-	    svalue_to_string(&(obj->u.arr->item[i]), outbuf, indent + 2, 1, 0);
-	svalue_to_string(&(obj->u.arr->item[i]), outbuf, indent + 2, 0, 0);
-	outbuf_add(outbuf, "\n");
-	add_indent(outbuf, indent);
-	outbuf_add(outbuf, " )");
-	break;
+	{
+	    int n = obj->u.arr->size;
+	    outbuf_add(outbuf, "CLASS( ");
+	    numadd(outbuf, n);
+	    outbuf_add(outbuf, n == 1 ? " element\n" : " elements\n");
+	    for (i = 0; i < (obj->u.arr->size) - 1; i++)
+		svalue_to_string(&(obj->u.arr->item[i]), outbuf,
+				 indent + 2, 1, 0);
+	    svalue_to_string(&(obj->u.arr->item[i]), outbuf, 
+			     indent + 2, 0, 0);
+	    outbuf_add(outbuf, "\n");
+	    add_indent(outbuf, indent);
+	    outbuf_add(outbuf, " )");
+	    break;
+	}
     case T_ARRAY:
 	if (!(obj->u.arr->size)) {
 	    outbuf_add(outbuf, "({ })");
@@ -382,12 +387,7 @@ void svalue_to_string P5(svalue_t *, obj, outbuffer_t *, outbuf, int, indent, in
 	    case FP_EFUN:
 		{
 		    int i;
-		    i = obj->u.fp->f.efun.opcodes[0];
-#ifdef NEEDS_CALL_EXTRA
-		    if (i == F_CALL_EXTRA) {
-			i = obj->u.fp->f.efun.opcodes[1] + 0xff;
-		    }
-#endif
+		    i = obj->u.fp->f.efun.index;
 		    outbuf_add(outbuf, instrs[i].name);
 		    break;
 		}

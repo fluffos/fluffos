@@ -13,6 +13,7 @@
  *   Added get_array_block()...using @@ENDMARKER to return array of strings
  */
 
+#define SUPPRESS_COMPILER_INLINES
 #include "std.h"
 #include "file_incl.h"
 #include "lpc_incl.h"
@@ -109,10 +110,13 @@ char *option_defs[] =
 
 static keyword_t reswords[] =
 {
-#ifdef ARRAY_RESERVED_WORD
-    {"array", '*', 0},
+#ifdef DEBUG
+    {"__TREE__", L_TREE, 0 },
 #endif
-    {"asm", L_ASM, 0},
+#ifdef ARRAY_RESERVED_WORD
+    {"array", L_ARRAY, 0 },
+#endif
+    {"asm", 0, 0},
     {"break", L_BREAK, 0},
 #ifndef DISALLOW_BUFFER_TYPE
     {"buffer", L_BASIC_TYPE, TYPE_BUFFER},
@@ -190,7 +194,6 @@ static void add_input PROT((char *));
 static int cond_get_exp PROT((int));
 static void merge PROT((char *name, char *dest));
 static void add_quoted_predefine PROT((char *, char *));
-static INLINE int mygetc PROT((void));
 static void lexerror PROT((char *));
 static int skip_to PROT((char *, char *));
 static void handle_cond PROT((int));
@@ -266,11 +269,6 @@ static void merge P2(char *, name, char *, dest)
 	    }
 	}
     }
-}
-
-static INLINE int mygetc()
-{
-    return *outp++;
 }
 
 static void
@@ -369,7 +367,11 @@ static int
     return -1;
 }
 
-#define include_error(x) do { current_line--; yyerror(x); current_line++; } while (0);
+#define include_error(x) SAFE(\
+			      current_line--;\
+			      yyerror(x);\
+			      current_line++;\
+			      )
 
 static void
 handle_include P1(char *, name)
@@ -846,9 +848,6 @@ static pragma_t our_pragmas[] = {
 #ifdef BINARIES
     { "save_binary", PRAGMA_SAVE_BINARY },
 #endif
-#ifdef LPC_TO_C
-    { "efun", PRAGMA_EFUN },
-#endif
     { "warnings", PRAGMA_WARNINGS },
     { "optimize", PRAGMA_OPTIMIZE },
     { "show_error_context", PRAGMA_ERROR_CONTEXT },
@@ -869,18 +868,8 @@ static void handle_pragma P1(char *, str)
     for (i = 0; our_pragmas[i].name; i++) {
 	if (strcmp(our_pragmas[i].name, str) == 0) {
 	    if (no_flag) {
-#ifdef LPC_TO_C
-		if (our_pragmas[i].value == PRAGMA_SAVE_TYPES)
-		    pragmas &= ~PRAGMA_EFUN;
-#endif
 		pragmas &= ~our_pragmas[i].value;
 	    } else {
-#ifdef LPC_TO_C
-		if (our_pragmas[i].value == PRAGMA_EFUN) {
-		    if (!compile_to_c) return;
-		    pragmas |= PRAGMA_SAVE_TYPES;
-		}
-#endif
 		pragmas |= our_pragmas[i].value;
 	    }
 	    return;
@@ -2006,6 +1995,8 @@ void init_num_args()
 	    instrs[n].name = predefs[i].word;
 	    instrs[n].type[0] = predefs[i].arg_type1;
 	    instrs[n].type[1] = predefs[i].arg_type2;
+	    instrs[n].type[2] = predefs[i].arg_type3;
+	    instrs[n].type[3] = predefs[i].arg_type4;
 	    instrs[n].Default = predefs[i].Default;
 	    instrs[n].ret_type = predefs[i].ret_type;
 	    instrs[n].arg_index = predefs[i].arg_index;
@@ -2026,15 +2017,17 @@ void init_num_args()
     add_instr_name("&", "f_and();\n", F_AND, T_ARRAY | T_NUMBER);
     add_instr_name("&=", "f_and_eq();\n", F_AND_EQ, T_NUMBER);
     add_instr_name("index", "c_index();\n", F_INDEX, T_ANY);
-    add_instr_name("member", 0, F_MEMBER, T_ANY);
+    add_instr_name("member", "c_member(%i);\n", F_MEMBER, T_ANY);
+    add_instr_name("new_class", "c_new_class(%i);\n", F_NEW_CLASS, T_ANY);
     add_instr_name("rindex", "c_rindex();\n", F_RINDEX, T_ANY);
-    add_instr_name("loop_cond", "c_loop_cond();\n", F_LOOP_COND, -1);
-    add_instr_name("loop_incr", "c_loop_incr();\n", F_LOOP_INCR, -1);
+    add_instr_name("loop_cond_local", "C_LOOP_COND_LV(%i, %i); if (lpc_int)\n", F_LOOP_COND_LOCAL, -1);
+    add_instr_name("loop_cond_number", "C_LOOP_COND_NUM(%i, %i); if (lpc_int)\n", F_LOOP_COND_NUMBER, -1);
+    add_instr_name("loop_incr", "C_LOOP_INCR(%i);\n", F_LOOP_INCR, -1);
     add_instr_name("foreach", 0, F_FOREACH, -1);
     add_instr_name("exit_foreach", "c_exit_foreach();\n", F_EXIT_FOREACH, -1);
     add_instr_name("expand_varargs", 0, F_EXPAND_VARARGS, -1);
-    add_instr_name("next_foreach", 0, F_NEXT_FOREACH, -1);
-    add_instr_name("member_lvalue", 0, F_MEMBER_LVALUE, T_LVALUE);
+    add_instr_name("next_foreach", "c_next_foreach();\n", F_NEXT_FOREACH, -1);
+    add_instr_name("member_lvalue", "c_member_lvalue(%i);\n", F_MEMBER_LVALUE, T_LVALUE);
     add_instr_name("index_lvalue", "push_indexed_lvalue(0);\n", 
 		   F_INDEX_LVALUE, T_LVALUE|T_LVALUE_BYTE);
     add_instr_name("rindex_lvalue", "push_indexed_lvalue(1);\n",
@@ -2059,16 +2052,17 @@ void init_num_args()
 		   F_RE_RANGE, T_BUFFER|T_ARRAY|T_STRING);
     add_instr_name("ne_range", "f_extract_range(0);\n",
 		   F_NE_RANGE, T_BUFFER|T_ARRAY|T_STRING);
-    add_instr_name("global", 0, F_GLOBAL, T_ANY);
-    add_instr_name("local", 0, F_LOCAL, T_ANY);
+    add_instr_name("global", "C_GLOBAL(%i);\n", F_GLOBAL, T_ANY);
+    add_instr_name("local", "C_LOCAL(%i);\n", F_LOCAL, T_ANY);
+    add_instr_name("transfer_local", "c_transfer_local(%i);\n", F_TRANSFER_LOCAL, T_ANY);
     add_instr_name("number", 0, F_NUMBER, T_NUMBER);
     add_instr_name("real", 0, F_REAL, T_REAL);
-    add_instr_name("local_lvalue", 0, F_LOCAL_LVALUE, T_LVALUE);
-    add_instr_name("while_dec", 0, F_WHILE_DEC, -1);
+    add_instr_name("local_lvalue", "C_LVALUE(fp + %i);\n", F_LOCAL_LVALUE, T_LVALUE);
+    add_instr_name("while_dec", "C_WHILE_DEC(%i); if (lpc_int)\n", F_WHILE_DEC, -1);
     add_instr_name("const1", "push_number(1);\n", F_CONST1, T_NUMBER);
     add_instr_name("subtract", "c_subtract();\n", F_SUBTRACT, T_NUMBER | T_REAL | T_ARRAY);
     add_instr_name("(void)assign", "c_void_assign();\n", F_VOID_ASSIGN, T_NUMBER);
-    add_instr_name("(void)assign_local", "c_void_assign_local();\n", F_VOID_ASSIGN_LOCAL, T_NUMBER);
+    add_instr_name("(void)assign_local", "c_void_assign_local(fp + %i);\n", F_VOID_ASSIGN_LOCAL, T_NUMBER);
     add_instr_name("assign", "c_assign();\n", F_ASSIGN, T_ANY);
     add_instr_name("branch", 0, F_BRANCH, -1);
     add_instr_name("bbranch", 0, F_BBRANCH, -1);
@@ -2097,23 +2091,25 @@ void init_num_args()
 #ifdef F_JUMP
     add_instr_name("jump", F_JUMP, -1);
 #endif
-    add_instr_name("return_zero", 0, F_RETURN_ZERO, -1);
-    add_instr_name("return", 0, F_RETURN, -1);
-    add_instr_name("sscanf", 0, F_SSCANF, T_NUMBER);
-    add_instr_name("parse_command", 0, F_PARSE_COMMAND, T_NUMBER);
+    add_instr_name("return_zero", "c_return_zero();\nreturn;\n", F_RETURN_ZERO, -1);
+    add_instr_name("return", "c_return();\nreturn;\n", F_RETURN, -1);
+    add_instr_name("sscanf", "c_sscanf(%i);\n", F_SSCANF, T_NUMBER);
+    add_instr_name("parse_command", "c_parse_command(%i);\n", F_PARSE_COMMAND, T_NUMBER);
     add_instr_name("string", 0, F_STRING, T_STRING);
     add_instr_name("short_string", 0, F_SHORT_STRING, T_STRING);
-    add_instr_name("call", 0, F_CALL_FUNCTION_BY_ADDRESS, T_ANY);
-    add_instr_name("call_inherited", 0, F_CALL_INHERITED, T_ANY);
-    add_instr_name("aggregate_assoc", 0, F_AGGREGATE_ASSOC, T_MAPPING);
+    add_instr_name("call", "c_call(%i, %i);\n", F_CALL_FUNCTION_BY_ADDRESS, T_ANY);
+    add_instr_name("call_inherited", "c_call_inherited(%i, %i, %i);\n", F_CALL_INHERITED, T_ANY);
+    add_instr_name("aggregate_assoc", "C_AGGREGATE_ASSOC(%i);\n", F_AGGREGATE_ASSOC, T_MAPPING);
 #ifdef DEBUG
-    add_instr_name("break_point", "f_break_point();\n", F_BREAK_POINT, -1);
+    add_instr_name("break_point", "break_point();\n", F_BREAK_POINT, -1);
 #endif
-    add_instr_name("call_extra", 0, F_CALL_EXTRA, -1);
-    add_instr_name("aggregate", 0, F_AGGREGATE, T_ARRAY);
+    add_instr_name("aggregate", "C_AGGREGATE(%i);\n", F_AGGREGATE, T_ARRAY);
     add_instr_name("(::)", 0, F_FUNCTION_CONSTRUCTOR, T_FUNCTION);
-    add_instr_name("simul_efun", 0, F_SIMUL_EFUN, T_ANY);
-    add_instr_name("global_lvalue", 0, F_GLOBAL_LVALUE, T_LVALUE);
+    /* sorry about this one */
+    add_instr_name("simul_efun", 
+		   "call_simul_efun(%i, (lpc_int = %i + num_varargs, num_varargs = 0, lpc_int));\n", 
+		   F_SIMUL_EFUN, T_ANY);
+    add_instr_name("global_lvalue", "C_LVALUE(&current_object->variables[variable_index_offset + %i]);\n", F_GLOBAL_LVALUE, T_LVALUE);
     add_instr_name("|", "f_or();\n", F_OR, T_NUMBER);
     add_instr_name("<<", "f_lsh();\n", F_LSH, T_NUMBER);
     add_instr_name(">>", "f_rsh();\n", F_RSH, T_NUMBER);
@@ -2402,7 +2398,7 @@ static void add_predefine P3(char *, name, int, nargs, char *, exps)
 	if (nargs != p->nargs || strcmp(exps, p->exps)) {
 	    char buf[200 + NSIZE];
 
-	    sprintf(buf, "Warning: redefinition of #define %s\n", name);
+	    sprintf(buf, "redefinition of #define %s\n", name);
 	    yywarn(buf);
 	}
 	p->exps = (char *)DREALLOC(p->exps, strlen(exps) + 1, TAG_PREDEFINES, "add_define: redef");

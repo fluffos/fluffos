@@ -1,5 +1,6 @@
 #include "std.h"
 #ifdef LPC_TO_C
+#define SUPRESS_COMPILER_INLINES
 #include "file_incl.h"
 #include "lpc_incl.h"
 #include "interface.h"
@@ -87,8 +88,7 @@ clean:\n\
 
 int generate_source P2(svalue_t *, arg1, char *, out_fname)
 {
-    FILE *specfile, *makefile;
-    int len;
+    FILE *makefile;
 
     struct stat c_st;
     char real_name[200];
@@ -176,7 +176,7 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
 	    debug_perror("generate_source: fopen", out_fname);
 	    error("Could not open output file '/%s'.\n", out_fname);
 	}
-	fprintf(compilation_output_file, "#include \"std.h\"\n#include \"interface.h\"\n");
+	fprintf(compilation_output_file, "#include \"std.h\"\n#include \"interface.h\"\n#include \"lpc_to_c.h\"\n\n");
 	
 	done = 0;
 	while (!done) {
@@ -229,57 +229,8 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
 
 		FREE(string_needs_free);
 		string_needs_free = 0;
-	    } else {
+	    } else
 		done = 1;
-		if (pragmas & PRAGMA_EFUN) {
-		    strcpy(out_name, out_fname);
-		    len = strlen(out_name);
-		    if (out_name[len-1] == 'c' && out_name[len-2] == '.') {
-			len -= 2;
-			out_name[len] = '\0';
-		    }
-		    strcat(out_name, "_spec.c");
-		    specfile = crdir_fopen(out_name);
-		    if (specfile == 0) {
-			fclose(compilation_output_file);
-			compilation_output_file = 0;
-			debug_perror("generate_source: close", out_fname);
-			error("Could not open output file '/%s.'\n", out_fname);
-		    }
-		    out_name[len] = '\0';
-		    if (prog) {
-			int n = prog->num_functions;
-			function_t *functions = prog->functions;
-			unsigned short *types;
-			while (n--) {
-			    int i = 0;
-			    
-			    if (prog->type_start && prog->type_start[n] != INDEX_START_NONE)
-				types = &prog->argument_types[prog->type_start[n]];
-			    else 
-				types = 0;
-			    
-			    if (functions[n].flags & 
-				(NAME_NO_CODE | NAME_INHERITED)) continue;
-			    
-			    fprintf(specfile, "%s%s( ", 
-				    get_type_name(functions[n].type & TYPE_MOD_MASK),
-				    functions[n].name);
-			    if (functions[n].num_arg)
-				while (1) {
-				    fprintf(specfile, "%s%s",
-					    (functions[n].type & TYPE_MOD_VARARGS) ?
-					    "void | " : "", get_type_name(types[i]));
-				    if (++i != functions[n].num_arg)
-					fprintf(specfile, ", ");
-				    else break;
-				}
-			    fprintf(specfile, ");\n");
-			}
-		    }
-		    fclose(specfile);
-		}
-	    }
 	}
 	if (prog) {
 	    free_prog(prog, 1);

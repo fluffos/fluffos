@@ -24,12 +24,13 @@
 
 int node_always_true PROT((parse_node_t *));
 short generate PROT((parse_node_t *));
-short generate_function PROT((function_t *, parse_node_t *));
+short generate_function PROT((function_t *, parse_node_t *, int));
 int generate_conditional_branch PROT((parse_node_t *));
 
 #ifdef DEBUG
-void dump_expr_list PROT((parse_node_t *, int));
-void dump_tree PROT((parse_node_t *, int));
+void dump_expr_list PROT((parse_node_t *));
+void dump_tree PROT((parse_node_t *));
+void lpc_tree_form PROT((parse_node_t *, parse_node_t *));
 #endif
 
 #endif

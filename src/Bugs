@@ -68,10 +68,6 @@ Line numbers get messed up when files don't end in a newline?
 
 -----
 
-anonymous function pointers don't work in LPC->C
-
------
-
 Range/switch search should be binary, not linear. (in LPC->C)
 
 -----
@@ -80,55 +76,6 @@ strings longer than MAXSHORT screw up statistics, b/c their length is counted
 inconsistently.
 
 -----
-
-Connected to address server on localhost port 6364
-secure/master/compile.c line 37: Undefined variable 'ob'
-
-secure/master/compile.c line 44: parse error
-secure/master/compile.c line 49: Illegal LHS
-secure/master/compile.c line 56: Illegal LHS
-secure/master/compile.c line 56: parse error
-secure/master/compile.c line 70: Illegal LHS
-MDfree: right side of entry corrupt: reallocate_locals:2 0220
-MDfree: right side of entry corrupt: reallocate_locals:3 400617d8
-Segmentation fault (core dumped)
-
-(gdb) where
-
-#0  0xb7b30 in deactivate_current_locals () at compiler.c:141
-#1  0x2e9d4 in yyparse () at grammar.y.pre:2362
-#2  0xbb9e8 in compile_file (f=4, name=0x7b033e60 "secure/master.c")
-    at compiler.c:1220
-#3  0x58c50 in load_object (lname=0x40056709 "secure/master", lpc_obj=0x0)
-    at simulate.c:448
-#4  0x40db8 in main (argc=2, argv=0x7b033a4c) at main.c:384
-
-(gdb) print current_prog
-$1 = (program_t *) 0x0
-(gdb) print current_file
-$2 = 0x40067248 "secure/master/security.c"
-(gdb) print current_line
-$3 = 99
-
-Line 97-101 as follows:
--------------
-
-int
-valid_write( string file, object ob, string fun )
-{
-    string *ok;
--------------
-
-The line that seems to cause the crash is the one that fails
-in compile.c (line 44)
-
-> if ( file_size(USER_SAVE_DIRS_V[type] nom[0..0]) != -2 )
-(Spot the missing '+', adding that cures the crash.)
-USER_SAVE_DIRS_V is a string *, nom is a string.
-
-                            !A
-
--------
 
 Probably need a test to see if bison's output actually compiles in
 ./build.Mudos;  on alot of AIX systems bison's use of alloca() fails.
@@ -144,67 +91,8 @@ swapping for much of the mud ...
 
 -Beek
 
-------
+-----
 
-foreach() in LPC->C needs the foreach_depth fixes and some code for foreach
-it also needs the loop generation cleanup
+replace_string(implode(({"east", "west", "foo", "arg"}), ", "), ", ", " and ", 3, 4)
 
-------
-
-grep crasher again?
-reclaim_objects() ?
--------
-
-OSF crasher:
-
-#0  0x12006387c in find_for_insert (m=0x14008f800, lv=0x11fffe9b0, doTheFree=1)
-    at mapping.c:549
-#1  0x120066cd0 in insert_in_mapping (m=0x14008f800,
-    key=0x140011290 "arguments") at mapping.c:1388
-#2  0x120067130 in add_mapping_array (m=0x14008f800,
-    key=0x140011290 "arguments", value=0x140098a40) at mapping.c:1436
-#3  0x120042684 in get_svalue_trace () at interpret.c:4159
-#4  0x120049d08 in mudlib_error_handler (
-    err=0x11fffeb08 "*Bad argument to [ .. ] range operator.\n", catch=0)
-    at simulate.c:2097
-#5  0x12004a18c in error_handler (
-    err=0x11fffeb08 "*Bad argument to [ .. ] range operator.\n")
-    at simulate.c:2169
-#6  0x12004a424 in error (
-    fmt=0x14001ae00 "Bad argument to [ .. ] range operator.\n")
-    at simulate.c:2256
-#7  0x1200bafe4 in f_range (code=0) at eoperators.c:724
-#8  0x12003e74c in eval_instruction (p=0x14006515e "@") at interpret.c:2950
-#9  0x120037108 in call_program (prog=0x140065040, offset=134)
-    at interpret.c:1611
-#10 0x120040218 in apply_low (fun=0x140099050 "prompt_password",
-    ob=0x14007e280, num_arg=1) at interpret.c:3507
-#11 0x120040388 in apply (fun=0x140099050 "prompt_password", ob=0x14007e280,
----Type <return> to continue, or q <return> to quit---
-    num_arg=1, where=1) at interpret.c:3565
-#12 0x12006cf70 in call_function_interactive (i=0x140080800,
-    str=0x140046238 "o") at comm.c:1890
-#13 0x12006b408 in process_user_command () at comm.c:1216
-#14 0x120056584 in backend () at backend.c:239
-#15 0x12002f388 in main (argc=2, argv=0x11ffffda8) at main.c:476
-(gdb)
-
--------
-
-!codefor int x = 1 + 1.2
-
-0000: byte 2
-0002: to_int 
-0003: (void)assign_local LV0
-0005: return_zero 
-
--------
-
-Unterminated @@ block bug is back?
-explode(read_file()) bug is back?
-
--------
-
-There seems to be some really nasty behavior with respect to UDP failures;
-this could be due to the mudlib continually retrying to send when it fails,
-but CPU seems to race a bit.
+=> eastwestfoo and arg

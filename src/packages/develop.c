@@ -1,9 +1,11 @@
 #ifdef LATTICE
 #include "/lpc_incl.h"
 #include "/comm.h"
+#include "/md.h"
 #else
 #include "../lpc_incl.h"
 #include "../comm.h"
+#include "../md.h"
 #endif
 
 static object_t *ob;
@@ -187,8 +189,7 @@ f_trace PROT((void))
 {
     int ot = -1;
 
-    if (command_giver && command_giver->interactive &&
-        command_giver->flags & O_IS_WIZARD) {
+    if (command_giver && command_giver->interactive) {
         ot = command_giver->interactive->trace_level;
         command_giver->interactive->trace_level = sp->u.number;
     }
@@ -202,8 +203,7 @@ f_traceprefix PROT((void))
 {
     char *old = 0;
 
-    if (command_giver && command_giver->interactive &&
-        command_giver->flags & O_IS_WIZARD) {
+    if (command_giver && command_giver->interactive) {
         old = command_giver->interactive->trace_prefix;
         if (sp->type & T_STRING) {
             command_giver->interactive->trace_prefix =

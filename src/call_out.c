@@ -366,8 +366,12 @@ remove_all_call_out P1(object_t *, obj)
 
     copp = &call_list;
     while (*copp) {
-	if ((*copp)->ob &&
-	    (((*copp)->ob == obj) || ((*copp)->ob->flags & O_DESTRUCTED))) {
+	if ( ((*copp)->ob &&
+	      (((*copp)->ob == obj) || ((*copp)->ob->flags & O_DESTRUCTED))) ||
+	    (!(*copp)->ob &&
+	     ((*copp)->function.f->hdr.owner == obj ||
+	      (*copp)->function.f->hdr.owner->flags & O_DESTRUCTED)) )
+	  {
 	    cop = *copp;
 	    if (cop->next)
 		cop->next->delta += cop->delta;

@@ -7,6 +7,7 @@
   credits intact.
 */
 
+#define SUPPRESS_COMPILER_INLINES
 #include "std.h"
 #include "config.h"
 #include "lpc_incl.h"
@@ -666,7 +667,7 @@ static void patch_in P3(program_t *, prog, short *, patches, int, len)
 		if (s == (char *)-1)
 		    s = 0;
 		else
-		    s = prog->strings[(int)s];
+		    s = prog->strings[(POINTER_INT)s];
 		COPY_PTR(p + offset, &s);
 		offset += SWITCH_CASE_SIZE;
 	    }

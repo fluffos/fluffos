@@ -41,6 +41,12 @@
 #ifdef INCL_CRYPT_H
 #  include <crypt.h>
 #endif
+#ifdef INCL_VALUES_H
+#  include <values.h>
+#endif
+#ifdef INCL_LIMITS_H
+#  include <limits.h>
+#endif
 
 #ifdef LATTICE
 #  undef VOID
@@ -90,7 +96,11 @@
 #  define size_t unsigned
 #endif
 
-#ifdef NeXT
+#ifdef INCL_MACH_MACH_H
+#  include <mach/mach.h>
+#endif
+
+#ifdef INCL_MACH_H
 #  include <mach.h>
 #endif
 

@@ -46,9 +46,18 @@ typedef struct malloc_block_s {
 #define MSTR_EXTRA_REF(x) (MSTR_BLOCK(x)->extra_ref)
 #define MSTR_REF(x) (MSTR_BLOCK(x)->ref)
 #define MSTR_SIZE(x) (MSTR_BLOCK(x)->size)
-#define MSTR_UPDATE_SIZE(x, y) do { ADD_STRING_SIZE(y - MSTR_SIZE(x)); MSTR_BLOCK(x)->size = (y > MAXSHORT ? MAXSHORT : y); } while (0)
+#define MSTR_UPDATE_SIZE(x, y) SAFE(\
+				    ADD_STRING_SIZE(y - MSTR_SIZE(x));\
+				    MSTR_BLOCK(x)->size = \
+				    (y > MAXSHORT ? MAXSHORT : y);\
+				)
 
-#define FREE_MSTR(x) do { SUB_STRING(MSTR_SIZE(x)); SUB_NEW_STRING(MSTR_SIZE(x), sizeof(malloc_block_t)); FREE(MSTR_BLOCK(x)); } while (0)
+#define FREE_MSTR(x) SAFE(\
+			  SUB_STRING(MSTR_SIZE(x));\
+			  SUB_NEW_STRING(MSTR_SIZE(x), \
+					 sizeof(malloc_block_t));\
+			  FREE(MSTR_BLOCK(x));\
+		      )
 
 /* This counts on some rather crucial alignment between malloc_block_t and
    block_t */

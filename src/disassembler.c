@@ -224,18 +224,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 
 	fprintf(f, "%04x: ", (unsigned) (pc - code));
 
-#ifdef NEEDS_CALL_EXTRA
-	if ((instr = EXTRACT_UCHAR(pc)) == F_CALL_EXTRA) {
-	    fprintf(f, "call_extra+");
-	    pc++;
-	    instr = EXTRACT_UCHAR(pc) + 0xff;
-	    is_efun = 1;
-	} else {
-	    is_efun = (instr >= BASE);
-	}
-#else
 	is_efun = (instr = EXTRACT_UCHAR(pc)) >= BASE;
-#endif
 
 	pc++;
 	buff[0] = 0;
@@ -393,30 +382,29 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 		    (unsigned) sarg, (unsigned) offset);
 	    pc += 3;
 	    break;
+	case F_TRANSFER_LOCAL:
 	case F_LOCAL:
 	case F_LOCAL_LVALUE:
 	case F_VOID_ASSIGN_LOCAL:
 	    sprintf(buff, "LV%d", EXTRACT_UCHAR(pc));
 	    pc++;
 	    break;
-	case F_LOOP_COND:
-	    i = EXTRACT_UCHAR(pc++);
-	    if (*pc++ == F_LOCAL) {
-	        iarg = *pc++;
-	        COPY_SHORT(&sarg, pc);
-		offset = (pc - code) - (unsigned short) sarg;
-		pc += 2;
-		sprintf(buff, "LV%d < LV%d bbranch_when_non_zero %04x (%04x)",
-			i, iarg, sarg, offset);
-	    } else {
-	        COPY_INT(&iarg, pc);
-		pc += 4;
-		COPY_SHORT(&sarg, pc);
-		offset = (pc - code) - (unsigned short) sarg;
-		pc += 2;
-		sprintf(buff, "LV%d < %d bbranch_when_non_zero %04x (%04x)",
-			i, iarg, sarg, offset);
-	    }
+	case F_LOOP_COND_NUMBER:
+	    COPY_INT(&iarg, pc);
+	    pc += 4;
+	    COPY_SHORT(&sarg, pc);
+	    offset = (pc - code) - (unsigned short) sarg;
+	    pc += 2;
+	    sprintf(buff, "LV%d < %d bbranch_when_non_zero %04x (%04x)",
+		    i, iarg, sarg, offset);
+	    break;
+	case F_LOOP_COND_LOCAL:
+	    iarg = *pc++;
+	    COPY_SHORT(&sarg, pc);
+	    offset = (pc - code) - (unsigned short) sarg;
+	    pc += 2;
+	    sprintf(buff, "LV%d < LV%d bbranch_when_non_zero %04x (%04x)",
+		    i, iarg, sarg, offset);
 	    break;
 	case F_STRING:
 	    COPY_SHORT(&sarg, pc);
@@ -447,13 +435,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 		pc += 2;
 		break;
 	    case FP_EFUN:
-#ifdef NEEDS_CALL_EXTRA
-		if ((sarg = EXTRACT_UCHAR(pc++)) == F_CALL_EXTRA) {
-		    sarg = EXTRACT_UCHAR(pc++) + 0xff;
-		}
-#else
-		sarg = EXTRACT_UCHAR(pc++);
-#endif
+		COPY_SHORT(&sarg, pc);
 		sprintf(buff, "<efun> %s", instrs[sarg].name);
 		break;
 	    case FP_LOCAL:
@@ -552,7 +534,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 			COPY_PTR(&parg, pc);
 			COPY_SHORT(&sarg, pc + SIZEOF_PTR);
 			if (ttype == 1 || !parg) {
-			    fprintf(f, "\t%-4d\t%04x\n",parg, (unsigned) sarg);
+			    fprintf(f, "\t%-4d\t%04x\n",(int)parg, (unsigned) sarg);
 			} else {
 			    fprintf(f, "\t\"%s\"\t%04x\n",
 			    disassem_string(parg), (unsigned) sarg);
@@ -562,13 +544,19 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 		}
 		continue;
 	    }
-	default:
-	    /* Instructions with no args */
-	    if (is_efun && (instrs[instr].min_arg != instrs[instr].max_arg)) {
-		/* efun w/varargs, next byte is actual number */
-		sprintf(buff, "%d", EXTRACT_UCHAR(pc));
-		pc++;
+	case F_EFUNV:
+	    sprintf(buff, "%d", EXTRACT_UCHAR(pc++));
+	    instr = EXTRACT_UCHAR(pc++) + ONEARG_MAX;
+	    break;
+	case F_EFUN0:
+	case F_EFUN1:
+	case F_EFUN2:
+	case F_EFUN3:
+	    if (instrs[instr].min_arg != instrs[instr].max_arg) {
+		sprintf(buff, "%d", instr - F_EFUN0);
 	    }
+	    instr = EXTRACT_UCHAR(pc++) + ONEARG_MAX;
+	    break;
 	}
 	fprintf(f, "%s %s\n", get_f_name(instr), buff);
 
@@ -582,234 +570,6 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 
     if (offsets)
 	free(offsets);
-}
-
-static void
-do_walk_program P4(int *, data, char *, code, int, start, int, end)
-{
-    int i, instr, is_efun;
-    char *pc;
-
-    int is_push;
-    int push_count = 0;
-    
-    pc = code + start;
-
-    while ((pc - code) < end) {
-#ifdef NEEDS_CALL_EXTRA
-	if ((instr = EXTRACT_UCHAR(pc)) == F_CALL_EXTRA) {
-	    pc++;
-	    instr = EXTRACT_UCHAR(pc) + 0xff;
-	    is_efun = 1;
-	} else {
-	    is_efun = (instr >= BASE);
-	}
-#else
-	is_efun = (instr = EXTRACT_UCHAR(pc)) >= BASE;
-#endif
-	is_push = 0;
-
-	pc++;
-
-	switch (instr) {
-	    /* Single numeric arg */
-	case F_BRANCH:
-	case F_BRANCH_WHEN_ZERO:
-	case F_BRANCH_WHEN_NON_ZERO:
-#ifdef F_LOR
-	case F_LOR:
-	case F_LAND:
-#endif
-	    pc += 2;
-	    break;
-
-	case F_BBRANCH_WHEN_ZERO:
-	case F_BBRANCH_WHEN_NON_ZERO:
-	case F_BBRANCH:
-	    pc += 2;
-	    break;
-
-#ifdef F_JUMP
-	case F_JUMP:
-#endif
-#ifdef F_JUMP_WHEN_ZERO
-	case F_JUMP_WHEN_ZERO:
-	case F_JUMP_WHEN_NON_ZERO:
-#endif
-	case F_CATCH:
-	    pc += 2;
-	    break;
-
-	case F_AGGREGATE:
-	case F_AGGREGATE_ASSOC:
-	    pc += 2;
-	    break;
-
-	case F_MEMBER:
-	case F_MEMBER_LVALUE:
-	    pc++;
-	    break;
-
-	case F_NEW_CLASS:
-	    pc++;
-	    break;
-
-	case F_CALL_FUNCTION_BY_ADDRESS:
-	    pc += 3;
-	    break;
-
-	case F_CALL_INHERITED:
-	{
-	    pc++;
-	    pc += 3;
-	    break;
-	}
-	case F_GLOBAL_LVALUE:
-	    pc++;
-	    break;
-	case F_LOCAL:
-	case F_GLOBAL:
-	    pc++;
-	    is_push = 1;
-	    break;
-
-	case F_LOOP_INCR:
-	    pc++;
-	    break;
-	case F_WHILE_DEC:
-	case F_LOCAL_LVALUE:
-	case F_VOID_ASSIGN_LOCAL:
-	    pc++;
-	    break;
-	case F_LOOP_COND:
-	    pc++;
-	    if (*pc++ == F_LOCAL) {
-	        pc++;
-		pc += 2;
-	    } else {
-		pc += 4;
-		pc += 2;
-	    }
-	    break;
-	case F_STRING:
-	    is_push = 1;
-	    pc += 2;
-	    break;
-	case F_SHORT_STRING:
-	    is_push = 1;
-	    pc++;
-	    break;
-	case F_SIMUL_EFUN:
-	    pc += 3;
-	    break;
-
-	case F_FUNCTION_CONSTRUCTOR:
-	    switch (EXTRACT_UCHAR(pc++)) {
-	    case FP_SIMUL:
-		pc += 2;
-		break;
-	    case FP_EFUN:
-#ifdef NEEDS_CALL_EXTRA
-		if (EXTRACT_UCHAR(pc++) == F_CALL_EXTRA) {
-		    pc++;
-		}
-#else
-		pc++;
-#endif
-		break;
-	    case FP_LOCAL:
-		pc += 2;
-		break;
-	    case FP_FUNCTIONAL:
-	    case FP_FUNCTIONAL | FP_NOT_BINDABLE:
-		pc += 3;
-		break;
-	    case FP_ANONYMOUS:
-		pc += 4;
-		break;
-	    }
-	    break;
-
-	case F_NUMBER:
-	    is_push = 1;
-	    pc += 4;
-	    break;
-
-	case F_REAL:
-	    {
-		pc += 4;
-		break;
-	    }
-
-	case F_BYTE:
-	    is_push = 1;
-	    pc++;
-	    break;
-
-	case F_SSCANF:
-	case F_PARSE_COMMAND:
-	    pc++;
-	    break;
-
-	case F_NBYTE:
-	    is_push = 1;
-	    pc++;
-	    break;
-
-	case F_SWITCH:
-	    {
-		unsigned char ttype;
-		unsigned short stable, etable, def;
-
-		ttype = EXTRACT_UCHAR(pc);
-		((char *) &stable)[0] = pc[1];
-		((char *) &stable)[1] = pc[2];
-		((char *) &etable)[0] = pc[3];
-		((char *) &etable)[1] = pc[4];
-		((char *) &def)[0] = pc[5];
-		((char *) &def)[1] = pc[6];
-		/* recursively disassemble stuff in switch */
-		do_walk_program(data, code, pc - code + 7, stable);
-
-		if (ttype == 0xfe)
-		    ttype = 0;	/* direct lookup */
-		else if (ttype >> 4 == 0xf)
-		    ttype = 1;	/* normal int */
-		else
-		    ttype = 2;	/* string */
-
-		pc = code + stable;
-		if (ttype == 0) {
-		    i = 0;
-		    while (pc < code + etable - 4) {
-			pc += 2;
-		    }
-		    pc += 4;
-		} else {
-		    while (pc < code + etable) {
-			pc += 6;
-		    }
-		}
-		continue;
-	    }
-	default:
-	    /* Instructions with no args */
-	    if (is_efun && (instrs[instr].min_arg != instrs[instr].max_arg)) {
-		/* efun w/varargs, next byte is actual number */
-		pc++;
-	    }
-	}
-	if (is_push) {
-	    data[push_count++]++;
-	} else {
-	    push_count = 0;
-	}
-    }
-}
-
-void
-walk_program_code P2(int *, data, program_t *, prog) {
-    do_walk_program(data, prog->program, 0, prog->program_size);
 }
 
 #define INCLUDE_DEPTH 10

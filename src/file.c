@@ -893,7 +893,7 @@ static int copy P2(char *, from, char *, to)
 	close(ifd);
 	return 1;
     }
-#ifndef FCHMOD_MISSING
+#ifdef HAS_FCHMOD
     if (fchmod(ofd, from_stats.st_mode & 0777)) {
 	close(ifd);
 	close(ofd);

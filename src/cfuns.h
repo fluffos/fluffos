@@ -55,9 +55,19 @@ void c_parse_command PROT((int));
 void c_prepare_catch PROT((error_context_t *));
 void c_caught_error PROT((error_context_t *));
 void c_end_catch PROT((error_context_t *));
+void c_functional PROT((int, int, POINTER_INT));
 void fix_switches PROT((string_switch_entry_t **));
 int c_string_switch_lookup PROT((svalue_t *, string_switch_entry_t *, int));
 int c_range_switch_lookup PROT((int, range_switch_entry_t *, int));
+void c_foreach PROT((int, int, int));
+int c_next_foreach PROT((void));
+void c_exit_foreach PROT((void));
+void c_anonymous PROT((int, int, POINTER_INT));
+void c_expand_varargs PROT((int));
+void c_new_class PROT((int));
+void c_member_lvalue PROT((int));
+void c_member PROT((int));
+
 #endif
 
 #endif

@@ -1,3 +1,112 @@
+--------------------------------------------------------------------------
+v21.6b7 promoted to v21.6 with the following changes:
+
+	* fixed a bug that would cause the driver to busy-wait when an
+	  object had it's heart_beat enabled, but had no such function.
+	* trap SIGFPE to avoid going down on floating point exceptions
+	* run runlib on the archives for systems that need it
+	* Actually use the limits.h configure info
+
+Wed Aug 30 19:09:04 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.6b7
+	* another crasher fix in functions with no local variables in the
+	  optimizer
+	* brought the Email fixes back from v21.7ax
+	* brought the 'array' type wierdness/crasher fix back from v21.7ax
+
+Thu Aug 24 06:53:08 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.6b6
+	* crasher fix in loading objects with a .c.c suffix.  The current
+	  fix entails stripping multiple .c's off the end instead of just one.
+	* edit_source -configure now checks if the configure.h file needs to
+	  be remade due to new config checks
+
+Mon Aug 21 03:18:45 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.6b5
+	* fixed a crasher in parse_command() [reported by Magician]
+	* fixed a few bad free's in parse_value() [reported by Aragorn]
+	* added Symmetry's fix for Tensor's 'Couldn't find enabled object in
+	  heart_beat list' crasher
+	* fixed a crasher with #pragma optimize on
+	* added pluralization for do, go, was
+
+Mon Aug 21 03:16:33 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.6b4
+	* make configure.h early enough so that it can be included in
+	  func_spec.c, so that the rusage() efun can be included
+	* added in Deathblade's fixes for remove_call_out()
+
+Thu Aug  3 11:29:56 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.6b3
+	* added REALLY verbose parsing mode for those really hard to find
+	  parser bugs; use flag > 1 to parse_sentence
+	* LPC->C fixes:
+	  . fixed a crasher in compilation of control jumps [break, continue]
+	  . fixed an error in adding labels that could write one byte
+	    past the end of the program block
+	  . fixed a syntax error in code for objects using function() {}
+	  . don't generate typechecks after the 4th efun arg
+	  . fixed incorrect argument number in errors from above type checks
+	  . varargs support
+	  . fixed several bugs in foreach handling
+	  . reordered code to fix forward references to functionals when they
+	    occur in global initializers
+	  . fixed continue and break branches for files which generate > 32k
+	    of source
+	  . added alot of prototypes to cfuns.h so LPC->C code compiles more
+	    quietly
+	  . fixed a crasher in __TREE__ { /* something involving foreach */ }
+
+Sun Jul 30 11:11:12 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.6b2
+	* fixed error() to add a \n to the end of the string if one is not
+	  present
+	* remove_call_out() [no args] now removes ALL this_object()'s call_outs
+	* added pluralize() prototype
+	* parser fixes:
+	  . remote livings are always within reach
+	  . fixed a bug that caused direct/indirect objects to not get
+	    callbacks
+	  . fixed a crasher when parse_my_rules tried to return an error
+
+Sat Jul 29 20:12:46 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.6b1
+	* updated with respect to v21.5
+	* added next_bit().  next_bit(string str, int foo) returns the
+	  next bit set in str after foo, or -1 if foo is the last one
+	  (str is a set_bit/clear_bit string).  For example, to loop over
+	  set bits:
+	     int bit = -1; while ((bit = next_bit(str, bit)) != -1) { ... }
+	* Added a warning for (: string constant :)
+	* fixed another crasher in filter_mapping
+	* fixed crashers in promote_to_float and promote_to_int
+	* clarified the error message for passing x... to a non-varargs
+	  function
+	* parser stuff:
+	  . added parser support for 'me' and 'myself'
+	  . fixed 'the' and 'a' support to not inappropriately gobble them
+	  . added a debug mode turned on with an optional flag to
+	      parse_sentence: parse_sentence(foo, 1)
+	  . Added parser support for visibility:
+	      ob->inventory_accessible() can objects inside be used?
+	      ob->inventory_visible() can objects inside be seen?
+	      as usual, they are cached, so call parse_refresh() if they change
+	  . Added extra attributes for tokens; the for is XXX:wxyz
+	    where w, x, y, z are one of:
+	    l - must be living    v - need not be accessible (visible only)
+	    so "OBJ:l" is the same as "LIV", and "LIV:v" is someone you can
+	    see.
+	  . fixed a bug introduced in the get_single optimization that
+	      erroneously reported ambiguous parses
+	  . fixed STR to return the original text, not the sanitized version
+	  . the 'verb' passed to verb_* rules are also no longer sanitized
+	  . same with 'real names' of objects
+	  . finished implementing the error messages, including 'There is no
+	      X here'
+	  . optimized STR rules a bit
+	  . fixed a few bugs in finding interpretations with multi-word
+	      tokens
+	  . parse_sentence() can legally be called from do_* callbacks now
 
 ---------------------------------------------------------------------------
 (v21.5b10 promoted to v21.5 with the following fixes)
@@ -56,13 +165,6 @@ Tue Jun 27 01:01:27 1995 (tim@handel.princeton.edu (Beek))
 	* fixed MUD mode sockets to not abort the driver if they can't
 	  allocate enough memory for a packet (due to garbage for the
 	  length field, for example).  The connection is killed instead.
-
-Fri Jun 23 02:26:54 1995 (tim@handel.princeton.edu (Beek))
-	* raised patchlevel to v21.5b4
-	* fixed a compilation problem with DO_MSTATS and BSDMALLOC
-	* fixed a HP name collision on RESTRICTED in ed.c
-	* fixed a crasher in destructing socket objects with function pointers
-	  for callbacks.
 
 Thu Jun 15 09:00:09 1995 (tim@handel.princeton.edu (Beek))
 	* raised patchlevel to v21.5b3

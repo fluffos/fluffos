@@ -1765,7 +1765,7 @@ svalue_t *
 	ob = find_object2(obj);
 
     if (!ob) {
-	FREE(func);
+	FREE_MSTR(func);
 	return &const0;
     }
     /*
@@ -1791,7 +1791,7 @@ svalue_t *
      */
     ret = apply(func, ob, numargs, ORIGIN_EFUN);
 
-    FREE(func);
+    FREE_MSTR(func);
 
     if (!ret)
 	return &const0;

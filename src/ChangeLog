@@ -1,3 +1,53 @@
+Fri Oct  6 18:58:01 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* bumped version number to v21.6
+	* LPC->C support:
+	  . annonymous functions, function pointers, and foreach now work
+	  . classes now work
+	  . faster string constants
+	  . a number of small fixes to code generation
+	* compiler changes:
+	  . warning for negative constants not meaning indexing from end
+	  . internal representation was changed to support better
+	        optimization
+	  . warning for (: string constant :)
+	* optimizations:
+	  . calling of efuns is significantly faster
+	  . faster calling of efun function pointers
+	  . last use of local variables when #pragma optimize is on
+	* removed support for:
+	  . #pragma efun
+	  . contrib/compat.c
+	* features:
+	  . variables() has an optional flag like functions()
+	  . new contrib parsing package added
+	  . implode(array, function) now takes a third arg (the value to
+	    start with)
+	  . more extensive configure checks
+	  . 'array' is now a legal type, meaning 'mixed *'.  See the
+	    v21.6a8 ChangeLog for more info
+	  . catch { ... } and time_expression { ... } are now legal  
+	  . if a function is defined as: void foo(int x, array args...)
+	    then all the additional arguments after x are put in args
+	  . regexp(string, string) now exists, returns 1/0
+	  . remove_call_out() [no args] now removes ALL of this_object()'s
+	    call_outs
+	* crasher fixes:
+	  . remove_interactive()
+	  . illegal indexes to array constants, e.g ({ 1, 2 })[5]
+	  . regexp() with 8 bit chars when host char is signed
+	  . two in parse_command()
+	  . don't go down on floating point exceptions on systems which
+	    crash when a SIGFPE is raised
+	* bug fixes:
+	  . replace_string() behavior in some cases
+	  . compilation fixes for DEC alpha
+	  . ranlib is run on the archives for systems that need it.
+	* COMPAT BUSTERs:
+	  . origin() and typeof() now return strings.  If you used the
+	    defines in the driver includes, that should be fine
+	  . filter_mapping() now passes the value as the second element,
+	    just like map_mapping()
+	
 Sun Jul 30 10:14:15 EDT 1995 (tim@handel.princeton.edu (Beek))
 	* bumped version number to v21.5
 	* features:
@@ -229,6 +279,12 @@ Thu Mar 30 14:56:48 EST 1995 (tim@handel.princeton.edu (Beek))
 	  . it is no longer to illegal to overload a function to have a
 	    different number of arguments
 	* porting fixes for CX/UX 6.1, IRIX 5.3, amiga
+	* COMPAT_BUSTERs:
+	  . removed OLD_HEARTBEAT, OLD_COMMAND, IGNORE_STRICT_PRAGMA
+	  . removed STRICT_TYPE_CHECKING; use PRAGMA_STRICT_TYPES
+	  . removed ALWAYS_SAVE_BINARIES; use PRAGMA_SAVE_BINARIES
+	  . move_object() only takes one arg; change
+	    move_object(this_object(), foo) to move_object(foo)
 
 Fri Mar 10 11:03:09 EST 1995 (tim@handel.princeton.edu (Beek))
 	* bumped version number to v21

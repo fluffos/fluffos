@@ -103,6 +103,25 @@ static int assert_swap_file()
 }
 
 /*
+ *  Seek the swap file
+ */
+static void
+swap_seek P2(long, offset, int, flag) {
+    int ret;
+    
+    do {
+#ifdef SWAP_USE_FD
+	ret = lseek(swap_file, offset, flag);
+#else
+	ret = fseek(swap_file, offset, flag);
+#endif
+    } while (ret == -1 && errno == EINTR);
+    if (ret == -1)
+	fatal("Couldn't seek the swap file, error %s, offset %d.\n",
+	      strerror(errno), offset);
+}
+
+/*
  * Find a position to swap to, using free blocks if possible.
  * 'length' is the size we need.
  *
@@ -217,7 +236,7 @@ static int
 swap_out P3(char *, block, int, size, int *, locp)
 {
     extern int errno;
-
+    
     if (!block || time_to_swap == 0)
 	return 0;
     if (!assert_swap_file())
@@ -225,10 +244,8 @@ swap_out P3(char *, block, int, size, int *, locp)
 
     if (*locp == -1) {		/* needs data written out */
 	*locp = alloc_swap(size + sizeof size);
+	swap_seek(*locp, 0);
 #ifdef SWAP_USE_FD
-        if (lseek(swap_file, *locp, 0) == -1)
-            fatal("Couldn't seek the swap file, errno %d, offset %d.\n",
-                  errno, *locp);
         if ((write(swap_file, &size, sizeof size) != sizeof size) ||
 	    write(swap_file, block, size) != size) {
 	    debug_perror("swap_out: ", swap_file);
@@ -236,9 +253,6 @@ swap_out P3(char *, block, int, size, int *, locp)
 	    return 0;
 	}
 #else
-	if (fseek(swap_file, *locp, 0) == -1)
-	    fatal("Couldn't seek the swap file, errno %d, offset %d.\n",
-		  errno, *locp);
 	if (fwrite((char *) &size, sizeof size, 1, swap_file) != 1 ||
 	    fwrite(block, size, 1, swap_file) != 1) {
 	    debug_perror("swap_out:swap file:", 0);
@@ -263,13 +277,11 @@ swap_in P2(char **, blockp, int, loc)
 {
     extern int errno;
     int size;
-
+    
     if (loc == -1)
 	return 0;
+    swap_seek(loc, 0);
 #ifdef SWAP_USE_FD
-    if (lseek(swap_file, loc, 0) == -1)
-        fatal("Couldn't seek the swap file, errno %d, offset %d.\n",
-              errno, loc);
     /* find out size */
     if (read(swap_file, &size, sizeof size) == -1)
         fatal("Couldn't read the swap file.\n");
@@ -277,9 +289,6 @@ swap_in P2(char **, blockp, int, loc)
     if (read(swap_file, *blockp, size) == -1)
         fatal("Couldn't read the swap file.\n");
 #else
-    if (fseek(swap_file, loc, 0) == -1)
-	fatal("Couldn't seek the swap file, errno %d, offset %d.\n",
-	      errno, loc);
     /* find out size */
     if (fread((char *) &size, sizeof size, 1, swap_file) == -1)
 	fatal("Couldn't read the swap file.\n");
@@ -551,13 +560,10 @@ void print_swap_stats P1(outbuffer_t *, out)
     }
     size = cnt = 0;
     for (m = swap_free; m; size += m->length, cnt++, m = m->next);
+    swap_seek(0, 2);
 #ifdef SWAP_USE_FD
-    if (lseek(swap_file, 0L, 2) == -1)
-        fatal("Couldn't seek end of the swap file, errno %d\n", errno);
     end = tell(swap_file) - last_data;
 #else
-    if (fseek(swap_file, 0L, 2) == -1)
-	fatal("Couldn't seek end of the swap file, errno %d\n", errno);
     end = ftell(swap_file) - last_data;
 #endif
     if (end) {

@@ -66,8 +66,14 @@ int yyparse PROT((void));
 %token L_ARRAY_OPEN L_MAPPING_OPEN L_FUNCTION_OPEN L_NEW_FUNCTION_OPEN
 
 %token L_SSCANF L_CATCH
+%ifdef DEBUG
+%token L_TREE
+%endif
+%ifdef ARRAY_RESERVED_WORD
+%token L_ARRAY
+%endif
 %token L_PARSE_COMMAND L_TIME_EXPRESSION
-%token L_ASM L_CLASS L_NEW
+%token L_CLASS L_NEW
 %token L_PARAMETER
 
 /*
@@ -109,7 +115,7 @@ int yyparse PROT((void));
     unsigned int address;       /* Address of an instruction */
     char *string;
     int type;
-    struct { short num_arg; char is_proto; } argument;
+    struct { short num_arg; char flags; } argument;
     ident_hash_elem_t *ihe;
     function_t funp;
     function_context_t context;
@@ -159,7 +165,7 @@ int yyparse PROT((void));
 
 /* These hold a type */
 %type <type> type optional_star type_modifier_list 
-%type <type> opt_basic_type L_TYPE_MODIFIER L_BASIC_TYPE basic_type
+%type <type> opt_basic_type L_TYPE_MODIFIER L_BASIC_TYPE basic_type atomic_type
 %type <type> cast
 
 /* This holds compressed and less flexible def_name information */
@@ -176,7 +182,10 @@ int yyparse PROT((void));
 %type <node> new_local_def statement while cond do for switch case
 %type <node> return optional_else_part block_or_semi foreach
 %type <node> case_label first_for_expr statements switch_block
-%type <node> foreach_var foreach_vars expr_list_node
+%type <node> foreach_var foreach_vars expr_list_node expr_or_block
+%ifdef DEBUG
+%type <node> tree
+%endif
 
 /* The following hold information about blocks and local vars */
 %type <decl> local_declarations local_name_list block
@@ -238,9 +247,9 @@ inheritance:
 		       inheriting's function table; this finds the
 		       appropriate entry in our table and generates
 		       a call to it */
-		    start_initializer();
+		    switch_to_block(A_INITIALIZER);
 		    generate_inherited_init_call(mem_block[A_INHERITS].current_size/sizeof(inherit_t) - 1, initializer);
-		    end_initializer();
+		    switch_to_block(A_PROGRAM);
 		}
 	    }
     ;
@@ -248,16 +257,14 @@ inheritance:
 real:
 	L_REAL
 	    {
-		CREATE_TYPED_NODE($$, F_REAL, TYPE_REAL);
-		$$->v.real = $1;
+		CREATE_REAL($$, $1);
 	    }
     ;
 
 number:
 	L_NUMBER
 	    {
-		CREATE_TYPED_NODE($$, F_NUMBER, ($1 ? TYPE_NUMBER : TYPE_ANY));
-		$$->v.number = $1;
+		CREATE_NUMBER($$, $1);
 	    }
     ;
 
@@ -277,7 +284,7 @@ block_or_semi:
             {
 		$$ = $1.node;
 		if (!$$) {
-		    NODE_NO_LINE($$, F_RETURN_ZERO);
+		    CREATE_RETURN($$, 0);
 		}
             }
     |   ';'
@@ -304,7 +311,11 @@ def:
 		/* Handle type checking here so we know whether to typecheck
 		   'argument' */
 		if ($1 & TYPE_MOD_MASK) {
+%ifdef OLD_TYPE_BEHAVIOR
+                    exact_types = 0;
+%else
 		    exact_types = $1 | $2;
+%endif
 		} else {
 		    if (pragmas & PRAGMA_STRICT_TYPES) {
 			if (strcmp($3, "create") != 0)
@@ -328,8 +339,13 @@ def:
 		 * Define a prototype. If it is a real function, then the
 		 * prototype will be replaced below.
 		 */
-		define_new_function($3, $6.num_arg, 0,
-				    NAME_UNDEFINED|NAME_PROTOTYPE, $1 | $2);
+
+		$<number>$ = NAME_UNDEFINED | NAME_PROTOTYPE;
+		if ($6.flags & ARG_IS_VARARGS) {
+		    $<number>$ |= NAME_TRUE_VARARGS;
+		    $1 |= TYPE_MOD_VARARGS;
+		}
+		define_new_function($3, $6.num_arg, 0, $<number>$, $1 | $2);
 	    }
 	block_or_semi
 	    {
@@ -337,24 +353,22 @@ def:
 		if ($9) {
 		    int fun;
 
-		    if (!($9->kind == F_RETURN || $9->kind == F_RETURN_ZERO) &&
-			!(($9->kind == NODE_STATEMENTS) 
-			  && ($9->r.expr->kind == F_RETURN || $9->r.expr->kind == F_RETURN_ZERO))) {
+		    $<number>8 &= ~(NAME_UNDEFINED | NAME_PROTOTYPE);
+		    if ($9->kind != NODE_RETURN &&
+			($9->kind != NODE_TWO_VALUES
+			 || $9->r.expr->kind != NODE_RETURN)) {
 			parse_node_t *replacement;
-			parse_node_t *sub_node;
-			NODE_NO_LINE(sub_node, F_RETURN_ZERO);
-			NODE_NO_LINE(replacement, NODE_STATEMENTS);
-			replacement->l.expr = $9;
-			replacement->r.expr = sub_node;
+			CREATE_STATEMENTS(replacement, $9, 0);
+			CREATE_RETURN(replacement->r.expr, 0);
 			$9 = replacement;
 		    }
-		    if ($6.is_proto) {
+		    if ($6.flags & ARG_IS_PROTO) {
 			yyerror("Missing name for function argument");
 		    }
 		    fun = define_new_function($3, $6.num_arg, 
 					      max_num_locals - $6.num_arg,
-					      0, $1 | $2);
-		    FUNCTION(fun)->offset = generate_function(FUNCTION(fun), $9);
+					      $<number>8, $1 | $2);
+		    FUNCTION(fun)->offset = generate_function(FUNCTION(fun), $9, max_num_locals);
 		}
 		free_all_local_names();
 		free_string($3);
@@ -440,7 +454,7 @@ new_local_name:
 	    }
       ;
 
-basic_type:
+atomic_type:
         L_BASIC_TYPE 
       | L_CLASS L_DEFINED_NAME
             {
@@ -454,10 +468,24 @@ basic_type:
 	    }
        ;
 
+basic_type:
+         atomic_type
+%ifdef ARRAY_RESERVED_WORD
+       | atomic_type L_ARRAY
+            {
+		$$ = $1 | TYPE_MOD_ARRAY;
+	    }
+       | L_ARRAY
+            {
+		$$ = TYPE_ANY | TYPE_MOD_ARRAY;
+            }
+%endif
+       ;
+
 new_arg:
         basic_type optional_star
             {
-                $$ = 1;
+                $$ = ARG_IS_PROTO;
                 add_local_name("", $1 | $2);
             }
       | basic_type optional_star new_local_name
@@ -481,22 +509,27 @@ argument:
 	/* empty */
 	    {
 		$$.num_arg = 0;
-                $$.is_proto = 0;
+                $$.flags = 0;
 	    }
     |   argument_list
+    |   argument_list L_DOT_DOT_DOT
+            {
+		$$ = $1;
+		$$.flags |= ARG_IS_VARARGS;
+	    }
     ;
 
 argument_list:
 	new_arg
 	    {
 		$$.num_arg = 1;
-                $$.is_proto = $1;
+                $$.flags = $1;
 	    }
     |   argument_list ',' new_arg
 	    {
                 $$ = $1;
 		$$.num_arg++;
-                $$.is_proto |= $3;
+                $$.flags |= $3;
 	    }
     ;
 
@@ -553,7 +586,7 @@ new_name:
 		if ($3 != F_ASSIGN)
 		    yyerror("Only '=' is legal in initializers.");
 
-		start_initializer();
+		switch_to_block(A_INITIALIZER);
 		if (!compatible_types(type, $4->type)) {
 		    char buff[100];
 
@@ -564,12 +597,11 @@ new_name:
 
 		$4 = do_promotions($4, type);
 
-		expr = make_branched_node(F_VOID_ASSIGN, 0, 0, $4);
-		CREATE_NODE(expr->l.expr, F_GLOBAL_LVALUE);
-		expr->l.expr->v.number = define_variable($2, 
-							 current_type | $1, 0);
+		CREATE_BINARY_OP(expr, F_VOID_ASSIGN, 0, $4, 0);
+		CREATE_OPCODE_1(expr->r.expr, F_GLOBAL_LVALUE, 0,
+				define_variable($2, current_type | $1, 0));
 		generate(expr);
-		end_initializer();
+		switch_to_block(A_PROGRAM);
 		scratch_free($2);
 	    }
     ;
@@ -578,9 +610,7 @@ block:
 	'{' local_declarations statements '}'
             {
 		if ($2.node && $3) {
-                    NODE_NO_LINE($$.node, NODE_STATEMENTS);
-                    $$.node->l.expr = $2.node;
-                    $$.node->r.expr = $3;
+		    CREATE_STATEMENTS($$.node, $2.node, $3);
 		} else $$.node = ($2.node ? $2.node : $3);
                 $$.num = $2.num;
             }
@@ -602,9 +632,7 @@ block:
         local_name_list ';'
             {
                 if ($1.node && $4.node) {
-                    NODE_NO_LINE($$.node, NODE_STATEMENTS);
-                    $$.node->l.expr = $1.node;
-                    $$.node->r.expr = $4.node;
+		    CREATE_STATEMENTS($$.node, $1.node, $4.node);
                 } else $$.node = ($1.node ? $1.node : $4.node);
                 $$.num = $1.num + $4.num;
             }
@@ -634,9 +662,8 @@ block:
 		
 		$4 = do_promotions($4, type);
 
-		$$ = make_branched_node(F_VOID_ASSIGN, 0, 0, $4);
-		CREATE_NODE($$->l.expr, F_LOCAL_LVALUE);
-		$$->l.expr->v.number = add_local_name($2, current_type | $1);
+		CREATE_UNARY_OP_1($$, F_VOID_ASSIGN_LOCAL, 0, $4,
+				  add_local_name($2, current_type | $1));
 		scratch_free($2);
 	    }
     ;
@@ -650,9 +677,7 @@ block:
     |   new_local_def ',' local_name_list
             {
                 if ($1 && $3.node) {
-                    NODE_NO_LINE($$.node, NODE_STATEMENTS);
-                    $$.node->l.expr = $1;
-                    $$.node->r.expr = $3.node;
+		    CREATE_STATEMENTS($$.node, $1, $3.node);
                 } else $$.node = ($1 ? $1 : $3.node);
                 $$.num = 1 + $3.num;
             }
@@ -666,9 +691,7 @@ statements:
     |   statement statements
             {
 		if ($1 && $2) {
-		    NODE_NO_LINE($$, NODE_STATEMENTS);
-		    $$->l.expr = $1;
-		    $$->r.expr = $2;
+		    CREATE_STATEMENTS($$, $1, $2);
 		} else $$ = ($1 ? $1 : $2);
             }
     |   error ';'
@@ -682,11 +705,10 @@ statement:
 	    {
 		$$ = insert_pop_value($1);
 #ifdef DEBUG
-		if (d_flag) {
+		{
 		    parse_node_t *replacement;
-		    NODE_NO_LINE(replacement, NODE_STATEMENTS);
-		    replacement->l.expr = $$;
-		    NODE_NO_LINE(replacement->r.expr, F_BREAK_POINT);
+		    CREATE_STATEMENTS(replacement, $$, 0);
+		    CREATE_OPCODE(replacement->r.expr, F_BREAK_POINT, 0);
 		    $$ = replacement;
 		}
 #endif
@@ -710,16 +732,14 @@ statement:
     |   L_BREAK ';'
             {
 		if (context & SWITCH_CONTEXT) {
-		    NODE_NO_LINE($$, NODE_BREAK_SWITCH);
+		    CREATE_CONTROL_JUMP($$, CJ_BREAK_SWITCH);
 		} else
 		if (context & LOOP_CONTEXT) {
-		    NODE_NO_LINE($$, NODE_BREAK);
+		    CREATE_CONTROL_JUMP($$, CJ_BREAK);
 		    if (context & LOOP_FOREACH) {
 			parse_node_t *replace;
-			NODE_NO_LINE(replace, NODE_STATEMENTS);
-			NODE_NO_LINE(replace->l.expr, F_EXIT_FOREACH);
-			replace->l.expr->v.number = 1;
-			replace->r.expr = $$;
+			CREATE_STATEMENTS(replace, 0, $$);
+			CREATE_OPCODE(replace->l.expr, F_EXIT_FOREACH, 0);
 			$$ = replace;
 		    }
 		} else {
@@ -731,7 +751,7 @@ statement:
 	    {
 		if (!(context & LOOP_CONTEXT))
 		    yyerror("continue statement outside loop");
-		NODE_NO_LINE($$, NODE_CONTINUE);
+		CREATE_CONTROL_JUMP($$, CJ_CONTINUE);
 	    }
     ;
 
@@ -744,16 +764,24 @@ while:
 	statement
 	    {
 		/* do some optimizations on the conditional expression */
-		if ($3->kind == F_LT && $3->l.expr->kind == F_LOCAL
-		    && ($3->r.expr->kind == F_LOCAL ||
-			$3->r.expr->kind == F_NUMBER))
-		    $3->kind = F_LOOP_COND;
-		else if ($3->kind == F_POST_DEC && $3->r.expr->kind == F_LOCAL_LVALUE) {
-		    $3->kind = F_WHILE_DEC;
-		    $3->v.number = $3->r.expr->v.number;
+		if (IS_NODE($3, NODE_BINARY_OP, F_LT) &&
+		    IS_NODE($3->l.expr, NODE_OPCODE_1, F_LOCAL)) {
+		    if (IS_NODE($3->r.expr, NODE_OPCODE_1, F_LOCAL)) {
+			CREATE_OPCODE_2($$, F_LOOP_COND_LOCAL, 0,
+					$3->l.expr->l.number,
+					$3->r.expr->l.number);
+		    } else if ($3->r.expr->kind == NODE_NUMBER) {
+			CREATE_OPCODE_2($$, F_LOOP_COND_NUMBER, 0,
+					$3->l.expr->l.number,
+					$3->r.expr->v.number);
+		    }
+		} else if (IS_NODE($3, NODE_UNARY_OP, F_POST_DEC) &&
+			   IS_NODE($3->r.expr, NODE_OPCODE_1, F_LOCAL_LVALUE)) {
+		    int lvar = $3->r.expr->l.number;
+		    CREATE_OPCODE_1($3, F_WHILE_DEC, 0, lvar);
 		}
 
-		$$ = make_branched_node(NODE_WHILE, 0, $3, $6);
+		CREATE_LOOP($$, 1, $6, 0, $3);
 		context = $<number>1;
 	    }
     ;
@@ -766,7 +794,7 @@ do:
 	    }
         statement L_WHILE '(' comma_expr ')' ';'
             {
-		$$ = make_branched_node(NODE_DO_WHILE, 0, $3, $6);
+		CREATE_LOOP($$, 0, $3, 0, $6);
 		context = $<number>1;
 	    }
     ;
@@ -779,28 +807,29 @@ for:
 	    }
         statement
             {
-		parse_node_t *sub_node;
-
-		if ($5->kind == F_LT && $5->l.expr->kind == F_LOCAL
-		    && ($5->r.expr->kind == F_LOCAL ||
-			$5->r.expr->kind == F_NUMBER))
-		    $5->kind = F_LOOP_COND;
+		if (IS_NODE($5, NODE_BINARY_OP, F_LT) &&
+		    IS_NODE($5->l.expr, NODE_OPCODE_1, F_LOCAL)) {
+		    if (IS_NODE($5->r.expr, NODE_OPCODE_1, F_LOCAL)) {
+			CREATE_OPCODE_2($$, F_LOOP_COND_LOCAL, 0,
+					$5->l.expr->l.number,
+					$5->r.expr->l.number);
+		    } else if ($5->r.expr->kind == NODE_NUMBER) {
+			CREATE_OPCODE_2($$, F_LOOP_COND_NUMBER, 0,
+					$5->l.expr->l.number,
+					$5->r.expr->v.number);
+		    }
+		}
 
 		$3 = insert_pop_value($3);
 		$7 = insert_pop_value($7);
-		if ($7 && $7->kind == F_INC && $7->r.expr->kind == F_LOCAL_LVALUE) {
-		    $7->kind = F_LOOP_INCR;
-		    $7->v.number = $7->r.expr->v.number;
+		if ($7 && IS_NODE($7, NODE_UNARY_OP, F_INC)
+		    && IS_NODE($7->r.expr, NODE_OPCODE_1, F_LOCAL_LVALUE)) {
+		    int lvar = $7->r.expr->l.number;
+		    CREATE_OPCODE_1($7, F_LOOP_INCR, 0, lvar);
 		}
 
-		NODE_NO_LINE(sub_node, NODE_FOR);
-		sub_node->l.expr = $3;
-		sub_node->r.expr = $7;
-		sub_node->v.expr = $5;
-
-		NODE_NO_LINE($$, NODE_FOR);
-		$$->l.expr = sub_node;
-		$$->r.expr = $10;
+		CREATE_STATEMENTS($$, $3, 0);
+		CREATE_LOOP($$->r.expr, 1, $10, $7, $5);
 
 		context = $<number>1;
 	      }
@@ -809,19 +838,16 @@ for:
 foreach_var: L_DEFINED_NAME
             {
 		if ($1->dn.local_num != -1) {
-		    CREATE_NODE($$, F_LOCAL_LVALUE);
-		    $$->v.number = $1->dn.local_num;
+		    CREATE_OPCODE_1($$, F_LOCAL_LVALUE, 0, $1->dn.local_num);
 		} else
 	        if ($1->dn.global_num != -1) {
-		    CREATE_NODE($$, F_GLOBAL_LVALUE);
-		    $$->v.number = $1->dn.global_num;
+		    CREATE_OPCODE_1($$, F_GLOBAL_LVALUE, 0, $1->dn.global_num);
 		} else {
 		    char buf[256];
 		    sprintf(buf, "'%s' is not a local or a global variable.",
 			    $1->name);
 		    yyerror(buf);
-		    CREATE_NODE($$, F_GLOBAL_LVALUE);
-		    $$->v.number = 0;
+		    CREATE_OPCODE_1($$, F_GLOBAL_LVALUE, 0, 0);
 		}
             }
      ;
@@ -829,30 +855,26 @@ foreach_var: L_DEFINED_NAME
 foreach_vars:
         foreach_var
             {
-		CREATE_NODE($$, NODE_FOREACH);
-		$$->l.expr = $1;
-		$$->v.expr = 0;
+		CREATE_FOREACH($$, $1, 0);
             }
      |  foreach_var ',' foreach_var
             {
-		CREATE_NODE($$, NODE_FOREACH);
-		$$->l.expr = $1;
-		$$->v.expr = $3;
+		CREATE_FOREACH($$, $1, $3);
             }
      ;
 
 foreach:
         L_FOREACH '(' foreach_vars L_IN expr0 ')'
             {
+		$3->v.expr = $5;
 		$<number>1 = context;
 		context = LOOP_CONTEXT | LOOP_FOREACH;
             }
         statement
             {
-		NODE_NO_LINE($$, NODE_FOREACH);
-		$$->l.expr = $3;
-		$$->l.expr->r.expr = $5;
-		$$->r.expr = $8;
+		CREATE_STATEMENTS($$, $3, 0);
+		CREATE_LOOP($$->r.expr, 2, $8, 0, 0);
+		CREATE_OPCODE($$->r.expr->r.expr, F_NEXT_FOREACH, 0);
 		
 		context = $<number>1;
 	    }
@@ -861,8 +883,7 @@ foreach:
 for_expr:
 	/* EMPTY */
 	    {
-		CREATE_TYPED_NODE($$, F_NUMBER, TYPE_NUMBER);
-		$$->v.number = 1;
+		CREATE_NUMBER($$, 1);
 	    }
     |   comma_expr
     ;
@@ -885,10 +906,9 @@ first_for_expr:
 
 		$5 = do_promotions($5, type);
 
-		CREATE_NODE($$, F_ASSIGN);
-		$$->r.expr = $5;
-		CREATE_NODE($$->l.expr, F_LOCAL_LVALUE);
-		$$->l.expr->v.number = add_local_name($3, $1 | $2);
+		CREATE_BINARY_OP($$, F_ASSIGN, 0, $5, 0);
+		CREATE_OPCODE_1($$->r.expr, F_LOCAL_LVALUE, 0, 
+				add_local_name($3, $1 | $2));
 		scratch_free($3);
 	    }
     ;
@@ -906,9 +926,7 @@ first_for_expr:
                 parse_node_t *node1, *node2;
 
                 if ($9) {
-                    NODE_NO_LINE(node1, NODE_STATEMENTS);
-                    node1->l.expr = $8;
-                    node1->r.expr = $9;
+		    CREATE_STATEMENTS(node1, $8, $9);
                 } else node1 = $8;
 
                 if (context & SWITCH_STRINGS) {
@@ -931,17 +949,13 @@ first_for_expr:
         case switch_block
           {
                if ($2){
-                   NODE_NO_LINE($$, NODE_STATEMENTS);
-                   $$->l.expr = $1;
-                   $$->r.expr = $2;
+		   CREATE_STATEMENTS($$, $1, $2);
                } else $$ = $1;
            }
     |   statement switch_block
            {
                if ($2){
-                   NODE_NO_LINE($$, NODE_STATEMENTS);
-                   $$->l.expr = $1;
-                   $$->r.expr = $2;
+		   CREATE_STATEMENTS($$, $1, $2);
                } else $$ = $1;
            }
     |   /* empty */
@@ -980,7 +994,8 @@ first_for_expr:
                     $$ = 0;
                     break;
                 }
-                CREATE_NODE($$, NODE_DEFAULT);
+		$$ = new_node();
+		$$->kind = NODE_DEFAULT;
                 $$->v.expr = 0;
                 add_to_mem_block(A_CASES, (char *)&($$), sizeof($$));
                 context |= SWITCH_DEFAULT;
@@ -994,7 +1009,8 @@ first_for_expr:
                     yyerror("Mixed case label list not allowed");
 
                 if ($1) context |= SWITCH_NUMBERS;
-                CREATE_NODE($$, NODE_CASE_NUMBER);
+		$$ = new_node();
+		$$->kind = NODE_CASE_NUMBER;
                 $$->r.expr = (parse_node_t *)$1;
             }
     |   string_con1
@@ -1006,7 +1022,8 @@ first_for_expr:
                 if (context & SWITCH_NUMBERS)
                     yyerror("Mixed case label list not allowed");
                 context |= SWITCH_STRINGS;
-                CREATE_NODE($$, NODE_CASE_STRING);
+		$$ = new_node();
+		$$->kind = NODE_CASE_STRING;
                 $$->r.number = str;
             }
     ;
@@ -1101,70 +1118,65 @@ comma_expr:
 	    }
     |   comma_expr ',' expr0
 	    {
-	      $$ = make_branched_node(NODE_COMMA, $3->type,
-				      insert_pop_value($1), $3);
+		CREATE_TWO_VALUES($$, $3->type, insert_pop_value($1), $3);
 	    }
     ;
 
 expr0:
 	lvalue L_ASSIGN expr0
 	    {
-	        parse_node_t *l = $1, *r = $3;
+	        parse_node_t *r = $1, *l = $3;
 		/* set this up here so we can change it below */
-		$$ = make_branched_node($2, r->type, l, r);
+		
+		CREATE_BINARY_OP($$, $2, l->type, l, r);
 
 		if (exact_types && !compatible_types(l->type, r->type) &&
-		      !($2 == F_ADD_EQ && l->type == TYPE_STRING && 
-			(r->type == TYPE_NUMBER || r->type == TYPE_REAL))) {
+		    !($2 == F_ADD_EQ
+		      && l->type == TYPE_STRING && 
+		      COMP_TYPE(r->type, TYPE_NUMBER))) {
 		    char buf[200];
 		    sprintf(buf, "Bad assignment %s.", get_two_types(l->type, r->type));
 		    yyerror(buf);
 		}
 
-		$$->r.expr = do_promotions(r, l->type);
+		$$->l.expr = do_promotions(l, r->type);
 	    }
     |   error L_ASSIGN expr0
 	    {
 		yyerror("Illegal LHS");
-		NODE_NO_LINE($$, F_CONST0);
-		$$->type = TYPE_NUMBER;
+		CREATE_ERROR($$);
 	    }
     |   expr0 '?' expr0 ':' expr0 %prec '?'
 	    {
 		parse_node_t *p1 = $3, *p2 = $5;
 
-		CREATE_TYPED_NODE($$, NODE_CONDITIONAL, TYPE_ANY);
 		if (exact_types && !compatible_types(p1->type, p2->type)) {
 		    char buf[200];
 		    sprintf(buf, "Types in ?: do not match %s.", 
 			    get_two_types(p1->type, p2->type));
 		    yywarn(buf);
 		}
-		$$->type = p1->type == p2->type ? p1->type : TYPE_ANY;
 
 		/* optimize if last expression did F_NOT */
-		if ($1->kind == F_NOT) {
+		if (IS_NODE($1, NODE_UNARY_OP, F_NOT)) {
 		    /* !a ? b : c  --> a ? c : b */
-		    $$->l.expr = $1->r.expr;
-		    $$->r.expr = make_branched_node(0, 0, p2, p1);
+		    CREATE_IF($$, $1->r.expr, p2, p1);
 		} else {
-		    $$->l.expr = $1;
-		    $$->r.expr = make_branched_node(0, 0, p1, p2);
+		    CREATE_IF($$, $1, p1, p2);
 		}
+		$$->type = ((p1->type == p2->type) ? p1->type : TYPE_ANY);
 	    }
     |   expr0 L_LOR expr0
 	    {
-		$$ = make_branched_node(F_LOR,
-			       ( $1->type == $3->type ) ? $1->type : TYPE_ANY,
-					$1, $3);
-		if ($1->kind == F_LOR) $1->kind = NODE_BRANCH_LINK;
+		CREATE_LAND_LOR($$, F_LOR, $1, $3);
+		if (IS_NODE($1, NODE_LAND_LOR, F_LOR))
+		    $1->kind = NODE_BRANCH_LINK;
 	    }
     |   expr0 L_LAND expr0
 	    {
-		$$ = make_branched_node(F_LAND,
-			       ( $1->type == $3->type ) ? $1->type : TYPE_ANY,
-					$1, $3);
-		if ($1->kind == F_LAND) $1->kind = NODE_BRANCH_LINK;
+		CREATE_LAND_LOR($$, F_LAND, $1, $3);
+		if (IS_NODE($1, NODE_LAND_LOR, F_LAND))
+		    $1->kind = NODE_BRANCH_LINK;
 	    }
     |   expr0 '|' expr0
 	    {
@@ -1177,57 +1189,48 @@ expr0:
     |   expr0 '&' expr0
 	    {
 		int t1 = $1->type, t3 = $3->type;
-		if ((t1 & TYPE_MOD_ARRAY) || (t3 & TYPE_MOD_ARRAY)){
-		    if (t1 == t3){
-			$$ = make_branched_node(F_AND, t1, $1, $3);
-		    } else if ((t1 == TYPE_ANY) || (t3 == TYPE_ANY) ||
-			       (t1 & t3 & TYPE_MOD_ARRAY)){
-			$$ = make_branched_node(F_AND, TYPE_ANY|TYPE_MOD_ARRAY, $1, $3);
-		    } else {
-			char buf[200];
-			sprintf(buf, "Incompatible types for & %s.", get_two_types(t1,t3));
-			yyerror(buf);
-			$$ = make_branched_node(F_AND, TYPE_ANY|TYPE_MOD_ARRAY, $1, $3);
+		if ((t1 & TYPE_MOD_ARRAY) || (t3 & TYPE_MOD_ARRAY)) {
+		    if (t1 != t3) {
+			if ((t1 != TYPE_ANY) && (t3 != TYPE_ANY) &&
+			    !(t1 & t3 & TYPE_MOD_ARRAY)) {
+			    char buf[200];
+			    sprintf(buf, "Incompatible types for & %s.", get_two_types(t1,t3));
+			    yyerror(buf);
+			}
+			t1 = TYPE_ANY | TYPE_MOD_ARRAY;
 		    } 
+		    CREATE_BINARY_OP($$, F_AND, t1, $1, $3);
 		} else $$ = binary_int_op($1, $3, F_AND, "&");
 	    }
     |   expr0 L_EQ expr0
 	    {
-%ifndef OLD_TYPE_BEHAVIOR
 		if (exact_types && !compatible_types($1->type, $3->type)){
 		    char buf[300];
 		    sprintf(buf, "== always false because of incompatible types %s.",get_two_types($1->type, $3->type));
 		    yyerror(buf);
 		}
-%endif
-		/* x == 0  -> !x */
-		if ($1->kind == F_NUMBER && $1->v.number == 0) {
-		    NODE_NO_LINE($$, F_NOT);
-		    $$->type = TYPE_NUMBER;
-		    $$->r.expr = $3;
+		/* x == 0 -> !x */
+		if (IS_NODE($1, NODE_NUMBER, 0)) {
+		    CREATE_UNARY_OP($$, F_NOT, TYPE_NUMBER, $3);
 		} else
-		if ($3->kind == F_NUMBER && $3->v.number == 0) {
-		    NODE_NO_LINE($$, F_NOT);
-		    $$->type = TYPE_NUMBER;
-		    $$->r.expr = $1;
-		} else
-		    $$ = make_branched_node(F_EQ, TYPE_NUMBER, $1, $3);
+		if (IS_NODE($3, NODE_NUMBER, 0)) {
+		    CREATE_UNARY_OP($$, F_NOT, TYPE_NUMBER, $1);
+		} else {
+		    CREATE_BINARY_OP($$, F_EQ, TYPE_NUMBER, $1, $3);
+		}
 	    }
     |   expr0 L_NE expr0
 	    {
-%ifndef OLD_TYPE_BEHAVIOR
 		if (exact_types && !compatible_types($1->type, $3->type)){
 		    char buf[300];
 		    sprintf(buf, "!= always true because of incompatible types %s.",get_two_types($1->type, $3->type));
 		    yyerror(buf);
 		}
-%endif
-		$$ = make_branched_node(F_NE, TYPE_NUMBER, $1, $3);
+                CREATE_BINARY_OP($$, F_NE, TYPE_NUMBER, $1, $3);
 	    }
     |   expr0 L_ORDER expr0
 	    {
-%ifndef OLD_TYPE_BEHAVIOR
-		if (exact_types){
+		if (exact_types) {
 		    int t1 = $1->type;
 		    int t3 = $3->type;
 
@@ -1256,13 +1259,11 @@ expr0:
 			yyerror(buf);
 		    }
 		}
-%endif
-		$$ = make_branched_node($2, TYPE_NUMBER, $1, $3);
+                CREATE_BINARY_OP($$, $2, TYPE_NUMBER, $1, $3);
 	    }
     |   expr0 '<' expr0
             {
-%ifndef OLD_TYPE_BEHAVIOR
-                if (exact_types){
+                if (exact_types) {
                     int t1 = $1->type, t3 = $3->type;
 
                     if (!COMP_TYPE(t1, TYPE_NUMBER) 
@@ -1286,8 +1287,7 @@ expr0:
                         yyerror(buf);
                     }
                 }
-%endif
-                $$ = make_branched_node(F_LT, TYPE_NUMBER, $1, $3);
+                CREATE_BINARY_OP($$, F_LT, TYPE_NUMBER, $1, $3);
             }
     |   expr0 L_LSH expr0
 	    {
@@ -1301,8 +1301,7 @@ expr0:
 	    {
 		int result_type;
 
-%ifndef OLD_TYPE_BEHAVIOR		
-		if (exact_types){
+		if (exact_types) {
 		    int t1 = $1->type, t3 = $3->type;
 
 		    if (t1 == t3){
@@ -1312,20 +1311,20 @@ expr0:
 			    result_type = TYPE_ANY;
 			} else
 #endif
-			result_type = t1;
+			    result_type = t1;
 		    }
-		    else if (t1 == TYPE_ANY){
-			if (t3 == TYPE_FUNCTION){
+		    else if (t1 == TYPE_ANY) {
+			if (t3 == TYPE_FUNCTION) {
 			    yyerror("Bad right argument to '+' (function)");
 			    result_type = TYPE_ANY;
 			} else result_type = t3;
-		    } else if (t3 == TYPE_ANY){
-			if (t1 == TYPE_FUNCTION){
+		    } else if (t3 == TYPE_ANY) {
+			if (t1 == TYPE_FUNCTION) {
 			    yyerror("Bad left argument to '+' (function)");
 			    result_type = TYPE_ANY;
 			} else result_type = t1;
 		    } else {
-			switch(t1){
+			switch(t1) {
 			    case TYPE_STRING:
 			    {
 				if (t3 == TYPE_REAL || t3 == TYPE_NUMBER){
@@ -1365,52 +1364,51 @@ get_two_types(t1, t3));
 			}
 		    }
 		} else 
-%endif
 		    result_type = TYPE_ANY;
 
 		switch ($1->kind) {
-		case F_NUMBER:
+		case NODE_NUMBER:
 		    /* 0 + X */
 		    if ($1->v.number == 0 &&
 			($3->type == TYPE_NUMBER || $3->type == TYPE_REAL)) {
 			$$ = $3;
 			break;
 		    }
-		    if ($3->kind == F_NUMBER) {
+		    if ($3->kind == NODE_NUMBER) {
 			$$ = $1;
 			$1->v.number += $3->v.number;
 			break;
 		    }
-		    if ($3->kind == F_REAL) {
+		    if ($3->kind == NODE_REAL) {
 			$$ = $3;
 			$3->v.real += $1->v.number;
 			break;
 		    }
 		    /* swapping the nodes may help later constant folding */
 		    if ($3->type != TYPE_STRING && $3->type != TYPE_ANY)
-			$$ = make_branched_node(F_ADD, result_type, $3, $1);
+			CREATE_BINARY_OP($$, F_ADD, result_type, $3, $1);
 		    else
-			$$ = make_branched_node(F_ADD, result_type, $1, $3);
+			CREATE_BINARY_OP($$, F_ADD, result_type, $1, $3);
 		    break;
-		case F_REAL:
-		    if ($3->kind == F_NUMBER) {
+		case NODE_REAL:
+		    if ($3->kind == NODE_NUMBER) {
 			$$ = $1;
 			$1->v.real += $3->v.number;
 			break;
 		    }
-		    if ($3->kind == F_REAL) {
+		    if ($3->kind == NODE_REAL) {
 			$$ = $1;
 			$1->v.real += $3->v.real;
 			break;
 		    }
 		    /* swapping the nodes may help later constant folding */
 		    if ($3->type != TYPE_STRING && $3->type != TYPE_ANY)
-			$$ = make_branched_node(F_ADD, result_type, $3, $1);
+			CREATE_BINARY_OP($$, F_ADD, result_type, $3, $1);
 		    else
-			$$ = make_branched_node(F_ADD, result_type, $1, $3);
+			CREATE_BINARY_OP($$, F_ADD, result_type, $1, $3);
 		    break;
-		case F_STRING:
-		    if ($3->kind == F_STRING) {
+		case NODE_STRING:
+		    if ($3->kind == NODE_STRING) {
 			/* Combine strings */
 			int n1, n2;
 			char *new, *s1, *s2;
@@ -1434,16 +1432,16 @@ get_two_types(t1, t3));
 			FREE(new);
 			break;
 		    }
-		    $$ = make_branched_node(F_ADD, result_type, $1, $3);
+		    CREATE_BINARY_OP($$, F_ADD, result_type, $1, $3);
 		    break;
 		default:
 		    /* X + 0 */
-		    if (($3->kind == F_NUMBER) && $3->v.number == 0 &&
+		    if (IS_NODE($3, NODE_NUMBER, 0) &&
 			($1->type == TYPE_NUMBER || $1->type == TYPE_REAL)) {
 			$$ = $1;
 			break;
 		    }
-		    $$ = make_branched_node(F_ADD, result_type, $1, $3);
+		    CREATE_BINARY_OP($$, F_ADD, result_type, $1, $3);
 		    break;
 		}
 	    }
@@ -1505,33 +1503,36 @@ get_two_types(t1, t3));
 		} else result_type = TYPE_ANY;
 		
 		switch ($1->kind) {
-		case F_NUMBER:
+		case NODE_NUMBER:
 		    if ($1->v.number == 0) {
-			$$ = make_branched_node(F_NEGATE, $3->type, 0, $3);
-		    } else if ($3->kind == F_NUMBER) {
+			CREATE_UNARY_OP($$, F_NEGATE, $3->type, $3);
+		    } else if ($3->kind == NODE_NUMBER) {
 			$$ = $1;
 			$1->v.number -= $3->v.number;
-		    } else if ($3->kind == F_REAL) {
+		    } else if ($3->kind == NODE_REAL) {
 			$$ = $3;
 			$3->v.real = $1->v.number - $3->v.real;
-		    } else $$ = make_branched_node(F_SUBTRACT, result_type, $1, $3);
-
+		    } else {
+			CREATE_BINARY_OP($$, F_SUBTRACT, result_type, $1, $3);
+		    }
 		    break;
-		case F_REAL:
-		    if ($3->kind == F_NUMBER) {
+		case NODE_REAL:
+		    if ($3->kind == NODE_NUMBER) {
 			$$ = $1;
 			$1->v.real -= $3->v.number;
-		    } else if ($3->kind == F_REAL) {
+		    } else if ($3->kind == NODE_REAL) {
 			$$ = $1;
 			$1->v.real -= $3->v.real;
-		    } else $$ = make_branched_node(F_SUBTRACT, result_type, $1, $3);
+		    } else {
+			CREATE_BINARY_OP($$, F_SUBTRACT, result_type, $1, $3);
+		    }
 		    break;
 		default:
 		    /* optimize X-0 */
-		    if ($3->kind == F_NUMBER && $3->v.number == 0) {
+		    if (IS_NODE($3, NODE_NUMBER, 0)) {
 			$$ = $1;
 		    } 
-		    $$ = make_branched_node(F_SUBTRACT, result_type, $1, $3);
+		    CREATE_BINARY_OP($$, F_SUBTRACT, result_type, $1, $3);
 		}
 	    }
     |   expr0 '*' expr0
@@ -1580,34 +1581,34 @@ get_two_types(t1, t3));
 		} else result_type = TYPE_ANY;
 
 		switch ($1->kind) {
-		case F_NUMBER:
-		    if ($3->kind == F_NUMBER) {
+		case NODE_NUMBER:
+		    if ($3->kind == NODE_NUMBER) {
 			$$ = $1;
 			$$->v.number *= $3->v.number;
 			break;
 		    }
-		    if ($3->kind == F_REAL) {
+		    if ($3->kind == NODE_REAL) {
 			$$ = $3;
 			$3->v.real *= $1->v.number;
 			break;
 		    }
-		    $$ = make_branched_node(F_MULTIPLY, result_type, $3, $1);
+		    CREATE_BINARY_OP($$, F_MULTIPLY, result_type, $3, $1);
 		    break;
-		case F_REAL:
-		    if ($3->kind == F_NUMBER) {
+		case NODE_REAL:
+		    if ($3->kind == NODE_NUMBER) {
 			$$ = $1;
 			$1->v.real *= $3->v.number;
 			break;
 		    }
-		    if ($3->kind == F_REAL) {
+		    if ($3->kind == NODE_REAL) {
 			$$ = $1;
 			$1->v.real *= $3->v.real;
 			break;
 		    }
-		    $$ = make_branched_node(F_MULTIPLY, result_type, $3, $1);
+		    CREATE_BINARY_OP($$, F_MULTIPLY, result_type, $3, $1);
 		    break;
 		default:
-		    $$ = make_branched_node(F_MULTIPLY, result_type, $1, $3);
+		    CREATE_BINARY_OP($$, F_MULTIPLY, result_type, $1, $3);
 		}
 	    }
     |   expr0 '%' expr0
@@ -1655,8 +1656,8 @@ get_two_types(t1, t3));
 
 		/* constant expressions */
 		switch ($1->kind) {
-		case F_NUMBER:
-		    if ($3->kind == F_NUMBER) {
+		case NODE_NUMBER:
+		    if ($3->kind == NODE_NUMBER) {
 			if ($3->v.number == 0) {
 			    yyerror("Divide by zero in constant");
 			    $$ = $1;
@@ -1666,7 +1667,7 @@ get_two_types(t1, t3));
 			$1->v.number /= $3->v.number;
 			break;
 		    }
-		    if ($3->kind == F_REAL) {
+		    if ($3->kind == NODE_REAL) {
 			if ($3->v.real == 0.0) {
 			    yyerror("Divide by zero in constant");
 			    $$ = $1;
@@ -1676,10 +1677,10 @@ get_two_types(t1, t3));
 			$1->v.number /= $3->v.real;
 			break;
 		    }
-		    $$ = make_branched_node(F_DIVIDE, result_type, $1, $3);
+		    CREATE_BINARY_OP($$, F_DIVIDE, result_type, $1, $3);
 		    break;
-		case F_REAL:
-		    if ($3->kind == F_NUMBER) {
+		case NODE_REAL:
+		    if ($3->kind == NODE_NUMBER) {
 			if ($3->v.number == 0) {
 			    yyerror("Divide by zero in constant");
 			    $$ = $1;
@@ -1689,7 +1690,7 @@ get_two_types(t1, t3));
 			$1->v.real /= $3->v.number;
 			break;
 		    }
-		    if ($3->kind == F_REAL) {
+		    if ($3->kind == NODE_REAL) {
 			if ($3->v.real == 0.0) {
 			    yyerror("Divide by zero in constant");
 			    $$ = $1;
@@ -1699,10 +1700,10 @@ get_two_types(t1, t3));
 			$1->v.real /= $3->v.real;
 			break;
 		    }
-		    $$ = make_branched_node(F_DIVIDE, result_type, $1, $3);
+		    CREATE_BINARY_OP($$, F_DIVIDE, result_type, $1, $3);
 		    break;
 		default:
-		    $$ = make_branched_node(F_DIVIDE, result_type, $1, $3);
+		    CREATE_BINARY_OP($$, F_DIVIDE, result_type, $1, $3);
 		}
 	    }
     |   cast expr0  %prec L_NOT
@@ -1715,12 +1716,8 @@ get_two_types(t1, t3));
 		   etc produces a F_CONST0 F_POP_VALUE, unfortunately.
 		   Do the conversion: (expr) -> (expr, 0) */
 		if ($2->type == TYPE_NOVALUE) {
-		    parse_node_t *replacement;
-		    
-		    NODE_NO_LINE(replacement, F_CONST0);
-		    $2->type = TYPE_VOID;
-		    $$ = make_branched_node(NODE_COMMA, $1,
-					    $2, replacement);
+		    CREATE_TWO_VALUES($$, $1, $2, 0);
+		    CREATE_NUMBER($$->r.expr, 0);
 		} else {
 		    $$ = $2;
 		    $$->type = $1;
@@ -1736,7 +1733,7 @@ get_two_types(t1, t3));
 	    }
     |   L_INC lvalue  %prec L_NOT  /* note lower precedence here */
 	    {
-		$$ = make_branched_node(F_PRE_INC, 0, 0, $2);
+		CREATE_UNARY_OP($$, F_PRE_INC, 0, $2);
                 if (exact_types){
                     switch($2->type){
                         case TYPE_NUMBER:
@@ -1757,7 +1754,7 @@ get_two_types(t1, t3));
 	    }
     |   L_DEC lvalue  %prec L_NOT  /* note lower precedence here */
 	    {
-		$$ = make_branched_node(F_PRE_DEC, 0, 0, $2);
+		CREATE_UNARY_OP($$, F_PRE_DEC, 0, $2);
                 if (exact_types){
                     switch($2->type){
                         case TYPE_NUMBER:
@@ -1779,26 +1776,22 @@ get_two_types(t1, t3));
 	    }
     |   L_NOT expr0
 	    {
-		if ($2->kind == F_NUMBER) {
+		if ($2->kind == NODE_NUMBER) {
 		    $$ = $2;
 		    $$->v.number = !($$->v.number);
 		} else {
-		    NODE_NO_LINE($$, F_NOT);
-		    $$->type = TYPE_NUMBER;
-		    $$->r.expr = $2;
+		    CREATE_UNARY_OP($$, F_NOT, TYPE_NUMBER, $2);
 		}
 	    }
     |   '~' expr0
 	    {
 		if (exact_types && !IS_TYPE($2->type, TYPE_NUMBER))
 		    type_error("Bad argument to ~", $2->type);
-		if ($2->kind == F_NUMBER) {
+		if ($2->kind == NODE_NUMBER) {
 		    $$ = $2;
 		    $$->v.number = ~$$->v.number;
 		} else {
-		    NODE_NO_LINE($$, F_COMPL);
-		    $$->type = TYPE_NUMBER;
-		    $$->r.expr = $2;
+		    CREATE_UNARY_OP($$, F_COMPL, TYPE_NUMBER, $2);
 		}
 	    }
     |   '-' expr0  %prec L_NOT
@@ -1813,21 +1806,22 @@ get_two_types(t1, t3));
 		} else result_type = TYPE_ANY;
 
 		switch ($2->kind) {
-		case F_NUMBER:
+		case NODE_NUMBER:
 		    $$ = $2;
 		    $$->v.number = -$$->v.number;
 		    break;
-		case F_REAL:
+		case NODE_REAL:
 		    $$ = $2;
 		    $$->v.real = -$$->v.real;
 		    break;
 		default:
-		    $$ = make_branched_node(F_NEGATE, result_type, 0, $2);
+		    CREATE_UNARY_OP($$, F_NEGATE, result_type, $2);
 		}
 	    }
     |   lvalue L_INC   /* normal precedence here */
             {
-		$$ = make_branched_node(F_POST_INC, 0, 0, $1);
+		CREATE_UNARY_OP($$, F_POST_INC, 0, $1);
+		$$->v.number = F_POST_INC;
                 if (exact_types){
                     switch($1->type){
                         case TYPE_NUMBER:
@@ -1848,7 +1842,7 @@ get_two_types(t1, t3));
 	    }
     |   lvalue L_DEC
 	    {
-		$$ = make_branched_node(F_POST_DEC, 0, 0, $1);
+		CREATE_UNARY_OP($$, F_POST_DEC, 0, $1);
                 if (exact_types){
                     switch($1->type){
                         case TYPE_NUMBER:
@@ -1880,7 +1874,7 @@ return:
 	    {
 		if (exact_types && !IS_TYPE(exact_types, TYPE_VOID))
 		    yyerror("Non-void functions must return a value.");
-		CREATE_NODE($$, F_RETURN_ZERO);
+		CREATE_RETURN($$, 0);
 	    }
     |   L_RETURN comma_expr ';'
 	    {
@@ -1889,12 +1883,10 @@ return:
 		    sprintf(buf, "Type of returned value doesn't match function return type %s.", get_two_types($2->type, exact_types & TYPE_MOD_MASK));
 		    yyerror(buf);
 		}
-		if (($2->kind == F_NUMBER && $2->v.number == 0)
-		    || ($2->kind == F_CONST0)) {
-		    CREATE_NODE($$, F_RETURN_ZERO);
+		if (IS_NODE($2, NODE_NUMBER, 0)) {
+		    CREATE_RETURN($$, 0);
 		} else {
-		    CREATE_NODE($$, F_RETURN);
-		    $$->r.expr = $2;
+		    CREATE_RETURN($$, $2);
 		}
 	    }
     ;
@@ -1902,44 +1894,26 @@ return:
 expr_list:
 	/* empty */
 	    {
-		/* this is a dummy node */
-		$$ = new_node();
-		$$->v.number = 0;
-		$$->l.expr = $$;
-		$$->r.expr = 0;
+		CREATE_EXPR_LIST($$, 0);
 	    }
     |   expr_list2
 	    {
-		$$ = new_node();
-		$$->v.number = $1->kind;
-		$$->l.expr = $1->l.expr;
-		$$->r.expr = $1;
+		CREATE_EXPR_LIST($$, $1);
 	    }
     |   expr_list2 ','
 	    {
-		$$ = new_node();
-		$$->v.number = $1->kind;
-		$$->l.expr = $1->l.expr;
-		$$->r.expr = $1;
+		CREATE_EXPR_LIST($$, $1);
 	    }
     ;
 
 expr_list_node:
         expr0
             {
-		$$ = new_node_no_line();
-		$$->v.expr = $1;
-		$$->r.expr = 0;
-		$$->l.expr = $$;
-		$$->type = 0;
+		CREATE_EXPR_NODE($$, $1, 0);
 	    }
     |   expr0 L_DOT_DOT_DOT
             {
-		$$ = new_node_no_line();
-		$$->v.expr = $1;
-		$$->r.expr = 0;
-		$$->l.expr = $$;
-		$$->type = 1;
+		CREATE_EXPR_NODE($$, $1, 1);
 	    }
     ;
 
@@ -1965,21 +1939,15 @@ expr_list3:
 	/* empty */
 	    {
 		/* this is a dummy node */
-		$$ = new_node_no_line();
-		$$->v.number = 0;
-		$$->r.expr = 0;
+		CREATE_EXPR_LIST($$, 0);
 	    }
     |   expr_list4
 	    {
-		$$ = new_node_no_line();
-		$$->v.number = $1->kind;
-		$$->r.expr = $1;
+		CREATE_EXPR_LIST($$, $1);
 	    }
     |   expr_list4 ','
 	    {
-		$$ = new_node_no_line();
-		$$->v.number = $1->kind;
-		$$->r.expr = $1;
+		CREATE_EXPR_LIST($$, $1);
 	    }
     ;
 
@@ -2014,7 +1982,7 @@ expr_list4:
 assoc_pair:
 	expr0 ':' expr0 
             {
-                $$ = make_branched_node(NODE_ASSOC, 0, $1, $3);
+		CREATE_TWO_VALUES($$, 0, $1, $3);
             }
     ;
 
@@ -2026,129 +1994,102 @@ lvalue:
 #define LV_INDEX 4
                 /* Restrictive lvalues, but I think they make more sense :) */
                 $$ = $1;
-                switch($$->kind){
-		case F_LOCAL:
-		    $$->kind = F_LOCAL_LVALUE;
+                switch($$->kind) {
+		default:
+		    yyerror("Illegal lvalue");
 		    break;
 		case NODE_PARAMETER:
 		    $$->kind = NODE_PARAMETER_LVALUE;
 		    break;
-		case F_GLOBAL:
-		    $$->kind = F_GLOBAL_LVALUE;
-		    break;
-		case F_MEMBER:
-		    $$->kind = F_MEMBER_LVALUE;
-		    break;
-		case F_INDEX:
-		case F_RINDEX:
-		case F_NN_RANGE:
-		case F_RN_RANGE:
-		case F_NR_RANGE:
-		case F_RR_RANGE:
-		case F_NE_RANGE:
-		case F_RE_RANGE:
-		case NODE_VALUE:
-                    {
+		case NODE_TERNARY_OP:
+		    $$->v.number = $$->r.expr->v.number;
+		case NODE_OPCODE_1:
+		case NODE_UNARY_OP_1:
+		case NODE_BINARY_OP:
+		    if ($$->v.number >= F_LOCAL && $$->v.number <= F_MEMBER)
+			$$->v.number++; /* make it an lvalue */
+		    else if ($$->v.number >= F_INDEX 
+			     && $$->v.number <= F_RE_RANGE) {
                         parse_node_t *node = $$;
                         int flag = 0;
                         do {
-                            switch(node->kind){
-			    case F_INDEX:
-				node->kind = F_INDEX_LVALUE;
-				flag |= LV_INDEX;
-				break;
-			    case F_RINDEX:
-				node->kind = F_RINDEX_LVALUE;
-				flag |= LV_INDEX;
-				break;
-			    case NODE_VALUE:
-				node->kind = NODE_LVALUE;
-				flag |= LV_ILLEGAL;
-				break;
-			    case F_NN_RANGE:
-			    case F_RN_RANGE:
-			    case F_NR_RANGE:
-			    case F_RR_RANGE:
-			    case F_NE_RANGE:
-			    case F_RE_RANGE:
-				if (flag & LV_RANGE){
-				    yyerror("Can't do range lvalue of range lvalue.");
-				    flag |= LV_ILLEGAL;
-				    break;
-				}
-				if (flag & LV_INDEX){
-				    yyerror("Can't do indexed lvalue of range lvalue.");
-				    flag |= LV_ILLEGAL;
-				    break;
-				}
-				switch(node->kind){
-				case F_NN_RANGE: node->kind = F_NN_RANGE_LVALUE; break;
-				case F_RN_RANGE: node->kind = F_RN_RANGE_LVALUE; break;
-				case F_NR_RANGE: node->kind = F_NR_RANGE_LVALUE; break;
-				case F_RR_RANGE: node->kind = F_RR_RANGE_LVALUE; break;
-				case F_NE_RANGE: node->kind = NODE_NE_RANGE_LVALUE; break;
-				case F_RE_RANGE: node->kind = NODE_RE_RANGE_LVALUE; break;
-				}
-				flag |= LV_RANGE;
-				node = node->v.expr;
-				continue;
-			    case F_LOCAL:
-				node->kind = F_LOCAL_LVALUE;
-				flag |= LV_ILLEGAL;
-				break;
-			    case F_GLOBAL:
-				node->kind = F_GLOBAL_LVALUE;
-				flag |= LV_ILLEGAL;
-				break;
-			    case F_MEMBER:
-				node->kind = F_MEMBER_LVALUE;
-				flag |= LV_ILLEGAL;
-				break;
+                            switch(node->kind) {
 			    case NODE_PARAMETER:
 				node->kind = NODE_PARAMETER_LVALUE;
 				flag |= LV_ILLEGAL;
 				break;
-			    case F_ADD_EQ:
-			    case F_SUB_EQ:
-			    case F_AND_EQ:
-			    case F_OR_EQ:
-			    case F_XOR_EQ:
-			    case F_LSH_EQ:
-			    case F_RSH_EQ:
-			    case F_MULT_EQ:
-			    case F_DIV_EQ:
-			    case F_MOD_EQ:
-			    case F_ASSIGN:
-				{
-                                    if (!(flag & LV_INDEX)){
-                                        yyerror("Illegal lvalue, a possible lvalue is (x <assign> y)[a]");
-                                    }
-                                    switch(node->l.expr->kind){
-				    case F_NN_RANGE_LVALUE:
-				    case F_RN_RANGE_LVALUE:
-				    case F_NR_RANGE_LVALUE:
-				    case F_RR_RANGE_LVALUE:
-				    case NODE_NE_RANGE_LVALUE:
-				    case NODE_RE_RANGE_LVALUE:
-					yyerror("Illegal to have (x[a..b] <assign> y) to be the beginning of an lvalue");
+			    case NODE_TERNARY_OP:
+				node->v.number = node->r.expr->v.number;
+			    case NODE_OPCODE_1:
+			    case NODE_UNARY_OP_1:
+			    case NODE_BINARY_OP:
+				if (node->v.number >= F_LOCAL 
+				    && node->v.number <= F_MEMBER) {
+				    node->v.number++;
+				    flag |= LV_ILLEGAL;
+				    break;
+				} else if (node->v.number == F_INDEX ||
+					 node->v.number == F_RINDEX) {
+				    node->v.number++;
+				    flag |= LV_INDEX;
+				    break;
+				} else if (node->v.number >= F_ADD_EQ
+					   && node->v.number <= F_ASSIGN) {
+				    if (!(flag & LV_INDEX)) {
+					yyerror("Illegal lvalue, a possible lvalue is (x <assign> y)[a]");
 				    }
-                                    flag = LV_ILLEGAL;
-                                    break;
-                                }
+				    if (node->r.expr->kind == NODE_BINARY_OP||
+					node->r.expr->kind == NODE_TERNARY_OP){
+					if (node->r.expr->v.number >= F_NN_RANGE_LVALUE && node->r.expr->v.number <= F_NR_RANGE_LVALUE)
+					    yyerror("Illegal to have (x[a..b] <assign> y) to be the beginning of an lvalue");
+				    }
+				    flag = LV_ILLEGAL;
+				    break;
+				} else if (node->v.number >= F_NN_RANGE
+					 && node->v.number <= F_RE_RANGE) {
+				    if (flag & LV_RANGE) {
+					yyerror("Can't do range lvalue of range lvalue.");
+					flag |= LV_ILLEGAL;
+					break;
+				    }
+				    if (flag & LV_INDEX){
+					yyerror("Can't do indexed lvalue of range lvalue.");
+					flag |= LV_ILLEGAL;
+					break;
+				    }
+				    if (node->v.number == F_NE_RANGE) {
+					/* x[foo..] -> x[foo..<1] */
+					parse_node_t *rchild = node->r.expr;
+					node->kind = NODE_TERNARY_OP;
+					CREATE_BINARY_OP(node->r.expr,
+							 F_NR_RANGE_LVALUE,
+							 0, 0, rchild);
+					CREATE_NUMBER(node->r.expr->l.expr, 1);
+				    } else if (node->v.number == F_RE_RANGE) {
+					/* x[<foo..] -> x[<foo..<1] */
+					parse_node_t *rchild = node->r.expr;
+					node->kind = NODE_TERNARY_OP;
+					CREATE_BINARY_OP(node->r.expr,
+							 F_RR_RANGE_LVALUE,
+							 0, 0, rchild);
+					CREATE_NUMBER(node->r.expr->l.expr, 1);
+				    } else
+					node->r.expr->v.number++;
+				    flag |= LV_RANGE;
+				    node = node->r.expr->r.expr;
+				    continue;
+				}
 			    default:
 				yyerror("Illegal lvalue");
 				flag = LV_ILLEGAL;
 				break;
 			    }   
-                            if ((flag & LV_ILLEGAL) || !(node = node->l.expr)) break;
+                            if ((flag & LV_ILLEGAL) || !(node = node->r.expr)) break;
                         } while (1);
                         break;
-                    }
-		default:
-                    {
-                        yyerror("Illegal lvalue");
-                        break;
-                    }
+		    } else 
+			yyerror("Illegal lvalue");
+		    break;
                 }
             }
         ;
@@ -2160,16 +2101,15 @@ expr4:
             {
               int i;
               if ((i = $1->dn.local_num) != -1) {
-                  CREATE_TYPED_NODE($$, F_LOCAL, type_of_locals_ptr[i]);
-                  $$->v.number = i & 0xff;
+		  CREATE_OPCODE_1($$, F_LOCAL, type_of_locals_ptr[i],i & 0xff);
 		  if (function_context.num_parameters >= 0)
 		      function_context.num_locals++;
               } else
 		  if ((i = $1->dn.global_num) != -1) {
 		      if (function_context.num_parameters >= 0)
 			  function_context.bindable = FP_NOT_BINDABLE;
-		      CREATE_TYPED_NODE($$, F_GLOBAL, VARIABLE(i)->type & TYPE_MOD_MASK);
-		      $$->v.number = i;
+		      CREATE_OPCODE_1($$, F_GLOBAL, 
+				      VARIABLE(i)->type & TYPE_MOD_MASK, i);
 		      if (VARIABLE(i)->type & TYPE_MOD_HIDDEN) {
 			  char buf[MAXLINE + 30];
 			  
@@ -2187,8 +2127,7 @@ expr4:
 		      if (current_number_of_locals < MAX_LOCAL) {
 			  add_local_name($1->name, TYPE_ANY);
 		      }
-		      CREATE_TYPED_NODE($$, F_LOCAL, TYPE_ANY);
-		      $$->v.number = 0;
+		      CREATE_OPCODE_1($$, F_LOCAL, TYPE_ANY, 0);
 		      yyerror(buf);
 		  }
 	    }
@@ -2202,15 +2141,13 @@ expr4:
                 if (current_number_of_locals < MAX_LOCAL) {
                     add_local_name($1, TYPE_ANY);
                 }
-                CREATE_TYPED_NODE($$, F_LOCAL, TYPE_ANY);
-                $$->v.number = 0;
+                CREATE_OPCODE_1($$, F_LOCAL, TYPE_ANY, 0);
                 yyerror(buf);
                 scratch_free($1);
             }
     |   L_PARAMETER
             {
-		CREATE_TYPED_NODE($$, NODE_PARAMETER, TYPE_ANY);
-		$$->v.number = $1;
+		CREATE_PARAMETER($$, TYPE_ANY, $1);
             }
     |   '$' '(' 
             {
@@ -2231,10 +2168,10 @@ expr4:
 		    /* This was illegal, and error'ed when the '$' token
 		     * was returned.
 		     */
-		    CREATE_TYPED_NODE($$, F_CONST0, TYPE_ANY);
+		    CREATE_ERROR($$);
 		} else {
-		    CREATE_TYPED_NODE($$, NODE_VALUE, $4->type);
-		    $$->v.number = function_context.values_list->kind++;
+		    CREATE_OPCODE_1($$, F_LOCAL, $4->type, 
+				    function_context.values_list->kind++);
 
 		    node = new_node_no_line();
 		    node->type = 0;
@@ -2252,10 +2189,9 @@ expr4:
 
 		if (!($1->type & TYPE_MOD_CLASS)) {
 		    yyerror("Left argument of -> is not a class");
-		    CREATE_TYPED_NODE($$, F_CONST0, TYPE_ANY);
+		    CREATE_ERROR($$);
 		} else {
-		    CREATE_NODE($$, F_MEMBER);
-		    $$->r.expr = $1;
+		    CREATE_UNARY_OP_1($$, F_MEMBER, 0, $1, 0);
 		    cd = ((class_def_t *)mem_block[A_CLASS_DEF].block)
 			+ ($1->type & (TYPE_MOD_MASK & ~TYPE_MOD_CLASS));
 		    cme = ((class_member_entry_t *)mem_block[A_CLASS_MEMBER].block) + cd->index;
@@ -2271,7 +2207,7 @@ expr4:
 			yyerror(buf);
 			$$->type = TYPE_ANY;
 		    } else {
-			$$->v.number = i;
+			$$->l.number = i;
 			$$->type = cme[i].type;
 		    }
 		}
@@ -2279,6 +2215,10 @@ expr4:
             }
     |   expr4 '[' comma_expr L_RANGE comma_expr ']'
             {
+%ifndef OLD_RANGE_BEHAVIOR
+                if ($5->kind == NODE_NUMBER && $5->v.number < 0)
+		    yywarn("A negative constant as the second element of arr[x..y] no longer means indexing from the end.  Use arr[x..<y]");
+%endif
                 $$ = make_range_node(F_NN_RANGE, $1, $3, $5);
             }
     |   expr4 '[' '<' comma_expr L_RANGE comma_expr ']'
@@ -2303,22 +2243,23 @@ expr4:
             }
     |   expr4 '[' '<' comma_expr ']'
             {
-                if ($1->kind == F_AGGREGATE && $4->kind == F_NUMBER) {
+                if (IS_NODE($1, NODE_CALL, F_AGGREGATE)
+		    && $4->kind == NODE_NUMBER) {
                     int i = $4->v.number;
-                    if (i < 1 || i > $1->v.number)
+                    if (i < 1 || i > $1->l.number)
                         yyerror("Illegal index to array constant.");
                     else {
                         parse_node_t *node = $1->r.expr;
-                        i = $1->v.number - i;
+                        i = $1->l.number - i;
                         while (i--)
                             node = node->r.expr;
                         $$ = node->v.expr;
                         break;
                     }
                 }
-                $$ = make_branched_node(F_RINDEX, 0, $1, $4);
+		CREATE_BINARY_OP($$, F_RINDEX, 0, $4, $1);
                 if (exact_types){
-                    if ($1->type ==  TYPE_MAPPING || $1->type == TYPE_ANY) {
+                    if ($1->type == TYPE_MAPPING || $1->type == TYPE_ANY) {
                         $$->type = TYPE_ANY;
                     } else {
                         switch($1->type){
@@ -2346,9 +2287,9 @@ expr4:
             }
     |   expr4 '[' comma_expr ']'
             {
-                if ($1->kind == F_AGGREGATE && $3->kind == F_NUMBER) {
+                if (IS_NODE($1, NODE_CALL, F_AGGREGATE) && $3->kind == NODE_NUMBER) {
                     int i = $3->v.number;
-                    if (i < 0 || i >= $1->v.number)
+                    if (i < 0 || i >= $1->l.number)
                         yyerror("Illegal index to array constant.");
                     else {
                         parse_node_t *node = $1->r.expr;
@@ -2358,12 +2299,16 @@ expr4:
                         break;
                     }
                 }
-                $$ = make_branched_node(F_INDEX, 0, $1, $3);
-                if (exact_types){
-                    if ($1->type ==  TYPE_MAPPING || $1->type == TYPE_ANY) {
+%ifndef OLD_RANGE_BEHAVIOR
+                if ($3->kind == NODE_NUMBER && $3->v.number < 0)
+		    yywarn("A negative constant in arr[x] no longer means indexing from the end.  Use arr[<x]");
+%endif		
+                CREATE_BINARY_OP($$, F_INDEX, 0, $3, $1);
+                if (exact_types) {
+                    if ($1->type == TYPE_MAPPING || $1->type == TYPE_ANY) {
                         $$->type = TYPE_ANY;
                     } else {
-                        switch($1->type){
+                        switch($1->type) {
                             case TYPE_FUNCTION:
                                 $$->type = TYPE_ANY;
                                 break;
@@ -2392,9 +2337,12 @@ expr4:
 		$$ = $2;
 	    }
     |   catch
+%ifdef DEBUG
+    |   tree
+%endif
     |   L_BASIC_TYPE
             {
-	        if ($1 != TYPE_FUNCTION) yyerror("A reserved type name cannot be used as a function name.");
+	        if ($1 != TYPE_FUNCTION) yyerror("Reserved type name unexpected.");
 		$<func_block>$.num_local = current_number_of_locals;
 		$<func_block>$.max_num_locals = max_num_locals;
 		$<func_block>$.context = context;
@@ -2411,24 +2359,25 @@ expr4:
             }
         '(' argument ')' block
             {
-		if ($4.is_proto) {
+		if ($4.flags & ARG_IS_PROTO) {
 		    yyerror("Missing name for function argument");
 		}
+		if ($4.flags & ARG_IS_VARARGS) {
+		    yyerror("Anonymous varargs functions aren't implemented");
+		}
 		if (!$6.node) {
-		    NODE_NO_LINE($$, F_RETURN_ZERO);
-		} else if (!($6.node->kind == F_RETURN) &&
-			   !(($6.node->kind == NODE_STATEMENTS)
-			     && $6.node->r.expr->kind == F_RETURN)) {
+		    CREATE_RETURN($$, 0);
+		} else if ($6.node->kind != NODE_RETURN &&
+			   ($6.node->kind != NODE_TWO_VALUES || $6.node->r.expr->kind != NODE_RETURN)) {
 		    parse_node_t *replacement;
-		    parse_node_t *sub_node;
-		    NODE_NO_LINE(sub_node, F_RETURN_ZERO);
-		    NODE_NO_LINE(replacement, NODE_STATEMENTS);
-		    replacement->l.expr = $6.node;
-		    replacement->r.expr = sub_node;
+		    CREATE_STATEMENTS(replacement, $6.node, 0);
+		    CREATE_RETURN(replacement->r.expr, 0);
 		    $6.node = replacement;
 		}
 		
-		CREATE_TYPED_NODE($$, NODE_ANON_FUNC, TYPE_FUNCTION);
+		$$ = new_node();
+		$$->kind = NODE_ANON_FUNC;
+		$$->type = TYPE_FUNCTION;
 		$$->l.number = (max_num_locals - $4.num_arg);
 		$$->r.expr = $6.node;
 		$$->v.number = $4.num_arg;
@@ -2447,17 +2396,20 @@ expr4:
 	    }
     |   L_NEW_FUNCTION_OPEN ':' ')'
             {
-		CREATE_TYPED_NODE($$, F_FUNCTION_CONSTRUCTOR, TYPE_FUNCTION);
+		$$ = new_node();
+		$$->kind = NODE_FUNCTION_CONSTRUCTOR;
+		$$->type = TYPE_FUNCTION;
 		$$->r.expr = 0;
 		switch ($1 & 0xff) {
 		case FP_L_VAR:
 		    yyerror("Illegal to use local variable in a functional.");
-		    $$->l.expr = make_branched_node(F_CONST0, 0, 0, 0);
+		    CREATE_NUMBER($$->l.expr, 0);
+		    $$->l.expr->r.expr = 0;
+		    $$->l.expr->l.expr = 0;
 		    $$->v.number = FP_FUNCTIONAL;
 		    break;
 		case FP_G_VAR:
-		    $$->l.expr = make_branched_node(F_GLOBAL, 0, 0, 0);
-		    $$->l.expr->v.number = $1 >> 8;
+		    CREATE_OPCODE_1($$->l.expr, F_GLOBAL, 0, $1 >> 8);
 		    $$->v.number = FP_FUNCTIONAL | FP_NOT_BINDABLE;
 		    if (VARIABLE($$->l.expr->v.number)->type & TYPE_MOD_HIDDEN) {
 		      char buf[MAXLINE + 30];
@@ -2475,7 +2427,9 @@ expr4:
 	    }
     |   L_NEW_FUNCTION_OPEN ',' expr_list2 ':' ')'
             {
-		CREATE_TYPED_NODE($$, F_FUNCTION_CONSTRUCTOR, TYPE_FUNCTION);
+		$$ = new_node();
+		$$->kind = NODE_FUNCTION_CONSTRUCTOR;
+		$$->type = TYPE_FUNCTION;
 		$$->v.number = $1;
 		$$->r.expr = $3;
 		
@@ -2554,72 +2508,86 @@ expr4:
     |   L_FUNCTION_OPEN comma_expr ':' ')'
              {
 		 if (function_context.num_locals)
-		   yyerror("Illegal to use local variable in functional.");
+		     yyerror("Illegal to use local variable in functional.");
 		 if (function_context.values_list->r.expr)
 		     function_context.values_list->r.expr->kind = function_context.values_list->kind;
-
-		 $$ = make_branched_node(F_FUNCTION_CONSTRUCTOR, TYPE_FUNCTION,
-					 $2, function_context.values_list->r.expr);
+		 
+		 $$ = new_node();
+		 $$->kind = NODE_FUNCTION_CONSTRUCTOR;
+		 $$->type = TYPE_FUNCTION;
+		 $$->l.expr = $2;
+		 if ($2->kind == NODE_STRING)
+		     yywarn("Function pointer returning string constant is NOT a function call");
+		 $$->r.expr = function_context.values_list->r.expr;
 		 $$->v.number = FP_FUNCTIONAL + function_context.bindable
 		     + (function_context.num_parameters << 8);
 		 function_context = $1;
              }
     |   L_MAPPING_OPEN expr_list3 ']' ')'
 	    {
-	        $$ = $2;
-		$$->kind = F_AGGREGATE_ASSOC;
-		$$->type = TYPE_MAPPING;
+		CREATE_CALL($$, F_AGGREGATE_ASSOC, TYPE_MAPPING, $2);
 	    }
     |   L_ARRAY_OPEN expr_list '}' ')'
 	    {
+		CREATE_CALL($$, F_AGGREGATE, TYPE_ANY | TYPE_MOD_ARRAY, $2);
+	    }
+    ;
+
+expr_or_block:
+        block
+            {
+		CREATE_TWO_VALUES($$, TYPE_NUMBER, $1.node, 0);
+		CREATE_NUMBER($$->r.expr, 0);
+	    }
+    |   '(' comma_expr ')'
+            {
 		$$ = $2;
-		$$->kind = F_AGGREGATE;
-		$$->type = TYPE_MOD_ARRAY | TYPE_ANY;
 	    }
     ;
 
 catch:
-	L_CATCH '(' comma_expr ')'
+	L_CATCH expr_or_block
 	    {
-		CREATE_TYPED_NODE($$, F_CATCH, TYPE_ANY);
-		$$->r.expr = $3;
+		CREATE_CATCH($$, $2);
 	    }
     ;
+
+%ifdef DEBUG
+tree:
+        L_TREE expr_or_block
+            {
+		$$ = new_node_no_line();
+		lpc_tree_form($2, $$);
+            }
+;
+%endif
 
 sscanf:
 	L_SSCANF '(' expr0 ',' expr0 lvalue_list ')'
 	    {
-	        parse_node_t *expr;
-		expr = new_node_no_line();
-		expr->l.expr = $3;
-		expr->r.expr = $5;
-		$$ = make_branched_node(F_SSCANF, TYPE_NUMBER,
-					expr, $6);
+		int p = $6->v.number;
+		CREATE_LVALUE_EFUN($$, TYPE_NUMBER, $6);
+		CREATE_BINARY_OP_1($$->l.expr, F_SSCANF, 0, $3, $5, p);
 	    }
     ;
 
 parse_command:
 	L_PARSE_COMMAND '(' expr0 ',' expr0 ',' expr0 lvalue_list ')'
 	    {
-	      parse_node_t *expr;
-	      parse_node_t *sub_expr;
-
-	      sub_expr = new_node_no_line();
-	      sub_expr->l.expr = $5;
-	      sub_expr->r.expr = $7;
-	      expr = new_node_no_line();
-	      expr->l.expr = $3;
-	      expr->r.expr = sub_expr;
-	      $$ = make_branched_node(F_PARSE_COMMAND, TYPE_NUMBER,
-					expr, $8);
+		int p = $8->v.number;
+		CREATE_LVALUE_EFUN($$, TYPE_NUMBER, $8);
+		CREATE_TERNARY_OP_1($$->l.expr, F_PARSE_COMMAND, 0, 
+				    $3, $5, $7, p);
 	    }
     ;
 
 time_expression:
-	L_TIME_EXPRESSION '(' comma_expr ')'
+	L_TIME_EXPRESSION expr_or_block
 	    {
-		$$ = make_branched_node(F_TIME_EXPRESSION, TYPE_NUMBER,
-					0, $3);
+		CREATE_TWO_VALUES($$, TYPE_NUMBER, 0, 0);
+		CREATE_OPCODE($$->l.expr, F_TIME_EXPRESSION, 0);
+		CREATE_STATEMENTS($$->r.expr, $2, 0);
+		CREATE_OPCODE($$->r.expr->r.expr, F_END_TIME_EXPRESSION, 0);
 	    }
     ;
 
@@ -2632,8 +2600,13 @@ lvalue_list:
 	    }
     |   ',' lvalue lvalue_list
 	    {
-	        $$ = $3;
-	        $$->r.expr = make_branched_node(0, 0, $2, $3->r.expr);
+		parse_node_t *insert;
+		
+		$$ = $3;
+		insert = new_node_no_line();
+		insert->r.expr = $3->r.expr;
+		insert->l.expr = $2;
+		$3->r.expr = insert;
 		$$->v.number++;
 	    }
     ;
@@ -2641,8 +2614,7 @@ lvalue_list:
 string:
 	string_con2
 	    {
-		CREATE_TYPED_NODE($$, F_STRING, TYPE_STRING);
-                $$->v.number = store_prog_string($1);
+		CREATE_STRING($$, $1);
 		scratch_free($1);
 	    }
     ;
@@ -2685,11 +2657,11 @@ function_call:
 		    char buf[MAXLINE + 30];
 		    sprintf(buf, "Undefined class '%s'", $4->name);
 		    yyerror(buf);
-		    CREATE_TYPED_NODE($$, F_CONST0, TYPE_ANY);
+		    CREATE_ERROR($$);
 		} else {
-		    CREATE_TYPED_NODE($$, F_NEW_CLASS, 
-				      $4->dn.class_num | TYPE_MOD_CLASS);
-		    $$->v.number = $4->dn.class_num;
+		    CREATE_OPCODE_1($$, F_NEW_CLASS, 
+				    $4->dn.class_num | TYPE_MOD_CLASS,
+				    $4->dn.class_num);
 		}
             }
 	| L_DEFINED_NAME '(' expr_list ')'
@@ -2702,15 +2674,16 @@ function_call:
 		  if (function_context.num_parameters >= 0)
 		      function_context.bindable = FP_NOT_BINDABLE;
 
-		  $$->kind = F_CALL_FUNCTION_BY_ADDRESS;
-		  $$->v.number = f;
+		  $$->kind = NODE_CALL_1;
+		  $$->v.number = F_CALL_FUNCTION_BY_ADDRESS;
+		  $$->l.number = f;
 		  funp = FUNCTION(f);
-	      
 		  $$->type = validate_function_call(funp, f, $3->r.expr);
 	      } else
 	      if ((f=$1->dn.simul_num) != -1) {
-		  $$->kind = F_SIMUL_EFUN;
-		  $$->v.number = f;
+		  $$->kind = NODE_CALL_1;
+		  $$->v.number = F_SIMUL_EFUN;
+		  $$->l.number = f;
 		  $$->type = (SIMUL(f)->type) & TYPE_MOD_MASK;
 	      } else 
 	      if ((f=$1->dn.efun_num) != -1) {
@@ -2731,8 +2704,9 @@ function_call:
 		    function_context.bindable = FP_NOT_BINDABLE;
 		
 		f = define_new_function($1->name, 0, 0, NAME_UNDEFINED, 0);
-		$$->kind = F_CALL_FUNCTION_BY_ADDRESS;
-		$$->v.number = f;
+		$$->kind = NODE_CALL_1;
+		$$->v.number = F_CALL_FUNCTION_BY_ADDRESS;
+		$$->l.number = f;
 		$$->type = TYPE_ANY; /* just a guess */
 		funp = FUNCTION(f);
 		if (exact_types) {
@@ -2768,23 +2742,22 @@ function_call:
 		      function_context.bindable = FP_NOT_BINDABLE;
 
 		  f = (ihe = lookup_ident(name)) ? ihe->dn.function_num : -1;
-		  $$->kind = F_CALL_FUNCTION_BY_ADDRESS;
+		  $$->kind = NODE_CALL_1;
+		  $$->v.number = F_CALL_FUNCTION_BY_ADDRESS;
 		  if (f!=-1) {
 		      /* The only way this can happen is if function_name
 		       * below made the function name.  The lexer would
 		       * return L_DEFINED_NAME instead.
 		       */
-		      $$->v.number = f;
 		      funp = FUNCTION(f);
 		      
 		      $$->type = validate_function_call(funp, f, $3->r.expr);
 		  } else {
-		      
 		      f = define_new_function(name, 0, 0, 
 					      NAME_UNDEFINED, 0);
 		      funp = FUNCTION(f);
 		  }
-		  $$->v.number = f;
+		  $$->l.number = f;
 		  /*
 		   * Check if this function has been defined.
 		   * But, don't complain yet about functions defined
@@ -2812,8 +2785,9 @@ function_call:
 	    {
 		parse_node_t *expr, *expr2;
 		$$ = $5;
-		$$->kind = F_CALL_OTHER;
-		$$->v.number += 2;
+		$$->kind = NODE_EFUN;
+		$$->l.number = $$->v.number + 2;
+		$$->v.number = F_CALL_OTHER;
 #ifdef CAST_CALL_OTHERS
 		$$->type = TYPE_UNKNOWN;
 #else
@@ -2825,31 +2799,32 @@ function_call:
 
 		expr2 = new_node_no_line();
 		expr2->type = 0;
-		CREATE_TYPED_NODE(expr2->v.expr, F_STRING, TYPE_STRING);
-		expr2->v.expr->v.number = store_prog_string($3);
+		CREATE_STRING(expr2->v.expr, $3);
+		scratch_free($3);
 
 		/* insert the two nodes */
 		expr2->r.expr = $$->r.expr;
 		expr->r.expr = expr2;
 		$$->r.expr = expr;
-		scratch_free($3);
 	    }
     |   '(' '*' comma_expr ')' '(' expr_list ')'
             {
 	        parse_node_t *expr;
 
 		$$ = $6;
-		$$->kind = F_EVALUATE;
+		$$->kind = NODE_EFUN;
+		$$->l.number = $$->v.number + 1;
+		$$->v.number = F_EVALUATE;
 #ifdef CAST_CALL_OTHERS
 		$$->type = TYPE_UNKNOWN;
 #else
 		$$->type = TYPE_ANY;
 #endif
 		expr = new_node_no_line();
+		expr->type = 0;
 		expr->v.expr = $3;
 		expr->r.expr = $$->r.expr;
 		$$->r.expr = expr;
-		$$->v.number++;
 	    }
     ;
 
@@ -2863,23 +2838,31 @@ efun_override: L_EFUN L_COLON_COLON identifier {
 	    sprintf(buff, "Unknown efun: %s", $3);
 	    yyerror(buff);
 	} else {
-#ifdef LPC_TO_C
-	    if (!(pragmas & PRAGMA_EFUN)) {
-#endif
-		push_malloced_string(the_file_name(current_file));
-		push_constant_string($3);
-		push_constant_string(main_file_name());
-		res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
-		if (!MASTER_APPROVED(res)) {
-		    yyerror("Invalid simulated efunction override");
-		    $$ = -1;
-		}
-#ifdef LPC_TO_C
+	    push_malloced_string(the_file_name(current_file));
+	    push_constant_string($3);
+	    push_constant_string(main_file_name());
+	    res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
+	    if (!MASTER_APPROVED(res)) {
+		yyerror("Invalid simulated efunction override");
+		$$ = -1;
 	    }
-#endif
 	}
 	scratch_free($3);
       }	
+    | L_EFUN L_COLON_COLON L_NEW {
+	ident_hash_elem_t *ihe;
+	svalue_t *res;
+	
+	ihe = lookup_ident("clone_object");
+	push_malloced_string(the_file_name(current_file));
+	push_constant_string("clone_object");
+	push_constant_string(main_file_name());
+	res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
+	if (!MASTER_APPROVED(res)) {
+	    yyerror("Invalid simulated efunction override");
+	    $$ = -1;
+	} else $$ = ihe->dn.efun_num;
+      }
     ;
     
 function_name:
@@ -2931,17 +2914,14 @@ cond:
         L_IF '(' comma_expr ')' statement optional_else_part
 	    {
 		/* x != 0 -> x */
-		if ($3->kind == F_NE) {
-		    if ($3->r.expr->kind == F_NUMBER && $3->r.expr->v.number == 0)
+		if (IS_NODE($3, NODE_BINARY_OP, F_NE)) {
+		    if (IS_NODE($3->r.expr, NODE_NUMBER, 0))
 			$3 = $3->l.expr;
-		    else if ($3->l.expr->kind == F_NUMBER && $3->l.expr->v.number == 0)
-			$3 = $3->r.expr;
+		    else if (IS_NODE($3->l.expr, NODE_NUMBER, 0))
+			     $3 = $3->r.expr;
 		}
 
-		NODE_NO_LINE($$, NODE_IF);
-		$$->v.expr = $3;
-		$$->l.expr = $5;
-		$$->r.expr = $6;
+		CREATE_IF($$, $3, $5, $6);
 	    }
     ;
 

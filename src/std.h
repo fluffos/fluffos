@@ -9,9 +9,7 @@
 #ifndef EDIT_SOURCE
 /* all options and configuration */
 #include "options_incl.h"
-#ifndef _FUNC_SPEC_
 #include "configure.h"
-#endif
 #endif
 
 #include "portability.h"

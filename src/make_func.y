@@ -1,4 +1,5 @@
 %{
+#define EDIT_SOURCE
 #define NO_OPCODES
 #include "std.h"
 #include "make_func.h"
@@ -6,10 +7,12 @@
 #include "preprocess.h"
 #include "edit_source.h"
 
-    int num_buff;
-    int op_code, efun_code;
-    char *oper_codes[MAX_FUNC], *efun_codes[MAX_FUNC];
-    char *key[MAX_FUNC], *buf[MAX_FUNC], has_token[MAX_FUNC];
+    int num_buff = 0;
+    int op_code, efun_code, efun1_code;
+    char *oper_codes[MAX_FUNC];
+    char *efun_codes[MAX_FUNC], *efun1_codes[MAX_FUNC];
+    char *efun_names[MAX_FUNC], *efun1_names[MAX_FUNC];
+    char *key[MAX_FUNC], *buf[MAX_FUNC];
 
     int min_arg = -1, limit_max = 0;
     
@@ -49,9 +52,9 @@ struct type {
     char *string;
 }
 
-%token ID DEFAULT OPERATOR
+%token ID NUM DEFAULT OPERATOR
 
-%type <number> type arg_list basic typel arg_type typel2
+%type <number> type arg_list basic typel arg_type typel2 NUM
 
 %type <string> ID optional_ID optional_default
 
@@ -83,24 +86,19 @@ op: ID
 
 optional_ID: ID | /* empty */ { $$ = ""; } ;
 
-optional_default: /* empty */ { $$="0"; } 
-                | DEFAULT ':' ID { 
-                        static char buf[40];
-                        sprintf(buf, $3);
-                        free($3); $$ = buf; }
-                | DEFAULT ':' ID ID { 
-    /* Static buffer is safe here */
-    static char buf[40];
-
-    strcpy(buf, "-((");
-    strcpy(buf+3, $3);
-    strcat(buf, " << 8) + ");
-    strcat(buf, $4);
-    strcat(buf, ")");
-    free($3);
-    free($4);
-    $$ = buf;
-} ;
+optional_default: /* empty */ { $$="DEFAULT_NONE"; } 
+                | DEFAULT ':' NUM
+                  {
+		      static char buf[40];
+                      sprintf(buf, "%i", $3);
+                      $$ = buf;
+		  }
+                | DEFAULT ':' ID 
+                  { 
+                      if (strcmp($3, "F_THIS_OBJECT"))
+                          yyerror("Illegal default");
+                      $$ = "DEFAULT_THIS_OBJECT";
+                  } ;
 
 func: type ID optional_ID '(' arg_list optional_default ')' ';'
     {
@@ -109,6 +107,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 	int i, len;
 	if (min_arg == -1)
 	    min_arg = $5;
+        if (min_arg > 4) mf_fatal("min_arg > 4\n");
 	if ($3[0] == '\0') {
 	    if (strlen($2) + 1 + 2 > sizeof f_name)
 		mf_fatal("A local buffer was too small!(1)\n");
@@ -118,10 +117,19 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 		if (islower(f_name[i]))
 		    f_name[i] = toupper(f_name[i]);
 	    }
-	    has_token[num_buff]=1;
-	    efun_codes[efun_code] = (char *) malloc(len + 1);
-	    strcpy(efun_codes[efun_code], f_name);
-	    efun_code++;
+            if (min_arg == 1 && !limit_max && $5 == 1) {
+	        efun1_codes[efun1_code] = (char *) malloc(len + 1);
+	        strcpy(efun1_codes[efun1_code], f_name);
+		efun1_names[efun1_code] = (char *) malloc(len - 1);
+		strcpy(efun1_names[efun1_code], $2);
+	        efun1_code++;
+	    } else {
+	        efun_codes[efun_code] = (char *) malloc(len + 1);
+	        strcpy(efun_codes[efun_code], f_name);
+		efun_names[efun_code] = (char *) malloc(len - 1);
+		strcpy(efun_names[efun_code], $2);
+	        efun_code++;
+	    }
 	} else {
 	    if (strlen($3) + 1 + 17 > sizeof f_name)
 		mf_fatal("A local buffer was too small(2)!\n");
@@ -131,7 +139,6 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 		if (islower(f_name[i]))
 		    f_name[i] = toupper(f_name[i]);
 	    }
-	    has_token[num_buff]=0;
 	    free($3);
 	}
 	for(i=0; i < last_current_type; i++) {
@@ -155,13 +162,14 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
         if (!strcmp($2, "call_other") && !lookup_define("CAST_CALL_OTHERS")) {
 	    $1 = MIXED;
 	}
-     	sprintf(buff, "{\"%s\",%s,0,0,%d,%d,%s,%s,%s,%d,%s},\n",
+     	sprintf(buff, "{\"%s\",%s,0,0,%d,%d,%s,%s,%s,%s,%s,%d,%s},\n",
 		$2, f_name, min_arg, limit_max ? -1 : $5, 
 		$1 != VOID ? ctype($1) : "TYPE_NOVALUE",
-		etype(0), etype(1), i, $6);
+		etype(0), etype(1), etype(2), etype(3), i, $6);
 	if (strlen(buff) > sizeof buff)
 	    mf_fatal("Local buffer overwritten !\n");
-	key[num_buff] = $2;
+
+        key[num_buff] = $2;
 	buf[num_buff] = (char *) malloc(strlen(buff) + 1);
         strcpy(buf[num_buff], buff);
         num_buff++;
@@ -287,7 +295,7 @@ char *etype P1(int, n)
 	    n--;
     }
     if (i == curr_arg_type_size)
-	return "0";
+	return "T_ANY";
     buff[0] = '\0';
     for(; curr_arg_types[i] != 0; i++) {
 	char *p;
@@ -328,8 +336,14 @@ int yylex() {
 	{
 	    int line;
 
-	    char aBuf[2048];
+	    char aBuf[2048], fname[2048];
 	    fgets(aBuf, 2047, yyin);
+	    if (sscanf(aBuf, "%d \"%[^\"]\"", &line, fname)) {
+		current_line = line;
+		if (current_file) free(current_file);
+		current_file = (char*)malloc(strlen(fname) + 1);
+		strcpy(current_file, fname);
+	    } else
 	    if (sscanf(aBuf, "%d", &line)) current_line = line;
             current_line++;
 	    continue;
@@ -338,6 +352,22 @@ int yylex() {
 	    fclose(yyin);
 	    return -1;
 	default:
+	    if ((c >= '0' && c <= '9') || c == '-') {
+		int v;
+		int neg = 0;
+		v = 0;
+		if (c == '-') {
+		    neg = 1;
+		    c = '0';
+		}
+		do {
+		    v = v * 10 + (c - '0');
+		    c = getc(yyin);
+		} while (c >= '0' && c <= '9');
+		ungetc(c, yyin);
+		yylval.number = (neg ? -v : v);
+		return NUM;
+	    }
 	    if (isalunum(c))
 		return ident(c);
 	    return c;

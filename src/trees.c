@@ -7,6 +7,7 @@
  *
  */
 
+#define SUPPRESS_COMPILER_INLINES
 #include "std.h"
 #include "lpc_incl.h"
 #include "trees.h"
@@ -131,8 +132,10 @@ make_branched_node P4(short, kind, char, type,
 parse_node_t *
 binary_int_op P4(parse_node_t *, l, parse_node_t *, r,
 		 char, op, char *, name) {
+    parse_node_t *ret;
+    
     if (exact_types){
-	if (!IS_TYPE(l->type, TYPE_NUMBER)){
+	if (!IS_TYPE(l->type, TYPE_NUMBER)) {
 	    char buf[256];
 	    strcpy(buf, "Bad left argument to '");
 	    strcat(buf, name);
@@ -151,8 +154,8 @@ binary_int_op P4(parse_node_t *, l, parse_node_t *, r,
 	    yyerror(buf);
 	}
     }
-    if (l->kind == F_NUMBER) {
-      if (r->kind == F_NUMBER) {
+    if (l->kind == NODE_NUMBER) {
+      if (r->kind == NODE_NUMBER) {
           switch (op) {
           case F_OR: l->v.number |= r->v.number; break;
           case F_XOR: l->v.number ^= r->v.number; break;
@@ -173,10 +176,12 @@ binary_int_op P4(parse_node_t *, l, parse_node_t *, r,
       case F_OR:
       case F_XOR:
       case F_AND:
-          return make_branched_node(op, TYPE_NUMBER, r, l);
+	  CREATE_BINARY_OP(ret, op, TYPE_NUMBER, r, l);
+	  return ret;
       }
     }
-    return make_branched_node(op, TYPE_NUMBER, l, r);
+    CREATE_BINARY_OP(ret, op, TYPE_NUMBER, l, r);
+    return ret;
 }
 
 parse_node_t *make_range_node P4(int, code, parse_node_t *, expr,
@@ -184,9 +189,12 @@ parse_node_t *make_range_node P4(int, code, parse_node_t *, expr,
                                       parse_node_t *, r) {
     parse_node_t *newnode;
 
-    newnode = make_branched_node(code, 0, l, r);
-    newnode->v.expr = expr;
-
+    if (r) {
+	CREATE_TERNARY_OP(newnode, code, 0, l, r, expr);
+    } else {
+	CREATE_BINARY_OP(newnode, code, 0, l, expr);
+    }
+    
     if (exact_types){
         switch(expr->type){
             case TYPE_ANY:
@@ -219,27 +227,41 @@ parse_node_t *insert_pop_value P1(parse_node_t *, expr) {
 	return expr;
     }
     switch (expr->kind) {
-    case F_ASSIGN: expr->kind = F_VOID_ASSIGN; break;
-    case F_ADD_EQ: expr->kind = F_VOID_ADD_EQ; break;
-    case F_PRE_INC:
-    case F_POST_INC: expr->kind = F_INC; break;
-    case F_PRE_DEC:
-    case F_POST_DEC: expr->kind = F_DEC; break;
-    case F_NUMBER:
-    case F_STRING:
-    case F_REAL: expr = 0; break;
-    case F_EQ:
-    case F_NE:
-    case F_GT:
-    case F_GE:
-    case F_LT:
-    case F_LE:
-	yywarn("Value of conditional expression is unused");
-    default:
-	NODE_NO_LINE(replacement, F_POP_VALUE);
-	replacement->r.expr = expr;
-	return replacement;
+    case NODE_BINARY_OP:
+	switch (expr->v.number) {
+	case F_EQ: case F_NE: case F_GT: case F_GE: case F_LT: case F_LE:
+	    yywarn("Value of conditional expression is unused");
+	    break;
+	case F_ASSIGN:
+	    if (IS_NODE(expr->r.expr, NODE_OPCODE_1, F_LOCAL_LVALUE)) {
+		int tmp = expr->r.expr->l.number;
+		expr->kind = NODE_UNARY_OP_1;
+		expr->r.expr = expr->l.expr;
+		expr->v.number = F_VOID_ASSIGN_LOCAL;
+		expr->l.number = tmp;
+	    } else expr->v.number = F_VOID_ASSIGN;
+	    return expr;
+	case F_ADD_EQ: 
+	    expr->v.number = F_VOID_ADD_EQ;
+	    return expr;
+	}
+	break;
+    case NODE_UNARY_OP:
+	switch (expr->v.number) {
+	case F_PRE_INC: case F_POST_INC:
+	    expr->v.number = F_INC;
+	    return expr;
+	case F_PRE_DEC: case F_POST_DEC: 
+	    expr->v.number = F_DEC;
+	    return expr;
+	}
+	break;
+    case NODE_NUMBER:
+    case NODE_STRING:
+    case NODE_REAL: 
+	return 0;
     }
-    return expr;
+    CREATE_UNARY_OP(replacement, F_POP_VALUE, 0, expr);
+    return replacement;
 }
 

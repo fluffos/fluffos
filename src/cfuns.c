@@ -9,6 +9,8 @@
 #include "parse.h"
 #include "qsort.h"
 
+IF_DEBUG(extern int foreach_in_progress);
+
 /* temporaries for LPC->C code */
 int lpc_int;
 svalue_t *lpc_svp;
@@ -16,6 +18,36 @@ array_t *lpc_arr;
 mapping_t *lpc_map;
 
 static svalue_t *lval;
+
+void c_new_class P1(int, which) {
+    array_t *cl;
+    
+    cl = allocate_class(&current_prog->classes[which]);
+    push_refed_class(cl);
+}
+
+void c_member P1(int, idx) {
+    array_t *arr;
+
+    if (sp->type != T_CLASS)
+        error("Tried to take a member of something that isn't a class.\n");
+    arr = sp->u.arr;
+    if (idx >= arr->size) error("Class has no corresponding member.\n");
+    assign_svalue_no_free(sp, &arr->item[idx]);
+    free_array(arr);
+}
+
+void c_member_lvalue P1(int, idx) {
+    array_t *arr;
+
+    if (sp->type != T_CLASS)
+        error("Tried to take a member of something that isn't a class.\n");
+    arr = sp->u.arr;
+    if (idx >= arr->size) error("Class has no corresponding member.\n");
+    sp->type = T_LVALUE;
+    sp->u.lvalue = arr->item + idx;
+    free_array(arr);
+}
 
 void c_return() {
     svalue_t sv;
@@ -36,6 +68,115 @@ void c_return_zero() {
     pop_control_stack();
 }
 
+void c_foreach P3(int, flags, int, idx1, int, idx2) {
+    IF_DEBUG(foreach_in_progress++);
+    
+    if (flags & 4) {
+	CHECK_TYPES(sp, T_MAPPING, 2, F_FOREACH);
+	
+	push_refed_array(mapping_indices(sp->u.map));
+	(++sp)->type = T_NUMBER;
+	sp->u.lvalue = (sp-1)->u.arr->item;
+	sp->subtype = (sp-1)->u.arr->size;
+		    
+	(++sp)->type = T_LVALUE;
+	if (flags & 2)
+	    sp->u.lvalue = &current_object->variables[idx1 + variable_index_offset];
+	else
+	    sp->u.lvalue = fp + idx1;
+    } else {
+	CHECK_TYPES(sp, T_ARRAY, 2, F_FOREACH);
+
+	(++sp)->type = T_NUMBER;
+	sp->u.lvalue = (sp-1)->u.arr->item;
+	sp->subtype = (sp-1)->u.arr->size;
+    }
+
+    (++sp)->type = T_LVALUE;
+    if (flags & 1)
+	sp->u.lvalue = &current_object->variables[idx2 + variable_index_offset];
+    else
+	sp->u.lvalue = fp + idx2;
+}
+
+void c_expand_varargs P1(int, where) {
+    svalue_t *s, *t;
+    array_t *arr;
+    int n;
+    
+    s = sp - where;
+    
+    if (s->type != T_ARRAY)
+	error("Item being expanded with ... is not an array\n");
+		
+    arr = s->u.arr;
+    n = arr->size;
+    num_varargs += n - 1;
+    if (!n) {
+	t = s;
+	while (t < sp) {
+	    *t = *(t + 1);
+	    t++;
+	}
+	sp--;
+    } else if (n == 1) {
+	assign_svalue_no_free(s, &arr->item[0]);
+    } else {
+	t = sp;
+	sp += n - 1;
+	while (t > s) {
+	    *(t + n - 1) = *t;
+	    t--;
+	}
+	t = s + n - 1;
+	if (arr->ref == 1) {
+	    memcpy(s, arr->item, n * sizeof(svalue_t));
+	    free_empty_array(arr);
+	    return;
+	} else {
+	    while (n--)
+		assign_svalue_no_free(t--, &arr->item[n]);
+	}
+    }
+    free_array(arr);
+}
+
+void c_exit_foreach PROT((void)) {
+    IF_DEBUG(foreach_in_progress--);
+    if ((sp-1)->type == T_LVALUE) {
+	/* mapping */
+	sp -= 3;
+	free_array((sp--)->u.arr);
+	free_mapping((sp--)->u.map);
+    } else {
+	/* array */
+	sp -= 2;
+	free_array((sp--)->u.arr);
+    }
+}
+
+int c_next_foreach PROT((void)) {
+    if ((sp-1)->type == T_LVALUE) {
+	/* mapping */
+	if ((sp-2)->subtype--) {
+	    svalue_t *key = (sp-2)->u.lvalue++;
+	    svalue_t *value = find_in_mapping((sp-4)->u.map, key);
+		    
+	    assign_svalue((sp-1)->u.lvalue, key);
+	    assign_svalue(sp->u.lvalue, value);
+	    return 1;
+	}
+    } else {
+	/* array */
+	if ((sp-1)->subtype--) {
+	    assign_svalue(sp->u.lvalue, (sp-1)->u.lvalue++);
+	    return 1;
+	}
+    }
+    c_exit_foreach();
+    return 0;
+}
+
 void c_call_inherited P3(int, inh, int, func, int, num_arg) {
     inherit_t *ip = current_prog->inherit + inh;
     program_t *temp_prog = ip->prog;
@@ -48,8 +189,9 @@ void c_call_inherited P3(int, inh, int, func, int, num_arg) {
     caller_type = ORIGIN_LOCAL;
     current_prog = temp_prog;
 		
-    csp->num_local_variables = num_arg;
-		
+    csp->num_local_variables = num_arg + num_varargs;
+    num_varargs = 0;
+    		
     function_index_offset += ip->function_index_offset;
     variable_index_offset += ip->variable_index_offset;
     
@@ -86,7 +228,8 @@ void c_call P2(int, func, int, num_arg) {
      * If it is an inherited function, search for the real
      * definition.
      */
-    csp->num_local_variables = num_arg;
+    csp->num_local_variables = num_arg + num_varargs;
+    num_varargs = 0;
     function_index_offset = variable_index_offset = 0;
     funp = setup_new_frame(funp);
     csp->pc = pc;	/* The corrected return address */
@@ -389,6 +532,64 @@ void c_rindex() {
 }
 
 void
+c_functional P3(int, kind, int, num_arg, POINTER_INT, func) {
+    funptr_t *fp;
+    
+    fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(functional_t),
+			     TAG_FUNP, "c_functional");
+    fp->hdr.owner = current_object;
+    add_ref( current_object, "c_functional" );
+    fp->hdr.type = kind;
+    
+    current_prog->func_ref++;
+    
+    fp->f.functional.prog = current_prog;
+    fp->f.functional.offset = func;
+    fp->f.functional.num_arg = num_arg;
+    fp->f.functional.num_local = 0;
+    fp->f.functional.fio = function_index_offset;
+    fp->f.functional.vio = variable_index_offset;
+
+    if (sp->type == T_ARRAY) {
+	fp->hdr.args = sp->u.arr;
+	fp->f.functional.num_arg += sp->u.arr->size;
+    } else
+	fp->hdr.args = 0;
+    
+    fp->hdr.ref = 1;
+
+    sp->type = T_FUNCTION;
+    sp->u.fp = fp;
+}
+
+void
+c_anonymous P3(int, num_arg, int, num_local, POINTER_INT, func) {
+    funptr_t *fp;
+    
+    fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(functional_t),
+			     TAG_FUNP, "c_functional");
+    fp->hdr.owner = current_object;
+    add_ref( current_object, "c_functional" );
+    fp->hdr.type = FP_FUNCTIONAL | FP_NOT_BINDABLE;
+    
+    current_prog->func_ref++;
+    
+    fp->f.functional.prog = current_prog;
+    fp->f.functional.offset = func;
+    fp->f.functional.num_arg = num_arg;
+    fp->f.functional.num_local = num_local;
+    fp->f.functional.fio = function_index_offset;
+    fp->f.functional.vio = variable_index_offset;
+
+    fp->hdr.args = 0;
+
+    fp->hdr.ref = 1;
+
+    (++sp)->type = T_FUNCTION;
+    sp->u.fp = fp;
+}
+
+void
 c_function_constructor P2(int, kind, int, arg)
 {
     funptr_t *fp;
@@ -408,9 +609,8 @@ c_function_constructor P2(int, kind, int, arg)
 	break;
     case FP_FUNCTIONAL:
     case FP_FUNCTIONAL | FP_NOT_BINDABLE:
-	/* */
     case FP_ANONYMOUS:
-	/* */
+	fatal("Wrong constructor called for LPC->C functional.\n");
     default:
 	fatal("Tried to make unknown type of function pointer.\n");
     }

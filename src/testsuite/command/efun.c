@@ -7,7 +7,11 @@ main(string fun)
 	string objname;
 
 	if (!fun) {
-		return notify_fail("efun what?\n");
+	    string file;
+	    
+	    foreach (file in get_dir("/single/efuns/*.c")) 
+		main(file);
+	    return 1;
 	}
 	objname = "/single/efuns/" + fun;
 	which = 0;

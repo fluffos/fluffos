@@ -49,46 +49,11 @@ short is_type[11] = {
     /* BUFFER */  CT_SIMPLE(TYPE_BUFFER),
 	      };
 
-#if 0
-int dump_function_table() {
-    int i;
-
-    printf("FUNCTIONS:\n");
-    printf("      name                          offset    fio  flags  # locals  # args\n");
-    printf("      -----------                   ------    ---  -----  --------  ------\n");
-    for (i = 0; i < mem_block[A_FUNCTIONS].current_size/sizeof(function_t); i++) {
-	char sflags[7];
-	int flags;
-	function_t *funp;
-
-	funp = (function_t *)(mem_block[A_FUNCTIONS].block + i * sizeof(function_t));
-	flags = funp->flags;
-	sflags[5] = '\0';
-	sflags[0] = (flags & NAME_INHERITED) ? 'i' : '-';
-	sflags[1] = (flags & NAME_UNDEFINED) ? 'u' : '-';
-	sflags[2] = (flags & NAME_STRICT_TYPES) ? 's' : '-';
-	sflags[3] = (flags & NAME_PROTOTYPE) ? 'p' : '-';
-	sflags[4] = (flags & NAME_DEF_BY_INHERIT) ? 'd' : '-';
-	printf("%4d: %-30s %5d  %5d  %5s  %8d  %6d\n",
-	       i,
-	       funp->name,
-	       (int)funp->offset,
-	       funp->function_index_offset,
-	       sflags,
-	       funp->num_local,
-	       funp->num_arg
-	       );
-    }
-    return 0;
-}
-#endif
-
 mem_block_t mem_block[NUMAREAS];
 
 function_context_t function_context;
 
 int exact_types;
-int approved_object;
 
 int current_type;
 
@@ -583,7 +548,8 @@ int compatible_types P2(int, t1, int, t2)
 	if (!(t2 & TYPE_MOD_ARRAY)) return 0;
 	return t1 == (TYPE_MOD_ARRAY | TYPE_ANY) ||
 	       t2 == (TYPE_MOD_ARRAY | TYPE_ANY) || (t1 == t2);
-    }
+    } else if (t2 & TYPE_MOD_ARRAY)
+	return 0;
     return compatible[t1] & (1 << t2);
 #endif
 }
@@ -643,8 +609,9 @@ void arrange_call_inherited P2(char *, name, parse_node_t *, node)
 		if (ip->prog->functions[i].name != shared_string)
 		    continue;
 #endif
-		node->kind = F_CALL_INHERITED;
-	        node->v.number = (ip - (inherit_t *) mem_block[A_INHERITS].block) | (i << 8);
+		node->kind = NODE_CALL_2;
+		node->v.number = F_CALL_INHERITED;
+		node->l.number = i + ((ip - (inherit_t *) mem_block[A_INHERITS].block) << 16);
 		node->type = ip->prog->functions[i].type;
 		return;
 	    }
@@ -654,8 +621,9 @@ void arrange_call_inherited P2(char *, name, parse_node_t *, node)
 	char buff[MAXLINE + 30];
 	sprintf(buff, "No such inherited function %.50s", name);
 	yyerror(buff);
-	node->kind = F_CALL_INHERITED;
-	node->v.number = 0;
+	node->kind = NODE_CALL_2;
+	node->v.number = F_CALL_INHERITED;
+	node->l.number = 0;
 	node->type = TYPE_ANY;
     }
 }
@@ -1031,13 +999,19 @@ int validate_function_call P3(function_t *, funp, int, f, parse_node_t *, args)
     /*
      * Check number of arguments.
      */
-    if ((num_var || funp->num_arg != num_arg)
-	&& !(funp->type & TYPE_MOD_VARARGS) &&
-	(funp->flags & NAME_STRICT_TYPES) && exact_types) {
+    if (!(funp->type & TYPE_MOD_VARARGS) &&
+	(funp->flags & NAME_STRICT_TYPES) &&
+	exact_types) {
 	char buff[100];
 
-	sprintf(buff, "Wrong number of arguments to %.60s\n    Expected: %d  Got: %d", funp->name, funp->num_arg, num_arg);
-	yyerror(buff);
+	if (num_var) {
+	    sprintf(buff, "Illegal to pass a variable number of arguments to non-varargs function %.60s\n", funp->name);
+	    yyerror(buff);
+	} else
+	if (funp->num_arg != num_arg) {
+	    sprintf(buff, "Wrong number of arguments to %.60s\n    Expected: %d  Got: %d", funp->name, funp->num_arg, num_arg);
+	    yyerror(buff);
+	}
     }
     /*
      * Check the argument types.
@@ -1071,34 +1045,52 @@ int validate_function_call P3(function_t *, funp, int, f, parse_node_t *, args)
 parse_node_t *
 promote_to_float P1(parse_node_t *, node) {
     parse_node_t *expr;
-    if (node->kind == F_NUMBER) {
-	node->kind = F_REAL;
+    if (node->kind == NODE_NUMBER) {
+	node->kind = NODE_REAL;
 	node->v.real = node->v.number;
+	return node;
     }
-    expr = make_branched_node(0, 0, 0, 0);
-    expr->v.expr = node;
-    expr = make_branched_node(F_TO_FLOAT, TYPE_REAL, 0, expr);
-    expr->v.number = 1;
+    expr = new_node();
+    expr->kind = NODE_EFUN;
+    expr->v.number = F_TO_FLOAT;
+    expr->type = TYPE_REAL;
+    expr->l.number = 1;
+    expr->r.expr = new_node_no_line();
+    expr->r.expr->kind = 1;
+    expr->r.expr->l.expr = expr->r.expr;
+    expr->r.expr->type = 0;
+    expr->r.expr->v.expr = node;
+    expr->r.expr->r.expr = 0;
     return expr;
 }
 
 parse_node_t *
 promote_to_int P1(parse_node_t *, node) {
     parse_node_t *expr;
-    if (node->kind == F_REAL) {
-	node->kind = F_NUMBER;
+    if (node->kind == NODE_REAL) {
+	node->kind = NODE_NUMBER;
 	node->v.number = node->v.real;
+	return node;
     }
-    expr = make_branched_node(0, 0, 0, 0);
-    expr->v.expr = node;
-    expr = make_branched_node(F_TO_INT, TYPE_NUMBER, 0, expr);
-    expr->v.number = 1;
+    expr = new_node();
+    expr->kind = NODE_EFUN;
+    expr->v.number = F_TO_INT;
+    expr->type = TYPE_NUMBER;
+    expr->l.number = 1;
+    expr->r.expr = new_node_no_line();
+    expr->r.expr->kind = 1;
+    expr->r.expr->l.expr = expr->r.expr;
+    expr->r.expr->type = 0;
+    expr->r.expr->v.expr = node;
+    expr->r.expr->r.expr = 0;
     return expr;
 }
 
 parse_node_t *do_promotions P2(parse_node_t *, node, int, type) {
-    if (type == TYPE_REAL && node->type == TYPE_NUMBER)
-	return promote_to_float(node);
+    if (type == TYPE_REAL) {
+	if (node->type == TYPE_NUMBER || node->kind == NODE_NUMBER)
+	    return promote_to_float(node);
+    }
     if (type == TYPE_NUMBER && node->type == TYPE_REAL)
 	return promote_to_int(node);
     return node;
@@ -1120,10 +1112,10 @@ validate_efun_call P2(int, f, parse_node_t *, args) {
 	/* should this move out of here? */
 	switch (predefs[f].token) {
 	case F_SIZEOF:
-	    if (!pn && num == 1 && args->r.expr->v.expr->kind == F_AGGREGATE) {
-		num = args->r.expr->v.expr->v.number;
-		CREATE_TYPED_NODE(args, F_NUMBER, (num ? TYPE_NUMBER : TYPE_ANY));
-		args->v.number = num;
+	    if (!pn && num == 1 && 
+		IS_NODE(args->r.expr->v.expr, NODE_CALL, F_AGGREGATE)) {
+		num = args->r.expr->v.expr->l.number;
+		CREATE_NUMBER(args, num);
 		return args;
 	    }
 	}
@@ -1133,36 +1125,41 @@ validate_efun_call P2(int, f, parse_node_t *, args) {
 	max_arg = predefs[f].max_args;
 
 	def = predefs[f].Default;
-	if (!num_var && def && num == min_arg -1) {
+	if (!num_var && def != DEFAULT_NONE && num == min_arg -1) {
 	    parse_node_t *tmp;
 	    tmp = new_node_no_line();
 	    tmp->r.expr = 0;
 	    tmp->type = 0;
 	    args->l.expr->r.expr = tmp;
-	    if (def > 0) {
-		CREATE_TYPED_NODE(tmp->v.expr, def, TYPE_ANY);
-		tmp->v.expr->v.number = -1;
-		tmp->r.expr = 0;
+	    if (def == DEFAULT_THIS_OBJECT) {
+		tmp->v.expr = new_node_no_line();
+		tmp->v.expr->kind = NODE_EFUN;
+		tmp->v.expr->v.number = F_THIS_OBJECT;
+		tmp->v.expr->l.number = 0;
+		tmp->v.expr->type = TYPE_ANY;
+		tmp->v.expr->r.expr = 0;
 	    } else {
-		CREATE_TYPED_NODE(tmp->v.expr, -(def) >> 8, TYPE_ANY);
-		tmp->v.expr->v.number = (-def) & 0xff;
+		CREATE_NUMBER(tmp->v.expr, def);
 	    }
-	    tmp->v.expr->r.expr = 0;
-	    max_arg--;
-	    min_arg--;
+	    args->v.number++;
+	    num++;
 	} else if (num_var && max_arg != -1) {
 	    char bff[100];
 	    sprintf(bff, "Illegal to pass variable number of arguments to non-varargs efun %s", predefs[f].word);
 	    yyerror(bff);
+	    return args;
 	} else if ((num - num_var) < min_arg) {
 	    char bff[100];
 	    sprintf(bff, "Too few arguments to %s", predefs[f].word);
 	    yyerror(bff);
+	    return args;
 	} else if (num > max_arg && max_arg != -1) {
 	    char bff[100];
 	    sprintf(bff, "Too many arguments to %s", predefs[f].word);
 	    yyerror(bff);
-	} else if (max_arg != -1 && exact_types) {
+	    return args;
+	}
+	if (max_arg != -1 && exact_types) {
 	    /*
 	     * Now check all types of arguments to efuns.
 	     */
@@ -1174,6 +1171,8 @@ validate_efun_call P2(int, f, parse_node_t *, args) {
 	    for (argn = 0; argn < num; argn++) {
 		enode = enode->r.expr;
 		if (enode->type & 1) break;
+		/* this can happen for default args */
+		if (!enode->v.expr) break;
 		tmp = enode->v.expr->type;
 		for (i=0; !compatible_types(argp[i], tmp) && argp[i] != 0; i++)
 		    ;
@@ -1202,15 +1201,11 @@ validate_efun_call P2(int, f, parse_node_t *, args) {
 		argp += i + 1;
 	    }
 	}
-	args->kind = predefs[f].token;
-	/* Only store number of arguments for instructions that allow
-	 * a variable number.
-	 */
-	if (max_arg == min_arg)
-	    args->v.number = -1;
+	args->l.number = num;
+	args->v.number = predefs[f].token;
+	args->kind = NODE_EFUN;
     } else {
-	CREATE_TYPED_NODE(args, F_NUMBER, TYPE_ANY);
-	args->v.number = 0;
+	CREATE_ERROR(args);
     }
     return args;
 }
@@ -1220,20 +1215,12 @@ validate_efun_call P2(int, f, parse_node_t *, args) {
  * A_INITIALIZER and put at the end of the program.  For compatibility,
  * there is a jump to it at address 0.
  */
-void start_initializer() {
+void switch_to_block P1(int, block) {
     UPDATE_PROGRAM_SIZE;
 
-    prog_code = mem_block[A_INITIALIZER].block + mem_block[A_INITIALIZER].current_size;
-    prog_code_max = mem_block[A_INITIALIZER].block + mem_block[A_INITIALIZER].max_size;
-    current_block = A_INITIALIZER;
-}
-
-void end_initializer() {
-    UPDATE_PROGRAM_SIZE;
-
-    prog_code = mem_block[A_PROGRAM].block + mem_block[A_PROGRAM].current_size;
-    prog_code_max = mem_block[A_PROGRAM].block + mem_block[A_PROGRAM].max_size;
-    current_block = A_PROGRAM;
+    prog_code = mem_block[block].block + mem_block[block].current_size;
+    prog_code_max = mem_block[block].block + mem_block[block].max_size;
+    current_block = block;
 }
 
 void yyerror P1(char *, str)
@@ -1322,11 +1309,10 @@ static void epilog() {
 	parse_node_t *pn;
 	int fun;
 	/* end the __INIT function */
-	start_initializer();
-	CREATE_NODE(pn, F_RETURN);
-	CREATE_NODE(pn->r.expr, F_CONST0);
+	switch_to_block(A_INITIALIZER);
+	CREATE_RETURN(pn, 0);
 	generate(pn);
-	end_initializer();
+	switch_to_block(A_PROGRAM);
  	fun = define_new_function(APPLY___INIT, 0, 0, 
 			    NAME_STRICT_TYPES, TYPE_VOID | TYPE_MOD_PRIVATE);
 	FUNCTION(fun)->offset = CURRENT_PROGRAM_SIZE;
@@ -1491,7 +1477,6 @@ static void prolog P2(int, f, char *, name) {
     int i;
 
     function_context.num_parameters = -1;
-    approved_object = 0;
     prog = 0;   /* 0 means fail to load. */
     num_parse_error = 0;
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH

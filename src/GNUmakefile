@@ -6,18 +6,26 @@ PROOF=
 STRFUNCS=
 INSTALL=install -c
 INSTALL_DIR=../bin
-OPTIMIZE=-O2 -fomit-frame-pointer -fstrength-reduce
+OPTIMIZE=-Wall
 CPP=gcc -E
-CFLAGS=
+CFLAGS=-g -DDEBUG
 CC=gcc
 YACC=bison -d -y
 
+# NeXT: link with MallocDebug if you have a NeXT with NeXTOS 2.1 or later and
+# you wish to search for memory leaks (see /NextDeveloper/Apps/MallocDebug).
+# Note: linking with MallocDebug will cause the virtual size of the
+# driver process to reach appoximately 40MB however the amount of real memory
+# used will remain close to normal.
+#EXTRALIBS=-lMallocDebug -lsys_s
+
 #################################################
-# the meat of things                            #
-# don't change anything below this section      #
+# Don't change anything in this file            #
 #                                               #
 # RUN ./build.MudOS to generate the Makefiles   #
 #################################################
+
+OURLIBS=packages/packages.a mudlib/mudlib.a
 
 OVERRIDES=$(MAKEOVERRIDES)
 
@@ -31,35 +39,48 @@ SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   strstr.c disassembler.c binaries.c ualarm.c $(STRFUNCS) \
   replace_program.c functab_tree.c ccode.c cfuns.c compile_file.c
 
+all: cc.h files configure.h main_build
+
+main_build: $(DRIVER_BIN) addr_server
+
 VPATH = $(OBJDIR)
 
 OBJ=$(addprefix $(OBJDIR)/,$(subst .c,.o,$(SRC)))
 
 $(OBJDIR)/%.o: %.c
-	$(CC) -I$(OBJDIR) $(CFLAGS) -DEDIT_SOURCE -o $@ -c $<
+	$(CC) $(CFLAGS) $(OPTIMIZE) -o $@ -c $<
 
-all: GNUmakefile.MudOS grammar.y cc.h files
-	$(MAKE) -f GNUmakefile.MudOS  'DRIVER_BIN=$(DRIVER_BIN)' \
-	'OBJ=$(OBJ)' 'MAKE=$(MAKE)' 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' \
-	'PROOF=$(PROOF)' 'OBJDIR=$(OBJDIR)' 'SRC=$(SRC)' 'YACC=$(YACC)' \
-	'OVERRIDES=$(OVERRIDES)'
+$(OBJDIR)/lex.o: lex.c preprocess.c cc.h grammar.tab.c
 
-$(OBJDIR)/hash.o: hash.c
-	$(CC) -I$(OBJDIR) $(CFLAGS) -DEDIT_SOURCE $(OPTIMIZE) -o $(OBJDIR)/hash.o -c hash.c
+$(OBJDIR)/grammar.tab.o: grammar.tab.c opcodes.h
 
 which_makefile:
 	echo MakeIsGNU
 
+grammar.tab.c: grammar.y
+	$(YACC) grammar.y
+	-rm -f grammar.tab.*
+	sed "s/y.tab.c/grammar.tab.c/g" y.tab.c  > grammar.tab.c
+	-mv y.tab.h grammar.tab.h
+
+$(DRIVER_BIN): $(OBJ)
+	$(MAKE) -C packages 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)'
+	$(MAKE) -C mudlib 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)'
+	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
+	$(PROOF) $(CC) $(CFLAGS) $(OPTIMIZE) $(OBJ) -o $(DRIVER_BIN) $(OURLIBS) `cat system_libs`
+
+addr_server:  $(OBJDIR)/addr_server.o $(OBJDIR)/socket_ctrl.o $(OBJDIR)/port.o addr_server.h
+	$(CC) $(CFLAGS) $(OPTIMIZE) $(OBJDIR)/socket_ctrl.o $(OBJDIR)/addr_server.o $(OBJDIR)/port.o \
+	-o addr_server `cat system_libs`
+
+
 remake: neat all
 
-depend: opcodes.h grammar.tab.c cc.h efunctions.h efun_defs.c
-	-rm tmpdepend Dependencies
-	for i in *.c do $(CPP) -MM $$i; done
-	sed -e"s!^!$(OBJ)!" <tmpdepend >Dependencies
+depend: opcodes.h grammar.tab.c cc.h efunctions.h efun_defs.c configure.h
 	-rm tmpdepend
-
-grammar.y: grammar.y.pre edit_source
-	./edit_source -process grammar.y.pre
+	for i in *.c; do $(CC) -MM -DDEPEND $$i >>tmpdepend; done
+	sed -e "s!^[^ ]!$(OBJDIR)/&!" <tmpdepend >Dependencies
+	-rm tmpdepend
 
 cc.h: GNUmakefile
 	rm -f cc.h
@@ -72,7 +93,8 @@ cc.h: GNUmakefile
 # the touches here are necessary to fix the modification times; link(2) does
 # 'modify' a file
 files: edit_source sysmalloc.c smalloc.c bsdmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c func_spec.c mudlib/Makefile.pre mudlib/GNUmakefile.pre packages/Makefile.pre packages/GNUmakefile.pre
-	./edit_source -options -malloc -build_func_spec '$(CPP) $(CFLAGS)'
+	./edit_source -options -malloc -build_func_spec '$(CPP) $(CFLAGS)' \
+	              -process grammar.y.pre
 	./edit_source -process packages/Makefile.pre
 	./edit_source -process packages/GNUmakefile.pre
 	./edit_source -process mudlib/Makefile.pre
@@ -95,6 +117,13 @@ $(OBJDIR)/edit_source.o: edit_source.c preprocess.c cc.h
 edit_source: $(OBJDIR)/edit_source.o $(OBJDIR)/hash.o $(OBJDIR)/make_func.tab.o
 	$(CC) $(CFLAGS) $(OBJDIR)/edit_source.o $(OBJDIR)/hash.o $(OBJDIR)/make_func.tab.o -o edit_source
 
+# don't optimize these two
+$(OBJDIR)/edit_source.o: edit_source.c
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+$(OBJDIR)/make_func.tab.o: make_func.tab.c
+	$(CC) $(CFLAGS) -o $@ -c $<
+
 tags: $(SRC)
 	ctags $(SRC)
 
@@ -106,19 +135,13 @@ install: all
 	$(INSTALL) $(DRIVER_BIN) $(INSTALL_DIR)
 	$(INSTALL) addr_server $(INSTALL_DIR)
 
-Makefiles: Makefile.in GNUmakefile.in Makefile.MudOS GNUmakefile.MudOS
+Makefiles: Makefile.in GNUmakefile.in
 
 Makefile.in: edit_source Makefile.in.pre Makefile.master
 	./edit_source -process Makefile.in.pre
 
 GNUmakefile.in: edit_source GNUmakefile.in.pre Makefile.master
 	./edit_source -process GNUmakefile.in.pre
-
-Makefile.MudOS: edit_source Makefile.MudOS.pre Makefile.MudOS.master configure.h
-	./edit_source -process Makefile.MudOS.pre
-
-GNUmakefile.MudOS: edit_source GNUmakefile.MudOS.pre Makefile.MudOS.master configure.h
-	./edit_source -process GNUmakefile.MudOS.pre
 
 nothing:
 
@@ -144,12 +167,12 @@ neat:
 clean: neat
 	-rm -f Makefile.MudOS GNUmakefile.MudOS
 	-rm -f cc.h edit_source
-	-rm -f core
+	-rm -f core y.output
 	-rm -f *.orig *.rej
 	-rm -f */*.orig */*.rej
 	-rm -f *.ln tags */*~ *~ TAGS
 	-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old addr_server
-	-rm -f Dependencies
+	-rm -f Dependencies tmpdepend
 	-touch Dependencies
 
 include Dependencies

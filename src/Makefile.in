@@ -1,10 +1,18 @@
 
+# NeXT: link with MallocDebug if you have a NeXT with NeXTOS 2.1 or later and
+# you wish to search for memory leaks (see /NextDeveloper/Apps/MallocDebug).
+# Note: linking with MallocDebug will cause the virtual size of the
+# driver process to reach appoximately 40MB however the amount of real memory
+# used will remain close to normal.
+#EXTRALIBS=-lMallocDebug -lsys_s
+
 #################################################
-# the meat of things                            #
-# don't change anything below this section      #
+# Don't change anything in this file            #
 #                                               #
 # RUN ./build.MudOS to generate the Makefiles   #
 #################################################
+
+OURLIBS=packages/packages.a mudlib/mudlib.a
 
 OVERRIDES=$(MAKEOVERRIDES)
 
@@ -18,6 +26,10 @@ SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   strstr.c disassembler.c binaries.c ualarm.c $(STRFUNCS) \
   replace_program.c functab_tree.c ccode.c cfuns.c compile_file.c
 
+all: cc.h files main_build
+
+main_build: $(DRIVER_BIN) addr_server
+
 OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   backend.o array.o mapping.o comm.o ed.o regexp.o swap.o buffer.o crc32.o \
   malloc.o mallocwrapper.o class.o efuns_main.o efuns_port.o \
@@ -29,26 +41,35 @@ OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   replace_program.o functab_tree.o ccode.o cfuns.o compile_file.o
 
 .c.o:
-	$(CC) $(CFLAGS) -DEDIT_SOURCE -c $*.c
+	$(CC) $(CFLAGS) $(OPTIMIZE) -c $*.c
 
-all: Makefile.MudOS grammar.y cc.h files
-	$(MAKE) -f Makefile.MudOS  'DRIVER_BIN=$(DRIVER_BIN)' \
-	'OBJ=$(OBJ)' 'MAKE=$(MAKE)' 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' \
-	'PROOF=$(PROOF)' 'SRC=$(SRC)' 'YACC=$(YACC)' 'OVERRIDES=$(OVERRIDES)'
+lex.o: lex.c preprocess.c cc.h grammar.tab.c
 
-hash.o: hash.c
-	$(CC) $(CFLAGS) $(OPTIMIZE) -DEDIT_SOURCE -c hash.c
+grammar.tab.o: grammar.tab.c opcodes.h
 
 which_makefile:
 	echo MakeIsMake
 
+grammar.tab.c: grammar.y
+	$(YACC) grammar.y
+	-rm -f grammar.tab.*
+	sed "s/y.tab.c/grammar.tab.c/g" y.tab.c  > grammar.tab.c
+	-mv y.tab.h grammar.tab.h
+
+$(DRIVER_BIN): $(OBJ)
+	(cd packages; $(MAKE) 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)')
+	(cd mudlib; $(MAKE) 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)')
+	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
+	$(PROOF) $(CC) $(CFLAGS) $(OPTIMIZE) $(OBJ) -o $(DRIVER_BIN) $(OURLIBS) `cat system_libs`
+
+addr_server:  addr_server.o socket_ctrl.o port.o addr_server.h
+	$(CC) $(CFLAGS) $(OPTIMIZE) socket_ctrl.o addr_server.o port.o \
+	-o addr_server `cat system_libs`
+
 remake: neat all
 
-depend: opcodes.h grammar.tab.c cc.h efunctions.h efun_defs.c
+depend: opcodes.h grammar.tab.c cc.h efunctions.h efun_defs.c configure.h
 	makedepend *.c
-
-grammar.y: grammar.y.pre edit_source
-	./edit_source -process grammar.y.pre
 
 cc.h: Makefile
 	rm -f cc.h
@@ -60,8 +81,9 @@ cc.h: Makefile
 
 # the touches here are necessary to fix the modification times; link(2) does
 # 'modify' a file
-files: edit_source sysmalloc.c smalloc.c bsdmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c func_spec.c mudlib/Makefile.pre mudlib/GNUmakefile.pre packages/Makefile.pre packages/GNUmakefile.pre
-	./edit_source -options -malloc -build_func_spec '$(CPP) $(CFLAGS)'
+files: edit_source sysmalloc.c smalloc.c bsdmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c func_spec.c mudlib/Makefile.pre mudlib/GNUmakefile.pre packages/Makefile.pre packages/GNUmakefile.pre configure.h
+	./edit_source -options -malloc -build_func_spec '$(CPP) $(CFLAGS)' \
+	              -process grammar.y.pre
 	./edit_source -process packages/Makefile.pre
 	./edit_source -process packages/GNUmakefile.pre
 	./edit_source -process mudlib/Makefile.pre
@@ -77,12 +99,23 @@ make_func.tab.c: make_func.y cc.h
 	mv y.tab.c make_func.tab.c
 
 configure.h: edit_source
-	./edit_source -configure
+	if test ! -f configure.h; then \
+	    ./edit_source -configure; \
+	fi
 
 edit_source.o: edit_source.c preprocess.c cc.h
 
 edit_source: edit_source.o hash.o make_func.tab.o
 	$(CC) $(CFLAGS) edit_source.o hash.o make_func.tab.o -o edit_source
+
+edit_source.o: edit_source.c
+	$(CC) $(CFLAGS) -c $*.c
+
+make_func.tab.o: make_func.tab.c
+	$(CC) $(CFLAGS) -c $*.c
+
+hash.o: hash.c
+	$(CC) $(CFLAGS) $(OPTIMIZE) -c $*.c
 
 tags: force
 	ctags *.c *.y
@@ -97,19 +130,13 @@ install: all
 	$(INSTALL) $(DRIVER_BIN) $(INSTALL_DIR)
 	$(INSTALL) addr_server $(INSTALL_DIR)
 
-Makefiles: Makefile.in GNUmakefile.in Makefile.MudOS GNUmakefile.MudOS
+Makefiles: Makefile.in GNUmakefile.in
 
 Makefile.in: edit_source Makefile.in.pre Makefile.master
 	./edit_source -process Makefile.in.pre
 
 GNUmakefile.in: edit_source GNUmakefile.in.pre Makefile.master
 	./edit_source -process GNUmakefile.in.pre
-
-Makefile.MudOS: edit_source Makefile.MudOS.pre Makefile.MudOS.master configure.h
-	./edit_source -process Makefile.MudOS.pre
-
-GNUmakefile.MudOS: edit_source GNUmakefile.MudOS.pre Makefile.MudOS.master configure.h
-	./edit_source -process GNUmakefile.MudOS.pre
 
 nothing:
 
@@ -127,7 +154,7 @@ neat:
 	-rm -f efun_defs.c option_defs.c
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
 	-rm -f malloc.c mallocwrapper.c
-	-rm -f func_spec.cpp
+	-rm -f func_spec.cpp files
 	-rm -f grammar.y comptest* a.out
 	-rm -f packages/Makefile packages/GNUmakefile
 
@@ -135,7 +162,7 @@ neat:
 clean: neat
 	-rm -f Makefile.MudOS GNUmakefile.MudOS
 	-rm -f cc.h edit_source
-	-rm -f core
+	-rm -f core y.output
 	-rm -f *.orig *.rej
 	-rm -f */*.orig */*.rej
 	-rm -f *.ln tags */*~ *~ TAGS

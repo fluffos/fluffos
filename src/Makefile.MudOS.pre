@@ -1,3 +1,0 @@
-%define NORMAL
-
-%include "Makefile.MudOS.master"

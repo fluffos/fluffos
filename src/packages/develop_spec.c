@@ -15,7 +15,7 @@
 #if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
     string debugmalloc(string, int);
     void set_malloc_mask(int);
-    string check_memory(int default: F_CONST0);
+    string check_memory(int default: 0);
 #endif
 
 #ifdef TRACE

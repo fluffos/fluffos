@@ -46,7 +46,6 @@ f_add_action PROT((void))
     int flag;
 
     if (st_num_arg == 3) {
-	CHECK_TYPES(sp, T_NUMBER, 3, F_ADD_ACTION);
 	flag = (sp--)->u.number;
     } else flag = 0;
 
@@ -314,6 +313,9 @@ f_call_stack PROT((void))
 {
     int i, n = csp - &control_stack[0] + 1;
     array_t *ret = allocate_empty_array(n);
+
+    if (sp->u.number < 0 || sp->u.number > 3)
+	error("First argument of call_stack() must be 0, 1, 2, or 3.\n");
     
     switch (sp->u.number) {
     case 0:
@@ -424,13 +426,12 @@ f_clonep PROT((void))
 }
 #endif
 
-#if defined(F_CLONE_OBJECT)
+#ifdef F_CLONE_OBJECT
 void
 f_clone_object PROT((void))
 {
     svalue_t *arg = sp - st_num_arg + 1;
 
-    CHECK_TYPES(arg, T_STRING, 1, F_CLONE_OBJECT);
     ob = clone_object(arg->u.string, st_num_arg - 1);
     free_string_svalue(sp);
     if (ob) {
@@ -752,7 +753,19 @@ f_enable_wizard PROT((void))
 void
 f_error PROT((void))
 {
-    error(sp->u.string);
+    int l = SVALUE_STRLEN(sp);
+    char err_buf[2048];
+
+    if (sp->u.string[l - 1] == '\n')
+	l--;
+    if (l > 2045) l = 2045;
+    
+    err_buf[0] = '*';
+    strncpy(err_buf + 1, sp->u.string, l);
+    err_buf[l + 1] = '\n';
+    err_buf[l + 2] = 0;
+    
+    error_handler(sp->u.string);
 }
 #endif
 
@@ -1025,23 +1038,38 @@ f_get_dir PROT((void))
 void
 f_implode PROT((void))
 {
-    check_for_destr((sp - 1)->u.arr);
-    if (sp->type == T_STRING) {
-	char *str;
+    array_t *arr;
+    int flag;
+    svalue_t *args;
+    
+    if (st_num_arg == 3) {
+	args = (sp - 2);
+	if (args[1].type == T_STRING)
+	    error("Third argument to implode() is illegal with implode(array, string)\n");
+	flag = 1;
+    } else {
+	args = (sp - 1);
+	flag = 0;
+    }
+    arr = args->u.arr;
+    check_for_destr(arr);
 
-	str = implode_string((sp - 1)->u.arr, sp->u.string, SVALUE_STRLEN(sp));
+    if (args[1].type == T_STRING) {
+	/* st_num_arg == 2 here */
+	char *str;
+	    
+	str = implode_string(arr, sp->u.string,
+			     SVALUE_STRLEN(sp));
 	free_string_svalue(sp--);
-	free_array(sp->u.arr);
+	free_array(arr);
 	put_malloced_string(str);
     } else { /* function */
-	svalue_t *v;
-	array_t *arr = (sp - 1)->u.arr;
-	funptr_t *funp = sp->u.fp;
-
-	v = implode_array(funp, arr);
-	/* be careful; v can be a pointer into arr */
+	funptr_t *funp = args[1].u.fp;
+	    
+	/* this pulls the extra arg off the stack if it exists */
+	implode_array(funp, arr, args, flag);
+	sp--;
 	free_funp(funp);
-	assign_svalue_no_free(--sp, v);
 	free_array(arr);
     }
 }
@@ -1244,6 +1272,8 @@ f_link PROT((void))
     ret = apply_master_ob(APPLY_VALID_LINK, 2);
     if (MASTER_APPROVED(ret))
         i = do_rename((sp - 1)->u.string, sp->u.string, F_LINK);
+    else
+	i = 0;
     (--sp)->type = T_NUMBER;
     sp->u.number = i;
     sp->subtype = 0;
@@ -1279,12 +1309,21 @@ f_lower_case PROT((void))
 {
     register char *str;
 
-    unlink_string_svalue(sp);
     str = sp->u.string;
-	
-    for (; *str; str++)
-	if (isupper(*str))
+    /* find first upper case letter, if any */
+    for (; *str; str++) {
+	if (isupper(*str)) {
+	    int l = str - sp->u.string;
+	    unlink_string_svalue(sp);
+	    str = sp->u.string + l;
 	    *str += 'a' - 'A';
+	    for (str++; *str; str++) {
+		if (isupper(*str))
+		    *str += 'a' - 'A';
+	    }
+	    return;
+	}
+    }
 }
 #endif
 
@@ -1465,7 +1504,6 @@ f_member_array PROT((void))
     int i;
 
     if (st_num_arg > 2) {
-        CHECK_TYPES(sp, T_NUMBER, 3, F_MEMBER_ARRAY);
         i = (sp--)->u.number;
         if (i<0) bad_arg(3, F_MEMBER_ARRAY);
     } else i = 0;
@@ -1817,7 +1855,20 @@ f_opcprof PROT((void))
 void
 f_origin PROT((void))
 {
-    push_number((int) caller_type);
+    int i = 0, j;
+    static char *origins[] = {
+	"driver",
+	"local",
+	"call_other",
+	"simul",
+	"call_out",
+	"efun",
+	"function pointer",
+	"functional"
+    };
+    j = caller_type;
+    while (j >>= 1) i++;
+    push_constant_string(origins[i]);
 }
 #endif
 
@@ -2104,7 +2155,6 @@ f_read_bytes PROT((void))
     if (num_arg > 1)
         start = arg[1].u.number;
     if (num_arg == 3) {
-        CHECK_TYPES(&arg[2], T_NUMBER, 2, F_READ_BYTES);
         len = arg[2].u.number;
     }
     str = read_bytes(arg[0].u.string, start, len, &rlen);
@@ -2129,7 +2179,6 @@ f_read_buffer PROT((void))
     if (num_arg > 1) {
        start = arg[1].u.number;
        if (num_arg == 3) {
-	   CHECK_TYPES(&arg[2], T_NUMBER, 2, F_READ_BUFFER);
 	   len = arg[2].u.number;
        }
     }
@@ -2164,7 +2213,6 @@ f_read_file PROT((void))
     int start,len;
 
     if (st_num_arg == 3) {
-        CHECK_TYPES(sp, T_NUMBER, 2, F_READ_FILE);
         len = (sp--)->u.number;
     } else len = 0;
     if (st_num_arg > 1)
@@ -2219,17 +2267,25 @@ f_regexp PROT((void))
 {
     array_t *v;
     int flag;
-    
-    if (st_num_arg > 2){
+
+    if (st_num_arg > 2) {
         if (!(sp->type == T_NUMBER)) error("Bad argument 3 to regexp()\n");
+	if (sp[-2].type == T_STRING) error("3rd argument illegal for regexp(string, string)\n"); 
 	flag = (sp--)->u.number;
     } else flag = 0;
-    v = match_regexp((sp - 1)->u.arr, sp->u.string, flag);
+    if (sp[-1].type == T_STRING) {
+	flag = match_single_regexp((sp - 1)->u.string, sp->u.string);
+	free_string_svalue(sp--);
+	free_string_svalue(sp);
+	put_number(flag);
+    } else {
+	v = match_regexp((sp - 1)->u.arr, sp->u.string, flag);
 
-    free_string_svalue(sp--);
-    free_array(sp->u.arr);
-    if (!v) *sp = const0;
-    else sp->u.arr = v;
+	free_string_svalue(sp--);
+	free_array(sp->u.arr);
+	if (!v) *sp = const0;
+	else sp->u.arr = v;
+    }
 }
 #endif
 
@@ -2252,8 +2308,14 @@ f_remove_call_out PROT((void))
 {
     int i;
 
-    i = remove_call_out(current_object, sp->u.string);
-    free_string_svalue(sp);
+    if (st_num_arg) {
+	i = remove_call_out(current_object, sp->u.string);
+	free_string_svalue(sp);
+    } else {
+	remove_all_call_out(current_object);
+	i = -1;
+	sp++;
+    }
     put_number(i);
 }
 #endif
@@ -2341,7 +2403,6 @@ f_replace_string PROT((void))
         return;
     }
     arg = sp - st_num_arg + 1;
-    CHECK_TYPES((arg + 2), T_STRING, 3, F_REPLACE_STRING);
     src = arg->u.string;
     first = 0;
     last = 0;
@@ -2405,7 +2466,7 @@ f_replace_string PROT((void))
 	
         if (plen > 1) { /* pattern length > 1, jump table most efficient */
             while (src < flimit) {
-                if (skip = skip_table[(unsigned char)src[probe]]) {
+                if ((skip = skip_table[(unsigned char)src[probe]])) {
                     for (climit = dst2 + skip; dst2 < climit; *dst2++ = *src++)
                         ;
                 } else if (memcmp(src, pattern, plen) == 0) {
@@ -2463,13 +2524,13 @@ f_replace_string PROT((void))
 	
         if (plen > 1) {
             while (src < flimit) {
-                if (skip = skip_table[(unsigned char)src[probe]]) {
+                if ((skip = skip_table[(unsigned char)src[probe]])) {
                     for (climit = dst2 + skip; dst2 < climit; *dst2++ = *src++)
                         ;
 		    
                 } else if (memcmp(src, pattern, plen) == 0) {
                     cur++;
-                    if ((cur >= first) &&  (cur <= last)) {
+                    if ((cur >= first) && (cur <= last)) {
                         if (rlen) {
                             if (max_string_length - dlen <= rlen) {
                                 pop_n_elems(st_num_arg);
@@ -2484,6 +2545,16 @@ f_replace_string PROT((void))
                         src += plen;
                         if (cur == last) break;
                     } else {
+			dlen += plen;
+			if (max_string_length - dlen <= 0) {
+			    pop_n_elems(st_num_arg);
+			    push_svalue(&const0u);
+			    
+			    FREE_MSTR(dst1);
+			    return;
+			}			    
+			memcpy(dst2, src, plen);
+			dst2 += plen;
                         src += plen;
                     }
                 } else {
@@ -3023,8 +3094,6 @@ f_strsrch PROT((void))
     static char buf[2];         /* should be initialized to 0 */
     int i, blen, llen;
 
-    CHECK_TYPES(sp, T_NUMBER, 3, F_STRSRCH);
-
     sp--;
     big = (sp - 1)->u.string;
     blen = SVALUE_STRLEN(sp - 1);
@@ -3189,7 +3258,6 @@ f_tell_room PROT((void))
     if (num_arg == 2) {
         avoid = null_array();
     } else {
-        CHECK_TYPES(arg + 2, T_ARRAY, 3, F_TELL_ROOM);
         avoid = arg[2].u.arr;
     }
 
@@ -3220,6 +3288,68 @@ f_test_bit PROT((void))
         free_string_svalue(sp);
         *sp = const0;
     }
+}
+#endif
+
+#ifdef F_NEXT_BIT
+void
+f_next_bit PROT((void))
+{
+    int start = (sp--)->u.number;
+    int len = SVALUE_STRLEN(sp);
+    int which, bit, value;
+    
+    if (!len || start / 6 >= len) {
+        free_string_svalue(sp);
+	put_number(-1);
+        return;
+    }
+    /* Find the next bit AFTER start */
+    if (start > 0) {
+	if (start % 6 == 5) {
+	    which = (start / 6) + 1;
+	    value = sp->u.string[which] - ' ';
+	} else {
+	    /* we have a partial byte to check */
+	    which = start / 6;
+	    bit = 0x3f - ((1 << ((start % 6) + 1)) - 1);
+	    value = (sp->u.string[which] - ' ') & bit;
+	}
+    } else {
+	which = 0;
+	value = *sp->u.string - ' ';
+    }
+
+    while (1) {
+	if (value)  {
+	    if (value & 0x07) {
+		if (value & 0x01)
+		    bit = which * 6;
+		else if (value & 0x02)
+		    bit = which * 6 + 1;
+		else if (value & 0x04)
+		    bit = which * 6 + 2;
+		break;
+	    } else if (value & 0x38) {
+		if (value & 0x08)
+		    bit = which * 6 + 3;
+		else if (value & 0x10)
+		    bit = which * 6 + 4;
+		else if (value & 0x20)
+		    bit = which * 6 + 5;
+		break;
+	    }
+	}
+	which++;
+	if (which == len) {
+	    bit = -1;
+	    break;
+	}
+	value = sp->u.string[which] - ' ';
+    }
+
+    free_string_svalue(sp);
+    put_number(bit);
 }
 #endif
 
@@ -3284,7 +3414,7 @@ f_time PROT((void))
 void
 f_to_float PROT((void))
 {
-    double temp;
+    double temp = 0;
 
     switch(sp->type){
         case T_NUMBER:
@@ -3339,12 +3469,10 @@ f_to_int PROT((void))
 void
 f_typeof PROT((void))
 {
-    /* Yes this is necessary.  put_number is a macro, and smashes sp->type
-       before evaluating it's arg */
-    int i = sp->type;
+    char *t = type_name(sp->type);
 
     free_svalue(sp, "f_typeof");
-    put_number(i);
+    put_constant_string(t);
 }
 #endif
 
@@ -3528,7 +3656,6 @@ f_write_file PROT((void))
     int flags = 0;
 
     if (st_num_arg == 3) {
-        CHECK_TYPES(sp, T_NUMBER, 3, F_WRITE_FILE);
         flags = (sp--)->u.number;
     }
     flags = write_file((sp - 1)->u.string, sp->u.string, flags);

@@ -25,7 +25,7 @@
 void
 f_crypt PROT((void))
 {
-    char *res, salt[2];
+    char *res, salt[3];
     char *choice =
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./";
 
@@ -38,6 +38,7 @@ f_crypt PROT((void))
         salt[1] = choice[random_number(strlen(choice))];
         pop_stack();
     }
+    salt[2] = 0;
 #if defined(sun) && !defined(SunOS_5)
     res = string_copy(_crypt(sp->u.string, salt), "f_crypt");
 #else

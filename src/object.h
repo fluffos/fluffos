@@ -116,14 +116,20 @@ typedef struct object_s {
 #ifdef PACKAGE_MUDLIB_STATS
     statgroup_t stats;		/* mudlib stats */
 #endif
+#ifdef PACKAGE_PARSER
+    struct parse_info_s *pinfo;
+#endif
     svalue_t variables[1];	/* All variables to this program */
     /* The variables MUST come last in the struct */
 } object_t;
 
 #ifdef DEBUG
-#define add_ref(ob, str) do { ob->ref++; \
-    if (d_flag > 1) \
-     printf("Add_ref %s (%d) from %s\n", ob->name, ob->ref, str); } while (0)
+#define add_ref(ob, str) SAFE(\
+			      ob->ref++; \
+			      if (d_flag > 1) \
+			      printf("Add_ref %s (%d) from %s\n", \
+				     ob->name, ob->ref, str);\
+			      )
 #else
 #define add_ref(ob, str) ob->ref++
 #endif

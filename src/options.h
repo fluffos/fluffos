@@ -286,8 +286,6 @@
  *                      optimize it further.  currently does jump threading.
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
  *                      compilation error occured.
- * PRAGMA_EFUN:         when using generate_source(), generate efun code
- *                      instead of object code
  */
 #define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_STRICT_TYPES
 
@@ -448,9 +446,6 @@
  * and the efuns in packages/xyzzy_spec.c will be added to the driver.      *
  ****************************************************************************/
 
-/* 0.9.18 compatibility efuns */
-#undef PACKAGE_COMPAT
-
 /* various miscellaneous efuns */
 #define PACKAGE_CONTRIB
 
@@ -478,6 +473,11 @@
  *   causes HAS_SOCKETS to be defined for all LPC objects.
  */
 #define PACKAGE_SOCKETS
+
+/* PACKAGE_PARSER: Natural language parsing efuns for interactive fiction
+ *   type applications
+ */
+#undef PACKAGE_PARSER
 
 /****************************************************************************
  *                            UID PACKAGE                                   *

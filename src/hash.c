@@ -2,6 +2,7 @@
 ** A simple and fast generic string hasher based on Peter K. Pearson's
 ** article in CACM 33-6, pp. 677.
 */
+#define EDIT_SOURCE
 #define NO_SOCKETS
 #define NO_OPCODES
 #include "std.h"

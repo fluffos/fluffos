@@ -81,17 +81,6 @@
 #  define INET_NTOA_OK
 #endif
 
-/*
- * Does the system have a getrusage() system call?
- * Sequent doesn't have it.  Solaris 2.1 (SunOS 5.1) has it in a compat
- * library but had trouble making it work correctly.
- */
-#if (!defined(_SEQUENT_) && !defined(SVR4) && !defined(LATTICE) \
-     && !defined(_AUX_SOURCE) && !defined(cray) && !defined(OLD_HPUX) \
-     && !defined(_M_UNIX)) && !defined(OS2)
-#  define RUSAGE
-#endif
-
 /* the !defined(_FUNC_SPEC) is needed to allow make_func to work okay. */
 #if defined(hpux) && !defined(OLD_HPUX) && !defined(_FUNC_SPEC_)
 #  include <sys/syscall.h>
@@ -106,29 +95,11 @@
 #endif
 
 /*
- * Does the system have the times() system call?  Is only used if RUSAGE not
- * defined.
- */
-#if defined(hpux) || defined(apollo) || defined(__386BSD__) || \
-        defined(SVR4) || defined(_SEQUENT_) || defined(_AUX_SOURCE) || \
-        defined(cray) || defined(SunOS_5) || defined(_M_UNIX)
-#  define TIMES
-#endif
-
-/*
  * Define SYSV if you are running System V with a lower release level than
  * System V Release 4.
  */
 #if (defined(_SEQUENT_))
 #  define SYSV
-#endif
-
-/*
- * Define this if your operating system supports the gettimeofday() system
- * call.
- */
-#if !defined(_SEQUENT_) && !defined(LATTICE)
-#  define HAS_GETTIMEOFDAY
 #endif
 
 /*
@@ -139,17 +110,6 @@
  */
 #if (defined(_SEQUENT_) || defined(_M_UNIX))
 #  define USE_POSIX_SIGNALS
-#endif
-
-/*
- * Define FCHMOD_MISSING only if your system doesn't have fchmod().
- */
-/* HP, Sequent, NeXT, Sparc all have fchmod() */
-#if defined(cray) || defined(LATTICE) || defined(_AIX) || defined(_M_UNIX) \
-    || defined(OS2)
-#  define FCHMOD_MISSING
-#else
-#  undef FCHMOD_MISSING
 #endif
 
 /*
@@ -168,18 +128,6 @@
 /* undefine this if your system doesn't have unsigned chars */
 /* NeXT, Sparc, HP, Sequent, and RS/6000 all have unsigned chars */
 #define HAS_UNSIGNED_CHAR
-
-/* SIGNAL_ERROR:
-   look in /usr/include/signal.h for the return type of signal() when an
-   error occurs
-*/
-#if defined(NeXT) || defined(accel) || defined(apollo) || \
-    (defined(__386BSD__) && !(defined(__FreeBSD__) || defined(__NetBSD__))) \
-    || defined(hp68k) || defined(sequent) || defined(_CX_UX)
-#  define SIGNAL_ERROR BADSIG
-#else
-#  define SIGNAL_ERROR SIG_ERR
-#endif
 
 #define SIGNAL_FUNC_TAKES_INT defined(_AIX) || defined(NeXT) \
     || defined(_SEQUENT_) || defined(SVR4) \
@@ -228,17 +176,6 @@ asking your system adminstrator.
 
 #if defined(_M_UNIX) && !defined(MAXPATHLEN)
 #define MAXPATHLEN 1024
-#endif
-
-/* UINT32 should be typedef'd to whatever type provides an unsigned 32-bit
-   integer type
-*/
-#ifndef _FUNC_SPEC_
-#if defined(__alpha)
-typedef unsigned int UINT32;
-#else
-typedef unsigned long UINT32;
-#endif
 #endif
 
 /*

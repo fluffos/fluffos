@@ -1,3 +1,6 @@
+#define CONFIGURE_VERSION	1
+
+#define EDIT_SOURCE
 #define NO_MALLOC
 #define NO_SOCKETS
 #define NO_OPCODES
@@ -62,16 +65,15 @@ static incstate *inctop = 0;
 
 static void add_define PROT((char *, int, char *));
 
-void mf_fatal P1(char *, str)
-{
-    fprintf(stderr, "%s", str);
-    exit(1);
-}
-
 void yyerror P1(char *, str)
 {
     fprintf(stderr, "%s:%d: %s\n", current_file, current_line, str);
     exit(1);
+}
+
+void mf_fatal P1(char *, str)
+{
+    yyerror(str);
 }
 
 void yywarn P1(char *, str)
@@ -834,7 +836,7 @@ void make_efun_tables()
     };
     FILE *files[NUM_FILES];
     int i;
-
+    
     fprintf(stderr, "Building efun tables ...\n");
     for (i = 0; i < NUM_FILES; i++) {
 	files[i] = fopen(outfiles[i], "w");
@@ -847,46 +849,44 @@ void make_efun_tables()
 	fprintf(files[i],
 		"\tdo not make any manual changes to this file.\n*/\n\n");
     }
-	
-    fprintf(files[0], "\ntypedef void (*func_t) PROT((void));\n\n");
+
+    fprintf(files[0],"\n#include \"efun_protos.h\"\n\n");
+    fprintf(files[0],"\ntypedef void (*func_t) PROT((void));\n\n");
     fprintf(files[0],"func_t efun_table[] = {\n");
 
     fprintf(files[1],"\ntypedef struct opc_s { char *name; int count; } opc_t;\n\n");
     fprintf(files[1],"opc_t opc_efun[] = {\n");
 
-    for (i = 0; i < (num_buff - 1); i++) {
-	if (has_token[i]) {
-	    fprintf(files[0],"\tf_%s,\n",key[i]);
-	    fprintf(files[1],"{\"%s\", 0},\n",key[i]);
-	    fprintf(files[3],"void f_%s PROT((void));\n", key[i]);
-	}
-    }
-    fprintf(files[0],"\tf_%s};\n",key[num_buff - 1]);
-    fprintf(files[1],"{\"%s\", 0}};\n",key[num_buff - 1]);
-    fprintf(files[3],"void f_%s PROT((void));\n", key[i]);
-
-    for (i = 0; i < num_buff; i++) {
-	if (has_token[i])
-	    fprintf(files[0],"void f_%s PROT((void));\n",key[i]);
-    }
-
     fprintf(files[2], "\n/* operators */\n\n");
     for (i = 0; i < op_code; i++) {
 	fprintf(files[2],"#define %-30s %d\n", oper_codes[i], i+1);
     }
-    fprintf(files[2],"\n/* efuns */\n#define BASE %d\n\n", op_code+1);
+    
+    fprintf(files[2],"\n/* 1 arg efuns */\n#define BASE %d\n\n", op_code+1);
+    for (i = 0; i < efun1_code; i++) {
+	fprintf(files[0],"\tf_%s,\n", efun1_names[i]);
+	fprintf(files[1],"{\"%s\", 0},\n", efun1_names[i]);
+	fprintf(files[2],"#define %-30s %d\n", efun1_codes[i], i+op_code+1);
+	fprintf(files[3],"void f_%s PROT((void));\n", efun1_names[i]);
+    }
+
+    fprintf(files[2],"\n/* efuns */\n#define ONEARG_MAX %d\n\n", efun1_code + op_code+1);
     for (i = 0; i < efun_code; i++) {
-	fprintf(files[2],"#define %-30s %d\n", efun_codes[i], i+op_code+1);
+	fprintf(files[0],"\tf_%s,\n", efun_names[i]);
+	fprintf(files[1],"{\"%s\", 0},\n", efun_names[i]);
+	fprintf(files[2],"#define %-30s %d\n", efun_codes[i], i+op_code+efun1_code+1);
+	fprintf(files[3],"void f_%s PROT((void));\n", efun_names[i]);
     }
-    if (efun_code + op_code < 256) {
-	fprintf(files[2],"#undef NEEDS_CALL_EXTRA\n");
-    } else {
-	fprintf(files[2],"#define NEEDS_CALL_EXTRA\n");
-	if (efun_code + op_code > 510) {
-	    fprintf(stderr, "You have way too many efuns.  Contact the MudOS developers if you really need this many.\n");
-	}
+    fprintf(files[0], "};\n");
+    fprintf(files[1], "};\n");
+
+    if (efun1_code + op_code >= 256) {
+	fprintf(stderr, "You have way too many efuns.  Contact the MudOS developers if you really need this many.\n");
     }
-    fprintf(files[2],"\n/* efuns */\n#define NUM_OPCODES %d\n\n", efun_code + op_code);
+    if (efun_code >= 256) {
+	fprintf(stderr, "You have way too many efuns.  Contact the MudOS developers if you really need this many.\n");
+    }
+    fprintf(files[2],"\n/* efuns */\n#define NUM_OPCODES %d\n\n", efun_code + efun1_code + op_code);
     
     /* Now sort the main_list */
     for (i = 0; i < num_buff; i++) {
@@ -894,11 +894,8 @@ void make_efun_tables()
        for (j = 0; j < i; j++)
 	   if (strcmp(key[i], key[j]) < 0) {
 	      char *tmp;
-	      int tmpi;
 	      tmp = key[i]; key[i] = key[j]; key[j] = tmp;
 	      tmp = buf[i]; buf[i] = buf[j]; buf[j] = tmp;
-	      tmpi = has_token[i];
-	      has_token[i] = has_token[j]; has_token[j] = tmpi;
 	   }
     }
 
@@ -934,6 +931,9 @@ static void handle_local_defines() {
 	p->flags |= DEF_IS_UNDEFINED;
 	p->flags &= ~DEF_IS_NOT_LOCAL;
     }
+    if ((p = lookup_define("DEBUG")))
+	p->flags &= ~DEF_IS_NOT_LOCAL;
+	
     ppchar = '#';
     preprocess();
     
@@ -1017,6 +1017,11 @@ static void handle_process P1(char *, file) {
     
     fprintf(stderr, "Creating '%s' from '%s' ...\n", buf, file);
 
+#ifdef DEBUG
+    /* pass down the DEBUG define from CFLAGS */
+    add_define("DEBUG", -1, " ");
+#endif
+
     open_input_file(file);
     open_output_file(buf);
     ppchar = '%';
@@ -1025,7 +1030,7 @@ static void handle_process P1(char *, file) {
 }
 
 static void handle_build_efuns() {
-    num_buff = op_code = efun_code = 0;
+    num_buff = op_code = efun_code = efun1_code = 0;
 
     open_input_file(FUNC_SPEC_CPP);
     yyparse();
@@ -1172,7 +1177,7 @@ static int check_prog P4(char *, tag, char *, pre, char *, code, int, andrun) {
     FILE *ct;
 
     ct = fopen("comptest.c", "w");
-    fprintf(ct, "%s\n\nint main() {%s}\n", pre, code);
+    fprintf(ct, "%s\n\nint main() {%s}\n", (pre ? pre : ""), code);
     fclose(ct);
     
     sprintf(buf, "%s %s comptest.c -o comptest >/dev/null 2>&1", COMPILER, CFLAGS);
@@ -1212,8 +1217,32 @@ static void find_memmove() {
     fprintf(yyout, "#define MEMMOVE_MISSING\n");
 }
 
+static void verbose_check_prog P5(char *, msg, char *, def, char *, pre,
+				  char *, prog, int, andrun) {
+    printf("%s ...", msg);
+    if (check_prog(def, pre, prog, andrun))
+	printf(" exists\n");
+    else printf(" does not exist\n");
+}
+
+static int check_configure_version() {
+    char buf[1024];
+    FILE *ct;
+    
+    ct = fopen("comptest.c", "w");
+    fprintf(ct, "#include \"configure.h\"\n\n#if CONFIGURE_VERSION < %i\nthrash and die\n#endif\n\nint main() { }\n", CONFIGURE_VERSION);
+    fclose(ct);
+    
+    sprintf(buf, "%s %s comptest.c -o comptest >/dev/null 2>&1", COMPILER, CFLAGS);
+    return !system(buf);
+}
+
 static void handle_configure() {
+    if (check_configure_version()) return;
+
     open_output_file("configure.h");
+    fprintf(yyout, "#define CONFIGURE_VERSION	%i\n", CONFIGURE_VERSION);
+
     check_include("INCL_STDLIB_H", "stdlib.h");
     check_include("INCL_UNISTD_H", "unistd.h");
     check_include("INCL_TIME_H", "time.h");
@@ -1222,7 +1251,10 @@ static void handle_configure() {
     check_include("INCL_SYS_TIME_H", "sys/time.h");
     check_include("INCL_DOS_H", "dos.h");
     check_include("INCL_USCLKC_H", "usclkc.h");
-
+    check_include("INCL_LIMITS_H", "limits.h");
+    if (!check_prog(0, 0, "int x = MAXSHORT;", 0))
+	check_include("INCL_VALUES_H", "values.h");
+    
     check_include("INCL_NETINET_IN_H", "netinet/in.h");
     check_include("INCL_ARPA_INET_H", "arpa/inet.h");
 
@@ -1238,10 +1270,10 @@ static void handle_configure() {
 
     check_include("INCL_SYS_STAT_H", "sys/stat.h");
 
-    /* sys/dir.h is BSD, dirent is sys V.  Try to do */
-    /* Try to do it the BSD way first.  If that fails, fall back to sys V */
-    if (check_include("INCL_SYS_DIR_H", "sys/dir.h")) {
-	/* do nothing; BSD will be used */
+    /* sys/dir.h is BSD, dirent is sys V.  Try to do it the BSD way first. */
+    /* If that fails, fall back to sys V */
+    if (check_prog("BSD_READDIR", "#include <sys/dir.h>", "struct direct *d; d->d_namlen;", 0)) {
+	check_include("INCL_SYS_DIR_H", "sys/dir.h");
     } else {
 	/* could be either of these */
 	check_include("INCL_DIRENT_H", "dirent.h");
@@ -1256,6 +1288,10 @@ static void handle_configure() {
     check_include("INCL_SYS_RUSAGE_H", "sys/rusage.h");
     check_include("INCL_SYS_CRYPT_H", "sys/crypt.h");
     check_include("INCL_CRYPT_H", "crypt.h");
+
+    /* for NeXT */
+    if (!check_include("INCL_MACH_MACH_H", "mach/mach.h"))
+	check_include("INCL_MACH_H", "mach.h");
 
     /* figure out what we need to do to get major()/minor() */
     check_include("INCL_SYS_SYSMACROS_H", "sys/sysmacros.h");
@@ -1275,35 +1311,52 @@ static void handle_configure() {
     } else
     if (check_prog("RANDOM", "#include <math.h>", "srandom(0);", 0)) {
 	printf("using random()\n");
-    } else
+    } else {
 	printf("WARNING: did not find a random number generator\n");
+	exit(-1);
+    }
 
-    printf("Checking for ualarm() ...");
-    if (check_prog("HAS_UALARM", "", "ualarm(0, 0);", 0))
-	printf(" exists\n");
-    else printf(" does not exist\n");
+    printf("Checking if signal() returns SIG_ERR on error ...");
+    if (check_prog("SIGNAL_ERROR SIG_ERR", "#include \"configure.h\"\n#include \"std_incl.h\"\n", "if (signal(0, 0) == SIG_ERR) ;", 0)) {
+	printf(" yes\n");
+    } else {
+	fprintf(yyout, "#define SIGNAL_ERROR BADSIG");
+	printf(" no\n");
+    }
 
-    printf("Checking for strerror() ...");
-    if (check_prog("HAS_STRERROR", "", "strerror(12);", 0))
-	printf(" exists\n");
-    else printf(" does not exist\n");
-
-    printf("Checking for POSIX getcwd() ...");
-    if (check_prog("HAS_GETCWD", "", "getcwd(\"\", 1000);", 0))
-	printf(" exists\n");
-    else printf(" does not exist ... using BSD getwd()\n");
-
+    verbose_check_prog("Checking for ualarm()", "HAS_UALARM",
+		       "", "ualarm(0, 0);", 0);
+    verbose_check_prog("Checking for strerror()", "HAS_STRERROR",
+		       "", "strerror(12);", 0);
+    verbose_check_prog("Checking for POSIX getcwd()", "HAS_GETCWD",
+		       "", "getcwd(\"\", 1000);", 0);
+    verbose_check_prog("Checking for getrusage()", "RUSAGE",
+		       "", "getrusage(0, 0);", 0);
+    verbose_check_prog("Checking for times()", "TIMES",
+		       "", "times(0);", 0);
+    verbose_check_prog("Checking for gettimeofday()", "HAS_GETTIMEOFDAY",
+		       "", "gettimeofday(0);", 0);
+    verbose_check_prog("Checking for fchmod()", "HAS_FCHMOD",
+		       "", "fchmod(0, 0);", 0);
+    
     find_memmove();
 
     fprintf(yyout, "#define SIZEOF_INT %i\n", sizeof(int));
     fprintf(yyout, "#define SIZEOF_PTR %i\n", sizeof(char *));
     fprintf(yyout, "#define SIZEOF_SHORT %i\n", sizeof(short));
     fprintf(yyout, "#define SIZEOF_FLOAT %i\n", sizeof(float));
-
+    if (sizeof(unsigned long) == 4)
+	fprintf(yyout, "#define UINT32 unsigned long\n");
+    else if (sizeof(unsigned int) == 4)
+	fprintf(yyout, "#define UINT32 unsigned int\n");
+    else {
+	printf("WARNING: could not find a 32 bit integral type.\n");
+	exit(-1);
+    }
+    
     close_output_file();
 
     open_output_file("system_libs");
-    fprintf(yyout, "LIBS=");
     check_library("-lresolv");
     check_library("-lbsd");
     check_library("-lBSD");

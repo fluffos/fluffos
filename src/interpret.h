@@ -101,8 +101,9 @@ typedef struct error_context_s {
 /* Beek - add some sanity to joining strings */
 /* add to an svalue */
 #define EXTEND_SVALUE_STRING(x, y, z) \
-    do { char *ess_res; \
-      int ess_len, ess_r; \
+    SAFE( char *ess_res; \
+      int ess_len; \
+      int ess_r; \
       ess_len = (ess_r = SVALUE_STRLEN(x)) + strlen(y); \
       if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) { \
           ess_res = (char *) extend_string((x)->u.string, ess_len); \
@@ -115,11 +116,11 @@ typedef struct error_context_s {
 	  free_string_svalue(x); \
 	  (x)->subtype = STRING_MALLOC; \
       } \
-      (x)->u.string = ess_res;  } while (0)
+      (x)->u.string = ess_res;  )
 
 /* <something that needs no free> + string svalue */
 #define SVALUE_STRING_ADD_LEFT(y, z) \
-    do { char *pss_res; int pss_r, pss_len; \
+    SAFE( char *pss_res; int pss_r; int pss_len; \
         pss_len = SVALUE_STRLEN(sp) + (pss_r = strlen(y)); \
         pss_res = new_string(pss_len, z); \
         strcpy(pss_res, y); \
@@ -128,11 +129,11 @@ typedef struct error_context_s {
 	sp->type = T_STRING; \
         sp->u.string = pss_res; \
         sp->subtype = STRING_MALLOC; \
-     } while (0)
+     )
 
 /* basically, string + string; faster than using extend b/c of SVALUE_STRLEN */
 #define SVALUE_STRING_JOIN(x, y, z) \
-    do { char *ssj_res; int ssj_r, ssj_len; \
+    SAFE( char *ssj_res; int ssj_r; int ssj_len; \
         ssj_r = SVALUE_STRLEN(x); \
         ssj_len = ssj_r + SVALUE_STRLEN(y); \
         if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) { \
@@ -149,7 +150,7 @@ typedef struct error_context_s {
             (x)->subtype = STRING_MALLOC; \
         } \
         (x)->u.string = ssj_res; \
-    } while (0)
+    )
 
 /* macro calls */
 #ifndef LPC_TO_C
@@ -164,23 +165,53 @@ typedef struct error_context_s {
 #endif
 
 #define push_svalue(x) assign_svalue_no_free(++sp, x)
-#define put_number(x) do { sp->type = T_NUMBER;sp->subtype = 0;sp->u.number = (x); } while (0)
-#define put_buffer(x) do { sp->type = T_BUFFER; sp->u.buf = (x); } while (0)
-#define put_undested_object(x) do { sp->type = T_OBJECT; sp->u.ob = (x); } while (0)
-#define put_object(x) do { if ((x)->flags & O_DESTRUCTED) put_number(0); \
-!                            else put_undested_object(x); } while (0)
-#define put_unrefed_undested_object(x, y) do { sp->type = T_OBJECT; sp->u.ob = (x); \
-   add_ref((x), y); } while (0)
-#define put_unrefed_object(x,y) do { if ((x)->flags & O_DESTRUCTED) put_number(0); \
-                           else put_unrefed_undested_object(x,y); } while (0)
+#define put_number(x) SAFE( \
+			   sp->type = T_NUMBER;\
+			   sp->subtype = 0;\
+			   sp->u.number = (x);\
+			   )
+#define put_buffer(x) SAFE( \
+			   sp->type = T_BUFFER;\
+			   sp->u.buf = (x);\
+			   )
+#define put_undested_object(x) SAFE(\
+				    sp->type = T_OBJECT;\
+				    sp->u.ob = (x);\
+				    )
+#define put_object(x) SAFE(\
+			   if ((x)->flags & O_DESTRUCTED) put_number(0); \
+			   else put_undested_object(x);\
+			   )
+#define put_unrefed_undested_object(x, y) SAFE(\
+					       sp->type = T_OBJECT;\
+					       sp->u.ob = (x);\
+					       add_ref((x), y);\
+					       )
+#define put_unrefed_object(x,y) SAFE(\
+				     if ((x)->flags & O_DESTRUCTED)\
+				     put_number(0);\
+				     else put_unrefed_undested_object(x,y);\
+				     )
 /* see comments on push_constant_string */
-#define put_constant_string(x) do { sp->type = T_STRING;sp->subtype = STRING_SHARED; \
-                sp->u.string = make_shared_string(x); } while (0)
-#define put_malloced_string(x) do { sp->type = T_STRING; sp->subtype = STRING_MALLOC; \
-                sp->u.string = (x); } while (0)
-#define put_array(x) do { sp->type = T_ARRAY; sp->u.arr = (x); } while (0)
-#define put_shared_string(x) do { sp->type = T_STRING; sp->subtype = STRING_SHARED; \
-                sp->u.string = (x); } while (0)
+#define put_constant_string(x) SAFE(\
+				    sp->type = T_STRING;\
+				    sp->subtype = STRING_SHARED;\
+				    sp->u.string = make_shared_string(x);\
+				    )
+#define put_malloced_string(x) SAFE(\
+				    sp->type = T_STRING;\
+				    sp->subtype = STRING_MALLOC;\
+				    sp->u.string = (x);\
+				    )
+#define put_array(x) SAFE(\
+			  sp->type = T_ARRAY;\
+			  sp->u.arr = (x);\
+			  )
+#define put_shared_string(x) SAFE(\
+				  sp->type = T_STRING;\
+				  sp->subtype = STRING_SHARED;\
+				  sp->u.string = (x);\
+				  )
 
 extern program_t *current_prog;
 extern short caller_type;
@@ -203,10 +234,11 @@ extern int master_ob_is_loading;
 extern int simul_efun_is_loading;
 extern program_t fake_prog;
 extern svalue_t global_lvalue_byte;
+extern int num_varargs;
 
 /* with LPC_TO_C off, these are defines using eval_instruction */
 #ifdef LPC_TO_C
-void call_program PROT((program_t *, int));
+void call_program PROT((program_t *, POINTER_INT));
 #endif
 void eval_instruction PROT((char *p));
 INLINE void assign_svalue PROT((svalue_t *, svalue_t *));
@@ -298,6 +330,8 @@ void save_context PROT((error_context_t *));
 void pop_control_stack PROT((void));
 INLINE function_t *setup_new_frame PROT((function_t *));
 INLINE void push_control_stack PROT((int, void *));
+
+void break_point PROT((void));
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_svalue PROT((svalue_t *));

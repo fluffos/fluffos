@@ -48,9 +48,10 @@ typedef struct {
 #define A_INCLUDES		14	/* list of included files */
 #define A_PATCH			15	/* for save_binary() */
 #define A_INITIALIZER           16
-#define NUMAREAS		17
+#define A_FUNCTIONALS           17
+#define NUMAREAS		18
 
-#define CURRENT_PROGRAM_SIZE prog_code - mem_block[current_block].block
+#define CURRENT_PROGRAM_SIZE (prog_code - mem_block[current_block].block)
 #define UPDATE_PROGRAM_SIZE mem_block[current_block].current_size = CURRENT_PROGRAM_SIZE
 
 /*
@@ -115,11 +116,14 @@ extern function_context_t function_context;
 #define SOME_NUMERIC_CASE_LABELS 0x40000
 #define NO_STRING_CASE_LABELS    0x80000
 
+#define ARG_IS_PROTO             1
+#define ARG_IS_VARARGS           2
+
+
 int validate_function_call PROT((function_t *, int, parse_node_t *));
 parse_node_t *validate_efun_call PROT((int, parse_node_t *));
 extern mem_block_t mem_block[];
 extern int exact_types;
-extern int approved_object;
 extern int current_type;
 extern int current_block;
 extern char *prog_code;
@@ -154,8 +158,7 @@ void save_file_info PROT((int, int));
 int add_program_file PROT((char *, int));
 void yyerror PROT((char *));
 void yywarn PROT((char *));
-void start_initializer PROT((void));
-void end_initializer PROT((void));
+void switch_to_block PROT((int));
 char *the_file_name PROT((char *));
 void free_all_local_names PROT((void));
 void pop_n_locals PROT((int));
@@ -192,6 +195,7 @@ parse_node_t *promote_to_float PROT((parse_node_t *));
 parse_node_t *promote_to_int PROT((parse_node_t *));
 parse_node_t *do_promotions PROT((parse_node_t *, int));
 
+#ifndef SUPPRESS_COMPILER_INLINES
 /* inlines - if we're lucky, they'll get honored. */
 INLINE static void realloc_mem_block PROT((mem_block_t *, int));
 INLINE static void add_to_mem_block PROT((int, char *, int));
@@ -247,5 +251,6 @@ void insert_in_mem_block P3(int, n, int, where, int, size)
 	*(p + size) = *p;
     mbp->current_size += size;
 }
+#endif
 #endif
 

@@ -3,7 +3,7 @@
 
 #include "std.h"
 #include "include/function.h"
-#include "include/origin.h"
+#include "origin.h"
 #include "config.h"
 #include "applies.h"
 

@@ -15,10 +15,10 @@
 
 static int current_num_values;
 static int switch_type, string_switches, range_switches;
-static int catch_number;
+static int catch_number, num_functionals;
 static int case_number, case_table_size;
 
-static int current_frame_size;
+static int foreach_depth = 0;
 
 static int *forward_branch_ptr;
 static int forward_branch_stack[100];
@@ -26,20 +26,15 @@ static int forward_branch_stack[100];
 static int label;
 static int notreached;
 
-static parse_node_t break_dummy = { NODE_BREAK, 0, 1 };
-static parse_node_t cont_dummy = { NODE_CONTINUE, 0, 1 };
+static parse_node_t *branch_list[2];
 
-static parse_node_t *break_ptr;
-static parse_node_t *cont_ptr;
-
-static void c_restore_loop_info PROT((void));
-static void c_save_loop_info PROT((void));
 static void c_generate_forward_branch PROT((char));
 static void c_update_forward_branch_links PROT((char, parse_node_t *));
 static void c_branch_backwards PROT((char, int));
 static void c_update_forward_branch PROT((void));
-static void c_update_breaks PROT((void));
-static void c_update_continues PROT((void));
+static void c_update_branch_list PROT((parse_node_t *));
+static void c_generate_loop PROT((int, parse_node_t *, parse_node_t *,
+				  parse_node_t *));
 static void c_generate_else PROT((void));
 
 typedef struct switch_table_s {
@@ -80,7 +75,7 @@ static void upd_jump P2(int, addr, int, label) {
 }
 
 static int add_label PROT((void)) {
-    if (prog_code + 11 > prog_code_max) {
+    if (prog_code + 12 > prog_code_max) {
         mem_block_t *mbp = &mem_block[current_block];
 
         UPDATE_PROGRAM_SIZE;
@@ -93,7 +88,7 @@ static int add_label PROT((void)) {
     notreached = 0;
 
     sprintf(prog_code, "label%03i:;\n", label);
-    prog_code += 10;
+    prog_code += 11;
     return label++;
 }
 
@@ -170,59 +165,6 @@ generate_lvalue_list P1(parse_node_t *, expr) {
 }
 
 static void
-ins_quoted_string P1(char *, s) {
-    if (notreached) return;
-    while (1) {
-	while (prog_code + 1 < prog_code_max) {
-	    switch (*s) {
-	    case 0: return;
-	    case '\n':
-		*prog_code++ = '\\';
-		*prog_code++ = 'n';
-		s++;
-		break;
-	    case '\t':
-		*prog_code++ = '\\';
-		*prog_code++ = 't';
-		s++;
-		break;
-	    case '\r':
-		*prog_code++ = '\\';
-		*prog_code++ = 'r';
-		s++;
-		break;
-	    case '\b':
-		*prog_code++ = '\\';
-		*prog_code++ = 'b';
-		s++;
-		break;
-	    case '"':
-		*prog_code++ = '\\';
-		*prog_code++ = '"';
-		s++;
-		break;
-	    case '\\':
-		*prog_code++ = '\\';
-		*prog_code++ = '\\';
-		s++;
-		break;
-	    default:
-		*prog_code++ = *s++;
-	    }
-	}
-	{
-	    mem_block_t *mbp = &mem_block[current_block];
-	    
-	    UPDATE_PROGRAM_SIZE;
-	    realloc_mem_block(mbp, mbp->current_size * 2);
-	    
-	    prog_code = mbp->block + mbp->current_size;
-	    prog_code_max = mbp->block + mbp->max_size;
-	}
-    }
-}
-
-static void
 f_quoted_string P2(FILE *, f, char *, s) {
     while (1) {
 	switch (*s) {
@@ -262,156 +204,63 @@ c_generate_node P1(parse_node_t *, expr) {
     if (!expr) return;
 
     switch (expr->kind) {
-    case F_OR:
-    case F_XOR:
-    case F_AND:
-    case F_EQ:
-    case F_NE:
-    case F_GT:
-    case F_GE:
-    case F_LT:
-    case F_LE:
-    case F_LSH:
-    case F_RSH:
-    case F_ADD:
-    case F_SUBTRACT:
-    case F_MULTIPLY:
-    case F_DIVIDE:
-    case F_MOD:
+    case NODE_TERNARY_OP:
+	c_generate_node(expr->l.expr);
+	expr = expr->r.expr;
+    case NODE_BINARY_OP:
 	c_generate_node(expr->l.expr);
 	/* fall through */
-    case F_PRE_INC:
-    case F_PRE_DEC:
-    case F_INC:
-    case F_DEC:
-    case F_POST_INC:
-    case F_POST_DEC:
-    case F_NOT:
-    case F_COMPL:
-    case F_NEGATE:
+    case NODE_UNARY_OP:
 	c_generate_node(expr->r.expr);
 	/* fall through */
-#ifdef DEBUG
-    case F_BREAK_POINT:
-#endif
-    case F_CONST0:
-    case F_CONST1:
-	ins_string(instrs[expr->kind].routine);
+    case NODE_OPCODE:
+	ins_string(instrs[expr->v.number].routine);
 	break;
-    case F_POP_VALUE:
-	if (expr->r.expr)
-	    c_generate_node(expr->r.expr);
-	ins_string(instrs[expr->kind].routine);
-	break;
-    case F_RETURN_ZERO:
-	if (pragmas & PRAGMA_EFUN) {
-	    if (current_frame_size)
-		ins_vstring("pop_n_elems(%i);\n\n", current_frame_size);
-	    ins_string("push_number(0);\n");
-	} else
-	    ins_string("c_return_zero();\n");
-	ins_string("return;\n");
-	notreached = 1;
-	break;
-    case F_RETURN:
+    case NODE_TERNARY_OP_1:
+	c_generate_node(expr->l.expr);
+	expr = expr->r.expr;
+	/* fall through */
+    case NODE_BINARY_OP_1:
+	c_generate_node(expr->l.expr);
 	c_generate_node(expr->r.expr);
-	if (pragmas & PRAGMA_EFUN) {
-	    if (current_frame_size)
-		ins_vstring("c_efun_return(%i);\n", current_frame_size);
-	} else
-	    ins_string("c_return();\n");
-	ins_string("return;\n");
-	notreached = 1;
+	ins_vstring(instrs[expr->v.number].routine, expr->type);
 	break;
-    case F_VOID_ASSIGN:
-	if (expr->l.expr->kind == F_LOCAL_LVALUE) {
-	    c_generate_node(expr->r.expr);
-	    ins_vstring("c_void_assign_local(fp + %i);\n", 
-			expr->l.expr->v.number);
+    case NODE_UNARY_OP_1:
+	c_generate_node(expr->r.expr);
+	/* fall through */
+    case NODE_OPCODE_1:
+	ins_vstring(instrs[expr->v.number].routine, expr->l.number);
+	break;
+    case NODE_OPCODE_2:
+	ins_vstring(instrs[expr->v.number].routine, expr->l.number, expr->r.number);
+	break;
+    case NODE_RETURN:
+	{
+	    int n = foreach_depth;
+	    while (n--)
+		ins_string("c_exit_foreach();\n");
+	    if (expr->r.expr) {
+		c_generate_node(expr->r.expr);
+		ins_string(instrs[F_RETURN].routine);
+	    } else ins_string(instrs[F_RETURN_ZERO].routine);
+	    notreached = 1;
 	    break;
 	}
-    case F_ASSIGN: /* note these are backwards */
-    case F_ADD_EQ:
-    case F_AND_EQ:
-    case F_OR_EQ:
-    case F_XOR_EQ:
-    case F_LSH_EQ:
-    case F_RSH_EQ:
-    case F_SUB_EQ:
-    case F_MULT_EQ:
-    case F_MOD_EQ:
-    case F_DIV_EQ:
-    case F_INDEX_LVALUE:
-    case F_INDEX:
-    case F_RINDEX:
-    case F_RINDEX_LVALUE:
-    case F_VOID_ADD_EQ:
-	c_generate_node(expr->r.expr);
-	c_generate_node(expr->l.expr);
-	ins_string(instrs[expr->kind].routine);
+    case NODE_STRING:
+	ins_vstring("C_STRING(%i);\n", expr->v.number);
 	break;
-    case F_NN_RANGE:
-    case F_RN_RANGE:
-    case F_RR_RANGE:
-    case F_NR_RANGE:
-    case F_NN_RANGE_LVALUE:
-    case F_RN_RANGE_LVALUE:
-    case F_NR_RANGE_LVALUE:
-    case F_RR_RANGE_LVALUE:
-	c_generate_node(expr->l.expr);
-	c_generate_node(expr->r.expr);
-	c_generate_node(expr->v.expr);
-	ins_string(instrs[expr->kind].routine);
-	break;
-    case NODE_NE_RANGE_LVALUE:
-        c_generate_node(expr->l.expr);
-	ins_string("push_number(1);\n");
-        c_generate_node(expr->v.expr);
-	ins_string("f_nr_range_lvalue();\n");
-        break;
-    case NODE_RE_RANGE_LVALUE:
-        c_generate_node(expr->l.expr);
-	ins_string("push_number(1);\n");
-        c_generate_node(expr->v.expr);
-	ins_string("f_rr_range_lvalue();\n");
-        break;
-    case F_RE_RANGE:
-    case F_NE_RANGE:
-        c_generate_node(expr->l.expr);
-        c_generate_node(expr->v.expr);
-	ins_string(instrs[expr->kind].routine);
-        break;
-    case F_STRING:
-	if (pragmas & PRAGMA_EFUN) {
-	    ins_string("push_string(\"");
-	    ins_quoted_string(PROG_STRING(expr->v.number));
-	    ins_string("\", STRING_CONSTANT);\n");
-	} else 
-	    ins_vstring("C_STRING(%i);\n", expr->v.number);
-	break;
-    case F_REAL:
+    case NODE_REAL:
 	ins_vstring("push_real(%f);\n", expr->v.real);
 	break;
-    case F_MEMBER:
-    case F_MEMBER_LVALUE:
-	c_generate_node(expr->r.expr);
-	ins_vstring("c_member(%i);\n", expr->v.number);
-	break;
-    case F_NEW_CLASS:
-	ins_vstring("c_new_class(%i);\n", expr->v.number);
-	break;
-    case F_NBYTE:
-    case F_BYTE:
-    case F_NUMBER:
+    case NODE_NUMBER:
 	ins_vstring("push_number(%i);\n", expr->v.number);
 	break;
-    case F_LOR:
-    case F_LAND:
+    case NODE_LAND_LOR:
 	c_generate_node(expr->l.expr);
-	c_generate_forward_branch(expr->kind);
+	c_generate_forward_branch(expr->v.number);
 	c_generate_node(expr->r.expr);
 	if (expr->l.expr->kind == NODE_BRANCH_LINK) {
-	    c_update_forward_branch_links(expr->kind,expr->l.expr);
+	    c_update_forward_branch_links(expr->v.number,expr->l.expr);
 	}
 	else c_update_forward_branch();
 	break;
@@ -424,38 +273,38 @@ c_generate_node P1(parse_node_t *, expr) {
 	ins_string(");\n");
 	c_generate_node(expr->r.expr);
         break;
-    case F_AGGREGATE:
+    case NODE_CALL_2:
 	generate_expr_list(expr->r.expr);
-	ins_vstring("C_AGGREGATE(%i);\n", expr->v.number);
+	ins_vstring(instrs[expr->v.number].routine, expr->l.number >> 16,
+		    expr->l.number & 0xffff, 
+		    (expr->r.expr ? expr->r.expr->kind : 0));
 	break;
-    case F_AGGREGATE_ASSOC:
+    case NODE_CALL_1:
 	generate_expr_list(expr->r.expr);
-	ins_vstring("C_AGGREGATE_ASSOC(%i);\n", expr->v.number);
+	ins_vstring(instrs[expr->v.number].routine, expr->l.number, 
+		    (expr->r.expr ? expr->r.expr->kind : 0));
 	break;
-    case NODE_COMMA:
-    case NODE_ASSOC:
+    case NODE_CALL:
+	generate_expr_list(expr->r.expr);
+	ins_vstring(instrs[expr->v.number].routine, expr->l.number);
+	break;
+    case NODE_TWO_VALUES:
 	c_generate_node(expr->l.expr);
 	c_generate_node(expr->r.expr);
 	break;
-    case NODE_BREAK_SWITCH:
-	ins_vstring("break;\n");
-	break;
-    case NODE_BREAK:
-	expr->r.expr = break_ptr;
-	expr->type = 0;
-	expr->v.number = ins_jump();
-	break_ptr = expr;
-	break;
-    case NODE_CONTINUE:
-	expr->r.expr = cont_ptr;
-	expr->v.number = ins_jump();
-	expr->type = 0;
-	cont_ptr = expr;
-	break;
-    case NODE_STATEMENTS:
-	c_generate_node(expr->l.expr);
-	c_generate_node(expr->r.expr);
-	break;
+    case NODE_CONTROL_JUMP:
+	{
+	    int kind = expr->v.number;
+	    
+	    if (kind == CJ_BREAK_SWITCH) {
+		ins_string("break;\n");
+		break;
+	    }
+	    expr->v.expr = branch_list[kind];
+	    expr->l.number = ins_jump();
+	    branch_list[kind] = expr;
+	    break;
+	}
     case NODE_PARAMETER:
 	ins_vstring("C_LOCAL(%i);\n", expr->v.number + current_num_values);
 	break;
@@ -463,16 +312,8 @@ c_generate_node P1(parse_node_t *, expr) {
 	ins_vstring("C_LVALUE(fp + %i);\n",
 		    expr->v.number + current_num_values);
 	break;
-    case F_LOCAL:
-    case NODE_VALUE:
-	ins_vstring("C_LOCAL(%i);\n", expr->v.number);
-	break;
-    case F_LOCAL_LVALUE:
-    case NODE_LVALUE:
-	ins_vstring("C_LVALUE(fp + %i);\n", expr->v.number);
-	break;
     case NODE_IF:
-	if (expr->v.expr->kind == F_NOT) {
+	if (IS_NODE(expr->v.expr, NODE_UNARY_OP, F_NOT)) {
 	    c_generate_node(expr->v.expr->r.expr);
 	    c_generate_forward_branch(F_BRANCH_WHEN_NON_ZERO);
 	} else {
@@ -486,91 +327,23 @@ c_generate_node P1(parse_node_t *, expr) {
 	}
 	c_update_forward_branch();
 	break;
-    case NODE_FOR:
-	{
-	    int forever = node_always_true(expr->l.expr->v.expr);
-	    int pos;
-
-	    c_save_loop_info();
-	    c_generate_node(expr->l.expr->l.expr);
-	    if (!forever) 
-		c_generate_forward_branch(F_BRANCH);
-	    pos = add_label();
-	    c_generate_node(expr->r.expr);
-	    c_update_continues();
-	    c_generate_node(expr->l.expr->r.expr);
-	    if (!forever)
-		c_update_forward_branch();
-	    if (expr->l.expr->v.expr->kind == F_LOOP_COND){
-	        c_generate_node(expr->l.expr->v.expr);
-		ins_vstring("goto label%03i;\n", pos);
-		notreached = 1;
-	    } else
-	        c_branch_backwards(generate_conditional_branch(expr->l.expr->v.expr), pos);
-	    c_update_breaks();
-	    c_restore_loop_info();
-	}
+    case NODE_LOOP:
+	c_generate_loop(expr->type, expr->v.expr, expr->l.expr, expr->r.expr);
 	break;
     case NODE_FOREACH:
 	{
-	    int pos, tmp = 0;
-	    parse_node_t *sub = expr->l.expr;
+	    int tmp = 0;
 
-	    c_save_loop_info();
-	    c_generate_node(sub->r.expr);
-
-	    if (sub->l.expr->kind == F_GLOBAL_LVALUE) tmp |= 1;
-	    if (sub->v.expr) {
+	    c_generate_node(expr->v.expr);
+	    if (expr->l.expr->v.number == F_GLOBAL_LVALUE) tmp |= 1;
+	    if (expr->r.expr) {
 		tmp |= 4;
-		if (sub->v.expr->kind == F_GLOBAL_LVALUE) tmp |= 2;
-		ins_vstring("c_foreach(%i, %i, %i);\n", tmp, sub->l.expr->v.number, sub->v.expr->v.number);
+		if (expr->r.expr->v.number == F_GLOBAL_LVALUE) tmp |= 2;
+		ins_vstring("c_foreach(%i, %i, %i);\n", tmp, expr->l.expr->l.number, expr->r.expr->l.number);
 	    } else
-		ins_vstring("c_foreach(%i, %i, 0);\n", tmp, sub->l.expr->v.number);
-	    c_generate_forward_branch(F_BRANCH);
-
-	    pos = add_label();
-	    c_generate_node(expr->r.expr);
-	    c_update_continues();
-	    c_update_forward_branch();
-	    ins_vstring("if (c_next_foreach())\ngoto label%03i;\n", pos);
-	    c_update_breaks();
-	    c_restore_loop_info();
+		ins_vstring("c_foreach(%i, 0, %i);\n", tmp, expr->l.expr->l.number);
 	}
 	break;
-    case NODE_WHILE:
-	{
-	    int forever = node_always_true(expr->l.expr);
-	    int pos;
-	    c_save_loop_info();
-	    if (!forever)
-		c_generate_forward_branch(F_BRANCH);
-	    pos = add_label();
-	    c_generate_node(expr->r.expr);
-	    if (!forever)
-		c_update_forward_branch();
-	    c_update_continues();
-	    if (expr->l.expr->kind == F_LOOP_COND){
-	        c_generate_node(expr->l.expr);
-		ins_vstring("goto label%03i;\n", pos);
-		notreached = 1;
-	    } else 
-	        c_branch_backwards(generate_conditional_branch(expr->l.expr), pos);
-	    c_update_breaks();
-	    c_restore_loop_info();
-	}
-	break;
-    case NODE_DO_WHILE:
-        {
-	    int pos;
-            c_save_loop_info();
-	    pos = add_label();
-            c_generate_node(expr->l.expr);
-            c_update_continues();
-            c_branch_backwards(generate_conditional_branch(expr->r.expr), pos);
-            c_update_breaks();
-            c_restore_loop_info();
-	}
-        break;
     case NODE_CASE_NUMBER:
 	case_table_size++;
 	notreached = 0;
@@ -619,8 +392,6 @@ c_generate_node P1(parse_node_t *, expr) {
 	    
 	    switch (switch_type) {
 	    case NODE_SWITCH_STRINGS:
-		if (pragmas & PRAGMA_EFUN)
-		    ins_string("CHECK_SWITCHES;\n");
 		ins_vstring("lpc_int = c_string_switch_lookup(sp, string_switch_table_%s_%02i, ", compilation_ident, string_switches++);
 		position = prog_code - mem_block[current_block].block;
 		ins_string("xxx);\nfree_string_svalue(sp--);\n");
@@ -655,8 +426,8 @@ c_generate_node P1(parse_node_t *, expr) {
 	    }
 
 	    if (position) {
-		sprintf(mem_block[current_block].block + position, "%3i",
-			case_table_size);
+		sprintf(mem_block[current_block].block + position,
+			"%3i", case_table_size);
 		/* restore the char smashed by the trailing null */
 		mem_block[current_block].block[position + 3] = ')'; 
 	    }
@@ -666,25 +437,7 @@ c_generate_node P1(parse_node_t *, expr) {
 	    case_table_size = save_case_table_size;
 	    break;
 	}
-    case NODE_CONDITIONAL:
-	{
-	    int addr1, addr2;
-	    
-	    c_generate_node(expr->l.expr);
-	    ins_string("C_CHECK_TRUE();\nif (!lpc_int) ");
-	    addr1 = ins_jump();
-	    notreached = 0;
-
-	    c_generate_node(expr->r.expr->l.expr);
-
-	    addr2 = ins_jump();
-	    upd_jump(addr1, add_label());
-	    
-	    c_generate_node(expr->r.expr->r.expr);
-	    upd_jump(addr2, add_label());
-	}
-	break;
-    case F_CATCH:
+    case NODE_CATCH:
 	{
 	    ins_vstring("{ error_context_t econ%02i;\nc_prepare_catch(&econ%02i);\nif (SETJMP(econ%02i.context)) {\nc_caught_error(&econ%02i);\n} else {\n",
 			catch_number, catch_number, catch_number, catch_number);
@@ -692,99 +445,11 @@ c_generate_node P1(parse_node_t *, expr) {
 	    ins_vstring("c_end_catch(&econ%02i);\n}\n}\n", catch_number++);
 	    break;
 	}
-    case F_SSCANF:
-	c_generate_node(expr->l.expr->l.expr);
-	c_generate_node(expr->l.expr->r.expr);
-	ins_vstring("c_sscanf(%i);\n", expr->r.expr->v.number);
+    case NODE_LVALUE_EFUN:
+	c_generate_node(expr->l.expr);
 	generate_lvalue_list(expr->r.expr);
 	break;
-    case F_PARSE_COMMAND:
-	c_generate_node(expr->l.expr->l.expr);
-	c_generate_node(expr->l.expr->r.expr->l.expr);
-	c_generate_node(expr->l.expr->r.expr->r.expr);
-	ins_vstring("c_parse_command(%i);\n", expr->r.expr->v.number);
-	generate_lvalue_list(expr->r.expr);
-	break;
-    case F_TIME_EXPRESSION:
-	ins_string("f_time_expression();\n");
-	c_generate_node(expr->r.expr);
-	ins_string("f_end_time_expression();\n");
-	break;
-    case F_TO_FLOAT:
-	generate_expr_list(expr->r.expr);
-	ins_string("CHECK_TYPES(sp, T_STRING | T_REAL | T_NUMBER, 1, F_TO_FLOAT);\nf_to_float();\n");
-	break;
-    case F_TO_INT:
-	generate_expr_list(expr->r.expr);
-	ins_string("CHECK_TYPES(sp, T_STRING | T_REAL | T_NUMBER | T_BUFFER, 1, F_TO_INT);\nf_to_int();\n");
-	break;
-    case F_GLOBAL_LVALUE:
-	if (pragmas & PRAGMA_EFUN)
-	    yyerror("Ilegal to use a global in an efun.\n");
-	ins_vstring("C_LVALUE(&current_object->variables[variable_index_offset + %i]);\n", expr->v.number);
-	break;
-    case F_GLOBAL:
-	if (pragmas & PRAGMA_EFUN)
-	    yyerror("Ilegal to use a global in an efun.\n");
-	ins_vstring("C_GLOBAL(%i);\n", expr->v.number);
-	break;
-    case F_LOOP_INCR:
-	ins_vstring("C_LOOP_INCR(%i);\n", expr->v.number);
-	break;
-    case F_WHILE_DEC:
-	ins_vstring("C_WHILE_DEC(%i); if (lpc_int)\n", expr->v.number);
-	break;
-    case F_LOOP_COND:
-	{
-	    int i;
-	    
-	    if (expr->r.expr->kind == F_LOCAL)
-		ins_vstring("C_LOOP_COND_LV(%i, %i); if (lpc_int)\n", 
-			    expr->l.expr->v.number, expr->r.expr->v.number);
-		else {
-		    switch (expr->r.expr->kind) {
-		    case F_CONST0: i = 0; break;
-		    case F_CONST1: i = 1; break;
-		    case F_NBYTE: i = - expr->r.expr->v.number; break;
-		    case F_BYTE:
-		    case F_NUMBER:
-			i = expr->r.expr->v.number; break;
-		    default:
-			fatal("Unknown node %i in F_LOOP_COND\n",
-			      expr->r.expr->kind);
-		    }
-		    ins_vstring("C_LOOP_COND_NUM(%i, %i); if (lpc_int)\n", 
-				expr->l.expr->v.number, i);
-		}
-	    break;
-	}
-    case F_SIMUL_EFUN:
-	if (pragmas & PRAGMA_EFUN)
-	    yyerror("Ilegal to use local function calls or simul_efuns in an efun.\n");
-	generate_expr_list(expr->r.expr);
-	ins_vstring("call_simul_efun(%i, %i);\n",
-		    expr->v.number, expr->r.expr ? expr->r.expr->kind : 0);
-	break;
-    case F_CALL_FUNCTION_BY_ADDRESS:
-	if (pragmas & PRAGMA_EFUN)
-	    yyerror("Ilegal to use local function calls or simul_efuns in an efun.\n");
-	generate_expr_list(expr->r.expr);
-	ins_vstring("c_call(%i, %i);\n", 
-		    expr->v.number, expr->r.expr ? expr->r.expr->kind : 0);
-	break;
-    case F_CALL_INHERITED:
-	if (pragmas & PRAGMA_EFUN)
-	    yyerror("Ilegal to call an inherited function in an efun.\n");
-	generate_expr_list(expr->r.expr);
-	ins_vstring("c_call_inherited(%i, %i, %i);\n", 
-		    expr->v.number & 0xff, expr->v.number >> 8,
-		    expr->r.expr ? expr->r.expr->kind : 0);
-	break;
-    case F_EVALUATE:
-	generate_expr_list(expr->r.expr);
-	ins_vstring("c_evaluate(%i);\n", expr->v.number);
-	break;
-    case F_FUNCTION_CONSTRUCTOR:
+    case NODE_FUNCTION_CONSTRUCTOR:
 	if (expr->r.expr) {
 	    generate_expr_list(expr->r.expr);
 	    ins_vstring("C_AGGREGATE(%i);\n", expr->r.expr->kind);
@@ -804,63 +469,105 @@ c_generate_node P1(parse_node_t *, expr) {
 	case FP_FUNCTIONAL:
 	case FP_FUNCTIONAL | FP_NOT_BINDABLE:
 	    {
-		yyerror("Cannot compile since it contains a functional.\n");
-/*		int addr, save_current_num_values = current_num_values;
-		ins_byte(expr->v.number >> 8);
-		addr = CURRENT_PROGRAM_SIZE;
-		ins_short(0);
+		int save_current_num_values = current_num_values;
+		int save_current_block = current_block;
+		
+		ins_vstring("c_functional(%i, %i, (POINTER_INT)LPCFUNCTIONAL_%03i);\n", 
+			    expr->v.number & 0xff, expr->v.number >> 8, num_functionals);
 		current_num_values = expr->r.expr ? expr->r.expr->kind : 0;
+		switch_to_block(A_FUNCTIONALS);
+		ins_vstring("static void LPCFUNCTIONAL_%03i PROT((void)) {\n", num_functionals++);
 		c_generate_node(expr->l.expr);
+		ins_vstring("c_return();\n}\n\n");
+		switch_to_block(save_current_block);
 		current_num_values = save_current_num_values;
-		ins_f_byte(F_RETURN);
-		upd_short(addr, CURRENT_PROGRAM_SIZE - addr - 2);
-		break; */
+		break;
 	    }
 	}
 	break;
     case NODE_ANON_FUNC:
 	{
-	    yyerror("Cannot compile since it contains an anonymous function.\n");
-/*	    ins_f_byte(F_FUNCTION_CONSTRUCTOR);
-	    ins_byte(FP_ANONYMOUS);
-	    ins_byte(expr->v.number);
-	    ins_byte(expr->l.number);
-	    addr = CURRENT_PROGRAM_SIZE;
-	    ins_short(0);
+	    int save_fd = foreach_depth;
+	    int save_current_block = current_block;
+	    int save_notreached = notreached;
+	    
+	    foreach_depth = 0;
+	    ins_vstring("c_anonymous(%i, %i, (POINTER_INT)LPCFUNCTIONAL_%03i);\n",
+			expr->v.number, expr->l.number, num_functionals);
+	    switch_to_block(A_FUNCTIONALS);
+	    ins_vstring("void LPCFUNCTIONAL_%03i PROT((void)) {\n", num_functionals++);
 	    c_generate_node(expr->r.expr);
-	    upd_short(addr, CURRENT_PROGRAM_SIZE - addr - 2);
-	    break; */
+	    notreached = 0;
+	    ins_string("\n}\n\n");
+	    switch_to_block(save_current_block);
+	    foreach_depth = save_fd;
+	    notreached = save_notreached;
+	    break;
 	}
-    default:
+    case NODE_EFUN:
 	{
 	    parse_node_t *node = expr->r.expr;
-	    int num_arg = expr->v.number;
-	    int f = expr->kind;
-
-	    DEBUG_CHECK1(f < BASE,
-			 "Unknown eoperator %s in c_generate_node.\n",
-			 get_f_name(expr->kind));
-	    if (num_arg == -1)
-		num_arg = instrs[f].min_arg;
+	    int num_arg = expr->l.number;
+	    int f = expr->v.number;
+	    int idx = 1;
 
 	    generate_expr_list(node);
-	    if (node && node->v.expr) {
-		ins_vstring("CHECK_TYPES(sp - %i, %i, 1, %i);\n",
-			    num_arg - 1, instrs[f].type[0], f);
-		if ((node = node->r.expr) && node->v.expr) {
-		ins_vstring("CHECK_TYPES(sp - %i, %i, 2, %i);\n",
-			    num_arg - 2, instrs[f].type[1], f);
-		}
+	    while (node) {
+		if (idx == 5) break;
+		ins_vstring("CHECK_TYPES(sp - %i, %i, %i, %i);\n",
+			    num_arg - idx, instrs[f].type[idx - 1], 
+			    idx, f);
+		idx++;
+		node = node->r.expr;
 	    }
-	    if (expr->v.number != -1)
-		ins_vstring("st_num_arg = %i;\n", expr->v.number);
+	    if (instrs[f].max_arg == -1) {
+		ins_vstring("st_num_arg = %i + num_varargs;\nnum_varargs = 0;\n", num_arg);
+	    } else {
+		ins_vstring("st_num_arg = %i;\n", num_arg);
+	    }
 	    ins_vstring("f_%s();\n", instrs[f].name);
 	    if (expr->type == TYPE_NOVALUE) {
 		/* the value of a void efun was used.  Put in a zero. */
 		ins_string("push_number(0);\n");
 	    }
 	}
-   }
+	break;
+    default:
+	    fatal("Unknown node %i in c_generate_node.\n", expr->kind);
+    }
+}
+
+static void c_generate_loop P4(int, test_first, parse_node_t *, block,
+			       parse_node_t *, inc, parse_node_t *, test) {
+    parse_node_t *save_breaks = branch_list[CJ_BREAK];
+    parse_node_t *save_continues = branch_list[CJ_CONTINUE];
+    int forever = node_always_true(test);
+    int pos;
+
+    if (test_first == 2) foreach_depth++;
+    branch_list[CJ_BREAK] = branch_list[CJ_CONTINUE] = 0;
+    if (!forever && test_first)
+	c_generate_forward_branch(F_BRANCH);
+    pos = add_label();
+    c_generate_node(block);
+    c_update_branch_list(branch_list[CJ_CONTINUE]);
+    if (inc) c_generate_node(inc);
+    if (!forever && test_first)
+	c_update_forward_branch();
+    if (test->kind == F_LOOP_COND_LOCAL || test->kind == F_LOOP_COND_NUMBER) {
+	c_generate_node(test);
+	ins_vstring("goto label%03i;\n", pos);
+	notreached = 1;
+    } else {
+	if (test_first == 2)
+	    ins_vstring("if (c_next_foreach())\ngoto label%03i;\n", pos);
+	else
+	    c_branch_backwards(generate_conditional_branch(test), pos);
+    }
+    c_update_branch_list(branch_list[CJ_BREAK]);
+    branch_list[CJ_BREAK] = save_breaks;
+    branch_list[CJ_CONTINUE] = save_continues;
+    if (test_first == 2) foreach_depth--;
 }
 
 void
@@ -870,18 +577,7 @@ c_generate_inherited_init_call P2(int, index, short, f) {
 
 void c_start_function P1(function_t *, f) {
     notreached = 0;
-    if (pragmas & PRAGMA_EFUN) {
-	current_frame_size = f->num_local + f->num_arg;
-	ins_vstring("void f_%s PROT((void)) {\n", f->name);
-	if (f->type & TYPE_MOD_VARARGS) {
-	    ins_vstring("svalue_t *fp = sp - st_num_arg + 1;\npush_nulls(%i - st_num_arg);\n", f->num_arg + f->num_local);
-	} else if (f->num_local) {
-	    ins_vstring("svalue_t *fp = sp - %i + 1;\npush_nulls(%i);\n", f->num_arg, f->num_local);
-	} else if (f->num_arg) {
-	    ins_vstring("svalue_t *fp = sp - %i + 1;\n", f->num_arg);
-	}
-    } else
-	ins_vstring("static void LPC_%s__%s() {\n", compilation_ident, f->name);
+    ins_vstring("static void LPC_%s__%s() {\n", compilation_ident, f->name);
 }
 
 void c_end_function() {
@@ -890,10 +586,6 @@ void c_end_function() {
 }
 
 void c_generate___INIT() {
-    fprintf(f_out, "static void LPCINIT_%s() {\n", compilation_ident);
-    fwrite(mem_block[A_INITIALIZER].block, 
-	   mem_block[A_INITIALIZER].current_size, 1, f_out);
-    fprintf(f_out, "}\n");
 }
 
 static void c_generate_forward_branch P1(char, b) {
@@ -973,41 +665,13 @@ c_branch_backwards P2(char, b, int, addr) {
 }
 
 static void
-c_update_breaks() {
-  /* traverse the list of nodes filling in the break address
-     required by each "break" statement.
-     */
-  while (!break_ptr->type){
-      upd_jump(break_ptr->v.number, label);
-      break_ptr = break_ptr->r.expr;
-  }
-  add_label();
-}
-
-static void
-c_update_continues() {
-  /* traverse the linked list filling in the continue address
-     required by each "continue" statement.
-     */
-  while (!cont_ptr->type){
-      upd_jump(cont_ptr->v.number, label);
-      cont_ptr = cont_ptr->r.expr;
-  }
-  add_label();
-}
-
-static void
-c_save_loop_info() {
-    /* Deactivate the current break and cont pointers */
-    break_ptr->type = 1;
-    cont_ptr->type = 1;
-}
-
-static void
-c_restore_loop_info() {
-    /* Reactivate the current break and cont pointers */
-    if (cont_ptr != &cont_dummy) cont_ptr->type = 0;
-    if (break_ptr != &break_dummy) break_ptr->type = 0;
+c_update_branch_list P1(parse_node_t *, bl) {
+    if (bl) {
+	do {
+	    upd_jump(bl->l.number, label);
+	} while ((bl = bl->v.expr));
+	add_label();
+    }
 }
 
 static void
@@ -1021,15 +685,16 @@ c_generate_else() {
 
 void
 c_initialize_parser() {
-    break_ptr = &break_dummy;
-    cont_ptr = &cont_dummy;
+    branch_list[CJ_BREAK] = 0;
+    branch_list[CJ_CONTINUE] = 0;
     forward_branch_ptr = &forward_branch_stack[0];
-
+    foreach_depth = 0;
+    
     current_block = A_PROGRAM;
     prog_code = mem_block[A_PROGRAM].block;
     prog_code_max = mem_block[A_PROGRAM].block + mem_block[A_PROGRAM].max_size;
 
-    catch_number = string_switches = range_switches = 0;
+    num_functionals = catch_number = string_switches = range_switches = 0;
     switch_tables = 0;
     label = 0;
     notreached = 0;
@@ -1082,14 +747,7 @@ c_generate_final_program P1(int, x) {
     int index = 0;
 
     if (!x) {
-	if (pragmas & PRAGMA_EFUN)
-	    fprintf(f_out, "#include \"../lpc_to_c.h\"\n\n");
-	else
-	    fprintf(f_out, "#include \"lpc_to_c.h\"\n\n");
 	if (string_switches) {
-	    if (pragmas & PRAGMA_EFUN) {
-		fprintf(f_out, "int switches_need_fixing = 1;\n\n#define NUM_STRING_SWITCHES %i\n\n", string_switches);
-	    }
 	    st = switch_tables;
 	    while (st) {
 		if (st->kind == NODE_SWITCH_STRINGS) {
@@ -1137,6 +795,16 @@ c_generate_final_program P1(int, x) {
 	    st = next;
 	}
 
+	fwrite(mem_block[A_FUNCTIONALS].block,
+	       mem_block[A_FUNCTIONALS].current_size, 1, f_out);
+
+	if (mem_block[A_INITIALIZER].current_size) {
+	    fprintf(f_out, "static void LPCINIT_%s() {\n", compilation_ident);
+	    fwrite(mem_block[A_INITIALIZER].block, 
+		   mem_block[A_INITIALIZER].current_size, 1, f_out);
+	    fprintf(f_out, "}\n");
+	}
+	
 	fwrite(mem_block[A_PROGRAM].block,
 	       mem_block[A_PROGRAM].current_size, 1, f_out);
 
@@ -1172,5 +840,9 @@ c_generate_final_program P1(int, x) {
 	else
 	    fprintf(f_out, "    0\n};\n");
     }
+}
+
+void c_analyze P1(parse_node_t *, node) {
+    /* future work */
 }
 #endif

@@ -1,3 +1,4 @@
+#define SUPPRESS_COMPILER_INLINES
 #include "std.h"
 #include "file_incl.h"
 #include "lpc_incl.h"
@@ -53,6 +54,9 @@ void init_addr_server();
 static void sig_usr1 PROT((int));
 static void sig_term PROT((int));
 static void sig_int PROT((int));
+#ifdef SIGFPE
+static void sig_fpe PROT((int));
+#endif
 
 #ifndef DEBUG
 static void sig_hup PROT((int)),
@@ -456,6 +460,9 @@ int main P2(int, argc, char **, argv)
 #endif
     signal(SIGTERM, sig_term);
     signal(SIGINT, sig_int);
+#ifdef SIGFPE
+    signal(SIGFPE, sig_fpe);
+#endif
 #ifndef DEBUG
 #if defined(SIGABRT) && !defined(LATTICE)
     signal(SIGABRT, sig_abrt);
@@ -666,6 +673,15 @@ static void sig_int()
 #endif
 {
     fatal("Process interrupted");
+}
+
+#ifdef SIGNAL_FUNC_TAKES_INT
+static void sig_fpe P1(int, sig)
+#else
+static void sig_fpe()
+#endif
+{
+    signal(SIGFPE, sig_fpe);
 }
 
 #ifndef DEBUG

@@ -335,20 +335,42 @@ char *implode_string P3(array_t *, arr, char *, del, int, del_len)
     return q;
 }
 
-svalue_t *implode_array P2(funptr_t *, fp, array_t *, arr) {
+void implode_array P4(funptr_t *, fp, array_t *, arr, 
+		      svalue_t *, dest, int, first_on_stack) {
     int i = 0, n;
     svalue_t *v;
 
-    if (!(n = arr->size)) return &const0u;
-    
-    v = &arr->item[i++];
-    while (i < n) {
-	push_svalue(v);
+    if (first_on_stack) {
+	if (!(n = arr->size)) {
+	    *dest = *sp--;
+	    return;
+	}
+    } else {
+	if (!(n = arr->size)) {
+	    *dest = const0;
+	    return;
+	} else if (n == 1) {
+	    assign_svalue_no_free(dest, &arr->item[0]);
+	    return;
+	}
+    }
+
+    if (!first_on_stack)
+	push_svalue(&arr->item[i++]);
+	
+    while (1) {
 	push_svalue(&arr->item[i++]);
 	v = call_function_pointer(fp, 2);
-	if (!v) return &const0u;
+	if (!v) {
+	    *dest = const0;
+	    return;
+	}
+	if (i < n)
+	    push_svalue(v);
+	else
+	    break;
     }
-    return v;
+    assign_svalue_no_free(dest, v);
 }
 
 array_t *users()
@@ -1648,6 +1670,18 @@ array_t *intersect_array P2(array_t *, a1, array_t *, a2) {
     return a3;
 }
 
+int match_single_regexp P2(char *, str, char *, pattern) {
+    struct regexp *reg;
+    int ret;
+    
+    regexp_user = EFUN_REGEXP;
+    reg = regcomp(pattern, 0);
+    if (!reg) error(regexp_error);
+    ret = regexec(reg, str);
+    FREE((char *)reg);
+    return ret;
+}
+
 array_t *match_regexp P3(array_t *, v, char *, pattern, int, flag) {
     struct regexp *reg;
     char *res;
@@ -1676,7 +1710,7 @@ array_t *match_regexp P3(array_t *, v, char *, pattern, int, flag) {
     sv2 = ret->item + (num_match << flag);
     size = v->size;
     while (size--){
-        if (res[size]){
+        if (res[size]) {
             if (flag) {
                 (--sv2)->type = T_NUMBER;
                 sv2->u.number = size + 1;

@@ -1177,9 +1177,10 @@ filter_mapping P2(svalue_t *, arg, int, num_arg)
     do {
 	for (elt = a[j]; elt ; elt = elt->next){
 	    push_svalue(elt->values);
+	    push_svalue(elt->values+1);
 	    if (numex) push_some_svalues(extra, numex);
-	    ret = ob ? apply(func, ob, 1+numex, ORIGIN_EFUN) 
-		: call_function_pointer(fp, 1+numex);
+	    ret = ob ? apply(func, ob, 2+numex, ORIGIN_EFUN) 
+		: call_function_pointer(fp, 2+numex);
 	    if (!ret) break;
 	    else if (ret->type != T_NUMBER || ret->u.number){
 		tb_index = elt->hashval & size;

@@ -15,9 +15,11 @@
 #define BUFFER         10
 
 extern int num_buff;
-extern int op_code, efun_code;
-extern char *oper_codes[MAX_FUNC], *efun_codes[MAX_FUNC];
-extern char *key[MAX_FUNC], *buf[MAX_FUNC], has_token[MAX_FUNC];
+extern int op_code, efun_code, efun1_code;
+extern char *oper_codes[MAX_FUNC];
+extern char *efun_codes[MAX_FUNC], *efun1_codes[MAX_FUNC];
+extern char *efun_names[MAX_FUNC], *efun1_names[MAX_FUNC];
+extern char *key[MAX_FUNC], *buf[MAX_FUNC];
 
 extern int arg_types[400], last_current_type;
 

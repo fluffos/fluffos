@@ -1,3 +1,186 @@
+----------------------------------------------------------------------------
+(v21.6a11 promoted to v21.6b1)
+
+Tue Jul 18 02:23:22 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.6a11
+	* updated with respect to v21.5b10
+	* fix from Marius for a crasher in x[<y] when x and y are constant
+	* fixed a bug that would incorrectly generated varargs expansion
+	  code for (*f)()
+	* null terminate crypt() strings, in case crypt() is des_crypt() in
+	  disguise
+	* in get_single() in the parsing package, binary search the bitvectors
+	  instead of doing a linear search
+	* added int regexp(string, string)
+	* fixed a bug in code generation for return statements in LPC->C
+	  introduced during the compiler rewrite
+	* only include <values.h> if MAXSHORT isn't in <limits.h>
+	* fixed a crasher in filter()
+	* fixed 'safe' -> 'saves' in pluralize()
+	* fixed TRACE compilation with NO_WIZARDS
+	* fixed regexp() to not crash on eight-bit characters in the format
+	  on hosts where 'char' is signed
+
+Sat Jul 15 14:35:50 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.6a10
+	* updated with respect to v21.5b9
+	* backed out the VOLATILE changes to compile_file.c since it relies
+	  on a gcc extension
+	* fixed a crasher in true varargs functions with local variables
+	* added configure checks for <mach.h> and <mach/mach.h>
+	* fixed a crasher in undefined functions
+	* COMPAT_BUSTER: filter_mapping() now passes the value as the
+	  second element, just like map_mapping()
+	* fixed the Makefile to support options in grammar.y.pre; this
+	  probably should be changed to use a %include "options_incl.h"
+	* added y.output and tmpdepend to 'make clean'
+	* fixed `system_libs` -> `cat system_libs` in the Makefile
+	* fixed a few DEBUG crashers in the parser package
+
+Thu Jul 13 04:05:49 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.6a9
+	* updated with respect to v21.5b8
+	* backed out the VOLATILE changes to sprintf.c since it relies on a
+	  gcc extension
+	* updated the Makefile not to define EDIT_SOURCE any more
+	* implemented the parser generated error messages for the parsing
+	  package
+	* added the other half of varargs support, allowing the following:
+	  void log(string file, string fmt, array args ...) {
+	      write_file(file, sprintf(fmt, args ...));
+	  }
+	  void foo(int x) {
+	      log("/log/foo", "foo() was called with: %i\n", x);
+	  }
+
+Thu Jul  6 03:52:27 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.6a8
+	* fixed to_float("illegal string") to always return 0.000000
+	* added testsuite tests for to_int() and to_float()
+	* fixed a crasher in illegal indexes to array constants
+	* 'make depend' now works again when using GNU make
+	* edit_source -configure is never rerun if configure.h exists,
+	  even if the file is out of date (it takes too long, and the
+	  info shouldn't change).
+	* fixed a dependency problem that caused configure.h not to get built
+	* DEBUG is now visible to %ifdefs
+	* check for <values.h>; MAXSHORT is there on SGI
+	* removed some unused variables
+	* added __TREE__(expr) and __TREE__{ ... } which evaluate to arrays
+	  representing the compiler's internal representation (IR) of the
+	  given code.  For example,
+	  __TREE__(x + y) gives: ({ "binary op", "+", ({ "opcode_1", "local",
+	                            0 }), ({ "opcode_1", "local", 1 }) })
+	* catch { ... } and time_expression { ... } are now legal.
+	* if ARRAY_RESERVED_WORD is on, then 'array' now associates with the
+	  type and not the var, for example:
+	  int array x, y == int *x, *y and not int *x, y
+	* 'array' by itself is now allowed, meaning 'mixed *'
+	* fixed a bug in type checking that allowed 'x *' and 'x' to be
+	  compatible in one order, but not the reverse
+
+Fri Jun 30 16:44:33 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.6a7
+	* updated with respect to v21.5b6
+	* merged Makefile.MudOS back into the main Makefile
+	* added implode(array, function, mixed) where the third
+	  argument is the value to start with, as in:
+	  flatten(arr) {
+	      if (arrayp(arr)) return implode(arr,(: $1 + flatten($2) :),({}));
+	      else return arr;
+          }
+	* fixed make_func.y to give file and line numbers on fatal errors
+	* added configure checks for getrusage(), times(), gettimeofday(),
+	  and fchmod() instead of using hard coded information
+	* figure out the correct type for UINT32 in configure
+	* removed the 0.9.18 compat efun package
+	* fixed a crasher in remove_interactive()
+	* disabled the lookat_rotate2 efun in the matrix package as it
+	  uses more arguments than the compiler currently supports
+
+Tue Jun 27 01:10:27 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.6a6
+	* fixed the debug checks to not panic on nested foreach's
+	* fixed edit_source -configure to not get fooled by OSF's queer
+	  non-standard BSD compatibility includes
+	* fixed a crasher in passing a bad argument to call_stack()
+	* optimized upper_case() and lower_case()
+	* fixed an ANSI style declaration in eoperators.c
+	* a couple minor fixes for alpha; also fixed DEBUGMALLOC to work
+	  correctly on alphas
+
+Fri Jun 23 02:39:02 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.6a5
+	* updated with respect to v21.5b4
+	* fixed a bug that caused sizeof(array constant) to always be 16
+
+Tue Jun 20 16:25:14 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.6a4
+	* updated with respect to v21.5b3
+	* fixed a few bug in using x[y..z] as an lvalue
+	* fixed an error in setting the return type of time_expression()
+	* added packages/parser.c, a flexible parsing system for interactive
+	  fiction applications
+	* fixed a crasher in variables()
+	* added a workaround for getting EINTR while trying to seek the swap
+	  file 
+
+Sun Jun 18 11:33:07 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.6a3
+	* fixed a bunch of warnings from gcc -Wall
+	* fixed c_update_branch_list() to not generate unused labels
+	* COMPAT_BUSTER:
+	  origin() and typeof() now return strings.  If you use the defines
+	  in the driver include/ files, you're fine (assuming you update your
+	  includes)
+	* fixed some compilation problems with local variable optimizations
+	* put the mudlib/ directory back to the default one
+	* fixed a bug that was disabling the while_dec optimization
+	* efun::new() is legal again
+	* the type info in functions() are now strings
+	* variables now has an optional flag just like functions
+	* fixed a bug in replace_string() that would not copy the elements
+	  which matched the search string which were not replaced in the
+	  case when the replace string is longer than the search string
+
+Thu Jun 15 09:15:23 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.6a2
+	* updated with respect to v21.5b2
+	* made functional procedures in LPC->C static so they don't interfere
+	  across multiple files
+	* fixed a bug that inserted extra to_int/to_float() calls even when
+	  the expression had already been reduced as a constant, i.e.
+	  1 + 2.3 -> 3.3 and not to_float(3.3)
+	* reorganized the compiler's intermediate representation to be
+	  easier to optimize/generate code from.  nodes now have general
+	  types like NODE_BINARY_OP instead of the old form.
+	* removed support for PRAGMA_EFUN
+	* optimized the last use of a local in a frame by transfering
+	  instead of copying.  If the last use is in a switch() or loop
+	  it is ignored.  The same trick is also done for use of a local
+          right before an assignment, as in: write(x); x = 1;
+	  (only done when #pragma optimize is on)
+	* split F_LOOP_COND up into F_LOOP_COND_NUMBER and F_LOOP_COND_LOCAL
+
+Mon Jun 12 04:45:44 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.6a1
+	* expression function pointers, anonymous functions, and foreach
+	  now work in LPC->C code.
+	* added class support in LPC->C code
+	* updated ccode.c with the icode.c cleanups
+	* added a warning for [x] and [y..x] when x is a negative constant
+	* optimized LPC->C string constants
+	* optimized the calling of efuns.  All arguments are now checked
+	  automatically.  The format is now:
+	  . efuns which _always_ take one arg have opcodes like eoperators
+	  . New efun eops which includes the number of arguments F_EFUN0,
+	    F_EFUN1, F_EFUN2, F_EFUN3 which is followed by the efun index
+	  . F_EFUNV for efun calls using 4 or more args
+	* some reorganization and cleaning up of make_func.y to allow the
+	  above
+	* inlined efun calling for efun pointers.  This should make
+	  (: efun, ... :) significantly faster than (: efun(...) :)
+
 ---------------------------------------------------------------------------
 (v21.5a6 promoted to v21.5b1)
 

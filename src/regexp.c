@@ -280,17 +280,17 @@ void regerror P1(char *, s) {
  * Beware that the optimization-preparation code in here knows about some
  * of the structure of the compiled regexp.
  */
-regexp *regcomp P2(char *, exp,
+regexp *regcomp P2(unsigned char *, exp,
                    int, excompat)       /* \( \) operators like in unix ex */
 {
     register regexp *r;
-    register char *scan;
+    register unsigned char *scan;
     register char *longest;
     register int len;
     int flags;
     short *exp2, *dest, c;
 
-    if (exp == (char *) NULL)
+    if (!exp)
 	FAIL("NULL argument");
 
     exp2 = (short *)

@@ -26,22 +26,22 @@ mixed evaluate(mixed, ...);
 function bind(function, object);
 object present(object | string, void | object);
 object this_object();
-object this_player(int default: F_CONST0);
-object this_interactive this_player( int default: F_CONST1 );
-object this_user this_player( int default: F_CONST0 );
+object this_player(int default: 0);
+object this_interactive this_player( int default: 1);
+object this_user this_player( int default: 0);
 void move_object(object | string);
-mixed previous_object(int default: F_CONST0);
-object *all_previous_objects previous_object(int default: F_NBYTE 1);
-mixed *call_stack(int default: F_CONST0);
+mixed previous_object(int default: 0);
+object *all_previous_objects previous_object(int default: -1);
+mixed *call_stack(int default: 0);
 int sizeof(mixed);
 int strlen sizeof(string);
 void destruct(object);
-string file_name(object default:F_THIS_OBJECT);
+string file_name(object default: F_THIS_OBJECT);
 object environment(void | object);
 string capitalize(string);
 string *explode(string, string);
-mixed implode(mixed *, string | function);
-object *all_inventory(object default:F_THIS_OBJECT);
+mixed implode(mixed *, string | function, void | mixed);
+object *all_inventory(object default: F_THIS_OBJECT);
 object first_inventory(object|string default: F_THIS_OBJECT);
 object next_inventory(object default: F_THIS_OBJECT);
 void call_out(string | function, int,...);
@@ -74,8 +74,8 @@ int save_object(string, void | int);
 string save_variable(mixed);
 mixed restore_variable(string);
 object *users();
-mixed *get_dir(string, int default:F_CONST0);
-int strsrch(string, string | int, int default:F_CONST0);
+mixed *get_dir(string, int default: 0);
+int strsrch(string, string | int, int default: 0);
 
 /* communication functions */
 
@@ -90,8 +90,8 @@ void message(mixed, string, string | string * | object | object *,
 
 /* the find_* functions */
 
-    object find_object(string, int default: F_CONST0);
-    object load_object find_object(string, int default: F_CONST1);
+    object find_object(string, int default: 0);
+    object load_object find_object(string, int default: 1);
     int find_call_out(string);
 
 /* mapping functions */
@@ -102,13 +102,13 @@ void message(mixed, string, string | string * | object | object *,
     mixed *keys(mapping);
 
 #ifdef EACH
-    mixed *each(mapping, int default:F_CONST0);
+    mixed *each(mapping, int default: 0);
 #endif
     mixed match_path(mapping, string);
 
 /* all the *p() type functions */
 
-    int clonep(mixed default:F_THIS_OBJECT);
+    int clonep(mixed default: F_THIS_OBJECT);
     int intp(mixed);
     int undefinedp(mixed);
     int nullp(mixed);
@@ -119,7 +119,7 @@ void message(mixed, string, string | string * | object | object *,
     int pointerp(mixed);
     int arrayp pointerp(mixed);
     int objectp(mixed);
-    int typeof(mixed);
+    string typeof(mixed);
 
 #ifndef DISALLOW_BUFFER_TYPE
     int bufferp(mixed);
@@ -131,7 +131,7 @@ void message(mixed, string, string | string * | object | object *,
 #ifndef DISALLOW_BUFFER_TYPE
     buffer allocate_buffer(int);
 #endif
-    string *regexp(string *, string, void | int);
+    mixed regexp(string | string *, string, void | int);
     mixed *reg_assoc(string, string *, mixed *, mixed | void);
     mixed *allocate(int);
 
@@ -175,6 +175,7 @@ void message(mixed, string, string | string * | object | object *,
     string clear_bit(string, int);
     int test_bit(string, int);
     string set_bit(string, int);
+    int next_bit(string, int);
 
     string crypt(string, string | int);	/* An int as second argument ? */
     string ctime(int);
@@ -192,7 +193,7 @@ void message(mixed, string, string | string * | object | object *,
     string query_ip_number(void | object);
     object query_snoop(object);
     object query_snooping(object);
-    int remove_call_out(string);
+    int remove_call_out(void | string);
     void set_heart_beat(int);
     int query_heart_beat(object default:F_THIS_OBJECT);
     void set_hide(int);
@@ -205,7 +206,7 @@ void message(mixed, string, string | string * | object | object *,
     void set_reset(object, void | int);
 
 #ifndef NO_SHADOWS
-    object shadow(object, int default: F_CONST1);
+    object shadow(object, int default: 1);
     object query_shadowing(object);
 #endif
     object snoop(object, void | object);
@@ -220,7 +221,7 @@ void message(mixed, string, string | string * | object | object *,
     void printf(string,...);
     string sprintf(string,...);
     int mapp(mixed);
-    mixed *stat(string, int default:F_CONST0);
+    mixed *stat(string, int default: 0);
 
 /*
  * Object properties
@@ -277,18 +278,18 @@ void message(mixed, string, string | string * | object | object *,
 
     object *deep_inventory(object);
 
-    mixed filter(mixed * | mapping, string | function, object | string | void, ...);
-    mixed filter_array filter(mixed *, string | function, void | object | string, ...);
-    mapping filter_mapping filter(mapping, string | function, object | string | void, ...);
+    mixed filter(mixed * | mapping, string | function, mixed | void, ...);
+    mixed filter_array filter(mixed *, string | function, mixed | void, ...);
+    mapping filter_mapping filter(mapping, string | function, mixed | void, ...);
 
-    mixed map(string | mapping | mixed *, string | function, object | string | void, ...);
-    mapping map_mapping map(mapping, string | function, object | string | void, ...);
-    mixed *map_array map(mixed *, string | function, object | string | void, ...);
+    mixed map(string | mapping | mixed *, string | function, mixed | void, ...);
+    mapping map_mapping map(mapping, string | function, mixed | void, ...);
+    mixed *map_array map(mixed *, string | function, mixed | void, ...);
 /*
  * parser 'magic' functions, turned into efuns
  */
     string malloc_status();
-    string mud_status(int default:F_CONST0);
+    string mud_status(int default: 0);
     void dumpallobj(string | void);
 
     string dump_file_descriptors();
@@ -299,16 +300,16 @@ void message(mixed, string, string | string * | object | object *,
     int set_light(int);
 #endif
 
-    int origin();
+    string origin();
 
 /* the infrequently used functions */
 
     int reclaim_objects();
 
     int set_eval_limit(int);
-    int reset_eval_cost set_eval_limit(int default: F_CONST0);
-    int eval_cost set_eval_limit(int default: F_NBYTE 1);
-    int max_eval_cost set_eval_limit(int default: F_CONST1);
+    int reset_eval_cost set_eval_limit(int default: 0);
+    int eval_cost set_eval_limit(int default: -1);
+    int max_eval_cost set_eval_limit(int default: 1);
 
 #ifdef DEBUG_MACRO
     void set_debug_level(int);

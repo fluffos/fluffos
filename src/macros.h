@@ -90,6 +90,9 @@
 #  endif
 #endif
 
+#define SAFE(x) do { x } while (0)
+ 
+
 /*
    Define for MALLOC, FREE, REALLOC, and CALLOC depend upon what malloc
    package and optional wrapper is used.  This technique is used because

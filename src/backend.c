@@ -32,7 +32,6 @@ int heart_beat_flag = 0;
 object_t *current_heart_beat;
 static void look_for_objects_to_swap PROT((void));
 static void call_heart_beat PROT((void));
-INLINE static void cycle_hb_list PROT((void));
 
 #ifdef DEBUG
 static void report_holes PROT((void));
@@ -267,7 +266,7 @@ static void look_for_objects_to_swap()
 {
     static int next_time;
     object_t *ob;
-    object_t *next_ob;
+    VOLATILE object_t *next_ob;
     error_context_t econ;
 
     if (current_time < next_time)
@@ -284,7 +283,7 @@ static void look_for_objects_to_swap()
     if (SETJMP(econ.context))
 	restore_context(&econ);
     
-    for (ob = next_ob; ob; ob = next_ob) {
+    while ((ob = (object_t *)next_ob)) {
 	int ready_for_swap;
 
 	eval_cost = max_cost;
@@ -416,7 +415,6 @@ static void call_heart_beat()
 {
     object_t *ob;
     heart_beat_t *curr_hb;
-    int num_done = 0;
 
 #ifdef OS2
     static TID bing = 0;
@@ -442,7 +440,7 @@ static void call_heart_beat()
     current_time = get_current_time();
     current_interactive = 0;
 
-    if (num_hb_to_do = num_hb_objs) {
+    if ((num_hb_to_do = num_hb_objs)) {
 	num_hb_calls++;
 	heart_beat_index = 0;
 	while (!heart_beat_flag) {
@@ -454,31 +452,31 @@ static void call_heart_beat()
 	    /* is it time to do a heart beat ? */
 	    curr_hb->heart_beat_ticks--;
 
-	    if (ob->prog->heart_beat == -1)
-		continue;
-	    if (curr_hb->heart_beat_ticks < 1) {
-		curr_hb->heart_beat_ticks = curr_hb->time_to_heart_beat;
-		current_prog = ob->prog;
-		current_object = ob;
-		current_heart_beat = ob;
-		command_giver = ob;
+	    if (ob->prog->heart_beat != -1) {
+		if (curr_hb->heart_beat_ticks < 1) {
+		    curr_hb->heart_beat_ticks = curr_hb->time_to_heart_beat;
+		    current_prog = ob->prog;
+		    current_object = ob;
+		    current_heart_beat = ob;
+		    command_giver = ob;
 #ifndef NO_SHADOWS
-		while (command_giver->shadowing)
-		    command_giver = command_giver->shadowing;
+		    while (command_giver->shadowing)
+			command_giver = command_giver->shadowing;
 #endif				/* NO_SHADOWS */
 #ifndef NO_ADD_ACTION
-		if (!(command_giver->flags & O_ENABLE_COMMANDS))
-		    command_giver = 0;
+		    if (!(command_giver->flags & O_ENABLE_COMMANDS))
+			command_giver = 0;
 #endif
 #ifdef PACKAGE_MUDLIB_STATS
-		add_heart_beats(&ob->stats, 1);
+		    add_heart_beats(&ob->stats, 1);
 #endif
-		eval_cost = max_cost;
-		/* this should be looked at ... */
-		call_function(ob->prog,
-			&ob->prog->functions[ob->prog->heart_beat]);
-		command_giver = 0;
-		current_object = 0;
+		    eval_cost = max_cost;
+		    /* this should be looked at ... */
+		    call_function(ob->prog,
+				  &ob->prog->functions[ob->prog->heart_beat]);
+		    command_giver = 0;
+		    current_object = 0;
+		}
 	    }
 	    if (++heart_beat_index == num_hb_to_do)
 		break;
@@ -509,6 +507,7 @@ query_heart_beat P1(object_t *, ob)
 	if (heart_beats[index].ob == ob) 
 	    return heart_beats[index].time_to_heart_beat;
     }
+    return 0;
 }				/* query_heart_beat() */
 
 /* add or remove an object from the heart beat list; does the major check...
@@ -538,7 +537,7 @@ int set_heart_beat P2(object_t *, ob, int, to)
 	    }
 	}
 	
-	if (num = (num_hb_objs - (index + 1)))
+	if ((num = (num_hb_objs - (index + 1))))
 	    memmove(heart_beats + index, heart_beats + (index + 1), num * sizeof(heart_beat_t));
 	
 	num_hb_objs--;
@@ -553,6 +552,7 @@ int set_heart_beat P2(object_t *, ob, int, to)
 	while (index--) {
 	    if (heart_beats[index].ob == ob) {
 		heart_beats[index].time_to_heart_beat = heart_beats[index].heart_beat_ticks = to;
+		break;
 	    }
 	}
 	DEBUG_CHECK(index < 0, "Couldn't find enabled object in heart_beat lsit!\n");

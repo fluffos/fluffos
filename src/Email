@@ -1,19 +1,9 @@
-1993/04/24:
-
-1)  Send email to mudos-info-request@actlab.rtf.utexas.edu if you wish to be
-    added to (or removed from) a MudOS mailing list that will be used to
-    send out information on new MudOS versions and example mudlib code that
-    demonstrates MudOS features.
-
-2)  Send email to mudos-request@actlab.rtf.utexas.edu if you wish to be added
-    to a mailing list for discussing the MudOS driver (proposed features etc).
-
-3)  Send email to mudos-bugs@actlab.rtf.utexas.edu if you find a bug (or bugs)
+Send email to beek@imaginary.com if you find a bug (or bugs)
     in the MudOS driver that is not already listed in the ./doc/driver/bugs
     file.  If you do report a bug be sure to include the following
     informaton:
 
-    MudOS version (e.g. 0.9.15)
+    MudOS version (e.g. v21.7a4), see patchlevel.h or the startup banner
 
     mudlib you are using (also specify the mudlib yours is based upon if you
     didn't start from scratch)

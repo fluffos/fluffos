@@ -14,6 +14,9 @@
 
 #define SKIPWHITE while (isspace(*p) && (*p != '\n')) p++
 
+#define DEFAULT_NONE           0xff
+#define DEFAULT_THIS_OBJECT    0xfe
+
 #define PRAGMA_STRICT_TYPES    1
 #define PRAGMA_WARNINGS        2
 #define PRAGMA_SAVE_TYPES      4
@@ -21,7 +24,6 @@
 #define PRAGMA_OPTIMIZE       16
 #define PRAGMA_ERROR_CONTEXT  32
 #define PRAGMA_OPTIMIZE_HIGH  64
-#define PRAGMA_EFUN          128
 /* for find_or_add_ident */
 #define FOA_GLOBAL_SCOPE       0x1
 #define FOA_NEEDS_MALLOC       0x2
@@ -83,6 +85,8 @@ typedef struct {
     short ret_type;		/* The return type used by the compiler. */
     unsigned short arg_type1;	/* Type of argument 1 */
     unsigned short arg_type2;	/* Type of argument 2 */
+    unsigned short arg_type3;	/* Type of argument 1 */
+    unsigned short arg_type4;	/* Type of argument 2 */
     short arg_index;		/* Index pointing to where to find arg type */
     short Default;		/* an efun to use as default for last
 				 * argument */
@@ -110,7 +114,7 @@ extern lpc_predef_t *lpc_predefs;
 
 typedef struct {
     short max_arg, min_arg;  /* Can't use char to represent -1 */
-    short type[2];	     /* need a short to hold the biggest type flag */
+    short type[4];	     /* need a short to hold the biggest type flag */
     short Default;
     short ret_type;
     char *name;

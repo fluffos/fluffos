@@ -2028,9 +2028,7 @@ static int docmd P1(int, glob)
     case 'w':
 	apflg = (c == 'W');
 
-	if (*inptr != NL)
-	    return SYNTAX_ERROR;
-	if (P_RESTRICT)
+	if (*inptr != NL && P_RESTRICT)
 	    return IS_RESTRICTED;
 	if (*inptr != ' ' && *inptr != HT && *inptr != NL)
 	    return SYNTAX_ERROR;

@@ -1,3 +1,4 @@
+#define SUPRESS_COMPILER_INLINES
 #ifdef LATTICE
 #include "/lpc_incl.h"
 #include "/mapping.h"
@@ -7,6 +8,8 @@
 #include "/object.h"
 #include "/eoperators.h"
 #include "/backend.h"
+#include "/swap.h"
+#include "/compiler.h"
 #else
 #include "../lpc_incl.h"
 #include "../mapping.h"
@@ -16,6 +19,8 @@
 #include "../object.h"
 #include "../eoperators.h"
 #include "../backend.h"
+#include "../swap.h"
+#include "../compiler.h"
 #endif
 
 /* I forgot who wrote this, please claim it :) */
@@ -246,14 +251,19 @@ void f_functions PROT((void)) {
 	    subvec->item[1].subtype = 0;
 	    subvec->item[1].u.number = funp->num_arg;
 
-	    subvec->item[2].type = T_NUMBER;
-	    subvec->item[2].subtype = 0;
-	    subvec->item[2].u.number = funp->type;
+	    subvec->item[2].type = T_STRING;
+	    subvec->item[2].subtype = STRING_SHARED;
+	    subvec->item[2].u.string = make_shared_string(get_type_name(funp->type));
 
 	    for (j = 0; j < funp->num_arg; j++) {
-		subvec->item[3 + j].type = T_NUMBER;
-		subvec->item[3 + j].subtype = 0;
-		subvec->item[3 + j].u.number = (types ? types[j] : 0);
+		if (types) {
+		    subvec->item[3 + j].type = T_STRING;
+		    subvec->item[3 + j].subtype = STRING_SHARED;
+		    subvec->item[3 + j].u.string = make_shared_string(get_type_name(types[j]));
+		} else {
+		    subvec->item[3 + j].type = T_NUMBER;
+		    subvec->item[3 + j].u.number = 0;
+		}
 	    }
 	} else {
 	    vec->item[i].type = T_STRING;
@@ -271,9 +281,13 @@ void f_functions PROT((void)) {
 #ifdef F_VARIABLES
 void f_variables PROT((void)) {
     int i, num;
-    array_t *vec;
+    array_t *vec, *subvec;
     variable_t *variables;
+    int flag = (sp--)->u.number;
     program_t *prog = sp->u.ob->prog;
+    
+    if (sp->u.ob->flags & O_SWAPPED)
+	load_ob_from_swap(sp->u.ob);
     
     num = prog->num_variables;
     variables = prog->variable_names;
@@ -282,9 +296,20 @@ void f_variables PROT((void)) {
     i = num;
     
     while (i--) {
-	vec->item[i].type = T_STRING;
-	vec->item[i].subtype = STRING_SHARED;
-	vec->item[i].u.string = ref_string(variables[i].name);
+	if (flag) {
+	    vec->item[i].type = T_ARRAY;
+	    subvec = vec->item[i].u.arr = allocate_empty_array(2);
+	    subvec->item[0].type = T_STRING;
+	    subvec->item[0].subtype = STRING_SHARED;
+	    subvec->item[0].u.string = ref_string(variables[i].name);
+	    subvec->item[1].type = T_STRING;
+	    subvec->item[1].subtype = STRING_SHARED;
+	    subvec->item[1].u.string = make_shared_string(get_type_name(variables[i].type));
+	} else {
+	    vec->item[i].type = T_STRING;
+	    vec->item[i].subtype = STRING_SHARED;
+	    vec->item[i].u.string = ref_string(variables[i].name);
+	}
     }
     
     pop_stack();
@@ -551,6 +576,10 @@ char *pluralize P1(char *, str) {
 	if (!strcasecmp(rel + 1, "eer")) {
 	    found = PLURAL_SAME;
 	} else
+	if (!strcasecmp(rel + 1, "o")) {
+	    found = PLURAL_SUFFIX;
+	    suffix = "es";
+        } else
 	if (!strcasecmp(rel + 1, "ynamo"))
 	    found = PLURAL_SUFFIX;
 	break;
@@ -573,6 +602,10 @@ char *pluralize P1(char *, str) {
 	if (!strcasecmp(rel + 1, "oose")) {
 	    found = PLURAL_CHOP + 4;
 	    suffix = "eese";
+	} else
+	if (!strcasecmp(rel + 1, "o")) {
+	    found = PLURAL_SUFFIX;
+	    suffix = "es";
 	}
 	break;
     case 'H':
@@ -626,7 +659,10 @@ char *pluralize P1(char *, str) {
 	if (!strcasecmp(rel + 1, "phinx")) {
 	    found = PLURAL_CHOP + 1;
 	    suffix = "ges";
+	    break;
 	}
+	if (!strcasecmp(rel + 1, "afe")) 
+	    found = PLURAL_SUFFIX;
 	break;
     case 'T':
     case 't':
@@ -641,6 +677,14 @@ char *pluralize P1(char *, str) {
 	    found = PLURAL_SUFFIX;
 	    suffix = "en";
 	}
+	break;
+    case 'W':
+    case 'w':
+	if (!strcasecmp(rel + 1, "as")) {
+	    found = PLURAL_CHOP + 2;
+	    suffix = "ere";
+	}
+	break;
     }
     /*
      * now handle "rules" ... god I hate english!!
@@ -843,12 +887,21 @@ f_upper_case PROT((void))
 {
     register char *str;
 
-    unlink_string_svalue(sp);
     str = sp->u.string;
-
-    for (; *str; str++)
-	if (islower(*str))
+    /* find first upper case letter, if any */
+    for (; *str; str++) {
+	if (islower(*str)) {
+	    int l = str - sp->u.string;
+	    unlink_string_svalue(sp);
+	    str = sp->u.string + l;
 	    *str -= 'a' - 'A';
+	    for (str++; *str; str++) {
+		if (islower(*str))
+		    *str -= 'a' - 'A';
+	    }
+	    return;
+	}
+    }
 }
 #endif
 
@@ -922,9 +975,13 @@ void f_program_info PROT((void)) {
 
 void f_remove_interactive PROT((void)) {
     if( (sp->u.ob->flags & O_DESTRUCTED) || !(sp->u.ob->interactive) ) {
-        push_number(0);
+	free_object(sp->u.ob, "f_remove_interactive");
+	*sp = const0;
     } else {
         remove_interactive(sp->u.ob);
-        push_number(1);
+	/* It may have been dested */
+	if (sp->type == T_OBJECT)
+	    free_object(sp->u.ob, "f_remove_interactive");
+	*sp = const1;
     }
 }

@@ -3,6 +3,7 @@
 	inside eval_instruction() in interpret.c.
 */
 
+#define SUPPRESS_COMPILER_INLINES
 #include "std.h"
 #include "lpc_incl.h"
 #include "efuns_incl.h"
@@ -626,7 +627,7 @@ f_parse_command()
 }
 
 INLINE void
-f_range(int code)
+f_range P1(int, code)
 {
     int from, to, len;
 
@@ -1159,7 +1160,6 @@ INLINE funptr_t *
 make_efun_funp P2(int, opcode, svalue_t *, args)
 {
     funptr_t *fp;
-    int i=0;
     
     fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(efun_ptr_t),
 			     TAG_FUNP, "make_efun_funp");
@@ -1167,24 +1167,7 @@ make_efun_funp P2(int, opcode, svalue_t *, args)
     add_ref( current_object, "make_efun_funp" );
     fp->hdr.type = FP_EFUN;
     
-#ifdef NEEDS_CALL_EXTRA
-    if (opcode >= 0xff) {
-	fp->f.efun.opcodes[i++] = F_CALL_EXTRA;
-	fp->f.efun.opcodes[i++] = opcode - 0xff;
-    } else { 
-#endif
-	fp->f.efun.opcodes[i++] = opcode;
-#ifdef NEEDS_CALL_EXTRA
-    }
-#endif
-    
-    if (instrs[opcode].min_arg != instrs[opcode].max_arg)
-	fp->f.efun.opcodes[i++] = 0; /* filled in when evaluated */
-    
-    if (instrs[opcode].ret_type == TYPE_NOVALUE)
-	fp->f.efun.opcodes[i++] = F_RETURN_ZERO;
-    else
-	fp->f.efun.opcodes[i++] = F_RETURN;
+    fp->f.efun.index = opcode;
     
     if (args->type == T_ARRAY) {
 	fp->hdr.args = args->u.arr;
@@ -1308,14 +1291,8 @@ f_function_constructor()
 
     switch (kind) {
     case FP_EFUN:
-	kind = EXTRACT_UCHAR(pc++);
-#ifdef NEEDS_CALL_EXTRA
-	if (kind == F_CALL_EXTRA) {
-	    kind = EXTRACT_UCHAR(pc) + 0xff;
-	    pc++;
-	}
-#endif
-	fp = make_efun_funp(kind, sp);
+	LOAD_SHORT(index, pc);
+	fp = make_efun_funp(index, sp);
 	pop_stack();
 	break;
     case FP_LOCAL:

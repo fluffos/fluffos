@@ -27,7 +27,7 @@ extern int regexp_user;
 extern char *regexp_error;
 
 void regdump PROT((regexp *));
-regexp *regcomp PROT((char *, int));
+regexp *regcomp PROT((unsigned char *, int));
 int regexec PROT((regexp *, char *));
 char *regsub PROT((regexp *, char *, char *, int));
 

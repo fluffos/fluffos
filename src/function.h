@@ -1,11 +1,6 @@
 #ifndef FUNCTION_H
 #define FUNCTION_H
 
-/* FP_EFUN */
-typedef struct {
-    unsigned char opcodes[4];
-} efun_ptr_t;
-
 /* FP_LOCAL */
 typedef struct {
     short index;
@@ -13,6 +8,9 @@ typedef struct {
 
 /* FP_SIMUL */
 typedef local_ptr_t simul_ptr_t;
+
+/* FP_EFUN */
+typedef local_ptr_t efun_ptr_t;
 
 /* FP_FUNCTIONAL */
 typedef struct {

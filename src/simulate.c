@@ -1,3 +1,4 @@
+#define SUPPRESS_COMPILER_INLINES
 #include "std.h"
 #include "lpc_incl.h"
 #include "file_incl.h"
@@ -56,7 +57,7 @@ static sentence_t *alloc_sentence PROT((void));
 #ifndef NO_ADD_ACTION
 static void remove_sent PROT((object_t *, object_t *));
 #endif
-static void error_handler PROT((char *));
+void error_handler PROT((char *));
 
 INLINE void check_legal_string P1(char *, s)
 {
@@ -299,10 +300,24 @@ int strip_name P3(char *, src, char *, dest, int, size) {
 	if (last_c == '/' && *src == '/') return 0;
 	last_c = (*p++ = *src++);
     }
-    if (p - dest > 2 && p[-1] == 'c' && p[-2] == '.') 
-	p[-2] = 0;
-    else
-	*p = 0;
+
+    /* In some cases, (for example, object loading) this currently gets
+     * run twice, once in find_object, and once in load object.  The
+     * net effect of this is:
+     * /foo.c -> /foo [no such exists, try to load] -> /foo created
+     * /foo.c.c -> /foo.c [no such exists, try to load] -> /foo created
+     *
+     * causing a duplicate object crash.  There are two ways to fix this:
+     * (1) strip multiple .c's so that the output of this routine is something
+     *     that doesn't change if this is run again.
+     * (2) make sure this routine is only called once on any name.
+     *
+     * The first solution is the one currently in use.
+     */
+    while (p - dest > 2 && p[-1] == 'c' && p[-2] == '.') 
+	p -= 2;
+
+    *p = 0;
     return 1;
 }
 
@@ -364,7 +379,7 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
      */
     (void) strcpy(real_name, name);
     (void) strcat(real_name, ".c");
-    if (!simul_efun_is_loading && !strcmp(real_name, simul_efun_file_name)){
+    if (!simul_efun_is_loading && simul_efun_file_name && !strcmp(real_name, simul_efun_file_name)){
         simul_efun_is_loading = 1;
     }
     if (stat(real_name, &c_st) == -1) {
@@ -877,6 +892,12 @@ static void destruct_object_two P1(object_t *, ob)
 	close_referencing_sockets(ob);
     }
 #endif
+#ifdef PACKAGE_PARSER
+    if (ob->pinfo) {
+	parse_free(ob->pinfo);
+	ob->pinfo = 0;
+    }
+#endif
 
     if (ob->flags & O_DESTRUCTED) {
 	return;
@@ -1182,6 +1203,7 @@ void tell_room P3(object_t *, room, svalue_t *, v, array_t *, avoid)
     default:
 	bad_argument(v, T_OBJECT | T_NUMBER | T_REAL | T_STRING,
 		     2, F_TELL_ROOM);
+	IF_DEBUG(buff = 0);
     }
 
     for (ob = room->contains; ob; ob = ob->next_inv) {
@@ -2116,7 +2138,7 @@ static void mudlib_error_handler P2(char *, err, int, catch) {
 }
 #endif
 
-static void error_handler P1(char *, err)
+void error_handler P1(char *, err)
 {
 #ifndef MUDLIB_ERROR_HANDLER
     char *object_name;
@@ -2235,7 +2257,7 @@ void error_needs_free P1(char *, s)
     char err_buf[2048];
     strncpy(err_buf + 1, s, 2047);
     err_buf[0] = '*';		/* all system errors get a * at the start */
-    err_buf[1999] = '\0';
+    err_buf[2047] = '\0';
     FREE_MSTR(s);
 
     error_handler(err_buf);

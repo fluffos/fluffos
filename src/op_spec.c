@@ -3,11 +3,10 @@
  * Normally, these should not be commented out.
  */
 
-operator pop_value, push;
+operator pop_value, push, efun0, efun1, efun2, efun3, efunv;
 
 operator number, real, byte, nbyte, string, short_string, const0, const1;
 
-operator member, index, rindex, nn_range, rn_range, rr_range, nr_range, ne_range, re_range;
 operator aggregate, aggregate_assoc;
 #ifdef DEBUG
 operator break_point;
@@ -22,7 +21,7 @@ operator bbranch_when_zero, bbranch_when_non_zero, bbranch;
 operator branch_ne, branch_ge, branch_le, branch_eq, bbranch_lt;
 
 operator foreach, next_foreach, exit_foreach;
-operator loop_cond;
+operator loop_cond_local, loop_cond_number;
 operator loop_incr;
 operator while_dec;
 
@@ -39,24 +38,26 @@ operator eq, ne, le, lt, ge, gt;
 
 operator inc, dec, pre_inc, post_inc, pre_dec, post_dec;
 
-operator local, global;
-operator local_lvalue, global_lvalue;
-operator index_lvalue, rindex_lvalue;
-operator member_lvalue;
+operator transfer_local;
 
-operator add, void_add_eq, add_eq;
-operator subtract, sub_eq;
-operator multiply, mult_eq;
-operator divide, div_eq;
-operator mod, mod_eq;
-operator not;
-operator and, and_eq;
-operator or, or_eq;
-operator xor, xor_eq;
-operator lsh, lsh_eq, rsh, rsh_eq;
-operator negate, compl;
+/* lvalue eops must be the original eop + 1 */
+operator local, local_lvalue;
+operator global, global_lvalue;
+operator member, member_lvalue;
+operator index, index_lvalue;
+operator rindex, rindex_lvalue;
+operator nn_range, nn_range_lvalue, rn_range, rn_range_lvalue;
+operator rr_range, rr_range_lvalue, nr_range, nr_range_lvalue;
+operator ne_range, re_range;
 
-operator assign, void_assign, void_assign_local;
+/* these must all be together */
+operator add_eq, sub_eq, and_eq, or_eq, xor_eq, lsh_eq, rsh_eq, mult_eq;
+operator div_eq, mod_eq, assign;
+
+operator void_add_eq, void_assign, void_assign_local;
+
+operator add, subtract, multiply, divide, mod, and, or, xor, lsh, rsh;
+operator not, negate, compl;
 
 operator function_constructor;
 operator simul_efun;
@@ -67,5 +68,3 @@ operator parse_command;
 operator new_class;
 operator expand_varargs;
 
-operator nn_range_lvalue, rn_range_lvalue, nr_range_lvalue, rr_range_lvalue;
-operator call_extra;
