@@ -1184,6 +1184,8 @@ static void handle_malloc() {
         the_malloc = "bsdmalloc.c";
     if (lookup_define("MMALLOC"))
         the_malloc = "mmalloc.c";
+    if (lookup_define("GNUMALLOC"))
+        the_malloc = "gnumalloc.c";
 
     if (lookup_define("WRAPPEDMALLOC"))
         the_wrapper = "wrappedmalloc.c";

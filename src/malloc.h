@@ -45,6 +45,14 @@
 
 #endif
 
+#ifdef GNUMALLOC
+#define MALLOC(x)       gnumalloc(x)
+#define FREE(x)         gnufree(x)
+#define REALLOC(x,y)    gnurealloc(x,y)
+#define CALLOC(x,y)     gnucalloc(x,y)
+
+#endif
+
 #define DXALLOC(x,tag,desc)     xalloc(x)
 #define DMALLOC(x,tag,desc)     MALLOC(x)
 #define DREALLOC(x,y,tag,desc)  REALLOC(x,y)

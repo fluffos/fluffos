@@ -1,10 +1,14 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
+new in FluffOS 1.26
+check resets every 5 minutes
+new malloc package (GNU)
+
 new in FluffOS 1.25
 fixed crasher in icode.c (Pinkfish)
 close external ports for external commands(they don't need the telnet port etc)
-
+ 
 new in FluffOS 1.24
 added mxp support (Pinkfish)
 updated with respect to MudOS v22.2b14
