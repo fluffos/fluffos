@@ -50,6 +50,8 @@ typedef struct defn_s {
 
 #define DEF_IS_UNDEFINED 1
 #define DEF_IS_PREDEF    2
+/* used only in edit_source */
+#define DEF_IS_NOT_LOCAL 4
 
 /* to speed up cleaning the hash table, and identify the union */
 #define IHE_RESWORD    0x8000
@@ -154,7 +156,7 @@ void free_unused_identifiers PROT((void));
 void init_identifiers PROT((void));
 char *show_error_context PROT((void));
 #ifdef DEBUGMALLOC_EXTENSIONS
-void mark_all_defines();
+void mark_all_defines PROT((void));
 #endif
 
 #endif

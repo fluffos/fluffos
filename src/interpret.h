@@ -52,6 +52,10 @@
 #define FRAME_FUNP         1
 #define FRAME_CATCH        2
 #define FRAME_FAKE         3
+#define FRAME_MASK         3
+
+#define FRAME_OB_CHANGE    4
+#define FRAME_EXTERNAL     8
 
 typedef struct {
 #ifdef PROFILE_FUNCTIONS
@@ -69,22 +73,19 @@ typedef struct {
     int num_local_variables;	/* Local + arguments */
     char *pc;
     svalue_t *fp;
-    int extern_call;		/* Flag if evaluator should return */
     int function_index_offset;	/* Used when executing functions in inherited
 				 * programs */
     int variable_index_offset;	/* Same */
-    short *break_sp;
     short caller_type;		/* was this a locally called function? */
 } control_stack_t;
 
-typedef struct error_context_stack_s {
-    jmp_buf old_error_context;
-    int old_exists_flag;
+typedef struct error_context_s {
+    jmp_buf context;
     control_stack_t *save_csp;
-    object_t *save_command_giver;
+    object_t *save_command_giver; 
     svalue_t *save_sp;
-    struct error_context_stack_s *next;
-} error_context_stack_t;
+    struct error_context_s *save_context;
+} error_context_t;
 
 /* for apply_master_ob */
 #define MASTER_APPROVED(x) (((x)==(svalue_t *)-1) || ((x) && (((x)->type != T_NUMBER) || (x)->u.number))) 
@@ -187,12 +188,9 @@ extern short caller_type;
 extern char *pc;
 extern svalue_t *sp;
 extern svalue_t *fp;
-extern short *break_sp;
-extern short *start_of_switch_stack;
 extern svalue_t catch_value;
 extern control_stack_t control_stack[MAX_TRACE];
 extern control_stack_t *csp;
-extern error_context_stack_t *ecsp;
 extern int too_deep_error;
 extern int max_eval_error;
 extern int function_index_offset;
@@ -205,6 +203,7 @@ extern int function_index_offset;
 extern int master_ob_is_loading;
 extern int simul_efun_is_loading;
 extern program_t fake_prog;
+extern svalue_t global_lvalue_byte;
 
 /* with LPC_TO_C off, these are defines using eval_instruction */
 #ifdef LPC_TO_C
@@ -247,6 +246,7 @@ INLINE function_t *setup_inherited_frame PROT((function_t *));
 void remove_object_from_stack PROT((object_t *));
 void setup_fake_frame PROT((funptr_t *));
 void remove_fake_frame PROT((void));
+void push_indexed_lvalue PROT((int));
 
 char *type_name PROT((int c));
 void bad_arg PROT((int, int));
@@ -256,6 +256,7 @@ int is_static PROT((char *, object_t *));
 int apply_low PROT((char *, object_t *, int));
 svalue_t *apply PROT((char *, object_t *, int, int));
 svalue_t *call_function_pointer PROT((funptr_t *, int));
+svalue_t *safe_call_function_pointer PROT((funptr_t *, int));
 svalue_t *safe_apply PROT((char *, object_t *, int, int));
 void call___INIT PROT((object_t *));
 array_t *call_all_other PROT((array_t *, char *, int));
@@ -264,7 +265,7 @@ void call_function PROT((program_t *, function_t *));
 svalue_t *apply_master_ob PROT((char *, int));
 svalue_t *safe_apply_master_ob PROT((char *, int));
 int assert_master_ob_loaded PROT((char *, char *));
-void mark_apply_low_cache();
+void mark_apply_low_cache PROT((void));
 
 void translate_absolute_line PROT((int, unsigned short *, int *, int *));
 char *add_slash PROT((char *));
@@ -291,7 +292,10 @@ int validate_shadowing PROT((object_t *));
 void try_reset PROT((object_t *));
 #endif
 
-void push_pop_error_context PROT((int));
+void pop_context PROT((error_context_t *));
+void restore_context PROT((error_context_t *));
+void save_context PROT((error_context_t *));
+
 void pop_control_stack PROT((void));
 INLINE function_t *setup_new_frame PROT((function_t *));
 INLINE void push_control_stack PROT((int, void *));

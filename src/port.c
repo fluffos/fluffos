@@ -29,7 +29,7 @@ int random_number P1(int, n)
     static char called = 0;
 
     if (!called) {
-	int tim;
+	time_t tim;
 
 	time(&tim);
 	srand(tim);
@@ -229,12 +229,10 @@ get_cpu_times P2(unsigned long *, secs, unsigned long *, usecs)
 char *
      get_current_dir P2(char *, buf, int, limit)
 {
-#if defined(NeXT)
-    return getwd(buf);		/* BSD */
-#else
-    extern char *getcwd();
-
+#ifdef HAS_GETCWD
     return getcwd(buf, limit);	/* POSIX */
+#else
+    return getwd(buf);		/* BSD */
 #endif
 }
 

@@ -130,7 +130,7 @@ static u_int nmalloc[NBUCKETS];
 #endif
 static int botch P1(char *, s)
 {
-    fprintf(stderr, "\r\nassertion botched: %s\r\n", s);
+    debug_message("\r\nassertion botched: %s\r\n", s);
     (void) fflush(stderr);	/* just in case user buffered it */
     abort();
     return 0;
@@ -398,24 +398,24 @@ findbucket P2(union overhead *, freep, int, srchlen)
  * frees for each size category.
  */
 void
-show_mstats P1(char *, s)
+show_mstats P2(outbuffer_t *, ob, char *, s)
 {
     register int i, j;
     register union overhead *p;
     int totfree = 0, totused = 0;
 
-    add_vmessage("Memory allocation statistics %s\nfree:\t", s);
+    outbuf_addv(ob, "Memory allocation statistics %s\nfree:\t", s);
     for (i = 0; i < NBUCKETS; i++) {
 	for (j = 0, p = nextf[i]; p; p = p->ov_next, j++);
-	add_vmessage(" %d", j);
+	outbuf_addv(ob, " %d", j);
 	totfree += j * (1 << (i + 3));
     }
-    add_message("\nused:\t");
+    outbuf_add(ob, "\nused:\t");
     for (i = 0; i < NBUCKETS; i++) {
-	add_vmessage(" %d", nmalloc[i]);
+	outbuf_addv(" %d", nmalloc[i]);
 	totused += nmalloc[i] * (1 << (i + 3));
     }
-    add_vmessage("\n\tTotal in use: %d, total free: %d\n",
+    outbuf_addv(ob, "\n\tTotal in use: %d, total free: %d\n",
 		totused, totfree);
 }
 #endif

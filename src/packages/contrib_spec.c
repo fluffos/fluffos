@@ -11,11 +11,14 @@ void set_prompt(string, void|object);
 #endif
 mixed copy(mixed);
 string *functions(object, int default: F_CONST0);
+string *variables(object);
+object *heart_beats();
 string terminal_colour(string, mapping);
 string pluralize(string);
 int file_length(string);
 string upper_case(string);
 int replaceable(object);
-void program_info();
+string program_info();
 void store_variable(string, mixed);
 mixed fetch_variable(string);
+int remove_interactive(object);

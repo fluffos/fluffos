@@ -1,10 +1,6 @@
 #ifndef MACROS_H
 #define MACROS_H
 
-#ifndef EDIT_SOURCE
-#include "configure.h"
-#endif
-
 /*
  * Some useful macros...
  */
@@ -50,15 +46,28 @@
 #  define SIGNED
 #endif				/* __STDC__ */
 
-/*
- * varargs can't be prototyped portably ... *sigh*
- */
-#if defined(LATTICE)
-#  define PROTVARGS(x) (char *, ...)
-#  define PVARGS(v) (char *v, ...)
+/* do things both ways ... */
+#ifdef INCL_STDARG_H
+#  define PROT1V(x) (x, ...)
+#  define P1V(t1, x1) (t1 x1, ...)
+#  define V_START(vlist, last_arg) va_start(vlist, last_arg)
+
+#  define PROT2V(x, y) (x, y, ...)
+#  define P2V(t1, x1, t2, x2) (t1 x1, t2 x2, ...)
+#  define V_START(vlist, last_arg) va_start(vlist, last_arg)
+
+#  define V_VAR(type, var, vlist)
+#  define V_DCL(x)
 #else
-#  define PROTVARGS(x) ()
-#  define PVARGS(v) (v) va_dcl
+#  define PROT1V(x) ()
+#  define P1V(t1, x) (va_alist) va_dcl
+#  define V_START(vlist, last_arg) va_start(vlist)
+
+#  define PROT2V(x, y) ()
+#  define P2V(t1, x1, t2, x2) (va_alist) va_dcl
+
+#  define V_VAR(type, var, vlist) var = va_arg(vlist, type)
+#  define V_DCL(x) x
 #endif
 
 #ifndef INLINE
@@ -138,7 +147,7 @@
 #  define DEBUG_CHECK2(x, y, a, b)
 #endif
 
-#ifndef EDIT_SOURCE
+#if !defined(EDIT_SOURCE) && !defined(_FUNC_SPEC_)
 #define COPY2(x, y)      ((char *)(x))[0] = ((char *)(y))[0]; \
                          ((char *)(x))[1] = ((char *)(y))[1]
 #define LOAD2(x, y)      ((char *)&(x))[0] = *y++; \
@@ -196,6 +205,7 @@ shorts of size other than 2 not implemented
 #define COPY_INT(x, y) COPY4(x,y)
 #define LOAD_INT(x, y) LOAD4(x,y)
 #define STORE_INT(x, y) STORE4(x,y)
+#define INT_32 int
 #else
 ints of size other than 4 not implemented
 #endif

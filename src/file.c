@@ -474,7 +474,7 @@ void smart_log P4(char *, error_file, int, line, char *, what, int, flag)
     push_constant_string(buff);
     mret = safe_apply_master_ob(APPLY_LOG_ERROR, 2);
     if (!mret || mret == (svalue_t *)-1) {
-	fprintf(stderr, "%s", buff);
+	debug_message("%s", buff);
     }
     FREE(buff);
 }				/* smart_log() */
@@ -600,6 +600,7 @@ char *read_file P3(char *, file, int, start, int, len)
 	    }
 	}
 	*p2 = '\0';
+	extend_string(str, p2 - str);
     } 
 	
     fclose(f);
@@ -1011,6 +1012,13 @@ static int do_move P3(char *, from, char *, to, int, flag)
 }
 #endif
 
+void debug_perror P2(char *, what, char *, file) {
+    if (file)
+	debug_message("System Error: %s:%s:%s\n", what, file, strerror(errno));
+    else
+	debug_message("System Error: %s:%s\n", what, strerror(errno));
+}
+
 /*
  * do_rename is used by the efun rename. It is basically a combination
  * of the unix system call rename and the unix command mv.
@@ -1098,7 +1106,7 @@ int copy_file P2(char *, from, char *, to)
     }
     while ((num_read = read(from_fd, buf, 128)) != 0) {
 	if (num_read < 0) {
-	    perror("error in read in copy_file()");
+	    debug_perror("copy_file: read", from);
 	    close(from_fd);
 	    close(to_fd);
 	    return (-3);
@@ -1107,7 +1115,7 @@ int copy_file P2(char *, from, char *, to)
 	while (write_ptr != (buf + num_read)) {
 	    num_written = write(to_fd, write_ptr, num_read);
 	    if (num_written < 0) {
-		perror("error in write in copy_file()");
+		debug_perror("copy_file: write", to);
 		close(from_fd);
 		close(to_fd);
 		return (-3);
@@ -1120,14 +1128,14 @@ int copy_file P2(char *, from, char *, to)
     return 1;
 }
 
-void dump_file_descriptors()
+void dump_file_descriptors P1(outbuffer_t *, out)
 {
     int i;
     dev_t dev;
     struct stat stbuf;
 
-    add_message("Fd  Device Number  Inode   Mode    Uid    Gid      Size\n");
-    add_message("--  -------------  -----  ------  -----  -----  ----------\n");
+    outbuf_add(out, "Fd  Device Number  Inode   Mode    Uid    Gid      Size\n");
+    outbuf_add(out, "--  -------------  -----  ------  -----  -----  ----------\n");
 
     for (i = 0; i < FD_SETSIZE; i++) {
 	/* bug in NeXT OS 2.1, st_mode == 0 for sockets */
@@ -1141,57 +1149,57 @@ void dump_file_descriptors()
 #endif
 	    dev = stbuf.st_dev;
 
-	add_vmessage("%2d", i);
+	outbuf_addv(out, "%2d", i);
 /* #if !defined(LATTICE) && !defined(OS2) */
 #if 0
-	add_vmessage("%6x", major(dev));
-	add_vmessage("%7x", minor(dev));
+	outbuf_addv(out, "%6x", major(dev));
+	outbuf_addv(out, "%7x", minor(dev));
 #else
-	add_vmessage("%13x", dev);
+	outbuf_addv(out, "%13x", dev);
 #endif
-	add_vmessage("%9d", stbuf.st_ino);
-	add_message("  ");
+	outbuf_addv(out, "%9d", stbuf.st_ino);
+	outbuf_add(out, "  ");
 
 	switch (stbuf.st_mode & S_IFMT) {
 
 	case S_IFDIR:
-	    add_message("d");
+	    outbuf_add(out, "d");
 	    break;
 	case S_IFCHR:
-	    add_message("c");
+	    outbuf_add(out, "c");
 	    break;
 #ifdef S_IFBLK
 	case S_IFBLK:
-	    add_message("b");
+	    outbuf_add(out, "b");
 	    break;
 #endif
 	case S_IFREG:
-	    add_message("f");
+	    outbuf_add(out, "f");
 	    break;
 #ifdef S_IFIFO
 	case S_IFIFO:
-	    add_message("p");
+	    outbuf_add(out, "p");
 	    break;
 #endif
 #ifdef S_IFLNK
 	case S_IFLNK:
-	    add_message("l");
+	    outbuf_add(out, "l");
 	    break;
 #endif
 #ifdef S_IFSOCK
 	case S_IFSOCK:
-	    add_message("s");
+	    outbuf_add(out, "s");
 	    break;
 #endif
 	default:
-	    add_message("?");
+	    outbuf_add(out, "?");
 	    break;
 	}
 
-	add_vmessage("%5o", stbuf.st_mode & ~S_IFMT);
-	add_vmessage("%7d", stbuf.st_uid);
-	add_vmessage("%7d", stbuf.st_gid);
-	add_vmessage("%12d", stbuf.st_size);
-	add_message("\n");
+	outbuf_addv(out, "%5o", stbuf.st_mode & ~S_IFMT);
+	outbuf_addv(out, "%7d", stbuf.st_uid);
+	outbuf_addv(out, "%7d", stbuf.st_gid);
+	outbuf_addv(out, "%12d", stbuf.st_size);
+	outbuf_add(out, "\n");
     }
 }

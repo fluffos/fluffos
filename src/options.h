@@ -64,7 +64,7 @@
  *   * Incurs a fair amount of overhead (both memory and CPU)
  */
 #undef WRAPPEDMALLOC
-#define DEBUGMALLOC
+#undef DEBUGMALLOC
 
 /* The following add certain bells and whistles to malloc: */
 
@@ -96,14 +96,14 @@
  * bytes per malloc down to 8.  This macro has no effect if DEBUGMALLOC isn't
  * defined.
  */
-#define DEBUGMALLOC_EXTENSIONS
+#undef DEBUGMALLOC_EXTENSIONS
 
 /* CHECK_MEMORY: defining this (in addition to DEBUGMALLOC) causes the driver
  * to check for memory corruption due to writing before the start or end
  * of a block.  This also adds the check_memory() efun.  Takes a considerable
  * ammount more memory.  Mainly for debugging.
  */
-#define CHECK_MEMORY
+#undef CHECK_MEMORY
 
 /****************************************************************************
  *                          COMPATIBILITY                                   *
@@ -126,7 +126,7 @@
  *   from stripping off more than one leading delimeters.  #undef it for the
  *   old behavior.
  */
-#undef SANE_EXPLODE_STRING
+#define SANE_EXPLODE_STRING
 
 /* EACH: define this if you want the each() operator for mappings.  Undefining
  *   EACH save about 12 bytes per allocated mapping but will make the each()
@@ -134,6 +134,8 @@
  *   its here because people use it and would gripe if I took it away.  The
  *   alternative to each() is to use keys() and iterate over the returned
  *   array.
+ *
+ * Warning: This will probably be removed in the near future
  */
 #undef EACH
 
@@ -159,7 +161,7 @@
 
 /* NO_WIZARDS: for historical reasons, MudOS used to keep track of who
    is and isn't a wizard.  Defining this removes that completely. */
-#undef NO_WIZARDS
+#define NO_WIZARDS
 
 /* OLD_TYPE_BEHAVIOR: reintroduces a bug in type-checking that effectively
  * renders compile time type checking useless.  For backwards compatibility.
@@ -239,13 +241,13 @@
  * errors.  Unfortunately, you need to have one.  Check the testsuite or
  * other libs for an example.
  */
-#undef MUDLIB_ERROR_HANDLER
+#define MUDLIB_ERROR_HANDLER
 
 /* OPTIMIZE_FUNCTION_TABLE_SEARCH: define this if you want the function
  *   table to be sorted for faster lookups (ie binary search).  The flipside
  *   of this is that there is some overhead in maintaining the sorted table.
  */
-#define OPTIMIZE_FUNCTION_TABLE_SEARCH
+#undef OPTIMIZE_FUNCTION_TABLE_SEARCH
 
 /* CONFIG_FILE_DIR specifies a directory in which the driver will search for
  *   config files by default.  If you don't wish to use this define, you may
@@ -443,7 +445,7 @@
  * add/remove code from the driver.                                         *
  *                                                                          *
  * if PACKAGE_XYZZY is defined here, then the code in packages/xyzzy.c      *
- * and the efuns in packages/xyzzy.spec will be added to the driver.        *
+ * and the efuns in packages/xyzzy_spec.c will be added to the driver.      *
  ****************************************************************************/
 
 /* 0.9.18 compatibility efuns */
@@ -555,15 +557,10 @@
 
 /* LPC_TO_C: define this to enable LPC->C compilation.
  *
- * [NOTE: In addition, you must uncomment the C_EFUNS line in your
- *  Makefile or GNUmakefile.  This is done separately to save non-LPC_TO_C
- *  users from having to yacc & compile unused files.]
  * [NOTE: BINARIES must also be defined for LPC->C to work.  Actually
  *  using binaries is not required, though.]
- *
- *   Don't define this for now, work in progress -Beek
  */
-#undef LPC_TO_C
+#define LPC_TO_C
 
 /* TRACE_CODE: define this to enable code tracing (the driver will print
  *   out the previous lines of code to an error) eval_instruction() runs about

@@ -45,6 +45,9 @@ static void add_define P3(char *, name, int, nargs, char *, exps)
 	p->exps = (char *)DREALLOC(p->exps, strlen(exps) + 1, TAG_COMPILER, "add_define: redef");
 	strcpy(p->exps, exps);
 	p->nargs = nargs;
+#ifndef LEXER
+	p->flags &= ~DEF_IS_NOT_LOCAL;
+#endif
     } else {
 	p = ALLOCATE(defn_t, TAG_COMPILER, "add_define: def");
 	p->name = (char *) DXALLOC(strlen(name) + 1, TAG_COMPILER, "add_define: def name");
@@ -101,7 +104,7 @@ static void handle_elif()
     }
 }
 
-static void handle_else() {
+static void handle_else PROT((void)) {
     if (iftop) {
 	if (iftop->state == EXPECT_ELSE) {
 	    iftop->state = EXPECT_ENDIF;
@@ -113,7 +116,7 @@ static void handle_else() {
     }
 }
 
-static void handle_endif() {
+static void handle_endif PROT((void)) {
     if (iftop && (iftop->state == EXPECT_ENDIF ||
 		  iftop->state == EXPECT_ELSE)) {
 	ifstate_t *p = iftop;

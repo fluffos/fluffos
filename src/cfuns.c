@@ -6,6 +6,8 @@
 #include "lpc_to_c.h"
 #include "stralloc.h"
 #include "eoperators.h"
+#include "parse.h"
+#include "qsort.h"
 
 /* temporaries for LPC->C code */
 int lpc_int;
@@ -14,8 +16,6 @@ array_t *lpc_arr;
 mapping_t *lpc_map;
 
 static svalue_t *lval;
-
-static svalue_t glb = { T_LVALUE_BYTE };
 
 void c_return() {
     svalue_t sv;
@@ -113,7 +113,7 @@ void c_void_assign() {
 		if (sp->type != T_NUMBER){
 		    error("Illegal rhs to char lvalue\n");
 		} else {
-		    *glb.u.lvalue_byte = (sp--)->u.number & 0xff;
+		    *global_lvalue_byte.u.lvalue_byte = (sp--)->u.number & 0xff;
 		}
 		break;
 	    }
@@ -166,7 +166,7 @@ void c_post_dec() {
 	break;
     case T_LVALUE_BYTE:
 	sp->type = T_NUMBER;
-	sp->u.number = (*glb.u.lvalue_byte)--;
+	sp->u.number = (*global_lvalue_byte.u.lvalue_byte)--;
 	break;
     default:
 	error("-- of non-numeric argument\n");
@@ -188,7 +188,7 @@ void c_post_inc() {
 	break;
     case T_LVALUE_BYTE:
 	sp->type = T_NUMBER;
-	sp->u.number = (*glb.u.lvalue_byte)++;
+	sp->u.number = (*global_lvalue_byte.u.lvalue_byte)++;
 	break;
     default:
 	error("++ of non-numeric argument\n");
@@ -212,7 +212,7 @@ void c_pre_dec() {
 	break;
     case T_LVALUE_BYTE:
 	sp->type = T_NUMBER;
-	sp->u.number = --(*glb.u.lvalue_byte);
+	sp->u.number = --(*global_lvalue_byte.u.lvalue_byte);
 	break;
     default:
 	error("-- of non-numeric argument\n");
@@ -236,7 +236,7 @@ void c_pre_inc() {
 	break;
     case T_LVALUE_BYTE:
 	sp->type = T_NUMBER;
-	sp->u.number = ++*glb.u.lvalue_byte;
+	sp->u.number = ++*global_lvalue_byte.u.lvalue_byte;
 	break;
     default:
 	error("++ of non-numeric argument\n");
@@ -252,7 +252,7 @@ void c_assign() {
 	if ((sp - 1)->type != T_NUMBER) {
 	    error("Illegal rhs to char lvalue\n");
 	} else {
-	    *glb.u.lvalue_byte = ((sp - 1)->u.number & 0xff);
+	    *global_lvalue_byte.u.lvalue_byte = ((sp - 1)->u.number & 0xff);
 	}
 	break;
     default:
@@ -318,16 +318,16 @@ void c_index() {
 	}
     case T_ARRAY:
 	{
-	    array_t *vec;
+	    array_t *arr;
 	    
 	    if ((sp-1)->type != T_NUMBER)
 		error("Indexing an array with an illegal type\n");
 	    i = (sp - 1)->u.number;
 	    if (i<0) error("Negative index passed to array.\n");
-	    vec = sp->u.arr;
-	    if (i >= vec->size) error("Array index out of bounds.\n");
-	    assign_svalue_no_free(--sp, &vec->item[i]);
-	    free_array(vec);
+	    arr = sp->u.arr;
+	    if (i >= arr->size) error("Array index out of bounds.\n");
+	    assign_svalue_no_free(--sp, &arr->item[i]);
+	    free_array(arr);
 	    break;
 	}
     default:
@@ -532,7 +532,7 @@ void c_add_eq P1(int, is_void) {
     case T_LVALUE_BYTE:
 	if (sp->type != T_NUMBER)
 	    error("Bad right type to += of char lvalue.\n");
-	else *glb.u.lvalue_byte += sp->u.number;
+	else *global_lvalue_byte.u.lvalue_byte += sp->u.number;
 	break;
     default:
 	bad_arg(1, (is_void ? F_VOID_ADD_EQ : F_ADD_EQ));
@@ -648,7 +648,7 @@ void c_inc() {
 	lval->u.real++;
 	break;
     case T_LVALUE_BYTE:
-	++*glb.u.lvalue_byte;
+	++*global_lvalue_byte.u.lvalue_byte;
 	break;
     default:
 	error("++ of non-numeric argument\n");
@@ -669,7 +669,7 @@ void c_dec() {
 	lval->u.real--;
 	break;
     case T_LVALUE_BYTE:
-	--(*glb.u.lvalue_byte);
+	--(*global_lvalue_byte.u.lvalue_byte);
 	break;
     default:
 	error("-- of non-numeric argument\n");
@@ -1093,60 +1093,146 @@ void c_sscanf P1(int, num_arg) {
     fp->u.number = i;
 }
 
-void c_prepare_catch() {
-    push_control_stack(FRAME_CATCH, 0);
-    /* next two probably not necessary... */
-    csp->num_local_variables = (csp - 1)->num_local_variables;	/* marion */
-    /*
-     * Save some global variables that must be restored separately after a
-     * longjmp. The stack will have to be manually popped all the way.
-     */
-    push_pop_error_context(1);
+void c_parse_command P1(int, num_arg) {
+    svalue_t *arg;
+    svalue_t *fp;
+    int i;
 
-    /* signal catch OK - print no err msg */
-    error_recovery_context_exists = CATCH_ERROR_CONTEXT;
+    /*
+     * type checking on first three required parameters to parse_command()
+     */
+    arg = sp - 2;
+    CHECK_TYPES(&arg[0], T_STRING, 1, F_PARSE_COMMAND);
+    CHECK_TYPES(&arg[1], T_OBJECT | T_ARRAY, 2, F_PARSE_COMMAND);
+    CHECK_TYPES(&arg[2], T_STRING, 3, F_PARSE_COMMAND);
+
+    /*
+     * allocate stack frame for rvalues and return value (number of matches);
+     * perform some stack manipulation;
+     */
+    fp = sp;
+    sp += num_arg + 1;
+    arg = sp;
+    *(arg--) = *(fp--);		/* move pattern to top of stack */
+    *(arg--) = *(fp--);		/* move source object or array to just below 
+				   the pattern */
+    *(arg) = *(fp);		/* move source string just below the object */
+    fp->type = T_NUMBER;
+
+    /*
+     * prep area for rvalues
+     */
+    for (i = 1; i <= num_arg; i++)
+	fp[i].type = T_INVALID;
+
+    /*
+     * do it...
+     */
+    i = parse(arg[0].u.string, &arg[1], arg[2].u.string, &fp[1], num_arg);
+
+    /*
+     * remove mandatory parameters
+     */
+    pop_3_elems();
+
+    /*
+     * save return value on stack
+     */
+    fp->u.number = i;
+}
+
+void c_prepare_catch P1(error_context_t *, econ) {
+    save_context(econ);
+    push_control_stack(FRAME_CATCH, 0);
+#if defined(DEBUG) || defined(TRACE_CODE)
+    csp->num_local_variables = (csp - 1)->num_local_variables;	/* marion */
+#endif
     assign_svalue(&catch_value, &const1);
 }
 
-void c_caught_error() {
-    push_pop_error_context(-1);
-    pop_control_stack();
+void c_caught_error P1(error_context_t *, econ) {
+    restore_context(econ);
     sp++;
     *sp = catch_value;
-    assign_svalue_no_free(&catch_value, &const1);
+    catch_value = const1;
 
     /* if it's too deep or max eval, we can't let them catch it */
+    pop_context(econ);
     if (max_eval_error)
 	error("Can't catch eval cost too big error.\n");
     if (too_deep_error)
 	error("Can't catch too deep recursion error.\n");
 }
     
-void c_end_catch() {
+void c_end_catch P1(error_context_t *, econ) {
     pop_stack();/* discard expression value */
     free_svalue(&catch_value, "F_END_CATCH");
-    catch_value.type = T_NUMBER;
-    catch_value.u.number = 0;
+    catch_value = const0;
     /* We come here when no longjmp() was executed */
     pop_control_stack();
-    push_pop_error_context(0);
     push_number(0);
+    pop_context(econ);
 }
+
+static int compare_switch_entries P2(string_switch_entry_t *, p1,
+				     string_switch_entry_t *, p2) {
+    return ((int)p1->string - (int)p2->string);
+}
+
+#ifdef DEBUGMALLOC_EXTENSIONS
+typedef struct msl_s {
+    struct msl_s *next;
+    string_switch_entry_t **tables;
+} msl_t;
+
+static msl_t *g_msl_tables = 0;
+
+static void add_switch_list P1(string_switch_entry_t **, tables) {
+    msl_t *new;
+        
+    new = ALLOCATE(msl_t, TAG_DEBUGMALLOC, "add_switch_list");
+    new->next = g_msl_tables;
+    new->tables = tables;
+}
+	
+void mark_switch_lists PROT((void)) {
+    string_switch_entry_t *p, **tables;
+    msl_t *msl = g_msl_tables;
+    
+    while (msl) {
+	tables = msl->tables;
+	msl = msl->next;
+	while (*tables) {
+	    p = *tables++;
+	    while (p->string) {
+		EXTRA_REF(BLOCK(p->string))++;
+		p++;
+	    }
+	}
+    }
+}
+#endif
 
 void fix_switches P1(string_switch_entry_t **, tables) {
     string_switch_entry_t *p;
 
+#ifdef DEBUGMALLOC_EXTENSIONS
+    add_switch_list(tables);
+#endif
     while (*tables) {
 	p = *tables;
 	while (p->string) {
 	    p->string = make_shared_string(p->string);
 	    p++;
 	}
+	quickSort((char *)(*tables), p - *tables , 
+		  sizeof(string_switch_entry_t), compare_switch_entries);
 	tables++;
     }
 }
 
-int c_string_switch_lookup P2(svalue_t *, str, string_switch_entry_t *, table) {
+int c_string_switch_lookup P3(svalue_t *, str, string_switch_entry_t *, table,
+			      int, table_size) {
     char *the_string;
 
     if (str->subtype == STRING_SHARED)
@@ -1164,8 +1250,38 @@ int c_string_switch_lookup P2(svalue_t *, str, string_switch_entry_t *, table) {
     return -1;
 }
 
-int c_range_switch_lookup P2(int, num, range_switch_entry_t *, table) {
-    /* future work */
+void c_evaluate P1(int, num) {
+    svalue_t *v;
+    svalue_t *arg = sp - num + 1;
+
+    if (arg->type != T_FUNCTION) {
+	pop_n_elems(num-1);
+	return;
+    }
+    if (current_object->flags & O_DESTRUCTED) {
+	pop_n_elems(num);
+	push_undefined();
+	return;
+    }
+    v = call_function_pointer(arg->u.fp, num - 1);
+    free_funp(arg->u.fp);
+    assign_svalue_no_free(sp, v);
+}
+
+int c_range_switch_lookup P3(int, num, range_switch_entry_t *, table,
+			     int, table_size) {
+    /* this should also be a better search method */
+    
+    while (table->index2 != -2) {
+	if (table->index2 == -1) {
+	    if (table->index1 <= num && num <= (table+1)->index1)
+		return (table+1)->index2;
+	    table += 2;
+	} else {
+	    if (table->index1 == num) return table->index2;
+	    table++;
+	}
+    }
     return 0;
 }
 #endif

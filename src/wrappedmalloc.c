@@ -47,12 +47,12 @@ INLINE void wrappedfree P1(void *, ptr)
     FREE(ptr);
 }
 
-void dump_malloc_data()
+void dump_malloc_data P1(outbuffer_t *, ob)
 {
-    add_message("using wrapped malloc:\n\n");
-    add_vmessage("#alloc calls:     %10lu\n", stats.alloc_calls);
-    add_vmessage("#free calls:      %10lu\n", stats.free_calls);
-    add_vmessage("#alloc - #free:   %10lu\n",
+    outbuf_add(ob, "using wrapped malloc:\n\n");
+    outbuf_addv(ob, "#alloc calls:     %10lu\n", stats.alloc_calls);
+    outbuf_addv(ob, "#free calls:      %10lu\n", stats.free_calls);
+    outbuf_addv(ob, "#alloc - #free:   %10lu\n",
 		stats.alloc_calls - stats.free_calls);
-    add_vmessage("#realloc calls:   %10lu\n", stats.realloc_calls);
+    outbuf_addv(ob, "#realloc calls:   %10lu\n", stats.realloc_calls);
 }

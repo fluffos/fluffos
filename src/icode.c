@@ -18,16 +18,21 @@ INLINE static void ins_f_byte PROT((unsigned int));
 static void write_number PROT((int));
 static short read_short PROT((int));
 static void ins_int PROT((int));
-#if 0
+#if SIZEOF_PTR == 8
 static void ins_long PROT((long));
 #endif
 void i_generate_node PROT((parse_node_t *));
 static void i_generate_if_branch PROT((parse_node_t *));
+static void i_generate_loop PROT((int, parse_node_t *, parse_node_t *, 
+				  parse_node_t *));
+static void i_update_branch_list PROT((parse_node_t *));
+     
+
 /*
    this variable is used to properly adjust the 'break_sp' stack in
    the event a 'continue' statement is issued from inside a 'switch'.
 */
-static short switches = 0;
+static int foreach_depth = 0;
 
 static int current_forward_branch;
 static int current_num_values;
@@ -38,10 +43,9 @@ static int line_being_generated;
 static int push_state;
 static int push_start;
 
-static parse_node_t break_dummy = { NODE_BREAK, 0, 1 };
-
 static parse_node_t *break_ptr;
 static parse_node_t *cont_ptr;
+static parse_node_t *switch_break_ptr;
 
 static void ins_real P1(double, l)
 {
@@ -107,7 +111,7 @@ static void ins_int P1(int, l)
  * Store a 8 byte number. It is stored in such a way as to be sure
  * that correct byte order is used, regardless of machine architecture.
  */
-#if 0
+#if SIZEOF_PTR == 8
 static void ins_long P1(long, l)
 {
     if (prog_code + 8 > prog_code_max) {
@@ -153,7 +157,7 @@ static void upd_byte P2(int, offset, unsigned char, b)
     mem_block[current_block].block[offset] = b;
 }
 
-static void end_pushes() {
+static void end_pushes PROT((void)) {
     if (push_state) {
 	if (push_state > 1)
 	    upd_byte(push_start, push_state);
@@ -177,7 +181,7 @@ static void ins_f_byte P1(unsigned int, b)
 #endif
 }
 
-static void initialize_push() {
+static void initialize_push PROT((void)) {
     int what = mem_block[current_block].block[push_start];
     int arg = mem_block[current_block].block[push_start + 1];
 
@@ -297,7 +301,7 @@ switch_to_line P1(int, line) {
 void
 i_generate_node P1(parse_node_t *, expr) {
     if (!expr) return;
-
+    
     if (expr->line && expr->line != line_being_generated)
 	switch_to_line(expr->line);
     switch (expr->kind) {
@@ -319,7 +323,6 @@ i_generate_node P1(parse_node_t *, expr) {
     case F_MOD:
 	i_generate_node(expr->l.expr);
 	/* fall through */
-    case F_RETURN:
     case F_POP_VALUE:
     case F_PRE_INC:
     case F_PRE_DEC:
@@ -335,8 +338,7 @@ i_generate_node P1(parse_node_t *, expr) {
 #ifdef DEBUG
     case F_BREAK_POINT:
 #endif
-    case F_RETURN_ZERO:
-    case F_BREAK:
+    case F_EXIT_FOREACH:
 	ins_f_byte(expr->kind);
 	break;
     case F_VOID_ASSIGN:
@@ -397,6 +399,17 @@ i_generate_node P1(parse_node_t *, expr) {
         i_generate_node(expr->v.expr);
         ins_f_byte(expr->kind);
         break;
+    case F_RETURN:
+    case F_RETURN_ZERO:
+	{
+	    int n;
+	    n = foreach_depth;
+	    while (n--)
+		ins_f_byte(F_EXIT_FOREACH);
+	    if (expr->kind == F_RETURN) i_generate_node(expr->r.expr);
+	    ins_f_byte(expr->kind);
+	    break;
+	}
     case F_STRING:
 	if (push_state && expr->v.number <= PUSH_MASK) {
 	    if (push_state == 1)
@@ -422,7 +435,11 @@ i_generate_node P1(parse_node_t *, expr) {
 	ins_real(expr->v.real);
 	break;
     case F_NEW_CLASS:
-	ins_f_byte(F_NEW_CLASS);
+    case F_GLOBAL_LVALUE:
+    case F_LOCAL_LVALUE:
+    case F_LOOP_INCR:
+    case F_WHILE_DEC:
+	ins_f_byte(expr->kind);
 	ins_byte(expr->v.number);
 	break;
     case F_MEMBER:
@@ -478,19 +495,20 @@ i_generate_node P1(parse_node_t *, expr) {
 	ins_f_byte(F_BRANCH);
 	expr->v.expr = break_ptr;
 	expr->line = CURRENT_PROGRAM_SIZE;
-	expr->type = 0;
 	ins_short(0);
 	break_ptr = expr;
 	break;
+    case NODE_BREAK_SWITCH:
+	ins_f_byte(F_BRANCH);
+	expr->v.expr = switch_break_ptr;
+	expr->line = CURRENT_PROGRAM_SIZE;
+	ins_short(0);
+	switch_break_ptr = expr;
+	break;
     case NODE_CONTINUE:
-	if (switches) {
-	    ins_f_byte(F_POP_BREAK);
-	    ins_byte(switches);
-	}
 	ins_f_byte(F_BRANCH);
 	expr->v.expr = cont_ptr;
 	expr->line = CURRENT_PROGRAM_SIZE;
-	expr->type = 0;
 	ins_short(0);
 	cont_ptr = expr;
 	break;
@@ -550,62 +568,54 @@ i_generate_node P1(parse_node_t *, expr) {
 	break;
     case NODE_FOR:
 	{
-	    int forever = node_always_true(expr->l.expr->v.expr), pos;
+	    parse_node_t *sub = expr->l.expr;
 	    
-	    i_save_loop_info(expr);
-	    i_generate_node(expr->l.expr->l.expr);
-	    end_pushes();
-	    if (!forever) 
-		i_generate_forward_branch(F_BRANCH);
+	    i_generate_node(sub->l.expr);
+	    i_generate_loop(1, expr->r.expr, sub->r.expr, sub->v.expr);
+	}
+	break;
+    case NODE_FOREACH:
+	{
+	    int pos, tmp = 0;
+	    parse_node_t *sub = expr->l.expr;
+	    parse_node_t *save_breaks = break_ptr;
+	    parse_node_t *save_continues = cont_ptr;
+
+	    foreach_depth++;
+	    break_ptr = 0;
+	    cont_ptr = 0;
+	    
+	    i_generate_node(sub->r.expr);
+	    ins_f_byte(F_FOREACH);
+	    if (sub->l.expr->kind == F_GLOBAL_LVALUE) tmp |= 1;
+	    if (sub->v.expr) {
+		tmp |= 4;
+		if (sub->v.expr->kind == F_GLOBAL_LVALUE) tmp |= 2;
+	    }
+	    ins_byte(tmp);
+	    ins_byte(sub->l.expr->v.number);
+	    if (sub->v.expr)
+		ins_byte(sub->v.expr->v.number);
+	    i_generate_forward_branch(F_BRANCH);
+
 	    pos = CURRENT_PROGRAM_SIZE;
 	    i_generate_node(expr->r.expr);
-	    i_update_continues();
-	    i_generate_node(expr->l.expr->r.expr);
-	    if (!forever)
-		i_update_forward_branch();
-	    if (expr->l.expr->v.expr->kind == F_LOOP_COND){
-	        i_generate_node(expr->l.expr->v.expr);
-		ins_short(CURRENT_PROGRAM_SIZE - pos);
-	    } else
-	        i_branch_backwards(generate_conditional_branch(expr->l.expr->v.expr), pos);
-	    i_update_breaks();
-	    i_restore_loop_info();
+	    i_update_branch_list(cont_ptr);
+	    i_update_forward_branch();
+	    ins_f_byte(F_NEXT_FOREACH);
+	    ins_short(CURRENT_PROGRAM_SIZE - pos);
+	    i_update_branch_list(break_ptr);
+	    break_ptr = save_breaks;
+	    cont_ptr = save_continues;
+	    foreach_depth--;
 	}
 	break;
     case NODE_WHILE:
-	{
-	    int forever = node_always_true(expr->l.expr), pos;
-	    i_save_loop_info(expr);
-	    end_pushes();
-	    if (!forever)
-		i_generate_forward_branch(F_BRANCH);
-	    pos =  CURRENT_PROGRAM_SIZE;
-	    i_generate_node(expr->r.expr);
-	    if (!forever)
-		i_update_forward_branch();
-	    i_update_continues();
-	    if (expr->l.expr->kind == F_LOOP_COND){
-	        i_generate_node(expr->l.expr);
-		ins_short(CURRENT_PROGRAM_SIZE - pos);
-	    } else 
-	        i_branch_backwards(generate_conditional_branch(expr->l.expr), pos);
-	    i_update_breaks();
-	    i_restore_loop_info();
-	}
+	i_generate_loop(1, expr->r.expr, 0, expr->l.expr);
 	break;
     case NODE_DO_WHILE:
-        {
-	    int pos;
-            i_save_loop_info(expr);
-	    end_pushes();
-	    pos = CURRENT_PROGRAM_SIZE;
-            i_generate_node(expr->l.expr);
-            i_update_continues();
-            i_branch_backwards(generate_conditional_branch(expr->r.expr), pos);
-            i_update_breaks();
-            i_restore_loop_info();
-	}
-        break;
+	i_generate_loop(0, expr->l.expr, 0, expr->r.expr);
+	break;
     case NODE_CASE_NUMBER:
     case NODE_CASE_STRING:
 	if (expr->v.expr) {
@@ -628,15 +638,17 @@ i_generate_node P1(parse_node_t *, expr) {
     case NODE_SWITCH_DIRECT:
     case NODE_SWITCH_RANGES:
 	{
-	    int addr;
-
-	    i_generate_node(expr->l.expr);
-	    switches++;
+	    int addr, last_break;
+	    parse_node_t *sub = expr->l.expr;
+	    parse_node_t *save_switch_breaks = switch_break_ptr;
+	    
+	    i_generate_node(sub);
+	    switch_break_ptr = 0;
 	    ins_f_byte(F_SWITCH);
 	    ins_byte(0xff); /* kind of table */
 	    addr = CURRENT_PROGRAM_SIZE;
 	    ins_short(0); /* address of table */
-	    ins_short(0); /* break address to push, table is entered before */
+	    ins_short(0); /* end of table */
 	    ins_short(0); /* default address */
 	    i_generate_node(expr->r.expr);
 	    if (expr->v.expr && expr->v.expr->kind == NODE_DEFAULT) {
@@ -646,7 +658,9 @@ i_generate_node P1(parse_node_t *, expr) {
 		upd_short(addr + 4, CURRENT_PROGRAM_SIZE);
 	    }
 	    /* just in case the last case doesn't have a break */
-	    ins_f_byte(F_BREAK);
+	    ins_f_byte(F_BRANCH);
+	    last_break = CURRENT_PROGRAM_SIZE;
+	    ins_short(0);
 	    /* build table */
 	    upd_short(addr, CURRENT_PROGRAM_SIZE);
 #ifdef BINARIES
@@ -688,7 +702,10 @@ i_generate_node P1(parse_node_t *, expr) {
 		else
 		    mem_block[current_block].block[addr-1] = (char)(i*0x10+0x0f);
 	    }
-	    upd_short(addr + 2, CURRENT_PROGRAM_SIZE);
+	    i_update_branch_list(switch_break_ptr);
+	    switch_break_ptr = save_switch_breaks;
+	    upd_short(last_break, CURRENT_PROGRAM_SIZE - last_break);
+	    upd_short(addr+2, CURRENT_PROGRAM_SIZE);
 	    break;
 	}
     case NODE_CONDITIONAL:
@@ -766,13 +783,6 @@ i_generate_node P1(parse_node_t *, expr) {
 	    push_start = CURRENT_PROGRAM_SIZE -2;
 	    push_state = 1;
 	}
-	break;
-    case F_GLOBAL_LVALUE:
-    case F_LOCAL_LVALUE:
-    case F_LOOP_INCR:
-    case F_WHILE_DEC:
-	ins_f_byte(expr->kind);
-	ins_byte(expr->v.number);
 	break;
     case F_LOOP_COND:
 	{
@@ -856,7 +866,9 @@ i_generate_node P1(parse_node_t *, expr) {
     case NODE_ANON_FUNC:
 	{
 	    int addr;
-	    
+	    int save_fd = foreach_depth;
+
+	    foreach_depth = 0;
 	    ins_f_byte(F_FUNCTION_CONSTRUCTOR);
 	    ins_byte(FP_ANONYMOUS);
 	    ins_byte(expr->v.number);
@@ -865,6 +877,7 @@ i_generate_node P1(parse_node_t *, expr) {
 	    ins_short(0);
 	    i_generate_node(expr->r.expr);
 	    upd_short(addr, CURRENT_PROGRAM_SIZE - addr - 2);
+	    foreach_depth = save_fd;
 	    break;
 	}
     default:
@@ -879,7 +892,32 @@ i_generate_node P1(parse_node_t *, expr) {
 	    /* the value of a void efun was used.  Put in a zero. */
 	    ins_byte(F_CONST0);
 	}
-   }
+    }
+}
+
+static void i_generate_loop P4(int, test_first, parse_node_t *, block,
+			       parse_node_t *, inc, parse_node_t *, test) {
+    parse_node_t *save_breaks = break_ptr;
+    parse_node_t *save_continues = cont_ptr;
+    int forever = node_always_true(test);
+    int pos;
+    
+    break_ptr = cont_ptr = 0;
+    end_pushes();
+    if (!forever && test_first)
+	i_generate_forward_branch(F_BRANCH);
+    pos = CURRENT_PROGRAM_SIZE;
+    i_generate_node(block);
+    i_update_branch_list(cont_ptr);
+    if (inc) i_generate_node(inc);
+    if (!forever && test_first) i_update_forward_branch();
+    if (test->kind == F_LOOP_COND) {
+	i_generate_node(test);
+	ins_short(CURRENT_PROGRAM_SIZE - pos);
+    } else i_branch_backwards(generate_conditional_branch(test), pos);
+    i_update_branch_list(break_ptr);
+    break_ptr = save_breaks;
+    cont_ptr = save_continues;
 }
 
 static void
@@ -961,10 +999,6 @@ void i_generate___INIT() {
 }
 
 void i_generate_continue() {
-  if (switches) {
-    ins_f_byte(F_POP_BREAK);
-    ins_byte(switches);
-  }
   /* form a linked list of the continue addresses */
   ins_f_byte(F_BRANCH);
   ins_short(cont_ptr->line);
@@ -1010,57 +1044,17 @@ i_branch_backwards P2(char, b, int, addr) {
     } 
 }
 
-void
-i_update_breaks() {
-  int current_size;
+static void
+i_update_branch_list P1(parse_node_t *, bl) {
+    int current_size;
+    
+    end_pushes();
+    current_size = CURRENT_PROGRAM_SIZE;
 
-  end_pushes();
-  current_size = CURRENT_PROGRAM_SIZE;
-
-  /* traverse the list of nodes filling in the break address
-     required by each "break" statement.
-     */
-  while (!break_ptr->type){
-      upd_short(break_ptr->line, current_size - break_ptr->line);
-      break_ptr = break_ptr->v.expr;
-  }
-}
-
-void
-i_update_continues() {
-  int current_size;
-
-  end_pushes();
-  current_size = CURRENT_PROGRAM_SIZE;
-  /* traverse the linked list filling in the continue address
-     required by each "continue" statement.
-     */
-  while (!cont_ptr->type){
-      upd_short(cont_ptr->line, current_size - cont_ptr->line);
-      cont_ptr = cont_ptr->v.expr;
-  }
-}
-
-void
-i_save_loop_info P1(parse_node_t *, expr) {
-    /* Deactivate the current break and cont pointers */
-    break_ptr->type++;
-    if (switches >= 255)
-	yyerror("Too many nested switches. Maximum is 254.\n");
-    expr->v.expr = cont_ptr;    /* push dummy node */
-    cont_ptr = expr;
-    cont_ptr->type = 1 + switches;
-    switches = 0;
-}
-
-void
-i_restore_loop_info() {
-    /* Reactivate the current break and cont pointers */
-    if (cont_ptr) {
-	switches = cont_ptr->type - 1;
-	cont_ptr = cont_ptr->v.expr;    /* pop dummy node */
+    while (bl) {
+	upd_short(bl->line, current_size - bl->line);
+	bl = bl->v.expr;
     }
-    break_ptr->type--;
 }
 
 void
@@ -1077,12 +1071,10 @@ i_generate_else() {
 
 void
 i_initialize_parser() {
-    switches = 0;
-    break_ptr = &break_dummy;
-    break_dummy.type = 1;
+    foreach_depth = 0;
+    break_ptr = 0;
+    switch_break_ptr = 0;
     cont_ptr = 0;
-    /* This is just to be safe */
-    break_dummy.type = 128;
 
     current_forward_branch = 0;
 
@@ -1242,7 +1234,6 @@ optimize_icode P3(char *, start, char *, pc, char *, end) {
 	case F_SSCANF:
 	case F_PARSE_COMMAND:
 	case F_BYTE:
-	case F_POP_BREAK:
 	case F_NBYTE:
 	    pc++;
 	    break;

@@ -18,7 +18,6 @@
 #define APPLY_CRASH                         "crash"
 #define APPLY_CREATE                        "create"
 #define APPLY_CREATOR_FILE                  "creator_file"
-#define APPLY_DESTRUCT_ENVIRONMENT_OF       "destruct_env_of"
 #define APPLY_DOMAIN_FILE                   "domain_file"
 #define APPLY_EPILOG                        "epilog"
 #define APPLY_ERROR_HANDLER                 "error_handler"

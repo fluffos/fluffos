@@ -6,6 +6,7 @@
 #include "/file.h"
 #include "/object.h"
 #include "/eoperators.h"
+#include "/backend.h"
 #else
 #include "../lpc_incl.h"
 #include "../mapping.h"
@@ -14,6 +15,7 @@
 #include "../file.h"
 #include "../object.h"
 #include "../eoperators.h"
+#include "../backend.h"
 #endif
 
 /* I forgot who wrote this, please claim it :) */
@@ -76,7 +78,7 @@ f_store_variable PROT((void)) {
 
     var = find_status((sp-1)->u.string);
     if (!var)
-	error("No variable named '%s'!", (sp-1)->u.string);
+	error("No variable named '%s'!\n", (sp-1)->u.string);
     sv = &current_object->variables[var - current_object->prog->variable_names];
     free_svalue(sv, "f_store_variable");
     *sv = *sp--;
@@ -92,7 +94,7 @@ f_fetch_variable PROT((void)) {
 
     var = find_status(sp->u.string);
     if (!var)
-	error("No variable named '%s'!", sp->u.string);
+	error("No variable named '%s'!\n", sp->u.string);
     sv = &current_object->variables[var - current_object->prog->variable_names];
     free_string_svalue(sp--);
     push_svalue(sv);
@@ -209,6 +211,9 @@ void f_functions PROT((void)) {
     int flag = (sp--)->u.number;
     unsigned short *types;
 
+    if (sp->u.ob->flags & O_SWAPPED) 
+	load_ob_from_swap(sp->u.ob);
+    
     num = sp->u.ob->prog->num_functions;
     functions = sp->u.ob->prog->functions;
 
@@ -259,6 +264,38 @@ void f_functions PROT((void)) {
     
     pop_stack();
     push_refed_array(vec);
+}
+#endif
+
+/* Beek */
+#ifdef F_VARIABLES
+void f_variables PROT((void)) {
+    int i, num;
+    array_t *vec;
+    variable_t *variables;
+    program_t *prog = sp->u.ob->prog;
+    
+    num = prog->num_variables;
+    variables = prog->variable_names;
+
+    vec = allocate_empty_array(num);
+    i = num;
+    
+    while (i--) {
+	vec->item[i].type = T_STRING;
+	vec->item[i].subtype = STRING_SHARED;
+	vec->item[i].u.string = ref_string(variables[i].name);
+    }
+    
+    pop_stack();
+    push_refed_array(vec);
+}
+#endif
+
+/* also Beek */
+#ifdef F_HEART_BEATS
+void f_heart_beats PROT((void)) {
+    push_refed_array(get_heart_beats());
 }
 #endif
 
@@ -323,7 +360,7 @@ f_terminal_colour P2( int, num_arg, int, instruction)
     }
     /* here we have something to parse */
 
-    parts = ( char ** ) DMALLOC(sizeof( char * ) * NSTRSEGS, TAG_TEMPORARY, "f_terminal_colour: parts");
+    parts = CALLOCATE(NSTRSEGS, char *, TAG_TEMPORARY, "f_terminal_colour: parts");
     if (cp - instr) 	/* starting seg, if not delimiter */
     {
 	num = 1;
@@ -352,15 +389,15 @@ f_terminal_colour P2( int, num_arg, int, instruction)
 		parts[num] = instr;
 		num++;
 		if (num % NSTRSEGS == 0)
-		    parts = ( char ** ) DREALLOC(( char *) parts,
-			sizeof( char * ) * (num + NSTRSEGS), TAG_TEMPORARY, "f_terminal_colour: parts realloc");
+		    parts = RESIZE(parts, num + NSTRSEGS, char *, 
+				   TAG_TEMPORARY, "f_terminal_colour: parts realloc");
 	    }
 	}
     }
     if (strlen(instr))	/* trailing seg, if not delimiter */
 	parts[num++] = instr;
 
-    lens = ( int * ) DMALLOC(sizeof( int ) * num, TAG_TEMPORARY, "f_terminal_colour: lens");
+    lens = CALLOCATE(num, int, TAG_TEMPORARY, "f_terminal_colour: lens");
 
     /* Do the the pointer replacement and calculate the lengths */
     if ( ( mtab = sp->u.map->table ) ) /* a mapping with values */
@@ -390,7 +427,7 @@ f_terminal_colour P2( int, num_arg, int, instruction)
     /* now we have the final string in parts and length in j. let's compose it */
     if (j > max_string_length) {
 	j = max_string_length;
-	cp = deststr = DXALLOC(j + 1, TAG_STRING, "f_terminal_colour: deststr");
+	cp = deststr = new_string(j, "f_terminal_colour: deststr");
 	for (j = i = 0; i < num; i++)
 	{
 	    k = lens[i];
@@ -406,7 +443,7 @@ f_terminal_colour P2( int, num_arg, int, instruction)
 	    }
 	}
     } else {
-	cp = deststr = DXALLOC(j + 1, TAG_STRING, "f_terminal_colour: deststr");
+	cp = deststr = new_string(j, "f_terminal_colour: deststr");
 	for (i = 0; i < num; i++)
 	{
 	    strcpy(cp,parts[i]);
@@ -415,20 +452,11 @@ f_terminal_colour P2( int, num_arg, int, instruction)
     }
     FREE(lens);
     FREE(parts);
-    FREE(savestr);
+    FREE_MSTR(savestr);
     /* now we have what we want */
     pop_stack();
-    switch(sp->subtype)
-    {
-	case STRING_MALLOC:
-	    FREE(sp->u.string);
-	    break;
-	case STRING_SHARED:
-	    free_string(sp->u.string);
-	    break;
-	default:
-	    break;
-    }
+    free_string_svalue(sp);
+    sp->type = T_STRING;
     sp->subtype = STRING_MALLOC;
     sp->u.string = deststr;
 }
@@ -436,48 +464,55 @@ f_terminal_colour P2( int, num_arg, int, instruction)
 
 #ifdef F_PLURALIZE
 
-#define PLURAL_IS(x) { x; return rel; }
-#define PLURAL_IS_SAME { return rel; }
+#define PLURAL_SUFFIX  1
+#define PLURAL_SAME    2
+/* number to chop is added */
+#define PLURAL_CHOP    2
 
-/* This should handle 'of' */
 char *pluralize P1(char *, str) {
     char *pre, *rel, *end;
-    char *p, of_buf[256];
-    int has_of = 0;
+    char *p, *of_buf;
+    int of_len = 0, plen, slen;
     int sz;
+
+    /* default rule */
+    int found = 0;
+    char *suffix = "s";
     
     sz = strlen(str);
     if (sz <= 1) return 0;
 
     /* if it is of the form 'X of Y', pluralize the 'X' part */
     if ((p = strstr(str, " of "))) {
-	strcpy(p, of_buf);
-	has_of = 1;
+	of_buf = alloc_cstring(p, "pluralize: of");
+	of_len = strlen(of_buf);
 	sz = p - str;
     }
 
-    /* currently can add up to 3 chars on the end (child -> children) */
-    pre = DXALLOC(sz+4, TAG_STRING, "pluralize: pre");
-    
     /*
      * first, get rid of determiners.  pluralized forms never have them ;)
      * They can have 'the' so don't remove that 
      */  
     if (str[0] == 'a' || str[0] == 'A') {
 	if (str[1] == ' ') {
-	    strncpy(pre, str + 2, sz - 2);
-	    pre[sz - 2] = 0;
+	    plen = sz - 2;
+	    pre = DXALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
+	    strncpy(pre, str + 2, plen);
 	} else if (str[1] == 'n' && str[2] == ' ') {
-	    strncpy(pre, str + 3, sz - 3);
-	    pre[sz - 3] = 0;
+	    plen = sz - 3;
+	    pre = DXALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
+	    strncpy(pre, str + 3, plen);
 	} else {
-	    strncpy(pre, str, sz);
-	    pre[sz] = 0;
+	    plen = sz;
+	    pre = DXALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
+	    strncpy(pre, str, plen);
 	}
     } else {
-	strncpy(pre, str, sz);
-	pre[sz] = 0;
+	plen = sz;
+	pre = DXALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
+	strncpy(pre, str, plen);
     }
+    pre[plen] = 0;
 
     /*
      * only pluralize the last word, ie: lose adjectives.
@@ -495,82 +530,117 @@ char *pluralize P1(char *, str) {
     switch (rel[0]) {
     case 'B':
     case 'b':
-	if (!strcasecmp(rel + 1, "us"))
-	    PLURAL_IS(strcpy(end, "es"));
+	if (!strcasecmp(rel + 1, "us")) {
+	    found = PLURAL_SUFFIX;
+	    suffix = "es";
+	}
 	break;
     case 'C':
     case 'c':
-	if (!strcasecmp(rel + 1, "hild"))
-	    PLURAL_IS(strcpy(end, "ren"));
+	if (!strcasecmp(rel + 1, "hild")) {
+	    found = PLURAL_SUFFIX;
+	    suffix = "ren";
+	}
 	break;
     case 'D':
     case 'd':
-	if (!strcasecmp(rel + 1, "ie"))
-	    PLURAL_IS(strcpy(rel + 2, "ce"));
-	if (!strcasecmp(rel + 1, "eer"))
-	    PLURAL_IS_SAME;
+	if (!strcasecmp(rel + 1, "ie")) {
+	    found = PLURAL_CHOP + 1;
+	    suffix = "ce";
+	} else
+	if (!strcasecmp(rel + 1, "eer")) {
+	    found = PLURAL_SAME;
+	} else
 	if (!strcasecmp(rel + 1, "ynamo"))
-	    PLURAL_IS(strcpy(end, "s"));
+	    found = PLURAL_SUFFIX;
 	break;
     case 'F':
     case 'f':
-	if (!strcasecmp(rel + 1, "oot"))
-	    PLURAL_IS( rel[1] = 'e'; rel[2] = 'e'; );
-	if (!strcasecmp(rel + 1, "ish"))
-	    PLURAL_IS_SAME;
+	if (!strcasecmp(rel + 1, "oot")) {
+	    found = PLURAL_CHOP + 3;
+	    suffix = "eet";
+	    break;
+	}
+	if (!strcasecmp(rel + 1, "ish")) {
+	    found = PLURAL_SAME;
+	    break;
+	}
 	if (!strcasecmp(rel + 1, "ife"))
-	    PLURAL_IS(strcpy(end, "s"));
+	    found = PLURAL_SUFFIX;
 	break;
     case 'G':
     case 'g':
-	if (!strcasecmp(rel + 1, "oose"))
-	    PLURAL_IS( rel[1] = 'e'; rel[2] = 'e'; );
+	if (!strcasecmp(rel + 1, "oose")) {
+	    found = PLURAL_CHOP + 4;
+	    suffix = "eese";
+	}
 	break;
     case 'H':
     case 'h':
 	if (!strcasecmp(rel + 1, "uman"))
-	    PLURAL_IS(strcpy(end, "s"));
+	    found = PLURAL_SUFFIX;
 	break;
     case 'I':
     case 'i':
-	if (!strcasecmp(rel + 1, "ndex"))
-	    PLURAL_IS(strcpy(rel + 3, "ices"));
+	if (!strcasecmp(rel + 1, "ndex")) {
+	    found = PLURAL_CHOP + 2;
+	    suffix = "ices";
+	}
 	break;
     case 'L':
     case 'l':
-	if (!strcasecmp(rel + 1, "ouse"))
-	    PLURAL_IS(strcpy(rel + 1, "ice"));
+	if (!strcasecmp(rel + 1, "ouse")) {
+	    found = PLURAL_CHOP + 4;
+	    suffix = "ice";
+	}
 	break;
     case 'M':
     case 'm':
-	if (!strcasecmp(rel + 1, "oose"))
-	    PLURAL_IS_SAME;
-	if (!strcasecmp(rel + 1, "ouse"))
-	    PLURAL_IS(strcpy(rel + 1, "ice"));
-	if (!strcasecmp(rel + 1, "atrix"))
-	    PLURAL_IS(strcpy(end - 1, "ces"));
+	if (!strcasecmp(rel + 1, "oose")) {
+	    found = PLURAL_SAME;
+	    break;
+	}
+	if (!strcasecmp(rel + 1, "ouse")) {
+	    found = PLURAL_CHOP + 4;
+	    suffix = "ice";
+	    break;
+	}
+	if (!strcasecmp(rel + 1, "atrix")) {
+	    found = PLURAL_CHOP + 1;
+	    suffix = "ces";
+	}
 	break;
     case 'O':
     case 'o':
-	if (!strcasecmp(rel + 1, "x"))
-	    PLURAL_IS(strcpy(end, "en"));
+	if (!strcasecmp(rel + 1, "x")) {
+	    found = PLURAL_SUFFIX;
+	    suffix = "en";
+	}
 	break;
     case 'S':
     case 's':
-	if (!strcasecmp(rel + 1, "heep"))
-	    PLURAL_IS_SAME;
-	if (!strcasecmp(rel + 1, "phinx"))
-	    PLURAL_IS(strcpy(end - 1, "ges"));
+	if (!strcasecmp(rel + 1, "heep")) {
+	    found = PLURAL_SAME;
+	    break;
+	}
+	if (!strcasecmp(rel + 1, "phinx")) {
+	    found = PLURAL_CHOP + 1;
+	    suffix = "ges";
+	}
 	break;
     case 'T':
     case 't':
-	if (!strcasecmp(rel + 1, "ooth"))
-	    PLURAL_IS( rel[1] = 'e'; rel[2] = 'e'; );
+	if (!strcasecmp(rel + 1, "ooth")) {
+	    found = PLURAL_CHOP + 4;
+	    suffix = "eeth";
+	}
 	break;
     case 'V':
     case 'v':
-	if (!strcasecmp(rel + 1, "ax"))
-	    PLURAL_IS(strcpy(end, "en"));
+	if (!strcasecmp(rel + 1, "ax")) {
+	    found = PLURAL_SUFFIX;
+	    suffix = "en";
+	}
     }
     /*
      * now handle "rules" ... god I hate english!!
@@ -604,58 +674,107 @@ char *pluralize P1(char *, str) {
     /*
      * *o -> *s (also from gordon)
      */
-    switch (end[-1]) {
-    case 'E': case 'e':
-	if (end[-2] == 'f' || end[-2] == 'F')
-	    PLURAL_IS(strcpy(end - 2, "ves"));
-	break;
-    case 'F': case 'f':
-	if (end[-2] == 'e' || end[-2] == 'E')
-	    PLURAL_IS(strcpy(end, "s"));
-	if (end[-2] == 'f' || end[-2] == 'F')
-	    PLURAL_IS(strcpy(end - 2, "ves"));
-	PLURAL_IS(strcpy(end - 1, "ves"));
-	break;
-    case 'H': case 'h':
-	if (end[-2] == 'c' || end[-2]=='s')
-	    PLURAL_IS(strcpy(end, "es"));
-	break;
-    case 'M': case 'm':
-	if (end[-2] == 'u')
-	    PLURAL_IS(strcpy(end - 2, "a"));
-	break;
-    case 'N': case 'n':
-	if (end[-2] == 'a' && end[-3] == 'm')
-	    PLURAL_IS(end[-2] = 'e');
-	break;
-    case 'O': case 'o':
-	PLURAL_IS(strcpy(end, "es"));
-    case 'S': case 's':
-	if (end[-2] == 'i')
-	    PLURAL_IS(end[-2] = 'e');
-	if (end[-2] == 'u')
-	    PLURAL_IS(strcpy(end-2, "i"));
-	if (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o')
-	    PLURAL_IS(strcpy(end, "ses"));
-	PLURAL_IS(strcpy(end, "es"));
-    case 'X': case 'x':
-	PLURAL_IS(strcpy(end, "es"));
-    case 'Y': case 'y':
-	if (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'i'
-	    || end[-2] == 'o' || end[-2] == 'u')
-	    PLURAL_IS(strcpy(end, "s"));
-	PLURAL_IS(strcpy(end - 1, "ies"));
-    case 'Z': case 'z':
-	if (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o'
-	    || end[-2] == 'i' || end[-2] == 'u')
-	    PLURAL_IS(strcpy(end, "zes"));
-	PLURAL_IS(strcpy(end, "es"));
+
+    /* don't have to set found to PLURAL_SUFFIX in these rules b/c
+       found == 0 is interpreted as PLURAL_SUFFIX */
+    if (!found)
+	switch (end[-1]) {
+	case 'E': case 'e':
+	    if (end[-2] == 'f' || end[-2] == 'F') {
+		found = PLURAL_CHOP + 2;
+		suffix = "ves";
+	    }
+	    break;
+	case 'F': case 'f':
+	    if (end[-2] == 'e' || end[-2] == 'E')
+		break;
+	    if (end[-2] == 'f' || end[-2] == 'F') {
+		found = PLURAL_CHOP + 2;
+		suffix = "ves";
+		break;
+	    }
+	    found = PLURAL_CHOP + 1;
+	    suffix = "ves";
+	    break;
+	case 'H': case 'h':
+	    if (end[-2] == 'c' || end[-2]=='s')
+		suffix = "es";
+	    break;
+	case 'M': case 'm':
+	    if (end[-2] == 'u') {
+		found = PLURAL_CHOP + 2;
+		suffix = "a";
+	    }
+	    break;
+	case 'N': case 'n':
+	    if (end[-2] == 'a' && end[-3] == 'm') {
+		found = PLURAL_CHOP + 3;
+		suffix = "men";
+	    }
+	    break;
+	case 'O': case 'o':
+	    suffix = "es";
+	    break;
+	case 'S': case 's':
+	    if (end[-2] == 'i') {
+		found = PLURAL_CHOP + 2;
+		suffix = "es";
+		break;
+	    }
+	    if (end[-2] == 'u') {
+		found = PLURAL_CHOP + 2;
+		suffix = "i";
+		break;
+	    }
+	    if (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o')
+		suffix = "ses";
+	    else
+		suffix = "es";
+	    break;
+	case 'X': case 'x':
+	    suffix = "es";
+	    break;
+	case 'Y': case 'y':
+	    if (end[-2] != 'a' && end[-2] != 'e' && end[-2] != 'i'
+	    && end[-2] != 'o' && end[-2] != 'u')
+		suffix = "ies";
+	    break;
+	case 'Z': case 'z':
+	    if (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o'
+		|| end[-2] == 'i' || end[-2] == 'u')
+		suffix = "zes";
+	    else
+		suffix = "es";
     }
+
+    switch (found) {
+    case PLURAL_SAME:
+	slen = 0;
+	sz = plen + of_len;
+	break;
+    default:
+	plen -= (found - PLURAL_CHOP);
+	/* fallthrough */
+    case 0:
+    case PLURAL_SUFFIX:
+	slen = strlen(suffix);
+	sz = plen + slen + of_len;
+	break;
+    }
+
+    p = new_string(sz, "pluralize");
+    p[sz] = 0;
     
-    /*
-     * default: (* -> *s)
-     */
-    PLURAL_IS(strcpy(end, "s"));
+    strncpy(p, pre, plen);
+    if (slen) 
+	strncpy(p + plen, suffix, slen);
+    if (of_len) {
+	strcpy(p + plen + slen, of_buf);
+	FREE(of_buf);
+    }
+
+    FREE(pre);
+    return p;
 } /* end of pluralize() */
 
 void 
@@ -724,23 +843,12 @@ f_upper_case PROT((void))
 {
     register char *str;
 
-    if (sp->subtype == STRING_MALLOC) {
-	str = sp->u.string;
+    unlink_string_svalue(sp);
+    str = sp->u.string;
 
-	for (; *str; str++)
-	    if (islower(*str))
-		*str -= 'a' - 'A';
-    } else {
-	char *result;
-
-	result = str = string_copy(sp->u.string, "upper_case");
-	for (; str; str++)
-	    if (isupper(*str))
-		*str += 'a' - 'A';
-	free_string_svalue(sp);
-	sp->subtype = STRING_MALLOC;
-	sp->u.string = result;
-    }
+    for (; *str; str++)
+	if (islower(*str))
+	    *str -= 'a' - 'A';
 }
 #endif
 
@@ -774,6 +882,7 @@ void f_program_info PROT((void)) {
     object_t *ob;
     int num_pushes[100];
     int i;
+    outbuffer_t out;
 
     for (i=0; i < 10; i++)
 	num_pushes[i]=0;
@@ -789,14 +898,33 @@ void f_program_info PROT((void)) {
 	walk_program_code(num_pushes, ob->prog);
 #endif
     }
+    outbuf_zero(&out);
     for (i=0; i <10; i++)
-	add_vmessage("%i ", num_pushes[i]);
+	outbuf_addv(&out, "%i ", num_pushes[i]);
     
-    add_vmessage("\nheader size: %i\n", hdr_size);
-    add_vmessage("code size: %i\n", prog_size);
-    add_vmessage("function size: %i\n", func_size);
-    add_vmessage("string size: %i\n", string_size);
-    add_vmessage("var size: %i\n", var_size);
-    add_vmessage("inherit size: %i\n", inherit_size);
+    outbuf_addv(&out, "\nheader size: %i\n", hdr_size);
+    outbuf_addv(&out, "code size: %i\n", prog_size);
+    outbuf_addv(&out, "function size: %i\n", func_size);
+    outbuf_addv(&out, "string size: %i\n", string_size);
+    outbuf_addv(&out, "var size: %i\n", var_size);
+    outbuf_addv(&out, "inherit size: %i\n", inherit_size);
+    
+    outbuf_push(&out);
 }
 #endif
+
+/* Magician - 08May95
+ * int remove_interactive(object ob)
+ * If the object isn't destructed and is interactive, then remove it's
+ * interactivity and disconnect it.  (useful for exec()ing to an already
+ * interactive object, ie, Linkdead reconnection)
+ */
+
+void f_remove_interactive PROT((void)) {
+    if( (sp->u.ob->flags & O_DESTRUCTED) || !(sp->u.ob->interactive) ) {
+        push_number(0);
+    } else {
+        remove_interactive(sp->u.ob);
+        push_number(1);
+    }
+}

@@ -2,17 +2,12 @@
 #define LPC_TO_C_H
 
 #include "lpc_incl.h"
+#include "eoperators.h"
+#include "efun_protos.h"
 
 #ifdef LPC_TO_C
 
-typedef struct {
-    short index1, index2;
-} range_switch_entry_t;
-
-typedef struct string_switch_entry_s {
-    char *string;
-    int index;
-} string_switch_entry_t;
+#include "cfuns.h"
 
 #define C_STRING(x) push_string(current_prog->strings[x], STRING_SHARED)
 #define C_AGGREGATE(x) lpc_arr = allocate_empty_array(x); for (lpc_int=x; lpc_int--; ) lpc_arr->item[lpc_int] = *sp--; (++sp)->type = T_ARRAY; sp->u.arr = lpc_arr

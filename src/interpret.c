@@ -2,7 +2,6 @@
 #include "lpc_incl.h"
 #include "efuns_incl.h"
 #include "file.h"
-#include "uid.h"
 #include "patchlevel.h"
 #include "backend.h"
 #include "simul_efun.h"
@@ -118,14 +117,9 @@ int st_num_arg;
 
 static svalue_t start_of_stack[EVALUATOR_STACK_SIZE];
 svalue_t *end_of_stack = start_of_stack + EVALUATOR_STACK_SIZE - 5;
-static short switch_stack[RUNTIME_SWITCH_STACK_SIZE];
-short *break_sp = switch_stack + RUNTIME_SWITCH_STACK_SIZE;
-/* Points to address to branch to at next F_BREAK */
-short *start_of_switch_stack = switch_stack;
 
 /* Used to throw an error to a catch */
-svalue_t catch_value =
-{T_NUMBER};
+svalue_t catch_value = {T_NUMBER};
 
 /* used by routines that want to return a pointer to an svalue */
 svalue_t apply_ret_value = {T_NUMBER};
@@ -135,8 +129,8 @@ control_stack_t *csp;	/* Points to last element pushed */
 
 int too_deep_error = 0, max_eval_error = 0;
 #define STACK_CHECK if (++sp >= end_of_stack) do { \
-			too_deep_error = 1; error("stack overflow\n"); } \
-		        while (0)
+		    too_deep_error = 1; error("stack overflow\n"); } \
+                    while (0)
 
 void get_version P1(char *, buff)
 {
@@ -215,7 +209,7 @@ int validate_shadowing P1(object_t *, ob)
 	error("shadow: cannot shadow the master object.\n");
     if (ob->shadowing)
 	error("shadow: Can't shadow a shadow.\n");
- #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
+#ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
     /*
      * Want to iterate over the smaller function table, and use binary search
      * on the larger one for faster operation, ie O(m lg n), where m < n,
@@ -238,7 +232,7 @@ int validate_shadowing P1(object_t *, ob)
 		      victim->functions[i].name);
 	}
     }
- #else
+#else
     for (i = 0; i < (int) shadow->num_functions; i++) {
 	for (j = 0; j < (int) victim->num_functions; j++) {
 	    if (shadow->functions[i].name != victim->functions[j].name)
@@ -248,7 +242,7 @@ int validate_shadowing P1(object_t *, ob)
 		      victim->functions[j].name);
 	}
     }
- #endif
+#endif
     push_object(ob);
     ret = apply_master_ob(APPLY_VALID_SHADOW, 1);
     if (!(ob->flags & O_DESTRUCTED) && MASTER_APPROVED(ret)) {
@@ -347,15 +341,21 @@ free_string_svalue P1(svalue_t *, v)
     char *str = v->u.string;
 
     if (v->subtype & STRING_COUNTED) {
-	SUB_STRING(COUNTED_STRLEN(str));
+#ifdef STRING_STATS
+	int size = COUNTED_STRLEN(str);
+#endif
+	SUB_STRING(size);
 	if (!(--(COUNTED_REF(str)))) {
+	    NDBG(BLOCK(str));
 	    if (v->subtype & STRING_HASHED) {
-		SUB_NEW_STRING(COUNTED_STRLEN(str), sizeof(block_t));
+		SUB_NEW_STRING(size, sizeof(block_t));
 		deallocate_string(str);
 	    } else {
-		SUB_NEW_STRING(COUNTED_STRLEN(str), sizeof(malloc_block_t));
+		SUB_NEW_STRING(size, sizeof(malloc_block_t));
 		FREE(MSTR_BLOCK(str));
 	    }
+	} else {
+	    NDBG(BLOCK(str));
 	}
     }
 }
@@ -394,22 +394,29 @@ void unlink_string_svalue P1(svalue_t *, s) {
 #ifdef DEBUG
 INLINE void int_free_svalue P2(svalue_t *, v, char *, tag)
 #else
-     INLINE void int_free_svalue P1(svalue_t *, v)
+INLINE void int_free_svalue P1(svalue_t *, v)
 #endif
 {
+
     if (v->type == T_STRING) {
 	char *str = v->u.string;
 	
 	if (v->subtype & STRING_COUNTED) {
-	    SUB_STRING(COUNTED_STRLEN(str));
+#ifdef STRING_STATS
+	    int size = COUNTED_STRLEN(str);
+#endif
+	    SUB_STRING(size);
 	    if (!(--(COUNTED_REF(str)))) {
+		NDBG(BLOCK(str));
 		if (v->subtype & STRING_HASHED) {
-		    SUB_NEW_STRING(COUNTED_STRLEN(str), sizeof(block_t));
+		    SUB_NEW_STRING(size, sizeof(block_t));
 		    deallocate_string(str);
 		} else {
-		    SUB_NEW_STRING(COUNTED_STRLEN(str), sizeof(malloc_block_t));
+		    SUB_NEW_STRING(size, sizeof(malloc_block_t));
 		    FREE(MSTR_BLOCK(str));
 		}
+	    } else {
+		NDBG(BLOCK(str));
 	    }
 	}
     } else if (v->type & T_REFED) {
@@ -486,6 +493,7 @@ INLINE void assign_svalue_no_free P2(svalue_t *, to, svalue_t *, from)
 	if (from->subtype & STRING_COUNTED) {
 	    ADD_STRING(COUNTED_STRLEN(to->u.string));
 	    COUNTED_REF(to->u.string)++;
+	    NDBG(BLOCK(to->u.string));
 	}
     } else if (from->type & T_REFED) {
 	from->u.refed->ref++;
@@ -533,35 +541,35 @@ INLINE void transfer_push_some_svalues P2(svalue_t *, v, int, num)
      free_svalue(sp--, "pop_stack");
  }
 
- svalue_t glb = { T_LVALUE_BYTE };
+svalue_t global_lvalue_byte = { T_LVALUE_BYTE };
 
- /*
-  * Compute the address of an array element.
-  */
- INLINE void push_indexed_lvalue P1(int, code)
- {
-     int ind;
-     svalue_t *lv;
+/*
+ * Compute the address of an array element.
+ */
+INLINE void push_indexed_lvalue P1(int, code)
+{
+    int ind;
+    svalue_t *lv;
+    
+    if (sp->type == T_LVALUE) {
+	lv = sp->u.lvalue;
+	if (!code && lv->type == T_MAPPING) {
+	    sp--;
+	    if (!(lv = find_for_insert(lv->u.map, sp, 0)))
+		mapping_too_large();
+	    free_svalue(sp, "push_indexed_lvalue: 1");
+	    sp->type = T_LVALUE;
+	    sp->u.lvalue = lv;
+	    return;
+	}
+	
+	if (!((--sp)->type == T_NUMBER))
+	    error("Illegal type of index\n");
 
-     if (sp->type == T_LVALUE){
-	 lv = sp->u.lvalue;
-	 if (!code && lv->type == T_MAPPING){
-	     sp--;
-	     if (!(lv = find_for_insert(lv->u.map, sp, 0)))
-		 mapping_too_large();
-	     free_svalue(sp, "push_indexed_lvalue: 1");
-	     sp->type = T_LVALUE;
-	     sp->u.lvalue = lv;
-	     return;
-	 }
+	ind = sp->u.number;
 
-	 if (!((--sp)->type == T_NUMBER))
-	     error("Illegal type of index\n");
-
-	 ind = sp->u.number;
-
-	 switch(lv->type){
-	     case T_STRING:
+	switch(lv->type){
+	case T_STRING:
 	     {
 		 int len = SVALUE_STRLEN(lv);
 
@@ -570,23 +578,23 @@ INLINE void transfer_push_some_svalues P2(svalue_t *, v, int, num)
 		     error("Index out of bounds in string index lvalue.\n");
 		 unlink_string_svalue(lv);
 		 sp->type = T_LVALUE;
-		 sp->u.lvalue = &glb;
-		 glb.u.lvalue_byte = (unsigned char *)&lv->u.string[ind];
+		 sp->u.lvalue = &global_lvalue_byte;
+		 global_lvalue_byte.u.lvalue_byte = (unsigned char *)&lv->u.string[ind];
 		 break;
 	     }
-
-	     case T_BUFFER:
+	     
+	 case T_BUFFER:
 	     {
 		 if (code) ind = lv->u.buf->size - ind;
 		 if (ind >= lv->u.buf->size || ind < 0)
 		     error("Buffer index out of bounds.\n");
 		 sp->type = T_LVALUE;
-		 sp->u.lvalue = &glb;
-		 glb.u.lvalue_byte = &lv->u.buf->item[ind];
+		 sp->u.lvalue = &global_lvalue_byte;
+		 global_lvalue_byte.u.lvalue_byte = &lv->u.buf->item[ind];
 		 break;
 	     }
-
-	     case T_ARRAY:
+	     
+	 case T_ARRAY:
 	     {
 		 if (code) ind = lv->u.arr->size - ind;
 		 if (ind >= lv->u.arr->size || ind < 0)
@@ -595,353 +603,354 @@ INLINE void transfer_push_some_svalues P2(svalue_t *, v, int, num)
 		 sp->u.lvalue = lv->u.arr->item + ind;
 		 break;
 	     }
-
-	     default:
-		 error("Indexing on illegal type.\n");
-	 }
-     } else {
-	 /* It is now coming from (x <assign_type> y)[index]... = rhs */
-	 /* Where x is a _valid_ lvalue */
-	 /* Hence the reference to sp is at least 2 :) */
-
-	 if (!code && (sp->type == T_MAPPING)){
-	     if (!(lv = find_for_insert(sp->u.map, sp-1, 0)))
-		 mapping_too_large();
-	     sp->u.map->ref--;
-	     free_svalue(--sp, "push_indexed_lvalue: 2");
-	     sp->type = T_LVALUE;
-	     sp->u.lvalue = lv;
-	     return;
-	 }
-
-	 if (!((sp-1)->type == T_NUMBER))
-	     error("Illegal type of index\n");
-
-	 ind = (sp-1)->u.number;
-
-	 switch (sp->type){
-	     case T_STRING:
-	     {
-		 error("Illegal to make char lvalue from assigned string\n");
-		 break;
-	     }
-
-	     case T_BUFFER:
-	     {
-		 if (code) ind = sp->u.buf->size - ind;
-		 if (ind >= sp->u.buf->size || ind < 0)
-		     error("Buffer index out of bounds.\n");
-		 sp->u.buf->ref--;
-		 (--sp)->type = T_LVALUE;
-		 sp->u.lvalue = &glb;
-		 glb.u.lvalue_byte = (sp+1)->u.buf->item + ind;
-		 break;
-	     }
-
-	     case T_ARRAY:
-	     {
-		 if (code) ind = sp->u.arr->size - ind;
-		 if (ind >= sp->u.arr->size || ind < 0)
-		     error("Array index out of bounds.\n");
-		 sp->u.arr->ref--;
-		 (--sp)->type = T_LVALUE;
-		 sp->u.lvalue = (sp+1)->u.arr->item + ind;
-		 break;
-	     }
-
-	     default:
-		 error("Indexing on illegal type.\n");
-	 }
-     }
- }
-
- static struct lvalue_range {
-     int ind1, ind2, size;
-     svalue_t *owner;
- } glr;
-
- static svalue_t glr_sv = { T_LVALUE_RANGE };
-
- static INLINE void push_lvalue_range P1(int, code)
- {
-     int ind1, ind2, size;
-     svalue_t *lv;
-
-     if (sp->type == T_LVALUE){
-	 switch((lv = glr.owner = sp->u.lvalue)->type){
-	 case T_ARRAY:
-	     size = lv->u.arr->size;
-	     break;
-	 case T_STRING: {
-	     size = SVALUE_STRLEN(lv);
-	     unlink_string_svalue(lv);
-	     break;
-	 }
-	 case T_BUFFER:
-	     size = lv->u.buf->size;
-	     break;
+	     
 	 default:
-	     error("Range lvalue on illegal type\n");
+	     error("Indexing on illegal type.\n");
 	 }
-     } else
-	 error("Range lvalue on illegal type\n");
-     
-     if (!((--sp)->type == T_NUMBER)) error("Illegal 2nd index type to range lvalue\n");
+    } else {
+	/* It is now coming from (x <assign_type> y)[index]... = rhs */
+	/* Where x is a _valid_ lvalue */
+	/* Hence the reference to sp is at least 2 :) */
+	
+	if (!code && (sp->type == T_MAPPING)){
+	    if (!(lv = find_for_insert(sp->u.map, sp-1, 0)))
+		mapping_too_large();
+	    sp->u.map->ref--;
+	    free_svalue(--sp, "push_indexed_lvalue: 2");
+	    sp->type = T_LVALUE;
+	    sp->u.lvalue = lv;
+	    return;
+	}
+	
+	if (!((sp-1)->type == T_NUMBER))
+	    error("Illegal type of index\n");
+	
+	ind = (sp-1)->u.number;
+	
+	switch (sp->type){
+	case T_STRING:
+	    {
+		error("Illegal to make char lvalue from assigned string\n");
+		break;
+	    }
+	    
+	case T_BUFFER:
+	    {
+		if (code) ind = sp->u.buf->size - ind;
+		if (ind >= sp->u.buf->size || ind < 0)
+		    error("Buffer index out of bounds.\n");
+		sp->u.buf->ref--;
+		(--sp)->type = T_LVALUE;
+		sp->u.lvalue = &global_lvalue_byte;
+		global_lvalue_byte.u.lvalue_byte = (sp+1)->u.buf->item + ind;
+		break;
+	    }
+	    
+	case T_ARRAY:
+	    {
+		if (code) ind = sp->u.arr->size - ind;
+		if (ind >= sp->u.arr->size || ind < 0)
+		    error("Array index out of bounds.\n");
+		sp->u.arr->ref--;
+		(--sp)->type = T_LVALUE;
+		sp->u.lvalue = (sp+1)->u.arr->item + ind;
+		break;
+	    }
+	    
+	default:
+	    error("Indexing on illegal type.\n");
+	}
+    }
+}
 
-     ind2 = (code & 0x01) ? (size - sp->u.number) : sp->u.number;
-     if (++ind2 < 0 || (ind2 > size))
-	 error("The 2nd index to range lvalue must be >= -1 and < sizeof(indexed value)\n");
+static struct lvalue_range {
+    int ind1, ind2, size;
+    svalue_t *owner;
+} global_lvalue_range;
 
-     if (!((--sp)->type == T_NUMBER)) error("Illegal 1st index type to range lvalue\n");
-     ind1 = (code & 0x10) ? (size - sp->u.number) : sp->u.number;
+static svalue_t global_lvalue_range_sv = { T_LVALUE_RANGE };
 
-     if (ind1 < 0 || ind1 > size)
-	 error("The 1st index to range lvalue must be >= 0 and <= sizeof(indexed value)\n");
+static INLINE void push_lvalue_range P1(int, code)
+{
+    int ind1, ind2, size;
+    svalue_t *lv;
+    
+    if (sp->type == T_LVALUE){
+	switch((lv = global_lvalue_range.owner = sp->u.lvalue)->type){
+	case T_ARRAY:
+	    size = lv->u.arr->size;
+	    break;
+	case T_STRING: {
+	    size = SVALUE_STRLEN(lv);
+	    unlink_string_svalue(lv);
+	    break;
+	}
+	case T_BUFFER:
+	    size = lv->u.buf->size;
+	    break;
+	default:
+	    error("Range lvalue on illegal type\n");
+	}
+    } else
+	error("Range lvalue on illegal type\n");
+    
+    if (!((--sp)->type == T_NUMBER)) error("Illegal 2nd index type to range lvalue\n");
+    
+    ind2 = (code & 0x01) ? (size - sp->u.number) : sp->u.number;
+    if (++ind2 < 0 || (ind2 > size))
+	error("The 2nd index to range lvalue must be >= -1 and < sizeof(indexed value)\n");
+    
+    if (!((--sp)->type == T_NUMBER)) error("Illegal 1st index type to range lvalue\n");
+    ind1 = (code & 0x10) ? (size - sp->u.number) : sp->u.number;
+    
+    if (ind1 < 0 || ind1 > size)
+	error("The 1st index to range lvalue must be >= 0 and <= sizeof(indexed value)\n");
+    
+    global_lvalue_range.ind1 = ind1;
+    global_lvalue_range.ind2 = ind2;
+    global_lvalue_range.size = size;
+    sp->type = T_LVALUE;
+    sp->u.lvalue = &global_lvalue_range_sv;
+}
 
-     glr.ind1 = ind1;
-     glr.ind2 = ind2;
-     glr.size = size;
-     sp->type = T_LVALUE;
-     sp->u.lvalue = &glr_sv;
- }
+INLINE void copy_lvalue_range P1(svalue_t *, from)
+{
+    int ind1, ind2, size, fsize;
+    svalue_t *owner;
+    
+    ind1 = global_lvalue_range.ind1;
+    ind2 = global_lvalue_range.ind2;
+    size = global_lvalue_range.size;
+    owner = global_lvalue_range.owner;
+    
+    switch(owner->type){
+    case T_ARRAY:
+	{
+	    array_t *fv, *dv;
+	    svalue_t *fptr, *dptr;
+	    if (from->type != T_ARRAY) error("Illegal rhs to array range lvalue\n");
+	    
+	    fv = from->u.arr;
+	    fptr = fv->item;
+	    
+	    if ((fsize = fv->size) == ind2 - ind1){
+		dptr = (owner->u.arr)->item + ind1;
+		
+		if (fv->ref == 1){
+		    /* Transfer the svalues */
+		    while (fsize--){
+			free_svalue(dptr, "copy_lvalue_range : 1");
+			*dptr++ = *fptr++;
+		    }
+		    free_empty_array(fv);
+		} else {
+		    while (fsize--) assign_svalue(dptr++, fptr++);
+		    fv->ref--;
+		}
+	    } else {
+		array_t *old_dv = owner->u.arr;
+		svalue_t *old_dptr = old_dv->item;
+		
+		/* Need to reallocate the array */
+		dv = allocate_empty_array(size - ind2 + ind1 + fsize);
+		dptr = dv->item;
+		
+		/* ind1 can range from 0 to sizeof(old_dv) */
+		while (ind1--) assign_svalue_no_free(dptr++, old_dptr++);
+		
+		if (fv->ref == 1){
+		    while (fsize--) *dptr++ = *fptr++;
+		    free_empty_array(fv);
+		} else {
+		    while (fsize--) assign_svalue_no_free(dptr++, fptr++);
+		    fv->ref--;
+		}
+		
+		/* ind2 can range from 0 to sizeof(old_dv) */
+		old_dptr = old_dv->item + ind2;
+		size -= ind2;
+		
+		while (size--) assign_svalue_no_free(dptr++, old_dptr++);
+		free_array(old_dv);
+		
+		owner->u.arr = dv;
+	    }
+	    break;
+	}
+	
+    case T_STRING:
+	{
+	    if (from->type != T_STRING) error("Illegal rhs to string range lvalue.\n");
+	    
+	    if ((fsize = SVALUE_STRLEN(from)) == ind2 - ind1){
+		/* since fsize >= 0, ind2 - ind1 <= strlen(orig string) */
+		/* because both of them can only range from 0 to len */
+		
+		strncpy(owner->u.string + ind1, from->u.string, fsize);
+	    } else {
+		char *tmp, *dstr = owner->u.string;
+		
+		owner->u.string = tmp = new_string(size - ind2 + ind1 + fsize + 1, "copy_lvalue_range");
+		if (ind1 >= 1){
+		    strncpy(tmp, dstr, ind1);
+		    tmp += ind1;
+		}
+		strcpy(tmp, from->u.string);
+		tmp += fsize;
+		
+		size -= ind2;
+		if (size >= 1){
+		    strncpy(tmp, dstr + ind2, size);
+		    *(tmp + size) = 0;
+		}
+		FREE_MSTR(dstr);
+	    }
+	    free_string_svalue(from);
+	    break;
+	}
+	
+    case T_BUFFER:
+	{
+	    if (from->type != T_BUFFER) error("Illegal rhs to buffer range lvalue.\n");
+	    
+	    if ((fsize = from->u.buf->size) == ind2 - ind1){
+		memcpy((owner->u.buf)->item + ind1, from->u.buf->item, fsize);
+	    } else {
+		buffer_t *b;
+		unsigned char *old_item = (owner->u.buf)->item;
+		unsigned char *new_item;
+		
+		b = allocate_buffer(size - ind2 + ind1 + fsize);
+		new_item = b->item;
+		if (ind1 >= 1){
+		    memcpy(b->item, old_item, ind1);
+		    new_item += ind1;
+		}
+		memcpy(new_item, from->u.buf, fsize);
+		new_item += fsize;
+		
+		if ((size -= ind2) >= 1)
+		    memcpy(new_item, old_item + ind2, size);
+		free_buffer(owner->u.buf);
+		owner->u.buf = b;
+	    }
+	    free_buffer(from->u.buf);
+	    break;
+	}
+    }
+}
 
- INLINE void copy_lvalue_range P1(svalue_t *, from)
- {
-     int ind1, ind2, size, fsize;
-     svalue_t *owner;
+INLINE void assign_lvalue_range P1(svalue_t *, from)
+{
+    int ind1, ind2, size, fsize;
+    svalue_t *owner;
+    
+    ind1 = global_lvalue_range.ind1;
+    ind2 = global_lvalue_range.ind2;
+    size = global_lvalue_range.size;
+    owner = global_lvalue_range.owner;
+    
+    switch(owner->type){
+    case T_ARRAY:
+	{
+	    array_t *fv, *dv;
+	    svalue_t *fptr, *dptr;
+	    if (from->type != T_ARRAY) error("Illegal rhs to array range lvalue\n");
+	    
+	    fv = from->u.arr;
+	    fptr = fv->item;
+	    
+	    if ((fsize = fv->size) == ind2 - ind1){
+		dptr = (owner->u.arr)->item + ind1;
+		while (fsize--) assign_svalue(dptr++, fptr++);
+	    } else {
+		array_t *old_dv = owner->u.arr;
+		svalue_t *old_dptr = old_dv->item;
+		
+		/* Need to reallocate the array */
+		dv = allocate_empty_array(size - ind2 + ind1 + fsize);
+		dptr = dv->item;
+		
+		/* ind1 can range from 0 to sizeof(old_dv) */
+		while (ind1--) assign_svalue_no_free(dptr++, old_dptr++);
+		
+		while (fsize--) assign_svalue_no_free(dptr++, fptr++);
+		
+		/* ind2 can range from 0 to sizeof(old_dv) */
+		old_dptr = old_dv->item + ind2;
+		size -= ind2;
+		
+		while (size--) assign_svalue_no_free(dptr++, old_dptr++);
+		free_array(old_dv);
+		
+		owner->u.arr = dv;
+	    }
+	    break;
+	}
+	
+    case T_STRING:
+	{
+	    if (from->type != T_STRING) error("Illegal rhs to string range lvalue.\n");
+	    
+	    if ((fsize = SVALUE_STRLEN(from)) == ind2 - ind1){
+		/* since fsize >= 0, ind2 - ind1 <= strlen(orig string) */
+		/* because both of them can only range from 0 to len */
+		
+		strncpy(owner->u.string + ind1, from->u.string, fsize);
+	    } else {
+		char *tmp, *dstr = owner->u.string;
+		
+		owner->u.string = tmp = new_string(size - ind2 + ind1 + fsize + 1, "assign_lvalue_range");
+		if (ind1 >= 1){
+		    strncpy(tmp, dstr, ind1);
+		    tmp += ind1;
+		}
+		strcpy(tmp, from->u.string);
+		tmp += fsize;
+		
+		size -= ind2;
+		if (size >= 1){
+		    strncpy(tmp, dstr + ind2, size);
+		    *(tmp + size) = 0;
+		}
+		FREE_MSTR(dstr);
+	    }
+	    break;
+	}
+	
+    case T_BUFFER:
+	{
+	    if (from->type != T_BUFFER) error("Illegal rhs to buffer range lvalue.\n");
+	    
+	    if ((fsize = from->u.buf->size) == ind2 - ind1){
+		memcpy((owner->u.buf)->item + ind1, from->u.buf->item, fsize);
+	    } else {
+		buffer_t *b;
+		unsigned char *old_item = (owner->u.buf)->item;
+		unsigned char *new_item;
+		
+		b = allocate_buffer(size - ind2 + ind1 + fsize);
+		new_item = b->item;
+		if (ind1 >= 1){
+		    memcpy(b->item, old_item, ind1);
+		    new_item += ind1;
+		}
+		memcpy(new_item, from->u.buf, fsize);
+		new_item += fsize;
+		
+		if ((size -= ind2) >= 1)
+		    memcpy(new_item, old_item + ind2, size);
+		free_buffer(owner->u.buf);
+		owner->u.buf = b;
+	    }
+	    break;
+	}
+    }
+}
 
-     ind1 = glr.ind1;
-     ind2 = glr.ind2;
-     size = glr.size;
-     owner = glr.owner;
-
-     switch(owner->type){
-     case T_ARRAY:
-	 {
-	     array_t *fv, *dv;
-	     svalue_t *fptr, *dptr;
-	     if (from->type != T_ARRAY) error("Illegal rhs to array range lvalue\n");
-
-	     fv = from->u.arr;
-	     fptr = fv->item;
-
-	     if ((fsize = fv->size) == ind2 - ind1){
-		 dptr = (owner->u.arr)->item + ind1;
-
-		 if (fv->ref == 1){
-		     /* Transfer the svalues */
-		     while (fsize--){
-			 free_svalue(dptr, "copy_lvalue_range : 1");
-			 *dptr++ = *fptr++;
-		     }
-		     free_empty_array(fv);
-		 } else {
-		     while (fsize--) assign_svalue(dptr++, fptr++);
-		     fv->ref--;
-		 }
-	     } else {
-		 array_t *old_dv = owner->u.arr;
-		 svalue_t *old_dptr = old_dv->item;
-
-		 /* Need to reallocate the array */
-		 dv = allocate_empty_array(size - ind2 + ind1 + fsize);
-		 dptr = dv->item;
-
-		 /* ind1 can range from 0 to sizeof(old_dv) */
-		 while (ind1--) assign_svalue_no_free(dptr++, old_dptr++);
-
-		 if (fv->ref == 1){
-		     while (fsize--) *dptr++ = *fptr++;
-		     free_empty_array(fv);
-		 } else {
-		     while (fsize--) assign_svalue_no_free(dptr++, fptr++);
-		     fv->ref--;
-		 }
-
-		 /* ind2 can range from 0 to sizeof(old_dv) */
-		 old_dptr = old_dv->item + ind2;
-		 size -= ind2;
-
-		 while (size--) assign_svalue_no_free(dptr++, old_dptr++);
-		 free_array(old_dv);
-
-		 owner->u.arr = dv;
-	     }
-	     break;
-	 }
-
-	 case T_STRING:
-	 {
-	     if (from->type != T_STRING) error("Illegal rhs to string range lvalue.\n");
-
-	     if ((fsize = SVALUE_STRLEN(from)) == ind2 - ind1){
-		 /* since fsize >= 0, ind2 - ind1 <= strlen(orig string) */
-		 /* because both of them can only range from 0 to len */
-
-		 strncpy(owner->u.string + ind1, from->u.string, fsize);
-	     } else {
-		 char *tmp, *dstr = owner->u.string;
-
-		 owner->u.string = tmp = new_string(size - ind2 + ind1 + fsize + 1, "copy_lvalue_range");
-		 if (ind1 >= 1){
-		     strncpy(tmp, dstr, ind1);
-		     tmp += ind1;
-		 }
-		 strcpy(tmp, from->u.string);
-		 tmp += fsize;
-
-		 size -= ind2;
-		 if (size >= 1){
-		     strncpy(tmp, dstr + ind2, size);
-		     *(tmp + size) = 0;
-		 }
-		 FREE_MSTR(dstr);
-	     }
-	     free_string_svalue(from);
-	     break;
-	 }
-
-	 case T_BUFFER:
-	 {
-	     if (from->type != T_BUFFER) error("Illegal rhs to buffer range lvalue.\n");
-
-	     if ((fsize = from->u.buf->size) == ind2 - ind1){
-		 memcpy((owner->u.buf)->item + ind1, from->u.buf->item, fsize);
-	     } else {
-		 buffer_t *b;
-		 unsigned char *old_item = (owner->u.buf)->item;
-		 unsigned char *new_item;
-
-		 b = allocate_buffer(size - ind2 + ind1 + fsize);
-		 new_item = b->item;
-		 if (ind1 >= 1){
-		     memcpy(b->item, old_item, ind1);
-		     new_item += ind1;
-		 }
-		 memcpy(new_item, from->u.buf, fsize);
-		 new_item += fsize;
-
-		 if ((size -= ind2) >= 1)
-		     memcpy(new_item, old_item + ind2, size);
-		 free_buffer(owner->u.buf);
-		 owner->u.buf = b;
-	     }
-	     free_buffer(from->u.buf);
-	     break;
-	 }
-     }
- }
- INLINE void assign_lvalue_range P1(svalue_t *, from)
- {
-     int ind1, ind2, size, fsize;
-     svalue_t *owner;
-
-     ind1 = glr.ind1;
-     ind2 = glr.ind2;
-     size = glr.size;
-     owner = glr.owner;
-
-     switch(owner->type){
-	 case T_ARRAY:
-	 {
-	     array_t *fv, *dv;
-	     svalue_t *fptr, *dptr;
-	     if (from->type != T_ARRAY) error("Illegal rhs to array range lvalue\n");
-
-	     fv = from->u.arr;
-	     fptr = fv->item;
-
-	     if ((fsize = fv->size) == ind2 - ind1){
-		 dptr = (owner->u.arr)->item + ind1;
-		 while (fsize--) assign_svalue(dptr++, fptr++);
-	     } else {
-		 array_t *old_dv = owner->u.arr;
-		 svalue_t *old_dptr = old_dv->item;
-
-		 /* Need to reallocate the array */
-		 dv = allocate_empty_array(size - ind2 + ind1 + fsize);
-		 dptr = dv->item;
-
-		 /* ind1 can range from 0 to sizeof(old_dv) */
-		 while (ind1--) assign_svalue_no_free(dptr++, old_dptr++);
-
-		 while (fsize--) assign_svalue_no_free(dptr++, fptr++);
-
-		 /* ind2 can range from 0 to sizeof(old_dv) */
-		 old_dptr = old_dv->item + ind2;
-		 size -= ind2;
-
-		 while (size--) assign_svalue_no_free(dptr++, old_dptr++);
-		 free_array(old_dv);
-
-		 owner->u.arr = dv;
-	     }
-	     break;
-	 }
-
-	 case T_STRING:
-	 {
-	     if (from->type != T_STRING) error("Illegal rhs to string range lvalue.\n");
-
-	     if ((fsize = SVALUE_STRLEN(from)) == ind2 - ind1){
-		 /* since fsize >= 0, ind2 - ind1 <= strlen(orig string) */
-		 /* because both of them can only range from 0 to len */
-
-		 strncpy(owner->u.string + ind1, from->u.string, fsize);
-	     } else {
-		 char *tmp, *dstr = owner->u.string;
-
-		 owner->u.string = tmp = new_string(size - ind2 + ind1 + fsize + 1, "assign_lvalue_range");
-		 if (ind1 >= 1){
-		     strncpy(tmp, dstr, ind1);
-		     tmp += ind1;
-		 }
-		 strcpy(tmp, from->u.string);
-		 tmp += fsize;
-
-		 size -= ind2;
-		 if (size >= 1){
-		     strncpy(tmp, dstr + ind2, size);
-		     *(tmp + size) = 0;
-		 }
-		 FREE_MSTR(dstr);
-	     }
-	     break;
-	 }
-
-	 case T_BUFFER:
-	 {
-	     if (from->type != T_BUFFER) error("Illegal rhs to buffer range lvalue.\n");
-
-	     if ((fsize = from->u.buf->size) == ind2 - ind1){
-		 memcpy((owner->u.buf)->item + ind1, from->u.buf->item, fsize);
-	     } else {
-		 buffer_t *b;
-		 unsigned char *old_item = (owner->u.buf)->item;
-		 unsigned char *new_item;
-
-		 b = allocate_buffer(size - ind2 + ind1 + fsize);
-		 new_item = b->item;
-		 if (ind1 >= 1){
-		     memcpy(b->item, old_item, ind1);
-		     new_item += ind1;
-		 }
-		 memcpy(new_item, from->u.buf, fsize);
-		 new_item += fsize;
-
-		 if ((size -= ind2) >= 1)
-		     memcpy(new_item, old_item + ind2, size);
-		 free_buffer(owner->u.buf);
-		 owner->u.buf = b;
-	     }
-	     break;
-	 }
-     }
- }
-
- /*
-  * Deallocate 'n' values from the stack.
-  */
+/*
+ * Deallocate 'n' values from the stack.
+ */
 INLINE void
 pop_n_elems P1(int, n)
 {
@@ -981,30 +990,29 @@ void bad_arg P2(int, arg, int, instr)
 
 void bad_argument P4(svalue_t *, val, int, type, int, arg, int, instr)
 {
-    char *buf;
+    outbuffer_t outbuf;
     int flag = 0;
     int j = TYPE_CODES_START;
     int k = 0;
 
-    buf = new_string(300, "bad_argument");
-    sprintf(buf, "Bad argument %d to %s%s\nExpected: ", arg, 
-	    get_f_name(instr), (instr < BASE ? "" : "()"));
+    outbuf_zero(&outbuf);
+    outbuf_addv(&outbuf, "Bad argument %d to %s%s\nExpected: ", arg, 
+		get_f_name(instr), (instr < BASE ? "" : "()"));
 
     do {
 	if (type & j) {
-	    if (flag) strcat(buf, " or ");
+	    if (flag) outbuf_add(&outbuf, " or ");
 	    else flag = 1;
-	    strcat(buf, type_names[k]);
+	    outbuf_add(&outbuf, type_names[k]);
 	}
 	k++;
     } while (!((j <<= 1) & TYPE_CODES_END));
 
-    strcat(buf, " Got: ");
-    MSTR_UPDATE_SIZE(buf, strlen(buf));
-    svalue_to_string(val, &buf, 300, 0, 0, 0);
-    strcat(buf, ".\n");
-    /* no need to fix length */
-    error_needs_free(buf);
+    outbuf_add(&outbuf, " Got: ");
+    svalue_to_string(val, &outbuf, 0, 0, 0);
+    outbuf_add(&outbuf, ".\n");
+    outbuf_fix(&outbuf);
+    error_needs_free(outbuf.buffer);
 }
 
 INLINE void
@@ -1017,22 +1025,20 @@ push_control_stack P2(int, frkind, void *, funp)
     csp++;
     csp->caller_type = caller_type;
     csp->ob = current_object;
-    csp->framekind = frkind;	/* Only used for tracebacks */
+    csp->framekind = frkind;
     csp->fr.func = (function_t *)funp;
     csp->prev_ob = previous_ob;
     csp->fp = fp;
     csp->prog = current_prog;
-    /* csp->extern_call = 0; It is set by eval_instruction() */
     csp->pc = pc;
     csp->function_index_offset = function_index_offset;
     csp->variable_index_offset = variable_index_offset;
-    csp->break_sp = break_sp;
- #ifdef PROFILE_FUNCTIONS
-    if (frkind == FRAME_FUNCTION) {
+#ifdef PROFILE_FUNCTIONS
+    if ((frkind & FRAME_MASK) == FRAME_FUNCTION) {
 	get_cpu_times(&(csp->entry_secs), &(csp->entry_usecs));
 	((function_t *)funp)->calls++;
     }
- #endif
+#endif
 }
 
 /*
@@ -1043,8 +1049,8 @@ void pop_control_stack()
 {
     DEBUG_CHECK(csp == (control_stack - 1),
 		"Popped out of the control stack\n");
- #ifdef PROFILE_FUNCTIONS
-    if (csp->framekind == FRAME_FUNCTION) {
+#ifdef PROFILE_FUNCTIONS
+    if ((csp->framekind & FRAME_MASK) == FRAME_FUNCTION) {
 	long secs, usecs, dsecs;
 
 	get_cpu_times((unsigned long *) &secs, (unsigned long *) &usecs);
@@ -1054,12 +1060,12 @@ void pop_control_stack()
 	if (csp != control_stack) {
 	    function_t *f;
 
-	    if ( (csp - 1)->framekind == FRAME_FUNCTION) {
+	    if (((csp - 1)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
 		(csp - 1)->fr.func->children += dsecs;
 	    }
 	}
     }
- #endif
+#endif
     current_object = csp->ob;
     current_prog = csp->prog;
     previous_ob = csp->prev_ob;
@@ -1068,7 +1074,6 @@ void pop_control_stack()
     fp = csp->fp;
     function_index_offset = csp->function_index_offset;
     variable_index_offset = csp->variable_index_offset;
-    break_sp = csp->break_sp;
     csp--;
 }
 
@@ -1182,13 +1187,13 @@ static void do_trace_call P1(function_t *, funp)
 	if (TRACETST(TRACE_ARGS)) {
 	    int i;
 
-	    add_vmessage(" with %d arguments: ", funp->num_arg);
+	    add_vmessage(command_giver, " with %d arguments: ", funp->num_arg);
 	    for (i = funp->num_arg - 1; i >= 0; i--) {
 		print_svalue(&sp[-i]);
-		add_message(" ");
+		add_message(command_giver, " ");
 	    }
 	}
-	add_message("\n");
+	add_message(command_giver, "\n");
     }
 }
 #endif
@@ -1226,12 +1231,12 @@ setup_new_frame P1(function_t *, funp)
     }
     /* Remove excessive arguments */
     setup_variables(csp->num_local_variables, funp->num_local, funp->num_arg);
- #ifdef TRACE
+#ifdef TRACE
     tracedepth++;
     if (TRACEP(TRACE_CALL)) {
 	do_trace_call(funp);
     }
- #endif
+#endif
     return funp;
 }
 
@@ -1247,21 +1252,22 @@ INLINE function_t *setup_inherited_frame P1(function_t *, funp)
     }
     /* Remove excessive arguments */
     setup_variables(csp->num_local_variables, funp->num_local, funp->num_arg);
- #ifdef TRACE
+#ifdef TRACE
     tracedepth++;
     if (TRACEP(TRACE_CALL)) {
 	do_trace_call(funp);
     }
- #endif
+#endif
     return funp;
 }
 
-
+#ifdef DEBUG
 static void break_point()
 {
     if (sp - fp - csp->num_local_variables + 1 != 0)
 	fatal("Bad stack pointer.\n");
 }
+#endif
 
 program_t fake_prog = { "<function>" };
 unsigned char fake_program = F_RETURN;
@@ -1275,10 +1281,9 @@ void setup_fake_frame P1(funptr_t *, fun) {
 	error("Owner of function pointer has been destructed.\n");
     csp++;
     csp->caller_type = caller_type;
-    csp->framekind = FRAME_FAKE;
+    csp->framekind = FRAME_FAKE | FRAME_OB_CHANGE;
     csp->fr.funp = fun;
     csp->ob = current_object;
-    csp->extern_call = 1;
     csp->prev_ob = previous_ob;
     csp->fp = fp;
     csp->prog = current_prog;
@@ -1286,7 +1291,6 @@ void setup_fake_frame P1(funptr_t *, fun) {
     pc = (char *)&fake_program;
     csp->function_index_offset = function_index_offset;
     csp->variable_index_offset = variable_index_offset;
-    csp->break_sp = break_sp;
     caller_type = ORIGIN_FUNCTION_POINTER;
     csp->num_local_variables = 0;
     current_prog = &fake_prog;
@@ -1305,7 +1309,6 @@ void remove_fake_frame() {
     fp = csp->fp;
     function_index_offset = csp->function_index_offset;
     variable_index_offset = csp->variable_index_offset;
-    break_sp = csp->break_sp;
     csp--;
 }
 
@@ -1349,6 +1352,8 @@ call_function_pointer P2(funptr_t *, funp, int, num_arg)
     int i, def;
 
     setup_fake_frame(funp);
+    if (current_object->flags & O_SWAPPED)
+	load_ob_from_swap(current_object);
 
     switch (funp->hdr.type) {
     case FP_SIMUL:
@@ -1365,9 +1370,9 @@ call_function_pointer P2(funptr_t *, funp, int, num_arg)
 	    num_arg = merge_arg_lists(num_arg, funp->hdr.args, 0);
 	}
 	i = funp->f.efun.opcodes[0];
- #ifdef NEEDS_CALL_EXTRA
+#ifdef NEEDS_CALL_EXTRA
 	if (i == F_CALL_EXTRA) i = 0xff + funp->f.efun.opcodes[1];
- #endif
+#endif
 	if (num_arg == instrs[i].min_arg - 1 && (def = instrs[i].Default)) {
 	    switch (def) {
 	    case F_CONST0:
@@ -1430,7 +1435,6 @@ call_function_pointer P2(funptr_t *, funp, int, num_arg)
 	csp->num_local_variables = num_arg;
 	func = setup_new_frame(func);
 
-	csp->extern_call = 1;
 	call_program(current_prog, func->offset);
 	break;
     }
@@ -1452,7 +1456,6 @@ call_function_pointer P2(funptr_t *, funp, int, num_arg)
 	setup_variables(num_arg, funp->f.functional.num_local,
 			funp->f.functional.num_arg);
 
-	csp->extern_call = 1;
 	function_index_offset = funp->f.functional.fio;
 	variable_index_offset = funp->f.functional.vio;
 	call_program(funp->f.functional.prog, funp->f.functional.offset);
@@ -1467,66 +1470,23 @@ call_function_pointer P2(funptr_t *, funp, int, num_arg)
     return &apply_ret_value;
 }
 
-/* marion
- * maintain a small and inefficient stack of error recovery context
- * data structures.
- * This routine is called in three different ways:
- * push=-1    Pop the stack.
- * push=1 push the stack.
- * push=0 No error occured, so the pushed value does not have to be
- *        restored. The pushed value can simply be popped into the void.
- *
- * The stack is implemented as a linked list of stack-objects, allocated
- * from the heap, and deallocated when popped.
- */
-
-/* push_pop_error_context: Copied directly from Lars version 3.1.1 */
-error_context_stack_t *ecsp = 0;
-
-void push_pop_error_context P1(int, push)
+svalue_t *
+safe_call_function_pointer P2(funptr_t *, funp, int, num_arg)
 {
-    error_context_stack_t *p;
+    error_context_t econ;
+    svalue_t *ret;
 
-    if (push == 1) {
-	/*
-	 * Save some global variables that must be restored separately after
-	 * a longjmp. The stack will have to be manually popped all the way.
-	 */
-	p = ALLOCATE(error_context_stack_t, TAG_ERROR_CONTEXT, "push_pop_error_context");
-	p->save_sp = sp;
-	p->save_csp = csp;
-	p->save_command_giver = command_giver;
-	memcpy(
-	       (char *) p->old_error_context,
-	       (char *) error_recovery_context,
-	       sizeof error_recovery_context);
-	p->old_exists_flag = error_recovery_context_exists;
-	p->next = ecsp;
-	ecsp = p;
+    save_context(&econ);
+    if (!SETJMP(econ.context)) {
+	ret = call_function_pointer(funp, num_arg);
     } else {
-	p = ecsp;
-	if (p == 0) {
-	    fatal("Catch: error context stack underflow.");
-	}
-	if (push == 0) {
-	    DEBUG_CHECK(csp != (p->save_csp - 1), 
-			"Catch: Lost track of csp\n");
-	} else {
-	    /*
-	     * push == -1 ! They did a throw() or error. That means that the
-	     * control stack must be restored manually here.
-	     */
-	    csp = p->save_csp;
-	    pop_n_elems(sp - p->save_sp);
-	    command_giver = p->save_command_giver;
-	}
-	memcpy((char *) error_recovery_context,
-	       (char *) p->old_error_context,
-	       sizeof error_recovery_context);
-	error_recovery_context_exists = p->old_exists_flag;
-	ecsp = p->next;
-	FREE((char *) p);
+	restore_context(&econ);
+	/* condition was restored to where it was when we came in */
+	pop_n_elems(num_arg);
+	ret = NULL;
     }
+    pop_context(&econ);
+    return ret;
 }
 
 /*
@@ -1646,7 +1606,7 @@ call_program P2(program_t *, prog, int, offset) {
     else {
 	DEBUG_CHECK(!offset, "Null function pointer in jump_table.\n");
 	(*
-	 ( void (*)() ) offset	/* cast to a function pointer */
+	 ( void (*) PROT((void)) ) offset	/* cast to a function pointer */
 	 )();
     }
 }
@@ -1684,7 +1644,7 @@ eval_instruction P1(char *, p)
     IF_DEBUG(svalue_t *expected_stack);
 
     /* Next F_RETURN at this level will return out of eval_instruction() */
-    csp->extern_call = 1;
+    csp->framekind |= FRAME_EXTERNAL;
     pc = p;
     while (1) {
 	instruction = EXTRACT_UCHAR(pc++);
@@ -1722,7 +1682,8 @@ eval_instruction P1(char *, p)
 #  endif
 #endif
 	if (!--eval_cost) {
-	    fprintf(stderr, "eval_cost too big %d\n", max_cost);
+	    debug_message("object /%s: eval_cost too big %d\n", 
+			  current_object->name, max_cost);
 	    eval_cost = max_cost;
 	    max_eval_error = 1;
 	    error("Too long evaluation. Execution aborted.\n");
@@ -1784,7 +1745,7 @@ eval_instruction P1(char *, p)
 		lval->u.real++;
 		break;
 	    case T_LVALUE_BYTE:
-		++*glb.u.lvalue_byte;
+		++*global_lvalue_byte.u.lvalue_byte;
 		break;
 	    default:
 		error("++ of non-numeric argument\n");
@@ -2214,7 +2175,7 @@ eval_instruction P1(char *, p)
 	    case T_LVALUE_BYTE:
 		if (sp->type != T_NUMBER)
 		    error("Bad right type to += of char lvalue.\n");
-		else *glb.u.lvalue_byte += sp->u.number;
+		else *global_lvalue_byte.u.lvalue_byte += sp->u.number;
 		break;
 	    default:
 		bad_arg(1, instruction);
@@ -2239,6 +2200,77 @@ eval_instruction P1(char *, p)
 	case F_FUNCTION_CONSTRUCTOR:
 	    f_function_constructor();
 	    break;
+
+	case F_FOREACH:
+	    {
+		int flags = EXTRACT_UCHAR(pc++);
+		
+		if (flags & 4) {
+		    CHECK_TYPES(sp, T_MAPPING, 2, F_FOREACH);
+		    
+		    push_refed_array(mapping_indices(sp->u.map));
+		    
+		    (++sp)->type = T_NUMBER;
+		    sp->u.lvalue = (sp-1)->u.arr->item;
+		    sp->subtype = (sp-1)->u.arr->size;
+		    
+		    (++sp)->type = T_LVALUE;
+		    if (flags & 2)
+			sp->u.lvalue = find_value((int)(EXTRACT_UCHAR(pc++) + variable_index_offset));
+		    else
+			sp->u.lvalue = fp + EXTRACT_UCHAR(pc++);
+		} else {
+		    CHECK_TYPES(sp, T_ARRAY, 2, F_FOREACH);
+
+		    (++sp)->type = T_NUMBER;
+		    sp->u.lvalue = (sp-1)->u.arr->item;
+		    sp->subtype = (sp-1)->u.arr->size;
+		}
+
+		(++sp)->type = T_LVALUE;
+		if (flags & 1)
+		    sp->u.lvalue = find_value((int)(EXTRACT_UCHAR(pc++) + variable_index_offset));
+		else
+		    sp->u.lvalue = fp + EXTRACT_UCHAR(pc++);
+		break;
+	    }
+	case F_NEXT_FOREACH:
+	    if ((sp-1)->type == T_LVALUE) {
+		/* mapping */
+		if ((sp-2)->subtype--) {
+		    svalue_t *key = (sp-2)->u.lvalue++;
+		    svalue_t *value = find_in_mapping((sp-4)->u.map, key);
+		    
+		    assign_svalue((sp-1)->u.lvalue, key);
+		    assign_svalue(sp->u.lvalue, value);
+		    COPY_SHORT(&offset, pc);
+		    pc -= offset;
+		    break;
+		}
+	    } else {
+		/* array */
+		if ((sp-1)->subtype--) {
+		    assign_svalue(sp->u.lvalue, (sp-1)->u.lvalue++);
+		    COPY_SHORT(&offset, pc);
+		    pc -= offset;
+		    break;
+		}
+	    }
+	    pc += 2;
+	    /* fallthrough */
+	case F_EXIT_FOREACH:
+	    if ((sp-1)->type == T_LVALUE) {
+		/* mapping */
+		sp -= 3;
+		free_array((sp--)->u.arr);
+		free_mapping((sp--)->u.map);
+	    } else {
+		/* array */
+		sp -= 2;
+		free_array((sp--)->u.arr);
+	    }
+	    break;
+
 	case F_NEW_CLASS:
 	    {
 		array_t *cl;
@@ -2282,7 +2314,7 @@ eval_instruction P1(char *, p)
 		if ((sp - 1)->type != T_NUMBER) {
 		    error("Illegal rhs to char lvalue\n");
 		} else {
-		    *glb.u.lvalue_byte = ((sp - 1)->u.number & 0xff);
+		    *global_lvalue_byte.u.lvalue_byte = ((sp - 1)->u.number & 0xff);
 		}
 		break;
 	    default:
@@ -2317,7 +2349,7 @@ eval_instruction P1(char *, p)
 			if (sp->type != T_NUMBER){
 			    error("Illegal rhs to char lvalue\n");
 			} else {
-			    *glb.u.lvalue_byte = (sp--)->u.number & 0xff;
+			    *global_lvalue_byte.u.lvalue_byte = (sp--)->u.number & 0xff;
 			}
 			break;
 		    }
@@ -2341,9 +2373,6 @@ eval_instruction P1(char *, p)
 	    break_point();
 	    break;
 #endif
-	case F_BREAK:
-	    pc = current_prog->program + *break_sp++;
-	    break;
 	case F_CALL_FUNCTION_BY_ADDRESS:
 	    {
 		function_t *funp;
@@ -2381,13 +2410,12 @@ eval_instruction P1(char *, p)
 		if (current_prog->program_size) {
 #endif
 		    pc = current_prog->program + funp->offset;
-		    csp->extern_call = 0;
 #ifdef LPC_TO_C
 		} else {
 		    DEBUG_CHECK(!(funp->offset),
 				"Null function pointer in jump_table.\n");
 		    (*
-		     ( void (*)() ) (funp->offset)
+		     ( void (*) PROT((void)) ) (funp->offset)
 		     )();
 		}
 #endif
@@ -2419,13 +2447,12 @@ eval_instruction P1(char *, p)
 		if (current_prog->program_size) {
 #endif
 		    pc = current_prog->program + funp->offset;
-		    csp->extern_call = 0;
 #ifdef LPC_TO_C
 		} else {
 		    DEBUG_CHECK(!(funp->offset),
 				"Null function pointer in jump_table.\n");
 		    (*
-		     ( void (*)() ) (funp->offset)
+		     ( void (*) PROT((void)) ) (funp->offset)
 		     )();
 		}
 #endif
@@ -2457,7 +2484,7 @@ eval_instruction P1(char *, p)
 		break;
 	    case T_LVALUE_BYTE:
 		sp->type = T_NUMBER;
-		sp->u.number = --(*glb.u.lvalue_byte);
+		sp->u.number = --(*global_lvalue_byte.u.lvalue_byte);
 		break;
 	    default:
 		error("-- of non-numeric argument\n");
@@ -2475,7 +2502,7 @@ eval_instruction P1(char *, p)
 		lval->u.real--;
 		break;
 	    case T_LVALUE_BYTE:
-		--(*glb.u.lvalue_byte);
+		--(*global_lvalue_byte.u.lvalue_byte);
 		break;
 	    default:
 		error("-- of non-numeric argument\n");
@@ -2567,7 +2594,7 @@ eval_instruction P1(char *, p)
 		break;
 	    case T_LVALUE_BYTE:
 		sp->type = T_NUMBER;
-		sp->u.number = ++*glb.u.lvalue_byte;
+		sp->u.number = ++*global_lvalue_byte.u.lvalue_byte;
 		break;
 	    default:
 		error("++ of non-numeric argument\n");
@@ -2848,9 +2875,6 @@ eval_instruction P1(char *, p)
 	case F_POP_VALUE:
 	    pop_stack();
 	    break;
-	case F_POP_BREAK:
-	    break_sp += EXTRACT_UCHAR(pc++);
-	    break;
 	case F_POST_DEC:
 	    DEBUG_CHECK(sp->type != T_LVALUE,
 			"non-lvalue argument to --\n");
@@ -2866,7 +2890,7 @@ eval_instruction P1(char *, p)
 		break;
 	    case T_LVALUE_BYTE:
 		sp->type = T_NUMBER;
-		sp->u.number = (*glb.u.lvalue_byte)--;
+		sp->u.number = (*global_lvalue_byte.u.lvalue_byte)--;
 		break;
 	    default:
 		error("-- of non-numeric argument\n");
@@ -2887,7 +2911,7 @@ eval_instruction P1(char *, p)
 		break;
 	    case T_LVALUE_BYTE:
 		sp->type = T_NUMBER;
-		sp->u.number = (*glb.u.lvalue_byte)++;
+		sp->u.number = (*global_lvalue_byte.u.lvalue_byte)++;
 		break;
 	    default:
 		error("++ of non-numeric argument\n");
@@ -2950,14 +2974,14 @@ eval_instruction P1(char *, p)
 		    do_trace("Return", "", "");
 		    if (TRACEHB) {
 			if (TRACETST(TRACE_ARGS)) {
-			    add_message(" with value: 0");
+			    add_message(command_giver, " with value: 0");
 			}
-			add_message("\n");
+			add_message(command_giver, "\n");
 		    }
 		}
 #endif
 		/* The control stack was popped just before */
-		if (csp[1].extern_call)
+		if (csp[1].framekind & FRAME_EXTERNAL)
 		    return;
 		break;
 	    }
@@ -2982,15 +3006,15 @@ eval_instruction P1(char *, p)
 		    do_trace("Return", "", "");
 		    if (TRACEHB) {
 			if (TRACETST(TRACE_ARGS)) {
-			    add_message(" with value: ");
+			    add_message(command_giver, " with value: ");
 			    print_svalue(sp);
 			}
-			add_message("\n");
+			add_message(command_giver, "\n");
 		    }
 		}
 #endif
 		/* The control stack was popped just before */
-		if (csp[1].extern_call)
+		if (csp[1].framekind & FRAME_EXTERNAL)
 		    return;
 		break;
 	    }
@@ -3095,11 +3119,9 @@ eval_instruction P1(char *, p)
 	    {
 		pop_stack();	/* discard expression value */
 		free_svalue(&catch_value, "F_END_CATCH");
-		catch_value.type = T_NUMBER;
-		catch_value.u.number = 0;
+		catch_value = const0;
 		/* We come here when no longjmp() was executed */
 		pop_control_stack();
-		push_pop_error_context(0);
 		push_number(0);
 		return;		/* return to do_catch */
 	    }
@@ -3137,12 +3159,12 @@ eval_instruction P1(char *, p)
 		st_num_arg = instrs[instruction].min_arg;
 #ifdef DEBUG
 	    if (instruction > NUM_OPCODES) {
-		debug_fatal("Undefined instruction %s (%d)\n",
-			    get_f_name(instruction), instruction);
+		fatal("Undefined instruction %s (%d)\n",
+		      get_f_name(instruction), instruction);
 	    }
 	    if (instruction < BASE) {
-		debug_fatal("No case for eoperator %s (%d)\n",
-			    get_f_name(instruction), instruction);
+		fatal("No case for eoperator %s (%d)\n",
+		      get_f_name(instruction), instruction);
 	    }
 	    if (instrs[instruction].ret_type == TYPE_NOVALUE)
 		expected_stack = sp - st_num_arg;
@@ -3158,7 +3180,7 @@ eval_instruction P1(char *, p)
 #ifdef DEBUG
 	    num_arg = st_num_arg;
 #endif
-
+	    
 	    (*oefun_table[instruction]) ();
 	    DEBUG_CHECK2(expected_stack != sp,
 			 "Bad stack after evaluation. Instruction %d, num arg %d\n",
@@ -3173,39 +3195,43 @@ eval_instruction P1(char *, p)
 static void
 do_catch P2(char *, pc, unsigned short, new_pc_offset)
 {
-    push_control_stack(FRAME_CATCH, 0);
-    /* next two probably not necessary... */
-    csp->pc = current_prog->program + new_pc_offset;
-    csp->num_local_variables = (csp - 1)->num_local_variables; /* marion */
+    error_context_t econ;
+    
     /*
      * Save some global variables that must be restored separately after a
      * longjmp. The stack will have to be manually popped all the way.
      */
-    push_pop_error_context(1);
+    save_context(&econ);
+    push_control_stack(FRAME_CATCH, 0);
+#if defined(DEBUG) || defined(TRACE_CODE)
+    csp->num_local_variables = (csp - 1)->num_local_variables; /* marion */
+#endif
 
-    /* signal catch OK - print no err msg */
-    error_recovery_context_exists = CATCH_ERROR_CONTEXT;
-    if (SETJMP(error_recovery_context)) {
+    if (SETJMP(econ.context)) {
 	/*
 	 * They did a throw() or error. That means that the control stack
 	 * must be restored manually here.
 	 */
-	push_pop_error_context(-1);
-	pop_control_stack();
+	restore_context(&econ);
 	sp++;
 	*sp = catch_value;
-	assign_svalue_no_free(&catch_value, &const1);
-	
+	catch_value = const1;
+
 	/* if it's too deep or max eval, we can't let them catch it */
-	if (max_eval_error)
+	if (max_eval_error) {
+	    pop_context(&econ);
 	    error("Can't catch eval cost too big error.\n");
-	if (too_deep_error)
+	}
+	if (too_deep_error) {
+	    pop_context(&econ);
 	    error("Can't catch too deep recursion error.\n");
+	}
     } else {
 	assign_svalue(&catch_value, &const1);
 	/* note, this will work, since csp->extern_call won't be used */
 	eval_instruction(pc);
     }
+    pop_context(&econ);
 }
 
 /*
@@ -3351,7 +3377,7 @@ int apply_low P3(char *, fun, object_t *, ob, int, num_arg)
 		 * the cache will tell us in which program the function is,
 		 * and where
 		 */
-	        push_control_stack(FRAME_FUNCTION, entry->pr);
+	        push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE, entry->pr);
 		caller_type = local_call_origin;
 		csp->num_local_variables = num_arg;
 		current_prog = entry->progp;
@@ -3451,7 +3477,7 @@ int apply_low P3(char *, fun, object_t *, ob, int, num_arg)
 			continue;
 		    }
 #endif
-		    push_control_stack(FRAME_FUNCTION, pr);
+		    push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE, pr);
 		    caller_type = local_call_origin;
 		    /* The searched function is found */
 		    entry->id = progp->id_number;
@@ -3573,7 +3599,7 @@ void call___INIT P1(object_t *, ob)
     /* ___INIT turns out to be always the last function */
     pr = progp->functions + num_functions - 1;
     if (*pr->name != APPLY___INIT_SPECIAL_CHAR) return;
-    push_control_stack(FRAME_FUNCTION, pr);
+    push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE, pr);
     caller_type = ORIGIN_DRIVER;
     csp->num_local_variables = 0;
     current_prog = progp;
@@ -3608,51 +3634,19 @@ void call___INIT P1(object_t *, ob)
 svalue_t *
 safe_apply P4(char *, fun, object_t *, ob, int, num_arg, int, where)
 {
-    jmp_buf save_error_recovery_context;
     svalue_t *ret;
-    object_t *save_command_giver = command_giver;
-    svalue_t *old_sp = sp;
-    control_stack_t *old_csp = csp;
-    int old_error_context_exists = error_recovery_context_exists;
+    error_context_t econ;
 
-    debug(32768, ("safe_apply: before sp = %d\n", sp));
-    debug(32768, ("safe_apply: before csp = %d\n", csp));
-    memcpy((char *) save_error_recovery_context,
-	   (char *) error_recovery_context, sizeof(error_recovery_context));
-    error_recovery_context_exists = SAFE_APPLY_ERROR_CONTEXT;
-    if (!SETJMP(error_recovery_context)) {
+    save_context(&econ);
+    if (!SETJMP(econ.context)) {
 	if (!(ob->flags & O_DESTRUCTED)) {
 	    ret = apply(fun, ob, num_arg, where);
 	} else ret = NULL;
     } else {
-#if 0
-	/*
-	 * this shouldn't be needed here (would likely cause problems).
-	 * 0.9.17.5 - tru
-	 */
-	clear_state();
-#else
-	/*
-	 * Think it shouldn't be done at all
-	 * v20.25a4 - Sym
-	 */
-
-	csp = old_csp + 1;
-	pop_control_stack();
-	pop_n_elems(sp - old_sp + num_arg);
-#endif
+	restore_context(&econ);
 	ret = NULL;
-	fprintf(stderr, "Warning: Error in the '%s' function in '%s'\n",
-		fun, ob->name);
-	fprintf(stderr,
-		"The driver may function improperly if this problem is not fixed.\n");
     }
-    debug(32768, ("safe_apply: after sp = %d\n", sp));
-    debug(32768, ("safe_apply: after csp = %d\n", csp));
-    error_recovery_context_exists = old_error_context_exists;
-    memcpy((char *) error_recovery_context,
-	   (char *) save_error_recovery_context, sizeof(error_recovery_context));
-    command_giver = save_command_giver;
+    pop_context(&econ);
     return ret;
 }
 
@@ -3806,7 +3800,7 @@ void call_function P2(program_t *, progp, function_t *, pr)
 {
     if (pr->flags & NAME_UNDEFINED)
 	return;
-    push_control_stack(FRAME_FUNCTION, pr);
+    push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE, pr);
     caller_type = ORIGIN_DRIVER;
     DEBUG_CHECK(csp != control_stack,
 		"call_function with bad csp\n");
@@ -3957,7 +3951,6 @@ char *dump_trace P1(int, how)
     if (current_prog == 0)
 	return 0;
     if (csp < &control_stack[0]) {
-	debug_message("No trace.\n");
 	return 0;
     }
 #ifdef TRACE_CODE
@@ -3965,7 +3958,7 @@ char *dump_trace P1(int, how)
 	(void) last_instructions();
 #endif
     for (p = &control_stack[0]; p < csp; p++) {
-	switch (p[0].framekind) {
+	switch (p[0].framekind & FRAME_MASK) {
 	case FRAME_FUNCTION:
 	    debug_message("'%15s' in '%20s' ('%20s') %s\n",
 			  p[0].fr.func->name, p[1].prog->name, p[1].ob->name,
@@ -3998,18 +3991,16 @@ char *dump_trace P1(int, how)
 	    ptr = p[1].fp;
 	    debug_message("arguments were (");
 	    for (i = 0; i < funp->num_arg; i++) {
-		char *buf;
+		outbuffer_t outbuf;
 
 		if (i) {
 		    debug_message(",");
 		}
-		buf = new_string(50, "dump_trace:1");
-		*buf = 0;
-		MSTR_UPDATE_SIZE(buf, 0);
-		svalue_to_string(&ptr[i], &buf, 50, 0, 0, 0);
-		/* no need to fix length */
-		debug_message("%s", buf);
-		FREE_MSTR(buf);
+		outbuf_zero(&outbuf);
+		svalue_to_string(&ptr[i], &outbuf, 0, 0, 0);
+		/* don't need to fix length here */
+		debug_message("%s", outbuf.buffer);
+		FREE_MSTR(outbuf.buffer);
 	    }
 	    debug_message(")\n");
 	}
@@ -4019,24 +4010,22 @@ char *dump_trace P1(int, how)
 	    ptr = p[1].fp + funp->num_arg;
 	    debug_message("locals were: ");
 	    for (i = 0; i < funp->num_local; i++) {
-		char *buf;
+		outbuffer_t outbuf;
 	      
 		if (i) {
 		    debug_message(",");
 		}
-		buf = new_string(50, "dump_trace:2");
-		*buf = 0;
-		MSTR_UPDATE_SIZE(buf, 0);
-		svalue_to_string(&ptr[i], &buf, 50, 0, 0, 0);
+		outbuf_zero(&outbuf);
+		svalue_to_string(&ptr[i], &outbuf, 0, 0, 0);
 		/* no need to fix length */
-		debug_message("%s", buf);
-		FREE_MSTR(buf);
+		debug_message("%s", outbuf.buffer);
+		FREE_MSTR(outbuf.buffer);
 	    }	
 	    debug_message("\n");
 	}
 #endif
     }
-    switch (p[0].framekind) {
+    switch (p[0].framekind & FRAME_MASK) {
     case FRAME_FUNCTION:
 	debug_message("'%15s' in '%20s' ('%20s') %s\n",
 		      p[0].fr.func->name,
@@ -4067,18 +4056,16 @@ char *dump_trace P1(int, how)
     if (funp) {
 	debug_message("arguments were (");
 	for (i = 0; i < funp->num_arg; i++) {
-	    char *buf;
+	    outbuffer_t outbuf;
 
 	    if (i) {
 		debug_message(",");
 	    }
-	    buf = new_string(50, "dump_trace:3");
-	    *buf = 0;
-	    MSTR_UPDATE_SIZE(buf, 0);
-	    svalue_to_string(&fp[i], &buf, 50, 0, 0, 0);
+	    outbuf_zero(&outbuf);
+	    svalue_to_string(&fp[i], &outbuf, 0, 0, 0);
 	    /* no need to fix length */
-	    debug_message("%s", buf);
-	    FREE_MSTR(buf);
+	    debug_message("%s", outbuf.buffer);
+	    FREE_MSTR(outbuf.buffer);
 	}
 	debug_message(")\n");
     }
@@ -4088,18 +4075,16 @@ char *dump_trace P1(int, how)
 	ptr = fp + funp->num_arg;
 	debug_message("locals were: ");
 	for (i = 0; i < funp->num_local; i++) {
-	    char *buf;
+	    outbuffer_t outbuf;
 
 	    if (i) {
 		debug_message(",");
 	    }
-	    buf = new_string(50, "dump_trace:4");
-	    *buf = 0;
-	    MSTR_UPDATE_SIZE(buf, 0);
-	    svalue_to_string(&ptr[i], &buf, 50, 0, 0, 0);
+	    outbuf_zero(&outbuf);
+	    svalue_to_string(&ptr[i], &outbuf, 0, 0, 0);
 	    /* no need to fix length */
-	    debug_message("%s", buf);
-	    FREE_MSTR(buf);
+	    debug_message("%s", outbuf.buffer);
+	    FREE_MSTR(outbuf.buffer);
 	}
 	debug_message("\n");
     }
@@ -4132,7 +4117,7 @@ array_t *get_svalue_trace()
     v = allocate_empty_array((csp - &control_stack[0]) + 1);
     for (p = &control_stack[0]; p < csp; p++) {
 	m = allocate_mapping(6);
-	switch (p[0].framekind) {
+	switch (p[0].framekind & FRAME_MASK) {
 	case FRAME_FUNCTION:
 	    add_mapping_string(m, "function", p[0].fr.func->name);
 	    funp = p[0].fr.func;
@@ -4188,7 +4173,7 @@ array_t *get_svalue_trace()
 	v->item[(p - &control_stack[0])].u.map = m;
     }
     m = allocate_mapping(6);
-    switch (p[0].framekind) {
+    switch (p[0].framekind & FRAME_MASK) {
     case FRAME_FUNCTION:
 	add_mapping_string(m, "function", p[0].fr.func->name);
 	funp = p[0].fr.func;
@@ -4280,6 +4265,7 @@ int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_ar
     int number_of_matches;
     char *cp;
     int skipme = 0;		/* Encountered a '*' ? */
+    int base = 10;
 
     /*
      * First get the string to be parsed.
@@ -4344,6 +4330,9 @@ int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_ar
 	    error("Too few arguments to sscanf()\n");
 
 	switch (fmt[1]) {
+	case 'x':
+	    base = 16;
+	    /* fallthrough */
 	case 'd':
 	    type = T_NUMBER;
 	    break;
@@ -4366,7 +4355,7 @@ int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_ar
 	    char *tmp = in_string;
 	    int tmp_num;
 
-	    tmp_num = (int) strtol(in_string, &in_string, 10);
+	    tmp_num = (int) strtol(in_string, &in_string, base);
 	    if (tmp == in_string) /* No match */
 		break;
 
@@ -4496,22 +4485,21 @@ void opcdump P1(char *, tfn)
     FILE *fp;
 
     if ((len = strlen(tfn)) >= (SMALL_STRING_SIZE - 7)) {
-	add_vmessage("Path '%s' too long.\n", tfn);
+	error("Path '%s' too long.\n", tfn);
 	return;
     }
     strcpy(tbuf, tfn);
     strcpy(tbuf + len, ".efun");
     fn = check_valid_path(tbuf, current_object, "opcprof", 1);
     if (!fn) {
-	add_vmessage("Invalid path '%s' for writing.\n", tbuf);
+	error("Invalid path '%s' for writing.\n", tbuf);
 	return;
     }
     fp = fopen(fn, "w");
     if (!fp) {
-	add_vmessage("Unable to open %s.\n", fn);
+	error("Unable to open %s.\n", fn);
 	return;
     }
-    add_vmessage("Dumping to %s ... ", fn);
     limit = sizeof(opc_efun) / sizeof(opc_t);
     for (i = 0; i < limit; i++) {
 	fprintf(fp, "%-30s: %10d\n", opc_efun[i].name, opc_efun[i].count);
@@ -4522,12 +4510,12 @@ void opcdump P1(char *, tfn)
     strcpy(tbuf + len, ".eoper");
     fn = check_valid_path(tbuf, current_object, "opcprof", 1);
     if (!fn) {
-	add_vmessage("Invalid path '%s' for writing.\n", tbuf);
+	error("Invalid path '%s' for writing.\n", tbuf);
 	return;
     }
     fp = fopen(fn, "w");
     if (!fp) {
-	add_vmessage("Unable to open %s for writing.\n", fn);
+	error("Unable to open %s for writing.\n", fn);
 	return;
     }
     for (i = 0; i < BASE; i++) {
@@ -4535,7 +4523,6 @@ void opcdump P1(char *, tfn)
 		query_instr_name(i), opc_eoper[i]);
     }
     fclose(fp);
-    add_message("done.\n");
 }
 #endif
 
@@ -4558,19 +4545,19 @@ void opcdump P1(char *, tfn)
     sort_elem_t ops[(BASE + 1) * (BASE + 1)];
 
     if ((len = strlen(tfn)) >= (SMALL_STRING_SIZE - 10)) {
-	add_message("Path '%s' too long.\n", tfn);
+	error("Path '%s' too long.\n", tfn);
 	return;
     }
     strcpy(tbuf, tfn);
     strcpy(tbuf + len, ".eop-2d");
     fn = check_valid_path(tbuf, current_object, "opcprof", 1);
     if (!fn) {
-	add_message("Invalid path '%s' for writing.\n", tbuf);
+	error("Invalid path '%s' for writing.\n", tbuf);
 	return;
     }
     fp = fopen(fn, "w");
     if (!fp) {
-	add_message("Unable to open %s for writing.\n", fn);
+	error("Unable to open %s for writing.\n", fn);
 	return;
     }
     for (i = 0; i <= BASE; i++) {
@@ -4589,7 +4576,6 @@ void opcdump P1(char *, tfn)
 		    query_instr_name(ops[i].op2), ops[i].num_calls);
     }
     fclose(fp);
-    add_message("done.\n");
 }
 #endif
 
@@ -4604,7 +4590,6 @@ void reset_machine P1(int, first)
     else {
 	pop_n_elems(sp - start_of_stack + 1);
     }
-    break_sp = start_of_switch_stack + RUNTIME_SWITCH_STACK_SIZE;
 }
 
 #ifdef TRACE_CODE
@@ -4645,12 +4630,12 @@ int last_instructions()
     i = last;
     do {
 	if (previous_instruction[i] != 0)
-	    printf("%6x: %3d %8s %-25s (%d)\n", previous_pc[i],
-		   previous_instruction[i],
-		   get_arg(i, (i + 1) %
-			   (sizeof previous_instruction / sizeof(int))),
-		   get_f_name(previous_instruction[i]),
-		   stack_size[i] + 1);
+	    debug_message("%6x: %3d %8s %-25s (%d)\n", previous_pc[i],
+		previous_instruction[i],
+		get_arg(i, (i + 1) %
+			(sizeof previous_instruction / sizeof(int))),
+		get_f_name(previous_instruction[i]),
+		stack_size[i] + 1);
 	i = (i + 1) % (sizeof previous_instruction / sizeof(int));
     } while (i != last);
     return last;
@@ -4668,7 +4653,7 @@ void do_trace P3(char *, msg, char *, fname, char *, post)
     if (!TRACEHB)
 	return;
     objname = TRACETST(TRACE_OBJNAME) ? (current_object && current_object->name ? current_object->name : "??") : "";
-    add_vmessage("*** %d %*s %s %s %s%s", tracedepth, tracedepth, "", msg, objname, fname, post);
+    add_vmessage(command_giver, "*** %d %*s %s %s %s%s", tracedepth, tracedepth, "", msg, objname, fname, post);
 }
 #endif
 
@@ -4685,7 +4670,7 @@ int assert_master_ob_loaded P2(char *, fun, char *, arg) {
 
 	ob = load_object(master_file_name, 0);
 	if (!ob) {
-	    fprintf(stderr, "%s(%s) failed: Master failed to load.\n", fun, arg);
+	    debug_message("%s(%s) failed: Master failed to load.\n", fun, arg);
 	    return 0;
 	}
     }
@@ -4815,5 +4800,26 @@ void mark_stack() {
 }
 #endif
 
+/* Be careful.  This assumes there will be a frame pushed right after this,
+   as we use econ->save_csp + 1 to restore */
+void save_context P1(error_context_t *, econ) {
+    econ->save_command_giver = command_giver;
+    econ->save_sp = sp;
+    econ->save_csp = csp;
+    econ->save_context = current_error_context;
 
+    current_error_context = econ;
+}
+
+void pop_context P1(error_context_t *, econ) {
+    current_error_context = econ->save_context;
+}
+
+/* can the error handler do this ? */
+void restore_context P1(error_context_t *, econ) {
+    command_giver = econ->save_command_giver;
+    csp = econ->save_csp + 1;
+    pop_control_stack();
+    pop_n_elems(sp - econ->save_sp);
+}
 

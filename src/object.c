@@ -19,9 +19,6 @@
 object_t *previous_ob;
 int tot_alloc_object, tot_alloc_object_size;
 
-#ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
-static void remove_all_objects PROT((void));
-#endif
 char *save_mapping PROT ((mapping_t *m));
 INLINE static int restore_array PROT((char **str, svalue_t *));
 INLINE static int restore_class PROT((char **str, svalue_t *));
@@ -1030,23 +1027,30 @@ restore_string P2(char *, val, svalue_t *, sv)
 INLINE int
 restore_svalue P2(char *, cp, svalue_t *, v)
 {
+    int ret;
+    
     switch(*cp++) {
     case '\"':
 	return restore_string(cp, v);
     case '(':
-	{
-	    if (*cp == '{'){
-		cp++;
-		return restore_array(&cp, v);
-	    } else if (*cp == '[') {
-		cp++;
-		return restore_mapping(&cp, v);
-	    } else if (*cp++ == '/') {
-		return restore_class(&cp, v);
-	    }
-	    else return ROB_GENERAL_ERROR;
+	if (*cp == '{') {
+	    cp++;
+	    ret = restore_array(&cp, v);
+	} else if (*cp == '[') {
+	    cp++;
+	    ret = restore_mapping(&cp, v);
+	} else if (*cp++ == '/') {
+	    ret = restore_class(&cp, v);
 	}
+	else ret = ROB_GENERAL_ERROR;
 
+	if (save_svalue_depth) {
+	    save_svalue_depth = max_depth = 0;
+	    FREE((char *) sizes);
+	    sizes = (int *) 0;
+	}
+	return ret;
+	
     case '-':
 	{
 	    char c;
@@ -1071,6 +1075,7 @@ restore_svalue P2(char *, cp, svalue_t *, v)
 	    v->u.number = 0;
 	}
     }
+
     return 0;
 }
 
@@ -1091,14 +1096,22 @@ safe_restore_svalue P2(char *, cp, svalue_t *, v)
 	{
 	    if (*cp == '{'){
 		cp++;
-		if ((ret = restore_array(&cp, &val))) return ret;
+		ret = restore_array(&cp, &val);
 	    } else if (*cp == '[') {
 		cp++;
-		if ((ret = restore_mapping(&cp, &val))) return ret;
+		ret = restore_mapping(&cp, &val);
 	    } else if (*cp++ == '/') {
-		if ((ret = restore_class(&cp, &val))) return ret;
+		ret = restore_class(&cp, &val);
 	    }
 	    else return ROB_GENERAL_ERROR;
+
+	    if (save_svalue_depth) {
+		save_svalue_depth = max_depth = 0;
+		FREE((char *) sizes);
+		sizes = (int *) 0;
+	    }
+	    if (ret) 
+		return ret;
 	    break;
 	}
 	
@@ -1198,11 +1211,6 @@ restore_object_from_buff P4(object_t *, ob, char *, theBuff, char *, name,
 	    rc = safe_restore_svalue(space+1, v);
 	else
 	    rc = restore_svalue(space+1, v);
-	if (save_svalue_depth){
-	    save_svalue_depth = max_depth = 0;
-	    FREE((char *) sizes);
-	    sizes = (int *) 0;
-	}
         if (rc & ROB_ERROR) {
             FREE(name);
             FREE(theBuff);
@@ -1302,7 +1310,8 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
 	FREE(new_string);
 	var++;
     }
-    if (failed) add_message("Failed to completely save file. Disk could be full.\n");
+    if (failed) 
+	debug_message("Failed to completely save file. Disk could be full.\n");
     else {
 	(void) fclose(f);
 #ifdef OS2
@@ -1321,14 +1330,14 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
                     }
                 }
 #endif
-		perror(name);
-		printf("Failed to rename /%s to /%s\n", tmp_name, name);
-		add_message("Failed to save object!\n");
+		debug_perror("save_object", name);
+		debug_message("Failed to rename /%s to /%s\n", tmp_name, name);
+		debug_message("Failed to save object!\n");
 	}
     }
     FREE(name);
     if (failed) {   
-	add_message("Failed to save to file. Disk could be full.\n");
+	debug_message("Failed to save to file. Disk could be full.\n");
 	return 0;
     }
     return 1;
@@ -1417,7 +1426,7 @@ int restore_object P3(object_t *, ob, char *, file, int, noclear)
     
     restore_object_from_buff(ob, theBuff, name, noclear);
     current_object = save;
-#ifdef DEBUg
+#ifdef DEBUG
     if (d_flag > 1)
         debug_message("Object /%s restored from /%s.\n", ob->name, name);
 #endif
@@ -1431,11 +1440,6 @@ void restore_variable P2(svalue_t *, var, char *, str)
     int rc;
 
     rc = restore_svalue(str, var);
-    if (save_svalue_depth){
-	save_svalue_depth = max_depth = 0;
-	FREE((char *) sizes);
-	sizes = (int *) 0;
-    }
     if (rc & ROB_ERROR) {
 	*var = const0; /* clean up */
 	if (rc & ROB_GENERAL_ERROR)
@@ -1460,7 +1464,7 @@ void tell_npc P2(object_t *, ob, char *, str)
  /* save some space snoop */
 #define ALM_BREAK LARGEST_PRINTABLE_STRING - 10
 
-static void add_long_message P1(char *, s) {
+static void add_long_message P2(object_t *, who, char *, s) {
     char save;
     int len;
 
@@ -1468,12 +1472,12 @@ static void add_long_message P1(char *, s) {
     while (len > ALM_BREAK) {
 	save = s[ALM_BREAK];
 	s[ALM_BREAK] = 0;
-	add_message(s);
+	add_message(who, s);
 	s[ALM_BREAK] = save;
 	s += ALM_BREAK;
 	len -= ALM_BREAK;
     }
-    add_message(s);
+    add_message(who, s);
 }
 
 /*
@@ -1488,13 +1492,8 @@ static void add_long_message P1(char *, s) {
  */
 void tell_object P2(object_t *, ob, char *, str)
 {
-    object_t *save_command_giver;
-    
-    save_command_giver = command_giver;
     if (!ob || (ob->flags & O_DESTRUCTED)) {
-	command_giver = 0;
-	add_long_message(str);
-	command_giver = save_command_giver;
+	add_long_message(0, str);
 	return;
     }
 #ifdef INTERACTIVE_CATCH_TELL
@@ -1502,9 +1501,7 @@ void tell_object P2(object_t *, ob, char *, str)
     return;
 #else
     if (ob->interactive) {
-	command_giver = ob;
-	add_long_message(str);
-	command_giver = save_command_giver;
+	add_long_message(ob, str);
 	return;
     }
     tell_npc(ob, str);
@@ -1519,7 +1516,7 @@ void dealloc_object P2(object_t *, ob, char *, from)
 
 #ifdef DEBUG
     if (d_flag)
-	printf("free_object: %s.\n", ob->name);
+	debug_message("free_object: %s.\n", ob->name);
 #endif
     if (!(ob->flags & O_DESTRUCTED)) {
 	/* This is fatal, and should never happen. */
@@ -1543,7 +1540,7 @@ void dealloc_object P2(object_t *, ob, char *, from)
 #ifndef NO_ADD_ACTION
     for (s = ob->sent; s;) {
 	sentence_t *next;
-
+	
 	next = s->next;
 	free_sentence(s);
 	s = next;
@@ -1605,53 +1602,6 @@ object_t *get_empty_object P1(int, num_var)
 	ob->variables[i] = const0n;
     return ob;
 }
-
-#ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
-static void remove_all_objects()
-{
-    object_t *ob;
-    svalue_t v;
-
-    v.type = T_OBJECT;
-    while (1) {
-	if (obj_list == 0)
-	    break;
-	ob = obj_list;
-	v.u.ob = ob;
-	destruct_object(&v);
-	if (ob == obj_list)
-	    break;
-    }
-    remove_destructed_objects();
-}
-#endif
-
-#ifdef CHECK_OB_REF
-/*
- * For debugging purposes.
- */
-void check_ob_ref P2(object_t *, ob, char *, from)
-{
-    object_t *o;
-    int i;
-
-    for (o = obj_list, i = 0; o; o = o->next_all) {
-	if (o->inherit == ob)
-	    i++;
-    }
-    if (i + 1 > ob->ref) {
-	fatal("FATAL too many references to inherited object %s (%d) from %s.\n",
-	      ob->name, ob->ref, from);
-	if (current_object)
-	    fprintf(stderr, "current_object: %s\n", current_object->name);
-	for (o = obj_list; o; o = o->next_all) {
-	    if (o->inherit != ob)
-		continue;
-	    fprintf(stderr, "  %s\n", ob->name);
-	}
-    }
-}
-#endif				/* CHECK_OB_REF */
 
 #ifndef NO_ADD_ACTION
 static object_t *hashed_living[LIVING_HASH_SIZE];
@@ -1735,11 +1685,11 @@ void remove_living_name P1(object_t *, ob)
     ob->living_name = 0;
 }
 
-void stat_living_objects()
+void stat_living_objects P1(outbuffer_t *, out)
 {
-    add_message("Hash table of living objects:\n");
-    add_message("-----------------------------\n");
-    add_vmessage("%d living named objects, average search length: %4.2f\n",
+    outbuf_add(out, "Hash table of living objects:\n");
+    outbuf_add(out, "-----------------------------\n");
+    outbuf_addv(out, "%d living named objects, average search length: %4.2f\n",
 		num_living_names, (double) search_length / num_searches);
 }
 #endif /* NO_ADD_ACTION */

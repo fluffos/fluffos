@@ -156,27 +156,27 @@ object_t *lookup_object_hash P1(char *, s)
 
 static char sbuf[100];
 
-int show_otable_status P1(int, verbose)
+int show_otable_status P2(outbuffer_t *, out, int, verbose)
 {
     int starts;
 
     if (verbose == 1) {
-	add_message("Object name hash table status:\n");
-	add_message("------------------------------\n");
+	outbuf_add(out, "Object name hash table status:\n");
+	outbuf_add(out, "------------------------------\n");
 	sprintf(sbuf, "%10.2f", objs_in_table / (float) OTABLE_SIZE);
-	add_vmessage("Average hash chain length:       %s\n", sbuf);
+	outbuf_addv(out, "Average hash chain length:       %s\n", sbuf);
 	sprintf(sbuf, "%10.2f", (float) obj_probes / obj_searches);
-	add_vmessage("Average search length:           %s\n", sbuf);
-	add_vmessage("Internal lookups (succeeded):    %lu (%lu)\n",
+	outbuf_addv(out, "Average search length:           %s\n", sbuf);
+	outbuf_addv(out, "Internal lookups (succeeded):    %lu (%lu)\n",
 		    obj_searches - user_obj_lookups, objs_found - user_obj_found);
-	add_vmessage("External lookups (succeeded):    %lu (%lu)\n",
+	outbuf_addv(out, "External lookups (succeeded):    %lu (%lu)\n",
 		    user_obj_lookups, user_obj_found);
     }
     starts = (int) OTABLE_SIZE *sizeof(object_t *) +
                 objs_in_table * sizeof(object_t);
 
     if (!verbose) {
-	add_vmessage("Obj table overhead:\t\t%8d %8d\n",
+	outbuf_addv(out, "Obj table overhead:\t\t%8d %8d\n",
 		    OTABLE_SIZE * sizeof(object_t *), starts);
     }
     return starts;

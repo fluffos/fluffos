@@ -33,6 +33,8 @@
 #define NODE_RE_RANGE_LVALUE    -23
 #define NODE_BRANCH_LINK        -24
 #define NODE_SWITCH_RANGES      -25
+#define NODE_FOREACH            -26
+#define NODE_BREAK_SWITCH       -27
 
 union parse_value {
     int number;

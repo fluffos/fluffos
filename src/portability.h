@@ -246,23 +246,9 @@ typedef unsigned long UINT32;
  *  - for the few systems without [working] bcopy(); not sure why some
  *    gcc users don't have this in their c.lib...it's ANSI C (see K&R)
  */
-#if !defined(LATTICE) && !defined(SunOS_5) && !defined(OSF) && \
-    !defined(_AIX) && !defined(linux) && !defined(ultrix) && \
-    !defined(hpux) && !defined(sgi) && !defined(NeXT) && \
-    !defined(_CX_UX)
-#if defined(_AUX_SOURCE)
-#define MEMMOVE_MISSING
-#else
+#ifdef USE_BCOPY
 /* sunos 4.x, msdos */
 #define memmove(a,b,c) bcopy(b,a,c)
-#endif
-#endif
-
-/*
- * stdarg.h (ANSI C) vs varargs.h (defacto Unix standard)
- */
-#if defined(LATTICE) 
-#define HAS_STDARG_H
 #endif
 
 #endif				/* _PORT_H */

@@ -1,4 +1,157 @@
 ---------------------------------------------------------------------------
+(v21.4b11 promoted to v21.4 with the following fix)
+
+	* fixed a fatal error in compiling switches to C
+
+Sat Jun  3 05:24:08 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4b11
+	* added Magician's fixes for pluralize() for words starting with 'b'
+	  and 'c'
+
+Thu Jun  1 14:28:38 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4b10
+	* added support for w->x[y] = z, w->x[y]++ and w->x[y]-- which was
+	  accidentally omitted (generated 'Illegal lvalue' errors)
+	* fixed a crasher in strings longer than 64k
+	* fixed a compilation error crasher in x->foo when x was not a class
+
+Thu Jun  1 01:52:29 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4b9
+	* removed a kludge to help older TMI-2 libs run.  It was causing
+	  delayed crashers after errors in add_actions(), as well as
+	  screwing up the previous_object(-1) lists.  I also think it was
+	  the cause of the unresolved backend crashers around v21 or so. 
+	* COMPAT_BUSTER: due to the above, previous_object() is now zero
+	  in add_action()'ed functions
+	
+Mon May 29 21:24:55 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4b8
+	* fixed a bug that caused str[n..] to return garbage if n > strlen(str)
+	* fixed a compilation problem with LPC_TO_C off
+	* fixed a bad free() in edit_source that would cause defines to
+	  mutate
+	* fixed a crasher when a socket which had a function pointer as a
+	  callback was closed and then reused
+	* if a unbound socket is marked as needing a read, print an error
+	  message and close it.  This shouldn't ever happen, but evidentally
+	  does and causes the CPU to race
+
+Sat May 27 00:39:07 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4b7
+	* fixed a crasher in set_privs(ob, 0)
+	* fixed a crasher in message() when the destinatination was a string
+	  that doesn't correspond to an object
+	* fixed a crasher in calling a function pointer in a swapped object
+	* fixed a bug that caused ./build.MudOS not to find 'make' if GNU
+	  make wasn't installed
+	* fixed a bug in disassembling F_BBRANCH_LT and F_NEXT_FOREACH
+	  (print as backwards, not forward branches)
+	* removed the switch stack; explicit jumps are used instead
+	* fixed a crasher in exiting foreach() via break or return
+	* cleaned up duplicated code in code generation for loops
+	* added support for verifying string lengths in md.c
+
+Tue May 23 17:59:12 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4b6
+	* fixed a bug in the makefile dependencies that would cause the
+	  wrong system libs to be used
+	* fixed a bug that when using older versions of gmake would give the 
+	  'can't find rule for obj/grammar.tab.o' error
+	* updated the Makefiles, fixed a uid compilation problem
+	* removed some extra newlines at the end of compiler error messages
+	* fixed a crasher in calling functions() on a swapped object
+	* fixed a crasher in pluralize()
+	* fixed a bug that would cause parse errors/wierd error messages
+	  if (: was followed by the end of a line
+
+Mon May 22 15:54:58 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4b5
+	* fixed a read_file() to set it's return string size correctly
+	* fixed a bug that would kick you out of ed if you went to line -1
+	* fixed pluralize() to make sure the string is zero terminated
+	* swapped two include files to prevent a definition of SE in
+	  <sys/sema.h> from overriding one in <arpa/telnet.h>; it causes
+	  terminal negotiation to freeze output to the user
+	* fixed a bug that caused type errors when inheriting from a
+	  program with #pragma save_types on which was saved as a binary
+	* upped the default optimization to -O3 on xlc
+	* fixed a crasher in assigning to indexed strings/array ranges
+	  in LPC->C
+	* added LPC->C support for parse_command() and evaluate()
+	* put the O_CLONE flag back on replace_program() objects; makes
+	  memory accounting efuns return slightly more intuitive values
+	  and makes some sense.  This means you can't clone from such an
+	  object, but that's probably good since create() isn't what you'd
+	  expect anyway	
+	* fixed a bug that generated illegal LPC->C code if the last case in a
+	  switch was empty (it's legal in LPC but not ANSI C)
+	* fixed a few typos in LPC->C code generation (i -> lpc_int)
+	* made the error messages for trying to compile something with a
+	  functional more friendly (LPC->C)
+
+Sun May 21 09:17:34 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4b4
+	* fixed a bug that caused void and int to be compatible
+	* modified svalue_to_string and sprintf() to use outbuffers
+	* modified bad_argument() to use an outbuffer
+	* modified *_IN_TRACEBACK to use an outbuffer
+	* fixed outbuffers to truncate if they accumulate > 64k of data
+	* fixed a bunch of lines in interpret.c which had a space
+	  before the preprocessor directive
+	* cleaned up some more uses of MSTR_SIZE/COUNTED_STRLEN to fix
+	  more bugs with > 64k strings
+	* fixed a typo in the string switch type error message
+	* optimized STRING_STATS a bit (only do COUNTED_STRLEN() once
+	  in places)
+	* set up an error context before calling flag() in master in case
+	  there is an error
+	* check_memory() updated to know about the new malloc'ed strings
+	* optimized/cleaned up break_string()
+	* fixed a memory leak due to functionals keeping programs loaded
+	* fixed a memory leak in throw()
+	* fixed a memory leak in [0..n] array ranges on ref 1 arrays
+
+Sat May 20 10:21:58 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4b3
+	* fixed a syntax error with PACKAGE_MUDLIB_STATS defined
+	* fixed a name conflict between mudlib_stats.c and 
+	  packages/mudlib_stats.c; moved all mudlib_stats and uid
+	  code into the appropriate package file
+	* removed some remaining DEALLOCATE_MEMORY_AT_SHUTDOWN code
+	* edit_source -configure now checks for POSIX getcwd()
+	  and <crypt.h>
+	* fixed a problem where edit_source would abort if a define
+	  in local_options and options.h had different values (it died
+	  with a redefinition warning)
+	* fixed alot of compilation warnings under SGI cc -fullwarn
+	* fixed a bug where __PORT__ was zero when specifying sockets
+	  as external_port_x
+	* fixed a crasher in socket_address()
+
+Wed May 17 15:30:02 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4b2
+	* fixed a typo in cfuns.h
+	* fixed a problem with parsing of line specifiers which was causing
+	  search in ed to not return an error message; changed the message
+	  for search failing
+	* fixed a bug in SVALUE_STRLEN that would cause crashes involving
+	  strings longer than 64k
+
+Tue May 16 16:24:21 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4b1
+	* fixed a typo in dumpstat.c
+	* added Aragorn's patch to allow %x to specify hexidecimal in sscanf
+	* partially rewrote the contrib efun pluralize() to handle 'X of Y'
+	  and clear up some crashers, as well as be a bit more robust/efficient
+	* cleaned up some gcc -Wall warnings
+	* include configure.h as well as std_incl.h when testing for existence
+	  of header files.  This fixes misconfiguration bugs with respect to
+	  rusage() on some systems (SunOS, ...)
+	* fixed outbuf_t compilation problems in comm.c on some systems
+	* fixed a crasher when explode() returned an array that was truncated
+	  due to max_array_size
+
+---------------------------------------------------------------------------
 (v21.3b5 promoted to v21.3)
 
 Mon May 15 02:46:10 EDT 1995 (tim@handel.princeton.edu (Beek))
@@ -42,7 +195,7 @@ Sat Apr 29 20:58:34 EDT 1995 (tim@handel.princeton.edu (Beek))
 	* v21.3a7 promoted to v21.3b1
 
 ---------------------------------------------------------------------------
-(v21.2b8 promoted to v21.3a1)
+(v21.2b8 promoted to v21.2)
 
 Sun Apr 23 21:02:52 EDT 1995 (tim@handel.princeton.edu (Beek))
 	* raised patchlevel to v21.2b8

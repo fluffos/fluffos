@@ -98,7 +98,7 @@ static void set_ed_buf PROT((void));
 static int subst PROT((regexp *, char *, int, int));
 static int docmd PROT((int));
 static int doglob PROT((void));
-static void free_ed_buffer PROT((void));
+static void free_ed_buffer PROT((object_t *));
 static void shift PROT((char *));
 static void indent PROT((char *));
 static int indent_code PROT((void));
@@ -117,6 +117,7 @@ static void _count_blanks PROT((char *str, int blanks));
 
 static ed_buffer_t *current_ed_buffer;
 static object_t *current_editor;        /* the object responsible */
+outbuffer_t current_ed_results;
 
 #define ED_BUFFER       (current_ed_buffer)
 #ifdef OLD_ED
@@ -238,9 +239,9 @@ static int append P2(int, line, int, glob)
     setCurLn(line);
     P_APPENDING = 1;
     if (P_NFLG)
-	ED_OUTPUTV("%6d. ", P_CURLN + 1);
+	ED_OUTPUTV(ED_DEST, "%6d. ", P_CURLN + 1);
     if (P_CUR_AUTOIND)
-	ED_OUTPUTV("%*s", P_LEADBLANKS, "");
+	ED_OUTPUTV(ED_DEST, "%*s", P_LEADBLANKS, "");
 #ifdef OLD_ED
     set_prompt("*\b");
 #endif
@@ -257,7 +258,7 @@ static int more_append P1(char *, str)
 	return (0);
     }
     if (P_NFLG)
-	ED_OUTPUTV("%6d. ", P_CURLN + 2);
+	ED_OUTPUTV(ED_DEST, "%6d. ", P_CURLN + 2);
     if (P_CUR_AUTOIND) {
 	int i;
 	int less_indent_flag = 0;
@@ -274,7 +275,7 @@ static int more_append P1(char *, str)
 	strncpy(inlin + P_LEADBLANKS, str, ED_MAXLINE - P_LEADBLANKS);
 	inlin[ED_MAXLINE - 1] = '\0';
 	_count_blanks(inlin, 0);
-	ED_OUTPUTV("%*s", P_LEADBLANKS, "");
+	ED_OUTPUTV(ED_DEST, "%*s", P_LEADBLANKS, "");
 	if (!*str && less_indent_flag)
 	    return 0;
 	str = inlin;
@@ -476,7 +477,7 @@ static int doprnt P2(int, from, int, to)
     return (0);
 }
 
-static void free_ed_buffer()
+static void free_ed_buffer P1(object_t *, who)
 {
     clrbuf();
 #ifdef OLD_ED
@@ -491,18 +492,18 @@ static void free_ed_buffer()
 	FREE(ED_BUFFER->exit_fn);
 	free_object(ED_BUFFER->exit_ob, "ed EOF");
 	FREE((char *) ED_BUFFER);
-	command_giver->interactive->ed_buffer = 0;
+	who->interactive->ed_buffer = 0;
 	set_prompt("> ");
 	return;
     }
 #endif
-    ED_OUTPUT("Exit from ed.\n");
+    ED_OUTPUT(ED_DEST, "Exit from ed.\n");
 
     if (P_OLDPAT)
 	FREE((char *) P_OLDPAT);
 #ifdef OLD_ED
     FREE((char *) ED_BUFFER);
-    command_giver->interactive->ed_buffer = 0;
+    who->interactive->ed_buffer = 0;
     set_prompt("> ");
 #else
     object_free_ed_buffer();
@@ -518,10 +519,10 @@ static void prntln P3(char *, str, int, vflg, int, len)
 
     line = start;
     if (len)
-	ED_OUTPUTV("%3d  ", len);
+	ED_OUTPUTV(ED_DEST, "%3d  ", len);
     while (*str && *str != NL) {
 	if ((line - start) > ED_MAXLINE) {
-	    free_ed_buffer();
+	    free_ed_buffer(current_editor);
 	    error("Bad file format. Ed can't handle lines longer than %d.\n", ED_MAXLINE);
 	}
 	if (*str < ' ' || *str >= DEL) {
@@ -548,7 +549,7 @@ static void prntln P3(char *, str, int, vflg, int, len)
 	*line++ = '$';
 #endif
     *line = EOS;
-    ED_OUTPUTV("%s\n", start);
+    ED_OUTPUTV(ED_DEST, "%s\n", start);
 }
 
 /*	egets.c	*/
@@ -563,7 +564,7 @@ static int egets P3(char *, str, int, size, FILE *, stream)
 	if (c == EOF) {
 	    *cp = EOS;
 	    if (count)
-		ED_OUTPUT("[Incomplete last line]\n");
+		ED_OUTPUT(ED_DEST, "[Incomplete last line]\n");
 	    return (count);
 	} else if (c == NL) {
 	    *cp = EOS;
@@ -582,7 +583,7 @@ static int egets P3(char *, str, int, size, FILE *, stream)
     }
     str[count - 1] = EOS;
     if (c != NL) {
-	ED_OUTPUT("truncating line\n");
+	ED_OUTPUT(ED_DEST, "truncating line\n");
 	P_TRUNCATED++;
 	while ((c = getc(stream)) != EOF)
 	    if (c == NL)
@@ -603,9 +604,9 @@ static int doread P2(int, lin, char *, fname)
     P_NONASCII = P_NULLCHAR = P_TRUNCATED = 0;
 
     if (P_VERBOSE)
-	ED_OUTPUTV("\"%s\" ", fname);
+	ED_OUTPUTV(ED_DEST, "\"%s\" ", fname);
     if ((fp = fopen(fname, "r")) == NULL) {
-	ED_OUTPUT(" isn't readable.\n");
+	ED_OUTPUT(ED_DEST, " isn't readable.\n");
 	return (ERR);
     }
     setCurLn(lin);
@@ -621,14 +622,14 @@ static int doread P2(int, lin, char *, fname)
     if (err < 0)
 	return (err);
     if (P_VERBOSE) {
-	ED_OUTPUTV("%u lines %u bytes", lines, bytes);
+	ED_OUTPUTV(ED_DEST, "%u lines %u bytes", lines, bytes);
 	if (P_NONASCII)
-	    ED_OUTPUTV(" [%d non-ascii]", P_NONASCII);
+	    ED_OUTPUTV(ED_DEST, " [%d non-ascii]", P_NONASCII);
 	if (P_NULLCHAR)
-	    ED_OUTPUTV(" [%d nul]", P_NULLCHAR);
+	    ED_OUTPUTV(ED_DEST, " [%d nul]", P_NULLCHAR);
 	if (P_TRUNCATED)
-	    ED_OUTPUTV(" [%d lines truncated]", P_TRUNCATED);
-	ED_OUTPUT("\n");
+	    ED_OUTPUTV(ED_DEST, " [%d lines truncated]", P_TRUNCATED);
+	ED_OUTPUT(ED_DEST, "\n");
     }
     return (err);
 }				/* doread */
@@ -658,12 +659,12 @@ static int dowrite P4(int, from, int, to, char *, fname, int, apflg)
 #endif
 
     if (!P_RESTRICT)
-	ED_OUTPUTV("\"%s\" ", fname);
+	ED_OUTPUTV(ED_DEST, "\"%s\" ", fname);
     if ((fp = fopen(fname, (apflg ? "a" : "w"))) == NULL) {
 	if (!P_RESTRICT)
-	    ED_OUTPUT(" can't be opened for writing!\n");
+	    ED_OUTPUT(ED_DEST, " can't be opened for writing!\n");
 	else
-	    ED_OUTPUT("Couldn't open file for writing!\n");
+	    ED_OUTPUT(ED_DEST, "Couldn't open file for writing!\n");
 	return (ERR);
     }
     lptr = getptr(from);
@@ -672,7 +673,7 @@ static int dowrite P4(int, from, int, to, char *, fname, int, apflg)
 	lines++;
 	bytes += strlen(str) + 1;	/* str + '\n' */
 	if (fputs(str, fp) == EOF) {
-	    ED_OUTPUT("file write error\n");
+	    ED_OUTPUT(ED_DEST, "file write error\n");
 	    err++;
 	    break;
 	}
@@ -681,7 +682,7 @@ static int dowrite P4(int, from, int, to, char *, fname, int, apflg)
     }
 
     if (!P_RESTRICT)
-	ED_OUTPUTV("%u lines %lu bytes\n", lines, bytes);
+	ED_OUTPUTV(ED_DEST, "%u lines %lu bytes\n", lines, bytes);
     fclose(fp);
 
 #ifdef OLD_ED
@@ -721,7 +722,7 @@ static int find P2(regexp *, pat, int, dir)
     }
 /* Put us back to where we came from */
     dir ? prevCurLn() : nextCurLn();
-    return (ERR);
+    return (SEARCH_FAILED);
 }				/* find() */
 
 /*	getfn.c	*/
@@ -748,7 +749,7 @@ static char *getfn P1(int, writeflg)
 
     }
     if (strlen(file) == 0) {
-	ED_OUTPUT("Bad file name.\n");
+	ED_OUTPUT(ED_DEST, "Bad file name.\n");
 	return (NULL);
     }
 
@@ -769,7 +770,7 @@ static char *getfn P1(int, writeflg)
     file[MAXFNAME - 1] = 0;
 
     if (strlen(file) == 0) {
-	ED_OUTPUT("no file name\n");
+	ED_OUTPUT(ED_DEST, "no file name\n");
 	return (NULL);
     }
     return (file);
@@ -812,11 +813,11 @@ static int getnum P1(int, first)
     case '\'':
 	inptr++;
 	if (*inptr < 'a' || *inptr > 'z')
-	    return (EOF);
+	    return MARK_A_TO_Z;
 	return P_MARK[*inptr++ - 'a'];
 
     default:
-	return (first ? EOF : 1);	/* unknown address */
+	return (first ? NO_LINE_RANGE : 1);	/* unknown address */
     }
 }				/* getnum */
 
@@ -842,8 +843,10 @@ static int getone()
 		return (i);
 	    if (c == '+')
 		num += i;
-	    else
+	    else {
 		num -= i;
+		if (num < 1) num = 1;
+	    }
 	}
     }
     return (num > P_LASTLN ? BAD_LINE_NUMBER : num);
@@ -871,7 +874,7 @@ static int getlst()
     if (P_NLINES <= 1)
 	P_LINE1 = P_LINE2;
 
-    return ((num < EOF) ? num : P_NLINES);
+    return ((num < 0) ? num : P_NLINES);
 }				/* getlst */
 
 
@@ -1020,7 +1023,7 @@ static int join P2(int, first, int, last)
 	str = gettxtl(lin);
 	while (*str) {
 	    if (cp >= buf + ED_MAXLINE - 1) {
-		ED_OUTPUT("line too long\n");
+		ED_OUTPUT(ED_DEST, "line too long\n");
 		return ERR;
 	    }
 	    *cp++ = *str++;
@@ -1134,19 +1137,19 @@ static int set()
 	inptr++;
 
     if ((*inptr == NL)) {
-	ED_OUTPUTV("ed version %d.%d\n", version / 100, version % 100);
+	ED_OUTPUTV(ED_DEST, "ed version %d.%d\n", version / 100, version % 100);
 	limit = tbl + (sizeof(tbl) / sizeof(struct tbl));
 	for (t = tbl; t < limit; t += 2) {
-	    ED_OUTPUTV("%s:%s ", t->t_str,
+	    ED_OUTPUTV(ED_DEST, "%s:%s ", t->t_str,
 			P_FLAGS & t->t_or_mask ? "on" : "off");
 	}
-	ED_OUTPUTV("\nshiftwidth:%d\n", P_SHIFTWIDTH);
+	ED_OUTPUTV(ED_DEST, "\nshiftwidth:%d\n", P_SHIFTWIDTH);
 	return (0);
     }
     Skip_White_Space;
     for (i = 0; *inptr != SP && *inptr != HT && *inptr != NL;) {
 	if (i == sizeof word - 1) {
-	    ED_OUTPUT("Too long argument to 'set'!\n");
+	    ED_OUTPUT(ED_DEST, "Too long argument to 'set'!\n");
 	    return 0;
 	}
 	word[i++] = *inptr++;
@@ -1269,7 +1272,7 @@ static int subst P4(regexp *, pat, char *, sub, int, gflg, int, pflag)
  * optimize for this editor.   Dworkin 920510
  */
 #ifdef OLD_ED
-#define error(s)               { ED_OUTPUTV(s, lineno); errs++; return; }
+#define error(s)               { ED_OUTPUTV(ED_DEST, s, lineno); errs++; return; }
 #endif
 #define bool char
 static int lineno, errs;
@@ -1762,7 +1765,7 @@ static int docmd P1(int, glob)
 	return (1);
 
     case '=':
-	ED_OUTPUTV("%d\n", P_LINE2);
+	ED_OUTPUTV(ED_DEST, "%d\n", P_LINE2);
 	break;
 
     case 'o':
@@ -1853,7 +1856,7 @@ static int docmd P1(int, glob)
 	fptr = getfn(0);
 
 	if (P_NOFNAME)
-	    ED_OUTPUTV("%s\n", P_FNAME);
+	    ED_OUTPUTV(ED_DEST, "%s\n", P_FNAME);
 	else {
 	    if (fptr == NULL)
 		return FILE_NAME_ERROR;
@@ -1915,6 +1918,7 @@ static int docmd P1(int, glob)
 	    return st;
 	P_FCHANGED = TRUE;
 	break;
+
     case 'n':
 	if (*inptr != NL)
 	    return SYNTAX_ERROR;
@@ -1922,7 +1926,7 @@ static int docmd P1(int, glob)
 	    P_FLAGS &= ~NFLG_MASK;
 	else
 	    P_FLAGS |= NFLG_MASK;
-	ED_OUTPUTV("number %s, list %s\n",
+	ED_OUTPUTV(ED_DEST, "number %s, list %s\n",
 		    P_NFLG ? "on" : "off", P_LFLG ? "on" : "off");
 	break;
 
@@ -1931,11 +1935,11 @@ static int docmd P1(int, glob)
 	    return LINE_OR_RANGE_ILL;
 	if (*inptr != NL)
 	    return SYNTAX_ERROR;
-	ED_OUTPUT("Indenting entire code...\n");
+	ED_OUTPUT(ED_DEST, "Indenting entire code...\n");
 	if (indent_code())
-	    ED_OUTPUT("Indentation halted.\n");
+	    ED_OUTPUT(ED_DEST, "Indentation halted.\n");
 	else
-	    ED_OUTPUT("Indentation complete.\n");
+	    ED_OUTPUT(ED_DEST, "Indentation complete.\n");
 	break;
 
     case 'H':
@@ -2129,7 +2133,7 @@ static int doglob()
 	P_CURLN = lin;
 	P_CURPTR = ptr;
 	inptr = cmd;
-	if ((status = getlst()) < 0)
+	if ((status = getlst()) < 0 && status != NO_LINE_RANGE)
 	    return (status);
 	if ((status = docmd(1)) < 0)
 	    return (status);
@@ -2221,7 +2225,7 @@ void ed_start P5(char *, file_arg, char *, write_fn, char *, exit_fn, int, restr
 	strncpy(P_FNAME, file_arg, MAXFNAME - 1);
 	P_FNAME[MAXFNAME - 1] = 0;
     } else {
-	ED_OUTPUT("No file.\n");
+	ED_OUTPUT(ED_DEST, "No file.\n");
     }
     set_prompt(":");
     return;
@@ -2251,7 +2255,7 @@ void ed_cmd P1(char *, str)
     strncpy(inlin, str, ED_MAXLINE - 1);
     inlin[ED_MAXLINE - 1] = 0;
     inptr = inlin;
-    if (getlst() >= 0)
+    if ((status = getlst()) >= 0 || status == NO_LINE_RANGE)
 	if ((status = ckglob()) != 0) {
 	    if (status >= 0 && (status = doglob()) >= 0) {
 		setCurLn(status);
@@ -2271,7 +2275,7 @@ void ed_cmd P1(char *, str)
 static void report_status P1(int, status) {
     switch (status) {
     case EOF:
-	free_ed_buffer();
+	free_ed_buffer(current_editor);
 	return;
 #if 0
     case FATAL:
@@ -2281,80 +2285,82 @@ static void report_status P1(int, status) {
 	}
 	FREE((char *) ED_BUFFER);
 	command_giver->interactive->ed_buffer = 0;
-	ED_OUTPUT("FATAL ERROR\n");
+	ED_OUTPUT(ED_DEST, "FATAL ERROR\n");
 	set_prompt(":");
 	return;
 #endif
     case CHANGED:
-	ED_OUTPUT("File has been changed.\n");
+	ED_OUTPUT(ED_DEST, "File has been changed.\n");
 	break;
     case SET_FAIL:
-	ED_OUTPUT("`set' command failed.\n");
+	ED_OUTPUT(ED_DEST, "`set' command failed.\n");
 	break;
     case SUB_FAIL:
-	ED_OUTPUT("string substitution failed.\n");
+	ED_OUTPUT(ED_DEST, "string substitution failed.\n");
 	break;
     case MEM_FAIL:
-	ED_OUTPUT("Out of memory: text may have been lost.\n");
+	ED_OUTPUT(ED_DEST, "Out of memory: text may have been lost.\n");
 	break;
     case UNRECOG_COMMAND:
-	ED_OUTPUT("Unrecognized command.\n");
+	ED_OUTPUT(ED_DEST, "Unrecognized command.\n");
 	break;
     case BAD_LINE_RANGE:
-	ED_OUTPUT("Bad line range.\n");
+	ED_OUTPUT(ED_DEST, "Bad line range.\n");
 	break;
     case BAD_LINE_NUMBER:
-	ED_OUTPUT("Bad line number.\n");
+	ED_OUTPUT(ED_DEST, "Bad line number.\n");
 	break;
     case SYNTAX_ERROR:
-	ED_OUTPUT("Bad command syntax.\n");
+	ED_OUTPUT(ED_DEST, "Bad command syntax.\n");
 	break;
     case RANGE_ILLEGAL:
-	ED_OUTPUT("Cannot use ranges with that command.\n");
+	ED_OUTPUT(ED_DEST, "Cannot use ranges with that command.\n");
 	break;
     case RESTRICTED:
-	ED_OUTPUT("That command is restricted.\n");
+	ED_OUTPUT(ED_DEST, "That command is restricted.\n");
 	break;
     case LINE_OR_RANGE_ILL:
-	ED_OUTPUT("Cannot use lines or ranges with that command.\n");
+	ED_OUTPUT(ED_DEST, "Cannot use lines or ranges with that command.\n");
 	break;
     case FILE_NAME_ERROR:
-	ED_OUTPUT("File command failed.\n");
+	ED_OUTPUT(ED_DEST, "File command failed.\n");
 	break;
     case MARK_A_TO_Z:
-	ED_OUTPUT("A mark must be in the range 'a to 'z.\n");
+	ED_OUTPUT(ED_DEST, "A mark must be in the range 'a to 'z.\n");
 	break;
     case SUB_BAD_PATTERN:
-	ED_OUTPUT("Bad pattern in search and replace.\n");
+	ED_OUTPUT(ED_DEST, "Bad pattern in search and replace.\n");
 	break;
     case SUB_BAD_REPLACEMENT:
-	ED_OUTPUT("Bad replacement in search and replace.\n");
+	ED_OUTPUT(ED_DEST, "Bad replacement in search and replace.\n");
 	break;
     case BAD_DESTINATION:
-	ED_OUTPUT("Bad destination for move or copy.\n");
+	ED_OUTPUT(ED_DEST, "Bad destination for move or copy.\n");
 	break;
     case END_OF_FILE:
-	ED_OUTPUT("End of file.\n");
+	ED_OUTPUT(ED_DEST, "End of file.\n");
+	break;
+    case SEARCH_FAILED:
+	ED_OUTPUT(ED_DEST, "Search failed.\n");
 	break;
     default:
-	ED_OUTPUT("Failed command.\n");
-	/* Unrecognized or failed command 
-	   (this is SOOOO much better than "?" :-)	  */
+	ED_OUTPUT(ED_DEST, "Failed command.\n");
     }
 }
 
 #ifdef OLD_ED
-void save_ed_buffer()
+void save_ed_buffer P1(object_t *, who)
 {
     svalue_t *stmp;
     char *fname;
 
     regexp_user = ED_REGEXP;
-    current_ed_buffer = command_giver->interactive->ed_buffer;
-    current_editor = command_giver;
+    current_ed_buffer = who->interactive->ed_buffer;
+    current_editor = who;
 
     push_string(P_FNAME, STRING_SHARED);
-    stmp = apply_master_ob(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME, 1);
+    push_object(who);
+    stmp = apply_master_ob(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME, 2);
     if (stmp && stmp != (svalue_t *)-1) {
 	if (stmp->type == T_STRING) {
 	    fname = stmp->u.string;
@@ -2363,7 +2369,7 @@ void save_ed_buffer()
 	    dowrite(1, P_LASTLN, fname, 0);
 	}
     }
-    free_ed_buffer();
+    free_ed_buffer(who);
 }
 #endif
 
@@ -2371,139 +2377,139 @@ static void print_help P1(int, arg)
 {
     switch (arg) {
     case 'I':
-	ED_OUTPUT("       Automatic Indentation (V 1.0)\n");
-	ED_OUTPUT("------------------------------------\n");
-	ED_OUTPUT("           by Qixx [Update: 7/10/91]\n");
-	ED_OUTPUT("\nBy using the command 'I', a program is run which will\n");
-	ED_OUTPUT("automatically indent all lines in your code.  As this is\n");
-	ED_OUTPUT("being done, the program will also search for some basic\n");
-	ED_OUTPUT("errors (which don't show up good during compiling) such as\n");
-	ED_OUTPUT("Unterminated String, Mismatched Brackets and Parentheses,\n");
-	ED_OUTPUT("and indented code is easy to understand and debug, since if\n");
-	ED_OUTPUT("your brackets are off -- the code will LOOK wrong. Please\n");
-	ED_OUTPUT("mail me at gaunt@mcs.anl.gov with any pieces of code which\n");
-	ED_OUTPUT("don't get indented properly.\n");
+	ED_OUTPUT(ED_DEST, "       Automatic Indentation (V 1.0)\n");
+	ED_OUTPUT(ED_DEST, "------------------------------------\n");
+	ED_OUTPUT(ED_DEST, "           by Qixx [Update: 7/10/91]\n");
+	ED_OUTPUT(ED_DEST, "\nBy using the command 'I', a program is run which will\n");
+	ED_OUTPUT(ED_DEST, "automatically indent all lines in your code.  As this is\n");
+	ED_OUTPUT(ED_DEST, "being done, the program will also search for some basic\n");
+	ED_OUTPUT(ED_DEST, "errors (which don't show up good during compiling) such as\n");
+	ED_OUTPUT(ED_DEST, "Unterminated String, Mismatched Brackets and Parentheses,\n");
+	ED_OUTPUT(ED_DEST, "and indented code is easy to understand and debug, since if\n");
+	ED_OUTPUT(ED_DEST, "your brackets are off -- the code will LOOK wrong. Please\n");
+	ED_OUTPUT(ED_DEST, "mail me at gaunt@mcs.anl.gov with any pieces of code which\n");
+	ED_OUTPUT(ED_DEST, "don't get indented properly.\n");
 	break;
     case 'n':
-	ED_OUTPUT("Command: n   Usage: n\n");
-	ED_OUTPUT("This command toggles the internal flag which will cause line\n");
-	ED_OUTPUT("numbers to be printed whenever a line is listed.\n");
+	ED_OUTPUT(ED_DEST, "Command: n   Usage: n\n");
+	ED_OUTPUT(ED_DEST, "This command toggles the internal flag which will cause line\n");
+	ED_OUTPUT(ED_DEST, "numbers to be printed whenever a line is listed.\n");
 	break;
     case 'a':
-	ED_OUTPUT("Command: a   Usage: a\n");
-	ED_OUTPUT("Append causes the editor to enter input mode, inserting all text\n");
-	ED_OUTPUT("starting AFTER the current line. Use a '.' on a blank line to exit\n");
-	ED_OUTPUT("this mode.\n");
+	ED_OUTPUT(ED_DEST, "Command: a   Usage: a\n");
+	ED_OUTPUT(ED_DEST, "Append causes the editor to enter input mode, inserting all text\n");
+	ED_OUTPUT(ED_DEST, "starting AFTER the current line. Use a '.' on a blank line to exit\n");
+	ED_OUTPUT(ED_DEST, "this mode.\n");
 	break;
     case 'A':
-	ED_OUTPUT("Command: A   Usage: A\n\
+	ED_OUTPUT(ED_DEST, "Command: A   Usage: A\n\
 Like the 'a' command, but uses inverse autoindent mode.\n");
 	break;
     case 'i':
-	ED_OUTPUT("Command: i   Usage: i\n");
-	ED_OUTPUT("Insert causes the editor to enter input mode, inserting all text\n");
-	ED_OUTPUT("starting BEFORE the current line. Use a '.' on a blank line to exit\n");
-	ED_OUTPUT("this mode.\n");
+	ED_OUTPUT(ED_DEST, "Command: i   Usage: i\n");
+	ED_OUTPUT(ED_DEST, "Insert causes the editor to enter input mode, inserting all text\n");
+	ED_OUTPUT(ED_DEST, "starting BEFORE the current line. Use a '.' on a blank line to exit\n");
+	ED_OUTPUT(ED_DEST, "this mode.\n");
 	break;
     case 'c':
-	ED_OUTPUT("Command: c   Usage: c\n");
-	ED_OUTPUT("Change command causes the current line to be wiped from memory.\n");
-	ED_OUTPUT("The editor enters input mode and all text is inserted where the previous\n");
-	ED_OUTPUT("line existed.\n");
+	ED_OUTPUT(ED_DEST, "Command: c   Usage: c\n");
+	ED_OUTPUT(ED_DEST, "Change command causes the current line to be wiped from memory.\n");
+	ED_OUTPUT(ED_DEST, "The editor enters input mode and all text is inserted where the previous\n");
+	ED_OUTPUT(ED_DEST, "line existed.\n");
 	break;
     case 'd':
-	ED_OUTPUT("Command: d   Usage: d  or [range]d\n");
-	ED_OUTPUT("Deletes the current line unless preceeded with a range of lines,\n");
-	ED_OUTPUT("then the entire range will be deleted.\n");
+	ED_OUTPUT(ED_DEST, "Command: d   Usage: d  or [range]d\n");
+	ED_OUTPUT(ED_DEST, "Deletes the current line unless preceeded with a range of lines,\n");
+	ED_OUTPUT(ED_DEST, "then the entire range will be deleted.\n");
 	break;
 #ifndef RESTRICTED_ED
     case 'e':
-	ED_OUTPUT("Commmand: e  Usage: e filename\n");
-	ED_OUTPUT("Causes the current file to be wiped from memory, and the new file\n");
-	ED_OUTPUT("to be loaded in.\n");
+	ED_OUTPUT(ED_DEST, "Commmand: e  Usage: e filename\n");
+	ED_OUTPUT(ED_DEST, "Causes the current file to be wiped from memory, and the new file\n");
+	ED_OUTPUT(ED_DEST, "to be loaded in.\n");
 	break;
     case 'E':
-	ED_OUTPUT("Commmand: E  Usage: E filename\n");
-	ED_OUTPUT("Causes the current file to be wiped from memory, and the new file\n");
-	ED_OUTPUT("to be loaded in.  Different from 'e' in the fact that it will wipe\n");
-	ED_OUTPUT("the current file even if there are unsaved modifications.\n");
+	ED_OUTPUT(ED_DEST, "Commmand: E  Usage: E filename\n");
+	ED_OUTPUT(ED_DEST, "Causes the current file to be wiped from memory, and the new file\n");
+	ED_OUTPUT(ED_DEST, "to be loaded in.  Different from 'e' in the fact that it will wipe\n");
+	ED_OUTPUT(ED_DEST, "the current file even if there are unsaved modifications.\n");
 	break;
     case 'f':
-	ED_OUTPUT("Command: f  Usage: f  or f filename\n");
-	ED_OUTPUT("Display or set the current filename.   If  filename is given as \nan argument, the file (f) command changes the current filename to\nfilename; otherwise, it prints  the current filename.\n");
+	ED_OUTPUT(ED_DEST, "Command: f  Usage: f  or f filename\n");
+	ED_OUTPUT(ED_DEST, "Display or set the current filename.   If  filename is given as \nan argument, the file (f) command changes the current filename to\nfilename; otherwise, it prints  the current filename.\n");
 	break;
 #endif				/* RESTRICTED_ED mode */
     case 'g':
-	ED_OUTPUT("Command: g  Usage: g/re/p\n");
-	ED_OUTPUT("Search in all lines for expression 're', and print\n");
-	ED_OUTPUT("every match. Command 'l' can also be given\n");
-	ED_OUTPUT("Unlike in unix ed, you can also supply a range of lines\n");
-	ED_OUTPUT("to search in\n");
-	ED_OUTPUT("Compare with command 'v'.\n");
+	ED_OUTPUT(ED_DEST, "Command: g  Usage: g/re/p\n");
+	ED_OUTPUT(ED_DEST, "Search in all lines for expression 're', and print\n");
+	ED_OUTPUT(ED_DEST, "every match. Command 'l' can also be given\n");
+	ED_OUTPUT(ED_DEST, "Unlike in unix ed, you can also supply a range of lines\n");
+	ED_OUTPUT(ED_DEST, "to search in\n");
+	ED_OUTPUT(ED_DEST, "Compare with command 'v'.\n");
 	break;
     case 'h':
-	ED_OUTPUT("Command: h    Usage:  h  or hc (where c is a command)\n");
-	ED_OUTPUT("Help files added by Qixx.\n");
+	ED_OUTPUT(ED_DEST, "Command: h    Usage:  h  or hc (where c is a command)\n");
+	ED_OUTPUT(ED_DEST, "Help files added by Qixx.\n");
 	break;
     case 'j':
-	ED_OUTPUT("Command: j    Usage: j or [range]j\n");
-	ED_OUTPUT("Join Lines. Remove the NEWLINE character  from  between the  two\naddressed lines.  The defaults are the current line and the line\nfollowing.  If exactly one address is given,  this  command does\nnothing.  The joined line is the resulting current line.\n");
+	ED_OUTPUT(ED_DEST, "Command: j    Usage: j or [range]j\n");
+	ED_OUTPUT(ED_DEST, "Join Lines. Remove the NEWLINE character  from  between the  two\naddressed lines.  The defaults are the current line and the line\nfollowing.  If exactly one address is given,  this  command does\nnothing.  The joined line is the resulting current line.\n");
 	break;
     case 'k':
-	ED_OUTPUT("Command: k   Usage: kc  (where c is a character)\n");
-	ED_OUTPUT("Mark the addressed line with the name c,  a  lower-case\nletter.   The  address-form,  'c,  addresses  the  line\nmarked by c.  k accepts one address; the default is the\ncurrent line.  The current line is left unchanged.\n");
+	ED_OUTPUT(ED_DEST, "Command: k   Usage: kc  (where c is a character)\n");
+	ED_OUTPUT(ED_DEST, "Mark the addressed line with the name c,  a  lower-case\nletter.   The  address-form,  'c,  addresses  the  line\nmarked by c.  k accepts one address; the default is the\ncurrent line.  The current line is left unchanged.\n");
 	break;
     case 'l':
-	ED_OUTPUT("Command: l   Usage: l  or  [range]l\n");
-	ED_OUTPUT("List the current line or a range of lines in an unambiguous\nway such that non-printing characters are represented as\nsymbols (specifically New-Lines).\n");
+	ED_OUTPUT(ED_DEST, "Command: l   Usage: l  or  [range]l\n");
+	ED_OUTPUT(ED_DEST, "List the current line or a range of lines in an unambiguous\nway such that non-printing characters are represented as\nsymbols (specifically New-Lines).\n");
 	break;
     case 'm':
-	ED_OUTPUT("Command: m   Usage: mADDRESS or [range]mADDRESS\n");
-	ED_OUTPUT("Move the current line (or range of lines if specified) to a\nlocation just after the specified ADDRESS.  Address 0 is the\nbeginning of the file and the default destination is the\ncurrent line.\n");
+	ED_OUTPUT(ED_DEST, "Command: m   Usage: mADDRESS or [range]mADDRESS\n");
+	ED_OUTPUT(ED_DEST, "Move the current line (or range of lines if specified) to a\nlocation just after the specified ADDRESS.  Address 0 is the\nbeginning of the file and the default destination is the\ncurrent line.\n");
 	break;
     case 'p':
-	ED_OUTPUT("Command: p    Usage: p  or  [range]p\n");
-	ED_OUTPUT("Print the current line (or range of lines if specified) to the\nscreen. See the command 'n' if line numbering is desired.\n");
+	ED_OUTPUT(ED_DEST, "Command: p    Usage: p  or  [range]p\n");
+	ED_OUTPUT(ED_DEST, "Print the current line (or range of lines if specified) to the\nscreen. See the command 'n' if line numbering is desired.\n");
 	break;
     case 'q':
-	ED_OUTPUT("Command: q    Usage: q\n");
-	ED_OUTPUT("Quit the editor. Note that you can't quit this way if there\nare any unsaved changes.  See 'w' for writing changes to file.\n");
+	ED_OUTPUT(ED_DEST, "Command: q    Usage: q\n");
+	ED_OUTPUT(ED_DEST, "Quit the editor. Note that you can't quit this way if there\nare any unsaved changes.  See 'w' for writing changes to file.\n");
 	break;
     case 'Q':
-	ED_OUTPUT("Command: Q    Usage: Q\n");
-	ED_OUTPUT("Force Quit.  Quit the editor even if the buffer contains unsaved\nmodifications.\n");
+	ED_OUTPUT(ED_DEST, "Command: Q    Usage: Q\n");
+	ED_OUTPUT(ED_DEST, "Force Quit.  Quit the editor even if the buffer contains unsaved\nmodifications.\n");
 	break;
 #ifndef RESTRICTED_ED
     case 'r':
-	ED_OUTPUT("Command: r    Usage: r filename\n");
-	ED_OUTPUT("Reads the given filename into the current buffer starting\nat the current line.\n");
+	ED_OUTPUT(ED_DEST, "Command: r    Usage: r filename\n");
+	ED_OUTPUT(ED_DEST, "Reads the given filename into the current buffer starting\nat the current line.\n");
 	break;
 #endif				/* RESTRICTED_ED */
     case 't':
-	ED_OUTPUT("Command: t   Usage: tADDRESS or [range]tADDRESS\n");
-	ED_OUTPUT("Transpose a copy of the current line (or range of lines if specified)\nto a location just after the specified ADDRESS.  Address 0 is the\nbeginning of the file and the default destination\nis the current line.\n");
+	ED_OUTPUT(ED_DEST, "Command: t   Usage: tADDRESS or [range]tADDRESS\n");
+	ED_OUTPUT(ED_DEST, "Transpose a copy of the current line (or range of lines if specified)\nto a location just after the specified ADDRESS.  Address 0 is the\nbeginning of the file and the default destination\nis the current line.\n");
 	break;
     case 'v':
-	ED_OUTPUT("Command: v   Usage: v/re/p\n");
-	ED_OUTPUT("Search in all lines without expression 're', and print\n");
-	ED_OUTPUT("every match. Other commands than 'p' can also be given\n");
-	ED_OUTPUT("Compare with command 'g'.\n");
+	ED_OUTPUT(ED_DEST, "Command: v   Usage: v/re/p\n");
+	ED_OUTPUT(ED_DEST, "Search in all lines without expression 're', and print\n");
+	ED_OUTPUT(ED_DEST, "every match. Other commands than 'p' can also be given\n");
+	ED_OUTPUT(ED_DEST, "Compare with command 'g'.\n");
 	break;
     case 'z':
-	ED_OUTPUT("Command: z   Usage: z  or  z-  or z.\n");
-	ED_OUTPUT("Displays 20 lines starting at the current line.\nIf the command is 'z.' then 20 lines are displayed being\ncentered on the current line. The command 'z-' displays\nthe 20 lines before the current line.\n");
+	ED_OUTPUT(ED_DEST, "Command: z   Usage: z  or  z-  or z.\n");
+	ED_OUTPUT(ED_DEST, "Displays 20 lines starting at the current line.\nIf the command is 'z.' then 20 lines are displayed being\ncentered on the current line. The command 'z-' displays\nthe 20 lines before the current line.\n");
 	break;
     case 'Z':
-	ED_OUTPUT("Command: Z   Usage: Z  or  Z-  or Z.\n");
-	ED_OUTPUT("Displays 40 lines starting at the current line.\nIf the command is 'Z.' then 40 lines are displayed being\ncentered on the current line. The command 'Z-' displays\nthe 40 lines before the current line.\n");
+	ED_OUTPUT(ED_DEST, "Command: Z   Usage: Z  or  Z-  or Z.\n");
+	ED_OUTPUT(ED_DEST, "Displays 40 lines starting at the current line.\nIf the command is 'Z.' then 40 lines are displayed being\ncentered on the current line. The command 'Z-' displays\nthe 40 lines before the current line.\n");
 	break;
     case 'x':
-	ED_OUTPUT("Command: x   Usage: x\n");
-	ED_OUTPUT("Save file under the current name, and then exit from ed.\n");
+	ED_OUTPUT(ED_DEST, "Command: x   Usage: x\n");
+	ED_OUTPUT(ED_DEST, "Save file under the current name, and then exit from ed.\n");
 	break;
     case 's':
 	if (*inptr == 'e' && *(inptr + 1) == 't') {
-	    ED_OUTPUT("\
+	    ED_OUTPUT(ED_DEST, "\
 Without arguments: show current settings.\n\
 'set save' will preserve the current settings for subsequent invocations of ed.\n\
 Options:\n\
@@ -2526,47 +2532,47 @@ typing ^D or ^K in the autoindent mode.\n");
 	}
 	break;
     case '/':
-	ED_OUTPUT("Command: /   Usage: /pattern\n");
-	ED_OUTPUT("finds the next occurence of 'pattern'.  Note that pattern\n\
+	ED_OUTPUT(ED_DEST, "Command: /   Usage: /pattern\n");
+	ED_OUTPUT(ED_DEST, "finds the next occurence of 'pattern'.  Note that pattern\n\
 is a regular expression, so things like .*][() have to be preceded by a \\.\n");
 	break;
     case '?':
-	ED_OUTPUT("Command: ?   Usage: ?pattern\n");
-	ED_OUTPUT("finds the last occurence of 'pattern' before the current line.  Note that pattern\n\
+	ED_OUTPUT(ED_DEST, "Command: ?   Usage: ?pattern\n");
+	ED_OUTPUT(ED_DEST, "finds the last occurence of 'pattern' before the current line.  Note that pattern\n\
 is a regular expression, so things like .*][() have to be preceded by a \\.\n");
 	break;
 	/* someone should REALLY write help for s in the near future */
 #ifndef RESTRICTED_ED
     case 'w':
     case 'W':
-	ED_OUTPUT("Sorry no help yet for this command. Try again later.\n");
+	ED_OUTPUT(ED_DEST, "Sorry no help yet for this command. Try again later.\n");
 	break;
 #endif				/* RESTRICTED_ED */
     default:
-	ED_OUTPUT("       Help for Ed  (V 2.0)\n");
-	ED_OUTPUT("---------------------------------\n");
-	ED_OUTPUT("     by Qixx [Update: 7/10/91]\n");
-	ED_OUTPUT("\n\nCommands\n--------\n");
-	ED_OUTPUT("/\tsearch forward for pattern\n");
-	ED_OUTPUT("?\tsearch backward for a pattern\n");
-	/* ED_OUTPUT("^\tglobal search and print for pattern\n"); */
-	ED_OUTPUT("=\tshow current line number\n");
-	ED_OUTPUT("a\tappend text starting after this line\n");
-	ED_OUTPUT("A\tlike 'a' but with inverse autoindent mode\n");
-	ED_OUTPUT("c\tchange current line, query for replacement text\n");
-	ED_OUTPUT("d\tdelete line(s)\n");
+	ED_OUTPUT(ED_DEST, "       Help for Ed  (V 2.0)\n");
+	ED_OUTPUT(ED_DEST, "---------------------------------\n");
+	ED_OUTPUT(ED_DEST, "     by Qixx [Update: 7/10/91]\n");
+	ED_OUTPUT(ED_DEST, "\n\nCommands\n--------\n");
+	ED_OUTPUT(ED_DEST, "/\tsearch forward for pattern\n");
+	ED_OUTPUT(ED_DEST, "?\tsearch backward for a pattern\n");
+	/* ED_OUTPUT(ED_DEST, "^\tglobal search and print for pattern\n"); */
+	ED_OUTPUT(ED_DEST, "=\tshow current line number\n");
+	ED_OUTPUT(ED_DEST, "a\tappend text starting after this line\n");
+	ED_OUTPUT(ED_DEST, "A\tlike 'a' but with inverse autoindent mode\n");
+	ED_OUTPUT(ED_DEST, "c\tchange current line, query for replacement text\n");
+	ED_OUTPUT(ED_DEST, "d\tdelete line(s)\n");
 #ifdef RESTRICTED_ED
 	if (!P_RESTRICT) {
-	    ED_OUTPUT("e\treplace this file with another file\n");
-	    ED_OUTPUT("E\tsame as 'e' but works if file has been modified\n");
-	    ED_OUTPUT("f\tshow/change current file name\n");
+	    ED_OUTPUT(ED_DEST, "e\treplace this file with another file\n");
+	    ED_OUTPUT(ED_DEST, "E\tsame as 'e' but works if file has been modified\n");
+	    ED_OUTPUT(ED_DEST, "f\tshow/change current file name\n");
 	}
 #endif				/* restricted ed */
-	ED_OUTPUT("g\tSearch and execute command on any matching line.\n");
-	ED_OUTPUT("h\thelp file (display this message)\n");
-	ED_OUTPUT("i\tinsert text starting before this line\n");
-	ED_OUTPUT("I\tindent the entire code (Qixx version 1.0)\n");
-	ED_OUTPUT("\n--Return to continue--");
+	ED_OUTPUT(ED_DEST, "g\tSearch and execute command on any matching line.\n");
+	ED_OUTPUT(ED_DEST, "h\thelp file (display this message)\n");
+	ED_OUTPUT(ED_DEST, "i\tinsert text starting before this line\n");
+	ED_OUTPUT(ED_DEST, "I\tindent the entire code (Qixx version 1.0)\n");
+	ED_OUTPUT(ED_DEST, "\n--Return to continue--");
 	P_MORE = 1;
 	break;
     }
@@ -2575,31 +2581,31 @@ is a regular expression, so things like .*][() have to be preceded by a \\.\n");
 static void print_help2()
 {
     P_MORE = 0;
-    ED_OUTPUT("j\tjoin lines together\n");
-    ED_OUTPUT("k\tmark this line with a character - later referenced as 'a\n");
-    ED_OUTPUT("l\tlist line(s) with control characters displayed\n");
-    ED_OUTPUT("m\tmove line(s) to specified line\n");
-    ED_OUTPUT("n\ttoggle line numbering\n");
-    ED_OUTPUT("O\tsame as 'i'\n");
-    ED_OUTPUT("o\tsame as 'a'\n");
-    ED_OUTPUT("p\tprint line(s) in range\n");
-    ED_OUTPUT("q\tquit editor\n");
-    ED_OUTPUT("Q\tquit editor even if file modified and not saved");
-    ED_OUTPUT("r\tread file into editor at end of file or behind the given line\n");
-    ED_OUTPUT("s\tsearch and replace\n");
-    ED_OUTPUT("set\tquery, change or save option settings\n");
-    ED_OUTPUT("t\tmove copy of line(s) to specified line\n");
-    ED_OUTPUT("v\tSearch and execute command on any non-matching line.\n");
-    ED_OUTPUT("x\tsave file and quit\n");
+    ED_OUTPUT(ED_DEST, "j\tjoin lines together\n");
+    ED_OUTPUT(ED_DEST, "k\tmark this line with a character - later referenced as 'a\n");
+    ED_OUTPUT(ED_DEST, "l\tlist line(s) with control characters displayed\n");
+    ED_OUTPUT(ED_DEST, "m\tmove line(s) to specified line\n");
+    ED_OUTPUT(ED_DEST, "n\ttoggle line numbering\n");
+    ED_OUTPUT(ED_DEST, "O\tsame as 'i'\n");
+    ED_OUTPUT(ED_DEST, "o\tsame as 'a'\n");
+    ED_OUTPUT(ED_DEST, "p\tprint line(s) in range\n");
+    ED_OUTPUT(ED_DEST, "q\tquit editor\n");
+    ED_OUTPUT(ED_DEST, "Q\tquit editor even if file modified and not saved");
+    ED_OUTPUT(ED_DEST, "r\tread file into editor at end of file or behind the given line\n");
+    ED_OUTPUT(ED_DEST, "s\tsearch and replace\n");
+    ED_OUTPUT(ED_DEST, "set\tquery, change or save option settings\n");
+    ED_OUTPUT(ED_DEST, "t\tmove copy of line(s) to specified line\n");
+    ED_OUTPUT(ED_DEST, "v\tSearch and execute command on any non-matching line.\n");
+    ED_OUTPUT(ED_DEST, "x\tsave file and quit\n");
 #ifdef RESTRICTED_ED
     if (!P_RESTRICT) {
-	ED_OUTPUT("w\twrite to current file (or specified file)\n");
-	ED_OUTPUT("W\tlike the 'w' command but appends instead\n");
+	ED_OUTPUT(ED_DEST, "w\twrite to current file (or specified file)\n");
+	ED_OUTPUT(ED_DEST, "W\tlike the 'w' command but appends instead\n");
     }
 #endif				/* restricted ed */
-    ED_OUTPUT("z\tdisplay 20 lines, possible args are . + -\n");
-    ED_OUTPUT("Z\tdisplay 40 lines, possible args are . + -\n");
-    ED_OUTPUT("\nFor further information type 'hc' where c is the command\nthat help is desired for.\n");
+    ED_OUTPUT(ED_DEST, "z\tdisplay 20 lines, possible args are . + -\n");
+    ED_OUTPUT(ED_DEST, "Z\tdisplay 40 lines, possible args are . + -\n");
+    ED_OUTPUT(ED_DEST, "\nFor further information type 'hc' where c is the command\nthat help is desired for.\n");
 }
 #endif				/* ED */
 
@@ -2608,77 +2614,13 @@ static void print_help2()
  ****************************************************************/
 
 #ifndef OLD_ED
-static char *current_results;
-static int max_size;
-static int size;
-
-void object_ed_outputv PVARGS(va_alist)
-{
-    va_list args;
-    char *format;
-    char buf[LARGEST_PRINTABLE_STRING];
-    int l;
-
-#ifdef HAS_STDARG_H
-    va_start(args, va_alist);
-    format = va_alist;
-#else
-    va_start(args);
-    format = va_arg(args, char *);
-#endif
-
-    vsprintf(buf, format, args);
-    va_end(args);
-
-    l = strlen(buf);
-
-    if (current_results) {
-	if (size + l > max_size) {
-	    /* assume it's going to grow some more */
-	    max_size = size + l + 1024;
-	    current_results = extend_string(current_results, max_size);
-	}
-    } else {
-	max_size = l;
-	current_results = new_string(max_size, "ed_results");
-	size = 0;
-    }
-
-    strcpy(current_results + size, buf);
-    size += l;
-}
-
-void object_ed_output P1(char *, str)
-{
-    int l;
-
-    l = strlen(str);
-
-    if (current_results) {
-	if (size + l > max_size) {
-	    /* assume it's going to grow some more */
-	    max_size = size + l + 1024;
-	    current_results = extend_string(current_results, max_size);	    
-	}
-    } else {
-	max_size = l;
-	current_results = new_string(max_size, "ed_results");
-	size = 0;
-    }
-			      
-    strcpy(current_results + size, str);
-    size += l;
-}
-
 static char *object_ed_results() {
     char *ret;
-    
-    ret = current_results;
-    if (max_size > size)
-	ret = extend_string(ret, size); /* yes, it handles contraction too */
-    current_results = 0;
-    size = 0;
-    max_size = 0;
+
+    outbuf_fix(&current_ed_results);
+    ret = current_ed_results.buffer;
+    outbuf_zero(&current_ed_results);
+
     return ret;
 }
 
@@ -2758,7 +2700,7 @@ char *object_ed_start P3(object_t *, ob, char *, fname, int, restricted) {
 	strncpy(P_FNAME, fname, MAXFNAME - 1);
 	P_FNAME[MAXFNAME - 1] = 0;
     } else {
-	ED_OUTPUT("No file.\n");
+	ED_OUTPUT(ED_DEST, "No file.\n");
     }
     return object_ed_results();
 }
@@ -2782,7 +2724,7 @@ void object_save_ed_buffer P1(object_t *, ob)
 	    dowrite(1, P_LASTLN, fname, 0);
 	}
     }
-    free_ed_buffer();
+    free_ed_buffer(current_editor);
 }
 
 int object_ed_mode P1(object_t *, ob) {
@@ -2820,7 +2762,7 @@ char *object_ed_cmd P2(object_t *, ob, char *, str)
     strcat(inlin, "\n");
 
     inptr = inlin;
-    if (getlst() >= 0)
+    if ((status = getlst()) >= 0 || status == NO_LINE_RANGE)
 	if ((status = ckglob()) != 0) {
 	    if (status >= 0 && (status = doglob()) >= 0) {
 		setCurLn(status);

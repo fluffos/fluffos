@@ -55,7 +55,7 @@ void set_simul_efun P1(char *, file)
     char buf[512];
     lpc_object_t *compiled_version;
 
-    if (!file) {
+    if (!file || !file[0]) {
 	fprintf(stderr, "No simul_efun\n");
 	return;
     }
@@ -103,25 +103,34 @@ void get_simul_efuns P1(program_t *, prog)
     funp = prog->functions;
     if (num_simul_efun) {
 	remove_simuls();
-	/* will be resized later */
-	simul_names = RESIZE(simul_names, num_simul_efun + num_new,
-			     simul_entry, TAG_SIMULS, "get_simul_efuns");
-	simuls = RESIZE(simuls, num_simul_efun + num_new,
-			function_t *, TAG_SIMULS, "get_simul_efuns: 2");
+	if (!num_new) {
+	    FREE(simul_names);
+	    FREE(simuls);
+	} else {
+	    /* will be resized later */
+	    simul_names = RESIZE(simul_names, num_simul_efun + num_new,
+				 simul_entry, TAG_SIMULS, "get_simul_efuns");
+	    simuls = RESIZE(simuls, num_simul_efun + num_new,
+			    function_t *, TAG_SIMULS, "get_simul_efuns: 2");
+	}
     } else {
-	simul_names = CALLOCATE(num_new, simul_entry, TAG_SIMULS, "get_simul_efuns");
-	simuls = CALLOCATE(num_new, function_t *, TAG_SIMULS, "get_simul_efuns: 2");
+	if (num_new) {
+	    simul_names = CALLOCATE(num_new, simul_entry, TAG_SIMULS, "get_simul_efuns");
+	    simuls = CALLOCATE(num_new, function_t *, TAG_SIMULS, "get_simul_efuns: 2");
+	}
     }
-    for (i=0; i < (int)prog->num_functions; i++)
+    for (i=0; i < num_new; i++)
 	if ((funp[i].type & (TYPE_MOD_STATIC | TYPE_MOD_PRIVATE)) == 0
 	    && (!(funp[i].flags & NAME_NO_CODE)))
 	    find_or_add_simul_efun(&funp[i]);
     
-    /* shrink to fit */
-    simul_names = RESIZE(simul_names, num_simul_efun, simul_entry,
-			 TAG_SIMULS, "get_simul_efuns");
-    simuls = RESIZE(simuls, num_simul_efun, function_t *,
-		    TAG_SIMULS, "get_simul_efuns");
+    if (num_simul_efun) {
+	/* shrink to fit */
+	simul_names = RESIZE(simul_names, num_simul_efun, simul_entry,
+			     TAG_SIMULS, "get_simul_efuns");
+	simuls = RESIZE(simuls, num_simul_efun, function_t *,
+			TAG_SIMULS, "get_simul_efuns");
+    }
 }
 
 #define compare_addrs(x,y) (x < y ? -1 : (x > y ? 1 : 0))

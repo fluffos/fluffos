@@ -137,25 +137,21 @@ void new_call_out P5(object_t *, ob, svalue_t *, fun, int, delay, int, num_args,
 void call_out()
 {
     pending_call_t *cop;
-    jmp_buf save_error_recovery_context;
-    int save_rec_exists;
-    object_t *save_command_giver;
     static int last_time;
+    object_t *save_command_giver = command_giver;
+    error_context_t econ;
 
+    current_interactive = 0;
     if (call_list == 0) {
 	last_time = current_time;
 	return;
     }
     if (last_time == 0)
 	last_time = current_time;
-    save_command_giver = command_giver;
-    current_interactive = 0;
+
     call_list->delta -= current_time - last_time;
     last_time = current_time;
-    memcpy((char *) save_error_recovery_context,
-	   (char *) error_recovery_context, sizeof error_recovery_context);
-    save_rec_exists = error_recovery_context_exists;
-    error_recovery_context_exists = NORMAL_ERROR_CONTEXT;
+    save_context(&econ);
     while (call_list && call_list->delta <= 0) {
 	/*
 	 * Move the first call_out out of the chain.
@@ -173,9 +169,8 @@ void call_out()
 	if (cop->ob && (cop->ob->flags & O_DESTRUCTED)) {
 	    free_call(cop);
 	} else {
-	    if (SETJMP(error_recovery_context)) {
-		clear_state();
-		debug_message("Error in call out.\n");
+	    if (SETJMP(econ.context)) {
+		restore_context(&econ);
 	    } else {
 		object_t *ob;
 
@@ -226,10 +221,7 @@ void call_out()
 	    free_called_call(cop);
 	}
     }
-    memcpy((char *) error_recovery_context,
-	   (char *) save_error_recovery_context,
-	   sizeof error_recovery_context);
-    error_recovery_context_exists = save_rec_exists;
+    pop_context(&econ);
     command_giver = save_command_giver;
 }
 
@@ -273,7 +265,7 @@ int find_call_out P2(object_t *, ob, char *, fun)
     return -1;
 }
 
-int print_call_out_usage P1(int, verbose)
+int print_call_out_usage P2(outbuffer_t *, ob, int, verbose)
 {
     int i;
     pending_call_t *cop;
@@ -282,14 +274,14 @@ int print_call_out_usage P1(int, verbose)
 	i++;
 
     if (verbose == 1) {
-	add_message("Call out information:\n");
-	add_message("---------------------\n");
-	add_vmessage("Number of allocated call outs: %8d, %8d bytes\n",
+	outbuf_add(ob, "Call out information:\n");
+	outbuf_add(ob, "---------------------\n");
+	outbuf_addv(ob, "Number of allocated call outs: %8d, %8d bytes\n",
 		    num_call, num_call * sizeof(pending_call_t));
-	add_vmessage("Current length: %d\n", i);
+	outbuf_addv(ob, "Current length: %d\n", i);
     } else {
 	if (verbose != -1)
-	    add_vmessage("call out:\t\t\t%8d %8d (current length %d)\n", num_call,
+	    outbuf_addv(ob, "call out:\t\t\t%8d %8d (current length %d)\n", num_call,
 			num_call * sizeof(pending_call_t), i);
     }
     return (int) (num_call * sizeof(pending_call_t));
@@ -339,7 +331,7 @@ array_t *get_all_call_outs()
 	array_t *vv;
 
 	next_time += cop->delta;
-	if (cop->ob && cop->ob->flags & O_DESTRUCTED)
+	if (cop->ob && (cop->ob->flags & O_DESTRUCTED))
 	    continue;
 	vv = allocate_empty_array(4);
 	if (cop->ob) {

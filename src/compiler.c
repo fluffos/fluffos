@@ -18,12 +18,38 @@ static void prolog PROT((int, char *));
 static void epilog PROT((void));
 static void show_overload_warnings PROT((void));
 
-short compatible[11] = { 0x000, 0xfff, 0x01e, 0x01e, 0x21e, 0x022,
-			 0x042, 0x082, 0x102, 0x212, 0x402 };
-short is_type[11] = { 0x000, 0xfff, 0x00e, 0x00e, 0x012, 0x022,
-		      0x042, 0x082, 0x102, 0x202, 0x402 };
+#define CT(x) (1 << (x))
+#define CT_SIMPLE(x) (CT(TYPE_ANY) | CT(x))
 
-#ifdef DEBUG
+short compatible[11] = { 
+    /* UNKNOWN */  0,
+    /* ANY */      0xfff,
+    /* NOVALUE */  CT_SIMPLE(TYPE_NOVALUE) | CT(TYPE_VOID) | CT(TYPE_NUMBER),
+    /* VOID */     CT_SIMPLE(TYPE_VOID) | CT(TYPE_NOVALUE),
+    /* NUMBER */   CT_SIMPLE(TYPE_NUMBER) | CT(TYPE_NOVALUE) | CT(TYPE_REAL),
+    /* STRING */   CT_SIMPLE(TYPE_STRING),
+    /* OBJECT */   CT_SIMPLE(TYPE_OBJECT),
+    /* MAPPING */  CT_SIMPLE(TYPE_MAPPING),
+    /* FUNCTION */ CT_SIMPLE(TYPE_FUNCTION),
+    /* REAL */     CT_SIMPLE(TYPE_REAL) | CT(TYPE_NUMBER),
+    /* BUFFER */   CT_SIMPLE(TYPE_BUFFER),
+	       };
+
+short is_type[11] = { 
+    /* UNKNOWN */ 0,
+    /* ANY */     0xfff,
+    /* NOVALUE */ CT_SIMPLE(TYPE_NOVALUE) | CT(TYPE_VOID),
+    /* VOID */    CT_SIMPLE(TYPE_VOID) | CT(TYPE_NOVALUE),
+    /* NUMBER */  CT_SIMPLE(TYPE_NUMBER),
+    /* STRING */  CT_SIMPLE(TYPE_STRING),
+    /* OBJECT */  CT_SIMPLE(TYPE_OBJECT),
+    /* MAPPING */ CT_SIMPLE(TYPE_MAPPING),
+    /* FUNCTION */CT_SIMPLE(TYPE_FUNCTION),
+    /* REAL */    CT_SIMPLE(TYPE_REAL),
+    /* BUFFER */  CT_SIMPLE(TYPE_BUFFER),
+	      };
+
+#if 0
 int dump_function_table() {
     int i;
 
@@ -1206,8 +1232,7 @@ void yyerror P1(char *, str)
 
 void yywarn P1(char *, str) {
     if (!(pragmas & PRAGMA_WARNINGS)) return;
-    (void)fprintf(stderr, "%s: Warning: %s line %d\n", current_file, str,
-		  current_line);
+    
     smart_log(current_file, current_line, str, 1);
 }
 
@@ -1225,6 +1250,19 @@ void compile_file P2(int, f, char *, name) {
 int get_id_number() {
     static int current_id_number = 1;
     return current_id_number++;
+}
+
+INLINE void copy_in P2(int, which, char **, start) {
+    char *block;
+    int size;
+
+    size = mem_block[which].current_size;
+    if (!size) return;
+
+    block = mem_block[which].block;
+    memcpy(*start, block, size);
+
+    *start += align(size);
 }
 
 /*
@@ -1298,11 +1336,16 @@ static void epilog() {
     generate_final_program(1);
 
     size = align(sizeof (program_t));
-    for (i=0; i<NUMPAREAS; i++)
-	if (i != A_LINENUMBERS && i != A_ARGUMENT_TYPES && i != A_ARGUMENT_INDEX)
-	    size += align(mem_block[i].current_size);
 
-    ihe = lookup_ident("heart_beat");
+    /* delete argument information if we're not saving it */
+    if (!(pragmas & PRAGMA_SAVE_TYPES))
+	mem_block[A_ARGUMENT_TYPES].current_size = 0;
+    if (!(mem_block[A_ARGUMENT_TYPES].current_size))
+	mem_block[A_ARGUMENT_INDEX].current_size = 0;
+
+    for (i=0; i<NUMPAREAS; i++)
+	if (i != A_LINENUMBERS)
+	    size += align(mem_block[i].current_size);
 
     p = (char *)DXALLOC(size, TAG_PROGRAM, "epilog: 1");
     prog = (program_t *)p;
@@ -1310,6 +1353,7 @@ static void epilog() {
     prog->total_size = size;
     prog->ref = 0;
     prog->func_ref = 0;
+    ihe = lookup_ident("heart_beat");
     prog->heart_beat = (ihe ? ihe->dn.function_num : -1);
     prog->name = current_file;
     current_file = 0;
@@ -1317,6 +1361,10 @@ static void epilog() {
     prog->id_number = get_id_number();
     total_prog_block_size += prog->total_size;
     total_num_prog_blocks += 1;
+
+#ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
+    prog->tree_r = a_functions_root;
+#endif
 
     prog->line_swap_index = -1;
     /* Format is now:
@@ -1340,70 +1388,48 @@ static void epilog() {
 	   mem_block[A_LINENUMBERS].current_size);
 
     p += align(sizeof (program_t));
-    prog->program = p;
-    if (mem_block[A_PROGRAM].current_size)
-	memcpy(p, mem_block[A_PROGRAM].block,
-	      mem_block[A_PROGRAM].current_size);
-    prog->program_size = mem_block[A_PROGRAM].current_size;
 
-    p += align(mem_block[A_PROGRAM].current_size);
+    prog->program = p;
+    prog->program_size = mem_block[A_PROGRAM].current_size;
+    copy_in(A_PROGRAM, &p);
+
     prog->functions = (function_t *)p;
     prog->num_functions = mem_block[A_FUNCTIONS].current_size /
-	  sizeof (function_t);
-    if (mem_block[A_FUNCTIONS].current_size)
-	memcpy(p, mem_block[A_FUNCTIONS].block,
-	      mem_block[A_FUNCTIONS].current_size);
+	sizeof (function_t);
+    copy_in(A_FUNCTIONS, &p);
 
-    p += align(mem_block[A_FUNCTIONS].current_size);
     prog->classes = (class_def_t *)p;
     prog->num_classes = mem_block[A_CLASS_DEF].current_size /
 	  sizeof (class_def_t);
-    if (mem_block[A_CLASS_DEF].current_size)
-	memcpy(p, mem_block[A_CLASS_DEF].block,
-	      mem_block[A_CLASS_DEF].current_size);
+    copy_in(A_CLASS_DEF, &p);
 
-    p += align(mem_block[A_CLASS_DEF].current_size);
     prog->class_members = (class_member_entry_t *)p;
-    if (mem_block[A_CLASS_MEMBER].current_size)
-	memcpy(p, mem_block[A_CLASS_MEMBER].block,
-	      mem_block[A_CLASS_MEMBER].current_size);
+    copy_in(A_CLASS_MEMBER, &p);
 
-#ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
-    prog->tree_r = a_functions_root;
-#endif
-
-    p += align(mem_block[A_CLASS_MEMBER].current_size);
     prog->strings = (char **)p;
     prog->num_strings = mem_block[A_STRINGS].current_size /
 	  sizeof (char *);
-    if (mem_block[A_STRINGS].current_size)
-	memcpy(p, mem_block[A_STRINGS].block,
-	      mem_block[A_STRINGS].current_size);
+    copy_in(A_STRINGS, &p);
 
-    p += align(mem_block[A_STRINGS].current_size);
     prog->variable_names = (variable_t *)p;
     prog->num_variables = mem_block[A_VARIABLES].current_size /
 	  sizeof (variable_t);
-    if (mem_block[A_VARIABLES].current_size)
-	memcpy(p, mem_block[A_VARIABLES].block,
-	      mem_block[A_VARIABLES].current_size);
+    copy_in(A_VARIABLES, &p);
 
-    p += align(mem_block[A_VARIABLES].current_size);
     prog->num_inherited = mem_block[A_INHERITS].current_size /
 	  sizeof (inherit_t);
     if (prog->num_inherited) {
-	memcpy(p, mem_block[A_INHERITS].block,
-	      mem_block[A_INHERITS].current_size);
 	prog->inherit = (inherit_t *)p;
+	copy_in(A_INHERITS, &p);
     } else
 	prog->inherit = 0;
 
-    if (pragmas & PRAGMA_SAVE_TYPES && (size = mem_block[A_ARGUMENT_TYPES].current_size)) {
-	prog->argument_types = (unsigned short *) DXALLOC(size, TAG_ARGUMENTS, "epilog: argument_types");
-	memcpy((char *) prog->argument_types, mem_block[A_ARGUMENT_TYPES].block, size);
-	size = mem_block[A_ARGUMENT_INDEX].current_size;
-	prog->type_start = (unsigned short *) DXALLOC(size, TAG_ARGUMENTS, "epilog: type_start");
-	memcpy((char *) prog->type_start, mem_block[A_ARGUMENT_INDEX].block, size);
+    if (mem_block[A_ARGUMENT_TYPES].current_size) {
+	prog->argument_types = (unsigned short *) p;
+	copy_in(A_ARGUMENT_TYPES, &p);
+
+	prog->type_start = (unsigned short *) p;
+	copy_in(A_ARGUMENT_INDEX, &p);
     } else {
 	prog->argument_types = 0;
 	prog->type_start = 0;

@@ -10,7 +10,7 @@ int remove_call_out PROT((object_t *, char *));
 void remove_all_call_out PROT((object_t *));
 int find_call_out PROT((object_t *, char *));
 array_t *get_all_call_outs PROT((void));
-int print_call_out_usage PROT((int));
+int print_call_out_usage PROT((outbuffer_t *, int));
 void mark_call_outs PROT((void));
 
 #endif

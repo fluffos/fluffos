@@ -1,27 +1,35 @@
-MudOS is an enhanced LPmud 3.x (native mode only).
+MudOS is an LPmud server (driver) which was originally distributed as an
+enhanced version of the LPmud 3.x driver.  It does not support COMPAT mode,
+but a number of newer mudlibs are available.
  
-This is the source (src) directory from the MudOS 0.9.x distribution.
+This is the source (src) directory from the MudOS v21.x distribution.
  
-Intermediate (beta) releases of MudOS (those with four components in the 
-version number e.g. 0.9.16.18) are typically released without installation 
+Minor releases of MudOS (those with a minor version number after the decimal,
+e.g. v20.26) are typically released without installation 
 instructions, usage instructions, documentation, or other supporting 
 material (since the size of this other material is fairly large).  Releases 
-of MudOS with version numbers having three components (e.g. 0.9.17) will 
-usually be released as a combined source/documentation package (e.g. 
-MudOS_0.9.20.tar.Z will be the next such release as of this time).
+of MudOS with version numbers having only one component (e.g. v21) will 
+be released as a combined source/documentation package (e.g. 
+MudOS_v21.tar.Z which is the most recent such release)
  
-The beta releases are intended for those who are already familiar with 
-installing and running MudOS.  Typically, only those interested in testing 
-for bugs or in being on the bleeding edge need install the beta releases. 
-However, in some cases the beta releases may fix serious bugs in the 
-previous non-beta release.  In these cases, obtain the last non-beta 
-release and replace its ./src subdirectory with the contents of latest beta 
-release (which is just an upgraded ./src subdirectory).  Read the ChangeLog 
-file in the same directory as this README to find out about the latest 
-changes to MudOS.  In particular, note the changes marked "compat buster" 
-since these describe changes to the driver which may cause pre-existing 
-mudlibs (such as Lil) to break in some minor fashion (the ChangeLog should 
-give enough information to allow affected mudlibs to be fixed).
+The minor releases are intended for those who are already familiar with 
+installing and running MudOS.  These fix bugs in older drivers and introduce
+new features.
+
+Alpha and beta versions of future versions are available only in the form
+of patches.
+
+Typically, only those interested in testing for bugs or in being on the
+bleeding edge need install the alpha/beta releases.
+
+When deciding to upgrade, be sure to read the ChangeLog file in the same
+directory as this README to find out about the latest changes to MudOS.
+In the case of alpha and beta releases, also check out ChangeLog.alpha
+and ChangeLog.beta.
+In particular, note the changes marked "compat buster" since these describe 
+changes to the driver which may cause pre-existing mudlibs (such as Lil)
+to break in some minor fashion (the ChangeLog should give enough information
+to allow affected mudlibs to be fixed).
  
 Notes:
  
@@ -58,7 +66,4 @@ amiga/          Contains amiga support files; a crypt package is also
                 provided for systems missing DES crypt()
 include/        Useful #defines for the mudlib to have access to (used by
                 various efuns)
-compiler/
-lpc_compiler/   These two directories contain the unshared parser/compiler
-                parts, used in generating yacc files
 packages/       This is where efun packages and user efuns should reside

@@ -7,11 +7,11 @@ void *debugcalloc PROT((int, int, int, char *));
 void debugfree PROT((void *));
 
 void debugmalloc_init PROT((void));
-void dump_malloc_data PROT((void));
+void dump_malloc_data PROT((outbuffer_t *));
 
 #    ifdef DEBUGMALLOC_EXTENSIONS
 void set_malloc_mask PROT((int));
-void dump_debugmalloc PROT((char *, int));
+char *dump_debugmalloc PROT((char *, int));
 #    endif
 #  else
    /* not DEBUGMALLOC */

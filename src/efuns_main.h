@@ -7,7 +7,6 @@
  */
 extern int call_origin;
 
-void print_cache_stats PROT((void));
 int inherits PROT((program_t *, program_t *));
 void add_mapping_pair PROT((mapping_t *, char *, int));
 void add_mapping_string PROT((mapping_t *, char *, char *));

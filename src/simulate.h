@@ -9,6 +9,7 @@
  * simulate.c
  */
 
+extern int illegal_sentence_action;
 extern object_t *obj_list;
 extern object_t *obj_list_destruct;
 extern object_t *current_object;
@@ -27,9 +28,9 @@ extern FILE *compilation_output_file;
 extern char *compilation_ident;
 #endif
 
-void debug_fatal PROTVARGS(());
-void fatal PROTVARGS(());
-void error PROTVARGS(());
+void debug_fatal PROT1V(char *);
+void fatal PROT1V(char *);
+void error PROT1V(char *);
 INLINE void check_legal_string PROT((char *));
 #ifndef NO_ADD_ACTION
 int user_parser PROT((char *));

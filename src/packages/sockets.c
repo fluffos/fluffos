@@ -27,14 +27,14 @@ f_socket_create PROT((void))
     svalue_t *arg;
 
     arg = sp - num_arg + 1;
-    if ((num_arg == 3) && (arg[2].type != T_STRING)) {
+    if ((num_arg == 3) && !(arg[2].type & (T_STRING | T_FUNCTION))) {
 	bad_arg(3, F_SOCKET_CREATE);
     }
     if (check_valid_socket("create", -1, current_object, "N/A", -1)) {
 	if (num_arg == 2)
-	    fd = socket_create(arg[0].u.number, arg[1].u.string, NULL);
+	    fd = socket_create(arg[0].u.number, &arg[1], NULL);
 	else {
-	    fd = socket_create(arg[0].u.number, arg[1].u.string, arg[2].u.string);
+	    fd = socket_create(arg[0].u.number, &arg[1], &arg[2]);
 	}
         pop_n_elems(num_arg - 1);
         sp->u.number = fd;
@@ -75,11 +75,11 @@ f_socket_listen PROT((void))
     get_socket_address(fd, addr, &port);
 
     if (VALID_SOCKET("listen")) {
-	i = socket_listen(fd, sp->u.string);
-        free_string_svalue(sp--);
+	i = socket_listen(fd, sp);
+	pop_stack();
         sp->u.number = i;
     } else {
-        free_string_svalue(sp--);
+	pop_stack();
         sp->u.number = EESECURITY;
     }
 }
@@ -92,16 +92,15 @@ f_socket_accept PROT((void))
     int port, fd;
     char addr[ADDR_BUF_SIZE];
 
-    if (sp->type != T_STRING) {
+    if (!(sp->type & (T_STRING | T_FUNCTION))) {
 	bad_arg(3, F_SOCKET_ACCEPT);
     }
     get_socket_address(fd = (sp-2)->u.number, addr, &port);
 
     (sp-2)->u.number = VALID_SOCKET("accept") ?
-       socket_accept(fd, (sp - 1)->u.string, sp->u.string) :
+       socket_accept(fd, (sp - 1), sp) :
 	 EESECURITY;
-    free_string_svalue(sp--);
-    free_string_svalue(sp--);
+    pop_2_elems();
 }
 #endif
 
@@ -112,10 +111,10 @@ f_socket_connect PROT((void))
     int i, fd, port;
     char addr[ADDR_BUF_SIZE];
 
-    if ((sp - 1)->type != T_STRING) {
+    if (!((sp - 1)->type & (T_FUNCTION | T_STRING))) {
 	bad_arg(3, F_SOCKET_CONNECT);
     }
-    if (sp->type != T_STRING) {
+    if (!(sp->type & (T_STRING | T_STRING))) {
 	bad_arg(4, F_SOCKET_CONNECT);
     }
     fd = (sp - 3)->u.number;
@@ -150,11 +149,8 @@ f_socket_connect PROT((void))
     }
 
     (sp-3)->u.number = VALID_SOCKET("connect") ?
-      socket_connect(fd, (sp - 2)->u.string, (sp - 1)->u.string,
-		     sp->u.string) : EESECURITY;
-    free_string_svalue(sp--);
-    free_string_svalue(sp--);
-    free_string_svalue(sp--);
+      socket_connect(fd, (sp - 2)->u.string, sp - 1, sp) : EESECURITY;
+    pop_3_elems();
 }
 #endif
 
@@ -196,7 +192,7 @@ f_socket_close PROT((void))
     fd = sp->u.number;
     get_socket_address(fd, addr, &port);
 
-    sp->u.number = VALID_SOCKET("close") ? socket_close(fd) : EESECURITY;
+    sp->u.number = VALID_SOCKET("close") ? socket_close(fd, 0) : EESECURITY;
 }
 #endif
 
@@ -207,17 +203,17 @@ f_socket_release PROT((void))
     int fd, port;
     char addr[ADDR_BUF_SIZE];
     
-    if (sp->type != T_STRING) {
+    if (!(sp->type & (T_STRING | T_FUNCTION))) {
 	bad_arg(3, F_SOCKET_RELEASE);
     }
     fd = (sp - 2)->u.number;
     get_socket_address(fd, addr, &port);
 
     (sp-2)->u.number = VALID_SOCKET("release") ?
-      socket_release((sp - 2)->u.number, (sp - 1)->u.ob, sp->u.string) :
+      socket_release((sp - 2)->u.number, (sp - 1)->u.ob, sp) :
 	EESECURITY;
 
-    free_string_svalue(sp--);
+    pop_stack();
     /* the object might have been dested an removed from the stack */
     if (sp->type == T_OBJECT)
 	free_object(sp->u.ob, "socket_release()");
@@ -232,22 +228,20 @@ f_socket_acquire PROT((void))
     int fd, port;
     char addr[ADDR_BUF_SIZE];
 
-    if ((sp - 1)->type != T_STRING) {
+    if (!((sp - 1)->type & (T_FUNCTION | T_STRING))) {
 	bad_arg(3, F_SOCKET_ACQUIRE);
     }
-    if (sp->type != T_STRING) {
+    if (!(sp->type & (T_FUNCTION | T_STRING))) {
 	bad_arg(4, F_SOCKET_ACQUIRE);
     }
     fd = (sp - 3)->u.number;
     get_socket_address(fd, addr, &port);
 
     (sp-3)->u.number = VALID_SOCKET("acquire") ?
-      socket_acquire((sp - 3)->u.number, (sp - 2)->u.string,
-		     (sp - 1)->u.string, sp->u.string) : EESECURITY;
+      socket_acquire((sp - 3)->u.number, (sp - 2),
+		     (sp - 1), sp) : EESECURITY;
 
-    free_string_svalue(sp--);
-    free_string_svalue(sp--);
-    free_string_svalue(sp--);
+    pop_3_elems();
 }
 #endif
 
@@ -266,6 +260,7 @@ f_socket_address PROT((void))
     char *str;
     int port;
     char addr[ADDR_BUF_SIZE];
+    char buf[2 * ADDR_BUF_SIZE]; /* a bit of overkill to be safe */
 
 /*
  * Ok, we will add in a cute little check thing here to see if it is
@@ -282,16 +277,16 @@ f_socket_address PROT((void))
             return;
 	}
         tmp = inet_ntoa(sp->u.ob->interactive->addr.sin_addr);
-        str = (char *) DMALLOC(strlen(tmp) + 5 + 3, TAG_STRING, "f_socket_address");
-        sprintf(str, "%s %d", tmp, 
+        sprintf(buf, "%s %d", tmp, 
 		ntohs(sp->u.ob->interactive->addr.sin_port));
+	str = string_copy(buf, "f_socket_address");
         free_object(sp->u.ob, "f_socket_address:2");
         put_malloced_string(str);
         return;
     }
     get_socket_address(sp->u.number, addr, &port);
-    str = (char *) DMALLOC(strlen(addr) + 5 + 3, TAG_STRING, "f_socket_address");
-    sprintf(str, "%s %d", addr, port);
+    sprintf(buf, "%s %d", addr, port);
+    str = string_copy(buf, "f_socket_address");
     put_malloced_string(str);
 }				/* f_socket_address() */
 #endif
@@ -300,7 +295,11 @@ f_socket_address PROT((void))
 void
 f_dump_socket_status PROT((void))
 {
-    dump_socket_status();
+    outbuffer_t out;
+
+    outbuf_zero(&out);
+    dump_socket_status(&out);
+    outbuf_push(&out);
 }
 #endif
 

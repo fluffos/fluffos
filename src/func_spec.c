@@ -40,7 +40,7 @@ string file_name(object default:F_THIS_OBJECT);
 object environment(void | object);
 string capitalize(string);
 string *explode(string, string);
-string implode(string *, string);
+mixed implode(mixed *, string | function);
 object *all_inventory(object default:F_THIS_OBJECT);
 object first_inventory(object|string default: F_THIS_OBJECT);
 object next_inventory(object default: F_THIS_OBJECT);
@@ -199,7 +199,7 @@ void message(mixed, string, string | string * | object | object *,
 
 #ifdef LPC_TO_C
     int generate_source(string | string *, void | string);
-    void lpc_info();
+    string lpc_info();
 #endif
 
     void set_reset(object, void | int);
@@ -272,7 +272,7 @@ void message(mixed, string, string | string * | object | object *,
 #endif
 
 #ifdef CACHE_STATS
-    void cache_stats();
+    string cache_stats();
 #endif
 
     object *deep_inventory(object);
@@ -287,11 +287,11 @@ void message(mixed, string, string | string * | object | object *,
 /*
  * parser 'magic' functions, turned into efuns
  */
-    void malloc_status();
-    void mud_status(int default:F_CONST0);
+    string malloc_status();
+    string mud_status(int default:F_CONST0);
     void dumpallobj(string | void);
 
-    void dump_file_descriptors();
+    string dump_file_descriptors();
     string query_load_average();
 
 #ifndef NO_LIGHT

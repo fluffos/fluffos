@@ -12,8 +12,10 @@ static object_t *ob;
 void
 f_debug_info PROT((void))
 {
-    svalue_t *arg, res;
+    svalue_t *arg;
+    outbuffer_t out;
 
+    outbuf_zero(&out);
     arg = sp - 1;
     switch (arg[0].u.number) {
     case 0:
@@ -23,87 +25,85 @@ f_debug_info PROT((void))
 
 	    ob = arg[1].u.ob;
 	    flags = ob->flags;
-	   add_vmessage("O_HEART_BEAT      : %s\n",
+	   outbuf_addv(&out, "O_HEART_BEAT      : %s\n",
 			flags & O_HEART_BEAT ? "TRUE" : "FALSE");
 #ifndef NO_WIZARDS
-	   add_vmessage("O_IS_WIZARD       : %s\n",
+	   outbuf_addv(&out, "O_IS_WIZARD       : %s\n",
 			flags & O_IS_WIZARD ? "TRUE" : "FALSE");
 #endif
 #ifdef NO_ADD_ACTION
-	   add_vmessage("O_LISTENER : %s\n",
+	   outbuf_addv(&out, "O_LISTENER : %s\n",
 			flags & O_LISTENER ? "TRUE" : "FALSE");
 #else
-	   add_vmessage("O_ENABLE_COMMANDS : %s\n",
+	   outbuf_addv(&out, "O_ENABLE_COMMANDS : %s\n",
 			flags & O_ENABLE_COMMANDS ? "TRUE" : "FALSE");
 #endif
-	   add_vmessage("O_CLONE           : %s\n",
+	   outbuf_addv(&out, "O_CLONE           : %s\n",
 			flags & O_CLONE ? "TRUE" : "FALSE");
-	   add_vmessage("O_VIRTUAL         : %s\n",
+	   outbuf_addv(&out, "O_VIRTUAL         : %s\n",
 			flags & O_VIRTUAL ? "TRUE" : "FALSE");
-	   add_vmessage("O_DESTRUCTED      : %s\n",
+	   outbuf_addv(&out, "O_DESTRUCTED      : %s\n",
 			flags & O_DESTRUCTED ? "TRUE" : "FALSE");
-	   add_vmessage("O_SWAPPED         : %s\n",
+	   outbuf_addv(&out, "O_SWAPPED         : %s\n",
 			flags & O_SWAPPED ? "TRUE" : "FALSE");
-	   add_vmessage("O_ONCE_INTERACTIVE: %s\n",
+	   outbuf_addv(&out, "O_ONCE_INTERACTIVE: %s\n",
 			flags & O_ONCE_INTERACTIVE ? "TRUE" : "FALSE");
-	   add_vmessage("O_RESET_STATE     : %s\n",
+	   outbuf_addv(&out, "O_RESET_STATE     : %s\n",
 			flags & O_RESET_STATE ? "TRUE" : "FALSE");
-	   add_vmessage("O_WILL_CLEAN_UP   : %s\n",
+	   outbuf_addv(&out, "O_WILL_CLEAN_UP   : %s\n",
 			flags & O_WILL_CLEAN_UP ? "TRUE" : "FALSE");
-	   add_vmessage("O_WILL_RESET: %s\n",
+	   outbuf_addv(&out, "O_WILL_RESET: %s\n",
 			flags & O_WILL_RESET ? "TRUE" : "FALSE");
 #ifndef NO_LIGHT
-	   add_vmessage("total light : %d\n", ob->total_light);
+	   outbuf_addv(&out, "total light : %d\n", ob->total_light);
 #endif
-	   add_vmessage("next_reset  : %d\n", ob->next_reset);
-	   add_vmessage("time_of_ref : %d\n", ob->time_of_ref);
-	   add_vmessage("ref         : %d\n", ob->ref);
+	   outbuf_addv(&out, "next_reset  : %d\n", ob->next_reset);
+	   outbuf_addv(&out, "time_of_ref : %d\n", ob->time_of_ref);
+	   outbuf_addv(&out, "ref         : %d\n", ob->ref);
 #ifdef DEBUG
-	   add_vmessage("extra_ref   : %d\n", ob->extra_ref);
+	   outbuf_addv(&out, "extra_ref   : %d\n", ob->extra_ref);
 #endif
-	   add_vmessage("swap_num    : %d\n", ob->swap_num);
-	   add_vmessage("name        : '%s'\n", ob->name);
-	   add_vmessage("next_all    : OBJ(%s)\n",
+	   outbuf_addv(&out, "swap_num    : %d\n", ob->swap_num);
+	   outbuf_addv(&out, "name        : '%s'\n", ob->name);
+	   outbuf_addv(&out, "next_all    : OBJ(%s)\n",
 			ob->next_all ? ob->next_all->name : "NULL");
 	    if (obj_list == ob)
-		add_message("This object is the head of the object list.\n");
+		outbuf_add(&out, "This object is the head of the object list.\n");
 	    for (obj2 = obj_list, i = 1; obj2; obj2 = obj2->next_all, i++)
 		if (obj2->next_all == ob) {
-		   add_vmessage("Previous object in object list: OBJ(%s)\n",
+		   outbuf_addv(&out, "Previous object in object list: OBJ(%s)\n",
 				obj2->name);
-		   add_vmessage("position in object list:%d\n", i);
+		   outbuf_addv(&out, "position in object list:%d\n", i);
 		}
-	    assign_svalue_no_free(&res, &const0);
 	    break;
 	}
     case 1:
 	ob = arg[1].u.ob;
 	if (ob->flags & O_SWAPPED) {
-	    add_message("Swapped\n");
+	    outbuf_add(&out, "Swapped\n");
 	    break;
 	}
-	add_vmessage("program ref's %d\n", ob->prog->ref);
-	add_vmessage("Name %s\n", ob->prog->name);
-	add_vmessage("program size %d\n",
+	outbuf_addv(&out, "program ref's %d\n", ob->prog->ref);
+	outbuf_addv(&out, "Name %s\n", ob->prog->name);
+	outbuf_addv(&out, "program size %d\n",
 		    ob->prog->program_size);
-	add_vmessage("num func's %d (%d) \n", ob->prog->num_functions,
+	outbuf_addv(&out, "num func's %d (%d) \n", ob->prog->num_functions,
 		    ob->prog->num_functions * sizeof(function_t));
-	add_vmessage("num strings %d\n", ob->prog->num_strings);
-	add_vmessage("num vars %d (%d)\n", ob->prog->num_variables,
+	outbuf_addv(&out, "num strings %d\n", ob->prog->num_strings);
+	outbuf_addv(&out, "num vars %d (%d)\n", ob->prog->num_variables,
 		    ob->prog->num_variables * sizeof(variable_t));
-	add_vmessage("num inherits %d (%d)\n", ob->prog->num_inherited,
+	outbuf_addv(&out, "num inherits %d (%d)\n", ob->prog->num_inherited,
 		    ob->prog->num_inherited * sizeof(inherit_t));
-	add_vmessage("total size %d\n", ob->prog->total_size);
-	assign_svalue_no_free(&res, &const0);
+	outbuf_addv(&out, "total size %d\n", ob->prog->total_size);
 	break;
     case 2:
 	{
 	    int i;
 	    ob = arg[1].u.ob;
 	    for (i=0; i<ob->prog->num_variables; i++) {
-		add_vmessage("%s: ", ob->prog->variable_names[i].name);
+		outbuf_addv(&out, "%s: ", ob->prog->variable_names[i].name);
 		print_svalue(&ob->variables[i]);
-		add_message("\n");
+		outbuf_add(&out, "\n");
 	    }
 	    break;
 	}	
@@ -111,8 +111,8 @@ f_debug_info PROT((void))
 	bad_arg(1, F_DEBUG_INFO);
     }
     pop_stack();
-    free_svalue(sp,"debug_info");
-    *sp = res;
+    pop_stack();
+    outbuf_push(&out);
 }
 #endif
 
@@ -154,9 +154,12 @@ f_refs PROT((void))
 void
 f_debugmalloc PROT((void))
 {
-    dump_debugmalloc((sp - 1)->u.string, sp->u.number);
+    char *res;
+    
+    res = dump_debugmalloc((sp - 1)->u.string, sp->u.number);
     free_string_svalue(--sp);
-    sp--;
+    sp->subtype = STRING_MALLOC;
+    sp->u.string = res;
 }
 #endif
 

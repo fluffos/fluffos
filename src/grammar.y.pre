@@ -59,7 +59,7 @@ int yyparse PROT((void));
 
 %token L_IF L_ELSE
 %token L_SWITCH L_CASE L_DEFAULT L_RANGE
-%token L_WHILE L_DO L_FOR
+%token L_WHILE L_DO L_FOR L_FOREACH L_IN
 %token L_BREAK L_CONTINUE
 %token L_RETURN
 %token L_ARROW L_INHERIT L_COLON_COLON
@@ -168,8 +168,9 @@ int yyparse PROT((void));
 %type <node> parse_command time_expression expr_list expr_list2 expr_list3
 %type <node> expr_list4 assoc_pair expr4 lvalue function_call lvalue_list
 %type <node> new_local_def statement while cond do for switch case
-%type <node> return optional_else_part block_or_semi
+%type <node> return optional_else_part block_or_semi foreach
 %type <node> case_label first_for_expr statements switch_block
+%type <node> foreach_var foreach_vars
 
 /* The following hold information about blocks and local vars */
 %type <decl> local_declarations local_name_list block
@@ -688,6 +689,7 @@ statement:
     |   while
     |   do
     |   for
+    |   foreach
     |   switch
     |   return
     |   block
@@ -702,10 +704,18 @@ statement:
     |   L_BREAK ';'
             {
 		if (context & SWITCH_CONTEXT) {
-		    NODE_NO_LINE($$, F_BREAK);
+		    NODE_NO_LINE($$, NODE_BREAK_SWITCH);
 		} else
 		if (context & LOOP_CONTEXT) {
 		    NODE_NO_LINE($$, NODE_BREAK);
+		    if (context & LOOP_FOREACH) {
+			parse_node_t *replace;
+			NODE_NO_LINE(replace, NODE_STATEMENTS);
+			NODE_NO_LINE(replace->l.expr, F_EXIT_FOREACH);
+			replace->l.expr->v.number = 1;
+			replace->r.expr = $$;
+			$$ = replace;
+		    }
 		} else {
 		    yyerror("break statement outside loop");
 		    $$ = 0;
@@ -789,6 +799,58 @@ for:
 		context = $<number>1;
 	      }
     ;
+
+foreach_var: L_DEFINED_NAME
+            {
+		if ($1->dn.local_num != -1) {
+		    CREATE_NODE($$, F_LOCAL_LVALUE);
+		    $$->v.number = $1->dn.local_num;
+		} else
+	        if ($1->dn.global_num != -1) {
+		    CREATE_NODE($$, F_GLOBAL_LVALUE);
+		    $$->v.number = $1->dn.global_num;
+		} else {
+		    char buf[256];
+		    sprintf(buf, "'%s' is not a local or a global variable.",
+			    $1->name);
+		    yyerror(buf);
+		    CREATE_NODE($$, F_GLOBAL_LVALUE);
+		    $$->v.number = 0;
+		}
+            }
+     ;
+
+foreach_vars:
+        foreach_var
+            {
+		CREATE_NODE($$, NODE_FOREACH);
+		$$->l.expr = $1;
+		$$->v.expr = 0;
+            }
+     |  foreach_var ',' foreach_var
+            {
+		CREATE_NODE($$, NODE_FOREACH);
+		$$->l.expr = $1;
+		$$->v.expr = $3;
+            }
+     ;
+
+foreach:
+        L_FOREACH '(' foreach_vars L_IN expr0 ')'
+            {
+		$<number>1 = context;
+		context = LOOP_CONTEXT | LOOP_FOREACH;
+            }
+        statement
+            {
+		NODE_NO_LINE($$, NODE_FOREACH);
+		$$->l.expr = $3;
+		$$->l.expr->r.expr = $5;
+		$$->r.expr = $8;
+		
+		context = $<number>1;
+	    }
+         ;
 
 for_expr:
 	/* EMPTY */
@@ -1972,12 +2034,12 @@ lvalue:
 			    case F_NE_RANGE:
 			    case F_RE_RANGE:
 				if (flag & LV_RANGE){
-				    yyerror("Can't do range lvalue of range lvalue.\n");
+				    yyerror("Can't do range lvalue of range lvalue.");
 				    flag |= LV_ILLEGAL;
 				    break;
 				}
 				if (flag & LV_INDEX){
-				    yyerror("Can't do indexed lvalue of range lvalue.\n");
+				    yyerror("Can't do indexed lvalue of range lvalue.");
 				    flag |= LV_ILLEGAL;
 				    break;
 				}
@@ -1998,6 +2060,10 @@ lvalue:
 				break;
 			    case F_GLOBAL:
 				node->kind = F_GLOBAL_LVALUE;
+				flag |= LV_ILLEGAL;
+				break;
+			    case F_MEMBER:
+				node->kind = F_MEMBER_LVALUE;
 				flag |= LV_ILLEGAL;
 				break;
 			    case NODE_PARAMETER:
@@ -2071,7 +2137,7 @@ expr4:
 			  
 			  strcpy(buf, "Illegal to use private variable '");
 			  strcat(buf, $1->name);
-			  strcat(buf, "'\n");
+			  strcat(buf, "'");
 			  yyerror(buf);
 		      }
 		  } else {
@@ -2079,7 +2145,7 @@ expr4:
 		      
 		      strcpy(buf, "Undefined variable '");
 		      strcat(buf, $1->name);
-		      strcat(buf, "'\n");
+		      strcat(buf, "'");
 		      if (current_number_of_locals < MAX_LOCAL) {
 			  add_local_name($1->name, TYPE_ANY);
 		      }
@@ -2094,7 +2160,7 @@ expr4:
     
                 strcpy(buf, "Undefined variable '");
                 strcat(buf, $1);
-                strcat(buf, "'\n");
+                strcat(buf, "'");
                 if (current_number_of_locals < MAX_LOCAL) {
                     add_local_name($1, TYPE_ANY);
                 }
@@ -2147,7 +2213,7 @@ expr4:
 
 		if (!($1->type & TYPE_MOD_CLASS)) {
 		    yyerror("Left argument of -> is not a class");
-		    CREATE_NODE($$, F_CONST0);
+		    CREATE_TYPED_NODE($$, F_CONST0, TYPE_ANY);
 		} else {
 		    CREATE_NODE($$, F_MEMBER);
 		    $$->r.expr = $1;
@@ -2201,7 +2267,7 @@ expr4:
                 if ($1->kind == F_AGGREGATE && $4->kind == F_NUMBER) {
                     int i = $4->v.number;
                     if (i < 1 || i > $1->v.number)
-                        yyerror("Illegal index to array constant.\n");
+                        yyerror("Illegal index to array constant.");
                     else {
                         parse_node_t *node = $1->r.expr;
                         i = $1->v.number - i;
@@ -2244,7 +2310,7 @@ expr4:
                 if ($1->kind == F_AGGREGATE && $3->kind == F_NUMBER) {
                     int i = $3->v.number;
                     if (i < 0 || i >= $1->v.number)
-                        yyerror("Illegal index to array constant.\n");
+                        yyerror("Illegal index to array constant.");
                     else {
                         parse_node_t *node = $1->r.expr;
                         while (i--)
@@ -2289,7 +2355,7 @@ expr4:
     |   catch
     |   L_BASIC_TYPE
             {
-	        if ($1 != TYPE_FUNCTION) yyerror("A reserved type name cannot be used as a function name.\n");
+	        if ($1 != TYPE_FUNCTION) yyerror("A reserved type name cannot be used as a function name.");
 		$<func_block>$.num_local = current_number_of_locals;
 		$<func_block>$.max_num_locals = max_num_locals;
 		$<func_block>$.context = context;
@@ -2359,7 +2425,7 @@ expr4:
 		
 		      strcpy(buf, "Illegal to use private variable '");
 		      strcat(buf, VARIABLE($$->l.expr->v.number)->name);
-		      strcat(buf, "'\n");
+		      strcat(buf, "'");
 		      yyerror(buf);
 		    }
 		    break;
@@ -2566,7 +2632,7 @@ function_call:
 		    char buf[MAXLINE + 30];
 		    sprintf(buf, "Undefined class '%s'", $4->name);
 		    yyerror(buf);
-		    CREATE_NODE($$, F_CONST0);
+		    CREATE_TYPED_NODE($$, F_CONST0, TYPE_ANY);
 		} else {
 		    CREATE_TYPED_NODE($$, F_NEW_CLASS, 
 				      $4->dn.class_num | TYPE_MOD_CLASS);
@@ -2741,7 +2807,6 @@ efun_override: L_EFUN L_COLON_COLON identifier {
 	    char buff[100];
 	    sprintf(buff, "Unknown efun: %s", $3);
 	    yyerror(buff);
-	    $$ = 0;
 	} else {
 #ifdef LPC_TO_C
 	    if (!(pragmas & PRAGMA_EFUN)) {
@@ -2752,7 +2817,7 @@ efun_override: L_EFUN L_COLON_COLON identifier {
 		res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
 		if (!MASTER_APPROVED(res)) {
 		    yyerror("Invalid simulated efunction override");
-		    $$ = 0;
+		    $$ = -1;
 		}
 #ifdef LPC_TO_C
 	    }

@@ -12,8 +12,8 @@
  *		for a number of reset periods.
  */
 
-#include "uid.h"
-#include "mudlib_stats.h"
+#include "packages/uids.h"
+#include "packages/mudlib_stats.h"
 
 #define MAX_OBJECT_NAME_SIZE 2048
 
@@ -48,14 +48,11 @@
 #define O_COMPILED_PROGRAM      0x4000  /* this is a marker for a compiled   */
                                         /* program                           */
 #endif
+#define O_UNUSED                0x8000
 
-#if 0
 /*
  * Note: use of more than 16 bits means extending flags to an unsigned long
  */
-#define O_UNUSED                0x4000	/* used to be O_MASTER (obsolete)    */
-#define O_UNUSED2               0x8000	/* reserved for future expansion     */
-#endif
 
 typedef struct sentence_s {
 #ifndef NO_ADD_ACTION
@@ -163,7 +160,7 @@ INLINE int valid_hide PROT((object_t *));
 INLINE int object_visible PROT((object_t *));
 void set_living_name PROT((object_t *, char *));
 void remove_living_name PROT((object_t *));
-void stat_living_objects PROT((void));
+void stat_living_objects PROT((outbuffer_t *));
 int shadow_catch_message PROT((object_t *, char *));
 void tell_npc PROT((object_t *, char *));
 void tell_object PROT((object_t *, char *));

@@ -3,6 +3,7 @@
 #####################################################
 
 SHELL=/bin/sh
+MAKEFLAGS=
 
 %include "system_libs"
  
@@ -28,7 +29,7 @@ $(OBJDIR)/%.o: %.c
 
 $(OBJDIR)/interpret.o: interpret.c patchlevel.h
 
-$(OBJDIR)/lex.o: lex.c preprocess.c cc.h grammar.tab.h
+$(OBJDIR)/lex.o: lex.c preprocess.c cc.h grammar.tab.c
 
 $(OBJDIR)/grammar.tab.o: grammar.tab.c opcodes.h
 
@@ -38,7 +39,7 @@ $(OBJDIR)/grammar.tab.o: grammar.tab.c opcodes.h
 
 interpret.o: interpret.c patchlevel.h
 
-lex.o: lex.c preprocess.c cc.h grammar.tab.h
+lex.o: lex.c preprocess.c cc.h grammar.tab.c
 
 grammar.tab.o: grammar.tab.c opcodes.h
 

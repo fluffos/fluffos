@@ -41,10 +41,6 @@ extern double consts[];
 extern int slow_shut_down_to_do;
 extern object_t *master_ob;
 
-void debug_message PROTVARGS(());
-
-#ifdef TRAP_CRASHES
-void crash_MudOS PROT((char *));
-#endif
+void debug_message PROT1V(char *);
 
 #endif

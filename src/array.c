@@ -200,15 +200,15 @@ array_t *explode_string P4(char *, str, int, slen, char *, del, int, len)
 	 * Compute number of array items. It is either number of delimiters,
 	 * or, one more.
 	 */
-	if ((slen == 1) || (lastdel != (str + slen - 1))) {
+	limit = max_array_size;
+	if (lastdel != (str + slen - 1)) {
 	    num++;
+	    limit--;
 	}
 	if (num > max_array_size) {
 	    num = max_array_size;
 	}
 	ret = allocate_empty_array(num);
-	limit = max_array_size - 1;	/* extra element can be added after
-					 * loop */
 	for (p = str, beg = str, num = 0; *p && (num < limit);) {
 	    if (*p == delimeter) {
 		DEBUG_CHECK(num >= ret->size, "Index out of bounds in explode!\n");
@@ -230,7 +230,7 @@ array_t *explode_string P4(char *, str, int, slen, char *, del, int, len)
 	if (*beg != '\0') {
 	    ret->item[num].type = T_STRING;
 	    ret->item[num].subtype = STRING_MALLOC;
-	    ret->item[num].u.string = string_copy(beg, "explode_string");
+	    ret->item[num].u.string = string_copy(beg, "explode_string: last, len == 1");
 	}
 	return ret;
     }				/* len == 1 */
@@ -297,7 +297,7 @@ array_t *explode_string P4(char *, str, int, slen, char *, del, int, len)
     if (*beg != '\0') {
 	ret->item[num].type = T_STRING;
 	ret->item[num].subtype = STRING_MALLOC;
-	ret->item[num].u.string = string_copy(beg, "explode_string");
+	ret->item[num].u.string = string_copy(beg, "explode_string: last, len != 1");
     }
     return ret;
 }
@@ -333,6 +333,22 @@ char *implode_string P3(array_t *, arr, char *, del, int, del_len)
     }
     *p = 0;
     return q;
+}
+
+svalue_t *implode_array P2(funptr_t *, fp, array_t *, arr) {
+    int i = 0, n;
+    svalue_t *v;
+
+    if (!(n = arr->size)) return &const0u;
+    
+    v = &arr->item[i++];
+    while (i < n) {
+	push_svalue(v);
+	push_svalue(&arr->item[i++]);
+	v = call_function_pointer(fp, 2);
+	if (!v) return &const0u;
+    }
+    return v;
 }
 
 array_t *users()
@@ -389,7 +405,7 @@ array_t *slice_array P3(array_t *, p, int, from, int, to)
 	add_array_size(&p->stats, -((int)p->size));
 #endif
 	total_array_size += (to - from + 1 - p->size) * sizeof(svalue_t);
-	if (from){
+	if (from) {
 	    sv1 = p->item + from;
 	    cnt = from;
 	    while (cnt--) free_svalue(--sv1, "slice_array:2");
@@ -397,9 +413,11 @@ array_t *slice_array P3(array_t *, p, int, from, int, to)
 	    sv1 = p->item;
 	    sv2 = p->item + from;
 	    while (cnt--) *sv1++ = *sv2++;
-	    cnt = p->size - 1 - to;
-	    while (cnt--) free_svalue(sv2++, "slice_array:3");
+	} else {
+	    sv2 = p->item + to + 1;
 	}
+	cnt = (p->size - 1) - to;
+	while (cnt--) free_svalue(sv2++, "slice_array:3");
 	p = RESIZE_ARRAY(p, to-from+1);
 #ifdef PACKAGE_MUDLIB_STATS
 	if (current_object) {
@@ -590,6 +608,7 @@ int sameval P2(svalue_t *, arg1, svalue_t *, arg2)
     case T_CLASS:
 	return arg1->u.arr == arg2->u.arr;
     case T_STRING:
+	if (SVALUE_STRLEN_DIFFERS(arg1, arg2)) return 0;
 	return !strcmp(arg1->u.string, arg2->u.string);
     case T_OBJECT:
 	return arg1->u.ob == arg2->u.ob;

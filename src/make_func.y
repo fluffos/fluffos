@@ -1,6 +1,5 @@
 %{
 #define NO_OPCODES
-#define EDIT_SOURCE
 #include "std.h"
 #include "make_func.h"
 #include "lex.h"
@@ -24,7 +23,7 @@ int arg_types[400], last_current_type;
  * Store the types of the current efun. They will be copied into the
  * arg_types list if they were not already there (to save memory).
  */
-int curr_arg_types[MAX_LOCAL], curr_arg_type_size;
+int curr_arg_types[40], curr_arg_type_size;
 
 struct type {
     char *name;

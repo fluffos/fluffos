@@ -1,7 +1,6 @@
 #define NO_MALLOC
 #define NO_SOCKETS
 #define NO_OPCODES
-#define EDIT_SOURCE
 #include "std.h"
 #include "lex.h"
 #include "preprocess.h"
@@ -21,8 +20,10 @@ FILE *yyin = 0, *yyout = 0;
  *
  * TODO: teach this file how to fix bugs in the source code :)
  */
+#define OPTIONS_INCL      "options_incl.h"
 #define PACKAGES          "packages/packages"
 #define OPTIONS_H         "options.h"
+#define LOCAL_OPTIONS     "local_options"
 #define OPTION_DEFINES    "option_defs.c"
 #define FUNC_SPEC         "func_spec.c"
 #define FUNC_SPEC_CPP     "func_spec.cpp"
@@ -75,8 +76,8 @@ void yyerror P1(char *, str)
 
 void yywarn P1(char *, str)
 {
-    fprintf(stderr, "%s:%d: %s\n", current_file, current_line, str);
-    exit(1);
+    /* ignore errors :)  local_options generates redefinition warnings,
+       which we don't want to see */
 }
 
 void yyerrorp P1(char *, str)
@@ -474,15 +475,22 @@ static int skip_to(token, atoken)
 
 #include "preprocess.c"
 
-static void open_input_file P1(char *, fn) {
+static int maybe_open_input_file P1(char *, fn) {
     if ((yyin = fopen(fn, "r")) == NULL) {
-	perror(fn);
-	exit(-1);
+	return 0;
     }
     if (current_file) free((char *)current_file);
     current_file = (char *) malloc(strlen(fn) + 1);
     current_line = 0;
     strcpy(current_file, fn);
+    return 1;
+}
+
+static void open_input_file P1(char *, fn) {
+    if (!maybe_open_input_file(fn)) {
+	perror(fn);
+	exit(-1);
+    }
 }
 
 static void open_output_file P1(char *, fn) {
@@ -515,6 +523,7 @@ create_option_defines() {
     int count = 0;
     int i;
 
+    fprintf(stderr, "Writing build options to %s ...\n", OPTION_DEFINES);
     open_output_file(OPTION_DEFINES);
     fprintf(yyout, "{\n");
     for (i = 0; i < DEFHASH; i++) {
@@ -605,8 +614,6 @@ handle_include P1(char *, name)
 static void
 handle_pragma P1(char *, name)
 {
-    int i;
-
     if (!strcmp(name, "auto_note_compiler_case_start"))
         pragmas |= PRAGMA_NOTE_CASE_START;
     else if (!strcmp(name, "no_auto_note_compiler_case_start"))
@@ -683,8 +690,10 @@ preprocess() {
 		defn_t *d;
 		
 		deltrail();
-		if ((d = lookup_define(outp)))
+		if ((d = lookup_define(outp))) {
 		    d->flags |= DEF_IS_UNDEFINED;
+		    d->flags &= ~DEF_IS_NOT_LOCAL;
+		}
 	    } else if (!strcmp("echo", yyp)) {
 		fprintf(stderr, "echo at line %d of %s: %s\n", current_line, current_file, outp);
 	    } else if (!strcmp("include", yyp)) {
@@ -803,6 +812,7 @@ preprocess() {
     }
     fclose(yyin);
     free(current_file);
+    current_file = 0;
     nexpands = 0;
     if (inctop){
       incstate *p = inctop;
@@ -813,7 +823,7 @@ preprocess() {
       inctop = p->next;
       free((char *) p);
       preprocess();
-    }
+    } else yyin = 0;
 }
 
 void make_efun_tables()
@@ -825,6 +835,7 @@ void make_efun_tables()
     FILE *files[NUM_FILES];
     int i;
 
+    fprintf(stderr, "Building efun tables ...\n");
     for (i = 0; i < NUM_FILES; i++) {
 	files[i] = fopen(outfiles[i], "w");
 	if (!files[i]) {
@@ -908,18 +919,71 @@ void make_efun_tables()
 	fclose(files[i]);
 }
 
+static void handle_local_defines() {
+    defn_t *p;
+    int i;
+    int problem = 0;
+
+    for (i = 0; i < DEFHASH; i++)
+	for (p = defns[i]; p; p = p->next)
+	    p->flags |= DEF_IS_NOT_LOCAL;
+
+    /* undefine _OPTIONS_H_ so it doesn't get propagated to the mudlib
+       or interfere with copies of options.h */
+    if ((p = lookup_define("_OPTIONS_H_"))) {
+	p->flags |= DEF_IS_UNDEFINED;
+	p->flags &= ~DEF_IS_NOT_LOCAL;
+    }
+    ppchar = '#';
+    preprocess();
+    
+    if ((p = lookup_define("_OPTIONS_H_")))
+	p->flags |= DEF_IS_UNDEFINED;
+
+    for (i = 0; i < DEFHASH; i++)
+	for (p = defns[i]; p; p = p->next)
+	    if (p->flags & DEF_IS_NOT_LOCAL) {
+		fprintf(stderr, "No setting for %s in '%s'.\n",
+			p->name, LOCAL_OPTIONS);
+		problem = 1;
+	    }
+
+    if (problem) exit(-1);
+}
+
+static void write_options_incl P1(int, local) {
+    open_output_file(OPTIONS_INCL);
+    if (local) {
+	fprintf(yyout, "#include \"%s\"\n", LOCAL_OPTIONS);
+    } else {
+	fprintf(yyout, "#include \"%s\"\n", OPTIONS_H);
+    }
+    close_output_file();
+}
+
 static void handle_options() {
     open_input_file(OPTIONS_H);
     ppchar = '#';
     preprocess();
+
+    if (maybe_open_input_file(LOCAL_OPTIONS)) {
+	fprintf(stdout, "Using '%s' file ...\n", LOCAL_OPTIONS);
+	handle_local_defines();
+	write_options_incl(1);
+    } else {
+	fprintf(stderr, "No \"%s\" file present.  If you create one from \"%s\",\nyou can use it when you get a new driver, and you will be warned if there are\nchanges to the real %s which you should include in your local file.\n",
+		LOCAL_OPTIONS, OPTIONS_H, OPTIONS_H);
+	write_options_incl(0);
+    }
+
     create_option_defines();
 }
 
 static void handle_build_func_spec P1(char *, command) {
     char buf[1024];
     int i;
-    FILE *f;
 
+    fprintf(stderr, "Building compiler files ...\n");
     sprintf(buf, "%s %s >%s", command, FUNC_SPEC, FUNC_SPEC_CPP);
     system(buf);
     for (i = 0; i < num_packages; i++) {
@@ -951,6 +1015,8 @@ static void handle_process P1(char *, file) {
     }
     *(buf + l - 4) = 0;
     
+    fprintf(stderr, "Creating '%s' from '%s' ...\n", buf, file);
+
     open_input_file(file);
     open_output_file(buf);
     ppchar = '%';
@@ -966,44 +1032,42 @@ static void handle_build_efuns() {
     make_efun_tables();
 }
 
-#ifdef SYSMALLOC
-#  define THE_MALLOC "sysmalloc.c"
-#endif
-#ifdef SMALLOC
-#  define THE_MALLOC "smalloc.c"
-#endif
-#ifdef BSDMALLOC
-#  define THE_MALLOC "bsdmalloc.c"
-#endif
-
-#ifdef WRAPPEDMALLOC
-#  define THE_WRAPPER "wrappedmalloc.c"
-#endif
-
-#ifdef DEBUGMALLOC
-#  define THE_WRAPPER "debugmalloc.c"
-#endif
-
 static void handle_malloc() {
-#if !defined(THE_MALLOC) && !defined(THE_WRAPPER)
-    fprintf(stderr, "Memory package and/or malloc wrapper incorrectly specified in options.h\n");
-    exit(-1);
-#endif
+    char *the_malloc = 0, *the_wrapper = 0;
+
+    if (lookup_define("SYSMALLOC"))
+	the_malloc = "sysmalloc.c";
+    if (lookup_define("SMALLOC"))
+	the_malloc = "smalloc.c";
+    if (lookup_define("BSDMALLOC"))
+	the_malloc = "bsdmalloc.c";
+
+    if (lookup_define("WRAPPEDMALLOC"))
+	the_wrapper = "wrappedmalloc.c";
+    if (lookup_define("DEBUGMALLOC"))
+	the_wrapper = "debugmalloc.c";
+
+    if (!the_malloc && !the_wrapper) {
+	fprintf(stderr, "Memory package and/or malloc wrapper incorrectly specified in options.h\n");
+	exit(-1);
+    }
+
     if (unlink("malloc.c") == -1)
 	perror("unlink malloc.c");
     if (unlink("mallocwrapper.c") == -1)
 	perror("unlink mallocwrapper.c");
-#ifdef THE_WRAPPER
-    printf("Using memory allocation package: %s\n\t\tWrapped with: %s\n",
-	   THE_MALLOC, THE_WRAPPER);
-    if (link(THE_WRAPPER, "mallocwrapper.c") == -1)
-	perror("link mallocwrapper.c");
-#else
-    printf("Using memory allocation package: %s\n", THE_MALLOC);
-    if (link("plainwrapper.c", "mallocwrapper.c") == -1)
-	perror("link mallocwrapper.c");
-#endif
-    if (link(THE_MALLOC, "malloc.c") == -1)
+
+    if (the_wrapper) {
+	printf("Using memory allocation package: %s\n\t\tWrapped with: %s\n",
+	       the_malloc, the_wrapper);
+	if (link(the_wrapper, "mallocwrapper.c") == -1)
+	    perror("link mallocwrapper.c");
+    } else {
+	printf("Using memory allocation package: %s\n", the_malloc);
+	if (link("plainwrapper.c", "mallocwrapper.c") == -1)
+	    perror("link mallocwrapper.c");
+    }
+    if (link(the_malloc, "malloc.c") == -1)
 	perror("link malloc.c");
 }
 
@@ -1038,7 +1102,7 @@ static int check_include P2(char *, tag, char *, file) {
 
     printf("Checking for include file <%s> ... ", file);
     ct = fopen("comptest.c", "w");
-    fprintf(ct, "#include \"std_incl.h\"\n#include <%s>\n", file);
+    fprintf(ct, "#include \"configure.h\"\n#include \"std_incl.h\"\n#include <%s>\n", file);
     fclose(ct);
     
 #ifdef DEBUG
@@ -1063,7 +1127,7 @@ static int check_library P1(char *, lib) {
 
     printf("Checking for library %s ... ", lib);
     ct = fopen("comptest.c", "w");
-    fprintf(ct, "int main() { exit(0); }");
+    fprintf(ct, "int main() { exit(0); }\n");
     fclose(ct);
     
 #ifdef DEBUG
@@ -1103,7 +1167,7 @@ static int check_ret_type P4(char *, tag, char *, pre,
 #endif
 
 /* This should check a.out existence, not exit value */
-static int check_prog P3(char *, tag, char *, pre, char *, code) {
+static int check_prog P4(char *, tag, char *, pre, char *, code, int, andrun) {
     char buf[1024];
     FILE *ct;
 
@@ -1112,12 +1176,40 @@ static int check_prog P3(char *, tag, char *, pre, char *, code) {
     fclose(ct);
     
     sprintf(buf, "%s %s comptest.c -o comptest >/dev/null 2>&1", COMPILER, CFLAGS);
-    if (!system(buf)) {
+    if (!system(buf) && (!andrun || !system("./comptest"))) {
 	if (tag) 
 	    fprintf(yyout, "#define %s\n", tag);
 	return 1;
     }
+
     return 0;
+}
+
+static char *memmove_prog = "\
+char buf[80];\n\
+strcpy(buf,\"0123456789ABCDEF\");\n\
+memmove(&buf[1],&buf[4],13);\n\
+if(strcmp(buf,\"0456789ABCDEF\")) exit(-1);\n\
+memmove(&buf[8],&buf[6],9);\n\
+if(strcmp(buf,\"0456789A9ABCDEF\")) exit(-1);\n\
+return 0;\n";
+
+static int check_memmove P2(char *, tag, char *, str) {
+    return check_prog(tag, str, memmove_prog, 1);
+}
+
+static void find_memmove() {
+    printf("Checking for memmove() ...");
+    if (check_memmove(0, "")) {
+	printf(" exists\n");
+	return;
+    }
+    if (check_memmove("USE_BCOPY", "#define memmove(a,b,c) bcopy(b,a,c)")) {
+	printf(" simulating via bcopy()\n");
+	return;
+    }
+    printf(" missing; using MudOS's version\n");
+    fprintf(yyout, "#define MEMMOVE_MISSING\n");
 }
 
 static void handle_configure() {
@@ -1163,22 +1255,45 @@ static void handle_configure() {
     check_include("INCL_SYS_RESOURCE_H", "sys/resource.h");
     check_include("INCL_SYS_RUSAGE_H", "sys/rusage.h");
     check_include("INCL_SYS_CRYPT_H", "sys/crypt.h");
+    check_include("INCL_CRYPT_H", "crypt.h");
 
     /* figure out what we need to do to get major()/minor() */
     check_include("INCL_SYS_SYSMACROS_H", "sys/sysmacros.h");
+    check_include("INCL_STDARG_H", "stdarg.h");
 
 #ifdef DEBUG
     /* includes just to shut up gcc's warnings on some systems */
     check_include("INCL_BSTRING_H", "bstring.h");
 #endif
 
-    if (!check_prog("DRAND48", "#include <math.h>", "srand48(0);"))
-	if (!check_prog("RAND", "#include <math.h>", "srand(0);"))
-	    if (!check_prog("RANDOM", "#include <math.h>", "srandom(0);"))
-		printf("WARNING: did not find a random number generator\n");
+    printf("Checking for random number generator ...");
+    if (check_prog("DRAND48", "#include <math.h>", "srand48(0);", 0)) {
+	printf(" using drand48()\n");
+    } else
+    if (check_prog("RAND", "#include <math.h>", "srand(0);", 0)) {
+	printf(" using rand()\n");
+    } else
+    if (check_prog("RANDOM", "#include <math.h>", "srandom(0);", 0)) {
+	printf("using random()\n");
+    } else
+	printf("WARNING: did not find a random number generator\n");
 
-    check_prog("HAS_UALARM", "", "ualarm(0, 0);");
-    check_prog("HAS_STRERROR", "", "strerror(12);");
+    printf("Checking for ualarm() ...");
+    if (check_prog("HAS_UALARM", "", "ualarm(0, 0);", 0))
+	printf(" exists\n");
+    else printf(" does not exist\n");
+
+    printf("Checking for strerror() ...");
+    if (check_prog("HAS_STRERROR", "", "strerror(12);", 0))
+	printf(" exists\n");
+    else printf(" does not exist\n");
+
+    printf("Checking for POSIX getcwd() ...");
+    if (check_prog("HAS_GETCWD", "", "getcwd(\"\", 1000);", 0))
+	printf(" exists\n");
+    else printf(" does not exist ... using BSD getwd()\n");
+
+    find_memmove();
 
     fprintf(yyout, "#define SIZEOF_INT %i\n", sizeof(int));
     fprintf(yyout, "#define SIZEOF_PTR %i\n", sizeof(char *));
@@ -1196,10 +1311,10 @@ static void handle_configure() {
 
     /* don't add -lcrypt if crypt() is in libc.a */
     if (!check_prog(0, "#include \"lint.h\"", 
-		    "char *x = crypt(\"foo\", \"bar\");"))
+		    "char *x = crypt(\"foo\", \"bar\");", 0))
 	check_library("-lcrypt");
     /* don't add -lmalloc if malloc() works */
-    if (!check_prog(0, "", "char *x = malloc(100);"))
+    if (!check_prog(0, "", "char *x = malloc(100);", 0))
 	check_library("-lmalloc");
 
     check_library("-lsocket");
@@ -1243,5 +1358,6 @@ int main P2(int, argc, char **, argv) {
 	}
 	idx++;
     }
+    printf("\n");
     return 0;
 }

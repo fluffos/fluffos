@@ -49,6 +49,13 @@ void conn_data_handler PROT((int));
 int index_by_fd PROT((int));
 void terminate PROT((int));
 
+void debug_perror P2(char *, what, char *, file) {
+    if (file)
+	fprintf(stderr, "System Error: %s:%s:%s\n", what, file, strerror(errno));
+    else
+	fprintf(stderr, "System Error: %s:%s\n", what, strerror(errno));
+}
+
 void init_conns()
 {
     int i;

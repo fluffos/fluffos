@@ -6,6 +6,7 @@
 #include "simul_efun.h"
 #include "comm.h"
 #include "md.h"
+#include "file.h"
 
 /*
  * Swap out programs from objects.
@@ -230,8 +231,7 @@ swap_out P3(char *, block, int, size, int *, locp)
                   errno, *locp);
         if ((write(swap_file, &size, sizeof size) != sizeof size) ||
 	    write(swap_file, block, size) != size) {
-	    debug_message("I/O error in swap.\n");
-	    perror("swap_out: ");
+	    debug_perror("swap_out: ", swap_file);
 	    *locp = -1;
 	    return 0;
 	}
@@ -241,8 +241,7 @@ swap_out P3(char *, block, int, size, int *, locp)
 		  errno, *locp);
 	if (fwrite((char *) &size, sizeof size, 1, swap_file) != 1 ||
 	    fwrite(block, size, 1, swap_file) != 1) {
-	    debug_message("I/O error in swap.\n");
-	    perror("swap_out:");
+	    debug_perror("swap_out:swap file:", 0);
 	    *locp = -1;
 	    return 0;
 	}
@@ -535,19 +534,19 @@ remove_line_swap P1(program_t *, prog)
     prog->line_swap_index = -1;
 }
 
-void print_swap_stats()
+void print_swap_stats P1(outbuffer_t *, out)
 {
     extern int errno;
     int size, cnt, end;
     sw_block_t *m;
 
-    add_message("Swap information:\n");
-    add_message("-------------------------\n");
-    add_vmessage("Progs swapped:       %10lu\n", num_swapped);
-    add_vmessage("Linenum bytes:       %10lu\n", line_num_bytes_swapped);
-    add_vmessage("Total bytes swapped: %10lu\n", total_bytes_swapped);
+    outbuf_add(out, "Swap information:\n");
+    outbuf_add(out, "-------------------------\n");
+    outbuf_addv(out, "Progs swapped:       %10lu\n", num_swapped);
+    outbuf_addv(out, "Linenum bytes:       %10lu\n", line_num_bytes_swapped);
+    outbuf_addv(out, "Total bytes swapped: %10lu\n", total_bytes_swapped);
     if (!swap_file) {
-	add_message("No swap file\n");
+	outbuf_add(out, "No swap file\n");
 	return;
     }
     size = cnt = 0;
@@ -565,7 +564,7 @@ void print_swap_stats()
 	size += end;
 	cnt++;
     }
-    add_vmessage("Freed bytes:         %10lu (%d chunks)\n", size, cnt);
+    outbuf_addv(out, "Freed bytes:         %10lu (%d chunks)\n", size, cnt);
 }
 
 /*

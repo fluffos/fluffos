@@ -127,8 +127,10 @@ static keyword_t reswords[] =
     {"else", L_ELSE, 0},
     {"float", L_BASIC_TYPE, TYPE_REAL},
     {"for", L_FOR, 0},
+    {"foreach", L_FOREACH, 0},
     {"function", L_BASIC_TYPE, TYPE_FUNCTION},
     {"if", L_IF, 0},
+    {"in", L_IN, 0},
     {"inherit", L_INHERIT, 0},
     {"int", L_BASIC_TYPE, TYPE_NUMBER},
     {"mapping", L_BASIC_TYPE, TYPE_MAPPING},
@@ -1243,7 +1245,7 @@ int yylex()
 		    } else {
 			while (isspace(c)){
 			    if (c == '\n'){
-				if ((yyp = last_nl + 1)) {
+				if ((yyp == last_nl + 1)) {
 				    outp = yyp;
 				    refill_buffer();
 				    yyp = outp;
@@ -1432,7 +1434,7 @@ int yylex()
 			if ((d = lookup_define(sp)))
 			    d->flags |= DEF_IS_UNDEFINED;
 		    } else if (strcmp("echo", yytext) == 0) {
-			fprintf(stderr, "%s\n", sp);
+			debug_message("%s\n", sp);
 		    } else if (strcmp("pragma", yytext) == 0) {
 			handle_pragma(sp);
 		    } else {
@@ -1451,6 +1453,8 @@ int yylex()
 		    case 't': yylval.number = '\t'; break;
 		    case 'r': yylval.number = '\r'; break;
 		    case 'b': yylval.number = '\b'; break;
+		    case 'a': yylval.number = '\x07'; break;
+		    case 'e': yylval.number = '\x1b'; break;
 		    case '\'': yylval.number = '\''; break;
 		    case '\\': yylval.number = '\\'; break;
 		    default: 
@@ -1486,7 +1490,8 @@ int yylex()
 		    if (rc > 0) {
 			return *outp++;
 		    } else if (rc == -1) {
-			yyerror("End of file in array block");
+			lexerror("End of file in array block");
+			return LEX_EOF;
 		    } else {	/* if rc == -2 */
 			yyerror("Array block exceeded maximum length");
 		    }
@@ -1506,7 +1511,8 @@ int yylex()
 
 			return L_STRING;
 		    } else if (rc == -1) {
-			yyerror("End of file in text block");
+			lexerror("End of file in text block");
+			return LEX_EOF;
 		    } else {	/* if (rc == -2) */
 			yyerror("Text block exceeded maximum length");
 		    }
@@ -1556,6 +1562,8 @@ int yylex()
 				case 't': *to++ = '\t'; break;
 				case 'r': *to++ = '\r'; break;
 				case 'b': *to++ = '\b'; break;
+				case 'a': *to++ = '\x07'; break;
+				case 'e': *to++ = '\x1b'; break;
 				case '"': *to++ = '"'; break;
 				case '\\': *to++ = '\\'; break;
 			        default:
@@ -1612,6 +1620,8 @@ int yylex()
                                 case 't': *yyp++ = '\t'; break;
                                 case 'r': *yyp++ = '\r'; break;
                                 case 'b': *yyp++ = '\b'; break;
+				case 'a': *yyp++ = '\x07'; break;
+				case 'e': *yyp++ = '\x1b'; break;
                                 case '"': *yyp++ = '"'; break;
                                 case '\\': *yyp++ = '\\'; break;
                                 default:
@@ -1787,7 +1797,7 @@ parse_identifier:
 	char buff[100];
 
 	sprintf(buff, "Illegal character (hex %02x) '%c'", (unsigned) c, (char) c);
-	fprintf(stderr, "partial = [%s]\n", partial);
+	debug_message("partial = [%s]\n", partial);
 	yyerror(buff);
 #endif
 	return ' ';
@@ -1851,7 +1861,7 @@ void add_predefines()
     add_predefine("MUDOS", -1, "");
     get_version(save_buf);
     add_quoted_predefine("__VERSION__", save_buf);
-    sprintf(save_buf, "%d", PORTNO);
+    sprintf(save_buf, "%d", external_port[0].port);
     add_predefine("__PORT__", -1, save_buf);
     for (i = 0; i < 2 * NUM_OPTION_DEFS; i += 2) {
 	add_predefine(option_defs[i], -1, option_defs[i+1]);
@@ -2015,6 +2025,9 @@ void init_num_args()
     add_instr_name("rindex", "c_rindex();\n", F_RINDEX, T_ANY);
     add_instr_name("loop_cond", "c_loop_cond();\n", F_LOOP_COND, -1);
     add_instr_name("loop_incr", "c_loop_incr();\n", F_LOOP_INCR, -1);
+    add_instr_name("foreach", 0, F_FOREACH, -1);
+    add_instr_name("exit_foreach", "c_exit_foreach();\n", F_EXIT_FOREACH, -1);
+    add_instr_name("next_foreach", 0, F_NEXT_FOREACH, -1);
     add_instr_name("member_lvalue", 0, F_MEMBER_LVALUE, T_LVALUE);
     add_instr_name("index_lvalue", "push_indexed_lvalue(0);\n", 
 		   F_INDEX_LVALUE, T_LVALUE|T_LVALUE_BYTE);
@@ -2045,6 +2058,7 @@ void init_num_args()
     add_instr_name("number", 0, F_NUMBER, T_NUMBER);
     add_instr_name("real", 0, F_REAL, T_REAL);
     add_instr_name("local_lvalue", 0, F_LOCAL_LVALUE, T_LVALUE);
+    add_instr_name("while_dec", 0, F_WHILE_DEC, -1);
     add_instr_name("const1", "push_number(1);\n", F_CONST1, T_NUMBER);
     add_instr_name("subtract", "c_subtract();\n", F_SUBTRACT, T_NUMBER | T_REAL | T_ARRAY);
     add_instr_name("(void)assign", "c_void_assign();\n", F_VOID_ASSIGN, T_NUMBER);
@@ -2121,8 +2135,6 @@ void init_num_args()
     add_instr_name("x++", "c_post_inc();\n", F_POST_INC, T_NUMBER | T_REAL);
     add_instr_name("x--", "c_post_dec();\n", F_POST_DEC, T_NUMBER | T_REAL);
     add_instr_name("switch", 0, F_SWITCH, -1);
-    add_instr_name("break", "break;\n", F_BREAK, -1);
-    add_instr_name("pop_break", 0, F_POP_BREAK, -1);
     add_instr_name("time_expression", 0, F_TIME_EXPRESSION, -1);
     add_instr_name("end_time_expression", 0, F_END_TIME_EXPRESSION, T_NUMBER);
 }

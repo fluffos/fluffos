@@ -80,6 +80,7 @@ extern char *compiler_type_names[];
 #define SWITCH_NUMBERS          0x8
 #define SWITCH_DEFAULT          0x10
 #define SWITCH_RANGES           0x20
+#define LOOP_FOREACH            0x40
 
 typedef struct {
     short bindable;

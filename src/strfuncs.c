@@ -78,7 +78,7 @@ INLINE char *memset P3(char *, s, int, c, int, n)
     if (c == 0)
 	bzero(s, n);
     else {
-	fprintf(stderr, "Failed in memset\n");
+	debug_message("Failed in memset\n");
 	exit(1);
     }
 }

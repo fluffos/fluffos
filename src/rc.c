@@ -17,9 +17,11 @@ char *config_str[NUM_CONFIG_STRS];
 int config_int[NUM_CONFIG_INTS];
 
 static char *buff;
+static int buff_size;
 
 static void read_config_file PROT((FILE *));
 static int scan_config_line PROT((char *, void *, int));
+static void config_init PROT((void)); /* don't ask */
 
 static void config_init() {
     int i;
@@ -35,14 +37,16 @@ static void config_init() {
 
 static void read_config_file P1(FILE *, file)
 {
-    char str[MAX_LINE_LENGTH];
-    int size = 0, len;
+    char str[MAX_LINE_LENGTH * 4];
+    int size = 2, len, tmp;
+    char *p;
 
-    buff = (char *)
-	DMALLOC(MAX_LINE_LENGTH * (NUM_CONFIG_INTS + 1) * (NUM_CONFIG_STRS + 1), TAG_CONFIG, "read_config_file: 1");
-    strcpy(buff, "\n");
+    buff_size = MAX_LINE_LENGTH * (NUM_CONFIG_INTS + 1) * (NUM_CONFIG_STRS + 1);
+    p = buff = CALLOCATE(buff_size, char, TAG_CONFIG, "read_config_file: 1");
+    *p++ = '\n';
+
     while (1) {
-	if (fgets(str, 120, file) == NULL)
+	if (fgets(str, MAX_LINE_LENGTH * 4, file) == NULL)
 	    break;
 	if (!str)
 	    break;
@@ -53,12 +57,18 @@ static void read_config_file P1(FILE *, file)
 	}
 	if (str[0] != '#' && str[0] != '\n') {
 	    size += len + 1;
-	    if (size > (MAX_LINE_LENGTH * (NUM_CONFIG_INTS + 1) * (NUM_CONFIG_STRS + 1)))
-		buff = (char *) DREALLOC(buff, size, TAG_CONFIG, "read_config_file: 2");
-	    strcat(buff, str);
-	    strcat(buff, "\n");
+	    if (size > buff_size) {
+		tmp = p - buff;
+		buff = RESIZE(buff, buff_size *= 2, char, 
+			      TAG_CONFIG, "read_config_file: 2");
+		p = buff + tmp;
+	    }
+	    strncpy(p, str, len);
+	    p += len;
+	    *p++ = '\n';
 	}
     }
+    *p = 0;
 }
 
 
@@ -99,7 +109,7 @@ static int scan_config_line P3(char *, fmt, void *, dest, int, required)
 	*tmp = '\0';
 	if (required == -1) {
 	    fprintf(stderr, "*Warning: Missing line in config file:\n\t%s\n",
-		    missing_line);
+			  missing_line);
 	    return 0;
 	}
 	if (!required) return 0;
@@ -123,7 +133,7 @@ void set_defaults P1(char *, filename)
     config_init();
     def = fopen(filename, "r");
     if (def) {
-	fprintf(stderr, "loading config file: %s\n", filename);
+	fprintf(stderr, "using config file: %s\n", filename);
     } else {
 #ifdef OS2
 	sprintf(defaults, "%s\\%s", CONFIG_FILE_DIR, filename);
@@ -138,17 +148,17 @@ void set_defaults P1(char *, filename)
 
 	def = fopen(defaults, "r");
 	if (def) {
-	    fprintf(stderr, "loading config file: %s\n", defaults);
+	    fprintf(stderr, "using config file: %s\n", defaults);
 	}
     }
     if (!def) {
-	fprintf(stderr, "*Error: couldn't load config file: '%s'\n", filename);
+	fprintf(stderr, "*Error: couldn't find or open config file: '%s'\n", filename);
 	exit(-1);
     }
     read_config_file(def);
 
     scan_config_line("global include file : %[^\n]", tmp, 0);
-    p = CONFIG_STR(__GLOBAL_INCLUDE_FILE__) = alloc_cstring(tmp, "config file");
+    p = CONFIG_STR(__GLOBAL_INCLUDE_FILE__) = alloc_cstring(tmp, "config file: gif");
 
     /* check if the global include file is quoted */
     if (*p && *p != '\"' && *p != '<') {
@@ -167,37 +177,37 @@ void set_defaults P1(char *, filename)
     }
 
     scan_config_line("name : %[^\n]", tmp, 1);
-    CONFIG_STR(__MUD_NAME__) = alloc_cstring(tmp, "config file");
-    scan_config_line("address server ip : %[^\n]", tmp, 1);
-    CONFIG_STR(__ADDR_SERVER_IP__) = alloc_cstring(tmp, "config file");
+    CONFIG_STR(__MUD_NAME__) = alloc_cstring(tmp, "config file: mn");
+    scan_config_line("address server ip : %[^\n]", tmp, 0);
+    CONFIG_STR(__ADDR_SERVER_IP__) = alloc_cstring(tmp, "config file: asi");
 
     scan_config_line("mudlib directory : %[^\n]", tmp, 1);
-    CONFIG_STR(__MUD_LIB_DIR__) = alloc_cstring(tmp, "config file");
+    CONFIG_STR(__MUD_LIB_DIR__) = alloc_cstring(tmp, "config file: mld");
     scan_config_line("binary directory : %[^\n]", tmp, 1);
-    CONFIG_STR(__BIN_DIR__) = alloc_cstring(tmp, "config file");
+    CONFIG_STR(__BIN_DIR__) = alloc_cstring(tmp, "config file: bd");
 
     scan_config_line("log directory : %[^\n]", tmp, 1);
-    CONFIG_STR(__LOG_DIR__) = alloc_cstring(tmp, "config file");
+    CONFIG_STR(__LOG_DIR__) = alloc_cstring(tmp, "config file: ld");
     scan_config_line("include directories : %[^\n]", tmp, 1);
-    CONFIG_STR(__INCLUDE_DIRS__) = alloc_cstring(tmp, "config file");
+    CONFIG_STR(__INCLUDE_DIRS__) = alloc_cstring(tmp, "config file: id");
 #ifdef BINARIES
     scan_config_line("save binaries directory : %[^\n]", tmp, 1);
-    CONFIG_STR(__SAVE_BINARIES_DIR__) = alloc_cstring(tmp, "config file");
+    CONFIG_STR(__SAVE_BINARIES_DIR__) = alloc_cstring(tmp, "config file: sbd");
 #endif
 
     scan_config_line("master file : %[^\n]", tmp, 1);
-    CONFIG_STR(__MASTER_FILE__) = alloc_cstring(tmp, "config file");
+    CONFIG_STR(__MASTER_FILE__) = alloc_cstring(tmp, "config file: mf");
     scan_config_line("simulated efun file : %[^\n]", tmp, 0);
-    CONFIG_STR(__SIMUL_EFUN_FILE__) = alloc_cstring(tmp, "config file");
+    CONFIG_STR(__SIMUL_EFUN_FILE__) = alloc_cstring(tmp, "config file: sef");
     scan_config_line("swap file : %[^\n]", tmp, 1);
-    CONFIG_STR(__SWAP_FILE__) = alloc_cstring(tmp, "config file");
+    CONFIG_STR(__SWAP_FILE__) = alloc_cstring(tmp, "config file: sf");
     scan_config_line("debug log file : %[^\n]", tmp, -1);
-    CONFIG_STR(__DEBUG_LOG_FILE__) = alloc_cstring(tmp, "config file");
+    CONFIG_STR(__DEBUG_LOG_FILE__) = alloc_cstring(tmp, "config file: dlf");
 
     scan_config_line("default error message : %[^\n]", tmp, 0);
-    CONFIG_STR(__DEFAULT_ERROR_MESSAGE__) = alloc_cstring(tmp, "config file");
+    CONFIG_STR(__DEFAULT_ERROR_MESSAGE__) = alloc_cstring(tmp, "config file: dem");
     scan_config_line("default fail message : %[^\n]", tmp, 0);
-    CONFIG_STR(__DEFAULT_FAIL_MESSAGE__) = alloc_cstring(tmp, "config file");
+    CONFIG_STR(__DEFAULT_FAIL_MESSAGE__) = alloc_cstring(tmp, "config file: dfm");
 
     if (scan_config_line("port number : %d\n", &CONFIG_INT(__MUD_PORT__), 0)) {
 	external_port[0].port = PORTNO;
@@ -281,7 +291,7 @@ void set_defaults P1(char *, filename)
 		    external_port[i].kind = PORT_ASCII;
 		else {
 		    fprintf(stderr, "Unknown kind of external port: %s\n",
-			    kind);
+				  kind);
 		    exit(-1);
 		}
 	    } else {

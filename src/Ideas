@@ -34,6 +34,8 @@ fashion throughout the driver/mudlib.
 Comment:
     Don't forget the perror() efun mentioned in the man page.
 
+### I'm not sure this is the best way to go.  -Beek
+
 -----
 
 we need to made a single-user option for MudOS that doesn't use sockets
@@ -112,6 +114,9 @@ Comment: with some of the optimizations lately, the subtype of numbers is
 An option for persistent swap files (that the driver can restore/recover
 from), saving clones and the contents of variables.
 
+### This seems to be a fad and a bad idea, but I'll get flamed for saying
+	 that ...
+
 -----
 
 mudlib_stats uses a linked list, it is fast for insertion; however
@@ -161,14 +166,6 @@ Comment:
           set prog flags
 
 -----
-
-mud_status(verbose|terse)
-
-option to dump to a file
-
--- Leto
-  
-------
 
 Implement compile stacks so we don't have to dump an object (and later
 restart the compile) if an inherited object isn't defined yet.
@@ -235,3 +232,60 @@ and/or objects.
 
 -----
 
+Threads :)
+
+-----
+
+Exceptions :)
+
+-----
+
+Use shared string comparison in searching for commands
+
+-----
+
+A make_mapping() efun that obeys the tautology:
+
+make_mapping( keys(m), values(m) ) == m
+
+-----
+
+include_list() efun; also, BINARIES saves a list of includes, but error
+line numbers do as well; the former should be modified to use the latter's
+list (which was added after binaries were)
+
+-----
+
+Anonymous functions which do not reference globals etc should be rebindable.
+Currently, non of the are, because the compile time checks aren't done.
+
+I.e. bind(function(int i){return i;}, this_player())
+
+should work.
+
+-----
+
+How about:
+
+private:
+
+int foo;
+
+void bar() { ... }
+
+need some way to turn it off, tho, since 'public' has a different meaning.
+(i.e. there is no specifier for the 'no modifier' state.)
+
+-----
+
+varargs foo(int bar, int *rest ... ) 
+
+foo(1, 2, 3) would give bar == 1, rest = ({ 2, 3 })
+
+Also allow foo( ({ 1, 2 })... ) ?
+
+-----
+
+foreach (i, x in ({ 1, 2 }))
+
+foreach (x in ([ 1 : 2, 3 : 4 ]))

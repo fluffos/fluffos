@@ -1,10 +1,6 @@
 #if !defined(STD_INCL_H) && !defined(_FUNC_SPEC_)
 #define STD_INCL_H
 
-#ifndef EDIT_SOURCE
-#  include "configure.h"
-#endif
-
 #ifdef INCL_STDLIB_H
 #  include <stdlib.h>
 #endif
@@ -37,6 +33,13 @@
 #endif
 #ifdef INCL_USCLKC_H
 #  include <usclkc.h>
+#endif
+
+#ifdef INCL_SYS_CRYPT_H
+#  include <sys/crypt.h>
+#endif
+#ifdef INCL_CRYPT_H
+#  include <crypt.h>
 #endif
 
 #ifdef LATTICE
@@ -95,7 +98,7 @@
 #  include <alloca.h>
 #endif
 
-#ifdef HAS_STDARG_H
+#ifdef INCL_STDARG_H
 #  include <stdarg.h>
 #else
 #  include <varargs.h>
@@ -103,6 +106,11 @@
 
 #ifdef INCL_BSTRING_H
 #include <bstring.h>
+#endif
+
+/* Add stuff we didn't get that we need */
+#ifndef MAXSHORT
+#define MAXSHORT ((1 << (sizeof(short)*8)) - 1)
 #endif
 
 #endif

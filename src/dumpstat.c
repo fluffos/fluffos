@@ -46,7 +46,10 @@ static int svalue_size P1(svalue_t *, v)
 	    tmp.type = T_ARRAY;
 	    tmp.u.arr = v->u.fp->hdr.args;
 
-	    total = (int)(sizeof(funptr_hdr_t) + svalue_size(&tmp));
+	    if (tmp.u.arr)
+		total = (int)(sizeof(funptr_hdr_t) + svalue_size(&tmp));
+	    else
+		total = (int)(sizeof(funptr_hdr_t));
 	    switch (v->u.fp->hdr.type) {
 	    case FP_EFUN:
 		total += sizeof(efun_ptr_t);
@@ -97,15 +100,14 @@ void dumpstat P1(char *, tfn)
 
     fn = check_valid_path(tfn, current_object, "dumpallobj", 1);
     if (!fn) {
-	add_vmessage("Invalid path '%s' for writing.\n", tfn);
+	error("Invalid path '%s' for writing.\n", tfn);
 	return;
     }
     f = fopen(fn, "w");
     if (!f) {
-	add_vmessage("Unable to open '/%s' for writing.\n", fn);
+	error("Unable to open '/%s' for writing.\n", fn);
 	return;
     }
-    add_vmessage("Dumping to /%s...", fn);
 
     display_hidden = -1;
     for (ob = obj_list; ob; ob = ob->next_all) {
@@ -128,6 +130,5 @@ void dumpstat P1(char *, tfn)
 		(ob->swap_num >= 0) ? ((ob->flags & O_SWAPPED) ?
 				       "SWAPPED(out)" : "SWAPPED(in)") : "");
     }
-    add_message("done.\n");
     fclose(f);
 }

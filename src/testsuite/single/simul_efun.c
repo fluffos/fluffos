@@ -1,6 +1,7 @@
 // mudlib: Lil
 // file:   /single/simul_efun.c
 
+#pragma show_error_context
 #include <globals.h>
 
 void
@@ -14,10 +15,7 @@ getoid(object ob)
 {
 	int id;
 
-	if (!ob) {
-		ob = previous_object();
-	}
-	sscanf(file_name(ob), "%*s#%d", id);
+	sscanf(file_name(ob || previous_object()), "%*s#%d", id);
 	return id;
 }
 
@@ -37,16 +35,17 @@ string user_path(string name)
 string
 file_owner(string file)
 {
-    string name, rest, dir;
+    string temp;
+    
+    if (file[0] != '/') file = "/" + file;
 
-    if (file[0] != '/') {
-        file = "/" + file;
-    }
-    if (sscanf(file, "/u/%s/%s/%s", dir, name, rest) == 3) {
-        return name;
+    if (sscanf(file, "/u/%s/%s/%*s", temp, temp) == 2) {
+        return temp;
     }
     return 0;
 }
+
+#include <lpctypes.h>
 
 // dump_variable, author: Huthar@Portals, TMI
 // - returns a printable representation of any variable.
@@ -57,40 +56,33 @@ dump_variable(mixed arg)
    mixed *index;
    string rtn;
    int i;
-   
-   if (objectp(arg))
-      return "("+file_name(arg)+")";
-   
-   if (stringp(arg))
-      return "\""+arg+"\"";
-   
-   if (intp(arg))
-      return "#"+arg;
-   
-   if (pointerp(arg)) {
-      rtn = "ARRAY\n";
-      
-      for (i = 0; i < sizeof(arg); i++)
-         rtn += "["+i+"] == "+dump_variable(arg[i])+"\n";
-      
-      return rtn;
-   }
 
-   if (mapp(arg)) {
-      rtn = "MAPPING\n";
+   switch (typeof(arg)) {
+   case T_OBJECT: return "(" + file_name(arg) + ")";
+   case T_STRING: return "\"" + arg + "\"";
+   case T_NUMBER: return "#" + arg;
+   case T_ARRAY:
+       {
+	   int j;
 
-      index = keys(arg);
+	   rnt = "ARRAY\n";
+	   i = sizeof(arg);
+	   while (j < i) 
+	       rtn += sprintf("[%d] == %s\n", j, dump_variable(arg[j++]));
+	   return rtn;
+       }
+   case T_MAPPING:
+       {
+	   return "MAPPING\n" + implode(map_array(keys(arg), (: sprintf("[%s] == %s", dump_variable($1), ($(arg)[$1]) ) :)), "\n");
+       }
 
-      for (i = 0; i < sizeof(index); i++)
-         rtn += "[" + dump_variable(index[i]) + "] == "
-            + dump_variable(arg[index[i]])+"\n";
-      return rtn;
-   }
-
-   if (functionp(arg)) {
-      rtn = "FUNCTION\n";
-      return "(:" + dump_variable(arg[0]) + ", "
-        + dump_variable(arg[1]) + ":)\n";
+   case T_FUNCTION:
+   case T_CLASS:
+   case T_REAL:
+   case T_BUFFER:
+       /* this really could be done for all of them, but the above format
+	  is traditional */
+       return sprintf("%O\n", arg);
    }
 
    return "UNKNOWN";
@@ -98,45 +90,57 @@ dump_variable(mixed arg)
 
 /*
 // Thanks to Huthar for resolve_path.
+// Rewrite by Symmetry 5/4/95
 */
 
-string resolve_path(string curr, string new) {
-    int i;
+string resolve_path(string curr, string newer) {
+    int i, j, size;
     string *tmp;
-    string t1,t2,t3,t4;
-
-    if (!new || new == ".") return curr;
-    if (new == "here")
-    {
-        return file_name(environment(this_object())) + ".c";
+    
+    switch(newer){
+    case 0: 
+    case ".":
+	return curr;
+	
+    case "here":
+	return file_name(environment())+".c";
+	
+    default:
+	if (newer[0..1] == "~/") newer = user_path((string)this_player()->query_name()) + newer[2..];
+	else {
+	    switch(newer[0]){
+	    case '~': newer = user_path(newer[1..]); break;
+	    case '/': break;
+	    default: newer[<0..<1] = curr + "/";
+	    }
+	}
+	
+	if (newer[<1] != '/') newer += "/";
+	size = sizeof(tmp = regexp(explode(newer, "/"), "."));
+	
+	i = j = 0;
+	
+	while (i < size){
+	    switch(tmp[i]){
+	    case "..":
+		if (j){
+		    while (j-- && !tmp[j]);
+		    if (j >= 0) tmp[j] = 0;
+		    else j++;
+		}
+	    case ".":
+		tmp[i++] = 0;
+		break;
+		
+	    default:
+		j = ++i;
+		break;
+	    }
+	}
+	return "/"+implode(tmp, "/");
     }
-    if (new == "~" || new == "~/" )
-      new = user_path((string)this_player()->query_name());
-    if (sscanf(new,"~/%s",t1))
-      new = user_path((string)this_player()->query_name()) + t1;
-    else if (sscanf(new,"~%s",t1))
-      new = user_path(t1); 
-    else if (new[0] != '/')
-      new = curr + "/" + new;
-
-    if (new[strlen(new) - 1] != '/')
-        new += "/";
-    tmp = explode(new,"/");
-    if (!tmp) tmp = ({"/"});
-    for (i = 0; i < sizeof(tmp); i++)
-        if (tmp[i] == "..") {
-            if (sizeof(tmp) > 2) {
-                tmp = tmp[0..(i-2)] + tmp[(i+1)..(sizeof(tmp)-1)];
-                i -= 2;
-            } else {
-                tmp = tmp[2 ..(sizeof(tmp)-1)];
-                i = 0;
-            }
-        }
-     new = "/" + implode(tmp,"/");
-     if (new == "//") new = "/";
-     return new;
 }
+
 
 // domain_file should return the domain associated with a given file.
 

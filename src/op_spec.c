@@ -21,6 +21,7 @@ operator bbranch_when_zero, bbranch_when_non_zero, bbranch;
 
 operator branch_ne, branch_ge, branch_le, branch_eq, bbranch_lt;
 
+operator foreach, next_foreach, exit_foreach;
 operator loop_cond;
 operator loop_incr;
 operator while_dec;
@@ -30,7 +31,7 @@ operator lor, land;
 operator catch, end_catch;
 operator time_expression, end_time_expression;
 
-operator switch, break, pop_break;
+operator switch;
 
 operator call_function_by_address, call_inherited, return, return_zero;
 

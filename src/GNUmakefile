@@ -6,22 +6,24 @@ PROOF=
 STRFUNCS=
 INSTALL=install -c
 INSTALL_DIR=../bin
-OPTIMIZE=
+OPTIMIZE=-fullwarn
 CPP=cc -E
-CFLAGS= -g -DDEBUG
+CFLAGS=-g -DDEBUG
 CC=cc
 YACC=bison -d -y
 
 #################################################
 # the meat of things                            #
 # don't change anything below this section      #
+#                                               #
+# RUN ./build.MudOS to generate the Makefiles   #
 #################################################
 
 SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   backend.c array.c mapping.c comm.c ed.c regexp.c swap.c buffer.c crc32.c \
   malloc.c mallocwrapper.c class.c efuns_main.c efuns_port.c \
-  call_out.c otable.c dumpstat.c stralloc.c hash.c mudlib_stats.c \
-  port.c reclaim.c parse.c simul_efun.c sprintf.c uid.c program.c \
+  call_out.c otable.c dumpstat.c stralloc.c hash.c \
+  port.c reclaim.c parse.c simul_efun.c sprintf.c program.c \
   compiler.c avltree.c icode.c trees.c generate.c scratchpad.c \
   socket_efuns.c socket_ctrl.c qsort.c eoperators.c socket_err.c md.c \
   strstr.c disassembler.c binaries.c ualarm.c $(STRFUNCS) \
@@ -31,26 +33,23 @@ VPATH = $(OBJDIR)
 
 OBJ=$(addprefix $(OBJDIR)/,$(subst .c,.o,$(SRC)))
 
-$(OBJDIR)/%.o: %.c $(OBJDIR)
-	$(CC) -I$(OBJDIR) $(CFLAGS) -o $@ -c $<
+$(OBJDIR)/%.o: %.c
+	$(CC) -I$(OBJDIR) $(CFLAGS) -DEDIT_SOURCE -o $@ -c $<
 
-all: GNUmakefile.MudOS $(OBJDIR) grammar.y cc.h opcodes.h malloc.c
+all: GNUmakefile.MudOS grammar.y cc.h files
 	$(MAKE) -f GNUmakefile.MudOS  'DRIVER_BIN=$(DRIVER_BIN)' \
 	'OBJ=$(OBJ)' 'MAKE=$(MAKE)' 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' \
 	'PROOF=$(PROOF)' 'OBJDIR=$(OBJDIR)' 'SRC=$(SRC)' 'YACC=$(YACC)'
 
-GNUmakefile.MudOS: edit_source
-	./edit_source -process GNUmakefile.MudOS.pre
-
-$(OBJDIR):
-	mkdir $(OBJDIR)
+$(OBJDIR)/hash.o: hash.c
+	$(CC) -I$(OBJDIR) $(CFLAGS) -DEDIT_SOURCE $(OPTIMIZE) -o $(OBJDIR)/hash.o -c hash.c
 
 which_makefile:
 	echo MakeIsGNU
 
 remake: neat all
 
-depend: opcodes.h efun_protos.h grammar.tab.h cc.h efunctions.h efun_defs.c
+depend: opcodes.h grammar.tab.c cc.h efunctions.h efun_defs.c
 	-rm tmpdepend Dependencies
 	for i in *.c do $(CPP) -MM $$i; done
 	sed -e"s!^!$(OBJ)!" <tmpdepend >Dependencies
@@ -67,27 +66,31 @@ cc.h: GNUmakefile
 	echo '#define CFLAGS   "$(CFLAGS) $(OPTIMIZE)"' >> cc.h
 	echo '#define OBJDIR   "$(OBJDIR)"' >> cc.h
 
-# The long list in the first ./edit_source depend on -options
-opcodes.h: options.h func_spec.c op_spec.c edit_source
-	./edit_source -options -build_func_spec '$(CPP) $(CFLAGS)' \
-		      -process packages/Makefile.pre \
-                      -process packages/GNUmakefile.pre
+# the touches here are necessary to fix the modification times; link(2) does
+# 'modify' a file
+files: edit_source sysmalloc.c smalloc.c bsdmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c func_spec.c mudlib/Makefile.pre mudlib/GNUmakefile.pre packages/Makefile.pre packages/GNUmakefile.pre
+	./edit_source -options -malloc -build_func_spec '$(CPP) $(CFLAGS)'
+	./edit_source -process packages/Makefile.pre
+	./edit_source -process packages/GNUmakefile.pre
+	./edit_source -process mudlib/Makefile.pre
+	./edit_source -process mudlib/GNUmakefile.pre
 	./edit_source -build_efuns
-
-malloc.c: sysmalloc.c smalloc.c bsdmalloc.c wrappedmalloc.c debugmalloc.c options.h edit_source
-	./edit_source -malloc
 	touch mallocwrapper.c
+	touch malloc.c
+	touch files
 
 make_func.tab.c: make_func.y cc.h
 	$(YACC) $(YFLAGS) make_func.y
-	-rm -f make_func_tab.c
+	-rm -f make_func.tab.c
 	mv y.tab.c make_func.tab.c
+
+configure.h: edit_source
+	./edit_source -configure
 
 $(OBJDIR)/edit_source.o: edit_source.c preprocess.c cc.h
 
 edit_source: $(OBJDIR)/edit_source.o $(OBJDIR)/hash.o $(OBJDIR)/make_func.tab.o
 	$(CC) $(CFLAGS) $(OBJDIR)/edit_source.o $(OBJDIR)/hash.o $(OBJDIR)/make_func.tab.o -o edit_source
-	./edit_source -configure
 
 tags: $(SRC)
 	ctags $(SRC)
@@ -100,28 +103,44 @@ install: all
 	$(INSTALL) $(DRIVER_BIN) $(INSTALL_DIR)
 	$(INSTALL) addr_server $(INSTALL_DIR)
 
-Makefiles: edit_source
-	./edit_source -process Makefile.in.pre
-	./edit_source -process GNUmakefile.in.pre
-	./edit_source -process Makefile.MudOS.pre
-	./edit_source -process GNUmakefile.MudOS.pre
+Makefiles: Makefile.in GNUmakefile.in Makefile.MudOS GNUmakefile.MudOS
 
-neat:
-	-(cd packages; $(MAKE) clean)
-	-(cd mudlib; $(MAKE) clean)
-	-rm -rf obj *.o *.tab.c *.tab.h
-	-rm -f efun_defs.c option_defs.c
-	-rm -f cc.h configure.h
-	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
-	-rm -f edit_source malloc.c mallocwrapper.c
-	-rm -f func_spec.cpp
-	-rm -f grammar.y comptest.* a.out
-	-rm -f Makefile.MudOS GNUmakefile.MudOS
-	-rm -f packages/Makefile packages/GNUmakefile
+Makefile.in: edit_source Makefile.in.pre Makefile.master
+	./edit_source -process Makefile.in.pre
+
+GNUmakefile.in: edit_source GNUmakefile.in.pre Makefile.master
+	./edit_source -process GNUmakefile.in.pre
+
+Makefile.MudOS: edit_source Makefile.MudOS.pre Makefile.MudOS.master configure.h
+	./edit_source -process Makefile.MudOS.pre
+
+GNUmakefile.MudOS: edit_source GNUmakefile.MudOS.pre Makefile.MudOS.master configure.h
+	./edit_source -process GNUmakefile.MudOS.pre
 
 nothing:
 
+# remove local configuration
+spotless: clean
+	-rm -f configure.h local_options system_libs
+	-rm -f options_incl.h
+
+# get ready for recompile
+neat:
+	-(cd packages; $(MAKE) clean)
+	-(cd mudlib; $(MAKE) clean)
+	-rm -rf $(OBJDIR) *.o *.tab.c *.tab.h
+	-mkdir $(OBJDIR)
+	-rm -f efun_defs.c option_defs.c
+	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
+	-rm -f malloc.c mallocwrapper.c
+	-rm -f func_spec.cpp
+	-rm -f grammar.y comptest* a.out
+	-rm -f packages/Makefile packages/GNUmakefile
+
+# remove everything except configuration
 clean: neat
+	-rm -f Makefile.MudOS GNUmakefile.MudOS
+	-rm -f cc.h edit_source
 	-rm -f core
 	-rm -f *.orig *.rej
 	-rm -f */*.orig */*.rej

@@ -116,11 +116,10 @@ int start_mudos()
     char **argv = old_argv;
 
 #else
-int main(argc, argv)
-    int argc;
-    char **argv;
+int main P2(int, argc, char **, argv)
 {
 #endif
+    time_t tm;
     int i, new_mudlib = 0, got_defaults = 0;
     int no_ip_demon = 0;
     char *p;
@@ -128,6 +127,7 @@ int main(argc, argv)
 #if 0
     int dtablesize;
 #endif
+    error_context_t econ;
 
 #if !defined(LATTICE) && !defined(OLD_ULTRIX) && !defined(sequent) && \
     !defined(sgi)
@@ -153,8 +153,6 @@ int main(argc, argv)
     tzset();
 #endif
     boot_time = get_current_time();
-    get_version(version_buf);
-    printf("%s (%s)\n", version_buf, ARCH);
 
     const0.type = T_NUMBER;
     const0.u.number = 0;
@@ -204,20 +202,6 @@ int main(argc, argv)
 	exit(-1);
     }
 
-    /*
-     * Check that memmove() works
-     */
-    sprintf(version_buf, "0123456789ABCDEF");
-    memmove(&version_buf[1], &version_buf[4], 13);
-    if (strcmp(version_buf, "0456789ABCDEF")) {
-	fprintf(stderr, "Bad definition of memmove() for your system.\n");
-	exit(-1);
-    }
-    memmove(&version_buf[8], &version_buf[6], 9);
-    if (strcmp(version_buf, "0456789A9ABCDEF")) {
-	fprintf(stderr, "Bad definition of memmove() for your system.\n");
-	exit(-1);
-    }
 #ifdef RAND
     srand(get_current_time());
 #else
@@ -247,10 +231,11 @@ int main(argc, argv)
 	}
     }
     if (!got_defaults) {
-	fprintf(stderr,
-	   "You must specify the configuration filename as an argument.\n");
+	fprintf(stderr, "You must specify the configuration filename as an argument.\n");
 	exit(-1);
     }
+
+    printf("Initializing internal tables....\n");
     init_strings();		/* in stralloc.c */
     init_otable();		/* in otable.c */
     init_identifiers();		/* in lex.c */
@@ -278,10 +263,8 @@ int main(argc, argv)
      * that can be resolved by decreasing MAX_USERS, MAX_EFUN_SOCKS, or both.
      */
     if (dtablesize > FD_SETSIZE) {
-	fprintf(stderr,
-	 "Warning: File descriptor requirements exceed system capacity!\n");
-	fprintf(stderr,
-		"         Configuration exceeds system capacity by %d descriptor(s).\n",
+	fprintf(stderr, "Warning: File descriptor requirements exceed system capacity!\n");
+	fprintf(stderr, "         Configuration exceeds system capacity by %d descriptor(s).\n",
 		dtablesize - FD_SETSIZE);
     }
 #ifdef HAS_SETDTABLESIZE
@@ -295,10 +278,8 @@ int main(argc, argv)
      */
     if (getdtablesize() < dtablesize)
 	if (setdtablesize(dtablesize) < dtablesize) {
-	    fprintf(stderr,
-		  "Warning: Could not allocate enough file descriptors!\n");
-	    fprintf(stderr,
-		    "         setdtablesize() could not allocate %d descriptor(s).\n",
+	    fprintf(stderr, "Warning: Could not allocate enough file descriptors!\n");
+	    fprintf(stderr, "         setdtablesize() could not allocate %d descriptor(s).\n",
 		    getdtablesize() - dtablesize);
 	}
     /*
@@ -374,6 +355,10 @@ int main(argc, argv)
 	fprintf(stderr, "Bad mudlib directory: %s\n", mud_lib);
 	exit(-1);
     }
+    get_version(version_buf);
+    time(&tm);
+    debug_message("----------------------------------------------------------------------------\n%s (%s) starting up on %s - %s\n\n", MUD_NAME, version_buf, ARCH, ctime(&tm));
+
 #ifdef BINARIES
     init_binaries(argc, argv);
 #endif
@@ -389,16 +374,17 @@ int main(argc, argv)
 
     eval_cost = max_cost;	/* needed for create() functions */
 
-    if (SETJMP(error_recovery_context)) {
-	fprintf(stderr, "The simul_efun (/%s) and master (/%s) objects must be loadable.\n", 
+    save_context(&econ);
+    if (SETJMP(econ.context)) {
+	debug_message("The simul_efun (/%s) and master (/%s) objects must be loadable.\n", 
 		simul_efun_file_name, master_file_name);
 	exit(-1);
     } else {
-	error_recovery_context_exists = NORMAL_ERROR_CONTEXT;
 	set_simul_efun(SIMUL_EFUN);
-	(void) load_object(master_file_name, 0);
+	if (!load_object(master_file_name, 0))
+	    error("Master object doesn't exist!\n");
     }
-    error_recovery_context_exists = NULL_ERROR_CONTEXT;
+    pop_context(&econ);
 
     for (i = 1; i < argc; i++) {
 	if (argv[i][0] != '-') {
@@ -414,12 +400,18 @@ int main(argc, argv)
 	    case 'y':
 		continue;
 	    case 'f':
+		save_context(&econ);
+		if (SETJMP(econ.context)) {
+		    debug_message("Error while calling master::flag(\"%s\"), aborting ...", argv[i] + 2);
+		    exit(-1);
+		}
 		push_constant_string(argv[i] + 2);
 		(void) apply_master_ob(APPLY_FLAG, 1);
 		if (MudOS_is_being_shut_down) {
-		    fprintf(stderr, "Shutdown by master object.\n");
+		    debug_message("Shutdown by master object.\n");
 		    exit(0);
 		}
+		pop_context(&econ);
 		continue;
 	    case 'e':
 		e_flag++;
@@ -431,7 +423,7 @@ int main(argc, argv)
 #ifdef DEBUG
                 d_flag++;
 #else
-                fprintf(stderr, "Driver must be compiled with DEBUG on to use -d.\n");
+                debug_message("Driver must be compiled with DEBUG on to use -d.\n");
 #endif
 	    case 'c':
 		comp_flag++;
@@ -440,7 +432,7 @@ int main(argc, argv)
 		t_flag++;
 		continue;
 	    default:
-		fprintf(stderr, "Unknown flag: %s\n", argv[i]);
+		debug_message("Unknown flag: %s\n", argv[i]);
 		exit(-1);
 	    }
 	}
@@ -519,30 +511,32 @@ char *int_string_unlink P1(char *, str)
     mbt = ((malloc_block_t *)str) - 1;
     mbt->ref--;
     
-    if (!(~mbt->size)) {
-	int l = strlen(str + 0xffff) + 0xffff; /* ouch */
+    if (mbt->size == MAXSHORT) {
+	int l = strlen(str + MAXSHORT) + MAXSHORT; /* ouch */
 
-	newmbt = (malloc_block_t *)DXALLOC(l + sizeof(malloc_block_t) + 1, TAG_STRING, desc);
+	newmbt = (malloc_block_t *)DXALLOC(l + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc);
 	memcpy((char *)(newmbt + 1), (char *)(mbt + 1), l+1);
-	newmbt->size = 0xffff;
+	newmbt->size = MAXSHORT;
+	ADD_NEW_STRING(l, sizeof(malloc_block_t));
     } else {
-	newmbt = (malloc_block_t *)DXALLOC(mbt->size + sizeof(malloc_block_t) + 1, TAG_STRING, desc);
+	newmbt = (malloc_block_t *)DXALLOC(mbt->size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc);
 	memcpy((char *)(newmbt + 1), (char *)(mbt + 1), mbt->size+1);
 	newmbt->size = mbt->size;
+	ADD_NEW_STRING(mbt->size, sizeof(malloc_block_t));
     }
     newmbt->ref = 1;
 
     return (char *)(newmbt + 1);
 }
 
-void debug_message PVARGS(va_alist)
+void debug_message P1V(char *, fmt)
 {
     static int append = 0;
     static char deb_buf[100];
     static char *deb = deb_buf;
     va_list args;
     FILE *fp = NULL;
-    char *fmt;
+    V_DCL(char *fmt);
 
     if (!append) {
 	/*
@@ -552,7 +546,7 @@ void debug_message PVARGS(va_alist)
 	    sprintf(deb, "%s/%s", LOG_DIR, DEBUG_LOG_FILE);
 	else
 	    sprintf(deb, "%s/debug.log", LOG_DIR);
-	if (*deb == '/')
+	while (*deb == '/')
 	    deb++;
     }
     fp = fopen(deb, append ? "a" : "w");
@@ -571,23 +565,21 @@ void debug_message PVARGS(va_alist)
 	append = 2;
     }
     if (!fp) {
+	/* darn.  We're in trouble */
 	perror(deb);
 	abort();
     }
-#ifdef HAS_STDARG_H
-    va_start(args, va_alist);
-    fmt = va_alist;
-#else
-    va_start(args);
-    fmt = va_arg(args, char *);
-#endif
+    V_START(args, fmt);
+    V_VAR(char *, fmt, args);
     vfprintf(fp, fmt, args);
+    fflush(fp);
+    vfprintf(stderr, fmt, args);
+    fflush(stderr);
     va_end(args);
 
     /*
      * don't close stdout
      */
-    fflush(fp);
     if (append != 2)
 	(void) fclose(fp);
 
@@ -622,10 +614,7 @@ char *xalloc P1(int, size)
 	    return xalloc(size);/* Try again */
 	}
 	going_to_exit = 1;
-	p = "Totally out of MEMORY.\n";
-	write(1, p, strlen(p));
-	(void) dump_trace(0);
-	exit(2);
+	fatal("Totally out of MEMORY.\n");
     }
     return p;
 }
@@ -647,7 +636,7 @@ static void sig_usr1()
     push_undefined();
     push_undefined();
     apply_master_ob(APPLY_CRASH, 3);
-    fprintf(stderr, "Received SIGUSR1, calling exit(-1)\n");
+    debug_message("Received SIGUSR1, calling exit(-1)\n");
 #if defined(OS2) && !defined(COMMAND_LINE)
     message_box_string("Host machine is shutting down.\n");
     FileExit();
@@ -657,13 +646,17 @@ static void sig_usr1()
 #endif
 }
 
+/*
+ * Actually, doing all this stuff from a signal is probably illegal
+ * -Beek
+ */
 #ifdef SIGNAL_FUNC_TAKES_INT
 static void sig_term P1(int, sig)
 #else
 static void sig_term()
 #endif
 {
-    crash_MudOS("Process terminated");
+    fatal("Process terminated");
 }
 
 #ifdef SIGNAL_FUNC_TAKES_INT
@@ -672,7 +665,7 @@ static void sig_int P1(int, sig)
 static void sig_int()
 #endif
 {
-    crash_MudOS("Process interrupted");
+    fatal("Process interrupted");
 }
 
 #ifndef DEBUG
@@ -684,7 +677,7 @@ static void sig_segv P1(int, sig)
 static void sig_segv()
 #endif
 {
-    crash_MudOS("Segmentation fault");
+    fatal("Segmentation fault");
 }
 
 #ifdef SIGNAL_FUNC_TAKES_INT
@@ -693,7 +686,7 @@ static void sig_bus P1(int, sig)
 static void sig_bus()
 #endif
 {
-    crash_MudOS("Bus error");
+    fatal("Bus error");
 }
 
 #ifdef SIGNAL_FUNC_TAKES_INT
@@ -702,7 +695,7 @@ static void sig_ill P1(int, sig)
 static void sig_ill()
 #endif
 {
-    crash_MudOS("Illegal instruction");
+    fatal("Illegal instruction");
 }
 
 #ifdef SIGNAL_FUNC_TAKES_INT
@@ -711,7 +704,7 @@ static void sig_hup P1(int, sig)
 static void sig_hup()
 #endif
 {
-    crash_MudOS("Hangup!");
+    fatal("Hangup!");
 }
 
 #ifdef SIGNAL_FUNC_TAKES_INT
@@ -720,7 +713,7 @@ static void sig_abrt P1(int, sig)
 static void sig_abrt()
 #endif
 {
-    crash_MudOS("Aborted");
+    fatal("Aborted");
 }
 
 #ifdef SIGNAL_FUNC_TAKES_INT
@@ -729,88 +722,9 @@ static void sig_iot P1(int, sig)
 static void sig_iot()
 #endif
 {
-    crash_MudOS("Aborted(IOT)");
+    fatal("Aborted(IOT)");
 }
 
 #endif				/* !DEBUG */
 
 #endif				/* TRAP_CRASHES */
-
-static int crash_condition = 0;
-
-void crash_MudOS P1(char *, str)
-{
-#ifdef DROP_CORE
-    char buf[SMALL_STRING_SIZE];
-
-#endif
-
-    /*
-     * Something really, really bad just happened.  Nothing we can do about
-     * it, so tell the master object to clean up, and exit.
-     */
-    if (crash_condition) {
-	fprintf(stderr, "Too many simultaneous fatal errors!\n");
-	fprintf(stderr, "Exiting before crash could be called successfully.\n");
-	fprintf(stderr, "Dying: %s\n", str);
-#if defined(OS2) && !defined(COMMAND_LINE)
-	message_box_string("Too many simultaneous errors.\n");
-	FileExit();
-	return;
-#else
-	exit(-3);
-#endif
-    } else {
-	/*
-	 * restore default action for SIGILL/SIGABRT so we don't loop when
-	 * crash_MudOS calls abort() at the end of this function.
-	 */
-#ifdef SIGABRT
-	signal(SIGABRT, SIG_DFL);
-#endif
-#ifdef SIGILL
-	signal(SIGILL, SIG_DFL);
-#endif
-#ifdef SIGIOT
-	signal(SIGIOT, SIG_DFL);
-#endif
-
-#if defined(OS2) && !defined(COMMAND_LINE)
-	message_box_string(str);
-#endif
-
-	fprintf(stderr, "Shutting down: %s\n", str);
-	crash_condition++;
-#ifdef PACKAGE_MUDLIB_STATS
-	save_stat_files();
-#endif
-	push_string(str, STRING_CONSTANT);
-	if (command_giver) {
-	    push_object(command_giver);
-	} else {
-	    push_undefined();
-	}
-	if (current_object) {
-	    push_object(current_object);
-	} else {
-	    push_undefined();
-	}
-	apply_master_ob(APPLY_CRASH, 3);
-    }
-#if defined(OS2) && !defined(COMMAND_LINE)
-    FileExit();
-    return;
-#else
-#ifdef DROP_CORE
-    strncpy(buf, mud_lib, SMALL_STRING_SIZE - 6);
-    buf[SMALL_STRING_SIZE - 6] = '\0';
-    strcat(buf, "/cores");
-    if (chdir(buf) == -1) {
-	chdir(mud_lib);
-    }
-    abort();
-#else
-    exit(-2);
-#endif
-#endif
-}

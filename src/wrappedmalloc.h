@@ -7,6 +7,6 @@ void *wrappedcalloc PROT((int, int));
 void wrappedfree PROT((void *));
 
 void wrappedmalloc_init PROT((void));
-void dump_malloc_data PROT((void));
+void dump_malloc_data PROT((outbuffer_t *));
 #endif
 #endif

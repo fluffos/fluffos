@@ -13,6 +13,6 @@ void unlink_swap_file PROT((void));
 void remove_line_swap PROT((program_t *));
 int locate_in PROT((program_t *));
 int locate_out PROT((program_t *));
-void print_swap_stats PROT((void));
+void print_swap_stats PROT((outbuffer_t *));
 
 #endif

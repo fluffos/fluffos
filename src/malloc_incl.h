@@ -1,9 +1,17 @@
 #ifndef MALLOC_INCL_H
 #define MALLOC_INCL_H
 
-/* used by some debugging info calls */
-void add_vmessage PROTVARGS(());
-void add_message PROT((char *));
+typedef struct {
+    int real_size;
+    char *buffer;
+} outbuffer_t;
+
+void outbuf_zero PROT((outbuffer_t *));
+void outbuf_add PROT((outbuffer_t *, char *));
+void outbuf_addv PROT2V(outbuffer_t *, char *);
+void outbuf_fix PROT((outbuffer_t *));
+void outbuf_push PROT((outbuffer_t *));
+int outbuf_extend PROT((outbuffer_t *, int));
 
 #include "bsdmalloc.h"
 #include "smalloc.h"
@@ -23,7 +31,7 @@ void add_message PROT((char *));
 #define TAG_CALL_OUT        (TAG_PERMANENT + 12)
 #define TAG_INTERACTIVE     (TAG_PERMANENT + 13)
 #define TAG_ED              (TAG_PERMANENT + 14)
-#define TAG_ERROR_CONTEXT   (TAG_PERMANENT + 15)
+
 #define TAG_INC_LIST        (TAG_PERMANENT + 16)
 #define TAG_PERM_IDENT      (TAG_PERMANENT + 17)
 #define TAG_IDENT_TABLE     (TAG_PERMANENT + 18)
@@ -41,19 +49,20 @@ void add_message PROT((char *));
 #define TAG_PREDEFINES      (TAG_PERMANENT + 30)
 #define TAG_LINENUMBERS     (TAG_PERMANENT + 31)
 #define TAG_LOCALS          (TAG_PERMANENT + 32)
-#define TAG_ARGUMENTS       (TAG_PERMANENT + 33)
-#define TAG_LPC_OBJECT      (TAG_PERMANENT + 34)
-#define TAG_USERS           (TAG_PERMANENT + 35)
+#define TAG_LPC_OBJECT      (TAG_PERMANENT + 33)
+#define TAG_USERS           (TAG_PERMANENT + 34)
+#define TAG_DEBUGMALLOC     (TAG_PERMANENT + 35)
 
 #define TAG_STRING          (TAG_DATA + 40)
-#define TAG_SHARED_STRING   (TAG_DATA + 41)
-#define TAG_FUNP            (TAG_DATA + 42)
-#define TAG_ARRAY           (TAG_DATA + 43)
-#define TAG_MAPPING         (TAG_DATA + 44)
-#define TAG_MAP_NODE_BLOCK  (TAG_DATA + 45)
-#define TAG_MAP_TBL         (TAG_DATA + 46)
-#define TAG_BUFFER          (TAG_DATA + 47)
-#define TAG_CLASS           (TAG_DATA + 48)
+#define TAG_MALLOC_STRING   (TAG_DATA + 41)
+#define TAG_SHARED_STRING   (TAG_DATA + 42)
+#define TAG_FUNP            (TAG_DATA + 43)
+#define TAG_ARRAY           (TAG_DATA + 44)
+#define TAG_MAPPING         (TAG_DATA + 45)
+#define TAG_MAP_NODE_BLOCK  (TAG_DATA + 46)
+#define TAG_MAP_TBL         (TAG_DATA + 47)
+#define TAG_BUFFER          (TAG_DATA + 48)
+#define TAG_CLASS           (TAG_DATA + 49)
 #endif
 
 #endif

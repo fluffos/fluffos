@@ -19,7 +19,7 @@ void *smalloc_calloc PROT((size_t, size_t));
 #endif
 void smalloc_free PROT((void *));
 #ifdef DO_MSTATS
-void show_mstats PROT((char *));
+void show_mstats PROT((outbuffer_t *, char *));
 #endif
 #endif
 

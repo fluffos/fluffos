@@ -1,5 +1,7 @@
 #include "std.h"
 #include "network_incl.h"
+#include "lpc_incl.h"
+#include "file.h"
 
 #ifndef OS2
 /*
@@ -69,9 +71,14 @@ INLINE int set_socket_nonblocking P2(int, fd, int, which)
     return fcntl(fd, F_SETFL, flags);
 #else
     result = ioctl(fd, FIONBIO, &which);
+    if (result == -1)
+	debug_perror("set_socket_nonblocking: ioctl", 0);
+#if 0
+    /* boggle ... someone track down an errno for this */
     if (result == -1) {
-	fprintf(stderr, "Try using cc instead of gcc to correct this error.\n");
+	XXX("Try using cc instead of gcc to correct this error.\n");
     }
+#endif
     return result;
 #endif
 

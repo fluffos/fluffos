@@ -110,6 +110,13 @@
      long random PROT((void));
 #  endif
 
+/* SGI is missing some prototypes in the .h files */
+#ifdef LINT
+#  ifdef sgi
+     void ualarm PROT((int, int));
+#  endif
+#endif
+
 #endif
 
 #endif

@@ -10,7 +10,7 @@
 #if !defined(_UID_H_) && defined(PACKAGE_UIDS)
 #define _UID_H_
 
-#include "std.h"
+#include "../std.h"
 
 typedef struct _uid {
     char *name;

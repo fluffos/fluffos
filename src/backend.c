@@ -10,6 +10,7 @@
 #include "swap.h"
 #include "call_out.h"
 #include "port.h"
+#include "lint.h"
 
 #if defined(OS2)
 #define INCL_DOSPROCESS
@@ -19,8 +20,7 @@
 extern HEV mudos_event_sem;
 #endif
 
-jmp_buf error_recovery_context;
-int error_recovery_context_exists = NULL_ERROR_CONTEXT;
+error_context_t *current_error_context = 0;
 
 /*
  * The 'current_time' is updated at every heart beat.
@@ -34,7 +34,7 @@ static void look_for_objects_to_swap PROT((void));
 static void call_heart_beat PROT((void));
 INLINE static void cycle_hb_list PROT((void));
 
-#if 0
+#ifdef DEBUG
 static void report_holes PROT((void));
 #endif
 
@@ -55,32 +55,32 @@ void clear_state()
     previous_ob = 0;
     current_prog = 0;
     caller_type = 0;
-    error_recovery_context_exists = NORMAL_ERROR_CONTEXT;
     reset_machine(0);		/* Pop down the stack. */
 }				/* clear_state() */
 
-#if 0
+#ifdef DEBUG
 static void report_holes() {
     if (current_object)
-	fprintf(stderr, "current_object is %s\n", current_object->name);
+	debug_message("current_object is %s\n", current_object->name);
     if (command_giver)
-	fprintf(stderr, "command_giver is %s\n", command_giver->name);
+	debug_message("command_giver is %s\n", command_giver->name);
     if (current_interactive)
-	fprintf(stderr, "current_interactive is %s\n", current_interactive->name);
+	debug_message("current_interactive is %s\n", current_interactive->name);
+    if (previous_ob)
+	debug_message("previous_ob is %s\n", previous_ob->name);
+    if (current_prog)
+	debug_message("current_prog is %s\n", current_prog->name);
+    if (caller_type)
+	debug_message("caller_type is %s\n", caller_type);
 }
 #endif
 
 void logon P1(object_t *, ob)
 {
-    svalue_t *ret;
-
     /* current_object no longer set */
-    ret = apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
-    if (ret == 0) {
-	add_vmessage("prog %s:\n", ob->name);
-	fatal("Could not find logon() in the user object /%s\n", ob->name);
-    }
-}				/* logon() */
+    apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
+    /* function not existing is no longer fatal */
+}
 
 #ifndef NO_ADD_ACTION
 /*
@@ -122,18 +122,29 @@ void backend()
     struct timeval timeout;
     int nb;
     int i;
+    int there_is_a_port = 0;
+    error_context_t econ;
 
+    debug_message("Initializations complete.\n\n");
     for (i = 0; i < 5; i++) {
-	if (external_port[i].port)
-	    fprintf(stderr, "Accepting connections on port %d.\n",
+	if (external_port[i].port) {
+	    debug_message("Accepting connections on port %d.\n",
 		    external_port[i].port);
+	    there_is_a_port = 1;
+	}
     }
+
+    if (!there_is_a_port)
+	debug_message("No external ports specified.\n");
+
     init_user_conn();		/* initialize user connection socket */
     signal(SIGHUP, startshutdownMudOS);
     if (!t_flag)
 	call_heart_beat();
-    SETJMP(error_recovery_context);
     clear_state();
+    save_context(&econ);
+    if (SETJMP(econ.context))
+	restore_context(&econ);
 
 #ifdef OS2
     do {
@@ -172,9 +183,7 @@ void backend()
 	 */
         /* Well, let's do it and see what happens - Sym */
 #ifdef DEBUG
-#if 0
 	report_holes();
-#endif
 #else
 	clear_state();
 #endif
@@ -260,29 +269,23 @@ static void look_for_objects_to_swap()
     static int next_time;
     object_t *ob;
     object_t *next_ob;
-    jmp_buf save_error_recovery_context;
-    int save_rec_exists;
-    object_t *save;
+    error_context_t econ;
 
     if (current_time < next_time)
 	return;			/* Not time to look yet */
     next_time = current_time + 15 * 60;	/* Next time is in 15 minutes */
-    memcpy((char *) save_error_recovery_context,
-	   (char *) error_recovery_context, sizeof error_recovery_context);
-    save_rec_exists = error_recovery_context_exists;
 
-    /*
-     * prevent error messages from objects going to whoever happens to be
-     * this_user() (usually this isn't the user of the object).
-     */
-    save = command_giver;
-    command_giver = (object_t *) 0;
     /*
      * Objects object can be destructed, which means that next object to
      * investigate is saved in next_ob. If very unlucky, that object can be
      * destructed too. In that case, the loop is simply restarted.
      */
-    for (ob = obj_list; ob; ob = next_ob) {
+    next_ob = obj_list;
+    save_context(&econ);
+    if (SETJMP(econ.context))
+	restore_context(&econ);
+    
+    for (ob = next_ob; ob; ob = next_ob) {
 	int ready_for_swap;
 
 	eval_cost = max_cost;
@@ -290,11 +293,7 @@ static void look_for_objects_to_swap()
 	if (ob->flags & O_DESTRUCTED)
 	    ob = obj_list;	/* restart */
 	next_ob = ob->next_all;
-	if (SETJMP(error_recovery_context)) {	/* amylaar */
-	    clear_state();
-	    debug_message("Error in " APPLY_CLEAN_UP "() or " APPLY_RESET "().\n");
-	    continue;
-	}
+
 	/*
 	 * Check reference time before reset() is called.
 	 */
@@ -310,7 +309,7 @@ static void look_for_objects_to_swap()
 	    && !(ob->flags & O_RESET_STATE)) {
 #ifdef DEBUG
 	    if (d_flag) {
-		fprintf(stderr, "RESET %s\n", ob->name);
+		debug_message("RESET %s\n", ob->name);
 	    }
 #endif
 	    reset_object(ob);
@@ -334,7 +333,7 @@ static void look_for_objects_to_swap()
 
 #ifdef DEBUG
 		if (d_flag)
-		    fprintf(stderr, "clean up %s\n", ob->name);
+		    debug_message("clean up %s\n", ob->name);
 #endif
 		/*
 		 * Supply a flag to the object that says if this program is
@@ -367,16 +366,12 @@ static void look_for_objects_to_swap()
 		continue;
 #ifdef DEBUG
 	    if (d_flag)
-		fprintf(stderr, "swap %s\n", ob->name);
+		debug_message("swap %s\n", ob->name);
 #endif
 	    swap(ob);		/* See if it is possible to swap out to disk */
 	}
     }
-    /* restore command_giver to its previous value */
-    command_giver = save;
-    memcpy((char *) error_recovery_context, (char *) save_error_recovery_context,
-	   sizeof error_recovery_context);
-    error_recovery_context_exists = save_rec_exists;
+    pop_context(&econ);
 }				/* look_for_objects_to_swap() */
 
 /* Call all heart_beat() functions in all objects.  Also call the next reset,
@@ -413,8 +408,6 @@ void alarm_loop()
 static void call_heart_beat()
 {
     object_t *ob;
-    object_t *save_current_object = current_object;
-    object_t *save_command_giver = command_giver;
     int num_done = 0;
 
 #ifdef OS2
@@ -474,8 +467,11 @@ static void call_heart_beat()
 		add_heart_beats(&ob->stats, 1);
 #endif
 		eval_cost = max_cost;
+		/* this should be looked at ... */
 		call_function(ob->prog,
 			&ob->prog->functions[ob->prog->heart_beat]);
+		command_giver = 0;
+		current_object = 0;
 	    }
 	}
 	if (num_hb_objs)
@@ -483,7 +479,6 @@ static void call_heart_beat()
 	else
 	    perc_hb_probes = 100.0;
     }
-    current_object = save_current_object;
     current_prog = 0;
     current_heart_beat = 0;
     look_for_objects_to_swap();
@@ -491,7 +486,6 @@ static void call_heart_beat()
 #ifdef PACKAGE_MUDLIB_STATS
     mudlib_stats_decay();
 #endif
-    command_giver = save_command_giver;
 }				/* call_heart_beat() */
 
 /* Take the first object off the heart beat list, place it at the end
@@ -579,17 +573,20 @@ int set_heart_beat P2(object_t *, ob, int, to)
     return (1);
 }				/* set_heart_beat() */
 
-int heart_beat_status P1(int, verbose)
+int heart_beat_status P2(outbuffer_t *, ob, int, verbose)
 {
     char buf[20];
 
     if (verbose == 1) {
-	add_message("Heart beat information:\n");
-	add_message("-----------------------\n");
-	add_vmessage("Number of objects with heart beat: %d, starts: %d\n",
+	outbuf_add(ob, "Heart beat information:\n");
+	outbuf_add(ob, "-----------------------\n");
+	outbuf_addv(ob, "Number of objects with heart beat: %d, starts: %d\n",
 		    num_hb_objs, num_hb_calls);
+	
+	/* passing floats to varargs isn't highly portable so let sprintf
+	   handle it */
 	sprintf(buf, "%.2f", perc_hb_probes);
-	add_vmessage("Percentage of HB calls completed last time: %s\n", buf);
+	outbuf_addv(ob, "Percentage of HB calls completed last time: %s\n", buf);
     }
     return (0);
 }				/* heart_beat_status() */
@@ -606,28 +603,31 @@ void preload_objects P1(int, eflag)
     array_t *prefiles;
     svalue_t *ret;
     VOLATILE int ix;
+    error_context_t econ;
 
-    if (SETJMP(error_recovery_context)) {
-	clear_state();
-	debug_message("error in epilog() in the master object.\n");
-	error_recovery_context_exists = NULL_ERROR_CONTEXT;
+    save_context(&econ);
+    if (SETJMP(econ.context)) {
+	restore_context(&econ);
+	pop_context(&econ);
 	return;
     }
-    error_recovery_context_exists = NORMAL_ERROR_CONTEXT;
     push_number(eflag);
     ret = apply_master_ob(APPLY_EPILOG, 1);
+    pop_context(&econ);
     if ((ret == 0) || (ret == (svalue_t *)-1) || (ret->type != T_ARRAY))
 	return;
     else
 	prefiles = ret->u.arr;
     if ((prefiles == 0) || (prefiles->size < 1))
 	return;
+
+    debug_message("\nLoading preloaded files ...\n");
     prefiles->ref++;
     ix = 0;
     /* in case of an error, effectively do a 'continue' */
-    if (SETJMP(error_recovery_context)) {
-	clear_state();
-	add_message("error in preload() in the master object.\n");
+    save_context(&econ);
+    if (SETJMP(econ.context)) {
+	restore_context(&econ);
 	ix++;
     }
     for ( ; ix < prefiles->size; ix++) {
@@ -640,7 +640,7 @@ void preload_objects P1(int, eflag)
 	(void) apply_master_ob(APPLY_PRELOAD, 1);
     }
     free_array(prefiles);
-    error_recovery_context_exists = NULL_ERROR_CONTEXT;
+    pop_context(&econ);
 }				/* preload_objects() */
 
 /* All destructed objects are moved into a sperate linked list,
@@ -711,3 +711,20 @@ char *query_load_av()
     sprintf(buff, "%.2f cmds/s, %.2f comp lines/s", load_av, compile_av);
     return (buff);
 }				/* query_load_av() */
+
+#ifdef F_HEART_BEATS
+array_t *get_heart_beats() {
+    int n = num_hb_objs;
+    object_t *ob = hb_list;
+    array_t *arr;
+    
+    arr = allocate_empty_array(n);
+    while (n--) {
+	arr->item[n].type = T_OBJECT;
+	arr->item[n].u.ob = ob;
+	add_ref(ob, "get_heart_beats");
+	ob = ob->next_heart_beat;
+    }
+    return arr;
+}
+#endif

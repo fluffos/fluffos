@@ -1,4 +1,190 @@
 ---------------------------------------------------------------------------
+(v21.4a9 promoted to v21.4b1)
+
+Tue May 16 07:07:17 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4a9
+	* fixed a crasher in calling sprintf("...%O...") before the
+	  master had finished loading
+	* fixed a few bugs in LPC->C compilation of string switch statements
+	* fixed a problem with the GNUmakefile made by LPC->C
+	* implemented ranges in switch statements for LPC->C
+	* fixed a crasher in parse_command()
+	* fixed catch() to work again from LPC->C code
+	* fixed a crasher in dumpallobjects with respect to some function
+	  pointers
+	* fixed a bug accidentally added last patchlevel which caused
+	  arrays and mappings to not restore when the 'noclear' flag was
+	  passed to restore_object
+
+Mon May 15 04:12:47 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4a8
+	* fixed a bug that would truncate arrays/mappings sent over
+	  MUD mode sockets
+	* added a missing #include of cfuns.h that caused undefined
+	  identifier errors during LPC->C compilation
+	* specifying an address server in the config file is no longer
+	  necessary
+	* fixed a crasher when the simul_efun object had no simuls in it
+	* fixed a crasher in implode(array, function)
+	* fixed a bug that caused catch() and function profiling to be
+	  ignored
+	* fixed wierd behavior with respect to unterminated @ and @@ blocks
+	* fixed a problem that would cause logging to fail of the log dir
+	  in the config file was specified as '/'
+
+Sat May  6 22:41:22 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4a7
+	* updated with respect to v21.3b5
+	* fixed a ref count problem in heart_beats()
+	* fixed a compilation problem for people who don't use 'local_options'
+	* put the v21 README into the distribution
+	* optimized implode_array
+	* recognize IAC IAC as a quoted IAC character; this has two effects:
+	  . IAC can now be received by the mudlib
+	  . window sizes with widths and heights of 255 work again
+	* fixed MUD mode sockets to work on machines where sizeof(long) > 4
+	* optimized member_array(), string compares, string hashing etc
+	  to check string length first; idea from Aragorn
+	* fixed load_object() to not error if the file doesn't exist,
+	  also fixed the error messages to be better than 'Failed to load
+	  file' in many places
+	* fixed a crasher in calling non-existent socket callbacks
+	* fixed a few syntax errors in ed commands to not dump you out of
+	  ed
+	* Added a bunch of stuff to Bugs/Ideas files; I'm going to try to
+	  keep them more up to date; dumped alot of stuff from my todo list
+	  there
+	* fixed generate_source() to not leak a file on some errors
+	* fixed a bunch of problems with the upper_case() contrib efun;
+	  it was out of date with respect to counted strings
+	* added Magician's remove_interactive() efun to the contrib package
+
+Sat May  6 19:03:29 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4a6
+	* added 'mixed implode(mixed *, function)'
+	  /* sum all the elements in an array */
+	  int sum(int *x) { return implode(x, (: $1 + $2 :)); }
+	  /* find the largest element */
+	  mixed max(mixed *x) { return implode(x, (: $1 > $2 ? $1 : $2 :)); }
+	  /* with respect to an arbitrary function ... */
+	  mixed max(mixed *x, function f) {
+	    return implode(x, (: evaluate($(f), $1, $2) > 0 ? $1 : $2 :));
+	  }
+	  /* comma separated list of numbers */
+	  string list(int *x) { return implode(x, (: $1 + ", " + $2 :)); }
+	* cleaned up alot of the Makefile dependencies
+
+Fri May  5 21:36:29 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4a5
+	* fixed a typo in wrappedmalloc.h
+	* memmove() is now checked in edit_source -configure
+	* COMPAT_BUSTER: this_player() is zero is get_save_file_name().
+	  The apply is now get_save_file_name(string fname, object who)
+	* added foreach (<var>, <var> in <mapping>), which should behave
+	  the same as k = keys(m); for (i = 0; i < sizeof(k); k++) {
+	  x = k[i]; y = m[k[i]]; ... }
+	* fixed a bug that gave odd error messages for illegal simulefun
+	  overrides
+	* returned options.h to the MudOS distribution options
+	* fixed crashers in terminal_colour()
+	
+Fri May  5 03:25:54 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4a4
+	* fixed some bad logic in rc.c that would sometimes write past
+	  the end of it's temporary buffer (rc.c needs a rewrite....)
+	* fixed a Makefile bug that caused edit_source to try to include
+	  configure.h
+	* added 'foreach (<var> in <expr>) <statement or block>'
+	  . currently only legal when <expr> is an array
+	  . foreach (x in y) { ... } should behave identically to
+	    for (i = 0; i < sizeof(y); i++) { x = y[i]; ... }
+	    with the exception that y is only evaluated once
+	* fixed another crasher in people going linkdead in ed
+	* added some output in edit_source.c related to local_options
+	* fixed a bug in replace_string() that would miss occurences at
+	  the end of the string
+	* fixed a typo in the alpha fix from last release
+	* COMPAT_BUSTER: 'foreach' and 'in' are reserved words
+	* COMPAT_BUSTER: map_mapping now passes the key and the value
+	  to the function
+	* crasher fix in the contrib efun pluralize(); also corrects a bug
+	  that caused it to strip adjectives
+	* fixed a few typos in smalloc.[ch]
+	* added Symmetry's changes to testsuite's master and simul_efun obs
+	
+Tue May  2 20:38:08 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4a3
+	* fixed a bug that would ignore 'local_options' during compilation
+	* fixed a bug in the handling of _OPTIONS_H_
+	* modified the OBJDIR rules not to recompile excessively
+	* rewrote the error context handling, propagating Symmetry's error
+	  popping tricks everywhere, cleaning up the code, and removing
+	  some ancient code
+	* fixed a bug in generate_source(string, ...) that produced an
+	  error message where there shouldn't be one
+	* put ins_long() back in since 64 bit machines need it
+	* fixed some incorrect calls to add_message in DO_MSTATS and TRACE_CODE
+	* cleaned up user_parser; fixed some crashers
+	* COMPAT_BUSTER: It is now illegal to any of the following from a
+	  verb action which return zero:
+	  . call remove_action()
+	  . destruct an object which defines commands
+	  . move an object which defines commands
+	  . move a living object
+	* cleaned up the mudlib error handler code; fixed a leak therein
+	* added ;'s in a few places in socket_efuns.c for strict ANSI
+	  compilation
+	* optimized deallocate_string() in the same way free_string previously
+	  was
+	* added Robocoder's patch to allow '\a' and '\e' (bell and escape)
+	* fixed the stringified efuns to set the type of the return value
+	  to 'string'
+	* fixed a crasher in clear_notify()
+	* fixed a crasher in people going linkdead in ed
+	* fixed a bug that would add an extra object on previous_object(-1)
+	  for lfun and functional pointers
+
+Tue May  2 19:34:55 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.4a2
+	* fixed a crasher when replace_string() was called on a string with
+	  more than one reference, and the replacement was smaller than the
+	  thing being replaced
+	* fixed addr_server to compile again
+	* fixed a crasher in string creation for the reworked efuns
+	* added a case for the new F_WHILE_DEC code in the disassembler
+	* slight optimization to replace_string :)
+	* sizeof(class) now returns the number of members, not zero	
+	* fixed #undef OLD_ED compile
+	* New contrib efuns: string *variables(object), object *heart_beats()
+
+Sun Apr 30 03:53:32 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* created v21.4a1 from v21.3b1
+	* updated with respect to v21.3b4
+	* added Truilkan's optimized replace_string(): 
+	  should be '15% to 40% faster' depending on the use.
+	  also modified it to work with counted strings, and slightly
+	  optimized the brute force (pattern length == 1) case
+	* the logon() function is no longer required to exist
+	* rearranged the output of the driver a bit, and cleaned up
+	  alot of the related code.  stdout and debug.log now both
+	  get the same information (with the exception of some stuff
+	  that only goes to stdout before debug.log is ready)
+	* removed alot of fidgeting with the value of command_giver
+	  COMPAT_BUSTER: the definition/existence of this_player()
+	  changed in some places.
+	* COMPAT_BUSTER: A number of efuns now return strings instead
+	  of dumping info to this_player(): malloc_status(), cache_stats(),
+	  lpc_info(), mud_status(), dump_file_descriptors(), program_info(),
+	  debug_info(), dump_socket_status()
+	* reorganized/rewrote varargs handling; default to the ANSI way
+	  if possible
+	* function pointers can now be used for socket callbacks
+	* New Feature: if you have a file 'local_options', it will be used
+	  instead of options.h.  Also, edit_source will issue an error message
+	  if an option has been added to options.h that you don't have a
+	  setting for.
+
+---------------------------------------------------------------------------
 (v21.3a7 promoted to v21.3b1)
 
 Tue Apr 25 15:43:47 EDT 1995 (tim@handel.princeton.edu (Beek))

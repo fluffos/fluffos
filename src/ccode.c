@@ -15,6 +15,7 @@
 
 static int current_num_values;
 static int switch_type, string_switches, range_switches;
+static int catch_number;
 static int case_number, case_table_size;
 
 static int current_frame_size;
@@ -31,15 +32,15 @@ static parse_node_t cont_dummy = { NODE_CONTINUE, 0, 1 };
 static parse_node_t *break_ptr;
 static parse_node_t *cont_ptr;
 
-static void c_restore_loop_info();
-static void c_save_loop_info();
+static void c_restore_loop_info PROT((void));
+static void c_save_loop_info PROT((void));
 static void c_generate_forward_branch PROT((char));
 static void c_update_forward_branch_links PROT((char, parse_node_t *));
 static void c_branch_backwards PROT((char, int));
-static void c_update_forward_branch();
-static void c_update_breaks();
-static void c_update_continues();
-static void c_generate_else();
+static void c_update_forward_branch PROT((void));
+static void c_update_breaks PROT((void));
+static void c_update_continues PROT((void));
+static void c_generate_else PROT((void));
 
 typedef struct switch_table_s {
     struct switch_table_s *next;
@@ -86,7 +87,7 @@ static void upd_jump P2(int, addr, int, label) {
     *p++ = label % 10 + '0';
 }
 
-static int add_label() {
+static int add_label PROT((void)) {
     if (prog_code + 11 > prog_code_max) {
         mem_block_t *mbp = &mem_block[current_block];
 
@@ -99,7 +100,7 @@ static int add_label() {
     
     notreached = 0;
 
-    sprintf(prog_code, "label%03i:\n", label);
+    sprintf(prog_code, "label%03i:;\n", label);
     prog_code += 10;
     return label++;
 }
@@ -122,26 +123,21 @@ static void ins_string P1(char *, s) {
     prog_code += l;
 }
 
-static void ins_vstring PVARGS(va_alist)
+static void ins_vstring P1V(char *, format)
 {
     va_list args;
     char buf[1024];
-    char *format;
+    V_DCL(char *format);
 
-#ifdef HAS_STDARG_H
-    va_start(args, va_alist);
-    format = va_alist;
-#else
-    va_start(args);
-    format = va_arg(args, char *);
-#endif
+    V_START(args, format);
+    V_VAR(char *, format, args);
     vsprintf(buf, format, args);
     va_end(args);
 
     ins_string(buf);
 }
 
-static int ins_jump() {
+static int ins_jump PROT((void)) {
     int ret = CURRENT_PROGRAM_SIZE;
 
     if (notreached) return 0;
@@ -278,15 +274,18 @@ c_generate_node P1(parse_node_t *, expr) {
     case F_NOT:
     case F_COMPL:
     case F_NEGATE:
-    case F_POP_VALUE:
 	c_generate_node(expr->r.expr);
 	/* fall through */
 #ifdef DEBUG
     case F_BREAK_POINT:
 #endif
-    case F_BREAK:
     case F_CONST0:
     case F_CONST1:
+	ins_string(instrs[expr->kind].routine);
+	break;
+    case F_POP_VALUE:
+	if (expr->r.expr)
+	    c_generate_node(expr->r.expr);
 	ins_string(instrs[expr->kind].routine);
 	break;
     case F_RETURN_ZERO:
@@ -423,6 +422,9 @@ c_generate_node P1(parse_node_t *, expr) {
 	c_generate_node(expr->l.expr);
 	c_generate_node(expr->r.expr);
 	break;
+    case NODE_BREAK_SWITCH:
+	ins_vstring("break;\n");
+	break;
     case NODE_BREAK:
 	expr->r.expr = break_ptr;
 	expr->type = 0;
@@ -494,6 +496,32 @@ c_generate_node P1(parse_node_t *, expr) {
 	    c_restore_loop_info();
 	}
 	break;
+    case NODE_FOREACH:
+	{
+	    int pos, tmp = 0;
+	    parse_node_t *sub = expr->l.expr;
+
+	    c_save_loop_info();
+	    c_generate_node(sub->r.expr);
+
+	    if (sub->l.expr->kind == F_GLOBAL_LVALUE) tmp |= 1;
+	    if (sub->v.expr) {
+		tmp |= 4;
+		if (sub->v.expr->kind == F_GLOBAL_LVALUE) tmp |= 2;
+		ins_vstring("c_foreach(%i, %i, %i);\n", tmp, sub->l.expr->v.number, sub->v.expr->v.number);
+	    } else
+		ins_vstring("c_foreach(%i, %i, 0);\n", tmp, sub->l.expr->v.number);
+	    c_generate_forward_branch(F_BRANCH);
+
+	    pos = add_label();
+	    c_generate_node(expr->r.expr);
+	    c_update_continues();
+	    c_update_forward_branch();
+	    ins_vstring("if (c_next_foreach())\ngoto label%03i;\n", pos);
+	    c_update_breaks();
+	    c_restore_loop_info();
+	}
+	break;
     case NODE_WHILE:
 	{
 	    int forever = node_always_true(expr->l.expr);
@@ -560,6 +588,7 @@ c_generate_node P1(parse_node_t *, expr) {
     case NODE_SWITCH_RANGES:
     case NODE_SWITCH_DIRECT:
 	{
+	    char *position;
 	    parse_node_t *pn;
 	    int save_switch_type = switch_type;
 	    int save_case_number = case_number;
@@ -569,21 +598,26 @@ c_generate_node P1(parse_node_t *, expr) {
 	    switch_type = expr->kind;
 	    case_number = 0;
 	    case_table_size = 0;
-
+	    position = 0;
+	    
 	    c_generate_node(expr->l.expr);
 	    
 	    switch (switch_type) {
 	    case NODE_SWITCH_STRINGS:
 		if (pragmas & PRAGMA_EFUN)
 		    ins_string("CHECK_SWITCHES;\n");
-		ins_vstring("i = c_string_switch_lookup(sp, string_switch_table_%s_%02i);\nfree_string_svalue(sp--);\n", compilation_ident, string_switches++);
+		ins_vstring("lpc_int = c_string_switch_lookup(sp, string_switch_table_%s_%02i, ", compilation_ident, string_switches++);
+		position = prog_code;
+		ins_string("xxx);\nfree_string_svalue(sp--);\n");
 		break;
 	    case NODE_SWITCH_DIRECT:
 	    case NODE_SWITCH_NUMBERS:
 		ins_string("lpc_int = (sp--)->u.number;\n");
 		break;
 	    case NODE_SWITCH_RANGES:
-		ins_vstring("lpc_int = c_range_switch_lookup((sp--)->u.number, %i);\n", range_switches++);
+		ins_vstring("lpc_int = c_range_switch_lookup((sp--)->u.number, range_switch_table_%s_%02i, ");
+		position = prog_code;
+		ins_string("xxx);\n");
 		break;
 	    }
 	    ins_string("switch (lpc_int) {\n");
@@ -604,6 +638,9 @@ c_generate_node P1(parse_node_t *, expr) {
 		DEBUG_CHECK(p - stable != case_table_size * 2,
 			    "case_table_size was incorrect.\n");
 	    }
+
+	    if (position) 
+		sprintf(position, "%3i", case_table_size);
 
             switch_type = save_switch_type;
 	    case_number = save_case_number;
@@ -630,9 +667,10 @@ c_generate_node P1(parse_node_t *, expr) {
 	break;
     case F_CATCH:
 	{
-	    ins_string("c_prepare_catch();\nif (SETJMP(error_recover_context)) {\nc_caught_error();\n} else {\n");
+	    ins_vstring("{ error_context_t econ%02i;\nc_prepare_catch(&econ%02i);\nif (SETJMP(econ%02i.context)) {\nc_caught_error(&econ%02i);\n} else {\n",
+			catch_number, catch_number, catch_number, catch_number);
 	    c_generate_node(expr->r.expr);
-	    ins_string("c_end_catch();\n}\n");
+	    ins_vstring("c_end_catch(&econ%02i);\n}\n}\n", catch_number++);
 	    break;
 	}
     case F_SSCANF:
@@ -675,14 +713,14 @@ c_generate_node P1(parse_node_t *, expr) {
 	ins_vstring("C_LOOP_INCR(%i);\n", expr->v.number);
 	break;
     case F_WHILE_DEC:
-	ins_vstring("C_WHILE_DEC(%i); if (i)\n", expr->v.number);
+	ins_vstring("C_WHILE_DEC(%i); if (lpc_int)\n", expr->v.number);
 	break;
     case F_LOOP_COND:
 	{
 	    int i;
 	    
 	    if (expr->r.expr->kind == F_LOCAL)
-		ins_vstring("C_LOOP_COND_LV(%i, %i); if (i)\n", 
+		ins_vstring("C_LOOP_COND_LV(%i, %i); if (lpc_int)\n", 
 			    expr->l.expr->v.number, expr->r.expr->v.number);
 		else {
 		    switch (expr->r.expr->kind) {
@@ -696,7 +734,7 @@ c_generate_node P1(parse_node_t *, expr) {
 			fatal("Unknown node %i in F_LOOP_COND\n",
 			      expr->r.expr->kind);
 		    }
-		    ins_vstring("C_LOOP_COND_NUM(%i, %i); if (i)\n", 
+		    ins_vstring("C_LOOP_COND_NUM(%i, %i); if (lpc_int)\n", 
 				expr->l.expr->v.number, i);
 		}
 	    break;
@@ -747,6 +785,7 @@ c_generate_node P1(parse_node_t *, expr) {
 	case FP_FUNCTIONAL:
 	case FP_FUNCTIONAL | FP_NOT_BINDABLE:
 	    {
+		yyerror("Cannot compile since it contains a functional.\n");
 /*		int addr, save_current_num_values = current_num_values;
 		ins_byte(expr->v.number >> 8);
 		addr = CURRENT_PROGRAM_SIZE;
@@ -762,6 +801,7 @@ c_generate_node P1(parse_node_t *, expr) {
 	break;
     case NODE_ANON_FUNC:
 	{
+	    yyerror("Cannot compile since it contains an anonymous function.\n");
 /*	    ins_f_byte(F_FUNCTION_CONSTRUCTOR);
 	    ins_byte(FP_ANONYMOUS);
 	    ins_byte(expr->v.number);
@@ -970,7 +1010,7 @@ c_initialize_parser() {
     prog_code = mem_block[A_PROGRAM].block;
     prog_code_max = mem_block[A_PROGRAM].block + mem_block[A_PROGRAM].max_size;
 
-    string_switches = range_switches = 0;
+    catch_number = string_switches = range_switches = 0;
     switch_tables = 0;
     label = 0;
     notreached = 0;
@@ -1061,7 +1101,7 @@ c_generate_final_program P1(int, x) {
 			fprintf(f_out, "{ %i, %i },\n", 
 				st->data[i*2], st->data[i*2+1]);
 		    }
-		    fprintf(f_out, "{ 0, 0 }\n};\n\n");
+		    fprintf(f_out, "{ 0, -2 }\n};\n\n");
 		}
 		st = st->next;
 	    }

@@ -1,5 +1,9 @@
 #!/bin/sh
 
+# If this is uncommented, the specified 'make' is used instead of looking for
+# one 
+#MAKE=make
+
 # define this to be where you want the temporary compiled files to go
 # (only used with GNU make)
 OBJDIR=obj
@@ -104,25 +108,35 @@ echo "Trying out some stuff to see what works; ignore errors ..."
 # 
 # Figure out what make is, and how to invoke it
 # 
-gmake nothing
-if test $? -eq 0; then
-    MAKE=gmake
-    MAKEFILE=GNUmakefile
-else
-    make nothing
+if test "${MAKE-x}" = "x"; then
+    gmake nothing
     if test $? -eq 0; then
-        MAKE=make
-        tmp=`make which_makefile 2>/dev/null | grep -v echo`
-        if test "x$tmp" = "xMakeIsGNU"; then
-            MAKEFILE=GNUmakefile
-        else
-            MAKEFILE=Makefile
-        fi
+        MAKE=gmake
+        MAKEFILE=GNUmakefile
     else
-        echo 'FATAL ERROR: Cannot find make or gmake'
-        exit
+        make nothing
+        if test $? -eq 0; then
+            MAKE=make
+            tmp=`make which_makefile 2>/dev/null | grep -v echo`
+            if test "x$tmp" = "xMakeIsGNU"; then
+                MAKEFILE=GNUmakefile
+            else
+                MAKEFILE=Makefile
+            fi
+        else
+            echo 'FATAL ERROR: Cannot find make or gmake'
+            exit
+        fi
+    fi
+else
+    tmp=`make which_makefile 2>/dev/null | grep -v echo`
+    if test "x$tmp" = "xMakeIsGNU"; then
+        MAKEFILE=GNUmakefile
+    else
+        MAKEFILE=Makefile
     fi
 fi
+
 echo MAKE=$MAKE >Makefile.tmp
 
 #
@@ -136,7 +150,7 @@ xlc comptest.c
 if test $? -eq 0; then
     CC=xlc
     if test "${DEBUG-x}" = "x"; then
-        OPTIMIZE=${OPTIMIZE-"-O -Q -qMAXMEM=16000"}
+        OPTIMIZE=${OPTIMIZE-"-O3 -Q -qMAXMEM=16000"}
     fi
 else
     gcc comptest.c
@@ -332,3 +346,27 @@ echo "Otherwise, type '$MAKE' to build MudOS, then '$MAKE install'."
 
 cat Makefile.tmp ${MAKEFILE}.in >$MAKEFILE
 rm Makefile.tmp
+
+if test $MAKEFILE = Makefile; then
+cat >GNUmakefile <<END
+all:
+	@echo MudOS is currently configured to use 'Makefile'.  Edit 'build.MudOS'
+	@echo if this is not what you want.
+
+nothing:
+
+which_makefile:
+	echo MakeIsGNU
+END
+else
+cat >Makefile <<END
+all:
+	@echo MudOS is currently configured to use 'GNUmakefile'.  Edit 'build.MudOS'
+	@echo if this is not what you want.
+
+nothing:
+
+which_makefile:
+	echo MakeIsMake
+END
+fi

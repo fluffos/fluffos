@@ -32,10 +32,6 @@ static time_t config_id;
 
 char driver_name[512];
 
-#ifndef MAXSHORT
-#define MAXSHORT ((1 << (sizeof(short)*8)) - 1)
-#endif
-
 static void patch_out PROT((program_t *, short *, int));
 static void patch_in PROT((program_t *, short *, int));
 static int str_case_cmp PROT((char *, char *));
@@ -165,7 +161,7 @@ void save_binary P3(program_t *, prog, mem_block_t *, includes, mem_block_t *, p
 	return;
 
     if (comp_flag) {
-	fprintf(stderr, " saving binary ... ");
+	debug_message(" saving binary ... ");
 #ifdef LATTICE
 	fflush(stderr);
 #endif
@@ -324,7 +320,7 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
 #endif
 
     if (comp_flag) {
-	fprintf(stderr, " loading binary %s ... ", name);
+	debug_message(" loading binary %s ... ", name);
 #ifdef LATTICE
 	fflush(stderr);
 #endif
@@ -332,7 +328,7 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
     /* see if we're out of date with source */
     if (check_times(mtime, name) <= 0) {
 	if (comp_flag)
-	    fprintf(stderr, "out of date (source file newer).\n");
+	    debug_message("out of date (source file newer).\n");
 	fclose(f);
 	return OUT_OF_DATE;
     }
@@ -345,7 +341,7 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
     if (fread(buf, strlen(magic_id), 1, f) != 1 ||
 	strncmp(buf, magic_id, strlen(magic_id)) != 0) {
 	if (comp_flag)
-	    fprintf(stderr, "out of date. (bad magic number)\n");
+	    debug_message("out of date. (bad magic number)\n");
 	fclose(f);
 	FREE(buf);
 	return OUT_OF_DATE;
@@ -353,14 +349,14 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
     if ((fread((char *) &i, sizeof i, 1, f) != 1 || driver_id != i)
 	&& (!lpc_obj)) {
 	if (comp_flag)
-	    fprintf(stderr, "out of date. (driver changed)\n");
+	    debug_message("out of date. (driver changed)\n");
 	fclose(f);
 	FREE(buf);
 	return OUT_OF_DATE;
     }
     if (fread((char *) &i, sizeof i, 1, f) != 1 || config_id != i) {
 	if (comp_flag)
-	    fprintf(stderr, "out of date. (config file changed)\n");
+	    debug_message("out of date. (config file changed)\n");
 	fclose(f);
 	FREE(buf);
 	return OUT_OF_DATE;
@@ -374,7 +370,7 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
     for (iname = buf; iname < buf + len; iname += strlen(iname) + 1) {
 	if (check_times(mtime, iname) <= 0) {
 	    if (comp_flag)
-		fprintf(stderr, "out of date (include file newer).\n");
+		debug_message("out of date (include file newer).\n");
 	    fclose(f);
 	    FREE(buf);
 	    return OUT_OF_DATE;
@@ -388,7 +384,7 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
     buf[len] = '\0';
     if (strcmp(name, buf) != 0) {
 	if (comp_flag)
-	    fprintf(stderr, "binary name inconsistent with file.\n");
+	    debug_message("binary name inconsistent with file.\n");
 	fclose(f);
 	FREE(buf);
 	return OUT_OF_DATE;
@@ -422,7 +418,7 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
 	    check_times(mtime, file_name_two) == 0) {	/* ok if -1 */
 
 	    if (comp_flag)
-		fprintf(stderr, "out of date (inherited source newer).\n");
+		debug_message("out of date (inherited source newer).\n");
 	    fclose(f);
 	    free_string(p->name);
 	    FREE(p);
@@ -433,7 +429,7 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
 	ob = find_object2(buf);
 	if (!ob) {
 	    if (comp_flag)
-		fprintf(stderr, "missing inherited prog.\n");
+		debug_message("missing inherited prog.\n");
 	    fclose(f);
 	    free_string(p->name);
 	    FREE(p);
@@ -516,7 +512,7 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
     if (prog->program_size == 0) {
 	if (lpc_obj) {
 	    if (comp_flag)
-		fprintf(stderr, "linking jump table ...\n");
+		debug_message("linking jump table ...\n");
 	    link_jump_table(prog, (void **)lpc_obj->jump_table);
 	} else {
 	    if (prog)
@@ -527,7 +523,7 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
 #endif
 
     if (comp_flag)
-	fprintf(stderr, "done.\n");
+	debug_message("done.\n");
     return 1;
 }				/* load_binary() */
 
@@ -540,8 +536,8 @@ void init_binaries P2(int, argc, char **, argv)
 	driver_id = st.st_mtime;
     } else {
 	driver_id = current_time;
-	fprintf(stderr, "Can't stat <%s>, ignoring old binaries.\n", argv[0]);
-	fprintf(stderr, "Try invoking the driver using the full pathname.\n");
+	debug_message("Can't find \"%s\", ignoring old binaries.\n", argv[0]);
+	debug_message("Try invoking the driver using the full pathname.\n");
     }
 
     arg_id = 0;

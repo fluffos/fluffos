@@ -95,6 +95,9 @@ extern int add_message_calls;
 extern interactive_t **all_users;
 extern int max_users;
 
+void add_vmessage PROT2V(object_t *, char *);
+void add_message PROT((object_t *, char *));
+
 #ifdef SIGNAL_FUNC_TAKES_INT
 void sigalrm_handler PROT((int));
 #else

@@ -318,8 +318,6 @@ static svalue_t *sub_parse PROT((array_t *, array_t *, int *,
 				 array_t *, int *, int *, svalue_t *));
 static svalue_t *one_parse PROT((array_t *, char *, array_t *, 
 				 int *, int *, svalue_t *));
-static svalue_t *one_parse PROT((array_t *, char *, array_t *,
-				 int *, int *, svalue_t *));
 static svalue_t *number_parse PROT((array_t *, array_t *, int *, int *));
 static svalue_t *item_parse PROT((array_t *, array_t *, int *, int *));
 #ifndef NO_ADD_ACTION
@@ -433,7 +431,7 @@ static void parse_clean_up() {
     if (pg->Prepos_list)
 	free_array(pg->Prepos_list);
     if (pg->Allword)
-	free_string(pg->Allword);
+	FREE(pg->Allword);
     if (pg->warr)
 	free_array(pg->warr);
     if (pg->patarr)
@@ -725,7 +723,6 @@ static svalue_t *
 {
     int cix, pix, subfail;
     svalue_t *pval;
-    svalue_t *one_parse();
 
     /*
      * Fail if we have a pattern left but no words to parse
@@ -1246,8 +1243,6 @@ match_object P4(int, obix, array_t *, warr, int *, cix_in, int *, plur)
     array_t *ids;
     int il, pos, cplur, old_cix;
     char *str;
-    int find_string();
-    int check_adjectiv();
 
     for (cplur = (*plur * 2); cplur < 4; cplur++) {
 	switch (cplur) {
@@ -1386,7 +1381,6 @@ check_adjectiv P4(int, obix, array_t *, warr, int, from, int, to)
     int il, back, sum, fail;
     char *adstr;
     array_t *ids;
-    int member_string();
 
     if (gAdjid_list->item[obix].type == T_ARRAY)
 	ids = gAdjid_list->item[obix].u.arr;
@@ -1720,7 +1714,6 @@ static char *
      process_part P1(char *, str)
 {
     svalue_t *ret;
-    svalue_t *process_value();
 
     if ((strlen(str) < 1) || (str[0] < 'A') || (str[0] > 'z'))
 	return str;
@@ -1824,37 +1817,39 @@ char *
     char *fstr, *istr;
     array_t *lines;
 
-    int il, l, nchar, space, indlen;
+    int l, il, ilen, flen, nchar, space, indlen;
 
     fstr = string_copy(str, "break_string");
-
+    flen = COUNTED_STRLEN(fstr);
+    
     if (!indent)
 	istr = 0;
     else if (indent->type == T_NUMBER && indent->u.number < 1000) {
 	l = indent->u.number;
-	istr = XALLOC(l + 1);
-	for (il = 0; il < l; il++)
-	    istr[il] = ' ';
-	istr[il] = 0;
-    } else if (indent->type == T_STRING)
-	istr = alloc_cstring(indent->u.string, "break_string");
-    else
+	istr = new_string(l, "break_string");
+	memset(istr, ' ', l);
+	istr[l] = 0;
+	ilen = l;
+    } else if (indent->type == T_STRING) {
+	istr = string_copy(indent->u.string, "break_string");
+        ilen = COUNTED_STRLEN(istr);
+    } else
 	return fstr;
 
     if (width < 1)
 	width = 1;
 
     if (istr) {
-	if (width <= strlen(istr))
-	    width = strlen(istr) + 1;
-	indlen = strlen(istr);
+	if (width <= ilen)
+	    width = ilen + 1;
+	indlen = ilen;
     } else
 	indlen = 0;
 
     /*
      * Split with newlines
      */
-    for (space = -1, nchar = 0, l = strlen(fstr), il = 0; il < l; il++) {
+    for (space = -1, nchar = 0, l = flen, il = 0; il < l; il++) {
 	if (fstr[il] == ' ')
 	    space = il;
 
@@ -1870,13 +1865,13 @@ char *
      */
     if (!indlen) {
 	if (istr)
-	    FREE(istr);
+	    FREE_MSTR(istr);
 	return fstr;
     }
     /*
      * Explode into array
      */
-    lines = explode_string(fstr, MSTR_SIZE(fstr), "\n", 1);
+    lines = explode_string(fstr, flen, "\n", 1);
 
     FREE_MSTR(fstr);
 
@@ -1897,7 +1892,7 @@ char *
 	strcat(fstr, "\n");
     }
 
-    FREE(istr);
+    FREE_MSTR(istr);
     free_array(lines);
 
     return fstr;

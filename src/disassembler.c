@@ -41,7 +41,7 @@ f_dump_prog PROT((void))
     }
     pop_n_elems(st_num_arg);
     if (!(prog = ob->prog)) {
-	add_message("No program for object.\n");
+	error("No program for object.\n");
     } else {
 	if (!where) {
 	    where = "/PROG_DUMP";
@@ -63,16 +63,14 @@ dump_prog P3(program_t *, prog, char *, fn, int, flags)
 
     fname = check_valid_path(fn, current_object, "dumpallobj", 1);
     if (!fname) {
-	add_vmessage("Invalid path '%s' for writing.\n", fn);
+	error("Invalid path '%s' for writing.\n", fn);
 	return;
     }
     f = fopen(fname, "w");
     if (!f) {
-	add_vmessage("Unable to open '/%s' for writing.\n", fname);
+	error("Unable to open '/%s' for writing.\n", fname);
 	return;
     }
-    add_vmessage("Dumping to /%s ...", fname);
-
     fprintf(f, "NAME: /%s\n", prog->name);
     fprintf(f, "INHERITS:\n");
     fprintf(f, "\tname                    fio    vio\n");
@@ -143,7 +141,6 @@ dump_prog P3(program_t *, prog, char *, fn, int, flags)
 	fprintf(f, "\n;;;  *** Line Number Info ***\n");
 	dump_line_numbers(f, prog);
     }
-    add_message("done.\n");
     fclose(f);
 }
 
@@ -263,7 +260,6 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	case F_BRANCH_GE:
 	case F_BRANCH_LE:
 	case F_BRANCH_EQ:
-	case F_BBRANCH_LT:
 	case F_BRANCH:
 	case F_BRANCH_WHEN_ZERO:
 	case F_BRANCH_WHEN_NON_ZERO:
@@ -276,6 +272,29 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	    sprintf(buff, "%04x (%04x)", (unsigned) sarg, (unsigned) offset);
 	    pc += 2;
 	    break;
+
+	case F_NEXT_FOREACH:
+	case F_BBRANCH_LT:
+	    COPY_SHORT(&sarg, pc);
+	    offset = (pc - code) - (unsigned short) sarg;
+	    sprintf(buff, "%04x (%04x)", (unsigned) sarg, (unsigned) offset);
+	    pc += 2;
+	    break;
+
+	case F_FOREACH:
+	    {
+		char tmp[32];
+		int flags = EXTRACT_UCHAR(pc++);
+
+		sprintf(buff, "(%s) %s %i", (flags & 4) ? "mapping" : "array",
+			(flags & 1) ? "global" : "local", EXTRACT_UCHAR(pc++));
+		if (flags & 4) {
+		    sprintf(tmp, ", %s %i", (flags & 2) ? "global" : "local",
+			    EXTRACT_UCHAR(pc++));
+		    strcat(buff, tmp);
+		}
+		break;
+	    }
 
 	case F_BBRANCH_WHEN_ZERO:
 	case F_BBRANCH_WHEN_NON_ZERO:
@@ -318,6 +337,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 		sprintf(buff, "class %s", STRS[CLSS[which].name]);
 		break;
 	    }
+
 	case F_CALL_FUNCTION_BY_ADDRESS:
 	    COPY_SHORT(&sarg, pc);
 	    pc += 3;
@@ -356,6 +376,12 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	    pc++;
 	    break;
 	case F_WHILE_DEC:
+	    COPY_SHORT(&sarg, pc + 1);
+	    offset = (pc - code) - (unsigned short) sarg;
+	    sprintf(buff, "LV%d--, branch %04x (%04x)", EXTRACT_UCHAR(pc),
+		    (unsigned) sarg, (unsigned) offset);
+	    pc += 3;
+	    break;
 	case F_LOCAL:
 	case F_LOCAL_LVALUE:
 	case F_VOID_ASSIGN_LOCAL:
@@ -460,7 +486,6 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	case F_SSCANF:
 	case F_PARSE_COMMAND:
 	case F_BYTE:
-	case F_POP_BREAK:
 	    sprintf(buff, "%d", EXTRACT_UCHAR(pc));
 	    pc++;
 	    break;
@@ -711,7 +736,6 @@ do_walk_program P4(int *, data, char *, code, int, start, int, end)
 
 	case F_SSCANF:
 	case F_PARSE_COMMAND:
-	case F_POP_BREAK:
 	    pc++;
 	    break;
 

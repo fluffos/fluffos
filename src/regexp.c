@@ -257,7 +257,7 @@ STATIC int strcspn();
 void regerror P1(char *, s) {
     switch (regexp_user) {
     case ED_REGEXP:
-	ED_OUTPUTV("ed: regular expression error: %s\n", s);
+	ED_OUTPUTV(ED_DEST, "ed: regular expression error: %s\n", s);
 	break;
     case EFUN_REGEXP:
 	regexp_error = s;
@@ -934,12 +934,12 @@ static int regmatch P1(char *, prog)
     scan = prog;
 #ifdef DEBUG
     if (scan != (char *) NULL && regnarrate)
-	fprintf(stderr, "%s(\n", regprop(scan));
+	debug_message("%s(\n", regprop(scan));
 #endif
     while (scan != (char *) NULL) {
 #ifdef DEBUG
 	if (regnarrate)
-	    fprintf(stderr, "%s...\n", regprop(scan));
+	    debug_message("%s...\n", regprop(scan));
 #endif
 	nxt = regnext(scan);
 

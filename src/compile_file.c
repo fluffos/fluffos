@@ -1,4 +1,5 @@
 #include "std.h"
+#ifdef LPC_TO_C
 #include "file_incl.h"
 #include "lpc_incl.h"
 #include "interface.h"
@@ -9,8 +10,8 @@
 #include "cfuns.h"
 #include "file.h"
 #include "backend.h"
+#include "binaries.h"
 
-#ifdef LPC_TO_C
 void
 link_jump_table P2(program_t *, prog, void **, jump_table)
 {
@@ -67,7 +68,7 @@ static void generate_identifier P2(char *, buf, char *, name)
 static char *rest_of_makefile = "interface.c\n\
 \n\
 %%ifdef GNU\n\
-OBJ=$(addprefix $(OBJDIR)/,$(subst .c, .o,$(SRC)))\n\
+OBJ=$(addprefix $(OBJDIR)/,$(subst .c,.o,$(SRC)))\n\
 \n\
 $(OBJDIR)/%%.o: %%.c $(OBJDIR)\n\
 \t$(CC) -I$(OBJDIR) -I.. $(CFLAGS) -o $@ -c $<\n\
@@ -84,11 +85,8 @@ clean:\n\
 \t-rm -f mudlib.a\n\
 \n";
 
-/* TODO: compilation_output_file may not get closed if there is an error in
-   load_object() */
 int generate_source P2(svalue_t *, arg1, char *, out_fname)
 {
-    FILE *crdir_fopen();
     FILE *specfile, *makefile;
     int len;
 
@@ -99,16 +97,30 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
     char ident[205];
     int done;
     char *outp;
+    char *string_needs_free;
     int index;
     array_t tmp_arr, *arr;
     int f;
     int single;
+    error_context_t econ;
 
     compilation_output_file = 0;
+    string_needs_free = 0;
+
+    save_context(&econ);
+    if (SETJMP(econ.context)) {
+	restore_context(&econ);
+	pop_context(&econ);
+	if (compilation_output_file)
+	    fclose(compilation_output_file);
+	if (string_needs_free)
+	    FREE(string_needs_free);
+	return 0;
+    }
 
     if (arg1->type != T_ARRAY) {
 	tmp_arr.size = 1;
-	tmp_arr.item[0] = arg1->u.arr->item[0];
+	tmp_arr.item[0] = *arg1;
 	arr = &tmp_arr;
 	
 	single = 1;
@@ -147,10 +159,9 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
 	(void) strcat(real_name, ".c");
 	if (stat(real_name, &c_st) == -1) 
 	    error("Could not find '%s' to compile.\n", real_name);
-	    
 	
 	if (!legal_path(real_name)) {
-	    fprintf(stderr, "Illegal pathname: %s\n", real_name);
+	    debug_message("Illegal pathname: %s\n", real_name);
 	    error("Illegal path name.\n");
 	}
 
@@ -162,7 +173,7 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
 
 	compilation_output_file = crdir_fopen(out_fname);
 	if (compilation_output_file == 0) {
-	    perror(out_fname);
+	    debug_perror("generate_source: fopen", out_fname);
 	    error("Could not open output file '/%s'.\n", out_fname);
 	}
 	fprintf(compilation_output_file, "#include \"std.h\"\n#include \"interface.h\"\n");
@@ -170,11 +181,12 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
 	done = 0;
 	while (!done) {
 	    if (comp_flag)
-		fprintf(stderr, " compiling /%s ...", real_name);
+		debug_message(" compiling /%s ...", real_name);
 	    f = open(real_name, O_RDONLY);
 	    if (f == -1) {
 		fclose(compilation_output_file);
-		perror(real_name);
+		compilation_output_file = 0;
+		debug_perror("generate_source", real_name);
 		error("Could not read the file '/%s'.\n", real_name);
 	    }
 	    generate_identifier(ident, name);
@@ -183,20 +195,22 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
 	    compile_file(f, real_name);
 	    compile_to_c = 0;
 	    if (comp_flag)
-		fprintf(stderr, " done\n");
+		debug_message(" done\n");
 	    update_compile_av(total_lines);
 	    close(f);
 	    total_lines = 0;
 	    
 	    if (inherit_file == 0 && (num_parse_error > 0 || !prog)) {
 		fclose(compilation_output_file);
+		compilation_output_file = 0;
 		if (prog)
 		    free_prog(prog, 1);
+		pop_context(&econ);
 		return 0;
 	    }
 	    
 	    if (inherit_file) {
-		char *tmp = inherit_file;
+		string_needs_free = inherit_file;
 		
 		if (prog) {
 		    free_prog(prog, 1);
@@ -204,13 +218,17 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
 		}
 		if (strcmp(inherit_file, name) == 0) {
 		    fclose(compilation_output_file);
+		    compilation_output_file = 0;
 		    FREE(inherit_file);
-		    inherit_file = 0;
+		    string_needs_free = inherit_file = 0;
 		    error("Illegal to inherit self.\n");
 		}
 		inherit_file = 0;
-		load_object(tmp, 0);
-		FREE(tmp);
+		if (!load_object(string_needs_free, 0))
+		    error("Attempted to inherit a non-existent file.");
+
+		FREE(string_needs_free);
+		string_needs_free = 0;
 	    } else {
 		done = 1;
 		if (pragmas & PRAGMA_EFUN) {
@@ -220,11 +238,12 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
 			len -= 2;
 			out_name[len] = '\0';
 		    }
-		    strcat(out_name, ".spec");
+		    strcat(out_name, "_spec.c");
 		    specfile = crdir_fopen(out_name);
 		    if (specfile == 0) {
 			fclose(compilation_output_file);
-			perror(out_fname);
+			compilation_output_file = 0;
+			debug_perror("generate_source: close", out_fname);
 			error("Could not open output file '/%s.'\n", out_fname);
 		    }
 		    out_name[len] = '\0';
@@ -267,13 +286,14 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
 	    prog = 0;
 	}
 	fclose(compilation_output_file);
+	compilation_output_file = 0;
     }
     if (!single) {
 	*outp = 0;
 	strcat(out_fname, "interface.c");
 	compilation_output_file = crdir_fopen(out_fname);
 	if (compilation_output_file == 0) {
-	    perror(out_fname);
+	    debug_perror("generate_source: fopen", out_fname);
 	    error("Could not open output file '/%s'.\n", out_fname);
 	}
 	*outp = 0;
@@ -281,7 +301,8 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
 	makefile = crdir_fopen(out_fname);
 	if (makefile == 0) {
 	    fclose(compilation_output_file);
-	    perror(out_fname);
+	    compilation_output_file = 0;
+	    debug_perror("generate_source: fclose", out_fname);
 	    error("Could not open output file '/%s'.\n", out_fname);
 	}
 	
@@ -307,6 +328,7 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
 	}
 	fprintf(compilation_output_file, "    0\n};\n");
 	fclose(compilation_output_file);
+	compilation_output_file = 0;
 	fprintf(makefile, rest_of_makefile);
 	fclose(makefile);
 
@@ -314,8 +336,7 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
 	strcat(out_fname, "Makefile.pre");
 	makefile = crdir_fopen(out_fname);
 	if (makefile == 0) {
-	    fclose(compilation_output_file);
-	    perror(out_fname);
+	    debug_perror("generate_source: fclose", out_fname);
 	    error("Could not open output file '/%s'.\n", out_fname);
 	}
 	fprintf(makefile, "%%define NORMAL\n\n%%include \"mudlib/Makefile.master\"\n\n");
@@ -325,13 +346,13 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
 	strcat(out_fname, "GNUmakefile.pre");
 	makefile = crdir_fopen(out_fname);
 	if (makefile == 0) {
-	    fclose(compilation_output_file);
-	    perror(out_fname);
+	    debug_perror("generate_source: fclose", out_fname);
 	    error("Could not open output file '/%s'.\n", out_fname);
 	}
 	fprintf(makefile, "%%define GNU\n\n%%include \"mudlib/Makefile.master\"\n\n");
 	fclose(makefile);
     }
+    pop_context(&econ);
     return 1;
 }
 #endif

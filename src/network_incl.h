@@ -12,13 +12,17 @@
 #ifdef INCL_NETDB_H
 #  include <netdb.h>
 #endif
+#ifdef INCL_SYS_SEMA_H
+#  include <sys/sema.h>
+#endif
+
+/* defined in <sys/sema.h> on HP-PA/RISC; causes problems with telnet */
+#undef SE
+
 #ifdef INCL_ARPA_TELNET_H
 #  include <arpa/telnet.h>
 #else
 #  include "telnet.h"
-#endif
-#ifdef INCL_SYS_SEMA_H
-#  include <sys/sema.h>
 #endif
 #ifdef INCL_SYS_SOCKETVAR_H
 #    include <sys/socketvar.h>

@@ -230,37 +230,20 @@ static unsigned int inignore;	/* are we not counting these characters */
 static unsigned int startignore;/* we found the first char... now for next */
 static jmp_buf error_jmp;	/* LONGJMP() buffer for error catching */
 
-static void stradd PROT((char **dst, int *size, char *add));
-static void numadd PROT((char **dst, int *size, int num));
-static void floatadd PROT((char **dst, int *size, double flt));
-static void add_indent PROT((char **dst, int *size, int indent));
+static void numadd PROT((outbuffer_t *, int num));
+static void add_indent PROT((outbuffer_t *, int indent));
 static int ignorestrlen PROT((char *str));
 static void add_justified PROT((char *str, char *pad, int fs, format_info finfo, short int trailing));
 static int add_column PROT((cst ** column, short int trailing));
 static int add_table PROT((cst ** table, short int trailing));
 
-/*
- * Probably should make this a #define...
- *
- * Oh god, no. -Beek
- */
-static void stradd P3(char **, dst, int *, size, char *, add)
-{
-    int i, l;
-
-    l = strlen(add);
-    if ((i = (MSTR_SIZE(*dst) + l)) >= *size) {
-	*size += i + 1;
-	*dst = extend_string(*dst, *size);
-    }
-    strcat(*dst, add);
-    MSTR_UPDATE_SIZE(*dst, i);
-}				/* end of stradd() */
-
-static void numadd P3(char **, dst, int *, size, int, num)
+static void numadd P2(outbuffer_t *, outbuf, int, num)
 {
     int i, num_l,		/* length of num as a string */
         nve;			/* true if num negative */
+    int space;
+    int chop;
+    char *p;
 
     if (num < 0) {
 	/* Beek: yes, it's possible for num < 0, and num * -1 < 0. */
@@ -270,57 +253,33 @@ static void numadd P3(char **, dst, int *, size, int, num)
     } else
 	nve = 0;
     for (i = num / 10, num_l = nve + 1; i; i /= 10, num_l++);
-    i = MSTR_SIZE(*dst);	/* i = length of constructed string so far */
-    if ((i + num_l) >= *size) {
-	*size += i + num_l + 2;
-	*dst = extend_string(*dst, *size);
+    if (space = outbuf_extend(outbuf, num_l)) {
+	chop = num_l - space;
+	while (chop--) 
+	    num /= 10; /* lose that last digits that got chopped */
+	p = outbuf->buffer + outbuf->real_size;
+	outbuf->real_size += space;
+	p[space] = 0;
+	if (nve) {
+	    *p++ = '-';
+	    space--;
+	}
+	while (space--) {
+	    p[space] = (num % 10) + '0';
+	    num /= 10;
+	}
     }
-    /* do this before we clobber num_l */
-    MSTR_UPDATE_SIZE(*dst, i + num_l);
-    (*dst)[i + num_l] = '\0';
-    if (nve)
-	(*dst)[i] = '-';
-    else
-	i--;
-    for (num_l -= nve; num_l; num_l--, num /= 10)
-	(*dst)[i + num_l] = (num % 10) + '0';
 }				/* end of numadd() */
 
-static void floatadd P3(char **, dst, int *, size, double, flt)
+static void add_indent P2(outbuffer_t *, outbuf, int, indent)
 {
-    int i;
-    int flt_l;			/* length of float as a string */
-    char buf[80];
-
-    sprintf(buf, "%g", flt);
-    flt_l = strlen(buf) + 1;
-
-    i = MSTR_SIZE(*dst);	/* i = length of constructed string so far */
-    if ((i + flt_l) >= *size) {
-	*size += i + flt_l + 2;
-	*dst = extend_string(*dst, *size);
+    int l;
+    
+    if (l = outbuf_extend(outbuf, indent)) {
+	memset(outbuf->buffer + outbuf->real_size, ' ', l);
+	*(outbuf->buffer + outbuf->real_size + l) = 0;
+	outbuf->real_size += l;
     }
-    sprintf(*dst + i, "%s", buf);
-    MSTR_UPDATE_SIZE(*dst, i + flt_l);
-}				/* end of floatadd() */
-
-/*
- * This is a function purely because stradd() is, to keep same param
- * passing...
- */
-static void add_indent P3(char **, dst, int *, size, int, indent)
-{
-    int i;
-
-    i = MSTR_SIZE(*dst);
-    if ((i + indent) >= *size) {
-	*size += i + indent + 1;
-	*dst = extend_string(*dst, *size);
-    }
-    MSTR_UPDATE_SIZE(*dst, i + indent);
-    for (; indent; indent--)
-	(*dst)[i++] = ' ';
-    (*dst)[i] = '\0';
 }
 
 /*
@@ -328,78 +287,79 @@ static void add_indent P3(char **, dst, int *, size, int, indent)
  * and returns a pointer to this string.
  * Scary number of parameters for a recursive function.
  */
-void svalue_to_string P6(svalue_t *, obj, char **, str, int, size, int, indent, int, trailing, int, indent2)
+void svalue_to_string P5(svalue_t *, obj, outbuffer_t *, outbuf, int, indent, int, trailing, int, indent2)
 {
     int i;
 
     /* prevent an infinite recursion on self-referential structures */
     if (indent > 200) {
+	FREE_MSTR(outbuf->buffer);
 	error("structure too deep to print.\n");
 	return;
     }
     if (!indent2)
-	add_indent(str, &size, indent);
+	add_indent(outbuf, indent);
     switch (obj->type) {
     case T_INVALID:
-	stradd(str, &size, "T_INVALID");
+	outbuf_add(outbuf, "T_INVALID");
 	break;
     case T_LVALUE:
-	stradd(str, &size, "lvalue: ");
-	svalue_to_string(obj->u.lvalue, str, size, indent + 2, trailing, 0);
+	outbuf_add(outbuf, "lvalue: ");
+	svalue_to_string(obj->u.lvalue, outbuf, indent + 2, trailing, 0);
 	break;
     case T_NUMBER:
-	numadd(str, &size, obj->u.number);
+	numadd(outbuf, obj->u.number);
 	break;
     case T_REAL:
-	floatadd(str, &size, obj->u.real);
+	outbuf_addv(outbuf, "%g", obj->u.real);
 	break;
     case T_STRING:
-	stradd(str, &size, "\"");
-	stradd(str, &size, obj->u.string);
-	stradd(str, &size, "\"");
+	outbuf_add(outbuf, "\"");
+	outbuf_add(outbuf, obj->u.string);
+	outbuf_add(outbuf, "\"");
 	break;
     case T_CLASS:
-	stradd(str, &size, "CLASS( ");
-	numadd(str, &size, obj->u.arr->size);
-	stradd(str, &size, " elements\n");
+	outbuf_add(outbuf, "CLASS( ");
+	numadd(outbuf, obj->u.arr->size);
+	outbuf_add(outbuf, " elements\n");
 	for (i = 0; i < (obj->u.arr->size) - 1; i++)
-	    svalue_to_string(&(obj->u.arr->item[i]), str, size, indent + 2, 1, 0);
-	svalue_to_string(&(obj->u.arr->item[i]), str, size, indent + 2, 0, 0);
-	stradd(str, &size, "\n");
-	add_indent(str, &size, indent);
-	stradd(str, &size, " )");
+	    svalue_to_string(&(obj->u.arr->item[i]), outbuf, indent + 2, 1, 0);
+	svalue_to_string(&(obj->u.arr->item[i]), outbuf, indent + 2, 0, 0);
+	outbuf_add(outbuf, "\n");
+	add_indent(outbuf, indent);
+	outbuf_add(outbuf, " )");
 	break;
     case T_ARRAY:
 	if (!(obj->u.arr->size)) {
-	    stradd(str, &size, "({ })");
+	    outbuf_add(outbuf, "({ })");
 	} else {
-	    stradd(str, &size, "({ /* sizeof() == ");
-	    numadd(str, &size, obj->u.arr->size);
-	    stradd(str, &size, " */\n");
+	    outbuf_add(outbuf, "({ /* sizeof() == ");
+	    numadd(outbuf, obj->u.arr->size);
+	    outbuf_add(outbuf, " */\n");
 	    for (i = 0; i < (obj->u.arr->size) - 1; i++)
-		svalue_to_string(&(obj->u.arr->item[i]), str, size, indent + 2, 1, 0);
-	    svalue_to_string(&(obj->u.arr->item[i]), str, size, indent + 2, 0, 0);
-	    stradd(str, &size, "\n");
-	    add_indent(str, &size, indent);
-	    stradd(str, &size, "})");
+		svalue_to_string(&(obj->u.arr->item[i]), outbuf, indent + 2, 1, 0);
+	    svalue_to_string(&(obj->u.arr->item[i]), outbuf, indent + 2, 0, 0);
+	    outbuf_add(outbuf, "\n");
+	    add_indent(outbuf, indent);
+	    outbuf_add(outbuf, "})");
 	}
 	break;
     case T_BUFFER:
-	stradd(str, &size, "<buffer>");
+	outbuf_add(outbuf, "<buffer>");
 	break;
     case T_FUNCTION:
 	{
 	    svalue_t tmp;
 	    tmp.type = T_ARRAY;
 
-	    stradd(str, &size, "(: ");
+	    outbuf_add(outbuf, "(: ");
 	    switch (obj->u.fp->hdr.type) {
 	    case FP_LOCAL | FP_NOT_BINDABLE:
-		stradd(str, &size, 
+		outbuf_add(outbuf,
 		       obj->u.fp->hdr.owner->prog->functions[obj->u.fp->f.local.index].name);
 		break;
 	    case FP_SIMUL:
-		stradd(str, &size, simuls[obj->u.fp->f.simul.index]->name);
+		outbuf_add(outbuf, simuls[obj->u.fp->f.simul.index]->name);
 		break;
 	    case FP_FUNCTIONAL:
 	    case FP_FUNCTIONAL | FP_NOT_BINDABLE:
@@ -407,16 +367,16 @@ void svalue_to_string P6(svalue_t *, obj, char **, str, int, size, int, indent, 
 		    char buf[10];
 		    int n = obj->u.fp->f.functional.num_arg;
 		    
-		    stradd(str, &size, "<code>(");
+		    outbuf_add(outbuf, "<code>(");
 		    for (i=1; i < n; i++) {
 			sprintf(buf, "$%i, ", i);
-			stradd(str, &size, buf);
+			outbuf_add(outbuf, buf);
 		    }
 		    if (n) {
 			sprintf(buf, "$%i", n);
-			stradd(str, &size, buf);
+			outbuf_add(outbuf, buf);
 		    }
-		    stradd(str, &size, ")");
+		    outbuf_add(outbuf, ")");
 		    break;
 		}
 	    case FP_EFUN:
@@ -428,72 +388,58 @@ void svalue_to_string P6(svalue_t *, obj, char **, str, int, size, int, indent, 
 			i = obj->u.fp->f.efun.opcodes[1] + 0xff;
 		    }
 #endif
-		    stradd(str, &size, instrs[i].name);
+		    outbuf_add(outbuf, instrs[i].name);
 		    break;
 		}
 	    }
 	    if (obj->u.fp->hdr.args) {
 		for (i=0; i<obj->u.fp->hdr.args->size; i++) {
-		    stradd(str, &size, ", ");
-		    svalue_to_string(&(obj->u.fp->hdr.args->item[i]), str, size, indent, 0, 0);
+		    outbuf_add(outbuf, ", ");
+		    svalue_to_string(&(obj->u.fp->hdr.args->item[i]), outbuf, indent, 0, 0);
 		}
 	    } 
 	}
-	stradd(str, &size, " :)");
+	outbuf_add(outbuf, " :)");
 	break;
     case T_MAPPING:
 	if (!(obj->u.map->count)) {
-	    stradd(str, &size, "([ ])");
+	    outbuf_add(outbuf, "([ ])");
 	} else {
-	    stradd(str, &size, "([ /* sizeof() == ");
-	    numadd(str, &size, obj->u.map->count);
-	    stradd(str, &size, " */\n");
+	    outbuf_add(outbuf, "([ /* sizeof() == ");
+	    numadd(outbuf, obj->u.map->count);
+	    outbuf_add(outbuf, " */\n");
 	    for (i = 0; i <= (int) (obj->u.map->table_size); i++) {
 		mapping_node_t *elm;
 
 		for (elm = obj->u.map->table[i]; elm; elm = elm->next) {
-		    svalue_to_string(&(elm->values[0]), str, size, indent + 2, 0, 0);
-		    stradd(str, &size, " : ");
-		    svalue_to_string(&(elm->values[1]), str, size, indent + 4, 1, 1);
+		    svalue_to_string(&(elm->values[0]), outbuf, indent + 2, 0, 0);
+		    outbuf_add(outbuf, " : ");
+		    svalue_to_string(&(elm->values[1]), outbuf, indent + 4, 1, 1);
 		}
 	    }
-	    add_indent(str, &size, indent);
-	    stradd(str, &size, "])");
+	    add_indent(outbuf, indent);
+	    outbuf_add(outbuf, "])");
 	}
 	break;
     case T_OBJECT:
 	{
 	    svalue_t *temp;
 
-	    stradd(str, &size, obj->u.ob->name);
+	    outbuf_add(outbuf, obj->u.ob->name);
 	    push_object(obj->u.ob);
-	    temp = apply_master_ob(APPLY_OBJECT_NAME, 1);
-	    if (temp && (temp->type == T_STRING)) {
-		stradd(str, &size, " (\"");
-		stradd(str, &size, temp->u.string);
-		stradd(str, &size, "\")");
+	    temp = safe_apply_master_ob(APPLY_OBJECT_NAME, 1);
+	    if (temp && temp != (svalue_t *) -1 && (temp->type == T_STRING)) {
+		outbuf_add(outbuf, " (\"");
+		outbuf_add(outbuf, temp->u.string);
+		outbuf_add(outbuf, "\")");
 	    }
-	    /*
-	     * These flags aren't that useful...
-	     * 
-	     * if (obj->u.ob->flags & O_HEART_BEAT) stradd(str,&size," (hb)");
-	     * if (obj->u.ob->flags & O_IS_WIZARD) stradd(str,&size," (wiz)");
-	     * if (obj->u.ob->flags & O_ENABLE_COMMANDS) stradd(str,&size," (enabled)");
-	     * if (obj->u.ob->flags & O_CLONE) stradd(str,&size," (clone)");
-	     * if (obj->u.ob->flags & O_DESTRUCTED) stradd(str,&size," (destructed)");
-	     * if (obj->u.ob->flags & O_SWAPPED) stradd(str,&size," (swapped)");
-	     * if (obj->u.ob->flags & O_ONCE_INTERACTIVE) stradd(str,&size," (x-activ)");
-	     * if (obj->u.ob->flags & O_APPROVED) stradd(str,&size," (ok)");
-	     * if (obj->u.ob->flags & O_RESET_STATE) stradd(str,&size," (reset)");
-	     * if (obj->u.ob->flags & O_WILL_CLEAN_UP) stradd(str,&size," (clean up)");
-	     */
 	    break;
 	}
     default:
-	stradd(str, &size, "!ERROR: GARBAGE SVALUE!");
+	outbuf_add(outbuf, "!ERROR: GARBAGE SVALUE!");
     }				/* end of switch (obj->type) */
     if (trailing)
-	stradd(str, &size, ",\n");
+	outbuf_add(outbuf, ",\n");
 }				/* end of svalue_to_string() */
 
 /* The ignore strlen is so that the pading will work with our wonderful
@@ -807,7 +753,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, svalue_t *, argv)
 #ifdef RETURN_ERROR_MESSAGES
 	    sprintf(buff,
 	      "ERROR: (s)printf(): !feature - undefined error 0x%X !\n", i);
-	    fprintf(stderr, "Program:%s File: %s: %s", current_prog->name,
+	    debug_message("Program:%s File: %s: %s", current_prog->name,
 		    get_line_number_if_any(), buff);
 	    debug_message("%s", buff);
 	    if (current_object) {
@@ -823,7 +769,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, svalue_t *, argv)
 	}			/* end of switch */
 #ifdef RETURN_ERROR_MESSAGES
 	sprintf(buff, "ERROR: (s)printf(): %s (arg %u)\n", err, arg);
-	fprintf(stderr, "Program %s File: %s: %s", current_prog->name,
+	debug_message("Program %s File: %s: %s", current_prog->name,
 		get_line_number_if_any(), buff);
 	debug_message("%s", buff);
 	if (current_object) {
@@ -1052,13 +998,17 @@ char *string_print_formatted P3(char *, format_str, int, argc, svalue_t *, argv)
 	        svalue_t *clean = 0;
 
 		if ((finfo & INFO_T) == INFO_T_LPC) {
+		    outbuffer_t outbuf;
+		    
+		    outbuf_zero(&outbuf);
+		    svalue_to_string(carg, &outbuf, 0, 0, 0);
+		    outbuf_fix(&outbuf);
+
+		    /* This is gross - Beek */
 		    clean = ALLOCATE(svalue_t, TAG_TEMPORARY, "string_print: 1");
 		    clean->type = T_STRING;
 		    clean->subtype = STRING_MALLOC;
-		    clean->u.string = new_string(500, "string_print: 2");
-		    clean->u.string[0] = '\0';
-		    MSTR_UPDATE_SIZE(clean->u.string, 0);
-		    svalue_to_string(carg, &(clean->u.string), 500, 0, 0, 0);
+		    clean->u.string = outbuf.buffer;
 		    carg = clean;
 		    finfo ^= INFO_T_LPC;
 		    finfo |= INFO_T_STRING;

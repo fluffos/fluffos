@@ -1055,7 +1055,6 @@ static char *esbrk P1(u, size)
     extern char *sbrk();
 #endif				/* linux */
 
-    extern int brk();
     static char *current_break = 0;
 
     if (current_break == 0)
@@ -1391,28 +1390,28 @@ static int resort_free_list()
     return 0;
 }
 #ifdef DO_MSTATS
-#define dump_stat(str,stat) add_vmessage(str,stat.counter,stat.size)
-void show_mstats P1(char *, s)
+#define dump_stat(str,stat) outbuf_addv(ob, str,stat.counter,stat.size)
+void show_mstats P2(outbuffer_t *, ob, char *, s)
 {
-    add_vmessage("Memory allocation statistics %s\n", s);
-    add_message("Type                   Count      Space (bytes)\n");
+    outbuf_addv(ob, "Memory allocation statistics %s\n", s);
+    outbuf_add(ob, "Type                   Count      Space (bytes)\n");
     dump_stat("sbrk requests:     %8d        %10d (a)\n", sbrk_stat);
     dump_stat("large blocks:      %8d        %10d (b)\n", large_alloc_stat);
     dump_stat("large free blocks: %8d        %10d (c)\n\n", large_free_stat);
     dump_stat("small chunks:      %8d        %10d (d)\n", small_chunk_stat);
     dump_stat("small blocks:      %8d        %10d (e)\n", small_alloc_stat);
     dump_stat("small free blocks: %8d        %10d (f)\n", small_free_stat);
-    add_vmessage(
+    outbuf_addv(ob,
        "unused from current chunk          %10d (g)\n\n", unused_size);
-    add_message(
+    outbuf_addv(ob,
     "    Small blocks are stored in small chunks, which are allocated as\n");
-    add_message(
+    outbuf_addv(ob,
     "large blocks.  Therefore, the total large blocks allocated (b) plus\n");
-    add_message(
+    outbuf_addv(ob,
     "the large free blocks (c) should equal total storage from sbrk (a).\n");
-    add_message(
+    outbuf_addv(ob,
     "Similarly, (e) + (f) + (g) equals (d).  The total amount of storage\n");
-    add_message(
+    outbuf_addv(ob,
     "wasted is (c) + (f) + (g); the amount allocated is (b) - (f) - (g).\n");
 }
 #endif
@@ -1454,7 +1453,7 @@ static void walk_new_small_malloced(func)
     for (p = last_small_chunk; p; p = *(u **) p) {
 	u *end = p - 1 + (p[-1] & MASK);
 
-	fprintf(stderr, "scanning chunk %x, end %x\n", (u) (p - 1), (u) end);
+	debug_message("scanning chunk %x, end %x\n", (u) (p - 1), (u) end);
 	for (q = p + 1; q < end;) {
 	    u size = *s_size_ptr(q);
 

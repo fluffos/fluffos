@@ -71,6 +71,8 @@
 #define SUB_BAD_REPLACEMENT (ERR-16)
 #define BAD_DESTINATION (ERR-17)
 #define END_OF_FILE     (ERR-18)
+#define SEARCH_FAILED   (ERR-19)
+#define NO_LINE_RANGE   (ERR-20)
 
 #define	BUFFER_SIZE	2048	/* stream-buffer size:  == 1 hd cluster */
 
@@ -124,14 +126,16 @@ typedef struct ed_buffer_s {
  */
 void ed_start PROT((char *, char *, char *, int, object_t *));
 void ed_cmd PROT((char *));
-void save_ed_buffer PROT((void));
+void save_ed_buffer PROT((object_t *));
 
 #ifdef OLD_ED
 #define ED_OUTPUT       add_message
 #define ED_OUTPUTV      add_vmessage
+#define ED_DEST         command_giver
 #else
-#define ED_OUTPUT       object_ed_output
-#define ED_OUTPUTV      object_ed_outputv
+#define ED_OUTPUT       outbuf_add
+#define ED_OUTPUTV      outbuf_addv
+#define ED_DEST         &current_ed_results
 #endif
 
 #ifndef OLD_ED
@@ -141,7 +145,9 @@ int object_ed_mode PROT((object_t *));
 void object_save_ed_buffer PROT((object_t *));
 ed_buffer_t *find_ed_buffer PROT((object_t *));
 void object_ed_output PROT((char *));
-void object_ed_outputv PROTVARGS(());
+void object_ed_outputv PROT1V(char *);
+
+extern outbuffer_t current_ed_results;
 #endif
 
 #endif

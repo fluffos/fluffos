@@ -9,6 +9,10 @@
 #include "swap.h"
 #include "call_out.h"
 #include "mapping.h"
+#ifdef PACKAGE_SOCKETS
+#include "socket_efuns.h"
+#endif
+#include "cfuns.h"
 #endif
 
 /*
@@ -39,12 +43,12 @@ static char *sources[] = {
     "*", "temporary blocks", "permanent blocks", "compiler blocks", 
     "data blocks", "miscellaneous blocks", "<#6>", "<#7>", "<#8>", "<#9>",
     "<#10>", "program blocks", "call_out blocks", "interactives", "ed blocks", 
-    "error_contexts", "include list", "permanent identifiers", 
+    "<#15>", "include list", "permanent identifiers", 
     "identifier hash table", "reserved block", "mudlib stats", "objects",
     "object table", "config table", "simul_efuns", "sentences", "string table",
     "free swap blocks", "uids", "object names", "predefines", "line numbers",
-    "compiler local blocks", "function arguments", "compiled program",
-    "users", "<#36>", "<#37>", "<#38>", "<#39>", 
+    "compiler local blocks", "compiled program", "users", "debugmalloc overhead",
+    "<#36>", "<#37>", "<#38>", "<#39>", 
     "malloc'ed strings", "shared strings", "function pointers", "arrays",
     "mappings", "mapping nodes", "mapping tables"
 };
@@ -54,6 +58,10 @@ int malloc_mask = 121;
 static md_node_t **table;
 unsigned int total_malloced = 0L;
 unsigned int hiwater = 0L;
+
+#ifdef DEBUGMALLOC_EXTENSIONS
+outbuffer_t out;
+#endif
 
 void MDinit()
 {
@@ -95,9 +103,8 @@ MDmalloc P4(md_node_t *, node, int, size, int, tag, char *, desc)
     node->id = count++;
     node->desc = desc ? desc : "default";
     if (malloc_mask == node->tag) {
-	fprintf(stderr, "MDmalloc: %5d, [%-25s], %8x:(%d)\n",
+	debug_message("MDmalloc: %5d, [%-25s], %8x:(%d)\n",
 		node->tag, node->desc, (unsigned int) PTR(node), node->size);
-	fflush(stderr);
     }
 #endif
     table[h] = node;
@@ -146,11 +153,11 @@ MDfree P1(void *, ptr)
     if (entry) {
 #ifdef CHECK_MEMORY
 	if (LEFT_MAGIC(entry) != MD_MAGIC) {
-	    fprintf(stderr, "MDfree: left side of entry corrupt: %s %04x\n", entry->desc, (int)entry->tag);
+	    debug_message("MDfree: left side of entry corrupt: %s %04x\n", entry->desc, (int)entry->tag);
 	}
 	COPY_INT(&tmp, RIGHT_MAGIC_ADDR(entry));
 	if (tmp != MD_MAGIC) {
-	    fprintf(stderr, "MDfree: right side of entry corrupt: %s %04x\n", entry->desc, (int)entry->tag);
+	    debug_message("MDfree: right side of entry corrupt: %s %04x\n", entry->desc, (int)entry->tag);
 	}
 #endif
 #ifdef DEBUGMALLOC_EXTENSIONS
@@ -163,14 +170,12 @@ MDfree P1(void *, ptr)
 	    blocks[(entry->tag >> 8) & 0xff]--;
 	}
 	if (malloc_mask == entry->tag) {
-	    fprintf(stderr, "MDfree: %5d, [%-25s], %8x:(%d)\n",
+	    debug_message("MDfree: %5d, [%-25s], %8x:(%d)\n",
 	    entry->tag, entry->desc, (unsigned int) PTR(entry), entry->size);
-	    fflush(stderr);
 	}
 #endif
     } else {
-	fprintf(stderr,
-	     "md: debugmalloc: attempted to free non-malloc'd pointer %04x\n",
+	debug_message("md: debugmalloc: attempted to free non-malloc'd pointer %04x\n",
 		(unsigned int) ptr);
 #ifdef DEBUG
 	abort();
@@ -181,24 +186,22 @@ MDfree P1(void *, ptr)
 }
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-void dump_debugmalloc P2(char *, tfn, int, mask)
+char *dump_debugmalloc P2(char *, tfn, int, mask)
 {
     int j, total = 0, chunks = 0, total2 = 0;
     char *fn;
     md_node_t *entry;
     FILE *fp;
 
+    outbuf_zero(&out);
     fn = check_valid_path(tfn, current_object, "debugmalloc", 1);
     if (!fn) {
-	add_vmessage("Invalid path '%s' for writing.\n", tfn);
-	return;
+	error("Invalid path '%s' for writing.\n", tfn);
     }
     fp = fopen(fn, "w");
     if (!fp) {
-	add_vmessage("Unable to open %s for writing.\n", fn);
-	return;
+	error("Unable to open %s for writing.\n", fn);
     }
-    add_vmessage("Dumping to %s ...", fn);
     for (j = 0; j < TABLESIZE; j++) {
 	for (entry = table[j]; entry; entry = entry->next) {
 	    if (!mask || (entry->tag == mask)) {
@@ -220,12 +223,13 @@ void dump_debugmalloc P2(char *, tfn, int, mask)
     }
     fprintf(fp, "\ntotal = %11d\n", total2);
     fclose(fp);
-    add_message(" done.\n");
-    add_vmessage("total =    %8d\n", total);
-    add_vmessage("# chunks = %8d\n", chunks);
+    outbuf_addv(&out, "total =    %8d\n", total);
+    outbuf_addv(&out, "# chunks = %8d\n", chunks);
     if (chunks) {
-	add_vmessage("ave. bytes per chunk = %7.2f\n", (float) total / chunks);
+	outbuf_addv(&out, "ave. bytes per chunk = %7.2f\n", (float) total / chunks);
     }
+    outbuf_fix(&out);
+    return out.buffer;
 }
 #endif				/* DEBUGMALLOC_EXTENSIONS */
 
@@ -275,7 +279,7 @@ static void mark_object P1(object_t *, ob) {
 	for (i = 0; i < ob->prog->num_variables; i++)
 	    mark_svalue(&ob->variables[i]);
     else
-	add_vmessage("can't mark variables; %s is swapped.\n",
+	outbuf_addv(&out, "can't mark variables; %s is swapped.\n",
 		    ob->name);
 }
 
@@ -302,7 +306,7 @@ void mark_svalue P1(svalue_t *, sv) {
     case T_STRING:
 	switch (sv->subtype) {
 	case STRING_MALLOC:
-	    DO_MARK(MSTR_BLOCK(sv->u.string), TAG_STRING);
+	    MSTR_EXTRA_REF(sv->u.string)++;
 	    break;
 	case STRING_SHARED:
 	    EXTRA_REF(BLOCK(sv->u.string))++;
@@ -313,14 +317,14 @@ void mark_svalue P1(svalue_t *, sv) {
 
 static void mark_funp P1(funptr_t*, fp) {
     svalue_t tmp;
-    if (fp->hdr.args) {
+    if (fp->hdr.owner->extra_ref == 0 && fp->hdr.args) {
 	tmp.type = T_ARRAY;
 	tmp.u.arr = fp->hdr.args;
 	mark_svalue(&tmp);
     }
 
     fp->hdr.owner->extra_ref++;
-    if (fp->hdr.type & 0x0f == FP_FUNCTIONAL) 
+    if ((fp->hdr.type & 0x0f) == FP_FUNCTIONAL) 
 	fp->f.functional.prog->extra_func_ref++;
 }
 
@@ -332,8 +336,10 @@ static void mark_sentence P1(sentence_t *, sent) {
       if (sent->function.s)
           EXTRA_REF(BLOCK(sent->function.s))++;
     }
+#ifndef NO_ADD_ACTION
     if (sent->verb)
       EXTRA_REF(BLOCK(sent->verb))++;
+#endif
 }
 
 static int print_depth = 0;
@@ -341,59 +347,86 @@ static int print_depth = 0;
 static void md_print_array  P1(array_t *, vec) {
     int i;
 
-    add_message("({ ");
+    outbuf_add(&out, "({ ");
     for (i=0; i < vec->size; i++) {
       switch (vec->item[i].type) {
       case T_INVALID:
-          add_message("INVALID");
+          outbuf_add(&out, "INVALID");
           break;
       case T_NUMBER:
-          add_vmessage("%d", vec->item[i].u.number);
+          outbuf_addv(&out, "%d", vec->item[i].u.number);
           break;
       case T_REAL:
-          add_vmessage("%f", vec->item[i].u.real);
+          outbuf_addv(&out, "%f", vec->item[i].u.real);
           break;
       case T_STRING:
-          add_vmessage("\"%s\"", vec->item[i].u.string);
+          outbuf_addv(&out, "\"%s\"", vec->item[i].u.string);
           break;
       case T_ARRAY:
           if (print_depth < 2) {
               print_depth++;
               md_print_array(vec->item[i].u.arr);
           } else {
-              add_message("({ ... })");
+              outbuf_add(&out, "({ ... })");
           }
           break;
       case T_CLASS:
-	  add_message("<class>");
+	  outbuf_add(&out, "<class>");
 	  break;
       case T_BUFFER:
-          add_message("<buffer>");
+          outbuf_add(&out, "<buffer>");
           break;
       case T_FUNCTION:
-          add_message("<function>");
+          outbuf_add(&out, "<function>");
           break;
       case T_MAPPING:
-          add_message("<mapping>");
+          outbuf_add(&out, "<mapping>");
           break;
       case T_OBJECT:
-          add_vmessage("OBJ(%s)", vec->item[i].u.ob->name);
+          outbuf_addv(&out, "OBJ(%s)", vec->item[i].u.ob->name);
           break;
       }
-      if (i != vec->size - 1) add_message(", ");
+      if (i != vec->size - 1) outbuf_add(&out, ", ");
     }
-    add_message(" })\n");
+    outbuf_add(&out, " })\n");
     print_depth--;
 }
 
-static void mark_config() {
+static void mark_config PROT((void)) {
     int i;
 
     for (i = 0; i < NUM_CONFIG_STRS; i++) {
-	if (*config_str[i])
-	    DO_MARK(config_str[i], TAG_STRING);
+	DO_MARK(config_str[i], TAG_STRING);
     }
 }
+
+#ifdef PACKAGE_SOCKETS
+void mark_sockets PROT((void)) {
+    int i;
+    char *s;
+
+    for (i = 0; i < MAX_EFUN_SOCKS; i++) {
+	if (lpc_socks[i].flags & S_READ_FP) {
+	    mark_funp(lpc_socks[i].read_callback.f);
+	} else 
+	if (s = lpc_socks[i].read_callback.s) {
+	    EXTRA_REF(BLOCK(s))++;
+	}
+	if (lpc_socks[i].flags & S_WRITE_FP) {
+	    mark_funp(lpc_socks[i].write_callback.f);
+	} else 
+	if (s = lpc_socks[i].write_callback.s) {
+	    EXTRA_REF(BLOCK(s))++;
+	}
+	if (lpc_socks[i].flags & S_CLOSE_FP) {
+	    mark_funp(lpc_socks[i].close_callback.f);
+	} else 
+	if (s = lpc_socks[i].close_callback.s) {
+	    EXTRA_REF(BLOCK(s))++;
+	}
+    }
+}
+#endif
 
 void check_all_blocks P1(int, flag) {
     int i, j, hsh;
@@ -409,6 +442,7 @@ void check_all_blocks P1(int, flag) {
     sentence_t *sent;
     char *ptr;
     block_t *ssbl;
+    malloc_block_t *msbl;
     extern svalue_t apply_ret_value;
 
 #if 0
@@ -421,7 +455,8 @@ void check_all_blocks P1(int, flag) {
           load_ob_from_swap(ob);
     }
 
-    add_message("Performing memory tests ...\n");
+    outbuf_zero(&out);
+    outbuf_add(&out, "Performing memory tests ...\n");
     
 #if 0
     for (hsh = 0; hsh < TABLESIZE; hsh++) {
@@ -433,7 +468,7 @@ void check_all_blocks P1(int, flag) {
 	    }
 	}
     }
-    add_vmessage("fraction: %d/%d\n", num, total);
+    outbuf_addv(&out, "fraction: %d/%d\n", num, total);
 #endif
     
     for (hsh = 0; hsh < TABLESIZE; hsh++) {
@@ -441,23 +476,23 @@ void check_all_blocks P1(int, flag) {
 	    entry->tag &= ~TAG_MARKED;
 #ifdef CHECK_MEMORY
 	    if (LEFT_MAGIC(entry) != MD_MAGIC) {
-		add_vmessage("WARNING: left side of entry corrupt: %s %04x\n", entry->desc, (int)entry->tag);
+		outbuf_addv(&out, "WARNING: left side of entry corrupt: %s %04x\n", entry->desc, (int)entry->tag);
 	    }
 	    COPY_INT(&tmp, RIGHT_MAGIC_ADDR(entry));
 	    if (tmp != MD_MAGIC) {
-		add_vmessage("WARNING: right side of entry corrupt: %s %04x\n", entry->desc, (int)entry->tag);
+		outbuf_addv(&out, "WARNING: right side of entry corrupt: %s %04x\n", entry->desc, (int)entry->tag);
 	    }
 #endif
 	    switch (entry->tag & 0xff00) {
 	    case TAG_TEMPORARY:
-		add_vmessage("WARNING: Found temporary block: %s %04x\n", entry->desc, (int)entry->tag);
+		outbuf_addv(&out, "WARNING: Found temporary block: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
 	    case TAG_COMPILER:
 		if (!(flag & 2))
-		    add_vmessage("Found compiler block: %s %04x\n", entry->desc, (int)entry->tag);
+		    outbuf_addv(&out, "Found compiler block: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
 	    case TAG_MISC:
-		add_vmessage("Found miscellaneous block: %s %04x\n", entry->desc, (int)entry->tag);
+		outbuf_addv(&out, "Found miscellaneous block: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
 	    }
 	    switch (entry->tag) {
@@ -470,6 +505,18 @@ void check_all_blocks P1(int, flag) {
 		prog->extra_ref = 0;
 		prog->extra_func_ref = 0;
 		break;
+	    case TAG_MALLOC_STRING:
+		{
+		    char *str;
+		
+		    msbl = NODET_TO_PTR(entry, malloc_block_t *);
+		    str = (char *)(msbl + 1);
+		    msbl->extra_ref = 0;
+		    if (msbl->size != MAXSHORT && msbl->size != strlen(str)) {
+			outbuf_addv(&out, "Malloc'ed string length is incorrect: %s %04x '%s': is: %i should be: %i\n", entry->desc, (int)entry->tag, str, msbl->size, strlen(str));
+		    }
+		    break;
+		}
 	    case TAG_SHARED_STRING:
 		ssbl = NODET_TO_PTR(entry, block_t *);
 		EXTRA_REF(ssbl) = 0;
@@ -500,7 +547,7 @@ void check_all_blocks P1(int, flag) {
 		&& strcmp(entry->desc, "assign_svalue_no_free")
 		&& strcmp(entry->desc, "restore_string")) {
 		if (findstring(PTR(entry))) {
-		    add_vmessage("Malloc'ed string is also shared: %s %04x:\n\"%s\"\n", entry->desc, (int)entry->tag, PTR(entry));
+		    outbuf_addv(out, "Malloc'ed string is also shared: %s %04x:\n\"%s\"\n", entry->desc, (int)entry->tag, PTR(entry));
 		}
 	    }
 #endif
@@ -509,51 +556,52 @@ void check_all_blocks P1(int, flag) {
     
     /* the easy ones to find */
     if (blocks[TAG_SIMULS & 0xff] > 2)
-	add_message("WARNING: more than two simul_efun tables allocated.\n");
+	outbuf_add(&out, "WARNING: more than two simul_efun tables allocated.\n");
     if (blocks[TAG_INC_LIST & 0xff] > 1)
-	add_message("WARNING: more than one include list allocated.\n");
+	outbuf_add(&out, "WARNING: more than one include list allocated.\n");
     if (blocks[TAG_IDENT_TABLE & 0xff] > 1)
-	add_message("WARNING: more than one identifier hash table allocated.\n");
+	outbuf_add(&out, "WARNING: more than one identifier hash table allocated.\n");
     if (blocks[TAG_RESERVED & 0xff] > 1)
-	add_message("WARNING: more than one reserved block allocated.\n");
+	outbuf_add(&out, "WARNING: more than one reserved block allocated.\n");
     if (blocks[TAG_OBJ_TBL & 0xff] > 1)
-	add_message("WARNING: more than object table allocated.\n");
+	outbuf_add(&out, "WARNING: more than object table allocated.\n");
     if (blocks[TAG_CONFIG & 0xff] > 1)
-	add_message("WARNING: more than config file table allocated.\n");
+	outbuf_add(&out, "WARNING: more than config file table allocated.\n");
     if (blocks[TAG_STR_TBL & 0xff] > 1)
-	add_message("WARNING: more than string table allocated.\n");
-    if (totals[TAG_CALL_OUT & 0xff] != print_call_out_usage(-1))
-	add_message("WARNING: wrong number of call_out blocks allocated.\n");
+	outbuf_add(&out, "WARNING: more than string table allocated.\n");
+    if (totals[TAG_CALL_OUT & 0xff] != print_call_out_usage(&out, -1))
+	outbuf_add(&out, "WARNING: wrong number of call_out blocks allocated.\n");
     if (blocks[TAG_LOCALS & 0xff] > 3)
-	add_message("WARNING: more than 3 local blocks allocated.\n");
+	outbuf_add(&out, "WARNING: more than 3 local blocks allocated.\n");
 
     if (blocks[TAG_SENTENCE & 0xff] != tot_alloc_sentence)
-	add_vmessage("WARNING: tot_alloc_sentence is: %i should be: %i\n",
+	outbuf_addv(&out, "WARNING: tot_alloc_sentence is: %i should be: %i\n",
 		     tot_alloc_sentence, blocks[TAG_SENTENCE & 0xff]);
     if (blocks[TAG_OBJECT & 0xff] != tot_alloc_object)
-	add_vmessage("WARNING: tot_alloc_object is: %i should be: %i\n",
+	outbuf_addv(&out, "WARNING: tot_alloc_object is: %i should be: %i\n",
 		     tot_alloc_object, blocks[TAG_OBJECT & 0xff]);
     if (blocks[TAG_PROGRAM & 0xff] != total_num_prog_blocks)
-	add_vmessage("WARNING: total_num_prog_blocks is: %i should be: %i\n",
+	outbuf_addv(&out, "WARNING: total_num_prog_blocks is: %i should be: %i\n",
 		     total_num_prog_blocks, blocks[TAG_PROGRAM & 0xff]);
     if (blocks[TAG_ARRAY & 0xff] != num_arrays)
-	add_vmessage("WARNING: num_arrays is: %i should be: %i\n",
+	outbuf_addv(&out, "WARNING: num_arrays is: %i should be: %i\n",
 		     num_arrays, blocks[TAG_ARRAY & 0xff]);
     if (blocks[TAG_MAPPING & 0xff] != num_mappings)
-	add_vmessage("WARNING: num_mappings is: %i should be: %i\n",
+	outbuf_addv(&out, "WARNING: num_mappings is: %i should be: %i\n",
 		     num_mappings, blocks[TAG_MAPPING & 0xff]);
     if (blocks[TAG_MAP_TBL & 0xff] != num_mappings)
-	add_vmessage("WARNING: %i tables for %i mappings\n",
+	outbuf_addv(&out, "WARNING: %i tables for %i mappings\n",
 		     blocks[TAG_MAP_TBL & 0xff], num_mappings);
     if (blocks[TAG_INTERACTIVE & 0xff] != total_users)
-	add_vmessage("WATNING: total_users is: %i should be: %i\n",
+	outbuf_addv(&out, "WATNING: total_users is: %i should be: %i\n",
 		     total_users, blocks[TAG_INTERACTIVE & 0xff]);
 #ifdef STRING_STATS
-    if (blocks[TAG_SHARED_STRING & 0xff] != num_distinct_strings)
-	add_vmessage("WARNING: num_distinct_strings is: %i should be: %i\n",
-		     num_distinct_strings, blocks[TAG_SHARED_STRING & 0xff]);
+    if (blocks[TAG_SHARED_STRING & 0xff] + blocks[TAG_MALLOC_STRING & 0xff]
+	!= num_distinct_strings)
+	outbuf_addv(&out, "WARNING: num_distinct_strings is: %i should be: %i\n",
+		     num_distinct_strings, blocks[TAG_SHARED_STRING & 0xff] + blocks[TAG_MALLOC_STRING & 0xff]);
 #endif
-    
+
     /* now do a mark and sweep check to see what should be alloc'd */
     for (i = 0; i < max_users; i++)
 	if (all_users[i]) {
@@ -581,6 +629,12 @@ void check_all_blocks P1(int, flag) {
 #endif
 #ifdef PACKAGE_MUDLIB_STATS
     mark_mudlib_stats();
+#endif
+#ifdef PACKAGE_SOCKETS
+    mark_sockets();
+#endif
+#ifdef LPC_TO_C
+    mark_switch_lists();
 #endif
     mark_all_defines();
     mark_free_sentences();
@@ -631,13 +685,13 @@ void check_all_blocks P1(int, flag) {
 	    case TAG_ARRAY:
 		vec = NODET_TO_PTR(entry, array_t *);
 		if (entry->size != sizeof(array_t) + sizeof(svalue_t[1]) * (vec->size - 1))
-		    add_vmessage("array size doesn't match block size: %s %04x\n", entry->desc, (int)entry->tag);
+		    outbuf_addv(&out, "array size doesn't match block size: %s %04x\n", entry->desc, (int)entry->tag);
 		for (i = 0; i < vec->size; i++) mark_svalue(&vec->item[i]);
 		break;
 	    case TAG_CLASS:
 		vec = NODET_TO_PTR(entry, array_t *);
 		if (entry->size != sizeof(array_t) + sizeof(svalue_t[1]) * (vec->size - 1))
-		    add_vmessage("class size doesn't match block size: %s %04x\n", entry->desc, (int)entry->tag);
+		    outbuf_addv(&out, "class size doesn't match block size: %s %04x\n", entry->desc, (int)entry->tag);
 		for (i = 0; i < vec->size; i++) mark_svalue(&vec->item[i]);
 		break;
 	    case TAG_MAPPING:		
@@ -655,6 +709,12 @@ void check_all_blocks P1(int, flag) {
 	    case TAG_OBJECT:
 		ob = NODET_TO_PTR(entry, object_t *);
 		mark_object(ob);
+		break;
+	    case TAG_LPC_OBJECT:
+		ob = NODET_TO_PTR(entry, object_t *);
+		if (ob->name) {
+		    DO_MARK(ob->name, TAG_OBJ_NAME);
+		}
 		break;
 	    case TAG_PROGRAM:
 		prog = NODET_TO_PTR(entry, program_t *);
@@ -684,38 +744,25 @@ void check_all_blocks P1(int, flag) {
     for (hsh = 0; hsh < TABLESIZE; hsh++) {
 	for (entry = table[hsh]; entry; entry = entry->next) {
 	    switch (entry->tag) {
-	    case TAG_ERROR_CONTEXT: {
-		error_context_stack_t *ec, *tmp;
-		
-		ec = NODET_TO_PTR(entry, error_context_stack_t *);
-		tmp = ecsp;
-		while (tmp) {
-		    if (tmp == ec) break;
-		    tmp = tmp->next;
-		}
-		if (!tmp) 
-		    add_vmessage("WARNING: Found orphan error context: %s %04x\n", entry->desc, (int)entry->tag);
-		break;
-	    }
 	    case TAG_MUDLIB_STATS:
-		add_vmessage("WARNING: Found orphan mudlib stat block: %s %04x\n", entry->desc, (int)entry->tag);
+		outbuf_addv(&out, "WARNING: Found orphan mudlib stat block: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
 	    case TAG_PROGRAM:
 		prog = NODET_TO_PTR(entry, program_t *);
 		if (prog->ref != prog->extra_ref)
-		    add_vmessage("Bad ref count for program %s, is %d - should be %d\n", prog->name, prog->ref, prog->extra_ref);
+		    outbuf_addv(&out, "Bad ref count for program %s, is %d - should be %d\n", prog->name, prog->ref, prog->extra_ref);
 		if (prog->func_ref != prog->extra_func_ref)
-		    add_vmessage("Bad function ref count for program %s, is %d - should be %d\n", prog->name, prog->func_ref, prog->extra_func_ref);
+		    outbuf_addv(&out, "Bad function ref count for program %s, is %d - should be %d\n", prog->name, prog->func_ref, prog->extra_func_ref);
 		break;
 	    case TAG_OBJECT:
 		ob = NODET_TO_PTR(entry, object_t *);
 		if (ob->ref != ob->extra_ref)
-		    add_vmessage("Bad ref count for object %s, is %d - should be %d\n", ob->name, ob->ref, ob->extra_ref);
+		    outbuf_addv(&out, "Bad ref count for object %s, is %d - should be %d\n", ob->name, ob->ref, ob->extra_ref);
 		break;
 	    case TAG_ARRAY:
 		vec = NODET_TO_PTR(entry, array_t *);
 		if (vec->ref != vec->extra_ref) {
-		    add_vmessage("Bad ref count for array, is %d - should be %d\n", vec->ref, vec->extra_ref);
+		    outbuf_addv(&out, "Bad ref count for array, is %d - should be %d\n", vec->ref, vec->extra_ref);
 		    print_depth = 0;
 		    md_print_array(vec);
 		}
@@ -723,62 +770,72 @@ void check_all_blocks P1(int, flag) {
 	    case TAG_CLASS:
 		vec = NODET_TO_PTR(entry, array_t *);
 		if (vec->ref != vec->extra_ref)
-		    add_vmessage("Bad ref count for class, is %d - should be %d\n", vec->ref, vec->extra_ref);
+		    outbuf_addv(&out, "Bad ref count for class, is %d - should be %d\n", vec->ref, vec->extra_ref);
 		break;
 	    case TAG_MAPPING:
 		map = NODET_TO_PTR(entry, mapping_t *);
 		if (map->ref != map->extra_ref)
-		    add_vmessage("Bad ref count for mapping, is %d - should be %d\n", map->ref, map->extra_ref);
+		    outbuf_addv(&out, "Bad ref count for mapping, is %d - should be %d\n", map->ref, map->extra_ref);
 		break;
 	    case TAG_FUNP:
 		fp = NODET_TO_PTR(entry, funptr_t *);
 		if (fp->hdr.ref != fp->hdr.extra_ref)
-		    add_vmessage("Bad ref count for function pointer, is %d - should be %d\n", fp->hdr.ref, fp->hdr.extra_ref);
+		    outbuf_addv(&out, "Bad ref count for function pointer, is %d - should be %d\n", fp->hdr.ref, fp->hdr.extra_ref);
 		break;
 	    case TAG_BUFFER:
 		buf = NODET_TO_PTR(entry, buffer_t *);
 		if (buf->ref != buf->extra_ref)
-		    add_vmessage("Bad ref count for buffer, is %d - should be %d\n", buf->ref, buf->extra_ref);
+		    outbuf_addv(&out, "Bad ref count for buffer, is %d - should be %d\n", buf->ref, buf->extra_ref);
 		break;
 	    case TAG_PREDEFINES:
-		add_vmessage("WARNING: Found orphan predefine: %s %04x\n", entry->desc, (int)entry->tag);
+		outbuf_addv(&out, "WARNING: Found orphan predefine: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
 	    case TAG_LINENUMBERS:
-		add_vmessage("WARNING: Found orphan line number block: %s %04x\n", entry->desc, (int)entry->tag);
+		outbuf_addv(&out, "WARNING: Found orphan line number block: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
 	    case TAG_OBJ_NAME:
-		add_vmessage("WARNING: Found orphan object name: %s %04x\n", entry->desc, (int)entry->tag);
+		outbuf_addv(&out, "WARNING: Found orphan object name: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
 	    case TAG_INTERACTIVE:
-		add_vmessage("WARNING: Found orphan interactive: %s %04x\n", entry->desc, (int)entry->tag);
+		outbuf_addv(&out, "WARNING: Found orphan interactive: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
 	    case TAG_UID:
-		add_vmessage("WARNING: Found orphan uid node: %s %04x\n", entry->desc, (int)entry->tag);
+		outbuf_addv(&out, "WARNING: Found orphan uid node: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
 	    case TAG_SENTENCE:
 		sent = NODET_TO_PTR(entry, sentence_t *);
-		add_vmessage("WARNING: Found orphan sentence: %s:%s - %s %04x\n", sent->ob->name, sent->function, entry->desc, (int)entry->tag);
+		outbuf_addv(&out, "WARNING: Found orphan sentence: %s:%s - %s %04x\n", sent->ob->name, sent->function, entry->desc, (int)entry->tag);
 		break;
 	    case TAG_PERM_IDENT:
-		add_vmessage("WARNING: Found orphan permanent identifier: %s %04x\n", entry->desc, (int)entry->tag);
+		outbuf_addv(&out, "WARNING: Found orphan permanent identifier: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
 	    case TAG_STRING: 
 		ptr = NODET_TO_PTR(entry, char *);
-		add_vmessage("WARNING: Found orphan malloc'ed string: \"%s\" - %s %04x\n", ptr, entry->desc, (int)entry->tag);
+		outbuf_addv(&out, "WARNING: Found orphan malloc'ed string: \"%s\" - %s %04x\n", ptr, entry->desc, (int)entry->tag);
+		break;
+	    case TAG_MALLOC_STRING:
+		msbl = NODET_TO_PTR(entry, malloc_block_t *);
+		/* don't give an error for the return value we are 
+		   constructing :) */
+		if (msbl == MSTR_BLOCK(out.buffer))
+		    msbl->extra_ref++;
+
+		if (msbl->ref != msbl->extra_ref)
+		    outbuf_addv(&out, "Bad ref count for malloc string \"%s\" %s %04x, is %d - should be %d\n", (char *)(msbl + 1), entry->desc, (int)entry->tag, msbl->ref, msbl->extra_ref);
 		break;
 	    case TAG_SHARED_STRING:
 		ssbl = NODET_TO_PTR(entry, block_t *);
 		if (REFS(ssbl) != EXTRA_REF(ssbl))
-		    add_vmessage("Bad ref count for shared string \"%s\", is %d - should be %d\n", STRING(ssbl), REFS(ssbl), EXTRA_REF(ssbl));
+		    outbuf_addv(&out, "Bad ref count for shared string \"%s\", is %d - should be %d\n", STRING(ssbl), REFS(ssbl), EXTRA_REF(ssbl));
 		break;
 	    case TAG_ED:
-		add_vmessage("Found allocated ed block: %s %04x\n", entry->desc, (int)entry->tag);
+		outbuf_addv(&out, "Found allocated ed block: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
 	    case TAG_MAP_TBL:
-		add_vmessage("WARNING: Found orphan mapping table: %s %04x\n", entry->desc, (int)entry->tag);
+		outbuf_addv(&out, "WARNING: Found orphan mapping table: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
 	    case TAG_MAP_NODE_BLOCK:
-		add_vmessage("WARNING: Found orphan mapping node block: %s %04x\n", entry->desc, (int)entry->tag);
+		outbuf_addv(&out, "WARNING: Found orphan mapping node block: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
 	    }
 	    entry->tag &= ~TAG_MARKED;
@@ -786,15 +843,16 @@ void check_all_blocks P1(int, flag) {
     }
 
     if (flag & 1) {
-	add_message("\n\n");
-	add_message("      source         blks  total\n");
-	add_message("-------------------- ---- --------\n");
+	outbuf_add(&out, "\n\n");
+	outbuf_add(&out, "      source         blks  total\n");
+	outbuf_add(&out, "-------------------- ---- --------\n");
 	for (i = 1; i < MAX_CATEGORY; i++) {
 	    if (totals[i])
-		add_vmessage("%30s %4d %8d\n", sources[i], blocks[i], totals[i]);
-	    if (i == 5) add_message("\n");
+		outbuf_addv(&out, "%30s %4d %8d\n", sources[i], blocks[i], totals[i]);
+	    if (i == 5) outbuf_add(&out, "\n");
 	}
     }
+    outbuf_push(&out);
 }
 #endif                          /* DEBUGMALLOC_EXTENSIONS */
 #endif				/* DEBUGMALLOC */

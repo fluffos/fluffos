@@ -151,8 +151,15 @@ f_bind PROT((void))
     new_fp->hdr.owner = ob; /* one ref from being on stack */
     if (new_fp->hdr.args)
 	new_fp->hdr.args->ref++;
-    if (old_fp->hdr.type & 0x0f == FP_FUNCTIONAL)
+    if ((old_fp->hdr.type & 0x0f) == FP_FUNCTIONAL) {
 	new_fp->f.functional.prog->func_ref++;
+#ifdef DEBUG
+	if (d_flag)
+	    printf("add func ref %s: now %i\n",
+		   new_fp->f.functional.prog->name,
+		   new_fp->f.functional.prog->func_ref);
+#endif	
+    }
 
     free_funp(old_fp);
     sp--;
@@ -182,27 +189,30 @@ f_break_string PROT((void))
 #endif
 
 #ifdef F_CACHE_STATS
-void print_cache_stats()
+static void print_cache_stats P1(outbuffer_t *, ob)
 {
-    add_message("Function cache information\n");
-    add_message("-------------------------------\n");
-    add_vmessage("%% cache hits:    %10.2f\n",
+    outbuf_add(ob, "Function cache information\n");
+    outbuf_add(ob, "-------------------------------\n");
+    outbuf_addv(ob, "%% cache hits:    %10.2f\n",
 	     100 * ((double) apply_low_cache_hits / apply_low_call_others));
-    add_vmessage("call_others:     %10lu\n", apply_low_call_others);
-    add_vmessage("cache hits:      %10lu\n", apply_low_cache_hits);
-    add_vmessage("cache size:      %10lu\n", APPLY_CACHE_SIZE);
-    add_vmessage("slots used:      %10lu\n", apply_low_slots_used);
-    add_vmessage("%% slots used:    %10.2f\n",
+    outbuf_addv(ob, "call_others:     %10lu\n", apply_low_call_others);
+    outbuf_addv(ob, "cache hits:      %10lu\n", apply_low_cache_hits);
+    outbuf_addv(ob, "cache size:      %10lu\n", APPLY_CACHE_SIZE);
+    outbuf_addv(ob, "slots used:      %10lu\n", apply_low_slots_used);
+    outbuf_addv(ob, "%% slots used:    %10.2f\n",
 		100 * ((double) apply_low_slots_used / APPLY_CACHE_SIZE));
-    add_vmessage("collisions:      %10lu\n", apply_low_collisions);
-    add_vmessage("%% collisions:    %10.2f\n",
+    outbuf_addv(ob, "collisions:      %10lu\n", apply_low_collisions);
+    outbuf_addv(ob, "%% collisions:    %10.2f\n",
 	     100 * ((double) apply_low_collisions / apply_low_call_others));
 }
 
 void f_cache_stats PROT((void))
 {
-    print_cache_stats();
-    *++sp = const0;
+    outbuffer_t ob;
+
+    outbuf_zero(&ob);
+    print_cache_stats(&ob);
+    outbuf_push(&ob);
 }
 #endif
 
@@ -235,6 +245,7 @@ f_call_other PROT((void))
         funcname = sv->u.string;
         num_arg = 2 + merge_arg_lists(num_arg - 2, v, 1);
     }
+
     if (arg[0].type == T_OBJECT)
 	ob = arg[0].u.ob;
     else if (arg[0].type == T_ARRAY) {
@@ -961,13 +972,25 @@ f_get_dir PROT((void))
 void
 f_implode PROT((void))
 {
-    char *str;
-
     check_for_destr((sp - 1)->u.arr);
-    str = implode_string((sp - 1)->u.arr, sp->u.string, SVALUE_STRLEN(sp));
-    free_string_svalue(sp--);
-    free_array(sp->u.arr);
-    put_malloced_string(str);
+    if (sp->type == T_STRING) {
+	char *str;
+
+	str = implode_string((sp - 1)->u.arr, sp->u.string, SVALUE_STRLEN(sp));
+	free_string_svalue(sp--);
+	free_array(sp->u.arr);
+	put_malloced_string(str);
+    } else { /* function */
+	svalue_t *v;
+	array_t *arr = (sp - 1)->u.arr;
+	funptr_t *funp = sp->u.fp;
+
+	v = implode_array(funp, arr);
+	/* be careful; v can be a pointer into arr */
+	free_funp(funp);
+	assign_svalue_no_free(--sp, v);
+	free_array(arr);
+    }
 }
 #endif
 
@@ -1215,58 +1238,63 @@ f_lower_case PROT((void))
 #ifdef F_LPC_INFO
 void f_lpc_info PROT((void))
 {
+    outbuffer_t out;
+
     interface_t **p = interface;
     object_t *ob;
 
-    add_vmessage("%30s  Loaded  Using compiled program\n", "Program");
+    outbuf_zero(&out);
+    outbuf_addv(&out, "%30s  Loaded  Using compiled program\n", "Program");
     while (*p) {
-	add_vmessage("%30s: ", (*p)->fname);
+	outbuf_addv(&out, "%30s: ", (*p)->fname);
 	ob = lookup_object_hash((*p)->fname);
 	if (ob) {
 	    if (ob->flags & O_COMPILED_PROGRAM) {
-		add_message(" No\n");
+		outbuf_add(&out, " No\n");
 	    } else if (ob->prog->program_size == 0) {
-		add_message(" Yes      Yes\n");
+		outbuf_add(&out, " Yes      Yes\n");
 	    } else {
-		add_message(" Yes      No\n");
+		outbuf_add(&out, " Yes      No\n");
 	    }
 	} else {
-	    add_message("Something REALLY wierd happened; no record of the object.\n");
+	    outbuf_add(&out, "Something REALLY wierd happened; no record of the object.\n");
 	}
 	p++;
     }
+    outbuf_push(&out);
 }
 #endif
 
 #ifdef F_MALLOC_STATUS
 void f_malloc_status PROT((void))
 {
-#if (defined(WRAPPEDMALLOC) || defined(DEBUGMALLOC))
-    void dump_malloc_data PROT((void));
-#endif
+    outbuffer_t ob;
+
+    outbuf_zero(&ob);
 
 #ifdef BSDMALLOC
-    add_message("Using BSD malloc");
+    outbuf_add(&ob, "Using BSD malloc");
 #endif
 #ifdef SMALLOC
-    add_message("Using Smalloc");
+    outbuf_add(&ob, "Using Smalloc");
 #endif
 #ifdef SYSMALLOC
-    add_message("Using system malloc");
+    outbuf_add(&ob, "Using system malloc");
 #endif
 #ifdef DEBUGMALLOC
-    add_message(", wrapped with debugmalloc");
+    outbuf_add(&ob, ", wrapped with debugmalloc");
 #endif
 #ifdef WRAPPEDMALLOC
-    add_message(", wrapped with wrappedmalloc");
+    outbuf_add(&ob, ", wrapped with wrappedmalloc");
 #endif
-    add_message(".\n");
+    outbuf_add(&ob, ".\n");
 #ifdef DO_MSTATS
-    show_mstats("malloc_status()");
+    show_mstats(&ob, "malloc_status()");
 #endif
 #if (defined(WRAPPEDMALLOC) || defined(DEBUGMALLOC))
-    dump_malloc_data();
+    dump_malloc_data(&ob);
 #endif
+    outbuf_push(&ob);
 }
 #endif
 
@@ -1402,14 +1430,25 @@ f_member_array PROT((void))
         int size = (v = sp->u.arr)->size;
         svalue_t *sv;
 	svalue_t *find;
+	int flen;
 
         find = (sp - 1);
+	/* optimize a bit */
+	if (find->type == T_STRING) {
+	    /* *not* COUNTED_STRLEN() which can do a (costly) strlen() call */
+	    if (find->subtype & STRING_COUNTED)
+		flen = MSTR_SIZE(find->u.string);
+	    else flen = 0;
+	}
 
         for (; i < size; i++) {
             switch (find->type|(sv= v->item + i)->type) {
             case T_STRING:
-                if (!strcmp(find->u.string, sv->u.string)) break;
-                continue;
+		if (flen && (sv->subtype & STRING_COUNTED)
+		    && flen != MSTR_SIZE(sv->u.string))
+		    continue;
+                if (strcmp(find->u.string, sv->u.string)) continue;
+		break;
             case T_NUMBER:
                 if (find->u.number == sv->u.number) break;
                 continue;
@@ -1505,7 +1544,7 @@ f_message PROT((void))
 	    /* this is really bad and probably should be rm'ed -Beek */
 	    /* for compatibility (write() simul_efuns, etc)  -bobf */
 	    check_legal_string(args[1].u.string);
-	    add_message(args[1].u.string);
+	    add_message(command_giver, args[1].u.string);
 	    pop_n_elems(num_arg);
 	    return;
 	}
@@ -1578,7 +1617,9 @@ f_move_object PROT((void))
 void f_mud_status PROT((void))
 {
     int tot, res, verbose = 0;
+    outbuffer_t ob;
 
+    outbuf_zero(&ob);
     verbose = (sp--)->u.number;
 
     if (reserved_area)
@@ -1592,58 +1633,58 @@ void f_mud_status PROT((void))
 
 	if ((testfp = fopen(".mudos_test_file", "w"))) {
 	    fclose(testfp);
-	    add_message("Open-file-test succeeded.\n");
+	    outbuf_add(&ob, "Open-file-test succeeded.\n");
 	    unlink(".mudos_test_file");
 	} else {
 	    /* if strerror() is missing, edit the #ifdef for it in port.c */
-	    add_vmessage("Open file test failed: %s\n", strerror(errno));
+	    outbuf_addv(&ob, "Open file test failed: %s\n", strerror(errno));
 	}
 
-	add_vmessage("current working directory: %s\n\n",
+	outbuf_addv(&ob, "current working directory: %s\n\n",
 		    get_current_dir(dir_buf, 1024));
-	add_message("add_message statistics\n");
-	add_message("------------------------------\n");
-	add_vmessage("Calls to add_message: %d   Packets: %d   Average packet size: %f\n\n",
+	outbuf_add(&ob, "add_message statistics\n");
+	outbuf_add(&ob, "------------------------------\n");
+	outbuf_addv(&ob, "Calls to add_message: %d   Packets: %d   Average packet size: %f\n\n",
 	add_message_calls, inet_packets, (float) inet_volume / inet_packets);
 
 #ifndef NO_ADD_ACTION
-	stat_living_objects();
-	add_message("\n");
+	stat_living_objects(&ob);
+	outbuf_add(&ob, "\n");
 #endif
 #ifdef F_CACHE_STATS
-	print_cache_stats();
-	add_message("\n");
+	print_cache_stats(&ob);
+	outbuf_add(&ob, "\n");
 #endif
-	print_swap_stats();
-	add_message("\n");
+	print_swap_stats(&ob);
+	outbuf_add(&ob, "\n");
 
-        tot = show_otable_status(verbose);
-        add_message("\n");
-        tot += heart_beat_status(verbose);
-        add_message("\n");
-        tot += add_string_status(verbose);
-        add_message("\n");
-        tot += print_call_out_usage(verbose);
+        tot = show_otable_status(&ob, verbose);
+        outbuf_add(&ob, "\n");
+        tot += heart_beat_status(&ob, verbose);
+        outbuf_add(&ob, "\n");
+        tot += add_string_status(&ob, verbose);
+        outbuf_add(&ob, "\n");
+        tot += print_call_out_usage(&ob, verbose);
     } else {
 	/* !verbose */
-	add_vmessage("Sentences:\t\t\t%8d %8d\n", tot_alloc_sentence,
+	outbuf_addv(&ob, "Sentences:\t\t\t%8d %8d\n", tot_alloc_sentence,
 		    tot_alloc_sentence * sizeof(sentence_t));
-	add_vmessage("Objects:\t\t\t%8d %8d\n",
+	outbuf_addv(&ob, "Objects:\t\t\t%8d %8d\n",
 		    tot_alloc_object, tot_alloc_object_size);
-	add_vmessage("Prog blocks:\t\t\t%8d %8d\n",
+	outbuf_addv(&ob, "Prog blocks:\t\t\t%8d %8d\n",
 		    total_num_prog_blocks, total_prog_block_size);
-	add_vmessage("Arrays:\t\t\t\t%8d %8d\n", num_arrays,
+	outbuf_addv(&ob, "Arrays:\t\t\t\t%8d %8d\n", num_arrays,
 		    total_array_size);
-	add_vmessage("Mappings:\t\t\t%8d %8d\n", num_mappings,
+	outbuf_addv(&ob, "Mappings:\t\t\t%8d %8d\n", num_mappings,
 		    total_mapping_size);
-	add_vmessage("Mappings(nodes):\t\t%8d\n", total_mapping_nodes);
-	add_vmessage("Interactives:\t\t\t%8d %8d\n", total_users,
+	outbuf_addv(&ob, "Mappings(nodes):\t\t%8d\n", total_mapping_nodes);
+	outbuf_addv(&ob, "Interactives:\t\t\t%8d %8d\n", total_users,
 		    total_users * sizeof(interactive_t));
 
-	tot = show_otable_status(verbose) +
-	    heart_beat_status(verbose) +
-	    add_string_status(verbose) +
-	    print_call_out_usage(verbose);
+	tot = show_otable_status(&ob, verbose) +
+	    heart_beat_status(&ob, verbose) +
+	    add_string_status(&ob, verbose) +
+	    print_call_out_usage(&ob, verbose);
     }
 
     tot += total_prog_block_size +
@@ -1655,9 +1696,10 @@ void f_mud_status PROT((void))
 	res;
 
     if (!verbose) {
-	add_message("\t\t\t\t\t --------\n");
-	add_vmessage("Total:\t\t\t\t\t %8d\n", tot);
+	outbuf_add(&ob, "\t\t\t\t\t --------\n");
+	outbuf_addv(&ob, "Total:\t\t\t\t\t %8d\n", tot);
     }
+    outbuf_push(&ob);
 }
 #endif
 
@@ -1774,7 +1816,7 @@ f_previous_object PROT((void))
         ob = 0;
         p = csp;
         do {
-            if (p->extern_call && !(--i)) {
+            if ((p->framekind & FRAME_OB_CHANGE) && !(--i)) {
                 ob = p->prev_ob;
                 break;
 	    }
@@ -1785,7 +1827,7 @@ f_previous_object PROT((void))
         i = previous_ob ? 1 : 0;
         p = csp;
         do {
-            if (p->extern_call && p->prev_ob) i++;
+            if ((p->framekind & FRAME_OB_CHANGE) && p->prev_ob) i++;
 	} while (--p >= control_stack);
         v = allocate_empty_array(i);
         p = csp;
@@ -1798,7 +1840,7 @@ f_previous_object PROT((void))
             i = 1;
 	} else i = 0;
         do {
-            if (p->extern_call && (ob = p->prev_ob)) {
+            if ((p->framekind & FRAME_OB_CHANGE) && (ob = p->prev_ob)) {
 		if (!(ob->flags & O_DESTRUCTED)){
 		    v->item[i].type = T_OBJECT;
 		    v->item[i].u.ob = ob;
@@ -2088,13 +2130,8 @@ void
 f_receive PROT((void))
 {
     if (current_object->interactive) {
-	object_t *save_command_giver = command_giver;
-
 	check_legal_string(sp->u.string);
-	command_giver = current_object;
-	add_message(sp->u.string);
-	command_giver = save_command_giver;
-	assign_svalue(sp, &const1);
+	add_message(current_object, sp->u.string);
     }
     free_string_svalue(sp--);
 }
@@ -2181,6 +2218,31 @@ f_rename PROT((void))
 }
 #endif				/* F_RENAME */
 
+/* This is an enhancement to the f_replace_string() in efuns_main.c of
+   MudOS v21.  When the search pattern has more than one character,
+   this version of f_replace_string() uses a skip table to more efficiently
+   search the file for the search pattern (the basic idea is to avoid
+   strings comparisons where possible).  This version is anywhere from
+   15% to 40% faster than the old version depending on the size of the
+   string to be searched and the length of the search string (and depending
+   on the relative frequency with which the letters in the search string
+   appear in the string to be searched).
+
+   Note: this version should behave identically to the old version (except
+   for runtime).  When the search pattern is only one character long, the
+   old algorithm is used.  The new algorithm is actually about 10% slower
+   than the old one when the search string is only one character long.
+
+   This enhancement to f_replace_string() was written by John Garnett
+   (aka Truilkan) on 1995/04/29.  I believe the original replace_string()
+   was written by Dave Richards (Cygnus).
+
+   I didn't come up with the idea of this algorithm (learned it in
+   a university programming course way back when).  For those interested
+   in the workings of the algorithm, you can probably find it in a book on
+   string processing algorithms.  Its also fairly easy to figure out the
+   algorithm by tracing through it for a small example.
+*/
 #ifdef F_REPLACE_STRING
 
 /*
@@ -2207,11 +2269,19 @@ The 4th/5th args are optional (to retain backward compatibility).
 void
 f_replace_string PROT((void))
 {
-    int plen, rlen, dlen, first, last, cur;
-    char *src, *pattern, *replace;
-    register char *dst1, *dst2;
+    int plen, rlen, dlen, slen, first, last, cur, j;
+    
+    char *pattern;
+    char *replace;
+    register char *src, *dst1, *dst2;
     svalue_t *arg;
-
+    int skip_table[256];
+    char *slimit;
+    char *flimit;
+    char *climit;
+    int probe;
+    int skip;
+    
     if (st_num_arg > 5) {
         error("Too many args to replace_string.\n");
         pop_n_elems(st_num_arg);
@@ -2222,23 +2292,24 @@ f_replace_string PROT((void))
     src = arg->u.string;
     first = 0;
     last = 0;
-
+    
     if (st_num_arg >= 4) {
         CHECK_TYPES((arg+3), T_NUMBER, 4, F_REPLACE_STRING);
         first = (arg+3)->u.number;
-
+	
         if (st_num_arg == 4) {
             last = first;
             first = 0;
-	} else if (st_num_arg == 5) {
+        } else if (st_num_arg == 5) {
             CHECK_TYPES(sp, T_NUMBER, 5, F_REPLACE_STRING);
             /* first set above. */
             last = sp->u.number;
-	}
+        }
     }
+        
     if (!last)
         last = max_string_length;
-
+    
     if (first > last) {         /* just return it */
         pop_n_elems(st_num_arg - 1);
         return;
@@ -2247,6 +2318,7 @@ f_replace_string PROT((void))
     plen = SVALUE_STRLEN(arg+1);
     if (!plen) {
         pop_n_elems(st_num_arg - 1);    /* just return it */
+	
         return;
     }
     replace = (arg+2)->u.string;
@@ -2255,66 +2327,161 @@ f_replace_string PROT((void))
     cur = 0;
 
     if (rlen <= plen) {
-        /* in string replacement */
+	/* we're going to do in string replacement */
 	unlink_string_svalue(arg);
-        dst2 = dst1 = src = arg->u.string;
-
-        /* assume source string is a string < maximum string length */
-        while (*src != '\0') {
-            if (strncmp(src, pattern, plen) == 0) {
-                cur++;
-                if (cur >= first && cur <= last) {
-                    if (rlen) {
-                        strncpy(dst2, replace, rlen);
-                        dst2 += rlen;
+	src = arg->u.string;
+    }
+    
+    if (plen > 1) {
+        /* build skip table */
+        for (j = 0; j < 256; j++) {
+            skip_table[j] = plen;
+        }
+        for (j = 0; j < plen; j++) {
+            skip_table[(unsigned char)pattern[j]] = plen - j - 1;
+        }
+        slen = SVALUE_STRLEN(arg);
+        slimit = src + slen;
+        flimit = slimit - plen + 1;
+        probe = plen - 1;
+    }
+    
+    if (rlen <= plen) {
+        /* in string replacement */
+        dst2 = dst1 = arg->u.string;
+	
+        if (plen > 1) { /* pattern length > 1, jump table most efficient */
+            while (src < flimit) {
+                if (skip = skip_table[(unsigned char)src[probe]]) {
+                    for (climit = dst2 + skip; dst2 < climit; *dst2++ = *src++)
+                        ;
+                } else if (memcmp(src, pattern, plen) == 0) {
+                    cur++;
+                    if ((cur >= first) &&  (cur <= last)) {
+                        if (rlen) {
+                            memcpy(dst2, replace, rlen);
+                            dst2 += rlen;
+                        }
+                        src += plen;
+                        if (cur == last) break;
+                    } else {
+                        src += plen;
+                    }
+                } else {
+                    *dst2++ = *src++;
+                }
+            }
+            memcpy(dst2, src, slimit - src);
+            dst2 += (slimit - src);
+        } else { /* pattern length <= 1, brute force most efficient */
+	    /* Beek - if it was zero, we already returned, so plen == 1 */
+	    /* assume source string is a string < maximum string length */
+            while (*src) {
+                if (*src == *pattern) {
+                    cur++;
+		    
+                    if (cur >= first && cur <= last) {
+                        if (rlen) {
+                            strncpy(dst2, replace, rlen);
+                            dst2 += rlen;
+                        }
+                        src++;
+                        continue;
 		    }
-                    src += plen;
-                    continue;
-		}
-	    }
-            *dst2++ = *src++;
-	}
-
+                }
+                *dst2++ = *src++;
+            }
+        }
+	
         /*
          * shrink block (if necessary)
          */
         if (rlen < plen) {
             *dst2 = '\0';
             arg->u.string = extend_string(dst1, dst2 - dst1);
-	}
+        }
         pop_n_elems(st_num_arg - 1);
     } else {
-        dst2 = dst1 = (char *) new_string(max_string_length, "f_replace_string: 2");
-
-        while (*src != '\0') {
-            if (strncmp(src, pattern, plen) == 0) {
-                cur++;
-                if (cur >= first && cur <= last) {
-                    if (rlen != 0) {
-                        if (max_string_length - dlen <= rlen) {
-                            pop_n_elems(st_num_arg);
-                            push_svalue(&const0u);
-                            FREE_MSTR(dst1);
-                            return;
-			}
-                        strncpy(dst2, replace, rlen);
-                        dst2 += rlen;
-                        dlen += rlen;
-		    }
-                    src += plen;
-                    continue;
-		}
-	    }
-            if (max_string_length - dlen <= 1) {
+        dst2 = dst1 = new_string(max_string_length, "f_replace_string: 2");
+	
+        if (plen > 1) {
+            while (src < flimit) {
+                if (skip = skip_table[(unsigned char)src[probe]]) {
+                    for (climit = dst2 + skip; dst2 < climit; *dst2++ = *src++)
+                        ;
+		    
+                } else if (memcmp(src, pattern, plen) == 0) {
+                    cur++;
+                    if ((cur >= first) &&  (cur <= last)) {
+                        if (rlen) {
+                            if (max_string_length - dlen <= rlen) {
+                                pop_n_elems(st_num_arg);
+                                push_svalue(&const0u);
+                                FREE_MSTR(dst1);
+                                return;
+                            }
+                            memcpy(dst2, replace, rlen);
+                            dst2 += rlen;
+                            dlen += rlen;
+                        }
+                        src += plen;
+                        if (cur == last) break;
+                    } else {
+                        src += plen;
+                    }
+                } else {
+                    if (max_string_length - dlen <= 1) {
+                        pop_n_elems(st_num_arg);
+                        push_svalue(&const0u);
+			
+                        FREE_MSTR(dst1);
+                        return;
+                    }
+                    *dst2++ = *src++;
+                    dlen++;
+                }
+            }
+            if (max_string_length - dlen <= (slimit - src)) {
                 pop_n_elems(st_num_arg);
                 push_svalue(&const0u);
                 FREE_MSTR(dst1);
                 return;
-	    }
-            *dst2++ = *src++;
-            dlen++;
-	}
+            }
+            memcpy(dst2, src, slimit - src);
+            dst2 += (slimit - src);
+        } else { /* plen <= 1 */
+	    /* Beek: plen == 1 */
+            while (*src != '\0') {
+                if (*src == *pattern) {
+                    cur++;
+                    if (cur >= first && cur <= last) {
+                        if (rlen != 0) {
+                            if (max_string_length - dlen <= rlen) {
+                                pop_n_elems(st_num_arg);
+                                push_svalue(&const0u);
+                                FREE_MSTR(dst1);
+                                return;
+                            }
+                            strncpy(dst2, replace, rlen);
+                            dst2 += rlen;
+                            dlen += rlen;
+                        }
+                        src++;
+                        continue;
+                    }
+                }
+                if (max_string_length - dlen <= 1) {
+                    pop_n_elems(st_num_arg);
+                    push_svalue(&const0u);
+                    FREE_MSTR(dst1);
+                    return;
+                }
+                *dst2++ = *src++;
+                dlen++;
+            }
+        }
         *dst2 = '\0';
+
         pop_n_elems(st_num_arg);
         /*
          * shrink block or make a copy of exact size
@@ -2587,11 +2754,13 @@ f_set_privs PROT((void))
     ob = (sp - 1)->u.ob;
     if (ob->privs != NULL)
         free_string(ob->privs);
-    if (!(sp->type == T_STRING))
+    if (!(sp->type == T_STRING)) {
         ob->privs = NULL;
-    else
+	sp--; /* It's a number */
+    } else {
         ob->privs = make_shared_string(sp->u.string);
-    free_string_svalue(sp--);
+	free_string_svalue(sp--);
+    }	    
     free_object(ob, "f_set_privs");
     sp--;
 }
@@ -2664,6 +2833,7 @@ f_sizeof PROT((void))
     int i;
 
     switch (sp->type) {
+    case T_CLASS:
     case T_ARRAY:
 	i = sp->u.arr->size;
 	free_array(sp->u.arr);
@@ -3039,7 +3209,8 @@ f_set_this_player PROT((void))
 void
 f_throw PROT((void))
 {
-    assign_svalue(&catch_value, sp--);
+    free_svalue(&catch_value, "f_throw");
+    catch_value = *sp--;
     throw_error();		/* do the longjump, with extra checks... */
 }
 #endif
@@ -3314,7 +3485,11 @@ f_write_file PROT((void))
 void
 f_dump_file_descriptors PROT((void))
 {
-    dump_file_descriptors();
+    outbuffer_t out;
+
+    outbuf_zero(&out);
+    dump_file_descriptors(&out);
+    outbuf_push(&out);
 }
 #endif
 
@@ -3344,10 +3519,10 @@ f_memory_info PROT((void))
 	    tot_alloc_object_size +
 	    tot_alloc_sentence * sizeof(sentence_t) +
 	    total_users * sizeof(interactive_t) +
-	    show_otable_status(-1) +
-	    heart_beat_status(-1) +
-	    add_string_status(-1) +
-	    print_call_out_usage(-1) + res;
+	    show_otable_status(0, -1) +
+	    heart_beat_status(0, -1) +
+	    add_string_status(0, -1) +
+	    print_call_out_usage(0, -1) + res;
 	push_number(tot);
 	return;
     }

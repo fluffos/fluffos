@@ -11,7 +11,7 @@ void reference_prog P2(program_t *, progp, char *, from)
     progp->ref++;
 #ifdef DEBUG
     if (d_flag)
-	printf("reference_prog: %s ref %d (%s)\n",
+	debug_message("reference_prog: %s ref %d (%s)\n",
 	       progp->name, progp->ref, from);
 #endif
 }
@@ -22,7 +22,7 @@ void deallocate_program P1(program_t *, progp)
 
 #ifdef DEBUG
     if (d_flag)
-	printf("free_prog: %s\n", progp->name);
+	debug_message("free_prog: %s\n", progp->name);
 #endif
     
     total_prog_block_size -= progp->total_size;

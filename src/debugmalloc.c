@@ -87,18 +87,18 @@ INLINE void debugfree P1(void *, ptr)
     }
 }
 
-void dump_malloc_data()
+void dump_malloc_data P1(outbuffer_t *, ob)
 {
     int net;
 
     net = stats.alloc_calls - stats.free_calls;
-    add_message("using debug malloc:\n\n");
-    add_vmessage("total malloc'd:   %10lu\n", total_malloced);
-    add_vmessage("high water mark:  %10lu\n", hiwater);
-    add_vmessage("overhead:         %10lu\n",
+    outbuf_add(ob, "using debug malloc:\n\n");
+    outbuf_addv(ob, "total malloc'd:   %10lu\n", total_malloced);
+    outbuf_addv(ob, "high water mark:  %10lu\n", hiwater);
+    outbuf_addv(ob, "overhead:         %10lu\n",
 		(TABLESIZE * sizeof(md_node_t *)) + (net * MD_OVERHEAD));
-    add_vmessage("#alloc calls:     %10lu\n", stats.alloc_calls);
-    add_vmessage("#free calls:      %10lu\n", stats.free_calls);
-    add_vmessage("#alloc - #free:   %10lu\n", net);
-    add_vmessage("#realloc calls:   %10lu\n", stats.realloc_calls);
+    outbuf_addv(ob, "#alloc calls:     %10lu\n", stats.alloc_calls);
+    outbuf_addv(ob, "#free calls:      %10lu\n", stats.free_calls);
+    outbuf_addv(ob, "#alloc - #free:   %10lu\n", net);
+    outbuf_addv(ob, "#realloc calls:   %10lu\n", stats.realloc_calls);
 }

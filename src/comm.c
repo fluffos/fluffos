@@ -14,6 +14,7 @@
 #include "eoperators.h"
 #include "debug.h"
 #include "ed.h"
+#include "file.h"
 
 #define TELOPTS
 #ifdef OS2
@@ -39,7 +40,7 @@ int total_users = 0;
 /*
  * local function prototypes.
  */
-static int flush_message PROT((void));
+static int flush_message PROT((interactive_t *));
 static int copy_chars PROT((unsigned char *, unsigned char *, int, interactive_t *));
 
 #ifdef SIGNAL_FUNC_TAKES_INT
@@ -63,9 +64,7 @@ static void add_ip_entry PROT((long, char *));
 static void clear_notify PROT((void));
 #endif
 static void new_user_handler PROT((int));
-#ifdef RECEIVE_SNOOP
 static void receive_snoop PROT((char *, object_t * ob));
-#endif
 
 /*
  * public local variables.
@@ -91,14 +90,20 @@ static HPIPE new_user_handle = 0;
 #else
 static int addr_server_fd = -1;
 #endif
-#ifdef RECEIVE_SNOOP
+
 static void
-receive_snoop P2(char *, buf, object_t *, ob)
+receive_snoop P2(char *, buf, object_t *, snooper)
 {
+/* command giver no longer set to snooper */
+#ifdef RECEIVE_SNOOP
     push_constant_string(buf);
-    apply(APPLY_RECEIVE_SNOOP, ob, 1, ORIGIN_DRIVER);
-}
+    apply(APPLY_RECEIVE_SNOOP, snooper, 1, ORIGIN_DRIVER);
+#else
+    /* snoop output is now % in all cases */
+    add_message(snooper, "%");
+    add_message(snooper, buf);
 #endif
+}
 
 #ifdef OS2
 void listen_connection P1(HPIPE, handle)
@@ -174,7 +179,7 @@ void init_user_conn()
 	 * create socket of proper type.
 	 */
 	if ((external_port[i].fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-	    perror("init_user_conn: socket");
+	    debug_perror("init_user_conn: socket", 0);
 	    exit(1);
 	}
 	/*
@@ -183,7 +188,7 @@ void init_user_conn()
 	optval = 1;
 	if (setsockopt(external_port[i].fd, SOL_SOCKET, SO_REUSEADDR,
 		       (char *) &optval, sizeof(optval)) == -1) {
-	    perror("init_user_conn: setsockopt");
+	    debug_perror("init_user_conn: setsockopt", 0);
 	    exit(2);
 	}
 	/*
@@ -197,7 +202,7 @@ void init_user_conn()
 	 */
 	if (bind(external_port[i].fd, (struct sockaddr *) & sin,
 		 sizeof(sin)) == -1) {
-	    perror("init_user_conn: bind");
+	    debug_perror("init_user_conn: bind", 0);
 	    exit(3);
 	}
 	/*
@@ -206,21 +211,21 @@ void init_user_conn()
 	sin_len = sizeof(sin);
 	if (getsockname(external_port[i].fd, (struct sockaddr *) & sin,
 			&sin_len) == -1) {
-	    perror("init_user_conn: getsockname");
+	    debug_perror("init_user_conn: getsockname", 0);
 	    exit(4);
 	}
 	/*
 	 * set socket non-blocking,
 	 */
 	if (set_socket_nonblocking(external_port[i].fd, 1) == -1) {
-	    perror("init_user_conn: set_socket_nonblocking 1");
+	    debug_perror("init_user_conn: set_socket_nonblocking 1", 0);
 	    exit(8);
 	}
 	/*
 	 * listen on socket for connections.
 	 */
 	if (listen(external_port[i].fd, SOMAXCONN) == -1) {
-	    perror("init_user_conn: listen");
+	    debug_perror("init_user_conn: listen", 0);
 	    exit(10);
 	}
     }
@@ -229,7 +234,7 @@ void init_user_conn()
      */
 #ifndef LATTICE
     if (signal(SIGPIPE, sigpipe_handler) == SIGNAL_ERROR) {
-	perror("init_user_conn: signal SIGPIPE");
+	debug_perror("init_user_conn: signal SIGPIPE",0);
 	exit(5);
     }
 #endif
@@ -250,11 +255,11 @@ void ipc_remove()
     for (i = 0; i < 5; i++) {
 	if (!external_port[i].port) continue;
 	if (close(external_port[i].fd) == -1) {
-	    perror("ipc_remove: close");
+	    debug_perror("ipc_remove: close", 0);
 	}
     }
 #endif
-    printf("closed external ports\n");
+    debug_message("closed external ports\n");
 }
 
 void init_addr_server P2(char *, hostname, int, addr_server_port)
@@ -266,6 +271,8 @@ void init_addr_server P2(char *, hostname, int, addr_server_port)
     int optval;
     long addr;
 
+    if (!hostname) return;
+
     /*
      * get network host data for hostname.
      */
@@ -276,7 +283,7 @@ void init_addr_server P2(char *, hostname, int, addr_server_port)
         hp = gethostbyname(hostname);
     }
     if (hp == NULL) {
-	perror("init_addr_server: gethostbyname");
+	debug_perror("init_addr_server: gethostbyname", 0);
 	return;
     }
 
@@ -292,7 +299,7 @@ void init_addr_server P2(char *, hostname, int, addr_server_port)
      */
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd < 0) {	/* problem opening socket */
-	perror("init_addr_server: socket");
+	debug_perror("init_addr_server: socket", 0);
 	return;
     }
     /*
@@ -301,25 +308,29 @@ void init_addr_server P2(char *, hostname, int, addr_server_port)
     optval = 1;
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, (char *) &optval,
 		   sizeof(optval)) == -1) {
-	perror("init_addr_server: setsockopt");
+	debug_perror("init_addr_server: setsockopt", 0);
 	return;
     }
     /*
      * connect socket to server address.
      */
     if (connect(server_fd, (struct sockaddr *) & server, sizeof(server)) == -1) {
-	perror("init_addr_server: connect");
+	if (errno == ECONNREFUSED)
+	    debug_message("Connection to address server (%s %d) refused.\n",
+			  hostname, addr_server_port);
+	else 
+	    debug_perror("init_addr_server: connect", 0);
 	close(server_fd);
 	return;
     }
     addr_server_fd = server_fd;
-    fprintf(stderr, "Connected to address server on %s port %d\n", hostname,
+    debug_message("Connected to address server on %s port %d\n", hostname,
 	    addr_server_port);
     /*
      * set socket non-blocking.
      */
     if (set_socket_nonblocking(server_fd, 1) == -1) {
-	perror("init_addr_server: set_socket_nonblocking 1");
+	debug_perror("init_addr_server: set_socket_nonblocking 1", 0);
 	return;
     }
 #endif
@@ -329,19 +340,17 @@ void init_addr_server P2(char *, hostname, int, addr_server_port)
  * Send a message to an interactive object. If that object is shadowed,
  * special handling is done.
  */
-void add_message P1(char *, data)
+void add_message P2(object_t *, who, char *, data)
 {
     interactive_t *ip;
     char *cp;
-    object_t *save_command_giver;
 
     /*
-     * if command_giver->interactive is not valid, write message on stderr.
+     * if who->interactive is not valid, write message on stderr.
      * (maybe)
      */
-    if ((command_giver == 0) || (command_giver->flags & O_DESTRUCTED)
-	|| (command_giver->interactive == 0)
-	|| (command_giver->interactive->iflags & (NET_DEAD | CLOSING))) {
+    if (!who || (who->flags & O_DESTRUCTED) || !who->interactive ||
+	(who->interactive->iflags & (NET_DEAD | CLOSING))) {
 #ifdef NONINTERACTIVE_STDERR_WRITE
 	putc(']', stderr);
 	fprintf(stderr, data);
@@ -351,39 +360,30 @@ void add_message P1(char *, data)
 #endif
 	return;
     }
-    ip = command_giver->interactive;
+    ip = who->interactive;
 #ifndef NO_SHADOWS
     /*
      * shadow handling.
      */
-    if (shadow_catch_message(command_giver, data)) {
+    if (shadow_catch_message(who, data)) {
 	/*
 	 * snoop handling.
 	 */
 #ifdef SNOOP_SHADOWED
-	if (ip->snoop_by) {
-	    save_command_giver = command_giver;
-	    command_giver = ip->snoop_by->ob;
-#ifdef RECEIVE_SNOOP
-	    receive_snoop(command_giver);
-#else
-	    add_message("$$ ");
-	    add_message(data);
-#endif
-	    command_giver = save_command_giver;
-	}
+	if (ip->snoop_by) 
+	    receive_snoop(data, ip->snoop_by->ob);
 #endif
 	return;
     }
 #endif				/* NO_SHADOWS */
 
     /*
-     * write message into command_giver->interactive->message_buf.
+     * write message into ip->message_buf.
      */
     for (cp = data; *cp != '\0'; cp++) {
 	if (ip->message_length == MESSAGE_BUF_SIZE) {
-	    if (!flush_message()) {
-		fprintf(stderr, "Broken connection during add_message.\n");
+	    if (!flush_message(ip)) {
+		debug_message("Broken connection during add_message.\n");
 		return;
 	    }
 	    if (ip->message_length == MESSAGE_BUF_SIZE)
@@ -391,8 +391,8 @@ void add_message P1(char *, data)
 	}
 	if (*cp == '\n') {
 	    if (ip->message_length == (MESSAGE_BUF_SIZE - 1)) {
-		if (!flush_message()) {
-		    fprintf(stderr, "Broken connection during add_message.\n");
+		if (!flush_message(ip)) {
+		    debug_message("Broken connection during add_message.\n");
 		    return;
 		}
 		if (ip->message_length == (MESSAGE_BUF_SIZE - 1))
@@ -408,50 +408,37 @@ void add_message P1(char *, data)
 	ip->message_length++;
     }
     if (ip->message_length != 0) {
-	if (!flush_message()) {
-	    fprintf(stderr, "Broken connection during add_message.\n");
+	if (!flush_message(ip)) {
+	    debug_message("Broken connection during add_message.\n");
 	    return;
 	}
     }
     /*
      * snoop handling.
      */
-    if (ip->snoop_by) {
-	save_command_giver = command_giver;
-	command_giver = ip->snoop_by->ob;
-#ifdef RECEIVE_SNOOP
-	receive_snoop(data, command_giver);
-#else
-	add_message("% ");
-	add_message(data);
-#endif
-	command_giver = save_command_giver;
-    }
+    if (ip->snoop_by)
+	receive_snoop(data, ip->snoop_by->ob);
+    
     add_message_calls++;
 }				/* add_message() */
 
-void add_vmessage PVARGS(va_alist)
+void add_vmessage P2V(object_t *, who, char *, format)
 {
-    va_list args;
-    char *format;
     interactive_t *ip;
     char *cp, new_string_data[LARGEST_PRINTABLE_STRING];
-    object_t *save_command_giver;
+    va_list args;
+    V_DCL(char *format);
+    V_DCL(object_t *who);
 
-#ifdef HAS_STDARG_H
-    va_start(args, va_alist);
-    format = va_alist;
-#else
-    va_start(args);
-    format = va_arg(args, char *);
-#endif
+    V_START(args, format);
+    V_VAR(char *, format, args);
+    V_VAR(object_t *, who, args);
     /*
-     * if command_giver->interactive is not valid, write message on stderr.
+     * if who->interactive is not valid, write message on stderr.
      * (maybe)
      */
-    if ((command_giver == 0) || (command_giver->flags & O_DESTRUCTED)
-	|| (command_giver->interactive == 0)
-	|| (command_giver->interactive->iflags & (NET_DEAD | CLOSING))) {
+    if (!who || (who->flags & O_DESTRUCTED) || !who->interactive || 
+	(who->interactive->iflags & (NET_DEAD | CLOSING))) {
 #ifdef NONINTERACTIVE_STDERR_WRITE
 	putc(']', stderr);
 	vfprintf(stderr, format, args);
@@ -462,7 +449,7 @@ void add_vmessage PVARGS(va_alist)
 #endif
 	return;
     }
-    ip = command_giver->interactive;
+    ip = who->interactive;
     new_string_data[0] = '\0';
     /*
      * this is dangerous since the data may not all fit into new_string_data
@@ -476,34 +463,25 @@ void add_vmessage PVARGS(va_alist)
     /*
      * shadow handling.
      */
-    if (shadow_catch_message(command_giver, new_string_data)) {
+    if (shadow_catch_message(who, new_string_data)) {
 	/*
 	 * snoop handling.
 	 */
 #ifdef SNOOP_SHADOWED
-	if (ip->snoop_by) {
-	    save_command_giver = command_giver;
-	    command_giver = ip->snoop_by->ob;
-#ifdef RECEIVE_SNOOP
-	    receive_snoop(new_string_data, command_giver);
-#else
-	    add_message("$$ ");
-	    add_message(new_string_data);
-#endif
-	    command_giver = save_command_giver;
-	}
+	if (ip->snoop_by)
+	    receive_snoop(new_string_data, ip->snoop_by->ob);
 #endif
 	return;
     }
 #endif				/* NO_SHADOWS */
 
     /*
-     * write message into command_giver->interactive->message_buf.
+     * write message into ip->message_buf.
      */
     for (cp = new_string_data; *cp != '\0'; cp++) {
 	if (ip->message_length == MESSAGE_BUF_SIZE) {
-	    if (!flush_message()) {
-		fprintf(stderr, "Broken connection during add_message.\n");
+	    if (!flush_message(ip)) {
+		debug_message("Broken connection during add_message.\n");
 		return;
 	    }
 	    if (ip->message_length == MESSAGE_BUF_SIZE)
@@ -511,8 +489,8 @@ void add_vmessage PVARGS(va_alist)
 	}
 	if (*cp == '\n') {
 	    if (ip->message_length == (MESSAGE_BUF_SIZE - 1)) {
-		if (!flush_message()) {
-		    fprintf(stderr, "Broken connection during add_message.\n");
+		if (!flush_message(ip)) {
+		    debug_message("Broken connection during add_message.\n");
 		    return;
 		}
 		if (ip->message_length == (MESSAGE_BUF_SIZE - 1))
@@ -528,49 +506,36 @@ void add_vmessage PVARGS(va_alist)
 	ip->message_length++;
     }
     if (ip->message_length != 0) {
-	if (!flush_message()) {
-	    fprintf(stderr, "Broken connection during add_message.\n");
+	if (!flush_message(ip)) {
+	    debug_message("Broken connection during add_message.\n");
 	    return;
 	}
     }
     /*
      * snoop handling.
      */
-    if (ip->snoop_by) {
-	save_command_giver = command_giver;
-	command_giver = ip->snoop_by->ob;
-#ifdef RECEIVE_SNOOP
-	receive_snoop(new_string_data, command_giver);
-#else
-	add_message("% ");
-	add_message(new_string_data);
-#endif
-	command_giver = save_command_giver;
-    }
+    if (ip->snoop_by)
+	receive_snoop(new_string_data, ip->snoop_by->ob);
+
     add_message_calls++;
 }				/* add_message() */
 
 /*
  * Flush outgoing message buffer of current interactive object.
  */
-static int flush_message()
+static int flush_message P1(interactive_t *, ip)
 {
-    interactive_t *ip;
     int length, num_bytes;
 
     /*
-     * if command_giver->interactive is not valid, do nothing.
+     * if ip is not valid, do nothing.
      */
-    if (command_giver == 0 ||
-	(command_giver->flags & O_DESTRUCTED) ||
-	command_giver->interactive == 0 ||
-	(command_giver->interactive->iflags & CLOSING)) {
-	fprintf(stderr, "flush_message: invalid command_giver!\n");
+    if (!ip || (ip->iflags & CLOSING)) {
+	debug_message("flush_message: invalid target!\n");
 	return 0;
     }
-    ip = command_giver->interactive;
     /*
-     * write command_giver->interactive->message_buf[] to socket.
+     * write ip->message_buf[] to socket.
      */
     while (ip->message_length != 0) {
 	if (ip->message_consumer < ip->message_producer) {
@@ -604,7 +569,7 @@ static int flush_message()
 		return 1;
 #endif
 	    } else {
-		perror("flush_message: write");
+		debug_perror("flush_message: write", 0);
 		ip->iflags |= NET_DEAD;
 		return 0;
 	    }
@@ -626,6 +591,7 @@ static int flush_message()
 #define TS_DO           4
 #define TS_DONT         5
 #define TS_SB		6
+#define TS_SB_IAC       7
 /*
  * Copy a string, replacing newlines with '\0'. Also add an extra
  * space and back space for every newline. This trick will allow
@@ -672,7 +638,6 @@ static char telnet_ga[] =
 static int copy_chars P4(unsigned char *, from, unsigned char *, to, int, n, interactive_t *, ip)
 {
     int i;
-    object_t *save_command_giver;
     unsigned char *start = to;
 
     for (i = 0; i < n; i++) {
@@ -700,8 +665,22 @@ static int copy_chars P4(unsigned char *, from, unsigned char *, to, int, n, int
 		break;
 	    }
 	    break;
+	case TS_SB_IAC:
+	    if (from[i] == IAC) {
+		/* IAC IAC is a quoted IAC char */
+		ip->sb_buf[ip->sb_pos++] = IAC;
+		ip->state = TS_SB;
+		break;
+	    }
+	    /* old MudOS treated IAC during IAC SB ... IAC SE as return
+	       to data mode.  That's probably wrong, but ... fallthrough */
 	case TS_IAC:
 	    switch (from[i]) {
+	    case IAC:
+		/* IAC IAC is a quoted IAC char */
+		*to++ = IAC;
+		ip->state = TS_DATA;
+		break;
 	    case DO:
 		ip->state = TS_DO;
 		break;
@@ -716,35 +695,22 @@ static int copy_chars P4(unsigned char *, from, unsigned char *, to, int, n, int
 		break;
 	    case BREAK:
 /* Send back a break character. */
-		save_command_giver = command_giver;
-		command_giver = ip->ob;
-		add_message(telnet_break_response);
-		flush_message();
-		command_giver = save_command_giver;
+		add_message(ip->ob, telnet_break_response);
+		flush_message(ip);
 		break;
 	    case IP:
 /* Send back an interupt process character. */
-		save_command_giver = command_giver;
-		command_giver = ip->ob;
-		add_message(telnet_interrupt_response);
-		flush_message();
-		command_giver = save_command_giver;
+		add_message(ip->ob, telnet_interrupt_response);
 		break;
 	    case AYT:
 /* Are you there signal.  Yep we are. */
-		save_command_giver = command_giver;
-		command_giver = ip->ob;
-		add_message("\n[Yes]\n");
-		command_giver = save_command_giver;
+		add_message(ip->ob, "\n[Yes]\n");
 		break;
 	    case AO:
 /* Abort output. Do a telnet sync operation. */
-		save_command_giver = command_giver;
-		command_giver = ip->ob;
 		ip->out_of_band = MSG_OOB;
-		add_message(telnet_abort_response);
-		flush_message();
-		command_giver = save_command_giver;
+		add_message(ip->ob, telnet_abort_response);
+		flush_message(ip);
 		break;
 	    case SB:
 		ip->state = TS_SB;
@@ -756,8 +722,6 @@ static int copy_chars P4(unsigned char *, from, unsigned char *, to, int, n, int
  * Ok...  need to call a function on the interactive object, passing the
  * buffer as a paramater.
  */
-		save_command_giver = command_giver;
-		command_giver = ip->ob;
 		ip->sb_buf[ip->sb_pos] = 0;
 		if (ip->sb_buf[0]==TELOPT_TTYPE && ip->sb_buf[1]=='I') {
 		    /* TELOPT_TTYPE TELQUAL_IS means it's telling us it's
@@ -783,7 +747,6 @@ static int copy_chars P4(unsigned char *, from, unsigned char *, to, int, n, int
 		} else {
 		    push_constant_string(ip->sb_buf);
 		    apply(APPLY_TELNET_SUBOPTION, ip->ob, 1, ORIGIN_DRIVER);
-		    command_giver = save_command_giver;
 		}
 		ip->state = TS_DATA;
 		break;
@@ -795,21 +758,15 @@ static int copy_chars P4(unsigned char *, from, unsigned char *, to, int, n, int
 	    break;
 	case TS_DO:
 	    if (from[i] == TELOPT_TM) {
-		save_command_giver = command_giver;
-		command_giver = ip->ob;
-		add_message(telnet_do_tm_response);
-		flush_message();
-		command_giver = save_command_giver;
+		add_message(ip->ob, telnet_do_tm_response);
+		flush_message(ip);
 	    }
 	    ip->state = TS_DATA;
 	    break;
 	case TS_WILL:
 	    if (from[i] == TELOPT_TTYPE) {
-		save_command_giver = command_giver;
-		command_giver = ip->ob;
-		add_message(telnet_term_query);
-		flush_message();
-		command_giver = save_command_giver;
+		add_message(ip->ob, telnet_term_query);
+		flush_message(ip);
 	    }
 	case TS_DONT:
 	case TS_WONT:
@@ -817,7 +774,7 @@ static int copy_chars P4(unsigned char *, from, unsigned char *, to, int, n, int
 	    break;
 	case TS_SB:
 	    if ((unsigned char) from[i] == IAC) {
-		ip->state = TS_IAC;
+		ip->state = TS_SB_IAC;
 		break;
 	    }
 /* Ok, put all the suboption stuff into the buffer on the interactive */
@@ -842,7 +799,7 @@ static void sigpipe_handler P1(int, sig)
 static void sigpipe_handler()
 #endif
 {
-    fprintf(stderr, "SIGPIPE received.\n");
+    debug_message("SIGPIPE received.\n");
 #ifdef linux
     signal(SIGPIPE, sigpipe_handler);
 #endif
@@ -943,10 +900,7 @@ INLINE void process_io()
 	    continue;
 	}
 	if (all_users[i]->message_length > 0 && !avail.cbmessage) {
-	    save_command_giver = command_giver;
-	    command_giver = all_users[i]->ob;
-	    flush_message();
-	    command_giver = save_command_giver;
+	    flush_message(all_users[i]);
 	}
 	if (avail.cbpipe) {
 	    get_user_data(all_users[i]);
@@ -954,7 +908,6 @@ INLINE void process_io()
     }
 #else
     int i;
-    object_t *save_command_giver;
 
     debug(256, ("@"));
     /*
@@ -983,12 +936,8 @@ INLINE void process_io()
 	    if (!all_users[i])
 		continue;
 	}
-	if (FD_ISSET(all_users[i]->fd, &writemask)) {
-	    save_command_giver = command_giver;
-	    command_giver = all_users[i]->ob;
-	    flush_message();
-	    command_giver = save_command_giver;
-	}
+	if (FD_ISSET(all_users[i]->fd, &writemask))
+	    flush_message(all_users[i]);
     }
 #ifdef PACKAGE_SOCKETS
     /*
@@ -1042,7 +991,7 @@ static void new_user_handler P1(int, which)
 	if (errno == EWOULDBLOCK) {
 	    debug(512, ("new_user_handler: accept: Operation would block\n"));
 	} else {
-	    perror("new_user_handler: accept");
+	    debug_perror("new_user_handler: accept", 0);
 	}
 	return;
     }
@@ -1053,7 +1002,7 @@ static void new_user_handler P1(int, which)
      * properly inherit the nonblocking property from the listening socket.
      */
     if (set_socket_nonblocking(new_socket_fd, 1) == -1) {
-	perror("new_user_handler: set_socket_nonblocking 1");
+	debug_perror("new_user_handler: set_socket_nonblocking 1", 0);
 	exit(8);
     }
 #endif				/* linux */
@@ -1074,10 +1023,10 @@ static void new_user_handler P1(int, which)
 
     err = assert_master_ob_loaded("[internal] new_user_handler","");
     if (err != 1) {
-	fprintf(stderr, "Can't connect with no master object.\n");
+	debug_message("Can't connect with no master object.\n");
 	close(new_socket_fd);
 #ifndef OS2
-	fprintf(stderr, "Connection from %s aborted.\n", inet_ntoa(addr.sin_addr));
+	debug_message("Connection from %s aborted.\n", inet_ntoa(addr.sin_addr));
 #endif
 	return;
     }
@@ -1142,7 +1091,7 @@ static void new_user_handler P1(int, which)
     if (ret == 0 || ret == (svalue_t *)-1 || ret->type != T_OBJECT) {
 	remove_interactive(master_ob);
 #ifndef OS2
-	fprintf(stderr, "Connection from %s aborted.\n", inet_ntoa(addr.sin_addr));
+	debug_message("Connection from %s aborted.\n", inet_ntoa(addr.sin_addr));
 #endif
 	return;
     }
@@ -1175,13 +1124,14 @@ static void new_user_handler P1(int, which)
     
     if (external_port[which].kind == PORT_TELNET) {
 	/* Ask permission to ask them for their terminal type */
-	add_message(telnet_do_ttype);
+	add_message(ob, telnet_do_ttype);
 	/* Ask them for their window size */
-	add_message(telnet_do_naws);
+	add_message(ob, telnet_do_naws);
     }
     
     logon(ob);
     debug(512, ("new_user_handler: end\n"));
+    command_giver = 0;
 }				/* new_user_handler() */
 
 /*
@@ -1200,8 +1150,11 @@ int process_user_command()
 
     buf[MAX_TEXT - 1] = '\0';
     if ((user_command = get_user_command())) {
-	if (command_giver->flags & O_DESTRUCTED)
+	if (command_giver->flags & O_DESTRUCTED) {
+	    command_giver = save_command_giver;
+	    current_object = save_current_object;
 	    return (1);
+	}
 #ifndef NO_ADD_ACTION
 	clear_notify();		/* moved from user_parser() */
 #endif
@@ -1222,14 +1175,14 @@ int process_user_command()
                 /* only 1 char ... switch to line buffer mode */
                 command_giver->interactive->iflags |= WAS_SINGLE_CHAR;
                 command_giver->interactive->iflags &= ~SINGLE_CHAR;
-                add_message(telnet_no_single);
+                add_message(command_giver, telnet_no_single);
                 /* come back later */
             } else {
                 if (command_giver->interactive->iflags & WAS_SINGLE_CHAR) {
                     /* we now have a string ... switch back to char mode */
                     command_giver->interactive->iflags &= ~WAS_SINGLE_CHAR;
                     command_giver->interactive->iflags |= SINGLE_CHAR;
-                    add_message(telnet_yes_single);
+                    add_message(command_giver, telnet_yes_single);
                 }
 
 	        if (command_giver->interactive->iflags & HAS_PROCESS_INPUT) {
@@ -1248,6 +1201,8 @@ int process_user_command()
 #endif
 	        }
 	        if (!command_giver || (command_giver->flags & O_DESTRUCTED)) {
+		    command_giver = save_command_giver;
+		    current_object = save_current_object;
 		    return 1;
 	        }
 #ifndef NO_ADD_ACTION
@@ -1283,6 +1238,8 @@ int process_user_command()
 #endif
 	    }
 	    if (!command_giver || command_giver->flags & O_DESTRUCTED) {
+		command_giver = save_command_giver;
+		current_object = save_current_object;
 		return 1;
 	    }
 #ifndef NO_ADD_ACTION
@@ -1332,8 +1289,8 @@ static void hname_handler()
 	    break;
 #endif
 	default:
-	    fprintf(stderr, "hname_handler: read on fd %d\n", addr_server_fd);
-	    perror("hname_handler: read");
+	    debug_message("hname_handler: read on fd %d\n", addr_server_fd);
+	    debug_perror("hname_handler: read", 0);
 	    tmp = addr_server_fd;
 	    addr_server_fd = -1;
 	    close(tmp);
@@ -1341,7 +1298,7 @@ static void hname_handler()
 	}
 	break;
     case 0:
-	fprintf(stderr, "hname_handler: closing address server connection.\n");
+	debug_message("hname_handler: closing address server connection.\n");
 	tmp = addr_server_fd;
 	addr_server_fd = -1;
 	close(tmp);
@@ -1391,7 +1348,6 @@ static void hname_handler()
  */
 static void get_user_data P1(interactive_t *, ip)
 {
-    object_t *save_command_giver;
     static char buf[MAX_TEXT];
     int text_space;
     int num_bytes;
@@ -1445,7 +1401,7 @@ static void get_user_data P1(interactive_t *, ip)
     switch (num_bytes) {
     case 0:
 	if (ip->iflags & CLOSING)
-	    fprintf(stderr, "get_user_data: tried to read from closing fd.\n");
+	    debug_message("get_user_data: tried to read from closing fd.\n");
 	remove_interactive(ip->ob);
 	return;
     case -1:
@@ -1457,11 +1413,11 @@ static void get_user_data P1(interactive_t *, ip)
 #endif
 	{
 #ifdef OS2
-	    fprintf(stderr, "get_user_data: read on fd %d\n", ip->named_pipe);
+	    debug_message("get_user_data: read on fd %d\n", ip->named_pipe);
 #else
-	    fprintf(stderr, "get_user_data: read on fd %d\n", ip->fd);
+	    debug_message("get_user_data: read on fd %d\n", ip->fd);
 #endif
-	    perror("get_user_data: read");
+	    debug_perror("get_user_data: read", 0);
 	    remove_interactive(ip->ob);
 	    return;
 	}
@@ -1486,17 +1442,9 @@ static void get_user_data P1(interactive_t *, ip)
 	     * handle snooping - snooper does not see type-ahead. seems like
 	     * that would be very inefficient, for little functional gain.
 	     */
-	    if (ip->snoop_by && !(ip->iflags & NOECHO)) {
-		save_command_giver = command_giver;
-		command_giver = ip->snoop_by->ob;
-#ifdef RECEIVE_SNOOP
-		receive_snoop(buf, command_giver);
-#else
-		add_message("%");
-		add_message(buf);
-#endif
-		command_giver = save_command_giver;
-	    }
+	    if (ip->snoop_by && !(ip->iflags & NOECHO))
+		receive_snoop(buf, ip->snoop_by->ob);
+
 	    /*
 	     * set flag if new data completes command.
 	     */
@@ -1516,9 +1464,9 @@ static void get_user_data P1(interactive_t *, ip)
 		p = temp;
 		while ((nl = strchr(p, '\n'))) {
 		    *nl = 0;
-		    if (!(command_giver->flags & O_DESTRUCTED)) {
+		    if (!(ip->ob->flags & O_DESTRUCTED)) {
 			push_string(p, STRING_MALLOC);
-			ret = apply(APPLY_PROCESS_INPUT, command_giver,
+			ret = apply(APPLY_PROCESS_INPUT, ip->ob,
 				    1, ORIGIN_DRIVER);
 		    }
 		    p = nl + 1;
@@ -1538,7 +1486,7 @@ static void get_user_data P1(interactive_t *, ip)
 		memcpy(buffer->item, buf, num_bytes);
 		
 		push_refed_buffer(buffer);
-		ret = apply(APPLY_PROCESS_INPUT, command_giver, 1, ORIGIN_DRIVER);
+		ret = apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
 		break;
 	    }
 	}
@@ -1647,7 +1595,7 @@ static char *get_user_command()
 	/*
 	 * Must not enable echo before the user input is received.
 	 */
-	add_message(telnet_no_echo);
+	add_message(command_giver, telnet_no_echo);
 	ip->iflags &= ~NOECHO;
     }
     ip->last_time = current_time;
@@ -1785,7 +1733,6 @@ static void next_cmd_in_buf P1(interactive_t *, ip)
  */
 void remove_interactive P1(object_t *, ob)
 {
-    object_t *save_command_giver = command_giver;
     int i;
 
     if (!ob->interactive) {
@@ -1795,7 +1742,7 @@ void remove_interactive P1(object_t *, ob)
 	if (all_users[i] != ob->interactive)
 	    continue;
 	if (ob->interactive->iflags & CLOSING) {
-	    fprintf(stderr, "Double call to remove_interactive()\n");
+	    debug_message("Double call to remove_interactive()\n");
 	    return;
 	}
 	ob->interactive->iflags |= CLOSING;
@@ -1813,23 +1760,22 @@ void remove_interactive P1(object_t *, ob)
 	    ob->interactive->snoop_on->snoop_by = 0;
 	    ob->interactive->snoop_on = 0;
 	}
-	command_giver = ob;
 	debug(512, ("Closing connection from %s.\n",
 		    inet_ntoa(ob->interactive->addr.sin_addr)));
 #ifdef F_ED
 	if (ob->interactive->ed_buffer) {
-	    save_ed_buffer();
+	    save_ed_buffer(ob);
 	}
 #endif
 	debug(512, ("remove_interactive: closing fd %d\n", ob->interactive->fd));
 #ifdef OS2
 	DosDisConnectNPipe(ob->interactive->named_pipe);
 	if (DosClose(ob->interactive->named_pipe)) {
-	    perror("remove_interactive: close");
+	    debug_perror("remove_interactive: close", 0);
 	}
 #else
 	if (close(ob->interactive->fd) == -1) {
-	    perror("remove_interactive: close");
+	    debug_perror("remove_interactive: close", 0);
 	}
 #endif
 	if (ob->flags & O_HIDDEN)
@@ -1853,12 +1799,10 @@ void remove_interactive P1(object_t *, ob)
 	ob->interactive = 0;
 	all_users[i] = 0;
 	free_object(ob, "remove_interactive");
-	command_giver = save_command_giver;
 	return;
     }
-    fprintf(stderr, "remove_interactive: could not find and remove user %s\n",
-	    ob->name);
-    abort();
+    fatal("remove_interactive: could not find and remove user %s\n",
+	ob->name);
 }				/* remove_interactive() */
 
 static int call_function_interactive P2(interactive_t *, i, char *, str)
@@ -1928,7 +1872,7 @@ static int call_function_interactive P2(interactive_t *, i, char *, str)
 	 * clear single character mode
 	 */
 	i->iflags &= ~SINGLE_CHAR;
-	add_message(telnet_no_single);
+	add_message(i->ob, telnet_no_single);
     }
 
     push_constant_string(str);
@@ -1954,20 +1898,16 @@ static int call_function_interactive P2(interactive_t *, i, char *, str)
 
 int set_call P3(object_t *, ob, sentence_t *, sent, int, flags)
 {
-    object_t *save_command_giver = command_giver;
-
     if (ob == 0 || sent == 0)
 	return (0);
     if (ob->interactive == 0 || ob->interactive->input_to)
 	return (0);
     ob->interactive->input_to = sent;
     ob->interactive->iflags |= (flags & (I_NOECHO | I_NOESC | I_SINGLE_CHAR));
-    command_giver = ob;
     if (flags & I_NOECHO)
-	add_message(telnet_yes_echo);
+	add_message(ob, telnet_yes_echo);
     if (flags & I_SINGLE_CHAR)
-	add_message(telnet_yes_single);
-    command_giver = save_command_giver;
+	add_message(ob, telnet_yes_single);
     return (1);
 }				/* set_call() */
 
@@ -1983,7 +1923,6 @@ void set_prompt P1(char *, str)
  */
 static void print_prompt()
 {
-    DEBUG_CHECK(command_giver == 0, "no command_giver in write_prompt.\n");
     if (command_giver->interactive->input_to == 0) {
 	/* give user object a chance to write its own prompt */
 	if (!(command_giver->interactive->iflags & HAS_WRITE_PROMPT))
@@ -2006,7 +1945,7 @@ static void print_prompt()
      * case? We'll see, I guess.
      */
     if (command_giver->interactive->iflags & USING_TELNET)
-	add_message(telnet_ga);
+	add_message(command_giver, telnet_ga);
 }				/* print_prompt() */
 
 /*
@@ -2131,11 +2070,11 @@ static void query_addr_name P1(object_t *, ob)
     if (write(addr_server_fd, buf, msglen + sizeof(int) + sizeof(int)) == -1) {
 	switch (errno) {
 	case EBADF:
-	    fprintf(stderr, "Address server has closed connection.\n");
+	    debug_message("Address server has closed connection.\n");
 	    addr_server_fd = -1;
 	    break;
 	default:
-	    perror("query_addr_name: write");
+	    debug_perror("query_addr_name: write", 0);
 	    break;
 	}
     }
@@ -2181,11 +2120,11 @@ int query_addr_number P2(char *, name, char *, call_back)
     if (write(addr_server_fd, buf, msglen + sizeof(int) + sizeof(int)) == -1) {
 	switch (errno) {
 	case EBADF:
-	    fprintf(stderr, "Address server has closed connection.\n");
+	    debug_message("Address server has closed connection.\n");
 	    addr_server_fd = -1;
 	    break;
 	default:
-	    perror("query_addr_name: write");
+	    debug_perror("query_addr_name: write", 0);
 	    break;
 	}
 	push_constant_string(name);
@@ -2430,7 +2369,7 @@ static void clear_notify()
 {
     union string_or_func dem;
 
-    if (!command_giver->interactive)
+    if (!command_giver || !command_giver->interactive)
 	return;
     dem = command_giver->interactive->default_err_message;
     if (command_giver->interactive->iflags & NOTIFY_FAIL_FUNC) {
@@ -2463,12 +2402,11 @@ void set_notify_fail_function P1(funptr_t *, fp)
 
 int replace_interactive P2(object_t *, ob, object_t *, obfrom)
 {
-    /* fprintf(stderr,"DEBUG: %s,%s\n",ob->name,obfrom->name); */
     if (ob->interactive) {
-	error("Bad argument1 to exec()\n");
+	error("Bad argument 1 to exec()\n");
     }
     if (!obfrom->interactive) {
-	error("Bad argument2 to exec()\n");
+	error("Bad argument 2 to exec()\n");
     }
     if ((ob->flags & O_HIDDEN) != (obfrom->flags & O_HIDDEN)) {
 	if (ob->flags & O_HIDDEN) {
@@ -2495,20 +2433,106 @@ int replace_interactive P2(object_t *, ob, object_t *, obfrom)
     return (1);
 }				/* replace_interactive() */
 
-#ifdef DEBUG
-/*
- * This is used for debugging reference counts.
- */
-void update_ref_counts_for_users()
-{
-    int i;
+void outbuf_zero P1(outbuffer_t *, outbuf) {
+    outbuf->real_size = 0;
+    outbuf->buffer = 0;
+}
 
-    for (i = 0; i < max_users; i++) {
-	if (all_users[i] == 0)
-	    continue;
-	all_users[i]->ob->extra_ref++;
-	if (all_users[i]->input_to)
-	    all_users[i]->input_to->ob->extra_ref++;
+int outbuf_extend P2(outbuffer_t *, outbuf, int, l)
+{
+    int limit;
+    
+    if (outbuf->buffer) {
+	limit = MSTR_SIZE(outbuf->buffer);
+	if (outbuf->real_size + l > limit) {
+	    if (outbuf->real_size == MAXSHORT) return 0; /* TRUNCATED */
+
+	    /* assume it's going to grow some more */
+	    limit = (outbuf->real_size + l) * 2;
+	    if (limit > MAXSHORT) {
+		limit = outbuf->real_size + l;
+		if (limit > MAXSHORT) {
+		    outbuf->buffer = extend_string(outbuf->buffer, MAXSHORT);
+		    return MAXSHORT - outbuf->real_size;
+		}
+	    }
+	    outbuf->buffer = extend_string(outbuf->buffer, limit);
+	}
+    } else {
+	outbuf->buffer = new_string(l, "outbuf_add");
+	outbuf->real_size = 0;
     }
-}				/* update_ref_counts_for_users() */
-#endif				/* DEBUG */
+    return l;
+}
+
+void outbuf_add P2(outbuffer_t *, outbuf, char *, str)
+{
+    int l, limit;
+    
+    if (!outbuf) return;
+    l = strlen(str);
+    DEBUG_CHECK(l > MAXSHORT, "Added string exceeds maximum buffer size\n");
+    if (outbuf->buffer) {
+	limit = MSTR_SIZE(outbuf->buffer);
+	if (outbuf->real_size + l > limit) {
+	    if (outbuf->real_size == MAXSHORT) return; /* TRUNCATED */
+
+	    /* assume it's going to grow some more */
+	    limit = (outbuf->real_size + l) * 2;
+	    if (limit > MAXSHORT) {
+		limit = outbuf->real_size + l;
+		if (limit > MAXSHORT) {
+		    outbuf->buffer = extend_string(outbuf->buffer, MAXSHORT);
+		    strncpy(outbuf->buffer + outbuf->real_size, str,
+			    MAXSHORT - outbuf->real_size);
+		    outbuf->buffer[MAXSHORT] = 0;
+		    outbuf->real_size = MAXSHORT;
+		    return;
+		}
+	    }
+	    outbuf->buffer = extend_string(outbuf->buffer, limit);
+	}
+    } else {
+	outbuf->buffer = new_string(l, "outbuf_add");
+	outbuf->real_size = 0;
+    }
+    strcpy(outbuf->buffer + outbuf->real_size, str);
+    outbuf->real_size += l;
+}
+
+void outbuf_addv P2V(outbuffer_t *, outbuf, char *, format)
+{
+    char buf[LARGEST_PRINTABLE_STRING];
+    va_list args;
+    V_DCL(char *format);
+    V_DCL(outbuffer_t *outbuf);
+
+    V_START(args, format);
+    V_VAR(outbuffer_t *, outbuf, args);
+    V_VAR(char *, format, args);
+
+    vsprintf(buf, format, args);
+    va_end(args);
+
+    if (!outbuf) return;
+    
+    outbuf_add(outbuf, buf);
+}
+
+void outbuf_fix P1(outbuffer_t *, outbuf) {
+    if (outbuf && outbuf->buffer)
+	outbuf->buffer = extend_string(outbuf->buffer, outbuf->real_size);
+}
+
+void outbuf_push P1(outbuffer_t *, outbuf) {
+    (++sp)->type = T_STRING;
+    if (outbuf && outbuf->buffer) {
+	outbuf->buffer = extend_string(outbuf->buffer, outbuf->real_size);
+	
+	sp->subtype = STRING_MALLOC;
+	sp->u.string = outbuf->buffer;
+    } else {
+	sp->subtype = STRING_CONSTANT;
+	sp->u.string = "";
+    }
+}

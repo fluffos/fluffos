@@ -1,3 +1,73 @@
+Sun Jun 11 03:33:40 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* bumped version number to v21.4
+	* features:
+	  . a file named 'local_options' with the defines from options.h in
+	    it will override options.h.  You will be warned if new options
+	    that don't exist in your local_options file have been added.
+	  . cleaned up the data written to stdout/debug.log.  The same
+	    info now goes to both.
+	  . the logon() function is no longer required.
+	  . sizeof(class) now returns the number of members
+	  . '\a' is now bell, '\e' is the escape char
+	  . foreach (<var> [, <var>] in <expr) <statement or block>
+	    for looping over arrays/mappings
+	  . memmove() checks done by edit_source -configure
+	  . implode(mixed *, function).  See the v21.4a6 changelog for
+	    some uses/examples
+	  . '%x' can be used for hexidecimal in sscanf()
+	  . w->x[y] = z, w->x[y]++ and w->x[y]-- are legal now
+	* fixed crashers in:
+	  . people going linkdead in ed
+	  . add_action parsing when objects move/get destructed
+	  . calling non-existent socket callbacks
+	  . simul efuns objects with no simuls
+	  . socket_address()
+	  . calling function pointers in swapped objects
+	  . x->foo compilation errors when x was not a class
+	* new contrib efuns:
+	  . string variables(object), object *heart_beats(), 
+	    int remove_interactive(object)
+	* memory leak fixes:
+	  . an array in mudlib error tracebacks
+	  . throw()
+	  . [0..n] array ranges on ref 1 arrays
+	  . functionals keeping programs from freeing
+	* bugfixes:
+	  . previous_object(-1) after an lfun or functional pointer; an
+	    extra object is no longer mistakenly inserted
+	  . numerous fixes to the pluralize contrib efun
+	  . load_object() doesn't error if the file doesn't exist now,
+	    like the documentation claims
+	  . fixed MUD mode sockets on machines where sizeof(long) > 4
+	  . window sizes with widths or heights of 255
+	  . '/' is now a legal log file directory
+	  . wierd error messages for unterminated @ or @@ blocks
+	  . fixed a bug that truncated arrays/mappings on MUD mode sockets
+	  . replace_program() objects now look like clones again (clonep)
+	  . workarround for a GNU make 'feature' that caused 'can't find
+	    rule for obj/grammar.tab.o' errors
+	  . str[n..] returns "" when n > strlen(str)
+	* optimizations:
+	  . replace_string(), member_array(), string comparisons, hashing
+	  . shared string deallocations
+	* COMPAT BUSTERS:
+	  . The following efuns now return their output as strings:
+	    malloc_status(), cache_stats(), lpc_info(), mud_status(),
+	    dump_file_descriptors(), program_info(), debug_info(),
+	    dump_socket_status()
+	  . this_player() no longer exists in some places where it
+	    previously did
+	  . It is now illegal to any of the following from a verb action
+	    which return zero: call remove_action(), destruct an object
+	    which defines commands, move an object which defines commands,
+	    move a living object
+	  . 'foreach' and 'in' are reserved words
+	  . map_mapping() now passes both the key and the value
+	  . get_safe_file_name() is now get_save_file_name(string fname,
+	    object who); this_player() is now zero in it
+	  . previous_object() is now zero in add_action()'ed functions;
+	    this fixes several crashers
+	  
 Wed May 17 14:54:59 EDT 1995 (tim@handel.princeton.edu (Beek))
 	* bumped version number to v21.3
 	* features:

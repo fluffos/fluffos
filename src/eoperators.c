@@ -24,6 +24,12 @@ dealloc_funp P1(funptr_t *, fp)
 	free_array(fp->hdr.args);
     if ((fp->hdr.type & 0x0f) == FP_FUNCTIONAL) {
     	fp->f.functional.prog->func_ref--;
+#ifdef DEBUG
+	if (d_flag)
+	    printf("subtr func ref %s: now %i\n",
+		   fp->f.functional.prog->name,
+		   fp->f.functional.prog->func_ref);
+#endif
 	if (fp->f.functional.prog->func_ref == 0 
 	    && fp->f.functional.prog->ref == 0)
 	    deallocate_program(fp->f.functional.prog);
@@ -159,7 +165,10 @@ f_eq()
 	
     case T_STRING:
 	{
-	    i = !strcmp((sp-1)->u.string, sp->u.string);
+	    if (SVALUE_STRLEN_DIFFERS(sp-1,sp))
+		i = 0;
+	    else
+		i = !strcmp((sp-1)->u.string, sp->u.string);
 	    free_string_svalue(sp--);
 	    free_string_svalue(sp);
 	    break;
@@ -495,7 +504,10 @@ f_ne()
 
     case T_STRING:
         {
-            i = !!strcmp((sp-1)->u.string, sp->u.string);
+	    if (SVALUE_STRLEN_DIFFERS(sp-1, sp))
+		i = 1;
+	    else
+		i = !!strcmp((sp-1)->u.string, sp->u.string);
 	    free_string_svalue(sp--);
 	    free_string_svalue(sp);
             break;
@@ -736,7 +748,12 @@ f_extract_range P1(int, code)
 #else
             if (from < 0) from = 0;
 #endif
-            put_malloced_string(string_copy(res + from, "f_extract_range"));
+            if (from >= len) {
+		sp->type = T_STRING;
+		sp->subtype = STRING_CONSTANT;
+		sp->u.string = "";
+	    } else 
+		put_malloced_string(string_copy(res + from, "f_extract_range"));
             free_string_svalue(sp + 1);
             break;
         }
@@ -756,6 +773,7 @@ f_extract_range P1(int, code)
 #else
             if (from < 0) from = 0;
 #endif
+	    if (from > len) from = len;
             nbuf = allocate_buffer(len - from);
             memcpy(nbuf->item, rbuf->item + from, len - from);
             free_buffer(rbuf);
@@ -871,7 +889,7 @@ f_sub_eq()
 /* offsets from 'pc' */
 #define SW_TYPE		0
 #define SW_TABLE	1
-#define SW_BREAK	3
+#define SW_ENDTAB       3
 #define SW_DEFAULT	5
 
 /* offsets used for range (L_ for lower member, U_ for upper member) */
@@ -887,7 +905,7 @@ f_sub_eq()
 INLINE void
 f_switch()
 {
-    unsigned short offset, break_adr;
+    unsigned short offset, end_off;
     int d;
     POINTER_INT s = 0;
     POINTER_INT r;
@@ -904,10 +922,7 @@ f_switch()
     };
 
     COPY_SHORT(&offset, pc + SW_TABLE);
-    COPY_SHORT(&break_adr, pc + SW_BREAK);
-    if (--break_sp == start_of_switch_stack)
-	fatal("Switch stack underflow!\n");
-    *break_sp = break_adr;
+    COPY_SHORT(&end_off, pc + SW_ENDTAB);
     if ((i = EXTRACT_UCHAR(pc) >> 4) != 0xf) {	/* String table, find correct
 						 * key */
 	if (sp->type == T_NUMBER && !sp->u.number) {
@@ -933,7 +948,7 @@ f_switch()
 		return;
 	    }
 	} else {
-	    bad_argument(sp, T_STRING | T_NUMBER, 1, F_SWITCH);
+	    bad_argument(sp, T_STRING, 1, F_SWITCH);
 	}
     } else {			/* Integer table, check type */
 	CHECK_TYPES(sp, T_NUMBER, 1, F_SWITCH);
@@ -941,7 +956,7 @@ f_switch()
 	i = (int) pc[0] & 0xf;
     }
     pop_stack();
-    end_tab = current_prog->program + break_adr;
+    end_tab = current_prog->program + end_off;
     /*
      * i is the table size as a power of 2.  Tells us where to start
      * searching.  i==14 is a special case.
@@ -1088,9 +1103,9 @@ call_simul_efun P2(unsigned short, index, int, num_arg)
     if (!simul_efun_ob || (simul_efun_ob->flags & O_DESTRUCTED)) {
 	if (simul_efun_is_loading)
 	    error("Attempt to call a simul_efun while compiling the simul_efun object.\n");
-	(void) load_object(simul_efun_file_name, 0);
-	/* if it didn't load we're in trouble. */
-	if (!simul_efun_ob || (simul_efun_ob->flags & O_DESTRUCTED))
+	/* if it failed to load, we're in trouble */
+	if (!load_object(simul_efun_file_name, 0) || !simul_efun_ob
+	    || (simul_efun_ob->flags & O_DESTRUCTED))
 	    error("No simul_efun object for simul_efun.\n");
     }
 #ifdef TRACE
@@ -1105,7 +1120,7 @@ call_simul_efun P2(unsigned short, index, int, num_arg)
 	if (simul_efun_ob->flags & O_SWAPPED)
 	    load_ob_from_swap(simul_efun_ob);
 	simul_efun_ob->time_of_ref = current_time;
-	push_control_stack(FRAME_FUNCTION, simuls[index]);
+	push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE, simuls[index]);
 	caller_type = ORIGIN_SIMUL_EFUN;
 	csp->num_local_variables = num_arg;
 	current_prog = simul_efun_ob->prog;
@@ -1248,6 +1263,12 @@ make_functional_funp P5(short, num_arg, short, num_local, short, len, svalue_t *
     fp->hdr.type = FP_FUNCTIONAL + flag;
 
     current_prog->func_ref++;
+#ifdef DEBUG
+	if (d_flag)
+	    printf("add func ref %s: now %i\n",
+		   current_prog->name,
+		   current_prog->func_ref);
+#endif
     
     fp->f.functional.prog = current_prog;
     fp->f.functional.offset = pc - current_prog->program;
@@ -1442,16 +1463,3 @@ f_sscanf()
      */
     fp->u.number = i;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

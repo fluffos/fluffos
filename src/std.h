@@ -3,8 +3,17 @@
 
 /* This stuff should be included EVERYWHERE */
 
+/* the definition of ARCH */
 #include "arch.h"
-#include "options.h"
+
+#ifndef EDIT_SOURCE
+/* all options and configuration */
+#include "options_incl.h"
+#ifndef _FUNC_SPEC_
+#include "configure.h"
+#endif
+#endif
+
 #include "portability.h"
 #include "macros.h"
 #ifndef _FUNC_SPEC_
@@ -16,3 +25,9 @@
 #endif
 
 #endif
+
+
+
+
+
+
