@@ -412,7 +412,7 @@ show_mstats P2(outbuffer_t *, ob, char *, s)
     }
     outbuf_add(ob, "\nused:\t");
     for (i = 0; i < NBUCKETS; i++) {
-	outbuf_addv(" %d", nmalloc[i]);
+	outbuf_addv(ob, " %d", nmalloc[i]);
 	totused += nmalloc[i] * (1 << (i + 3));
     }
     outbuf_addv(ob, "\n\tTotal in use: %d, total free: %d\n",

@@ -1010,7 +1010,14 @@ void free_prog_string P1(short, num)
 int validate_function_call P3(function_t *, funp, int, f, parse_node_t *, args)
 {
     int num_arg = ( args ? args->kind : 0 );
-
+    int num_var = 0;
+    parse_node_t *pn = args;
+    
+    while (pn) {
+	if (pn->type & 1) num_var++;
+	pn = pn->r.expr;
+    }
+	
     /*
      * Verify that the function has been defined already.
      */
@@ -1024,7 +1031,8 @@ int validate_function_call P3(function_t *, funp, int, f, parse_node_t *, args)
     /*
      * Check number of arguments.
      */
-    if (funp->num_arg != num_arg && !(funp->type & TYPE_MOD_VARARGS) &&
+    if ((num_var || funp->num_arg != num_arg)
+	&& !(funp->type & TYPE_MOD_VARARGS) &&
 	(funp->flags & NAME_STRICT_TYPES) && exact_types) {
 	char buff[100];
 
@@ -1044,6 +1052,7 @@ int validate_function_call P3(function_t *, funp, int, f, parse_node_t *, args)
 	arg_types = (unsigned short *) mem_block[A_ARGUMENT_TYPES].block;
 	first = *(unsigned short *) &mem_block[A_ARGUMENT_INDEX].block[f * sizeof(unsigned short)];
 	for (i = 0; (unsigned) i < funp->num_arg && i < num_arg; i++) {
+	    if (enode->type & 1) break;
 	    tmp = enode->v.expr->type;
 
 	    if (!compatible_types(tmp, arg_types[first + i])) {
@@ -1099,18 +1108,23 @@ parse_node_t *
 validate_efun_call P2(int, f, parse_node_t *, args) {
     int num = args->v.number;
     int min_arg, max_arg, def, *argp;
+    int num_var = 0;
+    parse_node_t *pn = args->r.expr;
+    
+    while (pn) {
+	if (pn->type & 1) num_var++;
+	pn = pn->r.expr;
+    }
     
     if (f != -1) {
 	/* should this move out of here? */
 	switch (predefs[f].token) {
 	case F_SIZEOF:
-	    if (num == 1) {
-		if (args->r.expr->v.expr->kind == F_AGGREGATE) {
-		    num = args->r.expr->v.expr->v.number;
-		    CREATE_TYPED_NODE(args, F_NUMBER, (num ? TYPE_NUMBER : TYPE_ANY));
-		    args->v.number = num;
-		    return args;
-		}
+	    if (!pn && num == 1 && args->r.expr->v.expr->kind == F_AGGREGATE) {
+		num = args->r.expr->v.expr->v.number;
+		CREATE_TYPED_NODE(args, F_NUMBER, (num ? TYPE_NUMBER : TYPE_ANY));
+		args->v.number = num;
+		return args;
 	    }
 	}
 
@@ -1119,10 +1133,11 @@ validate_efun_call P2(int, f, parse_node_t *, args) {
 	max_arg = predefs[f].max_args;
 
 	def = predefs[f].Default;
-	if (def && num == min_arg -1) {
+	if (!num_var && def && num == min_arg -1) {
 	    parse_node_t *tmp;
 	    tmp = new_node_no_line();
 	    tmp->r.expr = 0;
+	    tmp->type = 0;
 	    args->l.expr->r.expr = tmp;
 	    if (def > 0) {
 		CREATE_TYPED_NODE(tmp->v.expr, def, TYPE_ANY);
@@ -1135,7 +1150,11 @@ validate_efun_call P2(int, f, parse_node_t *, args) {
 	    tmp->v.expr->r.expr = 0;
 	    max_arg--;
 	    min_arg--;
-	} else if (num < min_arg) {
+	} else if (num_var && max_arg != -1) {
+	    char bff[100];
+	    sprintf(bff, "Illegal to pass variable number of arguments to non-varargs efun %s", predefs[f].word);
+	    yyerror(bff);
+	} else if ((num - num_var) < min_arg) {
 	    char bff[100];
 	    sprintf(bff, "Too few arguments to %s", predefs[f].word);
 	    yyerror(bff);
@@ -1154,6 +1173,7 @@ validate_efun_call P2(int, f, parse_node_t *, args) {
 	    
 	    for (argn = 0; argn < num; argn++) {
 		enode = enode->r.expr;
+		if (enode->type & 1) break;
 		tmp = enode->v.expr->type;
 		for (i=0; !compatible_types(argp[i], tmp) && argp[i] != 0; i++)
 		    ;

@@ -61,7 +61,6 @@ typedef struct {
 #ifdef PROFILE_FUNCTIONS
     unsigned long entry_secs, entry_usecs;
 #endif
-    /* Only used for tracebacks */
     short framekind;
     union {
 	function_t *func;

@@ -65,6 +65,7 @@ operator sscanf;
 operator parse_command;
 
 operator new_class;
+operator expand_varargs;
 
 operator nn_range_lvalue, rn_range_lvalue, nr_range_lvalue, rr_range_lvalue;
 operator call_extra;

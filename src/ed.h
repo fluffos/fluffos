@@ -63,7 +63,7 @@
 #define BAD_LINE_NUMBER (ERR-8)
 #define SYNTAX_ERROR    (ERR-9)
 #define RANGE_ILLEGAL   (ERR-10)
-#define RESTRICTED      (ERR-11)
+#define IS_RESTRICTED   (ERR-11)
 #define LINE_OR_RANGE_ILL (ERR-12)
 #define FILE_NAME_ERROR (ERR-13)
 #define MARK_A_TO_Z     (ERR-14)

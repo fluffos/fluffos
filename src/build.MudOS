@@ -253,7 +253,7 @@ cat >comptest.y <<END
 all: FOO
 END
 bison comptest.y
-if test $? -eq 0; then
+if test $? -eq 0 && test $CC != "xlc"; then
     YACC="bison -d -y"
 else
     byacc comptest.y

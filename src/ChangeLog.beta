@@ -1,3 +1,97 @@
+
+---------------------------------------------------------------------------
+(v21.5b10 promoted to v21.5 with the following fixes)
+
+	* fixed a crasher in deallocating classes with PACKAGE_MUDLIB_STATS
+	  defined
+	* fixed a crasher in read_file() when reading just a portion of the
+	  file
+
+Tue Jul 18 01:39:53 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.5b10
+	* made push_lvalue_range() non-static; it's used in LPC->C code
+	* fixed a crasher in the F_SHORT_STRING fix
+	* fixed a crasher in ed messages when <varargs.h> is used
+
+Sat Jul 15 14:30:37 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.5b9
+	* Fix from Marius: define the crdir_fopen() function even if BINARIES
+	  isn't defined
+	* fixed an LPC->C code generation bug that would change the third
+	  character of the first function to a ')' in some files
+	* in LPC->C compilation, generate 'case x:;' and 'default:;' instead
+	  of 'case x:' and 'default:' to satisfy picky compilers.
+
+Thu Jul 13 01:52:40 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.5b8
+	* another F_SHORT_STRING string disassembly fix from Sym
+	* fixed a bug that caused classes to fail to restore from inside
+	  classes/arrays/mappings
+	* fixed a bug that caused 'Inherit chain too deep' errors when
+	  load_object() was called repeatedly on non-existent objects
+	* fixed the alpha crasher fix (I changed the wrong #ifdef merging
+	  the changes into my local version)
+	* (: foo :) when foo is both a local function and a simul now gives
+	  a pointer to the lfun, not the simul in line with the normal
+	  visibility rules.
+	
+Thu Jul  6 03:29:37 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.5b7
+	* fix from Symmetry: use EXTRACT_UCHAR when disassembling 
+	  F_SHORT_STRING
+	* Alpha crasher fix: make sure there isn't any padding at the end
+	  of the shared string and malloc'ed string structs so that they
+	  overlap correctly
+	* don't use bison on AIX when compiling with xlC; xlC won't grok
+	  bison's use of alloca
+
+Fri Jun 30 16:02:44 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.5b6
+	* fixed a typo in socket_efuns.c
+	* fixed a bug that caused socket callbacks not to be called
+	  (introduced with the v21.5b4 fix)
+
+Tue Jun 27 01:01:27 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.5b5
+	* fixed MUD mode sockets to not abort the driver if they can't
+	  allocate enough memory for a packet (due to garbage for the
+	  length field, for example).  The connection is killed instead.
+
+Fri Jun 23 02:26:54 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.5b4
+	* fixed a compilation problem with DO_MSTATS and BSDMALLOC
+	* fixed a HP name collision on RESTRICTED in ed.c
+	* fixed a crasher in destructing socket objects with function pointers
+	  for callbacks.
+
+Thu Jun 15 09:00:09 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.5b3
+	* fixed a LPC->C compilation error in range switch tables
+	    
+Mon Jun 12 04:03:58 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.5b2
+	* fixed a bug that generated incorrect code for string switches
+	* fixed a typeclash in grammar.y.pre
+	* better fix for the obj/grammar.tab.o problem
+	* fixed a crasher in some assignments in LPC->C code
+	* fixed a crasher in casting a void valued efun, i.e.
+	  return (int) destruct(ob)
+
+Sun Jun 11 04:04:49 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.5b1
+	* updated with respect to v21.4
+	* fixed a bunch of warning messages and unsafe casts for DEC Alpha
+	* added a call_stack() efun: for each internal as well as external
+	  frame:
+	  . call_stack(), call_stack(0) : an array of program names
+	  . call_stack(1) : array of current objects (in that frame)
+	  . call_stack(2) : array of function names
+	  . call_stack(3) : array of what origin() returns in that frame
+	  all the arrays are the same length; i.e. element 5 of call_stack(0)
+	  is the same frame as element 5 of call_stack(2)
+	  e.g. printf("I got called from %s in %s", call_stack(2)[0],
+	       call_stack(0)[0]);
+
 ---------------------------------------------------------------------------
 (v21.4b11 promoted to v21.4 with the following fix)
 

@@ -1352,7 +1352,12 @@ int yylex()
 	    outp--;
 	    return ':';
 	case '.':
-	    if (*outp++ == '.') return L_RANGE;
+	    if (*outp++ == '.') {
+		if (*outp++ == '.')
+		    return L_DOT_DOT_DOT;
+		outp--;
+		return L_RANGE;
+	    }
 	    outp--;
 	    goto badlex;
 	case '#':
@@ -1766,10 +1771,10 @@ parse_identifier:
 				} else if ((val=ihe->dn.global_num) >= 0) {
 				    if (c == ',') return old_func();
 				    yylval.number = (val << 8) | FP_G_VAR;
-				} else if ((val=ihe->dn.simul_num) >=0) {
-				    yylval.number = (val << 8)|FP_SIMUL;
 				} else if ((val=ihe->dn.function_num) >=0) {
 				    yylval.number = (val << 8)|FP_LOCAL;
+				} else if ((val=ihe->dn.simul_num) >=0) {
+				    yylval.number = (val << 8)|FP_SIMUL;
 				} else if ((val=ihe->dn.efun_num) >=0) {
 				    yylval.number = (val << 8)|FP_EFUN;
 				} else return old_func();
@@ -2027,6 +2032,7 @@ void init_num_args()
     add_instr_name("loop_incr", "c_loop_incr();\n", F_LOOP_INCR, -1);
     add_instr_name("foreach", 0, F_FOREACH, -1);
     add_instr_name("exit_foreach", "c_exit_foreach();\n", F_EXIT_FOREACH, -1);
+    add_instr_name("expand_varargs", 0, F_EXPAND_VARARGS, -1);
     add_instr_name("next_foreach", 0, F_NEXT_FOREACH, -1);
     add_instr_name("member_lvalue", 0, F_MEMBER_LVALUE, T_LVALUE);
     add_instr_name("index_lvalue", "push_indexed_lvalue(0);\n", 

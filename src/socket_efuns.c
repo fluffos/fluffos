@@ -18,6 +18,10 @@
 
 #ifdef PACKAGE_SOCKETS
 
+/* flags for socket_close */
+#define SC_FORCE	1
+#define SC_DO_CALLBACK	2
+
 lpc_socket_t lpc_socks[MAX_EFUN_SOCKS];
 static int socket_name_to_sin PROT((char *, struct sockaddr_in *));
 static char *inet_address PROT((struct sockaddr_in *));
@@ -773,6 +777,8 @@ socket_read_select_handler P1(int, fd)
 		lpc_socks[fd].flags &= ~S_HEADER;
 		lpc_socks[fd].r_off = 0;
 		lpc_socks[fd].r_len = ntohl(lpc_socks[fd].r_len);
+		if (lpc_socks[fd].r_len > MAX_BYTE_TRANSFER)
+		    break;
 		lpc_socks[fd].r_buf = (char *)
 		    DMALLOC(lpc_socks[fd].r_len + 1, TAG_TEMPORARY, "socket_read_select_handler");
 		if (lpc_socks[fd].r_buf == NULL)
@@ -861,11 +867,7 @@ socket_read_select_handler P1(int, fd)
 	    break;
 	}
     }
-    socket_close(fd, 1);
-
-    debug(8192, ("read_socket_handler: apply close callback\n"));
-    push_number(fd);
-    call_callback(fd, S_CLOSE_FP, 1);
+    socket_close(fd, SC_FORCE | SC_DO_CALLBACK);
 }
 
 /*
@@ -908,13 +910,13 @@ socket_write_select_handler P1(int, fd)
  * Close an LPC efun socket
  */
 int
-socket_close P2(int, fd, int, force)
+socket_close P2(int, fd, int, flags)
 {
     if (fd < 0 || fd >= MAX_EFUN_SOCKS)
 	return EEFDRANGE;
     if (lpc_socks[fd].state == CLOSED)
 	return EEBADF;
-    if (!force && lpc_socks[fd].owner_ob != current_object)
+    if (!(flags & SC_FORCE) && lpc_socks[fd].owner_ob != current_object)
 	return EESECURITY;
     while (close(lpc_socks[fd].fd) == -1 && errno == EINTR)
 	;	/* empty while */
@@ -923,6 +925,17 @@ socket_close P2(int, fd, int, force)
 	FREE(lpc_socks[fd].r_buf);
     if (lpc_socks[fd].w_buf != NULL)
 	FREE(lpc_socks[fd].w_buf);
+
+    if (flags & SC_DO_CALLBACK) {
+	debug(8192, ("read_socket_handler: apply close callback\n"));
+	push_number(fd);
+	call_callback(fd, S_CLOSE_FP, 1);
+    }
+    
+    set_read_callback(fd, 0);
+    set_write_callback(fd, 0);
+    set_close_callback(fd, 0);
+
     debug(8192, ("socket_close: closed fd %d\n", fd));
     return EESUCCESS;
 }
@@ -1078,7 +1091,7 @@ close_referencing_sockets P1(object_t *, ob)
 
     for (i = 0; i < MAX_EFUN_SOCKS; i++)
 	if (lpc_socks[i].owner_ob == ob && lpc_socks[i].state != CLOSED)
-	    socket_close(i, 1);
+	    socket_close(i, SC_FORCE);
 }
 
 /*

@@ -52,6 +52,7 @@ int outbuf_extend PROT((outbuffer_t *, int));
 #define TAG_LPC_OBJECT      (TAG_PERMANENT + 33)
 #define TAG_USERS           (TAG_PERMANENT + 34)
 #define TAG_DEBUGMALLOC     (TAG_PERMANENT + 35)
+#define TAG_HEART_BEAT      (TAG_PERMANENT + 36)
 
 #define TAG_STRING          (TAG_DATA + 40)
 #define TAG_MALLOC_STRING   (TAG_DATA + 41)

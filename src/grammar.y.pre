@@ -58,7 +58,7 @@ int yyparse PROT((void));
 %token L_NOT
 
 %token L_IF L_ELSE
-%token L_SWITCH L_CASE L_DEFAULT L_RANGE
+%token L_SWITCH L_CASE L_DEFAULT L_RANGE L_DOT_DOT_DOT
 %token L_WHILE L_DO L_FOR L_FOREACH L_IN
 %token L_BREAK L_CONTINUE
 %token L_RETURN
@@ -103,6 +103,7 @@ int yyparse PROT((void));
  */
 %union
 {
+    POINTER_INT pointer_int;
     int number;
     float real;
     unsigned int address;       /* Address of an instruction */
@@ -137,7 +138,12 @@ int yyparse PROT((void));
 %type <number> L_PARAMETER
 
 /* These hold arbitrary numbers */
-%type <number> L_NUMBER constant
+%type <number> L_NUMBER 
+
+/* These hold numbers that are going to be stuffed into pointers :)
+ * Don't ask :)
+ */
+%type <pointer_int> constant
 
 /* These hold a real number */
 %type <real>   L_REAL
@@ -170,7 +176,7 @@ int yyparse PROT((void));
 %type <node> new_local_def statement while cond do for switch case
 %type <node> return optional_else_part block_or_semi foreach
 %type <node> case_label first_for_expr statements switch_block
-%type <node> foreach_var foreach_vars
+%type <node> foreach_var foreach_vars expr_list_node
 
 /* The following hold information about blocks and local vars */
 %type <decl> local_declarations local_name_list block
@@ -331,9 +337,9 @@ def:
 		if ($9) {
 		    int fun;
 
-		    if (!($9->kind == F_RETURN) &&
+		    if (!($9->kind == F_RETURN || $9->kind == F_RETURN_ZERO) &&
 			!(($9->kind == NODE_STATEMENTS) 
-			  && $9->r.expr->kind == F_RETURN)) {
+			  && ($9->r.expr->kind == F_RETURN || $9->r.expr->kind == F_RETURN_ZERO))) {
 			parse_node_t *replacement;
 			parse_node_t *sub_node;
 			NODE_NO_LINE(sub_node, F_RETURN_ZERO);
@@ -1071,6 +1077,9 @@ first_for_expr:
                 $$ = $2;
             }
     |   L_NUMBER
+            {
+		$$ = $1;
+	    }
     |   '-' L_NUMBER
             {
                 $$ = -$2;
@@ -1698,8 +1707,24 @@ get_two_types(t1, t3));
 	    }
     |   cast expr0  %prec L_NOT
 	    {
-		$$ = $2;
-		$$->type = $1;
+		/* Normally the code generator takes care of the use of
+		   TYPE_NOVALUE values, but casting away from TYPE_NOVALUE
+		   prevents that, so we have to do it here.  This means
+		   that a discarded cast:
+		   (void) destruct(ob)
+		   etc produces a F_CONST0 F_POP_VALUE, unfortunately.
+		   Do the conversion: (expr) -> (expr, 0) */
+		if ($2->type == TYPE_NOVALUE) {
+		    parse_node_t *replacement;
+		    
+		    NODE_NO_LINE(replacement, F_CONST0);
+		    $2->type = TYPE_VOID;
+		    $$ = make_branched_node(NODE_COMMA, $1,
+					    $2, replacement);
+		} else {
+		    $$ = $2;
+		    $$->type = $1;
+		}
 		if (exact_types && $2->type != TYPE_ANY && 
 		    $2->type != TYPE_UNKNOWN &&
 		      $1 != TYPE_VOID) {
@@ -1899,29 +1924,40 @@ expr_list:
 	    }
     ;
 
-expr_list2:
-	expr0
-	    {
+expr_list_node:
+        expr0
+            {
 		$$ = new_node_no_line();
-		$$->kind = 1;
 		$$->v.expr = $1;
 		$$->r.expr = 0;
-		/* we keep track of the end of the chain in the left nodes */
 		$$->l.expr = $$;
+		$$->type = 0;
 	    }
-    |   expr_list2 ',' expr0
-	    {
-		parse_node_t *expr;
+    |   expr0 L_DOT_DOT_DOT
+            {
+		$$ = new_node_no_line();
+		$$->v.expr = $1;
+		$$->r.expr = 0;
+		$$->l.expr = $$;
+		$$->type = 1;
+	    }
+    ;
 
-		expr = new_node_no_line();
-		expr->kind = 0;
-		expr->v.expr = $3;
-		expr->r.expr = 0;
-		
-		$1->l.expr->r.expr = expr;
-		$1->l.expr = expr;
-		$1->kind++;
+expr_list2:
+        expr_list_node
+	    {
+		$1->kind = 1;
+
 		$$ = $1;
+	    }
+    |   expr_list2 ',' expr_list_node
+	    {
+		$3->kind = 0;
+
+		$$ = $1;
+		$$->kind++;
+		$$->l.expr->r.expr = $3;
+		$$->l.expr = $3;
 	    }
     ;
 
@@ -1954,6 +1990,7 @@ expr_list4:
 		$$->kind = 2;
 		$$->v.expr = $1;
 		$$->r.expr = 0;
+		$$->type = 0;
 		/* we keep track of the end of the chain in the left nodes */
 		$$->l.expr = $$;
             }
@@ -1965,7 +2002,8 @@ expr_list4:
 		expr->kind = 0;
 		expr->v.expr = $3;
 		expr->r.expr = 0;
-
+		expr->type = 0;
+		
 		$1->l.expr->r.expr = expr;
 		$1->l.expr = expr;
 		$1->kind += 2;
@@ -2199,6 +2237,7 @@ expr4:
 		    $$->v.number = function_context.values_list->kind++;
 
 		    node = new_node_no_line();
+		    node->type = 0;
 		    function_context.values_list->l.expr->r.expr = node;
 		    function_context.values_list->l.expr = node;
 		    node->r.expr = 0;
@@ -2439,66 +2478,80 @@ expr4:
 		CREATE_TYPED_NODE($$, F_FUNCTION_CONSTRUCTOR, TYPE_FUNCTION);
 		$$->v.number = $1;
 		$$->r.expr = $3;
-
+		
 		switch ($1 & 0xff) {
 		case FP_EFUN: {
-		  int *argp;
-		  int f = $1 >>8;
-		  int num = $3->kind;
-		  int max_arg = predefs[f].max_args;
-		  
-		  if (num > max_arg && max_arg != -1) {
-		    char bff[100];
-		    sprintf(bff, "Too many arguments to %s", predefs[f].word);
-		    yyerror(bff);
-		  } else if (max_arg != -1 && exact_types) {
-		    /*
-		     * Now check all types of arguments to efuns.
-		     */
-		    int i, argn, tmp;
-		    char buff[100];
-		    parse_node_t *enode = $3;
-		    argp = &efun_arg_types[predefs[f].arg_index];
+		    int *argp;
+		    int f = $1 >>8;
+		    int num = $3->kind;
+		    int max_arg = predefs[f].max_args;
 		    
-		    for (argn = 0; argn < num; argn++) {
-		      tmp = enode->v.expr->type;
-		      for (i=0; !compatible_types(argp[i], tmp) && argp[i] != 0; i++)
-			;
-		      if (argp[i] == 0) {
-			sprintf(buff, "Bad argument %d to efun %s()",
-				argn+1, predefs[f].word);
-			yyerror(buff);
-		      } else {
-			  /* this little section necessary b/c in the case
-			     float | int we dont want to do promoting. */
-			  if (tmp == TYPE_NUMBER && argp[i] == TYPE_REAL) {
-			      for (i++; argp[i] && argp[i] != TYPE_NUMBER; i++)
-				  ;
-			      if (!argp[i])
-				  enode->v.expr = promote_to_float(enode->v.expr);
-			  }
-			  if (tmp == TYPE_REAL && argp[i] == TYPE_NUMBER) {
-			      for (i++; argp[i] && argp[i] != TYPE_REAL; i++)
-				  ;
-			      if (!argp[i])
-				  enode->v.expr = promote_to_int(enode->v.expr);
-			  }
-		      }
-		      while (argp[i] != 0)
-			i++;
-		      argp += i + 1;
-		      enode = enode->r.expr;
+		    if (num > max_arg && max_arg != -1) {
+			parse_node_t *pn = $3;
+			
+			while (pn) {
+			    if (pn->type & 1) break;
+			    pn = pn->r.expr;
+			}
+			
+			if (!pn) {
+			    char bff[100];
+			    sprintf(bff, "Too many arguments to %s", 
+				    predefs[f].word);
+			    yyerror(bff);
+			}
+		    } else if (max_arg != -1 && exact_types) {
+			/*
+			 * Now check all types of arguments to efuns.
+			 */
+			int i, argn, tmp;
+			char buff[100];
+			parse_node_t *enode = $3;
+			argp = &efun_arg_types[predefs[f].arg_index];
+			
+			for (argn = 0; argn < num; argn++) {
+			    if (enode->type & 1) break;
+			    
+			    tmp = enode->v.expr->type;
+			    for (i=0; !compatible_types(argp[i], tmp)
+				 && argp[i] != 0; i++)
+				;
+			    if (argp[i] == 0) {
+				sprintf(buff, "Bad argument %d to efun %s()",
+					argn+1, predefs[f].word);
+				yyerror(buff);
+			    } else {
+				/* this little section necessary b/c in the
+				   case float | int we dont want to do
+				   promoting. */
+				if (tmp == TYPE_NUMBER && argp[i] == TYPE_REAL) {
+				    for (i++; argp[i] && argp[i] != TYPE_NUMBER; i++)
+					;
+				    if (!argp[i])
+					enode->v.expr = promote_to_float(enode->v.expr);
+				}
+				if (tmp == TYPE_REAL && argp[i] == TYPE_NUMBER) {
+				    for (i++; argp[i] && argp[i] != TYPE_REAL; i++)
+					;
+				    if (!argp[i])
+					enode->v.expr = promote_to_int(enode->v.expr);
+				}
+			    }
+			    while (argp[i] != 0)
+				i++;
+			    argp += i + 1;
+			    enode = enode->r.expr;
+			}
 		    }
-		  }
-		  break;
+		    break;
 		}
 		case FP_L_VAR:
 		case FP_G_VAR:
-		  yyerror("Can't give parameters to functional.");
-		  break;
+		    yyerror("Can't give parameters to functional.");
+		    break;
 		}
-	      }
-      |   L_FUNCTION_OPEN comma_expr ':' ')'
+	    }
+    |   L_FUNCTION_OPEN comma_expr ':' ')'
              {
 		 if (function_context.num_locals)
 		   yyerror("Illegal to use local variable in functional.");
@@ -2767,9 +2820,11 @@ function_call:
                 $$->type = TYPE_ANY;
 #endif		  
 		expr = new_node_no_line();
+		expr->type = 0;
 		expr->v.expr = $1;
 
 		expr2 = new_node_no_line();
+		expr2->type = 0;
 		CREATE_TYPED_NODE(expr2->v.expr, F_STRING, TYPE_STRING);
 		expr2->v.expr->v.number = store_prog_string($3);
 

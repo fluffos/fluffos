@@ -1,6 +1,14 @@
 #ifndef MACROS_H
 #define MACROS_H
 
+#ifdef __STDC__
+#define ANSI_STRING_HACK(x) #x
+#define DONT_ASK_WHY(x) (x)
+#define WHERE (__FILE__ ":" DONT_ASK_WHY(x))
+#else
+#define WHERE "non-ansi compilers are a pain"
+#endif
+
 /*
  * Some useful macros...
  */
@@ -255,15 +263,15 @@ pointers of size other than 4 or 8 not implemented
 #endif
 
 #ifdef DEBUGMALLOC
-#   define string_copy(x, y) int_string_copy(x, y)
-#   define string_unlink(x, y) int_string_unlink(x, y)
-#   define new_string(x, y) int_new_string(x, y)
-#   define alloc_cstring(x, y) int_alloc_cstring(x, y)
+#   define string_copy(x,y) int_string_copy(x, y)
+#   define string_unlink(x,y) int_string_unlink(x, y)
+#   define new_string(x,y) int_new_string(x, y)
+#   define alloc_cstring(x,y) int_alloc_cstring(x, y)
 #else
-#   define string_copy(x, y) int_string_copy(x)
-#   define string_unlink(x, y) int_string_unlink(x)
-#   define new_string(x, y) int_new_string(x)
-#   define alloc_cstring(x, y) int_alloc_cstring(x)
+#   define string_copy(x,y) int_string_copy(x)
+#   define string_unlink(x,y) int_string_unlink(x)
+#   define new_string(x,y) int_new_string(x)
+#   define alloc_cstring(x,y) int_alloc_cstring(x)
 #endif
 
 #endif

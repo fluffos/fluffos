@@ -57,7 +57,7 @@ typedef struct malloc_block_s {
 
 typedef struct block_s {
     struct block_s *next;	/* next block in the hash chain */
-#ifdef DEBUGMALLOC_EXTENSIONS
+#if defined(DEBUGMALLOC_EXTENSIONS) || (SIZEOF_PTR == 8)
     int extra_ref;
 #endif
     /* these two must be last */

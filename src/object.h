@@ -85,13 +85,12 @@ typedef struct object_s {
     char *name;
     struct object_s *next_hash;
     /* the fields above must match lpc_object_t */
-    short heart_beat_ticks, time_to_heart_beat;
     int load_time;		/* time when this object was created */
     int next_reset;		/* Time of next reset of this object */
     int time_of_ref;		/* Time when last referenced. Used by swap */
     long swap_num;		/* Swap file offset. -1 is not swapped yet. */
     program_t *prog;
-    struct object_s *next_all, *next_inv, *next_heart_beat;
+    struct object_s *next_all, *next_inv;
     struct object_s *contains;
     struct object_s *super;	/* Which object surround us ? */
     struct interactive_s *interactive;	/* Data about an interactive user */

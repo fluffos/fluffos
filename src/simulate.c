@@ -372,14 +372,18 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 
 	if (is_master_ob) {
 	    master_ob_is_loading = 0;
+	    num_objects_this_thread--;
 	    return 0;
 	}
 	if (simul_efun_is_loading){
 	    simul_efun_is_loading = 0;
+	    num_objects_this_thread--;
 	    return 0;
 	}
-	if (!(v = load_virtual_object(name)))
+	if (!(v = load_virtual_object(name))) {
+	    num_objects_this_thread--;
 	    return 0;
+	}
 	/* Now set the file name of the specified object correctly... */
 	ob = v->u.ob;
 	remove_object_hash(ob);
@@ -397,6 +401,7 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 	if (ob->privs) free_string(ob->privs);
 	init_privs_for_object(ob);
 #endif
+	num_objects_this_thread--;
 	return ob;
     }
     /*
@@ -518,7 +523,10 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 	if (!(ob = lookup_object_hash(name))) {
 	    ob = load_object(name, 0);
 	    /* sigh, loading the inherited file removed us */
-	    if (!ob) return 0;
+	    if (!ob) { 
+		num_objects_this_thread--;
+		return 0;
+	    }
 	    ob->load_time = current_time;
 	}
 #ifdef LPC_TO_C

@@ -93,7 +93,7 @@ typedef struct {
     unsigned short offset;	/* Address of function, or inherit table
 				 * index when inherited. */
 #else
-    unsigned long offset;
+    POINTER_INT offset;
 #endif
     unsigned short type;      /* Return type of function. See below. */
     /*

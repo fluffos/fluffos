@@ -1819,7 +1819,7 @@ static int docmd P1(int, glob)
 
     case 'e':
 	if (P_RESTRICT)
-	    return RESTRICTED;
+	    return IS_RESTRICTED;
 	if (P_NLINES > 0)
 	    return LINE_OR_RANGE_ILL;
 	if (P_FCHANGED)
@@ -1827,7 +1827,7 @@ static int docmd P1(int, glob)
 	/* FALL THROUGH */
     case 'E':
 	if (P_RESTRICT)
-	    return RESTRICTED;
+	    return IS_RESTRICTED;
 	if (P_NLINES > 0)
 	    return LINE_OR_RANGE_ILL;
 
@@ -1846,7 +1846,7 @@ static int docmd P1(int, glob)
 
     case 'f':
 	if (P_RESTRICT)
-	    return RESTRICTED;
+	    return IS_RESTRICTED;
 	if (P_NLINES > 0)
 	    return LINE_OR_RANGE_ILL;
 
@@ -1973,7 +1973,7 @@ static int docmd P1(int, glob)
 
     case 'r':
 	if (P_RESTRICT)
-	    return RESTRICTED;
+	    return IS_RESTRICTED;
 	if (P_NLINES > 1)
 	    return RANGE_ILLEGAL;
 
@@ -2031,7 +2031,7 @@ static int docmd P1(int, glob)
 	if (*inptr != NL)
 	    return SYNTAX_ERROR;
 	if (P_RESTRICT)
-	    return RESTRICTED;
+	    return IS_RESTRICTED;
 	if (*inptr != ' ' && *inptr != HT && *inptr != NL)
 	    return SYNTAX_ERROR;
 
@@ -2316,7 +2316,7 @@ static void report_status P1(int, status) {
     case RANGE_ILLEGAL:
 	ED_OUTPUT(ED_DEST, "Cannot use ranges with that command.\n");
 	break;
-    case RESTRICTED:
+    case IS_RESTRICTED:
 	ED_OUTPUT(ED_DEST, "That command is restricted.\n");
 	break;
     case LINE_OR_RANGE_ILL:

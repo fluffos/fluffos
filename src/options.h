@@ -568,6 +568,13 @@
  */
 #undef TRACE_CODE
 
+/* HEART_BEAT_CHUNK: The number of heart_beat chunks allocated at a time.
+ * A large number wastes memory as some will be sitting around unused, while
+ * a small one wastes more CPU reallocating when it needs to grow.  Default
+ * to a middlish value.
+ */
+#define HEART_BEAT_CHUNK      32
+
 /* Some maximum string sizes
  */
 #define SMALL_STRING_SIZE     100

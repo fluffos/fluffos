@@ -308,6 +308,59 @@ f_call_out_info PROT((void))
 }
 #endif
 
+#ifdef F_CALL_STACK
+void
+f_call_stack PROT((void))
+{
+    int i, n = csp - &control_stack[0] + 1;
+    array_t *ret = allocate_empty_array(n);
+    
+    switch (sp->u.number) {
+    case 0:
+	ret->item[0].type = T_STRING;
+	ret->item[0].subtype = STRING_SHARED;
+	ret->item[0].u.string = current_prog->name;
+	ref_string(current_prog->name);
+	for (i = 1; i < n; i++) {
+	    ret->item[i].type = T_STRING;
+	    ret->item[i].subtype = STRING_SHARED;
+	    ret->item[i].u.string = make_shared_string((csp - i + 1)->prog->name);
+	}
+	break;
+    case 1:
+	ret->item[0].type = T_OBJECT;
+	ret->item[0].u.ob = current_object;
+	add_ref(current_object, "f_call_stack: curr");
+	for (i = 1; i < n; i++) {
+	    ret->item[i].type = T_OBJECT;
+	    ret->item[i].u.ob = (csp - i + 1)->ob;
+	    add_ref((csp - i + 1)->ob, "f_call_stack");
+	}
+	break;
+    case 2:
+	for (i = 0; i < n; i++) {
+	    ret->item[i].type = T_STRING;
+	    if (((csp - i)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
+		ret->item[i].subtype = STRING_SHARED;
+		ret->item[i].u.string = (csp - i)->fr.func->name;
+		ref_string((csp - i)->fr.func->name);
+	    } else {
+		ret->item[i].subtype = STRING_CONSTANT;
+		ret->item[i].u.string = (((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH) ? "CATCH" : "<function>";
+	    }
+	}
+	break;
+    case 3:
+	for (i = 0; i < n; i++) {
+	    ret->item[i].type = T_NUMBER;
+	    ret->item[i].u.number = (csp - i)->caller_type;
+	}
+	break;
+    }
+    put_array(ret);
+}
+#endif
+
 #ifdef F_CAPITALIZE
 void
 f_capitalize PROT((void))
@@ -1117,7 +1170,7 @@ f_interactive PROT((void))
 {
     int i;
 
-    i = ((int) sp->u.ob->interactive != 0);
+    i = (sp->u.ob->interactive != 0);
     free_object(sp->u.ob, "f_interactive");
     put_number(i);
 }
@@ -2373,33 +2426,37 @@ f_replace_string PROT((void))
             }
             memcpy(dst2, src, slimit - src);
             dst2 += (slimit - src);
+	    *dst2 = 0;
+	    arg->u.string = extend_string(dst1, dst2 - dst1);
         } else { /* pattern length <= 1, brute force most efficient */
 	    /* Beek - if it was zero, we already returned, so plen == 1 */
 	    /* assume source string is a string < maximum string length */
-            while (*src) {
-                if (*src == *pattern) {
-                    cur++;
+	    if (rlen) {
+		while (*src) {
+		    if (*src == *pattern) {
+			cur++;
 		    
-                    if (cur >= first && cur <= last) {
-                        if (rlen) {
-                            strncpy(dst2, replace, rlen);
-                            dst2 += rlen;
-                        }
-                        src++;
-                        continue;
+			if (cur >= first && cur <= last) {
+			    *src = *replace;
+			}
 		    }
-                }
-                *dst2++ = *src++;
-            }
-        }
-	
-        /*
-         * shrink block (if necessary)
-         */
-        if (rlen < plen) {
-            *dst2 = '\0';
-            arg->u.string = extend_string(dst1, dst2 - dst1);
-        }
+		    src++;
+		}
+	    } else { /* rlen is zero */
+		while (*src) {
+		    if (*src++ == *pattern) {
+			dst2 = src - 1;
+			while (*src) {
+			    if (*src == *pattern) src++;
+			    else *dst2++ = *src++;
+			}
+			*dst2 = 0;
+			arg->u.string = extend_string(dst1, dst2 - dst1);
+			break;
+		    }
+		}
+	    }
+	}
         pop_n_elems(st_num_arg - 1);
     } else {
         dst2 = dst1 = new_string(max_string_length, "f_replace_string: 2");

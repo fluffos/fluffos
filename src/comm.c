@@ -431,8 +431,8 @@ void add_vmessage P2V(object_t *, who, char *, format)
     V_DCL(object_t *who);
 
     V_START(args, format);
-    V_VAR(char *, format, args);
     V_VAR(object_t *, who, args);
+    V_VAR(char *, format, args);
     /*
      * if who->interactive is not valid, write message on stderr.
      * (maybe)
@@ -1188,25 +1188,24 @@ int process_user_command()
 	        if (command_giver->interactive->iflags & HAS_PROCESS_INPUT) {
 		    push_constant_string(user_command + 1);	/* not malloc'ed */
 		    ret = apply(APPLY_PROCESS_INPUT, command_giver, 1, ORIGIN_DRIVER);
-#ifdef NO_ADD_ACTION
+		    if (!command_giver || (command_giver->flags & O_DESTRUCTED)) {
+			command_giver = save_command_giver;
+			current_object = save_current_object;
+			return 1;
+		    }
 		    if (!ret && command_giver->interactive)
 		        command_giver->interactive->iflags &= ~HAS_PROCESS_INPUT;
-#else
-		    if (ret && (ret->type == T_STRING) && ret->u.string) {
-		        strncpy(buf + 1, ret->u.string, MAX_TEXT - 2);
-		        tbuf = buf;
-		    } else if (command_giver->interactive) {
-		        command_giver->interactive->iflags &= ~HAS_PROCESS_INPUT;
+#ifndef NO_ADD_ACTION
+		    if (ret && ret->type == T_STRING) {
+		        strncpy(buf, ret->u.string, MAX_TEXT - 1);
+			parse_command(buf, command_giver);
+		    } else if (!ret || ret->type != T_NUMBER || !ret->u.number) {
+			parse_command(tbuf+1, command_giver);
 		    }
 #endif
 	        }
-	        if (!command_giver || (command_giver->flags & O_DESTRUCTED)) {
-		    command_giver = save_command_giver;
-		    current_object = save_current_object;
-		    return 1;
-	        }
 #ifndef NO_ADD_ACTION
-	        parse_command(tbuf + 1, command_giver);
+	        else parse_command(tbuf + 1, command_giver);
 #endif
             }
 #ifdef OLD_ED
@@ -1225,25 +1224,24 @@ int process_user_command()
 	    if (command_giver->interactive->iflags & HAS_PROCESS_INPUT) {
 		push_constant_string(user_command);	/* not malloc'ed */
 		ret = apply(APPLY_PROCESS_INPUT, command_giver, 1, ORIGIN_DRIVER);
-#ifdef NO_ADD_ACTION
+		if (!command_giver || command_giver->flags & O_DESTRUCTED) {
+		    command_giver = save_command_giver;
+		    current_object = save_current_object;
+		    return 1;
+		}
 		if (!ret && command_giver->interactive)
 		    command_giver->interactive->iflags &= ~HAS_PROCESS_INPUT;
-#else
-		if (ret && (ret->type == T_STRING) && ret->u.string) {
+#ifndef NO_ADD_ACTION
+		if (ret && ret->type == T_STRING) {
 		    strncpy(buf, ret->u.string, MAX_TEXT - 1);
-		    tbuf = buf;
-		} else if (command_giver->interactive) {
-		    command_giver->interactive->iflags &= ~HAS_PROCESS_INPUT;
+		    parse_command(buf, command_giver);
+		} else if (!ret || ret->type != T_NUMBER || !ret->u.number) {
+		    parse_command(tbuf, command_giver);
 		}
 #endif
 	    }
-	    if (!command_giver || command_giver->flags & O_DESTRUCTED) {
-		command_giver = save_command_giver;
-		current_object = save_current_object;
-		return 1;
-	    }
 #ifndef NO_ADD_ACTION
-	    parse_command(tbuf, command_giver);
+	    else parse_command(tbuf, command_giver);
 #endif
 	}
 	/*
@@ -1257,6 +1255,7 @@ int process_user_command()
     }
     current_object = save_current_object;
     command_giver = save_command_giver;
+    current_interactive = 0;
     return (0);
 }				/* process_user_command() */
 

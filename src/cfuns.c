@@ -118,24 +118,6 @@ void c_void_assign() {
 		break;
 	    }
 	    
-	case T_STRING:
-	    {
-		free_svalue(lval, "F_VOID_ASSIGN : 2");
-		if (sp->subtype != STRING_CONSTANT) {
-		    /*
-		     * avoid unnecessary (and costly)
-		     * string_copy()...FREE() or
-		     * ref_string()...free_string()
-		     */
-		    *lval = *sp--;     /* copy string directly */
-		} else {
-		    lval->type = T_STRING;
-		    lval->subtype = STRING_SHARED;
-		    lval->u.string = make_shared_string((sp--)->u.string);
-		}
-		break;
-	    }
-	    
 	case T_LVALUE_RANGE:
 	    {
 		copy_lvalue_range(sp--);
@@ -1176,7 +1158,7 @@ void c_end_catch P1(error_context_t *, econ) {
 
 static int compare_switch_entries P2(string_switch_entry_t *, p1,
 				     string_switch_entry_t *, p2) {
-    return ((int)p1->string - (int)p2->string);
+    return ((POINTER_INT)p1->string - (POINTER_INT)p2->string);
 }
 
 #ifdef DEBUGMALLOC_EXTENSIONS

@@ -6,10 +6,10 @@ PROOF=
 STRFUNCS=
 INSTALL=install -c
 INSTALL_DIR=../bin
-OPTIMIZE=-fullwarn
-CPP=cc -E
-CFLAGS=-g -DDEBUG
-CC=cc
+OPTIMIZE=-O2 -fomit-frame-pointer -fstrength-reduce
+CPP=gcc -E
+CFLAGS=
+CC=gcc
 YACC=bison -d -y
 
 #################################################
@@ -18,6 +18,8 @@ YACC=bison -d -y
 #                                               #
 # RUN ./build.MudOS to generate the Makefiles   #
 #################################################
+
+OVERRIDES=$(MAKEOVERRIDES)
 
 SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   backend.c array.c mapping.c comm.c ed.c regexp.c swap.c buffer.c crc32.c \
@@ -39,7 +41,8 @@ $(OBJDIR)/%.o: %.c
 all: GNUmakefile.MudOS grammar.y cc.h files
 	$(MAKE) -f GNUmakefile.MudOS  'DRIVER_BIN=$(DRIVER_BIN)' \
 	'OBJ=$(OBJ)' 'MAKE=$(MAKE)' 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' \
-	'PROOF=$(PROOF)' 'OBJDIR=$(OBJDIR)' 'SRC=$(SRC)' 'YACC=$(YACC)'
+	'PROOF=$(PROOF)' 'OBJDIR=$(OBJDIR)' 'SRC=$(SRC)' 'YACC=$(YACC)' \
+	'OVERRIDES=$(OVERRIDES)'
 
 $(OBJDIR)/hash.o: hash.c
 	$(CC) -I$(OBJDIR) $(CFLAGS) -DEDIT_SOURCE $(OPTIMIZE) -o $(OBJDIR)/hash.o -c hash.c

@@ -265,6 +265,7 @@ restore_internal_size P3(char **, str, int, is_mapping, int, depth)
 		    if (!restore_internal_size(str, 1, save_svalue_depth++)){ return 0;}
 		}
 		else if (*cp == '/') {
+		    *str = ++cp;
 		    if (!restore_internal_size(str, 0, save_svalue_depth++))
 			return 0;
 		} else { return 0;}
@@ -573,19 +574,19 @@ restore_mapping P2(char **,str, svalue_t *, sv)
 		    *str = ++cp;
 		    if ((err = restore_mapping(str, &key)))
 			goto key_error;
-		    oi = (int) key.u.map;
+		    oi = (POINTER_INT) key.u.map;
 		}
 		else if (*cp == '{'){
 		    *str = ++cp;
 		    if ((err = restore_array(str, &key)))
 			goto key_error;
-		    oi = (int) key.u.arr;
+		    oi = (POINTER_INT) key.u.arr;
 		}
 		else if (*cp == '/') {
 		    *str = ++cp;
 		    if ((err = restore_class(str, &key)))
 			goto key_error;
-		    oi = (int) key.u.arr;
+		    oi = (POINTER_INT) key.u.arr;
 		}
 		else goto generic_key_error;
 		cp = *str;

@@ -16,6 +16,7 @@
 #include "port.h"
 #include "qsort.h"
 #include "compiler.h"
+#include "regexp.h"
 
 #ifdef OPCPROF
 #include "opc.h"
@@ -51,8 +52,9 @@ static char *type_names[] = {
     "function",
     "float",
     "buffer",
+    "class"
 };
-#define TYPE_CODES_END 0x200
+#define TYPE_CODES_END 0x400
 #define TYPE_CODES_START 0x2
 
 int master_ob_is_loading;
@@ -178,12 +180,14 @@ char * type_name P1(int, c) {
 	j++;
     } while (!((limit <<= 1) & TYPE_CODES_END));
     /* Oh crap.  Take some time and figure out what we have. */
-    if (c == T_INVALID) return "*invalid*";
-    if (c == T_LVALUE) return "*lvalue*";
-    if (c == T_LVALUE_BYTE) return "*lvalue_byte*";
-    if (c == T_LVALUE_RANGE) return "*lvalue_range*";
-    if (c == T_ERROR_HANDLER) return "*error_handler*";
-    IF_DEBUG(if (c == T_FREED) return "*freed*");
+    switch (c) {
+    case T_INVALID: return "*invalid*";
+    case T_LVALUE: return "*lvalue*";
+    case T_LVALUE_BYTE: return "*lvalue_byte*";
+    case T_LVALUE_RANGE: return "*lvalue_range*";
+    case T_ERROR_HANDLER: return "*error_handler*";
+    IF_DEBUG(case T_FREED: return "*freed*");
+    }
     return "*unknown*";
 }
 
@@ -425,8 +429,10 @@ INLINE void int_free_svalue P1(svalue_t *, v)
 	    case T_OBJECT:
 		dealloc_object(v->u.ob, "free_svalue");
 		break;
-	    case T_ARRAY:
 	    case T_CLASS:
+		dealloc_class(v->u.arr);
+		break;
+	    case T_ARRAY:
 		dealloc_array(v->u.arr);
 		break;
 	    case T_BUFFER:
@@ -670,7 +676,7 @@ static struct lvalue_range {
 
 static svalue_t global_lvalue_range_sv = { T_LVALUE_RANGE };
 
-static INLINE void push_lvalue_range P1(int, code)
+INLINE void push_lvalue_range P1(int, code)
 {
     int ind1, ind2, size;
     svalue_t *lv;
@@ -1324,20 +1330,21 @@ int merge_arg_lists P3(int, num_arg, array_t *, arr, int, start) {
     svalue_t *sptr;
     int i;
 
-    if (num_arg && num_arr_arg) {
-	/* We need to do some stack movement so that the order
-	   of arguments is logical */
-	for (i=0; i<num_arg; i++)
-	    *(sp-i+num_arr_arg) = *(sp-i);
-	sptr = sp - num_arg + 1;
-	for (i=start; i < arr->size; i++)
-	    assign_svalue_no_free(sptr++, &arr->item[i]);
-	sp += num_arr_arg;
-    } else {
-	for (i = start; i < arr->size; i++)
-	    push_svalue(&arr->item[i]);
-    }
-    return num_arg + num_arr_arg;
+    if (num_arr_arg) {
+	sptr = (sp += num_arr_arg);
+	if (num_arg) {
+	    /* We need to do some stack movement so that the order
+	       of arguments is logical */
+	    while (num_arg--) {
+		*sptr = *(sptr - num_arr_arg);
+		sptr--;
+	    }
+	}
+	num_arg = arr->size;
+	while (--num_arg >= start)
+	    assign_svalue_no_free(sptr--, &arr->item[num_arg]);
+	return (sp - sptr); /* could just return num_arr_arg if num_arg is 0 but .... -Sym */
+    }	    
 }
 
 void cfp_error P1(char *, s) {
@@ -1349,7 +1356,6 @@ svalue_t *
 call_function_pointer P2(funptr_t *, funp, int, num_arg)
 {
     function_t *func;
-    int i, def;
 
     setup_fake_frame(funp);
     if (current_object->flags & O_SWAPPED)
@@ -1364,58 +1370,62 @@ call_function_pointer P2(funptr_t *, funp, int, num_arg)
 	call_simul_efun(funp->f.simul.index, num_arg);
 	break;
     case FP_EFUN:
-	fp = sp - num_arg + 1;
-	if (funp->hdr.args) {
-	    check_for_destr(funp->hdr.args);
-	    num_arg = merge_arg_lists(num_arg, funp->hdr.args, 0);
-	}
-	i = funp->f.efun.opcodes[0];
-#ifdef NEEDS_CALL_EXTRA
-	if (i == F_CALL_EXTRA) i = 0xff + funp->f.efun.opcodes[1];
-#endif
-	if (num_arg == instrs[i].min_arg - 1 && (def = instrs[i].Default)) {
-	    switch (def) {
-	    case F_CONST0:
-		*(++sp)=const0;
-		break;
-	    case F_CONST1:
-		*(++sp)=const1;
-		break;
-	    case -((F_NBYTE << 8) + 1):
-		sp++;
-		sp->type = T_NUMBER;
-		sp->subtype = 0;
-		sp->u.number = -1;
-		break;
-	    case F_THIS_OBJECT:
-		if (current_object && !(current_object->flags & O_DESTRUCTED))
-		    push_object(current_object);
-		else
-		    *(++sp)=const0;
-		break;
-	    default:
-		fatal("Unsupported type of default argument in efun function pointer.\n");
+	{
+	    int i, def;
+	    
+	    fp = sp - num_arg + 1;
+	    if (funp->hdr.args) {
+		check_for_destr(funp->hdr.args);
+		num_arg = merge_arg_lists(num_arg, funp->hdr.args, 0);
 	    }
-	    num_arg++;
-	} else
-	    if (num_arg < instrs[i].min_arg) {
-		error("Too few arguments to efun %s in efun pointer.\n", instrs[i].name);
+	    i = funp->f.efun.opcodes[0];
+#ifdef NEEDS_CALL_EXTRA
+	    if (i == F_CALL_EXTRA) i = 0xff + funp->f.efun.opcodes[1];
+#endif
+	    if (num_arg == instrs[i].min_arg - 1 && (def = instrs[i].Default)) {
+		switch (def) {
+		case F_CONST0:
+		    *(++sp)=const0;
+		    break;
+		case F_CONST1:
+		    *(++sp)=const1;
+		    break;
+		case -((F_NBYTE << 8) + 1):
+		    sp++;
+		    sp->type = T_NUMBER;
+		    sp->subtype = 0;
+		    sp->u.number = -1;
+		    break;
+		case F_THIS_OBJECT:
+		    if (current_object && !(current_object->flags & O_DESTRUCTED))
+			push_object(current_object);
+		    else
+			*(++sp)=const0;
+		    break;
+		default:
+		    fatal("Unsupported type of default argument in efun function pointer.\n");
+		}
+		num_arg++;
 	    } else
-		if (num_arg > instrs[i].max_arg && instrs[i].max_arg != -1) {
+		if (num_arg < instrs[i].min_arg) {
+		    error("Too few arguments to efun %s in efun pointer.\n", instrs[i].name);
+		} else if (num_arg > instrs[i].max_arg && instrs[i].max_arg != -1) {
 		    error("Too many arguments to efun %s in efun pointer.\n", instrs[i].name);
 		}
-	if (instrs[i].min_arg != instrs[i].max_arg) {
-	    /* need to update the argument count */
-	    funp->f.efun.opcodes[(i > 255 ? 2 : 1)] = num_arg;
+	    if (instrs[i].min_arg != instrs[i].max_arg) {
+		/* need to update the argument count */
+		funp->f.efun.opcodes[(i > 255 ? 2 : 1)] = num_arg;
+	    }
+	    eval_instruction((char*)&funp->f.efun.opcodes[0]);
+	    free_svalue(&apply_ret_value, "call_function_pointer");
+	    apply_ret_value = *sp--;
+	    return &apply_ret_value;
 	}
-	eval_instruction((char*)&funp->f.efun.opcodes[0]);
-	free_svalue(&apply_ret_value, "call_function_pointer");
-	apply_ret_value = *sp--;
-	return &apply_ret_value;
     case FP_LOCAL | FP_NOT_BINDABLE: {
 	fp = sp - num_arg + 1;
 
-	func = &funp->hdr.owner->prog->functions[funp->f.local.index];
+	/* After the fake frame, current_object is funp->hdr.owner - Sym */
+	func = &current_object->prog->functions[funp->f.local.index];
 
 	if (func->flags & NAME_UNDEFINED)
 	    error("Undefined function: %s\n", func->name);
@@ -1600,7 +1610,7 @@ static INLINE void do_loop_cond()
 
 #ifdef LPC_TO_C
 void
-call_program P2(program_t *, prog, int, offset) {
+call_program P2(program_t *, prog, POINTER_INT, offset) {
     if (prog->program_size)
 	eval_instruction(prog->program + offset);
     else {
@@ -1638,7 +1648,7 @@ eval_instruction P1(char *, p)
     int i, n;
     float real;
     svalue_t *lval;
-    int instruction;
+    int instruction, num_varargs = 0;
     unsigned short offset;
     static func_t *oefun_table = efun_table - BASE;
     IF_DEBUG(svalue_t *expected_stack);
@@ -2271,6 +2281,50 @@ eval_instruction P1(char *, p)
 	    }
 	    break;
 
+	case F_EXPAND_VARARGS:
+	    {
+		svalue_t *s, *t;
+		array_t *arr;
+		
+		i = EXTRACT_UCHAR(pc++);
+		s = sp - i;
+		
+		if (s->type != T_ARRAY)
+		    error("Item being expanded with ... is not an array\n");
+		
+		arr = s->u.arr;
+		n = arr->size;
+		num_varargs += n - 1;
+		if (!n) {
+		    t = s;
+		    while (t < sp) {
+			*t = *(t + 1);
+			t++;
+		    }
+		    sp--;
+		} else if (n == 1) {
+		    assign_svalue_no_free(s, &arr->item[0]);
+		} else {
+		    t = sp;
+		    sp += n - 1;
+		    while (t > s) {
+			*(t + n - 1) = *t;
+			t--;
+		    }
+		    t = s + n - 1;
+		    if (arr->ref == 1) {
+			memcpy(s, arr->item, n * sizeof(svalue_t));
+			free_empty_array(arr);
+			break;
+		    } else {
+			while (n--)
+			    assign_svalue_no_free(t--, &arr->item[n]);
+		    }
+		}
+		free_array(arr);
+		break;
+	    }
+	    
 	case F_NEW_CLASS:
 	    {
 		array_t *cl;
@@ -2284,6 +2338,8 @@ eval_instruction P1(char *, p)
 		array_t *v;
 		
 		LOAD_SHORT(offset, pc);
+		offset += num_varargs;
+		num_varargs = 0;
 		v = allocate_empty_array((int) offset);
 		/*
 		 * transfer svalues in reverse...popping stack as we go
@@ -2299,7 +2355,9 @@ eval_instruction P1(char *, p)
 		mapping_t *m;
 		
 		LOAD_SHORT(offset, pc);
-		
+
+		offset += num_varargs;
+		num_varargs = 0;
 		m = load_mapping_from_aggregate(sp -= offset, offset);
 		(++sp)->type = T_MAPPING;
 		sp->u.map = m;
@@ -2402,7 +2460,8 @@ eval_instruction P1(char *, p)
 		 * If it is an inherited function, search for the real
 		 * definition.
 		 */
-		csp->num_local_variables = EXTRACT_UCHAR(pc++);
+		csp->num_local_variables = EXTRACT_UCHAR(pc++) + num_varargs;
+		num_varargs = 0;
 		function_index_offset = variable_index_offset = 0;
 		funp = setup_new_frame(funp);
 		csp->pc = pc;	/* The corrected return address */
@@ -2436,7 +2495,8 @@ eval_instruction P1(char *, p)
 		caller_type = ORIGIN_LOCAL;
 		current_prog = temp_prog;
 		
-		csp->num_local_variables = EXTRACT_UCHAR(pc++);
+		csp->num_local_variables = EXTRACT_UCHAR(pc++) + num_varargs;
+		num_varargs = 0;
 		
 		function_index_offset += ip->function_index_offset;
 		variable_index_offset += ip->variable_index_offset;
@@ -3087,7 +3147,15 @@ eval_instruction P1(char *, p)
 	    f_sub_eq();
 	    break;
 	case F_SIMUL_EFUN:
-	    f_simul_efun();
+	    {
+		unsigned short index;
+		int num_args;
+    
+		LOAD_SHORT(index, pc);
+		num_args = EXTRACT_UCHAR(pc++) + num_varargs;
+		num_varargs = 0;
+		call_simul_efun(index, num_args);
+	    }
 	    break;
 	case F_SWITCH:
 	    f_switch();
@@ -3153,9 +3221,10 @@ eval_instruction P1(char *, p)
 	    /* We have an efun.  Execute it
 	     * Check the types of the first two args first
 	     */
-	    if (instrs[instruction].min_arg != instrs[instruction].max_arg)
-		st_num_arg = EXTRACT_UCHAR(pc++);
-	    else
+	    if (instrs[instruction].min_arg != instrs[instruction].max_arg) {
+		st_num_arg = EXTRACT_UCHAR(pc++) + num_varargs;
+		num_varargs = 0;
+	    } else
 		st_num_arg = instrs[instruction].min_arg;
 #ifdef DEBUG
 	    if (instruction > NUM_OPCODES) {
@@ -3354,8 +3423,8 @@ int apply_low P3(char *, fun, object_t *, ob, int, num_arg)
 #ifdef CACHE_STATS
 	apply_low_call_others++;
 #endif
-	ix = (progp->id_number ^ (int) fun ^
-	      ((int) fun >> APPLY_CACHE_BITS)) & cache_mask;
+	ix = (progp->id_number ^ (POINTER_INT) fun ^
+	      ((POINTER_INT) fun >> APPLY_CACHE_BITS)) & cache_mask;
 	entry = &cache[ix];
 	if ((entry->id == progp->id_number)
 	    && (!entry->progp || (entry->oprogp == ob->prog))
@@ -3655,8 +3724,8 @@ safe_apply P4(char *, fun, object_t *, ob, int, num_arg, int, where)
  */
 array_t *call_all_other P3(array_t *, v, char *, func, int, numargs)
 {
-    int idx, size;
-    svalue_t *tmp;
+    int size;
+    svalue_t *tmp, *vptr, *rptr;
     array_t *ret;
     object_t *ob;
     int i;
@@ -3668,23 +3737,20 @@ array_t *call_all_other P3(array_t *, v, char *, func, int, numargs)
 	too_deep_error = 1;
 	error("stack overflow\n");
     }
-    for (idx = 0; idx < size; idx++) {
-	if (v->item[idx].type == T_OBJECT) {
-	    ob = v->item[idx].u.ob;
-	} else if (v->item[idx].type == T_STRING) {
-	    ob = find_object(v->item[idx].u.string);
+    for (vptr = v->item, rptr = ret->item; size--; vptr++, rptr++) {
+	if (vptr->type == T_OBJECT) {
+	    ob = vptr->u.ob;
+	} else if (vptr->type == T_STRING) {
+	    ob = find_object(vptr->u.string);
 	    if (!ob || !object_visible(ob))
 		continue;
 	} else continue;
-	if (ob->flags & O_DESTRUCTED)
+	if (ob->flags & O_DESTRUCTED) 
 	    continue;
-	for (i = numargs; i--;)
-	    push_svalue(tmp - i);
+	i = numargs;
+	while (i--) push_svalue(tmp - i);
 	call_origin = ORIGIN_CALL_OTHER;
-	if (apply_low(func, ob, numargs)) {
-	    assign_svalue_no_free(&ret->item[idx], sp);
-	    pop_stack();
-	}
+	if (apply_low(func, ob, numargs)) *rptr = *sp--;
     }
     sp--;
     pop_n_elems(numargs);
@@ -4263,17 +4329,17 @@ int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_ar
     char *fmt;			/* Format description */
     char *in_string;		/* The string to be parsed. */
     int number_of_matches;
-    char *cp;
-    int skipme = 0;		/* Encountered a '*' ? */
+    int skipme;			/* Encountered a '*' ? */
     int base = 10;
-
+    int num;
+    char *match, old_char;
+    register char *tmp;
+    
     /*
      * First get the string to be parsed.
      */
     CHECK_TYPES(s0, T_STRING, 1, F_SSCANF);
     in_string = s0->u.string;
-    if (in_string == 0)
-	return 0;
 
     /*
      * Now get the format description.
@@ -4285,102 +4351,130 @@ int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_ar
      * Loop for every % or substring in the format.
      */
     for (number_of_matches = 0; num_arg >= 0; number_of_matches++) {
-	int i, type;
-
-	while (fmt[0]) {
-	    if (fmt[0] == '%' && fmt[1] == '%') {
-		if (in_string[0] != '%')
-		    return number_of_matches;
-		fmt += 2;
-		in_string++;
-		continue;
-	    }
-	    if (fmt[0] == '%')
+	while (*fmt) {
+	    if (*fmt == '%') {
+		if (*++fmt == '%') {
+		    if (*in_string++ != '%') return number_of_matches;
+		    fmt++;
+		    continue;
+		}
 		break;
-	    if (in_string[0] == '\0' || fmt[0] != in_string[0])
-		return number_of_matches;
-	    fmt++;
-	    in_string++;
+	    }
+	    if (*fmt++ != *in_string++) return number_of_matches;
 	}
-
-	if (fmt[0] == '\0') {
+	
+	if (!*fmt) {
+	    if (*s1->u.string && (fmt[-1] == '%'))
+		error("Format string cannot end in '%%' in sscanf()\n");
+	    
 	    /*
-	     * We have reached end of the format string. If there are any
-	     * chars left in the in_string, then we put them in the last
-	     * variable (if any).
+	     * We have reached the end of the format string.  If there are
+	     * any chars left in the in_string, then we put them in the
+	     * last variable (if any).
 	     */
-	    if (in_string[0] && num_arg > 0) {
+	    if (*in_string && num_arg) {
 		number_of_matches++;
 		SSCANF_ASSIGN_SVALUE_STRING(string_copy(in_string, "sscanf"));
 	    }
 	    break;
 	}
-	DEBUG_CHECK(fmt[0] != '%',
-		    "In sscanf, should be a %% now !\n");
-	skipme = 0;
-	if (fmt[1] == '*') {
-	    skipme++;
-	    fmt++;
-	}
-	/*
-	 * Hmm..maybe we should return number_of_matches here instead of
-	 * error.
-	 */
-	if (skipme == 0 && num_arg < 1)
+	DEBUG_CHECK(fmt[-1] != '%', "In sscanf, should be a %% now!\n");
+	
+	if (skipme = (*fmt == '*')) fmt++;
+	else if (num_arg < 1) {
+	    /*
+	     * Hmm ... maybe we should return number_of_matches here instead
+	     * of an error
+	     */
 	    error("Too few arguments to sscanf()\n");
-
-	switch (fmt[1]) {
+	}
+	
+	switch (*fmt++) {
 	case 'x':
 	    base = 16;
 	    /* fallthrough */
 	case 'd':
-	    type = T_NUMBER;
-	    break;
+	    {
+		tmp = in_string;
+		num = (int) strtol(in_string, &in_string, base);
+		if (tmp == in_string) return number_of_matches;
+		if (!skipme) {
+		    SSCANF_ASSIGN_SVALUE_NUMBER(num);
+		}
+		base = 10;
+		continue;
+	    }
 	case 'f':
-	    type = T_REAL;
-	    break;
+	    {
+		float tmp_num;
+		
+		tmp = in_string;
+		tmp_num = _strtof(in_string, &in_string);
+		if (tmp == in_string)return number_of_matches;
+		if (!skipme) {
+		    SSCANF_ASSIGN_SVALUE(T_REAL, u.real, tmp_num);
+		}
+		continue;
+	    }
+	case '(':
+	    {
+		struct regexp *reg;
+		
+		tmp = fmt; /* 1 after the ( */
+		num = 1;
+		while (1) {
+		    switch (*tmp) {
+		    case '\\':
+			if (*++tmp) {
+			    tmp++;
+			    continue;
+			}
+		    case '\0':
+			error("Bad regexp format: '%%%s' in sscanf format string\n", fmt);
+		    case '(':
+			num++;
+			/* FALLTHROUGH */
+		    default:
+			tmp++;
+			continue;
+		    case ')':
+			if (!--num) break;
+			tmp++;
+			continue;
+		    }
+		    {
+			int n = tmp - fmt;
+			char *buf = (char *)DXALLOC(n + 1, TAG_TEMPORARY,
+						    "sscanf regexp");
+			memcpy(buf, fmt, n);
+			buf[n] = 0;
+			regexp_user = EFUN_REGEXP;
+			reg = regcomp(buf, 0);
+			FREE(buf);
+			if (!reg) error(regexp_error);
+			if (!regexec(reg, in_string) || (in_string != reg->startp[0]))
+			    return number_of_matches;
+			if (!skipme) {
+			    n = *reg->endp - in_string;
+			    buf = new_string(n, "sscanf regexp return");
+			    memcpy(buf, in_string, n);
+			    buf[n] = 0;
+			    SSCANF_ASSIGN_SVALUE_STRING(buf);
+			}				
+			in_string = *reg->endp;
+			FREE((char *)reg);
+			fmt = ++tmp;
+			break;
+		    }
+		}
+		continue;
+	    }
 	case 's':
-	    type = T_STRING;
 	    break;
 	default:
-	    error("Bad type : '%%%c' in sscanf() format string\n", fmt[1]);
+	    error("Bad type : '%%%c' in sscanf() format string\n", fmt[-1]);
 	}
-
-	fmt += 2;
-	/*
-	 * Parsing a number is the easy case. Just use strtol() to find the
-	 * end of the number.
-	 */
-	if (type == T_NUMBER) {
-	    char *tmp = in_string;
-	    int tmp_num;
-
-	    tmp_num = (int) strtol(in_string, &in_string, base);
-	    if (tmp == in_string) /* No match */
-		break;
-
-	    if (!skipme) {
-		SSCANF_ASSIGN_SVALUE_NUMBER(tmp_num);
-	    }
-	    continue;
-	}
-	/*
-	 * float case (bobf@metronet.com 2/24/93) too bad we can't use
-	 * strtod() -- not all OS's have it
-	 */
-	if (type == T_REAL) {
-	    char *tmp = in_string;
-	    float tmp_num;
-
-	    tmp_num = _strtof(in_string, &in_string);
-	    if (tmp == in_string) /* No match */
-		break;
-
-	    if (!skipme) {
-		SSCANF_ASSIGN_SVALUE(T_REAL, u.real, tmp_num);
-	    }
-	    continue;
-	}
+	
 	/*
 	 * Now we have the string case.
 	 */
@@ -4389,7 +4483,7 @@ int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_ar
 	 * First case: There were no extra characters to match. Then this is
 	 * the last match.
 	 */
-	if (fmt[0] == '\0') {
+	if (!*fmt) {
 	    number_of_matches++;
 	    if (!skipme) {
 		SSCANF_ASSIGN_SVALUE_STRING(string_copy(in_string, "sscanf"));
@@ -4398,70 +4492,178 @@ int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_ar
 	}
 	/*
 	 * If the next char in the format string is a '%' then we have to do
-	 * some special checks. Only %d, %f and %% are allowed after a %s
+	 * some special checks. Only %d, %f, %x, %(regexp) and %% are allowed
+	 * after a %s
 	 */
-	if (fmt[0] == '%') {
-	    switch (fmt[1]) {
+	if (*fmt++ == '%') {
+	    int skipme2;
+	    
+	    tmp = in_string;
+	    if (skipme2 = (*fmt == '*')) fmt++;
+	    else if (num_arg < 2) error("Too few arguments to sscanf().\n");
+	    
+	    number_of_matches++;
+	    
+	    switch (*fmt++) {
 	    case 's':
 		error("Illegal to have 2 adjacent %%s's in format string in sscanf()\n");
+	    case 'x':
+		do {
+		    while (*tmp && (*tmp != '0')) tmp++;
+		    if (*tmp == '0') {
+			if ((tmp[1] == 'x' || tmp[1] == 'X') &&
+			    isxdigit(tmp[2])) break;
+			tmp += 2;
+		    }
+		} while (*tmp);
+		break;
 	    case 'd':
-		for (i = 0; in_string[i]; i++) {
-		    if (isdigit(in_string[i]))
-			break;
-		}
+		while (*tmp && !isdigit(*tmp)) tmp++;
 		break;
 	    case 'f':
-		for (i = 0; in_string[i]; i++) {
-		    if (isdigit(in_string[i]) ||
-			(in_string[i] == '.' && isdigit(in_string[i + 1])))
-			break;
-		}
+		while (*tmp && !isdigit(*tmp) && 
+		       (*tmp != '.' || !isdigit(tmp[1]))) tmp++;
 		break;
 	    case '%':
-		if ((cp = strchr(in_string, '%')) == NULL)
-		    i = strlen(in_string);
-		else
-		    i = cp - in_string;
+		while (*tmp && (*tmp != '%')) tmp++;
 		break;
+	    case '(':
+		{
+		    struct regexp *reg;
+		    
+		    tmp = fmt;
+		    num = 1;
+		    while (1) {
+			switch (*tmp) {
+			case '\\':
+			    if (*++tmp) {
+				tmp++;
+				continue;
+			    }
+			case '\0':
+			    error("Bad regexp format : '%%%s' in sscanf format string\n", fmt);
+			case '(':
+			    num++;
+			    /* FALLTHROUGH */
+			default:
+			    tmp++;
+			    continue;
+			    
+			case ')':
+			    if (!--num) break;
+			    tmp++;
+			    continue;
+			}
+			{
+			    int n = tmp - fmt;
+			    char *buf = (char *)DXALLOC(n + 1, TAG_TEMPORARY,
+							"sscanf regexp");
+			    memcpy(buf, fmt, n);
+			    buf[n] = 0;
+			    regexp_user = EFUN_REGEXP;
+			    reg = regcomp(buf, 0);
+			    FREE(buf);
+			    if (!reg) error(regexp_error);
+			    if (!regexec(reg, in_string)) {
+				if (!skipme) {
+				    SSCANF_ASSIGN_SVALUE_STRING(string_copy(in_string, "sscanf"));
+				}
+				FREE((char *)reg);
+				return number_of_matches;
+			    } else {
+				if (!skipme) {
+				    match = new_string(num = (*reg->startp - in_string), "inter_sscanf");
+				    memcpy(match, in_string, num);
+				    match[num] = 0;
+				    SSCANF_ASSIGN_SVALUE_STRING(match);
+				}
+				in_string = *reg->endp;
+				if (!skipme2) {
+				    match = new_string(num = (*reg->endp - *reg->startp), "inter_sscanf");
+				    memcpy(match, *reg->startp, num);
+				    match[num] = 0;
+				    SSCANF_ASSIGN_SVALUE_STRING(match);
+				}
+				FREE((char *)reg);
+			    }
+			    fmt = ++tmp;
+			    break;
+			}
+		    }
+		    continue;
+		}
+		
 	    default:
-		error("Bad type : '%%%c' in sscanf() format string\n", fmt[1]);
+		error("Bad type : '%%%c' in sscanf() format string\n", fmt[-1]);
 	    }
-
+	    
 	    if (!skipme) {
-		char *match;
-
-		match = new_string(i, "inter_scanf");
-		(void) strncpy(match, in_string, i);
-		match[i] = '\0';
+		match = new_string(num = (tmp - in_string), "inter_sscanf");
+		memcpy(match, in_string, num);
+		match[num] = 0;
 		SSCANF_ASSIGN_SVALUE_STRING(match);
 	    }
-	    in_string += i;
-	    continue;
+	    if (!*(in_string = tmp)) return number_of_matches;
+	    switch (fmt[-1]) {
+	    case 'x':
+		base = 16;
+	    case 'd':
+		{
+		    num = (int) strtol(in_string, &in_string, base);
+		    /* We already knew it would be matched - Sym */
+		    if (!skipme2) {
+			SSCANF_ASSIGN_SVALUE_NUMBER(num);
+		    }
+		    base = 10;
+		    continue;
+		}
+	    case 'f':
+		{
+		    float tmp_num = _strtof(in_string, &in_string);
+		    if (!skipme2) {
+			SSCANF_ASSIGN_SVALUE(T_REAL, u.real, tmp_num);
+		    }
+		    continue;
+		}
+	    case '%':
+		in_string++;
+		continue; /* on the big for loop */
+	    }
 	}
-	if ((cp = strchr(fmt, '%')) == NULL)
-	    cp = fmt + strlen(fmt);
-
-	for (i = 0; in_string[i]; i++) {
-	    if (strncmp(in_string + i, fmt, cp - fmt) == 0) {
-		char *match;
-
+	if ((tmp = strchr(fmt, '%')) != NULL) num = tmp - fmt + 1;
+	else {
+	    tmp = fmt + (num = strlen(fmt));
+	    num++;
+	}
+	
+	old_char = *--fmt;
+	match = in_string;
+    
+	/* This loop would be even faster if it used replace_string's skiptable
+	   algorithm.  Maybe that algorithm should be lifted so it can be
+	   used in strsrch as well has here, etc? */
+	while (*in_string) {
+	    if ((*in_string == old_char) && !strncmp(in_string, fmt, num)) {
 		/*
 		 * Found a match !
 		 */
 		if (!skipme) {
-		    match = new_string(i, "inter_scanf");
-		    (void) strncpy(match, in_string, i);
-		    match[i] = '\0';
-		    SSCANF_ASSIGN_SVALUE_STRING(match);
+		    char *newmatch;
+		    
+		    newmatch = new_string(skipme = (in_string - match), "inter_sscanf");
+		    memcpy(newmatch, match, skipme);
+		    newmatch[skipme] = 0;
+		    SSCANF_ASSIGN_SVALUE_STRING(newmatch);
 		}
-		in_string += (i + cp - fmt);
-		fmt = cp;	/* advance fmt to next % */
+		in_string += num;
+		fmt = tmp; /* advance fmt to next % */
 		break;
 	    }
+	    in_string++;
 	}
-	if (fmt == cp)		/* If match, then do continue. */
+	if (fmt == tmp)    /* If match, then do continue. */
 	    continue;
-
+	
 	/*
 	 * No match was found. Then we stop here, and return the result so
 	 * far !
@@ -4683,7 +4885,7 @@ int assert_master_ob_loaded P2(char *, fun, char *, arg) {
  */
 svalue_t *apply_master_ob P2(char *, fun, int, num_arg)
 {
-    int err;
+    POINTER_INT err;
     IF_DEBUG(svalue_t *expected_sp);
 
     if ((err = assert_master_ob_loaded("apply_master_ob", fun)) != 1) {

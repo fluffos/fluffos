@@ -1135,15 +1135,6 @@ call_simul_efun P2(unsigned short, index, int, num_arg)
 }
 
 INLINE void
-f_simul_efun()
-{
-    unsigned short index;
-
-    LOAD_SHORT(index, pc);
-    call_simul_efun(index, EXTRACT_UCHAR(pc++));
-}
-
-INLINE void
 f_xor()
 {
     CHECK_TYPES((sp - 1), T_NUMBER, 1, F_XOR);
@@ -1362,38 +1353,6 @@ f_function_constructor()
 	fatal("Tried to make unknown type of function pointer.\n");
     }
     push_refed_funp(fp);
-}
-
-void
-f_apply PROT((void))
-{
-    svalue_t *v;
-    int num;
-    funptr_t *f;
-    array_t *vec;
-
-    if ((sp - 1)->type != T_FUNCTION) {
-	pop_stack();
-	return;
-    }
-    if (current_object->flags & O_DESTRUCTED) {
-	pop_2_elems();
-	push_undefined();
-	return;
-    }
-
-    vec = (sp--)->u.arr;
-    f = sp->u.fp;
-    if (vec->ref == 1) {
-	transfer_push_some_svalues(vec->item, num = vec->size);
-	free_empty_array(vec);
-    } else {
-	push_some_svalues(vec->item, num = vec->size);
-	vec->ref--;
-    }
-    v = call_function_pointer(f, num);
-    free_funp(f);
-    assign_svalue_no_free(sp, v);
 }
 
 INLINE void

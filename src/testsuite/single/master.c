@@ -219,15 +219,19 @@ author_file(string str)
 
 static void error_handler(mapping map, int flag){
   object ob;
-
+  string str;
+  
   ob = this_interactive() || this_player();
-  if (flag) tell_object(ob, "*Error caught\n");
-  tell_object(ob, sprintf("%O", map));
-  tell_object(ob, sprintf("Error: %s\nCurrent object: %O\nCurrent program: %s\nFile: %O Line: %d\n%O\n",
-			  map["error"], (map["object"] || "No current object"),
-			  (map["program"] || "No current program"),
-			  map["file"], map["line"],
-			  implode(map_array(map["trace"],
-					    (: sprintf("Line: %O  File: %O Object: %O Program: %O", $1["line"], $1["file"], $1["object"] || "No object", $1["program"] ||
-						       "No program") :)), "\n")));
+  if (flag) str = "*Error caught\n";
+  else str = "";
+  str += sprintf("Error: %s\nCurrent object: %O\nCurrent program: %s\nFile: %O Line: %d\n%O\n",
+		 map["error"], (map["object"] || "No current object"),
+		 (map["program"] || "No current program"),
+		 map["file"], map["line"],
+		 implode(map_array(map["trace"],
+				   (: sprintf("Line: %O  File: %O Object: %O Program: %O", $1["line"], $1["file"], $1["object"] || "No object", $1["program"] ||
+					      "No program") :)), "\n"));
+  write_file("/log/log", str);
+  if (ob) tell_object(ob, str);
 }
+     

@@ -5,6 +5,8 @@
 # RUN ./build.MudOS to generate the Makefiles   #
 #################################################
 
+OVERRIDES=$(MAKEOVERRIDES)
+
 SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   backend.c array.c mapping.c comm.c ed.c regexp.c swap.c buffer.c crc32.c \
   malloc.c mallocwrapper.c class.c efuns_main.c efuns_port.c \
@@ -26,7 +28,8 @@ $(OBJDIR)/%.o: %.c
 all: GNUmakefile.MudOS grammar.y cc.h files
 	$(MAKE) -f GNUmakefile.MudOS  'DRIVER_BIN=$(DRIVER_BIN)' \
 	'OBJ=$(OBJ)' 'MAKE=$(MAKE)' 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' \
-	'PROOF=$(PROOF)' 'OBJDIR=$(OBJDIR)' 'SRC=$(SRC)' 'YACC=$(YACC)'
+	'PROOF=$(PROOF)' 'OBJDIR=$(OBJDIR)' 'SRC=$(SRC)' 'YACC=$(YACC)' \
+	'OVERRIDES=$(OVERRIDES)'
 
 $(OBJDIR)/hash.o: hash.c
 	$(CC) -I$(OBJDIR) $(CFLAGS) -DEDIT_SOURCE $(OPTIMIZE) -o $(OBJDIR)/hash.o -c hash.c
@@ -50,7 +53,7 @@ OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
 all: Makefile.MudOS grammar.y cc.h files
 	$(MAKE) -f Makefile.MudOS  'DRIVER_BIN=$(DRIVER_BIN)' \
 	'OBJ=$(OBJ)' 'MAKE=$(MAKE)' 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' \
-	'PROOF=$(PROOF)' 'SRC=$(SRC)' 'YACC=$(YACC)'
+	'PROOF=$(PROOF)' 'SRC=$(SRC)' 'YACC=$(YACC)' 'OVERRIDES=$(OVERRIDES)'
 
 hash.o: hash.c
 	$(CC) $(CFLAGS) $(OPTIMIZE) -DEDIT_SOURCE -c hash.c

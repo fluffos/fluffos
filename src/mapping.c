@@ -453,16 +453,16 @@ svalue_to_int P1(svalue_t *, v)
 	case T_OBJECT:
 	    return mapHashstr(v->u.ob->name);
 	case T_MAPPING:
-	    return (int)v->u.map;
+	    return (POINTER_INT)v->u.map;
 	case T_ARRAY:
 	case T_CLASS:
-	    return (int)v->u.arr;
+	    return (POINTER_INT)v->u.arr;
 	case T_FUNCTION:
-	    return (int)v->u.fp;
+	    return (POINTER_INT)v->u.fp;
 	case T_REAL:
-	    return (int)v->u.real;
+	    return (POINTER_INT)v->u.real;
 	case T_BUFFER:
-	    return (int)v->u.buf;
+	    return (POINTER_INT)v->u.buf;
 	default:
 	    return 0;  /* so much for our precious distribution */
 	}

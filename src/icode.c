@@ -257,10 +257,28 @@ static void write_number P1(int, val)
 
 static void
 generate_expr_list P1(parse_node_t *, expr) {
+    parse_node_t *pn;
+    int n, flag;
+    
     if (!expr) return;
+    pn = expr;
+    flag = n = 0;
     do {
-      i_generate_node(expr->v.expr);
-    } while ((expr = expr->r.expr));
+	if (pn->type & 1) flag = 1;
+	i_generate_node(pn->v.expr);
+	n++;
+    } while ((pn = pn->r.expr));
+    
+    if (flag) {
+	pn = expr;
+	do {
+	    n--;
+	    if (pn->type & 1) {
+		ins_f_byte(F_EXPAND_VARARGS);
+		ins_byte(n);
+	    }
+	} while ((pn = pn->r.expr));
+    }
 }
 
 static void

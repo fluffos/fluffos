@@ -3,7 +3,7 @@
 #####################################################
 
 SHELL=/bin/sh
-MAKEFLAGS=
+MAKEOVERRIDES=$(OVERRIDES)
 
 %include "system_libs"
  

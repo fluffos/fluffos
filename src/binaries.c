@@ -592,73 +592,6 @@ static int check_times P2(time_t, mtime, char *, nm)
 }				/* check_times() */
 
 /*
- * open file for writing, creating intermediate directories if needed.
- */
-FILE *crdir_fopen P1(char *, file_name)
-{
-    char *p;
-    struct stat st;
-    FILE *ret;
-
-#ifdef OS2
-    char *newy;
-
-    /* Take a copy as it could be a shared string */
-    newy = alloc_cstring(file_name, "crdir_fopen");
-#endif
-
-    /*
-     * Beek - These directories probably exist most of the time, so let's
-     * optimize by trying the fopen first
-     */
-#ifdef OS2
-    if ((ret = fopen(newy, "wb")) != NULL) {
-	FREE(newy);
-	return ret;
-    }
-    p = newy;
-#else
-    if ((ret = fopen(file_name, "w")) != NULL) {
-	return ret;
-    }
-    p = file_name;
-#endif
-
-    while (*p && (p = (char *) strchr(p, '/'))) {
-	*p = '\0';
-#ifdef OS2
-	if (stat(newy, &st) == -1) {
-	    /* make this dir */
-	    if (mkdir(newy, 0770) == -1) {
-		*p = '\\';
-		FREE(newy);
-		return (FILE *) 0;
-	    }
-	}
-	*p = '\\';
-#else
-	if (stat(file_name, &st) == -1) {
-	    /* make this dir */
-	    if (mkdir(file_name, 0770) == -1) {
-		*p = '/';
-		return (FILE *) 0;
-	    }
-	}
-	*p = '/';
-#endif
-	p++;
-    }
-
-#ifdef OS2
-    f = fopen(newy, "wb");
-    FREE(newy);
-    return f;
-#else
-    return fopen(file_name, "wb");
-#endif
-}				/* crdir_fopen() */
-
-/*
  * Routines to do some hacking on the program being saved/loaded.
  * Basically to fix up string switch tables, since the alternative
  * would probably need a linear search in f_switch().
@@ -745,3 +678,70 @@ static void patch_in P3(program_t *, prog, short *, patches, int, len)
 }				/* patch_in() */
 
 #endif
+
+/*
+ * open file for writing, creating intermediate directories if needed.
+ */
+FILE *crdir_fopen P1(char *, file_name)
+{
+    char *p;
+    struct stat st;
+    FILE *ret;
+
+#ifdef OS2
+    char *newy;
+
+    /* Take a copy as it could be a shared string */
+    newy = alloc_cstring(file_name, "crdir_fopen");
+#endif
+
+    /*
+     * Beek - These directories probably exist most of the time, so let's
+     * optimize by trying the fopen first
+     */
+#ifdef OS2
+    if ((ret = fopen(newy, "wb")) != NULL) {
+	FREE(newy);
+	return ret;
+    }
+    p = newy;
+#else
+    if ((ret = fopen(file_name, "w")) != NULL) {
+	return ret;
+    }
+    p = file_name;
+#endif
+
+    while (*p && (p = (char *) strchr(p, '/'))) {
+	*p = '\0';
+#ifdef OS2
+	if (stat(newy, &st) == -1) {
+	    /* make this dir */
+	    if (mkdir(newy, 0770) == -1) {
+		*p = '\\';
+		FREE(newy);
+		return (FILE *) 0;
+	    }
+	}
+	*p = '\\';
+#else
+	if (stat(file_name, &st) == -1) {
+	    /* make this dir */
+	    if (mkdir(file_name, 0770) == -1) {
+		*p = '/';
+		return (FILE *) 0;
+	    }
+	}
+	*p = '/';
+#endif
+	p++;
+    }
+
+#ifdef OS2
+    f = fopen(newy, "wb");
+    FREE(newy);
+    return f;
+#else
+    return fopen(file_name, "wb");
+#endif
+}				/* crdir_fopen() */

@@ -110,8 +110,6 @@ int parse_command P2(char *, str, object_t *, ob)
 }				/* parse_command() */
 #endif
 
-#define NUM_COMMANDS max_users
-
 /*
  * This is the backend. We will stay here for ever (almost).
  */
@@ -164,13 +162,14 @@ void backend()
 	rc_wait = DosWaitEventSem(mudos_event_sem, -1);
 	DosResetEventSem(mudos_event_sem, &i);
 	process_io();
-	if (heart_beat_flag) {
-	    call_heart_beat();
-	}			/* endif */
+	if (heart_beat_flag) call_heart_beat();
 	/*
 	 * process user commands.
 	 */
-	for (i = 0; process_user_command() && i < NUM_COMMANDS; i++);
+	/* This should probably be done better */
+	i = max_users;
+	while (process_user_command() && i--)
+	    ;
     } while (1);
 #else
     while (1) {
@@ -236,7 +235,7 @@ void backend()
 	/*
 	 * process user commands.
 	 */
-	for (i = 0; process_user_command() && i < NUM_COMMANDS; i++)
+	for (i = 0; process_user_command() && i < max_users; i++)
 	    ;
 
 	/*
@@ -387,10 +386,18 @@ static void look_for_objects_to_swap()
  * is shadowed, check the shadowed object if living. There is no need to save
  * the value of the command_giver, as the caller resets it to 0 anyway.  */
 
-static object_t *hb_list = 0;	/* head */
-static object_t *hb_tail = 0;	/* for sane wrap around */
+typedef struct {
+    object_t *ob;
+    short heart_beat_ticks;
+    short time_to_heart_beat;
+} heart_beat_t;
 
-static int num_hb_objs = 0;	/* so we know when to stop! */
+static heart_beat_t *heart_beats = 0;
+static int max_heart_beats = 0;
+static int heart_beat_index = 0;
+static int num_hb_objs = 0;
+static int num_hb_to_do = 0;
+
 static int num_hb_calls = 0;	/* starts */
 static float perc_hb_probes = 100.0;	/* decaying avge of how many complete */
 
@@ -408,6 +415,7 @@ void alarm_loop()
 static void call_heart_beat()
 {
     object_t *ob;
+    heart_beat_t *curr_hb;
     int num_done = 0;
 
 #ifdef OS2
@@ -434,23 +442,22 @@ static void call_heart_beat()
     current_time = get_current_time();
     current_interactive = 0;
 
-    if (hb_list) {
+    if (num_hb_to_do = num_hb_objs) {
 	num_hb_calls++;
-	while (hb_list && !heart_beat_flag && (num_done < num_hb_objs)) {
-	    num_done++;
-	    cycle_hb_list();
-	    ob = hb_tail;	/* now at end */
+	heart_beat_index = 0;
+	while (!heart_beat_flag) {
+	    ob = (curr_hb = &heart_beats[heart_beat_index])->ob;
 	    DEBUG_CHECK(!(ob->flags & O_HEART_BEAT),
-			"Heartbeat not set in object on heart beat list!");
+			"Heartbeat not set in object on heartbeat list!");
 	    DEBUG_CHECK(ob->flags & O_SWAPPED,
-			"Heart beat in swapped object.\n");
-	    /* is it time to do a heartbeat ? */
-	    ob->heart_beat_ticks--;
-	    /* move ob to end of list, do ob */
+			"Heartbeat in swapped object.\n");
+	    /* is it time to do a heart beat ? */
+	    curr_hb->heart_beat_ticks--;
+
 	    if (ob->prog->heart_beat == -1)
 		continue;
-	    if (ob->heart_beat_ticks < 1) {
-		ob->heart_beat_ticks = ob->time_to_heart_beat;
+	    if (curr_hb->heart_beat_ticks < 1) {
+		curr_hb->heart_beat_ticks = curr_hb->time_to_heart_beat;
 		current_prog = ob->prog;
 		current_object = ob;
 		current_heart_beat = ob;
@@ -473,11 +480,14 @@ static void call_heart_beat()
 		command_giver = 0;
 		current_object = 0;
 	    }
+	    if (++heart_beat_index == num_hb_to_do)
+		break;
 	}
-	if (num_hb_objs)
-	    perc_hb_probes = 100 * (float) num_done / num_hb_objs;
+	if (heart_beat_index < num_hb_to_do)
+	    perc_hb_probes = 100 * (float) heart_beat_index / num_hb_to_do;
 	else
 	    perc_hb_probes = 100.0;
+	heart_beat_index = num_hb_to_do = 0;
     }
     current_prog = 0;
     current_heart_beat = 0;
@@ -488,30 +498,16 @@ static void call_heart_beat()
 #endif
 }				/* call_heart_beat() */
 
-/* Take the first object off the heart beat list, place it at the end
- */
-INLINE static void cycle_hb_list()
-{
-    object_t *ob;
-
-    if (!hb_list)
-	fatal("Cycle heart beat list with empty list!");
-    if (hb_list == hb_tail)
-	return;			/* 1 object on list */
-    ob = hb_list;
-    hb_list = hb_list->next_heart_beat;
-    hb_tail->next_heart_beat = ob;
-    hb_tail = ob;
-    ob->next_heart_beat = 0;
-}				/* cycle_hb_list() */
-
 int
 query_heart_beat P1(object_t *, ob)
 {
-    if (!(ob->flags & O_HEART_BEAT)) {
-	return 0;
-    } else {
-	return ob->time_to_heart_beat;
+    int index;
+    
+    if (!(ob->flags & O_HEART_BEAT))  return 0;
+    index = num_hb_objs;
+    while (index--) {
+	if (heart_beats[index].ob == ob) 
+	    return heart_beats[index].time_to_heart_beat;
     }
 }				/* query_heart_beat() */
 
@@ -522,56 +518,68 @@ query_heart_beat P1(object_t *, ob)
 
 int set_heart_beat P2(object_t *, ob, int, to)
 {
-    object_t *o = hb_list;
-    object_t *oprev = 0;
+    int index;
+    
+    if (ob->flags & O_DESTRUCTED) return 0;
 
-    if (ob->flags & O_DESTRUCTED)
-	return (0);
+    if (!to) {
+	int num;
+	
+	index = num_hb_objs;
+	while (index--) {
+	    if (heart_beats[index].ob == ob) break;
+	}
+	if (index < 0) return 0;
 
-    while (o && o != ob) {
-	if (!(o->flags & O_HEART_BEAT))
-	    fatal("Found disabled object in the active heart beat list!\n");
-	oprev = o;
-	o = o->next_heart_beat;
-    }
-    if (!o && (ob->flags & O_HEART_BEAT))
-	fatal("Couldn't find enabled object in heart beat list!");
-    if (!to && !(ob->flags & O_HEART_BEAT))	/* if set_heart_beat(0) and
-						 * O_HEART_BEAT is 0 */
-	return (0);
-    if (to && (ob->flags & O_HEART_BEAT)) {	/* change to intervals for
-						 * heart_beat */
-	if (to < 0)
-	    return 0;
-	ob->time_to_heart_beat = to;
-	ob->heart_beat_ticks = to;
-	return to;
-    }
-    if (to) {
-	ob->flags |= O_HEART_BEAT;
-	if (ob->next_heart_beat)
-	    fatal("Dangling pointer to next_heart_beat in object!");
-	ob->next_heart_beat = hb_list;
-	hb_list = ob;
-	if (!hb_tail)
-	    hb_tail = ob;
-	num_hb_objs++;
-	ob->time_to_heart_beat = to;
-	ob->heart_beat_ticks = to;
-	cycle_hb_list();	/* Added by Linus. 911104 */
-    } else {			/* remove all refs */
-	ob->flags &= ~O_HEART_BEAT;
-	if (hb_list == ob)
-	    hb_list = ob->next_heart_beat;
-	if (hb_tail == ob)
-	    hb_tail = oprev;
-	if (oprev)
-	    oprev->next_heart_beat = ob->next_heart_beat;
-	ob->next_heart_beat = 0;
+	if (num_hb_to_do) {
+	    if (index < num_hb_to_do) {
+		heart_beat_index--;
+		num_hb_to_do--;
+	    }
+	}
+	
+	if (num = (num_hb_objs - (index + 1)))
+	    memmove(heart_beats + index, heart_beats + (index + 1), num * sizeof(heart_beat_t));
+	
 	num_hb_objs--;
+	ob->flags &= ~O_HEART_BEAT;
+	return 1;
     }
-    return (1);
-}				/* set_heart_beat() */
+    
+    if (ob->flags & O_HEART_BEAT) {
+	if (to < 0) return 0;
+	
+	index = num_hb_objs;
+	while (index--) {
+	    if (heart_beats[index].ob == ob) {
+		heart_beats[index].time_to_heart_beat = heart_beats[index].heart_beat_ticks = to;
+	    }
+	}
+	DEBUG_CHECK(index < 0, "Couldn't find enabled object in heart_beat lsit!\n");
+    } else {
+	heart_beat_t *hb;
+	
+	if (!max_heart_beats)
+	    heart_beats = CALLOCATE(max_heart_beats = HEART_BEAT_CHUNK,
+				    heart_beat_t, TAG_HEART_BEAT,
+				    "set_heart_beat: 1");
+	else if (num_hb_objs == max_heart_beats) {
+	    max_heart_beats += HEART_BEAT_CHUNK;
+	    heart_beats = RESIZE(heart_beats, max_heart_beats,
+				 heart_beat_t, TAG_HEART_BEAT,
+				 "set_heart_beat: 1");
+	}
+	
+	hb = &heart_beats[num_hb_objs++];
+	hb->ob = ob;
+	if (to < 0) to = 1;
+	hb->time_to_heart_beat = to;
+	hb->heart_beat_ticks = to;
+	ob->flags |= O_HEART_BEAT;
+    }
+    
+    return 1;
+}
 
 int heart_beat_status P2(outbuffer_t *, ob, int, verbose)
 {
@@ -715,15 +723,15 @@ char *query_load_av()
 #ifdef F_HEART_BEATS
 array_t *get_heart_beats() {
     int n = num_hb_objs;
-    object_t *ob = hb_list;
+    heart_beat_t *hb = heart_beats;
     array_t *arr;
     
     arr = allocate_empty_array(n);
     while (n--) {
 	arr->item[n].type = T_OBJECT;
-	arr->item[n].u.ob = ob;
-	add_ref(ob, "get_heart_beats");
-	ob = ob->next_heart_beat;
+	arr->item[n].u.ob = hb->ob;
+	add_ref(hb->ob, "get_heart_beats");
+	hb++;
     }
     return arr;
 }

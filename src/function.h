@@ -19,7 +19,11 @@ typedef struct {
     /* these two must come first */
     unsigned char num_arg;
     unsigned char num_local;
+#ifndef LPC_TO_C
     short offset;
+#else
+    POINTER_INT offset;
+#endif
     program_t *prog;
     short fio, vio;
 } functional_t;

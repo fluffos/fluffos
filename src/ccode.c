@@ -68,14 +68,6 @@ static int *add_switch_table P2(int, kind, int, num_cases) {
     return &st->data[0];
 }
 
-static void
-generate_expr_list P1(parse_node_t *, expr) {
-    if (!expr) return;
-    do {
-      c_generate_node(expr->v.expr);
-    } while ((expr = expr->r.expr));
-}
-
 static void upd_jump P2(int, addr, int, label) {
     char *p;
 
@@ -144,6 +136,29 @@ static int ins_jump PROT((void)) {
     ins_string("goto label???;\n");
     notreached = 1;
     return ret;
+}
+
+static void
+generate_expr_list P1(parse_node_t *, expr) {
+    parse_node_t *pn;
+    int n, flag;
+    
+    if (!expr) return;
+    pn = expr;
+    flag = n = 0;
+    do {
+	if (pn->type & 1) flag = 1;
+	c_generate_node(pn->v.expr);
+    } while ((pn = pn->r.expr));
+    
+    if (flag) {
+	pn = expr;
+	do {
+	    n--;
+	    if (pn->type & 1)
+		ins_vstring("c_expand_varargs(%i);\n", n);
+	} while ((pn = pn->r.expr));
+    }
 }
 
 static void
@@ -560,7 +575,7 @@ c_generate_node P1(parse_node_t *, expr) {
 	case_table_size++;
 	notreached = 0;
 	if (switch_type == NODE_SWITCH_RANGES) {
-	    ins_vstring("case %i:\n", case_number);
+	    ins_vstring("case %i:;\n", case_number);
 	    if (expr->v.expr) {
 		parse_node_t *other = expr->v.expr;
 		case_table_size++;
@@ -571,24 +586,24 @@ c_generate_node P1(parse_node_t *, expr) {
 	    } else {
 		expr->v.number = case_number++;
 	    }
-	} else ins_vstring("case %i:\n", expr->r.number);
+	} else ins_vstring("case %i:;\n", expr->r.number);
 	break;
     case NODE_CASE_STRING:
 	notreached = 0;
 	case_table_size++;
 	expr->v.number = case_number;
-	ins_vstring("case %i:\n", case_number++);
+	ins_vstring("case %i:;\n", case_number++);
 	break;
     case NODE_DEFAULT:
 	notreached = 0;
-	ins_string("default:\n");
+	ins_string("default:;\n");
 	break;
     case NODE_SWITCH_STRINGS:
     case NODE_SWITCH_NUMBERS:
     case NODE_SWITCH_RANGES:
     case NODE_SWITCH_DIRECT:
 	{
-	    char *position;
+	    int position;
 	    parse_node_t *pn;
 	    int save_switch_type = switch_type;
 	    int save_case_number = case_number;
@@ -607,7 +622,7 @@ c_generate_node P1(parse_node_t *, expr) {
 		if (pragmas & PRAGMA_EFUN)
 		    ins_string("CHECK_SWITCHES;\n");
 		ins_vstring("lpc_int = c_string_switch_lookup(sp, string_switch_table_%s_%02i, ", compilation_ident, string_switches++);
-		position = prog_code;
+		position = prog_code - mem_block[current_block].block;
 		ins_string("xxx);\nfree_string_svalue(sp--);\n");
 		break;
 	    case NODE_SWITCH_DIRECT:
@@ -615,8 +630,8 @@ c_generate_node P1(parse_node_t *, expr) {
 		ins_string("lpc_int = (sp--)->u.number;\n");
 		break;
 	    case NODE_SWITCH_RANGES:
-		ins_vstring("lpc_int = c_range_switch_lookup((sp--)->u.number, range_switch_table_%s_%02i, ");
-		position = prog_code;
+		ins_vstring("lpc_int = c_range_switch_lookup((sp--)->u.number, range_switch_table_%s_%02i, ", compilation_ident, range_switches++);
+		position = prog_code - mem_block[current_block].block;
 		ins_string("xxx);\n");
 		break;
 	    }
@@ -639,9 +654,13 @@ c_generate_node P1(parse_node_t *, expr) {
 			    "case_table_size was incorrect.\n");
 	    }
 
-	    if (position) 
-		sprintf(position, "%3i", case_table_size);
-
+	    if (position) {
+		sprintf(mem_block[current_block].block + position, "%3i",
+			case_table_size);
+		/* restore the char smashed by the trailing null */
+		mem_block[current_block].block[position + 3] = ')'; 
+	    }
+	    
             switch_type = save_switch_type;
 	    case_number = save_case_number;
 	    case_table_size = save_case_table_size;

@@ -11,7 +11,7 @@
  *
  * The order in which the efuns are listed here is the order in which opcode
  * #'s will be assigned.  It is in your interest to move the least frequently
- * used efuns to the bottomm of this file (and the most frequently used
+ * used efuns to the bottom of this file (and the most frequently used
  * ones to the top).  The opcprof() efun could help you find out which
  * efuns are most often and least often used.  The reason for ordering
  * the efuns is that only the first 255 efuns are represented using
@@ -23,7 +23,6 @@
 object clone_object(string, ...);
 unknown call_other(object | string | object *, string | mixed *,...);
 mixed evaluate(mixed, ...);
-mixed apply(mixed, mixed *);
 function bind(function, object);
 object present(object | string, void | object);
 object this_object();
@@ -33,6 +32,7 @@ object this_user this_player( int default: F_CONST0 );
 void move_object(object | string);
 mixed previous_object(int default: F_CONST0);
 object *all_previous_objects previous_object(int default: F_NBYTE 1);
+mixed *call_stack(int default: F_CONST0);
 int sizeof(mixed);
 int strlen sizeof(string);
 void destruct(object);

@@ -52,8 +52,9 @@ void replace_programs()
 	if (d_flag)
 	    debug_message("freed.\n");
 #endif
-	for (j = 0; j < (int) r_ob->new_prog->num_variables; j++)
-	    r_ob->ob->variables[j] = svp[j];
+	if (r_ob->var_offset)
+	    for (j = 0; j < (int) r_ob->new_prog->num_variables; j++)
+		r_ob->ob->variables[j] = svp[j];
 	svp += j;
 #ifdef DEBUG
 	if (d_flag)

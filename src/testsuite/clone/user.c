@@ -99,7 +99,7 @@ create()
 // receive_message: called by the message() efun.
 
 void
-receive_message(string class, string msg)
+receive_message(string newclass, string msg)
 {
 	// the meaning of 'class' is at the mudlib's discretion
 	receive(msg);

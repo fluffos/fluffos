@@ -49,43 +49,45 @@ file_owner(string file)
 
 // dump_variable, author: Huthar@Portals, TMI
 // - returns a printable representation of any variable.
-
+// Changed by Symmetry@IdeaExchange, Tmi-2 5/4/95
+// - the format is retained
+// Beek - changed to use foreach()
 string
 dump_variable(mixed arg)
 {
-   mixed *index;
    string rtn;
-   int i;
-
-   switch (typeof(arg)) {
-   case T_OBJECT: return "(" + file_name(arg) + ")";
-   case T_STRING: return "\"" + arg + "\"";
-   case T_NUMBER: return "#" + arg;
-   case T_ARRAY:
+   mixed x, y;
+   
+   switch(typeof(arg)){
+   case T_OBJECT: return "("+file_name(arg)+")";
+   case T_STRING: return "\""+arg+"\"";
+   case T_NUMBER: return "#"+arg;
+   case T_ARRAY: 
        {
-	   int j;
-
-	   rnt = "ARRAY\n";
-	   i = sizeof(arg);
-	   while (j < i) 
-	       rtn += sprintf("[%d] == %s\n", j, dump_variable(arg[j++]));
+	   rtn = "ARRAY\n";
+	   foreach (y in arg) 
+	       rtn += sprintf("[%d] == %s\n", x++, dump_variable(y));
+		   
 	   return rtn;
        }
+ 
    case T_MAPPING:
        {
-	   return "MAPPING\n" + implode(map_array(keys(arg), (: sprintf("[%s] == %s", dump_variable($1), ($(arg)[$1]) ) :)), "\n");
+	   rtn = "MAPPING\n";
+	   foreach (x, y in arg)
+	       rtn += sprintf("[%s] == %s\n", dump_variable(x), dump_variable(y));
        }
-
-   case T_FUNCTION:
-   case T_CLASS:
-   case T_REAL:
-   case T_BUFFER:
-       /* this really could be done for all of them, but the above format
-	  is traditional */
-       return sprintf("%O\n", arg);
+  
+     case T_FUNCTION:
+     case T_CLASS:
+     case T_REAL:
+     case T_BUFFER:
+       {
+	   return sprintf("%O\n", arg);
+       }
+       
+       return "UNKNOWN";
    }
-
-   return "UNKNOWN";
 }
 
 /*

@@ -1,3 +1,56 @@
+Sun Jul 30 10:14:15 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* bumped version number to v21.5
+	* features:
+	  . a ... operator which expands an array into a list of arguments
+	  . %(regexp) format for sscanf()
+	  . added implode(array, function)
+	  . added foreach()
+	  . added \a and \e for bell and escape
+	  . a 'local_options' file can be used to override options.h
+	* fixed crashers in:
+	  . empty sefun objects
+	  . non-existent socket callbacks
+	* bugfixes in:
+	  . type errors including classes
+	  . consecutive tokens in sscanf() like %s%%
+	  . calling set_heart_beat() from from a heart_beat
+	  . LPC->C switch statements
+	  . MUD mode sockets
+	  . unterminated @ and @@ blocks
+	  . load_object()
+	  . better configure checks
+	  . pluralize()
+	* optimizations:
+	  . array call_other()
+	  . replace_string()
+	  . calling function pointers
+	  . replace_program()
+	  . heart_beats
+	  . member_array(), string compares, string hashing
+	  . more efficient handling of errors
+	* contrib efuns:
+	  . remove_interactive(), variables(), heart_beats()
+	* COMPAT_BUSTERS:
+	  . the apply() efun is gone.  There is a simul for it in compat/simuls
+	  . Now, if process_input() returns a non-zero number, no further
+	    processing takes place.  Also, returning zero does not disable
+	    the function
+	  . this_player() is now zero in get_save_file_name(); a new 2nd
+	    argument is the player
+	  . 'foreach' and 'in' are now reserved words
+	  . map_mapping now passes the key and the value
+	  . It is now illegal to any of the following from a
+	    verb action which return zero:
+	        call remove_action()
+	        destruct an object which defines commands
+	        move an object which defines commands
+	        move a living object
+	  . the following efuns now return strings and print nothing to
+	    this_player():
+	        malloc_status(), cache_stats(), lpc_info(), mud_status(),
+		dump_file_descriptors(), program_info(),
+		debug_info(), dump_socket_status()
+  	
 Sun Jun 11 03:33:40 EDT 1995 (tim@handel.princeton.edu (Beek))
 	* bumped version number to v21.4
 	* features:

@@ -600,7 +600,7 @@ char *read_file P3(char *, file, int, start, int, len)
 	    }
 	}
 	*p2 = '\0';
-	extend_string(str, p2 - str);
+	str = extend_string(str, p2 - str);
     } 
 	
     fclose(f);

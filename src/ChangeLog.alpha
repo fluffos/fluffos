@@ -1,4 +1,60 @@
 ---------------------------------------------------------------------------
+(v21.5a6 promoted to v21.5b1)
+
+Sat Jun  3 21:32:15 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.5a6
+	* updated with respect to v21.4b11
+	* fixed a bug in replace_string(x, y, z) when strlen(y)==strlen(z)==1
+	  and another one when strlen(z) < strlen(y)
+	* added a ... operator which expands an array into a list of arguments.
+	  it is legal in varargs efuns, function calls, varargs efun pointers,
+	  and array constants (the last can be useful; ({ x, y..., z }) is the
+	  same as ({ x }) + y + ({ z }), but slightly faster)
+	* COMPAT_BUSTER: removed the apply() efun.  A replacement is in the
+	  (new) directory compat/simuls.  Basically, apply(f, arr) is now
+	  the same as evaluate(f, arr...)
+	* fixed the space saving code that only generates a return 0 if the
+	  function doesn't end in a return to recognize the return_zero opcode
+
+Sat Jun  3 05:33:46 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.5a5
+	* fixed a bug in call_all_other that would return zero for all items
+	  other than the first
+
+Thu Jun  1 14:55:53 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.5a4
+	* updated with respect to v21.4b10
+	* COMPAT_BUSTER: If process_input returns a string, it behaves as
+	  before.  If it returns a non-zero integer, no further processing
+	  will be done.  In all cases, process_input will continue to be
+	  called if it exists.
+
+Mon May 29 22:28:50 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.5a3
+	* updated with respect to v21.4b9
+	* fixed a crasher in call_all_other
+
+Sat May 27 02:44:33 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.5a2
+	* updated with respect to v21.4b7
+	* optimized replace_string(foo, bar, bazz) when strlen(bar) is 0 or 1
+	
+Fri May 26 15:58:23 1995 (tim@handel.princeton.edu (Beek))
+	* created v21.5a1 from v21.4b6
+	* added the following diffs from Symmetry with minor modifications:
+	  . fixed type error messages to handle classes
+	  . optimized merge_arg_lists
+	  . optimized call_function_pointer a little
+	  . optimized call_all_other
+	  . support more general sscanf specifiers, including %(regexp),
+	    as well as %s%x and %s%% having the typical non-greedy %s support
+	  . small optimization to replace_program
+	  . made it so that set_heart_beat(0) and set_heart_beat(1) behave
+	    more consistently when called during a heart_beat
+	  . implemented heart_beats as an array which saves ~12 bytes in
+	    objects that don't have heartbeats
+
+---------------------------------------------------------------------------
 (v21.4a9 promoted to v21.4b1)
 
 Tue May 16 07:07:17 1995 (tim@handel.princeton.edu (Beek))

@@ -48,7 +48,7 @@ static char *sources[] = {
     "object table", "config table", "simul_efuns", "sentences", "string table",
     "free swap blocks", "uids", "object names", "predefines", "line numbers",
     "compiler local blocks", "compiled program", "users", "debugmalloc overhead",
-    "<#36>", "<#37>", "<#38>", "<#39>", 
+    "heart_beat list", "<#37>", "<#38>", "<#39>", 
     "malloc'ed strings", "shared strings", "function pointers", "arrays",
     "mappings", "mapping nodes", "mapping tables"
 };

@@ -330,6 +330,17 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	    sprintf(buff, "%d", (int)EXTRACT_UCHAR(pc++));
 	    break;
 
+	case F_EXPAND_VARARGS:
+	    {
+		int which = EXTRACT_UCHAR(pc++);
+		if (which) {
+		    sprintf(buff, "%d from top of stack", which);
+		} else {
+		    strcpy(buff, "top of stack");
+		}
+	    }		
+	    break;
+
 	case F_NEW_CLASS:
 	    {
 		int which = EXTRACT_UCHAR(pc++);
@@ -417,9 +428,9 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	    break;
 	case F_SHORT_STRING:
 	    if (EXTRACT_UCHAR(pc) < NUM_STRS)
-	        sprintf(buff, "\"%s\"", disassem_string(STRS[*pc]));
+	        sprintf(buff, "\"%s\"", disassem_string(STRS[EXTRACT_UCHAR(pc)]));
 	    else 
-	        sprintf(buff, "<out of range %d>", (int) *pc);
+	        sprintf(buff, "<out of range %d>", EXTRACT_UCHAR(pc));
 	    pc++;
 	    break;
 	case F_SIMUL_EFUN:
@@ -499,7 +510,8 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	    {
 		unsigned char ttype;
 		unsigned short stable, etable, def;
-
+		char *parg;
+		
 		ttype = EXTRACT_UCHAR(pc);
 		((char *) &stable)[0] = pc[1];
 		((char *) &stable)[1] = pc[2];
@@ -537,15 +549,15 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 		    pc += 4;
 		} else {
 		    while (pc < code + etable) {
-			COPY_INT(&iarg, pc);
-			COPY_SHORT(&sarg, pc + 4);
-			if (ttype == 1 || !iarg) {
-			    fprintf(f, "\t%-4d\t%04x\n", iarg, (unsigned) sarg);
+			COPY_PTR(&parg, pc);
+			COPY_SHORT(&sarg, pc + SIZEOF_PTR);
+			if (ttype == 1 || !parg) {
+			    fprintf(f, "\t%-4d\t%04x\n",parg, (unsigned) sarg);
 			} else {
 			    fprintf(f, "\t\"%s\"\t%04x\n",
-			    disassem_string((char *) iarg), (unsigned) sarg);
+			    disassem_string(parg), (unsigned) sarg);
 			}
-			pc += 6;
+			pc += 2 + SIZEOF_PTR;
 		    }
 		}
 		continue;
