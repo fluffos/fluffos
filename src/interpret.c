@@ -934,9 +934,9 @@ INLINE void copy_lvalue_range P1(svalue_t *, from)
         /* since fsize >= 0, ind2 - ind1 <= strlen(orig string) */
         /* because both of them can only range from 0 to len */
     
-        strncpy(owner->u.string + ind1, from->u.string, fsize);
+        strncpy(((char *)(owner->u.string)) + ind1, from->u.string, fsize);
       } else {
-        char *tmp, *dstr = owner->u.string;
+        char *tmp, *dstr = (char *)(owner->u.string);
     
         owner->u.string = tmp = new_string(size - ind2 + ind1 + fsize, "copy_lvalue_range");
         if (ind1 >= 1) {
@@ -1046,10 +1046,10 @@ INLINE void assign_lvalue_range P1(svalue_t *, from)
         /* since fsize >= 0, ind2 - ind1 <= strlen(orig string) */
         /* because both of them can only range from 0 to len */
     
-        strncpy(owner->u.string + ind1, from->u.string, fsize);
+        strncpy(((char *)(owner->u.string)) + ind1, from->u.string, fsize);
       } else {
         char *tmp;
-        const char *dstr = owner->u.string;
+        const char *dstr = (char *)(owner->u.string);
     
         owner->u.string = tmp = new_string(size - ind2 + ind1 + fsize, "assign_lvalue_range");
         if (ind1 >= 1) {

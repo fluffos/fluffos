@@ -1,6 +1,10 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
+new in FluffOS 1.19
+unlink the shared function name string in functions() before returning it.
+fixed compile errors with the intel(R) C++ compiler(7.0)
+
 new in FluffOS 1.18
 call the mudlib crash function even when printing the error trace gave a 
 	fatal error as well.

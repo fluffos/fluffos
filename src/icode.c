@@ -762,9 +762,9 @@ i_generate_node P1(parse_node_t *, expr) {
                 ins_byte(F_CONST0);
             }
             break;
+	}
         default:
             fatal("Unknown node %i in i_generate_node.\n", expr->kind);
-        }
     }
 }
 

@@ -390,7 +390,7 @@ f_capitalize PROT((void))
     if (uislower(sp->u.string[0])) {
         unlink_string_svalue(sp);
         //unlinked, so this is ok
-        sp->u.string[0] = toupper((unsigned char)sp->u.string[0]);
+        ((char *)(sp->u.string))[0] = toupper((unsigned char)sp->u.string[0]);
     }
 }
 #endif

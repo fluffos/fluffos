@@ -477,7 +477,7 @@ void load_line_numbers P1(const program_t *, prog)
     size = swap_in((char **) &prog->file_info, prog->line_swap_index);
     SET_TAG(prog->file_info, TAG_LINENUMBERS);
     //probably ok, dw doesn't use swap anyway
-    prog->line_info = (unsigned char *)&prog->file_info[prog->file_info[1]];
+    (char *)(prog->line_info) = (unsigned char *)&prog->file_info[prog->file_info[1]];
     line_num_bytes_swapped -= size;
 }
 
@@ -512,7 +512,7 @@ remove_line_swap P1(const program_t *, prog)
     if (prog->line_swap_index != -1 && prog->line_info)
         free_swap(prog->line_swap_index,
                   prog->file_info[0]);
-    prog->line_swap_index = -1;
+    (int)(prog->line_swap_index) = -1;
 }
 
 void print_swap_stats P1(outbuffer_t *, out)
