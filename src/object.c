@@ -1717,7 +1717,7 @@ int restore_object P3(object_t *, ob, const char *, file, int, noclear)
     restore_object_from_buff(ob, theBuff, noclear);
 #endif
     current_object = save;
-    debug(d_flag, ("Object /%s restored from /%s.\n", ob->name, file));
+    debug(d_flag, ("Object /%s restored from /%s.\n", ob->obname, file));
 
     return 1;
 }
@@ -1779,7 +1779,7 @@ void dealloc_object P2(object_t *, ob, const char *, from)
     object_t *tmp, *prev_all = 0;
 #endif
 
-    debug(d_flag, ("free_object: /%s.\n", ob->name));
+    debug(d_flag, ("free_object: /%s.\n", ob->obname));
 
     if (!(ob->flags & O_DESTRUCTED)) {
         /* This is fatal, and should never happen. */

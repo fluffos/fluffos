@@ -1815,7 +1815,7 @@ int process_user_command()
     current_interactive = command_giver;    /* this is yuck phooey, sigh */
     clear_notify(ip->ob);
     update_load_av();
-    debug(connections, ("process_user_command: command_giver = /%s\n", command_giver->name));
+    debug(connections, ("process_user_command: command_giver = /%s\n", command_giver->obname));
 
     if (escape_command(ip, user_command)) {
         if (ip->iflags & SINGLE_CHAR) {

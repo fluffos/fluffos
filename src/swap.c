@@ -384,7 +384,7 @@ int swap P1(object_t *, ob)
     if (ob == simul_efun_ob || ob == master_ob) return 0;
     if (ob->flags & O_DESTRUCTED)
         return 0;
-    debug(d_flag, ("Swap object /%s (ref %d)", ob->name, ob->ref));
+    debug(d_flag, ("Swap object /%s (ref %d)", ob->obname, ob->ref));
 
     if (ob->prog->line_info)
         swap_line_numbers(ob->prog);    /* not always done before we get here */
@@ -420,7 +420,7 @@ void load_ob_from_swap P1(object_t *, ob)
     if (ob->swap_num == -1)
         fatal("Loading not swapped object.\n");
 
-    debug(d_flag, ("Unswap object /%s (ref %d)", ob->name, ob->ref));
+    debug(d_flag, ("Unswap object /%s (ref %d)", ob->obname, ob->ref));
 
     swap_in((char **) &ob->prog, ob->swap_num);
     SET_TAG(ob->prog, TAG_PROGRAM);
@@ -448,7 +448,7 @@ swap_line_numbers P1(program_t *, prog)
     if (!prog || !prog->line_info)
         return 0;
 
-    debug(d_flag, ("Swap line numbers for /%s", prog->name));
+    debug(d_flag, ("Swap line numbers for /%s", prog->filename));
 
     size = prog->file_info[0];
     if (swap_out((char *) prog->file_info, size,
@@ -472,7 +472,7 @@ void load_line_numbers P1(const program_t *, prog)
     if (prog->line_info)
         return;
 
-    debug(d_flag, ("Unswap line numbers for /%s\n", prog->name));
+    debug(d_flag, ("Unswap line numbers for /%s\n", prog->filename));
 
     size = swap_in((char **) &prog->file_info, prog->line_swap_index);
     SET_TAG(prog->file_info, TAG_LINENUMBERS);

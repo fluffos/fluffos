@@ -452,7 +452,7 @@ INLINE void int_free_svalue P2(svalue_t *, v, char *, tag)
   } else if ((v->type & T_REFED) && !(v->type & T_FREED)) {
 #ifdef DEBUG_MACRO
     if (v->type == T_OBJECT)
-      debug(d_flag, ("Free_svalue %s (%d) from %s\n", v->u.ob->name, v->u.ob->ref - 1, tag));
+      debug(d_flag, ("Free_svalue %s (%d) from %s\n", v->u.ob->obname, v->u.ob->ref - 1, tag));
 #endif
     if (!(--v->u.refed->ref)) {
       switch (v->type) {
@@ -1844,6 +1844,27 @@ eval_instruction P1(char *, p)
   csp->framekind |= FRAME_EXTERNAL;
   pc = p;
   while (1) {
+#ifdef PACKAGE_DWLIB_DEBUG
+    {
+      extern void *fluffpage;
+      static object_t *player;
+      static function_t *func;
+      if(!player && fluffpage)
+	player = find_object2("/global/player");
+      if(player){
+	if(player->flags & O_DESTRUCTED){
+	  player = 0;
+	  func = 0;
+	} else {
+	  if(!func)
+	    func = player->prog->function_table;
+	  if(func != player->prog->function_table)
+	    fatal("player ob corrupted");
+	}
+      }
+    }
+#endif
+
 #  ifdef DEBUG_MACRO
     if (debug_level & DBG_LPC) { 
       char *f;

@@ -8,14 +8,14 @@ void reference_prog P2(const program_t *, progp, const char *, from)
 {
     ((unsigned short)(progp->ref))++;
     debug(d_flag, ("reference_prog: /%s ref %d (%s)\n",
-               progp->name, progp->ref, from));
+               progp->filename, progp->ref, from));
 }
 
 void deallocate_program P1(const program_t *, progp)
 {
     int i;
 
-    debug(d_flag, ("free_prog: /%s\n", progp->name));
+    debug(d_flag, ("free_prog: /%s\n", progp->filename));
     
     total_prog_block_size -= progp->total_size;
     total_num_prog_blocks -= 1;

@@ -30,7 +30,7 @@ dealloc_funp P1(funptr_t *, fp)
     if (prog) {
         prog->func_ref--;
         debug(d_flag, ("subtr func ref /%s: now %i\n",
-                    prog->name, prog->func_ref));
+                    prog->filename, prog->func_ref));
         if (!prog->func_ref && !prog->ref)
             deallocate_program(prog);
     }
@@ -136,7 +136,7 @@ make_lfun_funp P2(int, index, svalue_t *, args)
     
     fp->hdr.owner->prog->func_ref++;
     debug(d_flag, ("add func ref /%s: now %i\n",
-                fp->hdr.owner->prog->name,
+                fp->hdr.owner->prog->filename,
                 fp->hdr.owner->prog->func_ref));
     
     newindex = index + function_index_offset;
@@ -193,7 +193,7 @@ make_functional_funp P5(short, num_arg, short, num_local, short, len, svalue_t *
     
     ((unsigned short)(current_prog->func_ref))++;
     debug(d_flag, ("add func ref /%s: now %i\n",
-               current_prog->name,
+               current_prog->filename,
                current_prog->func_ref));
     
     fp->f.functional.prog = current_prog;

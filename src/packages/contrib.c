@@ -1158,21 +1158,21 @@ static char *pluralize P1(const char *, str) {
     if (!found && (end != pre))
         switch (end[-1]) {
         case 'E': case 'e':
-            if ((end-pre) > 2 && (end[-2] == 'f' || end[-2] == 'F')) {
+            if ((end-pre) > 1 && (end[-2] == 'f' || end[-2] == 'F')) {
                 found = PLURAL_CHOP + 2;
                 suffix = "ves";
             }
             break;
         case 'F': case 'f':
-            if ((end-pre) > 2 && (end[-2] == 'e' || end[-2] == 'E'))
+            if ((end-pre) > 1 && (end[-2] == 'e' || end[-2] == 'E'))
                 break;
             found = PLURAL_CHOP + 1;
-            if ((end-pre) > 2 && (end[-2] == 'f' || end[-2] == 'F'))
+            if ((end-pre) > 1 && (end[-2] == 'f' || end[-2] == 'F'))
               found++;
             suffix = "ves";
             break;
         case 'H': case 'h':
-            if ((end-pre) > 2 && (end[-2] == 'c' || end[-2]=='s'))
+            if ((end-pre) > 1 && (end[-2] == 'c' || end[-2]=='s'))
                 suffix = "es";
             break;
 #if 0
@@ -1186,34 +1186,34 @@ static char *pluralize P1(const char *, str) {
          * -- Marius, 23-Jun-2000
          */
         case 'M': case 'm':
-            if ((end-pre) > 2 && end[-2] == 'u') {
+            if ((end-pre) > 1 && end[-2] == 'u') {
                 found = PLURAL_CHOP + 2;
                 suffix = "a";
             }
             break;
 #endif
         case 'N': case 'n':
-            if ((end-pre) > 3 && end[-2] == 'a' && end[-3] == 'm') {
+            if ((end-pre) > 2 && end[-2] == 'a' && end[-3] == 'm') {
                 found = PLURAL_CHOP + 3;
                 suffix = "men";
             }
             break;
         case 'O': case 'o':
-            if ((end-pre) > 2 && end[-2] != 'o')
+            if ((end-pre) > 1 && end[-2] != 'o')
                 suffix = "es";
             break;
         case 'S': case 's':
-            if ((end-pre) > 2 && end[-2] == 'i') {
+            if ((end-pre) > 1 && end[-2] == 'i') {
                 found = PLURAL_CHOP + 2;
                 suffix = "es";
                 break;
             }
-            if ((end-pre) > 2 && end[-2] == 'u') {
+            if ((end-pre) > 1 && end[-2] == 'u') {
                 found = PLURAL_CHOP + 2;
                 suffix = "i";
                 break;
             }
-            if ((end-pre) > 2 && (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o'))
+            if ((end-pre) > 1 && (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o'))
                 suffix = "ses";
             else
                 suffix = "es";
@@ -1222,14 +1222,14 @@ static char *pluralize P1(const char *, str) {
             suffix = "es";
             break;
         case 'Y': case 'y':
-            if ((end-pre) > 2 && end[-2] != 'a' && end[-2] != 'e' && end[-2] != 'i'
+            if ((end-pre) > 1 && end[-2] != 'a' && end[-2] != 'e' && end[-2] != 'i'
                 && end[-2] != 'o' && end[-2] != 'u') {
                 found = PLURAL_CHOP + 1;    
                 suffix = "ies";
             }
             break;
         case 'Z': case 'z':
-            if ((end-pre) > 2 && (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o'
+            if ((end-pre) > 1 && (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o'
                 || end[-2] == 'i' || end[-2] == 'u'))
                 suffix = "zes";
             else

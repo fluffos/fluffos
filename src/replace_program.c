@@ -117,12 +117,12 @@ static program_t *search_inherited P3(char *, str, program_t *, prg, int *, offp
     int i;
 
     debug(d_flag, ("search_inherited started"));
-    debug(d_flag, ("searching for PRG(/%s) in PRG(/%s)", str, prg->name));
+    debug(d_flag, ("searching for PRG(/%s) in PRG(/%s)", str, prg->filename));
     debug(d_flag, ("num_inherited=%d\n", prg->num_inherited));
 
     for (i = 0; i < (int) prg->num_inherited; i++) {
         debug(d_flag, ("index %d:", i));
-        debug(d_flag, ("checking PRG(/%s)", prg->inherit[i].prog->name));
+        debug(d_flag, ("checking PRG(/%s)", prg->inherit[i].prog->filename));
 
         if (strcmp(str, prg->inherit[i].prog->filename) == 0) {
             debug(d_flag, ("match found"));

@@ -293,7 +293,7 @@ static void look_for_objects_to_swap()
    */
   if ((ob->flags & O_WILL_RESET) && (ob->next_reset < current_time)
       && !(ob->flags & O_RESET_STATE)) {
-      debug(d_flag, ("RESET /%s\n", ob->name));
+      debug(d_flag, ("RESET /%s\n", ob->obname));
       reset_object(ob);
       if(ob->flags & O_DESTRUCTED)
         continue;
@@ -314,7 +314,7 @@ static void look_for_objects_to_swap()
     int save_reset_state = ob->flags & O_RESET_STATE;
     svalue_t *svp;
 
-    debug(d_flag, ("clean up /%s\n", ob->name));
+    debug(d_flag, ("clean up /%s\n", ob->obname));
 
     /*
      * Supply a flag to the object that says if this program is
@@ -357,7 +357,7 @@ static void look_for_objects_to_swap()
       if (ob->flags & O_HEART_BEAT)
     continue;
 
-      debug(d_flag, ("swap /%s\n", ob->name));
+      debug(d_flag, ("swap /%s\n", ob->obname));
       swap(ob);   /* See if it is possible to swap out to disk */
   }
     }

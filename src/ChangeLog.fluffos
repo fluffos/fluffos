@@ -1,5 +1,9 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
+new in FluffOS 1.22
+fixed compiling a development version
+eval_cost reset for each call_out()ed function
+some fixes to pluralize()
 
 new in FluffOS 1.21
 changed allocating structure for efun function pointers to allocate space for

@@ -52,7 +52,7 @@ check_svalue P1(svalue_t *, v)
                     prog = v->u.fp->hdr.owner->prog;
                     prog->func_ref--;
                     debug(d_flag, ("subtr func ref /%s: now %i\n",
-                                prog->name, prog->func_ref));
+                                prog->filename, prog->func_ref));
                     if (!prog->ref && !prog->func_ref)
                         deallocate_program(prog);
                 }

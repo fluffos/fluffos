@@ -88,7 +88,7 @@ new_call_out P5(object_t *, ob, svalue_t *, fun, int, delay,
     if (delay < 0)
   delay = 0;
 
-    DBG(("new_call_out: /%s delay %i", ob->name, delay));
+    DBG(("new_call_out: /%s delay %i", ob->obname, delay));
     
     if (!call_list_free) {
   int i;
@@ -188,103 +188,104 @@ void call_out()
      */
     save_context(&econ);
     while (1) {
-        eval_cost = max_cost;
-        time_used  = query_time_used();
 
-  tm = current_time & (CALLOUT_CYCLE_SIZE - 1);
-  DBG(("   slot %i", tm));
-  while (call_list[tm] && call_list[tm]->delta == 0) {
-      object_t *ob, *new_command_giver;
-      
-      /*
-       * Move the first call_out out of the chain.
-       */
-      cop = call_list[tm];
-      call_list[tm] = call_list[tm]->next;
-      ob = (cop->ob ? cop->ob : cop->function.f->hdr.owner);
-
-      DBG(("      /%s", (ob ? ob->name : "(null)")));
-
-      if (!ob || (ob->flags & O_DESTRUCTED)) {
-    DBG(("         (destructed)"));
-    free_call(cop);
-    cop = 0;
-      } else {
-    if (SETJMP(econ.context)) {
-        restore_context(&econ);
-        if (max_eval_error) {
-      debug_message("Maximum evaluation cost reached while trying to process call_outs\n");
-      pop_context(&econ);
-      return;
-        }
-    } else {
-        object_t *ob;
-        
-        ob = cop->ob;
+      tm = current_time & (CALLOUT_CYCLE_SIZE - 1);
+      DBG(("   slot %i", tm));
+      while (call_list[tm] && call_list[tm]->delta == 0) {
+	object_t *ob, *new_command_giver;
+	
+	/*
+	 * Move the first call_out out of the chain.
+	 */
+	cop = call_list[tm];
+	call_list[tm] = call_list[tm]->next;
+	ob = (cop->ob ? cop->ob : cop->function.f->hdr.owner);
+	
+	DBG(("      /%s", (ob ? ob->obname : "(null)")));
+	
+	if (!ob || (ob->flags & O_DESTRUCTED)) {
+	  DBG(("         (destructed)"));
+	  free_call(cop);
+	  cop = 0;
+	} else {
+	  if (SETJMP(econ.context)) {
+	    restore_context(&econ);
+	    if (max_eval_error) {
+	      debug_message("Maximum evaluation cost reached while trying to process call_outs\n");
+	      pop_context(&econ);
+	      return;
+	    }
+	  } else {
+	    object_t *ob;
+	    
+	    ob = cop->ob;
 #ifndef NO_SHADOWS
-        if (ob)
-      while (ob->shadowing)
-          ob = ob->shadowing;
+	    if (ob)
+	      while (ob->shadowing)
+		ob = ob->shadowing;
 #endif
-        new_command_giver = 0;
+	    new_command_giver = 0;
 #ifdef THIS_PLAYER_IN_CALL_OUT
-        if (cop->command_giver &&
-      !(cop->command_giver->flags & O_DESTRUCTED)) {
-      new_command_giver = cop->command_giver;
-        } else if (ob && (ob->flags & O_LISTENER)) {
-      new_command_giver = ob;
-        }
-        if (new_command_giver)
-      DBG(("         command_giver: /%s", new_command_giver->name));
+	    if (cop->command_giver &&
+		!(cop->command_giver->flags & O_DESTRUCTED)) {
+	      new_command_giver = cop->command_giver;
+	    } else if (ob && (ob->flags & O_LISTENER)) {
+	      new_command_giver = ob;
+	    }
+	    if (new_command_giver)
+	      DBG(("         command_giver: /%s", new_command_giver->obname));
 #endif
-        save_command_giver(new_command_giver);
-        /* current object no longer set */
-        
-        if (cop->vs) {
-      array_t *vec = cop->vs;
-      svalue_t *svp = vec->item + vec->size;
-      
-      while (svp-- > vec->item) {
-          if (svp->type == T_OBJECT && 
-        (svp->u.ob->flags & O_DESTRUCTED)) {
-        free_object(svp->u.ob, "call_out");
-        *svp = const0u;
-          }
-      }
-      /* cop->vs is ref one */
-      extra = cop->vs->size;
-      transfer_push_some_svalues(cop->vs->item, extra);
-      free_empty_array(cop->vs);
-        } else
-      extra = 0;
-        
-        if (cop->ob) {
-      if (cop->function.s[0] == APPLY___INIT_SPECIAL_CHAR)
-          error("Illegal function name\n");
-      
-      (void) apply(cop->function.s, cop->ob, extra,
-             ORIGIN_INTERNAL);
-        } else {
-      (void) call_function_pointer(cop->function.f, extra);
-        }
+	    save_command_giver(new_command_giver);
+	    /* current object no longer set */
+	    
+	    if (cop->vs) {
+	      array_t *vec = cop->vs;
+	      svalue_t *svp = vec->item + vec->size;
+	      
+	      while (svp-- > vec->item) {
+		if (svp->type == T_OBJECT && 
+		    (svp->u.ob->flags & O_DESTRUCTED)) {
+		  free_object(svp->u.ob, "call_out");
+		  *svp = const0u;
+		}
+	      }
+	      /* cop->vs is ref one */
+	      extra = cop->vs->size;
+	      transfer_push_some_svalues(cop->vs->item, extra);
+	      free_empty_array(cop->vs);
+	    } else
+	      extra = 0;
+	    //reset_eval_cost();
+	    eval_cost = max_cost;
+	    time_used = query_time_used();
 
-        restore_command_giver();
-    }
-    free_called_call(cop);
-    cop = 0;
+	    if (cop->ob) {
+	      if (cop->function.s[0] == APPLY___INIT_SPECIAL_CHAR)
+		error("Illegal function name\n");
+	      
+	      (void) apply(cop->function.s, cop->ob, extra,
+			   ORIGIN_INTERNAL);
+	    } else {
+	      (void) call_function_pointer(cop->function.f, extra);
+	    }
+	    
+	    restore_command_giver();
+	  }
+	  free_called_call(cop);
+	  cop = 0;
+	}
       }
-  }
-  /* Ok, no more scheduled call_outs for current_time */
-  if (current_time < real_time) {
-      /* Time marches onward! */
-      if (call_list[tm])
-    call_list[tm]->delta--;
-      current_time++;
-      DBG(("   current_time = %i", current_time));
-  } else {
-      /* We're done! */
-      break;
-  }
+      /* Ok, no more scheduled call_outs for current_time */
+      if (current_time < real_time) {
+	/* Time marches onward! */
+	if (call_list[tm])
+	  call_list[tm]->delta--;
+	current_time++;
+	DBG(("   current_time = %i", current_time));
+      } else {
+	/* We're done! */
+	break;
+      }
     }
     DBG(("Done."));
     pop_context(&econ);
@@ -312,7 +313,7 @@ int remove_call_out P2(object_t *, ob, const char *, fun)
     
     if (!ob) return -1;
 
-    DBG(("remove_call_out: /%s \"%s\"", ob->name, fun));
+    DBG(("remove_call_out: /%s \"%s\"", ob->obname, fun));
 
     for (i = 0; i < CALLOUT_CYCLE_SIZE; i++) {
   delay = 0;
@@ -382,7 +383,7 @@ int find_call_out P2(object_t *, ob, const char *, fun)
 
     if (!ob) return -1;
 
-    DBG(("find_call_out: /%s \"%s\"", ob->name, fun));
+    DBG(("find_call_out: /%s \"%s\"", ob->obname, fun));
 
     for (i = 0; i < CALLOUT_CYCLE_SIZE; i++) {
   delay = 0;
