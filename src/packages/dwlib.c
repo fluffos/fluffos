@@ -12,6 +12,7 @@
 #include "../efun_protos.h"
 #include "../simul_efun.h"
 #include "../add_action.h"
+#include "../array.h"
 #include "../master.h"
 
 
@@ -536,3 +537,52 @@ f_reference_allowed PROT((void))
 }
 
 #endif
+
+#ifdef F_SHUFFLE
+
+/* shuffle efun, based on LPC shuffle simul efun.
+ * conversion by Taffyd.
+ */
+
+void shuffle P1(array_t *, args) {
+    int i, j;
+    svalue_t temp;
+
+    /* Hrm, if we have less than two elements, then the order isn't 
+     * going to change! Let's just leave the old array on the stack. 
+     */
+    if ( args->size < 2 ) {
+        return;
+    }
+    
+    for ( i = 0; i < args->size; i++ ) {
+        j = random_number( i + 1 );
+        
+        if ( i == j ) {
+            continue;
+        }
+        
+        temp = args->item[i];
+        args->item[i] = args->item[j];
+        args->item[j] = temp;
+    }
+    
+    /* Well, that's it. We don't need to push or anything. */ 
+}
+
+void
+f_shuffle PROT((void))
+{
+    svalue_t *sv = sp - st_num_arg + 1;
+    int num_arg = st_num_arg;
+
+    if (sv->type == T_ARRAY && sv->u.arr) {
+        shuffle(sv->u.arr);
+    }
+    else {
+        push_refed_array(&the_null_array);
+    }
+}
+
+#endif
+

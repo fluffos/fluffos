@@ -98,8 +98,10 @@ f_allocate_mapping PROT((void))
         }
         pop_stack();
         free_array(arr);
-    } else {
+    } else if (sp->type == T_NUMBER) {
         sp->u.map = allocate_mapping(sp->u.number);
+    } else {
+      error("Bad argument 1 to allocate_mapping()\n");
     }
     sp->type = T_MAPPING;
 }

@@ -1,6 +1,11 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
+new in FluffOS 1.11
+shuffle() efun by Taffyd
+crasher fixes (copied from divided skys)
+memory leak fix (also from DS)
+
 new in FluffOS 1.10:
 fixed bug in reference_allowed where invis would stop working
 changed the return value of save_object to the amount of bytes (uncompressed)

@@ -295,6 +295,8 @@ static void look_for_objects_to_swap()
       && !(ob->flags & O_RESET_STATE)) {
       debug(d_flag, ("RESET /%s\n", ob->name));
       reset_object(ob);
+      if(ob->flags & O_DESTRUCTED)
+        continue;
   }
 #endif
   if (time_to_clean_up > 0) {
@@ -746,8 +748,8 @@ array_t *get_heart_beats() {
   
   arr = allocate_empty_array(nob);
   while (nob--) {
-    arr->item[n].type = T_OBJECT;
-    arr->item[n].u.ob = obtab[nob];
+    arr->item[nob].type = T_OBJECT;
+    arr->item[nob].u.ob = obtab[nob];
     add_ref(arr->item[nob].u.ob, "get_heart_beats");
   }
   

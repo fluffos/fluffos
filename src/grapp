@@ -1,0 +1,191 @@
+add_action.c:	(void) apply(APPLY_INIT, dest, 0, ORIGIN_DRIVER);
+add_action.c:	    (void) apply(APPLY_INIT, item, 0, ORIGIN_DRIVER);
+add_action.c:	    (void) apply(APPLY_INIT, ob, 0, ORIGIN_DRIVER);
+add_action.c:	(void) apply(APPLY_INIT, item, 0, ORIGIN_DRIVER);
+add_action.c:	    ret = apply(s->function.s, s->ob, 1, where);
+array.c:	    sv = apply(func, (v->item + i)->u.ob, 0, ORIGIN_EFUN);
+array.c:	v = fp ? call_function_pointer(fp, numex + 1) : apply(func, ob, 1 + numex, ORIGIN_EFUN);
+array.c:	    else v = apply(func, current_object, 1, ORIGIN_EFUN);
+avltree.c:This code is hereby placed in the public domain, unless restrictions apply
+backend.c:    apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
+backend.c:     * Note that if it is in the apply_low cache, it will also
+backend.c:    svp = apply(APPLY_CLEAN_UP, ob, 1, ORIGIN_DRIVER);
+backend.c: * returned by apply() will be freed at next call of apply(), which means that
+backend.c:    ret = apply_master_ob(APPLY_EPILOG, 1);
+backend.c:  (void) apply_master_ob(APPLY_PRELOAD, 1);
+backend.c:  int apply_valid_hide = 1, display_hidden = 0;
+backend.c:      if (apply_valid_hide) {
+backend.c:        apply_valid_hide = 0;
+binaries.c:    ret = safe_apply_master_ob(APPLY_VALID_SAVE_BINARY, 1);
+call_out.c:      (void) apply(cop->function.s, cop->ob, extra,
+comm.c:    apply(APPLY_RECEIVE_SNOOP, snooper, 1, ORIGIN_DRIVER);
+comm.c:        if (apply(APPLY_CATCH_TELL, ob, 1, ORIGIN_DRIVER))      
+comm.c:                                    apply(APPLY_WINDOW_SIZE, ip->ob, 2, ORIGIN_DRIVER);
+comm.c:                                    apply(APPLY_TERMINAL_TYPE, ip->ob, 1, ORIGIN_DRIVER);
+comm.c:                                apply(APPLY_TELNET_SUBOPTION, ip->ob, 1, ORIGIN_DRIVER);
+comm.c:                    apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
+comm.c:                        apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
+comm.c:                apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
+comm.c:    ret = apply_master_ob(APPLY_CONNECT, 1);
+comm.c:    ret = apply(APPLY_PROCESS_INPUT, command_giver, 1, ORIGIN_DRIVER);
+comm.c:     * getting called recursively by CLOSING.  safe_apply() should be
+comm.c:        safe_apply(APPLY_NET_DEAD, ob, 0, ORIGIN_DRIVER);
+comm.c:     * We must all references to input_to fields before the call to apply(),
+comm.c:       (void) apply(function, ob, num_arg + 1, ORIGIN_INTERNAL);
+comm.c:        else if (!apply(APPLY_WRITE_PROMPT, ip->ob, 0, ORIGIN_DRIVER)) {
+comm.c:            apply(call_back->u.string, current_object, 2, ORIGIN_INTERNAL);
+comm.c:            apply(call_back->u.string, current_object, 2, ORIGIN_INTERNAL);
+comm.c:                apply(call_back->u.string, current_object, 2, ORIGIN_INTERNAL);
+comm.c:                safe_apply(ipnumbertable[i].call_back.u.string, 
+compile_file.c:    mret = apply_master_ob(APPLY_VALID_COMPILE_TO_C, 0);
+crypt.c: *  This doesn't apply, of course, if you change any of the settings
+ed.c:	safe_apply(exit_fn, exit_ob, 0, ORIGIN_INTERNAL);
+ed.c:        res = safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_INTERNAL);
+ed.c:        safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_INTERNAL);
+ed.c:	ret = apply_master_ob(APPLY_MAKE_PATH_ABSOLUTE, 1);
+ed.c:	ret = apply_master_ob(APPLY_SAVE_ED_SETUP, 2);
+ed.c:    setup = apply_master_ob(APPLY_RETRIEVE_ED_SETUP, 1);
+ed.c:    stmp = safe_apply_master_ob(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME, 2);
+ed.c:    setup = apply_master_ob(APPLY_RETRIEVE_ED_SETUP, 1);
+ed.c:    stmp = apply_master_ob(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME, 1);
+edit_source.c:    int apply_number = 0;
+edit_source.c:	    fprintf(out, "#define APPLY_%-30s\t%i\n", buf, apply_number++);
+edit_source.c:	    fprintf(out, "#define APPLY_%-30s\t%i\n", buf, apply_number++);
+edit_source.c:    fprintf(out, "\n#define NUM_MASTER_APPLIES\t%i\n\n#endif\n", apply_number);
+efuns_main.c:    res = apply_master_ob(APPLY_VALID_BIND, 3);
+efuns_main.c:             100 * ((double) apply_low_cache_hits / apply_low_call_others));
+efuns_main.c:    outbuf_addv(ob, "call_others:     %10lu\n", apply_low_call_others);
+efuns_main.c:    outbuf_addv(ob, "cache hits:      %10lu\n", apply_low_cache_hits);
+efuns_main.c:    outbuf_addv(ob, "slots used:      %10lu\n", apply_low_slots_used);
+efuns_main.c:                100 * ((double) apply_low_slots_used / APPLY_CACHE_SIZE));
+efuns_main.c:    outbuf_addv(ob, "collisions:      %10lu\n", apply_low_collisions);
+efuns_main.c:             100 * ((double) apply_low_collisions / apply_low_call_others));
+efuns_main.c:    if (apply_low(funcname, ob, num_arg - 2) == 0) {    /* Function not found */
+efuns_main.c:    ret = apply_master_ob(APPLY_VALID_LINK, 2);
+eoperators.c:	/* Don't need to use apply() since we have the pointer directly;
+file.c:    mret = safe_apply_master_ob(APPLY_LOG_ERROR, 2);
+file.c: * Otherwise, the returned path is temporarily allocated by apply(), which
+file.c: * means it will be deallocated at next apply().
+file.c:	v = apply_master_ob(APPLY_VALID_WRITE, 3);
+file.c:	v = apply_master_ob(APPLY_VALID_READ, 3);
+file.c:	extern svalue_t apply_ret_value;
+file.c:	free_svalue(&apply_ret_value, "check_valid_path");
+file.c:	apply_ret_value.type = T_STRING;
+file.c:	apply_ret_value.subtype = STRING_MALLOC;
+file.c:	path = apply_ret_value.u.string = string_copy(path, "check_valid_path");
+file.c:    extern svalue_t apply_ret_value;
+file.c:    assign_svalue(&from_sv, &apply_ret_value);
+file.c:    assign_svalue(&to_sv, &apply_ret_value);
+file.c:    extern svalue_t apply_ret_value;
+file.c:    assign_svalue(&from_sv, &apply_ret_value);
+file.c:    assign_svalue(&to_sv, &apply_ret_value);
+function.c:		free_svalue(&apply_ret_value, "call_function_pointer");
+function.c:		    apply_ret_value = const0;
+function.c:		    apply_ret_value = *sp--;
+function.c:		return &apply_ret_value;
+function.c:    free_svalue(&apply_ret_value, "call_function_pointer");
+function.c:    apply_ret_value = *sp--;
+function.c:    return &apply_ret_value;
+grammar.tab.c:	    res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
+grammar.tab.c:	res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
+interpret.c:svalue_t apply_ret_value = {T_NUMBER};
+interpret.c:    ret = apply_master_ob(APPLY_VALID_SHADOW, 1);
+interpret.c:  v = apply(ftc->f.str, ftc->ob, n + ftc->narg, ORIGIN_EFUN);
+interpret.c: * apply a function to it.
+interpret.c:   * LPC must return a value. This does not apply to control
+interpret.c: * the caller of apply().
+interpret.c:static char debug_apply_fun[30];/* For debugging */
+interpret.c:unsigned int apply_low_call_others = 0;
+interpret.c:unsigned int apply_low_cache_hits = 0;
+interpret.c:unsigned int apply_low_slots_used = 0;
+interpret.c:unsigned int apply_low_collisions = 0;
+interpret.c:void mark_apply_low_cache() {
+interpret.c:int apply_low P3(char *, fun, object_t *, ob, int, num_arg)
+interpret.c:    strncpy(debug_apply_fun, fun, sizeof(debug_apply_fun));
+interpret.c:    debug_apply_fun[sizeof debug_apply_fun - 1] = '\0';
+interpret.c:    DEBUG_CHECK(ob->flags & O_DESTRUCTED,"apply() on destructed object\n");
+interpret.c:    apply_low_call_others++;
+interpret.c:  apply_low_cache_hits++;
+interpret.c:          "Bad csp after execution in apply_low.\n");
+interpret.c:      apply_low_slots_used++;
+interpret.c:      apply_low_collisions++;
+interpret.c:    reference_prog(entry->oprogp, "apply_low() cache [oprogp]");
+interpret.c:    reference_prog(entry->progp, "apply_low() cache [progp]");
+interpret.c:          "Bad csp after execution in apply_low\n");
+interpret.c:  reference_prog(entry->oprogp, "apply_low() cache [oprogp miss]");
+interpret.c: * area in apply(), which will be overwritten by the next call to apply.
+interpret.c:svalue_t *apply P4(char *, fun, object_t *, ob, int, num_arg,
+interpret.c:    if (apply_low(fun, ob, num_arg) == 0)
+interpret.c:    free_svalue(&apply_ret_value, "sapply");
+interpret.c:    apply_ret_value = *sp--;
+interpret.c:    return &apply_ret_value;
+interpret.c:    "Bad csp after execution in apply_low\n");
+interpret.c: * this is a "safe" version of apply
+interpret.c: * after the apply. (such as the ed exit function, and the net_dead function).
+interpret.c: * compared to a normal apply().  Use sparingly.
+interpret.c:safe_apply P4(char *, fun, object_t *, ob, int, num_arg, int, where)
+interpret.c:      ret = apply(fun, ob, num_arg, where);
+interpret.c:  if (apply_low(func, ob, numargs)) *rptr = *sp--;
+interpret.c: * This function is similar to apply(), except that it will not
+interpret.c: * it's faster to just try to call it and check if apply() returns zero.
+interpret.c:     * won't make the object_name() apply and save_context() might fail
+main.c:    apply_master_ob(APPLY_FLAG, 1);
+main.c:    apply_master_ob(APPLY_CRASH, 3);
+master.c:svalue_t *apply_master_ob P2(int, fun, int, num_arg)
+master.c:	    do_trace("master apply", master_applies[fun].func->name, "\n");
+master.c:	free_svalue(&apply_ret_value, "apply_master_ob");
+master.c:	apply_ret_value = *sp--;
+master.c:	return &apply_ret_value;
+master.c:svalue_t *safe_apply_master_ob P2(int, fun, int, num_arg)
+master.c:    return safe_apply(applies_table[fun], master_ob, num_arg, ORIGIN_DRIVER);
+master.c:    ret = apply_master_ob(APPLY_GET_ROOT_UID, 0);
+master.c:	ret = apply_master_ob(APPLY_GET_BACKBONE_UID, 0);
+md.c:    extern svalue_t apply_ret_value;
+md.c:	mark_apply_low_cache();
+md.c:	mark_svalue(&apply_ret_value);
+object.c:    ret = apply_master_ob(APPLY_VALID_HIDE, 1);
+object.c:    apply(APPLY_CATCH_TELL, ob, 1, ORIGIN_DRIVER);
+object.c:    if (!apply(APPLY_RESET, ob, 0, ORIGIN_DRIVER)) {
+object.c:    apply(APPLY_CREATE, ob, num_arg, ORIGIN_DRIVER);
+parse.c:	ret = apply(APPLY_QGET_PLURID, ob, 0, ORIGIN_DRIVER);
+parse.c:	ret = apply(APPLY_QGET_ID, ob, 0, ORIGIN_DRIVER);
+parse.c:	ret = apply(APPLY_QGET_ADJID, ob, 0, ORIGIN_DRIVER);
+parse.c:    pval = apply(APPLY_QGET_ID, master_ob, 0, ORIGIN_DRIVER);
+parse.c:	pval->u.arr->ref++;	/* Otherwise next sapply will free it */
+parse.c:    pval = apply(APPLY_QGET_PLURID, master_ob, 0, ORIGIN_DRIVER);
+parse.c:	pval->u.arr->ref++;	/* Otherwise next sapply will free it */
+parse.c:    pval = apply(APPLY_QGET_ADJID, master_ob, 0, ORIGIN_DRIVER);
+parse.c:	pval->u.arr->ref++;	/* Otherwise next sapply will free it */
+parse.c:    pval = apply_master_ob(APPLY_QGET_PREPOS, 0);
+parse.c:	pval->u.arr->ref++;	/* Otherwise next sapply will free it */
+parse.c:    pval = apply_master_ob(APPLY_QGET_ALLWORD, 0);
+simulate.c:	value = apply_master_ob(APPLY_PRIVS_FILE, 1);
+simulate.c:	value = apply(applies_table[APPLY_PRIVS_FILE], ob, 1, ORIGIN_DRIVER);
+simulate.c:    ret = apply_master_ob(APPLY_CREATOR_FILE, 1);
+simulate.c:     * Now we are sure that we have a creator name. Do not call apply()
+simulate.c:    v = apply_master_ob(APPLY_COMPILE_OBJECT, argc);
+simulate.c:    mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
+simulate.c:	ret = apply(APPLY_ID, ob->super, 1, ORIGIN_DRIVER);
+simulate.c:	ret = apply(APPLY_ID, ob, 1, ORIGIN_DRIVER);
+simulate.c:	(void)apply(APPLY_MOVE, ob->contains, 1, ORIGIN_DRIVER);
+simulate.c:	safe_apply_master_ob(APPLY_CRASH, 3);
+simulate.c:	mret = apply_master_ob(APPLY_ERROR_HANDLER,2);
+simulate.c:	mret = apply_master_ob(APPLY_ERROR_HANDLER,1);
+simulate.c:	/* This can happen via errors in the object_name() apply. */
+simulate.c:    amo = apply_master_ob(APPLY_SLOW_SHUTDOWN, 1);
+simulate.c:		apply(APPLY_RECEIVE_MESSAGE, ob, 2, ORIGIN_DRIVER);
+simulate.c:	/* need to set the flag here to prevent infinite loops in apply_low */
+socket_efuns.c:    mret = apply_master_ob(APPLY_VALID_SOCKET, 3);
+socket_efuns.c:	safe_apply(callback.s, lpc_socks[fd].owner_ob, num_arg, ORIGIN_INTERNAL);
+socket_efuns.c:	    debug(sockets, ("read_socket_handler: apply\n"));
+socket_efuns.c:	debug(sockets, ("read_socket_handler: apply read callback\n"));
+socket_efuns.c:	    debug(sockets, ("read_socket_handler: apply read callback\n"));
+socket_efuns.c:	    debug(sockets, ("read_socket_handler: apply read callback\n"));
+socket_efuns.c:    debug(sockets, ("write_socket_handler: apply write_callback\n"));
+socket_efuns.c:	debug(sockets, ("read_socket_handler: apply close callback\n"));
+socket_efuns.c:	safe_apply(callback->u.string, ob, 2, ORIGIN_INTERNAL);
+sprintf.c: *        "@") is applyed to each element of the array.
+sprintf.c:		temp = safe_apply_master_ob(APPLY_OBJECT_NAME, 1);
+swap.c:	debug(d_flag, ("  object not swapped - inherited or interactive or in apply_low() cache."));
+y.tab.c:	    res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
+y.tab.c:	res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);

@@ -387,9 +387,9 @@ void unlink_string_svalue P1(svalue_t *, s) {
       break;
   }
     case STRING_CONSTANT:
-  s->u.string = string_copy(sp->u.string, "unlink_string_svalue");
-  s->subtype = STRING_MALLOC;
-  break;
+      s->u.string = string_copy(s->u.string, "unlink_string_svalue");
+      s->subtype = STRING_MALLOC;
+      break;
     }
 }
 
@@ -463,8 +463,11 @@ INLINE void int_free_svalue P1(svalue_t *, v)
     dealloc_funp(v->u.fp);
     break;
       case T_REF:
-    if (!v->u.ref->lvalue)
+        if (!v->u.ref->lvalue){
+          if(v->u.ref == global_ref_list)
+            global_ref_list = global_ref_list->next;
         FREE(v->u.ref);
+        }
     break;
       }
   }

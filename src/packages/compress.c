@@ -62,7 +62,7 @@ void f_compress_file PROT((void))
       strcat(output_file, GZ_EXTENSION);
    }
 
-   real_output_file = check_valid_path(output_file, current_object, "compress_file", 0);
+   real_output_file = check_valid_path(output_file, current_object, "compress_file", 1);
    if (!real_output_file) {
       pop_n_elems(num_arg);
       push_number(0);
@@ -154,7 +154,7 @@ void f_uncompress_file PROT((void))
       output_file[len - strlen(GZ_EXTENSION)] = 0;
    }
 
-   real_output_file = check_valid_path(output_file, current_object, "compress_file", 0);
+   real_output_file = check_valid_path(output_file, current_object, "compress_file", 1);
    if (!real_output_file) {
       pop_n_elems(num_arg);
       push_number(0);
