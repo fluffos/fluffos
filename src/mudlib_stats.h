@@ -40,7 +40,7 @@ void null_stats PROT((statgroup_t *));
 void init_stats_for_object PROT((struct object *));
 
 void add_moves PROT((statgroup_t *, int));
-void add_heart_beats PROT((statgroup_t *, int));
+INLINE void add_heart_beats PROT((statgroup_t *, int));
 void add_array_size PROT((statgroup_t *, int));
 void add_errors PROT((statgroup_t *, int));
 void add_errors_for_file PROT((char *, int));

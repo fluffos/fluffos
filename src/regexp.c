@@ -298,6 +298,7 @@ regexp *regcomp P2(char *, exp,
 		break;
 	    case '{':
 	    case '}':
+		FREE(exp2);
 		FAIL("sorry, unimplemented operator");
 	    case 'b':
 		*dest++ = '\b';
@@ -323,26 +324,36 @@ regexp *regcomp P2(char *, exp,
     regsize = 0L;
     regcode = &regdummy;
     regc((char) MAGIC);
-    if (reg(0, &flags) == (char *) NULL)
+    if (reg(0, &flags) == (char *) NULL) {
+	FREE(exp2);
 	return ((regexp *) NULL);
+    }
 
     /* Small enough for pointer-storage convention? */
     if (regsize >= 32767L)	/* Probably could be 65535L. */
+    {
+	FREE(exp2);
 	FAIL("regexp too big");
+    }
 
     /* Allocate space. */
     r = (regexp *) DXALLOC(sizeof(regexp) + (unsigned) regsize, 
 			   TAG_TEMPORARY, "regcomp: 2");
-    if (r == (regexp *) NULL)
+    if (r == (regexp *) NULL) {
+	FREE(exp2);
 	FAIL("out of space");
+    }
 
     /* Second pass: emit code. */
     regparse = exp2;
     regnpar = 1;
     regcode = r->program;
     regc((char) MAGIC);
-    if (reg(0, &flags) == NULL)
+    if (reg(0, &flags) == NULL) {
+	FREE(exp2);
+	FREE(r);
 	return ((regexp *) NULL);
+    }
 
     /* Dig out information for optimizations. */
     r->regstart = '\0';		/* Worst-case defaults. */

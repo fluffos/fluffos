@@ -442,15 +442,21 @@ void smart_log P4(char *, error_file, int, line, char *, what, int, flag)
 	DMALLOC(strlen(error_file) + strlen(what) + 
 		((pragmas & PRAGMA_ERROR_CONTEXT) ? 100 : 40), TAG_TEMPORARY, "smart_log: 1");
 
+    if (flag)
+	sprintf(buff, "%s line %d: Warning: %s", error_file, line, what);
+    else
+	sprintf(buff, "%s line %d: %s", error_file, line, what);
+
     if (pragmas & PRAGMA_ERROR_CONTEXT){
-        char *ls = strrchr(what, '\n');
+        char *ls = strrchr(buff, '\n');
 	char *tmp;
 	if (ls) {
 	    tmp = ls + 1;
 	    while (*tmp && isspace(*tmp)) tmp++;
 	    if (!*tmp) *ls = 0;
 	}
-    }
+	strcat(buff, show_error_context());
+    } else strcat(buff, "\n");
 
     if (flag) 
 	sprintf(buff, "%s line %d: Warning: %s%s", error_file, line, what,
@@ -1134,14 +1140,14 @@ void dump_file_descriptors()
 #endif
 	    dev = stbuf.st_dev;
 
-	add_message("%2d", i);
+	add_vmessage("%2d", i);
 #if !defined(LATTICE) && !defined(OS2)
-	add_message("%6x", major(dev));
-	add_message("%7x", minor(dev));
+	add_vmessage("%6x", major(dev));
+	add_vmessage("%7x", minor(dev));
 #else
-	add_message("%13x", dev);
+	add_vmessage("%13x", dev);
 #endif
-	add_message("%9d", stbuf.st_ino);
+	add_vmessage("%9d", stbuf.st_ino);
 	add_message("  ");
 
 	switch (stbuf.st_mode & S_IFMT) {
@@ -1180,10 +1186,10 @@ void dump_file_descriptors()
 	    break;
 	}
 
-	add_message("%5o", stbuf.st_mode & ~S_IFMT);
-	add_message("%7d", stbuf.st_uid);
-	add_message("%7d", stbuf.st_gid);
-	add_message("%12d", stbuf.st_size);
+	add_vmessage("%5o", stbuf.st_mode & ~S_IFMT);
+	add_vmessage("%7d", stbuf.st_uid);
+	add_vmessage("%7d", stbuf.st_gid);
+	add_vmessage("%12d", stbuf.st_size);
 	add_message("\n");
     }
 }

@@ -556,7 +556,7 @@ static struct mapping *
     for (dl = list; dl; dl = dl->next) {
 	lv.type = T_STRING;
 	lv.subtype = STRING_SHARED;
-	lv.u.string = ref_string(dl->name);
+	lv.u.string = dl->name;  /* find_for_insert() adds a ref */
 	s = find_for_insert(m, &lv, 1);
 	s->type = T_MAPPING;
 	s->subtype = 0;

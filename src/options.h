@@ -61,12 +61,24 @@
  * DEBUGMALLOC:
  *   * Statistics on precisely how much memory has been malloc'd (as well
  *     as the stats provided by WRAPPEDMALLOC).
- *   * Incurs a fair ammount of overhead (both memory and CPU)
+ *   * Incurs a fair amount of overhead (both memory and CPU)
  */
 #undef WRAPPEDMALLOC
 #undef DEBUGMALLOC
 
 /* The following add certain bells and whistles to malloc: */
+
+/*
+ * SBRK_OK: do not define this unless SMALLOC is chosen above.
+ *   Defining this causes smalloc to use the low level memory allocation
+ *   routines, and to act as a malloc replacement.  Conversely, undef'ing
+ *   SBRK_OK causes smalloc to act as a wrapper for the system malloc
+ *   routines.
+ *
+ * Note:
+ *   NeXTStep 3.x users should always #undef SBRK_OK.
+ */
+#undef SBRK_OK
 
 /* DO_MSTATS: do not define this unless BSDMALLOC or SMALLOC is chosen above.
  *   Defining this causes those replacement mallocs to keep statistics that
@@ -162,6 +174,14 @@
  *   based than user based, and replaces the traditional wiz_list stats.
  */
 #undef NO_MUDLIB_STATS
+
+/* NO_ADD_ACTION: define this to remove add_action, commands, livings, etc.
+   process_input() then becomes the only way to deal with player input. */
+#undef NO_ADD_ACTION
+
+/* NO_WIZARDS: for historical reasons, MudOS used to keep track of who
+   is and isn't a wizard.  Defining this removes that completely. */
+#undef NO_WIZARDS
 
 /*
  * NEW_FUNCTIONS: define this to allow the extended function pointers
@@ -269,17 +289,28 @@
  *
  * #define DEFAULT_PRAGMAS PRAGMA_STRICT_TYPES + PRAGMA_SAVE_TYPES
  *
- * for no default pragmas:
- * #define DEFAULT_PRAGMAS 0
- *
  * will make every LPC file behave as if it had the lines:
  * #pragma strict_types
  * #pragma save_types
  *
- * If you don't know what these are, 0 is a good choice, although
- * PRAGMA_WARNINGS is quite useful too.  Use PRAGMA_STRICT_TYPES if
- * you prefer strongly typed languages; leave it off if you like compiling
- * spaghetti.
+ * for no default pragmas:
+ * #define DEFAULT_PRAGMAS 0
+ *
+ * If you don't know what these are, 0 is a good choice.
+ *
+ * Supported pragmas:
+ * PRAGMA_STRICT_TYPES: enforces strict type checking
+ * PRAGMA_WARNINGS:     issues warnings about various dangerous things in
+ *                      your code
+ * PRAGMA_SAVE_TYPES:   save the types of function arguments for checking
+ *                      calls to functions in this object by objects that
+ *                    inherit it.
+ * PRAGMA_SAVE_BINARY:  save a compiled binary version of this file for
+ *                      faster loading next time it is needed.
+ * PRAGMA_OPTIMIZE:     make a second pass over the generated code to
+ *                      optimize it further.  currently does jump threading.
+ * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
+ *                      compilation error occured.
  */
 #define DEFAULT_PRAGMAS 0
 
@@ -461,7 +492,7 @@
  *                                                                          *
  * If you don't care about security, the first option is probably what you  *
  * want.                                                                    *
- ****************************************************************************
+ ****************************************************************************/
 
 /*
  * NO_UIDS: define this if you want a driver that doesn't use uids.
@@ -485,7 +516,7 @@
  *                       FOR EXPERIENCED USERS                           *
  *                      -----------------------                          *
  * Most of these options will probably be of no interest to many users.  *
- *************************************************************************
+ *************************************************************************/
 
 /* HEARTBEAT_INTERVAL: define heartbeat interval in microseconds (us).
  *   1,000,000 us = 1 second.  The value of this macro specifies
@@ -577,7 +608,7 @@
 /* MAX_LOCAL: maximum number of local variables allowed per LPC function */
 #define MAX_LOCAL 25		/* get_config_int(8)  */
 /* MAX_USERS: maximum number of simultaneous interactive users allowed */
-#define MAX_USERS 50	        /* get_config_int(12) */
+#define MAX_USERS 40	        /* get_config_int(12) */
 /* MAX_EFUN_SOCKS: maximum number of efun sockets */
 #define MAX_EFUN_SOCKS 16	/* get_config_int(24) */
 

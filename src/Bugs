@@ -20,40 +20,6 @@ the driver could just retry every now and then?
 
 -----
 
-The Solaris compiler doesn't define SunOS_5 (only gcc for Solaris does), so
-if gcc isn't being used, SunOS_5 needs to be #define'd manually?
-
-(source unknown)
-
------
-
-Note  19  Schoenf    (Wed Sep  8)  patch_in(), patch_out() for 64-Bit machines
-
-I'm running MUDOS on a alpha and I like to fix this thing with patch
-in and patch_out .....
-
-can one give me directions ??
-
--schoenf
-
-Comment:
-    Hmm, I could whip something up for an alpha I suppose
-    (or something assumed to work on an alpha, since I can
-    only use them when a certain prof isn't in town).
-    However, the same problems in the patch_in and patch_out
-    *also* occur in the parser when processing switch statements,
-    and in the f_switch efun.  That is, it assumes keys are
-    4 bytes long.  I suspect that if this actually works at
-    the moment on an alpha, it's because the upper 32 bits
-    in these addresses are all 0's or something similar.
-
-    So if patch_in/patch_out get fixed, the switch code will also
-    need fixing at the same time.
-
-    (djohnson@cs.ucsd.edu)
-
------
-
 read_file() doesn't guarantee that a "/" is at the start of the filename
 before passing to valid_read()...same problem might exist with
 write_file(), read_bytes(), write_bytes(), didn't check yet

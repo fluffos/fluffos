@@ -23,48 +23,55 @@ f_debug_info PROT((void))
 
 	    ob = arg[1].u.ob;
 	    flags = ob->flags;
-	    add_message("O_HEART_BEAT      : %s\n",
+	    add_vmessage("O_HEART_BEAT      : %s\n",
 			flags & O_HEART_BEAT ? "TRUE" : "FALSE");
-	    add_message("O_IS_WIZARD       : %s\n",
+#ifndef NO_WIZARDS
+	    add_vmessage("O_IS_WIZARD       : %s\n",
 			flags & O_IS_WIZARD ? "TRUE" : "FALSE");
-	    add_message("O_ENABLE_COMMANDS : %s\n",
+#endif
+#ifdef NO_ADD_ACTION
+	    add_vmessage("O_LISTENER : %s\n",
+			flags & O_LISTENER ? "TRUE" : "FALSE");
+#else
+	    add_vmessage("O_ENABLE_COMMANDS : %s\n",
 			flags & O_ENABLE_COMMANDS ? "TRUE" : "FALSE");
-	    add_message("O_CLONE           : %s\n",
+#endif
+	    add_vmessage("O_CLONE           : %s\n",
 			flags & O_CLONE ? "TRUE" : "FALSE");
-	    add_message("O_VIRTUAL         : %s\n",
+	    add_vmessage("O_VIRTUAL         : %s\n",
 			flags & O_VIRTUAL ? "TRUE" : "FALSE");
-	    add_message("O_DESTRUCTED      : %s\n",
+	    add_vmessage("O_DESTRUCTED      : %s\n",
 			flags & O_DESTRUCTED ? "TRUE" : "FALSE");
-	    add_message("O_SWAPPED         : %s\n",
+	    add_vmessage("O_SWAPPED         : %s\n",
 			flags & O_SWAPPED ? "TRUE" : "FALSE");
-	    add_message("O_ONCE_INTERACTIVE: %s\n",
+	    add_vmessage("O_ONCE_INTERACTIVE: %s\n",
 			flags & O_ONCE_INTERACTIVE ? "TRUE" : "FALSE");
-	    add_message("O_RESET_STATE     : %s\n",
+	    add_vmessage("O_RESET_STATE     : %s\n",
 			flags & O_RESET_STATE ? "TRUE" : "FALSE");
-	    add_message("O_WILL_CLEAN_UP   : %s\n",
+	    add_vmessage("O_WILL_CLEAN_UP   : %s\n",
 			flags & O_WILL_CLEAN_UP ? "TRUE" : "FALSE");
-	    add_message("O_WILL_RESET: %s\n",
+	    add_vmessage("O_WILL_RESET: %s\n",
 			flags & O_WILL_RESET ? "TRUE" : "FALSE");
 #ifndef NO_LIGHT
-	    add_message("total light : %d\n", ob->total_light);
+	    add_vmessage("total light : %d\n", ob->total_light);
 #endif
-	    add_message("next_reset  : %d\n", ob->next_reset);
-	    add_message("time_of_ref : %d\n", ob->time_of_ref);
-	    add_message("ref         : %d\n", ob->ref);
+	    add_vmessage("next_reset  : %d\n", ob->next_reset);
+	    add_vmessage("time_of_ref : %d\n", ob->time_of_ref);
+	    add_vmessage("ref         : %d\n", ob->ref);
 #ifdef DEBUG
-	    add_message("extra_ref   : %d\n", ob->extra_ref);
+	    add_vmessage("extra_ref   : %d\n", ob->extra_ref);
 #endif
-	    add_message("swap_num    : %d\n", ob->swap_num);
-	    add_message("name        : '%s'\n", ob->name);
-	    add_message("next_all    : OBJ(%s)\n",
+	    add_vmessage("swap_num    : %d\n", ob->swap_num);
+	    add_vmessage("name        : '%s'\n", ob->name);
+	    add_vmessage("next_all    : OBJ(%s)\n",
 			ob->next_all ? ob->next_all->name : "NULL");
 	    if (obj_list == ob)
 		add_message("This object is the head of the object list.\n");
 	    for (obj2 = obj_list, i = 1; obj2; obj2 = obj2->next_all, i++)
 		if (obj2->next_all == ob) {
-		    add_message("Previous object in object list: OBJ(%s)\n",
+		    add_vmessage("Previous object in object list: OBJ(%s)\n",
 				obj2->name);
-		    add_message("position in object list:%d\n", i);
+		    add_vmessage("position in object list:%d\n", i);
 		}
 	    assign_svalue_no_free(&res, &const0);
 	    break;
@@ -75,18 +82,18 @@ f_debug_info PROT((void))
 	    add_message("Swapped\n");
 	    break;
 	}
-	add_message("program ref's %d\n", ob->prog->p.i.ref);
-	add_message("Name %s\n", ob->prog->name);
-	add_message("program size %d\n",
+	add_vmessage("program ref's %d\n", ob->prog->p.i.ref);
+	add_vmessage("Name %s\n", ob->prog->name);
+	add_vmessage("program size %d\n",
 		    ob->prog->p.i.program_size);
-	add_message("num func's %d (%d) \n", ob->prog->p.i.num_functions,
+	add_vmessage("num func's %d (%d) \n", ob->prog->p.i.num_functions,
 		    ob->prog->p.i.num_functions * sizeof(struct function));
-	add_message("num strings %d\n", ob->prog->p.i.num_strings);
-	add_message("num vars %d (%d)\n", ob->prog->p.i.num_variables,
+	add_vmessage("num strings %d\n", ob->prog->p.i.num_strings);
+	add_vmessage("num vars %d (%d)\n", ob->prog->p.i.num_variables,
 		    ob->prog->p.i.num_variables * sizeof(struct variable));
-	add_message("num inherits %d (%d)\n", ob->prog->p.i.num_inherited,
+	add_vmessage("num inherits %d (%d)\n", ob->prog->p.i.num_inherited,
 		    ob->prog->p.i.num_inherited * sizeof(struct inherit));
-	add_message("total size %d\n", ob->prog->p.i.total_size);
+	add_vmessage("total size %d\n", ob->prog->p.i.total_size);
 	assign_svalue_no_free(&res, &const0);
 	break;
     case 2:
@@ -94,7 +101,7 @@ f_debug_info PROT((void))
 	    int i;
 	    ob = arg[1].u.ob;
 	    for (i=0; i<ob->prog->p.i.num_variables; i++) {
-		add_message("%s: ", ob->prog->p.i.variable_names[i].name);
+		add_vmessage("%s: ", ob->prog->p.i.variable_names[i].name);
 		print_svalue(&ob->variables[i]);
 		add_message("\n");
 	    }

@@ -41,7 +41,7 @@ static int svalue_size P1(struct svalue *, v)
     case T_FUNCTION:
 #ifdef NEW_FUNCTIONS
 	total = (int)(sizeof(struct funp)) + svalue_size(&v->u.fp->args);
-	if (v->u.fp->type == ORIGIN_CALL_OTHER)
+	if (v->u.fp->type == FP_CALL_OTHER)
 	    total += svalue_size(&v->u.fp->f.obj);
 	return total;
 #else
@@ -81,15 +81,15 @@ void dumpstat P1(char *, tfn)
 
     fn = check_valid_path(tfn, current_object, "dumpallobj", 1);
     if (!fn) {
-	add_message("Invalid path '%s' for writing.\n", tfn);
+	add_vmessage("Invalid path '%s' for writing.\n", tfn);
 	return;
     }
     f = fopen(fn, "w");
     if (!f) {
-	add_message("Unable to open '%s' for writing.\n", fn);
+	add_vmessage("Unable to open '%s' for writing.\n", fn);
 	return;
     }
-    add_message("Dumping to %s...", fn);
+    add_vmessage("Dumping to %s...", fn);
 
     display_hidden = -1;
     for (ob = obj_list; ob; ob = ob->next_all) {

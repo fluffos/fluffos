@@ -1,25 +1,40 @@
 #ifndef MY_MALLOC_H
 #define MY_MALLOC_H
 
-#ifdef SYSMALLOC
+/*
+ * to use sysmalloc or malloc replacements
+ */
+#if defined(SYSMALLOC) || \
+    (defined(SMALLOC) && defined(SBRK_OK)) || \
+    defined(BSDMALLOC)
 #define MALLOC(x)       malloc(x)
 #define FREE(x)         free(x)
 #define REALLOC(x,y)    realloc(x,y)
 #define CALLOC(x,y)     calloc(x,y)
+
 #endif
 
-#ifdef SMALLOC
-#define MALLOC(x)       smalloc_malloc(x)
-#define FREE(x)         smalloc_free(x)
-#define REALLOC(x,y)    smalloc_realloc(x,y)
-#define CALLOC(x,y)     smalloc_calloc(x,y)
+/* smalloc - choice between replacement or wrapper */
+#if defined(SMALLOC) && !defined(SYSMALLOC)
+#  ifdef SBRK_OK
+#    define smalloc_malloc        malloc
+#    define smalloc_free          free
+#    define smalloc_realloc       realloc
+#    define smalloc_calloc        calloc
+#  else
+#    define MALLOC(x)       smalloc_malloc(x)
+#    define FREE(x)         smalloc_free(x)
+#    define REALLOC(x,y)    smalloc_realloc(x,y)
+#    define CALLOC(x,y)     smalloc_calloc(x,y)
+#  endif
 #endif
 
-#ifdef BSDMALLOC
-#define MALLOC(x)       bsdmalloc_malloc(x)
-#define FREE(x)         bsdmalloc_free(x)
-#define REALLOC(x,y)    bsdmalloc_realloc(x,y)
-#define CALLOC(x,y)     bsdmalloc_calloc(x,y)
+/* bsdmalloc - always a replacement */
+#if defined(BSDMALLOC) && !defined(SYSMALLOC)
+#  define bsdmalloc_malloc      malloc
+#  define bsdmalloc_free        free
+#  define bsdmalloc_realloc     realloc
+#  define bsdmalloc_calloc      calloc
 #endif
 
 #define XALLOC(x)               xalloc(x)

@@ -8,6 +8,7 @@
 #include "debug.h"
 #include "socket_efuns.h"
 #include "swap.h"
+#include "call_out.h"
 #include "port.h"
 
 #if defined(OS2)
@@ -33,6 +34,10 @@ static void look_for_objects_to_swap PROT((void));
 static void call_heart_beat PROT((void));
 INLINE static void cycle_hb_list PROT((void));
 
+#ifdef DEBUG
+static void report_holes PROT((void));
+#endif
+
 /*
  * There are global variables that must be zeroed before any execution.
  * In case of errors, there will be a LONGJMP(), and the variables will
@@ -54,6 +59,17 @@ void clear_state()
     reset_machine(0);		/* Pop down the stack. */
 }				/* clear_state() */
 
+#ifdef DEBUG
+static void report_holes() {
+    if (current_object)
+	fprintf(stderr, "current_object is %s\n", current_object->name);
+    if (command_giver)
+	fprintf(stderr, "command_giver is %s\n", command_giver->name);
+    if (current_interactive)
+	fprintf(stderr, "current_interactive is %s\n", current_interactive->name);
+}
+#endif
+
 void logon P1(struct object *, ob)
 {
     struct svalue *ret;
@@ -61,11 +77,12 @@ void logon P1(struct object *, ob)
     /* current_object no longer set */
     ret = apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
     if (ret == 0) {
-	add_message("prog %s:\n", ob->name);
+	add_vmessage("prog %s:\n", ob->name);
 	fatal("Could not find logon on the user %s\n", ob->name);
     }
 }				/* logon() */
 
+#ifndef NO_ADD_ACTION
 /*
  * Take a user command and parse it.
  * The command can also come from a NPC.
@@ -91,6 +108,7 @@ int parse_command P2(char *, str, struct object *, ob)
     command_giver = save;
     return (res);
 }				/* parse_command() */
+#endif
 
 #define NUM_COMMANDS MAX_USERS
 
@@ -114,11 +132,12 @@ void backend()
     if (!t_flag)
 	call_heart_beat();
     SETJMP(error_recovery_context);
+    clear_state();
+
 #ifdef OS2
     do {
 	long rc_wait;
 
-	clear_state();
 	remove_destructed_objects();
 	eval_cost = 0;
 	if (MudOS_is_being_shut_down) {
@@ -150,8 +169,10 @@ void backend()
 	 * clear_state() can be moved to just before the while() - statement.
 	 * *sigh* /Lars
 	 */
+        /* Well, let's do it and see what happens - Sym */
+	/* What happens is random crashes at odd times.  It's too close
+	   to v21 to deal with this ... -Beek */
 	clear_state();
-
 	eval_cost = max_cost;
 
 	remove_destructed_objects();
@@ -287,7 +308,7 @@ static void look_for_objects_to_swap()
 		fprintf(stderr, "RESET %s\n", ob->name);
 	    }
 #endif
-	    reset_object(ob, 1);
+	    reset_object(ob);
 	}
 #endif
 	if (time_to_clean_up > 0) {
@@ -441,8 +462,10 @@ static void call_heart_beat()
 		while (command_giver->shadowing)
 		    command_giver = command_giver->shadowing;
 #endif				/* NO_SHADOWS */
+#ifndef NO_ADD_ACTION
 		if (!(command_giver->flags & O_ENABLE_COMMANDS))
 		    command_giver = 0;
+#endif
 #ifndef NO_MUDLIB_STATS
 		add_heart_beats(&ob->stats, 1);
 #endif
@@ -562,10 +585,10 @@ int heart_beat_status P1(int, verbose)
     if (verbose == 1) {
 	add_message("Heart beat information:\n");
 	add_message("-----------------------\n");
-	add_message("Number of objects with heart beat: %d, starts: %d\n",
+	add_vmessage("Number of objects with heart beat: %d, starts: %d\n",
 		    num_hb_objs, num_hb_calls);
 	sprintf(buf, "%.2f", perc_hb_probes);
-	add_message("Percentage of HB calls completed last time: %s\n", buf);
+	add_vmessage("Percentage of HB calls completed last time: %s\n", buf);
     }
     return (0);
 }				/* heart_beat_status() */

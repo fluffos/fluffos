@@ -3,33 +3,27 @@
 
 #include "lint.h"
 #include "trees.h"
+#include "icode.h"
 
-void generate_expr PROT((struct parse_node *));
-void generate_function_call PROT((short, char));
-void pop_value PROT((void));
-void generate_return PROT((struct parse_node *));
-void generate_break_point PROT((void));
-void generate_break PROT((void));
-void generate_continue PROT((void));
-void generate_forward_jump PROT((void));
-void update_forward_jump PROT((void));
-void update_continues PROT((void));
-void save_position PROT((void));
-void branch_backwards PROT((char));
-void update_breaks PROT((void));
-void save_loop_info PROT((void));
-void restore_loop_info PROT((void));
-void start_switch PROT((void));
-void generate_forward_branch PROT((char));
-void update_forward_branch PROT((void));
-void generate_else PROT((void));
-void initialize_parser PROT((void));
-int generate_conditional_branch PROT((struct parse_node *));
+#ifdef LPC_TO_C
+#include "ccode.h"
+
+#define generate_function_call(x,y) { if(compile_to_c) c_generate_function_call(x,y); else i_generate_function_call(x,y); }
+#define generate_inherited_init_call(x,y) { if (compile_to_c) c_generate_inherited_init_call(x,y); else i_generate_inherited_init_call(x,y); }
+#define generate___INIT() { if (compile_to_c) c_generate___INIT(); else i_generate___INIT(); }
+#define generate_final_program(x) { if (compile_to_c) c_generate_final_program(x); else i_generate_final_program(x); }
+#define initialize_parser() { if (compile_to_c) c_initialize_parser(); else i_initialize_parser(); }
+#else
+#define generate_function_call i_generate_function_call
+#define generate_inherited_init_call i_generate_inherited_init_call
+#define generate___INIT i_generate___INIT
+#define generate_final_program i_generate_final_program
+#define initialize_parser i_initialize_parser
+#endif
+
 int node_always_true PROT((struct parse_node *));
 short generate PROT((struct parse_node *));
-void generate_return PROT((struct parse_node *));
-void generate___INIT PROT((void));
-void generate_final_program PROT((int));
+int generate_conditional_branch PROT((struct parse_node *));
 
 #ifdef DEBUG
 void dump_expr_list PROT((struct parse_node *, int));

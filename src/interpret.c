@@ -54,13 +54,13 @@ extern userid_t *backbone_uid;
 extern int max_cost;
 extern int call_origin;
 
-static void push_indexed_lvalue PROT((int));
+static INLINE void push_indexed_lvalue PROT((int));
 static struct svalue *find_value PROT((int));
 #ifdef TRACE
 static void do_trace_call PROT((struct function *));
 #endif
 static void break_point PROT((void));
-static void do_loop_cond PROT((void));
+static INLINE void do_loop_cond PROT((void));
 static void do_catch PROT((char *, unsigned short));
 #ifdef OPCPROF
 static int cmpopc PROT((opc_t *, opc_t *));
@@ -106,7 +106,7 @@ struct svalue *fp;		/* Pointer to first argument. */
 struct svalue *sp;
 
 int function_index_offset;	/* Needed for inheritance */
-static int variable_index_offset;	/* Needed for inheritance */
+int variable_index_offset;	/* Needed for inheritance */
 int st_num_arg;
 
 static struct svalue start_of_stack[EVALUATOR_STACK_SIZE];
@@ -495,6 +495,7 @@ INLINE void copy_some_svalues P3(struct svalue *, dest, struct svalue *, v, int,
 
 INLINE void transfer_push_some_svalues P2(struct svalue *, v, int, num)
 {
+    if (sp + num >= end_of_stack) { too_deep_error = 1; error("stack overflow\n"); }
     memcpy(sp + 1, v, num * sizeof(struct svalue));
     sp += num;
 }
@@ -515,7 +516,7 @@ struct svalue glb = { T_LVALUE_BYTE };
 /*
  * Compute the address of an array element.
  */
-static INLINE void push_indexed_lvalue(int code)
+static INLINE void push_indexed_lvalue P1(int, code)
 {
     int ind;
     struct svalue *lv;
@@ -621,7 +622,7 @@ static INLINE void push_indexed_lvalue(int code)
                 if (ind > 1 || ind < 0)
                     error("Function variables may only be indexed with 0 or 1.\n");
                 lv = ind ? &sp->u.fp->fun : &sp->u.fp->obj;
-                sp->u.funp->ref--;
+                sp->u.fp->ref--;
                 (--sp)->type = T_LVALUE;
                 sp->u.lvalue = lv;
                 break;
@@ -1038,9 +1039,9 @@ push_control_stack P2(int, frkind, void *, funp)
     csp->variable_index_offset = variable_index_offset;
     csp->break_sp = break_sp;
 #ifdef PROFILE_FUNCTIONS
-    if (funp) {
+    if (frkind == FRAME_FUNCTION) {
 	get_cpu_times(&(csp->entry_secs), &(csp->entry_usecs));
-	funp->calls++;
+	((struct function *)funp)->calls++;
     }
 #endif
 }
@@ -1054,18 +1055,18 @@ void pop_control_stack()
     DEBUG_CHECK(csp == (control_stack - 1),
 		"Popped out of the control stack\n");
 #ifdef PROFILE_FUNCTIONS
-    if (csp->funp) {
+    if (csp->framekind == FRAME_FUNCTION) {
 	long secs, usecs, dsecs;
 
 	get_cpu_times((unsigned long *) &secs, (unsigned long *) &usecs);
 	dsecs = (((secs - csp->entry_secs) * 1000000)
 		 + (usecs - csp->entry_usecs));
-	csp->funp->self += dsecs;
+	csp->fr.func->self += dsecs;
 	if (csp != control_stack) {
 	    struct function *f;
 
-	    if ((f = (csp - 1)->funp)) {
-		f->children += dsecs;
+	    if ( (csp - 1)->framekind == FRAME_FUNCTION) {
+		(csp - 1)->fr.func->children += dsecs;
 	    }
 	}
     }
@@ -1170,7 +1171,7 @@ static void do_trace_call P1(struct function *, funp)
 	if (TRACETST(TRACE_ARGS)) {
 	    int i;
 
-	    add_message(" with %d arguments: ", funp->num_arg);
+	    add_vmessage(" with %d arguments: ", funp->num_arg);
 	    for (i = funp->num_arg - 1; i >= 0; i--) {
 		print_svalue(&sp[-i]);
 		add_message(" ");
@@ -1214,7 +1215,7 @@ INLINE struct function *
     }
     /* Remove excessive arguments */
     setup_variables(csp->num_local_variables, funp->num_local, funp->num_arg);
- #ifdef TRACE
+#ifdef TRACE
     tracedepth++;
     if (TRACEP(TRACE_CALL)) {
 	do_trace_call(funp);
@@ -1344,7 +1345,7 @@ call_function_pointer P2(struct funp *, funp, int, num_arg)
     setup_fake_frame(funp);
     
     switch (funp->type) {
-    case ORIGIN_CALL_OTHER:
+    case FP_CALL_OTHER:
 	if (funp->args.type == T_STRING)
 	    funcname = funp->args.u.string;
 	else if (funp->args.type == T_POINTER) {
@@ -1383,14 +1384,14 @@ call_function_pointer P2(struct funp *, funp, int, num_arg)
 	    return &const0u;
 	}
 	break;
-    case ORIGIN_SIMUL_EFUN:
+    case FP_SIMUL:
 	if (funp->args.type == T_POINTER) {
 	    check_for_destr(funp->args.u.vec);
 	    num_arg = merge_arg_lists(num_arg, funp->args.u.vec, 0);
 	}
 	call_simul_efun(funp->f.index, num_arg);
 	break;
-    case ORIGIN_EFUN:
+    case FP_EFUN:
 	fp = sp - num_arg + 1;
 	if (funp->args.type == T_POINTER) {
 	    check_for_destr(funp->args.u.vec);
@@ -1439,7 +1440,7 @@ call_function_pointer P2(struct funp *, funp, int, num_arg)
 	free_svalue(&apply_ret_value, "call_function_pointer");
 	apply_ret_value = *sp--;
 	return &apply_ret_value;
-    case ORIGIN_LOCAL: {
+    case FP_LOCAL | FP_NOT_BINDABLE: {
 	fp = sp - num_arg + 1;
 	
 	func = &funp->owner->prog->p.i.functions[funp->f.index];
@@ -1466,7 +1467,8 @@ call_function_pointer P2(struct funp *, funp, int, num_arg)
 	call_program(current_prog, func->offset);
 	break;
     }
-    case ORIGIN_FUNCTIONAL: {
+    case FP_FUNCTIONAL: 
+    case FP_FUNCTIONAL | FP_NOT_BINDABLE: {
 	fp = sp - num_arg + 1;
 
         push_control_stack(FRAME_FUNP, funp);
@@ -1483,6 +1485,8 @@ call_function_pointer P2(struct funp *, funp, int, num_arg)
 	setup_variables(num_arg, funp->f.a.num_locals, funp->f.a.num_args);
 
 	csp->extern_call = 1;
+	function_index_offset = funp->f.a.fio;
+	variable_index_offset = funp->f.a.vio;
 	call_program(funp->f.a.prog, funp->f.a.offset);
 	break;
     }
@@ -1549,59 +1553,6 @@ call_function_pointer P2(struct funp *, funp, int, num_arg) {
     return &apply_ret_value;
 }
 #endif
-
-/* Beek - add some sanity to joining strings */
-/* add to an svalue */
-#define EXTEND_SVALUE_STRING(x, y, z) \
-    do { char *ess_res; \
-      int ess_len, ess_r; \
-      ess_len = (ess_r = SVALUE_STRLEN(x)) + strlen(y) + 1; \
-      if (sp->subtype == STRING_MALLOC) { \
-          ess_res = (char *) DREALLOC(x->u.string, ess_len, TAG_STRING, z); \
-          if (!ess_res) fatal("Out of memory!\n"); \
-          strcpy(ess_res + ess_r, (y)); \
-      } else { \
-	  ess_res = DXALLOC(ess_len, TAG_STRING, z); \
-	  strcpy(ess_res, x->u.string); \
-	  strcpy(ess_res + ess_r, (y)); \
-	  free_string_svalue(x); \
-	  (x)->subtype = STRING_MALLOC; \
-      } \
-      (x)->u.string = ess_res;  } while (0)
-
-/* <something that needs no free> + string svalue */
-#define SVALUE_STRING_ADD_LEFT(y, z) \
-    do { char *pss_res; int pss_r, pss_len; \
-        pss_len = SVALUE_STRLEN(sp) + (pss_r = strlen(y)) + 1; \
-        pss_res = DXALLOC(pss_len, TAG_STRING, z); \
-        strcpy(pss_res, y); \
-        strcpy(pss_res + pss_r, sp->u.string); \
-        free_string_svalue(sp--); \
-	sp->type = T_STRING; \
-        sp->u.string = pss_res; \
-        sp->subtype = STRING_MALLOC; \
-     } while (0)
-
-/* basically, string + string; faster than using extend b/c of SVALUE_STRLEN */
-#define SVALUE_STRING_JOIN(x, y, z) \
-    do { char *ssj_res; int ssj_r, ssj_len; \
-        ssj_r = SVALUE_STRLEN(x); \
-        ssj_len = ssj_r + SVALUE_STRLEN(y) + 1; \
-        if ((x)->subtype == STRING_MALLOC) { \
-            ssj_res = (char *) DREALLOC((x)->u.string, ssj_len, TAG_STRING, z); \
-            if (!ssj_res) fatal("Out of memory!\n"); \
-            (void) strcpy(ssj_res + ssj_r, (y)->u.string); \
-            free_string_svalue(y); \
-        } else { \
-            ssj_res = (char *) DXALLOC(ssj_len, TAG_STRING, z); \
-	    strcpy(ssj_res, (x)->u.string); \
-	    strcpy(ssj_res + ssj_r, (y)->u.string); \
-	    free_string_svalue(y); \
-            free_string_svalue(x); \
-            (x)->subtype = STRING_MALLOC; \
-        } \
-        (x)->u.string = ssj_res; \
-    } while (0)
 
 /* marion
  * maintain a small and inefficient stack of error recovery context
@@ -1712,57 +1663,66 @@ static INLINE void do_loop_cond()
     if (*pc++ == F_LOCAL){
 	s2 = fp + EXTRACT_UCHAR(pc++);
 	switch(s1->type | s2->type){
-	    case T_NUMBER: 
-	        i = s1->u.number < s2->u.number;
-	        break;
+	case T_NUMBER: 
+	    i = s1->u.number < s2->u.number;
+	    break;
+	case T_REAL:
+	    i = s1->u.real < s2->u.real;
+	    break;
+	case T_STRING:
+	    i = (strcmp(s1->u.string, s2->u.string) < 0);
+	    break;
+	case T_NUMBER|T_REAL:
+	    if (s1->type == T_NUMBER) i = s1->u.number < s2->u.real;
+	    else i = s1->u.real < s2->u.number;
+	    break;
+	default:
+	    if (s1->type == T_OBJECT && (s1->u.ob->flags & O_DESTRUCTED)){
+		free_object(s1->u.ob, "do_loop_cond:1");
+		*s1 = const0;
+	    }
+	    if (s2->type == T_OBJECT && (s2->u.ob->flags & O_DESTRUCTED)){
+		free_object(s2->u.ob, "do_loop_cond:2");
+		*s2 = const0;
+	    }
+	    if (s1->type == T_NUMBER && s2->type == T_NUMBER){
+		i = 0;
+		break;
+	    }
+	    switch(s1->type){
+	    case T_NUMBER:
 	    case T_REAL:
-		i = s1->u.real < s2->u.real;
-		break;
+		error("2nd argument to < is not numeric when the 1st is.\n");
 	    case T_STRING:
-		i = (strcmp(s1->u.string, s2->u.string) < 0);
-		break;
-	    case T_NUMBER|T_REAL:
-		if (s1->type == T_NUMBER) i = s1->u.number < s2->u.real;
-		else i = s1->u.real < s2->u.number;
-		break;
+		error("2nd argument to < is not string when the 1st is.\n");
 	    default:
-		if (s1->type == T_OBJECT && (s1->u.ob->flags & O_DESTRUCTED)){
-		    free_object(s1->u.ob, "do_loop_cond:1");
-		    *s1 = const0;
-		}
-		if (s2->type == T_OBJECT && (s2->u.ob->flags & O_DESTRUCTED)){
-		    free_object(s2->u.ob, "do_loop_cond:2");
-		    *s2 = const0;
-		}
-		if (s1->type == T_NUMBER && s2->type == T_NUMBER){
-		    i = 0;
-		    break;
-		}
-		switch(s1->type){
-		    case T_NUMBER:
-		    case T_REAL:
-		        error("2nd argument to < is not numeric when the 1st is.\n");
-		    case T_STRING:
-   		        error("2nd argument to < is not string when the 1st is.\n");
-		    default:
-			error("Bad 1st argument to <.\n");
-	        }
+		error("Bad 1st argument to <.\n");
+	    }
         }
 	if (i) {
 	    unsigned short offset;
-
+	    
 	    COPY_SHORT(&offset, pc);
 	    pc -= offset;
 	} else pc += 2;
-
+	
     } else {
 	LOAD_INT(i, pc);
-	if (s1->u.number < i){
-	    unsigned short offset;
-
-	    COPY_SHORT(&offset, pc);
-	    pc -= offset;
-	} else pc += 2;
+	if (s1->type == T_NUMBER) {
+	    if (s1->u.number < i){
+		unsigned short offset;
+		
+		COPY_SHORT(&offset, pc);
+		pc -= offset;
+	    } else pc += 2;
+	} else if (s1->type == T_REAL) {
+	    if (s1->u.real < i) {
+		unsigned short offset;
+		
+		COPY_SHORT(&offset, pc);
+		pc -= offset;
+	    } else pc += 2;
+	} else error("Right side of < is a number, left side is not.\n");
     }
 }
 
@@ -1782,21 +1742,6 @@ call_program P2(struct program *, prog, int, offset) {
 	*sp++ = ret;
     }
 }
-
-void
-call_absolute P1(char *, pc) {
-    struct svalue ret;
-    
-    if (prog->p.i.program_size)
-	eval_instruction(pc);
-    else {
-	ret.type = T_NUMBER;
-	 (*
-	  ( void (*)() ) pc     /* cast to a function pointer */
-	  )(&ret);
-	*sp++ = ret;
-    }
-}
 #endif
 
  /*
@@ -1809,12 +1754,12 @@ call_absolute P1(char *, pc) {
   * all called efuns knows that they won't have destructed objects as
   * arguments.
   */
- #ifdef TRACE_CODE
+#ifdef TRACE_CODE
  static int previous_instruction[60];
  static int stack_size[60];
  static char *previous_pc[60];
  static int last;
- #endif
+#endif
 
  void
  eval_instruction P1(char *, p)
@@ -1836,29 +1781,29 @@ call_absolute P1(char *, pc) {
      while (1) {
 	 instruction = EXTRACT_UCHAR(pc++);
 	 /* These defines can't handle the F_CALL_EXTRA optimization */
- #if defined(TRACE_CODE) || defined(TRACE) || defined(OPCPROF)
- #  ifdef NEEDS_CALL_EXTRA
+#if defined(TRACE_CODE) || defined(TRACE) || defined(OPCPROF)
+#  ifdef NEEDS_CALL_EXTRA
 	 if (instruction == F_CALL_EXTRA)
 	     instruction = EXTRACT_UCHAR(pc++) + 0xff;
- #  endif
- #  ifdef TRACE_CODE
+#  endif
+#  ifdef TRACE_CODE
 	 previous_instruction[last] = instruction;
 	 previous_pc[last] = pc - 1;
 	 stack_size[last] = sp - fp - csp->num_local_variables;
 	 last = (last + 1) % (sizeof previous_instruction / sizeof(int));
- #  endif
- #  ifdef TRACE
+#  endif
+#  ifdef TRACE
 	 if (TRACEP(TRACE_EXEC)) {
 	     do_trace("Exec ", get_f_name(instruction), "\n");
 	 }
- #  endif
- #  ifdef OPCPROF
+#  endif
+#  ifdef OPCPROF
 	 if (instruction < BASE)
 	     opc_eoper[instruction]++;
 	 else
 	     opc_efun[instruction-BASE].count++;
- #  endif
- #endif
+#  endif
+#endif
 	 if (!--eval_cost) {
 	     fprintf(stderr, "eval_cost too big %d\n", max_cost);
 	     eval_cost = max_cost;
@@ -1928,7 +1873,7 @@ call_absolute P1(char *, pc) {
 	 case F_NBYTE:
 	     push_number(-((int)EXTRACT_UCHAR(pc++)));
 	     break;
- #ifdef F_JUMP_WHEN_NON_ZERO
+#ifdef F_JUMP_WHEN_NON_ZERO
 	 case F_JUMP_WHEN_NON_ZERO:
 	     if ((i = (sp->type == T_NUMBER)) && (sp->u.number == 0))
 		 pc += 2;
@@ -1943,7 +1888,7 @@ call_absolute P1(char *, pc) {
 		 pop_stack();
 	     }
 	     break;
- #endif
+#endif
 	 case F_BRANCH:	/* relative offset */
 	     COPY_SHORT(&offset, pc);
 	     pc += offset;
@@ -2075,7 +2020,7 @@ call_absolute P1(char *, pc) {
 		     } else sp->u.number = sp->u.number < (sp+1)->u.real;
 		     break;
 		 case T_STRING:
-		     i = (strcmp((sp - 1)->u.string, sp->u.string) < 0);
+		     i = (strcmp(sp->u.string, (sp + 1)->u.string) < 0);
 		     free_string_svalue(sp+1);
 		     free_string_svalue(sp);
 		     sp->type = T_NUMBER;
@@ -2483,6 +2428,7 @@ call_absolute P1(char *, pc) {
 		    csp->extern_call = 0;
 #ifdef LPC_TO_C
 		} else {
+/* TODO
 		    struct svalue ret =
 			{T_NUMBER};
 		    DEBUG_CHECK(!(funp->offset),
@@ -2491,6 +2437,7 @@ call_absolute P1(char *, pc) {
 		     (void (*) ()) (funp->offset)
 		     ) (&ret);
 		    *sp++ = ret;
+*/
 		}
 #endif
 	    }
@@ -3865,6 +3812,7 @@ struct vector *call_all_other P3(struct vector *, v, char *, func, int, numargs)
 	    continue;
 	for (i = numargs; i--;)
 	    push_svalue(tmp - i);
+	call_origin = ORIGIN_CALL_OTHER;
 	if (apply_low(func, ob, numargs)) {
 	    assign_svalue_no_free(&ret->item[idx], sp);
 	    pop_stack();
@@ -4157,6 +4105,7 @@ char *dump_trace P1(int, how)
               ret = p->ob ? p->ob->name : 0;
           funp = p[0].fr.func;
           break;
+#ifdef NEW_FUNCTIONS
       case FRAME_FUNP:
           debug_message("'     <function>' in '%20s' ('%20s') %s\n",
                         p[1].prog->name, p[1].ob->name,
@@ -4169,6 +4118,7 @@ char *dump_trace P1(int, how)
                         get_line_number(p[1].pc, p[1].prog));
           funp = 0;
           break;
+#endif
       case FRAME_CATCH:
           debug_message("'          CATCH' in '%20s' ('%20s') %s\n",
                         p[1].prog->name, p[1].ob->name,
@@ -4223,6 +4173,7 @@ char *dump_trace P1(int, how)
                     get_line_number(pc, current_prog));
       funp = p[0].fr.func;
       break;
+#ifdef NEW_FUNCTIONS
     case FRAME_FUNP:
       debug_message("'     <function>' in '%20s' ('%20s') %s\n",
                     current_prog->name, current_object->name,
@@ -4235,6 +4186,7 @@ char *dump_trace P1(int, how)
                     get_line_number(pc, current_prog));
       funp = 0;
       break;
+#endif
     case FRAME_CATCH:
       debug_message("'          CATCH' in '%20s' ('%20s') %s\n",
                     current_prog->name, current_object->name,
@@ -4316,6 +4268,7 @@ struct vector *get_svalue_trace()
 	    add_mapping_string(m, "function", "CATCH");
 	    funp = 0;
 	    break;
+#ifdef NEW_FUNCTIONS
 	  case FRAME_FAKE:
 	    add_mapping_string(m, "function", "<function>");
 	    funp = 0;
@@ -4324,6 +4277,7 @@ struct vector *get_svalue_trace()
 	    add_mapping_string(m, "function", "<function>");
 	    funp = (struct function *)&p[0].fr.funp->f.a;
 	    break;
+#endif
         }
 	add_mapping_string(m, "program", p[1].prog->name);
 	add_mapping_object(m, "object", p[1].ob);
@@ -4372,6 +4326,7 @@ struct vector *get_svalue_trace()
       add_mapping_string(m, "function", "CATCH");
       funp = 0;
       break;
+#ifdef NEW_FUNCTIONS
     case FRAME_FAKE:
       add_mapping_string(m, "function", "<function>");
       funp = 0;
@@ -4380,6 +4335,7 @@ struct vector *get_svalue_trace()
       add_mapping_string(m, "function", "<function>");
       funp = (struct function *)&p[0].fr.funp->f.a;
       break;
+#endif
     }
     add_mapping_string(m, "program", current_prog->name);
     add_mapping_object(m, "object", current_object);
@@ -4431,6 +4387,13 @@ char * get_line_number_if_any()
     arg->type = T_STRING; \
     arg->u.string = S; \
     arg->subtype = STRING_MALLOC; \
+    arg--; \
+    num_arg--
+
+#define SSCANF_ASSIGN_SVALUE_NUMBER(N) \
+    arg->type = T_NUMBER; \
+    arg->subtype = 0; \
+    arg->u.number = N; \
     arg--; \
     num_arg--
 
@@ -4539,7 +4502,7 @@ int inter_sscanf P4(struct svalue *, arg, struct svalue *, s0, struct svalue *, 
 		break;
 
 	    if (!skipme) {
-		SSCANF_ASSIGN_SVALUE(T_NUMBER, u.number, tmp_num);
+		SSCANF_ASSIGN_SVALUE_NUMBER(tmp_num);
 	    }
 	    continue;
 	}
@@ -4666,22 +4629,22 @@ void opcdump P1(char *, tfn)
     FILE *fp;
 
     if ((len = strlen(tfn)) >= (SMALL_STRING_SIZE - 7)) {
-	add_message("Path '%s' too long.\n", tfn);
+	add_vmessage("Path '%s' too long.\n", tfn);
 	return;
     }
     strcpy(tbuf, tfn);
     strcpy(tbuf + len, ".efun");
     fn = check_valid_path(tbuf, current_object, "opcprof", 1);
     if (!fn) {
-	add_message("Invalid path '%s' for writing.\n", tbuf);
+	add_vmessage("Invalid path '%s' for writing.\n", tbuf);
 	return;
     }
     fp = fopen(fn, "w");
     if (!fp) {
-	add_message("Unable to open %s.\n", fn);
+	add_vmessage("Unable to open %s.\n", fn);
 	return;
     }
-    add_message("Dumping to %s ... ", fn);
+    add_vmessage("Dumping to %s ... ", fn);
     limit = sizeof(opc_efun) / sizeof(opc_t);
     for (i = 0; i < limit; i++) {
 	fprintf(fp, "%-30s: %10d\n", opc_efun[i].name, opc_efun[i].count);
@@ -4692,12 +4655,12 @@ void opcdump P1(char *, tfn)
     strcpy(tbuf + len, ".eoper");
     fn = check_valid_path(tbuf, current_object, "opcprof", 1);
     if (!fn) {
-	add_message("Invalid path '%s' for writing.\n", tbuf);
+	add_vmessage("Invalid path '%s' for writing.\n", tbuf);
 	return;
     }
     fp = fopen(fn, "w");
     if (!fp) {
-	add_message("Unable to open %s for writing.\n", fn);
+	add_vmessage("Unable to open %s for writing.\n", fn);
 	return;
     }
     for (i = 0; i < BASE; i++) {
@@ -4779,14 +4742,12 @@ int last_instructions()
 /* Generate a debug message to the user */
 void do_trace P3(char *, msg, char *, fname, char *, post)
 {
-    char buf[10000];
     char *objname;
 
     if (!TRACEHB)
 	return;
     objname = TRACETST(TRACE_OBJNAME) ? (current_object && current_object->name ? current_object->name : "??") : "";
-    sprintf(buf, "*** %d %*s %s %s %s%s", tracedepth, tracedepth, "", msg, objname, fname, post);
-    add_message(buf);
+    add_vmessage("*** %d %*s %s %s %s%s", tracedepth, tracedepth, "", msg, objname, fname, post);
 }
 #endif
 
@@ -4818,11 +4779,11 @@ struct svalue *apply_master_ob P2(char *, fun, int, num_arg)
 {
     int err;
 
-    call_origin = ORIGIN_DRIVER;
     if ((err = assert_master_ob_loaded("apply_master_ob", fun)) != 1) {
 	pop_n_elems(num_arg);
 	return (struct svalue *)err;
     }
+    call_origin = ORIGIN_DRIVER;
     return sapply(fun, master_ob, num_arg);
 }
 

@@ -11,35 +11,19 @@
 ** adapted by Blackthorn@Genocide to work with MudOS 0.9.15 - 93/01/26
 **
 ** Amiga Lattice support added by Robocoder@TMI-2
-**
-** NeXT Mach support is preliminary. NeXTStep 3.x users should #undef SBRK_OK.
 */
 
 #define NO_OPCODES
 #include "std.h"
+#include "file_incl.h"
 #include "interpret.h"
 #include "simulate.h"
 #include "comm.h"
 
 #if defined(sparc)
 #define MALLOC_ALIGN 8
-#define MALLOC_ALIGN_8
 #else
 #define MALLOC_ALIGN 4
-#endif
-
-/*
- * #define SBRK_OK to use low level memory allocation routines;
- * conversely, #undef SBRK_OK to use the system malloc routines, eg malloc(),
- * in which case, smalloc becomes a wrapper...
- */
-#define SBRK_OK
-
-/* SGI IRIX stupidly calls malloc() all over the place, effectively rendering
-   sbrk() useless ...
- */
-#ifdef sgi
-#undef SBRK_OK
 #endif
 
 #define POINTER void *
@@ -58,7 +42,7 @@
 #define SMALL_CHUNK_SIZE	0x4000
 #define CHUNK_SIZE		0x40000
 
-#define SINT sizeof(int)
+#define SINT SIZEOF_INT
 #define SMALL_BLOCK_MAX (SMALL_BLOCK_MAX_BYTES/SINT)
 
 #define PREV_BLOCK	0x80000000
@@ -70,11 +54,7 @@
 
 /* SMALL BLOCK info */
 
-#if defined( atarist ) || defined( linux ) || defined( AMIGA )
 typedef unsigned int u;
-#else
-typedef unsigned int u;
-#endif
 
 static u *last_small_chunk = 0;
 static u *sfltable[SMALL_BLOCK_MAX] =
@@ -108,7 +88,9 @@ typedef struct {
 #define count_up(a,b)   { a.size+=(b); ++a.counter; }
 #define count_back(a,b) { a.size-=(b); --a.counter; }
 
+#if 0
 int debugmalloc = 0;		/* Only used when debuging malloc() */
+#endif
 
 /********************************************************/
 /*  SMALL BLOCK HANDLER					*/
@@ -148,12 +130,14 @@ POINTER smalloc_malloc P1(size_t, size)
     /* int i; */
     u *temp;
 
-#ifdef DEBUG
-    if (size == 0)
-	fatal("Malloc size 0.\n");
-#endif
+    DEBUG_CHECK(size == 0, "Malloc size 0.\n");
     if (size > SMALL_BLOCK_MAX_BYTES)
 	return large_malloc(size, 0);
+
+#if SIZEOF_PTR > SIZEOF_INT
+    if (size < SIZEOF_PTR)
+	size = SIZEOF_PTR;
+#endif
 
     size = (size + 7) & ~3;	/* block size in bytes */
 #define SIZE_INDEX(u_array, size) 	(*(u*) ((char*)u_array-8+size))
@@ -175,33 +159,43 @@ POINTER smalloc_malloc P1(size_t, size)
 	return (char *) temp;
     }				/* else allocate from the chunk */
     if (unused_size < size) {	/* no room in chunk, get another */
-	fake("Allocating new small chunk.");
+	/*
+	 * don't waste this smaller block
+	 */
 	if (unused_size) {
-	    if (unused_size < 8) {
-		*s_size_ptr(next_unused) = 0;
-	    } else {
-		*s_size_ptr(next_unused) = unused_size >> 2;
-		*s_next_ptr(next_unused) = SIZE_PNT_INDEX(sfltable, unused_size);
-		SIZE_PNT_INDEX(sfltable, unused_size) = next_unused;
-		count_up(small_free_stat, unused_size);
-	    }
+	    count_up(small_free_stat, unused_size);
+	    *s_size_ptr(next_unused) = unused_size >> 2;
+	    *s_next_ptr(next_unused) = SIZE_PNT_INDEX(sfltable, unused_size);
+	    SIZE_PNT_INDEX(sfltable, unused_size) = next_unused;
 	}
-	next_unused = (u *) large_malloc(SMALL_CHUNK_SIZE + sizeof(u *), 1);
+
+	fake("Allocating new small chunk.");
+	next_unused = (u *) large_malloc(SMALL_CHUNK_SIZE + SIZEOF_PTR, 1);
 	if (next_unused == 0)
 	    return 0;
+	
 	*next_unused = (u) last_small_chunk;
 	last_small_chunk = next_unused++;
-	count_up(small_chunk_stat, SMALL_CHUNK_SIZE + SINT + sizeof(u *));
+	count_up(small_chunk_stat, SMALL_CHUNK_SIZE + SINT + SIZEOF_PTR);
 	unused_size = SMALL_CHUNK_SIZE;
     } else
 	fake("Allocated from chunk.");
 
-
     temp = (u *) s_next_ptr(next_unused);
-
     *s_size_ptr(next_unused) = size >> 2;
-    next_unused += size >> 2;
     unused_size -= size;
+    if (unused_size < (SINT + SIZEOF_PTR)) {
+	if ((size + unused_size) < (SMALL_BLOCK_MAX_BYTES + SINT)) {
+	    /*
+	     * try to avoid waste
+	     */
+	    count_up(small_alloc_stat, unused_size);
+	    size += unused_size;
+	    *s_size_ptr(next_unused) = size >> 2;
+	}
+	unused_size = 0;
+    }
+    next_unused += size >> 2;
 
     fake("allocation from chunk successful\n");
     return (char *) temp;
@@ -209,7 +203,6 @@ POINTER smalloc_malloc P1(size_t, size)
 
 #ifdef DEBUG
 char *debug_free_ptr;
-
 #endif				/* DEBUG */
 
 static int malloc_size_mask()
@@ -268,7 +261,7 @@ int fit_style = BEST_FIT;
 
 #define l_size_ptr(p)		(p)
 #define l_next_ptr(p)		(*((u **) (p+1)))
-#define l_prev_ptr(p)		(*((u **) (p+2)))
+#define l_prev_ptr(p)		(*((u **) ((u **)(p+1)+1)))
 #define l_next_block(p)		(p + (MASK & (*(p))) )
 #define l_prev_block(p) 	(p - (MASK & (*(p-1))) )
 #define l_prev_free(p)		(!(*p & PREV_BLOCK))
@@ -1036,7 +1029,7 @@ static char *esbrk P1(u, size)
     extern void *sbrk();
     void *addr = NULL;
 
-    addr = sbrk(size);
+    addr = (char *)sbrk(size);
     if ((char *) addr == (char *) (-1))
 	return NULL;
 
@@ -1244,6 +1237,7 @@ static char *large_malloc P2(u, size, int, force_more)
 
 #ifdef SBRK_OK
 	if (!start_next_block) {
+	    count_up(large_alloc_stat, SINT);
 	    start_next_block = (u *) esbrk(SINT);
 	    if (!start_next_block)
 		fatal("Couldn't malloc anything");
@@ -1362,10 +1356,10 @@ POINTER smalloc_realloc P2(POINTER, p, size_t, size)
 
 #if MALLOC_ALIGN > 4
     while (!(old_size = *--q));
-    old_size = ((old_size & MASK) - 1) * sizeof(int);
+    old_size = ((old_size & MASK) - 1) * SINT;
 #else
     --q;
-    old_size = ((*q & MASK) - 1) * sizeof(int);
+    old_size = ((*q & MASK) - 1) * SINT;
 #endif
     if (old_size >= size)
 	return p;
@@ -1384,10 +1378,10 @@ static int resort_free_list()
     return 0;
 }
 #ifdef DO_MSTATS
-#define dump_stat(str,stat) add_message(str,stat.counter,stat.size)
+#define dump_stat(str,stat) add_vmessage(str,stat.counter,stat.size)
 void show_mstats P1(char *, s)
 {
-    add_message("Memory allocation statistics %s\n", s);
+    add_vmessage("Memory allocation statistics %s\n", s);
     add_message("Type                   Count      Space (bytes)\n");
     dump_stat("sbrk requests:     %8d        %10d (a)\n", sbrk_stat);
     dump_stat("large blocks:      %8d        %10d (b)\n", large_alloc_stat);
@@ -1395,7 +1389,7 @@ void show_mstats P1(char *, s)
     dump_stat("small chunks:      %8d        %10d (d)\n", small_chunk_stat);
     dump_stat("small blocks:      %8d        %10d (e)\n", small_alloc_stat);
     dump_stat("small free blocks: %8d        %10d (f)\n", small_free_stat);
-    add_message(
+    add_vmessage(
        "unused from current chunk          %10d (g)\n\n", unused_size);
     add_message(
     "    Small blocks are stored in small chunks, which are allocated as\n");
@@ -1470,7 +1464,7 @@ static void walk_new_small_malloced(func)
 
 #if 0
 
-int debugmalloc;
+int debug_smalloc = 0;
 
 /*
  * Verify that the free list is correct. The upper limit compared to
@@ -1482,7 +1476,7 @@ verify_sfltable()
     int i, j;
     extern int end;
 
-    if (!debugmalloc)
+    if (!debug_smalloc)
 	return;
     if (unused_size > SMALL_CHUNK_SIZE)
 	apa();
@@ -1509,7 +1503,7 @@ verify_free P1(u *, ptr)
     u *p;
     int i, j;
 
-    if (!debugmalloc)
+    if (!debug_smalloc)
 	return;
     for (i = 0; i < SMALL_BLOCK_MAX; i++) {
 	for (j = 0, p = sfltable[i]; p; p = *(u **) (p + 1), j++) {

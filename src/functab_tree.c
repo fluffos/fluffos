@@ -37,7 +37,7 @@
 /*
  * The function table tree is accomplished by augmenting the function
  * structure with fields for the left, right, and balance fields required
- * for AVL trees.  (See "exec.h".)  The actual function data in a slot
+ * for AVL trees.  (See "program.h".)  The actual function data in a slot
  * is not moved, rather only the branch information is changed.  Thus, the
  * table can still be searched linearly.  Also, F_CALL_FUNCTION_BY_ADDRESS
  * calls don't have to be patched.

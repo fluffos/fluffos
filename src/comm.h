@@ -52,13 +52,17 @@ struct interactive {
     struct interactive *snoop_on;
     struct interactive *snoop_by;
     int last_time;		/* time of last command executed           */
+#ifndef NO_ADD_ACTION
     /* this or What ? is printed when error    */
     union string_or_func default_err_message;
+#endif
 #ifdef TRACE
     int trace_level;		/* debug flags -- 0 means no debugging     */
     char *trace_prefix;		/* trace only object which has this as name  */
 #endif
+#ifdef OLD_ED
     struct ed_buffer *ed_buffer;/* local ed                                */
+#endif
     int message_producer;	/* message buffer producer index */
     int message_consumer;	/* message buffer consumer index */
     int message_length;		/* message buffer length */
@@ -94,16 +98,17 @@ void sigalrm_handler PROT((int));
 #else
 void sigalrm_handler PROT((void));
 #endif
-void add_message PROTVARGS(());
+void add_vmessage PROTVARGS(());
+void add_message PROT((char *));
 void update_ref_counts_for_users PROT((void));
-void make_selectmasks PROT((void));
+INLINE void make_selectmasks PROT((void));
 void init_user_conn PROT((void));
 void init_addr_server PROT((char *, int));
 void ipc_remove PROT((void));
 void set_prompt PROT((char *));
 void notify_no_command PROT((void));
 void set_notify_fail_message PROT((char *));
-void process_io PROT((void));
+INLINE void process_io PROT((void));
 int process_user_command PROT((void));
 int replace_interactive PROT((struct object *, struct object *));
 int set_call PROT((struct object *, struct sentence *, int));
@@ -117,5 +122,9 @@ int new_set_snoop PROT((struct object *, struct object *));
 struct object *query_snoop PROT((struct object *));
 struct object *query_snooping PROT((struct object *));
 void set_notify_fail_function PROT((struct funp *));
+
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_iptable PROT((void));
+#endif
 
 #endif				/* COMM_H */

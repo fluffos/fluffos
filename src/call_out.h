@@ -5,7 +5,7 @@
  * call_out.c
  */
 void call_out PROT((void));
-void new_call_out PROT((struct object *, char *, int, int, struct svalue *));
+void new_call_out PROT((struct object *, struct svalue *, int, int, struct svalue *));
 int remove_call_out PROT((struct object *, char *));
 void remove_all_call_out PROT((struct object *));
 int find_call_out PROT((struct object *, char *));

@@ -63,15 +63,15 @@ dump_prog P3(struct program *, prog, char *, fn, int, flags)
 
     fname = check_valid_path(fn, current_object, "dumpallobj", 1);
     if (!fname) {
-	add_message("Invalid path '%s' for writing.\n", fn);
+	add_vmessage("Invalid path '%s' for writing.\n", fn);
 	return;
     }
     f = fopen(fname, "w");
     if (!f) {
-	add_message("Unable to open '%s' for writing.\n", fname);
+	add_vmessage("Unable to open '%s' for writing.\n", fname);
 	return;
     }
-    add_message("Dumping to %s ...", fname);
+    add_vmessage("Dumping to %s ...", fname);
 
     fprintf(f, "NAME: %s\n", prog->name);
     fprintf(f, "INHERITS:\n");
@@ -356,7 +356,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	    pc += 2;
 	    break;
 	case F_SHORT_STRING:
-	    if (*pc < NUM_STRS)
+	    if (EXTRACT_UCHAR(pc) < NUM_STRS)
 	        sprintf(buff, "\"%s\"", disassem_string(STRS[*pc]));
 	    else 
 	        sprintf(buff, "<out of range %d>", (int) *pc);
@@ -370,18 +370,18 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 
 	case F_FUNCTION_CONSTRUCTOR:
 	    switch (EXTRACT_UCHAR(pc++)) {
-	    case ORIGIN_CALL_OTHER | 1:
+	    case FP_CALL_OTHER | FP_THIS_OBJECT:
 		strcpy(buff, "<this_object call_other>");
 		break;
-	    case ORIGIN_CALL_OTHER:
+	    case FP_CALL_OTHER:
 		strcpy(buff, "<call_other>");
 		break;
-	    case ORIGIN_SIMUL_EFUN:
+	    case FP_SIMUL:
 		COPY_SHORT(&sarg, pc);
 		sprintf(buff, "<simul_efun> \"%s\"", simuls[sarg]->name);
 		pc += 2;
 		break;
-	    case ORIGIN_EFUN:
+	    case FP_EFUN:
 #ifdef NEEDS_CALL_EXTRA
 		if ((sarg = EXTRACT_UCHAR(pc++)) == F_CALL_EXTRA) {
 		    sarg = EXTRACT_UCHAR(pc++) + 0xff;
@@ -391,7 +391,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 #endif
 		sprintf(buff, "<efun> %s", instrs[sarg].name);
 		break;
-	    case ORIGIN_LOCAL:
+	    case FP_LOCAL:
 		COPY_SHORT(&sarg, pc);
 		pc += 2;
 		if (sarg < NUM_FUNS)
@@ -399,11 +399,12 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 		else
 		    sprintf(buff, "<local_fun> <out of range %d>", (int)sarg);
 		break;
-	    case ORIGIN_FUNCTIONAL:
+	    case FP_FUNCTIONAL:
+	    case FP_FUNCTIONAL | FP_NOT_BINDABLE:
 		sprintf(buff, "<functional, %d args>\nCode:", (int)pc[0]);
 		pc += 3;
 		break;
-	    case ORIGIN_FUNCTIONAL | 1:
+	    case FP_ANONYMOUS:
 		COPY_SHORT(&sarg, &pc[2]);
 		sprintf(buff, "<anonymous function, %d args, %d locals, ends at %04x>\nCode:",
 			(int)pc[0], (int)pc[1], (int) (pc + 3 + sarg - code));

@@ -22,7 +22,7 @@ static struct object *find_obj_n PROT((char *));
 /*
  * Object hash function, ripped off from stralloc.c.
  */
-#define ObjHash(s) whashstr(s, 20) & otable_size_minus_one
+#define ObjHash(s) whashstr(s, 40) & otable_size_minus_one
 
 /*
  * hash table - list of pointers to heads of object chains.
@@ -33,11 +33,15 @@ static struct object **obj_table = 0;
 
 void init_otable()
 {
-    int x;
+    int x, y;
 
-    otable_size = OTABLE_SIZE;
-    otable_size_minus_one = OTABLE_SIZE - 1;
-    obj_table = CALLOCATE(otable_size, struct object *, TAG_OBJ_TBL, "init_otable");
+    /* ensure that otable_size is a power of 2 */
+    y = OTABLE_SIZE;
+    for (otable_size = 1; otable_size < y; otable_size *= 2)
+	;
+    otable_size_minus_one = otable_size - 1;
+    obj_table = CALLOCATE(otable_size, struct object *, 
+			  TAG_OBJ_TBL, "init_otable");
 
     for (x = 0; x < otable_size; x++)
 	obj_table[x] = 0;
@@ -86,21 +90,18 @@ static int objs_in_table = 0;
 
 void enter_object_hash P1(struct object *, ob)
 {
-    struct object *s;
     int h = ObjHash(ob->name);
+    IF_DEBUG(struct object *s);
 
-    s = find_obj_n(ob->name);
-    if (s) {
-	if (s != ob)
-	    fatal("Duplicate object \"%s\" in object hash table",
-		  ob->name);
-	else
-	    fatal("Entering object \"%s\" twice in object table",
-		  ob->name);
-    }
-    if (ob->next_hash)
-	fatal("Object \"%s\" not found in object table but next link not null",
-	      ob->name);
+    IF_DEBUG(s = find_obj_n(ob->name));
+
+    DEBUG_CHECK1(s && s != ob, "Duplicate object \"%s\" in object hash table",
+		 ob->name);
+    DEBUG_CHECK1(s, "Entering object \"%s\" twice in object table",
+		 ob->name);
+    DEBUG_CHECK1(ob->next_hash,
+		 "Object \"%s\" not found in object table but next link not null", ob->name);
+
     ob->next_hash = obj_table[h];
     obj_table[h] = ob;
     objs_in_table++;
@@ -114,14 +115,13 @@ void enter_object_hash P1(struct object *, ob)
 
 void remove_object_hash P1(struct object *, ob)
 {
-    struct object *s;
     int h = ObjHash(ob->name);
+    struct object *s;
 
     s = find_obj_n(ob->name);
 
-    if (s != ob)
-	fatal("Remove object \"%s\": found a different object!",
-	      ob->name);
+    DEBUG_CHECK1(s != ob, "Remove object \"%s\": found a different object!",
+		 ob->name);
 
     obj_table[h] = ob->next_hash;
     ob->next_hash = 0;
@@ -161,19 +161,20 @@ int show_otable_status P1(int, verbose)
     if (verbose == 1) {
 	add_message("Object name hash table status:\n");
 	add_message("------------------------------\n");
-	sprintf(sbuf, "%.2f", objs_in_table / (float) OTABLE_SIZE);
-	add_message("Average hash chain length	           %s\n", sbuf);
-	sprintf(sbuf, "%.2f", (float) obj_probes / obj_searches);
-	add_message("Searches/average search length       %d (%s)\n",
-		    obj_searches, sbuf);
-	add_message("External lookups succeeded (succeed) %d (%d)\n",
+	sprintf(sbuf, "%10.2f", objs_in_table / (float) OTABLE_SIZE);
+	add_vmessage("Average hash chain length:       %s\n", sbuf);
+	sprintf(sbuf, "%10.2f", (float) obj_probes / obj_searches);
+	add_vmessage("Average search length:           %s\n", sbuf);
+	add_vmessage("Internal lookups (succeeded):    %lu (%lu)\n",
+		    obj_searches - user_obj_lookups, objs_found - user_obj_found);
+	add_vmessage("External lookups (succeeded):    %lu (%lu)\n",
 		    user_obj_lookups, user_obj_found);
     }
     starts = (int) OTABLE_SIZE *sizeof(struct object *) +
                 objs_in_table * sizeof(struct object);
 
-    if (verbose != -1) {
-	add_message("Obj table overhead:\t\t%8d %8d\n",
+    if (!verbose) {
+	add_vmessage("Obj table overhead:\t\t%8d %8d\n",
 		    OTABLE_SIZE * sizeof(struct object *), starts);
     }
     return starts;

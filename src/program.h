@@ -128,8 +128,10 @@ struct external_program {
 
 struct internal_program {
     int ref;			/* Reference count */
+    int func_ref;
 #ifdef DEBUG
     int extra_ref;		/* Used to verify ref count */
+    int extra_func_ref;
 #endif
     char *program;		/* The binary instructions */
     int id_number;		/* used to associate information with this
@@ -178,10 +180,14 @@ union pu {
 
 struct program {
     char *name;			/* Name of file that defined prog */
+    int flags;
     union pu p;
 };
 
 extern int total_num_prog_blocks;
 extern int total_prog_block_size;
+void reference_prog PROT((struct program *, char *));
+void free_prog PROT((struct program *, int));
+void deallocate_program PROT((struct program *));
 
 #endif

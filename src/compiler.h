@@ -52,16 +52,6 @@
 #define TYPE_BUFFER     8
 #define TYPE_ANY        9	/* Will match any type */
 
-/* Types for function pointers */
-
-#define FP_SIMUL_EFUN 2
-#define FP_EFUN 4
-#define FP_LFUN 8
-#define FP_G_VAR 16
-#define FP_L_VAR 32
-#define FP_CALL_OTHER 64
-#define FP_FUNCTIONAL 128
-
 extern struct mem_block mem_block[NUMAREAS];
 
 #define CURRENT_PROGRAM_SIZE prog_code - mem_block[current_block].block
@@ -75,6 +65,7 @@ extern struct mem_block mem_block[NUMAREAS];
 
 #ifdef NEW_FUNCTIONS
 struct function_context_t {
+    short bindable;
     short num_parameters;
     short num_locals;
     struct parse_node *values_list;
@@ -188,9 +179,7 @@ INLINE static void insert_in_mem_block PROT((int, int, int));
 INLINE static char *allocate_in_mem_block PROT((int, int));
 
 INLINE static
-void realloc_mem_block(m, size)
-    struct mem_block *m;
-    int size;
+void realloc_mem_block P2(struct mem_block *, m, int, size)
 {
     while (size > m->max_size) {
 	m->max_size <<= 1;
@@ -200,9 +189,7 @@ void realloc_mem_block(m, size)
 }
 
 INLINE static
-void add_to_mem_block(n, data, size)
-    int n, size;
-    char *data;
+void add_to_mem_block P3(int, n, char *, data, int, size)
 {
     struct mem_block *mbp = &mem_block[n];
 
@@ -214,8 +201,7 @@ void add_to_mem_block(n, data, size)
 }
 
 INLINE static
-char *allocate_in_mem_block(n, size)
-    int n, size;
+char *allocate_in_mem_block P2(int, n, int, size)
 {
     struct mem_block *mbp = &mem_block[n];
     char *ret;
@@ -228,8 +214,7 @@ char *allocate_in_mem_block(n, size)
 }
 
 INLINE static
-void insert_in_mem_block(n, where, size)
-    int n, where, size;
+void insert_in_mem_block P3(int, n, int, where, int, size)
 {
     struct mem_block *mbp = &mem_block[n];
     char *p;

@@ -31,4 +31,8 @@ char *ref_string PROT((char *));
 void free_string PROT((char *));
 int add_string_status PROT((int));
 
+#ifdef DEBUGMALLOC_EXTENSIONS
+extern int num_distinct_strings;
+#endif
+
 #endif

@@ -369,21 +369,22 @@ void svalue_to_string P6(struct svalue *, obj, char **, str, int, size, int, ind
 	stradd(str, &size, "(: ");
 #ifdef NEW_FUNCTIONS
 	switch (obj->u.fp->type) {
-	case ORIGIN_CALL_OTHER:
+	case FP_CALL_OTHER:
 	    svalue_to_string(&(obj->u.fp->f.obj), str, size, indent, trailing, 0);
 	    if (obj->u.fp->args.type != T_POINTER){
 		stradd(str, &size, ", ");
 		svalue_to_string(&(obj->u.fp->args), str, size, indent, 0, 0);
 	    }
 	    break;
-	case ORIGIN_LOCAL:
+	case FP_LOCAL | FP_NOT_BINDABLE:
 	    stradd(str, &size, 
 		   obj->u.fp->owner->prog->p.i.functions[obj->u.fp->f.index].name);
 	    break;
-	case ORIGIN_SIMUL_EFUN:
+	case FP_SIMUL:
 	    stradd(str, &size, simuls[obj->u.fp->f.index]->name);
 	    break;
-	case ORIGIN_FUNCTIONAL:
+	case FP_FUNCTIONAL:
+	case FP_FUNCTIONAL | FP_NOT_BINDABLE:
 	    {
 		char buf[10];
 		int n = obj->u.fp->f.a.num_args;
@@ -400,7 +401,7 @@ void svalue_to_string P6(struct svalue *, obj, char **, str, int, size, int, ind
 		stradd(str, &size, ")");
 		break;
 	    }
-	case ORIGIN_EFUN:
+	case FP_EFUN:
 	    {
 		int i;
 		i = obj->u.fp->f.opcodes[0];
@@ -685,6 +686,7 @@ static int add_table P2(cst **, table, short int, trailing)
 	cst *temp;
 
 	temp = TAB->next;
+	if (TAB->d.tab) FREE((char *)(TAB->d.tab));
 	FREE((char *) TAB);
 	TAB = temp;
 	return 1;
@@ -707,7 +709,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
     struct svalue *carg;	/* current arg */
     VOLATILE unsigned int nelemno = 0;	/* next offset into array */
     unsigned int fpos;		/* position in format_str */
-    VOLATILE unsigned int arg = 0;	/* current arg number */
+    VOLATILE SIGNED int arg = 0;	/* current arg number */
     unsigned int fs;		/* field size */
     int pres;			/* presision */
     unsigned int i;
@@ -1097,6 +1099,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 
 #define TABLE carg->u.string
 			    (*temp) = ALLOCATE(cst, TAG_TEMPORARY, "string_print: 4");
+			    (*temp)->d.tab = 0;
 			    (*temp)->pad = pad;
 			    (*temp)->info = finfo;
 			    (*temp)->start = curpos;

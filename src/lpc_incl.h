@@ -2,6 +2,7 @@
 #define LPC_INCL_H
 
 #include "std.h"
+#include "include/function.h"
 #include "include/origin.h"
 #include "config.h"
 #include "applies.h"

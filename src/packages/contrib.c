@@ -1,8 +1,10 @@
 #ifdef LATTICE
 #include "/lpc_incl.h"
+#include "/mapping.h"
 #include "/comm.h"
 #else
 #include "../lpc_incl.h"
+#include "../mapping.h"
 #include "../comm.h"
 #endif
 
@@ -180,14 +182,6 @@ void f_functions PROT((void)) {
     push_refed_vector(vec);
 }
 #endif
-
-
-
-
-
-
-
-
 
 /*Aleas@Nightmare */
 #ifdef F_TERMINAL_COLOUR

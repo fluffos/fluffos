@@ -4,32 +4,23 @@
 #include "icode.h"
 #include "lex.h"
 #include "simulate.h"
+#include "include/function.h"
 
 void dump_tree PROT((struct parse_node *, int));
 static struct parse_node *optimize PROT((struct parse_node *));
-
-#ifdef LPC_TO_C
-#  define DISPATCH(x) void x() { if (compile_to_c) c_##x(); else i_##x(); }
-#  define DISPATCH1(x, a, b) void x P1(a,b) { if (compile_to_c) c_##x(b); else i_##x(b); }
-#  define DISPATCH2(x, a, b, c, d) void x P2(a,b,c,d) { if (compile_to_c) c_##x(b, d); else i_##x(b,d); }
-#else
-#  define DISPATCH(x) void x() { i_##x(); }
-#  define DISPATCH1(x, a, b) void x P1(a, b) { i_##x(b); }
-#  define DISPATCH2(x, a, b, c, d) void x P2(a, b, c, d) { i_##x(b, d); }
-#endif
 
 static void
 optimize_expr_list P1(struct parse_node *, expr) {
     if (!expr) return;
     do {
 	optimize(expr->v.expr);
-    } while (expr = expr->right);
+    } while (expr = expr->r.expr);
 }
 
 static void
 optimize_lvalue_list P1(struct parse_node *, expr) {
-    while (expr = expr->right) {
-	optimize(expr->left);
+    while (expr = expr->r.expr) {
+	optimize(expr->l.expr);
     }
 }
 
@@ -82,7 +73,7 @@ optimize P1(struct parse_node *, expr) {
     case F_MOD:
     case NODE_COMMA:
     case NODE_ASSOC:
-	expr->left = optimize(expr->left);
+	expr->l.expr = optimize(expr->l.expr);
 	/* fall through */
     case F_POP_VALUE:
     case F_PRE_INC:
@@ -96,7 +87,7 @@ optimize P1(struct parse_node *, expr) {
     case F_NEGATE:
     case F_CATCH:
     case F_TIME_EXPRESSION:
-	expr->right = optimize(expr->right);
+	expr->r.expr = optimize(expr->r.expr);
 	break;
     case F_AGGREGATE:
     case F_AGGREGATE_ASSOC:
@@ -104,52 +95,52 @@ optimize P1(struct parse_node *, expr) {
     case F_TO_INT:
     case F_SIMUL_EFUN:
     case F_CALL_FUNCTION_BY_ADDRESS:
-	optimize_expr_list(expr->right);
+	optimize_expr_list(expr->r.expr);
 	break;
     case NODE_CONDITIONAL:
-	expr->left = optimize(expr->left);
-	expr->right->left = optimize(expr->right->left);
-	expr->right->right = optimize(expr->right->right);
+	expr->l.expr = optimize(expr->l.expr);
+	expr->r.expr->l.expr = optimize(expr->r.expr->l.expr);
+	expr->r.expr->r.expr = optimize(expr->r.expr->r.expr);
 	break;
     case F_SSCANF:
-	expr->left->left = optimize(expr->left->left);
-	expr->left->right = optimize(expr->left->right);
-	optimize_lvalue_list(expr->right);
+	expr->l.expr->l.expr = optimize(expr->l.expr->l.expr);
+	expr->l.expr->r.expr = optimize(expr->l.expr->r.expr);
+	optimize_lvalue_list(expr->r.expr);
 	break;
     case F_PARSE_COMMAND:
-	expr->left->left = optimize(expr->left->left);
-	expr->left->right->left = optimize(expr->left->right->left);
-	expr->left->right->right = optimize(expr->left->right->right);
-	optimize_lvalue_list(expr->right);
+	expr->l.expr->l.expr = optimize(expr->l.expr->l.expr);
+	expr->l.expr->r.expr->l.expr = optimize(expr->l.expr->r.expr->l.expr);
+	expr->l.expr->r.expr->r.expr = optimize(expr->l.expr->r.expr->r.expr);
+	optimize_lvalue_list(expr->r.expr);
 	break;
     case F_EVALUATE:
 #ifdef NEW_FUNCTIONS
-	optimize_expr_list(expr->right);
+	optimize_expr_list(expr->r.expr);
 #else
-	expr->left = optimize(expr->left);
-	expr->right = optimize(expr->right);
+	expr->l.expr = optimize(expr->l.expr);
+	expr->r.expr = optimize(expr->r.expr);
 #endif
 	break;
     case F_FUNCTION_CONSTRUCTOR:
 #ifdef NEW_FUNCTIONS
 	if ((expr->v.number & 0xff) == FP_CALL_OTHER) {
-	    expr->left = optimize(expr->left);
-	    expr->right = optimize(expr->right);
+	    expr->l.expr = optimize(expr->l.expr);
+	    expr->r.expr = optimize(expr->r.expr);
 	    break;
 	}
-	if (expr->right)
-	    optimize_expr_list(expr->right);
+	if (expr->r.expr)
+	    optimize_expr_list(expr->r.expr);
 	if ((expr->v.number & 0xff) == FP_FUNCTIONAL)
-	    expr->left = optimize(expr->left);
+	    expr->l.expr = optimize(expr->l.expr);
 #else
-	if (expr->left)
-	    expr->left = optimize(expr->left);
-	expr->right = optimize(expr->right);
+	if (expr->l.expr)
+	    expr->l.expr = optimize(expr->l.expr);
+	expr->r.expr = optimize(expr->r.expr);
 #endif
 	break;
     default:
 	if (expr->kind > BASE)
-	    optimize_expr_list(expr->right);
+	    optimize_expr_list(expr->r.expr);
     }
     return expr;
 }
@@ -188,13 +179,13 @@ generate_conditional_branch P1(struct parse_node *, node) {
      * handled by the x == 0 -> !x and !x optimizations.
      */
     if (node->kind == F_NE) {
-	if (node->right->kind == F_NUMBER && node->right->v.number == 0)
-	    node = node->left;
-	else if (node->left->kind == F_NUMBER && node->left->v.number == 0)
-	    node = node->right;
+	if (node->r.expr->kind == F_NUMBER && node->r.expr->v.number == 0)
+	    node = node->l.expr;
+	else if (node->l.expr->kind == F_NUMBER && node->l.expr->v.number == 0)
+	    node = node->r.expr;
     }
     if (node->kind == F_NOT) {
-	node = node->right;
+	node = node->r.expr;
 	branch = F_BBRANCH_WHEN_ZERO;
     } else {
 	branch = F_BBRANCH_WHEN_NON_ZERO;
@@ -210,23 +201,13 @@ generate_conditional_branch P1(struct parse_node *, node) {
     return branch;
 }
 
-DISPATCH2(generate_function_call, short, f, char, num)
-
-DISPATCH(pop_value)
-
-DISPATCH(generate___INIT)
-
-DISPATCH1(generate_final_program, int, flag)
-
-DISPATCH(initialize_parser)
-
 #ifdef DEBUG
 void
 dump_expr_list P2(struct parse_node *, expr, int, indent) {
     if (!expr) return;
     do {
       dump_tree(expr->v.expr, indent);
-    } while (expr = expr->right);
+    } while (expr = expr->r.expr);
 }
 
 static void
@@ -236,8 +217,8 @@ dump_lvalue_list P2(struct parse_node *, expr, int, indent) {
     for (i=0; i<indent; i++) 
         putchar(' ');
     printf("lvalue_list\n");
-    while (expr = expr->right)
-      dump_tree(expr->left, indent + 2);
+    while (expr = expr->r.expr)
+      dump_tree(expr->l.expr, indent + 2);
 }
 
 void
@@ -248,22 +229,22 @@ dump_tree P2(struct parse_node *, expr, int, indent) {
         putchar(' ');
     switch (expr->kind) {
     case NODE_ASSOC:
-	dump_tree(expr->left, indent + 2);
-	dump_tree(expr->right, indent + 2);
+	dump_tree(expr->l.expr, indent + 2);
+	dump_tree(expr->r.expr, indent + 2);
 	break;
     case NODE_CONDITIONAL:
       printf("?\n");
-      dump_tree(expr->left, indent + 2);
+      dump_tree(expr->l.expr, indent + 2);
       for (i=0; i<indent + 2; i++) 
         putchar(' ');
       printf(":\n");
-      dump_tree(expr->right->left, indent + 4);
-      dump_tree(expr->right->right, indent + 4);
+      dump_tree(expr->r.expr->l.expr, indent + 4);
+      dump_tree(expr->r.expr->r.expr, indent + 4);
       break;
     case 0:
       printf("<empty>\n");
-      dump_tree(expr->left, indent + 2);
-      dump_tree(expr->right, indent + 2);
+      dump_tree(expr->l.expr, indent + 2);
+      dump_tree(expr->r.expr, indent + 2);
       break;
     case F_NN_RANGE:
     case F_RN_RANGE:
@@ -273,8 +254,8 @@ dump_tree P2(struct parse_node *, expr, int, indent) {
     case F_RE_RANGE:
       printf("%s\n", instrs[expr->kind].name);
       dump_tree(expr->v.expr, indent + 2);
-      dump_tree(expr->left, indent + 2);
-      dump_tree(expr->right, indent + 2);
+      dump_tree(expr->l.expr, indent + 2);
+      dump_tree(expr->r.expr, indent + 2);
       break;
     case F_INDEX_LVALUE:
     case F_INDEX:
@@ -304,8 +285,8 @@ dump_tree P2(struct parse_node *, expr, int, indent) {
     case F_LE:
     case F_VOID_ADD_EQ:
       printf("%s\n", instrs[expr->kind].name);
-      dump_tree(expr->left, indent + 2);
-      dump_tree(expr->right, indent + 2);
+      dump_tree(expr->l.expr, indent + 2);
+      dump_tree(expr->r.expr, indent + 2);
       break;
     case F_POP_VALUE:
     case F_NOT:
@@ -320,12 +301,12 @@ dump_tree P2(struct parse_node *, expr, int, indent) {
     case F_POST_DEC:
     case F_WHILE_DEC:
       printf("%s\n", instrs[expr->kind].name);
-      dump_tree(expr->right, indent + 2);
+      dump_tree(expr->r.expr, indent + 2);
       break;
     case F_SSCANF:
       printf("sscanf\n");
-      dump_tree(expr->left, indent + 2);
-      dump_lvalue_list(expr->right, indent + 2);
+      dump_tree(expr->l.expr, indent + 2);
+      dump_lvalue_list(expr->r.expr, indent + 2);
       break;
     case F_REAL:
       printf("%f\n", expr->v.real);
@@ -341,15 +322,15 @@ dump_tree P2(struct parse_node *, expr, int, indent) {
       break;
     case F_AGGREGATE:
       printf("aggregate\n");
-      dump_expr_list(expr->right, indent + 2);
+      dump_expr_list(expr->r.expr, indent + 2);
       break;
     case F_AGGREGATE_ASSOC:
       printf("aggregate_assoc\n");
-      dump_expr_list(expr->right, indent + 2);
+      dump_expr_list(expr->r.expr, indent + 2);
       break;
     case F_CALL_FUNCTION_BY_ADDRESS:
       printf("call function %x\n", expr->v.number);
-      dump_expr_list(expr->right, indent + 2);
+      dump_expr_list(expr->r.expr, indent + 2);
       break;
     case F_STRING:
       printf("string \"%s\"\n", ((char **)mem_block[A_STRINGS].block)[expr->v.number]);
@@ -363,11 +344,11 @@ dump_tree P2(struct parse_node *, expr, int, indent) {
       printf("%s %i\n", instrs[expr->kind].name, expr->v.number);
       break;
     case F_LOOP_COND:
-      printf("loop condition: local %i < ", expr->left->v.number);
-      if (expr->right->kind == F_NUMBER) {
-	printf("%i\n", expr->right->v.number);
+      printf("loop condition: local %i < ", expr->l.expr->v.number);
+      if (expr->r.expr->kind == F_NUMBER) {
+	printf("%i\n", expr->r.expr->v.number);
       } else {
-	printf("local %i\n", expr->right->v.number);
+	printf("local %i\n", expr->r.expr->v.number);
       }
       break;
     default:
@@ -376,7 +357,7 @@ dump_tree P2(struct parse_node *, expr, int, indent) {
 	  printf("%s %i\n", instrs[expr->kind].name, expr->v.number);
 	else
 	  printf("%s\n", instrs[expr->kind].name);
-	dump_expr_list(expr->right, indent + 2);
+	dump_expr_list(expr->r.expr, indent + 2);
       } else {
 	fatal("Unknown node type %d in dump tree.\n", expr->kind);
       }

@@ -111,7 +111,8 @@ void get_simul_efuns P1(struct program *, prog)
 	simuls = CALLOCATE(num_new, struct function *, TAG_SIMULS, "get_simul_efuns: 2");
     }
     for (i=0; i < (int)prog->p.i.num_functions; i++)
-	if ((funp[i].type & (TYPE_MOD_STATIC | TYPE_MOD_PRIVATE)) == 0)
+	if ((funp[i].type & (TYPE_MOD_STATIC | TYPE_MOD_PRIVATE)) == 0
+	    && (!(funp[i].flags & NAME_NO_CODE)))
 	    find_or_add_simul_efun(&funp[i]);
     
     /* shrink to fit */

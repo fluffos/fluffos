@@ -21,8 +21,6 @@ static struct parse_node_block *free_block_list = 0;
 static struct parse_node *next_node = 0;
 static struct parse_node *last_node = 0;
 
-static struct parse_node **line_starts;
-static int line_starts_size = 0, ls_index = -1;
 static int last_prog_size = 1;
 
 /* called by code generation when it is done with the tree */
@@ -124,8 +122,8 @@ make_branched_node P4(short, kind, char, type,
     ret = new_node();
     ret->kind = kind;
     ret->type = type;
-    ret->left = l;
-    ret->right = r;
+    ret->l.expr = l;
+    ret->r.expr = r;
     return ret;
 }
 
@@ -235,7 +233,7 @@ struct parse_node *insert_pop_value P1(struct parse_node *, expr) {
 	yywarn("Value of conditional expression is unused");
     default:
 	NODE_NO_LINE(replacement, F_POP_VALUE);
-	replacement->right = expr;
+	replacement->r.expr = expr;
 	return replacement;
     }
     return expr;

@@ -67,6 +67,8 @@ INSTALL_DIR = ../bin
 #DEBUG=-g
 # With extra driver debug code
 #DEBUG=-g -DDEBUG 
+# For DEC Alpha: to have optimization and debugging
+#DEBUG=-g3 -DDEBUG
 # Prevent -DDEBUG from aborting the driver (when in -DDEBUG mode)
 #DEBUG_NON_FATAL=-DDEBUG_NON_FATAL
 # Compile in debug() macro code
@@ -96,6 +98,8 @@ OPTIMIZE=-O
 #OPTIMIZE=+O3 +Obb3000
 # MIPS R3000 running EP/IX Version 1.4.3. Compiler is RISCompiler C 2.11 (cc).
 #OPTIMIZE=-Olimit 1802
+# DEC Alpha's cc's highest optimization: -O5
+#OPTIMIZE=-O -Olimit 2000
 # DEC Ultrix's cc's highest optimization:
 #OPTIMIZE=-O2 -Olimit 5000
 # high optimization for cc on SGI
@@ -118,6 +122,8 @@ CPP=$(CC) -E
 # Solaris (SunOS 5): for BSD compatible ioctl()
 # If using CC=cc, you can also add:
 #      -w     to turn off warnings, in order to get a cleaner compile
+# For 5.4, also add the following:
+#      -I/usr/bsdinclude
 #OSFLAGS=-DBSD_COMP -DSunOS_5
 
 # SCO 3.2v4.2
@@ -311,7 +317,7 @@ efun_defs.c opcodes.h grammar.y: malloc.c func_spec.c make_func options.h func_s
 	./make_func > efun_defs.c
 
 malloc.c: options.h make_malloc
-	./make_malloc $(MALLOC_C)
+	./make_malloc 
 	touch malloc.c
 	$(CC) $(CFLAGS) -c malloc.c
 	touch mallocwrapper.c

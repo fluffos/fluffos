@@ -4,7 +4,7 @@
     local efunctions that are specific to your driver, you would be better
     off adding them to a separate source file.  Doing so will make it much
     easier for you to upgrade (won't have to patch this file).  Be sure
-    to #include "efuns.h" in that separate source file.
+    to #include "lpc_incl.h" in that separate source file.
 */
 
 #include "std.h"

@@ -11,16 +11,19 @@ union string_or_func {
 };
 
 struct sentence {
+#ifndef NO_ADD_ACTION
     char *verb;
+#endif
+    struct sentence *next;
     struct object *ob;
     union string_or_func function;
-    struct sentence *next;
     int flags;
 };
 
 #define V_SHORT         1
-#define V_NOSPACE     2
+#define V_NOSPACE       2
 #define V_FUNCTION      4
+
 /*
  * simulate.c
  */
@@ -31,7 +34,9 @@ extern struct object *current_object;
 extern struct object *command_giver;
 extern struct object *current_interactive;
 extern char *inherit_file;
+#ifndef NO_ADD_ACTION
 extern char *last_verb;
+#endif
 extern int num_error;
 extern int tot_alloc_sentence;
 extern int MudOS_is_being_shut_down;
@@ -45,21 +50,23 @@ void debug_fatal PROTVARGS(());
 void fatal PROTVARGS(());
 void error PROTVARGS(());
 INLINE void check_legal_string PROT((char *));
+#ifndef NO_ADD_ACTION
+int user_parser PROT((char *));
 int command_for_object PROT((char *, struct object *));
+void enable_commands PROT((int));
+void add_action PROT((struct svalue *, char *, int));
+int remove_action PROT((char *, char *));
+#endif
 #ifndef NO_LIGHT
 void add_light PROT((struct object *, int));
 #endif
 void free_sentence PROT((struct sentence *));
-int user_parser PROT((char *));
 
-void enable_commands PROT((int));
 int input_to PROT((struct svalue *, int, int, struct svalue *));
 int get_char PROT((struct svalue *, int, int, struct svalue *));
-void add_action PROT((struct svalue *, char *, int));
-int remove_action PROT((char *, char *));
 
 struct object *load_object PROT((char *, int));
-struct object *clone_object PROT((char *));
+struct object *clone_object PROT((char *, int));
 struct object *environment PROT((struct svalue *));
 struct object *first_inventory PROT((struct svalue *));
 struct object *object_present PROT((struct svalue *, struct object *));

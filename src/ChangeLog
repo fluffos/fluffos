@@ -1,5 +1,275 @@
+	--- Robocoder
+	* fixed smalloc accounting stats, and small leak in small block handler
+	* more amiga fixes, and compilation tweaks
+	* fixed a memory leak in parse_command()
+	* save size of buffer in binaries.c to cut down on allocations a bit
+	* a few more fixes to clear_bit() and set_bit()
+	* fixed the Amiga port to handle problems with read() and
+	  write() macros more cleanly
+	* fixed some socket problems by changing recv() to read() in
+	  the socket handler
+	* fixed a problem that would sometimes allocate a string table
+	  that was twice as big as requested
+	* fixed some OSF/1 V3.0 cc compile problems with source code
+	  formatting
+	* fixed Alpha crasher with intersect_array() and alist_sort()
+	  -- reported by Dana
+	* fixed debugmalloc portability problems for AIX - reported by
+	  Curax; and undef'd SBRK_OK automatically for AIX
+	* added prototypes that were missing in places
+	* added some include files to fix some implicit definitions
+	* removed some more unused locals
+	* otable.c: copied Beek's power of 2 HTABLE_SIZE test for checking
+	  OTABLE_SIZE; increased the max number of characters to hash from
+	  20 to 40, to handle longer pathnames (FWIW, this was 100 in
+	  0.9.20); cleaned up show_otable_status() to be more consistent
+	  with other stats reporting functions
+	* eoperators.c: copied Beek's f_sscanf() return value fix to
+	  f_parse_command(); also removed a redundant check_for_destr()
+	* array.h: removed an unused #include (of itself? *boggle*)
+	* parse.c: bumped refcounts to a couple of arrays before calls to
+	  splice_array(), and rearranged some code to avoid an uninit'd
+	  svalue
+	* Makefile, GNUmakefile: to find <sys/rusage.h> on Solaris (5.4),
+	  add -I/usr/bsdinclude to OSFLAGS
+	* malloc.h, smalloc.c: fixed for SBRK_OK defined; and some changes
+	  for the Alpha
+	* some Amiga tweaks so that the driver actually works there =)
+	* fixed a crasher in parse_command()
+	--- Beek
+	* COMPAT_BUSTER: objects that call replace_program() no longer
+	  return true to clonep() or virtualp().
+	* fixed a crasher in binaries (program name is now a shared
+	  string)
+	* fixed some memory accounting errors
+	* sockets are now closed before calling shutdown, since the
+	  operating system doesn't always close them right
+	* reorganized the logic of parse.c in places; fixed uncountably
+	  many memory leaks; added a stack of globals so that it doesn't
+	  leak even in the event of an error
+	* fixed a leak involving destructing users with notify_fail()
+	  messages pending
+	* fixed a ref count bug in domain/author_stats()
+	* fixed a problem/crasher in compiling files which can't be opened
+	* added a non-varargs version of add_message(); profiling shows
+	  that the telnet support is slow without it; generally optimized
+	  and cleaned up sending of telnet codes; use add_vmessage() if
+	  you need varargs support.
+	* fixed a crasher in referencing local functions/globals from
+	  within a functional in some contexts
+	* fixed a crasher in string < string
+	* removed some (unused?) prototypes from lint.h
+	* fixed a crasher in prototypes in the simul_efun object with no
+	  corresponding procedure
+	* fixed a bug in the disassembler with non-bindable functionals
+	* removed outdated MALLOC defines from GNUMakefile
+	* fixed the error message for reverse sorts of arrays to indicate
+	  that arrays of arrays are legal
+	* fixed some serious bugs in clear_bit() and set_bit() introduced
+	  while optimizing
+	* fixed crashers in illegal arguments to snoop(); cyclic etc
+	* fixed compilation with TRACE defined
+	* fixed compilation problems with NO_SOCKETS; awaiting better
+	  Amiga patches from Robo :)
+	* fixed a bug in show_otable_status() that would print information
+	  to this_player()/stdout when memory_info() is used
+	* fixed the new ed efuns to return "" rather than 0 when there is
+	  no output.
+	* un-ANSI-ized the source for archaic/lame/braindead compilers
+	  that only understand K&R
+	* as part of the above, made the dispatching in generate.c use
+	  defines and not token pasting; also optimized a bit
+	* fixed a typo in lex.c that could crash on extremely long lines
+	* fixed the case for the -d option with DEBUG off
+	* COMPAT_BUSTER: previous_object() is now zero when crash() is
+	  called in the master object
+	* expanded the error messages printed by the creator_file() master
+	  apply; revised it to use apply_master_ob()
+	* fixed a memory leak in the 'table' feature of sprintf ('%#5s')
+	* set the tag of linenumbers correctly when they are swapped back in
+	* removed prototypes for some removed functions, some unused
+	  locals and globals
+	* added a 'block_or_semi: error' rule to the grammar so that 
+	  the back half of the function definition rule is always called
+	  This is important since the function name is saved on the yacc
+	  stack and will otherwise be leaked
+	* fixed the switch grammar to accept any constant string
+	  expression using () + and concatenation as case labes, same
+	  goes for inherit file names
+	* fixed some definitions to use Pn()
+	* small ed tweaks:
+	  . hitting return to get the next line at the end of a file
+	    now prints 'End of file.' and not 'Bad line range.'
+	  . 3,5 is now the same as 3,5p instead of just printing line 3
+	* COMPAT_BUSTER: slight change to the behavior of having two
+	  variables with the same name in an object:
+	  old one is made static only if the new one is not hidden
+	  (so inheriting an object with private foo; wont make the
+	  variable in the current object static), also if the new
+	  one is hidden, dont make it the 'foo' variable for this
+	  object.  Problem reported by Angus.
+	* fixed #undef OLD_ED compilation
+	* fixed a crasher in ed_start()
+	* modified a few references to non-existent files "efuns.h" and
+	  "exec.h"
+	* fixed a crasher in the optimization of icode (didn't know about
+	  F_SHORT_STRING)
+	* fixed a bug that caused numbers returned by sscanf() to often
+	  be undefined/null
+	* fixed a memory leak in constant mappings with duplicate keys
+	* compilation fix for DEBUGMALLOC but not DEBUGMALLOC_EXTENSIONS
+	* commented out an unused variable in smalloc.c; also cast sbrk()
+	  to (char *) since I don't know where to find the prototype and
+	  AIX complains ...
+	* fixed in_edit() to work with #undef OLD_ED
+	* optimized/made the snoop() code more sensible
+	* fixed a crasher in call_out(function, ...)
+	* disabled the report_holes debugging code
+	* updated the generate_source() efun for symmetry's efun changes
+	* fixed a bug in loop optimizations:
+	   for (...; local_var < integer_constant; ...)
+	   when local_var was *not* of type int.
+	* removed the mkdir prototype for SunOS 4.1.x; evidentally it
+	  exists in a standard include now? (blame Dseven if it doesnt)
+	* fixed the GNUmakefile to create mallocwrapper.c
+	* put the clear_state() back into backend.c for now
+	* fixed the source to actually use the BINARIES define; it
+	  was mistakenly using SAVE_BINARIES
+	* fixed a memory leak in ed regular expressions
+	* fixed array->foo() to set origin() correctly
+	* fixed a crasher in locals left behind by errors
+	* fixed some really odd (and inefficient) logic in address server
+	  callbacks; this implements the multiple query on the same
+	  address fix from 0.8.35 more sanely.
+	* Added mallocwrapper.c to the GNUmakefile
+	* fixed a memory leak in array ranges that return ({ })
+	  (array that was indexed was leaked)
+	* slight optimization to array addition
+	* fixed a memory leak in array intersection (intermediate table)
+	* fixed a memory leak in reg_assoc() (regexps not freed)
+	* fixed a memory leak in PRIVS (not freed when ob destructed)
+	* fixed a few memory leaks in errors in regular expressions
+	* in check_memory(), count the shared strings in the ip number
+	  table, count FP_FUNCTIONAL | FP_NOT_BINDABLE as a functional,
+	  count refs inside of function pointers, count refs from input_to
+	  and get_char, print out contents of arrays that are leaked,
+	  count references in swapped objects
+	* fixed undefinedp() and nullp() to return defined and non-null
+	  answers, respectively
+	* ( string ) and string + string are legal in case statements
+	  now/again, respectively.
+	* fixed compilation problems with PROFILE_FUNCTIONS on
+	* fixed a crasher in set_this_player()
+	* fixed compilation with NEW_FUNCTIONS off
+	* fixed a compilation problem with NO_ADD_ACTION and
+	  THIS_PLAYER_IN_CALL_OUT
+	* fixed a bunch of compilation warnings from gcc re: inline functions
+	* Fixed replace_program to not crash if called in an object
+	  with expression function pointers.  Global variables and
+	  functions can still cause problems tho.
+	* COMPAT_BUSTER: the values of funtionp() no longer use origin.
+	  use /include/function.h.  Now also returns info as to whether
+	  the fp is bindable, and whether it's owner has been dested
+	* added: function bind(function, object)
+	  returns a function pointer that behaves the same as the one
+	  that was passed to it, except the new function pointer belongs
+	  to the object passed to bind.  Security is handled through
+	  int valid_bind(object binder, object old_owner, object new_owner)
+	  (master apply)
+	* fixed a bug that would dest any user that sent more than 2k
+	  of data to the mud without a pause (pasting into ed, etc)
+	* fixed some cast problems in the switch code
+	* fixed binaries and string switch to work on machines with 8
+	  byte pointers (DEC Alpha)
+	* added in the v20.26b3-4.diffs since whoever released them didn't
+	  include them in an alpha release and I forgot to add them to
+	  mine ...
+	* extra arguments passed to new (clone_object) are passed along
+	  to create() of the clone.
+	* fixed the put_* defines to work as single statements
+	* fixed several bugs in the new ed() functionality
+	* made reset_object(foo, 0) and reset_object(foo, 1) separate
+	  functions
+	* added help for '/' and '?' in ed
+	* fixed a crasher in save_ed_buffer()
+	* added about 15 more different error messages to ed so it's a bit
+	  more friendly
+	* added a new interface for ed(), which is used if OLD_ED is not
+	  defined in options.h
+	  . Three new efuns replace ed():
+	    string ed_start(string | void, int | void) - start a new ed
+	           session on file file.  ed_start(foo, 1) means use 
+		   restricted mode.  Only one ed session may be started
+		   per object.
+	    string ed_cmd(string) - send the command line to ed
+	    int query_ed_mode() - returns:
+	         0 - the current object is at a normal ed prompt (':')
+		-1 - the current object isn't in ed
+		-2 - the current object is at the more prompt in the
+		     middle of help
+		>0 - the object is at a prompt for a line.  The number
+		     is the line number.
+	  . The string result of ed_cmd() and ed_start() is the output
+	    that would have been sent to the user
+	  . The mudlib is responsible for setting the user's prompt
+	    (see query_ed_mode())
+	* added an NO_ADD_ACTION define which has the following effects:
+	  . adds an efun: set_this_player()
+	  . removes many efuns: 
+	      add_action(), remove_action(), query_verb(), 
+	      command(), commands(), enable_commands(), disable_commands(),
+	      living(), set_living_name(), livings(), find_living(),
+	      find_player()
+	  . based on the above, the only way to handle user input is
+	    through the process_input() apply; but this is better than
+	    having add_action(..., "", 1)
+	  . the efuns that need to know if an object is living (say,
+	    tell_room, shout) now send messages to any object that
+	    defines a catch_tell() function.
+	  . note that NO_ANSI has no effect b/c it happens after
+	    process_input is called
+	  . %l removed from parse_command()
+	* added a NO_WIZARDS define.  combined with the following defines
+	  it has the following effects:
+	  . if MUDLIB_ERROR_HANDLER is undefined:
+	    all users are wizards (get verbose error messages)
+	  . if NO_MUDLIB_STATS is undefined:
+	    for the purposes of mudlib stats, no one is a wizard
+	    (the 'moves' field includes everyone)
+	  . if RESTRICTED_ED is defined:
+	    everyone is a wizard (defaults to unrestricted mode)
+	    the mudlib should explicitly start ed in restricted mode
+	    if this is needed
+	* added call_out(function, ...)
+	* added apply(function, mixed *) which allows a variable number
+	  of arguments to be passed to the function
+        --- Symmetry
+	* Fixed a possible crasher with #pragma show_error_context
+	* Correctly adjusted total array size and mudlib stats
+	  for slice_array with ref 1 arrays
+        *** Since v21a3 ***
+        * Fixed a bug when some efun names are also used as names for
+          local vars
+        * Allow $(expression) to be a valid indexable lvalue, i.e.
+          $(m)[5] = 3 is valid
+        * Fixed a crasher involving Illegal LHS errors
+        * Don't call clear_state() within the backend loop
+        * Allowed
+          #define FOO\
+          12
+          where the \ is right after the macro identifier
+        * Added a missing check for stack overflow during an apply
+          call using a ref 1 array for e.g.
+        * New efuns : unique_mapping(), filter_mapping()
+        * optimized slice_array()
+        * Some bug fixes to apply()
+	* Fixed a constant-folding optimization bug which gave
+	  erroneous results for simple subtraction as in 11 - 2
+        --- Robocoder
+        * Fixed a bug in lex.c concerning array blocks
+
 Sat Jan 21 20:25:44 EST 1995 (tim@handel.princeton.edu (Beek))
-	* raised patchlevel to v20.26
+        * raised patchlevel to v20.26
 	* fixed a problem that would sometimes claim the maximum include
 	  depth was exceeded
 	* fixed the tags on a bunch of memory allocations

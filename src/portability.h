@@ -254,15 +254,11 @@ asking your system adminstrator.
    integer type
 */
 #ifndef _FUNC_SPEC_
-
 #if defined(__alpha)
 typedef unsigned int UINT32;
-
 #else
 typedef unsigned long UINT32;
-
 #endif
-
 #endif
 
 /*
@@ -291,7 +287,7 @@ typedef unsigned long UINT32;
 #define SIZEOF_SHORT     2
 #define SIZEOF_INT       4
 #define SIZEOF_FLOAT     4
-#ifndef OSF
+#ifndef __alpha
 #define SIZEOF_PTR       4
 #else
 #define SIZEOF_PTR       8

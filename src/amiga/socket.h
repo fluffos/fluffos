@@ -11,13 +11,7 @@
 #include <netdb.h>
 
 /*
- * Note: if a module (.c file) uses these functions on both socket and
- *       file descriptors, function calls on file descriptors must have
- *       the function name parenthesized to keep the preprocessor from
- *       expanding the macro, eg
- *
- *       (close)(file_fd);      ->      close(file_fd);
- *       close(socket_fd);      ->      CloseSocket(socket_fd)
+ * to avoid conflict with <fcntl.h>
  */
 #undef close
 #undef ioctl

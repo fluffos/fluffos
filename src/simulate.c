@@ -52,8 +52,9 @@ static char *make_new_name PROT((char *));
 static void destruct_object_two PROT((struct object *));
 static void send_say PROT((struct object *, char *, struct vector *));
 static struct sentence *alloc_sentence PROT((void));
+#ifndef NO_ADD_ACTION
 static void remove_sent PROT((struct object *, struct object *));
-static void remove_sent PROT((struct object *, struct object *));
+#endif
 static void error_handler PROT((void));
 
 struct variable *find_status P2(char *, str, int, must_find)
@@ -80,12 +81,13 @@ INLINE void check_legal_string P1(char *, s)
 }
 
 #ifdef PRIVS
+static char *privs_file_fname = (char *) 0;
+
 static void
 init_privs_for_object P1(struct object *, ob)
 {
     struct object *tmp_ob;
     struct svalue *value;
-    static char *privs_file_fname = (char *) 0;
     int err;
 
     err = assert_master_ob_loaded("[internal] init_privs_for_object", "");
@@ -145,15 +147,17 @@ static int give_uid_to_object P1(struct object *, ob)
     push_string(ob->name, STRING_CONSTANT);
     if (!creator_file_fname)
 	creator_file_fname = make_shared_string(APPLY_CREATOR_FILE);
-    ret = apply(creator_file_fname, master_ob, 1, ORIGIN_DRIVER);
+    ret = apply_master_ob(creator_file_fname, 1);
     if (!ret)
 	error("master object: No function " APPLY_CREATOR_FILE "() defined!\n");
-    if (ret->type != T_STRING) {
+    if (!ret || ret == (struct svalue *)-1 || ret->type != T_STRING) {
 	struct svalue arg;
 
 	arg.type = T_OBJECT;
 	arg.u.ob = ob;
 	destruct_object(&arg);
+	if (!ret) error("Master object has no function " APPLY_CREATOR_FILE "().\n");
+	if (ret == (struct svalue *)-1) error("Can't load objects without a master object.");
 	error("Illegal object to load: return value of master::" APPLY_CREATOR_FILE "() was not a string.\n");
     }
     creator_name = ret->u.string;
@@ -212,6 +216,10 @@ static int init_object P1(struct object *, ob)
 #ifndef NO_MUDLIB_STATS
     add_objects(&ob->stats, 1);
 #endif
+#ifdef NO_ADD_ACTION
+    if (function_exists("catch_tell", ob))
+	ob->flags |= O_LISTENER;
+#endif
 #ifndef NO_UIDS
     return give_uid_to_object(ob);
 #else
@@ -237,8 +245,12 @@ static struct svalue *
 }
 
 void set_master P1(struct object *, ob) {
+#if !defined(NO_UIDS) || !defined(NO_MUDLIB_STATS)
     int first_load = (master_ob == (struct object *)-1);
+#endif
+#ifndef NO_UIDS
     struct svalue *ret;
+#endif
 
     master_ob = ob;
     /* Make sure master_ob is never made a dangling pointer. */
@@ -437,7 +449,7 @@ struct object *load_object P2(char *, lname, int, flags)
 	error("Illegal path name '%s'.\n", real_name);
 	return 0;
     }
-#ifdef SAVE_BINARIES
+#ifdef BINARIES
     if (!load_binary(real_name)) {
 #endif
 	/* maybe move this section into compile_file? */
@@ -448,7 +460,7 @@ struct object *load_object P2(char *, lname, int, flags)
 #endif
 	}
 	f = open(real_name, O_RDONLY);
-	if (f == 0) {
+	if (f == -1) {
 	    if (is_master_ob) master_ob_is_loading = 0;
 	    if (simul_efun_is_loading) simul_efun_is_loading = 0;
 	    perror(real_name);
@@ -495,7 +507,7 @@ struct object *load_object P2(char *, lname, int, flags)
 	update_compile_av(total_lines);
 	total_lines = 0;
 	close(f);
-#ifdef SAVE_BINARIES
+#ifdef BINARIES
     }
 #endif
 
@@ -591,7 +603,7 @@ struct object *load_object P2(char *, lname, int, flags)
     }
 
     if (init_object(ob) && !(flags & LO_DONT_RESET))
-	reset_object(ob, 0);
+	call_create(ob, 0);
     if (!(ob->flags & O_DESTRUCTED) &&
 	function_exists(APPLY_CLEAN_UP, ob)) {
 	ob->flags |= O_WILL_CLEAN_UP;
@@ -628,7 +640,7 @@ static char *make_new_name P1(char *, str)
  * Save the command_giver, because reset() in the new object might change
  * it.
  */
-struct object *clone_object P1(char *, str1)
+struct object *clone_object P2(char *, str1, int, num_arg)
 {
     struct object *ob, *new_ob;
     struct object *save_command_giver = command_giver;
@@ -645,8 +657,10 @@ struct object *clone_object P1(char *, str1)
     /*
      * If the object self-destructed...
      */
-    if (ob == 0)		/* fix from 3.1.1 */
+    if (ob == 0) {		/* fix from 3.1.1 */
+	pop_n_elems(num_arg);
 	return (0);
+    }
     if (ob->super)
 	error("Cannot clone a object which has an environment.\n");
     if (ob->flags & O_CLONE)
@@ -660,6 +674,14 @@ struct object *clone_object P1(char *, str1)
 	    struct svalue *v;
 	    char *p;
 
+	    pop_n_elems(num_arg); /* possibly this should be smarter */
+	                          /* but then, this whole section is a
+				     kludge and should be looked at.
+
+				     Note that create() never gets called
+				     in clones of virtual objects.
+				     -Beek */
+	    
 	    /* Remove leading '/' if any. */
 	    while (str1[0] == '/')
 		str1++;
@@ -679,8 +701,9 @@ struct object *clone_object P1(char *, str1)
 		new_ob = ob;
 	    } else {
 		/* can't reuse, so load another */
-		if (!(v = load_virtual_object(str1)))
+		if (!(v = load_virtual_object(str1))) {
 		    return 0;
+		}
 		new_ob = v->u.ob;
 	    }
 	    remove_object_hash(new_ob);
@@ -707,15 +730,14 @@ struct object *clone_object P1(char *, str1)
     new_ob->load_time = ob->load_time;
     new_ob->prog = ob->prog;
     reference_prog(ob->prog, "clone_object");
-    if (!current_object)
-	fatal("clone_object() from no current_object !\n");
+    DEBUG_CHECK(current_object, "clone_object() from no current_object !\n");
 
     init_object(new_ob);
 
     new_ob->next_all = obj_list;
     obj_list = new_ob;
     enter_object_hash(new_ob);	/* Add name to fast object lookup table */
-    reset_object(new_ob, 0);
+    call_create(new_ob, num_arg);
     command_giver = save_command_giver;
     /* Never know what can happen ! :-( */
     if (new_ob->flags & O_DESTRUCTED)
@@ -745,6 +767,7 @@ struct object *environment P1(struct svalue *, arg)
  * Return cost of the command executed if success (> 0).
  * When failure, return 0.
  */
+#ifndef NO_ADD_ACTION
 int command_for_object P2(char *, str, struct object *, ob)
 {
     char buff[1000];
@@ -763,6 +786,7 @@ int command_for_object P2(char *, str, struct object *, ob)
     else
 	return 0;
 }
+#endif
 
 /*
  * With no argument, present() looks in the inventory of the current_object,
@@ -980,6 +1004,12 @@ static void destruct_object_two P1(struct object *, ob)
 	    save_ed_buffer();
 	}
 #endif
+#ifndef OLD_ED
+	if (ob->flags & O_IN_EDIT) {
+	    object_save_ed_buffer(ob);
+	    ob->flags &= ~O_IN_EDIT;
+	}
+#endif
 	command_giver = save;
     }
     /*
@@ -987,14 +1017,18 @@ static void destruct_object_two P1(struct object *, ob)
      * defined by this object from all objects here.
      */
     if (ob->super) {
-	if (ob->super->flags & O_ENABLE_COMMANDS)
-	    remove_sent(ob, ob->super);
 #ifndef NO_LIGHT
 	add_light(ob->super, -ob->total_light);
 #endif
+#ifndef NO_ADD_ACTION
+	if (ob->super->flags & O_ENABLE_COMMANDS)
+	    remove_sent(ob, ob->super);
+#endif
 	for (pp = &ob->super->contains; *pp;) {
+#ifndef NO_ADD_ACTION
 	    if ((*pp)->flags & O_ENABLE_COMMANDS)
 		remove_sent(ob, *pp);
+#endif
 	    if (*pp != ob)
 		pp = &(*pp)->next_inv;
 	    else
@@ -1014,15 +1048,16 @@ static void destruct_object_two P1(struct object *, ob)
 	remove_object_hash(ob);
 	break;
     }
-    if (!removed)
-	fatal("Failed to delete object.\n");
+    DEBUG_CHECK(!removed, "Failed to delete object.\n");
 
+#ifndef NO_ADD_ACTION
     if (ob->living_name)
 	remove_living_name(ob);
+    ob->flags &= ~O_ENABLE_COMMANDS;
+#endif
     ob->super = 0;
     ob->next_inv = 0;
     ob->contains = 0;
-    ob->flags &= ~O_ENABLE_COMMANDS;
     ob->next_all = obj_list_destruct;
     obj_list_destruct = ob;
     set_heart_beat(ob, 0);
@@ -1129,7 +1164,7 @@ void say P2(struct svalue *, v, struct vector *, avoid)
     check_legal_string(v->u.string);
     buff = v->u.string;
 
-    if (current_object->flags & O_ENABLE_COMMANDS)
+    if (current_object->flags & O_LISTENER || current_object->interactive)
 	command_giver = current_object;
     if (command_giver)
 	origin = command_giver;
@@ -1138,12 +1173,12 @@ void say P2(struct svalue *, v, struct vector *, avoid)
 
     /* To our surrounding object... */
     if ((ob = origin->super)) {
-	if (ob->flags & O_ENABLE_COMMANDS || ob->interactive)
+	if (ob->flags & O_LISTENER || ob->interactive)
 	    send_say(ob, buff, avoid);
 
 	/* And its inventory... */
 	for (ob = origin->super->contains; ob; ob = ob->next_inv) {
-	    if (ob != origin && (ob->flags & O_ENABLE_COMMANDS || ob->interactive)) {
+	    if (ob != origin && (ob->flags & O_LISTENER || ob->interactive)) {
 		send_say(ob, buff, avoid);
 		if (ob->flags & O_DESTRUCTED)
 		    break;
@@ -1152,7 +1187,7 @@ void say P2(struct svalue *, v, struct vector *, avoid)
     }
     /* Our inventory... */
     for (ob = origin->contains; ob; ob = ob->next_inv) {
-	if (ob->flags & O_ENABLE_COMMANDS || ob->interactive) {
+	if (ob->flags & O_LISTENER || ob->interactive) {
 	    send_say(ob, buff, avoid);
 	    if (ob->flags & O_DESTRUCTED)
 		break;
@@ -1196,7 +1231,7 @@ void tell_room P3(struct object *, room, struct svalue *, v, struct vector *, av
     }
 
     for (ob = room->contains; ob; ob = ob->next_inv) {
-	if (!ob->interactive && !(ob->flags & O_ENABLE_COMMANDS))
+	if (!ob->interactive && !(ob->flags & O_LISTENER))
 	    continue;
 
 	for (valid = 1, j = 0; j < avoid->size; j++) {
@@ -1230,7 +1265,7 @@ void shout_string P1(char *, str)
     check_legal_string(str);
 
     for (ob = obj_list; ob; ob = ob->next_all) {
-	if (!(ob->flags & O_ENABLE_COMMANDS) || (ob == command_giver)
+	if (!(ob->flags & O_LISTENER) || (ob == command_giver)
 	    || !ob->super)
 	    continue;
 	tell_object(ob, str);
@@ -1244,6 +1279,7 @@ void shout_string P1(char *, str)
  * value of the wizlist ranking.
  */
 
+#ifndef NO_ADD_ACTION
 void enable_commands P1(int, num)
 {
     struct object *pp;
@@ -1277,6 +1313,7 @@ void enable_commands P1(int, num)
 	command_giver = 0;
     }
 }
+#endif
 
 /*
  * Set up a function in this object to be called with the next
@@ -1504,8 +1541,11 @@ struct object *find_object2 P1(char *, str)
  */
 void move_object P2(struct object *, item, struct object *, dest)
 {
-    struct object **pp, *ob, *next_ob;
+    struct object **pp, *ob;
+#ifndef NO_ADD_ACTION
+    struct object *next_ob;
     struct object *save_cmd = command_giver;
+#endif
 
     if (item != current_object)
 	error("move_object(): can't move anything other than this_object()\n");
@@ -1527,20 +1567,24 @@ void move_object P2(struct object *, item, struct object *, dest)
     if (item->super) {
 	int okey = 0;
 
+#ifndef NO_ADD_ACTION
 	if (item->flags & O_ENABLE_COMMANDS) {
 	    remove_sent(item->super, item);
 	}
 	if (item->super->flags & O_ENABLE_COMMANDS)
 	    remove_sent(item, item->super);
+#endif
 #ifndef NO_LIGHT
 	add_light(item->super, -item->total_light);
 #endif
 	for (pp = &item->super->contains; *pp;) {
 	    if (*pp != item) {
+#ifndef NO_ADD_ACTION
 		if ((*pp)->flags & O_ENABLE_COMMANDS)
 		    remove_sent(item, *pp);
 		if (item->flags & O_ENABLE_COMMANDS)
 		    remove_sent(*pp, item);
+#endif
 		pp = &(*pp)->next_inv;
 		continue;
 	    }
@@ -1561,6 +1605,7 @@ void move_object P2(struct object *, item, struct object *, dest)
     dest->contains = item;
     item->super = dest;
 
+#ifndef NO_ADD_ACTION
     /*
      * Setup the new commands. The order is very important, as commands in
      * the room should override commands defined by the room. Beware that
@@ -1613,6 +1658,7 @@ void move_object P2(struct object *, item, struct object *, dest)
 	(void) apply(APPLY_INIT, item, 0, ORIGIN_DRIVER);
     }
     command_giver = save_cmd;
+#endif
 }
 
 #ifndef NO_LIGHT
@@ -1645,7 +1691,9 @@ static struct sentence *alloc_sentence()
 	p = sent_free;
 	sent_free = sent_free->next;
     }
+#ifndef NO_ADD_ACTION
     p->verb = 0;
+#endif
     p->function.s = 0;
     p->next = 0;
     return p;
@@ -1700,9 +1748,11 @@ void free_sentence P1(struct sentence *, p)
           free_string(p->function.s);
       else p->function.s = 0;
     }
+#ifndef NO_ADD_ACTION
     if (p->verb)
 	free_string(p->verb);
     p->verb = 0;
+#endif
     p->next = sent_free;
     sent_free = p;
 }
@@ -1714,6 +1764,7 @@ void free_sentence P1(struct sentence *, p)
 
 #define MAX_VERB_BUFF 100
 
+#ifndef NO_ADD_ACTION
 int user_parser P1(char *, buff)
 {
     static char verb_buff[MAX_VERB_BUFF];
@@ -1860,12 +1911,15 @@ int user_parser P1(char *, buff)
 	    continue;
 	if (command_giver) {
 #ifndef NO_MUDLIB_STATS
-	    if (s && command_giver->interactive &&
-		!(command_giver->flags & O_IS_WIZARD))
+	    if (s && command_giver->interactive
+#ifndef NO_WIZARDS
+		&& !(command_giver->flags & O_IS_WIZARD)
+#endif
+            )
 		add_moves(&command_object->stats, 1);
 #endif
 	    if (ret == 0)
-		add_message("Error: action %s not found.\n", s->function);
+		add_vmessage("Error: action %s not found.\n", s->function);
 	}
 	return 1;
     }
@@ -1985,6 +2039,7 @@ static void remove_sent P2(struct object *, ob, struct object *, user)
 	    s = &((*s)->next);
     }
 }
+#endif /* NO_ADD_ACTION */
 
 void debug_fatal PVARGS(va_alist)
 {
@@ -2226,7 +2281,7 @@ static void error_handler()
 	ob = find_object2(object_name);
 	if (!ob) {
 	    if (command_giver)
-		add_message("error when executing program in destroyed object %s\n",
+		add_vmessage("error when executing program in destroyed object %s\n",
 			    object_name);
 	    debug_message("error when executing program in destroyed object %s\n",
 			  object_name);
@@ -2244,16 +2299,20 @@ static void error_handler()
 	if (error_recovery_context_exists != SAFE_APPLY_ERROR_CONTEXT)
 	  reset_machine(0);
 	num_error++;
+#ifndef NO_WIZARDS
 	if ((command_giver->flags & O_IS_WIZARD) || !strlen(DEFAULT_ERROR_MESSAGE)) {
-	    add_message("%s", emsg_buf + 1);
+#endif
+	    add_message(emsg_buf + 1);
 	    if (current_object)
-		add_message("program: %s, object: %s, file: %s\n",
+		add_vmessage("program: %s, object: %s, file: %s\n",
 			    current_prog ? current_prog->name : "",
 			    current_object->name,
 			    get_line_number_if_any());
+#ifndef NO_WIZARDS
 	} else {
-	    add_message("%s\n", DEFAULT_ERROR_MESSAGE);
+	    add_vmessage("%s\n", DEFAULT_ERROR_MESSAGE);
 	}
+#endif
     }
     if (current_heart_beat) {
 	set_heart_beat(current_heart_beat, 0);
@@ -2324,11 +2383,19 @@ void startshutdownMudOS()
  */
 void shutdownMudOS P1(int, exit_code)
 {
+    int i;
     shout_string("MudOS driver shouts: shutting down immediately.\n");
 #ifndef NO_MUDLIB_STATS
     save_stat_files();
 #endif
     ipc_remove();
+#ifdef SOCKET_EFUNS
+    for (i = 0; i < MAX_EFUN_SOCKS; i++) {
+	if (lpc_socks[i].state == CLOSED) continue;
+	while (close(lpc_socks[i].fd) == -1 && errno == EINTR)
+	    ;
+    }
+#endif
 #ifdef LATTICE
     signal(SIGUSR1, SIG_IGN);
     signal(SIGTERM, SIG_IGN);
@@ -2394,18 +2461,15 @@ void do_message P5(struct svalue *, class, char *, msg, struct vector *, scope, 
 	case T_STRING:
 	    ob = find_object(scope->item[i].u.string);
 	    if (ob && !object_visible(ob))
-		ob = 0;
+		continue;
 	    break;
 	case T_OBJECT:
 	    ob = scope->item[i].u.ob;
 	    break;
 	default:
-	    ob = 0;
-	    break;
-	}
-	if (!ob)
 	    continue;
-	if (ob->flags & O_ENABLE_COMMANDS || ob->interactive) {
+	}
+	if (ob->flags & O_LISTENER || ob->interactive) {
 	    for (valid = 1, j = 0; j < exclude->size; j++) {
 		if (exclude->item[j].type != T_OBJECT)
 		    continue;
@@ -2440,7 +2504,7 @@ INLINE void try_reset P1(struct object *, ob)
 #endif
 	/* need to set the flag here to prevent infinite loops in apply_low */
 	ob->flags |= O_RESET_STATE;
-	reset_object(ob, 1);
+	reset_object(ob);
     }
 }
 #endif

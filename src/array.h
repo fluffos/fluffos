@@ -1,8 +1,6 @@
 #ifndef ARRAY_H
 #define ARRAY_H
 
-#include "array.h"
-
 /*
  * array.c
  */
@@ -11,7 +9,7 @@ extern int num_arrays;
 extern int total_array_size;
 
 int sameval PROT((struct svalue *, struct svalue *));
-struct vector *null_array PROT((void));
+INLINE struct vector *null_array PROT((void));
 struct vector *allocate_array PROT((int));
 struct vector *allocate_empty_array PROT((int));
 void free_vector PROT((struct vector *));
@@ -23,6 +21,7 @@ struct vector *explode_string PROT((char *, char *));
 char *implode_string PROT((struct vector *, char *));
 struct vector *users PROT((void));
 struct vector *commands PROT((struct object *));
+void filter_array PROT((struct svalue *, int));
 struct vector *deep_inherit_list PROT((struct object *));
 struct vector *inherit_list PROT((struct object *));
 struct vector *children PROT((char *));

@@ -34,4 +34,11 @@
 extern char *sys_errlist[];
 #endif
 
+#if defined(LATTICE) || defined(__SASC)
+#undef close
+#undef ioctl
+#undef write
+#undef read
+#endif
+
 #endif

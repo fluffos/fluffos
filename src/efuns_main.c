@@ -4,7 +4,7 @@
     local efunctions that are specific to your driver, you would be better
     off adding them to a separate source file.  Doing so will make it much
     easier for you to upgrade (won't have to patch this file).  Be sure
-    to #include "efuns.h" in that separate source file.
+    to #include "lpc_incl.h" in that separate source file.
 */
 
 #include "std.h"
@@ -25,6 +25,11 @@
 #include "reclaim.h"
 #include "dumpstat.h"
 #include "efuns_main.h"
+#include "call_out.h"
+#include "array.h"
+#include "mapping.h"
+#include "debug.h"
+#include "ed.h"
 
 int call_origin = 0;
 
@@ -108,6 +113,53 @@ f_allocate_mapping PROT((void))
 }
 #endif
 
+#ifdef F_BIND
+void
+f_bind PROT((void))
+{
+    struct object *ob = sp->u.ob;
+    struct funp *old_fp = (sp-1)->u.fp;
+    struct funp *new_fp;
+    struct svalue *res;
+
+    if (old_fp->type == (FP_LOCAL | FP_NOT_BINDABLE))
+	error("Illegal to rebind a pointer to a local function.\n");
+    if (old_fp->type & FP_NOT_BINDABLE)
+	error("Illegal to rebind a functional that references globals or local functions.\n");
+    
+    /* the object doing the binding */
+    if (current_object->flags & O_DESTRUCTED)
+	push_number(0);
+    else
+	push_object(current_object);
+
+    /* the old owner */
+    if (old_fp->owner->flags & O_DESTRUCTED)
+	push_number(0);
+    else
+	push_object(old_fp->owner);
+
+    /* the new owner */
+    push_object(ob);
+    
+    res = apply_master_ob(APPLY_VALID_BIND, 3);
+    if (!MASTER_APPROVED(res))
+	error("Master object denied permission to bind() function pointer.\n");
+    
+    new_fp = ALLOCATE(struct funp, TAG_FUNP, "f_bind");
+    *new_fp = *old_fp;
+    new_fp->owner = ob; /* one ref from being on stack */
+    assign_svalue_no_free(&new_fp->args, &old_fp->args);
+
+    if ((new_fp->type & 0x0f) == FP_FUNCTIONAL) 
+	new_fp->f.a.prog->p.i.func_ref++;
+
+    free_funp(old_fp);
+    sp--;
+    sp->u.fp = new_fp;
+}
+#endif
+
 #ifdef F_BREAK_STRING
 void
 f_break_string PROT((void))
@@ -134,16 +186,16 @@ void print_cache_stats()
 {
     add_message("Function cache information\n");
     add_message("-------------------------------\n");
-    add_message("%% cache hits:    %10.2f\n",
+    add_vmessage("%% cache hits:    %10.2f\n",
 	     100 * ((double) apply_low_cache_hits / apply_low_call_others));
-    add_message("call_others:     %10lu\n", apply_low_call_others);
-    add_message("cache hits:      %10lu\n", apply_low_cache_hits);
-    add_message("cache size:      %10lu\n", APPLY_CACHE_SIZE);
-    add_message("slots used:      %10lu\n", apply_low_slots_used);
-    add_message("%% slots used:    %10.2f\n",
+    add_vmessage("call_others:     %10lu\n", apply_low_call_others);
+    add_vmessage("cache hits:      %10lu\n", apply_low_cache_hits);
+    add_vmessage("cache size:      %10lu\n", APPLY_CACHE_SIZE);
+    add_vmessage("slots used:      %10lu\n", apply_low_slots_used);
+    add_vmessage("%% slots used:    %10.2f\n",
 		100 * ((double) apply_low_slots_used / APPLY_CACHE_SIZE));
-    add_message("collisions:      %10lu\n", apply_low_collisions);
-    add_message("%% collisions:    %10.2f\n",
+    add_vmessage("collisions:      %10lu\n", apply_low_collisions);
+    add_vmessage("%% collisions:    %10.2f\n",
 	     100 * ((double) apply_low_collisions / apply_low_call_others));
 }
 
@@ -236,7 +288,7 @@ f_call_out PROT((void))
 
     arg = sp - st_num_arg + 1;
     if (!(current_object->flags & O_DESTRUCTED))
-	new_call_out(current_object, arg[0].u.string, arg[1].u.number,
+	new_call_out(current_object, arg, arg[1].u.number,
 		     st_num_arg - 3, (st_num_arg >= 3) ? &arg[2] : 0);
     pop_n_elems(st_num_arg);
     push_number(0);
@@ -289,26 +341,29 @@ void
 f_clear_bit PROT((void))
 {
     char *str;
-    int len, ind;
+    int len, ind, bit;
 
     if (sp->u.number > MAX_BITS)
-        error("clear_bit :: bit requested : %d > maximum bits: %d\n", sp->u.number, MAX_BITS);
-    len = SVALUE_STRLEN(sp - 1);
-    ind = (sp--)->u.number / 6;
-    if (ind >= len) return;         /* return first arg unmodified */
-    if (ind < 0) error("clear_bit :: negative bit argument.\n");
+        error("clear_bit() bit requested : %d > maximum bits: %d\n", sp->u.number, MAX_BITS);
+    bit = (sp--)->u.number;
+    if (bit < 0)
+	error("Bad argument 2 (negative) to clear_bit().\n");
+    ind = bit / 6;
+    bit %= 6;
+    len = SVALUE_STRLEN(sp);
+    if (ind >= len) 
+	return;         /* return first arg unmodified */
     if (!(sp->subtype & STRING_MALLOC)){
         str = DXALLOC(len + 1, TAG_STRING, "f_clear_bit: str");
         memcpy(str, sp->u.string, len + 1);       /* including null byte */
+	free_string_svalue(sp);
+	sp->u.string = str;
+	sp->subtype = STRING_MALLOC;
     } else str = sp->u.string;
+
     if (str[ind] > 0x3f + ' ' || str[ind] < ' ')
         error("Illegal bit pattern in clear_bit character %d\n", ind);
-    str[ind] = ((str[ind] - ' ') & ~(1 << (sp->u.number % 6))) + ' ';
-    if (!(sp->subtype & STRING_MALLOC)){
-        free_string_svalue(sp);
-        sp->subtype = STRING_MALLOC;
-    }
-    sp->u.string = str;
+    str[ind] = ((str[ind] - ' ') & ~(1 << bit)) + ' ';
 }
 #endif
 
@@ -568,6 +623,65 @@ f_ed PROT((void))
 }
 #endif
 
+#ifdef F_ED_CMD
+void f_ed_cmd PROT((void))
+{
+    char *res;
+    
+    if (current_object->flags & O_DESTRUCTED)
+	error("destructed objects can't use ed.\n");
+
+    if (!(current_object->flags & O_IN_EDIT))
+	error("ed_cmd() called with no ed session active.\n");
+
+    res = object_ed_cmd(current_object, sp->u.string);
+
+    free_string_svalue(sp);
+    if (res) {
+	sp->subtype = STRING_MALLOC;
+	sp->u.string = res;
+    } else {
+	sp->subtype = STRING_CONSTANT;
+	sp->u.string = "";
+    }
+}
+#endif
+
+#ifdef F_ED_START
+void f_ed_start PROT((void))
+{
+    char *res;
+    char *fname;
+    int restr = 0;
+
+    if (st_num_arg == 2)
+	restr = (sp--)->u.number;
+
+    if (st_num_arg)
+	fname = sp->u.string;
+    else
+	fname = 0;
+
+    if (current_object->flags & O_DESTRUCTED)
+	error("destructed objects can't use ed.\n");
+
+    if (current_object->flags & O_IN_EDIT)
+	error("ed_start() called while an ed session is already started.\n");
+
+    res = object_ed_start(current_object, fname, restr);
+
+    if (fname) free_string_svalue(sp);
+    
+    if (res) {
+	sp->subtype = STRING_MALLOC;
+	sp->u.string = res;
+    } else {
+	sp->subtype = STRING_CONSTANT;
+	sp->u.string = "";
+    }
+}
+#endif
+
 #ifdef F_ENABLE_COMMANDS
 void
 f_enable_commands PROT((void))
@@ -689,6 +803,17 @@ f_file_size PROT((void))
 }
 #endif
 
+#ifdef F_FILTER
+void
+f_filter PROT((void))
+{
+    struct svalue *arg = sp - st_num_arg + 1;
+
+    if (arg->type & T_MAPPING) filter_mapping(arg, st_num_arg);
+    else filter_array(arg, st_num_arg);
+}
+#endif
+
 #ifdef F_FIND_CALL_OUT
 void
 f_find_call_out PROT((void))
@@ -800,7 +925,7 @@ void f_generate_source PROT((void))
 {
     int i;
 
-    if (num_arg == 2) {
+    if (st_num_arg == 2) {
 	i = generate_source((sp - 1)->u.string, sp->u.string);
 	pop_stack();
     } else
@@ -878,15 +1003,23 @@ void
 f_in_edit PROT((void))
 {
     char *fn;
+    struct ed_buffer *eb = 0;
 
-    if (sp->u.ob->interactive && sp->u.ob->interactive->ed_buffer
-        && (fn = sp->u.ob->interactive->ed_buffer->fname)) {
-        free_object(sp->u.ob, "f_in_edit:1");
-        put_constant_string(fn);
-    } else {
-        free_object(sp->u.ob, "f_in_edit:2");
-        *sp = const0;
+#ifdef OLD_ED
+    if (sp->u.ob->interactive)
+	eb = sp->u.ob->interactive->ed_buffer;
+#else
+    if (sp->u.ob->flags & O_IN_EDIT)
+	eb = find_ed_buffer(sp->u.ob);
+#endif
+    if (eb && (fn = eb->fname)) {
+	free_object(sp->u.ob, "f_in_edit:1");
+	put_constant_string(fn); /* is this safe?  - Beek */
+	return;
     }
+    free_object(sp->u.ob, "f_in_edit:1");
+    *sp = const0;
+    return;
 }
 #endif
 
@@ -1017,7 +1150,10 @@ f_functionp PROT((void))
     if (sp->type & T_FUNCTION) {
 #ifdef NEW_FUNCTIONS
         i = sp->u.fp->type;
-        if (sp->u.fp->args.type & T_POINTER) i |= 1;
+        if (sp->u.fp->args.type & T_POINTER) 
+	    i |= FP_HAS_ARGUMENTS;
+	if (sp->u.fp->owner->flags & O_DESTRUCTED)
+	    i |= FP_OWNER_DESTED;
         free_funp(sp->u.fp);
         put_number(i);
         return;
@@ -1397,6 +1533,7 @@ f_message PROT((void))
 	break;
     case T_NUMBER:
 	if (args[2].u.number == 0) {
+	    /* this is really bad and probably should be rm'ed -Beek */
 	    /* for compatibility (write() simul_efuns, etc)  -bobf */
 	    check_legal_string(args[1].u.string);
 	    add_message(args[1].u.string);
@@ -1505,18 +1642,20 @@ void f_mud_status PROT((void))
 	    unlink(".mudos_test_file");
 	} else {
 	    /* if strerror() is missing, edit the #ifdef for it in port.c */
-	    add_message("Open file test failed: %s\n", strerror(errno));
+	    add_vmessage("Open file test failed: %s\n", strerror(errno));
 	}
 
-	add_message("current working directory: %s\n\n",
+	add_vmessage("current working directory: %s\n\n",
 		    get_current_dir(dir_buf, 1024));
 	add_message("add_message statistics\n");
 	add_message("------------------------------\n");
-	add_message("Calls to add_message: %d   Packets: %d   Average packet size: %f\n\n",
+	add_vmessage("Calls to add_message: %d   Packets: %d   Average packet size: %f\n\n",
 	add_message_calls, inet_packets, (float) inet_volume / inet_packets);
 
+#ifndef NO_ADD_ACTION
 	stat_living_objects();
 	add_message("\n");
+#endif
 #ifdef F_CACHE_STATS
 	print_cache_stats();
 	add_message("\n");
@@ -1533,18 +1672,18 @@ void f_mud_status PROT((void))
         tot += print_call_out_usage(verbose);
     } else {
 	/* !verbose */
-	add_message("Sentences:\t\t\t%8d %8d\n", tot_alloc_sentence,
+	add_vmessage("Sentences:\t\t\t%8d %8d\n", tot_alloc_sentence,
 		    tot_alloc_sentence * sizeof(struct sentence));
-	add_message("Objects:\t\t\t%8d %8d\n",
+	add_vmessage("Objects:\t\t\t%8d %8d\n",
 		    tot_alloc_object, tot_alloc_object_size);
-	add_message("Prog blocks:\t\t\t%8d %8d\n",
+	add_vmessage("Prog blocks:\t\t\t%8d %8d\n",
 		    total_num_prog_blocks, total_prog_block_size);
-	add_message("Arrays:\t\t\t\t%8d %8d\n", num_arrays,
+	add_vmessage("Arrays:\t\t\t\t%8d %8d\n", num_arrays,
 		    total_array_size);
-	add_message("Mappings:\t\t\t%8d %8d\n", num_mappings,
+	add_vmessage("Mappings:\t\t\t%8d %8d\n", num_mappings,
 		    total_mapping_size);
-	add_message("Mappings(nodes):\t\t%8d\n", total_mapping_nodes);
-	add_message("Interactives:\t\t\t%8d %8d\n", total_users,
+	add_vmessage("Mappings(nodes):\t\t%8d\n", total_mapping_nodes);
+	add_vmessage("Interactives:\t\t\t%8d %8d\n", total_users,
 		    total_users * sizeof(struct interactive));
 
 	tot = show_otable_status(verbose) +
@@ -1563,7 +1702,7 @@ void f_mud_status PROT((void))
 
     if (!verbose) {
 	add_message("\t\t\t\t\t --------\n");
-	add_message("Total:\t\t\t\t\t %8d\n", tot);
+	add_vmessage("Total:\t\t\t\t\t %8d\n", tot);
     }
 
     push_number(0);
@@ -1574,7 +1713,10 @@ void f_mud_status PROT((void))
 void
 f_new PROT((void))
 {
-    ob = clone_object(sp->u.string);
+    struct svalue *arg = sp - st_num_arg + 1;
+
+    CHECK_TYPES(arg, T_STRING, 1, F_NEW);
+    ob = clone_object(arg->u.string, st_num_arg - 1);
     free_string_svalue(sp);
     if (ob) {
 	put_unrefed_undested_object(ob, "F_NEW");
@@ -1586,7 +1728,7 @@ f_new PROT((void))
 void
 f_notify_fail PROT((void))
 {
-    if (sp->type == T_STRING){
+    if (sp->type == T_STRING) {
 	set_notify_fail_message(sp->u.string);
 	free_string_svalue(sp);
     }
@@ -1604,6 +1746,7 @@ f_nullp PROT((void))
 {
     if (sp->type & T_NUMBER){
         if (!sp->u.number && sp->subtype & T_NULLVALUE){
+	    sp->subtype = 0;
             sp->u.number = 1;
 	} else sp->u.number = 0;
     } else {
@@ -1781,6 +1924,21 @@ f_process_value PROT((void))
     free_string_svalue(sp);
     if (ret) assign_svalue_no_free(sp, ret);
     else *sp = const0;
+}
+#endif
+
+#ifdef F_QUERY_ED_MODE
+void
+f_query_ed_mode PROT((void))
+{
+    /* n = prompt for line 'n'
+       0 = normal ed prompt
+       -1 = not in ed
+       -2 = more prompt */
+    if (current_object->flags & O_IN_EDIT) {
+	push_number(object_ed_mode(current_object));
+    } else
+	push_number(-1);
 }
 #endif
 
@@ -2001,7 +2159,7 @@ f_receive PROT((void))
 
 	check_legal_string(sp->u.string);
 	command_giver = current_object;
-	add_message("%s", sp->u.string);
+	add_message(sp->u.string);
 	command_giver = save_command_giver;
 	assign_svalue(sp, &const1);
     } else {
@@ -2262,8 +2420,10 @@ f_restore_object PROT((void))
 #ifdef F_RESTORE_VARIABLE
 void
 f_restore_variable PROT((void)) {
-    struct svalue v = { T_NUMBER };
+    struct svalue v;
     char *s = string_copy(sp->u.string, "restore_variable");
+    
+    v.type = T_NUMBER;
 
     restore_variable(&v, s);
     free_string_svalue(sp);
@@ -2388,30 +2548,33 @@ void
 f_set_bit PROT((void))
 {
     char *str;
-    int len, old_len, ind;
+    int len, old_len, ind, bit;
 
     if (sp->u.number > MAX_BITS)
-        error("set_bit: too big bit number: %d\n", sp->u.number);
-    if (sp->u.number < 0)
-        error("set_bit: illegal (negative) arg 2\n");
-    old_len = len = SVALUE_STRLEN(sp - 1);
-    ind = sp->u.number / 6;
+        error("set_bit() bit requested: %d > maximum bits: %d\n", sp->u.number, MAX_BITS);
+    bit = (sp--)->u.number;
+    if (bit < 0)
+	error("Bad argument 2 (negative) to set_bit().\n");
+    ind = bit/6;
+    bit %= 6;
+    old_len = len = SVALUE_STRLEN(sp);
     if (ind >= len)
         len = ind + 1;
     if (ind >= old_len || !(sp->subtype & STRING_MALLOC)){
-        str = DXALLOC(len + 1, TAG_STRING, "f_set_bit");
+        str = DXALLOC(len + 1, TAG_STRING, "f_set_bit: str");
         str[len] = '\0';
         if (old_len)
-            memcpy(str, (sp - 1)->u.string, old_len);
+            memcpy(str, sp->u.string, old_len);
         if (len > old_len)
             memset(str + old_len, ' ', len - old_len);
-    }
+	free_string_svalue(sp);
+	sp->u.string = str;
+	sp->subtype = STRING_MALLOC;
+    } else
+	str = sp->u.string;
     if (str[ind] > 0x3f + ' ' || str[ind] < ' ')
         error("Illegal bit pattern in set_bit character %d\n", ind);
-    str[ind] = ((str[ind] - ' ') | (1 << (sp->u.number % 6))) + ' ';
-    free_string_svalue(--sp);
-    sp->u.string = str;
-    sp->subtype = STRING_MALLOC;
+    str[ind] = ((str[ind] - ' ') | (1 << bit)) + ' ';
 }
 #endif
 
@@ -2594,24 +2757,20 @@ f_snoop PROT((void))
      * This one takes a variable number of arguments. It returns 0 or an
      * object.
      */
-    ob = 0;
     if (st_num_arg == 1) {
-        if (new_set_snoop(sp->u.ob, 0))
-            ob = sp->u.ob;
-        if (!ob || (ob->flags & O_DESTRUCTED)){
-            free_object(sp->u.ob, "f_snoop:1");
-            *sp = const0;
+        if (!new_set_snoop(sp->u.ob, 0) || (sp->u.ob->flags & O_DESTRUCTED)) {
+	    free_object(sp->u.ob, "f_snoop:1");
+	    *sp = const0;
 	}
     } else {
-        if (new_set_snoop((sp - 1)->u.ob, sp->u.ob))
-            ob = sp->u.ob;
-        if (!ob || ob->flags & O_DESTRUCTED){
-            free_object(ob, "f_snoop:2");
-            free_object((--sp)->u.ob, "f_snoop:3");
-            *sp = const0;
+        if (!new_set_snoop((sp - 1)->u.ob, sp->u.ob) || 
+	    (sp->u.ob->flags & O_DESTRUCTED)) {
+	    free_object((sp--)->u.ob, "f_snoop:2");
+	    free_object(sp->u.ob, "f_snoop:3");
+	    *sp = const0;
 	} else {
-            free_object((--sp)->u.ob, "f_snoop:4");
-            sp->u.ob = ob;
+	    free_object((--sp)->u.ob, "f_snoop:4");
+	    sp->u.ob = (sp+1)->u.ob;
 	}
     }
 }
@@ -2841,7 +3000,7 @@ f_tell_room PROT((void))
     struct vector *avoid;
     int num_arg = st_num_arg;
     struct svalue *arg = sp - num_arg + 1;
-    
+
     if (arg->type & T_OBJECT) {
         ob = arg[0].u.ob;
     } else {                    /* must be a string... */
@@ -2911,6 +3070,17 @@ f_this_player PROT((void))
 	    put_unrefed_object(command_giver, "this_player(0)");
 	/* else zero is on stack already */
     }
+}
+#endif
+
+#ifdef F_SET_THIS_PLAYER
+void
+f_set_this_player PROT((void))
+{
+    if (sp->type & T_NUMBER)
+	command_giver = 0;
+    else 
+	command_giver = sp->u.ob;
 }
 #endif
 
@@ -3001,9 +3171,9 @@ void
 f_undefinedp PROT((void))
 {
     if (sp->type & T_NUMBER){
-        if (!sp->u.number && sp->subtype & T_UNDEFINED)
-            sp->u.number = 1;
-        else sp->u.number = 0;
+        if (!sp->u.number && sp->subtype & T_UNDEFINED) {
+	    *sp = const1;
+        } else *sp = const0;
     } else {
         free_svalue(sp, "f_undefinedp");
         *sp = const0;

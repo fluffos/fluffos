@@ -1,5 +1,9 @@
 /* used by md.c (the malloc debug module) */
 
+#if defined(CHECK_MEMORY) && !defined(DEBUGMALLOC_EXTENSIONS)
+#undef CHECK_MEMORY
+#endif
+
 typedef struct node_s {
     int size;
     struct node_s *next;
@@ -34,7 +38,7 @@ void check_all_blocks PROT((int));
     else PTR_TO_NODET(ptr)->tag |= TAG_MARKED
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-#define SET_TAG(x, y) PTR_TO_NODET(x)->tag = y
+#define SET_TAG(x, y) set_tag(x, y)
 #else
 #define SET_TAG(x, y)
 #endif
@@ -42,13 +46,15 @@ void check_all_blocks PROT((int));
 extern int malloc_mask;
 extern unsigned int total_malloced;
 extern unsigned int hiwater;
-void MDinit();
+void MDinit PROT((void));
 void MDmalloc PROT((node_t *, int, int, char *));
 int MDfree PROT((void *));
+
 #ifdef DEBUGMALLOC_EXTENSIONS
 #include "lpc_incl.h"
 
 void mark_svalue PROT((struct svalue *));
+void set_tag PROT((void *, int));
 #endif
 
 #define MAX_CATEGORY 130

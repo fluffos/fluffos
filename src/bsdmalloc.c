@@ -150,7 +150,6 @@ void *bsdmalloc_malloc P1(size_t, nbytes)
      * so all data will be page aligned.
      */
     if (pagesz == 0) {
-	using_bsd_malloc = 1;
 #ifdef MEMPAGESIZE
 	pagesz = n = MEMPAGESIZE;
 #else
@@ -405,18 +404,18 @@ show_mstats P1(char *, s)
     register union overhead *p;
     int totfree = 0, totused = 0;
 
-    add_message("Memory allocation statistics %s\nfree:\t", s);
+    add_vmessage("Memory allocation statistics %s\nfree:\t", s);
     for (i = 0; i < NBUCKETS; i++) {
 	for (j = 0, p = nextf[i]; p; p = p->ov_next, j++);
-	add_message(" %d", j);
+	add_vmessage(" %d", j);
 	totfree += j * (1 << (i + 3));
     }
     add_message("\nused:\t");
     for (i = 0; i < NBUCKETS; i++) {
-	add_message(" %d", nmalloc[i]);
+	add_vmessage(" %d", nmalloc[i]);
 	totused += nmalloc[i] * (1 << (i + 3));
     }
-    add_message("\n\tTotal in use: %d, total free: %d\n",
+    add_vmessage("\n\tTotal in use: %d, total free: %d\n",
 		totused, totfree);
 }
 #endif

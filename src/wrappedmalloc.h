@@ -1,6 +1,6 @@
 #ifndef WRAPPED_MALLOC_H
 #define WRAPPED_MALLOC_H
-#ifdef WRAPPED_MALLOC
+#ifdef WRAPPEDMALLOC
 void *wrappedmalloc PROT((int));
 void *wrappedrealloc PROT((void *, int));
 void *wrappedcalloc PROT((int, int));

@@ -27,22 +27,23 @@
 #define NODE_ANON_FUNC          -17
 #define NODE_PARAMETER          -18
 #define NODE_VALUE              -19
-#define NODE_PARAMETER_LVALUE   -20
-#define NODE_NE_RANGE_LVALUE    -21
-#define NODE_RE_RANGE_LVALUE    -22
-#define NODE_BRANCH_LINK        -23
+#define NODE_LVALUE             -20
+#define NODE_PARAMETER_LVALUE   -21
+#define NODE_NE_RANGE_LVALUE    -22
+#define NODE_RE_RANGE_LVALUE    -23
+#define NODE_BRANCH_LINK        -24
+
+union parse_value {
+    int number;
+    float real;
+    struct parse_node *expr;
+};
 
 struct parse_node {
     short kind;
     short line;
     char type;
-    union {
-	int number;
-	float real;
-	struct parse_node *expr;
-    } v;
-    struct parse_node *left;
-    struct parse_node *right;
+    union parse_value v, l, r; /* left, right, and value */
 };
 
 struct parse_node_block {

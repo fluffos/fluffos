@@ -1,6 +1,7 @@
 #include "std.h"
 #include "config.h"
 #include "lpc_incl.h"
+#include "file_incl.h"
 #include "swap.h"
 #include "simul_efun.h"
 #include "comm.h"
@@ -367,6 +368,14 @@ int swap P1(struct object *, ob)
 #endif
 	return 0;
     }
+    if (ob->prog->p.i.func_ref > 0) {
+#ifdef DEBUG
+	if (d_flag > 1) {
+	    debug_message("  object not swapped - referenced by functions.\n");
+	}
+#endif
+	return 0;
+    }
     locate_out(ob->prog);	/* relocate the internal pointers */
     if (swap_out((char *) ob->prog, ob->prog->p.i.total_size, (int *) &ob->swap_num)) {
 	num_swapped++;
@@ -446,6 +455,7 @@ void load_line_numbers P1(struct program *, prog)
     }
 #endif
     size = swap_in((char **) &prog->p.i.file_info, prog->p.i.line_swap_index);
+    SET_TAG(prog->p.i.file_info, TAG_LINENUMBERS);
     prog->p.i.line_info = (unsigned char *)&prog->p.i.file_info[prog->p.i.file_info[1]];
     line_num_bytes_swapped -= size;
 }
@@ -492,9 +502,9 @@ void print_swap_stats()
 
     add_message("Swap information:\n");
     add_message("-------------------------\n");
-    add_message("Progs swapped:       %10lu\n", num_swapped);
-    add_message("Linenum bytes:       %10lu\n", line_num_bytes_swapped);
-    add_message("Total bytes swapped: %10lu\n", total_bytes_swapped);
+    add_vmessage("Progs swapped:       %10lu\n", num_swapped);
+    add_vmessage("Linenum bytes:       %10lu\n", line_num_bytes_swapped);
+    add_vmessage("Total bytes swapped: %10lu\n", total_bytes_swapped);
     if (!swap_file) {
 	add_message("No swap file\n");
 	return;
@@ -508,7 +518,7 @@ void print_swap_stats()
 	size += end;
 	cnt++;
     }
-    add_message("Freed bytes:         %10lu (%d chunks)\n", size, cnt);
+    add_vmessage("Freed bytes:         %10lu (%d chunks)\n", size, cnt);
 }
 
 /*

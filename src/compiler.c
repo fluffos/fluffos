@@ -12,6 +12,7 @@
 #include "qsort.h"
 #include "file.h"
 #include "interpret.h"
+#include "binaries.h"
 
 static void clean_parser PROT((void));
 static void prolog PROT((int, char *));
@@ -153,7 +154,7 @@ void clean_up_locals()
 {
     int offset;
 
-    offset = locals_ptr - locals;
+    offset = locals_ptr + current_number_of_locals - locals;
     while (offset--){
 	locals[offset]->sem_value--;
 	locals[offset]->dn.local_num = -1;
@@ -165,7 +166,7 @@ void clean_up_locals()
     runtime_locals_ptr = runtime_locals;
 }
 
-void pop_n_locals(int num){
+void pop_n_locals P1(int, num) {
     while (num--) {
 	locals_ptr[--current_number_of_locals]->sem_value--;
 	locals_ptr[current_number_of_locals]->dn.local_num = -1;
@@ -283,7 +284,7 @@ static struct function *copy_function P2(struct function *, new, int, add) {
     return ret;
 }
 
-static char *get_inherit_name(int index) {
+static char *get_inherit_name P1(int, index) {
     struct inherit *ip;
     int num_inherits = mem_block[A_INHERITS].current_size /
 	sizeof(struct inherit);
@@ -294,6 +295,7 @@ static char *get_inherit_name(int index) {
         if (ip->function_index_offset <= index) return ip->prog->name;
     }
     IF_DEBUG(fatal("dropped off the end of get_inherit_name"));
+    /* NOTREACHED */
 }
 
 struct ovlwarn {
@@ -764,19 +766,28 @@ int define_variable P3(char *, name, int, type, int, hide)
     n = (mem_block[A_VARIABLES].current_size / sizeof(struct variable));
 
     ihe = find_or_add_ident(str, FOA_GLOBAL_SCOPE);
-    if (ihe->dn.global_num == -1)
+    if (ihe->dn.global_num == -1) {
 	ihe->sem_value++;
-    else {
+	ihe->dn.global_num = n;
+    } else {
 	if (VARIABLE(ihe->dn.global_num)->type & TYPE_MOD_NO_MASK) {
 	    char p[2048];
 	    
 	    sprintf(p, "Illegal to redefine 'nomask' variable \"%s\"", name);
 	    yyerror(p);
 	}
-	/* *sigh* make the old version static */
-	VARIABLE(ihe->dn.global_num)->type |= TYPE_MOD_STATIC;
+	/* Okay, the nasty idiots have two variables of the same name in
+	   the same object.  This causes headaches for save_object().
+	   To keep save_object sane, we need to make one static;
+	   Also, be careful not to hide the current variable with a
+	   hidden one. */
+	if (!(type & TYPE_MOD_STATIC)) {
+	    /* this one isn't static, make the other one static */
+	    VARIABLE(ihe->dn.global_num)->type |= TYPE_MOD_STATIC;
+	}
+	if (!hide)
+	    ihe->dn.global_num = n;
     }
-    ihe->dn.global_num = n;
 
     dummy = (struct variable *)allocate_in_mem_block(A_VARIABLES,sizeof(struct variable));
     dummy->name = str;
@@ -990,7 +1001,7 @@ int validate_function_call P3(struct function *, funp, int, f, struct parse_node
 			get_two_types(arg_types[first + i], tmp));
 		yyerror(buff);
 	    }
-	    enode = enode->right;
+	    enode = enode->r.expr;
 	}
     }
     return funp->type & TYPE_MOD_MASK;
@@ -1006,8 +1017,8 @@ validate_efun_call P2(int, f, struct parse_node *, args) {
 	switch (predefs[f].token) {
 	case F_SIZEOF:
 	    if (num == 1) {
-		if (args->right->v.expr->kind == F_AGGREGATE) {
-		    num = args->right->v.expr->v.number;
+		if (args->r.expr->v.expr->kind == F_AGGREGATE) {
+		    num = args->r.expr->v.expr->v.number;
 		    CREATE_TYPED_NODE(args, F_NUMBER, (num ? TYPE_NUMBER : TYPE_ANY));
 		    args->v.number = num;
 		    return args;
@@ -1023,17 +1034,17 @@ validate_efun_call P2(int, f, struct parse_node *, args) {
 	if (def && num == min_arg -1) {
 	    struct parse_node *tmp;
 	    tmp = new_node_no_line();
-	    tmp->right = 0;
-	    args->left->right = tmp;
+	    tmp->r.expr = 0;
+	    args->l.expr->r.expr = tmp;
 	    if (def > 0) {
 		CREATE_NODE(tmp->v.expr, def);
 		tmp->v.expr->v.number = -1;
-		tmp->right = 0;
+		tmp->r.expr = 0;
 	    } else {
 		CREATE_NODE(tmp->v.expr, -(def) >> 8);
 		tmp->v.expr->v.number = (-def) & 0xff;
 	    }
-	    tmp->v.expr->right = 0;
+	    tmp->v.expr->r.expr = 0;
 	    max_arg--;
 	    min_arg--;
 	} else if (num < min_arg) {
@@ -1054,7 +1065,7 @@ validate_efun_call P2(int, f, struct parse_node *, args) {
 	    argp = &efun_arg_types[predefs[f].arg_index];
 	    
 	    for (argn = 0; argn < num; argn++) {
-		enode = enode->right;
+		enode = enode->r.expr;
 		tmp = enode->v.expr->type;
 		for (i=0; !compatible_types(argp[i], tmp) && argp[i] != 0; i++)
 		    ;
@@ -1141,8 +1152,6 @@ int get_id_number() {
     return current_id_number++;
 }
 
-static short zero = 0;
-
 /*
  * The program has been compiled. Prepare a 'struct program' to be returned.
  */
@@ -1181,7 +1190,7 @@ static void epilog() {
 	/* end the __INIT function */
 	start_initializer();
 	CREATE_NODE(pn, F_RETURN);
-	CREATE_NODE(pn->right, F_CONST0);
+	CREATE_NODE(pn->r.expr, F_CONST0);
 	generate(pn);
 	end_initializer();
 	define_new_function(APPLY___INIT, 0, 0, CURRENT_PROGRAM_SIZE,
@@ -1223,6 +1232,7 @@ static void epilog() {
     *prog = NULL_program;
     prog->p.i.total_size = size;
     prog->p.i.ref = 0;
+    prog->p.i.func_ref = 0;
     prog->p.i.heart_beat = (ihe ? ihe->dn.function_num : -1);
     prog->name = current_file;
     current_file = 0;
@@ -1300,7 +1310,7 @@ static void epilog() {
     prog->p.i.argument_types = 0;       /* For now. Will be fixed someday */
     prog->p.i.type_start = 0;
 
-#ifdef SAVE_BINARIES
+#ifdef BINARIES
 #  ifdef ALWAYS_SAVE_BINARIES
     save_binary(prog, &mem_block[A_INCLUDES], &mem_block[A_PATCH]);
 #  else
@@ -1329,6 +1339,7 @@ static void epilog() {
 	reference_prog (prog->p.i.inherit[i].prog, "inheritance");
     }
     scratch_destroy();
+    clean_up_locals();
     free_unused_identifiers();
     end_new_file();
 }
@@ -1345,7 +1356,6 @@ static void prolog P2(int, f, char *, name) {
     approved_object = 0;
     prog = 0;   /* 0 means fail to load. */
     num_parse_error = 0;
-    clean_up_locals();     /* In case of earlier error */
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
     a_functions_root = (unsigned short)0xffff;
 #endif
@@ -1395,6 +1405,7 @@ static void clean_parser() {
     prog = 0;
     for (i=0; i<NUMAREAS; i++)
 	FREE(mem_block[i].block);
+    clean_up_locals();
     scratch_destroy();
     free_unused_identifiers();
 }
@@ -1425,7 +1436,7 @@ int case_compare P2(struct parse_node **, c1, struct parse_node **, c2) {
     if ((*c2)->kind == NODE_DEFAULT)
 	return 1;
 
-    return (((int)(*c1)->right) - ((int)(*c2)->right));
+    return ((*c1)->r.number - (*c2)->r.number);
 }
 
 void prepare_cases P2(struct parse_node *, pn, int, start) {
@@ -1452,21 +1463,21 @@ void prepare_cases P2(struct parse_node *, pn, int, start) {
 	if (ce + 1 == ce_end) {
 	    /* only a default */
 	    pn->v.expr = *ce;
-	    (*ce)->left = 0;
+	    (*ce)->l.expr = 0;
 	    mem_block[A_CASES].current_size = start;
 	    return;
 	}
 	ce++;
-	(*(ce-1))->left = *ce;
+	(*(ce-1))->l.expr = *ce;
     }
     if ((*ce)->v.expr) {
-	last_key = (int)(*ce)->v.expr->right;
+	last_key = (*ce)->v.expr->r.number;
 	direct = 0;
     } else
-	last_key = (int)(*ce)->right;
+	last_key = (*ce)->r.number;
     ce++;
     while (ce < ce_end) {
-	this_key = (int)(*ce)->right;
+	this_key = (*ce)->r.number;
 	if (this_key <= last_key) {
 	    char buf[1024];
 	    char *f1, *f2;
@@ -1491,9 +1502,9 @@ void prepare_cases P2(struct parse_node *, pn, int, start) {
 		    f2 ? f2 : "", f2 ? ":" : "line ", l2);
 	    yyerror(buf);
 	}
-	(*(ce-1))->left = *ce;
+	(*(ce-1))->l.expr = *ce;
 	if ((*ce)->v.expr) {
-	    last_key = (int)(*ce)->v.expr->right;
+	    last_key = (*ce)->v.expr->r.number;
 	    direct = 0;
 	} else {
 	    if (last_key + 1 != this_key) direct = 0;
@@ -1501,7 +1512,7 @@ void prepare_cases P2(struct parse_node *, pn, int, start) {
 	}
 	ce++;
     }
-    (*(ce_end-1))->left = 0;
+    (*(ce_end-1))->l.expr = 0;
     if (direct && pn->kind == NODE_SWITCH_NUMBERS)
 	pn->kind = NODE_SWITCH_DIRECT;
     pn->v.expr = *(ce_start);

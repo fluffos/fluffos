@@ -4,6 +4,7 @@
 #include "regexp.h"
 #include "backend.h"
 #include "qsort.h"
+#include "array.h"
 
 /*
  * This file contains functions used to manipulate arrays.
@@ -13,7 +14,6 @@
 
 int num_arrays;
 int total_array_size;
-static struct svalue *arg;
 
 INLINE static int builtin_sort_array_cmp_fwd PROT((struct svalue *, struct svalue *));
 INLINE static int builtin_sort_array_cmp_rev PROT((struct svalue *, struct svalue *));
@@ -367,10 +367,10 @@ struct vector *users()
 
 /*
  * Slice of an array.
+ * It now frees the passed array
  */
 struct vector *slice_array P3(struct vector *, p, int, from, int, to)
 {
-    struct vector *d;
     int cnt;
     struct svalue *sv1, *sv2;
 
@@ -378,16 +378,47 @@ struct vector *slice_array P3(struct vector *, p, int, from, int, to)
 	from = 0;
     if (to >= p->size)
 	to = p->size - 1;
-    if (from > to)
+    if (from > to) {
+	free_vector(p);
 	return null_array();
+    }
 
-    d = allocate_empty_array(to - from + 1);
-    sv1 = d->item - from;
-    sv2 = p->item;
-    for (cnt = from; cnt <= to; cnt++)
-	assign_svalue_no_free(sv1 + cnt, sv2 + cnt);
+    if (!(--p->ref)){
+#ifndef NO_MUDLIB_STATS
+	add_array_size(&p->stats, -((int)p->size));
+#endif
+	total_array_size += (to - from + 1 - p->size) * sizeof(struct svalue);
+	if (from){
+	    sv1 = p->item + from;
+	    cnt = from;
+	    while (cnt--) free_svalue(--sv1, "slice_array:2");
+	    cnt = to - from + 1;
+	    sv1 = p->item;
+	    sv2 = p->item + from;
+	    while (cnt--) *sv1++ = *sv2++;
+	    cnt = p->size - 1 - to;
+	    while (cnt--) free_svalue(sv2++, "slice_array:3");
+	}
+	p = RESIZE_VECTOR(p, to-from+1);
+#ifndef NO_MUDLIB_STATS
+	if (current_object) {
+	    assign_stats(&p->stats, current_object);
+	    add_array_size(&p->stats, to - from + 1);
+	} else null_stats(&p->stats);
+#endif
+	p->size = to-from+1;
+	p->ref = 1;
+	return p;
+    } else {
+	struct vector *d;
 
-    return d;
+	d = allocate_empty_array(to - from + 1);
+	sv1 = d->item - from;
+	sv2 = p->item;
+	for (cnt = from; cnt <= to; cnt++)
+	  assign_svalue_no_free(sv1 + cnt, sv2 + cnt);
+	return d;
+    }
 }
 
 /*
@@ -450,13 +481,12 @@ struct vector *commands P1(struct object *, ob)
    returned 1 for.
    */
 
-#ifdef F_FILTER_ARRAY
+#ifdef F_FILTER
 void
-f_filter_array PROT((void))
+filter_array P2(struct svalue *, arg, int, num_arg)
 {
-    struct svalue *arg = sp - st_num_arg + 1;
     struct vector *vec = arg->u.vec, *r;
-    int size, num_arg = st_num_arg;
+    int size;
 
     if ((size = vec->size) < 1) {
 	pop_n_elems(num_arg - 1);
@@ -484,7 +514,7 @@ f_filter_array PROT((void))
 		else if ((arg+2)->type == T_STRING){
 		    if ((ob = find_object(arg[2].u.string)) && !object_visible(ob)) ob = 0;
 		}
-		if (!ob) bad_argument(arg+2, T_STRING | T_OBJECT, 3, F_FILTER_ARRAY);
+		if (!ob) bad_argument(arg+2, T_STRING | T_OBJECT, 3, F_FILTER);
 		if (num_arg > 3) extra = arg + 3, numex = num_arg - 3;
 	    }
 	}
@@ -764,7 +794,7 @@ struct vector *add_array P2(struct vector *, p, struct vector *, r)
 	    fatal("Out of memory.\n");
 
 	total_array_size += sizeof(struct svalue) * (r->size);
-	d->ref = 1;
+	/* d->ref = 1;     d is p, and p's ref was already one -Beek */
 	d->size = res;
 
 #ifndef NO_MUDLIB_STATS
@@ -1084,7 +1114,7 @@ INLINE static int builtin_sort_array_cmp_rev P2(struct svalue *, p1, struct sval
 	}
 
     }
-    error("built-in sort_array() can only handle homogeneous arrays of strings/ints/floats\n");
+    error("built-in sort_array() can only handle homogeneous arrays of strings/ints/floats/arrays\n");
     return 0;
 }
 
@@ -1258,7 +1288,7 @@ struct vector *deep_inventory P2(struct object *, ob, int, take_top)
     /*
      * collect visible inventory objects recursively
      */
-    i = 0;
+    i = take_top;
     deep_inventory_collect(ob, dinv, &i);
 
     return dinv;
@@ -1289,8 +1319,8 @@ INLINE static struct svalue *alist_sort P1(struct vector *, inlist) {
 		free_object(tmp->u.ob, "alist_sort");
 		sv_tab[j] = *tmp = const0;
 	    } else if ((tmp->type & T_STRING) && !(tmp->subtype & STRING_SHARED)) {
-		(tmp = sv_tab + j)->u.string = make_shared_string(tmp->u.string);
-		tmp->subtype = STRING_SHARED;
+		sv_tab[j].u.string = make_shared_string(tmp->u.string);
+		(tmp = sv_tab + j)->subtype = STRING_SHARED;
 		tmp->type = T_STRING;
 	    } else assign_svalue_no_free(sv_tab + j, tmp);
 
@@ -1471,8 +1501,8 @@ struct vector *intersect_array P2(struct vector *, a1, struct vector *, a2) {
 		free_object(tmp->u.ob, "intersect_array");
 		sv_tab[j] = *tmp = const0;
 	    } else if ((tmp->type & T_STRING) && !(tmp->subtype & STRING_SHARED)) {
-		(tmp = sv_tab + j)->u.string = make_shared_string(tmp->u.string);
-		tmp->subtype = STRING_SHARED;
+		sv_tab[j].u.string = make_shared_string(tmp->u.string);
+		(tmp = sv_tab + j)->subtype = STRING_SHARED;
 		tmp->type = T_STRING;
 	    } else assign_svalue_no_free(sv_tab + j, tmp);
 	    
@@ -1563,7 +1593,8 @@ struct vector *intersect_array P2(struct vector *, a1, struct vector *, a2) {
 
     i = a1s;
     while (i--) free_svalue(svt_1 + i, "intersect_array");
-    
+    FREE((char *)svt_1);
+
     if (a1->ref > 1) a1->ref--;
     else {
 #ifndef NO_MUDLIB_STATS
@@ -1804,8 +1835,8 @@ struct vector *
     return ret;
 }
 
-struct vector *
-       livings()
+#ifdef F_LIVINGS
+struct vector *livings()
 {
     int nob, apply_valid_hide, hide_is_valid = 0;
     struct object *ob, **obtab;
@@ -1843,6 +1874,7 @@ struct vector *
 
     return vec;
 }
+#endif
 
 #ifdef F_OBJECTS
 void f_objects PROT((void))
@@ -1964,8 +1996,10 @@ struct vector *reg_assoc P4(char *, str, struct vector *, pat, struct vector *, 
 	rgpp = CALLOCATE(size, struct regexp *, TAG_TEMPORARY, "reg_assoc : rgpp");
 	for (i = 0; i < size; i++){
              if (!(rgpp[i] = regcomp(pat->item[i].u.string, 0))){
-	       FREE((char *) rgpp);
-	       return null_array();
+		 while (i--)
+		     FREE((char *)rgpp[i]);
+		 FREE((char *) rgpp);
+		 return null_array();
 	     }
  	}
  
@@ -1979,40 +2013,40 @@ struct vector *reg_assoc P4(char *, str, struct vector *, pat, struct vector *, 
  	    laststart = 0;
  	    index = -1;
  
-             for (i = 0; i < size; i++){
-                 if (regexec(tmpreg = rgpp[i], tmp)){
-                     currstart = tmpreg->startp[0];
-                     if (tmp == currstart){
-                         index = i;
-                         break;
+	    for (i = 0; i < size; i++){
+		if (regexec(tmpreg = rgpp[i], tmp)){
+		    currstart = tmpreg->startp[0];
+		    if (tmp == currstart){
+			index = i;
+			break;
  		    }
-                     if (!laststart || currstart < laststart){
-                         laststart = currstart;
+		    if (!laststart || currstart < laststart){
+			laststart = currstart;
  			index = i;
  		    }
  		}
  	    }
  
             if (index >= 0){
-                 num_match++;
-                 if (rmp){
-		     rmp->next = ALLOCATE(struct reg_match, 
-					  TAG_TEMPORARY, "reg_assoc : rmp->next");
-                     rmp = rmp->next;
+		num_match++;
+		if (rmp){
+		    rmp->next = ALLOCATE(struct reg_match, 
+					 TAG_TEMPORARY, "reg_assoc : rmp->next");
+		    rmp = rmp->next;
  		}
-                 else rmph = rmp =
-		     ALLOCATE(struct reg_match, TAG_TEMPORARY, "reg_assoc : rmp");
-		 tmpreg = rgpp[index];
-                 rmp->begin = tmpreg->startp[0];
-                 rmp->end = tmp = tmpreg->endp[0];
-                 rmp->tok_i = index; 
-                 rmp->next = (struct reg_match *) 0;
+		else rmph = rmp =
+		    ALLOCATE(struct reg_match, TAG_TEMPORARY, "reg_assoc : rmp");
+		tmpreg = rgpp[index];
+		rmp->begin = tmpreg->startp[0];
+		rmp->end = tmp = tmpreg->endp[0];
+		rmp->tok_i = index; 
+		rmp->next = (struct reg_match *) 0;
  	    }
-             else break;
+	    else break;
  
-             /* The following is from regexplode, to prevent i guess infinite */
-             /* loops on "" patterns - Randor 5/29/94 */
-             if (rmp->begin == tmp && (!*++tmp)) break;
+	    /* The following is from regexplode, to prevent i guess infinite */
+	    /* loops on "" patterns - Randor 5/29/94 */
+	    if (rmp->begin == tmp && (!*++tmp)) break;
  	}
  
 	sv = ret->item;
@@ -2056,6 +2090,8 @@ struct vector *reg_assoc P4(char *, str, struct vector *, pat, struct vector *, 
 	sv1->subtype = STRING_MALLOC;
 	sv1->u.string = string_copy(tmp, "reg_assoc");
 	assign_svalue_no_free(sv2, def);
+	for (i=0; i<size; i++)
+	    FREE((char *)rgpp[i]);
 	FREE((char *) rgpp);
 	
 	while (rmp = rmph){
@@ -2068,15 +2104,15 @@ struct vector *reg_assoc P4(char *, str, struct vector *, pat, struct vector *, 
 	struct svalue *temp;
 	struct svalue *sv;
 	
-         (sv = ret->item)->type = T_POINTER;
-         temp = (sv->u.vec = allocate_empty_array(1))->item;
-         temp->subtype = STRING_MALLOC;
-         temp->type = T_STRING;
-         temp->u.string = string_copy(str, "reg_assoc");
-         sv = &ret->item[1];
-         sv->type = T_POINTER;
-         assign_svalue_no_free((sv->u.vec = allocate_empty_array(1))->item, def);
-         return ret;
-     }
- }
-  #endif
+	(sv = ret->item)->type = T_POINTER;
+	temp = (sv->u.vec = allocate_empty_array(1))->item;
+	temp->subtype = STRING_MALLOC;
+	temp->type = T_STRING;
+	temp->u.string = string_copy(str, "reg_assoc");
+	sv = &ret->item[1];
+	sv->type = T_POINTER;
+	assign_svalue_no_free((sv->u.vec = allocate_empty_array(1))->item, def);
+	return ret;
+    }
+}
+#endif

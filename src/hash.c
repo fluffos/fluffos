@@ -68,10 +68,10 @@ whashstr P2(char *, s, int, maxn)
 	return 0;
     p = (unsigned char *) s;
     oh = T[*p];
-    h = (*p++ + 1) & 0xff;
-    for (i = maxn - 1; *p && --i >= 0; p++) {
+    h = (*(p++) + 1) & 0xff;
+    for (i = maxn - 1; *p && --i >= 0; ) {
 	oh = T[oh ^ *p];
-	h = T[h ^ *p];
+	h = T[h ^ *(p++)];
     }
 
     return (oh << 8) + h;

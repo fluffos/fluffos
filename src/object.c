@@ -8,6 +8,7 @@
 #include "comm.h"
 #include "swap.h"
 #include "socket_efuns.h"
+#include "call_out.h"
 #include "port.h"
 
 #define too_deep_save_error() \
@@ -1305,12 +1306,12 @@ static void add_long_message P1(char *, s) {
     while (len > ALM_BREAK) {
 	save = s[ALM_BREAK];
 	s[ALM_BREAK] = 0;
-	add_message("%s", s);
+	add_message(s);
 	s[ALM_BREAK] = save;
 	s += ALM_BREAK;
 	len -= ALM_BREAK;
     }
-    add_message("%s", s);
+    add_message(s);
 }
 
 /*
@@ -1350,7 +1351,9 @@ void tell_object P2(struct object *, ob, char *, str)
 
 void free_object P2(struct object *, ob, char *, from)
 {
+#ifndef NO_ADD_ACTION
     struct sentence *s;
+#endif
 
     ob->ref--;
 #ifdef DEBUG
@@ -1370,8 +1373,8 @@ void free_object P2(struct object *, ob, char *, from)
 	fatal("FATAL: Object 0x%x %s ref count 0, but not destructed (from %s).\n",
 	      ob, ob->name, from);
     }
-    if (ob->interactive)
-	fatal("Tried to free an interactive object.\n");
+    DEBUG_CHECK(ob->interactive,
+		"Tried to free an interactive object.\n");
     /*
      * If the program is freed, then we can also free the variable
      * declarations.
@@ -1385,6 +1388,7 @@ void free_object P2(struct object *, ob, char *, from)
 	free_prog(ob->prog, 1);
 	ob->prog = 0;
     }
+#ifndef NO_ADD_ACTION
     for (s = ob->sent; s;) {
 	struct sentence *next;
 
@@ -1392,13 +1396,18 @@ void free_object P2(struct object *, ob, char *, from)
 	free_sentence(s);
 	s = next;
     }
+#endif
+#ifdef PRIVS
+    if (ob->privs)
+	free_string(ob->privs);
+#endif
     if (ob->name) {
 #ifdef DEBUG
 	if (d_flag > 1)
 	    debug_message("Free object %s\n", ob->name);
 #endif
-	if (lookup_object_hash(ob->name) == ob)
-	    fatal("Freeing object %s but name still in name table", ob->name);
+	DEBUG_CHECK1(lookup_object_hash(ob->name) == ob,
+		     "Freeing object %s but name still in name table", ob->name);
 	FREE(ob->name);
 	ob->name = 0;
     }
@@ -1483,6 +1492,7 @@ void check_ob_ref P2(struct object *, ob, char *, from)
 }
 #endif				/* CHECK_OB_REF */
 
+#ifndef NO_ADD_ACTION
 static struct object *hashed_living[LIVING_HASH_SIZE];
 
 static int num_living_names, num_searches = 1, search_length = 1;
@@ -1569,99 +1579,44 @@ void stat_living_objects()
 {
     add_message("Hash table of living objects:\n");
     add_message("-----------------------------\n");
-    add_message("%d living named objects, average search length: %4.2f\n",
+    add_vmessage("%d living named objects, average search length: %4.2f\n",
 		num_living_names, (double) search_length / num_searches);
 }
+#endif /* NO_ADD_ACTION */
 
-void reference_prog P2(struct program *, progp, char *, from)
+void reset_object P1(struct object *, ob)
 {
-    progp->p.i.ref++;
-#ifdef DEBUG
-    if (d_flag)
-	printf("reference_prog: %s ref %d (%s)\n",
-	       progp->name, progp->p.i.ref, from);
-#endif
-}
+    struct object *save_command_giver;
 
-/*
- * Decrement reference count for a program. If it is 0, then free the prgram.
- * The flag free_sub_strings tells if the propgram plus all used strings
- * should be freed. They normally are, except when objects are swapped,
- * as we want to be able to read the program in again from the swap area.
- * That means that strings are not swapped.
- */
-void free_prog P2(struct program *, progp, int, free_sub_strings)
-{
-    progp->p.i.ref--;
-    if (progp->p.i.ref > 0)
-	return;
-#ifdef DEBUG
-    if (d_flag)
-	printf("free_prog: %s\n", progp->name);
-#endif
-    if (progp->p.i.ref < 0)
-	fatal("Negative ref count for prog ref.\n");
-    total_prog_block_size -= progp->p.i.total_size;
-    total_num_prog_blocks -= 1;
-    if (free_sub_strings) {
-	int i;
+    /* Be sure to update time first ! */
+    ob->next_reset = current_time + TIME_TO_RESET / 2 +
+	random_number(TIME_TO_RESET / 2);
 
-	/* Free all function names. */
-	for (i = 0; i < (int) progp->p.i.num_functions; i++)
-	    if (progp->p.i.functions[i].name)
-		free_string(progp->p.i.functions[i].name);
-	/* Free all strings */
-	for (i = 0; i < (int) progp->p.i.num_strings; i++)
-	    free_string(progp->p.i.strings[i]);
-	/* Free all variable names */
-	for (i = 0; i < (int) progp->p.i.num_variables; i++)
-	    free_string(progp->p.i.variable_names[i].name);
-	/* Free all inherited objects */
-	for (i = 0; i < (int) progp->p.i.num_inherited; i++)
-	    free_prog(progp->p.i.inherit[i].prog, 1);
-	free_string(progp->name);
-
-	/*
-	 * We're going away for good, not just being swapped, so free up
-	 * line_number stuff.
-	 */
-	if (progp->p.i.line_swap_index != -1)
-	    remove_line_swap(progp);
-	if (progp->p.i.file_info)
-	    FREE(progp->p.i.file_info);
-
-#ifdef LPC_TO_C
-	/*
-	 * more stuff for compiled objects; will swapping a compiled object
-	 * crash?  -Beek
-	 */
-	if (!progp->p.i.program_size)
-	    FREE(progp->p.i.program);
-#endif
+    save_command_giver = command_giver;
+    command_giver = (struct object *) 0;
+    if (!apply(APPLY_RESET, ob, 0, ORIGIN_DRIVER)) {
+	/* no reset() in the object */
+	ob->flags &= ~O_WILL_RESET;	/* don't call it next time */
     }
-    FREE((char *) progp);
+    command_giver = save_command_giver;
+    ob->flags |= O_RESET_STATE;
 }
 
-void reset_object P2(struct object *, ob, int, arg)
+void call_create P2(struct object *, ob, int, num_arg)
 {
     /* Be sure to update time first ! */
     ob->next_reset = current_time + TIME_TO_RESET / 2 +
 	random_number(TIME_TO_RESET / 2);
-    if (arg == 0) {
-        call___INIT(ob);
-	if (ob->flags & O_DESTRUCTED) return; /* sigh */
-	apply(APPLY_CREATE, ob, 0, ORIGIN_DRIVER);
-    } else {			/* check for O_WILL_RESET in backend */
-	struct object *save_command_giver;
 
-	save_command_giver = command_giver;
-	command_giver = (struct object *) 0;
-	if (!apply(APPLY_RESET, ob, 0, ORIGIN_DRIVER)) {
-	    /* no reset() in the object */
-	    ob->flags &= ~O_WILL_RESET;	/* don't call it next time */
-	}
-	command_giver = save_command_giver;
+    call___INIT(ob);
+
+    if (ob->flags & O_DESTRUCTED) {
+	pop_n_elems(num_arg);
+	return; /* sigh */
     }
+
+    apply(APPLY_CREATE, ob, num_arg, ORIGIN_DRIVER);
+
     ob->flags |= O_RESET_STATE;
 }
 
@@ -1749,9 +1704,11 @@ void reload_object P1(struct object *, obj)
     obj->shadowing = 0;
     obj->shadowed = 0;
 #endif
+#ifndef NO_ADD_ACTION
     if (obj->living_name)
 	remove_living_name(obj);
     obj->flags &= ~O_ENABLE_COMMANDS;
+#endif
     set_heart_beat(obj, 0);
     remove_all_call_out(obj);
 #ifndef NO_LIGHT
@@ -1764,5 +1721,5 @@ void reload_object P1(struct object *, obj)
     obj->euid = NULL;
 #endif
 #endif
-    reset_object(obj, 0);
+    call_create(obj, 0);
 }

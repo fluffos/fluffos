@@ -45,7 +45,7 @@ check_svalue P1(struct svalue *, v)
 	break;
     case T_FUNCTION:
 #ifdef NEW_FUNCTIONS
-	if (v->u.fp->type == ORIGIN_CALL_OTHER)
+	if (v->u.fp->type == FP_CALL_OTHER)
 	    check_svalue(&v->u.fp->f.obj);
 	check_svalue(&v->u.fp->args);
 #else

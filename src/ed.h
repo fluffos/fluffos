@@ -59,6 +59,18 @@
 #define MEM_FAIL	(ERR-5)
 #define UNRECOG_COMMAND (ERR-6)
 
+#define BAD_LINE_RANGE  (ERR-7)
+#define BAD_LINE_NUMBER (ERR-8)
+#define SYNTAX_ERROR    (ERR-9)
+#define RANGE_ILLEGAL   (ERR-10)
+#define RESTRICTED      (ERR-11)
+#define LINE_OR_RANGE_ILL (ERR-12)
+#define FILE_NAME_ERROR (ERR-13)
+#define MARK_A_TO_Z     (ERR-14)
+#define SUB_BAD_PATTERN (ERR-15)
+#define SUB_BAD_REPLACEMENT (ERR-16)
+#define BAD_DESTINATION (ERR-17)
+#define END_OF_FILE     (ERR-18)
 
 #define	BUFFER_SIZE	2048	/* stream-buffer size:  == 1 hd cluster */
 
@@ -97,9 +109,14 @@ struct ed_buffer {
     int flags;
     int appending;
     int moring;			/* used for the wait line of help */
+#ifdef OLD_ED
     char *exit_fn;		/* Function to be called when user exits */
     char *write_fn;             /* Function to be called when user writes */
     struct object *exit_ob;	/* in this object */
+#else
+    struct object *owner;
+    struct ed_buffer *next_ed_buf;
+#endif
     int shiftwidth;
     int leading_blanks;
     int cur_autoindent;
@@ -113,5 +130,13 @@ void ed_start PROT((char *, char *, char *, int, struct object *));
 void ed_cmd PROT((char *));
 void save_ed_buffer PROT((void));
 void regerror PROT((char *));
+
+#ifndef OLD_ED
+char *object_ed_cmd PROT((struct object *, char *));
+char *object_ed_start PROT((struct object *, char *, int));
+int object_ed_mode PROT((struct object *));
+void object_save_ed_buffer PROT((struct object *));
+struct ed_buffer *find_ed_buffer PROT((struct object *));
+#endif
 
 #endif

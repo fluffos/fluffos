@@ -22,21 +22,6 @@ DRIVER_BIN = driver
 # uncomment RESOLV if your machine has libresolv.a in /lib or /usr/lib
 #RESOLV=-lresolv
  
-# uncomment MALLOC* if you wish to use BSD malloc or Smalloc.
-#   Both of these require the sbrk() system call.  Be sure to read the
-#   comments in the bsdmalloc.c file before deciding on BSDMALLOC.
-#   note: These mallocs may not work correctly on the NeXT or other systems
-#   that don't fully support sbrk().  It is okay not to use either of these
-#   two mallocs in which case you will get system malloc (read the comments
-#   in options.h for choices on malloc statistics and debugging).
-#
-# uncomment this line for BSDmalloc
-# (fast but high overhead)
-#MALLOC=bsdmalloc.c
-# uncomment this line for SMALLOC
-# (slower than bsdmalloc, faster than most system mallocs, least overhead)
-#MALLOC=smalloc.c
- 
 # uncomment STRFUNCS if your machine is missing memcpy(), memset(), strtol(),
 # and strcspn().  (ie Sequent Dynix/3)
 #STRFUNCS=strfuncs.c
@@ -55,6 +40,8 @@ DRIVER_BIN = driver
 #OSFLAGS=-D_BSD
 
 # Solaris (SunOS 5): for BSD compatible ioctl()
+# for 5.4, also add the following:
+#       -I/usr/bsdinclude
 #OSFLAGS=-DBSD_COMP
 
 # If you don't have strchr() and strrchr(), uncomment following STR line
@@ -94,6 +81,8 @@ OPTIMIZE=-O
 #OPTIMIZE=+O3 +Obb3000
 # MIPS R3000 running EP/IX Version 1.4.3. Compiler is RISCompiler C 2.11 (cc).
 #OPTIMIZE=-Olimit 1802
+# DEC Alpha's cc's highest optimization: -O5
+#OPTIMIZE=-O -Olimit 2000
 # DEC Ultrix's cc's highest optimization:
 #OPTIMIZE=-O2 -Olimit 5000
  
@@ -107,6 +96,8 @@ OPTIMIZE=-O
 #DEBUG=-g
 # With extra driver debug code
 #DEBUG=-g -DDEBUG
+# For DEC Alpha: to have optimization and debugging
+#DEBUG=-g3 -DDEBUG
 # Prevent -DDEBUG from aborting the driver (when in -DDEBUG mode)
 #DEBUG_NON_FATAL=-DDEBUG_NON_FATAL
 # Compile in debug() macro code
@@ -212,10 +203,10 @@ SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   array.c mapping.c comm.c ed.c regexp.c mudlib_stats.c swap.c malloc.c \
   call_out.c otable.c dumpstat.c stralloc.c hash.c port.c buffer.c crc32.c \
   replace_program.c parse.c simul_efun.c sprintf.c reclaim.c backend.c \
-  generate.c scratchpad.c program.c \
+  generate.c scratchpad.c program.c mallocwrapper.c \
   strstr.c socket_efuns.c socket_ctrl.c qsort.c eoperators.c compiler.c \
   avltree.c trees.c socket_err.c md.c uid.c disassembler.c $(MIRE_C) $(EFUNS) \
-  binaries.c functab_tree.c icode.c $(UALARM) $(STRFUNCS) $(MALLOC) $(EXTRA_SRC)
+  binaries.c functab_tree.c icode.c $(UALARM) $(STRFUNCS) $(EXTRA_SRC)
  
 #################################################
 # the meat of things                            #
@@ -296,9 +287,11 @@ make_malloc: $(OBJDIR)/make_malloc.o
 	$(CC) $(CFLAGS) -Iobj $(OBJDIR)/make_malloc.o -o make_malloc
 
 malloc.c: config.h make_malloc
-	./make_malloc $(MALLOC)
+	./make_malloc
 	touch malloc.c
 	$(CC) $(CFLAGS) -c malloc.c -o $(OBJDIR)/malloc.o
+	touch mallocwrapper.c
+	$(CC) $(CFLAGS) -c mallocwrapper.c -o $(OBJDIR)/mallocwrapper.o
 
 grammar.y: opcodes.h
 
@@ -320,7 +313,7 @@ install: $(DRIVER_BIN) addr_server
 
 neat:
 	-(cd packages; make clean)
-	-rm packages/GNUmakefile packages/Makefile packages/SMakefile
+	-rm -f packages/GNUmakefile packages/Makefile packages/SMakefile
 	-rm -rf $(OBJDIR) *.o *.tab.c *.tab.h
 	-rm -f cc.h
 	-rm -f efun_defs.c option_defs.c

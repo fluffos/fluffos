@@ -8,8 +8,6 @@
 #include "scratchpad.h"
 #include "stralloc.h"
 #include "simul_efun.h"
-/* generate_inherited_call */
-#include "icode.h"
 /* inherit_file and find_object2 */
 #include "simulate.h"
 /* APPLY___INIT */
@@ -18,9 +16,7 @@
 #include "main.h"
 /* generate_function_call, generate, pop_value */
 #include "generate.h"
-#ifndef NEW_FUNCTIONS
-#include "include/origin.h"
-#endif
+#include "include/function.h"
 
 %line
 /*
@@ -286,13 +282,17 @@ block_or_semi:
 		$$ = $1.node;
 		if (!$$) {
 		    NODE_NO_LINE($$, F_RETURN);
-		    NODE_NO_LINE($$->right, F_CONST0);
+		    NODE_NO_LINE($$->r.expr, F_CONST0);
 		}
             }
     |   ';'
 	    {
 		$$ = 0;
 	    }
+    | error
+            {
+		$$ = 0;
+            }
     ;
 
 not_efun_ident: 
@@ -358,14 +358,14 @@ def:
 
 		    if (!($8->kind == F_RETURN) &&
 			!(($8->kind == NODE_STATEMENTS) 
-			  && $8->right->kind == F_RETURN)) {
+			  && $8->r.expr->kind == F_RETURN)) {
 			struct parse_node *replacement;
 			struct parse_node *sub_node;
 			NODE_NO_LINE(sub_node, F_RETURN);
-			NODE_NO_LINE(sub_node->right, F_CONST0);
+			NODE_NO_LINE(sub_node->r.expr, F_CONST0);
 			NODE_NO_LINE(replacement, NODE_STATEMENTS);
-			replacement->left = $8;
-			replacement->right = sub_node;
+			replacement->l.expr = $8;
+			replacement->r.expr = sub_node;
 			$8 = replacement;
 		    }
 		    func_start = generate($8);
@@ -517,8 +517,8 @@ new_name:
 		}
 
 		expr = make_branched_node(F_VOID_ASSIGN, 0, 0, $4);
-		CREATE_NODE(expr->left, F_GLOBAL_LVALUE);
-		expr->left->v.number = define_variable($2, current_type | $1, 0);
+		CREATE_NODE(expr->l.expr, F_GLOBAL_LVALUE);
+		expr->l.expr->v.number = define_variable($2, current_type | $1, 0);
 		generate(expr);
 		end_initializer();
 		scratch_free($2);
@@ -530,8 +530,8 @@ block:
             {
 		if ($2.node && $3) {
                     NODE_NO_LINE($$.node, NODE_STATEMENTS);
-                    $$.node->left = $2.node;
-                    $$.node->right = $3;
+                    $$.node->l.expr = $2.node;
+                    $$.node->r.expr = $3;
 		} else $$.node = ($2.node ? $2.node : $3);
                 $$.num = $2.num;
             }
@@ -554,8 +554,8 @@ block:
             {
                 if ($1.node && $4.node) {
                     NODE_NO_LINE($$.node, NODE_STATEMENTS);
-                    $$.node->left = $1.node;
-                    $$.node->right = $4.node;
+                    $$.node->l.expr = $1.node;
+                    $$.node->r.expr = $4.node;
                 } else $$.node = ($1.node ? $1.node : $4.node);
                 $$.num = $1.num + $4.num;
             }
@@ -582,8 +582,8 @@ block:
 		}
 
 		$$ = make_branched_node(F_VOID_ASSIGN, 0, 0, $4);
-		CREATE_NODE($$->left, F_LOCAL_LVALUE);
-		$$->left->v.number = add_local_name($2, current_type | $1);
+		CREATE_NODE($$->l.expr, F_LOCAL_LVALUE);
+		$$->l.expr->v.number = add_local_name($2, current_type | $1);
 		scratch_free($2);
 	    }
     ;
@@ -598,8 +598,8 @@ block:
             {
                 if ($1 && $3.node) {
                     NODE_NO_LINE($$.node, NODE_STATEMENTS);
-                    $$.node->left = $1;
-                    $$.node->right = $3.node;
+                    $$.node->l.expr = $1;
+                    $$.node->r.expr = $3.node;
                 } else $$.node = ($1 ? $1 : $3.node);
                 $$.num = 1 + $3.num;
             }
@@ -615,8 +615,8 @@ statements:
             {
 		if ($1 && $2) {
 		    NODE_NO_LINE($$, NODE_STATEMENTS);
-		    $$->left = $1;
-		    $$->right = $2;
+		    $$->l.expr = $1;
+		    $$->r.expr = $2;
 		} else $$ = ($1 ? $1 : $2);
             }
     |   error ';'
@@ -633,8 +633,8 @@ statement:
 		if (d_flag) {
 		    struct parse_node *replacement;
 		    NODE_NO_LINE(replacement, NODE_STATEMENTS);
-		    replacement->left = $$;
-		    NODE_NO_LINE(replacement->right, F_BREAK_POINT);
+		    replacement->l.expr = $$;
+		    NODE_NO_LINE(replacement->r.expr, F_BREAK_POINT);
 		    $$ = replacement;
 		}
 #endif
@@ -683,13 +683,13 @@ while:
 	statement
 	    {
 		/* do some optimizations on the conditional expression */
-		if ($3->kind == F_LT && $3->left->kind == F_LOCAL
-		    && ($3->right->kind == F_LOCAL ||
-			$3->right->kind == F_NUMBER))
+		if ($3->kind == F_LT && $3->l.expr->kind == F_LOCAL
+		    && ($3->r.expr->kind == F_LOCAL ||
+			$3->r.expr->kind == F_NUMBER))
 		    $3->kind = F_LOOP_COND;
-		else if ($3->kind == F_POST_DEC && $3->right->kind == F_LOCAL_LVALUE) {
+		else if ($3->kind == F_POST_DEC && $3->r.expr->kind == F_LOCAL_LVALUE) {
 		    $3->kind = F_WHILE_DEC;
-		    $3->v.number = $3->right->v.number;
+		    $3->v.number = $3->r.expr->v.number;
 		}
 
 		$$ = make_branched_node(NODE_WHILE, 0, $3, $6);
@@ -720,26 +720,26 @@ for:
             {
 		struct parse_node *sub_node;
 
-		if ($5->kind == F_LT && $5->left->kind == F_LOCAL
-		    && ($5->right->kind == F_LOCAL ||
-			$5->right->kind == F_NUMBER))
+		if ($5->kind == F_LT && $5->l.expr->kind == F_LOCAL
+		    && ($5->r.expr->kind == F_LOCAL ||
+			$5->r.expr->kind == F_NUMBER))
 		    $5->kind = F_LOOP_COND;
 
 		$3 = insert_pop_value($3);
 		$7 = insert_pop_value($7);
-		if ($7 && $7->kind == F_INC && $7->right->kind == F_LOCAL_LVALUE) {
+		if ($7 && $7->kind == F_INC && $7->r.expr->kind == F_LOCAL_LVALUE) {
 		    $7->kind = F_LOOP_INCR;
-		    $7->v.number = $7->right->v.number;
+		    $7->v.number = $7->r.expr->v.number;
 		}
 
 		NODE_NO_LINE(sub_node, NODE_FOR);
-		sub_node->left = $3;
-		sub_node->right = $7;
+		sub_node->l.expr = $3;
+		sub_node->r.expr = $7;
 		sub_node->v.expr = $5;
 
 		NODE_NO_LINE($$, NODE_FOR);
-		$$->left = sub_node;
-		$$->right = $10;
+		$$->l.expr = sub_node;
+		$$->r.expr = $10;
 
 		context = $<number>1;
 	      }
@@ -768,9 +768,9 @@ first_for_expr:
 		    yyerror(buff);
 		}
 		CREATE_NODE($$, F_ASSIGN);
-		$$->right = $5;
-		CREATE_NODE($$->left, F_LOCAL_LVALUE);
-		$$->left->v.number = add_local_name($3, $1 | $2);
+		$$->r.expr = $5;
+		CREATE_NODE($$->l.expr, F_LOCAL_LVALUE);
+		$$->l.expr->v.number = add_local_name($3, $1 | $2);
 		scratch_free($3);
 	    }
     ;
@@ -789,8 +789,8 @@ first_for_expr:
 
                 if ($9) {
                     NODE_NO_LINE(node1, NODE_STATEMENTS);
-                    node1->left = $8;
-                    node1->right = $9;
+                    node1->l.expr = $8;
+                    node1->r.expr = $9;
                 } else node1 = $8;
 
                 if (context & SWITCH_STRINGS) {
@@ -798,8 +798,8 @@ first_for_expr:
                 } else {
                     NODE_NO_LINE(node2, NODE_SWITCH_NUMBERS);
                 }
-                node2->left = $3;
-                node2->right = node1;
+                node2->l.expr = $3;
+                node2->r.expr = node1;
                 prepare_cases(node2, $<number>2);
                 context = $<number>1;
 		$$ = node2;
@@ -812,16 +812,16 @@ first_for_expr:
           {
                if ($2){
                    NODE_NO_LINE($$, NODE_STATEMENTS);
-                   $$->left = $1;
-                   $$->right = $2;
+                   $$->l.expr = $1;
+                   $$->r.expr = $2;
                } else $$ = $1;
            }
     |   statement switch_block
            {
                if ($2){
                    NODE_NO_LINE($$, NODE_STATEMENTS);
-                   $$->left = $1;
-                   $$->right = $2;
+                   $$->l.expr = $1;
+                   $$->r.expr = $2;
                } else $$ = $1;
            }
     |   /* empty */
@@ -844,7 +844,7 @@ first_for_expr:
                 if ( $2->kind != NODE_CASE_NUMBER
                     || $4->kind != NODE_CASE_NUMBER )
                     yyerror("String case labels not allowed as range bounds");
-                if (((int)$2->right) > ((int)$4->right)) break;
+                if ($2->r.number > $4->r.number) break;
 
                 $$ = $2;
                 $$->v.expr = $4;
@@ -873,9 +873,9 @@ first_for_expr:
 
                 if ($1) context |= SWITCH_NUMBERS;
                 CREATE_NODE($$, NODE_CASE_NUMBER);
-                $$->right = (struct parse_node *)$1;
+                $$->r.expr = (struct parse_node *)$1;
             }
-    |   string_con2
+    |   string_con1
             {
 		int str;
 		
@@ -885,7 +885,7 @@ first_for_expr:
                     yyerror("Mixed case label list not allowed");
                 context |= SWITCH_STRINGS;
                 CREATE_NODE($$, NODE_CASE_STRING);
-                $$->right = (struct parse_node *)(PROG_STRING(str));
+                $$->r.expr = (struct parse_node *)(PROG_STRING(str));
             }
     ;
 
@@ -1000,13 +1000,13 @@ expr0:
 		    struct parse_node *expr;
 		    expr = make_branched_node(0, 0, 0, 0);
 		    expr->v.expr = r;
-		    $$->right = make_branched_node(F_TO_FLOAT, TYPE_REAL, 0, expr);
+		    $$->r.expr = make_branched_node(F_TO_FLOAT, TYPE_REAL, 0, expr);
 		    $$->v.number = 1;
 		} else if ((l->type == TYPE_NUMBER) && (r->type == TYPE_REAL)) {
 		    struct parse_node *expr;
 		    expr = make_branched_node(0, 0, 0, 0);
 		    expr->v.expr = r;
-		    $$->right = make_branched_node(F_TO_INT, TYPE_NUMBER, 0, expr);
+		    $$->r.expr = make_branched_node(F_TO_INT, TYPE_NUMBER, 0, expr);
 		    $$->v.number = 1;
 		}
 	    }
@@ -1014,6 +1014,7 @@ expr0:
 	    {
 		yyerror("Illegal LHS");
 		NODE_NO_LINE($$, F_CONST0);
+		$$->type = TYPE_NUMBER;
 	    }
     |   expr0 '?' expr0 ':' expr0 %prec '?'
 	    {
@@ -1031,11 +1032,11 @@ expr0:
 		/* optimize if last expression did F_NOT */
 		if ($1->kind == F_NOT) {
 		    /* !a ? b : c  --> a ? c : b */
-		    $$->left = $1->right;
-		    $$->right = make_branched_node(0, 0, p2, p1);
+		    $$->l.expr = $1->r.expr;
+		    $$->r.expr = make_branched_node(0, 0, p2, p1);
 		} else {
-		    $$->left = $1;
-		    $$->right = make_branched_node(0, 0, p1, p2);
+		    $$->l.expr = $1;
+		    $$->r.expr = make_branched_node(0, 0, p1, p2);
 		}
 	    }
     |   expr0 L_LOR expr0
@@ -1090,12 +1091,12 @@ expr0:
 		if ($1->kind == F_NUMBER && $1->v.number == 0) {
 		    NODE_NO_LINE($$, F_NOT);
 		    $$->type = TYPE_NUMBER;
-		    $$->right = $3;
+		    $$->r.expr = $3;
 		} else
 		if ($3->kind == F_NUMBER && $3->v.number == 0) {
 		    NODE_NO_LINE($$, F_NOT);
 		    $$->type = TYPE_NUMBER;
-		    $$->right = $1;
+		    $$->r.expr = $1;
 		} else
 		    $$ = make_branched_node(F_EQ, TYPE_NUMBER, $1, $3);
 	    }
@@ -1393,34 +1394,29 @@ get_two_types(t1, t3));
 		case F_NUMBER:
 		    if ($1->v.number == 0) {
 			$$ = make_branched_node(F_NEGATE, $3->type, 0, $3);
-		    }
-		    if ($3->kind == F_NUMBER) {
+		    } else if ($3->kind == F_NUMBER) {
 			$$ = $1;
 			$1->v.number -= $3->v.number;
-		    }
-		    if ($3->kind == F_REAL) {
+		    } else if ($3->kind == F_REAL) {
 			$$ = $3;
 			$3->v.real = $1->v.number - $3->v.real;
-		    }
-		    $$ = make_branched_node(F_SUBTRACT, result_type, $1, $3);
+		    } else $$ = make_branched_node(F_SUBTRACT, result_type, $1, $3);
+
 		    break;
 		case F_REAL:
 		    if ($3->kind == F_NUMBER) {
 			$$ = $1;
 			$1->v.real -= $3->v.number;
-		    }
-		    if ($3->kind == F_REAL) {
+		    } else if ($3->kind == F_REAL) {
 			$$ = $1;
 			$1->v.real -= $3->v.real;
-		    }
-		    $$ = make_branched_node(F_SUBTRACT, result_type, $1, $3);
+		    } else $$ = make_branched_node(F_SUBTRACT, result_type, $1, $3);
 		    break;
 		default:
 		    /* optimize X-0 */
 		    if ($3->kind == F_NUMBER && $3->v.number == 0) {
 			$$ = $1;
-			break;
-		    }
+		    } 
 		    $$ = make_branched_node(F_SUBTRACT, result_type, $1, $3);
 		}
 	    }
@@ -1656,7 +1652,7 @@ get_two_types(t1, t3));
 		} else {
 		    NODE_NO_LINE($$, F_NOT);
 		    $$->type = TYPE_NUMBER;
-		    $$->right = $2;
+		    $$->r.expr = $2;
 		}
 	    }
     |   '~' expr0
@@ -1669,7 +1665,7 @@ get_two_types(t1, t3));
 		} else {
 		    NODE_NO_LINE($$, F_COMPL);
 		    $$->type = TYPE_NUMBER;
-		    $$->right = $2;
+		    $$->r.expr = $2;
 		}
 	    }
     |   '-' expr0  %prec L_NOT
@@ -1738,39 +1734,6 @@ get_two_types(t1, t3));
                     }
                 } else $$->type = TYPE_ANY;
 	    }
-%ifdef NEW_FUNCTIONS
-    |   '$' '(' 
-            {
-		/* temporarily drop out of function context, for two reasons:
-		   1. $(local var) shouldn't increment local var count
-		   2. $($2) is illegal
-		 */
-		$<number>$ = function_context.num_parameters;
-		function_context.num_parameters = -1;
-            }
-        comma_expr ')'
-            {
-		struct parse_node *node;
-
-		function_context.num_parameters = $<number>3;
-
-		if (function_context.num_parameters == -1) {
-		    /* This was illegal, and error'ed when the '$' token
-		     * was returned.
-		     */
-		    CREATE_TYPED_NODE($$, F_CONST0, TYPE_ANY);
-		} else {
-		    CREATE_TYPED_NODE($$, NODE_VALUE, $4->type);
-		    $$->v.number = function_context.values_list->kind++;
-
-		    node = new_node_no_line();
-		    function_context.values_list->left->right = node;
-		    function_context.values_list->left = node;
-		    node->right = 0;
-		    node->v.expr = $4;
-		}
-	    }
-%endif
     |   expr4
     |   sscanf
     |   parse_command
@@ -1785,8 +1748,8 @@ return:
 		if (exact_types && !TYPE(exact_types, TYPE_VOID))
 		    yyerror("Non-void functions must return a value.");
 		CREATE_NODE($$, F_RETURN);
-		CREATE_TYPED_NODE($$->right, F_NUMBER, TYPE_NUMBER);
-		$$->right->v.number = 0;
+		CREATE_TYPED_NODE($$->r.expr, F_NUMBER, TYPE_NUMBER);
+		$$->r.expr->v.number = 0;
 	    }
     |   L_RETURN comma_expr ';'
 	    {
@@ -1796,7 +1759,7 @@ return:
 		    yyerror(buf);
 		}
 		CREATE_NODE($$, F_RETURN);
-		$$->right = $2;
+		$$->r.expr = $2;
 	    }
     ;
 
@@ -1806,22 +1769,22 @@ expr_list:
 		/* this is a dummy node */
 		$$ = new_node();
 		$$->v.number = 0;
-		$$->left = $$;
-		$$->right = 0;
+		$$->l.expr = $$;
+		$$->r.expr = 0;
 	    }
     |   expr_list2
 	    {
 		$$ = new_node();
 		$$->v.number = $1->kind;
-		$$->left = $1->left;
-		$$->right = $1;
+		$$->l.expr = $1->l.expr;
+		$$->r.expr = $1;
 	    }
     |   expr_list2 ','
 	    {
 		$$ = new_node();
 		$$->v.number = $1->kind;
-		$$->left = $1->left;
-		$$->right = $1;
+		$$->l.expr = $1->l.expr;
+		$$->r.expr = $1;
 	    }
     ;
 
@@ -1831,9 +1794,9 @@ expr_list2:
 		$$ = new_node_no_line();
 		$$->kind = 1;
 		$$->v.expr = $1;
-		$$->right = 0;
+		$$->r.expr = 0;
 		/* we keep track of the end of the chain in the left nodes */
-		$$->left = $$;
+		$$->l.expr = $$;
 	    }
     |   expr_list2 ',' expr0
 	    {
@@ -1842,10 +1805,10 @@ expr_list2:
 		expr = new_node_no_line();
 		expr->kind = 0;
 		expr->v.expr = $3;
-		expr->right = 0;
+		expr->r.expr = 0;
 		
-		$1->left->right = expr;
-		$1->left = expr;
+		$1->l.expr->r.expr = expr;
+		$1->l.expr = expr;
 		$1->kind++;
 		$$ = $1;
 	    }
@@ -1857,19 +1820,19 @@ expr_list3:
 		/* this is a dummy node */
 		$$ = new_node_no_line();
 		$$->v.number = 0;
-		$$->right = 0;
+		$$->r.expr = 0;
 	    }
     |   expr_list4
 	    {
 		$$ = new_node_no_line();
 		$$->v.number = $1->kind;
-		$$->right = $1;
+		$$->r.expr = $1;
 	    }
     |   expr_list4 ','
 	    {
 		$$ = new_node_no_line();
 		$$->v.number = $1->kind;
-		$$->right = $1;
+		$$->r.expr = $1;
 	    }
     ;
 
@@ -1879,9 +1842,9 @@ expr_list4:
 		$$ = new_node_no_line();
 		$$->kind = 2;
 		$$->v.expr = $1;
-		$$->right = 0;
+		$$->r.expr = 0;
 		/* we keep track of the end of the chain in the left nodes */
-		$$->left = $$;
+		$$->l.expr = $$;
             }
     |   expr_list4 ',' assoc_pair
 	    {
@@ -1890,10 +1853,10 @@ expr_list4:
 		expr = new_node_no_line();
 		expr->kind = 0;
 		expr->v.expr = $3;
-		expr->right = 0;
+		expr->r.expr = 0;
 
-		$1->left->right = expr;
-		$1->left = expr;
+		$1->l.expr->r.expr = expr;
+		$1->l.expr = expr;
 		$1->kind += 2;
 		$$ = $1;
 	    }
@@ -1926,6 +1889,7 @@ assoc_pair:
                     case F_RR_RANGE:
                     case F_NE_RANGE:
                     case F_RE_RANGE:
+		    case NODE_VALUE:
                     {
                         struct parse_node *node = $$;
                         int flag = 0;
@@ -1939,6 +1903,10 @@ assoc_pair:
                                     node->kind = F_RINDEX_LVALUE;
                                     flag |= LV_INDEX;
                                     break;
+				case NODE_VALUE:
+				    node->kind = NODE_LVALUE;
+				    flag |= LV_ILLEGAL;
+				    break;
 				case F_NN_RANGE:
 				case F_RN_RANGE:
 				case F_NR_RANGE:
@@ -1993,7 +1961,7 @@ assoc_pair:
                                     if (!(flag & LV_INDEX)){
                                         yyerror("Illegal lvalue, a possible lvalue is (x <assign> y)[a]");
                                     }
-                                    switch(node->left->kind){
+                                    switch(node->l.expr->kind){
                                         case F_NN_RANGE_LVALUE:
                                         case F_RN_RANGE_LVALUE:
                                         case F_NR_RANGE_LVALUE:
@@ -2010,7 +1978,7 @@ assoc_pair:
                                     flag = LV_ILLEGAL;
                                     break;
 			    }   
-                            if ((flag & LV_ILLEGAL) || !(node = node->left)) break;
+                            if ((flag & LV_ILLEGAL) || !(node = node->l.expr)) break;
                         } while (1);
                         break;
                     }
@@ -2038,6 +2006,10 @@ expr4:
 #endif
               } else
 		  if ((i = $1->dn.global_num) != -1) {
+#ifdef NEW_FUNCTIONS
+		      if (function_context.num_parameters >= 0)
+			  function_context.bindable = FP_NOT_BINDABLE;
+#endif
 		      CREATE_TYPED_NODE($$, F_GLOBAL, VARIABLE(i)->type & TYPE_MOD_MASK);
 		      $$->v.number = i;
 		      if (VARIABLE(i)->type & TYPE_MOD_HIDDEN) {
@@ -2083,6 +2055,37 @@ expr4:
 		CREATE_TYPED_NODE($$, NODE_PARAMETER, TYPE_ANY);
 		$$->v.number = $1;
             }
+    |   '$' '(' 
+            {
+		/* temporarily drop out of function context, for two reasons:
+		   1. $(local var) shouldn't increment local var count
+		   2. $($2) is illegal
+		 */
+		$<number>$ = function_context.num_parameters;
+		function_context.num_parameters = -1;
+            }
+        comma_expr ')'
+            {
+		struct parse_node *node;
+
+		function_context.num_parameters = $<number>3;
+
+		if (function_context.num_parameters == -1) {
+		    /* This was illegal, and error'ed when the '$' token
+		     * was returned.
+		     */
+		    CREATE_TYPED_NODE($$, F_CONST0, TYPE_ANY);
+		} else {
+		    CREATE_TYPED_NODE($$, NODE_VALUE, $4->type);
+		    $$->v.number = function_context.values_list->kind++;
+
+		    node = new_node_no_line();
+		    function_context.values_list->l.expr->r.expr = node;
+		    function_context.values_list->l.expr = node;
+		    node->r.expr = 0;
+		    node->v.expr = $4;
+		}
+	    }
 %endif
     |   expr4 '[' comma_expr L_RANGE comma_expr ']'
             {
@@ -2115,10 +2118,10 @@ expr4:
                     if (i < 1 || i > $1->v.number)
                         yyerror("Illegal index to array constant.\n");
                     else {
-                        struct parse_node *node = $1->right;
+                        struct parse_node *node = $1->r.expr;
                         i = $1->v.number - i;
                         while (i--)
-                            node = node->right;
+                            node = node->r.expr;
                         $$ = node->v.expr;
                         break;
                     }
@@ -2133,23 +2136,23 @@ expr4:
                                 $$->type = TYPE_ANY;
                                 break;
 
-				case TYPE_STRING:
-				case TYPE_BUFFER:
+			    case TYPE_STRING:
+			    case TYPE_BUFFER:
                                 $$->type = TYPE_NUMBER;
                                 break;
 
-				default:
+			    default:
                                 if ($1->type & TYPE_MOD_POINTER)
                                     $$->type = $1->type & ~TYPE_MOD_POINTER;
                                 else{
-                                    type_error("Value indexed has a bad type : ", $1->type);
+                                    type_error("Value indexed has a bad type ", $1->type);
                                     $$->type = TYPE_ANY;
                                 }
 			    }
                         if (!BASIC_TYPE($4->type,TYPE_NUMBER))
                             type_error("Bad type of index", $4->type);
                     }
-                }
+                } else $$->type = TYPE_ANY;
             }
     |   expr4 '[' comma_expr ']'
             {
@@ -2158,9 +2161,9 @@ expr4:
                     if (i < 0 || i >= $1->v.number)
                         yyerror("Illegal index to array constant.\n");
                     else {
-                        struct parse_node *node = $1->right;
+                        struct parse_node *node = $1->r.expr;
                         while (i--)
-                            node = node->right;
+                            node = node->r.expr;
                         $$ = node->v.expr;
                         break;
                     }
@@ -2175,23 +2178,23 @@ expr4:
                                 $$->type = TYPE_ANY;
                                 break;
 
-				case TYPE_STRING:
-				case TYPE_BUFFER:
+			    case TYPE_STRING:
+			    case TYPE_BUFFER:
                                 $$->type = TYPE_NUMBER;
                                 break;
 
-				default:
+			    default:
                                 if ($1->type & TYPE_MOD_POINTER)
                                     $$->type = $1->type & ~TYPE_MOD_POINTER;
                                 else{
-                                    type_error("Value indexed has a bad type : ", $1->type);
+                                    type_error("Value indexed has a bad type ", $1->type);
                                     $$->type = TYPE_ANY;
                                 }
-			    }
+			}
                         if (!BASIC_TYPE($3->type,TYPE_NUMBER))
                             type_error("Bad type of index", $3->type);
                     }
-                }
+                } else $$->type = TYPE_ANY;
             }
     |   string
     |   '(' comma_expr ')'
@@ -2224,20 +2227,20 @@ expr4:
 		}
 		if (!($6.node->kind == F_RETURN) &&
 		    !(($6.node->kind == NODE_STATEMENTS)
-		      && $6.node->right->kind == F_RETURN)) {
+		      && $6.node->r.expr->kind == F_RETURN)) {
 		    struct parse_node *replacement;
 		    struct parse_node *sub_node;
 		    NODE_NO_LINE(sub_node, F_RETURN);
-		    NODE_NO_LINE(sub_node->right, F_CONST0);
+		    NODE_NO_LINE(sub_node->r.expr, F_CONST0);
 		    NODE_NO_LINE(replacement, NODE_STATEMENTS);
-		    replacement->left = $6.node;
-		    replacement->right = sub_node;
+		    replacement->l.expr = $6.node;
+		    replacement->r.expr = sub_node;
 		    $6.node = replacement;
 		}
-		$$ = make_branched_node(NODE_ANON_FUNC, TYPE_FUNCTION,
-			(struct parse_node *)
-			     (max_num_locals - $4.num_arg),
-			$6.node);
+		
+		CREATE_TYPED_NODE($$, NODE_ANON_FUNC, TYPE_FUNCTION);
+		$$->l.number = (max_num_locals - $4.num_arg);
+		$$->r.expr = $6.node;
 		$$->v.number = $4.num_arg;
 		free_all_local_names();
 		
@@ -2255,22 +2258,22 @@ expr4:
     |   L_NEW_FUNCTION_OPEN ':' ')'
             {
 		CREATE_TYPED_NODE($$, F_FUNCTION_CONSTRUCTOR, TYPE_FUNCTION);
-		$$->right = 0;
+		$$->r.expr = 0;
 		switch ($1 & 0xff) {
 		case FP_L_VAR:
 		    yyerror("Illegal to use local variable in a functional.");
-		    $$->left = make_branched_node(F_CONST0, 0, 0, 0);
+		    $$->l.expr = make_branched_node(F_CONST0, 0, 0, 0);
 		    $$->v.number = FP_FUNCTIONAL;
 		    break;
 		case FP_G_VAR:
-		    $$->left = make_branched_node(F_GLOBAL, 0, 0, 0);
-		    $$->left->v.number = $1 >> 8;
-		    $$->v.number = FP_FUNCTIONAL;
-		    if (VARIABLE($$->left->v.number)->type & TYPE_MOD_HIDDEN) {
+		    $$->l.expr = make_branched_node(F_GLOBAL, 0, 0, 0);
+		    $$->l.expr->v.number = $1 >> 8;
+		    $$->v.number = FP_FUNCTIONAL | FP_NOT_BINDABLE;
+		    if (VARIABLE($$->l.expr->v.number)->type & TYPE_MOD_HIDDEN) {
 		      char buf[MAXLINE + 30];
 		
 		      strcpy(buf, "Illegal to use private variable '");
-		      strcat(buf, VARIABLE($$->left->v.number)->name);
+		      strcat(buf, VARIABLE($$->l.expr->v.number)->name);
 		      strcat(buf, "'\n");
 		      yyerror(buf);
 		    }
@@ -2284,7 +2287,7 @@ expr4:
             {
 		CREATE_TYPED_NODE($$, F_FUNCTION_CONSTRUCTOR, TYPE_FUNCTION);
 		$$->v.number = $1;
-		$$->right = $3;
+		$$->r.expr = $3;
 
 		switch ($1 & 0xff) {
 		case FP_EFUN: {
@@ -2318,7 +2321,7 @@ expr4:
 		      while (argp[i] != 0)
 			i++;
 		      argp += i + 1;
-		      enode = enode->right;
+		      enode = enode->r.expr;
 		    }
 		  }
 		  break;
@@ -2333,12 +2336,12 @@ expr4:
              {
 		 if (function_context.num_locals)
 		   yyerror("Illegal to use local variable in functional.");
-		 if (function_context.values_list->right)
-		     function_context.values_list->right->kind = function_context.values_list->kind;
+		 if (function_context.values_list->r.expr)
+		     function_context.values_list->r.expr->kind = function_context.values_list->kind;
 
 		 $$ = make_branched_node(F_FUNCTION_CONSTRUCTOR, TYPE_FUNCTION,
-					 $2, function_context.values_list->right);
-		 $$->v.number = FP_FUNCTIONAL 
+					 $2, function_context.values_list->r.expr);
+		 $$->v.number = FP_FUNCTIONAL + function_context.bindable
 		     + (function_context.num_parameters << 8);
 		 function_context = $1;
              }
@@ -2346,9 +2349,9 @@ expr4:
       |   L_FUNCTION_OPEN expr0 ':' ')'
              {
 		 CREATE_TYPED_NODE($$, F_FUNCTION_CONSTRUCTOR, TYPE_FUNCTION);
-		 $$->v.number = ORIGIN_CALL_OTHER | 1;
-		 $$->left = 0;
-		 $$->right = $2;
+		 $$->v.number = FP_CALL_OTHER | FP_THIS_OBJECT;
+		 $$->l.expr = 0;
+		 $$->r.expr = $2;
  	    }
 %endif
      |   L_FUNCTION_OPEN expr0 ',' expr0 ':' ')'
@@ -2361,10 +2364,8 @@ expr4:
               if (function_context.values_list->kind > 0) 
 		  yyerror("Illegal use of $(expression) in call_other function pointer.");
               function_context = $1;
-	      $$->v.number = FP_CALL_OTHER;
-#else
-	      $$->v.number = ORIGIN_CALL_OTHER;
 #endif
+	      $$->v.number = FP_CALL_OTHER;
  	    }
     |   L_MAPPING_OPEN expr_list3 ']' ')'
 	    {
@@ -2384,7 +2385,7 @@ catch:
 	L_CATCH '(' comma_expr ')'
 	    {
 		CREATE_TYPED_NODE($$, F_CATCH, TYPE_ANY);
-		$$->right = $3;
+		$$->r.expr = $3;
 	    }
     ;
 
@@ -2393,8 +2394,8 @@ sscanf:
 	    {
 	        struct parse_node *expr;
 		expr = new_node_no_line();
-		expr->left = $3;
-		expr->right = $5;
+		expr->l.expr = $3;
+		expr->r.expr = $5;
 		$$ = make_branched_node(F_SSCANF, TYPE_NUMBER,
 					expr, $6);
 	    }
@@ -2407,11 +2408,11 @@ parse_command:
 	      struct parse_node *sub_expr;
 
 	      sub_expr = new_node_no_line();
-	      sub_expr->left = $5;
-	      sub_expr->right = $7;
+	      sub_expr->l.expr = $5;
+	      sub_expr->r.expr = $7;
 	      expr = new_node_no_line();
-	      expr->left = $3;
-	      expr->right = sub_expr;
+	      expr->l.expr = $3;
+	      expr->r.expr = sub_expr;
 	      $$ = make_branched_node(F_PARSE_COMMAND, TYPE_NUMBER,
 					expr, $8);
 	    }
@@ -2429,13 +2430,13 @@ lvalue_list:
 	/* empty */
 	    {
 	        $$ = new_node_no_line();
-		$$->right = 0;
+		$$->r.expr = 0;
 	        $$->v.number = 0;
 	    }
     |   ',' lvalue lvalue_list
 	    {
 	        $$ = $3;
-	        $$->right = make_branched_node(0, 0, $2, $3->right);
+	        $$->r.expr = make_branched_node(0, 0, $2, $3->r.expr);
 		$$->v.number++;
 	    }
     ;
@@ -2450,12 +2451,12 @@ string:
     ;
 
 string_con1:
-	L_STRING
+	string_con2
     |   '(' string_con1 ')'
 	    {
 		$$ = $2;
 	    }
-    |   string_con1 '+' L_STRING
+    |   string_con1 '+' string_con1
 	    {
 		$$ = scratch_join($1, $3);
 	    }
@@ -2481,11 +2482,16 @@ function_call:
 
 	      $$ = $3;
 	      if ((f = $1->dn.function_num) != -1) {
+#ifdef NEW_FUNCTIONS
+		  if (function_context.num_parameters >= 0)
+		      function_context.bindable = FP_NOT_BINDABLE;
+#endif
+
 		  $$->kind = F_CALL_FUNCTION_BY_ADDRESS;
 		  $$->v.number = f;
 		  funp = FUNCTION(f);
 	      
-		  $$->type = validate_function_call(funp, f, $3->right);
+		  $$->type = validate_function_call(funp, f, $3->r.expr);
 	      } else
 	      if ((f=$1->dn.simul_num) != -1) {
 		  $$->kind = F_SIMUL_EFUN;
@@ -2506,6 +2512,11 @@ function_call:
 		int f;
 		struct function *funp;
 
+#ifdef NEW_FUNCTIONS
+		if (function_context.num_parameters >= 0)
+		    function_context.bindable = FP_NOT_BINDABLE;
+#endif
+		
 		f = define_new_function($1->name, 0, 0, 0, NAME_UNDEFINED, 0);
 		$$->kind = F_CALL_FUNCTION_BY_ADDRESS;
 		$$->v.number = f;
@@ -2540,6 +2551,11 @@ function_call:
 		  struct function *funp;
 		  struct ident_hash_elem *ihe;
 		  
+#ifdef NEW_FUNCTIONS
+		  if (function_context.num_parameters >= 0)
+		      function_context.bindable = FP_NOT_BINDABLE;
+#endif
+
 		  f = (ihe = lookup_ident(name)) ? ihe->dn.function_num : -1;
 		  $$->kind = F_CALL_FUNCTION_BY_ADDRESS;
 		  if (f!=-1) {
@@ -2550,7 +2566,7 @@ function_call:
 		      $$->v.number = f;
 		      funp = FUNCTION(f);
 		      
-		      $$->type = validate_function_call(funp, f, $3->right);
+		      $$->type = validate_function_call(funp, f, $3->r.expr);
 		  } else {
 		      
 		      f = define_new_function(name, 0, 0, 0, 
@@ -2600,9 +2616,9 @@ function_call:
 		expr2->v.expr->v.number = store_prog_string($3);
 
 		/* insert the two nodes */
-		expr2->right = $$->right;
-		expr->right = expr2;
-		$$->right = expr;
+		expr2->r.expr = $$->r.expr;
+		expr->r.expr = expr2;
+		$$->r.expr = expr;
 		scratch_free($3);
 	    }
     |   '(' '*' comma_expr ')' '(' expr_list ')'
@@ -2615,12 +2631,12 @@ function_call:
 #ifdef NEW_FUNCTIONS
 		expr = new_node_no_line();
 		expr->v.expr = $3;
-		expr->right = $$->right;
-		$$->right = expr;
+		expr->r.expr = $$->r.expr;
+		$$->r.expr = expr;
 		$$->v.number++;
 #else
                 $$->v.number += 2; /* The two args from the fp split */
-                $$->left = $3;
+                $$->l.expr = $3;
 #endif
 	    }
     ;
@@ -2696,16 +2712,16 @@ cond:
 	    {
 		/* x != 0 -> x */
 		if ($3->kind == F_NE) {
-		    if ($3->right->kind == F_NUMBER && $3->right->v.number == 0)
-			$3 = $3->left;
-		    else if ($3->left->kind == F_NUMBER && $3->left->v.number == 0)
-			$3 = $3->right;
+		    if ($3->r.expr->kind == F_NUMBER && $3->r.expr->v.number == 0)
+			$3 = $3->l.expr;
+		    else if ($3->l.expr->kind == F_NUMBER && $3->l.expr->v.number == 0)
+			$3 = $3->r.expr;
 		}
 
 		NODE_NO_LINE($$, NODE_IF);
 		$$->v.expr = $3;
-		$$->left = $5;
-		$$->right = $6;
+		$$->l.expr = $5;
+		$$->r.expr = $6;
 	    }
     ;
 

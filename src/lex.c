@@ -14,6 +14,7 @@
  */
 
 #include "std.h"
+#include "file_incl.h"
 #include "lex.h"
 #include "config.h"
 #include "compiler.h"
@@ -28,6 +29,7 @@
 #include "hash.h"
 /* legal_path */
 #include "file.h"
+#include "include/function.h"
 
 #define NELEM(a) (sizeof (a) / sizeof((a)[0]))
 #define LEX_EOF ((char) EOF)
@@ -864,7 +866,7 @@ static void handle_pragma P1(char *, str)
 #endif
     } else if (strcmp(str, "save_types") == 0) {
 	pragmas |= PRAGMA_SAVE_TYPES;
-#ifdef SAVE_BINARIES
+#ifdef BINARIES
     } else if (strcmp(str, "save_binary") == 0) {
 	pragmas |= PRAGMA_SAVE_BINARY;
 #endif
@@ -905,7 +907,7 @@ char *show_error_context(){
 	    if (len == 19) strcat(buf, "the end of file");
 	    break;
 	}
-	*yyp2++ = *yyp++;
+        *yyp2++ = *yyp++;
     }
     *yyp2 = 0;
     if (yyp2 != sub_context) strcat(buf, sub_context);
@@ -914,16 +916,19 @@ char *show_error_context(){
 }
 
 static void refill_buffer(){
-    if (cur_lbuf != &head_lbuf){
-	if (outp >= cur_lbuf->buf_end && cur_lbuf->term_type == TERM_ADD_INPUT){
-	    /* In this case it cur_lbuf cannot have been allocated due to #include */
+    if (cur_lbuf != &head_lbuf) {
+	if (outp >= cur_lbuf->buf_end && 
+	    cur_lbuf->term_type == TERM_ADD_INPUT) {
+	    /* In this case it cur_lbuf cannot have been 
+	       allocated due to #include */
 	    struct linked_buf *prev_lbuf = cur_lbuf->prev;
 
 	    FREE(cur_lbuf);
 	    cur_lbuf = prev_lbuf;
 	    outp = cur_lbuf->outp;
 	    last_nl = cur_lbuf->last_nl;
-	    if (cur_lbuf->term_type == TERM_ADD_INPUT || (outp != last_nl + 1))
+	    if (cur_lbuf->term_type == TERM_ADD_INPUT
+		|| (outp != last_nl + 1))
 		return;
 	}
     }
@@ -957,7 +962,7 @@ static void refill_buffer(){
 	    while (*--p != '\n');
 	    if (p == outp - 1){
 		lexerror("Line too long.");
-		*(last_nl = cur_lbuf->buf_end - 1) == '\n';
+		*(last_nl = cur_lbuf->buf_end - 1) = '\n';
 		return;
 	    }
 	    last_nl = p;
@@ -1010,7 +1015,7 @@ static void refill_buffer(){
 	    while (*--p != '\n');
 	    if (p == outp - 1){
 		lexerror("Line too long.");
-		*(last_nl = end - 1) == '\n';
+		*(last_nl = end - 1) = '\n';
 		return;
 	    }
 	    last_nl = p;
@@ -1028,10 +1033,11 @@ static INLINE void reset_function_context() {
     function_context.num_parameters = 0;
     function_context.num_locals = 0;
     node = new_node_no_line();
-    node->left = node;
-    node->right = 0;
+    node->l.expr = node;
+    node->r.expr = 0;
     node->kind = 0;
     function_context.values_list = node;
+    function_context.bindable = 0;
 }
 
 static int old_func() {
@@ -1080,9 +1086,11 @@ int yylex()
 		free_string(current_file);
 		nexpands = 0;
 		if (outp >= cur_lbuf->buf_end){
-		    struct linked_buf *prev_lbuf = cur_lbuf->prev;
-		    FREE(cur_lbuf);
-		    cur_lbuf = prev_lbuf;
+		    struct linked_buf *prev_lbuf;
+		    if (prev_lbuf = cur_lbuf->prev) {
+			FREE(cur_lbuf);
+			cur_lbuf = prev_lbuf;
+		    }
 		}
 
 		current_file = p->file;
@@ -1109,6 +1117,7 @@ int yylex()
 		    FREE((char *) p);
 		}
 	    }
+	    outp--;
 	    return -1;
 	case '\n':
 	    {
@@ -1808,9 +1817,9 @@ parse_identifier:
 				    if (c == ',') return old_func();
 				    yylval.number = (val << 8) | FP_G_VAR;
 				} else if ((val=ihe->dn.simul_num) >=0) {
-				    yylval.number = (val << 8)|FP_SIMUL_EFUN;
+				    yylval.number = (val << 8)|FP_SIMUL;
 				} else if ((val=ihe->dn.function_num) >=0) {
-				    yylval.number = (val << 8)|FP_LFUN;
+				    yylval.number = (val << 8)|FP_LOCAL;
 				} else if ((val=ihe->dn.efun_num) >=0) {
 				    yylval.number = (val << 8)|FP_EFUN;
 				} else return old_func();
@@ -2364,7 +2373,7 @@ static void handle_define P1(char *, yyt)
 	}
 	*--q = 0;
 	add_define(namebuf, arg, mtext);
-    } else if (is_wspace(*p)) {
+    } else if (is_wspace(*p) || (*p == '\\')) {
 	for (q = mtext; *p;) {
 	    *q = *p++;
 	    if (q < mtext + MLEN - 2)

@@ -30,9 +30,9 @@ INLINE void f_sscanf PROT((void));
 /*
  * eoperators.c
  */
-struct funp *make_funp PROT((struct svalue *, struct svalue *));
-void push_funp PROT((struct funp *));
-void free_funp PROT((struct funp *));
+INLINE struct funp *make_funp PROT((struct svalue *, struct svalue *));
+INLINE void push_funp PROT((struct funp *));
+INLINE void free_funp PROT((struct funp *));
 int merge_arg_lists PROT((int, struct vector *, int));
 void call_simul_efun PROT((unsigned short, int));
 

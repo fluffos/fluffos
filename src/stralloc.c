@@ -70,7 +70,7 @@ static void bp() {
 #define	MAXSHORT (unsigned short)((1 << (sizeof(short)*8)) - 1)
 #endif
 
-static int num_distinct_strings = 0;
+int num_distinct_strings = 0;
 static int bytes_distinct_strings = 0;
 static int allocd_strings = 0;
 static int allocd_bytes = 0;
@@ -83,7 +83,7 @@ static int num_str_searches = 0;
 #define hfindblock(s, h) sfindblock(s, h = StrHash(s))
 #define findblock(s) sfindblock(s, StrHash(s))
 
-static block_t *sfindblock PROT((char *, int));
+INLINE static block_t *sfindblock PROT((char *, int));
 
 /*
  * hash table - list of pointers to heads of string chains.
@@ -102,12 +102,15 @@ static void checked PROT((char *, char *));
 
 void init_strings()
 {
-    int x;
+    int x, y;
 
     /* ensure that htable size is a power of 2 */
-    for (htable_size = 1; htable_size <= HTABLE_SIZE; htable_size *= 2);
+    y = HTABLE_SIZE;
+    for (htable_size = 1; htable_size < y; htable_size *= 2)
+	;
     htable_size_minus_one = htable_size - 1;
-    base_table = CALLOCATE(htable_size, block_t *, TAG_STR_TBL, "init_strings");
+    base_table = CALLOCATE(htable_size, block_t *, 
+			   TAG_STR_TBL, "init_strings");
     overhead_bytes += (sizeof(block_t *) * htable_size);
 
     for (x = 0; x < htable_size; x++) {
@@ -305,14 +308,14 @@ add_string_status P1(int, verbose)
 	add_message("-------------------------\t Strings    Bytes\n");
     }
     if (verbose != -1)
-	add_message("Strings malloced\t\t%8d %8d + %d overhead\n",
+	add_vmessage("Strings malloced\t\t%8d %8d + %d overhead\n",
 	      num_distinct_strings, bytes_distinct_strings, overhead_bytes);
     if (verbose == 1) {
-	add_message("Total asked for\t\t\t%8d %8d\n",
+	add_vmessage("Total asked for\t\t\t%8d %8d\n",
 		    allocd_strings, allocd_bytes);
-	add_message("Space actually required/total string bytes %d%%\n",
+	add_vmessage("Space actually required/total string bytes %d%%\n",
 	    (bytes_distinct_strings + overhead_bytes) * 100 / allocd_bytes);
-	add_message("Searches: %d    Average search length: %6.3f\n",
+	add_vmessage("Searches: %d    Average search length: %6.3f\n",
 		  num_str_searches, (double) search_len / num_str_searches);
     }
     return (bytes_distinct_strings + overhead_bytes);

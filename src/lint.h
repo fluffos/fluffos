@@ -47,7 +47,9 @@
    int printf(char *,...);
    int sscanf(char *, char *,...);
    void perror(char *);
+/* Dseven says SunOS has a mkdir() prototype now.
    int mkdir PROT((const char *, unsigned short));
+*/
    int system PROT((char *));
    int atoi PROT((const char *));
    void abort PROT(());
@@ -119,13 +121,6 @@
      long random PROT((void));
 #  endif
 
-/* Beek - Ok, who *does* need this??? */
-#  if !defined(sgi) && !defined(NeXT) && !defined(hpux) && !defined(sun) && \
-   !defined(_AIX) && !defined(LATTICE) && !defined(OS2) && !defined(__bsdi__)\
-   && !defined(linux)
-    int getpeername PROT((int, struct sockaddr *, int *));
-    int shutdown PROT((int, int));
-#  endif
 #endif
 
 #endif

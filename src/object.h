@@ -19,8 +19,17 @@
 #include "uid.h"
 
 #define O_HEART_BEAT		0x01	/* Does it have an heart beat ?      */
+#ifndef NO_WIZARDS
 #define O_IS_WIZARD		0x02	/* used to be O_IS_WIZARD            */
+#endif
+
+#define O_LISTENER              0x04    /* can hear say(), etc */
+#ifndef NO_ADD_ACTION
 #define O_ENABLE_COMMANDS	0x04	/* Can it execute commands ?         */
+#else
+#define O_CATCH_TELL            0x04
+#endif
+
 #define O_CLONE			0x08	/* Is it cloned from a master copy ? */
 #define O_DESTRUCTED		0x10	/* Is it destructed ?                */
 #define O_SWAPPED		0x20	/* Is it swapped to file             */
@@ -33,12 +42,14 @@
 #define O_EFUN_SOCKET           0x800	/* efun socket references object     */
 #endif
 #define O_WILL_RESET            0x1000	/* reset will be called next time    */
+#ifndef OLD_ED
+#define O_IN_EDIT               0x2000  /* object has an ed buffer open      */
+#endif
 
 #if 0
 /*
  * Note: use of more than 16 bits means extending flags to an unsigned long
  */
-#define O_EXTERN_PROGRAM        0x2000	/* external program (not used)       */
 #define O_UNUSED                0x4000	/* used to be O_MASTER (obsolete)    */
 #define O_UNUSED2               0x8000	/* reserved for future expansion     */
 #endif
@@ -50,9 +61,6 @@ typedef struct object {
 #endif
     unsigned short flags;	/* Bits or'ed together from above */
     short heart_beat_ticks, time_to_heart_beat;
-#ifndef NO_LIGHT
-    short total_light;
-#endif
     int load_time;		/* time when this object was created */
     int next_reset;		/* Time of next reset of this object */
     int time_of_ref;		/* Time when last referenced. Used by swap */
@@ -62,12 +70,19 @@ typedef struct object {
     struct object *next_all, *next_inv, *next_heart_beat, *next_hash;
     struct object *contains;
     struct object *super;	/* Which object surround us ? */
+    struct interactive *interactive;	/* Data about an interactive user */
+#ifndef NO_LIGHT
+    short total_light;
+#endif
 #ifndef NO_SHADOWS
     struct object *shadowing;	/* Is this object shadowing ? */
     struct object *shadowed;	/* Is this object shadowed ? */
 #endif				/* NO_SHADOWS */
-    struct interactive *interactive;	/* Data about an interactive user */
+#ifndef NO_ADD_ACTION
     struct sentence *sent;
+    struct object *next_hashed_living;
+    char *living_name;		/* Name of living object if in hash */
+#endif
 #ifndef NO_UIDS
     userid_t *uid;		/* the "owner" of this object */
     userid_t *euid;		/* the effective "owner" */
@@ -78,8 +93,6 @@ typedef struct object {
 #ifndef NO_MUDLIB_STATS
     statgroup_t stats;		/* mudlib stats */
 #endif
-    struct object *next_hashed_living;
-    char *living_name;		/* Name of living object if in hash */
     svalue variables[1];	/* All variables to this program */
     /* The variables MUST come last in the struct */
 }      object_t;
@@ -108,22 +121,21 @@ extern int tot_alloc_object_size;
 extern int save_svalue_depth;
 
 void bufcat PROT((char **, char *));
-void reference_prog PROT((struct program *, char *));
-void free_prog PROT((struct program *, int));
-int svalue_save_size PROT((struct svalue *));
-void save_svalue PROT((struct svalue *, char **));
-int restore_svalue PROT((char *, struct svalue *));
+INLINE int svalue_save_size PROT((struct svalue *));
+INLINE void save_svalue PROT((struct svalue *, char **));
+INLINE int restore_svalue PROT((char *, struct svalue *));
 int save_object PROT((struct object *, char *, int));
 char *save_variable PROT((struct svalue *));
 int restore_object PROT((struct object *, char *, int));
 void restore_variable PROT((struct svalue *, char *));
 struct object *get_empty_object PROT((int));
-void reset_object PROT((struct object *, int));
+void reset_object PROT((struct object *));
+void call_create PROT((struct object *, int));
 void reload_object PROT((struct object *));
 void free_object PROT((struct object *, char *));
 struct object *find_living_object PROT((char *, int));
-int valid_hide PROT((struct object *));
-int object_visible PROT((struct object *));
+INLINE int valid_hide PROT((struct object *));
+INLINE int object_visible PROT((struct object *));
 void set_living_name PROT((struct object *, char *));
 void remove_living_name PROT((struct object *));
 void stat_living_objects PROT((void));
@@ -143,17 +155,5 @@ void regerror PROT((char *));
  */
 int hashstr PROT((char *, int, int));
 int whashstr PROT((char *, int));
-
-/*
- * call_out.c
- */
-void call_out PROT((void));
-void new_call_out PROT((struct object *, char *, int, int, struct svalue *));
-int remove_call_out PROT((struct object *, char *));
-void remove_all_call_out PROT((struct object *));
-int find_call_out PROT((struct object *, char *));
-struct vector *get_all_call_outs PROT((void));
-int print_call_out_usage PROT((int));
-void count_ref_from_call_outs PROT((void));
 
 #endif

@@ -540,7 +540,7 @@ socket_write P3(int, fd, struct svalue *, message, char *, name)
 
 
 	case T_BUFFER:
-	    if (sendto(lpc_socks[fd].fd, message->u.buf->item,
+	    if (sendto(lpc_socks[fd].fd, (char *)message->u.buf->item,
 		       message->u.buf->size, 0,
 		       (struct sockaddr *) & sin, sizeof(sin)) == -1) {
 		perror("socket_write: sendto");
@@ -717,7 +717,7 @@ socket_read_select_handler P1(int, fd)
 
 	case STREAM:
 	    debug(8192, ("read_socket_handler: DATA_XFER STREAM\n"));
-	    cc = recv(lpc_socks[fd].fd, buf, sizeof(buf) - 1, 0);
+	    cc = read(lpc_socks[fd].fd, buf, sizeof(buf) - 1);
 	    if (cc <= 0)
 		break;
 	    debug(8192, ("read_socket_handler: read %d bytes\n", cc));
@@ -819,7 +819,8 @@ socket_close P1(int, fd)
 	return EEBADF;
     if (lpc_socks[fd].owner_ob != current_object)
 	return EESECURITY;
-    while (close(lpc_socks[fd].fd) == -1 && errno == EINTR);	/* empty while */
+    while (close(lpc_socks[fd].fd) == -1 && errno == EINTR)
+	;	/* empty while */
     lpc_socks[fd].state = CLOSED;
     if (lpc_socks[fd].r_buf != NULL)
 	FREE(lpc_socks[fd].r_buf);
@@ -1026,7 +1027,7 @@ void dump_socket_status()
     add_message("--  ---------  --------  ---------------------  ---------------------\n");
 
     for (i = 0; i < MAX_EFUN_SOCKS; i++) {
-	add_message("%2d  ", lpc_socks[i].fd);
+	add_vmessage("%2d  ", lpc_socks[i].fd);
 
 	switch (lpc_socks[i].state) {
 	case CLOSED:
@@ -1066,8 +1067,8 @@ void dump_socket_status()
 	}
 	add_message("  ");
 
-	add_message("%-21s  ", inet_address(&lpc_socks[i].l_addr));
-	add_message("%-21s\n", inet_address(&lpc_socks[i].r_addr));
+	add_vmessage("%-21s  ", inet_address(&lpc_socks[i].l_addr));
+	add_vmessage("%-21s\n", inet_address(&lpc_socks[i].r_addr));
     }
 }
 #endif				/* SOCKET_EFUNS */

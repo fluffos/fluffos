@@ -9,6 +9,7 @@
 #include "debugmalloc.h"
 #include "malloc.h"
 #include "md.h"
+#include "comm.h"
 
 #undef NOISY_MALLOC
 
@@ -93,12 +94,12 @@ void dump_malloc_data()
 
     net = stats.alloc_calls - stats.free_calls;
     add_message("using debug malloc:\n\n");
-    add_message("total malloc'd:   %10lu\n", total_malloced);
-    add_message("high water mark:  %10lu\n", hiwater);
-    add_message("overhead:         %10lu\n",
+    add_vmessage("total malloc'd:   %10lu\n", total_malloced);
+    add_vmessage("high water mark:  %10lu\n", hiwater);
+    add_vmessage("overhead:         %10lu\n",
 		(TABLESIZE * sizeof(node_t *)) + (net * MD_OVERHEAD));
-    add_message("#alloc calls:     %10lu\n", stats.alloc_calls);
-    add_message("#free calls:      %10lu\n", stats.free_calls);
-    add_message("#alloc - #free:   %10lu\n", net);
-    add_message("#realloc calls:   %10lu\n", stats.realloc_calls);
+    add_vmessage("#alloc calls:     %10lu\n", stats.alloc_calls);
+    add_vmessage("#free calls:      %10lu\n", stats.free_calls);
+    add_vmessage("#alloc - #free:   %10lu\n", net);
+    add_vmessage("#realloc calls:   %10lu\n", stats.realloc_calls);
 }

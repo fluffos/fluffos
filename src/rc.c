@@ -162,7 +162,7 @@ void set_defaults P1(char *, filename)
 
     scan_config_line(buff, "log directory : %[^\n]", CONFIG_STR(__LOG_DIR__), 1);
     scan_config_line(buff, "include directories : %[^\n]", CONFIG_STR(__INCLUDE_DIRS__), 1);
-#ifdef SAVE_BINARIES
+#ifdef BINARIES
     scan_config_line(buff, "save binaries directory : %[^\n]", CONFIG_STR(__SAVE_BINARIES_DIR__), 0);
 #endif
 

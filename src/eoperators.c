@@ -10,6 +10,33 @@
 #include "eoperators.h"
 #include "parse.h"
 #include "swap.h"
+#ifdef TRACE
+#include "comm.h"
+#endif
+
+INLINE void
+free_funp P1(struct funp *, fp)
+{
+    fp->ref--;
+    if (fp->ref > 0) {
+	return;
+    }
+#ifdef NEW_FUNCTIONS
+    free_object(fp->owner, "free_funp");
+    if (fp->type == FP_CALL_OTHER)
+	free_svalue(&fp->f.obj, "free_funp");
+    else if (fp->type == FP_FUNCTIONAL) {
+	fp->f.a.prog->p.i.func_ref--;
+	if (fp->f.a.prog->p.i.func_ref == 0 && fp->f.a.prog->p.i.ref == 0)
+	    deallocate_program(fp->f.a.prog);
+    }
+    free_svalue(&fp->args, "free_funp");
+#else
+    free_svalue(&fp->obj, "free_funp");
+    free_svalue(&fp->fun, "free_funp");
+#endif
+    FREE(fp);
+}
 
 INLINE void f_and()
 {
@@ -53,7 +80,7 @@ f_div_eq()
 	case T_REAL:
 	{
 	    if (sp->u.real == 0.0) error("Division by 0rr\n");
-	    sp->u.real = argp->u.number /= sp->u.real;
+	    sp->u.real = argp->u.real /= sp->u.real;
 	    break;
 	}
 
@@ -63,9 +90,10 @@ f_div_eq()
 		if (!sp->u.number) error("Division by 0rn\n");
 		sp->u.real = argp->u.real /= sp->u.number;
 		sp->type = T_REAL;
+	    } else {
+		if (sp->u.real == 0.0) error("Division by 0nr\n");
+		sp->u.real = argp->u.number /= sp->u.real;
 	    }
-	    else if (sp->u.real == 0.0) error("Division by 0nr\n");
-	    else sp->u.real = argp->u.number /= sp->u.real;
 	    break;
 	}
 
@@ -385,9 +413,6 @@ f_parse_command()
     CHECK_TYPES(&arg[1], T_OBJECT | T_POINTER, 2, F_PARSE_COMMAND);
     CHECK_TYPES(&arg[2], T_STRING, 3, F_PARSE_COMMAND);
 
-    if (arg[1].type == T_POINTER)
-	check_for_destr(arg[1].u.vec);
-
     /*
      * allocate stack frame for rvalues and return value (number of matches);
      * perform some stack manipulation;
@@ -396,9 +421,10 @@ f_parse_command()
     sp += num_arg + 1;
     arg = sp;
     *(arg--) = *(fp--);		/* move pattern to top of stack */
-    *(arg--) = *(fp--);		/* move source object to just below the
-				 * pattern */
+    *(arg--) = *(fp--);		/* move source object or array to just below 
+				   the pattern */
     *(arg) = *(fp);		/* move source string just below the object */
+    fp->type = T_NUMBER;
 
     /*
      * prep area for rvalues
@@ -419,7 +445,6 @@ f_parse_command()
     /*
      * save return value on stack
      */
-    fp->type = T_NUMBER;
     fp->u.number = i;
 }
 
@@ -513,7 +538,6 @@ f_range(int code)
             from = (--sp)->u.number;
             if (code & 0x10) from = v->size - from;
             put_vector(slice_array(v, from, to));
-            free_vector(v);
             break;
         }
 
@@ -523,7 +547,7 @@ f_range(int code)
 }
 
 INLINE void
-f_extract_range(int code)
+f_extract_range P1(int, code)
 {
     int from,  len;
 
@@ -578,7 +602,6 @@ f_extract_range(int code)
             from = (--sp)->u.number;
             if (code) from = v->size - from;
             put_vector(slice_array(v, from, v->size - 1));
-            free_vector(v);
             break;
         }
 
@@ -662,7 +685,7 @@ f_sub_eq()
  *
  * Table type is either
  *   0xfe  - integer labels, direct lookup.
- *           Table is followed by 1 long that is minimum key value.
+ *           Table is followed by 1 int that is minimum key value.
  *           Each table entry is a short address to jump to.
  *   0xfN  - integer labels.  N is size as a power of 2.
  *           Each table entry is 1 long (key) followed by 1 short (address).
@@ -684,37 +707,39 @@ f_sub_eq()
 #define SW_BREAK	3
 #define SW_DEFAULT	5
 
-#define ENTRY_SIZE	6
-
 /* offsets used for range (L_ for lower member, U_ for upper member) */
 #define L_LOWER	0
-#define L_TYPE	4
-#define L_UPPER	6
-#define L_ADDR	10
-#define U_LOWER	-6
-#define U_TYPE	-2
+#define L_TYPE	(sizeof(char *))
+#define L_UPPER	(SWITCH_CASE_SIZE)
+#define L_ADDR	(SWITCH_CASE_SIZE + sizeof(char *))
+#define U_LOWER	(-SWITCH_CASE_SIZE)
+#define U_TYPE	(-SWITCH_CASE_SIZE + sizeof(char *))
 #define U_UPPER	0
-#define U_ADDR	4
+#define U_ADDR	(sizeof(char *))
 
 INLINE void
 f_switch()
 {
     unsigned short offset, break_adr;
-    int d, s = 0, r;
+    int d;
+    POINTER_INT s = 0;
+    POINTER_INT r;
     int i;
     char *l, *end_tab;
     static unsigned short off_tab[] =
     {
-	0 * ENTRY_SIZE, 1 * ENTRY_SIZE, 3 * ENTRY_SIZE, 7 * ENTRY_SIZE, 15 * ENTRY_SIZE,
-	31 * ENTRY_SIZE, 63 * ENTRY_SIZE, 127 * ENTRY_SIZE, 255 * ENTRY_SIZE,
-	511 * ENTRY_SIZE, 1023 * ENTRY_SIZE, 2047 * ENTRY_SIZE, 4095 * ENTRY_SIZE,
-	8191 * ENTRY_SIZE,
+	0 * SWITCH_CASE_SIZE, 1 * SWITCH_CASE_SIZE, 3 * SWITCH_CASE_SIZE,
+	7 * SWITCH_CASE_SIZE, 15 * SWITCH_CASE_SIZE, 31 * SWITCH_CASE_SIZE,
+	63 * SWITCH_CASE_SIZE, 127 * SWITCH_CASE_SIZE, 
+	255 * SWITCH_CASE_SIZE, 511 * SWITCH_CASE_SIZE, 
+	1023 * SWITCH_CASE_SIZE, 2047 * SWITCH_CASE_SIZE, 
+	4095 * SWITCH_CASE_SIZE, 8191 * SWITCH_CASE_SIZE,
     };
 
     COPY_SHORT(&offset, pc + SW_TABLE);
     COPY_SHORT(&break_adr, pc + SW_BREAK);
-    if (--break_sp == start_of_switch_stack) fatal("Switch stack underflow!\n"\
-);
+    if (--break_sp == start_of_switch_stack)
+	fatal("Switch stack underflow!\n");
     *break_sp = break_adr;
     if ((i = EXTRACT_UCHAR(pc) >> 4) != 0xf) {	/* String table, find correct
 						 * key */
@@ -724,10 +749,10 @@ f_switch()
 	} else if (sp->type == T_STRING) {
 	    switch (sp->subtype) {
 	    case STRING_SHARED:
-		s = (int) sp->u.string;
+		s = (POINTER_INT) sp->u.string;
 		break;
 	    default:
-		s = (int) findstring(sp->u.string);
+		s = (POINTER_INT) findstring(sp->u.string);
 		break;
 	    }
 	    if (s == 0) {
@@ -775,22 +800,24 @@ f_switch()
 	    fatal("unsupported switch table format.\n");
 
     /*
-     * l - current entry we are looking at. d - size to add/subtract from l
-     * each iteration. s - key we're looking for r - key l is pointing at
+     * l - current entry we are looking at. 
+     * d - size to add/subtract from l each iteration. 
+     * s - key we're looking for 
+     * r - key l is pointing at
      */
     l = current_prog->p.i.program + offset + off_tab[i];
-    d = (int) (off_tab[i] + ENTRY_SIZE) >> 1;
-    if (d < ENTRY_SIZE)
+    d = (int) (off_tab[i] + SWITCH_CASE_SIZE) >> 1;
+    if (d < SWITCH_CASE_SIZE)
 	d = 0;
     for (;;) {
-	COPY_INT(&r, l);
+	COPY_PTR(&r, l);
 	if (s < r) {
-	    if (d < ENTRY_SIZE) {
+	    if (d < SWITCH_CASE_SIZE) {
 		/* test if entry is part of a range */
 		/* Don't worry about reading from F_BREAK (byte before table) */
 		COPY_SHORT(&offset, l + U_TYPE);
 		if (offset <= 1) {
-		    COPY_INT(&r, l + U_LOWER);
+		    COPY_PTR(&r, l + U_LOWER);
 		    if (s >= r) {
 			/* s is in the range */
 			COPY_SHORT(&offset, l + U_ADDR);
@@ -807,16 +834,16 @@ f_switch()
 		COPY_SHORT(&offset, pc + SW_DEFAULT);
 		break;
 	    } else {
-		/* d >= ENTRY_SIZE */
+		/* d >= SWITCH_CASE_SIZE */
 		l -= d;
 		d >>= 1;
 	    }
 	} else if (s > r) {
-	    if (d < ENTRY_SIZE) {
+	    if (d < SWITCH_CASE_SIZE) {
 		/* test if entry is part of a range */
 		COPY_SHORT(&offset, l + L_TYPE);
 		if (offset <= 1) {
-		    COPY_INT(&r, l + L_UPPER);
+		    COPY_PTR(&r, l + L_UPPER);
 		    if (s <= r) {
 			/* s is in the range */
 			COPY_SHORT(&offset, l + L_ADDR);
@@ -832,12 +859,12 @@ f_switch()
 		/* use default address */
 		COPY_SHORT(&offset, pc + SW_DEFAULT);
 		break;
-	    } else {		/* d >= ENTRY_SIZE */
+	    } else {		/* d >= SWITCH_CASE_SIZE */
 		l += d;
 		/* if table isn't a power of 2 in size, fix us up */
 		while (l >= end_tab) {
 		    d >>= 1;
-		    if (d < ENTRY_SIZE) {
+		    if (d < SWITCH_CASE_SIZE) {
 			d = 0;
 			break;
 		    }
@@ -856,7 +883,7 @@ f_switch()
 	    /* found the key - but could be part of a range... */
 	    if (!l[U_TYPE] && !l[U_TYPE + 1]) {
 		/* end of range with lookup table */
-		COPY_INT(&r, l + U_LOWER);
+		COPY_PTR(&r, l + U_LOWER);
 		l = current_prog->p.i.program + offset + (s - r) * sizeof(short);
 		COPY_SHORT(&offset, l);
 	    }
@@ -880,7 +907,6 @@ int simul_efun_is_loading = 0;
 void
 call_simul_efun P2(unsigned short, index, int, num_arg)
 {
-    /* prevent recursion */
     struct function *funp;
     extern struct object *simul_efun_ob;
     extern char *simul_efun_file_name;
@@ -926,7 +952,7 @@ call_simul_efun P2(unsigned short, index, int, num_arg)
     } else error("Function is no longer a simul_efun.");
 }
 
-void
+INLINE void
 f_simul_efun()
 {
     unsigned short index;
@@ -966,7 +992,7 @@ make_efun_funp P2(int, opcode, svalue *, args)
     fp = ALLOCATE(struct funp, TAG_FUNP, "make_efun_funp");
     fp->owner = current_object;
     add_ref( current_object, "make_efun_funp" );
-    fp->type = ORIGIN_EFUN;
+    fp->type = FP_EFUN;
     
 #ifdef NEEDS_CALL_EXTRA
     if (opcode >= 0xff) {
@@ -1001,7 +1027,7 @@ make_lfun_funp P2(int, index, svalue *, args)
     fp = ALLOCATE(struct funp, TAG_FUNP, "make_efun_funp");
     fp->owner = current_object;
     add_ref( current_object, "make_efun_funp" );
-    fp->type = ORIGIN_LOCAL;
+    fp->type = FP_LOCAL | FP_NOT_BINDABLE;
     
     fp->f.index = index + function_index_offset;
     
@@ -1022,7 +1048,7 @@ make_simul_funp P2(int, index, svalue *, args)
     fp = ALLOCATE(struct funp, TAG_FUNP, "make_efun_funp");
     fp->owner = current_object;
     add_ref( current_object, "make_efun_funp" );
-    fp->type = ORIGIN_SIMUL_EFUN;
+    fp->type = FP_SIMUL;
     
     fp->f.index = index;
     
@@ -1036,19 +1062,23 @@ make_simul_funp P2(int, index, svalue *, args)
 }
 
 INLINE struct funp *
-make_functional_funp P4(short, num_arg, short, num_local, short, len, svalue *, args)
+make_functional_funp P5(short, num_arg, short, num_local, short, len, svalue *, args, int, flag)
 {
     struct funp *fp;
     
     fp = ALLOCATE(struct funp, TAG_FUNP, "make_functional_funp");
     fp->owner = current_object;
     add_ref( current_object, "make_functional_funp" );
-    fp->type = ORIGIN_FUNCTIONAL;
+    fp->type = FP_FUNCTIONAL + flag;
+
+    current_prog->p.i.func_ref++;
     
     fp->f.a.prog = current_prog;
     fp->f.a.offset = pc - current_prog->p.i.program;
     fp->f.a.num_args = num_arg;
     fp->f.a.num_locals = num_local;
+    fp->f.a.fio = function_index_offset;
+    fp->f.a.vio = variable_index_offset;
     pc += len;
     
     if (args) {
@@ -1072,7 +1102,7 @@ make_funp P2(struct svalue *,sobj, struct svalue *,sfun)
 #ifdef NEW_FUNCTIONS
     fp->owner = current_object;
     add_ref( current_object, "make_funp" );
-    fp->type = ORIGIN_CALL_OTHER;
+    fp->type = FP_CALL_OTHER;
     
     assign_svalue_no_free(&fp->f.obj, sobj);
     assign_svalue_no_free(&fp->args, sfun);
@@ -1113,25 +1143,6 @@ push_funp P1(struct funp *, fp)
 }
 
 INLINE void
-free_funp P1(struct funp *, fp)
-{
-    fp->ref--;
-    if (fp->ref > 0) {
-	return;
-    }
-#ifdef NEW_FUNCTIONS
-    free_object(fp->owner, "free_funp");
-    if (fp->type == ORIGIN_CALL_OTHER)
-	free_svalue(&fp->f.obj, "free_funp");
-    free_svalue(&fp->args, "free_funp");
-#else
-    free_svalue(&fp->obj, "free_funp");
-    free_svalue(&fp->fun, "free_funp");
-#endif
-    FREE(fp);
-}
-
-INLINE void
 f_function_constructor()
 {
     struct funp *fp;
@@ -1142,7 +1153,7 @@ f_function_constructor()
 
     switch (kind) {
 #ifdef NEW_FUNCTIONS
-    case ORIGIN_EFUN:
+    case FP_EFUN:
 	kind = EXTRACT_UCHAR(pc++);
 #ifdef NEEDS_CALL_EXTRA
 	if (kind == F_CALL_EXTRA) {
@@ -1154,11 +1165,11 @@ f_function_constructor()
 	pop_stack();
 	break;
 #endif
-    case ORIGIN_CALL_OTHER:
+    case FP_CALL_OTHER:
 	fp = make_funp(sp - 1, sp);
 	pop_2_elems();
 	break;
-    case ORIGIN_CALL_OTHER | 1:
+    case FP_CALL_OTHER | FP_THIS_OBJECT:
 	if (current_object->flags & O_DESTRUCTED)
 	    push_number(0);
 	else
@@ -1167,30 +1178,35 @@ f_function_constructor()
 	pop_2_elems();
 	break;
 #ifdef NEW_FUNCTIONS
-    case ORIGIN_LOCAL:
+    case FP_LOCAL:
 	LOAD_SHORT(index, pc);
 	fp = make_lfun_funp(index, sp); 
 	pop_stack();
 	break;
-    case ORIGIN_SIMUL_EFUN:
+    case FP_SIMUL:
 	LOAD_SHORT(index, pc);
 	fp = make_simul_funp(index, sp); 
 	pop_stack();
 	break;
-    case ORIGIN_FUNCTIONAL:
-	kind = EXTRACT_UCHAR(pc++);  /* number of arguments */
-	LOAD_SHORT(index, pc);       /* length of functional */
-	fp = make_functional_funp(kind, 0, index, sp);
-	pop_stack();
-	break;
-    case ORIGIN_FUNCTIONAL | 1:
+    case FP_FUNCTIONAL:
+    case FP_FUNCTIONAL | FP_NOT_BINDABLE:
+	{
+	    int num_arg;
+
+	    num_arg = EXTRACT_UCHAR(pc++);  /* number of arguments */
+	    LOAD_SHORT(index, pc);       /* length of functional */
+	    fp = make_functional_funp(num_arg, 0, index, sp, kind & FP_NOT_BINDABLE);
+	    pop_stack();
+	    break;
+	}
+    case FP_ANONYMOUS:
 	{
 	    int num_arg, locals;
 	    
 	    num_arg = EXTRACT_UCHAR(pc++);
 	    locals = EXTRACT_UCHAR(pc++);
 	    LOAD_SHORT(index, pc); /* length */
-	    fp = make_functional_funp(num_arg, locals, index, 0);
+	    fp = make_functional_funp(num_arg, locals, index, 0, FP_NOT_BINDABLE);
 	    break;
 	}
 #endif
@@ -1201,6 +1217,38 @@ f_function_constructor()
 }
 
 #ifdef NEW_FUNCTIONS
+void
+f_apply PROT((void))
+{
+    struct svalue *v;
+    int num;
+    struct funp *f;
+    struct vector *vec;
+
+    if ((sp - 1)->type != T_FUNCTION) {
+	pop_stack();
+	return;
+    }
+    if (current_object->flags & O_DESTRUCTED) {
+	pop_2_elems();
+	push_undefined();
+	return;
+    }
+
+    vec = (sp--)->u.vec;
+    f = sp->u.fp;
+    if (vec->ref == 1) {
+	transfer_push_some_svalues(vec->item, num = vec->size);
+	free_empty_vector(vec);
+    } else {
+	push_some_svalues(vec->item, num = vec->size);
+	vec->ref--;
+    }
+    v = call_function_pointer(f, num);
+    free_funp(f);
+    assign_svalue_no_free(sp, v);
+}
+
 INLINE void
 f_evaluate PROT((void))
 {
@@ -1290,7 +1338,6 @@ f_sscanf()
     /*
      * save number of matches on stack
      */
-    fp->type = T_NUMBER;
     fp->u.number = i;
 }
 

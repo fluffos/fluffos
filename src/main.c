@@ -1,4 +1,5 @@
 #include "std.h"
+#include "file_incl.h"
 #include "config.h"
 #include "rc.h"
 #include "applies.h"
@@ -15,6 +16,7 @@
 #include "comm.h"
 #include "compiler.h"
 #include "port.h"
+#include "md.h"
 
 static int e_flag = 0;		/* Load empty, without castles. */
 #ifdef DEBUG
@@ -86,10 +88,6 @@ static void sig_hup PROT((void)),
 */
 int debug_level = 32768;
 #endif				/* DEBUG_MACRO */
-
-#ifdef LATTICE
-#undef write
-#endif
 
 #ifdef OS2
 int old_argc;
@@ -375,7 +373,7 @@ int main(argc, argv)
 	fprintf(stderr, "Bad mudlib directory: %s\n", mud_lib);
 	exit(-1);
     }
-#ifdef SAVE_BINARIES
+#ifdef BINARIES
     init_binaries(argc, argv);
 #endif
 #ifdef LPC_TO_C
@@ -428,8 +426,8 @@ int main(argc, argv)
 	    case 'p':
 		port_number = atoi(argv[i] + 2);
 		continue;
-#ifdef DEBUG
             case 'd':
+#ifdef DEBUG
                 d_flag++;
 #else
                 fprintf(stderr, "Driver must be compiled with DEBUG on to use -d.\n");
@@ -617,7 +615,6 @@ static void sig_usr1()
     push_string("Host machine shutting down", STRING_CONSTANT);
     push_undefined();
     push_undefined();
-    current_object = master_ob;
     apply_master_ob(APPLY_CRASH, 3);
     fprintf(stderr, "Received SIGUSR1, calling exit(-1)\n");
 #if defined(OS2) && !defined(COMMAND_LINE)
@@ -767,12 +764,6 @@ void crash_MudOS P1(char *, str)
 	} else {
 	    push_undefined();
 	}
-	/*
-	 * set the current object to be the master object. since we're
-	 * crashing, we don't need to save the actual current object. This is
-	 * so crash() can be static.
-	 */
-	current_object = master_ob;
 	apply_master_ob(APPLY_CRASH, 3);
     }
 #if defined(OS2) && !defined(COMMAND_LINE)

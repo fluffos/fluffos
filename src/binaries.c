@@ -22,7 +22,7 @@
 #include "functab_tree.h"
 #endif
 
-#ifdef SAVE_BINARIES
+#ifdef BINARIES
 
 static char *magic_id = "MUDB";
 static time_t driver_id;
@@ -263,7 +263,7 @@ void save_binary P3(struct program *, prog, struct mem_block *, includes, struct
 }				/* save_binary() */
 
 #define ALLOC_BUF(size) \
-    if ((size) > buf_size) { FREE(buf); buf = DXALLOC(size, TAG_TEMPORARY, "ALLOC_BUF"); }
+    if ((size) > buf_size) { FREE(buf); buf = DXALLOC(buf_size = size, TAG_TEMPORARY, "ALLOC_BUF"); }
 
 int load_binary P1(char *, name)
 {
@@ -395,7 +395,7 @@ int load_binary P1(char *, name)
     p = (struct program *) DXALLOC(ilen, TAG_PROGRAM, "load_binary");
     fread((char *) p, ilen, 1, f);
     locate_in(p);		/* from swap.c */
-    p->name = string_copy(name, "load_binary");
+    p->name = make_shared_string(name);
 
     /* Read inherit names and find prog.  Check mod times also. */
     for (i = 0; i < (int) p->p.i.num_inherited; i++) {
@@ -419,7 +419,7 @@ int load_binary P1(char *, name)
 	    if (comp_flag)
 		fprintf(stderr, "out of date (inherited source newer).\n");
 	    fclose(f);
-	    FREE(p->name);
+	    free_string(p->name);
 	    FREE(p);
 	    FREE(buf);
 	    return 0;
@@ -430,7 +430,7 @@ int load_binary P1(char *, name)
 	    if (comp_flag)
 		fprintf(stderr, "missing inherited prog.\n");
 	    fclose(f);
-	    FREE(p->name);
+	    free_string(p->name);
 	    FREE(p);
 	    inherit_file = buf;	/* freed elsewhere */
 	    return 1;		/* not 0 */
@@ -480,7 +480,7 @@ int load_binary P1(char *, name)
     fread((char *) &len, sizeof len, 1, f);
     p->p.i.file_info = (unsigned short *) DXALLOC(len, TAG_LINENUMBERS, "load binary");
     fread((char *) p->p.i.file_info, len, 1, f);
-    p->p.i.line_info = (unsigned char *)&prog->p.i.file_info[prog->p.i.file_info[1]];
+    p->p.i.line_info = (unsigned char *)&p->p.i.file_info[p->p.i.file_info[1]];
 
     /* patches */
     fread((char *) &len, sizeof len, 1, f);
@@ -693,9 +693,6 @@ FILE *crdir_fopen P1(char *, file_name)
  * would probably need a linear search in f_switch().
  * I set things up so these routines can be used with other things
  * that might need patching.
- *
- * I don't think the patch_out/patch_in will work on 64 bit machines,
- * however in that case, I don't think switches with strings will either...
  */
 static void patch_out P3(struct program *, prog, short *, patches, int, len)
 {
@@ -707,25 +704,24 @@ static void patch_out P3(struct program *, prog, short *, patches, int, len)
 	i = patches[--len];
 	if (p[i] == F_SWITCH && p[i + 1] >> 4 != 0xf) {	/* string switch */
 	    short offset, break_addr;
-	    int s;
+	    char *s;
 
 	    /* replace strings in table with string table indices */
 	    COPY_SHORT(&offset, p + i + 2);
 	    COPY_SHORT(&break_addr, p + i + 4);
 
 	    while (offset < break_addr) {
-		/* ALPHA: assumes (int) and (char *) same size */
-		COPY_INT(&s, p + offset);
+		COPY_PTR(&s, p + offset);
 		/*
 		 * take advantage of fact that s is in strings table to find
 		 * it's index.
 		 */
 		if (s == 0)
-		    s = -1;
+		    s = (char *)(POINTER_INT)-1;
 		else
-		    s = store_prog_string((char *) s);
-		COPY_INT(p + offset, &s);
-		offset += 6;
+		    s = (char *)(POINTER_INT)store_prog_string(s);
+		COPY_PTR(p + offset, &s);
+		offset += SWITCH_CASE_SIZE;
 	    }
 	}
     }
@@ -735,16 +731,11 @@ static int str_case_cmp P2(char *, a, char *, b)
 {
     char *s1, *s2;
 
-    /* ALPHA: assumes (int) and (char *) same size */
-    COPY_INT(&s1, a);
-    COPY_INT(&s2, b);
+    COPY_PTR(&s1, a);
+    COPY_PTR(&s2, b);
 
     return s1 - s2;
 }				/* str_case_cmp() */
-
-/* todo: this function contains non-portable code.  It assumes the size of
-   a pointer is the same as the size as an integer (not true on DEC Alpha)
-*/
 
 static void patch_in P3(struct program *, prog, short *, patches, int, len)
 {
@@ -756,7 +747,7 @@ static void patch_in P3(struct program *, prog, short *, patches, int, len)
 	i = patches[--len];
 	if (p[i] == F_SWITCH && p[i + 1] >> 4 != 0xf) {	/* string switch */
 	    short offset, start, break_addr;
-	    int s;
+	    char *s;
 
 	    /* replace string indices with string pointers */
 	    COPY_SHORT(&offset, p + i + 2);
@@ -764,19 +755,20 @@ static void patch_in P3(struct program *, prog, short *, patches, int, len)
 
 	    start = offset;
 	    while (offset < break_addr) {
-		COPY_INT(&s, p + offset);
+		COPY_PTR(&s, p + offset);
 		/*
 		 * get real pointer from strings table
 		 */
-		if (s == -1)
+		if (s == (char *)-1)
 		    s = 0;
 		else
-		    s = (int) prog->p.i.strings[s];
-		COPY_INT(p + offset, &s);
-		offset += 6;
+		    s = prog->p.i.strings[(int)s];
+		COPY_PTR(p + offset, &s);
+		offset += SWITCH_CASE_SIZE;
 	    }
 	    /* sort so binary search still works */
-	    quickSort(&p[start], (break_addr - start) / 6, 6, str_case_cmp);
+	    quickSort(&p[start], (break_addr - start) / SWITCH_CASE_SIZE, 
+		      SWITCH_CASE_SIZE, str_case_cmp);
 	}
     }
 }				/* patch_in() */

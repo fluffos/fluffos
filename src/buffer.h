@@ -18,8 +18,8 @@ struct buffer {
  */
 extern struct buffer null_buf;
 
-struct buffer *null_buffer PROT((void));
-void free_buffer PROT((struct buffer *));
+INLINE struct buffer *null_buffer PROT((void));
+INLINE void free_buffer PROT((struct buffer *));
 struct buffer *allocate_buffer PROT((int));
 int write_buffer PROT((struct buffer *, int, char *, int));
 char *read_buffer PROT((struct buffer *, int, int, int *));

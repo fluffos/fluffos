@@ -70,8 +70,6 @@ void replace_programs()
 	r_ob->new_prog->p.i.ref++;
 	old_prog = r_ob->ob->prog;
 	r_ob->ob->prog = r_ob->new_prog;
-	r_ob->ob->flags |= O_CLONE;
-	r_ob->ob->flags |= O_VIRTUAL;
 	r_next = r_ob->next;
 	free_prog(old_prog, 1);
 #ifdef DEBUG
@@ -184,6 +182,10 @@ f_replace_program P2(int, num_arg, int, instruction)
 	error("replace_program called with no current object\n");
     if (current_object == simul_efun_ob)
 	error("replace_program on simul_efun object\n");
+
+    if (current_object->prog->p.i.func_ref)
+	error("cannot replace a program with function references.\n");
+
     name_len = strlen(sp->u.string);
     name = (char *) DMALLOC(name_len + 3, TAG_TEMPORARY, "replace_program");
     xname = name;

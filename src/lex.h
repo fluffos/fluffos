@@ -2,6 +2,7 @@
 #define _LEX_H_
 
 #include "std.h"
+#include "instrs.h"
 
 #define DEFMAX 10000
 #define MAXLINE 1024

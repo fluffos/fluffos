@@ -2,9 +2,9 @@
 #define BSDMALLOC_H
 
 #ifdef BSDMALLOC
-void *bsdmalloc_malloc PROT((unsigned int));
-void *bsdmalloc_calloc PROT((unsigned int, unsigned int));
-void *bsdmalloc_realloc PROT((void *, unsigned int));
+void *bsdmalloc_malloc PROT((size_t));
+void *bsdmalloc_calloc PROT((size_t, size_t));
+void *bsdmalloc_realloc PROT((void *, size_t));
 void bsdmalloc_free PROT((void *));
 #ifdef DO_MSTATS
 void show_mstats PROT((char *));

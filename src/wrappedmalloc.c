@@ -7,6 +7,7 @@
 #define NO_OPCODES
 #include "std.h"
 #include "malloc.h"
+#include "comm.h"
 
 typedef struct stats_s {
     unsigned int free_calls, alloc_calls, realloc_calls;
@@ -48,9 +49,9 @@ INLINE void wrappedfree P1(void *, ptr)
 void dump_malloc_data()
 {
     add_message("using wrapped malloc:\n\n");
-    add_message("#alloc calls:     %10lu\n", stats.alloc_calls);
-    add_message("#free calls:      %10lu\n", stats.free_calls);
-    add_message("#alloc - #free:   %10lu\n",
+    add_vmessage("#alloc calls:     %10lu\n", stats.alloc_calls);
+    add_vmessage("#free calls:      %10lu\n", stats.free_calls);
+    add_vmessage("#alloc - #free:   %10lu\n",
 		stats.alloc_calls - stats.free_calls);
-    add_message("#realloc calls:   %10lu\n", stats.realloc_calls);
+    add_vmessage("#realloc calls:   %10lu\n", stats.realloc_calls);
 }

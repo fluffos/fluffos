@@ -1,8 +1,8 @@
 /* simple little program to link the right malloc c module to malloc.c */
 /* needs to be a C program so that it can include config.h */
 
-#define NO_OPCODES
 #define NO_SOCKETS
+#define NO_OPCODES
 #include "std.h"
 
 #ifdef SYSMALLOC

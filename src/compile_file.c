@@ -1,4 +1,5 @@
 #include "std.h"
+#include "file_incl.h"
 
 #if defined(LPC_TO_C) && defined(RUNTIME_LOADING)
 
@@ -538,8 +539,8 @@ int generate_source P2(char *, lname, char *, out_fname)
     while (!done) {
 	if (comp_flag)
 	    fprintf(stderr, " compiling %s ...", real_name);
-	f = fopen(real_name, "r");
-	if (f == 0) {
+	f = open(real_name, O_RDONLY);
+	if (f == -1) {
 	    perror(real_name);
 	    error("Could not read the file.\n");
 	}
@@ -551,12 +552,12 @@ int generate_source P2(char *, lname, char *, out_fname)
 	current_file = string_copy(real_name);
 	generate_identifier(ident, name);
 	compilation_ident = ident;
-	compile_file(f);
+	compile_file(f, real_name);
 	fclose(compilation_output_file);
 	if (comp_flag)
 	    fprintf(stderr, " done\n");
 	update_compile_av(total_lines);
-	(void) fclose(f);
+	(void) close(f);
 	total_lines = 0;
 	FREE(current_file);
 	current_file = 0;

@@ -134,34 +134,34 @@
 #  define DEBUG_CHECK2(x, y, a, b)
 #endif
 
-#define COPY2(x, y)      ((char *)(x))[0] = ((char *)y)[0]; \
-                         ((char *)(x))[1] = ((char *)y)[1]
+#define COPY2(x, y)      ((char *)(x))[0] = ((char *)(y))[0]; \
+                         ((char *)(x))[1] = ((char *)(y))[1]
 #define LOAD2(x, y)      ((char *)&(x))[0] = *y++; \
                          ((char *)&(x))[1] = *y++
-#define STORE2(x, y)     *x++ = ((char *)(&y))[0]; \
-                         *x++ = ((char *)(&y))[1]
+#define STORE2(x, y)     *x++ = ((char *)(&(y)))[0]; \
+                         *x++ = ((char *)(&(y)))[1]
 
-#define COPY4(x, y)      ((char *)(x))[0] = ((char *)y)[0]; \
-                         ((char *)(x))[1] = ((char *)y)[1]; \
-                         ((char *)(x))[2] = ((char *)y)[2]; \
-                         ((char *)(x))[3] = ((char *)y)[3]
+#define COPY4(x, y)      ((char *)(x))[0] = ((char *)(y))[0]; \
+                         ((char *)(x))[1] = ((char *)(y))[1]; \
+                         ((char *)(x))[2] = ((char *)(y))[2]; \
+                         ((char *)(x))[3] = ((char *)(y))[3]
 #define LOAD4(x, y)      ((char *)&(x))[0] = *y++; \
                          ((char *)&(x))[1] = *y++; \
                          ((char *)&(x))[2] = *y++; \
                          ((char *)&(x))[3] = *y++
-#define STORE4(x, y)     *x++ = ((char *)(&y))[0]; \
-                         *x++ = ((char *)(&y))[1]; \
-                         *x++ = ((char *)(&y))[2]; \
-                         *x++ = ((char *)(&y))[3]
+#define STORE4(x, y)     *x++ = ((char *)(&(y)))[0]; \
+                         *x++ = ((char *)(&(y)))[1]; \
+                         *x++ = ((char *)(&(y)))[2]; \
+                         *x++ = ((char *)(&(y)))[3]
 
-#define COPY8(x, y)      ((char *)(x))[0] = ((char *)y)[0]; \
-                         ((char *)(x))[1] = ((char *)y)[1]; \
-                         ((char *)(x))[2] = ((char *)y)[2]; \
-                         ((char *)(x))[3] = ((char *)y)[3]; \
-                         ((char *)(x))[4] = ((char *)y)[4]; \
-                         ((char *)(x))[5] = ((char *)y)[5]; \
-                         ((char *)(x))[6] = ((char *)y)[6]; \
-                         ((char *)(x))[7] = ((char *)y)[7]
+#define COPY8(x, y)      ((char *)(x))[0] = ((char *)(y))[0]; \
+                         ((char *)(x))[1] = ((char *)(y))[1]; \
+                         ((char *)(x))[2] = ((char *)(y))[2]; \
+                         ((char *)(x))[3] = ((char *)(y))[3]; \
+                         ((char *)(x))[4] = ((char *)(y))[4]; \
+                         ((char *)(x))[5] = ((char *)(y))[5]; \
+                         ((char *)(x))[6] = ((char *)(y))[6]; \
+                         ((char *)(x))[7] = ((char *)(y))[7]
 #define LOAD8(x, y)      ((char *)&(x))[0] = *y++; \
                          ((char *)&(x))[1] = *y++; \
                          ((char *)&(x))[2] = *y++; \
@@ -170,14 +170,14 @@
                          ((char *)&(x))[5] = *y++; \
                          ((char *)&(x))[6] = *y++; \
                          ((char *)&(x))[7] = *y++;
-#define STORE8(x, y)     *x++ = ((char *)(&y))[0]; \
-                         *x++ = ((char *)(&y))[1]; \
-                         *x++ = ((char *)(&y))[2]; \
-                         *x++ = ((char *)(&y))[3]; \
-                         *x++ = ((char *)(&y))[4]; \
-                         *x++ = ((char *)(&y))[5]; \
-                         *x++ = ((char *)(&y))[6]; \
-                         *x++ = ((char *)(&y))[7]
+#define STORE8(x, y)     *x++ = ((char *)(&(y)))[0]; \
+                         *x++ = ((char *)(&(y)))[1]; \
+                         *x++ = ((char *)(&(y)))[2]; \
+                         *x++ = ((char *)(&(y)))[3]; \
+                         *x++ = ((char *)(&(y)))[4]; \
+                         *x++ = ((char *)(&(y)))[5]; \
+                         *x++ = ((char *)(&(y)))[6]; \
+                         *x++ = ((char *)(&(y)))[7]
 
 #if SIZEOF_SHORT == 2
 #define COPY_SHORT(x, y) COPY2(x,y)
@@ -204,15 +204,23 @@ floats of size other than 4 not implemented
 #endif
 
 #if SIZEOF_PTR == 4
-#define COPY_PTR(x, y) COPY4(x,y)
-#define LOAD_PTR(x, y) LOAD4(x,y)
-#define STORE_PTR(x, y) STORE4(x,y)
-#elif SIZEOF_PTR == 8
-#define COPY_PTR(x, y) COPY8(x,y)
-#define LOAD_PTR(x, y) LOAD8(x,y)
-#define STORE_PTR(x, y) STORE8(x,y)
+#  define COPY_PTR(x, y) COPY4(x,y)
+#  define LOAD_PTR(x, y) LOAD4(x,y)
+#  define STORE_PTR(x, y) STORE4(x,y)
+
+#  define POINTER_INT int
+#  define INS_POINTER ins_int
 #else
+#  if SIZEOF_PTR == 8
+#    define COPY_PTR(x, y) COPY8(x,y)
+#    define LOAD_PTR(x, y) LOAD8(x,y)
+#    define STORE_PTR(x, y) STORE8(x,y)
+
+#    define POINTER_INT long
+#    define INS_POINTER ins_long
+#  else
 pointers of size other than 4 or 8 not implemented
+#  endif
 #endif
 
 #ifndef _FUNC_SPEC_

@@ -257,6 +257,7 @@ LIBS=LIB $(EXTRALIBS)
 
 # Amiga SAS/C
 EXTRA_PORT=amiga/signal.o amiga/signal_rr.o amiga/socket.o amiga/crypt.o
+AMIGA_BIN=amiga/cstrip amiga/replace
 
 # Define these for LPC->C support
 #EXTRA_EFUNS=cfuns.o cfuns_main.o cfuns_port.o cfuns_math.o cfuns_sock.o
@@ -282,7 +283,7 @@ OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
 
 PACKAGES= packages/\#?.o
 
-all: $(DRIVER_BIN) addr_server lpc_to_c.h
+all: $(AMIGA_BIN) $(DRIVER_BIN) addr_server lpc_to_c.h
 
 remake: neat all
 

@@ -24,13 +24,15 @@
 unknown call_other(object | string | object *, string | mixed *,...);
 #ifdef NEW_FUNCTIONS
 unknown evaluate(mixed, ...);
+unknown apply(mixed, mixed *);
+function bind(function, object);
 #endif
 object present(object | string, void | object);
 object this_object();
 object this_player(int default: F_CONST0);
 object this_interactive this_player( int default: F_CONST1 );
-object new(string);
-object clone_object new(string);
+object new(string, ...);
+object clone_object new(string, ...);
 void move_object(object | string, void | object | string);
 mixed previous_object(int default: F_CONST0);
 object *all_previous_objects previous_object(int default: F_NBYTE 1);
@@ -45,15 +47,30 @@ string implode(string *, string);
 object *all_inventory(object default:F_THIS_OBJECT);
 object first_inventory(object|string default: F_THIS_OBJECT);
 object next_inventory(object default: F_THIS_OBJECT);
-void call_out(string, int,...);
+void call_out(string | function, int,...);
 int member_array(mixed, string | mixed *, void | int);
-int notify_fail(string | function);
 int input_to(string | function,...);
 int random(int);
+
+#ifndef NO_ADD_ACTION
 void add_action(string | function, string | string *, void | int);
 string query_verb();
-string lower_case(string);
 int command(string, void | object);
+int remove_action(string, string);
+int living(object);
+mixed *commands();
+void disable_commands();
+void enable_commands();
+void set_living_name(string);
+object *livings();
+object find_living(string);
+object find_player(string);
+int notify_fail(string | function);
+#else
+void set_this_player(object | int);
+#endif
+
+string lower_case(string);
 string replace_string(string, string, string,...);
 int restore_object(string, void | int);
 int save_object(string, void | int);
@@ -78,8 +95,6 @@ void message(mixed, string, string | string * | object | object *,
 
     object find_object(string, int default: F_CONST0);
     object load_object find_object(string, int default: F_CONST1);
-    object find_living(string);
-    object find_player(string);
     int find_call_out(string);
 
 /* mapping functions */
@@ -166,13 +181,10 @@ void message(mixed, string, string | string * | object | object *,
 
     string crypt(string, string | int);	/* An int as second argument ? */
     string ctime(int);
-    void disable_commands();
-    void enable_commands();
     int exec(object, object);
     mixed *localtime(int);
     string function_exists(string, object default:F_THIS_OBJECT);
 
-    object *livings();
     object *objects(void | string | function, void | object);
     string process_string(string);
     mixed process_value(string);
@@ -192,7 +204,6 @@ void message(mixed, string, string | string * | object | object *,
     int generate_source(string, void | string);
 #endif
 
-    void set_living_name(string);
     void set_reset(object, void | int);
 
 #ifndef NO_SHADOWS
@@ -205,26 +216,27 @@ void message(mixed, string, string | string * | object | object *,
     void throw(mixed);
     int time();
     mixed *unique_array(mixed *, string | function, void | mixed);
+    mapping unique_mapping(mixed *, string | function, string | object | void, ...);
     string *deep_inherit_list(object default:F_THIS_OBJECT);
     string *inherit_list(object default:F_THIS_OBJECT);
     void printf(string,...);
     string sprintf(string,...);
     int mapp(mixed);
     mixed *stat(string, int default:F_CONST0);
-    int remove_action(string, string);
 
 /*
  * Object properties
  */
-    int living(object);
     int interactive(object default:F_THIS_OBJECT);
     string in_edit(object default:F_THIS_OBJECT);
     int in_input(object default:F_THIS_OBJECT);
-    mixed *commands();
+    int userp(object);
+
+#ifndef NO_WIZARDS
     void enable_wizard();
     void disable_wizard();
-    int userp(object);
     int wizardp(object);
+#endif
 
     object master();
 
@@ -266,7 +278,13 @@ void message(mixed, string, string | string * | object | object *,
     mapping rusage();
 #endif				/* RUSAGE */
 
+#ifdef OLD_ED
     void ed(string | void, string | void, string | int | void, int | void);
+#else
+    string ed_start(string | void, int | void);
+    string ed_cmd(string);
+    int query_ed_mode();
+#endif
 
 #ifdef MATH
 #include "packages/math.spec"
@@ -290,7 +308,10 @@ void message(mixed, string, string | string * | object | object *,
 #include "packages/mire.spec"
 #endif
 
-    mixed filter_array(mixed *, string | function, void | object | string, ...);
+    mixed filter(mixed * | mapping, string | function, object | string | void, ...);
+    mixed filter_array filter(mixed *, string | function, void | object | string, ...);
+    mapping filter_mapping filter(mapping, string | function, object | string | void, ...);
+
     mixed map(string | mapping | mixed *, string | function, object | string | void, ...);
     mapping map_mapping map(mapping, string | function, object | string | void, ...);
     mixed *map_array map(mixed *, string | function, object | string | void, ...);

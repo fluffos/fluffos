@@ -5,6 +5,9 @@
 
 #include "uid.h"
 #include "mudlib_stats.h"
+#include "program.h"
+
+#define SWITCH_CASE_SIZE ((int)(2 + sizeof(char *)))
 
 /* Trace defines */
 #ifdef TRACE
@@ -102,6 +105,7 @@ struct afp {
     unsigned char num_args;
     unsigned char num_locals;
     short offset;
+    short fio, vio;
     struct program *prog;
 };
 
@@ -111,7 +115,7 @@ struct funp {
     int extra_ref;
 #endif
     struct object *owner;
-    short type;                 /* ORIGIN_* is used */
+    short type;                 /* FP_* is used */
     union {
 	struct svalue obj;      /* for call_other function pointers */
 	short index;            /* lfuns and simul_efuns */
@@ -202,6 +206,59 @@ struct error_context_stack {
 #define CHECK_TYPES(val, t, arg, inst) \
   if (!((val)->type & (t))) bad_argument(val, t, arg, inst);
 
+/* Beek - add some sanity to joining strings */
+/* add to an svalue */
+#define EXTEND_SVALUE_STRING(x, y, z) \
+    do { char *ess_res; \
+      int ess_len, ess_r; \
+      ess_len = (ess_r = SVALUE_STRLEN(x)) + strlen(y) + 1; \
+      if (sp->subtype == STRING_MALLOC) { \
+          ess_res = (char *) DREALLOC(x->u.string, ess_len, TAG_STRING, z); \
+          if (!ess_res) fatal("Out of memory!\n"); \
+          strcpy(ess_res + ess_r, (y)); \
+      } else { \
+	  ess_res = DXALLOC(ess_len, TAG_STRING, z); \
+	  strcpy(ess_res, x->u.string); \
+	  strcpy(ess_res + ess_r, (y)); \
+	  free_string_svalue(x); \
+	  (x)->subtype = STRING_MALLOC; \
+      } \
+      (x)->u.string = ess_res;  } while (0)
+
+/* <something that needs no free> + string svalue */
+#define SVALUE_STRING_ADD_LEFT(y, z) \
+    do { char *pss_res; int pss_r, pss_len; \
+        pss_len = SVALUE_STRLEN(sp) + (pss_r = strlen(y)) + 1; \
+        pss_res = DXALLOC(pss_len, TAG_STRING, z); \
+        strcpy(pss_res, y); \
+        strcpy(pss_res + pss_r, sp->u.string); \
+        free_string_svalue(sp--); \
+	sp->type = T_STRING; \
+        sp->u.string = pss_res; \
+        sp->subtype = STRING_MALLOC; \
+     } while (0)
+
+/* basically, string + string; faster than using extend b/c of SVALUE_STRLEN */
+#define SVALUE_STRING_JOIN(x, y, z) \
+    do { char *ssj_res; int ssj_r, ssj_len; \
+        ssj_r = SVALUE_STRLEN(x); \
+        ssj_len = ssj_r + SVALUE_STRLEN(y) + 1; \
+        if ((x)->subtype == STRING_MALLOC) { \
+            ssj_res = (char *) DREALLOC((x)->u.string, ssj_len, TAG_STRING, z); \
+            if (!ssj_res) fatal("Out of memory!\n"); \
+            (void) strcpy(ssj_res + ssj_r, (y)->u.string); \
+            free_string_svalue(y); \
+        } else { \
+            ssj_res = (char *) DXALLOC(ssj_len, TAG_STRING, z); \
+	    strcpy(ssj_res, (x)->u.string); \
+	    strcpy(ssj_res + ssj_r, (y)->u.string); \
+	    free_string_svalue(y); \
+            free_string_svalue(x); \
+            (x)->subtype = STRING_MALLOC; \
+        } \
+        (x)->u.string = ssj_res; \
+    } while (0)
+
 /* macro calls */
 #ifndef LPC_TO_C
 #define call_program(prog, offset) \
@@ -219,11 +276,11 @@ struct error_context_stack {
 #define put_buffer(x) do { sp->type = T_BUFFER; sp->u.buf = (x); } while (0)
 #define put_undested_object(x) do { sp->type = T_OBJECT; sp->u.ob = (x); } while (0)
 #define put_object(x) do { if ((x)->flags & O_DESTRUCTED) put_number(0); \
-                           else put_undested_object(x); } while (0)
+!                            else put_undested_object(x); } while (0)
 #define put_unrefed_undested_object(x, y) do { sp->type = T_OBJECT; sp->u.ob = (x); \
    add_ref((x), y); } while (0)
-#define put_unrefed_object(x, y) do { if ((x)->flags & O_DESTRUCTED) put_number(0); \
-                           else put_unrefed_undested_object(x, y); } while (0)
+#define put_unrefed_object(x,y) do { if ((x)->flags & O_DESTRUCTED) put_number(0); \
+                           else put_unrefed_undested_object(x,y); } while (0)
 #define put_constant_string(x) do { sp->type = T_STRING;sp->subtype = STRING_CONSTANT; \
                 sp->u.string = (x); } while (0)
 #define put_malloced_string(x) do { sp->type = T_STRING; sp->subtype = STRING_MALLOC; \
@@ -245,6 +302,8 @@ extern struct control_stack *csp;
 extern struct error_context_stack *ecsp;
 extern int too_deep_error;
 extern int max_eval_error;
+extern int function_index_offset;
+extern int variable_index_offset;
 extern unsigned int apply_low_call_others;
 extern unsigned int apply_low_cache_hits;
 extern unsigned int apply_low_slots_used;
@@ -252,7 +311,9 @@ extern unsigned int apply_low_collisions;
 extern int function_index_offset;
 extern int master_ob_is_loading;
 extern int simul_efun_is_loading;
+#ifdef NEW_FUNCTIONS
 extern struct program fake_prog;
+#endif
 
 /* with LPC_TO_C off, these are defines using eval_instruction */
 #ifdef LPC_TO_C
