@@ -1,1 +1,1 @@
-#define PATCH_LEVEL "v1.7"
+#define PATCH_LEVEL "v(1.)8-0 (GER - KSA release)"

@@ -8,6 +8,11 @@ Many bug fixes :)
 
 Wodan.
 
+new in FluffOS 1.8:
+reference_allowed efun (by Taffyd)
+fixed crasher in ... when used in building arrays (reported by Presto).
+	avoid using it for that though, it's _very_ inefficient.
+
 new in FluffOS 1.7:
 return of the event() efun
 member_array extended for partial searches and searching from the end of the

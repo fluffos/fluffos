@@ -2663,6 +2663,7 @@ eval_instruction P1(char *, p)
     
     arr = s->u.arr;
     n = arr->size;
+    CHECK_STACK_OVERFLOW(n - 1);
     num_varargs += n - 1;
     if (!n) {
         t = s;
