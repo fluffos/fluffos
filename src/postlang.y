@@ -81,9 +81,13 @@ inheritance: type_modifier_list F_INHERIT string_con1 ';'
 number: F_NUMBER
 	{
 	    if ( $1 == 0 ) {
-		ins_f_byte(F_CONST0); $$ = TYPE_ANY;
+		ins_expr_f_byte(F_CONST0); $$ = TYPE_ANY;
 	    } else if ( $1 == 1 ) {
-		ins_f_byte(F_CONST1); $$ = TYPE_NUMBER;
+		ins_expr_f_byte(F_CONST1); $$ = TYPE_NUMBER;
+	    } else if (($1 > -1) && ($1 < 256)) {
+		ins_f_byte(F_BYTE); ins_byte($1); $$ = TYPE_NUMBER;
+	    } else if (($1 < 0) && ($1 > -256)) {
+	    ins_f_byte(F_NBYTE); ins_byte(-$1); $$ = TYPE_NUMBER;
 	    } else {
 		ins_f_byte(F_NUMBER); ins_long($1); $$ = TYPE_NUMBER;
 	    }
@@ -233,7 +237,7 @@ statements: /* empty */
 
 statement: comma_expr ';'
 	{
-	    ins_f_byte(F_POP_VALUE);
+	    insert_pop_value();
 	    if (d_flag)
 		ins_f_byte(F_BREAK_POINT);
 	    /* if (exact_types && !TYPE($1,TYPE_VOID))
@@ -249,101 +253,229 @@ statement: comma_expr ';'
 		    if (current_break_address & BREAK_ON_STACK) {
 			ins_f_byte(F_BREAK);
 		    } else {
+				/* form a linked list of the break addresses */
 		        ins_f_byte(F_JUMP); ins_short(current_break_address);
+				current_break_address =  mem_block[A_PROGRAM].current_size - 2;
 		    }
 		}
-	 | F_CONTINUE ';'	/* This code is a jump to a jump */
+	 | F_CONTINUE ';'	/* This code is a jump */
 		{
 		    if (current_continue_address == 0)
 			yyerror("continue statement outside loop");
-                    if (switches) {
-                         ins_f_byte(F_POP_BREAK); ins_short(switches);
-                    }
+			if (switches) {
+				ins_f_byte(F_POP_BREAK); ins_short(switches);
+			}
+			/* form a linked list of the continue addresses */
 		    ins_f_byte(F_JUMP); ins_short(current_continue_address);
+			current_continue_address = mem_block[A_PROGRAM].current_size - 2;
 		}
          ;
 
-while:  {   push_explicit(current_continue_address);
-	    push_explicit(current_break_address);
-            push_switches();
-	    current_continue_address = mem_block[A_PROGRAM].current_size;
+while:  {
+	/* be intelligent about the order in which the code is laid out.
+	   By inserting the code for the block first followed by the
+	   the expression (instead of vice versa), it is possible to save
+	   an instruction on each while loop iteration.
+	*/
+		push_explicit(current_continue_address);
+		push_explicit(current_break_address);
+		/* remember size of program before the while expression */
+		push_address(); /* 1 */
+		/* keep track of # of nested switches prior to this while
+		   so that we'll know how many to pop from the break stack in
+		   the event of a "continue;" in the body of a switch().
+		*/
+		push_switches();
 	} F_WHILE '(' comma_expr ')'
 	{
-	    ins_f_byte(F_JUMP_WHEN_NON_ZERO); ins_short(0);	/* to block */
-	    current_break_address = mem_block[A_PROGRAM].current_size;
-	    ins_f_byte(F_JUMP); ins_short(0);	/* Exit loop */
-	    upd_short(current_break_address-2,
-		      mem_block[A_PROGRAM].current_size);
+		int addr = pop_address(); /* 1 */
+		unsigned short jump_addr;
+		expr_t e;
+
+		/* + 3 to leave room for (byte) jump code and (short) target */
+		e.len = CURRENT_PROGRAM_SIZE - addr;
+		e.expr = (char *)DMALLOC(e.len + 3, 50, "F_WHILE");
+		/* copy the code for the loop control expression into a temp space */
+		memcpy(e.expr, mem_block[A_PROGRAM].block + addr, e.len);
+		/* relative offset (backwards) branch */
+		e.expr[e.len] = F_JUMP_WHEN_NON_ZERO - F_OFFSET;
+		/* adjust the size of the program so that we will overwrite the
+		   expression in the compiled code (remember we've already copied the
+		   expression into temp storage).
+		*/
+		SET_CURRENT_PROGRAM_SIZE(addr);
+		last_push_identifier = -1;
+		last_push_local = -1;
+		last_push_indexed = -1;
+		/* jump to code for expression (which hasn't yet been inserted) */
+		ins_f_byte(F_JUMP);
+		/* remember where the place holder is stored */
+		push_address(); /* 2 */
+		ins_short(0); /* insert the place holder */
+		/* store the address of the start of the body of the while loop */
+		jump_addr = CURRENT_PROGRAM_SIZE;
+		e.expr[e.len + 1] = ((char *)&jump_addr)[0];
+		e.expr[e.len + 2] = ((char *)&jump_addr)[1];
+		push_expression(&e); /* 3 */
+		/* each 'continue' statement will add to a linked list of slots that
+		   need filled in once the continue_address is known.  The delimeters
+		   serve as markers for the ends of the lists.
+		*/
+		current_continue_address = CONTINUE_DELIMITER;
+		current_break_address = BREAK_DELIMITER;
 	}
        statement
 	{
-	  ins_f_byte(F_JUMP); ins_short(current_continue_address);
-	  upd_short(current_break_address+1,
-		    mem_block[A_PROGRAM].current_size);
-	  current_break_address = pop_address();
-	  current_continue_address = pop_address();
-          pop_switches();
-        }
+		expr_t *e;
+		int addr = pop_address(); /* 2 */
+		int next_addr;
+
+		upd_short(addr, CURRENT_PROGRAM_SIZE);
+		e = pop_expression(); /* 3 */
+		/* traverse the linked list filling in the current_continue_address
+		   required by each "continue" statement.
+		*/
+		for(; current_continue_address > 0;
+			current_continue_address = next_addr)
+		{
+			next_addr = read_short(current_continue_address);
+			upd_short(current_continue_address, CURRENT_PROGRAM_SIZE);
+		}
+		/* branch already added to end of expression */
+		add_to_mem_block(A_PROGRAM, e->expr, e->len + 3);
+		FREE(e->expr);
+
+		/* traverse the linked list filling in the current_break_address
+		   required by each "break" statement.
+		*/
+		for(;current_break_address > 0; current_break_address = next_addr) {
+			next_addr = read_short(current_break_address);
+			upd_short(current_break_address, CURRENT_PROGRAM_SIZE);
+		}
+		pop_switches();
+		current_break_address = pop_address();
+		current_continue_address = pop_address();
+	}
 
 do: {
-        int tmp_save;
-
-        push_switches();
-        push_explicit(current_continue_address);
-	push_explicit(current_break_address);
-	/* Jump to start of loop. */
-	ins_f_byte(F_JUMP); tmp_save = mem_block[A_PROGRAM].current_size;
-	ins_short(0);
-	current_break_address = mem_block[A_PROGRAM].current_size;
-	/* Jump to end of loop. All breaks go through this one. */
-	ins_f_byte(F_JUMP); push_address(); ins_short(0);
-	current_continue_address = mem_block[A_PROGRAM].current_size;
-	upd_short(tmp_save, current_continue_address);
-        push_address();
-	
+		push_switches();
+		push_explicit(current_continue_address);
+		push_explicit(current_break_address);
+		current_break_address = BREAK_DELIMITER;
+		current_continue_address = CONTINUE_DELIMITER;
+		push_address(); /* 1 */
     } F_DO statement F_WHILE '(' comma_expr ')' ';'
-    {
-	ins_f_byte(F_JUMP_WHEN_NON_ZERO); ins_short(pop_address());
-	/* Fill in the break jump address in the beginning of the loop. */
-	upd_short(pop_address(), mem_block[A_PROGRAM].current_size);
-	current_break_address = pop_address();
-	current_continue_address = pop_address();
+	{
+		int addr = pop_address(); /* 1 */
+		int next_addr;
+
+		for (;current_continue_address > 0;
+			current_continue_address = next_addr)
+		{
+			next_addr = read_short(current_continue_address);
+			upd_short(current_continue_address, addr);
+		}
+		ins_f_byte(F_JUMP_WHEN_NON_ZERO);
+		ins_short(addr);
+		for(;current_break_address > 0; current_break_address = next_addr) {
+			next_addr = read_short(current_break_address);
+			upd_short(current_break_address, CURRENT_PROGRAM_SIZE);
+		}
+		current_break_address = pop_address();
+		current_continue_address = pop_address();
         pop_switches();
-    }
+	}
 
-for: F_FOR '('	  { push_explicit(current_continue_address);
-		    push_explicit(current_break_address);
-                    push_switches(); }
-     for_expr ';' {   ins_f_byte(F_POP_VALUE);
-		      push_address();
-		  }
-     for_expr ';' {
-		    ins_f_byte(F_JUMP_WHEN_NON_ZERO);
-		    ins_short(0);	/* Jump to block of block */
-		    current_break_address = mem_block[A_PROGRAM].current_size;
-		    ins_f_byte(F_JUMP); ins_short(0);	/* Out of loop */
-	 	    current_continue_address =
-			mem_block[A_PROGRAM].current_size;
-		  }
-     for_expr ')' {
-	 	    ins_f_byte(F_POP_VALUE);
-		    ins_f_byte(F_JUMP); ins_short(pop_address());
-		    /* Here starts the block. */
-		    upd_short(current_break_address-2,
-			      mem_block[A_PROGRAM].current_size);
-		  }
-     statement
-   {
-       ins_f_byte(F_JUMP); ins_short(current_continue_address);
-       /* Now, the address of the end of the block is known. */
-       upd_short(current_break_address+1, mem_block[A_PROGRAM].current_size);
-       current_break_address = pop_address();
-       current_continue_address = pop_address();
-       pop_switches();
-   }
+for: F_FOR '('{
+		push_explicit(current_continue_address);
+		push_explicit(current_break_address);
+		push_switches();
+	}
+    for_expr ';' {
+		current_continue_address = CONTINUE_DELIMITER;
+		insert_pop_value();
+		push_address();  /* 1 */
+	}
+	for_expr ';' {
+		int start = pop_address(); /* 1 */
+		expr_t e;
 
-for_expr: /* EMPTY */ { ins_f_byte(F_CONST1); }
-        | comma_expr;
+		e.len = CURRENT_PROGRAM_SIZE - start;
+		e.expr = (char *)DMALLOC(e.len + 3, 51, "for_expr");
+		memcpy(e.expr, mem_block[A_PROGRAM].block + start, e.len);
+        e.expr[e.len] = F_BBRANCH_WHEN_NON_ZERO - F_OFFSET;
+		push_expression(&e);
+		SET_CURRENT_PROGRAM_SIZE(start);
+		push_address(); /* 2 */
+		last_push_identifier = -1;
+		last_push_local = -1;
+		last_push_indexed = -1;
+	}
+	for_expr ')' {
+		expr_t e;
+		int start = pop_address(); /* 3 */
+
+		insert_pop_value();
+		e.len = CURRENT_PROGRAM_SIZE - start;
+		e.expr = e.len ? (char *)DMALLOC(e.len, 52, "for_expr:") : (char *)0;
+		if (e.expr) {
+			memcpy(e.expr, mem_block[A_PROGRAM].block + start, e.len);
+		}
+		push_expression(&e);
+		SET_CURRENT_PROGRAM_SIZE(start);
+		push_address(); /* 4 */
+		ins_f_byte(F_JUMP); /* to expression */
+		ins_short(0); /* 5 */
+		current_break_address = BREAK_DELIMITER;
+		last_push_identifier = -1;
+		last_push_local = -1;
+		last_push_indexed = -1;
+	}
+	statement
+	{
+		int next_addr;
+		unsigned short int jump = (unsigned short)pop_address(); /* 4 */
+		unsigned short int start = jump + 3;
+		unsigned short offset;
+		expr_t *e;
+
+		for(; current_continue_address > 0;
+			current_continue_address = next_addr)
+		{
+			next_addr = read_short(current_continue_address);
+			upd_short(current_continue_address, CURRENT_PROGRAM_SIZE);
+		}
+
+		e = pop_expression();
+		if (e->len) {
+			add_to_mem_block(A_PROGRAM, e->expr, e->len);
+			FREE(e->expr);
+		}
+
+		/* fix F_JUMP target inserted above */
+		upd_short(jump + 1, CURRENT_PROGRAM_SIZE); /* 5 */
+
+		e = pop_expression();
+		offset = CURRENT_PROGRAM_SIZE + (e->len + 1 - start);
+		e->expr[e->len + 1] = ((char *)&offset)[0];
+		e->expr[e->len + 2] = ((char *)&offset)[1];
+		add_to_mem_block(A_PROGRAM, e->expr, e->len + 3);
+		FREE(e->expr);
+
+		for(;current_break_address > 0;current_break_address = next_addr) {
+			next_addr = read_short(current_break_address);
+			upd_short(current_break_address, CURRENT_PROGRAM_SIZE);
+		}
+		current_break_address = pop_address();
+		current_continue_address = pop_address();
+		pop_switches();
+	}
+
+for_expr: /* EMPTY */
+	{
+		ins_expr_f_byte(F_CONST1);
+	}
+	| comma_expr;
 
 switch: F_SWITCH '(' comma_expr ')'
     {
@@ -617,8 +749,10 @@ const6: const7
 
 const7: const8
       | const7 '*' const8 { $$ = $1 * $3; }
-      | const7 '%' const8 { $$ = $1 % $3; }
-      | const7 '/' const8 { $$ = $1 / $3; } ;
+      | const7 '%' const8
+      { if ($3) $$ = $1 % $3; else yyerror("Modulo by zero"); }
+      | const7 '/' const8
+      { if ($3) $$ = $1 / $3; else yyerror("Division by zero"); } ;
 
 const8: const9
       | '(' constant ')' { $$ = $2; } ;
@@ -643,7 +777,7 @@ default: F_DEFAULT ':'
 
 
 comma_expr: expr0 { $$ = $1; }
-          | comma_expr { ins_f_byte(F_POP_VALUE); }
+          | comma_expr { insert_pop_value(); }
 	',' expr0
 	{ $$ = $4; } ;
 
@@ -655,7 +789,7 @@ expr0:  expr01
 	    {
 		type_error("Bad assignment. Rhs", $3);
 	    }
-	    ins_f_byte($2);
+	    ins_expr_f_byte($2);
 	    $$ = $3;
 	}
      | error assign expr01 { yyerror("Illegal LHS");  $$ = TYPE_ANY; };
@@ -663,7 +797,7 @@ expr0:  expr01
 expr01: expr1 { $$ = $1; }
      | expr1 '?'
 	{
-	    ins_f_byte(F_JUMP_WHEN_ZERO);
+	    ins_f_byte(F_BRANCH_WHEN_ZERO); /* relative0 */
 	    push_address();
 	    ins_short(0);
 	}
@@ -671,12 +805,16 @@ expr01: expr1 { $$ = $1; }
 	{
 	    int i;
 	    i = pop_address();
-	    ins_f_byte(F_JUMP); push_address(); ins_short(0);
-	    upd_short(i, mem_block[A_PROGRAM].current_size);
+	    ins_f_byte(F_BRANCH); /* relative1 */
+	    push_address(); ins_short(0);
+	    upd_short(i, CURRENT_PROGRAM_SIZE - i); /* relative0 */
 	}
       ':' expr01
 	{
-	    upd_short(pop_address(), mem_block[A_PROGRAM].current_size);
+	    int i = pop_address();
+
+	    last_expression = -1;
+	    upd_short(i, CURRENT_PROGRAM_SIZE - i); /* relative1 */
 	    if (exact_types && !compatible_types($4, $7)) {
 		type_error("Different types in ?: expr", $4);
 		type_error("                      and ", $7);
@@ -712,6 +850,7 @@ return: F_RETURN
 	{
 	    if (exact_types && !TYPE($2, exact_types & TYPE_MOD_MASK))
 		type_error("Return type not matching", exact_types);
+	    last_expression = -1;
 	    ins_f_byte(F_RETURN);
 	};
 
@@ -735,14 +874,17 @@ assoc_pair: expr0 ':' expr0    { $$ = 2; } ;
 expr1: expr2 { $$ = $1; }
      | expr2 F_LOR
 	{
-	    ins_f_byte(F_DUP); ins_f_byte(F_JUMP_WHEN_NON_ZERO);
+	    ins_f_byte(F_DUP); ins_f_byte(F_BRANCH_WHEN_NON_ZERO); /* relative2 */
 	    push_address();
 	    ins_short(0);
 	    ins_f_byte(F_POP_VALUE);
 	}
        expr1
 	{
-	    upd_short(pop_address(), mem_block[A_PROGRAM].current_size);
+		int i = pop_address();
+
+	    last_expression = -1;
+	    upd_short(i, CURRENT_PROGRAM_SIZE - i); /* relative2 */
 	    if ($1 == $4)
 		$$ = $1;
 	    else
@@ -752,14 +894,17 @@ expr1: expr2 { $$ = $1; }
 expr2: expr211 { $$ = $1; }
      | expr211 F_LAND
 	{
-	    ins_f_byte(F_DUP); ins_f_byte(F_JUMP_WHEN_ZERO);
+	    ins_f_byte(F_DUP); ins_f_byte(F_BRANCH_WHEN_ZERO); /* relative3 */
 	    push_address();
 	    ins_short(0);
 	    ins_f_byte(F_POP_VALUE);
 	}
        expr2
 	{
-	    upd_short(pop_address(), mem_block[A_PROGRAM].current_size);
+		int i = pop_address();
+
+	    last_expression = -1;
+	    upd_short(i, CURRENT_PROGRAM_SIZE - i); /* relative3 */
 	    if ($1 == $4)
 		$$ = $1;
 	    else
@@ -792,7 +937,7 @@ expr213: expr22
        | expr213 '&' expr22
 	  {
 	      ins_f_byte(F_AND);
-	      if ( !TYPE($1,TYPE_MOD_POINTER) || !TYPE($3,TYPE_MOD_POINTER) ) {
+	      if ( !($1 & TYPE_MOD_POINTER) || !($3 & TYPE_MOD_POINTER) ) {
 	          if (exact_types && !TYPE($1,TYPE_NUMBER))
 		      type_error("Bad argument 1 to &", $1);
 	          if (exact_types && !TYPE($3,TYPE_NUMBER))
@@ -929,16 +1074,16 @@ expr28: expr3
 	      } ;
 
 expr3: expr31
-     | F_INC lvalue
+     | F_PRE_INC lvalue
         {
-	    ins_f_byte(F_INC);
+	    ins_expr_f_byte(F_PRE_INC);
 	    if (exact_types && !TYPE($2, TYPE_NUMBER))
 		type_error("Bad argument to ++", $2);
 	    $$ = TYPE_NUMBER;
 	};
-     | F_DEC lvalue
+     | F_PRE_DEC lvalue
         {
-	    ins_f_byte(F_DEC);
+	    ins_expr_f_byte(F_PRE_DEC);
 	    if (exact_types && !TYPE($2, TYPE_NUMBER))
 		type_error("Bad argument to --", $2);
 	    $$ = TYPE_NUMBER;
@@ -964,16 +1109,16 @@ expr3: expr31
 	};
 
 expr31: expr4
-      | lvalue F_INC
+      | lvalue F_PRE_INC
          {
-	     ins_f_byte(F_POST_INC);
+	     ins_expr_f_byte(F_POST_INC);
 	     if (exact_types && !TYPE($1, TYPE_NUMBER))
 		 type_error("Bad argument to ++", $1);
 	     $$ = TYPE_NUMBER;
 	 };
-      | lvalue F_DEC
+      | lvalue F_PRE_DEC
          {
-	     ins_f_byte(F_POST_DEC);
+	     ins_expr_f_byte(F_POST_DEC);
 	     if (exact_types && !TYPE($1, TYPE_NUMBER))
 		 type_error("Bad argument to --", $1);
 	     $$ = TYPE_NUMBER;
@@ -1045,6 +1190,7 @@ lvalue_list: /* empty */ { $$ = 0; }
 lvalue: F_IDENTIFIER
 	{
 	    int i = verify_declared($1);
+
 	    last_push_identifier = mem_block[A_PROGRAM].current_size;
 	    ins_f_byte(F_PUSH_IDENTIFIER_LVALUE);
 	    ins_byte(i);
@@ -1085,7 +1231,7 @@ lvalue: F_IDENTIFIER
 	| expr4 '[' comma_expr ']'
 	{ 
                last_push_indexed = mem_block[A_PROGRAM].current_size;
-               if (TYPE($1, TYPE_MAPPING)) {
+               if (TYPE($1, TYPE_MAPPING) || TYPE($1, TYPE_FUNCTION)) {
                   ins_f_byte(F_PUSH_INDEXED_LVALUE);
                   $$ = TYPE_ANY;
                } else {
@@ -1123,7 +1269,7 @@ string_constant: string_con1
 string_con1: F_STRING
 	   | string_con1 '+' F_STRING
 	{
-	    $$ = DXALLOC( strlen($1) + strlen($3) + 1, 33554432, "string_con1" );
+	    $$ = DXALLOC( strlen($1) + strlen($3) + 1, 53, "string_con1" );
 	    strcpy($$, $1);
 	    strcat($$, $3);
 	    FREE($1);
@@ -1326,7 +1472,6 @@ function_call: function_name
     {
 		ins_f_byte(F_CALL_OTHER);
 		ins_byte($7 + 2);
-		ins_f_byte(F_POP_VALUE);
 		$$ = TYPE_UNKNOWN;
 		pop_arg_stack($7);	/* No good need of these arguments */
     };
@@ -1334,7 +1479,7 @@ function_call: function_name
 function_name: F_IDENTIFIER
 	     | F_COLON_COLON F_IDENTIFIER
 		{
-		    char *p = DXALLOC(strlen($2) + 3, 33554432, "function_name: 1");
+		    char *p = DXALLOC(strlen($2) + 3, 54, "function_name: 1");
 		    strcpy(p, "::"); strcat(p, $2); FREE($2);
 		    $$ = p;
 		}
@@ -1358,7 +1503,7 @@ function_name: F_IDENTIFIER
 				FREE($1);
 				$$ = $3;
 			} else {
-				p = DXALLOC(strlen($1) + strlen($3) + 3, 33554432,
+				p = DXALLOC(strlen($1) + strlen($3) + 3, 55,
 					"function_name: 2");
 				strcpy(p, $1); strcat(p, "::"); strcat(p, $3);
 				FREE($1); FREE($3);
@@ -1741,7 +1886,7 @@ void epilog() {
     size = align(sizeof (struct program));
     for (i=0; i<NUMPAREAS; i++)
 	size += align(mem_block[i].current_size);
-    p = (char *)DXALLOC(size, 33554432, "epilog: 1");
+    p = (char *)DXALLOC(size, 56, "epilog: 1");
     prog = (struct program *)p;
     *prog = NULL_program;
     prog->p.i.total_size = size;
@@ -1821,13 +1966,16 @@ void epilog() {
  */
 static void prolog() {
     int i;
+	void free_expressions();
 
     switches = 0;
     switch_sptr = 0;
+	last_expression = -1;
+	free_expressions();
     if (type_of_arguments.block == 0) {
 	type_of_arguments.max_size = 100;
 	type_of_arguments.block =
-		DXALLOC(type_of_arguments.max_size, 33554432, "prolog: 1");
+		DXALLOC(type_of_arguments.max_size, 57, "prolog: 1");
     }
     type_of_arguments.current_size = 0;
     approved_object = 0;
@@ -1845,7 +1993,7 @@ static void prolog() {
      * will be stored.
      */
     for (i=0; i < NUMAREAS; i++) {
-	mem_block[i].block = DXALLOC(START_BLOCK_SIZE, 33554432, "prolog: 2");
+	mem_block[i].block = DXALLOC(START_BLOCK_SIZE, 58, "prolog: 2");
 	mem_block[i].current_size = 0;
 	mem_block[i].max_size = START_BLOCK_SIZE;
     }
@@ -1870,7 +2018,8 @@ void add_new_init_jump() {
    any loop construct.
 */
 
-void push_switches()
+void
+push_switches()
 {
 #ifdef DEBUG
     if (switch_sptr == SWITCH_STACK_SIZE) {
@@ -1886,7 +2035,8 @@ void push_switches()
    construct.
 */
 
-void pop_switches()
+void
+pop_switches()
 {
 #ifdef DEBUG
     if (switch_sptr == 0) {
@@ -1894,6 +2044,43 @@ void pop_switches()
     }
 #endif
     switches = switch_stack[--switch_sptr];
+}
+
+void
+push_expression(e)
+expr_t *e;
+{
+#ifdef DEBUG
+    if (expr_sptr == EXPR_STACK_SIZE) {
+        fatal("expr_stack overflow\n");
+    }
+#endif
+	memcpy(&expr_stack[expr_sptr++], e, sizeof(expr_t));
+}
+
+expr_t *
+pop_expression()
+{
+#ifdef DEBUG
+    if (expr_sptr == 0) {
+       fatal("expr_stack underflow\n");
+    }
+#endif
+	return &expr_stack[--expr_sptr];
+}
+
+/* this only necessary in case of errors in compiling LPC code */
+void
+free_expressions()
+{
+	int j;
+
+	for (j = 0; j < expr_sptr; j++) {
+		if (expr_stack[j].expr) {
+			FREE(expr_stack[j].expr);
+		}
+	}
+	expr_sptr = 0;
 }
 
 char *
@@ -1907,7 +2094,7 @@ char *name;
 	if (len < 3) {
 		return string_copy(name);
 	}
-	tmp = (char *)DXALLOC(len, 33554432, "the_file_name");
+	tmp = (char *)DXALLOC(len, 59, "the_file_name");
 	if (!tmp) {
 		return string_copy(name);
 	}
@@ -1915,4 +2102,40 @@ char *name;
 	strncpy(tmp + 1, name, len - 2);
 	tmp[len - 1] = '\0';
 	return tmp;
+}
+
+static void
+insert_pop_value()
+{
+	if (last_expression == mem_block[A_PROGRAM].current_size-1) {
+		switch ( mem_block[A_PROGRAM].block[last_expression]+F_OFFSET ) {
+		case F_ASSIGN:
+			mem_block[A_PROGRAM].block[last_expression] =
+				F_VOID_ASSIGN - F_OFFSET;
+			break;
+		case F_ADD_EQ:
+			mem_block[A_PROGRAM].block[last_expression] =
+				F_VOID_ADD_EQ - F_OFFSET;
+			break;
+		case F_PRE_INC:
+		case F_POST_INC:
+			mem_block[A_PROGRAM].block[last_expression] =
+				F_INC - F_OFFSET;
+			break;
+		case F_PRE_DEC:
+		case F_POST_DEC:
+			mem_block[A_PROGRAM].block[last_expression] =
+				F_DEC - F_OFFSET;
+			break;
+		case F_CONST0:
+		case F_CONST1:
+			SET_CURRENT_PROGRAM_SIZE(last_expression);
+			break;
+		default: ins_f_byte(F_POP_VALUE);
+			break;
+		}
+		last_expression = -1;
+	} else {
+		ins_f_byte(F_POP_VALUE);
+	}
 }

@@ -60,15 +60,19 @@ int sscanf(char *, char *, ...);
 void perror(char *);
 #endif
 
-#if !defined(_SEQUENT_) && !defined(_AIX)
+#if !defined(_SEQUENT_) && !defined(_AIX) && !defined(__386BSD__) && \
+	!defined(linux)
 int read PROT((int, char *, int));
 #endif /* !defined(_SEQUENT_) && !defined(_AIX) */
-#if !defined(_AIX) && !defined(_SEQUENT_) && !defined(_YACC_)
+#if !defined(_AIX) && !defined(_SEQUENT_) && !defined(_YACC_) && \
+	!defined(linux) && !defined(sun)
 void *malloc PROT((unsigned));
 void *realloc PROT((void *, unsigned));
 void free PROT((void *));
 #endif
-#if !defined(sgi) && !defined(hpux) && !defined(_AIX) && !defined(_SEQUENT_) && !defined(SVR4)
+#if !defined(sgi) && !defined(hpux) && !defined(_AIX) && \
+	!defined(_SEQUENT_) && !defined(SVR4) && \
+	!defined(__386BSD__) && !defined(linux)
 int mkdir PROT((char *, int));
 #endif
 int fclose PROT_STDIO((FILE *));
@@ -83,13 +87,13 @@ int atoi PROT((char *));
 #if !defined(sgi) && !defined(hpux)
 void srandom PROT((int));
 #endif
-#ifndef _SEQUENT_
+#if !defined(_SEQUENT_) && !defined(__386BSD__) && !defined(linux)
 int chdir PROT((char *));
 #endif
 int gethostname PROT((char *, int));
 void abort PROT((void));
 int fflush PROT_STDIO((FILE *));
-#ifndef _SEQUENT_
+#if !defined(_SEQUENT_) && !defined(__386BSD__) && !defined(linux)
 int rmdir PROT((char *));
 int unlink PROT((char *));
 #endif
@@ -104,23 +108,32 @@ void qsort PROT((void *, size_t, size_t, int(*)(const void *, const void *)));
 void qsort PROT((char *, int, int, int (*)()));
 #endif
 #endif
-#if !defined(hpux)
+#if !defined(hpux) && !defined(__386BSD__) && !defined(linux)
 int setsockopt PROT((int, int, int, char *, int));
 #endif /* !defined(hpux) */
+#if !defined(linux)
 int fseek PROT_STDIO((FILE *, long, int));
+#endif
 int wait PROT((int *));
 int pipe PROT((int *));
 int dup2 PROT((int, int));
+#if !defined(linux)
 unsigned int alarm PROT((unsigned int));
-#if !defined(hpux)
+#endif
+#if !defined(hpux) && !defined(__386BSD__) && !defined(linux)
 int ioctl PROT((int, ...));
 #endif /* !defined(hpux) */
 int close PROT((int));
-#if !defined(_SEQUENT_) && !defined(_AIX)
+#if !defined(_SEQUENT_) && !defined(_AIX) && !defined(__386BSD__) && \
+	!defined(linux)
 int write PROT((int, char *, int));
 #endif /* !defined(_SEQUENT_) && !defined(_AIX) */
 int _filbuf();
+#if defined(__386BSD__) || defined(linux)
+char *crypt PROT((const char *, const char *));
+#else
 char *crypt PROT((char *, char *));
+#endif
 #ifdef sun
 char *_crypt PROT((char *, char *));
 #endif
@@ -140,7 +153,7 @@ long strtol PROT((const char *, char **, int));
 long strtol PROT((char *, char **, int));
 #endif
 #endif
-#ifndef _SEQUENT_
+#if !defined(_SEQUENT_) && !defined(__386BSD__) && !defined(linux)
 int link PROT((char *, char *));
 int unlink PROT((char *));
 #endif
@@ -242,18 +255,19 @@ INLINE void push_number PROT((int));
 INLINE void push_object PROT((struct object *));
 struct object *clone_object PROT((char *));
 void init_num_args PROT((void));
-int restore_object PROT((struct object *, char *));
+int restore_object PROT((struct object *, char *, int));
 struct object *first_inventory PROT((struct svalue *));
 struct vector *slice_array PROT((struct vector *,int,int));
 int query_idle PROT((struct object *));
 char *implode_string PROT((struct vector *, char *));
 struct object *query_snoop PROT((struct object *));
-struct vector *all_inventory PROT((struct object *));
+struct vector *all_inventory PROT((struct object *, int override));
 struct vector *deep_inventory PROT((struct object *, int));
 struct object *environment PROT((struct svalue *));
 struct vector *add_array PROT((struct vector *, struct vector *));
 char *get_f_name PROT((int));
-#if !defined(_AIX) && !defined(NeXT) && !defined(_SEQUENT_) && !defined(SVR4)
+#if !defined(_AIX) && !defined(NeXT) && !defined(_SEQUENT_) && !defined(SVR4) \
+	&& !defined(apollo)
 void startshutdownMudOS PROT((void));
 #else
 void startshutdownMudOS PROT((int));
@@ -334,7 +348,7 @@ char *function_exists PROT((char *, struct object *));
 void set_inc_list PROT((char *list));
 int legal_path PROT((char *path));
 struct vector *get_dir PROT((char *path, int));
-#if !defined(ultrix) && !defined(M_UNIX) && !defined(sgi) && !defined(hpux) && !defined(_AIX) && !defined(NeXT) && !defined(_SEQUENT_) && !defined(SVR4)
+#if defined(sun)
 extern int rename PROT((char *, char *));
 #endif
 void set_simul_efun PROT((char *));
@@ -352,8 +366,8 @@ INLINE char * get_config_str PROT((int num));
 void set_defaults PROT((char * filename));
 INLINE struct mapping *allocate_mapping PROT((int));
 
-int check_in PROT((char *fn, char *msg, int major, int minor));
-int check_out PROT((char *fn, int major, int minor));
+int check_in PROT((char *fn, char *msg, int maj, int min));
+int check_out PROT((char *fn, int maj, int min));
 char *rlog PROT((char *));
 
 int copy_file PROT((char *from, char *to));
@@ -370,10 +384,10 @@ struct vector *livings PROT((void));
 void do_message PROT((char *,char *, struct vector *, struct vector *));
 char *add_slash PROT((char *));
 struct object *load_extern_object PROT((char *name));
-struct vector *prepend_vector PROT((struct vector *v, struct svalue *a));
-struct vector *append_vector PROT((struct vector *v, struct svalue *a));
+INLINE struct vector *prepend_vector PROT((struct vector *v, struct svalue *a));
+INLINE struct vector *append_vector PROT((struct vector *v, struct svalue *a));
 INLINE void push_control_stack PROT((struct function *funp));
-struct function *setup_new_frame PROT((struct function *funp));
+INLINE struct function *setup_new_frame PROT((struct function *funp));
 INLINE struct svalue *find_value PROT((int num));
 INLINE void push_indexed_lvalue();
 int inter_sscanf PROT((int num_arg));
@@ -497,6 +511,9 @@ void restore_stat_files();
 void save_stat_files();
 void set_author PROT((char *name));
 void quickSort PROT((void *, int, int, int (*compar)()));
-struct funp *make_funp PROT((struct svalue *, struct svalue *));
-void free_funp PROT((struct funp *fp));
-void push_funp PROT((struct funp *fp));
+INLINE struct funp *make_funp PROT((struct svalue *, struct svalue *));
+INLINE void free_funp PROT((struct funp *fp));
+INLINE void push_funp PROT((struct funp *fp));
+INLINE int valid_hide PROT((struct object *obj));
+INLINE void free_string_svalue PROT((struct svalue *));
+INLINE void absorb_mapping PROT((struct mapping *, struct mapping *));

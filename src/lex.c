@@ -248,7 +248,7 @@ int c;
 
 /*fprintf(stderr, "cond %d\n", c);*/
     if (c || skip_to("else", "endif")) {
-	p = (struct ifstate *)DXALLOC(sizeof(struct ifstate), 512, "handle_cond");
+	p = (struct ifstate *)DXALLOC(sizeof(struct ifstate), 60, "handle_cond");
 	p->next = iftop;
 	iftop = p;
 	p->state = c ? EXPECT_ELSE : EXPECT_ENDIF;
@@ -330,7 +330,7 @@ char *name;
     *p = 0;
     if ((f = inc_open(buf, name)) != NULL) {
 	is = (struct incstate *)
-		DXALLOC(sizeof(struct incstate), 256, "handle_include: 1");
+		DXALLOC(sizeof(struct incstate), 61, "handle_include: 1");
 	is->yyin = yyin;
 	is->line = current_line;
 	is->file = current_file;
@@ -341,7 +341,7 @@ char *name;
 	pragma_strict_types = 0;
 	inctop = is;
 	current_line = 1;
-	current_file = DXALLOC(strlen(buf)+1, 256, "handle_include: 2");
+	current_file = DXALLOC(strlen(buf)+1, 62, "handle_include: 2");
 	strcpy(current_file, buf);
 	slast = lastchar = '\n';
 	yyin = f;
@@ -350,6 +350,77 @@ char *name;
 	sprintf(buf, "Cannot #include %s\n", name);
 	yyerror(buf);
     }
+}
+
+static int
+get_terminator(terminator)
+char *terminator;
+{
+	int c, j = 0;
+
+	while (((c = mygetc()) != '\n') && (c != EOF)) {
+		terminator[j++] = c;
+	}
+	if (c == EOF) {
+		return 0;
+	}
+	current_line++;
+	terminator[j] = '\0';
+	if (inctop == 0) {
+		store_line_number_info();
+	}
+	return j;
+}
+
+static int
+get_text_block(text, term)
+char *text;
+char *term;
+{
+	int c, len, finished = 0, j;
+	int total_len = 0;
+	char *beg;
+	static char text_line[MAXLINE + 1];
+
+	beg = text;
+	if (!strlen(term)) {
+		return 0;
+	}
+	text_line[0] = '"';
+	j = len = 1;
+	while (!finished) {
+		while (((c = mygetc()) != '\n') && (c != EOF)) {
+			if (len++ == MAXLINE) {
+				break;
+			}
+			text_line[j++] = c;
+		}
+		if (c == EOF) {
+			return -1;
+		}
+		current_line++;
+		if (inctop == 0) {
+			store_line_number_info();
+		}
+		text_line[j] = '\0';
+		if (!strcmp(text_line, term)) {
+			*text++ = '"';
+			*text = '\0';
+			finished = 1;
+		} else {
+			if ((total_len + len) >= MAXLINE) {
+				return -2;
+			}
+			strcpy(text, text_line);
+			j = 0;
+			text += len;
+			*text++ = '\n';
+			*text = '\0';
+			total_len += (len + 1);
+		}
+		len = 0;
+	}
+	return 1;
 }
 
 static void
@@ -438,6 +509,7 @@ static int
 yylex1()
 {
   static char partial[MAXLINE+5]; /* extra 5 for safety buffer */
+  static char terminator[MAXLINE+5];
   char *partp;
 
   register char *yyp;	/* Xeno */
@@ -495,12 +567,12 @@ yylex1()
     case '\v':
 	break;
     case '+':
-	TRY('+', F_INC);
+	TRY('+', F_PRE_INC);
 	TRY('=', F_ADD_EQ);
 	return c;
     case '-':
 	TRY('>', F_ARROW);
-	TRY('-', F_DEC);
+	TRY('-', F_PRE_DEC);
 	TRY('=', F_SUB_EQ);
 	return c;
     case '&':
@@ -688,6 +760,22 @@ yylex1()
 	if (!gobble('\''))
 	    yyerror("Illegal character constant");
 	return F_NUMBER;
+    case '@':
+	{
+		int rc;
+
+		if (!get_terminator(terminator)) {
+			yyerror("Illegal terminator");
+		}
+		if ((rc = get_text_block(yytext, terminator)) > 0) {
+			return string(yytext);
+		} else if (rc == -1) {
+			yyerror("End of file in text block");
+		} else /* if (rc == -2) */ {
+			yyerror("Text block exceeded maximum length");
+		}
+	}
+    break;
     case '"':
 	yyp = yytext;
 	*yyp++ = c;
@@ -696,10 +784,13 @@ yylex1()
 	    if (c == EOF) {
  		lexerror("End of file in string");
 		return string("\"\"");
-	    } else if (c == '\n') {
+	    }
+#if 0
+	else if (c == '\n') {
  		lexerror("Newline in string");
 		return string("\"\"");
 	    }
+#endif
 	    SAVEC;
 	    if (c == '"')
 		break;
@@ -866,7 +957,7 @@ static int string(str)
     if (!*str) {
 	str = "\"\"";
     }
-    p = DXALLOC(strlen(str), 256, "string: p");
+    p = DXALLOC(strlen(str), 63, "string: p");
     yylval.string = p;
     for (str++; str[0] && str[1] ; str++, p++) {
 	if (str[0] == '\\') {
@@ -934,7 +1025,7 @@ void start_new_file(f)
     add_define("MUDOS", -1, "");
     if (current_file)
       {
-	dir = (char *)DMALLOC(strlen(current_file)+3, 256, "start_new_file");
+	dir = (char *)DMALLOC(strlen(current_file)+3, 64, "start_new_file");
 	sprintf (dir,"\"%s",current_file);
 	tmp = strrchr (dir,'/');
 	if (tmp) {
@@ -992,7 +1083,7 @@ static struct keyword {
     short ret_type;	/* The return type used by the compiler. */
     char arg_type1;	/* Type of argument 1 */
     char arg_type2;	/* Type of argument 2 */
-    char arg_index;	/* Index pointing to where to find arg type */
+    short arg_index;	/* Index pointing to where to find arg type */
     short Default;      /* an efun to use as default for last argument */
 } predefs[] =
 #include "efun_defs.c"
@@ -1076,17 +1167,25 @@ void init_num_args()
     add_instr_name(">=", F_GE);
     add_instr_name("==", F_EQ);
     add_instr_name("+=", F_ADD_EQ);
+    add_instr_name("(void)+=", F_VOID_ADD_EQ);
     add_instr_name("!", F_NOT);
     add_instr_name("index", F_INDEX);
     add_instr_name("push_indexed_lvalue", F_PUSH_INDEXED_LVALUE);
     add_instr_name("identifier", F_IDENTIFIER);
     add_instr_name("local", F_LOCAL_NAME);
-    add_instr_name("indirect", F_INDIRECT);
     add_instr_name("number", F_NUMBER);
     add_instr_name("push_local_variable_lvalue", F_PUSH_LOCAL_VARIABLE_LVALUE);
     add_instr_name("const1", F_CONST1);
     add_instr_name("subtract", F_SUBTRACT);
     add_instr_name("assign", F_ASSIGN);
+    add_instr_name("(void)assign", F_VOID_ASSIGN);
+    add_instr_name("assign", F_ASSIGN);
+    add_instr_name("branch", F_BRANCH);
+    add_instr_name("byte", F_BYTE);
+    add_instr_name("-byte", F_NBYTE);
+    add_instr_name("bbranch_when_non_zero", F_BBRANCH_WHEN_NON_ZERO);
+    add_instr_name("branch_when_zero", F_BRANCH_WHEN_ZERO);
+    add_instr_name("branch_when_non_zero", F_BRANCH_WHEN_NON_ZERO);
     add_instr_name("pop", F_POP_VALUE);
     add_instr_name("const0", F_CONST0);
     add_instr_name("jump_when_zero", F_JUMP_WHEN_ZERO);
@@ -1108,6 +1207,10 @@ void init_num_args()
     add_instr_name("dup", F_DUP);
     add_instr_name("catch", F_CATCH);
     add_instr_name("neg", F_NEGATE);
+	add_instr_name("++x", F_PRE_INC);
+	add_instr_name("--x", F_PRE_DEC);
+	add_instr_name("inc(x)", F_INC);
+	add_instr_name("dec(x)", F_DEC);
     add_instr_name("x++", F_POST_INC);
     add_instr_name("x--", F_POST_DEC);
     add_instr_name("switch",F_SWITCH);
@@ -1120,11 +1223,11 @@ void init_num_args()
 char *get_f_name(n)
     int n;
 {
-    if (instrs[n-F_OFFSET].name)
-	return instrs[n-F_OFFSET].name;
+    if (instrs[n].name)
+	return instrs[n].name;
     else {
 	static char buf[30];
-	sprintf(buf, "<OTHER %d>", n);
+	sprintf(buf, "<OTHER %d>", n + F_OFFSET);
 	return buf;
     }
 }
@@ -1381,12 +1484,12 @@ int nargs;
 	}
 	return;
     }
-    p = (struct defn *)DXALLOC(sizeof(struct defn), 256, "add_define: 1");
-    p->name = DXALLOC(strlen(name)+1, 256, "add_define: 2");
+    p = (struct defn *)DXALLOC(sizeof(struct defn), 65, "add_define: 1");
+    p->name = DXALLOC(strlen(name)+1, 66, "add_define: 2");
     strcpy(p->name, name);
     p->undef = 0;
     p->nargs = nargs;
-    p->exps = DXALLOC(strlen(exps)+1, 256, "add_define: 3");
+    p->exps = DXALLOC(strlen(exps)+1, 67, "add_define: 3");
     strcpy(p->exps, exps);
     h = defhash(name);
     p->next = defns[h];
@@ -1787,7 +1890,7 @@ void set_inc_list (list)
       size++;
       p++;
     }
-  inc_list = (char **)DXALLOC(size * sizeof (char *), 256, "set_inc_list");
+  inc_list = (char **)DXALLOC(size * sizeof (char *), 68, "set_inc_list");
   inc_list_size = size;
   for (i=size-1; i >= 0; i--) 
     {

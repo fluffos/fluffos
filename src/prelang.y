@@ -34,6 +34,9 @@
 
 extern int base_code, call_extra_code;
 
+static void insert_pop_value();
+static int last_expression = -1;
+
 #define YYMAXDEPTH	600
 
 /* NUMPAREAS areas are saved with the program code after compilation.
@@ -55,7 +58,20 @@ extern int base_code, call_extra_code;
 #define BREAK_ON_STACK		0x40000
 #define BREAK_FROM_CASE		0x80000
 
-#define SWITCH_STACK_SIZE  100
+#define SWITCH_STACK_SIZE  200
+#define EXPR_STACK_SIZE  200
+
+#define CURRENT_PROGRAM_SIZE (mem_block[A_PROGRAM].current_size)
+#define BREAK_DELIMITER       -0x200000
+#define CONTINUE_DELIMITER    -0x40000000
+
+#define SET_CURRENT_PROGRAM_SIZE(x) \
+	do { CURRENT_PROGRAM_SIZE = (x); last_expression = -1; } while (0)
+
+typedef struct expr_s {
+	char *expr;
+	int len;
+} expr_t;
 
 /* make sure that this struct has a size that is a power of two */
 struct case_heap_entry { int key; short addr; short line; };
@@ -69,7 +85,10 @@ static struct mem_block mem_block[NUMAREAS];
 */
 static short switches = 0;
 static int switch_sptr = 0;
+static int expr_sptr = 0;
 static short switch_stack[SWITCH_STACK_SIZE];
+expr_t expr_stack[EXPR_STACK_SIZE];
+expr_t *pop_expression();
 
 /*
  * Some good macros to have.
@@ -212,10 +231,10 @@ static void add_arg_type(type)
     struct mem_block *mbp = &type_of_arguments;
     while (mbp->current_size + sizeof type > mbp->max_size) {
 	mbp->max_size <<= 1;
-	mbp->block = (char *)DREALLOC((char *)mbp->block, mbp->max_size, 16777216,
+	mbp->block = (char *)DREALLOC((char *)mbp->block, mbp->max_size, 48,
 		"add_arg_type");
     }
-    memcpy(mbp->block + mbp->current_size, &type, sizeof type);
+    memcpy(mbp->block + mbp->current_size, (char *)&type, sizeof type);
     mbp->current_size += sizeof type;
 }
 
@@ -252,7 +271,7 @@ static void add_to_mem_block(n, data, size)
     while (mbp->current_size + size > mbp->max_size) {
 	mbp->max_size <<= 1;
 	mbp->block = (char *)
-	DREALLOC((char *)mbp->block, mbp->max_size, 1677216, "add_to_mem_block");
+	DREALLOC((char *)mbp->block, mbp->max_size, 49, "add_to_mem_block");
     }
     memcpy(mbp->block + mbp->current_size, data, size);
     mbp->current_size += size;
@@ -307,15 +326,25 @@ static void ins_long(l)
     add_to_mem_block(A_PROGRAM, (char *)&l+3, 1);
 }
 
-static void ins_f_byte(b)
+INLINE static void
+ins_expr_f_byte(b)
 unsigned int b;
 {
+	last_expression = CURRENT_PROGRAM_SIZE;
 	if (b >= (F_OFFSET + 0xff)) {
 		ins_byte((char)call_extra_code);
 		ins_byte((char)(b - F_OFFSET - 0xff));
 	} else {
 		ins_byte((char)(b - F_OFFSET));
 	}
+}
+
+INLINE static void
+ins_f_byte(b)
+unsigned int b;
+{
+	ins_expr_f_byte(b);
+	last_expression = -1;
 }
 
 /*
@@ -639,11 +668,13 @@ void add_new_init_jump();
  * These values are used by the stack machine, and can not be directly
  * called from LPC.
  */
+%token F_BRANCH F_BRANCH_WHEN_ZERO F_BRANCH_WHEN_NON_ZERO
+%token F_BBRANCH_WHEN_ZERO F_BBRANCH_WHEN_NON_ZERO
 %token F_JUMP F_JUMP_WHEN_ZERO F_JUMP_WHEN_NON_ZERO
 %token F_POP_VALUE F_DUP
 %token F_STORE F_CALL_FUNCTION_BY_ADDRESS
 %token F_PUSH_IDENTIFIER_LVALUE F_PUSH_LOCAL_VARIABLE_LVALUE
-%token F_PUSH_INDEXED_LVALUE F_INDIRECT F_INDEX
+%token F_PUSH_INDEXED_LVALUE F_INDEX
 %token F_CONST0 F_CONST1
 
 /*
@@ -653,12 +684,12 @@ void add_new_init_jump();
 %token F_CALL_EXTRA F_CASE F_DEFAULT F_RANGE
 %token F_IF F_IDENTIFIER F_LAND F_LOR F_STATUS
 %token F_RETURN F_STRING
-%token F_INC F_DEC
-%token F_POST_INC F_POST_DEC F_COMMA
-%token F_NUMBER F_ASSIGN F_INT F_ADD F_SUBTRACT F_MULTIPLY
+%token F_INC F_DEC F_PRE_INC F_PRE_DEC
+%token F_POST_INC F_POST_DEC F_COMMA F_VOID_ASSIGN
+%token F_NUMBER F_BYTE F_NBYTE F_ASSIGN F_INT F_ADD F_SUBTRACT F_MULTIPLY
 %token F_DIVIDE F_LT F_GT F_EQ F_GE F_LE
 %token F_NE
-%token F_ADD_EQ F_SUB_EQ F_DIV_EQ F_MULT_EQ
+%token F_VOID_ADD_EQ F_ADD_EQ F_SUB_EQ F_DIV_EQ F_MULT_EQ
 %token F_NEGATE
 %token F_SUBSCRIPT F_WHILE F_BREAK F_POP_BREAK
 %token F_DO F_FOR F_SWITCH

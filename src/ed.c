@@ -580,7 +580,7 @@ void prntln(str, vflg, len)
   char *line, start[MAXLINE+2]; 
 
   line = start;
-  if (len) add_message("%4d ", len);
+  if (len) add_message("%6d  ", len); /* made 8 chars wide */
   while (*str && *str != NL) {
     if ((line - start) > MAXLINE) {
       free_ed_buffer();
@@ -1031,7 +1031,7 @@ int ins(str)
     len = cp - str;
     /* cp now points to end of first or only line */
     
-    if((new = (LINE *)DXALLOC(sizeof(LINE)+len, 16, "ins: new")) == NULL)
+    if((new = (LINE *)DXALLOC(sizeof(LINE)+len, 27, "ins: new")) == NULL)
       return( MEM_FAIL ); 	/* no memory */
     
     new->l_stat=0;
@@ -1179,6 +1179,7 @@ int set()
 {
   char	word[16];
   int	i;
+  struct tbl *limit;
 
   if(*(++inptr) != 't') {
     if(*inptr != SP && *inptr != HT && *inptr != NL)
@@ -1189,7 +1190,8 @@ int set()
   if ( (*inptr == NL))
     {
       add_message("ed version %d.%d\n", version/100, version%100);
-      for(t = tbl; t->t_str; t+=2) {
+      limit = tbl + (sizeof(tbl) / sizeof(struct tbl));
+      for(t = tbl; t < limit; t+=2) {
 	add_message(	"%s:%s ", t->t_str, 
 		    P_FLAGS & t->t_or_mask ?"on":"off");
       }
@@ -1206,7 +1208,8 @@ int set()
     word[i++] = *inptr++;
   }
   word[i] = EOS;
-  for(t = tbl; t->t_str; t++) {
+  limit = tbl + (sizeof(tbl) / sizeof(struct tbl));
+  for(t = tbl; t < limit; t++) {
     if(strcmp(word,t->t_str) == 0) {
       P_FLAGS = (P_FLAGS & t->t_and_mask) | t->t_or_mask;
       return(0);
@@ -1916,7 +1919,7 @@ ed_start(file_arg, exit_fn, restricted, exit_ob)
   if (ED_BUFFER)
     error("Tried to start an ed session, when already active.\n");
   ED_BUFFER = (struct ed_buffer *)
-		DXALLOC(sizeof(struct ed_buffer), 16, "ed_start: ED_BUFFER");
+		DXALLOC(sizeof(struct ed_buffer), 28, "ed_start: ED_BUFFER");
   memset((char *)command_giver->interactive->ed_buffer, '\0',
 	 sizeof (struct ed_buffer));
   ED_BUFFER->truncflg = 1;
@@ -2034,7 +2037,7 @@ ed_cmd(str)
     add_message("Out of memory: text may have been lost.\n" );
     break;
   case UNRECOG_COMMAND:
-    add_message("Unrecogniced command.\n");
+    add_message("Unrecognized command.\n");
     break;
   default:
     add_message("Failed command.\n");

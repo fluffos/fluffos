@@ -36,16 +36,15 @@ DRIVER_BIN = driver
 #
 # uncomment this line for BSD Malloc.
 #MALLOC=bsdmalloc.c
-# uncomment this line for Smalloc (not generally recommended)
-# Warning: smalloc seems not to return memory to the system upon reboot
-# of the driver on some systems (so far only noticed this on HP Snakes).
+# uncomment this line for Smalloc
 #MALLOC=smalloc.c
 
 # uncomment STR if your machine is missing memcpy(), memset(), strtol(),
 # and strcspn().
 #STRFUNCS=strfuncs.c
 
-# uncomment UALARM if your machine is missing ualarm()
+# uncomment UALARM if your machine is missing ualarm() (e.g. those
+# running Linux)
 #UALARM=ualarm.c
 
 # RS/6000 AIX: use this OSFLAGS line (required).
@@ -58,8 +57,14 @@ DRIVER_BIN = driver
 WARN=-Wall
 
 # define profiling if you want it
-# note: the gmon.out file will likely be written in the mudlib dir
-#PROFIL=-pg -DPROFILING
+# note: the gmon.out file will likely be written in the mudlib dir.
+# PROFILE_ON controls whether or not monitoring is active at driver
+# startup.  Comment PROFILE_ON to make profiling not active at startup.
+# Use moncontrol(1) efun to enable profiling and moncontrol(0) to turn
+# it off.
+#PROFILE_OFF=-DPROFILE_ON
+# Uncomment this if you want to enable profiling of the driver
+PROFIL=-pg -DPROFILING $(PROFILE_ON)
 
 # define this if you want (compiler) optimization enabled.
 # *WARNING* using high levels of optimization (e.g. -O3) can cause some
@@ -96,11 +101,13 @@ CFLAGS= $(WARN) $(OPTIMIZE) $(PROFIL) $(STR) $(PIPE) $(DEFINES)
 # comes with) and to gcc on other machines (if possible)
 # Note: at this time gcc (2.2.2) for HP doesn't implement varargs properly;
 # if you have problems compiling on an HP, try using cc instead of gcc.
-CC=cc
+CC=gcc
 
-CPP=cc -E
+CPP=gcc -E
 
 # define this to be bison if you have it, and yacc otherwise
+#YACC=bison
+#YFLAGS = -d -y
 YACC=yacc
 YFLAGS = -d
 
@@ -134,7 +141,7 @@ SRC=lang.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   call_out.c otable.c dumpstat.c stralloc.c hash.c port.c \
   access_check.c parse.c simul_efun.c sprintf.c backend.c \
   socket_efuns.c efunctions.c eoperators.c socket_ctrl.c qsort.c \
-  socket_errors.c md.c uid.c $(MIRE_C) \
+  socket_err.c md.c uid.c $(MIRE_C) \
   $(UALARM) $(STRFUNCS) $(MALLOC)
 
 # define this to be where you want the compiled files to go

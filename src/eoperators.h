@@ -1,10 +1,8 @@
 /* this file was manually generated -- don't delete it */
 
 INLINE void f_add PROT((int, int));
-INLINE void f_add_eq PROT((int, int));
 INLINE void f_and PROT((int, int));
 INLINE void f_and_eq PROT((int, int));
-INLINE void f_call_function_by_address PROT((int, int));
 INLINE void f_compl PROT((int, int));
 INLINE void f_dec PROT((int, int));
 INLINE void f_divide PROT((int, int));

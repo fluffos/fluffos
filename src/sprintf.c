@@ -167,7 +167,7 @@ typedef unsigned int format_info;
 
 #define SAVE_CHAR(pointer) {\
   savechars *new;\
-  new = (savechars *)DXALLOC(sizeof(savechars), 1048576, "SAVE_CHAR");\
+  new = (savechars *)DXALLOC(sizeof(savechars), 107, "SAVE_CHAR");\
   new->what = *(pointer);\
   new->where = pointer;\
   new->next = saves;\
@@ -215,7 +215,7 @@ void stradd(dst, size, add)
 
   if ((i = (strlen(*dst) + strlen(add))) >= *size) {
     *size += i + 1;
-    *dst = (char *)DREALLOC(*dst, *size, 1048576, "stradd");
+    *dst = (char *)DREALLOC(*dst, *size, 108, "stradd");
   }
   strcat(*dst, add);
 } /* end of stradd() */
@@ -233,7 +233,7 @@ void numadd(dst, size, num)
   i = strlen(*dst); /* i = length ofconstructed string so far */
   if ((i + num_l) >= *size) {
     *size += i + num_l + 2;
-    *dst = (char *)DREALLOC(*dst, *size, 1048576, "stradd");
+    *dst = (char *)DREALLOC(*dst, *size, 109, "stradd");
   }
   (*dst)[i+num_l] = '\0';
   if (nve) (*dst)[i] = '-'; else i--;
@@ -253,7 +253,7 @@ void add_indent(dst, size, indent)
   i = strlen(*dst);
   if ((i + indent) >= *size) {
     *size += i + indent + 1;
-    *dst = (char *)DREALLOC(*dst, *size, 1048576, "add_indent");
+    *dst = (char *)DREALLOC(*dst, *size, 110, "add_indent");
   }
   for (;indent;indent--) (*dst)[i++] = ' ';
   (*dst)[i] = '\0';
@@ -805,10 +805,10 @@ char *string_print_formatted(format_str, argc, argv)
 
         if ((finfo & INFO_T) == INFO_T_LPC) {
           clean = (struct svalue *)
-			DXALLOC(sizeof(struct svalue), 1048576, "string_print: 1");
+			DXALLOC(sizeof(struct svalue), 111, "string_print: 1");
           clean->type = T_STRING;
           clean->subtype = STRING_MALLOC;
-          clean->u.string = (char *)DXALLOC(500, 1048576, "string_print: 2");
+          clean->u.string = (char *)DXALLOC(500, 112, "string_print: 2");
           clean->u.string[0] = '\0';
           svalue_to_string(carg, &(clean->u.string), 500, 0, 0);
           carg = clean;
@@ -837,7 +837,7 @@ char *string_print_formatted(format_str, argc, argv)
             temp = &csts;
             while (*temp) temp = &((*temp)->next);
             if (finfo & INFO_COLS) {
-              *temp = (cst *)DXALLOC(sizeof(cst), 1048576, "string_print: 3");
+              *temp = (cst *)DXALLOC(sizeof(cst), 113, "string_print: 3");
               (*temp)->next = 0;
               (*temp)->d.col = carg->u.string;
               (*temp)->pad = pad;
@@ -856,7 +856,7 @@ char *string_print_formatted(format_str, argc, argv)
               unsigned int n, len, max;
 
 #define TABLE carg->u.string
-              (*temp) = (cst *)DXALLOC(sizeof(cst), 1048576, "string_print: 4");
+              (*temp) = (cst *)DXALLOC(sizeof(cst), 114, "string_print: 4");
               (*temp)->pad = pad;
               (*temp)->info = finfo;
               (*temp)->start = curpos;
@@ -885,7 +885,7 @@ char *string_print_formatted(format_str, argc, argv)
               if (len*pres < n) len++;
               if (len > 1 && n%pres) pres -= (pres - n%pres)/len;
               (*temp)->d.tab = (char **)
-				DXALLOC(pres*sizeof(char *), 1048576, "string_print: 5");
+				DXALLOC(pres*sizeof(char *), 115, "string_print: 5");
               (*temp)->nocols = pres; /* heavy sigh */
               (*temp)->d.tab[0] = TABLE;
               if (pres == 1) goto add_table_now;

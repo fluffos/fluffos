@@ -213,8 +213,8 @@ struct object *ob;
 /*
  * Push a number on the value stack.
  */
-INLINE
-  void push_number(n)
+INLINE void
+push_number(n)
 int n;
 {
   sp++;
@@ -289,6 +289,20 @@ INLINE struct svalue *find_value(num)
   return &current_object->variables[num];
 }
 
+INLINE void
+free_string_svalue(v)
+struct svalue *v;
+{
+    switch(v->subtype) {
+        case STRING_MALLOC:
+            FREE(v->u.string);
+            break;
+        case STRING_SHARED:
+            free_string(v->u.string);
+            break;
+    }
+}
+
 /*
  * Free the data that an svalue is pointing to. Not the svalue
  * itself.
@@ -346,7 +360,7 @@ char *add_slash(str)
 {
   char *tmp;
   
-  tmp = DXALLOC(strlen(str)+2, 256, "add_slash");
+  tmp = DXALLOC(strlen(str)+2, 43, "add_slash");
   strcpy(tmp,"/"); strcat(tmp,str);
   return tmp;
 }
@@ -365,7 +379,7 @@ INLINE void assign_svalue_no_free(to, from)
   if (from == 0)
     debug_fatal("Null pointer to assign_svalue().\n");
 #endif
-  memcpy(to, from, sizeof(struct svalue));
+  *to = *from;
   
   switch(from->type) {
   case T_STRING:
@@ -448,57 +462,70 @@ INLINE void pop_stack() {
 /*
  * Compute the address of an array element.
  */
-INLINE void push_indexed_lvalue()
+INLINE void
+push_indexed_lvalue()
 {
-  struct svalue *i, *vec, *item;
-  void mapping_too_large();
-  int ind, indType;
+	struct svalue *i, *vec, *item;
+	void mapping_too_large();
+	int ind, indType;
   
-  i = sp;
-  vec = sp - 1;
-  if (vec->type == T_MAPPING) {
-    struct mapping *m = vec->u.map;
-    vec = find_for_insert(m, i, 0);
-    pop_stack();
-    free_svalue(sp);
-    sp->type = T_LVALUE;
-    sp->u.lvalue = vec;
-    if (!vec) {
-      mapping_too_large();
-    }
-    return;
-  }
-  ind = i->u.number;
-  indType = i->type;
-  pop_stack();
-  if ((indType != T_NUMBER) || (ind < 0))
-    error("Illegal index\n");
-  if (vec->type == T_STRING) {
-    static struct svalue one_character;
-    /* marion says: this is a crude part of code */
-    one_character.type = T_NUMBER;
-    if (ind > SVALUE_STRLEN(vec) || ind < 0)
-      one_character.u.number = 0;
-    else
-      one_character.u.number = (unsigned char)vec->u.string[ind];
-    free_svalue(sp);
-    sp->type = T_LVALUE;
-    sp->u.lvalue = &one_character;
-    return;
-  }
-  if (vec->type != T_POINTER) error("Indexing on illegal type.\n");
-  if (ind >= vec->u.vec->size) error ("Index out of bounds\n");
-  item = &vec->u.vec->item[ind];
-  if (vec->u.vec->ref == 1) {
-    static struct svalue quickfix = { T_NUMBER };
-    /* marion says: but this is crude too */
-    /* marion blushes. */
-    assign_svalue (&quickfix, item);
-    item = &quickfix;
-  }
-  free_svalue(sp);		/* This will make 'vec' invalid to use */
-  sp->type = T_LVALUE;
-  sp->u.lvalue = item;
+	i = sp;
+	vec = sp - 1;
+	if (vec->type == T_MAPPING) {
+		struct mapping *m = vec->u.map;
+		vec = find_for_insert(m, i, 0);
+		pop_stack();
+		free_svalue(sp);
+		sp->type = T_LVALUE;
+		sp->u.lvalue = vec;
+		if (!vec) {
+		  mapping_too_large();
+		}
+		return;
+	}
+	ind = i->u.number;
+	indType = i->type;
+	pop_stack();
+	if ((indType != T_NUMBER) || (ind < 0))
+		error("Illegal index\n");
+	if (vec->type == T_FUNCTION) {
+		if (ind > 1) {
+			error("Function variables may only be indexed with 0 or 1.\n");
+		}
+		vec = ind ? &vec->u.fp->fun : &vec->u.fp->obj;
+		free_svalue(sp);
+		sp->type = T_LVALUE;
+		sp->u.lvalue = vec;
+		return;
+	}
+	if (vec->type == T_STRING) {
+		static struct svalue one_character;
+
+		/* marion says: this is a crude part of code */
+		one_character.type = T_NUMBER;
+		if ((ind > SVALUE_STRLEN(vec)) || ind < 0)
+			one_character.u.number = 0;
+		else
+			one_character.u.number = (unsigned char)vec->u.string[ind];
+		free_svalue(sp);
+		sp->type = T_LVALUE;
+		sp->u.lvalue = &one_character;
+		return;
+	}
+	if (vec->type != T_POINTER) error("Indexing on illegal type.\n");
+	if (ind >= vec->u.vec->size) error ("Index out of bounds\n");
+	item = &vec->u.vec->item[ind];
+	if (vec->u.vec->ref == 1) {
+		static struct svalue quickfix = { T_NUMBER };
+
+		/* marion says: but this is crude too */
+		/* marion blushes. */
+		assign_svalue (&quickfix, item);
+		item = &quickfix;
+	}
+	free_svalue(sp);		/* This will make 'vec' invalid to use */
+	sp->type = T_LVALUE;
+	sp->u.lvalue = item;
 }
 
 /*
@@ -580,22 +607,14 @@ INLINE void push_vector(v)
 /*
  * Push a mapping on the stack.  See push_vector(), above.
  */
-INLINE void push_mapping(m)
-     struct mapping *m;
+INLINE void
+push_mapping(m)
+struct mapping *m;
 {
-  m->ref++;
-  sp++;
-  sp->type = T_MAPPING;
-  sp->u.map = m;
-}
-
-INLINE void push_funp(fp)
-struct funp *fp;
-{
-	fp->ref++;
+	m->ref++;
 	sp++;
-	sp->type = T_FUNCTION;
-	sp->u.fp = fp;
+	sp->type = T_MAPPING;
+	sp->u.map = m;
 }
 
 /*
@@ -646,7 +665,8 @@ void do_trace_call(funp)
  * There is a number of arguments on the stack. Normalize them and initialize
  * local variables, so that the called function is pleased.
  */
-struct function *setup_new_frame(funp)
+INLINE struct function *
+setup_new_frame(funp)
      struct function *funp;
 {
   function_index_offset = 0;
@@ -667,7 +687,7 @@ struct function *setup_new_frame(funp)
   }
   /* Correct number of arguments and local variables */
   while((unsigned)csp->num_local_variables < funp->num_arg + funp->num_local) {
-    push_number(0);
+    push_null();
     csp->num_local_variables++;
   }
   tracedepth++;
@@ -720,7 +740,7 @@ void push_pop_error_context (push)
      * the way.
      */
     p=(struct error_context_stack *)
-	DXALLOC(sizeof(struct error_context_stack),256,"push_pop_error_context");
+	DXALLOC(sizeof(struct error_context_stack),44,"push_pop_error_context");
     p->save_sp = sp;
     p->save_csp = csp;
     p->save_command_giver = command_giver;
@@ -760,20 +780,6 @@ void push_pop_error_context (push)
   }
 }
 
-struct vector *prepend_vector(v, a)
-     struct vector *v;
-     struct svalue *a;
-{
-  int i;
-  struct vector *new;
-  
-  new = allocate_array(v->size+1);
-  assign_svalue(&new->item[0], a);
-  for (i=0; i < v->size; ++i)
-    assign_svalue(&new->item[i+1], &v->item[i]);
-  return new;
-}
-
 /*
  * When a vector is given as argument to an efun, all items have to be
  * checked if there would be a destructed object.
@@ -803,18 +809,42 @@ void check_for_destr(v)
   }
 }
 
-struct vector *append_vector(v, a)
-     struct vector *v;
-     struct svalue *a;
+INLINE struct vector *
+append_vector(vp, sv)
+	struct vector *vp;
+	struct svalue *sv;
 {
-  int i;
-  struct vector *new;
+	struct vector *nvp;
+	struct svalue *nsp, *osp, *limit;
+
+	nvp = allocate_array(vp->size + 1);
+	osp = vp->item;
+	nsp = nvp->item;
+	limit = nsp + vp->size;
+	while (nsp < limit) {
+		assign_svalue_no_free(nsp++, osp++);
+	}
+	assign_svalue_no_free(nsp, sv);
+	return nvp;
+}
+
+INLINE struct vector *
+prepend_vector(vp, sv)
+     struct vector *vp;
+     struct svalue *sv;
+{
+	struct vector *nvp;
+	struct svalue *nsp, *osp, *limit;
   
-  new = allocate_array(v->size+1);
-  for (i=0; i<v->size; ++i)
-    assign_svalue(&new->item[i], &v->item[i]);
-  assign_svalue(&new->item[i], a);
-  return new;
+	nvp = allocate_array(vp->size + 1);
+	nsp = nvp->item;
+	osp = vp->item;
+	limit = nsp + nvp->size;
+	assign_svalue_no_free(nsp++, sv);
+	while (nsp < limit) {
+		assign_svalue_no_free(nsp++, osp++);
+	}
+	return nvp;
 }
 
 /*
@@ -833,34 +863,37 @@ int stack_size[60];
 char *previous_pc[60];
 static int last;
 #endif
-static void eval_instruction(p)
-     char *p;
+
+static void
+eval_instruction(p)
+char *p;
 {
   int i, num_arg;
   int instruction, is_efun;
   unsigned short offset;
   unsigned short string_number;
+  static func_t *oefun_table = efun_table - (BASE - F_OFFSET);
   
   /* Next F_RETURN at this level will return out of eval_instruction() */
   csp->extern_call = 1;
   too_deep_error = max_eval_error = 0;
   pc = p;
   while (1) { /* used to be the 'again' label */
-    instruction = EXTRACT_UCHAR(pc);
-    if ((instruction == (F_CALL_EXTRA - F_OFFSET))) {
-      pc++;
-      instruction = EXTRACT_UCHAR(pc) + 0xff;
+    if ((instruction = EXTRACT_UCHAR(pc)) == (F_CALL_EXTRA - F_OFFSET)) {
+        pc++;
+        instruction = EXTRACT_UCHAR(pc) + 0xff;
+        is_efun = 1; /* assume less than 256 eoperators */
+    } else {
+	    is_efun = (instruction >= (BASE - F_OFFSET));
     }
-	is_efun = (instruction >= (BASE - F_OFFSET));
 #ifdef TRACE_CODE
-    previous_instruction[last] = instruction + F_OFFSET;
+    previous_instruction[last] = instruction;
     previous_pc[last] = pc;
     stack_size[last] = sp - fp - csp->num_local_variables;
     last = (last + 1) % (sizeof previous_instruction / sizeof (int));
 #endif
     pc++;
-    eval_cost++;
-    if (eval_cost > max_cost) {
+    if (++eval_cost > max_cost) {
       printf("eval_cost too big %d\n", eval_cost);
       eval_cost = 0;
       max_eval_error = 1;
@@ -881,13 +914,13 @@ static void eval_instruction(p)
       if (num_arg > 0) {
 	if (instrs[instruction].type[0] != 0 &&
 	    (instrs[instruction].type[0] & (sp-num_arg+1)->type) == 0) {
-	  bad_arg(1, instruction + F_OFFSET);
+	  bad_arg(1, instruction);
 	}
       }
       if (num_arg > 1) {
 	if (instrs[instruction].type[1] != 0 &&
 	    (instrs[instruction].type[1] & (sp-num_arg+2)->type) == 0) {
-	  bad_arg(2, instruction + F_OFFSET);
+	  bad_arg(2, instruction);
 	}
       }
     } else {
@@ -895,13 +928,13 @@ static void eval_instruction(p)
       if (instrs[instruction].min_arg > 0) {
 	if (instrs[instruction].type[0] != 0 &&
 	    (instrs[instruction].type[0] & (sp-num_arg+1)->type) == 0) {
-	  bad_arg(1, instruction + F_OFFSET);
+	  bad_arg(1, instruction);
 	}
       }
       if (instrs[instruction].min_arg > 1) {
 	if (instrs[instruction].type[1] != 0 &&
 	    (instrs[instruction].type[1] & (sp-num_arg+2)->type) == 0) {
-	  bad_arg(2, instruction + F_OFFSET);
+	  bad_arg(2, instruction);
 	}
       }
       /*
@@ -920,12 +953,11 @@ static void eval_instruction(p)
 #ifndef DEBUG
 	}
 #endif
-    instruction += F_OFFSET;
 #ifdef OPCPROF
-    if (instruction >= BASE && instruction < MAXOPC) {
-      opc_efun[instruction - BASE].count++;
-    } else if (instruction >= F_OFFSET) {
-      opc_eoper[instruction - F_OFFSET]++;
+    if (is_efun) {
+      opc_efun[instruction - (BASE - F_OFFSET)].count++;
+    } else if (instruction >= 0) {
+      opc_eoper[instruction]++;
     }
 #endif
     /*
@@ -935,35 +967,260 @@ static void eval_instruction(p)
     if (TRACEP(TRACE_EXEC)) {
       do_trace("Exec ", get_f_name(instruction), "\n");
     }
-    if (is_efun) {
-      (*efun_table[instruction - BASE])(num_arg, instruction);
-    } else {
-      switch (instruction) {
-      case F_ADD:
+    switch (instruction) {
+      case I(F_INC) :
+#if DEBUG
+      if (sp->type != T_LVALUE)
+        error("Bad argument to ++\n");
+#endif
+      if (sp->u.lvalue->type != T_NUMBER)
+        error("++ of non-numeric argument\n");
+      sp->u.lvalue->u.number++;
+	  sp--;
+	break;
+      case I(F_PUSH_LOCAL_VARIABLE_LVALUE) :
+      sp++;
+      sp->type = T_LVALUE;
+      sp->u.lvalue = fp + EXTRACT_UCHAR(pc);
+      pc++;
+	break;
+      case I(F_NUMBER) :
+      ((char *)&i)[0] = pc[0];
+      ((char *)&i)[1] = pc[1];
+      ((char *)&i)[2] = pc[2];
+      ((char *)&i)[3] = pc[3];
+      pc += 4;
+      push_number(i);
+      break;
+      case I(F_BYTE) :
+      i = EXTRACT_UCHAR(pc);
+      pc++;
+      push_number(i);
+      break;
+      case I(F_NBYTE) :
+      i = EXTRACT_UCHAR(pc);
+      pc++;
+      push_number(-i);
+      break;
+      case I(F_JUMP_WHEN_NON_ZERO) :
+     if ((i = (sp->type == T_NUMBER)) && (sp->u.number == 0))
+        pc += 2;
+     else {
+        ((char *)&offset)[0] = pc[0];
+        ((char *)&offset)[1] = pc[1];
+        pc = current_prog->p.i.program + offset;
+     }
+     if (i) {
+        sp--; /* when sp is an integer svalue, its cheaper to do this */
+     } else {
+        pop_stack();
+     }
+	break;
+	case I(F_BRANCH) : /* relative offset */
+		((char *)&offset)[0] = pc[0];
+		((char *)&offset)[1] = pc[1];
+		pc += offset;
+ 	break;
+	case I(F_BRANCH_WHEN_ZERO) : /* relative offset */
+		if ((i = (sp->type == T_NUMBER)) && (sp->u.number == 0)) {
+			((char *)&offset)[0] = pc[0];
+			((char *)&offset)[1] = pc[1];
+			pc += offset;
+			sp--; /* can use this instead of pop_stack since its an integer */
+			break;
+		}
+		pc += 2;  /* skip over the offset */
+		if (i) {
+			sp--;
+		} else {
+			pop_stack();
+		}
+ 	break;
+	case I(F_BRANCH_WHEN_NON_ZERO) : /* relative offset */
+		if (((i = (sp->type != T_NUMBER))) || (sp->u.number != 0)) {
+			((char *)&offset)[0] = pc[0];
+			((char *)&offset)[1] = pc[1];
+			if (i) {
+				pop_stack();
+			} else {
+				sp--;
+			}
+			pc += offset;
+			break;
+		}
+		pc += 2;  /* skip over the offset */
+		sp--;     /* sp contains an int   */
+	break;
+	case I(F_BBRANCH_WHEN_ZERO) : /* relative backwards offset */
+		if ((i = (sp->type == T_NUMBER)) && (sp->u.number == 0)) {
+			((char *)&offset)[0] = pc[0];
+			((char *)&offset)[1] = pc[1];
+			pc -= offset;
+			sp--;
+			break;
+		}
+		pc += 2;
+		if (i) {
+			sp--;
+		} else {
+			pop_stack();
+		}
+ 	break;
+	case I(F_BBRANCH_WHEN_NON_ZERO) : /* relative backwards offset */
+		if ((i = (sp->type != T_NUMBER)) || (sp->u.number != 0)) {
+			((char *)&offset)[0] = pc[0];
+			((char *)&offset)[1] = pc[1];
+			if (i) {
+				pop_stack();
+			} else {
+				sp--;
+			}
+			pc -= offset;
+			break;
+		}
+		pc += 2;
+		sp--;
+ 	break;
+      case I(F_LOCAL_NAME) :
+      sp++;
+      assign_svalue_no_free(sp, fp + EXTRACT_UCHAR(pc));
+      pc++;
+      /*
+       * Fetch value of a variable. It is possible that it is a variable
+       * that points to a destructed object. In that case, it has to
+       * be replaced by 0.
+       */
+      if ((sp->type == T_OBJECT) && (sp->u.ob->flags & O_DESTRUCTED)) {
+        free_svalue(sp);
+        *sp = const0;
+      }
+	break;
+      case I(F_LT) :
+      if (((sp - 1)->type == T_NUMBER) && (sp->type == T_NUMBER))
+      {
+         sp--;
+         sp->u.number = (sp->u.number < (sp + 1)->u.number);
+         break;
+      }
+      if ((sp-1)->type != T_STRING)
+        bad_arg(1, instruction);
+      if (sp->type != T_STRING)
+        bad_arg(2, instruction);
+      i = (strcmp((sp-1)->u.string, sp->u.string) < 0);
+      pop_n_elems(2);
+      push_number(i);
+	break;
+      case I(F_ADD) :
 	f_add(num_arg, instruction);
 	break;
-      case F_ADD_EQ :
-	f_add_eq(num_arg, instruction);
+    case I(F_VOID_ADD_EQ) :
+    case I(F_ADD_EQ) :
+	{
+		struct svalue *argp;
+
+#ifdef DEBUG
+		if (sp[-1].type != T_LVALUE)
+			bad_arg(1, instruction);
+#endif
+		  argp = sp[-1].u.lvalue;
+		  switch(argp->type) {
+		  case T_STRING:
+			{
+			  char *new_str;
+			  if (sp->type == T_STRING)
+			{
+			  int l = SVALUE_STRLEN(argp);
+			  int len = l + strlen(sp->u.string) + 1;
+
+			  new_str = DXALLOC(len, 45, "f_add_eq: 1");
+			  eval_cost += (len >> 3);
+			  strcpy(new_str, argp->u.string);
+			  strcpy(new_str + l, sp->u.string);
+			  free_string_svalue(sp); /* free the RHS */
+			  sp -= 2;
+			}
+			  else if (sp->type == T_NUMBER)
+			{
+			  char buff[20];
+			  int len;
+			  sprintf(buff, "%d", sp->u.number);
+			  len = SVALUE_STRLEN(argp) + strlen(buff) + 1;
+			  eval_cost += (len >> 3);
+			  new_str = DXALLOC(len, 46, "f_add_eq: 2");
+			  strcpy(new_str, argp->u.string);
+			  strcat(new_str, buff);
+			  sp -= 2; /* RHS is a number, doesn't need freed */
+			}
+			  else {
+			bad_arg(2, instruction);
+			  }
+			free_string_svalue(argp); /* free the LHS */
+			argp->subtype = STRING_MALLOC;
+			argp->u.string = new_str;
+		  }
+			break;
+		  case T_NUMBER:
+			if (sp->type == T_NUMBER) {
+				argp->u.number += sp->u.number;
+				sp -= 2; /* both sides are numbers, no freeing required */
+			} else
+				error("Bad type number to rhs +=.\n");
+			break;
+		  case T_POINTER:
+			if (sp->type != T_POINTER)
+			  bad_arg(2, instruction);
+			else
+			  {
+			struct vector *v;
+
+			v = add_array(argp->u.vec, sp->u.vec);
+			free_vector(sp->u.vec); /* free RHS */
+			free_vector(argp->u.vec); /* free LHS */
+			eval_cost += (v->size << 3);
+			sp -= 2;
+			argp->u.vec = v;
+			  }
+			break;	      
+		  case T_MAPPING:
+			if (sp->type != T_MAPPING)
+			  bad_arg(2, instruction);
+			else
+			  {
+			absorb_mapping(argp->u.map, sp->u.map);
+			eval_cost += (argp->u.map->count << 2);
+			free_mapping(sp->u.map); /* free RHS */
+			sp -= 2; /* LHS not freed because its being reused */
+			  }
+			break;
+		  default:
+			bad_arg(1, instruction);
+		  }
+		/* if (void)add_eq then no need to produce an rvalue */
+		if (instruction == (F_ADD_EQ - F_OFFSET)) { /* not void add_eq */
+			sp++;
+			assign_svalue_no_free(sp, argp);
+		}
+	}
 	break;
-      case F_AND :
+      case I(F_AND) :
 	f_and(num_arg, instruction);
 	break;
-      case F_AND_EQ :
+      case I(F_AND_EQ) :
 	f_and_eq(num_arg, instruction);
 	break;
-	case F_FUNCTION_CONSTRUCTOR :
+	case I(F_FUNCTION_CONSTRUCTOR) :
 	f_function_constructor(num_arg, instruction);
 	break;
-	case F_FUNCTION_SPLIT :
+	case I(F_FUNCTION_SPLIT) :
 	f_function_split(num_arg, instruction);
 	break;
-      case F_AGGREGATE :
+      case I(F_AGGREGATE) :
 	f_aggregate(num_arg, instruction);
 	break;
-      case F_AGGREGATE_ASSOC :
+      case I(F_AGGREGATE_ASSOC) :
 	f_aggregate_assoc(num_arg, instruction);
 	break;
-      case F_ASSIGN :
+      case I(F_ASSIGN) :
 #ifdef DEBUG
        if (sp[-1].type != T_LVALUE)
          fatal("Bad argument to F_ASSIGN\n");
@@ -972,24 +1229,70 @@ static void eval_instruction(p)
        assign_svalue(sp-1, sp);
        pop_stack();
 	break;
-      case F_BREAK :
+      case I(F_VOID_ASSIGN) :
+#ifdef DEBUG
+       if (sp[-1].type != T_LVALUE)
+         fatal("Bad argument to F_VOID_ASSIGN\n");
+#endif
+       assign_svalue((sp-1)->u.lvalue, sp);
+       pop_n_elems(2);
+	break;
+      case I(F_BREAK) :
       pc = current_prog->p.i.program + *break_sp++;
 	break;
-      case F_CALL_FUNCTION_BY_ADDRESS :
-	f_call_function_by_address(num_arg, instruction);
+    case I(F_CALL_FUNCTION_BY_ADDRESS) :
+	{
+	  unsigned short func_index;
+	  struct function *funp;
+
+	  ((char *)&func_index)[0] = pc[0];
+	  ((char *)&func_index)[1] = pc[1];
+	  pc += 2;
+	  func_index += function_index_offset;
+	  /*
+	   * Find the function in the function table. As the function may have
+	   * been redefined by inheritance, we must look in the last table,
+	   * which is pointed to by current_object.
+	   */
+#ifdef DEBUG
+	  if (func_index >= current_object->prog->p.i.num_functions)
+		fatal("Illegal function index\n");
+#endif
+
+	  /* NOT current_prog, which can be an inherited object. */
+	  funp = &current_object->prog->p.i.functions[func_index];
+
+	  if (funp->flags & NAME_UNDEFINED)
+		error("Undefined function: %s\n", funp->name);
+	  /* Save all important global stack machine registers */
+	  push_control_stack(funp);	/* return pc is adjusted later */
+
+	  /* This assigment must be done after push_control_stack() */
+	  current_prog = current_object->prog;
+	  /*
+	   * If it is an inherited function, search for the real
+	   * definition.
+	   */
+	  csp->num_local_variables = EXTRACT_UCHAR(pc);
+	  pc++;
+	  funp = setup_new_frame(funp);
+	  csp->pc = pc;			/* The corrected return address */
+	  pc = current_prog->p.i.program + funp->offset;
+	  csp->extern_call = 0;
+	}
 	break;
-      case F_COMPL :
+      case I(F_COMPL) :
       if (sp->type != T_NUMBER)
          error("Bad argument to ~\n");
       sp->u.number = ~ sp->u.number;
 	break;
-      case F_CONST0 :
+      case I(F_CONST0) :
       push_number(0);
 	break;
-      case F_CONST1 :
+      case I(F_CONST1) :
       push_number(1);
 	break;
-      case F_DEC :
+      case I(F_PRE_DEC) :
       if (sp->type != T_LVALUE)
         error("Bad argument to --\n");
       if (sp->u.lvalue->type != T_NUMBER)
@@ -997,29 +1300,39 @@ static void eval_instruction(p)
       sp->u.lvalue->u.number--;
       assign_svalue(sp, sp->u.lvalue);
 	break;
-      case F_DIVIDE :
+      case I(F_DEC) :
+#ifdef DEBUG
+      if (sp->type != T_LVALUE)
+        error("Bad argument to --\n");
+#endif
+      if (sp->u.lvalue->type != T_NUMBER)
+        error("-- of non-numeric argument\n");
+      sp->u.lvalue->u.number--;
+	  sp--;
+	break;
+      case I(F_DIVIDE) :
 	f_divide(num_arg, instruction);
 	break;
-      case F_DIV_EQ :
+      case I(F_DIV_EQ) :
 	f_div_eq(num_arg, instruction);
 	break;
-      case F_DO :
+      case I(F_DO) :
       fatal("F_DO should not appear.\n");
 	break;
-      case F_DUP :
+      case I(F_DUP) :
       sp++;
       assign_svalue_no_free(sp, sp-1);
 	break;
-      case F_END_CATCH :
+      case I(F_END_CATCH) :
 	f_end_catch(num_arg, instruction);
 	break;
-      case F_EQ :
+      case I(F_EQ) :
 	f_eq(num_arg, instruction);
 	break;
-      case F_FOR :
+      case I(F_FOR) :
       fatal("F_FOR should not appear.\n");
 	break;
-      case F_GE :
+      case I(F_GE) :
       if ((sp-1)->type == T_STRING && sp->type == T_STRING)
       {
         i = strcmp((sp-1)->u.string, sp->u.string) >= 0;
@@ -1035,7 +1348,7 @@ static void eval_instruction(p)
       sp--;
       sp->u.number = i;
 	break;
-      case F_GT :
+      case I(F_GT) :
       if ((sp-1)->type == T_STRING && sp->type == T_STRING)
       {
         i = strcmp((sp-1)->u.string, sp->u.string) > 0;
@@ -1051,7 +1364,7 @@ static void eval_instruction(p)
       sp--;
       sp->u.number = i;
 	break;
-      case F_IDENTIFIER :
+      case I(F_IDENTIFIER) :
       sp++;
       assign_svalue_no_free(sp, find_value((int)(EXTRACT_UCHAR(pc) +
                          variable_index_offset)));
@@ -1066,7 +1379,7 @@ static void eval_instruction(p)
         *sp = const0n;
       }
 	break;
-      case F_INC :
+      case I(F_PRE_INC) :
       if (sp->type != T_LVALUE)
         error("Bad argument to ++\n");
       if (sp->u.lvalue->type != T_NUMBER)
@@ -1074,16 +1387,17 @@ static void eval_instruction(p)
       sp->u.lvalue->u.number++;
       assign_svalue(sp, sp->u.lvalue);
 	break;
-      case F_INDEX :
+      case I(F_INDEX) :
       if ((sp-1)->type == T_MAPPING)
         {
           struct svalue *v;
+          struct mapping *m;
+
           v = find_in_mapping((sp-1)->u.map, sp);
-          pop_stack();
-          if (!v)
-        assign_svalue(sp, &const0);
-          else
-        assign_svalue(sp, v);
+          pop_stack(); /* free b from a[b] */
+          m = sp->u.map;
+          assign_svalue_no_free(sp, v); /* v will always have a value */
+          free_mapping(m);
         }
       else
         {
@@ -1102,30 +1416,26 @@ static void eval_instruction(p)
           sp->u.number = 0;
         }
 	break;
-      case F_JUMP_WHEN_ZERO :
-      ((char *)&offset)[0] = pc[0];
-      ((char *)&offset)[1] = pc[1];
-      if (sp->type == T_NUMBER && sp->u.number == 0)
+      case I(F_JUMP_WHEN_ZERO) :
+      if ((i = (sp->type == T_NUMBER)) && sp->u.number == 0) {
+        ((char *)&offset)[0] = pc[0];
+        ((char *)&offset)[1] = pc[1];
         pc = current_prog->p.i.program + offset;
-      else
+      } else {
         pc += 2;
-      pop_stack();
+      }
+      if (i) {
+         sp--;  /* cheaper to do this when sp is an integer svalue */
+      } else {
+         pop_stack();
+      }
 	break;
-      case F_JUMP :
+      case I(F_JUMP) :
      ((char *)&offset)[0] = pc[0];
      ((char *)&offset)[1] = pc[1];
      pc = current_prog->p.i.program + offset;
 	break;
-      case F_JUMP_WHEN_NON_ZERO :
-     ((char *)&offset)[0] = pc[0];
-     ((char *)&offset)[1] = pc[1];
-     if (sp->type == T_NUMBER && sp->u.number == 0)
-        pc += 2;
-     else
-        pc = current_prog->p.i.program + offset;
-     pop_stack();
-	break;
-      case F_LE :
+      case I(F_LE) :
       if ((sp-1)->type == T_STRING && sp->type == T_STRING) {
         i = strcmp((sp-1)->u.string, sp->u.string) <= 0;
         pop_n_elems(2);
@@ -1140,95 +1450,57 @@ static void eval_instruction(p)
       sp--;
       sp->u.number = i;
 	break;
-      case F_LOCAL_NAME :
-      sp++;
-      assign_svalue_no_free(sp, fp + EXTRACT_UCHAR(pc));
-      pc++;
-      /*
-       * Fetch value of a variable. It is possible that it is a variable
-       * that points to a destructed object. In that case, it has to
-       * be replaced by 0.
-       */
-      if ((sp->type == T_OBJECT) && (sp->u.ob->flags & O_DESTRUCTED)) {
-        free_svalue(sp);
-        *sp = const0;
-      }
-	break;
-      case F_LSH :
+      case I(F_LSH) :
 	f_lsh(num_arg, instruction);
 	break;
-      case F_LSH_EQ :
+      case I(F_LSH_EQ) :
 	f_lsh_eq(num_arg, instruction);
 	break;
-      case F_LT :
-      if ((sp-1)->type == T_STRING && sp->type == T_STRING)
-      {
-         i = strcmp((sp-1)->u.string, sp->u.string) < 0;
-         pop_n_elems(2);
-         push_number(i);
-         break;
-       }
-       if ((sp-1)->type != T_NUMBER)
-         bad_arg(1, instruction);
-       if (sp->type != T_NUMBER)
-         bad_arg(2, instruction);
-       i = (sp-1)->u.number < sp->u.number;
-       sp--;
-       sp->u.number = i;
-	break;
-      case F_MOD :
+      case I(F_MOD) :
 	f_mod(num_arg, instruction);
 	break;
-      case F_MOD_EQ :
+      case I(F_MOD_EQ) :
 	f_mod_eq(num_arg, instruction);
 	break;
-      case F_MULTIPLY :
+      case I(F_MULTIPLY) :
 	f_multiply(num_arg, instruction);
 	break;
-      case F_MULT_EQ :
+      case I(F_MULT_EQ) :
 	f_mult_eq(num_arg, instruction);
 	break;
-      case F_NE :
+      case I(F_NE) :
 	f_ne(num_arg, instruction);
 	break;
-      case F_NEGATE :
+      case I(F_NEGATE) :
       if (sp->type != T_NUMBER)
         error("Bad argument to unary minus\n");
       sp->u.number = - sp->u.number;
 	break;
-      case F_NOT :
+      case I(F_NOT) :
       if (sp->type == T_NUMBER && sp->u.number == 0)
          sp->u.number = 1;
       else
          assign_svalue(sp, &const0);
 	break;
-      case F_NUMBER :
-      ((char *)&i)[0] = pc[0];
-      ((char *)&i)[1] = pc[1];
-      ((char *)&i)[2] = pc[2];
-      ((char *)&i)[3] = pc[3];
-      pc += 4;
-      push_number(i);
-	break;
-      case F_OR :
+      case I(F_OR) :
 	f_or(num_arg, instruction);
 	break;
-      case F_OR_EQ :
+      case I(F_OR_EQ) :
 	f_or_eq(num_arg, instruction);
 	break;
-      case F_PARSE_COMMAND :
+      case I(F_PARSE_COMMAND) :
 	f_parse_command(num_arg, instruction);
 	break;
-      case F_POP_VALUE :
+      case I(F_POP_VALUE) :
       pop_stack();
 	break;
-      case F_POP_BREAK :
+      case I(F_POP_BREAK) :
       ((char *)&offset)[0] = pc[0];
       ((char *)&offset)[1] = pc[1];
       break_sp += offset;
       pc += 2;
 	break;
-      case F_POST_DEC :
+      case I(F_POST_DEC) :
       if (sp->type != T_LVALUE)
         error("Bad argument to --\n");
       if (sp->u.lvalue->type != T_NUMBER)
@@ -1237,7 +1509,7 @@ static void eval_instruction(p)
       assign_svalue(sp, sp->u.lvalue);
       sp->u.number++;
 	break;
-      case F_POST_INC :
+      case I(F_POST_INC) :
 #ifdef DEBUG
       if (sp->type != T_LVALUE)
          error("Bad argument to ++\n");
@@ -1248,26 +1520,20 @@ static void eval_instruction(p)
       assign_svalue(sp, sp->u.lvalue);
       sp->u.number--;
 	break;
-      case F_PUSH_IDENTIFIER_LVALUE :
+      case I(F_PUSH_IDENTIFIER_LVALUE) :
       sp++;
       sp->type = T_LVALUE;
       sp->u.lvalue = find_value((int)(EXTRACT_UCHAR(pc) +
                       variable_index_offset));
       pc++;
 	break;
-      case F_PUSH_INDEXED_LVALUE :
+      case I(F_PUSH_INDEXED_LVALUE) :
       push_indexed_lvalue();
 	break;
-      case F_PUSH_LOCAL_VARIABLE_LVALUE :
-      sp++;
-      sp->type = T_LVALUE;
-      sp->u.lvalue = fp + EXTRACT_UCHAR(pc);
-      pc++;
-	break;
-      case F_RANGE :
+      case I(F_RANGE) :
 	f_range(num_arg, instruction);
 	break;
-      case F_RETURN :
+      case I(F_RETURN) :
 	{
 	  struct svalue sv;
 	  
@@ -1300,44 +1566,44 @@ static void eval_instruction(p)
 	    return;
 	  break;
 	}
-      case F_RSH :
+      case I(F_RSH) :
 	f_rsh(num_arg, instruction);
 	break;
-      case F_RSH_EQ :
+      case I(F_RSH_EQ) :
 	f_rsh_eq(num_arg, instruction);
 	break;
-      case F_SSCANF :
+      case I(F_SSCANF) :
 	f_sscanf(num_arg, instruction);
 	break;
-      case F_STRING :
+      case I(F_STRING) :
         ((char *)&string_number)[0] = pc[0];
         ((char *)&string_number)[1] = pc[1];
         pc += 2;
         push_string(current_prog->p.i.strings[string_number],
                 STRING_CONSTANT);
 	break;
-      case F_SUBSCRIPT :
+      case I(F_SUBSCRIPT) :
       fatal("F_SUBSCRIPT should not appear.\n");
 	break;
-      case F_SUBTRACT :
+      case I(F_SUBTRACT) :
 	f_subtract(num_arg, instruction);
 	break;
-      case F_SUB_EQ :
+      case I(F_SUB_EQ) :
 	f_sub_eq(num_arg, instruction);
 	break;
-      case F_SWITCH :
+      case I(F_SWITCH) :
 	f_switch(num_arg, instruction);
 	break;
-      case F_WHILE :
+      case I(F_WHILE) :
       fatal("F_WHILE should not appear.\n");
 	break;
-      case F_XOR :
+      case I(F_XOR) :
 	f_xor(num_arg, instruction);
 	break;
-      case F_XOR_EQ :
+      case I(F_XOR_EQ) :
 	f_xor_eq(num_arg, instruction);
 	break;
-      case F_CATCH :
+      case I(F_CATCH) :
 	{
 	  /*
 	   * WARNING! WARNING! WARNING!
@@ -1394,12 +1660,16 @@ static void eval_instruction(p)
 	  break;
 	}
 	default :
-	  dump_trace(1);
-	fatal("Undefined instruction %s (%d)\n", get_f_name(instruction),
-	      instruction);
-	break;
-      }
-    }
+		if (is_efun) {
+			(*oefun_table[instruction])(num_arg, instruction);
+		} else {
+			dump_trace(1);
+			fatal("Undefined instruction %s (%d)\n", get_f_name(instruction),
+				instruction + F_OFFSET);
+			return;
+		}
+		break;
+	}
 #ifdef DEBUG
     if ((expected_stack && (expected_stack != sp)) ||
 	(sp < fp + csp->num_local_variables - 1))
@@ -1500,9 +1770,6 @@ int apply_low(fun, ob, num_arg)
       ob = ob->shadowed;
 #endif
   retry_for_shadow:
-    if (ob->flags & O_EXTERN_PROGRAM) {
-      return ob->prog->p.e.interface(fun, num_arg);
-    }
     if (ob->flags & O_SWAPPED)
       load_ob_from_swap(ob);
     progp = ob->prog;
@@ -1516,8 +1783,8 @@ int apply_low(fun, ob, num_arg)
     ix = (progp->p.i.id_number ^ (int)fun ^
 	  ((int)fun >> APPLY_CACHE_BITS )) & cache_mask;
     if ((cache_id[ix] == progp->p.i.id_number)
-		&& !strcmp(cache_name[ix], fun)
-		&& (!cache_progp[ix] || (cache_oprogp[ix] == ob->prog)))
+		&& (!cache_progp[ix] || (cache_oprogp[ix] == ob->prog))
+		&& !strcmp(cache_name[ix], fun))
     {
       /* We have found a matching entry in the cache. The pointer to
 	 the function name has to match, not only the contents.
@@ -1976,7 +2243,7 @@ int num_arg;
    * Now get the format description.
    */
   if (arg[1].type != T_STRING)
-    bad_arg(2, F_SSCANF);
+    bad_arg(2, I(F_SSCANF));
   fmt = arg[1].u.string;
   /*
    * First, skip and match leading text.
@@ -2092,7 +2359,7 @@ int num_arg;
 	  skipme = 0;
 	}
 	else {
-	  match = DXALLOC(i+1, 256, "inter_scanf");
+	  match = DXALLOC(i+1, 47, "inter_scanf");
 	  (void)strncpy(match, in_string, i);
 	  in_string += i + cp - fmt;
 	  match[i] = '\0';
@@ -2232,7 +2499,7 @@ int last_instructions() {
   do {
     if (previous_instruction[i] != 0)
       printf("%6x: %3d %8s %-25s (%d)\n", previous_pc[i],
-	     previous_instruction[i],
+	     previous_instruction[i] + F_OFFSET,
 	     get_arg(i, (i+1) %
 		     (sizeof previous_instruction / sizeof (int))),
 	     get_f_name(previous_instruction[i]),
@@ -2478,30 +2745,4 @@ char *p, *s;
     if (*p++ != *s++)
       return 0;
   return 1;
-}
-
-struct funp *
-make_funp(sob, sfun)
-struct svalue *sob, *sfun;
-{
-	struct funp *fp;
-
-	fp = (struct funp *)MALLOC(sizeof(struct funp));
-	assign_svalue_no_free(&fp->obj, sob);
-	assign_svalue_no_free(&fp->fun, sfun);
-	fp->ref = 1;
-	return fp;
-}
-
-void
-free_funp(fp)
-struct funp *fp;
-{
-	fp->ref--;
-	if (fp->ref > 0) {
-		return;
-	}
-	free_svalue(&fp->obj);
-	free_svalue(&fp->fun);
-	FREE(fp);
 }

@@ -251,7 +251,7 @@ int		excompat;	/* \( \) operators like in unix ex */
 	FAIL("NULL argument");
 
     exp2=(short*)
-	DXALLOC( (strlen(exp)+1) * (sizeof(short[8])/sizeof(char[8])), 65536,
+	DXALLOC( (strlen(exp)+1) * (sizeof(short[8])/sizeof(char[8])), 94,
 		"regcomp: 1" );
     for ( scan=exp,dest=exp2; (c= *scan++); ) {
 	switch (c) {
@@ -307,7 +307,7 @@ int		excompat;	/* \( \) operators like in unix ex */
 	FAIL("regexp too big");
 
     /* Allocate space. */
-    r = (regexp *) DXALLOC(sizeof(regexp) + (unsigned) regsize, 65536,
+    r = (regexp *) DXALLOC(sizeof(regexp) + (unsigned) regsize, 95,
 		"regcomp: 2");
     if (r == (regexp *) NULL)
 	FAIL("out of space");

@@ -1,5 +1,5 @@
 ###############################################################################
-#              Custom config file for Nightmare Mud                           #
+#                  Customizable runtime config file for MudOS                 #
 ###############################################################################
 # NOTE: All paths specified here are relative to the mudlib directory except  #
 #       for mudlib directory, and binary directory.                           #
@@ -7,19 +7,17 @@
 ###############################################################################
 
 # Name of this lpmud
-name : Wired
+name : basis
 
 # Define what port number the game is to use.
-port number : 2999
+port number : 7373
 
 # Maximum number of users in the game.
 # (currently this option is unused)
-maximum users : 60
+maximum users : 40
 
-#mudlib directory : /usr/students/pbeach/lib
-#binary directory : /usr/students/pbeach/bin
-mudlib directory : /home/couns/sstock/src/mos/lib
-binary directory : /home/couns/sstock/src/MudOS/bin
+mudlib directory : /usr/local/mud/libs/basis
+binary directory : /usr/local/mud/bin
 
 # This is the subdirectory where all the domain directorys are placed.
 domain directory : d
@@ -33,7 +31,7 @@ secure directory : /adm
 
 # the file which defines the master object
 # (should be in the secure directory)
-master file : /adm/master
+master file : /adm/obj/master
 
 # This is where the mud configuration files belong (access.allow, etc)
 config directory : /adm/etc
@@ -46,7 +44,7 @@ log directory : /log
 include directories : /include
 
 # This is the file where all global simulated efuns are defined.
-simulated efun file : /adm/simul_efun
+simulated efun file : /adm/obj/simul_efun
 
 # This is an include file which is automatically #include'd in all objects
 # This is an optional define, and currently doesn't work.
@@ -59,26 +57,19 @@ access allow file : /adm/etc/access.allow
 # (if enabled in access_check.c)
 access log file : /log/access.allow.log
 
-#
-default fail message : What?
-default error message : What?
-
-#
-maximum efun sockets : 16
-
 # If an object is left alone for a certain time, then the
 # function clean_up will be called. This function can do anything,
 # like destructing the object. If the function isn't defined by the
 # object, then nothing will happen.
 #
 # This time should be substantially longer than the swapping time.
-time to clean up : 3600
+time to clean up : 180
 
 # How long time until an unused object is swapped out.
 # Machine with too many players and too little memory: 900 (15 minutes)
 # Machine with few players and lot of memory: 10000
 # Machine with infinite memory: 0 (never swap).
-time to swap : 3600
+time to swap : 120
 
 # How many seconds until an object is reset again.
 # Set this value high if big system, otherwise low.
@@ -107,17 +98,17 @@ maximum call depth : 30
 maximum bits in a bitfield : 1200
 
 # Max number of local variables in a function.
-maximum local variables : 20
+maximum local variables : 30
 
 # Maximum number of evaluated nodes/loop.
 # If this is exceeded, current function is halted.
 # The worst case yet encountered is 3600       (dec 1989)
-maximum evaluation cost : 300000
+maximum evaluation cost : 1000000000
 
 # This is the maximum array size allowed for one single array.
-maximum array size : 5000
+maximum array size : 15000
 
-maximum mapping size : 5000
+maximum mapping size : 15000
 
 inherit chain size : 30
 
@@ -162,5 +153,7 @@ living hash table size : 100
 object table size : 1009
 
 # hname stuff
-address server ip : orlith.bates.edu
-address server port : 2998
+address server ip : localhost
+address server port : 7374
+
+default fail message : Errmm?

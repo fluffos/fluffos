@@ -8,7 +8,9 @@
 #include <sys/time.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#if !defined(apollo) && !defined(linux)
 #include <sys/socketvar.h>
+#endif
 #ifdef _AIX
 #include <sys/select.h>
 #endif /* _AIX */
@@ -29,7 +31,7 @@
 #include "exec.h"
 #include "debug.h"
 #include "socket_efuns.h"
-#include "socket_errors.h"
+#include "socket_err.h"
 
 extern int errno, d_flag;
 extern int save_svalue_depth;
@@ -100,7 +102,7 @@ socket_create(mode, read_callback, close_callback)
 	if (lpc_socks[i].state != CLOSED)
 	    continue;
 
-	fd = socket(AF_INET, type, DFAULT_PROTO);
+	fd = socket(AF_INET, type, 0);
 	if (fd == -1) {
 	    perror("socket_create: socket");
 	    return EESOCKET;
@@ -437,7 +439,7 @@ socket_write(fd, message, name)
 			return EEBADDATA;
 		}
 	    buf = (char *)
-           DMALLOC(sizeof (long) + len + 1, 524288, "socket_write: default");
+           DMALLOC(sizeof (long) + len + 1, 104, "socket_write: default");
 	    if (buf == NULL)
 		crash_MudOS("Out of memory");
 	    *(long *)buf = htonl((long)len);
@@ -453,7 +455,7 @@ socket_write(fd, message, name)
 
 	case T_STRING:
 	    len = strlen(message->u.string);
-	    buf = (char *)DMALLOC(len + 1, 524288, "socket_write: T_STRING");
+	    buf = (char *)DMALLOC(len + 1, 105, "socket_write: T_STRING");
 	    if (buf == NULL)
 		crash_MudOS("Out of memory");
 	    strcpy(buf, message->u.string);
@@ -591,7 +593,7 @@ socket_read_select_handler(fd)
 		lpc_socks[fd].r_off = 0;
 		lpc_socks[fd].r_len = ntohl(lpc_socks[fd].r_len);
 		lpc_socks[fd].r_buf = (char *)
-         DMALLOC(lpc_socks[fd].r_len + 1, 524288, "socket_read_select_handler");
+         DMALLOC(lpc_socks[fd].r_len + 1, 106, "socket_read_select_handler");
 		if (lpc_socks[fd].r_buf == NULL)
 		    crash_MudOS("Out of memory");
 		debug(8192,("read_socket_handler: svalue len is %d\n",

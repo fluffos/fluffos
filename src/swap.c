@@ -215,7 +215,7 @@ void load_ob_from_swap(ob)
 	fatal("Couldn't read the swap file.\n");
     }
     ob->prog = (struct program *)
-		DXALLOC(tmp_prog.p.i.total_size, 4194304, "load_ob_from_swap");
+		DXALLOC(tmp_prog.p.i.total_size, 118, "load_ob_from_swap");
     memcpy((char *)ob->prog, (char *)&tmp_prog, sizeof tmp_prog);
     fread((char *)ob->prog + sizeof tmp_prog,
 	  tmp_prog.p.i.total_size - sizeof tmp_prog, 1, swap_file);

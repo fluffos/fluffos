@@ -1434,7 +1434,7 @@ int check_adjectiv(obix, wvec, from, to)
    if (from == to)
      return 0;
    
-   adstr = DXALLOC(sum, 16384, "check_adjectiv"); 
+   adstr = DXALLOC(sum, 87, "check_adjectiv"); 
    
    for (il = from; il < to;) 
      {
@@ -1681,7 +1681,7 @@ char *str;
 	   *p1=' ';
 	   if (p2 != buf)
 	     {
-		p3 = DXALLOC(1+strlen(p1)+strlen(p2), 8192, "process_string: 1");
+		p3 = DXALLOC(1+strlen(p1)+strlen(p2), 88, "process_string: 1");
 		strcpy(p3,p2);
 		strcat(p3,p1);
 		FREE(p2);
@@ -1694,7 +1694,7 @@ char *str;
 	}
       if (p2 == vec->item[il].u.string) {
 	 if(!ch_last) {      /* get rid of the last snabels */
-	    p3 = DXALLOC(3+strlen(p2), 8192, "process_string: 2");
+	    p3 = DXALLOC(3+strlen(p2), 89, "process_string: 2");
 	    strcpy(p3,"@@"); strcat(p3,p2);
 	    p2 = p3;
 	 }
@@ -1784,7 +1784,7 @@ struct svalue *process_value(str)
      ob = current_object;
    else
   {
-    ob = find_object2(obj);
+    ob = find_object(obj);
     if (ob && !object_visible(ob)) ob = 0;
   }
    
@@ -1875,9 +1875,9 @@ int indent;
    for (nchar = 0, il = 0; il < lines->size; il++)
      nchar += indent + strlen(lines->item[il].u.string) + 1;
    
-   fstr = DXALLOC(nchar + 1, 16384, "break_string: 1");
+   fstr = DXALLOC(nchar + 1, 90, "break_string: 1");
    fstr[0] = 0;
-   istr = DXALLOC(indent + 1, 16384, "break_string: 2");
+   istr = DXALLOC(indent + 1, 91, "break_string: 2");
    istr[indent] = 0;
    for (il = 0; il < indent; il++) 
      istr[il] = ' ';

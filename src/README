@@ -1,3 +1,42 @@
-This directory contains the source for MudOS, an enhanced LPmud 3.0.53
-(incorporating patches up through 3.1.2).  See the Install and Run files
-in ../doc.
+MudOS is an enhanced LPmud 3.0 (native mode only).
+
+This is the source (src) directory from the MudOS-0.9.x distribution.
+Intermediate releases of MudOS (those with four components to the version
+number) are typically released without documentation and other supporting
+material (since the size of this other material is fairly large).  Releases
+of MudOS with version numbers having three components will usually be
+released as a combined source/documentation package (e.g. MudOS-0.9.15.tar.Z
+will be the next such release).
+
+Notes:
+
+Send bug reports to mudos-bugs@gestalt.austin.tx.us.  Be sure to include
+relevant information along with the problem description including:
+Type of machine (e.g. Sun3, NeXT, RS/6000, etc), operating system
+(e.g. SunOS 4.1, NeXTSTEP 3.0, AIX 3.2, etc), and version of MudOS
+(e.g. 0.9.14.17).  Include any other information you feel may help.
+
+Send mail to mudos-info-request@gestalt.austin.tx.us to be added to
+the MudOS information mailing list (info on new releases etc).
+
+Discuss the MudOS driver on the mudos@iastate.edu mailing list
+(request to be added at mudos-request@iastate.edu).
+
+ChangeLog.0 and ChangeLog.1 are no longer part of the src directory
+(although the most recent ChangeLog will be retained).  The older ChangeLogs
+will be kept in the documentation directory.
+
+The 'addr_server' file replaces the old hname program.  Unlike hname,
+addr_server must be started up manually (it takes a single argument
+which is the port # the addr_server should listen on -- this port #
+must also be specified in the runtime config file).
+
+Some older versions of yacc will not build lang.y correctly (they complain
+about "too many terminals".  If your yacc has this problem, you will need
+to build lang.tab.* (from lang.y) on another machine or you will need
+to get bison (a yacc replacement) from prep.ai.mit.edu in /pub/gnu (via
+anonymous ftp).  If you build yacc on a different machine be sure to
+configure options.h in the same way and make sure to add -DSYMBOL to
+CFLAGS in the Makefile where SYMBOL is the symbol that your C preprocessor
+automatically defines (e.g. NeXT, _AIX, hpux, linux, _AUX_SOURCE, etc).
+Look in port.h at the ARCH defines if you don't know what symbol to use.

@@ -4,7 +4,7 @@
  *   10-92 : Dave Richards (Cynosure) : less original coding.
  */
 
-#include "socket_errors.h"
+#include "socket_err.h"
 
 char *error_strings[ERROR_STRINGS] = {
     "Problem creating socket",

@@ -68,7 +68,7 @@ extern struct object *obj_list;
 extern struct object *obj_list_destruct;
 
 struct value;
-void save_object PROT((struct object *, char *)),
+void save_object PROT((struct object *, char *, int)),
     move_object PROT((struct object *, struct object *)),
     tell_npc PROT((struct object *, char *)),
     free_object PROT((struct object *, char *)),
@@ -76,7 +76,7 @@ void save_object PROT((struct object *, char *)),
 
 void tell_object PROT((struct object *, char *));
 
-int restore_object PROT((struct object *, char *));
+int restore_object PROT((struct object *, char *, int));
 
 #ifdef DEBUG
 #define add_ref(ob, str) ob->ref++; \

@@ -39,7 +39,7 @@ extern int readlink PROT((char *, char *, int));
 extern int symlink PROT((char *, char *));
 #endif /* NeXT */
      
-#if !defined(hpux) && !defined(_AIX)
+#if !defined(hpux) && !defined(_AIX) && !defined(__386BSD__) && !defined(linux)
 extern int fchmod PROT((int, int));
 #endif /* !defined(hpux) && !defined(_AIX) */
 char *last_verb;
@@ -401,7 +401,7 @@ char *make_new_name(str)
      char *str;
 {
   static int i;
-  char *p = DXALLOC(strlen(str) + 10, 262144, "make_new_name");
+  char *p = DXALLOC(strlen(str) + 10, 97, "make_new_name");
   
   (void)sprintf(p, "%s#%d", str, i);
   i++;
@@ -896,7 +896,7 @@ void say(v, avoid)
   
   curr_recipient = recipients = first_recipients =
     (struct object **)
-	DMALLOC(max_recipients * sizeof(struct object *), 262144, "say: 1");
+	DMALLOC(max_recipients * sizeof(struct object *), 98, "say: 1");
   last_recipients = first_recipients + max_recipients - 1;
   if (current_object->flags & O_ENABLE_COMMANDS)
     command_giver = current_object;
@@ -926,7 +926,7 @@ void say(v, avoid)
 	  max_recipients <<= 1;
 	  curr_recipient = (struct object **)
 	    DREALLOC(recipients, max_recipients * sizeof(struct object *),
-		262144, "say: 2");
+		99, "say: 2");
 	  recipients = curr_recipient;
 	  last_recipients = &recipients[max_recipients-1];
 	}
@@ -939,7 +939,7 @@ void say(v, avoid)
       if (curr_recipient >= last_recipients) {
 	max_recipients <<= 1;
 	curr_recipient = (struct object **)
-    DREALLOC(recipients, max_recipients * sizeof(struct object *), 262144,
+    DREALLOC(recipients, max_recipients * sizeof(struct object *), 100,
 		"say: 3");
 	recipients = curr_recipient;
 	last_recipients = &recipients[max_recipients-1];
@@ -1054,7 +1054,7 @@ void shout_string(str)
     p = current_object->uid->name;
   if (p)
     {
-      tmpstr = (char *)DMALLOC(strlen(LOG_DIR) + 8, 262144, "shout_string: 1");
+      tmpstr = (char *)DMALLOC(strlen(LOG_DIR) + 8, 101, "shout_string: 1");
       sprintf(tmpstr,"%s/shouts",LOG_DIR);
       if (tmpstr[0] == '/')
 	strcpy (tmpstr, tmpstr+1);
@@ -1150,7 +1150,7 @@ int input_to(fun, flag, num_arg, args)
    */
   if(num_arg){
     if((x = (struct svalue *)
-	DMALLOC(num_arg * sizeof(struct svalue), 262144, "input_to: 1")) == NULL)
+	DMALLOC(num_arg * sizeof(struct svalue), 102, "input_to: 1")) == NULL)
       fatal("Not enough memory to copy args from input_to.\n");	 
     copy_some_svalues(x, args, num_arg);
   }
@@ -1217,8 +1217,12 @@ void print_svalue(arg)
     add_message("OBJ(%s)", arg->u.ob->name);
   else if(arg->type == T_NUMBER)
     add_message("%d", arg->u.number);
-  else if(arg->type == T_POINTER)
+  else if(arg->type & T_POINTER)
     add_message("<ARRAY>");
+  else if (arg->type == T_MAPPING)
+    add_message("<MAPPING>");
+  else if (arg->type == T_FUNCTION)
+    add_message("<FUNCTION>");
   else
     add_message("<UNKNOWN>");
 }
@@ -1445,7 +1449,7 @@ struct sentence *alloc_sentence() {
   struct sentence *p;
   
   if (sent_free == 0) {
-    p = (struct sentence *)DXALLOC(sizeof *p, 262144, "alloc_sentence");
+    p = (struct sentence *)DXALLOC(sizeof *p, 103, "alloc_sentence");
     tot_alloc_sentence++;
   } else {
     p = sent_free;
@@ -1988,7 +1992,7 @@ void do_message(class, msg, scope, exclude)
 	  struct vector *ai;
 
 	  tmp = use;
-	  use = add_array(use,ai = all_inventory(scope->item[i].u.ob));
+	  use = add_array(use,ai = all_inventory(scope->item[i].u.ob, 1));
 	  free_vector(ai);
 	  free_vector(tmp);
 	}

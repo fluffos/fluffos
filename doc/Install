@@ -1,11 +1,11 @@
-MudOS installation (1992/12/12)
+MudOS installation (1993/01/28)
 
 This is a brief description of how to install MudOS 0.9 (or later)
 using native 3.x mode (MudOS does _not_ support 2.4.5 compatibility mode).
 
-When you have uncompressed and untarred the MudOS_0.9.0.tar.Z file, the
+When you have uncompressed and untarred the MudOS_0.9.15.tar.Z file, the
 following directories (and possibly others) should have been automatically
- created: src, bin, doc, etc, and mudlib.
+created: src, bin, doc, etc, and mudlib.
 
 Perform the following steps:
 
@@ -23,12 +23,15 @@ Perform the following steps:
 
 3) Edit the options.h file to specify a memory management package.
 
-   Choose one of SYSMALLOC, DEBUGMALLOC, WRAPPEDMALLOC, or BSDMALLOC.
-   If you are using a NeXT or an RS/6000, do not choose BSDMALLOC (it won't
-   link, you'll be wasting your time... hack away if you like but consider
-   yourself forewarned).  If you are using an HP, you probably should use
-   BSDMALLOC since the malloc() included in HP-UX seems really slow.  Also,
-   be sure to read doc/driver/malloc before modifying the driver source code.
+   Choose one of SYSMALLOC, WRAPPEDMALLOC, or DEBUGMALLOC.
+   If you are using a NeXT or an RS/6000, do not choose BSDMALLOC or
+   SMALLOC (it won't link, you'll be wasting your time... hack away if
+   you like but consider yourself forewarned).  If you are using an HP, you
+   probably should use smalloc or bsdmalloc (use SYSMALLOC in options.h
+   and uncomment SMALLOC* or BSDMALLOC* in the Makefile) since the HP
+   system malloc is really slow.  Note that smalloc is much more
+   space (overhead) efficient than bsdmalloc.  Be sure to read
+   doc/driver/malloc before modifying the driver source code.  
 
 4) Edit the options.h file to specify a default directory (CONFIG_FILE_DIR)
    for the runtime config file.  This step is optional.
@@ -38,24 +41,23 @@ Perform the following steps:
    driver (e.g.: driver /usr/local/mud/etc/config.basis).  If you do
    specify a value for CONFIG_FILE_DIR (and you put the config.basis file
    in that directory), then you may start the driver using:
-   driver config.basis.
+   driver config.basis
 
 5) Read the comments in the options.h file and change those remaining macro
    definitions that are not set appropriately for your tastes.
 
 6) If you do not have a NeXT (2.1 or 3.0), HP (HP-UX 7.0 or 8.x), SPARCstation,
-   RS/6000, Ultrix machine (e.g. DECstation), Sequent, or System VR4 machine
-   then you may need to change port.h.
+   Sun3, RS/6000, Ultrix (e.g. DECstation), Sequent, System VR4 machine,
+   Linux, 386bsd, SGI, or A/UX machine, then you may need to change port.h.
 
 7) Type: make install
 
    If errors occur at this stage, then you may be able to correct them by
    making additional changes to Makefile, options.h, or port.h.  If 'make'
-   prints some message similar to "/bin/ld: Undefined symbols: _alloca" then
-   that means your machine does not have the alloca() system call.  In this
-   case, you could correct the problem be uncommenting the ALLOCA definitions
-   in the Makefile.  The ualarm() system call and several others are handled
-   similarly.  If the install -c command itself fails, then you will need
+   prints some message similar to "/bin/ld: Undefined symbols: _ualarm" then
+   that means your machine does not have the ualarm() system call.  In this
+   case, you could correct the problem be uncommenting the UALARM definitions
+   in the Makefile.  If the install -c command itself fails, then you will need
    to copy the driver and addr_server to the bin directory manually (using
    the cp or mv command).  If /bin/ld prints an error regarding _getrusage,
    you will need to undefine RUSAGE in port.h.  Messages regarding _random,

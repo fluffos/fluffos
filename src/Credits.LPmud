@@ -1,0 +1,31 @@
+The program was written originally by
+
+Lars Pensj|, April 1989 (lars@cd.chalmers.se).
+
+Other credits:
+
+The regexp package was made by Henry Spencer.
+
+The ed package was not done by me. See the file ed.c for information.
+
+Bit manipulations was implemented by pell@lysator.liu.se who also found
+several bugs that had eluded me for months.
+
+Valuable help and hints from: Mark Nagel, James Seidman, Moonchilde and more.
+
+Roland Dunkerley III fixed for-loops, do-while and the operators ++ and --.
+
+Sean T Barrett made smalloc.c.
+
+Lennart Augustsson convinced me to implement a compiler for a virtual
+stack machine. He also implemented the built-in preprocessor.
+
+John S. Price found and fixed many bugs.
+
+The shadow idea was "forwarded" to me by John S. Price from Team Cthulhu
+(Bill Burdick, Roy Riggs, Mitch Adler).
+
+Michael Malone, Michael O'Reilly, Klaus Rennecke, J|rn Rennecke and
+Germano Caronni found and fixed a large amount of bugs.
+
+Petri Wessman fixed changes for SCO unix and AIX.

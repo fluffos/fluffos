@@ -4,7 +4,8 @@
  */
 
 #include <sys/types.h>
-#if (defined(_SEQUENT_) || defined(hpux))
+#if (defined(_SEQUENT_) || defined(hpux) || defined(sgi) || \
+	defined(_AUX_SOURCE) || defined(linux))
 #include <sys/sysmacros.h>
 #endif
 #include <sys/stat.h>
@@ -50,13 +51,13 @@ extern int symlink PROT((char *, char *));
 #ifdef MSDOS
 #define lstat stat
 #else
-#if !defined(hpux) && !defined(SVR4)
+#if !defined(hpux) && !defined(SVR4) && !defined(__386BSD__) && !defined(linux)
 extern int lstat PROT((char *, struct stat *));
 #endif
 #endif
 #endif /* NeXT */
 
-#if !defined(hpux) && !defined(_AIX)
+#if !defined(hpux) && !defined(_AIX) && !defined(__386BSD__) && !defined(linux)
 extern int fchmod PROT((int, int));
 #endif /* !defined(hpux) && !defined(_AIX) */
 
@@ -201,7 +202,7 @@ struct vector *get_dir(path, flags)
      *  Count files
      */
     for (de = readdir(dirp); de; de = readdir(dirp)) {
-#if defined(M_UNIX) || defined(_SEQUENT_) || defined(SVR4)
+#if defined(M_UNIX) || defined(_SEQUENT_) || defined(SVR4) || defined(linux)
 	namelen = strlen(de->d_name);
 #else
 	namelen = de->d_namlen;
@@ -228,7 +229,7 @@ struct vector *get_dir(path, flags)
     endtemp = temppath + strlen(temppath);
     strcat(endtemp++, "/");
     for(i = 0, de = readdir(dirp); i < count; de = readdir(dirp)) {
-#if defined(M_UNIX) || defined(_SEQUENT_) || defined(SVR4)
+#if defined(M_UNIX) || defined(_SEQUENT_) || defined(SVR4) || defined(linux)
         namelen = strlen(de->d_name);
 #else
 	namelen = de->d_namlen;
@@ -348,12 +349,16 @@ void log_file(file, str)
     char *file, *str;
 {
     FILE *f;
-    char file_name[100];
+    char the_file_name[100], *file_name;
     struct stat st;
 
+    file_name = the_file_name;
     sprintf(file_name, "%s/%s", LOG_DIR, file);
     if (file_name[0] == '/')
-      strcpy (file_name, file_name+1);
+       file_name++;
+    file_name = check_valid_path(file_name, current_object, "log_file", 1);
+    if (!file_name)
+	    return;
     if (stat(file_name, &st) != -1 && st.st_size > MAX_LOG_SIZE) {
       char file_name2[sizeof file_name + 4];
       sprintf(file_name2, "%s.old", file_name+1);
@@ -426,9 +431,9 @@ void smart_log(error_file, line, what, flush)
     {
       /* the +30 is more than is needed, but what the heck? */
       buff[count] = (char *)
-		DMALLOC(strlen(error_file)+strlen(what)+30, 128, "smart_log: 1");
+		DMALLOC(strlen(error_file)+strlen(what)+30, 39, "smart_log: 1");
       files[count] = (char *)
-		DMALLOC(strlen(error_file)+1, 128, "smart_log: 2");
+		DMALLOC(strlen(error_file)+1, 40, "smart_log: 2");
       sprintf (buff[count], "%s line %d:%s\n", error_file, line, what);
       strcpy (files[count],error_file);
       count ++;
@@ -439,7 +444,7 @@ void smart_log(error_file, line, what, flush)
 	{
 	  push_constant_string(files[i]);
 	  push_constant_string(buff[i]);
-	  apply_master_ob("log_error", 2);
+	  safe_apply_master_ob("log_error", 2);
 	  FREE(files[i]);
 	  FREE(buff[i]);
 	}
@@ -496,7 +501,7 @@ char *read_file(file,start,len)
     }
     if (!start) start = 1;
     if (!len) len = READ_FILE_MAX_SIZE;
-    str = DXALLOC(size + 1, 128, "read_file: str");
+    str = DXALLOC(size + 1, 41, "read_file: str");
     str[size] = '\0';
     do {
 	if (size > st.st_size)
@@ -585,7 +590,7 @@ char *read_bytes(file,start,len)
     if ((size = lseek(f,start, 0)) < 0)
 	return 0;
 
-    str = DXALLOC(len + 1, 128, "read_bytes: str");
+    str = DXALLOC(len + 1, 42, "read_bytes: str");
 
     size = read(f, str, len);
 
@@ -1091,7 +1096,8 @@ int copy_file (from, to)
 }
 
 void
-dump_file_descriptors() {
+dump_file_descriptors()
+{
     int i;
     dev_t dev;
     struct stat stbuf;
@@ -1129,9 +1135,11 @@ dump_file_descriptors() {
 	case S_IFREG:
 	    add_message("f");
 	    break;
+#ifndef apollo
 	case S_IFIFO:
 	    add_message("p");
 	    break;
+#endif
 	case S_IFLNK:
 	    add_message("l");
 	    break;

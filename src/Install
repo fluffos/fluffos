@@ -1,0 +1,14 @@
+Complete installation instructions are available in the MudOS_0.9.x.tar.Z
+releases (as opposed to the 0.9.x.y.tar.Z releases).  The MudOS_0.9.x.tar.Z
+releases also contain documentation for efuns etc.
+
+Short instructions:
+
+1) edit options.h to suit your tastes
+2) edit the Makefile to suit your tastes and machine requirements,
+3) type: make (to build 'driver' and 'addr_server')
+4) you will need a runtime config file and a mudlib in order to use the driver.
+5) look at the example config file in this directory (Config.example)
+6) get a MudOS-compatible mudlib such as the TMI-2, Nightmare,
+   or Basis mudlib, and read the instructions that come with it.
+7) have fun.

@@ -85,7 +85,7 @@ init_strings()
 
 	htable_size = HTABLE_SIZE;
 	base_table = (block_t **)
-		DXALLOC(sizeof(block_t *) * htable_size, 2097152, "init_strings");
+		DXALLOC(sizeof(block_t *) * htable_size, 116, "init_strings");
 	overhead_bytes += (sizeof(block_t *) * htable_size);
 
 	for (x = 0; x < htable_size; x++) {
@@ -155,7 +155,7 @@ int h;
 		len = max_string_length;
 	}
 	size = sizeof(block_t) + len + 1;
-	b = (block_t *)DXALLOC(size, 2097152, "alloc_new_string");
+	b = (block_t *)DXALLOC(size, 117, "alloc_new_string");
 	strncpy(STRING(b), string, len);
 	STRING(b)[len] = '\0'; /* strncpy doesn't put on \0 if 'from' too long */
 	SIZE(b) = size;

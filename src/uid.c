@@ -47,9 +47,9 @@ char *name;
   userid_t *uid;
   if ((uid = find_uid(name)))
     return uid;
-  uid = (userid_t *)DMALLOC(sizeof(userid_t), 8388608, "add_uid: 1");
+  uid = (userid_t *)DMALLOC(sizeof(userid_t), 119, "add_uid: 1");
   uid->next = NULL;
-  uid->name = (char *)DMALLOC(strlen(name)+1, 8388608, "add_uid: 2");
+  uid->name = (char *)DMALLOC(strlen(name)+1, 120, "add_uid: 2");
   strcpy(uid->name, name);
   insert_uid(uid);
   return uid;

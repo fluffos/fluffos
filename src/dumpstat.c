@@ -48,6 +48,9 @@ int svalue_size(v)
         total = sizeof(struct mapping);
 	mapTraverse(v->u.map, (int (*)())sumSizes, &total);
 	return total;
+    case T_FUNCTION:
+    return sizeof(struct funp) + svalue_size(&v->u.fp->obj) +
+        svalue_size(&v->u.fp->fun);
     case T_ANY:
 	break;
     default:

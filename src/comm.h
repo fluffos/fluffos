@@ -7,7 +7,9 @@
 #define _COMM_H_
 
 #include <sys/socket.h>
+#if !defined(apollo) && !defined(linux)
 #include <sys/socketvar.h>
+#endif
 #ifdef _AIX
 #include <sys/select.h>
 #endif /* _AIX */

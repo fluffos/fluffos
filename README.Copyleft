@@ -1,3 +1,0 @@
-The GNU Copyleft was included because a few pieces of Perl 4.0 were used
-in mapping.c (the mapping hash table implementation) and Perl 4.0 is
-covered under the GNU Copyleft.

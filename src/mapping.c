@@ -73,7 +73,7 @@ struct mapping *m;
 
 	/* resize the hash table to be twice the old size */
 	a = (struct node **)
-		DREALLOC(m->table, newsize * sizeof(struct node *), 1024, "growMap");
+		DREALLOC(m->table, newsize * sizeof(struct node *), 72, "growMap");
 	if (!a) {
 		/*
 		  We couldn't grow the hash table.  Rather than die, we just
@@ -227,12 +227,12 @@ int n;
 		n = 0;
 	}
 	size = MAPSIZE(n);
-	newmap = (struct mapping *)DXALLOC(size, 1024, "allocate_mapping: 1");
+	newmap = (struct mapping *)DXALLOC(size, 73, "allocate_mapping: 1");
 	debug(1024,("mapping.c: allocate_mapping begin, newmap = %x\n", newmap));
 	if (newmap == NULL) {
 		n = 0;
 		size = MAPSIZE(0);
-		newmap = (struct mapping *)DXALLOC(size, 1024, "allocate_mapping: 2");
+		newmap = (struct mapping *)DXALLOC(size, 74, "allocate_mapping: 2");
 	}
 	total_mapping_size += size;
 	for (k = MAP_HASH_TABLE_SIZE; k < n; k *= 2)
@@ -240,7 +240,7 @@ int n;
 	newmap->table_size = k;
 	newmap->do_split = newmap->table_size * FILL_PERCENT / 100;
 	newmap->table = (struct node **)DXALLOC(sizeof(struct node *)
-		* newmap->table_size, 1024, "allocate_mapping: 3");
+		* newmap->table_size, 75, "allocate_mapping: 3");
 	total_mapping_size += (sizeof(struct node *) * newmap->table_size);
 	/* zero out the hash table */
 	memset(newmap->table, 0, newmap->table_size * sizeof(struct node *));
@@ -439,7 +439,7 @@ int doTheFree;
 	add_array_size (&m->stats, 2);
 	total_mapping_size += sizeof(struct node);
 	debug(128,("mapping.c: allocated a node\n"));
-	newnode = (struct node *) DXALLOC(sizeof(struct node), 1024,
+	newnode = (struct node *) DXALLOC(sizeof(struct node), 76,
 		"find_for_insert");
 	assign_svalue_no_free(&newnode->values[0], lv);
 	newnode->values[1].type = T_NUMBER;
@@ -503,6 +503,15 @@ struct svalue *lv;
 	if (!n)
 		return &const0u;
 	return &n->values[1];
+}
+
+INLINE void
+absorb_mapping(m1, m2)
+struct mapping *m1, *m2;
+{
+	if (m2->count) {
+		mapTraverse(m2, (int (*)())doInsert, m1);
+	}
 }
 
 /*
@@ -755,7 +764,7 @@ struct mapping *m;
 	char *buf;
 
 	/* 5 == strlen("([])") */
-	buf = DXALLOC(mapping_save_size(m) + 5, 1024, "save_mapping");
+	buf = DXALLOC(mapping_save_size(m) + 5, 77, "save_mapping");
 
 	strcpy(buf, "([");
 	mapTraverse(m, (int (*)())doEncode, buf);

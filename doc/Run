@@ -1,4 +1,4 @@
-Running MudOS (1992/12/12)
+Running MudOS (1993/01/28)
 
 This file describes how to run the driver once you have it installed.
 
@@ -22,15 +22,15 @@ whenever this file mentions the word 'basis'.
 3) Edit $CONFIG_FILE_DIR/config.basis so that it is customized to
    be the way you want it.
 
-4) Move (if necessary) the your mudlib subdirectory so that the value
+4) Move (if necessary) your mudlib subdirectory so that the value
    you specified for "mudlib directory" in config.basis is correct.  If
-   you have ftp'd an existing mudlib that is meant to work with MudOS 0.9,
+   you have ftp'd an existing mudlib that is meant to work with MudOS 0.9.15,
    then you should follow the instructions included with that mudlib.  In
    general, just make sure that the value for "mudlib directory" in
-   config.basis is correct.  The mudlib basis-18.tar.Z (on the same ftp
+   config.basis is correct.  The mudlib basis-19.tar.Z (on the same ftp
    site as the driver) is a more complete version of the mini-lib that was
    previously included with MudOS.  In addition, the TMI-2 beta mudlib release
-   is now available.
+   and Nightmare mudlib are now available.
 
 5) Test the setup by starting the driver from the command line (without
    using the startmud script).  Do this by switching into the INSTALL_DIR
@@ -72,16 +72,12 @@ whenever this file mentions the word 'basis'.
    address server in config.basis (note: the addr_server must run on a
    different port than does MudOS).
 
-9) If you wish to stop the mud, either type 'halt' from inside the mud
-   or type 'stopmud basis' from outside the mud.  Stopping the mud from
-   the inside is the preferred method (when possible).  If you have ftp'd
-   a mudlib, the halt command may be named something different.  Read the
-   help files that came with your mudlib for more information.
+9) If you wish to stop the mud, either type 'halt' (or 'shutdown' depending
+   on the mudlib you are using) from inside the mud or type 'stopmud basis'
+   from outside the mud.  Stopping the mud from the inside is the preferred
+   method (when possible).
 
-10) If you merely wish to reboot the mud, then type 'reboot' from inside
-   the mud (again, this command may be named differently in your mudlib).
-
-11) If you wish to run more than on MudOS mudlib on the same machine,
+10) If you wish to run more than on MudOS mudlib on the same machine,
     there is no need to recompile the driver since you can use the same
     driver binary for each mudlib by adding additonal runtime config files
     (in the same directory as config.basis) for any new mudlibs.  In addition

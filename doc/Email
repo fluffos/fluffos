@@ -1,4 +1,4 @@
-1992/12/12:
+1993/01/28:
 
 1)  Send email to mudos-request@gestalt.austin.tx.us if you wish to be
     added to (or removed from) a MudOS mailing list that will be used to
@@ -13,7 +13,7 @@
     file.  If you do report a bug be sure to include the following
     informaton:
 
-    MudOS version (e.g. 0.9.14)
+    MudOS version (e.g. 0.9.15)
 
     mudlib you are using (also specify the mudlib yours is based upon if you
     didn't start from scratch)
@@ -28,6 +28,6 @@
     Information specifying how to duplicate the problem.  Be specific.
 
     Any fixes you may have if you have fixed the problem (patch files
-    generated using 'diff -cr' would be much appreciated).  Short of a fix,
-    a pointer to an LPmud-based driver that contains a fix would also be
-    appreciated.
+    generated using 'diff -cr old_dir new_dir' would be much appreciated).
+    Short of a fix, a pointer to an LPmud-based driver that contains a fix
+    would also be appreciated.

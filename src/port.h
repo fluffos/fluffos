@@ -22,7 +22,7 @@
  * use drand48 if you have it (it is the better random # generator)
  */
 
-#if (defined(NeXT))
+#if (defined(NeXT) || defined(__386BSD__))
 #define RANDOM
 #else /* Sequent, HP, Sparc, RS/6000 */
 #define DRAND48
@@ -32,7 +32,7 @@
  * Does the system have a getrusage() system call?
  * Sequent and HP don't have it.
  */
-#if (!defined(_SEQUENT_) && !defined(hpux)) && !defined(SVR4)
+#if !defined(_SEQUENT_) && !defined(hpux) && !defined(SVR4) && !defined(_AUX_SOURCE)
 #define RUSAGE
 #endif
 
@@ -40,7 +40,8 @@
  * Does the system have the times() system call?  Is only used if RUSAGE not
  * defined.
  */
-#if defined(hpux)
+#if defined(hpux) || defined(apollo) || defined(__386BSD__) || \
+	defined(_AUX_SOURCE)
 #define TIMES
 #endif
 
@@ -87,7 +88,7 @@
    look in /usr/include/signal.h for the return type of signal() when an
    error occurs
 */
-#if (defined(NeXT) || defined(accel))
+#if (defined(NeXT) || defined(accel) || defined(apollo) || defined(__386BSD__))
 #define SIGNAL_ERROR BADSIG
 #else
 #define SIGNAL_ERROR SIG_ERR
@@ -116,6 +117,15 @@ asking your system adminstrator.
 /* define this if you system is BSD 4.2 (not 4.3) */
 #undef BSD42
 
+/* these should be obtained from .h files when Linux .h structure stabilizes */
+#ifdef linux
+#ifndef SOMAXCONN
+#define SOMAXCONN 5
+#endif
+#ifndef FD_SETSIZE
+#define FD_SETSIZE 256
+#endif
+#endif
 
 /* ARCH for the arch() efun */
 
@@ -129,16 +139,25 @@ asking your system adminstrator.
 #define ARCH "AIX"
 #endif
 #ifdef hpux
-#define ARCH "hpux"
+#define ARCH "HPUX"
 #endif
 #ifdef accel
-#define ARCH "accel"
+#define ARCH "Accel"
 #endif
 #ifdef sun
-#define ARCH "sun"
+#define ARCH "Sun"
 #endif
 #ifdef ultrix
-#define ARCH "ultrix"
+#define ARCH "Ultrix"
+#endif
+#ifdef __386BSD__
+#define ARCH "386bsd"
+#endif
+#ifdef _AUX_SOURCE
+#define ARCH "A/UX"
+#endif
+#ifdef linux
+#define ARCH "Linux"
 #endif
 
 #if (!defined(ARCH) && defined(SVR4))
@@ -148,3 +167,6 @@ asking your system adminstrator.
 #ifndef ARCH
 #define ARCH "unknown"
 #endif
+
+/* undef this if your compiler doesn't support varargs */
+#define VARARGS

@@ -8,13 +8,15 @@
 #endif /* NeXT */
 #include <sys/ioctl.h>
 #include <sys/types.h>
-#if (!defined(NeXT) && !defined(hpux))
+#if (!defined(NeXT) && !defined(hpux) && !defined(apollo))
 #include <unistd.h>
 #endif /* NeXT */
 #include <fcntl.h>
 #include <sys/time.h>
 #include <sys/socket.h>
+#if !defined(apollo) && !defined(linux)
 #include <sys/socketvar.h>
+#endif
 #ifdef _AIX
 #include <sys/select.h>
 #endif /* _AIX */
@@ -32,7 +34,6 @@
 
 #include "config.h"
 #include "lint.h"
-#include "port.h"
 
 #ifdef DEBUG_MACRO
 int debug_level = 512;
@@ -76,7 +77,7 @@ void init_conn_sock(port_number)
   /*
    * create socket of proper type.
    */
-  if((conn_fd = socket(AF_INET,SOCK_STREAM,DFAULT_PROTO)) == -1){
+  if((conn_fd = socket(AF_INET,SOCK_STREAM,0)) == -1){
     perror("init_conn_sock: socket");
     exit(1);
   }
@@ -403,7 +404,7 @@ void conn_data_handler(fd)
     debug(512,("conn_data_handler: read %d bytes on fd %d\n",num_bytes,fd));
     buf_index = 0;
     while(buf_index < num_bytes){
-      memcpy(&msgtype,&buf[buf_index],sizeof(int));
+      memcpy((char *)&msgtype,(char *)&buf[buf_index],sizeof(int));
       debug(512,("conn_data_handler: message type: %d\n",msgtype));
       switch(msgtype){
       case NAMEBYIP:

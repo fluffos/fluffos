@@ -130,7 +130,7 @@ void init_user_conn()
   /*
    * create socket of proper type.
    */
-  if((new_user_fd = socket(AF_INET,SOCK_STREAM,DFAULT_PROTO)) == -1){
+  if((new_user_fd = socket(AF_INET,SOCK_STREAM,0)) == -1){
     perror("init_user_conn: socket");
     exit(1);
   }
@@ -230,11 +230,11 @@ void init_addr_server(hostname,addr_server_port)
   server.sin_family = AF_INET;
   server.sin_port = htons((u_short)addr_server_port);
   server.sin_addr.s_addr = inet_addr(hostname);
-  memcpy((char *)&server.sin_addr,hp->h_addr,hp->h_length);
+  memcpy((char *)&server.sin_addr,(char *)hp->h_addr,hp->h_length);
   /*
    * create socket of proper type.
    */
-  server_fd = socket(AF_INET, SOCK_STREAM, DFAULT_PROTO);
+  server_fd = socket(AF_INET, SOCK_STREAM, 0);
   if(server_fd < 0){  /* problem opening socket */
     perror("init_addr_server: socket");
     return;
@@ -273,17 +273,27 @@ void init_addr_server(hostname,addr_server_port)
  * special handling is done.
  */
 void
+#ifdef VARARGS
 add_message(va_alist)
      va_dcl
+#else
+add_message(format, t1, t2, t3, t4, t5, t6, t7, t8, t9)
+    char *format;
+    char *t1, t2, t3, t4, t5, t6, t7, t8, t9;
+#endif
 {
+#ifdef VARARGS
 	va_list args;
 	char *format;
+#endif
 	struct interactive *ip;
 	char *cp, new_string_data[LARGEST_PRINTABLE_STRING];
 	struct object *save_command_giver;
 
+#ifdef VARARGS
 	va_start(args);
 	format = va_arg(args, char *);
+#endif
   /*
    * if command_giver->interactive is not valid, write message on stderr.
    */
@@ -293,8 +303,12 @@ add_message(va_alist)
 		|| command_giver->interactive->closing)
 	{
 		putc(']',stderr);
+#ifdef VARARGS
 		vfprintf(stderr,format,args);
 		va_end(args);
+#else
+		fprintf(stderr,format,t1,t2,t3,t4,t5,t6,t7,t8,t9);
+#endif
 		return;
 	}
 	ip = command_giver->interactive;
@@ -305,8 +319,12 @@ add_message(va_alist)
 	  could rewrite vsprintf to accept a maximum length (like strncpy) --
 	  have fun!
 	*/
+#ifdef VARARGS
 	vsprintf(new_string_data, format, args);
 	va_end(args);
+#else
+	sprintf(new_string_data, format, t1,t2,t3,t4,t5,t6,t7,t8,t9);
+#endif
 #ifndef NO_SHADOWS
   /*
    * shadow handling.
@@ -315,12 +333,14 @@ add_message(va_alist)
 	    /*
 	    * snoop handling.
 	    */
+#ifdef SNOOP_SHADOWED
 		if (ip->snoop_by) {
 			save_command_giver = command_giver;
 			command_giver = ip->snoop_by->ob;
 			add_message("$$ %s",new_string_data);
 			command_giver = save_command_giver;
 		}
+#endif
 		return;
 	}
 #endif /* NO_SHADOWS */
@@ -631,7 +651,7 @@ void new_user_handler()
     command_giver = master_ob;
     master_ob->interactive =
       (struct interactive *)
-		DXALLOC(sizeof(struct interactive), 8, "new_user_handler");
+		DXALLOC(sizeof(struct interactive), 20, "new_user_handler");
     total_users++;
     master_ob->interactive->default_err_message = 0;
     master_ob->flags |= O_ONCE_INTERACTIVE;
@@ -980,8 +1000,8 @@ char *get_user_command()
      * Must not enable echo before the user input is received.
      */
     add_message("%c%c%c",IAC,WONT,TELOPT_ECHO);
+    ip->noecho = 0;
   }
-  ip->noecho = 0;
   ip->last_time = current_time;
   return(buf);
 }
@@ -1224,27 +1244,27 @@ int allow_host_access(new_socket)
 	      strcpy(comment, p1+1);
 	  }
 	  if(!(na = (struct access_list *)
-		DXALLOC(sizeof na[0], 8, "allow_host_access: na"))) {
+		DXALLOC(sizeof na[0], 21, "allow_host_access: na"))) {
 	    fatal("Out of mem.\n");
 	  }
 	  na->addr = na->name = na->comment = 0;
 	  na->next = 0;
-	  if(*ipn && (!(na->addr = DXALLOC(strlen(ipn) + 1, 8,
+	  if(*ipn && (!(na->addr = DXALLOC(strlen(ipn) + 1, 22,
 		"allow_host_access: na->addr")) ||
 		      !strcpy(na->addr, ipn)))
 	    fatal("Out of mem.\n");
 	  if(*hname && (!(na->name =
-		DXALLOC(strlen(hname) + 1, 8, "allow_host_access: na->name"))
+		DXALLOC(strlen(hname) + 1, 23, "allow_host_access: na->name"))
 		|| !strcpy(na->name, hname)))
 	    fatal("Out of mem.\n");
 	  if(*comment
 		&& (!(na->comment=
-			DXALLOC(strlen(comment)+1, 8, "allow_host_access: na->comment"))
+			DXALLOC(strlen(comment)+1, 24, "allow_host_access: na->comment"))
 			|| !strcpy(na->comment, comment)))
 	    fatal("Out of mem.\n");
 
 	  if((!(int)*ipn) && ((!*hname) || (!(hent = gethostbyname(hname))) ||
-			   (!(na->addr = DXALLOC(hent->h_length+1, 8,
+			   (!(na->addr = DXALLOC(hent->h_length+1, 25,
 				"allow_host_access: na->addr")))||
 			      !strcpy(na->addr,
 			       inet_ntoa(*(struct in_addr *)hent->h_addr)))) {
@@ -1355,7 +1375,7 @@ int call_function_interactive(i, str)
   num_arg = i->num_carry;
   if(num_arg){
     if((args=(struct svalue *)
-        DXALLOC(num_arg * sizeof(struct svalue),2,"comm.c: input_to")) == NULL)
+        DXALLOC(num_arg * sizeof(struct svalue),26,"comm.c: input_to")) == NULL)
       fatal("Not enough memory for input_to.");
     copy_some_svalues(args, i->carryover, i->num_carry);
     free_some_svalues(i->carryover, i->num_carry);
@@ -1365,11 +1385,13 @@ int call_function_interactive(i, str)
   else
     args = NULL;
   i->input_to = 0;
-  /*
-   * clear single character mode
-   */
-  i->single_char = 0;
-  add_message("%c%c%c", IAC, WONT, TELOPT_SGA);
+  if (i->single_char) {
+    /*
+     * clear single character mode
+     */
+     i->single_char = 0;
+     add_message("%c%c%c", IAC, WONT, TELOPT_SGA);
+  }
   /*
    * If we have args, we have to push them onto the stack in the
    * order they were in when we got them.  They will be popped off
@@ -1402,8 +1424,8 @@ int set_call(ob, sent, flags, single_char)
   if(ob->interactive == 0 || ob->interactive->input_to)
     return(0);
   ob->interactive->input_to = sent;
-  ob->interactive->noecho = (flags & I_NOECHO != 0);
-  ob->interactive->noesc = (flags & I_NOESC != 0);
+  ob->interactive->noecho = ((flags & I_NOECHO) != 0);
+  ob->interactive->noesc = ((flags & I_NOESC) != 0);
   ob->interactive->single_char = single_char;
   command_giver = ob;
   if (flags & I_NOECHO)
@@ -1616,7 +1638,7 @@ void query_addr_name(ob)
   static char buf[80];
   int msgtype = NAMEBYIP;
 
-  memcpy(buf,&msgtype,sizeof(msgtype));
+  memcpy(buf,(char *)&msgtype,sizeof(msgtype));
   sprintf(&buf[sizeof(int)],"%s",query_ip_number(ob));
   debug(512,("query_addr_name: sent address server %s\n",&buf[sizeof(int)]));
   if(write(addr_server_fd,buf,sizeof(int) + strlen(&buf[sizeof(int)]) + 1)

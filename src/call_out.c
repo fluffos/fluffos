@@ -78,7 +78,7 @@ void new_call_out(ob, fun, delay, num_args, arg)
 	int i;
 	call_list_free =
 	    (struct call *)DXALLOC(CHUNK_SIZE * sizeof (struct call),
-			16, "new_call_out: call_list_free");
+			19, "new_call_out: call_list_free");
 	for (i=0; i<CHUNK_SIZE - 1; i++)
 	    call_list_free[i].next  = &call_list_free[i+1];
 	call_list_free[CHUNK_SIZE-1].next = 0;

@@ -25,10 +25,10 @@
  * GCMALLOC: garbage collecting malloc (not included).
  *   **has not been recently tested with MudOS.
  *
- * [NOTE: BSD malloc is also an option however it must be selected from the
- *  Makefile rather than here since it is an actual replacement for system
- *  malloc rather than a wrapper for system malloc as are SYSMALLOC and
- *  DEBUGMALLOC]
+ * [NOTE: BSD malloc and smalloc are also options however they must be
+ *  selected from the Makefile rather than here since they are actual
+ *  replacements for system malloc rather than wrappers for system malloc
+ *  as are WRAPPEDMALLOC and DEBUGMALLOC]
  */
 #define SYSMALLOC
 #undef WRAPPEDMALLOC
@@ -55,7 +55,7 @@
  * defaults config files.  If you don't wish to use this MACRO, you may
  * always specific a full path to the config file when starting the driver.
  */
-#define CONFIG_FILE_DIR "/home/couns/sstock/src/MudOS/bin"
+#define CONFIG_FILE_DIR "/usr/local/mud/etc"
 
 /* LAZY_RESETS: if this is defined, an object will only have reset()
    called in it when it is touched via apply_low() or move_object()
@@ -66,13 +66,20 @@
    once and never again (which can save memory since some objects won't get
    reloaded that otherwise would).
 */
-#define LAZY_RESETS
+#undef LAZY_RESETS
+
+/* SAVE_EXTENSION: defines the file extension used by save_object()
+   and restore_object().  Some sysadmins run scripts that periodically
+   scan for and remove files ending in .o (but many mudlibs are already
+   set up to use .o thus we leave .o as the default).
+*/
+#define SAVE_EXTENSION ".o"
 
 /* SANE_EXPLODE_STRING: define this if you want to prevent explode_string
    from stripping off more than one leading delimeters.  #undef it for the
    old behavior.
 */
-#define SANE_EXPLODE_STRING
+#undef SANE_EXPLODE_STRING
 
 /* SET_EVAL_LIMIT:
    define this if you want to add the set_eval_limit() efun.  WARNING: do
@@ -109,7 +116,7 @@
    Allow a dump of the # of times each efun is invoked (via the opcprof() efun)
    Also enables the opcprof() efun.
 */
-#define OPCPROF
+#undef OPCPROF
 
 /* TRAP_CRASHES define this if you want MudOS to call crash() in master.c
    and then shutdown when signals are received that would normally crash the
@@ -132,7 +139,7 @@
 /* Define this if you wish this_player() to be useable from within
    call_out() callbacks.
 */
-#define THIS_PLAYER_IN_CALL_OUT
+#undef THIS_PLAYER_IN_CALL_OUT
 
 /*
  * AUTO_SETEUID: when an object is created it's euid is automatically set to
@@ -224,8 +231,10 @@
  * TRACE_CODE
  * define this for to enable code tracing
  * (the driver will print out the previous lines of code to an error)
+ * eval_instruction() runs about twice when this is not defined (for
+ * the most common eoperators).
  */
-#define TRACE_CODE
+#undef TRACE_CODE
 
 /*
  * undefine this if you want to use the old style of access control
@@ -246,6 +255,13 @@
  * define this if you want to disable shadows in your driver.
  */
 #undef NO_SHADOWS
+
+/* SNOOP_SHADOWED: define this if you want snoop to report what is
+   sent to the player even in the event that the player's catch_tell() is
+   shadowed and the player may not be seeing what is being sent.  Messages
+   of this sort will be prefixed with $$.
+*/
+#undef SNOOP_SHADOWED
 
 /*
  * Define LOG_SHOUT if you want all shouts to be logged in

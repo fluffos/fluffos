@@ -85,7 +85,7 @@ int num_arg, instruction;
           int r = SVALUE_STRLEN(sp-1);
           int len = r + SVALUE_STRLEN(sp) + 1;
 
-	      res = DXALLOC(len, 64, "f_add: 1");
+	      res = DXALLOC(len, 34, "f_add: 1");
           eval_cost += (len >> 3);
 	      (void)strcpy(res, (sp-1)->u.string);
 	      (void)strcpy(res + r, sp->u.string);
@@ -103,7 +103,7 @@ int num_arg, instruction;
 
 	      sprintf(buff, "%d", sp->u.number);
           len = SVALUE_STRLEN(sp-1) + strlen(buff) + 1;
-	      res = DXALLOC(len, 64, "f_add: 2");
+	      res = DXALLOC(len, 35, "f_add: 2");
           eval_cost += (len >> 3);
 	      strcpy(res, (sp-1)->u.string);
 	      strcat(res, buff);
@@ -139,7 +139,7 @@ int num_arg, instruction;
 
 	      sprintf(buff, "%d", (sp-1)->u.number);
           len = SVALUE_STRLEN(sp) + strlen(buff) + 1;
-	      res = DXALLOC(len, 64, "f_add: 3");
+	      res = DXALLOC(len, 36, "f_add: 3");
           eval_cost += (len >> 3);
 	      strcpy(res, buff);
 	      strcat(res, sp->u.string);
@@ -201,91 +201,6 @@ int num_arg, instruction;
 }
 
 INLINE void
-f_add_eq(num_arg, instruction)
-int num_arg, instruction;
-{
-	struct svalue *argp;
-
-	if (sp[-1].type != T_LVALUE)
-		bad_arg(1, F_ADD_EQ);
-	  argp = sp[-1].u.lvalue;
-	  switch(argp->type) {
-	  case T_STRING:
-		{
-		  char *new_str;
-		  if (sp->type == T_STRING)
-		{
-		  int l = SVALUE_STRLEN(argp);
-		  int len = l + strlen(sp->u.string) + 1;
-
-		  new_str = DXALLOC(len, 64, "f_add_eq: 1");
-		  eval_cost += (len >> 3);
-		  strcpy(new_str, argp->u.string);
-		  strcpy(new_str + l, sp->u.string);
-		  pop_n_elems(2);
-		  push_malloced_string(new_str);
-		}
-		  else if (sp->type == T_NUMBER)
-		{
-		  char buff[20];
-		  int len;
-		  sprintf(buff, "%d", sp->u.number);
-		  len = SVALUE_STRLEN(argp) + strlen(buff) + 1;
-		  eval_cost += (len >> 3);
-		  new_str = DXALLOC(len, 64, "f_add_eq: 2");
-		  strcpy(new_str, argp->u.string);
-		  strcat(new_str, buff);
-		  pop_n_elems(2);
-		  push_malloced_string(new_str);
-		}
-		  else
-		bad_arg(2, F_ADD_EQ);
-		  break;
-		}
-	  case T_NUMBER:
-		if (sp->type == T_NUMBER)
-		  {
-		i = argp->u.number + sp->u.number;
-		pop_n_elems(2);
-		push_number(i);
-		  }
-		else
-		  error("Bad type number to rhs +=.\n");
-		break;
-	  case T_POINTER:
-		if (sp->type != T_POINTER)
-		  bad_arg(2, F_ADD_EQ);
-		else
-		  {
-		struct vector *v;
-		v = add_array(argp->u.vec,sp->u.vec);
-		eval_cost += (v->size << 3);
-		pop_n_elems(2);
-		push_vector(v);		/* This will make ref count == 2 */
-		v->ref--;
-		  }
-		break;	      
-	  case T_MAPPING:
-		if (sp->type != T_MAPPING)
-		  bad_arg(2, F_ADD_EQ);
-		else
-		  {
-		struct mapping *m;
-
-		m = add_mapping(argp->u.map, sp->u.map);
-		eval_cost += (m->count << 2);
-		pop_n_elems(2);
-		push_mapping(m);
-		m->ref--;
-		  }
-		break;
-	  default:
-		bad_arg(1, F_ADD_EQ);
-	  }
-	  assign_svalue(argp, sp);
-}
-
-INLINE void
 f_and(num_arg, instruction)
 int num_arg, instruction;
 {
@@ -298,9 +213,9 @@ int num_arg, instruction;
       return;
     }
   if ((sp-1)->type != T_NUMBER)
-    bad_arg(1, F_AND);
+    bad_arg(1, instruction);
   if (sp->type != T_NUMBER)
-    bad_arg(2, F_AND);
+    bad_arg(2, instruction);
   i = (sp-1)->u.number & sp->u.number;
   sp--;
   sp->u.number = i;
@@ -311,7 +226,7 @@ f_and_eq(num_arg, instruction)
 int num_arg, instruction;
 {
   if (sp[-1].type != T_LVALUE)
-    bad_arg(1, F_AND_EQ);
+    bad_arg(1, instruction);
   argp = sp[-1].u.lvalue;
   if (argp->type != T_NUMBER)
     error("Bad left type to &=.\n");
@@ -333,11 +248,11 @@ int num_arg, instruction;
     pc++;
     arg = sp - num_arg + 1;
     if (arg[0].type != T_STRING)
-        bad_arg(1, F_PARSE_COMMAND);
+        bad_arg(1, instruction);
     if (arg[1].type != T_OBJECT && arg[1].type != T_POINTER)
-        bad_arg(2, F_PARSE_COMMAND);
+        bad_arg(2, instruction);
     if (arg[2].type != T_STRING)
-        bad_arg(3, F_PARSE_COMMAND);
+        bad_arg(3, instruction);
     if (arg[1].type == T_POINTER)
         check_for_destr(arg[1].u.vec);
 
@@ -345,49 +260,6 @@ int num_arg, instruction;
           num_arg-3);
     pop_n_elems(num_arg);   /* Get rid of all arguments */
     push_number(i);     /* Push the result value */
-}
-
-INLINE void
-f_call_function_by_address(num_arg, instruction)
-int num_arg, instruction;
-{
-  unsigned short func_index;
-  struct function *funp;
-
-  ((char *)&func_index)[0] = pc[0];
-  ((char *)&func_index)[1] = pc[1];
-  pc += 2;
-  func_index += function_index_offset;
-  /*
-   * Find the function in the function table. As the function may have
-   * been redefined by inheritance, we must look in the last table,
-   * which is pointed to by current_object.
-   */
-#ifdef DEBUG
-  if (func_index >= current_object->prog->p.i.num_functions)
-    fatal("Illegal function index\n");
-#endif
-
-  /* NOT current_prog, which can be an inherited object. */
-  funp = &current_object->prog->p.i.functions[func_index];
-
-  if (funp->flags & NAME_UNDEFINED)
-    error("Undefined function: %s\n", funp->name);
-  /* Save all important global stack machine registers */
-  push_control_stack(funp);	/* return pc is adjusted later */
-
-  /* This assigment must be done after push_control_stack() */
-  current_prog = current_object->prog;
-  /*
-   * If it is an inherited function, search for the real
-   * definition.
-   */
-  csp->num_local_variables = EXTRACT_UCHAR(pc);
-  pc++;
-  funp = setup_new_frame(funp);
-  csp->pc = pc;			/* The corrected return address */
-  pc = current_prog->p.i.program + funp->offset;
-  csp->extern_call = 0;
 }
 
 INLINE void
@@ -410,7 +282,7 @@ f_div_eq(num_arg, instruction)
 int num_arg, instruction;
 {
   if (sp[-1].type != T_LVALUE)
-    bad_arg(1, F_DIV_EQ);
+    bad_arg(1, instruction);
   argp = sp[-1].u.lvalue;
   if (argp->type != T_NUMBER)
     error("Bad left type to /=.\n");
@@ -489,7 +361,7 @@ f_lsh_eq(num_arg, instruction)
 int num_arg, instruction;
 {
   if (sp[-1].type != T_LVALUE)
-    bad_arg(1, F_LSH_EQ);
+    bad_arg(1, instruction);
   argp = sp[-1].u.lvalue;
   if (argp->type != T_NUMBER)
     error("Bad left type to <<=.\n");
@@ -521,7 +393,7 @@ f_mod_eq(num_arg, instruction)
 int num_arg, instruction;
 {
   if (sp[-1].type != T_LVALUE)
-    bad_arg(1, F_MOD_EQ);
+    bad_arg(1, instruction);
   argp = sp[-1].u.lvalue;
   if (argp->type != T_NUMBER)
     error("Bad left type to %=.\n");
@@ -564,7 +436,7 @@ f_mult_eq(num_arg, instruction)
 int num_arg, instruction;
 {
   if (sp[-1].type != T_LVALUE)
-    bad_arg(1, F_MULT_EQ);
+    bad_arg(1, instruction);
   argp = sp[-1].u.lvalue;
   if (argp->type != sp->type)
     error("Mismatched types on *=.\n");
@@ -582,7 +454,7 @@ int num_arg, instruction;
     push_mapping(m);
   }
   else
-    bad_arg(2, F_MULT_EQ);
+    bad_arg(2, instruction);
   assign_svalue(argp, sp);
 }
 
@@ -625,9 +497,9 @@ f_or(num_arg, instruction)
 int num_arg, instruction;
 {
   if ((sp-1)->type != T_NUMBER)
-    bad_arg(1, F_OR);
+    bad_arg(1, instruction);
   if (sp->type != T_NUMBER)
-    bad_arg(2, F_OR);
+    bad_arg(2, instruction);
   i = (sp-1)->u.number | sp->u.number;
   sp--;
   sp->u.number = i;
@@ -638,10 +510,10 @@ f_or_eq(num_arg, instruction)
 int num_arg, instruction;
 {
   if (sp[-1].type != T_LVALUE)
-    bad_arg(1, F_OR_EQ);
+    bad_arg(1, instruction);
   argp = sp[-1].u.lvalue;
   if (sp[-1].type != T_LVALUE)
-    bad_arg(1, F_OR_EQ);
+    bad_arg(1, instruction);
   argp = sp[-1].u.lvalue;
   if (argp->type != T_NUMBER)
     error("Bad left type to |=.\n");
@@ -708,7 +580,7 @@ int num_arg, instruction;
 	  push_malloced_string(res);
 	  return;
 	}
-      res = DXALLOC(to - from + 2, 64, "f_range");
+      res = DXALLOC(to - from + 2, 37, "f_range");
       strncpy(res, sp[-2].u.string + from, to - from + 1);
       res[to - from + 1] = '\0';
       pop_n_elems(3);
@@ -736,7 +608,7 @@ f_rsh_eq(num_arg, instruction)
 int num_arg, instruction;
 {
   if (sp[-1].type != T_LVALUE)
-    bad_arg(1, F_RSH_EQ);
+    bad_arg(1, instruction);
   argp = sp[-1].u.lvalue;
   if (argp->type != T_NUMBER)
     error("Bad left type to >>=.\n");
@@ -772,9 +644,9 @@ int num_arg, instruction;
 		return;
 	}
 	if ((sp-1)->type != T_NUMBER)
-		bad_arg(1, F_SUBTRACT);
+		bad_arg(1, instruction);
 	if (sp->type != T_NUMBER)
-		bad_arg(2, F_SUBTRACT);
+		bad_arg(2, instruction);
 	i = (sp-1)->u.number - sp->u.number;
 	sp--;
 	sp->u.number = i;
@@ -785,7 +657,7 @@ f_sub_eq(num_arg, instruction)
      int num_arg, instruction;
 {
   if (sp[-1].type != T_LVALUE)
-    bad_arg(1, F_SUB_EQ);
+    bad_arg(1, instruction);
   argp = sp[-1].u.lvalue;
   switch (argp->type) {
   case T_NUMBER:
@@ -858,12 +730,12 @@ int num_arg, instruction;
     }
     else
     {
-      bad_arg(1, F_SWITCH);
+      bad_arg(1, instruction);
     }
   }
   else
   {
-    if (sp->type != T_NUMBER) bad_arg(1, F_SWITCH);
+    if (sp->type != T_NUMBER) bad_arg(1, instruction);
     s = sp->u.number;
     i = (int)pc[0] &0xf ;
   }
@@ -1063,7 +935,7 @@ f_xor_eq(num_arg, instruction)
 int num_arg, instruction;
 {
   if (sp[-1].type != T_LVALUE)
-    bad_arg(1, F_XOR_EQ);
+    bad_arg(1, instruction);
   argp = sp[-1].u.lvalue;
   if (argp->type != T_NUMBER)
     error("Bad left type to ^=.\n");
@@ -1073,6 +945,42 @@ int num_arg, instruction;
   pop_n_elems(2);
   push_number(i);
   assign_svalue(argp, sp);
+}
+
+INLINE struct funp *
+make_funp(sob, sfun)
+struct svalue *sob, *sfun;
+{
+	struct funp *fp;
+
+	fp = (struct funp *)DMALLOC(sizeof(struct funp), 38, "make_funp");
+	assign_svalue_no_free(&fp->obj, sob);
+	assign_svalue_no_free(&fp->fun, sfun);
+	fp->ref = 1;
+	return fp;
+}
+
+INLINE void
+push_funp(fp)
+struct funp *fp;
+{
+	fp->ref++;
+	sp++;
+	sp->type = T_FUNCTION;
+	sp->u.fp = fp;
+}
+
+INLINE void
+free_funp(fp)
+struct funp *fp;
+{
+	fp->ref--;
+	if (fp->ref > 0) {
+		return;
+	}
+	free_svalue(&fp->obj);
+	free_svalue(&fp->fun);
+	FREE(fp);
 }
 
 INLINE void
@@ -1092,15 +1000,23 @@ f_function_split(num_arg, instruction)
 int num_arg, instruction;
 {
 	struct svalue *obj, *fun;
+	struct funp *tmp;
 
 	if (sp->type != T_FUNCTION) {
-		bad_arg(1, F_FUNCTION_SPLIT);
+		bad_arg(1, instruction);
 	}
 	obj = &sp->u.fp->obj;
 	fun = &sp->u.fp->fun;
-	/* the POP is inserted from postlang.y (don't do it here) */
-	push_svalue(obj);
+	tmp = sp->u.fp;
+	sp--; /* don't free the funp here since that would also free obj and fun */
+	if ((obj->type == T_OBJECT) && (obj->u.ob->flags & O_DESTRUCTED)) {
+		assign_svalue(obj, &const0n);
+		push_null();
+	} else {
+		push_svalue(obj);
+	}
 	push_svalue(fun);
+	free_funp(tmp); /* go ahead and free it here since the pushes make it ok */
 }
 
 INLINE void

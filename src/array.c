@@ -130,7 +130,7 @@ struct vector *explode_string(str, del)
 		for (j = 0; j < slen; j++) {
 			ret->item[j].type = T_STRING;
 			ret->item[j].subtype = STRING_MALLOC;
-			tmp = (char *)DXALLOC(2, 8, "explode_string: tmp");
+			tmp = (char *)DXALLOC(2, 6, "explode_string: tmp");
 			tmp[0] = str[j];
 			tmp[1] = '\0';
 			ret->item[j].u.string = tmp;
@@ -172,7 +172,7 @@ struct vector *explode_string(str, del)
 	if (num > max_array_size) {
 		num = max_array_size;
 	}
-	buff = DXALLOC(slen + 1, 8, "explode_string: buff");
+	buff = DXALLOC(slen + 1, 7, "explode_string: buff");
 	ret = allocate_array(num);
 	limit = max_array_size - 1; /* extra element can be added after loop */
 	for (p=str, beg = str, num=0; *p && (num < limit); ) {
@@ -243,19 +243,12 @@ users()
 	int i, j;
 	int display_hidden;
 	struct vector *ret;
-	struct svalue *r;
 
 	if (num_hidden > 0) {
 		if (current_object->flags & O_HIDDEN) {
 			display_hidden = 1;
 		} else {
-			push_object(current_object);
-			r = apply_master_ob("valid_hide", 1);
-			if (!IS_ZERO(r)) {
-				display_hidden = 1;
-			} else {
-				display_hidden = 0;
-			}
+			display_hidden = valid_hide(current_object);
 		}
 	}
 
@@ -271,24 +264,6 @@ users()
 		j++;
 	}
 	return ret;
-}
-
-/*
- * Check that an assignment to an array item is not cyclic.
- */
-static void check_for_recursion(vec, v)
-    struct vector *vec, *v;
-{
-    register int i;
-    extern int eval_cost;
-
-    eval_cost++;
-    if (v == vec)
-	error("Recursive asignment of vectors.\n");
-    for (i=0; i<v->size; i++) {
-	if (v->item[i].type == T_POINTER)
-	    check_for_recursion(vec, v->item[i].u.vec);
-    }
 }
 
 /*
@@ -374,7 +349,7 @@ struct vector *filter (p, func, ob, extra)
     if (p->size<1)
 	return null_array();
 
-    flags=DXALLOC(p->size+1, 8, "filter: flags"); 
+    flags=DXALLOC(p->size+1, 9, "filter: flags"); 
     for (cnt=0;cnt<p->size;cnt++) {
 	flags[cnt]=0;
 	push_svalue(&p->item[cnt]);
@@ -463,7 +438,7 @@ static int put_in(ulist,marker,elem)
 	if ((!fixed) && (sameval(marker,&(llink->mark)))) {
 	    for (tlink=llink;tlink->same;tlink=tlink->same) (tlink->count)++;
 	    (tlink->count)++;
-	    slink = (struct unique *) DXALLOC(sizeof(struct unique),8,
+	    slink = (struct unique *) DXALLOC(sizeof(struct unique),10,
 			"put_in: slink");
 	    slink->count = 1;
 	    assign_svalue_no_free(&slink->mark,marker);
@@ -476,7 +451,7 @@ static int put_in(ulist,marker,elem)
 	llink=llink->next; cnt++;
     }
     if (fixed) return cnt;
-    llink = (struct unique *) DXALLOC(sizeof(struct unique), 8,
+    llink = (struct unique *) DXALLOC(sizeof(struct unique), 11,
 		"put_in: llink");
     llink->count = 1;
     assign_svalue_no_free(&llink->mark,marker);
@@ -599,16 +574,20 @@ struct vector *subtract_array(minuend, subtrahend)
 
 /* Returns an array of all objects contained in 'ob'
  */
-struct vector *all_inventory(ob)
+struct vector *all_inventory(ob, override)
     struct object *ob;
+	int override;
 {
     struct vector *d;
     struct object *cur;
     int cnt,res;
     int display_hidden;
-    struct svalue *r;
 
-    display_hidden = -1;
+    if (override) {
+	    display_hidden = 1;
+    } else {
+	    display_hidden = -1;
+    }
     cnt=0;
     for (cur=ob->contains; cur; cur = cur->next_inv)
     {
@@ -616,9 +595,7 @@ struct vector *all_inventory(ob)
        {
            if (display_hidden == -1)
            {
-               push_object(current_object);
-               r = apply_master_ob("valid_hide", 1);
-               display_hidden = !IS_ZERO(r);
+               display_hidden = valid_hide(current_object);
            }
            if (display_hidden)
                cnt++;
@@ -796,7 +773,7 @@ struct vector *deep_inventory(ob, take_top)
     struct vector	*dinv, *ainv, *sinv, *tinv;
     int			il;
 
-    ainv = all_inventory(ob);
+    ainv = all_inventory(ob, 0);
     if (take_top)
     {
 	sinv = allocate_array(1);
@@ -858,7 +835,7 @@ struct svalue *sum_array (arr, func, ob, extra)
 	    v = *ret;
     }
 
-    ret = (struct svalue *) DXALLOC(sizeof(struct svalue), 8, "sum_array");
+    ret = (struct svalue *) DXALLOC(sizeof(struct svalue), 12, "sum_array");
     *ret = v;
 
     return ret;
@@ -888,7 +865,7 @@ struct vector *order_alist(inlist)
     root = inlists[0].u.vec->item;
     /* transform inlists[i].u.vec->item[j] into a heap, starting at the top */
     insval = (struct svalue*)
-		DXALLOC(sizeof(struct svalue[1])*listnum, 8, "order_alist: insval");
+		DXALLOC(sizeof(struct svalue[1])*listnum, 13, "order_alist: insval");
     for(j=0,inpnt=root; j<keynum; j++,inpnt++) {
 	int curix, parix;
 
@@ -1112,7 +1089,7 @@ struct vector *match_regexp(v, pattern)
     reg = regcomp(pattern, 0);
     if (reg == 0)
 	return 0;
-    res = (char *)DMALLOC(v->size, 8, "match_regexp: res");
+    res = (char *)DMALLOC(v->size, 14, "match_regexp: res");
     for (num_match=i=0; i < v->size; i++) {
 	res[i] = 0;
 	if (v->item[i].type != T_STRING)
@@ -1227,7 +1204,7 @@ char *str;
 		  A new writable copy of the name is needed.
 		*/
 		/* (sl - 1) == minus ".c" plus "\0" */
-		p = (char *)DMALLOC(sl - 1, 8, "children: p"); 
+		p = (char *)DMALLOC(sl - 1, 15, "children: p"); 
 		strncpy(p, str, sl - 2);
 		p[sl - 2] = '\0';
 		sl -= 2; /* removed the ".c" */
@@ -1236,7 +1213,7 @@ char *str;
     }
 	if (!(tmp_children = (struct object **)
 		DMALLOC(sizeof(struct object *) * (t_sz = 50),
-			8, "children: tmp_children")))
+			16, "children: tmp_children")))
 	{
 		if (needs_freed) FREE(str);
 		return null_array(); /* unable to malloc enough temp space */
@@ -1250,10 +1227,7 @@ char *str;
                 {
                     if (display_hidden == -1)
                     {
-                  struct svalue *r;
-                      push_object(current_object);
-                  r = apply_master_ob("valid_hide", 1);
-                  display_hidden = !IS_ZERO(r);
+                  display_hidden = valid_hide(current_object);
                     }
                     if (!display_hidden) continue;
                 }
@@ -1261,7 +1235,7 @@ char *str;
 			if ((++i == t_sz) &&(!(tmp_children
 				= (struct object **)DREALLOC((void *)tmp_children,
 					sizeof(struct object *) * (t_sz += 50),
-					8, "children: tmp_children: realloc"))))
+					17, "children: tmp_children: realloc"))))
 			{   /* unable to REALLOC more space (tmp_children is now NULL) */
 				if (needs_freed) FREE(str);
 				return null_array();
@@ -1287,7 +1261,7 @@ char *str;
 struct vector *
 livings()
 {
-    int nob, apply_valid_hide, valid_hide;
+    int nob, apply_valid_hide, hide_is_valid;
     struct object *ob, **obtab;
     struct vector *vec;
 
@@ -1295,7 +1269,7 @@ livings()
     apply_valid_hide = 1;
 
     obtab = (struct object **)
-		DMALLOC(max_array_size * sizeof(struct object **), 8, "livings");
+		DMALLOC(max_array_size * sizeof(struct object **), 18, "livings");
 
     for (ob = obj_list; ob != NULL; ob = ob->next_all) {
 	if ((ob->flags & O_ENABLE_COMMANDS) == 0)
@@ -1303,10 +1277,9 @@ livings()
 	if (ob->flags & O_HIDDEN) {
 	    if (apply_valid_hide) {
 		apply_valid_hide = 0;
-		push_object(current_object);
-		valid_hide = !IS_ZERO(apply_master_ob("valid_hide", 1));
+		hide_is_valid = valid_hide(current_object);
 	    }
-	    if (valid_hide)
+	    if (hide_is_valid)
 		continue;
 	}
 	if (nob == max_array_size)

@@ -75,7 +75,7 @@ mudlib_stats_t *add_stat_entry (str, list)
   
   if ((entry = find_stat_entry(str, *list)))
     return entry;
-  entry = (mudlib_stats_t *)DXALLOC(sizeof (mudlib_stats_t), 2048,
+  entry = (mudlib_stats_t *)DXALLOC(sizeof (mudlib_stats_t), 78,
 	"add_stat_entry");
   entry->name = make_shared_string(str);
   entry->length = strlen(str);

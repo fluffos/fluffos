@@ -26,7 +26,7 @@ DRIVER_BIN = driver
 
 # define this to be -lresolv if your machine has it.
 # HP and NeXT don't have it.
-RESOLV=-lresolv
+#RESOLV=-lresolv
 
 # uncomment MALLOC* if you wish to use BSD malloc or Smalloc.
 #   Both of these require the sbrk() system call.  Be sure to read the
@@ -38,9 +38,8 @@ RESOLV=-lresolv
 # uncomment these two lines for BSD Malloc.
 #MALLOC_C=bsdmalloc.c
 #MALLOC_O=bsdmalloc.o
-# uncomment these two lines for Smalloc (not generally recommended)
-# Warning: smalloc seems not to return memory to the system upon reboot
-# of the driver on some systems (so far only noticed this on HP Snakes).
+# uncomment these two lines for Smalloc (slightly slower than BSD malloc
+# but quite a bit less overhead).
 #MALLOC_C=smalloc.c
 #MALLOC_O=smalloc.o
 
@@ -65,8 +64,14 @@ INSTALL_DIR = ../bin
 #WARN=-Wall
 
 # define profiling if you want it
-# note: the gmon.out file will likely be written in the mudlib dir
-#PROFIL=-pg -DPROFILING
+# note: the gmon.out file will likely be written in the mudlib dir.
+# PROFILE_ON controls whether or not monitoring is active at driver
+# startup.  Comment PROFILE_ON to make profiling not active at startup.
+# Use moncontrol(1) efun to enable profiling and moncontrol(0) to turn
+# it off.
+#PROFILE_OFF=-DPROFILE_ON
+# Uncomment this if you want to enable profiling of the driver
+#PROFIL=-pg -DPROFILING $(PROFILE_ON)
 
 # Enable run time debugging.
 #DEBUG=-g -DDEBUG
@@ -89,6 +94,7 @@ OPTIMIZE=-O
 # uncomment for gcc
 #OPTIMIZE=-O2 -fomit-frame-pointer -fstrength-reduce
 # uncomment below for RS/6000(AIX) xlc compiler only.
+# remove the -Q if xlc complains.
 #OPTIMIZE=-O -Q
 # uncomment for HP's cc (not sure if this works on any but the Snake)
 #OPTIMIZE=+O3 +Obb3000
@@ -114,7 +120,13 @@ CC=cc
 #CC=gcc
 #CC=xlc
 
-# define this to be bison if you have it, and yacc otherwise
+# define this to be bison if you have it, and yacc otherwise.
+# The yaccs on SunOS and A/UX both have problems with lang.y
+# because of hardcoded limits on the number of symbols.  You
+# can either build lang.tab.* on another machine and move them
+# over or you can get bison from prep.ai.mit.edu:/pub/gnu.
+#YACC=bison
+#YFLAGS=-d -y
 YACC=yacc
 YFLAGS = -d
 
@@ -151,9 +163,9 @@ LIBS=-lm $(EXTRALIBS)
 SRC=lex.c main.c rc.c interpret.c simulate.c object.c backend.c file.c\
   array.c mapping.c comm.c ed.c regexp.c swap.c malloc.c\
   call_out.c otable.c dumpstat.c stralloc.c hash.c port.c\
-  access_check.c parse.c prelang.y postlang.y mudlib_stat.c \
+  access_check.c parse.c prelang.y postlang.y mudlib_stats.c \
   simul_efun.c sprintf.c uid.c socket_efuns.c efunctions.c eoperators.c \
-  socket_ctrl.c socket_errors.c qsort.c \
+  socket_ctrl.c socket_err.c qsort.c \
   md.c $(UALARM_C) $(STRFUNCS_C) $(MALLOC_C)
 
 OBJ=lang.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
@@ -161,7 +173,7 @@ OBJ=lang.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   malloc.o call_out.o otable.o dumpstat.o stralloc.o hash.o mudlib_stats.o \
   port.o access_check.o parse.o simul_efun.o sprintf.o uid.o \
   socket_efuns.o efunctions.o eoperators.o socket_ctrl.o qsort.o \
-  socket_errors.o md.o $(UALARM_O) $(STRFUNCS_O) $(MALLOC_O)
+  socket_err.o md.o $(UALARM_O) $(STRFUNCS_O) $(MALLOC_O)
 
 all: $(DRIVER_BIN) addr_server
 

@@ -48,7 +48,7 @@ void read_config_file (file)
   char str[120];
   int size = 0,len;
   buff = (char *)
-	DMALLOC(MAX_LINE_LENGTH * (NUM_INTS + 1) * (NUM_STRS + 1), 32768,
+	DMALLOC(MAX_LINE_LENGTH * (NUM_INTS + 1) * (NUM_STRS + 1), 92,
 		"read_config_file: 1");
   strcat(buff,"\n");
   while (1) 
@@ -65,7 +65,7 @@ void read_config_file (file)
 	{
 	  size += len + 1;
 	  if (size > (MAX_LINE_LENGTH * (NUM_INTS + 1) * (NUM_STRS + 1)))
-	    buff = (char *)DREALLOC(buff, size, 32768, "read_config_file: 2");
+	    buff = (char *)DREALLOC(buff, size, 93, "read_config_file: 2");
 	  strcat (buff, str);
 	  strcat (buff, "\n");
 	}

@@ -80,8 +80,6 @@ implement auto line wrap.
 implement support for linking muds (metamud) -- possible that jacques's
 comm.c mods will be useful for this.
 
-add runtime type checking to call_other
-
 add another version of __INIT that doesn't get used for anything by the
 driver itself (so that wizzes can safely use it)
 

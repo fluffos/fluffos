@@ -27,3 +27,7 @@ All of our documentation describing efuns and driver "applies" are in
 the UNIX "man" format.  To convert them to plain ascii format, from
 this directory, type "./man2ascii" and it will convert all of the docs
 into plain ascii for you. (and remove the man format files)
+
+If you have any additions or corrections to this set of documentation
+that would be generally applicable for all mudlibs, please send them
+to mudos-bugs@gestalt.austin.tx.us (include context diffs if feasible).

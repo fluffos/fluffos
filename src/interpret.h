@@ -61,7 +61,7 @@ struct vector {
 
 #define ALLOC_VECTOR(nelem) \
     (struct vector *)DXALLOC(sizeof (struct vector) + \
-			    sizeof(struct svalue) * (nelem - 1), 8, "ALLOC_VECTOR")
+			    sizeof(struct svalue) * (nelem - 1), 121, "ALLOC_VECTOR")
 
 struct lnode_def;
 

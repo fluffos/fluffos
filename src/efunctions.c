@@ -90,7 +90,7 @@ int num_arg, instruction;
 {
   struct vector *vec;
 
-  vec = all_inventory(sp->u.ob);
+  vec = all_inventory(sp->u.ob, 0);
   pop_stack();
   if (!vec)
     {
@@ -316,7 +316,7 @@ int num_arg, instruction;
       pop_stack();
       return;
     }
-  str = DXALLOC(len+1, 32, "f_clear_bit: str");
+  str = DXALLOC(len+1, 29, "f_clear_bit: str");
   memcpy(str, (sp-1)->u.string, len+1);	/* including null byte */
   if (str[ind] > 0x3f + ' ' || str[ind] < ' ')
     error("Illegal bit pattern in clear_bit character %d\n", ind);
@@ -449,7 +449,7 @@ int num_arg, instruction;
 {
   struct svalue *arg, res;
 
-  arg = sp - num_arg + 1;
+  arg = sp - 1;
   switch (arg[0].u.number)
     {
     case 0:
@@ -457,10 +457,6 @@ int num_arg, instruction;
 	int flags;
 	struct object *obj2;
 
-	if (num_arg != 2)
-	  error("bad number of args to debug_info\n");
-	if (arg[1].type != T_OBJECT)
-	  bad_arg(1, instruction);
 	ob = arg[1].u.ob;
 	flags = ob->flags;
 	add_message("O_HEART_BEAT      : %s\n",
@@ -507,10 +503,6 @@ int num_arg, instruction;
 	break;
       }
     case 1:
-      if (num_arg != 2)
-	error("bad number of arguments to debug_info");
-      if ( arg[1].type != T_OBJECT)
-	bad_arg(1,instruction);
       ob = arg[1].u.ob;
       add_message("program ref's %d\n", ob->prog->p.i.ref);
       add_message("Name %s\n", ob->prog->name);
@@ -529,7 +521,7 @@ int num_arg, instruction;
     default:
       bad_arg(1,instruction);
     }
-  pop_n_elems(num_arg);
+  pop_n_elems(2);
   sp++;
   *sp = res;
 }
@@ -701,6 +693,12 @@ int num_arg, instruction;
     push_number(0);
 }
 
+void
+f_error(num_arg, instruction)
+int num_arg, instruction;
+{
+	error(sp->u.string);
+}
 
 void
 f_disable_wizard(num_arg, instruction)
@@ -832,7 +830,7 @@ int num_arg, instruction;
       push_malloced_string(res);
       return;
     }
-  res = DXALLOC(to - from + 2, 32, "f_extract: res");
+  res = DXALLOC(to - from + 2, 30, "f_extract: res");
   strncpy(res, arg[0].u.string + from, to - from + 1);
   res[to - from + 1] = '\0';
   pop_n_elems(3);
@@ -1256,19 +1254,20 @@ f_localtime(num_arg, instruction)
     vec->item[LT_GMTOFF].type = T_NUMBER;
     vec->item[LT_ZONE].type = T_STRING;
     vec->item[LT_ZONE].subtype = STRING_MALLOC;
-#ifdef BSD42 /* look in port.h */
+#if defined(BSD42) || defined(apollo) || defined(_AUX_SOURCE)
 	/* 4.2 BSD doesn't seem to provide any way to get these last two values */
     vec->item[LT_GMTOFF].type = T_NUMBER;
 	vec->item[LT_GMTOFF].u.number = 0;
     vec->item[LT_ZONE].type = T_NUMBER;
 	vec->item[LT_ZONE].u.number = 0;
 #else /* BSD42 */
-#if (defined(hpux) || defined(_SEQUENT_) || defined(_AIX) || defined(SVR4))
+#if (defined(hpux) || defined(_SEQUENT_) || defined(_AIX) \
+	|| defined(SVR4) || defined(sgi) || defined(linux))
     if (!tm->tm_isdst) {
         vec->item[LT_GMTOFF].u.number = timezone;
         vec->item[LT_ZONE].u.string = string_copy(tzname[0]);
     } else {
-#if (defined(_AIX) || defined(hpux))
+#if (defined(_AIX) || defined(hpux) || defined(linux))
         vec->item[LT_GMTOFF].u.number = timezone;
 #else
         vec->item[LT_GMTOFF].u.number = altzone;
@@ -1382,7 +1381,7 @@ int num_arg, instruction;
    }
 
   if (!ob)
-    bad_arg (3, F_MAP_ARRAY);
+    bad_arg (3, instruction);
 
   if (arg[0].type == T_POINTER) {
     check_for_destr(arg[0].u.vec);
@@ -1567,6 +1566,15 @@ int num_arg, instruction;
   else
     assign_svalue(sp, &const1);
 }
+
+#ifdef PROFILING
+void
+f_moncontrol(num_arg, instruction)
+int num_arg, instruction;
+{
+	moncontrol(sp->u.number);
+}
+#endif
 
 void
 f_move_object(num_arg, instruction)
@@ -2025,6 +2033,32 @@ int num_arg, instruction;
 }
 
 void
+f_refs(num_arg, instruction)
+int num_arg, instruction;
+{
+	int r;
+
+	switch (sp->type) {
+	case T_MAPPING :
+		r = sp->u.map->ref;
+		break;
+	case T_POINTER :
+		r = sp->u.vec->ref;
+		break;
+	case T_OBJECT :
+		r = sp->u.ob->ref;
+		break;
+	case T_FUNCTION :
+		r = sp->u.fp->ref;
+	default :
+		r = 0;
+		break;
+	}
+	pop_stack();
+	push_number(r - 1);/* minus 1 to compensate for being arg of refs() */
+}
+
+void
 f_regexp(num_arg, instruction)
 int num_arg, instruction;
 {
@@ -2080,15 +2114,15 @@ f_replace_string(num_arg, instruction)
     int plen, rlen, dlen;
     char *src, *pattern, *replace, *dst1, *dst2;
 
-    if (IS_ZERO(sp)) { /* first and second args checked elsewhere */
-    	bad_arg(3, F_REPLACE_STRING);
+    if (sp->type != T_STRING) { /* first and second args checked elsewhere */
+    	bad_arg(3, instruction);
     	pop_n_elems(3);
     	return;
     }
     src = (sp-2)->u.string;
     pattern = (sp-1)->u.string;
     replace = sp->u.string;
-    dst2 = dst1 = (char *)DMALLOC(max_string_length, 32, "f_replace_string");
+    dst2 = dst1 = (char *)DMALLOC(max_string_length, 31, "f_replace_string");
 
     plen = strlen(pattern);
     rlen = strlen(replace);
@@ -2133,9 +2167,13 @@ void
 f_restore_object(num_arg, instruction)
 int num_arg, instruction;
 {
-  i = restore_object(current_object, sp->u.string);
-  pop_stack();
-  push_number(i);
+	int flag;
+	struct svalue *arg = sp - num_arg + 1;
+
+	flag = (num_arg == 1) ? 0 : arg[1].u.number;
+	i = restore_object(current_object, arg[0].u.string, flag);
+	pop_n_elems(num_arg);
+	push_number(i);
 }
 
 void
@@ -2251,8 +2289,13 @@ void
 f_save_object(num_arg, instruction)
 int num_arg, instruction;
 {
-  save_object(current_object, sp->u.string);
-  /* The argument is returned */
+	int flag;
+	struct svalue *arg = sp - num_arg + 1;
+
+	flag = (num_arg == 1) ? 0 : arg[1].u.number;
+	save_object(current_object, arg[0].u.string, flag);
+	pop_n_elems(num_arg-1);
+	/* The argument is returned */
 }
 
 void
@@ -2345,13 +2388,8 @@ void
 f_set_hide(num_arg, instruction)
 int num_arg, instruction;
 {
-	struct svalue *ret;
-
-	push_object(current_object);
-	ret = apply_master_ob("valid_hide", 1);
-	if (IS_ZERO(ret)) {
-		return;
-	}
+    if (!valid_hide(current_object))
+	    return;
 	if (sp->u.number) {
 		if (!(current_object->flags & O_HIDDEN) && current_object->interactive)
 			num_hidden++;
@@ -2392,7 +2430,7 @@ int num_arg, instruction;
 
   if (sp->type == T_NUMBER) {
     if (sp->u.number != 0)
-      bad_arg(1, F_SETEUID);
+      bad_arg(1, instruction);
     current_object->euid = NULL;
     pop_stack();
     push_number(1);
@@ -2400,7 +2438,7 @@ int num_arg, instruction;
   }
   argp = sp;
   if (argp->type != T_STRING)
-    bad_arg(1, F_SETEUID);
+    bad_arg(1, instruction);
   push_object(current_object);
   push_string(argp->u.string, STRING_CONSTANT);
   ret = apply_master_ob("valid_seteuid", 2);
@@ -2900,7 +2938,7 @@ f_socket_address(num_arg, instruction)
     char addr[ADDR_BUF_SIZE];
   
     get_socket_address(sp->u.number, addr, &port);
-    str = (char *)DMALLOC(strlen(addr) + 5 + 3, 2, "f_socket_address");
+    str = (char *)DMALLOC(strlen(addr) + 5 + 3, 33, "f_socket_address");
     sprintf(str, "%s %d", addr, port);
     push_string(str, STRING_MALLOC);
 }
@@ -2933,7 +2971,7 @@ int num_arg, instruction;
   }
 
   if (!ob)
-    bad_arg (3, F_SORT_ARRAY);
+    bad_arg (3, instruction);
 
   if (arg[0].type == T_POINTER)
     {

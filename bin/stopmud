@@ -1,14 +1,15 @@
-#! /bin/sh
+#!/bin/sh
 #
 # file:    startmud (linked to stopmud)
-# version: 0.92
-# date:    1992 August 9
+# version: 0.93
+# date:    1993 January 09
 # desc:    Bourne shell script for starting the MudOS driver and related
 #          binaries. (replaces restart_mud)
+#	   Fixed by Zak to use basename in recognizing name as stopmud
 #
 
 # directory for MudOS-related binaries (driver, addr_server, ftpd, etc)
-BINDIR=/usr/local/mud/bin
+BINDIR=/MudOS_0.9/bin
 
 # don't change anything below this line unless you know what you are doing.
 
@@ -28,7 +29,7 @@ else
 fi
 
 
-if test "$0" = "stopmud"
+if test "`basename $0`" = "stopmud"
 then
 	PID=`cat ${BINDIR}/${PIDFILE}`
 	echo "killing ${PID}"
@@ -46,13 +47,13 @@ fi
 
 echo $$ > ${BINDIR}/${PIDFILE}
 
-if test -f ${BINDIR}/${FTPD}
-then
-	${BINDIR}/${FTPD} -l
-else
-	echo "$0: Unable to find the ftp daemon:\n\t${BINDIR}/${FTPD}."
-	echo "Continuing anyway."
-fi
+#if test -f ${BINDIR}/${FTPD}
+#then
+#	${BINDIR}/${FTPD} -l
+#else
+#	echo "$0: Unable to find the ftp daemon:\n\t${BINDIR}/${FTPD}."
+#	echo "Continuing anyway."
+#fi
 
 if test -f ${BINDIR}/${ASERVER}
 then
@@ -72,8 +73,16 @@ then
 		ERROR=$?
 		echo -n "Driver went down (exit code: ${ERROR}): " >> ${LOGDIR}/${UP}
 		date >> ${LOGDIR}/${UP}
+		rm -f ${LOGDIR}/${LOG}.old
 		mv ${LOGDIR}/${LOG} ${LOGDIR}/${LOG}.old
+		rm -f ${LOGDIR}/${ERR}.old
 		mv ${LOGDIR}/${ERR} ${LOGDIR}/${ERR}.old
+		if test $ERROR -eq 255
+		then
+			echo "Driver exited with -1.  Halting." >> ${LOGDIR}/${UP}
+			echo "Halting"
+			exit 255
+		fi
 	done
 else
 	echo "$0: Unable to find the gamedriver executable:\n\t${BINDIR}/${DRIVER}"

@@ -102,6 +102,9 @@ int main(argc, argv)
   MDinit();
 #endif
 
+#if (defined(PROFILING) && !defined(PROFILE_ON))
+  moncontrol(0);
+#endif
   tzset();
   boot_time = get_current_time();
   get_version(version_buf);
@@ -208,7 +211,7 @@ int main(argc, argv)
   set_inc_list(INCLUDE_DIRS);
 
   if(reserved_size > 0)
-    reserved_area = (char *)DMALLOC(reserved_size,512,"main.c: reserved_area");
+    reserved_area = (char *)DMALLOC(reserved_size,69,"main.c: reserved_area");
   for(i=0; i < sizeof consts / sizeof consts[0]; i++)
     consts[i] = exp(- i / 900.0);
   init_num_args();
@@ -356,7 +359,9 @@ int main(argc, argv)
     signal(SIGIOT, sig_iot);
 #endif
     signal(SIGHUP, sig_hup);
+#ifdef SIGBUS
     signal(SIGBUS, sig_bus);
+#endif
     signal(SIGSEGV, sig_segv);
     signal(SIGILL, sig_ill);
 #endif /* DEBUG */
@@ -375,7 +380,7 @@ char *string_copy(str)
   if (len > max_string_length) {
      len = max_string_length;
   }
-  p = DXALLOC(len + 1, 512, "string_copy");
+  p = DXALLOC(len + 1, 70, "string_copy");
   (void)strncpy(p, str, len);
   p[len] = '\0'; /* strncpy doesn't put on \0 if 'from' too long */
   return p;
@@ -444,7 +449,7 @@ char *xalloc(size)
 	exit(3);
     if (size == 0)
 	fatal("Tried to allocate 0 bytes.\n");
-    p = (char *)DMALLOC(size, 512, "main.c: xalloc");
+    p = (char *)DMALLOC(size, 71, "main.c: xalloc");
     if (p == 0) {
 	if (reserved_area) {
 	    FREE(reserved_area);

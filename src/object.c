@@ -36,6 +36,20 @@ char *save_mapping PROT ((struct mapping *m));
 static int vector_save_size PROT((struct vector *));
 static struct mapping *restore_mapping PROT((char **));
 
+INLINE int
+valid_hide(obj)
+struct object *obj;
+{
+	struct svalue *ret;
+
+	if (!obj) {
+		return 0;
+	}
+	push_object(obj);
+	ret = apply_master_ob("valid_hide",1);
+	return (!IS_ZERO(ret));
+}
+
 /*
  * Replace newlines in a string with a carriage return, to make the string
  * writeable on one line.
@@ -184,7 +198,7 @@ save_array(v)
     char *buf;
     int i;
     
-    buf = DXALLOC(2+vector_save_size(v)+2+1, 4096, "save_array");
+    buf = DXALLOC(2+vector_save_size(v)+2+1, 79, "save_array");
     
     strcpy(buf,"({");
     for (i=0; i < v->size; i++) {
@@ -195,97 +209,13 @@ save_array(v)
     return buf;
 }
 
-/*
- * Save an object to a file.
- * The routine checks with the function "valid_write()" in /obj/master.c
- * to assertain that the write is legal.
- */
-void save_object(ob, file)
-    struct object *ob;
-    char *file;
-{
-    char *name, tmp_name[80];
-    int len, i;
-    FILE *f;
-    int failed = 0;
-    /* struct svalue *v; */
-
-    if (ob->flags & O_DESTRUCTED)
-	return;
-    file = check_valid_path(file, ob, "save_object", 1);
-    if (file == 0)
-	error("Denied write permission in save_object().\n");
-    len = strlen(file);
-    name = DXALLOC(len + 3, 4096, "save_object: 1");
-    (void)strcpy(name, file);
-#ifndef MSDOS
-    (void)strcat(name, ".o");
-#endif
-    /*
-     * Write the save-files to different directories, just in case
-     * they are on different file systems.
-     */
-    sprintf(tmp_name, "%s.tmp", name);
-#ifdef MSDOS
-    (void)strcat(name, ".o");
-#endif
-    f = fopen(tmp_name, "w");
-    if (f == 0) {
-	FREE(name);
-	error("Could not open %s for a save.\n", tmp_name);
-    }
-	for (i=0; (unsigned)i < ob->prog->p.i.num_variables; i++) {
-		struct svalue *v = &ob->variables[i];
-		char *new_string;
-		int theSize;
-
-		if (ob->prog->p.i.variable_names[i].type & TYPE_MOD_STATIC)
-			continue;
-
-		save_svalue_depth = 0;
-		theSize = svalue_save_size(v);
-		if (save_svalue_depth > MAX_SAVE_SVALUE_DEPTH) {
-		error("Mappings and/or arrays nested too deep (%d) for save_object\n",
-			MAX_SAVE_SVALUE_DEPTH);
-		}
-		new_string = (char *)DXALLOC(theSize, 4096, "save_object: 2");
-		*new_string = '\0';
-		save_svalue(v, new_string);
-		replace_newline(new_string);
-		if (fprintf(f, "%s %s\n", ob->prog->p.i.variable_names[i].name,
-				new_string) == EOF) {
-			failed = 1;
-		}
-		FREE(new_string);
-	}
-    (void)unlink(name);
-#ifndef MSDOS
-    if (link(tmp_name, name) == -1)
-#else
-    (void) fclose(f);
-    if (rename(tmp_name,name) < 0)
-#endif
-    {
-	perror(name);
-	printf("Failed to link %s to %s\n", tmp_name, name);
-	add_message("Failed to save object !\n");
-    }
-#ifndef MSDOS
-    (void)fclose(f);
-    unlink(tmp_name);
-#endif
-    FREE(name);
-    if (failed)
-	add_message("Failed to save to file. Disk could be full.\n");
-}
-
 static char *
 my_string_copy(str)
 char *str;
 {
 	char *apa, *cp;
 
-	cp = apa = DXALLOC(strlen(str)+1, 4096, "my_string_copy");
+	cp = apa = DXALLOC(strlen(str)+1, 82, "my_string_copy");
     
 	while (*str) {
 		if (*str == '\\') {
@@ -552,54 +482,155 @@ char *theBuff, *name, *val;
     }
 }
 
-int restore_object(ob, file)
+/*
+ * Save an object to a file.
+ * The routine checks with the function "valid_write()" in /obj/master.c
+ * to assertain that the write is legal.
+ * If 'save_zeros' is set, 0 valued variables will be saved
+ */
+void save_object(ob, file, save_zeros)
     struct object *ob;
     char *file;
+    int save_zeros;
+{
+    char *name, tmp_name[80];
+    int len, i;
+    FILE *f;
+    int failed = 0;
+    /* struct svalue *v; */
+
+    if (ob->flags & O_DESTRUCTED)
+        return;
+    file = check_valid_path(file, ob, "save_object", 1);
+    if (file == 0)
+        error("Denied write permission in save_object().\n");
+    len = strlen(file);
+    name = DXALLOC(len + 3, 80, "save_object: 1");
+    (void)strcpy(name, file);
+#ifndef MSDOS
+    (void)strcat(name, SAVE_EXTENSION);
+#endif
+    /*
+     * Write the save-files to different directories, just in case
+     * they are on different file systems.
+     */
+    sprintf(tmp_name, "%s.tmp", name);
+#ifdef MSDOS
+    (void)strcat(name, SAVE_EXTENSION);
+#endif
+    f = fopen(tmp_name, "w");
+    if (f == 0) {
+        FREE(name);
+        error("Could not open %s for a save.\n", tmp_name);
+    }
+	for (i=0; (unsigned)i < ob->prog->p.i.num_variables; i++) {
+		struct svalue *v = &ob->variables[i];
+		char *new_string;
+		int theSize;
+
+		if (ob->prog->p.i.variable_names[i].type & TYPE_MOD_STATIC)
+			continue;
+
+		save_svalue_depth = 0;
+		theSize = svalue_save_size(v);
+		if (save_svalue_depth > MAX_SAVE_SVALUE_DEPTH) {
+		  error("Mappings and/or arrays nested too deep (%d) for save_object\n",
+			MAX_SAVE_SVALUE_DEPTH);
+		}
+		new_string = (char *)DXALLOC(theSize, 81, "save_object: 2");
+		*new_string = '\0';
+		save_svalue(v, new_string);
+		replace_newline(new_string);
+		if (save_zeros || strcmp(new_string,"0")) /* Armidale */
+			if (fprintf(f, "%s %s\n", ob->prog->p.i.variable_names[i].name,
+				new_string) == EOF) {
+				failed = 1;
+			}
+		FREE(new_string);
+	}
+	(void)unlink(name);
+#ifndef MSDOS
+	if (link(tmp_name, name) == -1)
+#else
+	(void) fclose(f);
+	if (rename(tmp_name,name) < 0)
+#endif
+	{
+		perror(name);
+		printf("Failed to link %s to %s\n", tmp_name, name);
+		add_message("Failed to save object !\n");
+	}
+#ifndef MSDOS
+	(void)fclose(f);
+	unlink(tmp_name);
+#endif
+	FREE(name);
+	if (failed)
+		add_message("Failed to save to file. Disk could be full.\n");
+}
+
+int restore_object(ob, file, noclear)
+    struct object *ob;
+    char *file;
+    int noclear;
 {
     char *name, *val, *theBuff;
-    int len;
+    int len, num_var, i;
     FILE *f;
     struct object *save = current_object;
     struct stat st;
 
     if (current_object != ob)
-	fatal("Bad argument to restore_object()\n");
+        fatal("Bad argument to restore_object()\n");
     if (ob->flags & O_DESTRUCTED)
-	return 0;
+        return 0;
 
     file = check_valid_path(file, ob, "restore_object: 1", 0);
     if (file == 0)
-	error("Denied read permission in restore_object().\n");
+        error("Denied read permission in restore_object().\n");
 
     len = strlen(file);
-    name = DXALLOC(len + 3, 4096, "restore_object: 2");
+    name = DXALLOC(len + 3, 83, "restore_object: 2");
     (void)strcpy(name, file);
     if (name[len-2] == '.' && name[len-1] == 'c')
-	name[len-1] = 'o';
+        name[len-1] = SAVE_EXTENSION[1];
     else
-	(void)strcat(name, ".o");
+        (void)strcat(name, SAVE_EXTENSION);
     f = fopen(name, "r");
     if (!f || fstat(fileno(f), &st) == -1) {
-	FREE(name);
-	if (f) 
-	    (void)fclose(f);
-	return 0;
+        FREE(name);
+        if (f) 
+            (void)fclose(f);
+        return 0;
     }
     if (st.st_size == 0) {
-	(void)fclose(f);
-	FREE(name);
-	return 0;
+        (void)fclose(f);
+        FREE(name);
+        return 0;
     }
-    val = DXALLOC(st.st_size + 1, 4096, "restore_object: 3");
-    theBuff = DXALLOC(st.st_size + 1, 4096, "restore_object: 4");
+    val = DXALLOC(st.st_size + 1, 84, "restore_object: 3");
+    theBuff = DXALLOC(st.st_size + 1, 85, "restore_object: 4");
     fread(theBuff, 1, st.st_size, f);
-	fclose(f);
-	theBuff[st.st_size] = '\0';
+        fclose(f);
+        theBuff[st.st_size] = '\0';
     current_object = ob;
- 	restore_object_from_buff(ob, theBuff, name, val);
+    
+    /* This next bit added by Armidale@Cyberworld 1/1/93
+     * If 'noclear' flag is not set, all non-static variables will be
+     * initialized to 0 when restored.
+     */
+    if (!noclear) {
+		num_var = ob->prog->p.i.num_variables; 
+		for (i=0; i<num_var; i++) {
+			if (!(ob->prog->p.i.variable_names[i].type & TYPE_MOD_STATIC))
+				assign_svalue(&ob->variables[i], &const0n);
+			}
+	}
+    
+	restore_object_from_buff(ob, theBuff, name, val);
     current_object = save;
     if (d_flag > 1)
-	debug_message("Object %s restored from %s.\n", ob->name, name);
+        debug_message("Object %s restored from %s.\n", ob->name, name);
     FREE(name);
     FREE(theBuff);
     FREE(val);
@@ -721,7 +752,7 @@ struct object *get_empty_object(num_var)
 
     tot_alloc_object++;
     tot_alloc_object_size += size;
-    ob = (struct object *)DXALLOC(size, 4096, "get_empty_object");
+    ob = (struct object *)DXALLOC(size, 86, "get_empty_object");
     /* marion
      * Don't initialize via memset, this is incorrect. E.g. the bull machines
      * have a (char *)0 which is not zero. We have structure assignment, so
@@ -797,7 +828,6 @@ struct object *find_living_object(str, user)
 {
     struct object **obp, *tmp;
     struct object **hl;
-    struct svalue *ret;
 
     if (!str) return 0;
     num_searches++;
@@ -806,9 +836,7 @@ struct object *find_living_object(str, user)
 	search_length++;
 	if ((*obp)->flags & O_HIDDEN)
 	  {
-	     push_object(current_object);
-	     ret = apply_master_ob("valid_hide",1);
-	     if (IS_ZERO(ret))
+	     if (!valid_hide(current_object))
 	       continue;
 	  }
 	if (user && !((*obp)->flags & O_ONCE_INTERACTIVE))
@@ -989,15 +1017,11 @@ INLINE int
 object_visible(ob)
 struct object *ob;
 {
-	struct svalue *ret;
-
 	if (ob->flags & O_HIDDEN) {
 		if (current_object->flags & O_HIDDEN) {
 			return 1;
 		}
-		push_object(current_object);
-		ret = apply_master_ob("valid_hide", 1);
-		return !IS_ZERO(ret);
+		return valid_hide(current_object);
 	} else {
 		return 1;
 	}

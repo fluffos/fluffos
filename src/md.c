@@ -17,6 +17,8 @@
 
 #ifdef DEBUGMALLOC
 
+static totals[MAX_CATEGORY];
+
 int malloc_mask = 0;
 
 static node_t **table;
@@ -26,7 +28,12 @@ unsigned long hiwater = 0L;
 void
 MDinit()
 {
+	int j;
+
 	table = (node_t **)calloc(TABLESIZE, sizeof(node_t *));
+	for (j = 0; j < MAX_CATEGORY; j++) {
+		totals[j] = 0;
+	}
 }
 
 void
@@ -47,10 +54,13 @@ char *desc;
 	node->size = size;
 	node->next = table[h];
 #ifdef DEBUGMALLOC_EXTENSIONS
-	node->tag = tag + 1;
+	if (tag < MAX_CATEGORY) {
+		totals[tag] += size;
+	}
+	node->tag = tag;
 	node->id = count++;
 	node->desc = desc ? desc : "default";
-	if (malloc_mask & node->tag) {
+	if (malloc_mask == node->tag) {
 		fprintf(stderr,"MDmalloc: %5d, [%-25s], %8x:(%d)\n",
 			node->tag, node->desc, (unsigned int)PTR(node), node->size);
 		fflush(stderr);
@@ -77,7 +87,10 @@ void *ptr;
 	}
 	if (entry) {
 #ifdef DEBUGMALLOC_EXTENSIONS
-		if (malloc_mask & entry->tag) {
+		if (entry->tag < MAX_CATEGORY) {
+			totals[entry->tag] -= entry->size;
+		}
+		if (malloc_mask == entry->tag) {
 			fprintf(stderr,"MDfree: %5d, [%-25s], %8x:(%d)\n",
 				entry->tag, entry->desc, (unsigned int)PTR(entry), entry->size);
 			fflush(stderr);
@@ -100,7 +113,7 @@ void dump_debugmalloc(tfn, mask)
 char *tfn;
 int mask;
 {
-	int j, total = 0, chunks = 0;
+	int j, total = 0, chunks = 0, total2 = 0;
 	char *fn;
 	node_t *entry;
 	FILE *fp;
@@ -118,7 +131,7 @@ int mask;
 	add_message("Dumping to %s ...",fn);
 	for (j = 0; j < TABLESIZE; j++) {
 		for (entry = table[j]; entry; entry = entry->next) {
-			if (entry->tag & mask) {
+			if (!mask || (entry->tag == mask)) {
 				fprintf(fp,"%-20s: sz %7d: id %6d: tag %8d, a %8x\n",
 					entry->desc, entry->size, entry->id, entry->tag,
 					(unsigned int)PTR(entry));
@@ -129,12 +142,20 @@ int mask;
 	}
 	fprintf(fp, "total =    %8d\n", total);
 	fprintf(fp, "# chunks = %8d\n", chunks);
-	fprintf(fp, "ave. bytes per chunk = %7.2f\n", (float)total / chunks);
+	fprintf(fp, "ave. bytes per chunk = %7.2f\n\n", (float)total / chunks);
+	fprintf(fp, "categories:\n\n");
+	for (j = 0; j < MAX_CATEGORY; j++) {
+		fprintf(fp, "%4d: %10d\n", j, totals[j]);
+		total2 += totals[j];
+	}
+	fprintf(fp, "\ntotal = %11d\n", total2);
 	fclose(fp);
 	add_message(" done.\n");
-	add_message("total = %8d\n", total);
+	add_message("total =    %8d\n", total);
 	add_message("# chunks = %8d\n", chunks);
-	add_message("ave. bytes per chunk = %7.2f\n", (float)total / chunks);
+	if (chunks) {
+		add_message("ave. bytes per chunk = %7.2f\n", (float)total / chunks);
+	}
 }
 #endif /* DEBUGMALLOC_EXTENSIONS */
 

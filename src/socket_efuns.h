@@ -10,7 +10,6 @@
 enum socket_mode { MUD, STREAM, DATAGRAM };
 enum socket_state { CLOSED, UNBOUND, BOUND, LISTEN, DATA_XFER };
 
-#define DFAULT_PROTO	0	/* use the appropriate protocol    */
 #define	BUF_SIZE	2048	/* max reliable packet size	   */
 #define CALLBK_BUF_SIZE	64	/* max length of callback string   */
 #define ADDR_BUF_SIZE	64	/* max length of address string    */

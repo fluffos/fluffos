@@ -55,7 +55,9 @@ static char sccsid[] = "@(#)malloc.c	5.11 (Berkeley) 2/23/91";
 
 #include "config.h"
 #include "port.h"
+#ifndef hpux
 #include "lint.h"
+#endif
 
 #undef NULL
 #define	NULL 0

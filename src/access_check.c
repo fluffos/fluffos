@@ -77,12 +77,12 @@ check_read_file (name)
 	  addr_tab_index = 0;
 	  addr_tab = (struct access_address *)
 	      DMALLOC(addr_tab_size * sizeof (struct access_address),
-			4, "check_read_file: addr_tab");
+			122, "check_read_file: addr_tab");
 	  class_tab_size = 10;
 	  class_tab_index = 0;
 	  class_tab = (struct access_class *)
 	      DMALLOC(class_tab_size * sizeof (struct access_class),
-			4, "check_read_file: class_tab");
+			1, "check_read_file: class_tab");
 	  
 	  if (in = fopen (name, "r"))
 	    {
@@ -133,7 +133,7 @@ check_read_file (name)
 			  class_tab = (struct access_class *)
 			      DREALLOC((char *)class_tab,
 				       class_tab_size * sizeof (struct access_class),
-						4, "check_read_file: class_tab: realloc");
+						2, "check_read_file: class_tab: realloc");
 			}
 
 		      aa.ac = &class_tab[i];
@@ -153,7 +153,7 @@ check_read_file (name)
 		      addr_tab = (struct access_address *)
 			  DREALLOC((char *)addr_tab,
 				   addr_tab_size * sizeof (struct access_address),
-					4, "check_read_file: addr_tab: realloc");
+					3, "check_read_file: addr_tab: realloc");
 		    }
 		} /* over total input */
 	      fclose (in);
@@ -279,7 +279,7 @@ log_access (addr, ok)
   char *fname;
   FILE *log;
 
-  fname = DMALLOC(strlen(ACCESS_LOG)+1, 4, "log_access: fname");
+  fname = DMALLOC(strlen(ACCESS_LOG)+1, 5, "log_access: fname");
   sprintf (fname,"%s",ACCESS_LOG);
   if (fname[0] == '/')
     strcpy (fname,fname+1);

@@ -9,7 +9,7 @@
 #endif
 #include <sys/stat.h>
 #include <time.h>
-#ifdef sun
+#if defined(sun) || defined(apollo) || defined(__386BSD__)
 #include <sys/time.h>
 #endif /* sun */
 #include <sys/resource.h>
@@ -33,7 +33,7 @@
 #include "comm.h"
 #include "localtime.h"
 #include "socket_efuns.h"
-#include "socket_errors.h"
+#include "socket_err.h"
 #include "lang.tab.h"
 #include "switch.h"
 #include "sent.h"
