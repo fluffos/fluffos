@@ -10,8 +10,8 @@
 */
 
 #include "std.h"
-#include "lpc_incl.h"
 #include "parse.h"
+#include "master.h"
 
 /*****************************************************
 
@@ -441,7 +441,8 @@ static void parse_clean_up() {
 static void push_parse_globals() {
     parse_global_t *pg;
 
-    (++sp)->type = T_ERROR_HANDLER;
+    STACK_INC;
+    sp->type = T_ERROR_HANDLER;
     sp->u.error_handler = parse_clean_up;
 
     pg = ALLOCATE(parse_global_t, TAG_TEMPORARY, "push_parse_globals");

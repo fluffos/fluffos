@@ -10,6 +10,12 @@
 #ifdef INCL_LOCAL_MINERVA_MSQL_H
 #include "/usr/local/Minerva/include/msql.h"
 #endif
+#ifdef INCL_LOCAL_HUGHES_MSQL_H
+#include "/usr/local/Hughes/include/msql.h"
+#endif
+#ifdef INCL_LIB_HUGHES_MSQL_H
+#include "/usr/lib/Hughes/include/msql.h"
+#endif
 
 typedef struct _db {
     struct _db *next;

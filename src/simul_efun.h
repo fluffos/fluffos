@@ -1,6 +1,8 @@
 #ifndef SIMUL_EFUN_H
 #define SIMUL_EFUN_H
 
+#include "lpc_incl.h"
+
 /*
  * simul_efun.c
  */

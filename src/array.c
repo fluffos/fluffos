@@ -4,7 +4,6 @@
 #include "regexp.h"
 #include "backend.h"
 #include "qsort.h"
-#include "array.h"
 #include "md.h"
 
 /*
@@ -42,46 +41,41 @@ array_t the_null_array =
     0,				/* size */
 };
 
-/*
- * Allocate an array of size 'n'.
- */
-array_t *allocate_array P1(int, n)
-{
-    array_t *p;
-
-    if (n < 0 || n > max_array_size)
-	error("Illegal array size.\n");
-    if (n == 0) {
-	return &the_null_array;
-    }
-#ifdef ARRAY_STATS
-    num_arrays++;
-    total_array_size += sizeof(array_t) + sizeof(svalue_t) *
-	(n - 1);
-#endif
-    p = ALLOC_ARRAY(n);
-    p->ref = 1;
-    p->size = n;
 #ifdef PACKAGE_MUDLIB_STATS
+static void ms_setup_stats P1(array_t *, p) {
     if (current_object) {
 	assign_stats(&p->stats, current_object);
-	add_array_size(&p->stats, n);
+	add_array_size(&p->stats, p->size);
     } else {
 	null_stats(&p->stats);
     }
-#endif
-    while (n--)
-	p->item[n] = const0;
-    return p;
 }
 
-array_t *allocate_empty_array P1(int, n)
-{
+#define ms_remove_stats(p) add_array_size(&(p)->stats, -(int)((p)->size))
+#define ms_add_array_size(p, n) add_array_size(p, n)
+#else
+#define ms_setup_stats(x)
+#define ms_remove_stats(x)
+#define ms_add_array_size(p, n)
+#endif
+
+/* Array allocation routines:
+ *
+ * the prefix int_ indicates error checking is not performed.  It is up to
+ * the caller to guarantee 0 < n <= max_array_size [note that the first
+ * inequality is strict].
+ *
+ * _empty_ indicates that the internal svalues are not initialized to zero;
+ * this saves some time if the calling routine is simply going to overwrite
+ * the entries.  In the case of free_ and dealloc_, it means the entries
+ * have already been moved somewhere else or freed, and should be ignored.
+ * 
+ * Note that we rely a bit on gcc automatically inlining small routines.
+ * Speed maniacs may wish to add INLINE liberally.
+ */
+static array_t *int_allocate_empty_array P1(int, n) {
     array_t *p;
     
-    if (n < 0 || n > max_array_size)
-	error("Illegal array size.\n");
-    if (!n) return &the_null_array;
 #ifdef ARRAY_STATS
     num_arrays++;
     total_array_size += sizeof(array_t) + sizeof(svalue_t) * (n-1);
@@ -89,29 +83,67 @@ array_t *allocate_empty_array P1(int, n)
     p = ALLOC_ARRAY(n);
     p->ref = 1;
     p->size = n;
-#ifdef PACKAGE_MUDLIB_STATS
-    if (current_object) {
-	assign_stats(&p->stats, current_object);
-	add_array_size(&p->stats, n);
-    } else {
-	null_stats(&p->stats);
-    }
-#endif
+    ms_setup_stats(p);
+
     return p;
 }
 
-void dealloc_array P1(array_t *, p)
+array_t *allocate_empty_array P1(int, n)
 {
-    int i;
+    if (n < 0 || n > max_array_size)
+	error("Illegal array size.\n");
+    if (!n) return &the_null_array;
 
-    if (p == &the_null_array)
-	return;
+    return int_allocate_empty_array(n);
+}
+
+static array_t *int_allocate_array P1(int, n)
+{
+    array_t *p = int_allocate_empty_array(n);
+
+    while (n--)
+	p->item[n] = const0;
+
+    return p;
+}
+
+array_t *allocate_array P1(int, n)
+{
+    array_t *p = allocate_empty_array(n);
+
+    while (n--)
+	p->item[n] = const0;
+
+    return p;
+}
+
+array_t *allocate_array2 P2(int, n, svalue_t *, svp) {
+    int i;
+    array_t *ret;
     
-    for (i = p->size; i--;)
-	free_svalue(&p->item[i], "free_array");
-#ifdef PACKAGE_MUDLIB_STATS
-    add_array_size(&p->stats, -((int)p->size));
-#endif
+    if (svp->type == T_FUNCTION) {
+	ret = allocate_array(n);
+	
+	for (i = 0; i < n; i++) {
+	    svalue_t *r;
+
+	    push_number(i);
+	    r = call_function_pointer(svp->u.fp, 1);
+	    ret->item[i] = *r;
+	    r->type = T_NUMBER;
+	}
+    } else {
+	ret = allocate_empty_array(n);
+	
+	for (i = 0; i < n; i++)
+	    assign_svalue_no_free(ret->item + i, svp);
+    }
+
+    return ret;
+}
+
+void dealloc_empty_array P1(array_t *, p) {
+    ms_remove_stats(p);
 #ifdef ARRAY_STATS
     num_arrays--;
     total_array_size -= sizeof(array_t) + sizeof(svalue_t) *
@@ -120,9 +152,18 @@ void dealloc_array P1(array_t *, p)
     FREE((char *) p);
 }
 
+void dealloc_array P1(array_t *, p)
+{
+    int i;
+
+    for (i = p->size; i--;)
+	free_svalue(&p->item[i], "free_array");
+    dealloc_empty_array(p);
+}
+
 void free_array P1(array_t *, p)
 {
-    if (--(p->ref) > 0)
+    if (--(p->ref) > 0 || (p == &the_null_array))
 	return;
 
     dealloc_array(p);
@@ -130,27 +171,46 @@ void free_array P1(array_t *, p)
 
 void free_empty_array P1(array_t *, p)
 {
-    if ((--(p->ref) > 0) || (p == &the_null_array)) {
+    if ((--(p->ref) > 0) || (p == &the_null_array))
         return;
-      }
-#ifdef PACKAGE_MUDLIB_STATS
-    add_array_size(&p->stats, -((int)p->size));
-#endif
+
+    dealloc_empty_array(p);
+}
+
+/* Finish setting up an array allocated with ALLOC_ARRAY, resizing it to
+   size n */
+array_t *fix_array P2(array_t *, p, int, n) {
 #ifdef ARRAY_STATS
-    num_arrays--;
-    total_array_size -= sizeof(array_t) + sizeof(svalue_t) *
-        (p->size - 1);
+    num_arrays++;
+    total_array_size += sizeof(array_t) + sizeof(svalue_t) * (n-1);
 #endif
-    FREE((char *) p);
+    p->size = n;
+    p->ref = 1;
+    ms_setup_stats(p);
+    return RESIZE_ARRAY(p, n);
+}
+
+INLINE array_t *resize_array P2(array_t *, p, int, n) {
+#ifdef ARRAY_STATS
+    total_array_size += (n - p->size) * sizeof(svalue_t);
+#endif
+    ms_remove_stats(p);
+    p = RESIZE_ARRAY(p, n);
+    if (!p)
+	fatal("Out of memory.\n");
+    p->size = n;
+    ms_setup_stats(p);
+    
+    return p;
 }
 
 array_t *explode_string P4(char *, str, int, slen, char *, del, int, len)
 {
-    char *p, *beg, *lastdel = (char *) NULL;
+    char *p, *beg, *lastdel = 0;
     int num, j, limit;
     array_t *ret;
     char *buff, *tmp;
-    short sz;
+    unsigned short sz;
 
     if (!slen)
 	return &the_null_array;
@@ -162,7 +222,7 @@ array_t *explode_string P4(char *, str, int, slen, char *, del, int, len)
 	if (slen > max_array_size) {
 	    slen = max_array_size;
 	}
-	ret = allocate_empty_array(slen);
+	ret = int_allocate_empty_array(slen);
 	for (j = 0; j < slen; j++) {
 	    ret->item[j].type = T_STRING;
 	    ret->item[j].subtype = STRING_MALLOC;
@@ -220,7 +280,7 @@ array_t *explode_string P4(char *, str, int, slen, char *, del, int, len)
 	if (num > max_array_size) {
 	    num = max_array_size;
 	}
-	ret = allocate_empty_array(num);
+	ret = int_allocate_empty_array(num);
 	for (p = str, beg = str, num = 0; *p && (num < limit);) {
 	    if (*p == delimeter) {
 		DEBUG_CHECK(num >= ret->size, "Index out of bounds in explode!\n");
@@ -288,14 +348,14 @@ array_t *explode_string P4(char *, str, int, slen, char *, del, int, len)
 #ifdef REVERSIBLE_EXPLODE_STRING
     num++;
 #else
-    if ((slen <= len) || (lastdel != (str + slen - len))) {
+    if (lastdel != (str + slen - len)) {
 	num++;
     }
 #endif
     if (num > max_array_size) {
 	num = max_array_size;
     }
-    ret = allocate_empty_array(num);
+    ret = int_allocate_empty_array(num);
     limit = max_array_size - 1;	/* extra element can be added after loop */
     for (p = str, beg = str, num = 0; *p && (num < limit);) {
 	if (strncmp(p, del, len) == 0) {
@@ -336,11 +396,10 @@ char *implode_string P3(array_t *, arr, char *, del, int, del_len)
 {
     int size, i, num;
     char *p, *q;
-    svalue_t *sv = arr->item;
 
     for (i = arr->size, size = 0, num = 0; i--;) {
-	if (sv[i].type == T_STRING) {
-	    size += SVALUE_STRLEN(&sv[i]);
+	if (arr->item[i].type == T_STRING) {
+	    size += SVALUE_STRLEN(&arr->item[i]);
 	    num++;
 	}
     }
@@ -350,13 +409,13 @@ char *implode_string P3(array_t *, arr, char *, del, int, del_len)
     p = new_string(size + (num - 1) * del_len, "implode_string: p");
     q = p;
     for (i = 0, num = 0; i < arr->size; i++) {
-	if (sv[i].type == T_STRING) {
+	if (arr->item[i].type == T_STRING) {
 	    if (num) {
 		strncpy(p, del, del_len);
 		p += del_len;
 	    }
-	    size = SVALUE_STRLEN(&sv[i]);
-	    strncpy(p, sv[i].u.string, size);
+	    size = SVALUE_STRLEN(&arr->item[i]);
+	    strncpy(p, arr->item[i].u.string, size);
 	    p += size;
 	    num++;
 	}
@@ -407,25 +466,30 @@ array_t *users()
 {
     register object_t *ob;
     int i, j;
-    int display_hidden = 0;
     array_t *ret;
+#ifdef F_SET_HIDE
+    int display_hidden = 0;
 
-    if (num_hidden > 0) {
+    if (num_hidden_users > 0) {
 	if (current_object->flags & O_HIDDEN) {
 	    display_hidden = 1;
 	} else {
 	    display_hidden = valid_hide(current_object);
 	}
     }
-    ret = allocate_empty_array(num_user - (display_hidden ? 0 : num_hidden));
+    ret = allocate_empty_array(num_user - (display_hidden ? 0 : num_hidden_users));
+#else
+    ret = allocate_empty_array(num_user);
+#endif
     for (i = j = 0; i < max_users; i++) {
 	if (!all_users[i]) {
 	    continue;
 	}
 	ob = all_users[i]->ob;
-	if (!display_hidden && (ob->flags & O_HIDDEN)) {
+#ifdef F_SET_HIDE
+	if (!display_hidden && (ob->flags & O_HIDDEN))
 	    continue;
-	}
+#endif
 	ret->item[j].type = T_OBJECT;
 	ret->item[j].u.ob = ob;
 	add_ref(ob, "users");
@@ -452,13 +516,7 @@ array_t *slice_array P3(array_t *, p, int, from, int, to)
 	return &the_null_array;
     }
 
-    if (!(--p->ref)){
-#ifdef PACKAGE_MUDLIB_STATS
-	add_array_size(&p->stats, -((int)p->size));
-#endif
-#ifdef ARRAY_STATS
-	total_array_size += (to - from + 1 - p->size) * sizeof(svalue_t);
-#endif
+    if (!(--p->ref)) {
 	if (from) {
 	    sv1 = p->item + from;
 	    cnt = from;
@@ -472,20 +530,13 @@ array_t *slice_array P3(array_t *, p, int, from, int, to)
 	}
 	cnt = (p->size - 1) - to;
 	while (cnt--) free_svalue(sv2++, "slice_array:3");
-	p = RESIZE_ARRAY(p, to-from+1);
-#ifdef PACKAGE_MUDLIB_STATS
-	if (current_object) {
-	    assign_stats(&p->stats, current_object);
-	    add_array_size(&p->stats, to - from + 1);
-	} else null_stats(&p->stats);
-#endif
-	p->size = to-from+1;
+	p = resize_array(p, to-from+1);
 	p->ref = 1;
 	return p;
     } else {
 	array_t *d;
 
-	d = allocate_empty_array(to - from + 1);
+	d = int_allocate_empty_array(to - from + 1);
 	sv1 = d->item - from;
 	sv2 = p->item;
 	for (cnt = from; cnt <= to; cnt++)
@@ -525,7 +576,7 @@ array_t *commands P1(object_t *, ob)
     sv = v->item;
     for (s = ob->sent; cnt-- && s && s->verb; s = s->next) {
 	sv->type = T_ARRAY;
-	(sv++)->u.arr = p = allocate_empty_array(4);
+	(sv++)->u.arr = p = int_allocate_empty_array(4);
 	p->item[0].type = T_STRING;
 	p->item[0].u.string = ref_string(s->verb);	/* the verb is shared */
 	p->item[0].subtype = STRING_SHARED;
@@ -647,8 +698,10 @@ int sameval P2(svalue_t *, arg1, svalue_t *, arg2)
 	return arg1->u.fp == arg2->u.fp;
     case T_REAL:
 	return arg1->u.real == arg2->u.real;
+#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
 	return arg1->u.buf == arg2->u.buf;
+#endif
     }
     return 0;
 }
@@ -717,7 +770,8 @@ void f_unique_array PROT((void)) {
     head = &unlist->head;
     g_u_list = unlist;
 
-    (++sp)->type = T_ERROR_HANDLER;
+    STACK_INC;
+    sp->type = T_ERROR_HANDLER;
     sp->u.error_handler = unique_array_error_handler;
     
     for (i = 0; i < size; i++) {
@@ -811,57 +865,24 @@ array_t *add_array P2(array_t *, p, array_t *, r)
 
     /* x += x */
     if ((p == r) && (p->ref == 2)) {
-	d = RESIZE_ARRAY(p, res);
-        if (!d)
-	    fatal("Out of memory.\n");
+	int osize = p->size;
+	
+        p->ref = 1;
+	d = resize_array(p, res);
+
         /* copy myself */
-	for (cnt = d->size; cnt--;)
+	for (cnt = osize; cnt--; )
 	    assign_svalue_no_free(&d->item[--res], &d->item[cnt]);
-#ifdef ARRAY_STATS
-        total_array_size += sizeof(svalue_t) * (d->size);
-#endif
-#ifdef PACKAGE_MUDLIB_STATS
-	/* mudlib_stats stuff */
-	if (current_object) {
-	    assign_stats(&d->stats, current_object);
-	    add_array_size(&d->stats, d->size);
-	} else {
-	    null_stats(&d->stats);
-	}
-#endif
-        d->ref = 1;
-        d->size <<= 1;
 	
         return d;
     }
     
     /* transfer svalues for ref 1 target array */
     if (p->ref == 1) {
-	/*
-	 * realloc(p) to try extending block; this will save an
-	 * allocate_array(), copying the svalues over, and free()'ing p
-	 */
-	d = RESIZE_ARRAY(p, res);
-	if (!d)
-	    fatal("Out of memory.\n");
-
-#ifdef ARRAY_STATS
-	total_array_size += sizeof(svalue_t) * (r->size);
-#endif
-	/* d->ref = 1;     d is p, and p's ref was already one -Beek */
-	d->size = res;
-
-#ifdef PACKAGE_MUDLIB_STATS
-	/* mudlib_stats stuff */
-	if (current_object) {
-	    assign_stats(&d->stats, current_object);
-	    add_array_size(&d->stats, r->size);
-	} else {
-	    null_stats(&d->stats);
-	}
-#endif
+	d = resize_array(p, res);
+	/* note that d->ref is already 1, which is right */
     } else {
-	d = allocate_empty_array(res);
+	d = int_allocate_empty_array(res);
 
 	for (cnt = p->size; cnt--;)
 	    assign_svalue_no_free(&d->item[cnt], &p->item[cnt]);
@@ -872,15 +893,7 @@ array_t *add_array P2(array_t *, p, array_t *, r)
     if (r->ref == 1) {
 	for (cnt = r->size; cnt--;)
 	    d->item[--res] = r->item[cnt];
-#ifdef PACKAGE_MUDLIB_STATS
-	add_array_size(&r->stats, -((int)r->size));
-#endif
-#ifdef ARRAY_STATS
-	num_arrays--;
-	total_array_size -= sizeof(array_t) +
-	    sizeof(svalue_t) * (r->size - 1);
-#endif
-	FREE((char *) r);
+	dealloc_empty_array(r);
     } else {
 	for (cnt = r->size; cnt--;)
 	    assign_svalue_no_free(&d->item[--res], &r->item[cnt]);
@@ -891,8 +904,7 @@ array_t *add_array P2(array_t *, p, array_t *, r)
 }
 
 #ifndef NO_ENVIRONMENT
-/* Returns an array of all objects contained in 'ob'
- */
+/* Returns an array of all objects contained in 'ob' */
 array_t *all_inventory P2(object_t *, ob, int, override)
 {
     array_t *d;
@@ -907,6 +919,7 @@ array_t *all_inventory P2(object_t *, ob, int, override)
     }
     cnt = 0;
     for (cur = ob->contains; cur; cur = cur->next_inv) {
+#ifdef F_SET_HIDE
 	if (cur->flags & O_HIDDEN) {
 	    if (display_hidden == -1) {
 		display_hidden = valid_hide(current_object);
@@ -914,21 +927,24 @@ array_t *all_inventory P2(object_t *, ob, int, override)
 	    if (display_hidden)
 		cnt++;
 	} else
+#endif
 	    cnt++;
     }
 
     if (!cnt)
 	return &the_null_array;
 
-    d = allocate_empty_array(cnt);
+    d = int_allocate_empty_array(cnt);
     cur = ob->contains;
 
     for (res = 0; res < cnt; res++) {
+#ifdef F_SET_HIDE
 	if ((cur->flags & O_HIDDEN) && !display_hidden) {
 	    cur = cur->next_inv;
 	    res--;
 	    continue;
 	}
+#endif
 	d->item[res].type = T_OBJECT;
 	d->item[res].u.ob = cur;
 	add_ref(cur, "all_inventory");
@@ -949,7 +965,7 @@ map_array P2(svalue_t *, arg, int, num_arg)
     array_t *r;
     int size;
     
-    if ((size = arr->size) < 1) r = &the_null_array;
+    if ((size = arr->size) == 0) r = &the_null_array;
     else {
 	function_to_call_t ftc;
 	int cnt;
@@ -957,10 +973,9 @@ map_array P2(svalue_t *, arg, int, num_arg)
 
 	process_efun_callback(1, &ftc, F_MAP);
 	    
-	r = allocate_array(size);
+	r = int_allocate_array(size);
 
-	(++sp)->type = T_ARRAY;
-	sp->u.arr = r;
+	push_refed_array(r);
 
 	for (cnt = 0; cnt < size; cnt++){
 	    push_svalue(arr->item + cnt);
@@ -972,8 +987,7 @@ map_array P2(svalue_t *, arg, int, num_arg)
     }
 
     pop_n_elems(num_arg);
-    (++sp)->type = T_ARRAY;
-    sp->u.arr = r;
+    push_refed_array(r);
 }
 
 void
@@ -1209,8 +1223,7 @@ f_sort_array PROT((void))
     }
     
     pop_n_elems(num_arg);
-    (++sp)->type = T_ARRAY;
-    sp->u.arr = tmp;
+    push_refed_array(tmp);
 }
 #endif
 
@@ -1238,6 +1251,7 @@ static int deep_inventory_count P1(object_t *, ob)
 
     /* step through object's inventory and count visible objects */
     for (cur = ob->contains; cur; cur = cur->next_inv) {
+#ifdef F_SET_HIDE
 	if (cur->flags & O_HIDDEN) {
 	    if (!valid_hide_flag)
 		valid_hide_flag = 1 +
@@ -1247,9 +1261,12 @@ static int deep_inventory_count P1(object_t *, ob)
 		cnt += deep_inventory_count(cur);
 	    }
 	} else {
+#endif
 	    cnt++;
 	    cnt += deep_inventory_count(cur);
+#ifdef F_SET_HIDE
 	}
+#endif
     }
 
     return cnt;
@@ -1261,6 +1278,7 @@ static void deep_inventory_collect P3(object_t *, ob, array_t *, inv, int *, i)
 
     /* step through object's inventory and look for visible objects */
     for (cur = ob->contains; cur; cur = cur->next_inv) {
+#ifdef F_SET_HIDE
 	if (cur->flags & O_HIDDEN) {
 	    if (valid_hide_flag & 2) {
 		inv->item[*i].type = T_OBJECT;
@@ -1271,13 +1289,16 @@ static void deep_inventory_collect P3(object_t *, ob, array_t *, inv, int *, i)
 		deep_inventory_collect(cur, inv, i);
 	    }
 	} else {
+#endif
 	    inv->item[*i].type = T_OBJECT;
 	    inv->item[*i].u.ob = cur;
 	    (*i)++;
 	    add_ref(cur, "deep_inventory_collect");
 
 	    deep_inventory_collect(cur, inv, i);
+#ifdef F_SET_HIDE
 	}
+#endif
     }
 }
 
@@ -1302,7 +1323,7 @@ array_t *deep_inventory P2(object_t *, ob, int, take_top)
     /*
      * allocate an array
      */
-    dinv = allocate_empty_array(i);
+    dinv = int_allocate_empty_array(i);
     if (take_top) {
 	dinv->item[0].type = T_OBJECT;
 	dinv->item[0].u.ob = ob;
@@ -1341,7 +1362,7 @@ INLINE_STATIC svalue_t *alist_sort P1(array_t *, inlist) {
 	for (j = 0; j < size; j++) {
 	    if (((tmp = (sv_ptr + j))->type == T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
 		free_object(tmp->u.ob, "alist_sort");
-		sv_tab[j] = *tmp = const0;
+		sv_tab[j] = *tmp = const0u;
 	    } else if ((tmp->type == T_STRING) && !(tmp->subtype == STRING_SHARED)) {
 		sv_tab[j].u.string = make_shared_string(tmp->u.string);
 		(tmp = sv_tab + j)->subtype = STRING_SHARED;
@@ -1365,7 +1386,7 @@ INLINE_STATIC svalue_t *alist_sort P1(array_t *, inlist) {
 	for (j = 0; j < size; j++){
 	    if (((tmp = (sv_tab + j))->type == T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
 		free_object(tmp->u.ob, "alist_sort");
-		*tmp = const0;
+		*tmp = const0u;
 	    } else if ((tmp->type == T_STRING) && !(tmp->subtype == STRING_SHARED)) {
 		str = make_shared_string(tmp->u.string);
 		free_string_svalue(tmp);
@@ -1437,7 +1458,7 @@ array_t *subtract_array P2(array_t *, minuend, array_t *, subtrahend) {
 
 	if ((source->type == T_OBJECT) && (source->u.ob->flags & O_DESTRUCTED)) {
 	    free_object(source->u.ob, "subtract_array");
-	    *source = const0;
+	    *source = const0u;
 	} else if ((source->type == T_STRING) && !(source->subtype == STRING_SHARED)) {
 	    svalue_t stmp = {T_STRING, STRING_SHARED};
 	    
@@ -1471,41 +1492,14 @@ array_t *subtract_array P2(array_t *, minuend, array_t *, subtrahend) {
     i = size;
     while (i--) free_svalue(svt + i, "subtract_array");
     FREE((char *) svt);
-    if (subtrahend->ref > 1) {
-	subtrahend->ref--;
-    } else {
-#ifdef PACKAGE_MUDLIB_STATS
-	add_array_size(&subtrahend->stats, -size);
-#endif
-#ifdef ARRAY_STATS
-	num_arrays--;
-	total_array_size -= sizeof(array_t) + sizeof(svalue_t) *
-	    (size - 1);
-#endif
-	FREE((char *) subtrahend);
-    }
+    free_empty_array(subtrahend);
     free_array(minuend);
     msize = dest - difference->item;
     if (!msize) {
 	FREE((char *)difference);
 	return &the_null_array;
     }
-    difference = RESIZE_ARRAY(difference, msize);
-    difference->size = msize;
-    difference->ref = 1;
-#ifdef ARRAY_STATS
-    total_array_size += sizeof(array_t) + sizeof(svalue_t[1]) * (msize - 1);
-    num_arrays++;
-#endif
-#ifdef PACKAGE_MUDLIB_STATS
-    if (current_object) {
-	assign_stats(&difference->stats, current_object);
-	add_array_size(&difference->stats, msize);
-    } else {
-	null_stats(&difference->stats);
-    }
-#endif
-    return difference;
+    return fix_array(difference, msize);
 }
 
 array_t *intersect_array P2(array_t *, a1, array_t *, a2) {
@@ -1527,7 +1521,7 @@ array_t *intersect_array P2(array_t *, a1, array_t *, a2) {
 	for (j = 0; j < a2s; j++) {
 	    if (((tmp = (sv_ptr + j))->type == T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
 		free_object(tmp->u.ob, "intersect_array");
-		sv_tab[j] = *tmp = const0;
+		sv_tab[j] = *tmp = const0u;
 	    } else if ((tmp->type == T_STRING) && !(tmp->subtype == STRING_SHARED)) {
 		sv_tab[j].u.string = make_shared_string(tmp->u.string);
 		(tmp = sv_tab + j)->subtype = STRING_SHARED;
@@ -1553,7 +1547,7 @@ array_t *intersect_array P2(array_t *, a1, array_t *, a2) {
 	for (j = 0; j < a2s; j++) {
 	    if (((tmp = (sv_tab + j))->type == T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
 		free_object(tmp->u.ob, "alist_sort");
-		*tmp = const0;
+		*tmp = const0u;
 	    } else if ((tmp->type == T_STRING) && !(tmp->subtype == STRING_SHARED)) {
 		str = make_shared_string(tmp->u.string);
 		free_string_svalue(tmp);
@@ -1623,44 +1617,158 @@ array_t *intersect_array P2(array_t *, a1, array_t *, a2) {
     while (i--) free_svalue(svt_1 + i, "intersect_array");
     FREE((char *)svt_1);
 
-    if (a1->ref > 1) a1->ref--;
-    else {
-#ifdef PACKAGE_MUDLIB_STATS
-	add_array_size(&a1->stats, -a1s);
-#endif
-#ifdef ARRAY_STATS
-	num_arrays--;
-	total_array_size -= sizeof(array_t) + sizeof(svalue_t) * (a1s - 1);
-#endif
-	FREE((char *) a1);
-    }
+    free_empty_array(a1);
     
     if (flag) {
 	a2->ref--;
 	FREE((char *) sv_tab);
-    } else {
-#ifdef PACKAGE_MUDLIB_STATS
-	add_array_size(&a2->stats, -a2s);
-#endif
-#ifdef ARRAY_STATS
-	num_arrays--;
-	total_array_size -= sizeof(array_t) + sizeof(svalue_t) * (a2s - 1);
-#endif
-	FREE((char *) a2);
+    } else
+	dealloc_empty_array(a2);
+
+    return fix_array(a3, l);
+}
+
+array_t *union_array P2(array_t *, a1, array_t *, a2) {
+    int a1s = a1->size, a2s = a2->size;
+    int d, l, j, i, cnt, flag;
+    array_t *a3; /* destination */
+    svalue_t *svt_1, *ntab, *sv_tab, *tmp, *sv_ptr, val;
+    int curix, parix, child1, child2;
+    
+    if (a1s == 0) {
+	a1->ref--;
+	return a2->ref > 1 ? (a2->ref--, copy_array(a2)) : a2;
     }
-    a3 = RESIZE_ARRAY(a3, l);
+    
+    if (a2s == 0 || a1 == a2) {
+	a2->ref--;
+	return a1->ref > 1 ? (a1->ref--, copy_array(a1)) : a1;
+    }
+    /* allocating a new place, a1s + a2s must be enough */
+    d = a1s + a2s;
+    if (d < 0 || d > max_array_size)
+	error("result of array union could be greater than maximum array size.\n");
+    a3 = int_allocate_empty_array(d);
+    tmp = a1->item;
+    ntab = a3->item;
+    l = cnt = a1s;
+    while (cnt--)
+	assign_svalue_no_free(ntab + cnt, tmp + cnt);
+    
+    svt_1 = alist_sort(a1);
+    if ((flag = (a2->ref > 1))) {
+	sv_tab = CALLOCATE(a2s, svalue_t, TAG_TEMPORARY, "union_array: sv2_tab");
+	sv_ptr = a2->item;
+	for (j = 0; j < a2s; j++) {
+	    if (((tmp = (sv_ptr + j))->type == T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
+		free_object(tmp->u.ob, "union_array");
+		sv_tab[j] = *tmp = const0u;
+	    }
+	    else if ((tmp->type == T_STRING) && !(tmp->subtype == STRING_SHARED)) {
+		sv_tab[j].u.string = make_shared_string(tmp->u.string);
+		(tmp = sv_tab + j)->subtype = STRING_SHARED;
+		tmp->type = T_STRING;
+	    }
+	    else assign_svalue_no_free(sv_tab + j, tmp);
+	    
+	    if ((curix = j)) {
+		val = *tmp;
+		
+		do {
+		    parix = (curix - 1) >> 1;
+		    if (alist_cmp(sv_tab + parix, sv_tab + curix) > 0) {
+			sv_tab[curix] = sv_tab[parix];
+			sv_tab[parix] = val;
+		    }
+		} while ((curix = parix));
+	    }
+	}
+    } else {
+	char *str;
+	
+	sv_tab = a2->item;
+	for (j = 0; j < a2s; j++) {
+	    if (((tmp = (sv_tab + j))->type == T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
+		free_object(tmp->u.ob, "union_array");
+		*tmp = const0u;
+	    }
+	    else if ((tmp->type == T_STRING) && !(tmp->subtype == STRING_SHARED)) {
+		str = make_shared_string(tmp->u.string);
+		free_string_svalue(tmp);
+		tmp->u.string = str;
+		tmp->subtype = STRING_SHARED;
+	    }
+	    
+	    if ((curix = j)) {
+		val = *tmp;
+		
+		do {
+		    parix = (curix - 1) >> 1;
+		    if (alist_cmp(sv_tab + parix, sv_tab + curix) > 0) {
+			sv_tab[curix] = sv_tab[parix];
+			sv_tab[parix] = val;
+		    }
+		} while ((curix = parix));
+	    }
+	}
+    }
+    
+    i = 0;
+    
+    for (j = 0; j < a2s; j++) {
+	val = sv_tab[0];
+	
+	while (i < a1s && (d = alist_cmp(&val, &svt_1[i])) > 0) {
+	    i++;
+	}
+	
+	if (d) {
+	    ntab[l++] = val;
+	} else {
+	    free_svalue(&val, "union_array");
+	}
+	
+	for (curix = 0;; ) {
+	    child1 = (curix << 1) + 1;
+	    child2 = child1 + 1;
+	    
+	    if (child2 < a2s && sv_tab[child2].type != T_INVALID &&
+		(sv_tab[child1].type == T_INVALID ||
+		 alist_cmp(sv_tab + child1, sv_tab + child2) > 0)) {
+		child1 = child2;
+	    }
+	    
+	    if (child1 < a2s && sv_tab[child1].type != T_INVALID) {
+		sv_tab[curix] = sv_tab[child1];
+		curix = child1;
+	    }
+	    else break;
+	}
+	
+	sv_tab[curix].type = T_INVALID;
+    }
+    
+    curix = a2s;
+    while (curix--) {
+	if (sv_tab[curix].type != T_INVALID)
+	    free_svalue(sv_tab + curix, "union_array:2");
+    }
+    
+    i = a1s;
+    while (i--) free_svalue(svt_1 + i, "union_array");
+    FREE((char *)svt_1);
+    
+    free_empty_array(a1);
+    
+    if (flag) {
+	a2->ref--;
+	FREE((char *)sv_tab);
+    } else {
+	dealloc_empty_array(a2);
+    }
+    a3 = resize_array(a3, l);
     a3->ref = 1;
-    a3->size = l;
-#ifdef PACKAGE_MUDLIB_STATS
-    if (current_object) {
-	assign_stats(&a3->stats, current_object);
-	add_array_size(&a3->stats, l);
-    } else null_stats(&a3->stats);
-#endif
-#ifdef ARRAY_STATS
-    total_array_size += sizeof(array_t) + (l-1) * sizeof(svalue_t);
-    num_arrays++;
-#endif
+
     return a3;
 }
 
@@ -1672,7 +1780,7 @@ int match_single_regexp P2(char *, str, char *, pattern) {
     reg = regcomp((unsigned char *)pattern, 0);
     if (!reg) error(regexp_error);
     ret = regexec(reg, str);
-    FREE((char *)reg);
+    FREE(reg);
     return ret;
 }
 
@@ -1789,177 +1897,126 @@ array_t *inherit_list P1(object_t *, ob)
     return ret;
 }
 
-array_t *
-       children P1(char *, str)
+typedef struct children_filter_s {
+    int len;
+    char buf[MAX_OBJECT_NAME_SIZE];
+} children_filter_t;
+
+static int children_filter P2(object_t *, ob, children_filter_t *, cf)
 {
-    int i, j;
-    int t_sz;
-    int sl, ol;
-    object_t *ob;
-    object_t **tmp_children;
+    int ol = strlen(ob->name);
+    return ((ol == cf->len || (ol > cf->len && ob->name[cf->len] == '#')) && !strncmp(cf->buf, ob->name, cf->len));
+}
+
+array_t *
+children P1(char *, str)
+{
+    int count;
+    children_filter_t cf;
+    object_t **list;
     array_t *ret;
-    int display_hidden;
-    char tmpbuf[MAX_OBJECT_NAME_SIZE];
 
-    display_hidden = -1;
-    if (!strip_name(str, tmpbuf, sizeof tmpbuf))
+    if (!strip_name(str, cf.buf, sizeof(cf.buf)))
 	return &the_null_array;
+    cf.len = strlen(cf.buf);
 
-    sl = strlen(tmpbuf);
+    get_objects(&list, &count, (get_objectsfn_t)children_filter, (void *)&cf);
 
-    if (!(tmp_children = (object_t **)
-	  DMALLOC(sizeof(object_t *) * (t_sz = 50),
-		  TAG_TEMPORARY, "children: tmp_children"))) 
-	return &the_null_array;	/* unable to malloc enough temp space */
+    if (count > max_array_size)
+	count = max_array_size;
+    ret = allocate_empty_array(count);
+    while (count--) {
+	ret->item[count].type = T_OBJECT;
+	ret->item[count].u.ob = list[count];
+	add_ref(list[count], "children");
+    }
 
-    for (i = 0, ob = obj_list; ob; ob = ob->next_all) {
-	ol = strlen(ob->name);
-	if (((ol == sl) || ((ol > sl) && (ob->name[sl] == '#')))
-	    && !strncmp(tmpbuf, ob->name, sl)) {
-	    if (ob->flags & O_HIDDEN) {
-		if (display_hidden == -1) {
-		    display_hidden = valid_hide(current_object);
-		}
-		if (!display_hidden)
-		    continue;
-	    }
-	    tmp_children[i] = ob;
-	    if ((++i == t_sz) && (!(tmp_children
-			= RESIZE(tmp_children, (t_sz += 50), object_t *,
-				 TAG_TEMPORARY, "children: tmp_children: realloc")))) {
-		/* unable to REALLOC more space 
-		 * (tmp_children is now NULL) */
-		return &the_null_array;
-	    }
-	}
-    }
-    if (i > max_array_size) {
-	i = max_array_size;
-    }
-    ret = allocate_empty_array(i);
-    for (j = 0; j < i; j++) {
-	ret->item[j].type = T_OBJECT;
-	ret->item[j].u.ob = tmp_children[j];
-	add_ref(tmp_children[j], "children");
-    }
-    FREE((void *) tmp_children);
+    pop_stack();
     return ret;
 }
 
 #ifdef F_LIVINGS
+static int livings_filter P2(object_t *, ob, void *, data)
+{
+    return (ob->flags & O_ENABLE_COMMANDS);
+}
+
 array_t *livings()
 {
-    int nob, apply_valid_hide, hide_is_valid = 0;
-    object_t *ob, **obtab;
-    array_t *vec;
+    int count;
+    object_t **list;
+    array_t *ret;
 
-    nob = 0;
-    apply_valid_hide = 1;
+    get_objects(&list, &count, livings_filter, 0);
 
-    obtab = CALLOCATE(max_array_size, object_t *, TAG_TEMPORARY, "livings");
-
-    for (ob = obj_list; ob != NULL; ob = ob->next_all) {
-	if ((ob->flags & O_ENABLE_COMMANDS) == 0)
-	    continue;
-	if (ob->flags & O_HIDDEN) {
-	    if (apply_valid_hide) {
-		apply_valid_hide = 0;
-		hide_is_valid = valid_hide(current_object);
-	    }
-	    if (!hide_is_valid)
-		continue;
-	}
-	if (nob == max_array_size)
-	    break;
-	obtab[nob++] = ob;
+    if (count > max_array_size)
+	count = max_array_size;
+    ret = allocate_empty_array(count);
+    while (count--) {
+	ret->item[count].type = T_OBJECT;
+	ret->item[count].u.ob = list[count];
+	add_ref(list[count], "livings");
     }
 
-    vec = allocate_empty_array(nob);
-    while (--nob >= 0) {
-	vec->item[nob].type = T_OBJECT;
-	vec->item[nob].u.ob = obtab[nob];
-	add_ref(obtab[nob], "livings");
-    }
-
-    FREE(obtab);
-
-    return vec;
+    pop_stack();
+    return ret;
 }
 #endif
 
 #ifdef F_OBJECTS
 void f_objects PROT((void))
 {
+    int count, i;
     char *func;
-    object_t *ob, **tmp;
+    object_t **list;
     array_t *ret;
     funptr_t *f = 0;
-    int display_hidden = 0, t_sz, i,j, num_arg = st_num_arg;
-    svalue_t *v;
+
+    int num_arg = st_num_arg;
 
     if (!num_arg) func = 0;
     else if (sp->type == T_FUNCTION) f = sp->u.fp;
     else func = sp->u.string;
-	
-    if (!(tmp = (object_t **)new_string( (t_sz = 1000)*sizeof(object_t *),
-					"TMP: objects: tmp")))
-	fatal("Out of memory!\n");
 
-    push_malloced_string((char *)tmp);
+    get_objects(&list, &count, 0, 0);
+    if (f || func) {
+	/* NOTE: If an object's hidden status changes during a callback, that
+	 * change will NOT be reflected in the returned array.  If the caller
+	 * is destructed in a callback or the callback function does not exist,
+	 * abort and return the_null_array.
+	 */
+	for (i = 0;  i < count;  i++) {
+	    svalue_t *v;
 
-    for (i = 0, ob = obj_list; ob; ob = ob->next_all) {
-	if (ob->flags & O_HIDDEN) {
-	    if (!display_hidden)
-		display_hidden = 1 + !!valid_hide(current_object);
-	    if (!(display_hidden & 2))
-		continue;
-	}
-	if (f) {
-	    push_object(ob);
-	    v = call_function_pointer(f, 1);
-	    if (!v){
-		FREE_MSTR((char *)tmp);
-		sp--;
-		free_svalue(sp,"f_objects");
-		*sp = const0;
+	    push_object(list[i]);
+	    if (f) v = call_function_pointer(f, 1);
+	    else v = apply(func, current_object, 1, ORIGIN_EFUN);
+	    if (!v || (current_object->flags & O_DESTRUCTED)) {
+		pop_n_elems(num_arg + 1);
+		push_refed_array(&the_null_array);
 		return;
 	    }
-	    if (v->type == T_NUMBER && !v->u.number) continue;
-	} else if (func){
-	    push_object(ob);
-	    v = apply(func, current_object, 1, ORIGIN_EFUN);
-            if (!v){
-                FREE_MSTR((char *)tmp);
-                sp--;
-                free_svalue(sp,"f_objects");
-                *sp = const0;
-                return;
-	    }
-            if ((v->type == T_NUMBER) && !v->u.number) continue;
+	    if (v->type == T_NUMBER && !v->u.number)
+		list[i] = 0;
 	}
 
-	tmp[i] = ob;
-	if (++i == t_sz) {
-	    if (!(tmp = (object_t **)extend_string((char *)tmp, (t_sz += 1000)*sizeof(object_t *))))
-		fatal("Out of memory!\n");
-	    else
-		sp->u.string = (char *) tmp;
+	for (i = 0;  i < count;  i++) {
+	    if (!list[i] || (list[i]->flags & O_DESTRUCTED))
+		list[i--] = list[--count];
 	}
     }
-    if (i > max_array_size)
-	i = max_array_size;
-    ret = allocate_empty_array(i);
-    for (j = 0; j < i; j++) {
-	ret->item[j].type = T_OBJECT;
-	ret->item[j].u.ob = tmp[j];
-	add_ref(tmp[j], "objects");
+
+    if (count > max_array_size)
+	count = max_array_size;
+    ret = allocate_empty_array(count);
+    for (i = 0;  i < count;  i++) {
+	ret->item[i].type = T_OBJECT;
+	ret->item[i].u.ob = list[i];
+	add_ref(list[i], "f_objects");
     }
 
-    FREE_MSTR((char *)tmp);
-    sp--;
-    pop_n_elems(num_arg);
-    (++sp)->type = T_ARRAY;
-    sp->u.arr = ret;
+    pop_n_elems(num_arg + 1); /* include our temporary 'string' */
+    push_refed_array(ret);
 }
 #endif
 
@@ -1989,7 +2046,7 @@ array_t *reg_assoc P4(char *, str, array_t *, pat, array_t *, tok, svalue_t *, d
 	    error("Non-string found in pattern array.\n");
     }
     
-    ret = allocate_empty_array(2);
+    ret = int_allocate_empty_array(2);
     
     if (size) {
 	struct regexp **rgpp;
@@ -2115,7 +2172,7 @@ array_t *reg_assoc P4(char *, str, array_t *, pat, array_t *, tok, svalue_t *, d
 	svalue_t *sv;
 	
 	(sv = ret->item)->type = T_ARRAY;
-	temp = (sv->u.arr = allocate_empty_array(1))->item;
+	temp = (sv->u.arr = int_allocate_empty_array(1))->item;
 	temp->subtype = STRING_MALLOC;
 	temp->type = T_STRING;
 	temp->u.string = string_copy(str, "reg_assoc");

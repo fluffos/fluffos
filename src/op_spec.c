@@ -41,8 +41,11 @@ operator inc, dec, pre_inc, post_inc, pre_dec, post_dec;
 
 operator transfer_local;
 
+operator make_ref, kill_refs;
+
 /* lvalue eops must be the original eop + 1 */
 operator local, local_lvalue;
+operator ref, ref_lvalue;
 operator global, global_lvalue;
 operator member, member_lvalue;
 operator index, index_lvalue;

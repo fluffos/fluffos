@@ -99,11 +99,6 @@ figure out why i was getting all these weird bugs.. then I discovered it and
 
 -----
 
-The error for new(class undefined_class name, ...) could be better.
-Currently it's a parse error.
-
------
-
 This gives the wrong error message:
 
 unlock the door with the key
@@ -298,7 +293,7 @@ Range/switch search should be binary, not linear. (in LPC->C)
 -----
 
 Probably need a test to see if bison's output actually compiles in
-./build.Mudos;  on alot of AIX systems bison's use of alloca() fails.
+./build.Mudos;  on a lot of AIX systems bison's use of alloca() fails.
 
 -Beek
 

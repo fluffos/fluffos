@@ -98,15 +98,15 @@ dump_prog P3(program_t *, prog, char *, fn, int, flags)
 	int flags;
 
 	flags = prog->function_flags[i];
-	sflags[0] = (flags & NAME_INHERITED) ? 'i' : '-';
-	sflags[1] = (flags & NAME_UNDEFINED) ? 'u' : '-';
-	sflags[2] = (flags & NAME_STRICT_TYPES) ? 's' : '-';
-	sflags[3] = (flags & NAME_PROTOTYPE) ? 'p' : '-';
-	sflags[4] = (flags & NAME_DEF_BY_INHERIT) ? 'd' : '-';
-	sflags[5] = (flags & NAME_ALIAS) ? 'a' : '-';
-	sflags[6] = (flags & NAME_TRUE_VARARGS) ? 'v' : '-';
+	sflags[0] = (flags & FUNC_INHERITED) ? 'i' : '-';
+	sflags[1] = (flags & FUNC_UNDEFINED) ? 'u' : '-';
+	sflags[2] = (flags & FUNC_STRICT_TYPES) ? 's' : '-';
+	sflags[3] = (flags & FUNC_PROTOTYPE) ? 'p' : '-';
+	sflags[4] = (flags & FUNC_DEF_BY_INHERIT) ? 'd' : '-';
+	sflags[5] = (flags & FUNC_ALIAS) ? 'a' : '-';
+	sflags[6] = (flags & FUNC_TRUE_VARARGS) ? 'v' : '-';
 	sflags[7] = '\0';
-	if (flags & NAME_INHERITED) {
+	if (flags & FUNC_INHERITED) {
 	    runtime_function_u *func_entry = FIND_FUNC_ENTRY(prog, i);
 	    fprintf(f, "%4d: %-20s  %5d  %7s %5d\n",
 		    i, function_name(prog, i),
@@ -213,7 +213,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	offsets = (short *) malloc(NUM_FUNS_D * 2 * sizeof(short));
 	for (i = 0; i < (int) NUM_FUNS_D; i++) {
 	    if (prog->function_flags[prog->function_table[i].runtime_index]
-		& (NAME_INHERITED | NAME_NO_CODE))
+		& (FUNC_INHERITED | FUNC_NO_CODE))
 		offsets[i * 2] = end + 1;
 	    else
 		offsets[i * 2] = prog->function_table[i].address;
@@ -291,15 +291,25 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 
 	case F_FOREACH:
 	    {
-		char tmp[32];
 		int flags = EXTRACT_UCHAR(pc++);
+		char *left = "local", *right = "local";
 
-		sprintf(buff, "(%s) %s %i", (flags & 4) ? "mapping" : "array",
-			(flags & 1) ? "global" : "local", EXTRACT_UCHAR(pc++));
-		if (flags & 4) {
-		    sprintf(tmp, ", %s %i", (flags & 2) ? "global" : "local",
-			    EXTRACT_UCHAR(pc++));
-		    strcat(buff, tmp);
+		if (flags & FOREACH_LEFT_GLOBAL)
+		    left = "global";
+		if (flags & FOREACH_RIGHT_GLOBAL)
+		    right = "global";
+		if (flags & FOREACH_REF) {
+		    if (flags & FOREACH_MAPPING)
+			right = "ref";
+		    else
+			left = "ref";
+		}
+
+		if (flags & FOREACH_MAPPING) {
+		    sprintf(buff, "(mapping) %s %i, %s %i", 
+			    left, EXTRACT_UCHAR(pc++), right, EXTRACT_UCHAR(pc++));
+		} else {
+		    sprintf(buff, "(array) %s %i", left, EXTRACT_UCHAR(pc++));
 		}
 		break;
 	    }
@@ -333,6 +343,8 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	    pc += 2;
 	    break;
 
+	case F_MAKE_REF:
+	case F_KILL_REFS:
 	case F_MEMBER:
 	case F_MEMBER_LVALUE:
 	    sprintf(buff, "%d", (int)EXTRACT_UCHAR(pc++));
@@ -406,6 +418,8 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	case F_LOCAL:
 	case F_LOCAL_LVALUE:
 	case F_VOID_ASSIGN_LOCAL:
+	case F_REF:
+	case F_REF_LVALUE:
 	    sprintf(buff, "LV%d", EXTRACT_UCHAR(pc));
 	    pc++;
 	    break;
@@ -579,7 +593,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	    instr = EXTRACT_UCHAR(pc++) + ONEARG_MAX;
 	    break;
 	}
-	fprintf(f, "%s %s\n", get_f_name(instr), buff);
+	fprintf(f, "%s %s\n", query_instr_name(instr), buff);
     }
 
     if (offsets)

@@ -10,7 +10,6 @@
 #include "std.h"
 #include "lpc_incl.h"
 #include "file_incl.h"
-#include "debug.h"
 #include "lint.h"
 #include "include/localtime.h"
 #include "port.h"

@@ -1,5 +1,8 @@
 #ifndef RC_H
 #define RC_H
+
+#include "lpc_incl.h"
+
 /*
  * rc.c
  */

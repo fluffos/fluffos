@@ -4,16 +4,16 @@
  */
 
 #include "std.h"
-#include "lpc_incl.h"
+#include "file.h"
 #include "file_incl.h"
 #include "comm.h"
 #include "strstr.h"
-#include "file.h"
 #include "lex.h"
 #include "md.h"
 #include "port.h"
+#include "master.h"
 
-/* Removed due to hideousness: if you want to add it back, not that
+/* Removed due to hideousness: if you want to add it back, note that
  * we don't want redefinitions, and that some systems define major() in
  * one place, some in both, etc ...
  */
@@ -31,13 +31,6 @@
 #  endif
 #  include <sys/sysmacros.h>
 #endif
-#endif
-
-/* see binaries.c.  We don't want no $@$(*)@# system dependent mess of
-   includes */
-#ifdef WIN32
-#include <direct.h>
-#include <io.h>
 #endif
 
 extern int sys_nerr;
@@ -319,43 +312,6 @@ array_t *get_dir P2(char *, path, int, flags)
     return v;
 }
 
-int tail P1(char *, path)
-{
-    char buff[1000];
-    FILE *f;
-    struct stat st;
-    int offset;
-
-    path = check_valid_path(path, current_object, "tail", 0);
-
-    if (path == 0)
-	return 0;
-#ifdef LATTICE
-    if (stat(path, &st) == -1)
-	return 0;
-#endif
-    f = fopen(path, "r");
-    if (f == 0)
-	return 0;
-#ifndef LATTICE
-    if (fstat(fileno(f), &st) == -1)
-	fatal("Could not stat an open file.\n");
-#endif
-    offset = st.st_size - 54 * 20;
-    if (offset < 0)
-	offset = 0;
-    if (fseek(f, offset, 0) == -1)
-	fatal("Could not seek.\n");
-    /* Throw away the first incomplete line. */
-    if (offset > 0)
-	(void) fgets(buff, sizeof buff, f);
-    while (fgets(buff, sizeof buff, f)) {
-	tell_object(command_giver, buff);
-    }
-    fclose(f);
-    return 1;
-}
-
 int remove_file P1(char *, path)
 {
     path = check_valid_path(path, current_object, "remove_file", 1);
@@ -430,9 +386,9 @@ void smart_log P4(char *, error_file, int, line, char *, what, int, flag)
 		((pragmas & PRAGMA_ERROR_CONTEXT) ? 100 : 40), TAG_TEMPORARY, "smart_log: 1");
 
     if (flag)
-	sprintf(buff, "%s line %d: Warning: %s", error_file, line, what);
+	sprintf(buff, "/%s line %d: Warning: %s", error_file, line, what);
     else
-	sprintf(buff, "%s line %d: %s", error_file, line, what);
+	sprintf(buff, "/%s line %d: %s", error_file, line, what);
 
     if (pragmas & PRAGMA_ERROR_CONTEXT){
         char *ls = strrchr(buff, '\n');
@@ -445,14 +401,7 @@ void smart_log P4(char *, error_file, int, line, char *, what, int, flag)
 	strcat(buff, show_error_context());
     } else strcat(buff, "\n");
 
-    if (flag) 
-	sprintf(buff, "%s line %d: Warning: %s%s", error_file, line, what,
-		(pragmas & PRAGMA_ERROR_CONTEXT) ? show_error_context() : "\n");
-    else
-	sprintf(buff, "%s line %d: %s%s", error_file, line, what,
-		(pragmas & PRAGMA_ERROR_CONTEXT) ? show_error_context() : "\n");
-    
-    share_and_push_string(error_file);
+    push_malloced_string(add_slash(error_file));
     copy_and_push_string(buff);
     mret = safe_apply_master_ob(APPLY_LOG_ERROR, 2);
     if (!mret || mret == (svalue_t *)-1) {
@@ -490,23 +439,22 @@ int write_file P3(char *, file, char *, str, int, flags)
     fwrite(str, strlen(str), 1, f);
     fclose(f);
     return 1;
-}				/* write_file() */
+}
 
-char *read_file P3(char *, file, int, start, int, len)
-{
+char *read_file P3(char *, file, int, start, int, len) {
     struct stat st;
     FILE *f;
-    char *str, *end;
-    register char *p, *p2;
-    int size;
-
+    int lastchunk, chunk, ssize, fsize;
+    char *str, *p, *p2;
+    
     if (len < 0)
 	return 0;
+    
     file = check_valid_path(file, current_object, "read_file", 0);
-
+    
     if (!file)
 	return 0;
-
+    
     /*
      * file doesn't exist, or is really a directory
      */
@@ -516,180 +464,99 @@ char *read_file P3(char *, file, int, start, int, len)
     f = fopen(file, FOPEN_READ);
     if (f == 0)
 	return 0;
-
+    
 #ifndef LATTICE
     if (fstat(fileno(f), &st) == -1)
 	fatal("Could not stat an open file.\n");
 #endif
 
-    size = st.st_size;
-    if (size > READ_FILE_MAX_SIZE) {
-	if (start || len)
-	    size = READ_FILE_MAX_SIZE;
-	else {
-	    fclose(f);
-	    return 0;
-	}
-    }
-    if (start < 1)
-	start = 1;
-    if (!len)
-	len = READ_FILE_MAX_SIZE;
-    str = new_string(size, "read_file: str");
-    str[size] = '\0';
-    if (!size) {
-	/* zero length file */
+    /* lastchunk = the size of the last chunk we read
+     * chunk = size of the next chunk we will read (always < fsize)
+     * fsize = amount left in file
+     */
+    lastchunk = chunk = ssize = fsize = st.st_size;
+    if (fsize > READ_FILE_MAX_SIZE)
+	lastchunk = chunk = ssize = READ_FILE_MAX_SIZE;
+
+    /* Can't shortcut out if size > max even if start and len aren't
+       specified, since we still need to check for \0, and \r's may pull the
+       size into range */
+
+    if (start < 1) start = 1; 
+    if (len == 0) len = READ_FILE_MAX_SIZE; 
+    
+    str = new_string(ssize, "read_file: str"); 
+    if (fsize == 0) { 
+        /* zero length file */ 
+	str[0] = 0; 
 	fclose(f);
 	return str;
     }
-    
-#ifndef WIN32
+
     do {
-	if ((fread(str, size, 1, f) != 1) || !size) {
-	    fclose(f);
-	    FREE_MSTR(str);
-	    return 0;
-	}
-
-	if (size > st.st_size) {
-	    size = st.st_size;
-	}		
-
-	st.st_size -= size;
-	end = str + size;
-	for (p = str; --start && (p2 = (char *) memchr(p, '\n', end - p));) {
-	    p = p2 + 1;
-	}
-    } while (start > 1);
+	/* read another chunk */
+	if (fsize == 0 || fread(str, chunk, 1, f) != 1)
+	    goto free_str;
+	p = str;
+	lastchunk = chunk;
+	fsize -= chunk;
+	if (chunk > fsize) chunk = fsize;
     
-    if (len != READ_FILE_MAX_SIZE || st.st_size) {
-        for (p2 = str; p != end;) {
-	    char c;
-	    
-	    c = *p++;
+	while (start > 1) {
+	    /* skip newlines */
+	    p2 = memchr(p, '\n', str + lastchunk - p);
+	    if (p2) {
+		p = p2 + 1;
+		start--;
+	    } else
+		break; /* get another chunk */
+	}
+    } while (start > 1); /* until we've skipped enough */
+
+    p2 = str;
+    while (1) {
+	char c;
+
+	if (p == str + lastchunk) {
+	    /* need another chunk */
+	    if (chunk > ssize - (p2 - str))
+		chunk = ssize - (p2 - str); /* space remaining */
+	    if (fsize == 0) break; /* nothing left */
+	    if (chunk == 0 || fread(p2, chunk, 1, f) != 1)
+		goto free_str;
+	    p = p2;
+	    lastchunk = chunk + (p2 - str); /* fudge since we didn't
+					       start at str */
+	    fsize -= chunk;
+	    if (chunk > fsize) chunk = fsize;
+	}
+
+	c = *p++;
+	if (c == '\0') {
+	    FREE_MSTR(str);
+	    fclose(f);
+	    error("Attempted to read '\\0' into string!\n");	
+	}
+	if (c != '\r' || *p != '\n') {
 	    *p2++ = c;
-	    if (c == '\n') {
-	        if (!--len)
-		    break;
-	    } else if (c == '\0') {
-		fclose(f);
-		FREE_MSTR(str);
-		error("Attempted to read '\\0' into a string!\n");
-	    }
+	    if (c == '\n' && --len == 0)
+		break; /* done */
 	}
-	if (len && st.st_size) {
-	    size -= (p2 - str);
-	    
-	    if (size > st.st_size)
-		size = st.st_size;
+    }
 
-	    if ((fread(p2, size, 1, f) != 1) || !size) {
-		fclose(f);
-		FREE_MSTR(str);
-		return 0;
-	    }
-	    st.st_size -= size;
-	    /* end is same */
-	    for (; p2 != end;) {
-		if (*p2 == '\0') {
-		    fclose(f);
-		    FREE_MSTR(str);
-		    error("Attempted to read '\\0' into a string!\n");
-		}
-		if (*p2++ == '\n')
-		    if (!--len)
-			break;
-	    }
-
-	    if (st.st_size && len) {
-		/* tried to read more than READ_MAX_FILE_SIZE */
-		fclose(f);
-		FREE_MSTR(str);
-		return 0;
-	    }
-	}
-	*p2 = '\0';
-	str = extend_string(str, p2 - str);
-    } 
-#else
-    /* WIN32 defined */
-    do {
-	if ((fread(str, size, 1, f) != 1) || !size) {
-	    fclose(f);
-	    FREE_MSTR(str);
-	    return 0;
-	}
-
-	if (size > st.st_size) {
-	    size = st.st_size;
-	}		
-	st.st_size -= size;	/* It's OK, size is actual FILE size */
-	end = str + size;    /* OK */
-	for (p = str; --start && (p2 = (char *) memchr(p, '\n', end - p));) {
-	    p = p2 + 1;
-	}
-    } while (start > 1);
-
-    /* Now we have 'p' at desired position. From now on we have to translate \r\n to single \n */
-    
-    {
-	char *startline=p;
-	
-	if (len != READ_FILE_MAX_SIZE || st.st_size){
-	    for (p2 = str; p != end;) {
-		if ((*p == '\r') || (*p == 0x1a)) {
-		    p++;	/* \r will be skipped */
-		} else if ((*p2++ = *p++) == '\n') {
-		    if (!--len) break;
-		}
-	    }
-	    if (len && st.st_size) {
-		/* the next line is wrong; I have to compute this value according to 'p' (to count \r) */
-		/*	   	size -= (p2 - str); */
-		size -= (p-startline);
-		if (size > st.st_size)	size = st.st_size;
-		
-		if ((fread(p2, size, 1, f) != 1) || !size) {
-		    fclose(f);
-		    FREE_MSTR(str);
-		    return 0;
- 	    	}
-	    	st.st_size -= size;
-
-	    	end = p2 + size;
-
-	    	for (p=p2; p != end;) {
-		    if ((*p == '\r') || (*p == 0x1a)) {
-			p++;
-		    } else if ((*p2++ = *p++) == '\n') {
-			if (!--len) break;
-		    }
-	    	}
-	    	if (st.st_size && len) {
-		    /* tried to read more than READ_MAX_FILE_SIZE */
-		    fclose(f);
-		    FREE_MSTR(str);
-		    return 0;
-	    	}
-	    }
-	} else {
-	    /* I HAVE to translate \r\n ! */
-	    for (p2 = str; p != end;) {
-		if ((*p == '\r') || (*p == 0x1a)) {
-		    p++;	/* \r will be skipped */
-		} else if ((*p2++ = *p++) == '\n') {
-		    if (!--len) break;
-		}
-	    }
-	}
-	*p2 = '\0';
-	str = extend_string(str, p2 - str);
-    } 
-#endif
-
+    *p2 = 0;
+    str = extend_string(str, p2 - str); /* fix string length */
     fclose(f);
+    
     return str;
-}				/* read_file() */
+    
+    /* Error path: unwind allocated resources */
+
+  free_str:
+    FREE_MSTR(str);
+    fclose(f);
+    return 0;
+}
 
 char *read_bytes P4(char *, file, int, start, int, len, int *, rlen)
 {
@@ -722,6 +589,7 @@ char *read_bytes P4(char *, file, int, start, int, len, int *, rlen)
     if (len == 0)
 	len = size;
     if (len > MAX_BYTE_TRANSFER) {
+	fclose(fp);
 	error("Transfer exceeded maximum allowed number of bytes.\n");
 	return 0;
     }
@@ -732,9 +600,11 @@ char *read_bytes P4(char *, file, int, start, int, len, int *, rlen)
     if ((start + len) > size)
 	len = (size - start);
 
-    if ((size = fseek(fp, start, 0)) < 0)
+    if ((size = fseek(fp, start, 0)) < 0) {
+	fclose(fp);
 	return 0;
-
+    }
+    
     str = new_string(len, "read_bytes: str");
 
     size = fread(str, 1, len, fp);
@@ -826,7 +696,7 @@ int file_size P1(char *, file)
 	p = file;
 	file = new_string(len - 1, "file_size");
 	memcpy(file, p, len - 1);
-	file[len] = 0;
+	file[len-1] = 0;
     }
 #endif
 
@@ -860,7 +730,7 @@ char *check_valid_path P4(char *, path, object_t *, call_object, char *, call_fu
 
     if (call_object == 0 || call_object->flags & O_DESTRUCTED)
 	return 0;
-    /* FIXME: Ok? */
+
 #ifdef WIN32
     {
 	char *p;
@@ -942,27 +812,6 @@ static int match_string P2(char *, match, char *, str)
 	return 0;
     }
 }
-
-/*
- * Credits for some of the code below goes to Free Software Foundation
- * Copyright (C) 1990 Free Software Foundation, Inc.
- * See the GNU General Public License for more details.
- */
-#ifndef S_ISDIR
-#define	S_ISDIR(m)	(((m)&S_IFMT) == S_IFDIR)
-#endif
-
-#ifndef S_ISREG
-#define	S_ISREG(m)	(((m)&S_IFMT) == S_IFREG)
-#endif
-
-#ifndef S_ISCHR
-#define	S_ISCHR(m)	(((m)&S_IFMT) == S_IFCHR)
-#endif
-
-#ifndef S_ISBLK
-#define	S_ISBLK(m)	(((m)&S_IFMT) == S_IFBLK)
-#endif
 
 static struct stat to_stats, from_stats;
 
@@ -1128,14 +977,22 @@ void debug_perror P2(char *, what, char *, file) {
  * of the unix system call rename and the unix command mv.
  */
 
+static svalue_t from_sv = { T_NUMBER };
+static svalue_t to_sv = { T_NUMBER };
+
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_file_sv() {
+    mark_svalue(&from_sv);
+    mark_svalue(&to_sv);
+}
+#endif
+
 #ifdef F_RENAME
 int do_rename P3(char *, fr, char *, t, int, flag)
 {
     char *from, *to, tbuf[3];
     char newfrom[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
     int flen;
-    static svalue_t from_sv = { T_NUMBER };
-    static svalue_t to_sv = { T_NUMBER };
     extern svalue_t apply_ret_value;
 
     /*
@@ -1200,21 +1057,19 @@ int copy_file P2(char *, from, char *, to)
     int from_fd, to_fd;
     int num_read, num_written;
     char *write_ptr;
-    static svalue_t from_sv = { T_NUMBER };
-    static svalue_t to_sv = { T_NUMBER };
     extern svalue_t apply_ret_value;
 
     from = check_valid_path(from, current_object, "move_file", 0);
-
     assign_svalue(&from_sv, &apply_ret_value);
 
     to = check_valid_path(to, current_object, "move_file", 1);
+    assign_svalue(&to_sv, &apply_ret_value);
+
     if (from == 0)
 	return -1;
     if (to == 0)
 	return -2;
 
-    assign_svalue(&to_sv, &apply_ret_value);
 
     from_fd = open(from, OPEN_READ);
     if (from_fd < 0)

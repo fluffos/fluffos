@@ -1,4 +1,357 @@
 ----------------------------------------------------------------------------
+(v22.1a17 promoted to v22.1b1)
+
+Wed Jan 29 19:15:44 EST 1997 (tim@wfn-shop.princeton.edu (Beek))
+	* raised patchlevel to v22.1a17
+	* updated with respect to v22b27
+	* fixed origin() to not return "call_out" for ORIGIN_INTERNAL
+	  [reported by Jihad]
+	* added Marius' patch to make the parsing package work with
+	  NO_ENVIRONMENT.  Requires the following new master applies:
+	  . parse_get_first_inventory(object ob)
+	    { must behave like first_inventory(ob) }
+	  . parse_get_next_inventory(object parent, object current)
+	    { must behave like next_inventory(current); 
+	      parent == environment(current) in case you need it }
+	  . parse_get_environment(object ob)
+	    { must behave like environment(ob) }
+	  [I'm not in love with this interface, but it will do for now]
+	* fixed a number of warnings
+
+Sat Jan 25 18:14:00 EST 1997 (tim@wfn-shop.princeton.edu (Beek))
+	* raised patchlevel to v22.1a16
+	* wrapped debug.c in #ifdef DEBUG_MACRO
+	* fixed crasher in file operations very early in the boot process
+	  (before the master object loads); evidentally some libs actually
+	  do this [both reported by Aragorn]
+
+Thu Jan  9 20:20:40 EST 1997 (tim@wfn-shop.princeton.edu (Beek))
+	* raised patchlevel to v22.1a15
+	* updated with respect to v22b26
+	* added Raistlin@IE's patches to make the Win32 build procedure much
+	  cleaner and not depend on so many GNU utilities; also did a wonderful
+	  job of cleaning up the OS specific Win32 code.  Fixes a number of
+	  bugs, as well.
+	  [ also, I can't test these, since I still don't have a Win32
+	    compiler, so I'd appreciate it if someone would let me know
+	    if I messed something up ]
+	* fixed crasher in explode("foofoo", "foo") with SANE_EXPLODE_STRING
+	  on and REVERSIBLE_EXPLODE_STRING off
+	* enhanced DEBUG_MACRO a bit; things are now in terms of identifiers
+	  instead of impossible to remember numbers.  To add a new one,
+	  add the define to debug.h and the entry near the top of debug.c
+	  Then do:
+	     debug(mylevel, (...))
+	  new efuns:
+	  . set_debug_level("mylevel")
+	  . clear_debug_level("mylevel")
+	  . debug_levels() [returns a mapping showing which messages are
+	                    enabled]
+	* A few changes to call_out:
+	  . 0 delay call_outs are legal
+	  . call_outs to the same time are in the order they are set up, not
+	    in reverse order
+	  . call_outs() from w/in call_outs() are relative to the time the
+	    call_out was scheduled to go off, not the actual time; this is
+	    because:
+	  . the current time is slowly advanced as call_outs are executed
+	    until the current time reaches the real time, instead of taking
+	    a huge leap forward (in the event that the MUD is busy enough
+	    that it is getting behind)
+
+Mon Dec 30 04:08:08 EST 1996 (tim@wfn-shop.princeton.edu (Beek))
+	* raised patchlevel to v22.1a14
+	* fixed compilation with UIDS enabled [reported by Leto]
+	* added support for:
+	  . allocate(int n, mixed v):
+	    allocates an array of n elements.  The i-th element is set to
+	    evaluate(v, i) [i is in the range 0..n-1]
+	  . allocate_mapping(array keys, mixed v):
+	    - if v is an array, the returned array has keys 'keys' and values
+	      'v' (like 3.2.x's mkmapping)
+	    - if it is a function, the the mapping has keys 'keys' and values
+	      evaluate(v, key)
+	    - otherwise, each key has the value 'v'
+
+Mon Dec  9 13:27:42 EST 1996 (tim@wfn-shop.princeton.edu (Beek))
+	* raised patchlevel to v22.1a13
+	* updated with respect to v22b25
+	* fixed a bug introduced recently which caused random() to always
+	  return zero when drand48() was being used [reported by Leto]
+	* changed restore_object() to ignore ^M's at the end of lines in
+	  save files
+	* added leading / to get_save_file_name() argument [reported by
+	  Leto]
+	* fixed ARCH define for Linux/alpha
+	* fixed some implicitly defined functions which cause warnings on
+	  the alpha
+	* fixed crasher/wild pointer write in code like:
+	  foreach (string s, ref r in m) { map_delete(m, s); r = 0; }
+
+Sun Dec  8 23:50:32 EST 1996 (tim@wfn-shop.princeton.edu (Beek))
+	* raised patchlevel to v22.1a12
+	* fixed a bug that would cause implicitly defined functions (ones
+	  with no prototype in scope allowed by strict types being off)
+	  to become invisible when inherited [reported and tracked by
+	  Aragorn; also reported to affect NM muds on alpha drivers]
+
+Fri Nov  8 12:03:53 EST 1996 (tim@wfn-shop.princeton.edu (Beek))
+	* raised patchlevel to v22.1a11
+	* updated with respect to v22b24
+	* changed function pointers whose owners are destructed to be
+	  ignored by call_out_list() and to not error when they fire.
+	  Changed so that "foo" and (: foo :) have the same/similar
+	  behavior.  This isn't strictly an equivalent case, since
+	  (theoretically) the function could be owned by a different
+	  object than the one that did the call_out(), but that is
+	  probably restricted to code doing call_out()s on behalf of
+	  other objects anyway, and the runtime error is more annoying
+	  than useful.  [Suggested by Mordred@RoD]
+	* to_int() now returns undefined if no valid characters were converted.
+	* leading slash added to in_edit() [reported by Mystic]
+	* call srand48() if using drand48() to make random numbers [fix
+	  from Turrican@DW]
+	* fixed compilation with NO_ADD_ACTION off or OLD_ED on, or
+	  NO_BUFFER_TYPE on
+	* fixed the order of .o files for RUNTIME_LOADING
+	* fixed switch() when two cases differ by more than 2^31
+	* better local_options error message
+
+Sat Nov  2 18:00:04 EST 1996 (tim@wfn-shop.princeton.edu (Beek))
+	* raised patchlevel to v22.1a10
+	* use -m486 for pentium too
+	* added /'s in non mudlib error_handler traces
+	* fixed compilation with SUPPRESS_ARGUMENT_WARNINGS off
+	* receive() can now take a buffer as its argument (useful for
+	  PORT_BINARY connections)
+	* fixed PROFILE_FUNCTIONS not to miss calls which miss the apply_low
+	  cache
+	* fixed the driver not to loop if more than one -D option is passed
+	  on the command line
+	* the debug.log file is no longer opened and closed every time it
+	  needs to be written to; it is held open instead
+	* made the DEBUGMALLOC hash a bit more efficient
+	* fixed a bug that caused terminal_colour() not to strip spaces of
+	  the starts of all lines, instead of just continuations of wrapped
+	  lines
+	* parser callbacks went back to being ORIGIN_DRIVER, since they
+	  are restricted to the 'can_', 'do_' and 'indirect_' namespaces
+	* various fixes to compilation with uids enabled
+	* add to the errors field of mudlib stats, even if a mudlib error
+	  handler exists
+	* added parser support for 'a', 'any', 'my'
+
+Tue Oct 29 20:41:26 EST 1996 (tim@wfn-shop.princeton.edu (Beek))
+	* raised patchlevel to v22.1a9
+	* updated with respect to v22b21
+	* fixed possible crashers in code like 'call_out(something, 1, ref x)'
+	* fixed wild pointer into stack in code like:
+	  mixed global;
+	  void foo(mixed args...) { global = args; }
+	  void create() { int x; foo(ref x); }
+	  void inc(int ref x) { x++; }
+	  void increment_random_location_on_stack() { inc(global...); }
+	* fixed the 'multiple access modifiers' warning not to consider
+	  nomask and nosave to be access modifiers
+	* disabled the multiple access modifier error message with
+	  SENSIBLE_MODIFIERS off
+	* fix for compiling with COMPRESS_FUNCTION_TABLES off from Mystic
+	* fixed compilation with FD6 code disabled
+	* fixed various crashers in the unused locals warnings
+	* various changes to func_spec.c so that built in efuns can be
+	  disabled or renamed (e.g. remove or rename clone_object(), etc)
+	  [idea from Mystic]
+	* added support for foreach (ref x in array), 
+	  foreach (x, ref y in mapping)
+	* better error message for indexing an illegal type using a range
+	* enabled the 'public' keyword with SENSIBLE_MODIFIERS on; it was
+	  accidentally disabled.  Also fixed the options.h entry to be
+	  clearer
+	* added a SUPPRESS_ARGUMENT_WARNINGS option, to cut down on the
+	  number of warnings generated by code which existed before
+	  omitting the argument name was legal
+	* fixed terminal_colour() to treat multiple spaces as one space
+	  when wrapping [reported by Jihad]
+	* fix for errors writing to flushing sockets
+
+Mon Oct 28 17:14:29 EST 1996 (tim@wfn-shop.princeton.edu (Beek))
+	* raised patchlevel to v22.1a8
+	* COMPAT_BUSTER: ORIGIN_CALL_OUT is now ORIGIN_INTERNAL; in addition
+	  most driver callbacks which do not use hard coded function names
+	  also use ORIGIN_INTERNAL (add_action, socket callbacks, etc).
+	  The practical fallout of this is that such routines may be static,
+	  but *not* private.
+	* Use fd #6 instead of fd #3, since Solaris uses fd #3 while
+	  starting the program [reported by Aragorn]
+	* fixed crasher in the parsing package generating the object list
+	  [fix from Aragorn]
+	* It is now legal to use a class member of something of type mixed,
+	  as long as it is unambigous (e.g. foo->x is ok as long as only
+	  one class in scope has a member named 'x', or if 'x' is in the
+	  same position in all classes in scope)
+	* Unused local variables now generate warnings
+	* function arguments no longer need to have names (and not naming
+	  them inhibits 'unused' warnings)
+	* more than one access specifier (e.g. 'public private protected')
+	  generates a warning
+	* If SENSIBLE_MODIFIERS is defined, then:
+	  (1) 'static' no longer exists, and is replaced by 'nosave' and
+	      'protected'
+	  (2) 'public' no longer means what it used to; it now means the
+	      default visibility
+	* COMPAT_BUSTER: modifiers from a '<modifier>:' declaration only
+	  affect declarations which have no modifiers of their own.  I.e.
+	  'private: nomask x;' no longer declares x to be private
+	* if VIRTUAL_RESERVED_WORD is defined, then 'virtual' is a
+	  reserved word.  Doesn't do anything, though.
+	* if REF_RESERVED_WORD is defined, the 'ref' can be used to declare
+	  arguments to functions to be by reference instead of by value.
+	  example:
+	  int foo(int ref i) {
+	    i++;
+    	  }
+	  void create() {
+	    int y = 1; foo(ref y); write(y);
+	  }
+	  prints '2'.  Note that ref is required both in the declaration
+	  and the call.
+	* fixed a bug that would cause compile errors when indexing something
+	  of type 'mixed'
+	* added an 'efun_defined' pseudo function to the preprocessor.  It
+	  works just like 'defined', except that it looks up efuns.  Example:
+	  #if !efun_defined(snoop)
+	     write("snoop efun not available.\n");
+	  #endif
+
+Mon Oct 21 17:48:12 EDT 1996 (tim@wfn-shop.princeton.edu (Beek))
+	* raised patchlevel to v22.1a7
+	* updated with respect to v22b20
+	* added Burty@Nanvaent's fixes for stringizing and macro
+	  expansion
+	* added support for array &= and |= [idea from Avenger@CoreDump]
+	* added the object name to the "Saving successful match" parser
+	  debugging message [idea from Aragorn]
+	* added Leto's SERVER_IP patch
+	* abort compilation after getting 5 errors, since we don't print
+	  any more anyway, and the leaks this was supposed to prevent
+	  were fixed years ago
+	* MudOS now checks if file descriptor #3 is a valid socket when
+	  it starts up; if it is, it is used as a login port.
+	* added a 'portbind' program:
+	  syntax: portbind [-p port#] [-d drivername] [-u uid] [-g gid] [args ...]
+
+	  All it does it bind the specified port, then execv() the driver,
+	  passing the bound port as file descriptor #3 (see above).
+	  drivername defaults to ./driver, and port# defaults to 23.
+	  if uid or gid is specified, setuid() and setgid() are called
+	  before exec'ing the driver.
+
+	  This means one can bind the telnet port by making portbind setuid,
+	  and using:
+
+	  portbind -u <mud uid> -g <mud gid> config.mud
+
+	  to run the driver
+
+Wed Oct  9 15:26:37 EDT 1996 (tim@wfn-shop.princeton.edu (Beek))
+	* raised patchlevel to v22.1a6
+	* updated with respect to v22b19
+	* fixed compilation with NO_ADD_ACTION off, PRIVS on, or
+	  PROFILE_FUNCTIONS on [re: the 'ob' global recently removed;
+	  reported by Aragorn, Jihad, Avenger, etc]
+	* only do promotions (int)<->(float) on assignment, not op=; in
+	  the second case the conversion will be done by the efun (if
+	  legal) so there is no need.
+
+Mon Oct  7 16:43:45 EDT 1996 (tim@wfn-shop.princeton.edu (Beek))
+	* raised patchlevel to v22.1a5
+	* hidden checks are now compiled out if set_hide() is disabled in
+	  func_spec.c [idea from Avenger@CD]
+	* buffer code is compiled out if NO_BUFFER_TYPE is defined; also
+	  fixed a few old references to DISABLE_BUFFER_TYPE.  [idea from
+	  Avenger@CD] Also, a binary port in the config file will cause
+	  a sensible error message, and attempting to create a binary
+	  socket will return EEMODENOTSUPP.
+	* removed the 'ob' global in efuns_main.c and related hacks with
+	  respect to object_visible(); also fixes a bug in the return
+	  value of environment() when it is hidden (and probably other
+	  bugs elsewhere too) [reported by Jihad]
+	* fixed crasher in using the name of a file that doesn't exist
+	  as the object in an efun callback (e.g. filter(({}), "foo", "bar"))
+	* fixed a couple compile problems and a crasher in
+	  PACKAGE_MUDLIB_STATS [reported by Avenger@CD]
+
+Thu Oct  3 18:16:53 EDT 1996 (tim@wfn-shop.princeton.edu (Beek))
+	* raised patchlevel to v22.1a4
+	* updated with respect to v22b17
+	* need to include "master.h" in the uid package now [fix from Leto],
+	  mas well as md.c, and master.c needs comm.h when tracing is
+	  enabled
+	* fixed Makefiles on non-GNUmake systems to include the two new
+	  files introduced last pl
+	* fixed crasher in the handling of refreshing the master object;
+	  also the literals are cached but are *not* affected by
+	  parse_refresh().  The reasoning is that if they change, it
+	  would cause all hell to break loose with existing rules.
+	  So parse_refresh() only needs to be called when the return
+	  value of parse_command_users() changes.
+
+Tue Oct  1 19:14:42 EDT 1996 (tim@wfn-shop.princeton.edu (Beek))
+	* raised patchlevel to v22.1a3
+	* updated with respect to v22b16
+	* fixed various crashers in the new snoop code [reported by Jihad]
+	* Many thanks to DrFeelgood for helping clean up header file
+	  dependencies, and pointing out typos in options.h
+	* Warning for using both a 'port number : ' line and an 
+	  'external_port_1 : ' line
+	* moved master object and function pointer handling to their own
+	  files
+	
+Mon Sep 30 18:56:54 EDT 1996 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v22.1a2
+	* updated with respect to v22b15
+	* #'foo is now the same as (: foo :) when COMPAT_32 is defined
+	  [suggested by Bubbs]
+	* added NO_SNOOP option
+	* The requirement that a snooper must be interactive has been lifted
+	  (though this isn't particularly useful unless RECIEVE_SNOOP is
+	   also defined) [suggested by Larnen]
+
+Tue Jun  4 00:57:30 EDT 1996 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v22.1a1
+	* COMPAT_BUSTER: #include <...> now no longer searches based on
+	  relative paths; #include "..." still does.
+	* added Blackheart's diffs for using gdbm.  See PACKAGE_GDBM for
+	  details; probably this should be merged with Descartes'
+	  PACKAGE_DB stuff ...
+	* added Avenger@CD's diffs for a union array operator (|)
+	  (with trivial changes and a array stat fix)
+	  Works analogously to &:
+	  ({ 1, 2, 3 }) & ({ 2, 4 }) = ({ 2 })
+	  ({ 1, 2, 3 }) | ({ 2, 4 }) = ({ 1, 2, 3, 4 })
+	* if ARRAY_RESERVED_WORD is defined, use "array" instead of "*"
+	  in error messages [e.g. "Bad assignment ( mapping vs array )"]
+	* added Marius@Prilnari's fixes to lex.c: token pasting in
+	  preprocessor macro expansion and adds token quoting
+	* added the -c option to the RUNTIME_LOADING compile flags since
+	  it disappeared somehow
+	* Hidden object fixes for present() and environment()
+	* COMPAT_BUSTER: removed the tail() efun; a simul_efun is in the
+	  compat dir
+	* added leading / to log_error() filenames
+	* cleaned up a bunch of duplicated code in array.c, and corrected
+	  a few statistic bugs
+	* Parser package changes:
+	  . added the object name to some parser debugging messages
+	  . moved names of the applies to top of parser.c as #defines
+	  . information from the master object is now cached
+	    (parse_command_users, parse_command_prepos_list)
+	    COMPAT_BUSTER: this means parse_refresh() must be called
+	    if the information changes
+	  . livings_are_remote() is now rechecked when a parse_refresh()
+	    is done
+
+----------------------------------------------------------------------------
 (v22a41 promoted to v22b1)
 
 Mon May 27 16:20:09 EDT 1996 (tim@handel.princeton.edu (Beek))
@@ -1264,7 +1617,7 @@ Sat May  6 22:41:22 EDT 1995 (tim@handel.princeton.edu (Beek))
 	* fixed a few syntax errors in ed commands to not dump you out of
 	  ed
 	* Added a bunch of stuff to Bugs/Ideas files; I'm going to try to
-	  keep them more up to date; dumped alot of stuff from my todo list
+	  keep them more up to date; dumped a lot of stuff from my todo list
 	  there
 	* fixed generate_source() to not leak a file on some errors
 	* fixed a bunch of problems with the upper_case() contrib efun;
@@ -1284,7 +1637,7 @@ Sat May  6 19:03:29 EDT 1995 (tim@handel.princeton.edu (Beek))
 	  }
 	  /* comma separated list of numbers */
 	  string list(int *x) { return implode(x, (: $1 + ", " + $2 :)); }
-	* cleaned up alot of the Makefile dependencies
+	* cleaned up a lot of the Makefile dependencies
 
 Fri May  5 21:36:29 EDT 1995 (tim@handel.princeton.edu (Beek))
 	* raised patchlevel to v21.4a5
@@ -1378,10 +1731,10 @@ Sun Apr 30 03:53:32 EDT 1995 (tim@handel.princeton.edu (Beek))
 	  optimized the brute force (pattern length == 1) case
 	* the logon() function is no longer required to exist
 	* rearranged the output of the driver a bit, and cleaned up
-	  alot of the related code.  stdout and debug.log now both
+	  a lot of the related code.  stdout and debug.log now both
 	  get the same information (with the exception of some stuff
 	  that only goes to stdout before debug.log is ready)
-	* removed alot of fidgeting with the value of command_giver
+	* removed a lot of fidgeting with the value of command_giver
 	  COMPAT_BUSTER: the definition/existence of this_player()
 	  changed in some places.
 	* COMPAT_BUSTER: A number of efuns now return strings instead
@@ -1403,7 +1756,7 @@ Tue Apr 25 15:43:47 EDT 1995 (tim@handel.princeton.edu (Beek))
 	* raised patchlevel to v21.3a7
 	* updated with respect to v21.2b8
 	* added Robocoder's optimization to read_buffer()
-	* fixed alot of things gcc -Wall complained about
+	* fixed a lot of things gcc -Wall complained about
 	* fixed a crasher in disassembling code involving classes
 	* fixed type checking to not give an error for missing type
 	  for arguments when type checking is off
@@ -1716,7 +2069,7 @@ Sat Mar  4 16:14:17 EST 1995 (tim@handel.princeton.edu (Beek))
 Sat Mar  4 16:14:17 EST 1995 (tim@handel.princeton.edu (Beek))
 	* v21.2a1 created from v21.1b3
 	* added code to not generate unreachable code in LPC->C generation
-	  since SGI cc is very noisy about that and it happens alot.
+	  since SGI cc is very noisy about that and it happens a lot.
 	* protect special characters string constant case labels with '\'
 	  when generating switch tables (LPC->C)
 	* fixed a cases for int switches to use the correct field (LPC->C)

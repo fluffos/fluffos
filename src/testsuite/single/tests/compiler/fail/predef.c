@@ -1,0 +1,1 @@
+#undef __VERSION__

@@ -3,12 +3,13 @@
 #include "std.h"
 #include "config.h"
 #include "lpc_incl.h"
-#include "debug.h" /* added by Truilkan */
 #include "md.h"
 
 int num_mappings = 0;
 int total_mapping_size = 0;
 int total_mapping_nodes = 0;
+
+mapping_node_t *locked_map_nodes = 0;
 
 /*
  * LPC mapping (associative arrays) module.  Contains routines for
@@ -60,7 +61,7 @@ INLINE int growMap P1(mapping_t *, m)
 	}
 	/* hash table doubles in size -- keep track of the memory used */
 	total_mapping_size += sizeof(mapping_node_t *) * oldsize;
-	debug(1024,("mapping.c: growMap ptr = %x, size = %d\n", m, newsize));
+	debug(mapping,("mapping.c: growMap ptr = %p, size = %d\n", m, newsize));
 	m->unfilled = oldsize * (unsigned)FILL_PERCENT / (unsigned)100;
 	m->table_size = newsize - 1;
 	/* zero out the new storage area (2nd half of table) */
@@ -101,7 +102,7 @@ void *extra;
 	mapping_node_t *elt, *nelt;
 	int j = (int) m->table_size;
 	
-	debug(128,("mapTraverse %x\n", m));
+	debug(mapping,("mapTraverse %p\n", m));
 	do {
 	    for (elt = m->table[j]; elt; elt = nelt){
 		nelt = elt->next;
@@ -116,10 +117,10 @@ void *extra;
 INLINE void
 dealloc_mapping P1(mapping_t *, m)
 {
-	debug(1024,("mapping.c: actual free of %x\n", m));
+	debug(mapping,("mapping.c: actual free of %p\n", m));
 	num_mappings--;
 	{
-	    int j = m->table_size, c = m->count;
+	    int j = m->table_size, c = MAP_COUNT(m);
 	    mapping_node_t *elt, *nelt, **a = m->table;
 	    
 	    total_mapping_size -= (sizeof(mapping_t) +
@@ -133,28 +134,26 @@ dealloc_mapping P1(mapping_t *, m)
 	    do {
 		for (elt = a[j]; elt; elt = nelt){
 		    nelt = elt->next;
-		    free_svalue(elt->values + 1, "free_mapping");
 		    free_svalue(elt->values, "free_mapping");
-		    free_node(elt);
-
+		    free_node(m, elt);
 		}
 	    } while (j--);
 	
 
-	    debug(2048, ("in free_mapping: before table\n"));
+	    debug(mapping, ("in free_mapping: before table\n"));
 	    FREE((char *)a);
 	}
 
-	debug(2048, ("in free_mapping: after table\n"));
+	debug(mapping, ("in free_mapping: after table\n"));
 	FREE((char *) m);
-	debug(2048, ("in free_mapping: after m\n"));
-	debug(64,("mapping.c: free_mapping end\n"));
+	debug(mapping, ("in free_mapping: after m\n"));
+	debug(mapping,("mapping.c: free_mapping end\n"));
 }
 
 INLINE void
 free_mapping P1(mapping_t *, m)
 {
-	debug(64,("mapping.c: free_mapping begin, ptr = %x\n", m));
+	debug(mapping,("mapping.c: free_mapping begin, ptr = %p\n", m));
 	/* some other object is still referencing this mapping */
 	if (--m->ref > 0)
 		return;
@@ -195,9 +194,35 @@ mapping_node_t *new_map_node() {
     return ret;
 } 
 
-void free_node P1(mapping_node_t *, mn) {
-    mn->next = free_nodes;
-    free_nodes = mn;
+void unlock_mapping P1(mapping_t *, m) {
+    mapping_node_t **mn = &locked_map_nodes;
+    mapping_node_t *tmp;
+    
+    while (*mn) {
+	if ((*mn)->values[0].u.map == m) {
+	    free_svalue((*mn)->values + 1, "free_locked_nodes");
+	    /* take it out of the locked list ... */
+	    tmp = *mn;
+	    *mn = (*mn)->next;
+	    /* and add it to the free list */
+	    tmp->next = free_nodes;
+	    free_nodes = tmp;
+	} else
+	    mn = &((*mn)->next);
+    }
+    m->count &= ~MAP_LOCKED;
+}
+
+void free_node P2(mapping_t *, m, mapping_node_t *, mn) {
+    if (m->count & MAP_LOCKED) {
+	mn->next = locked_map_nodes;
+	locked_map_nodes = mn;
+	mn->values[0].u.map = m;
+    } else {
+	free_svalue(mn->values + 1, "free_node");
+	mn->next = free_nodes;
+	free_nodes = mn;
+    }
 }
 
 /* allocate_mapping(int n)
@@ -215,7 +240,7 @@ allocate_mapping P1(int, n)
 
 	if (n > MAX_MAPPING_SIZE) n = MAX_MAPPING_SIZE;
 	newmap = ALLOCATE(mapping_t, TAG_MAPPING, "allocate_mapping: 1");
-	debug(1024,("mapping.c: allocate_mapping begin, newmap = %x\n", newmap));
+	debug(mapping,("mapping.c: allocate_mapping begin, newmap = %p\n", newmap));
 	if (newmap == NULL) 
 	    error("Allocate_mapping - out of memory.\n");
 
@@ -248,8 +273,53 @@ allocate_mapping P1(int, n)
 	}
 #endif
 	num_mappings++;
-	debug(64,("mapping.c: allocate_mapping end\n"));
+	debug(mapping,("mapping.c: allocate_mapping end\n"));
 	return newmap;
+}
+
+INLINE mapping_t *
+allocate_mapping2 P2(array_t *, arr, svalue_t *, sv)
+{
+    mapping_t *newmap;
+    int i;
+    
+    newmap = allocate_mapping(arr->size);
+    STACK_INC;
+    sp->type = T_MAPPING;
+    sp->u.map = newmap;
+
+    for (i = 0; i < arr->size; i++) {
+	svalue_t *svp, *ret;
+
+	svp = find_for_insert(newmap, arr->item + i, 1);
+	if (sv->type == T_FUNCTION) {
+	    push_svalue(arr->item + i);
+	    ret = call_function_pointer(sv->u.fp, 1);
+	    *svp = *ret;
+	    ret->type = T_NUMBER;
+	} else {
+	    assign_svalue_no_free(svp, sv);
+	}
+    }
+    
+    sp--;
+    return newmap;
+}
+
+INLINE mapping_t *
+mkmapping P2(array_t *, k, array_t *, v) {
+    mapping_t *newmap;
+    int i;
+    
+    newmap = allocate_mapping(k->size);
+    for (i = 0; i < k->size; i++) {
+	svalue_t *svp;
+
+	svp = find_for_insert(newmap, k->item + i, 1);
+	assign_svalue_no_free(svp, v->item + i);
+    }
+    
+    return newmap;
 }
 
 /*
@@ -273,16 +343,17 @@ copyMapping P1(mapping_t *,m)
 	FREE((char *) newmap);
 	error("copyMapping 2 - out of memory.\n");
     }
-    total_mapping_nodes += (newmap->count = m->count);
+    newmap->count = m->count;
+    total_mapping_nodes += MAP_COUNT(m);
     memset(c, 0, k * sizeof(mapping_node_t *));
     total_mapping_size += (sizeof(mapping_t) +
 			   sizeof(mapping_node_t *) * k +
-			   sizeof(mapping_node_t) * m->count);
+			   sizeof(mapping_node_t) * MAP_COUNT(m));
 
 #ifdef PACKAGE_MUDLIB_STATS
     if (current_object) {
 	assign_stats (&newmap->stats, current_object);
-	add_array_size (&newmap->stats, m->count << 1);
+	add_array_size (&newmap->stats, MAP_COUNT(m) << 1);
     }
     else null_stats (&newmap->stats);
 #endif
@@ -396,7 +467,7 @@ node_find_in_mapping P2(mapping_t *, m, svalue_t *, lv)
 	int i;
 	mapping_node_t *elt, **a = m->table;
  
-	debug(1,("mapping.c: find_in_mapping\n"));
+	debug(mapping,("mapping.c: find_in_mapping\n"));
 
 	i = svalue_to_int(lv) & m->table_size;
 	for (elt = a[i]; elt; elt = elt->next) {
@@ -420,16 +491,15 @@ INLINE void mapping_delete P2(mapping_t *,m, svalue_t *,lv)
 		if (msameval(elt->values, lv)){
 		    if (!(*prev = elt->next) && !m->table[i]){
 			m->unfilled++;
-			debug(1024,("mapping delete: bucket empty, unfilled = \n",
+			debug(mapping,("mapping delete: bucket empty, unfilled = %i",
 				    m->unfilled));
 		    }
 		    m->count--;
 		    total_mapping_nodes--;
 		    total_mapping_size -= sizeof(mapping_node_t);
-		    debug(1024,("mapping delete: count = \n", m->count));
-		    free_svalue(elt->values + 1, "mapping_delete");
+		    debug(mapping,("mapping delete: count = %i", MAP_COUNT(m)));
 		    free_svalue(elt->values, "mapping_delete");
-		    free_node(elt);
+		    free_node(m, elt);
 		    return;
 
 		}
@@ -453,17 +523,17 @@ find_for_insert P3(mapping_t *, m, svalue_t *, lv, int, doTheFree)
 	unsigned short i = oi & m->table_size;
 	mapping_node_t *n, *newnode, **a = m->table + i;
  
-	debug(128,("mapping.c: hashed to %d\n", i));
+	debug(mapping,("mapping.c: hashed to %d\n", i));
 	if ((n = *a)) {
 	    do {
 		if (msameval(lv, n->values)) {
 		    /* normally, the f_assign would free the old value */
-		    debug(128,("mapping.c: found %x\n", n->values));
+		    debug(mapping,("mapping.c: found %p\n", n->values));
 		    if (doTheFree) free_svalue(n->values + 1, "find_for_insert");
 		    return n->values + 1;
 		}
 	    } while ((n = n->next));
-	    debug(128,("mapping.c: didn't find %x\n", lv));
+	    debug(mapping,("mapping.c: didn't find %p\n", lv));
 	    n = *a;
 	}
 	else if (!(--m->unfilled)){
@@ -477,16 +547,17 @@ find_for_insert P3(mapping_t *, m, svalue_t *, lv, int, doTheFree)
 	    }
 	}
 
-	if (++m->count > MAX_MAPPING_SIZE) {
-		m->count--;
-		debug(128,("mapping.c: too full\n", lv));
-		mapping_too_large();
+	m->count++;
+	if (MAP_COUNT(m) > MAX_MAPPING_SIZE) {
+	    m->count--;
+	    debug(mapping,("mapping.c: too full"));
+	    mapping_too_large();
 	}
 #ifdef PACKAGE_MUDLIB_STATS
 	add_array_size (&m->stats, 2);
 #endif
 	total_mapping_size += sizeof(mapping_node_t);
-	debug(128,("mapping.c: allocated a node\n"));
+	debug(mapping,("mapping.c: allocated a node\n"));
 	newnode = new_map_node();
 	assign_svalue_no_free(newnode->values, lv);
 	/* insert at head of bucket */
@@ -581,7 +652,8 @@ void f_unique_mapping PROT((void))
     nlist->mask = mask;
     g_u_m_list = nlist;
 
-    (++sp)->type = T_ERROR_HANDLER;
+    STACK_INC;
+    sp->type = T_ERROR_HANDLER;
     sp->u.error_handler = unique_mapping_error_handler;
 
     size = v->size;
@@ -700,7 +772,7 @@ load_mapping_from_aggregate P2(svalue_t *,sp, int, n)
 	int mask, i, oi, count = 0;
 	mapping_node_t **a, *elt, *elt2; 
  
-	debug(128,("mapping.c: load_mapping_from_aggregate begin, size = %d\n", n));
+	debug(mapping,("mapping.c: load_mapping_from_aggregate begin, size = %d\n", n));
 	m = allocate_mapping(n >> 1);
 	if (!n) return m;
 	mask = m->table_size;
@@ -756,7 +828,7 @@ load_mapping_from_aggregate P2(svalue_t *,sp, int, n)
 #endif
 	total_mapping_size += sizeof(mapping_node_t) * (m->count = count);
 	total_mapping_nodes += count;
-	debug(128,("mapping.c: load_mapping_from_aggregate end\n"));
+	debug(mapping,("mapping.c: load_mapping_from_aggregate end\n"));
 	return m;
 }
 
@@ -803,7 +875,7 @@ INLINE_STATIC void
 add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int, free_flag)
 {
     int mask = m1->table_size, j = m2->table_size;
-    int count = m1->count;
+    int count = MAP_COUNT(m1);
     int i, oi;
     mapping_node_t *elt1, *elt2, *newnode, *n;
     mapping_node_t **a1 = m1->table, **a2 = m2->table;
@@ -828,7 +900,7 @@ add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int, free_flag)
 		    mask <<= 1;
 		    mask--;
 		} else{
-		    count -= m1->count;
+		    count -= MAP_COUNT(m1);
 #ifdef PACKAGE_MUDLIB_STATS
 		    add_array_size(&m1->stats, count << 1);
 #endif
@@ -839,8 +911,9 @@ add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int, free_flag)
 		    error("Out of memory\n");
 		}
 	    }
-	    if (++count > MAX_MAPPING_SIZE){
-		if (count -= m1->count + 1){	
+	    count++;
+	    if (count > MAX_MAPPING_SIZE) {
+		if (count -= MAP_COUNT(m1) + 1){	
 #ifdef PACKAGE_MUDLIB_STATS
 		    add_array_size(&m1->stats, count << 1);
 #endif
@@ -858,7 +931,7 @@ add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int, free_flag)
 	}
     } while (j--);
 
-    if (count -= m1->count){
+    if (count -= MAP_COUNT(m1)) {
 #ifdef PACKAGE_MUDLIB_STATS
 	add_array_size(&m1->stats, count << 1);
 #endif
@@ -878,7 +951,7 @@ INLINE_STATIC void
 unique_add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int,free_flag)
 {
     int mask = m1->table_size, j = m2->table_size;
-    int count = m1->count;
+    int count = MAP_COUNT(m1);
     int i, oi;
     mapping_node_t *elt1, *elt2, *newnode, *n;
     mapping_node_t **a1 = m1->table, **a2 = m2->table;
@@ -902,7 +975,7 @@ unique_add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int,free_flag)
 		    mask--;
 		} else{
 		    ++m1->unfilled;
-		    count -= m1->count;
+		    count -= MAP_COUNT(m1);
 #ifdef PACKAGE_MUDLIB_STATS
 		    add_array_size(&m1->stats, count << 1);
 #endif
@@ -915,8 +988,8 @@ unique_add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int,free_flag)
 		}
 	    }
 
-	    if (++count > MAX_MAPPING_SIZE){
-		if (count -= m1->count + 1){
+	    if (++count > MAX_MAPPING_SIZE) {
+		if (count -= MAP_COUNT(m1) + 1) {
 #ifdef PACKAGE_MUDLIB_STATS
 		    add_array_size(&m1->stats, count << 1);
 #endif
@@ -934,7 +1007,7 @@ unique_add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int,free_flag)
 	}
     } while (j--);
 
-    if (count -= m1->count){
+    if (count -= MAP_COUNT(m1)) {
 #ifdef PACKAGE_MUDLIB_STATS
 	add_array_size(&m1->stats, count << 1);
 #endif
@@ -949,7 +1022,10 @@ INLINE void
 absorb_mapping(m1, m2)
 mapping_t *m1, *m2;
 {
-	if (m2->count) add_to_mapping(m1, m2, 0);
+    if (MAP_COUNT(m2)) {
+	if (m1 != m2)
+	    add_to_mapping(m1, m2, 0);
+    }
 }
 
 /*
@@ -962,20 +1038,20 @@ add_mapping P2(mapping_t *,m1, mapping_t *,m2)
 {
 	mapping_t *newmap;
  
-	debug(128,("mapping.c: add_mapping begin: %x, %x\n", m1, m2));
-	if (m1->count >= m2->count){
-	    if (m2->count){
+	debug(mapping,("mapping.c: add_mapping begin: %p, %p", m1, m2));
+	if (MAP_COUNT(m1) >= MAP_COUNT(m2)) {
+	    if (MAP_COUNT(m2)) {
 		add_to_mapping(newmap = copyMapping(m1), m2, 1);
 		return newmap;
 	    }
 	    else return copyMapping(m1);
 	}
-	else if (m1->count){
+	else if (MAP_COUNT(m1)) {
 	    unique_add_to_mapping(newmap = copyMapping(m2), m1, 1);
 	    return newmap;
 	}   
 	else return copyMapping(m2);
-	debug(128,("mapping.c: add_mapping end\n"));
+	debug(mapping,("mapping.c: add_mapping end\n"));
 }
 
 /*
@@ -996,11 +1072,10 @@ map_mapping P2(svalue_t *, arg, int, num_arg)
     process_efun_callback(1, &ftc, F_MAP);
 
     m = copyMapping(m);
-    (++sp)->type = T_MAPPING;
-    sp->u.map = m;
+    push_refed_mapping(m);
 
     a = m->table;
-    debug(1,("mapping.c: map_mapping\n"));
+    debug(mapping,("mapping.c: map_mapping\n"));
     do {
 	for (elt = a[j]; elt ; elt = elt->next){
 	    push_svalue(elt->values);
@@ -1013,8 +1088,7 @@ map_mapping P2(svalue_t *, arg, int, num_arg)
 
     sp--;
     pop_n_elems(num_arg);
-    (++sp)->type = T_MAPPING;	
-    sp->u.map = m;
+    push_refed_mapping(m);
 }
 #endif
 
@@ -1033,13 +1107,12 @@ filter_mapping P2(svalue_t *, arg, int, num_arg)
     process_efun_callback(1, &ftc, F_FILTER);
 
     newmap = allocate_mapping(0);
-    (++sp)->type = T_MAPPING;
-    sp->u.map = newmap;
+    push_refed_mapping(newmap);
     b = newmap->table;
     size = newmap->table_size;
 
     a = m->table;
-    debug(1,("mapping.c: filter_mapping\n"));
+    debug(mapping,("mapping.c: filter_mapping\n"));
     do {
 	for (elt = a[j]; elt ; elt = elt->next){
 	    push_svalue(elt->values);
@@ -1094,8 +1167,7 @@ filter_mapping P2(svalue_t *, arg, int, num_arg)
 
     sp--;
     pop_n_elems(num_arg);
-    (++sp)->type = T_MAPPING;	
-    sp->u.map = newmap;
+    push_refed_mapping(newmap);
 }
 #endif
 
@@ -1104,50 +1176,48 @@ filter_mapping P2(svalue_t *, arg, int, num_arg)
 INLINE mapping_t *
 compose_mapping P3(mapping_t *,m1, mapping_t *,m2, unsigned short,flag)
 {
-	mapping_node_t *elt, *elt2, **a, **b = m2->table, **prev;
-	unsigned short j = m1->table_size, deleted = 0;
-	unsigned short mask = m2->table_size;
-	svalue_t *sv;
+    mapping_node_t *elt, *elt2, **a, **b = m2->table, **prev;
+    unsigned short j = m1->table_size, deleted = 0;
+    unsigned short mask = m2->table_size;
+    svalue_t *sv;
 
-	debug(1,("mapping.c: compose_mapping\n"));
-	if (flag) m1 = copyMapping(m1);
-	a = m1->table;
+    debug(mapping,("mapping.c: compose_mapping\n"));
+    if (flag)
+	m1 = copyMapping(m1);
+    a = m1->table;
 
-	do {
-	    if ((elt = *(prev = a))) {
-		do {
-		    sv = elt->values + 1;
-		    if ((elt2 = b[svalue_to_int(sv) & mask])) {
-			do {
-			    if (msameval(sv, elt2->values)) {
+    do {
+	if ((elt = *(prev = a))) {
+	    do {
+		sv = elt->values + 1;
+		if ((elt2 = b[svalue_to_int(sv) & mask])) {
+		    do {
+			if (msameval(sv, elt2->values)) {
+			    if (sv != elt2->values + 1)	/* m1 == m2 */
 				assign_svalue(sv, elt2->values + 1);
-				break;
-			    }
-			} while ((elt2 = elt2->next));
-		    }
-		    if (!elt2) {
-			if (!(*prev = elt->next) && !(*a)) m1->unfilled++;
-			deleted++;
-			free_svalue(sv--, "compose_mapping");
-			free_svalue(sv, "compose_mapping");
-			free_node(elt);
-		    } else {
-			prev = &(elt->next);
-		    }
-		} while ((elt = *prev));
-	    }
-	} while (a++, j--);
-
-
-	if (deleted) {
-	    m1->count -= deleted;
-	    total_mapping_nodes -= deleted;
-	    total_mapping_size -= deleted * sizeof(mapping_node_t);
+			    break;
+			}
+		    } while ((elt2 = elt2->next));
+		}
+		if (!elt2) {
+		    if (!(*prev = elt->next) && !(*a))
+			m1->unfilled++;
+		    deleted++;
+		    free_node(m1, elt);
+		} else {
+		    prev = &(elt->next);
+		}
+    	    } while ((elt = *prev));
 	}
+    } while (a++, j--);
 
-	if (flag) return m1;
+    if (deleted) {
+	m1->count -= deleted;
+	total_mapping_nodes -= deleted;
+	total_mapping_size -= deleted * sizeof(mapping_node_t);
+    }
 
-	return NULL;
+    return m1;
 }
 
 /* mapping_indices */
@@ -1160,9 +1230,9 @@ mapping_indices P1(mapping_t *,m)
 	mapping_node_t *elt, **a = m->table;
 	svalue_t *sv;
 
-	debug(128,("mapping_indices: size = %d\n",m->count));
+	debug(mapping,("mapping_indices: size = %d\n", MAP_COUNT(m)));
 
-	v = allocate_empty_array(m->count);
+	v = allocate_empty_array(MAP_COUNT(m));
 	sv = v->item;
 	do {
 	    for (elt = a[j]; elt; elt = elt->next)
@@ -1181,9 +1251,9 @@ mapping_values P1(mapping_t *,m)
 	mapping_node_t *elt, **a = m->table;
 	svalue_t *sv;
 
-	debug(128,("mapping_indices: size = %d\n",m->count));
+	debug(mapping,("mapping_values: size = %d\n",MAP_COUNT(m)));
 
-	v = allocate_empty_array(m->count);
+	v = allocate_empty_array(MAP_COUNT(m));
 	sv = v->item;
 	do {
 	    for (elt = a[j]; elt; elt = elt->next)

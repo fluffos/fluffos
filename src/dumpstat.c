@@ -1,5 +1,5 @@
 #include "std.h"
-#include "lpc_incl.h"
+#include "dumpstat.h"
 #include "comm.h"
 #include "file.h"
 
@@ -19,6 +19,8 @@ static int sumSizes P3(mapping_t *, m, mapping_node_t *, elt, void *, tp)
     return 0;
 }
 
+int depth = 0;
+
 static int svalue_size P1(svalue_t *, v)
 {
     int i, total;
@@ -32,21 +34,31 @@ static int svalue_size P1(svalue_t *, v)
 	return (int) (strlen(v->u.string) + 1);
     case T_ARRAY:
     case T_CLASS:
+	if (++depth > 100)
+	    return 0;
+
 	/* first svalue is stored inside the array struct */
 	total = sizeof(array_t) - sizeof(svalue_t);
 	for (i = 0; i < v->u.arr->size; i++) {
 	    total += svalue_size(&v->u.arr->item[i]) + sizeof(svalue_t);
 	}
+	depth--;
 	return total;
     case T_MAPPING:
+	if (++depth > 100)
+	    return 0;
 	total = sizeof(mapping_t);
 	mapTraverse(v->u.map, sumSizes, &total);
+	depth--;
 	return total;
     case T_FUNCTION:
 	{
 	    svalue_t tmp;
 	    tmp.type = T_ARRAY;
 	    tmp.u.arr = v->u.fp->hdr.args;
+
+	    if (++depth > 100)
+		return 0;
 
 	    if (tmp.u.arr)
 		total = (int)(sizeof(funptr_hdr_t) + svalue_size(&tmp));
@@ -67,13 +79,15 @@ static int svalue_size P1(svalue_t *, v)
 		total += sizeof(functional_t);
 		break;
 	    }
+
+	    depth--;
 	    return total;
 	}
+#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
 	/* first byte is stored inside the buffer struct */
 	return (int) (sizeof(buffer_t) + v->u.buf->size - 1);
-    case T_ANY:
-	break;
+#endif
     default:
 	fatal("Illegal type: %d\n", v->type);
     }
@@ -87,6 +101,7 @@ int data_size P1(object_t *, ob)
 
     if (ob->prog) {
 	for (i = 0; i < (int) ob->prog->num_variables_total; i++) {
+	    depth = 0;
 	    total += svalue_size(&ob->variables[i]) + sizeof(svalue_t);
 	}
     }
@@ -98,11 +113,13 @@ void dumpstat P1(char *, tfn)
     FILE *f;
     object_t *ob;
     char *fn;
+#ifdef F_SET_HIDE
     int display_hidden;
+#endif
 
     fn = check_valid_path(tfn, current_object, "dumpallobj", 1);
     if (!fn) {
-	error("Invalid path '/%s' for writing.\n", fn);
+	error("Invalid path '/%s' for writing.\n", tfn);
 	return;
     }
     f = fopen(fn, "w");
@@ -111,16 +128,20 @@ void dumpstat P1(char *, tfn)
 	return;
     }
 
+#ifdef F_SET_HIDE
     display_hidden = -1;
+#endif
     for (ob = obj_list; ob; ob = ob->next_all) {
 	int tmp;
 
+#ifdef F_SET_HIDE
 	if (ob->flags & O_HIDDEN) {
 	    if (display_hidden == -1)
 		display_hidden = valid_hide(current_object);
 	    if (!display_hidden)
 		continue;
 	}
+#endif
 	if (ob->prog && (ob->prog->ref == 1 || !(ob->flags & O_CLONE)))
 	    tmp = ob->prog->total_size;
 	else

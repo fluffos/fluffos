@@ -9,6 +9,7 @@
 #include "/compiler.h"
 #include "/main.h"
 #include "/eoperators.h"
+#include "/simul_efun.h"
 #else
 #include "../lpc_incl.h"
 #include "../comm.h"
@@ -19,6 +20,7 @@
 #include "../compiler.h"
 #include "../main.h"
 #include "../eoperators.h"
+#include "../simul_efun.h"
 #endif
 
 /* should be done in configure */
@@ -35,12 +37,17 @@
 #ifdef F_NAMED_LIVINGS
 void f_named_livings() {
     int i;
-    int nob, apply_valid_hide, hide_is_valid = 0;
+    int nob;
+#ifdef F_SET_HIDE
+    int apply_valid_hide, hide_is_valid = 0;
+#endif
     object_t *ob, **obtab;
     array_t *vec;
 
     nob = 0;
+#ifdef F_SET_HIDE
     apply_valid_hide = 1;
+#endif
 
     obtab = CALLOCATE(max_array_size, object_t *, TAG_TEMPORARY, "named_livings");
 
@@ -48,6 +55,7 @@ void f_named_livings() {
 	for (ob = hashed_living[i]; ob; ob = ob->next_hashed_living) {
 	    if (!(ob->flags & O_ENABLE_COMMANDS))
 		continue;
+#ifdef F_SET_HIDE
 	    if (ob->flags & O_HIDDEN) {
 		if (apply_valid_hide) {
 		    apply_valid_hide = 0;
@@ -56,6 +64,7 @@ void f_named_livings() {
 		if (hide_is_valid)
 		    continue;
 	    }
+#endif
 	    if (nob == max_array_size)
 		break;
 	    obtab[nob++] = ob;
@@ -83,22 +92,20 @@ f_remove_shadow PROT((void))
     object_t *ob;
     
     ob = current_object;
-    if ( st_num_arg )
-	{
-	    ob = sp->u.ob;
-	    pop_stack();
-	}
-    if ( ! ob || ! ob->shadowing )
-	push_number( 0 );
-    else
-	{
-	    if ( ob->shadowed )
-		ob->shadowed->shadowing = ob->shadowing;
-	    if ( ob->shadowing )
-		ob->shadowing->shadowed = ob->shadowed;
-	    ob->shadowing = ob->shadowed = 0;
-	    push_number( 1 );
-	}
+    if (st_num_arg) {
+	ob = sp->u.ob;
+	pop_stack();
+    }
+    if (ob == 0 || (ob->shadowing == 0 && ob->shadowed == 0))
+	push_number(0);
+    else {
+	if (ob->shadowed)
+	    ob->shadowed->shadowing = ob->shadowing;
+	if (ob->shadowing)
+	    ob->shadowing->shadowed = ob->shadowed;
+	ob->shadowing = ob->shadowed = 0;
+	push_number(1);
+    }
 }
 #endif
 
@@ -114,7 +121,7 @@ f_query_notify_fail PROT((void)) {
 	    push_funp(command_giver->interactive->default_err_message.f);
 	    return;
 	} else if ((p = command_giver->interactive->default_err_message.s)) {
-	    sp++;
+	    STACK_INC;
 	    sp->type = T_STRING;
 	    sp->subtype = STRING_SHARED;
 	    sp->u.string = p;
@@ -195,6 +202,18 @@ array_t *deep_copy_array P1( array_t *, arg ) {
     vec = allocate_empty_array(arg->size);
     for (i = 0; i < arg->size; i++)
 	deep_copy_svalue(&arg->item[i], &vec->item[i]);
+
+    return vec;
+}
+
+array_t *deep_copy_class P1(array_t *, arg) {
+    array_t *vec;
+    int i;
+    
+    vec = allocate_empty_class_by_size(arg->size);
+    for (i = 0; i < arg->size; i++)
+	deep_copy_svalue(&arg->item[i], &vec->item[i]);
+
     return vec;
 }
 
@@ -222,7 +241,6 @@ mapping_t *deep_copy_mapping P1( mapping_t *, arg ) {
 void deep_copy_svalue P2(svalue_t *, from, svalue_t *, to) {
     switch (from->type) {
     case T_ARRAY:
-    case T_CLASS:
 	depth++;
 	if (depth > MAX_SAVE_SVALUE_DEPTH) {
 	    depth = 0;
@@ -231,6 +249,17 @@ void deep_copy_svalue P2(svalue_t *, from, svalue_t *, to) {
 	}
 	*to = *from;
 	to->u.arr = deep_copy_array( from->u.arr );
+	depth--;
+	break;
+    case T_CLASS:
+	depth++;
+	if (depth > MAX_SAVE_SVALUE_DEPTH) {
+	    depth = 0;
+	    error("Mappings, arrays and/or classes nested too deep (%d) for copy()\n",
+		  MAX_SAVE_SVALUE_DEPTH);
+	}
+	*to = *from;
+	to->u.arr = deep_copy_class( from->u.arr );
 	depth--;
 	break;
     case T_MAPPING:
@@ -280,7 +309,8 @@ void f_functions PROT((void)) {
 
     progp = sp->u.ob->prog;
     num = progp->num_functions_total;
-    if (num && progp->function_table[progp->num_functions_defined-1].name[0]
+    if (progp->num_functions_defined &&
+	progp->function_table[progp->num_functions_defined-1].name[0]
 	== APPLY___INIT_SPECIAL_CHAR)
 	num--;
 	
@@ -293,7 +323,7 @@ void f_functions PROT((void)) {
 	func_entry = FIND_FUNC_ENTRY(prog, index);
 
 	/* Walk up the inheritance tree to the real definition */
-	while (prog->function_flags[index] & NAME_INHERITED) {
+	while (prog->function_flags[index] & FUNC_INHERITED) {
 	    prog = prog->inherit[func_entry->inh.offset].prog;
 	    index = func_entry->inh.function_index_offset;
 	    func_entry = FIND_FUNC_ENTRY(prog, index);
@@ -452,13 +482,13 @@ int at_end(int i, int imax, int z, int *lens) {
 }
 
 void 
-f_terminal_colour P2( int, num_arg, int, instruction)
+f_terminal_colour PROT((void))
 {
     char *instr, *cp, *savestr, *deststr, **parts;
-    int num, i, j, k, col, space, *lens, maybe_at_end;
-    int space_garbage;
+    int num, i, j, k, col, start, space, *lens, maybe_at_end;
+    int space_garbage = 0;
     mapping_node_t *elt, **mtab;
-    int tmp;
+    int buflen, max_buflen, space_buflen;
     int wrap = 0;
     int indent = 0;
 
@@ -474,10 +504,8 @@ f_terminal_colour P2( int, num_arg, int, instruction)
     cp = instr = (sp-1)->u.string;
     do {
 	cp = strchr(cp, TC_FIRST_CHAR);
-	if (cp) 
-	{
-	    if (cp[1] == TC_SECOND_CHAR)
-	    {
+	if (cp) {
+	    if (cp[1] == TC_SECOND_CHAR) {
 		savestr = string_copy(instr, "f_terminal_colour");
 		cp = savestr + ( cp - instr );
 		instr = savestr;
@@ -520,16 +548,34 @@ f_terminal_colour P2( int, num_arg, int, instruction)
 	    if (cp) {
 		*cp = 0;
 		if (cp > instr) {
-		    parts[num] = instr;
-		    num++;
-		    if (num % NSTRSEGS == 0)
+		    if (num && num % NSTRSEGS == 0) {
 			parts = RESIZE(parts, num + NSTRSEGS, char *, 
 				       TAG_TEMPORARY, "f_terminal_colour: parts realloc");
+		    }
+		    parts[num++] = instr;
 		}
 	    }
 	}
-	if (*instr)	/* trailing seg, if not delimiter */
+	if (*instr) {	/* trailing seg, if not delimiter */
+	    if (num && num % NSTRSEGS == 0) {
+		parts = RESIZE(parts, num + NSTRSEGS, char *,
+			       TAG_TEMPORARY, "f_terminal_colour: parts realloc");
+	    }
 	    parts[num++] = instr;
+	}
+    }
+
+    if (num == 0) {
+	/* string consists entirely of %^'s */
+	FREE(parts);
+	if (savestr)
+	    FREE_MSTR(savestr);
+	pop_stack();
+	free_string_svalue(sp);
+	sp->type = T_STRING;
+	sp->subtype = STRING_CONSTANT;
+	sp->u.string = "";
+	return;
     }
 
     /* Could keep track of the lens as we create parts, removing the need
@@ -539,149 +585,190 @@ f_terminal_colour P2( int, num_arg, int, instruction)
 
     /* Do the the pointer replacement and calculate the lengths */
     col = 0;
+    start = -1;
     space = 0;
     maybe_at_end = 0;
+    buflen = max_buflen = space_buflen = 0;
     for (j = i = 0, k = sp->u.map->table_size; i < num; i++) {
-	int len;
-	    
 	if ((cp = findstring(parts[i]))) {
-	    tmp = MAP_POINTER_HASH(cp);
+	    int tmp = MAP_POINTER_HASH(cp);
 	    for (elt = mtab[tmp & k]; elt; elt = elt->next)
 		if ( elt->values->type == T_STRING && 
 		     (elt->values + 1)->type == T_STRING &&
 		     cp == elt->values->u.string) {
 		    parts[i] = (elt->values + 1)->u.string;
 		    /* Negative indicates don't count for wrapping */
-		    len = SVALUE_STRLEN(elt->values + 1);
-		    if (wrap) len = -len;
+		    lens[i] = SVALUE_STRLEN(elt->values + 1);
+		    if (wrap) lens[i] = -lens[i];
 		    break;
 		}
 	    if (!elt)
-		len = SHARED_STRLEN(cp);
+		lens[i] = SHARED_STRLEN(cp);
 	} else {
-	    len = strlen(parts[i]);
+	    lens[i] = strlen(parts[i]);
 	}
-	lens[i] = len;
-	if (len > 0) {
-	    if (maybe_at_end) {
-		if (j + indent > max_string_length) {
-		    /* this string no longer counts, so we are still in
-		       a maybe_at_end condition.  This means we will end
-		       up truncating the rest of the fragments too, since
-		       the indent will never fit. */
-		    lens[i] = 0;
-		    len = 0;
+
+	if (lens[i] <= 0) {
+	    if (j + -lens[i] > max_string_length)
+		lens[i] = -(-(lens[i]) - (j + -lens[i] - max_string_length));
+	    j += -lens[i];
+	    buflen += -lens[i];
+	    continue;
+	}
+
+	if (maybe_at_end) {
+	    if (j + indent > max_string_length) {
+		/* this string no longer counts, so we are still in
+		   a maybe_at_end condition.  This means we will end
+		   up truncating the rest of the fragments too, since
+		   the indent will never fit. */
+		lens[i] = 0;
+	    } else {
+		j += indent;
+		col += indent;
+		maybe_at_end = 0;
+	    }
+	}
+
+	j += lens[i];
+	if (j > max_string_length) {
+	    lens[i] -= j - max_string_length;
+	    j = max_string_length;
+	}
+
+	if (wrap) {
+	    int z;
+	    char *p = parts[i];
+	    for (z = 0; z < lens[i]; z++) {
+		char c = p[z];
+		buflen++;
+		if (c == '\n') {
+		    col = 0;
+		    space = space_buflen = 0;
+		    start = -1;
+		    max_buflen = (buflen > max_buflen ? buflen : max_buflen);
+		    buflen = 0;
 		} else {
+		    if (col > start || (c != ' ' && c != '\t'))
+			col++;
+		    else {
+			j--;
+			buflen--;
+		    }
+
+		    if (col > start && c == '\t')
+			col += (8 - ((col - 1) % 8));
+		    if (c == ' ' || c == '\t') {
+			space = col;
+			space_buflen = buflen;
+		    }
+		    if (col == wrap+1) {
+			if (space) {
+			    col -= space;
+			    space = 0;
+			    max_buflen = (buflen > max_buflen ? buflen : max_buflen);
+			    buflen -= space_buflen;
+			    space_buflen = 0;
+			} else {
+			    j++;
+			    col = 1;
+			    max_buflen = (buflen > max_buflen ? buflen : max_buflen);
+			    buflen = 1;
+			}
+			start = indent;
+		    } else
+			continue;
+		}
+
+		/* If we get here, we ended a line by wrapping */
+		if (z + 1 != lens[i] || col) {
 		    j += indent;
 		    col += indent;
-		    maybe_at_end = 0;
-		}
-	    }
-	    j += len;
-	    if (j > max_string_length) {
-		lens[i] -= j - max_string_length;
-		j = max_string_length;
-	    }
-	    if (wrap) {
-		int z;
-		char *p = parts[i];
-		for (z = 0; z < lens[i]; z++) {
-		    char c = p[z];
-		    if (c == '\n') {
-			col = 0;
-		    } else {
-			col++;
-			if (c == ' ')
-			    space = col;
-			if (col == wrap+1) {
-			    if (space) {
-				col -= space;
-				space = 0;
-			    } else {
-				j++;
-				col = 1;
-			    }
-			} else
-			    continue;
-		    }
-		    /* If we get here, we ended a line */
-		    if (z + 1 != lens[i] || col) {
-			j += indent;
-			col += indent;
-		    } else
-			maybe_at_end = 1;
+		} else
+		    maybe_at_end = 1;
 
-		    if (j > max_string_length) {
-			lens[i] -= (j - max_string_length);
-			j = max_string_length;
-			if (lens[i] < z) {
-			    /* must have been ok 
-			       or we wouldn't be here */
-			    lens[i] = z;
-			    break;
-			}
+		if (j > max_string_length) {
+		    lens[i] -= (j - max_string_length);
+		    j = max_string_length;
+		    if (lens[i] < z) {
+			/* must have been ok or we wouldn't be here */
+			lens[i] = z;
+			break;
 		    }
 		}
-	    }
-	} else {
-	    j += -len;
-	    if (j > max_string_length) {
-		lens[i] = -(-(lens[i]) - (j - max_string_length));
-		j = max_string_length;
 	    }
 	}
     }
+
+    if (wrap && buflen > max_buflen)
+	max_buflen = buflen;
     
     /* now we have the final string in parts and length in j. 
        let's compose it, wrapping if necessary */
     cp = deststr = new_string(j, "f_terminal_colour: deststr");
     if (wrap) {
-	/* FIXME */
-	char *tmp = new_string(8192, "f_terminal_colour: wrap");
+	char *tmp = new_string(max_buflen, "f_terminal_colour: wrap");
 	char *pt = tmp;
 	
 	col = 0;
+	start = -1;
 	space = 0;
+	buflen = space_buflen = 0;
 	for (i = 0; i < num; i++) {
 	    int kind;
-	    int len;
-	    int l = lens[i];
 	    char *p = parts[i];
-	    if (l < 0) {
-		memcpy(pt, p, -l);
-		pt += -l;
-		space_garbage += -l; /* Number of chars due to ignored junk
-					since last space */
+	    if (lens[i] < 0) {
+		memcpy(pt, p, -lens[i]);
+		pt += -lens[i];
+		buflen += -lens[i];
+		space_garbage += -lens[i]; /* Number of chars due to ignored junk
+					      since last space */
 		continue;
 	    }
 	    for (k = 0; k < lens[i]; k++) {
 		int n;
 		char c = p[k];
 		*pt++ = c;
+		buflen++;
 		if (c == '\n') {
 		    col = 0;
 		    kind = 0;
+		    space = space_garbage = 0;
+		    start = -1;
+		    buflen = 0;
 		} else {
-		    col++;
-		    if (c == ' ') {
+		    if (col > start || (c != ' ' && c != '\t'))
+			col++;
+		    else {
+			pt--;
+			buflen--;
+		    }
+		    
+		    if (col > start && c == '\t')
+			col += (8 - ((col - 1) % 8));
+		    if (c == ' ' || c == '\t') {
 			space = col;
 			space_garbage = 0;
+			space_buflen = buflen;
 		    }
 		    if (col == wrap+1) {
 			if (space) {
 			    col -= space;
 			    space = 0;
 			    kind = 1;
+			    buflen -= space_buflen;
+			    space_buflen = 0;
 			} else {
 			    col = 1;
 			    kind = 2;
+			    buflen = 1;
 			}
+			start = indent;
 		    } else
 			continue;
 		}
 		/* If we get here, we ended a line */
-		len = (kind == 1 ? col + space_garbage : col);
-		n = (pt - tmp) - len;
+		n = (pt - tmp) - buflen;
 		memcpy(cp, tmp, n);
 		cp += n;
 		if (kind == 1) {
@@ -692,8 +779,8 @@ f_terminal_colour P2( int, num_arg, int, instruction)
 		    /* need to insert a newline */
 		    *cp++ = '\n';
 		}
-		memmove(tmp, tmp + n, len);
-		pt = tmp + len;
+		memmove(tmp, tmp + n, buflen);
+		pt = tmp + buflen;
 		if (col || !at_end(i, num, k, lens)) {
 		    memset(cp, ' ', indent);
 		    cp += indent;
@@ -810,6 +897,10 @@ char *pluralize P1(char *, str) {
 	if (!strcasecmp(rel + 1, "us")) {
 	    found = PLURAL_SUFFIX;
 	    suffix = "es";
+	} else
+	if (!strcasecmp(rel + 1, "onus")) {
+	    found = PLURAL_SUFFIX;
+	    suffix = "es";
 	}
 	break;
     case 'C':
@@ -821,6 +912,10 @@ char *pluralize P1(char *, str) {
 	break;
     case 'D':
     case 'd':
+	if (!strcasecmp(rel + 1, "atum")) {
+	    found = PLURAL_CHOP + 2;
+	    suffix = "a";
+	} else
 	if (!strcasecmp(rel + 1, "ie")) {
 	    found = PLURAL_CHOP + 1;
 	    suffix = "ce";
@@ -844,6 +939,11 @@ char *pluralize P1(char *, str) {
 	}
 	if (!strcasecmp(rel + 1, "ish")) {
 	    found = PLURAL_SAME;
+	    break;
+	}
+	if (!strcasecmp(rel + 1, "orum")) {
+	    found = PLURAL_CHOP + 2;
+	    suffix = "a";
 	    break;
 	}
 	if (!strcasecmp(rel + 1, "ife"))
@@ -913,8 +1013,19 @@ char *pluralize P1(char *, str) {
 	    suffix = "en";
 	}
 	break;
+    case 'P':
+    case 'p':
+	if (!strcasecmp(rel + 1, "lum")) {
+	    found = PLURAL_SUFFIX;
+	    suffix = "s";
+	}
+	break;
     case 'S':
     case 's':
+        if (!strcasecmp(rel + 1, "niff")) {
+	    found = PLURAL_SUFFIX;
+	    break;
+	}
 	if (!strcasecmp(rel + 1, "heep")) {
 	    found = PLURAL_SAME;
 	    break;
@@ -922,6 +1033,11 @@ char *pluralize P1(char *, str) {
 	if (!strcasecmp(rel + 1, "phinx")) {
 	    found = PLURAL_CHOP + 1;
 	    suffix = "ges";
+	    break;
+	}
+	if (!strcasecmp(rel + 1, "taff")) {
+	    found = PLURAL_CHOP + 2;
+	    suffix = "ves";
 	    break;
 	}
 	if (!strcasecmp(rel + 1, "afe")) {
@@ -949,6 +1065,10 @@ char *pluralize P1(char *, str) {
 	    found = PLURAL_SUFFIX;
 	    suffix = "en";
 	}
+	if (!strcasecmp(rel + 1, "irus")) {
+	    found = PLURAL_SUFFIX;
+	    suffix = "es";
+	}
 	break;
     case 'W':
     case 'w':
@@ -968,7 +1088,6 @@ char *pluralize P1(char *, str) {
      * *sh -> *shes (brush -> brushes)
      */
     /*
-     * *ff -> *ves (staff -> staves)
      * *fe -> *ves (knife -> knives)
      */
     /*
@@ -979,7 +1098,7 @@ char *pluralize P1(char *, str) {
      * *y -> *ies (gumby -> gumbies)
      */
     /*
-     * *us -> *i (virus -> viri)
+     * *us -> *i (cactus -> cacti)
      */
     /*
      * *man -> *men (foreman -> foremen)
@@ -1004,11 +1123,6 @@ char *pluralize P1(char *, str) {
 	case 'F': case 'f':
 	    if (end[-2] == 'e' || end[-2] == 'E')
 		break;
-	    if (end[-2] == 'f' || end[-2] == 'F') {
-		found = PLURAL_CHOP + 2;
-		suffix = "ves";
-		break;
-	    }
 	    found = PLURAL_CHOP + 1;
 	    suffix = "ves";
 	    break;
@@ -1016,12 +1130,23 @@ char *pluralize P1(char *, str) {
 	    if (end[-2] == 'c' || end[-2]=='s')
 		suffix = "es";
 	    break;
+#if 0
+	/*
+	 * This rule is causing more problems than not.  As such, I'm removing
+	 * it in favour of adding exceptions for words above that should use
+	 * this rule.  I'm aware that this rule is proper for Latin derived
+	 * English words, however its use has fallen out of common speech and
+	 * writing for the majority of cases.  Currently known common exceptions
+	 * are forum (fora) and datum (data).
+	 * -- Marius, 23-Jun-2000
+	 */
 	case 'M': case 'm':
 	    if (end[-2] == 'u') {
 		found = PLURAL_CHOP + 2;
 		suffix = "a";
 	    }
 	    break;
+#endif
 	case 'N': case 'n':
 	    if (end[-2] == 'a' && end[-3] == 'm') {
 		found = PLURAL_CHOP + 3;
@@ -1029,7 +1154,8 @@ char *pluralize P1(char *, str) {
 	    }
 	    break;
 	case 'O': case 'o':
-	    suffix = "es";
+	    if (end[-2] != 'o')
+		suffix = "es";
 	    break;
 	case 'S': case 's':
 	    if (end[-2] == 'i') {
@@ -1167,14 +1293,14 @@ f_upper_case PROT((void))
     str = sp->u.string;
     /* find first upper case letter, if any */
     for (; *str; str++) {
-	if (islower(*str)) {
+	if (islower((unsigned char)*str)) {
 	    int l = str - sp->u.string;
 	    unlink_string_svalue(sp);
 	    str = sp->u.string + l;
-	    *str -= 'a' - 'A';
+	    *str = toupper((unsigned char)*str);
 	    for (str++; *str; str++) {
-		if (islower(*str))
-		    *str -= 'a' - 'A';
+		if (islower((unsigned char)*str))
+		    *str = toupper((unsigned char)*str);
 	    }
 	    return;
 	}
@@ -1184,45 +1310,56 @@ f_upper_case PROT((void))
 
 #ifdef F_REPLACEABLE
 void f_replaceable PROT((void)) {
+    object_t *obj;
     program_t *prog;
-    int i, j, num, numignore;
+    int i, j, num, numignore, replaceable;
     char **ignore;
     
     if (st_num_arg == 2) {
 	numignore = sp->u.arr->size;
 	if (numignore)
-	    ignore = CALLOCATE(numignore, char *, TAG_TEMPORARY, "replaceable");
+	    ignore = CALLOCATE(numignore + 2, char *, TAG_TEMPORARY, "replaceable");
 	else
 	    ignore = 0;
+        ignore[0] = findstring(APPLY_CREATE);
+        ignore[1] = findstring(APPLY___INIT);
 	for (i = 0; i < numignore; i++) {
 	    if (sp->u.arr->item[i].type == T_STRING)
-		ignore[i] = findstring(sp->u.arr->item[i].u.string);
+		ignore[i + 2] = findstring(sp->u.arr->item[i].u.string);
 	    else
-		ignore[i] = 0;
+		ignore[i + 2] = 0;
 	}
-	prog = (sp-1)->u.ob->prog;
+        numignore += 2;
+        obj = (sp-1)->u.ob;
     } else {
-	numignore = 1;
-	ignore = CALLOCATE(1, char *, TAG_TEMPORARY, "replaceable");
+	numignore = 2;
+	ignore = CALLOCATE(2, char *, TAG_TEMPORARY, "replaceable");
 	ignore[0] = findstring(APPLY_CREATE);
-	prog = sp->u.ob->prog;
+        ignore[1] = findstring(APPLY___INIT);
+        obj = sp->u.ob;
     }
     
-    num = prog->num_functions_total - 1; /* ignore #global_init# */
+    prog = obj->prog;
+    num = prog->num_functions_total;
     
     for (i = 0; i < num; i++) {
-	if (prog->function_flags[i] & (NAME_INHERITED | NAME_NO_CODE)) continue;
+	if (prog->function_flags[i] & (FUNC_INHERITED | FUNC_NO_CODE)) continue;
 	for (j = 0; j < numignore; j++)
 	    if (ignore[j] == prog->function_table[FIND_FUNC_ENTRY(prog, i)->def.f_index].name)
 		break;
 	if (j == numignore)
 	    break;
     }
+
+    replaceable = (i == num);
+    if (obj == simul_efun_ob || prog->func_ref)
+        replaceable = 0;
+
     if (st_num_arg == 2)
 	free_array((sp--)->u.arr);
     FREE(ignore);
     free_svalue(sp, "f_replaceable");
-    put_number(i == num);
+    put_number(replaceable);
 }
 #endif
 
@@ -1394,7 +1531,7 @@ f_query_ip_port PROT((void))
 	free_object(sp->u.ob, "f_query_ip_port");
     } else {
 	tmp = query_ip_port(command_giver);
-	sp++;
+	STACK_INC;
     }
     put_number(tmp);
 }
@@ -1622,9 +1759,11 @@ static int memory_share P1(svalue_t *, sv) {
 	}
 	return total + subtotal/sv->u.fp->hdr.ref;
     }
+#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
 	/* first byte is stored inside the buffer struct */
 	return total + (sizeof(buffer_t) + sv->u.buf->size - 1)/sv->u.buf->ref;
+#endif
     }
     return total;
 }

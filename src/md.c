@@ -9,11 +9,12 @@
 #include "swap.h"
 #include "call_out.h"
 #include "mapping.h"
-#ifdef PACKAGE_SOCKETS
+#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 #include "socket_efuns.h"
 #endif
 #include "cfuns.h"
 #endif
+#include "master.h"
 
 #ifdef PACKAGE_PARSER
 #include "packages/parser.h"
@@ -83,7 +84,7 @@ void MDinit()
 {
     int j;
 
-    table = (md_node_t **) calloc(TABLESIZE, sizeof(md_node_t *));
+    table = (md_node_t **) calloc(MD_TABLE_SIZE, sizeof(md_node_t *));
     for (j = 0; j < MAX_CATEGORY; j++) {
 	totals[j] = 0;
     }
@@ -106,7 +107,7 @@ MDmalloc P4(md_node_t *, node, int, size, int, tag, char *, desc)
     if (total_malloced > hiwater) {
 	hiwater = total_malloced;
     }
-    h = (unsigned int) node % TABLESIZE;
+    h = MD_HASH(node);
     node->size = size;
     node->next = table[h];
 #ifdef CHECK_MEMORY
@@ -164,7 +165,7 @@ MDfree P1(void *, ptr)
     int tmp;
     md_node_t *entry, **oentry;
 
-    h = (unsigned int) ptr % TABLESIZE;
+    h = MD_HASH(ptr);
     oentry = &table[h];
     for (entry = *oentry; entry; oentry = &entry->next, entry = *oentry) {
 	if (entry == ptr) {
@@ -225,7 +226,7 @@ char *dump_debugmalloc P2(char *, tfn, int, mask)
     if (!fp) {
 	error("Unable to open %s for writing.\n", fn);
     }
-    for (j = 0; j < TABLESIZE; j++) {
+    for (j = 0; j < MD_TABLE_SIZE; j++) {
 	for (entry = table[j]; entry; entry = entry->next) {
 	    if (!mask || (entry->tag == mask)) {
 		fprintf(fp, "%-30s: sz %7d: id %6d: tag %08x, a %8x\n",
@@ -280,6 +281,11 @@ static void mark_object P1(object_t *, ob) {
 	EXTRA_REF(BLOCK(ob->privs))++;
 #endif
 
+    if (ob->interactive) {
+	if (ob->interactive->input_to)
+	    ob->interactive->input_to->ob->extra_ref++;
+    }
+
 #ifndef NO_ADD_ACTION
     if (ob->living_name)
 	EXTRA_REF(BLOCK(ob->living_name))++;
@@ -330,9 +336,11 @@ void mark_svalue P1(svalue_t *, sv) {
     case T_FUNCTION:
 	sv->u.fp->hdr.extra_ref++;
 	break;
+#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
 	sv->u.buf->extra_ref++;
 	break;
+#endif
     case T_STRING:
 	switch (sv->subtype) {
 	case STRING_MALLOC:
@@ -349,9 +357,18 @@ static void mark_funp P1(funptr_t*, fp) {
     if (fp->hdr.args)
 	fp->hdr.args->extra_ref++;
 
-    fp->hdr.owner->extra_ref++;
-    if ((fp->hdr.type & 0x0f) == FP_FUNCTIONAL) 
-	fp->f.functional.prog->extra_func_ref++;
+    if (fp->hdr.owner)
+	fp->hdr.owner->extra_ref++;
+    switch (fp->hdr.type) {
+	case FP_LOCAL | FP_NOT_BINDABLE:
+	    if (fp->hdr.owner)
+		fp->hdr.owner->prog->extra_func_ref++;
+	    break;
+	case FP_FUNCTIONAL:
+	case FP_FUNCTIONAL | FP_NOT_BINDABLE:
+	    fp->f.functional.prog->extra_func_ref++;
+	    break;
+    }
 }
 
 static void mark_sentence P1(sentence_t *, sent) {
@@ -399,9 +416,11 @@ static void md_print_array  P1(array_t *, vec) {
       case T_CLASS:
 	  outbuf_add(&out, "<class>");
 	  break;
+#ifndef NO_BUFFER_TYPE
       case T_BUFFER:
           outbuf_add(&out, "<buffer>");
           break;
+#endif
       case T_FUNCTION:
           outbuf_add(&out, "<function>");
           break;
@@ -426,7 +445,7 @@ static void mark_config PROT((void)) {
     }
 }
 
-#ifdef PACKAGE_SOCKETS
+#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 void mark_sockets PROT((void)) {
     int i;
     char *s;
@@ -465,24 +484,24 @@ void compute_string_totals P3(int *, asp, int *, abp, int *, bp) {
     md_node_t *entry;
     malloc_block_t *msbl;
     block_t *ssbl;
-    
+
     *asp = 0;
     *abp = 0;
     *bp = 0;
     
-    for (hsh = 0; hsh < TABLESIZE; hsh++) {
+    for (hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
 	for (entry = table[hsh]; entry; entry = entry->next) {
 	    if (entry->tag == TAG_MALLOC_STRING) {
 		msbl = NODET_TO_PTR(entry, malloc_block_t*);
-		*bp += msbl->size + 1;
-		*asp += msbl->ref;
-		*abp += msbl->ref * (msbl->size + 1);
+ 		*bp += msbl->size + 1;
+ 		*asp += msbl->ref;
+ 		*abp += msbl->ref * (msbl->size + 1);
 	    }
 	    if (entry->tag == TAG_SHARED_STRING) {
 		ssbl = NODET_TO_PTR(entry, block_t*);
-		*bp += ssbl->size + 1;
-		*asp += ssbl->refs;
-		*abp += ssbl->refs * (ssbl->size + 1);
+ 		*bp += ssbl->size + 1;
+ 		*asp += ssbl->refs;
+ 		*abp += ssbl->refs * (ssbl->size + 1);
 	    }
 	}
     }
@@ -566,7 +585,9 @@ void check_all_blocks P1(int, flag) {
     object_t *ob;
     array_t *vec;
     mapping_t *map;
+#ifndef NO_BUFFER_TYPE
     buffer_t *buf;
+#endif
     funptr_t *fp;
     mapping_node_t *node;
     program_t *prog;
@@ -590,7 +611,7 @@ void check_all_blocks P1(int, flag) {
     if (!(flag & 2))
 	outbuf_add(&out, "Performing memory tests ...\n");
     
-    for (hsh = 0; hsh < TABLESIZE; hsh++) {
+    for (hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
 	for (entry = table[hsh]; entry; entry = entry->next) {
 	    entry->tag &= ~TAG_MARKED;
 #ifdef CHECK_MEMORY
@@ -662,10 +683,12 @@ void check_all_blocks P1(int, flag) {
 		fp = NODET_TO_PTR(entry, funptr_t *);
 		fp->hdr.extra_ref = 0;
 		break;
+#ifndef NO_BUFFER_TYPE
 	    case TAG_BUFFER:
 		buf = NODET_TO_PTR(entry, buffer_t *);
 		buf->extra_ref = 0;
 		break;
+#endif
 	    }
 	}
     }
@@ -723,8 +746,9 @@ void check_all_blocks P1(int, flag) {
 	
 #ifdef PACKAGE_EXTERNAL
 	for (i = 0; i < 5; i++) {
-	    if (external_cmd[i])
+	    if (external_cmd[i]) {
 		DO_MARK(external_cmd[i], TAG_STRING);
+	    }
 	}
 #endif
     
@@ -765,7 +789,7 @@ void check_all_blocks P1(int, flag) {
 #ifdef PACKAGE_MUDLIB_STATS
 	mark_mudlib_stats();
 #endif
-#ifdef PACKAGE_SOCKETS
+#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 	mark_sockets();
 #endif
 #ifdef PACKAGE_PARSER
@@ -774,6 +798,7 @@ void check_all_blocks P1(int, flag) {
 #ifdef LPC_TO_C
 	mark_switch_lists();
 #endif
+	mark_file_sv();
 	mark_all_defines();
 	mark_free_sentences();
 	mark_iptable();
@@ -798,7 +823,7 @@ void check_all_blocks P1(int, flag) {
 	    ob->extra_ref++;
 	}
     
-	for (hsh = 0; hsh < TABLESIZE; hsh++) {
+	for (hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
 	    for (entry = table[hsh]; entry; entry = entry->next) {
 		switch (entry->tag & ~TAG_MARKED) {
 		case TAG_IDENT_TABLE: {
@@ -853,6 +878,20 @@ void check_all_blocks P1(int, flag) {
 		case TAG_OBJECT:
 		    ob = NODET_TO_PTR(entry, object_t *);
 		    mark_object(ob);
+		    {
+			object_t *tmp = obj_list;
+			while (tmp && tmp != ob)
+			    tmp = tmp->next_all;
+			if (!tmp) {
+			    tmp = obj_list_destruct;
+			    while (tmp && tmp != ob)
+				tmp = tmp->next_all;
+			}
+			if (!tmp)
+			    outbuf_addv(&out, 
+					"WARNING: %s not in object list.\n",
+					ob->name);
+		    }
 		    break;
 		case TAG_LPC_OBJECT:
 		    ob = NODET_TO_PTR(entry, object_t *);
@@ -863,8 +902,9 @@ void check_all_blocks P1(int, flag) {
 		case TAG_PROGRAM:
 		    prog = NODET_TO_PTR(entry, program_t *);
 		    
-		    if (prog->line_info)
+		    if (prog->line_info) {
 			DO_MARK(prog->file_info, TAG_LINENUMBERS);
+		    }
 		    
 		    for (i = 0; i < (int) prog->num_inherited; i++)
 			prog->inherit[i].prog->extra_ref++;
@@ -885,7 +925,7 @@ void check_all_blocks P1(int, flag) {
 	}
 	
 	/* now check */
-	for (hsh = 0; hsh < TABLESIZE; hsh++) {
+	for (hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
 	    for (entry = table[hsh]; entry; entry = entry->next) {
 		switch (entry->tag) {
 		case TAG_MUDLIB_STATS:
@@ -924,13 +964,15 @@ void check_all_blocks P1(int, flag) {
 		case TAG_FUNP:
 		    fp = NODET_TO_PTR(entry, funptr_t *);
 		    if (fp->hdr.ref != fp->hdr.extra_ref)
-			outbuf_addv(&out, "Bad ref count for function pointer (owned by %s), is %d - should be %d\n", fp->hdr.owner->name, fp->hdr.ref, fp->hdr.extra_ref);
+			outbuf_addv(&out, "Bad ref count for function pointer (owned by %s), is %d - should be %d\n", (fp->hdr.owner ? fp->hdr.owner->name : "(null)"), fp->hdr.ref, fp->hdr.extra_ref);
 		    break;
+#ifndef NO_BUFFER_TYPE
 		case TAG_BUFFER:
 		    buf = NODET_TO_PTR(entry, buffer_t *);
 		    if (buf->ref != buf->extra_ref)
 			outbuf_addv(&out, "Bad ref count for buffer, is %d - should be %d\n", buf->ref, buf->extra_ref);
 		    break;
+#endif
 		case TAG_PREDEFINES:
 		    outbuf_addv(&out, "WARNING: Found orphan predefine: %s %04x\n", entry->desc, (int)entry->tag);
 		    break;
@@ -999,6 +1041,8 @@ void check_all_blocks P1(int, flag) {
     }
     if (!(flag & 2))
 	outbuf_push(&out);
+    else
+	push_number(0);
 }
 #endif                          /* DEBUGMALLOC_EXTENSIONS */
 #endif				/* DEBUGMALLOC */

@@ -1,7 +1,6 @@
 #include "std.h"
-#include "lpc_incl.h"
-#include "lex.h"
 #include "simul_efun.h"
+#include "lex.h"
 #include "otable.h"
 
 /*
@@ -123,13 +122,16 @@ void get_simul_efuns P1(program_t *, prog)
 	int index;
 	runtime_function_u *func_entry;
 	
-	if (prog->function_flags[i] & (NAME_NO_CODE | NAME_STATIC | NAME_PRIVATE))
+	if (prog->function_flags[i] & FUNC_NO_CODE)
 	    continue;
+	if (prog->function_flags[i] & (DECL_PROTECTED|DECL_PRIVATE|DECL_HIDDEN))
+	    continue;
+
 	nprog = prog;
 	index = i;
 	func_entry = FIND_FUNC_ENTRY(nprog, index);
 	
-	while (nprog->function_flags[index] & NAME_INHERITED) {
+	while (nprog->function_flags[index] & FUNC_INHERITED) {
 	    nprog = nprog->inherit[func_entry->inh.offset].prog;
 	    index = func_entry->inh.function_index_offset;
 	    func_entry = FIND_FUNC_ENTRY(nprog, index);

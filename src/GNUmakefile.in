@@ -48,6 +48,10 @@
 
 OVERRIDES=$(MAKEOVERRIDES)
 
+# **************************************************************************
+# **** NOTE: If you add something here, also add it to the OBJ= rule below,
+# **** or non-GNU makes will die
+# **************************************************************************
 SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   backend.c array.c mapping.c comm.c ed.c regexp.c swap.c buffer.c crc32.c \
   malloc.c mallocwrapper.c class.c efuns_main.c efuns_port.c \
@@ -56,7 +60,8 @@ SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   compiler.c avltree.c icode.c trees.c generate.c scratchpad.c \
   socket_efuns.c socket_ctrl.c qsort.c eoperators.c socket_err.c md.c \
   strstr.c disassembler.c binaries.c ualarm.c $(STRFUNCS) \
-  replace_program.c ccode.c cfuns.c compile_file.c crypt.c
+  replace_program.c ccode.c cfuns.c compile_file.c master.c function.c \
+  debug.c crypt.c
 
 all: cc.h files main_build
 
@@ -64,7 +69,7 @@ parallel:
 	$(MAKE) -k -l -j 6 cc.h files
 	$(MAKE) -k -l -j 6 main_build
 
-main_build: $(DRIVER_BIN) addr_server
+main_build: $(DRIVER_BIN) addr_server portbind
 
 VPATH = $(OBJDIR)
 
@@ -87,17 +92,20 @@ grammar.tab.c: grammar.y
 	-mv y.tab.h grammar.tab.h
 
 packages/packages.a: packages/parser.c packages/contrib.c
-	$(MAKE) -C packages 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)'
+	$(MAKE) -C packages 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)' 'A=$(A)' 'O=$(O)'
 
 mudlib/mudlib.a:
-	$(MAKE) -C mudlib 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)'
+	$(MAKE) -C mudlib 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)' 'A=$(A)' 'O=$(O)'
 $(DRIVER_BIN): packages/packages.a mudlib/mudlib.a $(OBJ)
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
 	$(PROOF) $(CC) $(CFLAGS) $(OPTIMIZE) $(OBJ) -o $(DRIVER_BIN) packages/packages.a mudlib/mudlib.a $(EXTRALIBS) `cat system_libs`
 
-addr_server:  $(OBJDIR)/addr_server.o $(OBJDIR)/socket_ctrl.o $(OBJDIR)/port.o addr_server.h
+addr_server: files $(OBJDIR)/addr_server.o $(OBJDIR)/socket_ctrl.o $(OBJDIR)/port.o addr_server.h
 	$(CC) $(CFLAGS) $(OPTIMIZE) $(OBJDIR)/socket_ctrl.o $(OBJDIR)/addr_server.o $(OBJDIR)/port.o \
 	-o addr_server `cat system_libs`
+
+portbind: $(OBJDIR)/portbind.o
+	$(CC) $(CFLAGS) $(OPTIMIZE) $(OBJDIR)/portbind.o -o portbind `cat system_libs`
 
 
 remake: neat all
@@ -174,14 +182,18 @@ install: all
 	-mkdir $(INSTALL_DIR)
 	$(INSTALL) $(DRIVER_BIN) $(INSTALL_DIR)
 	$(INSTALL) addr_server $(INSTALL_DIR)
+	$(INSTALL) portbind $(INSTALL_DIR)
 
-Makefiles: Makefile.in GNUmakefile.in
+Makefiles: Makefile.in GNUmakefile.in NMakefile.in
 
 Makefile.in: edit_source Makefile.in.pre Makefile.master
 	./edit_source -process Makefile.in.pre
 
 GNUmakefile.in: edit_source GNUmakefile.in.pre Makefile.master
 	./edit_source -process GNUmakefile.in.pre
+
+NMakefile.in: edit_source NMakefile.in.pre Makefile.master
+	./edit_source -process NMakefile.in.pre
 
 nothing:
 
@@ -192,9 +204,9 @@ spotless: clean
 
 # get ready for recompile
 neat:
-	-(cd packages; $(MAKE) clean)
-	-(cd mudlib; $(MAKE) clean)
-	-rm -rf $(OBJDIR) *.o *.tab.c *.tab.h
+	-(cd packages; $(MAKE) "A=$(A)" "O=$(O)" clean)
+	-(cd mudlib; $(MAKE) "A=$(A)" "O=$(O)" clean)
+	-rm -rf $(OBJDIR) *.$(O) *.tab.c *.tab.h
 	-mkdir $(OBJDIR)
 	-rm -f efun_defs.c option_defs.c
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
@@ -208,7 +220,8 @@ clean: neat
 	-rm -f Makefile.MudOS GNUmakefile.MudOS
 	-rm -f cc.h edit_source
 	-rm -f core y.output testsuite/core testsuite/tmp/*
-	-rm -rf testsuite/binaries
+	-rm -f testsuite/OPCPROF.* testsuite/opc.*
+	-rm -rf testsuite/binaries testsuite/single/swapfile.*
 	-rm -f testsuite/OBJ_DUMP* testsuite/test_file testsuite/testfile
 	-rm -f testsuite/tmp_eval_file.c testsuite/sf.o testsuite/ed_test
 	-rm -f testsuite/log/log testsuite/log/debug.log testsuite/log/compile
@@ -216,7 +229,7 @@ clean: neat
 	-find . -name "*.orig" -print | xargs rm
 	-find . -name "*.rej" -print | xargs rm
 	-rm -f *.ln tags TAGS
-	-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old addr_server
+	-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old addr_server portbind
 	-rm -f Dependencies tmpdepend
 	-touch Dependencies
 

@@ -25,7 +25,7 @@
  *
  * len1 is the length of string1 including the zero at the end
  *
- * Note: "" looks a heck of alot like a interior freed string.  Currently,
+ * Note: "" looks a heck of a lot like a interior freed string.  Currently,
  * we ignore the problem.  In some cases, it could be left dangling, but
  * I don't think that can happen with the present grammar/use of the
  * scratchpad.
@@ -38,7 +38,7 @@
 /*
  * Within this file, a capitalized identifier is that var cast to an
  * unsigned type.  It makes things easier to read than having casts
- * all over the place since we go back and forth alot.  strict ANSI
+ * all over the place since we go back and forth a lot.  strict ANSI
  * requires casts from (unsigned char *) to (char *) and back, but
  * we want to deal with strings as unsigned since we keep the length
  * in them.

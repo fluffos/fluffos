@@ -50,6 +50,16 @@
 #ifdef INCL_LIMITS_H
 #  include <limits.h>
 #endif
+#ifdef INCL_MALLOC_H
+#  include <malloc.h>
+#endif
+#ifdef INCL_LOCALE_H
+#  include <locale.h>
+#endif
+
+#ifdef INCL_DLFCN_H
+#  include <dlfcn.h>
+#endif
 
 #ifdef LATTICE
 #  undef VOID

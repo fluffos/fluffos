@@ -1,5 +1,8 @@
 /* mapping.h - 1992/07/19 */
 
+/* It is usually better to include "lpc_incl.h" instead of including this
+   directly */
+
 #ifndef _MAPPING_H
 #define _MAPPING_H
 
@@ -23,6 +26,9 @@ typedef struct mapping_node_block_s {
 
 #define MAPSIZE(size) sizeof(mapping_t)
 
+#define MAP_LOCKED 0x80000000
+#define MAP_COUNT(m) ((m)->count & ~MAP_LOCKED)
+
 typedef struct mapping_s {
     unsigned short ref;		/* how many times this map has been
 				 * referenced */
@@ -32,7 +38,7 @@ typedef struct mapping_s {
     mapping_node_t **table;	/* the hash table */
     unsigned short table_size;	/* # of buckets in hash table == power of 2 */
     unsigned short unfilled;	/* # of buckets among 80% of total buckets that do not have entries */
-    int count;			/* total # of nodes actually in mapping  */
+    unsigned int count;		/* total # of nodes actually in mapping  */
 #ifdef PACKAGE_MUDLIB_STATS
     statgroup_t stats;		/* creators of the mapping */
 #endif
@@ -67,12 +73,14 @@ typedef struct minfo_s {
 extern int num_mappings;
 extern int total_mapping_size;
 extern int total_mapping_nodes;
+extern mapping_node_t *locked_map_nodes;
 
 int msameval PROT((svalue_t *, svalue_t *));
 int mapping_save_size PROT((mapping_t *));
 INLINE mapping_t *mapTraverse PROT((mapping_t *, int (*) (mapping_t *, mapping_node_t *, void *), void *));
 INLINE mapping_t *load_mapping_from_aggregate PROT((svalue_t *, int));
 INLINE mapping_t *allocate_mapping PROT((int));
+INLINE mapping_t *allocate_mapping2 PROT((array_t *, svalue_t *));
 INLINE void free_mapping PROT((mapping_t *));
 INLINE svalue_t *find_in_mapping PROT((mapping_t *, svalue_t *));
 svalue_t *find_string_in_mapping PROT((mapping_t *, char *));
@@ -81,7 +89,8 @@ INLINE void absorb_mapping PROT((mapping_t *, mapping_t *));
 INLINE void mapping_delete PROT((mapping_t *, svalue_t *));
 INLINE mapping_t *add_mapping PROT((mapping_t *, mapping_t *));
 mapping_node_t *new_map_node PROT((void));
-void free_node PROT((mapping_node_t *));
+void free_node PROT((mapping_t *, mapping_node_t *));
+void unlock_mapping PROT((mapping_t *));
 void map_mapping PROT((svalue_t *, int));
 void filter_mapping PROT((svalue_t *, int));
 INLINE mapping_t *compose_mapping PROT((mapping_t *, mapping_t *, unsigned short));
@@ -91,6 +100,7 @@ array_t *mapping_each PROT((mapping_t *));
 char *save_mapping PROT((mapping_t *));
 void dealloc_mapping PROT((mapping_t *));
 void mark_mapping_node_blocks PROT((void));
+mapping_t *mkmapping PROT((array_t *, array_t *));
 
 void add_mapping_pair PROT((mapping_t *, char *, int));
 void add_mapping_string PROT((mapping_t *, char *, char *));

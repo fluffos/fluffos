@@ -47,6 +47,26 @@
 
 OVERRIDES=$(MAKEOVERRIDES)
 
+# **************************************************************************
+# **** NOTE: If you add something here, also add it to the OBJ= rule below,
+# **** or non-GNU makes will die
+# **************************************************************************
+%ifdef NMAKE
+SRC=grammar$(TAB_EXT).c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
+  backend.c array.c mapping.c comm.c ed.c regexp.c swap.c buffer.c crc32.c \
+  malloc.c mallocwrapper.c class.c efuns_main.c efuns_port.c \
+  call_out.c otable.c dumpstat.c stralloc.c hash.c \
+  port.c reclaim.c parse.c simul_efun.c sprintf.c program.c \
+  compiler.c avltree.c icode.c trees.c generate.c scratchpad.c \
+  socket_efuns.c socket_ctrl.c qsort.c eoperators.c socket_err.c md.c \
+  strstr.c disassembler.c binaries.c $(STRFUNCS) \
+  replace_program.c ccode.c cfuns.c compile_file.c master.c function.c \
+  debug.c crypt.c
+
+all: utils cc.h files main_build
+
+main_build: $(DRIVER_BIN) addr_server
+%else
 SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   backend.c array.c mapping.c comm.c ed.c regexp.c swap.c buffer.c crc32.c \
   malloc.c mallocwrapper.c class.c efuns_main.c efuns_port.c \
@@ -55,15 +75,19 @@ SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   compiler.c avltree.c icode.c trees.c generate.c scratchpad.c \
   socket_efuns.c socket_ctrl.c qsort.c eoperators.c socket_err.c md.c \
   strstr.c disassembler.c binaries.c ualarm.c $(STRFUNCS) \
-  replace_program.c ccode.c cfuns.c compile_file.c crypt.c
+  replace_program.c ccode.c cfuns.c compile_file.c master.c function.c \
+  debug.c crypt.c
 
 all: cc.h files main_build
 
+main_build: $(DRIVER) addr_server portbind
+%endif
+
+%ifndef NMAKE
 parallel:
 	$(MAKE) -k -l -j 6 cc.h files
 	$(MAKE) -k -l -j 6 main_build
-
-main_build: $(DRIVER_BIN) addr_server
+%endif
 
 %ifdef GNU
 VPATH = $(OBJDIR)
@@ -80,6 +104,31 @@ $(OBJDIR)/grammar.tab.o: grammar.tab.c opcodes.h
 which_makefile:
 	echo MakeIsGNU
 %else
+%ifdef NMAKE
+OBJ=$(OBJDIR)\grammar$(TAB_EXT).obj $(OBJDIR)\lex.obj $(OBJDIR)\main.obj $(OBJDIR)\rc.obj $(OBJDIR)\interpret.obj \
+	$(OBJDIR)\simulate.obj $(OBJDIR)\file.obj $(OBJDIR)\object.obj $(OBJDIR)\backend.obj $(OBJDIR)\array.obj \
+	$(OBJDIR)\mapping.obj $(OBJDIR)\comm.obj $(OBJDIR)\ed.obj $(OBJDIR)\regexp.obj $(OBJDIR)\swap.obj \
+	$(OBJDIR)\buffer.obj $(OBJDIR)\crc32.obj $(OBJDIR)\malloc.obj $(OBJDIR)\mallocwrapper.obj \
+	$(OBJDIR)\class.obj $(OBJDIR)\efuns_main.obj $(OBJDIR)\efuns_port.obj $(OBJDIR)\call_out.obj \
+	$(OBJDIR)\otable.obj $(OBJDIR)\dumpstat.obj $(OBJDIR)\stralloc.obj $(OBJDIR)\hash.obj $(OBJDIR)\port.obj \
+	$(OBJDIR)\reclaim.obj $(OBJDIR)\parse.obj $(OBJDIR)\simul_efun.obj $(OBJDIR)\sprintf.obj \
+	$(OBJDIR)\program.obj $(OBJDIR)\compiler.obj $(OBJDIR)\avltree.obj $(OBJDIR)\icode.obj $(OBJDIR)\trees.obj \
+	$(OBJDIR)\generate.obj $(OBJDIR)\scratchpad.obj $(OBJDIR)\socket_efuns.obj $(OBJDIR)\socket_ctrl.obj \
+	$(OBJDIR)\qsort.obj $(OBJDIR)\eoperators.obj $(OBJDIR)\socket_err.obj $(OBJDIR)\md.obj \
+	$(OBJDIR)\strstr.obj $(OBJDIR)\disassembler.obj $(OBJDIR)\binaries.obj \
+	$(OBJDIR)\replace_program.obj $(OBJDIR)\ccode.obj $(OBJDIR)\cfuns.obj $(OBJDIR)\compile_file.obj \
+	$(OBJDIR)\crypt.obj $(OBJDIR)\debug.obj $(OBJDIR)\master.obj $(OBJDIR)\function.obj
+
+.c{$(OBJDIR)/}.obj:
+	$(CC) $(CFLAGS) $(OPTIMIZE) -Fo$(OBJDIR)\ -c $<
+
+$(OBJDIR)/lex.obj: lex.c preprocess.c cc.h grammar$(TAB_EXT).c
+
+$(OBJDIR)/grammar$(TAB_EXT).obj: grammar$(TAB_EXT).c opcodes.h
+
+which_makefile:
+	echo MakeIsNmake
+%else
 OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   backend.o array.o mapping.o comm.o ed.o regexp.o swap.o buffer.o crc32.o \
   malloc.o mallocwrapper.o class.o efuns_main.o efuns_port.o \
@@ -88,7 +137,8 @@ OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   compiler.o avltree.o icode.o trees.o generate.o scratchpad.o \
   socket_efuns.o socket_ctrl.o qsort.o eoperators.o socket_err.o md.o \
   strstr.o disassembler.o binaries.o ualarm.o $(STRFUNCS) \
-  replace_program.o ccode.o cfuns.o compile_file.o crypt.o
+  replace_program.o ccode.o cfuns.o compile_file.o master.o function.o \
+  debug.o crypt.o
 
 .c.o:
 	$(CC) $(CFLAGS) $(OPTIMIZE) -c $*.c
@@ -105,48 +155,102 @@ grammar.tab.o: grammar.tab.c opcodes.h
 which_makefile:
 	echo MakeIsMake
 %endif
+%endif
 
+%ifdef NMAKE
+grammar$(TAB_EXT).c: grammar.y
+	$(YACC) grammar.y
+	-rm -f grammar$(TAB_EXT).*
+	sed "s/y$(TAB_EXT).c/grammar$(TAB_EXT).c/g" y$(TAB_EXT).c > grammar$(TAB_EXT).c
+	-mv y$(TAB_EXT).h grammar$(TAB_EXT).h
+%else
 grammar.tab.c: grammar.y
 	$(YACC) grammar.y
 	-rm -f grammar.tab.*
 	sed "s/y.tab.c/grammar.tab.c/g" y.tab.c  > grammar.tab.c
 	-mv y.tab.h grammar.tab.h
+%endif
 
 %ifdef GNU
 packages/packages.a: packages/parser.c packages/contrib.c
-	$(MAKE) -C packages 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)'
+	$(MAKE) -C packages 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)' 'A=$(A)' 'O=$(O)'
 
 mudlib/mudlib.a:
-	$(MAKE) -C mudlib 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)'
+	$(MAKE) -C mudlib 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)' 'A=$(A)' 'O=$(O)'
+%else
+%ifdef NMAKE
+packages/packages.lib: packages/parser.c packages/contrib.c
+	cd packages
+	$(MAKE) /nologo "CC=$(CC)" "CFLAGS=$(CFLAGS) $(OPTIMIZE)" "OBJDIR=../$(OBJDIR)" \
+	"RANLIB=$(RANLIB)" "O=$(O)" "A=$(A)"
+	cd ..
+
+mudlib/mudlib.lib:
+	cd mudlib
+	$(MAKE) /nologo "CC=$(CC)" "CFLAGS=$(CFLAGS) $(OPTIMIZE)" "OBJDIR=../$(OBJDIR)" \
+	"RANLIB=$(RANLIB)" "O=$(O)" "A=$(A)"
+	cd ..
 %else
 packages/packages.a: packages/parser.c packages/contrib.c
-	(cd packages; $(MAKE) 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'RANLIB=$(RANLIB)')
+	(cd packages; $(MAKE) 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'RANLIB=$(RANLIB)' 'A=$(A)' 'O=$(O)')
 
 mudlib/mudlib.a:
-	(cd mudlib; $(MAKE) 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'RANLIB=$(RANLIB)')
+	(cd mudlib; $(MAKE) 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'RANLIB=$(RANLIB)' 'A=$(A)' 'O=$(O)')
 %endif
+%endif
+%ifdef NMAKE
+$(DRIVER_BIN): $(DRIVER_BIN).exe
+
+$(DRIVER_BIN).exe: packages/packages.lib mudlib/mudlib.lib $(OBJ)
+	-mv -f $(DRIVER_BIN).exe $(DRIVER_BIN).old
+	$(CC) $(CFLAGS) $(OPTIMIZE) $(OBJ) -Fe$(DRIVER_BIN).exe packages/packages.lib mudlib/mudlib.lib \
+	$(EXTRALIBS) @system_libs
+%else
 $(DRIVER_BIN): packages/packages.a mudlib/mudlib.a $(OBJ)
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
 	$(PROOF) $(CC) $(CFLAGS) $(OPTIMIZE) $(OBJ) -o $(DRIVER_BIN) packages/packages.a mudlib/mudlib.a $(EXTRALIBS) `cat system_libs`
+%endif
 
 %ifdef GNU
-addr_server:  $(OBJDIR)/addr_server.o $(OBJDIR)/socket_ctrl.o $(OBJDIR)/port.o addr_server.h
+addr_server: files $(OBJDIR)/addr_server.o $(OBJDIR)/socket_ctrl.o $(OBJDIR)/port.o addr_server.h
 	$(CC) $(CFLAGS) $(OPTIMIZE) $(OBJDIR)/socket_ctrl.o $(OBJDIR)/addr_server.o $(OBJDIR)/port.o \
 	-o addr_server `cat system_libs`
 
+portbind: $(OBJDIR)/portbind.o
+	$(CC) $(CFLAGS) $(OPTIMIZE) $(OBJDIR)/portbind.o -o portbind `cat system_libs`
+
 %else
-addr_server:  addr_server.o socket_ctrl.o port.o addr_server.h
+%ifdef NMAKE
+addr_server: addr_server.exe
+
+addr_server.exe: $(OBJDIR)/addr_server.obj $(OBJDIR)/socket_ctrl.obj $(OBJDIR)/port.obj addr_server.h
+	$(CC) $(CFLAGS) $(OPTIMIZE) $(OBJDIR)/socket_ctrl.obj $(OBJDIR)/addr_server.obj $(OBJDIR)/port.obj \
+	-Feaddr_server.exe @system_libs
+%else
+addr_server: files addr_server.o socket_ctrl.o port.o addr_server.h
 	$(CC) $(CFLAGS) $(OPTIMIZE) socket_ctrl.o addr_server.o port.o \
 	-o addr_server `cat system_libs`
+
+portbind: portbind.o
+	$(CC) $(CFLAGS) $(OPTIMIZE) portbind.o -o portbind `cat system_libs`
+%endif
 %endif
 
 remake: neat all
 
+%ifdef NMAKE
+customize: cp.bat
+	-cp ..\local_options .
+	-cp ..\system_libs .
+	-cp ..\configure.h .
+%else
 customize:
 	-cp ../local_options .
 	-cp ../system_libs .
 	-cp ../configure.h .
+%endif
 
+%ifndef NMAKE
 depend: opcodes.h grammar.tab.c cc.h efunctions.h efun_defs.c configure.h
 %ifdef GNU
 	-rm tmpdepend
@@ -157,21 +261,40 @@ depend: opcodes.h grammar.tab.c cc.h efunctions.h efun_defs.c configure.h
 	makedepend *.c
 %endif
 
+%endif
 %ifdef GNU
 cc.h: GNUmakefile
 %else
 cc.h: Makefile
 %endif
+%ifdef NMAKE
+	rm -f cc.h
+	echo /* this file automatically generated by the Makefile */ > cc.h
+	echo #define COMPILER "$(CC)" >> cc.h
+	echo #define OPTIMIZE "$(OPTIMIZE)" >> cc.h
+	echo #define CFLAGS   "$(CFLAGS) $(OPTIMIZE)" >> cc.h
+	echo #define OBJDIR   "$(OBJDIR)" >> cc.h
+%else
 	rm -f cc.h
 	echo "/* this file automatically generated by the Makefile */" > cc.h
 	echo '#define COMPILER "$(CC)"' >> cc.h
 	echo '#define OPTIMIZE "$(OPTIMIZE)"' >> cc.h
 	echo '#define CFLAGS   "$(CFLAGS) $(OPTIMIZE)"' >> cc.h
 	echo '#define OBJDIR   "$(OBJDIR)"' >> cc.h
+%endif
 
 # the touches here are necessary to fix the modification times; link(2) does
 # 'modify' a file
 files: edit_source sysmalloc.c smalloc.c bsdmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c func_spec.c mudlib/Makefile.pre mudlib/GNUmakefile.pre packages/Makefile.pre packages/GNUmakefile.pre configure.h grammar.y.pre
+%ifdef NMAKE
+	.\edit_source -options -malloc -build_func_spec "$(CPP) $(CFLAGS)" \
+	              -process grammar.y.pre
+	.\edit_source -process packages/Makefile.pre
+	.\edit_source -process packages/GNUmakefile.pre
+	.\edit_source -process mudlib/Makefile.pre
+	.\edit_source -process mudlib/GNUmakefile.pre
+	.\edit_source -build_efuns
+%else	
 	./edit_source -options -malloc -build_func_spec '$(CPP) $(CFLAGS)' \
 	              -process grammar.y.pre
 	./edit_source -process packages/Makefile.pre
@@ -179,15 +302,29 @@ files: edit_source sysmalloc.c smalloc.c bsdmalloc.c debugmalloc.c wrappedmalloc
 	./edit_source -process mudlib/Makefile.pre
 	./edit_source -process mudlib/GNUmakefile.pre
 	./edit_source -build_efuns
+%endif
 	touch mallocwrapper.c
 	touch malloc.c
 	touch files
 
+%ifdef NMAKE
+make_func$(TAB_EXT).c: make_func.y cc.h
+	$(YACC) $(YFLAGS) make_func.y
+	-rm -f make_func$(TAB_EXT).c
+	mv y$(TAB_EXT).c make_func$(TAB_EXT).c
+%else
 make_func.tab.c: make_func.y cc.h
 	$(YACC) $(YFLAGS) make_func.y
 	-rm -f make_func.tab.c
 	mv y.tab.c make_func.tab.c
+%endif
 
+%ifdef NMAKE
+configure.h: edit_source.exe build.MudOS
+	if not exist configure.h rm -f configuration
+	touch configuration
+	.\edit_source -configure
+%else
 configure.h: edit_source build.MudOS
 	-if test \( ! -r configure.h \) -o \( ! -r configuration \); then \
 	    rm -f configuration; \
@@ -199,7 +336,42 @@ configure.h: edit_source build.MudOS
 	    ./edit_source -configure; \
 	    echo "Machine `uname -a` Configure version 5" > configuration; \
 	fi
+%endif
 
+%ifdef NMAKE
+build.MudOS: buildMudOS.bat
+
+$(OBJDIR)/crypt.obj: ./amiga/crypt.c
+	$(CC) $(CFLAGS) $(OPTIMIZE) -Fo$(OBJDIR)\ -c .\amiga\crypt.c
+
+utils: touch.exe mudlib/ar.exe packages/ar.exe mv.bat rm.bat packages/rm.bat mudlib/rm.bat cp.bat
+
+rm.bat: Win32/rm.bat
+	copy Win32\rm.bat .
+
+packages/rm.bat: Win32/rm.bat
+	copy Win32\rm.bat packages
+
+mudlib/rm.bat: Win32/rm.bat
+	copy Win32\rm.bat mudlib
+
+mv.bat: Win32/mv.bat
+	copy Win32\mv.bat .
+
+cp.bat: Win32/cp.bat
+	copy Win32\cp.bat .
+
+touch.exe: Win32/touch.c
+	$(CC) Win32/touch.c
+
+packages/ar.exe: mudlib/ar.exe
+	copy mudlib\ar.exe packages
+
+mudlib/ar.exe: Win32/ar.c
+	$(CC) -Femudlib/ Win32/ar.c
+
+
+%endif
 %ifdef GNU
 $(OBJDIR)/edit_source.o: edit_source.c preprocess.c cc.h
 
@@ -218,6 +390,21 @@ tags: $(SRC)
 
 TAGS: $(SRC)
 	etags $(SRC)
+%else
+%ifdef NMAKE
+$(OBJDIR)/edit_source.obj: edit_source.c preprocess.c cc.h
+
+edit_source: edit_source.exe
+
+edit_source.exe: $(OBJDIR)/edit_source.obj $(OBJDIR)/hash.obj $(OBJDIR)/make_func$(TAB_EXT).obj
+	$(CC) $(CFLAGS) $(OBJDIR)\edit_source.obj $(OBJDIR)\hash.obj $(OBJDIR)\make_func$(TAB_EXT).obj -Feedit_source.exe
+
+# don't optimize these two
+$(OBJDIR)/edit_source.obj: edit_source.c
+	$(CC) $(CFLAGS) -Fo$(OBJDIR)\ -c edit_source.c
+
+$(OBJDIR)/make_func$(TAB_EXT).obj: make_func$(TAB_EXT).c
+	$(CC) $(CFLAGS) -Fo$(OBJDIR)\ -c make_func$(TAB_EXT).c
 %else
 edit_source.o: edit_source.c preprocess.c cc.h
 
@@ -241,19 +428,48 @@ TAGS: force
 
 force:
 %endif
+%endif
 
 install: all
 	-mkdir $(INSTALL_DIR)
+%ifdef NMAKE
+	$(INSTALL) $(DRIVER_BIN).exe $(INSTALL_DIR)
+	$(INSTALL) addr_server.exe $(INSTALL_DIR)
+%else
 	$(INSTALL) $(DRIVER_BIN) $(INSTALL_DIR)
 	$(INSTALL) addr_server $(INSTALL_DIR)
+	$(INSTALL) portbind $(INSTALL_DIR)
+%endif
 
-Makefiles: Makefile.in GNUmakefile.in
+%ifdef NMAKE
+Makefiles: utils Makefile.in GNUmakefile.in NMakefile.in
+%else
+Makefiles: Makefile.in GNUmakefile.in NMakefile.in
+%endif
 
+%ifdef NMAKE
+Makefile.in: edit_source.exe Makefile.in.pre Makefile.master
+	.\edit_source -process Makefile.in.pre
+%else
 Makefile.in: edit_source Makefile.in.pre Makefile.master
 	./edit_source -process Makefile.in.pre
+%endif
 
+%ifdef NMAKE
+GNUmakefile.in: edit_source.exe GNUmakefile.in.pre Makefile.master
+	.\edit_source -process GNUmakefile.in.pre
+%else
 GNUmakefile.in: edit_source GNUmakefile.in.pre Makefile.master
 	./edit_source -process GNUmakefile.in.pre
+%endif
+
+%ifdef NMAKE
+NMakefile.in: edit_source.exe NMakefile.in.pre Makefile.master
+	.\edit_source -process NMakefile.in.pre
+%else
+NMakefile.in: edit_source NMakefile.in.pre Makefile.master
+	./edit_source -process NMakefile.in.pre
+%endif
 
 nothing:
 
@@ -262,26 +478,59 @@ spotless: clean
 	-rm -f configure.h local_options system_libs configuration
 	-rm -f options_incl.h
 	-rm -f *.diffs
+%ifdef NMAKE
+	-rm -f touch.exe mudlib\ar.exe packages\ar.exe mv.bat packages\rm.bat mudlib\rm.bat cp.bat
+	del rm.bat
+%endif
 
 # get ready for recompile
+%ifdef NMAKE
+neat: rm.bat packages/rm.bat mudlib/rm.bat
+	-cd packages
+	-$(MAKE) /nologo "O=$(O)" "A=$(A)" clean
+	-cd..
+	-cd mudlib
+	-$(MAKE) /nologo "O=$(O)" "A=$(A)" clean
+	-cd..
+	-deltree /y $(OBJDIR)
+	-rm *.obj *$(TAB_EXT).c *$(TAB_EXT).h trash_me.bat *.ilk *.pdb
+%else
 neat:
-	-(cd packages; $(MAKE) clean)
-	-(cd mudlib; $(MAKE) clean)
-	-rm -rf $(OBJDIR) *.o *.tab.c *.tab.h
+	-(cd packages; $(MAKE) "A=$(A)" "O=$(O)" clean)
+	-(cd mudlib; $(MAKE) "A=$(A)" "O=$(O)" clean)
+	-rm -rf $(OBJDIR) *.$(O) *.tab.c *.tab.h
+%endif
 	-mkdir $(OBJDIR)
 	-rm -f efun_defs.c option_defs.c
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
 	-rm -f malloc.c mallocwrapper.c
 	-rm -f func_spec.cpp files
 	-rm -f grammar.y comptest* a.out
+%ifdef NMAKE
+	-rm packages\Makefile packages\GNUmakefile packages\packages
+	-rm packages\*.pdb mudlib\*.pdb
+%else
 	-rm -f packages/Makefile packages/GNUmakefile packages/packages
+%endif
 
 # remove everything except configuration
 clean: neat
+%ifdef NMAKE
+	-rm -f cc.h edit_source.exe
+	-rm core y.output testsuite\core testsuite\single\swapfile.*
+	-rm -f testsuite\OPCPROF.* testsuite\opc.*
+	-echo y | del testsuite\tmp\*
+	-deltree /y testsuite\binaries
+	-rm testsuite\OBJ_DUMP* testsuite\test_file testsuite\testfile
+	-rm testsuite\tmp_eval_file.c testsuite\sf.o testsuite\ed_test
+	-rm testsuite\log\log testsuite\log\debug.log testsuite\log\compile
+	-rm -f $(DRIVER_BIN).exe $(DRIVER_BIN).old addr_server.exe
+%else
 	-rm -f Makefile.MudOS GNUmakefile.MudOS
 	-rm -f cc.h edit_source
 	-rm -f core y.output testsuite/core testsuite/tmp/*
-	-rm -rf testsuite/binaries
+	-rm -f testsuite/OPCPROF.* testsuite/opc.*
+	-rm -rf testsuite/binaries testsuite/single/swapfile.*
 	-rm -f testsuite/OBJ_DUMP* testsuite/test_file testsuite/testfile
 	-rm -f testsuite/tmp_eval_file.c testsuite/sf.o testsuite/ed_test
 	-rm -f testsuite/log/log testsuite/log/debug.log testsuite/log/compile
@@ -289,7 +538,8 @@ clean: neat
 	-find . -name "*.orig" -print | xargs rm
 	-find . -name "*.rej" -print | xargs rm
 	-rm -f *.ln tags TAGS
-	-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old addr_server
+	-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old addr_server portbind
+%endif
 %ifdef GNU
 	-rm -f Dependencies tmpdepend
 	-touch Dependencies

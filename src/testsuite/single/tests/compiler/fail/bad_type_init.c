@@ -1,0 +1,3 @@
+TYPETEST
+
+int x = "hi";

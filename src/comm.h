@@ -6,6 +6,7 @@
 #ifndef COMM_H
 #define COMM_H
 
+#include "lpc_incl.h"
 #include "network_incl.h"
 
 #define MAX_TEXT                   2048
@@ -50,9 +51,10 @@ typedef struct interactive_s {
     char text[MAX_TEXT];	/* input buffer for interactive object     */
     int text_end;		/* first free char in buffer               */
     int text_start;		/* where we are up to in user command buffer */
-    struct interactive_s *snoop_on;
-    struct interactive_s *snoop_by;
     int last_time;		/* time of last command executed           */
+#ifndef NO_SNOOP
+    object_t *snooped_by;
+#endif
 #ifndef NO_ADD_ACTION
     /* this or What ? is printed when error    */
     union string_or_func default_err_message;
@@ -114,14 +116,16 @@ extern fd_set writemask;
 extern int inet_packets;
 extern int inet_volume;
 extern int num_user;
-extern int num_hidden;
+#ifdef F_SET_HIDE
+extern int num_hidden_users;
+#endif
 extern int add_message_calls;
 
 extern interactive_t **all_users;
 extern int max_users;
 
-void add_vmessage PROT2V(object_t *, char *);
-void add_message PROT((object_t *, char *));
+void CDECL add_vmessage PROT2V(object_t *, char *);
+void add_message PROT((object_t *, char *, int));
 
 #ifdef SIGNAL_FUNC_TAKES_INT
 void sigalrm_handler PROT((int));
@@ -147,9 +151,11 @@ char *query_ip_name PROT((object_t *));
 char *query_ip_number PROT((object_t *));
 char *query_host_name PROT((void));
 int query_idle PROT((object_t *));
+#ifndef NO_SNOOP
 int new_set_snoop PROT((object_t *, object_t *));
 object_t *query_snoop PROT((object_t *));
 object_t *query_snooping PROT((object_t *));
+#endif
 void set_notify_fail_function PROT((funptr_t *));
 
 #ifdef DEBUGMALLOC_EXTENSIONS

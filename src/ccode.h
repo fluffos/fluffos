@@ -1,6 +1,9 @@
 #ifndef CCODE_H
 #define CCODE_H
 
+/* parse_node_t */
+#include "trees.h"
+
 #include "program.h"
 
 void c_start_function PROT((char *));

@@ -1,10 +1,7 @@
 #define SUPPRESS_COMPILER_INLINES
 #include "std.h"
-#include "lpc_incl.h"
 #include "generate.h"
 #include "compiler.h"
-#include "icode.h"
-#include "lex.h"
 
 static parse_node_t *optimize PROT((parse_node_t *));
 static parse_node_t **last_local_refs = 0;
@@ -87,7 +84,7 @@ optimize P1(parse_node_t *, expr) {
     case NODE_UNARY_OP_1:
 	OPT(expr->r.expr);
 	if (expr->v.number == F_VOID_ASSIGN_LOCAL) {
-	    if (last_local_refs[expr->l.number]	&& !optimizer_state) {
+	    if (last_local_refs[expr->l.number] && !optimizer_state) {
 		last_local_refs[expr->l.number]->v.number = F_TRANSFER_LOCAL;
 		last_local_refs[expr->l.number] = 0;
 	    }
@@ -284,7 +281,7 @@ static void lpc_tree_list P2(parse_node_t *, dest, parse_node_t *, expr) {
     }
 }
 
-#define lpc_tree_opc(x, y) lpc_tree_string(x, get_f_name(y & ~NOVALUE_USED_FLAG))
+#define lpc_tree_opc(x, y) lpc_tree_string(x, query_instr_name(y & ~NOVALUE_USED_FLAG))
 
 #define ARG_1 dest->r.expr
 #define ARG_2 dest->r.expr->r.expr
@@ -486,7 +483,8 @@ short generate_function P3(compiler_function_t *, cfp, parse_node_t *, node, int
     if (pragmas & PRAGMA_OPTIMIZE) {
 	optimizer_start_function(num);
 	optimizer_state = 0;
-	node = optimize(node);
+	if (num_parse_error == 0)
+	    node = optimize(node);
 	optimizer_end_function();
     }
     if (compile_to_c) {
@@ -494,7 +492,8 @@ short generate_function P3(compiler_function_t *, cfp, parse_node_t *, node, int
 	c_analyze(node);
 	ret = generate(node);
 	c_end_function();
-    } else ret = generate(node);
+    } else 
+	ret = generate(node);
     return ret;
 }
 #else

@@ -2,6 +2,7 @@
 #define BACKEND_H
 
 #include "interpret.h"
+#include "object.h"
 
 #define NULL_ERROR_CONTEXT       0
 #define NORMAL_ERROR_CONTEXT     1

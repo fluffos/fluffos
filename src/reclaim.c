@@ -44,6 +44,21 @@ check_svalue P1(svalue_t *, v)
     case T_FUNCTION:
 	{
 	    svalue_t tmp;
+	    program_t *prog;
+
+	    if (v->u.fp->hdr.owner && (v->u.fp->hdr.owner->flags & O_DESTRUCTED)) {
+		if (v->u.fp->hdr.type == FP_LOCAL | FP_NOT_BINDABLE) {
+		    prog = v->u.fp->hdr.owner->prog;
+		    prog->func_ref--;
+		    debug(d_flag, ("subtr func ref /%s: now %i\n",
+				prog->name, prog->func_ref));
+		    if (!prog->ref && !prog->func_ref)
+			deallocate_program(prog);
+		}
+		free_object(v->u.fp->hdr.owner, "reclaim_objects");
+		v->u.fp->hdr.owner = 0;
+		cleaned++;
+	    }
 	    tmp.type = T_ARRAY;
 	    if ((tmp.u.arr = v->u.fp->hdr.args))
 		check_svalue(&tmp);
@@ -78,8 +93,7 @@ gc_mapping P1(mapping_t *, m)
 		    m->count--;
 		    total_mapping_nodes--;
 		    total_mapping_size -= sizeof(mapping_node_t);
-		    free_svalue(elt->values + 1, "gc_mapping");
-		    free_node(elt);
+		    free_node(m, elt);
 		    continue;
 		}
 	    } else {

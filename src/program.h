@@ -40,45 +40,64 @@
  * after compilation, to be used when the object is inherited.
  */
 
-/* NAME_INHERITED - The function entry that exists in this object actually
+/* FUNC_INHERITED - The function entry that exists in this object actually
                     is a function in an object we inherited
- * NAME_UNDEFINED - the function hasn't been defined yet at this level
- * NAME_STRICT_TYPES - compiled with strict type testing
- * NAME_PROTOTYPE - only a prototype has been found so far
- * NAME_DEF_BY_INHERIT - this function actually exists in an object we've
+ * FUNC_UNDEFINED - the function hasn't been defined yet at this level
+ * FUNC_STRICT_TYPES - compiled with strict type testing
+ * FUNC_PROTOTYPE - only a prototype has been found so far
+ * FUNC_DEF_BY_INHERIT - this function actually exists in an object we've
                          inherited; if we don't find a function at this level
 			 we'll use that one
- * NAME_ALIAS     - This entry refers us to another entry, usually because
+ * FUNC_ALIAS     - This entry refers us to another entry, usually because
                     this function was overloaded by that function
  */
-#define NAME_INHERITED		0x1
-#define NAME_UNDEFINED		0x2
-#define NAME_STRICT_TYPES	0x4
-#define NAME_PROTOTYPE		0x8
-#define NAME_DEF_BY_INHERIT     0x10
-#define NAME_ALIAS              0x20
-#define NAME_TRUE_VARARGS       0x40
+#define FUNC_INHERITED		0x1
+#define FUNC_UNDEFINED		0x2
+#define FUNC_STRICT_TYPES	0x4
+#define FUNC_PROTOTYPE		0x8
+#define FUNC_DEF_BY_INHERIT     0x10
+#define FUNC_ALIAS              0x20
+#define FUNC_TRUE_VARARGS       0x40
+#define FUNC_VARARGS		0x80
 
-#define NAME_HIDDEN	        0x0100  /* used by private vars */
-#define NAME_STATIC		0x0200	/* Static function or variable */
-#define NAME_NO_MASK		0x0400	/* The nomask => not redefineable */
-#define NAME_PRIVATE		0x0800	/* Can't be inherited */
-#define NAME_PROTECTED		0x1000
-#define NAME_PUBLIC		0x2000	/* Force inherit through private */
-#define NAME_VARARGS		0x4000	/* Used for type checking */
+#define DECL_HIDDEN	        0x0200  /* used by private vars */
+#define DECL_PRIVATE		0x0400	/* Can't be inherited */
+#define DECL_PROTECTED		0x0800	/* Static function or variable */
+#define DECL_PUBLIC		0x1000	
+#define DECL_NOMASK		0x2000	/* The nomask => not redefineable */
+#define DECL_NOSAVE		0x4000
+#ifndef SENSIBLE_MODIFIERS
+#define DECL_VISIBLE		0x8000  /* Force inherit through private */
 
-#define NAME_TYPE_MOD		(NAME_HIDDEN | NAME_STATIC | NAME_NO_MASK | NAME_PRIVATE | NAME_PROTECTED | NAME_PUBLIC | NAME_VARARGS)
+#define DECL_ACCESS		(DECL_HIDDEN | DECL_PRIVATE | DECL_PROTECTED | DECL_PUBLIC | DECL_VISIBLE)
+
+#define DECL_MODIFY(x,y) ((((x)|(y))&DECL_VISIBLE) ? ((((x)|(y))&~DECL_ACCESS)|DECL_VISIBLE) : DECL_MODIFY2(x,y))
+#else
+#define DECL_ACCESS		(DECL_HIDDEN | DECL_PRIVATE | DECL_PROTECTED | DECL_PUBLIC)
+
+#define DECL_MODIFY(x,y) DECL_MODIFY2(x,y)
+#endif
+#define DECL_MODS		(DECL_ACCESS | DECL_NOMASK | DECL_NOSAVE)
+
+#define DECL_MODIFY2(t, mod) ((((t) & DECL_ACCESS) > ((mod) & DECL_ACCESS)) ? ((t) & ~DECL_ACCESS) | (mod) : (t) | ((mod) & ~DECL_ACCESS))
+
 /* only the flags that should be copied up through inheritance levels */
-#define NAME_MASK (NAME_UNDEFINED | NAME_STRICT_TYPES | NAME_PROTOTYPE | NAME_TRUE_VARARGS | NAME_TYPE_MOD)
+#define FUNC_MASK (FUNC_VARARGS | FUNC_UNDEFINED | FUNC_STRICT_TYPES | FUNC_PROTOTYPE | FUNC_TRUE_VARARGS | DECL_MODS)
+
 /* a function that isn't 'real' */
-#define NAME_NO_CODE  (NAME_UNDEFINED | NAME_ALIAS | NAME_PROTOTYPE)
-#define REAL_FUNCTION(x) (!((x) & (NAME_ALIAS | NAME_PROTOTYPE)) && \
-                         (((x) & NAME_DEF_BY_INHERIT) || (!((x) & NAME_UNDEFINED))))
+#define FUNC_NO_CODE  (FUNC_UNDEFINED | FUNC_ALIAS | FUNC_PROTOTYPE)
+#define REAL_FUNCTION(x) (!((x) & (FUNC_ALIAS | FUNC_PROTOTYPE)) && \
+                         (((x) & FUNC_DEF_BY_INHERIT) || (!((x) & FUNC_UNDEFINED))))
+
 /*
  * These are or'ed in on top of the basic type.
  */
 #define TYPE_MOD_ARRAY   	0x0020	/* Pointer to a basic type */
 #define TYPE_MOD_CLASS          0x0040  /* a class */
+#define LOCAL_MOD_UNUSED	0x0080
+#define LOCAL_MOD_REF		0x0100
+
+#define LOCAL_MODS (LOCAL_MOD_UNUSED|LOCAL_MOD_REF)
 
 typedef struct {
     unsigned char num_arg;

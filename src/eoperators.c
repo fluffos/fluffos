@@ -7,9 +7,7 @@
 #include "std.h"
 #include "lpc_incl.h"
 #include "efuns_incl.h"
-#include "lex.h"
 #include "backend.h"
-#include "eoperators.h"
 #include "parse.h"
 #include "swap.h"
 #ifdef TRACE
@@ -17,37 +15,6 @@
 #endif
 #include "compiler.h"
 #include "simul_efun.h"
-
-INLINE void
-dealloc_funp P1(funptr_t *, fp)
-{
-    free_object(fp->hdr.owner, "free_funp");
-    if (fp->hdr.args)
-	free_array(fp->hdr.args);
-    if ((fp->hdr.type & 0x0f) == FP_FUNCTIONAL) {
-    	fp->f.functional.prog->func_ref--;
-#ifdef DEBUG
-	if (d_flag)
-	    printf("subtr func ref /%s: now %i\n",
-		   fp->f.functional.prog->name,
-		   fp->f.functional.prog->func_ref);
-#endif
-	if (fp->f.functional.prog->func_ref == 0 
-	    && fp->f.functional.prog->ref == 0)
-	    deallocate_program(fp->f.functional.prog);
-    }
-    FREE(fp);
-}
-
-INLINE void
-free_funp P1(funptr_t *, fp)
-{
-    fp->hdr.ref--;
-    if (fp->hdr.ref > 0) {
-	return;
-    }
-    dealloc_funp(fp);
-}
 
 INLINE void f_and()
 {
@@ -68,9 +35,16 @@ f_and_eq()
 {
     svalue_t *argp;
 
-    if ((argp = sp->u.lvalue)->type != T_NUMBER)
+    argp = (sp--)->u.lvalue;
+
+    if (argp->type == T_ARRAY && sp->type == T_ARRAY) {
+	sp->u.arr = argp->u.arr = intersect_array(argp->u.arr, sp->u.arr);
+	sp->u.arr->ref++; /* since we put it in two places */
+	return;
+    }
+    if (argp->type != T_NUMBER)
 	error("Bad left type to &=\n");
-    if ((--sp)->type != T_NUMBER)
+    if (sp->type != T_NUMBER)
 	error("Bad right type to &=\n");
     sp->u.number = argp->u.number &= sp->u.number;
     sp->subtype = 0;
@@ -162,7 +136,15 @@ f_eq()
 	    free_array(sp->u.arr);
 	    break;
 	}
-	
+
+    case T_CLASS:
+        {
+	    i = (sp-1)->u.arr == sp->u.arr;
+	    free_class((sp--)->u.arr);
+	    free_class(sp->u.arr);
+	    break;
+	}
+    
     case T_MAPPING:
 	{
 	    i = (sp-1)->u.map == sp->u.map;
@@ -197,6 +179,7 @@ f_eq()
 	    free_funp(sp->u.fp);
 	    break;
 	}
+#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
 	{
 	    i = (sp-1)->u.buf == sp->u.buf;
@@ -204,6 +187,7 @@ f_eq()
 	    free_buffer(sp->u.buf);
 	    break;
 	}
+#endif
     default:
 	pop_stack();
 	free_svalue(sp, "f_eq");
@@ -441,7 +425,7 @@ f_mult_eq()
 
 	case T_NUMBER|T_REAL:
 	{
-	    if (sp->type == T_NUMBER){
+	    if (sp->type == T_NUMBER) {
 		sp->type = T_REAL;
 		sp->u.real = argp->u.real *= sp->u.number;
 	    }
@@ -454,9 +438,10 @@ f_mult_eq()
 	case T_MAPPING:
 	{
 	    mapping_t *m = compose_mapping(argp->u.map, sp->u.map,0);
-	    pop_stack();
-	    push_mapping(m);
-	    assign_svalue(argp, sp);
+	    if (argp->u.map != sp->u.map) {
+		pop_stack();
+		push_mapping(m);
+	    }
 	    break;
 	}
 
@@ -513,6 +498,14 @@ f_ne()
             break;
 	}
 
+    case T_CLASS:
+        {
+            i = (sp-1)->u.arr != sp->u.arr;
+	    free_class((sp--)->u.arr);
+	    free_class(sp->u.arr);
+            break;
+	}
+
     case T_MAPPING:
         {
             i = (sp-1)->u.map != sp->u.map;
@@ -548,6 +541,7 @@ f_ne()
             break;
 	}
 
+#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
         {
             i = (sp-1)->u.buf != sp->u.buf;
@@ -555,6 +549,7 @@ f_ne()
 	    free_buffer(sp->u.buf);
             break;
 	}
+#endif
 
     default:
 	pop_stack();
@@ -569,6 +564,11 @@ f_ne()
 INLINE void
 f_or()
 {
+    if (sp->type == T_ARRAY && (sp - 1)->type == T_ARRAY) {
+	sp--;
+	sp->u.arr = union_array(sp->u.arr, (sp+1)->u.arr);
+	return;
+    }
     CHECK_TYPES((sp - 1), T_NUMBER, 1, F_OR);
     CHECK_TYPES(sp, T_NUMBER, 2, F_OR);
     sp--;
@@ -580,9 +580,16 @@ f_or_eq()
 {
     svalue_t *argp;
 
-    if ((argp = sp->u.lvalue)->type != T_NUMBER)
+    argp = (sp--)->u.lvalue;
+    if (argp->type == T_ARRAY && sp->type == T_ARRAY) {
+	argp->u.arr = sp->u.arr = union_array(argp->u.arr, sp->u.arr);
+	sp->u.arr->ref++; /* because we put it in two places */
+	return;
+    }
+
+    if (argp->type != T_NUMBER)
 	error("Bad left type to |=\n");
-    if ((--sp)->type != T_NUMBER)
+    if (sp->type != T_NUMBER)
 	error("Bad right type to |=\n");
     sp->u.number = argp->u.number |= sp->u.number;
     sp->subtype = 0;
@@ -615,6 +622,7 @@ f_parse_command()
      * perform some stack manipulation;
      */
     fp = sp;
+    CHECK_STACK_OVERFLOW(num_arg + 1);
     sp += num_arg + 1;
     arg = sp;
     *(arg--) = *(fp--);		/* move pattern to top of stack */
@@ -656,7 +664,7 @@ f_range P1(int, code)
     if ((sp-1)->type != T_NUMBER)
         error("End of range [ .. ] interval must be a number.\n");
 
-    switch(sp->type){
+    switch(sp->type) {
         case T_STRING:
         {
             char *res = sp->u.string;
@@ -696,6 +704,7 @@ f_range P1(int, code)
             free_string_svalue(sp + 2);
             break;
         }
+#ifndef NO_BUFFER_TYPE
         case T_BUFFER:
         {
             buffer_t *rbuf = sp->u.buf;
@@ -729,6 +738,7 @@ f_range P1(int, code)
             }
             break;
         }
+#endif
 
         case T_ARRAY:
         {
@@ -742,7 +752,8 @@ f_range P1(int, code)
         }
 
         default:
-            error("Bad argument to [ .. ] range operator.\n");
+            error("Cannot index type '%s' using [ .. ] operator.\n",
+		  type_name(sp->type));
     }
 }
 
@@ -778,6 +789,7 @@ f_extract_range P1(int, code)
             free_string_svalue(sp + 1);
             break;
         }
+#ifndef NO_BUFFER_TYPE
         case T_BUFFER:
         {
             buffer_t *rbuf = sp->u.buf;
@@ -801,6 +813,7 @@ f_extract_range P1(int, code)
             put_buffer(nbuf);
             break;
         }
+#endif
 
         case T_ARRAY:
         {
@@ -843,7 +856,7 @@ f_sub_eq()
 {
     svalue_t *argp = (sp--)->u.lvalue;
 
-    switch(argp->type | sp->type){
+    switch(argp->type | sp->type) {
 	case T_NUMBER:
 	{
 	    sp->u.number = argp->u.number -= sp->u.number;
@@ -873,6 +886,18 @@ f_sub_eq()
 	    break;
 	}
 
+        case T_LVALUE_BYTE | T_NUMBER:
+	{
+	    char c;
+
+	    c = *global_lvalue_byte.u.lvalue_byte - sp->u.number;
+	    
+	    if (global_lvalue_byte.subtype == 0 && c == '\0')
+		error("Strings cannot contain 0 bytes.\n");
+	    *global_lvalue_byte.u.lvalue_byte = c;
+	    break;
+	}
+    
 	default:
 	{
 	    if (!(sp->type & (T_NUMBER|T_REAL|T_ARRAY))) error("Bad right type to -=\n");
@@ -983,14 +1008,17 @@ f_switch()
      * i is the table size as a power of 2.  Tells us where to start
      * searching.  i==14 is a special case.
      */
-    if (i >= 14)
+    if (i >= 14) {
 	if (i == 14) {
+	    char *zz = end_tab - 4;
+	    
 	    /* fastest switch format : lookup table */
 	    l = current_prog->program + offset;
-	    COPY_INT(&d, end_tab - 4);
+	    COPY_INT(&d, zz);
 	    /* d is minimum value - see if in range or not */
-	    if (s >= d && l + (s = (s - d) * sizeof(short)) < (end_tab - 4)) {
-		COPY_SHORT(&offset, &l[s]);
+	    s -= d;
+	    if (s >= 0 && s < (zz-l)/sizeof(short)) {
+		COPY_SHORT(&offset, l + s * sizeof(short));
 		if (offset) {
 		    pc = current_prog->program + offset;
 		    return;
@@ -1002,7 +1030,8 @@ f_switch()
 	    return;
 	} else
 	    fatal("unsupported switch table format.\n");
-
+    }
+    
     /*
      * l - current entry we are looking at. 
      * d - size to add/subtract from l each iteration. 
@@ -1159,131 +1188,6 @@ f_xor_eq()
     if ((--sp)->type != T_NUMBER)
 	error("Bad right type to ^=\n");
     sp->u.number = argp->u.number ^= sp->u.number;
-    sp->subtype = 0;
-}
-
-INLINE funptr_t *
-make_efun_funp P2(int, opcode, svalue_t *, args)
-{
-    funptr_t *fp;
-    
-    fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(efun_ptr_t),
-			     TAG_FUNP, "make_efun_funp");
-    fp->hdr.owner = current_object;
-    add_ref( current_object, "make_efun_funp" );
-    fp->hdr.type = FP_EFUN;
-    
-    fp->f.efun.index = opcode;
-    
-    if (args->type == T_ARRAY) {
-	fp->hdr.args = args->u.arr;
-	args->u.arr->ref++;
-    } else
-	fp->hdr.args = 0;
-    
-    fp->hdr.ref = 1;
-    return fp;
-}
-
-INLINE funptr_t *
-make_lfun_funp P2(int, index, svalue_t *, args)
-{
-    funptr_t *fp;
-    
-    fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(local_ptr_t),
-			     TAG_FUNP, "make_efun_funp");
-    fp->hdr.owner = current_object;
-    add_ref( current_object, "make_efun_funp" );
-    fp->hdr.type = FP_LOCAL | FP_NOT_BINDABLE;
-    
-    fp->f.local.index = index + function_index_offset;
-    
-    if (args->type == T_ARRAY) {
-	fp->hdr.args = args->u.arr;
-	args->u.arr->ref++;
-    } else
-	fp->hdr.args = 0;
-    
-    fp->hdr.ref = 1;
-    return fp;
-}
-
-INLINE funptr_t *
-make_simul_funp P2(int, index, svalue_t *, args)
-{
-    funptr_t *fp;
-    
-    fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(simul_ptr_t),
-			     TAG_FUNP, "make_efun_funp");
-    fp->hdr.owner = current_object;
-    add_ref( current_object, "make_efun_funp" );
-    fp->hdr.type = FP_SIMUL;
-    
-    fp->f.simul.index = index;
-    
-    if (args->type == T_ARRAY) {
-	fp->hdr.args = args->u.arr;
-	args->u.arr->ref++;
-    } else
-	fp->hdr.args = 0;
-    
-    fp->hdr.ref = 1;
-    return fp;
-}
-
-INLINE funptr_t *
-make_functional_funp P5(short, num_arg, short, num_local, short, len, svalue_t *, args, int, flag)
-{
-    funptr_t *fp;
-    
-    fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(functional_t), 
-			     TAG_FUNP, "make_functional_funp");
-    fp->hdr.owner = current_object;
-    add_ref( current_object, "make_functional_funp" );
-    fp->hdr.type = FP_FUNCTIONAL + flag;
-
-    current_prog->func_ref++;
-#ifdef DEBUG
-	if (d_flag)
-	    printf("add func ref /%s: now %i\n",
-		   current_prog->name,
-		   current_prog->func_ref);
-#endif
-    
-    fp->f.functional.prog = current_prog;
-    fp->f.functional.offset = pc - current_prog->program;
-    fp->f.functional.num_arg = num_arg;
-    fp->f.functional.num_local = num_local;
-    fp->f.functional.fio = function_index_offset;
-    fp->f.functional.vio = variable_index_offset;
-    pc += len;
-    
-    if (args && args->type == T_ARRAY) {
-	fp->hdr.args = args->u.arr;
-	args->u.arr->ref++;
-	fp->f.functional.num_arg += args->u.arr->size;
-    } else
-	fp->hdr.args = 0;
-
-    fp->hdr.ref = 1;
-    return fp;
-}
-
-INLINE void
-push_refed_funp P1(funptr_t *, fp)
-{
-    sp++;
-    sp->type = T_FUNCTION;
-    sp->u.fp = fp;
-}
-
-INLINE void
-push_funp P1(funptr_t *, fp)
-{
-    sp++;
-    sp->type = T_FUNCTION;
-    sp->u.fp = fp;
-    fp->hdr.ref++;
 }
 
 INLINE void
@@ -1340,7 +1244,7 @@ f_function_constructor()
 }
 
 INLINE void
-f_evaluate PROT((void))
+f__evaluate PROT((void))
 {
     svalue_t *v;
     svalue_t *arg = sp - st_num_arg + 1;
@@ -1378,6 +1282,7 @@ f_sscanf()
      * already on the stack by this time
      */
     fp = sp;
+    CHECK_STACK_OVERFLOW(num_arg + 1);
     sp += num_arg + 1;
     *sp = *(fp--);		/* move format description to top of stack */
     *(sp - 1) = *(fp);		/* move source string just below the format

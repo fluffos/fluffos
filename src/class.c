@@ -47,3 +47,13 @@ array_t *allocate_class_by_size P1(int, size) {
     return p;
 }
 
+array_t *allocate_empty_class_by_size P1(int, size) {
+    array_t *p;
+
+    p = (array_t *)DXALLOC(sizeof(array_t) + sizeof(svalue_t) * (size - 1), TAG_CLASS, "allocate_class");
+    p->ref = 1;
+    p->size = size;
+
+    return p;
+}
+

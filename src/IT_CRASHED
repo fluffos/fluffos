@@ -25,8 +25,8 @@ crashers (serious bugs).
 Ok, if your driver crashes, and you want to be helpful, here's what you do:
 
 1. recompile the driver with the -g flag.  Turning off optimization
-   is a good idea too. [This can be done by reruning ./build.MudOS as
-   follows: ./build.MudOS debug]
+   is a good idea too. [This can be done by doing a 'make neat' (or gmake),
+   reruning ./build.MudOS as follows: './build.MudOS debug', then recompile]
 2. go to your bin dir and type 'gdb driver' where driver is the name of your
    driver executable
 3. It should startup, etc.  When it's ready, type 'run config.foo' or
@@ -37,11 +37,13 @@ Ok, if your driver crashes, and you want to be helpful, here's what you do:
 6. Post the output of the where command along with anything you know
    about where/how/why the driver crashed on the MudOS bug report board.
    Stuff like example LPC source code, a tail of driver.err and/or
-   debug.log, etc may be helpful.
+   debug.log, etc may be helpful.  In some cases the driver writes important
+   information to those files as it goes down.
 
-If you actually get a traceback, it makes crashes somewhere between 10-100x
-easier to fix.  Remember to also specify your driver version (eg 0.9.19),
-operating system/architecture, and its version (eg SunOS 5.3).
+If you actually get a traceback, it makes crashes somewhere between
+10-100x easier to fix (at least!).  Remember to also specify your
+driver version (eg 0.9.19), operating system/architecture, and its
+version (eg SunOS 5.3).
 
 Note:
   If you didn't use 'gcc', but 'cc' instead (for example), to compile the

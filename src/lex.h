@@ -1,8 +1,6 @@
 #ifndef _LEX_H_
 #define _LEX_H_
 
-#include "std.h"
-
 #define DEFMAX 10000
 #define MAXLINE 1024
 #define MLEN 4096
@@ -67,7 +65,7 @@ typedef struct defn_s {
 typedef struct ident_hash_elem_s {
     char *name;
     short token; /* only flags */
-    short sem_value; /* for these, a count of the ambiguity */
+    unsigned short sem_value; /* for these, a count of the ambiguity */
     struct ident_hash_elem_s *next;
 /* the fields above must correspond to struct keyword_t */
     struct ident_hash_elem_s *next_dirty;
@@ -77,7 +75,7 @@ typedef struct ident_hash_elem_s {
 typedef struct {
     char *word;
     unsigned short token;       /* flags here too */
-    short sem_value;            /* semantic value for predefined tokens */
+    unsigned short sem_value;   /* semantic value for predefined tokens */
     ident_hash_elem_t *next;
 /* the fields above must correspond to struct ident_hash_elem */
     short min_args;		/* Minimum number of arguments. */
@@ -139,8 +137,9 @@ extern int num_parse_error;
 extern lpc_predef_t *lpc_predefs;
 extern int efun_arg_types[];
 extern char yytext[1024];
-extern instr_t instrs[];
 extern keyword_t predefs[];
+extern int lex_fatal;
+extern int arrow_efun, evaluate_efun, this_efun, to_float_efun, to_int_efun, new_efun;
 
 INLINE void push_function_context PROT((void));
 void pop_function_context PROT((void));

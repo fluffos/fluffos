@@ -1,6 +1,8 @@
 #ifndef MAIN_H
 #define MAIN_H
 
+#include "lpc_incl.h"
+
 /*
  * main.c
  */
@@ -20,9 +22,6 @@ extern port_def_t external_port[5];
 extern char *external_cmd[5];
 #endif
 
-#ifdef DEBUG
-extern int d_flag;
-#endif
 extern int t_flag;
 extern int comp_flag;
 extern int time_to_swap;
@@ -33,16 +32,10 @@ extern int max_cost;
 extern int max_array_size;
 extern int max_buffer_size;
 extern int max_string_length;
-extern char *master_file_name;
 extern char *reserved_area;
-extern svalue_t const0;
-extern svalue_t const1;
-extern svalue_t const0u;
-extern int st_num_arg;
 extern double consts[];
 extern int slow_shut_down_to_do;
-extern object_t *master_ob;
 
-void debug_message PROT1V(char *);
+void CDECL debug_message PROT1V(char *);
 
 #endif

@@ -69,8 +69,8 @@ typedef struct malloc_block_s {
                           DEBUG_CHECK(MSTR_REF(x) != 1, "FREE_MSTR used on a multiply referenced string\n");\
                           svalue_strlen_size = MSTR_SIZE(x);\
 			  SUB_NEW_STRING(svalue_strlen_size, \
-					 sizeof(malloc_block_t));\
-			  FREE(MSTR_BLOCK(x));\
+  					 sizeof(malloc_block_t));\
+  			  FREE(MSTR_BLOCK(x));\
 			  SUB_STRING(svalue_strlen_size);\
 		      )
 
@@ -119,7 +119,6 @@ typedef struct block_s {
 				     ((y)->subtype & STRING_COUNTED)) ? \
 				     MSTR_SIZE((x)->u.string) != \
 				     MSTR_SIZE((y)->u.string) : 0)
-
 /*
  * stralloc.c
  */

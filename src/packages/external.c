@@ -13,6 +13,7 @@ int external_start P5(int, which, char *, args,
     char *cmd;
     int fd;
     char **argv;
+    pid_t ret;
     
     if (--which < 0 || which > 4 || !external_cmd[which])
 	error("Bad argument 1 to external_start()\n");
@@ -23,7 +24,11 @@ int external_start P5(int, which, char *, args,
     if (socketpair(PF_UNIX, SOCK_STREAM, 0, sv) == -1)
 	return EESOCKET;
  
-    if (fork()) {
+    ret = fork();
+    if (ret == -1) {
+	error("fork() in external_start() failed: %s\n", strerror(errno));
+    }
+    if (ret) {
 	close(sv[1]);
 	lpc_socks[fd].fd = sv[0];
 	lpc_socks[fd].flags = S_EXTERNAL;
@@ -35,7 +40,6 @@ int external_start P5(int, which, char *, args,
 	lpc_socks[fd].state = DATA_XFER;
 	memset((char *) &lpc_socks[fd].l_addr, 0, sizeof(lpc_socks[fd].l_addr));
 	memset((char *) &lpc_socks[fd].r_addr, 0, sizeof(lpc_socks[fd].r_addr));
-	lpc_socks[fd].name[0] = '\0';
 	lpc_socks[fd].owner_ob = current_object;
 	lpc_socks[fd].release_ob = NULL;
 	lpc_socks[fd].r_buf = NULL;
@@ -88,7 +92,7 @@ int external_start P5(int, which, char *, args,
 	dup2(sv[1], 1);
 	dup2(sv[1], 2);
 	execv(cmd, argv);
-	return 0;
+	exit(1);
     }
 }
 

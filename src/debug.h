@@ -16,10 +16,24 @@
    debug(4,("module.c: simulate(): x = %d, y = %d\n",x,y));
 */
 
+#ifndef _FUNC_SPEC_
 extern int debug_level;
 
+void handle_debug_level PROT((char *));
+void debug_level_set PROT((char *));
+void debug_level_clear PROT((char *));
+
 #ifdef DEBUG_MACRO
-#define debug(x,y) if (x & debug_level) { printf y; fflush(stdout); }
+#define debug(x,y) if (debug_level & DBG_##x) { printf("%s: ", #x); printf y; putchar('\n'); fflush(stdout); }
 #else
 #define debug(x,y)
+#endif
+
+#define DBG_call_out	 	1
+#define DBG_addr_server		2
+#define DBG_d_flag		4
+#define DBG_connections		8
+#define DBG_mapping		16
+#define DBG_sockets		32
+
 #endif

@@ -47,11 +47,10 @@
  */
 
 #include "std.h"
-#include "lpc_incl.h"
+#include "ed.h"
 #include "comm.h"
 #include "file.h"
-#include "regexp.h"
-#include "ed.h"
+#include "master.h"
 
 /* Regexp is Henry Spencer's package. WARNING: regsub is modified to return
  * a pointer to the \0 after the destination string, and this program refers
@@ -486,14 +485,19 @@ static void free_ed_buffer P1(object_t *, who)
         free_object(ED_BUFFER->exit_ob, "ed EOF");
     }
     if (ED_BUFFER->exit_fn) {
-	/* make this "safe" */
-	safe_apply(ED_BUFFER->exit_fn,
-		   ED_BUFFER->exit_ob, 0, ORIGIN_DRIVER);
-	FREE(ED_BUFFER->exit_fn);
-	free_object(ED_BUFFER->exit_ob, "ed EOF");
+	char *exit_fn = ED_BUFFER->exit_fn;
+	object_t *exit_ob = ED_BUFFER->exit_ob;
+
+	if (P_OLDPAT)
+	    FREE((char *) P_OLDPAT);
 	FREE((char *) ED_BUFFER);
 	who->interactive->ed_buffer = 0;
 	set_prompt("> ");
+
+	/* make this "safe" */
+	safe_apply(exit_fn, exit_ob, 0, ORIGIN_INTERNAL);
+	FREE(exit_fn);
+	free_object(exit_ob, "ed EOF");
 	return;
     }
 #endif
@@ -598,7 +602,7 @@ static int doread P2(int, lin, char *, fname)
     unsigned int bytes;
     unsigned int lines;
     static char str[ED_MAXLINE];
-
+    
     err = 0;
     P_NONASCII = P_NULLCHAR = P_TRUNCATED = 0;
 
@@ -606,7 +610,7 @@ static int doread P2(int, lin, char *, fname)
 	ED_OUTPUTV(ED_DEST, "\"%s\" ", fname);
     if ((fp = fopen(fname, "r")) == NULL) {
 	ED_OUTPUT(ED_DEST, " isn't readable.\n");
-	return (ERR);
+	return ERR;
     }
     setCurLn(lin);
     for (lines = 0, bytes = 0; (err = egets(str, ED_MAXLINE, fp)) > 0;) {
@@ -649,22 +653,22 @@ static int dowrite P4(int, from, int, to, char *, fname, int, apflg)
     if (ED_BUFFER->write_fn) {
         svalue_t *res;
 
-        share_and_push_string(fname);
+        push_malloced_string(add_slash(fname));
         push_number(0);
-        res = safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_DRIVER);
+        res = safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_INTERNAL);
         if (IS_ZERO(res))
             return (ERR);
     }
 #endif
 
     if (!P_RESTRICT)
-	ED_OUTPUTV(ED_DEST, "\"%s\" ", fname);
+	ED_OUTPUTV(ED_DEST, "\"/%s\" ", fname);
     if ((fp = fopen(fname, (apflg ? "a" : "w"))) == NULL) {
 	if (!P_RESTRICT)
 	    ED_OUTPUT(ED_DEST, " can't be opened for writing!\n");
 	else
 	    ED_OUTPUT(ED_DEST, "Couldn't open file for writing!\n");
-	return (ERR);
+	return ERR;
     }
     lptr = getptr(from);
     for (lin = from; lin <= to; lin++) {
@@ -686,9 +690,9 @@ static int dowrite P4(int, from, int, to, char *, fname, int, apflg)
 
 #ifdef OLD_ED
     if (ED_BUFFER->write_fn) {
-        share_and_push_string(fname);
+        push_malloced_string(add_slash(fname));
         push_number(1);
-        safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_DRIVER);
+        safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_INTERNAL);
     }
 #endif
 
@@ -749,7 +753,7 @@ static char *getfn P1(int, writeflg)
     }
     if (strlen(file) == 0) {
 	ED_OUTPUT(ED_DEST, "Bad file name.\n");
-	return (NULL);
+	return (0);
     }
 
     if (file[0] != '/') {
@@ -768,7 +772,7 @@ static char *getfn P1(int, writeflg)
     strncpy(file, file2, MAXFNAME - 1);
     file[MAXFNAME - 1] = 0;
 
-    if (strlen(file) == 0) {
+    if (*file == 0) {
 	ED_OUTPUT(ED_DEST, "no file name\n");
 	return (NULL);
     }
@@ -1859,7 +1863,7 @@ static int docmd P1(int, glob)
 	fptr = getfn(0);
 
 	if (P_NOFNAME)
-	    ED_OUTPUTV(ED_DEST, "%s\n", P_FNAME);
+	    ED_OUTPUTV(ED_DEST, "/%s\n", P_FNAME);
 	else {
 	    if (fptr == NULL)
 		return FILE_NAME_ERROR;
@@ -2256,7 +2260,7 @@ void ed_cmd P1(char *, str)
     strncpy(inlin, str, ED_MAXLINE - 1);
     inlin[ED_MAXLINE - 1] = 0;
     inptr = inlin;
-    if ((status = getlst()) >= 0 || status == NO_LINE_RANGE)
+    if ((status = getlst()) >= 0 || status == NO_LINE_RANGE) {
 	if ((status = ckglob()) != 0) {
 	    if (status >= 0 && (status = doglob()) >= 0) {
 		setCurLn(status);
@@ -2269,6 +2273,7 @@ void ed_cmd P1(char *, str)
 		return;
 	    }
 	}
+    }
     report_status(status);
 }
 #endif
@@ -2276,21 +2281,9 @@ void ed_cmd P1(char *, str)
 static void report_status P1(int, status) {
     switch (status) {
     case EOF:
-	free_ed_buffer(current_editor);
 	ED_OUTPUT(ED_DEST, "Exit from ed.\n");
+	free_ed_buffer(current_editor);
 	return;
-#if 0
-    case FATAL:
-	if (ED_BUFFER->exit_fn) {
-	    FREE(ED_BUFFER->exit_fn);
-	    free_object(ED_BUFFER->exit_ob, "ed FATAL");
-	}
-	FREE((char *) ED_BUFFER);
-	command_giver->interactive->ed_buffer = 0;
-	ED_OUTPUT(ED_DEST, "FATAL ERROR\n");
-	set_prompt(":");
-	return;
-#endif
     case CHANGED:
 	ED_OUTPUT(ED_DEST, "File has been changed.\n");
 	break;
@@ -2360,7 +2353,7 @@ void save_ed_buffer P1(object_t *, who)
     current_ed_buffer = who->interactive->ed_buffer;
     current_editor = who;
 
-    copy_and_push_string(P_FNAME);
+    push_malloced_string(add_slash(P_FNAME));
     push_object(who);
     /* must be safe; we get called by remove_interactive() */
     stmp = safe_apply_master_ob(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME, 2);

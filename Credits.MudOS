@@ -10,7 +10,7 @@ We would like to thank the following muds for extensive testing and numerous
 bug reports:
  
 TMI, Portals, Overdrive, Genocide, TMI-2, Vincent's Hollow, DreamShadow,
-Nightmare, and many others.
+Nightmare, Nanvaent, and many others.
  
 The MudOS driver was a team effort with specific contributions from the
 following people:
@@ -47,7 +47,8 @@ Michael Bundy - provided patches allowing MudOS to run on System V Release 4.
  
 Luke Mewborn (Zak) - provided patches allowing MudOS to run on 386BSD
  
-Olav Kolbu (Aragorn) - provided patches allowing MudOS to run on Linux 0.99.3
+Olav Kolbu (Aragorn) - provided patches allowing MudOS to run on Linux 0.99.3,
+    many bug reports and misc fixes, countless compilation errors
 
 Darin Johnson (Darin) - provided various patches and optimizations (including
    combining prelang.y and postlang.y into compiler.y).
@@ -66,6 +67,30 @@ Tim Hollebeek (Beek) - LPC->C and patches, compiler rewrite, new function
 
 Ti-Ming Chiang (Symmetry) - Countless optimizations; array, mapping and
 	save_object rewrites
+
+Svata Dedic (Belgarat) - Win32 fixes, parser fixes, misc fixes
+
+Martin Tyler (Burty) - lex.c fixes, other misc fixes
+
+Troels Therkelsen (Qualin) - numerous bug reports and ideas
+
+Maarten de Jong - amiga compilation via gcc
+
+George Reese (Descartes) - bug reports, Win32 port
+
+Mark ? (Mystic) - tons of ideas; fixes for exotic options settings
+
+Skeeter Hartwig (Jihad) - numerous bug reports
+
+David Rudy (Aule) - optimizations; high usage testing and stability patches
+
+Greg Stein (Deathblade) - various fixes and bug reports
+
+Ben Gras (Fermat) - MD5 crypt(), various fixes
+
+Kars de Jong (Turrican) - various bug fixes
+
+and tons of others who have accidentally been omitted
 --
 Thanks to Adam Beeman (Buddha) for making numerous suggestions on
 improving the MudOS driver and for providing the TMI site as the original

@@ -1,0 +1,3 @@
+%define NMAKE
+
+%include "Makefile.master"

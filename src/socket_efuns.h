@@ -7,7 +7,7 @@
 #ifndef _SOCKET_EFUNS_H_
 #define _SOCKET_EFUNS_H_
 
-#include "std.h"
+#include "lpc_incl.h"
 #include "network_incl.h"
 
 enum socket_mode {
@@ -27,7 +27,6 @@ typedef struct {
     enum socket_state state;
     struct sockaddr_in l_addr;
     struct sockaddr_in r_addr;
-    char name[ADDR_BUF_SIZE];
     object_t *owner_ob;
     object_t *release_ob;
     union string_or_func read_callback;
@@ -44,15 +43,16 @@ typedef struct {
 extern lpc_socket_t *lpc_socks;
 extern int max_lpc_socks;
 
-#define	S_RELEASE	0x01
-#define	S_BLOCKED	0x02
-#define	S_HEADER	0x04
-#define	S_WACCEPT	0x08
-#define S_BINARY        0x10
-#define S_READ_FP       0x20
-#define S_WRITE_FP      0x40
-#define S_CLOSE_FP      0x80
+#define	S_RELEASE	0x001
+#define	S_BLOCKED	0x002
+#define	S_HEADER	0x004
+#define	S_WACCEPT	0x008
+#define S_BINARY	0x010
+#define S_READ_FP	0x020
+#define S_WRITE_FP	0x040
+#define S_CLOSE_FP	0x080
 #define S_EXTERNAL	0x100
+#define S_LINKDEAD	0x200
 
 int check_valid_socket PROT((char *, int, object_t *, char *, int));
 void socket_read_select_handler PROT((int));
@@ -72,5 +72,9 @@ int socket_close PROT((int, int));
 int socket_release PROT((int, object_t *, svalue_t *));
 int socket_acquire PROT((int, svalue_t *, svalue_t *, svalue_t *));
 char *socket_error PROT((int));
+int find_new_socket PROT((void));
+void set_read_callback PROT((int, svalue_t *));
+void set_write_callback PROT((int, svalue_t *));
+void set_close_callback PROT((int, svalue_t *));
 
 #endif				/* _SOCKET_EFUNS_H_ */

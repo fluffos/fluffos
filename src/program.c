@@ -1,7 +1,5 @@
 #include "std.h"
-#include "config.h"
 #include "lpc_incl.h"
-#include "program.h"
 #include "swap.h"
 
 int total_num_prog_blocks, total_prog_block_size;
@@ -9,21 +7,15 @@ int total_num_prog_blocks, total_prog_block_size;
 void reference_prog P2(program_t *, progp, char *, from)
 {
     progp->ref++;
-#ifdef DEBUG
-    if (d_flag)
-	debug_message("reference_prog: /%s ref %d (%s)\n",
-	       progp->name, progp->ref, from);
-#endif
+    debug(d_flag, ("reference_prog: /%s ref %d (%s)\n",
+	       progp->name, progp->ref, from));
 }
 
 void deallocate_program P1(program_t *, progp)
 {
     int i;
 
-#ifdef DEBUG
-    if (d_flag)
-	debug_message("free_prog: /%s\n", progp->name);
-#endif
+    debug(d_flag, ("free_prog: /%s\n", progp->name));
     
     total_prog_block_size -= progp->total_size;
     total_num_prog_blocks -= 1;

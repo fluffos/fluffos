@@ -6,14 +6,14 @@ OBJ=$(addprefix $(OBJDIR)/,$(subst .c,.o,$(SRC)))
 $(OBJDIR)/%.o: %.c
 	$(CC) -I$(OBJDIR) -I.. $(CFLAGS) -o $@ -c $<
 %else
-.c.o:
+.c.$(O):
 	$(CC) $(CFLAGS) -I.. -c $*.c
 %endif
 
 all: $(OBJ)
-	ar rcu packages.a $(OBJ)
-	$(RANLIB) packages.a
+	ar rcu packages.$(A) $(OBJ)
+	$(RANLIB) packages.$(A)
 
 clean:
-	-rm -f *.o
-	-rm -f packages.a
+	rm -f *.$(O)
+	rm -f packages.$(A)

@@ -6,7 +6,6 @@
 #ifndef ADDR_SERVER_H
 #define ADDR_SERVER_H
 
-#include "std.h"
 #include "network_incl.h"
 
 #define DFAULT_PROTO 0		/* use the appropriate protocol    */

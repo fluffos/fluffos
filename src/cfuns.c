@@ -1,10 +1,9 @@
 #include "std.h"
 
 #ifdef LPC_TO_C
-#include "lpc_incl.h"
+#include "cfuns.h"
 #include "backend.h"
 #include "lpc_to_c.h"
-#include "stralloc.h"
 #include "eoperators.h"
 #include "parse.h"
 #include "qsort.h"
@@ -54,7 +53,7 @@ void c_return() {
 
     sv = *sp--;
     pop_n_elems(csp->num_local_variables);
-    sp++;
+    STACK_INC;
     DEBUG_CHECK(sp != fp, "Bad stack at c_return\n");
     *sp =sv;
     pop_control_stack();
@@ -62,7 +61,7 @@ void c_return() {
 
 void c_return_zero() {
     pop_n_elems(csp->num_local_variables);
-    sp++;
+    STACK_INC;
     DEBUG_CHECK(sp != fp, "Bad stack at c_return\n");
     *sp = const0;
     pop_control_stack();
@@ -75,29 +74,34 @@ void c_foreach P3(int, flags, int, idx1, int, idx2) {
 	CHECK_TYPES(sp, T_MAPPING, 2, F_FOREACH);
 	
 	push_refed_array(mapping_indices(sp->u.map));
-	(++sp)->type = T_NUMBER;
+	STACK_INC;
+	sp->type = T_NUMBER;
 	sp->u.lvalue = (sp-1)->u.arr->item;
 	sp->subtype = (sp-1)->u.arr->size;
 		    
-	(++sp)->type = T_LVALUE;
+	STACK_INC;
+	sp->type = T_LVALUE;
 	if (flags & 2)
 	    sp->u.lvalue = &current_object->variables[idx1 + variable_index_offset];
 	else
 	    sp->u.lvalue = fp + idx1;
     } else 
     if (sp->type == T_STRING) {
-	(++sp)->type = T_NUMBER;
+	STACK_INC;
+	sp->type = T_NUMBER;
 	sp->u.lvalue_byte = (unsigned char *)((sp-1)->u.string);
 	sp->subtype = SVALUE_STRLEN(sp - 1);
     } else {
 	CHECK_TYPES(sp, T_ARRAY, 2, F_FOREACH);
 
-	(++sp)->type = T_NUMBER;
+	STACK_INC;
+	sp->type = T_NUMBER;
 	sp->u.lvalue = (sp-1)->u.arr->item;
 	sp->subtype = (sp-1)->u.arr->size;
     }
 
-    (++sp)->type = T_LVALUE;
+    STACK_INC;
+    sp->type = T_LVALUE;
     if (flags & 1)
 	sp->u.lvalue = &current_object->variables[idx2 + variable_index_offset];
     else
@@ -128,6 +132,7 @@ void c_expand_varargs P1(int, where) {
 	assign_svalue_no_free(s, &arr->item[0]);
     } else {
 	t = sp;
+	CHECK_STACK_OVERFLOW(n - 1);
 	sp += n - 1;
 	while (t > s) {
 	    *(t + n - 1) = *t;
@@ -226,7 +231,7 @@ void c_call P2(int, func, int, num_arg) {
     DEBUG_CHECK(func >= current_object->prog->num_functions_total,
 		"Illegal function index\n");
     
-    if (current_object->prog->function_flags[func] & NAME_UNDEFINED)
+    if (current_object->prog->function_flags[func] & FUNC_UNDEFINED)
 	error("Undefined function: %s\n", function_name(current_object->prog, func));
     /* Save all important global stack machine registers */
     push_control_stack(FRAME_FUNCTION);
@@ -424,6 +429,7 @@ void c_index() {
 	    free_mapping(m);
 	    break;
 	}
+#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
 	{
 	    if ((sp-1)->type != T_NUMBER)
@@ -437,6 +443,7 @@ void c_index() {
 	    (--sp)->u.number = i;
 	    break;
 	}
+#endif
     case T_STRING:
 	{
 	    if ((sp-1)->type != T_NUMBER) {
@@ -475,8 +482,7 @@ void c_index() {
      */
     if (sp->type == T_OBJECT && (sp->u.ob->flags & O_DESTRUCTED)) {
 	free_object(sp->u.ob, "F_INDEX");
-	sp->type = T_NUMBER;
-	sp->u.number = 0;
+	*sp = const0u;
     }
 }
 
@@ -484,6 +490,7 @@ void c_rindex() {
     int i;
 
     switch (sp->type) {
+#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
 	{
 	    if ((sp-1)->type != T_NUMBER)
@@ -498,6 +505,7 @@ void c_rindex() {
 	    (--sp)->u.number = i;
 	    break;
 	}
+#endif
     case T_STRING:
 	{
 	    int len = SVALUE_STRLEN(sp);
@@ -535,8 +543,7 @@ void c_rindex() {
      */
     if (sp->type == T_OBJECT && (sp->u.ob->flags & O_DESTRUCTED)) {
 	free_object(sp->u.ob, "F_RINDEX");
-	sp->type = T_NUMBER;
-	sp->u.number = 0;
+	*sp = const0u;
     }
 }
 
@@ -597,7 +604,8 @@ c_anonymous P3(int, num_arg, int, num_local, POINTER_INT, func) {
 
     fp->hdr.ref = 1;
 
-    (++sp)->type = T_FUNCTION;
+    STACK_INC;
+    sp->type = T_FUNCTION;
     sp->u.fp = fp;
 }
 
@@ -692,6 +700,7 @@ void c_add_eq P1(int, is_void) {
 	    error("Left hand side of += is a number (or zero); right side is not a number.\n");
 	}
 	break;
+#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
 	if (sp->type != T_BUFFER) {
 	    bad_argument(sp, T_BUFFER, 2, (is_void ? F_VOID_ADD_EQ : F_ADD_EQ));
@@ -707,6 +716,7 @@ void c_add_eq P1(int, is_void) {
 	    lval->u.buf = b;
 	}
 	break;
+#endif
     case T_ARRAY:
 	if (sp->type != T_ARRAY)
 	    bad_argument(sp, T_ARRAY, 2, (is_void ? F_VOID_ADD_EQ : F_ADD_EQ));
@@ -814,8 +824,7 @@ void c_multiply() {
 	    mapping_t *m;
 	    m = compose_mapping((sp-1)->u.map, sp->u.map, 1);
 	    pop_2_elems();
-	    (++sp)->type = T_MAPPING;
-	    sp->u.map = m;
+	    push_refed_mapping(m);
 	    break;
 	}
 	
@@ -1083,6 +1092,7 @@ void c_compl() {
 
 void c_add() {
     switch (sp->type) {
+#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
 	{
 	    if (!((sp-1)->type == T_BUFFER)) {
@@ -1101,6 +1111,7 @@ void c_add() {
 	    }
 	    break;
 	} /* end of x + T_BUFFER */
+#endif
     case T_NUMBER:
 	{
 	    switch ((--sp)->type) {
@@ -1226,11 +1237,11 @@ int c_loop_cond_compare P2(svalue_t *, s1, svalue_t *, s2) {
     default:
 	if (s1->type == T_OBJECT && (s1->u.ob->flags & O_DESTRUCTED)){
 	    free_object(s1->u.ob, "do_loop_cond:1");
-	    *s1 = const0;
+	    *s1 = const0u;
 	}
 	if (s2->type == T_OBJECT && (s2->u.ob->flags & O_DESTRUCTED)){
 	    free_object(s2->u.ob, "do_loop_cond:2");
-	    *s2 = const0;
+	    *s2 = const0u;
 	}
 	if (s1->type == T_NUMBER && s2->type == T_NUMBER)
 	    return 0;
@@ -1258,6 +1269,7 @@ void c_sscanf P1(int, num_arg) {
      * already on the stack by this time
      */
     fp = sp;
+    CHECK_STACK_OVERFLOW(num_arg + 1);
     sp += num_arg + 1;
     *sp = *(fp--);		/* move format description to top of stack */
     *(sp - 1) = *(fp);		/* move source string just below the format
@@ -1306,6 +1318,7 @@ void c_parse_command P1(int, num_arg) {
      * perform some stack manipulation;
      */
     fp = sp;
+    CHECK_STACK_OVERFLOW(num_arg + 1);
     sp += num_arg + 1;
     arg = sp;
     *(arg--) = *(fp--);		/* move pattern to top of stack */
@@ -1348,7 +1361,7 @@ void c_prepare_catch P1(error_context_t *, econ) {
 
 void c_caught_error P1(error_context_t *, econ) {
     restore_context(econ);
-    sp++;
+    STACK_INC;
     *sp = catch_value;
     catch_value = const1;
 

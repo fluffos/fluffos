@@ -147,9 +147,11 @@ f_refs PROT((void))
     case T_FUNCTION:
 	r = sp->u.fp->hdr.ref;
 	break;
+#ifndef NO_BUFFER_TYPE
     case T_BUFFER:
 	r = sp->u.buf->ref;
 	break;
+#endif
     default:
 	r = 0;
 	break;
@@ -215,15 +217,19 @@ f_traceprefix PROT((void))
     if (command_giver && command_giver->interactive) {
         old = command_giver->interactive->trace_prefix;
         if (sp->type & T_STRING) {
-            command_giver->interactive->trace_prefix =
-                make_shared_string(sp->u.string);
+	    char *p = sp->u.string;
+	    if (*p == '/') p++;
+	    
+            command_giver->interactive->trace_prefix = make_shared_string(p);
             free_string_svalue(sp);
 	} else
             command_giver->interactive->trace_prefix = 0;
     }
     if (old) {
-        put_shared_string(old);
-    } else *sp = const0;
+	put_malloced_string(add_slash(old));
+	free_string(old);
+    } else 
+	*sp = const0;
 }
 #endif
 

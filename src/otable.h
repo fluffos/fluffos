@@ -1,6 +1,8 @@
 #ifndef OTABLE_H
 #define OTABLE_H
 
+#include "lpc_incl.h"
+
 /*
  * otable.c
  */

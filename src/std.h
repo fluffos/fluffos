@@ -29,6 +29,7 @@
 #      include "opcodes.h"
 #   endif
 #endif
+#include "debug.h"
 
 #ifdef WIN32
 #  define outp outptr

@@ -2,6 +2,74 @@ This file is the *brief* version of what has been changed; see
 ChangeLog.alpha, ChangeLog.beta, and ChangeLog.old/ for all the gory
 details.
 
+(pre-v22.1 changes)
+      * new options:
+	. NO_SNOOP
+      * features:
+	. support for token quoting in the preprocessor (#x)
+	. 'array' is used in error messages with ARRAY_RESERVED_WORD is on
+	. added array |
+	  Works analogously to &:
+	  ({ 1, 2, 3 }) & ({ 2, 4 }) = ({ 2 })
+	  ({ 1, 2, 3 }) | ({ 2, 4 }) = ({ 1, 2, 3, 4 })
+	. both &= and |= now work with arrays
+	. The requirement that a snooper must be interactive has been lifted
+	  (though this isn't particularly useful unless RECIEVE_SNOOP)
+	  objects may now snoop other users (logging output to logs,
+	  output redirection, etc)
+	. #'foo is now the same as (: foo :) when COMPAT_32 is defined
+	. added a 'portbind' program; see v22.1a7 for details
+	. MudOS now checks if file descriptor #6 is a valid socket when
+	  it starts up; if it is, it is used as a login port.
+	. support for binding a specific IP number for machines with more
+	  than one
+	. It is now legal to use a class member of something of type mixed,
+	  as long as it is unambigous (e.g. foo->x is ok as long as only
+	  one class in scope has a member named 'x', or if 'x' is in the
+	  same position in all classes in scope)
+	. Unused local variables now generate warnings
+	. function arguments no longer need to have names (and not naming
+	  them inhibits 'unused' warnings)
+	. more than one access specifier (e.g. 'public private protected')
+	  generates a warning
+	. If SENSIBLE_MODIFIERS is defined, then:
+	  (1) 'static' no longer exists, and is replaced by 'nosave' and
+	      'protected'
+	  (2) 'public' no longer means what it used to; it now means the
+	      default visibility
+	. if REF_RESERVED_WORD is defined, the 'ref' can be used to declare
+	  arguments to functions to be by reference instead of by value.
+	  example:
+	  int foo(int ref i) {
+	    i++;
+    	  }
+	  void create() {
+	    int y = 1; foo(ref y); write(y);
+	  }
+	  prints '2'.  Note that ref is required both in the declaration
+	  and the call.
+	. added an 'efun_defined' pseudo function to the preprocessor.  It
+	  works just like 'defined', except that it looks up efuns.  Example:
+	  #if !efun_defined(snoop)
+	     write("snoop efun not available.\n");
+	  #endif
+      * bug fixes:
+	. hidden object fixes for present() and environment()
+	. token pasting and preprocessor macro expansion
+      * COMPAT_BUSTERs:
+	. log_error() filenames have a leading /
+	. tail() efun was removed; compat simul in compat/simuls
+	. #include <...> now no longer searches based on
+	  relative paths; #include "..." still does.
+	. ORIGIN_CALL_OUT is now ORIGIN_INTERNAL; in addition
+	  most driver callbacks which do not use hard coded function names
+	  also use ORIGIN_INTERNAL (add_action, socket callbacks, etc).
+	  The practical fallout of this is that such routines may be static,
+	  but *not* private.
+	. COMPAT_BUSTER: modifiers from a '<modifier>:' declaration only
+	  affect declarations which have no modifiers of their own.  I.e.
+	  'private: nomask x;' no longer declares x to be private
+	
 (pre-v22 changes)
       * new options:
 	. NO_RESETS
@@ -1348,7 +1416,7 @@ Mon Nov 14 12:56:40 EST 1994 (tim@handel.princeton.edu (Beek))
 	  with NO_MUDLIB_STATS off
 	* fixed a line in scratchpad.c that caused a compilation error
 	  for some compilers
-	* optimized variable name lookup for restore_object alot.  Now
+	* optimized variable name lookup for restore_object a lot.  Now
 	  uses shared string comparisions, and is optimized for the
 	  case where the variables are in the order they're defined
 	  in the object (i.e. guesses that the save file was made
@@ -1544,7 +1612,7 @@ Wed Oct 12 01:56:14 EDT 1994 (tim@handel.princeton.edu (Beek))
 	  the fix for the lvalue lifetime bug, etc
 	* removed some code duplication in checking efuns
 	* removed F_JUMP; all branches are relative now (F_BBRANCH added)
-	* renamed alot of stuff to be more informative:
+	* renamed a lot of stuff to be more informative:
 	  F_GLOBAL, F_GLOBAL_LVALUE, F_LOCAL, F_LOCAL_LVALUE
 	  instead of the previous inconsistent names
 	* only put () after the instruction name if it's an efun
@@ -1903,7 +1971,7 @@ Mon Sep 12 07:53:11 EDT 1994 (tim@handel.princeton.edu (Beek))
 	* optimized load_mapping_from_aggregate
 	* write_file now takes a second arg, 1 means overwrite instead of
 	  append.  Idea from Decker@TMI-2
-	* Improved alot of compile time error messages
+	* Improved a lot of compile time error messages
 	* Added type checking to save_object()
 	* Fixed a crasher in updating of the simul_efun object on
 	  some systems

@@ -16,11 +16,10 @@
 #include "mapping.h"
 #include "class.h"
 
-/* main.c has xalloc() and fatal() */
-#include "main.h"
 #include "stralloc.h"
 #include "simulate.h"
 #include "interpret.h"
 #include "rc.h"
+#include "main.h"
 
 #endif

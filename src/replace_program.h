@@ -1,6 +1,9 @@
 #ifndef _REPLACE_PROGRAM_H_
 #define _REPLACE_PROGRAM_H_
 
+#include "lpc_incl.h"
+
+int replace_program_pending PROT((object_t *));
 void replace_programs PROT((void));
 
 typedef struct replace_ob_s {

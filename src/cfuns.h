@@ -1,6 +1,8 @@
 #ifndef CFUNS_H
 #define CFUNS_H
 
+#include "lpc_incl.h"
+
 #ifdef LPC_TO_C
 typedef struct {
     short index1, index2;

@@ -1,9 +1,9 @@
 #include "std.h"
-#include "lpc_incl.h"
 #include "otable.h"
 #include "comm.h"
 #include "hash.h"
 #include "simul_efun.h"
+#include "master.h"
 
 /*
  * Object name hash table.  Object names are unique, so no special

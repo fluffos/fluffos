@@ -26,7 +26,9 @@ void check_all_blocks PROT((int));
 #define MD_OVERHEAD (sizeof(md_node_t))
 #endif
 
-#define TABLESIZE 20357		/* 20357 is prime */
+#define MD_TABLE_BITS 14
+#define MD_TABLE_SIZE (1 << MD_TABLE_BITS)
+#define MD_HASH(x) (((unsigned int)x >> 3) & (MD_TABLE_SIZE - 1))
 
 #define PTR(x) ((void *)(x + 1))
 #define NODET_TO_PTR(x, y) ((y)(x + 1))

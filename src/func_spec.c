@@ -18,20 +18,40 @@
  * a single byte.  Any additional efuns require two bytes.
  */
 
-/* most frequently used functions */
+#ifdef NO_BUFFER_TYPE
+#define OR_BUFFER
+#else
+#define OR_BUFFER | buffer
+#endif
 
-/* These next few efuns are used internally; do not remove them */
+/* These next few efuns are used internally; do not remove them.
+ * The leading _ is used to keep track of which efuns should exist,
+ * but not be added to the identifier lookup table.
+ * These names MUST exist, and may either be real efuns, or aliases
+ * for another efun.  For example, one could remove clone_object
+ * above, and change the internal one to:
+ *
+ * object _new(string, ...);
+ */
 /* used by X->f() */
-unknown call_other(object | string | object *, string | mixed *,...);
+unknown _call_other(object | string | object *, string | mixed *,...);
 /* used by (*f)(...) */
-mixed evaluate(mixed, ...);
+mixed _evaluate(mixed, ...);
 /* default argument for some efuns */
-object this_object();
+object _this_object();
 /* used for implicit float/int conversions */
-int to_int(string | float | int | buffer);
-float to_float(string | float | int);
+int _to_int(string | float | int OR_BUFFER);
+float _to_float(string | float | int);
+/* used by new() */
+object _new(string, ...);
 
-object clone_object(string, ...);
+unknown call_other _call_other(object | string | object *, string | mixed *,...);
+mixed evaluate _evaluate(mixed, ...);
+object this_object _this_object();
+int to_int _to_int(string | float | int OR_BUFFER);
+float to_float _to_float(string | float | int);
+object clone_object _new(string, ...);
+
 function bind(function, object);
 object this_player(int default: 0);
 object this_interactive this_player( int default: 1);
@@ -42,7 +62,7 @@ mixed *call_stack(int default: 0);
 int sizeof(mixed);
 int strlen sizeof(string);
 void destruct(object);
-string file_name(object default: F_THIS_OBJECT);
+string file_name(object default: F__THIS_OBJECT);
 string capitalize(string);
 string *explode(string, string);
 mixed implode(mixed *, string | function, void | mixed);
@@ -57,10 +77,10 @@ int random(int);
 
 #ifndef NO_ENVIRONMENT
 object environment(void | object);
-object *all_inventory(object default: F_THIS_OBJECT);
+object *all_inventory(object default: F__THIS_OBJECT);
 object *deep_inventory(object);
-object first_inventory(object|string default: F_THIS_OBJECT);
-object next_inventory(object default: F_THIS_OBJECT);
+object first_inventory(object|string default: F__THIS_OBJECT);
+object next_inventory(object default: F__THIS_OBJECT);
 void say(string, void | object | object *);
 void tell_room(object | string, string | object | int | float, void | object *);
 object present(object | string, void | object);
@@ -83,6 +103,7 @@ object find_player(string);
 void notify_fail(string | function);
 #else
 void set_this_player(object | int);
+void set_this_user set_this_player(object | int);
 #endif
 
 string lower_case(string);
@@ -100,7 +121,7 @@ int strsrch(string, string | int, int default: 0);
 void write(mixed);
 void tell_object(object, string);
 void shout(string);
-void receive(string);
+void receive(string OR_BUFFER);
 void message(mixed, mixed, string | string * | object | object *,
 	          void | object | object *);
 
@@ -116,7 +137,7 @@ void message(mixed, mixed, string | string * | object | object *,
 
 /* mapping functions */
 
-    mapping allocate_mapping(int);
+    mapping allocate_mapping(int | mixed *, void | mixed);
     mixed *values(mapping);
     mixed *keys(mapping);
 #ifdef COMPAT_32
@@ -132,7 +153,7 @@ void message(mixed, mixed, string | string * | object | object *,
 
 /* all the *p() type functions */
 
-    int clonep(mixed default: F_THIS_OBJECT);
+    int clonep(mixed default: F__THIS_OBJECT);
     int intp(mixed);
     int undefinedp(mixed);
     int nullp undefinedp(mixed);
@@ -146,36 +167,32 @@ void message(mixed, mixed, string | string * | object | object *,
     int classp(mixed);
     string typeof(mixed);
 
-#ifndef DISALLOW_BUFFER_TYPE
+#ifndef NO_BUFFER_TYPE
     int bufferp(mixed);
+    buffer allocate_buffer(int);
 #endif
 
     int inherits(string, object);
     void replace_program(string);
 
-#ifndef DISALLOW_BUFFER_TYPE
-    buffer allocate_buffer(int);
-#endif
     mixed regexp(string | string *, string, void | int);
     mixed *reg_assoc(string, string *, mixed *, mixed | void);
-    mixed *allocate(int);
+    mixed *allocate(int, void | mixed);
     mixed *call_out_info();
 
 /* 32-bit cyclic redundancy code - see crc32.c and crctab.h */
-    int crc32(string | buffer);
+    int crc32(string OR_BUFFER);
 
 /* commands operating on files */
 
-#ifndef DISALLOW_BUFFER_TYPE
+#ifndef NO_BUFFER_TYPE
     mixed read_buffer(string | buffer, void | int, void | int);
+    int write_buffer(string | buffer, int, string | buffer | int);
 #endif
     int write_file(string, string, void | int);
     int rename(string, string);
     int write_bytes(string, int, string);
 
-#ifndef DISALLOW_BUFFER_TYPE
-    int write_buffer(string | buffer, int, string | buffer | int);
-#endif
     int file_size(string);
     string read_bytes(string, void | int, void | int);
     string read_file(string, void | int, void | int);
@@ -203,20 +220,23 @@ void message(mixed, mixed, string | string * | object | object *,
     mixed *localtime(int);
     string function_exists(string, void | object, void | int);
 
-    object *objects(void | string | function, void | object);
+    object *objects(void | string | function);
     string query_host_name();
     int query_idle(object);
     string query_ip_name(void | object);
     string query_ip_number(void | object);
+#ifndef NO_SNOOP
+    object snoop(object, void | object);
     object query_snoop(object);
     object query_snooping(object);
+#endif
 #ifdef CALLOUT_HANDLES
     int remove_call_out(int | void | string);
 #else
     int remove_call_out(void | string);
 #endif
     void set_heart_beat(int);
-    int query_heart_beat(object default:F_THIS_OBJECT);
+    int query_heart_beat(object default:F__THIS_OBJECT);
     void set_hide(int);
 
 #ifdef LPC_TO_C
@@ -232,19 +252,17 @@ void message(mixed, mixed, string | string * | object | object *,
     object shadow(object, int default: 1);
     object query_shadowing(object);
 #endif
-    object snoop(object, void | object);
     mixed *sort_array(mixed *, int | string | function, ...);
-    int tail(string);
     void throw(mixed);
     int time();
     mixed *unique_array(mixed *, string | function, void | mixed);
     mapping unique_mapping(mixed *, string | function, ...);
-    string *deep_inherit_list(object default:F_THIS_OBJECT);
-    string *shallow_inherit_list(object default:F_THIS_OBJECT);
+    string *deep_inherit_list(object default:F__THIS_OBJECT);
+    string *shallow_inherit_list(object default:F__THIS_OBJECT);
 #ifdef COMPAT_32
-    string *inherit_list deep_inherit_list(object default:F_THIS_OBJECT);
+    string *inherit_list deep_inherit_list(object default:F__THIS_OBJECT);
 #else
-    string *inherit_list shallow_inherit_list(object default:F_THIS_OBJECT);
+    string *inherit_list shallow_inherit_list(object default:F__THIS_OBJECT);
 #endif
     void printf(string,...);
     string sprintf(string,...);
@@ -254,9 +272,9 @@ void message(mixed, mixed, string | string * | object | object *,
 /*
  * Object properties
  */
-    int interactive(object default:F_THIS_OBJECT);
-    string in_edit(object default:F_THIS_OBJECT);
-    int in_input(object default:F_THIS_OBJECT);
+    int interactive(object default:F__THIS_OBJECT);
+    string in_edit(object default:F__THIS_OBJECT);
+    int in_input(object default:F__THIS_OBJECT);
     int userp(object);
 
 #ifndef NO_WIZARDS
@@ -275,7 +293,7 @@ void message(mixed, mixed, string | string * | object | object *,
 
 #ifdef PRIVS
 /* privledge functions */
-    string query_privs(object default:F_THIS_OBJECT);
+    string query_privs(object default:F__THIS_OBJECT);
     void set_privs(object, int | string);
 #endif				/* PRIVS */
 
@@ -342,7 +360,9 @@ void message(mixed, mixed, string | string * | object | object *,
     int max_eval_cost set_eval_limit(int default: 1);
 
 #ifdef DEBUG_MACRO
-    void set_debug_level(int);
+    void set_debug_level(int|string);
+    mapping debug_levels();
+    void clear_debug_level(string);
 #endif
 
 #if defined(OPCPROF) || defined(OPCPROF_2D)
@@ -350,7 +370,7 @@ void message(mixed, mixed, string | string * | object | object *,
 #endif
 
 #ifdef PROFILE_FUNCTIONS
-    mapping *function_profile(object default:F_THIS_OBJECT);
+    mapping *function_profile(object default:F__THIS_OBJECT);
 #endif
 
 #ifdef DEBUG

@@ -3,7 +3,7 @@
 
 #include "lint.h"
 #include "trees.h"
-#include "program.h"
+#include "lpc_incl.h"
 #include "icode.h"
 
 #ifdef LPC_TO_C

@@ -13,11 +13,15 @@
 #include "/eoperators.h"
 #include "/avltree.h"
 #include "/md.h"
+#include "/uids.h"
+#include "/master.h"
 #else
 #include "../lpc_incl.h"
 #include "../eoperators.h"
 #include "../avltree.h"
 #include "../md.h"
+#include "uids.h"
+#include "master.h"
 #endif
 
 static object_t *ob;

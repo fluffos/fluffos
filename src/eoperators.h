@@ -32,12 +32,5 @@ INLINE void f_sscanf PROT((void));
 /*
  * eoperators.c
  */
-INLINE funptr_t *make_funp PROT((svalue_t *, svalue_t *));
-INLINE void push_funp PROT((funptr_t *));
-INLINE void free_funp PROT((funptr_t *));
-int merge_arg_lists PROT((int, array_t *, int));
 void call_simul_efun PROT((unsigned short, int));
 
-INLINE funptr_t *make_efun_funp PROT((int, svalue_t *));
-INLINE funptr_t *make_lfun_funp PROT((int, svalue_t *));
-INLINE funptr_t *make_simul_funp PROT((int, svalue_t *));

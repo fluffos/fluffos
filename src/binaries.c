@@ -9,10 +9,8 @@
 
 #define SUPPRESS_COMPILER_INLINES
 #include "std.h"
-#include "config.h"
 #include "lpc_incl.h"
 #include "file_incl.h"
-#include "compiler.h"
 #include "binaries.h"
 #include "lex.h"
 #include "backend.h"
@@ -20,6 +18,7 @@
 #include "qsort.h"
 #include "compile_file.h"
 #include "hash.h"
+#include "master.h"
 
 /* This should be a configure check.  What the heck is it needed for, anyway?*/
 #ifdef WIN32
@@ -188,7 +187,7 @@ void save_binary P3(program_t *, prog, mem_block_t *, includes, mem_block_t *, p
 	if (tmp > (int) USHRT_MAX) {	/* possible? */
 	    fclose(f);
 	    unlink(file_name);
-	    error("String to long for save_binary.\n");
+	    error("String too long for save_binary.\n");
 	    return;
 	}
 	len = tmp;
@@ -313,7 +312,7 @@ static void sort_function_table P1(program_t *, prog) {
 	    int ri = f_ov + i;
 	    if (j == 255)
 		continue;
-	    if (!(prog->function_flags[ri] & NAME_INHERITED)) {
+	    if (!(prog->function_flags[ri] & FUNC_INHERITED)) {
 		int oldix = prog->function_offsets[j].def.f_index;
 		DEBUG_CHECK(oldix >= num, "Function index out of range");
 		prog->function_offsets[j].def.f_index = inverse[oldix];
@@ -321,7 +320,7 @@ static void sort_function_table P1(program_t *, prog) {
 	}
 	for (i = 0; i < n_def; i++) {
 	    int ri = f_def + i;
-	    if (!(prog->function_flags[ri] & NAME_INHERITED)) {
+	    if (!(prog->function_flags[ri] & FUNC_INHERITED)) {
 		int oldix = prog->function_offsets[n_real + i].def.f_index;
 		DEBUG_CHECK(oldix >= num, "Function index out of range");
 		prog->function_offsets[n_real + i].def.f_index = inverse[oldix];
@@ -332,7 +331,7 @@ static void sort_function_table P1(program_t *, prog) {
     { 
 	int num_runtime = prog->num_functions_total;
 	for (i = 0; i < num_runtime; i++) {
-	    if (!(prog->function_flags[i] & NAME_INHERITED)) {
+	    if (!(prog->function_flags[i] & FUNC_INHERITED)) {
 		int oldix = prog->function_offsets[i].def.f_index;
 		DEBUG_CHECK(oldix >= num, "Function index out of range");
 		prog->function_offsets[i].def.f_index = inverse[oldix];

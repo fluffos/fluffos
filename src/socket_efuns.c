@@ -6,18 +6,15 @@
  */
 
 #include "std.h"
-#include "network_incl.h"
-#include "lpc_incl.h"
 #include "socket_efuns.h"
 #include "socket_err.h"
 #include "include/socket_err.h"
-#include "debug.h"
 #include "socket_ctrl.h"
 #include "comm.h"
-#include "eoperators.h"
 #include "file.h"
+#include "master.h"
 
-#ifdef PACKAGE_SOCKETS
+#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 
 /* flags for socket_close */
 #define SC_FORCE	1
@@ -27,14 +24,17 @@
 lpc_socket_t *lpc_socks = 0;
 int max_lpc_socks = 0;
 
+#ifdef PACKAGE_SOCKETS
 static int socket_name_to_sin PROT((char *, struct sockaddr_in *));
 static char *inet_address PROT((struct sockaddr_in *));
+#endif
 
 /*
  * check permission
  */
 int check_valid_socket P5(char *, what, int, fd, object_t *, owner,
-			  char *, addr, int, port) {
+			  char *, addr, int, port)
+{
     array_t *info;
     svalue_t *mret;
     
@@ -59,7 +59,7 @@ int check_valid_socket P5(char *, what, int, fd, object_t *, owner,
 /*
  * Get more LPC sockets structures if we run out
  */
-int more_lpc_sockets()
+static int more_lpc_sockets PROT((void))
 {
     int i;
 
@@ -78,7 +78,6 @@ int more_lpc_sockets()
 	lpc_socks[i].state = CLOSED;
 	memset((char *) &lpc_socks[i].l_addr, 0, sizeof(lpc_socks[i].l_addr));
 	memset((char *) &lpc_socks[i].r_addr, 0, sizeof(lpc_socks[i].r_addr));
-	lpc_socks[i].name[0] = '\0';
 	lpc_socks[i].owner_ob = NULL;
 	lpc_socks[i].release_ob = NULL;
 	lpc_socks[i].read_callback.s = 0;
@@ -97,8 +96,8 @@ int more_lpc_sockets()
 /*
  * Set the callbacks for a socket
  */
-void
-set_read_callback P2(int, which, svalue_t *, cb) {
+void set_read_callback P2(int, which, svalue_t *, cb)
+{
     char *s;
 
     if (lpc_socks[which].flags & S_READ_FP) {
@@ -119,8 +118,8 @@ set_read_callback P2(int, which, svalue_t *, cb) {
 	lpc_socks[which].read_callback.s = 0;
 }
 
-void
-set_write_callback P2(int, which, svalue_t *, cb) {
+void set_write_callback P2(int, which, svalue_t *, cb)
+{
     char *s;
 
     if (lpc_socks[which].flags & S_WRITE_FP) {
@@ -141,8 +140,8 @@ set_write_callback P2(int, which, svalue_t *, cb) {
 	lpc_socks[which].write_callback.s = 0;
 }
 
-void
-set_close_callback P2(int, which, svalue_t *, cb) {
+void set_close_callback P2(int, which, svalue_t *, cb)
+{
     char *s;
 
     if (lpc_socks[which].flags & S_CLOSE_FP) {
@@ -163,8 +162,10 @@ set_close_callback P2(int, which, svalue_t *, cb) {
 	lpc_socks[which].close_callback.s = 0;
 }
 
-static void
-copy_close_callback P2(int, to, int, from) {
+#ifdef PACKAGE_SOCKETS
+
+static void copy_close_callback P2(int, to, int, from)
+{
     char *s;
 
     if (lpc_socks[to].flags & S_CLOSE_FP) {
@@ -184,12 +185,15 @@ copy_close_callback P2(int, to, int, from) {
     }
 }
 
-int 
-find_new_socket PROT((void)) {
+#endif
+
+int find_new_socket PROT((void))
+{
     int i;
     
     for (i = 0; i < max_lpc_socks; i++) {
-	if (lpc_socks[i].state != CLOSED) continue;
+	if (lpc_socks[i].state != CLOSED)
+	    continue;
 	set_read_callback(i, 0);
 	set_write_callback(i, 0);
 	set_close_callback(i, 0);
@@ -198,13 +202,15 @@ find_new_socket PROT((void)) {
     return more_lpc_sockets();
 }
 
+#ifdef PACKAGE_SOCKETS
+
 /*
  * Create an LPC efun socket
  */
-int
-socket_create P3(enum socket_mode, mode, svalue_t *, read_callback, svalue_t *, close_callback)
+int socket_create P3(enum socket_mode, mode, svalue_t *, read_callback, svalue_t *, close_callback)
 {
     int type, i, fd, optval;
+#ifndef NO_BUFFER_TYPE
     int binary = 0;
 
     if (mode == STREAM_BINARY) {
@@ -214,55 +220,58 @@ socket_create P3(enum socket_mode, mode, svalue_t *, read_callback, svalue_t *, 
 	binary = 1;
 	mode = DATAGRAM;
     }
+#endif
     switch (mode) {
+	case MUD:
+	case STREAM:
+	    type = SOCK_STREAM;
+	    break;
 
-    case MUD:
-    case STREAM:
-	type = SOCK_STREAM;
-	break;
-    case DATAGRAM:
-	type = SOCK_DGRAM;
-	break;
+	case DATAGRAM:
+	    type = SOCK_DGRAM;
+	    break;
 
-    default:
-	return EEMODENOTSUPP;
+	default:
+	    return EEMODENOTSUPP;
     }
 
     i = find_new_socket();
     if (i >= 0) {
-	fd = socket(AF_INET, type, 0);
-	if (fd == -1) {
+	fd = socket(PF_INET, type, 0);
+	if (fd == INVALID_SOCKET) {
 	    socket_perror("socket_create: socket", 0);
 	    return EESOCKET;
 	}
 	optval = 1;
-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *) &optval,
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&optval,
 		       sizeof(optval)) == -1) {
 	    socket_perror("socket_create: setsockopt", 0);
 	    OS_socket_close(fd);
 	    return EESETSOCKOPT;
 	}
 	if (set_socket_nonblocking(fd, 1) == -1) {
-	    socket_perror("socket_create: set_socket_nonblocking", 0);
+	    socket_perror("socket_create: set_socket_nonblocking 1", 0);
 	    OS_socket_close(fd);
 	    return EENONBLOCK;
 	}
 	lpc_socks[i].fd = fd;
 	lpc_socks[i].flags = S_HEADER;
 
-	if (type == SOCK_DGRAM) close_callback = 0;
+	if (type == SOCK_DGRAM)
+	    close_callback = 0;
 	set_read_callback(i, read_callback);
 	set_write_callback(i, 0);
 	set_close_callback(i, close_callback);
 
+#ifndef NO_BUFFER_TYPE
 	if (binary) {
 	    lpc_socks[i].flags |= S_BINARY;
 	}
+#endif
 	lpc_socks[i].mode = mode;
 	lpc_socks[i].state = UNBOUND;
 	memset((char *) &lpc_socks[i].l_addr, 0, sizeof(lpc_socks[i].l_addr));
 	memset((char *) &lpc_socks[i].r_addr, 0, sizeof(lpc_socks[i].r_addr));
-	lpc_socks[i].name[0] = '\0';
 	lpc_socks[i].owner_ob = current_object;
 	lpc_socks[i].release_ob = NULL;
 	lpc_socks[i].r_buf = NULL;
@@ -274,7 +283,7 @@ socket_create P3(enum socket_mode, mode, svalue_t *, read_callback, svalue_t *, 
 
 	current_object->flags |= O_EFUN_SOCKET;
 
-	debug(8192, ("socket_create: created socket %d mode %d fd %d\n",
+	debug(sockets, ("socket_create: created socket %d mode %d fd %d\n",
 		     i, mode, fd));
     }
 
@@ -284,8 +293,7 @@ socket_create P3(enum socket_mode, mode, svalue_t *, read_callback, svalue_t *, 
 /*
  * Bind an address to an LPC efun socket
  */
-int
-socket_bind P2(int, fd, int, port)
+int socket_bind P2(int, fd, int, port)
 {
     int len;
     struct sockaddr_in sin;
@@ -301,18 +309,17 @@ socket_bind P2(int, fd, int, port)
 	return EEISBOUND;
 
     sin.sin_family = AF_INET;
+#ifdef SERVER_IP
+    sin.sin_addr.s_addr = inet_addr(SERVER_IP);
+#else
     sin.sin_addr.s_addr = INADDR_ANY;
+#endif
     sin.sin_port = htons((u_short) port);
 
     if (bind(lpc_socks[fd].fd, (struct sockaddr *) & sin, sizeof(sin)) == -1) {
 	switch (socket_errno) {
-#ifdef WINSOCK
-	case WSAEADDRINUSE:
-	    return EEADDRINUSE;
-#else
 	case EADDRINUSE:
 	    return EEADDRINUSE;
-#endif
 	default:
 	    socket_perror("socket_bind: bind", 0);
 	    return EEBIND;
@@ -325,7 +332,7 @@ socket_bind P2(int, fd, int, port)
     }
     lpc_socks[fd].state = BOUND;
 
-    debug(8192, ("socket_bind: bound socket %d to %s.%d\n",
+    debug(sockets, ("socket_bind: bound socket %d to %s.%d\n",
 		 fd, inet_ntoa(lpc_socks[fd].l_addr.sin_addr),
 		 ntohs(lpc_socks[fd].l_addr.sin_port)));
 
@@ -335,8 +342,7 @@ socket_bind P2(int, fd, int, port)
 /*
  * Listen for connections on an LPC efun socket
  */
-int
-socket_listen P2(int, fd, svalue_t *, callback)
+int socket_listen P2(int, fd, svalue_t *, callback)
 {
     if (fd < 0 || fd >= max_lpc_socks)
 	return EEFDRANGE;
@@ -361,7 +367,7 @@ socket_listen P2(int, fd, svalue_t *, callback)
 
     current_object->flags |= O_EFUN_SOCKET;
 
-    debug(8192, ("socket_listen: listen on socket %d\n", fd));
+    debug(sockets, ("socket_listen: listen on socket %d\n", fd));
 
     return EESUCCESS;
 }
@@ -369,8 +375,7 @@ socket_listen P2(int, fd, svalue_t *, callback)
 /*
  * Accept a connection on an LPC efun socket
  */
-int
-socket_accept P3(int, fd, svalue_t *, read_callback, svalue_t *, write_callback)
+int socket_accept P3(int, fd, svalue_t *, read_callback, svalue_t *, write_callback)
 {
     int len, accept_fd, i;
     struct sockaddr_in sin;
@@ -394,8 +399,10 @@ socket_accept P3(int, fd, svalue_t *, read_callback, svalue_t *, write_callback)
     accept_fd = accept(lpc_socks[fd].fd, (struct sockaddr *) & sin, (int *) &len);
     if (accept_fd == -1) {
 	switch (socket_errno) {
+#ifdef EWOULDBLOCK
 	case EWOULDBLOCK:
 	    return EEWOULDBLOCK;
+#endif
 	case EINTR:
 	    return EEINTR;
 	default:
@@ -403,6 +410,19 @@ socket_accept P3(int, fd, svalue_t *, read_callback, svalue_t *, write_callback)
 	    return EEACCEPT;
 	}
     }
+
+    /*
+     * According to Amylaar, 'accepted' sockets in Linux 0.99p6 don't
+     * properly inherit the nonblocking property from the listening socket.
+     * Marius, 19-Jun-2000: this happens on other platforms as well, so just
+     * do it for everyone
+     */
+    if (set_socket_nonblocking(accept_fd, 1) == -1) {
+	socket_perror("socket_accept: set_socket_nonblocking 1", 0);
+	OS_socket_close(accept_fd);
+	return EENONBLOCK;
+    }
+
     i = find_new_socket();
     if (i >= 0) {
 	fd_set wmask;
@@ -438,20 +458,6 @@ socket_accept P3(int, fd, svalue_t *, read_callback, svalue_t *, write_callback)
 	lpc_socks[i].w_off = 0;
 	lpc_socks[i].w_len = 0;
 
-#ifdef cray
-/* cray can't take addresses of bitfields */
-	hp = gethostbyaddr((char *) &sin.sin_addr,
-			   (int) sizeof(sin.sin_addr), AF_INET);
-#else
-	hp = gethostbyaddr((char *) &sin.sin_addr.s_addr,
-			   (int) sizeof(sin.sin_addr.s_addr), AF_INET);
-#endif
-	if (hp != NULL) {
-	    strncpy(lpc_socks[i].name, hp->h_name, ADDR_BUF_SIZE);
-	    lpc_socks[i].name[ADDR_BUF_SIZE - 1] = '\0';
-	} else
-	    lpc_socks[i].name[0] = '\0';
-
 	lpc_socks[i].owner_ob = current_object;
 	set_read_callback(i, read_callback);
 	set_write_callback(i, write_callback);
@@ -459,8 +465,8 @@ socket_accept P3(int, fd, svalue_t *, read_callback, svalue_t *, write_callback)
 
 	current_object->flags |= O_EFUN_SOCKET;
 
-	debug(8192, ("socket_accept: accept on socket %d\n", fd));
-	debug(8192, ("socket_accept: new socket %d on fd %d\n", i, accept_fd));
+	debug(sockets, ("socket_accept: accept on socket %d\n", fd));
+	debug(sockets, ("socket_accept: new socket %d on fd %d\n", i, accept_fd));
     } else
 	OS_socket_close(accept_fd);
 
@@ -470,8 +476,7 @@ socket_accept P3(int, fd, svalue_t *, read_callback, svalue_t *, write_callback)
 /*
  * Connect an LPC efun socket
  */
-int
-socket_connect P4(int, fd, char *, name, svalue_t *, read_callback, svalue_t *, write_callback)
+int socket_connect P4(int, fd, char *, name, svalue_t *, read_callback, svalue_t *, write_callback)
 {
     if (fd < 0 || fd >= max_lpc_socks)
 	return EEFDRANGE;
@@ -502,23 +507,19 @@ socket_connect P4(int, fd, char *, name, svalue_t *, read_callback, svalue_t *, 
 
     current_object->flags |= O_EFUN_SOCKET;
 
+#ifdef WINSOCK
+    /* Turn on blocking for connect to ensure correct errors */
+    if (set_socket_nonblocking(lpc_socks[fd].fd, 0) == -1) {
+	socket_perror("socket_connect: set_socket_nonblocking 0", 0);
+	OS_socket_close(fd);
+	return EENONBLOCK;
+    }
+#endif
     if (connect(lpc_socks[fd].fd, (struct sockaddr *) & lpc_socks[fd].r_addr,
 		sizeof(struct sockaddr_in)) == -1) {
 	switch (socket_errno) {
 	case EINTR:
 	    return EEINTR;
-#ifdef WINSOCK
-	case WSAEADDRINUSE:
-	    return EEADDRINUSE;
-	case WSAEALREADY:
-	    return EEALREADY;
-	case WSAECONNREFUSED:
-	    return EECONNREFUSED;
-	case WSAEINPROGRESS:
-	    break;
-	case WSAEWOULDBLOCK:
-	    break;
-#else
 	case EADDRINUSE:
 	    return EEADDRINUSE;
 	case EALREADY:
@@ -527,12 +528,18 @@ socket_connect P4(int, fd, char *, name, svalue_t *, read_callback, svalue_t *, 
 	    return EECONNREFUSED;
 	case EINPROGRESS:
 	    break;
-#endif
 	default:
 	    socket_perror("socket_connect: connect", 0);
 	    return EECONNECT;
 	}
     }
+#ifdef WINSOCK
+    if (set_socket_nonblocking(lpc_socks[fd].fd, 1) == -1) {
+	socket_perror("socket_connect: set_socket_nonblocking, 1", 0);
+	OS_socket_close(fd);
+	return EENONBLOCK;
+    }
+#endif
     lpc_socks[fd].state = DATA_XFER;
     lpc_socks[fd].flags |= S_BLOCKED;
 
@@ -542,8 +549,7 @@ socket_connect P4(int, fd, char *, name, svalue_t *, read_callback, svalue_t *, 
 /*
  * Write a message on an LPC efun socket
  */
-int
-socket_write P3(int, fd, svalue_t *, message, char *, name)
+int socket_write P3(int, fd, svalue_t *, message, char *, name)
 {
     int len, off;
     char *buf, *p;
@@ -552,7 +558,8 @@ socket_write P3(int, fd, svalue_t *, message, char *, name)
     if (fd < 0 || fd >= max_lpc_socks)
 	return EEFDRANGE;
     if (lpc_socks[fd].state == CLOSED ||
-	lpc_socks[fd].state == FLUSHING)
+	lpc_socks[fd].state == FLUSHING ||
+	(lpc_socks[fd].flags & S_LINKDEAD))
 	return EEBADF;
     if (lpc_socks[fd].owner_ob != current_object)
 	return EESECURITY;
@@ -571,14 +578,10 @@ socket_write P3(int, fd, svalue_t *, message, char *, name)
     }
 
     switch (lpc_socks[fd].mode) {
+	case MUD:
+	    if (message->type == T_OBJECT)
+		return EETYPENOTSUPP;
 
-    case MUD:
-	switch (message->type) {
-
-	case T_OBJECT:
-	    return EETYPENOTSUPP;
-
-	default:
 	    save_svalue_depth = 0;
 	    len = svalue_save_size(message);
 	    if (save_svalue_depth > MAX_SAVE_SVALUE_DEPTH) {
@@ -593,105 +596,115 @@ socket_write P3(int, fd, svalue_t *, message, char *, name)
 	    buf[4] = '\0';
 	    p = buf + 4;
 	    save_svalue(message, &p);
+	
 	    break;
-	}
-	break;
 
-    case STREAM:
-	switch (message->type) {
-	case T_BUFFER:
-	    len = message->u.buf->size;
-	    buf = (char *) DMALLOC(len, TAG_TEMPORARY, "socket_write: T_BUFFER");
-	    if (buf == NULL)
-		fatal("Out of memory");
-	    memcpy(buf, message->u.buf->item, len);
-	    break;
-	case T_STRING:
-	    len = SVALUE_STRLEN(message);
-	    buf = (char *) DMALLOC(len + 1, TAG_TEMPORARY, "socket_write: T_STRING");
-	    if (buf == NULL)
-		fatal("Out of memory");
-	    strcpy(buf, message->u.string);
-	    break;
-	case T_ARRAY:
-	    {
-		int i, limit;
-		svalue_t *el;
+	case STREAM:
+	    switch (message->type) {
+#ifndef NO_BUFFER_TYPE
+		case T_BUFFER:
+		    len = message->u.buf->size;
+		    buf = (char *) DMALLOC(len, TAG_TEMPORARY, "socket_write: T_BUFFER");
+		    if (buf == NULL)
+			fatal("Out of memory");
+		    memcpy(buf, message->u.buf->item, len);
+		    break;
+#endif
+		case T_STRING:
+		    len = SVALUE_STRLEN(message);
+		    buf = (char *) DMALLOC(len + 1, TAG_TEMPORARY, "socket_write: T_STRING");
+		    if (buf == NULL)
+			fatal("Out of memory");
+		    strcpy(buf, message->u.string);
+		    break;
 
-		len = message->u.arr->size * sizeof(int);
-		buf = (char *) DMALLOC(len + 1, TAG_TEMPORARY, "socket_write: T_ARRAY");
-		if (buf == NULL)
-		    fatal("Out of memory");
-		el = message->u.arr->item;
-		limit = len / sizeof(int);
-		for (i = 0; i < limit; i++) {
-		    switch (el[i].type) {
-		    case T_NUMBER:
-			memcpy((char *) &buf[i * sizeof(int)],
-			       (char *) &el[i].u.number, sizeof(int));
-			break;
-		    case T_REAL:
-			memcpy((char *) &buf[i * sizeof(int)], (char *) &el[i].u.real,
-			       sizeof(int));
-			break;
-		    default:
-			break;
+		case T_ARRAY:
+		    {
+			int i, limit;
+			svalue_t *el;
+
+			len = message->u.arr->size * sizeof(int);
+			buf = (char *) DMALLOC(len + 1, TAG_TEMPORARY, "socket_write: T_ARRAY");
+			if (buf == NULL)
+			    fatal("Out of memory");
+			el = message->u.arr->item;
+			limit = len / sizeof(int);
+			for (i = 0; i < limit; i++) {
+			    switch (el[i].type) {
+				case T_NUMBER:
+				    memcpy((char *) &buf[i * sizeof(int)],
+					   (char *) &el[i].u.number, sizeof(int));
+				break;
+
+				case T_REAL:
+				    memcpy((char *) &buf[i * sizeof(int)],
+					   (char *) &el[i].u.real, sizeof(int));
+				    break;
+
+				default:
+				    break;
+			    }
+			}
 		    }
-		}
-		break;
+		    break;
+
+		default:
+		    return EETYPENOTSUPP;
 	    }
+	    break;
+
+	case DATAGRAM:
+	    switch (message->type) {
+		case T_STRING:
+		    if (sendto(lpc_socks[fd].fd, (char *)message->u.string,
+			       strlen(message->u.string) + 1, 0,
+			       (struct sockaddr *)&sin, sizeof(sin)) == -1) {
+			socket_perror("socket_write: sendto", 0);
+			return EESENDTO;
+		    }
+		    return EESUCCESS;
+
+#ifndef NO_BUFFER_TYPE
+		case T_BUFFER:
+		    if (sendto(lpc_socks[fd].fd, (char *)message->u.buf->item,
+			       message->u.buf->size, 0,
+			       (struct sockaddr *)&sin, sizeof(sin)) == -1) {
+			socket_perror("socket_write: sendto", 0);
+			return EESENDTO;
+		    }
+		    return EESUCCESS;
+#endif
+
+		default:
+		    return EETYPENOTSUPP;
+	    }
+
 	default:
-	    return EETYPENOTSUPP;
-	}
-	break;
+	    return EEMODENOTSUPP;
+    }
 
-    case DATAGRAM:
-	switch (message->type) {
-
-	case T_STRING:
-	    if (sendto(lpc_socks[fd].fd, (char *)message->u.string,
-		       strlen(message->u.string) + 1, 0,
-		       (struct sockaddr *) & sin, sizeof(sin)) == -1) {
-		socket_perror("socket_write: sendto", 0);
-		return EESENDTO;
-	    }
-	    return EESUCCESS;
-
-
-	case T_BUFFER:
-	    if (sendto(lpc_socks[fd].fd, (char *)message->u.buf->item,
-		       message->u.buf->size, 0,
-		       (struct sockaddr *) & sin, sizeof(sin)) == -1) {
-		socket_perror("socket_write: sendto", 0);
-		return EESENDTO;
-	    }
-	    return EESUCCESS;
-
-	default:
-	    return EETYPENOTSUPP;
-	}
-
-    default:
-	return EEMODENOTSUPP;
+    if (!len) {
+	FREE(buf);
+	return EESUCCESS;
     }
 
     off = OS_socket_write(lpc_socks[fd].fd, buf, len);
-    if (off == -1) {
+    if (off <= 0) {
 	FREE(buf);
-	switch (socket_errno) {
-#ifdef WINSOCK
-	case WSAEWOULDBLOCK:
-	    return EEWOULDBLOCK;
-#else
-	case EWOULDBLOCK:
+
+#ifdef EWOULDBLOCK
+	if (off == -1 && socket_errno == EWOULDBLOCK)
 	    return EEWOULDBLOCK;
 #endif
+	if (off == -1 && socket_errno == EINTR)
+	    return EEINTR;
 
-	default:
-	    socket_perror("socket_write: send", 0);
-	    return EESEND;
-	}
+	socket_perror("socket_write: send", 0);
+	lpc_socks[fd].flags |= S_LINKDEAD;
+	socket_close(fd, SC_FORCE | SC_DO_CALLBACK | SC_FINAL_CLOSE);
+	return EESEND;
     }
+
     if (off < len) {
 	lpc_socks[fd].flags |= S_BLOCKED;
 	lpc_socks[fd].w_buf = buf;
@@ -699,19 +712,29 @@ socket_write P3(int, fd, svalue_t *, message, char *, name)
 	lpc_socks[fd].w_len = len - off;
 	return EECALLBACK;
     }
-    FREE(buf);
 
+    FREE(buf);
     return EESUCCESS;
 }
 
-static void
-call_callback P3(int, fd, int, what, int, num_arg) {
+#endif	/* PACKAGE_SOCKETS */
+
+static void call_callback P3(int, fd, int, what, int, num_arg)
+{
     union string_or_func callback;
 
     switch (what) {
-    case S_READ_FP: callback = lpc_socks[fd].read_callback; break;
-    case S_WRITE_FP: callback = lpc_socks[fd].write_callback; break;
-    case S_CLOSE_FP: callback = lpc_socks[fd].close_callback; break;
+	case S_READ_FP:
+	    callback = lpc_socks[fd].read_callback;
+	    break;
+
+	case S_WRITE_FP:
+	    callback = lpc_socks[fd].write_callback;
+	    break;
+
+	case S_CLOSE_FP:
+	    callback = lpc_socks[fd].close_callback;
+	    break;
     }
 
     if (lpc_socks[fd].flags & what) {
@@ -719,22 +742,21 @@ call_callback P3(int, fd, int, what, int, num_arg) {
     } else if (callback.s) {
 	if (callback.s[0] == APPLY___INIT_SPECIAL_CHAR)
 	    error("Illegal function name.\n");
-	safe_apply(callback.s, lpc_socks[fd].owner_ob, num_arg, ORIGIN_DRIVER);
+	safe_apply(callback.s, lpc_socks[fd].owner_ob, num_arg, ORIGIN_INTERNAL);
     }
 }
 
 /*
  * Handle LPC efun socket read select events
  */
-void
-socket_read_select_handler P1(int, fd)
+void socket_read_select_handler P1(int, fd)
 {
     int cc = 0, addrlen;
     char buf[BUF_SIZE], addr[ADDR_BUF_SIZE];
     svalue_t value;
     struct sockaddr_in sin;
 
-    debug(8192, ("read_socket_handler: fd %d state %d\n",
+    debug(sockets, ("read_socket_handler: fd %d state %d\n",
 		 fd, lpc_socks[fd].state));
 
     switch (lpc_socks[fd].state) {
@@ -755,17 +777,18 @@ socket_read_select_handler P1(int, fd)
 	    break;
 
 	case DATAGRAM:
-	    debug(8192, ("read_socket_handler: DATA_XFER DATAGRAM\n"));
+	    debug(sockets, ("read_socket_handler: DATA_XFER DATAGRAM\n"));
 	    addrlen = sizeof(sin);
 	    cc = recvfrom(lpc_socks[fd].fd, buf, sizeof(buf) - 1, 0,
 			  (struct sockaddr *) & sin, &addrlen);
 	    if (cc <= 0)
 		break;
-	    debug(8192, ("read_socket_handler: read %d bytes\n", cc));
+	    debug(sockets, ("read_socket_handler: read %d bytes\n", cc));
 	    buf[cc] = '\0';
 	    sprintf(addr, "%s %d", inet_ntoa(sin.sin_addr),
 		    (int)ntohs(sin.sin_port));
 	    push_number(fd);
+#ifndef NO_BUFFER_TYPE
 	    if (lpc_socks[fd].flags & S_BINARY) {
 		buffer_t *b;
 
@@ -777,10 +800,13 @@ socket_read_select_handler P1(int, fd)
 		    push_number(0);
 		}
 	    } else {
+#endif
 		copy_and_push_string(buf);
+#ifndef NO_BUFFER_TYPE
 	    }
+#endif
 	    copy_and_push_string(addr);
-	    debug(8192, ("read_socket_handler: apply\n"));
+	    debug(sockets, ("read_socket_handler: apply\n"));
 	    call_callback(fd, S_READ_FP, 3);
 	    return;
 #ifdef DEBUG
@@ -793,7 +819,7 @@ socket_read_select_handler P1(int, fd)
 	break;
 
     case LISTEN:
-	debug(8192, ("read_socket_handler: apply read callback\n"));
+	debug(sockets, ("read_socket_handler: apply read callback\n"));
 	lpc_socks[fd].flags |= S_WACCEPT;
 	push_number(fd);
 	call_callback(fd, S_READ_FP, 1);
@@ -806,18 +832,17 @@ socket_read_select_handler P1(int, fd)
 	    break;
 
 	case MUD:
-	    debug(8192, ("read_socket_handler: DATA_XFER MUD\n"));
+	    debug(sockets, ("read_socket_handler: DATA_XFER MUD\n"));
 	    if (lpc_socks[fd].flags & S_HEADER) {
-		cc = recv(lpc_socks[fd].fd, (char *) &lpc_socks[fd].r_len +
-			  lpc_socks[fd].r_off, 4 -
-			  lpc_socks[fd].r_off, 0);
+		cc = OS_socket_read(lpc_socks[fd].fd, (char *) &lpc_socks[fd].r_len +
+				    lpc_socks[fd].r_off, 4 - lpc_socks[fd].r_off);
 		if (cc <= 0)
 		    break;
-		debug(8192, ("read_socket_handler: read %d bytes\n", cc));
+		debug(sockets, ("read_socket_handler: read %d bytes\n", cc));
 		lpc_socks[fd].r_off += cc;
 		if (lpc_socks[fd].r_off != 4)
 		    return;
-		debug(8192, ("read_socket_handler: read header\n"));
+		debug(sockets, ("read_socket_handler: read header\n"));
 		lpc_socks[fd].flags &= ~S_HEADER;
 		lpc_socks[fd].r_off = 0;
 		lpc_socks[fd].r_len = ntohl(lpc_socks[fd].r_len);
@@ -827,45 +852,48 @@ socket_read_select_handler P1(int, fd)
 		    DMALLOC(lpc_socks[fd].r_len + 1, TAG_TEMPORARY, "socket_read_select_handler");
 		if (lpc_socks[fd].r_buf == NULL)
 		    fatal("Out of memory");
-		debug(8192, ("read_socket_handler: svalue len is %d\n",
+		debug(sockets, ("read_socket_handler: svalue len is %lu\n",
 			     lpc_socks[fd].r_len));
 	    }
 	    if (lpc_socks[fd].r_off < lpc_socks[fd].r_len) {
-		cc = recv(lpc_socks[fd].fd, lpc_socks[fd].r_buf +
-			  lpc_socks[fd].r_off, lpc_socks[fd].r_len -
-			  lpc_socks[fd].r_off, 0);
+		cc = OS_socket_read(lpc_socks[fd].fd, lpc_socks[fd].r_buf +
+				    lpc_socks[fd].r_off, lpc_socks[fd].r_len -
+				    lpc_socks[fd].r_off);
 		if (cc <= 0)
 		    break;
-		debug(8192, ("read_socket_handler: read %d bytes\n", cc));
+		debug(sockets, ("read_socket_handler: read %d bytes\n", cc));
 		lpc_socks[fd].r_off += cc;
 		if (lpc_socks[fd].r_off != lpc_socks[fd].r_len)
 		    return;
-		debug(8192, ("read_socket_handler: read svalue\n"));
+		debug(sockets, ("read_socket_handler: read svalue\n"));
 	    }
 	    lpc_socks[fd].r_buf[lpc_socks[fd].r_len] = '\0';
 	    value = const0;
 	    push_number(fd);
-	    if (restore_svalue(lpc_socks[fd].r_buf, &value) == 0)
-		*(++sp) = value;
-	    else
+	    if (restore_svalue(lpc_socks[fd].r_buf, &value) == 0) {
+		STACK_INC;
+		*sp = value;
+	    } else {
 		push_undefined();
+	    }
 	    FREE(lpc_socks[fd].r_buf);
 	    lpc_socks[fd].flags |= S_HEADER;
 	    lpc_socks[fd].r_buf = NULL;
 	    lpc_socks[fd].r_off = 0;
 	    lpc_socks[fd].r_len = 0;
-	    debug(8192, ("read_socket_handler: apply read callback\n"));
+	    debug(sockets, ("read_socket_handler: apply read callback\n"));
 	    call_callback(fd, S_READ_FP, 2);
 	    return;
 
 	case STREAM:
-	    debug(8192, ("read_socket_handler: DATA_XFER STREAM\n"));
+	    debug(sockets, ("read_socket_handler: DATA_XFER STREAM\n"));
 	    cc = OS_socket_read(lpc_socks[fd].fd, buf, sizeof(buf) - 1);
 	    if (cc <= 0)
 		break;
-	    debug(8192, ("read_socket_handler: read %d bytes\n", cc));
+	    debug(sockets, ("read_socket_handler: read %d bytes\n", cc));
 	    buf[cc] = '\0';
 	    push_number(fd);
+#ifndef NO_BUFFER_TYPE
 	    if (lpc_socks[fd].flags & S_BINARY) {
 		buffer_t *b;
 
@@ -878,9 +906,12 @@ socket_read_select_handler P1(int, fd)
 		    push_number(0);
 		}
 	    } else {
+#endif
 		copy_and_push_string(buf);
+#ifndef NO_BUFFER_TYPE
 	    }
-	    debug(8192, ("read_socket_handler: apply read callback\n"));
+#endif
+	    debug(sockets, ("read_socket_handler: apply read callback\n"));
 	    call_callback(fd, S_READ_FP, 2);
 	    return;
 #ifdef DEBUG
@@ -894,11 +925,7 @@ socket_read_select_handler P1(int, fd)
     }
     if (cc == -1) {
 	switch (socket_errno) {
-#ifdef WINSOCK
-	case WSAECONNREFUSED:
-#else
 	case ECONNREFUSED:
-#endif
 	    /* Evidentally, on Linux 1.2.1, ECONNREFUSED gets returned
 	     * if an ICMP_PORT_UNREACHED error happens internally.  Why
 	     * they use this error message, I have no idea, but this seems
@@ -909,9 +936,7 @@ socket_read_select_handler P1(int, fd)
 		return;
 	    break;
 	case EINTR:
-#ifdef WINSOCK
-	case WSAEWOULDBLOCK:
-#else
+#ifdef EWOULDBLOCK
 	case EWOULDBLOCK:
 #endif
 	    return;
@@ -919,34 +944,49 @@ socket_read_select_handler P1(int, fd)
 	    break;
 	}
     }
-    socket_close(fd, SC_FORCE | SC_DO_CALLBACK);
+
+    lpc_socks[fd].flags |= S_LINKDEAD;
+    socket_close(fd, SC_FORCE | SC_DO_CALLBACK | SC_FINAL_CLOSE);
 }
 
 /*
  * Handle LPC efun socket write select events
  */
-void
-socket_write_select_handler P1(int, fd)
+void socket_write_select_handler P1(int, fd)
 {
     int cc;
 
-    debug(8192, ("write_socket_handler: fd %d state %d\n",
+    debug(sockets, ("write_socket_handler: fd %d state %d\n",
 		 fd, lpc_socks[fd].state));
 
-    if ((lpc_socks[fd].flags & S_BLOCKED) == 0)
+    /* if the socket isn't blocked, we've got nothing to send */
+    /* if the socket is linkdead, don't send -- could block */
+    if (!(lpc_socks[fd].flags & S_BLOCKED) || lpc_socks[fd].flags & S_LINKDEAD)
+	return;
+
+    if (lpc_socks[fd].flags & S_LINKDEAD)
 	return;
 
     if (lpc_socks[fd].w_buf != NULL) {
 	cc = OS_socket_write(lpc_socks[fd].fd, 
 			     lpc_socks[fd].w_buf + lpc_socks[fd].w_off,
 			     lpc_socks[fd].w_len);
-	if (cc == -1) {
-	    if (lpc_socks[fd].state == FLUSHING &&
-		errno != EINTR) {
-		/* give up on errors writing to closing sockets */
+	if (cc <= -1) {
+	    if (cc == -1 && (
+#ifdef EWOULDBLOCK
+			errno == EWOULDBLOCK ||
+#endif
+			errno == EINTR)) {
+		return;
+	    }
+
+	    lpc_socks[fd].flags |= S_LINKDEAD;
+	    if (lpc_socks[fd].state == FLUSHING) {
 		lpc_socks[fd].flags &= ~S_BLOCKED;
 		socket_close(fd, SC_FORCE | SC_FINAL_CLOSE);
+		return;
 	    }
+	    socket_close(fd, SC_FORCE | SC_DO_CALLBACK | SC_FINAL_CLOSE);
 	    return;
 	}
 	lpc_socks[fd].w_off += cc;
@@ -963,7 +1003,7 @@ socket_write_select_handler P1(int, fd)
 	return;
     }
 
-    debug(8192, ("write_socket_handler: apply write_callback\n"));
+    debug(sockets, ("write_socket_handler: apply write_callback\n"));
 
     push_number(fd);
     call_callback(fd, S_WRITE_FP, 1);
@@ -972,8 +1012,7 @@ socket_write_select_handler P1(int, fd)
 /*
  * Close an LPC efun socket
  */
-int
-socket_close P2(int, fd, int, flags)
+int socket_close P2(int, fd, int, flags)
 {
     if (fd < 0 || fd >= max_lpc_socks)
 	return EEFDRANGE;
@@ -985,7 +1024,7 @@ socket_close P2(int, fd, int, flags)
 	return EESECURITY;
 
     if (flags & SC_DO_CALLBACK) {
-	debug(8192, ("read_socket_handler: apply close callback\n"));
+	debug(sockets, ("read_socket_handler: apply close callback\n"));
 	push_number(fd);
 	call_callback(fd, S_CLOSE_FP, 1);
     }
@@ -994,7 +1033,8 @@ socket_close P2(int, fd, int, flags)
     set_write_callback(fd, 0);
     set_close_callback(fd, 0);
 
-    if (lpc_socks[fd].flags & S_BLOCKED) {
+    /* if we're linkdead, we'll never flush, so don't even try :-) */
+    if ((lpc_socks[fd].flags & S_BLOCKED) && !(lpc_socks[fd].flags & S_LINKDEAD)) {
 	/* Can't close now; we still have data to write.  Tell the mudlib
 	 * it is closed, but we really finish up later.
 	 */
@@ -1005,20 +1045,25 @@ socket_close P2(int, fd, int, flags)
     while (OS_socket_close(lpc_socks[fd].fd) == -1 && socket_errno == EINTR)
 	;	/* empty while */
     lpc_socks[fd].state = CLOSED;
-    if (lpc_socks[fd].r_buf != NULL)
+    if (lpc_socks[fd].r_buf != NULL) {
 	FREE(lpc_socks[fd].r_buf);
-    if (lpc_socks[fd].w_buf != NULL)
+	lpc_socks[fd].r_buf = NULL;
+    }
+    if (lpc_socks[fd].w_buf != NULL) {
 	FREE(lpc_socks[fd].w_buf);
+	lpc_socks[fd].w_buf = NULL;
+    }
 
-    debug(8192, ("socket_close: closed fd %d\n", fd));
+    debug(sockets, ("socket_close: closed fd %d\n", fd));
     return EESUCCESS;
 }
+
+#ifdef PACKAGE_SOCKETS
 
 /*
  * Release an LPC efun socket to another object
  */
-int
-socket_release P3(int, fd, object_t *, ob, svalue_t *, callback)
+int socket_release P3(int, fd, object_t *, ob, svalue_t *, callback)
 {
     if (fd < 0 || fd >= max_lpc_socks)
 	return EEFDRANGE;
@@ -1039,7 +1084,7 @@ socket_release P3(int, fd, object_t *, ob, svalue_t *, callback)
     if (callback->type == T_FUNCTION)
 	safe_call_function_pointer(callback->u.fp, 2);
     else
-	safe_apply(callback->u.string, ob, 2, ORIGIN_DRIVER);
+	safe_apply(callback->u.string, ob, 2, ORIGIN_INTERNAL);
 
     if ((lpc_socks[fd].flags & S_RELEASE) == 0)
 	return EESUCCESS;
@@ -1053,8 +1098,7 @@ socket_release P3(int, fd, object_t *, ob, svalue_t *, callback)
 /*
  * Aquire an LPC efun socket from another object
  */
-int
-socket_acquire P4(int, fd, svalue_t *, read_callback, svalue_t *, write_callback, svalue_t *, close_callback)
+int socket_acquire P4(int, fd, svalue_t *, read_callback, svalue_t *, write_callback, svalue_t *, close_callback)
 {
     if (fd < 0 || fd >= max_lpc_socks)
 	return EEFDRANGE;
@@ -1080,11 +1124,9 @@ socket_acquire P4(int, fd, svalue_t *, read_callback, svalue_t *, write_callback
 /*
  * Return the string representation of a socket error
  */
-char *
-     socket_error P1(int, error)
-{
+char *socket_error P1(int, error) {
     error = -(error + 1);
-    if (error < 0 || error >= ERROR_STRINGS)
+    if (error < 0 || error >= ERROR_STRINGS - 1)
 	return "socket_error: invalid error number";
     return error_strings[error];
 }
@@ -1107,8 +1149,7 @@ int get_socket_address P3(int, fd, char *, addr, int *, port)
 /*
  * Return the current socket owner
  */
-object_t *
-       get_socket_owner P1(int, fd)
+object_t *get_socket_owner P1(int, fd)
 {
     if (fd < 0 || fd >= max_lpc_socks)
 	return (object_t *) NULL;
@@ -1118,11 +1159,12 @@ object_t *
     return lpc_socks[fd].owner_ob;
 }
 
+#endif	/* PACKAGE_SOCKETS */
+
 /*
  * Initialize a T_OBJECT svalue
  */
-void
-assign_socket_owner P2(svalue_t *, sv, object_t *, ob)
+void assign_socket_owner P2(svalue_t *, sv, object_t *, ob)
 {
     if (ob != NULL) {
 	sv->type = T_OBJECT;
@@ -1132,11 +1174,12 @@ assign_socket_owner P2(svalue_t *, sv, object_t *, ob)
 	assign_svalue_no_free(sv, &const0u);
 }
 
+#ifdef PACKAGE_SOCKETS
+
 /*
  * Convert a string representation of an address to a sockaddr_in
  */
-static int
-socket_name_to_sin P2(char *, name, struct sockaddr_in *, sin)
+static int socket_name_to_sin P2(char *, name, struct sockaddr_in *, sin)
 {
     int port;
     char *cp, addr[ADDR_BUF_SIZE];
@@ -1158,11 +1201,12 @@ socket_name_to_sin P2(char *, name, struct sockaddr_in *, sin)
     return 1;
 }
 
+#endif	/* PACKAGE_SOCKETS */
+
 /*
  * Close any sockets owned by ob
  */
-void
-close_referencing_sockets P1(object_t *, ob)
+void close_referencing_sockets P1(object_t *, ob)
 {
     int i;
 
@@ -1173,11 +1217,12 @@ close_referencing_sockets P1(object_t *, ob)
 	    socket_close(i, SC_FORCE);
 }
 
+#ifdef PACKAGE_SOCKETS
+
 /*
  * Return the string representation of a sockaddr_in
  */
-static char *
-     inet_address P1(struct sockaddr_in *, sin)
+static char *inet_address P1(struct sockaddr_in *, sin)
 {
     static char addr[23], port[7];
 
@@ -1254,63 +1299,6 @@ void dump_socket_status P1(outbuffer_t *, out)
     }
 }
 
-#ifdef WIN32
-void SocketPerror P2(char *, what, char *, file) {
-    static char *errstrings[] = 
-    {  "Operation would block",
-       "Blocking call in progress",
-       "as in BSD",
-       "Invalid socket",
-       "Missing destination",
-       "Data is too large",
-       "as in BSD",
-       /* WSAEPROTOTYPE */
-       "Wrong protocol type",
-       "Unsupported option",
-       "Unsupported protocol",
-       "Unsupported socket type",
-       "Socket can't listen",
-       "WSAEPFNOSUPPORT",
-       "Can't use adress family",
-       "Addr is used",
-       "Addr is not available",
-       "No buffer space",
-       "Already connected",
-       "Not connected",
-       "WSAESHUTDOWN",
-       "WSAETOOMANYREFS",
-       "Time-out",
-       "Connection refused",
-       "WSAELOOP",
-       "WSAEHOSTDOWN",
-       "WSAEHOSTUNREACH",
-       "WSASYSNOTREADY",
-       "WSAVERNOTSUPPORTED",
-       "Winsock not initialised",
-       "WSAHOST_NOT_FOUND",
-       "WSATRY_AGAIN",
-       "WSANO_RECOVERY",
-       "WSANO_DATA"
-    };
-    
-    char *s;
-    
-    switch (socket_errno) {
-    case WSAEINTR: s = "Function interrupted";
-    case WSAEACCES: s = "Cannot broadcast";
-    case WSAEFAULT: s = "Buffer is invalid";
-    case WSAEINVAL: s = "Unbound socket";
-    case WSAEMFILE: s = "No more descriptors";
-	
-    default: if ( (socket_errno >= WSAEWOULDBLOCK) && (socket_errno <= WSANO_DATA)) {
-	s = errstrings[socket_errno - WSAEWOULDBLOCK];
-    } else s = "unknown error";
-    }  
-    if (file)
-   	debug_message("System Error: %s:%s:%s\n", what, file, s);
-    else
-	debug_message("System Error: %s:%s\n", what, s);
-}
 #endif
 
 #endif				/* SOCKET_EFUNS */

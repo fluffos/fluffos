@@ -5,12 +5,12 @@ gcc 2.3+, then you might want to try the following flags:
 
 -O2 -fomit-frame-pointer -fstrength-reduce
 
-Note that some compilers can produce incorrect code at the higher levels
-of optimization.  If the driver behaves inexplicably, trying lowering
-the optimization level.  See the ./doc/platforms directory for more
-information on optimization flags for specific platforms.  Also type 'man cc'
-or ask your system guru if you are interested in finding out optimization
-flag information for your particular compiler.
+Note that some compilers can produce incorrect code at the higher levels of
+optimization.  If the driver behaves inexplicably, trying lowering the
+optimization level.  See the Platforms file for more information on
+optimization flags for specific platforms.  Also type 'man cc' or ask your
+system guru if you are interested in finding out optimization flag information
+for your particular compiler.
 
 2) choose an appropriate memory management (malloc) package.  Some systems
 have very slow system mallocs (like the HP snake on which malloc used 30%

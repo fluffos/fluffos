@@ -1,6 +1,9 @@
 #ifndef SIMULATE_H
 #define SIMULATE_H
 
+/* It is usually better to include "lpc_incl.h" instead of including this
+   directly */
+
 #define V_SHORT         1
 #define V_NOSPACE       2
 #define V_FUNCTION      4
@@ -32,9 +35,9 @@ extern char *compilation_ident;
 
 char *strput PROT((char *, char *, char *));
 char *strput_int PROT((char *, char *, int));
-void debug_fatal PROT1V(char *);
-void fatal PROT1V(char *);
-void error PROT1V(char *);
+void CDECL debug_fatal PROT1V(char *);
+void CDECL fatal PROT1V(char *);
+void CDECL error PROT1V(char *);
 INLINE void check_legal_string PROT((char *));
 #ifndef NO_ADD_ACTION
 int user_parser PROT((char *));

@@ -1,8 +1,6 @@
 #include "std.h"
-#include "config.h"
-#include "lpc_incl.h"
-#include "file_incl.h"
 #include "swap.h"
+#include "file_incl.h"
 #include "simul_efun.h"
 #include "comm.h"
 #include "md.h"
@@ -262,6 +260,8 @@ static int
 swap_in P2(char **, blockp, int, loc)
 {
     int size;
+
+    DEBUG_CHECK(!blockp, "blockp null in swap_in()\n");
     
     if (loc == -1)
 	return 0;
@@ -270,6 +270,7 @@ swap_in P2(char **, blockp, int, loc)
     /* find out size */
     if (read(swap_file, &size, sizeof size) == -1)
         fatal("Couldn't read the swap file.\n");
+    DEBUG_CHECK(size <= 0, "Illegal size read from swap file.\n");
     *blockp = DXALLOC(size, TAG_SWAP, "swap_in");
     if (read(swap_file, *blockp, size) == -1)
         fatal("Couldn't read the swap file.\n");
@@ -277,6 +278,7 @@ swap_in P2(char **, blockp, int, loc)
     /* find out size */
     if (fread((char *) &size, sizeof size, 1, swap_file) == -1)
 	fatal("Couldn't read the swap file.\n");
+    DEBUG_CHECK(size <= 0, "Illegal size read from swap file.\n");
     *blockp = DXALLOC(size, TAG_SWAP, "swap_in");
     if (fread(*blockp, size, 1, swap_file) == -1)
 	fatal("Couldn't read the swap file.\n");
@@ -304,14 +306,11 @@ locate_out P1(program_t *, prog)
 {
     if (!prog)
 	return 0;
-#ifdef DEBUG
-    if (d_flag > 1) {
-	debug_message("locate_out: %lX %lX %lX %lX %lX %lX %lX\n",
+    debug(d_flag, ("locate_out: %p %p %p %p %p %p %p\n",
 		      prog->program, prog->function_table,
 	     prog->strings, prog->variable_table, prog->inherit,
-		      prog->argument_types, prog->type_start);
-    }
-#endif
+		      prog->argument_types, prog->type_start));
+
     prog->program = (char *)DIFF(prog->program, prog);
     prog->function_table = (compiler_function_t *)DIFF(prog->function_table, prog);
     prog->function_flags = (unsigned short *)DIFF(prog->function_flags, prog);
@@ -365,14 +364,11 @@ locate_in P1(program_t *, prog)
 	prog->argument_types = (unsigned short *)ADD(prog->argument_types, prog);
 	prog->type_start = (unsigned short *)ADD(prog->type_start, prog);
     }
-#ifdef DEBUG
-    if (d_flag > 1) {
-	debug_message("locate_in: %lX %lX %lX %lX %lX %lX\n",
+    debug(d_flag, ("locate_in: %p %p %p %p %p %p %p\n",
 		      prog->program, prog->function_table,
 	     prog->strings, prog->variable_table, prog->inherit,
-		      prog->argument_types, prog->type_start);
-    }
-#endif
+		      prog->argument_types, prog->type_start));
+
     return 1;
 }
 
@@ -391,35 +387,22 @@ int swap P1(object_t *, ob)
     if (ob == simul_efun_ob) return 0;
     if (ob->flags & O_DESTRUCTED)
 	return 0;
-#ifdef DEBUG
-    if (d_flag > 1) {		/* marion */
-	debug_message("Swap object /%s (ref %d)\n", ob->name, ob->ref);
-    }
-#endif
+    debug(d_flag, ("Swap object /%s (ref %d)", ob->name, ob->ref));
+
     if (ob->prog->line_info)
 	swap_line_numbers(ob->prog);	/* not always done before we get here */
     if ((ob->flags & O_HEART_BEAT) || (ob->flags & O_CLONE)) {
-#ifdef DEBUG
-	if (d_flag > 1) {
-	    debug_message("  object not swapped - heart beat or cloned.\n");
-	}
-#endif
+	debug(d_flag, ("  object not swapped - heart beat or cloned."));
 	return 0;
     }
     if (ob->prog->ref > 1 || ob->interactive) {
-#ifdef DEBUG
-	if (d_flag > 1) {
-	    debug_message("  object not swapped - inherited or interactive.\n");
-	}
-#endif
+	debug(d_flag, ("  object not swapped - inherited or interactive."));
+
 	return 0;
     }
     if (ob->prog->func_ref > 0) {
-#ifdef DEBUG
-	if (d_flag > 1) {
-	    debug_message("  object not swapped - referenced by functions.\n");
-	}
-#endif
+	debug(d_flag, ("  object not swapped - referenced by functions."));
+
 	return 0;
     }
     locate_out(ob->prog);	/* relocate the internal pointers */
@@ -439,11 +422,9 @@ void load_ob_from_swap P1(object_t *, ob)
 {
     if (ob->swap_num == -1)
 	fatal("Loading not swapped object.\n");
-#ifdef DEBUG
-    if (d_flag > 1) {		/* marion */
-	debug_message("Unswap object /%s (ref %d)\n", ob->name, ob->ref);
-    }
-#endif
+
+    debug(d_flag, ("Unswap object /%s (ref %d)", ob->name, ob->ref));
+
     swap_in((char **) &ob->prog, ob->swap_num);
     SET_TAG(ob->prog, TAG_PROGRAM);
     /*
@@ -469,11 +450,9 @@ swap_line_numbers P1(program_t *, prog)
 
     if (!prog || !prog->line_info)
 	return 0;
-#ifdef DEBUG
-    if (d_flag > 1) {
-	debug_message("Swap line numbers for /%s\n", prog->name);
-    }
-#endif
+
+    debug(d_flag, ("Swap line numbers for /%s", prog->name));
+
     size = prog->file_info[0];
     if (swap_out((char *) prog->file_info, size,
 		 &prog->line_swap_index)) {
@@ -495,11 +474,9 @@ void load_line_numbers P1(program_t *, prog)
 
     if (prog->line_info)
 	return;
-#ifdef DEBUG
-    if (d_flag > 1) {
-	debug_message("Unswap line numbers for /%s\n", prog->name);
-    }
-#endif
+
+    debug(d_flag, ("Unswap line numbers for /%s\n", prog->name));
+
     size = swap_in((char **) &prog->file_info, prog->line_swap_index);
     SET_TAG(prog->file_info, TAG_LINENUMBERS);
     prog->line_info = (unsigned char *)&prog->file_info[prog->file_info[1]];

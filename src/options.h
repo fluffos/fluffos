@@ -5,6 +5,18 @@
 #ifndef _OPTIONS_H_
 #define _OPTIONS_H_
 
+/* 
+ * YOU PROBABLY DO NOT WANT TO MODIFY THIS FILE.
+ *
+ * Do 'cp options.h local_options' and edit that instead.  local_options,
+ * if it exists, overrides this file.
+ *
+ * The advantage is that when you upgrade to a newer MudOS driver, you can
+ * simply copy your local_options file into the src directory.  The build
+ * process will warn you if new options have been added that you should
+ * choose settings for.
+ */
+
 /****************************************************************************
  * EVERY time you change ANYTHING in this file, RECOMPILE from scratch.     *
  * (type "make clean" then "make" on a UNIX system) Failure to do so may    *
@@ -18,12 +30,18 @@
  *  you have problems compiling on your system.
  * Removing an efun from func_spec.c usually removes most, if not all,
  *  of the code associated with it.
+ * Note that anything defined in this file is also visible to LPC files
+ * surrounded by __.  So #define FOO in this file defines __FOO__ for
+ * all LPC files.  This allows code like:
+ *
+ * #ifdef __SENSIBLE_MODIFIERS__
+ * ...
  */
 
 /****************************************************************************
  *                              MALLOC                                      *
  *                             --------                                     *
- * for performance reasons, LP drivers have a variety of memory allocation  *
+ * For performance reasons, LP drivers have a variety of memory allocation  *
  * packages.  If you don't care, use the default one on your system:        *
  * #define SYSMALLOC, #undef the others.                                    *
  ****************************************************************************/
@@ -145,16 +163,13 @@
  *
  * REVERSIBLE_EXPLODE_STRING overrides SANE_EXPLODE_STRING, and makes
  * it so that implode(explode(x, y), y) is always x; i.e. no delimiters
- * are every stripped.  So the example above gives
+ * are ever stripped.  So the example above gives
  * ({ "", "", "x", "y", "", "z", "", "" }).
- *
- * Compat status: which of these is "correct" is a religious question
- * anyway, despite how ugly it makes the explode() code.
  */
 #define SANE_EXPLODE_STRING
 #undef REVERSIBLE_EXPLODE_STRING
 
-/* CAST_CALL_OTHERS: define this if you want to require casting of call_others;
+/* CAST_CALL_OTHERS: define this if you want to require casting of call_other's;
  *   this was the default behavior of the driver prior to this addition.
  *
  * Compat status: code that requires it doesn't break, and it promotes
@@ -185,6 +200,13 @@
  * very, very widely used.
  */
 #undef NO_ADD_ACTION
+
+/* NO_SNOOP: disables the snoop() efun and all related functionality.
+ */
+#undef NO_SNOOP
+
+/* NO_ADD_ACTION: define this to remove add_action, commands, livings, etc.
+   process_input() then becomes the only way to deal with player input. */
 
 /* NO_ENVIRONMENT: define this to remove the handling of object containment
  * relationships by the driver 
@@ -231,13 +253,20 @@
  */
 #define OLD_ED
 
-/* COMPRESS_FUNCTION_TABLES: Causes function tables to take up significantly
- * less memory, at the cost of a slight increase in function call overhead
- * (speed).
- * 
- * Compat status: The speed cost is almost neglible.
+/* SENSIBLE_MODIFIERS:
+ * Turning this on changes a few things, which may break old code:
+ *
+ * (1) 'static' is not recognized; either 'nosave' or 'protected' must
+ *     be used instead.
+ * (2) The old meaning of 'public' is no longer allowed.  Explicit
+ *     functions must be defined at each level to allow access to
+ *     privately inherited functions.
+ * (3) 'public' now means the default visibility.  Previously there was
+ *     no keyword that meant this (before you ask, 'public' meant something
+ *     else, and if you don't know that, you probably don't have any reason
+ *     to care about the old meaning).
  */
-#define COMPRESS_FUNCTION_TABLES
+#define SENSIBLE_MODIFIERS
 
 /****************************************************************************
  *                           MISCELLANEOUS                                  *
@@ -269,7 +298,7 @@
 #undef COMPAT_32
 
 /*
- * Keep statistics about allocated strings, etc.  Which can be veiwed with
+ * Keep statistics about allocated strings, etc.  Which can be viewed with
  * the mud_status() efun.  If this is off, mud_status() and memory_info()
  * ignore allocated strings, but string operations run faster.
  */
@@ -283,7 +312,7 @@
 /* LOG_CATCHES: define this to cause errors that are catch()'d to be
  *   sent to the debug log anyway.
  *
- * On by default, because newer libs use catch() alot, and it's confusing
+ * On by default, because newer libs use catch() a lot, and it's confusing
  * if the errors don't show up in the logs.
  */
 #define LOG_CATCHES
@@ -360,11 +389,17 @@
  * PRAGMA_SAVE_BINARY:  save a compiled binary version of this file for
  *                      faster loading next time it is needed.
  * PRAGMA_OPTIMIZE:     make a second pass over the generated code to
- *                      optimize it further.  currently does jump threading.
+ *                      optimize it further.  Currently does jump threading.
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
  *                      compilation error occured.
  */
-#define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_STRICT_TYPES
+#define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_STRICT_TYPES + PRAGMA_ERROR_CONTEXT
+
+/* supress warnings about unused arguments; only warn about unused local
+ * variables.  Makes older code (where argument names were required) compile
+ * more quietly.
+ */
+#define SUPPRESS_ARGUMENT_WARNINGS
 
 /* NO_RESETS: completely disable the periodic calling of reset() */
 #undef NO_RESETS
@@ -423,17 +458,6 @@
  */
 #define TRAP_CRASHES
 
-/* DROP_CORE: define this if you want the driver to attempt to create
- *   a core file when it crashes via the crash_MudOS() function.  This
- *   define only has an affect if -DDEBUG isn't defined in the makefile
- *   (except for the SIGINT and SIGTERM signals which are always trapped).
- *
- * [NOTE: keep this undefined for now since it seems to hang some machines
- *  upon crashing (some DECstations apparently).  If you want to get a core
- *  file, undef'ing TRAP_CRASHES should work.]
- */
-#undef DROP_CORE
-
 /* THIS_PLAYER_IN_CALL_OUT: define this if you wish this_player() to be
  *   usable from within call_out() callbacks.
  */
@@ -452,11 +476,11 @@
  */
 #undef FLUSH_OUTPUT_IMMEDIATELY
 
-/* PRIVS: define this if you want object privledges.  Your mudlib must
+/* PRIVS: define this if you want object privileges.  Your mudlib must
  *   explicitly make use of this functionality to be useful.  Defining this
  *   this will increase the size of the object structure by 4 bytes (8 bytes
  *   on the DEC Alpha) and will add a new master apply during object creation
- *   to "privs_file".  In general, priveleges can be used to increase the
+ *   to "privs_file".  In general, privileges can be used to increase the
  *   granularity of security beyond the current root uid mechanism.
  *
  * [NOTE: for those who'd rather do such things at the mudlib level, look at
@@ -490,7 +514,7 @@
  *   sent directly via add_message()).  This is useful if you want to
  *   build a smart client that does something different with snoop messages.
  */
-#define RECEIVE_SNOOP
+#undef RECEIVE_SNOOP
 
 /* PROFILE_FUNCTIONS: define this to be able to measure the CPU time used by
  *   all of the user-defined functions in each LPC object.  Note: defining
@@ -505,7 +529,7 @@
 
 /* NO_BUFFER_TYPE: if this is #define'd then LPC code using the 'buffer'
  *   type won't be allowed to compile (since the 'buffer' type won't be
- *   recognized by the lexer.
+ *   recognized by the lexer).
  */
 #undef NO_BUFFER_TYPE
 
@@ -531,9 +555,27 @@
  *
  * int array x = ({ .... });
  *
- * A side effect is that array cannot be a variable or function name.
+ * A side effect is that 'array' cannot be a variable or function name.
  */
-#undef ARRAY_RESERVED_WORD
+#define ARRAY_RESERVED_WORD
+
+/* REF_RESERVED_WORD: If this is defined then the word 'ref' can be
+ *   used to pass arguments to functions by value.  Example:
+ *
+ * void inc(int ref x) {
+ *     x++;
+ * }
+ *
+ * ... y = 1; inc(ref y); ...
+ *
+ * A side effect is that 'ref' cannot be a variable or function name.
+ *
+ * Note: ref must be used in *both* places; this is intentional.  It protects
+ * against passing references to routines which don't intend to return values
+ * through their arguments, and against forgetting to pass a reference 
+ * to a function which wants one (or accidentally having a variable modified!)
+ */
+#define REF_RESERVED_WORD
 
 /****************************************************************************
  *                              PACKAGES                                    *
@@ -583,7 +625,7 @@
  */
 #undef PACKAGE_EXTERNAL
 
-/* PACKAGE_DB: efuns for external database access */
+/* PACKAGE_DB: efuns for external database access using msql */
 #undef PACKAGE_DB
 
 /* If PACKAGE_DB is defined above, you must pick ONE of the following supported
@@ -600,7 +642,7 @@
  * preserved for backwards compatibility, as several ways of breaking       *
  * almost any system which relies on them are known.  (No, it's not a flaw  *
  * of uids; only that b/c of the ease with which LPC objects can call       *
- * each other, it's far to easy to leave holes)                             *
+ * each other, it's far too easy to leave holes)                            *
  *                                                                          *
  * If you don't care about security, the first option is probably what you  *
  * want.                                                                    *
@@ -653,7 +695,7 @@
 
 /* LARGEST_PRINTABLE_STRING: defines the size of the vsprintf() buffer in
  *   comm.c's add_message(). Instead of blindly making this value larger,
- *   mudlib should be coded to not send huge strings to users.
+ *   your mudlib should be coded to not send huge strings to users.
  */
 #define LARGEST_PRINTABLE_STRING 8192
 
@@ -703,15 +745,38 @@
 /* HEART_BEAT_CHUNK: The number of heart_beat chunks allocated at a time.
  * A large number wastes memory as some will be sitting around unused, while
  * a small one wastes more CPU reallocating when it needs to grow.  Default
- * to a middlish value.
+ * to a medium value.
  */
 #define HEART_BEAT_CHUNK      32
+
+/* SERVER_IP: For machines with multiple IP addresses, this specifies which
+ * one to use.  This is useful for IP accounting and is necessary to be
+ * able to do ident lookups on such machines.
+ *
+ * example: #define SERVER_IP "194.229.18.27"
+ */
+#undef SERVER_IP
+
+/* If MudOS inherits an open file descriptor #6 from it's parent process,
+ * it uses that as an additional login port.  The 'port #' for internal
+ * purposes (debugging messages, argument to connect(), etc) and kind is
+ * defined here.  The definition here assumes we inherited a port which
+ * was bound to the telnet port by 'portbind'.
+ *
+ * #define FD6_KIND PORT_TELNET
+ * #define FD6_PORT 23
+ *
+ * If you're not using this, I'd suggest leaving it disabled.  A suprising
+ * number of operating systems/debuggers/etc leave files open on various
+ * file descriptors, possibly including fd #6.
+ */
+#undef FD6_KIND
+#undef FD6_PORT
 
 /* Some maximum string sizes
  */
 #define SMALL_STRING_SIZE     100
 #define LARGE_STRING_SIZE     1000
-#define COMMAND_BUF_SIZE      2000
 
 /* Number of levels of nested datastructures allowed -- this limit prevents
  * crashes from occuring when saving objects containing variables containing
@@ -726,7 +791,6 @@
 #define CFG_MAX_LOCAL_VARIABLES		25
 
 #define CFG_EVALUATOR_STACK_SIZE 	1000
-#define CFG_COMPILER_STACK_SIZE		200
 #define CFG_MAX_CALL_DEPTH		50
 /* This must be one of 4, 16, 64, 256, 1024, 4096 */
 #define CFG_LIVING_HASH_SIZE		256

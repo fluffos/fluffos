@@ -1,6 +1,9 @@
 #ifndef ARRAY_H
 #define ARRAY_H
 
+/* It is usually better to include "lpc_incl.h" instead of including this
+   directly */
+
 typedef struct array_s {
     unsigned short ref;
 #ifdef DEBUG
@@ -24,6 +27,7 @@ extern int total_array_size;
 #endif
 
 int sameval PROT((svalue_t *, svalue_t *));
+array_t *allocate_array2 PROT((int, svalue_t *));
 array_t *allocate_array PROT((int));
 array_t *allocate_empty_array PROT((int));
 void free_array PROT((array_t *));
@@ -56,6 +60,7 @@ int match_single_regexp PROT((char *, char *));
 array_t *match_regexp PROT((array_t *, char *, int));
 array_t *reg_assoc PROT((char *, array_t *, array_t *, svalue_t *));
 void dealloc_array PROT((array_t *));
+array_t *union_array PROT((array_t *, array_t *));
 
 #define ALLOC_ARRAY(nelem) \
     (array_t *)DXALLOC(sizeof (array_t) + \
@@ -63,4 +68,5 @@ void dealloc_array PROT((array_t *));
 #define RESIZE_ARRAY(vec, nelem) \
     (array_t *)DREALLOC(vec, sizeof (array_t) + \
 	  sizeof(svalue_t) * (nelem - 1), TAG_ARRAY, "RESIZE_ARRAY")
+
 #endif

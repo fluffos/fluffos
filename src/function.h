@@ -1,6 +1,9 @@
 #ifndef FUNCTION_H
 #define FUNCTION_H
 
+/* It is usually better to include "lpc_incl.h" instead of including this
+   directly */
+
 /* FP_LOCAL */
 typedef struct {
     short index;
@@ -22,7 +25,7 @@ typedef struct {
 #else
     POINTER_INT offset;
 #endif
-    program_t *prog;
+    struct program_s *prog;
     short fio, vio;
 } functional_t;
 
@@ -54,5 +57,13 @@ union string_or_func {
 
 void dealloc_funp PROT((funptr_t *));
 void push_refed_funp PROT((funptr_t *));
+INLINE void push_funp PROT((funptr_t *));
+INLINE void free_funp PROT((funptr_t *));
+int merge_arg_lists PROT((int, struct array_s *, int));
+INLINE funptr_t *make_efun_funp PROT((int, struct svalue_s *));
+INLINE funptr_t *make_lfun_funp PROT((int, struct svalue_s *));
+INLINE funptr_t *make_simul_funp PROT((int, struct svalue_s *));
+INLINE funptr_t *make_functional_funp PROT((short, short, short, 
+					    struct svalue_s *, int));
 
 #endif

@@ -7,8 +7,8 @@
  */
 
 #include "std.h"
+#include "rc.h"
 #include "include/runtime_config.h"
-#include "lpc_incl.h"
 #include "main.h"
 
 #define MAX_LINE_LENGTH 120
@@ -244,8 +244,6 @@ void set_defaults P1(char *, filename)
     /*
      * not currently used...see options.h
      */
-    scan_config_line("compiler stack size : %d\n",
-		     &CONFIG_INT(__COMPILER_STACK_SIZE__), 0);
     scan_config_line("evaluator stack size : %d\n", 
 		     &CONFIG_INT(__EVALUATOR_STACK_SIZE__), 0);
     scan_config_line("maximum local variables : %d\n",
@@ -263,7 +261,7 @@ void set_defaults P1(char *, filename)
 
     scan_config_line("maximum array size : %d\n",
 		     &CONFIG_INT(__MAX_ARRAY_SIZE__), 1);
-#ifndef DISALLOW_BUFFER_TYPE
+#ifndef NO_BUFFER_TYPE
     scan_config_line("maximum buffer size : %d\n", 
 		     &CONFIG_INT(__MAX_BUFFER_SIZE__), 1);
 #endif
@@ -288,6 +286,12 @@ void set_defaults P1(char *, filename)
 		     &CONFIG_INT(__OBJECT_HASH_TABLE_SIZE__), 1);
 
     /* check for ports */
+    if (port_start == 1) {
+	if (scan_config_line("external_port_1 : %[^\n]", tmp, 0)) {
+	    int p = CONFIG_INT(__MUD_PORT__);
+	    fprintf(stderr, "Warning: external_port_1 already defined to be 'telnet %i' by the line\n    'port number : %i'; ignoring the line 'external_port_1 : %s'\n", p, p, tmp);
+	}
+    }
     for (i = port_start; i < 5; i++) {
 	external_port[i].kind = 0;
 	external_port[i].fd = -1;
@@ -298,9 +302,13 @@ void set_defaults P1(char *, filename)
 		if (!strcmp(kind, "telnet")) 
 		    external_port[i].kind = PORT_TELNET;
 		else
-		if (!strcmp(kind, "binary"))
+		if (!strcmp(kind, "binary")) {
+#ifdef NO_BUFFER_TYPE
+		    fprintf(stderr, "binary ports unavailable with NO_BUFFER_TYPE defined.\n");
+		    exit(-1);
+#endif		    
 		    external_port[i].kind = PORT_BINARY;
-		else
+		} else
 		if (!strcmp(kind, "ascii"))
 		    external_port[i].kind = PORT_ASCII;
 		else {
@@ -331,7 +339,6 @@ void set_defaults P1(char *, filename)
     /*
      * from options.h
      */
-    config_int[__COMPILER_STACK_SIZE__ - BASE_CONFIG_INT] = CFG_COMPILER_STACK_SIZE;
     config_int[__EVALUATOR_STACK_SIZE__ - BASE_CONFIG_INT] = CFG_EVALUATOR_STACK_SIZE;
     config_int[__MAX_LOCAL_VARIABLES__ - BASE_CONFIG_INT] = CFG_MAX_LOCAL_VARIABLES;
     config_int[__MAX_CALL_DEPTH__ - BASE_CONFIG_INT] = CFG_MAX_CALL_DEPTH;

@@ -11,10 +11,12 @@
 #include "/lpc_incl.h"
 #include "/backend.h"
 #include "/md.h"
+#include "/master.h"
 #else
 #include "../lpc_incl.h"
 #include "../backend.h"
 #include "../md.h"
+#include "../master.h"
 #endif
 
 #include "mudlib_stats.h"

@@ -8,9 +8,12 @@
 #include "edit_source.h"
 
 #ifdef WIN32
+#define MSDOS
 #include <process.h>
 #endif
 
+    void mf_fatal(char *);
+    
     int num_buff = 0;
     int op_code, efun_code, efun1_code;
     char *oper_codes[MAX_FUNC];
@@ -99,7 +102,7 @@ optional_default: /* empty */ { $$="DEFAULT_NONE"; }
 		  }
                 | DEFAULT ':' ID 
                   { 
-                      if (strcmp($3, "F_THIS_OBJECT"))
+                      if (strcmp($3, "F__THIS_OBJECT"))
                           yyerror("Illegal default");
                       $$ = "DEFAULT_THIS_OBJECT";
                   } ;

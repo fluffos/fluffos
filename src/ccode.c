@@ -5,11 +5,9 @@
 
 #ifdef LPC_TO_C
 #include "lpc_incl.h"
-#include "trees.h"
-#include "compiler.h"
-#include "lex.h"
-#include "generate.h"
 #include "ccode.h"
+#include "compiler.h"
+#include "generate.h"
 
 #define f_out compilation_output_file
 
@@ -822,7 +820,7 @@ c_generate_final_program P1(int, x) {
 	fprintf(f_out, "\n\nstatic void (*functions[])() = {\n");
 	for (i = 0; i < mem_block[A_COMPILER_FUNCTIONS].current_size/sizeof(*funp); i++) {
 	    funp = COMPILER_FUNC(i);
-	    if (!(FUNCTION_FLAGS(funp->runtime_index) & NAME_NO_CODE)) {
+	    if (!(FUNCTION_FLAGS(funp->runtime_index) & FUNC_NO_CODE)) {
 		if (funp->name[0] == APPLY___INIT_SPECIAL_CHAR)
 		    fprintf(f_out, "LPCINIT_%s,\n", compilation_ident);
 		else

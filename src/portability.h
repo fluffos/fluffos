@@ -8,7 +8,7 @@
 
 /* NOTE: Do not put anything into this file other than preprocessor
    directives (#define, #ifdef, #ifndef, etc).  If you must put something
-   other than that, then be sure to put it between #ifdef _FUNC_SPEC_
+   other than that, then be sure to put it between #ifndef _FUNC_SPEC_
    and #endif.  Otherwise make_func will break.
 */
 
@@ -26,7 +26,9 @@
 #if defined(WINNT) || defined(WIN95)
 #  ifndef WIN32
 #    define WIN32
-     typedef char * caddr_t;
+#      ifndef _FUNC_SPEC_
+         typedef char * caddr_t;
+#      endif
 #  endif
 #  define symlink(x, y) dos_style_link(x, y)
 #  define CDECL __cdecl
@@ -201,23 +203,78 @@
 #  define port_strerror strerror
 #endif
 
-#ifdef WIN32
-#define socket_errno WSAGetLastError()
-#define socket_perror(x, y) SocketPerror(x, y)
-void SocketPerror(char *str, char *file);
+#ifdef WINSOCK
+/* Windows stuff */
 
-#define FOPEN_READ "rb"
-#define FOPEN_WRITE "wb"
-#define OPEN_WRITE (O_WRONLY | O_BINARY)
-#define OPEN_READ (O_RDONLY | O_BINARY)
+#  define WINSOCK_NO_FLAGS_SET  0
+
+#  define OS_socket_write(f, m, l) send(f, m, l, WINSOCK_NO_FLAGS_SET)
+#  define OS_socket_read(r, b, l) recv(r, b, l, WINSOCK_NO_FLAGS_SET)
+#  define OS_socket_close(f) closesocket(f)
+#  define OS_socket_ioctl(f, w, a) ioctlsocket(f, w, a)
+#  define EWOULDBLOCK             WSAEWOULDBLOCK
+#  define EINPROGRESS             WSAEINPROGRESS
+#  define EALREADY                WSAEALREADY
+#  define ENOTSOCK                WSAENOTSOCK
+#  define EDESTADDRREQ            WSAEDESTADDRREQ
+#  define EMSGSIZE                WSAEMSGSIZE
+#  define EPROTOTYPE              WSAEPROTOTYPE
+#  define ENOPROTOOPT             WSAENOPROTOOPT
+#  define EPROTONOSUPPORT         WSAEPROTONOSUPPORT
+#  define ESOCKTNOSUPPORT         WSAESOCKTNOSUPPORT
+#  define EOPNOTSUPP              WSAEOPNOTSUPP
+#  define EPFNOSUPPORT            WSAEPFNOSUPPORT
+#  define EAFNOSUPPORT            WSAEAFNOSUPPORT
+#  define EADDRINUSE              WSAEADDRINUSE
+#  define EADDRNOTAVAIL           WSAEADDRNOTAVAIL
+#  define ENETDOWN                WSAENETDOWN
+#  define ENETUNREACH             WSAENETUNREACH
+#  define ENETRESET               WSAENETRESET
+#  define ECONNABORTED            WSAECONNABORTED
+#  define ECONNRESET              WSAECONNRESET
+#  define ENOBUFS                 WSAENOBUFS
+#  define EISCONN                 WSAEISCONN
+#  define ENOTCONN                WSAENOTCONN
+#  define ESHUTDOWN               WSAESHUTDOWN
+#  define ETOOMANYREFS            WSAETOOMANYREFS
+#  define ETIMEDOUT               WSAETIMEDOUT
+#  define ECONNREFUSED            WSAECONNREFUSED
+#  define ELOOP                   WSAELOOP
+#  define EHOSTDOWN               WSAEHOSTDOWN
+#  define EHOSTUNREACH            WSAEHOSTUNREACH
+#  define EPROCLIM                WSAEPROCLIM
+#  define EUSERS                  WSAEUSERS
+#  define EDQUOT                  WSAEDQUOT
+#  define ESTALE                  WSAESTALE
+#  define EREMOTE                 WSAEREMOTE
+#  define socket_errno WSAGetLastError()
+#  define socket_perror(x, y) SocketPerror(x, y)
+
+#  define FOPEN_READ "rb"
+#  define FOPEN_WRITE "wb"
+#  define OPEN_WRITE (O_WRONLY | O_BINARY)
+#  define OPEN_READ (O_RDONLY | O_BINARY)
 #else
-#define socket_errno errno
-#define socket_perror(x, y) debug_perror(x, y)
+/* Normal UNIX */
+#  define OS_socket_write(f, m, l) send(f, m, l, 0)
+#  define OS_socket_read(r, b, l) recv(r, b, l, 0)
+#  define OS_socket_close(f) close(f)
+#  define OS_socket_ioctl(f, w, a) ioctl(f, w, (caddr_t)a)
+#  define socket_errno errno
+#  define socket_perror(x, y) debug_perror(x, y)
+#  define INVALID_SOCKET -1
+#  define SOCKET_ERROR -1
 
-#define FOPEN_READ "r"
-#define FOPEN_WRITE "w"
-#define OPEN_WRITE O_WRONLY
-#define OPEN_READ O_RDONLY
+#  define FOPEN_READ "r"
+#  define FOPEN_WRITE "w"
+#  define OPEN_WRITE O_WRONLY
+#  define OPEN_READ O_RDONLY
+#endif
+
+#ifndef EWOULDBLOCK
+#ifdef EAGAIN
+#define EWOULDBLOCK EAGAIN
+#endif
 #endif
 
 #endif				/* _PORT_H */

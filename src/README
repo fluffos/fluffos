@@ -8,9 +8,9 @@ Minor releases of MudOS (those with a minor version number after the decimal,
 e.g. v20.26) are typically released without installation 
 instructions, usage instructions, documentation, or other supporting 
 material (since the size of this other material is fairly large).  Releases 
-of MudOS with version numbers having only one component (e.g. v22) will 
+of MudOS with version numbers having only one component (e.g. v21) will 
 be released as a combined source/documentation package (e.g. 
-MudOS_v22.tar.Z which is the most recent such release)
+MudOS_v21.tar.Z which is the most recent such release)
  
 The minor releases are intended for those who are already familiar with 
 installing and running MudOS.  These fix bugs in older drivers and introduce
@@ -32,12 +32,18 @@ to break in some minor fashion (the ChangeLog should give enough information
 to allow affected mudlibs to be fixed).
  
 Notes:
- 
-Send bug reports to mmessier@prilnari.com.  Be sure to include 
-relevant information along with the problem description including: Type of 
-machine (e.g. Sun3, NeXT, RS/6000, etc), operating system (e.g. SunOS 4.1, 
-NeXTSTEP 3.0, AIX 3.2, etc), and version of MudOS (e.g. 0.9.14.17).  
-Include any other information you feel may help.
+
+The official support site for MudOS is http://www.mudos.org/
+
+If you believe that you have found a bug in MudOS that is not listed in the
+Bugs file, please visit the support site and check through the existing bugs
+in the bug database to see if someone else has reported your bug.  If nobody
+has reported the bug, please submit a bug report.  Please try to include as
+much information as you possibly can about the bug.  If you can provide
+details on how to reproduce the problem, that's the best kind of information
+you can give.  If the driver has crashed, read the file IT_CRASHED included
+in this distribution to find out how to collect information for reporting
+your crash.
  
 The 'addr_server' file replaces the old hname program.  Unlike hname, 
 addr_server must be started up manually (it takes a single argument which 
@@ -61,4 +67,3 @@ amiga/          Contains amiga support files; a crypt package is also
 include/        Useful #defines for the mudlib to have access to (used by
                 various efuns)
 packages/       This is where efun packages and user efuns should reside
-windows/	Windows 95 and Windows NT support

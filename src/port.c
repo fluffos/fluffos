@@ -29,27 +29,31 @@ time_t time PROT((time_t *));
  */
 int random_number P1(int, n)
 {
-#ifdef RAND
+#if defined(RAND) || defined(DRAND48)
     static char called = 0;
 
     if (!called) {
 	time_t tim;
 
 	time(&tim);
+#  ifdef RAND
 	srand(tim);
+#  else
+	srand48(tim);
+#  endif
 	called = 1;
     }				/* endif */
+#  ifdef RAND
     return rand() % n;
+#  else
+    return (int)(drand48() * n);
+#  endif
 #else
-#ifdef RANDOM
+#  ifdef RANDOM
     return random() % n;
-#else				/* RANDOM */
-#ifdef DRAND48
-    return (int) (drand48() * n);
-#else				/* DRAND48 */
+#  else				/* RANDOM */
     return current_time % n;	/* You really don't want to use this method */
-#endif				/* DRAND48 */
-#endif				/* RANDOM */
+#  endif			/* RANDOM */
 #endif				/* RAND */
 }
 
@@ -67,9 +71,9 @@ int get_current_time()
     return (int) time(0l);	/* Just use the old time() for now */
 }
 
-char *time_string P1(int, t)
+char *time_string P1(time_t, t)
 {
-    return (char *) ctime((time_t *) & t);
+    return ctime(&t);
 }
 
 /*
@@ -263,19 +267,6 @@ INLINE char *memmove P3(register char *, b, register char *, a, register int, s)
     }
     return r;
 }
-#endif
-
-#if 0
-#ifdef WIN32
-char *crypt P2(char *, str, char *, salt)
-{
-    static char buf[50];
-
-    strncpy(buf, str, 50);
-    buf[50] = 0;
-    return buf;
-}				/* crypt() */
-#endif
 #endif
 
 #ifdef WIN32

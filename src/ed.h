@@ -1,6 +1,8 @@
 #ifndef ED_H
 #define ED_H
 
+#include "lpc_incl.h"
+
 #include "regexp.h"
 
 /* define this if you don't like the ending dollar signs in ed, in n-mode */
@@ -129,7 +131,7 @@ void ed_cmd PROT((char *));
 void save_ed_buffer PROT((object_t *));
 
 #ifdef OLD_ED
-#define ED_OUTPUT       add_message
+#define ED_OUTPUT(x, y)	add_message(x, y, strlen(y))
 #define ED_OUTPUTV      add_vmessage
 #define ED_DEST         command_giver
 #else

@@ -1,6 +1,8 @@
 #ifndef SWAP_H
 #define SWAP_H
 
+#include "lpc_incl.h"
+
 /*
  * swap.c
  */

@@ -1,6 +1,8 @@
 #ifndef CALL_OUT_H
 #define CALL_OUT_H
 
+#include "lpc_incl.h"
+
 /*
  * call_out.c
  */

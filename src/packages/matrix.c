@@ -35,8 +35,7 @@ void f_id_matrix PROT((void))
         matrix->item[i].type = T_REAL;
         matrix->item[i].u.real = identity[i];
     }
-    (++sp)->u.arr = matrix;
-    sp->type = T_ARRAY;
+    push_refed_array(matrix);
 }
 
 void f_translate PROT((void))

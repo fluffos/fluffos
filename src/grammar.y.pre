@@ -9,7 +9,12 @@
 #include "lpc_incl.h"
 #include "simul_efun.h"
 #include "generate.h"
+#include "master.h"
 
+/* gross. Necessary? - Beek */
+#ifdef WIN32
+#define MSDOS
+#endif
 %line
 /*
  * This is the grammar definition of LPC, and its parse tree generator.
@@ -25,6 +30,7 @@
       SWITCH_DEFAULT     - a default has been found
  */
 int context;
+int num_refs;
 
 /*
  * bison & yacc don't prototype this in y.tab.h
@@ -72,9 +78,16 @@ int yyparse PROT((void));
 %ifdef ARRAY_RESERVED_WORD
 %token L_ARRAY
 %endif
+%ifdef REF_RESERVED_WORD
+%token L_REF
+%endif
 %token L_PARSE_COMMAND L_TIME_EXPRESSION
 %token L_CLASS L_NEW
 %token L_PARAMETER
+
+%ifdef COMPAT_32
+%token L_LAMBDA
+%endif
 
 /*
  * 'Dangling else' shift/reduce conflict is well known...
@@ -169,10 +182,16 @@ int yyparse PROT((void));
 /* These hold a type */
 %type <type> type optional_star type_modifier_list 
 %type <type> opt_basic_type L_TYPE_MODIFIER L_BASIC_TYPE basic_type atomic_type
-%type <type> cast
+%type <type> cast basic_type1
+%ifdef ARRAY_RESERVED_WORD
+%type <type> opt_atomic_type
+%endif
 
 /* This holds compressed and less flexible def_name information */
 %type <number> L_NEW_FUNCTION_OPEN
+%ifdef COMPAT_32
+%type <number> simple_function_pointer
+%endif
 
 /* holds an identifier or some sort */
 %type <string> L_IDENTIFIER L_EFUN function_name identifier
@@ -228,8 +247,9 @@ inheritance:
 		inherit_t inherit;
 		int initializer;
 
-		$1 |= global_modifiers;
-
+		if (!$1) $1 = global_modifiers;
+		if (!($1 & DECL_ACCESS)) $1 |= DECL_PUBLIC;
+		
 		if (var_defined)
 		    yyerror("Illegal to inherit after defining global variables.");
 		ob = find_object2($3);
@@ -317,14 +337,21 @@ identifier:
 def:
 	type optional_star identifier 
             {
-		$1 |= global_modifiers;
+		if (!($1 & DECL_MODS)) $1 |= global_modifiers;
+		if (!($1 & DECL_ACCESS)) $1 |= DECL_PUBLIC;
+%ifdef SENSIBLE_MODIFIERS
+		if ($1 & DECL_NOSAVE) {
+		    yywarn("Illegal to declare nosave function.");
+		    $1 &= ~FUNC_VARARGS;
+		}
+%endif
 		/* Handle type checking here so we know whether to typecheck
 		   'argument' */
-		if ($1 & ~NAME_TYPE_MOD) {
+		if ($1 & ~(DECL_MODS|FUNC_VARARGS)) {
 %ifdef OLD_TYPE_BEHAVIOR
                     exact_types = 0;
 %else
-		    exact_types = $1 | $2;
+		    exact_types = ($1&~(DECL_MODS|FUNC_VARARGS)) | $2;
 %endif
 		} else {
 		    if (pragmas & PRAGMA_STRICT_TYPES) {
@@ -344,16 +371,19 @@ def:
 
 		/* If we had nested functions, we would need to check */
 		/* here if we have enough space for locals */
-
+		
 		/*
 		 * Define a prototype. If it is a real function, then the
 		 * prototype will be replaced below.
 		 */
 
-		$<number>$ = NAME_UNDEFINED | NAME_PROTOTYPE;
+		$<number>$ = FUNC_UNDEFINED | FUNC_PROTOTYPE;
 		if ($6.flags & ARG_IS_VARARGS) {
-		    $<number>$ |= NAME_TRUE_VARARGS;
-		    $1 |= NAME_VARARGS;
+		    $<number>$ |= (FUNC_TRUE_VARARGS | FUNC_VARARGS);
+		}
+		if ($1 & FUNC_VARARGS) {
+		    $<number>$ |= FUNC_VARARGS;
+		    $1 &= ~FUNC_VARARGS;
 		}
 		define_new_function($3, $6.num_arg, 0, $<number>$, $1 | $2);
 		/* This is safe since it is guaranteed to be in the
@@ -367,7 +397,7 @@ def:
 		if ($9) {
 		    int fun;
 
-		    $<number>8 &= ~(NAME_UNDEFINED | NAME_PROTOTYPE);
+		    $<number>8 &= ~(FUNC_UNDEFINED | FUNC_PROTOTYPE);
 		    if ($9->kind != NODE_RETURN &&
 			($9->kind != NODE_TWO_VALUES
 			 || $9->r.expr->kind != NODE_RETURN)) {
@@ -376,9 +406,6 @@ def:
 			CREATE_RETURN(replacement->r.expr, 0);
 			$9 = replacement;
 		    }
-		    if ($6.flags & ARG_IS_PROTO) {
-			yyerror("Missing name for function argument");
-		    }
 		    fun = define_new_function($3, $6.num_arg, 
 					      max_num_locals - $6.num_arg,
 					      $<number>8, $1 | $2);
@@ -386,11 +413,12 @@ def:
 			COMPILER_FUNC(fun)->address =
 			    generate_function(COMPILER_FUNC(fun), $9, max_num_locals);
 		}
-		free_all_local_names();
+		free_all_local_names(1);
 	    }
     |   type name_list ';'
 	    {
-		if (!$1) yyerror("Missing type for global variable declaration");
+		if (!($1 & ~(DECL_MODS)) && (pragmas & PRAGMA_STRICT_TYPES))
+		    yyerror("Missing type for global variable declaration");
 	    }
     |   inheritance
     |   type_decl
@@ -399,6 +427,24 @@ def:
 
 modifier_change: type_modifier_list ':'
             {
+%ifdef SENSIBLE_MODIFIERS
+		int t = $1 & DECL_ACCESS;
+%endif
+		if (!$1) 
+		    yyerror("modifier list may not be empty.");
+		
+		if ($1 & FUNC_VARARGS) {
+		    yyerror("Illegal modifier 'varargs' in global modifier list.");
+		    $1 &= ~FUNC_VARARGS;
+		}
+%ifdef SENSIBLE_MODIFIERS
+		if (t & (t-1)) {
+		    yywarn("Multiple access modifiers are redundant; weaker one ignored.");
+		    $1 = decl_fix($1);
+		}
+%endif
+
+		if (!($1 & DECL_ACCESS)) $1 |= DECL_PUBLIC;
 		global_modifiers = $1;
 	    }
      ;
@@ -406,8 +452,12 @@ modifier_change: type_modifier_list ':'
 member_name:
         optional_star identifier
             {
-		if ((current_type & ~NAME_TYPE_MOD) == TYPE_VOID)
+		if ((current_type & ~DECL_MODS) == TYPE_VOID)
 		    yyerror("Illegal to declare class member of type void.");
+		if (current_type & LOCAL_MOD_REF) {
+		    yyerror("Illegal to declare a reference inside a class");
+		    current_type &= ~LOCAL_MOD_REF;
+		}
 		add_local_name($2, current_type | $1);
 		scratch_free($2);
 	    }
@@ -431,40 +481,62 @@ type_decl:
 		ihe = find_or_add_ident(
 			   PROG_STRING($<number>$ = store_prog_string($3)),
 			   FOA_GLOBAL_SCOPE);
-		if (ihe->dn.class_num == -1)
+		if (ihe->dn.class_num == -1) {
 		    ihe->sem_value++;
-		else {
-		    /* Possibly, this should check if the definitions are
-		       consistent */
-		    char buf[256];
-		    char *end = EndOf(buf);
-		    char *p;
-		    
-		    p = strput(buf, end, "Illegal to redefine class ");
-		    p = strput(p, end, $3);
-		    yyerror(buf);
+		    ihe->dn.class_num = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
+		    $<ihe>2 = 0;
+		} else {
+		    $<ihe>2 = ihe;
 		}
-		ihe->dn.class_num = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
 	    }
     member_list '}'
             {
 		class_def_t *sd;
 		class_member_entry_t *sme;
-		int i;
+		int i, raise_error = 0;
 
-		sd = (class_def_t *)allocate_in_mem_block(A_CLASS_DEF, sizeof(class_def_t));
-		i = sd->size = current_number_of_locals;
-		sd->index = mem_block[A_CLASS_MEMBER].current_size / sizeof(class_member_entry_t);
-		sd->name = $<number>5;
-
-		sme = (class_member_entry_t *)allocate_in_mem_block(A_CLASS_MEMBER, sizeof(class_member_entry_t) * current_number_of_locals);
-
-		while (i--) {
-		    sme[i].name = store_prog_string(locals_ptr[i]->name);
-		    sme[i].type = type_of_locals_ptr[i];
+		/* check for a redefinition */
+		if ($<ihe>2 != 0) {
+		    sd = CLASS($<ihe>2->dn.class_num);
+		    if (sd->size != current_number_of_locals)
+			raise_error = 1;
+		    else {
+			i = sd->size;
+			sme = (class_member_entry_t *)mem_block[A_CLASS_MEMBER].block + sd->index;
+			while (i--) {
+			    /* check for matching names and types */
+			    if (strcmp(PROG_STRING(sme[i].name), locals_ptr[i].ihe->name) != 0 ||
+				sme[i].type != (type_of_locals_ptr[i] & ~LOCAL_MODS)) {
+				raise_error = 1;
+				break;
+			    }
+			}
+		    }
 		}
 
-		free_all_local_names();
+		if (raise_error) {
+		    char buf[256];
+		    char *end = EndOf(buf);
+		    char *p;
+
+		    p = strput(buf, end, "Illegal to redefine class ");
+		    p = strput(p, end, $3);
+		    yyerror(buf);
+		} else {
+		    sd = (class_def_t *)allocate_in_mem_block(A_CLASS_DEF, sizeof(class_def_t));
+		    i = sd->size = current_number_of_locals;
+		    sd->index = mem_block[A_CLASS_MEMBER].current_size / sizeof(class_member_entry_t);
+		    sd->name = $<number>5;
+
+		    sme = (class_member_entry_t *)allocate_in_mem_block(A_CLASS_MEMBER, sizeof(class_member_entry_t) * current_number_of_locals);
+
+		    while (i--) {
+			sme[i].name = store_prog_string(locals_ptr[i].ihe->name);
+			sme[i].type = type_of_locals_ptr[i] & ~LOCAL_MODS;
+		    }
+		}
+
+		free_all_local_names(0);
 		scratch_free($3);
 	    }
     ;
@@ -504,19 +576,47 @@ atomic_type:
 		} else 
 		    $$ = $2->dn.class_num | TYPE_MOD_CLASS;
 	    }
+      | L_CLASS L_IDENTIFIER
+	    {
+		char buf[256];
+		char *end = EndOf(buf);
+		char *p;
+
+		p = strput(buf, end, "Undefined class '");
+		p = strput(p, end, $2);
+		p = strput(p, end, "'");
+		yyerror(buf);
+		$$ = TYPE_ANY;
+	    }
        ;
 
-basic_type:
+%ifdef ARRAY_RESERVED_WORD
+opt_atomic_type:
+        basic_type
+    |   /* empty */
+	    {
+		$$ = TYPE_ANY;
+	    }
+    ;
+%endif
+
+basic_type1:
          atomic_type
 %ifdef ARRAY_RESERVED_WORD
-       | atomic_type L_ARRAY
+       | opt_atomic_type L_ARRAY    
             {
 		$$ = $1 | TYPE_MOD_ARRAY;
 	    }
-       | L_ARRAY
+%endif
+       ;
+
+basic_type:
+         basic_type1
+%ifdef REF_RESERVED_WORD
+       | basic_type1 L_REF
             {
-		$$ = TYPE_ANY | TYPE_MOD_ARRAY;
-            }
+		$$ = $1 | LOCAL_MOD_REF;
+	    }
 %endif
        ;
 
@@ -525,7 +625,7 @@ new_arg:
             {
 		if ($1 == TYPE_VOID)
 		    yyerror("Illegal to declare argument of type void.");
-                $$ = ARG_IS_PROTO;
+                $$ = 0;
                 add_local_name("", $1 | $2);
             }
       | basic_type optional_star new_local_name
@@ -557,11 +657,16 @@ argument:
     |   argument_list L_DOT_DOT_DOT
             {
 		int x = type_of_locals_ptr[max_num_locals-1];
+		int lt = x & ~LOCAL_MODS;
 		
 		$$ = $1;
 		$$.flags |= ARG_IS_VARARGS;
 
-		if (x != TYPE_ANY && !(x & TYPE_MOD_ARRAY))
+		if (x & LOCAL_MOD_REF) {
+		    yyerror("Variable to hold remainder of args may not be a reference");
+		    x &= ~LOCAL_MOD_REF;
+		}
+		if (lt != TYPE_ANY && !(lt & TYPE_MOD_ARRAY))
 		    yywarn("Variable to hold remainder of arguments should be an array.");
 	    }
     ;
@@ -587,7 +692,16 @@ type_modifier_list:
 	    }
     |   L_TYPE_MODIFIER type_modifier_list
 	    {
+		int t;
+		
 		$$ = $1 | $2;
+		t = $$ & DECL_ACCESS;
+%ifdef SENSIBLE_MODIFIERS
+		if (t & (t-1)) {
+		    yywarn("Multiple access modifiers are redundant; weaker one ignored.");
+		    $1 = decl_fix($1);
+		}
+%endif
 	    }
     ;
 
@@ -622,9 +736,17 @@ name_list:
 new_name:
 	optional_star identifier
 	    {
-		if ((current_type & ~NAME_TYPE_MOD) == TYPE_VOID)
+		if (!(current_type & DECL_MODS)) current_type |= global_modifiers;
+		if (!(current_type & DECL_ACCESS)) current_type |= DECL_PUBLIC;
+
+		if (current_type & FUNC_VARARGS) {
+		    yyerror("Illegal to declare varargs variable.");
+		    current_type &= ~FUNC_VARARGS;
+		}
+
+		if ((current_type & ~DECL_MODS) == TYPE_VOID)
 		    yyerror("Illegal to declare global variable of type void.");
-		define_new_variable($2, current_type | $1 | global_modifiers);
+		define_new_variable($2, current_type | $1);
 		scratch_free($2);
 	    }
     |   optional_star identifier L_ASSIGN expr0
@@ -632,14 +754,17 @@ new_name:
 		parse_node_t *expr;
 		int type;
 		
+		if (!(current_type & DECL_MODS)) current_type |= global_modifiers;
+		if (!(current_type & DECL_ACCESS)) current_type |= DECL_PUBLIC;
+
 		if ($3 != F_ASSIGN)
 		    yyerror("Only '=' is legal in initializers.");
 
 		/* ignore current_type == 0, which gets a missing type error
 		   later anyway */
 		if (current_type) {
-		    type = (current_type | $1 | global_modifiers) & ~NAME_TYPE_MOD;
-		    if ((current_type & ~NAME_TYPE_MOD) == TYPE_VOID)
+		    type = (current_type | $1) & ~DECL_MODS;
+		    if ((current_type & ~DECL_MODS) == TYPE_VOID)
 			yyerror("Illegal to declare global variable of type void.");
 		    if (!compatible_types(type, $4->type)) {
 			char buff[256];
@@ -658,7 +783,7 @@ new_name:
 
 		CREATE_BINARY_OP(expr, F_VOID_ASSIGN, 0, $4, 0);
 		CREATE_OPCODE_1(expr->r.expr, F_GLOBAL_LVALUE, 0,
-				define_new_variable($2, current_type | $1 | global_modifiers));
+				define_new_variable($2, current_type | $1));
 		generate(expr);
 		switch_to_block(A_PROGRAM);
 		scratch_free($2);
@@ -704,14 +829,24 @@ decl_block: block | for | foreach ;
 
  new_local_def:
 	optional_star new_local_name
-	    {
-		add_local_name($2, current_type | $1);
+            {
+		if (current_type & LOCAL_MOD_REF) {
+		    yyerror("Illegal to declare local variable as reference");
+		    current_type &= ~LOCAL_MOD_REF;
+		}
+		add_local_name($2, current_type | $1 | LOCAL_MOD_UNUSED);
 		scratch_free($2);
 		$$ = 0;
 	    }
     |   optional_star new_local_name L_ASSIGN expr0
 	    {
-		int type = (current_type | $1) & ~NAME_TYPE_MOD;
+		int type = (current_type | $1) & ~DECL_MODS;
+
+		if (current_type & LOCAL_MOD_REF) {
+		    yyerror("Illegal to declare local variable as reference");
+		    current_type &= ~LOCAL_MOD_REF;
+		    type &= ~LOCAL_MOD_REF;
+		}
 
 		if ($3 != F_ASSIGN)
 		    yyerror("Only '=' is allowed in initializers.");
@@ -731,7 +866,7 @@ decl_block: block | for | foreach ;
 		$4 = do_promotions($4, type);
 
 		CREATE_UNARY_OP_1($$, F_VOID_ASSIGN_LOCAL, 0, $4,
-				  add_local_name($2, current_type | $1));
+				  add_local_name($2, current_type | $1 | LOCAL_MOD_UNUSED));
 		scratch_free($2);
 	    }
     ;
@@ -751,6 +886,12 @@ decl_block: block | for | foreach ;
         single_new_local_def L_ASSIGN expr0
             {
                 int type = type_of_locals_ptr[$1];
+
+		if (type & LOCAL_MOD_REF) {
+		    yyerror("Illegal to declare local variable as reference");
+		    type_of_locals_ptr[$1] &= ~LOCAL_MOD_REF;
+		}
+		type &= ~LOCAL_MODS;
 
 		if ($2 != F_ASSIGN)
 		    yyerror("Only '=' is allowed in initializers.");
@@ -920,6 +1061,7 @@ foreach_var: L_DEFINED_NAME
             {
 		if ($1->dn.local_num != -1) {
 		    CREATE_OPCODE_1($$.node, F_LOCAL_LVALUE, 0, $1->dn.local_num);
+		    type_of_locals_ptr[$1->dn.local_num] &= ~LOCAL_MOD_UNUSED;
 		} else
 	        if ($1->dn.global_num != -1) {
 		    CREATE_OPCODE_1($$.node, F_GLOBAL_LVALUE, 0, $1->dn.global_num);
@@ -938,7 +1080,12 @@ foreach_var: L_DEFINED_NAME
             }
           | single_new_local_def
             {
-                CREATE_OPCODE_1($$.node, F_LOCAL_LVALUE, 0, $1);
+                if (type_of_locals_ptr[$1] & LOCAL_MOD_REF) {
+		    CREATE_OPCODE_1($$.node, F_REF_LVALUE, 0, $1);
+		} else {
+		    CREATE_OPCODE_1($$.node, F_LOCAL_LVALUE, 0, $1);
+		    type_of_locals_ptr[$1] &= ~LOCAL_MOD_UNUSED;
+		}
 		$$.num = 1;
             }
           | L_IDENTIFIER
@@ -967,6 +1114,8 @@ foreach_vars:
             {
 		CREATE_FOREACH($$.node, $1.node, $3.node);
 		$$.num = $1.num + $3.num;
+		if ($1.node->v.number == F_REF_LVALUE)
+		    yyerror("Mapping key may not be a reference in foreach()");
             }
      ;
 
@@ -1220,11 +1369,41 @@ comma_expr:
     ;
 
 expr0:
+%ifdef REF_RESERVED_WORD
+        L_REF lvalue
+            {
+		int op;
+
+		if (!(context & ARG_LIST))
+		    yyerror("ref illegal outside function argument list");
+		else
+		    num_refs++;
+		
+		switch ($2->kind) {
+		case NODE_PARAMETER_LVALUE:
+		    op = F_LOCAL_LVALUE;
+		    break;
+		case NODE_TERNARY_OP:
+		case NODE_OPCODE_1:
+		case NODE_UNARY_OP_1:
+		case NODE_BINARY_OP:
+		    op = $2->v.number;
+		    if (op > F_RINDEX_LVALUE) {
+			yyerror("Illegal to make reference to range");
+			break;
+		    }
+		}
+		CREATE_UNARY_OP_1($$, F_MAKE_REF, TYPE_ANY, $2, op);
+	    }
+    |
+%endif
 	lvalue L_ASSIGN expr0
 	    {
 	        parse_node_t *l = $1, *r = $3;
 		/* set this up here so we can change it below */
-		
+		/* assignments are backwards; rhs is evaluated before
+		   lhs, so put the RIGHT hand side on the LEFT hand
+		   side of the tree node. */
 		CREATE_BINARY_OP($$, $2, r->type, r, l);
 
 		if (exact_types && !compatible_types(r->type, l->type) &&
@@ -1240,8 +1419,9 @@ expr0:
 		    p = strput(p, end, ".");
 		    yyerror(buf);
 		}
-
-		$$->l.expr = do_promotions(r, l->type);
+		
+		if ($2 == F_ASSIGN)
+		    $$->l.expr = do_promotions(r, l->type);
 	    }
     |   error L_ASSIGN expr0
 	    {
@@ -1286,9 +1466,28 @@ expr0:
 	    }
     |   expr0 '|' expr0
 	    {
+		int t1 = $1->type, t3 = $3->type;
+		
 		if (is_boolean($1) && is_boolean($3))
 		    yywarn("bitwise operation on boolean values.");
-		$$ = binary_int_op($1, $3, F_OR, "|");		
+		if ((t1 & TYPE_MOD_ARRAY) || (t3 & TYPE_MOD_ARRAY)) {
+		    if (t1 != t3) {
+			if ((t1 != TYPE_ANY) && (t3 != TYPE_ANY) &&
+			    !(t1 & t3 & TYPE_MOD_ARRAY)) {
+			    char buf[256];
+			    char *end = EndOf(buf);
+			    char *p;
+
+			    p = strput(buf, end, "Incompatible types for | ");
+			    p = get_two_types(p, end, t1, t3);
+			    p = strput(p, end, ".");
+			    yyerror(buf);
+			}
+			t1 = TYPE_ANY | TYPE_MOD_ARRAY;
+		    }
+		    CREATE_BINARY_OP($$, F_OR, t1, $1, $3);
+		}
+		else $$ = binary_int_op($1, $3, F_OR, "|");		
 	    }
     |   expr0 '^' expr0
 	    {
@@ -1366,7 +1565,7 @@ expr0:
 			char *p;
 			
 			p = strput(buf, end, "Bad left argument to '");
-			p = strput(p, end, get_f_name($2));
+			p = strput(p, end, query_instr_name($2));
 			p = strput(p, end, "' : \"");
 			p = get_type_name(p, end, t1);
 			p = strput(p, end, "\"");
@@ -1378,7 +1577,7 @@ expr0:
 			char *p;
 			
                         p = strput(buf, end, "Bad right argument to '");
-                        p = strput(p, end, get_f_name($2));
+                        p = strput(p, end, query_instr_name($2));
                         p = strput(p, end, "' : \"");
                         p = get_type_name(p, end, t3);
 			p = strput(p, end, "\"");
@@ -1389,7 +1588,7 @@ expr0:
 			char *p;
 			
 			p = strput(buf, end, "Arguments to ");
-			p = strput(p, end, get_f_name($2));
+			p = strput(p, end, query_instr_name($2));
 			p = strput(p, end, " do not have compatible types : ");
 			p = get_two_types(p, end, t1, t3);
 			yyerror(buf);
@@ -2028,19 +2227,19 @@ add_error:
 return:
 	L_RETURN ';'
 	    {
-		if (exact_types && !IS_TYPE(exact_types, TYPE_VOID))
+    		if (exact_types && !IS_TYPE(exact_types, TYPE_VOID))
 		    yywarn("Non-void functions must return a value.");
-		CREATE_RETURN($$, 0);
+    		CREATE_RETURN($$, 0);
 	    }
     |   L_RETURN comma_expr ';'
 	    {
-		if (exact_types && !compatible_types($2->type, exact_types & ~NAME_TYPE_MOD)) {
+		if (exact_types && !compatible_types($2->type, exact_types)) {
 		    char buf[256];
 		    char *end = EndOf(buf);
 		    char *p;
 		    
 		    p = strput(buf, end, "Type of returned value doesn't match function return type ");
-		    p = get_two_types(p, end, $2->type, exact_types & ~NAME_TYPE_MOD);
+		    p = get_two_types(p, end, $2->type, exact_types);
 		    yyerror(buf);
 		}
 		if (IS_NODE($2, NODE_NUMBER, 0)) {
@@ -2254,6 +2453,29 @@ lvalue:
             }
         ;
 
+%ifdef COMPAT_32
+simple_function_pointer: L_NEW_FUNCTION_OPEN ':' ')' 
+            { 
+		$$ = $1;
+	    }
+    |   L_LAMBDA L_DEFINED_NAME
+            {
+		int val;
+		
+		if ((val=$2->dn.local_num) >= 0){
+		    $$ = (val << 8) | FP_L_VAR;
+		} else if ((val=$2->dn.global_num) >= 0) {
+		    $$ = (val << 8) | FP_G_VAR;
+		} else if ((val=$2->dn.function_num) >=0) {
+		    $$ = (val << 8)|FP_LOCAL;
+		} else if ((val=$2->dn.simul_num) >=0) {
+		    $$ = (val << 8)|FP_SIMUL;
+		} else if ((val=$2->dn.efun_num) >=0) {
+		    $$ = (val << 8)|FP_EFUN;
+		}
+	    }
+    ;
+%endif
 
 expr4:
 	function_call
@@ -2261,7 +2483,11 @@ expr4:
             {
               int i;
               if ((i = $1->dn.local_num) != -1) {
-		  CREATE_OPCODE_1($$, F_LOCAL, type_of_locals_ptr[i],i & 0xff);
+		  type_of_locals_ptr[i] &= ~LOCAL_MOD_UNUSED;
+		  if (type_of_locals_ptr[i] & LOCAL_MOD_REF)
+		      CREATE_OPCODE_1($$, F_REF, type_of_locals_ptr[i] & ~LOCAL_MOD_REF,i & 0xff);
+		  else
+		      CREATE_OPCODE_1($$, F_LOCAL, type_of_locals_ptr[i], i & 0xff);
 		  if (current_function_context)
 		      current_function_context->num_locals++;
               } else
@@ -2269,8 +2495,8 @@ expr4:
 		      if (current_function_context)
 			  current_function_context->bindable = FP_NOT_BINDABLE;
                           CREATE_OPCODE_1($$, F_GLOBAL,
-				      VAR_TEMP(i)->type & ~NAME_TYPE_MOD, i);
-		      if (VAR_TEMP(i)->type & NAME_HIDDEN) {
+				      VAR_TEMP(i)->type & ~DECL_MODS, i);
+		      if (VAR_TEMP(i)->type & DECL_HIDDEN) {
 			  char buf[256];
 			  char *end = EndOf(buf);
 			  char *p;
@@ -2291,7 +2517,7 @@ expr4:
 		      if (current_number_of_locals < CFG_MAX_LOCAL_VARIABLES) {
 			  add_local_name($1->name, TYPE_ANY);
 		      }
-		      CREATE_OPCODE_1($$, F_LOCAL, TYPE_ANY, 0);
+		      CREATE_ERROR($$);
 		      yyerror(buf);
 		  }
 	    }
@@ -2307,7 +2533,7 @@ expr4:
                 if (current_number_of_locals < CFG_MAX_LOCAL_VARIABLES) {
                     add_local_name($1, TYPE_ANY);
                 }
-                CREATE_OPCODE_1($$, F_LOCAL, TYPE_ANY, 0);
+                CREATE_ERROR($$);
                 yyerror(buf);
                 scratch_free($1);
             }
@@ -2347,7 +2573,17 @@ expr4:
 	    }
     |   expr4 L_ARROW identifier
             {
-		if (!IS_CLASS($1->type)) {
+		if ($1->type == TYPE_ANY) {
+		    int cmi;
+		    char tp;
+		    
+		    if ((cmi = lookup_any_class_member($3, &tp)) != -1) {
+			CREATE_UNARY_OP_1($$, F_MEMBER, tp, $1, 0);
+			$$->l.number = cmi;
+		    } else {
+			CREATE_ERROR($$);
+		    }
+		} else if (!IS_CLASS($1->type)) {
 		    yyerror("Left argument of -> is not a class");
 		    CREATE_ERROR($$);
 		} else {
@@ -2356,12 +2592,14 @@ expr4:
 						       $3,
 						       &($$->type));
 		}
+		    
 		scratch_free($3);
             }
     |   expr4 '[' comma_expr L_RANGE comma_expr ']'
             {
 %ifndef OLD_RANGE_BEHAVIOR
-                if ($5->kind == NODE_NUMBER && $5->v.number < 0)
+                if ($1->type != TYPE_MAPPING && 
+		    $5->kind == NODE_NUMBER && $5->v.number < 0)
 		    yywarn("A negative constant as the second element of arr[x..y] no longer means indexing from the end.  Use arr[x..<y]");
 %endif
                 $$ = make_range_node(F_NN_RANGE, $1, $3, $5);
@@ -2460,7 +2698,7 @@ expr4:
                     }
                 }
 %ifndef OLD_RANGE_BEHAVIOR
-                if ($3->kind == NODE_NUMBER && $3->v.number < 0)
+                if ($1->type != TYPE_MAPPING && $3->kind == NODE_NUMBER && $3->v.number < 0)
 		    yywarn("A negative constant in arr[x] no longer means indexing from the end.  Use arr[<x]");
 %endif		
                 CREATE_BINARY_OP($$, F_INDEX, 0, $3, $1);
@@ -2511,7 +2749,6 @@ expr4:
 		deactivate_current_locals();
 		locals_ptr += current_number_of_locals;
 		type_of_locals_ptr += max_num_locals;
-		runtime_locals_ptr += current_number_of_locals;
 		max_num_locals = current_number_of_locals = 0;
 		push_function_context();
 		current_function_context->num_parameters = -1;
@@ -2520,14 +2757,11 @@ expr4:
             }
         '(' argument ')' block
             {
-		if ($4.flags & ARG_IS_PROTO) {
-		    yyerror("Missing name for function argument");
-		}
 		if ($4.flags & ARG_IS_VARARGS) {
 		    yyerror("Anonymous varargs functions aren't implemented");
 		}
 		if (!$6.node) {
-		    CREATE_RETURN($$, 0);
+		    CREATE_RETURN($6.node, 0);
 		} else if ($6.node->kind != NODE_RETURN &&
 			   ($6.node->kind != NODE_TWO_VALUES || $6.node->r.expr->kind != NODE_RETURN)) {
 		    parse_node_t *replacement;
@@ -2544,7 +2778,7 @@ expr4:
 		$$->v.number = $4.num_arg;
 		if (current_function_context->bindable)
 		    $$->v.number |= 0x10000;
-		free_all_local_names();
+		free_all_local_names(1);
 		
 		current_number_of_locals = $<func_block>2.num_local;
 		max_num_locals = $<func_block>2.max_num_locals;
@@ -2555,10 +2789,13 @@ expr4:
 		
 		locals_ptr -= current_number_of_locals;
 		type_of_locals_ptr -= max_num_locals;
-		runtime_locals_ptr -= current_number_of_locals;
 		reactivate_current_locals();
 	    }
+%ifdef COMPAT_32
+    |   simple_function_pointer
+%else
     |   L_NEW_FUNCTION_OPEN ':' ')'
+%endif
             {
 		$$ = new_node();
 		$$->kind = NODE_FUNCTION_CONSTRUCTOR;
@@ -2575,7 +2812,7 @@ expr4:
 		case FP_G_VAR:
 		    CREATE_OPCODE_1($$->l.expr, F_GLOBAL, 0, $1 >> 8);
 		    $$->v.number = FP_FUNCTIONAL | FP_NOT_BINDABLE;
-		    if (VAR_TEMP($$->l.expr->l.number)->type & NAME_HIDDEN) {
+		    if (VAR_TEMP($$->l.expr->l.number)->type & DECL_HIDDEN) {
 		      char buf[256];
 		      char *end = EndOf(buf);
 		      char *p;
@@ -2851,16 +3088,29 @@ opt_class_init:
 
 
 function_call:
-	efun_override '(' expr_list ')'
-	    {
-	      $$ = validate_efun_call($1,$3);
-	    }
-        | L_NEW '(' expr_list ')'
+	efun_override '(' 
             {
-		ident_hash_elem_t *ihe;
-
-		ihe = lookup_ident("clone_object");
-		$$ = validate_efun_call(ihe->dn.efun_num, $3);
+		$<number>$ = context;
+		context |= ARG_LIST; 
+	    }
+        expr_list ')'
+	    {
+		context = $<number>3;
+		$$ = validate_efun_call($1,$4);
+		$$ = check_refs(num_refs, $4, $$);
+		num_refs = 0;
+	    }
+        | L_NEW '('
+            {
+		$<number>$ = context;
+		context |= ARG_LIST;
+	    }
+        expr_list ')'
+            {
+		context = $<number>3;
+		$$ = validate_efun_call(new_efun, $4);
+		$$ = check_refs(num_refs, $4, $$);
+		num_refs = 0;
             }
         | L_NEW '(' L_CLASS L_DEFINED_NAME opt_class_init ')'
             {
@@ -2897,13 +3147,37 @@ function_call:
 		    }
 		}
             }
-	| L_DEFINED_NAME '(' expr_list ')'
+	| L_NEW '(' L_CLASS L_IDENTIFIER opt_class_init ')'
+	    {
+		parse_node_t *node;
+		char buf[256];
+		char *end = EndOf(buf);
+		char *p;
+
+		p = strput(buf, end, "Undefined class '");
+		p = strput(p, end, $4);
+		p = strput(p, end, "'");
+		yyerror(buf);
+		CREATE_ERROR($$);
+		node = $5;
+		while (node) {
+		    scratch_free((char *)node->l.expr);
+		    node = node->r.expr;
+		}
+	    }
+	| L_DEFINED_NAME '(' 
+            {
+		$<number>$ = context;
+		context |= ARG_LIST;
+	    }
+        expr_list ')'
 	    {
 	      int f;
 
-	      $$ = $3;
+	      context = $<number>3;
+	      $$ = $4;
 	      if ((f = $1->dn.function_num) != -1) {
-		  if (FUNCTION_FLAGS(f) & NAME_HIDDEN) {
+		  if (FUNCTION_FLAGS(f) & DECL_HIDDEN) {
 		      char buf[256];
 		      char *end = EndOf(buf);
 		      char *p;
@@ -2919,16 +3193,16 @@ function_call:
 		  $$->kind = NODE_CALL_1;
 		  $$->v.number = F_CALL_FUNCTION_BY_ADDRESS;
 		  $$->l.number = f;
-		  $$->type = validate_function_call(f, $3->r.expr);
+		  $$->type = validate_function_call(f, $4->r.expr);
 	      } else
 	      if ((f=$1->dn.simul_num) != -1) {
 		  $$->kind = NODE_CALL_1;
 		  $$->v.number = F_SIMUL_EFUN;
 		  $$->l.number = f;
-		  $$->type = (SIMUL(f)->type) & ~NAME_TYPE_MOD;
+		  $$->type = (SIMUL(f)->type) & ~DECL_MODS;
 	      } else 
 	      if ((f=$1->dn.efun_num) != -1) {
-		  $$ = validate_efun_call(f, $3);
+		  $$ = validate_efun_call(f, $4);
 	      } else {
 		/* This here is a really nasty case that only occurs with
 		 * exact_types off.  The user has done something gross like:
@@ -2944,7 +3218,7 @@ function_call:
 		    current_function_context->bindable = FP_NOT_BINDABLE;
 		
 		cf = define_new_function($1->name, 0, 0, 
-					 NAME_UNDEFINED | NAME_PROTOTYPE, 0);
+					 FUNC_UNDEFINED | FUNC_PROTOTYPE, DECL_PUBLIC);
 		f = COMPILER_FUNC(cf)->runtime_index;
 		$$->kind = NODE_CALL_1;
 		$$->v.number = F_CALL_FUNCTION_BY_ADDRESS;
@@ -2960,20 +3234,27 @@ function_call:
 		     * inherited function we prevent redeclaration errors
 		     * if it shows up later
 		     */
-		    FUNCTION_FLAGS(f) &= ~NAME_UNDEFINED;
-		    FUNCTION_FLAGS(f) |= NAME_INHERITED;
-		    COMPILER_FUNC(cf)->type |= NAME_VARARGS;
+		    FUNCTION_FLAGS(f) &= ~FUNC_UNDEFINED;
+		    FUNCTION_FLAGS(f) |= (FUNC_INHERITED | FUNC_VARARGS);
 		    p = strput(buf, end, "Undefined function ");
 		    p = strput(p, end, n);
 		    yyerror(buf);
 		}
 	      }
+	      $$ = check_refs(num_refs, $4, $$);
+	      num_refs = 0;
 	    }
-	| function_name	'(' expr_list ')'
+	| function_name	'(' 
+            {
+		$<number>$ = context;
+		context |= ARG_LIST;
+	    }
+        expr_list ')'
 	    {
 	      char *name = $1;
 
-	      $$ = $3;
+	      context = $<number>3;
+	      $$ = $4;
 	      
 	      if (current_function_context)
 		  current_function_context->bindable = FP_NOT_BINDABLE;
@@ -3000,10 +3281,10 @@ function_call:
 		       * below made the function name.  The lexer would
 		       * return L_DEFINED_NAME instead.
 		       */
-		      $$->type = validate_function_call(f, $3->r.expr);
+		      $$->type = validate_function_call(f, $4->r.expr);
 		  } else {
 		      f = define_new_function(name, 0, 0, 
-					      NAME_UNDEFINED | NAME_PROTOTYPE, 0);
+					      FUNC_UNDEFINED | FUNC_PROTOTYPE, DECL_PUBLIC);
 		      f = COMPILER_FUNC(f)->runtime_index;
 		  }
 		  $$->l.number = f;
@@ -3012,33 +3293,42 @@ function_call:
 		   * But, don't complain yet about functions defined
 		   * by inheritance.
 		   */
-		  if (exact_types && (FUNCTION_FLAGS(f) & NAME_UNDEFINED)) {
+		  if (exact_types && (FUNCTION_FLAGS(f) & FUNC_UNDEFINED)) {
 		      char buf[256];
 		      char *end = EndOf(buf);
 		      char *p;
 		      char *n = $1;
 		      if (*n == ':') n++;
 		      /* prevent some errors */
-		      FUNCTION_FLAGS(f) &= ~NAME_UNDEFINED;
-		      FUNCTION_FLAGS(f) |= (NAME_INHERITED | NAME_VARARGS);
+		      FUNCTION_FLAGS(f) &= ~FUNC_UNDEFINED;
+		      FUNCTION_FLAGS(f) |= (FUNC_INHERITED | FUNC_VARARGS);
 		      p = strput(buf, end, "Undefined function ");
 		      p = strput(p, end, n);
 		      yyerror(buf);
 		  }
-		  if (!(FUNCTION_FLAGS(f) & NAME_UNDEFINED))
+		  if (!(FUNCTION_FLAGS(f) & FUNC_UNDEFINED))
 		      $$->type = FUNCTION_DEF(f)->type;
 		  else
 		      $$->type = TYPE_ANY;  /* Just a guess */
 	      }
+	      $$ = check_refs(num_refs, $4, $$);
+	      num_refs = 0;
 	      scratch_free(name);
 	  }
-    |   expr4 L_ARROW identifier '(' expr_list ')'
+    |   expr4 L_ARROW identifier '(' 
+            {
+		$<number>$ = context;
+		context |= ARG_LIST;
+	    }
+    expr_list ')'
 	    {
 		parse_node_t *expr, *expr2;
-		$$ = $5;
+		context = $<number>5;
+
+		$$ = $6;
 		$$->kind = NODE_EFUN;
 		$$->l.number = $$->v.number + 2;
-		$$->v.number = F_CALL_OTHER;
+		$$->v.number = predefs[arrow_efun].token;
 #ifdef CAST_CALL_OTHERS
 		$$->type = TYPE_UNKNOWN;
 #else
@@ -3057,15 +3347,24 @@ function_call:
 		expr2->r.expr = $$->r.expr;
 		expr->r.expr = expr2;
 		$$->r.expr = expr;
+
+		$$ = check_refs(num_refs, $6, $$);
+		num_refs = 0;
 	    }
-    |   '(' '*' comma_expr ')' '(' expr_list ')'
+    |   '(' '*' comma_expr ')' '(' 
+            {
+		$<number>$ = context;
+		context |= ARG_LIST;
+	    }
+        expr_list ')'
             {
 	        parse_node_t *expr;
 
-		$$ = $6;
+		context = $<number>6;
+		$$ = $7;
 		$$->kind = NODE_EFUN;
 		$$->l.number = $$->v.number + 1;
-		$$->v.number = F_EVALUATE;
+		$$->v.number = predefs[evaluate_efun].token;
 #ifdef CAST_CALL_OTHERS
 		$$->type = TYPE_UNKNOWN;
 #else
@@ -3076,6 +3375,8 @@ function_call:
 		expr->v.expr = $3;
 		expr->r.expr = $$->r.expr;
 		$$->r.expr = expr;
+		$$ = check_refs(num_refs, $7, $$);
+		num_refs = 0;
 	    }
     ;
 
@@ -3105,18 +3406,16 @@ efun_override: L_EFUN L_COLON_COLON identifier {
 	scratch_free($3);
       }	
     | L_EFUN L_COLON_COLON L_NEW {
-	ident_hash_elem_t *ihe;
 	svalue_t *res;
 	
-	ihe = lookup_ident("clone_object");
 	push_malloced_string(the_file_name(current_file));
-	push_constant_string("clone_object");
+	push_constant_string("new");
 	push_malloced_string(add_slash(main_file_name()));
 	res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
 	if (!MASTER_APPROVED(res)) {
 	    yyerror("Invalid simulated efunction override");
 	    $$ = -1;
-	} else $$ = ihe->dn.efun_num;
+	} else $$ = new_efun;
       }
     ;
     

@@ -81,7 +81,6 @@ static int htable_size;
 static int htable_size_minus_one;
 
 INLINE_STATIC block_t *alloc_new_string PROT((char *, int));
-static void checked PROT((char *, char *));
 
 void init_strings()
 {
@@ -217,17 +216,6 @@ ref_string P1(char *, str)
     return str;
 }
 
-/*
- * function called on free_string detected errors; things return checked(s).
- */
-
-static void
-checked P2(char *, s, char *, str)
-{
-    debug_message("%s (\"%s\")\n", s, str);
-    fatal(s);			/* brutal - debugging */
-}
-
 /* free_string: fatal to call free_string on a non-shared string */
 /*
  * free_string - reduce the ref count on a string.  Various sanity
@@ -267,12 +255,8 @@ free_string P1(char *, str)
 	prev = &(NEXT(b));
     }
 
-#ifdef DEBUG
-    if (!b) {
-	checked("free_string: not found in string table!", str);
-	return;
-    }
-#endif
+    DEBUG_CHECK1(!b, "free_string: not found in string table! (\"%s\")\n", str);
+
     SUB_NEW_STRING(SIZE(b), sizeof(block_t));
     FREE(b);
     CHECK_STRING_STATS;
@@ -307,7 +291,7 @@ add_string_status P2(outbuffer_t *, out, int, verbose)
 	outbuf_add(out, "-------------------------\t Strings    Bytes\n");
     }
     if (verbose != -1)
-	outbuf_addv(out, "All strings:\t\t\t%7d %8d + %d overhead\n",
+	outbuf_addv(out, "All strings:\t\t\t%8d %8d + %d overhead\n",
 	      num_distinct_strings, bytes_distinct_strings, overhead_bytes);
     if (verbose == 1) {
 	outbuf_addv(out, "Total asked for\t\t\t%8d %8d\n",

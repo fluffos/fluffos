@@ -6,7 +6,7 @@
 #define IN_MALLOC_WRAPPER
 #define NO_OPCODES
 #include "std.h"
-#include "malloc.h"
+#include "my_malloc.h"
 #include "lpc_incl.h"
 #include "comm.h"
 

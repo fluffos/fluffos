@@ -1,6 +1,8 @@
 #ifndef EFUNS_MAIN_H
 #define EFUNS_MAIN_H
 
+#include "lpc_incl.h"
+
 /* These really should be moved somewhere else */
 /*
  * efuns_main.c

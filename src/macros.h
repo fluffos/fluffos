@@ -98,6 +98,10 @@
 !Only one wrapper (at most) should be defined
 #endif
 
+#if defined(DO_MSTATS) && defined(SYSMALLOC)
+!'DO_MSTATS' not available with 'SYSMALLOC'
+#endif
+
 #if defined (WRAPPEDMALLOC) && !defined(IN_MALLOC_WRAPPER)
 
 #  define MALLOC(x)               wrappedmalloc(x)
@@ -124,7 +128,7 @@
 
 #  else
 
-#    include "malloc.h"
+#    include "my_malloc.h"
 
 #  endif
 #endif

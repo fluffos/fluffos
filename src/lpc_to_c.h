@@ -51,14 +51,14 @@
 #define C_GLOBAL(x) SAFE(\
 			 lpc_svp = &current_object->variables[variable_index_offset + x];\
 			 if ((lpc_svp->type == T_OBJECT) && (lpc_svp->u.ob->flags & O_DESTRUCTED)) {\
-													*++sp = const0; assign_svalue(lpc_svp, &const0);\
+			    *++sp = const0u; assign_svalue(lpc_svp, &const0u);\
 			 } else assign_svalue_no_free(++sp, lpc_svp);\
 			 )
 #define C_LOCAL(x) SAFE(\
 			if ((fp[x].type == T_OBJECT) &&\
 			    (fp[x].u.ob->flags & O_DESTRUCTED)) {\
-			    *++sp = const0;\
-			    assign_svalue(fp + x, &const0);\
+			    *++sp = const0u;\
+			    assign_svalue(fp + x, &const0u);\
 			} else assign_svalue_no_free(++sp, fp + x);\
 			)
 #define C_LVALUE(x) SAFE((++sp)->type = T_LVALUE; sp->u.lvalue = x;)

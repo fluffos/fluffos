@@ -4,9 +4,7 @@
 #include "std.h"
 #include "lpc_incl.h"
 #include "icode.h"
-#include "trees.h"
 #include "compiler.h"
-#include "lex.h"
 #include "generate.h"
 
 static void ins_real PROT((double));
@@ -488,10 +486,19 @@ i_generate_node P1(parse_node_t *, expr) {
 	    i_generate_node(expr->v.expr);
 	    end_pushes();
 	    ins_byte(F_FOREACH);
-	    if (expr->l.expr->v.number == F_GLOBAL_LVALUE) tmp |= 1;
+	    if (expr->l.expr->v.number == F_GLOBAL_LVALUE) 
+		tmp |= FOREACH_RIGHT_GLOBAL;
+	    else if (expr->l.expr->v.number == F_REF_LVALUE)
+		tmp |= FOREACH_REF;
 	    if (expr->r.expr) {
-		tmp |= 4;
-		if (expr->r.expr->v.number == F_GLOBAL_LVALUE) tmp |= 2;
+		if (tmp & FOREACH_RIGHT_GLOBAL)
+		    tmp = (tmp & ~FOREACH_RIGHT_GLOBAL) | FOREACH_LEFT_GLOBAL;
+
+		tmp |= FOREACH_MAPPING;
+		if (expr->r.expr->v.number == F_GLOBAL_LVALUE) 
+		    tmp |= FOREACH_RIGHT_GLOBAL;
+		else if (expr->r.expr->v.number == F_REF_LVALUE)
+		    tmp |= FOREACH_REF;
 	    }
 	    ins_byte(tmp);
 	    ins_byte(expr->l.expr->l.number);
@@ -1045,6 +1052,8 @@ optimize_icode P3(char *, start, char *, pc, char *, end) {
 	case F_WHILE_DEC:
 	case F_LOCAL:
 	case F_LOCAL_LVALUE:
+	case F_REF:
+	case F_REF_LVALUE:
 	case F_SSCANF:
 	case F_PARSE_COMMAND:
 	case F_BYTE:

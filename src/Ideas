@@ -1,4 +1,4 @@
-The current implementation of swapping could use alot of work.  Swapping
+The current implementation of swapping could use a lot of work.  Swapping
 an object in/out isn't that expensive CPU wise, and can save a decent amount
 of memory.  The problem is that cloned programs can't swap, which disables
 swapping for much of the mud ...
@@ -22,12 +22,6 @@ granularity, so the second call_out follows the first by whatever the
 time difference between the two was.  This problem will always happen
 if the call_outs are within the granularity, and real small
 granularities (microsecond?) may/may not be desirable.
-
------
-
-It would be nice if a | operator can be used for union on arrays.
-({"a","b","c"}) | ({"c","d"}) would be ({"a","b","c","d"}) it's more
-convenient than distinct_array(({"a","b","c"})+({"c","d"}) ).
 
 -----
 

@@ -1,6 +1,9 @@
 #ifndef BINARIES_H
 #define BINARIES_H
 
+/* lpc_object_t */
+#include "object.h"
+
 #include "compiler.h"
 
 extern char driver_name[];

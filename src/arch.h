@@ -77,7 +77,11 @@
 #  ifdef __mc68000
 #    define ARCH "Linux/m68k"
 #  else
-#    define ARCH "Linux"
+#    ifdef __alpha
+#      define ARCH "Linux/alpha"
+#    else
+#      define ARCH "Linux"
+#    endif
 #  endif
 #endif
 
@@ -93,7 +97,7 @@
 #define ARCH "Cray"
 #endif
 
-#ifdef __alpha
+#if !defined(ARCH) && defined(__alpha)
 #define ARCH "Alpha"
 #endif
 

@@ -12,10 +12,6 @@
 
 #include "std.h"
 
-#if defined(_SEQUENT_) || defined(SVR4)
-#  include <malloc.h>
-#endif
-
 /*******************************************************
  *  Declarations and/or prototypes for lib functions.  *
  *******************************************************/
@@ -36,7 +32,7 @@
    void _longjmp();
 #endif
 
-/* SunOS is missing alot of prototypes ... */
+/* SunOS is missing a lot of prototypes ... */
 #if defined(sun) && !defined(SunOS_5) && defined(__STDC__)
 #  ifdef BUFSIZ
      int fputs(char *, FILE *);

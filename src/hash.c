@@ -7,6 +7,7 @@
 #define NO_OPCODES
 
 #include "std.h"
+#include "hash.h"
 
 static int T[] =
 {

@@ -2,7 +2,6 @@
 #include "std.h"
 #include "file_incl.h"
 #include "lpc_incl.h"
-#include "lex.h"
 #include "backend.h"
 #include "simul_efun.h"
 #include "binaries.h"
@@ -15,13 +14,11 @@
 #include "main.h"
 #include "compile_file.h"
 #include "socket_efuns.h"
+#include "master.h"
 
 port_def_t external_port[5];
 
 static int e_flag = 0;		/* Load empty, without preloads. */
-#ifdef DEBUG
-int d_flag = 0;			/* Run with debug */
-#endif
 int t_flag = 0;			/* Disable heart beat and reset */
 int comp_flag = 0;		/* Trace compilations */
 int max_cost;
@@ -32,18 +29,11 @@ int boot_time;
 int max_array_size;
 int max_buffer_size;
 int max_string_length;
-char *master_file_name;
 static int reserved_size;
 char *reserved_area;		/* reserved for MALLOC() */
 static char *mud_lib;
 
-svalue_t const0, const1, const0u;
-
 double consts[NUM_CONSTS];
-
-/* -1 indicates that we have never had a master object.  This is so the
- * simul_efun object can load before the master. */
-object_t *master_ob = 0;
 
 #ifndef NO_IP_DEMON
 void init_addr_server();
@@ -100,7 +90,10 @@ int main P2(int, argc, char **, argv)
     !defined(sgi) && !defined(WIN32)
     void tzset();
 #endif
-    struct lpc_predef_s predefs;
+
+#ifdef INCL_LOCALE_H
+    setlocale(LC_ALL, "");
+#endif
 
 #if !defined(__SASC) && (defined(AMITCP) || defined(AS225))
     amiga_sockinit();
@@ -249,20 +242,12 @@ int main P2(int, argc, char **, argv)
     max_array_size = MAX_ARRAY_SIZE;
     max_buffer_size = MAX_BUFFER_SIZE;
     max_string_length = MAX_STRING_LENGTH;
-    master_file_name = (char *) MASTER_FILE;
-    /* fix the filename */
-    while (*master_file_name == '/') master_file_name++;
-    p = master_file_name;
-    while (*p++);
-    if (p[-2]=='c' && p[-3]=='.')
-	p[-3]=0;
     mud_lib = (char *) MUD_LIB;
     set_inc_list(INCLUDE_DIRS);
     if (reserved_size > 0)
 	reserved_area = (char *) DMALLOC(reserved_size, TAG_RESERVED, "main.c: reserved_area");
     for (i = 0; i < sizeof consts / sizeof consts[0]; i++)
 	consts[i] = exp(-i / 900.0);
-    init_num_args();
     reset_machine(1);
     /*
      * The flags are parsed twice ! The first time, we only search for the -m
@@ -274,11 +259,9 @@ int main P2(int, argc, char **, argv)
 	    continue;
 	switch (argv[i][1]) {
 	case 'D':
-	    if (argv[i][2]) {	/* Amylaar : allow flags to be passed down to
-				 * the LPC preprocessor */
-		struct lpc_predef_s *tmp;
-
-		tmp = &predefs;
+	    if (argv[i][2]) {
+		lpc_predef_t *tmp = ALLOCATE(lpc_predef_t, TAG_PREDEFINES,
+					     "predef");
 		tmp->flag = argv[i] + 2;
 		tmp->next = lpc_predefs;
 		lpc_predefs = tmp;
@@ -336,7 +319,7 @@ int main P2(int, argc, char **, argv)
 	exit(-1);
     } else {
 	init_simul_efun(SIMUL_EFUN);
-	init_master(MASTER_FILE);
+	init_master();
     }
     pop_context(&econ);
 
@@ -374,10 +357,10 @@ int main P2(int, argc, char **, argv)
 		external_port[0].port = atoi(argv[i] + 2);
 		continue;
             case 'd':
-#ifdef DEBUG
-                d_flag++;
+#ifdef DEBUG_MACRO
+		debug_level |= DBG_d_flag;
 #else
-                debug_message("Driver must be compiled with DEBUG on to use -d.\n");
+                debug_message("Driver must be compiled with DEBUG_MACRO on to use -d.\n");
 #endif
 	    case 'c':
 		comp_flag++;
@@ -500,16 +483,16 @@ char *int_string_unlink P1(char *, str)
     return (char *)(newmbt + 1);
 }
 
+static FILE *debug_message_fp = 0;
+
 void debug_message P1V(char *, fmt)
 {
-    static int append = 0;
     static char deb_buf[100];
     static char *deb = deb_buf;
     va_list args;
-    FILE *fp = NULL;
     V_DCL(char *fmt);
 
-    if (!append) {
+    if (!debug_message_fp) {
 	/*
 	 * check whether config file specified this option
 	 */
@@ -519,46 +502,24 @@ void debug_message P1V(char *, fmt)
 	    sprintf(deb, "%s/debug.log", LOG_DIR);
 	while (*deb == '/')
 	    deb++;
+	debug_message_fp = fopen(deb, "w");
+	if (!debug_message_fp) {
+	    /* darn.  We're in trouble */
+	    perror(deb);
+	    abort();
+	}
     }
-    fp = fopen(deb, append ? "a" : "w");
 
-    /*
-     * re-use stdout's file descriptor if system or process runs out
-     * 
-     * OS/2 doesn't have ENFILE.
-     */
-    if (!fp && (errno == EMFILE 
-#ifdef ENFILE
-		|| errno == ENFILE
-#endif
-		)) {
-	fp = freopen(deb, append ? "a" : "w", stdout);
-	append = 2;
-    }
-    if (!fp) {
-	/* darn.  We're in trouble */
-	perror(deb);
-	abort();
-    }
     V_START(args, fmt);
     V_VAR(char *, fmt, args);
-    vfprintf(fp, fmt, args);
-    fflush(fp);
+    vfprintf(debug_message_fp, fmt, args);
+    fflush(debug_message_fp);
+    va_end(args);
+    V_START(args, fmt);
+    V_VAR(char *, fmt, args);
     vfprintf(stderr, fmt, args);
     fflush(stderr);
     va_end(args);
-
-    /*
-     * don't close stdout
-     */
-    if (append != 2)
-	(void) fclose(fp);
-
-    /*
-     * append to debug.log next time thru
-     */
-    if (!append)
-	append = 1;
 }
 
 int slow_shut_down_to_do = 0;

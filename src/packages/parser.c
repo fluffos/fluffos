@@ -9,7 +9,6 @@
  * . OBS: and, all and everything (all [of] X, X except [for] Y, X and Y)
  * . OBS in OBS
  * . possesive: my his her its their Beek's
- * . first, second, etc
  * . one, two, ...
  * . questions.  'Take what?'
  * . oops
@@ -24,12 +23,44 @@
 #include "../lpc_incl.h"
 #include "parser.h"
 #include "../md.h"
+#include "../master.h"
+
+/* Most of these names are, unfortunately, historical accidents.  Feel free
+ * to change them to something sane. 
+ */
+/* Named this just for consistency */
+#define APPLY_USERS 		"parse_command_users"
+/* These match routines used by parse_command() */
+#define APPLY_LITERALS		"parse_command_prepos_list"
+#define APPLY_NOUN		"parse_command_id_list"
+#define APPLY_PLURAL		"parse_command_plural_id_list"
+#define APPLY_ADJECTIVE		"parse_command_adjectiv_id_list"
+/* These match routines in the LIMA mudlib.  [The fact that this file was
+ * written by an author of the LIMA mudlib is just a coincidence.  Honest.]
+ */
+#define IS_LIVING		"is_living"
+#define INVENTORY_ACCESSIBLE	"inventory_accessible"
+#define INVENTORY_VISIBLE	"inventory_visible"
+/* Named during a fit of madness */
+#define LIVINGS_ARE_REMOTE	"livings_are_remote"
+
+#ifdef NO_ENVIRONMENT
+/* Query the master object for object inventory information */
+#define APPLY_FIRST_INVENTORY	"parse_get_first_inventory"
+#define APPLY_NEXT_INVENTORY	"parse_get_next_inventory"
+#define APPLY_ENVIRONMENT	"parse_get_environment"
+#endif
 
 #define MAX_WORDS_PER_LINE 256
 #define MAX_WORD_LENGTH 1024
 #define MAX_MATCHES 10
 
 char *pluralize PROT((char *));
+
+#define MS_HAS_LITERALS   1
+#define MS_HAS_SPECIALS   2
+#define MS_HAS_USERS      4
+static int master_state = 0;
 
 static parse_info_t *pi = 0;
 static hash_entry_t *hash_table[HASH_SIZE];
@@ -39,7 +70,9 @@ static int objects_loaded = 0;
 static int num_objects, num_people, me_object;
 static struct object_s *loaded_objects[MAX_NUM_OBJECTS];
 static int object_flags[MAX_NUM_OBJECTS];
-static int num_literals = -1;
+static bitvec_t my_objects;
+static char *my_string = 0;
+static int num_literals = 0;
 static char **literals;
 static word_t words[MAX_WORDS_PER_LINE];
 static int num_words = 0;
@@ -47,6 +80,7 @@ static verb_node_t *parse_vn;
 static verb_t *parse_verb_entry;
 static object_t *parse_restricted;
 static object_t *parse_user;
+static array_t *master_user_list = 0;
 static bitvec_t cur_livings;
 static bitvec_t cur_accessible;
 static int best_match;
@@ -82,7 +116,7 @@ static void parse_rule PROT((parse_state_t *));
 static void clear_parallel_errors PROT((saved_error_t **));
 static svalue_t *get_the_error PROT((parser_error_t *, int));
 
-#define isignore(x) (!isascii(x) || !isprint(x) || x == '\'')
+#define isignore(x) (!isprint(x) || x == '\'')
 #define iskeep(x) (isalnum(x) || x == '*')
 
 #define SHARED_STRING(x) ((x)->subtype == STRING_SHARED ? (x)->u.string : findstring((x)->u.string))
@@ -148,8 +182,12 @@ void parser_mark_verbs() {
 	    swp = swp->next;
 	}
     }
+    if (my_string)
+	EXTRA_REF(BLOCK(my_string))++;
+    if (master_user_list)
+	master_user_list->extra_ref++;
 }
-    
+
 void parser_mark P1(parse_info_t *, pinfo) {
     int i;
 
@@ -187,8 +225,8 @@ void debug_parse P1V(char *, fmt) {
     vsprintf(p, fmt, args);
     va_end(args);
 
-    tell_object(command_giver, buf);
-    tell_object(command_giver, "\n");
+    tell_object(command_giver, buf, strlen(buf));
+    tell_object(command_giver, "\n", 1);
 }
 #endif
 
@@ -244,7 +282,7 @@ static int bitvec_count P1(bitvec_t *, bv) {
     for (i = 0; i < bv->last; i++) {
 	unsigned int k = bv->b[i];
 	if (k) {
-	    for (j = 0; j < 4; j++) {
+	    for (j = 0; j < 8; j++) {
 		ret += counts[k & 15];
 		k >>= 4;
 	    }
@@ -261,7 +299,7 @@ void all_objects P2(bitvec_t *, bv, int, remote_flag) {
     i = last;
     while (i--)
 	bv->b[i] = ~0;
-    if (BV_BIT(num) != 0) {
+    if (num < MAX_NUM_OBJECTS) {
 	bv->b[last] = BV_BIT(num) - 1;
 	bv->last = last + 1;
     } else 
@@ -344,56 +382,102 @@ static int check_special_word P2(char *, wrd, int *, arg) {
 	}
 	swp = swp->next;
     }
+
+    if (isdigit(*wrd)) {
+	char *p;
+
+	*arg = (int)strtol(wrd, &p, 10);
+	if (p && *p) {
+	    char *ending = "th";
+
+	    if (p - wrd < 2 || *(p - 2) != '1') {
+		switch (*(p - 1)) {
+		    case '1': ending = "st";  break;
+		    case '2': ending = "nd";  break;
+		    case '3': ending = "rd";  break;
+		}
+	    }
+
+	    if (!strcmp(p, ending))
+		return SW_ORDINAL;
+	}
+    }
+
     return SW_NONE;
 }
 
 static void interrogate_master PROT((void)) {
     svalue_t *ret;
 
-    DEBUG_PP(("[master::parse_command_prepos_list]"));
-    ret = apply_master_ob("parse_command_prepos_list", 0);
-    if (ret && ret->type == T_ARRAY)
-	num_literals = parse_copy_array(ret->u.arr, &literals);
-
-    add_special_word("the", SW_ARTICLE, 0);
-    add_special_word("a", SW_ARTICLE, 0);
-
-    add_special_word("me", SW_SELF, 0);
-    add_special_word("myself", SW_SELF, 0);
-
-    add_special_word("all", SW_ALL, 0);
-    add_special_word("of", SW_OF, 0);
-
-    add_special_word("and", SW_AND, 0);
+    if ((master_state & MS_HAS_USERS) == 0) {
+	DEBUG_PP(("[master::parse_command_users]"));
+	if (master_user_list) {
+	    free_array(master_user_list);
+	    master_user_list = 0;
+	}
     
-    add_special_word("first", SW_ORDINAL, 1);
-    add_special_word("1st", SW_ORDINAL, 1);
-    add_special_word("second", SW_ORDINAL, 2);
-    add_special_word("2nd", SW_ORDINAL, 2);
-    add_special_word("third", SW_ORDINAL, 3);
-    add_special_word("3rd", SW_ORDINAL, 3);
-    add_special_word("fourth", SW_ORDINAL, 4);
-    add_special_word("4th", SW_ORDINAL, 4);
-    add_special_word("fifth", SW_ORDINAL, 5);
-    add_special_word("5th", SW_ORDINAL, 5);
-    add_special_word("sixth", SW_ORDINAL, 6);
-    add_special_word("6th", SW_ORDINAL, 6);
-    add_special_word("seventh", SW_ORDINAL, 7);
-    add_special_word("7th", SW_ORDINAL, 7);
-    add_special_word("eighth", SW_ORDINAL, 8);
-    add_special_word("8th", SW_ORDINAL, 8);
-    add_special_word("ninth", SW_ORDINAL, 9);
-    add_special_word("9th", SW_ORDINAL, 9);
+	DEBUG_PP(("[%s]", APPLY_USERS));
+	ret = apply_master_ob(APPLY_USERS, 0);
+	if (ret && ret->type == T_ARRAY) {
+	    master_user_list = ret->u.arr;
+	    ret->u.arr->ref++;
+	} else {
+	    master_user_list = &the_null_array;
+	}
+	master_state |= MS_HAS_USERS;
+    }
+    if ((master_state & MS_HAS_LITERALS) == 0) {
+	if (literals) {
+	    int i;
+	    
+	    for (i = 0; i < num_literals; i++)
+		free_string(literals[i]);
+	    FREE(literals);
+	    num_literals = 0;
+	    literals = 0;
+	}
+	
+	DEBUG_PP(("[%s]", APPLY_LITERALS));
+	ret = apply_master_ob(APPLY_LITERALS, 0);
+
+	if (ret && ret->type == T_ARRAY)
+	    num_literals = parse_copy_array(ret->u.arr, &literals);
+	else
+	    num_literals = 0;
+	master_state |= MS_HAS_LITERALS;
+    }
+    if ((master_state & MS_HAS_SPECIALS) == 0) {
+	add_special_word("the", SW_ARTICLE, 0);
+
+	add_special_word("me", SW_SELF, 0);
+	add_special_word("myself", SW_SELF, 0);
+	
+	add_special_word("all", SW_ALL, 0);
+	add_special_word("of", SW_OF, 0);
+	
+	add_special_word("and", SW_AND, 0);
+	
+	add_special_word("a", SW_ORDINAL, -1);
+	add_special_word("any", SW_ORDINAL, -1);
+
+	add_special_word("first", SW_ORDINAL, 1);
+	add_special_word("second", SW_ORDINAL, 2);
+	add_special_word("other", SW_ORDINAL, 2);
+	add_special_word("third", SW_ORDINAL, 3);
+	add_special_word("fourth", SW_ORDINAL, 4);
+	add_special_word("fifth", SW_ORDINAL, 5);
+	add_special_word("sixth", SW_ORDINAL, 6);
+	add_special_word("seventh", SW_ORDINAL, 7);
+	add_special_word("eighth", SW_ORDINAL, 8);
+	add_special_word("ninth", SW_ORDINAL, 9);
+
+	master_state |= MS_HAS_SPECIALS;
+    }
 }
 
 void f_parse_init PROT((void)) {
     parse_info_t *pi;
 
-    if (num_literals == -1) {
-	num_literals = 0;
-	interrogate_master();
-    }
-    
     if (current_object->pinfo)
 	return;
 
@@ -424,12 +508,41 @@ static void remove_ids P1(parse_info_t *, pinfo) {
     }
 }
 
+/* The parse_refresh() efun.  Used to inform the parsing package that
+ * information returned by applies to current_object may have changed,
+ * and should be recached when necessary.
+ */
 void f_parse_refresh PROT((void)) {
-    if (!(current_object->pinfo))
+    parse_info_t *pi;
+    
+    /* If this is the master object, prepare to go through 
+     * interrogate_master() again.  Don't free the literals now, or
+     * things can dangle if we are in the middle of a parse.
+     */
+    if (current_object == master_ob) {
+	master_state &= ~MS_HAS_USERS;
+	if (!master_ob->pinfo)
+	    return;
+    }
+    
+    if (!(pi = current_object->pinfo))
 	error("/%s is not known by the parser.  Call parse_init() first.\n",
 	      current_object->name);
-    remove_ids(current_object->pinfo);
-    current_object->pinfo->flags &= PI_VERB_HANDLER;
+
+    remove_ids(pi);
+    pi->flags &= PI_VERB_HANDLER;
+    /* Recheck this immediately since we don't resync handler objects, only
+     * object involved in the parse.
+     */
+    if (pi->flags & PI_VERB_HANDLER) {
+	svalue_t *ret = apply(LIVINGS_ARE_REMOTE, current_object,
+			      0, ORIGIN_DRIVER);
+	if (current_object->flags & O_DESTRUCTED)
+	    return;
+	
+	if (!IS_ZERO(ret))
+	    pi->flags |= PI_REMOTE_LIVINGS;
+    }
 }
 
 /* called from free_object() */
@@ -514,9 +627,6 @@ static void free_parse_globals PROT((void)) {
 	    free_object(loaded_objects[i], "free_parse_globals");
 	objects_loaded = 0;
     }
-#ifdef DEBUG
-    debug_parse_depth = 0;
-#endif
 }
 
 token_def_t tokens[] = {
@@ -535,7 +645,7 @@ static int tokenize P2(char **, rule, int *, weightp) {
     char *start = *rule;
     int i, n;
     token_def_t *td;
-    
+
     while (*start == ' ') start++;
 
     if (!*start)
@@ -603,7 +713,7 @@ static int tokenize P2(char **, rule, int *, weightp) {
 
     /* it's not a standard token.  Check the literals */
     for (i = 0; i < num_literals; i++) {
-	if ((literals[i][n] == 0) && (strncmp(literals[i], start, n) == 0))
+        if (strlen(literals[i]) == n && (strncmp(literals[i], start, n) == 0))
 	    return -(i + 1);
     }
 
@@ -662,8 +772,8 @@ static void interrogate_object P1(object_t *, ob) {
     
     DEBUG_P(("Interogating /%s.", ob->name));
     
-    DEBUG_PP(("[parse_command_id_list]"));
-    ret = apply("parse_command_id_list", ob, 0, ORIGIN_DRIVER);
+    DEBUG_PP(("[%s]", APPLY_NOUN));
+    ret = apply(APPLY_NOUN, ob, 0, ORIGIN_DRIVER);
     if (ret && ret->type == T_ARRAY)
 	ob->pinfo->num_ids = parse_copy_array(ret->u.arr, &ob->pinfo->ids);
     else
@@ -675,47 +785,93 @@ static void interrogate_object P1(object_t *, ob) {
     ob->pinfo->num_adjs = 0;
     ob->pinfo->num_plurals = 0;
 
-    DEBUG_PP(("[parse_command_plural_id_list]"));
-    ret = apply("parse_command_plural_id_list", ob, 0, ORIGIN_DRIVER);
+    DEBUG_PP(("[%s]", APPLY_PLURAL));
+    ret = apply(APPLY_PLURAL, ob, 0, ORIGIN_DRIVER);
     if (ret && ret->type == T_ARRAY)
 	ob->pinfo->num_plurals = parse_copy_array(ret->u.arr, &ob->pinfo->plurals);
     else
 	ob->pinfo->num_plurals = 0;
     if (ob->flags & O_DESTRUCTED) return;
 
-    DEBUG_PP(("[parse_command_adjectiv_id_list]"));
-    ret = apply("parse_command_adjectiv_id_list", ob, 0, ORIGIN_DRIVER);
+    DEBUG_PP(("[%s]", APPLY_ADJECTIVE));
+    ret = apply(APPLY_ADJECTIVE, ob, 0, ORIGIN_DRIVER);
     if (ret && ret->type == T_ARRAY)
 	ob->pinfo->num_adjs = parse_copy_array(ret->u.arr, &ob->pinfo->adjs);
     else
 	ob->pinfo->num_adjs = 0;
     if (ob->flags & O_DESTRUCTED) return;
 
-    DEBUG_PP(("[is_living]"));
-    ret = apply("is_living", ob, 0, ORIGIN_DRIVER);
+    DEBUG_PP(("[%s]", IS_LIVING));
+    ret = apply(IS_LIVING, ob, 0, ORIGIN_DRIVER);
     if (!IS_ZERO(ret)) {
 	ob->pinfo->flags |= PI_LIVING;
 	DEBUG_PP(("(yes)"));
     }
     if (ob->flags & O_DESTRUCTED) return;
 
-    DEBUG_PP(("[inventory_accessible]"));
-    ret = apply("inventory_accessible", ob, 0, ORIGIN_DRIVER);
+    DEBUG_PP(("[%s]", INVENTORY_ACCESSIBLE));
+    ret = apply(INVENTORY_ACCESSIBLE, ob, 0, ORIGIN_DRIVER);
     if (!IS_ZERO(ret)) {
 	ob->pinfo->flags |= PI_INV_ACCESSIBLE;
 	DEBUG_PP(("(yes)"));
     }
     if (ob->flags & O_DESTRUCTED) return;
 
-    DEBUG_PP(("[inventory_visible]"));
-    ret = apply("inventory_visible", ob, 0, ORIGIN_DRIVER);
+    DEBUG_PP(("[%s]", INVENTORY_VISIBLE));
+    ret = apply(INVENTORY_VISIBLE, ob, 0, ORIGIN_DRIVER);
     if (!IS_ZERO(ret)) {
 	ob->pinfo->flags |= PI_INV_VISIBLE;
 	DEBUG_PP(("(yes)"));
     }
 }
 
-static void rec_add_object P2(object_t *, ob, int, inreach) {
+static object_t *first_inv P1(object_t *, ob) {
+#ifndef NO_ENVIRONMENT
+    return ob->contains;
+#else
+    svalue_t *ret;
+
+    push_object(ob);
+    ret = apply_master_ob(APPLY_FIRST_INVENTORY, 1);
+    if (ret && ret != (svalue_t *)-1 && ret->type == T_OBJECT)
+	return ret->u.ob;
+    return (object_t *)NULL;
+#endif
+}
+
+static object_t *next_inv P2(object_t *, parent, object_t *, sibling) {
+#ifndef NO_ENVIRONMENT
+    return sibling->next_inv;
+#else
+    svalue_t *ret;
+
+    push_object(parent);
+    push_object(sibling);
+    ret = apply_master_ob(APPLY_NEXT_INVENTORY, 2);
+    if (ret && ret != (svalue_t *)-1 && ret->type == T_OBJECT)
+        return ret->u.ob;
+    return (object_t *)NULL;
+#endif
+}
+
+static object_t *super P1(object_t *, ob) {
+#ifndef NO_ENVIRONMENT
+    return ob->super;
+#else
+    svalue_t *ret;
+
+    push_object(ob);
+    ret = apply_master_ob(APPLY_ENVIRONMENT, 1);
+    if (ret && ret != (svalue_t *)-1 && ret->type == T_OBJECT)
+        return ret->u.ob;
+    return (object_t *)NULL;
+#endif
+}
+
+#define RAO_INREACH 1
+#define RAO_MY 2
+
+static void rec_add_object P2(object_t *, ob, int, flags) {
     object_t *o;
 
     if (!ob) return;
@@ -723,21 +879,22 @@ static void rec_add_object P2(object_t *, ob, int, inreach) {
     if (ob->pinfo) {
 	if (num_objects == MAX_NUM_OBJECTS)
 	    return;
-	if (ob == parse_user)
+	if (flags & RAO_MY)
+	    bitvec_set(&my_objects, num_objects);
+	if (ob == parse_user) {
 	    me_object = num_objects;
-	object_flags[num_objects] = inreach;
+	    flags |= RAO_MY;
+	}
+	object_flags[num_objects] = flags & RAO_INREACH;
 	loaded_objects[num_objects++] = ob;
 	add_ref(ob, "rec_add_object");
 	if (!(ob->pinfo->flags & PI_INV_VISIBLE))
 	    return;
 	if (!(ob->pinfo->flags & PI_INV_ACCESSIBLE))
-	    inreach = 0;
+	    flags &= ~RAO_INREACH;
     }
-    o = ob->contains;
-    while (o) {
-	rec_add_object(o, inreach);
-	o = o->next_inv;
-    }
+    for (o = first_inv(ob);  o;  o = next_inv(ob, o))
+	rec_add_object(o, flags);
 }
 
 static void find_uninited_objects P1(object_t *, ob) {
@@ -751,11 +908,8 @@ static void find_uninited_objects P1(object_t *, ob) {
 	loaded_objects[num_objects++] = ob;
 	add_ref(ob, "find_united_objects");
     }
-    o = ob->contains;
-    while (o) {
+    for (o = first_inv(ob);  o;  o = next_inv(ob, o))
 	find_uninited_objects(o);
-	o = o->next_inv;
-    }
 }    
 
 static hash_entry_t *add_hash_entry P1(char *, str) {
@@ -814,18 +968,16 @@ static void add_to_hash_table P2(object_t *, ob, int, index) {
 }
 
 static void init_users() {
-    svalue_t *ret;
     int i;
     object_t *ob;
-    
-    /* FIXME: this should be cached */
-    DEBUG_PP(("[master::parse_command_users]"));
-    ret = apply_master_ob("parse_command_users", 0);
-    if (!ret || ret->type != T_ARRAY) return;
-    
-    for (i = 0; i < ret->u.arr->size; i++) {
-	if (ret->u.arr->item[i].type == T_OBJECT
-	    && (ob = ret->u.arr->item[i].u.ob)->pinfo
+
+    /* Note that destructed objects have pinfo == 0 [see free_object()], 
+     * so we don't have to worry about them here.  We could just keep a
+     * list of objects, but we keep an entire array anyway.
+     */
+    for (i = 0; i < master_user_list->size; i++) {
+	if (master_user_list->item[i].type == T_OBJECT
+	    && (ob = master_user_list->item[i].u.ob)->pinfo
 	    && !(ob->pinfo->flags & PI_SETUP)) {
 	    DEBUG_PP(("adding: /%s", ob->name));
 	    if (num_objects == MAX_NUM_OBJECTS)
@@ -838,8 +990,10 @@ static void init_users() {
 
 static void load_objects PROT((void)) {
     int i;
-    svalue_t *ret;
     object_t *ob, *env;
+    hash_entry_t *he;
+    
+    if (!my_string) my_string = make_shared_string("my");
 
     /* 1. Find things that need to be interrogated
      * 2. interrogate them
@@ -853,45 +1007,52 @@ static void load_objects PROT((void)) {
      */
     bitvec_zero(&cur_livings);
     bitvec_zero(&cur_accessible);
+    /* Step 1: */
     num_objects = 0;
     if (!parse_user || parse_user->flags & O_DESTRUCTED)
 	error("No this_player()!\n");
 
-    find_uninited_objects(parse_user->super);
+    find_uninited_objects(super(parse_user));
+    /* get users from master object */
+    interrogate_master();
     init_users();
     objects_loaded = 1;
+    /* Step 2: */
     for (i = 0; i < num_objects; i++)
 	interrogate_object(loaded_objects[i]);
     for (i = 0; i < num_objects; i++)
-	free_object(loaded_objects[i], "free_parse_globals");
+	free_object(loaded_objects[i], "load_objects");
+    /* Step 3: */
     num_objects = 0;
     me_object = -1;
     
-    rec_add_object(parse_user->super, 1);
-    /* FIXME: this should be cached */
-    DEBUG_PP(("[master::parse_command_users]"));
-    ret = apply_master_ob("parse_command_users", 0);
+    bitvec_zero(&my_objects);
+    rec_add_object(super(parse_user), RAO_INREACH);
+    he = add_hash_entry(my_string);
+    he->flags |= HV_ADJ;
+    bitvec_copy(&he->pv.adj, &my_objects);
+    
     num_people = 0;
-    if (ret && ret->type == T_ARRAY) {
-	for (i = 0; i < ret->u.arr->size; i++) {
-	    if (ret->u.arr->item[i].type != T_OBJECT) continue;
-	    /* check if we got them already */
-	    ob = ret->u.arr->item[i].u.ob;
-	    if (!(ob->pinfo))
-		continue;
-	    env = ob;
-	    while (env) {
-		if (env == parse_user->super)
-		    break;
-		env = env->super;
-	    }
-	    if (env) continue;
-	    if (num_objects + num_people == MAX_NUM_OBJECTS)
+    for (i = 0; i < master_user_list->size; i++) {
+	if (master_user_list->item[i].type != T_OBJECT) continue;
+	/* check if we have them already */
+	ob = master_user_list->item[i].u.ob;
+	if (!(ob->pinfo))
+	    continue;
+	env = ob;
+	while (env) {
+	    if (env == super(parse_user))
 		break;
-	    object_flags[num_objects + num_people] = 1;
-	    loaded_objects[num_objects + num_people++] = ob;
-	    add_ref(ob, "load_objects");
+	    env = super(env);
+	    if (env && env->pinfo && !(env->pinfo->flags & PI_INV_VISIBLE))
+		env = 0;
 	}
+	if (env) continue;
+	if (num_objects + num_people == MAX_NUM_OBJECTS)
+	    break;
+	object_flags[num_objects + num_people] = 1;
+	loaded_objects[num_objects + num_people++] = ob;
+	add_ref(ob, "load_objects");
     }
     num_objects += num_people;
 
@@ -919,7 +1080,7 @@ static int get_single P1(bitvec_t *, bv) {
     if (res < 0) return -1;
 
     tmp = bv->b[res];
-    res *= 32;
+    res *= BPI;
     /* Binary search for the set bit, unrolled for speed. */
     if (tmp & 0x0000ffff) {
 	if (tmp & 0xffff0000)
@@ -1073,7 +1234,12 @@ static void parse_obj P3(int, tok, parse_state_t *, state,
 	    }
 	    break;
 	}
-	ord_legal = 0;
+	/* This is a hack; in the future we are going to have to handle
+	   <possessive> <ordinal> better.  The problem is we don't want
+	   to accept "red 1st sword" but we do want "my first sword" and
+	   "my 1st red sword", and right now we don't distinguish between
+	   ordinals and adjectives.  Woops. */
+	if (str != my_string) ord_legal = 0;
 	hnode = hash_table[DO_HASH(str, HASH_SIZE)];
 	while (hnode) {
 	    if (hnode->name == str) {
@@ -1260,7 +1426,7 @@ static void make_error_message P2(int, which, parser_error_t *, err) {
 	}
     }
     p--;
-    strcpy(p, ".\n");
+    p = strput(p, end, ".\n");
     DEBUG_P((buf));
     free_parser_error(err);
     err->error_type = ERR_ALLOCATED;
@@ -1290,7 +1456,7 @@ static int process_answer P3(parse_state_t *, state, svalue_t *, sv,
 	return -2;
     }
     if (sv->type != T_STRING) {
-	DEBUG_P(("Return value was not a string or number.", sv->u.number));
+	DEBUG_P(("Return value was not a string or number."));
 	return 0;
     }
     DEBUG_P(("Returned string was: %s", sv->u.string));
@@ -1458,10 +1624,10 @@ static void push_bitvec_as_array P2(bitvec_t *, bv, int, errors_too) {
 	    k = 0;
 	    while (j) {
 		if (bv->b[i] & j) {
-		    object_t *ob = loaded_objects[32 * i + k];
+		    object_t *ob = loaded_objects[BPI * i + k];
 		    n--;
 		    if (ob->flags & O_DESTRUCTED) {
-			arr->item[n] = const0;
+			arr->item[n] = const0u;
 		    } else {
 			arr->item[n].type = T_OBJECT;
 			arr->item[n].u.ob = ob;
@@ -1604,7 +1770,7 @@ static int check_functions P2(object_t *, obj, parse_state_t *, state) {
 	    SET_OB(parse_vn->handler);
 	args = make_function(func, EndOf(func), 0, state, try % 4, obj);
 	args += push_real_names(try % 4, 0);
-	DEBUG_P(("Trying %s ...", func));
+	DEBUG_P(("Trying %s ... (/%s)", func, ob->name));
 	ret = process_answer(state, apply(func, ob, args, ORIGIN_DRIVER), 0);
 	if (ob->flags & O_DESTRUCTED)
 	    return 0;
@@ -1673,7 +1839,7 @@ static int parallel_check_functions P3(object_t *, obj,
 	    SET_OB(parse_vn->handler);
 	args = make_function(func, EndOf(func), which, state, try % 4, obj);
 	args += push_real_names(try % 4, which);
-	DEBUG_P(("Trying %s ...", func));
+	DEBUG_P(("Trying %s ... (/%s)", func, ob->name));
 	ret = parallel_process_answer(state, apply(func, ob, args, ORIGIN_DRIVER), which);
 	if (ob->flags & O_DESTRUCTED)
 	    return 0;
@@ -1693,7 +1859,7 @@ static void singular_check_functions P3(int, which, parse_state_t *, state,
     unsigned int j;
     int ordinal = m->ordinal;
     int ord2 = m->ordinal;
-    int has_ordinal = (m->ordinal > 0);
+    int has_ordinal = (m->ordinal != 0);
     int was_error = 0;
     
     for (i = 0; i < bv->last; i++) {
@@ -1702,16 +1868,22 @@ static void singular_check_functions P3(int, which, parse_state_t *, state,
 	    k = 0;
 	    while (j) {
 		if (bv->b[i] & j) {
-		    int ret = parallel_check_functions(loaded_objects[32 * i + k], state, which);
+		    int ret = parallel_check_functions(loaded_objects[BPI * i + k], state, which);
 		    if (ret) {
 			if (has_ordinal) {
 			    ord2--;
-			    if (--ordinal == 0) {
-				if (use_last_parallel_error(state))
+			    if (ordinal < 0 || --ordinal == 0) {
+				if (ordinal == -2)
+				    state->num_errors--;
+				if (use_last_parallel_error(state)) {
 				    m->token = ERROR_TOKEN;
-				else
-				    m->val.number = 32 * i + k;
-				return;
+				    if (ordinal != -1)
+					return;
+				    ordinal = -2;
+				} else {
+				    m->val.number = BPI * i + k;
+				    return;
+				}
 			    }
 			} else {
 			    if (!ambig++) {
@@ -1720,12 +1892,12 @@ static void singular_check_functions P3(int, which, parse_state_t *, state,
 				    m->token = ERROR_TOKEN;
 				} else {
 				    was_error = 0;
-				    match = 32 * i + k;
+				    match = BPI * i + k;
 				}
 			    }
 			}
 		    } else {
-			if (has_ordinal && --ord2 == 0) {
+			if (has_ordinal && (ordinal == -1 || --ord2 == 0)) {
 			    free_parser_error(&second_parallel_error_info);
 			    second_parallel_error_info = parallel_error_info;
 			    parallel_error_info.error_type = 0;
@@ -1752,21 +1924,14 @@ static void singular_check_functions P3(int, which, parse_state_t *, state,
 	    return;
 	if (state->num_errors++ == 0) {
 	    free_parser_error(&current_error_info);
-	    if (ambig > 1) {
-		current_error_info.error_type = ERR_AMBIG;
-		bitvec_copy(&current_error_info.err.obs, &m->val.obs);
-		return;
-	    }
-	    /* We know there was something in the bitvec, so if we are here,
-	     * we got back 0 for all objects; nothing makes sense.
-	     */
-	    /* FIXME: Wrong error message.  There is one/are some, they 
-	       just don't work.  Hopefully we don't get here anymore. */
-	    current_error_info.error_type = ERR_THERE_IS_NO;
-	    current_error_info.err.str_problem.start = m->first;
-	    current_error_info.err.str_problem.end = m->last;
+
+	    current_error_info.error_type = ERR_AMBIG;
+	    bitvec_copy(&current_error_info.err.obs, &m->val.obs);
+	    return;
 	}
     } else {
+	if (ordinal == -2) return;
+	
 	m->token = ERROR_TOKEN;
 	if (state->num_errors++ == 0) {
 	    free_parser_error(&current_error_info);
@@ -1776,7 +1941,7 @@ static void singular_check_functions P3(int, which, parse_state_t *, state,
 	    } else {
 		/* Didn't find enough; signal an ordinal error */
 		current_error_info.error_type = ERR_ORDINAL;
-		current_error_info.err.ord_error = -(bitvec_count(bv) + 1);
+		current_error_info.err.ord_error = bitvec_count(bv);
 	    }
 	}
     }
@@ -1796,8 +1961,8 @@ static void plural_check_functions P3(int, which, parse_state_t *, state,
 	    k = 0;
 	    while (j) {
 		if (bv->b[i] & j) {
-		    int ret = parallel_check_functions(loaded_objects[32 * i + k], state, which);
-		    if (!ret || save_last_parallel_error(32 * i + k))
+		    int ret = parallel_check_functions(loaded_objects[BPI * i + k], state, which);
+		    if (!ret || save_last_parallel_error(BPI * i + k))
 			bv->b[i] &= ~j;
 		    else
 			found_one = 1;
@@ -1815,7 +1980,6 @@ static void we_are_finished P1(parse_state_t *, state) {
     char func[256];
     char *p;
     int which, mtch;
-    int local_error;
     int try, args;
     
     DEBUG_INC;
@@ -1830,14 +1994,21 @@ static void we_are_finished P1(parse_state_t *, state) {
 	return;
     }
     if (state->num_errors) {
-	local_error = 0;
-	if (state->num_errors > best_num_errors) return;
+	if (state->num_errors > best_num_errors) {
+	    DEBUG_DEC;
+	    return;
+	}
 	if (state->num_errors == best_num_errors
-	    && parse_vn->weight < best_error_match) return;
-    } else local_error = 1; /* if we have an error, it was local */
+	    && parse_vn->weight < best_error_match) {
+	    DEBUG_DEC;
+	    return;
+	}
+    }
 
-    if (!check_functions(parse_user, state))
+    if (!check_functions(parse_user, state)) {
+	DEBUG_DEC;
 	return;
+    }
 
     clear_parallel_errors(&parallel_errors);
     which = 1;
@@ -1885,8 +2056,10 @@ static void we_are_finished P1(parse_state_t *, state) {
 	if (best_result) free_parse_result(best_result);
 	best_result = ALLOCATE(parse_result_t, TAG_PARSER, "we_are_finished");
 	clear_result(best_result);
-	if (parse_vn->handler->flags & O_DESTRUCTED)
+	if (parse_vn->handler->flags & O_DESTRUCTED) {
+	    DEBUG_DEC;
 	    return;
+	}
 	best_result->ob = parse_vn->handler;
 	best_result->parallel = parallel_errors;
 	parallel_errors = 0;
@@ -1903,7 +2076,8 @@ static void we_are_finished P1(parse_state_t *, state) {
 		sp -= args;
 	    }
 	}
-	DEBUG_P(("Saving successful match: %s", best_result->res[0].func));
+	DEBUG_P(("Saving successful match: %s (%s)", best_result->res[0].func,
+		 best_result->ob->name));
     }
     DEBUG_DEC;
 }
@@ -1916,6 +2090,7 @@ static void do_the_call PROT((void)) {
 	if (ob->flags & O_DESTRUCTED) return;
 	n = best_result->res[i].num;
 	if (n) {
+	    CHECK_STACK_OVERFLOW(n);
 	    memcpy((char *)(sp + 1), best_result->res[i].args, n*sizeof(svalue_t));
 	    /*
 	     * Make sure we haven't dumped any dested obs onto the stack;
@@ -1924,7 +2099,7 @@ static void do_the_call PROT((void)) {
 	    while (n--) {
 		if ((++sp)->type == T_OBJECT && (sp->u.ob->flags & O_DESTRUCTED)) {
 		    free_object(sp->u.ob, "do_the_call");
-		    *sp = const0;
+		    *sp = const0u;
 		}
 	    }
 	    FREE(best_result->res[i].args);
@@ -2014,6 +2189,7 @@ static void parse_rule P1(parse_state_t *, state) {
 	    state->word_index++;
 	    DEBUG_P(("Trying WRD match"));
 	    parse_rule(state);
+	    DEBUG_DEC;
 	    return;
 	default:
 	    if (literals[-(tok + 1)] == words[state->word_index].string) {
@@ -2181,7 +2357,8 @@ static void parse_sentence P1(char *, input) {
     char *starts[MAX_WORDS_PER_LINE];
     char *orig_starts[MAX_WORDS_PER_LINE];
     char *orig_ends[MAX_WORDS_PER_LINE];
-    char c, buf[MAX_WORD_LENGTH], *p, *start, *inp;
+    char buf[MAX_WORD_LENGTH], *p, *start;
+    unsigned char c, *inp;
     char *end = EndOf(buf) - 1; /* space for zero */
     int n = 0;
     int i;
@@ -2244,8 +2421,12 @@ static void parse_sentence P1(char *, input) {
 	else
 	    orig_ends[0] = inp - 2;
     }
-    starts[n] = p;
-    *p = 0;
+    if (p > end) {
+	starts[n] = end;
+    } else {
+	starts[n] = p;
+	*p = 0;
+    }
 
     /* find an interpretation, first word must be shared (verb) */
     for (i = 1; i <= n; i++) {
@@ -2287,7 +2468,7 @@ static svalue_t * get_the_error P2(parser_error_t *, err, int, obj) {
     err->error_type = 0;
     push_number(tmp);
     if (obj == -1 || (loaded_objects[obj]->flags & O_DESTRUCTED))
-	push_number(0);
+	push_undefined();
     else
 	push_object(loaded_objects[obj]);
     
@@ -2351,7 +2532,8 @@ void f_parse_sentence PROT((void)) {
 #endif
     }
 
-    (++sp)->type = T_ERROR_HANDLER;
+    STACK_INC;
+    sp->type = T_ERROR_HANDLER;
     sp->u.error_handler = free_parse_globals;
 
     parse_user = current_object;
@@ -2400,7 +2582,8 @@ void f_parse_my_rules PROT((void)) {
     if (pi)
 	error("Illegal to call parse_sentence() recursively.\n");
     
-    (++sp)->type = T_ERROR_HANDLER;
+    STACK_INC;
+    sp->type = T_ERROR_HANDLER;
     sp->u.error_handler = free_parse_globals;
 
     parse_user = (sp-2)->u.ob;
@@ -2426,7 +2609,7 @@ void f_parse_my_rules PROT((void)) {
 		while (n--) {
 		    if (arr->item[n].type == T_OBJECT && arr->item[n].u.ob->flags & O_DESTRUCTED) {
 			free_object(arr->item[n].u.ob, "parse_my_rules");
-			arr->item[n] = const0;
+			arr->item[n] = const0u;
 		    }
 		}
 		FREE(best_result->res[3].args);
@@ -2494,6 +2677,9 @@ void f_parse_add_rule() {
 	error("/%s is not known by the parser.  Call parse_init() first.\n",
 	      handler->name);
 
+    /* We need the literals */
+    interrogate_master();
+
     /* Create the rule */
     make_rule(rule, tokens, &weight);
 
@@ -2551,9 +2737,9 @@ void f_parse_add_rule() {
     verb_node->next = verb_entry->node;
     verb_entry->node = verb_node;
 
-    ret = apply("livings_are_remote", handler, 0, ORIGIN_DRIVER);
+    ret = apply(LIVINGS_ARE_REMOTE, handler, 0, ORIGIN_DRIVER);
     if (!IS_ZERO(ret))
-        handler->pinfo->flags |=PI_REMOTE_LIVINGS;
+        handler->pinfo->flags |= PI_REMOTE_LIVINGS;
 
     /* return */
     free_string_svalue(sp--);

@@ -10,10 +10,8 @@
 #define SUPPRESS_COMPILER_INLINES
 #include "std.h"
 #include "lpc_incl.h"
-#include "trees.h"
 #include "compiler.h"
 #include "opcodes.h"
-#include "lex.h"
 
 /* our globals */
 static parse_node_block_t *parse_block_list = 0;
@@ -325,7 +323,7 @@ parse_node_t *insert_pop_value P1(parse_node_t *, expr) {
 	case F_MEMBER:
 	    expr = insert_pop_value(expr->r.expr);
 	    return expr;
-	case F_LOCAL: case F_GLOBAL:
+	case F_LOCAL: case F_GLOBAL: case F_REF:
 	    return 0;
 	case F_EQ: case F_NE: case F_GT: case F_GE: case F_LT: case F_LE:
 	    yywarn("Value of conditional expression is unused");

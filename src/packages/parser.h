@@ -191,7 +191,7 @@ typedef struct saved_error_s {
     int obj;
 } saved_error_t;
 
-struct mu {
+struct ms {
     bitvec_t obs;
     int number;
 };
@@ -200,7 +200,7 @@ typedef struct {
     short token;
     short first, last;
     short ordinal;
-    struct mu val;
+    struct ms val;
 } match_t;
 
 typedef struct {

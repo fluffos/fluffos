@@ -164,7 +164,7 @@ void f_db_exec PROT((void)) {
  *     rows = db_exec(dbconn, "SELECT player_name from t_player");
  *     if( !rows ) write("No rows returned.");
  *     else if( stringp(rows) ) write(rows); 
- *     for(i=1; i<=rows; i++) {
+ *     else for(i=1; i<=rows; i++) {
  *         res = db_fetch(dbconn, i);
  *         write(res[0]);
  *     }
@@ -217,16 +217,21 @@ void f_db_fetch PROT((void)) {
 	else {
 	    switch(this_field->type) {
 	        case INT_TYPE:
+		case UINT_TYPE:
 		  v->item[i].type = T_NUMBER;
 		  v->item[i].u.number = atoi(this_row[i]);
 		  break;
 		  
 	        case REAL_TYPE:
+		case MONEY_TYPE:
 		  v->item[i].type = T_REAL;
 		  v->item[i].u.real = atof(this_row[i]);
 		  break;
 		
 	        case CHAR_TYPE:
+		case TEXT_TYPE:
+		case DATE_TYPE:
+		case TIME_TYPE:
 		  v->item[i].type = T_STRING;
 		  v->item[i].subtype = STRING_MALLOC;
 		  v->item[i].u.string = string_copy(this_row[i], "f_db_fetch");
@@ -304,7 +309,8 @@ void create_db_conn P1(int, sock) {
         db_t *tmp;
 
 	tmp = dbConnList;
-	while( tmp->next != (db_t *)NULL );
+	while( tmp->next != (db_t *)NULL )
+	    tmp = tmp->next;
 	tmp->next = db;
 	db->prior = tmp;
     }

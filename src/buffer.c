@@ -1,6 +1,8 @@
 /* buffer.c for MudOS 0.9.x by John Garnett, 1993/11/07 */
 
 #include "std.h"
+
+#ifndef NO_BUFFER_TYPE
 #include "crctab.h"
 #include "lpc_incl.h"
 #include "stralloc.h"
@@ -35,7 +37,7 @@ allocate_buffer P1(int, size)
 {
     buffer_t *buf;
 
-#ifndef DISALLOW_BUFFER_TYPE
+#ifndef NO_BUFFER_TYPE
     if ((size < 0) || (size > max_buffer_size)) {
 	error("Illegal buffer size.\n");
     }
@@ -108,3 +110,4 @@ read_buffer P4(buffer_t *, b, int, start, int, len, int *, rlen)
 
     return str;
 }				/* read_buffer() */
+#endif

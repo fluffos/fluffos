@@ -3,7 +3,6 @@
 #include "file_incl.h"
 #include "otable.h"
 #include "backend.h"
-#include "debug.h"
 #include "comm.h"
 #include "swap.h"
 #include "socket_efuns.h"
@@ -11,6 +10,7 @@
 #include "port.h"
 #include "file.h"
 #include "hash.h"
+#include "master.h"
 
 #define too_deep_save_error() \
     error("Mappings and/or arrays nested too deep (%d) for save_object\n",\
@@ -24,6 +24,9 @@ INLINE_STATIC int restore_array PROT((char **str, svalue_t *));
 INLINE_STATIC int restore_class PROT((char **str, svalue_t *));
 int restore_hash_string PROT((char **str, svalue_t *));
 
+#ifdef F_SET_HIDE
+int num_hidden = 0;
+
 INLINE int
 valid_hide P1(object_t *, obj)
 {
@@ -36,14 +39,14 @@ valid_hide P1(object_t *, obj)
     ret = apply_master_ob(APPLY_VALID_HIDE, 1);
     return (!IS_ZERO(ret));
 }
-
+#endif
 
 int save_svalue_depth = 0, max_depth;
 int *sizes = 0;
 
 INLINE int svalue_save_size P1(svalue_t *, v)
 {
-    switch(v->type){
+    switch(v->type) {
     case T_STRING:
 	{
 	    register char *cp = v->u.string;
@@ -112,13 +115,13 @@ INLINE int svalue_save_size P1(svalue_t *, v)
     case T_REAL:
 	{
 	    char buf[256];
-	    sprintf(buf, "%#g", v->u.real);
+	    sprintf(buf, "%f", v->u.real);
 	    return (int)(strlen(buf)+1);
 	}
 
     default:
 	{
-	    return 2;
+	    return 1;
 	}
     }
 }
@@ -198,7 +201,7 @@ INLINE void save_svalue P2(svalue_t *, v, char **, buf)
 
     case T_REAL:
 	{
-	    sprintf(*buf, "%#g", v->u.real);
+	    sprintf(*buf, "%f", v->u.real);
 	    (*buf) += strlen(*buf);
 	    return;
 	}
@@ -505,6 +508,10 @@ static int parse_numeric P3(char **, cpp, char, c, svalue_t *, dest)
 	float f1 = 0.0, f2 = 10.0;
 
 	c = *cp++;
+	if (!c) {
+	    cp--;
+	    c = '0';
+	}
 	if (!isdigit(c)) return 0;
 	
 	do {
@@ -1126,12 +1133,14 @@ static int fgv_recurse P4(program_t *, prog, int *, idx,
     int i;
     for (i = 0; i < prog->num_inherited; i++) {
 	if (fgv_recurse(prog->inherit[i].prog, idx, name, type)) {
-	    *type |= prog->inherit[i].type_mod;
+	    *type = DECL_MODIFY(prog->inherit[i].type_mod, *type);
+
 	    return 1;
 	}
     }
     for (i = 0; i < prog->num_variables_defined; i++) {
-	if (prog->variable_table[i] == name) {
+	if (prog->variable_table[i] == name &&
+	    !(prog->variable_types[i] & DECL_NOSAVE)) {
 	    *idx += i;
 	    *type = prog->variable_types[i];
 	    return 1;
@@ -1146,11 +1155,9 @@ int find_global_variable P3(program_t *, prog, char *, name,
     int idx = 0;
     char *str = findstring(name);
     
-    if (str && fgv_recurse(prog, &idx, str, type)) {
-	if (*type & NAME_PUBLIC)
-	    *type &= ~NAME_PRIVATE;
+    if (str && fgv_recurse(prog, &idx, str, type))
 	return idx;
-    }
+
     return -1;
 }
 
@@ -1171,6 +1178,8 @@ restore_object_from_buff P3(object_t *, ob, char *, theBuff,
  
         if ((tmp = strchr(buff, '\n'))) {
             *tmp = '\0';
+	    if (tmp > buff && tmp[-1] == '\r')
+		*(--tmp) = '\0';
             nextBuff = tmp + 1;
         } else {
             nextBuff = 0;
@@ -1185,7 +1194,7 @@ restore_object_from_buff P3(object_t *, ob, char *, theBuff,
         (void)strncpy(var, buff, space - buff);
         var[space - buff] = '\0';
 	idx = find_global_variable(current_object->prog, var, &t);
-        if (idx == -1 || t & NAME_STATIC)
+        if (idx == -1)
 	    continue;
 
         v = &sv[idx];
@@ -1231,12 +1240,12 @@ static int save_object_recurse P5(program_t *, prog, svalue_t **,
 				 save_zeros, f))
 	    return 0;
     }
-    if (type & NAME_STATIC) {
+    if (type & DECL_NOSAVE) {
 	(*svp) += prog->num_variables_defined;
 	return 1;
     }
     for (i = 0; i < prog->num_variables_defined; i++) {
-	if (prog->variable_types[i] & NAME_STATIC) {
+	if (prog->variable_types[i] & DECL_NOSAVE) {
 	    (*svp)++;
 	    continue;
 	}
@@ -1246,10 +1255,12 @@ static int save_object_recurse P5(program_t *, prog, svalue_t **,
 	*new_str = '\0';
 	p = new_str;
 	save_svalue((*svp)++, &p);
+	DEBUG_CHECK(p - new_str != theSize - 1, "Length miscalculated in save_object!");
 	/* FIXME: shouldn't use fprintf() */
 	if (save_zeros || new_str[0] != '0' || new_str[1] != 0) /* Armidale */
 	    if (fprintf(f, "%s %s\n", prog->variable_table[i], new_str) < 0) {
 		debug_perror("save_object: fprintf", 0);
+		FREE(new_str);
 		return 0;
 	    }
 	FREE(new_str);
@@ -1354,6 +1365,7 @@ save_variable P1(svalue_t *, var)
     *new_str = '\0';
     p = new_str;
     save_svalue(var, &p);
+    DEBUG_CHECK(p - new_str != theSize - 1, "Length miscalculated in save_variable");
     return new_str;
 }
 
@@ -1369,13 +1381,13 @@ static void cns_recurse P3(object_t *, ob, int *, idx, program_t *, prog) {
     int i;
     
     for (i = 0; i < prog->num_inherited; i++) {
-	if (prog->inherit[i].type_mod & NAME_STATIC)
+	if (prog->inherit[i].type_mod & DECL_NOSAVE)
 	    cns_just_count(idx, prog->inherit[i].prog);
 	else
 	    cns_recurse(ob, idx, prog->inherit[i].prog);
     }
     for (i = 0; i < prog->num_variables_defined; i++) {
-	if (!(prog->variable_types[i] & NAME_STATIC)) {
+	if (!(prog->variable_types[i] & DECL_NOSAVE)) {
 	    free_svalue(&ob->variables[*idx + i], "cns_recurse");
 	    ob->variables[*idx + i] = const0u;
 	}
@@ -1452,10 +1464,8 @@ int restore_object P3(object_t *, ob, char *, file, int, noclear)
     
     restore_object_from_buff(ob, theBuff, noclear);
     current_object = save;
-#ifdef DEBUG
-    if (d_flag > 1)
-        debug_message("Object /%s restored from /%s.\n", ob->name, file);
-#endif
+    debug(d_flag, ("Object /%s restored from /%s.\n", ob->name, file));
+
     FREE(theBuff);
     return 1;
 }
@@ -1496,16 +1506,16 @@ void tell_npc P2(object_t *, ob, char *, str)
  * goes to catch_tell unless the target of tell_object is interactive
  * and is the current_object in which case it is written via add_message().
  */
-void tell_object P2(object_t *, ob, char *, str)
+void tell_object P3(object_t *, ob, char *, str, int, len)
 {
     if (!ob || (ob->flags & O_DESTRUCTED)) {
-	add_message(0, str);
+	add_message(0, str, len);
 	return;
     }
     /* if this is on, EVERYTHING goes through catch_tell() */
 #ifndef INTERACTIVE_CATCH_TELL
     if (ob->interactive)
-	add_message(ob, str);
+	add_message(ob, str, len);
     else
 #endif
 	tell_npc(ob, str);
@@ -1513,14 +1523,8 @@ void tell_object P2(object_t *, ob, char *, str)
 
 void dealloc_object P2(object_t *, ob, char *, from)
 {
-#ifndef NO_ADD_ACTION
-    sentence_t *s;
-#endif
+    debug(d_flag, ("free_object: /%s.\n", ob->name));
 
-#ifdef DEBUG
-    if (d_flag)
-	debug_message("free_object: /%s.\n", ob->name);
-#endif
     if (!(ob->flags & O_DESTRUCTED)) {
 	/* This is fatal, and should never happen. */
 	fatal("FATAL: Object 0x%x /%s ref count 0, but not destructed (from %s).\n",
@@ -1540,24 +1544,13 @@ void dealloc_object P2(object_t *, ob, char *, from)
 	free_prog(ob->prog, 1);
 	ob->prog = 0;
     }
-#ifndef NO_ADD_ACTION
-    for (s = ob->sent; s;) {
-	sentence_t *next;
-	
-	next = s->next;
-	free_sentence(s);
-	s = next;
-    }
-#endif
 #ifdef PRIVS
     if (ob->privs)
 	free_string(ob->privs);
 #endif
     if (ob->name) {
-#ifdef DEBUG
-	if (d_flag > 1)
-	    debug_message("Free object /%s\n", ob->name);
-#endif
+	debug(d_flag, ("Free object /%s\n", ob->name));
+
 	DEBUG_CHECK1(lookup_object_hash(ob->name) == ob,
 		     "Freeing object /%s but name still in name table", ob->name);
 	FREE(ob->name);
@@ -1627,10 +1620,12 @@ object_t *find_living_object P2(char *, str, int, user)
     hl = &hashed_living[hash_living_name(str)];
     for (obp = hl; *obp; obp = &(*obp)->next_hashed_living) {
 	search_length++;
+#ifdef F_SET_HIDE
 	if ((*obp)->flags & O_HIDDEN) {
 	    if (!valid_hide(current_object))
 		continue;
 	}
+#endif
 	if (user && !((*obp)->flags & O_ONCE_INTERACTIVE))
 	    continue;
 	if (!((*obp)->flags & O_ENABLE_COMMANDS))
@@ -1733,17 +1728,18 @@ void call_create P2(object_t *, ob, int, num_arg)
     ob->flags |= O_RESET_STATE;
 }
 
+#ifdef F_SET_HIDE
 INLINE int object_visible P1(object_t *, ob)
 {
     if (ob->flags & O_HIDDEN) {
-	if (current_object->flags & O_HIDDEN) {
+	if (current_object->flags & O_HIDDEN)
 	    return 1;
-	}
+
 	return valid_hide(current_object);
-    } else {
+    } else
 	return 1;
-    }
 }
+#endif
 
 void reload_object P1(object_t *, obj)
 {
@@ -1755,7 +1751,7 @@ void reload_object P1(object_t *, obj)
 	free_svalue(&obj->variables[i], "reload_object");
 	obj->variables[i] = const0u;
     }
-#ifdef PACKAGE_SOCKETS
+#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
     if (obj->flags & O_EFUN_SOCKET) {
 	close_referencing_sockets(obj);
     }
@@ -1810,4 +1806,36 @@ void reload_object P1(object_t *, obj)
 #endif
 #endif
     call_create(obj, 0);
+}
+
+void get_objects P4(object_t ***, list, int *, size, get_objectsfn_t, callback, void *, data)
+{
+    object_t *ob;
+#ifdef F_SET_HIDE
+    int display_hidden = 0;
+
+    if (num_hidden > 0) {
+	if (current_object->flags & O_HIDDEN) {
+	    display_hidden = 1;
+	} else {
+	    display_hidden = valid_hide(current_object);
+	}
+    }
+    *list = (object_t **)new_string(((tot_alloc_object - (display_hidden ? 0 : num_hidden)) * sizeof(object_t *)) - 1, "get_objects");
+#else
+    *list = (object_t **)new_string((tot_alloc_object * sizeof(object_t *)) - 1, "get_objects");
+#endif
+
+    if (!list)
+	fatal("Out of memory!\n");
+    push_malloced_string((char *)*list);
+
+    for (*size = 0, ob = obj_list;  ob;  ob = ob->next_all) {
+#ifdef F_SET_HIDE
+	if (!display_hidden && (ob->flags & O_HIDDEN))
+	    continue;
+#endif
+	if (!callback || callback(ob, data))
+	    (*list)[(*size)++] = ob;
+    }
 }
