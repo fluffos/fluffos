@@ -1597,51 +1597,55 @@ void free_sentence P1(sentence_t *, p)
 
 void fatal P1V(const char *, fmt)
 {
-    static int in_fatal = 0;
-    char msg_buf[2049];
-    va_list args;
-    V_DCL(char *fmt);
-
-    if (in_fatal) {
-        debug_message("Fatal error while shutting down.  Aborting.\n");
-    } else {
-        in_fatal = 1;
-        V_START(args, fmt);
-        V_VAR(char *, fmt, args);
-        vsprintf(msg_buf, fmt, args);
-        va_end(args);
-        debug_message("******** FATAL ERROR: %s\nFluffOS driver attempting to exit gracefully.\n", msg_buf);
-        if (current_file)
-            debug_message("(occured during compilation of %s at line %d)\n", current_file, current_line);
-        if (current_object)
-            debug_message("(current object was /%s)\n", current_object->obname);
-        
-        dump_trace(1);
-        
+  static int in_fatal = 0;
+  char msg_buf[2049];
+  va_list args;
+  V_DCL(char *fmt);
+  
+  switch (in_fatal) {
+  default:
+    debug_message("Fatal error while shutting down.  Aborting.\n");
+    break;
+  case 0:
+    in_fatal = 1;
+    V_START(args, fmt);
+    V_VAR(char *, fmt, args);
+    vsprintf(msg_buf, fmt, args);
+    va_end(args);
+    debug_message("******** FATAL ERROR: %s\nFluffOS driver attempting to exit gracefully.\n", msg_buf);
+    if (current_file)
+      debug_message("(occured during compilation of %s at line %d)\n", current_file, current_line);
+    if (current_object)
+      debug_message("(current object was /%s)\n", current_object->obname);
+    
+    dump_trace(1);
+    
 #ifdef PACKAGE_MUDLIB_STATS
         save_stat_files();
 #endif
-        copy_and_push_string(msg_buf);
-        push_object(command_giver);
-        push_object(current_object);
-        safe_apply_master_ob(APPLY_CRASH, 3);
-        debug_message("crash() in master called successfully.  Aborting.\n");
-    }
-    /* Make sure we don't trap our abort() */
+  case 1:
+    in_fatal = 2;
+    copy_and_push_string(msg_buf);
+    push_object(command_giver);
+    push_object(current_object);
+    safe_apply_master_ob(APPLY_CRASH, 3);
+    debug_message("crash() in master called successfully.  Aborting.\n");
+  }
+  /* Make sure we don't trap our abort() */
 #ifdef SIGABRT
-    signal(SIGABRT, SIG_DFL);
+  signal(SIGABRT, SIG_DFL);
 #endif
 #ifdef SIGILL
-    signal(SIGILL, SIG_DFL);
+  signal(SIGILL, SIG_DFL);
 #endif
 #ifdef SIGIOT
-    signal(SIGIOT, SIG_DFL);
+  signal(SIGIOT, SIG_DFL);
 #endif
-    
+  
 #if !defined(DEBUG_NON_FATAL) || !defined(DEBUG)
-    abort();
+  abort();
 #endif
-    in_fatal = 0;
+  in_fatal = 0;
 }
 
 static int num_error = 0;

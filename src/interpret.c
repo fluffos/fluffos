@@ -4069,7 +4069,8 @@ int apply_low P3(const char *, fun, object_t *, ob, int, num_arg)
    * these.
    */
 #ifndef NO_SHADOWS
-  while (ob->shadowed && ob->shadowed != current_object)
+  while (ob->shadowed && ob->shadowed != current_object && 
+	 (!(ob->shadowed->flags & O_DESTRUCTED)))
     ob = ob->shadowed;
  retry_for_shadow:
 #endif
