@@ -1,11 +1,6 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
-new in FluffOS 1.13
-fixed crasher in global_ref_list cleanup (just the crasher, i suspect the 
-	list is borken as well
-added base_name() efun
-
 new in FluffOS 1.12
 updated with respect to MudOS v22.2b12
 removed some mixing of signed and unsigned chars

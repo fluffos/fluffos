@@ -123,32 +123,34 @@ int too_deep_error = 0, max_eval_error = 0;
 ref_t *global_ref_list = 0;
 
 void kill_ref P1(ref_t *, ref) {
-    if (ref->sv.type == T_MAPPING && (ref->sv.u.map->count & MAP_LOCKED)) {
-  ref_t *r = global_ref_list;
-  
-  /* if some other ref references this mapping, it needs to remain
-     locked */
-  while (r) {
+  if (ref->sv.type == T_MAPPING && (ref->sv.u.map->count & MAP_LOCKED)) {
+    ref_t *r = global_ref_list;
+    
+    /* if some other ref references this mapping, it needs to remain
+       locked */
+    while (r) {
       if (r->sv.u.map == ref->sv.u.map)
-    break;
+	break;
       r = r->next;
-  }
-  if (!r)
+    }
+    if (!r)
       unlock_mapping(ref->sv.u.map);
-    }
-    free_svalue(&ref->sv, "kill_ref");
-    if(ref->next)
-      ref->next->prev = ref->prev;
-    if(ref->prev)
-      ref->prev->next = ref->next;
-    else
+  }
+  free_svalue(&ref->sv, "kill_ref");
+  if(ref->next)
+    ref->next->prev = ref->prev;
+  if(ref->prev)
+    ref->prev->next = ref->next;
+  else{
+    if(ref == global_ref_list)
       global_ref_list = ref->next;
-    if (ref->ref > 0) {
-  /* still referenced */
-  ref->lvalue = 0;
-    } else {
-  FREE(ref);
-    }
+  }
+  if (ref->ref > 0) {
+    /* still referenced */
+    ref->lvalue = 0;
+  } else {
+    FREE(ref);
+  }
 }
 
 ref_t *make_ref PROT((void)) {
@@ -2013,8 +2015,8 @@ eval_instruction P1(char *, p)
   case F_KILL_REFS:
   {
       int num = EXTRACT_UCHAR(pc++);
-      
-      while (num--) 
+      //TODO check if num is really wrong, or something else is borken
+      while (--num) 
          kill_ref(global_ref_list);
       break;
   }

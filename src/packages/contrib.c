@@ -2135,3 +2135,35 @@ void f_query_num PROT((void)){
 
 #endif
       
+#ifdef F_BASE_NAME
+void f_base_name PROT((void)) {
+  char *name, *tmp;
+  int i;
+
+  if( sp->type == T_OBJECT ) {
+    if( sp->u.ob->flags & O_DESTRUCTED ) {
+      free_object( sp->u.ob, "f_base_name");
+      *sp = const0;
+      return;
+    }
+    name = (char *)add_slash(sp->u.ob->name);
+  } else {
+    name = string_copy( sp->u.string, "f_base_name: name");
+  }
+
+  pop_stack();
+
+  if( ( tmp = strchr( name, '#') ) != NULL ) {
+    char *ret;
+    i = tmp - name;
+    ret = new_string( i, "f_base_name: ret");
+    ret[i] = 0;
+    strncpy( ret, name, i );
+    FREE_MSTR(name);
+    push_malloced_string(ret);
+  } else {
+    push_malloced_string(name);
+  }
+
+} /* f_base_name() */
+#endif
