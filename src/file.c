@@ -71,10 +71,6 @@ extern char *sys_errlist[];
 extern int comp_flag;
 extern int max_array_size;
 
-#ifdef LATTICE
-#undef close
-#endif
-
 #if !defined(NeXT) && !defined(__386BSD__) && !defined(SunOS_5)
 extern int readlink PROT((char *, char *, int));
 extern int symlink PROT((char *, char *));

@@ -2,6 +2,7 @@
 #include "opcodes.h"
 #include "compiler_shared.h"
 #include "fp_defs.h"
+#include "icode.h"
 
 void dump_tree PROT((struct parse_node *, int));
 static struct parse_node *optimize_expr PROT((struct parse_node *));

@@ -542,20 +542,6 @@ i_update_forward_branch() {
 }
 
 void
-i_generate_continues() {
-  int next_addr;
-
-  /* traverse the linked list filling in the current_continue_address
-     required by each "continue" statement.
-     */
-  for (; current_continue_address > 0;
-       current_continue_address = next_addr) {
-    next_addr = read_short(current_continue_address);
-    upd_short(current_continue_address, CURRENT_PROGRAM_SIZE - current_continue_address);
-  }
-}
-
-void
 i_save_position() {
   push_address();
 }

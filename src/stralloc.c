@@ -266,7 +266,7 @@ free_string P1(char *, str)
 	return;
 
     b = findblock(str);		/* findblock moves str to head of hash chain */
-#ifndef	BUG_FREE
+#ifdef DEBUG
     if (!b) {
 	checked("free_string: not found in string table!", str);
 	return;

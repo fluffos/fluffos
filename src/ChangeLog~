@@ -1,8 +1,3 @@
-Mon Dec  5 12:14:46 EST 1994 (tim@handel.princeton.edu (Beek))
-	* raised patchlevel to v20.23
-	* __DIR__ now has a leading slash; "/u/b/beek/", not "u/b/beek"
-	* removed all LPC_OPTIMIZE_LOOPS ifdefs
-	* fixed a ref count bug in array + ({ })
 	* comm.c: fixed so "address server ip" in config file can be
 	  in dotted decimal (quad) form
 	* fixed sprintf("%n.ndfoo", whatever) to not truncate after

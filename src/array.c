@@ -671,24 +671,26 @@ struct vector *add_array P2(struct vector *, p, struct vector *, r)
     struct vector *d;		/* destination */
 
     /*
-     * have to be careful with size zero arrays because the could be
+     * have to be careful with size zero arrays because they could be
      * null_vector.  REALLOC(null_vector, ...) is bad :(
      */
     if (p->size == 0) {
 	struct vector *res;
 	free_vector(p);
-	if (r->ref > 1)
+	if (r->ref > 1) {
 	    res = slice_array(r, 0, r->size - 1);
-	else
+	    free_vector(r);
+	} else
 	    res = r;
 	return res;
     }
     if (r->size == 0) {
 	struct vector *res;
 	free_vector(r);
-	if (p->ref > 1)
+	if (p->ref > 1) {
 	    res = slice_array(p, 0, p->size - 1);
-	else
+	    free_vector(p);
+	} else
 	    res = p;
 	return res;
     }

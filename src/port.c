@@ -1,7 +1,10 @@
 #include "config.h"
 
 #include <stdio.h>
+#ifndef _AUX_SOURCE
+/* supposedly, memmove is prototyped here but isn't in any lib */
 #include <string.h>
+#endif
 #include <sys/types.h>
 #ifdef OS2
 #include <sys/timeb.h>

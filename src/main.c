@@ -19,6 +19,7 @@
 #include <amiga.h>
 #include <nsignal.h>
 #include <socket.h>
+#undef write
 #endif
 #if defined(sun)
 #include <alloca.h>
@@ -633,14 +634,14 @@ char *xalloc P1(int, size)
 	if (reserved_area) {
 	    FREE(reserved_area);
 	    p = "Temporarily out of MEMORY. Freeing reserve.\n";
-	    (void)write(1, p, strlen(p));
+	    write(1, p, strlen(p));
 	    reserved_area = 0;
 	    slow_shut_down_to_do = 6;
 	    return xalloc(size);/* Try again */
 	}
 	going_to_exit = 1;
 	p = "Totally out of MEMORY.\n";
-	(void)write(1, p, strlen(p));
+	write(1, p, strlen(p));
 	(void) dump_trace(0);
 	exit(2);
     }

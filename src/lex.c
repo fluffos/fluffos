@@ -178,8 +178,6 @@ static char defbuf[DEFMAX];
 static int nbuf;
 static char *outp;
 
-static int number PROT((int)), string PROT((char *));
-static int real PROT((double));
 static void handle_define PROT((char *));
 static void free_defines PROT((void));
 static void add_define PROT((char *, int, char *, int));
@@ -787,7 +785,7 @@ static void skip_line()
 static void skip_comment()
 {
     int comment_start;
-    int c = '/';
+    int c = '*';
 
     for (;;) {
 	while ((comment_start = c, c = mygetc()) != '*') {
@@ -1286,7 +1284,7 @@ static int yylex1()
 		    rc = get_text_block(terminator);
 
 		    if (rc > 0) {
-			int n, t;
+			int n;
 
 			/*
 			 * make string token and clean up
@@ -1313,14 +1311,12 @@ static int yylex1()
 		c = mygetc();
 		if (c == EOF) {
 		    lexerror("End of file in string");
-		    yylval.string = "";
-		    return L_STRING;
+		    return EOF;
 		}
 #if 0
 		else if (c == '\n') {
 		    lexerror("Newline in string");
-		    yylval.string = "";
-		    retur L_STRING;
+		    return EOF;
 		}
 #endif
 		SAVEC;
@@ -1667,8 +1663,8 @@ void start_new_file P1(FILE *, f)
 	char *dir;
 	char *tmp;
 
-	dir = (char *) DMALLOC(strlen(current_file) + 3, 64, "start_new_file");
-	sprintf(dir, "\"%s\"", current_file);
+	dir = (char *) DMALLOC(strlen(current_file) + 4, 64, "start_new_file");
+	sprintf(dir, "\"/%s\"", current_file);
 	add_define("__FILE__", -1, dir, 0);
 	tmp = strrchr(dir, '/');
 	if (tmp) {
@@ -2101,6 +2097,8 @@ static void free_defines()
 		break;
 	    }
 	    q = p->next;
+	    FREE(p->name);
+	    FREE(p->exps);
 	    FREE((char *) p);
 	}
 	defns[i] = p;

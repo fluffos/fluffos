@@ -477,7 +477,8 @@ int load_binary P1(char *, name)
 
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
 	/* rebuild function table tree */
-	add_function(p->p.i.functions, &p->p.i.tree_r, i);
+	if (!(p->p.i.functions[i].flags & (NAME_COLON_COLON | NAME_ALIAS)))
+	    add_function(p->p.i.functions, &p->p.i.tree_r, i);
 #endif
     }
 

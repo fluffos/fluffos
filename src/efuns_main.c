@@ -2813,6 +2813,16 @@ f_bufferp P2(int, num_arg, int, instruction)
 void
 f_swap P2(int, num_arg, int, instruction)
 {
+    struct object *ob = sp->u.ob;
+    extern struct control_stack control_stack[MAX_TRACE];
+    struct control_stack *p;
+
+    /* a few sanity checks */
+    if (ob->flags & O_SWAPPED) return;
+    if (ob == current_object) return;
+    for (p = csp; p >= control_stack; p--)
+	if (ob == csp->ob) return;
+
     (void) swap(sp->u.ob);
 }
 #endif

@@ -1558,6 +1558,7 @@ void make_package_makefile() {
     /* Have to make clean first so that the Makefile can use packages/*.o */
     fprintf(f1, "all: clean $(OBJ)\n\nclean:\n\t-rm *.o\n");
     fprintf(f2, "all: clean $(OBJDIR) $(OBJ)\n\n$(OBJDIR):\n\t-mkdir $(OBJDIR)\n\nclean:\n\t-rm $(OBJDIR)/*.o\n");
+    fprintf(f3, "all: $(OBJ)\n\nclean:\n\t-delete \\#?.o\n");
     fclose(f1);
     fclose(f2);
     fclose(f3);

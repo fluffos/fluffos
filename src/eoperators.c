@@ -1074,6 +1074,15 @@ push_refed_funp P1(struct funp *, fp)
 }
 
 INLINE void
+push_funp P1(struct funp *, fp)
+{
+    sp++;
+    sp->type = T_FUNCTION;
+    sp->u.fp = fp;
+    fp->ref++;
+}
+
+INLINE void
 free_funp P1(struct funp *, fp)
 {
     fp->ref--;

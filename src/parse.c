@@ -1462,11 +1462,11 @@ check_adjectiv P4(int, obix, struct vector *, wvec, int, from, int, to)
 		continue;
 	    else {
 		il = back + 1;	/* Match "adj[il] adj[il+1] .. adj[back]" */
-		back = 0;
+		back = to;
 		break;
 	    }
 	}
-	if (back) {
+	if (back < to) {
 	    FREE(adstr);	/* adj[il] does not match at all => no match */
 	    return 0;
 	}

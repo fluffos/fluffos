@@ -472,7 +472,7 @@
 #define EVALUATOR_STACK_SIZE 1000	/* get_config_int(4)  */
 #define COMPILER_STACK_SIZE 200	/* get_config_int(5)  */
 #define MAX_TRACE 30		/* get_config_int(6)  */
-#define LIVING_HASH_SIZE 101	/* get_config_int(20) */
+#define LIVING_HASH_SIZE 256	/* get_config_int(20) */
 
 /* NEXT_MALLOC_DEBUG: define this if using a NeXT and you want to enable
  *   the malloc_check() and/or malloc_debug() efuns.  Run the 'man malloc_debug'

@@ -168,8 +168,9 @@ YFLAGS = -d -y
  
 # A/UX: may be required for Apple's UNIX (and possibly others).  Try
 # uncommenting this if the make results in link errors seemingly related
-# to yacc (e.g. undefined symbol "yyerror").
+# to yacc (e.g. undefined symbol "yyerror").  May also need -lbsd.
 #EXTRALIBS=-ly
+#EXTRALIBS=-ly -lbsd
  
 # HP-UX: use this EXTRALIBS line for HP-UX (required)
 #EXTRALIBS=-lBSD
@@ -331,19 +332,19 @@ neat:
 	-(cd packages; make clean)
 	-rm packages/GNUmakefile packages/Makefile packages/SMakefile
 	-rm -rf $(OBJDIR) *.o *.tab.c *.tab.h
-	-rm efun_defs.c option_defs.c
 	-rm -f cc.h
-	-rm -f option_defs.c
+	-rm -f efun_defs.c option_defs.c
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
-	-rm -f make_func make_malloc
+	-rm -f make_func make_malloc malloc.c
 	-rm -f func_spec.cpp
 	-rm -f lpc_compiler.y compiler.y
 	
 clean: neat
 	-rm -f mon.out gmon.out *.orig *.rej
+	-rm -f */*.orig */*.rej
 	-rm -f core
-	-rm -f *.ln tags *~ TAGS
-	-rm -f addr_server $(DRIVER_BIN) $(DRIVER_BIN).old
+	-rm -f *.ln tags */*~ *~ TAGS
+	-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old addr_server
 	-rm -f Dependencies
 	-touch Dependencies
 

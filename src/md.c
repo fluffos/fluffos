@@ -21,7 +21,7 @@
 
 static totals[MAX_CATEGORY];
 
-int malloc_mask = 0;
+int malloc_mask = 121;
 
 static node_t **table;
 unsigned int total_malloced = 0L;

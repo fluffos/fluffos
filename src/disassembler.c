@@ -302,14 +302,12 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	    pc++;
 	    break;
 
-#ifdef LPC_OPTIMIZE_LOOPS
 	case I(F_LOOP_INCR):
 	    sprintf(buff, "LV%d", EXTRACT_UCHAR(pc));
 	    pc++;
 	    break;
 	case I(F_WHILE_DEC):
 	case I(F_LOOP_COND):
-#endif
 	case I(F_LOCAL):
 	case I(F_LOCAL_LVALUE):
 	    sprintf(buff, "LV%d", EXTRACT_UCHAR(pc));

@@ -1027,6 +1027,7 @@ char *scratch_join PROT((char *, char *));
 char *scratch_join2 PROT((char *, char *));
 char *scratch_realloc PROT((char *, int));
 char *scratch_copy_string PROT((char *));
+char *scratch_large_alloc PROT((int));
 
 /*
  * port.c

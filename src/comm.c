@@ -35,6 +35,8 @@
 #include <signal.h>
 #ifdef __SASC
 #include <nsignal.h>
+#endif
+#if defined(_AUX_SOURCE) || defined(__SASC)
 #include "telnet.h"
 #endif
 #ifndef LATTICE
@@ -314,15 +316,22 @@ void init_addr_server P2(char *, hostname, int, addr_server_port)
     struct hostent *hp;
     int server_fd;
     int optval;
+    long addr;
 
     /*
      * get network host data for hostname.
      */
-    hp = gethostbyname(hostname);
+    if (hostname[0] >= '0' && hostname[0] <= '9' &&
+          (addr = inet_addr(&hostname[0])) != -1) {
+        hp = gethostbyaddr((char *)&addr, sizeof(addr), AF_INET);
+    } else {
+        hp = gethostbyname(hostname);
+    }
     if (hp == NULL) {
 	perror("init_addr_server: gethostbyname");
 	return;
     }
+
     /*
      * set up address information for server.
      */

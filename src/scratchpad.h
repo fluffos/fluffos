@@ -18,7 +18,7 @@
 #define SDEBUG(x) 
 #define SDEBUG2(x) 
 
-#define SCRATCH_MAGIC 0xbb
+#define SCRATCH_MAGIC ((char)0xbb)
 
 struct sp_block_t {
     struct sp_block_t *next, *prev;

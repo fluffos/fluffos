@@ -63,7 +63,7 @@
 #define NAME_ALIAS              0x40
 #define NAME_COLON_COLON        0x80
 
-/* only the flags should be copied up through inheritance levels */
+/* only the flags that should be copied up through inheritance levels */
 #define NAME_MASK (NAME_UNDEFINED | NAME_STRICT_TYPES | NAME_PROTOTYPE | NAME_COLON_COLON)
 /* a function that isn't 'real' */
 #define NAME_NO_CODE  (NAME_UNDEFINED | NAME_ALIAS)

@@ -1,7 +1,9 @@
 /* 92/04/18 - cleaned up in accordance with ./src/style.guidelines */
 
 #include <stdio.h>
+#ifdef LATTICE
 #include <stdlib.h>
+#endif
 #include <string.h>
 #ifdef sun
 #include <alloca.h>

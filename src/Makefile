@@ -184,8 +184,9 @@ YFLAGS = -d
  
 # A/UX: may be required for Apple's UNIX (and possibly others).  Try
 # uncommenting this if the make results in link errors seemingly related
-# to yacc (e.g. undefined symbol "yyerror").
+# to yacc (e.g. undefined symbol "yyerror").  May also need -lbsd.
 #EXTRALIBS=-ly
+#EXTRALIBS=-ly -lbsd
  
 # HP-UX: use this EXTRALIBS line for HP-UX
 #EXTRALIBS=-lBSD
@@ -359,7 +360,7 @@ neat:
 	-rm -f efun_defs.c
 	-rm -f cc.h
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
-	-rm -f make_func make_malloc
+	-rm -f make_func make_malloc malloc.c
 	-rm -f func_spec.cpp
 	-rm -f lpc_compiler.y compiler.y
 

@@ -1238,7 +1238,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 			int tmpl = strlen(temp);
 
 			if (pres && tmpl > pres)
-			    temp[pres] = '\0';	/* well.... */
+			    temp[tmpl = pres] = '\0';	/* well.... */
 			if (tmpl < fs)
 			    add_justified(temp, pad, fs, finfo,
 					  (((format_str[fpos] != '\n') && (format_str[fpos] != '\0'))

@@ -1,7 +1,9 @@
 #include "config.h"
 
 #include <string.h>
+#ifdef LATTICE
 #include <stdlib.h>
+#endif
 
 #include "lint.h"
 #include "scratchpad.h"
@@ -21,16 +23,21 @@
  */
 /* Here is what is currently being used:
  *
- * <0> string1 <len1> string2 <len2>
- *                    ^          ^
- *                    last      tail
+ * <0> <0> string1 <len1> string2 <len2>
+ *                        ^          ^
+ *                        last      tail
  *
  * len1 is the length of string1 including the zero at the end
+ *
+ * Note: "" looks a heck of alot like a interior freed string.  Currently,
+ * we ignore the problem.  In some cases, it could be left dangling, but
+ * I don't think that can happen with the present grammar/use of the
+ * scratchpad.
  */
 /*
  *  Todo: This algorithm might be faster if we aligned to 2 byte
  *  boundaries and used shorts for lengths.  We wouldn't have to
- *  worry about the 256 byte limit them
+ *  worry about the 256 byte limit then
  */
 /*
  * Within this file, a capitalized identifier is that var cast to an
@@ -51,15 +58,18 @@
 #define Strncpy(x, y, z) (strncpy((char *)x, (char *)y, z))
 
 /* not strictly ANSI, but should always work ... */
-#define HDR_SIZE ((char *)&scratch_head.block[2] - (char *)scratch_head.next)
+#define HDR_SIZE ((char *)&scratch_head.block[2] - (char *)&scratch_head.next)
 #define FIND_HDR(x) ((struct sp_block_t *)(x - HDR_SIZE))
 #define SIZE_WITH_HDR(x) (x + HDR_SIZE)
 
-static unsigned char scratchblock[SCRATCHPAD_SIZE] = { 0 };
+static unsigned char scratchblock[SCRATCHPAD_SIZE];
 static struct sp_block_t scratch_head = { 0, 0 };
-static unsigned char *scr_last = scratchblock, *scr_tail = scratchblock;
+static unsigned char *scr_last = &scratchblock[2], 
+                     *scr_tail = &scratchblock[2];
 
 #ifdef DEBUG
+static void scratch_summary PROT((void));
+
 static void scratch_summary() {
     unsigned char *p = scratchblock;
     int i;
@@ -91,8 +101,8 @@ void scratch_destroy() {
 	this = next;
     }
     scratch_head.next = 0;
-    scr_last = scratchblock;
-    scr_tail = scratchblock;
+    scr_last = &scratchblock[2];
+    scr_tail = &scratchblock[2];
 }
 
 
@@ -133,14 +143,13 @@ void scratch_free P1(char *, ptr) {
 
     SDEBUG2(printf("scratch_free(%s): ", ptr));
 
-    if (!(*ptr)) return;
     if (Ptr == scr_last) {
 	SDEBUG2(printf("last freed\n"));
 	scratch_free_last();
-    } else if (*(ptr - 2)) {
+    } else if (*(Ptr - 2)) {
 	struct sp_block_t *sbt;
 
-	DEBUG_CHECK(*(ptr - 2) != SCRATCH_MAGIC, "scratch_free called on non-scratchpad string.\n");
+	DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC, "scratch_free called on non-scratchpad string.\n");
 	SDEBUG(printf("block freed\n"));
 	sbt = FIND_HDR(ptr);
 	if (sbt->prev)
@@ -152,7 +161,7 @@ void scratch_free P1(char *, ptr) {
 	SDEBUG(printf("interior free\n"));
 	*ptr = 0; /* mark it as freed */
     }
-}    
+}
 
 char *scratch_large_alloc P1(int, size) {
     struct sp_block_t *spt;
@@ -185,14 +194,16 @@ char *scratch_realloc P2(char *, ptr, int, size) {
 	     scratch_free_last();
 	     return res;
 	 }
-     } else if (*(ptr - 2)) {
+     } else if (*(Ptr - 2)) {
 	 struct sp_block_t *sbt, *newsbt;
 
+	DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC, "scratch_free realloc on non-scratchpad string.\n");
 	 SDEBUG(printf("block\n"));
 	 sbt = FIND_HDR(ptr);
 	 newsbt = (struct sp_block_t *)REALLOC(sbt, SIZE_WITH_HDR(size));
 	 newsbt->prev->next = newsbt;
-	 newsbt->next->prev = newsbt;
+	 if (newsbt->next)
+	     newsbt->next->prev = newsbt;
 	 return (char *)&newsbt->block[2];
      } else {
 	 char *res;
@@ -205,12 +216,13 @@ char *scratch_realloc P2(char *, ptr, int, size) {
 	     Strcpy(scr_last, ptr);
 	     scr_tail = scr_last + size;
 	     *scr_tail = size;
+	     res = (char *)scr_last;
 	 } else {
 	     SDEBUG(printf("copy off ... "));
 	     res = scratch_large_alloc(size);
 	     strcpy(res, ptr);
 	 }
-	 *ptr = 0;
+	 *ptr = 0; /* free the old version */
 	 return res;
      }
 }
@@ -235,18 +247,27 @@ char *scratch_join P2(char *, s1, char *, s2) {
     if (*(s1-2) || *(s2-2)) {
 	int l = strlen(s1);
 
+	DEBUG_CHECK(*(S1 - 2) && *(S1 - 2) != SCRATCH_MAGIC, "argument 1 to scratch_join was not a scratchpad string.\n");
+	DEBUG_CHECK(*(S2 - 2) && *(S2 - 2) != SCRATCH_MAGIC, "argument 2 to scratch_join was not a scratchpad string.\n");
+
 	res = scratch_realloc(s1, l + strlen(s2) + 1);
 	strcpy(res + l, s2);
 	scratch_free(s2);
 	return res;
     } else {
+	/* This assumes that S1 and S2 were the last two things allocated.
+	   Make sure this is true */
+	DEBUG_CHECK(S2 != scr_last, "Argument 2 to scratch_join was not the last allocated string.\n");
+	DEBUG_CHECK(S1 != (scr_last - 1 - (*(scr_last - 1))), "Argument 1 to scratch_join was not the second to last allocated string.\n");
+
 	if ((tmp = (*scr_tail + (scr_last - S1) - 2)) < 256) {
-	    *scr_tail = tmp + 2;
+	    scr_tail = scr_last - 2;
 	    do {
-		*(scr_last - 2) = *scr_last;
-	    } while (*scr_last++);
+		*scr_tail = *(scr_tail + 2);
+	    } while (*scr_tail++);
+	    *scr_tail = tmp;
 	    scr_last = S1;
-	    return (char *)scr_last;
+	    return s1;
 	} else {
 	    char *ret = scratch_large_alloc(tmp);
 	    strcpy(ret, s1);
