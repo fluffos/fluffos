@@ -848,7 +848,7 @@ f_terminal_colour PROT((void))
                     curcolour[0] = 0;
 		    curcolourlen = 0;
 		} else {
-		    if (curcolourlen + strlen(p) < MAX_COLOUR_STRING) {
+		    if (curcolourlen + strlen(p) < MAX_COLOUR_STRING -1) {
                            strcat(curcolour, p);
 			   curcolourlen += strlen(p);
 		    }

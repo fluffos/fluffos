@@ -6,7 +6,7 @@ PROOF=
 STRFUNCS=
 INSTALL=install -c
 INSTALL_DIR=../bin
-OPTIMIZE=-O2 
+OPTIMIZE=-O2
 CPP=gcc -E
 CFLAGS=-D__USE_FIXED_PROTOTYPES__ -rdynamic
 #CC=gcc
@@ -79,7 +79,7 @@ SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   socket_efuns.c socket_ctrl.c qsort.c eoperators.c socket_err.c md.c \
   disassembler.c binaries.c ualarm.c $(STRFUNCS) \
   replace_program.c ccode.c cfuns.c compile_file.c master.c function.c \
-  debug.c crypt.c applies_table.c add_action.c
+  debug.c crypt.c applies_table.c add_action.c eval.c
 
 all: $(OBJDIR) cc.h files main_build
 

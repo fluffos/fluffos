@@ -17,6 +17,7 @@
 #include "compiler.h"
 #include "regexp.h"
 #include "master.h" 
+#include "eval.h"
 
 #ifdef OPCPROF
 #include "opc.h"
@@ -1907,20 +1908,10 @@ eval_instruction P1(char *, p)
     }
 #  endif
 #endif
-    // Decrease eval_cost by the amount of cpu nanoseconds used since we
-    // were last called.
-    if(eval_cost != -1) {
-      eval_cost -= (query_time_used() - time_used);
-      if(eval_cost < 0)
-        eval_cost = 0;
-    }
-    // Update time_used to the current time_used.
-    time_used = query_time_used();
-  
-    if (eval_cost == 0) {
-      debug_message("object /%s: eval_cost too big %d %d\n", 
-                    current_object->obname, eval_cost, max_cost);
-      eval_cost = max_cost;
+    if (outoftime) {
+      debug_message("object /%s: eval_cost too big %d\n", 
+                    current_object->obname, max_cost);
+      set_eval(max_cost);
       max_eval_error = 1;
       error("Too long evaluation. Execution aborted.\n");
     }

@@ -863,11 +863,6 @@
 #define PACKAGE_COMPRESS
 #define SAVE_GZ_EXTENSION ".o.gz"
 
-/* USE_FLUFF_MOD: use the fluff kernel module, this cuts most of the overhead
- * in the evaluation cost calculations (syscalls to get the time)
- */
-#undef USE_FLUFF_MOD
-
 /* CALL_OTHER_TYPE_CHECK: enable type checking for call_other()
  * (-> operator on objects)
  */

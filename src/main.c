@@ -15,6 +15,7 @@
 #include "compile_file.h"
 #include "socket_efuns.h"
 #include "master.h"
+#include "eval.h"
 
 port_def_t external_port[5];
 
@@ -312,8 +313,7 @@ int main P2(int, argc, char **, argv)
   init_addr_server(ADDR_SERVER_IP, ADDR_SERVER_PORT);
 #endif        /* NO_IP_DEMON */
 
-    eval_cost = max_cost; /* needed for create() functions */
-    time_used  = query_time_used();
+    set_eval(max_cost);
 
     save_context(&econ);
     if (SETJMP(econ.context)) {
@@ -599,7 +599,7 @@ static void CDECL PSIG(sig_usr1)
 /* Abort evaluation */
 static void CDECL PSIG(sig_usr2)
 {
-    eval_cost = 1;
+    outoftime = 1;
 }
 
 /*

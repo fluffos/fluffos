@@ -704,7 +704,7 @@
  *  to an actual interval of one (1) second and 1,000,001 - 2,000,000 maps to
  *  an actual interval of two (2) seconds, etc.]
  */
-#define HEARTBEAT_INTERVAL 2000000
+#define HEARTBEAT_INTERVAL 2
 
 /* 
  * CALLOUT_CYCLE_SIZE: This is the number of slots in the call_out list.
@@ -854,7 +854,6 @@
 #define HAVE_ZLIB
 #define PACKAGE_COMPRESS
 #define SAVE_GZ_EXTENSION ".o.gz"
-#define USE_FLUFF_MOD
 #undef CALL_OTHER_TYPE_CHECK 
 #define CALL_OTHER_WARN
 #define PACKAGE_DWLIB

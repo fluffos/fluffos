@@ -10,31 +10,23 @@
 #include "port.h"
 #include "lint.h"
 #include "master.h"
+#include "eval.h"
 
 #ifdef WIN32
 #include <process.h>
 void CDECL alarm_loop PROT((void *));
 #endif
 
-#ifdef USE_FLUFF_MOD
-#include <unistd.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#endif
 error_context_t *current_error_context = 0;
 
 /*
- * The 'current_time' is updated at every heart beat.
+ * The 'current_time' is updated in the call_out cycles
  */
 int current_time;
 
-int heart_beat_flag = 0;
-
 object_t *current_heart_beat;
 static void look_for_objects_to_swap PROT((void));
-static void call_heart_beat PROT((void));
+void call_heart_beat PROT((void));
 
 #if 0
 static void report_holes PROT((void));
@@ -90,132 +82,89 @@ void logon P1(object_t *, ob)
 /*
  * This is the backend. We will stay here for ever (almost).
  */
-int eval_cost;
-long time_used;
-#ifndef USE_FLUFF_MOD
-int query_time_used() {
-  long secs, usecs;
-  
-  get_cpu_times((unsigned long *) &secs, (unsigned long *) &usecs);
-  return (secs * 1000000) + usecs;
-}
-#else
-
-int *fluffpage = 0;
-
-int query_time_used() {
-  if(fluffpage)
-    return *fluffpage;
-  return 0;
-}
-#endif
-
 
 void backend()
 {
-    struct timeval timeout;
-    int i, nb;
-    volatile int first_call = 1;
-    int there_is_a_port = 0;
-    error_context_t econ;
-#ifdef USE_FLUFF_MOD
-    fluffpage = mmap(0, 4000, PROT_READ, MAP_SHARED, open("/dev/fluff", O_RDONLY), 0);
-    time_used = *fluffpage;
-#endif
-
-    debug_message("Initializations complete.\n\n");
-    for (i = 0; i < 5; i++) {
-  if (external_port[i].port) {
+  struct timeval timeout;
+  int i, nb;
+  volatile int first_call = 1;
+  int there_is_a_port = 0;
+  error_context_t econ;
+  
+  debug_message("Initializations complete.\n\n");
+  for (i = 0; i < 5; i++) {
+    if (external_port[i].port) {
       debug_message("Accepting connections on port %d.\n",
-        external_port[i].port);
+		    external_port[i].port);
       there_is_a_port = 1;
+    }
   }
-    }
-
-    if (!there_is_a_port)
-  debug_message("No external ports specified.\n");
-
-    init_user_conn();   /* initialize user connection socket */
+  
+  if (!there_is_a_port)
+    debug_message("No external ports specified.\n");
+  
+  init_user_conn();   /* initialize user connection socket */
 #ifdef SIGHUP
-    signal(SIGHUP, startshutdownMudOS);
+  signal(SIGHUP, startshutdownMudOS);
 #endif
-    clear_state();
-    save_context(&econ);
-    if (SETJMP(econ.context))
-  restore_context(&econ);
-    if (!t_flag && first_call) {
-  first_call = 0;
-  call_heart_beat();
-    }
-
-    while (1) { 
-  /* Has to be cleared if we jumped out of process_user_command() */
-  current_interactive = 0;
-  eval_cost = max_cost;
-
-  if (obj_list_replace || obj_list_destruct)
+  clear_state();
+  save_context(&econ);
+  if (SETJMP(econ.context))
+    restore_context(&econ);
+  if (!t_flag && first_call) {
+    first_call = 0;
+    call_heart_beat();
+  }
+  
+  while (1) { 
+    /* Has to be cleared if we jumped out of process_user_command() */
+    current_interactive = 0;
+    set_eval(max_cost);
+    
+    if (obj_list_replace || obj_list_destruct)
       remove_destructed_objects();
-
-  /*
-   * shut down MudOS if MudOS_is_being_shut_down is set.
-   */
-  if (MudOS_is_being_shut_down)
+    
+    /*
+     * shut down MudOS if MudOS_is_being_shut_down is set.
+     */
+    if (MudOS_is_being_shut_down)
       shutdownMudOS(0);
-  if (slow_shut_down_to_do) {
+    if (slow_shut_down_to_do) {
       int tmp = slow_shut_down_to_do;
-
+      
       slow_shut_down_to_do = 0;
       slow_shut_down(tmp);
-  }
-  /*
-   * select
-   */
-  make_selectmasks();
-  if (heart_beat_flag) {  /* use zero timeout if a heartbeat is
-         * pending. */
-      timeout.tv_sec = 0; /* this should avoid problems with longjmp's
-         * too */
-      timeout.tv_usec = 0;
-  } else {
-      /*
-       * not using infinite timeout so that we'll have insurance in the
-       * unlikely event a heartbeat happens between now and the
-       * select(). Note that SIGALRMs (for heartbeats) do make select()
-       * drop through. (Except on Windows)
-       */
-#ifdef WIN32
-      timeout.tv_sec = HEARTBEAT_INTERVAL/1000000;
-      timeout.tv_usec = HEARTBEAT_INTERVAL%1000000;
-#else
-      timeout.tv_sec = 60;
-      timeout.tv_usec = 0;
-#endif
-  }
-#ifndef hpux
-  nb = select(FD_SETSIZE, &readmask, &writemask, (fd_set *) 0, &timeout);
-#else
-  nb = select(FD_SETSIZE, (int *) &readmask, (int *) &writemask,
-        (int *) 0, &timeout);
-#endif
-  /*
-   * process I/O if necessary.
-   */
-  if (nb > 0) {
-      process_io();
-  }
-  /*
-   * process user commands.
-   */
-  for (i = 0; process_user_command() && i < max_users; i++)
-      ;
-
-  /*
-   * call heartbeat if appropriate.
-   */
-  if (heart_beat_flag)
-      call_heart_beat();
     }
+    /*
+     * select
+     */
+    make_selectmasks();
+    timeout.tv_sec = 1;
+#ifndef hpux
+    nb = select(FD_SETSIZE, &readmask, &writemask, (fd_set *) 0, &timeout);
+#else
+    nb = select(FD_SETSIZE, (int *) &readmask, (int *) &writemask,
+		(int *) 0, &timeout);
+#endif
+    /*
+     * process I/O if necessary.
+     */
+    if (nb > 0) {
+      process_io();
+    }
+    /*
+     * process user commands.
+     */
+    for (i = 0; process_user_command() && i < max_users; i++)
+      ;
+    
+    /*
+     * call outs
+     */
+    call_out();
+  }
 }       /* backend() */
+
 
 /*
  * Despite the name, this routine takes care of several things.
@@ -277,7 +226,7 @@ static void look_for_objects_to_swap()
   int ready_for_swap = 0;
   int ready_for_clean_up = 0;
 
-  eval_cost = max_cost;
+  set_eval(max_cost);
 
   if (ob->flags & O_DESTRUCTED)
       ob = obj_list;  /* restart */
@@ -400,103 +349,87 @@ void CDECL alarm_loop P1(void *, ignore)
 {
     while (1) {
   Sleep(HEARTBEAT_INTERVAL / 1000);
-  heart_beat_flag = 1;
     }
 }       /* alarm_loop() */
 #endif
 
-static void call_heart_beat()
+void call_heart_beat()
 {
-    object_t *ob;
-    heart_beat_t *curr_hb;
-    error_context_t econ;
-
+  object_t *ob;
+  heart_beat_t *curr_hb;
+  error_context_t econ;
+  
 #ifdef WIN32
-    static long Win32Thread = -1;
+  static long Win32Thread = -1;
+  if (Win32Thread == -1) Win32Thread = _beginthread(
+						    /* This shouldn't be necessary b/c alarm_loop is already declared as this.
+						       Microsoft lossage? -Beek */
+						    (void (__cdecl *)(void *))
+						    alarm_loop, 256, 0);
 #endif
-
-    heart_beat_flag = 0;
-#ifdef SIGALRM
-    signal(SIGALRM, sigalrm_handler);
-#endif
-
-#ifdef HAS_UALARM
-    ualarm(HEARTBEAT_INTERVAL, 0);
-#else
-#  ifdef WIN32
-    if (Win32Thread == -1) Win32Thread = _beginthread(
-/* This shouldn't be necessary b/c alarm_loop is already declared as this.
-   Microsoft lossage? -Beek */
-  (void (__cdecl *)(void *))
-  alarm_loop, 256, 0);
-#  else
-    alarm(SYSV_HEARTBEAT_INTERVAL); /* defined in config.h */
-#  endif
-#endif
-
-    current_interactive = 0;
-
-    if ((num_hb_to_do = num_hb_objs)) {
-  num_hb_calls++;
-  heart_beat_index = 0;
-  save_context(&econ);
-  while (!heart_beat_flag) {
+  
+  current_interactive = 0;
+  
+  if ((num_hb_to_do = num_hb_objs)) {
+    num_hb_calls++;
+    heart_beat_index = 0;
+    save_context(&econ);
+    while (1) {
       ob = (curr_hb = &heart_beats[heart_beat_index])->ob;
       DEBUG_CHECK(!(ob->flags & O_HEART_BEAT),
-      "Heartbeat not set in object on heartbeat list!");
+		  "Heartbeat not set in object on heartbeat list!");
       DEBUG_CHECK(ob->flags & O_SWAPPED,
-      "Heartbeat in swapped object.\n");
+		  "Heartbeat in swapped object.\n");
       /* is it time to do a heart beat ? */
       curr_hb->heart_beat_ticks--;
-
+      
       if (ob->prog->heart_beat != 0) {
-    if (curr_hb->heart_beat_ticks < 1) {
-        object_t *new_command_giver;
-        curr_hb->heart_beat_ticks = curr_hb->time_to_heart_beat;
-        current_heart_beat = ob;
-        new_command_giver = ob;
+	if (curr_hb->heart_beat_ticks < 1) {
+	  object_t *new_command_giver;
+	  curr_hb->heart_beat_ticks = curr_hb->time_to_heart_beat;
+	  current_heart_beat = ob;
+	  new_command_giver = ob;
 #ifndef NO_SHADOWS
-        while (new_command_giver->shadowing)
-      new_command_giver = new_command_giver->shadowing;
+	  while (new_command_giver->shadowing)
+	    new_command_giver = new_command_giver->shadowing;
 #endif
 #ifndef NO_ADD_ACTION
-        if (!(new_command_giver->flags & O_ENABLE_COMMANDS))
-      new_command_giver = 0;
+	  if (!(new_command_giver->flags & O_ENABLE_COMMANDS))
+	    new_command_giver = 0;
 #endif
 #ifdef PACKAGE_MUDLIB_STATS
-        add_heart_beats(&ob->stats, 1);
+	  add_heart_beats(&ob->stats, 1);
 #endif
-        eval_cost = max_cost;
-
-        if (SETJMP(econ.context)) {
-      restore_context(&econ);
-        } else {
-      save_command_giver(new_command_giver);
-      call_direct(ob, ob->prog->heart_beat - 1,
-            ORIGIN_DRIVER, 0);
-      pop_stack(); /* pop the return value */
-      restore_command_giver();
-        }
-
-        current_object = 0;
-    }
+	  set_eval(max_cost);
+	  
+	  if (SETJMP(econ.context)) {
+	    restore_context(&econ);
+	  } else {
+	    save_command_giver(new_command_giver);
+	    call_direct(ob, ob->prog->heart_beat - 1,
+			ORIGIN_DRIVER, 0);
+	    pop_stack(); /* pop the return value */
+	    restore_command_giver();
+	  }
+	  
+	  current_object = 0;
+	}
       }
       if (++heart_beat_index == num_hb_to_do)
-    break;
-  }
-  pop_context(&econ);
-  if (heart_beat_index < num_hb_to_do)
-      perc_hb_probes = 100 * (float) heart_beat_index / num_hb_to_do;
-  else
-      perc_hb_probes = 100.0;
-  heart_beat_index = num_hb_to_do = 0;
+	break;
     }
-    current_prog = 0;
-    current_heart_beat = 0;
-    look_for_objects_to_swap();
-    call_out();
+    pop_context(&econ);
+    if (heart_beat_index < num_hb_to_do)
+      perc_hb_probes = 100 * (float) heart_beat_index / num_hb_to_do;
+    else
+      perc_hb_probes = 100.0;
+    heart_beat_index = num_hb_to_do = 0;
+  }
+  current_prog = 0;
+  current_heart_beat = 0;
+  look_for_objects_to_swap();
 #ifdef PACKAGE_MUDLIB_STATS
-    mudlib_stats_decay();
+  mudlib_stats_decay();
 #endif
 }       /* call_heart_beat() */
 
@@ -646,7 +579,7 @@ void preload_objects P1(int, eflag)
   if (prefiles->item[ix].type != T_STRING)
       continue;
 
-  eval_cost = max_cost;
+  set_eval(max_cost);
 
   push_svalue(((array_t *)prefiles)->item + ix);
   (void) apply_master_ob(APPLY_PRELOAD, 1);

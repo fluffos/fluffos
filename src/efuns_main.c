@@ -27,6 +27,7 @@
 #include "master.h"
 #include "efun_protos.h"
 #include "add_action.h"
+#include "eval.h"
 #ifdef LPC_TO_C
 #include "interface.h"
 #include "compile_file.h"
@@ -468,11 +469,11 @@ f__new PROT((void))
 {
     svalue_t *arg = sp - st_num_arg + 1;
     object_t *ob;
-    int tmp_eval = query_time_used() - time_used;
+    int tmp_eval = get_eval();
 
     ob = clone_object(arg->u.string, st_num_arg - 1);
     
-    time_used = query_time_used() - tmp_eval;
+    set_eval(tmp_eval);
 
     free_string_svalue(sp);
     if (ob) {
@@ -2639,11 +2640,11 @@ f_restore_object PROT((void))
 
     flag = (st_num_arg > 1) ? (sp--)->u.number : 0;
 
-    tmp_eval = query_time_used() - time_used;
+    tmp_eval = get_eval();
 
     flag = restore_object(current_object, sp->u.string, flag);
 
-    time_used = query_time_used() - tmp_eval;
+    set_eval(tmp_eval);
 
     free_string_svalue(sp);
     put_number(flag);
@@ -2707,11 +2708,11 @@ f_save_object PROT((void))
         flag = 0;
     }
     
-    tmp_eval = query_time_used() - time_used;
+    tmp_eval = get_eval();
 
     flag = save_object(current_object, sp->u.string, flag);
 
-    time_used = query_time_used() - tmp_eval;
+    set_eval(tmp_eval);
     
     free_string_svalue(sp);
     put_number(flag);
@@ -2772,10 +2773,11 @@ f_set_eval_limit PROT((void))
 {
     switch (sp->u.number) {
     case 0:
-        sp->u.number = eval_cost = max_cost;
+        sp->u.number = max_cost;
+	set_eval(max_cost);
         break;
     case -1:
-        sp->u.number = eval_cost;
+        sp->u.number = get_eval();
         break;
     case 1:
         sp->u.number = max_cost;

@@ -13,6 +13,7 @@
 #include "file.h"
 #include "master.h"
 #include "add_action.h"
+#include "eval.h"
 
 #define TELOPT_COMPRESS 85
 #define TELOPT_COMPRESS2 86
@@ -1388,7 +1389,7 @@ void sigalrm_handler P1(int, sig)
 void sigalrm_handler()
 #endif
 {
-    heart_beat_flag = 1;
+  outoftime = 1;
 }                               /* sigalrm_handler() */
 
 INLINE void make_selectmasks()

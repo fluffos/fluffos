@@ -5,6 +5,7 @@
 #include "port.h"
 #include "eoperators.h"
 #include "sprintf.h"
+#include "eval.h"
 
 #define DBG(x) debug(call_out, x)
 
@@ -256,8 +257,7 @@ void call_out()
 	    } else
 	      extra = 0;
 	    //reset_eval_cost();
-	    eval_cost = max_cost;
-	    time_used = query_time_used();
+	    set_eval(max_cost);
 
 	    if (cop->ob) {
 	      if (cop->function.s[0] == APPLY___INIT_SPECIAL_CHAR)
@@ -282,6 +282,8 @@ void call_out()
 	  call_list[tm]->delta--;
 	current_time++;
 	DBG(("   current_time = %i", current_time));
+	if(!(current_time%HEARTBEAT_INTERVAL))
+	  call_heart_beat();
       } else {
 	/* We're done! */
 	break;

@@ -1,13 +1,21 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
+new in FluffOS 1.31
+Fixed crasher in terminal_colour()
+Changed heartbeats to run relative to mud time (time() in the mud) and never 
+	never skip them anymore
+Changed eval cost code to use signals, removed kernel module code and the 
+	(VERY) slow fallback code there was before
+
 new in FluffOS 1.30
 added driver apply for mxp reply tags received from clients
 fixed crasher in functions() (DEBUG mode, probably corrupted memory) 
-fixed optimizer bug (Pelle Johansson peljo105 at student.liu.se) (from the mudos develop mailing list)
+fixed optimizer bug (Pelle Johansson peljo105 at student.liu.se) (from the
+	mudos develop mailing list)
 
 new in FluffOS 1.29
-fixed bug in terminal_colour
+fixed bug in terminal_colour()
 can now be compiled with tcc (you need to add a -DTCC flag)
 no longer use alloca in bison
 
