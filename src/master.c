@@ -85,7 +85,7 @@ static void get_master_applies P1(object_t *, ob) {
 	int ind, ri;
 	
 	if (find_function_by_name(ob, name, &ind, &ri)) {
-	    master_applies[i].func = find_func_entry(ob->prog, ri);
+	    master_applies[i].func = find_func_entry(ob->prog, ri, 0, 0, 0);
 	    master_applies[i].index = ri;
 	} else {
 	    master_applies[i].func = 0;
@@ -94,10 +94,8 @@ static void get_master_applies P1(object_t *, ob) {
 }
 
 void set_master P1(object_t *, ob) {
-#if defined(PACKAGE_UIDS) || defined(PACKAGE_MUDLIB_STATS)
-    int first_load = (!master_ob);
-#endif
 #ifdef PACKAGE_UIDS
+    int first_load = (!master_ob);
     svalue_t *ret;
 #endif
 
@@ -105,14 +103,7 @@ void set_master P1(object_t *, ob) {
     master_ob = ob;
     /* Make sure master_ob is never made a dangling pointer. */
     add_ref(master_ob, "set_master");
-#ifndef PACKAGE_UIDS
-#  ifdef PACKAGE_MUDLIB_STATS
-    if (first_load) {
-	set_backbone_domain("BACKBONE");
-	set_master_author("NONAME");
-    }
-#  endif
-#else
+#ifdef PACKAGE_UIDS
     ret = apply_master_ob(APPLY_GET_ROOT_UID, 0);
     /* can't be -1 or we wouldn't be here */
     if (!ret) {
@@ -128,9 +119,6 @@ void set_master P1(object_t *, ob) {
     if (first_load) {
 	master_ob->uid = set_root_uid(ret->u.string);
 	master_ob->euid = master_ob->uid;
-#  ifdef PACKAGE_MUDLIB_STATS
-	set_master_author(ret->u.string);
-#  endif
 	ret = apply_master_ob(APPLY_GET_BACKBONE_UID, 0);
 	if (ret == 0 || ret->type != T_STRING) {
 	    debug_message("%s() in the master file does not work\n",
@@ -138,9 +126,6 @@ void set_master P1(object_t *, ob) {
 	    exit(-1);
 	}
 	set_backbone_uid(ret->u.string);
-#  ifdef PACKAGE_MUDLIB_STATS
-	set_backbone_domain(ret->u.string);
-#  endif
     } else {
 	master_ob->uid = add_uid(ret->u.string);
 	master_ob->euid = master_ob->uid;

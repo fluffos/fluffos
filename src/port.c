@@ -4,7 +4,7 @@
 #include "file_incl.h"
 #include "network_incl.h"
 
-#if defined(WIN32) || defined(LATTICE)
+#if defined(LATTICE)
 int dos_style_link P2(char *, x, char *, y) {
     char link_cmd[100];
     sprintf(link_cmd, "copy %s %s", x, y);
@@ -269,11 +269,25 @@ INLINE char *memmove P3(register char *, b, register char *, a, register int, s)
 }
 #endif
 
-#ifdef WIN32
-char *WinStrError(int err) {
-    static char buf[30];
-    if (errno < 10000) return strerror(err);
-    sprintf(buf, "error #%d", err);
-    return buf;
+#ifndef INET_NTOA_OK
+/*
+ * Note: if the address string is "a.b.c.d" the address number is
+ *       a * 256^3 + b * 256^2 + c * 256 + d
+ */
+char *inet_ntoa P1(struct in_addr, ad)
+{
+    u_long s_ad;
+    int a, b, c, d;
+    static char addr[20];   /* 16 + 1 should be enough */
+
+    s_ad = ad.s_addr;
+    d = s_ad % 256;
+    s_ad /= 256;
+    c = s_ad % 256;
+    s_ad /= 256;
+    b = s_ad % 256;
+    a = s_ad / 256;
+    sprintf(addr, "%d.%d.%d.%d", a, b, c, d);
+    return (addr);
 }
 #endif

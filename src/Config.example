@@ -23,14 +23,18 @@ name : testsuite
 
 # the address server is an external program that lets the mud translate
 # internet names to numbers (and vice versa).  select an unused port.
+# if the address server disconnects, an attempt will be made to reconnect.
+# specify the reconnection timeout in seconds.  if reconnection timeout is
+# 0, no attempt will be made to reconnect.
 address server ip : localhost
 address server port : 9997
+address server reconnect : 900
 
 # absolute pathname of mudlib
-mudlib directory : /home/mmessier/mudos/mudos/beta/testsuite
+mudlib directory : /home/mmessier/mudos/mudos/alpha/testsuite
 
 # absolute pathname of driver/config dir
-binary directory : /home/mmessier/mudos/mudos/beta/testsuite
+binary directory : /home/mmessier/mudos/mudos/alpha/testsuite
 
 # debug.log and author/domain stats are stored here
 log directory : /log
@@ -135,24 +139,34 @@ default error message :
 external_port_1 : telnet 4000
 external_port_2 : binary 4001
 
-###############################################################################
-#          The following aren't currently used or implemented (yet)           #
-###############################################################################
-
-# maximum number of users in the game (unused currently)
-maximum users : 40
-
-# Define the maximum stack size of the stack machine. This stack will also
-# contain all local variables and arguments.  (unused currently)
+# Define the maximum stack size of the stack machine.  This stack will also
+# contain all local variables and arguments.
 evaluator stack size : 1000
 
-# Define the size of the compiler stack. This defines how complex
-# expressions the compiler can parse.  (unused currently)
+# Define the size of the compiler stack.  This defines how complex
+# expressions the compiler can parse.
 compiler stack size : 200
 
-# Define the maximum call depth for functions. (unused currently)
-maximum call depth : 30
+# Define the maximum call depth for functions.
+maximum call depth : 50
 
 # There is a hash table for living objects, used by find_living().
-# (unused currently)
-living hash table size : 100
+living hash table size : 256
+
+# Number of levels of nested datastructures allowed -- this limit prevents
+# crashes from occuring when saving objects containing variables containing
+# recursive datastructures (with circular references).
+maximum svalue save depth : 25
+
+# Define the pulse interval in microseconds (us).  1,000,000 us = 1 second.
+# This value specifies the frequency with which the pulse() function will be
+# called in the master object.  Omitting this setting or setting it to zero
+# disables the pulse.
+pulse interval : 2000000
+
+# Define this to be the characters that will escape get_char() or input_to().
+# This used to be hard-coded to be '!' only, but now you can define it to be
+# anything that you like or even have multiple characters that'll escape.
+# This is required, but you can leave it blank if you do not want any escape
+# characters at all.
+escape characters : !

@@ -1,5 +1,5 @@
 #include "std.h"
-#if defined(LPC_TO_C) && defined(BINARIES)
+#if defined(LPC_TO_C)
 #define SUPRESS_COMPILER_INLINES
 #include "compile_file.h"
 #include "file_incl.h"

@@ -19,9 +19,7 @@
 #include "swap.h"
 #include "otable.h"
 #include "crc32.h"
-#include "reclaim.h"
 #include "dumpstat.h"
-#include "call_out.h"
 #include "ed.h"
 #include "md.h"
 #include "master.h"
@@ -250,49 +248,6 @@ f__call_other PROT((void))
     free_svalue(--sp, "f_call_other:2");
     *sp = *(sp+2);
     return;
-}
-#endif
-
-#ifdef F_CALL_OUT
-void
-f_call_out PROT((void))
-{
-    svalue_t *arg = sp - st_num_arg + 1;
-    int num = st_num_arg - 2;
-#ifdef CALLOUT_HANDLES
-    int ret;
-
-    if (!(current_object->flags & O_DESTRUCTED)) {
-	ret = new_call_out(current_object, arg, arg[1].u.number, num, arg + 2);
-	/* args have been transfered; don't free them;
-	   also don't need to free the int */
-	sp -= num + 1;
-    } else {
-	ret = 0;
-	pop_n_elems(num);
-	sp--;
-    }
-    /* the function */
-    free_svalue(sp, "call_out");
-    put_number(ret);
-#else
-    if (!(current_object->flags & O_DESTRUCTED)) {
-	new_call_out(current_object, arg, arg[1].u.number, num, arg + 2);
-	sp -= num + 1;
-    } else {
-	pop_n_elems(num);
-	sp--;
-    }
-    free_svalue(sp--, "call_out");
-#endif
-}
-#endif
-
-#ifdef F_CALL_OUT_INFO
-void
-f_call_out_info PROT((void))
-{
-    push_refed_array(get_all_call_outs());
 }
 #endif
 
@@ -616,51 +571,6 @@ f_dumpallobj PROT((void))
 }
 #endif
 
-#ifdef F_ED
-void
-f_ed PROT((void))
-{
-    if (!command_giver || !command_giver->interactive) {
-	pop_n_elems(st_num_arg);
-        return;
-    }
-
-    if (!st_num_arg) {
-        /* ed() */
-        ed_start(0, 0, 0, 0, 0);
-    } else if (st_num_arg == 1) {
-        /* ed(fname) */
-        ed_start(sp->u.string, 0, 0, 0, 0);
-	pop_stack();
-    } else if (st_num_arg == 2) {
-        /* ed(fname,exitfn) */
-        ed_start((sp - 1)->u.string, 0, sp->u.string, 0, current_object);
-        pop_2_elems();
-    } else if (st_num_arg == 3) {
-        /* ed(fname,exitfn,restricted) / ed(fname,writefn,exitfn) */
-        if (sp->type == T_NUMBER) {
-            ed_start((sp - 2)->u.string, 0, (sp - 1)->u.string, sp->u.number,
-                     current_object);
-	} else if (sp->type == T_STRING) {
-            ed_start((sp - 2)->u.string, (sp - 1)->u.string, sp->u.string, 0,
-                     current_object);
-	} else {
-            bad_argument(sp, T_NUMBER | T_STRING, 3, F_ED);
-	}
-        pop_3_elems();
-    } else {                    /* st_num_arg == 4 */
-        /* ed(fname,writefn,exitfn,restricted) */
-        if (!((sp - 1)->type == T_STRING))
-            bad_argument(sp - 1, T_STRING, 3, F_ED);
-        if (!(sp->type == T_NUMBER))
-            bad_argument(sp, T_NUMBER, 4, F_ED);
-        ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string,
-                 sp->u.number, current_object);
-	pop_n_elems(4);
-    }
-}
-#endif
-
 #ifdef F_ED_CMD
 void f_ed_cmd PROT((void))
 {
@@ -689,16 +599,38 @@ void f_ed_cmd PROT((void))
 void f_ed_start PROT((void))
 {
     char *res;
-    char *fname;
+    char *fname = 0;
     int restr = 0;
+    int num_arg = st_num_arg;
+    function_to_call_t ftc = {0};
 
-    if (st_num_arg == 2)
-	restr = (sp--)->u.number;
-
-    if (st_num_arg)
-	fname = sp->u.string;
-    else
-	fname = 0;
+    if (num_arg == 3) {
+	if (sp->type == T_FUNCTION) {
+	    ftc.f.fp = sp->u.fp;
+	} else {
+	    ftc.ob = current_object;
+	    ftc.f.str = sp->u.string;
+	}
+	if ((sp - 1)->type != T_NUMBER)
+	    bad_argument(sp, T_NUMBER, 2, F_ED_START);
+	restr = (sp - 1)->u.number;
+	fname = (sp - 2)->u.string;
+    } else {
+	if (num_arg == 2) {
+	    if (sp->type == T_STRING) {
+		ftc.ob = current_object;
+		ftc.f.str = sp->u.string;
+	    } else if (sp->type == T_FUNCTION) {
+		ftc.f.fp = sp->u.fp;
+	    } else {
+		restr = sp->u.number;
+	    }
+	    fname = (sp - 1)->u.string;
+	} else {
+	    if (num_arg)
+		fname = sp->u.string;
+	}
+    }
 
     if (current_object->flags & O_DESTRUCTED)
 	error("destructed objects can't use ed.\n");
@@ -706,7 +638,12 @@ void f_ed_start PROT((void))
     if (current_object->flags & O_IN_EDIT)
 	error("ed_start() called while an ed session is already started.\n");
 
-    res = object_ed_start(current_object, fname, restr);
+    res = object_ed_start(current_object, fname, restr, &ftc);
+
+    if (num_arg == 3)
+	free_svalue(sp--, "f_ed_start");
+    if (num_arg >= 2)
+	free_svalue(sp--, "f_ed_start");
 
     if (fname) free_string_svalue(sp);
     else {
@@ -721,15 +658,6 @@ void f_ed_start PROT((void))
 	sp->subtype = STRING_CONSTANT;
 	sp->u.string = "";
     }
-}
-#endif
-
-#ifdef F_ENABLE_WIZARD
-void
-f_enable_wizard PROT((void))
-{
-    if (current_object->interactive)
-	current_object->flags |= O_IS_WIZARD;
 }
 #endif
 
@@ -750,15 +678,6 @@ f_error PROT((void))
     err_buf[l + 2] = 0;
     
     error_handler(err_buf);
-}
-#endif
-
-#ifdef F_DISABLE_WIZARD
-void
-f_disable_wizard PROT((void))
-{
-    if (current_object->interactive)
-	current_object->flags &= ~O_IS_WIZARD;
 }
 #endif
 
@@ -845,25 +764,6 @@ f_filter PROT((void))
     if (arg->type == T_MAPPING) filter_mapping(arg, st_num_arg);
     else if (arg->type == T_STRING) filter_string(arg, st_num_arg);
     else filter_array(arg, st_num_arg);
-}
-#endif
-
-#ifdef F_FIND_CALL_OUT
-void
-f_find_call_out PROT((void))
-{
-    int i;
-#ifdef CALLOUT_HANDLES
-    if (sp->type == T_NUMBER) {
-	i = find_call_out_by_handle(sp->u.number);
-    } else { /* T_STRING */
-#endif
-	i = find_call_out(current_object, sp->u.string);
-	free_string_svalue(sp);
-#ifdef CALLOUT_HANDLES
-    }
-#endif
-    put_number(i);
 }
 #endif
 
@@ -1067,13 +967,8 @@ f_in_edit PROT((void))
     char *fn;
     ed_buffer_t *eb = 0;
 
-#ifdef OLD_ED
-    if (sp->u.ob->interactive)
-	eb = sp->u.ob->interactive->ed_buffer;
-#else
     if (sp->u.ob->flags & O_IN_EDIT)
 	eb = find_ed_buffer(sp->u.ob);
-#endif
     if (eb && (fn = eb->fname)) {
 	free_object(sp->u.ob, "f_in_edit:1");
 	put_malloced_string(add_slash(fn));
@@ -1550,68 +1445,6 @@ f_member_array PROT((void))
 }
 #endif
 
-#ifdef F_MESSAGE
-void
-f_message PROT((void))
-{
-    array_t *use, *avoid;
-    int num_arg = st_num_arg;
-    svalue_t *args;
-
-    args = sp - num_arg + 1;
-    switch (args[2].type) {
-    case T_OBJECT:
-    case T_STRING:
-	use = allocate_empty_array(1);
-	use->item[0] = args[2];
-	args[2].type = T_ARRAY;
-	args[2].u.arr = use;
-	break;
-    case T_ARRAY:
-	use = args[2].u.arr;
-	break;
-    case T_NUMBER:
-	if (args[2].u.number == 0) {
-	    int len = SVALUE_STRLEN(args + 1);
-	    
-	    /* this is really bad and probably should be rm'ed -Beek;
-	     * on the other hand, we don't have a debug_message() efun yet.
-	     * Well, there is one in contrib now ...
-	     */
-	    /* for compatibility (write() simul_efuns, etc)  -bobf */
-	    if (len > LARGEST_PRINTABLE_STRING)
-		error("Printable strings limited to length of %d.\n",
-		      LARGEST_PRINTABLE_STRING);
-
-	    add_message(command_giver, args[1].u.string, len);
-	    pop_n_elems(num_arg);
-	    return;
-	}
-    default:
-	bad_argument(&args[2], T_OBJECT | T_STRING | T_ARRAY | T_NUMBER,
-		     3, F_MESSAGE);
-    }
-    if (num_arg == 4) {
-	switch (args[3].type) {
-	case T_OBJECT:
-	    avoid = allocate_empty_array(1);
-	    avoid->item[0] = args[3];
-	    args[3].type = T_ARRAY;
-	    args[3].u.arr = avoid;
-	    break;
-	case T_ARRAY:
-	    avoid = args[3].u.arr;
-	    break;
-	default:
-	    avoid = &the_null_array;
-	}
-    } else
-	avoid = &the_null_array;
-    do_message(&args[0], &args[1], use, avoid, 1);
-    pop_n_elems(num_arg);
-}
-#endif
-
 #ifdef F_MKDIR
 void
 f_mkdir PROT((void))
@@ -1696,11 +1529,8 @@ void f_mud_status PROT((void))
 
         tot = show_otable_status(&ob, verbose);
         outbuf_add(&ob, "\n");
-        tot += heart_beat_status(&ob, verbose);
-        outbuf_add(&ob, "\n");
         tot += add_string_status(&ob, verbose);
         outbuf_add(&ob, "\n");
-        tot += print_call_out_usage(&ob, verbose);
     } else {
 	/* !verbose */
 	outbuf_addv(&ob, "Sentences:\t\t\t%8d %8d\n", tot_alloc_sentence,
@@ -1726,10 +1556,7 @@ void f_mud_status PROT((void))
 	outbuf_addv(&ob, "Interactives:\t\t\t%8d %8d\n", num_user,
 		    num_user * sizeof(interactive_t));
 
-	tot = show_otable_status(&ob, verbose) +
-	    heart_beat_status(&ob, verbose) +
-	    add_string_status(&ob, verbose) +
-	    print_call_out_usage(&ob, verbose);
+	tot = show_otable_status(&ob, verbose) + add_string_status(&ob, verbose);
     }
 
     tot += total_prog_block_size +
@@ -1827,7 +1654,7 @@ f_previous_object PROT((void))
     object_t *ob;
     
     if ((i = sp->u.number) > 0) {
-        if (i >= CFG_MAX_CALL_DEPTH) {
+        if (i >= MAX_CALL_DEPTH) {
             sp->u.number = 0;
             return;
 	}
@@ -1878,53 +1705,6 @@ f_previous_object PROT((void))
     else {
         put_unrefed_undested_object(ob, "previous_object()");
     }
-}
-#endif
-
-#ifdef F_PRINTF
-void
-f_printf PROT((void))
-{
-    int num_arg = st_num_arg;
-    char *ret;
-    
-    if (command_giver) {
-	ret = string_print_formatted((sp - num_arg + 1)->u.string,
-				     num_arg - 1, sp - num_arg + 2);
-	if (ret) {
-	    tell_object(command_giver, ret, COUNTED_STRLEN(ret));
-	    FREE_MSTR(ret);
-	}
-    }
-    
-    pop_n_elems(num_arg);
-}
-#endif
-
-#ifdef F_PROCESS_STRING
-void
-f_process_string PROT((void))
-{
-    char *str;
-
-    str = process_string(sp->u.string);
-    if (str != sp->u.string) {
-        free_string_svalue(sp);
-        put_malloced_string(str);
-    }
-}
-#endif
-
-#ifdef F_PROCESS_VALUE
-void
-f_process_value PROT((void))
-{
-    svalue_t *ret;
-
-    ret = process_value(sp->u.string);
-    free_string_svalue(sp);
-    if (ret) assign_svalue_no_free(sp, ret);
-    else *sp = const0;
 }
 #endif
 
@@ -2148,22 +1928,18 @@ void
 f_receive PROT((void))
 {
     if (sp->type == T_STRING) {
-	if (current_object->interactive) {
-	    int len = SVALUE_STRLEN(sp);
+	int len = SVALUE_STRLEN(sp);
 	    
-	    if (len > LARGEST_PRINTABLE_STRING)
-		error("Printable strings limited to length of %d.\n",
-		      LARGEST_PRINTABLE_STRING);
+	if (len > LARGEST_PRINTABLE_STRING)
+	    error("Printable strings limited to length of %d.\n",
+		  LARGEST_PRINTABLE_STRING);
 		
-	    add_message(current_object, sp->u.string, len);
-	}
+	add_message(current_object, sp->u.string, len);
 	free_string_svalue(sp--);
     }
 #ifndef NO_BUFFER_TYPE
     else {
-	if (current_object->interactive)
-	    add_message(current_object, (char *)sp->u.buf->item, sp->u.buf->size);
-
+	add_message(current_object, (char *)sp->u.buf->item, sp->u.buf->size);
 	free_buffer((sp--)->u.buf);
     }
 #endif
@@ -2217,32 +1993,6 @@ f_regexp PROT((void))
 	free_array(sp->u.arr);
 	sp->u.arr = v;
     }
-}
-#endif
-
-#ifdef F_REMOVE_CALL_OUT
-void
-f_remove_call_out PROT((void))
-{
-    int i;
-
-    if (st_num_arg) {
-#ifdef CALLOUT_HANDLES
-	if (sp->type == T_STRING) {
-#endif
-	    i = remove_call_out(current_object, sp->u.string);
-	    free_string_svalue(sp);
-#ifdef CALLOUT_HANDLES
-	} else {
-	    i = remove_call_out_by_handle(sp->u.number);
-	}
-#endif
-    } else {
-	remove_all_call_out(current_object);
-	i = 0;
-	STACK_INC;
-    }
-    put_number(i);
 }
 #endif
 
@@ -2562,7 +2312,7 @@ f_replace_string PROT((void))
 void
 f_resolve PROT((void))
 {
-    int i, query_addr_number PROT((char *, svalue_t *));
+    int i;
 
     i = query_addr_number((sp - 1)->u.string, sp);
     pop_stack();
@@ -2652,40 +2402,6 @@ f_save_variable PROT((void)) {
 }
 #endif
 
-#ifdef F_SAY
-void
-f_say PROT((void))
-{
-    array_t *avoid;
-    static array_t vtmp =
-    {1,
-#ifdef DEBUG
-     1,
-#endif
-     1,
-#ifdef PACKAGE_MUDLIB_STATS
-     {(mudlib_stats_t *) NULL, (mudlib_stats_t *) NULL}
-#endif
-    };
-
-    if (st_num_arg == 1) {
-	avoid = &the_null_array;
-	say(sp, avoid);
-	pop_stack();
-    } else {
-	if (sp->type == T_OBJECT) {
-	    vtmp.item[0].type = T_OBJECT;
-	    vtmp.item[0].u.ob = sp->u.ob;
-	    avoid = &vtmp;
-	} else {		/* must be an array... */
-	    avoid = sp->u.arr;
-	}
-	say(sp - 1, avoid);
-	pop_2_elems();
-    }
-}
-#endif
-
 #ifdef F_SET_EVAL_LIMIT
 /* warning: do not enable this without using valid_override() in the master
    object and a set_eval_limit() simul_efun to restrict access.
@@ -2745,25 +2461,6 @@ f_set_bit PROT((void))
     if (str[ind] > 0x3f + ' ' || str[ind] < ' ')
         error("Illegal bit pattern in set_bit character %d\n", ind);
     str[ind] = ((str[ind] - ' ') | (1 << bit)) + ' ';
-}
-#endif
-
-#ifdef F_SET_HEART_BEAT
-void
-f_set_heart_beat PROT((void))
-{
-    set_heart_beat(current_object, (sp--)->u.number);
-}
-#endif
-
-#ifdef F_QUERY_HEART_BEAT
-void
-f_query_heart_beat PROT((void))
-{
-    object_t *ob;
-    
-    free_object(ob = sp->u.ob, "f_query_heart_beat");
-    put_number(query_heart_beat(ob));
 }
 #endif
 
@@ -2866,15 +2563,6 @@ f_shadow PROT((void))
     }
     free_object(sp->u.ob, "f_shadow:4");
     *sp = const0;
-}
-#endif
-
-#ifdef F_SHOUT
-void
-f_shout PROT((void))
-{
-    shout_string(sp->u.string);
-    free_string_svalue(sp--);
 }
 #endif
 
@@ -3157,65 +2845,6 @@ f_swap PROT((void))
 }
 #endif
 
-#ifdef F_TELL_OBJECT
-void
-f_tell_object PROT((void))
-{
-    tell_object((sp - 1)->u.ob, sp->u.string, SVALUE_STRLEN(sp));
-    free_string_svalue(sp--);
-    pop_stack();
-}
-#endif
-
-#ifdef F_TELL_ROOM
-void
-f_tell_room PROT((void))
-{
-    array_t *avoid;
-    static array_t vtmp =
-    {1,
-#ifdef DEBUG
-     1,
-#endif
-     1,
-#ifdef PACKAGE_MUDLIB_STATS
-     {(mudlib_stats_t *) NULL, (mudlib_stats_t *) NULL}
-#endif
-    };
-
-    int num_arg = st_num_arg;
-    svalue_t *arg = sp - num_arg + 1;
-    object_t *ob;
-    
-    if (arg->type == T_OBJECT) {
-        ob = arg[0].u.ob;
-    } else {                    /* must be a string... */
-        ob = find_object(arg[0].u.string);
-        if (!ob || !object_visible(ob))
-            error("Bad argument 1 to tell_room()\n");
-    }
-
-    if (num_arg == 2) {
-        avoid = &the_null_array;
-    } else {
-	if (arg[2].type == T_OBJECT) {
-	    vtmp.item[0].type = T_OBJECT;
-	    vtmp.item[0].u.ob = arg[2].u.ob;
-	    avoid = &vtmp;
-	} else {
-	    avoid = arg[2].u.arr;
-	}
-    }
-
-    tell_room(ob, &arg[1], avoid);
-    if (num_arg > 2 && arg[2].type != T_OBJECT)
-	free_array(avoid);
-    free_svalue(arg + 1, "f_tell_room");
-    free_svalue(arg, "f_tell_room");
-    sp = arg - 1;
-}
-#endif
-
 #ifdef F_TEST_BIT
 void
 f_test_bit PROT((void))
@@ -3490,18 +3119,6 @@ f_users PROT((void))
 }
 #endif
 
-#ifdef F_WIZARDP
-void
-f_wizardp PROT((void))
-{
-    int i;
-
-    i = (int) sp->u.ob->flags & O_IS_WIZARD;
-    free_object(sp->u.ob, "f_wizardp");
-    put_number(i != 0);
-}
-#endif
-
 #ifdef F_VIRTUALP
 void
 f_virtualp PROT((void))
@@ -3511,15 +3128,6 @@ f_virtualp PROT((void))
     i = (int) sp->u.ob->flags & O_VIRTUAL;
     free_object(sp->u.ob, "f_virtualp");
     put_number(i != 0);
-}
-#endif
-
-#ifdef F_WRITE
-void
-f_write PROT((void))
-{
-    do_write(sp);
-    pop_stack();
 }
 #endif
 
@@ -3683,9 +3291,7 @@ f_memory_info PROT((void))
 	    tot_alloc_sentence * sizeof(sentence_t) +
 	    num_user * sizeof(interactive_t) +
 	    show_otable_status(0, -1) +
-	    heart_beat_status(0, -1) +
-	    add_string_status(0, -1) +
-	    print_call_out_usage(0, -1) + res;
+	    add_string_status(0, -1) + res;
 	push_number(tot);
 	return;
     }
@@ -3816,5 +3422,16 @@ f_next_inventory PROT((void))
 	sp->u.ob = ob;
     } else
 	*sp = const0;
+}
+#endif
+
+#ifdef F_SET_PULSE
+void
+f_set_pulse PROT((void))
+{
+    if (sp->u.number < 0)
+	error("Illegal pulse interval value\n");
+    set_pulse_interval(sp->u.number);
+    sp--;
 }
 #endif

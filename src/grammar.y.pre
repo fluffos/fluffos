@@ -12,9 +12,6 @@
 #include "master.h"
 
 /* gross. Necessary? - Beek */
-#ifdef WIN32
-#define MSDOS
-#endif
 %line
 /*
  * This is the grammar definition of LPC, and its parse tree generator.
@@ -560,7 +557,6 @@ type_decl:
 			   FOA_GLOBAL_SCOPE);
 		if (ihe->dn.class_num == -1) {
 		    ihe->sem_value++;
-		    ihe->dn.class_num = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
 		    if (ihe->dn.class_num > CLASS_NUM_MASK){
 			char buf[256];
 			char *p;
@@ -570,6 +566,7 @@ type_decl:
 			yyerror(buf);
 		    }
 
+		    ihe->dn.class_num = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
 		    scratch_free($3);
 		    $<ihe>2 = 0;
 		}
@@ -2677,7 +2674,7 @@ expr4:
 		      p = strput(buf, end, "Undefined variable '");
 		      p = strput(p, end, $1->name);
 		      p = strput(p, end, "'");
-		      if (current_number_of_locals < CFG_MAX_LOCAL_VARIABLES) {
+		      if (current_number_of_locals < MAX_LOCAL_VARIABLES) {
 			  add_local_name($1->name, TYPE_ANY);
 		      }
 		      CREATE_ERROR($$);
@@ -2693,7 +2690,7 @@ expr4:
 		p = strput(buf, end, "Undefined variable '");
 		p = strput(p, end, $1);
 		p = strput(p, end, "'");
-                if (current_number_of_locals < CFG_MAX_LOCAL_VARIABLES) {
+                if (current_number_of_locals < MAX_LOCAL_VARIABLES) {
                     add_local_name($1, TYPE_ANY);
                 }
                 CREATE_ERROR($$);
@@ -2907,7 +2904,7 @@ expr4:
 		$<func_block>$.context = context;
 		$<func_block>$.save_current_type = current_type;
 		$<func_block>$.save_exact_types = exact_types;
-	        if (type_of_locals_ptr + max_num_locals + CFG_MAX_LOCAL_VARIABLES >= &type_of_locals[type_of_locals_size])
+	        if (type_of_locals_ptr + max_num_locals + MAX_LOCAL_VARIABLES >= &type_of_locals[type_of_locals_size])
 		    reallocate_locals();
 		deactivate_current_locals();
 		locals_ptr += current_number_of_locals;

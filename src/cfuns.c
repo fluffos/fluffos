@@ -6,7 +6,6 @@
 #include "lpc_to_c.h"
 #include "eoperators.h"
 #include "parse.h"
-#include "qsort.h"
 
 IF_DEBUG(extern int stack_in_use_as_temporary);
 
@@ -74,7 +73,6 @@ void c_foreach P3(int, flags, int, idx1, int, idx2) {
 	CHECK_TYPES(sp, T_MAPPING, 2, F_FOREACH);
 	
 	push_refed_array(mapping_indices(sp->u.map));
-
 	STACK_INC;
 	sp->type = T_NUMBER;
 	sp->u.lvalue = (sp-1)->u.arr->item;
@@ -82,11 +80,10 @@ void c_foreach P3(int, flags, int, idx1, int, idx2) {
 		    
 	STACK_INC;
 	sp->type = T_LVALUE;
-	if (flags & FOREACH_LEFT_GLOBAL) {
+	if (flags & FOREACH_LEFT_GLOBAL)
 	    sp->u.lvalue = &current_object->variables[idx1 + variable_index_offset];
-	} else {
+	else
 	    sp->u.lvalue = fp + idx1;
-	}
     } else 
     if (sp->type == T_STRING) {
 	STACK_INC;
@@ -1473,7 +1470,7 @@ void fix_switches P1(string_switch_entry_t **, tables) {
 	    p++;
 	}
 	quickSort((char *)(*tables), p - *tables , 
-		  sizeof(string_switch_entry_t), compare_switch_entries);
+		  sizeof(string_switch_entry_t), (qsort_comparefn_t)compare_switch_entries);
 	tables++;
     }
 }
@@ -1561,7 +1558,8 @@ void c_make_ref P1(int, op) {
     sp->u.ref = ref;
 }
 
-void c_kill_refs P1(int, num) {
+void c_kill_refs P1(int, num)
+{
     while (num--) {
 	ref_t *ref = global_ref_list;
 	global_ref_list = global_ref_list->next;

@@ -38,8 +38,8 @@ int legal_path PROT((char *));
 static int match_string PROT((char *, char *));
 static int copy PROT((char *from, char *to));
 static int do_move PROT((char *from, char *to, int flag));
-static int CDECL pstrcmp PROT((CONST void *, CONST void *));
-static int CDECL parrcmp PROT((CONST void *, CONST void *));
+static int pstrcmp PROT((CONST void *, CONST void *));
+static int parrcmp PROT((CONST void *, CONST void *));
 static void encode_stat PROT((svalue_t *, int, char *, struct stat *));
 
 #define MAX_LINES 50
@@ -47,7 +47,7 @@ static void encode_stat PROT((svalue_t *, int, char *, struct stat *));
 /*
  * These are used by qsort in get_dir().
  */
-static int CDECL pstrcmp P2(CONST void *, p1, CONST void *, p2)
+static int pstrcmp P2(CONST void *, p1, CONST void *, p2)
 {
     svalue_t *x = (svalue_t *)p1;
     svalue_t *y = (svalue_t *)p2;
@@ -55,7 +55,7 @@ static int CDECL pstrcmp P2(CONST void *, p1, CONST void *, p2)
     return strcmp(x->u.string, y->u.string);
 }
 
-static int CDECL parrcmp P2(CONST void *, p1, CONST void *, p2)
+static int parrcmp P2(CONST void *, p1, CONST void *, p2)
 {
     svalue_t *x = (svalue_t *)p1;
     svalue_t *y = (svalue_t *)p2;
@@ -107,35 +107,25 @@ static void encode_stat P4(svalue_t *, vp, int, flags, char *, str, struct stat 
  *    size of file,
  *    last update of file.
  */
-/* WIN32 should be fixed to do this correctly (i.e. no ifdefs for it) */
 #define MAX_FNAME_SIZE 255
 #define MAX_PATH_LEN   1024
 array_t *get_dir P2(char *, path, int, flags)
 {
     array_t *v;
     int i, count = 0;
-#ifndef WIN32
     DIR *dirp;
-#endif
     int namelen, do_match = 0;
 
-#ifndef WIN32
 #ifdef USE_STRUCT_DIRENT
     struct dirent *de;
 #else
     struct direct *de;
-#endif
 #endif
     struct stat st;
     char *endtemp;
     char temppath[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
     char regexppath[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
     char *p;
-
-#ifdef WIN32
-    struct _finddata_t FindBuffer;
-    long FileHandle, FileCount;
-#endif
 
     if (!path)
 	return 0;
@@ -191,36 +181,12 @@ array_t *get_dir P2(char *, path, int, flags)
 /*#ifdef LATTICE
 	if (temppath[0]=='.') temppath[0]=0;
 #endif*/
-#ifdef WIN32
-    FileHandle = -1;
-    FileCount = 1;
-/*    strcat(temppath, "\\*"); */
-    strcat(temppath, "/*");
-    if ((FileHandle = _findfirst(temppath, &FindBuffer)) == -1) return 0;
-#else
     if ((dirp = opendir(temppath)) == 0)
 	return 0;
-#endif
 
     /*
      * Count files
      */
-#ifdef WIN32
-    do {
-	if (!do_match && (!strcmp(FindBuffer.name, ".") ||
-			  !strcmp(FindBuffer.name, ".."))) {
-	    continue;
-	}
-	if (do_match && !match_string(regexppath, FindBuffer.name)) {
-	    continue;
-	}
-	count++;
-	if (count >= max_array_size) {
-	    break;
-	}
-    } while (!_findnext(FileHandle, &FindBuffer));
-    _findclose(FileHandle);
-#else
     for (de = readdir(dirp); de; de = readdir(dirp)) {
 #ifdef USE_STRUCT_DIRENT
 	namelen = strlen(de->d_name);
@@ -236,7 +202,6 @@ array_t *get_dir P2(char *, path, int, flags)
 	if (count >= max_array_size)
 	    break;
     }
-#endif
 
     /*
      * Make array and put files on it.
@@ -244,32 +209,9 @@ array_t *get_dir P2(char *, path, int, flags)
     v = allocate_empty_array(count);
     if (count == 0) {
 	/* This is the easy case :-) */
-#ifndef WIN32
 	closedir(dirp);
-#endif
 	return v;
     }
-#ifdef WIN32
-    FileHandle = -1;
-    if ((FileHandle = _findfirst(temppath, &FindBuffer)) == -1) return 0;
-    endtemp = temppath + strlen(temppath) - 2;
-    *endtemp = 0;
-/*    strcat(endtemp++, "\\"); */
-    strcat(endtemp++, "/");
-    i = 0;
-    do {
-	if (!do_match && (!strcmp(FindBuffer.name, ".") ||
-			  !strcmp(FindBuffer.name, ".."))) continue;
-	if (do_match && !match_string(regexppath, FindBuffer.name)) continue;
-	if (flags == -1) {
-	    strcpy(endtemp, FindBuffer.name);
-	    stat(temppath, &st);
-	}
-	encode_stat(&v->item[i], flags, FindBuffer.name, &st);
-	i++;
-    } while (!_findnext(FileHandle, &FindBuffer));
-    _findclose(FileHandle);
-#else				/* WIN32 */
     rewinddir(dirp);
     endtemp = temppath + strlen(temppath);
 
@@ -302,7 +244,6 @@ array_t *get_dir P2(char *, path, int, flags)
 	i++;
     }
     closedir(dirp);
-#endif				/* OS2 */
 
     /* Sort the names. */
     qsort((void *) v->item, count, sizeof v->item[0],
@@ -353,7 +294,7 @@ int legal_path P1(char *, path)
 	if (p)
 	    p++;		/* step over `/' */
     }
-#if defined(AMIGA) || defined(LATTICE) || defined(WIN32)
+#if defined(AMIGA) || defined(LATTICE)
     /*
      * I don't know what the proper define should be, just leaving an
      * appropriate place for the right stuff to happen here - Wayfarer
@@ -415,21 +356,10 @@ int write_file P3(char *, file, char *, str, int, flags)
 {
     FILE *f;
 
-#ifdef WIN32
-    char fmode[3];
-#endif
-
     file = check_valid_path(file, current_object, "write_file", 1);
     if (!file)
 	return 0;
-#ifdef WIN32
-    fmode[0] = (flags & 1) ? 'w' : 'a';
-    fmode[1] = 't';
-    fmode[2] = '\0';
-    f = fopen(file, fmode);
-#else    
     f = fopen(file, (flags & 1) ? "w" : "a");
-#endif
     if (f == 0) {
 	error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n",
 	      file, (flags & 1) ? "overwrite" : "append", port_strerror(errno));
@@ -677,26 +607,10 @@ int file_size P1(char *, file)
 {
     struct stat st;
     int ret;
-#ifdef WIN32
-    int needs_free = 0, len;
-    char *p;
-#endif
 
     file = check_valid_path(file, current_object, "file_size", 0);
     if (!file)
 	return -1;
-
-#ifdef WIN32
-    len = strlen(file);
-    p = file + len - 1;
-    if (*p == '/') {
-	needs_free = 1;
-	p = file;
-	file = new_string(len - 1, "file_size");
-	memcpy(file, p, len - 1);
-	file[len-1] = 0;
-    }
-#endif
 
     if (stat(file, &st) == -1)
 	ret = -1;
@@ -705,10 +619,6 @@ int file_size P1(char *, file)
     else 
 	ret = st.st_size;
 
-#ifdef WIN32
-    if (needs_free) FREE_MSTR(file);
-#endif
-    
     return ret;
 }
 
@@ -728,14 +638,6 @@ char *check_valid_path P4(char *, path, object_t *, call_object, char *, call_fu
 
     if (call_object == 0 || call_object->flags & O_DESTRUCTED)
 	return 0;
-
-#ifdef WIN32
-    {
-	char *p;
-	
-	for(p=path; *p; p++) if (*p == '\\') *p='/';
-    }
-#endif
 
     copy_and_push_string(path);
     push_object(call_object);
@@ -894,12 +796,8 @@ static int do_move P3(char *, from, char *, to, int, flag)
 	return 1;
     }
     if (lstat(to, &to_stats) == 0) {
-#ifdef WIN32
-	if (!strcmp(from, to))
-#else
 	if (from_stats.st_dev == to_stats.st_dev
 	    && from_stats.st_ino == to_stats.st_ino)
-#endif
 	{
 	    error("`/%s' and `/%s' are the same file", from, to);
 	    return 1;
@@ -908,9 +806,6 @@ static int do_move P3(char *, from, char *, to, int, flag)
 	    error("/%s: cannot overwrite directory", to);
 	    return 1;
 	}
-#ifdef WIN32
-	unlink(to);
-#endif
     } else if (errno != ENOENT) {
 	error("/%s: unknown error\n", to);
 	return 1;
@@ -927,12 +822,8 @@ static int do_move P3(char *, from, char *, to, int, flag)
 	return 0;
 #ifdef F_LINK
     else if (flag == F_LINK) {
-#ifdef WIN32
-	error("link() not supported.\n");
-#else
 	if (link(from, to) == 0)
 	    return 0;
-#endif
     }
 #endif
 
@@ -1073,12 +964,8 @@ int copy_file P2(char *, from, char *, to)
 	return 1;
     }
     if (lstat(to, &to_stats) == 0) {
-#ifdef WIN32
-	if (!strcmp(from, to))
-#else
 	if (from_stats.st_dev == to_stats.st_dev
 	    && from_stats.st_ino == to_stats.st_ino)
-#endif
 	{
 	    error("`/%s' and `/%s' are the same file", from, to);
 	    return 1;
@@ -1150,7 +1037,7 @@ void dump_file_descriptors P1(outbuffer_t *, out)
 	if (fstat(i, &stbuf) == -1)
 	    continue;
 
-#if !defined(LATTICE) && !defined(WIN32)
+#if !defined(LATTICE)
 	if (S_ISCHR(stbuf.st_mode) || S_ISBLK(stbuf.st_mode))
 	    dev = stbuf.st_rdev;
 	else

@@ -15,7 +15,7 @@ enum socket_mode {
 };
 
 enum socket_state {
-    STATE_CLOSED, STATE_FLUSHING, STATE_UNBOUND, STATE_BOUND, STATE_LISTEN, STATE_DATA_XFER
+    CLOSED, FLUSHING, UNBOUND, BOUND, LISTEN, DATA_XFER
 };
 
 #define	BUF_SIZE	2048	/* max reliable packet size	   */

@@ -9,6 +9,16 @@
 #include "lpc_incl.h"
 #include "network_incl.h"
 
+#ifdef HAVE_ZLIB_H
+#include <zlib.h>
+#else
+#undef MCCP_SUPPORT
+#endif
+
+#ifdef MCCP_SUPPORT
+#define COMPRESS_BUF_SIZE          MESSAGE_BUFFER_SIZE  /* from options.h */
+#endif
+
 #define MAX_TEXT                   2048
 #define MAX_SOCKET_PACKET_SIZE     1024
 #define DESIRED_SOCKET_PACKET_SIZE 800
@@ -83,8 +93,9 @@ typedef struct interactive_s {
     int trace_level;		/* debug flags -- 0 means no debugging     */
     char *trace_prefix;		/* trace only object which has this as name  */
 #endif
-#ifdef OLD_ED
-    struct ed_buffer_s *ed_buffer;  /* local ed                        */
+#ifdef MCCP_SUPPORT
+    z_stream *compress_stream;
+    unsigned char compress_buf[COMPRESS_BUF_SIZE];
 #endif
     int message_producer;	/* message buffer producer index */
     int message_consumer;	/* message buffer consumer index */
@@ -126,9 +137,7 @@ typedef struct interactive_s {
 #define IP_VALID(ip, ob) (ob && ob->interactive == ip)
 #define VALIDATE_IP(ip, ob) if (!IP_VALID(ip, ob)) goto failure
 
-/*
- * comm.c
- */
+/* comm.c */
 extern fd_set readmask;
 extern fd_set writemask;
 extern int inet_packets;
@@ -154,19 +163,12 @@ extern int add_message_calls;
 extern interactive_t **all_users;
 extern int max_users;
 
-void CDECL add_vmessage PROT2V(object_t *, char *);
+void add_vmessage PROT2V(object_t *, char *);
 void add_message PROT((object_t *, char *, int));
 void add_binary_message PROT((object_t *, char *, int));
 
-#ifdef SIGNAL_FUNC_TAKES_INT
-void sigalrm_handler PROT((int));
-#else
-void sigalrm_handler PROT((void));
-#endif
-void update_ref_counts_for_users PROT((void));
 INLINE void make_selectmasks PROT((void));
 void init_user_conn PROT((void));
-void init_addr_server PROT((char *, int));
 void ipc_remove PROT((void));
 void set_prompt PROT((char *));
 INLINE void process_io PROT((void));
@@ -175,9 +177,6 @@ int replace_interactive PROT((object_t *, object_t *));
 int set_call PROT((object_t *, sentence_t *, int));
 void remove_interactive PROT((object_t *, int));
 int flush_message PROT((interactive_t *));
-int query_addr_number PROT((char *, svalue_t *));
-char *query_ip_name PROT((object_t *));
-char *query_ip_number PROT((object_t *));
 char *query_host_name PROT((void));
 int query_idle PROT((object_t *));
 #ifndef NO_SNOOP
@@ -186,6 +185,14 @@ object_t *query_snoop PROT((object_t *));
 object_t *query_snooping PROT((object_t *));
 #endif
 
+/* addr_client.c */
+extern int addr_server_fd;
+
+void init_addr_server PROT((char *, int));
+void hname_handler PROT((void));
+int request_resolution PROT((char *, int));
+char *query_ip_name PROT((object_t *));
+char *query_ip_number PROT((object_t *));
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_iptable PROT((void));
 #endif

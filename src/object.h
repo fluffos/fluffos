@@ -16,14 +16,8 @@
  */
 
 #include "packages/uids.h"
-#include "packages/mudlib_stats.h"
 
 #define MAX_OBJECT_NAME_SIZE 2048
-
-#define O_HEART_BEAT		0x01	/* Does it have an heart beat ?      */
-#ifndef NO_WIZARDS
-#define O_IS_WIZARD		0x02	/* used to be O_IS_WIZARD            */
-#endif
 
 #define O_LISTENER              0x04    /* can hear say(), etc */
 #ifndef NO_ADD_ACTION
@@ -46,9 +40,7 @@
 #define O_EFUN_SOCKET           0x800	/* efun socket references object     */
 #endif
 #define O_WILL_RESET            0x1000	/* reset will be called next time    */
-#ifndef OLD_ED
 #define O_IN_EDIT               0x2000  /* object has an ed buffer open      */
-#endif
 #ifdef LPC_TO_C
 #define O_COMPILED_PROGRAM      0x4000  /* this is a marker for a compiled   */
                                         /* program                           */
@@ -128,9 +120,6 @@ typedef struct object_s {
 #ifdef PRIVS
     char *privs;		/* object's privledges */
 #endif				/* PRIVS */
-#ifdef PACKAGE_MUDLIB_STATS
-    statgroup_t stats;		/* mudlib stats */
-#endif
 #ifdef PACKAGE_PARSER
     struct parse_info_s *pinfo;
 #endif
@@ -192,6 +181,7 @@ void tell_object PROT((object_t *, char *, int));
 int find_global_variable PROT((program_t *, char *, unsigned short *, int));
 void dealloc_object PROT((object_t *, char *));
 void get_objects PROT((object_t ***, int *, get_objectsfn_t, void *));
+void init_objects PROT((void));
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_command_giver_stack PROT((void));
 #endif

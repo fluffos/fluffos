@@ -57,17 +57,13 @@
 
 /* MIRROR: inverts the order of bytes in a 32-bit quantity, if
  * necessary.
- * Define this to be empty on big-endian systems:
+ * Define this to be empty on little-endian systems:
  *      #define MIRROR(l)
- * And for little-endian systems something like:
+ * And for big-endian systems something like:
  *      #define MIRROR(l)    ( (l) = ( ((l) << 24) | (((l) & 0x0000ff00) << 8) 
 | (((l) & 0x00ff0000) >> 8) | ((l) >> 24) ) )
  */
-#ifdef BIGENDIAN
-#define MIRROR(l)
-#else
 #define MIRROR(l)       ( (l) = ( ((l) << 24) | (((l) & 0x0000ff00) << 8) | (((l) & 0x00ff0000) >> 8) | ((l) >> 24) ) )
-#endif
 
 
 /* Functions F, G, H and I as mentioned in RFC, section 3.4. */

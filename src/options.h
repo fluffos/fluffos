@@ -212,18 +212,6 @@
  */
 #undef NO_ENVIRONMENT
 
-/* NO_WIZARDS: for historical reasons, MudOS used to keep track of who
- * is and isn't a wizard.  Defining this removes that completely.
- * If this is defined, the wizardp() and related efuns don't exist.
- *
- * Also note that if it is not defined, then non-wizards are always put
- * in restricted mode when ed() is used, regardless of the setting of
- * the restrict parameter.
- *
- * Compat status: easy to simulate and dated.
- */
-#define NO_WIZARDS
-
 /* OLD_TYPE_BEHAVIOR: reintroduces a bug in type-checking that effectively
  * renders compile time type checking useless.  For backwards compatibility.
  *
@@ -242,13 +230,6 @@
  * trivial, and cannot be simulated.
  */
 #undef OLD_RANGE_BEHAVIOR
-
-/* OLD_ED: ed() efun backwards compatible with the old version.  The new
- * version requires/allows a mudlib front end.
- *
- * Compat status: Easily simulated.
- */
-#define OLD_ED
 
 /* SENSIBLE_MODIFIERS:
  * Turning this on changes a few things, which may break old code:
@@ -290,7 +271,6 @@
  *   respectively
  * . map_delete() returns it's first argument
  * . inherit_list() means deep_inherit_list(), not shallow_inherit_list()
- * . heart_beat_info() is a synonym for heart_beats()
  */
 #undef COMPAT_32
 
@@ -341,10 +321,9 @@
 #define LOCALS_IN_TRACEBACK
 
 /* MUDLIB_ERROR_HANDLER: If you define this, the driver doesn't do any
- *   handling of runtime errors, other than to turn the heartbeats of
- *   objects off.  Information about the error is passed in a mapping
- *   to the error_handler() function in the master object.  Whatever is
- *   returned is put in the debug.log.
+ *   handling of runtime errors.  Information about the error is passed
+ *   in a mapping to the error_handler() function in the master object.
+ *   Whatever is returned is put in the debug.log.
  *
  * A good mudlib error handler is one of the best tools for tracking down
  * errors.  Unfortunately, you need to have one.  Check the testsuite or
@@ -455,23 +434,17 @@
  */
 #define TRAP_CRASHES
 
-/* THIS_PLAYER_IN_CALL_OUT: define this if you wish this_player() to be
- *   usable from within call_out() callbacks.
- */
-#define THIS_PLAYER_IN_CALL_OUT
-
-/* CALLOUT_HANDLES: If this is defined, call_out() returns an integer, which
- * can be passed to remove_call_out() or find_call_out().  Removing call_outs
- * by name is still allowed, but is significantly less efficient, and also
- * doesn't work for function pointers.  This option adds 4 bytes overhead
- * per callout to keep track of the handle.
- */
-#define CALLOUT_HANDLES
-
 /* FLUSH_OUTPUT_IMMEDIATELY: Causes output to be written to sockets
  * immediately after being generated.  Useful for debugging.  
  */
 #undef FLUSH_OUTPUT_IMMEDIATELY
+
+/* MCCP_SUPPORT: Enable this if you'd like to support MCCP which is the MUD
+ * Client Compression Protocol.  You'll need to have zlib installed on your
+ * system someplace that MudOS can find it to link with it.  For more info
+ * on MCCP, see http://homepages.ihug.co.nz/~icecube/compress/
+ */
+#undef MCCP_SUPPORT
 
 /* PRIVS: define this if you want object privileges.  Your mudlib must
  *   explicitly make use of this functionality to be useful.  Defining this
@@ -490,10 +463,6 @@
  *   catch_tell(msg) method that calls receive(msg);
 */
 #undef INTERACTIVE_CATCH_TELL
-
-/* RESTRICTED_ED: define this if you want restricted ed mode enabled.
- */
-#define RESTRICTED_ED
 
 /* NO_SHADOWS: define this if you want to disable shadows in your driver.
  */
@@ -529,23 +498,6 @@
  *   recognized by the lexer).
  */
 #undef NO_BUFFER_TYPE
-
-/* BINARIES: define this to enable the 'save_binary' pragma.
- *   This pragma, when set in a program, will cause it to save a
- *   binary image when loaded, so that subsequent loadings will
- *   be much faster.  The binaries are saved in the directory
- *   specified in the configuration file.  The binaries will not
- *   load if the LPC source or any of the inherited or included
- *   files are out of date, in which case the file is compiled
- *   normally (and may save a new binary).
- *
- *   In order to save the binary, valid_save_binary() is called
- *   in master.c, and is passed the name of the source file.  If
- *   this returns a non-zero value, the binary is allowed to be
- *   saved.  Allowing any file by any wizard to be saved as a
- *   binary is convenient, but may take up a lot of disk space.
- */
-#define BINARIES
 
 /* ARRAY_RESERVED_WORD: If this is defined then the word 'array' can
  *   be used to define arrays, as in:
@@ -584,6 +536,14 @@
  * and the efuns in packages/xyzzy_spec.c will be added to the driver.      *
  ****************************************************************************/
 
+/* PACKAGE_OBSOLETE: this package contains efuns that have been removed from
+ * the driver proper.  they are now completely unsupported and unmaintained.
+ * they may or may not compile or work.  use at your own risk.  if it fails
+ * to compile or doesn't work, etc, DO NOT REPORT BUGS.  they will not be
+ * fixed (hence obsolete, unsupported, unmaintained)
+ */
+#undef PACKAGE_OBSOLETE
+
 /* various miscellaneous efuns */
 #define PACKAGE_CONTRIB
 
@@ -600,12 +560,6 @@
  *   are included - see packages/matrix.spec for a list.
  */
 #undef PACKAGE_MATRIX
-
-/* PACKAGE_MUDLIB_STATS: define this to enable domain and author stats
- *   maintenance by the driver.  These mudlib stats are more domain
- *   based than user based, and replaces the traditional wiz_list stats.
- */
-#undef PACKAGE_MUDLIB_STATS
 
 /* PACKAGE_SOCKETS: define this to enable the socket efunctions.  This
  *   causes HAS_SOCKETS to be defined for all LPC objects.
@@ -636,6 +590,7 @@
 #ifdef PACKAGE_DB
 #define USE_MSQL 1		/* MiniSQL, it's small; it's free */
 #undef USE_MYSQL 2		/* MySQL, bigger; it's free */
+#undef USE_POSTGRESQL 3		/* PostgreSQL, bigger still; it's free */
 #define DEFAULT_DB USE_MSQL	/* default database */
 #endif
 
@@ -675,40 +630,6 @@
  *                      -----------------------                          *
  * Most of these options will probably be of no interest to many users.  *
  *************************************************************************/
-
-/* USE_32BIT_ADDRESSES: Use 32 bits for addresses of function, instead of 
- * the usual 16 bits.  This increases the maximum program size from 64k
- * of LPC bytecode (NOT source) to 4 GB.  Branches are still 16 bits,
- * imposing a 64k limit on catch(), if(), switch(), loops, and most other
- * control structures.  It would take an extremely large function to hit
- * those limits, though.
- *
- * Overhead: 2 bytes/function with LPC->C off.  Having LPC->C on forces
- * this option, since it needs 4 bytes to store the function pointers
- * anyway, and this setting is ignored.
- */
-#undef USE_32BIT_ADDRESSES
-
-/* HEARTBEAT_INTERVAL: define heartbeat interval in microseconds (us).
- *   1,000,000 us = 1 second.  The value of this macro specifies
- *   the frequency with which the heart_beat method will be called in
- *   those LPC objects which have called set_heart_beat(1).
- *
- * [NOTE: if ualarm() isn't available, alarm() is used instead.  Since
- *  alarm() requires its argument in units of a second, we map 1 - 1,000,000 us
- *  to an actual interval of one (1) second and 1,000,001 - 2,000,000 maps to
- *  an actual interval of two (2) seconds, etc.]
- */
-#define HEARTBEAT_INTERVAL 2000000
-
-/* 
- * CALLOUT_CYCLE_SIZE: This is the number of slots in the call_out list.
- * It should be approximately the average number of active call_outs, or
- * a few times smaller.  It should also be a power of 2, and also be relatively
- * prime to any common call_out lengths.  If all this is too confusing, 32
- * isn't a bad number :-)
- */
-#define CALLOUT_CYCLE_SIZE 32
 
 /* LARGEST_PRINTABLE_STRING: defines the size of the vsprintf() buffer in
  *   comm.c's add_message(). Instead of blindly making this value larger,
@@ -759,7 +680,7 @@
  *
  * Note: This currently only works on machines that have the dlopen() system
  * call.  SunOS and IRIX do, as do a number of others.  AIX and Ultrix don't.
- * Linux does if you are using ELF.  Versions of FreeBSD prior to 3.0 don't.
+ * Linux does if you are using ELF.
  */
 #undef RUNTIME_LOADING
 
@@ -768,45 +689,6 @@
  *   twice as fast when this is not defined (for the most common eoperators).
  */
 #undef TRACE_CODE
-
-/* HEART_BEAT_CHUNK: The number of heart_beat chunks allocated at a time.
- * A large number wastes memory as some will be sitting around unused, while
- * a small one wastes more CPU reallocating when it needs to grow.  Default
- * to a medium value.
- */
-#define HEART_BEAT_CHUNK      32
-
-/* GET_CHAR_IS_BUFFERED: Normally get_char() is unbuffered.  That is, once
- * a character is received for get_char(), anything else is in the input
- * stream is immediately thrown away.  This can be very undesirable, especially
- * if you're calling get_char() again from the handler from the previous call.
- * Define this if you want get_char() to be buffered.  In this case, the buffer
- * will only get flushed if get_char() is not called from the first get_char()'s
- * LPC callback handler.
- */
-#undef GET_CHAR_IS_BUFFERED
-
-/* Some maximum string sizes
- */
-#define SMALL_STRING_SIZE     100
-#define LARGE_STRING_SIZE     1000
-
-/* Number of levels of nested datastructures allowed -- this limit prevents
- * crashes from occuring when saving objects containing variables containing
- * recursive datastructures (with circular references).
- */
-#define MAX_SAVE_SVALUE_DEPTH 25
-
-/* Miscellaneous config options that should probably be in the runtime
- * config file.
- */
-/* MAX_LOCAL: maximum number of local variables allowed per LPC function */
-#define CFG_MAX_LOCAL_VARIABLES		25
-
-#define CFG_EVALUATOR_STACK_SIZE 	1000
-#define CFG_MAX_CALL_DEPTH		50
-/* This must be one of 4, 16, 64, 256, 1024, 4096 */
-#define CFG_LIVING_HASH_SIZE		256
 
 /* NEXT_MALLOC_DEBUG: define this if using a NeXT and you want to enable
  *   the malloc_check() and/or malloc_debug() efuns.  Run the 'man malloc_debug'

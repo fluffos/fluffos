@@ -449,7 +449,7 @@ static void interrogate_master PROT((void)) {
 	add_special_word("and", SW_AND, 0);
 	
 	add_special_word("a", SW_ORDINAL, 1);
-        add_special_word("an", SW_ORDINAL, 1);
+	add_special_word("an", SW_ORDINAL, 1);
 	add_special_word("any", SW_ORDINAL, 1);
 
 	add_special_word("first", SW_ORDINAL, 1);

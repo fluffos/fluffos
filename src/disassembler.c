@@ -16,7 +16,7 @@
 void dump_prog PROT((program_t *, char *, int));
 static void disassemble PROT((FILE *, char *, int, int, program_t *));
 static char *disassem_string PROT((char *));
-static int CDECL short_compare PROT((CONST void *, CONST void *));
+static int short_compare PROT((CONST void *, CONST void *));
 static void dump_line_numbers PROT((FILE *, program_t *));
 
 void
@@ -101,7 +101,7 @@ dump_prog P3(program_t *, prog, char *, fn, int, flags)
 	char sflags[8];
 	int flags;
 	int runtime_index;
-	function_t *func_entry = find_func_entry(prog, i);
+	function_t *func_entry = find_func_entry(prog, i, 0, 0, 0);
 	register int low, high, mid;
 	
 
@@ -213,7 +213,7 @@ static char *disassem_string P1(char *, str)
 #define NUM_STRS prog->num_strings
 #define CLSS     prog->classes
 
-static int CDECL
+static int
 short_compare P2(CONST void *, a, CONST void *, b)
 {
     int x = *(unsigned short *)a;
@@ -681,11 +681,7 @@ dump_line_numbers P2(FILE *, f, program_t *, prog) {
     fprintf(f,"\naddress -> absolute line table:\n");
     while (li < li_end) {
 	sz = *li++;
-#if !defined(USE_32BIT_ADDRESSES) && !defined(LPC_TO_C)
-	COPY_SHORT(&s, li);
-#else
 	COPY_INT(&s, li);
-#endif
 	li += sizeof(ADDRESS_TYPE);
 	fprintf(f, "%4x-%4x: %i\n", addr, addr + sz - 1, (int)s);
 	addr += sz;

@@ -6,10 +6,8 @@
 #include "comm.h"
 #include "swap.h"
 #include "socket_efuns.h"
-#include "call_out.h"
 #include "port.h"
 #include "file.h"
-#include "hash.h"
 #include "master.h"
 #include "add_action.h"
 
@@ -578,9 +576,6 @@ INLINE_STATIC void add_map_stats P2(mapping_t *, m, int, count)
 {
     total_mapping_nodes += count;
     total_mapping_size += count * sizeof(mapping_node_t);
-#ifdef PACKAGE_MUDLIB_STATS
-    add_array_size(&m->stats, count << 1);
-#endif
     m->count = count;
 }
 
@@ -1330,10 +1325,6 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
 	debug_message("Failed to completely save file. Disk could be full.\n");
 	unlink(tmp_name);
     } else {
-#ifdef WIN32
-        /* Need to erase it to write over it. */
-        unlink(file);
-#endif
 	if (rename(tmp_name, file) < 0)	{
 #ifdef LATTICE
 	    /* AmigaDOS won't overwrite when renaming */
@@ -1452,11 +1443,7 @@ int restore_object P3(object_t *, ob, char *, file, int, noclear)
         return 0;
     }
     theBuff = DXALLOC(i + 1, TAG_TEMPORARY, "restore_object: 4");
-#ifdef WIN32
-    i = read(_fileno(f), theBuff, i);
-#else
     fread(theBuff, 1, i, f);
-#endif
     fclose(f);
     theBuff[i] = '\0';
     current_object = ob;
@@ -1715,8 +1702,6 @@ void reload_object P1(object_t *, obj)
     obj->shadowed = 0;
 #endif
     remove_living_name(obj);
-    set_heart_beat(obj, 0);
-    remove_all_call_out(obj);
 #ifndef NO_LIGHT
     add_light(obj, -(obj->total_light));
 #endif
@@ -1762,8 +1747,14 @@ void get_objects P4(object_t ***, list, int *, size, get_objectsfn_t, callback, 
     }
 }
 
-static object_t *command_giver_stack[CFG_MAX_CALL_DEPTH];
-object_t **cgsp = command_giver_stack;
+static object_t **command_giver_stack;
+object_t **cgsp = 0;
+
+void init_objects PROT((void))
+{
+    command_giver_stack = CALLOCATE(MAX_CALL_DEPTH, object_t *, TAG_INTERPRETER, "init_objects");
+    cgsp = command_giver_stack;
+}
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_command_giver_stack PROT((void))
@@ -1782,7 +1773,7 @@ void mark_command_giver_stack PROT((void))
 /* set a new command giver, saving the old one */
 void save_command_giver P1(object_t *, ob)
 {
-    DEBUG_CHECK(cgsp == &command_giver_stack[CFG_MAX_CALL_DEPTH], "command_giver stack overflow");
+    DEBUG_CHECK(cgsp == &command_giver_stack[MAX_CALL_DEPTH], "command_giver stack overflow");
     *(++cgsp) = command_giver;
 
     command_giver = ob;

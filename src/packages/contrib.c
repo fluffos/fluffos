@@ -26,11 +26,6 @@
 #include "../add_action.h"
 #endif
 
-/* should be done in configure */
-#ifdef WIN32
-#define strcasecmp(X, Y) stricmp(X, Y)
-#endif
-
 /*
  * This differs from the livings() efun in that this efun only returns
  * objects which have had set_living_name() called as well as 
@@ -42,7 +37,7 @@ void f_named_livings() {
     int i;
     int nob;
 #ifdef F_SET_HIDE
-    int apply_valid_hide, display_hidden = 0;
+    int apply_valid_hide, hide_is_valid = 0;
 #endif
     object_t *ob, **obtab;
     array_t *vec;
@@ -54,7 +49,7 @@ void f_named_livings() {
 
     obtab = CALLOCATE(max_array_size, object_t *, TAG_TEMPORARY, "named_livings");
 
-    for (i = 0; i < CFG_LIVING_HASH_SIZE; i++) {
+    for (i = 0; i < LIVING_HASH_TABLE_SIZE; i++) {
 	for (ob = hashed_living[i]; ob; ob = ob->next_hashed_living) {
 	    if (!(ob->flags & O_ENABLE_COMMANDS))
 		continue;
@@ -62,9 +57,9 @@ void f_named_livings() {
 	    if (ob->flags & O_HIDDEN) {
 		if (apply_valid_hide) {
 		    apply_valid_hide = 0;
-		    display_hidden = valid_hide(current_object);
+		    hide_is_valid = valid_hide(current_object);
 		}
-		if (!display_hidden)
+		if (hide_is_valid)
 		    continue;
 	    }
 #endif
@@ -320,33 +315,7 @@ void f_functions PROT((void)) {
     i = num;
     
     while (i--) {
-	unsigned short low, high, mid;
-	
-	prog = sp->u.ob->prog;
-	index = i;
-
-	/* Walk up the inheritance tree to the real definition */	
-	if (prog->function_flags[index] & FUNC_ALIAS) {
-	    index = prog->function_flags[index] & ~FUNC_ALIAS;
-	}
-	
-	while (prog->function_flags[index] & FUNC_INHERITED) {
-	    low = 0;
-	    high = prog->num_inherited -1;
-	    
-	    while (high > low) {
-		mid = (low + high + 1) >> 1;
-		if (prog->inherit[mid].function_index_offset > index)
-		    high = mid -1;
-		else low = mid;
-	    }
-	    index -= prog->inherit[low].function_index_offset;
-	    prog = prog->inherit[low].prog;
-	}
-    
-	index -= prog->last_inherited;
-
-	funp = prog->function_table + index;
+        funp = find_func_entry(sp->u.ob->prog, i, &prog, &index, 0);
 
 	if (flag) {
 	    if (prog->type_start && prog->type_start[index] != INDEX_START_NONE)
@@ -439,13 +408,6 @@ void f_variables PROT((void)) {
     
     pop_stack();
     push_refed_array(arr);
-}
-#endif
-
-/* also Beek */
-#ifdef F_HEART_BEATS
-void f_heart_beats PROT((void)) {
-    push_refed_array(get_heart_beats());
 }
 #endif
 
@@ -931,7 +893,7 @@ static char *pluralize P1(char *, str) {
 	break;
     case 'D':
     case 'd':
-	if (!strcasecmp(rel + 1, "datum")) {
+	if (!strcasecmp(rel + 1, "atum")) {
 	    found = PLURAL_CHOP + 2;
 	    suffix = "a";
 	} else
@@ -1004,10 +966,10 @@ static char *pluralize P1(char *, str) {
 	    found = PLURAL_CHOP + 4;
 	    suffix = "ice";
 	}
-        if (!strcasecmp(rel + 1, "otus")) {
-            found = PLURAL_SUFFIX;
-            break;
-        }
+	if (!strcasecmp(rel + 1, "otus")) {
+	    found = PLURAL_SUFFIX;
+	    break;
+	}
 	break;
     case 'M':
     case 'm':
@@ -1137,9 +1099,10 @@ static char *pluralize P1(char *, str) {
 	    }
 	    break;
 	case 'F': case 'f':
-	    if (end[-2] == 'e' || end[-2] == 'E')
+	    if (end[-2] == 'e' || end[-2] == 'E' ||
+		end[-2] == 'f' || end[-2] == 'F')
 		break;
-	    found = PLURAL_CHOP + 2;
+	    found = PLURAL_CHOP + 1;
 	    suffix = "ves";
 	    break;
 	case 'H': case 'h':
@@ -1361,7 +1324,7 @@ void f_replaceable PROT((void)) {
     for (i = 0; i < num; i++) {
 	if (prog->function_flags[i] & (FUNC_INHERITED | FUNC_NO_CODE)) continue;
 	for (j = 0; j < numignore; j++)
-	    if (ignore[j] == find_func_entry(prog, i)->name)
+	    if (ignore[j] == find_func_entry(prog, i, 0, 0, 0)->name)
 		break;
 	if (j == numignore)
 	    break;
@@ -1660,24 +1623,20 @@ void f_function_owner PROT((void)) {
 #ifdef F_REPEAT_STRING
 void f_repeat_string PROT((void)) {
     char *str;
-    int repeat, len, newlen;
+    int repeat, len;
     char *ret, *p;
     int i;
     
     repeat = (sp--)->u.number;    
-    if (repeat > 0) {
-	str = sp->u.string;
-	len = SVALUE_STRLEN(sp);
-        if ((newlen = len * repeat) > max_string_length)
-            repeat = max_string_length / len;
-    }
     if (repeat <= 0) {
 	free_string_svalue(sp);
 	sp->type = T_STRING;
 	sp->subtype = STRING_CONSTANT;
 	sp->u.string = "";
     } else if (repeat != 1) {
-	p = ret = new_string(newlen, "f_repeat_string");
+	str = sp->u.string;
+	len = SVALUE_STRLEN(sp);
+	p = ret = new_string(len * repeat, "f_repeat_string");
 	for (i = 0; i < repeat; i++) {
 	    memcpy(p, str, len);
 	    p += len;
@@ -1738,6 +1697,7 @@ static int memory_share P1(svalue_t *, sv) {
     case T_MAPPING:
         if (++depth > 100)
             return 0;
+
 	subtotal = sizeof(mapping_t);
 	mapTraverse(sv->u.map, node_share, &subtotal);
         depth--;

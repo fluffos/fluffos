@@ -23,7 +23,6 @@
 #  define TRACE_RETURN 4
 #  define TRACE_ARGS 8
 #  define TRACE_EXEC 16
-#  define TRACE_HEART_BEAT 32
 #  define TRACE_APPLY 64
 #  define TRACE_OBJNAME 128
 #  ifdef LPC_TO_C
@@ -36,7 +35,6 @@
      (command_giver->interactive->trace_prefix == 0 || \
       (current_object && strpref(command_giver->interactive->trace_prefix, \
 	      current_object->name))) )
-#  define TRACEHB (current_heart_beat == 0 || (command_giver->interactive->trace_level & TRACE_HEART_BEAT))
 #endif
 
 #define EXTRACT_UCHAR(p) (*(unsigned char *)(p))
@@ -248,7 +246,7 @@ extern svalue_t *sp;
 extern svalue_t *fp;
 extern svalue_t *end_of_stack;
 extern svalue_t catch_value;
-extern control_stack_t control_stack[CFG_MAX_CALL_DEPTH];
+extern control_stack_t *control_stack;
 extern control_stack_t *csp;
 extern int too_deep_error;
 extern int max_eval_error;
@@ -319,7 +317,6 @@ INLINE void pop_2_elems PROT((void));
 INLINE void pop_3_elems PROT((void));
 INLINE function_t *setup_inherited_frame PROT((int));
 INLINE program_t *find_function_by_name PROT((object_t *, char *, int *, int *));
-char *function_name PROT((program_t *, int));
 void remove_object_from_stack PROT((object_t *));
 void setup_fake_frame PROT((funptr_t *));
 void remove_fake_frame PROT((void));
@@ -328,6 +325,7 @@ void setup_variables PROT((int, int, int));
 
 void process_efun_callback PROT((int, function_to_call_t *, int));
 svalue_t *call_efun_callback PROT((function_to_call_t *, int));
+svalue_t *safe_call_efun_callback PROT((function_to_call_t *, int));
 char *type_name PROT((int c));
 void bad_arg PROT((int, int));
 void bad_argument PROT((svalue_t *, int, int, int));
@@ -348,7 +346,7 @@ char *add_slash PROT((char *));
 int strpref PROT((char *, char *));
 array_t *get_svalue_trace PROT((void));
 void do_trace PROT((char *, char *, char *));
-char *dump_trace PROT((int));
+void dump_trace PROT((int));
 void opcdump PROT((char *));
 int inter_sscanf PROT((svalue_t *, svalue_t *, svalue_t *, int));
 char * get_line_number_if_any PROT((void));

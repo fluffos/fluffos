@@ -13,7 +13,6 @@ typedef struct {
 #define E(x) { #x, DBG_##x }
 
 debug_t levels[] = {
-    E(call_out),
     E(d_flag),
     E(connections),
     E(mapping),

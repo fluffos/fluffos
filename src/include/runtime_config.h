@@ -43,12 +43,13 @@
 #define __GLOBAL_INCLUDE_FILE__     CFG_STR(13)
 
 #define __MUD_IP__                  CFG_STR(14)
+#define __ESCAPE_CHARACTERS__       CFG_STR(15)
 
 /*
  * These config settings return an int (ie number)
  */
 
-#define BASE_CONFIG_INT (BASE_CONFIG_STR + 15)
+#define BASE_CONFIG_INT (BASE_CONFIG_STR + 16)
 #define CFG_INT(x)  ((x) + BASE_CONFIG_INT)
 
 #define __MUD_PORT__                CFG_INT(0)
@@ -82,7 +83,11 @@
 #define __FD6_PORT__		    CFG_INT(22)
 #define __FD6_KIND__		    CFG_INT(23)
 
-#define RUNTIME_CONFIG_NEXT CFG_INT(24)
+#define __MAX_SAVE_SVALUE_DEPTH__   CFG_INT(24)
+#define __PULSE_INTERVAL__          CFG_INT(25)
+#define __ADDR_SERVER_RECONNECT__   CFG_INT(26)
+
+#define RUNTIME_CONFIG_NEXT CFG_INT(27)
 
 /*
  * The following is for internal use (ie driver) only

@@ -15,11 +15,12 @@
 #include "compile_file.h"
 #include "socket_efuns.h"
 #include "master.h"
+#include "add_action.h"
 
 port_def_t external_port[5];
 
 static int e_flag = 0;		/* Load empty, without preloads. */
-int t_flag = 0;			/* Disable heart beat and reset */
+int t_flag = 0;			/* Disable reset */
 int comp_flag = 0;		/* Trace compilations */
 int max_cost;
 int time_to_swap;
@@ -35,10 +36,8 @@ static char *mud_lib;
 
 double consts[NUM_CONSTS];
 
-#ifndef NO_IP_DEMON
-int no_ip_demon = 0;
+int no_ip_daemon = 0;
 void init_addr_server();
-#endif				/* NO_IP_DEMON */
 
 #ifdef SIGNAL_FUNC_TAKES_INT
 #define SIGPROT PROT((int))
@@ -48,22 +47,22 @@ void init_addr_server();
 #define PSIG(z) z()
 #endif
 
-static void CDECL sig_fpe SIGPROT;
-static void CDECL sig_cld SIGPROT;
+static void sig_fpe SIGPROT;
+static void sig_cld SIGPROT;
 
 #ifdef TRAP_CRASHES
-static void CDECL sig_usr1 SIGPROT;
-static void CDECL sig_usr2 SIGPROT;
-static void CDECL sig_term SIGPROT;
-static void CDECL sig_int SIGPROT;
+static void sig_usr1 SIGPROT;
+static void sig_usr2 SIGPROT;
+static void sig_term SIGPROT;
+static void sig_int SIGPROT;
 
 #ifndef DEBUG
-static void CDECL sig_hup SIGPROT,
-    CDECL sig_abrt SIGPROT,
-    CDECL sig_segv SIGPROT,
-    CDECL sig_ill SIGPROT,
-    CDECL sig_bus SIGPROT,
-    CDECL sig_iot SIGPROT;
+static void sig_hup SIGPROT,
+    sig_abrt SIGPROT,
+    sig_segv SIGPROT,
+    sig_ill SIGPROT,
+    sig_bus SIGPROT,
+    sig_iot SIGPROT;
 #endif
 #endif
 
@@ -145,16 +144,6 @@ int main P2(int, argc, char **, argv)
 	exit(-1);
     }
 
-    /*
-     * Check the living hash table size
-     */
-    if (CFG_LIVING_HASH_SIZE != 4 && CFG_LIVING_HASH_SIZE != 16 &&
-	CFG_LIVING_HASH_SIZE != 64 && CFG_LIVING_HASH_SIZE != 256 &&
-	CFG_LIVING_HASH_SIZE != 1024 && CFG_LIVING_HASH_SIZE != 4096) {
-	fprintf(stderr, "CFG_LIVING_HASH_SIZE in options.h must be one of 4, 16, 64, 256, 1024, 4096, ...\n");
-	exit(-1);
-    }
-
 #ifdef RAND
     srand(get_current_time());
 #else
@@ -192,9 +181,12 @@ int main P2(int, argc, char **, argv)
 
     printf("Initializing internal tables....\n");
     init_strings();		/* in stralloc.c */
+    init_objects();		/* in object.c */
     init_otable();		/* in otable.c */
+    init_living_table();	/* in add_action.c */
     init_identifiers();		/* in lex.c */
     init_locals();              /* in compiler.c */
+    init_interpreter();		/* in interpret.c */
 
     /*
      * If our estimate is larger than FD_SETSIZE, then we need more file
@@ -268,7 +260,7 @@ int main P2(int, argc, char **, argv)
 	    fprintf(stderr, "Illegal flag syntax: %s\n", argv[i]);
 	    exit(-1);
 	case 'N':
-	    no_ip_demon++;
+	    no_ip_daemon++;
 	    continue;
 #ifdef YYDEBUG
 	case 'y':
@@ -285,6 +277,12 @@ int main P2(int, argc, char **, argv)
 	    break;
 	}
     }
+
+    /* must init binaries before changing to mudlib directory, otherwise
+     * initialization will not be able to find the driver/config file
+     */
+    init_binaries(argc, argv);
+
     if (!new_mudlib && chdir(mud_lib) == -1) {
 	fprintf(stderr, "Bad mudlib directory: %s\n", mud_lib);
 	exit(-1);
@@ -292,21 +290,13 @@ int main P2(int, argc, char **, argv)
     time(&tm);
     debug_message("----------------------------------------------------------------------------\n%s (%s) starting up on %s - %s\n\n", MUD_NAME, version_buf, ARCH, ctime(&tm));
 
-#ifdef BINARIES
-    init_binaries(argc, argv);
-#endif
 #ifdef LPC_TO_C
     init_lpc_to_c();
 #endif
     add_predefines();
-#ifdef WIN32
-    _tzset();
-#endif
 
-#ifndef NO_IP_DEMON
-    if (!no_ip_demon && ADDR_SERVER_IP)
+    if (!no_ip_daemon && ADDR_SERVER_IP)
 	init_addr_server(ADDR_SERVER_IP, ADDR_SERVER_PORT);
-#endif				/* NO_IP_DEMON */
 
     eval_cost = max_cost;	/* needed for create() functions */
 
@@ -386,9 +376,6 @@ int main P2(int, argc, char **, argv)
 	default_fail_message = make_shared_string(buf);
     } else
 	default_fail_message = "What?\n";
-#ifdef PACKAGE_MUDLIB_STATS
-    restore_stat_files();
-#endif
     preload_objects(e_flag);
 #ifdef SIGFPE
     signal(SIGFPE, sig_fpe);
@@ -421,107 +408,13 @@ int main P2(int, argc, char **, argv)
 #endif
 #endif				/* DEBUG */
 #endif
-#ifndef WIN32
 #ifdef USE_BSD_SIGNALS
     signal(SIGCHLD, sig_cld);
 #else
     signal(SIGCLD, sig_cld);
 #endif
-#endif
     backend();
     return 0;
-}
-
-#ifdef DEBUGMALLOC
-char *int_string_copy P2(char *, str, char *, desc)
-#else
-char *int_string_copy P1(char *, str)
-#endif
-{
-    char *p;
-    int len;
-
-    DEBUG_CHECK(!str, "Null string passed to string_copy.\n");
-    len = strlen(str);
-    if (len > max_string_length) {
-	len = max_string_length;
-	p = new_string(len, desc);
-	(void) strncpy(p, str, len);
-	p[len] = '\0';
-    } else {
-	p = new_string(len, desc);
-	(void) strncpy(p, str, len + 1);
-    }
-    return p;
-}
-
-#ifdef DEBUGMALLOC
-char *int_string_unlink P2(char *, str, char *, desc)
-#else
-char *int_string_unlink P1(char *, str)
-#endif
-{
-    malloc_block_t *mbt, *newmbt;
-
-    mbt = ((malloc_block_t *)str) - 1;
-    mbt->ref--;
-    
-    if (mbt->size == USHRT_MAX) {
-	int l = strlen(str + USHRT_MAX) + USHRT_MAX; /* ouch */
-
-	newmbt = (malloc_block_t *)DXALLOC(l + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc);
-	memcpy((char *)(newmbt + 1), (char *)(mbt + 1), l+1);
-	newmbt->size = USHRT_MAX;
-	ADD_NEW_STRING(USHRT_MAX, sizeof(malloc_block_t));
-    } else {
-	newmbt = (malloc_block_t *)DXALLOC(mbt->size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc);
-	memcpy((char *)(newmbt + 1), (char *)(mbt + 1), mbt->size+1);
-	newmbt->size = mbt->size;
-	ADD_NEW_STRING(mbt->size, sizeof(malloc_block_t));
-    }
-    newmbt->ref = 1;
-    CHECK_STRING_STATS;
-    
-    return (char *)(newmbt + 1);
-}
-
-static FILE *debug_message_fp = 0;
-
-void debug_message P1V(char *, fmt)
-{
-    static char deb_buf[100];
-    static char *deb = deb_buf;
-    va_list args;
-    V_DCL(char *fmt);
-
-    if (!debug_message_fp) {
-	/*
-	 * check whether config file specified this option
-	 */
-	if (strlen(DEBUG_LOG_FILE))
-	    sprintf(deb, "%s/%s", LOG_DIR, DEBUG_LOG_FILE);
-	else
-	    sprintf(deb, "%s/debug.log", LOG_DIR);
-	while (*deb == '/')
-	    deb++;
-	debug_message_fp = fopen(deb, "w");
-	if (!debug_message_fp) {
-	    /* darn.  We're in trouble */
-	    perror(deb);
-	    abort();
-	}
-    }
-
-    V_START(args, fmt);
-    V_VAR(char *, fmt, args);
-    vfprintf(debug_message_fp, fmt, args);
-    fflush(debug_message_fp);
-    va_end(args);
-    V_START(args, fmt);
-    V_VAR(char *, fmt, args);
-    vfprintf(stderr, fmt, args);
-    fflush(stderr);
-    va_end(args);
 }
 
 int slow_shut_down_to_do = 0;
@@ -553,9 +446,8 @@ char *xalloc P1(int, size)
     return p;
 }
 
-static void CDECL PSIG(sig_cld) 
+static void PSIG(sig_cld) 
 {
-#ifndef WIN32
     int status;
 #ifdef USE_BSD_SIGNALS
     while (wait3(&status, WNOHANG, NULL) > 0)
@@ -564,11 +456,10 @@ static void CDECL PSIG(sig_cld)
     wait(&status);
     signal(SIGCLD, sig_cld);
 #endif
-#endif
 }
 
 
-static void CDECL PSIG(sig_fpe)
+static void PSIG(sig_fpe)
 {
     signal(SIGFPE, sig_fpe);
 }
@@ -580,7 +471,7 @@ static void CDECL PSIG(sig_fpe)
    restart
  */
 
-static void CDECL PSIG(sig_usr1)
+static void PSIG(sig_usr1)
 {
     push_constant_string("Host machine shutting down");
     push_undefined();
@@ -591,7 +482,7 @@ static void CDECL PSIG(sig_usr1)
 }
 
 /* Abort evaluation */
-static void CDECL PSIG(sig_usr2)
+static void PSIG(sig_usr2)
 {
     eval_cost = 1;
 }
@@ -600,43 +491,43 @@ static void CDECL PSIG(sig_usr2)
  * Actually, doing all this stuff from a signal is probably illegal
  * -Beek
  */
-static void CDECL PSIG(sig_term)
+static void PSIG(sig_term)
 {
     fatal("Process terminated");
 }
 
-static void CDECL PSIG(sig_int)
+static void PSIG(sig_int)
 {
     fatal("Process interrupted");
 }
 
 #ifndef DEBUG
-static void CDECL PSIG(sig_segv)
+static void PSIG(sig_segv)
 {
     fatal("Segmentation fault");
 }
 
-static void CDECL PSIG(sig_bus)
+static void PSIG(sig_bus)
 {
     fatal("Bus error");
 }
 
-static void CDECL PSIG(sig_ill)
+static void PSIG(sig_ill)
 {
     fatal("Illegal instruction");
 }
 
-static void CDECL PSIG(sig_hup)
+static void PSIG(sig_hup)
 {
     fatal("Hangup!");
 }
 
-static void CDECL PSIG(sig_abrt)
+static void PSIG(sig_abrt)
 {
     fatal("Aborted");
 }
 
-static void CDECL PSIG(sig_iot)
+static void PSIG(sig_iot)
 {
     fatal("Aborted(IOT)");
 }

@@ -21,11 +21,7 @@ INLINE int set_socket_owner P2(int, fd, int, which)
 #ifdef OLD_ULTRIX
     return fcntl(fd, F_SETOWN, which);
 #else
-#ifdef WINSOCK
-    return 1; /* FIXME */
-#else
     return ioctl(fd, SIOCSPGRP, &which);
-#endif
 #endif
 }
 
@@ -84,80 +80,3 @@ INLINE int set_socket_nonblocking P2(int, fd, int, which)
 
 #endif
 }
-
-#ifdef WIN32
-void SocketPerror P2(char *, what, char *, file) {
-    static char *errstrings[] = 
-    {  "Operation would block",
-       "Blocking call in progress",
-       "WSAEALREADY",
-       "Invalid socket",
-       "Missing destination",
-       "Data is too large",
-       "Wrong protocol type",
-       "Unsupported option",
-       "Unsupported protocol",
-       "Unsupported socket type",
-       "Socket can't listen",
-       "WSAEPFNOSUPPORT",
-       "Can't use address family",
-       "Addr is used",
-       "Addr is not available",
-       "WSAENETDOWN",
-       "WSAENETUNREACH",
-       "WSAENETRESET",
-       "WSAECONNABORTED",
-       "WSAECONNRESET",
-       "No buffer space",
-       "Already connected",
-       "Not connected",
-       "WSAESHUTDOWN",
-       "WSAETOOMANYREFS",
-       "Time-out",
-       "Connection refused",
-       "WSAELOOP",
-       "WSAENAMETOOLONG",
-       "WSAEHOSTDOWN",
-       "WSAEHOSTUNREACH",
-       "10066", "10067", "10068", "10069", "10070", "10071", "10072", "10073", "10074",
-       "10075", "10076", "10077", "10078", "10079", "10080", "10081", "10082", "10083",
-       "10084", "10085", "10086", "10087", "10088", "10089", "10090",
-       "WSASYSNOTREADY",
-       "WSAVERNOTSUPPORTED",
-       "Winsock not initialised",
-       "10094", "10095", "10096", "10097", "10098", "10099", "11000",
-       "WSAHOST_NOT_FOUND",
-       "WSATRY_AGAIN",
-       "WSANO_RECOVERY",
-       "WSANO_DATA"
-    };
-    
-    static char tmpstring[80];
-    char *s = tmpstring;
-    int sock_errno;
-
-    sock_errno = WSAGetLastError();
-    
-    switch (sock_errno) {
-        case WSAEINTR:  strcpy(tmpstring, "Function interrupted");
-        case WSAEACCES: strcpy(tmpstring, "Cannot broadcast");
-        case WSAEFAULT: strcpy(tmpstring, "Buffer is invalid");
-        case WSAEINVAL: strcpy(tmpstring, "Unbound socket");
-        case WSAEMFILE: strcpy(tmpstring, "No more descriptors");
-
-        default:
-            if ( (sock_errno >= WSAEWOULDBLOCK) && (sock_errno <= WSANO_DATA)) {
-                s = errstrings[sock_errno - WSAEWOULDBLOCK];
-		} else
-                strcpy(tmpstring, "unknown error");
-    }
-    if (file)
-        debug_message("System Error: %s:%s:%s\n", what, file, s);
-    else
-        debug_message("System Error: %s:%s\n", what, s);
-}
-
-void CDECL cleanup_sockets(void) {
-	WSACleanup();
-}
-#endif

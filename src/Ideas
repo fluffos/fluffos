@@ -7,24 +7,6 @@ swapping for much of the mud ...
 
 -----
 
-7. It would be more real, if a new call_out happen after all the previous
-   call_outs of the same delay. (because it were called later)
-   example: call_out("foo",1);
-            call_out("bar",1);
-   now bar will be called first and not foo! It's unreal.
-   could be possible a call_out with 0 delay ? we would use it for
-   safe destruct object.
-
-Comment:
-
-Ideally, a better fix would be for call_out to have a smaller
-granularity, so the second call_out follows the first by whatever the
-time difference between the two was.  This problem will always happen
-if the call_outs are within the granularity, and real small
-granularities (microsecond?) may/may not be desirable.
-
------
-
 The names of includes which define no code don't have to be saved for
 line number purposes (although they are still needed for binaries; see
 the other note about merging the two lists)
@@ -37,9 +19,9 @@ master applies slow.  APPLY_CREATE also always misses the cache, but
 it's always going to miss anyway so no problem :-).  Others like APPLY_ID
 etc should be changed to use shared strings so they can hit.
 
------
-
-There should be a NO_HEART_BEATS option
+Marius, 11-Sep-2000: Master applies are done, and have been for some time.
+Other frequent applies are not, but most are going to be removed from the
+driver proper soon anyway
 
 -----
 
@@ -75,29 +57,6 @@ UNIX process.
 
 -----
 
-In message <9303080120.AA26940@rock.concert.net> Dank writes:
->powerful.  This seems "grossly unfair" to our more serious gamers.  That's
->why i need to know the best way to implement (either in the driver or in LPC)
->an hb_call_out() efun, that operates exactly as call_out() does, except that
->it calls its function after a set number of _heartbeats_ have elapsed, not
->after a set number of seconds.
->  I ran this by Mobydick, and he thought the solution should be sought from
->you driver folks rather than in the mudlib (course, that may be because
->he's a mudlib coder :)
-
-I agree; it does seem that we need a variant of call_out that operates in terms
-of number of heartbeats rather than absolute # of seconds.  A few ways
-to do this.
-
-// optionally change the way call_out() works so that muds can change it if
-// they like.
-#define CALL_OUT_UNITS_EQUAL_HEARTBEAT /* or some shorter similar thing */
-
-Or we could make a call_out2() efun that operates in the desired heartbeat units
-(name it something more appropriate than call_out2()).
-
------
-
 hmm, save_object() should probably somehow save the subtype of numbers.
 (ie null, undefined, error, etc)
  
@@ -113,13 +72,6 @@ from), saving clones and the contents of variables.
 
 ### This seems to be a fad and a bad idea, but I'll get flamed for saying
 	 that ...
-
------
-
-mudlib_stats uses a linked list, it is fast for insertion; however
-  lookup is O(n)...this should be hacked to use an AVL tree (ala uid.c)
-
--- robo
 
 -----
 
@@ -209,20 +161,6 @@ Support L_ARRAY_CLOSE, L_FUNCTION_CLOSE, and L_MAPPING_CLOSE for consistency;
 L_MAPPING_CLOSE requires a bit more work...
 
 -- robo
-
------
-
-Threads :)
-
------
-
-Exceptions :)
-
------
-
-A make_mapping() efun that obeys the tautology:
-
-make_mapping( keys(m), values(m) ) == m
 
 -----
 

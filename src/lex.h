@@ -54,10 +54,10 @@ typedef struct defn_s {
 #define DEF_IS_NOT_LOCAL 4
 
 /* to speed up cleaning the hash table, and identify the union */
-#define IHE_RESWORD    0x8000	/* reserved word */
-#define IHE_EFUN       0x4000	/* efun name */
-#define IHE_SIMUL      0x2000	/* active simul efun name */
-#define IHE_ORPHAN     0x1000	/* old and unused simul efun name */
+#define IHE_RESWORD    0x8000 /* reserved word */
+#define IHE_EFUN       0x4000 /* efun name */
+#define IHE_SIMUL      0x2000 /* active simul efun name */
+#define IHE_ORPHAN     0x1000 /* old and unused simul efun name */
 #define IHE_PERMANENT  (IHE_RESWORD | IHE_EFUN | IHE_SIMUL | IHE_ORPHAN)
 #define TOKEN_MASK     0x0fff
 

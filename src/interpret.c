@@ -13,7 +13,6 @@
 #include "swap.h"
 #include "comm.h"
 #include "port.h"
-#include "qsort.h"
 #include "compiler.h"
 #include "regexp.h"
 #include "master.h" 
@@ -51,6 +50,9 @@ extern int max_cost;
 extern int call_origin;
 
 INLINE void push_indexed_lvalue PROT((int));
+#ifdef TRACE
+static void do_trace_call PROT((int));
+#endif
 #ifdef TRACE
 static void do_trace_call PROT((int));
 #endif
@@ -106,8 +108,8 @@ int function_index_offset;	/* Needed for inheritance */
 int variable_index_offset;	/* Needed for inheritance */
 int st_num_arg;
 
-static svalue_t start_of_stack[CFG_EVALUATOR_STACK_SIZE];
-svalue_t *end_of_stack = start_of_stack + CFG_EVALUATOR_STACK_SIZE - 5;
+static svalue_t *start_of_stack;
+svalue_t *end_of_stack;
 
 /* Used to throw an error to a catch */
 svalue_t catch_value = {T_NUMBER};
@@ -115,7 +117,7 @@ svalue_t catch_value = {T_NUMBER};
 /* used by routines that want to return a pointer to an svalue */
 svalue_t apply_ret_value = {T_NUMBER};
 
-control_stack_t control_stack[CFG_MAX_CALL_DEPTH];
+control_stack_t *control_stack;
 control_stack_t *csp;	/* Points to last element pushed */
 
 int too_deep_error = 0, max_eval_error = 0;
@@ -157,6 +159,13 @@ ref_t *make_ref PROT((void)) {
 void get_version P1(char *, buff)
 {
     sprintf(buff, "MudOS %s", PATCH_LEVEL);
+}
+
+void init_interpreter PROT((void))
+{
+    start_of_stack = CALLOCATE(EVALUATOR_STACK_SIZE, svalue_t, TAG_INTERPRETER, "init_interpreter");
+    end_of_stack = start_of_stack + EVALUATOR_STACK_SIZE - 5;
+    control_stack = CALLOCATE(MAX_CALL_DEPTH, control_stack_t, TAG_INTERPRETER, "init_interpreter");
 }
 
 /*
@@ -528,6 +537,23 @@ svalue_t *call_efun_callback P2(function_to_call_t *, ftc, int, n) {
     return v;
 }
 
+svalue_t *safe_call_efun_callback P2(function_to_call_t *, ftc, int, n) {
+    svalue_t *v;
+    error_context_t econ;
+
+    if (!save_context(&econ))
+	return 0;
+    if (!SETJMP(econ.context)) {
+	v = call_efun_callback(ftc, n);
+    } else {
+	restore_context(&econ);
+	pop_n_elems(n + ftc->narg); /* saved state had args on stack already */
+	v = 0;
+    }
+    pop_context(&econ);
+    return v;
+}
+
 /*
  * Free several svalues, and free up the space used by the svalues.
  * The svalues must be sequentially located.
@@ -564,7 +590,7 @@ INLINE void assign_svalue_no_free P2(svalue_t *, to, svalue_t *, from)
 {
     DEBUG_CHECK(from == 0, "Attempt to assign_svalue() from a null ptr.\n");
     DEBUG_CHECK(to == 0, "Attempt to assign_svalue() to a null ptr.\n");
-    DEBUG_CHECK((from->type & (from->type - 1)) & ~T_FREED, "from->type is corrupt; >1 bit set.\n");
+    DEBUG_CHECK(from->type & (from->type - 1), "from->type is corrupt; >1 bit set.\n");
     
     if (from->type == T_OBJECT && (!from->u.ob || (from->u.ob->flags & O_DESTRUCTED))) {
 	*to = const0u;
@@ -1158,7 +1184,7 @@ void bad_argument P4(svalue_t *, val, int, type, int, arg, int, instr)
 INLINE void
 push_control_stack P1(int, frkind)
 {
-    if (csp == &control_stack[CFG_MAX_CALL_DEPTH - 1]) {
+    if (csp == &control_stack[MAX_CALL_DEPTH - 1]) {
 	too_deep_error = 1;
 	error("Too deep recursion.\n");
     }
@@ -1327,20 +1353,18 @@ void push_constant_string P1(char *, p)
 static void do_trace_call P1(int, offset)
 {
     do_trace("Call direct ", current_prog->function_table[offset].name, " ");
-    if (TRACEHB) {
-	if (TRACETST(TRACE_ARGS)) {
-	    int i, n;
-	    
-	    n = current_prog->function_table[offset].num_arg;
+    if (TRACETST(TRACE_ARGS)) {
+	int i, n;
 
-	    add_vmessage(command_giver, " with %d arguments: ", n);
-	    for (i = n - 1; i >= 0; i--) {
-		print_svalue(&sp[-i]);
-		add_message(command_giver, " ", 1);
-	    }
+	n = current_prog->function_table[offset].num_arg;
+
+	add_vmessage(command_giver, " with %d arguments: ", n);
+	for (i = n - 1; i >= 0; i--) {
+	    print_svalue(&sp[-i]);
+	    add_message(command_giver, " ", 1);
 	}
-	add_message(command_giver, "\n", 1);
     }
+    add_message(command_giver, "\n", 1);
 }
 #endif
 
@@ -1386,41 +1410,17 @@ INLINE function_t *
 setup_new_frame P1(int, index)
 {
     function_t *func_entry;
-    register int low, high, mid;
     int flags;
 
     function_index_offset = variable_index_offset = 0;
-
-    /* Walk up the inheritance tree to the real definition */	
-    if (current_prog->function_flags[index] & FUNC_ALIAS) {
-	index = current_prog->function_flags[index] & ~FUNC_ALIAS;
-    }
+    func_entry = find_func_entry(current_prog, index, &current_prog, &index, 1);
+    flags = current_prog->function_flags[index + current_prog->last_inherited];
     
-    while (current_prog->function_flags[index] & FUNC_INHERITED) {
-	low = 0;
-	high = current_prog->num_inherited -1;
-	
-	while (high > low) {
-	    mid = (low + high + 1) >> 1;
-	    if (current_prog->inherit[mid].function_index_offset > index)
-		high = mid -1;
-	    else low = mid;
-	}
-	index -= current_prog->inherit[low].function_index_offset;
-	function_index_offset += current_prog->inherit[low].function_index_offset;
-	variable_index_offset += current_prog->inherit[low].variable_index_offset;
-	current_prog = current_prog->inherit[low].prog;
-    }
-    
-    flags = current_prog->function_flags[index];
-
-    index -= current_prog->last_inherited;
-
-    func_entry = current_prog->function_table + index;
     csp->fr.table_index = index;
+
 #ifdef PROFILE_FUNCTIONS
     get_cpu_times(&(csp->entry_secs), &(csp->entry_usecs));
-    current_prog->function_table[index].calls++;
+    func_entry->calls++;
 #endif
 
     /* Remove excessive arguments */
@@ -1428,73 +1428,56 @@ setup_new_frame P1(int, index)
 	setup_varargs_variables(csp->num_local_variables, 
 				func_entry->num_local, 
 				func_entry->num_arg);
-    }
-    else
+    } else {
 	setup_variables(csp->num_local_variables,
 			func_entry->num_local, 
 			func_entry->num_arg);
+    }
+
 #ifdef TRACE
     tracedepth++;
     if (TRACEP(TRACE_CALL)) {
 	do_trace_call(index);
     }
 #endif
-    return &current_prog->function_table[index];
+
+    return func_entry;
 }
 
 INLINE function_t *setup_inherited_frame P1(int, index)
 {
     function_t *func_entry;
-    register int low, high, mid;
     int flags;
 
-    /* Walk up the inheritance tree to the real definition */	
-    if (current_prog->function_flags[index] & FUNC_ALIAS) {
-	index = current_prog->function_flags[index] & ~FUNC_ALIAS;
-    }
+    func_entry = find_func_entry(current_prog, index, &current_prog, &index, 1);
+    flags = current_prog->function_flags[index + current_prog->last_inherited];
     
-    while (current_prog->function_flags[index] & FUNC_INHERITED) {
-	low = 0;
-	high = current_prog->num_inherited -1;
-	
-	while (high > low) {
-	    mid = (low + high + 1) >> 1;
-	    if (current_prog->inherit[mid].function_index_offset > index)
-		high = mid -1;
-	    else low = mid;
-	}
-	index -= current_prog->inherit[low].function_index_offset;
-	function_index_offset += current_prog->inherit[low].function_index_offset;
-	variable_index_offset += current_prog->inherit[low].variable_index_offset;
-	current_prog = current_prog->inherit[low].prog;
-    }
-    
-    flags = current_prog->function_flags[index];
-    index -= current_prog->last_inherited;
-
-    func_entry = current_prog->function_table + index;
     csp->fr.table_index = index;
+
 #ifdef PROFILE_FUNCTIONS
     get_cpu_times(&(csp->entry_secs), &(csp->entry_usecs));
-    current_prog->function_table[index].calls++;
+    func_entry->calls++;
 #endif
 
     /* Remove excessive arguments */
-    if (flags & FUNC_TRUE_VARARGS)
+    if (flags & FUNC_TRUE_VARARGS) {
 	setup_varargs_variables(csp->num_local_variables, 
 				func_entry->num_local, 
 				func_entry->num_arg);
-    else
+    } else {
 	setup_variables(csp->num_local_variables,
 			func_entry->num_local, 
 			func_entry->num_arg);
+    }
+
 #ifdef TRACE
     tracedepth++;
     if (TRACEP(TRACE_CALL)) {
 	do_trace_call(index);
     }
 #endif
-    return &current_prog->function_table[index];
+
+    return func_entry;
 }
 
 #ifdef DEBUG
@@ -1523,7 +1506,7 @@ unsigned char fake_program = F_RETURN;
  * These frames are the ones that show up as <function> in error traces.
  */
 void setup_fake_frame P1(funptr_t *, fun) {
-    if (csp == &control_stack[CFG_MAX_CALL_DEPTH-1]) {
+    if (csp == &control_stack[MAX_CALL_DEPTH-1]) {
 	too_deep_error = 1;
 	error("Too deep recursion.\n");
     }
@@ -1970,7 +1953,7 @@ eval_instruction P1(char *, p)
 	     */
 	    ref = make_ref();
 	    ref->lvalue = sp->u.lvalue;
-	    if (op != F_GLOBAL_LVALUE && op != F_LOCAL_LVALUE && op != F_REF_LVALUE) {
+	    if (op != F_GLOBAL_LVALUE && op != F_LOCAL_LVALUE) {
 		ref->sv.type = lv_owner_type;
 		ref->sv.subtype = STRING_MALLOC; /* ignored if non-string */
 		if (lv_owner_type == T_STRING) {
@@ -1988,6 +1971,7 @@ eval_instruction P1(char *, p)
 		ref->sv.type = T_NUMBER;
 	    sp->type = T_REF;
 	    sp->u.ref = ref;
+	    ref->ref++;
 	    break;
 	}
 	case F_KILL_REFS:
@@ -3453,14 +3437,12 @@ eval_instruction P1(char *, p)
 		tracedepth--;
 		if (TRACEP(TRACE_RETURN)) {
 		    do_trace("Return", "", "");
-		    if (TRACEHB) {
-			if (TRACETST(TRACE_ARGS)) {
-			    static char msg[] = "with value: 0";
-			    
-			    add_message(command_giver, msg, sizeof(msg)-1);
-			}
-			add_message(command_giver, "\n", 1);
+		    if (TRACETST(TRACE_ARGS)) {
+			static char msg[] = " with value: 0";
+
+			add_message(command_giver, msg, sizeof(msg)-1);
 		    }
+		    add_message(command_giver, "\n", 1);
 		}
 #endif
 		/* The control stack was popped just before */
@@ -3497,15 +3479,13 @@ eval_instruction P1(char *, p)
 		tracedepth--;
 		if (TRACEP(TRACE_RETURN)) {
 		    do_trace("Return", "", "");
-		    if (TRACEHB) {
-			if (TRACETST(TRACE_ARGS)) {
-			    char msg[] = " with value: ";
-			    
-			    add_message(command_giver, msg, sizeof(msg)-1);
-			    print_svalue(sp);
-			}
-			add_message(command_giver, "\n", 1);
+		    if (TRACETST(TRACE_ARGS)) {
+			static char msg[] = " with value: ";
+
+			add_message(command_giver, msg, sizeof(msg)-1);
+			print_svalue(sp);
 		    }
+		    add_message(command_giver, "\n", 1);
 		}
 #endif
 		/* The control stack was popped just before */
@@ -3889,10 +3869,6 @@ find_function_by_name2 P6(object_t *, ob, char **, name,
  * exists for variables. The global variables function_index_offset and
  * variable_index_offset keep track of how much to adjust the index when
  * executing code in the superclass objects.
- *
- * There is a special case when called from the heart beat, as
- * current_prog will be 0. When it is 0, set current_prog
- * to the 'ob->prog' sent as argument.
  *
  * Arguments are always removed from the stack.
  * If the function is not found, return 0 and nothing on the stack.
@@ -4330,33 +4306,6 @@ array_t *call_all_other P3(array_t *, v, char *, func, int, numargs)
     return ret;
 }
 
-char *function_name P2(program_t *, prog, int, index) {
-    register int low, high, mid;
-
-    /* Walk up the inheritance tree to the real definition */	
-    if (prog->function_flags[index] & FUNC_ALIAS) {
-	index = prog->function_flags[index] & ~FUNC_ALIAS;
-    }
-    
-    while (prog->function_flags[index] & FUNC_INHERITED) {
-	low = 0;
-	high = prog->num_inherited -1;
-	
-	while (high > low) {
-	    mid = (low + high + 1) >> 1;
-	    if (prog->inherit[mid].function_index_offset > index)
-		high = mid -1;
-	    else low = mid;
-	}
- 	index -= prog->inherit[low].function_index_offset;
-	prog = prog->inherit[low].prog;
-    }
-    
-    index -= prog->last_inherited;
-
-    return prog->function_table[index].name;
-}
- 
 static void get_trace_details P5(program_t *, prog, int, index,
 				 char **, fname, int *, na, int *, nl) {
     function_t *cfp = &prog->function_table[index];
@@ -4433,7 +4382,7 @@ int is_static P2(char *, fun, object_t *, ob)
  * Call a function by object and index number.  Used by parts of the
  * driver which cache function numbers to optimize away function lookup.
  * The return value is left on the stack.
- * Currently: heart_beats, simul_efuns, master applies.
+ * Currently: simul_efuns, master applies.
  */
 void call_direct P4(object_t *, ob, int, offset, int, origin, int, num_arg) {
     function_t *funp;
@@ -4515,11 +4464,7 @@ static int find_line P4(char *, p, program_t *, progp,
 	lns += (sizeof(ADDRESS_TYPE) + 1);
     }
     
-#if !defined(USE_32BIT_ADDRESSES) && !defined(LPC_TO_C)
-    COPY_SHORT(&abs_line, lns + 1);
-#else
     COPY_INT(&abs_line, lns + 1);
-#endif
     
     translate_absolute_line(abs_line, &progp->file_info[2], 
 			    &file_idx, ret_line);
@@ -4597,13 +4542,11 @@ static void dump_trace_line P4(char *, fname, char *, pname,
 }
 
 /*
- * Write out a trace. If there is a heart_beat(), then return the
- * object that had that heart beat.
+ * Write out a trace.
  */
-char *dump_trace P1(int, how)
+void dump_trace P1(int, how)
 {
     control_stack_t *p;
-    char *ret = 0;
     char *fname;
     int num_arg = -1, num_local = -1;
     
@@ -4614,9 +4557,9 @@ char *dump_trace P1(int, how)
 #endif
 
     if (current_prog == 0)
-	return 0;
+	return;
     if (csp < &control_stack[0]) {
-	return 0;
+	return;
     }
 
 #if defined(ARGUMENTS_IN_TRACEBACK) || defined(LOCALS_IN_TRACEBACK)
@@ -4630,12 +4573,12 @@ char *dump_trace P1(int, how)
      */
     if (!max_eval_error && !too_deep_error) {
 	if (!save_context(&econ))
-	    return 0;
+	    return;
 	context_saved = 1;
 	if (SETJMP(econ.context)) {
 	    restore_context(&econ);
 	    pop_context(&econ);
-	    return 0;
+	    return;
 	}
     }
 #endif
@@ -4652,8 +4595,6 @@ char *dump_trace P1(int, how)
 			      &fname, &num_arg, &num_local);
 	    dump_trace_line(fname, p[1].prog->name, p[1].ob->name,
 			    get_line_number(p[1].pc, p[1].prog));
-	    if (strcmp(fname, "heart_beat") == 0)
-		ret = p->ob ? p->ob->name : 0;
 	    break;
 	case FRAME_FUNP:
 	    dump_trace_line("<function>", p[1].prog->name, p[1].ob->name,
@@ -4785,7 +4726,6 @@ char *dump_trace P1(int, how)
     if (context_saved)
 	pop_context(&econ);
 #endif
-    return ret;
 }
 
 array_t *get_svalue_trace()
@@ -5312,10 +5252,10 @@ int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_ar
 void opcdump P1(char *, tfn)
 {
     int i, len, limit;
-    char tbuf[SMALL_STRING_SIZE], *fn;
+    char tbuf[100], *fn;
     FILE *fp;
 
-    if ((len = strlen(tfn)) >= (SMALL_STRING_SIZE - 7)) {
+    if ((len = strlen(tfn)) >= (sizeof(tbuf) - 7)) {
 	error("Path '%s' too long.\n", tfn);
 	return;
     }
@@ -5371,11 +5311,11 @@ int sort_elem_cmp P2(sort_elem_t *, se1, sort_elem_t *, se2) {
 void opcdump P1(char *, tfn)
 {
     int ind, i, j, len;
-    char tbuf[SMALL_STRING_SIZE], *fn;
+    char tbuf[100], *fn;
     FILE *fp;
     sort_elem_t ops[(BASE + 1) * (BASE + 1)];
 
-    if ((len = strlen(tfn)) >= (SMALL_STRING_SIZE - 10)) {
+    if ((len = strlen(tfn)) >= (sizeof(tbuf) - 10)) {
 	error("Path '%s' too long.\n", tfn);
 	return;
     }
@@ -5400,7 +5340,7 @@ void opcdump P1(char *, tfn)
 	}
     }
     quickSort((char *) ops, (BASE + 1) * (BASE + 1), sizeof(sort_elem_t),
-	      sort_elem_cmp);
+	      (qsort_comparefn_t)sort_elem_cmp);
     for (i = 0; i < (BASE + 1) * (BASE + 1); i++) {
 	if (ops[i].num_calls)
 	    fprintf(fp, "%-30s %-30s: %10d\n", query_instr_name(ops[i].op1),
@@ -5483,8 +5423,6 @@ void do_trace P3(char *, msg, char *, fname, char *, post)
 {
     char *objname;
 
-    if (!TRACEHB)
-	return;
     objname = TRACETST(TRACE_OBJNAME) ? (current_object && current_object->name ? current_object->name : "??") : "";
     add_vmessage(command_giver, "*** %d %*s %s %s %s%s", tracedepth, tracedepth, "", msg, objname, fname, post);
 }
@@ -5575,7 +5513,7 @@ void mark_stack() {
 /* Be careful.  This assumes there will be a frame pushed right after this,
    as we use econ->save_csp + 1 to restore */
 int save_context P1(error_context_t *, econ) {
-    if (csp == &control_stack[CFG_MAX_CALL_DEPTH - 1]) {
+    if (csp == &control_stack[MAX_CALL_DEPTH - 1]) {
 	/* Attempting to push the frame will give Too deep recursion.
 	   fail now. */
 	return 0;

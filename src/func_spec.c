@@ -69,11 +69,6 @@ string file_name(object default: F__THIS_OBJECT);
 string capitalize(string);
 string *explode(string, string);
 mixed implode(mixed *, string | function, void | mixed);
-#ifdef CALLOUT_HANDLES
-int call_out(string | function, int,...);
-#else
-void call_out(string | function, int,...);
-#endif
 int member_array(mixed, string | mixed *, void | int);
 int input_to(string | function,...);
 int random(int);
@@ -84,8 +79,6 @@ object *all_inventory(object default: F__THIS_OBJECT);
 object *deep_inventory(object default: F__THIS_OBJECT);
 object first_inventory(object|string default: F__THIS_OBJECT);
 object next_inventory(object default: F__THIS_OBJECT);
-void say(string, void | object | object *);
-void tell_room(object | string, string | object | int | float, void | object | object *);
 object present(object | string, void | object);
 void move_object(object | string);
 #endif
@@ -104,10 +97,9 @@ object *livings();
 object find_living(string);
 object find_player(string);
 void notify_fail(string | function);
-#else
+#endif
 void set_this_player(object | int);
 void set_this_user set_this_player(object | int);
-#endif
 
 string lower_case(string);
 string replace_string(string, string, string,...);
@@ -124,22 +116,12 @@ int strstr strsrch(string, string | int, int default: 0);
 
 /* communication functions */
 
-void write(mixed);
-void tell_object(object, string);
-void shout(string);
 void receive(string OR_BUFFER);
-void message(mixed, mixed, string | string * | object | object *,
-	          void | object | object *);
 
 /* the find_* functions */
 
     object find_object(string, int default: 0);
     object load_object find_object(string, int default: 1);
-#ifdef CALLOUT_HANDLES
-    int find_call_out(int|string);
-#else
-    int find_call_out(string);
-#endif
 
 /* mapping functions */
 
@@ -187,7 +169,6 @@ void message(mixed, mixed, string | string * | object | object *,
     mixed regexp(string | string *, string, void | int);
     mixed *reg_assoc(string, string *, mixed *, mixed | void);
     mixed *allocate(int, void | mixed);
-    mixed *call_out_info();
 
 /* 32-bit cyclic redundancy code - see crc32.c and crctab.h */
     int crc32(string OR_BUFFER);
@@ -239,13 +220,7 @@ void message(mixed, mixed, string | string * | object | object *,
     object query_snoop(object);
     object query_snooping(object);
 #endif
-#ifdef CALLOUT_HANDLES
-    int remove_call_out(int | void | string);
-#else
-    int remove_call_out(void | string);
-#endif
-    void set_heart_beat(int);
-    int query_heart_beat(object default:F__THIS_OBJECT);
+    void set_pulse(int);
     void set_hide(int);
 
 #ifdef LPC_TO_C
@@ -273,7 +248,6 @@ void message(mixed, mixed, string | string * | object | object *,
 #else
     string *inherit_list shallow_inherit_list(object default:F__THIS_OBJECT);
 #endif
-    void printf(string,...);
     string sprintf(string,...);
     int mapp(mixed);
     mixed *stat(string, int default: 0);
@@ -287,12 +261,6 @@ void message(mixed, mixed, string | string * | object | object *,
     int userp(object);
 #ifdef COMPAT_32
     int query_once_interactive userp(object);
-#endif
-
-#ifndef NO_WIZARDS
-    void enable_wizard();
-    void disable_wizard();
-    int wizardp(object);
 #endif
 
     object master();
@@ -321,21 +289,15 @@ void message(mixed, mixed, string | string * | object | object *,
     int uptime();
     int strcmp(string, string);
 
-#ifndef WIN32
 #if (defined(RUSAGE) || defined(GET_PROCESS_STATS) || defined(TIMES)) || defined(LATTICE)
     mapping rusage();
 #endif				/* RUSAGE */
-#endif
 
     void flush_messages(void | object);
 
-#ifdef OLD_ED
-    void ed(string | void, string | void, string | int | void, int | void);
-#else
-    string ed_start(string | void, int | void);
+    string ed_start(string | void, function | string | int | void, function | string | void);
     string ed_cmd(string);
     int query_ed_mode();
-#endif
 
 #ifdef CACHE_STATS
     string cache_stats();

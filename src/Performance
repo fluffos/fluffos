@@ -31,10 +31,7 @@ for building arrays).
 when debugging code but it slows down most simple LPC instructions (in
 eval_instruction()) by a factor of two.
 
-5) Don't give objects heartbeats (set_heart_beat(1)) unless really
-necessary.  Do as little in heart_beat() functions as reasonable.
-Consider turning off heartbeats when not needed and then restarting
-them when again needed.
+5) Do as little in the master object pulse() function as reasonable.
 
 6) Read the comments in the example config file about hash table size, and
 object hash table size--setting proper (large enough) values for these

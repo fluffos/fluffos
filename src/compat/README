@@ -1,0 +1,38 @@
+This directory and its subdirectories contain LPC code that can be used to
+implement functionality that used to be part of the driver or provide examples
+as to how to use a particular driver interface (e.g., a mudlib error handler).
+The code is provided AS IS and is not supported.  It is meant to be used for a
+quick replacement when features are cut from the MudOS driver proper, however
+the code should be custom tailored to the mudlib it is being placed in.  In
+most cases, the code is suboptimal and could be improved with a minimal amount
+of effort (which I am not willing to put forth ... there's a reason the
+features were cut from the MudOS driver proper in the first place).  Optimizing
+the code is left as an exercise for the reader.
+
+Header files in this directory are used by many of the source files contained
+within the various subdirectories.  Code is written with the assumption that
+global.h in this directory is globally included.  No provdided code includes
+it explicitly.  One will note that global.h includes options.h.  The file
+options.h is a stripped down version of the driver options.h file and contains
+those options that have been removed from the MudOS driver proper.
+
+The master directory contains example code that should be placed into your
+master object.  Using all of the assembled code will not provide you with a
+complete master object.  If you're trying to write a master object from scratch
+then you should be able to find what you need in the driver source or from
+looking at examples in other mudlibs that have already accomplished your goal.
+
+The simuls directory contains a collection of simulated efunctions that you can
+use to implement obsoleted driver efuns in your mudlib.  Some of them depend on
+other code that you will find within this compat directory structure.  Read the
+notes in each for more information.
+
+The modules directory contains inheritable objects that can be used in your
+mudlib to aid in simulating removed features from the MudOS driver proper.
+Refer to the documentation in each for the gory details.
+
+Finally, the misc directory contains miscellaneous supporting source used by
+the provided simuls and modules.  See the documentation in each for more
+information.
+
+-- Matt Messier (Marius), 28-Sep-2000

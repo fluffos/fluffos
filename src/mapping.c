@@ -128,9 +128,6 @@ dealloc_mapping P1(mapping_t *, m)
 				   sizeof(mapping_node_t *) * (j+1) +
 				   sizeof(mapping_node_t) * c);
 	    total_mapping_nodes -= c;
-#ifdef PACKAGE_MUDLIB_STATS
-	    add_array_size (&m->stats, - (c << 1));
-#endif
 
 	    do {
 		for (elt = a[j]; elt; elt = nelt) {
@@ -265,14 +262,6 @@ allocate_mapping P1(int, n)
 	total_mapping_size += sizeof(mapping_t) + n;
 	newmap->ref = 1;
 	newmap->count = 0;
-#ifdef PACKAGE_MUDLIB_STATS
-	if (current_object) {
-	  assign_stats (&newmap->stats, current_object);
-	  add_array_size (&newmap->stats, n << 1);
-	} else {
-	  null_stats (&newmap->stats);
-	}
-#endif
 	num_mappings++;
 	debug(mapping,("mapping.c: allocate_mapping end\n"));
 	return newmap;
@@ -349,13 +338,6 @@ copyMapping P1(mapping_t *,m)
 			   sizeof(mapping_node_t *) * k +
 			   sizeof(mapping_node_t) * MAP_COUNT(m));
 
-#ifdef PACKAGE_MUDLIB_STATS
-    if (current_object) {
-	assign_stats (&newmap->stats, current_object);
-	add_array_size (&newmap->stats, MAP_COUNT(m) << 1);
-    }
-    else null_stats (&newmap->stats);
-#endif
     num_mappings++;
     while (k--) {
 	if ((elt = b[k])) {
@@ -553,9 +535,6 @@ find_for_insert P3(mapping_t *, m, svalue_t *, lv, int, doTheFree)
 	    debug(mapping,("mapping.c: too full"));
 	    mapping_too_large();
 	}
-#ifdef PACKAGE_MUDLIB_STATS
-	add_array_size (&m->stats, 2);
-#endif
 	total_mapping_size += sizeof(mapping_node_t);
 	debug(mapping,("mapping.c: allocated a node\n"));
 	newnode = new_map_node();
@@ -717,9 +696,6 @@ void f_unique_mapping PROT((void))
 			    } while ((uptr = nptr));
 			    uptr = table[--j];
 			} while (j >= 0);
-#ifdef PACKAGE_MUDLIB_STATS
-                        add_array_size(&m->stats, numkeys << 1);
-#endif
                         total_mapping_size += sizeof(mapping_node_t) * (m->count = numkeys);
                         total_mapping_nodes += numkeys;
                         free_mapping(m);
@@ -744,9 +720,6 @@ void f_unique_mapping PROT((void))
         }
     } while (j--);
 
-#ifdef PACKAGE_MUDLIB_STATS
-    add_array_size(&m->stats, numkeys << 1);
-#endif
     total_mapping_size += sizeof(mapping_node_t) * (m->count = numkeys);
     total_mapping_nodes += numkeys;
     FREE((char *) table);
@@ -797,9 +770,6 @@ load_mapping_from_aggregate P2(svalue_t *,sp, int, n)
 		    mask <<= 1;
 		    mask--;
 		} else{
-#ifdef PACKAGE_MUDLIB_STATS
-		    add_array_size(&m->stats, count << 1);
-#endif
 		    total_mapping_size += sizeof(mapping_node_t) * (m->count = count);
 		    total_mapping_nodes += count;
 		    free_mapping(m);
@@ -808,9 +778,6 @@ load_mapping_from_aggregate P2(svalue_t *,sp, int, n)
 	    }
 
 	    if (++count > MAX_MAPPING_SIZE) {
-#ifdef PACKAGE_MUDLIB_STATS
-		add_array_size(&m->stats, (--count) << 1);
-#endif
 		total_mapping_size += sizeof(mapping_node_t) * (m->count = count);
 		total_mapping_nodes += count;
 		
@@ -823,9 +790,6 @@ load_mapping_from_aggregate P2(svalue_t *,sp, int, n)
 	    *(elt->values + 1) = *sp;
 	    (a[i] = elt)->next = elt2;
 	} while (n -= 2);
-#ifdef PACKAGE_MUDLIB_STATS
-	add_array_size(&m->stats, count << 1);
-#endif
 	total_mapping_size += sizeof(mapping_node_t) * (m->count = count);
 	total_mapping_nodes += count;
 	debug(mapping,("mapping.c: load_mapping_from_aggregate end\n"));
@@ -901,9 +865,6 @@ add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int, free_flag)
 		    mask--;
 		} else{
 		    count -= MAP_COUNT(m1);
-#ifdef PACKAGE_MUDLIB_STATS
-		    add_array_size(&m1->stats, count << 1);
-#endif
 		    total_mapping_size += count * sizeof(mapping_node_t);
 		    total_mapping_nodes += count;
 		    m1->count += count;
@@ -914,9 +875,6 @@ add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int, free_flag)
 	    count++;
 	    if (count > MAX_MAPPING_SIZE) {
 		if (count -= MAP_COUNT(m1) + 1) {	
-#ifdef PACKAGE_MUDLIB_STATS
-		    add_array_size(&m1->stats, count << 1);
-#endif
 		    total_mapping_size += count * sizeof(mapping_node_t);
 		    total_mapping_nodes += count;
 		}
@@ -932,9 +890,6 @@ add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int, free_flag)
     } while (j--);
 
     if (count -= MAP_COUNT(m1)) {
-#ifdef PACKAGE_MUDLIB_STATS
-	add_array_size(&m1->stats, count << 1);
-#endif
 	total_mapping_size += count * sizeof(mapping_node_t);
 	total_mapping_nodes += count;
     }
@@ -976,9 +931,6 @@ unique_add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int,free_flag)
 		} else{
 		    ++m1->unfilled;
 		    count -= MAP_COUNT(m1);
-#ifdef PACKAGE_MUDLIB_STATS
-		    add_array_size(&m1->stats, count << 1);
-#endif
 		    total_mapping_size += count * sizeof(mapping_node_t);
 		    total_mapping_nodes += count;
 		    m1->count += count;
@@ -990,9 +942,6 @@ unique_add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int,free_flag)
 
 	    if (++count > MAX_MAPPING_SIZE) {
 		if (count -= MAP_COUNT(m1) + 1) {
-#ifdef PACKAGE_MUDLIB_STATS
-		    add_array_size(&m1->stats, count << 1);
-#endif
 		    total_mapping_size += count * sizeof(mapping_node_t);
 		    total_mapping_nodes += count;
 		}
@@ -1008,9 +957,6 @@ unique_add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int,free_flag)
     } while (j--);
 
     if (count -= MAP_COUNT(m1)) {
-#ifdef PACKAGE_MUDLIB_STATS
-	add_array_size(&m1->stats, count << 1);
-#endif
 	total_mapping_size += count * sizeof(mapping_node_t);
 	total_mapping_nodes += count;
     }
@@ -1141,9 +1087,6 @@ filter_mapping P2(svalue_t *, arg, int, num_arg)
 			tb_index = node_hash(elt) & size;
 			n = *(b = newmap->table + tb_index);
 		    } else {
-#ifdef PACKAGE_MUDLIB_STATS
-			add_array_size(&newmap->stats, count << 1);
-#endif
 			total_mapping_size += count * sizeof(mapping_node_t);
 			total_mapping_nodes += count;
 			newmap->count = count;
@@ -1152,9 +1095,6 @@ filter_mapping P2(svalue_t *, arg, int, num_arg)
 		}
 		if (++count > MAX_MAPPING_SIZE) {
 		    count--;
-#ifdef PACKAGE_MUDLIB_STATS
-		    add_array_size(&newmap->stats, count << 1);
-#endif
 		    total_mapping_size += count * sizeof(mapping_node_t);
                     total_mapping_nodes += count;
 		    newmap->count = count;
@@ -1170,9 +1110,6 @@ filter_mapping P2(svalue_t *, arg, int, num_arg)
     } while (j--);
 
     if (count) {
-#ifdef PACKAGE_MUDLIB_STATS
-        add_array_size(&newmap->stats, count << 1);
-#endif
         total_mapping_size += count * sizeof(mapping_node_t);
         total_mapping_nodes += count;
 	newmap->count += count;

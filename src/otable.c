@@ -1,7 +1,6 @@
 #include "std.h"
 #include "otable.h"
 #include "comm.h"
-#include "hash.h"
 #include "simul_efun.h"
 #include "master.h"
 

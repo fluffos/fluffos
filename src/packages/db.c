@@ -103,6 +103,19 @@ static db_defn_t mysql = {
 };
 #endif
 
+#ifdef USE_POSTGRESQL
+static int	PGSQL_connect	PROT((dbconn_t *, char *, char *, char *, char *));
+static int	PGSQL_close	PROT((dbconn_t *));
+static int	PGSQL_execute	PROT((dbconn_t *, char *));
+static array_t *PGSQL_fetch	PROT((dbconn_t *, int));
+static void	PGSQL_cleanup	PROT((dbconn_t *));
+static char *	PGSQL_errormsg	PROT((dbconn_t *));
+
+static db_defn_t postgresql = {
+    "PostgreSQL", PGSQL_connect, PGSQL_close, PGSQL_execute, PGSQL_fetch, NULL, NULL, PGSQL_cleanup, NULL, PGSQL_errormsg
+};
+#endif
+
 static db_defn_t no_db = {
     "None", NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 };
@@ -268,6 +281,13 @@ void f_db_connect PROT((void))
 	case USE_MYSQL:
 #endif
 	    db->type = &mysql;
+	    break;
+#endif
+#ifdef USE_POSTGRESQL
+#if USE_POSTGRESQL - 0
+	case USE_POSTGRESQL:
+#endif
+	    db->type = &postgresql;
 	    break;
 #endif
     }
@@ -633,24 +653,24 @@ static array_t *MySQL_fetch P2(dbconn_t *, c, int, row)
 		case FIELD_TYPE_BLOB:
 		case FIELD_TYPE_STRING:
 		case FIELD_TYPE_VAR_STRING:
-                    if (field->flags & BINARY_FLAG) {
+		    if (field->flags & BINARY_FLAG) {
 #ifndef NO_BUFFER_TYPE
-		        v->item[i].type = T_BUFFER;
-		        v->item[i].u.buf = allocate_buffer(field->length);
-		        write_buffer(v->item[i].u.buf, 0, target_row[i], field->length);
+			v->item[i].type = T_BUFFER;
+			v->item[i].u.buf = allocate_buffer(field->length);
+			write_buffer(v->item[i].u.buf, 0, target_row[i], field->length);
 #else
-                        v->item[i] = const0u;
+			v->item[i] = const0u;
 #endif
-                    } else {
-		        v->item[i].type = T_STRING;
-		        if (target_row[i]) {
+		    } else {
+			v->item[i].type = T_STRING;
+			if (target_row[i]) {
 			    v->item[i].subtype = STRING_MALLOC;
 			    v->item[i].u.string = string_copy(target_row[i], "MySQL_fetch");
-		        } else {
+			} else {
 			    v->item[i].subtype = STRING_CONSTANT;
 			    v->item[i].u.string = "";
-		        }
-                    }
+			}
+		    }
 		    break;
 
 		default:
@@ -814,4 +834,104 @@ static char *msql_errormsg P1(dbconn_t *, c)
 {
     return string_copy(msqlErrMsg, "msql_errormsg");
 }
+#endif
+
+#ifdef USE_POSTGRESQL
+static int PGSQL_connect P5(dbconn_t *, c, char *, host, char *, database, char *, username, char *, password)
+{
+    c->postgresql.handle = PQsetdbLogin(host, NULL, NULL, NULL, database, username, password);
+    if (!c->postgresql.handle)
+	return 0;
+
+    if (PQstatus(c->postgresql.handle) != CONNECTION_OK) {
+	PQfinish(c->postgresql.handle);
+	return 0;
+    }
+
+    c->postgresql.result = 0;
+    return 1;
+}
+
+static int PGSQL_close P1(dbconn_t *, c)
+{
+    PQfinish(c->postgresql.handle);
+    c->postgresql.handle = NULL;
+
+    return 1;
+}
+
+static char *PGSQL_errormsg P1(dbconn_t *, c)
+{
+    return string_copy(PQerrorMessage(c->postgresql.handle), "PGSQL_errormsg");
+}
+
+static void PGSQL_cleanup P1(dbconn_t *, c)
+{
+    if (c->postgresql.result) {
+	PQclear(c->postgresql.result);
+	c->postgresql.result = 0;
+    }
+}
+
+static int PGSQL_execute P2(dbconn_t *, c, char *, s)
+{
+    PGresult *result;
+    ExecStatusType status;
+
+    result = PQexec(c->postgresql.handle, s);
+    status = PQresultStatus(result);
+    if (status != PGRES_COMMAND_OK && status != PGRES_TUPLES_OK)
+	return -1;
+
+    c->postgresql.result = result;
+    return PQntuples(result);
+}
+
+static array_t *PGSQL_fetch P2(dbconn_t *, c, int, row)
+{
+    array_t *v;
+    int binary, i, num_fields;
+
+    if (!c->postgresql.result)
+	return &the_null_array;
+    if (row < 1 || row > PQntuples(c->postgresql.result))
+	return &the_null_array;
+    if ((num_fields = PQnfields(c->postgresql.result)) < 1)
+	return &the_null_array;
+
+    v = allocate_empty_array(num_fields);
+    binary = PQbinaryTuples(c->postgresql.result);
+    for (i = 0;  i < num_fields;  i++) {
+	char *value;
+
+	value = PQgetvalue(c->postgresql.result, row - 1, i);
+	if (binary) {
+	    v->item[i].type = T_STRING;
+	    v->item[i].subtype = STRING_MALLOC;
+	    v->item[i].u.string = string_copy(value, "PGSQL_fetch");
+	    continue;
+	} else {
+	    /* This is a really ugly limitation that needs to be lifted.  The
+	     * problem is that PostgreSQL doesn't make its datatypes easily
+	     * available for inclusion.  I am not at all familiar with the API
+	     * and have basically pulled the existing support here completely
+	     * out of my ass, so this is going to stay this way until someone
+	     * can contribute code that'll handle the individual datatypes in
+	     * a reasonable fashion.	    -- Marius, 19-Sep-2000
+	     */
+#ifndef NO_BUFFER_TYPE
+	    int length = PQgetlength(c->postgresql.result, row - 1, i);
+
+	    v->item[i].type = T_BUFFER;
+	    v->item[i].u.buf = allocate_buffer(length);
+	    write_buffer(v->item[i].u.buf, 0, value, length);
+#else
+	    v->item[i] = const0u;
+#endif
+	}
+    }
+
+    return v;
+}
+
 #endif

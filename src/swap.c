@@ -388,8 +388,8 @@ int swap P1(object_t *, ob)
 
     if (ob->prog->line_info)
 	swap_line_numbers(ob->prog);	/* not always done before we get here */
-    if ((ob->flags & O_HEART_BEAT) || (ob->flags & O_CLONE)) {
-	debug(d_flag, ("  object not swapped - heart beat or cloned."));
+    if ((ob->flags & O_CLONE)) {
+	debug(d_flag, ("  object not swapped - cloned."));
 	return 0;
     }
     if (ob->prog->ref > 1 || ob->interactive) {

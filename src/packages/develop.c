@@ -30,12 +30,6 @@ f_debug_info PROT((void))
 
 	    ob = arg[1].u.ob;
 	    flags = ob->flags;
-	   outbuf_addv(&out, "O_HEART_BEAT      : %s\n",
-			flags & O_HEART_BEAT ? "TRUE" : "FALSE");
-#ifndef NO_WIZARDS
-	   outbuf_addv(&out, "O_IS_WIZARD       : %s\n",
-			flags & O_IS_WIZARD ? "TRUE" : "FALSE");
-#endif
 #ifdef NO_ADD_ACTION
 	   outbuf_addv(&out, "O_LISTENER : %s\n",
 			flags & O_LISTENER ? "TRUE" : "FALSE");

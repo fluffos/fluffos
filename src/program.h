@@ -152,18 +152,8 @@ typedef struct {
     unsigned char index[1];
 } compressed_offset_table_t;
 
-#ifdef LPC_TO_C
 #define ADDRESS_TYPE	POINTER_INT
 #define ADDRESS_MAX	UINT_MAX
-#else
-#  ifdef USE_32BIT_ADDRESSES
-#define ADDRESS_TYPE	unsigned int
-#define ADDRESS_MAX	UINT_MAX
-#  else
-#define ADDRESS_TYPE	unsigned short
-#define ADDRESS_MAX	USHRT_MAX
-#  endif
-#endif
 
 typedef struct {
     char *name;
@@ -239,8 +229,6 @@ typedef struct program_s {
     /*
      * And now some general size information.
      */
-    unsigned short heart_beat;  /* Index of the heart beat function. 0 means
-				 * no heart beat */
     unsigned short program_size;/* size of this instruction code */
     unsigned short num_classes;
     unsigned short num_functions_defined;
@@ -256,7 +244,8 @@ void reference_prog PROT((program_t *, char *));
 void free_prog PROT((program_t *, int));
 void deallocate_program PROT((program_t *));
 char *variable_name PROT((program_t *, int));
-function_t *find_func_entry PROT((program_t *, int));
+function_t *find_func_entry PROT((program_t *, int, program_t **, int *, int));
+char *function_name PROT((program_t *, int));
 
 #endif
 

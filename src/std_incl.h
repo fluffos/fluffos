@@ -84,7 +84,7 @@
 #  include "amiga/socket.h"
 #endif
 
-#if defined(WIN32) || defined(LATTICE)
+#if defined(LATTICE)
 int dos_style_link PROT((char *, char *));
 #define link(x, y) dos_style_link(x, y)
 #endif
@@ -93,11 +93,7 @@ int dos_style_link PROT((char *, char *));
 #  include <libc.h>
 #endif
 
-#ifdef WIN32
-#  include <sys/timeb.h>
-#endif
-
-#if !defined(NeXT) && !defined(LATTICE) && !defined(WIN32)
+#if !defined(NeXT) && !defined(LATTICE)
 #  include <sys/param.h>
 #endif
 
@@ -118,15 +114,10 @@ int dos_style_link PROT((char *, char *));
 #  include <alloca.h>
 #endif
 
-#if defined(__APPLE__) && defined(__GNUC__)
-/* varargs.h distributed with Mac OSX is broken */
-#include <stdarg.h>
-#else
 #ifdef INCL_STDARG_H
 #  include <stdarg.h>
 #else
 #  include <varargs.h>
-#endif
 #endif
 
 #ifdef INCL_BSTRING_H

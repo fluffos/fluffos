@@ -36,6 +36,15 @@
 #endif
 #endif
 
+#ifdef USE_POSTGRESQL
+#ifdef INCL_PGSQL_LIBPQ_FE_H
+#include "/usr/include/pgsql/libpq-fe.h"
+#endif
+#ifdef INCL_LOCAL_PGSQL_LIBPQ_FE_H
+#include "/usr/local/include/pgsql/libpq-fe.h"
+#endif
+#endif
+
 typedef union dbconn_u {
 #ifdef USE_MSQL
     struct tmp_msql {
@@ -49,6 +58,12 @@ typedef union dbconn_u {
 	MYSQL *handle;
 	MYSQL_RES *results;
     } mysql;
+#endif
+#ifdef USE_POSTGRESQL
+    struct tmp_postgreslq {
+	PGconn *handle;
+	PGresult *result;
+    } postgresql;
 #endif
 } dbconn_t;
 

@@ -1,3 +1,8 @@
+/*
+ * Author: Unknown (Beek?)
+ * Description: An LPC implementation of the very old tail() efun
+ */
+
 #ifdef COMPAT_TAIL
 /* This version is strictly compatible with the old version */
 int tail(string fname) {

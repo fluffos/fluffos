@@ -67,7 +67,7 @@ static void clear_socket P2(int, which, int, dofree)
     lpc_socks[which].fd = -1;
     lpc_socks[which].flags = 0;
     lpc_socks[which].mode = MUD;
-    lpc_socks[which].state = STATE_CLOSED;
+    lpc_socks[which].state = CLOSED;
     memset((char *) &lpc_socks[which].l_addr, 0, sizeof(lpc_socks[which].l_addr));
     memset((char *) &lpc_socks[which].r_addr, 0, sizeof(lpc_socks[which].r_addr));
     lpc_socks[which].owner_ob = NULL;
@@ -203,7 +203,7 @@ int find_new_socket PROT((void))
     int i;
     
     for (i = 0; i < max_lpc_socks; i++) {
-	if (lpc_socks[i].state == STATE_CLOSED) 
+	if (lpc_socks[i].state == CLOSED) 
 	    return i;
     }
     return more_lpc_sockets();
@@ -275,7 +275,7 @@ int socket_create P3(enum socket_mode, mode, svalue_t *, read_callback, svalue_t
 	}
 #endif
 	lpc_socks[i].mode = mode;
-	lpc_socks[i].state = STATE_UNBOUND;
+	lpc_socks[i].state = UNBOUND;
 	memset((char *) &lpc_socks[i].l_addr, 0, sizeof(lpc_socks[i].l_addr));
 	memset((char *) &lpc_socks[i].r_addr, 0, sizeof(lpc_socks[i].r_addr));
 	lpc_socks[i].owner_ob = current_object;
@@ -306,12 +306,12 @@ int socket_bind P3(int, fd, int, port, char *, addr)
 
     if (fd < 0 || fd >= max_lpc_socks)
 	return EEFDRANGE;
-    if (lpc_socks[fd].state == STATE_CLOSED ||
-	lpc_socks[fd].state == STATE_FLUSHING)
+    if (lpc_socks[fd].state == CLOSED ||
+	lpc_socks[fd].state == FLUSHING)
 	return EEBADF;
     if (lpc_socks[fd].owner_ob != current_object)
 	return EESECURITY;
-    if (lpc_socks[fd].state != STATE_UNBOUND)
+    if (lpc_socks[fd].state != UNBOUND)
 	return EEISBOUND;
 
     sin.sin_family = AF_INET;
@@ -341,7 +341,7 @@ int socket_bind P3(int, fd, int, port, char *, addr)
 	socket_perror("socket_bind: getsockname", 0);
 	return EEGETSOCKNAME;
     }
-    lpc_socks[fd].state = STATE_BOUND;
+    lpc_socks[fd].state = BOUND;
 
     debug(sockets, ("socket_bind: bound socket %d to %s.%d\n",
 		 fd, inet_ntoa(lpc_socks[fd].l_addr.sin_addr),
@@ -357,23 +357,23 @@ int socket_listen P2(int, fd, svalue_t *, callback)
 {
     if (fd < 0 || fd >= max_lpc_socks)
 	return EEFDRANGE;
-    if (lpc_socks[fd].state == STATE_CLOSED ||
-	lpc_socks[fd].state == STATE_FLUSHING)
+    if (lpc_socks[fd].state == CLOSED ||
+	lpc_socks[fd].state == FLUSHING)
 	return EEBADF;
     if (lpc_socks[fd].owner_ob != current_object)
 	return EESECURITY;
     if (lpc_socks[fd].mode == DATAGRAM)
 	return EEMODENOTSUPP;
-    if (lpc_socks[fd].state == STATE_UNBOUND)
+    if (lpc_socks[fd].state == UNBOUND)
 	return EENOADDR;
-    if (lpc_socks[fd].state != STATE_BOUND)
+    if (lpc_socks[fd].state != BOUND)
 	return EEISCONN;
 
     if (listen(lpc_socks[fd].fd, 5) == -1) {
 	socket_perror("socket_listen: listen", 0);
 	return EELISTEN;
     }
-    lpc_socks[fd].state = STATE_LISTEN;
+    lpc_socks[fd].state = LISTEN;
     set_read_callback(fd, callback);
 
     current_object->flags |= O_EFUN_SOCKET;
@@ -393,14 +393,14 @@ int socket_accept P3(int, fd, svalue_t *, read_callback, svalue_t *, write_callb
 
     if (fd < 0 || fd >= max_lpc_socks)
 	return EEFDRANGE;
-    if (lpc_socks[fd].state == STATE_CLOSED ||
-	lpc_socks[fd].state == STATE_FLUSHING)
+    if (lpc_socks[fd].state == CLOSED ||
+	lpc_socks[fd].state == FLUSHING)
 	return EEBADF;
     if (lpc_socks[fd].owner_ob != current_object)
 	return EESECURITY;
     if (lpc_socks[fd].mode == DATAGRAM)
 	return EEMODENOTSUPP;
-    if (lpc_socks[fd].state != STATE_LISTEN)
+    if (lpc_socks[fd].state != LISTEN)
 	return EENOTLISTN;
 
     lpc_socks[fd].flags &= ~S_WACCEPT;
@@ -456,7 +456,7 @@ int socket_accept P3(int, fd, svalue_t *, read_callback, svalue_t *, write_callb
 	    lpc_socks[i].flags |= S_BLOCKED;
 
 	lpc_socks[i].mode = lpc_socks[fd].mode;
-	lpc_socks[i].state = STATE_DATA_XFER;
+	lpc_socks[i].state = DATA_XFER;
 	len = sizeof(sin);
 	if (getsockname(lpc_socks[i].fd, (struct sockaddr *)&lpc_socks[i].l_addr, &len) == -1) {
 	    lpc_socks[i].l_addr = lpc_socks[fd].l_addr;
@@ -493,22 +493,22 @@ int socket_connect P4(int, fd, char *, name, svalue_t *, read_callback, svalue_t
 {
     if (fd < 0 || fd >= max_lpc_socks)
 	return EEFDRANGE;
-    if (lpc_socks[fd].state == STATE_CLOSED ||
-	lpc_socks[fd].state == STATE_FLUSHING)
+    if (lpc_socks[fd].state == CLOSED ||
+	lpc_socks[fd].state == FLUSHING)
 	return EEBADF;
     if (lpc_socks[fd].owner_ob != current_object)
 	return EESECURITY;
     if (lpc_socks[fd].mode == DATAGRAM)
 	return EEMODENOTSUPP;
     switch (lpc_socks[fd].state) {
-    case STATE_CLOSED:
-    case STATE_FLUSHING:
-    case STATE_UNBOUND:
-    case STATE_BOUND:
+    case CLOSED:
+    case FLUSHING:
+    case UNBOUND:
+    case BOUND:
 	break;
-    case STATE_LISTEN:
+    case LISTEN:
 	return EEISLISTEN;
-    case STATE_DATA_XFER:
+    case DATA_XFER:
 	return EEISCONN;
     }
 
@@ -520,14 +520,6 @@ int socket_connect P4(int, fd, char *, name, svalue_t *, read_callback, svalue_t
 
     current_object->flags |= O_EFUN_SOCKET;
 
-#ifdef WINSOCK
-    /* Turn on blocking for connect to ensure correct errors */
-    if (set_socket_nonblocking(lpc_socks[fd].fd, 0) == -1) {
-	socket_perror("socket_connect: set_socket_nonblocking 0", 0);
-	OS_socket_close(fd);
-	return EENONBLOCK;
-    }
-#endif
     if (connect(lpc_socks[fd].fd, (struct sockaddr *) & lpc_socks[fd].r_addr,
 		sizeof(struct sockaddr_in)) == -1) {
 	switch (socket_errno) {
@@ -546,14 +538,7 @@ int socket_connect P4(int, fd, char *, name, svalue_t *, read_callback, svalue_t
 	    return EECONNECT;
 	}
     }
-#ifdef WINSOCK
-    if (set_socket_nonblocking(lpc_socks[fd].fd, 1) == -1) {
-	socket_perror("socket_connect: set_socket_nonblocking 1", 0);
-	OS_socket_close(fd);
-	return EENONBLOCK;
-    }
-#endif
-    lpc_socks[fd].state = STATE_DATA_XFER;
+    lpc_socks[fd].state = DATA_XFER;
     lpc_socks[fd].flags |= S_BLOCKED;
 
     return EESUCCESS;
@@ -570,8 +555,8 @@ int socket_write P3(int, fd, svalue_t *, message, char *, name)
 
     if (fd < 0 || fd >= max_lpc_socks)
 	return EEFDRANGE;
-    if (lpc_socks[fd].state == STATE_CLOSED ||
-	lpc_socks[fd].state == STATE_FLUSHING)
+    if (lpc_socks[fd].state == CLOSED ||
+	lpc_socks[fd].state == FLUSHING)
 	return EEBADF;
     if (lpc_socks[fd].owner_ob != current_object)
 	return EESECURITY;
@@ -581,7 +566,7 @@ int socket_write P3(int, fd, svalue_t *, message, char *, name)
 	if (!socket_name_to_sin(name, &sin))
 	    return EEBADADDR;
     } else {
-	if (lpc_socks[fd].state != STATE_DATA_XFER)
+	if (lpc_socks[fd].state != DATA_XFER)
 	    return EENOTCONN;
 	if (name != NULL)
 	    return EEBADADDR;
@@ -785,15 +770,15 @@ void socket_read_select_handler P1(int, fd)
 
     switch (lpc_socks[fd].state) {
 
-    case STATE_CLOSED:
-    case STATE_FLUSHING:
+    case CLOSED:
+    case FLUSHING:
 	return;
 	
-    case STATE_UNBOUND:
+    case UNBOUND:
 	debug_message("socket_read_select_handler: read on unbound socket %i\n");
 	break;
 
-    case STATE_BOUND:
+    case BOUND:
 	switch (lpc_socks[fd].mode) {
 
 	case MUD:
@@ -847,14 +832,14 @@ void socket_read_select_handler P1(int, fd)
 	}
 	break;
 
-    case STATE_LISTEN:
+    case LISTEN:
 	debug(sockets, ("read_socket_handler: apply read callback\n"));
 	lpc_socks[fd].flags |= S_WACCEPT;
 	push_number(fd);
 	call_callback(fd, S_READ_FP, 1);
 	return;
 
-    case STATE_DATA_XFER:
+    case DATA_XFER:
 	switch (lpc_socks[fd].mode) {
 
 	case DATAGRAM:
@@ -981,7 +966,7 @@ void socket_read_select_handler P1(int, fd)
 	     * they use this error message, I have no idea, but this seems
 	     * to work.
 	     */
-	    if (lpc_socks[fd].state == STATE_BOUND
+	    if (lpc_socks[fd].state == BOUND
 		&& lpc_socks[fd].mode == DATAGRAM)
 		return;
 	    break;
@@ -1028,7 +1013,7 @@ void socket_write_select_handler P1(int, fd)
 	    }
 
 	    lpc_socks[fd].flags |= S_LINKDEAD;
-	    if (lpc_socks[fd].state == STATE_FLUSHING) {
+	    if (lpc_socks[fd].state == FLUSHING) {
 		lpc_socks[fd].flags &= ~S_BLOCKED;
 		socket_close(fd, SC_FORCE | SC_FINAL_CLOSE);
 		return;
@@ -1053,7 +1038,7 @@ void socket_write_select_handler P1(int, fd)
 	lpc_socks[fd].w_off = 0;
     }
     lpc_socks[fd].flags &= ~S_BLOCKED;
-    if (lpc_socks[fd].state == STATE_FLUSHING) {
+    if (lpc_socks[fd].state == FLUSHING) {
 	socket_close(fd, SC_FORCE | SC_FINAL_CLOSE);
 	return;
     }
@@ -1071,9 +1056,9 @@ int socket_close P2(int, fd, int, flags)
 {
     if (fd < 0 || fd >= max_lpc_socks)
 	return EEFDRANGE;
-    if (lpc_socks[fd].state == STATE_CLOSED)
+    if (lpc_socks[fd].state == CLOSED)
 	return EEBADF;
-    if (lpc_socks[fd].state == STATE_FLUSHING && !(flags & SC_FINAL_CLOSE))
+    if (lpc_socks[fd].state == FLUSHING && !(flags & SC_FINAL_CLOSE))
 	return EEBADF;
     if (!(flags & SC_FORCE) && lpc_socks[fd].owner_ob != current_object)
 	return EESECURITY;
@@ -1093,7 +1078,7 @@ int socket_close P2(int, fd, int, flags)
 	/* Can't close now; we still have data to write.  Tell the mudlib
 	 * it is closed, but we really finish up later.
 	 */
-	lpc_socks[fd].state = STATE_FLUSHING;
+	lpc_socks[fd].state = FLUSHING;
 	return EESUCCESS;
     }
     
@@ -1118,8 +1103,8 @@ int socket_release P3(int, fd, object_t *, ob, svalue_t *, callback)
 {
     if (fd < 0 || fd >= max_lpc_socks)
 	return EEFDRANGE;
-    if (lpc_socks[fd].state == STATE_CLOSED ||
-	lpc_socks[fd].state == STATE_FLUSHING)
+    if (lpc_socks[fd].state == CLOSED ||
+	lpc_socks[fd].state == FLUSHING)
 	return EEBADF;
     if (lpc_socks[fd].owner_ob != current_object)
 	return EESECURITY;
@@ -1153,8 +1138,8 @@ int socket_acquire P4(int, fd, svalue_t *, read_callback, svalue_t *, write_call
 {
     if (fd < 0 || fd >= max_lpc_socks)
 	return EEFDRANGE;
-    if (lpc_socks[fd].state == STATE_CLOSED ||
-	lpc_socks[fd].state == STATE_FLUSHING)
+    if (lpc_socks[fd].state == CLOSED ||
+	lpc_socks[fd].state == FLUSHING)
 	return EEBADF;
     if ((lpc_socks[fd].flags & S_RELEASE) == 0)
 	return EESOCKNOTRLSD;
@@ -1208,8 +1193,8 @@ object_t *get_socket_owner P1(int, fd)
 {
     if (fd < 0 || fd >= max_lpc_socks)
 	return (object_t *) NULL;
-    if (lpc_socks[fd].state == STATE_CLOSED ||
-	lpc_socks[fd].state == STATE_FLUSHING)
+    if (lpc_socks[fd].state == CLOSED ||
+	lpc_socks[fd].state == FLUSHING)
 	return (object_t *) NULL;
     return lpc_socks[fd].owner_ob;
 }
@@ -1267,8 +1252,8 @@ void close_referencing_sockets P1(object_t *, ob)
 
     for (i = 0; i < max_lpc_socks; i++)
 	if (lpc_socks[i].owner_ob == ob && 
-	    lpc_socks[i].state != STATE_CLOSED &&
-	    lpc_socks[i].state != STATE_FLUSHING)
+	    lpc_socks[i].state != CLOSED &&
+	    lpc_socks[i].state != FLUSHING)
 	    socket_close(i, SC_FORCE);
 }
 

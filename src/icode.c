@@ -281,20 +281,12 @@ switch_to_line P1(int, line) {
 	while (sz > 255) {
 	    p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS, sizeof(ADDRESS_TYPE) + 1);
 	    *p++ = 255;
-#if !defined(USE_32BIT_ADDRESSES) && !defined(LPC_TO_C)
-	    STORE_SHORT(p, s);
-#else
 	    STORE_INT(p, s);
-#endif
 	    sz -= 255;
 	}
 	p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS, sizeof(ADDRESS_TYPE) + 1);
 	*p++ = sz;
-#if !defined(USE_32BIT_ADDRESSES) && !defined(LPC_TO_C)
-	STORE_SHORT(p, s);
-#else
 	STORE_INT(p, s);
-#endif
     }
     line_being_generated = line;
 }
@@ -594,7 +586,7 @@ i_generate_node P1(parse_node_t *, expr) {
 	    ins_short(0);
 	    /* build table */
 	    upd_short(addr + 1, CURRENT_PROGRAM_SIZE - addr, "switch");
-#ifdef BINARIES
+
 	    if (pragmas & PRAGMA_SAVE_BINARY) {
 		if (expr->kind == NODE_SWITCH_STRINGS) {
 		    short sw;
@@ -602,7 +594,7 @@ i_generate_node P1(parse_node_t *, expr) {
 		    add_to_mem_block(A_PATCH, (char *)&sw, sizeof sw);
 		}
 	    }
-#endif
+
 	    if (expr->kind == NODE_SWITCH_DIRECT) {
 		parse_node_t *pn = expr->v.expr;
 		while (pn) {

@@ -57,17 +57,6 @@ static int give_uid_to_object PROT((object_t *));
 static int init_object PROT((object_t *));
 static object_t *load_virtual_object PROT((char *, int));
 static char *make_new_name PROT((char *));
-#ifndef NO_ENVIRONMENT
-static void send_say PROT((object_t *, char *, array_t *));
-#endif
-
-INLINE void check_legal_string P1(char *, s)
-{
-    if (strlen(s) > LARGEST_PRINTABLE_STRING) {
-	error("Printable strings limited to length of %d.\n",
-	      LARGEST_PRINTABLE_STRING);
-    }
-}
 
 /* equivalent to strcpy(x, y); return x + strlen(y), but faster and safer */
 /* Code like:
@@ -213,15 +202,9 @@ static int give_uid_to_object P1(object_t *, ob)
 
 static int init_object P1(object_t *, ob)
 {
-#ifdef PACKAGE_MUDLIB_STATS
-    init_stats_for_object(ob);
-#endif
 #ifdef PRIVS
     init_privs_for_object(ob);
 #endif				/* PRIVS */
-#ifdef PACKAGE_MUDLIB_STATS
-    add_objects(&ob->stats, 1);
-#endif
 #ifdef NO_ADD_ACTION
     if (function_exists(APPLY_CATCH_TELL, ob, 1) ||
 	function_exists(APPLY_RECEIVE_MESSAGE, ob, 1))
@@ -284,10 +267,6 @@ static object_t *load_virtual_object P2(char *, name, int, clone)
 	new_name = make_new_name(name);
     }
 
-#ifdef PACKAGE_MUDLIB_STATS
-    add_objects(&new_ob->stats, -1);
-#endif
-
     /* perform the object rename */
     remove_object_hash(new_ob);
     if (new_ob->name)
@@ -298,10 +277,6 @@ static object_t *load_virtual_object P2(char *, name, int, clone)
     /* finish initialization */
     new_ob->flags |= O_VIRTUAL;
     new_ob->load_time = current_time;
-#ifdef PACKAGE_MUDLIB_STATS
-    init_stats_for_object(new_ob);
-    add_objects(&new_ob->stats, 1);
-#endif
 #ifdef PRIVS
     if (new_ob->privs)
 	free_string(new_ob->privs);
@@ -418,9 +393,7 @@ object_t *int_load_object P1(char *, lname)
 	debug_message("Illegal pathname: /%s\n", real_name);
 	error("Illegal path name '/%s'.\n", real_name);
     }
-#ifdef BINARIES
     if (!(prog = load_binary(real_name, lpc_obj)) && !inherit_file) {
-#endif
 	/* maybe move this section into compile_file? */
 	if (comp_flag) {
 	    debug_message(" compiling /%s ...", real_name);
@@ -462,9 +435,7 @@ object_t *int_load_object P1(char *, lname)
 	update_compile_av(total_lines);
 	total_lines = 0;
 	close(f);
-#ifdef BINARIES
     }
-#endif
 
     /* Sorry, can't handle objects without programs yet. */
     if (inherit_file == 0 && (num_parse_error > 0 || prog == 0)) {
@@ -530,7 +501,7 @@ object_t *int_load_object P1(char *, lname)
 	    /* I don't think this is possible, but ... */
 	    ob = load_object(name, (lpc_object_t *)ob);
 	    /* sigh, loading the inherited file removed us */
-	    if (!ob) { num_objects_this_thread--; return 0; }
+	    if (!ob) { num_objects_this_thread--; restore_command_giver(); return 0; }
 	    ob->load_time = current_time;
 	}
 #endif
@@ -630,9 +601,6 @@ object_t *clone_object P2(char *, str1, int, num_arg)
 	}
     }
     
-    /* We do not want the heart beat to be running for unused copied objects */
-    if (ob->flags & O_HEART_BEAT)
-	(void) set_heart_beat(ob, 0);
     new_ob = get_empty_object(ob->prog->num_variables_total);
     new_ob->name = make_new_name(ob->name);
     new_ob->flags |= (O_CLONE | (ob->flags & (O_WILL_CLEAN_UP | O_WILL_RESET)));
@@ -882,18 +850,10 @@ void destruct_object P1(object_t *, ob)
     }
 #endif
     
-#ifdef PACKAGE_MUDLIB_STATS
-    add_objects(&ob->stats, -1);
-#endif
-#ifdef OLD_ED
-    if (ob->interactive && ob->interactive->ed_buffer)
-	save_ed_buffer(ob);
-#else
     if (ob->flags & O_IN_EDIT) {
 	object_save_ed_buffer(ob);
 	ob->flags &= ~O_IN_EDIT;
     }
-#endif
 #ifndef NO_SNOOP
     if (ob->flags & O_SNOOP) {
 	int i;
@@ -1000,7 +960,6 @@ void destruct_object P1(object_t *, ob)
 #endif
     ob->next_all = obj_list_destruct;
     obj_list_destruct = ob;
-    set_heart_beat(ob, 0);
     ob->flags |= O_DESTRUCTED;
     /* moved this here from destruct2() -- see comments in destruct2() */
     if (ob->interactive)
@@ -1071,152 +1030,9 @@ void destruct2 P1(object_t *, ob)
     free_object(ob, "destruct_object");
 }
 
-/*
- * say() efun - send a message to:
- *  all objects in the inventory of the source,
- *  all objects in the same environment as the source,
- *  and the object surrounding the source.
- *
- * when there is no command_giver, current_object is used as the source,
- *  otherwise, command_giver is used.
- *
- * message never goes to objects in the avoid array, or the source itself.
- *
- * rewritten, bobf@metronet.com (Blackthorn) 9/6/93
- */
-
-#ifndef NO_ENVIRONMENT
-static void send_say P3(object_t *, ob, char *, text, array_t *, avoid)
-{
-    int valid, j;
-
-    for (valid = 1, j = 0; j < avoid->size; j++) {
-	if (avoid->item[j].type != T_OBJECT)
-	    continue;
-	if (avoid->item[j].u.ob == ob) {
-	    valid = 0;
-	    break;
-	}
-    }
-
-    if (!valid)
-	return;
-
-    tell_object(ob, text, strlen(text));
-}
-
-void say P2(svalue_t *, v, array_t *, avoid)
-{
-    object_t *ob, *origin;
-    char *buff;
-
-    check_legal_string(v->u.string);
-    buff = v->u.string;
-
-    if (current_object->flags & O_LISTENER || current_object->interactive)
-	save_command_giver(current_object);
-    else
-	save_command_giver(command_giver);
-    if (command_giver)
-	origin = command_giver;
-    else
-	origin = current_object;
-
-    /* To our surrounding object... */
-    if ((ob = origin->super)) {
-	if (ob->flags & O_LISTENER || ob->interactive)
-	    send_say(ob, buff, avoid);
-
-	/* And its inventory... */
-	for (ob = origin->super->contains; ob; ob = ob->next_inv) {
-	    if (ob != origin && (ob->flags & O_LISTENER || ob->interactive)) {
-		send_say(ob, buff, avoid);
-		if (ob->flags & O_DESTRUCTED)
-		    break;
-	    }
-	}
-    }
-    /* Our inventory... */
-    for (ob = origin->contains; ob; ob = ob->next_inv) {
-	if (ob->flags & O_LISTENER || ob->interactive) {
-	    send_say(ob, buff, avoid);
-	    if (ob->flags & O_DESTRUCTED)
-		break;
-	}
-    }
-
-    restore_command_giver();
-}
-
-/*
- * Sends a string to all objects inside of a specific object.
- * Revised, bobf@metronet.com 9/6/93
- */
-#ifdef F_TELL_ROOM
-void tell_room P3(object_t *, room, svalue_t *, v, array_t *, avoid)
-{
-    object_t *ob;
-    char *buff;
-    int valid, j;
-    char txt_buf[LARGEST_PRINTABLE_STRING + 1];
-
-    switch (v->type) {
-    case T_STRING:
-	check_legal_string(v->u.string);
-	buff = v->u.string;
-	break;
-    case T_OBJECT:
-	buff = v->u.ob->name;
-	break;
-    case T_NUMBER:
-	buff = txt_buf;
-	sprintf(buff, "%d", v->u.number);
-	break;
-    case T_REAL:
-	buff = txt_buf;
-	sprintf(buff, "%f", v->u.real);
-	break;
-    default:
-	bad_argument(v, T_OBJECT | T_NUMBER | T_REAL | T_STRING,
-		     2, F_TELL_ROOM);
-	IF_DEBUG(buff = 0);
-    }
-
-    for (ob = room->contains; ob; ob = ob->next_inv) {
-	if (!ob->interactive && !(ob->flags & O_LISTENER))
-	    continue;
-
-	for (valid = 1, j = 0; j < avoid->size; j++) {
-	    if (avoid->item[j].type != T_OBJECT)
-		continue;
-	    if (avoid->item[j].u.ob == ob) {
-		valid = 0;
-		break;
-	    }
-	}
-
-	if (!valid)
-	    continue;
-
-	if (!ob->interactive) {
-	    tell_npc(ob, buff);
-	    if (ob->flags & O_DESTRUCTED)
-		break;
-	} else {
-	    tell_object(ob, buff, strlen(buff));
-	    if (ob->flags & O_DESTRUCTED)
-		break;
-	}
-    }
-}
-#endif
-#endif
-
 void shout_string P1(char *, str)
 {
     object_t *ob;
-
-    check_legal_string(str);
 
     for (ob = obj_list; ob; ob = ob->next_all) {
 	if (!(ob->flags & O_LISTENER) || (ob == command_giver)
@@ -1372,27 +1188,6 @@ void print_svalue P1(svalue_t *, arg)
 	    break;
 	}
     return;
-}
-
-void do_write P1(svalue_t *, arg)
-{
-    object_t *ob = command_giver;
-
-#ifndef NO_SHADOWS
-    if (ob == 0 && current_object->shadowing)
-	ob = current_object;
-    if (ob) {
-	/* Send the message to the first object in the shadow list */
-	while (ob->shadowing)
-	    ob = ob->shadowing;
-    }
-#else
-    if (!ob)
-	ob = current_object;
-#endif				/* NO_SHADOWS */
-    save_command_giver(ob);
-    print_svalue(arg);
-    restore_command_giver();
 }
 
 /* Find an object. If not loaded, load it !
@@ -1616,9 +1411,6 @@ void fatal P1V(char *, fmt)
 	
 	dump_trace(1);
 	
-#ifdef PACKAGE_MUDLIB_STATS
-	save_stat_files();
-#endif
 	copy_and_push_string(msg_buf);
 	push_object(command_giver);
 	push_object(current_object);
@@ -1743,8 +1535,6 @@ static void mudlib_error_handler P2(char *, err, int, catch) {
 
 void error_handler P1(char *, err)
 {
-    char *object_name;
-
     /* in case we're going to jump out of load_object */
 #ifndef NO_ENVIRONMENT
     restrict_destruct = 0;
@@ -1761,7 +1551,7 @@ void error_handler P1(char *, err)
 	    num_error++;
 #endif
 	    debug_message_with_location(err);
-	    (void) dump_trace(0);
+	    dump_trace(0);
 #ifdef MUDLIB_ERROR_HANDLER
 	    num_error--;
 	    num_mudlib_error = 0;
@@ -1790,16 +1580,12 @@ void error_handler P1(char *, err)
 	fatal("LONGJMP failed or no error context for error.\n");
     }
     num_error++;
-#ifdef PACKAGE_MUDLIB_STATS
-    if (current_object)
-	add_errors(&current_object->stats, 1);
-#endif
 #ifdef MUDLIB_ERROR_HANDLER
     if (!max_eval_error && !too_deep_error) {
 	if (num_mudlib_error) {
 	    debug_message("Error in error handler: ");
 	    debug_message_with_location(err);
-	    (void) dump_trace(0);
+	    dump_trace(0);
 	    num_mudlib_error = 0;
 	} else {
 	    num_mudlib_error++;
@@ -1814,42 +1600,12 @@ void error_handler P1(char *, err)
     {
 	debug_message_with_location(err + 1);
 #if defined(DEBUG) && defined(TRACE_CODE)
-        object_name = dump_trace(1);
+        dump_trace(1);
 #else
-        object_name = dump_trace(0);
+        dump_trace(0);
 #endif
-	if (object_name) {
-	    object_t *ob;
-
-	    ob = find_object2(object_name);
-	    if (!ob) {
-		if (command_giver)
-		    add_vmessage(command_giver,
-				"error when executing program in destroyed object /%s\n",
-				object_name);
-		debug_message("error when executing program in destroyed object /%s\n",
-			    object_name);
-	    }
-	}
 	if (command_giver && command_giver->interactive) {
-#ifndef NO_WIZARDS
-	    if ((command_giver->flags & O_IS_WIZARD) || !strlen(DEFAULT_ERROR_MESSAGE)) {
-#endif
-		add_message_with_location(err + 1);
-#ifndef NO_WIZARDS
-	    } else {
-		add_vmessage(command_giver, "%s\n", DEFAULT_ERROR_MESSAGE);
-	    }
-#endif
-	}
-	if (current_heart_beat) {
-	    static char hb_message[] = "MudOS driver tells you: You have no heart beat!\n";
-	    set_heart_beat(current_heart_beat, 0);
-	    debug_message("Heart beat in /%s turned off.\n", current_heart_beat->name);
-	    if (current_heart_beat->interactive)
-		add_message(current_heart_beat, hb_message, sizeof(hb_message)-1);
-	
-	    current_heart_beat = 0;
+	    add_message_with_location(err + 1);
 	}
     }
     num_error--;
@@ -1908,16 +1664,13 @@ void shutdownMudOS P1(int, exit_code)
     int i;
 
     shout_string("MudOS driver shouts: shutting down immediately.\n");
-#ifdef PACKAGE_MUDLIB_STATS
-    save_stat_files();
-#endif
 #ifdef PACKAGE_DB
     db_cleanup();
 #endif
     ipc_remove();
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
     for (i = 0; i < max_lpc_socks; i++) {
-	if (lpc_socks[i].state == STATE_CLOSED) continue;
+	if (lpc_socks[i].state == CLOSED) continue;
 	while (OS_socket_close(lpc_socks[i].fd) == -1 && errno == EINTR)
 	    ;
     }
@@ -1972,51 +1725,6 @@ void slow_shut_down P1(int, minutes)
     }
 }
 
-void do_message P5(svalue_t *, class, svalue_t *, msg, array_t *, scope, array_t *, exclude, int, recurse)
-{
-    int i, j, valid;
-    object_t *ob;
-
-    for (i = 0; i < scope->size; i++) {
-	switch (scope->item[i].type) {
-	case T_STRING:
-	    ob = find_object(scope->item[i].u.string);
-	    if (!ob || !object_visible(ob))
-		continue;
-	    break;
-	case T_OBJECT:
-	    ob = scope->item[i].u.ob;
-	    break;
-	default:
-	    continue;
-	}
-	if (ob->flags & O_LISTENER || ob->interactive) {
-	    for (valid = 1, j = 0; j < exclude->size; j++) {
-		if (exclude->item[j].type != T_OBJECT)
-		    continue;
-		if (exclude->item[j].u.ob == ob) {
-		    valid = 0;
-		    break;
-		}
-	    }
-	    if (valid) {
-		push_svalue(class);
-		push_svalue(msg);
-		apply(APPLY_RECEIVE_MESSAGE, ob, 2, ORIGIN_DRIVER);
-	    }
-	}
-#ifndef NO_ENVIRONMENT
-	else if (recurse) {
-	    array_t *tmp;
-
-	    tmp = all_inventory(ob, 1);
-	    do_message(class, msg, tmp, exclude, 0);
-	    free_array(tmp);
-	}
-#endif
-    }
-}
-
 #if !defined(NO_RESETS) && defined(LAZY_RESETS)
 void try_reset P1(object_t *, ob)
 {
@@ -2055,3 +1763,122 @@ object_t *first_inventory P1(svalue_t *, arg)
 }
 #endif
 #endif
+
+/*
+ * reclaim.c
+ * loops through all variables in all objects looking for the possibility
+ * of freeing up destructed objects (that are still hanging around because
+ * of references) -- coded by Blackthorn@Genocide Feb. 1993
+ */
+
+#define MAX_RECURSION 25
+
+static void gc_mapping PROT((mapping_t *));
+static void check_svalue PROT((svalue_t *));
+
+static int cleaned, nested;
+
+static void
+check_svalue P1(svalue_t *, v)
+{
+    register int idx;
+
+    nested++;
+    if (nested > MAX_RECURSION) {
+	return;
+    }
+    switch (v->type) {
+    case T_OBJECT:
+	if (v->u.ob->flags & O_DESTRUCTED) {
+	    free_svalue(v, "reclaim_objects");
+	    *v = const0u;
+	    cleaned++;
+	}
+	break;
+    case T_MAPPING:
+	gc_mapping(v->u.map);
+	break;
+    case T_ARRAY:
+    case T_CLASS:
+	for (idx = 0; idx < v->u.arr->size; idx++)
+	    check_svalue(&v->u.arr->item[idx]);
+	break;
+    case T_FUNCTION:
+	{
+	    svalue_t tmp;
+	    program_t *prog;
+
+            if (v->u.fp->hdr.owner && (v->u.fp->hdr.owner->flags & O_DESTRUCTED)) {
+		if (v->u.fp->hdr.type == FP_LOCAL | FP_NOT_BINDABLE) {
+		    prog = v->u.fp->hdr.owner->prog;
+		    prog->func_ref--;
+		    debug(d_flag, ("subtr func ref /%s: now %i\n",
+				prog->name, prog->func_ref));
+		    if (!prog->ref && !prog->func_ref)
+			deallocate_program(prog);
+		}
+                free_object(v->u.fp->hdr.owner, "reclaim_objects");
+                v->u.fp->hdr.owner = 0;
+                cleaned++;
+            }
+
+	    tmp.type = T_ARRAY;
+	    if ((tmp.u.arr = v->u.fp->hdr.args))
+		check_svalue(&tmp);
+	    break;
+	}
+    }
+    nested--;
+    return;
+}
+
+static void
+gc_mapping P1(mapping_t *, m)
+{
+    /* Be careful to correctly handle destructed mapping keys.  We can't
+     * just call check_svalue() b/c the hash would be wrong and the '0'
+     * element we add would be unreferenceable (in most cases)
+     */
+    mapping_node_t **prev, *elt;
+    int j = (int) m->table_size;
+
+    do {
+	prev = m->table + j;
+	while ((elt = *prev)) {
+	    if (elt->values[0].type == T_OBJECT) {
+		if (elt->values[0].u.ob->flags & O_DESTRUCTED) {
+		    free_object(elt->values[0].u.ob, "gc_mapping");
+		    
+		    /* found one, do a map_delete() */
+		    if (!(*prev = elt->next) && !m->table[j])
+			m->unfilled++;
+		    cleaned++;
+		    m->count--;
+		    total_mapping_nodes--;
+		    total_mapping_size -= sizeof(mapping_node_t);
+		    free_node(m, elt);
+		    continue;
+		}
+	    } else {
+		/* in case the key is a mapping or something */
+		check_svalue(elt->values);
+	    }
+	    check_svalue(elt->values+1);
+	    prev = &(elt->next);
+	}
+    } while (j--);
+}
+
+int reclaim_objects()
+{
+    int i;
+    object_t *ob;
+
+    cleaned = nested = 0;
+    for (ob = obj_list; ob; ob = ob->next_all)
+	if (ob->prog)
+	    for (i = 0; i < (int) ob->prog->num_variables_total; i++)
+		check_svalue(&ob->variables[i]);
+    
+    return cleaned;
+}
