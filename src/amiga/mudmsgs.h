@@ -5,15 +5,12 @@
 */
 
 struct connect_message {
-  struct Message Msg;
-  char *port_name;
+    struct Message Msg;
+    char *port_name;
 };
 
 struct data_message {
-  struct Message Msg;
-  char *buffer;
-  long length;
+    struct Message Msg;
+    char *buffer;
+    long length;
 };
-
-
-

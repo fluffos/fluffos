@@ -36,7 +36,7 @@
 #define	DM	242		/* data mark--for connect. cleaning */
 #define	NOP	241		/* nop */
 #define	SE	240		/* end sub negotiation */
-#define EOR     239             /* end of record (transparent mode) */
+#define EOR     239		/* end of record (transparent mode) */
 #define	ABORT	238		/* Abort process */
 #define	SUSP	237		/* Suspend process */
 #define	xEOF	236		/* End of file: EOF is already used... */
@@ -44,11 +44,13 @@
 #define SYNCH	242		/* for telfunc calls */
 
 #ifdef TELCMDS
-char *telcmds[] = {
-	"EOF", "SUSP", "ABORT", "EOR",
-	"SE", "NOP", "DMARK", "BRK", "IP", "AO", "AYT", "EC",
-	"EL", "GA", "SB", "WILL", "WONT", "DO", "DONT", "IAC",
+char *telcmds[] =
+{
+    "EOF", "SUSP", "ABORT", "EOR",
+    "SE", "NOP", "DMARK", "BRK", "IP", "AO", "AYT", "EC",
+    "EL", "GA", "SB", "WILL", "WONT", "DO", "DONT", "IAC",
 };
+
 #define	TELCMD_FIRST	xEOF
 #define	TELCMD_LAST	IAC
 #define	TELCMD_OK(x)	((x) <= TELCMD_LAST && (x) >= TELCMD_FIRST)
@@ -95,17 +97,19 @@ char *telcmds[] = {
 
 #define	NTELOPTS	(1+TELOPT_LINEMODE)
 #ifdef TELOPTS
-char *telopts[NTELOPTS] = {
-	"BINARY", "ECHO", "RCP", "SUPPRESS GO AHEAD", "NAME",
-	"STATUS", "TIMING MARK", "RCTE", "NAOL", "NAOP",
-	"NAOCRD", "NAOHTS", "NAOHTD", "NAOFFD", "NAOVTS",
-	"NAOVTD", "NAOLFD", "EXTEND ASCII", "LOGOUT", "BYTE MACRO",
-	"DATA ENTRY TERMINAL", "SUPDUP", "SUPDUP OUTPUT",
-	"SEND LOCATION", "TERMINAL TYPE", "END OF RECORD",
-	"TACACS UID", "OUTPUT MARKING", "TTYLOC",
-	"3270 REGIME", "X.3 PAD", "NAWS", "TSPEED", "LFLOW",
-	"LINEMODE",
+char *telopts[NTELOPTS] =
+{
+    "BINARY", "ECHO", "RCP", "SUPPRESS GO AHEAD", "NAME",
+    "STATUS", "TIMING MARK", "RCTE", "NAOL", "NAOP",
+    "NAOCRD", "NAOHTS", "NAOHTD", "NAOFFD", "NAOVTS",
+    "NAOVTD", "NAOLFD", "EXTEND ASCII", "LOGOUT", "BYTE MACRO",
+    "DATA ENTRY TERMINAL", "SUPDUP", "SUPDUP OUTPUT",
+    "SEND LOCATION", "TERMINAL TYPE", "END OF RECORD",
+    "TACACS UID", "OUTPUT MARKING", "TTYLOC",
+    "3270 REGIME", "X.3 PAD", "NAWS", "TSPEED", "LFLOW",
+    "LINEMODE",
 };
+
 #define	TELOPT_FIRST	TELOPT_BINARY
 #define	TELOPT_LAST	TELOPT_LINEMODE
 #define	TELOPT_OK(x)	((x) <= TELOPT_LAST && (x) >= TELOPT_FIRST)

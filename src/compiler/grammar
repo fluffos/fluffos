@@ -1,0 +1,2455 @@
+/* This is to make emacs edit this in C mode: -*-C-*- */
+all:
+	program
+    ;
+
+program:
+	program def possible_semi_colon
+    |   /* empty */
+    ;
+
+possible_semi_colon:
+	/* empty */
+    |   ';'
+	    {
+		yyerror("Extra ';'. Ignored.");
+	    }
+    ;
+
+inheritance:
+	type_modifier_list L_INHERIT string_con1 ';'
+	    {
+		struct object *ob;
+		struct inherit inherit;
+		int initializer;
+
+		ob = find_object2($3);
+		if (ob == 0) {
+		    inherit_file = $3;
+		    /* Return back to load_object() */
+		    YYACCEPT;
+		}
+		FREE($3);
+		inherit.prog = ob->prog;
+		inherit.function_index_offset =
+		      mem_block[A_FUNCTIONS].current_size /
+		      sizeof (struct function);
+		inherit.variable_index_offset =
+		      mem_block[A_VARIABLES].current_size /
+		      sizeof (struct variable);
+		add_to_mem_block(A_INHERITS, (char *)&inherit, sizeof inherit);
+		copy_variables(ob->prog, $1);
+		initializer = copy_functions(ob->prog, $1);
+		if (initializer > 0) {
+		    struct function *funp;
+		    int f;
+
+		    f = define_new_function("::__INIT", 0, 0, 0, 0, 0);
+		    funp = FUNCTION(f);
+		    funp->offset = mem_block[A_INHERITS].current_size /
+			  sizeof (struct inherit) - 1;
+		    funp->flags = NAME_STRICT_TYPES |
+			  NAME_INHERITED | NAME_HIDDEN;
+		    funp->type = TYPE_VOID;
+		    funp->function_index_offset = initializer;
+		    start_initializer();
+		    ins_f_byte(F_CALL_FUNCTION_BY_ADDRESS);
+		    ins_short(f);
+		    ins_byte(0);        /* Actual number of arguments */
+		    ins_f_byte(F_POP_VALUE);
+		    end_initializer();
+		}
+	    }
+    ;
+
+real:
+	L_REAL
+	    {
+		$$.type = TYPE_REAL;
+		$$.iscon = 1;
+		$$.addr = CURRENT_PROGRAM_SIZE;
+		ins_f_byte(F_REAL);
+		ins_real($1);
+	    }
+    ;
+
+number:
+	L_NUMBER
+	    {
+		if ($1 == 0)
+		    $$.type = TYPE_ANY;
+		else
+		    $$.type = TYPE_NUMBER;
+		$$.iscon = 1;
+		$$.addr = CURRENT_PROGRAM_SIZE;
+		write_number($1);
+	    }
+    ;
+
+optional_star:
+	/* empty */
+	    {
+		$$ = 0;
+	    }
+    |   '*'
+	    {
+		$$ = TYPE_MOD_POINTER;
+	    }
+    ;
+
+block_or_semi:
+	block
+	    {
+		$$ = 0;
+	    }
+    |   ';'
+	    {
+		$$ = ';';
+	    }
+    ;
+
+not_efun_string:
+      L_IDENTIFIER
+    |   L_EFUN_NAME { $$ = string_copy(instrs[$1].name); }
+    |   L_SIMUL_EFUN { $$ = string_copy($1->name); }
+    |   L_DEFINED_FUNCTION { $$ = string_copy(FUNCTION($1)->name); }
+    ;
+
+identifier:
+      not_efun_string
+    |   L_EFUN { $$ = string_copy("efun"); }
+    ;
+
+def:
+	type optional_star identifier
+	    {
+		/* Save start of function. */
+		push_explicit(mem_block[current_block].current_size);
+
+		if ($1 & TYPE_MOD_MASK) {
+		    exact_types = $1 | $2;
+		} else {
+		    if (pragma_strict_types)
+			yyerror("\"#pragma strict_types\" requires type of function");
+		    /* force strict types - no more compat mode */
+#ifdef STRICT_TYPE_CHECKING
+		    exact_types = TYPE_ANY; /* default to return type of mixed */
+#else
+		    exact_types = 0;
+#endif
+		}
+	    }
+	'(' argument ')'
+	    {
+		/*
+		 * Define a prototype. If it is a real function, then the
+		 * prototype will be replaced below.
+		 */
+		define_new_function($3, $6, 0, 0,
+		      NAME_UNDEFINED|NAME_PROTOTYPE, $1 | $2);
+	    }
+	block_or_semi
+	    {
+		/* Either a prototype or a block */
+		if ($9 == ';') {
+		    (void)pop_address(); /* Not used here */
+		} else {
+		    define_new_function($3, $6, current_number_of_locals - $6+
+			  ( max_break_stack_need -1 ) / sizeof(svalue) + 1,
+			  pop_address(), 0, $1 | $2);
+		    ins_f_byte(F_CONST0); ins_f_byte(F_RETURN);
+		}
+		free_all_local_names();
+		FREE($3);       /* Value was copied above */
+	    }
+    |   type name_list ';'
+	    {
+		if ($1 == 0)
+		    yyerror("Missing type");
+	    }
+    |   inheritance
+    ;
+
+new_arg_name:
+	type optional_star identifier
+	    {
+		if (exact_types && $1 == 0) {
+		    yyerror("Missing type for argument");
+		    add_local_name($3, TYPE_ANY);   /* Supress more errors */
+		} else {
+		    add_local_name($3, $1 | $2);
+		}
+	    }
+    |   type L_LOCAL_NAME
+	    {
+		yyerror("Illegal to redeclare local name");
+	    }
+    ;
+
+argument:
+	/* empty */
+	    {
+		$$ = 0;
+	    }
+    |   argument_list
+    ;
+
+argument_list:
+	new_arg_name
+	    {
+		$$ = 1;
+	    }
+    |   argument_list ',' new_arg_name
+	    {
+		$$ = $1 + 1;
+	    }
+    ;
+
+type_modifier:
+	L_NO_MASK
+	    {
+		$$ = TYPE_MOD_NO_MASK;
+	    }
+    |   L_STATIC
+	    {
+		$$ = TYPE_MOD_STATIC;
+	    }
+    |   L_PRIVATE
+	    {
+		$$ = TYPE_MOD_PRIVATE;
+	    }
+    |   L_PUBLIC
+	    {
+		$$ = TYPE_MOD_PUBLIC;
+	    }
+    |   L_VARARGS
+	    {
+		$$ = TYPE_MOD_VARARGS;
+	    }
+    |   L_PROTECTED
+	    {
+		$$ = TYPE_MOD_PROTECTED;
+	    }
+    ;
+
+type_modifier_list:
+	/* empty */
+	    {
+		$$ = 0;
+	    }
+    |   type_modifier type_modifier_list
+	    {
+		$$ = $1 | $2;
+	    }
+    ;
+
+type:
+	type_modifier_list opt_basic_type
+	    {
+		$$ = $1 | $2;
+		current_type = $$;
+	    }
+    ;
+
+cast:
+	'(' basic_type optional_star ')'
+	    {
+		$$ = $2 | $3;
+	    }
+    ;
+
+opt_basic_type:
+	basic_type
+    |   /* empty */
+	    {
+		$$ = TYPE_UNKNOWN;
+	    }
+    ;
+
+basic_type:
+	L_STATUS
+	    {
+		$$ = TYPE_NUMBER; current_type = $$;
+	    }
+    |   L_INT
+	    {
+		$$ = TYPE_NUMBER; current_type = $$;
+	    }
+    |   L_FLOAT
+	    {
+		$$ = TYPE_REAL; current_type = $$;
+	    }
+    |   L_STRING_DECL
+	    {
+		$$ = TYPE_STRING; current_type = $$;
+	    }
+    |   L_BUFFER_DECL
+	    {
+		$$ = TYPE_BUFFER; current_type = $$;
+	    }
+    |   L_OBJECT
+	    {
+		$$ = TYPE_OBJECT; current_type = $$;
+	    }
+    |   L_MAPPING
+	    {
+		$$ = TYPE_MAPPING; current_type = $$;
+	    }
+    |   L_FUNCTION
+	    {
+		$$ = TYPE_FUNCTION; current_type = $$;
+	    }
+    |   L_VOID
+	    {
+		$$ = TYPE_VOID; current_type = $$;
+	    }
+    |   L_MIXED
+	    {
+		$$ = TYPE_ANY; current_type = $$;
+	    }
+    ;
+
+name_list:
+	new_name
+    |   new_name ',' name_list
+    ;
+
+new_name:
+	optional_star identifier
+	    {
+		define_variable($2, current_type | $1, 0);
+		FREE($2);
+	    }
+    |   optional_star identifier
+	    {
+		define_variable($2, current_type | $1, 0);
+		$<number>$ = verify_declared($2);
+		start_initializer();
+	    }
+	'=' expr0
+	    {
+		if (!compatible_types((current_type | $1) & TYPE_MOD_MASK,
+		      $5.type)) {
+		    char buff[100];
+
+		    sprintf(buff, "Type mismatch %s when initializing %s",
+			  get_two_types(current_type | $1, $5.type), $2);
+		    yyerror(buff);
+		}
+
+		ins_f_byte(F_PUSH_IDENTIFIER_LVALUE);
+		ins_byte($<number>3);
+
+		ins_f_byte(F_VOID_ASSIGN);
+		end_initializer();
+		FREE($2);
+	    }
+    ;
+
+block:
+	'{' local_declarations statements '}'
+	    {
+		;
+	    }
+    ;
+
+local_declarations:
+	/* empty */
+    |   local_declarations basic_type local_name_list ';'
+    ;
+
+new_local_name:
+	optional_star identifier
+	    {
+		add_local_name($2, current_type | $1);
+	    }
+    |   optional_star identifier '=' expr0
+	    {
+		int var_num;
+
+		var_num = add_local_name($2, current_type | $1);
+
+		if (!compatible_types((current_type | $1) & TYPE_MOD_MASK, $4.type)) {
+		    char buff[100];
+
+		    sprintf(buff, "Type mismatch %s when initializing %s",
+			  get_two_types(current_type | $1, $4.type), $2);
+		    yyerror(buff);
+		}
+
+		ins_f_byte(F_PUSH_LOCAL_VARIABLE_LVALUE);
+		ins_byte(var_num);
+
+		ins_f_byte(F_VOID_ASSIGN);
+	    }
+    ;
+
+local_name_list:
+	new_local_name
+    |   new_local_name ',' local_name_list
+    ;
+
+statements:
+	/* empty */
+    |   statement statements
+    |   error ';'
+    ;
+
+statement:
+	comma_expr ';'
+	    {
+		insert_pop_value();
+		if (d_flag)
+		    ins_f_byte(F_BREAK_POINT);
+		/* if (exact_types && !TYPE($1,TYPE_VOID))
+		yyerror("Value thrown away"); */
+	    }
+    |   cond
+    |   while
+    |   do
+    |   for
+    |   switch
+    |   case
+    |   default
+    |   return ';'
+    |   block
+    |   /* empty */ ';'
+    |   L_BREAK ';'
+	    {
+		/* This code is a jump to a jump */
+		if (current_break_address == 0)
+		    yyerror("break statement outside loop");
+		if (current_break_address & BREAK_ON_STACK) {
+		    ins_f_byte(F_BREAK);
+		} else {
+		    /* form a linked list of the break addresses */
+		    ins_f_byte(F_JUMP); ins_short(current_break_address);
+		    current_break_address =  mem_block[current_block].current_size - 2;
+		}
+	    }
+    |   L_CONTINUE ';'
+	    {
+		/* This code is a jump */
+		if (current_continue_address == 0)
+		    yyerror("continue statement outside loop");
+		if (switches) {
+		    ins_f_byte(F_POP_BREAK); ins_byte(switches);
+		}
+		/* form a linked list of the continue addresses */
+		ins_f_byte(F_JUMP); ins_short(current_continue_address);
+		current_continue_address = mem_block[current_block].current_size - 2;
+	    }
+    ;
+
+while:
+	/* empty */
+	    {
+		/* be intelligent about the order in which the code is laid out.
+		   By inserting the code for the block first followed by the
+		   the expression (instead of vice versa), it is possible to
+		   save an instruction on each while loop iteration.
+		 */
+		push_explicit(current_continue_address);
+		push_explicit(current_break_address);
+		/* remember size of program before the while expression */
+		push_address(); /* 1 */
+		/* keep track of # of nested switches prior to this while
+		   so that we'll know how many to pop from the break stack in
+		   the event of a "continue;" in the body of a switch().
+		*/
+		push_switches();
+	    }
+	L_WHILE '(' comma_expr ')'
+	    {
+		int addr = pop_address(); /* 1 */
+		expr_t e;
+		char branch;
+
+		/* optimize if last expression did F_NOT */
+		if (last_expression == CURRENT_PROGRAM_SIZE-1 &&
+		      LAST_EXPR_CODE == F_NOT) {
+		    SET_CURRENT_PROGRAM_SIZE(last_expression);
+		    branch = F_BBRANCH_WHEN_ZERO;
+		} else {
+		    branch = F_BBRANCH_WHEN_NON_ZERO;
+		}
+
+		/* + 3 to leave room for (byte) jump code and (short) target */
+		e.len = CURRENT_PROGRAM_SIZE - addr;
+		e.expr = (char *)DMALLOC(e.len + 3, 50, "WHILE");
+		/* copy the code for the loop control expression into a temp space */
+		memcpy(e.expr, mem_block[current_block].block + addr, e.len);
+		/* relative offset (backwards) branch */
+		e.expr[e.len] = branch;
+#ifdef LPC_OPTIMIZE_LOOPS
+		if (!optimize_loop_cond(e.expr, e.len)) {
+		    optimize_while_dec(e.expr, e.len);
+		}
+#endif
+		/* adjust the size of the program so that we will overwrite the
+		   expression in the compiled code (remember we've already copied the
+		   expression into temp storage).
+		*/
+		SET_CURRENT_PROGRAM_SIZE(addr);
+		last_push_identifier = -1;
+		last_push_local = -1;
+		last_push_indexed = -1;
+		/* jump to code for expression (which hasn't yet been inserted) */
+		ins_f_byte(F_JUMP);
+		/* remember where the place holder is stored */
+		push_address(); /* 2 */
+		ins_short(0); /* insert the place holder */
+		push_expression(&e); /* 3 */
+		/* each 'continue' statement will add to a linked list of slots that
+		   need filled in once the continue_address is known.  The delimeters
+		   serve as markers for the ends of the lists.
+		*/
+		current_continue_address = CONTINUE_DELIMITER;
+		current_break_address = BREAK_DELIMITER;
+	    }
+	statement
+	    {
+		expr_t *e;
+		int addr = pop_address(); /* 2 */
+		unsigned short start = addr + 2;
+		unsigned short offset;
+		int next_addr;
+
+		upd_short(addr, CURRENT_PROGRAM_SIZE);
+		e = pop_expression(); /* 3 */
+		/* traverse the linked list filling in the current_continue_address
+		   required by each "continue" statement.
+		*/
+		for (; current_continue_address > 0;
+		      current_continue_address = next_addr) {
+		    next_addr = read_short(current_continue_address);
+		    upd_short(current_continue_address, CURRENT_PROGRAM_SIZE);
+		}
+		/* branch already added to end of expression */
+		offset = CURRENT_PROGRAM_SIZE + (e->len + 1 - start);
+		e->expr[e->len+1] = ((char *)&offset)[0];
+		e->expr[e->len+2] = ((char *)&offset)[1];
+		add_to_mem_block(current_block, (char *)e->expr, e->len + 3);
+		/* fill in branch address */
+		FREE(e->expr);
+
+		/* traverse the linked list filling in the current_break_address
+		   required by each "break" statement.
+		*/
+		for (;current_break_address > 0; current_break_address = next_addr) {
+		    next_addr = read_short(current_break_address);
+		    upd_short(current_break_address, CURRENT_PROGRAM_SIZE);
+		}
+		pop_switches();
+		current_break_address = pop_address();
+		current_continue_address = pop_address();
+	    }
+    ;
+
+do:
+	/* empty */
+	    {
+		push_switches();
+		push_explicit(current_continue_address);
+		push_explicit(current_break_address);
+		current_break_address = BREAK_DELIMITER;
+		current_continue_address = CONTINUE_DELIMITER;
+		push_address(); /* 1 */
+	    }
+	L_DO statement
+	    {
+		push_address(); /* 2 */
+	    }
+	L_WHILE '(' comma_expr ')' ';'
+	    {
+		int cont_addr = pop_address(); /* 2 */
+		int addr = pop_address(); /* 1 */
+		int next_addr;
+
+		for (;current_continue_address > 0;
+		      current_continue_address = next_addr) {
+		    next_addr = read_short(current_continue_address);
+		    upd_short(current_continue_address, cont_addr);
+		}
+		/* optimize if last expression did F_NOT */
+		if (last_expression == CURRENT_PROGRAM_SIZE-1 &&
+		      LAST_EXPR_CODE == F_NOT) {
+		    SET_CURRENT_PROGRAM_SIZE(last_expression);
+		    ins_f_byte(F_BBRANCH_WHEN_ZERO);
+		} else {
+		    ins_f_byte(F_BBRANCH_WHEN_NON_ZERO);
+		}
+		ins_short(CURRENT_PROGRAM_SIZE - addr);
+		for (;current_break_address > 0; current_break_address = next_addr) {
+		    next_addr = read_short(current_break_address);
+		    upd_short(current_break_address, CURRENT_PROGRAM_SIZE);
+		}
+		current_break_address = pop_address();
+		current_continue_address = pop_address();
+		pop_switches();
+	    }
+    ;
+
+for:
+	L_FOR '('
+	    {
+		push_explicit(current_continue_address);
+		push_explicit(current_break_address);
+		push_switches();
+	    }
+	for_expr ';'
+	    {
+		current_continue_address = CONTINUE_DELIMITER;
+		insert_pop_value();
+		push_address();  /* 1 */
+	    }
+	for_expr ';'
+	    {
+		int start = pop_address(); /* 1 */
+		expr_t e;
+		char branch;
+
+		/* optimize if last expression did F_NOT */
+		if (last_expression == CURRENT_PROGRAM_SIZE-1 &&
+		      LAST_EXPR_CODE == F_NOT) {
+		    SET_CURRENT_PROGRAM_SIZE(last_expression);
+		    branch = F_BBRANCH_WHEN_ZERO;
+		} else {
+		    branch = F_BBRANCH_WHEN_NON_ZERO;
+		}
+
+		e.len = CURRENT_PROGRAM_SIZE - start;
+		e.expr = (char *)DMALLOC(e.len + 3, 51, "for_expr");
+		memcpy(e.expr, mem_block[current_block].block + start, e.len);
+		e.expr[e.len] = branch;
+#ifdef LPC_OPTIMIZE_LOOPS
+		optimize_loop_cond(e.expr, e.len);
+#endif
+		push_expression(&e);
+		SET_CURRENT_PROGRAM_SIZE(start);
+		push_address(); /* 2 */
+		last_push_identifier = -1;
+		last_push_local = -1;
+		last_push_indexed = -1;
+	    }
+	for_expr ')'
+	    {
+		expr_t e;
+		int start = pop_address(); /* 3 */
+
+		insert_pop_value();
+		e.len = CURRENT_PROGRAM_SIZE - start;
+		e.expr = e.len ? (char *)DMALLOC(e.len, 52, "for_expr:") : (char *)0;
+		if (e.expr) {
+		    memcpy(e.expr, mem_block[current_block].block + start, e.len);
+#ifdef LPC_OPTIMIZE_LOOPS
+		    if ((e.len == 3) && (e.expr[0] == F_PUSH_LOCAL_VARIABLE_LVALUE)
+			  && (e.expr[2] == F_INC)) {
+			/* optimizaton for the i++ of a for loop ;) - jwg */
+			e.expr[0] = F_LOOP_INCR;
+			e.len = 2;
+		    }
+#endif
+		}
+		push_expression(&e);
+		SET_CURRENT_PROGRAM_SIZE(start);
+		push_address(); /* 4 */
+		ins_f_byte(F_JUMP); /* to expression */
+		ins_short(0); /* 5 */
+		current_break_address = BREAK_DELIMITER;
+		last_push_identifier = -1;
+		last_push_local = -1;
+		last_push_indexed = -1;
+	    }
+	statement
+	    {
+		int next_addr;
+		unsigned short int jump = (unsigned short)pop_address(); /* 4 */
+		unsigned short int start = jump + 3;
+		unsigned short offset;
+		expr_t *e;
+
+		for (; current_continue_address > 0;
+		      current_continue_address = next_addr) {
+		    next_addr = read_short(current_continue_address);
+		    upd_short(current_continue_address, CURRENT_PROGRAM_SIZE);
+		}
+
+		e = pop_expression();
+		if (e->len) {
+		    add_to_mem_block(current_block, (char *)e->expr, e->len);
+		    FREE(e->expr);
+		}
+
+		/* fix F_JUMP target inserted above */
+		upd_short(jump + 1, CURRENT_PROGRAM_SIZE); /* 5 */
+
+		e = pop_expression();
+		offset = CURRENT_PROGRAM_SIZE + (e->len + 1 - start);
+		e->expr[e->len + 1] = ((char *)&offset)[0];
+		e->expr[e->len + 2] = ((char *)&offset)[1];
+		add_to_mem_block(current_block, (char *)e->expr, e->len + 3);
+		FREE(e->expr);
+
+		for (;current_break_address > 0;current_break_address = next_addr) {
+		    next_addr = read_short(current_break_address);
+		    upd_short(current_break_address, CURRENT_PROGRAM_SIZE);
+		}
+		current_break_address = pop_address();
+		current_continue_address = pop_address();
+		pop_switches();
+	    }
+    ;
+
+for_expr:
+	/* EMPTY */
+	    {
+		ins_expr_f_byte(F_CONST1);
+	    }
+    |   comma_expr
+    ;
+
+switch:
+	L_SWITCH '(' comma_expr ')'
+	    {
+		switches++;
+		current_break_stack_need += sizeof(short);
+		if ( current_break_stack_need > max_break_stack_need )
+		    max_break_stack_need = current_break_stack_need;
+		push_explicit(current_case_number_heap);
+		push_explicit(current_case_string_heap);
+		push_explicit(zero_case_label);
+		push_explicit(current_break_address);
+		ins_f_byte(F_SWITCH);
+		ins_byte(0xff); /* kind of table */
+		current_case_number_heap = mem_block[A_CASE_NUMBERS].current_size;
+		current_case_string_heap = mem_block[A_CASE_STRINGS].current_size;
+		zero_case_label = NO_STRING_CASE_LABELS;
+		ins_short(0); /* address of table */
+		current_break_address = mem_block[current_block].current_size |
+		      BREAK_ON_STACK | BREAK_FROM_CASE ;
+		ins_short(0); /* break address to push, table is entered before */
+		ins_short(0); /* default address */
+	    }
+	statement
+	    {
+		char *heap_start;
+		int heap_end_offs;
+		int i,o;
+		int current_key, last_key = 0;
+		/* int size_without_table; */
+		int block_index;
+		int current_case_heap;
+		int first_key;
+		int num_keys;
+
+		current_break_address &= ~(BREAK_ON_STACK|BREAK_FROM_CASE);
+
+		if ( !read_short(current_break_address+2 ) )
+		    upd_short(current_break_address+2,  /* no default given ->  */
+		mem_block[current_block].current_size);     /* create one           */
+
+		/* it isn't unusual that the last case/default has no break */
+		ins_f_byte(F_BREAK);
+		if (zero_case_label & (NO_STRING_CASE_LABELS|SOME_NUMERIC_CASE_LABELS)) {
+		    block_index = A_CASE_NUMBERS;
+		    current_case_heap = current_case_number_heap;
+		} else {
+		    block_index = A_CASE_STRINGS;
+		    current_case_heap = current_case_string_heap;
+		    if (zero_case_label&0xffff) {
+			struct case_heap_entry temp;
+
+			temp.key = (int)ZERO_AS_STR_CASE_LABEL;
+			temp.addr = zero_case_label & 0xffff;
+			temp.line = 0;  /* if this is accessed later, something is
+					 * really wrong                            */
+			add_to_case_heap(A_CASE_STRINGS,&temp);
+		    }
+#ifdef SAVE_BINARIES
+		    {
+			short sw;
+
+			sw = current_break_address - 4;  /* the F_SWITCH */
+			add_to_mem_block(A_PATCH, (char *)&sw, sizeof sw);
+		    }
+#endif
+		}
+		heap_start = mem_block[block_index].block + current_case_heap ;
+		heap_end_offs = mem_block[block_index].current_size -current_case_heap;
+		if (!heap_end_offs)
+		    yyerror("switch without case not supported");
+
+		/* add a dummy entry so that we can always
+		 * assume we have no or two childs
+		 */
+		add_to_mem_block(block_index, "\0\0\0\0\0\0\0\0",
+		      sizeof(struct case_heap_entry) );
+
+		/* read out the heap and build a sorted table */
+		/* the table could be optimized better, but let's first see
+		 * how much switch is used at all when it is full-featured...
+		 */
+		mem_block[A_CASE_LABELS].current_size = 0;
+		first_key = ((struct case_heap_entry*)heap_start)->key;
+		num_keys = 0;
+		for ( ; ((struct case_heap_entry*)heap_start)->addr; ) {
+		    int offset;
+		    int curr_line, last_line = 0;
+		    unsigned short current_addr,last_addr = 0xffff;
+		    int range_start = 0;
+
+		    current_key = ((struct case_heap_entry*)heap_start)->key ;
+		    curr_line = ((struct case_heap_entry*)heap_start)->line ;
+		    current_addr = ((struct case_heap_entry*)heap_start)->addr ;
+		    if ( current_key == last_key &&
+			  mem_block[A_CASE_LABELS].current_size ) {
+			char buf[90];
+
+			sprintf(buf,"Duplicate case in line %d and %d",
+			      last_line, curr_line);
+			yyerror(buf);
+		    }
+		    if (curr_line) {
+			if (last_addr == 1) {
+			    char buf[120];
+
+			    sprintf(buf,
+				  "Discontinued case label list range, line %d by line %d",
+				  last_line, curr_line);
+			    yyerror(buf);
+			}
+			else if (current_key == (last_key + 1) && current_addr == last_addr) {
+			    if (mem_block[A_CASE_LABELS].current_size != (range_start + 6)) {
+				/* todo: this next line is probably non-portable (byte-ordering) */
+				*(short*)(mem_block[A_CASE_LABELS].block+range_start+4) = 1;
+			       mem_block[A_CASE_LABELS].current_size = range_start + 6;
+			    }
+			} else {
+			    range_start = mem_block[A_CASE_LABELS].current_size;
+			}
+		    }
+		    last_key = current_key;
+		    last_line = curr_line;
+		    last_addr = current_addr;
+		    num_keys++;
+		    add_to_mem_block(A_CASE_LABELS,
+			  (char *)&current_key, sizeof(int) );
+		    add_to_mem_block(A_CASE_LABELS,
+			  (char *)&current_addr, sizeof(short) );
+		    for ( offset = 0; ; ) {
+			int child1,child2;
+
+			child1 = ( offset << 1 ) + sizeof(struct case_heap_entry);
+			child2 = child1 + sizeof(struct case_heap_entry);
+			if ( child1 >= heap_end_offs ) break;
+			if ( ((struct case_heap_entry*)(heap_start+child1))->addr &&
+			      ( !((struct case_heap_entry*)(heap_start+child2))->addr ||
+			      ((struct case_heap_entry*)(heap_start+child1))->key <=
+			      ((struct case_heap_entry*)(heap_start+child2))->key  ) ) {
+			    *(struct case_heap_entry*)(heap_start+offset) =
+				  *(struct case_heap_entry*)(heap_start+child1);
+			    offset = child1;
+			} else
+			    if (((struct case_heap_entry*)(heap_start+child2))->addr ) {
+				*(struct case_heap_entry*)(heap_start+offset) =
+				*(struct case_heap_entry*)(heap_start+child2);
+				offset = child2;
+			    } else
+				break;
+		    }
+		    ((struct case_heap_entry*)(heap_start+offset))->addr = 0;
+		}
+
+		/* write start of table */
+		upd_short(current_break_address-2,
+		      mem_block[current_block].current_size);
+
+		/* check to see if quicker direct lookup can be used */
+		if (block_index == A_CASE_NUMBERS &&
+		      num_keys == last_key - first_key + 1) {
+		    short offset;
+
+		    for (i = 0; i<num_keys; i++) {
+			/* only using offset part of table here */
+			((char *)&offset)[0] = mem_block[A_CASE_LABELS].block[i*6 + 4];
+			((char *)&offset)[1] = mem_block[A_CASE_LABELS].block[i*6 + 5];
+			if (offset <= 1) {
+			    ((char *)&offset)[0] = mem_block[A_CASE_LABELS].block[i*6 + 4 + 6];
+			    ((char *)&offset)[1] = mem_block[A_CASE_LABELS].block[i*6 + 5 + 6];
+			}
+			ins_short(offset);
+		    }
+		    ins_long(first_key);
+		    mem_block[current_block].block[current_break_address-3] = (char)0xfe;
+		} else { /* use slower binary search */
+		    /* copy over table */
+		    add_to_mem_block(current_block, (char *)mem_block[A_CASE_LABELS].block,
+			  mem_block[A_CASE_LABELS].current_size );
+		    /* calculate starting index for search at execution time */
+		    for (i=0xf0,o=6; o<<1 <= mem_block[A_CASE_LABELS].current_size; )
+			i++,o<<=1;
+		    if (block_index == A_CASE_STRINGS) i = ( i << 4 ) | 0xf;
+		    /* and store it */
+		    mem_block[current_block].block[current_break_address-3] &= (i & 0xff);
+		}
+		upd_short(current_break_address, mem_block[current_block].current_size);
+
+		mem_block[A_CASE_NUMBERS].current_size = current_case_number_heap;
+		mem_block[A_CASE_STRINGS].current_size = current_case_string_heap;
+		current_break_address = pop_address();
+		zero_case_label = pop_address();
+		current_case_string_heap = pop_address();
+		current_case_number_heap = pop_address();
+		current_break_stack_need -= sizeof(short);
+		switches--;
+	    }
+    ;
+
+case:
+	L_CASE case_label ':'
+	    {
+		struct case_heap_entry temp;
+
+		if ( !( current_break_address & BREAK_FROM_CASE ) ) {
+		    yyerror("Case outside switch");
+		    break;
+		}
+		temp.key = $2.key;
+		temp.addr = mem_block[current_block].current_size;
+		temp.line = current_line;
+		add_to_case_heap($2.block,&temp);
+	    }
+    |   L_CASE case_label L_RANGE case_label ':'
+	    {
+		struct case_heap_entry temp;
+
+		if ( $2.block != A_CASE_NUMBERS || $4.block != A_CASE_NUMBERS )
+		    yyerror("String case labels not allowed as range bounds");
+		if ($2.key > $4.key) break;
+		temp.key = $2.key;
+		temp.addr = 1;
+		temp.line = current_line;
+		add_to_case_heap(A_CASE_NUMBERS,&temp);
+		temp.key = $4.key;
+		temp.addr = mem_block[current_block].current_size;
+		temp.line = 0;
+		add_to_case_heap(A_CASE_NUMBERS,&temp);
+	    }
+    ;
+
+case_label:
+	constant
+	    {
+		if ( !(zero_case_label & NO_STRING_CASE_LABELS) && $1 )
+		    yyerror("Mixed case label list not allowed");
+		    if ( ($$.key = $1) )
+			zero_case_label |= SOME_NUMERIC_CASE_LABELS;
+		    else
+			zero_case_label |= mem_block[current_block].current_size;
+		    $$.block = A_CASE_NUMBERS;
+	    }
+    |   string_constant
+	    {
+		if ( zero_case_label & SOME_NUMERIC_CASE_LABELS )
+		    yyerror("Mixed case label list not allowed");
+		    zero_case_label &= ~NO_STRING_CASE_LABELS;
+		    store_prog_string($1);
+		    $$.key = (int)$1;
+		    $$.block = A_CASE_STRINGS;
+	    }
+    ;
+
+constant:
+	constant '|' constant
+	    {
+		$$ = $1 | $3;
+	    }
+    |   constant '^' constant
+	    {
+		$$ = $1 ^ $3;
+	    }
+    |   constant '&' constant
+	    {
+		$$ = $1 & $3;
+	    }
+    |   constant L_EQ constant
+	    {
+		$$ = $1 == $3;
+	    }
+    |   constant L_NE constant
+	    {
+		$$ = $1 != $3;
+	    }
+    |   constant '>'  constant
+	    {
+		$$ = $1 >  $3;
+	    }
+    |   constant L_GE constant
+	    {
+		$$ = $1 >= $3;
+	    }
+    |   constant '<'  constant
+	    {
+		$$ = $1 <  $3;
+	    }
+    |   constant L_LE constant
+	    {
+		$$ = $1 <= $3;
+	    }
+    |   constant L_LSH constant
+	    {
+		$$ = $1 << $3;
+	    }
+    |   constant L_RSH constant
+	    {
+		$$ = $1 >> $3;
+	    }
+    |   constant '+' constant
+	    {
+		$$ = $1 + $3;
+	    }
+    |   constant '-' constant
+	    {
+		$$ = $1 - $3;
+	    }
+    |   constant '*' constant
+	    {
+		$$ = $1 * $3;
+	    }
+    |   constant '%' constant
+	    {
+		if ($3) $$ = $1 % $3; else yyerror("Modulo by zero");
+	    }
+    |   constant '/' constant
+	    {
+		if ($3) $$ = $1 / $3; else yyerror("Division by zero");
+	    }
+    |   '(' constant ')'
+	    {
+		$$ = $2;
+	    }
+    |   L_NUMBER
+    |   '-' L_NUMBER
+	    {
+		$$ = -$2;
+	    }
+    |   L_NOT L_NUMBER
+	    {
+		$$ = !$2;
+	    }
+    |   '~' L_NUMBER
+	    {
+		$$ = ~$2;
+	    }
+    ;
+
+default:
+	L_DEFAULT ':'
+	    {
+		if ( !( current_break_address & BREAK_FROM_CASE ) ) {
+		    yyerror("Default outside switch");
+		    break;
+		}
+		current_break_address &= ~(BREAK_ON_STACK|BREAK_FROM_CASE);
+		if ( read_short(current_break_address+2 ) )
+		    yyerror("Duplicate default");
+		upd_short(current_break_address+2, mem_block[current_block].current_size);
+		current_break_address |= (BREAK_ON_STACK|BREAK_FROM_CASE);
+	    }
+    ;
+
+comma_expr:
+	expr0
+	    {
+		$$ = $1.type;
+	    }
+    |   comma_expr
+	    {
+		insert_pop_value();
+	    }
+	',' expr0
+	    {
+		$$ = $4.type;
+	    }
+    ;
+
+comma_expr1:
+	expr0
+	    {
+		$$ = $1;
+	    }
+    |   comma_expr1
+	    {
+		insert_pop_value();
+	    }
+	',' expr0
+	    {
+		$$ = $4;
+		$$.iscon = 0;
+	    }
+    ;
+
+expr0:
+	lvalue assign expr0  %prec '='
+	    {
+		int start_addr, end_addr;
+		char *copybuf;
+		int lbytes, rbytes;
+
+		/* set this up here so we can change it below */
+		$$.type = $3.type;
+		$$.addr = 0; $$.iscon = 0;
+
+		if (exact_types && !compatible_types($1.type, $3.type) &&
+		      !($1.type == TYPE_STRING && $3.type == TYPE_NUMBER &&
+		      $2 == F_ADD_EQ)) {
+		    type_error("Bad assignment. Rhs", $3.type);
+		}
+
+		if (($1.type == TYPE_REAL) && ($3.type == TYPE_NUMBER)) {
+		    ins_expr_f_byte(F_TO_FLOAT);
+		    $$.type = $1.type;
+		} else if (($1.type == TYPE_NUMBER) && ($3.type == TYPE_REAL)) {
+		    ins_expr_f_byte(F_TO_INT);
+		    $$.type = $1.type;
+		}
+
+		/*
+		 * copy lvalue to temporary buffer
+		 */
+		start_addr = $1.addr;   /* start of lvalue code */
+		lbytes = $1.len;        /* size of lvalue expression */
+		copybuf = (char *)DXALLOC(lbytes, 123, "lvalue_assign");
+		memcpy(copybuf, mem_block[current_block].block + start_addr, lbytes);
+
+		/*
+		 * move rhs expression (overwriting lvalue)
+		 */
+		end_addr = start_addr + lbytes;
+		rbytes = CURRENT_PROGRAM_SIZE - end_addr;
+		memmove(mem_block[current_block].block + start_addr,
+		      mem_block[current_block].block + end_addr, rbytes);
+
+		/*
+		 * adjust size of program and append lvalue
+		 */
+		SET_CURRENT_PROGRAM_SIZE(start_addr + rbytes);
+		add_to_mem_block(current_block, copybuf, lbytes);
+		FREE(copybuf);
+
+		last_push_identifier = -1;
+		last_push_local = -1;
+		last_push_indexed = -1;
+
+		/*
+		 * the assignment operator
+		 */
+		ins_expr_f_byte($2);
+
+	    }
+    |   error assign expr0  %prec '='
+	    {
+		yyerror("Illegal LHS");
+		$$.type = TYPE_ANY;
+	    }
+    |   expr0 '?'
+	    {
+		/* optimize if last expression did F_NOT */
+		if (last_expression == CURRENT_PROGRAM_SIZE-1 &&
+		      LAST_EXPR_CODE == F_NOT) {
+		    SET_CURRENT_PROGRAM_SIZE(last_expression);
+		    ins_f_byte(F_BRANCH_WHEN_NON_ZERO); /* relative0 */
+		} else {
+		    ins_f_byte(F_BRANCH_WHEN_ZERO); /* relative0 */
+		}
+		push_address();
+		ins_short(0);
+	    }
+	expr0
+	    {
+		int i;
+		i = pop_address();
+		ins_f_byte(F_BRANCH); /* relative1 */
+		push_address(); ins_short(0);
+		upd_short(i, CURRENT_PROGRAM_SIZE - i); /* relative0 */
+	    }
+	':' expr0  %prec '?'
+	    {
+		int i = pop_address();
+
+		last_expression = -1;
+		upd_short(i, CURRENT_PROGRAM_SIZE - i); /* relative1 */
+		if (exact_types && !compatible_types($4.type, $7.type)) {
+		    type_error("Different types in ?: expr", $4.type);
+		    type_error("                      and ", $7.type);
+		}
+		if ($4.type == TYPE_ANY)
+		    $$.type = $7.type;
+		else if (TYPE($4.type, TYPE_MOD_POINTER|TYPE_ANY))
+		    $$.type = $7.type;
+		else
+		    $$.type = $4.type;
+		$$.addr = $1.addr; $$.iscon = 0;
+	    }
+    |   expr0 L_LOR
+	    {
+#if 0
+		ins_f_byte(F_DUP);
+		ins_f_byte(F_BRANCH_WHEN_NON_ZERO); /* relative2 */
+		push_address();
+		ins_short(0);
+		ins_f_byte(F_POP_VALUE);
+#else
+		ins_f_byte(F_LOR);
+		push_address();
+		ins_short(0);
+#endif
+	    }
+	expr0
+	    {
+		int i = pop_address();
+
+		last_expression = -1;
+		upd_short(i, CURRENT_PROGRAM_SIZE - i); /* relative2 */
+		if ($1.type == $4.type)
+		    $$.type = $1.type;
+		else
+		    $$.type = TYPE_ANY; /* Return type can't be known */
+		$$.addr = $1.addr; $$.iscon = 0;
+	    }
+    |   expr0 L_LAND
+	    {
+#if 0
+		ins_f_byte(F_DUP);
+		ins_f_byte(F_BRANCH_WHEN_ZERO); /* relative3 */
+		push_address();
+		ins_short(0);
+		ins_f_byte(F_POP_VALUE);
+#else
+		ins_f_byte(F_LAND);
+		push_address();
+		ins_short(0);
+#endif
+	    }
+	expr0
+	    {
+		int i = pop_address();
+
+		last_expression = -1;
+		upd_short(i, CURRENT_PROGRAM_SIZE - i); /* relative3 */
+		if ($1.type == $4.type)
+		    $$.type = $1.type;
+		else
+		    $$.type = TYPE_ANY; /* Return type can't be known */
+		$$.addr = $1.addr; $$.iscon = 0;
+	    }
+    |   expr0 '|' expr0
+	    {
+		if (exact_types && !TYPE($1.type,TYPE_NUMBER))
+		    type_error("Bad argument 1 to |", $1.type);
+		if (exact_types && !TYPE($3.type,TYPE_NUMBER))
+		    type_error("Bad argument 2 to |", $3.type);
+		$$.type = TYPE_NUMBER;
+		$$.addr = $1.addr; $$.iscon = 0;
+#ifdef LPC_OPTIMIZE
+		/* constant expressions */
+		if ($1.iscon && BASIC_TYPE($1.type, TYPE_NUMBER) &&
+		      $3.iscon && BASIC_TYPE($3.type, TYPE_NUMBER)) {
+		    SET_CURRENT_PROGRAM_SIZE($1.addr);
+		    write_number(read_number($1.addr) | read_number($3.addr));
+		    $$.iscon = 1;
+		    break;
+		}
+#endif
+		ins_f_byte(F_OR);
+	    }
+    |   expr0 '^' expr0
+	    {
+		if (exact_types && !TYPE($1.type,TYPE_NUMBER))
+		    type_error("Bad argument 1 to ^", $1.type);
+		if (exact_types && !TYPE($3.type,TYPE_NUMBER))
+		    type_error("Bad argument 2 to ^", $3.type);
+		$$.type = TYPE_NUMBER;
+		$$.addr = $1.addr; $$.iscon = 0;
+#ifdef LPC_OPTIMIZE
+		/* constant expressions */
+		if ($1.iscon && BASIC_TYPE($1.type, TYPE_NUMBER) &&
+		      $3.iscon && BASIC_TYPE($3.type, TYPE_NUMBER)) {
+		    SET_CURRENT_PROGRAM_SIZE($1.addr);
+		    write_number(read_number($1.addr) ^ read_number($3.addr));
+		    $$.iscon = 1;
+		    break;
+		}
+#endif
+		ins_f_byte(F_XOR);
+	    }
+    |   expr0 '&' expr0
+	    {
+		if ( !($1.type & TYPE_MOD_POINTER) || !($3.type & TYPE_MOD_POINTER) ) {
+		    if (exact_types && !TYPE($1.type,TYPE_NUMBER))
+			type_error("Bad argument 1 to &", $1.type);
+		    if (exact_types && !TYPE($3.type,TYPE_NUMBER))
+			type_error("Bad argument 2 to &", $3.type);
+		}
+		$$.type = TYPE_NUMBER;
+		$$.addr = $1.addr; $$.iscon = 0;
+#ifdef LPC_OPTIMIZE
+		/* constant expressions */
+		if ($1.iscon && BASIC_TYPE($1.type, TYPE_NUMBER) &&
+		      $3.iscon && BASIC_TYPE($3.type, TYPE_NUMBER)) {
+		    SET_CURRENT_PROGRAM_SIZE($1.addr);
+		    write_number(read_number($1.addr) & read_number($3.addr));
+		    $$.iscon = 1;
+		    break;
+		}
+#endif
+		ins_f_byte(F_AND);
+	    }
+    |   expr0 L_EQ expr0
+	    {
+		int t1 = $1.type & TYPE_MOD_MASK, t2 = $3.type & TYPE_MOD_MASK;
+		if (exact_types && (t1 != t2) &&
+		      !((t1 & (TYPE_NUMBER | TYPE_REAL)) &&
+		      (t2 & (TYPE_NUMBER | TYPE_REAL))) &&
+		      (t1 != TYPE_ANY && t2 != TYPE_ANY)) {
+		    type_error("== always false because of incompatible types",$1.type);
+		    type_error("			       compared to", $3.type);
+		}
+		ins_f_byte(F_EQ);
+		$$.type = TYPE_NUMBER;
+		$$.addr = $1.addr; $$.iscon = 0;
+	    }
+    |   expr0 L_NE expr0
+	    {
+		int t1 = $1.type & TYPE_MOD_MASK, t2 = $3.type & TYPE_MOD_MASK;
+		if (exact_types && (t1 != t2) &&
+		      !((t1 & (TYPE_NUMBER | TYPE_REAL)) &&
+		      (t2 & (TYPE_NUMBER | TYPE_REAL))) &&
+		      (t1 != TYPE_ANY && t2 != TYPE_ANY)) {
+		    type_error("!= always true because of incompatible types", $1.type);
+		    type_error("			       compared to", $3.type);
+		}
+		ins_f_byte(F_NE);
+		$$.type = TYPE_NUMBER;
+		$$.addr = $1.addr; $$.iscon = 0;
+	    }
+    |   expr0 '>' expr0
+	    {
+		$$.addr = $1.addr; $$.iscon = 0;
+		$$.type = TYPE_NUMBER;
+		ins_f_byte(F_GT);
+	    }
+    |   expr0 L_GE expr0
+	    {
+		$$.addr = $1.addr; $$.iscon = 0;
+		$$.type = TYPE_NUMBER;
+		ins_f_byte(F_GE);
+	    }
+    |   expr0 '<' expr0
+	    {
+		$$.addr = $1.addr; $$.iscon = 0;
+		$$.type = TYPE_NUMBER;
+		ins_f_byte(F_LT);
+	    }
+    |   expr0 L_LE expr0
+	    {
+		$$.addr = $1.addr; $$.iscon = 0;
+		$$.type = TYPE_NUMBER;
+		ins_f_byte(F_LE);
+	    }
+    |   expr0 L_LSH expr0
+	    {
+		ins_f_byte(F_LSH);
+		$$.type = TYPE_NUMBER;
+		$$.addr = $1.addr; $$.iscon = 0;
+		if (exact_types && !TYPE($1.type, TYPE_NUMBER))
+		    type_error("Bad argument number 1 to '<<'", $1.type);
+		if (exact_types && !TYPE($3.type, TYPE_NUMBER))
+		    type_error("Bad argument number 2 to '<<'", $3.type);
+	    }
+    |   expr0 L_RSH expr0
+	    {
+		ins_f_byte(F_RSH);
+		$$.type = TYPE_NUMBER;
+		$$.addr = $1.addr; $$.iscon = 0;
+		if (exact_types && !TYPE($1.type, TYPE_NUMBER))
+		    type_error("Bad argument number 1 to '>>'", $1.type);
+		if (exact_types && !TYPE($3.type, TYPE_NUMBER))
+		    type_error("Bad argument number 2 to '>>'", $3.type);
+	    }
+    |   expr0 '+' expr0 /* Type checks of this case are incomplete */
+	    {
+		if ($1.type == $3.type)
+		    $$.type = $1.type;
+		else if (($1.type & TYPE_ANY) || ($3.type & TYPE_ANY))
+		    $$.type = TYPE_ANY;
+		else if ((TYPE($1.type, TYPE_NUMBER) && TYPE($3.type, TYPE_REAL)) ||
+		      (TYPE($1.type, TYPE_REAL) && TYPE($3.type, TYPE_NUMBER)))
+		    $$.type = TYPE_REAL;
+		else
+		    $$.type = TYPE_ANY;
+
+		$$.addr = $1.addr;
+		$$.iscon = 0;
+
+#ifdef LPC_OPTIMIZE
+		/* optimize 0's */
+		if ($1.iscon && $1.type == TYPE_ANY &&
+		      ($3.type == TYPE_NUMBER || $3.type == TYPE_REAL)) {
+		    /* 0 + X */
+		    /* Currently, $3.addr isn't set a lot of times */
+		    int len;
+
+		    len = CURRENT_PROGRAM_SIZE - ($1.addr + SIZEOF_ZERO_CODE);
+		    memcpy(mem_block[current_block].block + $1.addr,
+			  mem_block[current_block].block + $1.addr + SIZEOF_ZERO_CODE,
+			  len);
+		    SET_CURRENT_PROGRAM_SIZE($1.addr + len);
+		    $$ = $3;
+		    $$.addr = $1.addr;
+		    last_expression = -1;  /* could be smarter */
+		    break;
+		} else if ($3.iscon && $3.type == TYPE_ANY &&
+		      ($1.type == TYPE_NUMBER || $1.type == TYPE_REAL)) {
+		    /* X + 0 */
+		    SET_CURRENT_PROGRAM_SIZE($3.addr);
+		    $$ = $1;
+		    last_expression = -1; /* ? */
+		    break;
+		}
+
+		/* constant expressions */
+		if ($1.iscon && $3.iscon) {
+		    if (BASIC_TYPE($1.type, TYPE_NUMBER) &&
+			  BASIC_TYPE($3.type, TYPE_NUMBER)) {
+			SET_CURRENT_PROGRAM_SIZE($1.addr);
+			write_number(read_number($1.addr) +
+			      read_number($3.addr));
+			$$.iscon = 1;
+			break;
+		    } else if ($$.type == TYPE_REAL) {
+			double val;
+
+			if ($1.type == TYPE_NUMBER)
+			    val = read_number($1.addr) + read_real($3.addr);
+			else if ($3.type == TYPE_NUMBER)
+			    val = read_real($1.addr) + read_number($3.addr);
+			else
+			    val = read_real($1.addr) + read_real($3.addr);
+			SET_CURRENT_PROGRAM_SIZE($1.addr);
+			ins_f_byte(F_REAL);
+			ins_real(val);
+			$$.iscon = 1;
+			break;
+		    } else if ($$.type == TYPE_STRING) {
+			/* Combine strings */
+			short n1, n2;
+			char *new, *s1, *s2;
+			int l;
+
+			n1 = read_string($1.addr);
+			s1 = ((char **)mem_block[A_STRINGS].block)[n1];
+			n2 = read_string($3.addr);
+			s2 = ((char **)mem_block[A_STRINGS].block)[n2];
+			new = DXALLOC( (l = strlen(s1))+strlen(s2)+1, 53, "string add" );
+			strcpy(new, s1);
+			strcpy(new + l, s2);
+			/* free old strings (ordering may help shrink table) */
+			if (n1 > n2) {
+			    free_prog_string(n1); free_prog_string(n2);
+			} else {
+			    free_prog_string(n2); free_prog_string(n1);
+			}
+			/* store new string */
+			SET_CURRENT_PROGRAM_SIZE($1.addr);
+			ins_f_byte(F_STRING);
+			ins_short(store_prog_string(new));
+			FREE(new);
+			$$.iscon = 1;
+			break;
+		    }
+		}
+#endif /* OPTIMIZE */
+		/* wasn't optimized away */
+		ins_f_byte(F_ADD);
+	    }
+    |   expr0 '-' expr0
+	    {
+		int bad_arg = 0;
+
+		if (exact_types) {
+		    if (!TYPE($1.type, TYPE_NUMBER) &&
+			  !TYPE($1.type, TYPE_REAL) &&
+			  !($1.type & TYPE_MOD_POINTER)) {
+			type_error("Bad argument number 1 to '-'", $1.type);
+			bad_arg++;
+		    }
+		    if (!TYPE($3.type, TYPE_NUMBER) &&
+			  !TYPE($3.type, TYPE_REAL) &&
+			  !($3.type & TYPE_MOD_POINTER)) {
+			type_error("Bad argument number 2 to '-'", $3.type);
+			bad_arg++;
+		    }
+		}
+		$$.type = TYPE_ANY;
+		$$.addr = $1.addr;
+		$$.iscon = 0;
+		if (($1.type & TYPE_MOD_POINTER) || ($3.type & TYPE_MOD_POINTER))
+		    $$.type = TYPE_MOD_POINTER | TYPE_ANY;
+		if (!($1.type & TYPE_MOD_POINTER) || !($3.type & TYPE_MOD_POINTER)) {
+		    if (exact_types && $$.type != TYPE_ANY && !bad_arg)
+			yyerror("Arguments to '-' don't match");
+		    if (($1.type & TYPE_ANY) || ($3.type & TYPE_ANY))
+			$$.type = TYPE_ANY;
+		    else if ((TYPE($1.type, TYPE_NUMBER) && TYPE($3.type, TYPE_NUMBER)))
+			$$.type = TYPE_NUMBER;
+		    else
+			$$.type = TYPE_REAL;
+		}
+
+#ifdef LPC_OPTIMIZE
+		if ($3.iscon && $3.type == TYPE_ANY) {  /* optimize X-0 */
+		    SET_CURRENT_PROGRAM_SIZE($3.addr);
+		    $$ = $1;
+		    last_expression = -1; /* ? */
+		    break;
+		}
+
+		/* constant expressions */
+		if ($1.iscon && $3.iscon) {
+		    if (BASIC_TYPE($1.type, TYPE_NUMBER) &&
+			  BASIC_TYPE($3.type, TYPE_NUMBER)) {
+			SET_CURRENT_PROGRAM_SIZE($1.addr);
+			write_number(read_number($1.addr) - read_number($3.addr));
+			$$.iscon = 1;
+			break;
+		    } else if ($$.type == TYPE_REAL) {
+			double val;
+			if ($1.type == TYPE_NUMBER)
+			    val = read_number($1.addr) - read_real($3.addr);
+			else if ($3.type == TYPE_NUMBER)
+			    val = read_real($1.addr) - read_number($3.addr);
+			else
+			    val = read_real($1.addr) - read_real($3.addr);
+			SET_CURRENT_PROGRAM_SIZE($1.addr);
+			ins_f_byte(F_REAL);
+			ins_real(val);
+			$$.iscon = 1;
+			break;
+		    }
+		}
+#endif
+		ins_f_byte(F_SUBTRACT);
+	    }
+    |   expr0 '*' expr0
+	    {
+		if (($1.type != TYPE_MAPPING) || ($3.type != TYPE_MAPPING)) {
+		    if (exact_types && !TYPE($1.type, TYPE_NUMBER) && !TYPE($1.type, TYPE_REAL))
+			type_error("Bad argument number 1 to '*'", $1.type);
+		    if (exact_types && !TYPE($3.type, TYPE_NUMBER) && !TYPE($3.type, TYPE_REAL))
+			type_error("Bad argument number 2 to '*'", $3.type);
+		    if (TYPE($1.type, TYPE_NUMBER) && TYPE($3.type, TYPE_NUMBER))
+			$$.type = TYPE_NUMBER;
+		    else
+			$$.type = TYPE_REAL;
+		} else
+		    $$.type = TYPE_MAPPING;
+		$$.addr = $1.addr; $$.iscon = 0;
+
+#ifdef LPC_OPTIMIZE
+		/* constant expressions */
+		if ($1.iscon && $3.iscon) {
+		    if (BASIC_TYPE($1.type, TYPE_NUMBER) &&
+			  BASIC_TYPE($3.type, TYPE_NUMBER)) {
+			SET_CURRENT_PROGRAM_SIZE($1.addr);
+			write_number(read_number($1.addr) * read_number($3.addr));
+			$$.iscon = 1;
+			break;
+		    } else if ($$.type == TYPE_REAL) {
+			double val;
+			if ($1.type == TYPE_NUMBER)
+			    val = read_number($1.addr) * read_real($3.addr);
+			else if ($3.type == TYPE_NUMBER)
+			    val = read_real($1.addr) * read_number($3.addr);
+			else
+			    val = read_real($1.addr) * read_real($3.addr);
+			SET_CURRENT_PROGRAM_SIZE($1.addr);
+			ins_f_byte(F_REAL);
+			ins_real(val);
+			$$.iscon = 1;
+			break;
+		    }
+		}
+#endif
+		ins_f_byte(F_MULTIPLY);
+	    }
+    |   expr0 '%' expr0
+	    {
+		if (exact_types && !TYPE($1.type, TYPE_NUMBER))
+		    type_error("Bad argument number 1 to '%'", $1.type);
+		if (exact_types && !TYPE($3.type, TYPE_NUMBER))
+		    type_error("Bad argument number 2 to '%'", $3.type);
+		$$.type = TYPE_NUMBER;
+		$$.addr = $1.addr; $$.iscon = 0;
+#ifdef LPC_OPTIMIZE
+		/* constant expressions */
+		if ($1.iscon && BASIC_TYPE($1.type, TYPE_NUMBER) &&
+		      $3.iscon && BASIC_TYPE($3.type, TYPE_NUMBER)) {
+		    int v;
+		    if ((v = read_number($3.addr)) == 0) {
+		        yyerror("Modulo by zero constant");
+		        break;
+		    }
+		    SET_CURRENT_PROGRAM_SIZE($1.addr);
+		    write_number(read_number($1.addr) % v);
+		    $$.iscon = 1;
+		    break;
+		}
+#endif
+		ins_f_byte(F_MOD);
+	    }
+    |   expr0 '/' expr0
+	    {
+		if (exact_types && !TYPE($1.type, TYPE_NUMBER) && !TYPE($1.type, TYPE_REAL))
+		    type_error("Bad argument number 1 to '/'", $1.type);
+		if (exact_types && !TYPE($3.type, TYPE_NUMBER) && !TYPE($3.type, TYPE_REAL))
+		    type_error("Bad argument number 2 to '/'", $3.type);
+		if (TYPE($1.type, TYPE_NUMBER) && TYPE($3.type, TYPE_NUMBER))
+		    $$.type = TYPE_NUMBER;
+		else
+		    $$.type = TYPE_REAL;
+		$$.addr = $1.addr; $$.iscon = 0;
+#ifdef LPC_OPTIMIZE
+		/* constant expressions */
+		if ($1.iscon && $3.iscon) {
+		    if (BASIC_TYPE($1.type, TYPE_NUMBER) &&
+			  BASIC_TYPE($3.type, TYPE_NUMBER)) {
+			int v;
+			if ((v = read_number($3.addr)) == 0) {
+			    yyerror("Divide by zero in constant");
+			    break;
+			}
+			SET_CURRENT_PROGRAM_SIZE($1.addr);
+			write_number(read_number($1.addr) / v);
+			$$.iscon = 1;
+			break;
+		    } else if ($$.type == TYPE_REAL) {
+			double val;
+			/* a bit complicated with divide-by-zero checking */
+			if ($3.type == TYPE_REAL) {
+			    if ((val = read_real($3.addr)) == 0.0) {
+				yyerror("Divide by zero in constant");
+				break;
+			    }
+			    if ($1.type == TYPE_NUMBER)
+				val = read_number($1.addr) / val;
+			    else
+				val = read_real($1.addr) / val;
+			} else {
+			    int iv;
+			    if ((iv = read_number($3.addr)) == 0) {
+				yyerror("Divide by zero in constant");
+				break;
+			    }
+			    val = read_real($1.addr) / iv;
+			}
+			SET_CURRENT_PROGRAM_SIZE($1.addr);
+			ins_f_byte(F_REAL);
+			ins_real(val);
+			$$.iscon = 1;
+			break;
+		    }
+		}
+#endif
+		ins_f_byte(F_DIVIDE);
+	    }
+    |   cast expr0  %prec L_NOT
+	    {
+		$$.type = $1;
+		$$.addr = $2.addr; $$.iscon = 0;
+		if (exact_types && $2.type != TYPE_ANY && $2.type != TYPE_UNKNOWN &&
+		      $1 != TYPE_VOID)
+		    type_error("Casts are only legal for type mixed, or when unknown", $2.type);
+	    }
+    |   L_INC lvalue  %prec L_NOT  /* note lower precedence here */
+	    {
+		ins_expr_f_byte(F_PRE_INC);
+		if (exact_types && !TYPE($2.type, TYPE_NUMBER) && !TYPE($2.type, TYPE_REAL))
+		    type_error("Bad argument to ++", $2.type);
+		if (TYPE($2.type, TYPE_NUMBER))
+		    $$.type = TYPE_NUMBER;
+		else
+		    $$.type = TYPE_REAL;
+		$$.addr = $$.iscon = 0;
+	    }
+    |   L_DEC lvalue  %prec L_NOT  /* note lower precedence here */
+	    {
+		ins_expr_f_byte(F_PRE_DEC);
+		if (exact_types && !TYPE($2.type, TYPE_NUMBER) && !TYPE($2.type, TYPE_REAL))
+		    type_error("Bad argument to --", $2.type);
+		if (TYPE($2.type, TYPE_NUMBER))
+		    $$.type = TYPE_NUMBER;
+		else
+		    $$.type = TYPE_REAL;
+		$$.addr = $$.iscon = 0;
+	    }
+    |   L_NOT expr0
+	    {
+		$$.type = TYPE_NUMBER;
+		$$.addr = $2.addr; $$.iscon = 0;
+#ifdef LPC_OPTIMIZE
+		/* constant expressions */
+		if ($2.iscon && BASIC_TYPE($2.type, TYPE_NUMBER)) {
+		    SET_CURRENT_PROGRAM_SIZE($2.addr);
+		    write_number(!read_number($2.addr));
+		    $$.iscon = 1;
+		    break;
+		}
+#endif
+		ins_expr_f_byte(F_NOT);     /* Any type is valid here. */
+	    }
+    |   '~' expr0
+	    {
+		if (exact_types && !TYPE($2.type, TYPE_NUMBER))
+		    type_error("Bad argument to ~", $2.type);
+		$$.type = TYPE_NUMBER;
+		$$.addr = $2.addr; $$.iscon = 0;
+#ifdef LPC_OPTIMIZE
+		/* constant expressions */
+		if ($2.iscon && BASIC_TYPE($2.type, TYPE_NUMBER)) {
+		    SET_CURRENT_PROGRAM_SIZE($2.addr);
+		    write_number(~read_number($2.addr));
+		    $$.iscon = 1;
+		    break;
+		}
+#endif
+		ins_f_byte(F_COMPL);
+	    }
+    |   '-' expr0  %prec L_NOT
+	    {
+		if (exact_types && !TYPE($2.type, TYPE_NUMBER) && !TYPE($2.type, TYPE_REAL))
+		    type_error("Bad argument to unary '-'", $2.type);
+		if (TYPE($2.type, TYPE_NUMBER))
+		    $$.type = TYPE_NUMBER;
+		else
+		    $$.type = TYPE_REAL;
+		$$.addr = $2.addr; $$.iscon = 0;
+#ifdef LPC_OPTIMIZE
+		/* constant expressions */
+		if ($2.iscon) {
+		    if ($$.type == TYPE_NUMBER) {
+			SET_CURRENT_PROGRAM_SIZE($2.addr);
+			write_number(-read_number($2.addr));
+			$$.iscon = 1;
+			break;
+		    } else if ($$.type == TYPE_REAL) {
+			SET_CURRENT_PROGRAM_SIZE($2.addr);
+			ins_f_byte(F_REAL);
+			ins_real(-read_real($2.addr));
+			$$.iscon = 1;
+			break;
+		    }
+		}
+#endif
+		ins_f_byte(F_NEGATE);
+	    }
+    |   lvalue L_INC   /* normal precedence here */
+	    {
+		ins_expr_f_byte(F_POST_INC);
+		if (exact_types && !TYPE($1.type, TYPE_NUMBER) && !TYPE($1.type, TYPE_REAL))
+		    type_error("Bad argument to ++", $1.type);
+		if (TYPE($1.type, TYPE_NUMBER))
+		    $$.type = TYPE_NUMBER;
+		else
+		    $$.type = TYPE_REAL;
+		$$.addr = $$.iscon = 0;
+	    }
+    |   lvalue L_DEC
+	    {
+		ins_expr_f_byte(F_POST_DEC);
+		if (exact_types && !TYPE($1.type, TYPE_NUMBER) && !TYPE($1.type, TYPE_REAL))
+		    type_error("Bad argument to --", $1.type);
+		if (TYPE($1.type, TYPE_NUMBER))
+		    $$.type = TYPE_NUMBER;
+		else
+		    $$.type = TYPE_REAL;
+		$$.addr = $$.iscon = 0;
+	    }
+    |   expr4
+    ;
+
+assign:
+	'='
+	    {
+		$$ = F_ASSIGN;
+	    }
+    |   L_AND_EQ
+	    {
+		$$ = F_AND_EQ;
+	    }
+    |   L_OR_EQ
+	    {
+		$$ = F_OR_EQ;
+	    }
+    |   L_XOR_EQ
+	    {
+		$$ = F_XOR_EQ;
+	    }
+    |   L_LSH_EQ
+	    {
+		$$ = F_LSH_EQ;
+	    }
+    |   L_RSH_EQ
+	    {
+		$$ = F_RSH_EQ;
+	    }
+    |   L_ADD_EQ
+	    {
+		$$ = F_ADD_EQ;
+	    }
+    |   L_SUB_EQ
+	    {
+		$$ = F_SUB_EQ;
+	    }
+    |   L_MULT_EQ
+	    {
+		$$ = F_MULT_EQ;
+	    }
+    |   L_MOD_EQ
+	    {
+		$$ = F_MOD_EQ;
+	    }
+    |   L_DIV_EQ
+	    {
+		$$ = F_DIV_EQ;
+	    }
+    ;
+
+return:
+	L_RETURN
+	    {
+		if (exact_types && !TYPE(exact_types, TYPE_VOID))
+		    type_error("Must return a value for a function declared",
+			  exact_types);
+		ins_f_byte(F_CONST0);
+		ins_f_byte(F_RETURN);
+	    }
+    |   L_RETURN comma_expr
+	    {
+		if (exact_types && !compatible_types($2, exact_types))
+		      type_error("Return type not matching", exact_types);
+		last_expression = -1;
+		ins_f_byte(F_RETURN);
+	    }
+    ;
+
+expr_list:
+	/* empty */
+	    {
+		$$ = 0;
+	    }
+    |   expr_list2
+	    {
+		$$ = $1;
+	    }
+    |   expr_list2 ','
+	    {
+		$$ = $1; /* Allow a terminating comma */
+	    }
+    ;
+
+expr_list2:
+	expr0
+	    {
+		$$ = 1;
+		add_arg_type($1.type);
+	    }
+    |   expr_list2 ',' expr0
+	    {
+		$$ = $1 + 1;
+		add_arg_type($3.type);
+	    }
+    ;
+
+expr_list3:
+	/* empty */
+	    {
+		$$ = 0;
+	    }
+    |   expr_list4
+	    {
+		$$ = $1;
+	    }
+    |   expr_list4 ','
+	    {
+		$$ = $1; /* Allow terminating comma */
+	    }
+    ;
+
+expr_list4:
+	assoc_pair
+	    {
+		$$ = $1;
+	    }
+    |   expr_list4 ',' assoc_pair
+	    {
+		$$ = $1 + 2;
+	    }
+    ;
+
+assoc_pair:
+	expr0 ':' expr0
+	    {
+		$$ = 2;
+	    }
+    ;
+
+expr4:
+	function_call
+	    {
+		$$.type = $1;
+		$$.len = $$.addr = $$.iscon = 0;
+	    }
+    |   lvalue
+	    {
+		int pos = mem_block[current_block].current_size;
+
+		/* Some optimization. Replace the push-lvalue with push-value */
+		if (last_push_identifier == pos-2)
+		    mem_block[current_block].block[last_push_identifier] = F_IDENTIFIER;
+		else if (last_push_local == pos-2)
+		    mem_block[current_block].block[last_push_local] = F_LOCAL_NAME;
+		else if (last_push_indexed == pos-1)
+		    mem_block[current_block].block[last_push_indexed] = F_INDEX;
+		else if (last_push_indexed != 0)
+		    fatal("Should be a push at this point !\n");
+		$$.type = $1.type;
+		$$.iscon = 0;
+		$$.len = $1.len;
+		$$.addr = $1.addr;
+	    }
+    |   string
+    |   number
+    |   real
+    |   '(' comma_expr1 ')'
+	    {
+		$$ = $2;
+	    }
+    |   catch
+	    {
+		$$.type = TYPE_ANY;
+		$$.addr = $$.iscon = 0;
+	    }
+    |   sscanf
+	    {
+		$$.type = TYPE_NUMBER;
+		$$.addr = $$.iscon = 0;
+	    }
+    |   parse_command
+	    {
+		$$.type = TYPE_NUMBER;
+		$$.addr = $$.iscon = 0;
+	    }
+    |   time_expression
+	    {
+		$$.type = TYPE_NUMBER;
+		$$.addr = $$.iscon = 0;
+	    }
+    |   L_FUNCTION_OPEN expr0 ':' ')'
+	    {
+		ins_f_byte(F_THIS_FUNCTION_CONSTRUCTOR);
+		$$.type = TYPE_FUNCTION;
+		$$.addr = $2.addr;
+		$$.iscon = 0;
+	    }
+    |   L_FUNCTION_OPEN expr0 ',' expr0 ':' ')'
+	    {
+		ins_f_byte(F_FUNCTION_CONSTRUCTOR);
+		$$.type = TYPE_FUNCTION;
+		$$.addr = $2.addr; $$.iscon = 0;
+	    }
+    |   L_MAPPING_OPEN expr_list3 ']' ')'
+	    {
+		ins_f_byte(F_AGGREGATE_ASSOC);
+		ins_short($2);
+		$$.type = TYPE_MAPPING;
+		$$.addr = $$.iscon = 0;
+	    }
+    |   L_ARRAY_OPEN expr_list '}' ')'
+	    {
+		pop_arg_stack($2);      /* We don't care about these types */
+		ins_f_byte(F_AGGREGATE);
+		ins_short($2);
+		$$.type = TYPE_MOD_POINTER | TYPE_ANY;
+		$$.addr = $$.iscon = 0;
+	    }
+    ;
+
+catch:
+	L_CATCH
+	    {
+		ins_f_byte(F_CATCH);
+
+		push_address();
+		ins_short(0); /* for offset to end of comma expr */
+	    }
+       '(' comma_expr ')'
+	    {
+		int addr;
+
+		ins_f_byte(F_END_CATCH);
+
+		/* backpatch */
+		addr = pop_address();
+		upd_short(addr, mem_block[current_block].current_size - addr);
+	    }
+    ;
+
+sscanf:
+	L_SSCANF '(' expr0 ',' expr0
+	    {
+		ins_f_byte(F_SSCANF);
+
+		push_address(); /* start of lvalue list */
+		ins_byte(0);    /* for number of lvalue args only */
+	    }
+	lvalue_list ')'
+	    {
+		int addr;
+
+		/* backpatch */
+		addr = pop_address();
+		upd_byte(addr, $7);
+	    }
+    ;
+
+parse_command:
+	L_PARSE_COMMAND '(' expr0 ',' expr0 ',' expr0
+	    {
+		ins_f_byte(F_PARSE_COMMAND);
+
+		push_address(); /* start of lvalue list */
+		ins_byte(0);    /* for number of lvalue args only */
+	    }
+	lvalue_list ')'
+	    {
+		int addr;
+
+		/* backpatch */
+		addr = pop_address();
+		upd_byte(addr, $9);
+	    }
+    ;
+
+time_expression:
+	L_TIME_EXPRESSION
+	    {
+		ins_f_byte(F_TIME_EXPRESSION);
+	    }
+	'(' comma_expr ')'
+	    {
+		ins_f_byte(F_END_TIME_EXPRESSION);
+	    }
+    ;
+
+lvalue_list:
+	/* empty */
+	    {
+		$$ = 0;
+	    }
+    |   ',' lvalue
+	    {
+		ins_f_byte(F_VOID_ASSIGN);
+	    }
+	lvalue_list
+	    {
+		$$ = 1 + $4;
+	    }
+    ;
+
+lvalue:
+	identifier
+	    {
+		int i = verify_declared($1);
+
+		last_push_identifier = CURRENT_PROGRAM_SIZE;
+		ins_f_byte(F_PUSH_IDENTIFIER_LVALUE);
+		ins_byte(i);
+		FREE($1);
+		if (i == -1)
+		    $$.type = TYPE_ANY;
+		else
+		    $$.type = VARIABLE(i)->type & TYPE_MOD_MASK;
+		$$.len = 2;
+		$$.iscon = 0;
+		$$.addr = CURRENT_PROGRAM_SIZE - 2;
+	    }
+    |   L_LOCAL_NAME
+	    {
+		last_push_local = CURRENT_PROGRAM_SIZE;
+		ins_f_byte(F_PUSH_LOCAL_VARIABLE_LVALUE);
+		ins_byte($1);
+		$$.type = type_of_locals[$1];
+		$$.len = 2;
+		$$.iscon = 0;
+		$$.addr = CURRENT_PROGRAM_SIZE - 2;
+	    }
+    |   expr4 '[' comma_expr L_RANGE comma_expr ']'
+	    {
+		if (exact_types) {
+		    if (($1.type & TYPE_MOD_POINTER) == 0
+			  && !TYPE($1.type, TYPE_STRING)
+			  && !TYPE($1.type, TYPE_BUFFER))
+			type_error("Bad type to indexed value", $1.type);
+		    if (!TYPE($3, TYPE_NUMBER))
+			type_error("Bad type of index", $3);
+		    if (!TYPE($5, TYPE_NUMBER))
+			type_error("Bad type of index", $5);
+		}
+
+		if ($1.type == TYPE_ANY)
+		    $$.type = TYPE_ANY;
+		else if (TYPE($1.type, TYPE_STRING))
+		    $$.type = TYPE_STRING;
+		else if (TYPE($1.type, TYPE_BUFFER))
+		    $$.type = TYPE_BUFFER;
+		else if ($1.type & TYPE_MOD_POINTER)
+		    $$.type = $1.type;
+		else if (exact_types)
+		    type_error("Bad type of argument used for range", $1.type);
+
+		last_push_indexed = 0;
+		ins_f_byte(F_RANGE);
+
+		$$.len = CURRENT_PROGRAM_SIZE - $1.addr;
+		$$.addr = $1.addr;
+		$$.iscon = 0;
+	    }
+    |   expr4 '[' comma_expr ']'
+	    {
+		if (TYPE($1.type, TYPE_MAPPING) || TYPE($1.type, TYPE_FUNCTION)) {
+		    $$.type = TYPE_ANY;
+		} else {
+		    if (exact_types) {
+			if (!($1.type & TYPE_MOD_POINTER) &&
+			      !TYPE($1.type, TYPE_STRING) &&
+			      !TYPE($1.type, TYPE_BUFFER))
+			    type_error("Bad type to indexed value", $1.type);
+			if (!TYPE($3, TYPE_NUMBER))
+			    type_error("Bad type of index", $3);
+		    }
+		    if ($1.type == TYPE_ANY)
+			$$.type = TYPE_ANY;
+		    else if (TYPE($1.type, TYPE_STRING))
+			$$.type = TYPE_NUMBER;
+		    else if (TYPE($1.type, TYPE_BUFFER))
+			$$.type = TYPE_NUMBER;
+		    else
+			$$.type = $1.type & TYPE_MOD_MASK & ~TYPE_MOD_POINTER;
+		}
+
+		last_push_indexed = CURRENT_PROGRAM_SIZE;
+		ins_f_byte(F_PUSH_INDEXED_LVALUE);
+
+		$$.len = CURRENT_PROGRAM_SIZE - $1.addr;
+		$$.addr = $1.addr;
+		$$.iscon = 0;
+	    }
+    ;
+
+string:
+	string_con2
+	    {
+		$$.type = TYPE_STRING;
+		$$.iscon = 1;
+		$$.addr = CURRENT_PROGRAM_SIZE;
+		ins_f_byte(F_STRING);
+		ins_short(store_prog_string($1));
+		FREE($1);
+	    }
+    ;
+
+string_constant:
+	string_con1
+	    {
+		char *p = make_shared_string($1);
+		FREE($1);
+		$$ = p;
+	    }
+    ;
+
+string_con1:
+	L_STRING
+    |   '(' string_con1 ')'
+	    {
+		$$ = $2;
+	    }
+    |   string_con1 '+' L_STRING
+	    {
+		int l;
+
+		$$ = DXALLOC( (l = strlen($1)) + strlen($3) + 1, 53, "string_con1" );
+		strcpy($$, $1);
+		strcpy($$ + l, $3);
+		FREE($1);
+		FREE($3);
+	    }
+    ;
+
+string_con2:
+	L_STRING
+    |   string_con2 L_STRING
+	    {
+		int l;
+
+		$$ = DXALLOC( (l = strlen($1)) + strlen($2) + 1, 53, "string_con2" );
+		strcpy($$, $1);
+		strcpy($$ + l, $2);
+		FREE($1);
+		FREE($2);
+	    }
+    ;
+
+function_call:
+	efun_name '(' expr_list ')'
+	    {
+	      int f = $1;
+	      int min_arg, max_arg, def, *argp;
+	      extern int efun_arg_types[];
+
+	      if (f != 0) {
+		min_arg = instrs[f].min_arg;
+		max_arg = instrs[f].max_arg;
+		def = instrs[f].Default;
+		$$ = instrs[f].ret_type;
+		argp = &efun_arg_types[instrs[f].arg_index];
+		if (def && $3 == min_arg-1) {
+		  ins_f_byte(def);
+		  max_arg--;
+		  min_arg--;
+		} else if ($3 < min_arg) {
+		  char bff[100];
+		  sprintf(bff, "Too few arguments to %s", instrs[f].name);
+		  yyerror(bff);
+		} else if ($3 > max_arg && max_arg != -1) {
+		  char bff[100];
+		  sprintf(bff, "Too many arguments to %s", instrs[f].name);
+		  yyerror(bff);
+		} else if (max_arg != -1 && exact_types) {
+		  /*
+		   * Now check all types of the arguments to efuns.
+		   */
+		  int i, argn;
+		  char buff[100];
+		  for (argn=0; argn < $3; argn++) {
+		    int tmp = get_argument_type(argn, $3);
+		    for (i=0; !compatible_types(argp[i], tmp) && argp[i] != 0; i++)
+		      ;
+		    if (argp[i] == 0) {
+		      sprintf(buff, "Bad argument %d type to efun %s()",
+			      argn+1, instrs[f].name);
+		      yyerror(buff);
+		    }
+		    while (argp[i] != 0)
+		      i++;
+		    argp += i + 1;
+		  }
+		}
+		ins_f_byte(f);
+		/* Only store number of arguments for instructions
+		 * that allowed a variable number.
+		 */
+		if (max_arg != min_arg)
+		  ins_byte($3);/* Number of actual arguments */
+	      }
+	      pop_arg_stack($3);
+	      last_expression = 0;
+	    }
+	| L_SIMUL_EFUN
+	    {
+	      ins_f_byte(F_STRING);
+	      ins_short(store_prog_string($1->name));
+	    }
+	'(' expr_list ')'
+	    {
+	      ins_f_byte(F_SIMUL_EFUN);
+	      ins_byte($4+1);
+	      $$ = $1->type;
+	      pop_arg_stack($4);
+	    }
+	| L_DEFINED_FUNCTION '(' expr_list ')'
+	    {
+	      struct function *funp;
+	      ins_f_byte(F_CALL_FUNCTION_BY_ADDRESS); ins_short($1);
+	      ins_byte($3);       /* Actual number of arguments */
+	      funp = FUNCTION($1);
+	      
+	      $$ = validate_function_call(funp, $1, $3);
+
+	      pop_arg_stack($3);      /* Argument types not needed more */
+	    }
+	| function_name	'(' expr_list ')'
+	    {
+	      int f;
+	      struct function *funp;
+
+	      if ((f = defined_function($1))!=-1) {
+		/* The only way this can happen is if function_name
+		 * below made the function name.  The lexer would
+		 * return L_DEFINED_FUNCTION instead.
+		 */
+		ins_f_byte(F_CALL_FUNCTION_BY_ADDRESS); ins_short(f);
+		ins_byte($3);       /* Actual number of arguments */
+		funp = FUNCTION(f);
+
+		$$ = validate_function_call(funp, f, $3);
+	      } else {
+		f = define_new_function($1, 0, 0, 0, NAME_UNDEFINED, 0);
+		ins_f_byte(F_CALL_FUNCTION_BY_ADDRESS);
+		ins_short(f);
+		ins_byte($3);       /* Number of actual arguments */
+		funp = FUNCTION(f);
+		if (strchr($1, ':')) {
+		/*
+		 * A function defined by inheritance. Find
+		 * real definition immediately.
+		 */
+		  find_inherited(funp);
+		}
+	      /*
+	       * Check if this function has been defined.
+	       * But, don't complain yet about functions defined
+	       * by inheritance.
+	       */
+		if (exact_types && (funp->flags & NAME_UNDEFINED)) {
+		  char buff[100];
+		  sprintf(buff, "Undefined function %.50s", $1);
+		  yyerror(buff);
+		}
+		if (!(funp->flags & NAME_UNDEFINED))
+		  $$ = funp->type;
+		else
+		  $$ = TYPE_ANY;  /* Just a guess */
+	      }
+	      FREE($1);
+	      pop_arg_stack($3);      /* Argument types not needed more */
+	    }
+    |   expr4 L_ARROW identifier
+	    {
+		ins_f_byte(F_STRING);
+		ins_short(store_prog_string($3));
+		FREE($3);
+	    }
+	'(' expr_list ')'
+	    {
+		ins_f_byte(F_CALL_OTHER);
+		ins_byte($6 + 2);
+		$$ = TYPE_UNKNOWN;
+		pop_arg_stack($6);      /* No good need of these arguments */
+	    }
+    |   '(' '*' comma_expr ')'
+	    {
+		ins_f_byte(F_FUNCTION_SPLIT);
+	    }
+	'(' expr_list ')'
+	    {
+		ins_f_byte(F_CALL_OTHER);
+		ins_byte($7 + 2);
+		$$ = TYPE_UNKNOWN;
+		pop_arg_stack($7);      /* No good need of these arguments */
+	    }
+    ;
+
+efun_name: L_EFUN_NAME | L_EFUN L_COLON_COLON identifier {
+	extern struct object *master_ob;
+	struct svalue *res;
+
+	$$ = lookup_predef($3);
+	if ($$ == -1) {
+	  char buff[100];
+	  sprintf(buff, "Unknown efun: %s", $3);
+	  yyerror(buff);
+	  $$ = 0;
+	} else if (master_ob) {
+	  push_malloced_string(the_file_name(current_file));
+	  push_constant_string($3);
+	  res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 2);
+	  if (IS_ZERO(res)) {
+	    yyerror("Invalid simulated efunction override");
+	    $$ = 0;
+	  }
+	}
+	FREE($3);
+      }	
+
+function_name:
+	L_IDENTIFIER
+    |   L_COLON_COLON identifier
+	    {
+		char *p = DXALLOC(strlen($2) + 3, 54, "function_name: 1");
+		strcpy(p, "::"); strcpy(p + 2, $2); FREE($2);
+		$$ = p;
+	    }
+    |   L_OBJECT L_COLON_COLON identifier
+	    {
+		char *p;
+
+		p = DXALLOC(strlen($3) + 9, 55,
+		      "function_name: 2");
+		strcpy(p, "object::"); strcpy(p + 8, $3);
+		FREE($3);
+		$$ = p;
+	    }
+    |   not_efun_string L_COLON_COLON identifier
+	    {
+	      char *p;
+	      int l;
+
+	      p = DXALLOC((l = strlen($1)) + strlen($3) + 3, 55,
+			  "function_name: 2");
+	      strcpy(p, $1); strcpy(p + l, "::"); strcpy(p + l + 2, $3);
+	      FREE($1); FREE($3);
+	      $$ = p;
+	    }
+    ;
+
+cond:
+	condStart
+	statement
+	optional_else_part
+	    {
+		int i = pop_address();
+
+		upd_short(i, CURRENT_PROGRAM_SIZE - i);
+	    }
+    ;
+
+condStart:
+	L_IF '(' comma_expr ')'
+	    {
+		/* optimize if last expression did F_NOT */
+		if (last_expression == CURRENT_PROGRAM_SIZE-1 &&
+		      LAST_EXPR_CODE == F_NOT) {
+		    SET_CURRENT_PROGRAM_SIZE(last_expression);
+		    ins_f_byte(F_BRANCH_WHEN_NON_ZERO);
+		} else {
+		    ins_f_byte(F_BRANCH_WHEN_ZERO);
+		}
+		push_address();
+		ins_short(0);
+	    }
+    ;
+
+optional_else_part:
+	/* empty */    %prec LOWER_THAN_ELSE
+    |   L_ELSE
+	    {
+		int i;
+		i = pop_address();
+		ins_f_byte(F_BRANCH); push_address(); ins_short(0);
+		upd_short(i, CURRENT_PROGRAM_SIZE - i);
+	    }
+	statement
+    ;
+%%

@@ -1,0 +1,16 @@
+.\"generates the C code corresponding to a given object
+.TH generate_source 3 "5 Sep 1994" MudOS "LPC Library Functions"
+ 
+.SH NAME
+generate_source() - generates the C code corresponding to a give object
+ 
+.SH SYNOPSIS
+void generate_source( string file, void | string out_file );
+ 
+.SH DESCRIPTION
+generate_source() calls the LPC->C compiler to generate the source code
+for a given object.  If no output file is specified, the output is saved
+in the SAVE_BINARIES directory.
+
+.SH SEE ALSO
+valid_asm(4), valid_compile_to_c(4)

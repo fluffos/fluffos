@@ -1,0 +1,748 @@
+%{   /* This is to make emacs edit this in C mode: -*-C-*- */
+#include "compiler_shared.h"
+#include "opcodes.h"
+
+#line 6 "lpc_compiler/pre"
+
+/*
+ * This file is the compiler for LPC->C
+ */
+#ifdef DEBUG
+# ifdef TRACE_CODE
+# define LPC_TRACE
+# endif
+#undef LPC_DEBUG
+#endif
+
+#define STACK_DEBUG
+
+extern int current_number_of_locals, max_break_stack_need;
+
+#define CURRENT_PROGRAM_SIZE (mem_block[current_block].current_size)
+#define BREAK_DELIMITER       -0x200000
+#define CONTINUE_DELIMITER    -0x40000000
+
+#define SET_CURRENT_PROGRAM_SIZE(x) \
+( CURRENT_PROGRAM_SIZE = (x), last_expression = -1)
+
+#define BACKSPACE(x) \
+( CURRENT_PROGRAM_SIZE -= (x) )
+
+/* Enough for 10 nested efuns */
+#define EFUN_STACK_SIZE   20
+
+static int efun_stack[EFUN_STACK_SIZE];
+static int *efun_sp=efun_stack-1;
+
+#if defined(LPC_TRACE) || defined(LPC_DEBUG)
+static int prefab_in_progress;
+#endif
+
+/*
+ * LPC->C initializers are much more efficient.  They are collected
+ * and put together in the __INIT function.  No jumps, etc.
+ *
+ * When inheriting from another object, a call will automatically be made
+ * to call __INIT in that code from the current __INIT.
+ */
+static int init_dirty;
+static int switch_kind;
+
+FILE *output_file;
+
+/*
+ * new argument stack stuff
+ */
+
+#define SIMUL_STACK_SIZE 50
+
+#define SS_NUMBER 1
+#define SS_REAL 2
+#define SS_STRING 3
+#define SS_IDENTIFIER 4
+#define SS_LOCAL 5
+#define SS_REG 6
+#define SS_NULL 7
+#define SS_PREFAB 8
+#define SS_ARG 9
+
+typedef struct {
+  union {
+    int num;
+    float f;
+    char *prefab;
+  } u;
+/* only needed for prefabs */
+  short saved_registers_in_use;
+  short type;
+} stack_item;
+
+/* some defines for handling registers */
+#define TOP                  (stack_sp-1)
+#define NEXT                 (stack_sp-2)
+#define REG_BIT(x)           (1 << x)
+#define TOP_NEEDS_FREE       (TOP->type == SS_REG && \
+			     (REG_BIT(TOP->u.num) & registers_need_free))
+#define MARK_NEEDS_FREE(x)   (registers_need_free |= REG_BIT(x))
+#define MARK_NEEDS_NO_FREE(x) (registers_need_free &= ~REG_BIT(x))
+#define MARK_IN_USE(x)       (registers_in_use |= REG_BIT(x))
+#define MARK_NOT_IN_USE(x)   (registers_in_use &= ~REG_BIT(x))
+
+static int current_num_arg;
+static long last_expression = 0;
+static int last_expression_code;
+static int last_expression_register;
+static char last_arg[80];
+static short registers_in_use, registers_need_free;
+static int dirty_register, needs_comma;
+#ifdef DEBUG
+static int on_stack, num_prefab;
+#endif
+static stack_item simul_stack[SIMUL_STACK_SIZE];
+static stack_item *stack_sp = simul_stack;
+
+static void epilog PROT((char *));
+static void prolog PROT((void));
+static void clean_parser PROT((void));
+
+static void lpc_fatal PROT((char *));
+static void check_for_garbage PROT((void));
+static void insert_pop_value PROT((void));
+static void start_initializer PROT((void));
+static void end_initializer PROT((void));
+static void insert_locals PROT((int, int, int));
+static print_stack PROT((void));
+static void stack_push_explicit_zero PROT((void));
+static void stack_push_prefab PROT((char *, short));
+static void stack_push_number PROT((int));
+static void stack_push_register PROT((int, int));
+static void stack_push_real PROT((float));
+static void stack_push_local PROT((int));
+static void stack_push_identifier PROT((int));
+static void stack_pop PROT((void));
+static void stack_push_string PROT((int));
+INLINE static void ins_string PROT((char *));
+INLINE static void ins_string_with_num PROT((char *, int));
+INLINE static void ins_arg PROT((char *, char *, int));
+INLINE static void ins_char PROT((char));
+INLINE static void change_last_expression PROT((int));
+static int get_register PROT((void));
+static int prepare_arguments PROT((char *, int, int, int));
+static int ins_arguments PROT((int, int, int));
+static void do_comma PROT((void));
+static void must_have_register PROT((void));
+static void create_intermediate PROT((stack_item *));
+static void create_intermediates PROT((int));
+static void ins_replacement_cfun PROT((char *, int));
+static void ins_cfun PROT((char *, int));
+static void change_destination_to_stack PROT((void));
+static void change_destination_to_stack_lvalue PROT((void));
+static void ins_ext_cfun PROT((char *, int, int));
+static void ins_ext_cfun_call PROT((int, int, int));
+static void ins_cfun_call_by_name PROT((char *, int, int));
+static void ins_cfun_call PROT((int, int));
+static void generate_frees PROT((void));
+static void ins_two_valued_cfun PROT((char *, int));
+static void stack_push_default PROT((int));
+static void generate_truth_test PROT((void));
+
+/*
+ * bison & yacc don't prototype this in y.tab.h
+ */
+int yyparse PROT((void));
+
+static void start_initializer() {
+  current_block = A_INITIALIZER;
+  dirty_register = init_dirty;
+}
+
+static void end_initializer() {
+  current_block = A_PROGRAM;
+  init_dirty = dirty_register;
+}
+
+static void insert_locals P3(int, where, int, num_local, int, num_register)
+{
+  int sizeneeded = 12*num_local + 11*num_register;
+  char *p = mem_block[current_block].block+where;
+  int i;
+
+  insert_in_mem_block(current_block, where, sizeneeded);
+  for (i=0; i<num_local; i++) {
+    memcpy(p, "svalue l", 8);
+    p[8]=i/10+'0';
+    p[9]=i%10+'0';
+    memcpy(p+10, ";\n", 2);
+    p+=12;
+  }
+  for (i=0; i<num_register; i++) {
+    memcpy(p, "svalue r", 8);
+    p[8]=i+'0';
+    memcpy(p+9, ";\n", 2);
+    p+=11;
+  }
+}
+
+#ifdef DEBUG
+static print_stack() {
+  stack_item *ptr;
+
+  printf("SS(%x):", registers_in_use);
+  for (ptr=simul_stack;ptr<stack_sp;ptr++) {
+    switch (ptr->type) {
+    case SS_NUMBER:
+      printf(" NUMBER(%i)",ptr->u.num);
+      break;
+    case SS_PREFAB:
+      printf(" PREFAB(\"%s\", %x)",ptr->u.prefab, (int)ptr->saved_registers_in_use);
+      break;
+    case SS_REAL:
+      printf(" REAL(%f)",ptr->u.f);
+      break;
+    case SS_STRING:
+      printf(" STRING(#%i)",ptr->u.num);
+      break;
+    case SS_IDENTIFIER:
+      printf(" IDENT(#%i)",ptr->u.num);
+      break;
+    case SS_LOCAL:
+      printf(" LOCAL(#%i)",ptr->u.num);
+      break;
+    case SS_ARG:
+      printf(" ARGUMENT(#%i)", ptr->u.num);
+      break;
+    case SS_REG:
+      printf(" REGISTER(#%i)",ptr->u.num);
+      break;
+    default:
+      printf(" UNKNOWN");
+      break;
+    }
+  }
+  printf("\n");
+}
+#endif
+
+static void stack_push_explicit_zero()
+{
+  stack_sp->type = SS_NULL;
+  stack_sp++;
+  STACK_DEBUG
+}
+
+static void stack_push_prefab P2(char *, x, short, regs)
+{
+  stack_sp->type = SS_PREFAB;
+  stack_sp->u.prefab = string_copy(x);
+  stack_sp->saved_registers_in_use = regs;
+  stack_sp++;
+#ifdef DEBUG
+  num_prefab++;
+#endif
+  STACK_DEBUG
+}
+
+static void stack_push_number P1(int, x)
+{
+  stack_sp->u.num = x;
+  stack_sp->type = SS_NUMBER;
+  stack_sp++;
+  STACK_DEBUG
+}
+
+static void stack_push_register P2(int, x, int, need_free)
+{
+  stack_sp->u.num = x;
+  stack_sp->type = SS_REG;
+  stack_sp++;
+  if (need_free)
+    MARK_NEEDS_FREE(x);
+  MARK_IN_USE(x);
+  STACK_DEBUG
+}
+
+static void stack_push_real P1(float, x)
+{
+  stack_sp->u.f = x;
+  stack_sp->type = SS_REAL;
+  stack_sp++;
+  STACK_DEBUG
+}
+
+static void stack_push_local P1(int, x)
+{
+  if (x<current_num_arg) {
+    stack_sp->u.num = x;
+    stack_sp->type = SS_ARG;
+  } else {
+    stack_sp->u.num = x - current_num_arg;
+    stack_sp->type = SS_LOCAL;
+  }
+  stack_sp++;
+  STACK_DEBUG
+}
+
+static void stack_push_identifier P1(int, x)
+{
+  stack_sp->u.num = x;
+  stack_sp->type = SS_IDENTIFIER;
+  stack_sp++;
+  STACK_DEBUG
+}
+
+static void stack_pop() {
+#ifdef DEBUG
+  char buf[100];
+  if (stack_sp == simul_stack) {
+    sprintf(buf,"simul_stack underflow at line %i in %s.\n",
+	    current_line,current_file);
+    fatal(buf);
+  }
+#endif
+  stack_sp--;
+  if (stack_sp->type == SS_REG)
+    MARK_NOT_IN_USE(stack_sp->u.num);
+  if (stack_sp->type == SS_PREFAB) {
+    free(stack_sp->u.prefab);
+#ifdef DEBUG
+    num_prefab--;
+#endif
+    registers_in_use = stack_sp->saved_registers_in_use;
+  }
+  STACK_DEBUG
+}
+
+static void stack_push_string P1(int, x)
+{
+  stack_sp->u.num = x;
+  stack_sp->type = SS_STRING;
+  stack_sp++;
+  STACK_DEBUG
+}
+
+INLINE
+static void ins_string P1(char *, x)
+{
+  add_to_mem_block(current_block, x, strlen(x));
+}
+
+INLINE
+static void ins_string_with_num P2(char *, str, int, num)
+{
+  char buf[100];
+
+  sprintf(buf,str,num);
+  ins_string(buf);
+}
+
+INLINE
+static void ins_arg P3(char *, buf, char *, str, int, num)
+{
+  sprintf(last_arg,str,num);
+  strcat(buf,last_arg);
+}
+
+INLINE
+static void ins_char P1(char, b)
+{
+  add_to_mem_block(current_block, &b, 1);
+}
+
+INLINE
+static void change_last_expression P1(int, nexpr)
+{
+  char buf[5];
+
+  sprintf(buf,"%3i",nexpr);
+  memcpy(mem_block[current_block].block + last_expression, buf, 3);
+}
+
+/* Note: This doesn't mark the register as used.  Make sure you push it */
+static int get_register() {
+  int next=0, bit=1;
+  int busy_registers = registers_in_use | registers_need_free;
+#ifdef DEBUG
+  char buf[100];
+  if (registers_in_use==0xff) {
+    sprintf(buf,"Out of registers at line %i in %s.\n",current_line,current_file);
+    fatal(buf);
+  }
+#endif
+  while (busy_registers & bit) {
+    next++; bit <<= 1;
+  }
+  if (next>dirty_register) dirty_register=next;
+  return next;
+}
+
+static int prepare_arguments P4(char *, buf, int, numargs, int, flag, int, needs_free)
+{
+  stack_item *p;
+  int return_reg;
+
+#ifdef DEBUG
+  if (stack_sp-numargs<simul_stack) {
+    sprintf(buf,"Argument request extends above stack at line %i in %s.\n",
+	    current_line,current_file);
+    fatal(buf);
+  }
+#endif
+  if (flag) {
+    return_reg = get_register();
+    sprintf(buf, "&r%i,", return_reg);
+  } else {
+    *buf = 0;
+    return_reg = -1;
+  }
+
+  for (p=stack_sp-numargs;p<stack_sp;p++) {
+    switch (p->type) {
+    case SS_NUMBER: /* if a number has survived to this point, it's 0 or 1 */
+      ins_arg(buf,"&const%i,",p->u.num);
+      break;
+    case SS_NULL:
+      strcat(buf,"0,");
+      break;
+    case SS_REG:
+      ins_arg(buf,"&r%i,",p->u.num);
+      break;
+    case SS_IDENTIFIER:
+      ins_arg(buf,"GV(%i),",p->u.num);
+      break;
+    case SS_ARG:
+      ins_arg(buf,"fp+%i,",p->u.num);
+      break;
+    case SS_LOCAL:
+      ins_arg(buf,"&l%.2i,",p->u.num);
+      break;
+    case SS_PREFAB:
+      strcat(buf,p->u.prefab);
+      strcat(buf,",");
+    }
+  }
+  buf[strlen(buf)-1]=0;
+  while (numargs--)  stack_pop();
+  if (flag) stack_push_register(return_reg, needs_free);
+  return return_reg;
+}
+
+static int ins_arguments P3(int, numargs, int, flag, int, needs_free)
+{
+  char buf[256];
+  int ret;
+
+  ret = prepare_arguments(buf,numargs,flag, needs_free);
+  ins_string(buf);
+  return ret;
+}
+
+static void do_comma() {
+#ifdef LPC_TRACE
+  static int last_line;
+#endif
+  if (needs_comma) {
+    ins_string(",\n");
+#ifdef LPC_TRACE
+    if (last_line!=current_line && !prefab_in_progress) {
+      last_line = current_line;
+      ins_string("c_do_trace(\"LPC\",\"");
+      ins_string(current_file);
+      ins_string_with_num("\",\" (line %i)\\n\"),\n",current_line);
+    }
+#endif
+#ifdef LPC_DEBUG
+    if (!prefab_in_progress) {
+      ins_string("c_debug(\"");
+      ins_string(current_file);
+      ins_string_with_num("\",%i",current_line);
+      ins_string_with_num(",%i),\n",on_stack);
+    }
+#endif
+  }
+}
+
+static void must_have_register() {
+  int i,r, needs_free = 0;
+  char buf[100];
+
+  if (TOP->type == SS_REG) return;
+  do_comma();
+  i = TOP->u.num;
+  r = get_register();
+  switch (TOP->type) {
+  case SS_NUMBER:
+    sprintf(buf,"C_NUMBER(&r%i,%i)",r,i);
+    if (i==0 || i==1) {
+      sprintf(buf,"(void)(r%i=const%i)",r,i);
+    }
+    break;
+  case SS_REAL:
+    sprintf(buf,"C_REAL(&r%i,%f)",r,TOP->u.f);
+    break;
+  case SS_STRING:
+    sprintf(buf,"C_PROG_STRING(&r%i,%i)",r,i);
+    break;
+  case SS_IDENTIFIER:
+    sprintf(buf,"assign_svalue_no_free(&r%i,GV(%i))",r,i);
+    needs_free = 1;
+    break;
+  case SS_ARG:
+    sprintf(buf,"assign_svalue_no_free(&r%i,fp+%i)",r,i);
+    needs_free = 1;
+    break;
+  case SS_LOCAL:
+    sprintf(buf,"assign_svalue_no_free(&r%i,&l%.2i)",r,i);
+    needs_free = 1;
+    break;
+  case SS_PREFAB:
+    sprintf(buf,"assign_svalue_no_free(&r%i,%s)",r,TOP->u.prefab);
+    needs_free = 1;
+    break;
+  }
+  ins_string(buf);
+  needs_comma=1;
+  stack_pop();
+  stack_push_register(r, needs_free);
+}
+
+static void create_intermediate P1(stack_item *, p)
+{
+  int i,r;
+  char buf[100];
+
+  switch (p->type) {
+  case SS_NUMBER:
+    i = p->u.num;
+    if (i==0 || i==1) return;
+    r=get_register();
+    sprintf(buf,"C_NUMBER(&r%i,%i),\n",r,i);
+    break;
+  case SS_REAL:
+    r=get_register();
+    sprintf(buf,"C_REAL(&r%i,%f),\n",r,p->u.f);
+    break;
+  case SS_STRING:
+    r=get_register();
+    sprintf(buf,"C_PROG_STRING(&r%i,%i),\n",r,p->u.num);
+    break;
+  default:
+    return;
+  }
+  ins_string(buf);
+  p->type = SS_REG;
+  p->u.num = r;
+  MARK_IN_USE(r);
+}
+
+static void create_intermediates P1(int, numargs)
+{
+  stack_item *p;
+
+  for (p=stack_sp-numargs;p<stack_sp;p++)
+    create_intermediate(p);
+}
+
+static void ins_replacement_cfun P2(char *, name, int, numargs)
+{
+  ins_string(name);
+  ins_char('(');
+  ins_string(last_arg);
+  /* Arguments end in commas.  Snarf the last one. */
+  BACKSPACE(1);
+  ins_char(')');
+  stack_pop();
+  needs_comma=1;
+  last_expression = 0;
+}
+
+static void ins_cfun P2(char *, name, int, numargs)
+{
+  do_comma();
+  create_intermediates(numargs);
+  ins_string(name);
+  ins_char('(');
+  ins_arguments(numargs,0,0);
+  ins_char(')');
+  needs_comma=1;
+  last_expression = 0;
+}
+
+static void change_destination_to_stack() {
+  ins_cfun("push_svalue",1);
+  generate_frees();
+#ifdef DEBUG
+  on_stack++;
+#endif
+}
+
+static void change_destination_to_stack_lvalue() {
+  ins_cfun("C_PUSH_LVALUE",1);
+#ifdef DEBUG
+  on_stack++;
+#endif
+}
+
+static void ins_ext_cfun P3(char *, name, int, numargs, int, extra)
+{
+  char buf[100];
+
+  do_comma();
+  create_intermediates(numargs);
+  ins_string(name);
+  ins_char('(');
+  ins_arguments(numargs,1,1);
+  sprintf(buf,",%2d)",extra);
+  ins_string(buf);
+  needs_comma=1;
+  last_expression = 0;
+}
+
+static void ins_ext_cfun_call P3(int, which, int, numargs, int, extra)
+{
+  char buf[100];
+
+  sprintf(buf,"c_%s",get_f_name(which));
+  ins_ext_cfun(buf,numargs,extra);
+}
+
+#define NEEDS_FREE_MASK (T_STRING | T_OBJECT | T_POINTER | T_BUFFER | T_MAPPING | T_FUNCTION)
+
+static void ins_cfun_call_by_name P3(char *, which, int, numargs, int, needs_free)
+{
+  do_comma();
+  create_intermediates(numargs);
+  ins_string(which);
+  ins_string("(");
+  last_expression = 0;
+  if (needs_free == -1) {
+    /* -1 indicated that the result needs a free only if one of it's
+     * arguments needs a free.  For example, the result of
+     * c_add(string, string) needs a free but the result of
+     * c_add(number, number) doesn't.
+     */
+    stack_item *p;
+    for (p=stack_sp-numargs;p<stack_sp;p++) {
+      if (p->type != SS_NUMBER && p->type != SS_REAL &&
+	  !(p->type == SS_REG && (registers_need_free & REG_BIT(p->u.num))))
+	needs_free = 1;
+    }
+    if (needs_free == -1) needs_free = 0;
+  }
+  ins_arguments(numargs,1, needs_free);
+  ins_char(')');
+  needs_comma=1;
+}
+
+static void ins_cfun_call P2(int, which, int, numargs)
+{
+  int i,needs_free;
+  char tmp[256];
+
+  do_comma();
+  create_intermediates(numargs);
+  if (which<BASE) {
+    last_expression = CURRENT_PROGRAM_SIZE + 12;
+    last_expression_code = which;
+    sprintf(tmp,"eval_opcode(%3i /* %s */,",which,get_f_name(which));
+  } else {
+    sprintf(tmp,"c_%s(",get_f_name(which));
+    last_expression = 0;
+  }
+  ins_string(tmp);
+  /* We could be smarter about the return values of operators here */
+  /* Trust opcodes to return what they claim. */
+  if (which < BASE) {
+    needs_free = (instrs[which].ret_type & NEEDS_FREE_MASK);
+  } else {
+    needs_free = (instrs[which].ret_type != TYPE_NUMBER
+	       && instrs[which].ret_type != TYPE_REAL
+	       && instrs[which].ret_type != TYPE_VOID);
+  }
+  ins_arguments(numargs,1, needs_free);
+  if (which<BASE) {
+    for (i=2-numargs;i;i--)
+      ins_string(",0");
+    /* top of stack is a register */
+    last_expression_register = TOP->u.num;
+  }
+  ins_char(')');
+  needs_comma=1;
+}
+
+static void generate_frees() {
+  int need_free = registers_need_free & ~registers_in_use;
+  int reg, bit;
+  if (!need_free) return;
+
+  registers_need_free &= registers_in_use;
+  reg = 0;
+  bit = 1;
+  while (need_free && reg<8) {
+    if (bit & need_free) {
+      do_comma();
+      ins_string_with_num("free_register(&r%i)", reg);
+      needs_comma = 1;
+      need_free ^= bit;
+    }
+    reg++;
+    bit <<= 1;
+  }
+}
+
+static void ins_two_valued_cfun P2(char *, name, int, numargs)
+{
+  int i;
+  char tmp[256];
+
+  do_comma();
+  create_intermediates(numargs);
+  ins_string(name);
+  ins_char('(');
+  ins_arguments(numargs,0, 0);
+  i = get_register();
+  stack_push_register(i, 1);
+  sprintf(tmp,",&r%i",i);
+  ins_string(tmp);
+  i = get_register();
+  stack_push_register(i, 1);
+  sprintf(tmp,",&r%i)",i);
+  ins_string(tmp);
+  needs_comma=1;
+}
+
+static void stack_push_default P1(int, x)
+{
+  switch (x) {
+  case F_CONST0:
+    stack_push_number(0);
+    break;
+  default: /* currently only F_THIS_OBJECT */
+    ins_cfun_call(x,0);
+    break;
+  }
+}
+
+static void generate_truth_test() {
+  /* optimize if last expression did F_NOT */
+  if (last_expression &&
+      last_expression_code == F_NOT)
+    {
+      SET_CURRENT_PROGRAM_SIZE(last_expression-12);
+      if (registers_need_free & ~registers_in_use)
+	ins_replacement_cfun("C_SV_FALSE",1);
+      else
+	ins_replacement_cfun("C_IS_FALSE",1);
+      registers_need_free &= registers_in_use;
+    } else {
+      generate_frees();
+      if (TOP_NEEDS_FREE) {
+	MARK_NEEDS_NO_FREE(TOP->u.num);
+	ins_cfun("C_SV_TRUE",1);
+      } else
+	ins_cfun("C_IS_TRUE",1);
+    }
+}
+%}
+
+%type <number> expr_list5 expr_list6
+

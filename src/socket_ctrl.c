@@ -1,3 +1,6 @@
+#include "config.h"
+
+#ifndef OS2
 /*
   ioctl.c: part of the MudOS release -- Truilkan@TMI
 
@@ -6,16 +9,17 @@
 */
 
 #include <stdio.h>
-#include "config.h"
 #ifdef SunOS_5
 #include <unistd.h>
 #endif
 #include <sys/types.h>
-#ifndef LATTICE
+#if !defined(LATTICE) && !defined(OS2)
 #include <sys/ioctl.h>
 #include <sys/socket.h>
-#else
-#include "amiga.h"
+#endif
+#ifdef LATTICE
+#include <amiga.h>
+#include <socket.h>
 #endif
 #if defined(_SEQUENT_) || defined(OLD_ULTRIX)
 #include <fcntl.h>
@@ -31,13 +35,12 @@
  * set process receiving SIGIO/SIGURG signals to us.
  */
 
-INLINE int set_socket_owner(fd, which)
-int fd, which;
+INLINE int set_socket_owner P2(int, fd, int, which)
 {
 #ifdef OLD_ULTRIX
-	return fcntl(fd, F_SETOWN, which);
+    return fcntl(fd, F_SETOWN, which);
 #else
-	return ioctl(fd, SIOCSPGRP, &which);
+    return ioctl(fd, SIOCSPGRP, &which);
 #endif
 }
 
@@ -45,13 +48,12 @@ int fd, which;
  * allow receipt of asynchronous I/O signals.
  */
 
-INLINE int set_socket_async(fd, which)
-int fd, which;
+INLINE int set_socket_async P2(int, fd, int, which)
 {
 #ifdef OLD_ULTRIX
-	return fcntl(fd, F_SETFL, FASYNC);
+    return fcntl(fd, F_SETFL, FASYNC);
 #else
-	return ioctl(fd, FIOASYNC, &which);
+    return ioctl(fd, FIOASYNC, &which);
 #endif
 }
 
@@ -59,36 +61,39 @@ int fd, which;
  * set socket non-blocking
  */
 
-INLINE int set_socket_nonblocking(fd, which)
-int fd, which;
+INLINE int set_socket_nonblocking P2(int, fd, int, which)
 {
 #if !defined(OLD_ULTRIX) && !defined(_SEQUENT_)
-	int result;
+    int result;
+
 #endif
 
 #ifdef OLD_ULTRIX
     if (which)
-       return fcntl(fd, F_SETFL, FNDELAY);
+	return fcntl(fd, F_SETFL, FNDELAY);
     else
-       return fcntl(fd, F_SETFL, FNBLOCK);
+	return fcntl(fd, F_SETFL, FNBLOCK);
 #else
 
 #ifdef _SEQUENT_
-	int flags = fcntl(fd, F_GETFL, 0);
-	if (flags == -1)
-		return (-1);
-	if (which)
-		flags |= O_NONBLOCK;
-	else
-		flags &= ~O_NONBLOCK;
-	return fcntl(fd, F_SETFL, flags);
+    int flags = fcntl(fd, F_GETFL, 0);
+
+    if (flags == -1)
+	return (-1);
+    if (which)
+	flags |= O_NONBLOCK;
+    else
+	flags &= ~O_NONBLOCK;
+    return fcntl(fd, F_SETFL, flags);
 #else
-	result = ioctl(fd, FIONBIO, &which);
-	if (result == -1) {
-		fprintf(stderr, "Try using cc instead of gcc to correct this error.\n");
-	}
-	return result;
+    result = ioctl(fd, FIONBIO, &which);
+    if (result == -1) {
+	fprintf(stderr, "Try using cc instead of gcc to correct this error.\n");
+    }
+    return result;
 #endif
 
 #endif
 }
+
+#endif				/* OS2 */

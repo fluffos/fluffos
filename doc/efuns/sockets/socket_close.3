@@ -1,15 +1,14 @@
 .\"close a socket
-.TH socket_close 3
+.TH socket_close 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 socket_close() - close a socket
 
 .SH SYNOPSIS
 .nf
-#include <socket.h>
-#include <socket_errors.h>
+#include <socket_err.h>
 
-int socket_close(int s)
+int socket_close( int s );
 
 .SH DESCRIPTION
 socket_close() closes socket s. This frees a socket efun slot for use.

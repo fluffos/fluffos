@@ -1,12 +1,11 @@
 .\"reports information gathered by the getrusage() system call.
- 
-.TH rusage 3
+.TH rusage 3 "5 Sep 1994" MudOS "LPC Library Functions"
  
 .SH NAME
 rusage() - reports information gathered by the getrusage() system call
  
 .SH SYNOPSIS
-mapping rusage();
+mapping rusage( void );
  
 .SH DESCRIPTION
 This efun collects information gathered via the getrusage() system
@@ -24,8 +23,8 @@ Here is an example usage of rusage():
       mapping info;
  
       info = rusage();
-      write("user time = " + info["utime"] + "ms\n");
-      write("system time = " + info["stime"] + "ms\n");
+      write("user time = " + info["utime"] + "ms\\n");
+      write("system time = " + info["stime"] + "ms\\n");
   }
 .fi
 .PP
@@ -35,4 +34,4 @@ utime, stime, maxrss, ixrss, idrss, isrss, minflt, majflt, nswap, inblock,
 oublock, msgsnd, msgrcv, nsignals, nvcsw, nivcsw.
  
 .SH SEE ALSO
-time_expression(3), function_profile(3).
+time_expression(3), function_profile(3), time(3), uptime(3)

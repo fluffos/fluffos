@@ -1,7 +1,7 @@
 /* hosts/amiga/signal_rr.c
 **
-** Just the exception catcher -- it need registerized args (-mRR) which
-** are note used elsewhere.
+** Just the exception catcher -- it needs registerized args (-mRR) which
+** are not used elsewhere.
 **
 **   28-Feb-93 [lars]  Done for DICE 2.07.53
 */
@@ -12,36 +12,38 @@
 #else
 #include <libraries/dos.h>
 #endif
-#include "amiga.h"
-extern __stkargs ULONG SetSignal( unsigned long newSignals, unsigned long signalSet );
-/*#include "nsignal.h"*/
+#include "nsignal.h"
+extern __stkargs ULONG SetSignal(unsigned long newSignals, unsigned long signalSet);
 
 
 /*-----------------------------------------------------------------------*/
 
 extern ULONG sys_signal_alarm,	/* The system-signal-masks */
-	     sys_signal_hup,
-	     sys_signal_usr;
+      sys_signal_hup, sys_signal_usr;
 
-extern void (*handler_hup)(void), (*handler_alarm)(void), (*handler_usr)(void);
+extern void (*handler_hup) (void), (*handler_alarm) (void), (*handler_usr) (void);
 
 /*-----------------------------------------------------------------------
 ** ULONG catch_exception (ULONG mask)
 **
 **   Called by the OS if the task gets an exception, this dispatch to
-**   the approbiate signal-function.
+**   the appropriate signal-function.
 **   Note that the std-raise() also removes the handler, so our functions
-**   are called by hand.
+**   are called manually.
 */
 
-__regargs __geta4 ULONG catch_exception( __D0 ULONG mask) {
+__regargs __geta4 ULONG catch_exception(__D0 ULONG mask)
+{
     /* Handle our special exceptions */
-  if (mask & sys_signal_alarm) (*handler_alarm)();
-  if (mask & sys_signal_hup) (*handler_hup)();
-  if (mask & sys_signal_usr) (*handler_usr)();
+    if (mask & sys_signal_alarm)
+	(*handler_alarm) ();
+    if (mask & sys_signal_hup)
+	(*handler_hup) ();
+    if (mask & sys_signal_usr)
+	(*handler_usr) ();
     /* Stop select() anyway */
-  SetSignal(EXT_SIGINT, EXT_SIGINT);
-  return mask;
+    SetSignal(EXT_SIGINT, EXT_SIGINT);
+    return mask;
 }
 
 /*************************************************************************/

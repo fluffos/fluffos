@@ -1,11 +1,12 @@
 .\"called by the MudOS driver when an interactive object drops its connection
-.TH NET_NEAD 4
+.TH net_nead 4 "5 Sep 1994" MudOS "Driver Applies"
 
 .SH NAME
-net_dead \- called by the MudOS driver when an interactive object drops its connection
+net_dead - called by the MudOS driver when an interactive object
+drops its connection
 
 .SH SYNOPSIS
-void net_dead();
+void net_dead( void );
 
 .SH DESCRIPTION
 If an interactive object (i.e. the player object) suddenly loses its

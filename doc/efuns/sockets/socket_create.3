@@ -1,16 +1,15 @@
 .\"create an efun socket
-.TH socket_create 3
+.TH socket_create 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 socket_create() - create an efun socket
 
 .SH SYNOPSIS
 .nf
-#include <socket.h>
-#include <socket_errors.h>
+#include <socket_err.h>
 
-int socket_create(int mode, string read_callback,
-string|void close_callback)
+int socket_create( int mode, string read_callback,
+                   void | string close_callback );
 
 .SH DESCRIPTION
 socket_create() creates an efun socket. mode determines which type of
@@ -71,5 +70,4 @@ EESECURITY
 Security violation attempted.
 .SH SEE ALSO
 socket_accept(3), socket_bind(3), socket_close(3), socket_connect(3),
-socket_listen(3), socket_write(3)
 socket_listen(3), socket_write(3)

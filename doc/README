@@ -2,25 +2,26 @@ This is the MudOS documentation directory.
 
 It has the following contents:
 
-Credits         Credits those that helped write the documentation
+Credits.docs    Credits those that helped write the documentation
 History.MudOS   Brief history of the development of MudOS 
-Install         Installation and Unpacking guide for MudOS
-Platforms       Platforms that MudOS has been ported to and tested on
-Run             Guide on how to run MudOS
-Email           email addresses for bug reports and discussion of MudOS.
+Install.MudOS   Installation and Unpacking guide for MudOS
+Platforms.MudOS Platforms that MudOS has been ported to and tested on
+Running.MudOS   Guide on how to run MudOS
+Email           Email addresses for bug reports and discussion of MudOS.
+FTP             (incomplete) list of ftp sites for MudOS driver and mudlibs
 man2ascii.sh
 convert.sh      These two shell scripts are used to convert the documentation
 		        from "man" format to ascii.
 applies/	    "man" format files describing the local functions that 
                 the MudOS driver depends on being present in various objects
                 in your mudlib
-defines/        descriptions of the #defines automagically available to LPC
+defines/        Descriptions of the #defines automagically available to LPC
                 objects.
-concepts/       descriptions of several important fundamental topics
-driver/         description of the inner workings of the MudOS/lpmud driver
+concepts/       Descriptions of several important fundamental topics
+driver/         Description of the inner workings of the MudOS/lpmud driver
 efuns/          "man" format system function documentation
-lpc/            documentation on the language syntax itself
-platforms/      tips for compiling MudOS on various platforms
+lpc/            Documentation on the language syntax itself
+platforms/      Tips for compiling MudOS on various platforms
 
 
 "man page format" documents:
@@ -29,3 +30,19 @@ All of our documentation describing efuns and driver "applies" are in
 the UNIX "man" format.  To convert them to plain ascii format, from
 this directory, type "./man2ascii" and it will convert all of the docs
 into plain ascii for you. (and remove the man format files)
+
+
+Additional documentation appears in the /src directory:
+
+Artistic
+Artistic.README
+Copyright       These three files discuss copyright, re-distribution, etc
+Credits.MudOS
+Credits.LPmud   These two files give credit to significant contributors
+ChangeLog.*     List of changes
+Bugs            List of known bugs at this patchlevel
+Ideas           A ToDo list
+Config.Example  Sample configuration file
+Install         Brief installation notes
+IT_CRASHED      Notes on debugging crashes
+Performance     Notes on improving performance

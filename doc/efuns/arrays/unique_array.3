@@ -1,17 +1,21 @@
 .\"partitions a set of objects according to the action of a separator function
-.TH unique_array 3
+.TH unique_array 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 unique_array() - partitions an array of objects into groups
 
 .SH SYNOPSIS
-mixed unique_array(object *obarr, string separator);
+mixed unique_array( object *obarr, string separator, void | mixed skip );
 
 .SH DESCRIPTION
 Groups objects together for which the `separator' function returns the same 
 value. `obarr' should be an array of objects, other types are ignored.
-The `separator' function is called only once in each object in `obarr'. The
-return value is an array of arrays of objects on the form:
+The `separator' function is called only once in each object in `obarr'.
+THe optional `skip' parameter enables a pre-filter on `obarr', skipping
+elements which match `skip'.
+
+.SH RETURN VALUE
+The return value is an array of arrays of objects on the form:
 .PP
 .nf
      ({

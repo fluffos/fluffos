@@ -2,6 +2,8 @@ MudOS LPC Sockets Tutorial - version 1.0
 1992 October 20
 by Cynosure (Dave Richards)
 
+Minor update 1994 Sept 16 by Robocoder (Anthon Pang)
+
 One of the enhancements added to MudOS between 0.8.14 and 0.9.0 was the
 inclusion of Internet sockets in LPC.  It has been an ongoing dream of
 the MudOS and TMI researchers to provide more tightly integrated MUDs
@@ -740,40 +742,51 @@ beyond the scope of the tutorial.  Alas.
 
 So have we finished with socket_write()?  I hope you don't think so.
 You should have noticed that we didn't check error after calling
-socket_write().  Why is this?  Well to be blunt, because there are three
+socket_write().  Why is this?  Well to be blunt, because there are four
 different classes of return codes that socket_write() can return and I
 figured we'd ease into the nitty gritty details.  So here we go.
 
-There are three things socket_write() can return.  1) because it sent
+There are four things socket_write() can return.  1) because it sent
 the data along and everything is just fine, 2) the data has been saved in
 a buffer and will eventually be sent, but no more data can be accomodated
-at the moment and 3) socket_write() is very confused and doesn't know what
-to do now.  In the first case, socket_write() has sent the data and is ready
-for more.  It will not call the write callback function because there is no
-need to, we are not flow-controlled.  In other words, we should remember that
-it is still okay to send data.  In the second case the data will be sent,
-it's sitting in a memory buffer ready to be sent when the network can send
-it, but the buffer is now full.  Which means we are now flow-controlled.
-It would be inappropriate for us to try to send more at this point, so we
-should remember we cannot send any more right now.  When the network empties
-the memory buffer the write callback function will be called and we can then
-start sending data again.  In the latter case, some error has occurred either
-on the network connect or within the operating system such that the
-write can not be performed.  In that case, however, it is likely nothing
-can be done to rectify the problem.  In general, the best thing to do is
-simply close the connection.  In general, this never happens.
+at the moment, 3) the data has not been saved in a buffer and will not
+be sent since no more data can be accomodated at the moment, and
+4) socket_write() is very confused and doesn't know what to do now.  In the
+first case, socket_write() has sent the data and is ready for more.  It will
+not call the write callback function because there is no need to, we are not
+flow-controlled.  In other words, we should remember that it is still okay
+to send data.  In the second case the data will be sent, it's sitting in a
+memory buffer ready to be sent when the network can send it, but the buffer
+is now full.  Which means we are now flow-controlled.  It would be
+inappropriate for us to try to send more at this point, so we should remember
+we cannot send any more right now.  When the network empties the memory buffer
+the write callback function will be called and we can then start sending data
+again.  In the third case, the data couldn't be sent at that moment,
+possibly due to socket traffic or network congestion.  We are not flow-
+controlled so the write callback function must be called explicitly, to
+attempt resending the data.  A call_out() is a better choice here over
+a direct function call since the delay gives the system a chance to recover,
+reduces the possibility of max eval'ing, and better simulates a callback.
+In the final case, some error has occurred either on the network connect or
+within the operating system such that the write can not be performed.  In
+that case, however, it is likely nothing can be done to rectify the problem.
+In general, the best thing to do is simply close the connection.  In general,
+this never happens.
 
 Okay so much for the abstract, let's look at the specifics.  socket_write()
 returns EESUCCESS in case (1) above.  This means that further writes to the
-socket are still possible.  If socket_write() return EECALLBACK this indicates
-that the data has been buffered for output, but that further writes should
-be suspended until the write callback function is called.  EEALREADY means
-that the object has violated the flow control model, i.e. a write was done
-while the socket was flow-controlled.  In this event, the data is *not*
-buffered and the caller should again wait for the write callback function.
-Of course, well written application will not see EEALREADY.  Any other
-return value should probably be interpreted as a fatal error and the
-socket closed.
+socket are still possible.  If socket_write() returns EECALLBACK, this
+indicates that the data has been buffered for output, but that further writes
+should be suspended until the write callback function is called.  Conversely,
+if socket_write() returns EEWOULDBLOCK, this indicates that the data has
+not been buffered for output, and that the write callback function must be
+called again manually (to resend) before further writes are attempted.
+EEALREADY means that the object has violated the flow control model,
+i.e. a write was done while the socket was flow-controlled.  In this event,
+the data is *not* buffered and the caller should again wait for the write
+callback function.  Of course, well written application will not see
+EEALREADY.  Any other return value should probably be interpreted as a fatal
+error and the socket closed.
 
 
 int socket_write(int, mixed, string|void);

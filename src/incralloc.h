@@ -1,3 +1,6 @@
+#ifndef _INCRALLOC_H_
+#define _INCRALLOC_H_
+
 /*
  * Information for allocating a block that can grow dynamically
  * using realloc. That means that no pointers should be kept into such
@@ -11,3 +14,5 @@ struct mem_block {
 };
 
 #define START_BLOCK_SIZE	4096
+
+#endif

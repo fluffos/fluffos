@@ -1,11 +1,13 @@
 .\"try to match a string with a given pattern
-.TH parse_command 3
+.TH parse_command 3 "5 Sep 1994" MudOS "LPC Library Functions"
  
 .SH NAME
 parse_command() - try to match a string with a given pattern
  
 .SH SYNOPSIS
-int parse_command(string command, object env|object *oblist, string pattern, mixed arg, ...);
+.nf
+int parse_command( string command, object env|object *oblist,
+                   string pattern, mixed arg, ... );
  
 .SH DESCRIPTION
 parse_command() is a piffed up sscanf(3) operating on word basis.  
@@ -22,15 +24,20 @@ of objects. If it holds a single object than a list of objects are
 automatically created by adding the deep_inventory of the object, ie this
 is identical:
 .PP
+.nf
    parse_command(cmd, environment(), pattern, arg)
+.fi
 .PP
 and
 .PP
-   parse_command(cmd, ({ environment() }) + deep_inventory(environment()),
-                 pattern, arg)
+.nf
+   parse_command( cmd, ({ environment() }) +
+                  deep_inventory(environment()), pattern, arg)
+.fi
 .PP
 'pattern' is a list of words and formats:
 .PP
+.nf
    Example string = " 'get' / 'take' %i "
         Syntax:
                 'word'          obligatory text
@@ -43,11 +50,13 @@ and
                 %p              One of a list (prepositions)
                 %i              Any items
                 %d              Number 0- or tx(0-99)
+.fi
 .PP
 The 'arg' list is zero or more arguments. These are the result variables
 as in sscanf. Note that one variable is needed for each %_
 .PP
 The return types of different %_ is:
+.nf
                 %o      Returns an object
                 %s      Returns a string of words
                 %w      Returns a string of one word
@@ -64,6 +73,7 @@ The return types of different %_ is:
                         [1..n] (object) Objectpointers
                                         These are only living objects.
                 %d      Returns a number
+.fi
 .PP
 The only types of % that uses all the loaded information from the objects
 are %i and %l. These are in fact identical except that %l filters out
@@ -75,12 +85,15 @@ As the typical string matched by %i/%l looks like: 'three red roses',
 'all nasty bugs' or 'second blue sword' the number indicates which 
 of these numerical constructs was matched:
 .PP
+.nf
    if numeral >0 then three, four, five etc were matched
    if numeral <0 then second, twentyfirst etc were matched
-   if numeral==0 then 'all' or a generic plural form such as 'apples'
-                  were matched.
+   if numeral==0 then 'all' or a generic plural form such as
+                  'apples' were matched.
+.fi
 .PP
 NOTE!
+.IP
   The efun makes no semantic implication on the given numeral. It does
   not matter if 'all apples' or 'second apple' is given. A %i will
   return ALL possible objects matching in the array. It is up to the
@@ -107,15 +120,16 @@ a pattern MUST be separated with space, ie not " 'word'/%i " but
 " 'word' / %i"
 .PP
 EXAMPLE:
- 
-         if (parse_command("spray car",environment(this_player()),
-                              " 'spray' / 'paint' [paint] %i ",items))  
+.nf 
+     if (parse_command("spray car",environment(this_player()),
+                       " 'spray' / 'paint' [paint] %i ",items))  
          {      
             /*
               If the pattern matched then items holds a return array as
               described under 'destargs' %i above.
             */
          }
+.fi
 .PP
 MUDLIB SUPPORT
 .PP
@@ -130,15 +144,19 @@ calls when very long commands were parsed.
 .PP  
 The new version relies on the LPC objects to give it three lists of 'names'.
 .PP
+.nf
    1 - The normal singular names.
    2 - The plural forms of the names.
    3 - The acknowledged adjectives of the object.
+.fi
 .PP
 These are fetched by calls to the functions:
 .PP
+.nf
    1 - string *parse_command_id_list();
    2 - string *parse_command_plural_id_list();
    3 - string *parse_command_adjectiv_id_list();
+.fi
 .PP
 The only really needed list is the first. If the second does not exist
 than the efun will try to create one from the singluar list.  For 
@@ -159,6 +177,7 @@ lists of names fetched from each object.
 The names in these lists are applicable to any and all objects, the first
 three are identical to the lfuns in the objects:
 .PP
+.nf
    string *parse_command_id_list()
       - Would normally return: ({ "one", "thing" })
  
@@ -167,12 +186,14 @@ three are identical to the lfuns in the objects:
  
    string *parse_command_adjectiv_id_list()
       - Would normally return ({ "iffish" })
+.fi
 .PP
 The last two are the default list of the prepositions and a single so called
 'all' word. 
- 
+.nf
    string *parse_command_prepos_list()
       - Would normally return: ({ "in", "on", "under" })
  
    string parse_command_all_word()
       - Would normally return: "all"
+.fi

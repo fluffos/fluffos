@@ -55,6 +55,12 @@ David Bennett (Pinkfish) - provided enhancements for parse_command and for the
    telnet negotiation code in comm.c (as well as various other small bug fixes),
    and the resolve() efun. 
 
+John Fehr (Wildcard) - provided patches allowing MudOS to run on Amiga
+
+Anthon Pang (Robocoder) - provided various patches
+
+Tim Hollebeek (Beek) - LPC->C and patches
+
 --
 Thanks to Adam Beeman (Buddha) for making numerous suggestions on
 improving the MudOS driver and for providing the TMI site as the original

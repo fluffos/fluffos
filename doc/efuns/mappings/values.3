@@ -1,12 +1,13 @@
 .\"return an array of the values from the (key, value) pairs in a mapping
-.TH values 3
+.TH values 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
-values() - return an array of the values from the (key, value) pairs in a
-mapping
+.nf
+values() - return an array of the values from the (key, value) pairs
+           in a mapping
 
 .SH SYNOPSIS
-mixed * values(mapping m)
+mixed *values( mapping m );
 
 .SH DESCRIPTION
 values() returns an array of values corresponding to the value elements
@@ -18,14 +19,16 @@ For example, if:
 mapping m;
 
 m = (["hp" : 35, "sp" : 42, "mass" : 100]);
+.fi
 .PP
 then
 .IP
+.nf
 values(m) == ({35, 42, 100})
-.PP
 .fi
+.PP
 Note: the values will be returned in the same order as the corresponding
 keys.
 
 .SH SEE ALSO
-keys()
+keys(3), each(3)

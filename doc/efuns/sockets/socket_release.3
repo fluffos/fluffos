@@ -1,11 +1,15 @@
 .\"release ownership of a socket to another object
-.TH socket_release 3
+.TH socket_release 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 socket_release() - release ownership of a socket to another object
 
 .SH SYNOPSIS
-int socket_release( int socket, object ob, string release_callback );
+.nf
+#include <socket_err.h>
+
+int socket_release( int socket, object ob,
+                    string release_callback );
 
 .SH DESCRIPTION
 socket_release() is used to change ownership (and control) of a socket

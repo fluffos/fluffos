@@ -1,5 +1,5 @@
 .\"forces an error to occur in an object.
-.TH throw 3
+.TH throw 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 throw() - forces an error to occur in an object.
@@ -20,9 +20,9 @@ usage:
 
    err = catch(rc = ob->move(dest));
    if (err) {
-        throw("move.c: ob->move(dest): " + err + "\n");
+        throw("move.c: ob->move(dest): " + err + "\\n");
         return;
    }
 
 .SH SEE ALSO
-catch(3), error(3)
+catch(3), error(3), error_handler(4)

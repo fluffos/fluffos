@@ -1,11 +1,11 @@
 .\"controls the use of efun:: to override simulated efuns that mask efuns.
-.TH VALID_OVERRIDE 4
+.TH valid_override 4 "5 Sep 1994" MudOS "Driver Applies"
 
 .SH NAME
 valid_override - controls the use of efun:: 
 
 .SH SYNOPSIS
-int valid_override(string file, string efun_name);
+int valid_override( string file, string efun_name );
 
 .SH DESCRIPTION
 Add valid_override to master.c in order to control the use of the efun::
@@ -45,4 +45,4 @@ Here is an example valid_override that is more restrictive:
 Truilkan@Basis
 
 .SH SEE ALSO
-valid_object(4)
+valid_object(4), function_exists(3)

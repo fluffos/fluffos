@@ -1,16 +1,16 @@
 .\"give a value from a described function call
-.TH process_value 3
+.TH process_value 3 "5 Sep 1994" MudOS "LPC Library Functions"
  
 .SH NAME
 process_value() - give a value from a described function call
  
 .SH SYNOPSIS
-mixed process_value(string calldescription);
+mixed process_value( string calldescription );
  
 .SH DESCRIPTION
 Get the replacement of one syntactic pattern. The pattern is on
 the form:
-.PP
+.IP
    "function[:filename][|arg1|arg2....|argN]"
 .PP
 The returned value can be of any type.

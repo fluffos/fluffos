@@ -1,11 +1,13 @@
 .\"search for substrings in a string
-.TH strsrch 3
+.TH strsrch 3 "5 Sep 1994" MudOS "LPC Library Functions"
  
 .SH NAME
 strsrch() - search for substrings in a string
  
 .SH SYNOPSIS
-int strsrch(string str, string substr | int char, int flag);
+.nf
+int strsrch( string str, string substr | int char,
+             int flag );
  
 .SH DESCRIPTION
 strsrch() searches for the first occurance of the string `substr' in the 
@@ -19,4 +21,4 @@ The integer offset of the first (last) match is returned.  -1 is returned
 if there was no match, or an error occurred (bad args, etc).
  
 .SH SEE ALSO
-explode(3), sscanf(3), replace_string(3)
+explode(3), sscanf(3), replace_string(3), regexp(3)

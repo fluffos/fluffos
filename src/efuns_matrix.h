@@ -11,10 +11,10 @@
 typedef float Matrix[16];
 
 typedef struct {
-  float x;
-  float y;
-  float z;
-} Vector;
+    float x;
+    float y;
+    float z;
+}      Vector;
 
 void translate_matrix PROT((double x, double y, double z, Matrix m));
 
@@ -29,8 +29,8 @@ void rotate_z_matrix PROT((double a, Matrix m));
 void lookat_rotate PROT((Matrix T, double x, double y, double z, Matrix m));
 
 void lookat_rotate2
-  PROT((double a, double b, double c, double d, double e, double f, Matrix m));
+     PROT((double a, double b, double c, double d, double e, double f, Matrix m));
 
 void mult_matrix PROT((Matrix m1, Matrix m2, Matrix m));
 
-#endif /* _MATRIX_H_ */
+#endif				/* _MATRIX_H_ */

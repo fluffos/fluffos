@@ -1,14 +1,14 @@
 .\"switches a player (interactive) connection from one object to another
-.TH exec 3
+.TH exec 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 exec() - switches a player (interactive) connection from one object to another
 
 .SH SYNOPSIS
-int exec(object to, object from);
+int exec( object to, object from );
 
 .SH DESCRIPTION
-This efunction allows the interactite link to a given object to be
+This efunction allows the interactive link to a given object to be
 migrated to another object.  That is, after a successful exec(to, from)
 call, interactive(to) will return 1 and interactive(from) will return 0.
 The player that was controlling 'from' will begin controlling 'to' following

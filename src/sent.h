@@ -1,3 +1,6 @@
+#ifndef _SENT_H_
+#define _SENT_H_
+
 struct sentence {
     char *verb;
     struct object *ob;
@@ -9,7 +12,4 @@ struct sentence {
 #define V_SHORT     1
 #define V_NOSPACE	2
 
-struct sentence *alloc_sentence();
-
-void remove_sent PROT((struct object *, struct object *)),
-    free_sentence PROT((struct sentence *));
+#endif

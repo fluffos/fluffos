@@ -1,11 +1,11 @@
 .\"iterate over the (key, value) pairs in a mapping
-.TH each 3
+.TH each 3 "5 Sep 1994" MudOS "LPC Library Functions"
  
 .SH NAME
 each() - iterate over the (key, value) pairs in a mapping
  
 .SH SYNOPSIS
-mixed *each(mapping m, int reset);
+mixed *each( mapping m, int reset );
  
 .SH DESCRIPTION
 The (key, value) pairs in a mapping may be iterated over using the each()
@@ -26,8 +26,8 @@ For example:
 mixed *pair;
  
 while ((pair = each(x)) != ({})) {
-  write("key   = " + pair[0] + "\n");
-  write("value = " + pair[1] + "\n");
+  write("key   = " + pair[0] + "\\n");
+  write("value = " + pair[1] + "\\n");
 }
  
 .SH SEE ALSO

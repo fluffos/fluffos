@@ -1,11 +1,11 @@
 .\"determine whether or not a given variable is a function pointer
-.TH functionp 3
+.TH functionp 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 functionp() - determine whether or not a given variable is a function pointer.
 
 .SH SYNOPSIS
-int functionp(mixed arg);
+int functionp( mixed arg );
 
 .SH DESCRIPTION
 Return 1 if `arg' is a function pointer and zero (0) otherwise.  Function
@@ -21,4 +21,5 @@ functionp() will return 2 if the function pointer is of the format:
 (: obj, ({ str, arg0, arg1, arg3, ... }) :)
 
 .SH SEE ALSO
-stringp(3), pointerp(3), objectp(3), lpc/types/function
+mapp(3), stringp(3), pointerp(3), objectp(3), intp(3), bufferp(3), floatp(3),
+nullp(3), undefinedp(3), errorp(3), lpc/types/function

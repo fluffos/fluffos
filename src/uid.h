@@ -4,19 +4,19 @@
  * Description: new uid / euid data structures and security
  * Modification:
  *    11-1-92 - Erik Kay - initial creation
+ *    94.07.09 - Robocoder - modified to use AVL tree
  */
 
-#ifndef __UID_H
-#define __UID_H
+#ifndef _UID_H_
+#define _UID_H_
 
 typedef struct _uid {
-  char *name;
-  struct _uid *next;
-} userid_t;
+    char *name;
+}    userid_t;
 
+extern userid_t *backbone_uid;
+extern userid_t *root_uid;
 
-userid_t *find_uid PROT((char *name));
-void insert_uid PROT((userid_t *new_uid));
 userid_t *add_uid PROT((char *name));
 userid_t *set_root_uid PROT((char *name));
 userid_t *set_backbone_uid PROT((char *name));

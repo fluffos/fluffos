@@ -1,14 +1,16 @@
 .\"generic message delivery function
-.TH message 3
+.TH message 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 message() - deliver messages to "living" objects
 
 .SH SYNOPSIS
-void message(string class, string message, mixed target, mixed exclude);
+.nf
+void message( string class, string message, mixed target,
+              mixed exclude );
 
 .SH DESCRIPTION
-message calls receive_message(string class, string message) in all objects
+message() calls receive_message(string class, string message) in all objects
 in the target list excluding those in the exclude list. This basically
 tells the object the message.
 .PP
@@ -26,4 +28,4 @@ Exclude is a list of objects that should not receive the message. This
 can either be one object or an array of objects.
 
 .SH SEE ALSO
-write(3), shout(3), tell_object(3).
+say(3), write(3), shout(3), tell_object(3), tell_room(3)

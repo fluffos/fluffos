@@ -2,7 +2,7 @@
 **
 ** Adapt the default-signal handling for inclusion of timer-
 ** and user-generated signals. In detail this means setting the
-** task_exception_code hook on a stub which 'raise()s' the approbiate
+** task_exception_code hook on a stub which 'raise()s' the appropriate
 ** signals.
 ** This is closely coupled with the timer functions so they are also
 ** implemented here.
@@ -46,21 +46,20 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <signal.h>
-#include "amiga.h"
-/*#include "nsignal.h"*/
-#undef signal	      /* This macro is implemented here! */
+#include <fcntl.h>
+#include "nsignal.h"
+#undef signal			/* This macro is implemented here! */
 
 /*-----------------------------------------------------------------------*/
 
-extern __regargs __geta4 ULONG catch_exception( __D0 ULONG);
+extern __regargs __geta4 ULONG catch_exception(__D0 ULONG);
 
-ULONG sys_signal_alarm = 0,  /* The system-signal-masks */
-      sys_signal_hup = 0,
-      sys_signal_usr = 0;
+ULONG sys_signal_alarm = 0,	/* The system-signal-masks */
+      sys_signal_hup = 0, sys_signal_usr = 0;
 
-void (*handler_hup)(void), (*handler_alarm)(void), (*handler_usr)(void);
+void (*handler_hup) (void), (*handler_alarm) (void), (*handler_usr) (void);
 
-static struct timerequest *treq = NULL; /* the alarm()-timer */
+static struct timerequest *treq = NULL;	/* the alarm()-timer */
 
 /*-----------------------------------------------------------------------
 ** int start_timer (struct timeval *tv, struct timerequest *tr)
@@ -68,20 +67,20 @@ static struct timerequest *treq = NULL; /* the alarm()-timer */
 **   Start a timer <tr> with given timeval <tv>.
 */
 
-__stkargs int start_timer(struct timeval *tv, struct timerequest *tr) {
-  if (!tr) {
-    printf("no request structure\n");
-    return 0;
-  }
+__stkargs int start_timer(struct timeval * tv, struct timerequest * tr)
+{
+    if (!tr) {
+	printf("no request structure\n");
+	return 0;
+    }
+    if (tv->tv_secs == 0L && tv->tv_micro < 2L)
+	tv->tv_micro = 2L;	/* minimal delay */
 
-  if (tv->tv_secs == 0L && tv->tv_micro < 2L)
-    tv->tv_micro = 2L; /* minimal delay */
+    tr->tr_time = *tv;
+    tr->tr_node.io_Command = TR_ADDREQUEST;
 
-  tr->tr_time = *tv;
-  tr->tr_node.io_Command = TR_ADDREQUEST;
-
-  SendIO ((struct IORequest *) tr);
-  return 1;
+    SendIO((struct IORequest *) tr);
+    return 1;
 }
 
 /*-----------------------------------------------------------------------
@@ -90,37 +89,37 @@ __stkargs int start_timer(struct timeval *tv, struct timerequest *tr) {
 **   Setup a timer counting in <unit>, and store it in <tr>.
 */
 
-__stkargs int setup_timer (LONG unit, struct timerequest **tr) {
-  struct MsgPort *timerport;
-  struct timerequest *req;
+__stkargs int setup_timer(LONG unit, struct timerequest ** tr)
+{
+    struct MsgPort *timerport;
+    struct timerequest *req;
 
-  if (*tr) return 1;
+    if (*tr)
+	return 1;
 
-  if (!(timerport = (struct MsgPort *)CreatePort(0L, 0L))) {
-    *tr = NULL;
-    printf("setup_timer: could not create port\n");
-    return 0;
-  }
-
-  if (!(req = (struct timerequest *) CreateExtIO (timerport
-						 , sizeof(struct timerequest))
-     )) {
-    DeletePort(timerport);
-    *tr = NULL;
-    printf("setup_timer: could not get request\n");
-    return 0;
-  }
-
-  if (OpenDevice (TIMERNAME, unit, (struct IORequest *) req, 0L)) {
-    CloseDevice( (struct IORequest *) req);
-    DeleteExtIO( (struct IORequest *) req);
-    DeletePort(timerport);
-    printf("setup_timer: could not open timer\n");
-    *tr = NULL;
-    return 0;
-  }
-  *tr = req;
-  return 1;
+    if (!(timerport = (struct MsgPort *) CreatePort(0L, 0L))) {
+	*tr = NULL;
+	printf("setup_timer: could not create port\n");
+	return 0;
+    }
+    if (!(req = (struct timerequest *) CreateExtIO(timerport
+						,sizeof(struct timerequest))
+	)) {
+	DeletePort(timerport);
+	*tr = NULL;
+	printf("setup_timer: could not get request\n");
+	return 0;
+    }
+    if (OpenDevice(TIMERNAME, unit, (struct IORequest *) req, 0L)) {
+	CloseDevice((struct IORequest *) req);
+	DeleteExtIO((struct IORequest *) req);
+	DeletePort(timerport);
+	printf("setup_timer: could not open timer\n");
+	*tr = NULL;
+	return 0;
+    }
+    *tr = req;
+    return 1;
 }
 
 /*-----------------------------------------------------------------------
@@ -129,30 +128,31 @@ __stkargs int setup_timer (LONG unit, struct timerequest **tr) {
 **   Cleanup given timer <tr>.
 */
 
-__stkargs void cleanup_timer (struct timerequest **tr) {
-  struct MsgPort *tp;
-  struct timerequest *tmp;
-  UBYTE pFlags;
+__stkargs void cleanup_timer(struct timerequest ** tr)
+{
+    struct MsgPort *tp;
+    struct timerequest *tmp;
+    UBYTE pFlags;
 
-  if (*tr) {
-    tmp = *tr;
-    tp = tmp->tr_node.io_Message.mn_ReplyPort;
-    if (tp) {
-	/* abort the current request */
-      pFlags = tp->mp_Flags; /* still needed for DeletePort */
-      tp->mp_Flags = PA_IGNORE;
-      AbortIO( (struct IORequest *) tmp );
-      WaitIO( (struct IORequest *) tmp );
-      while(GetMsg(tp));
-      Forbid();
-      tp->mp_Flags = pFlags;
-      DeletePort(tp);
-      Permit();
+    if (*tr) {
+	tmp = *tr;
+	tp = tmp->tr_node.io_Message.mn_ReplyPort;
+	if (tp) {
+	    /* abort the current request */
+	    pFlags = tp->mp_Flags;	/* still needed for DeletePort */
+	    tp->mp_Flags = PA_IGNORE;
+	    AbortIO((struct IORequest *) tmp);
+	    WaitIO((struct IORequest *) tmp);
+	    while (GetMsg(tp));
+	    Forbid();
+	    tp->mp_Flags = pFlags;
+	    DeletePort(tp);
+	    Permit();
+	}
+	CloseDevice((struct IORequest *) tmp);
+	DeleteExtIO((struct IORequest *) tmp);
     }
-    CloseDevice( (struct IORequest *) tmp );
-    DeleteExtIO( (struct IORequest *) tmp );
-  }
-  *tr = NULL;
+    *tr = NULL;
 }
 
 /*-----------------------------------------------------------------------
@@ -160,44 +160,44 @@ __stkargs void cleanup_timer (struct timerequest **tr) {
 **
 **   Start a timer which raises SIGALRM after <seconds>.
 **   Also cleans up the mess made by a previous alarm.
-**   Specifying a zero timecount just cleans up.
+**   Specifying a zero time count just cleans up.
 */
 
-__stkargs unsigned int alarm (unsigned int seconds) {
-  static struct timeval tv;
-  static first = 1;
+__stkargs unsigned int alarm(unsigned int seconds)
+{
+    static struct timeval tv;
+    static first = 1;
 
-  if (!treq) {
-    printf("No handler installed !\n");
-    return 0;	    /* Heartbeat won't work :+( */
-  }
-
-  tv.tv_secs = seconds;
-  tv.tv_micro = 0;
-
-  if (seconds > 0) {
-      /* first call of alarm() : WaitIO on unsent request ..... */
-    if (!first) {
-      treq->tr_node.io_Message.mn_ReplyPort->mp_Flags = PA_IGNORE;
-      AbortIO( (struct IORequest *) treq);
-      WaitIO( (struct IORequest *) treq);
-      treq->tr_node.io_Message.mn_ReplyPort->mp_Flags = PA_SIGNAL;
+    if (!treq) {
+	printf("No handler installed !\n");
+	return 0;		/* Heartbeat won't work :+( */
     }
-    first = 0;
-    start_timer (&tv, treq);
-  }
-  else {
-    /* if I don't use this code, AbortIO will generate a signal, which will
-     * trigger catch_alarm. catch_alarm will then generate CTRL-E. This
-     * can be resolved by preventing the signal to occur :+)
-     */
-    treq->tr_node.io_Message.mn_ReplyPort->mp_Flags = PA_IGNORE;
-    AbortIO( (struct IORequest *) treq);
-    WaitIO( (struct IORequest *) treq);
-    cleanup_timer (&treq);
-    first = 1;
-  }
-  return 0;
+    tv.tv_secs = seconds;
+    tv.tv_micro = 0;
+
+    if (seconds > 0) {
+	/* first call of alarm() : WaitIO on unsent request ..... */
+	if (!first) {
+	    treq->tr_node.io_Message.mn_ReplyPort->mp_Flags = PA_IGNORE;
+	    AbortIO((struct IORequest *) treq);
+	    WaitIO((struct IORequest *) treq);
+	    treq->tr_node.io_Message.mn_ReplyPort->mp_Flags = PA_SIGNAL;
+	}
+	first = 0;
+	start_timer(&tv, treq);
+    } else {
+	/*
+	 * if I don't use this code, AbortIO will generate a signal, which
+	 * will trigger catch_alarm. catch_alarm will then generate CTRL-E.
+	 * This can be resolved by preventing the signal to occur :+)
+	 */
+	treq->tr_node.io_Message.mn_ReplyPort->mp_Flags = PA_IGNORE;
+	AbortIO((struct IORequest *) treq);
+	WaitIO((struct IORequest *) treq);
+	cleanup_timer(&treq);
+	first = 1;
+    }
+    return 0;
 }
 
 
@@ -209,64 +209,67 @@ __stkargs unsigned int alarm (unsigned int seconds) {
 **   allow the system-signals call the handlers via external exceptions.
 */
 
-__stkargs __sigfunc new_signal (int signo, __sigfunc handler) {
-  register struct Task *this_task;
+__stkargs __sigfunc new_signal(int signo, __sigfunc handler)
+{
+    register struct Task *this_task;
 
-  this_task = (struct Task *)FindTask(NULL);
+    this_task = (struct Task *) FindTask(NULL);
 
-  switch (signo) {
-    case SIGALRM : {
-      ULONG sigalrm;
+    switch (signo) {
+    case SIGALRM:{
+	    ULONG sigalrm;
 
-      sigalrm = sys_signal_alarm;
-      if ((__sigfunc)handler == SIG_IGN) { /* remove SIGALRM handler */
-	SetExcept(0L, sigalrm);  /* Only sigalrm !! */
-	sys_signal_alarm = 0;
-	handler_alarm = NULL;
-	cleanup_timer( &treq );
-      }
-      else { /* install handler */
-	if (!setup_timer (UNIT_VBLANK, &treq)) {
-	  printf("Could not setup_timer\n");
-	  break;      /* What else ?? */
+	    sigalrm = sys_signal_alarm;
+	    if ((__sigfunc) handler == SIG_IGN) {	/* remove SIGALRM
+							 * handler */
+		SetExcept(0L, sigalrm);	/* Only sigalrm !! */
+		sys_signal_alarm = 0;
+		handler_alarm = NULL;
+		cleanup_timer(&treq);
+	    } else {		/* install handler */
+		if (!setup_timer(UNIT_VBLANK, &treq)) {
+		    printf("Could not setup_timer\n");
+		    break;	/* What else ?? */
+		}
+		sigalrm = 1L << (treq->tr_node.io_Message.mn_ReplyPort->mp_SigBit);
+
+		this_task->tc_ExceptCode = (APTR) catch_exception;
+		sys_signal_alarm = sigalrm;
+		handler_alarm = (void (*) ()) handler;
+		SetExcept(sigalrm, sigalrm);
+		/* If we start treq, handler will be called */
+	    }
+	    break;
 	}
-	sigalrm = 1L << (treq->tr_node.io_Message.mn_ReplyPort->mp_SigBit);
+    case SIGHUP:{
+	    ULONG sighup;
 
-	this_task->tc_ExceptCode = (APTR) catch_exception;
-	sys_signal_alarm = sigalrm;
-	handler_alarm = handler;
-	SetExcept (sigalrm, sigalrm);
-	  /* If we start treq, handler will be called */
-      }
-      break;
+	    sighup = (((__sigfunc) handler == SIG_IGN) || ((__sigfunc) handler == SIG_DFL))
+		? 0 : EXT_SIGHUP;
+
+	    this_task->tc_ExceptCode = (APTR) catch_exception;
+	    sys_signal_hup = sighup;
+	    handler_hup = (void (*) ()) handler;
+	    SetExcept(sighup, EXT_SIGHUP);
+	    break;
+	}
+    case SIGUSR1:{
+	    ULONG sigusr;
+
+	    sigusr = (((__sigfunc) handler == SIG_IGN) || ((__sigfunc) handler == SIG_DFL))
+		? 0 : EXT_SIGUSR;
+
+	    this_task->tc_ExceptCode = (APTR) catch_exception;
+	    sys_signal_usr = sigusr;
+	    handler_usr = (void (*) ()) handler;
+	    SetExcept(sigusr, EXT_SIGUSR);
+	    break;
+	}
+    default:
+	signal(signo, handler);
+	break;
     }
-    case SIGHUP : {
-      ULONG sighup;
-
-      sighup = (((__sigfunc)handler == SIG_IGN) || ((__sigfunc)handler == SIG_DFL))
-	       ? 0 : EXT_SIGHUP;
-
-      this_task->tc_ExceptCode = (APTR) catch_exception;
-      sys_signal_hup = sighup;
-      handler_hup = handler;
-      SetExcept(sighup, EXT_SIGHUP);
-      break;
-    }
-    case SIGUSR1 : {
-      ULONG sigusr;
-
-      sigusr = (((__sigfunc)handler == SIG_IGN) || ((__sigfunc)handler == SIG_DFL))
-	       ? 0 : EXT_SIGUSR;
-
-      this_task->tc_ExceptCode = (APTR) catch_exception;
-      sys_signal_usr = sigusr;
-      handler_usr = handler;
-      SetExcept(sigusr, EXT_SIGUSR);
-      break;
-    }
-    default: signal (signo, handler); break;
-  }
-  return handler;
+    return handler;
 }
 
 /*-----------------------------------------------------------------------
@@ -277,36 +280,40 @@ __stkargs __sigfunc new_signal (int signo, __sigfunc handler) {
 **   Result is the signal mask.
 */
 
-static int _ChkSignalLockout = 0;  /* simple semaphore for check_signals() */
+static int _ChkSignalLockout = 0;	/* simple semaphore for
+					 * check_signals() */
 
-ULONG check_signals ( void )
+ULONG check_signals(void)
 {
-  ULONG mask;
+    ULONG mask;
 
-  if (_ChkSignalLockout) return 0L;
-  ++_ChkSignalLockout;
+    if (_ChkSignalLockout)
+	return 0L;
+    ++_ChkSignalLockout;
 
-  mask = ((struct Task *)FindTask(NULL))->tc_SigRecvd;
+    mask = ((struct Task *) FindTask(NULL))->tc_SigRecvd;
 
     /* Default Ctrl-C handling */
-  if (!sys_signal_hup && (mask & SIGBREAKF_CTRL_C)) {
-    SetSignal (0L, SIGBREAKF_CTRL_C);
-    write (2, "*** Break.\n", 11);
-    exit (EXIT_FAILURE);
-  }
-
+    if (!sys_signal_hup && (mask & SIGBREAKF_CTRL_C)) {
+	SetSignal(0L, SIGBREAKF_CTRL_C);
+	write(2, "*** Break.\n", 11);
+	exit(EXIT_FAILURE);
+    }
     /* Handle our special exceptions */
-  if (mask & sys_signal_alarm) {
-    (*handler_alarm)(); SetSignal (0L, sys_signal_alarm);
-  }
-  if (mask & sys_signal_hup) {
-    (*handler_hup)(); SetSignal (0L, sys_signal_hup);
-  }
-  if (mask & sys_signal_usr) {
-    (*handler_usr)(); SetSignal (0L, sys_signal_usr);
-  }
-  --_ChkSignalLockout;
-  return mask;
+    if (mask & sys_signal_alarm) {
+	(*handler_alarm) ();
+	SetSignal(0L, sys_signal_alarm);
+    }
+    if (mask & sys_signal_hup) {
+	(*handler_hup) ();
+	SetSignal(0L, sys_signal_hup);
+    }
+    if (mask & sys_signal_usr) {
+	(*handler_usr) ();
+	SetSignal(0L, sys_signal_usr);
+    }
+    --_ChkSignalLockout;
+    return mask;
 }
 
 /*************************************************************************/

@@ -1,16 +1,30 @@
 .\"determine how the current function was called
-.TH origin 3
+.TH origin 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 origin() - determine how the current function was called
 
 .SH SYNOPSIS
-int origin();
+int origin( void );
 
 .SH DESCRIPTION
 Returns an integer specifying how the current function was called.  Current
-values are 1 for the driver (heart_beat, call_out, etc), 2 for a local
-function call, and 4 for a call_other().
+values are:
+.TP 6
+1
+Driver (heart_beats, etc)
+.TP
+2
+Local function call
+.TP
+4
+call_other()
+.TP
+8
+From simul_efun object
+.TP
+16
+call_out()
 
 .SH SEE ALSO
-previous_object(3).
+previous_object(3), /include/origin.h

@@ -1,7 +1,11 @@
+#include "config.h"
+
 #include <stdio.h>
 #include <string.h>
+#ifdef LATTICE
+#include <stdlib.h>
+#endif
 
-#include "config.h"
 #include "lint.h"
 #include "stralloc.h"
 
@@ -10,7 +14,7 @@
    use structs to: 1) make it easier to check the driver for memory leaks
    (using MallocDebug on a NeXT) and 2) because it looks cleaner this way.
    --Truilkan@TMI 92/04/19
-   
+
    modified to make calls to strlen() unnecessary and to remove superfluous
    calls to findblock().  -- Truilkan@TMI, 1992/08/05
 */
@@ -49,16 +53,11 @@
 
 extern int max_string_length;
 
-char * xalloc();
-#if !defined(_AIX) && !defined(LATTICE)
-char * strcpy();
-#endif
-
 static int num_distinct_strings = 0;
-int bytes_distinct_strings = 0;
+static int bytes_distinct_strings = 0;
 static int allocd_strings = 0;
 static int allocd_bytes = 0;
-int overhead_bytes = 0;
+static int overhead_bytes = 0;
 static int search_len = 0;
 static int num_str_searches = 0;
 
@@ -66,6 +65,8 @@ static int num_str_searches = 0;
 
 #define hfindblock(s, h) sfindblock(s, h = StrHash(s))
 #define findblock(s) sfindblock(s, StrHash(s))
+
+static block_t *sfindblock PROT((char *, int));
 
 /*
  * hash table - list of pointers to heads of string chains.
@@ -75,26 +76,27 @@ static int num_str_searches = 0;
  * 1000 and 5000.
  */
 
-static block_t **base_table = (block_t **)0;
+static block_t **base_table = (block_t **) 0;
 static int htable_size;
 static int htable_size_minus_one;
 
-void
-init_strings()
+INLINE static block_t *alloc_new_string PROT((char *, int));
+static void checked PROT((char *, char *));
+
+void init_strings()
 {
-	int x;
+    int x;
 
-	/* ensure that htable size is a power of 2 */
-	for (htable_size = 1; htable_size <= HTABLE_SIZE; htable_size *= 2)
-		;
-	htable_size_minus_one = htable_size - 1;
-	base_table = (block_t **)
-		DXALLOC(sizeof(block_t *) * htable_size, 116, "init_strings");
-	overhead_bytes += (sizeof(block_t *) * htable_size);
+    /* ensure that htable size is a power of 2 */
+    for (htable_size = 1; htable_size <= HTABLE_SIZE; htable_size *= 2);
+    htable_size_minus_one = htable_size - 1;
+    base_table = (block_t **)
+	DXALLOC(sizeof(block_t *) * htable_size, 116, "init_strings");
+    overhead_bytes += (sizeof(block_t *) * htable_size);
 
-	for (x = 0; x < htable_size; x++) {
-		base_table[x] = 0;
-	}
+    for (x = 0; x < htable_size; x++) {
+	base_table[x] = 0;
+    }
 }
 
 /*
@@ -104,94 +106,90 @@ init_strings()
  * pointer on the hash chain into fs_prev.
  */
 
-INLINE block_t *
-sfindblock(s, h)
-char *s;
-int h;
+static INLINE block_t *
+        sfindblock P2(char *, s, int, h)
 {
-	block_t *curr, *prev;
+    block_t *curr, *prev;
 
-	curr = base_table[h];
-	prev = NULL;
-	num_str_searches++;
+    curr = base_table[h];
+    prev = NULL;
+    num_str_searches++;
 
-	while (curr) {
-		search_len++;
-		if (*(STRING(curr)) == *s && !strcmp(STRING(curr), s)) { /* found it */
-			if (prev) { /* not at head of list */
-				NEXT(prev) = NEXT(curr);
-				NEXT(curr) = base_table[h];
-				base_table[h] = curr;
-			}
-			return(curr);  /* pointer to string */
-		}
-		prev = curr;
-		curr = NEXT(curr);
+    while (curr) {
+	search_len++;
+	if (*(STRING(curr)) == *s && !strcmp(STRING(curr), s)) {	/* found it */
+	    if (prev) {		/* not at head of list */
+		NEXT(prev) = NEXT(curr);
+		NEXT(curr) = base_table[h];
+		base_table[h] = curr;
+	    }
+	    return (curr);	/* pointer to string */
 	}
-	return((block_t *)0); /* not found */
+	prev = curr;
+	curr = NEXT(curr);
+    }
+    return ((block_t *) 0);	/* not found */
 }
 
 char *
-findstring(s)
-char *s;
+     findstring P1(char *, s)
 {
-	block_t *b;
+    block_t *b;
 
-	if ((b = findblock(s))) {
-		return STRING(b);
-	} else {
-		return(NULL);
-	}
+    if ((b = findblock(s))) {
+	return STRING(b);
+    } else {
+	return (NULL);
+    }
 }
 
 /* alloc_new_string: Make a space for a string.  */
 
 INLINE static block_t *
-alloc_new_string(string, h)
-char * string;
-int h;
+        alloc_new_string P2(char *, string, int, h)
 {
-	block_t *b;
-	int len = strlen(string);
-	int size;
+    block_t *b;
+    int len = strlen(string);
+    int size;
 
-	if (len > max_string_length) {
-		len = max_string_length;
-	}
-	size = sizeof(block_t) + len + 1;
-	b = (block_t *)DXALLOC(size, 117, "alloc_new_string");
-	strncpy(STRING(b), string, len);
-	STRING(b)[len] = '\0'; /* strncpy doesn't put on \0 if 'from' too long */
-	SIZE(b) = size;
-	REFS(b) = 0;
-	NEXT(b) = base_table[h];
-	base_table[h] = b;
-	num_distinct_strings++;
-	bytes_distinct_strings += size;
-	overhead_bytes += sizeof(block_t);
-	return(b);
+    if (len > max_string_length) {
+	len = max_string_length;
+    }
+    size = sizeof(block_t) + len + 1;
+    b = (block_t *) DXALLOC(size, 117, "alloc_new_string");
+    strncpy(STRING(b), string, len);
+    STRING(b)[len] = '\0';	/* strncpy doesn't put on \0 if 'from' too
+				 * long */
+    SIZE(b) = size;
+    REFS(b) = 0;
+    NEXT(b) = base_table[h];
+    base_table[h] = b;
+    num_distinct_strings++;
+    bytes_distinct_strings += size;
+    overhead_bytes += sizeof(block_t);
+    return (b);
 }
 
 char *
-make_shared_string(str)
-char *str;
+     make_shared_string P1(char *, str)
 {
-	block_t *b;
-	int h;
+    block_t *b;
+    int h;
 
-	b = hfindblock(str, h);  /* hfindblock macro sets h = StrHash(s) */
-	if (!b) {
-		b = alloc_new_string(str, h);
-	}
-	/* stop keeping track of ref counts at the point where overflow would
-	   occur.
-	*/
-	if (REFS(b) < MAXSHORT) {
-		REFS(b)++;
-	}
-	allocd_strings++;
-	allocd_bytes += SIZE(b);
-	return(STRING(b));
+    b = hfindblock(str, h);	/* hfindblock macro sets h = StrHash(s) */
+    if (!b) {
+	b = alloc_new_string(str, h);
+    }
+    /*
+     * stop keeping track of ref counts at the point where overflow would
+     * occur.
+     */
+    if (REFS(b) < MAXSHORT) {
+	REFS(b)++;
+    }
+    allocd_strings++;
+    allocd_bytes += SIZE(b);
+    return (STRING(b));
 }
 
 /*
@@ -199,23 +197,22 @@ char *str;
 */
 
 char *
-ref_string(str)
-     char *str;
+     ref_string P1(char *, str)
 {
-  block_t *b;
+    block_t *b;
 
-  b = BLOCK(str);
+    b = BLOCK(str);
 #ifdef DEBUG
-  if (b != findblock(str)) {
-    fatal("stralloc.c: called ref_string on non-shared string: %s.\n",str);
-  }
-#endif /* defined(DEBUG) */
-  if (REFS(b) < MAXSHORT) {
-    REFS(b)++;
-  }
-  allocd_strings++;
-  allocd_bytes += SIZE(b);
-  return STRING(b);
+    if (b != findblock(str)) {
+	fatal("stralloc.c: called ref_string on non-shared string: %s.\n", str);
+    }
+#endif				/* defined(DEBUG) */
+    if (REFS(b) < MAXSHORT) {
+	REFS(b)++;
+    }
+    allocd_strings++;
+    allocd_bytes += SIZE(b);
+    return STRING(b);
 }
 
 /*
@@ -223,11 +220,10 @@ ref_string(str)
  */
 
 static void
-checked(s, str)
-char *s, *str;
+checked P2(char *, s, char *, str)
 {
-	fprintf(stderr, "%s (\"%s\")\n", s, str);
-	fatal(s); /* brutal - debugging */
+    fprintf(stderr, "%s (\"%s\")\n", s, str);
+    fatal(s);			/* brutal - debugging */
 }
 
 /* free_string: fatal to call free_string on a non-shared string */
@@ -237,49 +233,49 @@ char *s, *str;
  */
 
 void
-free_string(str)
-char * str;
+free_string P1(char *, str)
 {
-  block_t *b;
+    block_t *b;
 
 
-  b = BLOCK(str);
+    b = BLOCK(str);
 #ifdef DEBUG
-  if (b != findblock(str)) {
-    fatal("stralloc.c: free_string called on non-shared string: %s.\n",str);
-  }
-#endif /* defined(DEBUG) */
+    if (b != findblock(str)) {
+	fatal("stralloc.c: free_string called on non-shared string: %s.\n", str);
+    }
+#endif				/* defined(DEBUG) */
 
-  allocd_strings--;
-  allocd_bytes -= SIZE(b);
-  
-  /* if a string has been ref'd MAXSHORT times then we assume that its
-     used often enough to justify never freeing it.
+    allocd_strings--;
+    allocd_bytes -= SIZE(b);
+
+    /*
+     * if a string has been ref'd MAXSHORT times then we assume that its used
+     * often enough to justify never freeing it.
      */
-  if (REFS(b) >= MAXSHORT)
-    return;
+    if (REFS(b) >= MAXSHORT)
+	return;
 
-  REFS(b)--;
-  if (REFS(b) > 0) return;
+    REFS(b)--;
+    if (REFS(b) > 0)
+	return;
 
-  b = findblock(str); /* findblock moves str to head of hash chain */
+    b = findblock(str);		/* findblock moves str to head of hash chain */
 #ifndef	BUG_FREE
-  if (!b) {
-    checked("free_string: not found in string table!", str);
-    return;
-  }
-  if (STRING(b) != str) {
-    checked("free_string: string didn't hash to the same spot!", str);
-    return;
-  }
-
-#endif	/* BUG_FREE */
-	/* It will be at the head of the hash chain */
-  base_table[StrHash(str)] = NEXT(b);
-  num_distinct_strings--;
-  bytes_distinct_strings -= SIZE(b);
-  overhead_bytes -= sizeof(block_t);
-  FREE(b);
+    if (!b) {
+	checked("free_string: not found in string table!", str);
+	return;
+    }
+    if (STRING(b) != str) {
+	checked("free_string: string didn't hash to the same spot!", str);
+	return;
+    }
+#endif				/* BUG_FREE */
+    /* It will be at the head of the hash chain */
+    base_table[StrHash(str)] = NEXT(b);
+    num_distinct_strings--;
+    bytes_distinct_strings -= SIZE(b);
+    overhead_bytes -= sizeof(block_t);
+    FREE(b);
 }
 
 /*
@@ -288,23 +284,22 @@ char * str;
  */
 
 int
-add_string_status(verbose)
-int verbose;
+add_string_status P1(int, verbose)
 {
     if (verbose == 1) {
-	add_message("\nShared string hash table:\n");
+	add_message("Shared string hash table:\n");
 	add_message("-------------------------\t Strings    Bytes\n");
     }
     if (verbose != -1)
-      add_message("Strings malloced\t\t%8d %8d + %d overhead\n",
-		num_distinct_strings, bytes_distinct_strings, overhead_bytes);
+	add_message("Strings malloced\t\t%8d %8d + %d overhead\n",
+	      num_distinct_strings, bytes_distinct_strings, overhead_bytes);
     if (verbose == 1) {
 	add_message("Total asked for\t\t\t%8d %8d\n",
 		    allocd_strings, allocd_bytes);
 	add_message("Space actually required/total string bytes %d%%\n",
-		    (bytes_distinct_strings + overhead_bytes)*100 / allocd_bytes);
+	    (bytes_distinct_strings + overhead_bytes) * 100 / allocd_bytes);
 	add_message("Searches: %d    Average search length: %6.3f\n",
-		    num_str_searches, (double)search_len / num_str_searches);
+		  num_str_searches, (double) search_len / num_str_searches);
     }
-    return(bytes_distinct_strings + overhead_bytes);
+    return (bytes_distinct_strings + overhead_bytes);
 }

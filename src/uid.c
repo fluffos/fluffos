@@ -1,79 +1,77 @@
 /*
  * uid.c
+ *
  * Created by: Erik Kay
  * Description: new uid / euid data structures and security
  * Modification:
- *    11-1-92 - Erik Kay - initial creation
+ *   11-1-92 - Erik Kay - initial creation
+ *   94.07.14 - Robocoder - replaced linked list with AVL tree, and
+ *                made uids into shared strings
  */
 
-#include <stdio.h>  /* to get NULL */
+#include "config.h"
+
+#include <stdio.h>
 #ifdef __386BSD__
 #include <string.h>
 #endif
-#include "config.h"
+#ifdef LATTICE
+#include <stdlib.h>
+#endif
+
 #include "lint.h"
+#include "avltree.h"
 #include "uid.h"
 
-userid_t *uids = NULL;
-userid_t *backbone_uid;
-userid_t *root_uid;
+static tree *uids = NULL;
+userid_t *backbone_uid = NULL;
+userid_t *root_uid = NULL;
 
-userid_t *find_uid (name)
-char *name;
+static int uidcmp PROT((userid_t *, userid_t *));
+
+static int uidcmp P2(userid_t *, uid1, userid_t *, uid2)
 {
-  userid_t *uid = uids;
-  while (uid) {
-    if (!strcmp(name, uid->name))
-      return uid;
-    uid = uid->next;
-  }
-  return NULL;
+    register char *name1, *name2;
+
+    name1 = uid1->name;
+    name2 = uid2->name;
+    return (name1 < name2 ? -1 : (name1 > name2 ? 1 : 0));
 }
 
-void insert_uid (new_uid)
-userid_t *new_uid;
+userid_t *add_uid P1(char *, name)
 {
-  userid_t *uid = uids;
+    userid_t *uid, t_uid;
+    char *sname;
 
-  if (uid) {
-    while (uid->next) {
-      uid = uid->next;
+    sname = make_shared_string(name);
+    t_uid.name = sname;
+    uid = (userid_t *) tree_srch(uids, uidcmp, (char *) &t_uid);
+    if (!uid) {
+	uid = (userid_t *) DMALLOC(sizeof(userid_t), 119, "add_uid");
+	uid->name = sname;
+	tree_add(&uids, uidcmp, (char *) uid, NULL);
     }
-    uid->next = new_uid;
-  } else uids = new_uid;
-  return;
-}
-
-userid_t *add_uid (name)
-char *name;
-{
-  userid_t *uid;
-  if ((uid = find_uid(name)))
     return uid;
-  uid = (userid_t *)DMALLOC(sizeof(userid_t), 119, "add_uid: 1");
-  uid->next = NULL;
-  uid->name = (char *)DMALLOC(strlen(name)+1, 120, "add_uid: 2");
-  strcpy(uid->name, name);
-  insert_uid(uid);
-  return uid;
 }
 
-userid_t *set_root_uid (name)
-char *name;
+userid_t *set_root_uid P1(char *, name)
 {
-  userid_t *uid;
-  uid = add_uid(name);
-  if (uid)
-    root_uid = uid;
-  return uid;
+    if (!root_uid)
+	return root_uid = add_uid(name);
+
+    tree_delete(&uids, uidcmp, (char *) root_uid, NULL);
+    root_uid->name = make_shared_string(name);
+    tree_add(&uids, uidcmp, (char *) root_uid, NULL);
+    return root_uid;
 }
-  
-userid_t *set_backbone_uid (name)
-char *name;
+
+userid_t *set_backbone_uid P1(char *, name)
 {
-  userid_t *uid;
-  uid = add_uid(name);
-  if (uid)
-    backbone_uid = uid;
-  return uid;
+    if (!backbone_uid)
+	return backbone_uid = add_uid(name);
+
+    tree_delete(&uids, uidcmp, (char *) backbone_uid, NULL);
+    backbone_uid->name = make_shared_string(name);
+    tree_add(&uids, uidcmp, (char *) backbone_uid, NULL);
+    return backbone_uid;
 }

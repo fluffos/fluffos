@@ -1,14 +1,14 @@
 .\"return the ip number for a player object
-.TH query_ip_number 3
+.TH query_ip_number 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 query_ip_number() - return the ip number for a player object
 
 .SH SYNOPSIS
-string query_ip_number(object ob);
+string query_ip_number( object ob );
 
 .SH DESCRIPTION
-return the ip-number (dotted decimal form) for player `ob'.
+Return the ip-number (dotted decimal form) for player `ob'.
 
 .SH SEE ALSO
-query_ip_name(3).
+query_ip_name(3), query_host_name(3), resolve(3), socket_address(3)

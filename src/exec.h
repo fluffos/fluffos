@@ -1,8 +1,11 @@
+#ifndef _EXEC_H_
+#define _EXEC_H_
+
 /*
  * A compiled program consists of several data blocks, all allocated
- * contiguos in memory to enhance the working set. At the compilation,
+ * contiguously in memory to enhance the working set. During compilation,
  * the blocks will be allocated separately, as the final size is
- * unknow. When compilation is done, the blocks will be copied into
+ * unknown. When compilation is done, the blocks will be copied into
  * the one big area.
  *
  * There are 5 different blocks of information for each program:
@@ -47,22 +50,31 @@
 #define T_EXTERNAL_PROGRAM 0x1
 
 struct function {
-	char *name;
-	unsigned short offset;	/* Address of function,
-				 * or inherit table index when inherited. */
-    /* Used so that it is possible to quickly find this function
-     * in the inherited program.
-     */
-	unsigned short function_index_offset;
-	unsigned short type;	/* Return type of function. See below. */
-	unsigned char num_local;	/* Number of local variables */
-	unsigned char num_arg;	/* Number of arguments needed.
-				   -1 arguments means function not defined
-				   in this object. Probably inherited */
-#ifdef PROFILE_FUNCTIONS
-	unsigned long calls, self, children;
+    char *name;
+#ifndef LPC_TO_C
+    unsigned short offset;	/* Address of function, or inherit table
+				 * index when inherited. */
+#else
+    unsigned long offset;
 #endif
-	unsigned char flags;	/* NAME_ . See above. */
+    /*
+     * Used so that it is possible to quickly find this function in the
+     * inherited program.
+     */
+    unsigned short function_index_offset;
+    unsigned short type;	/* Return type of function. See below. */
+    unsigned char num_local;	/* Number of local variables */
+    unsigned char num_arg;	/* Number of arguments needed. -1 arguments
+				 * means function not defined in this object.
+				 * Probably inherited */
+#ifdef PROFILE_FUNCTIONS
+    unsigned long calls, self, children;
+#endif
+#ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
+    unsigned short tree_l, tree_r;	/* Left and right branches. */
+    SIGNED short tree_b;	        /* Balance of subtrees. */
+#endif
+    unsigned char flags;	/* NAME_ . See above. */
 };
 
 struct variable {
@@ -78,38 +90,40 @@ struct inherit {
 };
 
 struct external_program {
-	int (*interface) PROT((char *, int));
-	void *data;
+    int (*interface) PROT((char *, int));
+    void *data;
 };
 
 struct internal_program {
-    int ref;				/* Reference count */
+    int ref;			/* Reference count */
 #ifdef DEBUG
-    int extra_ref;			/* Used to verify ref count */
+    int extra_ref;		/* Used to verify ref count */
 #endif
-    char *program;			/* The binary instructions */
-    int  id_number;			/* used to associate information with
-					   this prog block without needing to
-					   increase the reference count     */
+    char *program;		/* The binary instructions */
+    int id_number;		/* used to associate information with this
+				 * prog block without needing to increase the
+				 * reference count     */
     unsigned short *line_numbers;	/* Line number information */
-    int line_swap_index;                /* Where line number info is swapped */
+    int line_swap_index;	/* Where line number info is swapped */
     struct function *functions;
-    char **strings;			/* All strings uses by the program */
+#ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
+    unsigned short tree_r;	/* function table tree's 'root' */
+#endif
+    char **strings;		/* All strings uses by the program */
     struct variable *variable_names;	/* All variables defined */
-    struct inherit *inherit;		/* List of inherited prgms */
-    int total_size;			/* Sum of all data in this struct */
-    int heart_beat;			/* Index of the heart beat function.
-					 * -1 means no heart beat
-					 */
+    struct inherit *inherit;	/* List of inherited prgms */
+    int total_size;		/* Sum of all data in this struct */
+    int heart_beat;		/* Index of the heart beat function. -1 means
+				 * no heart beat */
     /*
      * The types of function arguments are saved where 'argument_types'
-     * points. It can be a variable number of arguments, so allocation
-     * is done dynamically. To know where first argument is found for
-     * function 'n' (number of function), use 'type_start[n]'.
-     * These two arrays will only be allocated if '#pragma save_types' has
-     * been specified. This #pragma should be specified in files that are
-     * commonly used for inheritance. There are several lines of code
-     * that depends on the type length (16 bits) of 'type_start' (sorry !).
+     * points. It can be a variable number of arguments, so allocation is
+     * done dynamically. To know where first argument is found for function
+     * 'n' (number of function), use 'type_start[n]'. These two arrays will
+     * only be allocated if '#pragma save_types' has been specified. This
+     * #pragma should be specified in files that are commonly used for
+     * inheritance. There are several lines of code that depends on the type
+     * length (16 bits) of 'type_start' (sorry !).
      */
     unsigned short *argument_types;
 #define INDEX_START_NONE		65535
@@ -117,7 +131,7 @@ struct internal_program {
     /*
      * And now some general size information.
      */
-    unsigned short program_size;	/* size of this instruction code */
+    unsigned short program_size;/* size of this instruction code */
     unsigned short num_functions;
     unsigned short num_strings;
     unsigned short num_variables;
@@ -125,16 +139,14 @@ struct internal_program {
 };
 
 union pu {
-	struct internal_program i;
-	struct external_program e;
+    struct internal_program i;
+    struct external_program e;
 };
 
 struct program {
-	char *name;				/* Name of file that defined prog */
-	union pu p;
+    char *name;			/* Name of file that defined prog */
+    union pu p;
 };
-
-extern struct program *current_prog;
 
 /*
  * Types available. The number '0' is valid as any type. These types
@@ -142,7 +154,7 @@ extern struct program *current_prog;
  * the run-time types, named T_ interpret.h.
  */
 
-#define TYPE_UNKNOWN	0   /* This type must be casted */
+#define TYPE_UNKNOWN	0	/* This type must be casted */
 #define TYPE_VOID       1
 #define TYPE_NUMBER     2
 #define TYPE_STRING     3
@@ -151,7 +163,7 @@ extern struct program *current_prog;
 #define TYPE_FUNCTION   6
 #define TYPE_REAL       7
 #define TYPE_BUFFER     8
-#define TYPE_ANY        9  /* Will match any type */
+#define TYPE_ANY        9	/* Will match any type */
 
 /*
  * These are or'ed in on top of the basic type.
@@ -161,9 +173,11 @@ extern struct program *current_prog;
 #define TYPE_MOD_POINTER	0x0400	/* Pointer to a basic type */
 #define TYPE_MOD_PRIVATE	0x0800	/* Can't be inherited */
 #define TYPE_MOD_PROTECTED	0x1000
-#define TYPE_MOD_PUBLIC		0x2000  /* Force inherit through private */
+#define TYPE_MOD_PUBLIC		0x2000	/* Force inherit through private */
 #define TYPE_MOD_VARARGS	0x4000	/* Used for type checking */
 
 #define TYPE_MOD_MASK		(~(TYPE_MOD_STATIC | TYPE_MOD_NO_MASK |\
 				   TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED |\
 				   TYPE_MOD_PUBLIC | TYPE_MOD_VARARGS))
+
+#endif

@@ -1,3 +1,6 @@
+#ifndef _LEX_H_
+#define _LEX_H_
+
 #define MLEN 4096
 #define NSIZE 256
 #define MAX_INSTRS 512
@@ -7,4 +10,6 @@ struct lpc_predef_s {
     struct lpc_predef_s *next;
 };
 
-extern struct lpc_predef_s * lpc_predefs;
+extern struct lpc_predef_s *lpc_predefs;
+
+#endif

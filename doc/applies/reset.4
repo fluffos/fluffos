@@ -1,11 +1,11 @@
 .\"allows an object to do self-maintenance
-.TH RESET 4
+.TH reset 4 "5 Sep 1994" MudOS "Driver Applies"
 
 .SH NAME
 reset - allows an object to do self-maintenance
 
 .SH SYNOPSIS
-void reset();
+void reset( void );
 
 .SH DESCRIPTION
 After every reset interval (whose exact length is determined on
@@ -18,4 +18,4 @@ is usually used to check if any treasures and/or monsters in the room
 have been removed so they can be replaced.
 
 .SH SEE ALSO
-create()
+set_reset(3), create(4)

@@ -1,11 +1,13 @@
 .\"read a file into a string
-.TH read_file 3
+.TH read_file 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 read_file() - read a file into a string
 
 .SH SYNOPSIS
-string read_file(string file, int start_line, int number_of_lines);
+.nf
+string read_file( string file, int start_line,
+                  int number_of_lines );
 
 .SH DESCRIPTION
 Read a line of text from a file into a string.  The second and third
@@ -17,4 +19,4 @@ will return 0 if you try to read past the end of the file, or if you try to
 read from a nonpositive line.
 
 .SH SEE ALSO
-log_file(3), write_file(3).
+write_file(3), read_buffer(3)

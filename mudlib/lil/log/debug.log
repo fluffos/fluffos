@@ -1,8 +1,0 @@
-caught: Failed to load file: command/look
-program: clone/user.c, object: clone/user#1 line 68
-'    commandHook' in '        clone/user.c' ('        clone/user#1')line 68
-'          CATCH' in '        clone/user.c' ('        clone/user#1')line 68
-caught: Failed to load file: command/pwd
-program: clone/user.c, object: clone/user#1 line 68
-'    commandHook' in '        clone/user.c' ('        clone/user#1')line 68
-'          CATCH' in '        clone/user.c' ('        clone/user#1')line 68

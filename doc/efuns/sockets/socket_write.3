@@ -1,15 +1,15 @@
 .\"send a message from a socket
-.TH socket_write 3
+.TH socket_write 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 socket_write() - send a message from a socket
 
 .SH SYNOPSIS
 .nf
-#include <socket.h>
-#include <socket_errors.h>
+#include <socket_err.h>
 
-int socket_write(int s, mixed message, string|void address)
+int socket_write( int s, mixed message,
+                  void | string address );
 
 .SH DESCRIPTION
 socket_write() sends a message on a socket s. If the socket s is of type

@@ -1,0 +1,17 @@
+.\"called by the driver to find out an object's name
+.TH object_name 4 "5 Sep 1994" MudOS "Driver Applies"
+
+.SH NAME
+object_name - called by the driver to find out an object's name
+
+.SH SYNOPSIS
+string object_name( object );
+
+.SH DESCRIPTION
+This master apply is called by the sprintf() efun, when
+printing the "value" of an object.  This function should
+return a string corresponding to the name of the object
+(eg a user's name).
+
+.SH SEE ALSO
+file_name(3)

@@ -1,5 +1,5 @@
 .\"display debug information
-.TH debug_info 3
+.TH debug_info 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 debug_info() - display debug information
@@ -25,7 +25,9 @@ The following LPC code was used to generate the sample output:
 create() {
     debug_info(0, this_object());
 }
-
+.fi
+.IP
+.nf
 O_HEART_BEAT      : FALSE
 O_IS_WIZARD       : FALSE
 O_ENABLE_COMMANDS : FALSE
@@ -44,12 +46,16 @@ swap_num    : -1
 name        : 'u/c/cynosure/di0'
 next_all    : OBJ(bin/dev/_update)
 This object is the head of the object list.
-
+.fi
+.PP
+.nf
 /* di1.c */
 create() {
     debug_info(1, this_object());
 }
-
+.fi
+.IP
+.nf
 program ref's 1
 Name u/c/cynosure/di1.c
 program size 10

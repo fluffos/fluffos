@@ -3,7 +3,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <fcntl.h>
-#ifdef __386BSD__
+#if defined(__386BSD__) || defined(LATTICE)
 #include <stdlib.h>
 #endif
 #include "config.h"
@@ -47,9 +47,13 @@ int arg_types[400], last_current_type;
  */
 int curr_arg_types[MAX_LOCAL], curr_arg_type_size;
 
+void mf_fatal PROT((char *));
 void yyerror PROT((char *));
-int yylex();
-int yyparse();
+int yylex1 PROT((void));
+int yylex PROT((void));
+int ident PROT((int c));
+int yyparse PROT((void));
+void make_efun_tables PROT((void));
 int ungetc PROT((int c, FILE *f));
 char *type_str PROT((int)), *etype PROT((int)), *etype1 PROT((int)),
    *ctype PROT((int));
@@ -57,7 +61,7 @@ char *type_str PROT((int)), *etype PROT((int)), *etype1 PROT((int)),
 int toupper PROT((int));
 #endif
 
-#define VOID		1
+#define VOID 		1
 #define INT		2
 #define STRING		3
 #define OBJECT		4
@@ -84,8 +88,7 @@ struct type {
 { "buffer", BUFFER}
 };
 
-void fatal(str)
-    char *str;
+void mf_fatal P1(char *, str)
 {
     fprintf(stderr, "%s", str);
     exit(1);
@@ -141,7 +144,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 	    min_arg = $5;
 	if ($3[0] == '\0') {
 	    if (strlen($2) + 1 + 2 > sizeof f_name)
-		fatal("A local buffer was too small!(1)\n");
+		mf_fatal("A local buffer was too small!(1)\n");
 	    sprintf(f_name, "F_%s", $2);
 	    len = strlen(f_name);
 	    for (i=0; i < len; i++) {
@@ -154,7 +157,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 	    efun_code++;
 	} else {
 	    if (strlen($3) + 1 > sizeof f_name)
-		fatal("A local buffer was too small(2)!\n");
+		mf_fatal("A local buffer was too small(2)!\n");
 	    sprintf(f_name, "F_%s", $3);
 	    len = strlen(f_name);
 	    for (i=0; i < len; i++) {
@@ -185,7 +188,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 		$2, f_name, min_arg, limit_max ? -1 : $5, ctype($1),
 		etype(0), etype(1), i, $6);
 	if (strlen(buff) > sizeof buff)
-	    fatal("Local buffer overwritten !\n");
+	    mf_fatal("Local buffer overwritten !\n");
 	key[num_buff] = (char *) malloc(strlen($2) + 1);
 	strcpy(key[num_buff], $2);
 	buf[num_buff] = (char *) malloc(strlen(buff) + 1);
@@ -293,15 +296,13 @@ int main(argc, argv)
     return 0;
 }
 
-void yyerror(str)
-    char *str;
+void yyerror P1(char *, str)
 {
     fprintf(stderr, "%s:%d: %s\n", FUNC_SPEC, current_line, str);
     exit(1);
 }
 
-int ident(c)
-    int c;
+int ident P1(int, c)
 {
     char buff[100];
     int len;
@@ -309,7 +310,7 @@ int ident(c)
     for (len=0; isalnum(c) || c == '_'; c = getc(f)) {
 	buff[len++] = c;
 	if (len + 1 >= sizeof buff)
-	    fatal("Local buffer in ident() too small!\n");
+	    mf_fatal("Local buffer in ident() too small!\n");
 	if (len == sizeof buff - 1) {
 	    yyerror("Too long indentifier");
 	    break;
@@ -326,8 +327,7 @@ int ident(c)
     return ID;
 }
 
-char *type_str(n)
-    int n;
+char *type_str P1(int, n)
 {
     int i, type = n & 0xffff;
 
@@ -336,7 +336,7 @@ char *type_str(n)
 	    if (n & 0x10000) {
 		static char buff[100];
 		if (strlen(types[i].name) + 3 > sizeof buff)
-		    fatal("Local buffer too small in type_str()!\n");
+		    mf_fatal("Local buffer too small in type_str()!\n");
 		sprintf(buff, "%s *", types[i].name);
 		return buff;
 	    }
@@ -387,8 +387,7 @@ int yylex() {
     return yylex1();
 }
 
-char *etype1(n)
-    int n;
+char *etype1 P1(int, n)
 {
     if (n & 0x10000)
 	return "T_POINTER";
@@ -415,8 +414,7 @@ char *etype1(n)
     return "What?";
 }
 
-char *etype(n)
-    int n;
+char *etype P1(int, n)
 {
     int i;
     int local_size = 100;
@@ -453,8 +451,7 @@ char *etype(n)
     return buff;
 }
 
-char *ctype(n)
-    int n;
+char *ctype P1(int, n)
 {
     static char buff[100];	/* 100 is such a comfortable size :-) */
     char *p = (char *)NULL;
@@ -479,7 +476,7 @@ char *ctype(n)
     }
     strcat(buff, p);
     if (strlen(buff) + 1 > sizeof buff)
-	fatal("Local buffer overwritten in ctype()");
+	mf_fatal("Local buffer overwritten in ctype()");
     return buff;
 }
 

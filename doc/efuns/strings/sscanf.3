@@ -1,11 +1,13 @@
 .\"parse a string using a given format
-.TH sscanf 3
+.TH sscanf 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 sscanf() - match substrings in a string.
 
 .SH SYNOPSIS
-int sscanf(string str, string fmt, mixed var1, mixed var2 ...)
+.nf
+int sscanf( string str, string fmt,
+            mixed var1, mixed var2 ... );
 
 .SH DESCRIPTION
 Parse a string `str' using the format `fmt'. `fmt' can contain strings
@@ -23,4 +25,4 @@ str1 and the remainder of str into str2.
 The number of matched "%d" and "%s" is returned.
 
 .SH SEE ALSO
-extract(3), explode(3), replace_string(3).
+explode(3), replace_string(3), strsrch(3)

@@ -1,19 +1,19 @@
 .\"shadow one or more functions in some object
-.TH shadow 3
+.TH shadow 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 shadow() - shadow one or more functions in some object
 
 .SH SYNOPSIS
-object shadow(object ob, int flag);
+object shadow( object ob, int flag );
 
 .SH DESCRIPTION
 If `flag' is 1, then current object will shadow `ob'. If `flag' is 0,
 then either 0 will be returned, or the object that is already shadowing `ob'.
 .PP
-An object that defines the funtion "query_prevent_shadow()" to return 1
-can't be shadowed, and the "shadow()" function will return 0 instead
-of `ob'.
+The master object defines the function "valid_shadow()".  If it returns 1
+the target object can't be shadowed, and the "shadow()" function will
+return 0 instead of `ob'.
 .PP
 If an object `a' shadows an object `b', then all "call_other(func)" to `b'
 will be redirected to `a'. If object `a' has not defined the function,
@@ -37,4 +37,4 @@ much simpler than it could be if the code for the various classes had
 to be in the player object itself.
 
 .SH SEE ALSO
-destruct(3), shadowp(3)
+destruct(3), shadowp(3), query_shadowing(3), valid_shadow(4)

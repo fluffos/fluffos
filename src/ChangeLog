@@ -1,11 +1,701 @@
-Fri Jan 14 20:10:31 CST 1993 (ucs_brf@pip.shsu.edu (Blackthorn))
+Thu Sep 22 00:12:51 PDT 1994 (apang@mindlink.bc.ca (Robocoder))
+	* raised patchlevel to 0.9.20
+	  Warning: versions following this patchlevel will have the leading
+	  portion of the version number stripped off, ie "0.9.".  For
+	  example, what would have been 0.9.20.9 will instead be released as
+	  v20.9; this is for the convenience of the developers and users,
+	  and completely sidesteps the issue of when will "1.0" be released
+	* IT_CRASHED: a text file describing how sites experiencing
+	  mysterious crashers can help in finding a fix; mind you, we believe
+	  we have a very stable driver now
+	* array.c: changed built-in sort_array() directions from: 0 for forward,
+	  non-zero (..., -2, -1, 1, 2, ...) for reverse, to: non-negative
+	  (0, 1, 2, ...) for forward, and negative (-1, -2, ...) for reverse
+	  -- from Beek -- COMPAT BUSTER to 0.9.19.14; updated man page as well
+	* lint.h: added support for SIGNED, so "signed" keyword (not accepted by
+	  some older compilers) can be used explicitly in places where we really
+	  do want signed ints, otherwise we're left at the mercy of the compiler
+	  for its default signedness (which so far, we've assumed will be
+	  signed...); also fixed exec.h, functab_tree.c, smalloc.c: to use SIGNED
+	  define -- patches from Beek's v20 preview
+	* compiler/grammar, lpc_compiler/grammar, sprintf.c, parse.c, port.c:
+	  fixed code to not require #undef min, #undef max (macros from
+	  <string.h>) by renaming the variables with conflicting names;
+	  to fix A/UX compilation problems -- patches from Beek's v20 preview
+	* functab_tree.c: forgot to prototype local function with PROT();
+	  fixes the last of the known A/UX problems -- patch from Beek's v20
+	  preview
+	* lint.h: #if'd out srandom() prototype for OSF/1 -- reported by
+	  Lon Stockton, Jr (LONS@tiger.hsc.edu)
+	* smalloc.c: trying some more changes for NeXTStep 3.x support of
+	  vm_allocate() in lieu of sbrk() -- thanks Archimedes
+	* lex.c: added conditional defines for HAS_LIGHT, HAS_MUDLIB_STATS,
+	  and HAS_MUDLIB_ERROR_HANDLER -- missing; spotted by Leto
+	* options.h: better commented RESTRICTED_ED -- suggested by Leto
+	* concepts/socket_efuns: documented EEWOULDBLOCK
+	* applies/error_handler.4: updated this doc a bit since 19.26
+	* testsuite (aka lil): updated to provide error_handler
+	  support, added & removed some valid_* applies
+	* moved ref(count) field to beginning of svalue structs, for peephole
+	  optimization on some architectures -- suggested by Hyp
+	* interpret.h: made size field for vectors (arrays) unsigned short
+	  instead of (signed) short
+
+Mon Sep  5 21:16:18 PDT 1994 (apang@mindlink.bc.ca (Robocoder))
+	* raised patchlevel to 0.9.19.26
+	* lint.h: added conditional prototyping for varargs...for systems
+	  which don't complain about (char *v, ...) prototypes
+	* compiler_shared.c: undid narrow->wide conversion on add_arg_types()
+	  and free_prog_string() (0.9.19.22)
+	* except for those functions with function ptrs as args, the
+	  remaining function headers were converted to use Pn(); cleaned up
+	  sig handler and OS2 related function headers so indentor can do a
+	  nicer job
+	* port.h, main.c, comm.c., simulate.c: added support for
+	  stdarg.h -- requested by Cygnus for BSDI; also removed
+	  amiga/varargs.h as a result
+	* mud_status(): removed extra add_message("\n") from show_otable(),
+	  moving some creative white space code here, to reduce
+	  call order dependence of some stat printing functions
+	* lex.c: added ANSI C trigraph support ... eek, I forgot the
+	  contributor's name (send me mail...you probably know who you are);
+	  default is not enabled; here as a curiosity piece, so we don't
+	  have to explain it...
+	* lex.c: undid "( {" and "( [" COMPAT BUSTER...until L_ARRAY_CLOSE,
+	  L_MAPPING_CLOSE, and L_FUNCTION_CLOSE is supported
+	* interactive() now returns TRUE/FALSE, instead of a meaningless
+	  pointer (at the mudlib level, anyways) or FALSE (NULL); suggested
+	  by Descartes & Symmetry
+	* ed.c: undid the make_path_absolute() apply COMPAT BUSTER(s)
+	  (.12, .17, .20); instead ed() takes a new write_fn() callback,
+	  called before & after each editor write to a file ('x', 'w', 'W')
+	  -- backwards compatible -- see updated man page
+	* ed(): moved null command_giver check to proper place
+	* included preliminary release of updated docs ... every MUDOS
+	  apply and efun is documented here; some more terse than others =)
+	* renamed (ie shortened) two master applies -- COMPAT BUSTER!
+	  destruct_environment_of() -> destruct_env_of()
+	  get_ed_buffer_save_file_name() -> get_save_file_name()
+	* interpret.c: added += optimization trick for malloc'd strings
+	* array.c: applied Beek's add_array() crasher fix; added another
+	  potential crasher fix when adding an array to itself with
+	  refcount 2 (refcounts of elements would become wrong)
+
+Mon Aug 29 17:47:41 EDT 1994 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to 0.9.19.25
+	* added a workaround for wierd behavior under SunOS 4.1.3_U1 that
+	  causes the mud to freeze
+	* fixed a crasher in get_char()
+	* fixed some prototyping problems
+	* fixed a Linux GNUmakefile which had crept into the distrib
+	* indented the entire source code
+	* ran the source through lint and fixed a few things it caught
+	* added some code back in that seems to have disappeared between
+	  .23 and .24
+
+Thu Aug 25 16:00:37 PDT 1994 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to 0.9.19.24
+	* fixed a bug in string ranging (reported by Grey@TMI-2)
+	* added a missing "locals were ..."
+	* fixed crashers in MUDLIB_ERROR_HANDLER and *_IN_TRACE_BACK
+	* changed ALOT of function definitions (via a 200 line perl script)
+	* improved some error messages
+	* functions without local variables no longer have blank "locals were:"
+	  lines
+	* made /testsuite/single/master.c updateable
+	* fixed some incorrect varargs declarations
+	* fixed two bugs in (: parsing
+
+Wed Aug 24 20:40:17 PDT 1994 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to 0.9.19.23
+	* fixed a problem with make_func on Linux; it should compile
+	  cleanly with no FD_SETSIZE problems now
+	* Fixed some prototype problems that were preventing Linux
+	  compilation
+	* Fixed lots of prototype problems that were preventing AIX
+	  compilation (xlc is rather picky), including adding of a new
+	  function definition system; currently only in use to shut up
+	  picky compilers
+	* Fixed a few things spotted by -Wall (mostly unused code and
+	  variables)
+	* If LOG_CATCHES is defined, caught errors are passed through
+	  the mudlib error_handler with a second argument of 1.
+
+Tue Aug 23 22:43:51 PDT 1994 (apang@mindlink.bc.ca (Robocoder))
+	* raised patchlevel to 0.9.19.22
+	* More changes to get driver to build again on other platforms/OS's
+	* compiles on A/UX - thanks to Maphael@Ancient.Crown
+	* merged in Pinkfish's OS2 patches...needs to be tested
+	* LPC->C should now be buildable again; de-ANSI-fied function headers
+	  in lpc_compiler/*, and added prototypes for static functions
+	* changed extern prototypes for add_arg_type() and free_prog_string()
+	  to not use "narrow" types (which can lead to C compiler portability
+	  problems...like misaligned stack parameters, ouch!)
+	* port.h: bsdmalloc.c should now be more compilable out of the box
+	  on other OS's
+	* bsdmalloc.c, smalloc.c: sync'd show_mstats()'s a bit...; also
+	  resolved regexp.h's MAGIC conflict with smalloc.c and bsdmalloc.c
+	  by moving this define to regexp.c (a side effect of overloading
+	  lint.h)
+	* binaries.c: will now search CONFIG_FILE_DIR (see options.h)
+	  before "binary directory" (see config file) to stat the config
+	  file for config id; COMPAT BUSTER -- though you're unaffected
+	  if you use absolute pathnames
+
+Sun Aug 21 00:08:28 PDT 1994 (apang@actlab.rtf.utexas.edu (Robocoder))
+	* raised patchlevel to 0.9.19.21
+	* lint.h, lex.c: various prototypes for FreeBSD, AIX, Linux, etc
+	  changed - hopefully this will fix problems reported by Drfeelgood,
+	  Misery, Chuck, Leto, Darkone, Trillian, ...
+	* Makefile, GNUmakefile: sed missing input file 'y.tab.c' -- oops!
+	  -- reported by many people...
+	* lex.c: fixed bug fix for @ENDTEXT -- reported by Trillian
+	* cleaned up signal handler prototypes to use SIGNAL_FUNC_TAKES_INT
+	* various changes to make it compile relatively cleanly with
+	  gcc & bison (tested on Sparc running SunOS 5.3 (Solaris)); also
+	  tested with berkeley yacc 1.9
+	* cleaned up various error messages -- suggested by Tensor
+	* lpc_compiler/pre: fixed typo in #includes; added prototype for
+	  yyparse() (which later becomes lpcyyparse())
+	* lex.c, compiler/grammar, lpc_compiler/grammar, token_defs: reduced
+	  the following sequences: "({", "([", and "(:" into single lexical
+	  tokens
+	* lex.c: added check for illegal macro symbols -- should fix crasher
+	  reported by Misery; COMPAT BUSTER ?
+
+Sun Aug 14 12:30:35 PDT 1994 (apang@actlab.rtf.utexas.edu (Robocoder))
+	* raised patchlevel to 0.9.19.20
+	  (skipping .19...posted in haste and then pulled)
+	* interpret.c: bug fixes to origin() - by Beek
+	* lint.h: SunOS 4.x prototype conflict with mkdir() - by Beek
+	* options.h: fixed typo referring to handle_error() instead of
+	  error_handler() apply - reported by Beek
+	* ed.c: fixed make_path_absolute() apply to always be called with
+	  "r" and "w" editor commands (instead of with just non-absolute
+	  paths), for more thorough evil admin logging...
+	* uid.c: Linux and AIX picky about type casts - reported by Demon,
+	  Kalinash, and others
+	* port.h: various conflicts with memmove() define resolved - fixed
+	  from various reports (posted and emailed) -- Thanks everyone.
+	* efuns_main.c: fixed calculation bug in memory_info() - reported
+	  by Archimedes; now should match total reported by mud_status()
+	* eoperators.c: removed a straggling eval_cost calculation from
+	  f_sub_eq
+	* port.h: 386BSD fix for SIGNAL_ERROR on FreeBSD and NetBSD
+	  systems
+	* reclaim.c: change v->type = T_NUMBER to *v = const0n, after
+	  free_svalue()
+	* lex.c: changed get_text_block() handling for long strings, to
+	  handle longer strings, instead of yytext size - reported by Misery
+	* otable.c: show_otable_status()...added an extra LF to the output
+	* GNUmakefile, Makefile, SMakefile: synced a bit more; now
+	  changes "y.tab.c" to appropriate source file name so debugger
+	  can find it (ie "compiler.tab.c" and/or "lpc_compiler.tab.c")
+	* lint.h: cleaned up--added extern declarations for symbols, and
+	  sorted function prototypes by module -- this helped to fix a few
+	  cases where incorrect or incomplete number of args were passed;
+	  added support for compilers that support generation of pre-compiled
+	  header files (aka global symbol table files)
+	* compiler_shared.h: PROT()'ified function declarations - reported
+	  by Blackthorn
+	* amiga/replace.c: added (because I was too lazy to port "sed") -
+	  Boyer-Moore string search code from Grendel
+	* SMakefile: cleaned up a bit
+
+Mon Aug  1 09:35:40 EDT 1994 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to 0.9.19.18
+	* all of the following bugs reported by Alfred@TMI-2
+	* fixed a bug in MUD mode sockets that caused the socket to be
+	  closed some times when it shouldn't be
+	* added mixing line number info in master::handle_error 
+	* fixed mutating error message and ref count bug in 
+	  MUDLIB_ERROR_HANDLER
+	* fixed two crashers in LPC->C source generation
+	* End of Alfred@TMI-2 section
+	* functab_tree.c, exec.h, etc: changed branches from int to
+	  unsigned short for memory savings
+	* simulate.c, efuns_main.c, cfuns_main.c, comm.c: fixed get_char() to
+	  match docs (COMPAT BUSTER), and optimized get_char() & input_to() when
+	  passing parameters around; sealed a couple of potential memory leaks
+	* interpret.c: changed a couple of lines from:
+	        caller_type = call_origin;
+	  to:
+	        caller_type = local_call_origin;
+	  (typos) so origin() works again...
+	* memmove() moved to port.h as a macro for those with working
+	  bcopy() (ie handles overlaps), and the code to port.c for those
+	  without (read non-BSD); added a memmove() validation check to
+	  main.c...report your platform/os to us if you get an error here
+
+Sun Jul 31 09:25:12 PDT 1994 (apang@mindlink.bc.ca (Robocoder))
+	* bumped patchlevel to 0.9.19.17
+	* array.c: fixed deep_inventory() to only call valid_hide()
+	  apply once, and only if necessary -- idea from Randor
+	* avltree.h, avltree.c: Paul Vixie's public domain AVL tree
+	  source package added (comp.sources.unix archive); made
+	  tree_srch() non-recursive
+	* uid.h, uid.c: modified Erik's code to use AVL tree instead of
+	  a linear list, so insertion and searching is faster; also, made
+	  uids into shared strings for further search speedup and to
+	  reduce mem usage; as before, uids are never FREE()'d or
+	  free_string()'d
+	* functab_tree.c: renamed tree_add() to avoid conflict with
+	  tree_add() in avltree.c
+	* Makefile, GNUmakefile, SMakefile: added avltree.o to OBJ list
+	* compiler/grammar, lpc_compiler/grammar: converted some more
+	  strcat()'s to strcpy()'s where append position was already
+	  known
+	* efuns_main.c: optimized replace_string a little to reuse
+	  string svalue's memory, if possible
+	* ed.c: make_path_absolute() master apply should now have the
+	  form:
+	    string make_path_absolute(string path, object ob, int writeflag)
+	  writeflag is FALSE for read operations, and TRUE for write
+	  operations; COMPAT BUSTER
+	* efuns_main.c: slight code change to avoid dependency side
+	  effects from evaluation order
+	* call_out.c, sprintf.c, mapping.c, replace_program.c:
+	  free_svalue() no longer zero'd out target svalue...needed to
+	  fix cases which assumed it did
+	* interpret.c: peephole optimization to free_some_svalues()
+	  (used by comm.c)
+	* strfuncs.c: added memmove() for systems that don't have it;
+	  according to Stevens, bcopy() behaviour is undefined for
+	  overlapping memory; changed a couple of bcopy() calls to
+	  explicitly use memmove()
+	* comm.c: apparently, socket() can return 0 as a valid socket
+	  descriptor (man pages state ``non-negative'', and this is
+	  hinted at by Comer as well)
+	* removed amiga/options.h
+	* parse.c: closed off the comment [again?]
+	* binaries.c: fixed memory munger (aka crasher) in load_binary()
+
+Sat Jul 30 15:07:21 EDT 1994 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to 0.9.19.16
+	* fixed crasher from T_INVALID debugging code with DEBUG defined
+	* fixed crasher in reclaim_objects
+
+Fri Jul 29 12:03:54 EDT 1994 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to 0.9.19.15
+	* fixed a problem with having an error in your error handler or
+	  not having one
+	* fixed an error in "Expected object or string"	error messages
+	* fixed some crashers in *_IN_TRACEBACK
+
+Fri Jul 29 23:35:51 EDT 1994 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to 0.9.19.14
+	* Added NeXT 3.1 and 3.2 to the Platforms file
+	    (info from Pel@TMI-2)
+	* Added a builtin sort_array() function for arrays of arrays;
+	  compare the first items (idea from Pel@TMI-2)
+	* fixed a rather nasty delayed crasher:
+	    An optimization which was in BeekOS got into the distribution
+	    starting with 19.6 I think.  The optimization makes LPC code
+	    about 1-2% faster, but makes freeing the same svalue twice
+	    a crasher.  This would be no problem, except for the fact
+	    that the Bugs file mistakenly states that not freeing the
+	    return value of apply() is a memory leak.  The "fixes" which
+	    were applied in a few places lead to delayed crashes.
+	    removed the "fixes" and erroneous Bugs file entry (Robocoder
+	    had commented below it already that it was wrong)
+	    affected efuns: filter_array, sort_array, and save_ed_buffer
+	    I suspect this is the crasher that has been making versions
+	    since 0.9.19.5 unstable.
+	* Commented on a few other entries in the Bugs file
+	* Implemented LOCALS_IN_TRACEBACK for non-mudlib error handler
+	    case
+	* added some missing prototypes, added APPLY_ERROR_HANDLER define
+
+Tue Jul 27 23:33:50 EDT 1994 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to 0.9.19.13
+	* slight optimization to previous_object(n)
+	* now keep track of simul_efun_ob
+	* COMPAT BUSTER:
+	    in the simul_efun object, origin() now returns ORIGIN_SIMUL_EFUN
+	    functions called from call_outs have origin() == ORIGIN_CALL_OUT
+	* improved error messages, e.g:
+	  Bad argument 1 to call_other
+	  Expected: object or array  Got: 0
+	* added MUDLIB_ERROR_HANDLER
+	* added LOCALS_IN_TRACEBACK
+	   (currently only supported for mudlib error handlers)
+	* optimized the type checking in interpret.c
+	* added missing \n's in a couple errors
+
+Wed Jul 27 21:16:05 PDT 1994 (apang@mindlink.bc.ca (Robocoder))
+	* bumped patchlevel to 0.9.19.12
+	* lint.h: added sgi checks to prevent prototype redeclaration
+	  errors; reported by Ian Dean
+	* options.h: added defines and support for NO_LIGHT and
+	  NO_MUDLIB_STATS
+	* main.c: now opens & closes debug.log on each debug_message()
+	  call -- based on patch from Ornan
+	* rc.c: reorganized config stuff; added get_config() efun; added
+	  'debug log file' to runtime config options -- idea from Alexus
+	* applies.h: added; various files changed to use defines --
+	  suggested by Tensor
+	* include/runtime_config.h: added; also origin.h, localtime.h,
+	  and socket_err.h: moved to include subdir; these include files
+	  contain #defines used/returned by various efuns; your mudlib
+	  should copy these files to its include directory, or make a link
+	  there to here
+	* ed.c: changed make_path_absolute() master apply ... now also
+	  passes "read" or "write" string (as 2nd argument), so master
+	  can update logs for reads/writes, maintain file locks, etc
+	  -- COMPAT BUSTER?
+	* interpret.c: added Randor's peephole optimization [more or less]
+	  to check_for_destr() 
+	* array.c: added Randor's peephole optimizations [more or less]
+	  to free_vector(), filter(), sameval(), make_unique() [in addition
+	  to fixing a potential mem leak here], add_array(),
+	  deep_inventory_count(), deep_inventory_collect()
+	* array.c: added an optimization to explode(), to avoid use of an
+	  intermediate string buffer when it can explode strings to the
+	  array directly
+	* array.c, efuns_main.c, func_spec.c: sort_array() now has builtin
+	  sort routines that don't callback LPC code...for string, int,
+	  and float arrays; sort_array(mixed *items, int direction) -- if
+	  direction is non-zero, then it sorts the array in reverse order
+	  alphabetically or in decreasing order numerically; for
+	  non-homogeneous arrays and arrays of other types, the "old"
+	  sort_array() must/can be used
+	* qsort.c: peephole optimization to doSwap() ... use a tight loop
+	  that can be easily optimized by the compiler, rather than using
+	  three memcpy()'s (should be more noticeable with built-in sort
+	  array on ints and floats) -- hopefully this doesn't start a
+	  debate about the relative merits of other sort algorithms...
+	* simulate.c: undid 0.9.19.10's remove_action() patch and instead
+	  applied Randor's idea to only check current_object for defined
+	  action & verb -- this appears to work (but has not been
+	  fully tested); COMPAT BUSTER
+	* compiler_shared.c: added back code which disappeared at some
+	  point for OPTIMIZE_FUNCTION_TABLE_SEARCH support
+	* functab_tree.c: made branches explicitly signed int...so compilers
+	  which default to unsigned don't choke on the -1 for empty branches
+	* Config.Example: should now be up to date
+
+Tue Jul 26 07:26:31 EDT 1994 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to 0.9.19.11
+	* added ARGUMENTS_IN_TRACEBACK, which prints out the arguments
+	  to functions in error tracebacks
+	* added previous_object(-1) which returns all previous objects
+	* removed caller_stack_depth(), use sizeof(previous_object(-1))
+	* removed extern_call(), use origin() != ORIGIN_LOCAL
+	* removed switch over eoperators in compiled LPC->C code for most
+	  eops
+	* fixed a bug in the LPC->C '>>' operator
+	* added a valid_compile_to_c master apply
+	* fixed a crasher in sscanf
+	* parse.c: closed off a comment... broken since 0.9.18.27?
+	  *boggle* -- reported by Kay@TMI-2
+
+Sun Jul 24 20:05:19 EDT 1994 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to 0.9.19.10
+	* COMPAT_BUSTER: private functions in the simul_efun object are
+	  no longer recognized as simul_efuns (the previous behavior was
+	  a simul_efun that always returned zero)
+	* optimized string_copy()
+	* moved several #ifdef LPC_TO_C's to after #include "options.h"
+	* removed the O_MASTER bit
+	* ifdef'd out O_EXTERNAL_PROGRAM support
+	  --- diffs from Robocoder for .10, added with some modifications
+	* forgot to mention that Kevlar's addr_server patches were applied
+	  in 0.9.19.8 [more or less]
+	* simulate.c: shadow chain wasn't being properly unlinked in
+	  0.9.19.6 fix (so a potential error was still there); also,
+	  bottom-most object could be dest'd twice -- bug report and fix
+	  from Oboe Chrisy
+	* regexp.c: regprop() missing a couple of cases; fix from Randor
+	* simulate.c: added Randor's add_light() optimization [more or less]
+	  making it iterative rather than recursive
+	* efuns_main.c: optimized capitalize() and lower_case() efuns to
+	  reuse STRING_MALLOC string; in sort_array(), check_for_destr()
+	  now occurs before we make a copy of the array
+	* compiler/grammar, lpc_compiler/grammar: fixed c%0 optimization
+	  to check for modulo by zero constant -- crasher reported by Ornan
+	* eoperators.c, cfuns.c: optimized aggregate() efun
+	* efuns_sock, cfuns_sock: plugged a small memory leak in
+	  socket_address() efun
+	* binaries.c: optimized save_binary() by avoiding string_copy()
+	* efuns_main.c: optimized read_bytes() and read_buffer() efuns to
+	  avoid string_copy()
+	* interpret.c: fixed string addition optimization (crasher) ...
+	  introduced in 0.9.19.7
+	* functab_tree.c: changed comparison function to be a bit more
+	  portable, albeit slower
+	* simulate.c: remove_action() should now work
+	* lint.h: mkdir() prototype conflict for Ultrix #if'd out -- fix from
+	  Archimedes
+	* comm.c: support for telnet go-ahead (GA) added by Dainia@Dreamshadow;
+	  Dainia also writes:
+	  ``[IAC GA is written after] the prompt; vt src says it's a
+	    terminator.  Should it be inside the no-input-to-case?
+	    We'll see, I guess.''
+	  ``As far as I can tell, the only side effect of this is that people
+	    using clients that don't support LPmuds (the one I noticed it with
+	    was saywat, which is a derivative of TinyTalk) get funky characters
+	    (a y with an umlaut) before and after prompts.  But those clients
+	    don't do prompts right anyways...''
+	  Beek comments:
+	  ``Of course, tinyfugue suffers from the same problem.  Maybe I'll
+	    write a version that actually understands the GA and uses it
+	    to recognize prompts ...''
+	* Makefile, GNUmakefile, SMakefile: sync'd a bit
+
+Sun Jul 24 19:43:21 EDT 1994 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to 0.9.19.9
+	* corrections to various bugs in runtime loading
+	* fixed $$ to $$.type in floating point conversions
+	* removed an incorrect definition of current_type in compiler/pre
+
+Tue Jul  5 21:40:10 PDT 1994 (apang@mindlink.bc.ca (Robocoder))
+	* bumprev'd patchlevel to 0.9.19.8
+	* corrected the year in various ChangeLog entries
+	* ed.c: added indentor patches for Heron (untested)
+	* options.h: *oops* an old copy creeped into the distribution...
+	  installed Blackthorn's 0.9.19.4 version; updated a bit for this
+	  release:
+	     OPTIMIZE_FUNCTION_TABLE_SEARCH - from 0.9.19.6
+	     SAVE_COMPILED_BINARIES - from BeekOS 0.6
+	     LPC_TO_C - for enabling the LPC->C option
+	* array.c: add_array() attempts to REALLOC() vector to avoid doing
+	  allocate_array(), copying svalues, free_array()
+	* BeekOS 0.6 - <<<MERGING>>>
+	   -- Changes below by (tim@hollebeek.hep.upenn.edu (Beek))
+	   -- Bumping the patchlevel here would be confusing since 0.9.19.8
+	   -- isn't officially out yet.
+	* converted efuns crypt(), localtime(), malloc_check() and
+	  malloc_debug()
+	* previous_object(n) now errors on negative values
+	  (used to be the same as previous_object(0))
+	* Added support for the RUNTIME_LOADING define in options.h
+	* Applied BeekOS 0.6->0.7 patches
+	* changed __INIT code to be collected and placed at the end of the
+	  program instead of being spread throughout the program
+	* fixed a bug in LPC->C which would occasionally cause registers
+	  to get overwritten
+	* converted math efuns, socket efuns (Just in case you're wondering,
+	  that means only the matrix efuns are missing now)
+	* lots more merging
+	* COMPAT BUSTER:  removed float + array, string + array and 
+	  int + array, since array + foo isn't legal
+	* clonep() now defaults to this_object()
+	* renamed compile_object() efun to generate_source()
+	* bugfix in type checking of assigning ints to floats and vice
+	  versa
+
+Mon Jul  4 00:52:43 PDT 1994 (apang@mindlink.bc.ca (Robocoder))
+	* bumprev'd patchlevel to 0.9.19.7
+	* simulate.c: misplaced setting O_DESTRUCTED in destructed object
+	  before set_heart_beat(0) instead of after -- reported by
+	  Chuck@TMI-2
+	* addr_server.c, compiler.y: apparently, SunOS 4.x doesn't have
+	  memmove() *boggle* -- reported by Dworkin; changed memmove()
+	  (ANSI) to bcopy() (BSD) calls -- I'm assuming bcopy() handles
+	  overlaps correctly...
+	* interpret.c: yet another string addition (F_ADD) optimization
+	  added ... attempts to extend memory block if STRING_MALLOC ...
+	  which can save a malloc(), memcpy(), and free(); converted a lot
+	  of strcat()'s to use strcpy() where "paste" position was already
+	  known!
+	* SMakefile: small change to one rule to workaround SMake bug
+	  from yacc'ing compiler.y over and over again...
+
+Sat Jul  2 13:26:40 PDT 1994 (apang@mindlink.bc.ca (Robocoder))
+	* bumprev'd patchlevel to 0.9.19.6
+	* efuns_main.c: to_int() now uses atoi() for string to int
+	  conversion, since sscanf(string, "%d", &temp) doesn't
+	  appear to initialize temp to 0 -- bug reported by
+	  Descartes@TMI-2; to_float() initializes temp
+	  if converting from string type (better safe than sorry)
+	* Makefile: strategically placed some -rm lines for cleaner
+	  "out of the box" compiles; use GNUmakefile if you can...
+	* array.c: allocated arrays are temporarily pushed onto stack
+	  in case of an error in an apply call to LPC -- bug reported
+	  by Ellery
+	* simulate.c: COMPAT BUSTER?  shadow chain is destructed from
+	  top (highest shadower) to bottom (shadowee) to prevent
+	  shadow chain from being corrupted in the event of an error
+	  in move_or_destruct() -- bug reported by Ellery
+	* simulate.c: COMPAT BUSTER?  disable_commands() will now
+	  remove all sentences defined by the current object to
+	  objects in its environment; fixes crasher reported by Ellery
+	* efuns_main.c: added float support for member_array() to
+	  prevent crasher -- fix from Randor@EoP
+	* eoperators.c: added function support to f_ne(), ie !=, for
+	  completeness -- fix from Randor@EoP
+	* efuns_main.c: fixed f_write() from crashing machine (wasn't
+	  popping arg off stack) -- bug reported by Beek & Publius...
+	  *boggled* because TMI mudlib simul_efun'd write() to use the
+	  message() efun
+	* efuns_math.c: prevent acos() and asin() from crashing on machine
+	  which don't do domain range checks (eg linux?) -- bug reported
+	  by Dwarfer
+	* file.c: added directory check to write_file() for robustness
+	  since log_error() in master.c causes a crash if a runtime error
+	  occurs during it -- bug reported by Blackthorn
+	* smalloc.c: added Amiga Lattice C support for sbrk(); added a
+	  naughty OS (eg Linux) check for null ptr in sfree()
+	* efuns_sock.c: f_socket_connect() tries to extract address and port
+	  from second arg if it can't extract it from the socket descriptor;
+	  fixes bug reported by Watcher@TMI-2
+	* array.c: rewrote deep_inventory() efun for speed
+	* array.c, interpret.c: add_array() optimized for vector addition
+	* addr_server.h, addr_server.c: fixed multiple message handling--
+	  when multiple messages were received and buffer filled up,
+	  the last message, if truncated, was discarded--now buffers
+	  data between conn_data_handler() calls; also resyncs on NAMEBYIP
+	  and IPBYNAME in the unlikely event that null strings follow
+	* addr_server.h, comm.h, addr_server.c, comm.c: added DATALEN msg
+	  type as "hint" for determining whether the next message is
+	  truncated or not; this is backwards compatible with old
+	  addr_servers---they just discard the unrecognized data
+	* functab_tree.c: optional binary search tree implementation
+	  for function table lookup; other files affected:
+	    options.h: added #define OPTIMIZE_FUNCTION_TABLE_SEARCH
+	    exec.h: augmented internal_program and function structures
+	    compiler.y: added tree support to defined_function(),
+	      find_in_table(), find_inherited(), define_new_function(),
+	      copy_functions(), epilog(), prolog()
+	    binaries.c: load_binary() rebuilds function table tree
+	    simul_efun.c: get_simul_efuns() copies function table tree
+	      information when it makes its own local copy of simul_efun
+	      ob's function table; find_simul_efun() uses binary search
+	    interpret.c: added tree support to validate_shadowing(),
+	      apply_low(), function_exists(), is_static()
+	    amiga/Makefile, ./Makefile, ./GNUmakefile: added functab_tree.o
+	      to OBJ list (or SRC list for GNUmakefile)
+	* interpret.c: optimized F_VOID_ASSIGN for STRING_MALLOC and
+	  STRING_SHARED strings, to avoid costly string_copy()...FREE()
+	  and ref_string()...free_string()--thanks to Dworkin's
+	  benchmarks for helping to isolate this one; also, added Beek's
+	  F_ADD string addition optimization (from BeekOS)
+	* binaries.c: added Beek's more descriptive "out of date (...)"
+	  error messages (from BeekOS)
+	* sprintf.c: cleaned up error reporting
+	* lint.h: un #if'd qsort() prototype for 386BSD for NetBSD 0.9--
+	  reported by Vax@TMI-2
+	* amended 0.9.19.2 and 0.9.19.5 ChangeLog entries
+	* removed fixed bugs from "Bugs" file, and added a couple from the
+	  TMI boards; removed implemented ideas from "Ideas" file
+
+Sun Jun 26 04:05:54 PDT 1994 (apang@mindlink.bc.ca (Robocoder))
+	* raised patchlevel to 0.9.19.5
+	* Makefile: changed "ln" hardlinks to "mv"...to prevent overwriting
+	  compiler.tab.h and compiler.tab.c; bug reported by
+	  Stig (aka Auronthas) @ VikingMUD
+	* compiler.y, interpret.c, eoperators.c, parse.c: lvalue lifetime
+	  bug fix--general assignment, sscanf() lvalue list, parse_command()
+	  lvalue list; idea for 'len' field in YYTYPE from Amylaar, but
+	  otherwise code is original; major reformatting of compiler.y;
+	  fixed Descartes' parse_command() crasher
+	* lex.c: implemented Badlegs@Clootie's idea to allow text on same
+	  line as terminator of an @ENDTEXT or @@ENDARRAY block;
+	  get_terminator() is now a little more restrictive on the char
+	  set for the terminator { 'A'..'Z', 'a'..'z', '0'..'9', '_' };
+	  rewrote get_array_block() and get_text_block() to dynamically
+	  allocate more buffers as necessary...this also fixes a bug
+	  introduced in 0.9.17.15, which allowed these two functions
+	  to overflow the yytext buffer, munging a lot of memory;
+	  get_terminator() now strips whitespace after @END or @@END
+	  because it made it harder to match :)
+	* lex.c: for consistent behaviour, both get_array_block() and
+	  get_text_block() accept embedded double quotes `"' without
+	  the literal escape character `\'; used to be only
+	  get_text_block() would accept `"', while get_array_block()
+	  required `\"'; COMPAT BUSTER
+	* interpret.c, lex.c: fix memory leak in I(F_SUBTRACT) and f_sub_eq(),
+	  respectively (fix by Snif@TMI-2)
+	* array.c: fixed memory leak in intersect_array (Snif missed this one)
+	  and added missing "\n" to two strings passed in calls to error()
+	* parse.c, simulate.c: added missing "\n" to error() strings
+	* func_spec.c, efuns_main.c: for consistency, allow f_move_object()
+	  to take object or string as first arg (if second parameter is void)
+	  (idea from Alfred@TMI-2); as a side effect, added support for
+	  finding object if first arg is a string and second parameter is not
+	  void...lets move_object() do the necessary checking for valid move
+	  (idea from Blackthorn@TMI-2)
+	* mapping.c: applied Randor's doCompose() fix which creates a mapping
+	  as documented, rather than a subset of m1
+	* efuns_main.c: applied Randor's match_path() fix which delays freeing
+	  the mapping on the stack (in case it is ref 1) until the value
+	  from it has been pushed onto the stack
+	* eoperators.c: != case for strings done as strcmp(a,b) != 0
+	  to get 0 or 1 result, rather than an implementation dependent
+	  result (eg 0 or -2) (idea from Randor@EoP)
+	* lex.c: changed it so current_line++ is always after the
+	  store_line_number_info() (this appears to give the correct value)
+	* regexp.c: added '?' and '+' support (removed by Amylaar?)--closely
+	  following Henry Spencer's original source--bug reported by
+	  Vax@TMI-2; added Randor's idea to split the error message for 
+	  "?+* follows nothing" into separate cases
+	* rc.c: reversed search path for config file (current directory, then
+	  /etc)
+	* addr_server.c: #if'd out SIGPIPE signal handler if SIGPIPE not
+	  defined
+	* arch.h: added #define ARCH "Amiga"
+	* amiga/ChangeLog: added; in addition, Amiga port should now be up to
+	  date and complete; tested with AmiTCP 2.3 (networking)
+
+Sun Jun 26 03:21:56 CDT 1994 (ucs_brf@pip.shsu.edu (Blackthorn))
+	* raised patchlevel to 0.9.19.4
+	* updated Bugs/Ideas files with mail I've received in the last 3+
+	  months
+
+Fri Mar 11 10:28:30 CST 1994 (ucs_brf@pip.shsu.edu (Blackthorn))
+	* raised patchlevel to 0.9.19.3
+	* fixed open calls in cp() efun to use the correct mode
+
+Fri Mar 11 03:24:11 CST 1994 (ucs_brf@pip.shsu.edu (Blackthorn))
+	* raised patchlevel to 0.9.19.2
+	* changed open() calls in file.c to not explicitly specify a
+	  permissions setting so the process' umask settings will be used
+	* added a patch from Beek in simulate.c to fix a "duplicate entry
+	  in hash table" crasher he noticed--preventing recursive calls
+	  to compile_object from loading an object twice and causing game
+	  to crash
+	* added a fix from Beek to allow parenthesis around inherit filenames
+	  (I guess)
+	* added a check_legal_string() call in shout_string (shout() efun
+	  to prevent crashes when shout()'s arg size exceeds max string limit
+	* changed notify_no_command() in comm.c to use tell_object() instead
+	  of add_message() for the error message so it goes through
+	  the catch_tell() lfun if INTERACTIVE_CATCH_TELL is defined
+	* changed simulate.c's print_svalue() to always use tell_object()
+	  instead of add_message() - so more stuff goes through catch_tell()
+	  if using INTERACTIVE_CATCH_TELL
+	* changed the prompt printing in comm.c and the tail() efun in
+	  file.c to use tell_object() instead of add_message() (see
+	  above)
+	* fixed move_object() efun so it can't cause a crash when
+	  move_object(dest) (note the one argument) is used when this_object()
+	  is destructed
+	* added some #defines to make MudOS more easily compilable under
+	  SCO
+	* fixed the F_VOID_ASSIGN case in interpret.c to not crash when
+	  doing "buffer_variable[0] = ..." (needed to allow T_LVALUE_BYTE)
+	* fixed f_call_other() so things like foo->bar::func() should not
+	  be valid (will produce a invalid func name error)
+	* Changed restore_object()'s string from "restore_object: 1" to
+	  "restore_object", and rename()'s string from "do_rename" to
+	  "rename" (this is the string it passed to valid_read/write in
+	  master as its function name)
+	* added remaining bugs i've collected to the Bugs file
+
+Mon Jan 24 19:30:53 CST 1994 (ucs_brf@pip.shsu.edu)
+	* raised patchlevel to 0.9.19.1
+	* fixed a crasher in swap.c that could occur when the swap file
+	  can't be opened (reported by Malic)
+	* fixed lint.h for SunOS 4.1.3 using gcc 2.5.6
+
+Fri Jan 14 20:10:31 CST 1994 (ucs_brf@pip.shsu.edu (Blackthorn))
 	* raised patchlevel to 0.9.19
 	* fixed parse.c's check_for_destr() call to use the proper
-          argument (tmp.u.vec, not &tmp)
+	  argument (tmp.u.vec, not &tmp)
 	* defined FCHMOD_MISSING for AIX (there were problems w/ it)
 	* fixed stralloc.c so REFS(b)++ is only done if REFS(b) < MAXSHORT
 
-Sat Jan  8 03:23:07 CST 1993 (bobf@metronet.com)
+Sat Jan  8 03:23:07 CST 1994 (bobf@metronet.com)
 	* raised patchlevel to 0.9.18.31
 	* fixed F_ADD case in interpret.c so array = array + scalar is not
 	  allowed (F_ADD_EQ already does not allow array += scalar)
@@ -16,12 +706,12 @@ Sat Jan  8 03:23:07 CST 1993 (bobf@metronet.com)
 	  from Wildcard - they were for "0.9.18" - not sure if 0.9.18.31
 	  will work for Amiga without changes
 
-Fri Jan  7 06:32:54 CST 1993 (bobf@metronet.com)
+Fri Jan  7 06:32:54 CST 1994 (bobf@metronet.com)
 	* raised patchlevel to 0.9.18.30
 	* mud_status() total still wasn't matching; the Interactives field
 	  wasn't included in the total - fixed
 
-Fri Jan  7 06:06:17 CST 1993 (bobf@metronet.com)
+Fri Jan  7 06:06:17 CST 1994 (bobf@metronet.com)
 	* raised patchlevel to 0.9.18.29
 	* put a newline on the end of the "Warning: redefinition of #define"
 	  compile-time error
@@ -29,13 +719,13 @@ Fri Jan  7 06:06:17 CST 1993 (bobf@metronet.com)
 	  match up with the total (Sentences weren't being added properly,
 	  and the overhead of object structs wasn't reflected on the chart)
 	* fixed compiler.y to not pass the name of the current include file
-	  to valid_override() when processing an "efun::..." statement in 
+	  to valid_override() when processing an "efun::..." statement in
 	  an include file...rather, pass the name of the actual program being
 	  compiled
 
-Mon Jan  3 02:49:59 CST 1993 (bobf@metronet.com (Blackthorn))
+Mon Jan  3 02:49:59 CST 1994 (bobf@metronet.com (Blackthorn))
 	* raised patchlevel to 0.9.18.28
-	* fixed the "Cannot #include ..." error msg to not have an 
+	* fixed the "Cannot #include ..." error msg to not have an
 	  extra newline at the end
 
 Thu Dec 30 15:20:34 PST 1993 (Cygnus)
@@ -53,7 +743,7 @@ Sun Dec 19 04:59:03 CST 1993 (bobf@metronet.com)
 	* raised patchlevel to 0.9.18.26
 	* changed compiler.y so efun arg checking follows the
 	  CAST_CALL_OTHERS define
-	* added code from Cygnus (ptx_close.c) to work around a bug in 
+	* added code from Cygnus (ptx_close.c) to work around a bug in
 	  Sequent DYNIX/ptx (close() sometimes blocks when it shouldn't),
 	  changed comm.c, socket_efuns.c, addr_server.c to use it
 	* fixed resolve() efun so its callback will be able to be called by
@@ -90,7 +780,7 @@ Sat Dec 11 21:43:08 CST 1993 (bobf@metronet.com)
 	* added Cygnus' shortest_path() efun, see comments in shortest_path.c
 	* added the entry for the new "buffer" type into the type_name array
 	  in get_type_name() of compiler.y (reported by sjpaavol@cc.helsinki.fi)
-	* fixed rc.c to not require the 'maximum buffer size' line if 
+	* fixed rc.c to not require the 'maximum buffer size' line if
 	  DISALLOW_BUFFER_TYPE is defined in options.h
 	* changed socket_accept() in socket_efuns.c to do a select() on the
 	  newly accepted socket to decide whether or not to make it S_BLOCKED
@@ -106,8 +796,8 @@ Sat Dec 11 21:43:08 CST 1993 (bobf@metronet.com)
 	  problem w/ sites who have names larger than 19 chars
 	* changed socket_efuns.c so current_object is set before all applies,
 	  so socket callbacks can be static
-	* fixed comm.c so having a "%s" in your prompt string won't cause a 
-	  crash 
+	* fixed comm.c so having a "%s" in your prompt string won't cause a
+	  crash
 
 Fri Nov 12 01:31:32 CST 1993 (John Garnett)
 	* raised patchlevel to 0.9.18.20
@@ -238,7 +928,7 @@ Wed Oct 27 23:18:25 CDT 1993 (bobf@metronet.com)
 
 Wed Oct 27 17:41:57 CDT 1993 (bobf@metronet.com)
 	* raised patchlevel to 0.9.18.11
-	* fixed socket_accept() in socket_efuns.c to set S_BLOCKED on 
+	* fixed socket_accept() in socket_efuns.c to set S_BLOCKED on
 	  the returned socket so write_callback() is called (as the docs
 	  say it will be)
 	* added replace_program.c to GNUmakefile
@@ -248,7 +938,7 @@ Wed Oct 27 17:41:57 CDT 1993 (bobf@metronet.com)
 	* added a define of HAS_PROFILE_FUNCTIONS when the driver is compiled
 	  with PROFILE_FUNCTIONS enabled
 	* added OPTIMIZE line with -qMAXMEM in Makefile for AIX 3.2.4
-	* fixed f_call_out() so call_out("::func", x); 
+	* fixed f_call_out() so call_out("::func", x);
 	  is not allowed (was a crasher)
 
 Wed Oct 27 02:02:08 CDT 1993 (bobf@metronet.com)
@@ -256,7 +946,7 @@ Wed Oct 27 02:02:08 CDT 1993 (bobf@metronet.com)
 	* fixed crasher in stat() efun
 
 Sat Oct 23 20:23:48 PDT 1993 (rickert@cco.caltech.edu (Kringled))
-	* added replace_program() efun, modified from Amylaars 
+	* added replace_program() efun, modified from Amylaars
 	  3.2.  Consists of replace_program.c and replace_program.h,
 	  and patches to backend.c, and of course the entry in
 	  func_spec.c
@@ -302,62 +992,62 @@ Tue Sep 21 20:01:55 CDT 1993 (bobf@metronet.com (Blackthorn))
 	  this have been causing hangs at crashes?
 
 Sun Sep 19 00:22:45 CDT 1993 (bobf@metronet.com (Blackthorn))
-        * raised patchlevel to 0.9.18.2
+	* raised patchlevel to 0.9.18.2
 	* fixed 0.9.18.1 bug in new simul_efun updating stuff, didn't work
 	  when the simul_efun object was loaded through a binary file
 	* removed filtering of certain chars from read_file()
-        * changed addr_server.c's select() call to avoid warnings on HP-UX
-        * added optional argument to query_heart_beat(), object to query
-          the heart_beat of (patch from hasse@solace.hsh.se)
+	* changed addr_server.c's select() call to avoid warnings on HP-UX
+	* added optional argument to query_heart_beat(), object to query
+	  the heart_beat of (patch from hasse@solace.hsh.se)
 	* changed set_eval_limit() so an argument of 0 resets the current
 	  eval cost, rather than setting the eval limit to 0
-        * added support to initialize local variables.  Any valid expression
-          is allowed (int x = <exp>;), as with global initializations (dj)
+	* added support to initialize local variables.  Any valid expression
+	  is allowed (int x = <exp>;), as with global initializations (dj)
 	* optimized shout() efun (whee)
-        * COMPAT BUSTERS galore:
-        * removed cat() (read_file() can easily be used to make a simul_efun)
-        * removed log_file() (simul_efun can be easily made
-        * removed extract() (simul_efun can be easily made)
-        * removed shadowp() (use query_shadowing() instead)
-        * removed next_living()
-        * removed first_inventory() and next_inventory()
-        * removed add_worth()
-        * removed add_verb() and add_xverb() (add_action(x, y, 2) is the
-          equivalent of add_action(x); add_xverb(y))
+	* COMPAT BUSTERS galore:
+	* removed cat() (read_file() can easily be used to make a simul_efun)
+	* removed log_file() (simul_efun can be easily made
+	* removed extract() (simul_efun can be easily made)
+	* removed shadowp() (use query_shadowing() instead)
+	* removed next_living()
+	* removed first_inventory() and next_inventory()
+	* removed add_worth()
+	* removed add_verb() and add_xverb() (add_action(x, y, 2) is the
+	  equivalent of add_action(x); add_xverb(y))
 	* made add_action() require a string as second argument
-        * removed 'cost' and 'worth' fields from domain/author stats
-        * removed all references to GMALLOC and GCMALLOC
-        * removed PRINTF from options.h; removing printf() and sprintf() from
-          func_spec.c will cause its code to not be compiled in (as with
-          most efuns)
-        * removed ED from options.h; see PRINTF above
-        * removed SET_EVAL_LIMIT from options.h; see PRINTF above
-        * removed OLD_HB_BEHAVIOR support in options.h
-        * removed OLD_PRESENT define from options.h; always on now
-        * moved the define of NULL_MSG to "0" to config.h
-        * removed COMM_STAT from options.h; its "overhead" is almost zero;
-          always on now
-        * removed support for LOG_SHOUT (was a define in options.h)
-        * removed all host restriction support (ACCESS_RESTRICTED define
-          in options.h, ACCESS.DENY files, etc etc)
-        * removed VALID_CLONE support (was an options.h define)
-        * removed LPC_OPTIMIZE and LPC_OPTIMIZE_LOOPS from options.h since
-          they are apparently bugfree now; they will always be on
-        * removed support for a string as argument #1 of move_object()
-        * cleaned up options.h more
-        * removed from runtime config file: "access log file",
-          "access allow file", "config directory", "allowed ed cmds"
-        * updated Config.example
- 
+	* removed 'cost' and 'worth' fields from domain/author stats
+	* removed all references to GMALLOC and GCMALLOC
+	* removed PRINTF from options.h; removing printf() and sprintf() from
+	  func_spec.c will cause its code to not be compiled in (as with
+	  most efuns)
+	* removed ED from options.h; see PRINTF above
+	* removed SET_EVAL_LIMIT from options.h; see PRINTF above
+	* removed OLD_HB_BEHAVIOR support in options.h
+	* removed OLD_PRESENT define from options.h; always on now
+	* moved the define of NULL_MSG to "0" to config.h
+	* removed COMM_STAT from options.h; its "overhead" is almost zero;
+	  always on now
+	* removed support for LOG_SHOUT (was a define in options.h)
+	* removed all host restriction support (ACCESS_RESTRICTED define
+	  in options.h, ACCESS.DENY files, etc etc)
+	* removed VALID_CLONE support (was an options.h define)
+	* removed LPC_OPTIMIZE and LPC_OPTIMIZE_LOOPS from options.h since
+	  they are apparently bugfree now; they will always be on
+	* removed support for a string as argument #1 of move_object()
+	* cleaned up options.h more
+	* removed from runtime config file: "access log file",
+	  "access allow file", "config directory", "allowed ed cmds"
+	* updated Config.example
+
 Fri Sep 17 23:51:15 CDT 1993 (bobf@metronet.com (Blackthorn))
-        * raised patchlevel to 0.9.18.1
-        * changed eval_instruction() so that the switch() isn't done if
-          the instruction is an efun, since none of the efuns are inside
-          the switch() anyway.  might help on some compilers
-        * fixed save_object() so its filename is passed with a leading slash
-          to valid_write() in the master object
-        * optimized sizeof() efun a bit
-        * updated GNUmakefile to contain all latest Makefile stuff
+	* raised patchlevel to 0.9.18.1
+	* changed eval_instruction() so that the switch() isn't done if
+	  the instruction is an efun, since none of the efuns are inside
+	  the switch() anyway.  might help on some compilers
+	* fixed save_object() so its filename is passed with a leading slash
+	  to valid_write() in the master object
+	* optimized sizeof() efun a bit
+	* updated GNUmakefile to contain all latest Makefile stuff
 	* fixed shadow() so you can't shadow yourself (heh)
 	* new simul_efuns can now be added without shutting down the driver
 	* removed arg type checks from destruct(), query_ip_name(),
@@ -390,7 +1080,7 @@ Thu Sep  9 03:05:39 CDT 1993 (bobf@metronet.com (Blackthorn))
 	* added -lmalloc to the EXTRALIBS Makefile line for Sequent (Cygnus)
 	* added some typecasts to binaries.c to avoid compiler warnings(?)
 	  (from Cygnus)
-	* added names for the F_BREAK_POINT, F_CALL_EXTRA, and 
+	* added names for the F_BREAK_POINT, F_CALL_EXTRA, and
 	  F_AGGREGATE_ASSOC ops in lex.c (add_instr_name's)
 	* added a (char *) typecast to lex.c and efuns_main.c (RS/6000 complaining)
 	* moved clear_notify() so that notify_fail() will work from inside

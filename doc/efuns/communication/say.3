@@ -1,11 +1,11 @@
 .\"send a message to all users in the same environment as the sayer
-.TH say 3
+.TH say 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 say() - send a message to all users in the same environment
 
 .SH SYNOPSIS
-varargs void say(string str, object obj);
+varargs void say( string str, object obj );
 
 .SH DESCRIPTION
 Sends a message to the environment of the originator, all items in the
@@ -19,4 +19,4 @@ an array of objects, all those objects are excluded from receiving the
 message.
 
 .SH SEE ALSO
-message(3), write(3), shout(3), tell(3).
+message(3), write(3), shout(3), tell_object(3), tell_room(3)

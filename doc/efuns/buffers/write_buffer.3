@@ -1,11 +1,13 @@
 .\"write a buffer to a file, or read into a buffer from a source
-.TH write_buffer 3
+.TH write_buffer 3 "5 Sep 1994" MudOS "LPC Library Functions"
  
 .SH NAME
 write_buffer() - write a buffer to a file, or read into a buffer from a source
  
 .SH SYNOPSIS
-int write_buffer(string|buffer dest, int start, mixed source);
+.nf
+int write_buffer( string | buffer dest, int start,
+                  mixed source );
  
 .SH DESCRIPTION
 If `dest' is a file, then `source' must be an int (and will be written to

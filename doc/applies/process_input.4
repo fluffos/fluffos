@@ -1,12 +1,12 @@
 .\"accepts a copy of all user input from the MudOS driver
-.TH PROCESS_INPUT 4
+.TH process_input 4 "5 Sep 1994" MudOS "Driver Applies"
 
 .SH NAME
 process_input - provide a hook for the MudOS driver to send a copy of what the
 player is typing to the player object.
 
 .SH SYNOPSIS
-string process_input(string)
+string process_input( string );
 
 .SH DESCRIPTION
 If process_input is present in the player object, then the MudOS driver

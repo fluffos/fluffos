@@ -1,11 +1,13 @@
 .\"provides security governing the use of the socket efunctions
-.TH VALID_SOCKET 4
+.TH valid_socket 4 "5 Sep 1994" MudOS "Driver Applies"
 
 .SH NAME
 valid_socket - protects the socket efunctions.
 
 .SH SYNOPSIS
-int valid_socket(object caller, string function, mixed *info);
+.nf
+int valid_socket( object caller, string function,
+                  mixed *info );
 
 .SH DESCRIPTION
 Each of the socket efunctions calls valid_socket() prior to executing.

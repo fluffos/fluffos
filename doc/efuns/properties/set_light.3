@@ -1,0 +1,13 @@
+.\"update or query an object's light level
+.TH set_light 3 "5 Sep 1994" MudOS "LPC Library Functions"
+
+.SH NAME
+set_light() - update or query an object's light level
+
+.SH SYNOPSIS
+int set_light( int light_level_adjustment );
+
+.SH DESCRIPTION
+Passing <light_level_adjustment> as 0 queries the object's current
+light level.  A positive number will increase the light level, while
+a negative number will decrease the light level.

@@ -1,0 +1,17 @@
+.\"get the backbone uid
+.TH get_bb_uid 4 "5 Sep 1994" MudOS "Driver Applies"
+
+.SH NAME
+get_bb_uid - get the backbone uid
+
+.SH SYNOPSIS
+string get_bb_uid( void );
+
+.SH DESCRIPTION
+This master apply is called by the driver on startup,
+after it has loaded the master object, to get the
+backbone uid defined by the mud.  The function should
+return a string, eg "BACKBONE"
+
+.SH SEE ALSO
+get_root_uid(4)

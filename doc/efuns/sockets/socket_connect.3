@@ -1,16 +1,16 @@
 .\"initiate a connection on a socket
-.TH socket_connect 3
+.TH socket_connect 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 socket_connect() - initiate a connection on a socket
 
 .SH SYNOPSIS
 .nf
-#include <socket.h>
-#include <socket_errors.h>
+#include <socket_err.h>
 
-int socket_connect(int s, string address, string read_callback,
-string write_callback)
+int socket_connect( int s, string address,
+                    string read_callback,
+                    string write_callback );
 
 .SH DESCRIPTION
 The argument s is a socket. s must be either a STREAM mode or a MUD mode
@@ -80,5 +80,4 @@ EECONNECT
 Problem with connect.
 
 .SH SEE ALSO
-socket_accept(3), socket_close(3), socket_create(3)
 socket_accept(3), socket_close(3), socket_create(3)

@@ -1,11 +1,11 @@
 .\"checks if a certain person has write permission on a file
-.TH valid_write 4
+.TH valid_write 4 "5 Sep 1994" MudOS "Driver Applies"
 
 .SH NAME
 valid_write - checks if a certain person has write permission on a file
 
 .SH SYNOPSIS
-int valid_write(string file, mixed user, string func);
+int valid_write( string file, mixed user, string func );
 
 .SH DESCRIPTION
 Every time a user tries to write a file, thie driver calls valid_write

@@ -1,11 +1,11 @@
 .\"save the values of variables in an object into a file
-.TH save_object 3
+.TH save_object 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 save_object() - save the values of variables in an object into a file
 
 .SH SYNOPSIS
-int save_object(string name, int flag)
+int save_object( string name, int flag );
 
 .SH DESCRIPTION
 Save all values of non-static variables in this object in the file `name'.
@@ -17,4 +17,4 @@ saved (normally, they aren't).  Object variables always save as 0.
 save_object() returns 1 for success, 0 for failure.
 
 .SH SEE ALSO
-restore_object(3).
+restore_object(3)

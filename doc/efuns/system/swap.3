@@ -1,0 +1,18 @@
+.\"swap out an object explicitly
+.TH swap 3 "5 Sep 1994" MudOS "LPC Library Functions"
+ 
+.SH NAME
+swap - swap out a file explicitly
+ 
+.SH SYNOPSIS
+void swap( object );
+ 
+.SH DESCRIPTION
+This efun should be reserved for debugging only.  It
+allows an object to be explicitly swapped out.  If
+enabled, it is strongly recommended that a simul_efun
+override (for this efun) be used to prevent abuse.
+
+Note: objects which have been destructed, already
+swapped out, contain a heart beat, cloned, inherited,
+or interactive, cannot be swapped out.

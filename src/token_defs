@@ -1,0 +1,109 @@
+/*
+ * Token definitions.
+ *
+ * Appearing in the precedence declarations are:
+ *      '+'  '-'  '/'  '*'  '%'
+ *      '&'  '|'  '<'  '>'  '^'
+ *      '~'  '?'
+ *
+ * Other single character tokens recognized in this grammar:
+ *      '{'  '}'  ','  ';'  ':'
+ *      '('  ')'  '['  ']'
+ */
+
+%token L_STRING L_NUMBER L_REAL L_INT L_FLOAT
+%token L_MAPPING L_OBJECT L_FUNCTION
+%token L_STATUS L_VOID L_MIXED
+%token L_STRING_DECL L_BUFFER_DECL
+%token L_LOCAL_NAME L_IDENTIFIER L_DEFINED_FUNCTION L_SIMUL_EFUN
+%token L_EFUN L_EFUN_NAME
+
+%token L_INC L_DEC
+%token L_ADD_EQ L_SUB_EQ L_DIV_EQ L_MULT_EQ L_MOD_EQ
+%token L_LAND L_AND_EQ L_LOR L_OR_EQ L_XOR_EQ
+%token L_LSH L_LSH_EQ L_RSH L_RSH_EQ
+%token L_EQ L_NE L_GE L_LE
+%token L_NOT
+
+%token L_PROTECTED L_PUBLIC L_PRIVATE
+%token L_VARARGS L_STATIC L_NO_MASK
+
+%token L_IF L_ELSE
+%token L_SWITCH L_CASE L_DEFAULT L_RANGE
+%token L_WHILE L_DO L_FOR
+%token L_BREAK L_CONTINUE
+%token L_RETURN
+%token L_ARROW L_INHERIT L_COLON_COLON
+%token L_ARRAY_OPEN L_MAPPING_OPEN L_FUNCTION_OPEN
+
+%token L_SSCANF L_CATCH
+%token L_PARSE_COMMAND L_TIME_EXPRESSION
+%token L_ASM
+
+/*
+ * 'Dangling else' shift/reduce conflict is well known...
+ *  define these precedences to shut yacc up.
+ */
+
+%nonassoc LOWER_THAN_ELSE
+%nonassoc L_ELSE
+
+/*
+ * Operator precedence and associativity...
+ * greatly simplify the grammar.
+ */
+
+%right '='
+%right '?'
+%left L_LOR
+%left L_LAND
+%left '|'
+%left '^'
+%left '&'
+%left L_EQ L_NE
+%left '>' L_GE '<' L_LE
+%left L_LSH L_RSH
+%left '+' '-'
+%left '*' '%' '/'
+%right L_NOT '~'
+%nonassoc L_INC L_DEC
+
+/*
+ * YYTYPE
+ */
+
+%union
+{
+    int number;
+    float real;
+    unsigned int address;       /* Address of an instruction */
+    char *string;
+    short type;
+    struct { int key; char block; } case_label;
+    struct { short type; char iscon; unsigned int addr; short len; } expr;
+    struct function *funp;
+}
+
+/*
+ * Type declarations.
+ */
+
+%type <number> assign L_NUMBER constant L_LOCAL_NAME expr_list
+%type <real>   L_REAL
+%type <number> lvalue_list argument type basic_type optional_star expr_list2
+%type <number> expr_list3 expr_list4 assoc_pair
+%type <number> type_modifier type_modifier_list opt_basic_type block_or_semi
+%type <number> argument_list L_EFUN_NAME L_DEFINED_FUNCTION efun_name
+%type <string> L_IDENTIFIER L_EFUN L_STRING string_con1 string_con2
+%type <string> string_constant function_name identifier
+%type <string> not_efun_string
+%type <funp> L_SIMUL_EFUN
+
+%type <case_label> case_label
+
+/* The following symbols return type information */
+
+%type <type> function_call cast for_expr comma_expr
+
+%type <expr> number real string expr4 expr0 comma_expr1 lvalue
+%%

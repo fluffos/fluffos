@@ -1,11 +1,11 @@
 .\"returns a pointer to the user (player) object to the driver
-.TH CONNECT 4
+.TH connect 4 "5 Sep 1994" MudOS "Driver Applies"
 
 .SH NAME
 connect - returns a pointer to the user (player) object to the driver
 
 .SH SYNOPSIS
-object connect();
+object connect( void );
 
 .SH DESCRIPTION
 
@@ -15,4 +15,4 @@ user object.  Note that it is possible to use exec(3) to switch the user
 connection from the initial user object to some other object.
 
 .SH SEE ALSO
-exec(3)
+exec(3), logon(4)

@@ -1,12 +1,7 @@
 #ifndef SOCKET_TCP_H
 #define SOCKET_TCP_H
 
-#include <sys/types.h>
-#include <sys/errno.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
+#define FD_SETSIZE      256
 
 #define SOCKET_T int
 #define socket_close(s) s_close(s)
@@ -18,4 +13,11 @@
 
 /* #define perror(str) printf("%s: %d %s\n", str, errno, strerror(errno)) */
 
-#endif /* SOCKET_TCP_H */
+#define read(s,t,l) read_socket(s,t,l)
+#define write(s,t,l) write_socket(s,t,l)
+#define close(s) close_socket(s)
+
+void amiga_sockinit(void);
+void amiga_sockexit(void);
+
+#endif				/* SOCKET_TCP_H */

@@ -1,0 +1,16 @@
+.\"retrieve a user's editor setup or configuration settings
+.TH retrieve_ed_setup 4 "5 Sep 1994" MudOS "Driver Applies"
+
+.SH NAME
+retrieve_ed_setup - retrieve a user's editor setup or configuration settings
+
+.SH SYNOPSIS
+int retrieve_ed_setup( object user );
+
+.SH DESCRIPTION
+This master apply is called by the ed() efun to retrieve
+a user's ed setup/configuration settings.  This function
+should return the setup (contained in an int).
+
+.SH SEE ALSO
+save_ed_setup(4)

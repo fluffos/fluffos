@@ -1,14 +1,13 @@
 .\"return a text description of a socket error
-.TH socket_error 3
+.TH socket_error 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 socket_error() - return a text description of a socket error
 .SH SYNOPSIS
 .nf
-#include <socket.h>
-#include <socket_errors.h>
+#include <socket_err.h>
 
-string socket_error(int error)
+string socket_error( int error );
 
 .SH DESCRIPTION
 socket_error() returns a string describing the error signified by error.

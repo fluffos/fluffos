@@ -1,15 +1,14 @@
 .\"listen for connections on a socket
-.TH socket_listen 3
+.TH socket_listen 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 socket_listen() - listen for connections on a socket
 
 .SH SYNOPSIS
 .nf
-#include <socket.h>
-#include <socket_errors.h>
+#include <socket_err.h>
 
-int socket_listen(int s, string listen_callback)
+int socket_listen( int s, string listen_callback );
 
 .SH DESCRIPTION
 To accept connections, a socket is first created with socket_create(3),

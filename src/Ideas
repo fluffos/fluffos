@@ -31,7 +31,10 @@ fashion throughout the driver/mudlib.
 
         Cygnus
 
---
+Comment:
+    Don't forget the perror() efun mentioned in the man page.
+
+-----
 
 we need to made a single-user option for MudOS that doesn't use sockets
 at all so that people wanting to run MudOS at schools where programs
@@ -40,7 +43,7 @@ for developing LPC code for another mud.
 
 --john
 
---
+-----
 
 We came up with hopefully a somewhat useful idea to add_action() efun.
 
@@ -53,7 +56,7 @@ have to do 3 different add_action calls.  What do you think?
 
 Decker
 
---
+-----
 
 From: John Garnett <garnett@gestalt.austin.tx.us>
 
@@ -76,7 +79,7 @@ We could use the dbm database code in UNIX(tm).  Only problem is
 not all UNIX's have dbm's that support multiple databases per
 UNIX process.
 
---
+-----
 
 In message <9303080120.AA26940@rock.concert.net> Dank writes:
 >powerful.  This seems "grossly unfair" to our more serious gamers.  That's
@@ -99,7 +102,7 @@ to do this.
 Or we could make a call_out2() efun that operates in the desired heartbeat units
 (name it something more appropriate than call_out2()).
 
---
+-----
 
 1) Have the z command in the editor check the user's PAGER settings.
    ie: getenv("LINES")  much like the mudlib's more command does.  If there
@@ -107,96 +110,139 @@ Or we could make a call_out2() efun that operates in the desired heartbeat units
 
 --watcher
 
---
-
-someone should add support for the telnet go-ahead (GA) thingie so
-that clients can tell what is a prompt and what is not.
-
---john
-
 -----
 
-This is not precisely a bug.. if this is not the correct forum for this please
-tell me.
-Basically, I am wondering why master virtual objects (i.e. virtual objects not
-created via new()) still have clonep==1.  It seems to me that they should not.
-In one sense, the reason is obvious -- in simulate.c, the O_CLONE flag isn't
-modified, thus it remains set.  I think virtual objects would behave more like
-normal objects if simulate.c cleared this flag for virtual master objects.
-The reason I'd like this is because as it stands now, objects can't distinguish
-between:
- 1) being a virtual object that was not created using new() (ie a "master")
- 2) being a "clone" of a virtual object (an object "cloned" from a master
-        virtual object)
-I would find the ability to distinguish between these useful, but more
-importantly I think it fits the conceptual model for the behavior of virtual
-objects.
- 
- - Does this make sense?
- - Is it a compat buster?
- 
------
-
-Note  11  Badlegs      (Sat Sep 11)  MARKERS
- 
-When using markers within a list, you have to remember to start the line
-after the marker with a comma. Could we possibly have it so that it
-MARKERTEXT end in a comma or semicolon, that those characters are preserved
-, so that
-        ([ "sign" : @END,
-<text>
-END,
-           "box" : @END,
- 
-would work. Also, if you try to do:
-        string = @END
-<text>
-END
- 
-You have to remember to put a spare semicolon on the next line, which looks
-silly. Please could we have a cure to this?
- 
-Badlegs@clootie
-
------
-
-From bobf Sun Oct  3 00:31:28 1993
-Received: from actlab.rtf.utexas.edu by feenix.metronet.com with SMTP id AA22687
- 
-  (5.65c/feenix for <bobf@metronet.com>); Sun, 3 Oct 1993 05:31:48 -0500
-Return-Path: <bobf>
-Received: from feenix.metronet.com by actlab.rtf.utexas.edu (5.0/SMI-SVR4)
-        id AA12770; Sun, 3 Oct 93 05:31:48 CDT
-Received: by feenix.metronet.com id AA22661
-  (5.65c/feenix for mudos-bugs@actlab.rtf.utexas.edu); Sun, 3 Oct 1993 05:31:28 
--0500
-Date: Sun, 3 Oct 1993 05:31:28 -0500
-From: Bob Farmer <bobf>
-Message-Id: <199310031031.AA22661@feenix.metronet.com>
-To: mudos-bugs@actlab.rtf.utexas.edu
-Subject: save_object()
-Content-Length: 109
- 
 hmm, save_object() should probably somehow save the subtype of numbers.
 (ie null, undefined, error, etc)
  
-bt
+ucs_brf@pip.shsu.edu
 
----
+Comment: with some of the optimizations lately, the subtype of numbers is
+	not always reliable longterm ...
 
-Note  17  Alexus       (Sun Oct  3)  config settings
- 
-Driver folks, how about a tool for showing wizards what all the current
-config settings are?  (Or not all, just some useful ones, like what max_eval
-is, etc.)
- 
-I'd write it, but I dunno how these settings are stored, and my time is
-stretched to the limit anyways, haven't had much driver tinkering time.
- 
-- Al
-
----
+-----
 
 file_length() efun that returns the number of lines in a file
 
----
+-----
+
+An option for persistent swap files (that the driver can restore/recover
+from), saving clones and the contents of variables.
+
+-----
+
+swap.c: use unbuffered I/O functions (eg read() and seek()) instead of
+          buffered I/O functions (eg fread() and fseek())
+        use mmap() instead of read(), write() on systems where available
+          for further speed up
+
+  -- Hyp
+
+-----
+
+mudlib_stats uses a linked list, it is fast for insertion; however
+  lookup is O(n)...this should be hacked to use an AVL tree (ala uid.c)
+
+-- robo
+
+-----
+
+get_char() flag that respects input_to()-like option for bang escaped
+commands (ie via !)
+
+-- Demon
+
+-----
+
+uid-less driver option
+
+-- Alexus
+
+-----
+
+#pragma no_inherit
+#pragma no_clone
+
+-- Cygnus & Descartes
+
+Comment:
+    Unlike regular C, should these two pragmas should generate warnings
+    (or error out) if the driver wasn't compiled with this option enabled?
+
+    Also, adapt Tensor's idea for uniquep() efun...which queries these
+    flags, telling whether an object is cloneable and/or inheritable
+    (or not, depending on your point of view).
+
+    These aren't object flags as first believed...they have to be stored
+    in the program structure, so that it can be restored from binaries.
+    pragma_no_inherit & pragma_no_clone flags should probably be in
+    simulate.c, disjoint from those in lex.c.
+        clone_object()
+          ob = find_object_no_load()
+          if (ob->prog->flags & P_NO_CLONE)
+            error("Illegal object to clone\n");
+
+          find_object()
+            find_object2() <- avoid calling this again (for performance)
+            load_object()
+
+        inheritance: (compiler/grammar & lpc_compiler/grammar)
+          ob = find_object2()
+
+          if (ob->prog->flags & P_NO_INHERIT)
+             yyerror("Illegal object to inherit\n");
+
+        lex.c
+          init pragma_no_inherit
+               pragma_no_clone
+
+        compiler/grammar & lpc_compiler/grammar
+          set prog flags
+
+------
+
+Implement compile stacks so we don't have to dump an object (and later
+restart the compile) if an inherited object isn't defined yet.
+
+Use parse trees to simplify compile time optimizations.
+
+Rewrite strings to use counted strings (strlen and refcount).
+
+Set up contrib dir for efun submissions?
+
+Set up grammar dir for pre-byacc'd and/or pre-bison'd parsers for people
+  with broken 'yacc's.
+
+Support L_ARRAY_CLOSE, L_FUNCTION_CLOSE, and L_MAPPING_CLOSE for consistency;
+L_MAPPING_CLOSE requires a bit more work...
+
+-- robo
+
+-----
+
+Add an option to log the amount of input/output.
+
+-- Leto
+
+-----
+
+Add params to call_out_info() to limit info to particular functions
+and/or objects.
+
+-----
+
+Add 2nd arg to find_object() to optionally load object
+
+arrayp() efun (same as pointerp())
+
+-- Cygnus
+
+-----
+
+mud_status(verbose|terse)
+
+option to dump to a file
+
+-- Leto
+
+-----

@@ -1,11 +1,11 @@
 .\"rename a file
-.TH rename 3
+.TH rename 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 rename() - rename a file
 
 .SH SYNOPSIS
-int rename(string src, string dst);
+int rename( string src, string dst );
 
 .SH DESCRIPTION
 Renames the file <src> to <dst>.
@@ -14,4 +14,4 @@ Renames the file <src> to <dst>.
 rename() returns zero (0) to indicate success.  Nonzero indicates failure.
 
 .SH SEE ALSO
-rm(3), rmdir(3), cat(3), cp(3).
+rm(3), rmdir(3), cp(3), link(3)

@@ -1,11 +1,11 @@
 .\"resolve an internet address to domain name, or vice versa
-.TH resolve 3
+.TH resolve 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 resolve() - resolve an internet address to domain name, or vice versa
 
 .SH SYNOPSIS
-int resolve(string address, string callback_func);
+int resolve( string address, string callback_func );
 
 .SH DESCRIPTION
 resolve() resolves `address', which should be an internet address in the form
@@ -20,4 +20,4 @@ void callback(string address, string resolved, int key);
 decimal ip address.  The unknown value will be 0 if the lookup failed.
 
 .SH SEE ALSO
-query_ip_name(3), query_ip_number(3)
+query_host_name(3), socket_address(3), query_ip_name(3), query_ip_number(3)

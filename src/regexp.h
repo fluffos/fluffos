@@ -1,3 +1,6 @@
+#ifndef _REGEXP_H_
+#define _REGEXP_H_
+
 /*
  * Definitions etc. for regexp(3) routines.
  *
@@ -7,23 +10,20 @@
 
 #define NSUBEXP  10
 typedef struct regexp {
-	char *startp[NSUBEXP];
-	char *endp[NSUBEXP];
-	char regstart;		/* Internal use only. */
-	char reganch;		/* Internal use only. */
-	char *regmust;		/* Internal use only. */
-	int regmlen;		/* Internal use only. */
-	char program[1];	/* Unwarranted chumminess with compiler. */
-} regexp;
+    char *startp[NSUBEXP];
+    char *endp[NSUBEXP];
+    char regstart;		/* Internal use only. */
+    char reganch;		/* Internal use only. */
+    char *regmust;		/* Internal use only. */
+    int regmlen;		/* Internal use only. */
+    char program[1];		/* Unwarranted chumminess with compiler. */
+}      regexp;
 
+extern int regnarrate;
 
-/*
- * The first byte of the regexp internal "program" is actually this magic
- * number; the start node begins in the second byte.
- */
-#define	MAGIC	0234
+void regdump PROT((regexp *));
+regexp *regcomp PROT((char *, int));
+int regexec PROT((regexp *, char *));
+char *regsub PROT((regexp *, char *, char *, int));
 
-extern regexp *regcomp();
-extern int regexec();
-extern char *regsub();
-extern void regerror();
+#endif

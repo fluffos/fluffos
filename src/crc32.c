@@ -1,5 +1,7 @@
-#include "crctab.h" /* see this file for more CRC credits and comments */
-#include "port.h"   /* gets UINT32 typedef */
+#include "config.h"             /* gets UINT32 typedef */
+#include "lint.h"
+#include "crctab.h"		/* see this file for more CRC credits and
+				 * comments */
 
 /* compute_crc32: compute a cyclic redundancy code for a buffer 'buf' of a
    given length 'len'.  This trivial little routine was written by
@@ -8,17 +10,15 @@
 */
 
 UINT32
-compute_crc32(buf, len)
-unsigned char *buf;
-int len;
+compute_crc32 P2(unsigned char *, buf, int, len)
 {
-	register UINT32 crc = 0xFFFFFFFFL;
-	register int j;
+    register UINT32 crc = 0xFFFFFFFFL;
+    register int j;
 
-	j = len;
-	while (j--) {
-		/* the UPDC32 macro uses 1st arg only once */
-		crc = UPDC32((unsigned int)*buf++, crc);
-	}
-	return crc;
+    j = len;
+    while (j--) {
+	/* the UPDC32 macro uses 1st arg only once */
+	crc = UPDC32((unsigned int) *buf++, crc);
+    }
+    return crc;
 }

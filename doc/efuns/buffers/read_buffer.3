@@ -1,11 +1,13 @@
 .\"read from a file and return a buffer, or return part of a buffer as a string
-.TH read_buffer 3
+.TH read_buffer 3 "5 Sep 1994" MudOS "LPC Library Functions"
  
 .SH NAME
 read_buffer() - read from a file and return a buffer, or return part of a buffer as a string
  
 .SH SYNOPSIS
-string|buffer read_buffer(string|buffer src, int start, int len)
+.nf
+string | buffer read_buffer( string | buffer src,
+                             int start,  int len );
  
 .SH DESCRIPTION
 If `src' is a string (filename), then the filename will be read, starting

@@ -25,20 +25,21 @@ struct Library *SockBase;
 
 /* required for Initialization of socket.library */
 
-amiga_sockinit () {
-  if ((SockBase = OpenLibrary ("socket.library", 1L)) == NULL) {
-    printf ("Error opening socket.library\n");
-    Exit(10);
-  }
-  setup_sockets (MAXSOCKS, &errno);
+void amiga_sockinit()
+{
+    if ((SockBase = OpenLibrary("socket.library", 1L)) == NULL) {
+	printf("Error opening socket.library\n");
+	Exit(10);
+    }
+    setup_sockets(MAXSOCKS, &errno);
 }
 
 /* exit in a clean way (close remaining sockets */
 
-amiga_sockexit() {
-  cleanup_sockets();
-  CloseLibrary (SockBase);
+void amiga_sockexit()
+{
+    cleanup_sockets();
+    CloseLibrary(SockBase);
 }
 
 /*************************************************************************/
-

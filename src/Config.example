@@ -1,9 +1,9 @@
 ###############################################################################
-#              Customizable runtime config file for MudOS 0.9.19              #
+#              Customizable runtime config file for MudOS 0.9.20              #
 ###############################################################################
 # NOTE: All paths specified here are relative to the mudlib directory except  #
 #       for mudlib directory, and binary directory.                           #
-# Lines beginning with a # or a newline are ignored.
+# Lines beginning with a # or a newline are ignored.                          #
 ###############################################################################
  
 # name of this mud
@@ -12,8 +12,10 @@ name : Basis
 # port number to accept users on
 port number : 4000
  
-# maximum number of users in the game (unused currently)
-maximum users : 40
+# the address server is an external program that lets the mud translate
+# internet names to numbers (and vice versa).  select an unused port.
+address server ip : localhost
+address server port : 7374
  
 # absolute pathname of mudlib
 mudlib directory : /usr/local/mud/libs/basis
@@ -21,15 +23,9 @@ mudlib directory : /usr/local/mud/libs/basis
 # absolute pathname of driver/config dir
 binary directory : /usr/local/mud/bin
  
-# file to swap to.  not used if time to swap is 0
-swap file : /adm/swapfile
- 
-# the file which defines the master object
-master file : /adm/master
- 
 # debug.log and author/domain stats are stored here
 log directory : /log
- 
+
 # the directories which are searched by #include <...>
 # for multiple dirs, separate each path with a ':'
 include directories : /include
@@ -37,9 +33,18 @@ include directories : /include
 # Directory to save binaries in.  (if BINARIES is defined)
 save binaries directory : /binaries
  
+# the file which defines the master object
+master file : /adm/master
+ 
 # the file where all global simulated efuns are defined.
 simulated efun file : /adm/simul_efun
  
+# file to swap out objects; not used if time to swap is 0
+swap file : /adm/swapfile
+ 
+# alternate debug.log file name (assumed to be in specified 'log directory')
+debug log file : debug.log
+
 # if an object is left alone for a certain time, then the
 # function clean_up will be called. This function can do anything,
 # like destructing the object. If the function isn't defined by the
@@ -55,17 +60,6 @@ time to swap : 600
  
 # How many seconds until an object is reset again.
 time to reset : 1800
- 
-# Define the maximum stack size of the stack machine. This stack will also
-# contain all local variables and arguments.  (unused currently)
-evaluator stack size : 1000
- 
-# Define the size of the compiler stack. This defines how complex
-# expressions the compiler can parse.  (unused currently)
-compiler stack size : 200
- 
-# Define the maximum call depth for functions. (unused currently)
-maximum call depth : 30
  
 # Maximum number of bits in a bit field. They are stored in printable
 # strings, 6 bits per byte.
@@ -90,9 +84,6 @@ maximum mapping size : 15000
 # Max inherit chain size
 inherit chain size : 30
  
-# Define the maximum size of log files (in bytes).
-maximum log size : 200000
- 
 # maximum length of a string variable
 maximum string length : 200000
  
@@ -104,7 +95,8 @@ maximum read file size : 200000
 maximum byte transfer : 10000
  
 # Reserve an extra memory area from malloc(), to free when we run out
-# of memory.   If this value is 0, no area will be reserved.
+# of memory; so begins Armageddon.
+# If this value is 0, no area will be reserved.
 reserved size : 0
  
 # Define the size of the shared string hash table.  This number should
@@ -115,20 +107,36 @@ reserved size : 0
 # need more, and you will still get good results with a smaller table.
 hash table size : 7001
  
-# There is a hash table for living objects, used by find_living().
-# (unused currently)
-living hash table size : 100
- 
 # Object hash table size.
 # Define this like you did with the strings; probably set to about 1/4 of
 # the number of objects in a game, as the distribution of accesses to
 # objects is somewhat more uniform than that of strings.
 object table size : 1501
  
-# the address server is an external program that lets the mud translate
-# internet names to numbers (and vice versa).  select an unused port.
-address server ip : localhost
-address server port : 7374
- 
 # default no-matching-action message
 default fail message : What?
+
+# default message when error() occurs (optional)
+default error message :
+
+###############################################################################
+#          The following aren't currently used or implemented (yet)           #
+###############################################################################
+
+# maximum number of users in the game (unused currently)
+maximum users : 40
+
+# Define the maximum stack size of the stack machine. This stack will also
+# contain all local variables and arguments.  (unused currently)
+evaluator stack size : 1000
+ 
+# Define the size of the compiler stack. This defines how complex
+# expressions the compiler can parse.  (unused currently)
+compiler stack size : 200
+ 
+# Define the maximum call depth for functions. (unused currently)
+maximum call depth : 30
+
+# There is a hash table for living objects, used by find_living().
+# (unused currently)
+living hash table size : 100

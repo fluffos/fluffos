@@ -1,5 +1,5 @@
 .\"specifies the uid to give to a newly created object
-.TH CREATOR_FILE 4
+.TH creator_file 4 "5 Sep 1994" MudOS "Driver Applies"
 
 .SH NAME
 creator_file - specifies the uid to give to a newly created object
@@ -18,3 +18,6 @@ One exception: if the AUTO_TRUST_BACKBONE option is enabled at compile-time of
 the driver, and creator_file() returns the backbone uid (as specified by
 get_bb_uid() in the master object), the object is given the uid and euid of
 the object that loaded it.
+
+.SH SEE ALSO
+seteuid(3), new(3), clone_object(3), call_other(3)

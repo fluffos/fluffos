@@ -1,11 +1,11 @@
 .\"give a string with replaced calldescriptions
-.TH process_string 3
+.TH process_string 3 "5 Sep 1994" MudOS "LPC Library Functions"
  
 .SH NAME
 process_string() - give a string with replaced calldescriptions
  
 .SH SYNOPSIS
-string process_string(string combinestring);
+string process_string( string combinestring );
  
 .SH DESCRIPTION
 Processes a string by replacing specific syntactic patterns with
@@ -13,11 +13,11 @@ what is returned when the pattern is interpreted as a function
 call description.
 .PP
 The syntactic patterns are on the form:
-.PP
+.IP
   "@@function[:filename][|arg1|arg2....|argN]@@"
 .PP
 This is interpreted as a call:
-.PP
+.IP
    filename->function(arg1, arg2, ....., argN)
 .PP
 Note that process_string does not recurse over returned
@@ -42,11 +42,11 @@ any arguments.
  
 .SH EXAMPLE
 A string:       
-.PP
-  "You are chased by @@query_the_name:/obj/monster#123@@ eastward."
+.nf
+    "You are chased by @@query_the_name:/obj/monster#123@@ eastward."
 .PP
 is replaced by: 
-.PP
-  "You are chased by the orc eastward."
+.nf
+    "You are chased by the orc eastward."
 .PP
 Assuming that query_the_name in monster#123 returns "the orc".

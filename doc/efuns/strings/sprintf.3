@@ -1,20 +1,20 @@
 .\"formatted output conversion
-.TH sprintf 3
+.TH sprintf 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 printf, sprintf - formatted output conversion
 
 .SH SYNOPSIS
 .nf
-void printf(string format, ...)
-string sprintf(string format, ...)
+void printf( string format, ... );
+string sprintf( string format, ... );
 
 .SH DESCRIPTION
 An implementation of (s)printf() for LPC, with quite a few extensions
 Implemented by Lynscar (Sean A Reith).
 .PP
 This version supports the following as modifiers:
-.TP 6
+.TP 8
 " "
 pad positive integers with a space.
 .TP
@@ -37,7 +37,7 @@ meaningful with strings, all other types ignore this. Columns are
 auto-magically word wrapped.
 .TP
 "#"
-table mode, print a list of '\n' separated 'words' in a
+table mode, print a list of '\\n' separated 'words' in a
 table within the field size.  only meaningful with strings.
 .TP
 n

@@ -36,30 +36,33 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)strstr.c	5.2 (Berkeley) 1/26/91";
-#endif /* LIBC_SCCS and not lint */
+
+#endif				/* LIBC_SCCS and not lint */
+
+#include "config.h"
 
 #include <stdio.h>
 #include <string.h>
 
+#include "lint.h"
+
 /*
  * Find the first occurrence of find in s.
  */
-char *
-_strstr(s, find)
-	register char *s, *find;
+char *_strstr P2(register char *, s, register char *, find)
 {
-	register char c, sc;
-	register int len;
+    register char c, sc;
+    register int len;
 
-	if ((c = *find++) != 0) {
-		len = strlen(find);
-		do {
-			do {
-				if ((sc = *s++) == 0)
-					return (NULL);
-			} while (sc != c);
-		} while (strncmp(s, find, len) != 0);
-		s--;
-	}
-	return ((char *)s);
+    if ((c = *find++) != 0) {
+	len = strlen(find);
+	do {
+	    do {
+		if ((sc = *s++) == 0)
+		    return (NULL);
+	    } while (sc != c);
+	} while (strncmp(s, find, len) != 0);
+	s--;
+    }
+    return ((char *) s);
 }

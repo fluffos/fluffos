@@ -8,7 +8,7 @@ instructions, usage instructions, documentation, or other supporting
 material (since the size of this other material is fairly large).  Releases 
 of MudOS with version numbers having three components (e.g. 0.9.17) will 
 usually be released as a combined source/documentation package (e.g. 
-MudOS_0.9.18.tar.Z will be the next such release as of this time).
+MudOS_0.9.20.tar.Z will be the next such release as of this time).
  
 The beta releases are intended for those who are already familiar with 
 installing and running MudOS.  Typically, only those interested in testing 
@@ -48,8 +48,16 @@ If the driver errors out at runtime with a message saying that the
 operation is not supported on the socket, then try using cc instead of gcc 
 (assuming you were using gcc).  Alternatively, try uncommenting 
 NEED_OLD_CPP in the Makefile and then 'make clean' and 'make'.
- 
-See the 'amiga' subdirectory for more information on the Amiga port.
- 
+
 For more information about LPmuds and MUDs in general try reading
 the USENET groups rec.games.mud.{admin,announce,misc,lp,tiny,diku}.
+
+On subdirectories:
+
+amiga/          Contains amiga support files; a crypt package is also
+                provided for systems missing DES crypt()
+include/        Useful #defines for the mudlib to have access to (used by
+                various efuns)
+compiler/
+lpc_compiler/   These two directories contain the unshared parser/compiler
+                parts, used in generating yacc files

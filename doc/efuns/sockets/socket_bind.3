@@ -1,15 +1,14 @@
 .\"bind a name to a socket
-.TH socket_bind 3
+.TH socket_bind 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 socket_bind() - bind a name to a socket
 
 .SH SYNOPSIS
 .nf
-#include <socket.h>
-#include <socket_errors.h>
+#include <socket_err.h>
 
-int socket_bind(int s, int port)
+int socket_bind( int s, int port );
 
 .SH DESCRIPTION
 socket_bind() assigns a name to an unnamed socket. When a socket is

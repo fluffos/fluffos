@@ -146,7 +146,7 @@ It would just work.
 In addition, you could do a simply graphical client using the same
 technique.  The BSX graphical mud / client could easily be implemented
 on top of MudOS using message().  Or you could pass around small
-bitmaps rather than the simple line drawings of BSX.  The
+bitmaps rather than the polygon-based line drawings of BSX.  The
 possibilities are pretty wide open.
 
 There is at least one major flaw with this argument so far.  Since

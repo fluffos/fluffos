@@ -1,11 +1,11 @@
 .\"shutdown the driver
-.TH shutdown 3
+.TH shutdown 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 shutdown() - shutdown the driver
 
 .SH SYNOPSIS
-void shutdown(int how);
+void shutdown( int how );
 
 .SH DESCRIPTION
 This function shuts down the driver in a controlled fashion (as opposed to
@@ -19,3 +19,6 @@ is a sensitive function and should be secured.  As with exec(), the way
 to make it secure is to add a simul_efun of the same name which does
 the appropriate security checks.  Be sure to set valid_override(4) up
 (in master.c) to protect against efun::shutdown().
+
+.SH SEE ALSO
+crash(4), slow_shutdown(4)

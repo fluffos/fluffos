@@ -1,0 +1,17 @@
+.\"get the root uid
+.TH get_root_uid 4 "5 Sep 1994" MudOS "Driver Applies"
+
+.SH NAME
+get_root_uid - get the root uid
+
+.SH SYNOPSIS
+string get_root_uid( void );
+
+.SH DESCRIPTION
+This master apply is called by the driver each time
+it loads the master object, to verify that the master
+object has loaded, and to get the root uid defined by
+the mud.  The function should return a string, eg "ROOT"
+
+.SH SEE ALSO
+get_bb_uid(4)

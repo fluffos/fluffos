@@ -3,51 +3,53 @@
    options have been moved into the options.h file.
 */
 
+#ifndef _CONFIG_H_
+#define _CONFIG_H_
+
 #include "port.h"
 #include "options.h"
+#include "include/runtime_config.h"
 
 /*
  * runtime config strings.  change these values in the runtime configuration
  * file (config.example)
  */
 
-#define MUD_NAME                get_config_str(0)
-#define MUD_LIB                 get_config_str(1)
-#define BIN_DIR                 get_config_str(2)
-#define SWAP_FILE               get_config_str(3)
-#define LOG_DIR                 get_config_str(5)
-#define MASTER_FILE             get_config_str(6)
-#define INCLUDE_DIRS            get_config_str(9)
-#define SIMUL_EFUN              get_config_str(10)
-#define ADDR_SERVER_IP          get_config_str(11)
-#define DEFAULT_ERROR_MESSAGE   get_config_str(12)
-#define DEFAULT_FAIL_MESSAGE   get_config_str(13)
-#ifdef BINARIES
-#define SAVE_BINARIES           get_config_str(14)
-#endif
+#define MUD_NAME                GET_CONFIG_STR(__MUD_NAME__)
+#define ADDR_SERVER_IP          GET_CONFIG_STR(__ADDR_SERVER_IP__)
+#define MUD_LIB                 GET_CONFIG_STR(__MUD_LIB_DIR__)
+#define BIN_DIR                 GET_CONFIG_STR(__BIN_DIR__)
+#define LOG_DIR                 GET_CONFIG_STR(__LOG_DIR__)
+#define INCLUDE_DIRS            GET_CONFIG_STR(__INCLUDE_DIRS__)
+#define SAVE_BINARIES           GET_CONFIG_STR(__SAVE_BINARIES_DIR__)
+#define MASTER_FILE             GET_CONFIG_STR(__MASTER_FILE__)
+#define SIMUL_EFUN              GET_CONFIG_STR(__SIMUL_EFUN_FILE__)
+#define SWAP_FILE               GET_CONFIG_STR(__SWAP_FILE__)
+#define DEBUG_LOG_FILE          GET_CONFIG_STR(__DEBUG_LOG_FILE__)
+#define DEFAULT_ERROR_MESSAGE   GET_CONFIG_STR(__DEFAULT_ERROR_MESSAGE__)
+#define DEFAULT_FAIL_MESSAGE    GET_CONFIG_STR(__DEFAULT_FAIL_MESSAGE__)
 
 /*
  * runtime config ints
  */
 
-#define TIME_TO_CLEAN_UP        get_config_int(0)
-#define TIME_TO_SWAP            get_config_int(1)
-#define TIME_TO_RESET	        get_config_int(2)
-#define MAX_BITS                get_config_int(7)
-#define MAX_COST                get_config_int(9)
-#define MAX_ARRAY_SIZE          get_config_int(10)
-#define MAX_MAPPING_SIZE        get_config_int(11)
-#define MAX_LOG_SIZE            get_config_int(13)
-#define READ_FILE_MAX_SIZE      get_config_int(14)
-#define MAX_STRING_LENGTH       get_config_int(15)
-#define ADDR_SERVER_PORT        get_config_int(16)
-#define MAX_BYTE_TRANSFER       get_config_int(17)
-#define PORTNO                  get_config_int(18)
-#define RESERVED_SIZE           get_config_int(19)
-#define	HTABLE_SIZE             get_config_int(21)
-#define OTABLE_SIZE             get_config_int(22)
-#define INHERIT_CHAIN_SIZE      get_config_int(23)
-#define MAX_BUFFER_SIZE         get_config_int(24)
+#define PORTNO                  GET_CONFIG_INT(__MUD_PORT__)
+#define ADDR_SERVER_PORT        GET_CONFIG_INT(__ADDR_SERVER_PORT__)
+#define TIME_TO_CLEAN_UP        GET_CONFIG_INT(__TIME_TO_CLEAN_UP__)
+#define TIME_TO_RESET           GET_CONFIG_INT(__TIME_TO_RESET__)
+#define TIME_TO_SWAP            GET_CONFIG_INT(__TIME_TO_SWAP__)
+#define MAX_COST                GET_CONFIG_INT(__MAX_EVAL_COST__)
+#define MAX_BITS                GET_CONFIG_INT(__MAX_BITFIELD_BITS__)
+#define MAX_ARRAY_SIZE          GET_CONFIG_INT(__MAX_ARRAY_SIZE__)
+#define MAX_BUFFER_SIZE         GET_CONFIG_INT(__MAX_BUFFER_SIZE__)
+#define MAX_MAPPING_SIZE        GET_CONFIG_INT(__MAX_MAPPING_SIZE__)
+#define MAX_STRING_LENGTH       GET_CONFIG_INT(__MAX_STRING_LENGTH__)
+#define READ_FILE_MAX_SIZE      GET_CONFIG_INT(__MAX_READ_FILE_SIZE__)
+#define MAX_BYTE_TRANSFER       GET_CONFIG_INT(__MAX_BYTE_TRANSFER__)
+#define RESERVED_SIZE           GET_CONFIG_INT(__RESERVED_MEM_SIZE__)
+#define HTABLE_SIZE             GET_CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__)
+#define OTABLE_SIZE             GET_CONFIG_INT(__OBJECT_HASH_TABLE_SIZE__)
+#define INHERIT_CHAIN_SIZE      GET_CONFIG_INT(__INHERIT_CHAIN_SIZE__)
 
 #ifdef USE_POSIX_SIGNALS
 #define sigblock(m) port_sigblock(m)
@@ -67,9 +69,15 @@
 #if defined(__GNUC__) && !defined(__STRICT_ANSI__) && !defined(lint)
 #define INLINE inline
 #else
+#ifdef LATTICE
+#define INLINE __inline
+#else
 #define INLINE
 #endif
 #endif
+#endif
+
+/* the compiler can do a better job */
 #undef INLINE
 #define INLINE
 
@@ -77,7 +85,7 @@
 #define EXTRACT_UCHAR(p) (*(unsigned char *)p)
 #else
 #define EXTRACT_UCHAR(p) (*p < 0 ? *p + 0x100 : *p)
-#endif /* HAS_UNSIGNED_CHAR */
+#endif				/* HAS_UNSIGNED_CHAR */
 
 #define APPLY_CACHE_SIZE (1 << APPLY_CACHE_BITS)
 
@@ -94,7 +102,7 @@
    define MALLOC, FREE, REALLOC, and CALLOC depending upon what malloc
    package is is used.  This technique is used because overlaying system malloc
    with another function also named malloc doesn't work on most machines
-   that have shared libraries.  It will also let us keep malloc stats even 
+   that have shared libraries.  It will also let us keep malloc stats even
    when system malloc is used.
 */
 
@@ -135,4 +143,6 @@
 #define FREE(x) puts("You need to specify a malloc package in options.h")
 #define REALLOC(x) puts("You need to specify a malloc package in options.h")
 #define CALLOC(x) puts("You need to specify a malloc package in options.h")
+#endif
+
 #endif

@@ -1,15 +1,15 @@
 .\"accept a connection on a socket
-.TH socket_accept 3
+.TH socket_accept 3 "5 Sep 1994" MudOS "LPC Library Functions"
 
 .SH NAME
 socket_accept() - accept a connection on a socket
 
 .SH SYNOPSIS
 .nf
-#include <socket.h>
-#include <socket_errors.h>
+#include <socket_err.h>
 
-int socket_accept(int s, string close_callback, string write_callback)
+int socket_accept( int s, string read_callback,
+                   string write_callback );
 
 .SH DESCRIPTION
 The argument s is a socket that has been created with socket_create(3),
@@ -23,13 +23,13 @@ to and from the socket which connected to this one; it is not used to accept
 more connections. The original socket s remains open for accepting further
 connections.
 .PP
-The argument close_callback is the name of a function for the driver to
-call if the socket closes unexpectedly, i.e. not as the result of a
-socket_close(3) call. The close callback should follow this format:
+The argument read_callback is the name of a function for the driver to
+call when the new socket (not the accepting socket) receives data.
+The write callback should follow this format:
 .IP
-void close_callback(int fd)
+void read_callback(int fd)
 .PP
-Where fd is the socket which has closed.
+Where fd is the socket which is ready to accept data.
 .PP
 The argument write_callback is the name of a function for the driver to
 call when the new socket (not the accepting socket) is ready to be
@@ -38,6 +38,14 @@ written to. The write callback should follow this format:
 void write_callback(int fd)
 .PP
 Where fd is the socket which is ready to be written to.
+.PP
+Note: The close_callback of the accepting socket (not the new socket)
+is called if the new socket closes unexpectedly, i.e. not as the result
+of a socket_close(3) call. The close callback should follow this format:
+.IP
+void close_callback(int fd)
+.PP
+Where fd is the socket which has closed.
 
 .SH RETURN VALUES
 socket_accept() returns a non-negative descriptor for the accepted

@@ -4,9 +4,10 @@
  *   10-92 : Dave Richards (Cynosure) : less original coding.
  */
 
-#include "socket_err.h"
+#include "include/socket_err.h"
 
-char *error_strings[ERROR_STRINGS] = {
+char *error_strings[ERROR_STRINGS] =
+{
     "Problem creating socket",
     "Problem with setsockopt",
     "Problem setting non-blocking mode",
@@ -38,5 +39,5 @@ char *error_strings[ERROR_STRINGS] = {
     "Wait for callback",
     "Socket already released",
     "Socket not released",
-	"Data nested too deeply"
+    "Data nested too deeply"
 };

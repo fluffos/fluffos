@@ -9,6 +9,7 @@
 
 #include "efuns.h"
 #include "stralloc.h"
+
 #if defined(__386BSD__) || defined(SunOS_5)
 #include <unistd.h>
 #endif
@@ -21,43 +22,40 @@
 
 #ifdef F_CRYPT
 void
-f_crypt(num_arg, instruction)
-int num_arg, instruction;
+f_crypt P2(int, num_arg, int, instruction)
 {
-  char *res, salt[2];
-  char *choice =
+    char *res, salt[2];
+    char *choice =
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./";
-	
-  if (sp->type == T_STRING && SVALUE_STRLEN(sp) >= 2)
-    {
-      salt[0] = sp->u.string[0];
-      salt[1] = sp->u.string[1];
-    }
-  else
-    {
-      salt[0] = choice[random_number(strlen(choice))];
-      salt[1] = choice[random_number(strlen(choice))];
+
+    if (sp->type == T_STRING && SVALUE_STRLEN(sp) >= 2) {
+	salt[0] = sp->u.string[0];
+	salt[1] = sp->u.string[1];
+    } else {
+	salt[0] = choice[random_number(strlen(choice))];
+	salt[1] = choice[random_number(strlen(choice))];
     }
 #if defined(sun) && !defined(SunOS_5)
-  res = string_copy(_crypt((sp-1)->u.string, salt));
+    res = string_copy(_crypt((sp - 1)->u.string, salt));
 #else
-  res = string_copy(crypt((sp-1)->u.string, salt));
+    res = string_copy(crypt((sp - 1)->u.string, salt));
 #endif
-  pop_n_elems(2);
-  push_malloced_string(res);
+    pop_n_elems(2);
+    push_malloced_string(res);
 }
 #endif
 
 #ifdef F_LOCALTIME
 void
-f_localtime(num_arg, instruction)
-    int num_arg, instruction;
+f_localtime P2(int, num_arg, int, instruction)
 {
     struct tm *tm;
     struct vector *vec;
     time_t lt;
+
 #ifdef sequent
     struct timezone tz;
+
 #endif
 
     lt = sp->u.number;
@@ -85,39 +83,41 @@ f_localtime(num_arg, instruction)
     vec->item[LT_ZONE].subtype = STRING_MALLOC;
 #if defined(BSD42) || defined(apollo) || defined(_AUX_SOURCE) \
 	|| defined(OLD_ULTRIX)
-	/* 4.2 BSD doesn't seem to provide any way to get these last two values */
+    /* 4.2 BSD doesn't seem to provide any way to get these last two values */
     vec->item[LT_GMTOFF].type = T_NUMBER;
-	vec->item[LT_GMTOFF].u.number = 0;
+    vec->item[LT_GMTOFF].u.number = 0;
     vec->item[LT_ZONE].type = T_NUMBER;
-	vec->item[LT_ZONE].u.number = 0;
-#else /* BSD42 */
+    vec->item[LT_ZONE].u.number = 0;
+#else				/* BSD42 */
 #if defined(sequent)
     gettimeofday(NULL, &tz);
     vec->item[LT_GMTOFF].u.number = tz.tz_minuteswest;
     vec->item[LT_ZONE].u.string =
 	string_copy(timezone(tz.tz_minuteswest, tm->tm_isdst));
-#else /* sequent */
+#else				/* sequent */
 #if (defined(hpux) || defined(_SEQUENT_) || defined(_AIX) || defined(SunOS_5) \
 	|| defined(SVR4) || defined(sgi) || defined(linux) || defined(cray) \
-	|| defined(LATTICE)) 
+	|| defined(LATTICE))
     if (!tm->tm_isdst) {
-        vec->item[LT_GMTOFF].u.number = timezone;
-        vec->item[LT_ZONE].u.string = string_copy(tzname[0]);
+	vec->item[LT_GMTOFF].u.number = timezone;
+	vec->item[LT_ZONE].u.string = string_copy(tzname[0]);
     } else {
 #if (defined(_AIX) || defined(hpux) || defined(linux) || defined(cray) \
 	|| defined(LATTICE))
-        vec->item[LT_GMTOFF].u.number = timezone;
+	vec->item[LT_GMTOFF].u.number = timezone;
 #else
-        vec->item[LT_GMTOFF].u.number = altzone;
+	vec->item[LT_GMTOFF].u.number = altzone;
 #endif
-        vec->item[LT_ZONE].u.string = string_copy(tzname[1]);
+	vec->item[LT_ZONE].u.string = string_copy(tzname[1]);
     }
 #else
+#ifndef OS2
     vec->item[LT_GMTOFF].u.number = tm->tm_gmtoff;
     vec->item[LT_ZONE].u.string = string_copy(tm->tm_zone);
 #endif
-#endif /* sequent */
-#endif /* BSD42 */
+#endif
+#endif				/* sequent */
+#endif				/* BSD42 */
     pop_stack();
     push_vector(vec);
     vec->ref--;
@@ -127,55 +127,53 @@ f_localtime(num_arg, instruction)
 #ifdef F_RUSAGE
 #ifdef RUSAGE
 void
-f_rusage(num_arg, instruction)
-int num_arg, instruction;
+f_rusage P2(int, num_arg, int, instruction)
 {
-  struct rusage rus;
-  struct mapping *m;
-  long usertime, stime;
-  int maxrss;
+    struct rusage rus;
+    struct mapping *m;
+    long usertime, stime;
+    int maxrss;
 
-  if (getrusage(RUSAGE_SELF, &rus) < 0) {
-    m = allocate_mapping(0);
-  } else {
+    if (getrusage(RUSAGE_SELF, &rus) < 0) {
+	m = allocate_mapping(0);
+    } else {
 #ifndef SunOS_5
-    usertime = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
-    stime = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_usec / 1000;
+	usertime = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
+	stime = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_usec / 1000;
 #else
-    usertime = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_nsec / 1000000;
-    stime = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_nsec / 1000000;
+	usertime = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_nsec / 1000000;
+	stime = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_nsec / 1000000;
 #endif
-    maxrss = rus.ru_maxrss;
+	maxrss = rus.ru_maxrss;
 #ifdef sun
-    maxrss *= getpagesize() / 1024;
+	maxrss *= getpagesize() / 1024;
 #endif
-    m = allocate_mapping(16);
-    add_mapping_pair(m, "utime", usertime);
-    add_mapping_pair(m, "stime", stime);
-    add_mapping_pair(m, "maxrss", maxrss);
-    add_mapping_pair(m, "ixrss", rus.ru_ixrss);
-    add_mapping_pair(m, "idrss", rus.ru_idrss);
-    add_mapping_pair(m, "isrss", rus.ru_isrss);
-    add_mapping_pair(m, "minflt", rus.ru_minflt);
-    add_mapping_pair(m, "majflt", rus.ru_majflt);
-    add_mapping_pair(m, "nswap", rus.ru_nswap);
-    add_mapping_pair(m, "inblock", rus.ru_inblock);
-    add_mapping_pair(m, "oublock", rus.ru_oublock);
-    add_mapping_pair(m, "msgsnd", rus.ru_msgsnd);
-    add_mapping_pair(m, "msgrcv", rus.ru_msgrcv);
-    add_mapping_pair(m, "nsignals", rus.ru_nsignals);
-    add_mapping_pair(m, "nvcsw", rus.ru_nvcsw);
-    add_mapping_pair(m, "nivcsw", rus.ru_nivcsw);
-  }
-  m->ref--;
-  push_mapping(m);
+	m = allocate_mapping(16);
+	add_mapping_pair(m, "utime", usertime);
+	add_mapping_pair(m, "stime", stime);
+	add_mapping_pair(m, "maxrss", maxrss);
+	add_mapping_pair(m, "ixrss", rus.ru_ixrss);
+	add_mapping_pair(m, "idrss", rus.ru_idrss);
+	add_mapping_pair(m, "isrss", rus.ru_isrss);
+	add_mapping_pair(m, "minflt", rus.ru_minflt);
+	add_mapping_pair(m, "majflt", rus.ru_majflt);
+	add_mapping_pair(m, "nswap", rus.ru_nswap);
+	add_mapping_pair(m, "inblock", rus.ru_inblock);
+	add_mapping_pair(m, "oublock", rus.ru_oublock);
+	add_mapping_pair(m, "msgsnd", rus.ru_msgsnd);
+	add_mapping_pair(m, "msgrcv", rus.ru_msgrcv);
+	add_mapping_pair(m, "nsignals", rus.ru_nsignals);
+	add_mapping_pair(m, "nvcsw", rus.ru_nvcsw);
+	add_mapping_pair(m, "nivcsw", rus.ru_nivcsw);
+    }
+    m->ref--;
+    push_mapping(m);
 }
 #else
 
 #ifdef GET_PROCESS_STATS
 void
-f_rusage(num_arg, instruction)
-int num_arg, instruction;
+f_rusage P2(int, num_arg, int, instruction)
 {
     struct process_stats ps;
     struct mapping *m;
@@ -214,7 +212,7 @@ int num_arg, instruction;
 }
 #else
 
-#ifdef TIMES /* has times() but not getrusage() */
+#ifdef TIMES			/* has times() but not getrusage() */
 
 /*
   warning times are reported in processor dependent units of time.
@@ -222,25 +220,45 @@ int num_arg, instruction;
 */
 
 void
-f_rusage(num_arg, instruction)
-int num_arg, instruction;
+f_rusage P2(int, num_arg, int, instruction)
 {
-	struct mapping *m;
-	struct tms t;
+    struct mapping *m;
+    struct tms t;
 
-	times(&t);
-	m = allocate_mapping(2);
+    times(&t);
+    m = allocate_mapping(2);
     add_mapping_pair(m, "utime", t.tms_utime * 1000 / CLK_TCK);
     add_mapping_pair(m, "stime", t.tms_stime * 1000 / CLK_TCK);
-	m->ref--;
-	push_mapping(m);
+    m->ref--;
+    push_mapping(m);
 }
 
-#endif /* TIMES */
+#else
 
-#endif /* GET_PROCESS_STATS */
+#ifdef LATTICE
 
-#endif /* RUSAGE */
+void
+f_rusage P2(int, num_arg, int, instruction)
+{
+    struct mapping *m;
+    int i;
+    unsigned int clock[2];
+
+    i = timer(clock);		/* returns 0 if success, -1 otherwise */
+    m = allocate_mapping(2);
+    add_mapping_pair(m, "utime", i ? 0 : clock[0] * 1000 + clock[1] / 1000);
+    add_mapping_pair(m, "stime", i ? 0 : clock[0] * 1000 + clock[1] / 1000);
+    m->ref--;
+    push_mapping(m);
+}
+
+#endif				/* LATTICE */
+
+#endif				/* TIMES */
+
+#endif				/* GET_PROCESS_STATS */
+
+#endif				/* RUSAGE */
 
 #endif
 
@@ -250,10 +268,9 @@ int num_arg, instruction;
    at some time prior to this calling of this efun.
 */
 void
-f_malloc_check(num_arg, instruction)
-int num_arg, instruction;
+f_malloc_check P2(int, num_arg, int, instruction)
 {
-	push_number(NXMallocCheck());
+    push_number(NXMallocCheck());
 }
 #endif
 
@@ -262,21 +279,20 @@ int num_arg, instruction;
    malloc.
 */
 void
-f_malloc_debug(num_arg, instruction)
-int num_arg, instruction;
+f_malloc_debug P2(int, num_arg, int, instruction)
 {
-	int level;
+    int level;
 
-	level = sp->u.number;
-	pop_stack();
-	if (level < 0) {
-		int rc;
+    level = sp->u.number;
+    pop_stack();
+    if (level < 0) {
+	int rc;
 
-		rc = malloc_debug(0);
-		malloc_singlethreaded();
-		push_number(rc);
-	} else {
-		push_number(malloc_debug(level));
-	}
+	rc = malloc_debug(0);
+	malloc_singlethreaded();
+	push_number(rc);
+    } else {
+	push_number(malloc_debug(level));
+    }
 }
 #endif

@@ -1,11 +1,11 @@
 .\"object initialization
-.TH CREATE 4
+.TH create 4 "5 Sep 1994" MudOS "Driver Applies"
 
 .SH NAME
 create - object initialization
 
 .SH SYNOPSIS
-void create();
+void create( void );
 
 .SH DESCRIPTION
 Every object should have a create function defined within it.  Within
@@ -22,7 +22,7 @@ object.  In reality, create *is* being called twice, but on two
 parent::create() manually.
 
 .SH SEE ALSO
-reset(3)
+reset(4), __INIT(4)
 
 .SH AUTHOR
 Wayfarer@Portals

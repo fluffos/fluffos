@@ -1,11 +1,11 @@
 .\"called by the MudOS driver when a prompt should be printed
-.TH WRITE_PROMPT 4
+.TH write_prompt 4 "5 Sep 1994" MudOS "Driver Applies"
 
 .SH NAME
-write_prompt \- called when the parser wants a prompt to be written.
+write_prompt - called when the parser wants a prompt to be written.
 
 .SH SYNOPSIS
-void write_prompt();
+void write_prompt( void );
 
 .SH DESCRIPTION
 If write_prompt is present in the player object, the driver will call it

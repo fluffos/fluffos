@@ -1,0 +1,20 @@
+.\"ask an object to move to the specified destination
+.TH move 4 "5 Sep 1994" MudOS "Driver Applies"
+
+.SH NAME
+move - ask an object to move to the specified destination
+
+.SH SYNOPSIS
+int move( object dest, int flag );
+
+.SH DESCRIPTION
+This apply is called by destruct() on each of the
+destructed object's contents or inventory.  In so doing, the driver
+passes the flag 1.  This allows objects to choose between
+moving to the destructed object's environment or be
+destructed.  This function should return 0 if the move was
+ok.  The object is destructed if the return value is non-zero
+(ie failed to move).
+
+.SH SEE ALSO
+destruct(3), move_object(3), init(4), destruct_env_of(4)

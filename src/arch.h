@@ -1,5 +1,8 @@
 /* arch.h: __ARCH__ - a predefined macro exported to all LPC objects */
 
+#ifndef _ARCH_H_
+#define _ARCH_H_
+
 #ifdef sequent
 #define ARCH "Sequent DYNIX"
 #endif
@@ -83,10 +86,16 @@
 #define ARCH "SVR4"
 #endif
 
-#if defined(OSF) && !defined(ARCH)
+#if !defined(ARCH) && defined(OSF)
 #define ARCH "OSF/1"
+#endif
+
+#if !defined(ARCH) && defined(LATTICE)
+#define ARCH "Amiga"
 #endif
 
 #ifndef ARCH
 #define ARCH "stuf!"
+#endif
+
 #endif
