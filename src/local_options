@@ -854,7 +854,7 @@
 #define PACKAGE_COMPRESS
 #define SAVE_GZ_EXTENSION ".o.gz"
 #define USE_FLUFF_MOD
-#undef CALL_OTHER_TYPE_CHECK 
+#define CALL_OTHER_TYPE_CHECK 
 #define CALL_OTHER_WARN
 #define PACKAGE_DWLIB
 #endif

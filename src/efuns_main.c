@@ -359,8 +359,8 @@ f_call_stack PROT((void))
                 function_t *cfp = &prog->function_table[index];
 
                 ret->item[i].subtype = STRING_SHARED;
-                ret->item[i].u.string = cfp->name;
-                ref_string(cfp->name);
+                ret->item[i].u.string = cfp->funcname;
+                ref_string(cfp->funcname);
             } else {
                 ret->item[i].subtype = STRING_CONSTANT;
                 ret->item[i].u.string = (((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH) ? "CATCH" : "<function>";

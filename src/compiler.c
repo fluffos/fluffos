@@ -227,11 +227,11 @@ static void fix_class_type P2(int *, t, program_t *, from) {
     int num;
 
     if ((*t) & TYPE_MOD_CLASS) {
-        ihe = lookup_ident(from->strings[from->classes[(*t) & CLASS_NUM_MASK].name]);
+        ihe = lookup_ident(from->strings[from->classes[(*t) & CLASS_NUM_MASK].classname]);
         if (ihe && ((num = ihe->dn.class_num) != -1)) {
             (*t) = (*t & ~CLASS_NUM_MASK) | num;
         } else {
-            fatal("Cannot find class %s (%s,%d).\n",from->strings[from->classes[(*t) & CLASS_NUM_MASK].name], current_file, current_line);
+            fatal("Cannot find class %s (%s,%d).\n",from->strings[from->classes[(*t) & CLASS_NUM_MASK].classname], current_file, current_line);
         }
     }
 }
@@ -323,7 +323,7 @@ static void copy_new_function P5(program_t *, prog, int, index,
     FUNCTION_NEXT(where) = 0;
     
     /* add the identifier */
-    ihe = find_or_add_ident(defprog->function_table[defindex].name,
+    ihe = find_or_add_ident(defprog->function_table[defindex].funcname,
                             FOA_GLOBAL_SCOPE);
     ihe->sem_value++; /* we knew it was the first, so dn.function_num = -1 */
     ihe->dn.function_num = where;
@@ -339,7 +339,7 @@ static int find_class_member P3(int, which, char *, name, unsigned char *, type)
     cd = ((class_def_t *)mem_block[A_CLASS_DEF].block) + which;
     cme = ((class_member_entry_t *)mem_block[A_CLASS_MEMBER].block) + cd->index;
     for (i = 0; i < cd->size; i++) {
-        if (PROG_STRING(cme[i].name) == name)
+        if (PROG_STRING(cme[i].membername) == name)
             break;
     }
     if (i == cd->size) {
@@ -404,7 +404,7 @@ int lookup_class_member P3(int, which, char *, name, unsigned char *, type) {
         char *p;
         
         p = strput(buf, end, "Class '");
-        p = strput(p, end, PROG_STRING(cd->name));
+        p = strput(p, end, PROG_STRING(cd->classname));
         p = strput(p, end, "' has no member '");
         p = strput(p, end, name);
         p = strput(p, end, "'");
@@ -437,7 +437,7 @@ parse_node_t *reorder_class_values P2(int, which, parse_node_t *, node) {
                 p = strput(buf, end, "Redefinition of member '");
                 p = strput(p, end, (char *) node->l.expr);
                 p = strput(p, end, "' in instantiation of class  '");
-                p = strput(p, end, PROG_STRING(cd->name));
+                p = strput(p, end, PROG_STRING(cd->classname));
                 p = strput(p, end, "'");
                 yyerror(buf);
             } else {
@@ -497,7 +497,7 @@ static void check_class P4(char *, name, program_t *, prog, int, idx, int, nidx)
         fix_class_type(&newtype, prog);
 
         if (sme2[i].type != newtype ||
-            prog->strings[sme1[i].name] != PROG_STRING(sme2[i].name)) {
+            prog->strings[sme1[i].membername] != PROG_STRING(sme2[i].membername)) {
             char buf[512];
             char *end = EndOf(buf);
             char *p;
@@ -533,7 +533,7 @@ void copy_structures P1(program_t *, prog) {
     }
 
     for (i = 0; i < prog->num_classes; i++) {
-        str = prog->strings[prog->classes[i].name];
+        str = prog->strings[prog->classes[i].classname];
         ihe = find_or_add_ident(str, FOA_GLOBAL_SCOPE);
         if (ihe->dn.class_num == -1) {
             ihe->dn.class_num = sd_off++;
@@ -543,7 +543,7 @@ void copy_structures P1(program_t *, prog) {
             continue;
         }
         sd = (class_def_t *)allocate_in_mem_block(A_CLASS_DEF, sizeof(class_def_t));
-        sd->name = store_prog_string(str);
+        sd->classname = store_prog_string(str);
         sd->size = prog->classes[i].size;
         sd->index = sm_off;
         sm_off += sd->size;
@@ -554,7 +554,7 @@ void copy_structures P1(program_t *, prog) {
 
             fix_class_type(&oldtype, prog);
             sme[j].type = oldtype;
-            sme[j].name = store_prog_string(prog->strings[prog->class_members[offset + j].name]);
+            sme[j].membername = store_prog_string(prog->strings[prog->class_members[offset + j].membername]);
         }
     }
 }
@@ -633,7 +633,7 @@ static void overload_function P6(program_t *, prog, int, index,
         char *p;
         
         p = strput(buf, end, "Illegal to redefine 'nomask' function \"");
-        p = strput(p, end, definition->name);
+        p = strput(p, end, definition->funcname);
         p = strput(p, end, "\"");
         yyerror(buf);
     }
@@ -668,7 +668,7 @@ static void overload_function P6(program_t *, prog, int, index,
             program_t *defprog2;
 
             defprog2 = func_entry->prog;
-            p = strput(buf, end, definition->name);
+            p = strput(buf, end, definition->funcname);
             p = strput(p, end, "() inherited from both /");
             p = strput(p, end, defprog->name);
             if (prog != defprog) {
@@ -689,7 +689,7 @@ static void overload_function P6(program_t *, prog, int, index,
             
             ow = ALLOCATE(ovlwarn_t, TAG_COMPILER, "overload warning");
             ow->next = overload_warnings;
-            ow->func = definition->name;
+            ow->func = definition->funcname;
             ow->warn = alloc_cstring(buf, "overload warning");
             overload_warnings = ow;
         }
@@ -770,7 +770,7 @@ int copy_functions P2(program_t *, from, int, typemod)
     num_functions = from->num_functions_defined + from->last_inherited;
     
     if (from->num_functions_defined && 
-        (from->function_table[from->num_functions_defined - 1].name[0] == APPLY___INIT_SPECIAL_CHAR))
+        (from->function_table[from->num_functions_defined - 1].funcname[0] == APPLY___INIT_SPECIAL_CHAR))
         initializer = --num_functions;
 
     for (i = 0; i < num_functions; i++) {
@@ -803,7 +803,7 @@ int copy_functions P2(program_t *, from, int, typemod)
         funp = prog->function_table + index;
         
         
-        ihe = lookup_ident(funp->name);
+        ihe = lookup_ident(funp->funcname);
         if (ihe && ((num = ihe->dn.function_num)!=-1)) {
           /* The function has already been defined in this object */
             overload_function(from, i, prog,index, num, typemod);
@@ -904,7 +904,7 @@ static int find_matching_function P3(program_t *, prog, char *, name,
     /* Search our function table */
     while (high >= low) {
         int mid = (high + low)/2;
-        char *p = prog->function_table[mid].name;
+        char *p = prog->function_table[mid].funcname;
         
         if (name < p)
             high = mid-1;
@@ -1150,7 +1150,7 @@ int define_new_function P5(char *, name, int, num_arg, int, num_local,
             return -1; /* unused for prototypes */
 
         if (pragmas & PRAGMA_WARNINGS)
-            remove_overload_warnings(funp->name);
+            remove_overload_warnings(funp->funcname);
 
         /* If there was already a definition at this level (due to a 
          * prototype), clear it out.  Don't free the function name, though;
@@ -1166,7 +1166,7 @@ int define_new_function P5(char *, name, int, num_arg, int, num_local,
     if (!funp) {
         num = mem_block[A_FUNCTIONS].current_size / sizeof(function_t);
         funp = (function_t *)allocate_in_mem_block(A_FUNCTIONS, sizeof(function_t));
-        funp->name = make_shared_string(name);
+        funp->funcname = make_shared_string(name);
         argument_start_index = INDEX_START_NONE;
         add_to_mem_block(A_ARGUMENT_INDEX, (char *) &argument_start_index,
                          sizeof argument_start_index);
@@ -1175,7 +1175,7 @@ int define_new_function P5(char *, name, int, num_arg, int, num_local,
 
     if (oldindex < 0) {
         newindex = add_new_function_entry();
-        ihe = find_or_add_ident(funp->name, FOA_GLOBAL_SCOPE);
+        ihe = find_or_add_ident(funp->funcname, FOA_GLOBAL_SCOPE);
         ihe->sem_value++;
         ihe->dn.function_num = newindex;
         newfunc = FUNCTION_TEMP(newindex);
@@ -1576,7 +1576,7 @@ int validate_function_call P2(int, f, parse_node_t *, args)
         char *p;
         
         p = strput(buf, end, "Illegal to call inherited private function '");
-        p = strput(p, end, funp->name);
+        p = strput(p, end, funp->funcname);
         p = strput(p, end, "'");
         yyerror(buf);
     }
@@ -1591,7 +1591,7 @@ int validate_function_call P2(int, f, parse_node_t *, args)
             char *p;
             
             p = strput(buf, end, "Function ");
-            p = strput(p, end, funp->name);
+            p = strput(p, end, funp->funcname);
             p = strput(p, end, " undefined");
             yyerror(buf);
         }
@@ -1606,12 +1606,12 @@ int validate_function_call P2(int, f, parse_node_t *, args)
             
             if (num_var) {
                 p = strput(buff, end, "Illegal to pass a variable number of arguments to non-varargs function ");
-                p = strput(p, end, funp->name);
+                p = strput(p, end, funp->funcname);
                 p = strput(p, end, "\n");
                 yyerror(buff);
             } else if (funp->num_arg != num_arg) {
                 p = strput(buff, end, "Wrong number of arguments to ");
-                p = strput(p, end, funp->name);
+                p = strput(p, end, funp->funcname);
                 p = strput(p, end, "\n    Expected: ");
                 p = strput_int(p, end, funp->num_arg);
                 p = strput(p, end, "  Got: ");
@@ -1660,7 +1660,7 @@ int validate_function_call P2(int, f, parse_node_t *, args)
                     p = strput(buff, end, "Bad type for argument ");
                     p = strput_int(p, end, i+1);
                     p = strput(p, end, " of ");
-                    p = strput(p, end, funp->name);
+                    p = strput(p, end, funp->funcname);
                     p = strput(p, end, " ");
                     p = get_two_types(p, end, arg_types[i], tmp);
                     yyerror(buff);
@@ -2052,7 +2052,7 @@ compile_file P2(int, f, char *, name) {
      * errors, valid_override) LPC code is called during compilation,
      * causing the possibility of arriving here again.
      */
-    if (guard) {
+    if (guard || current_file) {
         error("Object cannot be loaded during compilation.\n");
     }
     guard = 1;
@@ -2085,8 +2085,8 @@ INLINE_STATIC void copy_in P2(int, which, char **, start) {
 }
 
 static int compare_funcs P2(unsigned short *, x, unsigned short *, y) {
-    char *n1 = FUNC(*x)->name;
-    char *n2 = FUNC(*y)->name;
+    char *n1 = FUNC(*x)->funcname;
+    char *n2 = FUNC(*y)->funcname;
     int sp1, sp2;
     
     /* make sure #global_init# stays last; also shuffle empty entries to
@@ -2163,7 +2163,7 @@ static void handle_functions() {
             inherited_prog->num_functions_defined;
         
         if (inherited_prog->num_functions_defined &&
-            inherited_prog->function_table[inherited_prog->num_functions_defined -1].name[0] == '#') comp_last_inherited--;
+            inherited_prog->function_table[inherited_prog->num_functions_defined -1].funcname[0] == APPLY___INIT_SPECIAL_CHAR) comp_last_inherited--;
     } else comp_last_inherited = 0;
     
     /* Pass one: We allocate space for the comp_def_index_map             */
@@ -2550,7 +2550,7 @@ static void clean_parser() {
      */
     for (i = 0; i < mem_block[A_FUNCTIONS].current_size / sizeof(function_t); i++) {
         funp = FUNC(i);
-        if (funp->name) free_string(funp->name);
+        if (funp->funcname) free_string(funp->funcname);
     }
 
     for (i = 0; i < mem_block[A_FUNCTION_DEFS].current_size / 

@@ -421,7 +421,7 @@ void svalue_to_string P5(svalue_t *, obj, outbuffer_t *, outbuf, int, indent, in
                                                  obj->u.fp->f.local.index));
                 break;
             case FP_SIMUL:
-                outbuf_add(outbuf, simuls[obj->u.fp->f.simul.index].func->name);
+                outbuf_add(outbuf, simuls[obj->u.fp->f.simul.index].func->funcname);
                 break;
             case FP_FUNCTIONAL:
             case FP_FUNCTIONAL | FP_NOT_BINDABLE:

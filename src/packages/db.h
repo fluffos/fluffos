@@ -1,5 +1,11 @@
-#ifndef l_db_h
-#define l_db_h
+#ifndef PACKAGES_DB_H
+#define PACKAGES_DB_H
+
+#ifdef PACKAGE_DB
+
+#ifdef USE_MSQL
+/* MSQL v2 requires this so that it knows the right prototypes */
+#define _OS_UNIX
 
 #ifdef INCL_LOCAL_MSQL_H
 #include "/usr/local/include/msql.h"
@@ -10,32 +16,68 @@
 #ifdef INCL_LOCAL_MINERVA_MSQL_H
 #include "/usr/local/Minerva/include/msql.h"
 #endif
-#ifdef MY_SQL
-#include <mysql.h>
+#ifdef INCL_LIB_HUGHES_MSQL_H
+#include "/usr/lib/Hughes/include/msql.h"
 #endif
+#endif
+
+#ifdef USE_MYSQL
+#ifdef INCL_LOCAL_MYSQL_H
+#include "/usr/local/include/mysql.h"
+#endif
+#ifdef INCL_LOCAL_INCLUDE_MYSQL_MYSQL_H
+#include "/usr/local/include/mysql/mysql.h"
+#endif
+#ifdef INCL_LOCAL_MYSQL_MYSQL_H
+#include "/usr/local/mysql/include/mysql.h"
+#endif
+#ifdef INCL_MYSQL_MYSQL_H
+#include "/usr/include/mysql/mysql.h"
+#endif
+#endif
+
+typedef union dbconn_u {
+#ifdef USE_MSQL
+    struct tmp_msql {
+	int handle;
+	m_result * result_set;
+    } msql;
+#endif
+#ifdef USE_MYSQL
+    struct tmp_mysql {
+	char errormsg[256];
+	MYSQL *handle;
+	MYSQL_RES *results;
+    } mysql;
+#endif
+} dbconn_t;
+
+/*
+ * Structure so we can have a lookup table for the specific database
+ */
+typedef struct db_defn_s {
+    char *name;
+    int (*connect)(dbconn_t *, char *, char *, char *, char *);
+    int (*close)(dbconn_t *);
+    int (*execute)(dbconn_t *, char *);
+    array_t * (*fetch)(dbconn_t *, int);
+    int (*commit)(dbconn_t *);
+    int (*rollback)(dbconn_t *);
+    void (*cleanup)(dbconn_t *);
+    void (*status)(dbconn_t *, outbuffer_t *);
+    char * (*error)(dbconn_t *);
+} db_defn_t;
+
+#define DB_FLAG_EMPTY	0x1
 
 typedef struct _db {
-    struct _db *next;
-    struct _db *prior;
-    int handle;
-    char errmsg[255];
-#ifdef MSQL
-    m_result *result_set;
-#endif
-#ifdef MY_SQL
-    MYSQL *my_handle;
-    MYSQL_RES *result_set;
-#endif
+    int flags;
+    db_defn_t *type;
+    dbconn_t c;
 } db_t;
 
-#ifdef MSQL
-char *db_error P1(int, hdl);
-#endif
-#ifdef MY_SQL
-char *mysql_db_error P1(MYSQL *, hdl);
-#endif
-db_t *create_db_conn P1(int, sock);
-void free_db_conn P1(int, sock);
-db_t *valid_db_conn P1(int, hdl);
+void db_cleanup PROT((void));
 
-#endif /* l_db_h */
+#endif	/* PACKAGES_DB */
+
+#endif	/* PACKAGES_DB_H */

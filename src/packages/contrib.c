@@ -338,7 +338,7 @@ void f_functions PROT((void)) {
     progp = sp->u.ob->prog;
     num = progp->num_functions_defined + progp->last_inherited;
     if (progp->num_functions_defined &&
-        progp->function_table[progp->num_functions_defined-1].name[0]
+        progp->function_table[progp->num_functions_defined-1].funcname[0]
         == APPLY___INIT_SPECIAL_CHAR)
         num--;
         
@@ -385,7 +385,7 @@ void f_functions PROT((void)) {
             
             subvec->item[0].type = T_STRING;
             subvec->item[0].subtype = STRING_SHARED;
-            subvec->item[0].u.string = ref_string(funp->name);
+            subvec->item[0].u.string = ref_string(funp->funcname);
 
             subvec->item[1].type = T_NUMBER;
             subvec->item[1].subtype = 0;
@@ -410,7 +410,7 @@ void f_functions PROT((void)) {
         } else {
             vec->item[i].type = T_STRING;
             vec->item[i].subtype = STRING_SHARED;
-            vec->item[i].u.string = ref_string(funp->name);
+            vec->item[i].u.string = ref_string(funp->funcname);
         }
     }
     
@@ -1389,7 +1389,7 @@ void f_replaceable PROT((void)) {
     for (i = 0; i < num; i++) {
         if (prog->function_flags[i] & (FUNC_INHERITED | FUNC_NO_CODE)) continue;
         for (j = 0; j < numignore; j++)
-            if (ignore[j] == find_func_entry(prog, i)->name)
+            if (ignore[j] == find_func_entry(prog, i)->funcname)
                 break;
         if (j == numignore)
             break;
@@ -1928,7 +1928,7 @@ void f_network_stats PROT((void))
     if (ports) {
         for (i = 0;  i < 5;  i++) {
             if (external_port[i].port) {
-                char buf[30];
+                char buf[40];
 
                 sprintf(buf, "incoming packets port %d", external_port[i].port);
                 add_mapping_pair(m, buf, external_port[i].in_packets);

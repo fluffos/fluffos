@@ -301,7 +301,7 @@ inheritance:
 			+ prev_inherit->prog->num_functions_defined
 			+ prev_inherit->prog->last_inherited;
 		    if (prev_inherit->prog->num_functions_defined &&
-			prev_inherit->prog->function_table[prev_inherit->prog->num_functions_defined - 1].name[0] == '#')
+			prev_inherit->prog->function_table[prev_inherit->prog->num_functions_defined - 1].funcname[0] == APPLY___INIT_SPECIAL_CHAR)
 			inherit.function_index_offset--;
 		} else inherit.function_index_offset = 0;
 		
@@ -596,7 +596,7 @@ type_decl:
 			sme = (class_member_entry_t *)mem_block[A_CLASS_MEMBER].block + sd->index;
 			while (i--) {
 			    /* check for matching names and types */
-			    if (strcmp(PROG_STRING(sme[i].name), locals_ptr[i].ihe->name) != 0 ||
+			    if (strcmp(PROG_STRING(sme[i].membername), locals_ptr[i].ihe->name) != 0 ||
 				sme[i].type != (type_of_locals_ptr[i] & ~LOCAL_MODS)) {
 				raise_error = 1;
 				break;
@@ -606,7 +606,7 @@ type_decl:
 		}
 
 		if (raise_error) {
-		    char buf[256];
+		    char buf[512];
 		    char *end = EndOf(buf);
 		    char *p;
 
@@ -617,12 +617,12 @@ type_decl:
 		    sd = (class_def_t *)allocate_in_mem_block(A_CLASS_DEF, sizeof(class_def_t));
 		    i = sd->size = current_number_of_locals;
 		    sd->index = mem_block[A_CLASS_MEMBER].current_size / sizeof(class_member_entry_t);
-		    sd->name = $<number>5;
+		    sd->classname = $<number>5;
 
 		    sme = (class_member_entry_t *)allocate_in_mem_block(A_CLASS_MEMBER, sizeof(class_member_entry_t) * current_number_of_locals);
 
 		    while (i--) {
-			sme[i].name = store_prog_string(locals_ptr[i].ihe->name);
+			sme[i].membername = store_prog_string(locals_ptr[i].ihe->name);
 			sme[i].type = type_of_locals_ptr[i] & ~LOCAL_MODS;
 		    }
 		}

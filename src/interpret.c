@@ -245,9 +245,9 @@ static char *check_shadow_functions P2(program_t *, shadow, program_t *, victim)
     program_t *prog;
     
     for (i = 0; i < shadow->num_functions_defined; i++) {
-  prog = ffbn_recurse(victim, shadow->function_table[i].name, &index, &runtime_index);
+  prog = ffbn_recurse(victim, shadow->function_table[i].funcname, &index, &runtime_index);
   if (prog && (victim->function_flags[runtime_index] & DECL_NOMASK))
-      return prog->function_table[index].name;
+      return prog->function_table[index].funcname;
     }
     return 0;
 }
@@ -3806,33 +3806,33 @@ static program_t *ffbn_recurse P4(program_t *, prog, char *, name,
     
     /* Search our function table */
     while (high >= low) {
-  mid = (high + low) >> 1;
-  p = prog->function_table[mid].name;
-  if (name < p) high = mid - 1;
-  else if (name > p) low = mid + 1;
-  else {
-      ri = mid + prog->last_inherited;
+      mid = (high + low) >> 1;
+      p = prog->function_table[mid].funcname;
+      if (name < p) high = mid - 1;
+      else if (name > p) low = mid + 1;
+      else {
+        ri = mid + prog->last_inherited;
       
-      if (prog->function_flags[ri] & 
-    (FUNC_UNDEFINED | FUNC_PROTOTYPE)) {
-    return 0;
+        if (prog->function_flags[ri] & 
+            (FUNC_UNDEFINED | FUNC_PROTOTYPE)) {
+          return 0;
+        }
+        
+        *index = mid;
+        *runtime_index = ri;
+        return prog;
       }
-
-      *index = mid;
-      *runtime_index = ri;
-      return prog;
-  }
     }
 
     /* Search inherited function tables */
     mid = prog->num_inherited;
     while (mid--) {
-  program_t *ret = ffbn_recurse(prog->inherit[mid].prog, name, index, 
-              runtime_index);
-  if (ret) {
-      *runtime_index += prog->inherit[mid].function_index_offset;
-      return ret;
-  }
+      program_t *ret = ffbn_recurse(prog->inherit[mid].prog, name, index, 
+                                    runtime_index);
+      if (ret) {
+        *runtime_index += prog->inherit[mid].function_index_offset;
+        return ret;
+      }
     }
     return 0;
 }
@@ -3847,23 +3847,23 @@ static program_t *ffbn_recurse2 P6(program_t *, prog, char *, name,
 
     /* Search our function table */
     while (high >= low) {
-  mid = (high + low) >> 1;
-  p = prog->function_table[mid].name;
-  if (name < p) high = mid - 1;
-  else if (name > p) low = mid + 1;
-  else {
-      ri = mid + prog->last_inherited;
-      
-      if (prog->function_flags[ri] &
-    (FUNC_UNDEFINED | FUNC_PROTOTYPE)) {
-    return 0;
-      }
+      mid = (high + low) >> 1;
+      p = prog->function_table[mid].funcname;
+      if (name < p) high = mid - 1;
+      else if (name > p) low = mid + 1;
+      else {
+        ri = mid + prog->last_inherited;
+        
+        if (prog->function_flags[ri] &
+            (FUNC_UNDEFINED | FUNC_PROTOTYPE)) {
+          return 0;
+        }
 
-      *index = mid;
-      *runtime_index = ri;
-      *fio = *vio = 0;
-      return prog;
-  }
+        *index = mid;
+        *runtime_index = ri;
+        *fio = *vio = 0;
+        return prog;
+      }
     }
 
     /* Search inherited function tables */
@@ -3986,8 +3986,10 @@ void check_co_args2 P4(unsigned short *, types, int, num_arg, char *, name, char
             type_name(exptype), type_name((sp-argc)->type));
 #ifdef CALL_OTHER_WARN
       if(current_prog){
-        find_line(pc, current_prog, &current_file, &current_line);
-        smart_log(current_file, current_line, buf, 1);
+	char *file;
+	int line;
+        find_line(pc, current_prog, &file, &line);
+        smart_log(file, line, buf, 1);
       } else 
         smart_log("driver", 0, buf, 1);
 #else
@@ -4000,14 +4002,16 @@ void check_co_args2 P4(unsigned short *, types, int, num_arg, char *, name, char
 void check_co_args P4(int, num_arg, program_t *, prog, function_t *, fun, int, index) {
 #ifdef CALL_OTHER_TYPE_CHECK
   if(num_arg != fun->num_arg){
-    char buf[255];
+    char buf[1024];
     //if(!current_prog) what do i need this for again?
     // current_prog = master_ob->prog;
-    sprintf(buf, "Wrong number of arguments to %s in %s.\n", fun->name, prog->name);
+    sprintf(buf, "Wrong number of arguments to %s in %s.\n", fun->funcname, prog->name);
 #ifdef CALL_OTHER_WARN
     if(current_prog){
-      find_line(pc, current_prog, &current_file, &current_line);
-      smart_log(current_file, current_line, buf, 1);
+      char *file;
+      int line;
+      find_line(pc, current_prog, &file, &line);
+      smart_log(file, line, buf, 1);
     } else
       smart_log("driver", 0, buf, 1);
 #else
@@ -4018,7 +4022,7 @@ void check_co_args P4(int, num_arg, program_t *, prog, function_t *, fun, int, i
   if(num_arg && prog->type_start &&
      prog->type_start[index] != INDEX_START_NONE)
     check_co_args2(&prog->argument_types[prog->type_start[index]], num_arg,
-                   fun->name, prog->name);
+                   fun->funcname, prog->name);
 #endif
 }
 
@@ -4081,7 +4085,7 @@ int apply_low P3(char *, fun, object_t *, ob, int, num_arg)
     ix = (pfun >> 2)^(pfun >> (2 + APPLY_CACHE_BITS))^(pprog >> 2)^(pprog >> (2 + APPLY_CACHE_BITS));
     entry = &cache[ix & cache_mask];
     if (entry->oprogp == progp && 
-  (entry->progp ? (strcmp(entry->funp->name, fun) == 0) :
+  (entry->progp ? (strcmp(entry->funp->funcname, fun) == 0) :
       strcmp((char *)entry->funp, fun) == 0)) {
 #ifdef CACHE_STATS
   apply_low_cache_hits++;
@@ -4329,7 +4333,7 @@ void call___INIT P1(object_t *, ob)
     
     /* ___INIT turns out to be always the last function */
     cfp = &progp->function_table[num_functions - 1];
-    if (cfp->name[0] != APPLY___INIT_SPECIAL_CHAR) return;
+    if (cfp->funcname[0] != APPLY___INIT_SPECIAL_CHAR) return;
     push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);
     current_prog = progp;
     csp->fr.table_index = num_functions - 1;
@@ -4426,33 +4430,33 @@ char *function_name P2(program_t *, prog, int, index) {
 
     /* Walk up the inheritance tree to the real definition */ 
     if (prog->function_flags[index] & FUNC_ALIAS) {
-  index = prog->function_flags[index] & ~FUNC_ALIAS;
+      index = prog->function_flags[index] & ~FUNC_ALIAS;
     }
     
     while (prog->function_flags[index] & FUNC_INHERITED) {
-  low = 0;
-  high = prog->num_inherited -1;
+      low = 0;
+      high = prog->num_inherited -1;
   
-  while (high > low) {
-      mid = (low + high + 1) >> 1;
-      if (prog->inherit[mid].function_index_offset > index)
-    high = mid -1;
-      else low = mid;
-  }
-  index -= prog->inherit[low].function_index_offset;
-  prog = prog->inherit[low].prog;
+      while (high > low) {
+        mid = (low + high + 1) >> 1;
+        if (prog->inherit[mid].function_index_offset > index)
+          high = mid -1;
+        else low = mid;
+      }
+      index -= prog->inherit[low].function_index_offset;
+      prog = prog->inherit[low].prog;
     }
     
     index -= prog->last_inherited;
 
-    return prog->function_table[index].name;
+    return prog->function_table[index].funcname;
 }
  
 static void get_trace_details P5(program_t *, prog, int, index,
          char **, fname, int *, na, int *, nl) {
     function_t *cfp = &prog->function_table[index];
 
-    *fname = cfp->name;
+    *fname = cfp->funcname;
     *na = cfp->num_arg;
     *nl = cfp->num_local;
 }

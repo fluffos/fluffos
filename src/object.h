@@ -145,7 +145,7 @@ typedef int (* get_objectsfn_t) PROT((object_t *, void *));
                               ob->ref++; \
                               debug(d_flag, \
                               ("Add_ref %s (%d) from %s\n", \
-                                     ob->name, ob->ref, str));\
+                                     ob->obname, ob->ref, str));\
                               )
 #else
 #define add_ref(ob, str) ob->ref++

@@ -440,7 +440,7 @@ mudlib_stats_t *set_backbone_domain P1(char *, str)
 static char *domain_for_file P1(char *, file)
 {
     svalue_t *ret;
-    static char buff[50];
+    static char buff[512];
 
     share_and_push_string(file);
     ret = apply_master_ob(APPLY_DOMAIN_FILE, 1);

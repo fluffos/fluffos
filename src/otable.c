@@ -151,10 +151,10 @@ void remove_object_hash P1(object_t *, ob)
 
     s = find_obj_n(ob->obname); /* this sets h, and cycles the ob to the front */
     if(!s)
-      return;
+      fatal("couldn't find object %s in obj_table", ob->obname);
 
     DEBUG_CHECK1(s != ob, "Remove object \"/%s\": found a different object!",
-                 ob->name);
+                 ob->obname);
 
     obj_table[h] = ob->next_hash;
     ob->next_hash = 0;

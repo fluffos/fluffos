@@ -1,6 +1,14 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
+new in FluffOS 1.15
+many local buffers (on the stack) are now bigger to avoid overflow
+class names, class member names and function names are no longer stored as 
+	name, but as classname, membername and funcname instead (for easier
+	debugging)
+now uses the v22.2 database code instead of forward ported v22.1
+fixed bug in call_other type warnings
+
 new in FluffOS 1.14
 changed size of a local sprintf buffer from 100 to 1024 (100 must be really 
 	easy to reach)
@@ -15,7 +23,7 @@ fixed crasher in global_ref_list cleanup (just the crasher, i suspect the
 added base_name() efun
 
 new in FluffOS 1.12
-updated with respect to MudOS v22.2b12
+updated with respect to MudOS v22.2b13
 removed some mixing of signed and unsigned chars
 added mmap based malloc option (MMALLOC)
 added option to make call_other type errors warnings

@@ -14,7 +14,7 @@
 #include "eoperators.h"
 #include "ed.h"
 #include "file.h"
-//#include "packages/db.h"
+#include "packages/db.h"
 #include "packages/parser.h"
 #include "master.h"
 #include "add_action.h"
@@ -1912,7 +1912,7 @@ void shutdownMudOS P1(int, exit_code)
     save_stat_files();
 #endif
 #ifdef PACKAGE_DB
-    //not on dw    db_cleanup();
+    db_cleanup();
 #endif
     ipc_remove();
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
