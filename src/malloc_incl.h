@@ -9,7 +9,7 @@ typedef struct {
 void outbuf_zero PROT((outbuffer_t *));
 void outbuf_add PROT((outbuffer_t *, const char *));
 void outbuf_addchar PROT((outbuffer_t *, char));
-void CDECL outbuf_addv PROT2V(outbuffer_t *, char *);
+void CDECL outbuf_addv PROT2V(outbuffer_t *, const char *);
 void outbuf_fix PROT((outbuffer_t *));
 void outbuf_push PROT((outbuffer_t *));
 int outbuf_extend PROT((outbuffer_t *, int));

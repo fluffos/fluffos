@@ -11,7 +11,7 @@
 #define PORT_TELNET      1
 #define PORT_BINARY      2
 #define PORT_ASCII       3
-#define PORT_MUD	 4
+#define PORT_MUD         4
 
 typedef struct {
     int kind;
@@ -34,7 +34,7 @@ extern int t_flag;
 extern int comp_flag;
 extern int time_to_swap;
 extern int time_to_clean_up;
-extern char *default_fail_message;
+extern const char *default_fail_message;
 extern int boot_time;
 extern int max_cost;
 extern int max_array_size;
@@ -44,6 +44,6 @@ extern char *reserved_area;
 extern double consts[];
 extern int slow_shut_down_to_do;
 
-void CDECL debug_message PROT1V(char *);
+void CDECL debug_message PROT1V(const char *);
 
 #endif

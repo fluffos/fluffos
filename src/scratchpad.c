@@ -71,10 +71,10 @@ static void scratch_summary() {
     int i;
     
     while (p<=scr_tail) {
-	if (*p == 0) printf("0");
-	else if (*p < 32 || *p > 127) printf("*");
-	else printf("%c", *p);
-	p++;
+        if (*p == 0) printf("0");
+        else if (*p < 32 || *p > 127) printf("*");
+        else printf("%c", *p);
+        p++;
     }
     printf("\n");
     i = scr_last - scratchblock;
@@ -92,9 +92,9 @@ void scratch_destroy() {
     SDEBUG(printf("scratch_destroy\n"));
 
     while (this) {
-	next = this->next;
-	FREE(this);
-	this = next;
+        next = this->next;
+        FREE(this);
+        this = next;
     }
     scratch_head.next = 0;
     scr_last = &scratchblock[2];
@@ -102,7 +102,7 @@ void scratch_destroy() {
 }
 
 
-char *scratch_copy P1(char *, str) {
+char *scratch_copy P1(const char *, str) {
     unsigned char *from, *to, *end;
 
     SDEBUG2(printf("scratch_copy(%s):", str));
@@ -113,15 +113,15 @@ char *scratch_copy P1(char *, str) {
     end = scratch_end - 2; /* room for zero and len */
     if (end > to + 255) end = to + 255;
     while (*from && to < end)
-	*to++ = *from++;
+        *to++ = *from++;
     if (!(*from)) {
-	SDEBUG2(printf(" on scratchpad\n"));
+        SDEBUG2(printf(" on scratchpad\n"));
 
-	scr_last = scr_tail + 1;
-	*to++ = 0;
-	scr_tail = to;
-	*to = to - scr_last;
-	return (char *)scr_last;
+        scr_last = scr_tail + 1;
+        *to++ = 0;
+        scr_tail = to;
+        *to = to - scr_last;
+        return (char *)scr_last;
     }
     SDEBUG(printf(" mallocing ... "));
 
@@ -140,22 +140,22 @@ void scratch_free P1(char *, ptr) {
     SDEBUG2(printf("scratch_free(%s): ", ptr));
 
     if (Ptr == scr_last) {
-	SDEBUG2(printf("last freed\n"));
-	scratch_free_last();
+        SDEBUG2(printf("last freed\n"));
+        scratch_free_last();
     } else if (*(Ptr - 2)) {
-	sp_block_t *sbt;
+        sp_block_t *sbt;
 
-	DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC, "scratch_free called on non-scratchpad string.\n");
-	SDEBUG(printf("block freed\n"));
-	sbt = FIND_HDR(ptr);
-	if (sbt->prev)
-	    sbt->prev->next = sbt->next;
-	if (sbt->next)
-	    sbt->next->prev = sbt->prev;
-	FREE(sbt);
+        DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC, "scratch_free called on non-scratchpad string.\n");
+        SDEBUG(printf("block freed\n"));
+        sbt = FIND_HDR(ptr);
+        if (sbt->prev)
+            sbt->prev->next = sbt->next;
+        if (sbt->next)
+            sbt->next->prev = sbt->prev;
+        FREE(sbt);
     } else {
-	SDEBUG(printf("interior free\n"));
-	*ptr = 0; /* mark it as freed */
+        SDEBUG(printf("interior free\n"));
+        *ptr = 0; /* mark it as freed */
     }
 }
 
@@ -166,7 +166,7 @@ char *scratch_large_alloc P1(int, size) {
 
     spt = (sp_block_t *)DMALLOC(SIZE_WITH_HDR(size), TAG_COMPILER, "scratch_alloc");
     if ((spt->next = scratch_head.next))
-	spt->next->prev = spt;
+        spt->next->prev = spt;
     spt->prev = (sp_block_t *)&scratch_head;
     spt->block[0] = SCRATCH_MAGIC;
     scratch_head.next = spt;
@@ -178,50 +178,50 @@ char *scratch_realloc P2(char *, ptr, int, size) {
     SDEBUG(printf("scratch_realloc(%s): ", ptr));
 
      if (Ptr == scr_last) {
-	 if (size < 256 && (scr_last + size) < scratch_end) {
-	     SDEBUG(printf("on scratchpad\n"));
-	     scr_tail = scr_last + size;
-	     *scr_tail = size;
-	     return ptr;
-	 } else {
-	     char *res;
-	     SDEBUG(printf("copy off ... "));
-	     res = scratch_large_alloc(size);
-	     strcpy(res, ptr);
-	     scratch_free_last();
-	     return res;
-	 }
+         if (size < 256 && (scr_last + size) < scratch_end) {
+             SDEBUG(printf("on scratchpad\n"));
+             scr_tail = scr_last + size;
+             *scr_tail = size;
+             return ptr;
+         } else {
+             char *res;
+             SDEBUG(printf("copy off ... "));
+             res = scratch_large_alloc(size);
+             strcpy(res, ptr);
+             scratch_free_last();
+             return res;
+         }
      } else if (*(Ptr - 2)) {
-	 sp_block_t *sbt, *newsbt;
+         sp_block_t *sbt, *newsbt;
 
-	DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC, "scratch_realloc on non-scratchpad string.\n");
-	 SDEBUG(printf("block\n"));
-	 sbt = FIND_HDR(ptr);
-	 newsbt = (sp_block_t *)DREALLOC(sbt, SIZE_WITH_HDR(size),
-					 TAG_COMPILER, "scratch_realloc");
-	 newsbt->prev->next = newsbt;
-	 if (newsbt->next)
-	     newsbt->next->prev = newsbt;
-	 return (char *)&newsbt->block[2];
+        DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC, "scratch_realloc on non-scratchpad string.\n");
+         SDEBUG(printf("block\n"));
+         sbt = FIND_HDR(ptr);
+         newsbt = (sp_block_t *)DREALLOC(sbt, SIZE_WITH_HDR(size),
+                                         TAG_COMPILER, "scratch_realloc");
+         newsbt->prev->next = newsbt;
+         if (newsbt->next)
+             newsbt->next->prev = newsbt;
+         return (char *)&newsbt->block[2];
      } else {
-	 char *res;
+         char *res;
 
-	 SDEBUG(printf("interior ... "));
-	 /* ACK!! it's in the middle. */
-	 if (size < 256 && (scr_tail + size + 1) < scratch_end) {
-	     SDEBUG(printf("move to end\n"));
-	     scr_last = scr_tail + 1;
-	     Strcpy(scr_last, ptr);
-	     scr_tail = scr_last + size;
-	     *scr_tail = size;
-	     res = (char *)scr_last;
-	 } else {
-	     SDEBUG(printf("copy off ... "));
-	     res = scratch_large_alloc(size);
-	     strcpy(res, ptr);
-	 }
-	 *ptr = 0; /* free the old version */
-	 return res;
+         SDEBUG(printf("interior ... "));
+         /* ACK!! it's in the middle. */
+         if (size < 256 && (scr_tail + size + 1) < scratch_end) {
+             SDEBUG(printf("move to end\n"));
+             scr_last = scr_tail + 1;
+             Strcpy(scr_last, ptr);
+             scr_tail = scr_last + size;
+             *scr_tail = size;
+             res = (char *)scr_last;
+         } else {
+             SDEBUG(printf("copy off ... "));
+             res = scratch_large_alloc(size);
+             strcpy(res, ptr);
+         }
+         *ptr = 0; /* free the old version */
+         return res;
      }
 }
 
@@ -229,12 +229,12 @@ char *scratch_realloc P2(char *, ptr, int, size) {
 char *scratch_alloc P1(int, size) {
     SDEBUG(printf("scratch_alloc(%i)\n", size));
     if (size < 256 && (scr_tail + size + 1) < scratch_end) {
-	scr_last = scr_tail + 1;
-	scr_tail = scr_last + size;
-	*scr_tail = size;
-	return (char *)scr_last;
+        scr_last = scr_tail + 1;
+        scr_tail = scr_last + size;
+        *scr_tail = size;
+        return (char *)scr_last;
     } else
-	return scratch_large_alloc(size);
+        return scratch_large_alloc(size);
 }
 
 char *scratch_join P2(char *, s1, char *, s2) {
@@ -243,37 +243,37 @@ char *scratch_join P2(char *, s1, char *, s2) {
 
     SDEBUG(printf("scratch_join\n"));
     if (*(s1-2) || *(s2-2)) {
-	int l = strlen(s1);
+        int l = strlen(s1);
 
-	DEBUG_CHECK(*(S1 - 2) && *(S1 - 2) != SCRATCH_MAGIC, "argument 1 to scratch_join was not a scratchpad string.\n");
-	DEBUG_CHECK(*(S2 - 2) && *(S2 - 2) != SCRATCH_MAGIC, "argument 2 to scratch_join was not a scratchpad string.\n");
+        DEBUG_CHECK(*(S1 - 2) && *(S1 - 2) != SCRATCH_MAGIC, "argument 1 to scratch_join was not a scratchpad string.\n");
+        DEBUG_CHECK(*(S2 - 2) && *(S2 - 2) != SCRATCH_MAGIC, "argument 2 to scratch_join was not a scratchpad string.\n");
 
-	res = scratch_realloc(s1, l + strlen(s2) + 1);
-	strcpy(res + l, s2);
-	scratch_free(s2);
-	return res;
+        res = scratch_realloc(s1, l + strlen(s2) + 1);
+        strcpy(res + l, s2);
+        scratch_free(s2);
+        return res;
     } else {
-	/* This assumes that S1 and S2 were the last two things allocated.
-	   Make sure this is true */
-	DEBUG_CHECK(S2 != scr_last, "Argument 2 to scratch_join was not the last allocated string.\n");
-	DEBUG_CHECK(S1 != (scr_last - 1 - (*(scr_last - 1))), "Argument 1 to scratch_join was not the second to last allocated string.\n");
+        /* This assumes that S1 and S2 were the last two things allocated.
+           Make sure this is true */
+        DEBUG_CHECK(S2 != scr_last, "Argument 2 to scratch_join was not the last allocated string.\n");
+        DEBUG_CHECK(S1 != (scr_last - 1 - (*(scr_last - 1))), "Argument 1 to scratch_join was not the second to last allocated string.\n");
 
-	if ((tmp = ((scr_tail - S1) - 2)) < 256) {
-	    scr_tail = scr_last - 2;
-	    do {
-		*scr_tail = *(scr_tail + 2);
-	    } while (*scr_tail++);
-	    *scr_tail = tmp;
-	    scr_last = S1;
-	    return s1;
-	} else {
-	    char *ret = scratch_large_alloc(tmp);
-	    strcpy(ret, s1);
-	    strcpy(ret + (scr_last - S1) - 2, s2);
-	    scratch_free(s1);
-	    scratch_free(s2);
-	    return ret;
-	}
+        if ((tmp = ((scr_tail - S1) - 2)) < 256) {
+            scr_tail = scr_last - 2;
+            do {
+                *scr_tail = *(scr_tail + 2);
+            } while (*scr_tail++);
+            *scr_tail = tmp;
+            scr_last = S1;
+            return s1;
+        } else {
+            char *ret = scratch_large_alloc(tmp);
+            strcpy(ret, s1);
+            strcpy(ret + (scr_last - S1) - 2, s2);
+            scratch_free(s1);
+            scratch_free(s2);
+            return ret;
+        }
     }
 }
 
@@ -288,32 +288,32 @@ char *scratch_copy_string P1(char *,s) {
     if (l > 255) l = 255;
     s++;
     while (l--) {
-	if (*s == '\\') {
-	    switch (*++s) {
-	    case 'n': *to++ = '\n'; break;
-	    case 't': *to++ = '\t'; break;
-	    case 'r': *to++ = '\r'; break;
-	    case 'b': *to++ = '\b'; break;
-	    case '"':
-	    case '\\': *to++ = *s; break;
-	    default:
-		*to++ = *s;
-		yywarn("Unknown \\x char.");
-	    }
-	    s++;
-	} else if (*s == '"') {
-	    *to++ = 0;
-	    if (!l && (to == scratch_end)) {
-		res = scratch_large_alloc(to - scr_tail - 1);
-		Strcpy(res, scr_tail + 1);
-		return res;
-	    }
-	    scr_last = scr_tail + 1;
-	    scr_tail = to;
-	    *to = to - scr_last;
-	    return (char *)scr_last;
-	} else
-	    *to++ = *s++;
+        if (*s == '\\') {
+            switch (*++s) {
+            case 'n': *to++ = '\n'; break;
+            case 't': *to++ = '\t'; break;
+            case 'r': *to++ = '\r'; break;
+            case 'b': *to++ = '\b'; break;
+            case '"':
+            case '\\': *to++ = *s; break;
+            default:
+                *to++ = *s;
+                yywarn("Unknown \\x char.");
+            }
+            s++;
+        } else if (*s == '"') {
+            *to++ = 0;
+            if (!l && (to == scratch_end)) {
+                res = scratch_large_alloc(to - scr_tail - 1);
+                Strcpy(res, scr_tail + 1);
+                return res;
+            }
+            scr_last = scr_tail + 1;
+            scr_tail = to;
+            *to = to - scr_last;
+            return (char *)scr_last;
+        } else
+            *to++ = *s++;
     }
     /* estimate the length we need */
     /* Note that the last char is we read is ", not \0 - Sym */
@@ -321,24 +321,24 @@ char *scratch_copy_string P1(char *,s) {
     Strncpy(res, (scr_tail + 1), (to - scr_tail) - 1);
     to = Res + (to - scr_tail) - 1;
     for (;;) {
-	if (*s == '\\') {
-	    switch (*++s) {
-	    case 'n': *to++ = '\n'; break;
-	    case 't': *to++ = '\t'; break;
-	    case 'r': *to++ = '\r'; break;
-	    case 'b': *to++ = '\b'; break;
-	    case '"':
-	    case '\\': *to++ = *s; break;
-	    default:
-		*to++ = *s;
-		yywarn("Unknown \\x char.");
-	    }
-	    s++;
-	} else if (*s == '"') {
-	    *to++ = 0;
-	    return res;
-	} else
-	    *to++ = *s++;
+        if (*s == '\\') {
+            switch (*++s) {
+            case 'n': *to++ = '\n'; break;
+            case 't': *to++ = '\t'; break;
+            case 'r': *to++ = '\r'; break;
+            case 'b': *to++ = '\b'; break;
+            case '"':
+            case '\\': *to++ = *s; break;
+            default:
+                *to++ = *s;
+                yywarn("Unknown \\x char.");
+            }
+            s++;
+        } else if (*s == '"') {
+            *to++ = 0;
+            return res;
+        } else
+            *to++ = *s++;
     }
 }
 

@@ -111,11 +111,11 @@ int data_size P1(object_t *, ob)
     return total;
 }
 
-void dumpstat P1(char *, tfn)
+void dumpstat P1(const char *, tfn)
 {
     FILE *f;
     object_t *ob;
-    char *fn;
+    const char *fn;
 #ifdef F_SET_HIDE
     int display_hidden;
 #endif

@@ -205,9 +205,9 @@ INLINE_STATIC array_t *resize_array P2(array_t *, p, int, n) {
     return p;
 }
 
-array_t *explode_string P4(char *, str, int, slen, char *, del, int, len)
+array_t *explode_string P4(const char *, str, int, slen, const char *, del, int, len)
 {
-    char *p, *beg, *lastdel = 0;
+    const char *p, *beg, *lastdel = 0;
     int num, j, limit;
     array_t *ret;
     char *buff, *tmp;
@@ -393,7 +393,7 @@ array_t *explode_string P4(char *, str, int, slen, char *, del, int, len)
     return ret;
 }
 
-char *implode_string P3(array_t *, arr, char *, del, int, del_len)
+char *implode_string P3(array_t *, arr, const char *, del, int, del_len)
 {
     int size, i, num;
     char *p, *q;
@@ -425,7 +425,7 @@ char *implode_string P3(array_t *, arr, char *, del, int, del_len)
     return q;
 }
 
-void implode_array P4(funptr_t *, fp, array_t *, arr, 
+void implode_array P4(funptr_t *, fptr, array_t *, arr, 
                       svalue_t *, dest, int, first_on_stack) {
     int i = 0, n;
     svalue_t *v;
@@ -450,7 +450,7 @@ void implode_array P4(funptr_t *, fp, array_t *, arr,
         
     while (1) {
         push_svalue(&arr->item[i++]);
-        v = call_function_pointer(fp, 2);
+        v = call_function_pointer(fptr, 2);
         if (!v) {
             *dest = const0;
             return;
@@ -669,7 +669,7 @@ filter_string P2(svalue_t *, arg, int, num_arg)
         
         unlink_string_svalue(arg);
         size = SVALUE_STRLEN(arg);
-        str = arg->u.string;
+        str = (char *) arg->u.string;
         
         process_efun_callback(1, &ftc, F_FILTER);
 
@@ -778,8 +778,8 @@ void f_unique_array PROT((void)) {
     svalue_t *skipval, *sv, *svp;
     unique_list_t *unlist;
     unique_t **head, *uptr, *nptr;
-    funptr_t *fp = 0;
-    char *func;
+    funptr_t *fptr = 0;
+    const char *func;
     
     size = (v = (sp - num_arg + 1)->u.arr)->size;
     if (!size) {
@@ -790,12 +790,12 @@ void f_unique_array PROT((void)) {
 
     if (num_arg == 3) {
         skipval = sp;
-        if ((sp-1)->type == T_FUNCTION) fp = (sp-1)->u.fp;
+        if ((sp-1)->type == T_FUNCTION) fptr = (sp-1)->u.fp;
         else func = (sp-1)->u.string;
     }
     else {
         skipval = &const0;
-        if (sp->type == T_FUNCTION) fp = sp->u.fp;
+        if (sp->type == T_FUNCTION) fptr = sp->u.fp;
         else func = sp->u.string;
     }
 
@@ -810,9 +810,9 @@ void f_unique_array PROT((void)) {
     sp->u.error_handler = unique_array_error_handler;
     
     for (i = 0; i < size; i++) {
-        if (fp) {
+        if (fptr) {
             push_svalue(v->item + i);
-            sv = call_function_pointer(fp, 1);
+            sv = call_function_pointer(fptr, 1);
         } else if ((v->item + i)->type == T_OBJECT) {
             sv = apply(func, (v->item + i)->u.ob, 0, ORIGIN_EFUN);
         } else sv = 0;
@@ -1030,11 +1030,11 @@ map_string P2(svalue_t *, arg, int, num_arg)
 {
     char *arr;
     char *p;
-    funptr_t *fp = 0;
+    funptr_t *fptr = 0;
     int numex = 0;
     object_t *ob = 0;
     svalue_t *extra, *v;
-    char *func;
+    const char *func;
 
     /* get a modifiable string */
     /* do not use arg after this; it has been copied or freed.
@@ -1042,10 +1042,10 @@ map_string P2(svalue_t *, arg, int, num_arg)
        error (note it is also in the right spot for the return value).
      */
     unlink_string_svalue(arg);
-    arr = arg->u.string;
+    arr = (char *)arg->u.string;
 
     if (arg[1].type == T_FUNCTION) {
-        fp = arg[1].u.fp;
+        fptr = arg[1].u.fp;
         if (num_arg > 2) extra = arg + 2, numex = num_arg - 2;
     }
     else {
@@ -1065,7 +1065,7 @@ map_string P2(svalue_t *, arg, int, num_arg)
     for (p = arr; *p; p++) {
         push_number((unsigned char)*p);
         if (numex) push_some_svalues(extra, numex);
-        v = fp ? call_function_pointer(fp, numex + 1) : apply(func, ob, 1 + numex, ORIGIN_EFUN);
+        v = fptr ? call_function_pointer(fptr, numex + 1) : apply(func, ob, 1 + numex, ORIGIN_EFUN);
         /* no function or illegal return value is unaltered.
          * Anyone got a better idea?  A few idea:
          * (1) insert strings? - algorithm needs changing
@@ -1807,7 +1807,7 @@ array_t *union_array P2(array_t *, a1, array_t *, a2) {
     return a3;
 }
 
-int match_single_regexp P2(char *, str, char *, pattern) {
+int match_single_regexp P2(const char *, str, const char *, pattern) {
     struct regexp *reg;
     int ret;
     
@@ -1819,7 +1819,7 @@ int match_single_regexp P2(char *, str, char *, pattern) {
     return ret;
 }
 
-array_t *match_regexp P3(array_t *, v, char *, pattern, int, flag) {
+array_t *match_regexp P3(array_t *, v, const char *, pattern, int, flag) {
     struct regexp *reg;
     char *res;
     int num_match, size, match = !(flag & 2);
@@ -1896,7 +1896,7 @@ array_t *deep_inherit_list P1(object_t *, ob)
         pr = plist[il + 1];
         ret->item[il].type = T_STRING;
         ret->item[il].subtype = STRING_MALLOC;
-        ret->item[il].u.string = add_slash(pr->name);
+        ret->item[il].u.string = add_slash(pr->filename);
     }
     return ret;
 }
@@ -1927,7 +1927,7 @@ array_t *inherit_list P1(object_t *, ob)
         pr = plist[il + 1];
         ret->item[il].type = T_STRING;
         ret->item[il].subtype = STRING_MALLOC;
-        ret->item[il].u.string = add_slash(pr->name);
+        ret->item[il].u.string = add_slash(pr->filename);
     }
     return ret;
 }
@@ -1944,7 +1944,7 @@ static int children_filter P2(object_t *, ob, children_filter_t *, cf)
 }
 
 array_t *
-children P1(char *, str)
+children P1(const char *, str)
 {
     int count;
     children_filter_t cf;
@@ -2002,7 +2002,7 @@ array_t *livings()
 void f_objects PROT((void))
 {
     int count, i;
-    char *func = 0;
+    const char *func = 0;
     object_t **list;
     array_t *ret;
     funptr_t *f = 0;
@@ -2067,9 +2067,9 @@ void f_objects PROT((void))
  * })
  *
  */
-array_t *reg_assoc P4(char *, str, array_t *, pat, array_t *, tok, svalue_t *, def) {
+array_t *reg_assoc P4(const char *, str, array_t *, pat, array_t *, tok, svalue_t *, def) {
     int i, size;
-    char *tmp;
+    const char *tmp;
     array_t *ret;
     
     regexp_user = EFUN_REGEXP;
@@ -2087,14 +2087,14 @@ array_t *reg_assoc P4(char *, str, array_t *, pat, array_t *, tok, svalue_t *, d
         struct regexp **rgpp;
         struct reg_match {
             int tok_i;
-            char *begin, *end;
+            const char *begin, *end;
             struct reg_match *next;
         } *rmp = (struct reg_match *) 0, *rmph = (struct reg_match *) 0;
         int num_match = 0, length;
         svalue_t *sv1, *sv2, *sv;
-        int index;
+        int regindex;
         struct regexp *tmpreg;
-        char *laststart, *currstart;
+        const char *laststart, *currstart;
  
         rgpp = CALLOCATE(size, struct regexp *, TAG_TEMPORARY, "reg_assoc : rgpp");
         for (i = 0; i < size; i++) {
@@ -2115,23 +2115,23 @@ array_t *reg_assoc P4(char *, str, array_t *, pat, array_t *, tok, svalue_t *, d
              /* so as to minimize checks here - Randor 5/30/94 */
  
             laststart = 0;
-            index = -1;
+            regindex = -1;
  
             for (i = 0; i < size; i++) {
                 if (regexec(tmpreg = rgpp[i], tmp)) {
                     currstart = tmpreg->startp[0];
                     if (tmp == currstart) {
-                        index = i;
+                        regindex = i;
                         break;
                     }
                     if (!laststart || currstart < laststart) {
                         laststart = currstart;
-                        index = i;
+                        regindex = i;
                     }
                 }
             }
  
-            if (index >= 0) {
+            if (regindex >= 0) {
                 num_match++;
                 if (rmp) {
                     rmp->next = ALLOCATE(struct reg_match, 
@@ -2140,10 +2140,10 @@ array_t *reg_assoc P4(char *, str, array_t *, pat, array_t *, tok, svalue_t *, d
                 }
                 else rmph = rmp =
                     ALLOCATE(struct reg_match, TAG_TEMPORARY, "reg_assoc : rmp");
-                tmpreg = rgpp[index];
+                tmpreg = rgpp[regindex];
                 rmp->begin = tmpreg->startp[0];
                 rmp->end = tmp = tmpreg->endp[0];
-                rmp->tok_i = index; 
+                rmp->tok_i = regindex; 
                 rmp->next = (struct reg_match *) 0;
             }
             else break;
@@ -2171,7 +2171,7 @@ array_t *reg_assoc P4(char *, str, array_t *, pat, array_t *, tok, svalue_t *, d
             length = rmp->begin - tmp;
             sv1->type = T_STRING;
             sv1->subtype = STRING_MALLOC;
-            svtmp = sv1->u.string = new_string(length, "reg_assoc : sv1");
+            sv1->u.string = svtmp= new_string(length, "reg_assoc : sv1");
             strncpy(svtmp, tmp, length);
             svtmp[length] = 0;
             sv1++;
@@ -2180,7 +2180,7 @@ array_t *reg_assoc P4(char *, str, array_t *, pat, array_t *, tok, svalue_t *, d
             length = rmp->end - rmp->begin;
             sv1->type = T_STRING;
             sv1->subtype = STRING_MALLOC;
-            svtmp = sv1->u.string = new_string(length, "reg_assoc : sv1");
+            sv1->u.string = svtmp = new_string(length, "reg_assoc : sv1");
             strncpy(svtmp, tmp, length);
             svtmp[length] = 0;
             sv1++;

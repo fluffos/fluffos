@@ -78,9 +78,9 @@ static int    create_db_conn PROT((void));
 static void   free_db_conn PROT((db_t *));
 
 #ifdef USE_MSQL
-static int      msql_connect  PROT((dbconn_t *, char *, char *, char *, char *));
+static int      msql_connect  PROT((dbconn_t *, const char *, const char *, const char *, const char *));
 static int      msql_close    PROT((dbconn_t *));
-static int      msql_execute  PROT((dbconn_t *, char *));
+static int      msql_execute  PROT((dbconn_t *, const char *));
 static array_t *msql_fetch    PROT((dbconn_t *, int));
 static void     msql_cleanup  PROT((dbconn_t *));
 static char *   msql_errormsg PROT((dbconn_t *));
@@ -91,9 +91,9 @@ static db_defn_t msql = {
 #endif
 
 #ifdef USE_MYSQL
-static int      MySQL_connect  PROT((dbconn_t *, char *, char *, char *, char *));
+static int      MySQL_connect  PROT((dbconn_t *, const char *, const char *, const char *, const char *));
 static int      MySQL_close    PROT((dbconn_t *));
-static int      MySQL_execute  PROT((dbconn_t *, char *));
+static int      MySQL_execute  PROT((dbconn_t *, const char *));
 static array_t *MySQL_fetch    PROT((dbconn_t *, int));
 static void     MySQL_cleanup  PROT((dbconn_t *));
 static char *   MySQL_errormsg PROT((dbconn_t *));
@@ -113,7 +113,7 @@ static db_defn_t no_db = {
  * security on which objects can tweak your database (we don't want
  * people doing "DELETE * FROM *" or equivalent for us)
  */
-static svalue_t *valid_database P2(char *, action, array_t *, info)
+static svalue_t *valid_database P2(const char *, action, array_t *, info)
 {
     svalue_t *ret;
 
@@ -214,7 +214,8 @@ void f_db_commit PROT((void))
 #ifdef F_DB_CONNECT
 void f_db_connect PROT((void))
 {
-    char *database, *host, *user = "", *errormsg = 0;
+    char *errormsg = 0;
+    const char *user = "", *database, *host;
     db_t *db;
     array_t *info;
     svalue_t *mret;
@@ -562,7 +563,7 @@ static int MySQL_close P1(dbconn_t *, c)
     return 1;
 }
 
-static int MySQL_execute P2(dbconn_t *, c, char *, s)
+static int MySQL_execute P2(dbconn_t *, c, const char *, s)
 {
     if (!mysql_query(c->mysql.handle, s)) {
 	c->mysql.results = mysql_store_result(c->mysql.handle);
@@ -677,7 +678,7 @@ static array_t *MySQL_fetch P2(dbconn_t *, c, int, row)
     return v;
 }
 
-static int MySQL_connect P5(dbconn_t *, c, char *, host, char *, database, char *, username, char *, password)
+static int MySQL_connect P5(dbconn_t *, c, const char *, host, const char *, database, const char *, username, const char *, password)
 {
     int ret;
     MYSQL *tmp;
@@ -728,7 +729,7 @@ static int msql_close P1(dbconn_t *, c)
     return 1;
 }
 
-static int msql_execute P2(dbconn_t *, c, char *, s)
+static int msql_execute P2(dbconn_t *, c, const char *, s)
 {
     if (msqlQuery(c->msql.handle, s) != -1) {
 	c->msql.result_set = msqlStoreResult();

@@ -49,7 +49,7 @@ INLINE int svalue_save_size P1(svalue_t *, v)
     switch(v->type) {
     case T_STRING:
         {
-            register char *cp = v->u.string;
+            register const char *cp = v->u.string;
             char c;
             int size = 0;
 
@@ -134,7 +134,8 @@ INLINE void save_svalue P2(svalue_t *, v, char **, buf)
     switch(v->type) {
     case T_STRING:
         {
-            register char *cp = *buf, *str = v->u.string;
+            register char *cp = *buf;
+            const char *str = v->u.string;
             char c;
 
             *cp++ = '"';
@@ -234,11 +235,11 @@ INLINE void save_svalue P2(svalue_t *, v, char **, buf)
 }
 
 INLINE_STATIC int
-restore_internal_size P3(char **, str, int, is_mapping, int, depth)
+restore_internal_size P3(const char **, str, int, is_mapping, int, depth)
 {
-    register char *cp = *str;
+    register const char *cp = *str;
     int size = 0;
-    char c, delim, index = 0;
+    char c, delim, toggle = 0;
 
     delim = is_mapping ? ':' : ',';
     while ((c = *cp++)) {
@@ -336,7 +337,7 @@ restore_internal_size P3(char **, str, int, is_mapping, int, depth)
                 size++;
             }
         }
-        if (is_mapping) delim = (index ^= 1) ? ',' : ':';
+        if (is_mapping) delim = (toggle ^= 1) ? ',' : ':';
     }
     return 0;
 }
@@ -344,11 +345,11 @@ restore_internal_size P3(char **, str, int, is_mapping, int, depth)
 
 
 INLINE_STATIC int
-restore_size P2(char **, str, int, is_mapping)
+restore_size P2(const char **, str, int, is_mapping)
 {
-    register char *cp = *str;
+    register const char *cp = *str;
     int size = 0;
-    char c, delim, index = 0;
+    char c, delim, toggle = 0;
 
     delim = is_mapping ? ':' : ',';
 
@@ -421,7 +422,7 @@ restore_size P2(char **, str, int, is_mapping)
                 size++;
             }
         }
-        if (is_mapping) delim = (index ^= 1) ? ',' : ':';
+        if (is_mapping) delim = (toggle ^= 1) ? ',' : ':';
     }
     return -1;
 }
@@ -430,7 +431,7 @@ INLINE_STATIC int
 restore_interior_string P2(char **, val, svalue_t *, sv)
 {
     register char *cp = *val;
-    char *start = cp;
+    char *start = cp, *newstr;
     char c;
     int len;
 
@@ -460,9 +461,10 @@ restore_interior_string P2(char **, val, svalue_t *, sv)
                     if (c == '\0') return ROB_STRING_ERROR;
                     *new = '\0';
                     *val = cp;
-                    sv->u.string = new_string(len = (new - start),
+                    newstr = new_string(len = (new - start),
                                               "restore_string");
-                    strcpy(sv->u.string, start);
+                    strcpy(newstr, start);
+                    sv->u.string = newstr;
                     sv->type = T_STRING;
                     sv->subtype = STRING_MALLOC;
                     return 0;
@@ -481,8 +483,9 @@ restore_interior_string P2(char **, val, svalue_t *, sv)
     *val = cp;
     *--cp = '\0';
     len = cp - start;
-    sv->u.string = new_string(len, "restore_string");
-    strcpy(sv->u.string, start);
+    newstr = new_string(len, "restore_string");
+    strcpy(newstr, start);
+    sv->u.string = newstr;
     sv->type = T_STRING;
     sv->subtype = STRING_MALLOC;
     return 0;
@@ -599,7 +602,7 @@ restore_mapping P2(char **,str, svalue_t *, sv)
     int err;
 
     if (save_svalue_depth) size = sizes[save_svalue_depth-1]; 
-    else if ((size = restore_size(str, 1)) < 0) return 0;
+    else if ((size = restore_size((const char **)str, 1)) < 0) return 0;
     
     if (!size) {
         *str += 2;
@@ -805,7 +808,7 @@ restore_class P2(char **, str, svalue_t *, ret)
     int err;
 
     if (save_svalue_depth) size = sizes[save_svalue_depth-1];
-    else if ((size = restore_size(str,0)) < 0) return ROB_CLASS_ERROR; 
+    else if ((size = restore_size((const char **)str,0)) < 0) return ROB_CLASS_ERROR; 
 
     v = allocate_class_by_size(size); /* after this point we have to clean up
                                          or we'll leak */
@@ -892,7 +895,7 @@ restore_array P2(char **, str, svalue_t *, ret)
     int err;
 
     if (save_svalue_depth) size = sizes[save_svalue_depth-1];
-    else if ((size = restore_size(str,0)) < 0) return ROB_ARRAY_ERROR; 
+    else if ((size = restore_size((const char **)str,0)) < 0) return ROB_ARRAY_ERROR; 
 
     v = allocate_array(size); /* after this point we have to clean up
                                  or we'll leak */
@@ -972,7 +975,7 @@ INLINE_STATIC int
 restore_string P2(char *, val, svalue_t *, sv)
 {
     register char *cp = val;
-    char *start = cp;
+    char *start = cp, *newstr;
     char c;
     int len;
 
@@ -1001,9 +1004,10 @@ restore_string P2(char *, val, svalue_t *, sv)
                     }
                     if ((c == '\0') || (*cp != '\0')) return ROB_STRING_ERROR;
                     *new = '\0';
-                    sv->u.string = new_string(new - start,
+                    newstr = new_string(new - start,
                                               "restore_string");
-                    strcpy(sv->u.string, start);
+                    strcpy(newstr, start);
+                    sv->u.string = newstr;
                     sv->type = T_STRING;
                     sv->subtype = STRING_MALLOC;
                     return 0;
@@ -1022,8 +1026,9 @@ restore_string P2(char *, val, svalue_t *, sv)
     if (*cp--) return ROB_STRING_ERROR;
     *cp = '\0';
     len = cp - start;
-    sv->u.string = new_string(len, "restore_string");
-    strcpy(sv->u.string, start);
+    newstr = new_string(len, "restore_string");
+    strcpy(newstr, start);
+    sv->u.string = newstr;
     sv->type = T_STRING;
     sv->subtype = STRING_MALLOC;
     return 0;
@@ -1152,7 +1157,7 @@ static int fgv_recurse P5(program_t *, prog, int *, idx,
     return 0;
 }
 
-int find_global_variable P4(program_t *, prog, char *, name,
+int find_global_variable P4(program_t *, prog, const char * const, name,
                             unsigned short *, type, int, check_nosave) {
     int idx = 0;
     char *str = findstring(name);
@@ -1222,7 +1227,7 @@ restore_object_from_gzip P4(object_t *, ob,
                             int, noclear, int, count)
 {
     static char *buff = NULL;
-    char* tmp = "";
+    const char* tmp = "";
     int idx;
     int t;
     
@@ -1246,11 +1251,11 @@ restore_object_from_gzip P4(object_t *, ob,
         }
         
         if (buff[0]) {
-            char *tmp = strchr(buff, '\n');
-            if (tmp) {
-                *tmp = '\0';
-                if (tmp > buff && tmp[-1] == '\r') {
-                    *(--tmp) = '\0';
+            char *tmp2 = strchr(buff, '\n');
+            if (tmp2) {
+                *tmp2 = '\0';
+                if (tmp2 > buff && tmp2[-1] == '\r') {
+                    *(--tmp2) = '\0';
                 }
             }
             restore_object_from_line(ob, buff, noclear);
@@ -1389,7 +1394,7 @@ int gz_sel = -1;
 #endif
 
 int
-save_object P3(object_t *, ob, char *, file, int, save_zeros)
+save_object P3(object_t *, ob, const char *, file, int, save_zeros)
 {
     char *name, *p;
     static char save_name[256], tmp_name[256];
@@ -1463,7 +1468,7 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
         if (!gzf) {
             error("Could not open /%s for a save.\n", tmp_name);
         }
-        if (!gzprintf(gzf, "#/%s\n", ob->prog->name)) {
+        if (!gzprintf(gzf, "#/%s\n", ob->prog->filename)) {
             error("Could not open /%s for a save.\n", tmp_name);
         }
     } else
@@ -1515,10 +1520,12 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
         }
 #ifdef HAVE_ZLIB
         else if (save_compressed) {
+            char buf[1024];
             // When compressed, unlink the uncompressed name too.
-            len = strlen(file) - gz_sel;
-            strcpy(file + len, SAVE_EXTENSION);
-            unlink(file);
+            strcpy(buf, file);
+            len = strlen(buf) - gz_sel;
+            strcpy(buf + len, SAVE_EXTENSION);
+            unlink(buf);
         }
 #endif
 
@@ -1579,7 +1586,7 @@ static void clear_non_statics P1(object_t *, ob) {
     cns_recurse(ob, &idx, ob->prog);
 }
 
-int restore_object P3(object_t *, ob, char *, file, int, noclear)
+int restore_object P3(object_t *, ob, const char *, file, int, noclear)
 {
     char *name;
     int len;
@@ -1766,7 +1773,7 @@ void tell_object P3(object_t *, ob, const char *, str, int, len)
         tell_npc(ob, str);
 }
 
-void dealloc_object P2(object_t *, ob, char *, from)
+void dealloc_object P2(object_t *, ob, const char *, from)
 {
 #ifdef DEBUG
     object_t *tmp, *prev_all = 0;
@@ -1821,7 +1828,7 @@ void dealloc_object P2(object_t *, ob, char *, from)
     FREE((char *) ob);
 }
 
-void free_object P2(object_t *, ob, char *, from)
+void free_object P2(object_t *, ob, const char * const, from)
 {
     ob->ref--;
 

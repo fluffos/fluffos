@@ -22,20 +22,23 @@
 #ifdef F_COMPRESS_FILE
 void f_compress_file PROT((void))
 {
-   int read;
+   int readb;
    int len;
    int num_arg = st_num_arg;
-   char* input_file;
-   char* output_file;
-   char* real_input_file;
-   char* real_output_file;
+   const char* input_file;
+   const char* output_file;
+   const char* real_input_file;
+   const char* real_output_file;
+   char* tmpout;
    gzFile out_file;
    FILE* in_file;
    char buf[4096];
+   char outname[1024];
 
    // Not a string?  Error!
    if ((sp - num_arg + 1)->type != T_STRING) {
       pop_n_elems(num_arg);
+      printf("not reached? (1)");
       push_number(0);
       return ;
    }
@@ -53,23 +56,27 @@ void f_compress_file PROT((void))
       if (!strcmp(input_file + len - strlen(GZ_EXTENSION), GZ_EXTENSION)) {
          // Already compressed...
          pop_n_elems(num_arg);
+         printf("not reached? (2)");
          push_number(0);
          return ;
       }
-      output_file = new_string(strlen(input_file) + strlen(GZ_EXTENSION),
+      tmpout = new_string(strlen(input_file) + strlen(GZ_EXTENSION),
                             "compress_file");
-      strcpy(output_file, input_file);
-      strcat(output_file, GZ_EXTENSION);
+      strcpy(tmpout, input_file);
+      strcat(tmpout, GZ_EXTENSION);
+      output_file = tmpout;
    }
 
    real_output_file = check_valid_path(output_file, current_object, "compress_file", 1);
    if (!real_output_file) {
       pop_n_elems(num_arg);
+      printf("not reached? (3)");
       push_number(0);
       return ;
    }
    // Copy it into our little buffer.
-   strcpy(output_file, real_output_file);
+   strcpy(outname, real_output_file);
+   output_file = outname;
 
    real_input_file = check_valid_path(input_file, current_object, "compress_file", 0);
    if (!real_input_file) {
@@ -94,9 +101,9 @@ void f_compress_file PROT((void))
    }
 
    do {
-      read = fread(buf, 1, 4096, in_file);
-      gzwrite(out_file, buf, read);
-   } while (read == 4096);
+      readb = fread(buf, 1, 4096, in_file);
+      gzwrite(out_file, buf, readb);
+   } while (readb == 4096);
    fclose(in_file);
    gzclose(out_file);
 
@@ -114,20 +121,22 @@ void f_compress_file PROT((void))
 #ifdef F_UNCOMPRESS_FILE
 void f_uncompress_file PROT((void))
 {
-   int read;
+   int readb;
    int len;
    int num_arg = st_num_arg;
-   char* input_file;
-   char* output_file;
-   char* real_input_file;
-   char* real_output_file;
+   const char* input_file;
+   const char* output_file;
+   const char* real_input_file;
+   const char* real_output_file;
    FILE* out_file;
    gzFile in_file;
    char buf[4096];
+   char outname[1024];
 
    // Not a string?  Error!
    if ((sp - num_arg + 1)->type != T_STRING) {
       pop_n_elems(num_arg);
+      printf("not reached? (4)");
       push_number(0);
       return ;
    }
@@ -141,6 +150,7 @@ void f_uncompress_file PROT((void))
       }
       output_file = (sp - num_arg + 2)->u.string;
    } else {
+      char *tmp;
       len = strlen(input_file);
       if (strcmp(input_file + len - strlen(GZ_EXTENSION), GZ_EXTENSION)) {
          // Not compressed...
@@ -148,10 +158,11 @@ void f_uncompress_file PROT((void))
          push_number(0);
          return ;
       }
-      output_file = new_string(strlen(input_file),
+      tmp = new_string(strlen(input_file),
                             "compress_file");
-      strcpy(output_file, input_file);
-      output_file[len - strlen(GZ_EXTENSION)] = 0;
+      strcpy(tmp, input_file);
+      tmp[len - strlen(GZ_EXTENSION)] = 0;
+      output_file = tmp;
    }
 
    real_output_file = check_valid_path(output_file, current_object, "compress_file", 1);
@@ -161,7 +172,8 @@ void f_uncompress_file PROT((void))
       return ;
    }
    // Copy it into our little buffer.
-   strcpy(output_file, real_output_file);
+   strcpy(outname, real_output_file);
+   output_file = outname;
 
    real_input_file = check_valid_path(input_file, current_object, "compress_file", 0);
    if (!real_input_file) {
@@ -187,9 +199,9 @@ void f_uncompress_file PROT((void))
    }
 
    do {
-      read = gzread(in_file, buf, 4096);
-      fwrite(buf, 1, read, out_file);
-   } while (read == 4096);
+      readb = gzread(in_file, buf, 4096);
+      fwrite(buf, 1, readb, out_file);
+   } while (readb == 4096);
    gzclose(in_file);
    fclose(out_file);
 
@@ -250,7 +262,7 @@ static void zlib_free(void* opaque, void* address) {
 
 void f_uncompress PROT((void))
 {
-   z_stream* compress;
+   z_stream* compressed;
    unsigned char compress_buf[COMPRESS_BUF_SIZE];
    unsigned char* output_data = NULL;
    int len;
@@ -266,19 +278,19 @@ void f_uncompress PROT((void))
       return ;
    }
 
-   compress = (z_stream *)
+   compressed = (z_stream *)
             DXALLOC(sizeof(z_stream), TAG_INTERACTIVE,
                     "start_compression");
-   compress->next_in = buffer->item;
-   compress->avail_in = buffer->size;
-   compress->next_out = compress_buf;
-   compress->avail_out = COMPRESS_BUF_SIZE;
-   compress->zalloc = zlib_alloc;
-   compress->zfree = zlib_free;
-   compress->opaque = NULL;
+   compressed->next_in = buffer->item;
+   compressed->avail_in = buffer->size;
+   compressed->next_out = compress_buf;
+   compressed->avail_out = COMPRESS_BUF_SIZE;
+   compressed->zalloc = zlib_alloc;
+   compressed->zfree = zlib_free;
+   compressed->opaque = NULL;
 
-   if (inflateInit(compress) != Z_OK) {
-      FREE(compress);
+   if (inflateInit(compressed) != Z_OK) {
+      FREE(compressed);
       pop_n_elems(st_num_arg);
       push_undefined();
       return ;
@@ -287,22 +299,22 @@ void f_uncompress PROT((void))
    len = 0;
    output_data = NULL;
    do {
-      ret = inflate(compress, 0);
+      ret = inflate(compressed, 0);
       if (ret == Z_OK) {
          pos = len;
-         len += COMPRESS_BUF_SIZE - compress->avail_out;
+         len += COMPRESS_BUF_SIZE - compressed->avail_out;
          if (!output_data) {
             output_data = (unsigned char*)DXALLOC(len, TAG_TEMPORARY, "uncompress");
          } else {
             output_data = REALLOC(output_data, len);
          }
          memcpy(output_data + pos, compress_buf, len - pos);
-         compress->next_out = compress_buf;
-         compress->avail_out = COMPRESS_BUF_SIZE;
+         compressed->next_out = compress_buf;
+         compressed->avail_out = COMPRESS_BUF_SIZE;
       }
    } while (ret == Z_OK);
 
-   inflateEnd(compress);
+   inflateEnd(compressed);
 
    pop_n_elems(st_num_arg);
 

@@ -201,7 +201,7 @@ typedef struct {
 } inherit_t;
 
 typedef struct program_s {
-    char *name;                 /* Name of file that defined prog */
+    const char *filename;                 /* Name of file that defined prog */
     unsigned short flags;
     unsigned short last_inherited;
     unsigned short ref;                 /* Reference count */
@@ -252,9 +252,9 @@ typedef struct program_s {
 
 extern int total_num_prog_blocks;
 extern int total_prog_block_size;
-void reference_prog PROT((program_t *, char *));
-void free_prog PROT((program_t *, int));
-void deallocate_program PROT((program_t *));
+void reference_prog PROT((const program_t *, const char *));
+void free_prog PROT((const program_t *, int));
+void deallocate_program PROT((const program_t *));
 char *variable_name PROT((program_t *, int));
 function_t *find_func_entry PROT((program_t *, int));
 

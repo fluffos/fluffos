@@ -9,9 +9,9 @@
 
 buffer_t null_buf =
 {
-    1,				/* Ref count, which will ensure that it will
-				 * never be deallocated */
-    0				/* size */
+    1,                          /* Ref count, which will ensure that it will
+                                 * never be deallocated */
+    0                           /* size */
 };
 
 INLINE buffer_t *
@@ -19,7 +19,7 @@ INLINE buffer_t *
 {
     null_buf.ref++;
     return &null_buf;
-}				/* null_buffer() */
+}                               /* null_buffer() */
 
 INLINE void
 free_buffer P1(buffer_t *, b)
@@ -27,10 +27,10 @@ free_buffer P1(buffer_t *, b)
     b->ref--;
     /* don't try to free the null_buffer (ref count might overflow) */
     if ((b->ref > 0) || (b == &null_buf)) {
-	return;
+        return;
     }
     FREE((char *) b);
-}				/* free_buffer() */
+}                               /* free_buffer() */
 
 buffer_t *
 allocate_buffer P1(int, size)
@@ -39,14 +39,14 @@ allocate_buffer P1(int, size)
 
 #ifndef NO_BUFFER_TYPE
     if ((size < 0) || (size > max_buffer_size)) {
-	error("Illegal buffer size.\n");
+        error("Illegal buffer size.\n");
     }
     if (size == 0) {
-	return null_buffer();
+        return null_buffer();
     }
     /* using calloc() so that memory will be zero'd out when allocated */
     buf = (buffer_t *) DCALLOC(sizeof(buffer_t) + size - 1, 1,
-				    TAG_BUFFER, "allocate_buffer");
+                                    TAG_BUFFER, "allocate_buffer");
     buf->size = size;
     buf->ref = 1;
     return buf;
@@ -55,27 +55,27 @@ allocate_buffer P1(int, size)
 #endif
 }
 
-int write_buffer P4(buffer_t *, buf, int, start, char *, str, int, theLength)
+int write_buffer P4(buffer_t *, buf, int, start, const char *, str, int, theLength)
 {
     int size;
 
     size = buf->size;
     if (start < 0) {
-	start = size + start;
-	if (start < 0) {
-	    return 0;
-	}
+        start = size + start;
+        if (start < 0) {
+            return 0;
+        }
     }
     /*
      * can't write past the end of the buffer since we can't reallocate the
      * buffer here (no easy way to propagate back the changes to the caller
      */
     if ((start + theLength) > size) {
-	return 0;
+        return 0;
     }
     memcpy(buf->item + start, str, theLength);
     return 1;
-}				/* write_buffer() */
+}                               /* write_buffer() */
 
 char *
 read_buffer P4(buffer_t *, b, int, start, int, len, int *, rlen)
@@ -84,30 +84,30 @@ read_buffer P4(buffer_t *, b, int, start, int, len, int *, rlen)
     unsigned int size;
     
     if (len < 0)
-	return 0;
+        return 0;
 
     size = b->size;
     if (start < 0) {
-	start = size + start;
-	if (start < 0) {
-	    return 0;
-	}
+        start = size + start;
+        if (start < 0) {
+            return 0;
+        }
     }
     if (len == 0) {
-	len = size;
+        len = size;
     }
     if (start >= size) {
-	return 0;
+        return 0;
     }
     if ((start + len) > size) {
-	len = (size - start);
+        len = (size - start);
     }
     for (str = (char *)b->item + start, size = 0; *str && size < len; str++, size++)
-	;
+        ;
     str = new_string(size, "read_buffer: str");
     memcpy(str, b->item + start, size);
     str[*rlen = size] = '\0';
 
     return str;
-}				/* read_buffer() */
+}                               /* read_buffer() */
 #endif

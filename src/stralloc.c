@@ -66,7 +66,7 @@ int num_str_searches = 0;
 #define hfindblock(s, h) sfindblock(s, h = StrHash(s))
 #define findblock(s) sfindblock(s, StrHash(s))
 
-INLINE_STATIC block_t *sfindblock PROT((char *, int));
+INLINE_STATIC block_t *sfindblock PROT((const char *, int));
 
 /*
  * hash table - list of pointers to heads of string chains.
@@ -80,7 +80,7 @@ static block_t **base_table = (block_t **) 0;
 static int htable_size;
 static int htable_size_minus_one;
 
-INLINE_STATIC block_t *alloc_new_string PROT((char *, int));
+INLINE_STATIC block_t *alloc_new_string PROT((const char *, int));
 
 void init_strings()
 {
@@ -110,7 +110,7 @@ void init_strings()
  */
 
 INLINE_STATIC block_t *
-        sfindblock P2(char *, s, int, h)
+        sfindblock P2(const char *, s, int, h)
 {
     block_t *curr, *prev;
 
@@ -139,7 +139,7 @@ INLINE_STATIC block_t *
 }
 
 char *
-     findstring P1(char *, s)
+     findstring P1(const char *, s)
 {
     block_t *b;
 
@@ -153,7 +153,7 @@ char *
 /* alloc_new_string: Make a space for a string.  */
 
 INLINE_STATIC block_t *
-alloc_new_string P2(char *, string, int, h)
+alloc_new_string P2(const char *, string, int, h)
 {
     block_t *b;
     int len = strlen(string);
@@ -177,7 +177,7 @@ alloc_new_string P2(char *, string, int, h)
 }
 
 char *
-     make_shared_string P1(char *, str)
+     make_shared_string P1(const char *, str)
 {
     block_t *b;
     int h;
@@ -198,8 +198,8 @@ char *
    ref_string: Fatal to call this function on a string that isn't shared.
 */
 
-char *
-ref_string P1(char *, str)
+const char *
+ref_string P1(const char *, str)
 {
     block_t *b;
 
@@ -223,7 +223,7 @@ ref_string P1(char *, str)
  */
 
 void
-free_string P1(char *, str)
+free_string P1(const char *, str)
 {
     block_t **prev, *b;
     int h;
@@ -351,7 +351,7 @@ char *int_new_string P1(int, size)
     return (char *)(mbt + 1);
 }
 
-char *extend_string P2(char *, str, int, len) {
+char *extend_string P2(const char *, str, int, len) {
     malloc_block_t *mbt;
 #ifdef STRING_STATS
     int oldsize = MSTR_SIZE(str);

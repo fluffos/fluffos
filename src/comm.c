@@ -498,7 +498,7 @@ void add_message P3(object_t *, who, const char *, data, int, len)
 }                               /* add_message() */
 
 /* WARNING: this can only handle results < LARGEST_PRINTABLE_STRING in size */
-void add_vmessage P2V(object_t *, who, char *, format)
+void add_vmessage P2V(object_t *, who, const char *, format)
 {
     int len;
     interactive_t *ip;
@@ -2162,7 +2162,7 @@ int set_call P3(object_t *, ob, sentence_t *, sent, int, flags)
 }                               /* set_call() */
 #endif
 
-void set_prompt P1(char *, str)
+void set_prompt P1(const char *, str)
 {
     if (command_giver && command_giver->interactive) {
         command_giver->interactive->prompt = str;
@@ -2322,7 +2322,7 @@ static ipnumberentry_t ipnumbertable[IPSIZE];
 /*
  * Does a call back on the current_object with the function call_back.
  */
-int query_addr_number P2(char *, name, svalue_t *, call_back)
+int query_addr_number P2(const char *, name, svalue_t *, call_back)
 {
     static char buf[100];
     static char *dbuf = &buf[sizeof(int) + sizeof(int) + sizeof(int)];
@@ -2659,7 +2659,7 @@ void outbuf_addchar P2(outbuffer_t *, outbuf, char, c)
     }
 }
 
-void outbuf_addv P2V(outbuffer_t *, outbuf, char *, format)
+void outbuf_addv P2V(outbuffer_t *, outbuf, const char *, format)
 {
     char buf[LARGEST_PRINTABLE_STRING + 1];
     va_list args;
@@ -2725,43 +2725,43 @@ static void end_compression (interactive_t *ip) {
 }
 
 static void start_compression (interactive_t *ip) {
-    z_stream* compress;
+    z_stream* zcompress;
   
     if (ip->compressed_stream) {
         return ;
     }
-    compress = (z_stream *) DXALLOC(sizeof(z_stream), TAG_INTERACTIVE,
+    zcompress = (z_stream *) DXALLOC(sizeof(z_stream), TAG_INTERACTIVE,
                                     "start_compression");
-    compress->next_in = NULL;
-    compress->avail_in = 0;
-    compress->next_out = ip->compress_buf;
-    compress->avail_out = COMPRESS_BUF_SIZE;
-    compress->zalloc = zlib_alloc;
-    compress->zfree = zlib_free;
-    compress->opaque = NULL;
+    zcompress->next_in = NULL;
+    zcompress->avail_in = 0;
+    zcompress->next_out = ip->compress_buf;
+    zcompress->avail_out = COMPRESS_BUF_SIZE;
+    zcompress->zalloc = zlib_alloc;
+    zcompress->zfree = zlib_free;
+    zcompress->opaque = NULL;
     
-    if (deflateInit(compress, 9) != Z_OK) {
-        FREE(compress);
+    if (deflateInit(zcompress, 9) != Z_OK) {
+        FREE(zcompress);
         fprintf(stderr, "Compression failed.\n");
         return ;
     }
       
     // Ok, compressing.
-    ip->compressed_stream = compress;
+    ip->compressed_stream = zcompress;
 }
 
 static int flush_compressed_output (interactive_t *ip) {
     int iStart, nBlock, nWrite, len;
-    z_stream* compress;
+    z_stream* zcompress;
     
     if (!ip->compressed_stream) {
         return TRUE;
     }
     
-    compress = ip->compressed_stream;
+    zcompress = ip->compressed_stream;
       
     /* Try to write out some data.. */
-    len = compress->next_out - ip->compress_buf;
+    len = zcompress->next_out - ip->compress_buf;
     if (len > 0) {
         /* we have some data to write */
 
@@ -2799,7 +2799,7 @@ static int flush_compressed_output (interactive_t *ip) {
                 
             }
  
-            compress->next_out = ip->compress_buf + len - iStart;
+            zcompress->next_out = ip->compress_buf + len - iStart;
         }
     }
         
@@ -2808,16 +2808,16 @@ static int flush_compressed_output (interactive_t *ip) {
 
 
 static int send_compressed (interactive_t *ip, unsigned char* data, int length) {
-    z_stream* compress;
-    compress = ip->compressed_stream;
-    compress->next_in = data;
-    compress->avail_in = length;
-    while (compress->avail_in) {
-        compress->avail_out = COMPRESS_BUF_SIZE - (compress->next_out -
+    z_stream* zcompress;
+    zcompress = ip->compressed_stream;
+    zcompress->next_in = data;
+    zcompress->avail_in = length;
+    while (zcompress->avail_in) {
+        zcompress->avail_out = COMPRESS_BUF_SIZE - (zcompress->next_out -
                                                    ip->compress_buf);
         
-        if (compress->avail_out) {
-            deflate(compress, Z_SYNC_FLUSH);
+        if (zcompress->avail_out) {
+            deflate(zcompress, Z_SYNC_FLUSH);
         }
         
         if(!flush_compressed_output(ip))

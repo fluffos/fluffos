@@ -11,7 +11,7 @@ typedef struct array_s {
 #endif
     unsigned short size;
 #ifdef PACKAGE_MUDLIB_STATS
-    statgroup_t stats;		/* creator of the array */
+    statgroup_t stats;          /* creator of the array */
 #endif
     svalue_t item[1];
 } array_t;
@@ -36,15 +36,15 @@ array_t *add_array PROT((array_t *, array_t *));
 void implode_array PROT((funptr_t *, array_t *, svalue_t *, int));
 array_t *subtract_array PROT((array_t *, array_t *));
 array_t *slice_array PROT((array_t *, int, int));
-array_t *explode_string PROT((char *, int, char *, int));
-char *implode_string PROT((array_t *, char *, int));
+array_t *explode_string PROT((const char *, int, const char *, int));
+char *implode_string PROT((array_t *, const char *, int));
 array_t *users PROT((void));
 array_t *commands PROT((object_t *));
 void filter_array PROT((svalue_t *, int));
 void filter_string PROT((svalue_t *, int));
 array_t *deep_inherit_list PROT((object_t *));
 array_t *inherit_list PROT((object_t *));
-array_t *children PROT((char *));
+array_t *children PROT((const char *));
 array_t *livings PROT((void));
 array_t *objects PROT((funptr_t *));
 array_t *all_inventory PROT((object_t *, int));
@@ -57,17 +57,17 @@ array_t *make_unique PROT((array_t *, char *, funptr_t *, svalue_t *));
 void map_string PROT((svalue_t *arg, int num_arg));
 void map_array PROT((svalue_t *arg, int num_arg));
 array_t *intersect_array PROT((array_t *, array_t *));
-int match_single_regexp PROT((char *, char *));
-array_t *match_regexp PROT((array_t *, char *, int));
-array_t *reg_assoc PROT((char *, array_t *, array_t *, svalue_t *));
+int match_single_regexp PROT((const char *, const char *));
+array_t *match_regexp PROT((array_t *, const char *, int));
+array_t *reg_assoc PROT((const char *, array_t *, array_t *, svalue_t *));
 void dealloc_array PROT((array_t *));
 array_t *union_array PROT((array_t *, array_t *));
 
 #define ALLOC_ARRAY(nelem) \
     (array_t *)DXALLOC(sizeof (array_t) + \
-	  sizeof(svalue_t) * (nelem - 1), TAG_ARRAY, "ALLOC_ARRAY")
+          sizeof(svalue_t) * (nelem - 1), TAG_ARRAY, "ALLOC_ARRAY")
 #define RESIZE_ARRAY(vec, nelem) \
     (array_t *)DREALLOC(vec, sizeof (array_t) + \
-	  sizeof(svalue_t) * (nelem - 1), TAG_ARRAY, "RESIZE_ARRAY")
+          sizeof(svalue_t) * (nelem - 1), TAG_ARRAY, "RESIZE_ARRAY")
 
 #endif

@@ -9,7 +9,7 @@ typedef struct {
 } refed_t;
 
 union u {
-    char *string;
+    const char *string;
     int number;
     float real;
 

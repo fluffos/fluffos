@@ -100,7 +100,7 @@ f_debug_info PROT((void))
             break;
         }
         outbuf_addv(&out, "program ref's %d\n", ob->prog->ref);
-        outbuf_addv(&out, "Name /%s\n", ob->prog->name);
+        outbuf_addv(&out, "Name /%s\n", ob->prog->filename);
         outbuf_addv(&out, "program size %d\n",
                     ob->prog->program_size);
         outbuf_addv(&out, "function flags table %d (%d) \n", 

@@ -191,7 +191,7 @@ void pop_n_locals P1(int, num) {
     }
 }
 
-int add_local_name P2(char *, str, int, type)
+int add_local_name P2(const char *, str, int, type)
 {
     if (max_num_locals == CFG_MAX_LOCAL_VARIABLES) {
         yyerror("Too many local variables");
@@ -670,21 +670,21 @@ static void overload_function P6(program_t *, prog, int, index,
             defprog2 = func_entry->prog;
             p = strput(buf, end, definition->funcname);
             p = strput(p, end, "() inherited from both /");
-            p = strput(p, end, defprog->name);
+            p = strput(p, end, defprog->filename);
             if (prog != defprog) {
                 p = strput(p, end, " (via /");
-                p = strput(p, end, prog->name);
+                p = strput(p, end, prog->filename);
                 p = strput(p, end, ")");
             }
             p = strput(p, end, " and /");
-            p = strput(p, end, defprog2->name);
+            p = strput(p, end, defprog2->filename);
             if (prog2 != defprog2) {
                 p = strput(p, end, " (via /");
-                p = strput(p, end, prog2->name);
+                p = strput(p, end, prog2->filename);
                 p = strput(p, end, ")");
             }
             p = strput(p, end, "; using the definition in /");
-            p = strput(p, end, prog->name);
+            p = strput(p, end, prog->filename);
             p = strput(p, end, ".");
             
             ow = ALLOCATE(ovlwarn_t, TAG_COMPILER, "overload warning");
@@ -814,9 +814,9 @@ int copy_functions P2(program_t *, from, int, typemod)
     return initializer;
 }
 
-void type_error P2(char *, str, int, type)
+void type_error P2(const char *, str, int, type)
 {
-    static char buff[256];
+    static char buff[512];
     char *end = EndOf(buff);
     char *p;
 
@@ -976,14 +976,14 @@ int arrange_call_inherited P2(char *, name, parse_node_t *, node)
             int tmp;
             
             if (super_name) {
-                int l = SHARED_STRLEN(ip->prog->name);  /* Including .c */
+                int l = SHARED_STRLEN(ip->prog->filename);  /* Including .c */
 
                 if (l - 2 < super_length)
                     continue;
-                if (strncmp(super_name, ip->prog->name + l - 2 -super_length,
+                if (strncmp(super_name, ip->prog->filename + l - 2 -super_length,
                             super_length) != 0 ||
                     !((l - 2 == super_length) ||
-                     ((ip->prog->name + l - 3 - super_length)[0] == '/')))
+                     ((ip->prog->filename + l - 3 - super_length)[0] == '/')))
                     continue;
             }
 
@@ -1028,7 +1028,7 @@ int arrange_call_inherited P2(char *, name, parse_node_t *, node)
 /* Warning: returns an index into A_FUNCTIONS, not the full
  * function list
  */
-int define_new_function P5(char *, name, int, num_arg, int, num_local,
+int define_new_function P5(const char *, name, int, num_arg, int, num_local,
                            int, flags, int, type)
 {
     int oldindex, num, newindex;
@@ -1119,7 +1119,7 @@ int define_new_function P5(char *, name, int, num_arg, int, num_local,
                         p = strput(buff, end, "Function ");
                         p = strput(p, end, name);
                         p = strput(p, end, " inherited from '/");
-                        p = strput(p, end, FUNCTION_TEMP(oldindex)->prog->name);
+                        p = strput(p, end, FUNCTION_TEMP(oldindex)->prog->filename);
                         p = strput(p, end, "' does not match ");
                     } else {
                         if (funflags & FUNC_PROTOTYPE)
@@ -1362,7 +1362,7 @@ int decl_fix P1(int, x) {
     return rest | DECL_PROTECTED;
 }
 
-char *compiler_type_names[] = {"unknown", "mixed", "void", "void", 
+const char *compiler_type_names[] = {"unknown", "mixed", "void", "void", 
                                "int", "string", "object", "mapping",
                                "function", "float", "buffer" };
 
@@ -1438,7 +1438,7 @@ char *get_type_name P3(char *, where, char *, end, int, type)
     var = (long)str ^ (long)str >> 16; \
     var = (var ^ var >> 8) & 0xff;
 
-short store_prog_string P1(char *, str)
+short store_prog_string P1(const char *, str)
 {
     short i, next, *next_tab, *idxp;
     char **p;
@@ -2017,7 +2017,7 @@ validate_efun_call P2(int, f, parse_node_t *, args) {
     return args;
 }
 
-void yyerror P1(char *, str)
+void yyerror P1(const char *, str)
 {
     extern int num_parse_error;
 
@@ -2033,7 +2033,7 @@ void yyerror P1(char *, str)
     num_parse_error++;
 }
 
-void yywarn P1(char *, str) {
+void yywarn P1(const char *, str) {
     if (!(pragmas & PRAGMA_WARNINGS)) return;
     
     smart_log(current_file, current_line, str, 1);
@@ -2341,7 +2341,7 @@ static program_t *epilog PROT((void)) {
             prog->heart_beat = 0;
     } else
         prog->heart_beat = 0;
-    prog->name = current_file;
+    prog->filename = current_file;
 
     current_file = 0;
 
@@ -2621,7 +2621,7 @@ static int case_compare P2(parse_node_t **, c1, parse_node_t **, c2) {
 
 static int string_case_compare P2(parse_node_t **, c1, parse_node_t **, c2) {
     int i1, i2;
-    char *p1, *p2;
+    const char *p1, *p2;
     
     if ((*c1)->kind == NODE_DEFAULT)
         return -1;
@@ -2683,7 +2683,7 @@ void prepare_cases P2(parse_node_t *, pn, int, start) {
             char buf[1024];
             char *end = EndOf(buf);
             char *p;
-            char *f1, *f2;
+            const char *f1, *f2;
             int fi1, fi2;
             int l1, l2;
 

@@ -174,15 +174,15 @@ void bufcat PROT((char **, char *));
 INLINE int svalue_save_size PROT((svalue_t *));
 INLINE void save_svalue PROT((svalue_t *, char **));
 INLINE int restore_svalue PROT((char *, svalue_t *));
-int save_object PROT((object_t *, char *, int));
+int save_object PROT((object_t *, const char *, int));
 char *save_variable PROT((svalue_t *));
-int restore_object PROT((object_t *, char *, int));
+int restore_object PROT((object_t *, const char *, int));
 void restore_variable PROT((svalue_t *, char *));
 object_t *get_empty_object PROT((int));
 void reset_object PROT((object_t *));
 void call_create PROT((object_t *, int));
 void reload_object PROT((object_t *));
-void free_object PROT((object_t *, char *));
+void free_object PROT((object_t *, const char * const));
 #ifdef F_SET_HIDE
 INLINE int valid_hide PROT((object_t *));
 INLINE int object_visible PROT((object_t *));
@@ -191,8 +191,8 @@ INLINE int object_visible PROT((object_t *));
 #endif
 void tell_npc PROT((object_t *, const char *));
 void tell_object PROT((object_t *, const char *, int));
-int find_global_variable PROT((program_t *, char *, unsigned short *, int));
-void dealloc_object PROT((object_t *, char *));
+int find_global_variable PROT((program_t *, const char * const, unsigned short *, int));
+void dealloc_object PROT((object_t *, const char *));
 void get_objects PROT((object_t ***, int *, get_objectsfn_t, void *));
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_command_giver_stack PROT((void));

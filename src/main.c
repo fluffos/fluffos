@@ -24,7 +24,7 @@ int comp_flag = 0;    /* Trace compilations */
 int max_cost;
 int time_to_swap;
 int time_to_clean_up;
-char *default_fail_message;
+const char *default_fail_message;
 int boot_time;
 int max_array_size;
 int max_buffer_size;
@@ -122,7 +122,7 @@ int main P2(int, argc, char **, argv)
     const0u.subtype = T_UNDEFINED;
     const0u.u.number = 0;
 
-    fake_prog.program_size = 0;
+    //fake_prog.program_size = 0; //0 anyway
 
     /*
      * Check that the definition of EXTRACT_UCHAR() is correct.
@@ -457,9 +457,9 @@ char *int_string_copy P1(const char * const, str)
 }
 
 #ifdef DEBUGMALLOC
-char *int_string_unlink P2(char *, str, char *, desc)
+char *int_string_unlink P2(const char *, str, char *, desc)
 #else
-char *int_string_unlink P1(char *, str)
+char *int_string_unlink P1(const char *, str)
 #endif
 {
     malloc_block_t *mbt, *newmbt;
@@ -488,7 +488,7 @@ char *int_string_unlink P1(char *, str)
 
 static FILE *debug_message_fp = 0;
 
-void debug_message P1V(char *, fmt)
+void debug_message P1V(const char *, fmt)
 {
     static char deb_buf[1024];
     static char *deb = deb_buf;
@@ -530,6 +530,7 @@ int slow_shut_down_to_do = 0;
 char *xalloc P1(int, size)
 {
     char *p;
+    const char *t;
     static int going_to_exit;
 
     if (going_to_exit)
@@ -542,8 +543,8 @@ char *xalloc P1(int, size)
     if (p == 0) {
   if (reserved_area) {
       FREE(reserved_area);
-      p = "Temporarily out of MEMORY. Freeing reserve.\n";
-      write(1, p, strlen(p));
+      t = "Temporarily out of MEMORY. Freeing reserve.\n";
+      write(1, t, strlen(t));
       reserved_area = 0;
       slow_shut_down_to_do = 6;
       return xalloc(size);/* Try again */

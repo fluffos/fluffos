@@ -249,12 +249,12 @@
    char *xalloc PROT((int));
 #  ifdef DEBUGMALLOC
       char *int_string_copy PROT((const char * const, char *));
-      char *int_string_unlink PROT((char *, char *));
+      char *int_string_unlink PROT((const char *, char *));
       char *int_new_string PROT((int, char *));
       char *int_alloc_cstring PROT((const char *, char *));
 #  else
       char *int_string_copy PROT((const char * const));
-      char *int_string_unlink PROT((char *));
+      char *int_string_unlink PROT((const char *));
       char *int_new_string PROT((int));
       char *int_alloc_cstring PROT((const char *));
 #  endif

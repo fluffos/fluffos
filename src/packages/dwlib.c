@@ -19,7 +19,7 @@
 
 #ifdef F_QUERY_MULTIPLE_SHORT
 /* Hideous mangling of C code by Taffyd. */ 
-void query_multiple_short P6(svalue_t *, arg, char *, type, int, no_dollars, int, quiet, int, dark, int, num_arg) { 
+void query_multiple_short P6(svalue_t *, arg, const char *, type, int, no_dollars, int, quiet, int, dark, int, num_arg) { 
     char m[] = "$M$";
     char s[] = "_short";
     char default_function[] = "a_short";
@@ -260,7 +260,7 @@ void
 f_query_multiple_short PROT((void))
 {
     svalue_t *sv = sp - st_num_arg + 1;
-    char *type = NULL;
+    const char *type = NULL;
     int no_dollars = 0, quiet = 0, dark = 0;
     
     if ( st_num_arg > 4)  {
@@ -303,14 +303,14 @@ f_query_multiple_short PROT((void))
 
 int _in_reference_allowed = 0;
 
-int reference_allowed P3(object_t *, referee, object_t *, referrer_obj, char *, referrer_name) 
+int reference_allowed P3(object_t *, referee, object_t *, referrer_obj, const char *, referrer_name) 
 {
     int invis = 0;
     int referee_creator = 0;
     svalue_t *v;
     svalue_t *item;
     array_t *vec;
-    char *referee_name = NULL;
+    const char *referee_name = NULL;
     object_t *playtester_handler = NULL;
     object_t *player_handler = NULL;
     int referrer_playtester = 0;
@@ -482,7 +482,7 @@ f_reference_allowed PROT((void))
     svalue_t *v;
     object_t *referee = NULL;
     object_t *referrer_obj = command_giver; /* Default to this_player(). */
-    char *referrer_name = NULL;
+    const char *referrer_name = NULL;
     int result = 0;
     int num_arg = st_num_arg;
 

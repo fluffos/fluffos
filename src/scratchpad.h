@@ -41,7 +41,7 @@ extern unsigned char *scratch_end;
  *  scratchpad.c
  */
 void scratch_destroy PROT((void));
-char *scratch_copy PROT((char *));
+char *scratch_copy PROT((const char *));
 char *scratch_alloc PROT((int));
 void scratch_free PROT((char *));
 char *scratch_join PROT((char *, char *));

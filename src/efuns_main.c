@@ -193,7 +193,7 @@ void
 f__call_other PROT((void))
 {
     svalue_t *arg;
-    char *funcname;
+    const char *funcname;
     int i;
     int num_arg = st_num_arg;
     object_t *ob;
@@ -299,10 +299,10 @@ f_call_out_info PROT((void))
 #endif
 
 #if defined(F_CALL_STACK) || defined(F_ORIGIN)
-static char *origin_name P1(int, orig) {
+static const char *origin_name P1(int, orig) {
     /* FIXME: this should use ffs() if available (BSD) */
     int i = 0;
-    static char *origins[] = {
+    static const char *origins[] = {
         "driver",
         "local",
         "call_other",
@@ -333,11 +333,11 @@ f_call_stack PROT((void))
     case 0:
         ret->item[0].type = T_STRING;
         ret->item[0].subtype = STRING_MALLOC;
-        ret->item[0].u.string = add_slash(current_prog->name);
+        ret->item[0].u.string = add_slash(current_prog->filename);
         for (i = 1; i < n; i++) {
             ret->item[i].type = T_STRING;
             ret->item[i].subtype = STRING_MALLOC;
-            ret->item[i].u.string = add_slash((csp - i + 1)->prog->name);
+            ret->item[i].u.string = add_slash((csp - i + 1)->prog->filename);
         }
         break;
     case 1:
@@ -354,7 +354,7 @@ f_call_stack PROT((void))
         for (i = 0; i < n; i++) {
             ret->item[i].type = T_STRING;
             if (((csp - i)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
-                program_t *prog = (i ? (csp-i+1)->prog : current_prog);
+                const program_t *prog = (i ? (csp-i+1)->prog : current_prog);
                 int index = (csp-i)->fr.table_index;
                 function_t *cfp = &prog->function_table[index];
 
@@ -389,6 +389,7 @@ f_capitalize PROT((void))
 {
     if (uislower(sp->u.string[0])) {
         unlink_string_svalue(sp);
+        //unlinked, so this is ok
         sp->u.string[0] = toupper((unsigned char)sp->u.string[0]);
     }
 }
@@ -438,7 +439,7 @@ f_clear_bit PROT((void))
     if (ind >= len) 
         return;         /* return first arg unmodified */
     unlink_string_svalue(sp);
-    str = sp->u.string;
+    str = (char *)sp->u.string;
 
     if (str[ind] > 0x3f + ' ' || str[ind] < ' ')
         error("Illegal bit pattern in clear_bit character %d\n", ind);
@@ -935,7 +936,8 @@ f_function_profile PROT((void))
 void
 f_function_exists PROT((void))
 {
-    char *str, *res;
+    const char *str;
+    char *res;
     int l;
     object_t *ob;
     int flag = 0;
@@ -1119,7 +1121,7 @@ inherits P2(program_t *, prog, program_t *, thep)
     for (j = 0; j < k; j++) {
         if ((pg = prog->inherit[j].prog) == thep)
             return 1;
-        if (!strcmp(pg->name, thep->name))
+        if (!strcmp(pg->filename, thep->filename))
             return 2;
         if (inherits(pg, thep))
             return 1;
@@ -1284,13 +1286,13 @@ f_lower_case PROT((void))
 {
     char *str;
 
-    str = sp->u.string;
+    str = (char *)sp->u.string;
     /* find first upper case letter, if any */
     for (; *str; str++) {
         if (uisupper(*str)) {
             int l = str - sp->u.string;
             unlink_string_svalue(sp);
-            str = sp->u.string + l;
+            str = (char *)sp->u.string + l;
             *str = tolower((unsigned char)*str);
             for (str++; *str; str++) {
                 if (uisupper(*str))
@@ -1436,7 +1438,8 @@ void
 f_match_path PROT((void))
 {
     svalue_t *value;
-    register char *src, *dst;
+    register const char *src;
+    register char *dst;
     svalue_t *nvalue;
     mapping_t *map;
     char *tmpstr;
@@ -1655,7 +1658,7 @@ f_message PROT((void))
 void
 f_mkdir PROT((void))
 {
-    char *path;
+    const char *path;
 
     path = check_valid_path(sp->u.string, current_object, "mkdir", 1);
     if (!path || OS_mkdir(path, 0770) == -1) {
@@ -2351,13 +2354,14 @@ f_replace_string PROT((void))
 {
     int plen, rlen, dlen, slen, first, last, cur, j;
     
-    char *pattern;
-    char *replace;
-    register char *src, *dst1, *dst2;
+    const char *pattern;
+    const char *replace;
+    register const char *src;
+    register char *dst1, *dst2;
     svalue_t *arg;
     int skip_table[256];
-    char *slimit;
-    char *flimit;
+    const char *slimit;
+    const char *flimit;
     char *climit;
     int probe;
     int skip;
@@ -2427,7 +2431,7 @@ f_replace_string PROT((void))
     
     if (rlen <= plen) {
         /* in string replacement */
-        dst2 = dst1 = arg->u.string;
+        dst2 = dst1 = (char *)arg->u.string;
         
         if (plen > 1) { /* pattern length > 1, jump table most efficient */
             while (src < flimit) {
@@ -2465,7 +2469,7 @@ f_replace_string PROT((void))
                         cur++;
                     
                         if (cur >= first && cur <= last) {
-                            *src = *replace;
+                            *(char *)src = *replace;
                         }
                     }
                     src++;
@@ -2475,7 +2479,7 @@ f_replace_string PROT((void))
                     if (*src++ == *pattern) {
                         cur++;
                         if (cur >= first) {
-                            dst2 = src - 1;
+                            dst2 = (char *)src - 1;
                             while (*src) {
                                 if (*src == *pattern) {
                                     cur++;
@@ -2601,7 +2605,7 @@ f_replace_string PROT((void))
 void
 f_resolve PROT((void))
 {
-    int i, query_addr_number PROT((char *, svalue_t *));
+    int i;
 
     i = query_addr_number((sp - 1)->u.string, sp);
     pop_stack();
@@ -2637,7 +2641,8 @@ f_restore_variable PROT((void)) {
     unlink_string_svalue(sp);
     v.type = T_NUMBER;
 
-    restore_variable(&v, sp->u.string);
+    //unlinked string
+    restore_variable(&v, (char *)sp->u.string);
     FREE_MSTR(sp->u.string);
     *sp = v;
 }
@@ -2659,7 +2664,7 @@ f_rm PROT((void))
 void
 f_rmdir PROT((void))
 {
-    char *path;
+    const char *path;
 
     path = check_valid_path(sp->u.string, current_object, "rmdir", 1);
     if (!path || rmdir(path) == -1) {
@@ -2784,7 +2789,7 @@ f_set_bit PROT((void))
         len = ind + 1;
     if (ind < old_len) {
         unlink_string_svalue(sp);
-        str = sp->u.string;
+        str = (char *)sp->u.string;
     } else {
         str = new_string(len, "f_set_bit: str");
         str[len] = '\0';
@@ -3039,7 +3044,7 @@ void
 f_stat PROT((void))
 {
     struct stat buf;
-    char *path;
+    const char *path;
     array_t *v;
     object_t *ob;
     
@@ -3088,7 +3093,7 @@ f_stat PROT((void))
 void
 f_strsrch PROT((void))
 {
-    register char *big, *little, *pos;
+    register const char *big, *little, *pos;
     static char buf[2];         /* should be initialized to 0 */
     int i, blen, llen;
 
@@ -3495,7 +3500,7 @@ f__to_int PROT((void))
 void
 f_typeof PROT((void))
 {
-    char *t = type_name(sp->type);
+    const char *t = type_name(sp->type);
 
     free_svalue(sp, "f_typeof");
     put_constant_string(t);

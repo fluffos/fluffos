@@ -64,7 +64,7 @@ typedef struct defn_s {
 #define INDENT_HASH_SIZE 1024 /* must be a power of 2 */
 
 typedef struct ident_hash_elem_s {
-    char *name;
+    const char *name;
     short token; /* only flags */
     unsigned short sem_value; /* for these, a count of the ambiguity */
     struct ident_hash_elem_s *next;
@@ -74,7 +74,7 @@ typedef struct ident_hash_elem_s {
 } ident_hash_elem_t;
 
 typedef struct {
-    char *word;
+    const char *word;
     unsigned short token;       /* flags here too */
     unsigned short sem_value;   /* semantic value for predefined tokens */
     ident_hash_elem_t *next;
@@ -116,7 +116,7 @@ typedef struct {
     short type[4];           /* need a short to hold the biggest type flag */
     short Default;
     short ret_type;
-    char *name;
+    const char *name;
 #ifdef LPC_TO_C
     char *routine;
 #endif
@@ -146,7 +146,7 @@ INLINE void push_function_context PROT((void));
 void pop_function_context PROT((void));
 int yylex PROT((void));
 void init_num_args PROT((void));
-char *query_instr_name PROT((int));
+const char *query_instr_name PROT((int));
 char *get_f_name PROT((int));
 void set_inc_list PROT((char *));
 void start_new_file PROT((int));
@@ -155,9 +155,9 @@ int lookup_predef PROT((char *));
 void add_predefines PROT((void));
 char *main_file_name PROT((void));
 char *get_defined_name PROT((defined_name_t *));
-ident_hash_elem_t *find_or_add_ident PROT((char *, int));
-ident_hash_elem_t *find_or_add_perm_ident PROT((char *));
-ident_hash_elem_t *lookup_ident PROT((char *));
+ident_hash_elem_t *find_or_add_ident PROT((const char *, int));
+ident_hash_elem_t *find_or_add_perm_ident PROT((const char *));
+ident_hash_elem_t *lookup_ident PROT((const char *));
 void free_unused_identifiers PROT((void));
 void init_identifiers PROT((void));
 char *show_error_context PROT((void));

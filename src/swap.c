@@ -60,31 +60,31 @@ static int assert_swap_file()
 {
     if (swap_file == NULL) {
 #ifdef SWAP_USE_FD
-	char host[50];
+        char host[50];
 
-	gethostname(host, sizeof host);
-	sprintf(file_name_buf, "%s.%s.%d", SWAP_FILE, host, 
-		external_port[0].port);
-	file_name = file_name_buf;
-	if (file_name[0] == '/')
-	    file_name++;
+        gethostname(host, sizeof host);
+        sprintf(file_name_buf, "%s.%s.%d", SWAP_FILE, host, 
+                external_port[0].port);
+        file_name = file_name_buf;
+        if (file_name[0] == '/')
+            file_name++;
         swap_file = open(file_name, O_RDWR | O_CREAT | O_TRUNC);
 #else
-	char host[50];
+        char host[50];
 
-	gethostname(host, sizeof host);
-	sprintf(file_name_buf, "%s.%s.%d", SWAP_FILE, host, 
-		external_port[0].port);
-	file_name = file_name_buf;
-	if (file_name[0] == '/')
-	    file_name++;
-	swap_file = fopen(file_name, "w+b");
+        gethostname(host, sizeof host);
+        sprintf(file_name_buf, "%s.%s.%d", SWAP_FILE, host, 
+                external_port[0].port);
+        file_name = file_name_buf;
+        if (file_name[0] == '/')
+            file_name++;
+        swap_file = fopen(file_name, "w+b");
 #endif
-	swap_free = 0;
-	last_data = 0;
-	/* Leave this file pointer open ! */
-	if (swap_file == 0)
-	    return 0;
+        swap_free = 0;
+        last_data = 0;
+        /* Leave this file pointer open ! */
+        if (swap_file == 0)
+            return 0;
     }
     return 1;
 }
@@ -98,14 +98,14 @@ swap_seek P2(long, offset, int, flag) {
     
     do {
 #ifdef SWAP_USE_FD
-	ret = lseek(swap_file, offset, flag);
+        ret = lseek(swap_file, offset, flag);
 #else
-	ret = fseek(swap_file, offset, flag);
+        ret = fseek(swap_file, offset, flag);
 #endif
     } while (ret == -1 && errno == EINTR);
     if (ret == -1)
-	fatal("Couldn't seek the swap file, error %s, offset %d.\n",
-	      port_strerror(errno), offset);
+        fatal("Couldn't seek the swap file, error %s, offset %d.\n",
+              port_strerror(errno), offset);
 }
 
 /*
@@ -124,25 +124,25 @@ static int alloc_swap P1(int, length)
      * when a block is freed, anticipating a new allocation of the same size)
      */
     for (ptr = swap_free, prev = 0; ptr; prev = ptr, ptr = ptr->next) {
-	if (ptr->length < length)
-	    continue;
-	/*
-	 * found a block, update free list
-	 */
-	ret = ptr->start;
-	ptr->start += length;
-	ptr->length -= length;
-	if (ptr->length == 0) {
-	    /*
-	     * exact fit, remove free block from list
-	     */
-	    if (!prev)
-		swap_free = ptr->next;
-	    else
-		prev->next = ptr->next;
-	    FREE(ptr);
-	}
-	return ret;
+        if (ptr->length < length)
+            continue;
+        /*
+         * found a block, update free list
+         */
+        ret = ptr->start;
+        ptr->start += length;
+        ptr->length -= length;
+        if (ptr->length == 0) {
+            /*
+             * exact fit, remove free block from list
+             */
+            if (!prev)
+                swap_free = ptr->next;
+            else
+                prev->next = ptr->next;
+            FREE(ptr);
+        }
+        return ret;
     }
 
     /*
@@ -161,7 +161,7 @@ static void free_swap P2(int, start, int, length)
 {
     sw_block_t *m, *ptr, *prev;
 
-    length += sizeof(int);	/* extend with size of hidden information */
+    length += sizeof(int);      /* extend with size of hidden information */
 
     /*
      * Construct and insert new free block
@@ -171,13 +171,13 @@ static void free_swap P2(int, start, int, length)
     m->length = length;
 
     for (ptr = swap_free, prev = 0; ptr; prev = ptr, ptr = ptr->next) {
-	if (start < ptr->start)
-	    break;
+        if (start < ptr->start)
+            break;
     }
     if (!prev) {
-	swap_free = m;
+        swap_free = m;
     } else {
-	prev->next = m;
+        prev->next = m;
     }
     m->next = ptr;
 
@@ -185,15 +185,15 @@ static void free_swap P2(int, start, int, length)
      * Combine adjacent blocks
      */
     if (ptr && m->start + m->length == ptr->start) {
-	m->length += ptr->length;
-	m->next = ptr->next;
-	FREE(ptr);
+        m->length += ptr->length;
+        m->next = ptr->next;
+        FREE(ptr);
     }
     if (prev && prev->start + prev->length == m->start) {
-	prev->length += m->length;
-	prev->next = m->next;
-	FREE(m);
-	m = prev;
+        prev->length += m->length;
+        prev->next = m->next;
+        FREE(m);
+        m = prev;
     }
     /*
      * There is an implicit infinite block at the end making life hard Can't
@@ -201,15 +201,15 @@ static void free_swap P2(int, start, int, length)
      * found again (or use doubly linked list, etc).
      */
     if (m->start + m->length == last_data) {
-	DEBUG_CHECK(m->next, "extraneous free swap blocks!\n");
-	/* find prev pointer again *sigh* */
-	for (ptr = swap_free, prev = 0; ptr != m; prev = ptr, ptr = ptr->next);
-	last_data = m->start;
-	FREE(m);
-	if (!prev)
-	    swap_free = 0;
-	else
-	    prev->next = 0;
+        DEBUG_CHECK(m->next, "extraneous free swap blocks!\n");
+        /* find prev pointer again *sigh* */
+        for (ptr = swap_free, prev = 0; ptr != m; prev = ptr, ptr = ptr->next);
+        last_data = m->start;
+        FREE(m);
+        if (!prev)
+            swap_free = 0;
+        else
+            prev->next = 0;
     }
 }
 
@@ -223,30 +223,30 @@ static int
 swap_out P3(char *, block, int, size, int *, locp)
 {
     if (!block || time_to_swap == 0)
-	return 0;
+        return 0;
     if (!assert_swap_file())
-	return 0;
+        return 0;
 
-    if (*locp == -1) {		/* needs data written out */
-	*locp = alloc_swap(size + sizeof size);
-	swap_seek(*locp, 0);
+    if (*locp == -1) {          /* needs data written out */
+        *locp = alloc_swap(size + sizeof size);
+        swap_seek(*locp, 0);
 #ifdef SWAP_USE_FD
         if ((write(swap_file, &size, sizeof size) != sizeof size) ||
-	    write(swap_file, block, size) != size) {
-	    debug_perror("swap_out", swap_file);
-	    *locp = -1;
-	    return 0;
-	}
+            write(swap_file, block, size) != size) {
+            debug_perror("swap_out", swap_file);
+            *locp = -1;
+            return 0;
+        }
 #else
-	if (fwrite((char *) &size, sizeof size, 1, swap_file) != 1 ||
-	    fwrite(block, size, 1, swap_file) != 1) {
-	    debug_perror("swap_out:swap file", 0);
-	    *locp = -1;
-	    return 0;
-	}
+        if (fwrite((char *) &size, sizeof size, 1, swap_file) != 1 ||
+            fwrite(block, size, 1, swap_file) != 1) {
+            debug_perror("swap_out:swap file", 0);
+            *locp = -1;
+            return 0;
+        }
 #endif
-	if (*locp >= last_data)
-	    last_data = *locp + sizeof size + size;
+        if (*locp >= last_data)
+            last_data = *locp + sizeof size + size;
     }
     total_bytes_swapped += size;/* also count sizeof int?? */
     return 1;
@@ -265,7 +265,7 @@ swap_in P2(char **, blockp, int, loc)
     DEBUG_CHECK(!blockp, "blockp null in swap_in()\n");
     
     if (loc == -1)
-	return 0;
+        return 0;
     swap_seek(loc, 0);
 #ifdef SWAP_USE_FD
     /* find out size */
@@ -278,11 +278,11 @@ swap_in P2(char **, blockp, int, loc)
 #else
     /* find out size */
     if (fread((char *) &size, sizeof size, 1, swap_file) == -1)
-	fatal("Couldn't read the swap file.\n");
+        fatal("Couldn't read the swap file.\n");
     DEBUG_CHECK(size <= 0, "Illegal size read from swap file.\n");
     *blockp = DXALLOC(size, TAG_SWAP, "swap_in");
     if (fread(*blockp, size, 1, swap_file) == -1)
-	fatal("Couldn't read the swap file.\n");
+        fatal("Couldn't read the swap file.\n");
 #endif
     total_bytes_swapped -= size;
     return size;
@@ -306,11 +306,11 @@ int
 locate_out P1(program_t *, prog)
 {
     if (!prog)
-	return 0;
+        return 0;
     debug(d_flag, ("locate_out: %p %p %p %p %p %p %p\n",
-		      prog->program, prog->function_table,
-	     prog->strings, prog->variable_table, prog->inherit,
-		      prog->argument_types, prog->type_start));
+                      prog->program, prog->function_table,
+             prog->strings, prog->variable_table, prog->inherit,
+                      prog->argument_types, prog->type_start));
 
     prog->program = (char *)DIFF(prog->program, prog);
     prog->function_table = (function_t *)DIFF(prog->function_table, prog);
@@ -322,8 +322,8 @@ locate_out P1(program_t *, prog)
     prog->classes = (class_def_t *)DIFF(prog->classes, prog);
     prog->class_members = (class_member_entry_t *)DIFF(prog->class_members, prog);
     if (prog->type_start) {
-	prog->argument_types = (unsigned short *)DIFF(prog->argument_types, prog);
-	prog->type_start = (unsigned short *)DIFF(prog->type_start, prog);
+        prog->argument_types = (unsigned short *)DIFF(prog->argument_types, prog);
+        prog->type_start = (unsigned short *)DIFF(prog->type_start, prog);
     }
     return 1;
 }
@@ -343,7 +343,7 @@ int
 locate_in P1(program_t *, prog)
 {
     if (!prog)
-	return 0;
+        return 0;
     prog->program = ADD(prog->program, prog);
     prog->function_table = (function_t *)ADD(prog->function_table, prog);
     prog->function_flags = (unsigned short *)ADD(prog->function_flags, prog);
@@ -354,13 +354,13 @@ locate_in P1(program_t *, prog)
     prog->classes = (class_def_t *)ADD(prog->classes, prog);
     prog->class_members = (class_member_entry_t *)ADD(prog->class_members, prog);
     if (prog->type_start) {
-	prog->argument_types = (unsigned short *)ADD(prog->argument_types, prog);
-	prog->type_start = (unsigned short *)ADD(prog->type_start, prog);
+        prog->argument_types = (unsigned short *)ADD(prog->argument_types, prog);
+        prog->type_start = (unsigned short *)ADD(prog->type_start, prog);
     }
     debug(d_flag, ("locate_in: %p %p %p %p %p %p %p\n",
-		      prog->program, prog->function_table,
-	     prog->strings, prog->variable_table, prog->inherit,
-		      prog->argument_types, prog->type_start));
+                      prog->program, prog->function_table,
+             prog->strings, prog->variable_table, prog->inherit,
+                      prog->argument_types, prog->type_start));
 
     return 1;
 }
@@ -383,42 +383,42 @@ int swap P1(object_t *, ob)
      */
     if (ob == simul_efun_ob || ob == master_ob) return 0;
     if (ob->flags & O_DESTRUCTED)
-	return 0;
+        return 0;
     debug(d_flag, ("Swap object /%s (ref %d)", ob->name, ob->ref));
 
     if (ob->prog->line_info)
-	swap_line_numbers(ob->prog);	/* not always done before we get here */
+        swap_line_numbers(ob->prog);    /* not always done before we get here */
     if ((ob->flags & O_HEART_BEAT) || (ob->flags & O_CLONE)) {
-	debug(d_flag, ("  object not swapped - heart beat or cloned."));
-	return 0;
+        debug(d_flag, ("  object not swapped - heart beat or cloned."));
+        return 0;
     }
     if (ob->prog->ref > 1 || ob->interactive) {
-	debug(d_flag, ("  object not swapped - inherited or interactive or in apply_low() cache."));
+        debug(d_flag, ("  object not swapped - inherited or interactive or in apply_low() cache."));
 
-	return 0;
+        return 0;
     }
     if (ob->prog->func_ref > 0) {
-	debug(d_flag, ("  object not swapped - referenced by functions."));
+        debug(d_flag, ("  object not swapped - referenced by functions."));
 
-	return 0;
+        return 0;
     }
-    locate_out(ob->prog);	/* relocate the internal pointers */
+    locate_out(ob->prog);       /* relocate the internal pointers */
     if (swap_out((char *) ob->prog, ob->prog->total_size, (int *) &ob->swap_num)) {
-	num_swapped++;
-	free_prog(ob->prog, 0);	/* Do not free the strings */
-	ob->prog = 0;
-	ob->flags |= O_SWAPPED;
-	return 1;
+        num_swapped++;
+        free_prog(ob->prog, 0); /* Do not free the strings */
+        ob->prog = 0;
+        ob->flags |= O_SWAPPED;
+        return 1;
     } else {
-	locate_in(ob->prog);
-	return 0;
+        locate_in(ob->prog);
+        return 0;
     }
 }
 
 void load_ob_from_swap P1(object_t *, ob)
 {
     if (ob->swap_num == -1)
-	fatal("Loading not swapped object.\n");
+        fatal("Loading not swapped object.\n");
 
     debug(d_flag, ("Unswap object /%s (ref %d)", ob->name, ob->ref));
 
@@ -428,7 +428,7 @@ void load_ob_from_swap P1(object_t *, ob)
      * to be relocated: program functions strings variable_names inherit
      * argument_types type_start
      */
-    locate_in(ob->prog);	/* relocate the internal pointers */
+    locate_in(ob->prog);        /* relocate the internal pointers */
 
     /* The reference count will already be 1 ! */
     ob->flags &= ~O_SWAPPED;
@@ -446,18 +446,18 @@ swap_line_numbers P1(program_t *, prog)
     int size;
 
     if (!prog || !prog->line_info)
-	return 0;
+        return 0;
 
     debug(d_flag, ("Swap line numbers for /%s", prog->name));
 
     size = prog->file_info[0];
     if (swap_out((char *) prog->file_info, size,
-		 &prog->line_swap_index)) {
-	line_num_bytes_swapped += size;
-	FREE(prog->file_info);
-	prog->file_info = 0;
-	prog->line_info = 0;
-	return 1;
+                 &prog->line_swap_index)) {
+        line_num_bytes_swapped += size;
+        FREE(prog->file_info);
+        prog->file_info = 0;
+        prog->line_info = 0;
+        return 1;
     }
     return 0;
 }
@@ -465,17 +465,18 @@ swap_line_numbers P1(program_t *, prog)
 /*
  * Reload line number information from swap.
  */
-void load_line_numbers P1(program_t *, prog)
+void load_line_numbers P1(const program_t *, prog)
 {
     int size;
 
     if (prog->line_info)
-	return;
+        return;
 
     debug(d_flag, ("Unswap line numbers for /%s\n", prog->name));
 
     size = swap_in((char **) &prog->file_info, prog->line_swap_index);
     SET_TAG(prog->file_info, TAG_LINENUMBERS);
+    //probably ok, dw doesn't use swap anyway
     prog->line_info = (unsigned char *)&prog->file_info[prog->file_info[1]];
     line_num_bytes_swapped -= size;
 }
@@ -490,13 +491,13 @@ void load_line_numbers P1(program_t *, prog)
 void remove_swap_file P1(object_t *, ob)
 {
     if (!ob)
-	return;
+        return;
 
     /* may be swapped out, so swap in to get size, update stats, etc */
     if (ob->flags & O_SWAPPED)
-	load_ob_from_swap(ob);
+        load_ob_from_swap(ob);
     if (ob->prog)
-	free_swap(ob->swap_num, ob->prog->total_size);
+        free_swap(ob->swap_num, ob->prog->total_size);
     ob->swap_num = -1;
 }
 
@@ -504,13 +505,13 @@ void remove_swap_file P1(object_t *, ob)
  * Same as above, but to remove line_number swap space.
  */
 void
-remove_line_swap P1(program_t *, prog)
+remove_line_swap P1(const program_t *, prog)
 {
     if (!prog->line_info)
-	load_line_numbers(prog);
+        load_line_numbers(prog);
     if (prog->line_swap_index != -1 && prog->line_info)
-	free_swap(prog->line_swap_index,
-		  prog->file_info[0]);
+        free_swap(prog->line_swap_index,
+                  prog->file_info[0]);
     prog->line_swap_index = -1;
 }
 
@@ -525,8 +526,8 @@ void print_swap_stats P1(outbuffer_t *, out)
     outbuf_addv(out, "Linenum bytes:       %10lu\n", line_num_bytes_swapped);
     outbuf_addv(out, "Total bytes swapped: %10lu\n", total_bytes_swapped);
     if (!swap_file) {
-	outbuf_add(out, "No swap file\n");
-	return;
+        outbuf_add(out, "No swap file\n");
+        return;
     }
     size = cnt = 0;
     for (m = swap_free; m; size += m->length, cnt++, m = m->next);
@@ -537,8 +538,8 @@ void print_swap_stats P1(outbuffer_t *, out)
     end = ftell(swap_file) - last_data;
 #endif
     if (end) {
-	size += end;
-	cnt++;
+        size += end;
+        cnt++;
     }
     outbuf_addv(out, "Freed bytes:         %10lu (%d chunks)\n", size, cnt);
 }
@@ -549,7 +550,7 @@ void print_swap_stats P1(outbuffer_t *, out)
 void unlink_swap_file()
 {
     if (swap_file == 0)
-	return;
+        return;
 #ifdef SWAP_USE_FD
     close(swap_file);
     unlink(file_name);

@@ -4,14 +4,14 @@
 
 int total_num_prog_blocks, total_prog_block_size;
 
-void reference_prog P2(program_t *, progp, char *, from)
+void reference_prog P2(const program_t *, progp, const char *, from)
 {
     progp->ref++;
     debug(d_flag, ("reference_prog: /%s ref %d (%s)\n",
                progp->name, progp->ref, from));
 }
 
-void deallocate_program P1(program_t *, progp)
+void deallocate_program P1(const program_t *, progp)
 {
     int i;
 
@@ -33,7 +33,7 @@ void deallocate_program P1(program_t *, progp)
     /* Free all inherited objects */
     for (i = 0; i < (int) progp->num_inherited; i++)
         free_prog(progp->inherit[i].prog, 1);
-    free_string(progp->name);
+    free_string(progp->filename);
 
     /*
      * We're going away for good, not just being swapped, so free up
@@ -54,7 +54,7 @@ void deallocate_program P1(program_t *, progp)
  * as we want to be able to read the program in again from the swap area.
  * That means that strings are not swapped.
  */
-void free_prog P2(program_t *, progp, int, free_sub_strings)
+void free_prog P2(const program_t *, progp, int, free_sub_strings)
 {
     progp->ref--;
     if (progp->ref > 0)

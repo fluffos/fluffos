@@ -142,19 +142,19 @@ typedef unsigned int format_info;
 }
 
 typedef struct {
-    char *what;
+    const char *what;
     int len;
 } pad_info_t;
 
 typedef struct {
-    char *start;
-    char *cur;
+    const char *start;
+    const char *cur;
 } tab_data_t;
 
 /* slash here means 'or' */
 typedef struct ColumnSlashTable {
     union CSTData {
-        char *col;              /* column data */
+        const char *col;        /* column data */
         tab_data_t *tab;        /* table data */
     }       d;                  /* d == data */
     unsigned short int nocols;  /* number of columns in table *sigh* */
@@ -179,7 +179,7 @@ static sprintf_state_t  *sprintf_state = NULL;
 
 static void numadd PROT((outbuffer_t *, int num));
 static void add_space PROT((outbuffer_t *, int indent));
-static void add_justified PROT((char *str, int slen, pad_info_t *pad, int fs, format_info finfo, short int trailing));
+static void add_justified PROT((const char *str, int slen, pad_info_t *pad, int fs, format_info finfo, short int trailing));
 static int add_column PROT((cst ** column, int trailing));
 static int add_table PROT((cst ** table));
 
@@ -228,7 +228,7 @@ static void push_sprintf_state PROT((void)) {
  */
 static void sprintf_error P2(int, which, char *, premade) {
     char lbuf[2048];
-    char *err;
+    const char *err;
     
     switch (which) {
     case ERR_BUFF_OVERFLOW:
@@ -520,7 +520,7 @@ static void add_pad P2(pad_info_t *, pad, int, len) {
     
     if (pad && (padlen = pad->len)) {
         char *end;
-        char *pstr = pad->what;
+        const char *pstr = pad->what;
         int i;
         char c;
         
@@ -538,7 +538,7 @@ static void add_pad P2(pad_info_t *, pad, int, len) {
         memset(p, ' ', len);
 }
 
-INLINE_STATIC void add_nstr P2(char *, str, int, len) {
+INLINE_STATIC void add_nstr P2(const char *, str, int, len) {
     if (outbuf_extend(&(sprintf_state->obuff), len) < len)
         ERROR(ERR_BUFF_OVERFLOW);
     memcpy(sprintf_state->obuff.buffer + sprintf_state->obuff.real_size, str, len);
@@ -552,7 +552,7 @@ INLINE_STATIC void add_nstr P2(char *, str, int, len) {
  * "str" is unmodified.  trailing is, of course, ignored in the case
  * of right justification.
  */
-static void add_justified P6(char *, str, int, slen, pad_info_t *, pad,
+static void add_justified P6(const char *, str, int, slen, pad_info_t *, pad,
                              int, fs, format_info, finfo, short int, trailing)
 {
     fs -= slen;
@@ -603,7 +603,7 @@ static int add_column P2(cst **, column, int, trailing)
     int space = -1;
     int ret;
     cst *col = *column;    /* always holds (*column) */
-    char *col_d = col->d.col; /* always holds (col->d.col) */
+    const char *col_d = col->d.col; /* always holds (col->d.col) */
 
     done = 0;
     /* find a good spot to break the line */
@@ -655,7 +655,7 @@ static int add_table P1(cst **, table)
     int done, i;
     cst *tab = *table;                  /* always (*table) */
     tab_data_t *tab_d = tab->d.tab;     /* always tab->d.tab */
-    char *tab_di;                       /* always tab->d.tab[i].cur */
+    const char *tab_di;                       /* always tab->d.tab[i].cur */
     int end;
     
     for (i = 0; i < tab->nocols && (tab_di = tab_d[i].cur); i++) {
@@ -727,7 +727,7 @@ static pad_info_t *make_pad P1(pad_info_t *, p) {
  * this function is called again, or if it's going to be modified (esp.
  * if it risks being free()ed).
  */
-char *string_print_formatted P3(char *, format_str, int, argc, svalue_t *, argv)
+char *string_print_formatted P3(const char *, format_str, int, argc, svalue_t *, argv)
 {
     format_info finfo;
     svalue_t *carg;     /* current arg */
@@ -1027,7 +1027,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, svalue_t *, argv)
                             }
                         } else {/* (finfo & INFO_TABLE) */
                             unsigned int n, len, max_len;
-                            char *p1, *p2;
+                            const char *p1, *p2;
                             
 #define TABLE carg->u.string
                             (*temp) = ALLOCATE(cst, TAG_TEMPORARY, "string_print: 4");

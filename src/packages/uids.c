@@ -56,20 +56,20 @@ f_geteuid PROT((void))
             put_constant_string(ob->euid->name);
             free_object(ob, "f_geteuid:1");
             return;
-	} else {
+        } else {
             free_object(ob, "f_geteuid:2");
             *sp = const0;
             return;
-	}
+        }
     } else if (sp->type & T_FUNCTION) {
         funptr_t *fp;
         if ((fp = sp->u.fp)->hdr.owner && fp->hdr.owner->euid) {
             put_constant_string(fp->hdr.owner->euid->name);
             free_funp(fp);
             return;
-	} 
-	free_funp(fp);
-	*sp = const0;
+        } 
+        free_funp(fp);
+        *sp = const0;
     }
 }
 #endif
@@ -97,7 +97,7 @@ f_seteuid PROT((void))
         if (sp->u.number)
             bad_arg(1, F_SETEUID);
         current_object->euid = NULL;
-	sp->u.number = 1;
+        sp->u.number = 1;
         return;
     }
     arg = sp;
@@ -105,7 +105,7 @@ f_seteuid PROT((void))
     push_svalue(arg);
     ret = apply_master_ob(APPLY_VALID_SETEUID, 2);
     if (!MASTER_APPROVED(ret)) {
-	free_string_svalue(sp);
+        free_string_svalue(sp);
         *sp = const0;
         return;
     }
@@ -127,14 +127,14 @@ static void mark_uid_tree P1(tree *, tr) {
     
     EXTRA_REF(BLOCK(((userid_t *)tr->tree_p)->name))++;
     if (tr->tree_l)
-	mark_uid_tree(tr->tree_l);
+        mark_uid_tree(tr->tree_l);
     if (tr->tree_r)
-	mark_uid_tree(tr->tree_r);
+        mark_uid_tree(tr->tree_r);
 }
 
 void mark_all_uid_nodes() {
     if (uids)
-	mark_uid_tree(uids);
+        mark_uid_tree(uids);
 }
 #endif
 
@@ -149,7 +149,7 @@ static int uidcmp P2(userid_t *, uid1, userid_t *, uid2)
     return (name1 < name2 ? -1 : (name1 > name2 ? 1 : 0));
 }
 
-userid_t *add_uid P1(char *, name)
+userid_t *add_uid P1(const char *, name)
 {
     userid_t *uid, t_uid;
     char *sname;
@@ -157,19 +157,19 @@ userid_t *add_uid P1(char *, name)
     sname = make_shared_string(name);
     t_uid.name = sname;
     if ((uid = (userid_t *) tree_srch(uids, uidcmp, (char *) &t_uid))) {
-	free_string(sname);
+        free_string(sname);
     } else {
-	uid = ALLOCATE(userid_t, TAG_UID, "add_uid");
-	uid->name = sname;
-	tree_add(&uids, uidcmp, (char *) uid, NULL);
+        uid = ALLOCATE(userid_t, TAG_UID, "add_uid");
+        uid->name = sname;
+        tree_add(&uids, uidcmp, (char *) uid, NULL);
     }
     return uid;
 }
 
-userid_t *set_root_uid P1(char *, name)
+userid_t *set_root_uid P1(const char *, name)
 {
     if (!root_uid)
-	return root_uid = add_uid(name);
+        return root_uid = add_uid(name);
 
     tree_delete(&uids, uidcmp, (char *) root_uid, NULL);
     root_uid->name = make_shared_string(name);
@@ -177,10 +177,10 @@ userid_t *set_root_uid P1(char *, name)
     return root_uid;
 }
 
-userid_t *set_backbone_uid P1(char *, name)
+userid_t *set_backbone_uid P1(const char *, name)
 {
     if (!backbone_uid)
-	return backbone_uid = add_uid(name);
+        return backbone_uid = add_uid(name);
 
     tree_delete(&uids, uidcmp, (char *) backbone_uid, NULL);
     backbone_uid->name = make_shared_string(name);

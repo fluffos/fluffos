@@ -6,7 +6,7 @@
 
 #include "include/socket_err.h"
 
-char *error_strings[ERROR_STRINGS] =
+const char *error_strings[ERROR_STRINGS] =
 {
     "Problem creating socket",
     "Problem with setsockopt",

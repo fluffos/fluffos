@@ -25,7 +25,7 @@ extern buffer_t null_buf;
 INLINE buffer_t *null_buffer PROT((void));
 INLINE void free_buffer PROT((buffer_t *));
 buffer_t *allocate_buffer PROT((int));
-int write_buffer PROT((buffer_t *, int, char *, int));
+int write_buffer PROT((buffer_t *, int, const char *, int));
 char *read_buffer PROT((buffer_t *, int, int, int *));
 #endif
 

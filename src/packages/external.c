@@ -55,7 +55,8 @@ int external_start P5(int, which, svalue_t *, args,
         int flag = 1;
         int i = 1;
         int n = 1;
-        char *p, *arg;
+        const char *p;
+	char *arg;
         
         if (args->type == T_ARRAY) {
             n = args->u.arr->size;

@@ -1930,7 +1930,8 @@ add_error:
 		    if ($3->kind == NODE_STRING) {
 			/* Combine strings */
 			int n1, n2;
-			char *new, *s1, *s2;
+			const char *s1, *s2;
+			char *new;
 			int l;
 
 			n1 = $1->v.number;
@@ -3392,7 +3393,6 @@ function_call:
 		     *
 		     * Don't complain, just grok it.
 		     */
-		    int f;
 		    
 		    if (current_function_context)
 			current_function_context->bindable = FP_NOT_BINDABLE;
@@ -3407,7 +3407,7 @@ function_call:
 			char buf[256];
 			char *end = EndOf(buf);
 			char *p;
-			char *n = $1->name;
+			const char *n = $1->name;
 			if (*n == ':') n++;
 			/* prevent some errors; by making it look like an
 			 * inherited function we prevent redeclaration errors

@@ -75,7 +75,7 @@ typedef struct interactive_s {
 #ifdef F_NETWORK_STATS
     int external_port;          /* external port index for connection      */
 #endif
-    char *prompt;               /* prompt string for interactive object    */
+    const char *prompt;         /* prompt string for interactive object    */
     char text[MAX_TEXT];        /* input buffer for interactive object     */
     int text_end;               /* first free char in buffer               */
     int text_start;             /* where we are up to in user command buffer */
@@ -168,7 +168,7 @@ extern int add_message_calls;
 extern interactive_t **all_users;
 extern int max_users;
 
-void CDECL add_vmessage PROT2V(object_t *, char *);
+void CDECL add_vmessage PROT2V(object_t *, const char *);
 void add_message PROT((object_t *, const char *, int));
 void add_binary_message PROT((object_t *, unsigned char *, int));
 
@@ -182,14 +182,14 @@ INLINE void make_selectmasks PROT((void));
 void init_user_conn PROT((void));
 void init_addr_server PROT((char *, int));
 void ipc_remove PROT((void));
-void set_prompt PROT((char *));
+void set_prompt PROT((const char *));
 INLINE void process_io PROT((void));
 int process_user_command PROT((void));
 int replace_interactive PROT((object_t *, object_t *));
 int set_call PROT((object_t *, sentence_t *, int));
 void remove_interactive PROT((object_t *, int));
 int flush_message PROT((interactive_t *));
-int query_addr_number PROT((char *, svalue_t *));
+int query_addr_number PROT((const char *, svalue_t *));
 char *query_ip_name PROT((object_t *));
 char *query_ip_number PROT((object_t *));
 char *query_host_name PROT((void));

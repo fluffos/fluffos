@@ -27,7 +27,7 @@
 
 #ifdef BINARIES
 
-static char *magic_id = "MUDB";
+static const char *magic_id = "MUDB";
 static time_t driver_id;
 static time_t config_id;
 
@@ -94,7 +94,7 @@ void save_binary P3(program_t *, prog, mem_block_t *, includes, mem_block_t *, p
     svalue_t *ret;
     char *nm;
 
-    nm = add_slash(prog->name);
+    nm = add_slash(prog->filename);
     push_malloced_string(nm);
     ret = safe_apply_master_ob(APPLY_VALID_SAVE_BINARY, 1);
     if (!MASTER_APPROVED(ret))
@@ -110,7 +110,7 @@ void save_binary P3(program_t *, prog, mem_block_t *, includes, mem_block_t *, p
     if (stat(file_name, &st) == -1)
         return;
     strcat(file_name, "/");
-    strcat(file_name, prog->name);
+    strcat(file_name, prog->filename);
     len = strlen(file_name);
 #ifdef LPC_TO_C
     if (compile_to_c)
@@ -168,9 +168,9 @@ void save_binary P3(program_t *, prog, mem_block_t *, includes, mem_block_t *, p
 
 
     /* program name */
-    len = SHARED_STRLEN(p->name);
+    len = SHARED_STRLEN(p->filename);
     fwrite((char *) &len, sizeof len, 1, f);
-    fwrite(p->name, sizeof(char), len, f);
+    fwrite(p->filename, sizeof(char), len, f);
 
 
     fwrite((char *) &p->total_size, sizeof p->total_size, 1, f);
@@ -180,9 +180,9 @@ void save_binary P3(program_t *, prog, mem_block_t *, includes, mem_block_t *, p
 
     /* inherit names */
     for (i = 0; i < (int) p->num_inherited; i++) {
-        len = SHARED_STRLEN(p->inherit[i].prog->name);
+        len = SHARED_STRLEN(p->inherit[i].prog->filename);
         fwrite((char *) &len, sizeof len, 1, f);
-        fwrite(p->inherit[i].prog->name, sizeof(char), len, f);
+        fwrite(p->inherit[i].prog->filename, sizeof(char), len, f);
     }
 
     /* string table */
@@ -366,7 +366,7 @@ program_t *int_load_binary P1(char *, name)
     p = (program_t *) DXALLOC(ilen, TAG_PROGRAM, "load_binary");
     fread((char *) p, ilen, 1, f);
     locate_in(p);               /* from swap.c */
-    p->name = make_shared_string(name);
+    p->filename = make_shared_string(name);
 
     /* Read inherit names and find prog.  Check mod times also. */
     for (i = 0; i < (int) p->num_inherited; i++) {
@@ -390,7 +390,7 @@ program_t *int_load_binary P1(char *, name)
             if (comp_flag)
                 debug_message("out of date (inherited source newer).\n");
             fclose(f);
-            free_string(p->name);
+            free_string(p->filename);
             FREE(p);
             FREE(buf);
             return OUT_OF_DATE;
@@ -401,7 +401,7 @@ program_t *int_load_binary P1(char *, name)
             if (comp_flag)
                 debug_message("missing inherited prog.\n");
             fclose(f);
-            free_string(p->name);
+            free_string(p->filename);
             FREE(p);
             inherit_file = buf; /* freed elsewhere */
             return 0;

@@ -1,6 +1,6 @@
 /*
-	efunctions.c: this file contains the efunctions called from
-	inside eval_instruction() in interpret.c.  Note: if you are adding
+        efunctions.c: this file contains the efunctions called from
+        inside eval_instruction() in interpret.c.  Note: if you are adding
     local efunctions that are specific to your driver, you would be better
     off adding them to a separate source file.  Doing so will make it much
     easier for you to upgrade (won't have to patch this file).  Be sure
@@ -23,25 +23,26 @@
 #endif
 
 #ifdef F_CRYPT
-#define SALT_LEN	8
+#define SALT_LEN        8
 
 void
 f_crypt PROT((void))
 {
-    char *res, *p, salt[SALT_LEN + 1];
-    char *choice =
+    const char *res, *p;
+    char salt[SALT_LEN + 1];
+    const char *choice =
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./";
 
     if (sp->type == T_STRING && SVALUE_STRLEN(sp) >= 2) {
-	p = sp->u.string;
+        p = sp->u.string;
     } else {
-	int i;
-	
-	for (i = 0; i < SALT_LEN; i++)
-	    salt[i] = choice[random_number(strlen(choice))];
+        int i;
+        
+        for (i = 0; i < SALT_LEN; i++)
+            salt[i] = choice[random_number(strlen(choice))];
 
-	salt[SALT_LEN] = 0;
-	p = salt;
+        salt[SALT_LEN] = 0;
+        p = salt;
     }
     
     res = string_copy(CRYPT((sp-1)->u.string, p), "f_crypt");
@@ -56,7 +57,7 @@ f_crypt PROT((void))
 void
 f_oldcrypt PROT((void)) {
     char *res, salt[3];
-    char *choice =
+    const char *choice =
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./";
 
     if (sp->type == T_STRING && SVALUE_STRLEN(sp) >= 2) {
@@ -115,35 +116,35 @@ f_localtime PROT((void))
     vec->item[LT_ZONE].subtype = STRING_MALLOC;
     vec->item[LT_ISDST].type = T_NUMBER;
 #if defined(BSD42) || defined(apollo) || defined(_AUX_SOURCE) \
-	|| defined(OLD_ULTRIX)
+        || defined(OLD_ULTRIX)
     /* 4.2 BSD doesn't seem to provide any way to get these last three values */
     vec->item[LT_GMTOFF].u.number = 0;
     vec->item[LT_ZONE].type = T_NUMBER;
     vec->item[LT_ZONE].u.number = 0;
     vec->item[LT_ISDST].u.number = -1;
-#else				/* BSD42 */
+#else                           /* BSD42 */
     vec->item[LT_ISDST].u.number = tm->tm_isdst;
 #if defined(sequent)
     vec->item[LT_GMTOFF].u.number = 0;
     gettimeofday(NULL, &tz);
     vec->item[LT_GMTOFF].u.number = tz.tz_minuteswest;
     vec->item[LT_ZONE].u.string =
-	string_copy(timezone(tz.tz_minuteswest, tm->tm_isdst), "f_localtime");
-#else				/* sequent */
+        string_copy(timezone(tz.tz_minuteswest, tm->tm_isdst), "f_localtime");
+#else                           /* sequent */
 #if (defined(hpux) || defined(_SEQUENT_) || defined(_AIX) || defined(SunOS_5) \
-	|| defined(SVR4) || defined(sgi) || defined(linux) || defined(cray) \
-	|| defined(LATTICE) || defined(SCO))
+        || defined(SVR4) || defined(sgi) || defined(linux) || defined(cray) \
+        || defined(LATTICE) || defined(SCO))
     if (!tm->tm_isdst) {
-	vec->item[LT_GMTOFF].u.number = timezone;
-	vec->item[LT_ZONE].u.string = string_copy(tzname[0], "f_localtime");
+        vec->item[LT_GMTOFF].u.number = timezone;
+        vec->item[LT_ZONE].u.string = string_copy(tzname[0], "f_localtime");
     } else {
 #if (defined(_AIX) || defined(hpux) || defined(linux) || defined(cray) \
-	|| defined(LATTICE))
-	vec->item[LT_GMTOFF].u.number = timezone;
+        || defined(LATTICE))
+        vec->item[LT_GMTOFF].u.number = timezone;
 #else
-	vec->item[LT_GMTOFF].u.number = altzone;
+        vec->item[LT_GMTOFF].u.number = altzone;
 #endif
-	vec->item[LT_ZONE].u.string = string_copy(tzname[1], "f_localtime");
+        vec->item[LT_ZONE].u.string = string_copy(tzname[1], "f_localtime");
     }
 #else
 #ifndef WIN32
@@ -154,8 +155,8 @@ f_localtime PROT((void))
     vec->item[LT_ZONE].u.string = string_copy(_tzname[_daylight?1:0],"f_localtime");
 #endif
 #endif
-#endif				/* sequent */
-#endif				/* BSD42 */
+#endif                          /* sequent */
+#endif                          /* BSD42 */
     put_array(vec);
 }
 #endif
@@ -167,7 +168,7 @@ void f_rusage PROT((void))
     error("rusage() not supported under Windows.\n");
 }
 #else
-	
+        
 #ifdef RUSAGE
 void
 f_rusage PROT((void))
@@ -178,36 +179,36 @@ f_rusage PROT((void))
     int maxrss;
 
     if (getrusage(RUSAGE_SELF, &rus) < 0) {
-	m = allocate_mapping(0);
+        m = allocate_mapping(0);
     } else {
 #if 1 /* Was !SunOS_5 */
-	usertime = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
-	stime = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_usec / 1000;
+        usertime = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
+        stime = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_usec / 1000;
 #else
-	usertime = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_nsec / 1000000;
-	stime = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_nsec / 1000000;
+        usertime = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_nsec / 1000000;
+        stime = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_nsec / 1000000;
 #endif
-	maxrss = rus.ru_maxrss;
+        maxrss = rus.ru_maxrss;
 #ifdef sun
-	maxrss *= getpagesize() / 1024;
+        maxrss *= getpagesize() / 1024;
 #endif
-	m = allocate_mapping(16);
-	add_mapping_pair(m, "utime", usertime);
-	add_mapping_pair(m, "stime", stime);
-	add_mapping_pair(m, "maxrss", maxrss);
-	add_mapping_pair(m, "ixrss", rus.ru_ixrss);
-	add_mapping_pair(m, "idrss", rus.ru_idrss);
-	add_mapping_pair(m, "isrss", rus.ru_isrss);
-	add_mapping_pair(m, "minflt", rus.ru_minflt);
-	add_mapping_pair(m, "majflt", rus.ru_majflt);
-	add_mapping_pair(m, "nswap", rus.ru_nswap);
-	add_mapping_pair(m, "inblock", rus.ru_inblock);
-	add_mapping_pair(m, "oublock", rus.ru_oublock);
-	add_mapping_pair(m, "msgsnd", rus.ru_msgsnd);
-	add_mapping_pair(m, "msgrcv", rus.ru_msgrcv);
-	add_mapping_pair(m, "nsignals", rus.ru_nsignals);
-	add_mapping_pair(m, "nvcsw", rus.ru_nvcsw);
-	add_mapping_pair(m, "nivcsw", rus.ru_nivcsw);
+        m = allocate_mapping(16);
+        add_mapping_pair(m, "utime", usertime);
+        add_mapping_pair(m, "stime", stime);
+        add_mapping_pair(m, "maxrss", maxrss);
+        add_mapping_pair(m, "ixrss", rus.ru_ixrss);
+        add_mapping_pair(m, "idrss", rus.ru_idrss);
+        add_mapping_pair(m, "isrss", rus.ru_isrss);
+        add_mapping_pair(m, "minflt", rus.ru_minflt);
+        add_mapping_pair(m, "majflt", rus.ru_majflt);
+        add_mapping_pair(m, "nswap", rus.ru_nswap);
+        add_mapping_pair(m, "inblock", rus.ru_inblock);
+        add_mapping_pair(m, "oublock", rus.ru_oublock);
+        add_mapping_pair(m, "msgsnd", rus.ru_msgsnd);
+        add_mapping_pair(m, "msgrcv", rus.ru_msgrcv);
+        add_mapping_pair(m, "nsignals", rus.ru_nsignals);
+        add_mapping_pair(m, "nvcsw", rus.ru_nvcsw);
+        add_mapping_pair(m, "nivcsw", rus.ru_nivcsw);
     }
     push_refed_mapping(m);
 }
@@ -222,38 +223,38 @@ f_rusage PROT((void))
     int utime, stime, maxrss;
 
     if (get_process_stats(NULL, PS_SELF, &ps, NULL) == -1)
-	m = allocate_mapping(0);
+        m = allocate_mapping(0);
     else {
-	utime = ps.ps_utime.tv_sec * 1000 + ps.ps_utime.tv_usec / 1000;
-	stime = ps.ps_stime.tv_sec * 1000 + ps.ps_stime.tv_usec / 1000;
-	maxrss = ps.ps_maxrss * getpagesize() / 1024;
+        utime = ps.ps_utime.tv_sec * 1000 + ps.ps_utime.tv_usec / 1000;
+        stime = ps.ps_stime.tv_sec * 1000 + ps.ps_stime.tv_usec / 1000;
+        maxrss = ps.ps_maxrss * getpagesize() / 1024;
 
-	m = allocate_mapping(19);
-	add_mapping_pair(m, "utime", utime);
-	add_mapping_pair(m, "stime", stime);
-	add_mapping_pair(m, "maxrss", maxrss);
-	add_mapping_pair(m, "pagein", ps.ps_pagein);
-	add_mapping_pair(m, "reclaim", ps.ps_reclaim);
-	add_mapping_pair(m, "zerofill", ps.ps_zerofill);
-	add_mapping_pair(m, "pffincr", ps.ps_pffincr);
-	add_mapping_pair(m, "pffdecr", ps.ps_pffdecr);
-	add_mapping_pair(m, "swap", ps.ps_swap);
-	add_mapping_pair(m, "syscall", ps.ps_syscall);
-	add_mapping_pair(m, "volcsw", ps.ps_volcsw);
-	add_mapping_pair(m, "involcsw", ps.ps_involcsw);
-	add_mapping_pair(m, "signal", ps.ps_signal);
-	add_mapping_pair(m, "lread", ps.ps_lread);
-	add_mapping_pair(m, "lwrite", ps.ps_lwrite);
-	add_mapping_pair(m, "bread", ps.ps_bread);
-	add_mapping_pair(m, "bwrite", ps.ps_bwrite);
-	add_mapping_pair(m, "phread", ps.ps_phread);
-	add_mapping_pair(m, "phwrite", ps.ps_phwrite);
+        m = allocate_mapping(19);
+        add_mapping_pair(m, "utime", utime);
+        add_mapping_pair(m, "stime", stime);
+        add_mapping_pair(m, "maxrss", maxrss);
+        add_mapping_pair(m, "pagein", ps.ps_pagein);
+        add_mapping_pair(m, "reclaim", ps.ps_reclaim);
+        add_mapping_pair(m, "zerofill", ps.ps_zerofill);
+        add_mapping_pair(m, "pffincr", ps.ps_pffincr);
+        add_mapping_pair(m, "pffdecr", ps.ps_pffdecr);
+        add_mapping_pair(m, "swap", ps.ps_swap);
+        add_mapping_pair(m, "syscall", ps.ps_syscall);
+        add_mapping_pair(m, "volcsw", ps.ps_volcsw);
+        add_mapping_pair(m, "involcsw", ps.ps_involcsw);
+        add_mapping_pair(m, "signal", ps.ps_signal);
+        add_mapping_pair(m, "lread", ps.ps_lread);
+        add_mapping_pair(m, "lwrite", ps.ps_lwrite);
+        add_mapping_pair(m, "bread", ps.ps_bread);
+        add_mapping_pair(m, "bwrite", ps.ps_bwrite);
+        add_mapping_pair(m, "phread", ps.ps_phread);
+        add_mapping_pair(m, "phwrite", ps.ps_phwrite);
     }
     push_refed_mapping(m);
 }
 #else
 
-#ifdef TIMES			/* has times() but not getrusage() */
+#ifdef TIMES                    /* has times() but not getrusage() */
 
 /*
   warning times are reported in processor dependent units of time.
@@ -284,22 +285,22 @@ f_rusage PROT((void))
     int i;
     unsigned int clock[2];
 
-    i = timer(clock);		/* returns 0 if success, -1 otherwise */
+    i = timer(clock);           /* returns 0 if success, -1 otherwise */
     m = allocate_mapping(2);
     add_mapping_pair(m, "utime", i ? 0 : clock[0] * 1000 + clock[1] / 1000);
     add_mapping_pair(m, "stime", i ? 0 : clock[0] * 1000 + clock[1] / 1000);
     push_refed_mapping(m);
 }
 
-#endif				/* LATTICE */
+#endif                          /* LATTICE */
 
-#endif				/* TIMES */
+#endif                          /* TIMES */
 
-#endif				/* GET_PROCESS_STATS */
+#endif                          /* GET_PROCESS_STATS */
 
-#endif				/* RUSAGE */
+#endif                          /* RUSAGE */
 
-#endif				/* WIN32 */
+#endif                          /* WIN32 */
 
 #endif
 

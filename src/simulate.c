@@ -59,10 +59,10 @@ static int init_object PROT((object_t *));
 static object_t *load_virtual_object PROT((const char *, int));
 static char *make_new_name PROT((const char *));
 #ifndef NO_ENVIRONMENT
-static void send_say PROT((object_t *, char *, array_t *));
+static void send_say PROT((object_t *, const char *, array_t *));
 #endif
 
-INLINE void check_legal_string P1(char *, s)
+INLINE void check_legal_string P1(const char *, s)
 {
     if (strlen(s) > LARGEST_PRINTABLE_STRING) {
         error("Printable strings limited to length of %d.\n",
@@ -137,7 +137,7 @@ init_privs_for_object P1(object_t *, ob)
 static int give_uid_to_object P1(object_t *, ob)
 {
     svalue_t *ret;
-    char *creator_name;
+    const char *creator_name;
 
     if (!master_ob) {
         ob->uid = add_uid("NONAME");
@@ -592,7 +592,7 @@ static char *make_new_name P1(const char *, str)
  * Save the command_giver, because reset() in the new object might change
  * it.
  */
-object_t *clone_object P2(char *, str1, int, num_arg)
+object_t *clone_object P2(const char *, str1, int, num_arg)
 {
     object_t *ob, *new_ob;
 
@@ -679,7 +679,7 @@ object_t *environment P1(svalue_t *, arg)
 
 
 #ifdef F_PRESENT
-static object_t *object_present2 PROT((char *, object_t *));
+static object_t *object_present2 PROT((const char *, object_t *));
 
 object_t *object_present P2(svalue_t *, v, object_t *, ob)
 {
@@ -733,10 +733,10 @@ object_t *object_present P2(svalue_t *, v, object_t *, ob)
     return 0;
 }
 
-static object_t *object_present2 P2(char *, str, object_t *, ob)
+static object_t *object_present2 P2(const char *, str, object_t *, ob)
 {
     svalue_t *ret;
-    char *p;
+    const char *p;
     int count = 0, length;
 
     length = strlen(str);
@@ -755,10 +755,11 @@ static object_t *object_present2 P2(char *, str, object_t *, ob)
         }
     }
     for (; ob; ob = ob->next_inv) {
-        p = new_string(length, "object_present2");
-        memcpy(p, str, length);
-        p[length] = 0;
-        push_malloced_string(p);
+        char *np;
+        np = new_string(length, "object_present2");
+        memcpy(np, str, length);
+        np[length] = 0;
+        push_malloced_string(np);
         ret = apply(APPLY_ID, ob, 1, ORIGIN_DRIVER);
         if (ob->flags & O_DESTRUCTED)
             return 0;
@@ -1087,7 +1088,7 @@ void destruct2 P1(object_t *, ob)
  */
 
 #ifndef NO_ENVIRONMENT
-static void send_say P3(object_t *, ob, char *, text, array_t *, avoid)
+static void send_say P3(object_t *, ob, const char *, text, array_t *, avoid)
 {
     int valid, j;
 
@@ -1109,7 +1110,7 @@ static void send_say P3(object_t *, ob, char *, text, array_t *, avoid)
 void say P2(svalue_t *, v, array_t *, avoid)
 {
     object_t *ob, *origin;
-    char *buff;
+    const char *buff;
 
     check_legal_string(v->u.string);
     buff = v->u.string;
@@ -1213,7 +1214,7 @@ void tell_room P3(object_t *, room, svalue_t *, v, array_t *, avoid)
 #endif
 #endif
 
-void shout_string P1(char *, str)
+void shout_string P1(const char *, str)
 {
     object_t *ob;
 
@@ -1401,7 +1402,7 @@ void do_write P1(svalue_t *, arg)
  * returned.
  */
 
-object_t *find_object P1(char *, str)
+object_t *find_object P1(const char *, str)
 {
     object_t *ob;
     char tmpbuf[MAX_OBJECT_NAME_SIZE];
@@ -1594,7 +1595,7 @@ void free_sentence P1(sentence_t *, p)
     sent_free = p;
 }
 
-void fatal P1V(char *, fmt)
+void fatal P1V(const char *, fmt)
 {
     static int in_fatal = 0;
     char msg_buf[2049];
@@ -1676,7 +1677,7 @@ static void debug_message_with_location P1(char *, err) {
     if (current_object && current_prog) {
         debug_message("%sprogram: /%s, object: /%s, file: %s\n",
                       err,
-                      current_prog->name,
+                      current_prog->filename,
                       current_object->obname,
                       get_line_number(pc, current_prog));
     } else if (current_object) {
@@ -1693,7 +1694,7 @@ static void add_message_with_location P1(char *, err) {
     if (current_object && current_prog) {
         add_vmessage(command_giver, "%sprogram: /%s, object: /%s, file: %s\n",
                      err,
-                     current_prog->name,
+                     current_prog->filename,
                      current_object->obname,
                      get_line_number(pc, current_prog));
     } else if (current_object) {
@@ -1709,14 +1710,14 @@ static void add_message_with_location P1(char *, err) {
 #ifdef MUDLIB_ERROR_HANDLER
 static void mudlib_error_handler P2(char *, err, int, catch) {
     mapping_t *m;
-    char *file;
+    const char *file;
     int line;
     svalue_t *mret;
 
     m = allocate_mapping(6);
     add_mapping_string(m, "error", err);
     if (current_prog)
-        add_mapping_malloced_string(m, "program", add_slash(current_prog->name));
+        add_mapping_malloced_string(m, "program", add_slash(current_prog->filename));
     if (current_object)
         add_mapping_object(m, "object", current_object);
     add_mapping_array(m, "trace", get_svalue_trace());
@@ -1870,7 +1871,7 @@ void error_needs_free P1(char *, s)
     error_handler(err_buf);
 }
 
-void error P1V(char *, fmt)
+void error P1V(const char * const, fmt)
 {
     char err_buf[2048];
     va_list args;

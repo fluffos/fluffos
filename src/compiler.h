@@ -81,7 +81,7 @@ typedef struct {
 } local_info_t;
 
 extern mem_block_t mem_block[NUMAREAS];
-extern char *compiler_type_names[];
+extern const char *compiler_type_names[];
 
 #define LOOP_CONTEXT            0x1
 #define SWITCH_CONTEXT          0x2
@@ -150,7 +150,7 @@ typedef struct compiler_temp_t {
 #define INHERIT(n)  ((inherit_t *)mem_block[A_INHERITS].block + (n))
 #define VAR_TEMP(n) ((variable_t *)mem_block[A_VAR_TEMP].block + (n))
 #define SIMUL(n)    (simuls[n].func)
-#define PROG_STRING(n)   (((char **)mem_block[A_STRINGS].block)[n])
+#define PROG_STRING(n)   (((const char **)mem_block[A_STRINGS].block)[n])
 #define CLASS(n)    ((class_def_t *)mem_block[A_CLASS_DEF].block + (n))
 
 #if !defined(__alpha) && !defined(cray)
@@ -198,8 +198,8 @@ void init_locals PROT((void));
 
 void save_file_info PROT((int, int));
 int add_program_file PROT((char *, int));
-void yyerror PROT((char *));
-void yywarn PROT((char *));
+void yyerror PROT((const char *));
+void yywarn PROT((const char *));
 void switch_to_block PROT((int));
 char *the_file_name PROT((char *));
 void free_all_local_names PROT((int));
@@ -207,7 +207,7 @@ void pop_n_locals PROT((int));
 void reactivate_current_locals PROT((void));
 void clean_up_locals PROT((void));
 void deactivate_current_locals PROT((void));
-int add_local_name PROT((char *, int));
+int add_local_name PROT((const char *, int));
 void reallocate_locals PROT((void));
 void initialize_locals PROT((void));
 int get_id_number PROT((void));
@@ -216,15 +216,15 @@ void reset_function_blocks PROT((void));
 void copy_variables PROT((program_t *, int));
 void copy_structures PROT((program_t *));
 int copy_functions PROT((program_t *, int));
-void type_error PROT((char *, int));
+void type_error PROT((const char *, int));
 int compatible_types PROT((int, int));
 int compatible_types2 PROT((int, int));
 int arrange_call_inherited PROT((char *, parse_node_t *));
 void add_arg_type PROT((unsigned short));
-int define_new_function PROT((char *, int, int, int, int));
+int define_new_function PROT((const char *, int, int, int, int));
 int define_variable PROT((char *, int));
 int define_new_variable PROT((char *, int));
-short store_prog_string PROT((char *));
+short store_prog_string PROT((const char *));
 void free_prog_string PROT((short));
 #ifdef DEBUG
 int dump_function_table PROT((void));

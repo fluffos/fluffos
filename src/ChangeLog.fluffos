@@ -1,6 +1,10 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
+new in FluffOS 1.17
+fixed writing over shared strings (yay const!)
+fixed some buffer overflows
+
 new in FluffOS 1.16
 stop parsing after illegal to inherit error (crasher)
 fixed some uninitialised variables

@@ -36,9 +36,9 @@ extern int tot_dangling_object;
 char *strput PROT((char *, char *, const char *));
 char *strput_int PROT((char *, char *, int));
 void CDECL debug_fatal PROT1V(char *);
-void CDECL fatal PROT1V(char *);
-void CDECL error PROT1V(char *);
-INLINE void check_legal_string PROT((char *));
+void CDECL fatal PROT1V(const char *);
+void CDECL error PROT1V(const char * const);
+INLINE void check_legal_string PROT((const char *));
 #ifndef NO_LIGHT
 void add_light PROT((object_t *, int));
 #endif
@@ -57,11 +57,11 @@ object_t *int_load_object PROT((char *, lpc_object_t *));
 #define load_object(x, y) int_load_object(x)
 object_t *int_load_object PROT((const char *));
 #endif
-object_t *clone_object PROT((char *, int));
+object_t *clone_object PROT((const char *, int));
 object_t *environment PROT((svalue_t *));
 object_t *first_inventory PROT((svalue_t *));
 object_t *object_present PROT((svalue_t *, object_t *));
-object_t *find_object PROT((char *));
+object_t *find_object PROT((const char *));
 object_t *find_object2 PROT((const char *));
 void move_object PROT((object_t *, object_t *));
 void destruct_object PROT((object_t *));
@@ -72,7 +72,7 @@ void do_write PROT((svalue_t *));
 void do_message PROT((svalue_t *, svalue_t *, array_t *, array_t *, int));
 void say PROT((svalue_t *, array_t *));
 void tell_room PROT((object_t *, svalue_t *, array_t *));
-void shout_string PROT((char *));
+void shout_string PROT((const char *));
 
 void error_needs_free PROT((char *));
 void throw_error PROT((void));

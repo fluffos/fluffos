@@ -60,19 +60,19 @@ typedef struct malloc_block_s {
 #define MSTR_REF(x) (MSTR_BLOCK(x)->ref)
 #define MSTR_SIZE(x) (MSTR_BLOCK(x)->size)
 #define MSTR_UPDATE_SIZE(x, y) SAFE(\
-				    ADD_STRING_SIZE(y - MSTR_SIZE(x));\
-				    MSTR_BLOCK(x)->size = \
-				    (y > USHRT_MAX ? USHRT_MAX : y);\
-				)
+                                    ADD_STRING_SIZE(y - MSTR_SIZE(x));\
+                                    MSTR_BLOCK(x)->size = \
+                                    (y > USHRT_MAX ? USHRT_MAX : y);\
+                                )
 
 #define FREE_MSTR(x) SAFE(\
                           DEBUG_CHECK(MSTR_REF(x) != 1, "FREE_MSTR used on a multiply referenced string\n");\
                           svalue_strlen_size = MSTR_SIZE(x);\
-			  SUB_NEW_STRING(svalue_strlen_size, \
-  					 sizeof(malloc_block_t));\
-  			  FREE(MSTR_BLOCK(x));\
-			  SUB_STRING(svalue_strlen_size);\
-		      )
+                          SUB_NEW_STRING(svalue_strlen_size, \
+                                         sizeof(malloc_block_t));\
+                          FREE(MSTR_BLOCK(x));\
+                          SUB_STRING(svalue_strlen_size);\
+                      )
 
 /* This counts on some rather crucial alignment between malloc_block_t and
  * block_t.  COUNTED_STRLEN(x) is the same as strlen(sv->u.string) when
@@ -92,45 +92,45 @@ typedef struct malloc_block_s {
 #define DEC_COUNTED_REF(x) (!(MSTR_REF(x) == 0 || --MSTR_REF(x) > 0))
 
 typedef struct block_s {
-    struct block_s *next;	/* next block in the hash chain */
+    struct block_s *next;       /* next block in the hash chain */
 #if defined(DEBUGMALLOC_EXTENSIONS) || (SIZEOF_PTR == 8)
     int extra_ref;
 #endif
     /* these two must be last */
-    unsigned short size;	/* length of the string */
-    unsigned short refs;	/* reference count    */
+    unsigned short size;        /* length of the string */
+    unsigned short refs;        /* reference count    */
 } block_t;
 
 #define NEXT(x) (x)->next
 #define REFS(x) (x)->refs
 #define EXTRA_REF(x) (x)->extra_ref
 #define SIZE(x) (x)->size
-#define BLOCK(x) (((block_t *)(x)) - 1)	/* pointer arithmetic */
+#define BLOCK(x) (((block_t *)(x)) - 1) /* pointer arithmetic */
 #define STRING(x) ((char *)(x + 1))
 
 #define SHARED_STRLEN(x) COUNTED_STRLEN(x)
 
 #define SVALUE_STRLEN(x) (((x)->subtype & STRING_COUNTED) ? \
-			  COUNTED_STRLEN((x)->u.string) : \
-			  strlen((x)->u.string))
+                          COUNTED_STRLEN((x)->u.string) : \
+                          strlen((x)->u.string))
 
 /* For quick checks.  Avoid strlen(), etc.  This is  */
 #define SVALUE_STRLEN_DIFFERS(x, y) ((((x)->subtype & STRING_COUNTED) && \
-				     ((y)->subtype & STRING_COUNTED)) ? \
-				     MSTR_SIZE((x)->u.string) != \
-				     MSTR_SIZE((y)->u.string) : 0)
+                                     ((y)->subtype & STRING_COUNTED)) ? \
+                                     MSTR_SIZE((x)->u.string) != \
+                                     MSTR_SIZE((y)->u.string) : 0)
 /*
  * stralloc.c
  */
 void init_strings PROT((void));
-char *findstring PROT((char *));
-char *make_shared_string PROT((char *));
-char *ref_string PROT((char *));
-void free_string PROT((char *));
+char *findstring PROT((const char *));
+char *make_shared_string PROT((const char *));
+const char *ref_string PROT((const char *));
+void free_string PROT((const char *));
 void deallocate_string PROT((char *));
 int add_string_status PROT((outbuffer_t *, int));
 
-char *extend_string PROT((char *, int));
+char *extend_string PROT((const char *, int));
 
 extern int svalue_strlen_size;
 

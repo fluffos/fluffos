@@ -13,9 +13,9 @@
 #include "program.h"
 
 #ifdef F_DUMP_PROG
-void dump_prog PROT((program_t *, char *, int));
+void dump_prog PROT((program_t *, const char *, int));
 static void disassemble PROT((FILE *, char *, int, int, program_t *));
-static char *disassem_string PROT((char *));
+static const char *disassem_string PROT((const char *));
 static int CDECL short_compare PROT((CONST void *, CONST void *));
 static void dump_line_numbers PROT((FILE *, program_t *));
 
@@ -23,7 +23,7 @@ void
 f_dump_prog PROT((void))
 {
     program_t *prog;
-    char *where;
+    const char *where;
     int d;
     object_t *ob;
     int narg = st_num_arg;
@@ -57,9 +57,9 @@ f_dump_prog PROT((void))
  * 2 - dump line number table
  */
 void
-dump_prog P3(program_t *, prog, char *, fn, int, flags)
+dump_prog P3(program_t *, prog, const char *, fn, int, flags)
 {
-    char *fname;
+    const char *fname;
     FILE *f;
     int i, j;
     int num_funcs_total;
@@ -75,13 +75,13 @@ dump_prog P3(program_t *, prog, char *, fn, int, flags)
         error("Unable to open '/%s' for writing.\n", fname);
         return;
     }
-    fprintf(f, "NAME: /%s\n", prog->name);
+    fprintf(f, "NAME: /%s\n", prog->filename);
     fprintf(f, "INHERITS:\n");
     fprintf(f, "\tname                    fio    vio\n");
     fprintf(f, "\t----------------        ---    ---\n");
     for (i = 0; i < (int) prog->num_inherited; i++)
         fprintf(f, "\t%-20s  %5d  %5d\n",
-                prog->inherit[i].prog->name,
+                prog->inherit[i].prog->filename,
                 (int)prog->inherit[i].function_index_offset,
                 (int)prog->inherit[i].variable_index_offset
             );
@@ -181,7 +181,7 @@ dump_prog P3(program_t *, prog, char *, fn, int, flags)
     fclose(f);
 }
 
-static char *disassem_string P1(char *, str)
+static const char *disassem_string P1(const char *, str)
 {
     static char buf[30];
     char *b;
@@ -222,7 +222,7 @@ short_compare P2(CONST void *, a, CONST void *, b)
     return x - y;
 }
 
-static char *pushes[] = { "string", "number", "global", "local" };
+static const char *pushes[] = { "string", "number", "global", "local" };
 
 static void
 disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
@@ -324,7 +324,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
         case F_FOREACH:
             {
                 int flags = EXTRACT_UCHAR(pc++);
-                char *left = "local", *right = "local";
+                const char *left = "local", *right = "local";
 
                 if (flags & FOREACH_LEFT_GLOBAL)
                     left = "global";
@@ -422,9 +422,9 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
             pc += 3;
             if (sarg < (newprog->num_functions_defined + 
                         newprog->last_inherited))
-                sprintf(buff, "%30s::%-12s %5d", newprog->name,
+                sprintf(buff, "%30s::%-12s %5d", newprog->filename,
                         function_name(newprog, sarg), (int) sarg);
-            else sprintf(buff, "<out of range in %30s - %d>", newprog->name,
+            else sprintf(buff, "<out of range in %30s - %d>", newprog->filename,
                          (int) sarg);
             break;
         }

@@ -25,15 +25,15 @@ lpc_socket_t *lpc_socks = 0;
 int max_lpc_socks = 0;
 
 #ifdef PACKAGE_SOCKETS
-static int socket_name_to_sin PROT((char *, struct sockaddr_in *));
+static int socket_name_to_sin PROT((const char *, struct sockaddr_in *));
 static char *inet_address PROT((struct sockaddr_in *));
 #endif
 
 /*
  * check permission
  */
-int check_valid_socket P5(char *, what, int, fd, object_t *, owner,
-                          char *, addr, int, port)
+int check_valid_socket P5(const char *, what, int, fd, object_t *, owner,
+                          const char *, addr, int, port)
 {
     array_t *info;
     svalue_t *mret;
@@ -299,7 +299,7 @@ int socket_create P3(enum socket_mode, mode, svalue_t *, read_callback, svalue_t
 /*
  * Bind an address to an LPC efun socket
  */
-int socket_bind P3(int, fd, int, port, char *, addr)
+int socket_bind P3(int, fd, int, port, const char *, addr)
 {
     int len;
     struct sockaddr_in sin;
@@ -489,7 +489,7 @@ int socket_accept P3(int, fd, svalue_t *, read_callback, svalue_t *, write_callb
 /*
  * Connect an LPC efun socket
  */
-int socket_connect P4(int, fd, char *, name, svalue_t *, read_callback, svalue_t *, write_callback)
+int socket_connect P4(int, fd, const char *, name, svalue_t *, read_callback, svalue_t *, write_callback)
 {
     if (fd < 0 || fd >= max_lpc_socks)
         return EEFDRANGE;
@@ -562,7 +562,7 @@ int socket_connect P4(int, fd, char *, name, svalue_t *, read_callback, svalue_t
 /*
  * Write a message on an LPC efun socket
  */
-int socket_write P3(int, fd, svalue_t *, message, char *, name)
+int socket_write P3(int, fd, svalue_t *, message, const char *, name)
 {
     int len, off;
     char *buf, *p;
@@ -1175,7 +1175,7 @@ int socket_acquire P4(int, fd, svalue_t *, read_callback, svalue_t *, write_call
 /*
  * Return the string representation of a socket error
  */
-char *socket_error P1(int, error)
+const char *socket_error P1(int, error)
 {
     error = -(error + 1);
     if (error < 0 || error >= ERROR_STRINGS - 1)
@@ -1234,7 +1234,7 @@ void assign_socket_owner P2(svalue_t *, sv, object_t *, ob)
 /*
  * Convert a string representation of an address to a sockaddr_in
  */
-static int socket_name_to_sin P2(char *, name, struct sockaddr_in *, sin)
+static int socket_name_to_sin P2(const char *, name, struct sockaddr_in *, sin)
 {
     int port;
     char *cp, addr[ADDR_BUF_SIZE];
@@ -1279,7 +1279,7 @@ void close_referencing_sockets P1(object_t *, ob)
  */
 static char *inet_address P1(struct sockaddr_in *, sin)
 {
-    static char addr[23], port[7];
+    static char addr[32], port[7];
 
     if (ntohl(sin->sin_addr.s_addr) == INADDR_ANY)
         strcpy(addr, "*");
@@ -1295,7 +1295,7 @@ static char *inet_address P1(struct sockaddr_in *, sin)
     return (addr);
 }
 
-char *socket_modes[] = {
+const char *socket_modes[] = {
     "MUD",
     "STREAM",
     "DATAGRAM",
@@ -1303,7 +1303,7 @@ char *socket_modes[] = {
     "DATAGRAM_BINARY"
 };
 
-char *socket_states[] = {
+const char *socket_states[] = {
     "CLOSED",
     "CLOSING",
     "UNBOUND",

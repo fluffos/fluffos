@@ -322,7 +322,7 @@ void f_copy PROT((void))
 /* flag and extra info by Beek */
 #ifdef F_FUNCTIONS
 void f_functions PROT((void)) {
-    int i, j, num, index;
+    int i, j, num, ind;
     array_t *vec, *subvec;
     function_t *funp;
     program_t *prog;
@@ -349,34 +349,34 @@ void f_functions PROT((void)) {
         unsigned short low, high, mid;
         
         prog = sp->u.ob->prog;
-        index = i;
+        ind = i;
 
         /* Walk up the inheritance tree to the real definition */       
-        if (prog->function_flags[index] & FUNC_ALIAS) {
-            index = prog->function_flags[index] & ~FUNC_ALIAS;
+        if (prog->function_flags[ind] & FUNC_ALIAS) {
+            ind = prog->function_flags[ind] & ~FUNC_ALIAS;
         }
         
-        while (prog->function_flags[index] & FUNC_INHERITED) {
+        while (prog->function_flags[ind] & FUNC_INHERITED) {
             low = 0;
             high = prog->num_inherited -1;
             
             while (high > low) {
                 mid = (low + high + 1) >> 1;
-                if (prog->inherit[mid].function_index_offset > index)
+                if (prog->inherit[mid].function_index_offset > ind)
                     high = mid -1;
                 else low = mid;
             }
-            index -= prog->inherit[low].function_index_offset;
+            ind -= prog->inherit[low].function_index_offset;
             prog = prog->inherit[low].prog;
         }
     
-        index -= prog->last_inherited;
+        ind -= prog->last_inherited;
 
-        funp = prog->function_table + index;
+        funp = prog->function_table + ind;
 
         if (flag) {
-            if (prog->type_start && prog->type_start[index] != INDEX_START_NONE)
-                types = &prog->argument_types[prog->type_start[index]];
+            if (prog->type_start && prog->type_start[ind] != INDEX_START_NONE)
+                types = &prog->argument_types[prog->type_start[ind]];
             else
                 types = 0;
 
@@ -527,7 +527,8 @@ static int at_end(int i, int imax, int z, int *lens) {
 void 
 f_terminal_colour PROT((void))
 {
-    char *instr, *cp, *savestr, *deststr, **parts;
+    const char *instr, *cp, **parts;
+    char *savestr, *deststr, *ncp;
     int num, i, j, k, col, start, space, *lens, maybe_at_end;
     int space_garbage = 0;
     mapping_node_t *elt, **mtab;
@@ -562,7 +563,7 @@ f_terminal_colour PROT((void))
     if (cp == NULL) {
         if (wrap) {
             num = 1;
-            parts = CALLOCATE(1, char *, TAG_TEMPORARY, "f_terminal_colour: parts");
+            parts = (const char **)CALLOCATE(1, char *, TAG_TEMPORARY, "f_terminal_colour: parts");
             parts[0] = instr;
             savestr = 0;
         } else {
@@ -571,30 +572,30 @@ f_terminal_colour PROT((void))
         }
     } else {
         /* here we have something to parse */
-
-        parts = CALLOCATE(NSTRSEGS, char *, TAG_TEMPORARY, "f_terminal_colour: parts");
-        if (cp - instr) {       /* starting seg, if not delimiter */
+        char *newstr = (char *) cp; //must be result of the string_copy above
+        parts = (const char **) CALLOCATE(NSTRSEGS, char *, TAG_TEMPORARY, "f_terminal_colour: parts");
+        if (newstr - instr) {       /* starting seg, if not delimiter */
             num = 1;
             parts[0] = instr;
-            *cp = 0;
+            *newstr = 0;
         } else
             num = 0;
-        while (cp) {
-            cp += 2;
-            instr = cp;
+        while (newstr) {
+            newstr += 2;
+            instr = newstr;
             do {
-                cp = strchr(cp,TC_FIRST_CHAR);
-                if (cp) {
-                    if (cp[1] == TC_SECOND_CHAR)
+                newstr = strchr(newstr,TC_FIRST_CHAR);
+                if (newstr) {
+                    if (newstr[1] == TC_SECOND_CHAR)
                         break;
-                    cp++;
+                    newstr++;
                 }
-            } while (cp);
-            if (cp) {
-                *cp = 0;
-                if (cp > instr) {
+            } while (newstr);
+            if (newstr) {
+                *newstr = 0;
+                if (newstr > instr) {
                     if (num && num % NSTRSEGS == 0) {
-                        parts = RESIZE(parts, num + NSTRSEGS, char *, 
+                        parts = (const char **) RESIZE(parts, num + NSTRSEGS, char *, 
                                        TAG_TEMPORARY, "f_terminal_colour: parts realloc");
                     }
                     parts[num++] = instr;
@@ -603,7 +604,7 @@ f_terminal_colour PROT((void))
         }
         if (*instr) {   /* trailing seg, if not delimiter */
             if (num && num % NSTRSEGS == 0) {
-                parts = RESIZE(parts, num + NSTRSEGS, char *,
+                parts = (const char **) RESIZE(parts, num + NSTRSEGS, char *,
                                TAG_TEMPORARY, "f_terminal_colour: parts realloc");
             }
             parts[num++] = instr;
@@ -683,7 +684,7 @@ f_terminal_colour PROT((void))
 
         if (wrap) {
             int z;
-            char *p = parts[i];
+            const char *p = parts[i];
             for (z = 0; z < lens[i]; z++) {
                 char c = p[z];
                 buflen++;
@@ -750,7 +751,7 @@ f_terminal_colour PROT((void))
     
     /* now we have the final string in parts and length in j. 
        let's compose it, wrapping if necessary */
-    cp = deststr = new_string(j, "f_terminal_colour: deststr");
+    ncp = deststr = new_string(j, "f_terminal_colour: deststr");
     if (wrap) {
         char *tmp = new_string(max_buflen, "f_terminal_colour: wrap");
         char *pt = tmp;
@@ -761,7 +762,7 @@ f_terminal_colour PROT((void))
         buflen = space_buflen = 0;
         for (i = 0; i < num; i++) {
             int kind;
-            char *p = parts[i];
+            const char *p = parts[i];
             if (lens[i] < 0) {
                 memcpy(pt, p, -lens[i]);
                 pt += -lens[i];
@@ -814,35 +815,35 @@ f_terminal_colour PROT((void))
                 }
                 /* If we get here, we ended a line */
                 n = (pt - tmp) - buflen;
-                memcpy(cp, tmp, n);
-                cp += n;
+                memcpy(ncp, tmp, n);
+                ncp += n;
                 if (kind == 1) {
                     /* replace the space */
-                    cp[-1] = '\n';
+                    ncp[-1] = '\n';
                 }
                 if (kind == 2) {
                     /* need to insert a newline */
-                    *cp++ = '\n';
+                    *ncp++ = '\n';
                 }
                 memmove(tmp, tmp + n, buflen);
                 pt = tmp + buflen;
                 if (col || !at_end(i, num, k, lens)) {
-                    memset(cp, ' ', indent);
-                    cp += indent;
+                    memset(ncp, ' ', indent);
+                    ncp += indent;
                     col += indent;
                 }
             }
         }
-        memcpy(cp, tmp, pt - tmp);
-        cp += pt - tmp;
+        memcpy(ncp, tmp, pt - tmp);
+        ncp += pt - tmp;
         FREE_MSTR(tmp);
     } else {
         for (i = 0; i < num; i++) {
-            memcpy(cp, parts[i], lens[i]);
-            cp += lens[i];
+            memcpy(ncp, parts[i], lens[i]);
+            ncp += lens[i];
         }
     }
-    *cp = 0;
+    *ncp = 0;
     FREE(lens);
     FREE(parts);
     if (savestr)
@@ -850,8 +851,8 @@ f_terminal_colour PROT((void))
     /* now we have what we want */
     pop_stack();
 #ifdef DEBUG
-    if (cp - deststr != j) {
-        fatal("Length miscalculated in terminal_colour()\n    Expected: %i Was: %i\n    String: %s\n    Indent: %i Wrap: %i\n", j, cp - deststr, sp->u.string, indent, wrap);
+    if (ncp - deststr != j) {
+        fatal("Length miscalculated in terminal_colour()\n    Expected: %i Was: %i\n    String: %s\n    Indent: %i Wrap: %i\n", j, ncp - deststr, sp->u.string, indent, wrap);
     }
 #endif
     free_string_svalue(sp);
@@ -868,7 +869,7 @@ f_terminal_colour PROT((void))
 /* number to chop is added */
 #define PLURAL_CHOP    2
 
-static char *pluralize P1(char *, str) {
+static char *pluralize P1(const char *, str) {
     char *pre, *rel, *end;
     char *p, *of_buf;
     int of_len = 0, plen, slen;
@@ -876,7 +877,7 @@ static char *pluralize P1(char *, str) {
 
     /* default rule */
     int found = 0;
-    char *suffix = "s";
+    const char * suffix = "s";
     
     sz = strlen(str);
     if (sz == 0) return 0;
@@ -1284,7 +1285,7 @@ f_pluralize PROT((void))
  * file_length() efun, returns the number of lines in a file.
  * Returns -1 if no privs or file doesn't exist.
  */
-static int file_length P1(char *, file)
+static int file_length P1(const char *, file)
 {
   struct stat st;
   FILE *f;
@@ -1332,19 +1333,20 @@ f_file_length PROT((void))
 void
 f_upper_case PROT((void))
 {
-    char *str;
+    const char *str;
 
     str = sp->u.string;
     /* find first upper case letter, if any */
     for (; *str; str++) {
         if (uislower(*str)) {
+            char *newstr;
             int l = str - sp->u.string;
             unlink_string_svalue(sp);
-            str = sp->u.string + l;
-            *str = toupper((unsigned char)*str);
-            for (str++; *str; str++) {
-                if (uislower((unsigned char)*str))
-                    *str = toupper((unsigned char)*str);
+            newstr = (char *) sp->u.string + l;
+            *newstr = toupper((unsigned char)*newstr);
+            for (newstr++; *newstr; newstr++) {
+                if (uislower((unsigned char)*newstr))
+                    *newstr = toupper((unsigned char)*newstr);
             }
             return;
         }
@@ -1687,7 +1689,7 @@ void f_function_owner PROT((void)) {
 
 #ifdef F_REPEAT_STRING
 void f_repeat_string PROT((void)) {
-    char *str;
+    const char *str;
     int repeat, len, newlen;
     char *ret, *p;
     int i;
@@ -1735,7 +1737,7 @@ static int node_share P3(mapping_t *, m, mapping_node_t *, elt, void *, tp) {
 static int memory_share P1(svalue_t *, sv) {
     int i, total = sizeof(svalue_t);
     int subtotal;
-    static int depth = 0;
+    static int calldepth = 0;
     
     switch (sv->type) {
     case T_STRING:
@@ -1752,23 +1754,24 @@ static int memory_share P1(svalue_t *, sv) {
         break;
     case T_ARRAY:
     case T_CLASS:
-        if (++depth > 100)
+        if (1+calldepth > 100)
             return 0;
-
+        calldepth++;
         /* first svalue is stored inside the array struct, so sizeof(array_t)
          * includes one svalue.
          */
         subtotal = sizeof(array_t) - sizeof(svalue_t);
         for (i = 0; i < sv->u.arr->size; i++)
             subtotal += memory_share(&sv->u.arr->item[i]);
-        depth--;
+        calldepth--;
         return total + subtotal/sv->u.arr->ref;
     case T_MAPPING:
-        if (++depth > 100)
+        if (1+calldepth > 100)
             return 0;
+        calldepth++;
         subtotal = sizeof(mapping_t);
         mapTraverse(sv->u.map, node_share, &subtotal);
-        depth--;
+        calldepth--;
         return total + subtotal/sv->u.map->ref;
     case T_FUNCTION:
     {
@@ -1776,9 +1779,9 @@ static int memory_share P1(svalue_t *, sv) {
         tmp.type = T_ARRAY;
         tmp.u.arr = sv->u.fp->hdr.args;
 
-        if (++depth > 100)
+        if (1+calldepth > 100)
             return 0;
-
+        calldepth++;
         if (tmp.u.arr)
             subtotal = sizeof(funptr_hdr_t) + memory_share(&tmp) - sizeof(svalue_t);
         else
@@ -1798,7 +1801,7 @@ static int memory_share P1(svalue_t *, sv) {
             subtotal += sizeof(functional_t);
             break;
         }
-        depth--;
+        calldepth--;
         return total + subtotal/sv->u.fp->hdr.ref;
     }
 #ifndef NO_BUFFER_TYPE
@@ -1854,7 +1857,7 @@ void f_memory_summary PROT((void)) {
         if (ob->flags & O_SWAPPED) 
             load_ob_from_swap(ob);
 
-        sv.u.string = ob->prog->name;
+        sv.u.string = ob->prog->filename;
         entry = find_for_insert(result, &sv, 0);
         if (entry->type == T_NUMBER) {
             entry->type = T_MAPPING;
@@ -1961,7 +1964,7 @@ void f_network_stats PROT((void))
 
 #define EVENT_PREFIX "event_"
 
-void event P4 (svalue_t *, event_ob, char *, event_fun, int, numparam,
+void event P4 (svalue_t *, event_ob, const char *, event_fun, int, numparam,
                svalue_t *, event_param){
 
   object_t *ob, *origin;
@@ -2042,12 +2045,12 @@ void f_event PROT ((void)){
 
 #ifdef F_QUERY_NUM
 void number_as_string P2(char *, buf, int, n){
-  char *low[] =  { "ten", "eleven", "twelve", "thirteen",
+  const char *low[] =  { "ten", "eleven", "twelve", "thirteen",
                      "fourteen", "fifteen", "sixteen", "seventeen",
                      "eighteen", "nineteen" };
-  char *hi[] =  { "", "", "twenty", "thirty", "forty", "fifty", "sixty",
+  const char *hi[] =  { "", "", "twenty", "thirty", "forty", "fifty", "sixty",
                     "seventy", "eighty", "ninety"};
-  char *single[] =  { "", "one", "two", "three", "four", "five", "six",
+  const char *single[] =  { "", "one", "two", "three", "four", "five", "six",
                        "seven", "eight", "nine"};
   if(!n){
     strcat(buf, "zero");

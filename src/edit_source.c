@@ -81,7 +81,7 @@ static incstate *inctop = 0;
 #define CHAR_QUOTE 1
 #define STRING_QUOTE 2
 
-static void add_define PROT((char *, int, char *));
+static void add_define PROT((const char *, int, char *));
 
 #ifdef WIN32
 #include <io.h>

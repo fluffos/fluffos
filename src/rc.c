@@ -21,7 +21,7 @@ static char *buff;
 static int buff_size;
 
 static void read_config_file PROT((FILE *));
-static int scan_config_line PROT((char *, void *, int));
+static int scan_config_line PROT((const char *, void *, int));
 static void config_init PROT((void)); /* don't ask */
 
 static void config_init() {
@@ -82,7 +82,7 @@ static void read_config_file P1(FILE *, file)
       1  : Must have
       0  : optional
       -1 : warn if missing */
-static int scan_config_line P3(char *, fmt, void *, dest, int, required)
+static int scan_config_line P3(const char *, fmt, void *, dest, int, required)
 {
     char *tmp, *end;
     char missing_line[MAX_LINE_LENGTH];
