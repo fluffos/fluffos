@@ -45,19 +45,6 @@ for developing LPC code for another mud.
 
 -----
 
-We came up with hopefully a somewhat useful idea to add_action() efun.
-
-Something like:   add_action( string, void|string|string *, void|int );
-
-So that if you do  add_action( "look", ({ "look", "l", "glance" }) );
-it will set 'look', 'i', and 'glance' as all possible commands to call
-'look' function in the object.  This would shorten code so that you don't
-have to do 3 different add_action calls.  What do you think?
-
-Decker
-
------
-
 From: John Garnett <garnett@gestalt.austin.tx.us>
 
 
@@ -131,15 +118,6 @@ from), saving clones and the contents of variables.
 
 -----
 
-swap.c: use unbuffered I/O functions (eg read() and seek()) instead of
-          buffered I/O functions (eg fread() and fseek())
-        use mmap() instead of read(), write() on systems where available
-          for further speed up
-
-  -- Hyp
-
------
-
 mudlib_stats uses a linked list, it is fast for insertion; however
   lookup is O(n)...this should be hacked to use an AVL tree (ala uid.c)
 
@@ -154,9 +132,12 @@ commands (ie via !)
 
 -----
 
-uid-less driver option
+swap.c: use unbuffered I/O functions (eg read() and seek()) instead of
+          buffered I/O functions (eg fread() and fseek())
+        use mmap() instead of read(), write() on systems where available
+          for further speed up
 
--- Alexus
+  -- Hyp
 
 -----
 
@@ -199,16 +180,25 @@ Comment:
         compiler/grammar & lpc_compiler/grammar
           set prog flags
 
+-----
+
+mud_status(verbose|terse)
+
+option to dump to a file
+
+-- Leto
+  
 ------
 
 Implement compile stacks so we don't have to dump an object (and later
 restart the compile) if an inherited object isn't defined yet.
 
+Note: This would entail requiring the use of bison or pre-yacc'ed grammars
+since most versions of yacc parsers aren't reentrant. -Beek
+
 Use parse trees to simplify compile time optimizations.
 
 Rewrite strings to use counted strings (strlen and refcount).
-
-Set up contrib dir for efun submissions?
 
 Set up grammar dir for pre-byacc'd and/or pre-bison'd parsers for people
   with broken 'yacc's.
@@ -224,6 +214,10 @@ Add an option to log the amount of input/output.
 
 -- Leto
 
+Comment:
+number of packets and total output is already logged; it's hidden off in a
+corner tho.  A better interface for the mud info stuff, maybe?
+
 -----
 
 Add params to call_out_info() to limit info to particular functions
@@ -231,18 +225,3 @@ and/or objects.
 
 -----
 
-Add 2nd arg to find_object() to optionally load object
-
-arrayp() efun (same as pointerp())
-
--- Cygnus
-
------
-
-mud_status(verbose|terse)
-
-option to dump to a file
-
--- Leto
-
------

@@ -184,7 +184,7 @@ void *
 	bucket = 0;
 	amt = 8;
 	while (pagesz > amt) {
-	    amt << = 1;
+	    amt <<= 1;
 	    bucket++;
 	}
 	pagebucket = bucket;
@@ -208,7 +208,7 @@ void *
 	bucket = pagebucket;
     }
     while (nbytes > amt + n) {
-	amt << = 1;
+	amt <<= 1;
 	if (amt == 0)
 	    return (NULL);
 	bucket++;

@@ -21,14 +21,16 @@
 
 #include "lint.h"
 #include "interpret.h"
-#include "config.h"
 #include "object.h"
+#include "include/origin.h"
 
 extern char *string_copy PROT((char *)), *xalloc PROT((int));
 extern int d_flag;		/* for debugging purposes */
 extern struct object *previous_ob;
 extern struct svalue const0, const1;
+#ifndef NO_UIDS
 extern userid_t *backbone_uid;
+#endif
 
 #ifndef tolower			/* On some systems this is a function */
 extern int tolower PROT((int));
@@ -340,19 +342,19 @@ static void
 load_lpc_info P2(int, ix, struct object *, ob)
 {
     struct vector *tmp, *sing;
-    struct svalue sval, *ret;
+    struct svalue *ret;
     int il, make_plural = 0;
     char *str;
     char *parse_to_plural();
 
-    if (!ob)
+    if (!ob || ob->flags & O_DESTRUCTED)
 	return;
 
     if (gPluid_list &&
 	gPluid_list->size > ix &&
 	gPluid_list->item[ix].type == T_NUMBER &&
 	gPluid_list->item[ix].u.number == 0) {
-	ret = apply(QGET_PLURID, ob, 0);
+	ret = apply(QGET_PLURID, ob, 0, ORIGIN_DRIVER);
 	if (ret && ret->type == T_POINTER)
 	    assign_svalue_no_free(&gPluid_list->item[ix], ret);
 	else {
@@ -363,28 +365,25 @@ load_lpc_info P2(int, ix, struct object *, ob)
     if (gId_list &&
 	gId_list->size > ix &&
 	gId_list->item[ix].type == T_NUMBER &&
-	gId_list->item[ix].u.number == 0) {
-	ret = apply(QGET_ID, ob, 0);
+	gId_list->item[ix].u.number == 0 &&
+	!(ob->flags & O_DESTRUCTED) ) {
+	ret = apply(QGET_ID, ob, 0, ORIGIN_DRIVER);
 	if (ret && ret->type == T_POINTER) {
 	    assign_svalue_no_free(&gId_list->item[ix], ret);
 	    if (make_plural) {
 		tmp = allocate_array(ret->u.vec->size);
 		sing = ret->u.vec;
 
-		sval.type = T_STRING;
-		sval.subtype = STRING_MALLOC;
 		for (il = 0; il < tmp->size; il++) {
 		    if (sing->item[il].type == T_STRING) {
 			str = parse_to_plural(sing->item[il].u.string);
-			sval.u.string = string_copy(str);
-			assign_svalue_no_free(&tmp->item[il], &sval);
-			FREE(sval.u.string);
+			tmp->item[il].type = T_STRING;
+			tmp->item[il].subtype = STRING_MALLOC;
+			tmp->item[il].u.string = string_copy(str);
 		    }
 		}
-		sval.type = T_POINTER;
-		sval.u.vec = tmp;
-		assign_svalue_no_free(&gPluid_list->item[ix], &sval);
-		free_svalue(&sval);
+		gPluid_list->item[ix].type = T_POINTER;
+		gPluid_list->item[ix].u.vec = tmp;
 	    }
 	} else {
 	    gId_list->item[ix].u.number = 1;
@@ -393,8 +392,9 @@ load_lpc_info P2(int, ix, struct object *, ob)
     if (gAdjid_list &&
 	gAdjid_list->size > ix &&
 	gAdjid_list->item[ix].type == T_NUMBER &&
-	gAdjid_list->item[ix].u.number == 0) {
-	ret = apply(QGET_ADJID, ob, 0);
+	gAdjid_list->item[ix].u.number == 0 &&
+	!(ob->flags & O_DESTRUCTED)) {
+	ret = apply(QGET_ADJID, ob, 0, ORIGIN_DRIVER);
 	if (ret && ret->type == T_POINTER)
 	    assign_svalue_no_free(&gAdjid_list->item[ix], ret);
 	else
@@ -438,7 +438,6 @@ parse P5(char *, cmd,		/* Command to parse */
     void check_for_destr();	/* In interpret.c */
     struct svalue *sub_parse();
     struct svalue *slice_words(), tmp;
-    void stack_put();
     struct vector *deep_inventory();
 
     /*
@@ -715,7 +714,7 @@ static struct svalue *
 	    tx = implode_string(slice, " ");
 	free_vector(slice);
     }
-    free_svalue(&stmp);		/* May be allocated! */
+    free_svalue(&stmp, "slice_words");		/* May be allocated! */
 
     if (tx) {
 	stmp.type = T_STRING;
@@ -1077,7 +1076,7 @@ static struct svalue *
     /*
      * stmp is static, and may contain old info that must be freed
      */
-    free_svalue(&stmp);
+    free_svalue(&stmp, "item_parse");
     stmp.type = T_POINTER;
     stmp.u.vec = ret;
     return &stmp;
@@ -1142,7 +1141,7 @@ static struct svalue *
 	ob = find_living_object(wvec->item[*cix_in].u.string, 0);
 
     if (ob) {
-	free_svalue(&stmp);	/* Might be allocated */
+	free_svalue(&stmp, "living_parse");	/* Might be allocated */
 	stmp.type = T_OBJECT;
 	stmp.u.ob = ob;
 	add_ref(ob, "living_parse");
@@ -1239,7 +1238,7 @@ static struct svalue *
 	}
     }
 
-    free_svalue(&stmp);
+    free_svalue(&stmp, "prepos_parse");
 
     if (pix == pvec->size) {
 	stmp.type = T_NUMBER;
@@ -1655,12 +1654,16 @@ char *
     int pr_start, il, changed;
     char *p1, *p2, *p3, *buf;
     char *process_part();
+#ifndef NO_UIDS
     userid_t *old_euid;
+#endif
 
     if ((!str) || (!(p1 = strchr(str, '@'))))
 	return str;
 
+#ifndef NO_UIDS
     old_euid = 0;
+#endif
 
     /*
      * This means we are called from notify_ in comm1 We must temporary set
@@ -1669,6 +1672,7 @@ char *
     if (!current_object) {
 	current_object = command_giver;
 
+#ifndef NO_UIDS
 	if (!backbone_uid)
 	    return str;
 
@@ -1676,6 +1680,7 @@ char *
 	    old_euid = current_object->euid;
 	    current_object->euid = backbone_uid;
 	}
+#endif
     }
     vec = explode_string(str, "@@");
 
@@ -1704,7 +1709,7 @@ char *
 	} else
 	    changed = 1;
 
-	free_svalue(&vec->item[il]);
+	free_svalue(&vec->item[il], "process_string");
 	vec->item[il].u.string = p2;
 	vec->item[il].type = T_STRING;
 	vec->item[il].subtype = STRING_MALLOC;
@@ -1717,9 +1722,11 @@ char *
 
     free_vector(vec);
 
+#ifndef NO_UIDS
     if (old_euid) {
 	current_object->euid = old_euid;
     }
+#endif
     current_object = old_cur;
 
     return (changed) ? buf : str;
@@ -1812,7 +1819,7 @@ struct svalue *
     /*
      * Apply the function and see if adequate answer is returned
      */
-    ret = apply(func, ob, numargs);
+    ret = apply(func, ob, numargs, ORIGIN_EFUN);
 
     FREE(func);
 

@@ -1,10 +1,9 @@
 ###############################################################################
-#              Customizable runtime config file for MudOS 0.9.20              #
+#              Customizable runtime config file for MudOS v20                 #
 ###############################################################################
 # NOTE: All paths specified here are relative to the mudlib directory except  #
 #       for mudlib directory, and binary directory.                           #
-# Lines beginning with a # or a newline are ignored.                          #
-###############################################################################
+# Lines beginning with a # or a newline are ignored.                          ################################################################################
  
 # name of this mud
 name : Basis
@@ -95,7 +94,7 @@ maximum read file size : 200000
 maximum byte transfer : 10000
  
 # Reserve an extra memory area from malloc(), to free when we run out
-# of memory; so begins Armageddon.
+# of memory and allow the mudlib to shutdown.
 # If this value is 0, no area will be reserved.
 reserved size : 0
  

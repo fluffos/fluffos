@@ -17,13 +17,14 @@
  */
 
 static int otable_size;
+static int otable_size_minus_one;
 
 static struct object *find_obj_n PROT((char *));
 
 /*
  * Object hash function, ripped off from stralloc.c.
  */
-#define ObjHash(s) hashstr(s, 100, otable_size)
+#define ObjHash(s) whashstr(s, 20) & otable_size_minus_one
 
 /*
  * hash table - list of pointers to heads of object chains.
@@ -37,6 +38,7 @@ void init_otable()
     int x;
 
     otable_size = OTABLE_SIZE;
+    otable_size_minus_one = OTABLE_SIZE - 1;
     obj_table = (struct object **)
 	DXALLOC(sizeof(struct object *) * otable_size, 8192, "init_otable");
 

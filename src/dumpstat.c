@@ -9,6 +9,7 @@
 #include "buffer.h"
 #include "object.h"
 #include "exec.h"
+#include "include/origin.h"
 
 /*
  * Write statistics about objects on file.
@@ -21,8 +22,6 @@ static int svalue_size PROT((struct svalue *));
 
 static int sumSizes P3(struct mapping *, m, struct node *, elt, int *, t)
 {
-    int svalue_size PROT((struct svalue *));
-
     *t += (svalue_size(&elt->values[0]) + svalue_size(&elt->values[1]));
     *t += sizeof(struct node);
     return 0;
@@ -51,8 +50,15 @@ static int svalue_size P1(struct svalue *, v)
 	mapTraverse(v->u.map, (int (*) ()) sumSizes, &total);
 	return total;
     case T_FUNCTION:
+#ifdef NEW_FUNCTIONS
+	total = (int)(sizeof(struct funp)) + svalue_size(&v->u.fp->args);
+	if (v->u.fp->type == ORIGIN_CALL_OTHER)
+	    total += svalue_size(&v->u.fp->f.obj);
+	return total;
+#else
 	return (int) (sizeof(struct funp) + svalue_size(&v->u.fp->obj) +
 		      svalue_size(&v->u.fp->fun));
+#endif
     case T_BUFFER:
 	/* first byte is stored inside the buffer struct */
 	return (int) (sizeof(struct buffer) + v->u.buf->size - 1);

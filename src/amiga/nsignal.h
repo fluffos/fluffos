@@ -1,7 +1,7 @@
 /* hosts/amiga/nsignal.h */
 
-#ifndef _NSIGNAL_H
-#define _NSIGNAL_H
+#ifndef AMIGA_NSIGNAL_H
+#define AMIGA_NSIGNAL_H
 
 #include <exec/types.h>
 #include "ccdep.h"

@@ -1,3 +1,7 @@
+%include "comp_warning"
+%include "lpc_compiler/pre"
+%include "token_defs"
+
 /* This is to make emacs edit this in C mode: -*-C-*- */
 all: program;
 
@@ -81,12 +85,19 @@ optional_star: /* empty */ { $$ = 0; } | '*' { $$ = TYPE_MOD_POINTER; } ;
 
 block_or_semi: block { $$ = 0; } | ';' { $$ = ';'; } ;
 
-not_efun_string: L_IDENTIFIER
-  | L_EFUN_NAME { $$ = string_copy(instrs[$1].name); }
-  | L_SIMUL_EFUN { $$ = string_copy($1->name); }
-  | L_DEFINED_FUNCTION { $$ = string_copy(FUNCTION($1)->name); }
+not_efun_ident: 
+        L_DEFINED_NAME
+            {
+	      $$ = get_defined_name(&($1));
+	    }
+     |  L_IDENTIFIER
+     |  L_ASM
+            {
+	      $$ = string_copy("asm");
+	    }
+     ;
 
-identifier: not_efun_string
+identifier: not_efun_ident
 	  | L_EFUN { $$ = string_copy("efun"); }
 
 def: type optional_star identifier
@@ -98,7 +109,7 @@ def: type optional_star identifier
 	    if ($1 & TYPE_MOD_MASK) {
 		exact_types = $1 | $2;
 	    } else {
-		if (pragma_strict_types)
+		if (pragmas & PRAGMA_STRICT_TYPES)
 		    yyerror("\"#pragma strict_types\" requires type of function");
 		/* force strict types - no more compat mode */
 #ifdef STRICT_TYPE_CHECKING
@@ -135,8 +146,8 @@ def: type optional_star identifier
 	      insert_locals($<number>8,
 			    current_number_of_locals-$6, dirty_register+1);
 	      define_new_function($3, $6, 0, 0, 0, $1 | $2);
-		/* Snarf the }\n created by the block, so we can insert
-		   the return */
+		/* Snarf the closing brace created by the block, so we can
+		   insert the return */
 		BACKSPACE(2);
 		ins_string("c_return(ret,&const0);\n}\n");
 		needs_comma = 0;
@@ -147,18 +158,43 @@ def: type optional_star identifier
    | type name_list ';' { if ($1 == 0) yyerror("Missing type"); }
    | inheritance ;
 
-new_arg_name: type optional_star identifier
+new_arg_name: type optional_star L_IDENTIFIER
 	{
-	  int i;
 	    if (exact_types && $1 == 0) {
 		yyerror("Missing type for argument");
-		i = add_local_name($3, TYPE_ANY);/* Supress more errors */
+		add_local_name($3, TYPE_ANY);/* Supress more errors */
 	    } else {
-		i = add_local_name($3, $1 | $2);
+		add_local_name($3, $1 | $2);
 	    }
 	}
-	  | type L_LOCAL_NAME
-		{yyerror("Illegal to redeclare local name"); } ;
+   | type optional_star L_EFUN
+	{
+	    if (exact_types && $1 == 0) {
+		yyerror("Missing type for argument");
+		add_local_name(string_copy("efun"), TYPE_ANY);/* Supress more errors */
+	    } else {
+		add_local_name(string_copy("efun"), $1 | $2);
+	    }
+	}
+   | type optional_star L_ASM
+	{
+	    if (exact_types && $1 == 0) {
+		yyerror("Missing type for argument");
+		add_local_name(string_copy("asm"), TYPE_ANY);/* Supress more errors */
+	    } else {
+		add_local_name(string_copy("asm"), $1 | $2);
+	    }
+	}
+	  | type optional_star L_DEFINED_NAME
+		{
+		  if ($3.local_num != -1)
+		    yyerror("Illegal to redeclare local name");
+		  else {
+		    add_local_name(get_defined_name(&($3)), $1 | $2);
+		  }
+		}
+          ;
+
 
 argument: /* empty */ { $$ = 0; }
 	  | argument_list ;
@@ -451,7 +487,9 @@ expr0:
 	      !($1.type == TYPE_STRING && $3.type == TYPE_NUMBER &&
 		$2 == F_ADD_EQ))
 	    {
-	      type_error("Bad assignment. Rhs", $3.type);
+		char buf[1000];
+		sprintf(buf, "Bad assignment %s.", get_two_types($1.type, $3.type));
+		yyerror(buf);
 	    }
 	  if (($1.type == TYPE_REAL) && ($3.type == TYPE_NUMBER)) {
 	    ins_cfun_call_by_name("c_to_float",1,0);
@@ -509,8 +547,10 @@ expr0:
 	  }
 	  ins_string("\n)\n");
 	  if (exact_types && !compatible_types($4.type, $7.type)) {
-	    type_error("Different types in ?: expr", $4.type);
-	    type_error("                      and ", $7.type);
+	      char buf[1000];
+	      sprintf(buf, "Types in ?: do not match %s.", 
+		      get_two_types($4.type, $7.type));
+	      yyerror(buf);
 	  }
 	  if ($4.type == TYPE_ANY)
 	    $$.type = $7.type;
@@ -640,8 +680,9 @@ expr0:
 		(t1 != t2) &&
 !((t1 & (TYPE_NUMBER | TYPE_REAL)) && (t2 & (TYPE_NUMBER | TYPE_REAL))) &&
 		(t1 != TYPE_ANY && t2 != TYPE_ANY)) {
-		type_error("== always false because of incompatible types",$1.type);
-		type_error("                               compared to", $3.type);
+		char buf[1000];
+		sprintf(buf, "== always false because of incompatible types %s.",get_two_types($1.type, $3.type));
+		yyerror(buf);
 	    }
 	    ins_cfun_call_by_name("c_eq",2,0);
 	    generate_frees();
@@ -655,8 +696,9 @@ expr0:
 		(t1 != t2) &&
 !((t1 & (TYPE_NUMBER | TYPE_REAL)) && (t2 & (TYPE_NUMBER | TYPE_REAL))) &&
 		(t1 != TYPE_ANY && t2 != TYPE_ANY)) {
-		type_error("!= always true because of incompatible types", $1.type);
-		type_error("                               compared to", $3.type);
+		char buf[1000];
+		sprintf(buf, "!= always false because of incompatible types %s.",get_two_types($1.type, $3.type));
+		yyerror(buf);
 	    }
 	    ins_cfun_call_by_name("c_ne",2,0);
 	    generate_frees();
@@ -1003,8 +1045,12 @@ expr0:
 	  $$.type = $1;
 	  $$.addr = $2.addr; $$.iscon = 0;
 	  if (exact_types && $2.type != TYPE_ANY && $2.type != TYPE_UNKNOWN &&
-	      $1 != TYPE_VOID)
-	type_error("Casts are only legal for type mixed, or when unknown", $2.type);
+	      $1 != TYPE_VOID) {
+		    char tname[100];
+		    char buf[1000];
+		    strcpy(tname, get_type_name($2.type));
+		    sprintf(buf, "Cannot cast %s to %s.", tname, get_type_name($1));
+		}
 	}
 
       | L_INC lvalue  %prec L_NOT  /* note lower precedence here */
@@ -1138,8 +1184,7 @@ assign: '=' { $$ = F_ASSIGN; }
 return: L_RETURN
 	{
 	    if (exact_types && !TYPE(exact_types, TYPE_VOID))
-		type_error("Must return a value for a function declared",
-			   exact_types);
+		yyerror("Non-void functions must return a value.");
 	    do_comma();
 	    ins_string("return c_return(ret,&const0)");
 	    needs_comma = 0;
@@ -1150,8 +1195,11 @@ return: L_RETURN
       }
         comma_expr
         {
-	  if (exact_types && !compatible_types($3, exact_types))
-	    type_error("Return type not matching", exact_types);
+	  if (exact_types && !compatible_types($3, exact_types | TYPE_MOD_MASK)) {
+	      char buf[1000];
+	      sprintf(buff, "Type of returned value doesn't match function return type %s.", get_two_types($2, exact_types & TYPE_MOD_MASK));
+	      yyerror(buf);
+	  }
 	  do_comma();
 	  create_intermediates(1);
 	  ins_string("c_return(ret,");
@@ -1164,16 +1212,33 @@ return: L_RETURN
 	  last_expression = 0;
 	};
 
+expr_list_on_stack:
+        {
+	  $<number>$ = keep_in_register;
+	  keep_in_register = 0;
+	}
+     expr_list
+        {
+	  keep_in_register = $<number>1;
+	  $$ = $2;
+	}
+
 expr_list: /* empty */		{ $$ = 0; }
 	 | expr_list2		{ $$ = $1; }
 	 | expr_list2 ','	{ $$ = $1; } ; /* Allow a terminating comma */
 
 expr_list2: expr0	{ $$ = 1; 
-			  change_destination_to_stack();
-			  add_arg_type($1.type); }
+			  if (!keep_in_register) {
+			    change_destination_to_stack();
+			    add_arg_type($1.type);
+			  } else keep_in_register--;
+			}
 | expr_list2 ',' expr0	{ $$ = $1 + 1;
-			  change_destination_to_stack();
-			  add_arg_type($3.type); }
+			  if (!keep_in_register) {
+			    change_destination_to_stack();
+			    add_arg_type($3.type);
+			  } else keep_in_register--;
+			}
 
 expr_list3: /* empty */         { $$ = 0; }
            | expr_list4         { $$ = $1; }
@@ -1181,16 +1246,6 @@ expr_list3: /* empty */         { $$ = 0; }
 
 expr_list4: assoc_pair          { $$ = $1; }
            | expr_list4 ',' assoc_pair  { $$ = $1 + 2; } ;
-
-expr_list5: /* empty */         { $$ = 0; }
-           | expr_list6         { $$ = $1; }
-           | expr_list6 ','     { $$ = $1; }
-
-expr_list6: expr0                   { $$ = 1; add_arg_type($1.type); }
-           | expr_list6 ',' expr0   { $$ = $1 + 1; 
-				      if (*efun_sp && ($1 >= *efun_sp))
-					change_destination_to_stack();
-				      add_arg_type($3.type); }
 
 assoc_pair: expr0 { change_destination_to_stack(); } 
         ':' expr0 { change_destination_to_stack(); $$ = 2; } ;
@@ -1207,31 +1262,146 @@ expr4: function_call { $$.type = $1; $$.addr = $$.iscon = 0; }
      | sscanf { $$.type = TYPE_NUMBER; $$.addr = $$.iscon = 0; }
      | parse_command { $$.type = TYPE_NUMBER; $$.addr = $$.iscon = 0; }
      | time_expression { $$.type = TYPE_NUMBER; $$.addr = $$.iscon = 0; }
-     | L_FUNCTION_OPEN expr0 ':' ')'
+     | L_FUNCTION_OPEN L_DEFINED_NAME ':' ')' %prec NEW_FUNCTION_PTR
+           {
+	   $$.type = TYPE_FUNCTION;
+	   $$.addr = CURRENT_PROGRAM_SIZE;
+	   $$.iscon = 0;
+	   if (($2.local_num != -1) || ($2.global_num != -1)) {
+	     if ($2.local_num != -1) {
+	       stack_push_local($2.local_num);
+	     } else {
+	       stack_push_identifier($2.global_num);
+	     }
+	     ins_cfun_call_by_name("c_this_function_constructor",1,1);
+	     generate_frees();
+	   } else
+#ifdef NEW_FUNCTIONS
+	     if ($2.simul_num != -1) {
+		 yyerror("Simul_efun pointers not implemented yet.\n");
+	     } else
+	     if ($2.function_num != -1) {
+	       yyerror("Lfun pointers not implemented yet.\n");
+	     } else { /* must be an efun */
+	       stack_push_number(0);
+	       ins_ext_cfun("c_efun_function_constructor", 1, $2);
+	     }
+#else
+	   yyerror("extended functions not enabled.\n");
+#endif
+	 }
+     | L_FUNCTION_OPEN L_DEFINED_NAME ','  %prec NEW_FUNCTION_PTR
+         {
+	   $$.type = TYPE_FUNCTION;
+	   $$.addr = CURRENT_PROGRAM_SIZE;
+	   $$.iscon = 0;
+	   /* this semantic value already used.  use the first '(' as
+	      another temporary. */
+	   $<number>1 = keep_in_register;
+	   keep_in_register = 0;
+
+	   /* the semantic value of this block is a flag */
+	   if (($2.local_num != -1) || ($2.global_num != -1)) {
+	     if ($2.local_num != -1) {
+		 stack_push_local($2.local_num);
+ 	     } else {
+		 stack_push_identifier($2.global_num);
+	     }
+	     $<number>1 = keep_in_register;
+	     keep_in_register = 1;
+	     $<number>$ = 1;
+	   } else
+#ifdef NEW_FUNCTIONS
+	      if ($2.simul_num != -1) {
+		yyerror("Simul_efun pointers not implemented yet.\n");
+		$<number>$ = 2;
+	      } else
+	      if ($2.function_num != -1) {
+		yyerror("Lfun pointers not implemented yet.\n");
+		$<number>$ = 3;
+	      } else { /* an efun */
+		$<number>$ = 4;
+	      }
+#else
+	      {
+		yyerror("extended functions not enabled.\n");
+		$<number>$ = 5;
+	      }
+#endif
+	 }
+       expr_list2 ':' ')'
+         {
+	   switch ($<number>4) {
+	   case 1: /* the name was an expression */
+	     if ($6 == 0) {
+	       yyerror("missing expression\n");
+	       stack_push_number(1);
+	     }
+	     if ($6 > 1) {
+	       yyerror("Too many arguments to (: :)\n");
+	       pop_arg_stack($6 - 1);
+#ifdef DEBUG
+	       on_stack -= $6 - 1;
+#endif
+	     }
+	     ins_cfun_call_by_name("c_function_constructor",2,1);
+	     generate_frees();
+	     break;
+#ifdef NEW_FUNCTIONS
+	   case 2: /* unimplemented */
+	   case 3:
+	     pop_arg_stack($6);
+#ifdef DEBUG
+	     on_stack -= $6;
+#endif
+	     break;
+	   case 4:
+	     ins_ext_cfun("C_AGGREGATE", 0, $6);
+	     pop_arg_stack($6);
+#ifdef DEBUG
+	     on_stack -= $6;
+#endif
+	     ins_ext_cfun("c_efun_function_constructor", 1, $2);
+	     break;
+#else
+	   case 5:
+	     pop_arg_stack($6);
+	     break;
+#endif
+	   }
+	   /* restore old value */
+	   keep_in_register = $<number>1;
+	 }
+     | L_FUNCTION_OPEN expr0 ':' ')'    %prec OLD_FUNCTION_PTR
          {
 	   ins_cfun_call_by_name("c_this_function_constructor",1,1);
 	   generate_frees();
 	   $$.type = TYPE_FUNCTION;
 	   $$.addr = $2.addr; $$.iscon = 0;
 	 }
-     | L_FUNCTION_OPEN expr0 ',' expr0 ':' ')'
+     | L_FUNCTION_OPEN expr0 ',' expr0 ':' ')' %prec OLD_FUNCTION_PTR
          {
 	   ins_cfun_call_by_name("c_function_constructor",2,1);
 	   generate_frees();
            $$.type = TYPE_FUNCTION;
            $$.addr = $2.addr; $$.iscon = 0;
          }
-     | L_MAPPING_OPEN expr_list3 ']' ')'
+     | L_MAPPING_OPEN 
          {
-	   ins_ext_cfun("C_ASSOC",0,$2);
+	     $<number>$ = keep_in_register; keep_in_register = 0;
+	 }
+       expr_list3 ']' ')'
+         {
+	   ins_ext_cfun("C_ASSOC",0,$3);
 	   generate_frees();
 #ifdef DEBUG
-	   on_stack-=$2;
+	   on_stack-=$3;
 #endif
 	   $$.type = TYPE_MAPPING;
 	   $$.addr = $$.iscon = 0;
+	   keep_in_register = $<number>2;
          }
-     | L_ARRAY_OPEN expr_list '}' ')'
+     | L_ARRAY_OPEN expr_list_on_stack '}' ')'
        {
 	   pop_arg_stack($2); /* we don't care about these */
 	   ins_ext_cfun("C_AGGREGATE",0,$2);
@@ -1312,16 +1482,13 @@ time_expression: L_TIME_EXPRESSION
 	;
 
 asm_directive: L_ASM '{' string_con2 '}' {
-  extern struct object *master_ob;
   struct svalue *res;
   
-  if (master_ob) {
-    push_malloced_string(the_file_name(current_file));
-    res = safe_apply_master_ob(APPLY_VALID_ASM, 1);
-    if (IS_ZERO(res)) {
+  push_malloced_string(the_file_name(current_file));
+  res = safe_apply_master_ob(APPLY_VALID_ASM, 1);
+  if (!MASTER_APPROVED(res)) {
       yyerror("Invalid asm directive");
       break;
-    }
   }
   ins_string($3);
 }
@@ -1344,25 +1511,30 @@ lvalue_list:
 	    }
     ;
 
-lvalue: identifier
+lvalue: L_DEFINED_NAME
 	{
-	    int i = verify_declared($1);
-
+	  int i;
+	  if ((i = $1.local_num) != -1) {
+	    stack_push_local(i);
+	    $$.type = type_of_locals[i];
+	    $$.iscon = 0;
+	    $$.addr = CURRENT_PROGRAM_SIZE;
+	  } else
+	  if ((i = $1.global_num) != -1) {
 	    stack_push_identifier(i);
-	    FREE($1);
-	    if (i == -1)
-		$$.type = TYPE_ANY;
-	    else
-		$$.type = VARIABLE(i)->type & TYPE_MOD_MASK;
+	    $$.type = VARIABLE(i)->type & TYPE_MOD_MASK;
 	    $$.iscon = 0;
 	    $$.addr = CURRENT_PROGRAM_SIZE;
-	}
-        | L_LOCAL_NAME
-	{
-	    stack_push_local($1);
-	    $$.type = type_of_locals[$1];
-	    $$.iscon = 0;
-	    $$.addr = CURRENT_PROGRAM_SIZE;
+	  } else {
+	    char *s;
+	    char buf[256];
+	    s = get_defined_name(&($1));
+	    strcpy(buf, "Undefined variable '");
+	    strcat(buf, s);
+	    FREE(s);
+	    strcat(buf, "'\n");
+	    yyerror(buf);
+	  }
 	}
 	| expr4 '[' comma_expr L_RANGE comma_expr ']'
        {
@@ -1490,30 +1662,35 @@ string_con2: L_STRING
 /* Beek -- normal function calls and efun calls are now seperate cases.
    made possible by a change in lex which now returns L_EFUN if the identifier
    is an efun */
-function_call: efun_name {
-      *(++efun_sp) = $1;
-      if (($1>-1) && (instrs[$1].max_arg == -1)) 
-	*(++efun_sp) = instrs[$1].min_arg;
-      else
-	*(++efun_sp) = 0;
-}
-'(' expr_list5 ')'
+function_call: efun_override {
+      $<number>$ = keep_in_register;
+      if ($1 > -1) {
+	if (predefs[$1].max_args == -1) 
+	  keep_in_register = predefs[$1].min_args;
+	else
+	  keep_in_register = predefs[$1].max_args;
+      } else keep_in_register = 0;
+    }
+'(' expr_list2 ')'
     {
       int f;
-      int min_arg, max_arg, num, needed, def, *argp;
+      int min_arg, max_arg, num, stack, needed, def, *argp;
       extern int efun_arg_types[];
       
-      f = *(efun_sp-1);
-      efun_sp-=2;
-      if (f != 0) {
-	min_arg = instrs[f].min_arg;
-	max_arg = instrs[f].max_arg;
-	def = instrs[f].Default;
-	$$ = instrs[f].ret_type;
+      f = $1;
+      if (f > -1) {
+	min_arg = predefs[f].min_args;
+	max_arg = predefs[f].max_args;
+	def = predefs[f].Default;
+	$$ = predefs[f].ret_type;
 	num = $4;
-	argp = &efun_arg_types[instrs[f].arg_index];
+	stack = num - max_arg;
+	argp = &efun_arg_types[predefs[f].arg_index];
 	needed = max_arg-num;
-	if (max_arg==-1) needed = 0;
+	if (max_arg==-1) {
+	  needed = 0;
+	  stack = num - min_arg;
+	}
 	if (def && $4 == min_arg-1) {
 	  stack_push_default(def);
 	  max_arg--;
@@ -1521,13 +1698,19 @@ function_call: efun_name {
 	  needed--;
 	  num++;
 	} else if ($4 < min_arg) {
+	  int i;
 	  char bff[100];
-	  sprintf(bff, "Too few arguments to %s", instrs[f].name);
+	  sprintf(bff, "Too few arguments to %s", predefs[f].word);
 	  yyerror(bff);
+	  i = $4;
+	  while (i--) stack_pop();
 	} else if ($4 > max_arg && max_arg != -1) {
+	  int i;
 	  char bff[100];
-	  sprintf(bff, "Too many arguments to %s", instrs[f].name);
+	  sprintf(bff, "Too many arguments to %s", predefs[f].word);
 	  yyerror(bff);
+	  i = $4;
+	  while (i--) stack_pop();
 	} else if (max_arg != -1 && exact_types) {
 	  /*
 	   * Now check all types of the arguments to efuns.
@@ -1540,7 +1723,7 @@ function_call: efun_name {
 	      ;
 	    if (argp[i] == 0) {
 	      sprintf(buff, "Bad argument %d type to efun %s()",
-		      argn+1, instrs[f].name);
+		      argn+1, predefs[f].word);
 	      yyerror(buff);
 	    }
 	    while(argp[i] != 0)
@@ -1553,49 +1736,57 @@ function_call: efun_name {
 	  num++;
 	}
 	if (max_arg==-1) {
-	  ins_ext_cfun_call(f,min_arg,num-min_arg);
+	  ins_ext_cfun_call(f,min_arg,stack);
 #ifdef DEBUG
-	  on_stack-=num-min_arg;
+	  on_stack-=stack;
 #endif
 	} else {
 	  ins_cfun_call(f,num);
 	}
-      }
+	pop_arg_stack(stack);
+      } else pop_arg_stack($4);
       generate_frees();
-      pop_arg_stack($4);
       last_expression = 0;
     }
-| L_SIMUL_EFUN
+| L_DEFINED_NAME
       {
-	stack_push_string(store_prog_string($1->name));
+	int i;
+	if ((i=$1.simul_num) != -1) 
+	  stack_push_string(store_prog_string(SIMUL(i)->name));
       }
         '(' expr_list ')'
       { 
-	ins_ext_cfun("c_simul_efun",1,$4);
-#ifdef DEBUG
-	on_stack-=$4;
-#endif
-	$$ = $1->type;
-	generate_frees();
-	pop_arg_stack($4);	/* Argument types not needed more */
-	last_expression = 0;
-      }
-| L_DEFINED_FUNCTION '(' expr_list ')'
-      { 
+	int f;
 	struct function *funp;
-	ins_ext_cfun("C_CALL",0,$3);
-	/* Snarf the last ), so we can add another argument */
-	BACKSPACE(1);
-	ins_string_with_num(",%i)", $1);
+	
+	if ((f = $1.function_num) != -1) {
+	  ins_ext_cfun("C_CALL",0,$4);
+	  /* Snarf the last ), so we can add another argument */
+	  BACKSPACE(1);
+	  ins_string_with_num(",%i)", f);
 #ifdef DEBUG
-        on_stack-=$3;
+	  on_stack-=$4;
 #endif
-	funp = FUNCTION($1);
+	  funp = FUNCTION(f);
 
-	$$ = validate_function_call(funp, $1, $3);
+	  $$ = validate_function_call(funp, f, $4);
 
-	generate_frees();
-	pop_arg_stack($3);	/* Argument types not needed more */
+	  generate_frees();
+	} else
+        if ((f = $1.simul_num) != -1) {
+	  ins_ext_cfun("c_simul_efun",1,$4);
+#ifdef DEBUG
+	  on_stack-=$4;
+#endif
+	  $$ = (SIMUL(f)->type) & TYPE_MOD_MASK;
+	  generate_frees();
+	} else
+        if ((f = $1.efun_num) != -1) {
+	  /*...*/
+	} else {
+	  /*...*/
+	}
+	pop_arg_stack($4);	/* Argument types not needed more */
 	last_expression = 0;
       }
   | function_name '(' expr_list ')'
@@ -1646,7 +1837,7 @@ function_call: efun_name {
 	  yyerror(buff);
 	}
 	if (!(funp->flags & NAME_UNDEFINED))
-	  $$ = funp->type;
+	  $$ = funp->type & TYPE_MOD_MASK;
 	else
 	  $$ = TYPE_ANY;	/* Just a guess */
       }
@@ -1660,7 +1851,7 @@ function_call: efun_name {
       stack_push_string(store_prog_string($3));
       FREE($3);
     }
-  '(' expr_list ')'
+  '(' expr_list_on_stack ')'
     {
       ins_ext_cfun("c_call_other",2,$6);
       generate_frees();
@@ -1673,12 +1864,18 @@ function_call: efun_name {
     }
 | '(' '*' comma_expr ')'
     {
-      ins_two_valued_cfun("c_function_split",1);
+#ifndef NEW_FUNCTIONS
+      ins_two_valued_cfun("c_evaluate",1);
       generate_frees();
+#endif
     }
-     '(' expr_list ')'
+     '(' expr_list_on_stack ')'
     {
+#ifdef NEW_FUNCTIONS
+      ins_ext_cfun("c_evaluate",1,$7);
+#else
       ins_ext_cfun("c_call_other",2,$7);
+#endif
       generate_frees();
 #ifdef DEBUG
       on_stack-=$7;
@@ -1687,8 +1884,7 @@ function_call: efun_name {
       pop_arg_stack($7);	/* No good need of these arguments */
     };
 
-efun_name: L_EFUN_NAME | L_EFUN L_COLON_COLON identifier {
-	extern struct object *master_ob;
+efun_override: L_EFUN L_COLON_COLON identifier {
 	struct svalue *res;
 
 	$$ = lookup_predef($3);
@@ -1697,14 +1893,14 @@ efun_name: L_EFUN_NAME | L_EFUN L_COLON_COLON identifier {
 	  sprintf(buf, "Unknown efun: %s", $3);
 	  yyerror(buf);
 	  $$ == 0;
-	} else if (master_ob) {
-	  push_malloced_string(the_file_name(current_file));
-	  push_constant_string($3);
-	  res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 2);
-	  if (IS_ZERO(res)) {
-	    yyerror("Invalid simulated efunction override");
-	    $$ = 0;
-	  }
+	} else {
+	    push_malloced_string(the_file_name(current_file));
+	    push_constant_string($3);
+	    res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 2);
+	    if (!MASTER_APPROVED(res)) {
+		yyerror("Invalid simulated efunction override");
+		$$ = 0;
+	    }
 	}
 	FREE($3);
       }
@@ -1726,7 +1922,7 @@ function_name: L_IDENTIFIER
 			FREE($3);
 			$$ = p;
 		}
-	      | not_efun_string L_COLON_COLON identifier
+	      | not_efun_ident L_COLON_COLON identifier
 		{
 		    char *p;
 		    int l;
@@ -1763,3 +1959,5 @@ optional_else_part:
          statement
        ;
 %%
+
+%include "lpc_compiler/post"

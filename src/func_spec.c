@@ -21,16 +21,21 @@
 
 /* most frequently used functions */
 
-unknown simul_efun(string,...);
 unknown call_other(object | string | object *, string | mixed *,...);
+#ifdef NEW_FUNCTIONS
+unknown evaluate(mixed, ...);
+#endif
 object present(object | string, void | object);
 object this_object();
-object this_player(void | int);
+object this_player(int default: F_CONST0);
+object this_interactive this_player( int default: F_CONST1 );
 object new(string);
 object clone_object new(string);
 void move_object(object | string, void | object | string);
-object previous_object(void | int);
+mixed previous_object(int default: F_CONST0);
+object *all_previous_objects previous_object(int default: F_NBYTE 1);
 int sizeof(mixed);
+int strlen sizeof(string);
 int destruct(object);
 string file_name(object default:F_THIS_OBJECT);
 object environment(void | object);
@@ -38,20 +43,22 @@ string capitalize(string);
 string *explode(string, string);
 string implode(string *, string);
 object *all_inventory(object default:F_THIS_OBJECT);
+object first_inventory(object|string default: F_THIS_OBJECT);
+object next_inventory(object default: F_THIS_OBJECT);
 void call_out(string, int,...);
-int member_array(mixed, mixed *, void | int);
-int notify_fail(string);
+int member_array(mixed, string | mixed *, void | int);
+int notify_fail(string | function);
 int input_to(string,...);
 int random(int);
-int save_object(string, void | int);
-void add_action(string, string, void | int);
+void add_action(string, string | string *, void | int);
 string query_verb();
 string lower_case(string);
-object first_inventory(object | string default:F_THIS_OBJECT);
-object next_inventory(object default:F_THIS_OBJECT);
 int command(string, void | object);
 string replace_string(string, string, string,...);
 int restore_object(string, void | int);
+int save_object(string, void | int);
+string save_variable(mixed);
+mixed restore_variable(string);
 object *users();
 string *get_dir(string, int default:F_CONST0);
 int strsrch(string, string | int, int default:F_CONST0);
@@ -64,12 +71,13 @@ void say(string, void | object | object *);
 void shout(string);
 int receive(string);
 void tell_room(object | string, string | object | int | float, void | object *);
-void message(string, string, string | string * | object | object *,
+void message(mixed, string, string | string * | object | object *,
 	          void | object | object *);
 
 /* the find_* functions */
 
-    object find_object(string);
+    object find_object(string, int default: F_CONST0);
+    object load_object find_object(string, int default: F_CONST1);
     object find_living(string);
     object find_player(string);
     int find_call_out(string);
@@ -83,7 +91,6 @@ void message(string, string, string | string * | object | object *,
 
 #ifdef EACH
     mixed *each(mapping, int default:F_CONST0);
-
 #endif
     mixed match_path(mapping, string);
 
@@ -98,11 +105,12 @@ void message(string, string, string | string * | object | object *,
     int virtualp(object);
     int functionp(mixed);
     int pointerp(mixed);
+    int arrayp pointerp(mixed);
     int objectp(mixed);
+    int typeof(mixed);
 
 #ifndef DISALLOW_BUFFER_TYPE
     int bufferp(mixed);
-
 #endif
 
     int inherits(string, object);
@@ -110,13 +118,12 @@ void message(string, string, string | string * | object | object *,
 
 #ifndef DISALLOW_BUFFER_TYPE
     buffer allocate_buffer(int);
-
 #endif
     string *regexp(string *, string);
     mixed *allocate(int);
 
-/* do not remove to_int() and to_float() because they are also used by
-   the compiler (compiler.y)
+/* do not remove to_int(), to_float() because they are also used by
+   the compiler (compiler.pre)
 */
     int to_int(string | float | int | buffer);
     float to_float(string | float | int);
@@ -130,15 +137,13 @@ void message(string, string, string | string * | object | object *,
 
 #ifndef DISALLOW_BUFFER_TYPE
     mixed read_buffer(string | buffer, void | int, void | int);
-
 #endif
-    int write_file(string, string);
+    int write_file(string, string, void | int);
     int rename(string, string);
     int write_bytes(string, int, string);
 
 #ifndef DISALLOW_BUFFER_TYPE
     int write_buffer(string | buffer, int, string | buffer | int);
-
 #endif
     int file_size(string);
     string read_bytes(string, void | int, void | int);
@@ -147,7 +152,6 @@ void message(string, string, string | string * | object | object *,
 
 #if !defined(LATTICE) && !defined(OS2)
     int link(string, string);
-
 #endif
     int mkdir(string);
     int rm(string);
@@ -161,7 +165,6 @@ void message(string, string, string | string * | object | object *,
 
     string crypt(string, string | int);	/* An int as second argument ? */
     string ctime(int);
-    mixed debug_info(int, object);
     void disable_commands();
     void enable_commands();
     int exec(object, object);
@@ -169,7 +172,7 @@ void message(string, string, string | string * | object | object *,
     string function_exists(string, object default:F_THIS_OBJECT);
 
     object *livings();
-    object *objects(void | string, void | object);
+    object *objects(void | string | function, void | object);
     string process_string(string);
     mixed process_value(string);
     string break_string(int | string, int, void | int | string);
@@ -186,26 +189,23 @@ void message(string, string, string | string * | object | object *,
 
 #ifdef LPC_TO_C
     int generate_source(string, void | string);
-
 #endif
 
     void set_living_name(string);
     void set_reset(object, void | int);
 
 #ifndef NO_SHADOWS
-    object shadow(object, int);
+    object shadow(object, int default: F_CONST1);
     object query_shadowing(object);
-
 #endif
     object snoop(object, void | object);
-    mixed *sort_array(mixed *, int | string, object | string default:F_THIS_OBJECT);
+    mixed *sort_array(mixed *, int | string | function, void | object | string);
     void tail(string);
     void throw(mixed);
     int time();
-    mixed *unique_array(mixed *, string, void | mixed);
+    mixed *unique_array(mixed *, string | function, void | mixed);
     string *deep_inherit_list(object default:F_THIS_OBJECT);
     string *inherit_list(object default:F_THIS_OBJECT);
-    int strlen(string);
     void printf(string,...);
     string sprintf(string,...);
     int mapp(mixed);
@@ -217,7 +217,7 @@ void message(string, string, string | string * | object | object *,
  */
     int living(object);
     int interactive(object default:F_THIS_OBJECT);
-    int in_edit(object default:F_THIS_OBJECT);
+    string in_edit(object default:F_THIS_OBJECT);
     int in_input(object default:F_THIS_OBJECT);
     mixed *commands();
     void enable_wizard();
@@ -231,26 +231,20 @@ void message(string, string, string | string * | object | object *,
  * various mudlib statistics
  */
 #ifndef NO_MUDLIB_STATS
-    mapping domain_stats(void | string);
-    void set_author(string);
-    mapping author_stats(void | string);
-
+#include "packages/mudlib_stats.spec"
 #endif
     int memory_info(object | void);
     mixed get_config(int);
 
 /* uid functions */
-
-    int export_uid(object);
-    string geteuid(function | object default:F_THIS_OBJECT);
-    string getuid(object default:F_THIS_OBJECT);
-    int seteuid(string | int);
+#ifndef NO_UIDS
+#include "packages/uids.spec"
+#endif
 
 #ifdef PRIVS
 /* privledge functions */
     string query_privs(object default:F_THIS_OBJECT);
     void set_privs(object, int | string);
-
 #endif				/* PRIVS */
 
     void get_char(string,...);
@@ -259,22 +253,7 @@ void message(string, string, string | string * | object | object *,
     void reload_object(object);
 
 #ifdef SOCKET_EFUNS
-/*
- * socket efuns
- */
-    int socket_create(int, string, string | void);
-    int socket_bind(int, int);
-    int socket_listen(int, string);
-    int socket_accept(int, string, string);
-    int socket_connect(int, string, string, string);
-    int socket_write(int, mixed, string | void);
-    int socket_close(int);
-    int socket_release(int, object, string);
-    int socket_acquire(int, string, string, string);
-    string socket_error(int);
-    string socket_address(int | object);
-    void dump_socket_status();
-
+#include "packages/sockets.spec"
 #endif				/* SOCKET_EFUNS */
 
     void error(string);
@@ -284,45 +263,20 @@ void message(string, string, string | string * | object | object *,
 
 #if (defined(RUSAGE) || defined(GET_PROCESS_STATS) || defined(TIMES)) || defined(LATTICE)
     mapping rusage();
-
 #endif				/* RUSAGE */
 
     void ed(string | void, string | void, string | int | void, int | void);
 
 #ifdef MATH
-    float cos(float);
-    float sin(float);
-    float tan(float);
-    float asin(float);
-    float acos(float);
-    float atan(float);
-    float sqrt(float);
-    float log(float);
-    float pow(float, float);
-    float exp(float);
-    float floor(float);
-    float ceil(float);
-
+#include "packages/math.spec"
 #endif
 
-/*
- * Matrix efuns for Jacques' 3d mud etc.
- */
 #ifdef MATRIX
-    float *id_matrix();
-    float *translate(float *, float, float, float);
-    float *scale(float *, float, float, float);
-    float *rotate_x(float *, float);
-    float *rotate_y(float *, float);
-    float *rotate_z(float *, float);
-    float *lookat_rotate(float *, float, float, float);
-    float *lookat_rotate2(float *, float, float, float, float, float, float);
-
-#endif				/* MATRIX */
+#include "packages/matrix.spec"
+#endif
 
 #ifdef CACHE_STATS
     void cache_stats();
-
 #endif
 
     object *deep_inventory(object);
@@ -332,18 +286,13 @@ void message(string, string, string | string * | object | object *,
  */
 
 #ifdef MIRE
-    int *editor_list(string, int);
-    int remove_editor_list(string);
-    string *fetch_article(int);
-    void doppel_mod(string, string, int);
-    mixed *find_keywords(string);
-    void init_mire();
-
+#include "packages/mire.spec"
 #endif
 
-    mixed filter_array(mixed *, string, object | string, void | mixed);
-    mixed *map_array(mixed *, string, object | string, void | mixed);
-
+    mixed filter_array(mixed *, string | function, void | object | string, ...);
+    mixed map(mapping | mixed *, string | function, object | string | void, ...);
+    mapping map_mapping map(mapping, string | function, object | string | void, ...);
+    mixed *map_array map(mixed *, string | function, object | string | void, ...);
 /*
  * parser 'magic' functions, turned into efuns
  */
@@ -357,7 +306,6 @@ void message(string, string, string | string * | object | object *,
 #ifndef NO_LIGHT
 /* set_light should die a dark death */
     int set_light(int);
-
 #endif
 
     int origin();
@@ -365,56 +313,49 @@ void message(string, string, string | string * | object | object *,
 /* the infrequently used functions */
 
     int reclaim_objects();
-    int refs(mixed);
-
-#if defined(PROFILING) && defined(HAS_MONCONTROL)
-    void moncontrol(int);
-
-#endif
-
-/* dump_prog: disassembler... comment out this line if you don't want the
-   disassembler compiled in.
-*/
-    void dump_prog(object,...);
-
-#if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
-    void debugmalloc(string, int);
-    void set_malloc_mask(int);
-
-#endif
 
     void set_eval_limit(int);
+    void reset_eval_cost set_eval_limit(int default: F_CONST0);
+    int eval_cost set_eval_limit(int default: F_NBYTE 1);
+    int max_eval_cost set_eval_limit(int default: F_CONST1);
 
 #ifdef DEBUG_MACRO
     void set_debug_level(int);
-
 #endif
 
 #ifdef OPCPROF
     void opcprof(string | void);
-
 #endif
 
 #ifdef PROFILE_FUNCTIONS
     mapping *function_profile(object default:F_THIS_OBJECT);
-
 #endif
 
-#ifdef TRACE
-    string traceprefix(string | int);
-    int trace(int);
-
+/*
+ * Change 0 to 1 on the next line for 0.9.18 compatibility efuns
+ */
+#if 0
+#include "packages/compat.spec"
 #endif
 
+/* Efuns that are only useful to people who know something about driver
+ * internals
+ */
+#if 1
+#include "packages/develop.spec"
+#endif
+
+/*  To some one of the contributed efuns, change 0 to 1 on the next line
+ *  and comment the efuns you don't want out of packages/contrib.spec
+ */
+#if 0
+#include "packages/contrib.spec"
+#endif
+
+#ifdef DEBUG
     void swap(object);		/* Only used for debugging */
+#endif
+    int resolve(string, string);
 
 /* shutdown is at the end because it is only called once per boot cycle :) */
     void shutdown(void | int);
-
-    int resolve(string, string);
-
-#if defined(NeXT) && defined(NEXT_MALLOC_DEBUG)
-    int malloc_check();
-    int malloc_debug(int);
-
-#endif

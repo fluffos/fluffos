@@ -52,6 +52,7 @@ extern struct lpc_socket lpc_socks[MAX_EFUN_SOCKS];
 #define S_BINARY    0x10
 
 void init_sockets PROT((void));
+int check_valid_socket PROT((char *, int, struct object *, char *, int));
 void socket_read_select_handler PROT((int));
 void socket_write_select_handler PROT((int));
 void assign_socket_owner PROT((struct svalue *, struct object *));

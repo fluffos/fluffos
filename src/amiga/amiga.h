@@ -1,10 +1,10 @@
 /*
  * Amiga include file for MudOS
- *   By Wildcard (umfehr06@ccu.umanitoba.ca
+ *   By Wildcard (umfehr06@ccu.umanitoba.ca)
  */
 
-#ifndef AMIGA_H
-#define AMIGA_H
+#ifndef AMIGA_AMIGA_H
+#define AMIGA_AMIGA_H
 
 /* file.c */
 #define _IFIFO  0010000

@@ -19,6 +19,7 @@
 #include "sent.h"
 #include "debug.h"
 #include "comm.h"
+#include "include/origin.h"
 
 /*
  * This file contains functions used to manipulate arrays.
@@ -54,14 +55,15 @@ static int search_alist PROT((struct svalue *, struct vector *));
  * Make an empty vector for everyone to use, never to be deallocated.
  * It is cheaper to reuse it, than to use MALLOC() and allocate.
  */
+
 struct vector null_vector =
 {
     1,				/* Ref count, which will ensure that it will
 				 * never be deallocated */
 #ifdef DEBUG
-    1,
+    1,                          /* extra ref */
 #endif
-    0				/* size */
+    0,				/* size */
 };
 
 INLINE struct vector *
@@ -117,7 +119,7 @@ void free_vector P1(struct vector *, p)
 	return;
     }
     for (i = p->size; i--;)
-	free_svalue(&p->item[i]);
+	free_svalue(&p->item[i], "free_vector");
 #ifndef NO_MUDLIB_STATS
     add_array_size(&p->stats, -((int)p->size));
 #endif
@@ -221,7 +223,6 @@ struct vector *explode_string P2(char *, str, char *, del)
 		if (num >= ret->size) {
 		    fatal("Index out of bounds in explode!\n");
 		}
-		/* free_svalue(&ret->item[num]); Not needed for new array */
 		ret->item[num].type = T_STRING;
 		ret->item[num].subtype = STRING_MALLOC;
 		ret->item[num].u.string = buff =
@@ -319,6 +320,7 @@ char *implode_string P2(struct vector *, arr, char *, del)
 {
     int size, i, num;
     char *p, *q;
+    int del_len;
 
     for (i = arr->size, size = 0, num = 0; i--;) {
 	if (arr->item[i].type == T_STRING) {
@@ -328,20 +330,23 @@ char *implode_string P2(struct vector *, arr, char *, del)
     }
     if (num == 0)
 	return string_copy("");
-    p = DXALLOC(size + (num - 1) * strlen(del) + 1, 8, "implode_string: p");
+
+    del_len = strlen(del);
+    p = DXALLOC(size + (num - 1) * del_len + 1, 8, "implode_string: p");
     q = p;
-    p[0] = '\0';
-    for (i = 0, size = 0, num = 0; i < arr->size; i++) {
+    for (i = 0, num = 0; i < arr->size; i++) {
 	if (arr->item[i].type == T_STRING) {
-	    if (num > 0) {
-		strcpy(p, del);
-		p += strlen(del);
+	    if (num) {
+		strncpy(p, del, del_len);
+		p += del_len;
 	    }
-	    strcpy(p, arr->item[i].u.string);
-	    p += strlen(arr->item[i].u.string);
+	    size = strlen(arr->item[i].u.string);
+	    strncpy(p, arr->item[i].u.string, size);
+	    p += size;
 	    num++;
 	}
     }
+    *p = 0;
     return q;
 }
 
@@ -410,19 +415,16 @@ struct vector *commands P1(struct object *, ob)
     struct vector *v;
     int cnt = 0;
 
-    for (s = ob->sent; s && (cnt < max_array_size); s = s->next) {
-	if (s->verb)
-	    cnt++;
+    for (s = ob->sent; s && s->verb; s = s->next) {
+	if (++cnt == max_array_size) break;
     }
     v = allocate_array(cnt);
     cnt = 0;
-    for (s = ob->sent; s && cnt < max_array_size; s = s->next) {
+    for (s = ob->sent; s && s->verb; s = s->next) {
 	struct vector *p;
 
-	if (!s->verb)
-	    continue;
 	v->item[cnt].type = T_POINTER;
-	v->item[cnt].u.vec = p = allocate_array(3);
+	v->item[cnt].u.vec = p = allocate_array(4);
 	p->item[0].type = T_STRING;
 	p->item[0].u.string = ref_string(s->verb);	/* the verb is shared */
 	p->item[0].subtype = STRING_SHARED;
@@ -430,8 +432,11 @@ struct vector *commands P1(struct object *, ob)
 	p->item[1].u.number = s->flags;
 	p->item[2].type = T_OBJECT;
 	p->item[2].u.ob = s->ob;
+	p->item[3].type = T_STRING;
+	p->item[3].u.string = ref_string(s->function);
+	p->item[3].subtype = STRING_SHARED;
 	add_ref(s->ob, "commands");
-	cnt++;
+	if (++cnt == max_array_size) break;
     }
     return v;
 }
@@ -443,54 +448,78 @@ struct vector *commands P1(struct object *, ob)
    and returns an array holding those elements that ob->func
    returned 1 for.
    */
-struct vector *filter P4(struct vector *, p, char *, func, struct object *, ob, struct svalue *, extra)
+
+#ifdef F_FILTER_ARRAY
+void
+f_filter_array P2(int, num_arg, int, instruction)
 {
     extern struct svalue *sp;
-    struct vector *r;
-    struct svalue *v;
-    char *flags;
-    int cnt, res;
+    struct svalue *arg = sp - num_arg + 1;
+    struct vector *vec = arg->u.vec, *r;
+    int size;
 
-    res = 0;
-    r = 0;
-    if (!func || !ob || (ob->flags & O_DESTRUCTED)) {
-	if (d_flag)
-	    debug_message("filter: invalid agument\n");
-	return 0;
-    }
-    if (p->size < 1)
-	return null_array();
+    if ((size = vec->size) < 1) r = null_array();
+    else {
+	struct funp *fp;
+	struct object *ob = 0;
+	char *func;
+	char *flags = DXALLOC(size+1, 9, "filter: flags");
+	struct svalue *extra, *v;
+	int res = 0, cnt, numex = 0;
 
-    flags = DXALLOC(p->size + 1, 9, "filter: flags");
+	push_malloced_string(flags);
 
-    push_malloced_string(flags);
-
-    for (cnt = 0; cnt < p->size; cnt++) {
-	flags[cnt] = 0;
-	push_svalue(&p->item[cnt]);
-	if (extra) {
-	    push_svalue(extra);
-	    v = apply(func, ob, 2);
-	} else {
-	    v = apply(func, ob, 1);
+	if ((arg+1)->type == T_FUNCTION){
+	    fp = (arg+1)->u.fp;
+	    if (num_arg > 2) extra = arg+2, numex = num_arg - 2;
+	} else {    
+	    func = (arg+1)->u.string;
+	    if (num_arg < 3) ob = current_object;
+	    else{
+		if ((arg+2)->type == T_OBJECT) ob = (arg+2)->u.ob;
+		else if ((arg+2)->type == T_STRING){
+		    if ((ob = find_object(arg[2].u.string)) && !object_visible(ob)) ob = 0;
+		}
+		if (!ob) bad_argument(arg+2, T_STRING | T_OBJECT, 3, instruction);
+		if (num_arg > 3) extra = arg + 3, numex = num_arg - 3;
+	    }
 	}
-	if (!IS_ZERO(v)) {
-	    flags[cnt] = 1;
-	    res++;
-	}
-    }
-    r = allocate_array(res);
-    if (res) {
-	while (cnt--) {
-	    if (flags[cnt])
-		assign_svalue_no_free(&r->item[--res], &p->item[cnt]);
-	}
-    }
-    FREE(flags);
-    sp--;
 
-    return r;
+	for (cnt = 0; cnt < size; cnt++){
+	    push_svalue(vec->item + cnt);
+	    if (numex) push_some_svalues(extra, numex);
+	    v = ob ? apply(func, ob, 1 + numex, ORIGIN_EFUN)
+		: call_function_pointer(fp, 1 + numex);
+	    if (!IS_ZERO(v)){
+		flags[cnt] = 1;
+		res++;
+	    } else flags[cnt] = 0;
+	}
+	r = allocate_array(res);
+	if (res){
+	    while (cnt--) {
+		if (flags[cnt])
+		    assign_svalue_no_free(&r->item[--res], vec->item+cnt);
+	    }
+	}
+
+	FREE(flags);
+	sp--;
+    }
+
+    pop_n_elems(num_arg);
+    (++sp)->type = T_POINTER;
+    sp->u.vec = r;
 }
+
+#ifdef FILTER_ARRAY
+void c_filter_array P5(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2, svalue *, s3)
+{
+    error("c_filter_array needs to be written.\n");
+    /* TODO */
+}
+#endif
+#endif
 
 /* Unique maker
 
@@ -533,6 +562,8 @@ int sameval P2(struct svalue *, arg1, struct svalue *, arg2)
 	    return arg1->u.ob == arg2->u.ob;
 	case T_MAPPING:
 	    return arg1->u.map == arg2->u.map;
+	case T_FUNCTION:
+	    return arg1->u.fp == arg2->u.fp;
 	}
     }
     return 0;
@@ -581,7 +612,7 @@ static int put_in P3(struct unique **, ulist, struct svalue *, marker, struct sv
 
 
 struct vector *
-       make_unique P3(struct vector *, arr, char *, func, struct svalue *, skipnum)
+       make_unique P4(struct vector *, arr, char *, func, struct funp *, fp, struct svalue *, skipnum)
 {
     struct svalue *v;
     struct vector *res, *ret;
@@ -594,14 +625,18 @@ struct vector *
 
     head = 0;
     ant = 0;
-    for (cnt = 0; cnt < arr->size; cnt++)
-	if (arr->item[cnt].type == T_OBJECT) {
-	    v = apply(func, arr->item[cnt].u.ob, 0);
-	    if (v && ((v->type != skipnum->type) || !sameval(v, skipnum)))
-		ant = put_in(&head, v, &(arr->item[cnt]));
-	}
+    for (cnt = 0; cnt < arr->size; cnt++) {
+	if (fp) {
+	    push_svalue(&arr->item[cnt]);
+	    v = call_function_pointer(fp,1);
+	} else if (arr->item[cnt].type == T_OBJECT) {
+	    v = apply(func, arr->item[cnt].u.ob, 0, ORIGIN_EFUN);
+	} else v = 0;
+	if (v && ((v->type != skipnum->type) || !sameval(v, skipnum)))
+	    ant = put_in(&head, v, &(arr->item[cnt]));
+    }
     ret = allocate_array(ant);
-
+    
     for (cnt = ant - 1; cnt >= 0; cnt--) {	/* Reverse to compensate
 						 * put_in */
 	ret->item[cnt].type = T_POINTER;
@@ -611,7 +646,7 @@ struct vector *
 	cnt2 = 0;
 	while (nxt2) {
 	    assign_svalue_no_free(&res->item[cnt2++], nxt2->val);
-	    free_svalue(&nxt2->mark);
+	    free_svalue(&nxt2->mark, "make_unique");
 	    nxt = nxt2->same;
 	    FREE((char *) nxt2);
 	    nxt2 = nxt;
@@ -636,36 +671,42 @@ struct vector *add_array P2(struct vector *, p, struct vector *, r)
     struct vector *d;		/* destination */
 
     /*
-     * have to be careful with size zero arrays because it could be
+     * have to be careful with size zero arrays because the could be
      * null_vector.  REALLOC(null_vector, ...) is bad :(
      */
     if (p->size == 0) {
-        free_vector(p);
-        return r;
+	struct vector *res;
+	free_vector(p);
+	if (r->ref > 1)
+	    res = slice_array(r, 0, r->size - 1);
+	else
+	    res = r;
+	return res;
     }
     if (r->size == 0) {
-        free_vector(r);
-        return p;
+	struct vector *res;
+	free_vector(r);
+	if (p->ref > 1)
+	    res = slice_array(p, 0, p->size - 1);
+	else
+	    res = p;
+	return res;
     }
 
     res = p->size + r->size;
-#ifdef DEBUG
-    if (res <= 0 || res > max_array_size)
-	error("Illegal array size.\n");
-#endif
+    if (res < 0 || res > max_array_size)
+      error("result of array addition is greater than maximum array size.\n");
 
+    /* x + x */
     if ((p == r) && (p->ref == 2)) {
         d = (struct vector *) DREALLOC(p, sizeof(struct vector) +
-              sizeof(struct svalue) * (res - 1), 121, "add_array()");
+		sizeof(struct svalue) * (res - 1), 121, "add_array()");
         if (!d)
 	    fatal("Out of memory.\n");
-
         /* copy myself */
 	for (cnt = d->size; cnt--;)
 	    assign_svalue_no_free(&d->item[--res], &d->item[cnt]);
-
         total_array_size += sizeof(struct svalue) * (d->size);
-
 #ifndef NO_MUDLIB_STATS
 	/* mudlib_stats stuff */
 	if (current_object) {
@@ -675,13 +716,12 @@ struct vector *add_array P2(struct vector *, p, struct vector *, r)
 	    null_stats(&d->stats);
 	}
 #endif
-
         d->ref = 1;
         d->size += d->size;
-
+	
         return d;
     }
-
+    
     /* transfer svalues for ref 1 target array */
     if (p->ref == 1) {
 	/*
@@ -827,160 +867,254 @@ struct vector *all_inventory P2(struct object *, ob, int, override)
 /* Runs all elements of an array through ob::func
    and replaces each value in arr by the value returned by ob::func
    */
-struct vector *map_array P4(struct vector *, arr, char *, func, struct object *, ob, struct svalue *, extra)
+#ifdef F_MAP
+void
+map_array P2(struct svalue *, arg, int, num_arg)
 {
     extern struct svalue *sp;
+    struct vector *arr = arg->u.vec;
     struct vector *r;
-    struct svalue *v;
-    int cnt;
+    int size;
 
-    if (arr->size < 1)
-	return null_array();
+    if ((size = arr->size) < 1) r = null_array();
+    else {
+	struct funp *fp = 0;
+	int numex = 0, cnt;
+	struct object *ob;
+	struct svalue *extra, *v;
+	char *func;
 
-    r = allocate_array(arr->size);
+	r = allocate_array(size);
 
-    push_vector(r);
+	(++sp)->type = T_POINTER;
+	sp->u.vec = r;
 
-    for (cnt = 0; cnt < arr->size; cnt++) {
-	if (ob->flags & O_DESTRUCTED)
-	    error("object used by map_array destructed\n");	/* amylaar */
-	push_svalue(&arr->item[cnt]);
-
-	if (extra) {
-	    push_svalue(extra);
-	    v = apply(func, ob, 2);
-	} else {
-	    v = apply(func, ob, 1);
+	if (arg[1].type == T_FUNCTION) {
+	    fp = arg[1].u.fp;
+	    if (num_arg > 2) extra = arg + 2, numex = num_arg - 2;
 	}
-	if (v)
-	    assign_svalue_no_free(&r->item[cnt], v);
+	else {
+	    func = arg[1].u.string;
+	    if (num_arg < 3) ob = current_object;
+	    else{
+		if (arg[2].type == T_OBJECT) ob = arg[2].u.ob;
+		else if (arg[2].type == T_STRING){
+		    if ((ob = find_object(arg[2].u.string)) && !object_visible(ob))
+			ob = 0;
+		}
+		if (num_arg > 3) extra = arg + 3, numex = num_arg - 3;
+		if (!ob) error("Bad argument 3 to map_array.\n");
+	    }
+	}
+	    
+	for (cnt = 0; cnt < size; cnt++){
+	    push_svalue(arr->item + cnt);
+	    if (numex) push_some_svalues(extra, numex);
+	    v = fp ? call_function_pointer(fp, numex + 1) : apply(func, ob, 1 + numex, ORIGIN_EFUN);
+	    if (v) assign_svalue_no_free(&r->item[cnt], v);
+	    else break;
+	}
+	sp--;
     }
 
-    r->ref--;
-    sp--;
-
-    return r;
+    
+    pop_n_elems(num_arg);
+    (++sp)->type = T_POINTER;
+    sp->u.vec = r;
 }
+#endif
 
+static struct funp *sort_array_cmp_funp;
 static struct object *sort_array_cmp_ob;
 static char *sort_array_cmp_func;
-INLINE static int sort_array_cmp();
-INLINE static int builtin_sort_array_cmp_fwd();
-INLINE static int builtin_sort_array_cmp_rev();
 
 #define COMPARE_NUMS(x,y) (x < y ? -1 : (x > y ? 1 : 0))
 
 struct vector *builtin_sort_array P2(struct vector *, inlist, int, dir)
 {
     quickSort((char *) inlist->item, inlist->size, sizeof(inlist->item),
-	      (dir < 0) ? builtin_sort_array_cmp_rev : builtin_sort_array_cmp_fwd);
+	      (dir<0) ? builtin_sort_array_cmp_rev : builtin_sort_array_cmp_fwd);
 
     return inlist;
 }
 
 INLINE static int builtin_sort_array_cmp_fwd P2(struct svalue *, p1, struct svalue *, p2)
 {
-    if (p1->type == T_STRING && p2->type == T_STRING)
-	return strcmp(p1->u.string, p2->u.string);
+    switch(p1->type | p2->type){
+	case T_STRING:
+	{
+	    return strcmp(p1->u.string, p2->u.string);
+	}
 
-    if (p1->type == T_NUMBER && p2->type == T_NUMBER)
-	return COMPARE_NUMS(p1->u.number, p2->u.number);
+	case T_NUMBER:
+	{
+	    return COMPARE_NUMS(p1->u.number, p2->u.number);
+	}
 
-    if (p1->type == T_REAL && p2->type == T_REAL)
-	return COMPARE_NUMS(p1->u.real, p2->u.real);
+	case T_REAL:
+	{
+	    return COMPARE_NUMS(p1->u.real, p2->u.real);
+	}
 
-/* arrays are compared by comparing the first element.  Allows databases
-   to be sorted. */
-    if (p1->type == T_POINTER && p2->type == T_POINTER) {
-	int t1, t2;
+	case T_POINTER:
+	{
+	    struct vector *v1 = p1->u.vec, *v2 = p2->u.vec;
+	    if (!v1->size  || !v2->size)
+		error("Illegal to have empty array in array for sort_array()\n");
 
-	if (p1->u.vec->size == 0 || p1->u.vec->size == 0)
-	    error("Illegal to have empty array in array for sort_array()\n");
-	t1 = p1->u.vec->item[0].type;
-	t2 = p2->u.vec->item[0].type;
 
-	if (t1 == T_STRING && t2 == T_STRING)
-	    return strcmp(p1->u.vec->item[0].u.string, p2->u.vec->item[0].u.string);
-	if (t1 == T_NUMBER && t2 == T_NUMBER)
-	    return COMPARE_NUMS(p1->u.vec->item[0].u.number, p2->u.vec->item[0].u.number);
-	if (t1 == T_REAL && t2 == T_REAL)
-	    return COMPARE_NUMS(p1->u.vec->item[0].u.real, p2->u.vec->item[0].u.real);
+	    switch(v1->item->type | v2->item->type){
+		case T_STRING:
+		{
+		    return strcmp(v1->item->u.string, v2->item->u.string);
+		}
+
+		case T_NUMBER:
+		{
+		    return COMPARE_NUMS(v1->item->u.number, v2->item->u.number);
+		}
+
+		case T_REAL:
+		{
+		    return COMPARE_NUMS(v1->item->u.real, v2->item->u.real);
+		}
+		default:
+		{
+		    /* Temp. long err msg till I can think of a better one - Sym */
+		    error("sort_array() cannot handle arrays of arrays whose 1st elems\naren't strings/ints/floats\n");
+		}
+	    }
+	}
+
     }
-    error("built-in sort_array() can only handle homogeneous arrays of strings/ints/floats\n");
-    return 0;			/* not reached */
+    error("built-in sort_array() can only handle homogeneous arrays of strings/ints/floats/arrays\n");
 }
 
 INLINE static int builtin_sort_array_cmp_rev P2(struct svalue *, p1, struct svalue *, p2)
 {
-    if (p1->type == T_STRING && p2->type == T_STRING)
-	return strcmp(p2->u.string, p1->u.string);
+    switch(p1->type | p2->type){
+        case T_STRING:
+        {
+            return strcmp(p2->u.string, p1->u.string);
+	}
 
-    if (p1->type == T_NUMBER && p2->type == T_NUMBER)
-	return COMPARE_NUMS(p2->u.number, p1->u.number);
+        case T_NUMBER:
+        {
+            return COMPARE_NUMS(p2->u.number, p1->u.number);
+	}
 
-    if (p1->type == T_REAL && p2->type == T_REAL)
-	return COMPARE_NUMS(p2->u.real, p1->u.real);
+        case T_REAL:
+        {
+            return COMPARE_NUMS(p2->u.real, p1->u.real);
+	}
 
-/* arrays are compared by comparing the first element.  Allows databases
-   to be sorted. */
-    if (p1->type == T_POINTER && p2->type == T_POINTER) {
-	int t1, t2;
+        case T_POINTER:
+        {
+            struct vector *v1 = p1->u.vec, *v2 = p2->u.vec;
+            if (!v1->size  || !v2->size)
+                error("Illegal to have empty array in array for sort_array()\n");
 
-	if (p1->u.vec->size == 0 || p1->u.vec->size == 0)
-	    error("Illegal to have empty array in array for sort_array()\n");
-	t1 = p1->u.vec->item[0].type;
-	t2 = p2->u.vec->item[0].type;
 
-	if (t1 == T_STRING && t2 == T_STRING)
-	    return strcmp(p2->u.vec->item[0].u.string, p1->u.vec->item[0].u.string);
-	if (t1 == T_NUMBER && t2 == T_NUMBER)
-	    return COMPARE_NUMS(p2->u.vec->item[0].u.number, p1->u.vec->item[0].u.number);
-	if (t1 == T_REAL && t2 == T_REAL)
-	    return COMPARE_NUMS(p2->u.vec->item[0].u.real, p1->u.vec->item[0].u.real);
+            switch(v1->item->type | v2->item->type){
+                case T_STRING:
+                {
+                    return strcmp(v2->item->u.string, v1->item->u.string);
+		}
+
+                case T_NUMBER:
+                {
+                    return COMPARE_NUMS(v2->item->u.number, v1->item->u.number);
+		}
+
+                case T_REAL:
+                {
+                    return COMPARE_NUMS(v2->item->u.real, v1->item->u.real);
+		}
+                default:
+		{
+		    /* Temp. long err msg till I can think of a better one - Sym */
+		    error("sort_array() cannot handle arrays of arrays whose 1st elems\naren't strings/ints/floats\n");
+		}
+	    }
+	}
+
     }
     error("built-in sort_array() can only handle homogeneous arrays of strings/ints/floats\n");
-    return 0;			/* not reached */
 }
 
-struct vector *sort_array P3(struct vector *, inlist, char *, func, struct object *, ob)
-{
-    /*
-     * Make func and ob globally available for sort_array_cmp used by qsort
-     */
-    sort_array_cmp_func = func;
-    sort_array_cmp_ob = ob;
-
-    /*
-     * Do the sort.  Use quickSort (in qsort.c) rather than qsort() because
-     * qsort() isn't tolerant of bad compare functions.
-     */
-    quickSort((char *) inlist->item, inlist->size, sizeof(inlist->item),
-	      sort_array_cmp);
-
-    return inlist;
-}
-
-
-INLINE static int sort_array_cmp P2(struct svalue *, p1, struct svalue *, p2)
-{
-    int ret;
+INLINE static
+int sort_array_cmp P2(struct svalue *, p1, struct svalue *, p2) {
     struct svalue *d;
 
-    if (sort_array_cmp_ob->flags & O_DESTRUCTED)
-	error("object used by sort_array destructed\n");
     push_svalue(p1);
     push_svalue(p2);
-    d = apply(sort_array_cmp_func, sort_array_cmp_ob, 2);
-    if (!d) {
+
+    if (sort_array_cmp_funp){
+	d = call_function_pointer(sort_array_cmp_funp, 2);
+    } else {	
+	if (sort_array_cmp_ob->flags & O_DESTRUCTED)
+	    error("object used by sort_array destructed\n");
+	d = apply(sort_array_cmp_func, sort_array_cmp_ob, 2, ORIGIN_EFUN);
+    }
+
+    if (!d || d->type != T_NUMBER) {
 	return 0;
-    }
-    if (d->type != T_NUMBER) {
-	ret = 0;
     } else {
-	ret = d->u.number;
+	return d->u.number;
     }
-    return ret;
 }
+
+#ifdef F_SORT_ARRAY
+void
+f_sort_array P2(int, num_arg, int, instruction)
+{
+    extern struct svalue *sp;
+    struct svalue *arg = sp - num_arg + 1;
+    struct vector *tmp = arg->u.vec;
+
+    check_for_destr(tmp);
+    tmp = slice_array(tmp, 0, tmp->size - 1);
+
+    switch(arg[1].type){
+	case T_NUMBER:
+        {
+	    tmp = builtin_sort_array(tmp, arg[1].u.number);
+	    break;
+	}
+
+	case T_FUNCTION:
+        {
+	    sort_array_cmp_funp = arg[1].u.fp;
+	    quickSort((char *) tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
+	    break;
+	}
+
+	case T_STRING:
+        {
+	    sort_array_cmp_funp = 0;
+	    sort_array_cmp_ob = 0;
+	    sort_array_cmp_func = (arg+1)->u.string;
+	    if (num_arg == 2) {
+		sort_array_cmp_ob = current_object;
+		if (sort_array_cmp_ob->flags & O_DESTRUCTED) sort_array_cmp_ob = 0;
+	    } else if (arg[2].type == T_OBJECT)
+		sort_array_cmp_ob = arg[2].u.ob;
+	    else if (arg[2].type == T_STRING) {
+		sort_array_cmp_ob = find_object(arg[2].u.string);
+		if (sort_array_cmp_ob && !object_visible(sort_array_cmp_ob)) sort_array_cmp_ob = 0;
+	    }
+	    if (!sort_array_cmp_ob) bad_arg(3, instruction);
+	    quickSort((char *) tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
+	    break;
+	}
+
+    }
+    
+    pop_n_elems(num_arg);
+    (++sp)->type = T_POINTER;
+    sp->u.vec = tmp;
+}
+#endif
 
 /*
  * deep_inventory()
@@ -1117,7 +1251,7 @@ static struct vector *order_alist P1(struct vector *, inlist)
 	if (inpnt->type == T_STRING && inpnt->subtype != STRING_SHARED) {
 	    char *str = make_shared_string(inpnt->u.string);
 
-	    free_svalue(inpnt);
+	    free_svalue(inpnt,"order_alist");
 	    inpnt->type = T_STRING;
 	    inpnt->subtype = STRING_SHARED;
 	    inpnt->u.string = str;
@@ -1527,23 +1661,21 @@ struct vector *
     return vec;
 }
 
-struct vector *
-       objects(select_func, select_ob)
-    char *select_func;
-    struct object *select_ob;
+#ifdef F_OBJECTS
+void f_objects P2(int, num_arg, int, instruction)
 {
-    extern struct object *obj_list;
     extern struct svalue *sp;
-    int i, j, t_sz;
-    struct object *ob;
-    struct object **tmp;
+    char *func;
+    struct object *ob, **tmp;
     struct vector *ret;
-    int display_hidden;
+    struct funp *f = 0;
+    int display_hidden = 0, t_sz, i,j;
     struct svalue *v;
-    int zerop;
 
-    display_hidden = -1;
-
+    if (!num_arg) func = 0;
+    else if (sp->type == T_FUNCTION) f = sp->u.fp;
+    else func = sp->u.string;
+	
     if (!(tmp = (struct object **) DMALLOC(sizeof(struct object *) * (t_sz = 1000),
 					   16, "objects: tmp")))
 	fatal("Out of memory!\n");
@@ -1553,29 +1685,35 @@ struct vector *
 
     for (i = 0, ob = obj_list; ob; ob = ob->next_all) {
 	if (ob->flags & O_HIDDEN) {
-	    if (display_hidden == -1)
-		display_hidden = valid_hide(current_object);
 	    if (!display_hidden)
+		display_hidden = 1 + !!valid_hide(current_object);
+	    if (!(display_hidden & 2))
 		continue;
 	}
-	if (select_func != NULL) {
+	if (f) {
 	    push_object(ob);
-#if 0				/* safe_apply doesn't seem to be up to the
-				 * task */
-	    v = safe_apply(select_func, select_ob, 1);
-#else				/* just take the memory hit for now so as not
-				 * to crash the driver */
-	    v = apply(select_func, select_ob, 1);
-#endif
-	    zerop = IS_ZERO(v);
-	    if (!v) {
+	    v = call_function_pointer(f, 1);
+	    if (!v){
 		FREE((void *) tmp);
 		sp--;
-		return 0;
+		free_svalue(sp,"f_objects");
+		*sp = const0;
+		return;
 	    }
-	    if (zerop)
-		continue;
+	    if (v->type == T_NUMBER && !v->u.number) continue;
+	} else if (func){
+	    push_object(ob);
+	    v = apply(func, current_object, 1, ORIGIN_EFUN);
+            if (!v){
+                FREE((void *) tmp);
+                sp--;
+                free_svalue(sp,"f_objects");
+                *sp = const0;
+                return;
+	    }
+            if (v->type == T_NUMBER && !v->u.number) continue;
 	}
+
 	tmp[i] = ob;
 	if (++i == t_sz) {
 	    if (!(tmp = (struct object **) DREALLOC((void *) tmp,
@@ -1597,6 +1735,8 @@ struct vector *
 
     FREE((void *) tmp);
     sp--;
-
-    return ret;
+    pop_n_elems(num_arg);
+    (++sp)->type = T_POINTER;
+    sp->u.vec = ret;
 }
+#endif

@@ -1,9 +1,9 @@
 #include "efuns.h"
+#include "cfuns.h"
 #include "stralloc.h"
 #include "include/origin.h"
 
 #ifdef LPC_TO_C
-extern int too_deep_error, max_eval_error;
 extern int call_origin;
 extern int error_recovery_context_exists;
 
@@ -17,24 +17,8 @@ int c_do_trace P3(char *, msg, char *, fname, char *, post)
 }
 #endif
 
-int c_return P2(struct svalue *, ret, struct svalue *, x)
-{
-    assign_svalue_no_free(ret, x);
-    pop_n_elems(csp->num_local_variables);
-#ifdef DEBUG
-    if (sp != fp - 1)
-	debug_fatal("Bad stack in c_return\n");
-#endif
-    pop_control_stack();
-}
-
 int c_catch_start()
 {
-    if (max_eval_error)
-	error("Can't catch eval cost too big error.\n");
-    if (too_deep_error)
-	error("Can't catch too deep recursion error.\n");
-
     push_control_stack(0);
     csp->num_local_variables = (csp - 1)->num_local_variables;	/* marion */
     push_pop_error_context(1);
@@ -46,6 +30,11 @@ int c_catch_error()
 {
     push_pop_error_context(-1);
     pop_control_stack();
+    /* if it's too deep or max eval, we can't let them catch it */
+    if (max_eval_error)
+	error("Can't catch eval cost too big error.\n");
+    if (too_deep_error)
+	error("Can't catch too deep recursion error.\n");
 }
 
 int c_catch_end()
@@ -63,8 +52,17 @@ int c_debug P3(char *, file, int, line, int, on_stack)
 }
 #endif
 
+int c_return P2(struct svalue *, ret, struct svalue *, x)
+{
+    assign_svalue_no_free(ret, x);
+    pop_n_elems(csp->num_local_variables);
+    DEBUG_CHECK(sp != fp - 1,
+		"Bad stack in c_return\n");
+    pop_control_stack();
+}
+
 /* This is used by sscanf and parse_command (lvalue_list) */
-void C_ASSIGN_FROM_STACK P2(svalue *, lvalue)
+void C_ASSIGN_FROM_STACK P1(svalue *, lvalue)
 {
     if (sp->type == T_INVALID) {
 	pop_stack();
@@ -80,7 +78,7 @@ void C_ASSIGN_FROM_STACK P2(svalue *, lvalue)
 	    }
 	} else {
 	    /* Be clever here */
-	    free_svalue(lvalue);
+	    free_svalue(lvalue, "C_ASSIGN_FROM_STACK");
 	    *lvalue = *sp--;
 	}
     }
@@ -128,11 +126,13 @@ svalue *
 	}
 	tmp->u.number = (unsigned char) vec->u.string[idx];
 	return tmp;
+#ifndef NEW_FUNCTIONS
     } else if (vec->type == T_FUNCTION) {
 	if (idx > 1) {
 	    error("Function variables may only be indexed with 0 or 1.\n");
 	}
 	return (idx ? &vec->u.fp->fun : check_dested(&vec->u.fp->obj));
+#endif
     } else if (vec->type == T_POINTER) {
 	if (idx >= vec->u.vec->size)
 	    error("Index out of bounds\n");
@@ -208,10 +208,9 @@ void c_range P4(svalue *, ret, svalue *, base, svalue *, start, svalue *, end)
 	struct vector *v;
 
 	v = slice_array(base->u.vec, start->u.number, end->u.number);
-	if (v) {
-	    C_VECTOR(ret, v);
-	    v->ref--;
-	} else
+	if (v)
+	    C_REFED_VECTOR(ret, v);
+	else
 	    *ret = const0;
     } else
 	error("Bad argument to [ .. ] range operator.\n");
@@ -287,12 +286,14 @@ void c_call_other P4(svalue *, ret, svalue *, s0, svalue *, s1, int, num_arg)
 	    || (s1->u.vec->item[0].type != T_STRING))
 	    error("call_other: 1st elem of array for arg 2 must be a string\n");
 	funcname = s1->u.vec->item[0].u.string;	/* complicated huh? */
+#ifdef NEW_FUNCTIONS
+	num_arg = merge_arg_lists(num_arg, s1->u.vec, 1);
+#else
 	for (i = 1; i < s1->u.vec->size; i++)
 	    push_svalue(&s1->u.vec->item[i]);
 	num_arg += i - 1;	/* hopefully that will work */
+#endif
     }
-    if (strchr(funcname, ':') != NULL)
-	error("Illegal function name in call_other: %s\n", s1->u.string);
     if (s0->type == T_OBJECT)
 	ob = s0->u.ob;
     else if (s0->type == T_POINTER) {
@@ -301,8 +302,7 @@ void c_call_other P4(svalue *, ret, svalue *, s0, svalue *, s1, int, num_arg)
 
 
 	v = call_all_other(s0->u.vec, funcname, num_arg);
-	C_VECTOR(ret, v);
-	v->ref--;
+	C_REFED_VECTOR(ret, v);
 	return;
     } else {
 	ob = find_object(s0->u.string);
@@ -447,8 +447,7 @@ void C_ASSOC P2(struct svalue *, ret, int, num)
 {
     struct mapping *m;
 
-    m = load_mapping_from_aggregate(sp - num + 1, num);
-    pop_n_elems(num);
+    m = load_mapping_from_aggregate(sp -= num, num);
     ret->type = T_MAPPING;
     ret->u.map = m;
 }
@@ -463,13 +462,10 @@ void C_CALL P3(struct svalue *, ret, unsigned short, numargs, unsigned short, fu
      * redefined by inheritance, we must look in the last table, which is
      * pointed to by current_object.
      */
-#ifdef DEBUG
-    if (func_index >= current_object->prog->p.i.num_functions)
-	fatal("Illegal function index\n");
-#endif
+    DEBUG_CHECK(func_index >= current_object->prog->p.i.num_functions,
+		"Illegal function index\n");
 
-    /* NOT current_prog, which can be an inherited object. */
-    funp = &current_object->prog->p.i.functions[func_index];
+    funp = &current_object->p.i.functions[func_index];
 
     if (funp->flags & NAME_UNDEFINED)
 	error("Undefined function: %s\n", funp->name);
@@ -520,12 +516,12 @@ INLINE int C_IS_TRUE P1(svalue *, s0)
 
 INLINE int C_SV_FALSE P1(svalue *, s0)
 {
-    return (s0->type != T_NUMBER ? (free_svalue(s0), 0) : s0->u.number);
+    return (s0->type != T_NUMBER ? (free_svalue(s0, "C_SV_FALSE"), 0) : s0->u.number);
 }
 
 INLINE int C_SV_TRUE P1(svalue *, s0)
 {
-    return (s0->type != T_NUMBER ? (free_svalue(s0), 1) : s0->u.number);
+    return (s0->type != T_NUMBER ? (free_svalue(s0, "C_SV_TRUE"), 1) : s0->u.number);
 }
 
 INLINE
@@ -569,6 +565,12 @@ void C_BUFFER P2(svalue *, ret, struct buffer *, b)
     b->ref++;
 }
 
+void C_REFED_BUFFER P2(svalue *, ret, struct buffer *, b)
+{
+    ret->type = T_BUFFER;
+    ret->u.buf = b;
+}
+
 void C_MAPPING P2(svalue *, ret, struct mapping *, m)
 {
     ret->type = T_MAPPING;
@@ -576,7 +578,13 @@ void C_MAPPING P2(svalue *, ret, struct mapping *, m)
     m->ref++;
 }
 
-void C_STRING P2(svalue *, ret, char *, p, int, type)
+void C_REFED_MAPPING P2(svalue *, ret, struct mapping *, m)
+{
+    ret->type = T_MAPPING;
+    ret->u.map = m;
+}
+
+void C_STRING P3(svalue *, ret, char *, p, int, type)
 {
     ret->type = T_STRING;
     ret->subtype = type;
@@ -607,6 +615,12 @@ void C_CONSTANT_STRING P2(svalue *, ret, char *, p)
     ret->u.string = p;
 }
 
+void C_REFED_VECTOR P2(svalue *, ret, struct vector *, v)
+{
+    ret->type = T_POINTER;
+    ret->u.vec = v;
+}
+
 void C_VECTOR P2(svalue *, ret, struct vector *, v)
 {
     ret->type = T_POINTER;
@@ -623,14 +637,78 @@ void c_function_constructor P3(svalue *, ret, svalue *, s0, svalue *, s1)
     fp->ref--;
 }
 
+#ifdef NEW_FUNCTIONS
+/* This is hideously out of date */
+void
+c_evaluate P3(svalue *, ret, svalue *, s0, int, num_arg) {
+  struct funp *fun;
+  char *funcname;
+  int i;
+  struct object *ob;
+
+  if (s0->type != T_FUNCTION) {
+      pop_n_elems(num_arg);
+      assign_svalue_no_free(ret, *s0);
+      return;
+  }
+  CHECK_TYPES(s0, T_FUNCTION, 1, F_EVALUATE);
+  if (current_object->flags & O_DESTRUCTED) {
+    pop_n_elems(num_arg);
+    *ret = const0u;
+    return;
+  }
+  fun = s0->u.fp;
+  setup_fake_frame(fun);
+	      
+  if (fun->args.type == T_STRING)
+    funcname = fun->args.u.string;
+  else if (fun->args.type == T_POINTER) {
+    check_for_destr(fun->args.u.vec);
+    if ( (fun->args.u.vec->size <1)
+      || (fun->args.u.vec->item[0].type != T_STRING) )
+      error("First argument of call_other function pointer must be a string.\n");
+    funcname = fun->args.u.vec->item[0].u.string;
+    num_arg = merge_arg_lists(num_arg, funp->args.u.vec, 1);
+  } else error("Illegal type for function name in function pointer.\n");
+
+  if (fun->f.obj.type == T_OBJECT)
+    ob = fun->f.obj.u.ob;
+  else if (fun->f.obj.type == T_POINTER) {
+    struct vector *vec;
+    extern struct vector *call_all_other PROT((struct vector *, char *, int));
+    
+    vec = call_all_other(fun->f.obj.u.vec, funcname, num_arg);
+    remove_fake_frame();
+    C_REFED_VECTOR(ret,vec);
+    return;
+  } else if (fun->f.obj.type == T_STRING) {
+    ob = (struct object *)find_object(fun->f.obj.u.string);
+    if (!ob || !object_visible(ob))
+      error("Function pointer couldn't find object\n");
+  } else error("Function pointer object must be an object, array or string.\n");
+  
+#ifdef TRACE
+  if (TRACEP(TRACE_CALL_OTHER)) {
+    do_trace("Call other (function pointer)", funcname, "\n");
+  }
+#endif
+  call_origin = ORIGIN_CALL_OTHER;
+  if (apply_low(funcname, ob, num_arg - 1) == 0) {
+    *sp=const0u;
+    remove_fake_frame();
+    return;
+  }
+  *ret = *sp--;
+  remove_fake_frame();
+  return;
+}
+#else
 /* Yes, this is an odd prototype, due to the fact (*) returns two values */
-void c_function_split P3(svalue *, s0, svalue *, ret1, svalue *, ret2)
+void c_evaluate P3(svalue *, s0, svalue *, ret1, svalue *, ret2)
 {
     struct svalue *obj, *fun;
 
-    if (s0->type != T_FUNCTION) {
-	bad_arg(1, F_FUNCTION_SPLIT);
-    }
+    CHECK_TYPES(s0, T_FUNCTION, 1, F_EVALUATE);
     obj = &sp->u.fp->obj;
     fun = &sp->u.fp->fun;
 
@@ -640,6 +718,7 @@ void c_function_split P3(svalue *, s0, svalue *, ret1, svalue *, ret2)
     assign_svalue_no_free(ret1, obj);
     assign_svalue_no_free(ret2, fun);
 }
+#endif
 
 void c_this_function_constructor P2(svalue *, ret, svalue *, s0)
 {
@@ -650,9 +729,29 @@ void c_this_function_constructor P2(svalue *, ret, svalue *, s0)
     else
 	C_OBJECT(ret, current_object);
     fp = make_funp(ret, s0);
+    free_svalue(ret, "c_this_function_constructor");
     C_FUNCTION(ret, fp);
     fp->ref--;
 }
+
+#ifdef NEW_FUNCTIONS
+void c_efun_constructor P3(svalue *, ret, svalue *, s0, int, instr) {
+  struct funp *fp;
+  
+#ifdef NEEDS_CALL_EXTRA
+  if (instr > 255) {
+    fp = (struct funp *)make_efun_funp(F_CALL_EXTRA, instr, F_CONST0, F_RETURN, s0);
+  } else {
+#endif
+    fp = (struct funp *)make_efun_funp(instr, F_CONST0, F_RETURN, 0, s0);
+#ifdef NEEDS_CALL_EXTRA
+  }
+#endif
+
+  C_FUNCTION(ret,fp);
+  fp->ref--;
+}
+#endif
 
 void c_or P3(svalue *, ret, svalue *, s0, svalue *, s1)
 {
@@ -1003,8 +1102,7 @@ void c_add P3(svalue *, ret, svalue *, s0, svalue *, s1)
 		s0->u.vec->ref++;
 		s1->u.vec->ref++;
 		vec = add_array(s0->u.vec, s1->u.vec);
-		C_VECTOR(ret, vec);
-		vec->ref--;
+		C_REFED_VECTOR(ret, vec);
 		break;
 	    }
 	    break;
@@ -1056,8 +1154,7 @@ void c_subtract P3(svalue *, ret, svalue *, s0, svalue *, s1)
 	    /* subtract_array already takes care of destructed objects */
 	    w = subtract_array(s0->u.vec, v);
 	    free_vector(v);
-	    C_VECTOR(ret, w);
-	    ret->u.vec->ref--;
+	    C_REFED_VECTOR(ret, w);
 	    return;
 	} else {
 	    error("Bad right type to -\n");
@@ -1067,6 +1164,7 @@ void c_subtract P3(svalue *, ret, svalue *, s0, svalue *, s1)
     }
 }
 
+#if 0 /* this is out of date */
 void c_multiply P3(svalue *, ret, svalue *, s0, svalue *, s1)
 {
     if ((s0->type != s1->type)
@@ -1097,6 +1195,7 @@ void c_multiply P3(svalue *, ret, svalue *, s0, svalue *, s1)
     }
     bad_arg(2, F_MULTIPLY);
 }
+#endif
 
 void c_mod P3(svalue *, ret, svalue *, s0, svalue *, s1)
 {
@@ -1155,7 +1254,8 @@ void c_negate P2(svalue *, ret, svalue *, s0)
 	error("Bad argument to unary minus\n");
 }
 
-void eval_opcode P4(int, instruction, svalue *, ret, svalue *, s0, svalue *, s1)
+void eval_opcode P4(int, instruction, svalue *, ret,
+		    svalue *, s0, svalue *, s1)
 {
 #ifdef TRACE
     if (TRACEP(TRACE_LPC_EXEC)) {
@@ -1344,9 +1444,6 @@ void eval_opcode P4(int, instruction, svalue *, ret, svalue *, s0, svalue *, s1)
 	    error("Bad right type to &=\n");
 	C_NUMBER(ret, s0->u.number &= s1->u.number);
 	break;
-    case I(F_FUNCTION_CONSTRUCTOR):
-	c_function_constructor(ret, s0, s1);
-	break;
     case I(F_ASSIGN):
 	if (s0->type == T_LVALUE_BYTE) {
 	    if (s1->type != T_NUMBER) {
@@ -1433,17 +1530,22 @@ void eval_opcode P4(int, instruction, svalue *, ret, svalue *, s0, svalue *, s1)
 	    } else {
 		error("Bad right type to *=\n");
 	    }
-	} else if (s0->type == T_MAPPING) {
+	}
+	/* this code is out of date */
+#if 0
+        else if (s0->type == T_MAPPING) {
 	    if (s1->type == T_MAPPING) {
 		struct mapping *m;
-
+		
 		m = compose_mapping(s0->u.map, s1->u.map);
 		C_MAPPING(ret, m);
 		assign_svalue(s0, ret);
 	    } else {
 		error("Bad right type to *=\n");
 	    }
-	} else {
+	}
+#endif
+	else {
 	    error("Bad left type to *=\n");
 	}
 	break;
@@ -1521,5 +1623,4 @@ void eval_opcode P4(int, instruction, svalue *, ret, svalue *, s0, svalue *, s1)
 	return;
     }
 }
-
 #endif

@@ -1,5 +1,5 @@
-#ifndef _SYS_TIMES_H
-#define _SYS_TIMES_H
+#ifndef AMIGA_TIMES_H
+#define AMIGA_TIMES_H
 
 #include <devices/timer.h>
 

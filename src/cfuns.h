@@ -9,7 +9,7 @@ void
      C_PUSH_LVALUE(struct svalue * s0);
 
 void
-     C_UNDEFINED(struct svalue * ret);
+     C_UNDEFINED PROT((struct svalue *));
 
 void
      C_AGGREGATE(struct svalue * ret, int num);
@@ -24,7 +24,7 @@ void
      C_PROG_STRING(svalue * ret, int string_number);
 
 void
-     C_STRING(svalue * ret, char *p, int type);
+     C_STRING PROT((svalue *, char *, int));
 
 int
     C_IS_FALSE(svalue * s0);
@@ -42,25 +42,34 @@ void
      C_OBJECT(svalue * ret, struct object * ob);
 
 void
-     C_NUMBER(svalue * ret, int n);
+     C_NUMBER PROT((svalue *, int));
 
 void
      C_REAL(svalue * ret, double r);
 
 void
-     C_BUFFER(svalue * ret, struct buffer * b);
+     C_BUFFER PROT((svalue *, struct buffer *));
+
+void
+     C_REFED_BUFFER PROT((svalue *, struct buffer *));
 
 void
      C_MAPPING(svalue * ret, struct mapping * m);
 
 void
-     C_MALLOCED_STRING(svalue * ret, char *p);
+     C_REFED_MAPPING(svalue * ret, struct mapping * m);
+
+void
+     C_MALLOCED_STRING PROT((svalue * ret, char *p));
 
 void
      C_CONSTANT_STRING(svalue * ret, char *p);
 
 void
      C_VECTOR(svalue * ret, struct vector * v);
+
+void
+     C_REFED_VECTOR(svalue * ret, struct vector * v);
 
 void eval_opcode(int instruction,
 		      svalue * ret,

@@ -15,6 +15,7 @@
 #include "buffer.h"
 #include "object.h"
 #include "exec.h"
+#include "include/origin.h"
 
 #define MAX_RECURSION 25
 
@@ -39,7 +40,7 @@ check_svalue P1(struct svalue *, v)
     switch (v->type) {
     case T_OBJECT:
 	if (v->u.ob->flags & O_DESTRUCTED) {
-	    free_svalue(v);
+	    free_svalue(v, "reclaim_objects");
 	    *v = const0n;
 	    cleaned++;
 	}
@@ -53,8 +54,14 @@ check_svalue P1(struct svalue *, v)
 	    check_svalue(&v->u.vec->item[idx]);
 	break;
     case T_FUNCTION:
+#ifdef NEW_FUNCTIONS
+	if (v->u.fp->type == ORIGIN_CALL_OTHER)
+	    check_svalue(&v->u.fp->f.obj);
+	check_svalue(&v->u.fp->args);
+#else
 	check_svalue(&v->u.fp->obj);
 	check_svalue(&v->u.fp->fun);
+#endif
 	break;
     }
     nested--;

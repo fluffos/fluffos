@@ -84,9 +84,9 @@ extern int symlink PROT((char *, char *));
 #else
 #if !defined(hpux) && !defined(SVR4) \
 	&& !defined(linux) && !defined(SunOS_5) && !defined(sgi) \
-	&& !defined(__bsdi__) && !defined(_M_UNIX) && !defined(LATTICE)
+	&& !defined(__bsdi__) && !defined(_M_UNIX) && !defined(LATTICE) \
+        && !defined(_AIX)
 extern int lstat PROT((char *, struct stat *));
-
 #endif
 #endif
 #endif				/* !NeXT && !__386BSD__ */
@@ -509,57 +509,45 @@ int legal_path P1(char *, path)
  * There is an error in a specific file. Ask the MudOS driver to log the
  * message somewhere.
  */
-void smart_log P4(char *, error_file, int, line, char *, what, int, flush)
+void smart_log P4(char *, error_file, int, line, char *, what, int, flag)
 {
-    static char *buff[6], *files[6];
-    static int count = 0;
-    int i;
+    char *buff;
+    struct svalue *mret;
 
-    if (count > 5)
-	fatal("Fatal error in smart_log\n");
 
-    if (count == 5)
-	flush = 1;
-
-    if (error_file) {
-	/* the +30 is more than is needed, but what the heck? */
-	buff[count] = (char *)
-	    DMALLOC(strlen(error_file) + strlen(what) + 30, 39, "smart_log: 1");
-	files[count] = (char *)
-	    DMALLOC(strlen(error_file) + 1, 40, "smart_log: 2");
-	sprintf(buff[count], "%s line %d:%s\n", error_file, line, what);
-	strcpy(files[count], error_file);
-	count++;
+    buff = (char *)
+	DMALLOC(strlen(error_file) + strlen(what) + 40, 39, "smart_log: 1");
+    if (flag)
+	sprintf(buff, "%s line %d: Warning: %s\n", error_file, line, what);
+    else
+	sprintf(buff, "%s line %d: %s\n", error_file, line, what);
+    
+    push_constant_string(error_file);
+    push_constant_string(buff);
+    mret = safe_apply_master_ob(APPLY_LOG_ERROR, 2);
+    if (!mret || mret == (struct svalue *)-1) {
+	fprintf(stderr, "%s", buff);
     }
-    if (flush) {
-	for (i = 0; i < count; i++) {
-	    push_constant_string(files[i]);
-	    push_constant_string(buff[i]);
-	    safe_apply_master_ob(APPLY_LOG_ERROR, 2);
-	    FREE(files[i]);
-	    FREE(buff[i]);
-	}
-	count = 0;
-    }
+    FREE(buff);
 }				/* smart_log() */
 
 /*
  * Append string to file. Return 0 for failure, otherwise 1.
  */
-int write_file P2(char *, file, char *, str)
+int write_file P3(char *, file, char *, str, int, flags)
 {
     FILE *f;
 
     file = check_valid_path(file, current_object, "write_file", 1);
     if (!file)
 	return 0;
-    f = fopen(file, "a");
+    f = fopen(file, (flags & 1) ? "w" : "a");
     if (f == 0) {
 	if (errno < sys_nerr) {
-	    error("Wrong permissions for opening file %s for append.\n\"%s\"\n",
-		  file, sys_errlist[errno]);
+	    error("Wrong permissions for opening file %s for %s.\n\"%s\"\n",
+		  file, (flags & 1) ? "overwrite" : "append", sys_errlist[errno]);
 	} else {
-	    error("Wrong permissions for opening file %s for append.\n", file);
+	    error("Wrong permissions for opening file %s for %s.\n", file, (flags & 1) ? "overwrite" : "append");
 	}
     }
     fwrite(str, strlen(str), 1, f);
@@ -748,11 +736,17 @@ int write_bytes P4(char *, file, int, start, char *, str, int, theLength)
 	return 0;
     if (theLength > MAX_BYTE_TRANSFER)
 	return 0;
-#ifdef LATTICE
-    if (stat(file, &st) == -1)
-	return 0;
-#endif
-    fp = fopen(file, "ab");
+    /* Under system V, it isn't possible change existing data in a file
+     * opened for append, so it can't be opened for append.
+     * opening for r+ won't create the file if it doesn't exist.
+     * opening for w or w+ will truncate it if it does exist.  So we
+     * have to check if it exists first.
+     */
+    if (stat(file, &st) == -1) {
+      fp = fopen(file, "wb");
+    } else {
+      fp = fopen(file, "r+b");
+    }
     if (fp == NULL) {
 	return 0;
     }
@@ -763,8 +757,7 @@ int write_bytes P4(char *, file, int, start, char *, str, int, theLength)
     size = st.st_size;
     if (start < 0)
 	start = size + start;
-
-    if (start > size) {
+    if (start < 0 || start > size) {
 	fclose(fp);
 	return 0;
     }
@@ -822,7 +815,7 @@ char *check_valid_path P4(char *, path, struct object *, call_object, char *, ca
     else
 	v = apply_master_ob(APPLY_VALID_READ, 3);
 
-    if (v && v->type == T_NUMBER && v->u.number == 0)
+    if (v && v != (struct svalue *)-1 && v->type == T_NUMBER && v->u.number == 0)
 	return 0;
     if (path[0] == '/')
 	path++;

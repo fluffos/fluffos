@@ -23,6 +23,7 @@
 #include "avltree.h"
 #include "uid.h"
 
+#ifndef NO_UIDS
 static tree *uids = NULL;
 userid_t *backbone_uid = NULL;
 userid_t *root_uid = NULL;
@@ -75,3 +76,4 @@ userid_t *set_backbone_uid P1(char *, name)
     tree_add(&uids, uidcmp, (char *) backbone_uid, NULL);
     return backbone_uid;
 }
+#endif

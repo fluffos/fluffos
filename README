@@ -1,13 +1,64 @@
-MudOS is an enhanced LPmud 3.x (native mode only) MUD* server (driver).
+MudOS is an enhanced LPmud 3.x (native mode only).
  
-This distribution contains the source code (written in C) to MudOS in the 
-./src subdirectory, documentation in ./doc, configuration files in ./etc, a 
-small sample mudlib in ./mudlib, and a few utility scripts in ./bin.
+This is the source (src) directory from the MudOS 0.9.x distribution.
  
-Begin by reading all of the remaining files in this directory (most 
-importantly, the "Copyright" file).  Continue by reading the information in 
-the ./doc subdirectory (i.e. Install and Run).
+Intermediate (beta) releases of MudOS (those with four components in the 
+version number e.g. 0.9.16.18) are typically released without installation 
+instructions, usage instructions, documentation, or other supporting 
+material (since the size of this other material is fairly large).  Releases 
+of MudOS with version numbers having three components (e.g. 0.9.17) will 
+usually be released as a combined source/documentation package (e.g. 
+MudOS_0.9.20.tar.Z will be the next such release as of this time).
  
-*For more information on MUD itself, try the rec.games.mud.* USENET 
-newsgroups or the "Virtual Spaces: MUD" menu of the ACTLab Internet Gopher 
-(actlab.rtf.utexas.edu).
+The beta releases are intended for those who are already familiar with 
+installing and running MudOS.  Typically, only those interested in testing 
+for bugs or in being on the bleeding edge need install the beta releases. 
+However, in some cases the beta releases may fix serious bugs in the 
+previous non-beta release.  In these cases, obtain the last non-beta 
+release and replace its ./src subdirectory with the contents of latest beta 
+release (which is just an upgraded ./src subdirectory).  Read the ChangeLog 
+file in the same directory as this README to find out about the latest 
+changes to MudOS.  In particular, note the changes marked "compat buster" 
+since these describe changes to the driver which may cause pre-existing 
+mudlibs (such as Lil) to break in some minor fashion (the ChangeLog should 
+give enough information to allow affected mudlibs to be fixed).
+ 
+Notes:
+ 
+Send bug reports to mudos-bugs@actlab.rtf.utexas.edu.  Be sure to include 
+relevant information along with the problem description including: Type of 
+machine (e.g. Sun3, NeXT, RS/6000, etc), operating system (e.g. SunOS 4.1, 
+NeXTSTEP 3.0, AIX 3.2, etc), and version of MudOS (e.g. 0.9.14.17).  
+Include any other information you feel may help.
+ 
+Send mail to mudos-info-request@actlab.rtf.utexas.edu to be added to the 
+MudOS information mailing list (info on new releases etc).
+ 
+Discuss the MudOS driver on the mudos@actlab.rtf.utexas.edu mailing list 
+(request to be added at mudos-request@actlab.rtf.utexas.edu).
+ 
+The 'addr_server' file replaces the old hname program.  Unlike hname, 
+addr_server must be started up manually (it takes a single argument which 
+is the port # the addr_server should listen on -- this port # must also be 
+specified in the runtime config file).  If addr_server doesn't work on your 
+machine, its okay to run the driver without it (just set your config file 
+up to point to someone else's addr_server).
+ 
+If the driver errors out at runtime with a message saying that the 
+operation is not supported on the socket, then try using cc instead of gcc 
+(assuming you were using gcc).  Alternatively, try uncommenting 
+NEED_OLD_CPP in the Makefile and then 'make clean' and 'make'.
+ 
+For more information about LPmuds and MUDs in general try reading
+the USENET groups rec.games.mud.{admin,announce,misc,lp,tiny,diku}.
+
+On subdirectories:
+
+amiga/          Contains amiga support files; a crypt package is also
+                provided for systems missing DES crypt()
+include/        Useful #defines for the mudlib to have access to (used by
+                various efuns)
+compiler/
+lpc_compiler/   These two directories contain the unshared parser/compiler
+                parts, used in generating yacc files
+packages/       This is where efun packages and user efuns should reside

@@ -23,8 +23,7 @@ struct mapping {
 #endif
     struct node **table;	/* the hash table */
     unsigned short table_size;	/* # of buckets in hash table == power of 2 */
-    unsigned short filled;	/* # of buckets that have entries */
-    unsigned short do_split;	/* indicates size at which to split the table */
+    unsigned short unfilled;	/* # of buckets among 80% of total buckets that do not have entries */
     int count;			/* total # of nodes actually in mapping  */
 #ifndef NO_MUDLIB_STATS
     statgroup_t stats;		/* creators of the mapping */
@@ -40,6 +39,7 @@ typedef struct finfo_s {
     char *func;
     struct object *obj;
     struct svalue *extra;
+    struct funp *fp;
 }       finfo_t;
 
 typedef struct vinfo_s {
@@ -50,6 +50,9 @@ typedef struct vinfo_s {
 typedef struct minfo_s {
     struct mapping *map, *newmap;
 }       minfo_t;
+
+#define mapping_too_large() \
+    error("Mapping exceeded maximum allowed size of %d.\n",MAX_MAPPING_SIZE);
 
 #ifndef max
 #define max(x,y) ((x) > (y)) ? (x) : (y)

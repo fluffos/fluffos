@@ -1,3 +1,11 @@
+Sat Nov 26 22:38:44 1994    Anthon Pang         (apang@{mindlink.bc.ca,bix.com})
+        * brought SMakefile up to date with release, added make_packages
+	  script, and renamed strip.c to cstrip.c
+	* removed simulated socket code for now; to merge in latest
+	  support code from adr32's hosts/amiga/ dir would require
+	  significant changes to the driver source
+	* cleaned up header files a bit
+
 Mon Jun 27 19:25:40 PDT 1994 (apang@mindlink.bc.ca (Robocoder))
 	* SMakefile: fixed some dependency problems
 

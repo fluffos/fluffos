@@ -26,9 +26,6 @@
 #if !defined(apollo) && !defined(linux) && !defined(LATTICE) && !defined(_M_UNIX)
 #include <sys/socketvar.h>
 #endif
-#ifdef _AIX
-#include <sys/select.h>
-#endif				/* _AIX */
 #ifndef LATTICE
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -57,10 +54,36 @@
 #include "debug.h"
 #include "socket_efuns.h"
 #include "include/socket_err.h"
+#include "include/origin.h"
+#include "applies.h"
 
 struct lpc_socket lpc_socks[MAX_EFUN_SOCKS];
 static int socket_name_to_sin PROT((char *, struct sockaddr_in *));
 static char *inet_address PROT((struct sockaddr_in *));
+
+/*
+ * check permission
+ */
+int check_valid_socket P5(char *, what, int, fd, struct object *, owner,
+			  char *, addr, int, port) {
+    struct vector *info;
+    struct svalue *mret;
+    
+    info = allocate_array(4);
+    info->item[0].u.number = fd;
+    assign_socket_owner(&info->item[1], owner);
+    info->item[2].type = T_STRING;
+    info->item[2].subtype = STRING_CONSTANT;
+    info->item[2].u.string = addr;
+    info->item[3].u.number = port;
+
+    push_object(current_object);
+    push_string(what, STRING_CONSTANT);
+    push_refed_vector(info);
+
+    mret = apply_master_ob(APPLY_VALID_SOCKET, 3);
+    return MASTER_APPROVED(mret);
+}
 
 /*
  * Initialize the LPC efun socket array
@@ -642,9 +665,8 @@ socket_read_select_handler P1(int, fd)
 
 		b = allocate_buffer(cc);
 		if (b) {
-		    b->ref--;
 		    memcpy(b->item, buf, cc);
-		    push_buffer(b);
+		    push_refed_buffer(b);
 		} else {
 		    push_number(0);
 		}
@@ -655,7 +677,8 @@ socket_read_select_handler P1(int, fd)
 	    debug(8192, ("read_socket_handler: apply\n"));
 	    save_current_object = current_object;
 	    current_object = lpc_socks[fd].owner_ob;
-	    safe_apply(lpc_socks[fd].read_callback, lpc_socks[fd].owner_ob, 3);
+	    safe_apply(lpc_socks[fd].read_callback, lpc_socks[fd].owner_ob, 3,
+		       ORIGIN_DRIVER);
 	    current_object = save_current_object;
 	    return;
 	}
@@ -667,7 +690,7 @@ socket_read_select_handler P1(int, fd)
 	push_number(fd);
 	save_current_object = current_object;
 	current_object = lpc_socks[fd].owner_ob;
-	safe_apply(lpc_socks[fd].read_callback, lpc_socks[fd].owner_ob, 1);
+	safe_apply(lpc_socks[fd].read_callback, lpc_socks[fd].owner_ob, 1, ORIGIN_DRIVER);
 	current_object = save_current_object;
 	return;
 
@@ -727,7 +750,7 @@ socket_read_select_handler P1(int, fd)
 	    debug(8192, ("read_socket_handler: apply read callback\n"));
 	    save_current_object = current_object;
 	    current_object = lpc_socks[fd].owner_ob;
-	    safe_apply(lpc_socks[fd].read_callback, lpc_socks[fd].owner_ob, 2);
+	    safe_apply(lpc_socks[fd].read_callback, lpc_socks[fd].owner_ob, 2, ORIGIN_DRIVER);
 	    current_object = save_current_object;
 	    return;
 
@@ -756,7 +779,7 @@ socket_read_select_handler P1(int, fd)
 	    debug(8192, ("read_socket_handler: apply read callback\n"));
 	    save_current_object = current_object;
 	    current_object = lpc_socks[fd].owner_ob;
-	    safe_apply(lpc_socks[fd].read_callback, lpc_socks[fd].owner_ob, 2);
+	    safe_apply(lpc_socks[fd].read_callback, lpc_socks[fd].owner_ob, 2, ORIGIN_DRIVER);
 	    current_object = save_current_object;
 	    return;
 	}
@@ -780,7 +803,7 @@ socket_read_select_handler P1(int, fd)
     push_number(fd);
     save_current_object = current_object;
     current_object = lpc_socks[fd].owner_ob;
-    safe_apply(lpc_socks[fd].close_callback, lpc_socks[fd].owner_ob, 1);
+    safe_apply(lpc_socks[fd].close_callback, lpc_socks[fd].owner_ob, 1, ORIGIN_DRIVER);
     current_object = save_current_object;
 }
 
@@ -819,7 +842,7 @@ socket_write_select_handler P1(int, fd)
     push_number(fd);
     save_current_object = current_object;
     current_object = lpc_socks[fd].owner_ob;
-    safe_apply(lpc_socks[fd].write_callback, lpc_socks[fd].owner_ob, 1);
+    safe_apply(lpc_socks[fd].write_callback, lpc_socks[fd].owner_ob, 1, ORIGIN_DRIVER);
     current_object = save_current_object;
 }
 
@@ -869,7 +892,7 @@ socket_release P3(int, fd, struct object *, ob, char *, callback)
     push_object(ob);
     save_current_object = current_object;
     current_object = ob;
-    safe_apply(callback, ob, 2);
+    safe_apply(callback, ob, 2, ORIGIN_DRIVER);
     current_object = save_current_object;
 
     if ((lpc_socks[fd].flags & S_RELEASE) == 0)

@@ -97,6 +97,9 @@
 /* OPTIMIZE_FUNCTION_TABLE_SEARCH: define this if you want the function
  *   table to be sorted for faster lookups (ie binary search).  The flipside
  *   of this is that there is some overhead in maintaining the sorted table.
+ *
+ * WARNING: Currently broken, I think.  -Beek
+ *          I think I fixed it in 0.9.19.12.  -Robo
  */
 #define OPTIMIZE_FUNCTION_TABLE_SEARCH
 
@@ -109,6 +112,25 @@
 #else
 #define CONFIG_FILE_DIR "etc:"
 #endif
+
+/* DEFAULT_PRAGMAS:  This should be a sum of pragmas you want to always
+ * be on, i.e.
+ *
+ * #define DEFAULT_PRAGMAS PRAGMA_STRICT_TYPES + PRAGMA_SAVE_TYPES
+ *
+ * for no default pragmas:
+ * #define DEFAULT_PRAGMAS 0
+ *
+ * will make every LPC file behave as if it had the lines:
+ * #pragma strict_types
+ * #pragma save_types
+ */
+#define DEFAULT_PRAGMAS 0
+
+/* HAS_STATUS_TYPE: old MudOS drivers had a 'status' type which was
+ * identical to the 'int' type.  Define this to bring it back.
+ */
+#undef HAS_STATUS_TYPE
 
 /* OLD_COMMAND: if this is defined, then the command() efun may take a 2nd
  *   argument specifying on which object to perform the command.
@@ -263,7 +285,8 @@
  */
 #define APPLY_CACHE_BITS 11
 
-/* CACHE_STATS: define this if you want call_other (apply_low) cache statistics.
+/* CACHE_STATS: define this if you want call_other (apply_low) cache 
+ * statistics.  Causes HAS_CACHE_STATS to be defined in all LPC objects.
  */
 #define CACHE_STATS
 
@@ -290,9 +313,6 @@
 #undef TRACE
 
 /* RESTRICTED_ED: define this if you want restricted ed mode enabled.
- *   If defined only wizards may use the 'e', 'E', 'f', 'r', 'w', and
- *   'W' commands within ed.  Wizards are identified by enable_wizard(),
- *   and is independent of a similar mudlib specific property.
  */
 #define RESTRICTED_ED
 
@@ -333,7 +353,7 @@
  *   times to very small (fast) functions.  In particular if the clock
  *   resolution is 1/60 of a second, then any time less than approxmately 15k
  *   microseconds will resolve to zero (0).
-*/
+ */
 #undef PROFILE_FUNCTIONS
 
 /* DISALLOW_BUFFER_TYPE: if this is #define'd then LPC code using the 'buffer'
@@ -368,6 +388,18 @@
 */
 #undef ALWAYS_SAVE_BINARIES
 
+/*
+ * NEW_FUNCTIONS: define this to allow the extended function pointers
+ * introduced in v20.
+ */
+#define NEW_FUNCTIONS
+
+/*
+ * NO_UIDS: define this if you want a driver that doesn't use uids.
+ *
+ */
+#undef NO_UIDS
+
 /* LPC_TO_C: define this to enable LPC->C compilation.
  *
  * [NOTE: In addition, you must uncomment the C_EFUNS line in your
@@ -375,6 +407,8 @@
  *  users from having to yacc & compile unused files.]
  * [NOTE: BINARIES must also be defined for LPC->C to work.  Actually
  *  using binaries is not required, though.]
+ *
+ *   Don't define this for now, work in progress -Beek
  */
 #undef LPC_TO_C
 
@@ -385,6 +419,20 @@
  *          following architectures:  SunOS 4.1, Linux, and SGI.
  */
 #undef RUNTIME_LOADING
+
+/* ARRAY_RESERVED_WORD: If this is defined then the word 'array' can
+ *   be used to define arrays, as in:
+ *
+ * int array x = ({ .... });
+ *
+ * A side effect is that array cannot be a variable or function name.
+ */
+#undef ARRAY_RESERVED_WORD
+
+/* OLD_TYPE_BEHAVIOR: reintroduces a bug in type-checking that effectively
+ * renders compile time type checking useless.  For backwards compatibility.
+ */
+#undef OLD_TYPE_BEHAVIOR
 
 /* ALWAYS_SAVE_COMPILED_BINARIES: define this to cause every file that
  *   is compiled to C code to behave as if it contains a line
@@ -417,7 +465,7 @@
 /* MAX_LOCAL: maximum number of local variables allowed per LPC function */
 #define MAX_LOCAL 25		/* get_config_int(8)  */
 /* MAX_USERS: maximum number of simultaneous interactive users allowed */
-#define MAX_USERS 5		/* get_config_int(12) */
+#define MAX_USERS 50	        /* get_config_int(12) */
 /* MAX_EFUN_SOCKS: maximum number of efun sockets */
 #define MAX_EFUN_SOCKS 16	/* get_config_int(24) */
 
@@ -452,10 +500,5 @@
  *  completeness of malloc debugging (malloc/free will be about half as fast).]
  */
 #define NEXT_MALLOC_DEBUG
-
-/* Current version of the driver.
- * (the patchlevel is automatically appended to the end)
- */
-#define VERSION "0.9."
 
 #endif

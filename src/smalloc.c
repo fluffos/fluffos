@@ -85,10 +85,8 @@ extern int using_smalloc;
 
 #if defined( atarist ) || defined( linux ) || defined( AMIGA )
 typedef unsigned int u;
-
 #else
 typedef unsigned int u;
-
 #endif
 
 static u *last_small_chunk = 0;
@@ -101,7 +99,6 @@ static u unused_size = 0;	/* until we need a new chunk */
 
 #ifndef FIT_STYLE_FAST_FIT
 static u *free_list = 0;
-
 #endif				/* FIT_STYLE_FAST_FIT */
 static u *start_next_block = 0;
 
@@ -1033,10 +1030,10 @@ static char *esbrk P1(u, size)
     addr = current_break;
     ret = vm_allocate(task_self(), (vm_address_t *) & addr, size, anywhere);
     if (ret != KERN_SUCCESS && (anywhere == FALSE)) {
-        /*
-         * allocate anywhere
-         */
-        anywhere = TRUE;
+	/*
+	 * allocate anywhere
+	 */
+	anywhere = TRUE;
 	ret = vm_allocate(task_self(), (vm_address_t *) & addr, size, TRUE);
 	if (ret != KERN_SUCCESS)
 	    return (NULL);

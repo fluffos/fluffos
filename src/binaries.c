@@ -137,20 +137,14 @@ void save_binary P3(struct program *, prog, struct mem_block *, includes, struct
     struct program *p;
     struct stat st;
 
-    /*
-     * See if we can save the binary.  If master_ob doesn't exist, assume
-     * it's ok (so that simul_efun.c and master.c can be saved)
-     */
-    if (master_ob) {
-	struct svalue *ret;
-	char *nm;
+    struct svalue *ret;
+    char *nm;
 
-	nm = add_slash(prog->name);
-	push_malloced_string(nm);
-	ret = safe_apply_master_ob(APPLY_VALID_SAVE_BINARY, 1);
-	if (IS_ZERO(ret))
-	    return;
-    }
+    nm = add_slash(prog->name);
+    push_malloced_string(nm);
+    ret = safe_apply_master_ob(APPLY_VALID_SAVE_BINARY, 1);
+    if (!MASTER_APPROVED(ret))
+	return;
     if (prog->p.i.total_size > (int) MAXSHORT ||
 	includes->current_size > (int) MAXSHORT)
 	/* assume all other sizes ok */

@@ -2,15 +2,15 @@
 /*
  * Compile an LPC file.
  */
-void lpc_compile_file P2(FILE *, f, char *, ident)
+void lpc_compile_file P3(FILE *, fin, FILE *, fout, char *, ident)
 {
     int yyparse();
 
-    output_file = f;
-    prolog();
+    output_file = fout;
+    prolog(fin);
     yyparse();
     epilog(ident);
-    fclose(f);
+    fclose(fout);
 }
 
 /*
@@ -166,12 +166,13 @@ static void epilog P1(char *, ident)
     for (i = 0; (unsigned)i < prog->p.i.num_inherited; i++) {
 	reference_prog (prog->p.i.inherit[i].prog, "inheritance");
     }
+    end_new_file();
 }
 
 /*
  * Initialize the environment that the compiler needs.
  */
-static void prolog() {
+static void prolog P1(FILE *, f) {
     int i;
     
 	last_expression = 0;
@@ -205,8 +206,9 @@ static void prolog() {
 #endif
     needs_comma = 0;
     stack_sp = simul_stack;
-    efun_sp = efun_stack-1;
+    keep_in_register = 0;
     ins_string("#include \"lpc_to_c.h\"\n");
+    start_new_file(f);
 }
 
 /*

@@ -9,6 +9,8 @@
 #include "lint.h"
 #include "stralloc.h"
 
+#undef NOISY_DEBUG
+
 /*
    this code is not the same as the original code.  I cleaned it up to
    use structs to: 1) make it easier to check the driver for memory leaks
@@ -187,6 +189,9 @@ char *
     if (REFS(b) < MAXSHORT) {
 	REFS(b)++;
     }
+#ifdef NOISY_DEBUG
+    fprintf(stderr, "%s - %d\n", STRING(b), REFS(b));
+#endif
     allocd_strings++;
     allocd_bytes += SIZE(b);
     return (STRING(b));
@@ -197,7 +202,7 @@ char *
 */
 
 char *
-     ref_string P1(char *, str)
+ref_string P1(char *, str)
 {
     block_t *b;
 
@@ -210,9 +215,12 @@ char *
     if (REFS(b) < MAXSHORT) {
 	REFS(b)++;
     }
+#ifdef NOISY_DEBUG
+    fprintf(stderr, "%s - %d\n", STRING(b), REFS(b));
+#endif
     allocd_strings++;
     allocd_bytes += SIZE(b);
-    return STRING(b);
+    return str;
 }
 
 /*
@@ -237,13 +245,8 @@ free_string P1(char *, str)
 {
     block_t *b;
 
-
     b = BLOCK(str);
-#ifdef DEBUG
-    if (b != findblock(str)) {
-	fatal("stralloc.c: free_string called on non-shared string: %s.\n", str);
-    }
-#endif				/* defined(DEBUG) */
+    DEBUG_CHECK1(b != findblock(str),"stralloc.c: free_string called on non-shared string: %s.\n", str);
 
     allocd_strings--;
     allocd_bytes -= SIZE(b);
@@ -252,10 +255,13 @@ free_string P1(char *, str)
      * if a string has been ref'd MAXSHORT times then we assume that its used
      * often enough to justify never freeing it.
      */
-    if (REFS(b) >= MAXSHORT)
+    if (REFS(b) == MAXSHORT)
 	return;
 
     REFS(b)--;
+#ifdef NOISY_DEBUG
+    fprintf(stderr, "%s - %d\n", STRING(b), REFS(b));
+#endif
     if (REFS(b) > 0)
 	return;
 

@@ -15,7 +15,7 @@
 #include "uid.h"
 
 #define O_HEART_BEAT		0x01	/* Does it have an heart beat ?      */
-#define O_IS_WIZARD		0x02	/* Is it a wizard user.c ?           */
+#define O_IS_WIZARD		0x02	/* used to be O_IS_WIZARD            */
 #define O_ENABLE_COMMANDS	0x04	/* Can it execute commands ?         */
 #define O_CLONE			0x08	/* Is it cloned from a master copy ? */
 #define O_DESTRUCTED		0x10	/* Is it destructed ?                */
@@ -40,13 +40,15 @@
 #endif
 
 typedef struct object {
-    unsigned int ref;			/* Reference count. */
+    unsigned int ref;		/* Reference count. */
 #ifdef DEBUG
-    int extra_ref;		/* Used to check ref count. */
+    unsigned int extra_ref;	/* Used to check ref count. */
 #endif
     unsigned short flags;	/* Bits or'ed together from above */
     short heart_beat_ticks, time_to_heart_beat;
+#ifndef NO_LIGHT
     short total_light;
+#endif
     int load_time;		/* time when this object was created */
     int next_reset;		/* Time of next reset of this object */
     int time_of_ref;		/* Time when last referenced. Used by swap */
@@ -62,12 +64,16 @@ typedef struct object {
 #endif				/* NO_SHADOWS */
     struct interactive *interactive;	/* Data about an interactive user */
     struct sentence *sent;
+#ifndef NO_UIDS
     userid_t *uid;		/* the "owner" of this object */
     userid_t *euid;		/* the effective "owner" */
+#endif
 #ifdef PRIVS
     char *privs;		/* object's privledges */
 #endif				/* PRIVS */
+#ifndef NO_MUDLIB_STATS
     statgroup_t stats;		/* mudlib stats */
+#endif
     struct object *next_hashed_living;
     char *living_name;		/* Name of living object if in hash */
     svalue variables[1];	/* All variables to this program */
@@ -81,5 +87,12 @@ typedef struct object {
 #else
 #define add_ref(ob, str) ob->ref++
 #endif
+
+#define ROB_STRING_ERROR 1
+#define ROB_ARRAY_ERROR 2
+#define ROB_MAPPING_ERROR 4
+#define ROB_NUMERAL_ERROR 8
+#define ROB_GENERAL_ERROR 16
+#define ROB_ERROR 31
 
 #endif

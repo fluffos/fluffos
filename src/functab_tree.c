@@ -64,7 +64,7 @@
 /*
  * Prototypes for local functions
  */
-static void functab_tree_add PROT((struct function *, unsigned short *, int, SIGNED short *));
+static void functab_tree_add(struct function *, unsigned short *, int, SIGNED short *);
 
 /*
  * The address comparison routine.
@@ -141,6 +141,8 @@ static void functab_tree_add P4(struct function *, functab,
     SIGNED int i;
     unsigned short p1, p2;	/* temporary "pointers" */
 
+    DEBUG_CHECK(*balance < -1 || *balance > 1, "Balance is garbage.\n");
+    DEBUG_CHECK(!balance || !root || !functab, "Null pointer in functab_tree.\n");
     /*
      * Are we at an insertion point? If so, add new node here, rebalance, and
      * exit.
@@ -284,6 +286,8 @@ static void functab_tree_add P4(struct function *, functab,
      */
     *balance = 0;
 
+    IF_DEBUG(fatal("Duplicate entry in function table tree [%s].\n", 
+		   functab[newfunc].name));
     return;
 }
 

@@ -5,11 +5,27 @@
 
 #include "uid.h"
 
-#ifdef LPC_TO_C
-#define lpcyylex yylex
-#define lpcyytext yytext
-#define lpcyylval yylval
-#define lpcyyerror yyerror
+/* Trace defines */
+#ifdef TRACE
+#  define TRACE_CALL 1
+#  define TRACE_CALL_OTHER 2
+#  define TRACE_RETURN 4
+#  define TRACE_ARGS 8
+#  define TRACE_EXEC 16
+#  define TRACE_HEART_BEAT 32
+#  define TRACE_APPLY 64
+#  define TRACE_OBJNAME 128
+#  ifdef LPC_TO_C
+#    define TRACE_COMPILED 256
+#    define TRACE_LPC_EXEC 512
+#  endif
+#  define TRACETST(b) (command_giver->interactive->trace_level & (b))
+#  define TRACEP(b) \
+    (command_giver && command_giver->interactive && TRACETST(b) && \
+     (command_giver->interactive->trace_prefix == 0 || \
+      (current_object && strpref(command_giver->interactive->trace_prefix, \
+	      current_object->name))) )
+#  define TRACEHB (current_heart_beat == 0 || (command_giver->interactive->trace_level & TRACE_HEART_BEAT))
 #endif
 
 union u {
@@ -52,7 +68,10 @@ typedef struct svalue {
 #define T_REAL          0x80
 #define T_BUFFER        0x100
 #define T_LVALUE_BYTE   0x200	/* byte-sized lvalue */
+#ifdef DEBUG
 #define T_FREED         0x400
+#endif
+
 #define T_ANY T_STRING|T_NUMBER|T_POINTER|T_OBJECT|T_MAPPING|T_FUNCTION| \
 	T_REAL|T_BUFFER
 
@@ -65,10 +84,38 @@ typedef struct svalue {
 #define T_REMOTE        0x10	/* remote object (subtype of object) */
 #define T_ERROR         0x20	/* error code */
 
+#ifdef NEW_FUNCTIONS
+struct afp {
+    char *start;
+    short num_args;
+};
+
 struct funp {
     unsigned short ref;
+    struct object *owner;
+    short type;                 /* ORIGIN_* is used */
+    union {
+	struct svalue obj;      /* for call_other function pointers */
+	short index;            /* lfuns and simul_efuns */
+	/* worst case here is F_CALL_EXTRA F_EFUN <num_arg> F_RETURN */
+	unsigned char opcodes[4]; /* for efun function pointers */
+	struct afp a;           /* for functionals */
+    } f;
+    struct svalue args;         /* includes the function for call_other */
+};
+#else
+struct funp {	
+    unsigned short ref;
     struct svalue obj, fun;
+#ifndef NO_UIDS
     userid_t *euid;
+#endif
+};
+#endif
+
+union string_or_func {
+    struct funp *f;
+    char *s;
 };
 
 struct vector {
@@ -112,6 +159,9 @@ struct control_stack {
     short caller_type;		/* was this a locally called function? */
 };
 
+/* for apply_master_ob */
+#define MASTER_APPROVED(x) (((x)==(struct svalue *)-1) || ((x) && (((x)->type != T_NUMBER) || (x)->u.number))) 
+
 #define IS_ZERO(x) (!(x) || (((x)->type == T_NUMBER) && ((x)->u.number == 0)))
 #define IS_UNDEFINED(x) (!(x) || (((x)->type == T_NUMBER) && \
 	((x)->subtype == T_UNDEFINED) && ((x)->u.number == 0)))
@@ -119,6 +169,19 @@ struct control_stack {
 	((x)->subtype == T_NULLVALUE) && ((x)->u.number == 0)))
 
 #define CHECK_TYPES(val, t, arg, inst) \
-  if ((t) && !((val)->type & (t))) bad_argument(val, t, arg, inst);
+  if (!((val)->type & (t))) bad_argument(val, t, arg, inst);
+
+/* macro calls */
+#ifndef LPC_TO_C
+#define call_program(prog, offset) \
+        eval_instruction(prog->p.i.program + offset)
+#define call_absolute(offset) eval_instruction(offset)
+#endif
+
+#ifdef DEBUG
+#define free_svalue(x,y) int_free_svalue(x,y)
+#else
+#define free_svalue(x,y) int_free_svalue(x)
+#endif
 
 #endif				/* _INTERPRET_H */

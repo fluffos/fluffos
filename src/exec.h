@@ -40,14 +40,33 @@
  * If the #pragma save_types is specified, then the types are saved even
  * after compilation, to be used when the object is inherited.
  */
-#define NAME_INHERITED		0x1	/* Defined by inheritance */
-#define NAME_UNDEFINED		0x2	/* Not defined yet */
-#define NAME_STRICT_TYPES	0x4	/* Compiled with type testing */
-#define NAME_HIDDEN		0x8	/* Not visible for inheritance */
-#define NAME_PROTOTYPE		0x10	/* Defined by a prototype only */
 
-#define T_INTERNAL_PROGRAM 0x0
-#define T_EXTERNAL_PROGRAM 0x1
+/* NAME_INHERITED - The function entry that exists in this object actually
+                    is a function in an object we inherited
+ * NAME_UNDEFINED - the function hasn't been defined yet at this level
+ * NAME_STRICT_TYPES - compiled with strict type testing
+ * NAME_PROTOTYPE - only a prototype has been found so far
+ * NAME_DEF_BY_INHERIT - this function actually exists in an object we've
+                         inherited; if we don't find a function at this level
+			 we'll use that one
+ * NAME_ALIAS     - This entry refers us to another entry, usually because
+                    this function was overloaded by that function
+ * NAME_COLON_COLON - has a :: in it.  Don't allow call_others to it, etc
+                      This function is propagated up the tree for technical
+		      reasons.
+ */
+#define NAME_INHERITED		0x1
+#define NAME_UNDEFINED		0x2
+#define NAME_STRICT_TYPES	0x4
+#define NAME_PROTOTYPE		0x10
+#define NAME_DEF_BY_INHERIT     0x20
+#define NAME_ALIAS              0x40
+#define NAME_COLON_COLON        0x80
+
+/* only the flags should be copied up through inheritance levels */
+#define NAME_MASK (NAME_UNDEFINED | NAME_STRICT_TYPES | NAME_PROTOTYPE | NAME_COLON_COLON)
+/* a function that isn't 'real' */
+#define NAME_NO_CODE  (NAME_UNDEFINED | NAME_ALIAS)
 
 struct function {
     char *name;
@@ -72,7 +91,7 @@ struct function {
 #endif
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
     unsigned short tree_l, tree_r;	/* Left and right branches. */
-    SIGNED short tree_b;	        /* Balance of subtrees. */
+    SIGNED short tree_b;	/* Balance of subtrees. */
 #endif
     unsigned char flags;	/* NAME_ . See above. */
 };
@@ -80,7 +99,6 @@ struct function {
 struct variable {
     char *name;
     unsigned short type;	/* Type of variable. See below. TYPE_ */
-    unsigned short flags;	/* Facts found by the compiler. NAME_ */
 };
 
 struct inherit {
@@ -168,9 +186,10 @@ struct program {
 /*
  * These are or'ed in on top of the basic type.
  */
+#define TYPE_MOD_POINTER	0x0040	/* Pointer to a basic type */
+#define TYPE_MOD_HIDDEN         0x0080  /* used by private vars */
 #define TYPE_MOD_STATIC		0x0100	/* Static function or variable */
 #define TYPE_MOD_NO_MASK	0x0200	/* The nomask => not redefineable */
-#define TYPE_MOD_POINTER	0x0400	/* Pointer to a basic type */
 #define TYPE_MOD_PRIVATE	0x0800	/* Can't be inherited */
 #define TYPE_MOD_PROTECTED	0x1000
 #define TYPE_MOD_PUBLIC		0x2000	/* Force inherit through private */
@@ -180,4 +199,28 @@ struct program {
 				   TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED |\
 				   TYPE_MOD_PUBLIC | TYPE_MOD_VARARGS))
 
+typedef struct {
+  SIGNED short local_num, global_num, efun_num;
+  SIGNED short function_num, simul_num;
+} defined_name;
+
+/* to speed up cleaning the hash table, and identify the union */
+#define IHE_RESWORD    0x8000
+#define IHE_EFUN       0x4000
+#define IHE_SIMUL      0x2000
+#define IHE_PERMANENT  (IHE_RESWORD | IHE_EFUN | IHE_SIMUL)
+#define TOKEN_MASK     0x0fff
+
+#define INDENT_HASH_SIZE 1024 /* must be a power of 2 */
+
+struct ident_hash_elem {
+    char *name;
+    short token; /* only flags */
+    short sem_value; /* for these, a count of the ambiguity */
+    struct ident_hash_elem *next;
+/* the fields above must correspond to struct keyword */
+    defined_name dn;
+};
 #endif
+
+

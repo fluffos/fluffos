@@ -348,6 +348,12 @@ locate_in P1(struct program *, prog)
  */
 int swap P1(struct object *, ob)
 {
+    /* the simuls[] table uses pointers to the functions so the simul_efun
+     * program cannot be relocated.  locate_in() could be changed to
+     * correct this or simuls[] could use offsets, but it doesn't seem
+     * worth it just to get the simul_efun object to swap.  Maybe later.
+     */
+    if (ob == simul_efun_ob) return 0;
     if (ob->flags & O_DESTRUCTED)
 	return 0;
     if (d_flag > 1) {		/* marion */

@@ -1,0 +1,2679 @@
+/* This is to make emacs edit this in C mode: -*-C-*- */
+%include "comp_warning"
+
+%{
+#include "compiler_shared.h"
+#include "trees.h"
+#include "opcodes.h"
+#ifdef NEW_FUNCTIONS
+#include "fp_defs.h"
+#endif
+#include "generate.h"
+/* this should be removed when switch generation moves to icode.c */
+#include "icode.h"
+
+%line
+/*
+ * This is the grammar definition of LPC, and its parse tree generator.
+ */
+static void start_initializer PROT((void));
+static void end_initializer PROT((void));
+static void epilog PROT((void));
+static void prolog PROT((FILE *));
+static void clean_parser PROT((void));
+
+/*
+ * bison & yacc don't prototype this in y.tab.h
+ */
+int yyparse PROT((void));
+
+/*
+ * Initialization code is now more compact.  It's collected in
+ * A_INITIALIZER and put at the end of the program.  For compatibility,
+ * there is a jump to it at address 0.
+ */
+
+static void start_initializer() {
+  current_block = A_INITIALIZER;
+}
+
+static void end_initializer() {
+  current_block = A_PROGRAM;
+}
+
+static void add_to_case_heap P2(int, block_index, struct case_heap_entry *, entry)
+{
+    char *heap_start;
+    int offset,parent;
+    int current_heap;
+
+    if ( block_index == A_CASE_NUMBERS )
+	current_heap = current_case_number_heap;
+    else
+	current_heap = current_case_string_heap;
+    offset = mem_block[block_index].current_size - current_heap;
+    add_to_mem_block(block_index, (char*)entry, sizeof(*entry) );
+    heap_start = mem_block[block_index].block + current_heap;
+    for ( ; offset; offset = parent ) {
+	parent = ( offset - sizeof(struct case_heap_entry) ) >> 1 ;
+	CASE_HEAP_ENTRY_ALIGN(parent);
+	if ( ((struct case_heap_entry*)(heap_start+offset))->key <
+	     ((struct case_heap_entry*)(heap_start+parent))->key ) {
+	    *(struct case_heap_entry*)(heap_start+offset) =
+	    *(struct case_heap_entry*)(heap_start+parent);
+	    *(struct case_heap_entry*)(heap_start+parent) = *entry;
+	}
+    }
+}
+
+%}
+/*
+ * Token definitions.
+ *
+ * Appearing in the precedence declarations are:
+ *      '+'  '-'  '/'  '*'  '%'
+ *      '&'  '|'  '<'  '>'  '^'
+ *      '~'  '?'
+ *
+ * Other single character tokens recognized in this grammar:
+ *      '{'  '}'  ','  ';'  ':'
+ *      '('  ')'  '['  ']'  '$'
+ */
+
+%token L_STRING L_NUMBER L_REAL
+%token L_BASIC_TYPE L_OBJECT L_FUNCTION L_TYPE_MODIFIER
+%token L_DEFINED_NAME L_IDENTIFIER
+%token L_EFUN
+
+%token L_INC L_DEC
+%token L_ASSIGN
+%token L_LAND L_LOR
+%token L_LSH L_RSH
+%token L_EQ L_NE L_GE L_LE
+%token L_NOT
+
+%token L_IF L_ELSE
+%token L_SWITCH L_CASE L_DEFAULT L_RANGE
+%token L_WHILE L_DO L_FOR
+%token L_BREAK L_CONTINUE
+%token L_RETURN
+%token L_ARROW L_INHERIT L_COLON_COLON
+%token L_ARRAY_OPEN L_MAPPING_OPEN L_FUNCTION_OPEN L_NEW_FUNCTION_OPEN
+
+%token L_SSCANF L_CATCH
+%token L_PARSE_COMMAND L_TIME_EXPRESSION
+%token L_ASM
+%ifdef NEW_FUNCTIONS
+%token L_PARAMETER
+%endif
+
+/*
+ * 'Dangling else' shift/reduce conflict is well known...
+ *  define these precedences to shut yacc up.
+ */
+
+%nonassoc LOWER_THAN_ELSE
+%nonassoc L_ELSE
+
+/*
+ * Operator precedence and associativity...
+ * greatly simplify the grammar.
+ */
+
+%right L_ASSIGN
+%right '?'
+%left L_LOR
+%left L_LAND
+%left '|'
+%left '^'
+%left '&'
+%left L_EQ L_NE
+%left '>' L_GE '<' L_LE
+%left L_LSH L_RSH
+%left '+' '-'
+%left '*' '%' '/'
+%right L_NOT '~'
+%nonassoc L_INC L_DEC
+
+/*
+ * YYTYPE
+ */
+%union
+{
+    int number;
+    float real;
+    unsigned int address;       /* Address of an instruction */
+    char *string;
+    short type;
+    struct { int key; char block; } case_label;
+    struct { short type; char iscon; unsigned int addr; short len; } expr;
+    struct { unsigned int addr; short num; } expr_list;
+    struct { short num_arg; char is_proto; } argument;
+    struct ident_hash_elem *ihe;
+    struct function *funp;
+#ifdef NEW_FUNCTIONS
+    struct function_context_t context;
+#endif
+    struct parse_node *node;
+}
+
+/*
+ * Type declarations.
+ */
+
+/* These hold opcodes */
+%type <number> efun_override L_ASSIGN
+
+/* Holds a variable index */
+%ifdef NEW_FUNCTIONS
+%type <number> L_PARAMETER
+%endif
+
+/* These hold arbitrary numbers */
+%type <number> L_NUMBER constant
+
+/* These hold a real number */
+%type <real>   L_REAL
+
+/* holds a string constant */
+%type <string> L_STRING string_con1 string_con2
+
+/* Holds the number of elements in a list and whether it must be a prototype */
+%type <argument> argument_list argument
+
+/* These hold a list of possible interpretations of an identifier */
+%type <ihe> L_DEFINED_NAME
+
+/* These hold a type */
+%type <number> type optional_star type_modifier_list basic_type
+%type <number> opt_basic_type L_TYPE_MODIFIER L_BASIC_TYPE L_OBJECT L_FUNCTION
+%type <type> cast
+
+/* Holds either 0 or ';' */
+%type <number> block_or_semi
+
+/* This holds compressed and less flexible def_name information */
+%type <number> L_NEW_FUNCTION_OPEN
+
+/* holds an identifier or some sort */
+%type <string> L_IDENTIFIER L_EFUN function_name identifier not_efun_ident
+%type <string> new_arg_name
+
+/* holds information about a case */
+%type <case_label> case_label
+
+/* The following return a parse node */
+%type <node> number real string expr0 comma_expr for_expr sscanf catch
+%type <node> parse_command time_expression expr_list expr_list2 expr_list3
+%type <node> expr_list4 assoc_pair expr4 lvalue function_call lvalue_list
+
+/* This holds a flag */
+%type <number> new_arg
+
+/* This holds a saved value of function_context */
+%type <context> L_FUNCTION_OPEN
+%%
+
+all:
+	program
+    ;
+
+program:
+	program def possible_semi_colon
+    |   /* empty */
+    ;
+
+possible_semi_colon:
+	/* empty */
+    |   ';'
+	    {
+
+		yywarn("Extra ';'. Ignored.");
+	    }
+    ;
+
+inheritance:
+	type_modifier_list L_INHERIT string_con1 ';'
+	    {
+		struct object *ob;
+		struct inherit inherit;
+		int initializer;
+
+		ob = find_object2($3);
+		if (ob == 0) {
+		    inherit_file = string_copy($3);
+		    /* Return back to load_object() */
+		    YYACCEPT;
+		}
+		scratch_free($3);
+		inherit.prog = ob->prog;
+		inherit.function_index_offset =
+		      mem_block[A_FUNCTIONS].current_size /
+		      sizeof (struct function);
+		inherit.variable_index_offset =
+		      mem_block[A_VARIABLES].current_size /
+		      sizeof (struct variable);
+		add_to_mem_block(A_INHERITS, (char *)&inherit, sizeof inherit);
+		copy_variables(ob->prog, $1);
+		initializer = copy_functions(ob->prog, $1);
+		if (initializer > 0) {
+		    /* initializer is an index into the object we're
+		       inheriting's function table; this finds the
+		       appropriate entry in our table and generates
+		       a call to it */
+		    initializer += inherit.function_index_offset;
+		    start_initializer();
+		    generate_function_call(initializer, 0);
+		    pop_value();
+		    end_initializer();
+		}
+	    }
+    ;
+
+real:
+	L_REAL
+	    {
+		$$ = make_node(F_REAL, E_CONST, TYPE_REAL);
+		$$->v.real = $1;
+	    }
+    ;
+
+number:
+	L_NUMBER
+	    {
+		$$ = make_node(F_NUMBER, E_CONST, 
+			       ($1 ? TYPE_NUMBER : TYPE_ANY));
+		$$->v.number = $1;
+	    }
+    ;
+
+optional_star:
+	/* empty */
+	    {
+		$$ = 0;
+	    }
+    |   '*'
+	    {
+		$$ = TYPE_MOD_POINTER;
+	    }
+    ;
+
+block_or_semi:
+	block
+	    {
+		$$ = 0;
+	    }
+    |   ';'
+	    {
+		$$ = ';';
+	    }
+    ;
+
+not_efun_ident: 
+        L_DEFINED_NAME
+            {
+	      $$ = scratch_copy($1->name);
+	    }
+     |  L_IDENTIFIER
+     |  L_ASM
+            {
+              $$ = scratch_copy("asm");
+            }
+     ;
+
+identifier:
+        not_efun_ident
+     |  L_EFUN
+            {
+              $$ = scratch_copy("efun");
+            }
+
+def:
+	type optional_star identifier
+	    {
+		char *p = $3;
+		/* Save start of function. */
+	        $<number>$ = CURRENT_PROGRAM_SIZE;
+
+		/* don't want it sitting on the scratchpad forever */
+		$3 = make_shared_string($3);
+		scratch_free(p);
+
+		if ($1 & TYPE_MOD_MASK) {
+		    exact_types = $1 | $2;
+		} else {
+		/* force strict types - no more compat mode */
+
+#ifdef STRICT_TYPE_CHECKING
+		    exact_types = TYPE_ANY;
+#else
+		    exact_types = 0;
+#endif
+		    if (pragmas & PRAGMA_STRICT_TYPES) {
+			if (strcmp($3, "create") != 0)
+			    yyerror("\"#pragma strict_types\" requires type of function");
+			else
+			    exact_types = TYPE_VOID;
+		    }
+		}
+	    }
+	'(' argument ')'
+	    {
+		/*
+		 * Define a prototype. If it is a real function, then the
+		 * prototype will be replaced below.
+		 */
+		define_new_function($3, $6.num_arg, 0, 0,
+				    NAME_UNDEFINED|NAME_PROTOTYPE, $1 | $2);
+	    }
+	block_or_semi
+	    {
+
+		/* Either a prototype or a block */
+		if ($9 != ';') {
+		    if ($6.is_proto) {
+			yyerror("Missing name for function argument");
+		    }
+		    define_new_function($3, $6.num_arg, 
+			  current_number_of_locals - $6.num_arg +
+			  ( max_break_stack_need -1 ) / sizeof(svalue) + 1,
+			  $<number>4, 0, $1 | $2);
+		    generate_return(0);
+		}
+		free_all_local_names();
+		free_string($3);
+	    }
+    |   type name_list ';'
+	    {
+		if ($1 == 0)
+		    yyerror("Missing type");
+	    }
+    |   inheritance
+    ;
+
+new_arg_name:
+        L_IDENTIFIER
+      | L_ASM
+            {
+		$$ = scratch_copy("asm");
+            }
+      | L_EFUN
+            {
+		$$ = scratch_copy("efun");
+	    }
+      | L_DEFINED_NAME
+            {
+		if ($1->dn.local_num != -1) {
+		    yyerror("Illegal to redeclare local name");
+		}
+		$$ = scratch_copy($1->name);
+	    }
+      ;
+
+new_arg:
+        basic_type optional_star
+            {
+                $$ = 1;
+                add_local_name("", $1 | $2);
+            }
+      | basic_type optional_star new_arg_name
+	    {
+                add_local_name($3, $1 | $2);
+		scratch_free($3);
+                $$ = 0;
+	    }
+      | new_arg_name
+            {
+		if (exact_types) {
+		    yyerror("Missing type for argument");
+		}
+		add_local_name($1, TYPE_ANY);
+		scratch_free($1);
+		$$ = 0;
+            }
+
+argument:
+	/* empty */
+	    {
+		$$.num_arg = 0;
+                $$.is_proto = 0;
+	    }
+    |   argument_list
+    ;
+
+argument_list:
+	new_arg
+	    {
+		$$.num_arg = 1;
+                $$.is_proto = $1;
+	    }
+    |   argument_list ',' new_arg
+	    {
+                $$ = $1;
+		$$.num_arg++;
+                $$.is_proto |= $3;
+	    }
+    ;
+
+type_modifier_list:
+	/* empty */
+	    {
+		$$ = 0;
+	    }
+    |   L_TYPE_MODIFIER type_modifier_list
+	    {
+		$$ = $1 | $2;
+	    }
+    ;
+
+type:
+	type_modifier_list opt_basic_type
+	    {
+		$$ = $1 | $2;
+		current_type = $$;
+	    }
+    ;
+
+cast:
+	'(' basic_type optional_star ')'
+	    {
+		$$ = $2 | $3;
+	    }
+    ;
+
+opt_basic_type:
+        L_BASIC_TYPE
+    |   L_FUNCTION
+    |   L_OBJECT
+    |   /* empty */
+	    {
+		$$ = TYPE_UNKNOWN;
+	    }
+    ;
+
+basic_type:
+        L_BASIC_TYPE
+    |   L_FUNCTION
+    |   L_OBJECT
+   ;
+
+name_list:
+	new_name
+    |   new_name ',' name_list
+    ;
+
+new_name:
+	optional_star identifier
+	    {
+		define_variable($2, current_type | $1, 0);
+		scratch_free($2);
+	    }
+    |   optional_star identifier L_ASSIGN expr0
+	    {
+		struct parse_node *expr;
+
+		if ($3 != F_ASSIGN)
+		    yyerror("Only '=' is legal in initializers.");
+
+		start_initializer();
+		if (!compatible_types((current_type | $1) & TYPE_MOD_MASK,
+		      $4->type)) {
+		    char buff[100];
+
+		    sprintf(buff, "Type mismatch %s when initializing %s",
+			  get_two_types((current_type | $1) & TYPE_MOD_MASK,
+					$4->type), $2);
+		    yyerror(buff);
+		}
+
+		expr = make_branched_node(F_VOID_ASSIGN, 0, 0, $4);
+		expr->left = make_node(F_GLOBAL_LVALUE, 0, 0);
+		expr->left->v.number = define_variable($2, current_type | $1, 0);
+		generate_expr(expr);
+		end_initializer();
+		scratch_free($2);
+	    }
+    ;
+
+block:
+	'{' local_declarations statements '}'
+    ;
+
+local_declarations:
+	/* empty */
+    |   local_declarations basic_type
+            {
+		/* can't do this in basic_type b/c local_name_list contains
+		 * expr0 which contains cast which contains basic_type
+		 */
+		current_type = $2;
+	    }
+        local_name_list ';'
+    ;
+
+new_local_name:
+	optional_star identifier
+	    {
+		add_local_name($2, current_type | $1);
+		scratch_free($2);
+	    }
+    |   optional_star identifier L_ASSIGN expr0
+	    {
+		struct parse_node *expr;
+
+		if ($3 != F_ASSIGN)
+		    yyerror("Only '=' is allowed in initializers.");
+		if (!compatible_types((current_type | $1) & TYPE_MOD_MASK, $4->type)) {
+		    char buff[100];
+
+		    sprintf(buff, "Type mismatch %s when initializing %s",
+			  get_two_types((current_type | $1) & TYPE_MOD_MASK, $4->type), $2);
+		    yyerror(buff);
+		}
+
+		expr = make_branched_node(F_VOID_ASSIGN, 0, 0, $4);
+		expr->left = make_node(F_LOCAL_LVALUE, 0, 0);
+		expr->left->v.number = add_local_name($2, current_type | $1);
+
+		generate_expr(expr);
+		scratch_free($2);
+	    }
+    ;
+
+local_name_list:
+	new_local_name
+    |   new_local_name ',' local_name_list
+    ;
+
+statements:
+	/* empty */
+    |   statement statements
+    |   error ';'
+    ;
+
+statement:
+	comma_expr ';'
+	    {
+		generate_expr(insert_pop_value($1));
+		if (d_flag)
+		  generate_break_point();
+	    }
+    |   cond
+    |   while
+    |   do
+    |   for
+    |   switch
+    |   case
+    |   default
+    |   return ';'
+    |   block
+    |   /* empty */ ';'
+    |   L_BREAK ';'
+	    {
+		/* This code is a jump to a jump */
+		if (current_break_address == 0)
+		    yyerror("break statement outside loop");
+		generate_break();
+	    }
+    |   L_CONTINUE ';'
+	    {
+		/* This code is a jump */
+		if (current_continue_address == 0)
+		    yyerror("continue statement outside loop");
+		generate_continue();
+	    }
+    ;
+
+while:
+       L_WHILE '(' comma_expr ')'
+	    {
+		save_loop_info();
+		/* be intelligent about the order in which the code is laid out.
+		   By inserting the code for the block first followed by the
+		   the expression (instead of vice versa), it is possible to
+		   save an instruction on each while loop iteration.
+		   */
+
+		/* jump over while body; be extra smart about while (1) */
+		if (!node_always_true($3))
+		    generate_forward_branch(F_BRANCH);
+		/* so we can branch back here */
+		save_position();
+
+		/* do some optimizations on the conditional expression */
+		if ($3->kind == F_LT && $3->left->kind == F_LOCAL
+		    && ($3->right->kind == F_LOCAL ||
+			$3->right->kind == F_NUMBER))
+		    $3->kind = F_LOOP_COND;
+		if ($3->kind == F_POST_DEC && $3->right->kind == F_LOCAL_LVALUE) {
+		    $3->kind = F_WHILE_DEC;
+		    $3->v.number = $3->right->v.number;
+		}
+		/* make sure expr is not destroyed */
+		lock_expressions();
+	    }
+	statement
+	    {
+		unlock_expressions();
+		if (!node_always_true($3))
+		    update_forward_branch();
+		update_continues();
+		generate_conditional_branch($3);
+		update_breaks();
+		restore_loop_info();
+	    }
+    ;
+
+do:
+        /* empty */
+            {
+	      save_loop_info();
+	      save_position();
+	    }
+        L_DO statement L_WHILE '(' comma_expr ')' ';'
+            {
+		update_continues();
+		generate_conditional_branch($6);
+		update_breaks();
+		restore_loop_info();
+	    }
+    ;
+
+for:
+	L_FOR '(' for_expr ';' for_expr ';' for_expr ')'
+	    {
+	      save_loop_info();
+
+	      /* we have three expressions; don't want to free them
+	       * until we have generated all 3.
+	       */
+	      lock_expressions();
+		
+	      /* initializations */
+	      generate_expr(insert_pop_value($3));
+	      if (!node_always_true($5))
+		  generate_forward_branch(F_BRANCH);
+	      save_position();
+	    }
+        statement
+            {
+		update_continues();
+
+		if ($5->kind == F_LT && $5->left->kind == F_LOCAL
+		    && ($5->right->kind == F_LOCAL ||
+			$5->right->kind == F_NUMBER))
+		    $5->kind = F_LOOP_COND;
+		
+		$7 = insert_pop_value($7);
+		if ($7 && $7->kind == F_INC && $7->right->kind == F_LOCAL_LVALUE) {
+		    $7->kind = F_LOOP_INCR;
+		    $7->v.number = $7->right->v.number;
+		}
+		/* increment code */
+		generate_expr($7);
+
+		/* fix jump */
+		if (!node_always_true($5))
+		    update_forward_branch();
+
+		/* conditional code */
+		/* this is the last expression left so we can free after
+		   generating it */
+		unlock_expressions();
+		generate_conditional_branch($5);
+
+		update_breaks();
+		restore_loop_info();
+	      }
+    ;
+
+for_expr:
+	/* EMPTY */
+	    {
+		$$ = make_node(F_NUMBER, E_CONST, TYPE_NUMBER);
+		$$->v.number = 1;
+	    }
+    |   comma_expr
+    ;
+
+switch:
+	L_SWITCH '(' comma_expr ')'
+	    {
+		generate_expr($3);
+		switches++;
+		current_break_stack_need += sizeof(short);
+		if ( current_break_stack_need > max_break_stack_need )
+		    max_break_stack_need = current_break_stack_need;
+		start_switch();
+		current_case_number_heap = mem_block[A_CASE_NUMBERS].current_size;
+		current_case_string_heap = mem_block[A_CASE_STRINGS].current_size;
+		zero_case_label = NO_STRING_CASE_LABELS;
+	    }
+	statement
+	    {
+		char *heap_start;
+		int heap_end_offs;
+		int i,o;
+		int current_key, last_key = 0;
+		/* int size_without_table; */
+		int block_index;
+		int current_case_heap;
+		int first_key;
+		int num_keys;
+		int offset;
+		int curr_line, last_line = 0;
+		unsigned short current_addr,last_addr = 0xffff;
+		int range_start = 0;
+
+		current_break_address &= ~(BREAK_ON_STACK|BREAK_FROM_CASE);
+
+		if ( !read_short(current_break_address+2 ) )
+		    upd_short(current_break_address+2,  /* no default given ->  */
+		mem_block[current_block].current_size);     /* create one           */
+
+		/* it isn't unusual that the last case/default has no break */
+		ins_f_byte(F_BREAK);
+		if (zero_case_label & (NO_STRING_CASE_LABELS|SOME_NUMERIC_CASE_LABELS)) {
+		    block_index = A_CASE_NUMBERS;
+		    current_case_heap = current_case_number_heap;
+		} else {
+		    block_index = A_CASE_STRINGS;
+		    current_case_heap = current_case_string_heap;
+		    if (zero_case_label&0xffff) {
+			struct case_heap_entry temp;
+
+			temp.key = (int)ZERO_AS_STR_CASE_LABEL;
+			temp.addr = zero_case_label & 0xffff;
+			temp.line = 0;  /* if this is accessed later, something is
+					 * really wrong                            */
+			add_to_case_heap(A_CASE_STRINGS,&temp);
+		    }
+#ifdef SAVE_BINARIES
+		    {
+			short sw;
+
+			sw = current_break_address - 4;  /* the F_SWITCH */
+			add_to_mem_block(A_PATCH, (char *)&sw, sizeof sw);
+		    }
+#endif
+		}
+		heap_start = mem_block[block_index].block + current_case_heap ;
+		heap_end_offs = mem_block[block_index].current_size -current_case_heap;
+		if (!heap_end_offs)
+		    yyerror("switch without case not supported");
+
+		/* add a dummy entry so that we can always
+		 * assume we have no or two childs
+		 */
+		add_to_mem_block(block_index, "\0\0\0\0\0\0\0\0",
+		      sizeof(struct case_heap_entry) );
+
+		/* read out the heap and build a sorted table */
+		/* the table could be optimized better, but let's first see
+		 * how much switch is used at all when it is full-featured...
+		 */
+		mem_block[A_CASE_LABELS].current_size = 0;
+		first_key = ((struct case_heap_entry*)heap_start)->key;
+		num_keys = 0;
+		for ( ; ((struct case_heap_entry*)heap_start)->addr; ) {
+		    current_key = ((struct case_heap_entry*)heap_start)->key ;
+		    curr_line = ((struct case_heap_entry*)heap_start)->line ;
+		    current_addr = ((struct case_heap_entry*)heap_start)->addr ;
+		    if ( current_key == last_key &&
+			  mem_block[A_CASE_LABELS].current_size ) {
+			char buf[90];
+
+			sprintf(buf,"Duplicate case in line %d and %d",
+			      last_line, curr_line);
+			yyerror(buf);
+		    }
+		    if (curr_line) {
+			if (last_addr == 1) {
+			    char buf[120];
+
+			    sprintf(buf,
+				  "Discontinued case label list range, line %d by line %d",
+				  last_line, curr_line);
+			    yyerror(buf);
+			    num_keys++;
+			}
+			else if (current_key == (last_key + 1) && current_addr == last_addr) {
+			    if (mem_block[A_CASE_LABELS].current_size != (range_start + 6)) {
+				/* todo: this next line is probably non-portable (byte-ordering) */
+				*(short*)(mem_block[A_CASE_LABELS].block+range_start+4) = 1;
+			       mem_block[A_CASE_LABELS].current_size = range_start + 6;
+			    } else num_keys++;
+			} else {
+			    range_start = mem_block[A_CASE_LABELS].current_size;
+			    num_keys++;
+			}
+		    } else num_keys++;
+		    last_key = current_key;
+		    last_line = curr_line;
+		    last_addr = current_addr;
+		    add_to_mem_block(A_CASE_LABELS,
+			  (char *)&current_key, sizeof(int) );
+		    add_to_mem_block(A_CASE_LABELS,
+			  (char *)&current_addr, sizeof(short) );
+		    for ( offset = 0; ; ) {
+			int child1,child2;
+
+			child1 = ( offset << 1 ) + sizeof(struct case_heap_entry);
+			child2 = child1 + sizeof(struct case_heap_entry);
+			if ( child1 >= heap_end_offs ) break;
+			if ( ((struct case_heap_entry*)(heap_start+child1))->addr &&
+			      ( !((struct case_heap_entry*)(heap_start+child2))->addr ||
+			      ((struct case_heap_entry*)(heap_start+child1))->key <=
+			      ((struct case_heap_entry*)(heap_start+child2))->key  ) ) {
+			    *(struct case_heap_entry*)(heap_start+offset) =
+				  *(struct case_heap_entry*)(heap_start+child1);
+			    offset = child1;
+			} else
+			    if (((struct case_heap_entry*)(heap_start+child2))->addr ) {
+				*(struct case_heap_entry*)(heap_start+offset) =
+				*(struct case_heap_entry*)(heap_start+child2);
+				offset = child2;
+			    } else
+				break;
+		    }
+		    ((struct case_heap_entry*)(heap_start+offset))->addr = 0;
+		}
+
+		/* write start of table */
+		upd_short(current_break_address-2,
+		      mem_block[current_block].current_size);
+
+		/* check to see if quicker direct lookup can be used */
+		if (block_index == A_CASE_NUMBERS &&
+		      num_keys == last_key - first_key + 1) {
+		    short offset;
+
+		    for (i = 0; i<num_keys; i++) {
+			/* only using offset part of table here */
+			((char *)&offset)[0] = mem_block[A_CASE_LABELS].block[i*6 + 4];
+			((char *)&offset)[1] = mem_block[A_CASE_LABELS].block[i*6 + 5];
+			if (offset <= 1) {
+			    ((char *)&offset)[0] = mem_block[A_CASE_LABELS].block[i*6 + 4 + 6];
+			    ((char *)&offset)[1] = mem_block[A_CASE_LABELS].block[i*6 + 5 + 6];
+			}
+			ins_short(offset);
+		    }
+		    ins_long(first_key);
+		    mem_block[current_block].block[current_break_address-3] = (char)0xfe;
+		} else { /* use slower binary search */
+		    /* copy over table */
+		    add_to_mem_block(current_block, (char *)mem_block[A_CASE_LABELS].block,
+			  mem_block[A_CASE_LABELS].current_size );
+		    /* calculate starting index for search at execution time */
+		    for (i=0xf0,o=6; o<<1 <= mem_block[A_CASE_LABELS].current_size; )
+			i++,o<<=1;
+		    if (block_index == A_CASE_STRINGS) i = ( i << 4 ) | 0xf;
+		    /* and store it */
+		    mem_block[current_block].block[current_break_address-3] &= (i & 0xff);
+		}
+		upd_short(current_break_address, mem_block[current_block].current_size);
+
+		mem_block[A_CASE_NUMBERS].current_size = current_case_number_heap;
+		mem_block[A_CASE_STRINGS].current_size = current_case_string_heap;
+		current_break_address = pop_address();
+		zero_case_label = pop_address();
+		current_case_string_heap = pop_address();
+		current_case_number_heap = pop_address();
+		current_break_stack_need -= sizeof(short);
+		switches--;
+	    }
+    ;
+
+case:
+	L_CASE case_label ':'
+	    {
+
+		struct case_heap_entry temp;
+
+		if ( !( current_break_address & BREAK_FROM_CASE ) ) {
+		    yyerror("Case outside switch");
+		    break;
+		}
+		temp.key = $2.key;
+		temp.addr = mem_block[current_block].current_size;
+		temp.line = current_line;
+		add_to_case_heap($2.block,&temp);
+	    }
+    |   L_CASE case_label L_RANGE case_label ':'
+	    {
+
+		struct case_heap_entry temp;
+
+		if ( $2.block != A_CASE_NUMBERS || $4.block != A_CASE_NUMBERS )
+		    yyerror("String case labels not allowed as range bounds");
+		if ($2.key > $4.key) break;
+		temp.key = $2.key;
+		temp.addr = 1;
+		temp.line = current_line;
+		add_to_case_heap(A_CASE_NUMBERS,&temp);
+		temp.key = $4.key;
+		temp.addr = mem_block[current_block].current_size;
+		temp.line = 0;
+		add_to_case_heap(A_CASE_NUMBERS,&temp);
+	    }
+    ;
+
+case_label:
+	constant
+	    {
+
+		if ( !(zero_case_label & NO_STRING_CASE_LABELS) && $1 )
+		    yyerror("Mixed case label list not allowed");
+		    if ( ($$.key = $1) )
+			zero_case_label |= SOME_NUMERIC_CASE_LABELS;
+		    else
+			zero_case_label |= mem_block[current_block].current_size;
+		    $$.block = A_CASE_NUMBERS;
+	    }
+    |   string_con1
+	    {
+		char *p = make_shared_string($1);
+		scratch_free($1);
+		if ( zero_case_label & SOME_NUMERIC_CASE_LABELS )
+		    yyerror("Mixed case label list not allowed");
+		zero_case_label &= ~NO_STRING_CASE_LABELS;
+		store_prog_string(p);
+		$$.key = (int)p;
+		$$.block = A_CASE_STRINGS;
+	    }
+    ;
+
+constant:
+	constant '|' constant
+	    {
+		$$ = $1 | $3;
+	    }
+    |   constant '^' constant
+	    {
+		$$ = $1 ^ $3;
+	    }
+    |   constant '&' constant
+	    {
+		$$ = $1 & $3;
+	    }
+    |   constant L_EQ constant
+	    {
+		$$ = $1 == $3;
+	    }
+    |   constant L_NE constant
+	    {
+		$$ = $1 != $3;
+	    }
+    |   constant '>'  constant
+	    {
+		$$ = $1 >  $3;
+	    }
+    |   constant L_GE constant
+	    {
+		$$ = $1 >= $3;
+	    }
+    |   constant '<'  constant
+	    {
+		$$ = $1 <  $3;
+	    }
+    |   constant L_LE constant
+	    {
+		$$ = $1 <= $3;
+	    }
+    |   constant L_LSH constant
+	    {
+		$$ = $1 << $3;
+	    }
+    |   constant L_RSH constant
+	    {
+		$$ = $1 >> $3;
+	    }
+    |   constant '+' constant
+	    {
+		$$ = $1 + $3;
+	    }
+    |   constant '-' constant
+	    {
+		$$ = $1 - $3;
+	    }
+    |   constant '*' constant
+	    {
+		$$ = $1 * $3;
+	    }
+    |   constant '%' constant
+	    {
+		if ($3) $$ = $1 % $3; else yyerror("Modulo by zero");
+	    }
+    |   constant '/' constant
+	    {
+		if ($3) $$ = $1 / $3; else yyerror("Division by zero");
+	    }
+    |   '(' constant ')'
+	    {
+		$$ = $2;
+	    }
+    |   L_NUMBER
+    |   '-' L_NUMBER
+	    {
+		$$ = -$2;
+	    }
+    |   L_NOT L_NUMBER
+	    {
+		$$ = !$2;
+	    }
+    |   '~' L_NUMBER
+	    {
+		$$ = ~$2;
+	    }
+    ;
+
+default:
+	L_DEFAULT ':'
+	    {
+		if ( !( current_break_address & BREAK_FROM_CASE ) ) {
+		    yyerror("Default outside switch");
+		    break;
+		}
+		current_break_address &= ~(BREAK_ON_STACK|BREAK_FROM_CASE);
+		if ( read_short(current_break_address+2 ) )
+		    yyerror("Duplicate default");
+		upd_short(current_break_address+2, mem_block[current_block].current_size);
+		current_break_address |= (BREAK_ON_STACK|BREAK_FROM_CASE);
+	    }
+    ;
+
+comma_expr:
+	expr0
+	    {
+		$$ = $1;
+	    }
+    |   comma_expr ',' expr0
+	    {
+	      $$ = make_branched_node(NODE_COMMA, $3->type,
+				      insert_pop_value($1), $3);
+	    }
+    ;
+
+expr0:
+	lvalue L_ASSIGN expr0
+	    {
+		/* set this up here so we can change it below */
+		$$ = make_branched_node($2, $3->type, $1, $3);
+
+		if (exact_types && !compatible_types($1->type, $3->type) &&
+		      !($1->type == TYPE_STRING && $3->type == TYPE_NUMBER &&
+		      $2 == F_ADD_EQ)) {
+		    char buf[1000];
+		    sprintf(buf, "Bad assignment %s.", get_two_types($1->type, $3->type));
+		    yyerror(buf);
+		}
+
+                if (($1->type == TYPE_REAL) && ($3->type == TYPE_NUMBER)) {
+		  struct parse_node *expr;
+		  expr = make_branched_node(0, 0, 0, 0);
+		  expr->v.expr = $3;
+		  $$->right = make_branched_node(F_TO_FLOAT, TYPE_REAL, 0, expr);
+		  $$->v.number = 1;
+		} else if (($1->type == TYPE_NUMBER) && ($3->type == TYPE_REAL)) {
+		  struct parse_node *expr;
+		  expr = make_branched_node(0, 0, 0, 0);
+		  expr->v.expr = $3;
+		  $$->right = make_branched_node(F_TO_INT, TYPE_NUMBER, 0, expr);
+		  $$->v.number = 1;
+		}
+	    }
+    |   error L_ASSIGN expr0
+	    {
+		yyerror("Illegal LHS");
+		$$ = make_node(F_CONST0, 0, TYPE_ANY);
+	    }
+    |   expr0 '?' expr0 ':' expr0 %prec '?'
+	    {
+		$$ = make_node(NODE_CONDITIONAL, 0, TYPE_ANY);
+		if (exact_types && !compatible_types($3->type, $5->type)) {
+		    char buf[1000];
+		    sprintf(buf, "Types in ?: do not match %s.", 
+			    get_two_types($3->type, $5->type));
+		    yyerror(buf);
+		}
+		if ($3->type == TYPE_ANY)
+		    $$->type = $5->type;
+		else if (TYPE($3->type, TYPE_MOD_POINTER|TYPE_ANY))
+		    $$->type = $5->type;
+		else
+		    $$->type = $3->type;
+		/* optimize if last expression did F_NOT */
+		if ($1->kind == F_NOT) {
+		    /* !a ? b : c  --> a ? c : b */
+		    $$->left = $1->right;
+		    $$->right = make_branched_node(0, 0, $5, $3);
+		} else {
+		    $$->left = $1;
+		    $$->right = make_branched_node(0, 0, $3, $5);
+		}
+	    }
+    |   expr0 L_LOR expr0
+	    {
+		$$ = make_branched_node(F_LOR,
+			       ( $1->type == $3->type ) ? $1->type : TYPE_ANY,
+					$1, $3);
+	    }
+    |   expr0 L_LAND expr0
+	    {
+		$$ = make_branched_node(F_LAND,
+			       ( $1->type == $3->type ) ? $1->type : TYPE_ANY,
+					$1, $3);
+	    }
+    |   expr0 '|' expr0
+	    {
+		$$ = binary_int_op($1, $3, F_OR, "|");
+	    }
+    |   expr0 '^' expr0
+	    {
+		$$ = binary_int_op($1, $3, F_XOR, "^");
+	    }
+    |   expr0 '&' expr0
+	    {
+		if ($1->type & $3->type & TYPE_MOD_POINTER) {
+		    $$ = make_branched_node(F_AND, ($1->type == $3->type) ?
+				   $1->type : TYPE_ANY | TYPE_MOD_POINTER,
+					    $1, $3);
+		} else 
+		    $$ = binary_int_op($1, $3, F_AND, "&");
+	    }
+    |   expr0 L_EQ expr0
+	    {
+		int t1 = $1->type, t2 = $3->type;
+		if (exact_types && (t1 != t2) &&
+		      !((t1 & (TYPE_NUMBER | TYPE_REAL)) &&
+		      (t2 & (TYPE_NUMBER | TYPE_REAL))) &&
+		      (t1 != TYPE_ANY && t2 != TYPE_ANY)) {
+		    char buf[1000];
+		    sprintf(buf, "== always false because of incompatible types %s.",get_two_types($1->type, $3->type));
+		    yyerror(buf);
+		}
+		/* x == 0  -> !x */
+		if (($1->flags & E_CONST) && $1->kind == F_NUMBER && $1->v.number == 0) {
+		    $$ = make_branched_node(F_NOT, TYPE_NUMBER, 0, $3);
+		} else
+		if (($3->flags & E_CONST) && $3->kind == F_NUMBER && $3->v.number == 0) {
+		    $$ = make_branched_node(F_NOT, TYPE_NUMBER, 0, $1);
+		} else
+		    $$ = make_branched_node(F_EQ, TYPE_NUMBER, $1, $3);
+	    }
+    |   expr0 L_NE expr0
+	    {
+		int t1 = $1->type, t2 = $3->type;
+		if (exact_types && (t1 != t2) &&
+		      !((t1 & (TYPE_NUMBER | TYPE_REAL)) &&
+		      (t2 & (TYPE_NUMBER | TYPE_REAL))) &&
+		      (t1 != TYPE_ANY && t2 != TYPE_ANY)) {
+		    char buf[1000];
+		    sprintf(buf, "!= always true because of incompatible types %s.",get_two_types($1->type, $3->type));
+		    yyerror(buf);
+		}
+		$$ = make_branched_node(F_NE, TYPE_NUMBER, $1, $3);
+	    }
+    |   expr0 '>' expr0
+	    {
+		$$ = make_branched_node(F_GT, TYPE_NUMBER, $1, $3);
+	    }
+    |   expr0 L_GE expr0
+	    {
+		$$ = make_branched_node(F_GE, TYPE_NUMBER, $1, $3);
+	    }
+    |   expr0 '<' expr0
+	    {
+		$$ = make_branched_node(F_LT, TYPE_NUMBER, $1, $3);
+	    }
+    |   expr0 L_LE expr0
+	    {
+		$$ = make_branched_node(F_LE, TYPE_NUMBER, $1, $3);
+	    }
+    |   expr0 L_LSH expr0
+	    {
+		$$ = binary_int_op($1, $3, F_LSH, "<<");
+	    }
+    |   expr0 L_RSH expr0
+	    {
+		$$ = binary_int_op($1, $3, F_RSH, ">>");
+	    }
+    |   expr0 '+' expr0 /* Type checks of this case are incomplete */
+	    {
+		int result_type;
+		
+		if ($1->type == $3->type)
+		    result_type = $1->type;
+		else if (($1->type & TYPE_ANY) || ($3->type & TYPE_ANY))
+		    result_type = TYPE_ANY;
+		else if ((TYPE($1->type, TYPE_NUMBER) && TYPE($3->type, TYPE_REAL)) ||
+		      (TYPE($1->type, TYPE_REAL) && TYPE($3->type, TYPE_NUMBER)))
+		    result_type = TYPE_REAL;
+		else
+		    result_type = TYPE_ANY;
+
+		/* These should depend on OPTIMIZE_HIGH */
+		/* 0 + X */
+		if (($1->flags & E_CONST) && ($1->kind == F_NUMBER) &&
+		    $1->v.number == 0 &&
+		    ($3->type == TYPE_NUMBER || $3->type == TYPE_REAL)) {
+		    $$ = $3;
+		    break;
+		}
+		/* X + 0 */
+		else if (($3->flags & E_CONST) && ($3->kind == F_NUMBER)
+		    && $3->v.number == 0 &&
+		    ($1->type == TYPE_NUMBER || $1->type == TYPE_REAL)) {
+		    $$ = $1;
+		    break;
+		}
+		/* const + const */
+		else if ($1->flags & $3->flags & E_CONST) {
+		    if (result_type == TYPE_NUMBER) {
+			$$ = $1;
+			$1->v.number += $3->v.number;
+			break;
+		    } else if (result_type == TYPE_REAL) {
+			$$ = $1;
+
+			if ($1->type == TYPE_NUMBER)
+			    $$->v.real = $1->v.number + $3->v.real;
+			else if ($3->type == TYPE_NUMBER)
+			    $$->v.real = $1->v.real + $3->v.number;
+			else
+			    $$->v.real = $1->v.real + $3->v.real;
+			
+			$$->kind = F_REAL;
+			$$->type = TYPE_REAL;
+			break;
+		    } else if (result_type == TYPE_STRING) {
+			/* Combine strings */
+			int n1, n2;
+			char *new, *s1, *s2;
+			int l;
+
+			n1 = $1->v.number;
+			n2 = $3->v.number;
+			s1 = ((char**)mem_block[A_STRINGS].block)[n1];
+			s2 = ((char**)mem_block[A_STRINGS].block)[n2];
+			new = DXALLOC( (l = strlen(s1))+strlen(s2)+1, 53, "string add" );
+			strcpy(new, s1);
+			strcat(new + l, s2);
+			/* free old strings (ordering may help shrink table) */
+			if (n1 > n2) {
+			    free_prog_string(n1); free_prog_string(n2);
+			} else {
+			    free_prog_string(n2); free_prog_string(n1);
+			}
+			$$ = $1;
+			$$->v.number = store_prog_string(new);
+			FREE(new);
+			break;
+		    }
+		}
+		/* wasn't optimized away; if left expression is constant,
+		 * swap them so further constant folding can occur, but
+		 * be careful since this can't be done for strings
+		 */
+		if ((pragmas & PRAGMA_OPTIMIZE) 
+		    && (optimization & OPTIMIZE_HIGH)
+		    && ($1->flags & E_CONST)
+		    && ($1->type != TYPE_STRING)
+		    && ($1->type != TYPE_ANY)) {
+		  $$ = make_branched_node(F_ADD, result_type, $3, $1);
+		  break;
+		}
+		$$ = make_branched_node(F_ADD, result_type, $1, $3);
+	    }
+    |   expr0 '-' expr0
+	    {
+		int bad_arg = 0;
+		int result_type;
+
+		if (exact_types) {
+		    if (!TYPE($1->type, TYPE_NUMBER) &&
+			  !TYPE($1->type, TYPE_REAL) &&
+			  !($1->type & TYPE_MOD_POINTER)) {
+			type_error("Bad argument number 1 to '-'", $1->type);
+			bad_arg++;
+		    }
+		    if (!TYPE($3->type, TYPE_NUMBER) &&
+			  !TYPE($3->type, TYPE_REAL) &&
+			  !($3->type & TYPE_MOD_POINTER)) {
+			type_error("Bad argument number 2 to '-'", $3->type);
+			bad_arg++;
+		    }
+		}
+		
+		result_type = TYPE_ANY;
+		if (($1->type & TYPE_MOD_POINTER) || ($3->type & TYPE_MOD_POINTER))
+		    result_type = TYPE_MOD_POINTER | TYPE_ANY;
+		if (!($1->type & TYPE_MOD_POINTER) || !($3->type & TYPE_MOD_POINTER)) {
+		    if (exact_types && result_type != TYPE_ANY && !bad_arg)
+			yyerror("Arguments to '-' don't match");
+		    if (($1->type & TYPE_ANY) || ($3->type & TYPE_ANY))
+			result_type = TYPE_ANY;
+		    else if ((TYPE($1->type, TYPE_NUMBER) && TYPE($3->type, TYPE_NUMBER)))
+			result_type = TYPE_NUMBER;
+		    else
+			result_type = TYPE_REAL;
+		}
+
+		/* should depend on OPTIMIZE_HIGH */
+		/* optimize X-0 */
+		if (($3->flags & E_CONST) && $3->kind == F_NUMBER && $3->v.number == 0) {
+		    $$ = $1;
+		    break;
+		}
+
+		/* constant expressions */
+		if ($1->flags & $3->flags & E_CONST) {
+		    if (BASIC_TYPE($1->type, TYPE_NUMBER) &&
+			  BASIC_TYPE($3->type, TYPE_NUMBER)) {
+			$$ = $1;
+			$$->v.number -= $3->v.number;
+			break;
+		    } else if (result_type == TYPE_REAL) {
+			$$ = $1;
+			if ($1->type == TYPE_NUMBER)
+			    $$->v.real = $1->v.number - $3->v.real;
+			else if ($3->type == TYPE_NUMBER)
+			    $$->v.real = $1->v.real - $3->v.number;
+			else
+			    $$->v.real = $1->v.real - $3->v.real;
+			$$->kind = F_REAL;
+			$$->type = TYPE_REAL;
+			break;
+		    }
+		}
+		$$ = make_branched_node(F_SUBTRACT, result_type, $1, $3);
+	    }
+    |   expr0 '*' expr0
+	    {
+		int result_type;
+
+		if (($1->type != TYPE_MAPPING) || ($3->type != TYPE_MAPPING)) {
+		    if (exact_types && !TYPE($1->type, TYPE_NUMBER) && !TYPE($1->type, TYPE_REAL))
+			type_error("Bad argument number 1 to '*'", $1->type);
+		    if (exact_types && !TYPE($3->type, TYPE_NUMBER) && !TYPE($3->type, TYPE_REAL))
+			type_error("Bad argument number 2 to '*'", $3->type);
+		    if (TYPE($1->type, TYPE_NUMBER) && TYPE($3->type, TYPE_NUMBER))
+			result_type = TYPE_NUMBER;
+		    else
+			result_type = TYPE_REAL;
+		} else
+		    result_type = TYPE_MAPPING;
+
+		if ($1->flags & $3->flags & E_CONST) {
+		    if (BASIC_TYPE($1->type, TYPE_NUMBER) &&
+			  BASIC_TYPE($3->type, TYPE_NUMBER)) {
+			$$ = $1;
+			$$->v.number *= $3->v.number;
+			break;
+		    } else if (result_type == TYPE_REAL) {
+			$$ = $1;
+			if ($1->type == TYPE_NUMBER)
+			    $$->v.real = ($1->v.number) * ($3->v.real);
+			else if ($3->type == TYPE_NUMBER)
+			    $$->v.real = ($1->v.real) * ($3->v.number);
+			else
+			    $$->v.real = ($1->v.real) * ($3->v.real);
+			$$->kind = F_REAL;
+			$$->type = TYPE_REAL;
+			break;
+		    }
+		}
+		if ($1->flags & E_CONST)
+		    $$ = make_branched_node(F_MULTIPLY, result_type, $3, $1);
+		else
+		    $$ = make_branched_node(F_MULTIPLY, result_type, $1, $3);
+	    }
+    |   expr0 '%' expr0
+	    {
+		$$ = binary_int_op($1, $3, F_MOD, "%");
+	    }
+    |   expr0 '/' expr0
+	    {
+		int result_type;
+
+		if (exact_types && !TYPE($1->type, TYPE_NUMBER) && !TYPE($1->type, TYPE_REAL))
+		    type_error("Bad left argument to '/'", $1->type);
+		if (exact_types && !TYPE($3->type, TYPE_NUMBER) && !TYPE($3->type, TYPE_REAL))
+		    type_error("Bad right argument to '/'", $3->type);
+		if (TYPE($1->type, TYPE_NUMBER) && TYPE($3->type, TYPE_NUMBER))
+		    result_type = TYPE_NUMBER;
+		else
+		    result_type = TYPE_REAL;
+		/* constant expressions */
+		if ($1->flags & $3->flags & E_CONST) {
+		    if (BASIC_TYPE($1->type, TYPE_NUMBER) &&
+			  BASIC_TYPE($3->type, TYPE_NUMBER)) {
+			if ($3->v.number == 0) {
+			    yyerror("Divide by zero in constant");
+			    break;
+			}
+			$$ = $1;
+			$$->v.number /= $3->v.number;
+			break;
+		    } else if (result_type == TYPE_REAL) {
+			double val;
+			/* a bit complicated with divide-by-zero checking */
+			if ($3->type == TYPE_REAL) {
+			    if ((val = $3->v.real) == 0.0) {
+				yyerror("Divide by zero in constant");
+				break;
+			    }
+			    if ($1->type == TYPE_NUMBER)
+				val = $1->v.number / val;
+			    else
+				val = $1->v.real / val;
+			} else {
+			    int iv;
+			    if ((iv = $3->v.number) == 0) {
+				yyerror("Divide by zero in constant");
+				break;
+			    }
+			    val = $1->v.real / iv;
+			}
+			$$ = $1;
+			$$->kind = F_REAL;
+			$$->type = TYPE_REAL;
+			$$->v.real = val;
+			break;
+		    }
+		}
+		$$ = make_branched_node(F_DIVIDE, result_type, $1, $3);
+	    }
+    |   cast expr0  %prec L_NOT
+	    {
+		$$ = $2;
+		$$->type = $1;
+		$$->flags &= ~E_CONST;
+		if (exact_types && $2->type != TYPE_ANY && $2->type != TYPE_UNKNOWN &&
+		      $1 != TYPE_VOID) {
+		    char tname[100];
+		    char buf[1000];
+		    strcpy(tname, get_type_name($2->type));
+		    sprintf(buf, "Cannot cast %s to %s.", tname, get_type_name($1));
+		}
+	    }
+    |   L_INC lvalue  %prec L_NOT  /* note lower precedence here */
+	    {
+		$$ = make_branched_node(F_PRE_INC, 0, 0, $2);
+		if (exact_types && !TYPE($2->type, TYPE_NUMBER) && !TYPE($2->type, TYPE_REAL))
+		    type_error("Bad argument to ++", $2->type);
+		if (TYPE($2->type, TYPE_NUMBER))
+		    $$->type = TYPE_NUMBER;
+		else
+		    $$->type = TYPE_REAL;
+	    }
+    |   L_DEC lvalue  %prec L_NOT  /* note lower precedence here */
+	    {
+		$$ = make_branched_node(F_PRE_DEC, 0, 0, $2);
+		if (exact_types && !TYPE($2->type, TYPE_NUMBER) && !TYPE($2->type, TYPE_REAL))
+		    type_error("Bad argument to --", $2->type);
+		if (TYPE($2->type, TYPE_NUMBER))
+		    $$->type = TYPE_NUMBER;
+		else
+		    $$->type = TYPE_REAL;
+	    }
+    |   L_NOT expr0
+	    {
+		if (($2->flags & E_CONST) && BASIC_TYPE($2->type, TYPE_NUMBER)) {
+		    $$ = $2;
+		    $$->v.number = !($$->v.number);
+		} else
+		    $$ = make_branched_node(F_NOT, TYPE_NUMBER, 0, $2);
+	    }
+    |   '~' expr0
+	    {
+		if (exact_types && !TYPE($2->type, TYPE_NUMBER))
+		    type_error("Bad argument to ~", $2->type);
+		if (($2->flags & E_CONST) && BASIC_TYPE($2->type, TYPE_NUMBER)) {
+		    $$ = $2;
+		    $$->v.number = ~$$->v.number;
+		} else
+		    $$ = make_branched_node(F_COMPL, TYPE_NUMBER, 0, $2);
+	    }
+    |   '-' expr0  %prec L_NOT
+            {
+                if (exact_types && !TYPE($2->type, TYPE_NUMBER) && !TYPE($2->type, TYPE_REAL))
+		    type_error("Bad argument to unary '-'", $2->type);
+                if ($2->flags & E_CONST) {
+		    if ($2->type == TYPE_NUMBER) {
+			$$ = $2;
+			$$->v.number = -$$->v.number;
+			break;
+		    }
+		    if ($2->type == TYPE_REAL) {
+			$$ = $2;
+			$$->v.real = -$$->v.real;
+			break;
+		    }
+		}
+                $$ = make_branched_node(F_NEGATE, TYPE($2->type, TYPE_NUMBER)
+					? TYPE_NUMBER : TYPE_REAL,
+					0, $2);
+	    }
+    |   lvalue L_INC   /* normal precedence here */
+            {
+		if (exact_types && !TYPE($1->type, TYPE_NUMBER) && !TYPE($1->type, TYPE_REAL))
+		    type_error("Bad argument to ++", $1->type);
+		$$ = make_branched_node(F_POST_INC, TYPE($1->type, TYPE_NUMBER)
+					? TYPE_NUMBER : TYPE_REAL,
+					0, $1);
+	    }
+    |   lvalue L_DEC
+	    {
+		if (exact_types && !TYPE($1->type, TYPE_NUMBER) && !TYPE($1->type, TYPE_REAL))
+		    type_error("Bad argument to --", $1->type);
+		$$ = make_branched_node(F_POST_DEC, TYPE($1->type, TYPE_NUMBER)
+					? TYPE_NUMBER : TYPE_REAL,
+					0, $1);
+	    }
+    |   expr4
+            {
+	      $$ = $1;
+            }
+    ;
+
+return:
+	L_RETURN
+	    {
+		if (exact_types && !TYPE(exact_types, TYPE_VOID))
+		    yyerror("Non-void functions must return a value.");
+		generate_return(0);
+	    }
+    |   L_RETURN comma_expr
+	    {
+		if (exact_types && !compatible_types($2->type, exact_types & TYPE_MOD_MASK)) {
+		    char buf[1000];
+		    sprintf(buf, "Type of returned value doesn't match function return type %s.", get_two_types($2->type, exact_types & TYPE_MOD_MASK));
+		    yyerror(buf);
+		}
+		generate_return($2);
+	    }
+    ;
+
+expr_list:
+	/* empty */
+	    {
+		/* this is a dummy node */
+		$$ = new_node();
+		$$->v.number = 0;
+		$$->left = $$;
+		$$->right = 0;
+		$$->flags = 0;
+	    }
+    |   expr_list2
+	    {
+		$$ = new_node();
+		$$->v.number = $1->kind;
+		$$->left = $1->left;
+		$$->right = $1;
+		$$->flags = $1->flags;
+	    }
+    |   expr_list2 ','
+	    {
+		$$ = new_node();
+		$$->v.number = $1->kind;
+		$$->left = $1->left;
+		$$->right = $1;
+		$$->flags = $1->flags;
+	    }
+    ;
+
+expr_list2:
+	expr0
+	    {
+		$$ = new_node();
+		$$->kind = 1;
+		$$->v.expr = $1;
+		$$->right = 0;
+		/* we keep track of the end of the chain in the left nodes */
+		$$->left = $$;
+		$$->flags = $1->flags & E_CONST;
+	    }
+    |   expr_list2 ',' expr0
+	    {
+		struct parse_node *expr;
+
+		expr = new_node();
+		expr->kind = 0;
+		expr->v.expr = $3;
+		expr->right = 0;
+		
+		$1->left->right = expr;
+		$1->left = expr;
+		$1->kind++;
+		$1->flags &= $3->flags & E_CONST;
+		$$ = $1;
+	    }
+    ;
+
+expr_list3:
+	/* empty */
+	    {
+		/* this is a dummy node */
+		$$ = new_node();
+		$$->v.number = 0;
+		$$->right = 0;
+	    }
+    |   expr_list4
+	    {
+		$$ = new_node();
+		$$->v.number = $1->kind;
+		$$->right = $1;
+	    }
+    |   expr_list4 ','
+	    {
+		$$ = new_node();
+		$$->v.number = $1->kind;
+		$$->right = $1;
+	    }
+    ;
+
+expr_list4:
+	assoc_pair
+            {
+		$$ = new_node();
+		$$->kind = 2;
+		$$->v.expr = $1;
+		$$->right = 0;
+		/* we keep track of the end of the chain in the left nodes */
+		$$->left = $$;
+            }
+    |   expr_list4 ',' assoc_pair
+	    {
+		struct parse_node *expr;
+
+		expr = new_node();
+		expr->kind = 0;
+		expr->v.expr = $3;
+		expr->right = 0;
+
+		$1->left->right = expr;
+		$1->left = expr;
+		$1->kind += 2;
+		$$ = $1;
+	    }
+    ;
+
+assoc_pair:
+	expr0 ':' expr0 
+            {
+                $$ = make_branched_node(NODE_ASSOC, 0, $1, $3);
+            }
+    ;
+
+expr4:
+	function_call
+    |   lvalue
+	    {
+		if ($1->kind == F_GLOBAL_LVALUE)
+		    $1->kind = F_GLOBAL;
+		if ($1->kind == F_LOCAL_LVALUE)
+		    $1->kind = F_LOCAL;
+		if ($1->kind == F_INDEXED_LVALUE)
+		    $1->kind = F_INDEX;
+		$$ = $1;
+		$$->flags &= ~E_CONST;
+	    }
+    |   string
+    |   number
+    |   real
+    |   '(' comma_expr ')'
+	    {
+		$$ = $2;
+	    }
+    |   catch
+    |   sscanf
+    |   parse_command
+    |   time_expression
+%ifdef NEW_FUNCTIONS
+    |   L_FUNCTION '(' argument ')' block
+            {
+		yyerror("Anonymous functions not implemented.");
+            }
+    |   L_NEW_FUNCTION_OPEN ':' ')'
+            {
+		$$ = make_node(F_FUNCTION_CONSTRUCTOR, 0, TYPE_FUNCTION);
+		$$->right = 0;
+		switch ($1 & 0xff) {
+		case FP_L_VAR:
+		    yyerror("Illegal to use local variable in a functional.");
+		    $$->left = make_branched_node(F_CONST0, 0, 0, 0);
+		    $$->v.number = FP_FUNCTIONAL;
+		    break;
+		case FP_G_VAR:
+		    $$->left = make_branched_node(F_GLOBAL, 0, 0, 0);
+		    $$->left->v.number = ($1 & ~ 0xff) >> 8;
+		    $$->v.number = FP_FUNCTIONAL;
+		    if (VARIABLE($$->left->v.number)->type & TYPE_MOD_HIDDEN) {
+		      char buf[256];
+		
+		      strcpy(buf, "Illegal to use private variable '");
+		      strcat(buf, VARIABLE($$->left->v.number)->name);
+		      strcat(buf, "'\n");
+		      yyerror(buf);
+		    }
+		    break;
+		default:
+		    $$->v.number = $1;
+		    break;
+		}
+	    }
+    |   L_NEW_FUNCTION_OPEN ',' expr_list2 ':' ')'
+            {
+		$$ = make_node(F_FUNCTION_CONSTRUCTOR, 0, TYPE_FUNCTION);
+		$$->v.number = $1;
+		$$->right = $3;
+
+		switch ($1 & 0xff) {
+		case FP_EFUN: {
+		  int *argp;
+		  int f = ($1 & ~0xff) >>8;
+		  int num = $3->kind;
+		  int max_arg = predefs[f].max_args;
+		  
+		  if (num > max_arg && max_arg != -1) {
+		    char bff[100];
+		    sprintf(bff, "Too many arguments to %s", predefs[f].word);
+		    yyerror(bff);
+		  } else if (max_arg != -1 && exact_types) {
+		    /*
+		     * Now check all types of arguments to efuns.
+		     */
+		    int i, argn, tmp;
+		    char buff[100];
+		    struct parse_node *enode = $3;
+		    argp = &efun_arg_types[predefs[f].arg_index];
+		    
+		    for (argn = 0; argn < num; argn++) {
+		      tmp = enode->v.expr->type;
+		      for (i=0; !compatible_types(argp[i], tmp) && argp[i] != 0; i++)
+			;
+		      if (argp[i] == 0) {
+			sprintf(buff, "Bad argument %d to efun %s()",
+				argn+1, predefs[f].word);
+			yyerror(buff);
+		      }
+		      while (argp[i] != 0)
+			i++;
+		      argp += i + 1;
+		      enode = enode->right;
+		    }
+		  }
+		  break;
+		}
+		case FP_L_VAR:
+		case FP_G_VAR:
+		  yyerror("Can't give parameters to functional.");
+		  break;
+		}
+	      }
+      |   L_FUNCTION_OPEN expr0 ':' ')'
+             {
+		 if (function_context.num_locals)
+		   yyerror("Illegal to use local variable in functional.");
+
+		 $$ = make_branched_node(F_FUNCTION_CONSTRUCTOR, TYPE_FUNCTION,
+					 $2, 0);
+		 $$->v.number = FP_FUNCTIONAL 
+		     + (function_context.num_parameters << 8);
+		 function_context = $1;
+             }
+%else
+      |   L_FUNCTION_OPEN expr0 ':' ')'
+             {
+		 $$ = make_node(F_FUNCTION_CONSTRUCTOR, 0, TYPE_FUNCTION);
+		 $$->v.number = ORIGIN_CALL_OTHER | 1;
+		 $$->left = 0;
+		 $$->right = $2;
+ 	    }
+%endif
+     |   L_FUNCTION_OPEN expr0 ',' expr0 ':' ')'
+ 	    {
+	      $$ = make_branched_node(F_FUNCTION_CONSTRUCTOR, TYPE_FUNCTION,
+				      $2, $4);
+#ifdef NEW_FUNCTIONS
+              if (function_context.num_parameters > 0) 
+		  yyerror("Illegal use of $var in call_other function pointer.");
+              function_context = $1;
+	      $$->v.number = FP_CALL_OTHER;
+#else
+	      $$->v.number = ORIGIN_CALL_OTHER;
+#endif
+ 	    }
+    |   L_MAPPING_OPEN expr_list3 ']' ')'
+	    {
+	        $$ = $2;
+		$$->kind = F_AGGREGATE_ASSOC;
+		$$->type = TYPE_MAPPING;
+	    }
+    |   L_ARRAY_OPEN expr_list '}' ')'
+	    {
+		$$ = $2;
+		$$->kind = F_AGGREGATE;
+		$$->type = TYPE_MOD_POINTER | TYPE_ANY;
+	    }
+    ;
+
+catch:
+	L_CATCH '(' comma_expr ')'
+	    {
+		$$ = make_node(F_CATCH, 0, TYPE_ANY);
+		$$->right = $3;
+	    }
+    ;
+
+sscanf:
+	L_SSCANF '(' expr0 ',' expr0 lvalue_list ')'
+	    {
+	        struct parse_node *expr;
+		expr = make_branched_node(0, 0, $3, $5);
+		$$ = make_branched_node(F_SSCANF, TYPE_NUMBER,
+					expr, $6);
+	    }
+    ;
+
+parse_command:
+	L_PARSE_COMMAND '(' expr0 ',' expr0 ',' expr0 lvalue_list ')'
+	    {
+	      struct parse_node *expr;
+
+	      expr = make_branched_node(0, 0, $3,
+		     make_branched_node(0, 0, $5, $7)
+			               );
+	      $$ = make_branched_node(F_PARSE_COMMAND, TYPE_NUMBER,
+					expr, $8);
+	    }
+    ;
+
+time_expression:
+	L_TIME_EXPRESSION '(' comma_expr ')'
+	    {
+		$$ = make_branched_node(F_TIME_EXPRESSION, TYPE_NUMBER,
+					0, $3);
+	    }
+    ;
+
+lvalue_list:
+	/* empty */
+	    {
+	        $$ = new_node();
+		$$->right = 0;
+	        $$->v.number = 0;
+	    }
+    |   ',' lvalue lvalue_list
+	    {
+	        $$ = $3;
+	        $$->right = make_branched_node(0, 0, $2, $3->right);
+		$$->v.number++;
+	    }
+    ;
+
+lvalue:
+        L_DEFINED_NAME
+	    {
+	      int i;
+	      if ((i = $1->dn.local_num) != -1) {
+		  $$ = make_node(F_LOCAL_LVALUE, 0, 
+				 type_of_locals[i]);
+		  $$->v.number = i;
+#ifdef NEW_FUNCTIONS
+		/* safe even if not in a function context */
+		function_context.num_locals++;
+#endif
+	      } else
+	      if ((i = $1->dn.global_num) != -1) {
+		  $$ = make_node(F_GLOBAL_LVALUE, 0,
+				 VARIABLE(i)->type & TYPE_MOD_MASK);
+		  $$->v.number = i;
+		  if (VARIABLE(i)->type & TYPE_MOD_HIDDEN) {
+		      char buf[256];
+		
+		      strcpy(buf, "Illegal to use private variable '");
+		      strcat(buf, $1->name);
+		      strcat(buf, "'\n");
+		      yyerror(buf);
+		  }
+	      } else {
+		char buf[256];
+		
+		strcpy(buf, "Undefined variable '");
+		strcat(buf, $1->name);
+		strcat(buf, "'\n");
+		if (current_number_of_locals < MAX_LOCAL) {
+		    add_local_name($1->name, TYPE_ANY);
+		}
+		$$ = make_node(F_LOCAL_LVALUE, 0, TYPE_ANY);
+		$$->v.number = 0;
+		yyerror(buf);
+	      }
+	    }
+    |   L_IDENTIFIER
+            {
+		char buf[256];
+
+		strcpy(buf, "Undefined variable '");
+		strcat(buf, $1);
+		strcat(buf, "'\n");
+		if (current_number_of_locals < MAX_LOCAL) {
+		    add_local_name($1, TYPE_ANY);
+		}
+		$$ = make_node(F_LOCAL_LVALUE, 0, TYPE_ANY);
+		$$->v.number = 0;
+		yyerror(buf);
+		scratch_free($1);
+            }
+%ifdef NEW_FUNCTIONS
+    |   L_PARAMETER
+            {
+		$$ = make_node(F_LOCAL_LVALUE, 0, TYPE_ANY);
+		$$->v.number = $1;
+            }
+    |   '$' '(' comma_expr ')'
+            {
+		yyerror("$(expression) not implemented yet.");
+	    }
+%endif
+    |   expr4 '[' comma_expr L_RANGE comma_expr ']'
+	    {
+		if (exact_types) {
+		    if (($1->type & TYPE_MOD_POINTER) == 0
+			  && !TYPE($1->type, TYPE_STRING)
+			  && !TYPE($1->type, TYPE_BUFFER))
+			type_error("Bad type to indexed value", $1->type);
+		    if (!TYPE($3->type, TYPE_NUMBER))
+			type_error("Bad type of index", $3->type);
+		    if (!TYPE($5->type, TYPE_NUMBER))
+			type_error("Bad type of index", $5->type);
+		}
+
+		$$ = make_branched_node(F_RANGE, 0, $3, $5);
+		$$->v.expr = $1;
+		if ($1->type == TYPE_ANY)
+		    $$->type = TYPE_ANY;
+		else if (TYPE($1->type, TYPE_STRING))
+		    $$->type = TYPE_STRING;
+		else if (TYPE($1->type, TYPE_BUFFER))
+		    $$->type = TYPE_BUFFER;
+		else if ($1->type & TYPE_MOD_POINTER)
+		    $$->type = $1->type;
+		else if (exact_types)
+		    type_error("Bad type of argument used for range", $1->type);
+	    }
+    |   expr4 '[' comma_expr ']'
+	    {
+		if ($1->kind == F_AGGREGATE && ($3->flags & E_CONST) && $3->kind == F_NUMBER) {
+		    int i = $3->v.number;
+		    if (i < 0 || i >= $1->v.number)
+			yyerror("Illegal index to array constant.\n");
+		    else {
+			struct parse_node *node = $1->right;
+			while (i--)
+			    node = node->right;
+			$$ = node->v.expr;
+			break;
+		    }
+		}
+		$$ = make_branched_node(F_INDEXED_LVALUE, 0, $1, $3);
+		if (TYPE($1->type, TYPE_MAPPING) || TYPE($1->type, TYPE_FUNCTION)) {
+		    $$->type = TYPE_ANY;
+		} else {
+		    if (exact_types) {
+			if (!($1->type & TYPE_MOD_POINTER) &&
+			      !TYPE($1->type, TYPE_STRING) &&
+			      !TYPE($1->type, TYPE_BUFFER))
+			    type_error("Bad type to indexed value", $1->type);
+			if (!TYPE($3->type, TYPE_NUMBER))
+			    type_error("Bad type of index", $3->type);
+		    }
+		    if ($1->type == TYPE_ANY)
+			$$->type = TYPE_ANY;
+		    else if (TYPE($1->type, TYPE_STRING))
+			$$->type = TYPE_NUMBER;
+		    else if (TYPE($1->type, TYPE_BUFFER))
+			$$->type = TYPE_NUMBER;
+		    else
+			$$->type = $1->type & TYPE_MOD_MASK & ~TYPE_MOD_POINTER;
+		}
+	    }
+    ;
+
+string:
+	string_con2
+	    {
+		$$ = make_node(F_STRING, E_CONST, TYPE_STRING);
+                $$->v.number = store_prog_string($1);
+		scratch_free($1);
+	    }
+    ;
+
+string_con1:
+	L_STRING
+    |   '(' string_con1 ')'
+	    {
+		$$ = $2;
+	    }
+    |   string_con1 '+' L_STRING
+	    {
+		$$ = scratch_join($1, $3);
+	    }
+    ;
+
+string_con2:
+	L_STRING
+    |   string_con2 L_STRING
+	    {
+		$$ = scratch_join($1, $2);
+	    }
+    ;
+
+function_call:
+	efun_override '(' expr_list ')'
+	    {
+	      $$ = validate_efun_call($1,$3);
+	    }
+	| L_DEFINED_NAME '(' expr_list ')'
+	    {
+	      int f;
+	      struct function *funp;
+
+	      $$ = $3;
+	      if ((f = $1->dn.function_num) != -1) {
+		  $$->flags = 0;
+		  $$->kind = F_CALL_FUNCTION_BY_ADDRESS;
+		  $$->v.number = f;
+		  funp = FUNCTION(f);
+	      
+		  $$->type = validate_function_call(funp, f, $3->right);
+	      } else
+	      if ((f=$1->dn.simul_num) != -1) {
+		  $$->flags = 0;
+		  $$->kind = F_SIMUL_EFUN;
+		  $$->v.number = f;
+		  $$->type = (SIMUL(f)->type) & TYPE_MOD_MASK;
+	      } else 
+	      if ((f=$1->dn.efun_num) != -1) {
+		  $$ = validate_efun_call(f, $3);
+	      } else {
+		/* This here is a really nasty case that only occurs with
+		 * exact_types off.  The user has done something gross like:
+		 *
+		 * func() { int f; f(); } // if f was prototyped we wouldn't
+		 * f() { }                // need this case
+		 *
+		 * Don't complain, just grok it.
+		 */
+		int f;
+		struct function *funp;
+
+		f = define_new_function($1->name, 0, 0, 0, NAME_UNDEFINED, 0);
+		$$->flags = 0;
+		$$->kind = F_CALL_FUNCTION_BY_ADDRESS;
+		$$->v.number = f;
+		$$->type = TYPE_ANY; /* just a guess */
+		funp = FUNCTION(f);
+		if (exact_types) {
+		  char buff[100];
+		  /* prevent some errors; by making it look like an
+		   * inherited function we prevent redeclaration errors
+		   * if it shows up later
+		   */
+		  funp->flags &= ~NAME_UNDEFINED;
+		  funp->flags |= NAME_INHERITED;
+		  funp->type |= TYPE_MOD_VARARGS;
+		  sprintf(buff, "Undefined function %.50s", $1->name);
+		  yyerror(buff);
+		}
+	      }
+	    }
+	| function_name	'(' expr_list ')'
+	    {
+	      int f;
+	      struct function *funp;
+	      struct ident_hash_elem *ihe;
+	      char *name = $1;
+	      int is_inherited = *($1) == ':';
+	      
+	      if (is_inherited) name++;
+	      
+	      f = (ihe = lookup_ident(name)) ? ihe->dn.function_num : -1;
+	      $$ = $3;
+	      $$->kind = F_CALL_FUNCTION_BY_ADDRESS;
+	      if (f!=-1) {
+		  /* The only way this can happen is if function_name
+		   * below made the function name.  The lexer would
+		   * return L_DEFINED_FUNCTION instead.
+		   */
+		  $$->v.number = f;
+		  funp = FUNCTION(f);
+
+		  $$->type = validate_function_call(funp, f, $3->right);
+	      } else {
+		  if (is_inherited) {
+		      f = define_new_function(name, 0, 0, 0, 
+			  NAME_UNDEFINED | NAME_COLON_COLON, 0); 
+		      funp = FUNCTION(f);
+		      find_inherited(funp);
+		  } else {
+		      f = define_new_function(name, 0, 0, 0, 
+					      NAME_UNDEFINED, 0);
+		      funp = FUNCTION(f);
+		  }
+		  $$->v.number = f;
+		  /*
+		   * Check if this function has been defined.
+		   * But, don't complain yet about functions defined
+		   * by inheritance.
+		   */
+		  if (exact_types && (funp->flags & NAME_UNDEFINED)) {
+		      char buff[100];
+		      /* prevent some errors */
+		      funp->flags &= ~NAME_UNDEFINED;
+		      funp->type |= TYPE_MOD_VARARGS;
+		      sprintf(buff, "Undefined function %.50s", $1);
+		      yyerror(buff);
+		  }
+		  if (!(funp->flags & NAME_UNDEFINED))
+		      $$->type = funp->type & TYPE_MOD_MASK;
+		  else
+		      $$->type = TYPE_ANY;  /* Just a guess */
+	      }
+	      scratch_free($1);
+	      $$->flags = 0;
+	    }
+    |   expr4 L_ARROW identifier '(' expr_list ')'
+	    {
+		struct parse_node *expr, *expr2;
+		$$ = $5;
+		$$->kind = F_CALL_OTHER;
+		$$->v.number += 2;
+		$$->flags = 0;
+		$$->type = TYPE_UNKNOWN;
+		  
+		expr = new_node();
+		expr->v.expr = $1;
+
+		expr2 = new_node();
+		expr2->v.expr = make_node(F_STRING, E_CONST, TYPE_STRING);
+		expr2->v.expr->v.number = store_prog_string($3);
+
+		/* insert the two nodes */
+		expr2->right = $$->right;
+		expr->right = expr2;
+		$$->right = expr;
+		scratch_free($3);
+	    }
+    |   '(' '*' comma_expr ')' '(' expr_list ')'
+            {
+	        struct parse_node *expr;
+
+		$$ = $6;
+		$$->kind = F_EVALUATE;
+		$$->type = TYPE_UNKNOWN;
+#ifdef NEW_FUNCTIONS
+		expr = new_node();
+		expr->v.expr = $3;
+		expr->right = $$->right;
+		$$->right = expr;
+		$$->v.number++;
+#else
+                $$->v.number += 2; /* The two args from the fp split */
+                $$->left = $3;
+#endif
+	    }
+    ;
+
+efun_override: L_EFUN L_COLON_COLON identifier {
+	struct svalue *res;
+	struct ident_hash_elem *ihe;
+
+	$$ = (ihe = lookup_ident($3)) ? ihe->dn.efun_num : -1;
+	if ($$ == -1) {
+	    char buff[100];
+	    sprintf(buff, "Unknown efun: %s", $3);
+	    yyerror(buff);
+	    $$ = 0;
+	} else {
+	  push_malloced_string(the_file_name(current_file));
+	  push_constant_string($3);
+	  push_constant_string(main_file_name());
+	  res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
+	  if (!MASTER_APPROVED(res)) {
+	    yyerror("Invalid simulated efunction override");
+	    $$ = 0;
+	  }
+	}
+	scratch_free($3);
+      }	
+
+function_name:
+	L_IDENTIFIER
+    |   L_COLON_COLON identifier
+	    {
+		int l = strlen($2) + 1;
+		char *p;
+		/* here we be a bit cute.  we put a : on the front so we
+		 * don't have to strchr for it.  Here we do:
+		 * "name" -> ":::name"
+		 */
+		$$ = scratch_realloc($2, l + 3);
+		p = $$ + l;
+		while (p--,l--)
+		    *(p+3) = *p;
+		strncpy($$, ":::", 3);
+	    }
+    |   L_OBJECT L_COLON_COLON identifier
+	    {
+		int l = strlen($3) + 1;
+		char *p;
+		/* "name" -> ":object::name" */
+		$$ = scratch_realloc($3, l + 9);
+		p = $$ + l;
+		while (p--,l--)
+		    *(p+9) = *p;
+		strncpy($$, ":object::", 9);
+	    }
+    |   not_efun_ident L_COLON_COLON identifier
+	    {
+		int l = strlen($1);
+		/* "ob" and "name" -> ":ob::name" */
+		$$ = scratch_alloc(l + strlen($3) + 4);
+		*($$) = ':';
+		strcpy($$ + 1, $1);
+		strcpy($$ + l + 1, "::");
+		strcpy($$ + l + 3, $3);
+		scratch_free($1);
+		scratch_free($3);
+	    }
+    ;
+
+cond:
+        condStart
+	statement
+	optional_else_part
+	    {
+	      update_forward_branch();
+	    }
+    ;
+
+condStart:
+	L_IF '(' comma_expr ')'
+	    {
+		int branch;
+		
+		/* x != 0 -> x */
+		if ($3->kind == F_NE) {
+		    if ($3->right->kind == F_NUMBER && $3->right->v.number == 0)
+			$3 = $3->left;
+		    else if ($3->left->kind == F_NUMBER && $3->left->v.number == 0)
+			$3 = $3->right;
+		}
+		if ($3->kind == F_NOT) {
+		    branch = F_BRANCH_WHEN_NON_ZERO;
+		    $3 = $3->right;
+		} else
+		    branch = F_BRANCH_WHEN_ZERO;
+
+		generate_expr($3);
+		generate_forward_branch(branch);
+	    }
+    ;
+
+optional_else_part:
+	/* empty */    %prec LOWER_THAN_ELSE
+    |   L_ELSE
+	    {
+	      generate_else();
+	    }
+	statement
+    ;
+%%
+
+%line
+
+void yyerror P1(char *, str)
+{
+    extern int num_parse_error;
+
+#ifdef NEW_FUNCTIONS
+    function_context.num_parameters = -1;
+#endif
+    if (num_parse_error > 5)
+	return;
+    smart_log(current_file, current_line, str, 0);
+#ifndef NO_MUDLIB_STATS
+    add_errors_for_file (current_file, 1);
+#endif
+    num_parse_error++;
+}
+
+void yywarn P1(char *, str) {
+    if (!(pragmas & PRAGMA_WARNINGS)) return;
+    (void)fprintf(stderr, "%s: Warning: %s line %d\n", current_file, str,
+		  current_line);
+    smart_log(current_file, current_line, str, 1);
+}
+
+int add_local_name P2(char *, str, int, type)
+{
+    if (current_number_of_locals == MAX_LOCAL) {
+	yyerror("Too many local variables");
+	return 0;
+    } else {
+	struct ident_hash_elem *ihe;
+
+	ihe = find_or_add_ident(str,1);
+	type_of_locals[current_number_of_locals] = type;
+	locals[current_number_of_locals] = ihe;
+	if (ihe->dn.local_num == -1)
+	    ihe->sem_value++;
+	ihe->dn.local_num = current_number_of_locals;
+	return (current_number_of_locals++);
+    }
+}
+
+void store_line_number_info()
+{
+    unsigned short offset = mem_block[A_PROGRAM].current_size;
+
+    add_to_mem_block(A_LINENUMBERS, (char *)&offset, sizeof offset);
+}
+
+/*
+ * Compile an LPC file.
+ */
+void compile_file P1(FILE *, f) {
+    int yyparse PROT((void));
+
+    prolog(f);
+    yyparse();
+    epilog();
+}
+
+int get_id_number() {
+    static int current_id_number = 1;
+    return current_id_number++;
+}
+
+/*
+ * The program has been compiled. Prepare a 'struct program' to be returned.
+ */
+static void epilog() {
+    int size, i;
+    char *p;
+    struct function *funp;
+    struct ident_hash_elem *ihe;
+
+    /* don't need the parse trees any more */
+    release_tree();
+
+    if (num_parse_error > 0 || inherit_file) {
+	clean_parser();
+	end_new_file();
+	return;
+    }
+
+    /*
+     * Define the __INIT function, but only if there was any code
+     * to initialize.
+     */
+    if (mem_block[A_INITIALIZER].current_size) {
+	/* end the __INIT function */
+	current_block = A_INITIALIZER;
+	generate_return(0);
+	/* NAME_COLON_COLON makes it get copied correctly and not show
+	 * up in the symbol table of the object that inherits us.
+	 */
+	define_new_function(APPLY___INIT, 0, 0, 0, 
+			    NAME_COLON_COLON | NAME_STRICT_TYPES, 
+			    TYPE_VOID | TYPE_MOD_PRIVATE);
+	generate___INIT();
+    }
+
+    generate_final_program(0);
+
+    /*
+     * If functions are undefined, replace them by definitions done
+     * by inheritance. All explicit "name::func" are already resolved.
+     * Also replace aliases with the updated info.  We use aliases
+     * so that only one function definition has to be fooled with for
+     * overloading during compile time, but here we want to make sure
+     * they're all the same again.
+     */
+    for (i = 0; i < mem_block[A_FUNCTIONS].current_size; i += sizeof *funp) {
+	funp = (struct function *)(mem_block[A_FUNCTIONS].block + i);
+	if ((funp->flags & NAME_UNDEFINED) && (funp->flags & NAME_DEF_BY_INHERIT))
+	    funp->flags = (funp->flags & ~NAME_UNDEFINED) | NAME_INHERITED;
+	if (funp->flags & NAME_ALIAS) {
+	    *funp = *(funp - funp->offset);
+	    funp->flags |= NAME_ALIAS;
+	}
+    }
+    generate_final_program(1);
+
+    /* This actually marks the end of the file in the line number info */
+    pop_include();
+
+    size = align(sizeof (struct program));
+    for (i=0; i<NUMPAREAS; i++)
+	if (i != A_LINENUMBERS && i != A_ARGUMENT_TYPES && i != A_ARGUMENT_INDEX)
+	    size += align(mem_block[i].current_size);
+
+    ihe = lookup_ident("heart_beat");
+
+    p = (char *)DXALLOC(size, 56, "epilog: 1");
+    prog = (struct program *)p;
+    *prog = NULL_program;
+    prog->p.i.total_size = size;
+    prog->p.i.ref = 0;
+    prog->p.i.heart_beat = (ihe ? ihe->dn.function_num : -1);
+    prog->name = string_copy(current_file);
+    prog->p.i.id_number = get_id_number();
+    total_prog_block_size += prog->p.i.total_size;
+    total_num_prog_blocks += 1;
+
+    prog->p.i.line_swap_index = -1;
+    prog->p.i.line_numbers = (unsigned short *)
+	  XALLOC(mem_block[A_LINENUMBERS].current_size + sizeof(short));
+    memcpy(((char*)&prog->p.i.line_numbers[1]),
+	  mem_block[A_LINENUMBERS].block,
+	  mem_block[A_LINENUMBERS].current_size);
+    prog->p.i.line_numbers[0] =
+	  (mem_block[A_LINENUMBERS].current_size / sizeof(short)) + 1;
+
+    p += align(sizeof (struct program));
+    prog->p.i.program = p;
+    if (mem_block[A_PROGRAM].current_size)
+	memcpy(p, mem_block[A_PROGRAM].block,
+	      mem_block[A_PROGRAM].current_size);
+    prog->p.i.program_size = mem_block[A_PROGRAM].current_size;
+
+    p += align(mem_block[A_PROGRAM].current_size);
+    prog->p.i.functions = (struct function *)p;
+    prog->p.i.num_functions = mem_block[A_FUNCTIONS].current_size /
+	  sizeof (struct function);
+    if (mem_block[A_FUNCTIONS].current_size)
+	memcpy(p, mem_block[A_FUNCTIONS].block,
+	      mem_block[A_FUNCTIONS].current_size);
+
+#ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
+    prog->p.i.tree_r = a_functions_root;
+#endif
+
+    p += align(mem_block[A_FUNCTIONS].current_size);
+    prog->p.i.strings = (char **)p;
+    prog->p.i.num_strings = mem_block[A_STRINGS].current_size /
+	  sizeof (char *);
+    if (mem_block[A_STRINGS].current_size)
+	memcpy(p, mem_block[A_STRINGS].block,
+	      mem_block[A_STRINGS].current_size);
+
+    p += align(mem_block[A_STRINGS].current_size);
+    prog->p.i.variable_names = (struct variable *)p;
+    prog->p.i.num_variables = mem_block[A_VARIABLES].current_size /
+	  sizeof (struct variable);
+    if (mem_block[A_VARIABLES].current_size)
+	memcpy(p, mem_block[A_VARIABLES].block,
+	      mem_block[A_VARIABLES].current_size);
+
+    p += align(mem_block[A_VARIABLES].current_size);
+    prog->p.i.num_inherited = mem_block[A_INHERITS].current_size /
+	  sizeof (struct inherit);
+    if (prog->p.i.num_inherited) {
+	memcpy(p, mem_block[A_INHERITS].block,
+	      mem_block[A_INHERITS].current_size);
+	prog->p.i.inherit = (struct inherit *)p;
+    } else
+	prog->p.i.inherit = 0;
+
+    prog->p.i.argument_types = 0;       /* For now. Will be fixed someday */
+    prog->p.i.type_start = 0;
+
+#ifdef SAVE_BINARIES
+#  ifdef ALWAYS_SAVE_BINARIES
+    save_binary(prog, &mem_block[A_INCLUDES], &mem_block[A_PATCH]);
+#  else
+#    if defined(LPC_TO_C) && defined(ALWAYS_SAVE_COMPILED_BINARIES)
+    if (pragmas & PRAGMA_SAVE_BINARY || prog->p.i.program_size == 0) {
+#    else
+    if (pragmas & PRAGMA_SAVE_BINARY) {
+#    endif
+	save_binary(prog, &mem_block[A_INCLUDES], &mem_block[A_PATCH]);
+    }
+#  endif
+#endif
+
+    swap_line_numbers(prog); /* do this after saving binary */
+
+    for (i=0; i<NUMAREAS; i++)
+	FREE((char *)mem_block[i].block);
+
+    /*  marion
+	Do referencing here - avoid multiple referencing when an object
+	inherits more than one object and one of the inherited is already
+	loaded and not the last inherited
+    */
+    reference_prog (prog, "epilog");
+    for (i = 0; (unsigned)i < prog->p.i.num_inherited; i++) {
+	reference_prog (prog->p.i.inherit[i].prog, "inheritance");
+    }
+    scratch_destroy();
+    free_unused_identifiers();
+    end_new_file();
+}
+
+/*
+ * Initialize the environment that the compiler needs.
+ */
+static void prolog P1(FILE *, f) {
+    int i;
+
+#ifdef NEW_FUNCTIONS
+    function_context.num_parameters = -1;
+#endif
+    approved_object = 0;
+    prog = 0;   /* 0 means fail to load. */
+    num_parse_error = 0;
+    free_all_local_names();     /* In case of earlier error */
+#ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
+    a_functions_root = (unsigned short)0xffff;
+#endif
+    /* Initialize memory blocks where the result of the compilation
+     * will be stored.
+     */
+    for (i=0; i < NUMAREAS; i++) {
+	mem_block[i].block = DXALLOC(START_BLOCK_SIZE, 58, "prolog: 2");
+	mem_block[i].current_size = 0;
+	mem_block[i].max_size = START_BLOCK_SIZE;
+    }
+    memset(string_tags, 0, sizeof(string_tags));
+    freed_string = -1;
+    initialize_parser();
+    start_new_file(f);
+}
+
+/*
+ * The program has errors, clean things up.
+ */
+static void clean_parser() {
+    int i;
+    struct function *funp;
+    struct variable dummy;
+    char *s;
+
+    /*
+     * Free function stuff.
+     */
+    for (i = 0; i < mem_block[A_FUNCTIONS].current_size; i += sizeof *funp) {
+	funp = (struct function *)(mem_block[A_FUNCTIONS].block + i);
+	if (funp->name)
+	    free_string(funp->name);
+    }
+    for (i = 0; i < mem_block[A_STRINGS].current_size; i += sizeof(char *)) {
+	((char *)&s)[0] = mem_block[A_STRINGS].block[i + 0];
+	((char *)&s)[1] = mem_block[A_STRINGS].block[i + 1];
+	((char *)&s)[2] = mem_block[A_STRINGS].block[i + 2];
+	((char *)&s)[3] = mem_block[A_STRINGS].block[i + 3];
+	free_string(s);
+    }
+    for (i = 0; i < mem_block[A_VARIABLES].current_size; i += sizeof dummy) {
+	memcpy(&dummy, mem_block[A_VARIABLES].block + i, sizeof dummy);
+	free_string(dummy.name);
+    }
+
+    prog = 0;
+    for (i=0; i<NUMAREAS; i++)
+	FREE(mem_block[i].block);
+    scratch_destroy();
+    free_unused_identifiers();
+}
+
+char *
+the_file_name P1(char *, name)
+{
+    char *tmp;
+    int len;
+
+    len = strlen(name);
+    if (len < 3) {
+	return string_copy(name);
+    }
+    tmp = (char *)DXALLOC(len, 59, "the_file_name");
+    if (!tmp) {
+	return string_copy(name);
+    }
+    tmp[0] = '/';
+    strncpy(tmp + 1, name, len - 2);
+    tmp[len - 1] = '\0';
+    return tmp;
+}
+
+/*
+ * Save a list of all the include files.  This is so we can
+ * tell if a saved binary is out of date or not.  In the future,
+ * may be used to give better line numbers for errors.
+ */
+
+void
+save_include P1(char *, name)
+{
+    short zero = 0;
+    short s;
+    add_to_mem_block(A_INCLUDES, name, strlen(name)+1);
+    s = store_prog_string(name) + 1;
+    add_to_mem_block(A_LINENUMBERS, (char *)&zero, sizeof zero);
+    add_to_mem_block(A_LINENUMBERS, (char *)&s, sizeof s);
+}
+
+void
+pop_include()
+{
+    short zero = 0;
+    add_to_mem_block(A_LINENUMBERS, (char *)&zero, sizeof zero);
+    add_to_mem_block(A_LINENUMBERS, (char *)&zero, sizeof zero);
+}
+

@@ -20,9 +20,21 @@ void c_add_action P4(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2)
 	if (s2->type != T_NUMBER)
 	    bad_arg(3, F_ADD_ACTION);
     }
-    add_action(s0->u.string,
-	       s1 ? s1->u.string : 0,
-	       s2 ? s2->u.number : 0);
+    if (s1 && s1->type == T_POINTER) {
+	int i,n;
+	n = s1->u.vec->size;
+	for (i=0; i<n; i++) {
+	    if (s1->u.vec->item[i].type == T_STRING) {
+		add_action(s0->u.string,
+			   s1->u.vec->item[i].u.string,
+			   s2 ? s2->u.number : 0);
+	    }
+	}
+    } else {
+	add_action(s0->u.string,
+		   s1 ? s1->u.string : 0,
+		   s2 ? s2->u.number : 0);
+    }
 }
 #endif
 
@@ -36,8 +48,7 @@ void c_all_inventory P2(svalue *, ret, svalue *, s0)
 	C_NUMBER(ret, 0);
 	return;
     }
-    C_VECTOR(ret, vec);		/* This will make ref count == 2 */
-    vec->ref--;
+    C_REFED_VECTOR(ret, vec);
 }
 #endif
 
@@ -47,8 +58,7 @@ void c_allocate P2(svalue *, ret, svalue *, s0)
     struct vector *vec;
 
     vec = allocate_array(s0->u.number);
-    C_VECTOR(ret, vec);
-    vec->ref--;
+    C_REFED_VECTOR(ret, vec);
 }
 #endif
 
@@ -59,8 +69,7 @@ void c_allocate_buffer P2(svalue *, ret, svalue *, s0)
 
     buf = allocate_buffer(s0->u.number);
     if (buf) {
-	C_BUFFER(ret, buf);
-	buf->ref--;
+	C_REFED_BUFFER(ret, buf);
     } else {
 	C_NUMBER(ret, 0);
     }
@@ -73,8 +82,7 @@ void c_allocate_mapping P2(svalue *, ret, svalue *, s0)
     struct mapping *map;
 
     map = allocate_mapping(s0->u.number);
-    C_MAPPING(ret, map);
-    map->ref--;
+    C_REFED_MAPPING(ret, map);
 }
 #endif
 
@@ -89,8 +97,6 @@ void c_cache_stats P1(svalue *, ret)
 #ifdef F_CALL_OUT
 void c_call_out P4(svalue *, ret, svalue *, s0, svalue *, s1, int, num_arg)
 {
-    if (s0->u.string[0] == ':')
-	error("Illegal function name in call_out: %s\n", s0->u.string);
     if (!(current_object->flags & O_DESTRUCTED))
 	new_call_out(current_object, s0->u.string, s1->u.number,
 		     num_arg - 1, num_arg ? sp - num_arg + 1 : 0);
@@ -101,8 +107,7 @@ void c_call_out P4(svalue *, ret, svalue *, s0, svalue *, s1, int, num_arg)
 #ifdef F_CALL_OUT_INFO
 void c_call_out_info P1(svalue *, ret)
 {
-    C_VECTOR(ret, get_all_call_outs());
-    ret->u.vec->ref--;		/* set ref count to 1 */
+    C_REFED_VECTOR(ret, get_all_call_outs());
 }
 #endif
 
@@ -129,8 +134,7 @@ void c_children P2(svalue *, ret, svalue *, s0)
     if (!vec)
 	C_NUMBER(ret, 0);
     else {
-	C_VECTOR(ret, vec);
-	vec->ref--;		/* reset ref count */
+	C_REFED_VECTOR(ret, vec);
     }
 }
 #endif
@@ -192,8 +196,7 @@ void c_commands P1(svalue *, ret)
     struct vector *vec;
 
     vec = commands(current_object);
-    C_VECTOR(ret, vec);
-    vec->ref--;			/* reset ref count to 1 */
+    C_REFED_VECTOR(ret, vec);
 }
 #endif
 
@@ -227,7 +230,7 @@ void c_crc32 P2(svalue *, ret, svalue *, s0)
     } else {
 	bad_arg(1, F_CRC32);
     }
-    crc = compute_crc32(buf, len);
+    crc = compute_crc32((unsigned char *)buf, len);
     C_NUMBER(ret, crc);
 }
 #endif
@@ -291,7 +294,9 @@ void c_debug_info P3(svalue *, ret, svalue *, s0, svalue *, s1)
 			flags & O_WILL_CLEAN_UP ? "TRUE" : "FALSE");
 	    add_message("O_WILL_RESET: %s\n",
 			flags & O_WILL_RESET ? "TRUE" : "FALSE");
+#ifndef NO_LIGHT
 	    add_message("total light : %d\n", ob->total_light);
+#endif
 	    add_message("next_reset  : %d\n", ob->next_reset);
 	    add_message("time_of_ref : %d\n", ob->time_of_ref);
 	    add_message("ref         : %d\n", ob->ref);
@@ -333,6 +338,17 @@ void c_debug_info P3(svalue *, ret, svalue *, s0, svalue *, s1)
 	add_message("total size %d\n", ob->prog->p.i.total_size);
 	C_NUMBER(ret, 0);
 	break;
+    case 2:
+        {
+            int i;
+            ob = s1->u.ob;
+            for (i=0; i<ob->prog->p.i.num_variables; i++) {
+                add_message("%s: ", ob->prog->p.i.variable_names[i].name);
+                print_svalue(&ob->variables[i]);
+                add_message("\n");
+            }
+            break;
+        }
     default:
 	bad_arg(1, F_DEBUG_INFO);
     }
@@ -369,8 +385,7 @@ void c_deep_inherit_list P2(svalue *, ret, svalue *, s0)
     } else {
 	vec = null_array();
     }
-    C_VECTOR(ret, vec);
-    vec->ref--;			/* reset ref count */
+    C_REFED_VECTOR(ret, vec);
 }
 #endif
 
@@ -392,8 +407,7 @@ void c_deep_inventory P2(svalue *, ret, svalue *, s0)
     struct vector *vec;
 
     vec = deep_inventory(s0->u.ob, 0);
-    C_VECTOR(ret, vec);
-    vec->ref--;			/* reset ref count */
+    C_REFED_VECTOR(ret, vec);
 }
 #endif
 
@@ -445,8 +459,7 @@ void c_each P3(svalue *, ret, svalue *, s0, svalue *, s1)
 	return;
     }
     v = mapping_each(m);
-    C_VECTOR(ret, v);
-    v->ref--;
+    C_REFED_VECTOR(ret, v);
 }
 #endif
 
@@ -570,8 +583,7 @@ void c_explode P3(svalue *, ret, svalue *, s0, svalue *, s1)
 
     vec = explode_string(s0->u.string, s1->u.string);
     if (vec) {
-	C_VECTOR(ret, vec);	/* This will make ref count == 2 */
-	vec->ref--;
+	C_REFED_VECTOR(ret, vec);	/* This will make ref count == 2 */
     } else
 	C_NUMBER(ret, 0);
 }
@@ -611,36 +623,6 @@ void c_file_size P2(svalue *, ret, svalue *, s0)
 
     i = file_size(s0->u.string);
     C_NUMBER(ret, i);
-}
-#endif
-
-#ifdef F_FILTER_ARRAY
-void c_filter_array P5(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2, svalue *, s3)
-{
-    struct vector *vec;
-
-    ob = 0;
-    if (s2->type == T_OBJECT)
-	ob = s2->u.ob;
-    else if (s2->type == T_STRING) {
-	ob = find_object(s2->u.string);
-	if (ob && !object_visible(ob))
-	    ob = 0;
-    }
-    if (!ob)
-	error("Bad third argument to filter_array()\n");
-    if (s0->type == T_POINTER) {
-	check_for_destr(s0->u.vec);
-	vec = filter(s0->u.vec, s1->u.string, ob, s3);
-    } else {
-	vec = 0;
-    }
-    if (vec) {
-	C_VECTOR(ret, vec);	/* This will make ref count == 2 */
-	vec->ref--;
-    } else {
-	C_NUMBER(ret, 0);
-    }
 }
 #endif
 
@@ -713,8 +695,7 @@ void c_function_profile P2(svalue *, ret, svalue *, s0)
 	vec->item[j].type = T_MAPPING;
 	vec->item[j].u.map = map;
     }
-    C_VECTOR(ret, vec);
-    vec->ref--;
+    C_REFED_VECTOR(ret, vec);
 }
 #endif
 
@@ -772,8 +753,7 @@ void c_get_dir P3(svalue *, ret, svalue *, s0, svalue *, s1)
 
     vec = get_dir(s0->u.string, s1->u.number);
     if (vec) {
-	C_VECTOR(ret, vec);
-	vec->ref--;		/* resets ref count */
+	C_REFED_VECTOR(ret, vec);
     } else
 	C_NUMBER(ret, 0);
 }
@@ -795,10 +775,24 @@ void c_geteuid P2(svalue *, ret, svalue *, s0)
 	    return;
 	}
     } else if (s0->type == T_FUNCTION) {
+#ifdef NEW_FUNCTIONS
+	if (s0->u.fp->owner && s0->u.fp->owner->euid) {
+ 	    char *tmp;
+	    
+ 	    tmp = s0->u.fp->owner->euid->name;
+ 	    pop_stack();
+ 	    push_string(tmp, STRING_CONSTANT);
+ 	    return;
+	} else {
+	    assign_svalue(sp, &const0);
+ 	    return;
+	}
+#else
 	if (s0->u.fp->euid) {
 	    C_CONSTANT_STRING(ret, s0->u.fp->euid->name);
 	    return;
 	}
+#endif
     }
     C_NUMBER(ret, 0);
 }
@@ -810,10 +804,8 @@ void c_getuid P2(svalue *, ret, svalue *, s0)
     char *tmp;
 
     ob = s0->u.ob;
-#ifdef DEBUG
-    if (ob->uid == NULL)
-	fatal("UID is a null pointer\n");
-#endif
+    DEBUG_CHECK(ob->uid == NULL,
+		"UID is a null pointer\n");
     tmp = ob->uid->name;
     C_CONSTANT_STRING(ret, tmp);
 }
@@ -876,8 +868,7 @@ void c_inherit_list P2(svalue *, ret, svalue *, s0)
     } else {
 	vec = null_array();
     }
-    C_VECTOR(ret, vec);
-    vec->ref--;			/* reset ref count */
+    C_REFED_VECTOR(ret, vec);
 }
 #endif
 
@@ -923,20 +914,31 @@ void c_intp P2(svalue *, ret, svalue *, s0)
 #ifdef F_FUNCTIONP
 void c_functionp P2(svalue *, ret, svalue *, s0)
 {
-    if (s0->type == T_FUNCTION) {
-	if (((s0->u.fp->obj.type == T_OBJECT) &&
-	     !(s0->u.fp->obj.u.ob->flags & O_DESTRUCTED)) ||
-	    (s0->u.fp->obj.type == T_STRING)) {
-	    if (s0->u.fp->fun.type == T_STRING) {
-		C_NUMBER(ret, 1);
-		return;
-	    } else if (s0->u.fp->fun.type == T_POINTER) {
-		C_NUMBER(ret, 2);
-		return;
-	    }
-	}
-    }
-    C_NUMBER(ret, 0);
+#ifdef NEW_FUNCTIONS
+  int i;
+#endif
+  
+  if (s0->type == T_FUNCTION) {
+#ifdef NEW_FUNCTIONS
+      i = s0->u.fp->type;
+      if (s0->u.fp->args.type == T_POINTER) i |= 1;
+      C_NUMBER(ret, i);
+      return;
+#else
+      if (((s0->u.fp->obj.type == T_OBJECT) &&
+	   !(s0->u.fp->obj.u.ob->flags & O_DESTRUCTED)) ||
+	  (s0->u.fp->obj.type == T_STRING)) {
+	  if (s0->u.fp->fun.type == T_STRING) {
+	      C_NUMBER(ret, 1);
+	      return;
+	  } else if (s0->u.fp->fun.type == T_POINTER) {
+	      C_NUMBER(ret, 2);
+	      return;
+	  }
+      }
+#endif
+  }
+  C_NUMBER(ret, 0);
 }
 #endif
 
@@ -946,8 +948,7 @@ void c_keys P2(svalue *, ret, svalue *, s0)
     struct vector *vec;
 
     vec = mapping_indices(s0->u.map);
-    C_VECTOR(ret, vec);
-    vec->ref--;			/* resets ref count */
+    C_REFED_VECTOR(ret, vec);
 }
 #endif
 
@@ -957,8 +958,7 @@ void c_values P2(svalue *, ret, svalue *, s0)
     struct vector *vec;
 
     vec = mapping_values(s0->u.map);
-    C_VECTOR(ret, vec);
-    vec->ref--;			/* resets ref count */
+    C_REFED_VECTOR(ret, vec);
 }
 #endif
 
@@ -971,7 +971,7 @@ void c_link P3(svalue *, ret, svalue *, s0, svalue *, s1)
     push_string(s0->u.string, STRING_CONSTANT);
     push_string(s1->u.string, STRING_CONSTANT);
     mret = apply_master_ob(APPLY_VALID_LINK, 2);
-    if (!IS_ZERO(mret))
+    if (MASTER_APPROVED(mret))
 	i = do_rename(s0->u.string, s1->u.string, F_LINK);
     C_NUMBER(ret, i);
 }
@@ -990,8 +990,7 @@ void c_living P2(svalue *, ret, svalue *, s0)
 #ifdef F_LIVINGS
 void c_livings P1(svalue *, ret)
 {
-    C_VECTOR(ret, livings());	/* livings() has already set ref count to 1 */
-    sp->u.vec->ref--;
+    C_REFED_VECTOR(ret, livings());
 }
 #endif
 
@@ -1083,11 +1082,9 @@ void c_map_array P5(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2, sva
 	res = 0;
     }
     if (map) {
-	C_MAPPING(ret, map);
-	map->ref--;
+	C_REFED_MAPPING(ret, map);
     } else if (res) {
-	C_VECTOR(ret, res);	/* This will make ref count == 2 */
-	res->ref--;
+	C_REFED_VECTOR(ret, res);
     } else
 	C_NUMBER(ret, 0);
 }
@@ -1096,8 +1093,12 @@ void c_map_array P5(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2, sva
 #ifdef F_MASTER
 void c_master P1(svalue *, ret)
 {
-    assert_master_ob_loaded("master()");
-    C_OBJECT(ret, master_ob);
+    int err;
+
+    if (err=assert_master_ob_loaded("master", "") != 1)
+	ret = &const0n;
+    else 
+	C_OBJECT(ret, master_ob);
 }
 #endif
 
@@ -1225,19 +1226,25 @@ void c_message P5(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2, svalu
     struct vector *use, *avoid;
 
     static struct vector vtmp1 =
-    {1,
+	{1,
 #ifdef DEBUG
-     1,
+	     1,
 #endif
-     1,
-     {(mudlib_stats_t *) NULL, (mudlib_stats_t *) NULL}};
+	     1,
+#ifndef NO_MUDLIB_STATS
+	     {(mudlib_stats_t *) NULL, (mudlib_stats_t *) NULL}
+#endif
+     };
     static struct vector vtmp2 =
-    {1,
+	{1,
 #ifdef DEBUG
-     1,
+	     1,
 #endif
-     1,
-     {(mudlib_stats_t *) NULL, (mudlib_stats_t *) NULL}};
+	     1,
+#ifndef NO_MUDLIB_STATS
+	     {(mudlib_stats_t *) NULL, (mudlib_stats_t *) NULL}
+#endif
+     };
 
     switch (s2->type) {
     case T_OBJECT:
@@ -1261,7 +1268,8 @@ void c_message P5(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2, svalu
 	    return;
 	}
     default:
-	error("Bad argument 3 to message()\n");
+        bad_argument(s2, T_OBJECT | T_STRING | T_POINTER | T_NUMBER,
+                     3, F_MESSAGE);
     }
     if (s3) {
 	switch (s3->type) {
@@ -1278,7 +1286,7 @@ void c_message P5(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2, svalu
 	}
     } else
 	avoid = null_array();
-    do_message(s0->u.string, s1->u.string, use, avoid, 1);
+    do_message(s0, s1->u.string, use, avoid, 1);
     return;
 }
 #endif
@@ -1539,7 +1547,7 @@ void c_previous_object P2(svalue *, ret, svalue *, s0)
 	} else if (i == -1) {
 	    struct vector *v;
 
-	    i = 1;
+	    i = previous_ob ? 1 : 0;
 	    p = csp + 1;
 	    while ((p--) >= control_stack) {
 		if (p->extern_call)
@@ -1547,22 +1555,25 @@ void c_previous_object P2(svalue *, ret, svalue *, s0)
 	    }
 	    v = allocate_array(i);
 	    p = csp + 1;
-	    i = 1;
-	    if (previous_ob && !(previous_ob->flags & O_DESTRUCTED)) {
-		v->item[0].type = T_OBJECT;
-		v->item[0].u.ob = previous_ob;
-		add_ref(previous_ob, "previous_object(-1)");
-	    }
+	    if (previous_ob) {
+		if (!(previous_ob->flags & O_DESTRUCTED)) {
+		    v->item[0].type = T_OBJECT;
+		    v->item[0].u.ob = previous_ob;
+		    add_ref(previous_ob, "previous_object(-1)");
+		}
+		i = 1;
+	    } else i = 0;
 	    while ((p--) >= control_stack) {
-		if (p->extern_call && p->prev_ob && !(p->prev_ob->flags & O_DESTRUCTED)) {
-		    v->item[i].type = T_OBJECT;
-		    v->item[i].u.ob = p->prev_ob;
-		    add_ref(p->prev_ob, "previous_object(-1)");
+		if (p->extern_call && p->prev_ob) {
+		    if (!p->prev_ob->flags & O_DESTRUCTED) {
+			v->item[i].type = T_OBJECT;
+			v->item[i].u.ob = p->prev_ob;
+			add_ref(p->prev_ob, "previous_object(-1)");
+		    }
 		    i++;
 		}
 	    }
-	    C_VECTOR(ret, v);
-	    v->ref--;
+	    C_REFED_VECTOR(ret, v);
 	    return;
 	} else if (i < -1) {
 	    error("Illegal negative argument to previous_object()\n");
@@ -1765,8 +1776,7 @@ void c_read_buffer P4(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2)
 
 	buf = allocate_buffer(rlen);
 	memcpy(buf->item, str, rlen);
-	buf->ref--;
-	C_BUFFER(ret, buf);
+	C_REFED_BUFFER(ret, buf);
 	FREE(str);
     } else {			/* T_BUFFER */
 	C_MALLOCED_STRING(ret, str);
@@ -1853,8 +1863,7 @@ void c_regexp P3(svalue *, ret, svalue *, s0, svalue *, s1)
     if (v == 0)
 	C_NUMBER(ret, 0);
     else {
-	C_VECTOR(ret, v);
-	v->ref--;		/* Will make ref count == 1 */
+	C_REFED_VECTOR(ret, v);
     }
 }
 #endif
@@ -2059,12 +2068,15 @@ void c_say P3(svalue *, ret, svalue *, s0, svalue *, s1)
 {
     struct vector *avoid;
     static struct vector vtmp =
-    {1,
+	{1,
 #ifdef DEBUG
-     1,
+	     1,
 #endif
-     1,
-     {(mudlib_stats_t *) NULL, (mudlib_stats_t *) NULL}};
+	     1,
+#ifndef NO_MUDLIB_STATS
+	     {(mudlib_stats_t *) NULL, (mudlib_stats_t *) NULL}
+#endif
+     };
 
     if (!s1) {
 	avoid = null_array();
@@ -2221,7 +2233,7 @@ void c_seteuid P2(svalue *, ret, svalue *, s0)
     push_object(current_object);
     push_string(s0->u.string, STRING_CONSTANT);
     mret = apply_master_ob(APPLY_VALID_SETEUID, 2);
-    if (mret == 0 || mret->type != T_NUMBER || mret->u.number != 1) {
+    if (!MASTER_APPROVED(mret)) {
 	C_NUMBER(ret, 0);
 	return;
     }
@@ -2371,8 +2383,7 @@ void c_sort_array P4(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2)
 	res = 0;
 
     if (res) {
-	C_VECTOR(ret, res);
-	res->ref--;
+	C_REFED_VECTOR(ret, res);
     } else
 	C_NUMBER(ret, 0);
 }
@@ -2427,15 +2438,13 @@ void c_stat P3(svalue *, ret, svalue *, s0, svalue *, s1)
 		v->item[2].u.number = ob->load_time;
 	    else
 		v->item[2].u.number = 0;
-	    C_VECTOR(ret, v);
-	    v->ref--;		/* Will now be 1. */
+	    C_REFED_VECTOR(ret, v);
 	    return;
 	}
     }
     v = get_dir(s0->u.string, s1->u.number);
     if (v) {
-	C_VECTOR(ret, v);
-	v->ref--;		/* Will now be 1. */
+	C_REFED_VECTOR(ret, v);
     } else {
 	C_NUMBER(ret, 0);
     }
@@ -2648,7 +2657,7 @@ void c_to_float P2(svalue *, ret, svalue *, s0)
     double temp;
 
     if (s0->type == T_REAL) {
-	free_svalue(ret);
+	free_svalue(ret,"c_to_float");
 	*ret = *s0;
 	return;
     } else if (s0->type == T_NUMBER) {
@@ -2742,19 +2751,15 @@ void c_undefinedp P2(svalue *, ret, svalue *, s0)
 }
 #endif
 
-#ifdef F_UNIQUE_ARRAY
+#if 0 /* out of date */
 void c_unique_array P4(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2)
 {
-    extern struct vector
-          *make_unique PROT((struct vector * arr, char *func,
-			            struct svalue * skipnum));
     struct vector *res;
 
     check_for_destr(s0->u.vec);
     res = make_unique(s0->u.vec, s1->u.string, (s2 ? s2 : &const0));
     if (res) {
-	C_VECTOR(ret, res);	/* This will make ref count == 2 */
-	res->ref--;
+	C_REFED_VECTOR(ret, res);
     } else
 	C_NUMBER(ret, 0);
 }
@@ -2780,8 +2785,7 @@ void c_userp P2(svalue *, ret, svalue *, s0)
 #ifdef F_USERS
 void c_users P1(svalue *, ret)
 {
-    C_VECTOR(ret, users());	/* users() has already set ref count to 1 */
-    ret->u.vec->ref--;
+    C_REFED_VECTOR(ret, users());
 }
 #endif
 
@@ -2878,7 +2882,7 @@ void c_write_bytes P4(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2)
 			    sizeof(int));
 	} else if (s2->type == T_BUFFER) {
 	    i = write_bytes(s0->u.string, s1->u.number,
-			    s2->u.buf->item, s2->u.buf->size);
+			    (char *)s2->u.buf->item, s2->u.buf->size);
 	} else if (s2->type == T_STRING) {
 	    i = write_bytes(s0->u.string, s1->u.number,
 			    s2->u.string, strlen(s2->u.string));
@@ -2926,17 +2930,17 @@ void c_write_buffer P4(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2)
 #endif
 
 #ifdef F_WRITE_FILE
-void c_write_file P3(svalue *, ret, svalue *, s0, svalue *, s1)
+void c_write_file P4(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2)
 {
     int i;
+    int flags = 0;
 
-    if (IS_ZERO(s1)) {
-	bad_arg(2, F_WRITE_FILE);
-	C_NUMBER(ret, 0);
-    } else {
-	i = write_file(s0->u.string, s1->u.string);
-	C_NUMBER(ret, i);
+    if (s2) {
+	CHECK_TYPES(s2, T_NUMBER, 3, F_WRITE_FILE);
+	flags = s2->u.number;
     }
+    i = write_file(s0->u.string, s1->u.string, flags);
+    C_NUMBER(ret, i);
 }
 #endif
 
@@ -2957,7 +2961,7 @@ void c_reclaim_objects P1(svalue *, ret)
 }
 #endif
 
-#ifdef F_OBJECTS
+#if 0 /* needs to be updated */
 extern struct vector *objects PROT((char *, struct object *));
 
 void c_objects P3(svalue *, ret, svalue *, s0, svalue *, s1)
@@ -2979,8 +2983,7 @@ void c_objects P3(svalue *, ret, svalue *, s0, svalue *, s1)
     if (!vec) {
 	C_NUMBER(ret, 0);
     } else {
-	C_VECTOR(ret, vec);
-	vec->ref--;
+	C_REFED_VECTOR(ret, vec);
     }
 }
 #endif

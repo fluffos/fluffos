@@ -90,10 +90,12 @@ static void scan_config_line P4(char *, start, char *, fmt, void *, dest, int, r
     char *tmp;
     char missing_line[MAX_LINE_LENGTH];
 
-    tmp = (char *) strchr(start, fmt[0]);
-    if (tmp && (*(tmp - 1) != '\n')) {
-	scan_config_line(tmp + 1, fmt, dest, required);
-	return;
+    tmp = start;
+    while (tmp) {
+	while (tmp = (char *) strchr(tmp, '\n')) {
+	    if (*(++tmp) == fmt[0]) break;
+	}
+	if (tmp && sscanf(tmp, fmt, dest) == 1) break;
     }
     if (!tmp) {
 	strcpy(missing_line, fmt);
@@ -109,14 +111,13 @@ static void scan_config_line P4(char *, start, char *, fmt, void *, dest, int, r
 		missing_line);
 	exit(-1);
     }
-    if (sscanf(tmp, fmt, dest) != 1)
-	scan_config_line(tmp + 1, fmt, dest, required);
 }
 
 void set_defaults P1(char *, filename)
 {
     FILE *def;
     char defaults[SMALL_STRING_SIZE];
+    char *p;
 
     def = fopen(filename, "r");
     if (def) {
@@ -144,6 +145,23 @@ void set_defaults P1(char *, filename)
     }
     read_config_file(def);
 
+    scan_config_line(buff, "global include file : %[^\n]", CONFIG_STR(__GLOBAL_INCLUDE_FILE__), 0);
+    /* check if the global include file is quoted */
+    p = CONFIG_STR(__GLOBAL_INCLUDE_FILE__);
+    if (*p && *p != '\"' && *p != '<') {
+	char *ptr;
+
+	fprintf(stderr, "Missing '\"' or '<' around global include file name; adding quotes.\n");
+	for (ptr = p; *ptr; ptr++)
+	    ;
+	ptr[2] = 0;
+	ptr[1] = '\"';
+	while (ptr > p) {
+	    *ptr = ptr[-1];
+	    ptr--;
+	}
+	*p = '\"';
+    }
     scan_config_line(buff, "name : %[^\n]", CONFIG_STR(__MUD_NAME__), 1);
     scan_config_line(buff, "address server ip : %[^\n]", CONFIG_STR(__ADDR_SERVER_IP__), 1);
 

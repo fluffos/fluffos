@@ -1,0 +1,6 @@
+; make_packages
+stack 40000
+cd packages
+smake clean
+smake
+cd /

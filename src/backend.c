@@ -51,6 +51,7 @@ extern HEV mudos_event_sem;
 #include "debug.h"
 #include "replace_program.h"
 #include "applies.h"
+#include "include/origin.h"
 
 jmp_buf error_recovery_context;
 int error_recovery_context_exists = 0;
@@ -93,19 +94,13 @@ void clear_state()
 void logon P1(struct object *, ob)
 {
     struct svalue *ret;
-    struct object *save = current_object;
 
-    /*
-     * current_object must be set here, so that the static "logon" in user.c
-     * can be called.
-     */
-    current_object = ob;
-    ret = apply(APPLY_LOGON, ob, 0);
+    /* current_object no longer set */
+    ret = apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
     if (ret == 0) {
 	add_message("prog %s:\n", ob->name);
 	fatal("Could not find logon on the user %s\n", ob->name);
     }
-    current_object = save;
 }				/* logon() */
 
 /*
@@ -315,7 +310,7 @@ static void look_for_objects_to_swap()
 	    extern void clear_state();
 
 	    clear_state();
-	    debug_message("Error in look_for_objects_to_swap.\n");
+	    debug_message("Error in " APPLY_CLEAN_UP "() or " APPLY_RESET "().\n");
 	    continue;
 	}
 	/*
@@ -364,7 +359,7 @@ static void look_for_objects_to_swap()
 		 */
 
 		push_number(ob->flags & (O_CLONE | O_SWAPPED) ? 0 : ob->prog->p.i.ref);
-		svp = apply(APPLY_CLEAN_UP, ob, 1);
+		svp = apply(APPLY_CLEAN_UP, ob, 1, ORIGIN_DRIVER);
 		if (ob->flags & O_DESTRUCTED)
 		    continue;
 		if (!svp || (svp->type == T_NUMBER && svp->u.number == 0))
@@ -413,7 +408,7 @@ static struct object *hb_list = 0;	/* head */
 static struct object *hb_tail = 0;	/* for sane wrap around */
 
 static int num_hb_objs = 0;	/* so we know when to stop! */
-static int num_hb_calls = 0;	/* stats */
+static int num_hb_calls = 0;	/* starts */
 static float perc_hb_probes = 100.0;	/* decaying avge of how many complete */
 
 #ifdef OS2
@@ -500,6 +495,7 @@ static void call_heart_beat()
 	    perc_hb_probes = 100.0;
     }
     current_object = save_current_object;
+    current_prog = 0;
     current_heart_beat = 0;
     look_for_objects_to_swap();
     call_out();
@@ -625,9 +621,16 @@ void preload_objects P1(int, eflag)
     struct svalue *ret;
     VOLATILE int ix;
 
+    if (SETJMP(error_recovery_context)) {
+	clear_state();
+	debug_message("error in epilog() in the master object.\n");
+	error_recovery_context_exists = 0;
+	return;
+    }
+    error_recovery_context_exists = 1;
     push_number(eflag);
     ret = apply_master_ob(APPLY_EPILOG, 1);
-    if ((ret == 0) || (ret->type != T_POINTER))
+    if ((ret == 0) || (ret == (svalue *)-1) || (ret->type != T_POINTER))
 	return;
     else
 	prefiles = ret->u.vec;
@@ -637,9 +640,8 @@ void preload_objects P1(int, eflag)
     ix = -1;
     if (SETJMP(error_recovery_context)) {
 	clear_state();
-	add_message("Anomaly in the fabric of world space.\n");
+	add_message("error in preload() in the master object.\n");
     }
-    error_recovery_context_exists = 1;
     while (++ix < prefiles->size) {
 	if (prefiles->item[ix].type != T_STRING)
 	    continue;

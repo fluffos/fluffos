@@ -25,26 +25,21 @@
 #include "exec.h"
 #include "debug.h"
 #include "applies.h"
+#include "include/origin.h"
+
+#define too_deep_save_error() \
+    error("Mappings and/or arrays nested too deep (%d) for save_object\n",\
+	  MAX_SAVE_SVALUE_DEPTH);
 
 struct object *previous_ob;
 int tot_alloc_object, tot_alloc_object_size;
-int save_svalue_depth = 0;
 
-static char *save_array PROT((struct vector * v));
-static int vector_save_size PROT((struct vector *));
-static struct mapping *restore_mapping PROT((char **));
-static void restore_object_from_buff PROT((struct object *, char *, char *, char *));
 #ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
 static void remove_all_objects PROT((void));
 #endif
-static void replace_newline PROT((char *));
-static void restore_newline PROT((char *));
-static int my_strlen PROT((char *));
-static char *my_string_copy PROT((char *));
-static int restore_size PROT((char **, int));
-static struct vector *restore_array PROT((char **, int));
-static int hash_living_name PROT((char *));
-static void my_strcat PROT((char **, char *));
+char *save_mapping PROT ((struct mapping *m));
+static int restore_array PROT((char **str, struct svalue *));
+int restore_hash_string PROT((char **str, int *a, struct svalue *));
 
 INLINE int
 valid_hide P1(struct object *, obj)
@@ -59,490 +54,1029 @@ valid_hide P1(struct object *, obj)
     return (!IS_ZERO(ret));
 }
 
-/*
- * Replace newlines in a string with a carriage return, to make the string
- * writeable on one line.
- */
 
-static void replace_newline P1(char *, str)
+int save_svalue_depth = 0, max_depth;
+int *sizes = 0;
+
+INLINE int svalue_save_size P1(struct svalue *, v)
 {
-    for (; *str; str++) {
-	if (str[0] == '\n')
-#ifndef MSDOS
-	    str[0] = '\r';
-#else
-	    str[0] = 30;
-#endif
-    }
-}
+    switch(v->type){
+    case T_STRING:
+	{
+	    register char *cp = v->u.string;
+	    char c;
+	    int size = 0;
 
-/*
- * Replace carriage return in a string with newlines.
- */
-
-static void restore_newline P1(char *, str)
-{
-    for (; *str; str++) {
-#ifndef MSDOS
-	if (str[0] == '\r')
-#else
-	if (str[0] == 30)
-#endif
-	    str[0] = '\n';
-    }
-}
-
-static int my_strlen P1(char *, str)
-{
-    int sz = 0;
-
-    while (*str) {
-	sz++;
-	if (*str == '\"' || *str == '\\')
-	    sz++;
-	str++;
-    }
-    return sz;
-}
-
-/*
- * Does a strcpy, but also advances the buffer to point to the
- * end of the string so extra searches are unnecessary for later
- * catenation.
- */
-void bufcat P2(char **, buf, char *, str)
-{
-    while (*str) {
-	**buf = *str++;
-	(*buf)++;
-    }
-    **buf = 0;
-}
-
-/*
- * Similar to strcat(), but escapes all funny characters.
- * Used by save_object().
- * src is modified temporarily, but restored again :-(
- */
-static void my_strcat P2(char **, dest, char *, src)
-{
-    char *pt, *pt2, ch[2];
-
-    pt = strchr(src, '\\');
-    ch[1] = 0;
-    pt2 = strchr(src, '\"');
-    if ((pt2 && pt2 < pt) || (pt == 0))
-	pt = pt2;
-    while (pt) {
-	ch[0] = *pt;
-	*pt = 0;
-	bufcat(dest, src);
-	bufcat(dest, "\\");
-	bufcat(dest, ch);
-	src = pt + 1;
-	*pt = ch[0];
-	pt = strchr(src, '\\');
-	pt2 = strchr(src, '\"');
-	if ((pt2 && pt2 < pt) || (pt == 0))
-	    pt = pt2;
-    }
-    bufcat(dest, src);
-}
-
-int svalue_save_size P1(struct svalue *, v)
-{
-    char numbuf[SMALL_STRING_SIZE];
-    int mapping_save_size PROT((struct mapping *));
-    int size;
-
-    if (v->type == T_STRING)
-	return my_strlen(v->u.string) + 3;	/* my_ */
-    if (v->type == T_POINTER) {
-	save_svalue_depth++;
-	if (save_svalue_depth > MAX_SAVE_SVALUE_DEPTH) {
-	    return 0;
-	}
-	size = vector_save_size(v->u.vec);
-	save_svalue_depth--;
-	return 2 + size + 2 + 1;
-    }
-    if (v->type == T_MAPPING) {
-	save_svalue_depth++;
-	if (save_svalue_depth > MAX_SAVE_SVALUE_DEPTH) {
-	    return 0;
-	}
-	size = mapping_save_size(v->u.map);
-	save_svalue_depth--;
-	return size + 5;
-    }
-    if (v->type == T_NUMBER) {
-	sprintf(numbuf, "%d", v->u.number);
-	return (int) (strlen(numbuf) + 1);
-    }
-    if (v->type == T_REAL) {
-	sprintf(numbuf, "%f", v->u.real);
-	return (int) (strlen(numbuf) + 1);
-    }
-    return 2;
-}
-
-static int vector_save_size P1(struct vector *, v)
-{
-    int i, siz;
-
-    for (i = 0, siz = 0; i < v->size; i++)
-	siz += svalue_save_size(&v->item[i]);
-    return siz;
-}
-
-void save_svalue P2(struct svalue *, v, char **, buf)
-{
-    char *tbuf;
-
-    if (v->type == T_STRING) {
-	bufcat(buf, "\"");
-	my_strcat(buf, v->u.string);	/* my_ */
-	bufcat(buf, "\"");
-    } else if (v->type == T_POINTER) {
-	tbuf = save_array(v->u.vec);
-	bufcat(buf, tbuf);
-	FREE(tbuf);
-    } else if (v->type == T_NUMBER) {
-	sprintf(*buf, "%d", v->u.number);
-	*buf += strlen(*buf);
-    } else if (v->type == T_REAL) {
-	sprintf(*buf, "%f", v->u.real);
-	*buf += strlen(*buf);
-    } else if (v->type == T_MAPPING) {
-	tbuf = save_mapping(v->u.map);
-	bufcat(buf, tbuf);
-	FREE(tbuf);
-    }
-}
-
-/*
- * Encode an array of elements into a contiguous string.
- */
-static char *
-     save_array P1(struct vector *, v)
-{
-    char *buf, *p;
-    int i;
-
-    buf = DXALLOC(2 + vector_save_size(v) + 2 + 1, 79, "save_array");
-
-    p = buf;
-    bufcat(&p, "({");
-    for (i = 0; i < v->size; i++) {
-	save_svalue(&v->item[i], &p);
-	bufcat(&p, ",");
-    }
-    bufcat(&p, "})");
-    return buf;
-}
-
-static char *
-     my_string_copy P1(char *, str)
-{
-    char *apa, *cp;
-
-    cp = apa = DXALLOC(strlen(str) + 1, 82, "my_string_copy");
-
-    while (*str) {
-	if (*str == '\\') {
-	    *cp = str[1];
-	    if (str[1]) {
-		str += 2;
-	    } else {
-		str++;		/* String ends with a \\ buggy probably */
+	    while (c = *cp++){
+		if (c == '\\' || c == '\"') size++;
+		size++;
 	    }
-	    cp++;
-	} else {
-	    *cp = *str;
-	    cp++;
-	    str++;
+	    return 3 + size;
 	}
-    }
-    *cp = 0;
-    cp = string_copy(apa);
-    FREE(apa);
-    return cp;
-}
 
-/*
- * Find the size of an array or mapping. Return -1 for failure.
- */
-static int restore_size P2(char **, str, int, is_mapping)
-{
-    char *pt, *pt2;
-    int siz, tsiz;
+    case T_POINTER:
+	{
+	    struct svalue *sv = v->u.vec->item;
+	    int i = v->u.vec->size, size = 0;
 
-    pt = *str;
-    if (strncmp(pt, is_mapping ? "([" : "({", 2))
-	return -1;
-    else
-	pt += 2;
-    siz = 0;
-
-    while ((pt) && (*pt)) {
-	if (pt[0] == '}') {
-	    if (pt[1] != ')')
-		return -1;
-	    if (is_mapping)
-		return -1;
-	    *str = &pt[2];
-	    return siz;
+	    if (++save_svalue_depth > MAX_SAVE_SVALUE_DEPTH){
+		too_deep_save_error();
+	    }
+	    while (i--) size += svalue_save_size(sv++);
+	    save_svalue_depth--;
+	    return size + 5;
 	}
-	if (pt[0] == ']') {
-	    if (pt[1] != ')')
-		return -1;
-	    if (!is_mapping)
-		return -1;
-	    *str = &pt[2];
-	    return siz;
-	}
-	if (pt[0] == '\"') {
-	    for (pt2 = &pt[1]; *pt2 && (*pt2 != '\"'); pt2++) {
-		if (*pt2 == '\\') {
-		    pt2++;
+
+    case T_MAPPING:
+	{
+	    struct node **a = v->u.map->table, *elt;
+	    int j = v->u.map->table_size, size = 0;
+
+	    if (++save_svalue_depth > MAX_SAVE_SVALUE_DEPTH){
+                too_deep_save_error();
+	    }
+	    do {
+		for (elt = a[j]; elt; elt = elt->next){
+		    size += svalue_save_size(elt->values) +
+			    svalue_save_size(elt->values+1);
 		}
-	    }
-	    if (!*pt2) {
-		return -1;
-	    }
-	    pt2--;
-	    if (pt2[2] != ',' && pt2[2] != ':')
-		return -1;
-	    siz++;
-	    pt = &pt2[3];
-	} else if (pt[0] == '(') {
-	    tsiz = restore_size(&pt, pt[1] == '[');
-	    /* Lazy way of doing it, a bit inefficient */
-	    if (tsiz < 0)
-		return -1;
-	    pt++;
-	    siz++;
-	} else {
-	    if (is_mapping && !(siz % 2))
-		pt2 = strchr(pt, ':');
-	    else
-		pt2 = strchr(pt, ',');
-	    if (!pt2)
-		return -1;
-	    siz++;
-	    pt = &pt2[1];
+	    } while (j--);
+	    save_svalue_depth--;
+	    return size + 5;
 	}
+
+    case T_NUMBER:
+	{
+	    int res = v->u.number, len;
+	    len = res < 0 ? (res = -res,3) : 2;
+	    while (res>9) { res /= 10; len++; }
+	    return len;
+	}
+
+    case T_REAL:
+	{
+	    char buf[256];
+	    sprintf(buf, "%g", v->u.real);
+	    return (int)(strlen(buf)+1);
+	}
+
+    default:
+	{
+	    return 2;
+	}
+    }
+}
+
+INLINE void save_svalue P2(struct svalue *, v, char **, buf)
+{
+    switch(v->type){
+    case T_STRING:
+	{
+	    register char *cp = *buf, *str = v->u.string;
+	    char c;
+
+	    *cp++ = '"';
+	    while (c = *str++){
+		if (c == '"' || c == '\\'){
+		    *cp++ = '\\';
+		    *cp++ = c;
+		}
+#ifndef MSDOS
+		else *cp++ = (c == '\n') ? '\r' : c;
+#else
+		else *cp++ = (c == '\n') ? 30 : c;
+#endif
+	    }
+
+	    *cp++ = '"';
+	    *(*buf = cp) = '\0';
+	    return;
+	}
+
+    case T_POINTER:
+	{
+	    int i = v->u.vec->size;
+	    struct svalue *sv = v->u.vec->item;
+
+	    *(*buf)++ = '(';
+	    *(*buf)++ = '{';
+	    while (i--){
+		save_svalue(sv++, buf);
+		*(*buf)++ = ',';
+	    }
+	    *(*buf)++ = '}';
+	    *(*buf)++ = ')';
+	    *(*buf) = '\0';
+	    return;
+	}
+
+    case T_NUMBER:
+	{
+	    int res = v->u.number, fact, len = 1, neg = 0;
+	    register char *cp;
+
+	    if (res < 0) { len++, neg = 1, res = -res; }
+	    fact = res;
+	    while (fact > 9) { fact /= 10; len++; }
+	    *(cp = (*buf += len)) = '\0';
+	    do {
+		*--cp = res % 10 + '0';
+		res /= 10;
+	    } while (res);
+	    if (neg) *(cp-1) = '-';
+	    return;
+	}
+
+    case T_REAL:
+	{
+	    sprintf(*buf, "%g", v->u.real);
+	    (*buf) += strlen(*buf);
+	    return;
+	}
+
+    case T_MAPPING:
+	{
+	    int j = v->u.map->table_size;
+	    struct node **a = v->u.map->table, *elt;
+
+	    *(*buf)++ = '(';
+	    *(*buf)++ = '[';
+	    do {
+		for (elt = a[j]; elt; elt = elt = elt->next){
+		    save_svalue(elt->values, buf);
+		    *(*buf)++ = ':';
+		    save_svalue(elt->values + 1, buf);
+		    *(*buf)++ = ',';
+		}
+	    } while (j--);
+
+	    *(*buf)++ = ']';
+	    *(*buf)++ = ')';
+	    *(*buf) = '\0';
+	    return;
+	}
+    }
+}
+
+INLINE static int
+restore_internal_size P3(char **, str, int, is_mapping, int, depth)
+{
+    register char *cp = *str;
+    int size = 0;
+    char c, delim, index = 0;
+
+    delim = is_mapping ? ':' : ',';
+    while (c = *cp++){
+	switch(c){
+	case '\"':
+	    {
+		while ((c = *cp++) != '"')
+		    if ((c == '\0') || (c == '\\' && !*cp++)){
+			return 0;
+		    }
+		if (*cp++ != delim) return 0;
+		size++;
+		break;
+	    }
+
+	case '(':
+	    {
+		if (*cp == '{'){
+	            *str = ++cp;
+		    if (!restore_internal_size(str, 0, save_svalue_depth++)){
+			return 0;
+		    }
+		}
+		else if (*cp == '['){
+		    *str = ++cp;
+		    if (!restore_internal_size(str, 1, save_svalue_depth++)){ return 0;}
+		}
+		else { return 0;}
+		
+		if (*(cp = *str) != delim){ return 0;}
+		cp++;
+		size++;
+		break;
+	    }
+
+	case ']':
+	    {
+		if (*cp++ == ')' && is_mapping){
+		    *str = cp;
+		    if (!sizes){
+			max_depth = 128;
+			while (max_depth <= depth) max_depth <<= 1;
+			sizes = (int *) DXALLOC(max_depth * sizeof(int),
+						126, "restore_internal_size");
+			
+		    }
+		    else if (depth >= max_depth){
+			while ((max_depth <<= 1) <= depth);
+			sizes = (int *) DREALLOC(sizes, max_depth * sizeof(int),
+						 127, "restore_internal_size");
+		    }
+		    sizes[depth] = size;
+		    return 1;
+		}
+		else { return 0; }
+	    }
+
+	case '}':
+	    {
+		if (*cp++ == ')' && !is_mapping){
+		    *str = cp;
+                    if (!sizes){
+                        max_depth = 128;
+                        while (max_depth <= depth) max_depth <<= 1;
+                        sizes = (int *) DXALLOC(max_depth * sizeof(int),
+						126, "restore_internal_size");
+
+		    }
+                    else if (depth >= max_depth){
+                        while ((max_depth <<= 1) <= depth);
+                        sizes = (int *) DREALLOC(sizes, max_depth * sizeof(int),
+						 127, "restore_internal_size");
+		    }
+                    sizes[depth] = size;
+		    return 1;
+		}
+		else { return 0;}
+	    }
+
+	case ':':
+	case ',':
+	    {
+		if (c != delim) return 0;
+		size++;
+		break;
+	    }
+
+	default:
+	    {
+		if (!(cp = strchr(cp, delim))) return 0;
+		cp++;
+		size++;
+	    }
+	}
+	if (is_mapping) delim = (index ^= 1) ? ',' : ':';
+    }
+    return 0;
+}
+
+
+
+INLINE static int
+restore_size P2(char **, str, int, is_mapping)
+{
+    register char *cp = *str;
+    int size = 0;
+    char c, delim, index = 0;
+
+    delim = is_mapping ? ':' : ',';
+
+    while (c = *cp++){
+	switch(c){
+	case '\"':
+	    {
+		while ((c = *cp++) != '"')
+		    if ((c == '\0') || (c == '\\' && !*cp++)) return 0;
+
+		if (*cp++ != delim){ return -1; }
+		size++;
+		break;
+	    }
+
+	case '(':
+	    {
+		if (*cp == '{'){
+	            *str = ++cp;
+		    if (!restore_internal_size(str, 0, save_svalue_depth++)) return -1;
+		}
+		else if (*cp == '['){
+		    *str = ++cp;
+		    if (!restore_internal_size(str, 1, save_svalue_depth++)) return -1;
+		}
+		else { return -1; }
+		
+		if (*(cp = *str) != delim) { return -1;}
+		cp++;
+		size++;
+		break;
+	    }
+
+	case ']':
+	    {
+		save_svalue_depth = 0;
+		if (*cp++ == ')' && is_mapping){
+		    *str = cp;
+		    return size;
+		}
+		else { return -1;}
+	    }
+
+	case '}':
+	    {
+		save_svalue_depth = 0;
+		if (*cp++ == ')' && !is_mapping){
+		    *str = cp;
+		    return size;
+		}
+		else { return -1;}
+	    }
+
+	case ':':
+	case ',':
+	    {
+		if (c != delim) return -1;
+		size++;
+		break;
+	    }
+
+	default:
+	    {
+		if (!(cp = strchr(cp, delim))) { return -1;}
+		cp++;
+		size++;
+	    }
+	}
+	if (is_mapping) delim = (index ^= 1) ? ',' : ':';
     }
     return -1;
 }
 
-static struct vector *
-       restore_array P2(char **, str, int, is_mapping)
+INLINE static int
+restore_interior_string P2(char **, val, struct svalue *, sv)
 {
-    struct vector *v, *t;
-    char *pt, *pt2;
-    char delim;
-    int i, siz;
+    register char *cp = *val;
+    char *start = cp;
+    char c;
+    int len;
 
-    pt = *str;
-    if (is_mapping && strncmp(pt, "([", 2))
-	return 0;
-    else if (!is_mapping && strncmp(pt, "({", 2))
-	return 0;
-    pt2 = pt;
-    siz = restore_size(&pt2, is_mapping);
-    if (siz < 0)
-	return 0;
-    v = allocate_array(siz);
-    pt += 2;
+    while ((c = *cp++) != '"') {
+	switch (c){
+#ifndef MSDOS	    
+	case '\r':
+#else
+	case 30:
+#endif
+	    {
+		*(cp-1) = '\n';
+		break;
+	    }
 
-    for (i = 0; i < siz; i++) {
-	if (!*pt)
-	    return v;
-	if (is_mapping && !(i % 2))
-	    delim = ':';
-	else
-	    delim = ',';
-	if (pt[0] == '\"') {
-	    for (pt2 = &pt[1]; *pt2 && (*pt2 != '\"'); pt2++) {
-		if (*pt2 == '\\') {
-		    pt2++;
+	case '\\':
+	    {
+		char *new = cp - 1;
+
+		if (*new++ = *cp++){
+		    while ((c = *cp++) && (c != '"')){
+			if (c == '\\'){
+			    if (!(*new++ = *cp++)) return ROB_STRING_ERROR;
+			}
+			else {
+#ifndef MSDOS
+			    if (c == '\r')
+#else
+			    if (c == 30)
+#endif
+				*new++ = '\n';
+			    else *new++ = c;
+			}
+		    }
+		    if (c == '\0') return ROB_STRING_ERROR;
+		    *new = '\0';
+		    *val = cp;
+		    sv->u.string = DXALLOC((len = (new - start)) + 1, 102,
+				"restore_string");
+		    strcpy(sv->u.string, start);
+		    sv->type = T_STRING;
+		    sv->subtype = STRING_MALLOC;
+		    return 0;
 		}
+		else return ROB_STRING_ERROR;
 	    }
-	    if (!*pt2) {
-		return v;
-	    }
-	    pt2--;
-	    if (pt2[2] != delim)
-		return v;
-	    pt2[1] = 0;
-	    v->item[i].type = T_STRING;
-	    v->item[i].u.string = my_string_copy(pt + 1);	/* my_ */
-	    v->item[i].subtype = STRING_MALLOC;
-	    pt = &pt2[3];
-	} else if (pt[0] == '(' && pt[1] == '{') {
-	    t = restore_array(&pt, 0);
-	    if (!t)
-		return v;
-	    v->item[i].type = T_POINTER;
-	    v->item[i].u.vec = t;
-	    /*
-	     * v->item[i].u.vec->ref++; marion - ref is already 1
-	     * (allocate_array)
-	     */
-	    pt++;
-	} else if (pt[0] == '(' && pt[1] == '[') {
-	    struct mapping *m;
 
-	    m = restore_mapping(&pt);
-	    if (!m)
-		return v;
-	    v->item[i].type = T_MAPPING;
-	    v->item[i].u.map = m;
-	    pt++;
-	} else {
-	    pt2 = strchr(pt, delim);
-	    if (!pt2)
-		return v;
-	    pt2[0] = 0;
-	    if (strchr(pt, '.')) {
-		v->item[i].type = T_REAL;
-		sscanf(pt, "%f", &(v->item[i].u.real));
-	    } else {
-		v->item[i].type = T_NUMBER;
-		sscanf(pt, "%d", &(v->item[i].u.number));
+	case '\0':
+	    {
+		return ROB_STRING_ERROR;
 	    }
-	    pt = &pt2[1];
+
 	}
     }
-    if (is_mapping && strncmp(pt, "])", 2))
-	return v;
-    if (!is_mapping && strncmp(pt, "})", 2))
-	return v;
-    *str = &pt[2];
-    return v;
-}
 
-static struct mapping
-       *restore_mapping P1(char **, str)
-{
-    struct vector *v;
-    struct mapping *newmap;
-
-    /* We take the easy way out. */
-    v = restore_array(str, 1);
-    if (!v)
-	return (struct mapping *) 0;
-    newmap = load_mapping_from_aggregate(&v->item[0], v->size);
-    free_vector(v);
-    return newmap;
-}
-
-int restore_svalue P2(char *, val, struct svalue *, v)
-{
-    if (val[0] == '\"') {
-	restore_newline(val + 1);
-	free_svalue(v);
-	v->type = T_STRING;
-	val[strlen(val) - 1] = '\0';	/* don't copy the ending quote (") */
-	v->u.string = my_string_copy(val + 1);
-	v->subtype = STRING_MALLOC;
-	return 0;
-    }
-/* Restore array: JnA 910520
-*/
-    if (val[0] == '(' && val[1] == '{') {
-	char *pt = val;
-
-	restore_newline(val + 1);
-	free_svalue(v);
-	v->type = T_POINTER;
-	v->u.vec = restore_array(&pt, 0);
-	if (!v->u.vec) {
-	    *v = const0n;
-	    return -1;
-	}
-	return 0;
-    }
-/* Restore mapping: JTR 01/24/92
-*/
-    if (val[0] == '(' && val[1] == '[') {
-	char *pt = val;
-
-	restore_newline(val + 1);
-	free_svalue(v);
-	v->type = T_MAPPING;
-	v->u.map = restore_mapping(&pt);
-	if (!v->u.map) {
-	    *v = const0n;
-	    return -2;
-	}
-	return 0;
-    }
-/* Restore real: blackthorn 2/24/93
-*/
-
-    if (strchr(val, '.')) {
-	free_svalue(v);
-	v->type = T_REAL;
-	if (sscanf(val, "%f", &(v->u.real)) == 1)
-	    return 0;
-    }
-    free_svalue(v);
-    v->type = T_NUMBER;
-    v->u.number = atoi(val);
+    *val = cp;
+    *--cp = '\0';
+    len = cp - start;
+    sv->u.string = DXALLOC(len + 1, 100, "restore_string");
+    strcpy(sv->u.string, start);
+    sv->type = T_STRING;
+    sv->subtype = STRING_MALLOC;
     return 0;
 }
 
-static void restore_object_from_buff P4(struct object *, ob, char *, theBuff, char *, name, char *, val)
+extern int total_mapping_size, total_mapping_nodes;
+
+#define PARSE_NUMERIC(X,Y,Z) \
+    { \
+                int res = c - '0'; \
+	\
+                while ((c = *cp++) >= '0' && c <= '9'){ \
+                    res *= 10, res += c - '0'; \
+		} \
+                if (c == '.'){ \
+                    float f1 = 0.0, f2 = 10.0; \
+                    int hh = 0; \
+			\
+                    while ((c = *cp++) >= '0' && c <= '9' && !(++hh & 8)){ \
+                        f1 += (c - '0') / f2; \
+                        f2 *= 10.0; \
+		    } \
+                    if (!hh)  \
+			Z; \
+		    X; \
+		} \
+                else { \
+		    Y; \
+		} \
+                break; \
+    } \
+
+INLINE static void add_map_stats P2(struct mapping *, m, int, count)
 {
-    char *buff, *nextBuff, *tmp, *theEnd, *space;
-    char var[100];
-    struct variable *p;
-    int rc;
+    total_mapping_nodes += count;
+    total_mapping_size += count * sizeof(struct node);
+#ifndef NO_MUDLIB_STATS
+    add_array_size(&m->stats, count << 1);
+#endif
+    m->count = count;
+}
 
-    theEnd = theBuff + strlen(theBuff);
-    nextBuff = theBuff;
+int growMap PROT((struct mapping *));
+
+static int
+restore_mapping P2(char **,str, struct svalue *, sv)
+{
+    int size, i, oi, mask, count = 0;
+    char c;
+    struct mapping *m;
+    struct svalue key, value;
+    struct node **a, *elt, *elt2;
+    register char *cp = *str;
+    int err;
+
+    if (save_svalue_depth) size = sizes[save_svalue_depth-1]; 
+    else if ((size = restore_size(str, 1)) < 0) return 0;
+    
+    if (!size) {
+	*str += 2;
+	sv->u.map = allocate_mapping(0);
+	sv->type = T_MAPPING;
+	return 0;
+    }
+    m = allocate_mapping(size >> 1); /* have to clean up after this or */
+    a = m->table;                    /* we'll leak */
+    mask = m->table_size;
+    
     while (1) {
-	struct svalue *v;
+	switch (c = *cp++) {
+	case '"':
+	    {
+		*str = cp;
+		if (err = restore_hash_string(str, &oi, &key))
+		    goto key_error;
+		cp = *str;
+		cp++;
+		break;
+	    }
+	    
+	case '(':
+	    {
+		save_svalue_depth++;
+		if (*cp == '['){
+		    *str = ++cp;
+		    if (err = restore_mapping(str, &key))
+			goto key_error;
+		    oi = (int) key.u.map;
+		}
+		else if (*cp == '{'){
+		    *str = ++cp;
+		    if (err = restore_array(str, &key))
+			goto key_error;
+		    oi = (int) key.u.vec;
+		}
+		else goto generic_key_error;
+		cp = *str;
+		cp++;
+		break;
+	    }
+	    
+	case ':':
+	    {
+		oi = key.u.number = 0;
+		key.type = T_NUMBER;
+		break;
+	    }
+	    
+	case ']':
+	    *str = ++cp;
+	    add_map_stats(m, count);
+	    sv->type = T_MAPPING;
+	    sv->u.map = m;
+	    return 0;
 
-	buff = nextBuff;
-	if (!buff || (buff == theEnd))
+	case '-':
+	    if ((c = *cp++) < '0' || c > '9') {
+		goto key_numeral_error;
+	    }
+	    PARSE_NUMERIC(oi = 0;key.u.real = -(f1+res); key.type = T_REAL,
+			  key.type = T_NUMBER; key.u.number = -(oi = res),
+			  goto key_numeral_error)
+		
+	case '0': case '1': case '2': case '3': case '4':
+	case '5': case '6': case '7': case '8': case '9':
+	    {
+		PARSE_NUMERIC(oi = 0; key.u.real = f1+res;key.type = T_REAL,
+			      key.type = T_NUMBER; oi = key.u.number = res,
+			      goto key_numeral_error)
+	    }
+	    
+	default:
+	    goto generic_key_error;
+	}
+
+	/* At this point, key is a valid, referenced svalue and we're
+	   responsible for it */
+	
+	switch (c = *cp++){
+	case '"':
+	    {
+		*str = cp;
+		if (err = restore_interior_string(str, &value))
+		    goto value_error;
+		cp = *str;
+		cp++;
+		break;
+	    }
+	    
+	case '(':
+	    {
+		save_svalue_depth++;
+		if (*cp == '['){
+		    *str = ++cp;
+		    if (err = restore_mapping(str, &value))
+			goto value_error;
+		}
+		else if (*cp == '{'){
+		    *str = ++cp;
+		    if (err = restore_array(str, &value))
+			goto value_error;
+		}
+		else goto generic_value_error;
+		cp = *str;
+		cp++;
+		break;
+	    }
+	    
+	case '-':
+	    {
+		if ((c = *cp++) < '0' || c > '9') {
+		    goto value_numeral_error;
+		}
+		PARSE_NUMERIC((value.u.real = -(f1+res), value.type = T_REAL),
+			      (value.type = T_NUMBER, value.u.number = -res),
+			      goto value_numeral_error)
+	    }
+	    
+	case '0': case '1': case '2': case '3': case '4':
+	case '5': case '6': case '7': case '8': case '9':
+	    {
+		PARSE_NUMERIC((value.u.real = (f1+res),value.type = T_REAL),
+			      (value.type = T_NUMBER,value.u.number = res),
+			      goto value_numeral_error)
+	    }
+	    
+	case ',':
+	    {
+		value.u.number = 0;
+		value.type = T_NUMBER;
+		break;
+	    }
+	    
+	default:
+	    goto generic_value_error;
+	}
+
+	/* both key and value are valid, referenced svalues */
+
+	i = oi & mask;
+	if (elt2 = elt = a[i]){
+	    do {
+		if (sameval(&key, elt->values)){
+		    free_svalue(&key, "restore_mapping: duplicate key");
+		    free_svalue(elt->values+1, "restore_mapping: replaced value");
+		    *(elt->values+1) = value;
+		    break;
+		}
+	    } while (elt = elt->next);
+	    if (elt)
+		continue;
+	} else if (!(--m->unfilled)){
+	    if (growMap(m)){
+		a = m->table;
+		if (oi & ++mask) elt2 = a[i |= mask];
+		mask <<= 1;
+		mask--;
+	    } else {
+		add_map_stats(m, count);
+		free_mapping(m);
+		free_svalue(&key, "restore_mapping: out of memory");
+		free_svalue(&value, "restore_mapping: out of memory");
+		error("Out of memory\n");
+	    }
+	}
+	
+	if (++count > MAX_MAPPING_SIZE) {
+	    add_map_stats(m, count -1);
+	    free_mapping(m);
+	    free_svalue(&key, "restore_mapping: mapping too large");
+	    free_svalue(&value, "restore_mapping: mapping too large");
+	    mapping_too_large();
+	}
+	
+	elt = (struct node *) DXALLOC(sizeof(struct node), 81,
+				      "restore_mapping");
+	*elt->values = key;
+	*(elt->values + 1) = value;
+	elt->hashval = oi;
+	(a[i] = elt)->next = elt2;
+    }
+
+    /* something went wrong */
+ value_numeral_error:
+    free_svalue(&key, "restore_mapping: numeral value error");
+ key_numeral_error:
+    add_map_stats(m, count);
+    free_mapping(m);
+    return ROB_NUMERAL_ERROR;
+ generic_value_error:
+    free_svalue(&key, "restore_mapping: generic value error");
+ generic_key_error:
+    add_map_stats(m, count);
+    free_mapping(m);
+    return ROB_MAPPING_ERROR;
+ value_error:
+    free_svalue(&key, "restore_mapping: value error");
+ key_error:
+    add_map_stats(m, count);
+    free_mapping(m);
+    return err;
+}
+
+
+INLINE static int
+restore_array P2(char **, str, struct svalue *, ret)
+{   
+    int size;
+    char c;
+    struct vector *v;
+    struct svalue *sv;
+    register char *cp = *str;
+    int err;
+
+    if (save_svalue_depth) size = sizes[save_svalue_depth-1];
+    else if ((size = restore_size(str,0)) < 0) return ROB_ARRAY_ERROR; 
+
+    v = allocate_array(size); /* after this point we have to clean up
+				 or we'll leak */
+    sv = v->item;
+
+    while (size--) {
+	switch (c = *cp++) {
+	case '"':
+	    *str = cp;
+	    if (err = restore_interior_string(str, sv))
+		goto generic_error;
+	    cp = *str;
+	    cp++;
+	    sv++;
 	    break;
-	if ((tmp = strchr(buff, '\n'))) {
-	    *tmp = '\0';
-	    nextBuff = tmp + 1;
-	} else {
-	    nextBuff = 0;
-	}
-	if (buff[0] == '#')	/* ignore 'comments' in savefiles */
-	    continue;
-	space = strchr(buff, ' ');
-	if ((space == 0) || ((space - buff) >= sizeof(var))) {
-	    FREE(val);
-	    FREE(name);
-	    FREE(theBuff);
-	    error("restore_object(): Illegal file format.\n");
-	}
-	(void) strncpy(var, buff, space - buff);
-	var[space - buff] = '\0';
-	(void) strcpy(val, space + 1);
-	p = find_status(var, 0);
-	if (p == 0 || (p->type & TYPE_MOD_STATIC))
-	    continue;
 
-	v = &ob->variables[p - ob->prog->p.i.variable_names];
-	rc = restore_svalue(val, v);
-	if (rc < 0) {
-	    FREE(val);
-	    FREE(name);
-	    FREE(theBuff);
+	case ',':
+	    sv++;
+	    break;
 
-	    if (rc == -1)
-		error("restore_object(): Illegal array format.\n");
-	    else if (rc == -2)
-		error("restore_object(): Illegal mapping format.\n");
+	case '(':
+	    {
+		save_svalue_depth++;
+		if (*cp == '['){
+		    *str = ++cp;
+		    if (err = restore_mapping(str, sv))
+			goto error;
+		}
+		else if (*cp == '{'){
+		    *str = ++cp;
+		    if (err = restore_array(str, sv))
+			goto error;
+		}
+		else goto generic_error;
+		sv++;
+		cp = *str;
+		cp++;
+		break;
+	    }
+
+	case '-':
+	    {
+		if ((c = *cp++) < '0' || c > '9') {
+		    err = ROB_NUMERAL_ERROR;
+		    goto error;
+		}
+		PARSE_NUMERIC((sv->u.real = -(f1+res), (sv++)->type = T_REAL),
+			      ((sv++)->u.number = -res),
+			      goto numeral_error)
+	    }
+
+	case '0': case '1': case '2': case '3': case '4':
+	case '5': case '6': case '7': case '8': case '9':
+	    {
+		PARSE_NUMERIC((sv->u.real = (f1+res), (sv++)->type = T_REAL),
+			      ((sv++)->u.number = res),
+			      goto numeral_error)
+	    }
+
+	default:
+	    goto generic_error;
 	}
+    }
+
+    cp += 2;
+    *str = cp;
+    ret->u.vec = v;
+    ret->type = T_POINTER;
+    return 0;
+    /* something went wrong */
+ numeral_error:
+    err = ROB_NUMERAL_ERROR;
+    goto error;
+ generic_error:
+    err = ROB_ARRAY_ERROR;
+ error:
+    free_vector(v);
+    return err;
+}
+
+INLINE int
+restore_string P2(char *, val, struct svalue *, sv)
+{
+    register char *cp = val;
+    char *start = cp;
+    char c;
+    int len;
+
+    while ((c = *cp++) != '"') {
+        switch (c){
+#ifndef MSDOS
+	case '\r':
+#else
+	case 30:
+#endif
+            {
+                *(cp-1) = '\n';
+                break;
+	    }
+
+	case '\\':
+            {
+                char *new = cp - 1;
+
+                if (*new++ = *cp++){
+                    while ((c = *cp++) && (c != '"')){
+                        if (c == '\\'){
+                            if (!(*new++ = *cp++)) return ROB_STRING_ERROR;
+			}
+                        else {
+#ifndef MSDOS
+                            if (c == '\r')
+#else
+                            if (c == 30)
+#endif
+                                *new++ = '\n';
+                            else *new++ = c;
+			}
+		    }
+                    if ((c == '\0') || (*cp != '\0')) return ROB_STRING_ERROR;
+                    *new = '\0';
+                    sv->u.string = DXALLOC(new - start + 1, 102,
+					   "restore_string");
+                    strcpy(sv->u.string, start);
+		    sv->type = T_STRING;
+		    sv->subtype = STRING_MALLOC;
+                    return 0;
+		}
+                else return ROB_STRING_ERROR;
+	    }
+
+	case '\0':
+            {
+                return ROB_STRING_ERROR;
+	    }
+
+	}
+    }
+
+    if (*cp--) return ROB_STRING_ERROR;
+    *cp = '\0';
+    len = cp - start;
+    sv->u.string = DXALLOC(len + 1, 100, "restore_string");
+    strcpy(sv->u.string, start);
+    sv->type = T_STRING;
+    sv->subtype = STRING_MALLOC;
+    return 0;
+}
+
+/* for this case, the variable in question has been set to zero already,
+   and we don't have to worry about preserving it */
+INLINE int
+restore_svalue P2(char *, cp, struct svalue *, v)
+{
+    switch(*cp++) {
+    case '\"':
+	return restore_string(cp, v);
+    case '(':
+	{
+	    if (*cp == '{'){
+		cp++;
+		return restore_array(&cp, v);
+	    } else if (*cp++ == '[') {
+		return restore_mapping(&cp, v);
+	    }
+	    else return ROB_GENERAL_ERROR;
+	}
+
+    case '-':
+	{
+	    char c;
+
+	    if ((c = *cp++) < '0' || (c > '9')) return ROB_NUMERAL_ERROR;
+	    PARSE_NUMERIC((v->type = T_REAL, v->u.real = -f1-res),
+			  (v->type = T_NUMBER, v->u.number = -res),
+			  return ROB_NUMERAL_ERROR);
+	}
+
+    case '0': case '1': case '2': case '3': case '4':
+    case '5': case '6': case '7': case '8': case '9':
+        {
+	    char c = *(cp-1);
+	    PARSE_NUMERIC((v->type = T_REAL, v->u.real = f1+res),
+			  (v->type = T_NUMBER, v->u.number = res),
+			  return ROB_NUMERAL_ERROR);
+	}
+
+    default: {
+	    v->type = T_NUMBER;
+	    v->u.number = 0;
+	}
+    }
+    return 0;
+}
+
+/* for this case, we're being careful and want to leave the value alone on
+   an error */
+INLINE int
+safe_restore_svalue P2(char *, cp, struct svalue *, v)
+{
+    int ret;
+    struct svalue val = { T_NUMBER };
+    switch(*cp++) {
+    case '\"':
+	if (ret = restore_string(cp, &val)) return ret;
+	break;
+    case '(':
+	{
+	    if (*cp == '{'){
+		cp++;
+		if (ret = restore_array(&cp, &val)) return ret;
+	    } else if (*cp++ == '[') {
+		if (ret = restore_mapping(&cp, &val)) return ret;
+	    }
+	    else return ROB_GENERAL_ERROR;
+	    break;
+	}
+	
+    case '-':
+	{
+	    char c;
+	    
+	    if ((c = *cp++) < '0' || (c > '9')) return ROB_NUMERAL_ERROR;
+	    PARSE_NUMERIC((val.type = T_REAL, val.u.real = -f1-res),
+			  (val.type = T_NUMBER, val.u.number = -res),
+			  return ROB_NUMERAL_ERROR);
+	}
+	
+    case '0': case '1': case '2': case '3': case '4':
+    case '5': case '6': case '7': case '8': case '9':
+        {
+	    char c = *(cp-1);
+	    PARSE_NUMERIC((val.type = T_REAL, val.u.real = f1+res),
+			  (val.type = T_NUMBER, val.u.number = res),
+			  return ROB_NUMERAL_ERROR);
+	}
+
+    default:
+	val.type = T_NUMBER;
+	val.u.number = 0;
+    }
+    free_svalue(v, "safe_restore_svalue");
+    *v = val;
+    return 0;
+}
+
+static int var_index = 0;
+
+static struct variable *find_status P1(char *, str) {
+    int i;
+    struct variable *vars = current_object->prog->p.i.variable_names;
+    int n = current_object->prog->p.i.num_variables;
+    
+    if (str = findstring(str)) {
+	for (i=var_index; i < n; i++) {
+	    if (vars[i].name == str) {
+		var_index = i+1;
+		return &vars[i];
+	    }
+	}
+	for (i=0; i < var_index; i++) {
+	    if (vars[i].name == str) {
+		var_index = i+1;
+		return &vars[i];
+	    }
+	}
+    }
+    /* leave var_index alone; they might have just deleted this var */
+    return 0;
+}
+
+void
+restore_object_from_buff P4(struct object *, ob, char *, theBuff, char *, name,
+			    int, noclear)
+{
+    char *buff, *nextBuff, *tmp,  *space;
+    char var[100];
+    struct variable *p, *var_start = ob->prog->p.i.variable_names;
+    struct svalue *sv = ob->variables;
+    int rc;
+ 
+    var_index = 0;
+
+    nextBuff = theBuff;
+    while ((buff = nextBuff) && *buff) {
+        struct svalue *v;
+ 
+        if ((tmp = strchr(buff, '\n'))) {
+            *tmp = '\0';
+            nextBuff = tmp + 1;
+        } else {
+            nextBuff = 0;
+        }
+        if (buff[0] == '#') /* ignore 'comments' in savefiles */
+            continue;
+        space = strchr(buff, ' ');
+        if (!space || ((space - buff) >= sizeof(var))) {
+            FREE(name);
+            FREE(theBuff);
+            error("restore_object(): Illegal file format.\n");
+        }
+        (void)strncpy(var, buff, space - buff);
+        var[space - buff] = '\0';
+        p = find_status(var);
+        if (!p || (p->type & TYPE_MOD_STATIC))
+            continue;
+
+        v = &sv[p - var_start];
+	if (noclear)
+	    rc = safe_restore_svalue(space+1, v);
+	else
+	    rc = restore_svalue(space+1, v);
+	if (save_svalue_depth){
+	    save_svalue_depth = max_depth = 0;
+	    FREE((char *) sizes);
+	    sizes = (int *) 0;
+	}
+        if (rc & ROB_ERROR) {
+            FREE(name);
+            FREE(theBuff);
+
+	    if (rc & ROB_GENERAL_ERROR)
+		error("restore_object(): Illegal general format while restoring %s.\n", var);
+	    else if (rc & ROB_NUMERAL_ERROR)
+		error("restore_object(): Illegal numeric format while restoring %s.\n", var);
+	    else if (rc & ROB_ARRAY_ERROR)
+                error("restore_object(): Illegal array format while restoring %s.\n", var);
+            else if (rc & ROB_MAPPING_ERROR)
+                error("restore_object(): Illegal mapping format while restoring %s.\n", var);
+	    else if (rc & ROB_STRING_ERROR)
+		error("restore_object(): Illegal string format while restoring %s.\n", var);
+        }
     }
 }
 
@@ -552,105 +1086,100 @@ static void restore_object_from_buff P4(struct object *, ob, char *, theBuff, ch
  * to assertain that the write is legal.
  * If 'save_zeros' is set, 0 valued variables will be saved
  */
-int save_object P3(struct object *, ob, char *, file, int, save_zeros)
+int
+save_object P3(struct object *, ob, char *, file, int, save_zeros)
 {
     char *name;
     static char tmp_name[80];
     int len, i;
     FILE *f;
     int failed = 0;
-    char *use_name;
-    int free_use_name = 0;
-
-    /* struct svalue *v; */
+    char *use_name, *new_string, *p;
+    int free_use_name = 0, theSize;
+    struct variable *var = ob->prog->p.i.variable_names;
+    struct svalue *v = ob->variables;
 
     if (ob->flags & O_DESTRUCTED)
-	return 0;
-    if (file[0] != '/') {
-	use_name = DXALLOC(strlen(file) + 2, 80, "save_object: 1");
+        return 0;
+    if (file[0] != '/')
+    {
+	use_name = DXALLOC((len = strlen(file)) + 2, 80, "save_object: 1");
 	strcpy(use_name, "/");
-	strcat(use_name, file);
+	strcpy(use_name+1, file);
 	free_use_name = 1;
-    } else
+    } else {
 	use_name = file;
+	len = 0;
+    }
 
     file = check_valid_path(use_name, ob, "save_object", 1);
-    if (file == 0)
-	error("Denied write permission in save_object().\n");
-    len = strlen(file);
-    name = DXALLOC(len + strlen(SAVE_EXTENSION) + 1, 80, "save_object: 1");
-    (void) strcpy(name, file);
+
     if (free_use_name)
-	FREE(use_name);
+      FREE(use_name);
+
+    if (file == 0)
+        error("Denied write permission in save_object().\n");
+    if (!len) len = strlen(file);
+    name = DXALLOC(len + strlen(SAVE_EXTENSION) + 1, 80, "save_object: 1");
+    (void)strcpy(name, file);
 #ifndef MSDOS
-    (void) strcat(name, SAVE_EXTENSION);
+    (void)strcat(name + len, SAVE_EXTENSION);
 #endif
     /*
-     * Write the save-files to different directories, just in case they are
-     * on different file systems.
+     * Write the save-files to different directories, just in case
+     * they are on different file systems.
      */
     sprintf(tmp_name, "%s.tmp", name);
 #ifdef MSDOS
-    (void) strcat(name, SAVE_EXTENSION);
+    (void)strcat(name, SAVE_EXTENSION);
 #endif
-    f = fopen(tmp_name, "w");
-    if (f == 0) {
+    if (!(f = fopen(tmp_name, "w"))){
 	FREE(name);
-	error("Could not open %s for a save.\n", tmp_name);
+        error("Could not open %s for a save.\n", tmp_name);
     }
     fprintf(f, "#%s\n", ob->prog->name);
-    for (i = 0; i < (int) ob->prog->p.i.num_variables; i++) {
-	struct svalue *v = &ob->variables[i];
-	char *new_string, *p;
-	int theSize;
 
-	if (ob->prog->p.i.variable_names[i].type & TYPE_MOD_STATIC)
-	    continue;
+    i = ob->prog->p.i.num_variables;
+    while (i--){
+	if (var->type & TYPE_MOD_STATIC) { v++; var++; continue; }
 
 	save_svalue_depth = 0;
 	theSize = svalue_save_size(v);
-	if (save_svalue_depth > MAX_SAVE_SVALUE_DEPTH) {
-	    error("Mappings and/or arrays nested too deep (%d) for save_object\n",
-		  MAX_SAVE_SVALUE_DEPTH);
-	}
-	new_string = (char *) DXALLOC(theSize, 81, "save_object: 2");
+	new_string = (char *)DXALLOC(theSize, 81, "save_object: 2");
 	*new_string = '\0';
-	p = new_string;
-	save_svalue(v, &p);
-	replace_newline(new_string);
-	if (save_zeros || strcmp(new_string, "0"))	/* Armidale */
-	    if (fprintf(f, "%s %s\n", ob->prog->p.i.variable_names[i].name,
-			new_string) == EOF) {
-		failed = 1;
-	    }
+	p = new_string;	
+	save_svalue(v++, &p);
+	if (save_zeros || strcmp(new_string,"0")) /* Armidale */
+	    if (fprintf(f, "%s %s\n", var->name, new_string) == EOF) failed = 1;
 	FREE(new_string);
+	var++;
     }
-    if (failed) {
-	add_message("Failed to completely save file. Disk could be full.\n");
-    } else {
+    if (failed) add_message("Failed to completely save file. Disk could be full.\n");
+    else {
 	(void) fclose(f);
 #ifdef OS2
-	/* Need to erase it to write over it. */
-	unlink(name);
+        /* Need to erase it to write over it. */
+        unlink(name);
 #endif
-	if (rename(tmp_name, name) < 0) {
+	if (rename(tmp_name, name) < 0)
+	{
 #ifdef LATTICE
-	    /* AmigaDOS won't overwrite when renaming */
-	    if (errno == EEXIST) {
-		unlink(name);
-		if (rename(tmp_name, name) >= 0) {
-		    FREE(name);
-		    return 1;
-		}
-	    }
+                /* AmigaDOS won't overwrite when renaming */
+                if (errno == EEXIST) {
+                    unlink(name);
+                    if (rename(tmp_name, name) >= 0) {
+                        FREE(name);
+                        return 1;
+                    }
+                }
 #endif
-	    perror(name);
-	    printf("Failed to rename %s to %s\n", tmp_name, name);
-	    add_message("Failed to save object!\n");
+		perror(name);
+		printf("Failed to rename %s to %s\n", tmp_name, name);
+		add_message("Failed to save object!\n");
 	}
     }
     FREE(name);
-    if (failed) {
+    if (failed) {   
 	add_message("Failed to save to file. Disk could be full.\n");
 	return 0;
     }
@@ -658,32 +1187,51 @@ int save_object P3(struct object *, ob, char *, file, int, save_zeros)
 }
 
 
+/*
+ * return a string representing an svalue in the form that save_object()
+ * would write it.
+ */
+char *
+save_variable P1(struct svalue *, var)
+{
+    int theSize;
+    char *new_string, *p;
+    
+    save_svalue_depth = 0;
+    theSize = svalue_save_size(var);
+    new_string = (char *)DXALLOC(theSize, 81, "save_object: 2");
+    *new_string = '\0';
+    p = new_string;
+    save_svalue(var, &p);
+    return new_string;
+}
+
+
 int restore_object P3(struct object *, ob, char *, file, int, noclear)
 {
-    char *name, *val, *theBuff;
-    int len, num_var, i;
+    char *name, *theBuff;
+    int len, i;
     FILE *f;
     struct object *save = current_object;
     struct stat st;
 
     if (ob->flags & O_DESTRUCTED)
-	return 0;
+        return 0;
 
     file = check_valid_path(file, ob, "restore_object", 0);
-    if (file == 0)
-	error("Denied read permission in restore_object().\n");
+    if (!file) error("Denied read permission in restore_object().\n");
 
     len = strlen(file);
     name = DXALLOC(len + strlen(SAVE_EXTENSION) + 1, 83, "restore_object: 2");
-    (void) strcpy(name, file);
-    if (name[len - 2] == '.' &&
+    (void)strcpy(name, file);
+    if (name[len-2] == '.' &&
 #ifndef LPC_TO_C
-	name[len - 1] == 'c')
+        name[len - 1] == 'c')
 #else
-	(name[len - 1] == 'c' || name[len - 1] == 'C'))
+        (name[len - 1] == 'c' || name[len - 1] == 'C'))
 #endif
-	name[len - 2] = 0;
-    (void) strcat(name, SAVE_EXTENSION);
+        name[len-2] = 0;
+    (void)strcat(name, SAVE_EXTENSION);
 #ifdef LATTICE
     f = NULL;
     if ((stat(name, &st) == -1) || !(f = fopen(name, "r"))) {
@@ -691,49 +1239,96 @@ int restore_object P3(struct object *, ob, char *, file, int, noclear)
     f = fopen(name, "r");
     if (!f || fstat(fileno(f), &st) == -1) {
 #endif
-	FREE(name);
-	if (f)
-	    (void) fclose(f);
-	return 0;
+        FREE(name);
+        if (f) 
+            (void)fclose(f);
+        return 0;
     }
-    if (st.st_size == 0) {
-	(void) fclose(f);
-	FREE(name);
-	return 0;
-    }
-    val = DXALLOC(st.st_size + 1, 84, "restore_object: 3");
-    theBuff = DXALLOC(st.st_size + 1, 85, "restore_object: 4");
-    fread(theBuff, 1, st.st_size, f);
-    fclose(f);
-    theBuff[st.st_size] = '\0';
-    current_object = ob;
 
-    /*
-     * This next bit added by Armidale@Cyberworld 1/1/93 If 'noclear' flag is
-     * not set, all non-static variables will be initialized to 0 when
-     * restored.
+    if (!(i = st.st_size)) {
+        (void)fclose(f);
+        FREE(name);
+        return 0;
+    }
+    theBuff = DXALLOC(i + 1, 85, "restore_object: 4");
+    fread(theBuff, 1, i, f);
+    fclose(f);
+    theBuff[i] = '\0';
+    current_object = ob;
+    
+    /* This next bit added by Armidale@Cyberworld 1/1/93
+     * If 'noclear' flag is not set, all non-static variables will be
+     * initialized to 0 when restored.
      */
     if (!noclear) {
-	num_var = ob->prog->p.i.num_variables;
-	for (i = 0; i < num_var; i++) {
-	    if (!(ob->prog->p.i.variable_names[i].type & TYPE_MOD_STATIC))
-		assign_svalue(&ob->variables[i], &const0n);
+	struct variable *v = ob->prog->p.i.variable_names;
+	struct svalue *sv = ob->variables;
+
+	i = ob->prog->p.i.num_variables; 
+	while (i--) {
+	    if (!((v++)->type & TYPE_MOD_STATIC))
+		assign_svalue(sv++, &const0n);
+	    else sv++;
 	}
     }
-    restore_object_from_buff(ob, theBuff, name, val);
+    
+    restore_object_from_buff(ob, theBuff, name, noclear);
     current_object = save;
     if (d_flag > 1)
-	debug_message("Object %s restored from %s.\n", ob->name, name);
+        debug_message("Object %s restored from %s.\n", ob->name, name);
     FREE(name);
     FREE(theBuff);
-    FREE(val);
     return 1;
+}
+
+void restore_variable P2(struct svalue *, var, char *, str)
+{
+    int rc;
+
+    rc = restore_svalue(str, var);
+    if (save_svalue_depth){
+	save_svalue_depth = max_depth = 0;
+	FREE((char *) sizes);
+	sizes = (int *) 0;
+    }
+    if (rc & ROB_ERROR) {
+	*var = const0; /* clean up */
+	if (rc & ROB_GENERAL_ERROR)
+	    error("restore_object(): Illegal general format.\n");
+	else if (rc & ROB_NUMERAL_ERROR)
+	    error("restore_object(): Illegal numeric format.\n");
+	else if (rc & ROB_ARRAY_ERROR)
+	    error("restore_object(): Illegal array format.\n");
+	else if (rc & ROB_MAPPING_ERROR)
+	    error("restore_object(): Illegal mapping format.\n");
+	else if (rc & ROB_STRING_ERROR)
+	    error("restore_object(): Illegal string format.\n");
+    }
 }
 
 void tell_npc P2(struct object *, ob, char *, str)
 {
     push_constant_string(str);
-    (void) apply(APPLY_CATCH_TELL, ob, 1);
+    (void) apply(APPLY_CATCH_TELL, ob, 1, ORIGIN_DRIVER);
+}
+
+ /* save some space snoop */
+#define ALM_BREAK LARGEST_PRINTABLE_STRING - 10
+
+static void add_long_message P1(char *, s) {
+    char save;
+    int len;
+
+    len = strlen(s);
+    while (len > ALM_BREAK) {
+	save = s[ALM_BREAK];
+	s[ALM_BREAK] = 0;
+	add_message("%s", s);
+	s[ALM_BREAK] = save;
+	s += ALM_BREAK;
+	len -= ALM_BREAK;
+    }
+    add_message("%s", s);
 }
 
 /*
@@ -749,11 +1344,11 @@ void tell_npc P2(struct object *, ob, char *, str)
 void tell_object P2(struct object *, ob, char *, str)
 {
     struct object *save_command_giver;
-
+    
     save_command_giver = command_giver;
     if (!ob || (ob->flags & O_DESTRUCTED)) {
 	command_giver = 0;
-	add_message("%s", str);
+	add_long_message(str);
 	command_giver = save_command_giver;
 	return;
     }
@@ -763,7 +1358,7 @@ void tell_object P2(struct object *, ob, char *, str)
 #else
     if (ob->interactive) {
 	command_giver = ob;
-	add_message("%s", str);
+	add_long_message(str);
 	command_giver = save_command_giver;
 	return;
     }
@@ -904,9 +1499,9 @@ static struct object *hashed_living[LIVING_HASH_SIZE];
 
 static int num_living_names, num_searches = 1, search_length = 1;
 
-static int hash_living_name P1(char *, str)
+static INLINE int hash_living_name P1(char *, str)
 {
-    return hashstr(str, 100, LIVING_HASH_SIZE);
+    return whashstr(str, 20) & (LIVING_HASH_SIZE - 1);
 }
 
 struct object *find_living_object P2(char *, str, int, user)
@@ -1063,14 +1658,16 @@ void reset_object P2(struct object *, ob, int, arg)
     ob->next_reset = current_time + TIME_TO_RESET / 2 +
 	random_number(TIME_TO_RESET / 2);
     if (arg == 0) {
-	apply(APPLY___INIT, ob, 0);
-	apply(APPLY_CREATE, ob, 0);
+	apply(APPLY___INIT, ob, 0, ORIGIN_DRIVER);
+	if (ob->flags & O_DESTRUCTED) return; /* sigh */
+	apply(APPLY_CREATE, ob, 0, ORIGIN_DRIVER);
     } else {			/* check for O_WILL_RESET in backend */
 	struct object *save_command_giver;
 
 	save_command_giver = command_giver;
 	command_giver = (struct object *) 0;
-	if (!apply(APPLY_RESET, ob, 0)) {	/* no reset() in the object */
+	if (!apply(APPLY_RESET, ob, 0, ORIGIN_DRIVER)) {
+	    /* no reset() in the object */
 	    ob->flags &= ~O_WILL_RESET;	/* don't call it next time */
 	}
 	command_giver = save_command_giver;
@@ -1095,8 +1692,8 @@ int shadow_catch_message P2(struct object *, ob, char *, str)
     while (ob->shadowing) {
 	if (function_exists(APPLY_CATCH_TELL, ob)) {
 	    push_constant_string(str);
-	    if (apply(APPLY_CATCH_TELL, ob, 1))	/* this will work, since we
-						 * know the */
+	    if (apply(APPLY_CATCH_TELL, ob, 1, ORIGIN_DRIVER))	
+		/* this will work, since we know the */
 		/* function is defined */
 		return 1;
 	}
@@ -1125,7 +1722,7 @@ void reload_object P1(struct object *, obj)
     if (!obj->prog)
 	return;
     for (i = 0; i < (int) obj->prog->p.i.num_variables; i++) {
-	free_svalue(&obj->variables[i]);
+	free_svalue(&obj->variables[i], "reload_object");
 	obj->variables[i] = const0n;
     }
 #ifdef SOCKET_EFUNS
@@ -1170,10 +1767,12 @@ void reload_object P1(struct object *, obj)
 #ifndef NO_LIGHT
     add_light(obj, -(obj->total_light));
 #endif
+#ifndef NO_UIDS
 #ifdef AUTO_SETEUID
     obj->euid = obj->uid;
 #else
     obj->euid = NULL;
+#endif
 #endif
     reset_object(obj, 0);
 }

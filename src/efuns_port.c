@@ -40,7 +40,7 @@ f_crypt P2(int, num_arg, int, instruction)
 #else
     res = string_copy(crypt((sp - 1)->u.string, salt));
 #endif
-    pop_n_elems(2);
+    pop_2_elems();
     push_malloced_string(res);
 }
 #endif
@@ -97,7 +97,7 @@ f_localtime P2(int, num_arg, int, instruction)
 #else				/* sequent */
 #if (defined(hpux) || defined(_SEQUENT_) || defined(_AIX) || defined(SunOS_5) \
 	|| defined(SVR4) || defined(sgi) || defined(linux) || defined(cray) \
-	|| defined(LATTICE))
+	|| defined(LATTICE) || defined(SCO))
     if (!tm->tm_isdst) {
 	vec->item[LT_GMTOFF].u.number = timezone;
 	vec->item[LT_ZONE].u.string = string_copy(tzname[0]);
@@ -119,8 +119,7 @@ f_localtime P2(int, num_arg, int, instruction)
 #endif				/* sequent */
 #endif				/* BSD42 */
     pop_stack();
-    push_vector(vec);
-    vec->ref--;
+    push_refed_vector(vec);
 }
 #endif
 
@@ -166,8 +165,7 @@ f_rusage P2(int, num_arg, int, instruction)
 	add_mapping_pair(m, "nvcsw", rus.ru_nvcsw);
 	add_mapping_pair(m, "nivcsw", rus.ru_nivcsw);
     }
-    m->ref--;
-    push_mapping(m);
+    push_refed_mapping(m);
 }
 #else
 
@@ -207,8 +205,7 @@ f_rusage P2(int, num_arg, int, instruction)
 	add_mapping_pair(m, "phread", ps.ps_phread);
 	add_mapping_pair(m, "phwrite", ps.ps_phwrite);
     }
-    m->ref--;
-    push_mapping(m);
+    push_refed_mapping(m);
 }
 #else
 
@@ -229,8 +226,7 @@ f_rusage P2(int, num_arg, int, instruction)
     m = allocate_mapping(2);
     add_mapping_pair(m, "utime", t.tms_utime * 1000 / CLK_TCK);
     add_mapping_pair(m, "stime", t.tms_stime * 1000 / CLK_TCK);
-    m->ref--;
-    push_mapping(m);
+    push_refed_mapping(m);
 }
 
 #else
@@ -248,8 +244,7 @@ f_rusage P2(int, num_arg, int, instruction)
     m = allocate_mapping(2);
     add_mapping_pair(m, "utime", i ? 0 : clock[0] * 1000 + clock[1] / 1000);
     add_mapping_pair(m, "stime", i ? 0 : clock[0] * 1000 + clock[1] / 1000);
-    m->ref--;
-    push_mapping(m);
+    push_refed_mapping(m);
 }
 
 #endif				/* LATTICE */

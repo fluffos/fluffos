@@ -30,6 +30,9 @@
 #include "switch.h"
 #include "incralloc.h"
 #include "applies.h"
+#include "include/origin.h"
+#include "lex.h"
+#include "trees.h"
 
 #define YYMAXDEPTH    600
 
@@ -55,7 +58,14 @@
 #define A_INITIALIZER           15
 #define NUMAREAS		16
 
+
+
 extern struct mem_block mem_block[NUMAREAS];
+
+#define CURRENT_PROGRAM_SIZE (mem_block[current_block].current_size)
+
+#define SET_CURRENT_PROGRAM_SIZE(x) \
+        ( CURRENT_PROGRAM_SIZE = (x) )
 
 #define BREAK_ON_STACK          0x40000
 #define BREAK_FROM_CASE         0x80000
@@ -65,6 +75,14 @@ extern struct mem_block mem_block[NUMAREAS];
 
 #define BREAK_DELIMITER       -0x200000
 #define CONTINUE_DELIMITER    -0x40000000
+
+#ifdef NEW_FUNCTIONS
+struct function_context_t {
+    short num_parameters;
+    short num_locals;
+};
+extern struct function_context_t function_context;
+#endif
 
 /* make sure that this struct has a size that is a power of two */
 struct case_heap_entry {
@@ -88,8 +106,12 @@ struct case_heap_entry {
                 BASIC_TYPE((e) & (TYPE_MOD_MASK & ~TYPE_MOD_POINTER),\
                 (t) & (TYPE_MOD_MASK & ~TYPE_MOD_POINTER))))
 
+extern struct function **simuls;
+extern keyword predefs[];
+
 #define FUNCTION(n) ((struct function *)mem_block[A_FUNCTIONS].block + (n))
 #define VARIABLE(n) ((struct variable *)mem_block[A_VARIABLES].block + (n))
+#define SIMUL(n)    (simuls[n])
 
 #if !defined(__alpha) && !defined(cray)
 #define align(x) (((x) + 3) & ~3)
@@ -100,12 +122,14 @@ struct case_heap_entry {
 #define SOME_NUMERIC_CASE_LABELS 0x40000
 #define NO_STRING_CASE_LABELS    0x80000
 
+int validate_function_call PROT((struct function *, int, struct parse_node *));
+struct parse_node *validate_efun_call PROT((int, struct parse_node *));
+
 /* inlines - if we're luckly, they'll get honored. */
 INLINE static void realloc_mem_block PROT((struct mem_block *, int));
 INLINE static void add_to_mem_block PROT((int, char *, int));
 INLINE static void insert_in_mem_block PROT((int, int, int));
-INLINE static void pop_arg_stack PROT((int));
-INLINE static int get_argument_type PROT((int, int));
+INLINE static char *allocate_in_mem_block PROT((int, int));
 
 INLINE
 static void realloc_mem_block(m, size)
@@ -134,6 +158,20 @@ static void add_to_mem_block(n, data, size)
 }
 
 INLINE
+static char *allocate_in_mem_block(n, size)
+    int n, size;
+{
+    struct mem_block *mbp = &mem_block[n];
+    char *ret;
+
+    if (mbp->current_size + size > mbp->max_size)
+	realloc_mem_block(mbp, mbp->current_size + size);
+    ret = mbp->block + mbp->current_size;
+    mbp->current_size += size;
+    return ret;
+}
+
+INLINE
 static void insert_in_mem_block(n, where, size)
     int n, where, size;
 {
@@ -148,29 +186,5 @@ static void insert_in_mem_block(n, where, size)
 	*(p + size) = *p;
     mbp->current_size += size;
 }
-
-/*
- * Pop the argument type stack 'n' elements.
- */
-INLINE
-static void pop_arg_stack(n)
-    int n;
-{
-    type_of_arguments.current_size -= sizeof(unsigned short) * n;
-}
-
-/*
- * Get type of argument number 'arg', where there are
- * 'n' arguments in total in this function call. Argument
- * 0 is the first argument.
- */
-INLINE
-static int get_argument_type(arg, n)
-    int arg, n;
-{
-    return
-	((unsigned short *)
-       (type_of_arguments.block + type_of_arguments.current_size))[arg - n];
-}
-
 #endif
+

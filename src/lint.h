@@ -20,6 +20,9 @@
 #include <stdio.h>
 #include <setjmp.h>
 #include <sys/types.h>
+#ifdef _AIX
+#include <sys/select.h>
+#endif
 
 /*
  * Some useful macros...
@@ -83,7 +86,6 @@
  ******************************************************************/
 
 #ifndef LATTICE
-
 struct program;
 struct object;
 struct buffer;
@@ -102,7 +104,6 @@ struct instr;
 struct mem_block;
 struct lpc_socket;
 struct funp;
-
 #endif
 
 /*
@@ -161,12 +162,10 @@ int fputs(char *, FILE *);
 int fputc(char, FILE *);
 int fwrite(char *, int, int, FILE *);
 int fread(char *, int, int, FILE *);
-
 #endif
 int printf(char *,...);
 int sscanf(char *, char *,...);
 void perror(char *);
-
 #endif
 
 #if (defined(SVR4) && !defined(sgi)) || defined(__386BSD__)
@@ -336,6 +335,7 @@ extern struct svalue const0u;
 extern struct svalue const0n;
 extern double consts[];
 extern int slow_shut_down_to_do;
+extern struct object *master_ob;
 
 char *xalloc PROT((int));
 char *string_copy PROT((char *));
@@ -380,7 +380,7 @@ void notify_no_command PROT((void));
 void set_notify_fail_message PROT((char *));
 void process_io PROT((void));
 int process_user_command PROT((void));
-int set_call PROT((struct object *, struct sentence *, int, int));
+int set_call PROT((struct object *, struct sentence *, int));
 void remove_interactive PROT((struct object *));
 int replace_interactive PROT((struct object *, struct object *));
 int query_addr_number PROT((char *, char *));
@@ -391,6 +391,7 @@ int query_idle PROT((struct object *));
 int new_set_snoop PROT((struct object *, struct object *));
 struct object *query_snoop PROT((struct object *));
 struct object *query_snooping PROT((struct object *));
+void set_notify_fail_function PROT((struct funp *));
 
 /*
  * backend.c
@@ -418,7 +419,6 @@ char *query_load_av PROT((void));
 /*
  * simulate.c
  */
-extern struct object *master_ob;
 extern struct object *obj_list;
 extern struct object *obj_list_destruct;
 extern struct object *current_object;
@@ -430,9 +430,13 @@ extern int num_parse_error;
 extern int num_error;
 extern int tot_alloc_sentence;
 extern int MudOS_is_being_shut_down;
+#ifdef LPC_TO_C
+extern int compile_to_c;
+extern FILE *compilation_output_file;
+extern char *compilation_ident;
+#endif
 
 void check_legal_string PROT((char *));
-struct variable *find_status PROT((char *, int));
 int command_for_object PROT((char *, struct object *));
 void add_light PROT((struct object *, int));
 void free_sentence PROT((struct sentence *));
@@ -457,7 +461,7 @@ void destruct2 PROT((struct object *));
 
 void print_svalue PROT((struct svalue *));
 void do_write PROT((struct svalue *));
-void do_message PROT((char *, char *, struct vector *, struct vector *, int));
+void do_message PROT((struct svalue *, char *, struct vector *, struct vector *, int));
 void say PROT((struct svalue *, struct vector *));
 void tell_room PROT((struct object *, struct svalue *, struct vector *));
 void shout_string PROT((char *));
@@ -515,13 +519,14 @@ int svalue_save_size PROT((struct svalue *));
 void save_svalue PROT((struct svalue *, char **));
 int restore_svalue PROT((char *, struct svalue *));
 int save_object PROT((struct object *, char *, int));
+char *save_variable PROT((struct svalue *));
 int restore_object PROT((struct object *, char *, int));
+void restore_variable PROT((struct svalue *, char *));
 struct object *get_empty_object PROT((int));
 void reset_object PROT((struct object *, int));
 void reload_object PROT((struct object *));
 void free_object PROT((struct object *, char *));
 struct object *find_living_object PROT((char *, int));
-
 int valid_hide PROT((struct object *));
 int object_visible PROT((struct object *));
 void set_living_name PROT((struct object *, char *));
@@ -541,21 +546,17 @@ struct object *lookup_object_hash PROT((char *));
 int show_otable_status PROT((int));
 
 /*
- * compiler.y
+ * compiler.pre
  */
 void yyerror PROT((char *));
-void compile_file PROT((void));
+void yywarn PROT((char *));
+void compile_file PROT((FILE *));
 void store_line_number_info PROT((void));
 int get_id_number PROT((void));
 void save_include PROT((char *name));
 char *the_file_name PROT((char *));
 int add_local_name PROT((char *, int));
-
-/*
- * lpc_compiler.y
- */
-void lpcyyerror PROT((char *));
-void lpc_compile_file PROT((FILE *, char *));
+void pop_include PROT((void));
 
 /*
  * compiler_shared.c
@@ -564,40 +565,49 @@ extern struct mem_block mem_block[];
 extern int exact_types;
 extern int approved_object;
 extern int current_type;
-extern int heart_beat;
 extern int current_block;
 extern struct program NULL_program;
 extern struct program *prog;
 extern unsigned char string_tags[0x20];
 extern short freed_string;
-extern char *local_names[];
+extern struct ident_hash_elem *locals[];
 extern unsigned short type_of_locals[];
 extern int current_number_of_locals;
 extern int current_break_stack_need;
 extern int max_break_stack_need;
 extern unsigned short a_functions_root;
-extern int comp_stackp;
 extern struct mem_block type_of_arguments;
 
 char *get_two_types PROT((int, int));
+char *get_type_name PROT((int));
+
 void free_all_local_names PROT((void));
-int verify_declared PROT((char *));
 void copy_variables PROT((struct program *, int));
 int copy_functions PROT((struct program *, int));
 void type_error PROT((char *, int));
 int compatible_types PROT((int, int));
 void add_arg_type PROT((unsigned short));
-int defined_function PROT((char *));
-void push_address PROT((void));
-void push_explicit PROT((int));
-int pop_address PROT((void));
 int find_in_table PROT((struct function *, int));
 void find_inherited PROT((struct function *));
 int define_new_function PROT((char *, int, int, int, int, int));
-void define_variable PROT((char *, int, int));
+int define_variable PROT((char *, int, int));
 short store_prog_string PROT((char *));
 void free_prog_string PROT((short));
-int validate_function_call PROT((struct function *, int, int));
+#ifdef DEBUG
+int dump_function_table PROT((void));
+#endif
+
+/*
+ * this should be removed when switch support moves into icode.c
+ * 
+ * icode.c
+ */
+short read_short PROT((int));
+void upd_short PROT((int, short));
+INLINE void ins_f_byte PROT((unsigned int));
+void ins_short PROT((short));
+void ins_long PROT((int));
+int pop_address PROT((void));
 
 /*
  * interpret.c
@@ -618,13 +628,26 @@ extern unsigned int apply_low_cache_hits;
 extern unsigned int apply_low_slots_used;
 extern unsigned int apply_low_collisions;
 extern int function_index_offset;
+extern int master_ob_is_loading;
+extern struct function fake_func;
+extern struct program fake_prog;
 
+/* with LPC_TO_C off, these are defines using eval_instruction */
+#ifdef LPC_TO_C
+void call_program PROT((struct program *, int));
+void call_absolute PROT((char *));
+#endif
 void eval_instruction PROT((char *p));
 void assign_svalue PROT((struct svalue *, struct svalue *));
 void assign_svalue_no_free PROT((struct svalue *, struct svalue *));
 void copy_some_svalues PROT((struct svalue *, struct svalue *, int));
 void transfer_push_some_svalues PROT((struct svalue *, int));
-void free_svalue PROT((struct svalue *));
+void push_some_svalues PROT((struct svalue *, int));
+#ifdef DEBUG
+void int_free_svalue PROT((struct svalue *, char *));
+#else
+void int_free_svalue PROT((struct svalue *));
+#endif
 void free_string_svalue PROT((struct svalue *));
 void free_some_svalues PROT((struct svalue *, int));
 void push_object PROT((struct object *));
@@ -635,13 +658,21 @@ void push_null PROT((void));
 void push_string PROT((char *, int));
 void push_svalue PROT((struct svalue *));
 void push_vector PROT((struct vector *));
+void push_refed_vector PROT((struct vector *));
 void push_buffer PROT((struct buffer *));
+void push_refed_buffer PROT((struct buffer *));
 void push_mapping PROT((struct mapping *));
+void push_refed_mapping PROT((struct mapping *));
 void push_malloced_string PROT((char *));
 void push_constant_string PROT((char *));
 void pop_stack PROT((void));
 void pop_n_elems PROT((int));
+void pop_2_elems PROT((void));
+void pop_3_elems PROT((void));
 void remove_object_from_stack PROT((struct object *));
+
+void setup_fake_frame PROT((struct funp *));
+void remove_fake_frame PROT((void));
 
 char *type_name PROT((int c));
 void bad_arg PROT((int, int));
@@ -649,14 +680,14 @@ void bad_argument PROT((struct svalue *, int, int, int));
 void check_for_destr PROT((struct vector *));
 int is_static PROT((char *, struct object *));
 int apply_low PROT((char *, struct object *, int));
-struct svalue *apply PROT((char *, struct object *, int));
-struct svalue *safe_apply PROT((char *, struct object *, int));
+struct svalue *apply PROT((char *, struct object *, int, int));
+struct svalue *safe_apply PROT((char *, struct object *, int, int));
 struct vector *call_all_other PROT((struct vector *, char *, int));
 char *function_exists PROT((char *, struct object *));
 void call_function PROT((struct program *, struct function *));
 struct svalue *apply_master_ob PROT((char *, int));
 struct svalue *safe_apply_master_ob PROT((char *, int));
-void assert_master_ob_loaded PROT((char *));
+int assert_master_ob_loaded PROT((char *, char *));
 
 char *add_slash PROT((char *));
 int strpref PROT((char *, char *));
@@ -665,18 +696,16 @@ void do_trace PROT((char *, char *, char *));
 char *dump_trace PROT((int));
 void opcdump PROT((char *));
 int inter_sscanf PROT((struct svalue *, struct svalue *, struct svalue *, int));
-int get_line_number_if_any PROT((void));
+char * get_line_number_if_any PROT((void));
 void get_version PROT((char *));
-void reset_machine PROT((int));
+int reset_machine PROT((int));
 
 #ifndef NO_SHADOWS
 int validate_shadowing PROT((struct object *));
-
 #endif
 
 #ifdef LAZY_RESETS
 void try_reset PROT((struct object *));
-
 #endif
 
 void push_pop_error_context PROT((int));
@@ -684,15 +713,18 @@ void pop_control_stack PROT((void));
 struct function *setup_new_frame PROT((struct function *));
 void push_control_stack PROT((struct function *));
 
+#ifdef DEBUG
+void check_a_lot_ref_counts PROT((struct program *));
+#endif
+
 /*
  * lex.c
  */
 extern int current_line;
 extern int total_lines;
 extern char *current_file;
-extern int pragma_strict_types;
-extern int pragma_save_binaries;
-extern int pragma_save_types;
+extern int pragmas;
+extern int optimization;
 extern struct lpc_predef_s *lpc_predefs;
 extern int efun_arg_types[];
 extern char yytext[1024];
@@ -706,7 +738,14 @@ void set_inc_list PROT((char *));
 void start_new_file PROT((FILE *));
 void end_new_file PROT((void));
 int lookup_predef PROT((char *));
+void add_predefines PROT((void));
 char *main_file_name PROT((void));
+char *get_defined_name PROT((defined_name *));
+struct ident_hash_elem *find_or_add_ident PROT((char *, int));
+struct ident_hash_elem *find_or_add_perm_ident PROT((char *));
+struct ident_hash_elem *lookup_ident PROT((char *));
+void free_unused_identifiers PROT((void));
+void init_identifiers PROT((void));
 
 /*
  * binaries.c
@@ -766,7 +805,10 @@ void add_mapping_shared_string PROT((struct mapping *, char *, char *));
  * eoperators.c
  */
 struct funp *make_funp PROT((struct svalue *, struct svalue *));
+void push_funp PROT((struct funp *));
 void free_funp PROT((struct funp *));
+struct svalue *call_function_pointer PROT((struct funp *, int));
+int merge_arg_lists PROT((int, struct vector *, int));
 
 /*
  * file.c
@@ -778,7 +820,7 @@ void dump_file_descriptors PROT((void));
 
 char *read_file PROT((char *, int, int));
 char *read_bytes PROT((char *, int, int, int *));
-int write_file PROT((char *, char *));
+int write_file PROT((char *, char *, int));
 int write_bytes PROT((char *, int, char *, int));
 struct vector *get_dir PROT((char *, int));
 int tail PROT((char *));
@@ -792,10 +834,11 @@ int remove_file PROT((char *));
  */
 extern struct object *simul_efun_ob;
 extern char *simul_efun_file_name;
+extern struct function **simuls;
 
 void set_simul_efun PROT((char *));
 void get_simul_efuns PROT((struct program *));
-struct function *find_simul_efun PROT((char *));
+int find_simul_efun PROT((char *));
 
 /*
  * array.c
@@ -819,14 +862,15 @@ struct vector *deep_inherit_list PROT((struct object *));
 struct vector *inherit_list PROT((struct object *));
 struct vector *children PROT((char *));
 struct vector *livings PROT((void));
-struct vector *objects PROT((char *, struct object *));
+struct vector *objects PROT((struct funp *));
 struct vector *all_inventory PROT((struct object *, int));
 struct vector *deep_inventory PROT((struct object *, int));
-struct vector *filter PROT((struct vector *, char *, struct object *, struct svalue *));
+struct vector *filter PROT((struct vector *, struct funp *, struct svalue *));
 struct vector *builtin_sort_array PROT((struct vector *, int));
+struct vector *fp_sort_array PROT((struct vector *, struct funp *));
 struct vector *sort_array PROT((struct vector *, char *, struct object *));
-struct vector *make_unique PROT((struct vector *, char *, struct svalue *));
-struct vector *map_array PROT((struct vector *, char *, struct object *, struct svalue *));
+struct vector *make_unique PROT((struct vector *, char *, struct funp *, struct svalue *));
+void map_array PROT((struct svalue *arg, int num_arg));
 struct vector *intersect_array PROT((struct vector *, struct vector *));
 struct vector *match_regexp PROT((struct vector *, char *));
 
@@ -838,7 +882,6 @@ extern int total_mapping_size;
 extern int total_mapping_nodes;
 
 int mapping_save_size PROT((struct mapping *));
-void mapping_too_large PROT((void));
 struct mapping *mapTraverse PROT((struct mapping *, int (*) (struct mapping *, struct node *, void *), void *));
 struct mapping *load_mapping_from_aggregate PROT((struct svalue *, int));
 struct mapping *allocate_mapping PROT((int));
@@ -848,12 +891,19 @@ struct svalue *find_for_insert PROT((struct mapping *, struct svalue *, int));
 void absorb_mapping PROT((struct mapping *, struct mapping *));
 void mapping_delete PROT((struct mapping *, struct svalue *));
 struct mapping *add_mapping PROT((struct mapping *, struct mapping *));
-struct mapping *map_mapping PROT((struct mapping *, char *, struct object *, struct svalue *));
-struct mapping *compose_mapping PROT((struct mapping *, struct mapping *));
+void map_mapping PROT((struct svalue *, int));
+struct mapping *compose_mapping PROT((struct mapping *, struct mapping *, unsigned short));
 struct vector *mapping_indices PROT((struct mapping *));
 struct vector *mapping_values PROT((struct mapping *));
 struct vector *mapping_each PROT((struct mapping *));
 char *save_mapping PROT((struct mapping *));
+
+void add_mapping_pair PROT((struct mapping *, char *, int));
+void add_mapping_string PROT((struct mapping *, char *, char *));
+void add_mapping_malloced_string PROT((struct mapping *, char *, char *));
+void add_mapping_object PROT((struct mapping *, char *, struct object *));
+void add_mapping_array PROT((struct mapping *, char *, struct vector *));
+void add_mapping_shared_string PROT((struct mapping *, char *, char *));
 
 /*
  * buffer.c
@@ -965,6 +1015,18 @@ void add_function PROT((struct function *, unsigned short *, int));
  * strstr.c
  */
 char *_strstr PROT((char *, char *));
+
+/*
+ *  scratchpad.c
+ */
+void scratch_destroy PROT((void));
+char *scratch_copy PROT((char *));
+char *scratch_alloc PROT((int));
+void scratch_free PROT((char *));
+char *scratch_join PROT((char *, char *));
+char *scratch_join2 PROT((char *, char *));
+char *scratch_realloc PROT((char *, int));
+char *scratch_copy_string PROT((char *));
 
 /*
  * port.c

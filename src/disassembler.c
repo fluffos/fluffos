@@ -4,14 +4,16 @@
 
 #include "efuns.h"
 #include "instrs.h"
+#include "include/origin.h"
 #if defined(SunOS_5) || defined(LATTICE)
 #include <stdlib.h>
 #endif
 
 static struct object *ob;
+extern struct function **simuls;
 
 #ifdef F_DUMP_PROG
-static void dump_prog PROT((struct program *, char *, int));
+void dump_prog PROT((struct program *, char *, int));
 static void disassemble PROT((FILE *, char *, int, int, struct program *));
 static char *disassem_string PROT((char *));
 static int short_compare PROT((unsigned short *, unsigned short *));
@@ -48,7 +50,7 @@ f_dump_prog P2(int, num_arg, int, instruction)
     push_number(0);
 }
 
-static void
+void
 dump_prog P3(struct program *, prog, char *, fn, int, do_dis)
 {
     char *fname;
@@ -85,20 +87,21 @@ dump_prog P3(struct program *, prog, char *, fn, int, do_dis)
     }
     fputc('\n', f);
     fprintf(f, "FUNCTIONS:\n");
-    fprintf(f, "      name        offset    fio  flags  # locals  # args\n");
-    fprintf(f, "      ----------- ------    ---  -----  --------  ------\n");
+    fprintf(f, "      name        offset    fio   flags   # locals  # args\n");
+    fprintf(f, "      ----------- ------    ---  -------  --------  ------\n");
     for (i = 0; i < (int) prog->p.i.num_functions; i++) {
-	char sflags[6];
+	char sflags[8];
 	int flags;
 
 	flags = prog->p.i.functions[i].flags;
-	sflags[5] = '\0';
+	sflags[6] = '\0';
 	sflags[0] = (flags & NAME_INHERITED) ? 'i' : '-';
 	sflags[1] = (flags & NAME_UNDEFINED) ? 'u' : '-';
 	sflags[2] = (flags & NAME_STRICT_TYPES) ? 's' : '-';
-	sflags[3] = (flags & NAME_HIDDEN) ? 'h' : '-';
-	sflags[4] = (flags & NAME_PROTOTYPE) ? 'p' : '-';
-	fprintf(f, "%4d: %-12s %5d  %5d  %5s  %8d  %6d\n",
+	sflags[3] = (flags & NAME_PROTOTYPE) ? 'p' : '-';
+	sflags[4] = (flags & NAME_DEF_BY_INHERIT) ? 'd' : '-';
+	sflags[5] = (flags & NAME_ALIAS) ? 'a' : '-';
+	fprintf(f, "%4d: %-12s %5d  %5d  %7s  %8d  %6d\n",
 		i,
 		prog->p.i.functions[i].name,
 		(int)prog->p.i.functions[i].offset,
@@ -110,9 +113,8 @@ dump_prog P3(struct program *, prog, char *, fn, int, do_dis)
     }
     fprintf(f, "VARIABLES:\n");
     for (i = 0; i < (int) prog->p.i.num_variables; i++)
-	fprintf(f, "%4d: %-12s %02x\n", i,
-		prog->p.i.variable_names[i].name,
-		(unsigned) prog->p.i.variable_names[i].flags);
+	fprintf(f, "%4d: %-12s\n", i,
+		prog->p.i.variable_names[i].name);
     fprintf(f, "STRINGS:\n");
     for (i = 0; i < (int) prog->p.i.num_strings; i++) {
 	fprintf(f, "%4d: ", i);
@@ -189,7 +191,8 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	/* sort offsets of functions */
 	offsets = (short *) malloc(NUM_FUNS * 2 * sizeof(short));
 	for (i = 0; i < (int) NUM_FUNS; i++) {
-	    if (!FUNS[i].offset || (FUNS[i].flags & NAME_INHERITED))
+	    if (!FUNS[i].offset ||
+		(FUNS[i].flags & (NAME_ALIAS | NAME_INHERITED)))
 		offsets[i * 2] = end + 1;
 	    else
 		offsets[i * 2] = FUNS[i].offset;
@@ -213,6 +216,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 
 	fprintf(f, "%04x: ", (unsigned) (pc - code));
 
+#ifdef NEEDS_CALL_EXTRA
 	if ((instr = EXTRACT_UCHAR(pc)) == F_CALL_EXTRA) {
 	    fprintf(f, "call_extra+");
 	    pc++;
@@ -221,6 +225,9 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	} else {
 	    is_efun = (instr >= BASE);
 	}
+#else
+	is_efun = (instr = EXTRACT_UCHAR(pc)) >= BASE;
+#endif
 
 	pc++;
 	buff[0] = 0;
@@ -244,6 +251,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 
 	case I(F_BBRANCH_WHEN_ZERO):
 	case I(F_BBRANCH_WHEN_NON_ZERO):
+	case I(F_BBRANCH):
 	    ((char *) &sarg)[0] = pc[0];
 	    ((char *) &sarg)[1] = pc[1];
 	    offset = (pc - code) - (unsigned short) sarg;
@@ -251,7 +259,9 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	    pc += 2;
 	    break;
 
+#ifdef F_JUMP
 	case I(F_JUMP):
+#endif
 #ifdef F_JUMP_WHEN_ZERO
 	case I(F_JUMP_WHEN_ZERO):
 	case I(F_JUMP_WHEN_NON_ZERO):
@@ -283,8 +293,8 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	    pc++;
 	    break;
 
-	case I(F_PUSH_IDENTIFIER_LVALUE):
-	case I(F_IDENTIFIER):
+	case I(F_GLOBAL_LVALUE):
+	case I(F_GLOBAL):
 	    if ((unsigned) (iarg = EXTRACT_UCHAR(pc)) < NUM_VARS)
 		sprintf(buff, "%s", VARS[iarg].name);
 	    else
@@ -300,8 +310,8 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	case I(F_WHILE_DEC):
 	case I(F_LOOP_COND):
 #endif
-	case I(F_LOCAL_NAME):
-	case I(F_PUSH_LOCAL_VARIABLE_LVALUE):
+	case I(F_LOCAL):
+	case I(F_LOCAL_LVALUE):
 	    sprintf(buff, "LV%d", EXTRACT_UCHAR(pc));
 	    pc++;
 	    break;
@@ -314,6 +324,52 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	    else
 		sprintf(buff, "<out of range %d>", (int)sarg);
 	    pc += 2;
+	    break;
+
+	case I(F_SIMUL_EFUN):
+	    ((char *) &sarg)[0] = pc[0];
+	    ((char *) &sarg)[1] = pc[1];
+	    sprintf(buff, "\"%s\" %d", simuls[sarg]->name, pc[2]);
+	    pc += 3;
+	    break;
+
+	case I(F_FUNCTION_CONSTRUCTOR):
+	    switch (EXTRACT_UCHAR(pc++)) {
+	    case ORIGIN_CALL_OTHER | 1:
+		strcpy(buff, "<this_object call_other>");
+		break;
+	    case ORIGIN_CALL_OTHER:
+		strcpy(buff, "<call_other>");
+		break;
+	    case ORIGIN_SIMUL_EFUN:
+		((char *) &sarg)[0] = pc[0];
+		((char *) &sarg)[1] = pc[1];
+		sprintf(buff, "<simul_efun> \"%s\"", simuls[sarg]->name);
+		pc += 2;
+		break;
+	    case ORIGIN_EFUN:
+#ifdef NEEDS_CALL_EXTRA
+		if ((sarg = EXTRACT_UCHAR(pc++)) == F_CALL_EXTRA) {
+		    sarg = EXTRACT_UCHAR(pc++) + 0xff;
+		}
+#else
+		sarg = EXTRACT_UCHAR(pc++);
+#endif
+		sprintf(buff, "<efun> %s", instrs[sarg].name);
+		break;
+	    case ORIGIN_LOCAL:
+		((char *) &sarg)[0] = pc[0];
+		((char *) &sarg)[1] = pc[1];
+		pc += 2;
+		if (sarg < NUM_FUNS)
+		    sprintf(buff, "<local_fun> %s", FUNS[sarg].name);
+		else
+		    sprintf(buff, "<local_fun> <out of range %d>", (int)sarg);
+		break;
+	    case ORIGIN_FUNCTIONAL:
+		strcpy(buff, "<functional, code follows>");
+		pc+=3;
+	    }
 	    break;
 
 	case I(F_NUMBER):

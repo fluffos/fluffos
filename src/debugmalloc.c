@@ -6,6 +6,20 @@
 /* config.h gets INLINE */
 #include "config.h"
 
+#undef NOISY_MALLOC
+
+#ifdef NOISY_MALLOC
+#define NOISY(x) printf(x)
+#define NOISY1(x,y) printf(x,y)
+#define NOISY2(x,y,z) printf(x,y,z)
+#define NOISY3(w,x,y,z) printf(w,x,y,z)
+#else
+#define NOISY(x) 
+#define NOISY1(x,y) 
+#define NOISY2(x,y,z) 
+#define NOISY3(w,x,y,z) 
+#endif
+
 #ifdef NeXT
 #include <stdlib.h>
 #endif
@@ -35,6 +49,7 @@ INLINE void *debugrealloc P4(void *, ptr, int, size, int, tag, char *, desc)
 {
     void *tmp;
 
+    NOISY3("realloc: %i (%x), %s\n", size, ptr, desc);
     stats.realloc_calls++;
     tmp = (node_t *) ptr - 1;
     if (MDfree(tmp)) {
@@ -52,6 +67,7 @@ INLINE void *debugmalloc P3(int, size, int, tag, char *, desc)
     stats.alloc_calls++;
     tmp = (void *) malloc(size + sizeof(node_t));
     MDmalloc(tmp, size, tag, desc);
+    NOISY3("malloc: %i (%x), %s\n", size, (node_t *)tmp + 1, desc);
     return (node_t *) tmp + 1;
 }
 
@@ -62,6 +78,7 @@ INLINE void *debugcalloc P4(int, nitems, int, size, int, tag, char *, desc)
     stats.alloc_calls++;
     tmp = (void *) calloc(nitems * size + sizeof(node_t), 1);
     MDmalloc(tmp, nitems * size, tag, desc);
+    NOISY3("calloc: %i (%x), %s\n", nitems*size, (node_t *)tmp + 1, desc);
     return (node_t *) tmp + 1;
 }
 
@@ -69,6 +86,7 @@ INLINE void debugfree P1(void *, ptr)
 {
     void *tmp;
 
+    NOISY1("free (%x)\n", ptr);
     stats.free_calls++;
     tmp = (node_t *) ptr - 1;
     if (MDfree(tmp)) {

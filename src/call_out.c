@@ -50,7 +50,7 @@ static void free_call P1(struct call *, cop)
     if (cop->vs) {
 	free_vector(cop->vs);
     }
-    free_svalue(&cop->v);
+    free_svalue(&cop->v, "free_call");
     cop->v = const0n;
     cop->next = call_list_free;
     free_string(cop->function);
@@ -135,7 +135,6 @@ void call_out()
     jmp_buf save_error_recovery_context;
     int save_rec_exists;
     struct object *save_command_giver;
-    struct object *save_current_object;
     extern struct object *command_giver;
     extern struct object *current_interactive;
     extern int current_time;
@@ -203,8 +202,7 @@ void call_out()
 		    v.subtype = 0;
 		    v.u.number = 0;
 		}
-		save_current_object = current_object;
-		current_object = cop->ob;
+		/* current object no longer set */
 		push_svalue(&v);
 		if (cop->vs) {
 		    int j;
@@ -214,9 +212,9 @@ void call_out()
 			push_svalue(&cop->vs->item[j]);
 		    }
 		}
-		call_origin = ORIGIN_CALL_OUT;
-		(void) apply(cop->function, cop->ob, 1 + (cop->vs ? cop->vs->size : 0));
-		current_object = save_current_object;
+		(void) apply(cop->function, cop->ob, 
+			     1 + (cop->vs ? cop->vs->size : 0),
+			     ORIGIN_CALL_OUT);
 	    }
 	}
 	free_call(cop);

@@ -74,91 +74,17 @@ static int version = 610;	/* used only in the "set" function, for i.d. */
 #include "comm.h"
 #include "opcodes.h"
 #include "applies.h"
+#include "ed.h"
+#include "include/origin.h"
 
 #ifdef F_ED			/* remove ed() from func_spec.c if you don't
 				 * want this */
 
-/* define this if you don't like the ending dollar signs in ed, in n-mode */
-#undef NO_END_DOLLAR_SIGN
-/*
- *	#defines for non-printing ASCII characters
- */
-#define NUL	0x00		/* ^@ */
-#define EOS	0x00		/* end of string */
-#define SOH	0x01		/* ^A */
-#define STX	0x02		/* ^B */
-#define ETX	0x03		/* ^C */
-#define EOT	0x04		/* ^D */
-#define ENQ	0x05		/* ^E */
-#define ACK	0x06		/* ^F */
-#define BEL	0x07		/* ^G */
-#define BS	0x08		/* ^H */
-#define HT	0x09		/* ^I */
-#define LF	0x0a		/* ^J */
-#define NL	'\n'
-#define VT	0x0b		/* ^K */
-#define FF	0x0c		/* ^L */
-#define CR	0x0d		/* ^M */
-#define SO	0x0e		/* ^N */
-#define SI	0x0f		/* ^O */
-#define DLE	0x10		/* ^P */
-#define DC1	0x11		/* ^Q */
-#define DC2	0x12		/* ^R */
-#define DC3	0x13		/* ^S */
-#define DC4	0x14		/* ^T */
-#define NAK	0x15		/* ^U */
-#define SYN	0x16		/* ^V */
-#define ETB	0x17		/* ^W */
-#define CAN	0x18		/* ^X */
-#define EM	0x19		/* ^Y */
-#define SUB	0x1a		/* ^Z */
-#define ESC	0x1b		/* ^[ */
-#define FS	0x1c		/* ^\ */
-#define GS	0x1d		/* ^] */
-#define US	0x1f		/* ^_ */
-#define SP	0x20		/* space */
-#define DEL	0x7f		/* DEL */
-#define ESCAPE  '\\'
-
-#ifndef TRUE
-#define TRUE	1
-#endif
-#ifndef FALSE
-#define FALSE	0
-#endif
-#define ERR		-2
-#define FATAL		(ERR-1)
-#define CHANGED		(ERR-2)
-#define SET_FAIL	(ERR-3)
-#define SUB_FAIL	(ERR-4)
-#define MEM_FAIL	(ERR-5)
-#define UNRECOG_COMMAND (ERR-6)
-
-
-#define	BUFFER_SIZE	2048	/* stream-buffer size:  == 1 hd cluster */
-
-#define LINFREE		1	/* entry not in use */
-#define LGLOB		2	/* line marked global */
-
-#define MAXLINE		512	/* max number of chars per line */
-#define MAXPAT		256	/* max number of chars per replacemnt pattern */
-#define MAXFNAME 	256	/* max file name size */
-
-
 /**  Global variables  **/
 
 extern struct program *current_prog;
-extern struct object *master_ob;
 
 static int EdErr = 0;
-
-struct line {
-    int l_stat;			/* empty, mark */
-    struct line *l_prev;
-    struct line *l_next;
-    char l_buff[1];
-};
-typedef struct line LINE;
 
 extern struct object *command_giver;
 void set_prompt PROT((char *));
@@ -210,7 +136,7 @@ static void count_blanks PROT((int line));
 static void _count_blanks PROT((char *str, int blanks));
 
 #define P_INTERACTIVE 	(command_giver->interactive)
-#define P_NET_DEAD 	(P_INTERACTIVE->net_dead)
+#define P_NET_DEAD 	(P_INTERACTIVE->iflags & NET_DEAD)
 #define P_DIAG		(P_INTERACTIVE->ed_buffer->diag)
 #define P_TRUNCFLG	(P_INTERACTIVE->ed_buffer->truncflg)
 #define P_NONASCII	(P_INTERACTIVE->ed_buffer->nonascii)
@@ -259,34 +185,6 @@ static void _count_blanks PROT((char *str, int blanks));
 
 static char inlin[MAXLINE];
 static char *inptr;		/* tty input buffer */
-struct ed_buffer {
-    int diag;			/* diagnostic-output? flag */
-    int truncflg;		/* truncate long line flag */
-    int nonascii;		/* count of non-ascii chars read */
-    int nullchar;		/* count of null chars read */
-    int truncated;		/* count of lines truncated */
-    char fname[MAXFNAME];
-    int fchanged;		/* file-changed? flag */
-    int nofname;
-    int mark['z' - 'a' + 1];
-    regexp *oldpat;
-
-    LINE Line0;
-    int CurLn;
-    LINE *CurPtr;		/* CurLn and CurPtr must be kept in step */
-    int LastLn;
-    int Line1, Line2, nlines;
-    int flags;
-    int appending;
-    int moring;			/* used for the wait line of help */
-    char *exit_fn;		/* Function to be called when user exits */
-    char *write_fn;             /* Function to be called when user writes */
-    struct object *exit_ob;	/* in this object */
-    int shiftwidth;
-    int leading_blanks;
-    int cur_autoindent;
-    int restricted;		/* restricted access ed */
-};
 
 static struct tbl {
     char *t_str;
@@ -633,7 +531,7 @@ static void free_ed_buffer()
     if (ED_BUFFER->exit_fn) {
 	/* make this "safe" */
 	safe_apply(ED_BUFFER->exit_fn,
-		   ED_BUFFER->exit_ob, 0);
+		   ED_BUFFER->exit_ob, 0, ORIGIN_DRIVER);
 	FREE(ED_BUFFER->exit_fn);
 	free_object(ED_BUFFER->exit_ob, "ed EOF");
 	FREE((char *) ED_BUFFER);
@@ -656,7 +554,7 @@ static void prntln P3(char *, str, int, vflg, int, len)
 
     line = start;
     if (len)
-	add_message("%3d  ", len);	/* made 8 chars wide */
+	add_message("%3d  ", len);
     while (*str && *str != NL) {
 	if ((line - start) > MAXLINE) {
 	    free_ed_buffer();
@@ -665,11 +563,10 @@ static void prntln P3(char *, str, int, vflg, int, len)
 	if (*str < ' ' || *str >= DEL) {
 	    switch (*str) {
 	    case '\t':
-		/*
-		 * didn't see a reason to make tabs a special case like this
-		 * -- Raistlin
-		 */
-		*line++ = *str;
+		/* have to be smart about this or the indentor will fail */
+		*line++ = ' ';
+		while ((line - start) % 8)
+		    *line++ = ' ';
 		break;
 	    case DEL:
 		putcntl(0);
@@ -791,7 +688,7 @@ static int dowrite P4(int, from, int, to, char *, fname, int, apflg)
 
         push_constant_string(fname);
         push_number(0);
-        res = safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2);
+        res = safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_DRIVER);
         if (IS_ZERO(res))
             return (ERR);
     }
@@ -826,7 +723,7 @@ static int dowrite P4(int, from, int, to, char *, fname, int, apflg)
     if (ED_BUFFER->write_fn) {
         push_constant_string(fname);
         push_number(1);
-        safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2);
+        safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_DRIVER);
     }
 
     return (err);
@@ -891,16 +788,17 @@ static char *getfn P1(int, writeflg)
     }
 
     if (file[0] != '/') {
-        push_string(file, STRING_MALLOC);
-        ret = apply_master_ob(APPLY_MAKE_PATH_ABSOLUTE, 1);
-        if (ret == 0 || ret->type != T_STRING)
-            return NULL;
-        strncpy(file, ret->u.string, sizeof file - 1);
-        file[MAXFNAME - 1] = '\0';
+	push_string(file, STRING_MALLOC);
+	ret = apply_master_ob(APPLY_MAKE_PATH_ABSOLUTE,1 );
+	if ((ret == 0) || (ret == (struct svalue *)-1) || ret->type != T_STRING)
+	    return NULL;
+	strncpy(file, ret->u.string, sizeof file - 1);
+	file[MAXFNAME - 1] = '\0';
     }
 
-    /* valid_read() / valid_write() is done here */
-    file2 = check_valid_path(file, command_giver, "ed_start", writeflg);
+    /* valid_read/valid_write done here */
+    file2 = check_valid_path(file, command_giver,
+			     "ed_start", writeflg);
     if (!file2)
 	return (NULL);
     strncpy(file, file2, MAXFNAME - 1);
@@ -1306,7 +1204,7 @@ static int set()
 	push_object(command_giver);
 	push_number(P_SHIFTWIDTH | P_FLAGS);
 	ret = apply_master_ob(APPLY_SAVE_ED_SETUP, 2);
-	if (ret && ret->type == T_NUMBER && ret->u.number > 0)
+	if (MASTER_APPROVED(ret))
 	    return 0;
     }
     if (!strcmp(word, "shiftwidth")) {
@@ -1407,7 +1305,6 @@ static int subst P4(regexp *, pat, char *, sub, int, gflg, int, pflag)
  * Indent code from DGD editor (v0.1), adapted.  No attempt has been made to
  * optimize for this editor.   Dworkin 920510
  */
-/* closure / symbol support Amylaar 30th Sep 1993 */
 #define error(s)               { add_message(s, lineno); errs++; return; }
 #define bool char
 static int lineno, errs;
@@ -1484,7 +1381,10 @@ static void shift P1(register char *, text)
 static char *stack, *stackbot;	/* token stack */
 static int *ind, *indbot;	/* indent stack */
 static char quote;		/* ' or " */
-static bool in_ppcontrol, in_comment, after_keyword;	/* status */
+static bool in_ppcontrol, after_keyword, in_mblock;	/* status */
+int in_comment;
+static char last_term[MAXLINE+5];
+static int last_term_len;
 
 /*
  * NAME:        indent(char*)
@@ -1522,7 +1422,7 @@ static void indent P1(char *, buf)
     /* process status vars */
     if (quote != '\0') {
 	shi = 0;		/* in case a comment starts on this line */
-    } else if (in_ppcontrol || (*p == '#' && p[1] != '\'')) {
+    } else if (in_ppcontrol || *p == '#') {
 	while (*p != '\0') {
 	    if (*p == '\\' && *++p == '\0') {
 		in_ppcontrol = TRUE;
@@ -1532,6 +1432,12 @@ static void indent P1(char *, buf)
 	}
 	in_ppcontrol = FALSE;
 	return;
+    } else if (in_mblock) {
+	if (!strncmp(p, last_term, last_term_len)) {
+	    in_mblock = FALSE;
+	    p+=last_term_len;
+	}
+	else return;
     } else {
 	/* count leading ws */
 	while (*p == ' ' || *p == '\t') {
@@ -1562,6 +1468,7 @@ static void indent P1(char *, buf)
 	    /* comment */
 	    while (*p != '*') {
 		if (*p == '\0') {
+		    if (in_comment == 2) in_comment = 0;
 		    return;
 		}
 		p++;
@@ -1570,7 +1477,7 @@ static void indent P1(char *, buf)
 		p++;
 	    }
 	    if (*p == '/') {
-		in_comment = FALSE;
+		in_comment = 0;
 		p++;
 	    }
 	    continue;
@@ -1598,30 +1505,23 @@ static void indent P1(char *, buf)
 		continue;
 
 	    case '\'':
-		if ((isalnum(*p) || (*p == '_')) && p[1] && p[1] != '\'') {
-		    do
-			++p;
-		    while (isalnum(*p) || (*p == '_'));
-		    token = TOKEN;
-		    break;
-		}
-		if (*p == '(' && p[1] == '{') {
-		    /* treat quoted array like an array */
-		    token = TOKEN;
-		    break;
-		}
-		/* fall through */
-
 	    case '"':		/* start of string */
 		quote = p[-1];
 		continue;
 
+	    case '@': {
+		int j = 0;
+		
+		if (*p == '@') p++;
+		while (isalnum(*p) || *p == '_') last_term[j++] = *p++;
+		last_term[j] = '\0';
+		last_term_len = j;
+		in_mblock = TRUE;
+		return;
+	    }
 	    case '/':
 		if (*p == '*' || *p == '/') {	/* start of a comment	 */
-		    /* 2nd part of line 	 */
-		    /* added by Inspiral to  */
-		    /* better handle "//" 	 */
-		    in_comment = TRUE;
+		    in_comment = (*p == '*') ? 1 : 2;
 		    if (do_indent) {
 			/* this line hasn't been indented yet */
 			shi = *ind - indent_index;
@@ -1668,8 +1568,8 @@ static void indent P1(char *, buf)
 		    token = LOPERATOR;
 		    break;
 		}
-		if (*p == '{' || *p == '[') {
-		    p++;	/* ({ , ([ each are one token */
+		if (*p == '{' || *p == '[' || (*p == ':' && p[1] != ':')) {
+		    p++;	/* ({ , ([ , (: each are one token */
 		    token = LHOOK2;
 		    break;
 		}
@@ -1677,6 +1577,14 @@ static void indent P1(char *, buf)
 		token = LHOOK;
 		break;
 
+	    case ':':
+		if (*p == ')') {
+		    p++;
+		    token = RHOOK;
+		    break;
+		}
+		token = TOKEN;
+		break;
 	    case '}':
 		if (*p != ')') {
 		    token = RBRACKET;
@@ -1833,7 +1741,7 @@ static int indent_code()
 
     quote = '\0';
     in_ppcontrol = FALSE;
-    in_comment = FALSE;
+    in_comment = 0;
 
     P_FCHANGED = TRUE;
     last = P_LASTLN;
@@ -2137,7 +2045,7 @@ static int docmd P1(int, glob)
     case 'w':
 	apflg = (c == 'W');
 
-	if (P_RESTRICT)
+	if (*inptr != NL && P_RESTRICT)
 	    return (ERR);
 	if (*inptr != ' ' && *inptr != HT && *inptr != NL)
 	    return (ERR);
@@ -2278,7 +2186,7 @@ void ed_start P5(char *, file_arg, char *, write_fn, char *, exit_fn, int, restr
     ED_BUFFER->shiftwidth = 4;
     push_object(command_giver);
     setup = apply_master_ob(APPLY_RETRIEVE_ED_SETUP, 1);
-    if (setup && setup->type == T_NUMBER && setup->u.number) {
+    if (setup && setup != (struct svalue *)-1 && setup->type == T_NUMBER && setup->u.number) {
 	ED_BUFFER->flags = setup->u.number & ALL_FLAGS_MASK;
 	ED_BUFFER->shiftwidth = setup->u.number & SHIFTWIDTH_MASK;
     }
@@ -2408,7 +2316,7 @@ void save_ed_buffer()
 
     push_string(P_FNAME, STRING_SHARED);
     stmp = apply_master_ob(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME, 1);
-    if (stmp) {
+    if (stmp && stmp != (svalue *)-1) {
 	if (stmp->type == T_STRING) {
 	    fname = stmp->u.string;
 	    if (*fname == '/')

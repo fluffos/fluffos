@@ -7,7 +7,7 @@
  *    94.07.09 - Robocoder - modified to use AVL tree
  */
 
-#ifndef _UID_H_
+#if !defined(_UID_H_) && !defined(NO_UIDS)
 #define _UID_H_
 
 typedef struct _uid {

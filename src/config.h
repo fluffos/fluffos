@@ -28,6 +28,7 @@
 #define DEBUG_LOG_FILE          GET_CONFIG_STR(__DEBUG_LOG_FILE__)
 #define DEFAULT_ERROR_MESSAGE   GET_CONFIG_STR(__DEFAULT_ERROR_MESSAGE__)
 #define DEFAULT_FAIL_MESSAGE    GET_CONFIG_STR(__DEFAULT_FAIL_MESSAGE__)
+#define GLOBAL_INCLUDE_FILE     GET_CONFIG_STR(__GLOBAL_INCLUDE_FILE__)
 
 /*
  * runtime config ints
@@ -82,7 +83,7 @@
 #define INLINE
 
 #ifdef HAS_UNSIGNED_CHAR
-#define EXTRACT_UCHAR(p) (*(unsigned char *)p)
+#define EXTRACT_UCHAR(p) (*(unsigned char *)(p))
 #else
 #define EXTRACT_UCHAR(p) (*p < 0 ? *p + 0x100 : *p)
 #endif				/* HAS_UNSIGNED_CHAR */
@@ -97,6 +98,18 @@
 #define LPC_OPTIMIZE_LOOPS
 
 #define I(x) (x)
+
+#ifdef DEBUG
+#  define IF_DEBUG(x) x
+#  define DEBUG_CHECK(x, y) if (x) fatal(y)
+#  define DEBUG_CHECK1(x, y, a) if (x) fatal(y, a)
+#  define DEBUG_CHECK2(x, y, a, b) if (x) fatal(y, a, b)
+#else
+#  define IF_DEBUG(x) 
+#  define DEBUG_CHECK(x, y)
+#  define DEBUG_CHECK1(x, y, a)
+#  define DEBUG_CHECK2(x, y, a, b)
+#endif
 
 /*
    define MALLOC, FREE, REALLOC, and CALLOC depending upon what malloc

@@ -7,7 +7,10 @@
 #ifndef APPLIES_H
 #define APPLIES_H
 
-#define APPLY___INIT                        "__INIT"
+/* the folowing must be the first character of __INIT, although it's not
+   used if OPTIMIZE_FUNCTION_TABLE_SEARCH is on. */
+#define APPLY___INIT_SPECIAL_CHAR           '#'
+#define APPLY___INIT                        "#global_init#"
 #define APPLY_AUTHOR_FILE                   "author_file"
 #define APPLY_CATCH_TELL                    "catch_tell"
 #define APPLY_CLEAN_UP                      "clean_up"
@@ -29,7 +32,7 @@
 #define APPLY_LOG_ERROR                     "log_error"
 #define APPLY_MAKE_PATH_ABSOLUTE            "make_path_absolute"
 #define APPLY_FLAG                          "flag"
-#define APPLY_MOVE                          "move"
+#define APPLY_MOVE                          "move_or_destruct"
 #define APPLY_NET_DEAD                      "net_dead"
 #define APPLY_OBJECT_NAME                   "object_name"
 #define APPLY_PRELOAD                       "preload"
@@ -42,6 +45,7 @@
 #define APPLY_SAVE_ED_SETUP                 "save_ed_setup"
 #define APPLY_SLOW_SHUTDOWN                 "slow_shutdown"
 #define APPLY_TELNET_SUBOPTION              "telnet_suboption"
+#define APPLY_TERMINAL_TYPE                 "terminal_type"
 #define APPLY_VALID_ASM                     "valid_asm"
 #define APPLY_VALID_COMPILE_TO_C            "valid_compile_to_c"
 #define APPLY_VALID_HIDE                    "valid_hide"

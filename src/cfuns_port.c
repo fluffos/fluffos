@@ -159,8 +159,7 @@ void c_rusage P1(svalue *, ret)
 	add_mapping_pair(m, "nvcsw", rus.ru_nvcsw);
 	add_mapping_pair(m, "nivcsw", rus.ru_nivcsw);
     }
-    m->ref--;
-    C_MAPPING(ret, m);
+    C_REFED_MAPPING(ret, m);
 }
 #else
 
@@ -199,8 +198,7 @@ void c_rusage P1(svalue *, ret)
 	add_mapping_pair(m, "phread", ps.ps_phread);
 	add_mapping_pair(m, "phwrite", ps.ps_phwrite);
     }
-    m->ref--;
-    C_MAPPING(ret, m);
+    C_REFED_MAPPING(ret, m);
 }
 #else
 
@@ -220,8 +218,7 @@ void c_rusage P1(svalue *, ret)
     m = allocate_mapping(2);
     add_mapping_pair(m, "utime", t.tms_utime * 1000 / CLK_TCK);
     add_mapping_pair(m, "stime", t.tms_stime * 1000 / CLK_TCK);
-    m->ref--;
-    C_MAPPING(ret, m);
+    C_REFED_MAPPING(ret, m);
 }
 
 #else
@@ -239,8 +236,7 @@ void c_rusage P1(svalue *, ret)
     add_mapping_pair(m, "utime", i ? 0 : clock[0] * 1000 + clock[1] / 1000);
     add_mapping_pair(m, "stime", i ? 0 : clock[0] * 1000 + clock[1] / 1000);
 
-    m->ref--;
-    C_MAPPING(ret, m);
+    C_MAPPING_REFED(ret, m);
 }
 
 #endif				/* LATTICE */

@@ -266,7 +266,7 @@ typedef unsigned long UINT32;
  */
 #if !defined(LATTICE) && !defined(SunOS_5) && !defined(OSF) && \
     !defined(_AIX) && !defined(linux) && !defined(ultrix) && \
-    !defined(hpux) && !defined(sgi)
+    !defined(hpux) && !defined(sgi) && !defined(NeXT)
 #if defined(_AUX_SOURCE)
 #define MEMMOVE_MISSING
 #else

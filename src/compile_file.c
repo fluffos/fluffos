@@ -130,7 +130,7 @@ compile_and_link(input_name, the_funcs, code, error_name, output_name)
 #else
 	    "%s %s -I%s -c -o %s.B %s.c > %s 2>&1",
 #endif
-	    COMPILER, CFLAGS,
+	    COMPILER, CFLAGS2,
 	    "lpc2c", module_name, module_name, error_name);
 
 #ifdef DEBUG_LINKER
@@ -207,10 +207,10 @@ runtime_link(module_name, the_funcs, code, error_name, output_name)
 
 #if ALIGN_CODE
     size_needed += 2048;
-    func = (char *) MALLOC(size_needed);
+    func = (char *) DMALLOC(size_needed, 0, "lpc->c code block");
     func1 = (char *) ((((int) func) + 2047) & ~0x7ff);
 #else
-    func = func1 = (char *) MALLOC(size_needed);
+    func = func1 = (char *) DMALLOC(size_needed, 0, "lpc->c code block");
 #endif
 
     close(fd);
@@ -372,7 +372,7 @@ struct nlist *
 
     /* Allocate a buffer for and read the symbol table */
 
-    nlst = (struct nlist *) MALLOC((unsigned) hdr->a_syms);
+    nlst = (struct nlist *) DMALLOC((unsigned) hdr->a_syms, "namelist");
     lseek(fd, (long) N_SYMOFF(*hdr), L_SET);
     if ((read(fd, (char *) nlst, (int) hdr->a_syms)) != hdr->a_syms) {
 	FREE((char *) nlst);
@@ -387,7 +387,7 @@ struct nlist *
     }
     /* Allocate a buffer and read the string table out of the file. */
 
-    *stbl = (char *) MALLOC((unsigned) size);
+    *stbl = (char *) DMALLOC((unsigned) size, "namelist: 2");
     lseek(fd, (long) N_STROFF(*hdr), L_SET);
     if ((read(fd, *stbl, size)) != size) {
 	FREE((char *) nlst);
@@ -414,25 +414,10 @@ struct nlist *
 #undef F_EXEC
 #include <nlist.h>
 
-link_jump_table(prog, jump_table, code)
-    struct program *prog;
-    void (**jump_table) (struct svalue *);
-    char *code;
-{
-    int num = prog->p.i.num_functions;
-    struct function *funp = prog->p.i.functions;
-    int i;
-
-    for (i = 0; i < num; i++, funp++)
-	if (jump_table[i])
-	    funp->offset = (unsigned long) jump_table[i];
-    prog->p.i.program = code;
-}
-
 compile_and_link(input_name, the_funcs, code, error_name, output_name)
     char *input_name;
     char **code;
-    char *output_name, *errorname;
+    char *output_name, *error_name;
     void (**the_funcs) ();
 {
     char *p, command[1024];
@@ -459,7 +444,7 @@ compile_and_link(input_name, the_funcs, code, error_name, output_name)
 
     /* Do the compile */
     sprintf(command, "%s %s -I%s -c -o %s.B %s.c > %s 2>&1",
-	    COMPILER, CFLAGS,
+	    COMPILER, CFLAGS2,
 	    "lpc2c", module_name, module_name, error_name);
 
 #ifdef DEBUG_LINKER
@@ -494,14 +479,14 @@ runtime_link(module_name, the_funcs, code, error_name, output_name)
     if (system(command))
 	return 3;
 
-    if ((p = load(output_name, 1, getenv("LIBPATH"))) == NULL)
+    if ((p = (char*)load(output_name, 1, getenv("LIBPATH"))) == NULL)
 	return 5;
 
     memset(nl, 0, 2 * sizeof(struct nlist));
     nl[0]._n._n_name = "__FUNCS";
     nlist(output_name, nl);
     if (nl[0].n_type != 0) {
-	address = p + (char *) nl[0].n_value;
+	address = p + nl[0].n_value;
 	*the_funcs = (void (*) ()) address;
 	*code = p;
 	return 0;
@@ -522,7 +507,7 @@ init_lpc_to_c()
 #ifdef F_GENERATE_SOURCE
 static void generate_identifier P2(char *, buf, char *, name)
 {
-    while (*name) {
+   while (*name) {
 	if ((*name >= 'a' && *name <= 'z') || (*name >= 'A' && *name <= 'Z'))
 	    *buf++ = *name++;
 	else {
@@ -536,14 +521,15 @@ static void generate_identifier P2(char *, buf, char *, name)
 int generate_source P2(char *, lname, char *, out_fname)
 {
     FILE *crdir_fopen();
-    FILE *f, *f_out;
+    FILE *f;
     extern int total_lines;
     extern int comp_flag;
     extern char *inherit_file;
     extern struct program *prog;
     extern char *current_file;
     struct stat c_st;
-    char real_name[200], name[200];
+    char real_name[200];
+    char name[200];
     char out_name[200];
     char ident[205];
     int done = 0;
@@ -604,22 +590,22 @@ int generate_source P2(char *, lname, char *, out_fname)
 	    perror(real_name);
 	    error("Could not read the file.\n");
 	}
-	f_out = crdir_fopen(out_fname);
-	if (f_out == 0) {
+	compilation_output_file = crdir_fopen(out_fname);
+	if (compilation_output_file == 0) {
 	    perror(out_fname);
-	    error("Could not open output file.\n");
+	    error("Could not open output file '%s'.\n", out_fname);
 	}
-	current_file = string_copy(real_name);
-	start_new_file(f);
+	current_file = make_shared_string(real_name);
 	generate_identifier(ident, name);
-	lpc_compile_file(f_out, ident);
-	end_new_file();
+	compilation_ident = ident;
+	compile_file(f);
+	fclose(compilation_output_file);
 	if (comp_flag)
 	    fprintf(stderr, " done\n");
 	update_compile_av(total_lines);
 	(void) fclose(f);
 	total_lines = 0;
-	FREE(current_file);
+	free_string(current_file);
 	current_file = 0;
 	if (inherit_file) {
 	    char *tmp = inherit_file;
@@ -641,5 +627,4 @@ int generate_source P2(char *, lname, char *, out_fname)
     }
     return 1;
 }
-
 #endif

@@ -2,7 +2,7 @@
 #include "compiler_shared.h"
 #include "opcodes.h"
 
-#line 6 "lpc_compiler/pre"
+%line
 
 /*
  * This file is the compiler for LPC->C
@@ -95,6 +95,7 @@ static int last_expression_register;
 static char last_arg[80];
 static short registers_in_use, registers_need_free;
 static int dirty_register, needs_comma;
+static int keep_in_register;
 #ifdef DEBUG
 static int on_stack, num_prefab;
 #endif
@@ -102,7 +103,7 @@ static stack_item simul_stack[SIMUL_STACK_SIZE];
 static stack_item *stack_sp = simul_stack;
 
 static void epilog PROT((char *));
-static void prolog PROT((void));
+static void prolog PROT((FILE *));
 static void clean_parser PROT((void));
 
 static void lpc_fatal PROT((char *));
@@ -421,7 +422,7 @@ static int prepare_arguments P4(char *, buf, int, numargs, int, flag, int, needs
     }
   }
   buf[strlen(buf)-1]=0;
-  while (numargs--)  stack_pop();
+  while (numargs--) stack_pop();
   if (flag) stack_push_register(return_reg, needs_free);
   return return_reg;
 }
@@ -568,6 +569,8 @@ static void ins_cfun P2(char *, name, int, numargs)
 }
 
 static void change_destination_to_stack() {
+  /* save location so we can undo this later */
+  last_expression = CURRENT_PROGRAM_SIZE;
   ins_cfun("push_svalue",1);
   generate_frees();
 #ifdef DEBUG
@@ -744,5 +747,4 @@ static void generate_truth_test() {
 }
 %}
 
-%type <number> expr_list5 expr_list6
-
+%type <number> expr_list_on_stack

@@ -9,7 +9,8 @@ read the './doc/driver/done-mudos' and './src/ChangeLog' files.
 We would like to thank the following muds for extensive testing and numerous
 bug reports:
  
-TMI, Portals, Overdrive, Genocide, TMI-2, Vincent's Hollow, and DreamShadow.
+TMI, Portals, Overdrive, Genocide, TMI-2, Vincent's Hollow, DreamShadow,
+Nightmare, and many others.
  
 The MudOS driver was a team effort with specific contributions from the
 following people:
@@ -52,14 +53,14 @@ Darin Johnson (Darin) - provided various patches and optimizations (including
    combining prelang.y and postlang.y into compiler.y).
 
 David Bennett (Pinkfish) - provided enhancements for parse_command and for the
-   telnet negotiation code in comm.c (as well as various other small bug fixes),
-   and the resolve() efun. 
+   telnet negotiation code in comm.c (as well as various other small bug 
+   fixes), and the resolve() efun. 
 
 John Fehr (Wildcard) - provided patches allowing MudOS to run on Amiga
 
 Anthon Pang (Robocoder) - provided various patches
 
-Tim Hollebeek (Beek) - LPC->C and patches
+Tim Hollebeek (Beek) - LPC->C and patches, compiler rewrite, etc
 
 --
 Thanks to Adam Beeman (Buddha) for making numerous suggestions on

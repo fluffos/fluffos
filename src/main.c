@@ -4,9 +4,6 @@
 #if !defined(LATTICE) && !defined(OS2)
 #include <sys/socket.h>
 #endif
-#ifdef AIX
-#include <sys/select.h>
-#endif
 #include <stdio.h>
 #if defined(__386BSD__) || defined(SunOS_5)
 #include <stdlib.h>
@@ -18,6 +15,7 @@
 #include <signal.h>
 #ifdef LATTICE
 #include <stdlib.h>
+#include <fcntl.h>
 #include <amiga.h>
 #include <nsignal.h>
 #include <socket.h>
@@ -40,6 +38,8 @@
 #include "md.h"
 #include "arch.h"		/* after config.h */
 #include "applies.h"
+#include "exec.h"
+#include "include/origin.h"
 
 extern int current_line;
 
@@ -52,10 +52,12 @@ extern int eval_cost;
 int time_to_swap;
 int time_to_clean_up;
 char *default_fail_message;
+#ifdef NEW_FUNCTIONS
+extern struct program fake_prog;
+#endif
 
 #ifdef YYDEBUG
 extern int yydebug;
-
 #endif
 
 int port_number;
@@ -74,7 +76,9 @@ double consts[NUM_CONSTS];
 
 extern jmp_buf error_recovery_context;
 extern int error_recovery_context_exists;
-extern struct object *master_ob;
+/* -1 indicates that we have never had a master object.  This is so the
+ * simul_efun object can load before the master. */
+struct object *master_ob = (struct object *) -1;
 
 static void debug_message_svalue PROT((struct svalue * v));
 
@@ -163,8 +167,6 @@ int main(argc, argv)
     int no_ip_demon = 0;
     char *p;
     char version_buf[80];
-    struct svalue *ret;
-    void init_strings(), init_otable();
     int dtablesize;
 
 #ifdef SAVE_BINARIES
@@ -198,14 +200,21 @@ int main(argc, argv)
     const0.u.number = 0;
     const1.type = T_NUMBER;
     const1.u.number = 1;
+
     /* const0u used by undefinedp() */
     const0u.type = T_NUMBER;
     const0u.subtype = T_UNDEFINED;
     const0u.u.number = 0;
+
     /* const0n used by nullp() */
     const0n.type = T_NUMBER;
     const0n.subtype = T_NULLVALUE;
     const0n.u.number = 0;
+
+#ifdef NEW_FUNCTIONS
+    fake_prog.p.i.program_size = 0;
+#endif
+
     /*
      * Check that the definition of EXTRACT_UCHAR() is correct.
      */
@@ -213,6 +222,27 @@ int main(argc, argv)
     *p = -10;
     if (EXTRACT_UCHAR(p) != 0x100 - 10) {
 	fprintf(stderr, "Bad definition of EXTRACT_UCHAR() in config.h.\n");
+	exit(-1);
+    }
+
+    /*
+     * An added test: can we do EXTRACT_UCHAR(x++)?
+     * (read_number, etc uses it)
+     */
+    p = (char *) &i;
+    (void) EXTRACT_UCHAR(p++);
+    if ((p - (char *) &i) != 1) {
+	fprintf(stderr, "EXTRACT_UCHAR() in config.h evaluates its argument more than once.\n");
+	exit(-1);
+    }
+
+    /*
+     * Check the living hash table size
+     */
+    if (LIVING_HASH_SIZE != 4 && LIVING_HASH_SIZE != 16 &&
+	LIVING_HASH_SIZE != 64 && LIVING_HASH_SIZE != 256 &&
+	LIVING_HASH_SIZE != 1024 && LIVING_HASH_SIZE != 4096) {
+	fprintf(stderr, "LIVING_HASH_SIZE in options.h must be one of 4, 16, 64, 256, 1024, 4096, ...\n");
 	exit(-1);
     }
     /*
@@ -264,6 +294,7 @@ int main(argc, argv)
     }
     init_strings();		/* in stralloc.c */
     init_otable();		/* in otable.c */
+    init_identifiers();		/* in lex.c */
     /*
      * We estimate that we will need MAX_USERS + MAX_EFUN_SOCKS + 10 file
      * descriptors if the maximum number of users were to log in and all LPC
@@ -322,6 +353,12 @@ int main(argc, argv)
     max_buffer_size = MAX_BUFFER_SIZE;
     max_string_length = MAX_STRING_LENGTH;
     master_file_name = (char *) MASTER_FILE;
+    /* fix the filename */
+    while (*master_file_name == '/') master_file_name++;
+    p = master_file_name;
+    while (*p++);
+    if (p[-2]=='c' && p[-3]=='.')
+	p[-3]=0;
     mud_lib = (char *) MUD_LIB;
     set_inc_list(INCLUDE_DIRS);
     if (reserved_size > 0)
@@ -355,6 +392,11 @@ int main(argc, argv)
 	case 'N':
 	    no_ip_demon++;
 	    continue;
+#ifdef YYDEBUG
+	case 'y':
+	    yydebug = 1;
+	    continue;
+#endif				/* YYDEBUG */
 	case 'm':
 	    mud_lib = string_copy(argv[i] + 2);
 	    if (chdir(mud_lib) == -1) {
@@ -375,6 +417,7 @@ int main(argc, argv)
 #ifdef LPC_TO_C
     init_lpc_to_c();
 #endif
+    add_predefines();
 
 #ifndef NO_IP_DEMON
     if (!no_ip_demon)
@@ -382,44 +425,18 @@ int main(argc, argv)
 #endif				/* NO_IP_DEMON */
 
     eval_cost = max_cost;	/* needed for create() functions */
-    set_simul_efun(SIMUL_EFUN);
 
     if (SETJMP(error_recovery_context)) {
-	clear_state();
-	add_message("Anomaly in the fabric of world space.\n");
+	fprintf(stderr, "The simul_efun (/%s) and master (/%s) objects must be loadable.\n", 
+		simul_efun_file_name, master_file_name);
+	exit(-1);
     } else {
 	error_recovery_context_exists = 1;
-	master_ob = load_object(master_file_name, 0);
+	set_simul_efun(SIMUL_EFUN);
+	(void) load_object(master_file_name, 0);
     }
     error_recovery_context_exists = 0;
-    if (master_ob == 0) {
-	fprintf(stderr, "The file master file must be loadable.\n");
-	exit(-1);
-    }
-    /*
-     * Make sure master_ob is never made a dangling pointer. Look at
-     * apply_master_ob() for more details.
-     */
-    add_ref(master_ob, "main");
-    ret = apply_master_ob(APPLY_GET_ROOT_UID, 0);
-    if (ret == 0 || ret->type != T_STRING) {
-	fprintf(stderr, "%s() in the master file does not work\n", APPLY_GET_ROOT_UID);
-	exit(-1);
-    }
-    master_ob->uid = set_root_uid(ret->u.string);
-    master_ob->euid = master_ob->uid;
-#ifndef NO_MUDLIB_STATS
-    set_root_author(ret->u.string);
-#endif
-    ret = apply_master_ob(APPLY_GET_BACKBONE_UID, 0);
-    if (ret == 0 || ret->type != T_STRING) {
-	fprintf(stderr, "%s() in the master file does not work\n", APPLY_GET_BACKBONE_UID);
-	exit(-1);
-    }
-    set_backbone_uid(ret->u.string);
-#ifndef NO_MUDLIB_STATS
-    set_backbone_domain(ret->u.string);
-#endif
+
     for (i = 1; i < argc; i++) {
 	if (argv[i][0] != '-') {
 	    continue;
@@ -428,6 +445,11 @@ int main(argc, argv)
 	     * Look at flags. -m and -o has already been tested.
 	     */
 	    switch (argv[i][1]) {
+	    case 'D':
+	    case 'N':
+	    case 'm':
+	    case 'y':
+		continue;
 	    case 'f':
 		push_constant_string(argv[i] + 2);
 		(void) apply_master_ob(APPLY_FLAG, 1);
@@ -439,14 +461,8 @@ int main(argc, argv)
 	    case 'e':
 		e_flag++;
 		continue;
-	    case 'D':
-		continue;
-	    case 'N':
-		continue;
 	    case 'p':
 		port_number = atoi(argv[i] + 2);
-		continue;
-	    case 'm':
 		continue;
 	    case 'd':
 		d_flag++;
@@ -457,11 +473,6 @@ int main(argc, argv)
 	    case 't':
 		t_flag++;
 		continue;
-#ifdef YYDEBUG
-	    case 'y':
-		yydebug = 1;
-		continue;
-#endif				/* YYDEBUG */
 	    default:
 		fprintf(stderr, "Unknown flag: %s\n", argv[i]);
 		exit(-1);
@@ -622,14 +633,14 @@ char *xalloc P1(int, size)
 	if (reserved_area) {
 	    FREE(reserved_area);
 	    p = "Temporarily out of MEMORY. Freeing reserve.\n";
-	    write(1, p, strlen(p));
+	    (void)write(1, p, strlen(p));
 	    reserved_area = 0;
 	    slow_shut_down_to_do = 6;
 	    return xalloc(size);/* Try again */
 	}
 	going_to_exit = 1;
 	p = "Totally out of MEMORY.\n";
-	write(1, p, strlen(p));
+	(void)write(1, p, strlen(p));
 	(void) dump_trace(0);
 	exit(2);
     }

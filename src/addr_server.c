@@ -26,9 +26,6 @@
 #include <sys/socketvar.h>
 #endif				/* !apollo && !linux */
 #endif				/* LATTICE */
-#ifdef _AIX
-#include <sys/select.h>
-#endif				/* _AIX */
 #ifndef LATTICE
 #include <netinet/in.h>
 #include <arpa/inet.h>

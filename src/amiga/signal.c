@@ -170,7 +170,8 @@ __stkargs unsigned int alarm(unsigned int seconds)
 
     if (!treq) {
 	printf("No handler installed !\n");
-	return 0;		/* Heartbeat won't work :+( */
+	if (seconds > 0)
+	    return 0;		/* Heartbeat won't work :+( */
     }
     tv.tv_secs = seconds;
     tv.tv_micro = 0;

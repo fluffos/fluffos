@@ -11,34 +11,19 @@
 #endif
 #include "applies.h"
 
+#define GET_ADDRESS fd = s0->u.number; get_socket_address(fd, addr, &port)
+#define VALID_SOCKET(x) check_valid_socket((x), fd, get_socket_owner(fd), addr, port)
+
 #ifdef LPC_TO_C
 #ifdef F_SOCKET_CREATE
 void c_socket_create P4(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2)
 {
     int fd;
-    struct svalue *mret;
-    struct vector *info;
 
     if (s2 && (s2->type != T_STRING))
 	bad_arg(3, F_SOCKET_CREATE);
 
-    info = allocate_array(4);
-    info->ref--;
-    info->item[0].type = T_NUMBER;
-    info->item[0].u.number = -1;
-    assign_socket_owner(&info->item[1], current_object);
-    info->item[2].type = T_STRING;
-    info->item[2].subtype = STRING_CONSTANT;
-    info->item[2].u.string = "N/A";
-    info->item[3].type = T_NUMBER;
-    info->item[3].u.number = -1;
-
-    push_object(current_object);
-    push_string("create", STRING_CONSTANT);
-    push_vector(info);
-
-    mret = apply_master_ob(APPLY_VALID_SOCKET, 3);
-    if (!IS_ZERO(mret)) {
+    if (check_valid_socket("create", -1, current_object, "N/A", -1)) {
 	fd = socket_create(s0->u.number, s1->u.string, s2 ? s2->u.string : NULL);
 	C_NUMBER(ret, fd);
     } else {
@@ -51,30 +36,11 @@ void c_socket_create P4(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2)
 void c_socket_bind P3(svalue *, ret, svalue *, s0, svalue *, s1)
 {
     int i, fd, port;
-    struct svalue *mret;
-    struct vector *info;
     char addr[ADDR_BUF_SIZE];
 
-    fd = s0->u.number;
-    get_socket_address(fd, addr, &port);
+    GET_ADDRESS;
 
-    info = allocate_array(4);
-    info->ref--;
-    info->item[0].type = T_NUMBER;
-    info->item[0].u.number = fd;
-    assign_socket_owner(&info->item[1], get_socket_owner(fd));
-    info->item[2].type = T_STRING;
-    info->item[2].subtype = STRING_CONSTANT;
-    info->item[2].u.string = addr;
-    info->item[3].type = T_NUMBER;
-    info->item[3].u.number = port;
-
-    push_object(current_object);
-    push_string("bind", STRING_CONSTANT);
-    push_vector(info);
-
-    mret = apply_master_ob(APPLY_VALID_SOCKET, 3);
-    if (!IS_ZERO(mret)) {
+    if (VALID_SOCKET("bind")) {
 	i = socket_bind(fd, s1->u.number);
 	C_NUMBER(ret, i);
     } else {
@@ -87,30 +53,11 @@ void c_socket_bind P3(svalue *, ret, svalue *, s0, svalue *, s1)
 void c_socket_listen P3(svalue *, ret, svalue *, s0, svalue *, s1)
 {
     int i, fd, port;
-    struct svalue *mret;
-    struct vector *info;
     char addr[ADDR_BUF_SIZE];
 
-    fd = s0->u.number;
-    get_socket_address(fd, addr, &port);
+    GET_ADDRESS;
 
-    info = allocate_array(4);
-    info->ref--;
-    info->item[0].type = T_NUMBER;
-    info->item[0].u.number = fd;
-    assign_socket_owner(&info->item[1], get_socket_owner(fd));
-    info->item[2].type = T_STRING;
-    info->item[2].subtype = STRING_CONSTANT;
-    info->item[2].u.string = addr;
-    info->item[3].type = T_NUMBER;
-    info->item[3].u.number = port;
-
-    push_object(current_object);
-    push_string("listen", STRING_CONSTANT);
-    push_vector(info);
-
-    mret = apply_master_ob(APPLY_VALID_SOCKET, 3);
-    if (!IS_ZERO(mret)) {
+    if (VALID_SOCKET("listen")) {
 	i = socket_listen(fd, s1->u.string);
 	C_NUMBER(ret, i);
     } else {
@@ -123,33 +70,14 @@ void c_socket_listen P3(svalue *, ret, svalue *, s0, svalue *, s1)
 void c_socket_accept P4(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2)
 {
     int i, fd, port;
-    struct svalue *mret;
-    struct vector *info;
     char addr[ADDR_BUF_SIZE];
 
     if (s2->type != T_STRING) {
 	bad_arg(3, F_SOCKET_ACCEPT);
     }
-    fd = s0->u.number;
-    get_socket_address(fd, addr, &port);
+    GET_ADDRESS;
 
-    info = allocate_array(4);
-    info->ref--;
-    info->item[0].type = T_NUMBER;
-    info->item[0].u.number = fd;
-    assign_socket_owner(&info->item[1], get_socket_owner(fd));
-    info->item[2].type = T_STRING;
-    info->item[2].subtype = STRING_CONSTANT;
-    info->item[2].u.string = addr;
-    info->item[3].type = T_NUMBER;
-    info->item[3].u.number = port;
-
-    push_object(current_object);
-    push_string("accept", STRING_CONSTANT);
-    push_vector(info);
-
-    mret = apply_master_ob(APPLY_VALID_SOCKET, 3);
-    if (!IS_ZERO(mret)) {
+    if (VALID_SOCKET("accept")) {
 	i = socket_accept(fd, s1->u.string, s2->u.string);
 	C_NUMBER(ret, i);
     } else {
@@ -162,8 +90,6 @@ void c_socket_accept P4(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2)
 void c_socket_connect P5(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2, svalue *, s3)
 {
     int i, fd, port;
-    struct svalue *mret;
-    struct vector *info;
     char addr[ADDR_BUF_SIZE];
 
     if (s2->type != T_STRING) {
@@ -172,8 +98,7 @@ void c_socket_connect P5(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2
     if (s3->type != T_STRING) {
 	bad_arg(4, F_SOCKET_CONNECT);
     }
-    fd = s0->u.number;
-    get_socket_address(fd, addr, &port);
+    GET_ADDRESS;
 
     if (!strcmp(addr, "0.0.0.0") && port == 0) {
 	/*
@@ -203,23 +128,7 @@ void c_socket_connect P5(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2
 #endif
     }
 
-    info = allocate_array(4);
-    info->ref--;
-    info->item[0].type = T_NUMBER;
-    info->item[0].u.number = fd;
-    assign_socket_owner(&info->item[1], get_socket_owner(fd));
-    info->item[2].type = T_STRING;
-    info->item[2].subtype = STRING_CONSTANT;
-    info->item[2].u.string = addr;
-    info->item[3].type = T_NUMBER;
-    info->item[3].u.number = port;
-
-    push_object(current_object);
-    push_string("connect", STRING_CONSTANT);
-    push_vector(info);
-
-    mret = apply_master_ob(APPLY_VALID_SOCKET, 3);
-    if (!IS_ZERO(mret)) {
+    if (VALID_SOCKET("connect")) {
 	i = socket_connect(fd, s1->u.string, s2->u.string,
 			   s3->u.string);
 	C_NUMBER(ret, i);
@@ -233,33 +142,14 @@ void c_socket_connect P5(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2
 void c_socket_write P4(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2)
 {
     int i, fd, port;
-    struct svalue *mret;
-    struct vector *info;
     char addr[ADDR_BUF_SIZE];
 
     if (s2 && s2->type != T_STRING) {
 	bad_arg(3, F_SOCKET_WRITE);
     }
-    fd = s0->u.number;
-    get_socket_address(fd, addr, &port);
+    GET_ADDRESS;
 
-    info = allocate_array(4);
-    info->ref--;
-    info->item[0].type = T_NUMBER;
-    info->item[0].u.number = fd;
-    assign_socket_owner(&info->item[1], get_socket_owner(fd));
-    info->item[2].type = T_STRING;
-    info->item[2].subtype = STRING_CONSTANT;
-    info->item[2].u.string = addr;
-    info->item[3].type = T_NUMBER;
-    info->item[3].u.number = port;
-
-    push_object(current_object);
-    push_string("write", STRING_CONSTANT);
-    push_vector(info);
-
-    mret = apply_master_ob(APPLY_VALID_SOCKET, 3);
-    if (!IS_ZERO(mret)) {
+    if (VALID_SOCKET("write")) {
 	i = socket_write(fd, s1, s2 ? s2->u.string : (char *) NULL);
 	C_NUMBER(ret, i);
     } else {
@@ -272,30 +162,11 @@ void c_socket_write P4(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2)
 void c_socket_close P2(svalue *, ret, svalue *, s0)
 {
     int i, fd, port;
-    struct svalue *mret;
-    struct vector *info;
     char addr[ADDR_BUF_SIZE];
 
-    fd = s0->u.number;
-    get_socket_address(fd, addr, &port);
+    GET_ADDRESS;
 
-    info = allocate_array(4);
-    info->ref--;
-    info->item[0].type = T_NUMBER;
-    info->item[0].u.number = fd;
-    assign_socket_owner(&info->item[1], get_socket_owner(fd));
-    info->item[2].type = T_STRING;
-    info->item[2].subtype = STRING_CONSTANT;
-    info->item[2].u.string = addr;
-    info->item[3].type = T_NUMBER;
-    info->item[3].u.number = port;
-
-    push_object(current_object);
-    push_string("close", STRING_CONSTANT);
-    push_vector(info);
-
-    mret = apply_master_ob(APPLY_VALID_SOCKET, 3);
-    if (!IS_ZERO(mret)) {
+    if (VALID_SOCKET("close")) {
 	i = socket_close(fd);
 	C_NUMBER(ret, i);
     } else {
@@ -308,33 +179,14 @@ void c_socket_close P2(svalue *, ret, svalue *, s0)
 void c_socket_release P4(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2)
 {
     int i, fd, port;
-    struct svalue *mret;
-    struct vector *info;
     char addr[ADDR_BUF_SIZE];
 
     if (s2->type != T_STRING) {
 	bad_arg(3, F_SOCKET_RELEASE);
     }
-    fd = s0->u.number;
-    get_socket_address(fd, addr, &port);
+    GET_ADDRESS;
 
-    info = allocate_array(4);
-    info->ref--;
-    info->item[0].type = T_NUMBER;
-    info->item[0].u.number = fd;
-    assign_socket_owner(&info->item[1], get_socket_owner(fd));
-    info->item[2].type = T_STRING;
-    info->item[2].subtype = STRING_CONSTANT;
-    info->item[2].u.string = addr;
-    info->item[3].type = T_NUMBER;
-    info->item[3].u.number = port;
-
-    push_object(current_object);
-    push_string("release", STRING_CONSTANT);
-    push_vector(info);
-
-    mret = apply_master_ob(APPLY_VALID_SOCKET, 3);
-    if (!IS_ZERO(mret)) {
+    if (VALID_SOCKET("release")) {
 	i = socket_release(s0->u.number, s1->u.ob, s2->u.string);
 	C_NUMBER(ret, i);
     } else {
@@ -347,8 +199,6 @@ void c_socket_release P4(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2
 void c_socket_acquire P5(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2, svalue *, s3)
 {
     int i, fd, port;
-    struct svalue *mret;
-    struct vector *info;
     char addr[ADDR_BUF_SIZE];
 
     if (s2->type != T_STRING) {
@@ -357,26 +207,9 @@ void c_socket_acquire P5(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2
     if (s3->type != T_STRING) {
 	bad_arg(4, F_SOCKET_ACQUIRE);
     }
-    fd = s2->u.number;
-    get_socket_address(fd, addr, &port);
+    GET_ADDRESS;
 
-    info = allocate_array(4);
-    info->ref--;
-    info->item[0].type = T_NUMBER;
-    info->item[0].u.number = fd;
-    assign_socket_owner(&info->item[1], get_socket_owner(fd));
-    info->item[2].type = T_STRING;
-    info->item[2].subtype = STRING_CONSTANT;
-    info->item[2].u.string = addr;
-    info->item[3].type = T_NUMBER;
-    info->item[3].u.number = port;
-
-    push_object(current_object);
-    push_string("acquire", STRING_CONSTANT);
-    push_vector(info);
-
-    mret = apply_master_ob(APPLY_VALID_SOCKET, 3);
-    if (!IS_ZERO(mret)) {
+    if (VALID_SOCKET("acquire")) {
 	i = socket_acquire(s0->u.number, s1->u.string,
 			   s2->u.string, s3->u.string);
 	C_NUMBER(ret, i);

@@ -1,0 +1,48 @@
+AMIGA/README
+
+Compiling the driver
+~~~~~~~~~~~~~~~~~~~~
+
+At this time, you require:
+
+	SAS/C
+	a networking package -- either AmiTCP or AS225
+
+To build the driver, select the appropriate networking package in the
+SMakefile, in addition to configuring any other options, and run "smake".
+
+Note: if using AmiTCP, the logical directories NETINCLUDE: and NETLIB:
+      should be assigned.
+
+
+Installing and running a mud
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(I assume you've already downloaded the driver...)
+
+Install a networking package (runtime system) -- AmiTCP or AS225
+
+Download a mudlib; if an "options.h" file is supplied, copy this to the
+main drive source directory; most likely, you'll want to change the
+#define for CONFIG_FILE_DIR
+
+Install the driver; a sample config file is given in "Config.example"
+
+Edit your config file (eg "config.file") according to where the lib is
+located, port number, etc
+
+Run the driver ("driver config.file")
+
+Telnet (or letnet) to the mud, eg "telnet localhost 4444",
+where 4444 is the assigned port specified in your config file
+
+
+Source notes
+~~~~~~~~~~~~
+
+The Amiga support code is courtesy of Martin Brenner, Lars Duening, John
+Fehr, and Anthon Pang, and heavily based on the hosts/amiga code included
+with adr32.  The only major differences are the lack of DICE compiler
+support and the simulated sockets code.  The omission of the later may
+bother some people...so I (A. Pang) will explain why:  "I don't like
+kludgy code".  Moreover, significant changes in the main driver source
+would be required.

@@ -48,7 +48,7 @@ If the driver errors out at runtime with a message saying that the
 operation is not supported on the socket, then try using cc instead of gcc 
 (assuming you were using gcc).  Alternatively, try uncommenting 
 NEED_OLD_CPP in the Makefile and then 'make clean' and 'make'.
-
+ 
 For more information about LPmuds and MUDs in general try reading
 the USENET groups rec.games.mud.{admin,announce,misc,lp,tiny,diku}.
 
@@ -61,3 +61,4 @@ include/        Useful #defines for the mudlib to have access to (used by
 compiler/
 lpc_compiler/   These two directories contain the unshared parser/compiler
                 parts, used in generating yacc files
+packages/       This is where efun packages and user efuns should reside

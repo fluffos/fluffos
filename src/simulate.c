@@ -42,6 +42,7 @@
 #include "debug.h"
 #include "applies.h"
 #include "mapping.h"
+#include "include/origin.h"
 
 extern int errno;
 extern int current_time;
@@ -53,6 +54,11 @@ extern int comp_flag;
  * and the original object must be loaded again.
  */
 char *inherit_file;
+#ifdef LPC_TO_C
+int compile_to_c;
+FILE *compilation_output_file;
+char *compilation_ident;
+#endif
 
 /* prevents infinite inherit loops.
    No, mark-and-sweep solution won't work.  Exercise for reader.  */
@@ -64,16 +70,13 @@ extern int symlink PROT((char *, char *));
 
 #endif				/* NeXT */
 
-#if !defined(hpux) && !defined(_AIX) && !defined(__386BSD__) \
-	&& !defined(linux) && !defined(SunOS_5) && !defined(SVR4) \
-	&& !defined(__bsdi__)
+#if !defined(hpux) && !defined(_AIX) && !defined(__386BSD__) && !defined(linux) && !defined(SunOS_5) && !defined(SVR4) && !defined(__bsdi__)
 extern int fchmod PROT((int, int));
+#endif
 
-#endif				/* !defined(hpux) && !defined(_AIX) */
 char *last_verb = 0;
 
-extern int set_call PROT((struct object *, struct sentence *, int, int)),
-         legal_path PROT((char *));
+extern int legal_path PROT((char *));
 
 void pre_compile PROT((char *)),
             remove_interactive PROT((struct object *)),
@@ -90,9 +93,11 @@ void pre_compile PROT((char *)),
 
 extern int d_flag;
 
-struct object *obj_list, *obj_list_destruct, *master_ob;
+struct object *obj_list, *obj_list_destruct;
 
+#ifndef NO_UIDS
 extern userid_t *backbone_uid;
+#endif
 
 struct object *current_object;	/* The object interpreting a function. */
 struct object *command_giver;	/* Where the current command came from. */
@@ -102,9 +107,10 @@ int num_parse_error;		/* Number of errors in the parser. */
 
 #ifdef PRIVS
 static void init_privs_for_object PROT((struct object *));
-
 #endif
+#ifndef NO_UIDS
 static int give_uid_to_object PROT((struct object *));
+#endif
 static int init_object PROT((struct object *));
 static struct svalue *load_virtual_object PROT((char *));
 static char *make_new_name PROT((char *));
@@ -138,21 +144,26 @@ init_privs_for_object P1(struct object *, ob)
     struct object *tmp_ob;
     struct svalue *value;
     static char *privs_file_fname = (char *) 0;
+    int err;
 
-    if (master_ob == NULL)
+    err = assert_master_ob_loaded("[internal] init_privs_for_object", "");
+    if (err == -1) {
 	tmp_ob = ob;
-    else {
-	assert_master_ob_loaded("[internal] init_privs_for_object()");
+    } else {
 	tmp_ob = master_ob;
     }
-    if (!current_object || !current_object->uid) {
+    if (!current_object
+#ifndef NO_UIDS
+	|| !current_object->uid
+#endif
+    ) {
 	ob->privs = NULL;
 	return;
     }
     push_string(ob->name, STRING_CONSTANT);
     if (!privs_file_fname)
 	privs_file_fname = make_shared_string(APPLY_PRIVS_FILE);
-    value = apply(privs_file_fname, tmp_ob, 1);
+    value = apply(privs_file_fname, tmp_ob, 1, ORIGIN_DRIVER);
     if (value == NULL || value->type != T_STRING)
 	ob->privs = NULL;
     else
@@ -163,28 +174,26 @@ init_privs_for_object P1(struct object *, ob)
 /*
  * Give the correct uid and euid to a created object.
  */
+#ifndef NO_UIDS
 static int give_uid_to_object P1(struct object *, ob)
 {
     struct svalue *ret;
     char *creator_name;
-    struct object *tmp_ob;
     static char *creator_file_fname = (char *) 0;
+    int err;
 
-    if (master_ob == 0)
-	tmp_ob = ob;
-    else {
-	assert_master_ob_loaded("[internal] give_uid_to_object()");
-	tmp_ob = master_ob;
-    }
-
-    if (!current_object || !current_object->uid) {
+    err = assert_master_ob_loaded("[internal] give_uid_to_object", "");
+    if (err == -1) {
 	/*
 	 * Only for the master and void object. Note that back_bone_uid is
 	 * not defined when master.c is being loaded.
 	 */
 	ob->uid = add_uid("NONAME");
+#ifdef AUTO_SETEUID
+	ob->euid = ob->uid;
+#else	
 	ob->euid = NULL;
-
+#endif
 	return 1;
     }
     /*
@@ -193,16 +202,16 @@ static int give_uid_to_object P1(struct object *, ob)
     push_string(ob->name, STRING_CONSTANT);
     if (!creator_file_fname)
 	creator_file_fname = make_shared_string(APPLY_CREATOR_FILE);
-    ret = apply(creator_file_fname, tmp_ob, 1);
+    ret = apply(creator_file_fname, master_ob, 1, ORIGIN_DRIVER);
     if (!ret)
-	error("master object: No function %s() defined!\n", APPLY_CREATOR_FILE);
+	error("master object: No function " APPLY_CREATOR_FILE "() defined!\n");
     if (ret->type != T_STRING) {
 	struct svalue arg;
 
 	arg.type = T_OBJECT;
 	arg.u.ob = ob;
 	destruct_object(&arg);
-	error("Illegal object to load: return value of master::creator_file() was not a string.\n");
+	error("Illegal object to load: return value of master::" APPLY_CREATOR_FILE "() was not a string.\n");
     }
     creator_name = ret->u.string;
     /*
@@ -247,7 +256,7 @@ static int give_uid_to_object P1(struct object *, ob)
 #endif
     return 1;
 }
-
+#endif
 
 static int init_object P1(struct object *, ob)
 {
@@ -260,24 +269,26 @@ static int init_object P1(struct object *, ob)
 #ifndef NO_MUDLIB_STATS
     add_objects(&ob->stats, 1);
 #endif
+#ifndef NO_UIDS
     return give_uid_to_object(ob);
+#else
+    return 1;
+#endif
 }
 
 
 static struct svalue *
        load_virtual_object P1(char *, name)
 {
-    static int loading_virtual_object = 0;
     extern char *simul_efun_file_name;
     struct svalue *v;
 
+    if (master_ob_is_loading || master_ob == (struct object *)-1) return 0;
     if (strcmp(name, simul_efun_file_name) == 0) {
 	v = 0;
     } else {
 	push_string(name, STRING_MALLOC);
-	loading_virtual_object++;
 	v = apply_master_ob(APPLY_COMPILE_OBJECT, 1);
-	loading_virtual_object--;
     }
     if (!v || (v->type != T_OBJECT)) {
 	fprintf(stderr, "Could not load file: %s\n", name);
@@ -286,6 +297,48 @@ static struct svalue *
     }
     return v;
 }
+
+void set_master P1(struct object *, ob) {
+    int first_load = (master_ob == (struct object *)-1);
+    struct svalue *ret;
+
+    master_ob = ob;
+    /* Make sure master_ob is never made a dangling pointer. */
+    add_ref(master_ob, "set_master");
+#ifdef NO_UIDS
+#  ifndef NO_MUDLIB_STATS
+    if (first_load) {
+      set_backbone_domain("BACKBONE");
+      set_master_author("NONAME");
+    }
+#  endif
+#else
+    ret = apply_master_ob(APPLY_GET_ROOT_UID, 0);
+    /* can't be -1 or we wouldn't be here */
+    if (ret == 0 || ret->type != T_STRING) {
+        debug_fatal("%s() in master object does not work\n",
+		    APPLY_GET_ROOT_UID);
+    }
+    if (first_load) {
+      master_ob->uid = set_root_uid(ret->u.string);
+      master_ob->euid = master_ob->uid;
+#  ifndef NO_MUDLIB_STATS
+      set_master_author(ret->u.string);
+#  endif
+      ret = apply_master_ob(APPLY_GET_BACKBONE_UID, 0);
+      if (ret == 0 || ret->type != T_STRING) {
+        fatal("%s() in the master file does not work\n", APPLY_GET_BACKBONE_UID);
+      }
+      set_backbone_uid(ret->u.string);
+#  ifndef NO_MUDLIB_STATS
+      set_backbone_domain(ret->u.string);
+#  endif
+    } else {
+      master_ob->uid = add_uid(ret->u.string);
+      master_ob->euid = master_ob->uid;
+    }
+#endif
+ }
 
 /*
  * Load an object definition from file. If the object wants to inherit
@@ -325,9 +378,8 @@ struct object *load_object P2(char *, lname, int, flags)
     int name_length;
     char real_name[200], name[200];
     char *p;
-
+    int is_master_ob=0;
 #ifdef LPC_TO_C
-    FILE *f_out;
     char out_name[200];
     char *out_ptr = out_name;
 #ifdef RUNTIME_LOADING
@@ -335,13 +387,15 @@ struct object *load_object P2(char *, lname, int, flags)
     void (**jump_table) (struct svalue *);
     int err;
 #endif
-    int compile_to_c = 0;
+    int save_compile_to_c = compile_to_c;
 #endif
 
     if (++num_objects_this_thread > INHERIT_CHAIN_SIZE)
 	error("Inherit chain too deep: > %d\n", INHERIT_CHAIN_SIZE);
+#ifndef NO_UIDS
     if (current_object && current_object->euid == NULL)
 	error("Can't load objects when no effective user.\n");
+#endif
     /* don't allow consecutive "/"'s - Wayfarer */
     p = lname;
     while (*p) {
@@ -370,6 +424,15 @@ struct object *load_object P2(char *, lname, int, flags)
 	name[name_length - 2] = '\0';
 	name_length -= 2;
     }
+    if (strcmp(name, master_file_name)==0) {
+	master_ob_is_loading = 1;
+	is_master_ob = 1;
+	/* free the old copy */
+	if (master_ob && master_ob != (struct object *)-1) {
+	    free_object(master_ob, "apply_master_ob");
+	    master_ob = 0;
+	}
+    }
     /*
      * First check that the c-file exists.
      */
@@ -385,7 +448,7 @@ struct object *load_object P2(char *, lname, int, flags)
 	    /* will get copied */
 	    push_string(real_name, STRING_MALLOC);
 	    mret = apply_master_ob(APPLY_VALID_COMPILE_TO_C, 1);
-	    if (!(IS_ZERO(mret))) {
+	    if (MASTER_APPROVED(mret)) {
 		compile_to_c = 1;
 		strcpy(out_ptr, SAVE_BINARIES);
 		if (*out_ptr == '/')
@@ -398,6 +461,10 @@ struct object *load_object P2(char *, lname, int, flags)
 #endif
 	    struct svalue *v;
 
+	    if (is_master_ob) {
+		master_ob_is_loading = 0;
+		return 0;
+	    }
 	    if (!(v = load_virtual_object(name))) {
 		return 0;
 	    }
@@ -410,8 +477,11 @@ struct object *load_object P2(char *, lname, int, flags)
 	    enter_object_hash(ob);
 	    ob->flags |= O_VIRTUAL;
 	    ob->load_time = current_time;
+#ifndef LPC_TO_C
 	    return ob;
-#ifdef LPC_TO_C
+#else
+	    compile_to_c = save_compile_to_c;
+	    return ob;
 	}
 #endif
     }
@@ -419,8 +489,9 @@ struct object *load_object P2(char *, lname, int, flags)
      * Check if it's a legal name.
      */
     if (!legal_path(real_name)) {
+	if (is_master_ob) master_ob_is_loading = 0;
 	fprintf(stderr, "Illegal pathname: %s\n", real_name);
-	error("Illegal path name.\n");
+	error("Illegal path name '%s'.\n", real_name);
 	return 0;
     }
 #ifdef SAVE_BINARIES
@@ -435,73 +506,66 @@ struct object *load_object P2(char *, lname, int, flags)
 	}
 	f = fopen(real_name, "r");
 	if (f == 0) {
+	    if (is_master_ob) master_ob_is_loading = 0;
 	    perror(real_name);
-	    error("Could not read the file.\n");
+	    error("Could not read the file '%s'.\n", real_name);
 	}
-#ifndef LPC_TO_C
-	current_file = string_copy(real_name);	/* This one is freed below */
-	start_new_file(f);
-	compile_file();
-	end_new_file();
-#else
+#ifdef LPC_TO_C
 	if (compile_to_c) {
-	    f_out = crdir_fopen(out_ptr);
-	    if (f_out == 0) {
+	    compilation_output_file = crdir_fopen(out_ptr);
+	    if (compilation_output_file == 0) {
+		if (is_master_ob) master_ob_is_loading = 0;
 		perror(out_ptr);
-		error("Could not open output file.\n");
+		error("Could not open output file '%s'.\n", out_ptr);
 	    }
-	}
-	current_file = string_copy(real_name);	/* This one is freed below */
-	start_new_file(f);
-	if (compile_to_c) {
-	    lpc_compile_file(f_out, 0);	/* This closes f_out for us */
-	    end_new_file();
-	} else {
-	    compile_file();
-	    end_new_file();
-	}
-	if (prog && compile_to_c) {
+	    current_file = make_shared_string(real_name);/* This one is freed below */
+	    compilation_ident = 0;
+	    compile_file(f);
+	    fclose(compilation_output_file);
+	    if (prog) {
 #ifdef RUNTIME_LOADING
-	    err = compile_and_link(out_ptr, &jump_table, &code, "errors", "OUT");
-	    if (err) {
-		compile_file_error(err, "compile_and_link");
+		err = compile_and_link(out_ptr, &jump_table, &code, "errors", "OUT");
+		if (err) {
+		    compile_file_error(err, "compile_and_link");
+		    if (prog)
+			free_prog(prog, 1);
+		    prog = 0;
+		} else
+		    link_jump_table(prog, jump_table, code);
+#else
 		if (prog)
 		    free_prog(prog, 1);
 		prog = 0;
-	    } else
-		link_jump_table(prog, jump_table, code);
-#else
-	    if (prog)
-		free_prog(prog, 1);
-	    prog = 0;
 #endif
+	    }
+	    if (!(flags & LO_SAVE_OUTPUT))
+		unlink(out_ptr);
+	} else {
+#endif
+	    current_file = make_shared_string(real_name);/* This one is freed below */
+	    compile_file(f);
+#ifdef LPC_TO_C
 	}
-	if (!(flags & LO_SAVE_OUTPUT))
-	    unlink(out_ptr);
 #endif
 	if (comp_flag)
 	    fprintf(stderr, " done\n");
 	update_compile_av(total_lines);
 	total_lines = 0;
 	(void) fclose(f);
-	FREE(current_file);
+	free_string(current_file);
 	current_file = 0;
 #ifdef SAVE_BINARIES
     }
 #endif
 
-    /* allow updating of simul_efun and adding of new functions -bobf */
-    if (prog && simul_efun_file_name &&
-	(strcmp(prog->name, simul_efun_file_name) == 0))
-	get_simul_efuns(prog);
-
     /* Sorry, can't handle objects without programs yet. */
     if (inherit_file == 0 && (num_parse_error > 0 || prog == 0)) {
+	if (is_master_ob) master_ob_is_loading = 0;
 	if (prog)
 	    free_prog(prog, 1);
 	if (num_parse_error == 0 && prog == 0)
-	    error("No program in object!\n");
-	error("Error in loading object\n");
+	    error("No program in object '%s'!\n", lname);
+	error("Error in loading object '%s'\n", lname);
     }
     /*
      * This is an iterative process. If this object wants to inherit an
@@ -517,6 +581,7 @@ struct object *load_object P2(char *, lname, int, flags)
 	    prog = 0;
 	}
 	if (strcmp(inherit_file, name) == 0) {
+	    if (is_master_ob) master_ob_is_loading = 0;
 	    FREE(inherit_file);
 	    inherit_file = 0;
 	    error("Illegal to inherit self.\n");
@@ -545,6 +610,13 @@ struct object *load_object P2(char *, lname, int, flags)
 	    ob->load_time = current_time;
 	}
 	num_objects_this_thread--;
+	if (is_master_ob) {
+	  master_ob_is_loading = 0;
+	  set_master(ob);
+	}
+#ifdef LPC_TO_C
+	compile_to_c = save_compile_to_c;
+#endif
 	return ob;
     }
     ob = get_empty_object(prog->p.i.num_variables);
@@ -554,21 +626,24 @@ struct object *load_object P2(char *, lname, int, flags)
     ob->next_all = obj_list;
     obj_list = ob;
     enter_object_hash(ob);	/* add name to fast object lookup table */
-
-    if (master_ob) {
-	push_object(ob);
-	mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
-	if (mret) {
-	    if (mret->type & T_NUMBER) {
-		if (IS_ZERO(mret)) {
-		    void destruct_object_two();
-
-		    destruct_object_two(ob);
-		    error("master object: %s() denied permission to load %s.\n", APPLY_VALID_OBJECT, name);
-		}
-	    }
-	}
+    push_object(ob);
+    mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
+    if (mret && !MASTER_APPROVED(mret)) {
+	destruct_object_two(ob);
+	error("master object: " APPLY_VALID_OBJECT "() denied permission to load %s.\n", name);
     }
+
+    /* allow updating of simul_efun and adding of new functions -bobf */
+    /* moved to here by Beek so we can set the simul_efun_ob */
+    if (prog && simul_efun_file_name &&
+	(strcmp(prog->name, simul_efun_file_name) == 0)) {
+	get_simul_efuns(ob->prog);
+	if (simul_efun_ob)
+	    free_object(simul_efun_ob, "load_object");
+	simul_efun_ob = ob;
+	add_ref(simul_efun_ob, "load_object");
+    }
+
     if (init_object(ob) && !(flags & LO_DONT_RESET))
 	reset_object(ob, 0);
     if (!(ob->flags & O_DESTRUCTED) &&
@@ -580,6 +655,13 @@ struct object *load_object P2(char *, lname, int, flags)
 	debug_message("--%s loaded\n", ob->name);
     ob->load_time = current_time;
     num_objects_this_thread--;
+    if (is_master_ob) {
+      master_ob_is_loading = 0;
+      set_master(ob);
+    }
+#ifdef LPC_TO_C
+    compile_to_c = save_compile_to_c;
+#endif
     return ob;
 }
 
@@ -603,9 +685,11 @@ struct object *clone_object P1(char *, str1)
     struct object *ob, *new_ob;
     struct object *save_command_giver = command_giver;
 
+#ifndef NO_UIDS
     if (current_object && current_object->euid == 0) {
 	error("Object must call seteuid() prior to calling clone_object().\n");
     }
+#endif
     num_objects_this_thread = 0;
     ob = find_object(str1);
     if (ob && !object_visible(ob))
@@ -775,7 +859,7 @@ struct object *object_present P2(struct svalue *, v, struct object *, ob)
 	return 0;
     if (ob->super) {
 	push_string(v->u.string, STRING_CONSTANT);
-	ret = apply(APPLY_ID, ob->super, 1);
+	ret = apply(APPLY_ID, ob->super, 1, ORIGIN_DRIVER);
 	if (ob->super->flags & O_DESTRUCTED)
 	    return 0;
 	if (!IS_ZERO(ret)) {
@@ -817,7 +901,7 @@ static struct object *object_present2 P2(char *, str, struct object *, ob)
     }
     for (; ob; ob = ob->next_inv) {
 	push_string(item, STRING_CONSTANT);
-	ret = apply(APPLY_ID, ob, 1);
+	ret = apply(APPLY_ID, ob, 1, ORIGIN_DRIVER);
 	if (ob->flags & O_DESTRUCTED) {
 	    FREE(item);
 	    return 0;
@@ -906,29 +990,31 @@ static void destruct_object_two P1(struct object *, ob)
 
     if (d_flag > 1)
 	debug_message("Destruct object %s (ref %d)\n", ob->name, ob->ref);
-    super = ob->super;
-    if (super == 0) {
-	/*
-	 * There is nowhere to move the objects.
-	 */
-	struct svalue svp;
 
+    /* try to move our contents somewhere */
+    super = ob->super;
+
+    while (ob->contains) {
+	struct svalue svp;
+	struct svalue *retv;
 	svp.type = T_OBJECT;
-	while (ob->contains) {
-	    svp.u.ob = ob->contains;
-	    push_object(ob->contains);
-	    /*
-	     * An error here will not leave destruct() in an inconsistent
-	     * stage.
-	     */
-	    apply_master_ob(APPLY_DESTRUCT_ENVIRONMENT_OF, 1);
-	    if (svp.u.ob == ob->contains)
-		destruct_object(&svp);
-	}
-    } else {
-	while (ob->contains)
-	    move_or_destruct(ob->contains, super);
+	svp.u.ob = ob->contains;
+	/*
+	 * An error here will not leave destruct() in an inconsistent
+	 * stage.
+	 */
+	if (super && !(super->flags & O_DESTRUCTED))
+	    push_object(super);
+	else
+	    push_number(0);
+	    
+	retv = apply(APPLY_MOVE, ob->contains, 1, ORIGIN_DRIVER);
+	/* OUCH! we could be dested by this. -Beek */
+	if (ob->flags & O_DESTRUCTED) return;
+	if (svp.u.ob == ob->contains)
+	    destruct_object(&svp);
     }
+    
 #ifndef NO_MUDLIB_STATS
     add_objects(&ob->stats, -1);
 #endif
@@ -1042,10 +1128,8 @@ void destruct2 P1(struct object *, ob)
 	int i;
 
 	for (i = 0; i < (int) ob->prog->p.i.num_variables; i++) {
-	    free_svalue(&ob->variables[i]);
-	    ob->variables[i].type = T_NUMBER;
-	    ob->variables[i].u.number = 0;
-	    ob->variables[i].subtype = T_NULLVALUE;
+	    free_svalue(&ob->variables[i], "destruct2");
+	    ob->variables[i] = const0n;
 	}
     }
     free_object(ob, "destruct_object");
@@ -1154,7 +1238,8 @@ void tell_room P3(struct object *, room, struct svalue *, v, struct vector *, av
 	sprintf(buff, "%g", v->u.real);
 	break;
     default:
-	error("Bad arg 2 to tell_room()\n");
+	bad_argument(v, T_OBJECT | T_NUMBER | T_REAL | T_STRING,
+		     2, F_TELL_ROOM);
     }
 
     for (ob = room->contains; ob; ob = ob->next_inv) {
@@ -1208,7 +1293,7 @@ void shout_string P1(char *, str)
 
 void enable_commands P1(int, num)
 {
-    struct object **pp;
+    struct object *pp;
 
     if (current_object->flags & O_DESTRUCTED)
 	return;
@@ -1227,13 +1312,9 @@ void enable_commands P1(int, num)
 	    if (current_object->super) {
 		if (current_object->flags & O_ENABLE_COMMANDS)
 		    remove_sent(current_object, current_object->super);
-		for (pp = &current_object->super->contains; *pp;) {
-		    if ((*pp)->flags & O_ENABLE_COMMANDS)
-			remove_sent(current_object, *pp);
-		    if (*pp != current_object)
-			pp = &(*pp)->next_inv;
-		    else
-			*pp = (*pp)->next_inv;
+		for (pp = current_object->super->contains; pp; pp = pp->next_inv) {
+		    if (pp->flags & O_ENABLE_COMMANDS)
+			remove_sent(current_object, pp);
 		}
 	    }
 	}
@@ -1255,7 +1336,7 @@ int input_to P4(char *, fun, int, flag, int, num_arg, struct svalue *, args)
     if (!command_giver || command_giver->flags & O_DESTRUCTED)
 	return 0;
     s = alloc_sentence();
-    if (set_call(command_giver, s, flag, 0)) {
+    if (set_call(command_giver, s, flag & ~I_SINGLE_CHAR)) {
 	/*
 	 * If we have args, we copy them, and adjust the stack automatically
 	 * (elsewhere) to avoid double free_svalue()'s
@@ -1293,7 +1374,7 @@ int get_char P4(char *, fun, int, flag, int, num_arg, struct svalue *, args)
     if (!command_giver || command_giver->flags & O_DESTRUCTED)
 	return 0;
     s = alloc_sentence();
-    if (set_call(command_giver, s, flag, 1)) {
+    if (set_call(command_giver, s, flag | I_SINGLE_CHAR)) {
 	/*
 	 * If we have args, we copy them, and adjust the stack automatically
 	 * (elsewhere) to avoid double free_svalue()'s
@@ -1529,7 +1610,7 @@ void move_object P2(struct object *, item, struct object *, dest)
      */
     if (item->flags & O_ENABLE_COMMANDS) {
 	command_giver = item;
-	(void) apply(APPLY_INIT, dest, 0);
+	(void) apply(APPLY_INIT, dest, 0, ORIGIN_DRIVER);
 	if ((dest->flags & O_DESTRUCTED) || item->super != dest) {
 	    command_giver = save_cmd;	/* marion */
 	    return;
@@ -1544,20 +1625,20 @@ void move_object P2(struct object *, item, struct object *, dest)
 	if (ob == item)
 	    continue;
 	if (ob->flags & O_DESTRUCTED)
-	    error("An object was destructed at call of %s()\n", APPLY_INIT);
+	    error("An object was destructed at call of " APPLY_INIT "()\n");
 	if (ob->flags & O_ENABLE_COMMANDS) {
 	    command_giver = ob;
-	    (void) apply(APPLY_INIT, item, 0);
+	    (void) apply(APPLY_INIT, item, 0, ORIGIN_DRIVER);
 	    if (dest != item->super) {
 		command_giver = save_cmd;	/* marion */
 		return;
 	    }
 	}
 	if (item->flags & O_DESTRUCTED)	/* marion */
-	    error("The object to be moved was destructed at call of %s()\n", APPLY_INIT);
+	    error("The object to be moved was destructed at call of " APPLY_INIT "()\n");
 	if (item->flags & O_ENABLE_COMMANDS) {
 	    command_giver = item;
-	    (void) apply(APPLY_INIT, ob, 0);
+	    (void) apply(APPLY_INIT, ob, 0, ORIGIN_DRIVER);
 	    if (dest != item->super) {
 		command_giver = save_cmd;	/* marion */
 		return;
@@ -1565,10 +1646,10 @@ void move_object P2(struct object *, item, struct object *, dest)
 	}
     }
     if (dest->flags & O_DESTRUCTED)	/* marion */
-	error("The destination to move to was destructed at call of %s()\n", APPLY_INIT);
+	error("The destination to move to was destructed at call of " APPLY_INIT "()\n");
     if (dest->flags & O_ENABLE_COMMANDS) {
 	command_giver = dest;
-	(void) apply(APPLY_INIT, item, 0);
+	(void) apply(APPLY_INIT, item, 0, ORIGIN_DRIVER);
     }
     command_giver = save_cmd;
 }
@@ -1649,6 +1730,7 @@ int user_parser P1(char *, buff)
     int length;
     struct object *save_current_object = current_object, *save_command_giver = command_giver;
     char *user_verb = 0;
+    int where;
 
     if (d_flag > 1)
 	debug_message("cmd [%s]: %s\n", command_giver->name, buff);
@@ -1719,8 +1801,15 @@ int user_parser P1(char *, buff)
 	 * set current_object so that static functions are allowed.
 	 * current_object is reset just after the call to apply().
 	 */
-	if (current_object == 0)
+	where = (current_object ? ORIGIN_EFUN : ORIGIN_DRIVER);
+	/*
+	 * This is really a kludge for stupid libs (TMI-2) that try to
+	 * use previous_object() to figure out who is doing certain things,
+	 * and can't really deal with it being zero.
+	 */
+	if (!current_object)
 	    current_object = s->ob;
+
 	/*
 	 * Remember the object, to update moves.
 	 */
@@ -1728,22 +1817,29 @@ int user_parser P1(char *, buff)
 	super = command_object->super;
 	if (s->flags & V_NOSPACE) {
 	    push_constant_string(&buff[strlen(s->verb)]);
-	    ret = apply(s->function, s->ob, 1);
+	    ret = apply(s->function, s->ob, 1, where);
 	} else if (buff[length] == ' ') {
 	    push_constant_string(&buff[length + 1]);
-	    ret = apply(s->function, s->ob, 1);
+	    ret = apply(s->function, s->ob, 1, where);
 	} else {
-	    ret = apply(s->function, s->ob, 0);
+	    ret = apply(s->function, s->ob, 0, where);
 	}
 	/*
 	 * prevent an action from moving its associated object into another
 	 * another object prior to returning 0.  closes a security hole which
 	 * was making the static keyword of no use on actions.
+	 * 
+	 * BE CAREFUL HERE!.  if the command giver was moved as a result
+	 * of the command, or several other likely possibilities, then
+	 * s has been freed and possibly reallocated.  command_object
+	 * is saved for that reason but whoever added this fix blew it.
+	 * -Beek
 	 */
-	if (IS_ZERO(ret) && (super != s->ob->super)) {
+	if (IS_ZERO(ret) && (super != command_object->super)) {
 	    fprintf(stderr,
 	    "** Check '%s' as a possible attempted breach of security **\n",
 		    s->ob->name);
+	    current_object = save_current_object;
 	    break;
 	}
 	if (current_object->flags & O_DESTRUCTED) {
@@ -1793,8 +1889,6 @@ void add_action P3(char *, str, char *, cmd, int, flag)
     struct sentence *p;
     struct object *ob;
 
-    if (str[0] == ':')
-	error("Illegal function name: %s\n", str);
     if (current_object->flags & O_DESTRUCTED)
 	return;
     ob = current_object;
@@ -1902,6 +1996,9 @@ void debug_fatal PVARGS(va_alist)
     va_end(args);
     fprintf(stderr, "%s", msg_buf);
     fflush(stderr);
+    if (current_file)
+	(void) fprintf(stderr, "Compilation in progress: %s:%d\n",
+		       current_file, current_line);
     if (current_object)
 	(void) fprintf(stderr, "Current object was %s\n",
 		       current_object->name);
@@ -1937,7 +2034,6 @@ int num_error = 0;
 
 #ifdef MUDLIB_ERROR_HANDLER
 static int num_mudlib_error = 0;
-
 #endif
 
 /*
@@ -1974,15 +2070,18 @@ static void error_handler()
     extern jmp_buf error_recovery_context;
     extern struct object *current_heart_beat;
     extern struct svalue catch_value;
-    extern int too_deep_error, max_eval_error;
 
 #ifdef MUDLIB_ERROR_HANDLER
     struct mapping *m;
     struct svalue *mret;
+    char *file;
+    int line;
 #else
     char *object_name;
 #endif
 
+    /* in case we're going to jump out of load_object */
+    master_ob_is_loading = 0;
     num_objects_this_thread = 0;/* reset the count */
     if (error_recovery_context_exists > 1) {	/* user catches this error */
 	struct svalue v;
@@ -1992,36 +2091,47 @@ static void error_handler()
 #ifdef MUDLIB_ERROR_HANDLER
 	if (num_mudlib_error) {
 	    debug_message("Error in error handler: ");
+#endif
 	    debug_message(emsg_buf);
+	    if (current_object)
+		debug_message("program: %s, object: %s, file: %s\n",
+			      current_prog ? current_prog->name : "",
+			      current_object->name,
+			      get_line_number_if_any());
+	    (void) dump_trace(0);
+#ifdef MUDLIB_ERROR_HANDLER
+	    num_mudlib_error = 0;
 	} else {
 	    num_mudlib_error++;
-	    m = allocate_mapping(5);
+	    m = allocate_mapping(6);
 	    add_mapping_string(m, "error", emsg_buf);
-	    add_mapping_string(m, "program", current_prog->name);
-	    add_mapping_object(m, "object", current_object);
+	    if (current_prog)
+		add_mapping_string(m, "program", current_prog->name);
+	    if (current_object)
+		add_mapping_object(m, "object", current_object);
 	    add_mapping_array(m, "trace", get_svalue_trace());
-	    add_mapping_pair(m, "line", get_line_number_if_any());
-	    num_error--;
-	    reset_machine (0);
-	    push_mapping(m);
-	    m->ref--;
-	    *sp++ = const1;
+	    get_line_number_info(&file, &line);
+	    add_mapping_string(m, "file", file);
+	    add_mapping_pair(m, "line", line);
+	    push_refed_mapping(m);
+	    *(++sp) = const1;
 	    mret = apply_master_ob(APPLY_ERROR_HANDLER,2);
-	    if (mret && mret->type == T_STRING) 
-	      debug_message("caught: %s", mret->u.string);
+	    if ((mret == (struct svalue *)-1) || !mret) {
+		debug_message("No error handler for error: ");
+		debug_message(emsg_buf);
+		if (current_object)
+		    debug_message("program: %s, object: %s, file: %s\n",
+				  current_prog ? current_prog->name : "",
+				  current_object->name,
+				  get_line_number_if_any());
+		(void) dump_trace(0);
+	    } else if (mret->type == T_STRING) {
+		debug_message("caught: %s", mret->u.string);
+	    }
 	    num_mudlib_error--;
 	}
-#else
-	debug_message("caught: %s", emsg_buf + 1);
-	if (current_object)
-	    debug_message("program: %s, object: %s line %d\n",
-			  current_prog ? current_prog->name : "",
-			  current_object->name,
-			  get_line_number_if_any());
-	(void) dump_trace(0);
 #endif
 #endif
-	
 	v.type = T_STRING;
 	v.u.string = emsg_buf;
 	v.subtype = STRING_MALLOC;	/* Always reallocate */
@@ -2037,24 +2147,43 @@ static void error_handler()
     if (num_mudlib_error) {
 	debug_message("Error in error handler: ");
 	debug_message("%s", emsg_buf);
+	if (current_object)
+	    debug_message("program: %s, object: %s, file: %s\n",
+			  current_prog ? current_prog->name : "",
+			  current_object->name,
+			  get_line_number_if_any());
+	(void) dump_trace(0);
+	num_mudlib_error = 0;
     } else {
 	num_mudlib_error++;
-	m = allocate_mapping(5);
+	m = allocate_mapping(6);
 	add_mapping_string(m, "error", emsg_buf);
-	add_mapping_string(m, "program", current_prog->name);
-	add_mapping_object(m, "object", current_object);
+	if (current_prog)
+	    add_mapping_string(m, "program", current_prog->name);
+	if (current_object)
+	    add_mapping_object(m, "object", current_object);
 	add_mapping_array(m, "trace", get_svalue_trace());
-	add_mapping_pair(m, "line", get_line_number_if_any());
+	get_line_number_info(&file, &line);
+	add_mapping_string(m, "file", file);
+	add_mapping_pair(m, "line", line);
 	num_error--;
 	reset_machine(0);
 	push_mapping(m);
 	m->ref--;
 	mret = apply_master_ob(APPLY_ERROR_HANDLER, 1);
-	if (mret && mret->type == T_STRING)
+	if ((mret == (struct svalue *)-1) || !mret) {
+	    debug_message("No error handler for error: ");
+	    debug_message(emsg_buf);
+	    if (current_object)
+		debug_message("program: %s, object: %s, file: %s\n",
+			      current_prog ? current_prog->name : "",
+			      current_object->name,
+			      get_line_number_if_any());
+	} else if (mret->type == T_STRING)
 	    debug_message("%s", mret->u.string);
 	num_mudlib_error--;
+	num_error++;
     }
-    num_error++;
     if (current_heart_beat) {
 	set_heart_beat(current_heart_beat, 0);
 	debug_message("Heart beat in %s turned off.\n", current_heart_beat->name);
@@ -2074,7 +2203,7 @@ static void error_handler()
 #ifndef NO_MUDLIB_STATS
 	add_errors(&current_object->stats, 1);
 #endif
-	debug_message("program: %s, object: %s line %d\n",
+	debug_message("program: %s, object: %s, file: %s\n",
 		      current_prog ? current_prog->name : "",
 		      current_object->name,
 		      get_line_number_if_any());
@@ -2084,7 +2213,6 @@ static void error_handler()
 #else
     object_name = dump_trace(0);
 #endif
-    fflush(stdout);
     if (object_name) {
 	struct object *ob;
 
@@ -2110,7 +2238,7 @@ static void error_handler()
 	if ((command_giver->flags & O_IS_WIZARD) || !strlen(DEFAULT_ERROR_MESSAGE)) {
 	    add_message("%s", emsg_buf + 1);
 	    if (current_object)
-		add_message("program: %s, object: %s line %d\n",
+		add_message("program: %s, object: %s, file: %s\n",
 			    current_prog ? current_prog->name : "",
 			    current_object->name,
 			    get_line_number_if_any());
@@ -2228,8 +2356,7 @@ static void move_or_destruct P2(struct object *, what, struct object *, to)
      * This is very dubious, why not just destruct them /JnA
      */
     push_object(to);
-    push_number(1);
-    svp = apply(APPLY_MOVE, what, 2);
+    svp = apply(APPLY_MOVE, what, 1, ORIGIN_DRIVER);
     if (svp && svp->type == T_NUMBER && svp->u.number == 0)
 	return;
 
@@ -2257,8 +2384,8 @@ void slow_shut_down P1(int, minutes)
 
     push_number(minutes);
     amo = apply_master_ob(APPLY_SLOW_SHUTDOWN, 1);
-    if (IS_ZERO(amo))
-	/* if (IS_ZERO(apply_master_ob(APPLY_SLOW_SHUTDOWN,1))) */
+    /* in this case, approved means the mudlib will handle it */
+    if (!MASTER_APPROVED(amo))
     {
 	struct object *save_current = current_object, *save_command = command_giver;
 
@@ -2276,7 +2403,7 @@ void slow_shut_down P1(int, minutes)
     }
 }
 
-void do_message P5(char *, class, char *, msg, struct vector *, scope, struct vector *, exclude, int, recurse)
+void do_message P5(struct svalue *, class, char *, msg, struct vector *, scope, struct vector *, exclude, int, recurse)
 {
     int i, j, valid;
     struct object *ob;
@@ -2307,9 +2434,9 @@ void do_message P5(char *, class, char *, msg, struct vector *, scope, struct ve
 		}
 	    }
 	    if (valid) {
-		push_string(class, STRING_CONSTANT);
+		push_svalue(class);
 		push_string(msg, STRING_CONSTANT);
-		apply(APPLY_RECEIVE_MESSAGE, ob, 2);
+		apply(APPLY_RECEIVE_MESSAGE, ob, 2, ORIGIN_DRIVER);
 	    }
 	} else if (recurse) {
 	    struct vector *tmp;
@@ -2346,7 +2473,7 @@ struct object *first_inventory P1(struct svalue *, arg)
     } else
 	ob = arg->u.ob;
     if (ob == 0)
-	error("first_inventory(): bad arg 1\n");
+	bad_argument(arg, T_STRING | T_OBJECT, 1, F_FIRST_INVENTORY);
     ob = ob->contains;
     while (ob) {
 	if (ob->flags & O_HIDDEN) {

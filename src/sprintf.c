@@ -72,6 +72,8 @@
 #include "ignore.h"
 #include "exec.h"
 #include "applies.h"
+#include "include/origin.h"
+#include "instrs.h"
 
 /*
  * If this #define is defined then error messages are returned,
@@ -82,7 +84,6 @@
 #if defined(F_SPRINTF) || defined(F_PRINTF)
 
 extern char *xalloc(), *string_copy();
-extern INLINE void free_svalue PROT((struct svalue *));
 
 extern struct svalue const0n;
 extern struct object *current_object;
@@ -280,7 +281,7 @@ static void floatadd P3(char **, dst, int *, size, double, flt)
 	*size += i + flt_l + 2;
 	*dst = (char *) DREALLOC(*dst, *size, 109, "stradd");
     }
-    sprintf(*dst, "%s", buf);
+    sprintf(*dst + i, "%s", buf);
 }				/* end of floatadd() */
 
 /*
@@ -356,9 +357,62 @@ void svalue_to_string P6(struct svalue *, obj, char **, str, int, size, int, ind
 	break;
     case T_FUNCTION:
 	stradd(str, &size, "(: ");
-	svalue_to_string(&(obj->u.fp->obj), str, size, indent + 2, trailing, 0);
-	stradd(str, &size, ", ");
-	svalue_to_string(&(obj->u.fp->fun), str, size, indent + 2, trailing, 0);
+#ifdef NEW_FUNCTIONS
+	switch (obj->u.fp->type) {
+	case ORIGIN_CALL_OTHER:
+	    svalue_to_string(&(obj->u.fp->f.obj), str, size, indent, trailing, 0);
+	    if (obj->u.fp->args.type != T_POINTER){
+		stradd(str, &size, ", ");
+		svalue_to_string(&(obj->u.fp->args), str, size, indent, 0, 0);
+	    }
+	    break;
+	case ORIGIN_LOCAL:
+	    stradd(str, &size, 
+		   obj->u.fp->owner->prog->p.i.functions[obj->u.fp->f.index].name);
+	    break;
+	case ORIGIN_SIMUL_EFUN:
+	    stradd(str, &size, simuls[obj->u.fp->f.index]->name);
+	    break;
+	case ORIGIN_FUNCTIONAL:
+	    {
+		char buf[10];
+		int n = obj->u.fp->f.a.num_args;
+
+		stradd(str, &size, "<code>(");
+		for (i=1; i < n; i++) {
+		     sprintf(buf, "$%i, ", i);
+		     stradd(str, &size, buf);
+		}
+		if (n) {
+		     sprintf(buf, "$%i", n);
+		     stradd(str, &size, buf);
+		}
+		stradd(str, &size, ")");
+		break;
+	    }
+	case ORIGIN_EFUN:
+	    {
+		int i;
+		i = obj->u.fp->f.opcodes[0];
+#ifdef NEEDS_CALL_EXTRA
+		if (i == F_CALL_EXTRA) {
+		    i = obj->u.fp->f.opcodes[1] + 0xff;
+		}
+#endif
+		stradd(str, &size, instrs[i].name);
+		break;
+	    }
+	}
+	if (obj->u.fp->args.type == T_POINTER) {
+	    stradd(str, &size, ", ");
+	    for (i=0; i<obj->u.fp->args.u.vec->size; i++)
+		svalue_to_string(&(obj->u.fp->args.u.vec->item[i]), str, size, indent, 0, 0);
+	} 
+#else
+        svalue_to_string(&(obj->u.fp->obj), str, size, indent + 2, trailing, 0);
+        stradd(str, &size, ", ");
+        svalue_to_string(&(obj->u.fp->fun), str, size, indent + 2, trailing, 0);
+#endif
 	stradd(str, &size, " :)");
 	break;
     case T_MAPPING:
@@ -368,7 +422,7 @@ void svalue_to_string P6(struct svalue *, obj, char **, str, int, size, int, ind
 	    stradd(str, &size, "([ /* sizeof() == ");
 	    numadd(str, &size, obj->u.map->count);
 	    stradd(str, &size, " */\n");
-	    for (i = 0; i < (int) (obj->u.map->table_size); i++) {
+	    for (i = 0; i <= (int) (obj->u.map->table_size); i++) {
 		struct node *elm;
 
 		for (elm = obj->u.map->table[i]; elm; elm = elm->next) {
@@ -719,11 +773,11 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 #ifdef RETURN_ERROR_MESSAGES
 	    sprintf(buff,
 	      "ERROR: (s)printf(): !feature - undefined error 0x%X !\n", i);
-	    fprintf(stderr, "%s:%d: %s", current_prog->name,
+	    fprintf(stderr, "Program:%s File: %s: %s", current_prog->name,
 		    get_line_number_if_any(), buff);
 	    debug_message("%s", buff);
 	    if (current_object) {
-		debug_message("program: %s, object: %s line %d\n",
+		debug_message("program: %s, object: %s, file: %s\n",
 			      current_prog ? current_prog->name : "",
 			      current_object->name,
 			      get_line_number_if_any());
@@ -735,11 +789,11 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 	}			/* end of switch */
 #ifdef RETURN_ERROR_MESSAGES
 	sprintf(buff, "ERROR: (s)printf(): %s (arg %u)\n", err, arg);
-	fprintf(stderr, "%s:%d: %s", current_prog->name,
+	fprintf(stderr, "Program %s File: %s: %s", current_prog->name,
 		get_line_number_if_any(), buff);
 	debug_message("%s", buff);
 	if (current_object) {
-	    debug_message("program: %s, object: %s line %d\n",
+	    debug_message("program: %s, object: %s, file: %s\n",
 			  current_prog ? current_prog->name : "",
 			  current_object->name,
 			  get_line_number_if_any());
@@ -749,7 +803,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 	error("ERROR: (s)printf(): %s (arg: %d)\n", err, arg);
 #endif				/* RETURN_ERROR_MESSAGES */
     }
-    arg = (unsigned int)-1;
+    arg = -1;
     bpos = 0;
     curpos = 0;
     inignore = 0;
@@ -1054,8 +1108,8 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 			    } else {
 				if (len > max_len)
 				    max_len = len;	/* the null terminated word */
-				pres = fs / (max_len + 2);	/* at least two
-							 * separating spaces */
+				pres = fs / (max_len + 2); /* at least two
+							    * separating spaces */
 				if (!pres)
 				    pres = 1;
 				(*temp)->size = fs / pres;
@@ -1152,11 +1206,11 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 			sprintf(buff,
 				"ERROR: (s)printf(): Incorrect argument type to %%%c. (arg: %u)\n",
 				cheat[i - 1], arg);
-			fprintf(stderr, "%s:%d: %s", current_prog->name,
+			fprintf(stderr, "Program %s File: %s: %s", current_prog->name,
 				get_line_number_if_any(), buff);
 			debug_message("%s", buff);
 			if (current_object) {
-			    debug_message("program: %s, object: %s line %d\n",
+			    debug_message("program: %s, object: %s, file: %s\n",
 				     current_prog ? current_prog->name : "",
 					  current_object->name,
 					  get_line_number_if_any());
@@ -1196,7 +1250,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 		} else		/* type not found */
 		    ERROR(ERR_UNDEFINED_TYPE);
 		if (clean) {
-		    free_svalue(clean);
+		    free_svalue(clean, "string_print_formatted");
 		    *clean = const0n;
 		}
 		if (!(finfo & INFO_ARRAY))

@@ -12,6 +12,7 @@
 #include "efuns.h"
 #include "stralloc.h"
 #include "include/origin.h"
+#include "ed.h"
 
 #if defined(__386BSD__) || defined(SunOS_5)
 #include <unistd.h>
@@ -25,7 +26,6 @@
 #include "lint.h"
 #include "applies.h"
 
-static struct svalue *argp;
 static struct object *ob;
 
 int using_bsd_malloc = 0;
@@ -45,9 +45,21 @@ f_add_action P2(int, num_arg, int, instruction)
     if (num_arg == 3) {
 	CHECK_TYPES(&arg[2], T_NUMBER, 3, instruction);
     }
-    add_action(arg[0].u.string,
-	       num_arg > 1 ? arg[1].u.string : 0,
-	       num_arg > 2 ? arg[2].u.number : 0);
+    if (num_arg > 1 && arg[1].type == T_POINTER) {
+	int i,n;
+	n = arg[1].u.vec->size;
+	for (i=0; i<n; i++) {
+	    if (arg[1].u.vec->item[i].type == T_STRING) {
+		add_action(arg[0].u.string,
+			   arg[1].u.vec->item[i].u.string,
+			   num_arg > 2 ? arg[2].u.number : 0);
+	    }
+	}
+    } else {
+	add_action(arg[0].u.string,
+		   num_arg > 1 ? arg[1].u.string : 0,
+		   num_arg > 2 ? arg[2].u.number : 0);
+    }
     pop_n_elems(num_arg - 1);
 }
 #endif
@@ -59,13 +71,12 @@ f_all_inventory P2(int, num_arg, int, instruction)
     struct vector *vec;
 
     vec = all_inventory(sp->u.ob, 0);
-    pop_stack();
     if (!vec) {
-	push_number(0);
+	assign_svalue(sp, &const0);
 	return;
     }
-    push_vector(vec);		/* This will make ref count == 2 */
-    vec->ref--;
+    pop_stack();
+    push_refed_vector(vec);
 }
 #endif
 
@@ -77,8 +88,7 @@ f_allocate P2(int, num_arg, int, instruction)
 
     vec = allocate_array(sp->u.number);
     pop_stack();
-    push_vector(vec);
-    vec->ref--;
+    push_refed_vector(vec);
 }
 #endif
 
@@ -89,12 +99,11 @@ f_allocate_buffer P2(int, num_arg, int, instruction)
     struct buffer *buf;
 
     buf = allocate_buffer(sp->u.number);
-    pop_stack();
     if (buf) {
-	push_buffer(buf);
-	buf->ref--;
+	pop_stack();
+	push_refed_buffer(buf);
     } else {
-	push_number(0);
+	assign_svalue(sp, &const0);
     }
 }
 #endif
@@ -107,8 +116,7 @@ f_allocate_mapping P2(int, num_arg, int, instruction)
 
     map = allocate_mapping(sp->u.number);
     pop_stack();
-    push_mapping(map);
-    map->ref--;
+    push_refed_mapping(map);
 }
 #endif
 
@@ -164,7 +172,9 @@ f_call_other P2(int, num_arg, int, instruction)
 {
     struct svalue *arg;
     char *funcname;
+#ifndef NEW_FUNCTIONS
     int i;
+#endif
 
     if (current_object->flags & O_DESTRUCTED) {	/* No external calls allowed */
 	pop_n_elems(num_arg);
@@ -180,23 +190,22 @@ f_call_other P2(int, num_arg, int, instruction)
 	    || (arg[1].u.vec->item[0].type != T_STRING))
 	    error("call_other: 1st elem of array for arg 2 must be a string\n");
 	funcname = arg[1].u.vec->item[0].u.string;	/* complicated huh? */
+#ifdef NEW_FUNCTIONS
+	num_arg = 2 + merge_arg_lists(num_arg - 2, arg[1].u.vec, 1);
+#else
 	for (i = 1; i < arg[1].u.vec->size; i++)
 	    push_svalue(&arg[1].u.vec->item[i]);
-	num_arg += i - 1;	/* hopefully that will work */
+	num_arg += i - 1;
+#endif
     }
-    if (strchr(funcname, ':') != NULL)
-	error("Illegal function name in call_other: %s\n", arg[1].u.string);
     if (arg[0].type == T_OBJECT)
 	ob = arg[0].u.ob;
     else if (arg[0].type == T_POINTER) {
 	struct vector *ret;
-	extern struct vector *call_all_other PROT((struct vector *, char *, int));
-
 
 	ret = call_all_other(arg[0].u.vec, funcname, num_arg - 2);
-	pop_n_elems(2);
-	push_vector(ret);
-	sp->u.vec->ref--;
+	pop_2_elems();
+	push_refed_vector(ret);
 	return;
     } else {
 	ob = find_object(arg[0].u.string);
@@ -211,7 +220,7 @@ f_call_other P2(int, num_arg, int, instruction)
 #endif
     call_origin = ORIGIN_CALL_OTHER;
     if (apply_low(funcname, ob, num_arg - 2) == 0) {	/* Function not found */
-	pop_n_elems(2);
+	pop_2_elems();
 	push_undefined();
 	return;
     }
@@ -219,55 +228,10 @@ f_call_other P2(int, num_arg, int, instruction)
      * The result of the function call is on the stack.  So is the function
      * name and object that was called, though. These have to be removed.
      */
-    free_svalue(sp - 2);
+    free_svalue(sp - 2, "f_call_other");
     *(sp - 2) = *sp;
     sp--;
     pop_stack();
-    return;
-}
-#endif
-
-#ifdef F_SIMUL_EFUN
-void
-f_simul_efun P2(int, num_arg, int, instruction)
-{
-    struct svalue *arg;
-    char *funcname;
-
-#if 0
-    int i;
-
-#endif
-    extern struct object *simul_efun_ob;
-    extern char *simul_efun_file_name;
-
-    if (current_object->flags & O_DESTRUCTED) {	/* No external calls allowed */
-	pop_n_elems(num_arg);
-	push_undefined();
-	return;
-    }
-    arg = sp - num_arg + 1;
-    /* no error checking here; first argument is a program string (always) */
-    funcname = arg[0].u.string;
-
-    if (!simul_efun_ob || (simul_efun_ob->flags & O_DESTRUCTED)) {
-	simul_efun_ob = find_object(simul_efun_file_name);
-	/* if it didn't load we're in trouble. */
-	if (!simul_efun_ob || (simul_efun_ob->flags & O_DESTRUCTED))
-	    error("No simul_efun object for simul_efun\n");
-    }
-#ifdef TRACE
-    if (TRACEP(TRACE_CALL_OTHER)) {
-	do_trace("simul_efun ", funcname, "\n");
-    }
-#endif
-    call_origin = ORIGIN_SIMUL_EFUN;
-    if (apply_low(funcname, simul_efun_ob, num_arg - 1) == 0) {	/* Function not found */
-	error("%s is no longer a simul_efun.\n", funcname);
-    }
-    free_svalue(sp - 1);
-    *(sp - 1) = *sp;
-    sp--;
     return;
 }
 #endif
@@ -279,8 +243,6 @@ f_call_out P2(int, num_arg, int, instruction)
     struct svalue *arg;
 
     arg = sp - num_arg + 1;
-    if (arg[0].u.string[0] == ':')
-	error("Illegal function name in call_out: %s\n", arg[0].u.string);
     if (!(current_object->flags & O_DESTRUCTED))
 	new_call_out(current_object, arg[0].u.string, arg[1].u.number,
 		     num_arg - 3, (num_arg >= 3) ? &arg[2] : 0);
@@ -293,8 +255,7 @@ f_call_out P2(int, num_arg, int, instruction)
 void
 f_call_out_info P2(int, num_arg, int, instruction)
 {
-    push_vector(get_all_call_outs());
-    sp->u.vec->ref--;		/* set ref count to 1 */
+    push_refed_vector(get_all_call_outs());
 }
 #endif
 
@@ -330,8 +291,7 @@ f_children P2(int, num_arg, int, instruction)
     if (!vec)
 	push_number(0);
     else {
-	push_vector(vec);
-	vec->ref--;		/* reset ref count */
+	push_refed_vector(vec);
     }
 }
 #endif
@@ -356,7 +316,7 @@ f_clear_bit P2(int, num_arg, int, instruction)
     if (str[ind] > 0x3f + ' ' || str[ind] < ' ')
 	error("Illegal bit pattern in clear_bit character %d\n", ind);
     str[ind] = ((str[ind] - ' ') & ~(1 << (sp->u.number % 6))) + ' ';
-    pop_n_elems(2);
+    pop_2_elems();
     push_malloced_string(str);
 }
 #endif
@@ -400,25 +360,7 @@ f_commands P2(int, num_arg, int, instruction)
     struct vector *vec;
 
     vec = commands(current_object);
-    push_vector(vec);
-    vec->ref--;			/* reset ref count to 1 */
-}
-#endif
-
-#ifdef F_GENERATE_SOURCE
-void f_generate_source P2(int, num_arg, int, instruction)
-{
-    int i;
-
-    if (num_arg == 2) {
-	i = generate_source((sp - 1)->u.string, sp->u.string);
-	pop_stack();
-    } else
-	i = generate_source(sp->u.string, 0);
-    free_svalue(sp);
-    sp->type = T_NUMBER;
-    sp->subtype = 0;
-    sp->u.number = i;
+    push_refed_vector(vec);
 }
 #endif
 
@@ -429,7 +371,7 @@ f_cp P2(int, num_arg, int, instruction)
     int i;
 
     i = copy_file(sp[-1].u.string, sp[0].u.string);
-    pop_n_elems(2);
+    pop_2_elems();
     push_number(i);
 }
 #endif
@@ -487,119 +429,6 @@ f_ctime P2(int, num_arg, int, instruction)
 }
 #endif
 
-#ifdef F_DEBUG_INFO
-void
-f_debug_info P2(int, num_arg, int, instruction)
-{
-    struct svalue *arg, res;
-
-    arg = sp - 1;
-    switch (arg[0].u.number) {
-    case 0:
-	{
-	    int i, flags;
-	    struct object *obj2;
-
-	    ob = arg[1].u.ob;
-	    flags = ob->flags;
-	    add_message("O_HEART_BEAT      : %s\n",
-			flags & O_HEART_BEAT ? "TRUE" : "FALSE");
-	    add_message("O_IS_WIZARD       : %s\n",
-			flags & O_IS_WIZARD ? "TRUE" : "FALSE");
-	    add_message("O_ENABLE_COMMANDS : %s\n",
-			flags & O_ENABLE_COMMANDS ? "TRUE" : "FALSE");
-	    add_message("O_CLONE           : %s\n",
-			flags & O_CLONE ? "TRUE" : "FALSE");
-	    add_message("O_VIRTUAL         : %s\n",
-			flags & O_VIRTUAL ? "TRUE" : "FALSE");
-	    add_message("O_DESTRUCTED      : %s\n",
-			flags & O_DESTRUCTED ? "TRUE" : "FALSE");
-	    add_message("O_SWAPPED         : %s\n",
-			flags & O_SWAPPED ? "TRUE" : "FALSE");
-	    add_message("O_ONCE_INTERACTIVE: %s\n",
-			flags & O_ONCE_INTERACTIVE ? "TRUE" : "FALSE");
-	    add_message("O_RESET_STATE     : %s\n",
-			flags & O_RESET_STATE ? "TRUE" : "FALSE");
-	    add_message("O_WILL_CLEAN_UP   : %s\n",
-			flags & O_WILL_CLEAN_UP ? "TRUE" : "FALSE");
-	    add_message("O_WILL_RESET: %s\n",
-			flags & O_WILL_RESET ? "TRUE" : "FALSE");
-#ifndef NO_LIGHT
-	    add_message("total light : %d\n", ob->total_light);
-#endif
-	    add_message("next_reset  : %d\n", ob->next_reset);
-	    add_message("time_of_ref : %d\n", ob->time_of_ref);
-	    add_message("ref         : %d\n", ob->ref);
-#ifdef DEBUG
-	    add_message("extra_ref   : %d\n", ob->extra_ref);
-#endif
-	    add_message("swap_num    : %d\n", ob->swap_num);
-	    add_message("name        : '%s'\n", ob->name);
-	    add_message("next_all    : OBJ(%s)\n",
-			ob->next_all ? ob->next_all->name : "NULL");
-	    if (obj_list == ob)
-		add_message("This object is the head of the object list.\n");
-	    for (obj2 = obj_list, i = 1; obj2; obj2 = obj2->next_all, i++)
-		if (obj2->next_all == ob) {
-		    add_message("Previous object in object list: OBJ(%s)\n",
-				obj2->name);
-		    add_message("position in object list:%d\n", i);
-		}
-	    assign_svalue_no_free(&res, &const0);
-	    break;
-	}
-    case 1:
-	ob = arg[1].u.ob;
-	if (ob->flags & O_SWAPPED) {
-	    add_message("Swapped\n");
-	    break;
-	}
-	add_message("program ref's %d\n", ob->prog->p.i.ref);
-	add_message("Name %s\n", ob->prog->name);
-	add_message("program size %d\n",
-		    ob->prog->p.i.program_size);
-	add_message("num func's %d (%d) \n", ob->prog->p.i.num_functions,
-		    ob->prog->p.i.num_functions * sizeof(struct function));
-	add_message("num strings %d\n", ob->prog->p.i.num_strings);
-	add_message("num vars %d (%d)\n", ob->prog->p.i.num_variables,
-		    ob->prog->p.i.num_variables * sizeof(struct variable));
-	add_message("num inherits %d (%d)\n", ob->prog->p.i.num_inherited,
-		    ob->prog->p.i.num_inherited * sizeof(struct inherit));
-	add_message("total size %d\n", ob->prog->p.i.total_size);
-	assign_svalue_no_free(&res, &const0);
-	break;
-    default:
-	bad_arg(1, instruction);
-    }
-    pop_stack();
-    free_svalue(sp);
-    *sp = res;
-}
-#endif
-
-#if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
-#ifdef F_DEBUGMALLOC
-void
-f_debugmalloc P2(int, num_arg, int, instruction)
-{
-    dump_debugmalloc((sp - 1)->u.string, sp->u.number);
-    pop_n_elems(2);
-    push_number(0);
-}
-#endif
-
-#ifdef F_SET_MALLOC_MASK
-void
-f_set_malloc_mask P2(int, num_arg, int, instruction)
-{
-    set_malloc_mask(sp->u.number);
-    pop_stack();
-    push_number(0);
-}
-#endif
-#endif				/* (defined(DEBUGMALLOC) &&
-				 * defined(DEBUGMALLOC_EXTENSIONS)) */
-
 #ifdef F_DEEP_INHERIT_LIST
 void
 f_deep_inherit_list P2(int, num_arg, int, instruction)
@@ -613,8 +442,7 @@ f_deep_inherit_list P2(int, num_arg, int, instruction)
 	vec = null_array();
     }
     pop_stack();
-    push_vector(vec);
-    vec->ref--;			/* reset ref count */
+    push_refed_vector(vec);
 }
 #endif
 
@@ -640,8 +468,7 @@ f_deep_inventory P2(int, num_arg, int, instruction)
 
     vec = deep_inventory(sp->u.ob, 0);
     pop_stack();
-    push_vector(vec);
-    vec->ref--;			/* reset ref count */
+    push_refed_vector(vec);
 }
 #endif
 
@@ -702,10 +529,8 @@ f_each P2(int, num_arg, int, instruction)
 	return;
     }
     v = mapping_each(m);
-    pop_stack();
-    pop_stack();
-    push_vector(v);
-    v->ref--;
+    pop_2_elems();
+    push_refed_vector(v);
 }
 #endif
 
@@ -743,7 +568,7 @@ f_ed P2(int, num_arg, int, instruction)
 	} else {
             bad_argument(sp, T_NUMBER | T_STRING, 3, instruction);
 	}
-	pop_n_elems(2);
+	pop_2_elems();
     } else {                    /* num_arg == 4 */
         /* ed(fname,writefn,exitfn,restricted) */
         if ((sp - 1)->type != T_STRING)
@@ -838,7 +663,7 @@ f_exec P2(int, num_arg, int, instruction)
     int i;
 
     i = replace_interactive((sp - 1)->u.ob, sp->u.ob);
-    pop_n_elems(2);
+    pop_2_elems();
     push_number(i);
 }
 #endif
@@ -850,29 +675,11 @@ f_explode P2(int, num_arg, int, instruction)
     struct vector *vec;
 
     vec = explode_string((sp - 1)->u.string, sp->u.string);
-    pop_n_elems(2);
+    pop_2_elems();
     if (vec) {
-	push_vector(vec);	/* This will make ref count == 2 */
-	vec->ref--;
+	push_refed_vector(vec);
     } else
 	push_number(0);
-}
-#endif
-
-#ifdef F_EXPORT_UID
-void
-f_export_uid P2(int, num_arg, int, instruction)
-{
-    if (current_object->euid == NULL)
-	error("Illegal to export uid 0\n");
-    ob = sp->u.ob;
-    pop_stack();
-    if (ob->euid)
-	push_number(0);
-    else {
-	ob->uid = current_object->euid;
-	push_number(1);
-    }
 }
 #endif
 
@@ -899,41 +706,6 @@ f_file_size P2(int, num_arg, int, instruction)
     i = file_size(sp->u.string);
     pop_stack();
     push_number(i);
-}
-#endif
-
-#ifdef F_FILTER_ARRAY
-void
-f_filter_array P2(int, num_arg, int, instruction)
-{
-    struct vector *vec;
-    struct svalue *arg;
-
-    arg = sp - num_arg + 1;
-    ob = 0;
-    if (arg[2].type == T_OBJECT)
-	ob = arg[2].u.ob;
-    else if (arg[2].type == T_STRING) {
-	ob = find_object(arg[2].u.string);
-	if (ob && !object_visible(ob))
-	    ob = 0;
-    }
-    if (!ob)
-	error("Bad third argument to filter_array()\n");
-    if (arg[0].type == T_POINTER) {
-	check_for_destr(arg[0].u.vec);
-	vec = filter(arg[0].u.vec, arg[1].u.string, ob,
-		     num_arg > 3 ? sp : (struct svalue *) 0);
-    } else {
-	vec = 0;
-    }
-    pop_n_elems(num_arg);
-    if (vec) {
-	push_vector(vec);	/* This will make ref count == 2 */
-	vec->ref--;
-    } else {
-	push_number(0);
-    }
 }
 #endif
 
@@ -966,7 +738,10 @@ f_find_living P2(int, num_arg, int, instruction)
 void
 f_find_object P2(int, num_arg, int, instruction)
 {
-    ob = find_object2(sp->u.string);
+    if ((sp--)->u.number)
+	ob = find_object(sp->u.string);
+    else
+	ob = find_object2(sp->u.string);
     pop_stack();
     if (ob) {
 	if (object_visible(ob))
@@ -990,19 +765,6 @@ f_find_player P2(int, num_arg, int, instruction)
 	push_object(ob);
 }
 #endif
-
-void add_mapping_shared_string P3(struct mapping *, m, char *, key, char *, value)
-{
-    struct svalue *s, lv;
-
-    lv.type = T_STRING;
-    lv.subtype = STRING_CONSTANT;
-    lv.u.string = key;
-    s = find_for_insert(m, &lv, 1);
-    s->type = T_STRING;
-    s->subtype = STRING_SHARED;
-    s->u.string = ref_string(value);
-}
 
 #ifdef F_FUNCTION_PROFILE
 /* f_function_profile: John Garnett, 1993/05/31, 0.9.17.3 */
@@ -1032,8 +794,7 @@ f_function_profile P2(int, num_arg, int, instruction)
 	vec->item[j].u.map = map;
     }
     pop_stack();
-    push_vector(vec);
-    vec->ref--;
+    push_refed_vector(vec);
 }
 #endif
 
@@ -1044,7 +805,7 @@ f_function_exists P2(int, num_arg, int, instruction)
     char *str, *res;
 
     str = function_exists((sp - 1)->u.string, sp->u.ob);
-    pop_n_elems(2);
+    pop_2_elems();
     if (str) {
 	res = (char *) add_slash(str);
 	if ((str = strrchr(res, '.')))
@@ -1053,6 +814,23 @@ f_function_exists P2(int, num_arg, int, instruction)
     } else {
 	push_number(0);
     }
+}
+#endif
+
+#ifdef F_GENERATE_SOURCE
+void f_generate_source P2(int, num_arg, int, instruction)
+{
+    int i;
+
+    if (num_arg == 2) {
+	i = generate_source((sp - 1)->u.string, sp->u.string);
+	pop_stack();
+    } else
+	i = generate_source(sp->u.string, 0);
+    free_svalue(sp, "f_generate_source");
+    sp->type = T_NUMBER;
+    sp->subtype = 0;
+    sp->u.number = i;
 }
 #endif
 
@@ -1075,7 +853,7 @@ f_get_char P2(int, num_arg, int, instruction)
     }
     num_arg--;
     i = get_char(arg[0].u.string, flag, num_arg, &arg[1 + tmp]);
-    free_svalue(arg);
+    free_svalue(arg, "f_get_char");
     sp = arg;
     sp->type = T_NUMBER;
     sp->u.number = i;
@@ -1098,59 +876,11 @@ f_get_dir P2(int, num_arg, int, instruction)
     struct vector *vec;
 
     vec = get_dir((sp - 1)->u.string, sp->u.number);
-    pop_n_elems(2);
+    pop_2_elems();
     if (vec) {
-	push_vector(vec);
-	vec->ref--;		/* resets ref count */
+	push_refed_vector(vec);
     } else
 	push_number(0);
-}
-#endif
-
-#ifdef F_GETEUID
-void
-f_geteuid P2(int, num_arg, int, instruction)
-{
-    if (sp->type == T_OBJECT) {
-	ob = sp->u.ob;
-	if (ob->euid) {
-	    char *tmp;
-
-	    tmp = ob->euid->name;
-	    pop_stack();
-	    push_string(tmp, STRING_CONSTANT);
-	    return;
-	} else {
-	    pop_stack();
-	    push_number(0);
-	    return;
-	}
-    } else if (sp->type == T_FUNCTION) {
-	if (sp->u.fp->euid) {
-	    pop_stack();
-	    push_string(sp->u.fp->euid->name, STRING_CONSTANT);
-	    return;
-	}
-    }
-    pop_stack();
-    push_number(0);
-}
-#endif
-
-#ifdef F_GETUID
-void
-f_getuid P2(int, num_arg, int, instruction)
-{
-    char *tmp;
-
-    ob = sp->u.ob;
-#ifdef DEBUG
-    if (ob->uid == NULL)
-	fatal("UID is a null pointer\n");
-#endif
-    tmp = ob->uid->name;
-    pop_stack();
-    push_string(tmp, STRING_CONSTANT);
 }
 #endif
 
@@ -1162,7 +892,7 @@ f_implode P2(int, num_arg, int, instruction)
 
     check_for_destr((sp - 1)->u.vec);
     str = implode_string((sp - 1)->u.vec, sp->u.string);
-    pop_n_elems(2);
+    pop_2_elems();
     if (str)
 	push_malloced_string(str);
     else
@@ -1174,14 +904,16 @@ f_implode P2(int, num_arg, int, instruction)
 void
 f_in_edit P2(int, num_arg, int, instruction)
 {
-    int i;
+    char *fn;
 
-    i = sp->u.ob->interactive && sp->u.ob->interactive->ed_buffer;
-    pop_stack();
-    if (i)
-	push_number(1);
-    else
+    if (sp->u.ob->interactive && sp->u.ob->interactive->ed_buffer
+	&& (fn = sp->u.ob->interactive->ed_buffer->fname)) {
+	pop_stack();
+	push_string(fn, STRING_CONSTANT);
+    } else {
+	pop_stack();
 	push_number(0);
+    }
 }
 #endif
 
@@ -1253,8 +985,7 @@ f_inherit_list P2(int, num_arg, int, instruction)
 	vec = null_array();
     }
     pop_stack();
-    push_vector(vec);
-    vec->ref--;			/* reset ref count */
+    push_refed_vector(vec);
 }
 #endif
 
@@ -1277,7 +1008,7 @@ f_input_to P2(int, num_arg, int, instruction)
     }
     num_arg--;			/* Don't count the name of the func either. */
     i = input_to(arg[0].u.string, flag, num_arg, &arg[1 + tmp]);
-    free_svalue(arg);
+    free_svalue(arg, "f_input_to");
     sp = arg;
     sp->type = T_NUMBER;
     sp->u.number = i;
@@ -1311,19 +1042,32 @@ f_intp P2(int, num_arg, int, instruction)
 void
 f_functionp P2(int, num_arg, int, instruction)
 {
+#ifdef NEW_FUNCTIONS
+    int i;
+#endif
+    
     if (sp->type == T_FUNCTION) {
+#ifdef NEW_FUNCTIONS
+	i = sp->u.fp->type;
+	if (sp->u.fp->args.type == T_POINTER) i |= 1;
+	pop_stack();
+	push_number(i);
+	return;
+#else
 	if (((sp->u.fp->obj.type == T_OBJECT) &&
 	     !(sp->u.fp->obj.u.ob->flags & O_DESTRUCTED)) ||
-	    (sp->u.fp->obj.type == T_STRING)) {
-	    if (sp->u.fp->fun.type == T_STRING) {
-		assign_svalue(sp, &const1);
-		return;
-	    } else if (sp->u.fp->fun.type == T_POINTER) {
-		pop_stack();
-		push_number(2);
-		return;
+	    (sp->u.fp->obj.type == T_STRING))
+	    {
+		if (sp->u.fp->fun.type == T_STRING) {
+		    assign_svalue(sp, &const1);
+		    return;
+		} else if (sp->u.fp->fun.type == T_POINTER) {
+		    pop_stack();
+		    push_number(2);
+		    return;
+		}
 	    }
-	}
+#endif
     }
     assign_svalue(sp, &const0);
 }
@@ -1334,11 +1078,10 @@ void
 f_keys P2(int, num_arg, int, instruction)
 {
     struct vector *vec;
-
+    
     vec = mapping_indices(sp->u.map);
     pop_stack();
-    push_vector(vec);
-    vec->ref--;			/* resets ref count */
+    push_refed_vector(vec);
 }
 #endif
 
@@ -1350,8 +1093,7 @@ f_values P2(int, num_arg, int, instruction)
 
     vec = mapping_values(sp->u.map);
     pop_stack();
-    push_vector(vec);
-    vec->ref--;			/* resets ref count */
+    push_refed_vector(vec);
 }
 #endif
 
@@ -1365,9 +1107,9 @@ f_link P2(int, num_arg, int, instruction)
     push_string((sp - 1)->u.string, STRING_CONSTANT);
     push_string(sp->u.string, STRING_CONSTANT);
     ret = apply_master_ob(APPLY_VALID_LINK, 2);
-    if (!IS_ZERO(ret))
+    if (MASTER_APPROVED(ret))
 	i = do_rename((sp - 1)->u.string, sp->u.string, F_LINK);
-    pop_n_elems(2);
+    pop_2_elems();
     push_number(i);
 }
 #endif				/* F_LINK */
@@ -1387,8 +1129,7 @@ f_living P2(int, num_arg, int, instruction)
 void
 f_livings P2(int, num_arg, int, instruction)
 {
-    push_vector(livings());	/* livings() has already set ref count to 1 */
-    sp->u.vec->ref--;
+    push_refed_vector(livings());
 }
 #endif
 
@@ -1468,46 +1209,14 @@ f_mapp P2(int, num_arg, int, instruction)
 }
 #endif
 
-#ifdef F_MAP_ARRAY
+#ifdef F_MAP
 void
-f_map_array P2(int, num_arg, int, instruction)
+f_map P2(int, num_arg, int, instruction)
 {
-    struct vector *res = 0;
-    struct mapping *map = (struct mapping *) 0;
-    struct svalue *arg;
+    struct svalue *arg = sp - num_arg + 1;
 
-    arg = sp - num_arg + 1;
-    ob = 0;
-
-    if (arg[2].type == T_OBJECT)
-	ob = arg[2].u.ob;
-    else if (arg[2].type == T_STRING) {
-	ob = find_object(arg[2].u.string);
-	if (ob && !object_visible(ob))
-	    ob = 0;
-    }
-    if (!ob)
-	bad_arg(3, instruction);
-
-    if (arg[0].type == T_POINTER) {
-	check_for_destr(arg[0].u.vec);
-	res = map_array(arg[0].u.vec, arg[1].u.string, ob,
-			num_arg > 3 ? sp : (struct svalue *) 0);
-    } else if (arg[0].type == T_MAPPING) {
-	map = map_mapping(arg[0].u.map, arg[1].u.string, ob,
-			  num_arg > 3 ? sp : (struct svalue *) 0);
-    } else {
-	res = 0;
-    }
-    pop_n_elems(num_arg);
-    if (map) {
-	push_mapping(map);
-	map->ref--;
-    } else if (res) {
-	push_vector(res);	/* This will make ref count == 2 */
-	res->ref--;
-    } else
-	push_number(0);
+    if (arg->type == T_MAPPING) map_mapping(arg, num_arg);
+    else map_array(arg, num_arg);
 }
 #endif
 
@@ -1515,8 +1224,13 @@ f_map_array P2(int, num_arg, int, instruction)
 void
 f_master P2(int, num_arg, int, instruction)
 {
-    assert_master_ob_loaded("master()");
-    push_object(master_ob);
+    int err;
+    
+    err = assert_master_ob_loaded("master", "");
+    if (err != 1)
+	push_number(0);
+    else
+	push_object(master_ob);
 }
 #endif
 
@@ -1547,7 +1261,7 @@ f_match_path P2(int, num_arg, int, instruction)
 
     string.type = T_STRING;
     string.subtype = STRING_MALLOC;
-    string.u.string = (char *) MALLOC(strlen(sp->u.string) + 1);
+    string.u.string = (char *) DMALLOC(strlen(sp->u.string) + 1, 0, "match_path");
 
     src = sp->u.string;
     dst = string.u.string;
@@ -1583,70 +1297,72 @@ f_member_array P2(int, num_arg, int, instruction)
 {
     struct vector *v;
     struct svalue *find;
-    int i, ncmp = 0;
+    int i = 0;
 
     if (num_arg > 2) {
-	v = (sp - 1)->u.vec;
-	find = (sp - 2);
-	if ((sp->type == T_NUMBER) &&
-	    sp->u.number && ((sp - 2)->type == T_STRING)) {
-	    ncmp = strlen((sp - 2)->u.string);
-	}
+	CHECK_TYPES(sp, T_NUMBER, 3, instruction);
+	i = (sp--)->u.number;
+	if (i<0) bad_arg(3, instruction);
+    }
+    if (sp->type == T_STRING) {
+	char *res;
+	CHECK_TYPES(sp-1, T_NUMBER, 1, instruction);
+	if (res = strchr(sp->u.string + i, (sp-1)->u.number))
+	    i = res - sp->u.string;
+	else
+	    i = -1;
     } else {
 	v = sp->u.vec;
 	find = (sp - 1);
-    }
-
-    for (i = 0; i < v->size; i++) {
-	if (v->item[i].type == T_OBJECT &&
-	    v->item[i].u.ob->flags & O_DESTRUCTED)
-	    assign_svalue(&v->item[i], &const0);
-	if (v->item[i].type != find->type)
-	    continue;
-	switch (find->type) {
-	case T_STRING:
-	    if (ncmp) {
-		if (strncmp(find->u.string, v->item[i].u.string, ncmp) == 0)
+	
+	for (; i < v->size; i++) {
+	    if (v->item[i].type == T_OBJECT &&
+		v->item[i].u.ob->flags & O_DESTRUCTED)
+		assign_svalue(&v->item[i], &const0);
+	    if (v->item[i].type != find->type)
+		continue;
+	    switch (find->type) {
+	    case T_STRING:
+		if (strcmp(find->u.string, v->item[i].u.string) == 0)
 		    break;
-	    } else if (strcmp(find->u.string, v->item[i].u.string) == 0)
-		break;
-	    continue;
-	case T_NUMBER:
-	    if (find->u.number == v->item[i].u.number)
-		break;
-	    continue;
-	case T_REAL:
-	    if (find->u.real == v->item[i].u.real)
-		break;
-	    continue;
-	case T_POINTER:
-	    if (find->u.vec == v->item[i].u.vec)
-		break;
-	    continue;
-	case T_OBJECT:
-	    if (find->u.ob == v->item[i].u.ob)
-		break;
-	    continue;
-	case T_MAPPING:
-	    if (find->u.map == v->item[i].u.map)
-		break;
-	    continue;
-	case T_FUNCTION:
-	    if (find->u.fp == v->item[i].u.fp)
-		break;
-	    continue;
-	case T_BUFFER:
-	    if (find->u.buf == v->item[i].u.buf)
-		break;
-	    continue;
-	default:
-	    fatal("Bad type to member_array(): %d\n", (sp - 1)->type);
+		continue;
+	    case T_NUMBER:
+		if (find->u.number == v->item[i].u.number)
+		    break;
+		continue;
+	    case T_REAL:
+		if (find->u.real == v->item[i].u.real)
+		    break;
+		continue;
+	    case T_POINTER:
+		if (find->u.vec == v->item[i].u.vec)
+		    break;
+		continue;
+	    case T_OBJECT:
+		if (find->u.ob == v->item[i].u.ob)
+		    break;
+		continue;
+	    case T_MAPPING:
+		if (find->u.map == v->item[i].u.map)
+		    break;
+		continue;
+	    case T_FUNCTION:
+		if (find->u.fp == v->item[i].u.fp)
+		    break;
+		continue;
+	    case T_BUFFER:
+		if (find->u.buf == v->item[i].u.buf)
+		    break;
+		continue;
+	    default:
+		fatal("Bad type to member_array(): %d\n", (sp - 1)->type);
+	    }
+	    break;
 	}
-	break;
+	if (i == v->size)
+	    i = -1;			/* Return -1 for failure */
     }
-    if (i == v->size)
-	i = -1;			/* Return -1 for failure */
-    pop_n_elems(num_arg);
+    pop_2_elems();
     push_number(i);
 }
 #endif
@@ -1704,7 +1420,8 @@ f_message P2(int, num_arg, int, instruction)
 	    return;
 	}
     default:
-	error("Bad argument 3 to message()\n");
+	bad_argument(&args[2], T_OBJECT | T_STRING | T_POINTER | T_NUMBER,
+		     3, F_MESSAGE);
     }
     if (num_arg == 4) {
 	switch (args[3].type) {
@@ -1721,7 +1438,7 @@ f_message P2(int, num_arg, int, instruction)
 	}
     } else
 	avoid = null_array();
-    do_message(args[0].u.string, args[1].u.string, use, avoid, 1);
+    do_message(&args[0], args[1].u.string, use, avoid, 1);
     pop_n_elems(num_arg);
     push_number(0);
     return;
@@ -1895,10 +1612,12 @@ f_new P2(int, num_arg, int, instruction)
 void
 f_notify_fail P2(int, num_arg, int, instruction)
 {
-    set_notify_fail_message(sp->u.string);
+    if (sp->type == T_STRING)
+	set_notify_fail_message(sp->u.string);
+    else if (sp->type == T_FUNCTION)
+	set_notify_fail_function(sp->u.fp);
     pop_stack();
     push_number(0);
-    /* Return the argument */
 }
 #endif
 
@@ -1989,59 +1708,59 @@ f_previous_object P2(int, num_arg, int, instruction)
     struct control_stack *p;
     int i;
 
-    if (num_arg) {
-	if ((i = sp->u.number) > 0) {
-	    if (i >= MAX_TRACE) {
-		sp->u.number = 0;
-		return;
-	    }
-	    ob = 0;
-	    p = csp + 1;
-	    while ((p--) >= control_stack) {
-		if (p->extern_call) {
-		    i--;
-		    if (!i) {
-			ob = p->prev_ob;
-			break;
-		    }
+    if ((i = sp->u.number) > 0) {
+	if (i >= MAX_TRACE) {
+	    sp->u.number = 0;
+	    return;
+	}
+	ob = 0;
+	p = csp + 1;
+	while ((p--) >= control_stack) {
+	    if (p->extern_call) {
+		i--;
+		if (!i) {
+		    ob = p->prev_ob;
+		    break;
 		}
 	    }
-	} else if (i == -1) {
-	    struct vector *v;
-
-	    i = 1;
-	    p = csp + 1;
-	    while ((p--) >= control_stack) {
-		if (p->extern_call)
-		    i++;
-	    }
-	    v = allocate_array(i);
-	    p = csp + 1;
-	    i = 1;
-	    if (previous_ob && !(previous_ob->flags & O_DESTRUCTED)) {
+	}
+    } else if (i == -1) {
+	struct vector *v;
+	
+	i = previous_ob ? 1 : 0;
+	p = csp + 1;
+	while ((p--) > control_stack) {
+	    if (p->extern_call && p->prev_ob)
+		i++;
+	}
+	v = allocate_array(i);
+	p = csp + 1;
+	if (previous_ob) {
+	    if (!(previous_ob->flags & O_DESTRUCTED)) {
 		v->item[0].type = T_OBJECT;
 		v->item[0].u.ob = previous_ob;
 		add_ref(previous_ob, "previous_object(-1)");
 	    }
-	    while ((p--) >= control_stack) {
-		if (p->extern_call && p->prev_ob && !(p->prev_ob->flags & O_DESTRUCTED)) {
+	    i = 1;
+	} else i = 0;
+	while ((p--) > control_stack) {
+	    if (p->extern_call && p->prev_ob) {
+		if (!(p->prev_ob->flags & O_DESTRUCTED)) {
 		    v->item[i].type = T_OBJECT;
 		    v->item[i].u.ob = p->prev_ob;
 		    add_ref(p->prev_ob, "previous_object(-1)");
-		    i++;
 		}
+		i++;
 	    }
-	    sp--;
-	    push_vector(v);
-	    v->ref--;
-	    return;
-	} else if (i < -1) {
-	    error("Illegal negative argument to previous_object()\n");
-	} else
-	    ob = previous_ob;
+	}
 	sp--;
+	push_refed_vector(v);
+	return;
+    } else if (i < -1) {
+	error("Illegal negative argument to previous_object()\n");
     } else
 	ob = previous_ob;
+    sp--;
 
     if (ob == 0 || (ob->flags & O_DESTRUCTED))
 	push_number(0);
@@ -2283,8 +2002,7 @@ f_read_buffer P2(int, num_arg, int, instruction)
 
 	buf = allocate_buffer(rlen);
 	memcpy(buf->item, str, rlen);
-	buf->ref--;
-	push_buffer(buf);
+	push_refed_buffer(buf);
 	FREE(str);
     } else {			/* T_BUFFER */
 	push_malloced_string(str);
@@ -2335,38 +2053,6 @@ f_receive P2(int, num_arg, int, instruction)
 }
 #endif
 
-#ifdef F_REFS
-void
-f_refs P2(int, num_arg, int, instruction)
-{
-    int r;
-
-    switch (sp->type) {
-    case T_MAPPING:
-	r = sp->u.map->ref;
-	break;
-    case T_POINTER:
-	r = sp->u.vec->ref;
-	break;
-    case T_OBJECT:
-	r = sp->u.ob->ref;
-	break;
-    case T_FUNCTION:
-	r = sp->u.fp->ref;
-	break;
-    case T_BUFFER:
-	r = sp->u.buf->ref;
-	break;
-    default:
-	r = 0;
-	break;
-    }
-    pop_stack();
-    push_number(r - 1);		/* minus 1 to compensate for being arg of
-				 * refs() */
-}
-#endif
-
 #ifdef F_REGEXP
 void
 f_regexp P2(int, num_arg, int, instruction)
@@ -2374,12 +2060,11 @@ f_regexp P2(int, num_arg, int, instruction)
     struct vector *v;
 
     v = match_regexp((sp - 1)->u.vec, sp->u.string);
-    pop_n_elems(2);
+    pop_2_elems();
     if (v == 0)
 	push_number(0);
     else {
-	push_vector(v);
-	v->ref--;		/* Will make ref count == 1 */
+	push_refed_vector(v);
     }
 }
 #endif
@@ -2391,7 +2076,7 @@ f_remove_action P2(int, num_arg, int, instruction)
     int success;
 
     success = remove_action((sp - 1)->u.string, sp->u.string);
-    pop_n_elems(2);
+    pop_2_elems();
     push_number(success);
 }
 #endif
@@ -2415,7 +2100,7 @@ f_rename P2(int, num_arg, int, instruction)
     int i;
 
     i = do_rename((sp - 1)->u.string, sp->u.string, F_RENAME);
-    pop_n_elems(2);
+    pop_2_elems();
     push_number(i);
 }
 #endif				/* F_RENAME */
@@ -2567,7 +2252,7 @@ f_resolve P2(int, num_arg, int, instruction)
     int i, query_addr_number PROT((char *, char *));
 
     i = query_addr_number((sp - 1)->u.string, sp->u.string);
-    pop_n_elems(2);
+    pop_2_elems();
     push_number(i);
 }				/* f_resolve() */
 #endif
@@ -2583,6 +2268,20 @@ f_restore_object P2(int, num_arg, int, instruction)
     i = restore_object(current_object, arg[0].u.string, flag);
     pop_n_elems(num_arg);
     push_number(i);
+}
+#endif
+
+#ifdef F_RESTORE_VARIABLE
+void
+f_restore_variable P2(int, num_arg, int, instruction) {
+    struct svalue v = { T_NUMBER };
+    char *s = string_copy(sp->u.string);
+    
+    if (!s) error("Out of memory\n");
+    restore_variable(&v, s);
+    free_string_svalue(sp);
+    FREE(s);
+    *sp = v;
 }
 #endif
 
@@ -2612,71 +2311,34 @@ f_rmdir P2(int, num_arg, int, instruction)
 }
 #endif
 
-void add_mapping_pair P3(struct mapping *, m, char *, key, int, value)
-{
-    struct svalue *s, lv;
-
-    lv.type = T_STRING;
-    lv.subtype = STRING_CONSTANT;
-    lv.u.string = key;
-    s = find_for_insert(m, &lv, 1);
-    s->type = T_NUMBER;
-    s->subtype = 0;
-    s->u.number = value;
-}
-
-void add_mapping_string P3(struct mapping *, m, char *, key, char *, value)
-{
-    struct svalue *s, lv;
-
-    lv.type = T_STRING;
-    lv.subtype = STRING_CONSTANT;
-    lv.u.string = key;
-    s = find_for_insert(m, &lv, 1);
-    s->type = T_STRING;
-    s->subtype = STRING_MALLOC;
-    s->u.string = string_copy(value);
-}
-
-void add_mapping_object P3(struct mapping *, m, char *, key, struct object *, value)
-{
-    struct svalue *s, lv;
-
-    lv.type = T_STRING;
-    lv.subtype = STRING_CONSTANT;
-    lv.u.string = key;
-    s = find_for_insert(m, &lv, 1);
-    s->type = T_OBJECT;
-    s->subtype = 0;
-    s->u.ob = value;
-    add_ref(value, "add_mapping_object");
-}
-
-void add_mapping_array P3(struct mapping *, m, char *, key, struct vector *, value)
-{
-    struct svalue *s, lv;
-
-    lv.type = T_STRING;
-    lv.subtype = STRING_CONSTANT;
-    lv.u.string = key;
-    s = find_for_insert(m, &lv, 1);
-    s->type = T_POINTER;
-    s->subtype = 0;
-    s->u.vec = value;
-    value->ref++;
-}
-
 #ifdef F_SAVE_OBJECT
 void
 f_save_object P2(int, num_arg, int, instruction)
 {
     int flag, i;
-    struct svalue *arg = sp - num_arg + 1;
 
-    flag = (num_arg == 1) ? 0 : arg[1].u.number;
-    i = save_object(current_object, arg[0].u.string, flag);
-    pop_n_elems(num_arg);
+    if (num_arg == 2) {
+	CHECK_TYPES(sp-1, T_STRING, 1, instruction);
+	CHECK_TYPES(sp, T_NUMBER, 2, instruction);
+	flag = (sp--)->u.number;
+    } else {
+	CHECK_TYPES(sp, T_STRING, 1, instruction);
+	flag = 0;
+    }
+    i = save_object(current_object, sp->u.string, flag);
+    free_string_svalue(sp--);
     push_number(i);
+}
+#endif
+
+#ifdef F_SAVE_VARIABLE
+void
+f_save_variable P2(int, num_arg, int, instruction) {
+    char *p;
+
+    p = save_variable(sp);
+    pop_stack();
+    push_malloced_string(p);
 }
 #endif
 
@@ -2729,6 +2391,9 @@ f_set_eval_limit P2(int, num_arg, int, instruction)
     case -1:
 	sp->u.number = eval_cost;
 	break;
+    case 1:
+	sp->u.number = max_cost;
+	break;
     default:
 	max_cost = sp->u.number;
 	break;
@@ -2762,7 +2427,7 @@ f_set_bit P2(int, num_arg, int, instruction)
 	error("Illegal bit pattern in set_bit character %d\n", ind);
     str[ind] = ((str[ind] - ' ') | (1 << (sp->u.number % 6))) + ' ';
     pop_stack();
-    free_svalue(sp);
+    free_svalue(sp, "f_set_bit");
     sp->u.string = str;
     sp->subtype = STRING_MALLOC;
     sp->type = T_STRING;
@@ -2853,44 +2518,6 @@ f_set_privs P2(int, num_arg, int, instruction)
 }
 #endif
 
-#ifdef F_SETEUID
-void
-f_seteuid P2(int, num_arg, int, instruction)
-{
-    struct svalue *ret;
-
-    if (sp->type == T_NUMBER) {
-	if (sp->u.number != 0)
-	    bad_arg(1, instruction);
-	current_object->euid = NULL;
-	*sp = const1;
-	return;
-    }
-    argp = sp;
-    CHECK_TYPES(argp, T_STRING, 1, instruction);
-    push_object(current_object);
-    push_string(argp->u.string, STRING_CONSTANT);
-    ret = apply_master_ob(APPLY_VALID_SETEUID, 2);
-    if (ret == 0 || ret->type != T_NUMBER || ret->u.number != 1) {
-	pop_stack();
-	push_number(0);
-	return;
-    }
-    current_object->euid = add_uid(argp->u.string);
-    free_string_svalue(sp);
-    *sp = const1;
-}
-#endif
-
-#ifdef F_SETUID
-void f_setuid P2(int, num_arg, int, instruction)
-    int num_arg, instruction;
-{
-    setuid();
-    push_number(0);
-}
-#endif				/* F_SETUID */
-
 #ifdef F_SHADOW
 void
 f_shadow P2(int, num_arg, int, instruction)
@@ -2900,7 +2527,7 @@ f_shadow P2(int, num_arg, int, instruction)
     ob = (sp - 1)->u.ob;
     if (sp->u.number == 0) {
 	ob = ob->shadowed;
-	pop_n_elems(2);
+	pop_2_elems();
 	if (ob)
 	    push_object(ob);
 	else
@@ -2963,15 +2590,27 @@ f_sizeof P2(int, num_arg, int, instruction)
 {
     int i;
 
-    if (sp->type == T_POINTER)
+    switch (sp->type) {
+    case T_POINTER:
 	i = sp->u.vec->size;
-    else if (sp->type == T_MAPPING)
+	free_vector(sp->u.vec);
+	break;
+    case T_MAPPING:
 	i = sp->u.map->count;
-    else if (sp->type == T_BUFFER)
+	free_mapping(sp->u.map);
+	break;
+    case T_BUFFER:
 	i = sp->u.buf->size;
-    else
+	free_buffer(sp->u.buf);
+	break;
+    case T_STRING:
+	i = SVALUE_STRLEN(sp);
+	free_string_svalue(sp);
+	break;
+    default:
 	i = 0;
-    free_svalue(sp);
+	free_svalue(sp, "f_sizeof");
+    }
     sp->type = T_NUMBER;
     sp->u.number = i;
 }
@@ -2985,79 +2624,19 @@ f_snoop P2(int, num_arg, int, instruction)
      * This one takes a variable number of arguments. It returns 0 or an
      * object.
      */
-    if (!command_giver) {
-	pop_n_elems(num_arg);
-	push_number(0);
-    } else {
-	ob = 0;			/* Do not remove this, it is not 0 by default */
-	switch (num_arg) {
-	case 1:
-	    if (new_set_snoop(sp->u.ob, 0))
-		ob = sp->u.ob;
-	    break;
-	case 2:
-	    if (new_set_snoop((sp - 1)->u.ob, sp->u.ob))
-		ob = sp->u.ob;
-	    break;
-	default:
-	    ob = 0;
-	    break;
-	}
-	pop_n_elems(num_arg);
-	if (ob)
-	    push_object(ob);
-	else
-	    push_number(0);
-    }
-}
-#endif
-
-#ifdef F_SORT_ARRAY
-void
-f_sort_array P2(int, num_arg, int, instruction)
-{
-    extern struct vector *sort_array
-           PROT((struct vector *, char *, struct object *));
-    extern struct vector *builtin_sort_array
-           PROT((struct vector *, int));
-    struct vector *res;
-    struct svalue *arg;
-
-    arg = sp - 2;
     ob = 0;
-
-    if (arg[1].type == T_STRING) {
-	if (arg[2].type == T_OBJECT)
-	    ob = arg[2].u.ob;
-	else if (arg[2].type == T_STRING) {
-	    ob = find_object(arg[2].u.string);
-	    if (ob && !object_visible(ob))
-		ob = 0;
-	}
-	if (!ob)
-	    bad_arg(3, instruction);
+    if (num_arg == 1) {
+	if (new_set_snoop(sp->u.ob, 0))
+	    ob = sp->u.ob;
+    } else {
+	if (new_set_snoop((sp - 1)->u.ob, sp->u.ob))
+	    ob = sp->u.ob;
     }
-    if (arg[0].type == T_POINTER) {
-	struct vector *tmp;
-
-	check_for_destr(arg[0].u.vec);
-	tmp = slice_array(arg[0].u.vec, 0, arg[0].u.vec->size - 1);
-	if (arg[1].type == T_NUMBER)
-	    res = builtin_sort_array(tmp, arg[1].u.number);
-	else
-	    res = sort_array(tmp, arg[1].u.string, ob);
-    } else
-	res = 0;
-
-    pop_stack();
-    pop_stack();
-    free_svalue(sp);
-
-    if (res) {
-	sp->type = T_POINTER;
-	sp->u.vec = res;
-    } else
-	*sp = const0;
+    pop_n_elems(num_arg);
+    if (ob && !(ob->flags & O_DESTRUCTED))
+	push_object(ob);
+    else
+	push_number(0);
 }
 #endif
 
@@ -3113,17 +2692,15 @@ f_stat P2(int, num_arg, int, instruction)
 		v->item[2].u.number = ob->load_time;
 	    else
 		v->item[2].u.number = 0;
-	    pop_n_elems(2);
-	    push_vector(v);
-	    v->ref--;		/* Will now be 1. */
+	    pop_2_elems();
+	    push_refed_vector(v);
 	    return;
 	}
     }
     v = get_dir((sp - 1)->u.string, sp->u.number);
-    pop_n_elems(2);
+    pop_2_elems();
     if (v) {
-	push_vector(v);
-	v->ref--;		/* Will now be 1. */
+	push_refed_vector(v);
     } else {
 	push_number(0);
     }
@@ -3192,7 +2769,7 @@ f_strsrch P2(int, num_arg, int, instruction)
 	i = -1;
     else
 	i = (int) (pos - big);
-    pop_n_elems(3);
+    pop_3_elems();
     push_number(i);
 }				/* strsrch */
 #endif
@@ -3204,7 +2781,7 @@ f_strcmp P2(int, num_arg, int, instruction)
     int i;
 
     i = strcmp((sp - 1)->u.string, sp->u.string);
-    pop_n_elems(2);
+    pop_2_elems();
     push_number(i);
 }
 #endif
@@ -3229,18 +2806,6 @@ f_bufferp P2(int, num_arg, int, instruction)
     } else {
 	assign_svalue(sp, &const0);
     }
-}
-#endif
-
-#ifdef F_STRLEN
-void
-f_strlen P2(int, num_arg, int, instruction)
-{
-    int i;
-
-    i = SVALUE_STRLEN(sp);
-    pop_stack();
-    push_number(i);
 }
 #endif
 
@@ -3284,7 +2849,7 @@ f_tell_room P2(int, num_arg, int, instruction)
     } else {			/* must be a string... */
 	ob = find_object(arg[0].u.string);
 	if (!ob || !object_visible(ob))
-	    error("Bad argument 1 to tell_room()\n");
+	    bad_argument(&arg[0], T_OBJECT | T_STRING, 1, F_TELL_ROOM);
     }
 
     if (num_arg == 2) {
@@ -3337,14 +2902,13 @@ f_this_object P2(int, num_arg, int, instruction)
 void
 f_this_player P2(int, num_arg, int, instruction)
 {
-    pop_n_elems(num_arg);
-    if (num_arg && current_interactive &&
+    if ((sp--)->u.number && current_interactive &&
 	!(current_interactive->flags & O_DESTRUCTED))
 	push_object(current_interactive);
     else if (command_giver && !(command_giver->flags & O_DESTRUCTED))
 	push_object(command_giver);
-    else
-	push_number(0);
+    else  
+	(++sp)->u.number = 0;
 }
 #endif
 
@@ -3420,50 +2984,9 @@ f_to_int P2(int, num_arg, int, instruction)
 }
 #endif
 
-#ifdef F_TRACE
+#ifdef F_TYPEOF
 void
-f_trace P2(int, num_arg, int, instruction)
-{
-    int ot = -1;
-
-    if (command_giver && command_giver->interactive &&
-	command_giver->flags & O_IS_WIZARD) {
-	ot = command_giver->interactive->trace_level;
-	command_giver->interactive->trace_level = sp->u.number;
-    }
-    pop_stack();
-    push_number(ot);
-}
-#endif
-
-#ifdef F_TRACEPREFIX
-void
-f_traceprefix P2(int, num_arg, int, instruction)
-{
-    char *old = 0;
-
-    if (command_giver && command_giver->interactive &&
-	command_giver->flags & O_IS_WIZARD) {
-	old = command_giver->interactive->trace_prefix;
-	if (sp->type == T_STRING) {
-	    command_giver->interactive->trace_prefix =
-		make_shared_string(sp->u.string);
-	} else
-	    command_giver->interactive->trace_prefix = 0;
-    }
-    pop_stack();
-    if (old) {
-	push_string(old, STRING_SHARED);	/* Will incr ref count */
-	free_string(old);
-    } else {
-	push_number(0);
-    }
-}
-#endif
-
-#ifdef F_TYPE
-void
-f_type P2(int, num_arg, int, instruction)
+f_typeof P2(int, num_arg, int, instruction)
 {
     int k;
 
@@ -3488,23 +3011,21 @@ f_undefinedp P2(int, num_arg, int, instruction)
 void
 f_unique_array P2(int, num_arg, int, instruction)
 {
-    extern struct vector
-          *make_unique PROT((struct vector * arr, char *func,
-			            struct svalue * skipnum));
     struct vector *res;
-
-    if (num_arg < 3) {
-	check_for_destr((sp - 1)->u.vec);
-	res = make_unique((sp - 1)->u.vec, sp->u.string, &const0);
+    struct svalue *arg;
+    
+    arg = sp - num_arg + 1;
+    check_for_destr(arg[0].u.vec);
+    if (arg[1].type == T_STRING) {
+	res = make_unique(arg[0].u.vec, arg[1].u.string, NULL,
+			  (num_arg == 3) ? sp : &const0);
     } else {
-	check_for_destr((sp - 2)->u.vec);
-	res = make_unique((sp - 2)->u.vec, (sp - 1)->u.string, sp);
-	pop_stack();
+	res = make_unique(arg[0].u.vec, NULL, arg[1].u.fp,
+			  (num_arg == 3) ? sp : &const0);
     }
-    pop_n_elems(2);
+    pop_n_elems(num_arg);
     if (res) {
-	push_vector(res);	/* This will make ref count == 2 */
-	res->ref--;
+	push_refed_vector(res);
     } else
 	push_number(0);
 }
@@ -3534,8 +3055,7 @@ f_userp P2(int, num_arg, int, instruction)
 void
 f_users P2(int, num_arg, int, instruction)
 {
-    push_vector(users());	/* users() has already set ref count to 1 */
-    sp->u.vec->ref--;
+    push_refed_vector(users());
 }
 #endif
 
@@ -3563,56 +3083,6 @@ f_virtualp P2(int, num_arg, int, instruction)
 }
 #endif
 
-#ifdef F_DOMAIN_STATS
-void
-f_domain_stats P2(int, num_arg, int, instruction)
-{
-    struct mapping *m;
-
-    if (num_arg) {
-	m = get_domain_stats(sp->u.string);
-	pop_stack();
-    } else {
-	m = get_domain_stats(0);
-    }
-    if (!m) {
-	push_number(0);
-    } else {
-	/* ref count is properly decremented by get_domain_stats */
-	push_mapping(m);
-    }
-}
-#endif
-
-#ifdef F_AUTHOR_STATS
-void
-f_author_stats P2(int, num_arg, int, instruction)
-{
-    struct mapping *m;
-
-    if (num_arg) {
-	m = get_author_stats(sp->u.string);
-	pop_stack();
-    } else {
-	m = get_author_stats(0);
-    }
-    if (!m) {
-	push_number(0);
-    } else {
-	/* ref count is properly decremented by get_author_stats */
-	push_mapping(m);
-    }
-}
-#endif
-
-#ifdef F_SET_AUTHOR
-void
-f_set_author P2(int, num_arg, int, instruction)
-{
-    set_author(sp->u.string);
-}
-#endif
-
 #ifdef F_WRITE
 void
 f_write P2(int, num_arg, int, instruction)
@@ -3631,7 +3101,7 @@ f_write_bytes P2(int, num_arg, int, instruction)
 
     if (IS_ZERO(sp)) {
 	bad_arg(3, instruction);
-	pop_n_elems(3);
+	pop_3_elems();
 	push_number(0);
     } else {
 	if (sp->type == T_NUMBER) {
@@ -3652,7 +3122,7 @@ f_write_bytes P2(int, num_arg, int, instruction)
 	} else {
 	    bad_argument(sp, T_BUFFER | T_STRING | T_NUMBER, 3, instruction);
 	}
-	pop_n_elems(3);
+	pop_3_elems();
 	push_number(i);
     }
 }
@@ -3666,7 +3136,7 @@ f_write_buffer P2(int, num_arg, int, instruction)
 
     if (IS_ZERO(sp)) {
 	bad_arg(3, instruction);
-	pop_n_elems(3);
+	pop_3_elems();
 	push_number(0);
     } else {
 	if ((sp - 2)->type == T_STRING) {
@@ -3691,7 +3161,7 @@ f_write_buffer P2(int, num_arg, int, instruction)
 	} else {
 	    bad_arg(3, instruction);
 	}
-	pop_n_elems(3);
+	pop_3_elems();
 	push_number(i);
     }
 }
@@ -3702,17 +3172,19 @@ void
 f_write_file P2(int, num_arg, int, instruction)
 {
     int i;
+    int flags = 0;
 
-    if (IS_ZERO(sp)) {
-	bad_arg(2, instruction);
-	pop_stack();
-	assign_svalue(sp, &const0);
-    } else {
-	i = write_file((sp - 1)->u.string, sp->u.string);
-	pop_stack();
-	pop_stack();
-	push_number(i);
+    if (num_arg == 3) {
+	CHECK_TYPES(sp, T_NUMBER, 3, instruction);
+	flags = sp->u.number;
+	sp--;
     }
+    i = write_file((sp - 1)->u.string, sp->u.string, flags);
+    free_string_svalue(sp--);
+    free_string_svalue(sp);
+    sp->type = T_NUMBER;
+    sp->subtype = 0;
+    sp->u.number = i;
 }
 #endif
 
@@ -3731,37 +3203,6 @@ extern int reclaim_objects PROT((void));
 void f_reclaim_objects P2(int, num_arg, int, instruction)
 {
     push_number(reclaim_objects());
-}
-#endif
-
-#ifdef F_OBJECTS
-extern struct vector *objects PROT((char *, struct object *));
-
-void f_objects P2(int, num_arg, int, instruction)
-{
-    struct svalue *arg;
-    char *func;
-    struct object *ob;
-    struct vector *vec;
-
-    arg = sp - num_arg + 1;
-    if (num_arg == 0)
-	func = NULL;
-    else {
-	func = arg[0].u.string;
-	if (num_arg == 1)
-	    ob = current_object;
-	else
-	    ob = arg[1].u.ob;
-    }
-    vec = objects(func, ob);
-    pop_n_elems(num_arg);
-    if (!vec) {
-	push_number(0);
-    } else {
-	push_vector(vec);
-	vec->ref--;
-    }
 }
 #endif
 
@@ -3799,7 +3240,7 @@ f_memory_info P2(int, num_arg, int, instruction)
 	return;
     }
     if (sp->type != T_OBJECT)
-	error("Bad argument 1 to memory_info()\n");
+	bad_argument(sp, T_OBJECT, 1, F_MEMORY_INFO);
     ob = sp->u.ob;
     if (ob->prog && (ob->prog->p.i.ref == 1 || !(ob->flags & O_CLONE)))
 	mem = ob->prog->p.i.total_size;
@@ -3816,7 +3257,7 @@ void
 f_reload_object P2(int, num_arg, int, instruction)
 {
     if (sp->type != T_OBJECT)
-	error("Bad arg 1 to reload_object()\n");
+	bad_argument(sp, T_OBJECT, 1, F_RELOAD_OBJECT);
     reload_object(sp->u.ob);
     pop_stack();
     push_number(0);

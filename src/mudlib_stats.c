@@ -10,7 +10,6 @@
 #include "config.h"
 
 #ifndef NO_MUDLIB_STATS
-
 #include <stdio.h>
 #include <string.h>
 #if !defined(NeXT) && !defined(LATTICE)
@@ -26,6 +25,7 @@
 #include "mapping.h"
 #include "buffer.h"
 #include "applies.h"
+#include "include/origin.h"
 
 extern char *string_copy PROT((char *)), *xalloc PROT((int));
 
@@ -34,7 +34,7 @@ extern struct object *master_ob, *current_object;
 static mudlib_stats_t *domains = 0;
 static mudlib_stats_t *backbone_domain = 0;
 static mudlib_stats_t *authors = 0;
-static mudlib_stats_t *root_author = 0;
+static mudlib_stats_t *master_author = 0;
 
 static mudlib_stats_t *find_stat_entry PROT((char *, mudlib_stats_t *));
 static mudlib_stats_t *add_stat_entry PROT((char *, mudlib_stats_t **));
@@ -47,7 +47,7 @@ static void restore_stat_list PROT((char *, mudlib_stats_t **));
 static struct mapping *get_info PROT((mudlib_stats_t *));
 static struct mapping *get_stats PROT((char *, mudlib_stats_t *));
 static mudlib_stats_t *insert_stat_entry PROT((mudlib_stats_t *, mudlib_stats_t **));
-#if defined(DEALLOCATE_MEMORY_AT_SHUTDOWN) && !defined(NO_MUDLIB_STATS)
+#ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
 static void free_mudlib_stats PROT((void));
 #endif
 
@@ -230,7 +230,7 @@ void mudlib_stats_decay()
 /*
  * free all of the mudlib statistics structures
  */
-#if defined(DEALLOCATE_MEMORY_AT_SHUTDOWN) && !defined(NO_MUDLIB_STATS)
+#ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
 static void free_mudlib_stats()
 {
     mudlib_stats_t *dl, *d;
@@ -256,13 +256,11 @@ static void init_author_for_ob P1(struct object *, ob)
 {
     struct svalue *ret;
 
-    if (master_ob == NULL) {
-	ob->stats.author = root_author;
-	return;
-    }
     push_string(ob->name, STRING_CONSTANT);
     ret = apply_master_ob(APPLY_AUTHOR_FILE, 1);
-    if (IS_ZERO(ret)) {
+    if (ret == (struct svalue *)-1) {
+	ob->stats.author = master_author;
+    } else if (IS_ZERO(ret)) {
 	ob->stats.author = NULL;
     } else {
 	ob->stats.author = add_stat_entry(ret->u.string, &authors);
@@ -276,7 +274,7 @@ void set_author P1(char *, name)
     if (!current_object)
 	return;
     ob = current_object;
-    if (master_ob == NULL) {
+    if (master_ob == (struct object *)-1) {
 	ob->stats.author = NULL;
 	return;
     }
@@ -289,13 +287,13 @@ void set_author P1(char *, name)
     }
 }
 
-mudlib_stats_t *set_root_author P1(char *, str)
+mudlib_stats_t *set_master_author P1(char *, str)
 {
     mudlib_stats_t *author;
 
     author = add_stat_entry(str, &authors);
     if (author)
-	root_author = author;
+	master_author = author;
     return author;
 }
 
@@ -306,7 +304,7 @@ static char *author_for_file P1(char *, file)
 
     push_string(file, STRING_CONSTANT);
     ret = apply_master_ob(APPLY_AUTHOR_FILE, 1);
-    if (ret == 0 || ret->type != T_STRING)
+    if (ret == 0 || ret == (struct svalue*)-1 || ret->type != T_STRING)
 	return 0;
     strcpy(buff, ret->u.string);
     return buff;
@@ -323,15 +321,20 @@ static void init_domain_for_ob P1(struct object *, ob)
     char *domain_name;
     struct object *tmp_ob;
     static char *domain_file_fname = NULL;
+    int err;
 
-    if (master_ob == 0)
+    err = assert_master_ob_loaded("[internal] init_domain_for_ob","");
+    if (err == -1)
 	tmp_ob = ob;
-    else {
-	assert_master_ob_loaded("[internal] init_domain_for_ob()");
+    else if (err == 1) {
 	tmp_ob = master_ob;
     }
 
-    if (!master_ob || !current_object || !current_object->uid) {
+    if (!master_ob || !current_object
+#ifndef NO_UIDS
+	|| !current_object->uid
+#endif
+	) {
 	/*
 	 * Only for the master and void object. Note that you can't ask for
 	 * the backbone or root domain here since we're in the process of
@@ -346,7 +349,7 @@ static void init_domain_for_ob P1(struct object *, ob)
     push_string(ob->name, STRING_CONSTANT);
     if (!domain_file_fname)
 	domain_file_fname = make_shared_string(APPLY_DOMAIN_FILE);
-    ret = apply(domain_file_fname, tmp_ob, 1);
+    ret = apply(domain_file_fname, tmp_ob, 1, ORIGIN_DRIVER);
     if (!ret)
 	error("No function 'domain_file' in master ob!\n");
     domain_name = ret->u.string;
@@ -392,11 +395,9 @@ static char *domain_for_file P1(char *, file)
     struct svalue *ret;
     static char buff[50];
 
-    if (!master_ob)
-	return NULL;
     push_string(file, STRING_CONSTANT);
     ret = apply_master_ob(APPLY_DOMAIN_FILE, 1);
-    if (ret == 0 || ret->type != T_STRING)
+    if (ret == 0 || ret == (struct svalue*)-1 || ret->type != T_STRING)
 	return 0;
     strcpy(buff, ret->u.string);
     return buff;

@@ -66,26 +66,6 @@
 #include "virtual_architecture.h"
 #endif
 
-/* Needed these from interpret.c. But what for? -SH */
-#define TRACE_CALL_OTHER 2
-#define TRACE_RETURN 4
-#define TRACE_ARGS 8
-#define TRACE_HEART_BEAT 32
-
-#ifdef LPC_TO_C
-#define TRACE_COMPILED 256
-#define TRACE_LPC_EXEC 512
-#endif
-
-#define TRACETST(b) (command_giver->interactive->trace_level & (b))
-#define TRACEP(b) \
-    (command_giver && command_giver->interactive && TRACETST(b) && \
-     (command_giver->interactive->trace_prefix == 0 || \
-      (current_object && strpref(command_giver->interactive->trace_prefix, \
-	      current_object->name))) )
-#define TRACEHB (current_heart_beat == 0 \
-	 || (command_giver->interactive->trace_level & TRACE_HEART_BEAT))
-
 extern int max_string_length;
 extern int d_flag, boot_time;
 extern char *pc;
@@ -97,7 +77,9 @@ extern int function_index_offset;	/* Needed for inheritance */
 extern int variable_index_offset;	/* Needed for inheritance */
 extern struct object *previous_ob;
 extern struct object *master_ob;
+#ifndef NO_UIDS
 extern userid_t *backbone_uid;
+#endif
 extern struct svalue const0, const1, const0u, const0n;
 extern struct object *current_heart_beat, *current_interactive;
 extern struct svalue catch_value;	/* Used to throw an error to a catch */

@@ -7,7 +7,7 @@
  * and will be a little more general purpose than wiz_list was
  */
 
-#ifndef _MUDLIB_STATS_H
+#if !defined(_MUDLIB_STATS_H) && !defined(NO_MUDLIB_STATS)
 #define _MUDLIB_STATS_H
 
 typedef struct _mstats {
@@ -49,7 +49,7 @@ void mudlib_stats_decay PROT((void));
 void save_stat_files PROT((void));
 void restore_stat_files PROT((void));
 void set_author PROT((char *));
-mudlib_stats_t *set_root_author PROT((char *));
+mudlib_stats_t *set_master_author PROT((char *));
 mudlib_stats_t *set_backbone_domain PROT((char *));
 
 #endif

@@ -1,5 +1,5 @@
-#ifndef _CCDEP_H
-#define _CCDEP_H
+#ifndef AMIGA_CCDEP_H
+#define AMIGA_CCDEP_H
 
 #ifdef LATTICE
 /* stuff to make the DICE code happy */

@@ -49,7 +49,7 @@ void replace_programs()
 	    debug_message("freeing %d variables:\n", j);
 #endif
 	while (--j >= 0) {
-	    free_svalue(svp);
+	    free_svalue(svp, "replace_programs");
 	    *(svp++) = const0n;
 	}
 #ifdef DEBUG
@@ -64,7 +64,7 @@ void replace_programs()
 	    debug_message("freeing %d variables:\n", i);
 #endif
 	while (--i >= 0) {
-	    free_svalue(svp);
+	    free_svalue(svp, "replace_programs");
 	    *(svp++) = const0n;
 	}
 #ifdef DEBUG
@@ -190,7 +190,7 @@ f_replace_program P2(int, num_arg, int, instruction)
     if (current_object == simul_efun_ob)
 	error("replace_program on simul_efun object\n");
     name_len = strlen(sp->u.string);
-    name = (char *) MALLOC(name_len + 3);
+    name = (char *) DMALLOC(name_len + 3, 0, "replace_program");
     xname = name;
     strcpy(name, sp->u.string);
     if (name[name_len - 2] != '.' || name[name_len - 1] != 'c')

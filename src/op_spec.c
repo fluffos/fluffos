@@ -3,7 +3,7 @@
  * Normally, these should not be commented out.
  */
 
-operator dup, pop_value;
+operator pop_value;
 
 operator number, real, byte, nbyte, string, const0, const1;
 
@@ -11,16 +11,16 @@ operator index, range;
 operator aggregate, aggregate_assoc;
 operator break_point;
 
-operator jump;
-operator branch, branch_when_zero, branch_when_non_zero;
-operator bbranch_when_zero, bbranch_when_non_zero;
+/* these must be set up so that F_BRANCH is the last foward branch and
+ * F_BRANCH_X + 3 == F_BBRANCH_X
+ */
+operator branch_when_zero, branch_when_non_zero, branch;
+operator bbranch_when_zero, bbranch_when_non_zero, bbranch;
 
-#ifdef LPC_OPTIMIZE_LOOPS
 operator loop_cond;
 operator loop_incr;
 operator while_dec;
 
-#endif
 operator lor, land;
 
 operator catch, end_catch;
@@ -34,9 +34,9 @@ operator eq, ne, le, lt, ge, gt;
 
 operator inc, dec, pre_inc, post_inc, pre_dec, post_dec;
 
-operator local_name, identifier;
-operator push_identifier_lvalue, push_local_variable_lvalue;
-operator push_indexed_lvalue;
+operator local, global;
+operator local_lvalue, global_lvalue;
+operator indexed_lvalue;
 
 operator add, void_add_eq, add_eq;
 operator subtract, sub_eq;
@@ -52,7 +52,11 @@ operator negate, compl;
 
 operator assign, void_assign;
 
-operator function_constructor, this_function_constructor, function_split;
+operator function_constructor;
+#ifndef NEW_FUNCTIONS
+operator evaluate;
+#endif
+operator simul_efun;
 
 operator sscanf;
 operator parse_command;
