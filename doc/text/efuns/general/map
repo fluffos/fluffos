@@ -1,0 +1,15 @@
+map - modify an mapping
+
+mixed map( mixed x, string fun, object ob, mixed extra, ... );
+
+mixed map( mixed x, function f, mixed extra, ... );
+
+The (ob, fun) syntax works as if (: call_other, ob, fun :) had been passed as
+f.  Map returns a new structure containing the return values of f being applied
+to each element of x.  Currently, it can be used on arrays, mappings and
+strings.  In the case of mappings, both the key and the value are passed
+to the function.  In the case of strings, the characters are passed to the
+function one at a time as ints.  extra and all the following arguments are
+passed to the function after the element.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

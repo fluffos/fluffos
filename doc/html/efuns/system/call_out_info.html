@@ -1,0 +1,21 @@
+<HEAD> <TITLE> call_out_info - get pending call_out() information </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> call_out_info - get pending call_out() information </H1> </center>
+<p>
+<b> array call_out_info(); </b>
+<p>
+Get information about all pending call outs. An array is returned,
+where every item in the array consists 3 elements: the object,
+the function, and the remaining delay.
+<p>
+Note: due to security concerns, and the fact that call_outs may now
+have an arbitrary number of arguments, the 4th element of the return
+value was returned.  The security concerns stem from the fact that if
+the arguments where types which can be modified (arrays, mappings,
+etc), obtaining them would allow them to be modified before the
+function was called.  It is possible this will be fixed in the
+future if there is enough interest.
+<p>
+See also:
+<A HREF=../calls/call_out.html>  call_out </A>,
+<A HREF=../calls/remove_call_out.html>  remove_call_out </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

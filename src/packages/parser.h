@@ -1,37 +1,39 @@
 #ifndef ZORKPARSE_H
 #define ZORKPARSE_H
 
+#include "../include/parser_error.h"
+
 /* Token convention:
- * <0 is a token (OBJ, etc).
- * >=0 is a literal.
+ * >0 is a token (OBJ, etc).
+ * <=0 is a literal.
  */
-#define ERROR_TOKEN          -1
-#define STR_TOKEN	     -2
-#define WRD_TOKEN	     -3
+#define ERROR_TOKEN          1
+#define STR_TOKEN	     2
+#define WRD_TOKEN	     3
 
 #define LIV_MODIFIER         8
 #define VIS_ONLY_MODIFIER    16
 #define PLURAL_MODIFIER	     32
 
-#define ADD_MOD(x, y) (-((-(x)) | (y)))
+#define ADD_MOD(x, y) ((x) | (y))
 
-#define OBJ_A_TOKEN          -4
+#define OBJ_A_TOKEN          4
 #define LIV_A_TOKEN          ADD_MOD(OBJ_A_TOKEN, LIV_MODIFIER)
 #define OBJ_TOKEN	     ADD_MOD(OBJ_A_TOKEN, VIS_ONLY_MODIFIER)
 #define LIV_TOKEN	     ADD_MOD(LIV_A_TOKEN, VIS_ONLY_MODIFIER)
 #define OBS_TOKEN	     ADD_MOD(OBJ_A_TOKEN, PLURAL_MODIFIER)
 #define LVS_TOKEN	     ADD_MOD(LIV_A_TOKEN, PLURAL_MODIFIER)
 
-#define MAX_NUM_OBJECTS      256
+#define MAX_NUM_OBJECTS      1024
 /* must be powers of 2 */
 #define HASH_SIZE            32
 #define VERB_HASH_SIZE       128
 #define SPECIAL_HASH_SIZE    16
 
 /* This is used to hash shared string pointers for various lookup tables */
-#define DO_HASH(x, n)         ((((int)x) & (n - 1)) ^ \
-			      (((int)x >> 8) & (n - 1)) ^ \
-			      (((int)x >> 16) & (n - 1)))
+#define DO_HASH(x, n)         ((((POINTER_INT)x) & (n - 1)) ^ \
+			      (((POINTER_INT)x >> 8) & (n - 1)) ^ \
+			      (((POINTER_INT)x >> 16) & (n - 1)))
 
 /*
  * bitvec stuff.  Basically, at the start of parsing, we determine what
@@ -45,6 +47,11 @@
 #define BV_WHICH(x) ((x) / BPI)
 #define BV_BIT(x) (1 << ((x) % BPI))
 
+typedef struct {
+    unsigned int b[NUM_BITVEC_INTS];
+    short last;
+} bitvec_t;
+
 /* A parse value.  This keeps track of which objects respond to a given
  * word and how.  For example:
  *
@@ -57,9 +64,7 @@
  *   adj:  (ob1)
  */
 typedef struct {
-    unsigned int noun[NUM_BITVEC_INTS];
-    unsigned int plural[NUM_BITVEC_INTS];
-    unsigned int adj[NUM_BITVEC_INTS];
+    bitvec_t noun, plural, adj;
 } parse_val_t;
 
 #define WORD_ALLOCATED 1
@@ -119,7 +124,7 @@ typedef struct special_word_s {
 } special_word_t;
 
 enum sw_enum_s {
-    SW_NONE = 0, SW_ARTICLE, SW_SELF, SW_ORDINAL
+    SW_NONE = 0, SW_ARTICLE, SW_SELF, SW_ORDINAL, SW_ALL, SW_OF, SW_AND
 };
 
 /* Each node holds informations about a given rule.  The handler for the
@@ -138,14 +143,24 @@ typedef struct verb_node_s {
  * The entry for a verb.  Links for the verb hash table, and a linked
  * list of rules.
  */
-#define VB_HAS_OBJ   1
+#define VB_HAS_OBJ	1
+#define VB_IS_SYN	2
 
 typedef struct verb_s {
     struct verb_s *next;
-    char *name;
     int flags;
+    char *match_name; 
+    char *real_name;
     verb_node_t *node;
 } verb_t;
+
+typedef struct verb_syn_s {
+    struct verb_s *next;
+    int flags;
+    char *match_name; 
+    char *real_name;
+    verb_t *real;
+} verb_syn_t;
 
 /* A token definition for the token lookup table */
 typedef struct {
@@ -154,15 +169,38 @@ typedef struct {
     int mod_legal;
 } token_def_t;
 
-union mu {
-    int number;
-    char *string;
+union parser_error_u {
+    hash_entry_t *noun;
+    struct {
+	int start, end;
+    } str_problem;
+    bitvec_t obs;
+    int ord_error;
+    char *str;
+    struct saved_error_s *parallel;
 };
 
 typedef struct {
-    int token;
-    int first, last;
-    union mu val;
+    int error_type;
+    union parser_error_u err;
+} parser_error_t;
+
+typedef struct saved_error_s {
+    struct saved_error_s *next;
+    parser_error_t err;
+    int obj;
+} saved_error_t;
+
+struct mu {
+    bitvec_t obs;
+    int number;
+};
+
+typedef struct {
+    short token;
+    short first, last;
+    short ordinal;
+    struct mu val;
 } match_t;
 
 typedef struct {
@@ -179,9 +217,14 @@ typedef struct {
 
 typedef struct {
     object_t *ob;
+    saved_error_t *parallel;
     sub_result_t res[4];
 } parse_result_t;
 
 void parse_free PROT((parse_info_t *));
+#ifdef DEBUGMALLOC_EXTENSIONS
+void parser_mark_verbs();
+void parser_mark PROT((parse_info_t *));
+#endif
 
 #endif

@@ -1,0 +1,47 @@
+<HEAD> <TITLE> ref </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> ref </H1> </center>
+<p>
+The 'ref' keyword introduces the ability to use pass-by-reference when
+calling functions, as opposed to pass-by-value.  Consider the following
+routine:
+<p>
+PRE
+void f(int x) {
+    x++;
+}
+<p>
+void create() {
+    int x = 5;
+    printf("%i\n", x);
+    f(x);
+    printf("%i\n", x);
+}
+ENDPRE
+<p>
+The output will be 5 in both cases, since only the value of x (5) is
+passed to f; when f modifies x it only modifies its own copy, not the
+copy in create().  However, if we instead write:
+<p>
+PRE
+void f(int ref x) {
+    x++;
+}
+<p>
+void create() {
+    int x = 5;
+    printf("%i\n", x);
+    f(ref x);
+    printf("%i\n", x);
+}
+ENDPRE
+<p>
+the output will be 5 and then 6.  In the declaration of f, 'int ref x'
+indicates that the actual variable 'x' should be used and modified,
+not just its value.  Note that 'ref' also must be used when calling f;
+this is so that it is obvious when reading create that the call to
+f() might modify x.
+<p>
+Anything which can appear on the left side of '=' (i.e. anything that
+can be modified) can be passed by reference, with one exception:
+'x[1..2] = ({ 1 })' is legal, but 'ref x[1..2]' is not.  'ref x[4]'
+is perfectly legal, however.
+<p>

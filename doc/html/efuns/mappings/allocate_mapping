@@ -1,0 +1,27 @@
+allocate_mapping - pre-allocate space for a mapping
+
+mapping allocate_mapping( int size );
+
+Returns a mapping with space for 'size' elements preallocated.
+
+For example:
+
+<pre>
+mapping x;
+int y = 200;
+
+x = allocate_mapping(y);
+</pre>
+
+where y is the initial size of the mapping.  Using allocate_mapping is
+the preferred way to initalize the mapping if you have some idea of how
+many elements the map will contain (200 in this case).  The reason is that
+allocating storage all at once is slightly more efficient.  Thus if
+you are using mappings to store a soul with 200 entries, the above
+initialization would be quite appropriate.  Note, that the
+above initialization does not restrict you to 200 entries.
+
+See also:
+ map_delete
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,18 @@
+<HEAD> <TITLE> clone_object - load a copy of an object </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> clone_object - load a copy of an object </H1> </center>
+<p>
+<b> object clone_object( string name, ... ); </b>
+<p>
+<b> object new( string name, ... ); </b>
+<p>
+Create a new object from the file 'name', and give it a new unique
+name (by adding #xxx on to the end of the name).  Returns the new object.
+The object shares the program of the object 'name', but has its own
+set of variables.  The second and following arguments are passed to
+create()
+<p>
+See also:
+<A HREF=destruct.html>  destruct </A>,
+<A HREF=move_object.html>  move_object </A>,
+<A HREF=new.html>  new </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

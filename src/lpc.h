@@ -69,8 +69,5 @@ typedef struct svalue_s {
 #define STRING_CONSTANT 0
 
 #define T_UNDEFINED     0x4	/* undefinedp() returns true */
-#define T_NULLVALUE     0x8	/* nullp() returns true */
-#define T_REMOTE        0x10	/* remote object (subtype of object) */
-#define T_ERROR         0x20	/* error code */
 
 #endif

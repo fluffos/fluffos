@@ -1,0 +1,19 @@
+geteuid - return the effective user id of an object or function
+
+string geteuid( object|function );
+
+This efun is only available if PACKAGE_UIDS is compiled into the driver.
+
+If given an object argument, geteuid returns the effective user id (euid)
+of the object.  If given an argument of type 'function', it returns the
+euid of the object that created that 'function' variable.  If the object,
+at the time of the function variable's construction, had no euid, the
+object's uid is stored instead.
+
+See also:
+ seteuid,
+ getuid,
+ export_uid,
+ valid_seteuid
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

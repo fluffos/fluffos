@@ -15,6 +15,12 @@ char *get_current_dir PROT((char *, int));
 #ifdef DRAND48
 double drand48 PROT((void));
 #endif
+#ifdef WIN32
+char *crypt(char *, char *);
+#endif
+#ifndef HAS_STRERROR
+char *port_strerror PROT((int));
+#endif
 #endif
 
 #endif

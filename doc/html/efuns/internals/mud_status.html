@@ -1,0 +1,16 @@
+<HEAD> <TITLE> mud_status - report various driver and mudlib statistics </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> mud_status - report various driver and mudlib statistics </H1> </center>
+<p>
+<b> string mud_status( int extra ); </b>
+<p>
+This function returns a string containing driver and mudlib statistics.
+If extra is non-zero, then additional information about various internal
+tables is included as well.  This efun replaces the hardcoded 'status'
+and 'status tables' commands in vanilla 3.1.2.
+<p>
+See also:
+<A HREF=debug_info.html>  debug_info </A>,
+<A HREF=dumpallobj.html>  dumpallobj </A>,
+<A HREF=memory_info.html>  memory_info </A>,
+<A HREF=../system/uptime.html>  uptime </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

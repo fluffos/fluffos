@@ -1,0 +1,12 @@
+rm - remove a file
+
+int rm( string file );
+
+Remove file `file'. Returns 0 for failure and 1 for success.
+
+See also:
+ mkdir,
+ rmdir,
+ link
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -7,11 +7,13 @@
  * Write statistics about objects on file.
  */
 
-static int sumSizes PROT((mapping_t *, mapping_node_t *, int *));
+static int sumSizes PROT((mapping_t *, mapping_node_t *, void *));
 static int svalue_size PROT((svalue_t *));
 
-static int sumSizes P3(mapping_t *, m, mapping_node_t *, elt, int *, t)
+static int sumSizes P3(mapping_t *, m, mapping_node_t *, elt, void *, tp)
 {
+    int *t = (int *)tp;
+
     *t += (svalue_size(&elt->values[0]) + svalue_size(&elt->values[1]));
     *t += sizeof(mapping_node_t);
     return 0;
@@ -32,13 +34,13 @@ static int svalue_size P1(svalue_t *, v)
     case T_CLASS:
 	/* first svalue is stored inside the array struct */
 	total = sizeof(array_t) - sizeof(svalue_t);
-	for (i = 0, total = 0; i < v->u.arr->size; i++) {
+	for (i = 0; i < v->u.arr->size; i++) {
 	    total += svalue_size(&v->u.arr->item[i]) + sizeof(svalue_t);
 	}
 	return total;
     case T_MAPPING:
 	total = sizeof(mapping_t);
-	mapTraverse(v->u.map, (int (*) ()) sumSizes, &total);
+	mapTraverse(v->u.map, sumSizes, &total);
 	return total;
     case T_FUNCTION:
 	{
@@ -84,7 +86,7 @@ int data_size P1(object_t *, ob)
     int total = 0, i;
 
     if (ob->prog) {
-	for (i = 0; i < (int) ob->prog->num_variables; i++) {
+	for (i = 0; i < (int) ob->prog->num_variables_total; i++) {
 	    total += svalue_size(&ob->variables[i]) + sizeof(svalue_t);
 	}
     }
@@ -100,7 +102,7 @@ void dumpstat P1(char *, tfn)
 
     fn = check_valid_path(tfn, current_object, "dumpallobj", 1);
     if (!fn) {
-	error("Invalid path '%s' for writing.\n", tfn);
+	error("Invalid path '/%s' for writing.\n", fn);
 	return;
     }
     f = fopen(fn, "w");

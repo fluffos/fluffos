@@ -1,0 +1,14 @@
+valid_object - allows control over which objects can be loaded
+
+int valid_object( object obj );
+
+After loading an object, the driver will call valid_object() with the newly
+created object as its argument, in the master object.  If the function
+exists, and returns 0, then the object will be destructed and the efun that
+caused it to load will error out.  If it does not exist, or returns 1, then
+loading will proceed as normal.  This is called before the object has a
+chance to execute any code, including create(), so not much should be
+assumed about the object except that file_name(obj) is valid.
+
+See also:
+ valid_override

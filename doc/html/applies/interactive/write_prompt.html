@@ -1,0 +1,9 @@
+<HEAD> <TITLE> write_prompt - called when the parser wants a prompt to be written. </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> write_prompt - called when the parser wants a prompt to be written. </H1> </center>
+<p>
+<b> void write_prompt(); </b>
+<p>
+If write_prompt is present in the player object, the driver will call it
+whenever the default prompt would normally be printed.  The driver will
+not call write_prompt when the player is in input_to or ed.
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

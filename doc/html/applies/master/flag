@@ -1,0 +1,14 @@
+flag - handle mudlib specific flags specified at driver startup
+
+void flag( string );
+
+This master apply is called for each command line
+option passed to the driver with the -f flag.  For example, invoking the
+driver via:
+
+./driver -fdebug
+
+will call flag("debug") in the master object during initialization.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

@@ -1,0 +1,27 @@
+socket_address - return the remote address for an efun socket
+
+string socket_address( int s | object ob );
+
+This efun is only available if PACKAGE_SOCKETS is compiled in.
+
+socket_address() returns the remote address for an efun socket s, or for
+an interactive object ob.
+
+The returned address is of the form:
+
+"127.0.0.1 23".
+
+socket_address() returns:
+
+a string format address on success.
+
+an empty string on failure.
+
+See also:
+ socket_connect,
+ socket_create,
+ resolve,
+ query_host_name,
+ query_ip_number
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,20 @@
+typeof - return the type of an expression
+
+int typeof( mixed var );
+
+Return the type of an expression.  The return values are given in
+the driver include "type.h".  They are:
+
+<pre>
+INT             "int"
+STRING  	"string"
+ARRAY   	"array"
+OBJECT  	"object"
+MAPPING         "mapping"
+FUNCTION        "function"
+FLOAT           "float"
+BUFFER          "buffer"
+CLASS		"class"
+</pre>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,14 @@
+all_inventory - return the inventory of an object
+
+object array all_inventory( object ob );
+
+This efun is only available if NO_ENVIRONMENT is not compiled into the driver.
+
+Returns an array of the objects contained inside of 'ob'.  If 'ob' is
+omitted, this_object() is used.
+
+See also:
+ deep_inventory,
+ environment
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -36,11 +36,7 @@
 #  define TRACEHB (current_heart_beat == 0 || (command_giver->interactive->trace_level & TRACE_HEART_BEAT))
 #endif
 
-#ifdef HAS_UNSIGNED_CHAR
 #define EXTRACT_UCHAR(p) (*(unsigned char *)(p))
-#else
-#define EXTRACT_UCHAR(p) (*p < 0 ? *p + 0x100 : *p)
-#endif				/* HAS_UNSIGNED_CHAR */
 
 /*
  * Control stack element.
@@ -63,7 +59,7 @@ typedef struct {
 #endif
     short framekind;
     union {
-	function_t *func;
+	int table_index;
 	funptr_t *funp;
     } fr;
     object_t *ob;		/* Current object */
@@ -77,6 +73,16 @@ typedef struct {
     int variable_index_offset;	/* Same */
     short caller_type;		/* was this a locally called function? */
 } control_stack_t;
+
+typedef struct {
+    object_t *ob;
+    union {
+	funptr_t *fp;
+	char *str;
+    } f;
+    int narg;
+    svalue_t *args;
+} function_to_call_t;
 
 typedef struct error_context_s {
     jmp_buf context;
@@ -92,8 +98,6 @@ typedef struct error_context_s {
 #define IS_ZERO(x) (!(x) || (((x)->type == T_NUMBER) && ((x)->u.number == 0)))
 #define IS_UNDEFINED(x) (!(x) || (((x)->type == T_NUMBER) && \
 	((x)->subtype == T_UNDEFINED) && ((x)->u.number == 0)))
-#define IS_NULL(x) (!(x) || (((x)->type == T_NUMBER) && \
-	((x)->subtype == T_NULLVALUE) && ((x)->u.number == 0)))
 
 #define CHECK_TYPES(val, t, arg, inst) \
   if (!((val)->type & (t))) bad_argument(val, t, arg, inst);
@@ -256,8 +260,8 @@ INLINE void push_object PROT((object_t *));
 INLINE void push_number PROT((int));
 INLINE void push_real PROT((double));
 INLINE void push_undefined PROT((void));
-INLINE void push_null PROT((void));
-INLINE void push_string PROT((char *, int));
+INLINE void copy_and_push_string PROT((char *));
+INLINE void share_and_push_string PROT((char *));
 INLINE void push_array PROT((array_t *));
 INLINE void push_refed_array PROT((array_t *));
 INLINE void push_buffer PROT((buffer_t *));
@@ -267,17 +271,21 @@ INLINE void push_refed_mapping PROT((mapping_t *));
 INLINE void push_class PROT((array_t *));
 INLINE void push_refed_class PROT((array_t *));
 INLINE void push_malloced_string PROT((char *));
+INLINE void push_shared_string PROT((char *));
 INLINE void push_constant_string PROT((char *));
 INLINE void pop_stack PROT((void));
 INLINE void pop_n_elems PROT((int));
 INLINE void pop_2_elems PROT((void));
 INLINE void pop_3_elems PROT((void));
-INLINE function_t *setup_inherited_frame PROT((function_t *));
+INLINE compiler_function_t *setup_inherited_frame PROT((int));
+char *function_name PROT((program_t *, int));
 void remove_object_from_stack PROT((object_t *));
 void setup_fake_frame PROT((funptr_t *));
 void remove_fake_frame PROT((void));
 void push_indexed_lvalue PROT((int));
 
+void process_efun_callback PROT((int, function_to_call_t *, int));
+svalue_t *call_efun_callback PROT((function_to_call_t *, int));
 char *type_name PROT((int c));
 void bad_arg PROT((int, int));
 void bad_argument PROT((svalue_t *, int, int, int));
@@ -290,8 +298,8 @@ svalue_t *safe_call_function_pointer PROT((funptr_t *, int));
 svalue_t *safe_apply PROT((char *, object_t *, int, int));
 void call___INIT PROT((object_t *));
 array_t *call_all_other PROT((array_t *, char *, int));
-char *function_exists PROT((char *, object_t *));
-void call_function PROT((program_t *, function_t *));
+char *function_exists PROT((char *, object_t *, int));
+void call_function PROT((program_t *, int));
 svalue_t *apply_master_ob PROT((char *, int));
 svalue_t *safe_apply_master_ob PROT((char *, int));
 void init_master PROT((char *));
@@ -323,11 +331,11 @@ void try_reset PROT((object_t *));
 
 void pop_context PROT((error_context_t *));
 void restore_context PROT((error_context_t *));
-void save_context PROT((error_context_t *));
+int save_context PROT((error_context_t *));
 
 void pop_control_stack PROT((void));
-INLINE function_t *setup_new_frame PROT((function_t *));
-INLINE void push_control_stack PROT((int, void *));
+INLINE compiler_function_t *setup_new_frame PROT((int));
+INLINE void push_control_stack PROT((int));
 
 void break_point PROT((void));
 

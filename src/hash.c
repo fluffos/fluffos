@@ -5,6 +5,7 @@
 #define EDIT_SOURCE
 #define NO_SOCKETS
 #define NO_OPCODES
+
 #include "std.h"
 
 static int T[] =

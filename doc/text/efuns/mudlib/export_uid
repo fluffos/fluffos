@@ -1,0 +1,16 @@
+export_uid - set the uid of another object
+
+int export_uid( object ob );
+
+This efun is only available if PACKAGE_UIDS is compiled in.
+
+Set the uid of 'ob' to the effective uid of this_object(). It is
+only possible when 'ob' has an effective uid of 0.
+
+See also:
+ seteuid,
+ getuid,
+ geteuid,
+ valid_seteuid
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

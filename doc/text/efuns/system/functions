@@ -1,0 +1,21 @@
+functions - list all the functions in a given object.
+
+string array functions(object, int default: 0);
+
+functions() can return two different things. If the second argument is
+0 (which it is by default) it will return an array containing the names
+of all the functions in the object passed as the first argument. If the
+second argument is non-zero, more information about each function is
+given. For a non-zero second argument, each array element contains
+the following:
+
+({ function_name, number_of_arguments, return_type, ... }). 
+
+Where the fourth and following elements are the argument types.  If
+the save_types pragma was not in effect when the function was compiled,
+number_of_arguments will be correct, but no types will be available.
+
+This efun is only available if PACKAGE_CONTRIB is defined in the
+options file.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

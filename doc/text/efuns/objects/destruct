@@ -1,0 +1,16 @@
+destruct - remove an object
+
+void destruct( object ob );
+
+Completely destroy and remove object 'ob'. After the call to destruct().
+If 'ob' is this_object(), execution will continue, but it is best to return
+a value immediately.  All pointers to the object in any variable or structure
+will immediately become zero.  move_or_destruct() is called in all the
+objects inside of the object being destructed.
+
+See also:
+ clone_object,
+ new,
+ move_or_destruct
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,22 @@
+<HEAD> <TITLE> resolve - resolve an internet address to domain name </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> resolve - resolve an internet address to domain name </H1> </center>
+<p>
+<b> int resolve( string address, string callback_func ); </b>
+<p>
+resolve() resolves `address', which should be an internet address in the form
+"127.0.0.1" or a domain name, into its domain name, or internet address.
+When the resolve is complete, `callback_func' will be called in the
+current object.  The form of the callback is:
+<p>
+void callback(string address, string resolved, int key);
+<p>
+`key' will match up with the number that the call to resolve() returned.
+`address' will be the domain name of the host, and `resolved' the dotted
+decimal ip address.  The unknown value will be 0 if the lookup failed.
+<p>
+See also:
+<A HREF=query_host_name.html>  query_host_name </A>,
+<A HREF=../sockets/socket_address.html>  socket_address </A>,
+<A HREF=query_ip_name.html>  query_ip_name </A>,
+<A HREF=query_ip_number.html>  query_ip_number </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

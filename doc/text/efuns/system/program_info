@@ -1,0 +1,11 @@
+program_info - returns information about program memory usage
+
+string program_info();
+
+string program_info(object ob);
+
+Returns a summary of the memory usage of the program for a given object.
+If no program is specified, a summary of the memory usage of all loaded
+programs is returned.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

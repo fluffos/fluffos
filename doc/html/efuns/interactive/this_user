@@ -1,0 +1,12 @@
+this_user - return the object representing the current interactive
+
+Return the object representing the user that caused the calling function
+to be called.  Note that this_user() may return a different value than
+this_object() even when called from within a user object.  If this_user
+is called as this_user(1) then the returned value will be the interactive
+that caused the calling function to be called.  this_user(1) may return
+a different value than this_user() in certain cases (such as when command()
+is used by an admin to force a user to perform some command).
+
+See also:
+ this_object

@@ -1,0 +1,13 @@
+set_malloc_mask - sets the mask controlling display of malloc debug info
+
+void set_malloc_mask( int mask );
+
+This efun is only available when PACKAGE_DEVELOP, DEBUGMALLOC and DEBUGMALLOC_EXTENSIONS are
+both defined in options.h at driver build time.  The mask controls what
+memory-related debugging information is displayed as the driver allocates
+and deallocates memory.  Read md.c in the driver source for more information.
+
+See also:
+ debugmalloc
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,7 @@
+random - return a pseudo-random number
+
+int random( int n );
+
+Return a pseudo-random number from the range [0 .. (n -1)] (inclusive).
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,17 @@
+telnet_suboption - process telnet suboptions
+
+void telnet_suboption( string buf );
+
+This apply is called on the interactive object with the parameter given
+by the SE telnet suboption, for mudlib defined processing.  Note that
+terminal type responses and window size responses are interpreted and
+sent to terminal_type() and window_size() respectively instead of going
+through telnet_suboption().
+
+The first byte of the buffer is typically a type descriptor,
+ie TELOPT_TTYPE. The next byte is a procession option, such
+as TELQUAL_IS.  Following this is the type dependent data.
+
+See also:  terminal_type,  window_size
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

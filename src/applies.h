@@ -33,6 +33,7 @@
 #define APPLY_MOVE                          "move_or_destruct"
 #define APPLY_NET_DEAD                      "net_dead"
 #define APPLY_OBJECT_NAME                   "object_name"
+#define APPLY_PARSER_ERROR_MESSAGE	    "parser_error_message"
 #define APPLY_PRELOAD                       "preload"
 #define APPLY_PRIVS_FILE                    "privs_file"
 #define APPLY_PROCESS_INPUT                 "process_input"

@@ -1,0 +1,16 @@
+external_start - start an external command
+
+int external_start(int which, string args, mixed read_cb, mixed write_cb, mixed close_cb);
+
+'which' specifies which of the 5 external commands specified in
+the config file to run.  'args' are the arguments to pass to the
+command.  The driver then starts up the specified command, and sets up
+an LPC socket to communicate with the input and output of the command.
+The file descriptor of the LPC socket is returned.
+
+See also:
+ time,
+ ctime,
+ localtime
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,10 @@
+<HEAD> <TITLE> terminal_type - inform the mudlib of the user's terminal type </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> terminal_type - inform the mudlib of the user's terminal type </H1> </center>
+<p>
+<b> void terminal_type( string term ); </b>
+<p>
+This apply is called on the interactive object with term set to the
+terminal type for the user, as reported by telnet negotiation.  If the
+user's client never responds (it's not telnet, for example) this will
+never be called.
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

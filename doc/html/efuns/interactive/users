@@ -1,0 +1,12 @@
+users - return an array of objects containing all interactive players
+
+object array users();
+
+Return an array of objects, containing all interactive players.
+
+See also:
+ livings,
+ children,
+ objects
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

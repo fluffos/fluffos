@@ -1,0 +1,12 @@
+restore_variable - restore value of a variable from a string 
+
+mixed restore_variable( string value );
+
+Restores an LPC value from a string.  The format used is the
+same format as save/restore_object.
+
+See also:
+ save_variable,
+ restore_object
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -30,7 +30,7 @@ static void config_init() {
 	config_int[i] = 0;
     }
     for (i = 0; i < NUM_CONFIG_STRS; i++) {
-	config_str[i] = "";
+	config_str[i] = 0;
     }
     
 }
@@ -50,7 +50,7 @@ static void read_config_file P1(FILE *, file)
 	    break;
 	if (!str)
 	    break;
-	len = strlen(str);
+	len = strlen(str); /* ACK! */
 	if (len > MAX_LINE_LENGTH) {
 	    fprintf(stderr, "*Error in config file: line too long:\n%s...\n", str);
 	    exit(-1);
@@ -120,6 +120,23 @@ static int scan_config_line P3(char *, fmt, void *, dest, int, required)
     return 1;
 }
 
+char *process_config_string(char *str) {
+    char *p = str;
+    char *q;
+    int n;
+    
+    while (*p && isspace(*p))
+	p++;
+    n = strlen(p);
+    if (!n) return alloc_cstring("", "config_file: blank string");
+
+    q = p + n - 1;
+    while (q > p && isspace(*q))
+	q--;
+    q[1] = 0;
+    return alloc_cstring(p, "process_config_string()");
+}
+
 void set_defaults P1(char *, filename)
 {
     FILE *def;
@@ -157,19 +174,19 @@ void set_defaults P1(char *, filename)
     p = CONFIG_STR(__GLOBAL_INCLUDE_FILE__) = alloc_cstring(tmp, "config file: gif");
 
     /* check if the global include file is quoted */
-    if (*p && *p != '\"' && *p != '<') {
+    if (*p && *p != '"' && *p != '<') {
 	char *ptr;
 
 	fprintf(stderr, "Missing '\"' or '<' around global include file name; adding quotes.\n");
 	for (ptr = p; *ptr; ptr++)
 	    ;
 	ptr[2] = 0;
-	ptr[1] = '\"';
+	ptr[1] = '"';
 	while (ptr > p) {
 	    *ptr = ptr[-1];
 	    ptr--;
 	}
-	*p = '\"';
+	*p = '"';
     }
 
     scan_config_line("name : %[^\n]", tmp, 1);
@@ -189,6 +206,8 @@ void set_defaults P1(char *, filename)
 #ifdef BINARIES
     scan_config_line("save binaries directory : %[^\n]", tmp, 1);
     CONFIG_STR(__SAVE_BINARIES_DIR__) = alloc_cstring(tmp, "config file: sbd");
+#else
+    CONFIG_STR(__SAVE_BINARIES_DIR__) = alloc_cstring("", "config file: sbd");
 #endif
 
     scan_config_line("master file : %[^\n]", tmp, 1);
@@ -225,8 +244,6 @@ void set_defaults P1(char *, filename)
     /*
      * not currently used...see options.h
      */
-    scan_config_line("maximum efun sockets : %d\n",
-		     &CONFIG_INT(__MAX_EFUN_SOCKS__), 0);
     scan_config_line("compiler stack size : %d\n",
 		     &CONFIG_INT(__COMPILER_STACK_SIZE__), 0);
     scan_config_line("evaluator stack size : %d\n", 
@@ -270,6 +287,7 @@ void set_defaults P1(char *, filename)
     scan_config_line("object table size : %d\n",
 		     &CONFIG_INT(__OBJECT_HASH_TABLE_SIZE__), 1);
 
+    /* check for ports */
     for (i = port_start; i < 5; i++) {
 	external_port[i].kind = 0;
 	external_port[i].fd = -1;
@@ -296,6 +314,16 @@ void set_defaults P1(char *, filename)
 	    }
 	}
     }		    
+#ifdef PACKAGE_EXTERNAL
+    /* check for commands */
+    for (i = 0; i < 5; i++) {
+	sprintf(kind, "external_cmd_%i : %%[^\n]", i + 1);
+	if (scan_config_line(kind, tmp, 0))
+	    external_cmd[i] = alloc_cstring(tmp, "external cmd");
+	else
+	    external_cmd[i] = 0;
+    }		    
+#endif
 
     FREE(buff);
     fclose(def);
@@ -303,7 +331,6 @@ void set_defaults P1(char *, filename)
     /*
      * from options.h
      */
-    config_int[__MAX_EFUN_SOCKS__ - BASE_CONFIG_INT] = CFG_MAX_EFUN_SOCKS;
     config_int[__COMPILER_STACK_SIZE__ - BASE_CONFIG_INT] = CFG_COMPILER_STACK_SIZE;
     config_int[__EVALUATOR_STACK_SIZE__ - BASE_CONFIG_INT] = CFG_EVALUATOR_STACK_SIZE;
     config_int[__MAX_LOCAL_VARIABLES__ - BASE_CONFIG_INT] = CFG_MAX_LOCAL_VARIABLES;

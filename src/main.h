@@ -16,6 +16,9 @@ typedef struct {
 } port_def_t;
 
 extern port_def_t external_port[5];
+#ifdef PACKAGE_EXTERNAL
+extern char *external_cmd[5];
+#endif
 
 #ifdef DEBUG
 extern int d_flag;
@@ -35,7 +38,6 @@ extern char *reserved_area;
 extern svalue_t const0;
 extern svalue_t const1;
 extern svalue_t const0u;
-extern svalue_t const0n;
 extern int st_num_arg;
 extern double consts[];
 extern int slow_shut_down_to_do;

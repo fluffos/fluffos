@@ -25,6 +25,7 @@ CFG=Win32 Debug
 
 ################################################################################
 # Begin Project
+# PROP Target_Last_Scanned "Win32 Debug"
 CPP=cl.exe
 RSC=rc.exe
 
@@ -46,9 +47,9 @@ ALL : $(OUTDIR)/edit_source.exe $(OUTDIR)/edit_source.bsc
 $(OUTDIR) : 
     if not exist $(OUTDIR)/nul mkdir $(OUTDIR)
 
-# ADD BASE CPP /nologo /ML /W3 /GX /YX /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /FR /c
-# ADD CPP /nologo /ML /W3 /GX /YX /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /FR /c
-CPP_PROJ=/nologo /ML /W3 /GX /YX /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE"\
+# ADD BASE CPP /nologo /W3 /GX /YX /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /FR /c
+# ADD CPP /nologo /W3 /GX /YX /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /FR /c
+CPP_PROJ=/nologo /W3 /GX /YX /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE"\
  /FR$(INTDIR)/ /Fp$(OUTDIR)/"edit_source.pch" /Fo$(INTDIR)/ /c 
 CPP_OBJS=.\WinRel/
 # ADD BASE RSC /l 0x409 /d "NDEBUG"
@@ -104,11 +105,11 @@ ALL : $(OUTDIR)/edit_source.exe $(OUTDIR)/edit_source.bsc
 $(OUTDIR) : 
     if not exist $(OUTDIR)/nul mkdir $(OUTDIR)
 
-# ADD BASE CPP /nologo /ML /W3 /GX /Zi /YX /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /FR /c
-# ADD CPP /nologo /W3 /GX /Zi /YX /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "WIN95" /D "EDIT_SOURCE" /FR /c
+# ADD BASE CPP /nologo /W3 /GX /Zi /YX /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /FR /c
+# ADD CPP /nologo /W3 /GX /Zi /YX /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "WIN95" /D "EDIT_SOURCE" /D "DEBUG" /FR /c
 CPP_PROJ=/nologo /W3 /GX /Zi /YX /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D\
- "WIN95" /D "EDIT_SOURCE" /FR$(INTDIR)/ /Fp$(OUTDIR)/"edit_source.pch"\
- /Fo$(INTDIR)/ /Fd$(OUTDIR)/"edit_source.pdb" /c 
+ "WIN95" /D "EDIT_SOURCE" /D "DEBUG" /FR$(INTDIR)/\
+ /Fp$(OUTDIR)/"edit_source.pch" /Fo$(INTDIR)/ /Fd$(OUTDIR)/"edit_source.pdb" /c 
 CPP_OBJS=.\WinDebug/
 # ADD BASE RSC /l 0x409 /d "_DEBUG"
 # ADD RSC /l 0x409 /d "_DEBUG"
@@ -188,6 +189,11 @@ DEP_MAKE_=\
 
 $(INTDIR)/make_func_tab.obj :  $(SOURCE)  $(DEP_MAKE_) $(INTDIR)
 
+# End Source File
+################################################################################
+# Begin Source File
+
+SOURCE=.\local_options
 # End Source File
 # End Group
 # End Project

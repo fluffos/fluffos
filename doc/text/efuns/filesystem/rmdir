@@ -1,0 +1,11 @@
+rmdir - remove a directory
+
+int rmdir( string dir );
+
+Remove directory `dir'. 
+Returns nonzero for success, zero (0) for failure.
+
+See also:
+ rm,
+ mkdir,
+ link

@@ -1,0 +1,16 @@
+<HEAD> <TITLE> set_debug_level - sets the debug level used by the driver's debug() macro </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> set_debug_level - sets the debug level used by the driver's debug() macro </H1> </center>
+<p>
+<b> void set_debug_level( int level ); </b>
+<p>
+This efun is only available when the driver is compiled with -DDEBUG_MACRO.
+The purpose of this efun is to allow the amount and type of debugging
+information produced to be controlled from within the mud (while the
+driver is running).
+<p>
+For more information, read the file debug.h which is included with the
+driver source.
+<p>
+See also:
+<A HREF=set_malloc_mask.html>  set_malloc_mask </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

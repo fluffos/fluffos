@@ -1,0 +1,43 @@
+<HEAD> <TITLE> sscanf - match substrings in a string </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> sscanf - match substrings in a string </H1> </center>
+<p>
+<b> int sscanf( string str, string fmt, mixed var1, mixed var2, ... ); </b>
+<p>
+Parse a string 'str' using the format 'fmt'.  The format 'fmt'
+consists of text to match against 'str', separated by patterns which
+begin with '%'.  The following patterns are supported:
+<p>
+<DL>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> '%%' - matches '%'
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> '%x' - matches a hexidecimal number
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> '%d' - matches a decimal number
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> '%f' - matches a floating point number
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> '%(regexp)' - matches anything that matches the regular
+expression 'regexp' (see the regexp() efun for details)
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> '%s' - matches a string; see below
+</DL>
+<p>
+Note that the third and following arguments are NOT expressions; they
+must be valid lvalues (locations which can be assigned to).  As
+matches are encountered in the string, the corresponding values are
+put directly into the third and following arguments.  If a problem
+is encountered (either some of the text between patterns doesn't
+match, or a pattern can't be matched to the corresponding input)
+the number of matches so far is returned, and the remaining arguments
+are left unchanged.  If a '*' comes immediately after the '%' in the
+format, then that pattern is matched, but not assigned to a variable.
+It is counted in the return value.
+<p>
+'%s' is handled as follows.  If it is followed by text, '%s' matches
+up the the next ocurrence of the text.  For example, the format
+"%sxy%s" will match "fox" to the first %s when used on the string
+"foxxybarxyz".  If the %s occurs at the end of the string, the
+remainder of the string is matched.  If it is followed immediately
+by another pattern, then %s matches up to the first valid match for
+the following pattern.  "%s%s" is illegal. 
+<p>
+See also:
+<A HREF=explode.html>  explode </A>,
+<A HREF=replace_string.html>  replace_string </A>,
+<A HREF=strsrch.html>  strsrch </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

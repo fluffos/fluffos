@@ -39,27 +39,16 @@
 /* SunOS is missing alot of prototypes ... */
 #if defined(sun) && !defined(SunOS_5) && defined(__STDC__)
 #  ifdef BUFSIZ
-     int fprintf(FILE *, char *,...);
      int fputs(char *, FILE *);
-     int fputc(char, FILE *);
      int fwrite(char *, int, int, FILE *);
      int fread(char *, int, int, FILE *);
 #  endif
-   int printf(char *,...);
    int sscanf(char *, char *,...);
    void perror(char *);
-/* Dseven says SunOS has a mkdir() prototype now.
-   int mkdir PROT((const char *, unsigned short));
-*/
    int system PROT((char *));
    int atoi PROT((const char *));
-   void abort PROT(());
-/* configure now finds the qsort prototype for sun
-   void qsort PROT((char *, int, int, int (*) ()));
-*/
    int setsockopt PROT((int, int, int, char *, int));
    int fseek PROT_STDIO((FILE *, long, int));
-   int wait PROT((int *));
    unsigned int alarm PROT((unsigned int));
    int ioctl PROT((int,...));
    extern int rename PROT((char *, char *));
@@ -73,28 +62,6 @@
 #endif
 
 #if !defined(SunOS_5) && !defined(NeXT)
-#  ifndef sgi
-#    ifndef LATTICE
-       int fclose PROT_STDIO((FILE *));
-#    endif
-     int pclose PROT_STDIO((FILE *));
-#  endif
-
-#  if !defined(LATTICE) && !defined(sgi)
-     int fflush PROT_STDIO((FILE *));
-     int fclose PROT_STDIO((FILE *));
-#  endif
-
-   int pipe PROT((int *));
-   int dup2 PROT((int, int));
-
-#  ifndef LATTICE
-     int close PROT((int));
-#  endif
-#  ifndef sgi
-     int _filbuf();
-#  endif
-
 #  ifdef sun
      char *_crypt PROT((char *, char *));
 #  endif
@@ -110,7 +77,7 @@
 #  endif
 
 /* SGI is missing some prototypes in the .h files */
-#ifdef LINT
+#ifdef PEDANTIC
 #  ifdef sgi
      void ualarm PROT((int, int));
 #  endif

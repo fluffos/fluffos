@@ -1,0 +1,12 @@
+Efuns relating to ints
+
+Pretty trivial stuff here
+
+<DL>
+*  intp
+*  nullp
+*  random
+*  to_float
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

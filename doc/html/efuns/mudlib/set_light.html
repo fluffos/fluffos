@@ -1,0 +1,17 @@
+<HEAD> <TITLE> set_light - update or query an object's light level </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> set_light - update or query an object's light level </H1> </center>
+<p>
+<b> int set_light( int light_level_adjustment ); </b>
+<p>
+This efun is only available if NO_LIGHT is not compiled in.
+<p>
+Passing 'light_level_adjustment' as 0 queries the object's current
+light level.  A positive number will increase the light level, while
+a negative number will decrease the light level.
+<p>
+Note that the object's current light level includes the light it sees from
+other objects.
+<p>
+This efun is provided mostly for backwards compatibility; it really should
+be handled by the mudlib.
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

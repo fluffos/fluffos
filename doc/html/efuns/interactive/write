@@ -1,0 +1,15 @@
+write() - send a message to current player
+
+void write( mixed str );
+
+Write a message `str' to current player. `str' can also be a number, which
+will be translated to a string.
+
+See also:
+ message,
+ tell_object,
+ tell_room,
+ shout,
+ say
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -309,7 +309,7 @@ static void init_author_for_ob P1(object_t *, ob)
 {
     svalue_t *ret;
 
-    push_string(ob->name, STRING_SHARED);
+    push_malloced_string(add_slash(ob->name));
     ret = apply_master_ob(APPLY_AUTHOR_FILE, 1);
     if (ret == (svalue_t *)-1) {
 	ob->stats.author = master_author;
@@ -355,7 +355,7 @@ static char *author_for_file P1(char *, file)
     svalue_t *ret;
     static char buff[50];
 
-    push_string(file, STRING_SHARED);
+    copy_and_push_string(file);
     ret = apply_master_ob(APPLY_AUTHOR_FILE, 1);
     if (ret == 0 || ret == (svalue_t*)-1 || ret->type != T_STRING)
 	return 0;
@@ -373,7 +373,6 @@ static void init_domain_for_ob P1(object_t *, ob)
     svalue_t *ret;
     char *domain_name;
     object_t *tmp_ob;
-    int err;
 
     if (master_ob == (object_t *)-1)
 	tmp_ob = ob;
@@ -396,7 +395,7 @@ static void init_domain_for_ob P1(object_t *, ob)
     /*
      * Ask master object who the creator of this object is.
      */
-    push_string(ob->name, STRING_SHARED);
+    push_malloced_string(add_slash(ob->name));
     if (!domain_file_fname)
 	domain_file_fname = make_shared_string(APPLY_DOMAIN_FILE);
     ret = apply(domain_file_fname, tmp_ob, 1, ORIGIN_DRIVER);
@@ -448,7 +447,7 @@ static char *domain_for_file P1(char *, file)
     svalue_t *ret;
     static char buff[50];
 
-    push_string(file, STRING_SHARED);
+    share_and_push_string(file);
     ret = apply_master_ob(APPLY_DOMAIN_FILE, 1);
     if (ret == 0 || ret == (svalue_t*)-1 || ret->type != T_STRING)
 	return 0;

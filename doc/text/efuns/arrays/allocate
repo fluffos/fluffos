@@ -1,0 +1,12 @@
+allocate - allocate an array
+
+array allocate( int size );
+
+Allocate an array of <size> elements.  The number of elements must be >= 0
+and not bigger than a system maximum (usually ~10000).  All elements are
+initialized to 0.
+
+See also:
+ sizeof,
+ allocate_mapping
+

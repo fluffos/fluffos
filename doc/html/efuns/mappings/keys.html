@@ -1,0 +1,27 @@
+<HEAD> <TITLE> keys - return an array of the keys from the (key, value) pairs in a mapping </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> keys - return an array of the keys from the (key, value) pairs in a mapping </H1> </center>
+<p>
+<b> array keys( mapping m ); </b>
+<p>
+keys() returns an array of keys (indices) corresponding to the keys in
+the (key, value) pairs stored in the mapping m.
+<p>
+For example, if:
+<p>
+<pre>
+mapping m;
+m = (["hp" : 35, "sp" : 42, "mass" : 100]);
+</pre>
+<p>
+then
+<p>
+<pre>
+keys(m) == ({"hp", "sp", "mass"})
+</pre>
+<p>
+Note: the keys will not be returned in any apparent order.  However, they
+will be returned in the same order as the corresponding values (returned
+by the values() efun).
+<p>
+See also:
+<A HREF=values.html>  values </A>
+<p>

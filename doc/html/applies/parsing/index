@@ -1,0 +1,12 @@
+Parsing applies
+
+These are the applies used by the parse_command() efun, and also the new
+parsing package:
+
+<DL>
+*  parse_command_adjectiv_id_list
+*  parse_command_id_list
+*  parse_command_plural_id_list
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

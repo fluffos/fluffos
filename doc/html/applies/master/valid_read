@@ -1,0 +1,14 @@
+valid_read - checks if a certain person has read permission on a file
+
+int valid_read( string file, object user, string func );
+
+Every time an object tries to read a file, the driver calls valid_read
+in the master object to check if the read should be allowed.  The
+arguments are the filename, the object making the read, and
+the calling function name.  If valid_read returns non-zero, the read is
+allowed.
+
+See also:
+ valid_write
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,70 +1,210 @@
+This file is the *brief* version of what has been changed; see
+ChangeLog.alpha, ChangeLog.beta, and ChangeLog.old/ for all the gory
+details.
+
+(pre-v22 changes)
+      * new options:
+	. NO_RESETS
+	. added a COMPAT_32 option, which tweaks a few things to allow	
+	  some 3.2/3.2.1 code to be ported easier
+	. added REVERSIBLE_EXPLODE_STRING
+	. added CALLOUT_HANDLES; see v22a28 for details.  Allows a specific
+	  call_out to be tracked and removed instead of having to specify
+	  the function name.
+	. Added a FLUSH_OUTPUT_IMMEDIATELY option, which disables buffering
+	  of output.  Useful for debugging.
+      * features:
+	. It is legal to define variables in foreach() statements, e.g.:
+	  foreach (string x, object y in z)
+	. various indexing error messages are now more information
+	. many changes/improvements to the parsing package
+	. added a package for running/communicating with external commands
+	  (tar, gzip, etc)  See the v22a15 entry for details.
+	. carriage returns are now considered white space by the parser,
+	  so DOS style files don't cause errors
+	. new(class X) can now specify values for the members.  Examples:
+	  class foo { int x; string y; }
+	  class foo f1 = new(class foo, x : 5);
+	  class foo f2 = new(class foo, y : "foo", x : 1);
+	. added named_livings() contrib efun, which is faster than livings(),
+	  but only finds livings which have called set_living_name().
+	. bind(f, ob) now always succeeds if f is already bound to ob
+	. function(...) { ... } is now rebindable if it does not reference
+	  local functions or global variables
+	. the message of message() may be of any type
+	. replaceable now can be optionally passed a second array argument
+	  which is a list of function names to ignore; if the second arg
+	  is left out, ({ "create" }) is assumed, which gives the old
+	  behavior.
+	. made the message queue flushing a bit lazier which should result
+	  in smoother output and larger packet sizes
+	. added a flush_messages(void | object) efun for manually flushing
+	  message queues (during a long thread of execution, for example)
+	. \012 octal codes and \x1e hex codes are now allowed in string
+	  and character constants
+	. added a classp() efun
+	. fixed sort_array() to work correctly when called from inside
+	  itself
+	. added repeat_string() contrib efun.  Example:
+	  repeat_string("-=", 10) == "-=-=-=-=-=-=-=-"
+	. added a memory_summary() contrib efun, which returns a mapping
+	  of with entries: map["program name"]["variable name"]
+	  Each entry contains the number of bytes used by that variable in
+	  all active instances of that program.  The size of shared structures
+	  is divided up evenly between all values that reference it.
+	. terminal_colour() now has two more optional args; the 3rd is the
+	  width to wrap at, and the 4th is the indent for lines after the
+	  first
+	. characters in user input with the 8th bit set are no longer ignored
+	. function_exists(string, object, flag); if flag is nonzero, private
+	  and static functions are checked too.
+	. SIGUSR2 will now cause the driver to eval out immediately
+      * optimizations:
+	. sprintf() is about 3 times faster than it used to be
+	. optimized present(), terminal_colour()
+	. call_out() is now O(1), not O(n)
+	. function tables are sorted, so they can be searched in O(log n)
+	  time instead of O(n).  Speeds up call_other(), function_exists(),
+	  etc.
+      * memory usage:
+	. fixed leaks in call_out(), illegal arguments to call_stack(),
+	  errors in id()
+	. function overhead is now 15 bytes per function defined and 5 bytes
+	  per function inherited, not 14 bytes for both.  Typically cuts
+	  function memory usage in half or more, also:
+	. if COMPRESS_FUNCTION_TABLES is defined, the function tables are
+	  compressed even further (estimated compression: 2-3x) at the cost
+	  of slowing down function calls slightly (seems to be <10%)
+	. variable information is now stored only in the program in which
+	  the variable is defined; estimated compression ratio is about
+	  10:1 on typical libs
+      * bug fixes:
+	. testsuite now compiles with almost any option settings
+	. sprintf()'s %O handles recursive structures gracefully
+	. many fixes to center/left justification in sprintf
+	. function arguments and variables no longer may be of type 'void'
+	. leading and trailing whitespace in the config file is now ignored
+	. switch (...) { case 0: function() { break; }; },
+	  while (...) { function() { continue; }; },
+	  while (...) { e = catch { break; } }
+	  and similar pathological code is no longer allowed.
+	. message() now behaves correctly when called from inside 
+	  recieve_message() [i.e. recursively]
+	. a number of changes to $() notation.  See v22a38.
+	. several fixes to sscanf(): format strings ending in %, %% as
+	  the last pattern
+	. fixed socket_close() to not close sockets immediately when data
+	  is buffered internally; this adds a new socket state 'CLOSING'
+	  which will transparently change to 'CLOSED' when the data has
+	  been written.
+	. cleaned up the disk full logic a bit; also added error checking
+	  on the fclose(), which apparently the call that usually errors.
+	  should prevent .o files from getting lost when the disk is full
+	. fixed read_file() to return "" and not 0 for zero-length files
+	. sending a SIGUSR2 to the mud will now cause it to eval out; temporary
+	  fix until eval_cost gets rewritten.
+	. sscanf() no longer errors on some legal uses of %%
+      * crasher fixes:
+	. removing heart_beats during a heart_beat()
+	. lots in the parsing package
+	. extremely long tables in sprintf(), negative field widths, etc,
+	  etc, etc
+	. recursive structures in error traces
+	. function_owner()
+	. unterminated @ and @@ blocks
+	. some too deep recursion errors
+	. mapping composition
+	. quite a number of other rare ones
+      * COMPAT_BUSTERS:
+	. previous_object() is now 0 in heart_beat()
+	. the scope of variables defined in for() and foreach() is inside
+	  the loop ONLY; it used to extend to the end of the function
+	. "%^" is no longer considered "special" by sprintf(); see
+	  terminal_colour() if you want to wrap strings containing it.
+	. removed break_string(), process_string(), process_value().
+	  See compat/simuls/ for replacements
+	. call_stack(3) now uses strings, like origin()
+	. call_out_info() elements now have only 3 elements,
+	  not 4; this is due to argument handling restructuring, as well
+	  as mild security concerns for reference types.  Maybe an option
+	  will be added to get the arguments at a latter date if it is
+	  desired.
+	. all inherits must now precede all global variable definitions
+	. Added slashes to the front of many object/program names.  The most
+	  noteworthy are: deep_inherit_list(), inherit_list(), call_stack(),
+	  names passed to author_file(), domain_file(), privs_file(),
+	  creator_file(), a few error messages and tons of debug messages
+	. The third argument passed to valid_override() now has a leading
+	  slash
+	. The filename passed to compile_object() has a leading slash
+
 Thu May 30 14:35:06 EDT 1996 (tim@wfn-shop.princeton.edu (Beek))
-	* bumped version number to v21.7
-	* new options:
-	  . NO_ENVIRONMENT
-	* features:
-	  . destruct()'ing the master or simul_efun object now fails if a
-	    new copy can't be loaded, leaving the old copy loaded
-	  . copy() supports classes
-	  . the simul_efun object is optional; simply don't specify one in
-	    the runtime config file if you don't want one
-	  . outside functions, "modifier:" can be used to make all
-	    functions, variables, and inherits automatically include
-	    "modifier" until the next such definition.  For example,
-	    "private static:" makes all definitions that follow it both
-	    private and static
-	  . ed ranges can now extend past the end of the file; any line #
-	    larger than the last one refers to the last line
-	  . foreach (int in string)
-	  . preliminary Windows 95 support, though I'd recommend using
-	    a v22 beta instead
-	* new warnings:
-	  . return type doesn't match prototype
-	* contrib efuns:
-	  . query_ip_port(), for figuring out which of the external ports
-	    an interactive object connected to (the port number is also
-	    passed to connect; this causes it to be stored internally)
-	* optimizations:
-	  . better code generation for some loops, empty blocks in if
-	    statements, x[y..<1], elimination of expressions with no
-	    side effects
-	  . sprintf() is significantly faster
-	  . most mapping operations are significantly faster
-	* memory usage:
-	  . mapping memory is down about 20%
-	* bug fixes:
-	  . A number of bugs which allowed private functions to be called
-	    were removed
-	  . problems with comments in long #define's
-	  . various problems with the 'array' keyword
-	  . testsuite works again
-	  . literally hundreds of fixes to the parsing package, though
-	    if you use it I'd suggest using a v22 beta instead.
-	  . ranlib is run on subdirectory archives, for systems that need it
-	  . using the values of (void) efuns in some cases
-	  . ... syntax varargs expansion in some cases
-	  . several bug fixes in macro expansion
-	  . @@ blocks work again
-	  . a few crasher and leak fixes in parse_command()
-	  . query_verb() returns the entire verb even when only part of it
-	    was matched again
-	  . SIGFPE and SIGPIPE no longer take down the driver on some
-	    systems
-	  . case 0 now works in string switches again
-	  . (int constant)/(real constant) is a real, not an int
-	  . the telnet option code is more robust to protect against buggy
-	    telnet clients
-	  . a number of other fixes for rare crashers
-	* COMPAT_BUSTERS:
-	  . the each() efun is gone.  Use foreach().
-	* minor changes:
-	  . objects with environments may be cloned
-	* LPC->C:
-	  . valid_compile_to_c() in the master object now controls the use
-	    of generate_source()
-	  . RUNTIME_LOADING works if your system supports dlopen()/dlsym();
-	    see ChangeLog.alpha:v21.7a1 for details
-	
+      * bumped version number to v21.7
+      * new options:
+        . NO_ENVIRONMENT
+      * features:
+        . destruct()'ing the master or simul_efun object now fails if a
+          new copy can't be loaded, leaving the old copy loaded
+        . copy() supports classes
+        . the simul_efun object is optional; simply don't specify one in
+          the runtime config file if you don't want one
+        . outside functions, "modifier:" can be used to make all
+          functions, variables, and inherits automatically include
+          "modifier" until the next such definition.  For example,
+          "private static:" makes all definitions that follow it both
+          private and static
+        . ed ranges can now extend past the end of the file; any line #
+          larger than the last one refers to the last line
+        . foreach (int in string)
+        . preliminary Windows 95 support, though I'd recommend using
+          a v22 beta instead
+      * new warnings:
+        . return type doesn't match prototype
+      * contrib efuns:
+        . query_ip_port(), for figuring out which of the external ports
+          an interactive object connected to (the port number is also
+          passed to connect; this causes it to be stored internally)
+      * optimizations:
+        . better code generation for some loops, empty blocks in if
+          statements, x[y..<1], elimination of expressions with no
+          side effects
+        . sprintf() is significantly faster
+        . most mapping operations are significantly faster
+      * memory usage:
+        . mapping memory is down about 20%
+      * bug fixes:
+        . A number of bugs which allowed private functions to be called
+          were removed
+        . problems with comments in long #define's
+        . various problems with the 'array' keyword
+        . testsuite works again
+        . literally hundreds of fixes to the parsing package, though
+          if you use it I'd suggest using a v22 beta instead.
+        . ranlib is run on subdirectory archives, for systems that need it
+        . using the values of (void) efuns in some cases
+        . ... syntax varargs expansion in some cases
+        . several bug fixes in macro expansion
+        . @@ blocks work again
+        . a few crasher and leak fixes in parse_command()
+        . query_verb() returns the entire verb even when only part of it
+          was matched again
+        . SIGFPE and SIGPIPE no longer take down the driver on some
+          systems
+        . case 0 now works in string switches again
+        . (int constant)/(real constant) is a real, not an int
+        . the telnet option code is more robust to protect against buggy
+          telnet clients
+        . a number of other fixes for rare crashers
+      * COMPAT_BUSTERS:
+        . the each() efun is gone.  Use foreach().
+      * minor changes:
+        . objects with environments may be cloned
+      * LPC->C:
+        . valid_compile_to_c() in the master object now controls the use
+          of generate_source()
+        . RUNTIME_LOADING works if your system supports dlopen()/dlsym();
+          see ChangeLog.alpha:v21.7a1 for details
+
 Fri Oct  6 18:58:01 EDT 1995 (tim@handel.princeton.edu (Beek))
 	* bumped version number to v21.6
 	* LPC->C support:

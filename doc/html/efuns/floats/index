@@ -1,0 +1,22 @@
+Float Efuns
+
+The following efuns provide general math library functions.
+
+<DL>
+*  acos
+*  asin
+*  atan
+*  ceil
+*  cos
+*  exp
+*  floatp
+*  floor
+*  log
+*  pow
+*  sin
+*  sqrt
+*  tan
+*  to_int
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

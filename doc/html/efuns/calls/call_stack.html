@@ -1,0 +1,14 @@
+<HEAD> <TITLE> call_stack - returns information about the functions involved in calling this function </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> call_stack - returns information about the functions involved in calling this function </H1> </center>
+<p>
+<b> array call_stack(int); </b>
+<p>
+If the int argument is 0, call_stack() returns an array of the names of the
+on the call stack, with the first one being the most recent (i.e. the
+currently running program).  If the int argument is 1, call_stack returns
+the objects in which that program is executing.  If it is 2, the name
+of the functions are returned.  If it is 3, the value of origin() in that
+frame is returned.
+<p>
+See also:
+<A HREF=previous_object.html>  previous_object </A>,
+<A HREF=origin.html>  origin </A>

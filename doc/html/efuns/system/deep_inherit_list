@@ -1,0 +1,12 @@
+deep_inherit_list - get a list of ancestors of an object
+
+string array deep_inherit_list( object obj );
+
+Returns an array of filenames of all objects inherited (directly and
+indirectly) by obj.
+
+See also:
+ inherit_list,
+ inherits
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

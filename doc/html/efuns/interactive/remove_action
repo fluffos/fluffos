@@ -1,0 +1,18 @@
+remove_action - unbind a command verb from a local function
+
+int remove_action( string fun, string cmd );
+
+This efun is only available if NO_ADD_ACTION is not compiled in.
+
+remove_action() unbinds a verb cmd from an object function fun. Basically,
+remove_action() is the complement to add_action(). When a
+verb is no longer required, it can be unbound with remove_action().
+
+remove_action() returns 1 on success and 0 on failure.
+
+See also:
+ add_action,
+ query_verb,
+ init
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

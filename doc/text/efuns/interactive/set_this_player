@@ -1,0 +1,15 @@
+set_this_player - change the value of the current command giver.
+
+void set_this_player(object);
+
+This function changes the value of what this_player() returns during the
+current execution. If the argument is an object, this_player() will return
+the argument object. If it is an int, this_player() will return 0.
+
+This function requires the NO_ADD_ACTION option be defined in the
+options file.
+
+See also:
+ this_player
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

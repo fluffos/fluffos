@@ -1,0 +1,18 @@
+valid_seteuid - secures the use of seteuid
+
+int valid_seteuid( object obj, string euid );
+
+This routine is only used if PACKAGE_UIDS is defined.
+
+The driver calls valid_seteuid(ob, euid) in the master object from inside the
+seteuid(euid) efunction.  If valid_seteuid() returns 0, then the seteuid()
+call will fail.  If valid_seteuid() returns 1, then the seteuid() will
+succeed.  
+
+See also:
+ seteuid,
+ geteuid,
+ getuid,
+ export_uid
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

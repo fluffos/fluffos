@@ -1,0 +1,16 @@
+<HEAD> <TITLE> external_start - start an external command </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> external_start - start an external command </H1> </center>
+<p>
+<b> int external_start(int which, string args, mixed read_cb, mixed write_cb, mixed close_cb); </b>
+<p>
+'which' specifies which of the 5 external commands specified in
+the config file to run.  'args' are the arguments to pass to the
+command.  The driver then starts up the specified command, and sets up
+an LPC socket to communicate with the input and output of the command.
+The file descriptor of the LPC socket is returned.
+<p>
+See also:
+<A HREF=../sockets/socket_create.html>  time </A>,
+<A HREF=../sockets/socket_read.html>  ctime </A>,
+<A HREF=../sockets/socket_write.html>  localtime </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

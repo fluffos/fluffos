@@ -1,0 +1,11 @@
+Function efuns
+
+These efuns are for use with function pointers.
+
+<DL>
+*  bind
+*  evaluate
+*  functionp
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

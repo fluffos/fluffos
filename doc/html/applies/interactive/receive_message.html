@@ -1,0 +1,17 @@
+<HEAD> <TITLE> receive_message - provides the interface used by the message efun. </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> receive_message - provides the interface used by the message efun. </H1> </center>
+<p>
+<b> void receive_message( mixed cl, mixed message ); </b>
+<p>
+The message() efun calls this method in the player object.  The cl
+parameter is typically used to indicate the class (say, tell, emote,
+combat, room description, etc) of the message.  The receive_message() 
+apply together with the message() efun can provide a good mechanism for
+interfacing with a "smart" client.
+<p>
+See also:
+<A HREF=catch_tell.html>  catch_tell </A>,
+<A HREF=../../efuns/interactive/message.html>  message </A>,
+<A HREF=../../efuns/interactive/receive.html>  receive </A>,
+<A HREF=receive_snoop.html>  receive_snoop </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

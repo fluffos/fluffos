@@ -1,0 +1,43 @@
+sscanf - match substrings in a string
+
+int sscanf( string str, string fmt, mixed var1, mixed var2, ... );
+
+Parse a string 'str' using the format 'fmt'.  The format 'fmt'
+consists of text to match against 'str', separated by patterns which
+begin with '%'.  The following patterns are supported:
+
+<DL>
+* '%%' - matches '%'
+* '%x' - matches a hexidecimal number
+* '%d' - matches a decimal number
+* '%f' - matches a floating point number
+* '%(regexp)' - matches anything that matches the regular
+expression 'regexp' (see the regexp() efun for details)
+* '%s' - matches a string; see below
+</DL>
+
+Note that the third and following arguments are NOT expressions; they
+must be valid lvalues (locations which can be assigned to).  As
+matches are encountered in the string, the corresponding values are
+put directly into the third and following arguments.  If a problem
+is encountered (either some of the text between patterns doesn't
+match, or a pattern can't be matched to the corresponding input)
+the number of matches so far is returned, and the remaining arguments
+are left unchanged.  If a '*' comes immediately after the '%' in the
+format, then that pattern is matched, but not assigned to a variable.
+It is counted in the return value.
+
+'%s' is handled as follows.  If it is followed by text, '%s' matches
+up the the next ocurrence of the text.  For example, the format
+"%sxy%s" will match "fox" to the first %s when used on the string
+"foxxybarxyz".  If the %s occurs at the end of the string, the
+remainder of the string is matched.  If it is followed immediately
+by another pattern, then %s matches up to the first valid match for
+the following pattern.  "%s%s" is illegal. 
+
+See also:
+ explode,
+ replace_string,
+ strsrch
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,74 @@
+<HEAD> <TITLE> socket_accept - accept a connection on a socket </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> socket_accept - accept a connection on a socket </H1> </center>
+<p>
+<b> int socket_accept( int s, string | function read_callback, string | function write_callback ); </b>
+<p>
+This efun is only available if PACKAGE_SOCKETS is compiled in.
+<p>
+The argument s is a socket that has been created with socket_create(),
+bound to an address with socket_bind(), and is listening for connections
+after a socket_listen(). socket_accept() extracts the first connection
+on the queue of pending connections, creates a new socket with the same
+properties of s and allocates a new file descriptor for the socket. If no
+pending connections are present on the queue, socket_accept() returns an
+error as described below. The accepted socket is used to read and write data
+to and from the socket which connected to this one; it is not used to accept
+more connections. The original socket s remains open for accepting further
+connections.
+<p>
+The argument read_callback is the function or name of a function
+for the driver to call when the new socket (not the accepting socket)
+receives data.
+<p>
+The write callback should follow this format:
+<p>
+<pre>
+void read_callback(int fd)
+</pre>
+<p>
+Where fd is the socket which is ready to accept data.
+<p>
+The argument write_callback is the name of a function for the driver to
+call when the new socket (not the accepting socket) is ready to be
+written to. The write callback should follow this format:
+<p>
+<pre>
+void write_callback(int fd)
+</pre>
+<p>
+Where fd is the socket which is ready to be written to.
+<p>
+Note: The close_callback of the accepting socket (not the new socket)
+is called if the new socket closes unexpectedly, i.e. not as the result
+of a socket_close() call. The close callback should follow this format:
+<p>
+<pre>
+void close_callback(int fd)
+</pre>
+<p>
+Where fd is the socket which has closed.
+<p>
+socket_accept() returns a non-negative descriptor for the accepted
+socket on success. On failure, it returns a negative value. socket_error()
+can be used on the return value to get a text description of the error.
+<p>
+ERRORS - these definitions are in socket_err.h
+<p>
+<DL>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEFDRANGE Descriptor out of range.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEBADF Descriptor is invalid.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EESECURITY Security violation attempted.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEMODENOTSUPP Socket mode not supported.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EENOTLISTN Socket not listening.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEWOULDBLOCK Operation would block.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEINTR Interrupted system call.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEACCEPT Problem with accept.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EENOSOCKS No more available efun sockets.
+</DL>
+<p>
+See also:
+<A HREF=socket_bind.html>  socket_bind </A>,
+<A HREF=socket_connect.html>  socket_connect </A>,
+<A HREF=socket_create.html>  socket_create </A>,
+<A HREF=socket_listen.html>  socket_listen </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

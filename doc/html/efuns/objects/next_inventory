@@ -1,0 +1,14 @@
+next_inventory - return the next object in the same inventory
+
+object next_inventory( object ob );
+
+This efun is only available if NO_ENVIRONMENT is not compiled in.
+
+Return the next object in the same inventory as 'ob'.
+
+See also:
+ first_inventory,
+ all_inventory,
+ deep_inventory
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

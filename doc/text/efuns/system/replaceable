@@ -1,0 +1,23 @@
+replaceable - determine whether any functions are defined in at this level
+
+int replaceable(object ob);
+
+int replaceable(object ob, string array fnames);
+
+In the second form, return 0 if the program for object ob defines any
+functions explicitly, as opposed to simply inheriting.  Function names
+in the array fnames are ignored.  If no such functions are defined, 1
+is returned.  If the second argument is omitted, it defaults to
+({ "create" }).  The purpose of this efun is to assist in making
+automatic decisions on whether to call replace_program().  Note that
+the default version ignores create(), so it is only safe to replace a
+object for which replaceable() returns true if you never intend to
+clone from that object.
+
+See also:
+ replace_program,
+ functions,
+ function_exists,
+ inherit_list
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,14 @@
+asin - return the arcsine of a float
+
+float asin( float f );
+
+This efun is only available if PACKAGE_MATH is compiled in.
+
+Returns the arcsine of its argument, `f', measured in radians.
+
+See also:
+ acos,
+ atan,
+ cos,
+ sin,
+ tan

@@ -1,0 +1,17 @@
+<HEAD> <TITLE> write_buffer - write a buffer to a file or read into a buffer from a source </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> write_buffer - write a buffer to a file or read into a buffer from a source </H1> </center>
+<p>
+<b> int write_buffer(mixed dest, int start, mixed source ); </b>
+<p>
+If `dest' is a file, then `source' must be an int (and will be written to
+the file in network-byte-order), a buffer, or a string, and `source' will
+be written to the file `dest' starting at byte # `start'.
+<p>
+If `dest' is a buffer, then `source' will be written into the buffer starting
+at byte # `start' in the buffer.  If `source' is an int, it will be written
+in network-byte-order.
+<p>
+See also:
+<A HREF=read_buffer.html>  read_buffer </A>,
+<A HREF=allocate_buffer.html>  allocate_buffer </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

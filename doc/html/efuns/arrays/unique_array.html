@@ -1,0 +1,33 @@
+<HEAD> <TITLE> unique_array - partitions an array of objects into groups </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> unique_array - partitions an array of objects into groups </H1> </center>
+<p>
+<b> array unique_array(object array obarr, string separator); </b>
+<p>
+<b> array unique_array(object array obarr, string separator, mixed skip); </b>
+<p>
+<b> array unique_array(array arr, function f); </b>
+<p>
+<b> array unique_array(array arr, function f, mixed skip); </b>
+<p>
+Groups objects/values together for which the `separator' function
+returns the same value.  In the first case, "separator" is a string function
+name to try on each object.  In the second case, the function f is called
+with the element as the argument.  If 'skip' is passed, elements for which
+the separator function returns the same as 'skip' are omitted from the
+return value.
+<p>
+The return value is an array of arrays of the form:
+<pre>
+     ({
+         ({Same1:1, Same1:2, Same1:3, .... Same1:N }),
+         ({Same2:1, Same2:2, Same2:3, .... Same2:N }),
+         ({Same3:1, Same3:2, Same3:3, .... Same3:N }),
+                       ....
+                       ....
+         ({SameM:1, SameM:2, SameM:3, .... SameM:N }),
+     })
+</pre>
+<p>
+i.e. an array of arrays, where each of the elements in the sub arrays returned
+the same value as the other elements in the same sub array.
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

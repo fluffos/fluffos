@@ -1,0 +1,16 @@
+command - execute a command as if given by the object
+
+int command( string str );
+
+This efun is only available if NO_ADD_ACTION isn't defined.
+
+Execute 'str' for the object this_object() as a command (matching against
+add_actions and such).  The object must have called enable_commands() for
+this to have any effect.
+In case of failure, 0 is returned, otherwise a numeric value is returned,
+which is the LPC "evaluation cost" of the command.  Bigger numbers mean
+higher cost, but the whole scale is subjective and unreliable.
+
+See also:
+ add_action,
+ enable_commands

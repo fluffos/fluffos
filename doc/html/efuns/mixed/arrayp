@@ -1,0 +1,8 @@
+arrayp - determine whether or not a given variable is an array
+
+int arrayp( mixed arg );
+
+Return 1 if `arg' is an array, zero otherwise.
+
+See also:
+ typeof

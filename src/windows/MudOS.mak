@@ -48,9 +48,9 @@ $(OUTDIR) :
     if not exist $(OUTDIR)/nul mkdir $(OUTDIR)
 
 # ADD BASE CPP /nologo /W3 /GX /YX /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /FR /c
-# ADD CPP /nologo /W3 /GX /YX /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /FR /c
-CPP_PROJ=/nologo /W3 /GX /YX /O2 /D "WIN32" /D "NDEBUG" /D "_CONSOLE"\
- /FR$(INTDIR)/ /Fp$(OUTDIR)/"MudOS.pch" /Fo$(INTDIR)/ /c 
+# ADD CPP /nologo /G4 /MT /W3 /GX /YX /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "WIN95" /FR /c
+CPP_PROJ=/nologo /G4 /MT /W3 /GX /YX /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D\
+ "WIN95" /FR$(INTDIR)/ /Fp$(OUTDIR)/"MudOS.pch" /Fo$(INTDIR)/ /c 
 CPP_OBJS=.\WinRel/
 # ADD BASE RSC /l 0x409 /d "NDEBUG"
 # ADD RSC /l 0x409 /d "NDEBUG"
@@ -105,7 +105,6 @@ BSC32_SBRS= \
 	$(INTDIR)/disassembler.sbr \
 	$(INTDIR)/binaries.sbr \
 	$(INTDIR)/replace_program.sbr \
-	$(INTDIR)/functab_tree.sbr \
 	$(INTDIR)/ccode.sbr \
 	$(INTDIR)/cfuns.sbr \
 	$(INTDIR)/compile_file.sbr \
@@ -114,9 +113,11 @@ BSC32_SBRS= \
 	$(INTDIR)/develop.sbr \
 	$(INTDIR)/math.sbr \
 	$(INTDIR)/interface.sbr \
-	$(INTDIR)/mudlib_stats.sbr \
 	$(INTDIR)/hash.sbr \
-	$(INTDIR)/efuns_port.sbr
+	$(INTDIR)/efuns_port.sbr \
+	$(INTDIR)/mallocwrapper.sbr \
+	$(INTDIR)/parser.sbr \
+	$(INTDIR)/crypt.sbr
 
 $(OUTDIR)/MudOS.bsc : $(OUTDIR)  $(BSC32_SBRS)
     $(BSC32) @<<
@@ -125,11 +126,12 @@ $(OUTDIR)/MudOS.bsc : $(OUTDIR)  $(BSC32_SBRS)
 
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /NOLOGO /SUBSYSTEM:console /MACHINE:I386
-# ADD LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /NOLOGO /SUBSYSTEM:console /MACHINE:I386
-LINK32_FLAGS=kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib\
- advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib\
- odbccp32.lib /NOLOGO /SUBSYSTEM:console /INCREMENTAL:no\
- /PDB:$(OUTDIR)/"MudOS.pdb" /MACHINE:I386 /OUT:$(OUTDIR)/"MudOS.exe" 
+! # ADD LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib wsock32.lib /NOLOGO /VERSION:22,32 /SUBSYSTEM:console /PDB:none /MACHINE:I386
+! # SUBTRACT LINK32 /DEBUG
+  LINK32_FLAGS=kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib\
+   advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib\
+!  odbccp32.lib wsock32.lib /NOLOGO /VERSION:22,32 /SUBSYSTEM:console /PDB:none\
+!  /MACHINE:I386 /OUT:$(OUTDIR)/"MudOS.exe" 
 DEF_FILE=
 LINK32_OBJS= \
 	$(INTDIR)/grammar_tab.obj \
@@ -178,7 +180,6 @@ LINK32_OBJS= \
 	$(INTDIR)/disassembler.obj \
 	$(INTDIR)/binaries.obj \
 	$(INTDIR)/replace_program.obj \
-	$(INTDIR)/functab_tree.obj \
 	$(INTDIR)/ccode.obj \
 	$(INTDIR)/cfuns.obj \
 	$(INTDIR)/compile_file.obj \
@@ -187,9 +188,11 @@ LINK32_OBJS= \
 	$(INTDIR)/develop.obj \
 	$(INTDIR)/math.obj \
 	$(INTDIR)/interface.obj \
-	$(INTDIR)/mudlib_stats.obj \
 	$(INTDIR)/hash.obj \
-	$(INTDIR)/efuns_port.obj
+	$(INTDIR)/efuns_port.obj \
+	$(INTDIR)/mallocwrapper.obj \
+	$(INTDIR)/parser.obj \
+	$(INTDIR)/crypt.obj
 
 $(OUTDIR)/MudOS.exe : $(OUTDIR)  $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
@@ -215,10 +218,11 @@ $(OUTDIR) :
     if not exist $(OUTDIR)/nul mkdir $(OUTDIR)
 
 # ADD BASE CPP /nologo /W3 /GX /Zi /YX /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /FR /c
-# ADD CPP /nologo /MT /W3 /GX /Zi /YX /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "WIN95" /FR /c
+# ADD CPP /nologo /MT /W3 /GX /Zi /YX /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "WIN95" /D "DEBUG" /FR /c
+# SUBTRACT CPP /Gy
 CPP_PROJ=/nologo /MT /W3 /GX /Zi /YX /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE"\
- /D "WIN95" /FR$(INTDIR)/ /Fp$(OUTDIR)/"MudOS.pch" /Fo$(INTDIR)/\
- /Fd$(OUTDIR)/"MudOS.pdb" /c 
+ /D "WIN95" /D "DEBUG" /FR$(INTDIR)/ /Fp$(OUTDIR)/"MudOS.pch" /Fo$(INTDIR)/\
+   /Fd$(OUTDIR)/"MudOS.pdb" /c 
 CPP_OBJS=.\WinDebug/
 # ADD BASE RSC /l 0x409 /d "_DEBUG"
 # ADD RSC /l 0x409 /d "_DEBUG"
@@ -273,7 +277,6 @@ BSC32_SBRS= \
 	$(INTDIR)/disassembler.sbr \
 	$(INTDIR)/binaries.sbr \
 	$(INTDIR)/replace_program.sbr \
-	$(INTDIR)/functab_tree.sbr \
 	$(INTDIR)/ccode.sbr \
 	$(INTDIR)/cfuns.sbr \
 	$(INTDIR)/compile_file.sbr \
@@ -282,9 +285,11 @@ BSC32_SBRS= \
 	$(INTDIR)/develop.sbr \
 	$(INTDIR)/math.sbr \
 	$(INTDIR)/interface.sbr \
-	$(INTDIR)/mudlib_stats.sbr \
 	$(INTDIR)/hash.sbr \
-	$(INTDIR)/efuns_port.sbr
+	$(INTDIR)/efuns_port.sbr \
+	$(INTDIR)/mallocwrapper.sbr \
+	$(INTDIR)/parser.sbr \
+	$(INTDIR)/crypt.sbr
 
 $(OUTDIR)/MudOS.bsc : $(OUTDIR)  $(BSC32_SBRS)
     $(BSC32) @<<
@@ -347,7 +352,6 @@ LINK32_OBJS= \
 	$(INTDIR)/disassembler.obj \
 	$(INTDIR)/binaries.obj \
 	$(INTDIR)/replace_program.obj \
-	$(INTDIR)/functab_tree.obj \
 	$(INTDIR)/ccode.obj \
 	$(INTDIR)/cfuns.obj \
 	$(INTDIR)/compile_file.obj \
@@ -356,9 +360,11 @@ LINK32_OBJS= \
 	$(INTDIR)/develop.obj \
 	$(INTDIR)/math.obj \
 	$(INTDIR)/interface.obj \
-	$(INTDIR)/mudlib_stats.obj \
 	$(INTDIR)/hash.obj \
-	$(INTDIR)/efuns_port.obj
+	$(INTDIR)/efuns_port.obj \
+	$(INTDIR)/mallocwrapper.obj \
+	$(INTDIR)/parser.obj \
+	$(INTDIR)/crypt.obj
 
 $(OUTDIR)/MudOS.exe : $(OUTDIR)  $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
@@ -814,14 +820,6 @@ $(INTDIR)/replace_program.obj :  $(SOURCE)  $(DEP_REPLA) $(INTDIR)
 ################################################################################
 # Begin Source File
 
-SOURCE=.\functab_tree.c
-
-$(INTDIR)/functab_tree.obj :  $(SOURCE)  $(INTDIR)
-
-# End Source File
-################################################################################
-# Begin Source File
-
 SOURCE=.\ccode.c
 
 $(INTDIR)/ccode.obj :  $(SOURCE)  $(INTDIR)
@@ -895,15 +893,6 @@ $(INTDIR)/interface.obj :  $(SOURCE)  $(INTDIR)
 ################################################################################
 # Begin Source File
 
-SOURCE=.\packages\mudlib_stats.c
-
-$(INTDIR)/mudlib_stats.obj :  $(SOURCE)  $(INTDIR)
-   $(CPP) $(CPP_PROJ)  $(SOURCE) 
-
-# End Source File
-################################################################################
-# Begin Source File
-
 SOURCE=.\hash.c
 DEP_HASH_=\
 	.\std.h
@@ -919,6 +908,36 @@ SOURCE=.\efuns_port.c
 $(INTDIR)/efuns_port.obj :  $(SOURCE)  $(INTDIR)
 
 # End Source File
+################################################################################
+# Begin Source File
+
+SOURCE=.\mallocwrapper.c
+
+$(INTDIR)/mallocwrapper.obj :  $(SOURCE)  $(INTDIR)
+
+# End Source File
+################################################################################
+# Begin Source File
+
+SOURCE=.\packages\parser.c
+
+$(INTDIR)/parser.obj :  $(SOURCE)  $(INTDIR)
+   $(CPP) $(CPP_PROJ)  $(SOURCE) 
+
+# End Source File
+################################################################################
+# Begin Source File
+
+SOURCE=.\amiga\crypt.c
+
+$(INTDIR)/crypt.obj :  $(SOURCE)  $(INTDIR)
+   $(CPP) $(CPP_PROJ)  $(SOURCE) 
+
+# End Source File
+################################################################################
+# Begin Source File
+
+SOURCE=.\local_options
+# End Source File
 # End Group
 # End Project
-################################################################################

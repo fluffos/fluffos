@@ -13,24 +13,26 @@
  * by the MudOS driver.
  */
 
+#ifdef ARRAY_STATS
 int num_arrays;
 int total_array_size;
+#endif
 
-INLINE static int builtin_sort_array_cmp_fwd PROT((svalue_t *, svalue_t *));
-INLINE static int builtin_sort_array_cmp_rev PROT((svalue_t *, svalue_t *));
-INLINE static int sort_array_cmp PROT((svalue_t *, svalue_t *));
+INLINE_STATIC int builtin_sort_array_cmp_fwd PROT((svalue_t *, svalue_t *));
+INLINE_STATIC int builtin_sort_array_cmp_rev PROT((svalue_t *, svalue_t *));
+INLINE_STATIC int sort_array_cmp PROT((svalue_t *, svalue_t *));
 #ifndef NO_ENVIRONMENT
 static int deep_inventory_count PROT((object_t *));
 static void deep_inventory_collect PROT((object_t *, array_t *, int *));
 #endif
-INLINE static int alist_cmp PROT((svalue_t *, svalue_t *));
+INLINE_STATIC int alist_cmp PROT((svalue_t *, svalue_t *));
 
 /*
  * Make an empty array for everyone to use, never to be deallocated.
  * It is cheaper to reuse it, than to use MALLOC() and allocate.
  */
 
-static array_t the_null_array =
+array_t the_null_array =
 {
     1,				/* Ref count, which will ensure that it will
 				 * never be deallocated */
@@ -39,13 +41,6 @@ static array_t the_null_array =
 #endif
     0,				/* size */
 };
-
-INLINE array_t *
-       null_array()
-{
-    the_null_array.ref++;
-    return &the_null_array;
-}
 
 /*
  * Allocate an array of size 'n'.
@@ -57,11 +52,13 @@ array_t *allocate_array P1(int, n)
     if (n < 0 || n > max_array_size)
 	error("Illegal array size.\n");
     if (n == 0) {
-	return null_array();
+	return &the_null_array;
     }
+#ifdef ARRAY_STATS
     num_arrays++;
     total_array_size += sizeof(array_t) + sizeof(svalue_t) *
 	(n - 1);
+#endif
     p = ALLOC_ARRAY(n);
     p->ref = 1;
     p->size = n;
@@ -84,9 +81,11 @@ array_t *allocate_empty_array P1(int, n)
     
     if (n < 0 || n > max_array_size)
 	error("Illegal array size.\n");
-    if (!n) return null_array();
+    if (!n) return &the_null_array;
+#ifdef ARRAY_STATS
     num_arrays++;
     total_array_size += sizeof(array_t) + sizeof(svalue_t) * (n-1);
+#endif
     p = ALLOC_ARRAY(n);
     p->ref = 1;
     p->size = n;
@@ -107,15 +106,17 @@ void dealloc_array P1(array_t *, p)
 
     if (p == &the_null_array)
 	return;
-
+    
     for (i = p->size; i--;)
 	free_svalue(&p->item[i], "free_array");
 #ifdef PACKAGE_MUDLIB_STATS
     add_array_size(&p->stats, -((int)p->size));
 #endif
+#ifdef ARRAY_STATS
     num_arrays--;
     total_array_size -= sizeof(array_t) + sizeof(svalue_t) *
 	(p->size - 1);
+#endif
     FREE((char *) p);
 }
 
@@ -135,9 +136,11 @@ void free_empty_array P1(array_t *, p)
 #ifdef PACKAGE_MUDLIB_STATS
     add_array_size(&p->stats, -((int)p->size));
 #endif
+#ifdef ARRAY_STATS
     num_arrays--;
     total_array_size -= sizeof(array_t) + sizeof(svalue_t) *
         (p->size - 1);
+#endif
     FREE((char *) p);
 }
 
@@ -150,7 +153,7 @@ array_t *explode_string P4(char *, str, int, slen, char *, del, int, len)
     short sz;
 
     if (!slen)
-	return null_array();
+	return &the_null_array;
 
     /* return an array of length strlen(str) -w- one character per element */
     if (len == 0) {
@@ -174,6 +177,7 @@ array_t *explode_string P4(char *, str, int, slen, char *, del, int, len)
 
 	delimeter = *del;
 
+#ifndef REVERSIBLE_EXPLODE_STRING
 	/*
 	 * Skip leading 'del' strings, if any.
 	 */
@@ -181,13 +185,13 @@ array_t *explode_string P4(char *, str, int, slen, char *, del, int, len)
 	    str++;
 	    slen--;
 	    if (str[0] == '\0') {
-		return null_array();
+		return &the_null_array;
 	    }
-#ifdef SANE_EXPLODE_STRING
+#  ifdef SANE_EXPLODE_STRING
 	    break;
-#endif
+#  endif
 	}
-
+#endif
 	/*
 	 * Find number of occurences of the delimiter 'del'.
 	 */
@@ -204,10 +208,15 @@ array_t *explode_string P4(char *, str, int, slen, char *, del, int, len)
 	 * or, one more.
 	 */
 	limit = max_array_size;
+#ifdef REVERSIBLE_EXPLODE_STRING
+	num++;
+	limit--;
+#else
 	if (lastdel != (str + slen - 1)) {
 	    num++;
 	    limit--;
 	}
+#endif
 	if (num > max_array_size) {
 	    num = max_array_size;
 	}
@@ -229,14 +238,21 @@ array_t *explode_string P4(char *, str, int, slen, char *, del, int, len)
 	    }
 	}
 
+#ifdef REVERSIBLE_EXPLODE_STRING
+	ret->item[num].type = T_STRING;
+	ret->item[num].subtype = STRING_MALLOC;
+	ret->item[num].u.string = string_copy(beg, "explode_string: last, len == 1");
+#else
 	/* Copy last occurence, if there was not a 'del' at the end. */
 	if (*beg != '\0') {
 	    ret->item[num].type = T_STRING;
 	    ret->item[num].subtype = STRING_MALLOC;
 	    ret->item[num].u.string = string_copy(beg, "explode_string: last, len == 1");
 	}
+#endif
 	return ret;
     }				/* len == 1 */
+#ifndef REVERSIBLE_EXPLODE_STRING
     /*
      * Skip leading 'del' strings, if any.
      */
@@ -244,12 +260,13 @@ array_t *explode_string P4(char *, str, int, slen, char *, del, int, len)
 	str += len;
 	slen -= len;
 	if (str[0] == '\0') {
-	    return null_array();
+	    return &the_null_array;
 	}
-#ifdef SANE_EXPLODE_STRING
+#  ifdef SANE_EXPLODE_STRING
 	break;
-#endif
+#  endif
     }
+#endif
 
     /*
      * Find number of occurences of the delimiter 'del'.
@@ -268,9 +285,13 @@ array_t *explode_string P4(char *, str, int, slen, char *, del, int, len)
      * Compute number of array items. It is either number of delimiters, or,
      * one more.
      */
+#ifdef REVERSIBLE_EXPLODE_STRING
+    num++;
+#else
     if ((slen <= len) || (lastdel != (str + slen - len))) {
 	num++;
     }
+#endif
     if (num > max_array_size) {
 	num = max_array_size;
     }
@@ -297,11 +318,17 @@ array_t *explode_string P4(char *, str, int, slen, char *, del, int, len)
     }
 
     /* Copy last occurence, if there was not a 'del' at the end. */
+#ifdef REVERSIBLE_EXPLODE_STRING
+    ret->item[num].type = T_STRING;
+    ret->item[num].subtype = STRING_MALLOC;
+    ret->item[num].u.string = string_copy(beg, "explode_string: last, len != 1");
+#else
     if (*beg != '\0') {
 	ret->item[num].type = T_STRING;
 	ret->item[num].subtype = STRING_MALLOC;
 	ret->item[num].u.string = string_copy(beg, "explode_string: last, len != 1");
     }
+#endif
     return ret;
 }
 
@@ -422,14 +449,16 @@ array_t *slice_array P3(array_t *, p, int, from, int, to)
 	to = p->size - 1;
     if (from > to) {
 	free_array(p);
-	return null_array();
+	return &the_null_array;
     }
 
     if (!(--p->ref)){
 #ifdef PACKAGE_MUDLIB_STATS
 	add_array_size(&p->stats, -((int)p->size));
 #endif
+#ifdef ARRAY_STATS
 	total_array_size += (to - from + 1 - p->size) * sizeof(svalue_t);
+#endif
 	if (from) {
 	    sv1 = p->item + from;
 	    cnt = from;
@@ -537,44 +566,27 @@ filter_array P2(svalue_t *, arg, int, num_arg)
 	return;
     }
     else {
-	funptr_t *fp;
-	object_t *ob = 0;
-	char *func;
+	char *flags;
+	svalue_t *v;
+	int res = 0, cnt;
+	function_to_call_t ftc;
+	
+	process_efun_callback(1, &ftc, F_FILTER);
 
-	char *flags = new_string(size, "TEMP: filter: flags");
-	svalue_t *extra, *v;
-	int res = 0, cnt, numex = 0;
-
+	flags = new_string(size, "TEMP: filter: flags");
 	push_malloced_string(flags);
 
-	if ((arg+1)->type == T_FUNCTION){
-	    fp = (arg+1)->u.fp;
-	    if (num_arg > 2) extra = arg+2, numex = num_arg - 2;
-	} else {    
-	    func = (arg+1)->u.string;
-	    if (num_arg < 3) ob = current_object;
-	    else {
-		if ((arg+2)->type == T_OBJECT) ob = (arg+2)->u.ob;
-		else if ((arg+2)->type == T_STRING){
-		    if ((ob = find_object(arg[2].u.string)) && !object_visible(ob)) ob = 0;
-		}
-		if (!ob) bad_argument(arg+2, T_STRING | T_OBJECT, 3, F_FILTER);
-		if (num_arg > 3) extra = arg + 3, numex = num_arg - 3;
-	    }
-	}
-
-	for (cnt = 0; cnt < size; cnt++){
+	for (cnt = 0; cnt < size; cnt++) {
 	    push_svalue(vec->item + cnt);
-	    if (numex) push_some_svalues(extra, numex);
-	    v = ob ? apply(func, ob, 1 + numex, ORIGIN_EFUN)
-		: call_function_pointer(fp, 1 + numex);
-	    if (!IS_ZERO(v)){
+	    v = call_efun_callback(&ftc, 1);
+	    if (!IS_ZERO(v)) {
 		flags[cnt] = 1;
 		res++;
-	    } else flags[cnt] = 0;
+	    } else
+		flags[cnt] = 0;
 	}
 	r = allocate_empty_array(res);
-	if (res){
+	if (res) {
 	    while (cnt--) {
 		if (flags[cnt])
 		    assign_svalue_no_free(&r->item[--res], vec->item+cnt);
@@ -588,14 +600,6 @@ filter_array P2(svalue_t *, arg, int, num_arg)
 	sp->u.arr = r;
     }
 }
-
-#ifdef FILTER_ARRAY
-void c_filter_array P5(svalue *, ret, svalue *, s0, svalue *, s1, svalue *, s2, svalue *, s3)
-{
-    error("c_filter_array needs to be written.\n");
-    /* TODO */
-}
-#endif
 #endif
 
 /* Unique maker
@@ -680,7 +684,7 @@ void unique_array_error_handler PROT((void)) {
     FREE((char *)unlist);
 }
 
-void f_unique_array PROT((void)){
+void f_unique_array PROT((void)) {
     array_t *v, *ret;
     int size, i, numkeys = 0, *ind, num_arg = st_num_arg;
     svalue_t *skipval, *sv, *svp;
@@ -688,7 +692,7 @@ void f_unique_array PROT((void)){
     unique_t **head, *uptr, *nptr;
     funptr_t *fp = 0;
     char *func;
-
+    
     size = (v = (sp - num_arg + 1)->u.arr)->size;
     if (!size) {
 	if (num_arg == 3) free_svalue(sp--, "f_unique_array");
@@ -813,7 +817,9 @@ array_t *add_array P2(array_t *, p, array_t *, r)
         /* copy myself */
 	for (cnt = d->size; cnt--;)
 	    assign_svalue_no_free(&d->item[--res], &d->item[cnt]);
+#ifdef ARRAY_STATS
         total_array_size += sizeof(svalue_t) * (d->size);
+#endif
 #ifdef PACKAGE_MUDLIB_STATS
 	/* mudlib_stats stuff */
 	if (current_object) {
@@ -839,7 +845,9 @@ array_t *add_array P2(array_t *, p, array_t *, r)
 	if (!d)
 	    fatal("Out of memory.\n");
 
+#ifdef ARRAY_STATS
 	total_array_size += sizeof(svalue_t) * (r->size);
+#endif
 	/* d->ref = 1;     d is p, and p's ref was already one -Beek */
 	d->size = res;
 
@@ -867,9 +875,11 @@ array_t *add_array P2(array_t *, p, array_t *, r)
 #ifdef PACKAGE_MUDLIB_STATS
 	add_array_size(&r->stats, -((int)r->size));
 #endif
+#ifdef ARRAY_STATS
 	num_arrays--;
 	total_array_size -= sizeof(array_t) +
 	    sizeof(svalue_t) * (r->size - 1);
+#endif
 	FREE((char *) r);
     } else {
 	for (cnt = r->size; cnt--;)
@@ -908,7 +918,7 @@ array_t *all_inventory P2(object_t *, ob, int, override)
     }
 
     if (!cnt)
-	return null_array();
+	return &the_null_array;
 
     d = allocate_empty_array(cnt);
     cur = ob->contains;
@@ -938,42 +948,23 @@ map_array P2(svalue_t *, arg, int, num_arg)
     array_t *arr = arg->u.arr;
     array_t *r;
     int size;
-
-    if ((size = arr->size) < 1) r = null_array();
+    
+    if ((size = arr->size) < 1) r = &the_null_array;
     else {
-	funptr_t *fp = 0;
-	int numex = 0, cnt;
-	object_t *ob;
-	svalue_t *extra, *v;
-	char *func;
+	function_to_call_t ftc;
+	int cnt;
+	svalue_t *v;
 
+	process_efun_callback(1, &ftc, F_MAP);
+	    
 	r = allocate_array(size);
 
 	(++sp)->type = T_ARRAY;
 	sp->u.arr = r;
 
-	if (arg[1].type == T_FUNCTION) {
-	    fp = arg[1].u.fp;
-	    if (num_arg > 2) extra = arg + 2, numex = num_arg - 2;
-	}
-	else {
-	    func = arg[1].u.string;
-	    if (num_arg < 3) ob = current_object;
-	    else{
-		if (arg[2].type == T_OBJECT) ob = arg[2].u.ob;
-		else if (arg[2].type == T_STRING){
-		    if ((ob = find_object(arg[2].u.string)) && !object_visible(ob))
-			ob = 0;
-		}
-		if (num_arg > 3) extra = arg + 3, numex = num_arg - 3;
-		if (!ob) error("Bad argument 3 to map_array.\n");
-	    }
-	}
-	    
 	for (cnt = 0; cnt < size; cnt++){
 	    push_svalue(arr->item + cnt);
-	    if (numex) push_some_svalues(extra, numex);
-	    v = fp ? call_function_pointer(fp, numex + 1) : apply(func, ob, 1 + numex, ORIGIN_EFUN);
+	    v = call_efun_callback(&ftc, 1);
 	    if (v) assign_svalue_no_free(&r->item[cnt], v);
 	    else break;
 	}
@@ -1042,9 +1033,8 @@ map_string P2(svalue_t *, arg, int, num_arg)
 }
 #endif
 
-static funptr_t *sort_array_cmp_funp;
-static object_t *sort_array_cmp_ob;
-static char *sort_array_cmp_func;
+#ifdef F_SORT_ARRAY
+static function_to_call_t *sort_array_ftc;
 
 #define COMPARE_NUMS(x,y) (x < y ? -1 : (x > y ? 1 : 0))
 
@@ -1056,7 +1046,7 @@ array_t *builtin_sort_array P2(array_t *, inlist, int, dir)
     return inlist;
 }
 
-INLINE static int builtin_sort_array_cmp_fwd P2(svalue_t *, p1, svalue_t *, p2)
+INLINE_STATIC int builtin_sort_array_cmp_fwd P2(svalue_t *, p1, svalue_t *, p2)
 {
     switch(p1->type | p2->type){
 	case T_STRING:
@@ -1109,7 +1099,7 @@ INLINE static int builtin_sort_array_cmp_fwd P2(svalue_t *, p1, svalue_t *, p2)
     return 0;
 }
 
-INLINE static int builtin_sort_array_cmp_rev P2(svalue_t *, p1, svalue_t *, p2)
+INLINE_STATIC int builtin_sort_array_cmp_rev P2(svalue_t *, p1, svalue_t *, p2)
 {
     switch(p1->type | p2->type){
         case T_STRING:
@@ -1162,20 +1152,14 @@ INLINE static int builtin_sort_array_cmp_rev P2(svalue_t *, p1, svalue_t *, p2)
     return 0;
 }
 
-INLINE static
+INLINE_STATIC
 int sort_array_cmp P2(svalue_t *, p1, svalue_t *, p2) {
     svalue_t *d;
 
     push_svalue(p1);
     push_svalue(p2);
 
-    if (sort_array_cmp_funp){
-	d = call_function_pointer(sort_array_cmp_funp, 2);
-    } else {	
-	if (sort_array_cmp_ob->flags & O_DESTRUCTED)
-	    error("object used by sort_array destructed\n");
-	d = apply(sort_array_cmp_func, sort_array_cmp_ob, 2, ORIGIN_EFUN);
-    }
+    d = call_efun_callback(sort_array_ftc, 2);
 
     if (!d || d->type != T_NUMBER) {
 	return 0;
@@ -1184,50 +1168,44 @@ int sort_array_cmp P2(svalue_t *, p1, svalue_t *, p2) {
     }
 }
 
-#ifdef F_SORT_ARRAY
 void
 f_sort_array PROT((void))
 {
     svalue_t *arg = sp - st_num_arg + 1;
     array_t *tmp = arg->u.arr;
     int num_arg = st_num_arg;
-
+    
     check_for_destr(tmp);
-    tmp = copy_array(tmp);
 
-    switch(arg[1].type){
+    switch(arg[1].type) {
 	case T_NUMBER:
         {
-	    tmp = builtin_sort_array(tmp, arg[1].u.number);
+	    tmp = builtin_sort_array(copy_array(tmp), arg[1].u.number);
 	    break;
 	}
 
 	case T_FUNCTION:
+        case T_STRING:
         {
-	    sort_array_cmp_funp = arg[1].u.fp;
+	    /* 
+	     * We use a global to communicate with the comparison function,
+	     * so we have to be careful to make sure we can recurse (the
+	     * callback might call sort_array itself).  For this reason, the
+	     * ftc structure is on the stack, and we just keep a pointer
+	     * to it in a global, being careful to save and restore the old
+	     * value.
+	     */
+	    function_to_call_t ftc, *old_ptr;
+
+	    old_ptr = sort_array_ftc;
+	    sort_array_ftc = &ftc;
+	    process_efun_callback(1, &ftc, F_SORT_ARRAY);
+
+	    tmp = copy_array(tmp);
 	    quickSort((char *) tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
+	    sort_array_ftc = old_ptr;
 	    break;
 	}
-
-	case T_STRING:
-        {
-	    sort_array_cmp_funp = 0;
-	    sort_array_cmp_ob = 0;
-	    sort_array_cmp_func = (arg+1)->u.string;
-	    if (num_arg == 2) {
-		sort_array_cmp_ob = current_object;
-		if (sort_array_cmp_ob->flags & O_DESTRUCTED) sort_array_cmp_ob = 0;
-	    } else if (arg[2].type == T_OBJECT)
-		sort_array_cmp_ob = arg[2].u.ob;
-	    else if (arg[2].type == T_STRING) {
-		sort_array_cmp_ob = find_object(arg[2].u.string);
-		if (sort_array_cmp_ob && !object_visible(sort_array_cmp_ob)) sort_array_cmp_ob = 0;
-	    }
-	    if (!sort_array_cmp_ob) bad_arg(3, F_SORT_ARRAY);
-	    quickSort((char *) tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
-	    break;
-	}
-
     }
     
     pop_n_elems(num_arg);
@@ -1319,7 +1297,7 @@ array_t *deep_inventory P2(object_t *, ob, int, take_top)
 	i++;
 
     if (i == 0)
-	return null_array();
+	return &the_null_array;
 
     /*
      * allocate an array
@@ -1340,7 +1318,7 @@ array_t *deep_inventory P2(object_t *, ob, int, take_top)
 }
 #endif
 
-INLINE static int alist_cmp P2(svalue_t *, p1, svalue_t *, p2)
+INLINE_STATIC int alist_cmp P2(svalue_t *, p1, svalue_t *, p2)
 {
     register int d;
 
@@ -1351,7 +1329,7 @@ INLINE static int alist_cmp P2(svalue_t *, p1, svalue_t *, p2)
     return 0;
 }
 
-INLINE static svalue_t *alist_sort P1(array_t *, inlist) {
+INLINE_STATIC svalue_t *alist_sort P1(array_t *, inlist) {
     int size, j, curix, parix, child1, child2, flag;
     svalue_t *sv_tab, *tmp, *table, *sv_ptr, val;
     char *str;
@@ -1499,22 +1477,26 @@ array_t *subtract_array P2(array_t *, minuend, array_t *, subtrahend) {
 #ifdef PACKAGE_MUDLIB_STATS
 	add_array_size(&subtrahend->stats, -size);
 #endif
+#ifdef ARRAY_STATS
 	num_arrays--;
 	total_array_size -= sizeof(array_t) + sizeof(svalue_t) *
 	    (size - 1);
+#endif
 	FREE((char *) subtrahend);
     }
     free_array(minuend);
     msize = dest - difference->item;
     if (!msize) {
 	FREE((char *)difference);
-	return null_array();
+	return &the_null_array;
     }
     difference = RESIZE_ARRAY(difference, msize);
     difference->size = msize;
     difference->ref = 1;
+#ifdef ARRAY_STATS
     total_array_size += sizeof(array_t) + sizeof(svalue_t[1]) * (msize - 1);
     num_arrays++;
+#endif
 #ifdef PACKAGE_MUDLIB_STATS
     if (current_object) {
 	assign_stats(&difference->stats, current_object);
@@ -1535,7 +1517,7 @@ array_t *intersect_array P2(array_t *, a1, array_t *, a2) {
     if (!a1s || !a2s) {
 	free_array(a1);
 	free_array(a2);
-	return null_array();
+	return &the_null_array;
     }
 
     svt_1 = alist_sort(a1);
@@ -1646,8 +1628,10 @@ array_t *intersect_array P2(array_t *, a1, array_t *, a2) {
 #ifdef PACKAGE_MUDLIB_STATS
 	add_array_size(&a1->stats, -a1s);
 #endif
+#ifdef ARRAY_STATS
 	num_arrays--;
 	total_array_size -= sizeof(array_t) + sizeof(svalue_t) * (a1s - 1);
+#endif
 	FREE((char *) a1);
     }
     
@@ -1658,8 +1642,10 @@ array_t *intersect_array P2(array_t *, a1, array_t *, a2) {
 #ifdef PACKAGE_MUDLIB_STATS
 	add_array_size(&a2->stats, -a2s);
 #endif
+#ifdef ARRAY_STATS
 	num_arrays--;
 	total_array_size -= sizeof(array_t) + sizeof(svalue_t) * (a2s - 1);
+#endif
 	FREE((char *) a2);
     }
     a3 = RESIZE_ARRAY(a3, l);
@@ -1671,8 +1657,10 @@ array_t *intersect_array P2(array_t *, a1, array_t *, a2) {
 	add_array_size(&a3->stats, l);
     } else null_stats(&a3->stats);
 #endif
+#ifdef ARRAY_STATS
     total_array_size += sizeof(array_t) + (l-1) * sizeof(svalue_t);
     num_arrays++;
+#endif
     return a3;
 }
 
@@ -1696,7 +1684,7 @@ array_t *match_regexp P3(array_t *, v, char *, pattern, int, flag) {
     svalue_t *sv1, *sv2;
 
     regexp_user = EFUN_REGEXP;
-    if (!(size = v->size)) return null_array();
+    if (!(size = v->size)) return &the_null_array;
     reg = regcomp((unsigned char *)pattern, 0);
     if (!reg) error(regexp_error);
     res = (char *)DMALLOC(size, TAG_TEMPORARY, "match_regexp: res");
@@ -1725,8 +1713,8 @@ array_t *match_regexp P3(array_t *, v, char *, pattern, int, flag) {
             sv1 = v->item + size;
 	    *sv2 = *sv1;
 	    if (sv1->subtype & STRING_COUNTED) {
-		ADD_STRING(COUNTED_STRLEN(sv1->u.string));
-		COUNTED_REF(sv1->u.string)++;
+		INC_COUNTED_REF(sv1->u.string);
+		ADD_STRING(MSTR_SIZE(sv1->u.string));
 	    }
             if (!--num_match) break;
 	}
@@ -1764,9 +1752,8 @@ array_t *deep_inherit_list P1(object_t *, ob)
     for (il = 0; il < next; il++) {
 	pr = plist[il + 1];
 	ret->item[il].type = T_STRING;
-	ret->item[il].subtype = STRING_SHARED;
-	ret->item[il].u.string =
-	    make_shared_string(pr->name);
+	ret->item[il].subtype = STRING_MALLOC;
+	ret->item[il].u.string = add_slash(pr->name);
     }
     return ret;
 }
@@ -1796,8 +1783,8 @@ array_t *inherit_list P1(object_t *, ob)
     for (il = 0; il < next; il++) {
 	pr = plist[il + 1];
 	ret->item[il].type = T_STRING;
-	ret->item[il].subtype = STRING_SHARED;
-	ret->item[il].u.string = make_shared_string(pr->name);
+	ret->item[il].subtype = STRING_MALLOC;
+	ret->item[il].u.string = add_slash(pr->name);
     }
     return ret;
 }
@@ -1816,14 +1803,14 @@ array_t *
 
     display_hidden = -1;
     if (!strip_name(str, tmpbuf, sizeof tmpbuf))
-	return null_array();
+	return &the_null_array;
 
     sl = strlen(tmpbuf);
 
     if (!(tmp_children = (object_t **)
 	  DMALLOC(sizeof(object_t *) * (t_sz = 50),
 		  TAG_TEMPORARY, "children: tmp_children"))) 
-	return null_array();	/* unable to malloc enough temp space */
+	return &the_null_array;	/* unable to malloc enough temp space */
 
     for (i = 0, ob = obj_list; ob; ob = ob->next_all) {
 	ol = strlen(ob->name);
@@ -1842,7 +1829,7 @@ array_t *
 				 TAG_TEMPORARY, "children: tmp_children: realloc")))) {
 		/* unable to REALLOC more space 
 		 * (tmp_children is now NULL) */
-		return null_array();
+		return &the_null_array;
 	    }
 	}
     }
@@ -1879,7 +1866,7 @@ array_t *livings()
 		apply_valid_hide = 0;
 		hide_is_valid = valid_hide(current_object);
 	    }
-	    if (hide_is_valid)
+	    if (!hide_is_valid)
 		continue;
 	}
 	if (nob == max_array_size)

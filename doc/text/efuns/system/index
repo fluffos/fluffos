@@ -1,0 +1,36 @@
+System efuns
+
+<DL>
+*  all_previous_objects
+*  call_out_info
+*  check_memory
+*  ctime
+*  debug_message
+*  deep_inherit_list
+*  error
+*  eval_cost
+*  external_start
+*  find_call_out
+*  flush_messages
+*  function_exists
+*  function_profile
+*  functions
+*  inherit_list
+*  inherits
+*  localtime
+*  lpc_info
+*  max_eval_cost
+*  memory_summary
+*  named_livings
+*  program_info
+*  reclaim_objects
+*  replace_program
+*  reset_eval_cost
+*  set_eval_limit
+*  set_reset
+*  shutdown
+*  time
+*  uptime
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

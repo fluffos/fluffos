@@ -1,0 +1,35 @@
+<HEAD> <TITLE> rusage - reports information gathered by the getrusage() system call </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> rusage - reports information gathered by the getrusage() system call </H1> </center>
+<p>
+<b> mapping rusage(); </b>
+<p>
+This efun collects information gathered via the getrusage() system
+call.  Read the getrusage() man page for more information on what information
+will be collected.  Some systems do not have the getrusage() system call
+but do have the times() system call.  On those systems, only "utime"
+and "stime" will be available.  Times are reported in milliseconds.
+<p>
+Here is an example usage of rusage():
+<p>
+<pre>
+  void
+  create()
+  {
+      mapping info;
+<p>
+      info = rusage();
+      write("user time = " + info["utime"] + "ms\\n");
+      write("system time = " + info["stime"] + "ms\\n");
+  }
+</pre>
+<p>
+The available fields are:
+utime, stime, maxrss, ixrss, idrss, isrss, minflt, majflt, nswap, inblock,
+oublock, msgsnd, msgrcv, nsignals, nvcsw, nivcsw.
+<p>
+See also:
+<A HREF=time_expression.html>  time_expression </A>,
+<A HREF=../system/function_profile.html>  function_profile </A>,
+<A HREF=../system/time.html>  time </A>,
+<A HREF=../system/uptime.html>  uptime </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

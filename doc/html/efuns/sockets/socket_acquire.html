@@ -1,0 +1,32 @@
+<HEAD> <TITLE> socket_acquire - assume ownership of a socket </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> socket_acquire - assume ownership of a socket </H1> </center>
+<p>
+<b> int socket_acquire( int socket, string | function read_callback,
+		     string | function write_callback,
+                    string | function close_callback ); </b>
+<p>
+This efun is only available if PACKAGE_SOCKETS is compiled in.
+<p>
+socket_acquire() is called to complete the handshake begun by socket_release()
+for transferring ownership (and control) of a socket to a new object.
+socket_release() calls the release callback function within the new owner
+object to notify the object that it wishes to pass control of the socket
+on.  It is the responsibility of the new owner socket to decide whether
+it wishes to accept the socket.  It it does, then socket_acquire() is
+called to complete the transfer.  If not, then the callback simply returns
+without completing the handshake.
+<p>
+In the former case the handshake is completed and the new object
+becomes the socket owner.  The read, write and close callback function
+parameters refer to functions within the new object.  These are specified
+so that the MudOS driver will know which functions to call within the new
+object.  Decling to acquire the socket will cause socket_release() to
+return EESOCKNOTRLSD so the owner can perform appropriate clean-up.
+EESOCKNOTRLSD is in "socket_err.h".
+<p>
+socket_acquire() may only be called within the context of thr release
+callback function and only with the socket specified.
+<p>
+See also:
+<A HREF=socket_release.html>  socket_release </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

@@ -1,0 +1,17 @@
+
+MudOS is an LPmud driver, and as such, needs a mudlib in order to be used.
+You have various options:
+
+(1) Download an available mudlib.  Many are available in at
+    http://ftp.imaginary.com/pub/LPC/servers/MudOS/lib
+
+    Note that many mudlibs come with a version of this driver they work
+    well with already, and it is VERY IMPORTANT that the driver be compiled
+    with the correct options for the mudlib in question.  See the mudlib
+    documentation for details.
+
+(2) Write your own.  Beware that this is quite a substantial task; available
+    mudlibs range from 10,000 to 80,000 lines of code.  You probably should
+    be quite familiar with the details of the internals of at least one mudlib
+    before attempting this.
+

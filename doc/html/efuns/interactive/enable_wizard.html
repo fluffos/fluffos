@@ -1,0 +1,29 @@
+<HEAD> <TITLE> enable_wizard - give wizard priveleges to an object </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> enable_wizard - give wizard priveleges to an object </H1> </center>
+<p>
+<b> void enable_wizard(); </b>
+<p>
+Available only if NO_WIZARDS isn't defined.
+<p>
+Any interactive object that calls enable_wizard() will cause wizardp()
+to return true if called on that object.  enable_wizard() gives three
+privileges to the interactive object in question:
+<p>
+<DL>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> ability to use restricted modes of ed when the RESTRICTED_ED option
+is compiled into the driver.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif>
+privilege of receiving descriptive runtime error messages.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif>
+privilege of using the trace() and traceprefix() efuns.
+<DL>
+<p>
+If you don't use this, ed() must be explicitly restricted when necessary,
+an error_handler should be implemented to give appropriate messages if you
+don't want all users to get descriptive error traces, and trace() and
+traceprefix() should be restricted via simul_efuns, if necessary.
+<p>
+See also:
+<A HREF=disable_wizard.html>  disable_wizard </A>,
+<A HREF=wizardp.html>  wizardp </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

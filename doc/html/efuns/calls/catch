@@ -1,0 +1,24 @@
+catch - catch an evaluation error
+
+mixed catch( mixed expr );
+
+mixed catch { ... }; 
+
+Note: catch is really a keyword and not an efun.
+
+The code inside the { ... } or the expression is evaluated.  If there
+is no error, catch() returns zero.  If there is an error, a string (with
+a leading '*') will be returned.
+
+The function throw() can also be used to immediately return any value,
+except 0.
+
+The catch() is somewhat costly, and should not be used just anywhere.
+Rather, use it at places where an error would destroy consistency.
+
+See also:
+ error,
+ throw,
+ error_handler
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

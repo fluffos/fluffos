@@ -1,0 +1,12 @@
+id - function called by present() in order to identify an object
+
+int id( string an_id );
+
+The present() efunction calls id() to determine if a given object is named
+by a given string.  id() should return 1 if the object wishes to be known
+by the name in the string anId; it should return 0 otherwise.
+
+See also:
+ present
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

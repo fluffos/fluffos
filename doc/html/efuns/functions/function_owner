@@ -1,0 +1,11 @@
+function_owner - return the owner of a given function.
+
+object function_owner(function);
+
+function_owner returns the object that owns the function specified by
+the argument.
+
+This function requires PACKAGE_CONTRIB to be defined in the options file.
+
+See also:
+ bind

@@ -1,0 +1,19 @@
+explode - break up a string
+
+string array explode( string str, string del );
+
+explode() returns an array of strings, created when the string 'str'
+is split into pieces as divided by the delimiter 'del'.
+
+EXAMPLE:
+
+explode(str," ") will return as an array all of the words (separated
+by spaces) in the string 'str'.
+
+See also:
+ sscanf,
+ replace_string,
+ strsrch
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

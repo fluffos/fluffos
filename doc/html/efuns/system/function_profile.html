@@ -1,0 +1,27 @@
+<HEAD> <TITLE> function_profile - get function profiling information for an object </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> function_profile - get function profiling information for an object </H1> </center>
+<p>
+<b> array function_profile( object ob ); </b>
+<p>
+Returns function profiling information for 'ob', or this_object() if 'ob'
+is not specified.  This is only available if the driver was compiled
+with PROFILE_FUNCTIONS defined.
+<p>
+An array of mappings is returned, one for each function in 'ob'.  The format 
+of the mapping is:
+<pre>
+       ([ "name"     : name_of_the_function,
+          "calls"    : number_of_calls,
+<p>
+          "self"     : cpu_time_spent_in self,
+          "children" : cpu_time_spent_in_children
+       ])
+</pre>
+The usefulness of this is tied to the resolution of the CPU clock--even 
+though the units are microseconds, the CPU timer resolution is often much 
+less.
+<p>
+See also:
+<A HREF=../internals/rusage.html>  rusage </A>,
+<A HREF=../internals/time_expression.html>  time_expression </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

@@ -1,0 +1,15 @@
+<HEAD> <TITLE> debugmalloc - dumps information on malloc'd memory to a file </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> debugmalloc - dumps information on malloc'd memory to a file </H1> </center>
+<p>
+<b> void debugmalloc(string filename, int mask); </b>
+<p>
+This efun is only available when PACKAGE_DEVELOP, DEBUGMALLOC and DEBUGMALLOC_EXTENSIONS are
+both defined in options.h at driver build time.  The debugmalloc() efun
+will dump information on those chunks of memory allocated by DMALLOC() and
+related macros if the bitwise and (&) with the tag supplied by the macro
+(i.e. (mask & tag)) is non-zero.  Read md.c and config.h in the
+driver source for more information.
+<p>
+See also:
+<A HREF=set_malloc_mask.html>  set_malloc_mask </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

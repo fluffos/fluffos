@@ -1,0 +1,15 @@
+remove_call_out - remove a pending call_out
+
+int remove_call_out( string fun | int handle );
+
+Remove next pending call out for function `fun' in the current object,
+or the call_out() which returned the integer 'handle'.
+The return value is the time remaining before the callback is to be called.
+The returned value is -1 if there were no call out pending to this function.
+If fun is zero, all the call_outs of the object are removed.
+
+See also:
+ call_out,
+ call_out_info
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

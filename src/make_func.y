@@ -7,6 +7,10 @@
 #include "preprocess.h"
 #include "edit_source.h"
 
+#ifdef WIN32
+#include <process.h>
+#endif
+
     int num_buff = 0;
     int op_code, efun_code, efun1_code;
     char *oper_codes[MAX_FUNC];
@@ -332,6 +336,13 @@ int yylex() {
 	case '\n':
 	    current_line++;
 	    continue;
+	case '!':
+	{
+	    char buff[2048];
+	    fgets(buff, 2047, yyin);
+	    fprintf(stderr, "Configuration problem: %s\n", buff);
+	    exit(-1);
+	}
 	case '#':
 	{
 	    int line;

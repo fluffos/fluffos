@@ -1,0 +1,17 @@
+commands - returns some information about actions the user can take
+
+array commands();
+
+This efun is only available if NO_ADD_ACTION is not defined.
+
+Returns an array of an array of 4 items describing the actions that
+are available to this_object().  The first item is the command
+itself (as passed to add_action()).  The second is the set of
+flags (passed to add_action as the third argument, often defaulted
+to 0).  The third is the object that defined the action.  The fourth
+is the function to be called ("&#60;function&#62;" if it is a function pointer).
+
+See also:
+ add_action,
+ enable_commands,
+ disable_commands

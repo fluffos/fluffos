@@ -1,0 +1,26 @@
+<HEAD> <TITLE> Predefined preprocessor #defines </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> Predefined preprocessor #defines </H1> </center>
+<p>
+Note: additional predefines may be added from the command line using the -D
+flag.  Also, anything defined in either options.h will be available surrounded
+by __; e.g if FOO is defined in options.h, the __FOO__ will be defined in all
+objects.
+<p>
+The following identifiers may be defined:
+<p>
+<DL>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> <b> MUDOS </b>: always defined
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> <b> "2.7.2" </b>: a string representing the version of MudOS being run
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> <b> __PORT__ </b>: archaic; the port number of the first (previously, the only) external port
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> <b> __ARCH__ </b>: the name of the architecture of the machine
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> <b> __COMPILER__ </b>: the compiler MudOS was compiled with
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> <b> __OPTIMIZATION__ </b>: the optimization used
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> <b> MUD_NAME </b>: the MUD name from the config file
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> <b> HAS_ED </b>: defined if the ed() efun is available
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> <b> HAS_PRINTF </b>: defined if the printf() efun is available
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> <b> HAS_RUSAGE </b>: defined if the rusage() efun is available
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> <b> HAS_DEBUG_LEVEL </b>: defined if the debug_level() efun is available
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> <b> "doc/concepts/defines.c" </b>: the file being compiled
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> <b> __DIR__ </b>: the directory the file is in (with the trailing /)
+</DL>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

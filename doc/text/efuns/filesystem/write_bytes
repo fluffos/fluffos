@@ -1,0 +1,10 @@
+write_bytes - writes a contiguous series of bytes to a file
+
+int write_bytes( string path, int start, string series );
+
+This function writes the bytes in 'series' into the file named by 'path'
+beginning at byte # 'start'.  It returns zero (0) upon failure, 1 otherwise.
+
+See also:
+ write_file,
+ read_bytes

@@ -37,13 +37,13 @@ static int reserved_size;
 char *reserved_area;		/* reserved for MALLOC() */
 static char *mud_lib;
 
-svalue_t const0, const1, const0u, const0n;
+svalue_t const0, const1, const0u;
 
 double consts[NUM_CONSTS];
 
 /* -1 indicates that we have never had a master object.  This is so the
  * simul_efun object can load before the master. */
-object_t *master_ob = (object_t *) -1;
+object_t *master_ob = 0;
 
 #ifndef NO_IP_DEMON
 void init_addr_server();
@@ -57,20 +57,22 @@ void init_addr_server();
 #define PSIG(z) z()
 #endif
 
-static void sig_fpe SIGPROT;
+static void CDECL sig_fpe SIGPROT;
+static void CDECL sig_cld SIGPROT;
 
 #ifdef TRAP_CRASHES
-static void sig_usr1 SIGPROT;
-static void sig_term SIGPROT;
-static void sig_int SIGPROT;
+static void CDECL sig_usr1 SIGPROT;
+static void CDECL sig_usr2 SIGPROT;
+static void CDECL sig_term SIGPROT;
+static void CDECL sig_int SIGPROT;
 
 #ifndef DEBUG
-static void sig_hup SIGPROT,
-        sig_abrt SIGPROT,
-        sig_segv SIGPROT,
-        sig_ill SIGPROT,
-        sig_bus SIGPROT,
-        sig_iot SIGPROT;
+static void CDECL sig_hup SIGPROT,
+    CDECL sig_abrt SIGPROT,
+    CDECL sig_segv SIGPROT,
+    CDECL sig_ill SIGPROT,
+    CDECL sig_bus SIGPROT,
+    CDECL sig_iot SIGPROT;
 #endif				/* DEBUG */
 #endif				/* TRAP_CRASHES */
 
@@ -93,8 +95,9 @@ int main P2(int, argc, char **, argv)
 #endif
     error_context_t econ;
 
+/* FIXME: should be a configure check */
 #if !defined(LATTICE) && !defined(OLD_ULTRIX) && !defined(sequent) && \
-    !defined(sgi)
+    !defined(sgi) && !defined(WIN32)
     void tzset();
 #endif
     struct lpc_predef_s predefs;
@@ -127,11 +130,6 @@ int main P2(int, argc, char **, argv)
     const0u.type = T_NUMBER;
     const0u.subtype = T_UNDEFINED;
     const0u.u.number = 0;
-
-    /* const0n used by nullp() */
-    const0n.type = T_NUMBER;
-    const0n.subtype = T_NULLVALUE;
-    const0n.u.number = 0;
 
     fake_prog.program_size = 0;
 
@@ -194,7 +192,9 @@ int main P2(int, argc, char **, argv)
 	    got_defaults = 1;
 	}
     }
+    get_version(version_buf);
     if (!got_defaults) {
+	fprintf(stderr, "%s for %s.\n", version_buf, ARCH);
 	fprintf(stderr, "You must specify the configuration filename as an argument.\n");
 	exit(-1);
     }
@@ -205,27 +205,16 @@ int main P2(int, argc, char **, argv)
     init_identifiers();		/* in lex.c */
     init_locals();              /* in compiler.c */
 
-/* disable this for now */
-#if 0
-    /*
-     * We estimate that we will need MAX_USERS + MAX_EFUN_SOCKS + 10 file
-     * descriptors if the maximum number of users were to log in and all LPC
-     * sockets were in use.  This is a pretty close estimate.
-     */
-#ifndef LATTICE
-    dtablesize = MAX_USERS + MAX_EFUN_SOCKS + 10;
-#else
-    /*
-     * Amiga sockets separate from file descriptors
-     */
-    dtablesize = MAX_USERS + MAX_EFUN_SOCKS;
-#endif
-
     /*
      * If our estimate is larger than FD_SETSIZE, then we need more file
      * descriptors than the operating system can handle.  This is a problem
      * that can be resolved by decreasing MAX_USERS, MAX_EFUN_SOCKS, or both.
+     *
+     * Unfortunately, since neither MAX_USERS or MAX_EFUN_SOCKS exist any more,
+     * we have no clue how many we will need.  This code really should be
+     * moved to places where ENFILE/EMFILE is returned.
      */
+#if 0
     if (dtablesize > FD_SETSIZE) {
 	fprintf(stderr, "Warning: File descriptor requirements exceed system capacity!\n");
 	fprintf(stderr, "         Configuration exceeds system capacity by %d descriptor(s).\n",
@@ -319,7 +308,6 @@ int main P2(int, argc, char **, argv)
 	fprintf(stderr, "Bad mudlib directory: %s\n", mud_lib);
 	exit(-1);
     }
-    get_version(version_buf);
     time(&tm);
     debug_message("----------------------------------------------------------------------------\n%s (%s) starting up on %s - %s\n\n", MUD_NAME, version_buf, ARCH, ctime(&tm));
 
@@ -330,6 +318,9 @@ int main P2(int, argc, char **, argv)
     init_lpc_to_c();
 #endif
     add_predefines();
+#ifdef WIN32
+    _tzset();
+#endif
 
 #ifndef NO_IP_DEMON
     if (!no_ip_demon && ADDR_SERVER_IP)
@@ -365,7 +356,7 @@ int main P2(int, argc, char **, argv)
 	    case 'f':
 		save_context(&econ);
 		if (SETJMP(econ.context)) {
-		    debug_message("Error while calling master::flag(\"%s\"), aborting ...", argv[i] + 2);
+		    debug_message("Error while calling master::flag(\"%s\"), aborting ...\n", argv[i] + 2);
 		    exit(-1);
 		}
 		push_constant_string(argv[i] + 2);
@@ -402,15 +393,16 @@ int main P2(int, argc, char **, argv)
     }
     if (MudOS_is_being_shut_down)
 	exit(1);
-    if (strlen(DEFAULT_FAIL_MESSAGE))
-	default_fail_message = DEFAULT_FAIL_MESSAGE;
-    else
-	default_fail_message = "What?";
+    if (*(DEFAULT_FAIL_MESSAGE)) {
+	char buf[8192];
+
+	strcpy(buf, DEFAULT_FAIL_MESSAGE);
+	strcat(buf, "\n");
+	default_fail_message = make_shared_string(buf);
+    } else
+	default_fail_message = "What?\n";
 #ifdef PACKAGE_MUDLIB_STATS
     restore_stat_files();
-#endif
-#ifdef PACKAGE_SOCKETS
-    init_sockets();		/* initialize efun sockets           */
 #endif
     preload_objects(e_flag);
 #ifdef SIGFPE
@@ -419,6 +411,9 @@ int main P2(int, argc, char **, argv)
 #ifdef TRAP_CRASHES
 #ifdef SIGUSR1
     signal(SIGUSR1, sig_usr1);
+#endif
+#ifdef SIGUSR2
+    signal(SIGUSR2, sig_usr2);
 #endif
     signal(SIGTERM, sig_term);
     signal(SIGINT, sig_int);
@@ -440,6 +435,13 @@ int main P2(int, argc, char **, argv)
     signal(SIGILL, sig_ill);
 #endif
 #endif				/* DEBUG */
+#endif
+#ifndef WIN32
+#ifdef USE_BSD_SIGNALS
+    signal(SIGCHLD, sig_cld);
+#else
+    signal(SIGCLD, sig_cld);
+#endif
 #endif
     backend();
     return 0;
@@ -588,7 +590,22 @@ char *xalloc P1(int, size)
     return p;
 }
 
-static void PSIG(sig_fpe)
+static void CDECL PSIG(sig_cld) 
+{
+#ifndef WIN32
+    int status;
+#ifdef USE_BSD_SIGNALS
+    while (wait3(&status, WNOHANG, NULL) > 0)
+	;
+#else
+    wait(&status);
+    signal(SIGCLD, sig_cld);
+#endif
+#endif
+}
+
+
+static void CDECL PSIG(sig_fpe)
 {
     signal(SIGFPE, sig_fpe);
 }
@@ -600,9 +617,9 @@ static void PSIG(sig_fpe)
    restart
  */
 
-static void PSIG(sig_usr1)
+static void CDECL PSIG(sig_usr1)
 {
-    push_string("Host machine shutting down", STRING_CONSTANT);
+    push_constant_string("Host machine shutting down");
     push_undefined();
     push_undefined();
     apply_master_ob(APPLY_CRASH, 3);
@@ -610,47 +627,53 @@ static void PSIG(sig_usr1)
     exit(-1);
 }
 
+/* Abort evaluation */
+static void CDECL PSIG(sig_usr2)
+{
+    eval_cost = 1;
+}
+
 /*
  * Actually, doing all this stuff from a signal is probably illegal
  * -Beek
  */
-static void PSIG(sig_term)
+static void CDECL PSIG(sig_term)
 {
     fatal("Process terminated");
 }
 
-static void PSIG(sig_int)
+static void CDECL PSIG(sig_int)
 {
     fatal("Process interrupted");
 }
 
 #ifndef DEBUG
-static void PSIG(sig_segv)
+static void CDECL PSIG(sig_segv)
 {
     fatal("Segmentation fault");
 }
 
-static void PSIG(sig_bus)
+static void CDECL PSIG(sig_bus)
 {
     fatal("Bus error");
 }
 
-static void PSIG(sig_ill)
+static void CDECL PSIG(sig_ill)
 {
     fatal("Illegal instruction");
 }
 
-static void PSIG(sig_hup)
+static void CDECL PSIG(sig_hup)
 {
     fatal("Hangup!");
 }
 
-static void PSIG(sig_abrt)
+static void CDECL PSIG(sig_abrt)
 {
     fatal("Aborted");
 }
 
-static void PSIG(sig_iot)
+static void CDECL PSIG(sig_iot)
 {
     fatal("Aborted(IOT)");
 }

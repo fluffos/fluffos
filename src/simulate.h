@@ -5,6 +5,9 @@
 #define V_NOSPACE       2
 #define V_FUNCTION      4
 
+/* The end of a static buffer */
+#define EndOf(x) (x + sizeof(x)/sizeof(x[0]))
+
 /*
  * simulate.c
  */
@@ -19,7 +22,6 @@ extern char *inherit_file;
 #ifndef NO_ADD_ACTION
 extern char *last_verb;
 #endif
-extern int num_error;
 extern int tot_alloc_sentence;
 extern int MudOS_is_being_shut_down;
 #ifdef LPC_TO_C
@@ -28,6 +30,8 @@ extern FILE *compilation_output_file;
 extern char *compilation_ident;
 #endif
 
+char *strput PROT((char *, char *, char *));
+char *strput_int PROT((char *, char *, int));
 void debug_fatal PROT1V(char *);
 void fatal PROT1V(char *);
 void error PROT1V(char *);
@@ -49,7 +53,13 @@ int get_char PROT((svalue_t *, int, int, svalue_t *));
 
 int strip_name PROT((char *, char *, int));
 char *check_name PROT((char *));
-object_t *load_object PROT((char *, lpc_object_t *));
+#ifdef LPC_TO_C
+#define load_object(x, y) int_load_object(x, y)
+object_t *int_load_object PROT((char *, lpc_object_t *));
+#else
+#define load_object(x, y) int_load_object(x)
+object_t *int_load_object PROT((char *));
+#endif
 object_t *clone_object PROT((char *, int));
 object_t *environment PROT((svalue_t *));
 object_t *first_inventory PROT((svalue_t *));
@@ -57,12 +67,12 @@ object_t *object_present PROT((svalue_t *, object_t *));
 object_t *find_object PROT((char *));
 object_t *find_object2 PROT((char *));
 void move_object PROT((object_t *, object_t *));
-void destruct_object PROT((svalue_t *));
+void destruct_object PROT((object_t *));
 void destruct2 PROT((object_t *));
 
 void print_svalue PROT((svalue_t *));
 void do_write PROT((svalue_t *));
-void do_message PROT((svalue_t *, char *, array_t *, array_t *, int));
+void do_message PROT((svalue_t *, svalue_t *, array_t *, array_t *, int));
 void say PROT((svalue_t *, array_t *));
 void tell_room PROT((object_t *, svalue_t *, array_t *));
 void shout_string PROT((char *));

@@ -1,0 +1,32 @@
+<HEAD> <TITLE> message - deliver messages to "living" objects </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> message - deliver messages to "living" objects </H1> </center>
+<p>
+<b> void message( mixed class, mixed message, mixed target, mixed exclude ); </b>
+<p>
+message() calls receive_message(mixed class, mixed message) in all objects
+in the target list excluding those in the exclude list. This basically
+tells the object the message.
+<p>
+Class is the type of message (used for clients and such). An example
+would be 'combat', 'shout', 'emergency' etc.  Any LPC value can be
+passed, though.
+<p>
+Message is usually a string containing the text to send, though it
+can also be any value.
+<p>
+Target is a list of objects to be sent the message. This can be either a 
+single object string or object pointer, or may be an array of either.
+If a target is non-living all objects in its environment will receive
+the message.
+<p>
+Exclude is a list of objects that should not receive the message. This
+can either be one object or an array of objects.
+<p>
+See also:
+<A HREF=../../applies/interactive/receive_message.html>  receive_message </A>,
+<A HREF=say.html>  say </A>,
+<A HREF=write.html>  write </A>,
+<A HREF=shout.html>  shout </A>,
+<A HREF=../objects/tell_object.html>  tell_object </A>,
+<A HREF=../objects/tell_room.html>  tell_room </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

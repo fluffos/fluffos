@@ -1,0 +1,12 @@
+userp - determine if a given object was once interactive
+
+int userp( object );
+
+Returns 1 if the arg was once interactive.
+
+See also:
+ interactive,
+ users,
+ living
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

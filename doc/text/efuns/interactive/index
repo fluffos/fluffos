@@ -1,0 +1,72 @@
+Interactive efuns
+
+<H3>These efuns are for dealing with interactive (user) objects:</H3>
+
+actions and related efuns: (Not available with NO_ADD_ACTION)
+
+<DL>
+*  add_action
+*  command
+*  commands
+*  disable_commands
+*  enable_commands
+*  find_player
+*  notify_fail
+</DL>
+
+Archaic wizard functions: (Not available with NO_WIZARDS)
+<DL>
+*  disable_wizard
+*  enable_wizard
+*  wizardp
+</DL>
+
+The old ed interface: (#define OLD_ED)
+<DL>
+*  ed
+*  in_edit
+</DL>
+
+The new one:
+<DL>
+*  ed_cmd
+*  ed_start
+*  in_edit
+*  query_ed_mode
+</DL>
+
+Input handling:
+<DL>
+*  get_char
+*  input_to
+*  in_input
+*  receive
+</DL>
+
+Output handling:
+<DL>
+*  printf
+*  say
+*  shout
+*  snoop
+*  write
+</DL>
+
+Information about user objects, and miscellaneous utility functions:
+<DL>
+*  exec
+*  interactive
+*  message
+*  query_host_name
+*  query_idle
+*  query_ip_name
+*  query_ip_number
+*  query_snoop
+*  query_snooping
+*  resolve
+*  this_interactive
+*  this_player
+*  userp
+*  users
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

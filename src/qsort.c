@@ -13,10 +13,10 @@
 #define LEN sizeof(svalue_t)
 #define MAX_LEN 1000
 
-INLINE static void doSwap PROT((char *, char *, int));
+INLINE_STATIC void doSwap PROT((char *, char *, int));
 static void qSort PROT((void *, int, int, int, int, int (*) ()));
 
-INLINE static void doSwap P3(register char *, one, register char *, two,
+INLINE_STATIC void doSwap P3(register char *, one, register char *, two,
                              register int, size)
 {
     register char t;

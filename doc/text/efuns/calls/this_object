@@ -1,0 +1,13 @@
+this_object - return the object pointer of the calling object
+
+object this_object();
+
+Return the object pointer of the current object.  Useful for passing the
+current object to other functions.
+
+See also:
+ this_player,
+ previous_object,
+ origin
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,21 @@
+map_mapping - modify an mapping of elements via application of a function
+
+mapping map_mapping( mapping map, string fun, object ob, ... );
+
+mapping map_mapping( mapping map, function f, ... );
+
+Returns an mapping with the same keys as map whose items have been
+mapped throught 'ob->fun()' or 'f'.  The function is called for each
+(key, value) pair in 'map' and the returned mapping has the return value
+of the function as its value for each key.
+The extra arguments are passed as parameters to the function
+after the key and the value.
+
+See also:
+ filter_array,
+ filter,
+ sort_array,
+ map_array,
+ map
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

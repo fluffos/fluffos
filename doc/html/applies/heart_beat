@@ -1,0 +1,11 @@
+heart_beat - called periodically in objects in which it is enabled
+
+void heart_beat();
+
+If an object has called set_heart_beat(), this function will be called
+periodically in that object.
+
+See also:
+ set_heart_beat
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

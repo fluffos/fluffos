@@ -1,0 +1,7 @@
+crc32 - compute the cycle redundancy code for a buffer or string
+
+int crc32( buffer | string x );
+
+Computes and returns the CRC-32 code for the given buffer or string, `x'.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

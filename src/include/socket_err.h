@@ -11,7 +11,7 @@
 #define EESOCKET	 -1	/* Problem creating socket */
 #define EESETSOCKOPT	 -2	/* Problem with setsockopt */
 #define	EENONBLOCK	 -3	/* Problem setting non-blocking mode */
-#define EENOSOCKS	 -4	/* No more available efun sockets */
+#define EENOSOCKS	 -4	/* UNUSED */
 #define EEFDRANGE	 -5	/* Descriptor out of range */
 #define EEBADF		 -6	/* Descriptor is invalid */
 #define EESECURITY	 -7	/* Security violation attempted */

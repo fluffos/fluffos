@@ -34,6 +34,7 @@ operator switch;
 
 operator call_function_by_address, call_inherited, return, return_zero;
 
+/* eq must be first, gt must be last; c.f. is_boolean() */
 operator eq, ne, le, lt, ge, gt;
 
 operator inc, dec, pre_inc, post_inc, pre_dec, post_dec;
@@ -65,6 +66,6 @@ operator simul_efun;
 operator sscanf;
 operator parse_command;
 
-operator new_class;
+operator new_class, new_empty_class;
 operator expand_varargs;
 

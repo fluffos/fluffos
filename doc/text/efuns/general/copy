@@ -1,0 +1,22 @@
+copy - recursively duplicate a value
+
+mixed copy(mixed);
+
+copy() returns a value with exactly the same value as its argument, but with
+all reference types (mappings, arrays, etc) duplicated.  For example:
+
+mapping a, b = ({ 1 });
+a = b;
+a[0] = 2;
+printf("%O %O\n", a, b);
+
+results in ({ 2 }) and ({ 2 }), while:
+
+mapping a, b = ({ 1 });
+a = copy(b);
+a[0] = 2;
+printf("%O %O\n", a, b);
+
+results in ({ 2 }) and ({ 1 }).
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

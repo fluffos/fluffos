@@ -1,0 +1,1227 @@
+<HEAD> <TITLE> done-lars </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> done-lars </H1> </center>
+<p>
+3.1.1
+<p>
+. Fixed a severe bug, where this_player() returned non-zero value when the
+  object was destructed. The basic idea is that it should never be possible
+  to refer to a destructed object.
+<p>
+. 'nomask' functions and variables wasn't checked for correctly. 'private'
+  functions were fixed, so that they can no be called through call_other().
+<p>
+. This is a short summary of how special types are handled:
+<p>
+    'static' variables: Will not be saved at save_object(), nor modified at
+    restore_object(). 'static' functions can not be called through
+    call_other(). 'static' inheritance will make all inherited definitions
+    'static'.
+<p>
+    'private' variables and functions: Can not be accessed by a sub class
+    inheriting their definitions. Functions can not be called through
+    call_other(). 'private' inheritance will make all variables and functions
+    'private'. 
+<p>
+    'nomask' functions and variables can not be redefined by a sub class.
+    'nomask' inheritance will make all inherited definitions 'nomask'.
+<p>
+    'public' variables and functions can be redefined by a sub class, even if
+    they have been inherited 'private'ly. 'public' inheritance will make all
+    inherited definitions 'public'. 
+<p>
+    The type 'protected' is reserved, but does not mean anything currently.
+<p>
+3.1.0
+<p>
+. From now on, <i> lars@cd.chalmers.se </i> will not develop new major features. 
+  I will only use minimum time to fix bugs. The goal is to make the game 
+  driver as bug free and stable as possible. I will not either incorporate 
+  new big features from others, as that has proven to require much time from 
+  me.
+<p>
+. Fixed a bug in the initialization code, which did become a recursive
+  function call.
+<p>
+. The statment catch(exec(...)) could crash the game.
+<p>
+3.0.53
+<p>
+. JnA: Fixed some bugs in parse_command(). Empty commands and patterns 
+  will not dump the driver. Multi word id's is now possible. 'word word' 
+  is not.
+<p>
+. RW: Fixed a lot of #else XXX and #endif XXX that ought to have the XXX
+  within comments. Apparently a lot of compilers complain mightily.
+<p>
+. RW: Applied fix to apply_low() in interpret.c. References to functions in 
+  swapped objects were kept and made the game dump.  Fix supplied by Dworkin.
+<p>
+. It is now possible to initialize non-local variables. If such 
+  initialization is used, then a function __INIT() will automatically be 
+  defined, which can be called. __INIT() is automatically called when the 
+  object is created for the first time, as well as when it is cloned. The 
+  __INIT() function will also call __INIT() of all inherited files, if 
+  there are any. Strict types are enforced. Example:
+    object created_me = this_player();
+  The variables are initalized and __INIT is called in the same order as
+  variables are declared respectively inherit statements are encountered.
+<p>
+. Fixed a bug in set_notify(), which would crash the game if the value of
+  this_player() was 0.
+<p>
+. previous_object() should now behave the same way, independent of if the 
+  called function was found in the cache or not.
+<p>
+. A bug was fixed which cold crash the game driver by the following code:
+    int test;
+    void test() {
+      test = "test"->(int)test;
+      test = 1;
+    }
+<p>
+. A new function, 'string *inherit_list(object ob)' will return the names
+  of all files inherited by 'ob'.
+<p>
+3.0.52
+<p>
+. Fixed a fatal bug in say() when an object was given as a second optional
+  argument.
+<p>
+3.0.51
+<p>
+. create_wizard() is now only defined for compatibility mode.
+<p>
+. The -D flag is now parsed before master.c is loaded.
+<p>
+. It is no longer possible to shadow a function that is defined as 'nomask'.
+<p>
+. previous_object() is now also set when doing call_other(this_object()). I
+  examined the code to mudlib 2.4.5, and found no case where code would be
+  broken.  Tell me if I am wrong ! It is unlikely, as you normally don't do
+  call_other(this_object()).
+<p>
+. Fixed some type tests of binary operator '-' in regards to arrays. (It is
+  allowed to subtract arrays from each other.)
+<p>
+. A new function is defined in master.c: query_player_level(string type).
+  It is supposed to be a portable function that defines what permissions a
+  player has depending on his level. It is used by the game driver. Be sure 
+  to copy this function to your master.c, and update it !
+<p>
+. A new efun has been defined: 'string *regexp(string *list, string pattern)'.
+  It takes an array 'list' of strings, and returns a new array of the strings
+  that matched 'pattern'.
+<p>
+. Sorry, some NULL:s had been used again in array.c.
+<p>
+. New efun: object *deep_inventory(object *ob);
+  This function returns the recursive inventory of an object. The returned 
+  array of objects is flat, ie there is no structure reflecting the 
+  internal containment relations.
+<p>
+. When the user gives a 'e file' command from inside the editor session, then
+  the file name has to be transformed to correct path if not given with a
+  leading slash. This is only needed in native mode. A function 'string 
+  make_path_absolute(string file)' is called in master.c to do this job. For 
+  example, when Lars does 'e file.c', then make_path_absolute() could 
+  transform this into '/w/lars/file.c'.
+<p>
+. Efun rename() only worked for native mode, so it was changed so as to be
+  undefined for compatibility mode.
+<p>
+. Allocating much fewer strings when compiling, as pointers to identical 
+  strings can be shared.
+<p>
+. The value of this_player() could be wrong sometimes in 'catch_tell'.
+<p>
+. A saved file name from yyerror() has to be stored with a leading slash
+  in native mode.
+<p>
+. Using ed() without arguments to edit the file with the last error now also
+  works for native mode, if query_real_name() is defined in the player object.
+<p>
+. say() now allows a list of objects to be avoided.
+<p>
+. Fixed a bug in ed() when starting a new ed() session from the function call
+  executed when ed() finished.
+<p>
+. The argument to 'set' in 'ed' can now be 80 characters, and will give error
+  if exceeded (instead of crashing the game).
+<p>
+. Players not yet in a room will not receive shout messages.
+<p>
+. Extended efun debug_info() with a second type of info, which is really even
+  more of the first type. Try 'debug_info(0, ob)' and 'debug_info(1, ob)'.
+<p>
+. JnA: Changed exec() so that it calls valid_exec(program_name) in master.c.
+  Earlier versions enforced program_name to be secure/login.c
+<p>
+. Fixed a memory leak by calling YYACCEPT instead of doing return from the
+  yacc parser.
+<p>
+3.0.50
+<p>
+. Implemented a "range" argument to index operators, which can be used on
+  strings and arrays. extract() and slice_array() are no longer needed.
+  The syntax is: 'expr1[expr2 .. expr3]' where 'expr1' is either a string 
+  or an array of any type of elements. 'expr2' and 'expr3' must be numbers.
+  extract() will remain for compatibility, but slice_array() has been replaced
+  by a simulated efun in mudlib_simul_efun.c.
+<p>
+. Functions defined in mudlib_simul_efun.c could fail to be used if it was a
+  complex expression.
+<p>
+. Fixed bug in read_bytes(), which did not terminate strings properly with
+  a 0-byte.
+<p>
+. Made make_func more robust, so as to verify that no buffers are overwritten.
+<p>
+. The -lpc flag is now supplied to the indent program.
+<p>
+. The efun filter_objects() has been renamed as filter_array(), as that is
+  really what it does. An entry has been added to mudlib_simul_efun.c for
+  the sake of compatibility.
+<p>
+. sort_array() has been made more portable.
+<p>
+. Allows -DFLAG as arguments to the game driver, which will define symbols
+  for all LPC files loaded.
+<p>
+. Made efun trace usable in compatibility mode.
+<p>
+. New efun: intersect_alist(), does a fast set intersection on alists. The
+  operator '&' does set intersection on arrays in general.
+<p>
+3.0.49
+<p>
+. Fixed a severe allocation bug in get_dir().
+<p>
+. Fixed a bug that could crash the game if the simul_efun file was destructed.
+<p>
+. The value of error() was used in array.c. Sigh. Also, NULL was used, while
+  stdio.h was not included. it is more proper to us 0.
+<p>
+. Functions that are 'static' in mudlib_simul_efun.c will not overide any
+  efuns and will never be called automatically.
+<p>
+. Doing "set_heart_beat(0)" followed by "set_heart_beat(1)" in the heart beat
+  would leave the object for every firts in the list of objects to get
+  heart beats.
+<p>
+. The file func_spec has been renamed to func_spec.c, so as to enable the
+  C preprocessor to use it as input. The old file 'func_spec' can be removed.
+  Look at the end of func_spec.c for LPC efuns conditionally defined. You might
+  want to change the list.  There is currently only one.
+<p>
+3.0.48
+<p>
+. get_dir() and ls() will now also return files with the suffix .i.
+<p>
+. Fixed a function in array.c that was defined in the ANSI way.
+<p>
+. read_bytes() will no longer convert newlines to spaces.
+<p>
+. xt: -o replaced with #define COMPAT_MODE
+<p>
+. xt: rename() now checks that you have write permission on the file
+  you move.
+<p>
+. Catching errors when calling reset() was not done.
+<p>
+. A new efun, "mixed debug_info(int, ...)", to be used for general debug
+  information. The first number defines what kind of debugging information.
+  Currently, only 0 is allowed, which will print info about an object (second
+  argument).
+<p>
+. get_dir() now returns a zero length array if no files in directory.
+<p>
+. Fixed a bug in ls() and get_dir(), which would fail in some circumstances.
+<p>
+. Runtime type check of third argument to tell_room was missing.
+<p>
+. A substitution in ed.c that yielded a too long line was likely to crash
+  the game.
+<p>
+. indent() popped off it's arguments before it was used. Can be dangerous.
+<p>
+. Preventing against explicit calls of ::functions through call_other() and
+  add_action().
+<p>
+. The efun ls() is no longer needed because of get_dir(), and has been removed.
+  There is a file mudlib_simul_efun.c, which can define functions to replace
+  obsolete efuns etc. This file has a definition of ls() if you don't want to
+  fix all occurences in your mudlib code. The provided master.c now as a
+  function named get_simul_efun(), which is supposed to return the name of this
+  simul-efun file. Users of both COMPAT_MODE and native mode can use this
+  get_simul_efun() in master.c. Beware of other things in the provided master.c,
+  as they are specially for COMPAT_MODE. Expect more obsolete efuns to disappear
+  in the future. Because of this simul_efun mechanism, compatibilty is
+  maintained.  For more details, look in source code or in the LPmud.texinfo
+  documentation.
+<p>
+3.0.47
+<p>
+. Got rid of the shift/reduce conflict from lang.y.
+<p>
+. Renamed the game driver to 'driver' instead of 'debug'.
+<p>
+. Enabled subtracting of arrays, which will do a set operation.
+<p>
+. Enabled default argument to some efuns. For example, all_inventory() will
+  use this_object() as argument if none specified.
+<p>
+. There can now be third optional argument to tell_room(), an array of 
+  objects to be excluded.
+<p>
+. There is a new function:
+    string *get_dir(string)
+  that takes a path as argument and returns an array of file names in that
+  directory.
+    get_dir("/w"); returns ({ "w" })
+    get_dir("/w/"); and get_dir("/w/."); return contents of directory "/w"
+    get_dir("/");, get_dir("."); and get_dir("/."); return contents of
+        directory "/".
+<p>
+. New efun:
+  mixed assoc(mixed key, mixed *keys, mixed *|void data_or_fail, mixed|void fail);
+  Searches a key in an alist.
+<p>
+  Three modes of calling:
+   i) With exactly two arguments, the second being an array which's first
+      element is no array.
+      In this case the entire array is searched for the key; -1 is returned
+        if not found, else the index ( like member_array, but faster ).
+<p>
+   ii) With two or three arguments, the second being an array which's first
+       element is an array.
+       The array has to have a second element of the same size;
+       the key is searched in the first and the associated element of the
+       second array that is element of second argument is returned if succesful;
+       if not, 0 is returned, or the third argument, if given.
+<p>
+   iii) With three or four arguments, the second being an array of keys
+        ( first element no array ) and the second is a matching data array.
+        returns 0 or fourth argument ( if given ) for failure,
+        or the matching entry in the array given as third argument for success.
+<p>
+  Complexity : O( lg(n) ) , where n is the number of keys.
+<p>
+  Return value is undefined if another list is given in place of a presorted
+  key list.
+<p>
+. New efun:
+  mixed insert_alist( mixed key, mixed data_or_key_list..., mixed * alist);
+  inserts an entry into an alist, or shows the place where this is to be done.
+  When called with the last argument being an alist:
+  The first argument is a key to be inserted, the second and all the
+  following but the last are data to associate it with.
+  The last has to be an array with as much elements as key and data arguments
+  are given, the matching key and data arrays; this should be already an
+  alist, or the return value will neither be an alist.
+  Return value is the enlarged assoc list ( array of two arrays ).
+  If the key is already in the list, the data is simply replaced
+  in the returned list.
+<p>
+  When called with the last argument beinig a list of non-lists:
+  The call has to be done with exactly two arguments.
+  The first argument is a key to be inserted in the presorted key list
+  ( first element of an array that is an alist )
+  that has to be given as second argument. Return value is the index
+  where the key has to be inserted to preserve the structure of a presorted
+  alist, or the index where the key has been found.
+  Return value is an int.
+  CEVEATS: when called with certain string keys, the correct place might
+    change after the call. So better don't use this mode of calling with
+    a string key.
+<p>
+  Complexity O( lg(n) + a*n ) Where n is the number of keys and s is
+  a very small constant ( for block move );
+<p>
+. New efun:
+  mixed *order_alist(mixed *keys, mixed *|void data, ...);
+  Creates an alist.
+  Either takes an array containing keys, and others containing the associated
+  data, where all arrays are to be of the same length,
+  or takes a single array that contains as first member the array of keys
+  and has an arbitrary number of other members containing data, each of wich
+  has to be of the same length as the key array.
+  Returns an array holding the sorted key array and the data arrays; the same
+  permutation that is applied to the key array is applied to all data arrays.
+<p>
+  Complexity is O( n * lg(n) * m ) , where n is the number of elements in the key
+  array and m is the number of data arrays + 1;
+<p>
+  Note that the the dimensions of the arrays are used the other way than in lisp
+  to allow for faster searching.
+<p>
+  Keys have to be of type integer, string or object. Types can be mixed.
+<p>
+. New efun:
+  mixed *sort_array(mixed *arr, string greater_fun, object ob);
+  Returns an array sorted by the ordering function ob->greater_fun()
+  The function 'greater_fun' in the object 'ob' is continously passed two
+  arguments which are two of the elements of the array 'arr'. It should return
+  true or a positive number if the first argument is greater than the second.
+<p>
+. A parse_old.c was copied from 3.0.45 parse.c, and the new parse.c is not 
+  used currently.
+<p>
+3.0.46
+<p>
+. RW: query_snoop was declared as returning string while actually returning
+  object. Fixed in efun_spec.
+<p>
+. Fixed a bug in log_file(), which called valid_read instead of valid_write()
+  (does not apply to the -o mode).
+<p>
+. The saved commandgiver in call_out() was not properly freed in 
+  circumstances of errors.
+<p>
+. JnA: Added read_bytes() to read a given number of bytes from a given 
+  position in a file. This will be used in CDlib to implement the worldmap.
+<p>
+. JnA: Remade the principal functionality of parse_command(). It is now a lot
+  more efficient if properly supported by the mudlib. This makes it not
+  backwards compatible, meaning the old parse_command() is run in -o mode.
+<p>
+. JnA: this_player(1) returning current_interactive
+<p>
+. Applied changes for MSDOS.
+<p>
+. JnA: move_or_destruct: should call move(to,1) in objects in mudlib 3.0
+  It is dubious if the objects should be moved at all and not just destructed.
+<p>
+. New restrictions has been defined for when a shadow may be used. A function
+  query_allow_shadow() is called in master.c, which should return 0 or 1
+  to deny respectively allow shadowing. The example in the provided master.c
+  will define such a function that is compatible with the old way of calling
+  query_prevent_shadow() in the victim. It is thus easy to change the shadowing
+  into both allow never, allow always and allow sometimes, whatever you prefer.
+<p>
+. The file lang.y is now automatically generated from prelang.y and postlang.y
+  with make_func, which uses func_spec.
+<p>
+. JnA: Added docs in parse.c and some support functions in master.c
+<p>
+3.0.45
+<p>
+. Fixed a bug in call_out, where destructed objects would not increment the
+  time to next object in ther list of call outs to be executed.
+<p>
+. call_out will now save and restore this_player(). That means that 'write()'
+  will send messages to the player etc. It also means that efuns requiring
+  valid_read and valid_write in the player object can be used (was only needed
+  for -o mode).
+<p>
+. Fixed a bug in log_file() which would only work for -o mode because
+  valid_write was called with wrong argument.
+<p>
+. Fixed a memory leak in load_object() which would not deallocate used arrays.
+<p>
+. Changed the way reference counts for programs were updated, the old one was
+  ugly and buggy.
+<p>
+. The 'status' command was cleaned up. The command 'status tables' can also be
+  given for verbose information about various tables.
+<p>
+. Added interface for 'mudwho'. Define symbol MUDWHO in config.h and
+  some constants in mudwho.h if you want to use it.
+<p>
+. Fixed a bug in smart_log(), which could crash the game for very long
+  error messages.
+<p>
+. JnA: Replaced '*' in process_string with '@@', which is more uncommon
+<p>
+. xt: made new efun rename().
+<p>
+. cat() now returns number of lines that was printed.
+<p>
+. It is now considered an error if objects are destructed at call of init().
+<p>
+. Strings were not freed when multiple calls of notify_fail() was done.
+<p>
+. The switch-statement has now been fixed so that it is poossible to do
+  'return' in it. It is also possible to use numeric intervals like
+  'case 1..100:'.
+<p>
+. JnA: Fixed small bug in new_call_out which dumped the GD if 
+  command_giver == 0
+<p>
+. JnA: Fixed a bug with fclose() in restore_object(), dumped the GD
+<p>
+. RW: snoop: Added a backwards compatible patch to set_snoop. There is 
+  now a new function in comm1.c (new_set_snoop) that defines the
+  mudlib 3.0 version of set_snoop. The difference is that the efun
+  in !o_flag mode takes two arguments, snooper and snopee and checks
+  with the function valid_snoop() in master.c if this is permissable
+  or not. The new function breaks previous snoops if necessary
+  relying on the mudlib to decide if this is ok or not. Neither does
+  the new function write anything to the player, but expects the mudlib
+  to take care of that as well. The efun returns the object snooped on if
+  success, otherwise 0. Note however, that in o_flag mode, the
+  functionality is just as before.
+<p>
+. RW: query_snoop: Fixed so that in !o_flag mode query_snoop can only be
+  called from the master object.
+<p>
+3.0.44
+<p>
+. Made a constant array of size 0, for all to share. This saves memory, and
+  means that all variables set to ({}) uses as much memory as variables
+  containing numbers. It will also mean that the test "({}) == ({})" will 
+  evaluate to true.
+<p>
+. The types of arguments to '+' is now checked (when type testing is enabled).
+  Expect errors if there is a call_other with no cast.
+<p>
+. Implemented switch() statement, which takes a number or string as argument
+  (thanks to J|rn Rennecke!) It uses a sorted table to speed up searching.
+  Strings are very efficient, using the shared string table. Don't have a
+  return statement inside the switch statement. It will crash the game due
+  to a bug.
+<p>
+. The definition of INC_LIST in config.h has been removed. Instead, there
+  is a function 'define_include_dirs()' in master.c that returns an array
+  of these strings. That also means that the master.c is compiled without
+  automatica search for include files. If master.c inlucde any files, make
+  sure these has absolute path. This is simply found out when the game driver
+  is started :-)
+<p>
+. Fixed some bugs in preload(). It didn't behave well when there was an error.
+  Nor did it free the array of castle names.
+<p>
+. Changed read_file(), to take an optional start and end argument.
+<p>
+. Fixed a bug in 'ed', which could crash the game when trying to edit a file
+  that you did not have permissions to.
+<p>
+3.0.43
+<p>
+. Added an option 'excompatible', which means that round brackets in reg exp
+  needn't be escaped.
+<p>
+. The regexp now allows \< and \> for matching start and end of word.
+<p>
+. Fixed more bugs with the flushing of inet packages.
+<p>
+. JnA: Total rehack of parse_command. Even I couldn't read the old mess.
+<p>
+. JnA: Fixed a small bug in process_string which produced a star to much.
+<p>
+3.0.42
+<p>
+. JnA: "destruct_environment_of" is now called in master when the environment
+  of an object gets destructed and the destructed environment does not
+  have an environment itself, ie in rooms. This is so players will not
+  get disconnected when the room they are in get destructed.
+  If this func does not exist in master or does not move the object from
+  its location then the object is destructed.
+<p>
+. Efuns can now be access with the syntax 'efun::fun' where 'fun' is the name
+  of the efun. That means that efuns can be accessed even if it has
+  been redefined.
+<p>
+. The bug that required prototypes for recursive functions has been fixed.
+<p>
+. If a command moves the player and returns 0, then an error will be
+  generated. This was silently accepted previously.
+<p>
+. JnA: process_string() is called from notify_no_command() i comm1.c
+  This enables notify_fail() to work with 'value by function call'.
+  Rehacked process_string() so it looks presentable, it didn't before.
+<p>
+. Added add_xverb().
+<p>
+. Fixed bugs in the auto indent option of ed.
+<p>
+. The '?' command in ed started the search on the wrong line.
+<p>
+. 'ed' can now handle names for new files.
+<p>
+. Fixed a bug when a player went link-dead with inet packets pending and some
+  other bugs for handling flushing.
+<p>
+3.0.41
+<p>
+. Types are now checked for all arguments to efuns. Expect errors if you
+  have not casted the return value from call_other(). No argument types are
+  checked if the the type checking is not enabled (which is done by defining the
+  type of a function definition).
+<p>
+. Inet packets are now buffered, and flushed later.
+<p>
+. The master.c (in -o mode) is now allowed to read and write any file in the
+  mudlib (but not outside).
+<p>
+. The code for the efun creat_wizard() is now moved to master_creat_wizard()
+  in master.c (see example). It is thus easy to customize.
+<p>
+3.0.40
+<p>
+. Added handling of hexadecimal numbers in lex.c and fixed a line number
+  counting bug.
+<p>
+. Fixed a bug for not clearing the O_RESET_STATE flag by moving it from 
+  apply() to apply_low().
+<p>
+. The setup in the editor can now be saved. Use 'hset' for info. The save
+  setup mechanism is in master.c: save_ed_setup() and retrieve_ed_setup().
+  There are two mechanisms provided. One that save setup into a file, and
+  one that saves setup in the player dedicated flags. The file saving
+  method is default.
+<p>
+. Errors are now logged by calling function log_error(file_name, message)
+  in master.c. It is thus easy to change how to handle error messages.
+  The old function, get_log_file() in master.c has been removed. This is yet
+  another step of moving hard coded dependencies from the game driver to
+  the master.c object.
+<p>
+3.0.39
+<p>
+. A new file, func_desc, has been created that defines number of arguments,
+  return types and types of arguments for all efuns. A program, make_func, will
+  automatically generate a file efun_defs.c that is included into lex.c.
+  The base for compile time type checking is also done this way.
+<p>
+. JnA: get_log_file() added to get the filename of where to log errors for a 
+  given file. This is a function in wiz_list.c called from smart_log. It
+  calls the corresponding function in /secure/master. It is not used
+  in -o mode.
+<p>
+. JnA: Fixed a bug in map_array that dumped the GD when map on a nonexistent
+  function was performed.
+<p>
+. A major change has been done with the way reset() is called. When the
+  object is loaded first time, create() is called instead of reset(0). When it
+  is time for next 'reset', then reset() will be called (without arguments).
+  The -o flag is a compatible mode as usual. A good coding technique may be
+  to call reset() from create(). The mudlib.n found at alcazar.cd.chalmers.se
+  has been changed apropriately.
+<p>
+3.0.38
+<p>
+. Fixed a bug in catch() that could crash the game. This happened when the 
+  code inside catch called a local function, which did something that 
+  triggered an error.
+<p>
+. JnA: trace() and traceprefix() fixed to work with mudlib3 in a correct way
+<p>
+. RW: A missing call to valid_write() in log_file() added.
+<p>
+. JnA: Local log files should be under peoples homedirs, not in /log This has
+  been fixed for mudlib3.
+<p>
+. JnA: Efun geteuid() added for 3.0, the simul_efun version had no possibility
+  of finding out effuser 'from the start'. This messed up the secsystem.
+<p>
+. move_object() in -o mode will clear the O_RESET_FLAG, which will force a
+  new call of reset() sometime. This is only needed in -o mode.
+<p>
+. Added protection against snooping loops.
+<p>
+. Fixed a fatal bug in shadow(), that crashed the game when asking for shadow
+  while non existed.
+<p>
+3.0.37
+<p>
+. Provided support for IRIS-4D/340 using gcc (defining 'sgi').
+<p>
+. create_wizard() will no longer make a workroom when in -o mode, so as to
+  be compatible.
+<p>
+. The definition of CASTLE_ROOM (in config.h) has a new meaning when not
+  defined. In that case, the castle will be put in the same room as the
+  player.
+<p>
+. The verify_create_wizard() defined in master.c was bad. A correct one
+  is now supported (for 2.4.5). If this function is incorrect or non-existent,
+  then create_wizard() can never be called successfully.
+<p>
+. clean_up() now gets a flag as argument, which will be non-zero if the the
+  program of this object is used for inheritance by other objects.
+<p>
+3.0.36
+<p>
+. Fixed a bug in shadowing, how catch_tell was called.  It would fail when
+  catch_tell is defined by the player object.
+<p>
+. Fixed several bugs in the tracing mechanisms.
+<p>
+. Changed mechanism of calling clean_up() slightly. Only objects that defines
+  the function will be called. And, only clean_up() that returns non-zero
+  will be called again. This will minimize calls of clean_up(), while still
+  cost very litte to maintain.
+<p>
+. When an object is destructed, all pointers to it from the stack is
+  immediately removed. All tests of destructed objects as arguments on
+  the stack has been removed. Previously, there were tests in many efuns.
+<p>
+. A simple command procedure, 'configure' is provided, that asks for
+  configuration details to be used by the Makefile. It will answers in
+  config.data, and reuse it if wanted. The idea is to simplify updates of
+  new versions of LPmud.
+<p>
+3.0.35
+<p>
+. Added a protection against recursive call of assert_master_ob_loaded().
+  This could happen when error in master object.
+<p>
+. JnA: Fixed some bugs in process_string, it actually works now :-)
+<p>
+. Fixed a bug in eval_instruction() where F_INDENT was executed. Added a 
+  missing 'break;', which would be disastrous when illegal file name was given.
+<p>
+. Added new commands to the editor: help and indenting. There are thus two ways
+  to indent LPC code. Probably only one needed. Which one is preferred ?
+<p>
+. Fixed several bugs in the swap/reset/clean_up logic. Recommended values
+  are that the swap time is short (less than 30 minutes), and that reset time
+  is medium (aprox 60 minutes), and that time to clean_up is long
+  (greater than 1.5h hours). Any feedback of how to best tune these values
+  are welcome. The call of reset will be done once, and not yet again until
+  the object has been touched. This enables reset'ed objects to stay swapped
+  out. If you have a mudlib that has no ojbects that defines 'clean_up', then
+  you may better define this time as 0, which means never call clean_up (and
+  thus never swap the object in needlessly). A well implemented usage
+  of clean_up is better than the swap algorithm, as even cloned objects
+  can be cleaned up and a self destruction is more efficient than swapping
+  (memory wise).
+<p>
+3.0.34
+<p>
+. LA: Fixed some bugs in lex.c.
+<p>
+. The swap file is now automatically removed at shutdown().
+<p>
+. Fixed a slight bug in save_array() that would save object as ",0" instead
+  of "0,".
+<p>
+. query_level is no longer called from 'set_living_name()'. The results
+  is that wizard commands will again give points to the wizlist structure.
+  This should be solved in a cleaner way.
+<p>
+. Fixed some bugs in 'ed', for how to handle ''.
+<p>
+. The 'ed_buffer' pointer has been moved into the interactive structure
+  from the object structure.
+<p>
+. The command ed(), can now use a second argument, which is the function
+  to be called when the player exits ed. It will be called in the same
+  object that called ed().
+<p>
+. JnA: Fixade 'fixen' i make_unique
+<p>
+. The call of clean_up() has been modified. There is a constant in config.h
+  that defines how long time until clean_up is called in an object. This
+  call is independent of reset() and swapping. It is recommended that the
+  swapping time is something short, like 10 minutes to 30 minutes, while
+  the time to clean_up is longer.
+<p>
+3.0.33
+<p>
+. When create_wizard() is called, the function 'verify_create_wizard'
+  will be called with the name the object that did the call. If this
+  function returns 0, then create_wizard() will fail. Note that
+  'valid_castle_place' is no longer called. Sorry for the change. See example
+  in the provided master.c.
+<p>
+. It is now allowed again to do add_action() to a function named 'exit',
+  but only when not in -o mode.
+<p>
+. Fixed a bug in shout(), that could modify the string argument.
+<p>
+. Fixed yet another memory leak at compilation by ensuring that epilog()
+  is called.
+<p>
+3.0.32
+<p>
+. The call to legal_path() is done again (for the version not using -o).
+<p>
+. Added support for NeXT.
+<p>
+. Added support for using the system malloc.
+<p>
+. A new access permission system has been added, much better than the old.
+  Look at ACCESS.ALLOW for more information. Don't forget to copy this file
+  to your mudlib if you use this new system (specified by config.h) !
+<p>
+. Fixed a bug in make_unique(), which assigned an svalue without updating
+  the ref count.
+<p>
+. Now testing and calling reset() from call_other(), as was done in
+  2.4.5. This test was accidently lost in 3.0.
+<p>
+3.0.31
+<p>
+. The 'status' command now reports the space used of object including
+  variables.
+<p>
+. LA: Added object names in tracing.
+<p>
+. LA: Added traceprefix to limit trace information.
+<p>
+. LA: Merged changes to evaluate expression in #if.
+  Also added processing of defined in the expressions.
+<p>
+. Fixed a memory leak in ed() when doing command 'x'.
+<p>
+. There is a new function 'get_wiz_name()' that should be defined in
+  the master.c object. A master.c file is provided with the source, which
+  includes an example.
+<p>
+. Fixed a memory leak in the compilation that occured when there was a
+  compilation error.
+<p>
+3.0.30
+<p>
+. Fixed a bug in the shadow logic wich would fail to report facts about
+  shadows.
+<p>
+. Fixed a bug in make_unique(), which didn't work when third argument
+  was missing.
+<p>
+. Fixed a function
+   int find_call_out(string func_name);
+  which will return the time until this call out will occur.
+<p>
+. Fixed a function
+   int interactive(object ob);
+  which will return a non-zero number if object ob is an interactive player.
+<p>
+. The symbol "LPC3" will automatically be defined when loading
+  objects. It can be used for '#ifdef LPC3' etc. The symbol 'COMPAT_FLAG'
+  will automatically be defined if '-o' is specified as argument.
+<p>
+. The swapping algorithm has been changed. A test is done for every object,
+  comparing to a time stamp. If the object hasn't been touched for a while,
+  it could be subject for swapping. Here comes the new thing: the function
+  'clean_up' will be called in the object. If the object still remains,
+  the old swapping algorithm will continue. That means that objects that
+  would never be subject to swapping (cloned objects) now has a chance
+  to self-destruct. It also means that rooms that contains no important
+  data can self-destruct. Self-destruction saves more memory than
+  swapping, as swapping only frees the program code, while self-destruction
+  also frees the internal object representation.
+<p>
+3.0.29
+<p>
+. Fixed a bug in player_parser, which could dereference a dangling pointer
+  (the sentence of a command just executed could be deallocated if the 
+  command moved the player).
+<p>
+. Fixed a bug in transfer(), which would not check prevent_insert correctly.
+  This bug did only affect the -o mode.
+<p>
+. The hard-coded command 'status' now displays information about allocated
+  arrays.
+<p>
+. The file void.c is no longer loaded, nor needed. The only difference, is that
+  objects in destroyed rooms are also destroyed, instead of being moved
+  to the void.
+<p>
+. LA: Added some checking when hname starts to avoid looping in select.
+<p>
+. Fixed a bug in call of hname, which could be problems on some architecture.
+<p>
+. There was a test in ed_start, that only allowed ed() to be started
+  by a special object. The test is removed, and is not needed as
+  valid_path_name() is called instead.
+<p>
+3.0.28
+<p>
+. Line number reports were off one line per #if - #endif.
+<p>
+. Error reports were given for calling specific functions defined
+  by inheritance.
+<p>
+. Specific function calls defined by inheritance are now resolved
+  immediately.
+<p>
+. Function 'implode()' now returns empty string instead of 0 for empty arrays.
+<p>
+. JnA: All array efuns are now returning ({}) not int 0, explode is dubious
+  though.
+<p>
+. JnA: filter_array and map_array can now take its 'object' argument as a
+  string in the same manner as the first argument to call_other()
+<p>
+3.0.27
+<p>
+. All calls to master_ob are now checked, to see if it has been destructed.
+  A function 'assert_master_ob_loaded()' will reload master_ob if destructed.
+  Do not do 'apply(fun, master_ob, args)' any more, but rather
+  'apply_master_ob(fun, args)'.
+<p>
+. JnA: New scheme for preloading in 3.0, epilog() in master returns an array
+  of filenames and the gamedriver calls preload() in master with each of
+  those filenames as argument. This is done in: preload_objects()
+<p>
+. The 'status' command now also shows the reserved memory area.
+<p>
+. JnA: make_unique debugged, it should not dump the game anymore
+<p>
+. JnA: process_string added to speed up 'value by function call' especially
+  in the say/'met' strategy used in mudlib3.
+<p>
+. Moved array manipulation functions into array.c
+<p>
+. The type system has been extended with checks for number of arguments.
+. The check is only done when type check is enabled. Functions can now be
+. declared of type 'varargs', which will turn off this check.
+<p>
+3.0.26
+<p>
+. There was a bug in '>=' for strings.
+<p>
+. Fixed bug in >>=
+<p>
+. LA: Added a 'trace()' efun to aid debugging.
+<p>
+. Fixed a bad efficiency bug in add_to_mem_block().
+<p>
+. Fixed a bug in crypt(), which would generate bad salts.
+<p>
+. Implemented "int member_array(mixed elem, mixed *arr);" It will search
+  for "elem" as an item in array "arr", and return the index if found.
+  Otherwise, -1 is returned.
+<p>
+3.0.25
+<p>
+. save_object() should not do fatal error whwn failure to open file for
+  writing.
+<p>
+. The '#pragma strict_types' are now not propagated from #include files.
+<p>
+. catch() is defined to return a value of type 'mixed'.
+<p>
+. living() now only accepts an 'object' as argument.
+<p>
+. objectp(), stringp(), intp() accepts any type.
+<p>
+. explode() with empty string will no longer crash the game.
+<p>
+. clear_vector_refs() now really does clear the ref counts.
+<p>
+. count_ref_from_call_outs() failed to count references for arguments to
+  call outs.
+<p>
+. Fixed updating of total_prog_block_size, so that the 'status' commands
+  reports correct info about programs.
+<p>
+3.0.24
+<p>
+. exit() wasn't called in the -o mode.
+<p>
+. present(object ob, object env) returned 'env', not 'ob' when true.
+<p>
+. Fixed a severe memory leak in instruction F_RETURN.
+<p>
+. Added a search list of where to search for include files.
+<p>
+. ctime() returned current time, instead of using the argument.
+<p>
+. Fixed some changes for SCO 1 and AIX.
+<p>
+3.0.23
+<p>
+. JnA: When epilog() is called with o_flag false, it gets e_flag as argument.
+  Because preloading of objects is done in /secure/master.c in mudlib3.0
+<p>
+. xt: In 3.0 void is in /d/Standard/void.c instead of /room, because of the
+  new security stuff.
+<p>
+. query_level should not be called from error() if the living object
+  is non-interactive or destructed.
+<p>
+. A more careful limitation of number of read characters is used in comm1.c
+  when reading characters from players. It is difficult, becaus the read
+  text can expand up to a factor 3 in worst case.
+<p>
+. Sources to some sub-programs are now provided in subdirectory 'util'.
+  The compiled results of these will be moved the a binary directory that
+  is defined in Makefile.
+<p>
+. The new binaries are 'indent' (for reindenting LPC from inside the game),
+  and restart_mud (which is really a command procedure).
+<p>
+. The definition of MUD_LIB has been moved from config.h to Makefile.
+<p>
+. The function 'version()' had a bad return type, which was changed 
+  to 'string'.
+<p>
+3.0.22
+<p>
+. LA: Added query_ip_name changes.
+<p>
+. LA: Added latest fixes to lex.c.
+<p>
+. ',' is allowed in the end of lists again: ({ 1, 2, 3, });
+<p>
+. filter_objects() was accidently renamed to filter_array(). It has been
+  renamed again, to filter_objects().
+<p>
+. query_ip_name() has been implemented. It uses an asynchronous process, to
+  ensure that no slow down is experienced.
+<p>
+3.0.21
+<p>
+. Changed restore_size(), to return -1 for failures instead of the legal 
+  value 0.
+<p>
+. Implemented "#pragma strict_types", which will ensure strict type checking
+  for the rest of the code in that file.
+<p>
+. Changed priority of assigment and the '?' - ':' operator, which was
+  erroneous.
+<p>
+. Fixed how '' was used in the 's' command to ed.
+<p>
+3.0.20
+<p>
+. Fixed the type returned by '&&' and '||' operator.
+<p>
+. The type checker now allows indexing on strings.
+<p>
+. Indexing on a type 'mixed' now gives a type 'mixed'.
+<p>
+. Use of an undeclared variable would give it a random type, which could
+  crash the game.
+<p>
+. Fixed some memory leaks when restore_array failed.
+<p>
+. create_wizard() can return 0, which must not be pushed as a string.
+<p>
+3.0.19
+<p>
+. Fixed load_object() to take an extra parameter for not resetting object 
+  after load. This is used in mudlib 3.0 for inherited objects. Only when the
+  ENTIRE object is loaded (all inherited objects loaded) is its reset() called.
+<p>
+. Fixed bug in input_to(), which did not check if command_giver was a valid
+  pointer.
+<p>
+. A program truncated just after a string start with " would generate a fatal
+  error.
+<p>
+. load_first_objects() should load objects using find_object(), not
+  load_object().
+<p>
+. When swapped objects are destructed, they have to be loaded.
+<p>
+3.0.18
+<p>
+. Allowed '*' i type of argument declarations.
+<p>
+. Fixed bug in error message printed when type error.
+<p>
+. The numeric value 0 can now be used to index arrays and strings. It did
+  generate a type error.
+<p>
+. Fixed a better test of type equality.
+<p>
+3.0.17
+<p>
+. Fixed bug in dump_trace(), which could crash the game when in heart beat.
+<p>
+. Fixed bug in save_object(), which enabled wizards to save anything on their
+  own player save file.
+<p>
+. Fixed lex.c, so that comments are allowed in '#if' statements, and so that
+  the '#if' statement allows expressions of the type '!VAR'.
+<p>
+3.0.16
+<p>
+. Fixed some type tests and better error messages when type problems.
+<p>
+. Fixed several small bugs when parsing commands.
+<p>
+. Reinstalled call of 'load_first_objects()' when -o flag is used.
+<p>
+. Added automatic include of documentation of lfuns and efuns into the
+  LPmud.doc document. They should be sorted also (by make_docs).
+<p>
+3.0.15
+<p>
+. function_exists() and file_name() returns a leading '/' on the file names,
+  which was incompatible with mudlib 2.4.5 and older. This was fixed
+  when using -o flag.
+<p>
+3.0.a14
+<p>
+. Efuns file_name() and function_exists() returns filename with leading '/'
+<p>
+. Efun living() returns 0 for other arguments than objects.
+<p>
+. Implemented: string read_file(string).
+<p>
+. Added a new complex permission system. Look at LPmud.doc for more 
+  information.
+<p>
+. New function: version(). Will return "03.00.14" for this version.
+  The number 14 is the patchlevel.
+<p>
+. Improved the line number report given at errors.
+<p>
+. Fixed bug in 'ed', that made it impossible to use.
+<p>
+3.0.a13
+<p>
+. player_parse() did not always restore current_object in time, which means 
+  that static declared functions sometimes was not found.
+<p>
+. fixed save_object(), which were broken when used in compatibility mode.
+<p>
+. Fixed a bad bug in the inherit handling in lang.y. The error would occur
+  sometimes when multiple inheritance was used. An almost random address could
+  be called.
+<p>
+. The documentation is slowly growing.
+<p>
+3.0.a12
+<p>
+. call_out_info() returns an array of all pending call outs.
+  Every item in the array consists of 4 items (but only if the object not is
+  destructed):
+   * 0:   The object.
+   * 1:   The function (string).
+   * 2:   The delay.
+   * 3:   The argument.
+  Probably only interesting for administrators.
+<p>
+3.0.a11
+<p>
+. Fixed the shadowing data structure, to enable an unlimited number of
+  shadows to one object.
+<p>
+. Objects must inherit std/object.c if they want to be moved, or moved into.
+  The -o flag will as usual remove this requirement.
+<p>
+. Fixed a bug in restore_object and save_object, so that the 'static' 
+  information is used.
+<p>
+. Merged from Marion's version:
+   Fixed some bugs.
+     swap now relocates the program pointers
+     main recognizes '-s<num>' for an alternate time to swap as an invocation
+      parameter
+     fixed the double include of time.h in interpret.c
+     function_exists had a null dereference when an overloaded function was
+     involved in the examined object - fixed
+     set reference debugging to level 3
+<p>
+. save_object() and restore_object() can now handle arrays.
+<p>
+. Included a large amount of fixes by Klaus Rennecke.
+<p>
+3.0.a10
+<p>
+. write() from a shadowing object will now be transfered to the shadowed
+  object.
+<p>
+. say() will likewise be sent to objects around the shadowed object when
+  called from a shadowing object.
+<p>
+. Fixed some line number counting bugs.
+<p>
+3.0.a9
+<p>
+. The function destruct() was changed to behave differently. Instead of moving
+  objects with 'transfer()', they will be moved with the function 'move()'
+  called internally in the objects. As usual, when the -o flag is specified,
+  the old behaviour is used.
+<p>
+. A new function shadow(), has been defined
+<p>
+3.0.a8
+<p>
+. The flag -o is now required when using the game driver with a mudlib of
+  version 2.4.6 or older. The flag stand for 'old compatibility mode'.
+<p>
+. The following changes are nullified with the -o flag:
+    move_object():      Can only move current_object.
+    transfer():         Not supported any longer.
+    move_object():      exit() is not called any longer when a player leaves
+                        a room.
+<p>
+. Fixed a bug in create_wizard(). create_wizard() can take a second
+  argument, which is an optional domain name. That allows wizards too be
+  groped into domains, which resides in a common directory.
+<p>
+3.0.a7
+<p>
+. Fixed bug in find_player().
+<p>
+. The documentation file LPmud.doc.ms was renamed to LPmud.doc.me, as it
+  was really on nroff -me format.
+<p>
+3.0.a6
+<p>
+. Added the empty statement.
+<p>
+3.0.a5
+<p>
+. Functions and variables now have both a flag field and a type field. The type
+  field is the type specified by the LPC program. The flag field is information
+  that the compiler found out.
+<p>
+. Fixed type 'private', and 'private inherit' statement. Type 'no_mask' can
+  also be used.
+<p>
+3.0.a4
+<p>
+. Fixed some bugs. Default port number is now 3000.
+<p>
+3.0.a3
+<p>
+. Added flag -m, to use another mudlib directory.
+<p>
+. Added the ? : conditional expression.
+<p>
+. Added a function exec(), which can be called from player.c to replace
+  with a new player object.
+<p>
+. Add catch_tell(), which also catches strings sent to the monster with
+  'write()'.
+<p>
+3.0.a2:
+<p>
+. The '+' instruction can add two arrays, and make a new big array with the
+  two arguments concatenated.
+<p>
+3.0.a1:
+<p>
+. The type testing now seems to work. The types are enabled when the
+  type is defined for a function. Types available are 'int', 'status' (same
+  as 'int'), 'string', 'object', 'void' and 'mixed'. Any type can be
+  combined with a '*' to form an array of types. For example,
+  'int *' would declare an array of numbers.
+<p>
+. The function 'command()' now returns the evaluation cost if successful,
+  otherwise 0.
+<p>
+3.0.a0
+<p>
+. Number of arguments are checked at compile time, if possible.
+<p>
+. lex isn't used any more, and no i-files need to be saved. The preprocessor
+  is built into the parser.
+<p>
+. Strings written with write(), are now seen by NPCs. This means that more
+  intelligent monsters can be made.
+<p>
+. A special object, /obj/master.c, is called at startup. This gives
+  possibilities to do special initialization, and debugging. This file must
+  exist ! You will find it in the source dir to 3.0.
+<p>
+. Multiple inheritance is allowed.
+<p>
+. Swapping of objects are done when a specified time has passed with no
+  reference of the object.
+<p>
+. The reset is now called when a specified time has passed.
+<p>
+. Player save files are saved in subdirectories named 'a' to 'z', after
+  the first letter of the player name. These directories has to be created
+  as /players/a /players/b/ etc. This also means that a wizard with a name
+  of only one character, suddenly will find saved characters in his directory.
+<p>
+. New types: 'mixed', and 'type *'.

@@ -1,0 +1,17 @@
+allocate_buffer - allocate a buffer
+
+buffer allocate_buffer( int size );
+
+This efun is only available if DISALLOW_BUFFER_TYPE is not compiled in.
+
+Allocate a buffer of 'size' elements.  The number of elements must be >= 0 
+and not bigger than a system maximum (usually ~10000).  All elements are 
+initialized to 0.
+
+See also:
+ bufferp,
+ read_buffer,
+ write_buffer
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

@@ -1,0 +1,10 @@
+sizeof - return the number of elements in an array
+
+int sizeof( mixed var );
+
+Return the number of elements in an array, mapping, string, class or
+buffer 'var'.  If `var' is not an array, mapping, string, class or 
+buffer, then zero (0) is returned.
+
+See also:
+ strlen

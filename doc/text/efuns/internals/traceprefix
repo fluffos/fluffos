@@ -1,0 +1,16 @@
+traceprefix - sets the prefix determining which objects to trace
+
+string traceprefix( string prefix );
+
+This efun is only available if TRACE and PACKAGE_DEVELOP are compiled in.
+
+If the the traceprefix is set (i.e. not 0) tracing will only occur in objects
+having a name with the set prefix.
+
+The old value is returned.
+
+See also:
+ trace
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

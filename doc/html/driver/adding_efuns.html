@@ -1,0 +1,47 @@
+<HEAD> <TITLE> Adding Efuns </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> Adding Efuns </H1> </center>
+<p>
+This document explains how to add efunctions to the MudOS driver.  Here are the
+steps:
+<p>
+1) Add a prototype for the efunction to func_spec.c.  This is not an ANSI
+   C prototype but a prototype in the same form as the other prototypes in
+   that file.  For example, the prototype for the cat() efun is as follows:
+<p>
+   int cat(string, void|int, void|int);
+<p>
+   The second and third arguments of cat can either be void or int.  Here
+   'void' means optional.  Thus cat("xyz") is allowed as is cat("xyz",5,8);
+   The return type of cat() is int.
+<p>
+   If a function is to allow a variable number of arguments (vararg), you can
+   declare with trailing elipses:
+<p>
+   void call_out(string, int, ...);
+<p>
+   call_out() does not return a value.
+<p>
+2) Add a function of the form f_efunction_name to efunctions.c or to
+   a C source file created for the purpose of adding your own local efunctions.
+   Creating your own C file for local efunctions can be the best choice because
+   doing so makes it easy for you to integrate your changes into future
+   releases of MudOS.  If you do create a separate C file for your efunctions
+   (e.g. local_efuns.c), then you will need to #include "efuns.h" which gives
+   your file the extern, and static declarations that efuns are likely to
+   need.  For examples of how to structure the f_efunction_name
+   function, look at the efunctions already defined in efunctions.c.  In
+   addition, you should read the file ./doc/driver/stackmachine.  This
+   file is fairly old but is still useful toward understanding the general
+   structure of the driver stack machine.  The main points to know are
+   that the arguments passed to an efunction are stored on a stack of svalues
+   named sp.  For example, if the efunction is passed three arguments, then the
+   first argument will be at (sp - 2), the second at (sp - 1), and the
+   third at sp.  If a function allows a variable number of arguments, then
+   the num_arg parameter of the efun will be set to indicate the number of
+   arguments actually passed (on the sp stack).  Each efunction is responsible
+   for leaving a single svalue on the sp stack at the time the efunction
+   exits (even if the efunction is defined to return void).  The usual
+   strategy is to use the stack values that you need (sp - x),
+   pop_n_elems(num_args) and then push a result onto the stack.  Note,
+   if an efunction takes a single argument and is defined to return void,
+   then you needn't pop anything from the stack or push anything on (the
+   single argument can serve as the return value).

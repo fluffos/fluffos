@@ -1,0 +1,17 @@
+domain_file - determine the domain for a given object
+
+string domain_file( string file );
+
+This function must exist in the master object.  It is called by the
+domain statistic functions in the driver to determine what domain a
+given object should be associated with.  This is totally arbitrary and
+up to the mudlib designers wishes.  It should be noted that the domain
+that the object is assigned to will receive "credit" for all of the
+objects behavior (errors, heart_beats, etc).
+
+See also:
+ author_stats,
+ domain_stats,
+ author_file
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

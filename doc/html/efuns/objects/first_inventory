@@ -1,0 +1,16 @@
+first_inventory - return the first item in an object's inventory
+
+object first_inventory( mixed ob );
+
+This efun is only available if NO_ENVIRONMENT is not compiled in.
+
+Return the first object in the inventory of 'ob', where 'ob' is
+either an object or the file name of an object.
+
+See also:
+ file_name,
+ next_inventory,
+ all_inventory,
+ deep_inventory
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

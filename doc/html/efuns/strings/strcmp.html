@@ -1,0 +1,18 @@
+<HEAD> <TITLE> strcmp - determines the lexical relationship between two strings </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> strcmp - determines the lexical relationship between two strings </H1> </center>
+<p>
+<b> int strcmp( string one, string two ); </b>
+<p>
+This implementatin of strcmp() is identical to the one found in C libraries.
+If string one lexically precedes string two, then strcmp() returns a number
+less than 0.  If the two strings have the same value, strcmp() returns 0.
+If string two lexically precedes string one, then strcmp() returns a number
+greater than 0.  This efunction is particularly useful in the compare
+functions needed by sort_array().
+<p>
+Note that relational operators (&lt;, &gt;, etc) can also be used to compare
+strings.
+<p>
+See also:
+<A HREF=../arrays/sort_array.html>  sort_array </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

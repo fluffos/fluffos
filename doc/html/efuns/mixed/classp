@@ -1,0 +1,7 @@
+classp - determine whether or not a given variable is a class
+
+int classp(mixed);
+
+Return 1 if the argument is a class.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

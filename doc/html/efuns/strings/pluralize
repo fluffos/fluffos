@@ -1,0 +1,10 @@
+pluralize - returns the plural of a given string
+
+string pluralize( string str );
+
+Returns the plural of 'str'.  Handles most of the oddities of the English
+language.
+
+This efun is only available if PACKAGE_CONTRIB is defined.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

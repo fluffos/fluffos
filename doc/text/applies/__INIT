@@ -1,0 +1,9 @@
+__INIT - obsolete apply
+
+void __INIT(); 
+
+This function used to be called in objects right before create.
+global variable initialization is now handled by another function that
+cannot be interfered with, so this is no longer called.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

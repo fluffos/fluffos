@@ -1,0 +1,21 @@
+call_out_info - get pending call_out() information
+
+array call_out_info();
+
+Get information about all pending call outs. An array is returned,
+where every item in the array consists 3 elements: the object,
+the function, and the remaining delay.
+
+Note: due to security concerns, and the fact that call_outs may now
+have an arbitrary number of arguments, the 4th element of the return
+value was returned.  The security concerns stem from the fact that if
+the arguments where types which can be modified (arrays, mappings,
+etc), obtaining them would allow them to be modified before the
+function was called.  It is possible this will be fixed in the
+future if there is enough interest.
+
+See also:
+ call_out,
+ remove_call_out
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

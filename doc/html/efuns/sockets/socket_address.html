@@ -1,0 +1,27 @@
+<HEAD> <TITLE> socket_address - return the remote address for an efun socket </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> socket_address - return the remote address for an efun socket </H1> </center>
+<p>
+<b> string socket_address( int s | object ob ); </b>
+<p>
+This efun is only available if PACKAGE_SOCKETS is compiled in.
+<p>
+socket_address() returns the remote address for an efun socket s, or for
+an interactive object ob.
+<p>
+The returned address is of the form:
+<p>
+"127.0.0.1 23".
+<p>
+socket_address() returns:
+<p>
+a string format address on success.
+<p>
+an empty string on failure.
+<p>
+See also:
+<A HREF=socket_connect.html>  socket_connect </A>,
+<A HREF=socket_create.html>  socket_create </A>,
+<A HREF=../interactive/resolve.html>  resolve </A>,
+<A HREF=../interactive/query_host_name.html>  query_host_name </A>,
+<A HREF=../interactive/query_ip_name.html>  query_ip_number </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

@@ -1,0 +1,7 @@
+mapp - determine whether or not a given variable is a mapping
+
+int mapp( mixed arg );
+
+Return 1 if `arg' is a mapping.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

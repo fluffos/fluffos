@@ -1,0 +1,55 @@
+sprintf - formatted output conversion
+
+string sprintf( string format, ... );
+
+An implementation of sprintf() for LPC, with quite a few extensions
+Originally implemented by Lynscar (Sean A Reith).
+
+This version supports the following as modifiers:
+<dl>
+* " " - pad positive integers with a space.
+* "+" - pad positive integers with a plus sign.
+* "-" - left adjusted within field size.
+<b>Note:</b> sprintf() defaults to right justification, which is unnatural
+in the context of a mainly string based language but has been retained for
+"compatability".
+* "|" - centered within field size.
+* "=" - column mode if width is greater than field size. This is only
+meaningful with strings, all other types ignore this. Columns are
+auto-magically word wrapped.
+* "#" - table mode, print a list of '\\n' separated 'words' in a
+table within the field size.  only meaningful with strings.
+* a number - specifies the field size, a '*' specifies to use the
+corresponding arg as the field size.  If n is prepended with a zero, then
+the field is padded zeros, otherwise it is padded with spaces (or specified pad string; see below).
+* "." then a number - precision of n, simple strings truncate after this (if precision is
+greater than field size, then field size = precision), tables use
+precision to specify the number of columns (if precision not specified
+then tables calculate a best fit), all other types ignore this.
+* ":" then a number - n specifies the fs _and_ the precision, if n is prepended by a zero then the field is padded with zeros instead of spaces.
+* "@" - the argument is an array.  the corresponding format_info (minus the "@") is applied to each element of the array.
+* "'X'" - The char(s) between the single-quotes are used to pad to
+field size (defaults to space) (if both a zero (in front of field
+size) and a pad string are specified, the one specified second
+overrules).  NOTE:  to include "'" in the pad string, you must
+use "\'" (as the backslash has to be escaped past the
+interpreter), similarly, to include "\" requires "\\\\".
+</dl>
+The following are the possible type specifiers.
+<dl>
+* % - in which case no arguments are interpreted, and a "%" is
+inserted, and all modifiers are ignored.
+* O - the argument is an LPC datatype.
+* s - the argument is a string.
+* d, i - the integer arg is printed in decimal.
+* c - the integer arg is to be printed as a character.
+* o - the integer arg is printed in octal.
+* x - the integer arg is printed in hex.
+* X - the integer arg is printed in hex (with A-F in capitals).
+* f - floating point number
+</dl>
+
+See also:
+ sscanf
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,16 @@
+<HEAD> <TITLE> crash - function in master that is called in the event the driver crashes </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> crash - function in master that is called in the event the driver crashes </H1> </center>
+<p>
+<b> void crash( string crash_message, object command_giver, object current_object ); </b>
+<p>
+The driver calls crash() in master in the event that the driver crashes
+(segmentation fault, bus error, etc).  This function offers a way to
+shutdown the mudlib (safe players and other important data) before the driver
+crashes.  It also lets you log various useful information such as what
+signal crashed the driver, what object was active, who the current player
+was etc.
+<p>
+See also:
+<A HREF=../../efuns/system/shutdown.html>  shutdown </A>,
+<A HREF=slow_shutdown.html>  slow_shutdown </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

@@ -1,0 +1,14 @@
+tan - return the tangent of a float
+
+float tan( float f );
+
+This efun is only available if PACKAGE_MATH is compiled in.
+
+Returns the tangent of its argument, 'f', measured in radians.
+
+See also:
+ acos,
+ asin,
+ atan,
+ cos,
+ sin

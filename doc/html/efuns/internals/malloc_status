@@ -1,0 +1,16 @@
+malloc_status - report various statistics related to memory usage.
+
+string malloc_status();
+
+This function returns memory usage statistics in a string.
+This function replaces the hardcoded 'malloc' command in vanilla 3.1.2.
+Note that the output produced by malloc_status() depends upon which
+memory management package is chosen in options.h when building the driver.
+
+See also:
+ mud_status,
+ dumpallobj,
+ memory_info
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

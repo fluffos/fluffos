@@ -12,22 +12,23 @@ HP Apollo
 HP PA-RISC (HP-UX 7.x, 8.x, 9.0x)
 HP 68k Motorola (HP-UX)
 HP 68k Motorola (BSD 4.3)
-Silicon Graphics Indigo, 4D/x and RS4000 Series (IRIX release 4.0.5F System V)
+Silicon Graphics Indigo, 4D/x and RS4000 Series (IRIX release 4.0.5F, 5.2, 5.3)
 Sequent Symmetry (DYNIX/ptx 1.4, 2.0)
 Mac Quadra (A/UX 3.0)
 Ridge (RISC/os)
-IBM PC 386/486 Clone (386BSD)
-IBM PC 386/486 Clone (Linux 0.99.3)
-IBM PC 386/486 Clone (System V Release 4)
-IBM PC 386/486 Clone (BSDI's Commercial 386BSD)
-Amiga (AmigaDOS using the LATTICE C or SAS/C compiler, or Linux)
+IBM PC (386BSD)
+IBM PC (Linux 0.99.3)
+IBM PC (System V Release 4)
+IBM PC (BSDI's Commercial 386BSD)
+IBM PC (Windows 95/NT using Visual C++; see the windows/ subdirectory)
+Amiga (AmigaDOS using the LATTICE C or SAS/C compiler, or Linux, or gcc)
 
-*Send mail to beek@imaginary.com if you experience any problems 
+*Send mail to mmessier@prilnari.com if you experience any problems 
 compiling or running on these systems.  Note that some of these machines have 
 old versions of yacc and do require bison (a yacc replacement) to compile 
 MudOS correctly.  If you manage to compile and run MudOS on a system other 
 than one listed here, please send the diffs along with machine and OS 
 information to the mudos-bugs address.
 
-MSDOS versions of MudOS are available in the /pub/mud/drivers/mudos/msdos
+MSDOS versions of MudOS are available in the /pub/mud/servers/lpc/mudos/msdos
 directory on ftp.ccs.neu.edu.

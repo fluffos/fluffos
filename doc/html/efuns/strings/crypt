@@ -1,0 +1,10 @@
+crypt - encrypt a string
+
+string crypt( string str, string seed );
+
+Crypt the string 'str' using the first two characters from 'seed' as
+a seed. If 'seed' is 0, then random seed is used.
+
+The result has the first two characters as the seed.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

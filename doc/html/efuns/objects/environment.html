@@ -1,0 +1,11 @@
+<HEAD> <TITLE> environment - return the environment of an object </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> environment - return the environment of an object </H1> </center>
+<p>
+<b> object environment( object ob ); </b>
+<p>
+This efun is only available if NO_ENVIRONMENT is not compiled in.
+<p>
+Return the containing object (environment) of 'ob'. If no argument
+is given, 'ob' defaults to this_object().  If the object is not
+inside anything, zero is returned.
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

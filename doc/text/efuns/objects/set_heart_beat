@@ -1,0 +1,16 @@
+set_heart_beat - enable or disable an object's heartbeat
+
+int set_heart_beat( int flag );
+
+Passing 'flag' as 0 disables the object's heart beat.  Passing a 'flag' of
+1 will cause heart_beat() to be called in the object once each heart beat
+(a variable number defined by your local administrator, usually 2 seconds).
+Passing a 'flag' of greater than 1 will usually set the number of heart beats
+in between calls to heart_beat(), however your local administrator may have
+the system configured to treat any 'flag' above 1 as 1.
+
+See also:
+ heart_beat,
+ query_heart_beat
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,15 @@
+<HEAD> <TITLE> file_length - get the number of lines in a file </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> file_length - get the number of lines in a file </H1> </center>
+<p>
+<b> int file_length( string file ); </b>
+<p>
+file_length() returns the number of lines in file 'file'.  Size -1
+indicates that 'file' either does not exist, or that it is not
+readable. Size -2 indicates that 'file' is a directory.
+<p>
+Note that this efun is not particularly fast on long files, since
+determining the number of lines requires reading the entire file.
+<p>
+See also:
+<A HREF=file_size.html>  file_size </A>,
+<A HREF=stat.html>  stat </A>,
+<A HREF=get_dir.html>  get_dir </A>

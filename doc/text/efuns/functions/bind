@@ -1,0 +1,15 @@
+bind - bind a function pointer to a new object
+
+function bind(function, object);
+
+bind() causes a function to become owned by the new object.  This changes
+the value of this_object() when the function pointer is evaluated.  Functions
+that reference global variables or functions in the object that created
+them cannot be rebound.  Binding a function to the object it is already
+bound to will never fail.
+
+Permission to use this efun is controlled by the valid_bind() master apply.
+
+See also:
+ function_owner,
+ valid_bind

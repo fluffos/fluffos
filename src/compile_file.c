@@ -20,17 +20,17 @@
 void
 link_jump_table P2(program_t *, prog, void **, jump_table)
 {
-    int num = prog->num_functions;
-    function_t *funcs = prog->functions;
+    int num = prog->num_functions_defined;
+    compiler_function_t *funcs = prog->function_table;
     int i;
     int j;
 
     for (i = 0, j = 0; i < num; i++) {
-	if (funcs[i].flags & (NAME_NO_CODE | NAME_INHERITED)) continue;
+	if (prog->function_flags[funcs[i].runtime_index] & (NAME_NO_CODE | NAME_INHERITED)) continue;
 	if (jump_table[j])
-	    funcs[i].offset = (unsigned long) jump_table[j];
+	    funcs[i].address = (unsigned long) jump_table[j];
 	else
-	    funcs[i].offset = 0;
+	    funcs[i].address = 0;
 	j++;
     }
 }
@@ -158,6 +158,7 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
     array_t tmp_arr;
 #endif
     array_t *arr;
+    program_t *prog;
     int f;
     int single;
     error_context_t econ;
@@ -170,7 +171,8 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
     compilation_output_file = 0;
     string_needs_free = 0;
 
-    save_context(&econ);
+    if (!save_context(&econ))
+	error("Too deep recursion.");
     if (SETJMP(econ.context)) {
 	restore_context(&econ);
 	pop_context(&econ);
@@ -255,7 +257,7 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
 	    generate_identifier(ident, name);
 	    compilation_ident = ident;
 	    compile_to_c = 1;
-	    compile_file(f, real_name);
+	    prog = compile_file(f, real_name);
 	    compile_to_c = 0;
 	    if (comp_flag)
 		debug_message(" done\n");

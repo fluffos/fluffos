@@ -8,6 +8,7 @@
 #include "socket_ctrl.h"
 #include "file_incl.h"
 #include "debug.h"
+#include "port.h"
 
 #ifdef DEBUG_MACRO
 int debug_level = 512;
@@ -28,7 +29,7 @@ fd_set readmask;
 
 int name_by_ip PROT((int, char *));
 int ip_by_name PROT((int, char *));
-static INLINE void process_queue PROT((void));
+INLINE_STATIC void process_queue PROT((void));
 void init_conns PROT((void));
 void init_conn_sock PROT((int));
 
@@ -52,9 +53,9 @@ void terminate PROT((int));
 
 void debug_perror P2(char *, what, char *, file) {
     if (file)
-	fprintf(stderr, "System Error: %s:%s:%s\n", what, file, strerror(errno));
+	fprintf(stderr, "System Error: %s:%s:%s\n", what, file, port_strerror(errno));
     else
-	fprintf(stderr, "System Error: %s:%s\n", what, strerror(errno));
+	fprintf(stderr, "System Error: %s:%s\n", what, port_strerror(errno));
 }
 
 void init_conns()
@@ -153,7 +154,7 @@ void init_conn_sock P1(int, port_num)
     /*
      * listen on socket for connections.
      */
-    if (listen(conn_fd, SOMAXCONN) == -1) {
+    if (listen(conn_fd, 128) == -1) {
 	perror("init_conn_sock: listen");
 	CLEANUP;
 	exit(10);
@@ -209,7 +210,7 @@ INLINE void aserv_process_io P1(int, nb)
     }
 }
 
-static INLINE void process_queue()
+INLINE_STATIC void process_queue()
 {
     int i;
 
@@ -321,7 +322,10 @@ void new_conn_handler()
 	    all_conns[conn_index].fd = new_fd;
 	    all_conns[conn_index].state = CONN_OPEN;
 	    all_conns[conn_index].addr = client;
-	    strcpy(all_conns[conn_index].sname, c_hostent->h_name);
+	    if (c_hostent)
+		strcpy(all_conns[conn_index].sname, c_hostent->h_name);
+	    else
+		strcpy(all_conns[conn_index].sname, "<unknown>");
 	    total_conns++;
 	    return;
 	}

@@ -1,0 +1,27 @@
+<HEAD> <TITLE> allocate_mapping - pre-allocate space for a mapping </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> allocate_mapping - pre-allocate space for a mapping </H1> </center>
+<p>
+<b> mapping allocate_mapping( int size ); </b>
+<p>
+Returns a mapping with space for 'size' elements preallocated.
+<p>
+For example:
+<p>
+<pre>
+mapping x;
+int y = 200;
+<p>
+x = allocate_mapping(y);
+</pre>
+<p>
+where y is the initial size of the mapping.  Using allocate_mapping is
+the preferred way to initalize the mapping if you have some idea of how
+many elements the map will contain (200 in this case).  The reason is that
+allocating storage all at once is slightly more efficient.  Thus if
+you are using mappings to store a soul with 200 entries, the above
+initialization would be quite appropriate.  Note, that the
+above initialization does not restrict you to 200 entries.
+<p>
+See also:
+<A HREF=map_delete.html>  map_delete </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

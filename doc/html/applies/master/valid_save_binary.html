@@ -1,0 +1,13 @@
+<HEAD> <TITLE> valid_save_binary - controls whether or not an object can save its loaded program </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> valid_save_binary - controls whether or not an object can save its loaded program </H1> </center>
+<p>
+<b> int valid_save_binary( string file );  </b>
+<p>
+This routine is only used when BINARIES are enabled.
+<p>
+When the driver is compiled with ALWAYS_SAVE_BINARIES, or an object uses
+'#pragma save_binary', valid_save_binary is called with the program's filename.
+If valid_save_binary returns 1, then the program will be saved to disk for
+faster reloading, otherwise it will not be saved, and the next reload will
+recompile as usual.
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

@@ -37,7 +37,6 @@
 #  define bsdmalloc_calloc      calloc
 #endif
 
-#define XALLOC(x)               xalloc(x)
 #define DXALLOC(x,tag,desc)     xalloc(x)
 #define DMALLOC(x,tag,desc)     MALLOC(x)
 #define DREALLOC(x,y,tag,desc)  REALLOC(x,y)

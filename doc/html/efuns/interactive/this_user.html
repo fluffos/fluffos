@@ -1,0 +1,12 @@
+<HEAD> <TITLE> this_user - return the object representing the current interactive </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> this_user - return the object representing the current interactive </H1> </center>
+<p>
+Return the object representing the user that caused the calling function
+to be called.  Note that this_user() may return a different value than
+this_object() even when called from within a user object.  If this_user
+is called as this_user(1) then the returned value will be the interactive
+that caused the calling function to be called.  this_user(1) may return
+a different value than this_user() in certain cases (such as when command()
+is used by an admin to force a user to perform some command).
+<p>
+See also:
+<A HREF=../calls/this_object.html>  this_object </A>

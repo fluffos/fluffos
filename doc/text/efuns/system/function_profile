@@ -1,0 +1,27 @@
+function_profile - get function profiling information for an object
+
+array function_profile( object ob );
+
+Returns function profiling information for 'ob', or this_object() if 'ob'
+is not specified.  This is only available if the driver was compiled
+with PROFILE_FUNCTIONS defined.
+
+An array of mappings is returned, one for each function in 'ob'.  The format 
+of the mapping is:
+<pre>
+       ([ "name"     : name_of_the_function,
+          "calls"    : number_of_calls,
+
+          "self"     : cpu_time_spent_in self,
+          "children" : cpu_time_spent_in_children
+       ])
+</pre>
+The usefulness of this is tied to the resolution of the CPU clock--even 
+though the units are microseconds, the CPU timer resolution is often much 
+less.
+
+See also:
+ rusage,
+ time_expression
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

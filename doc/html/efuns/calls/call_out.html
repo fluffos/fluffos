@@ -1,0 +1,26 @@
+<HEAD> <TITLE> call_out - delayed function call in same object </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> call_out - delayed function call in same object </H1> </center>
+<p>
+<b> int call_out( function fun, int delay, mixed arg, ... ); </b>
+<p>
+Set up a call to 'fun'.  If fun is a string, it is interpreted as the
+name of a function in this_object().  The call will take place 'delay'
+seconds later, with the arguments 'arg' and following provided.
+<p>
+Note:
+Unless THIS_PLAYER_IN_CALL_OUT is defined, you can't rely on
+write() or say() in 'fun' since this_player() is set to 0.
+Use tell_object() instead.
+<p>
+If THIS_PLAYER_IN_CALL_OUT is defined, this_player() is the same as
+it was when the call_out() call was scheduled.
+<p>
+The return value will be a unique integer identifying the call_out, if
+CALLOUT_HANDLES is defined.  This 'handle' can be passed to
+remove_call_out() and find_call_out().
+<p>
+See also:
+<A HREF=remove_call_out.html>  remove_call_out </A>,
+<A HREF=../system/call_out_info.html>  call_out_info </A>,
+<A HREF=../system/find_call_out.html>  find_call_out </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

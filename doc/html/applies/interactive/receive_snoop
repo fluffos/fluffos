@@ -1,0 +1,14 @@
+receive_snoop - catch incoming snoop text
+
+void receive_snoop(string message);
+
+If RECEIVE_SNOOP is defined in options.h or  local_options,
+whenever a user is snooping another
+user, all snoop text is sent to receive_snoop() in their user object.  Inside
+of this function, you can do as you wish with the text.  A common activity
+would be to receive() it.
+
+See also:
+ catch_tell,  receive
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

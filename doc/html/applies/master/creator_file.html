@@ -1,0 +1,23 @@
+<HEAD> <TITLE> creator_file - specifies the uid to give to a newly created object </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> creator_file - specifies the uid to give to a newly created object </H1> </center>
+<p>
+<b> string creator_file(string filename); </b>
+<p>
+This routine is only used if PACKAGE_UIDS is used.
+<p>
+The creator_file() function is called in the master object each time a new
+object is created.  The `filename' of the object is passed as the sole
+parameter, and the string that creator_file() returns is set as the new
+object's uid.  If the AUTO_SETEUID option is enabled at compile-time of the
+driver, it is also set as the new object's euid.
+.PP
+One exception: if the AUTO_TRUST_BACKBONE option is enabled at compile-time of
+the driver, and creator_file() returns the backbone uid (as specified by
+get_bb_uid() in the master object), the object is given the uid and euid of
+the object that loaded it.
+<p>
+See also:
+<A HREF=../../efuns/mudlib/seteuid.html>  seteuid </A>,
+<A HREF=../../efuns/objects/clone_object.html>  clone_object </A>,
+<A HREF=../../efuns/objects/clone_object.html>  new </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

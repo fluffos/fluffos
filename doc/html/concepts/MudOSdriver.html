@@ -1,0 +1,32 @@
+<HEAD> <TITLE> What is the MudOS driver? </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> What is the MudOS driver? </H1> </center>
+<p>
+The MudOS driver is the program (written in C) which
+provides the lowlevel support that makes a mud possible.  The driver
+does many things including:
+<p>
+<DL>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> accepts connections from remote machines (via a communications port) and
+   attaches those connections to the login object (/adm/login.c on TMI).
+<p>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> provides a set of external functions (efuns) that may be called from
+   within LPC objects.
+<p>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> compiles files into a compact internal tokenized form via the new(filename)
+   (or clone_object(filename)) efun.
+<p>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> interprets (executes) objects represented in the tokenized form.   The
+   two main ways in which code gets executed are as follows:
+<p>
+<UL>
+<LI> a) the driver calls functions in objects based on input received from
+      users (via the communications port).  The specific functions that get
+      called depend on what associations the objects of the mud have specified
+      between player-typed commands and functions (via the
+      add_action(function_name,command_name) efun).  The driver also
+      calls functions in LPC objects from within certain efuns (such as "init",
+      "create", "clean_up", etc.).
+<LI> b) objects can cause the driver to execute code in other objects via
+      the call_other(object,function_name,args,...) efun.  An alternate
+      form of the call_other efun is object->function_name(args,...).
+</UL>
+</DT>

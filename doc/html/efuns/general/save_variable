@@ -1,0 +1,10 @@
+save_variable - save the value of variable into a string
+
+string save_variable( mixed var );
+
+Saves an LPC value into a string.  The format is the same as
+save/restore_object.
+
+See also:
+ restore_variable,
+ restore_object

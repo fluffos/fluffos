@@ -8,9 +8,9 @@ Minor releases of MudOS (those with a minor version number after the decimal,
 e.g. v20.26) are typically released without installation 
 instructions, usage instructions, documentation, or other supporting 
 material (since the size of this other material is fairly large).  Releases 
-of MudOS with version numbers having only one component (e.g. v21) will 
+of MudOS with version numbers having only one component (e.g. v22) will 
 be released as a combined source/documentation package (e.g. 
-MudOS_v21.tar.Z which is the most recent such release)
+MudOS_v22.tar.Z which is the most recent such release)
  
 The minor releases are intended for those who are already familiar with 
 installing and running MudOS.  These fix bugs in older drivers and introduce
@@ -33,7 +33,7 @@ to allow affected mudlibs to be fixed).
  
 Notes:
  
-Send bug reports to beek@imaginary.com.  Be sure to include 
+Send bug reports to mmessier@prilnari.com.  Be sure to include 
 relevant information along with the problem description including: Type of 
 machine (e.g. Sun3, NeXT, RS/6000, etc), operating system (e.g. SunOS 4.1, 
 NeXTSTEP 3.0, AIX 3.2, etc), and version of MudOS (e.g. 0.9.14.17).  
@@ -61,3 +61,4 @@ amiga/          Contains amiga support files; a crypt package is also
 include/        Useful #defines for the mudlib to have access to (used by
                 various efuns)
 packages/       This is where efun packages and user efuns should reside
+windows/	Windows 95 and Windows NT support

@@ -1,0 +1,14 @@
+living - detects whether or not a given object is "living"
+
+int living( object ob );
+
+This efun is only available if NO_ADD_ACTION is not compiled in.
+
+Return true if `ob' is a living object (that is, if "enable_commands()" has
+been called by `ob').
+
+See also:
+ enable_commands
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

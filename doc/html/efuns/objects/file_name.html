@@ -1,0 +1,14 @@
+<HEAD> <TITLE> file_name - get the file name of an object </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> file_name - get the file name of an object </H1> </center>
+<p>
+<b> string file_name( object ob ); </b>
+<p>
+file_name() returns the name of the file from which 'ob' was loaded.
+If the object is a cloned object, then file_name() will not be an
+actual file on disk, but will be the name of the file from which the
+object was originally cloned, appended with an octothorpe (#) and the
+object instance number.  Object instance numbers start at 0 when the
+game is booted, and increase by one for each object cloned, hence the
+number is unique for each cloned object.  'ob' defaults to this_object()
+if not specified.
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

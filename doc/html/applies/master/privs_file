@@ -1,0 +1,15 @@
+privs_file - specifies the privs string to give to a newly created object
+
+string privs_file( string filename );
+
+The privs_file() function is called in the master object when a new file
+is created.  The `filename' of the object is passed as the argument, and
+the string that privs_file() returns is used as the new object's privs
+string.
+
+The privs_file() functionality is only available if the driver is compiled
+with the PRIVS option defined.
+
+See also:
+ query_privs
+ set_privs

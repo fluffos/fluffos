@@ -1,0 +1,15 @@
+query_verb - return the name of the command currently being executed
+
+string query_verb();
+
+This efun is only available if NO_ADD_ACTION is not compiled in.
+
+Give the name of the current command, or 0 if not executing from a command.
+This function is useful when several commands (verbs) may cause the same
+function to execute and it is necessary to determine which verb it was
+that invoked the function.
+
+See also:
+ add_action
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

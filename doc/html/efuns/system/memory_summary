@@ -1,0 +1,24 @@
+memory_summary - return a summary of memory usage
+
+mapping memory_summary();
+
+memory_summary() returns a mapping of the form:
+
+PRE(
+([ 
+  program name : ([
+    var name : mem usage,
+    ...
+  ])
+  ...
+])
+)
+
+the memory usage is the memory required to store the value divided by the
+number of variables pointing to that particular value.  [Due to sharing
+of values, giving an exact number for the memory usage of any
+value is impossible]
+
+This efun is only available if PACKAGE_CONTRIB is defined.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

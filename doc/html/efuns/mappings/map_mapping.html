@@ -1,0 +1,21 @@
+<HEAD> <TITLE> map_mapping - modify an mapping of elements via application of a function </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> map_mapping - modify an mapping of elements via application of a function </H1> </center>
+<p>
+<b> mapping map_mapping( mapping map, string fun, object ob, ... ); </b>
+<p>
+<b> mapping map_mapping( mapping map, function f, ... ); </b>
+<p>
+Returns an mapping with the same keys as map whose items have been
+mapped throught 'ob->fun()' or 'f'.  The function is called for each
+(key, value) pair in 'map' and the returned mapping has the return value
+of the function as its value for each key.
+The extra arguments are passed as parameters to the function
+after the key and the value.
+<p>
+See also:
+<A HREF=../arrays/filter_array.html>  filter_array </A>,
+<A HREF=../general/filter.html>  filter </A>,
+<A HREF=../arrays/sort_array.html>  sort_array </A>,
+<A HREF=../arrays/map_array.html>  map_array </A>,
+<A HREF=../general/map.html>  map </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

@@ -1,0 +1,15 @@
+<HEAD> <TITLE> privs_file - specifies the privs string to give to a newly created object </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> privs_file - specifies the privs string to give to a newly created object </H1> </center>
+<p>
+<b> string privs_file( string filename ); </b>
+<p>
+The privs_file() function is called in the master object when a new file
+is created.  The `filename' of the object is passed as the argument, and
+the string that privs_file() returns is used as the new object's privs
+string.
+<p>
+The privs_file() functionality is only available if the driver is compiled
+with the PRIVS option defined.
+<p>
+See also:
+<A HREF=../../efuns/mudlib/query_privs.html>  query_privs </A>
+<A HREF=../../efuns/mudlib/set_privs.html>  set_privs </A>

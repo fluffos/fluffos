@@ -1,0 +1,8 @@
+parse_add_rule(string, string) [PACKAGE_PARSER]
+parse_add_synonym(string, string, void | string) [PACKAGE_PARSER]
+parse_dump() [PACKAGE_PARSER]
+parse_init() [PACKAGE_PARSER]
+parse_my_rules(object, string, void | int) [PACKAGE_PARSER]
+parse_refresh() [PACKAGE_PARSER]
+parse_remove(string) [PACKAGE_PARSER]
+parse_sentence(string, void|int) [PACKAGE_PARSER]

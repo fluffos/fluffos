@@ -1,0 +1,15 @@
+receive - displays a message to the current object
+
+int receive( string message );
+
+This efun is an interface to the add_message() function in the driver.
+Its purpose is to display a message to the current object.  It returns 1
+if the current object is interactive, 0 otherwise.  Often, receive() is
+called from within catch_tell() or receive_message().
+
+See also:
+ catch_tell,
+ receive_message,
+ message
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

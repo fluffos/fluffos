@@ -1,0 +1,14 @@
+new
+
+object x = new( string name, ...);
+class foo x = new(class foo);
+
+If given a string, it behaves like clone object.  If given a class type,
+it creates a new instance of the class type.
+
+See also:
+ clone_object,
+ destruct,
+ move_object
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

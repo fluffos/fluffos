@@ -1,0 +1,25 @@
+<HEAD> <TITLE> trace - sets trace flags and returns the old ones </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> trace - sets trace flags and returns the old ones </H1> </center>
+<p>
+<b> int trace( int traceflags ); </b>
+<p>
+This efun is only available if TRACE and PACKAGE_DEVELOP are compiled in.
+<p>
+Sets the trace flags and returns the old trace flags.
+When tracing is on a lot of information is printed during execution.
+<p>
+The trace bits are:
+<DL>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> 1 - Trace all function calls to lfuns.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> 2 - Trace all calls to "call_other".
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> 4 - Trace all function returns.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> 8 - Print arguments at function calls and return values.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> 16 - Print all executed stack machine instructions (produces a lot of output!).
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> 32 - Enable trace in heart beat functions.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> 64 - Trace calls to apply.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> 128 - Show object name in tracing.
+</DL>
+<p>
+See also:
+<A HREF=traceprefix.html>  traceprefix </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

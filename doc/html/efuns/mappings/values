@@ -1,0 +1,26 @@
+values - return an array of the values from the (key, value) pairs in a mapping
+
+array values( mapping m );
+
+values() returns an array of values corresponding to the value elements
+in the (key, value) pairs stored in the mapping m.
+
+For example, if:
+
+<pre>
+mapping m;
+
+m = (["hp" : 35, "sp" : 42, "mass" : 100]);
+</pre>
+
+then
+
+<pre>
+values(m) == ({35, 42, 100})
+</pre>
+
+Note: the values will be returned in the same order as the corresponding
+keys.
+
+See also:
+ keys

@@ -1,2 +1,0 @@
-SRC=contrib.c sockets.c develop.c parser.c 
-OBJ=contrib.o sockets.o develop.o parser.o 

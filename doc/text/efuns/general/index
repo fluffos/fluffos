@@ -1,0 +1,18 @@
+Efuns for general LPC values
+
+These efuns act on arbitrary values of various types.
+
+<DL>
+*  copy
+*  fetch_variable
+*  filter
+*  map
+*  restore_variable
+*  save_variable
+*  store_variable
+*  sizeof
+*  typeof
+*  undefinedp
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -136,7 +136,7 @@ static int botch P1(char *, s)
 #endif
 
 #ifdef malloc
-/* Linux */
+/* linux */
 #undef malloc
 #endif
 void *bsdmalloc_malloc P1(size_t, nbytes)
@@ -420,8 +420,9 @@ show_mstats P2(outbuffer_t *, ob, char *, s)
 }
 #endif
 
+/* calloc was originally in its own source file */
 #ifdef calloc
-/* Linux */
+/* linux */
 #undef calloc
 #endif
 INLINE void *bsdmalloc_calloc P2(size_t, num, register size_t, size)

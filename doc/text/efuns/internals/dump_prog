@@ -1,0 +1,21 @@
+dump_prog - dump/disassemble an LPC object
+
+void dump_prog( object ob, int flags, string file );
+
+This efun is only available when PACKAGE_DEVELOP is compiled into the driver.
+
+dump_prog() dumps information about the program of `obj' to a file,
+`file', or "/PROG_DUMP" if `file' is not given.  If the current object
+does not have write access to the file, it fails.  
+
+Flags can be a combination of the following values:
+<DL>
+* 1 - include a disassembly of the i-code
+* 2 - include line number information
+</DL>
+
+See also:
+ debug_info,
+ dumpallobj
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

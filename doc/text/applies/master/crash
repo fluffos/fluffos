@@ -1,0 +1,16 @@
+crash - function in master that is called in the event the driver crashes
+
+void crash( string crash_message, object command_giver, object current_object );
+
+The driver calls crash() in master in the event that the driver crashes
+(segmentation fault, bus error, etc).  This function offers a way to
+shutdown the mudlib (safe players and other important data) before the driver
+crashes.  It also lets you log various useful information such as what
+signal crashed the driver, what object was active, who the current player
+was etc.
+
+See also:
+ shutdown,
+ slow_shutdown
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

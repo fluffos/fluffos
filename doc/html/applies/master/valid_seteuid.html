@@ -1,0 +1,18 @@
+<HEAD> <TITLE> valid_seteuid - secures the use of seteuid </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> valid_seteuid - secures the use of seteuid </H1> </center>
+<p>
+<b> int valid_seteuid( object obj, string euid ); </b>
+<p>
+This routine is only used if PACKAGE_UIDS is defined.
+<p>
+The driver calls valid_seteuid(ob, euid) in the master object from inside the
+seteuid(euid) efunction.  If valid_seteuid() returns 0, then the seteuid()
+call will fail.  If valid_seteuid() returns 1, then the seteuid() will
+succeed.  
+<p>
+See also:
+<A HREF=../../efuns/mudlib/seteuid.html>  seteuid </A>,
+<A HREF=../../efuns/mudlib/geteuid.html>  geteuid </A>,
+<A HREF=../../efuns/mudlib/getuid.html>  getuid </A>,
+<A HREF=../../efuns/mudlib/export_uid.html>  export_uid </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

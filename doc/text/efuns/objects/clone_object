@@ -1,0 +1,18 @@
+clone_object - load a copy of an object
+
+object clone_object( string name, ... );
+
+object new( string name, ... );
+
+Create a new object from the file 'name', and give it a new unique
+name (by adding #xxx on to the end of the name).  Returns the new object.
+The object shares the program of the object 'name', but has its own
+set of variables.  The second and following arguments are passed to
+create()
+
+See also:
+ destruct,
+ move_object,
+ new
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

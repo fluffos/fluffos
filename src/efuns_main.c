@@ -127,6 +127,13 @@ f_bind PROT((void))
     funptr_t *new_fp;
     svalue_t *res;
 
+    if (ob == old_fp->hdr.owner) {
+	/* no change */
+	free_object(ob, "bind nop");
+	sp--;
+	return;
+    }
+    
     if (old_fp->hdr.type == (FP_LOCAL | FP_NOT_BINDABLE))
 	error("Illegal to rebind a pointer to a local function.\n");
     if (old_fp->hdr.type & FP_NOT_BINDABLE)
@@ -160,7 +167,7 @@ f_bind PROT((void))
 	new_fp->f.functional.prog->func_ref++;
 #ifdef DEBUG
 	if (d_flag)
-	    printf("add func ref %s: now %i\n",
+	    printf("add func ref /%s: now %i\n",
 		   new_fp->f.functional.prog->name,
 		   new_fp->f.functional.prog->func_ref);
 #endif	
@@ -169,27 +176,6 @@ f_bind PROT((void))
     free_funp(old_fp);
     sp--;
     sp->u.fp = new_fp;
-}
-#endif
-
-#ifdef F_BREAK_STRING
-void
-f_break_string PROT((void))
-{
-    char *str;
-    svalue_t *arg = sp - st_num_arg + 1;
-
-    if (arg->type == T_STRING) {
-	str = break_string(arg[0].u.string, arg[1].u.number,
-			   (st_num_arg > 2 ? &arg[2] : (svalue_t *) 0));
-	if (st_num_arg > 2) free_svalue(sp--, "f_break_string");
-	free_string_svalue(--sp);
-	sp->subtype = STRING_MALLOC;
-	sp->u.string = str;
-    } else {
-	pop_n_elems(st_num_arg);
-	*++sp = const0;
-    }
 }
 #endif
 
@@ -295,13 +281,34 @@ f_call_other PROT((void))
 void
 f_call_out PROT((void))
 {
-    svalue_t *arg;
+    svalue_t *arg = sp - st_num_arg + 1;
+    int num = st_num_arg - 2;
+#ifdef CALLOUT_HANDLES
+    int ret;
 
-    arg = sp - st_num_arg + 1;
-    if (!(current_object->flags & O_DESTRUCTED))
-	new_call_out(current_object, arg, arg[1].u.number,
-		     st_num_arg - 3, (st_num_arg >= 3) ? &arg[2] : 0);
-    pop_n_elems(st_num_arg);
+    if (!(current_object->flags & O_DESTRUCTED)) {
+	ret = new_call_out(current_object, arg, arg[1].u.number, num, arg + 2);
+	/* args have been transfered; don't free them;
+	   also don't need to free the int */
+	sp -= num + 1;
+    } else {
+	ret = 0;
+	pop_n_elems(num);
+	sp--;
+    }
+    /* the function */
+    free_svalue(sp, "call_out");
+    put_number(ret);
+#else
+    if (!(current_object->flags & O_DESTRUCTED)) {
+	new_call_out(current_object, arg, arg[1].u.number, num, arg + 2);
+	sp -= num + 1;
+    } else {
+	pop_n_elems(num);
+	sp--;
+    }
+    free_svalue(sp--, "call_out");
+#endif
 }
 #endif
 
@@ -313,26 +320,46 @@ f_call_out_info PROT((void))
 }
 #endif
 
+#if defined(F_CALL_STACK) || defined(F_ORIGIN)
+char *origin_name P1(int, orig) {
+    /* FIXME: this should use ffs() if available (BSD) */
+    int i = 0;
+    static char *origins[] = {
+	"driver",
+	"local",
+	"call_other",
+	"simul",
+	"call_out",
+	"efun",
+	"function pointer",
+	"functional"
+    };
+    while (orig >>= 1) i++;
+    return origins[i];
+}
+#endif
+
 #ifdef F_CALL_STACK
 void
 f_call_stack PROT((void))
 {
     int i, n = csp - &control_stack[0] + 1;
-    array_t *ret = allocate_empty_array(n);
+    array_t *ret;
 
     if (sp->u.number < 0 || sp->u.number > 3)
 	error("First argument of call_stack() must be 0, 1, 2, or 3.\n");
+
+    ret = allocate_empty_array(n);
     
     switch (sp->u.number) {
     case 0:
 	ret->item[0].type = T_STRING;
-	ret->item[0].subtype = STRING_SHARED;
-	ret->item[0].u.string = current_prog->name;
-	ref_string(current_prog->name);
+	ret->item[0].subtype = STRING_MALLOC;
+	ret->item[0].u.string = add_slash(current_prog->name);
 	for (i = 1; i < n; i++) {
 	    ret->item[i].type = T_STRING;
-	    ret->item[i].subtype = STRING_SHARED;
-	    ret->item[i].u.string = make_shared_string((csp - i + 1)->prog->name);
+	    ret->item[i].subtype = STRING_MALLOC;
+	    ret->item[i].u.string = add_slash((csp - i + 1)->prog->name);
 	}
 	break;
     case 1:
@@ -349,9 +376,13 @@ f_call_stack PROT((void))
 	for (i = 0; i < n; i++) {
 	    ret->item[i].type = T_STRING;
 	    if (((csp - i)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
+		program_t *prog = (i ? (csp-i+1)->prog : current_prog);
+		int index = (csp-i)->fr.table_index;
+		compiler_function_t *cfp = &prog->function_table[index];
+
 		ret->item[i].subtype = STRING_SHARED;
-		ret->item[i].u.string = (csp - i)->fr.func->name;
-		ref_string((csp - i)->fr.func->name);
+		ret->item[i].u.string = cfp->name;
+		ref_string(cfp->name);
 	    } else {
 		ret->item[i].subtype = STRING_CONSTANT;
 		ret->item[i].u.string = (((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH) ? "CATCH" : "<function>";
@@ -359,9 +390,14 @@ f_call_stack PROT((void))
 	}
 	break;
     case 3:
-	for (i = 0; i < n; i++) {
-	    ret->item[i].type = T_NUMBER;
-	    ret->item[i].u.number = (csp - i)->caller_type;
+	ret->item[0].type = T_STRING;
+	ret->item[0].subtype = STRING_CONSTANT;
+	ret->item[0].u.string = origin_name(caller_type);
+	
+	for (i = 1; i < n; i++) {
+	    ret->item[i].type = T_STRING;
+	    ret->item[i].subtype = STRING_CONSTANT;
+	    ret->item[i].u.string = origin_name((csp-i+1)->caller_type);
 	}
 	break;
     }
@@ -389,6 +425,20 @@ f_children PROT((void))
     vec = children(sp->u.string);
     free_string_svalue(sp);
     put_array(vec);
+}
+#endif
+
+#ifdef F_CLASSP
+void
+f_classp PROT((void))
+{
+    if (sp->type == T_CLASS) {
+	free_class(sp->u.arr);
+	*sp = const1;
+    } else {
+	free_svalue(sp, "f_classp");
+	*sp = const0;
+    }
 }
 #endif
 
@@ -502,22 +552,6 @@ f_crc32 PROT((void))
 }
 #endif
 
-#ifdef F_CREATOR
-void
-f_creator PROT((void))
-{
-    ob = sp->u.ob;
-    if (!ob->uid){
-        free_object(ob, "f_creator");
-        *sp = const0;
-    } else {
-        char *str = ob->uid->name;
-        free_object(sp->u.ob, "f_creator");
-        put_constant_string(str);
-    }
-}
-#endif				/* CREATOR */
-
 #ifdef F_CTIME
 void
 f_ctime PROT((void))
@@ -548,7 +582,7 @@ f_deep_inherit_list PROT((void))
     if (!(sp->u.ob->flags & O_SWAPPED)) {
         vec = deep_inherit_list(sp->u.ob);
     } else {
-        vec = null_array();
+        vec = &the_null_array;
     }
     free_object(sp->u.ob, "f_deep_inherit_list");
     put_array(vec);
@@ -583,7 +617,7 @@ f_deep_inventory PROT((void))
 void
 f_destruct PROT((void))
 {
-    destruct_object(sp);
+    destruct_object(sp->u.ob);
     sp--; /* Ok since the object was removed from the stack */
 }
 #endif
@@ -702,6 +736,10 @@ void f_ed_start PROT((void))
     res = object_ed_start(current_object, fname, restr);
 
     if (fname) free_string_svalue(sp);
+    else {
+	++sp;
+	sp->type = T_STRING;
+    }
     
     if (res) {
 	sp->subtype = STRING_MALLOC;
@@ -746,7 +784,7 @@ f_error PROT((void))
     err_buf[l + 1] = '\n';
     err_buf[l + 2] = 0;
     
-    error_handler(sp->u.string);
+    error_handler(err_buf);
 }
 #endif
 
@@ -846,8 +884,17 @@ f_filter PROT((void))
 void
 f_find_call_out PROT((void))
 {
-    int i = find_call_out(current_object, sp->u.string);
-    free_string_svalue(sp);
+    int i;
+#ifdef CALLOUT_HANDLES
+    if (sp->type == T_NUMBER) {
+	i = find_call_out_by_handle(sp->u.number);
+    } else { /* T_STRING */
+#endif
+	i = find_call_out(current_object, sp->u.string);
+	free_string_svalue(sp);
+#ifdef CALLOUT_HANDLES
+    }
+#endif
     put_number(i);
 }
 #endif
@@ -913,15 +960,15 @@ f_function_profile PROT((void))
 	load_ob_from_swap(ob);
     }
     prog = ob->prog;
-    nf = prog->num_functions;
+    nf = prog->num_functions_defined;
     vec = allocate_empty_array(nf);
     for (j = 0; j < nf; j++) {
 	map = allocate_mapping(3);
-	add_mapping_pair(map, "calls", prog->functions[j].calls);
-	add_mapping_pair(map, "self", prog->functions[j].self
-			 - prog->functions[j].children);
-	add_mapping_pair(map, "children", prog->functions[j].children);
-	add_mapping_shared_string(map, "name", prog->functions[j].name);
+	add_mapping_pair(map, "calls", prog->function_table[j].calls);
+	add_mapping_pair(map, "self", prog->function_table[j].self
+			 - prog->function_table[j].children);
+	add_mapping_pair(map, "children", prog->function_table[j].children);
+	add_mapping_shared_string(map, "name", prog->function_table[j].name);
 	vec->item[j].type = T_MAPPING;
 	vec->item[j].u.map = map;
     }
@@ -936,9 +983,24 @@ f_function_exists PROT((void))
 {
     char *str, *res;
     int l;
+    object_t *ob;
+    int flag = 0;
+    
+    if (st_num_arg > 1) {
+	if (st_num_arg > 2)
+	    flag = (sp--)->u.number;
+	ob = (sp--)->u.ob;
+	free_object(ob, "f_function_exists");
+    } else {
+	if (current_object->flags & O_DESTRUCTED) {
+	    free_string_svalue(sp);
+	    *sp = const0;
+	    return;
+	}
+	ob = current_object;
+    }
 
-    str = function_exists((sp - 1)->u.string, sp->u.ob);
-    free_object((sp--)->u.ob, "f_function_exists");
+    str = function_exists(sp->u.string, ob, flag);
     free_string_svalue(sp);
     if (str) {
 	l = SHARED_STRLEN(str) - 2; /* no .c */
@@ -1133,16 +1195,16 @@ f_inherits PROT((void))
 }
 #endif
 
-#ifdef F_INHERIT_LIST
+#ifdef F_SHALLOW_INHERIT_LIST
 void
-f_inherit_list PROT((void))
+f_shallow_inherit_list PROT((void))
 {
     array_t *vec;
 
     if (!(sp->u.ob->flags & O_SWAPPED)) {
         vec = inherit_list(sp->u.ob);
     } else {
-        vec = null_array();
+        vec = &the_null_array;
     }
     free_object(sp->u.ob, "f_inherit_list");
     put_array(vec);
@@ -1249,7 +1311,7 @@ f_link PROT((void))
     int i;
 
     push_svalue(sp - 1);
-    push_svalue(sp);
+    push_svalue(sp - 1);
     ret = apply_master_ob(APPLY_VALID_LINK, 2);
     if (MASTER_APPROVED(ret))
         i = do_rename((sp - 1)->u.string, sp->u.string, F_LINK);
@@ -1379,7 +1441,9 @@ f_map_delete PROT((void))
 {
     mapping_delete((sp - 1)->u.map, sp);
     pop_stack();
+#ifndef COMPAT_32
     free_mapping((sp--)->u.map);
+#endif
 }
 #endif
 
@@ -1413,7 +1477,7 @@ f_map PROT((void))
 void
 f_master PROT((void))
 {
-    if (master_ob == (object_t *)-1)
+    if (!master_ob)
 	push_number(0);
     else
 	push_object(master_ob);
@@ -1572,45 +1636,24 @@ f_message PROT((void))
     int num_arg = st_num_arg;
     svalue_t *args;
 
-    static array_t vtmp1 =
-    {1,
-#ifdef DEBUG
-     1,
-#endif
-     1,
-#ifdef PACKAGE_MUDLIB_STATS
-     {(mudlib_stats_t *) NULL, (mudlib_stats_t *) NULL}
-#endif
-    };
-    static array_t vtmp2 =
-    {1,
-#ifdef DEBUG
-     1,
-#endif
-     1,
-#ifdef PACKAGE_MUDLIB_STATS
-     {(mudlib_stats_t *) NULL, (mudlib_stats_t *) NULL}
-#endif
-    };
-
     args = sp - num_arg + 1;
     switch (args[2].type) {
     case T_OBJECT:
-	vtmp1.item[0].type = T_OBJECT;
-	vtmp1.item[0].u.ob = args[2].u.ob;
-	use = &vtmp1;
+    case T_STRING:
+	use = allocate_empty_array(1);
+	use->item[0] = args[2];
+	args[2].type = T_ARRAY;
+	args[2].u.arr = use;
 	break;
     case T_ARRAY:
 	use = args[2].u.arr;
 	break;
-    case T_STRING:
-	vtmp1.item[0].type = T_STRING;
-	vtmp1.item[0].u.string = args[2].u.string;
-	use = &vtmp1;
-	break;
     case T_NUMBER:
 	if (args[2].u.number == 0) {
-	    /* this is really bad and probably should be rm'ed -Beek */
+	    /* this is really bad and probably should be rm'ed -Beek;
+	     * on the other hand, we don't have a debug_message() efun yet.
+	     * Well, there is one in contrib now ...
+	     */
 	    /* for compatibility (write() simul_efuns, etc)  -bobf */
 	    check_legal_string(args[1].u.string);
 	    add_message(command_giver, args[1].u.string);
@@ -1624,21 +1667,21 @@ f_message PROT((void))
     if (num_arg == 4) {
 	switch (args[3].type) {
 	case T_OBJECT:
-	    vtmp2.item[0].type = T_OBJECT;
-	    vtmp2.item[0].u.ob = args[3].u.ob;
-	    avoid = &vtmp2;
+	    avoid = allocate_empty_array(1);
+	    avoid->item[0] = args[3];
+	    args[3].type = T_ARRAY;
+	    args[3].u.arr = avoid;
 	    break;
 	case T_ARRAY:
 	    avoid = args[3].u.arr;
 	    break;
 	default:
-	    avoid = null_array();
+	    avoid = &the_null_array;
 	}
     } else
-	avoid = null_array();
-    do_message(&args[0], args[1].u.string, use, avoid, 1);
+	avoid = &the_null_array;
+    do_message(&args[0], &args[1], use, avoid, 1);
     pop_n_elems(num_arg);
-    return;
 }
 #endif
 
@@ -1705,8 +1748,7 @@ void f_mud_status PROT((void))
 	    outbuf_add(&ob, "Open-file-test succeeded.\n");
 	    unlink(".mudos_test_file");
 	} else {
-	    /* if strerror() is missing, edit the #ifdef for it in port.c */
-	    outbuf_addv(&ob, "Open file test failed: %s\n", strerror(errno));
+	    outbuf_addv(&ob, "Open file test failed: %s\n", port_strerror(errno));
 	}
 
 	outbuf_addv(&ob, "current working directory: %s\n\n",
@@ -1742,8 +1784,12 @@ void f_mud_status PROT((void))
 		    tot_alloc_object, tot_alloc_object_size);
 	outbuf_addv(&ob, "Prog blocks:\t\t\t%8d %8d\n",
 		    total_num_prog_blocks, total_prog_block_size);
+#ifdef ARRAY_STATS
 	outbuf_addv(&ob, "Arrays:\t\t\t\t%8d %8d\n", num_arrays,
 		    total_array_size);
+#else
+	outbuf_add(&ob, "<Array statistics disabled, no information available>\n");
+#endif
 	outbuf_addv(&ob, "Mappings:\t\t\t%8d %8d\n", num_mappings,
 		    total_mapping_size);
 	outbuf_addv(&ob, "Mappings(nodes):\t\t%8d\n", total_mapping_nodes);
@@ -1757,7 +1803,9 @@ void f_mud_status PROT((void))
     }
 
     tot += total_prog_block_size +
+#ifdef ARRAY_STATS
 	total_array_size +
+#endif
 	total_mapping_size +
 	tot_alloc_sentence * sizeof(sentence_t) +
 	tot_alloc_object_size +
@@ -1783,22 +1831,6 @@ f_notify_fail PROT((void))
     else {
 	set_notify_fail_function(sp->u.fp);
 	free_funp((sp--)->u.fp);
-    }
-}
-#endif
-
-#ifdef F_NULLP
-void
-f_nullp PROT((void))
-{
-    if (sp->type == T_NUMBER){
-        if (!sp->u.number && (sp->subtype == T_NULLVALUE)) {
-	    sp->subtype = 0;
-            sp->u.number = 1;
-	} else sp->u.number = 0;
-    } else {
-        free_svalue(sp, "f_nullp");
-        *sp = const0;
     }
 }
 #endif
@@ -1833,20 +1865,7 @@ f_opcprof PROT((void))
 void
 f_origin PROT((void))
 {
-    int i = 0, j;
-    static char *origins[] = {
-	"driver",
-	"local",
-	"call_other",
-	"simul",
-	"call_out",
-	"efun",
-	"function pointer",
-	"functional"
-    };
-    j = caller_type;
-    while (j >>= 1) i++;
-    push_constant_string(origins[i]);
+    push_constant_string(origin_name(caller_type));
 }
 #endif
 
@@ -2041,7 +2060,7 @@ f_query_ip_name PROT((void))
     tmp = query_ip_name(st_num_arg ? sp->u.ob : 0);
     if (st_num_arg) free_object((sp--)->u.ob, "f_query_ip_name");
     if (!tmp) *++sp = const0;
-    else push_string(tmp, STRING_MALLOC);
+    else share_and_push_string(tmp);
 }
 #endif
 
@@ -2054,7 +2073,7 @@ f_query_ip_number PROT((void))
     tmp = query_ip_number(st_num_arg ? sp->u.ob : 0);
     if (st_num_arg) free_object((sp--)->u.ob, "f_query_ip_number");
     if (!tmp) *++sp = const0;
-    else push_string(tmp, STRING_MALLOC);
+    else share_and_push_string(tmp);
 }
 #endif
 
@@ -2062,7 +2081,7 @@ f_query_ip_number PROT((void))
 void
 f_query_load_average PROT((void))
 {
-    push_string(query_load_av(), STRING_MALLOC);
+    copy_and_push_string(query_load_av());
 }
 #endif
 
@@ -2113,7 +2132,7 @@ f_query_verb PROT((void))
         push_number(0);
         return;
     }
-    push_string(last_verb, STRING_SHARED);
+    share_and_push_string(last_verb);
 }
 #endif
 
@@ -2269,8 +2288,7 @@ f_regexp PROT((void))
 
 	free_string_svalue(sp--);
 	free_array(sp->u.arr);
-	if (!v) *sp = const0;
-	else sp->u.arr = v;
+	sp->u.arr = v;
     }
 }
 #endif
@@ -2295,11 +2313,19 @@ f_remove_call_out PROT((void))
     int i;
 
     if (st_num_arg) {
-	i = remove_call_out(current_object, sp->u.string);
-	free_string_svalue(sp);
+#ifdef CALLOUT_HANDLES
+	if (sp->type == T_STRING) {
+#endif
+	    i = remove_call_out(current_object, sp->u.string);
+	    free_string_svalue(sp);
+#ifdef CALLOUT_HANDLES
+	} else {
+	    i = remove_call_out_by_handle(sp->u.number);
+	}
+#endif
     } else {
 	remove_all_call_out(current_object);
-	i = -1;
+	i = 0;
 	sp++;
     }
     put_number(i);
@@ -2729,7 +2755,7 @@ f_say PROT((void))
     };
 
     if (st_num_arg == 1) {
-	avoid = null_array();
+	avoid = &the_null_array;
 	say(sp, avoid);
 	pop_stack();
     } else {
@@ -2851,15 +2877,13 @@ f_set_light PROT((void))
 {
     object_t *o1;
 
-#ifdef NO_LIGHT
-    sp->u.number = 1;
-#else
     add_light(current_object, sp->u.number);
     o1 = current_object;
+#ifndef NO_ENVIRONMENT
     while (o1->super)
 	o1 = o1->super;
-    sp->u.number = o1->total_light;
 #endif
+    sp->u.number = o1->total_light;
 }
 #endif
 
@@ -2961,6 +2985,9 @@ f_sizeof PROT((void))
 
     switch (sp->type) {
     case T_CLASS:
+	i = sp->u.arr->size;
+	free_class(sp->u.arr);
+	break;
     case T_ARRAY:
 	i = sp->u.arr->size;
 	free_array(sp->u.arr);
@@ -3254,7 +3281,7 @@ f_tell_room PROT((void))
     }
 
     if (num_arg == 2) {
-        avoid = null_array();
+        avoid = &the_null_array;
     } else {
         avoid = arg[2].u.arr;
     }
@@ -3404,7 +3431,12 @@ f_throw PROT((void))
 void
 f_time PROT((void))
 {
+#ifdef WIN32
+    /* Necessary?  Good? -Beek */
+    push_number(current_time = time(NULL));
+#else
     push_number(current_time);
+#endif
 }
 #endif
 
@@ -3613,7 +3645,6 @@ f_write_buffer PROT((void))
             int netint;
             char *netbuf;
 
-            if (!sp->u.number) bad_arg(3, F_WRITE_BUFFER);
             netint = htonl(sp->u.number);       /* convert to network
                                                  * byte-order */
             netbuf = (char *) &netint;
@@ -3696,7 +3727,9 @@ f_memory_info PROT((void))
 	else
 	    res = 0;
 	tot = total_prog_block_size +
+#ifdef ARRAY_STATS
 	    total_array_size +
+#endif
 	    total_mapping_size +
 	    tot_alloc_object_size +
 	    tot_alloc_sentence * sizeof(sentence_t) +
@@ -3772,6 +3805,24 @@ f_floatp PROT((void))
     else {
         free_svalue(sp, "f_floatp");
         *sp = const0;
+    }
+}
+#endif
+
+#ifdef F_FLUSH_MESSAGES
+void
+f_flush_messages PROT((void)) {
+    if (st_num_arg == 1) {
+	if (sp->u.ob->interactive)
+	    flush_message(sp->u.ob->interactive);
+	pop_stack();
+    } else {
+	int i;
+	
+	for (i = 0; i < max_users; i++) {
+	    if (all_users[i] && !(all_users[i]->iflags & CLOSING))
+		flush_message(all_users[i]);
+	}
     }
 }
 #endif

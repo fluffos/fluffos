@@ -1,0 +1,9 @@
+virtualp - determine whether or not a given variable points to a virtual object
+
+int virtualp( object arg );
+
+Returns true (1) if the argument is objectp() and the O_VIRTUAL flag is set.
+The driver sets the O_VIRTUAL flag for those objects created via the
+'compile_object' function in the master object.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

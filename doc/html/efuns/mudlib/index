@@ -1,0 +1,23 @@
+Mudlib related efuns
+
+These efuns do things which probably should be done by the mudlib, but
+are kept for backwards compatibility.
+
+<DL>
+*  author_stats
+*  domain_stats
+*  export_uid
+*  find_living
+*  geteuid
+*  getuid
+*  living
+*  livings
+*  query_privs
+*  set_author
+*  set_light
+*  set_living_name
+*  set_privs
+*  seteuid
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

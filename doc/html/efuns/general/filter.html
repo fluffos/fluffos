@@ -1,0 +1,15 @@
+<HEAD> <TITLE> filter - select certain elements </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> filter - select certain elements </H1> </center>
+<p>
+<b> mixed filter(mixed x, string fun, object ob, mixed extra, ...); </b>
+<p>
+<b> mixed filter(mixed x, function f, mixed extra, ...); </b>
+<p>
+The (ob, fun) syntax works as if (: call_other, ob, fun :) had been passed as
+f.  Filter returns a new structure containing only the elements of x for which
+the function returns nonzero.  Currently, it can be used on arrays and
+mappings.  In the case of mappings, both the key and the value are passed
+to the function.  extra and all the following arguments are passed to the
+function after the element.  For example, filter(arr, fun, 2, 3) will
+first call fun(arr[0], 2, 3) then fun(arr[1], 2, 3) etc.
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

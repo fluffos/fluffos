@@ -1,0 +1,26 @@
+call_out - delayed function call in same object
+
+int call_out( function fun, int delay, mixed arg, ... );
+
+Set up a call to 'fun'.  If fun is a string, it is interpreted as the
+name of a function in this_object().  The call will take place 'delay'
+seconds later, with the arguments 'arg' and following provided.
+
+Note:
+Unless THIS_PLAYER_IN_CALL_OUT is defined, you can't rely on
+write() or say() in 'fun' since this_player() is set to 0.
+Use tell_object() instead.
+
+If THIS_PLAYER_IN_CALL_OUT is defined, this_player() is the same as
+it was when the call_out() call was scheduled.
+
+The return value will be a unique integer identifying the call_out, if
+CALLOUT_HANDLES is defined.  This 'handle' can be passed to
+remove_call_out() and find_call_out().
+
+See also:
+ remove_call_out,
+ call_out_info,
+ find_call_out
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

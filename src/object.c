@@ -20,8 +20,8 @@ object_t *previous_ob;
 int tot_alloc_object, tot_alloc_object_size;
 
 char *save_mapping PROT ((mapping_t *m));
-INLINE static int restore_array PROT((char **str, svalue_t *));
-INLINE static int restore_class PROT((char **str, svalue_t *));
+INLINE_STATIC int restore_array PROT((char **str, svalue_t *));
+INLINE_STATIC int restore_class PROT((char **str, svalue_t *));
 int restore_hash_string PROT((char **str, svalue_t *));
 
 INLINE int
@@ -51,7 +51,7 @@ INLINE int svalue_save_size P1(svalue_t *, v)
 	    int size = 0;
 
 	    while ((c = *cp++)) {
-		if (c == '\\' || c == '\"') size++;
+		if (c == '\\' || c == '"') size++;
 		size++;
 	    }
 	    return 3 + size;
@@ -112,7 +112,7 @@ INLINE int svalue_save_size P1(svalue_t *, v)
     case T_REAL:
 	{
 	    char buf[256];
-	    sprintf(buf, "%g", v->u.real);
+	    sprintf(buf, "%#g", v->u.real);
 	    return (int)(strlen(buf)+1);
 	}
 
@@ -198,7 +198,7 @@ INLINE void save_svalue P2(svalue_t *, v, char **, buf)
 
     case T_REAL:
 	{
-	    sprintf(*buf, "%g", v->u.real);
+	    sprintf(*buf, "%#g", v->u.real);
 	    (*buf) += strlen(*buf);
 	    return;
 	}
@@ -227,7 +227,7 @@ INLINE void save_svalue P2(svalue_t *, v, char **, buf)
     }
 }
 
-INLINE static int
+INLINE_STATIC int
 restore_internal_size P3(char **, str, int, is_mapping, int, depth)
 {
     register char *cp = *str;
@@ -237,7 +237,7 @@ restore_internal_size P3(char **, str, int, is_mapping, int, depth)
     delim = is_mapping ? ':' : ',';
     while ((c = *cp++)) {
 	switch(c){
-	case '\"':
+	case '"':
 	    {
 		while ((c = *cp++) != '"')
 		    if ((c == '\0') || (c == '\\' && !*cp++)){
@@ -337,7 +337,7 @@ restore_internal_size P3(char **, str, int, is_mapping, int, depth)
 
 
 
-INLINE static int
+INLINE_STATIC int
 restore_size P2(char **, str, int, is_mapping)
 {
     register char *cp = *str;
@@ -348,7 +348,7 @@ restore_size P2(char **, str, int, is_mapping)
 
     while ((c = *cp++)) {
 	switch(c){
-	case '\"':
+	case '"':
 	    {
 		while ((c = *cp++) != '"')
 		    if ((c == '\0') || (c == '\\' && !*cp++)) return 0;
@@ -420,7 +420,7 @@ restore_size P2(char **, str, int, is_mapping)
     return -1;
 }
 
-INLINE static int
+INLINE_STATIC int
 restore_interior_string P2(char **, val, svalue_t *, sv)
 {
     register char *cp = *val;
@@ -442,7 +442,7 @@ restore_interior_string P2(char **, val, svalue_t *, sv)
 
 		if ((*new++ = *cp++)) {
 		    while ((c = *cp++) != '"'){
-			if (c == '\\'){
+			if (c == '\\') {
 			    if (!(*new++ = *cp++)) return ROB_STRING_ERROR;
 			}
 			else {
@@ -482,32 +482,92 @@ restore_interior_string P2(char **, val, svalue_t *, sv)
     return 0;
 }
 
-#define PARSE_NUMERIC(X,Y,Z) \
-    { \
-                int res = c - '0'; \
-	\
-                while ((c = *cp++) >= '0' && c <= '9'){ \
-                    res *= 10, res += c - '0'; \
-		} \
-                if (c == '.'){ \
-                    float f1 = 0.0, f2 = 10.0; \
-                    int hh = 0; \
-			\
-                    while ((c = *cp++) >= '0' && c <= '9' && !(++hh & 8)){ \
-                        f1 += (c - '0') / f2; \
-                        f2 *= 10.0; \
-		    } \
-                    if (!hh)  \
-			Z; \
-		    X; \
-		} \
-                else { \
-		    Y; \
-		} \
-                break; \
-    } \
+static int parse_numeric P3(char **, cpp, char, c, svalue_t *, dest) 
+{
+    char *cp = *cpp;
+    int res, neg;
+    
+    if (c == '-') {
+	neg = 1;
+	res = 0;
+	c = *cp++;
+	if (!isdigit(c))
+	    return 0;
+    } else
+      neg = 0;
+    res = c - '0';
+    
+    while ((c = *cp++) && isdigit(c)) {
+	res *= 10;
+	res += c - '0';
+    }
+    if (c == '.') {
+	float f1 = 0.0, f2 = 10.0;
 
-INLINE static void add_map_stats P2(mapping_t *, m, int, count)
+	c = *cp++;
+	if (!isdigit(c)) return 0;
+	
+	do {
+	    f1 += (c - '0')/f2;
+	    f2 *= 10;
+	} while ((c = *cp++) && isdigit(c));
+
+	f1 += res;
+	if (c == 'e') {
+	    int expo = 0;
+	    
+	    if ((c = *cp++) == '+') {
+		while ((c = *cp++) && isdigit(c)) {
+		    expo *= 10;
+		    expo += (c - '0');
+		}
+		f1 *= pow(10.0, expo);
+	    } else if (c == '-') {
+		while ((c = *cp++) && isdigit(c)) {
+		    expo *= 10;
+		    expo += (c - '0');
+		}
+		f1 *= pow(10.0, -expo);
+	    } else
+		return 0;
+	}
+	    
+	dest->type = T_REAL;
+	dest->u.real = (neg ? -f1 : f1);
+	*cpp = cp;
+	return 1;
+    } else if (c == 'e') {
+	int expo = 0;
+	float f1;
+	
+	if ((c = *cp++) == '+') {
+	    while ((c = *cp++) && isdigit(c)) {
+		expo *= 10;
+		expo += (c - '0');
+	    }
+	    f1 = res * pow(10.0, expo);
+	} else if (c == '-') {
+	    while ((c = *cp++) && isdigit(c)) {
+		expo *= 10;
+		expo += (c - '0');
+	    }
+	    f1 = res * pow(10.0, -expo);
+	} else
+	    return 0;
+	
+	dest->type = T_REAL;
+	dest->u.real = (neg ? -f1 : f1);
+	*cpp = cp;
+	return 1;
+    } else {
+	dest->type = T_NUMBER;
+	dest->u.number = (neg ? -res : res);
+	*cpp = cp;
+	return 1;
+    }
+}
+
+INLINE_STATIC void add_map_stats P2(mapping_t *, m, int, count)
 {
     total_mapping_nodes += count;
     total_mapping_size += count * sizeof(mapping_node_t);
@@ -527,7 +587,7 @@ restore_mapping P2(char **,str, svalue_t *, sv)
     mapping_t *m;
     svalue_t key, value;
     mapping_node_t **a, *elt, *elt2;
-    register char *cp = *str;
+    char *cp = *str;
     int err;
 
     if (save_svalue_depth) size = sizes[save_svalue_depth-1]; 
@@ -594,20 +654,11 @@ restore_mapping P2(char **,str, svalue_t *, sv)
 	    return 0;
 
 	case '-':
-	    if ((c = *cp++) < '0' || c > '9') {
-		goto key_numeral_error;
-	    }
-	    PARSE_NUMERIC(key.u.real = -(f1+res); key.type = T_REAL,
-			  key.type = T_NUMBER; key.u.number = -res,
-			  goto key_numeral_error)
-		
 	case '0': case '1': case '2': case '3': case '4':
 	case '5': case '6': case '7': case '8': case '9':
-	    {
-		PARSE_NUMERIC(key.u.real = f1+res;key.type = T_REAL,
-			      key.type = T_NUMBER; key.u.number = res,
-			      goto key_numeral_error)
-	    }
+	    if (!parse_numeric(&cp, c, &key))
+		goto key_numeral_error;
+	    break;
 	    
 	default:
 	    goto generic_key_error;
@@ -651,23 +702,12 @@ restore_mapping P2(char **,str, svalue_t *, sv)
 	    }
 	    
 	case '-':
-	    {
-		if ((c = *cp++) < '0' || c > '9') {
-		    goto value_numeral_error;
-		}
-		PARSE_NUMERIC((value.u.real = -(f1+res), value.type = T_REAL),
-			      (value.type = T_NUMBER, value.u.number = -res),
-			      goto value_numeral_error)
-	    }
-	    
 	case '0': case '1': case '2': case '3': case '4':
 	case '5': case '6': case '7': case '8': case '9':
-	    {
-		PARSE_NUMERIC((value.u.real = (f1+res),value.type = T_REAL),
-			      (value.type = T_NUMBER,value.u.number = res),
-			      goto value_numeral_error)
-	    }
-	    
+	    if (!parse_numeric(&cp, c, &value))
+		goto value_numeral_error;
+	    break;
+
 	case ',':
 	    {
 		value.u.number = 0;
@@ -681,7 +721,7 @@ restore_mapping P2(char **,str, svalue_t *, sv)
 
 	/* both key and value are valid, referenced svalues */
 
-	oi = (key.u.number > 0 ? key.u.number : -key.u.number);
+	oi = MAP_POINTER_HASH(key.u.number);
 	i = oi & mask;
 	if ((elt2 = elt = a[i])) {
 	    do {
@@ -746,21 +786,21 @@ restore_mapping P2(char **,str, svalue_t *, sv)
 }
 
 
-INLINE static int
+INLINE_STATIC int
 restore_class P2(char **, str, svalue_t *, ret)
 {   
     int size;
     char c;
     array_t *v;
     svalue_t *sv;
-    register char *cp = *str;
+    char *cp = *str;
     int err;
 
     if (save_svalue_depth) size = sizes[save_svalue_depth-1];
     else if ((size = restore_size(str,0)) < 0) return ROB_CLASS_ERROR; 
 
-    v = allocate_array(size); /* after this point we have to clean up
-				 or we'll leak */
+    v = allocate_class_by_size(size); /* after this point we have to clean up
+					 or we'll leak */
     sv = v->item;
 
     while (size--) {
@@ -804,23 +844,13 @@ restore_class P2(char **, str, svalue_t *, ret)
 	    }
 
 	case '-':
-	    {
-		if ((c = *cp++) < '0' || c > '9') {
-		    err = ROB_NUMERAL_ERROR;
-		    goto error;
-		}
-		PARSE_NUMERIC((sv->u.real = -(f1+res), (sv++)->type = T_REAL),
-			      ((sv++)->u.number = -res),
-			      goto numeral_error)
-	    }
-
 	case '0': case '1': case '2': case '3': case '4':
 	case '5': case '6': case '7': case '8': case '9':
-	    {
-		PARSE_NUMERIC((sv->u.real = (f1+res), (sv++)->type = T_REAL),
-			      ((sv++)->u.number = res),
-			      goto numeral_error)
-	    }
+	    if (parse_numeric(&cp, c, sv))
+		sv++;
+	    else
+		goto numeral_error;
+	    break;
 
 	default:
 	    goto generic_error;
@@ -839,18 +869,18 @@ restore_class P2(char **, str, svalue_t *, ret)
  generic_error:
     err = ROB_CLASS_ERROR;
  error:
-    free_array(v);
+    free_class(v);
     return err;
 }
 
-INLINE static int
+INLINE_STATIC int
 restore_array P2(char **, str, svalue_t *, ret)
 {   
     int size;
     char c;
     array_t *v;
     svalue_t *sv;
-    register char *cp = *str;
+    char *cp = *str;
     int err;
 
     if (save_svalue_depth) size = sizes[save_svalue_depth-1];
@@ -901,23 +931,13 @@ restore_array P2(char **, str, svalue_t *, ret)
 	    }
 
 	case '-':
-	    {
-		if ((c = *cp++) < '0' || c > '9') {
-		    err = ROB_NUMERAL_ERROR;
-		    goto error;
-		}
-		PARSE_NUMERIC((sv->u.real = -(f1+res), (sv++)->type = T_REAL),
-			      ((sv++)->u.number = -res),
-			      goto numeral_error)
-	    }
-
 	case '0': case '1': case '2': case '3': case '4':
 	case '5': case '6': case '7': case '8': case '9':
-	    {
-		PARSE_NUMERIC((sv->u.real = (f1+res), (sv++)->type = T_REAL),
-			      ((sv++)->u.number = res),
-			      goto numeral_error)
-	    }
+	    if (parse_numeric(&cp, c, sv))
+		sv++;
+	    else
+		goto numeral_error;
+	    break;
 
 	default:
 	    goto generic_error;
@@ -949,7 +969,7 @@ restore_string P2(char *, val, svalue_t *, sv)
     int len;
 
     while ((c = *cp++) != '"') {
-        switch (c){
+        switch (c) {
 	case '\r':
             {
                 *(cp-1) = '\n';
@@ -1007,9 +1027,10 @@ INLINE int
 restore_svalue P2(char *, cp, svalue_t *, v)
 {
     int ret;
+    char c;
     
-    switch(*cp++) {
-    case '\"':
+    switch (c = *cp++) {
+    case '"':
 	return restore_string(cp, v);
     case '(':
 	if (*cp == '{') {
@@ -1032,28 +1053,15 @@ restore_svalue P2(char *, cp, svalue_t *, v)
 	return ret;
 	
     case '-':
-	{
-	    char c;
-
-	    if ((c = *cp++) < '0' || (c > '9')) return ROB_NUMERAL_ERROR;
-	    PARSE_NUMERIC((v->type = T_REAL, v->u.real = -f1-res),
-			  (v->type = T_NUMBER, v->u.number = -res),
-			  return ROB_NUMERAL_ERROR);
-	}
-
     case '0': case '1': case '2': case '3': case '4':
     case '5': case '6': case '7': case '8': case '9':
-        {
-	    char c = *(cp-1);
-	    PARSE_NUMERIC((v->type = T_REAL, v->u.real = f1+res),
-			  (v->type = T_NUMBER, v->u.number = res),
-			  return ROB_NUMERAL_ERROR);
-	}
-
-    default: {
-	    v->type = T_NUMBER;
-	    v->u.number = 0;
-	}
+	if (!parse_numeric(&cp, c, v))
+	    return ROB_NUMERAL_ERROR;
+	break;
+	
+    default:
+	v->type = T_NUMBER;
+	v->u.number = 0;
     }
 
     return 0;
@@ -1066,10 +1074,11 @@ safe_restore_svalue P2(char *, cp, svalue_t *, v)
 {
     int ret;
     svalue_t val;
-
+    char c;
+    
     val.type = T_NUMBER;
-    switch(*cp++) {
-    case '\"':
+    switch (c = *cp++) {
+    case '"':
 	if ((ret = restore_string(cp, &val))) return ret;
 	break;
     case '(':
@@ -1097,23 +1106,11 @@ safe_restore_svalue P2(char *, cp, svalue_t *, v)
 	}
 	
     case '-':
-	{
-	    char c;
-	    
-	    if ((c = *cp++) < '0' || (c > '9')) return ROB_NUMERAL_ERROR;
-	    PARSE_NUMERIC((val.type = T_REAL, val.u.real = -f1-res),
-			  (val.type = T_NUMBER, val.u.number = -res),
-			  return ROB_NUMERAL_ERROR);
-	}
-	
     case '0': case '1': case '2': case '3': case '4':
     case '5': case '6': case '7': case '8': case '9':
-        {
-	    char c = *(cp-1);
-	    PARSE_NUMERIC((val.type = T_REAL, val.u.real = f1+res),
-			  (val.type = T_NUMBER, val.u.number = res),
-			  return ROB_NUMERAL_ERROR);
-	}
+	if (!parse_numeric(&cp, c, &val))
+	    return ROB_NUMERAL_ERROR;
+	break;
 
     default:
 	val.type = T_NUMBER;
@@ -1124,45 +1121,50 @@ safe_restore_svalue P2(char *, cp, svalue_t *, v)
     return 0;
 }
 
-static int var_index = 0;
-/* optimized to start where we left off, so that walking the variables in
-   order is O(N) instead of O(N^2) -Beek */
-
-variable_t *find_status P1(char *, str) {
+static int fgv_recurse P4(program_t *, prog, int *, idx, 
+			  char *, name, unsigned short *, type) {
     int i;
-    variable_t *vars = current_object->prog->variable_names;
-    int n = current_object->prog->num_variables;
-    
-    if ((str = findstring(str))) {
-	for (i=var_index; i < n; i++) {
-	    if (vars[i].name == str) {
-		var_index = i+1;
-		return &vars[i];
-	    }
-	}
-	for (i=0; i < var_index; i++) {
-	    if (vars[i].name == str) {
-		var_index = i+1;
-		return &vars[i];
-	    }
+    for (i = 0; i < prog->num_inherited; i++) {
+	if (fgv_recurse(prog->inherit[i].prog, idx, name, type)) {
+	    *type |= prog->inherit[i].type_mod;
+	    return 1;
 	}
     }
-    /* leave var_index alone; they might have just deleted this var */
+    for (i = 0; i < prog->num_variables_defined; i++) {
+	if (prog->variable_table[i] == name) {
+	    *idx += i;
+	    *type = prog->variable_types[i];
+	    return 1;
+	}
+    }
+    *idx += prog->num_variables_defined;
     return 0;
 }
 
+int find_global_variable P3(program_t *, prog, char *, name,
+			    unsigned short *, type) {
+    int idx = 0;
+    char *str = findstring(name);
+    
+    if (str && fgv_recurse(prog, &idx, str, type)) {
+	if (*type & NAME_PUBLIC)
+	    *type &= ~NAME_PRIVATE;
+	return idx;
+    }
+    return -1;
+}
+
 void
-restore_object_from_buff P4(object_t *, ob, char *, theBuff, char *, name,
+restore_object_from_buff P3(object_t *, ob, char *, theBuff,
 			    int, noclear)
 {
     char *buff, *nextBuff, *tmp,  *space;
     char var[100];
-    variable_t *p, *var_start = ob->prog->variable_names;
+    int idx;
     svalue_t *sv = ob->variables;
     int rc;
- 
-    var_index = 0;
-
+    unsigned short t;
+    
     nextBuff = theBuff;
     while ((buff = nextBuff) && *buff) {
         svalue_t *v;
@@ -1177,23 +1179,21 @@ restore_object_from_buff P4(object_t *, ob, char *, theBuff, char *, name,
             continue;
         space = strchr(buff, ' ');
         if (!space || ((space - buff) >= sizeof(var))) {
-            FREE(name);
             FREE(theBuff);
             error("restore_object(): Illegal file format.\n");
         }
         (void)strncpy(var, buff, space - buff);
         var[space - buff] = '\0';
-        p = find_status(var);
-        if (!p || (p->type & TYPE_MOD_STATIC))
-            continue;
+	idx = find_global_variable(current_object->prog, var, &t);
+        if (idx == -1 || t & NAME_STATIC)
+	    continue;
 
-        v = &sv[p - var_start];
+        v = &sv[idx];
 	if (noclear)
 	    rc = safe_restore_svalue(space+1, v);
 	else
 	    rc = restore_svalue(space+1, v);
         if (rc & ROB_ERROR) {
-            FREE(name);
             FREE(theBuff);
 
 	    if (rc & ROB_GENERAL_ERROR)
@@ -1218,109 +1218,122 @@ restore_object_from_buff P4(object_t *, ob, char *, theBuff, char *, name,
  * to assertain that the write is legal.
  * If 'save_zeros' is set, 0 valued variables will be saved
  */
+static int save_object_recurse P5(program_t *, prog, svalue_t **,
+				  svp, int, type, int, save_zeros,
+				  FILE *, f) {
+    int i;
+    int theSize;
+    char *new_str, *p;
+    
+    for (i = 0; i < prog->num_inherited; i++) {
+	if (!save_object_recurse(prog->inherit[i].prog, svp, 
+				 prog->inherit[i].type_mod | type,
+				 save_zeros, f))
+	    return 0;
+    }
+    if (type & NAME_STATIC) {
+	(*svp) += prog->num_variables_defined;
+	return 1;
+    }
+    for (i = 0; i < prog->num_variables_defined; i++) {
+	if (prog->variable_types[i] & NAME_STATIC) {
+	    (*svp)++;
+	    continue;
+	}
+	save_svalue_depth = 0;
+	theSize = svalue_save_size(*svp);
+	new_str = (char *)DXALLOC(theSize, TAG_TEMPORARY, "save_object: 2");
+	*new_str = '\0';
+	p = new_str;
+	save_svalue((*svp)++, &p);
+	/* FIXME: shouldn't use fprintf() */
+	if (save_zeros || new_str[0] != '0' || new_str[1] != 0) /* Armidale */
+	    if (fprintf(f, "%s %s\n", prog->variable_table[i], new_str) < 0) {
+		debug_perror("save_object: fprintf", 0);
+		return 0;
+	    }
+	FREE(new_str);
+    }
+    return 1;
+}
+
+int sel = -1;
+
 int
 save_object P3(object_t *, ob, char *, file, int, save_zeros)
 {
     char *name;
-    static char tmp_name[80];
-    int len, i;
+    static char tmp_name[256];
+    int len;
     FILE *f;
-    int failed = 0;
-    char *use_name, *new_str, *p;
-    int free_use_name = 0, theSize;
-    variable_t *var = ob->prog->variable_names;
-    svalue_t *v = ob->variables;
+    int success;
+    svalue_t *v;
 
     if (ob->flags & O_DESTRUCTED)
         return 0;
-    if (file[0] != '/')
-    {
-	use_name = DXALLOC((len = strlen(file)) + 2, TAG_TEMPORARY, "save_object: 1");
-	strcpy(use_name, "/");
-	strcpy(use_name+1, file);
-	free_use_name = 1;
-    } else {
-	use_name = file;
-	len = 0;
-    }
 
-    file = check_valid_path(use_name, ob, "save_object", 1);
-    /* WARNING: file may point at use_name */
+    len = strlen(file);
+    if (file[len-2] == '.' && file[len - 1] == 'c')
+	len -= 2;
 
-    if (file == 0) {
-	if (free_use_name)
-	    FREE(use_name);
+    if (sel == -1) sel = strlen(SAVE_EXTENSION);
+    if (strcmp(file + len - sel, SAVE_EXTENSION) == 0)
+	len -= sel;
+    
+    name = new_string(len + strlen(SAVE_EXTENSION), "save_object");
+    strcpy(name, file);
+    strcpy(name + len, SAVE_EXTENSION);
+
+    push_malloced_string(name);    /* errors */
+
+    file = check_valid_path(name, ob, "save_object", 1);
+    free_string_svalue(sp--);
+    if (!file) 
         error("Denied write permission in save_object().\n");
-    }
-    if (!len) len = strlen(file);
-    name = DXALLOC(len + strlen(SAVE_EXTENSION) + 1, TAG_TEMPORARY, "save_object: 1");
-    (void)strcpy(name, file);
-    (void)strcat(name + len, SAVE_EXTENSION);
 
-    /* we don't use file after this.  It's safe to free it. */
-    if (free_use_name)
-	FREE(use_name);
     /*
      * Write the save-files to different directories, just in case
      * they are on different file systems.
      */
-    sprintf(tmp_name, "%s.tmp", name);
+    sprintf(tmp_name, "%.250s.tmp", file);
 
-#ifdef WIN32
-    if (!(f = fopen(tmp_name, "wb"))){
-#else
-    if (!(f = fopen(tmp_name, "w"))){
-#endif
-	FREE(name);
+    if (!(f = fopen(tmp_name, "w")) || fprintf(f, "#/%s\n", ob->prog->name) < 0) {
         error("Could not open /%s for a save.\n", tmp_name);
     }
-    fprintf(f, "#%s\n", ob->prog->name);
 
-    i = ob->prog->num_variables;
-    while (i--){
-	if (var->type & TYPE_MOD_STATIC) { v++; var++; continue; }
+    v = ob->variables;
+    success = save_object_recurse(ob->prog, &v, 0, save_zeros, f);
 
-	save_svalue_depth = 0;
-	theSize = svalue_save_size(v);
-	new_str = (char *)DXALLOC(theSize, TAG_TEMPORARY, "save_object: 2");
-	*new_str = '\0';
-	p = new_str;	
-	save_svalue(v++, &p);
-	if (save_zeros || strcmp(new_str,"0")) /* Armidale */
-	    if (fprintf(f, "%s %s\n", var->name, new_str) == EOF) failed = 1;
-	FREE(new_str);
-	var++;
+    if (fclose(f) < 0) {
+	debug_perror("save_object", file);
+	success = 0;
     }
-    if (failed) 
+
+    if (!success) {
 	debug_message("Failed to completely save file. Disk could be full.\n");
-    else {
-	(void) fclose(f);
+	unlink(tmp_name);
+    } else {
 #ifdef WIN32
         /* Need to erase it to write over it. */
-        unlink(name);
+        unlink(file);
 #endif
-	if (rename(tmp_name, name) < 0)
-	{
+	if (rename(tmp_name, file) < 0)	{
 #ifdef LATTICE
-                /* AmigaDOS won't overwrite when renaming */
-                if (errno == EEXIST) {
-                    unlink(name);
-                    if (rename(tmp_name, name) >= 0) {
-                        FREE(name);
-                        return 1;
-                    }
-                }
+	    /* AmigaDOS won't overwrite when renaming */
+	    if (errno == EEXIST) {
+		unlink(file);
+		if (rename(tmp_name, file) >= 0) {
+		    return 1;
+		}
+	    }
 #endif
-		debug_perror("save_object", name);
-		debug_message("Failed to rename /%s to /%s\n", tmp_name, name);
-		debug_message("Failed to save object!\n");
+	    debug_perror("save_object", file);
+	    debug_message("Failed to rename /%s to /%s\n", tmp_name, file);
+	    debug_message("Failed to save object!\n");
+	    unlink(tmp_name);
 	}
     }
-    FREE(name);
-    if (failed) {   
-	debug_message("Failed to save to file. Disk could be full.\n");
-	return 0;
-    }
+
     return 1;
 }
 
@@ -1344,6 +1357,36 @@ save_variable P1(svalue_t *, var)
     return new_str;
 }
 
+static void cns_just_count P2(int *, idx, program_t *, prog) {
+    int i;
+    
+    for (i = 0; i < prog->num_inherited; i++)
+	cns_just_count(idx, prog->inherit[i].prog);
+    *idx += prog->num_variables_defined;
+}
+
+static void cns_recurse P3(object_t *, ob, int *, idx, program_t *, prog) {
+    int i;
+    
+    for (i = 0; i < prog->num_inherited; i++) {
+	if (prog->inherit[i].type_mod & NAME_STATIC)
+	    cns_just_count(idx, prog->inherit[i].prog);
+	else
+	    cns_recurse(ob, idx, prog->inherit[i].prog);
+    }
+    for (i = 0; i < prog->num_variables_defined; i++) {
+	if (!(prog->variable_types[i] & NAME_STATIC)) {
+	    free_svalue(&ob->variables[*idx + i], "cns_recurse");
+	    ob->variables[*idx + i] = const0u;
+	}
+    }
+    *idx += prog->num_variables_defined;
+}
+
+static void clear_non_statics P1(object_t *, ob) {
+    int idx = 0;
+    cns_recurse(ob, &idx, ob->prog);
+}
 
 int restore_object P3(object_t *, ob, char *, file, int, noclear)
 {
@@ -1356,23 +1399,31 @@ int restore_object P3(object_t *, ob, char *, file, int, noclear)
     if (ob->flags & O_DESTRUCTED)
         return 0;
 
-    file = check_valid_path(file, ob, "restore_object", 0);
+    len = strlen(file);
+    if (file[len-2] == '.' && file[len - 1] == 'c')
+	len -= 2;
+    
+    if (sel == -1) sel = strlen(SAVE_EXTENSION);
+    if (strcmp(file + len - sel, SAVE_EXTENSION) == 0)
+	len -= sel;
+
+    name = new_string(len + strlen(SAVE_EXTENSION), "restore_object");
+    strncpy(name, file, len);
+    strcpy(name + len, SAVE_EXTENSION);
+
+    push_malloced_string(name);    /* errors */
+
+    file = check_valid_path(name, ob, "restore_object", 0);
+    free_string_svalue(sp--);
     if (!file) error("Denied read permission in restore_object().\n");
 
-    len = strlen(file);
-    name = DXALLOC(len + strlen(SAVE_EXTENSION) + 1, TAG_TEMPORARY, "restore_object: 2");
-    (void)strcpy(name, file);
-    if (name[len-2] == '.' && name[len - 1] == 'c')
-        name[len-2] = 0;
-    (void)strcat(name, SAVE_EXTENSION);
 #ifdef LATTICE
     f = NULL;
-    if ((stat(name, &st) == -1) || !(f = fopen(name, "r"))) {
+    if ((stat(file, &st) == -1) || !(f = fopen(file, "r"))) {
 #else
-    f = fopen(name, "r");
+    f = fopen(file, "r");
     if (!f || fstat(fileno(f), &st) == -1) {
 #endif
-        FREE(name);
         if (f) 
             (void)fclose(f);
         return 0;
@@ -1380,11 +1431,14 @@ int restore_object P3(object_t *, ob, char *, file, int, noclear)
 
     if (!(i = st.st_size)) {
         (void)fclose(f);
-        FREE(name);
         return 0;
     }
     theBuff = DXALLOC(i + 1, TAG_TEMPORARY, "restore_object: 4");
+#ifdef WIN32
+    i = read(_fileno(f), theBuff, i);
+#else
     fread(theBuff, 1, i, f);
+#endif
     fclose(f);
     theBuff[i] = '\0';
     current_object = ob;
@@ -1393,25 +1447,15 @@ int restore_object P3(object_t *, ob, char *, file, int, noclear)
      * If 'noclear' flag is not set, all non-static variables will be
      * initialized to 0 when restored.
      */
-    if (!noclear) {
-	variable_t *v = ob->prog->variable_names;
-	svalue_t *sv = ob->variables;
-
-	i = ob->prog->num_variables; 
-	while (i--) {
-	    if (!((v++)->type & TYPE_MOD_STATIC))
-		assign_svalue(sv++, &const0n);
-	    else sv++;
-	}
-    }
+    if (!noclear)
+	clear_non_statics(ob);
     
-    restore_object_from_buff(ob, theBuff, name, noclear);
+    restore_object_from_buff(ob, theBuff, noclear);
     current_object = save;
 #ifdef DEBUG
     if (d_flag > 1)
-        debug_message("Object /%s restored from /%s.\n", ob->name, name);
+        debug_message("Object /%s restored from /%s.\n", ob->name, file);
 #endif
-    FREE(name);
     FREE(theBuff);
     return 1;
 }
@@ -1438,27 +1482,8 @@ void restore_variable P2(svalue_t *, var, char *, str)
 
 void tell_npc P2(object_t *, ob, char *, str)
 {
-    push_string(str, STRING_MALLOC);
-    (void) apply(APPLY_CATCH_TELL, ob, 1, ORIGIN_DRIVER);
-}
-
- /* save some space snoop */
-#define ALM_BREAK LARGEST_PRINTABLE_STRING - 10
-
-static void add_long_message P2(object_t *, who, char *, s) {
-    char save;
-    int len;
-
-    len = strlen(s);
-    while (len > ALM_BREAK) {
-	save = s[ALM_BREAK];
-	s[ALM_BREAK] = 0;
-	add_message(who, s);
-	s[ALM_BREAK] = save;
-	s += ALM_BREAK;
-	len -= ALM_BREAK;
-    }
-    add_message(who, s);
+    copy_and_push_string(str);
+    apply(APPLY_CATCH_TELL, ob, 1, ORIGIN_DRIVER);
 }
 
 /*
@@ -1474,19 +1499,16 @@ static void add_long_message P2(object_t *, who, char *, s) {
 void tell_object P2(object_t *, ob, char *, str)
 {
     if (!ob || (ob->flags & O_DESTRUCTED)) {
-	add_long_message(0, str);
+	add_message(0, str);
 	return;
     }
-#ifdef INTERACTIVE_CATCH_TELL
-    tell_npc(ob, str);
-    return;
-#else
-    if (ob->interactive) {
-	add_long_message(ob, str);
-	return;
-    }
-    tell_npc(ob, str);
+    /* if this is on, EVERYTHING goes through catch_tell() */
+#ifndef INTERACTIVE_CATCH_TELL
+    if (ob->interactive)
+	add_message(ob, str);
+    else
 #endif
+	tell_npc(ob, str);
 }
 
 void dealloc_object P2(object_t *, ob, char *, from)
@@ -1497,11 +1519,11 @@ void dealloc_object P2(object_t *, ob, char *, from)
 
 #ifdef DEBUG
     if (d_flag)
-	debug_message("free_object: %s.\n", ob->name);
+	debug_message("free_object: /%s.\n", ob->name);
 #endif
     if (!(ob->flags & O_DESTRUCTED)) {
 	/* This is fatal, and should never happen. */
-	fatal("FATAL: Object 0x%x %s ref count 0, but not destructed (from %s).\n",
+	fatal("FATAL: Object 0x%x /%s ref count 0, but not destructed (from %s).\n",
 	      ob, ob->name, from);
     }
     DEBUG_CHECK(ob->interactive, "Tried to free an interactive object.\n");
@@ -1513,7 +1535,7 @@ void dealloc_object P2(object_t *, ob, char *, from)
 	remove_swap_file(ob);	/* do this before prog is freed */
     if (ob->prog) {
 	tot_alloc_object_size -=
-	    (ob->prog->num_variables - 1) * sizeof(svalue_t) +
+	    (ob->prog->num_variables_total - 1) * sizeof(svalue_t) +
 	    sizeof(object_t);
 	free_prog(ob->prog, 1);
 	ob->prog = 0;
@@ -1534,10 +1556,10 @@ void dealloc_object P2(object_t *, ob, char *, from)
     if (ob->name) {
 #ifdef DEBUG
 	if (d_flag > 1)
-	    debug_message("Free object %s\n", ob->name);
+	    debug_message("Free object /%s\n", ob->name);
 #endif
 	DEBUG_CHECK1(lookup_object_hash(ob->name) == ob,
-		     "Freeing object %s but name still in name table", ob->name);
+		     "Freeing object /%s but name still in name table", ob->name);
 	FREE(ob->name);
 	ob->name = 0;
     }
@@ -1580,16 +1602,16 @@ object_t *get_empty_object P1(int, num_var)
     ob->ref = 1;
     ob->swap_num = -1;
     for (i = 0; i < num_var; i++)
-	ob->variables[i] = const0n;
+	ob->variables[i] = const0u;
     return ob;
 }
 
 #ifndef NO_ADD_ACTION
-static object_t *hashed_living[CFG_LIVING_HASH_SIZE];
+object_t *hashed_living[CFG_LIVING_HASH_SIZE];
 
 static int num_living_names, num_searches = 1, search_length = 1;
 
-static INLINE int hash_living_name P1(char *, str)
+INLINE_STATIC int hash_living_name P1(char *, str)
 {
     return whashstr(str, 20) & (CFG_LIVING_HASH_SIZE - 1);
 }
@@ -1711,34 +1733,6 @@ void call_create P2(object_t *, ob, int, num_arg)
     ob->flags |= O_RESET_STATE;
 }
 
-/*
- * If there is a shadow for this object, then the message should be
- * sent to it. But only if catch_tell() is defined. Beware that one of the
- * shadows may be the originator of the message, which means that we must
- * not send the message to that shadow, or any shadows in the linked list
- * before that shadow.
- */
-#ifndef NO_SHADOWS
-int shadow_catch_message P2(object_t *, ob, char *, str)
-{
-    if (!ob->shadowed)
-	return 0;
-    while (ob->shadowed != 0 && ob->shadowed != current_object)
-	ob = ob->shadowed;
-    while (ob->shadowing) {
-	if (function_exists(APPLY_CATCH_TELL, ob)) {
-	    push_constant_string(str);
-	    if (apply(APPLY_CATCH_TELL, ob, 1, ORIGIN_DRIVER))	
-		/* this will work, since we know the */
-		/* function is defined */
-		return 1;
-	}
-	ob = ob->shadowing;
-    }
-    return 0;
-}
-#endif
-
 INLINE int object_visible P1(object_t *, ob)
 {
     if (ob->flags & O_HIDDEN) {
@@ -1757,9 +1751,9 @@ void reload_object P1(object_t *, obj)
 
     if (!obj->prog)
 	return;
-    for (i = 0; i < (int) obj->prog->num_variables; i++) {
+    for (i = 0; i < (int) obj->prog->num_variables_total; i++) {
 	free_svalue(&obj->variables[i], "reload_object");
-	obj->variables[i] = const0n;
+	obj->variables[i] = const0u;
     }
 #ifdef PACKAGE_SOCKETS
     if (obj->flags & O_EFUN_SOCKET) {
@@ -1776,16 +1770,15 @@ void reload_object P1(object_t *, obj)
      */
 #ifndef NO_SHADOWS
     if (obj->shadowed && !obj->shadowing) {
-	svalue_t svp;
 	object_t *ob2;
-
-	svp.type = T_OBJECT;
+	object_t *otmp;
+	
 	for (ob2 = obj->shadowed; ob2;) {
-	    svp.u.ob = ob2;
+	    otmp = ob2;
 	    ob2 = ob2->shadowed;
-	    svp.u.ob->shadowed = 0;
-	    svp.u.ob->shadowing = 0;
-	    destruct_object(&svp);
+	    otmp->shadowed = 0;
+	    otmp->shadowing = 0;
+	    destruct_object(otmp);
 	}
     }
     /*

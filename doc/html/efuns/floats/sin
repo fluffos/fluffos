@@ -1,0 +1,16 @@
+sin - return the sine of a float
+
+float sin( float f );
+
+This efun is only available if PACKAGE_MATH is compiled in.
+
+Returns the sine of its argument, `f', measured in radians.
+
+See also:
+ acos,
+ asin,
+ atan,
+ cos,
+ tan
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

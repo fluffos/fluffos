@@ -1,0 +1,12 @@
+<HEAD> <TITLE> check_memory - check all allocated blocks </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> check_memory - check all allocated blocks </H1> </center>
+<p>
+<b> string check_memory(int flag) </b>
+<p>
+returns a string describing possible memory allocation problems.  If the
+optional flag is 1, a summary of allocated memory is printed at the
+end.
+<p>
+This efun is only available if PACKAGE_DEVELOP, DEBUGMALLOC, and
+DEBUGMALLOC_EXTENSIONS are defined.
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

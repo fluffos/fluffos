@@ -1,0 +1,9 @@
+parse_command_all_word - find out what word refers to everything
+
+string parse_command_all_word(); 
+
+This routine is called in the master object to find out what word should
+be considered to refer to everyting.  It is used by the parse_command() efun.
+
+See also:
+ parse_command

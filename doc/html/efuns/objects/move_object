@@ -1,0 +1,8 @@
+move_object - move current object to another environment
+
+void move_object( mixed dest );
+
+Move the current object into the object `dest'.  dest should either be
+a filename or an object.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,10 @@
+map_array - modify an array of elements via application of a function
+
+array map_array( array arr, string fun, object ob, mixed extra, ... );
+
+array map_array( array arr, function f, mixed extra, ... );;
+
+The map_array() efun is really just an alias for the map() efun.
+
+See also:
+ map

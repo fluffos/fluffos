@@ -1,0 +1,18 @@
+<HEAD> <TITLE> memory_info - obtain info on object/overall memory usage </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> memory_info - obtain info on object/overall memory usage </H1> </center>
+<p>
+<b> varargs int memory_info( object ob ); </b>
+<p>
+If optional argument `ob' is given, memory_info() returns the approximate
+amount of memory that `ob' is using.  If no argument is given, memory_info()
+returns the approximate amount of memory that the entire mud is using.  Note
+that the amount of memory the mud is using does not necessarily correspond
+to the amount of memory actually allocated by the mud from the system, and
+that total memory used by all the objects is not additive due to sharing of
+certain structures.
+<p>
+See also:
+<A HREF=debug_info.html>  debug_info </A>,
+<A HREF=malloc_status.html>  malloc_status </A>,
+<A HREF=mud_status.html>  mud_status </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

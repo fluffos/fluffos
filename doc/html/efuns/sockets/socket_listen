@@ -1,0 +1,45 @@
+socket_listen - listen for connections on a socket
+
+int socket_listen( int s, string listen_callback );
+
+This efun is only available if PACKAGE_SOCKETS is compiled in.
+
+To accept connections, a socket is first created with socket_create(),
+the socket is them put into listening mode with socket_listen(), and
+the connections are accepted with socket_accept(). The socket_listen() call
+applies only to sockets of type STREAM or MUD.
+
+The argument listen_callback is the name of a function for the driver to
+call when a connection is requested on the listening socket. The listen
+callback should follow this format:
+
+<pre>
+void listen_callback(int fd)
+</pre>
+
+Where fd is the listening socket.
+
+socket_listen() returns:
+
+EESUCCESS on success.
+
+a negative value indicated below on error.
+
+ERRORS - these are in "socket_err.h"
+
+<DL>
+* EEFDRANGE Descriptor out of range.
+* EEBADF Descriptor is invalid.
+* EESECURITY Security violation attempted.
+* EEMODENOTSUPP Socket mode not supported.
+* EENOADDR Socket not bound to an address.
+* EEISCONN Socket is already connected.
+* EELISTEN Problem with listen.
+</DL>
+
+See also:
+ socket_accept,
+ socket_connect,
+ socket_create
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,5 +1,26 @@
 #!/bin/sh
 
+if test $# -ne 0; then
+    case $1 in
+        develop)
+	    echo Preparing to build developmental version of MudOS driver ...
+	    OPTIMIZE="-Wall -DPEDANTIC -pedantic"
+	    DEBUG="-g -DDEBUG"
+            ;;
+        debug)
+	    echo Preparing to build debugging version of MudOS driver ...
+	    OPTIMIZE=
+	    DEBUG="-g -DDEBUG"
+            ;;
+        *)
+	    echo Unknown build type
+	    exit 1
+            ;;
+    esac
+else
+    echo Preparing to build standard MudOS driver ...
+fi
+
 # If this is uncommented, the specified 'make' is used instead of looking for
 # one 
 #MAKE=make
@@ -58,20 +79,20 @@ INSTALL_DIR="../bin"
 # -O is usually a safe level of optimization for most compilers
 #OPTIMIZE="-O"
 # high optimization for gcc:
-#OPTIMIZE=-O2 -fomit-frame-pointer -fstrength-reduce
+#OPTIMIZE="-O2 -fomit-frame-pointer -fstrength-reduce"
 # uncomment below for RS/6000(AIX) xlc compiler only.
 # remove the -Q if xlc complains.
-#OPTIMIZE=-O -Q
+#OPTIMIZE="-O -Q"
 # might need this one with newer versions of AIX (ie 3.2.4)
-#OPTIMIZE=-O -Q -qMAXMEM=16000
+#OPTIMIZE="-O -Q -qMAXMEM=16000"
 # high optimization for HP-UX 7.x/8.x's cc (don't use with 9.x)
-#OPTIMIZE=+O3 +Obb3000
+#OPTIMIZE="+O3 +Obb3000"
 # MIPS R3000 running EP/IX Version 1.4.3. Compiler is RISCompiler C 2.11 (cc).
-#OPTIMIZE=-Olimit 1802
+#OPTIMIZE="-Olimit 1802"
 # DEC Alpha's cc's highest optimization: -O5
-#OPTIMIZE=-O -Olimit 2000
+#OPTIMIZE="-O -Olimit 2000"
 # DEC Ultrix's cc's highest optimization:
-#OPTIMIZE=-O2 -Olimit 5000
+#OPTIMIZE="-O2 -Olimit 5000"
 # high optimization for cc on SGI
 #OPTIMIZE="-O2 -Olimit 2500"
  
@@ -257,6 +278,11 @@ $CC -c comptest.c -o comptest.o
 #
 # Check if ranlib exists/is needed.  Also check ar.
 #
+cat >comptest.c <<END
+int if_you_are_reading_this_you_must_be_bored() { return 1; }
+END
+$CC -c comptest.c
+
 ar rcu comptest.a comptest.o
 if test $? -ne 0; then
     echo "FATAL ERROR: Could not find ar."
@@ -316,6 +342,10 @@ case $ARCH in
         OSFLAGS="$OSFLAGS -D_BSD -D_ALL_SOURCE"
 	CFLAGS="$CFLAGS -D_BSD -D_ALL_SOURCE"
         ;;    
+    Solaris)
+	OSFLAGS="$OSFLAGS -DSunOS_5"
+	CFLAGS="$CFLAGS -DSunOS_5"
+	;;
 esac
 
 #
@@ -343,6 +373,7 @@ if test ! -f a.out; then
     STRFUNCS=strfuncs.o
 fi
 
+CFLAGS="$OSFLAGS $WARN $PROFIL $DEBUG $DEBUG_MACRO $DEBUG_NON_FATAL $STR $PIPE $NEED_OLD_CPP $INCLUDE"
 mkdir $OBJDIR
 
 echo SHELL=/bin/sh >>Makefile.tmp

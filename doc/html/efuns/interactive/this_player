@@ -1,0 +1,8 @@
+this_player - return the object representing the current player
+
+object this_player( int flag );
+
+this_player() is exactly the same as this_user().
+
+See also:
+ this_user

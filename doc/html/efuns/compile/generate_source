@@ -1,0 +1,19 @@
+generate_source - generates the C code corresponding to a give object(s)
+
+int generate_source(string file);
+
+int generate_source(string array files);
+
+This efun is only available if LPC_TO_C is compiled into the driver.
+
+generate_source() calls the LPC->C compiler to generate the source code
+for a given object or objects.  If more than one file is passed, a directory
+named 'mudlib' is created in the SAVE_BINARIES directory, and that directory
+can be copied into the driver source directory and compiled into the driver.
+
+If one file is given, the C source for that file is compiled, and the driver
+attempts to link it into the running executable using the RUNTIME_LOADING
+option.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

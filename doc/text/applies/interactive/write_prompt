@@ -1,0 +1,9 @@
+write_prompt - called when the parser wants a prompt to be written.
+
+void write_prompt();
+
+If write_prompt is present in the player object, the driver will call it
+whenever the default prompt would normally be printed.  The driver will
+not call write_prompt when the player is in input_to or ed.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

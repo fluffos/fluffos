@@ -1,0 +1,14 @@
+deep_inventory - return the nested inventory of an object
+
+object array deep_inventory( object ob );
+
+This efun is only available when NO_ENVIRONMENT is not compiled into the
+driver.
+
+Returns an array of the objects contained in the inventory of 'ob' and
+also all the objects contained in the inventories of those objects and so on.
+
+See also:
+ all_inventory
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

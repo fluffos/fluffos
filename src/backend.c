@@ -14,7 +14,7 @@
 
 #ifdef WIN32
 #include <process.h>
-void alarm_loop PROT((void *));
+void CDECL alarm_loop PROT((void *));
 #endif
 
 error_context_t *current_error_context = 0;
@@ -29,10 +29,6 @@ int heart_beat_flag = 0;
 object_t *current_heart_beat;
 static void look_for_objects_to_swap PROT((void));
 static void call_heart_beat PROT((void));
-
-#ifdef DEBUG
-static void report_holes PROT((void));
-#endif
 
 /*
  * There are global variables that must be zeroed before any execution.
@@ -54,18 +50,18 @@ void clear_state()
     reset_machine(0);		/* Pop down the stack. */
 }				/* clear_state() */
 
-#ifdef DEBUG
+#if 0
 static void report_holes() {
     if (current_object && current_object->name)
-	debug_message("current_object is %s\n", current_object->name);
+	debug_message("current_object is /%s\n", current_object->name);
     if (command_giver && command_giver->name)
-	debug_message("command_giver is %s\n", command_giver->name);
+	debug_message("command_giver is /%s\n", command_giver->name);
     if (current_interactive && current_interactive->name)
-	debug_message("current_interactive is %s\n", current_interactive->name);
+	debug_message("current_interactive is /%s\n", current_interactive->name);
     if (previous_ob && previous_ob->name)
-	debug_message("previous_ob is %s\n", previous_ob->name);
+	debug_message("previous_ob is /%s\n", previous_ob->name);
     if (current_prog && current_prog->name)
-	debug_message("current_prog is %s\n", current_prog->name);
+	debug_message("current_prog is /%s\n", current_prog->name);
     if (caller_type)
 	debug_message("caller_type is %s\n", caller_type);
 }
@@ -90,7 +86,7 @@ int parse_command P2(char *, str, object_t *, ob)
     int res;
 
     /* disallow users to issue commands containing ansi escape codes */
-#ifdef NO_ANSI
+#if defined(NO_ANSI) && !defined(STRIP_BEFORE_PROCESS_INPUT)
     char *c;
 
     for (c = str; *c; c++) {
@@ -142,23 +138,13 @@ void backend()
     if (SETJMP(econ.context))
 	restore_context(&econ);
 
-    while (1) {
-	/*
-	 * The call of clear_state() should not really have to be done once
-	 * every loop. However, there seem to be holes where the state is not
-	 * consistent. If these holes are removed, then the call of
-	 * clear_state() can be moved to just before the while() - statement.
-	 * *sigh* /Lars
-	 */
-        /* Well, let's do it and see what happens - Sym */
-#ifdef DEBUG
-	report_holes();
-#else
-	clear_state();
-#endif
+    while (1) {	
+	/* Has to be cleared if we jumped out of process_user_command() */
+	current_interactive = 0;
 	eval_cost = max_cost;
 
-	remove_destructed_objects();
+	if (obj_list_replace || obj_list_destruct)
+	    remove_destructed_objects();
 
 	/*
 	 * shut down MudOS if MudOS_is_being_shut_down is set.
@@ -185,10 +171,15 @@ void backend()
 	     * not using infinite timeout so that we'll have insurance in the
 	     * unlikely event a heartbeat happens between now and the
 	     * select(). Note that SIGALRMs (for heartbeats) do make select()
-	     * drop through.
+	     * drop through. (Except on Windows)
 	     */
+#ifdef WIN32
+	    timeout.tv_sec = HEARTBEAT_INTERVAL/1000000;
+	    timeout.tv_usec = HEARTBEAT_INTERVAL%1000000;
+#else
 	    timeout.tv_sec = 60;
 	    timeout.tv_usec = 0;
+#endif
 	}
 #ifndef hpux
 	nb = select(FD_SETSIZE, &readmask, &writemask, (fd_set *) 0, &timeout);
@@ -264,11 +255,14 @@ static void look_for_objects_to_swap()
 
 	/*
 	 * Check reference time before reset() is called.
+	 *
+	 * FIXME: clean_up has the same problem. -Beek
 	 */
 	if (current_time < ob->time_of_ref + time_to_swap)
 	    ready_for_swap = 0;
 	else
 	    ready_for_swap = 1;
+#ifndef NO_RESETS
 #ifndef LAZY_RESETS
 	/*
 	 * Should this object have reset(1) called ?
@@ -277,11 +271,12 @@ static void look_for_objects_to_swap()
 	    && !(ob->flags & O_RESET_STATE)) {
 #ifdef DEBUG
 	    if (d_flag) {
-		debug_message("RESET %s\n", ob->name);
+		debug_message("RESET /%s\n", ob->name);
 	    }
 #endif
 	    reset_object(ob);
 	}
+#endif
 #endif
 	if (time_to_clean_up > 0) {
 	    /*
@@ -301,7 +296,7 @@ static void look_for_objects_to_swap()
 
 #ifdef DEBUG
 		if (d_flag)
-		    debug_message("clean up %s\n", ob->name);
+		    debug_message("clean up /%s\n", ob->name);
 #endif
 		/*
 		 * Supply a flag to the object that says if this program is
@@ -334,7 +329,7 @@ static void look_for_objects_to_swap()
 		continue;
 #ifdef DEBUG
 	    if (d_flag)
-		debug_message("swap %s\n", ob->name);
+		debug_message("swap /%s\n", ob->name);
 #endif
 	    swap(ob);		/* See if it is possible to swap out to disk */
 	}
@@ -371,10 +366,10 @@ static int num_hb_calls = 0;	/* starts */
 static float perc_hb_probes = 100.0;	/* decaying avge of how many complete */
 
 #ifdef WIN32
-void alarm_loop P1(void *, ignore)
+void CDECL alarm_loop P1(void *, ignore)
 {
     while (1) {
-	_sleep(HEARTBEAT_INTERVAL / 1000);
+	Sleep(HEARTBEAT_INTERVAL / 1000);
 	heart_beat_flag = 1;
     }
 }				/* alarm_loop() */
@@ -382,10 +377,6 @@ void alarm_loop P1(void *, ignore)
 
 static void call_heart_beat()
 {
-#ifdef PEDANTIC
-    /* IRIX 5.2 bug: not prototyped anywhere in the system includes */
-    void ualarm(int, int);
-#endif
     object_t *ob;
     heart_beat_t *curr_hb;
 
@@ -428,14 +419,12 @@ static void call_heart_beat()
 	    if (ob->prog->heart_beat != -1) {
 		if (curr_hb->heart_beat_ticks < 1) {
 		    curr_hb->heart_beat_ticks = curr_hb->time_to_heart_beat;
-		    current_prog = ob->prog;
-		    current_object = ob;
 		    current_heart_beat = ob;
 		    command_giver = ob;
 #ifndef NO_SHADOWS
 		    while (command_giver->shadowing)
 			command_giver = command_giver->shadowing;
-#endif				/* NO_SHADOWS */
+#endif
 #ifndef NO_ADD_ACTION
 		    if (!(command_giver->flags & O_ENABLE_COMMANDS))
 			command_giver = 0;
@@ -445,8 +434,7 @@ static void call_heart_beat()
 #endif
 		    eval_cost = max_cost;
 		    /* this should be looked at ... */
-		    call_function(ob->prog,
-				  &ob->prog->functions[ob->prog->heart_beat]);
+		    call_function(ob->prog, ob->prog->heart_beat);
 		    command_giver = 0;
 		    current_object = 0;
 		}
@@ -528,7 +516,7 @@ int set_heart_beat P2(object_t *, ob, int, to)
 		break;
 	    }
 	}
-	DEBUG_CHECK(index < 0, "Couldn't find enabled object in heart_beat lsit!\n");
+	DEBUG_CHECK(index < 0, "Couldn't find enabled object in heart_beat list!\n");
     } else {
 	heart_beat_t *hb;
 	

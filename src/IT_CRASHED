@@ -25,7 +25,8 @@ crashers (serious bugs).
 Ok, if your driver crashes, and you want to be helpful, here's what you do:
 
 1. recompile the driver with the -g flag.  Turning off optimization
-   is a good idea too.
+   is a good idea too. [This can be done by reruning ./build.MudOS as
+   follows: ./build.MudOS debug]
 2. go to your bin dir and type 'gdb driver' where driver is the name of your
    driver executable
 3. It should startup, etc.  When it's ready, type 'run config.foo' or

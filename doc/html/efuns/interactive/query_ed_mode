@@ -1,0 +1,21 @@
+query_ed_mode - return which mode ed is in
+
+This efun is only available if OLD_ED is not defined.
+
+int query_ed_mode();
+
+Return value should be interpreted as follows:
+
+0 = normal ed prompt
+
+-1 = not in ed
+
+-2 = more prompt for help
+
+positive number = prompt for input for line n
+
+See also:
+ ed,
+ ed_start
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

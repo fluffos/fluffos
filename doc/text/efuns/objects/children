@@ -1,0 +1,13 @@
+children - returns an array of objects cloned from a given file 
+
+object array children( string name );
+
+This efun returns an array of objects that have been loaded or cloned from
+the file named by 'name' (including the object 'name' itself, if loaded).
+
+See also:
+ deep_inherit_list,
+ inherit_list,
+ objects
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

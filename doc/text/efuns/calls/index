@@ -1,0 +1,21 @@
+Call Efuns
+
+The following efuns deal with making, redirecting, and intercepting various
+calls between objects.
+
+<DL>
+*  call_other
+*  call_out
+*  call_stack
+*  catch
+*  origin
+*  previous_object
+*  query_shadowing
+*  remove_call_out
+*  shadow
+*  this_object
+*  throw
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

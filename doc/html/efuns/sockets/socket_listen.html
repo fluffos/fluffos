@@ -1,0 +1,45 @@
+<HEAD> <TITLE> socket_listen - listen for connections on a socket </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> socket_listen - listen for connections on a socket </H1> </center>
+<p>
+<b> int socket_listen( int s, string listen_callback ); </b>
+<p>
+This efun is only available if PACKAGE_SOCKETS is compiled in.
+<p>
+To accept connections, a socket is first created with socket_create(),
+the socket is them put into listening mode with socket_listen(), and
+the connections are accepted with socket_accept(). The socket_listen() call
+applies only to sockets of type STREAM or MUD.
+<p>
+The argument listen_callback is the name of a function for the driver to
+call when a connection is requested on the listening socket. The listen
+callback should follow this format:
+<p>
+<pre>
+void listen_callback(int fd)
+</pre>
+<p>
+Where fd is the listening socket.
+<p>
+socket_listen() returns:
+<p>
+EESUCCESS on success.
+<p>
+a negative value indicated below on error.
+<p>
+ERRORS - these are in "socket_err.h"
+<p>
+<DL>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEFDRANGE Descriptor out of range.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEBADF Descriptor is invalid.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EESECURITY Security violation attempted.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEMODENOTSUPP Socket mode not supported.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EENOADDR Socket not bound to an address.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEISCONN Socket is already connected.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EELISTEN Problem with listen.
+</DL>
+<p>
+See also:
+<A HREF=socket_accept.html>  socket_accept </A>,
+<A HREF=socket_connect.html>  socket_connect </A>,
+<A HREF=socket_create.html>  socket_create </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

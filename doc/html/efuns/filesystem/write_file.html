@@ -1,0 +1,12 @@
+<HEAD> <TITLE> write_file - appends a string to a file </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> write_file - appends a string to a file </H1> </center>
+<p>
+<b> int write_file( string file, string str, int flag ); </b>
+<p>
+Append the string `str' into the file `file'. Returns 0 or 1 for
+failure or success.  If flag is 1, write_file overwrites instead of
+appending.
+<p>
+See also:
+<A HREF=read_file.html>  read_file </A>,
+<A HREF=../buffers/write_buffer.html>  write_buffer </A>,
+<A HREF=file_size.html>  file_size </A>

@@ -285,12 +285,14 @@ switch_to_line P1(int, line) {
 
 static int
 try_to_push P2(int, kind, int, value) {
-    if (push_state) { 
+    if (push_state) {
 	if (value <= PUSH_MASK) {
 	    if (push_state == 1)
 		initialize_push();
 	    push_state++;
 	    ins_byte(kind | value);
+	    if (push_state == 255)
+		end_pushes();
 	    return 1;
 	} else end_pushes();
     } else if (value <= PUSH_MASK) {
@@ -667,8 +669,11 @@ i_generate_node P1(parse_node_t *, expr) {
 	    foreach_depth = 0;
 	    end_pushes();
 	    ins_byte(F_FUNCTION_CONSTRUCTOR);
-	    ins_byte(FP_ANONYMOUS);
-	    ins_byte(expr->v.number);
+	    if (expr->v.number & 0x10000)
+		ins_byte(FP_ANONYMOUS | FP_NOT_BINDABLE);
+	    else
+		ins_byte(FP_ANONYMOUS);
+	    ins_byte(expr->v.number & 0xff);
 	    ins_byte(expr->l.number);
 	    addr = CURRENT_PROGRAM_SIZE;
 	    ins_short(0);
@@ -1057,6 +1062,7 @@ optimize_icode P3(char *, start, char *, pc, char *, end) {
 		pc += 3;
 		break;
 	    case FP_ANONYMOUS:
+	    case FP_ANONYMOUS | FP_NOT_BINDABLE:
 		pc += 4;
 		break;
 	    case FP_EFUN:

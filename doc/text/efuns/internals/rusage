@@ -1,0 +1,35 @@
+rusage - reports information gathered by the getrusage() system call
+
+mapping rusage();
+
+This efun collects information gathered via the getrusage() system
+call.  Read the getrusage() man page for more information on what information
+will be collected.  Some systems do not have the getrusage() system call
+but do have the times() system call.  On those systems, only "utime"
+and "stime" will be available.  Times are reported in milliseconds.
+
+Here is an example usage of rusage():
+
+<pre>
+  void
+  create()
+  {
+      mapping info;
+
+      info = rusage();
+      write("user time = " + info["utime"] + "ms\\n");
+      write("system time = " + info["stime"] + "ms\\n");
+  }
+</pre>
+
+The available fields are:
+utime, stime, maxrss, ixrss, idrss, isrss, minflt, majflt, nswap, inblock,
+oublock, msgsnd, msgrcv, nsignals, nvcsw, nivcsw.
+
+See also:
+ time_expression,
+ function_profile,
+ time,
+ uptime
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,36 @@
+socket_bind - bind a name to a socket
+
+int socket_bind( int s, int port );
+
+This efun is only available if PACKAGE_SOCKETS is compiled in.
+
+socket_bind() assigns a name to an unnamed socket. When a socket is
+created with socket_create() it exists in a name space (address family)
+but has no name assigned. socket_bind() requests that the port be assigned
+to the socket s.
+
+socket_bind() returns:
+
+EESUCCESS on success.
+
+a negative value indicated below on error.
+
+ERRORS - These errors are in "socket_err.h"
+
+<DL>
+* EEFDRANGE Descriptor out of range.
+* EEBADF Descriptor is invalid.
+* EESECURITY Security violation attempted.
+* EEISBOUND Socket is already bound.
+* EEADDRINUSE Address already in use.
+* EEBIND Problem with bind.
+* EEGETSOCKNAME Problem with getsockname.
+</DL>
+
+See also:
+ socket_connect.
+ socket_create,
+ socket_listen
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

@@ -1,0 +1,15 @@
+sqrt - returns the square root of a float
+
+float sqrt( float f );
+
+This efun is only available if PACKAGE_MATH is compiled in.
+
+sqrt() returns the non-negative square root of its argument, `f'.  The value
+of `f' must not be negative.
+
+See also:
+ exp,
+ log,
+ pow
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

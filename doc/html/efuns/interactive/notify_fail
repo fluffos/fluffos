@@ -1,0 +1,36 @@
+notify_fail - set the default error message to a specified string
+
+int notify_fail( string | function str );
+
+This efun is only available if NO_ADD_ACTION is not compiled in.
+
+Store `str' as the error message to be returned instead of the default message
+`What?'.  The message will be displayed if a 0 is returned from all actions
+setup via add_action().  This is the preferred way to display error messages
+since it allows other objects a chance to respond to the same verb (command).
+Do not use write() to display the error message since this will require you
+to return a 1 (unless you want to see the result of the write() in addition to
+the 'What?' message).  However, if you do return a 1, then no other objects
+will get a chance to respond to the user command.
+
+Note: Getting this right in the presence of multiple failures is tricky,
+to say the least.  One can use a function pointer instead, and have the
+routine resolve the collisions.
+
+If a function is passed instead of a string, the function is called
+instead of printing a message.  If the function returns a string, that
+string is used as the failure message.  Also, this_player() is set
+correctly, so write() can be used.
+
+If "notify_fail()" is called more than once, only the last call will have
+an effect.
+
+The idea behind this function is to allow better error messages than
+`What?'.
+
+As a side note, notify_fail() always returns zero, so return notify_fail(...)
+works as expected.
+
+ add_action
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

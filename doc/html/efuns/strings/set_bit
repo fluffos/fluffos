@@ -1,0 +1,12 @@
+next_bit - find the next bit set in a bitstring
+
+int next_bit( string str, int n );
+
+next_bit() returns the next bit set in a bitstring after 'n', or -1 if
+'n' is the last set bit.
+
+See also:
+ set_bit,
+ test_bit
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

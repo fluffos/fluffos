@@ -1,0 +1,18 @@
+<HEAD> <TITLE> undefinedp - determine whether or not a given value is undefined. </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> undefinedp - determine whether or not a given value is undefined. </H1> </center>
+<p>
+<b> int undefinedp( mixed arg ); </b>
+<p>
+Return 1 if `arg' is undefined.  'arg' will be undefined in the following
+cases:
+<p>
+<DL>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> it is a variable set equal to the return value of a call_other to a
+non-existent method (e.g. arg = call_other(obj, "???")).
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> it is a variable set equal to the return value of an access of an
+element in a mapping that doesn't exist (e.g. arg = map[not_there]).
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> it has not yet been initialized.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> it points to a destructed object.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> it is a function (formal) parameter that corresponds to a missing actual argument.
+</DL>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

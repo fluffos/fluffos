@@ -1,0 +1,7 @@
+floatp - determine whether or not a given variable is a float
+
+int floatp( mixed arg );
+
+Return 1 if `arg' is a float number and zero (0) otherwise.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

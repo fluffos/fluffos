@@ -1,0 +1,11 @@
+<HEAD> <TITLE> refs - return the number of references to a data structure </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> refs - return the number of references to a data structure </H1> </center>
+<p>
+<b> int refs( mixed data ); </b>
+<p>
+This efun is only available if PACKAGE_DEVELOP is compiled in.
+<p>
+The number of references to `data' will be returned by refs().  This is 
+useful for deciding whether or not to make a copy of a data structure
+before returning it.
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

@@ -30,7 +30,7 @@
  * functions must be done K&R (b/c va_dcl is K&R style) so don't prototype
  * vararg function arguments under AIX
  */
-#ifdef __STDC__
+#if defined(__STDC__) || defined(WIN32)
 #  define PROT(x) x
 #  define P1(t1, v1) (t1 v1)
 #  define P2(t1, v1, t2, v2) (t1 v1, t2 v2)
@@ -78,18 +78,6 @@
 #  define V_DCL(x) x
 #endif
 
-#ifndef INLINE
-#  if defined(__GNUC__) && !defined(__STRICT_ANSI__) && !defined(lint) && !defined(PEDANTIC)
-#    define INLINE inline
-#  else
-#    ifdef LATTICE
-#      define INLINE __inline
-#    else
-#      define INLINE
-#    endif
-#  endif
-#endif
-
 #define SAFE(x) do { x } while (0)
  
 
@@ -102,13 +90,20 @@
 
    Please refer to options.h for selecting malloc package and wrapper.
 */
+#if (defined(SYSMALLOC) + defined(SMALLOC) + defined(BSDMALLOC)) > 1
+!Only one malloc package should be defined
+#endif
+
+#if (defined(WRAPPEDMALLOC) + defined(DEBUGMALLOC)) > 1
+!Only one wrapper (at most) should be defined
+#endif
+
 #if defined (WRAPPEDMALLOC) && !defined(IN_MALLOC_WRAPPER)
 
 #  define MALLOC(x)               wrappedmalloc(x)
 #  define FREE(x)                 wrappedfree(x)
 #  define REALLOC(x, y)           wrappedrealloc(x, y)
 #  define CALLOC(x, y)            wrappedcalloc(x, y)
-#  define XALLOC(x)               xalloc(x)
 #  define DXALLOC(x, t, d)        xalloc(x)
 #  define DMALLOC(x, t, d)        MALLOC(x)
 #  define DREALLOC(x, y, t, d)    REALLOC(x,y)
@@ -120,7 +115,6 @@
 
 #    define MALLOC(x)               debugmalloc(x, 0, (char *)0)
 #    define DMALLOC(x, t, d)        debugmalloc(x, t, d)
-#    define XALLOC(x)               debugmalloc(x, 0, (char *)0)
 #    define DXALLOC(x, t, d)        debugmalloc(x, t, d)
 #    define FREE(x)                 debugfree(x)
 #    define REALLOC(x,y)            debugrealloc(x,y,0,(char *)0)
@@ -135,11 +129,8 @@
 #  endif
 #endif
 
-#ifndef MALLOC
-#  define MALLOC(x)  puts("You need to specify a malloc package in options.h")
-#  define FREE(x)    puts("You need to specify a malloc package in options.h")
-#  define REALLOC(x) puts("You need to specify a malloc package in options.h")
-#  define CALLOC(x)  puts("You need to specify a malloc package in options.h")
+#if !defined(MALLOC) && !defined(EDIT_SOURCE)
+!You need to specify a malloc package in local_options/options.h
 #endif
 
 #define ALLOCATE(type, tag, desc) ((type *)DXALLOC(sizeof(type), tag, desc))
@@ -209,7 +200,7 @@
 #define LOAD_SHORT(x, y) LOAD2(x,y)
 #define STORE_SHORT(x, y) STORE2(x,y)
 #else
-shorts of size other than 2 not implemented
+!shorts of size other than 2 not implemented
 #endif
 
 #if SIZEOF_INT == 4
@@ -218,7 +209,7 @@ shorts of size other than 2 not implemented
 #define STORE_INT(x, y) STORE4(x,y)
 #define INT_32 int
 #else
-ints of size other than 4 not implemented
+!ints of size other than 4 not implemented
 #endif
 
 #if SIZEOF_FLOAT == 4
@@ -226,7 +217,7 @@ ints of size other than 4 not implemented
 #define LOAD_FLOAT(x, y) LOAD4(x,y)
 #define STORE_FLOAT(x, y) STORE4(x,y)
 #else
-floats of size other than 4 not implemented
+!floats of size other than 4 not implemented
 #endif
 
 #if SIZEOF_PTR == 4
@@ -245,7 +236,7 @@ floats of size other than 4 not implemented
 #    define POINTER_INT long
 #    define INS_POINTER ins_long
 #  else
-pointers of size other than 4 or 8 not implemented
+!pointers of size other than 4 or 8 not implemented
 #  endif
 #endif
 #endif
@@ -275,6 +266,19 @@ pointers of size other than 4 or 8 not implemented
 #   define string_unlink(x,y) int_string_unlink(x)
 #   define new_string(x,y) int_new_string(x)
 #   define alloc_cstring(x,y) int_alloc_cstring(x)
+#endif
+
+#ifndef INLINE
+#  ifdef WIN32
+#    define INLINE extern __inline
+#    define INLINE_STATIC __inline
+#  else
+#    define INLINE
+#  endif
+#endif
+
+#ifndef INLINE_STATIC
+#  define INLINE_STATIC static INLINE
 #endif
 
 #endif

@@ -1,0 +1,15 @@
+file_length - get the number of lines in a file
+
+int file_length( string file );
+
+file_length() returns the number of lines in file 'file'.  Size -1
+indicates that 'file' either does not exist, or that it is not
+readable. Size -2 indicates that 'file' is a directory.
+
+Note that this efun is not particularly fast on long files, since
+determining the number of lines requires reading the entire file.
+
+See also:
+ file_size,
+ stat,
+ get_dir

@@ -1,0 +1,15 @@
+query_ip_name - return the ip name of a given player object.
+
+string query_ip_name( object ob );
+
+Return the IP address for player `ob'.  An asynchronous process `addr_server'
+is used to find out these name in parallel.  If there are any failures to
+find the ip-name, then the ip-number is returned instead.
+
+See also:
+ query_ip_number,
+ query_host_name,
+ resolve,
+ socket_address
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -114,7 +114,7 @@ f_socket_connect PROT((void))
     if (!((sp - 1)->type & (T_FUNCTION | T_STRING))) {
 	bad_arg(3, F_SOCKET_CONNECT);
     }
-    if (!(sp->type & (T_STRING | T_STRING))) {
+    if (!(sp->type & (T_FUNCTION | T_STRING))) {
 	bad_arg(4, F_SOCKET_CONNECT);
     }
     fd = (sp - 3)->u.number;
@@ -273,7 +273,7 @@ f_socket_address PROT((void))
 
         if (!sp->u.ob->interactive) {
             free_object(sp->u.ob, "f_socket_address:1");
-            *sp = const0n;
+            *sp = const0u;
             return;
 	}
         tmp = inet_ntoa(sp->u.ob->interactive->addr.sin_addr);

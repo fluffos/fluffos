@@ -1,0 +1,14 @@
+<HEAD> <TITLE> receive_snoop - catch incoming snoop text </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> receive_snoop - catch incoming snoop text </H1> </center>
+<p>
+<b> void receive_snoop(string message); </b>
+<p>
+If RECEIVE_SNOOP is defined in options.h or <A HREF=http://www.imaginary.com/~beek/mudos/options/local_options.html>  local_options </A>,
+whenever a user is snooping another
+user, all snoop text is sent to receive_snoop() in their user object.  Inside
+of this function, you can do as you wish with the text.  A common activity
+would be to receive() it.
+<p>
+See also:
+<A HREF=catch_tell.html>  catch_tell </A>, <A HREF=../../efuns/interactive/receive.html>  receive </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

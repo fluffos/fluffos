@@ -3,7 +3,7 @@
 
 #include "program.h"
 
-void c_start_function PROT((function_t *));
+void c_start_function PROT((char *));
 void c_end_function PROT((void));
 
 void c_generate_inherited_call PROT((int, short));

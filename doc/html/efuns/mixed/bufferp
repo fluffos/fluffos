@@ -1,0 +1,7 @@
+bufferp - determine whether or not a given variable is a buffer
+
+int bufferp( mixed arg );
+
+Return 1 if `arg' is a buffer value and zero otherwise.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,15 @@
+debugmalloc - dumps information on malloc'd memory to a file
+
+void debugmalloc(string filename, int mask);
+
+This efun is only available when PACKAGE_DEVELOP, DEBUGMALLOC and DEBUGMALLOC_EXTENSIONS are
+both defined in options.h at driver build time.  The debugmalloc() efun
+will dump information on those chunks of memory allocated by DMALLOC() and
+related macros if the bitwise and (&) with the tag supplied by the macro
+(i.e. (mask & tag)) is non-zero.  Read md.c and config.h in the
+driver source for more information.
+
+See also:
+ set_malloc_mask
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

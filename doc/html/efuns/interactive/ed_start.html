@@ -1,0 +1,22 @@
+<HEAD> <TITLE> ed_start - start up 'ed' </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> ed_start - start up 'ed' </H1> </center>
+<p>
+This efun is only available if OLD_ED is not defined.
+<p>
+<b> string ed_start(string file, int flag); </b>
+<p>
+<b> string ed_start(string file); </b>
+<p>
+<b> string ed_start(); </b>
+<p>
+If 'flag' is nonzero, ed is started in restricted mode.  See the documentation
+for the old efun for information.  'file' is the name of the file to open;
+if none is given then no file becomes active.
+<p>
+ed_start() may not be called when another ed session for the current
+object is already active.  Any messages generated while starting up ed
+are returned by this efun.
+<p>
+See also:
+<A HREF=ed.html>  ed </A>,
+<A HREF=ed_cmd.html>  ed_cmd </A>,
+<A HREF=query_ed_mode.html>  query_ed_mode </A>

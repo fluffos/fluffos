@@ -1,0 +1,307 @@
+<HEAD> <TITLE> LPC Preprocessor Manual </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> LPC Preprocessor Manual </H1> </center>
+<p>
+The preprocessor is a front end to the LPC compiler that provides such
+handy features as:
+<p>
+<DL>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> sharing definitions and code (#include)
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> macros (#define, #undef)
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> conditional compilation (#if, #ifdef, #ifndef, #else, #elif, #endif)
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> debugging (#echo)
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> compiler specific (#pragma)
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> text formatting short cuts (@, @@)
+</DL>
+<p>
+The first three are identical to C usage, so those already familiar with
+C may want to just skim the last few sections of this document.
+<p>
+Note:
+    For those directives that begin with '#' (such as #include), the
+    '#' symbol must start in the first column (of the line).
+<p>
+<b> Sharing Definitions and Code </b>
+<p>
+This facility is provided through the #include directive.
+<p>
+    Syntax 1:   #include <file.h>
+<p>
+    Syntax 2:   #include "file.h"
+<p>
+Notes:
+    The '#include <file.h>' form looks for the file, 'file.h' in the
+    system's standard include directories.
+                       (On TMI this is just '/include'.)
+<p>
+    The '#include "file.h"' form looks for the file, 'file.h' in the
+    same directory as the file that is including it.
+<p>
+The #include statement is a way to textually include one file into another.
+Putting a statement such as '#include "file.h"' in a file gives the same
+effect as if the contents of file.h had been directly entered into the file
+at the point where the #include statement occurred.  Included files are
+recompiled each time the object that include's them is recompiled.  If the
+included file contains variables or functions of the same name as variables
+in the file doing the including, then a duplicate-name error will occur at
+compile time (in the same way that the error would occur if you simply typed
+in file.h rather than using #include).
+<p>
+<b> Macros </b>
+<p>
+Macro definitions are used to replace subsequent instances of a given
+word with a different sequence of text.  Reasons for doing so include
+hiding implementation details, reducing the number of keystrokes, and
+ease in changing constants.
+<p>
+    Syntax 1:   #define identifier token_sequence
+<p>
+    Syntax 2:   #define identifier(id_list) token_sequence
+<p>
+Notes:
+    As a matter of convention, identifiers are usually capitalized to
+    emphasize their presence in the code, and defined close to the
+    start of program, or in a separate header file which you #include.
+<p>
+    The second case allows identifiers in the id_list to be substituted
+    back into the token_sequence.
+<p>
+Example:
+<p>
+<pre>
+    // Create a 40 cell array of integers and initialize each cell
+    // to its cell number times 2,
+    //   i.e. stack[0] = 0, stack[1] = 2, stack[2] = 4, etc
+<p>
+    #define STACKSIZE 40
+    #define INITCELL(x) 2*x
+<p>
+    int *stack;
+<p>
+    create() {
+        int i;
+<p>
+        stack = allocate(STACKSIZE);
+<p>
+        for (i = 0; i < STACKSIZE; i++)
+            stack[i] = INITCELL(i);
+    }
+</pre>
+<p>
+Lastly, it's sometimes useful to undefine (i.e. make the compiler forget
+about) a macro.  The following directive is then used:
+<p>
+    Syntax:     #undef identifier
+<p>
+Note:
+    It's perfectly acceptable to undefine an identifier that hasn't been
+    defined yet.
+<p>
+<b> Conditional Compilation </b>
+<p>
+These directives can add flexibility to your code.  Based on whether an
+identifier is defined (or not defined), variations of the code can be
+produced for different effects.  Applications include selective admin
+logging and support for multiple drivers (or versions of the same driver).
+<p>
+<pre>
+    Syntax:     #ifdef <identifier>
+                #ifndef <identifier>
+                #if <expression>
+                #elif <expression>
+                #else
+                #endif
+</pre>
+<p>
+Note:
+    <identifier> refers to an identifier that has been (or could be) defined
+    by your program, a file you have included, or a symbol predefined by
+    the driver.
+<p>
+    <expression> is a constant expression that evaluates to a boolean
+    condition.  The expression may contain any legal combination of the
+    following:
+</pre>
+        operators: ||, &&, >>, <<,
+                   +, -, *, /, %,
+                   &, |, ^, !, ~,
+                   ==, !=, <, >, <=, >=, ?:
+</pre>
+        parentheses for grouping: (, )
+        calls of the form: defined(identifier)
+        and identifiers
+<p>
+    #ifdef identifier
+        can be considered shorthand for:
+            #if defined(identifier)
+<p>
+    #ifndef identifier
+        can be considered shorthand for:
+            #if !defined(identifier)
+<p>
+    #elif expression
+        can be considered shorthand for the sequence:
+            #else
+            #  if expression
+            #  endif
+<p>
+Example 1:
+<p>
+<pre>
+    // Using #if 0 allows you to comment out a block of code that
+    // contains comments.  One reason to do so may be to keep a copy
+    // of the old code around in case the new code doesn't work.
+    #if 0
+        // In this case, the constant expression evaluates
+        // (or is) 0, so the code here is not compiled
+<p>
+        write(user_name + " has " + total_coins + " coins\n");
+    #else
+        // This is the alternate case (non-zero), so the code
+        // here _is_ compiled
+<p>
+        printf("%s has %d coins\n", user_name, total_coins);
+    #endif
+</pre>
+<p>
+Example 2:
+<p>
+</pre>
+    // This example is derived from TMI's /adm/simul_efun/system.c
+    #ifdef __VERSION
+          string version() { return "2.7.2"; }
+    #elif defined(MUDOS_VERSION)
+          string version() { return MUDOS_VERSION; }
+    #else
+    #  if defined(VERSION)
+          string version() { return VERSION; }
+    #  else
+          string version() { return -1; }
+    #  endif
+    #endif
+</pre>
+<p>
+<b> Debugging </b>
+<p>
+The '#echo' directive allows you to print messages to the driver's stderr
+(STanDard ERRor) stream.  This facility is useful for diagnostics and
+debugging.
+<p>
+    Syntax:     #echo This is a message
+<p>
+Note:
+    The rest of the line (or end-of-file, which ever comes first) is the
+    message, and is printed verbatim.  It's not necessary to enclose text
+    with quotes.
+<p>
+<b> Compiler Specific </b>
+<p>
+This facility performs implementation-dependent actions.
+<p>
+    Syntax:     #pragma keyword
+<p>
+At this time the following control keywords are recognized:
+<p>
+<DL>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> strict_types
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> save_binary
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> save_types
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> warnings
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> optimize
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> show_error_context
+</DL>
+<p>
+Notes:
+    'strict_types' informs the compiler that extensive type checking should
+    be done
+<p>
+    'save_binary' informs the compiler to save the binary object;
+     loading will go faster after a reboot/shutdown since object has been
+     precompiled
+<p>
+    'save_types' is saves the types of function arguments for type checking
+    in objects that inherit this program
+<p>
+    'warnings' enables the printing of warnings about things the driver thinks
+    are dangerous or likely to be incorrect.
+<p>
+    'optimize' directs the compiler to spend a little extra time generating
+    better code
+<p>
+    'show_error_context' adds information about where on the line an error 
+    occured to error messages
+<p>
+<b> Text Formatting Shortcuts </b>
+<p>
+This facility makes it easier to format text for help messages, room
+descriptions, etc.
+<p>
+<pre>
+    Syntax 1:   @marker
+                  <... text block ...>
+                marker
+</pre>
+<p>
+<pre>    
+    Syntax 2:   @@marker
+                  <... text block ...>
+                marker
+</pre>
+<p>
+Notes:
+<pre>
+    @   - produces a string suitable for write()
+<p>
+    @@  - produces an array of strings, suitable for the body pager
+</pre>
+<p>
+These are used by prepending '@' (or '@@') before an end marker word.  This
+is followed by your formatted text, as you would have it appear to the user.
+The text block is terminated by the end marker word, without the '@'
+(or '@@').  With '@', the text block is processed as if it were a single
+string surrounded by quotes and '\n' (newlines) in between the lines.
+With '@@', the text block is processed as it were an array of strings,
+with each line being a string surrounded by quotes.
+<p>
+<pre>
+Example 1:
+<p>
+        int help() {
+            write( @ENDHELP
+        This is the help text.
+        It's hopelessly inadequate.
+        ENDHELP
+              );
+            return 1;
+        }
+<p>
+</pre>
+    Is equivalent to:
+<p>
+<pre>
+        int help() {
+            write( "This is the help text\nIt's hopelessly inadequate.\n" );
+            return 1;
+        }
+</pre>
+<p>
+Example 2:
+<p>
+<pre>
+        int help() {
+            this_player()->more( @@ENDHELP
+        This is the help text.
+        It's hopelessly inadequate.
+        ENDHELP
+              , 1);
+            return 1;
+        }
+</pre>
+<p>
+    Is equivalent to:
+<p>
+<pre>
+        int help() {
+            this_player()->more( ({ "This is the help text.",
+                  "It's hopelessly inadequate." }), 1);
+            return 1;
+        }
+</pre>

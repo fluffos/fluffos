@@ -1,0 +1,20 @@
+<HEAD> <TITLE> function_exists - find the file containing a given function in an object </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> function_exists - find the file containing a given function in an object </H1> </center>
+<p>
+<b> string function_exists( string str, object ob, int flag ); </b>
+<p>
+Return the file name of the object that defines the function 'str' in
+object 'ob'. The returned value can be other than 'file_name(ob)' if the
+function is defined by an inherited object.
+<p>
+0 is returned if the function was not defined.
+<p>
+Note that function_exists() does not check shadows.
+<p>
+If flag is omitted or zero functions that cannot be called are not returned
+(e.g. the function is returned only if call_other(ob, str) would succeed).
+If the flag is nonzero, static and private functions are returned too.
+<p>
+See also:
+<A HREF=../calls/call_other.html>  call_other </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

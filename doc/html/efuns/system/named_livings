@@ -1,0 +1,11 @@
+named_livings - return all living objects with names
+
+mapping named_livings();
+
+named_livings() returns all objects that have called both set_living_name()
+and enable_commands().  It is significantly more efficient than livings().
+
+named_livings() is available if PACKAGE_CONTRIB is defined, and NO_ADD_ACTION
+is not.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

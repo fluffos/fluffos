@@ -1,0 +1,13 @@
+valid_save_binary - controls whether or not an object can save its loaded program
+
+int valid_save_binary( string file ); 
+
+This routine is only used when BINARIES are enabled.
+
+When the driver is compiled with ALWAYS_SAVE_BINARIES, or an object uses
+'#pragma save_binary', valid_save_binary is called with the program's filename.
+If valid_save_binary returns 1, then the program will be saved to disk for
+faster reloading, otherwise it will not be saved, and the next reload will
+recompile as usual.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

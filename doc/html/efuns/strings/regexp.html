@@ -1,0 +1,93 @@
+<HEAD> <TITLE> regexp - regular expression handler </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> regexp - regular expression handler </H1> </center>
+<p>
+<b> int regexp( string str, string pattern); </b>
+<p>
+<b> string array regexp( string array lines, string pattern); </b>
+<p>
+<b> string array regexp( string array lines, string pattern, int flag); </b>
+<p>
+In the first version, regexp() returns true (1) if the string str contains
+a substring which matches the regular expression 'pattern'.  If a complete
+match is wanted, the pattern should begin with ^ and end with $.
+<p>
+When presented with an array of lines of text and a regular 
+expression, regexp() returns an array containing those lines which 
+match the pattern specified by the regular expression. If the (flag & 2)
+is nonzero, (flag defaults to zero), then non-matches will be returned
+instead of matches. If (flag & 1) is nonzero, the array returned will be of 
+the form ({ index1 + 1, match1, ..., indexn + 1, matchn }) where indexn
+is the index of nth match/non match in the array lines.
+<p>
+REGULAR EXPRESSION SYNTAX
+<p>
+A regular expression is zero or more <b>branches</b>, separated by '|'.
+It matches anything that matches one of the branches.
+<p>
+A <b>branch</b> is zero or more <i>pieces</i>, concatenated.
+It matches a match for the first, followed by a match for the second, etc.
+<p>
+A <b>piece</b> is an <i>atom</i> possibly followed by '*', '+', or '?'.
+An atom followed by '*' matches a sequence of 0 or more matches of the atom.
+An atom followed by '+' matches a sequence of 1 or more matches of the atom.
+An atom followed by '?' matches a match of the atom, or the null string.
+<p>
+An <b>atom</b> is a regular expression in parentheses (matching a match for the
+regular expression), a <i>range</i> (see below), '.'
+(matching any single character), '^' (matching the null string at the
+beginning of the input string), '$' (matching the null string at the
+end of the input string), a '\e' followed by a single character (matching
+that character), or a single character with no other significance
+(matching that character).
+<p>
+A <b>range</b> is a sequence of characters enclosed in '[]'.
+It normally matches any single character from the sequence.
+If the sequence begins with '^',
+it matches any single character <b>not</b> from the rest of the sequence.
+If two characters in the sequence are separated by '-', this is shorthand
+for the full list of ASCII characters between them
+(e.g. '[0-9]' matches any decimal digit).
+To include a literal ']' in the sequence, make it the first character
+(following a possible '^').
+To include a literal '-', make it the first or last character.
+<p>
+AMBIGUITY
+<p>
+If a regular expression could match two different parts of the input string,
+it will match the one which begins earliest.
+If both begin in the same place but match different lengths, or match
+the same length in different ways, life gets messier, as follows.
+<p>
+In general, the possibilities in a list of branches are considered in
+left-to-right order, the possibilities for '*', '+', and '?' are
+considered longest-first, nested constructs are considered from the
+outermost in, and concatenated constructs are considered leftmost-first.
+The match that will be chosen is the one that uses the earliest
+possibility in the first choice that has to be made.
+If there is more than one choice, the next will be made in the same manner
+(earliest possibility) subject to the decision on the first choice.
+And so forth.
+<p>
+For example, '(ab|a)b*c' could match 'abc' in one of two ways.
+The first choice is between 'ab' and 'a'; since 'ab' is earlier, and does
+lead to a successful overall match, it is chosen.
+Since the 'b' is already spoken for,
+the 'b*' must match its last possibility (the empty string) since
+it must respect the earlier choice.
+<p>
+In the particular case where no '|'s are present and there is only one
+'*', '+', or '?', the net effect is that the longest possible
+match will be chosen.
+So 'ab*', presented with 'xabbbby', will match 'abbbb'.
+Note that if 'ab*' is tried against 'xabyabbbz', it
+will match 'ab' just after 'x', due to the begins-earliest rule.
+(In effect, the decision on where to start the match is the first choice
+to be made, hence subsequent choices must respect it even if this leads them
+to less-preferred alternatives.)
+<p>
+See also:
+<p>
+<A HREF=sscanf.html>  sscanf </A>,
+<A HREF=explode.html>  explode </A>,
+<A HREF=strsrch.html>  strsrch </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

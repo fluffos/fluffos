@@ -1,0 +1,18 @@
+enable_commands - allow object to use 'player' commands
+
+void enable_commands();
+
+This efun is only available if NO_ADD_ACTION is not defined.
+
+enable_commands() marks this_object() as a living object, and allows
+it to use commands added with add_action() (by using command()).
+When enable_commands() is called, the driver also looks for the
+local function catch_tell(), and if found, it will call it every time
+a message (via say() for example) is given to the object.
+
+See also:
+ living,
+ add_action,
+ command,
+ catch_tell,
+ say

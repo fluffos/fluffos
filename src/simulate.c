@@ -52,21 +52,52 @@ static int give_uid_to_object PROT((object_t *));
 static int init_object PROT((object_t *));
 static svalue_t *load_virtual_object PROT((char *));
 static char *make_new_name PROT((char *));
-static void destruct_object_two PROT((object_t *));
 #ifndef NO_ENVIRONMENT
 static void send_say PROT((object_t *, char *, array_t *));
 #endif
 static sentence_t *alloc_sentence PROT((void));
-#ifndef NO_ADD_ACTION
+#if !defined(NO_ADD_ACTION) && !defined(NO_ENVIRONMENT)
 static void remove_sent PROT((object_t *, object_t *));
 #endif
 
 INLINE void check_legal_string P1(char *, s)
 {
-    if (strlen(s) >= LARGEST_PRINTABLE_STRING) {
+    if (strlen(s) > LARGEST_PRINTABLE_STRING) {
 	error("Printable strings limited to length of %d.\n",
 	      LARGEST_PRINTABLE_STRING);
     }
+}
+
+/* equivalent to strcpy(x, y); return x + strlen(y), but faster and safer */
+/* Code like:
+ * 
+ * char buf[256];
+ * strcpy(buf, ...);
+ * strcat(buf, ...);
+ * strcat(buf, ...);
+ *
+ * Should be replaced with:
+ *
+ * char buf[256];
+ * char *p, *end = EndOf(buf);
+ * p = strput(buf, end, ...);
+ * p = strput(p, end, ...);
+ * p = strput(p, end, ...);
+ */
+char *strput P3(char *, x, char *, limit, char *, y) {
+    while ((*x++ = *y++)) {
+	if (x == limit) {
+	    *(x-1) = 0;
+	    break;
+	}
+    }
+    return x - 1;
+}
+
+char *strput_int P3(char *, x, char *, limit, int, num) {
+    char buf[20];
+    sprintf(buf, "%d", num);
+    return strput(x, limit, buf);
 }
 
 #ifdef PRIVS
@@ -78,11 +109,11 @@ init_privs_for_object P1(object_t *, ob)
     object_t *tmp_ob;
     svalue_t *value;
 
-    if (master_ob == (object_t *)-1) {
+    if (!master_ob)
 	tmp_ob = ob;
-    } else {
+    else
 	tmp_ob = master_ob;
-    }
+
     if (!current_object
 #ifdef PACKAGE_UIDS
 	|| !current_object->uid
@@ -91,7 +122,7 @@ init_privs_for_object P1(object_t *, ob)
 	ob->privs = NULL;
 	return;
     }
-    push_string(ob->name, STRING_SHARED);
+    push_malloced_string(add_slash(ob->name));
     if (!privs_file_fname)
 	privs_file_fname = make_shared_string(APPLY_PRIVS_FILE);
     value = apply(privs_file_fname, tmp_ob, 1, ORIGIN_DRIVER);
@@ -113,7 +144,7 @@ static int give_uid_to_object P1(object_t *, ob)
     svalue_t *ret;
     char *creator_name;
 
-    if (master_ob == (object_t *)-1) {
+    if (!master_ob) {
 	ob->uid = add_uid("NONAME");
 #ifdef AUTO_SETEUID
 	ob->euid = ob->uid;
@@ -125,7 +156,7 @@ static int give_uid_to_object P1(object_t *, ob)
     /*
      * Ask master object who the creator of this object is.
      */
-    push_string(ob->name, STRING_SHARED);
+    push_malloced_string(add_slash(ob->name));
     if (!creator_file_fname)
 	creator_file_fname = make_shared_string(APPLY_CREATOR_FILE);
     ret = apply_master_ob(creator_file_fname, 1);
@@ -134,9 +165,7 @@ static int give_uid_to_object P1(object_t *, ob)
     if (!ret || ret == (svalue_t *)-1 || ret->type != T_STRING) {
 	svalue_t arg;
 
-	arg.type = T_OBJECT;
-	arg.u.ob = ob;
-	destruct_object(&arg);
+	destruct_object(ob);
 	if (!ret) error("Master object has no function " APPLY_CREATOR_FILE "().\n");
 	if (ret == (svalue_t *)-1) error("Can't load objects without a master object.");
 	error("Illegal object to load: return value of master::" APPLY_CREATOR_FILE "() was not a string.\n");
@@ -198,7 +227,8 @@ static int init_object P1(object_t *, ob)
     add_objects(&ob->stats, 1);
 #endif
 #ifdef NO_ADD_ACTION
-    if (function_exists("catch_tell", ob))
+    if (function_exists(APPLY_CATCH_TELL, ob, 1) ||
+	function_exists(APPLY_RECEIVE_MESSAGE, ob, 1))
 	ob->flags |= O_LISTENER;
 #endif
 #ifdef PACKAGE_UIDS
@@ -214,8 +244,8 @@ static svalue_t *
 {
     svalue_t *v;
 
-    if (master_ob == (object_t *)-1) return 0;
-    push_string(name, STRING_MALLOC);
+    if (!master_ob) return 0;
+    push_malloced_string(add_slash(name));
     v = apply_master_ob(APPLY_COMPILE_OBJECT, 1);
     if (!v || (v->type != T_OBJECT))
 	return 0;
@@ -224,7 +254,7 @@ static svalue_t *
 
 void set_master P1(object_t *, ob) {
 #if defined(PACKAGE_UIDS) || defined(PACKAGE_MUDLIB_STATS)
-    int first_load = (master_ob == (object_t *)-1);
+    int first_load = (!master_ob);
 #endif
 #ifdef PACKAGE_UIDS
     svalue_t *ret;
@@ -339,9 +369,14 @@ int strip_name P3(char *, src, char *, dest, int, size) {
  * it.
  *
  */
-object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
+#ifdef LPC_TO_C
+object_t *int_load_object P2(char *, lname, lpc_object_t *, lpc_obj)
+#else
+object_t *int_load_object P1(char *, lname)
+#endif
 {
     int f;
+    program_t *prog;
     object_t *ob, *save_command_giver = command_giver;
     svalue_t *mret;
     struct stat c_st;
@@ -353,7 +388,7 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 #endif
 
     if (++num_objects_this_thread > INHERIT_CHAIN_SIZE)
-	error("Inherit chain too deep: > %d when trying to load '%s'.", INHERIT_CHAIN_SIZE, lname);
+	error("Inherit chain too deep: > %d when trying to load '%s'.\n", INHERIT_CHAIN_SIZE, lname);
 #ifdef PACKAGE_UIDS
     if (current_object && current_object->euid == NULL)
 	error("Can't load objects when no effective user.\n");
@@ -404,7 +439,7 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 	return 0;
     }
 #ifdef BINARIES
-    if (!load_binary(real_name, lpc_obj)) {
+    if (!(prog = load_binary(real_name, lpc_obj)) && !inherit_file) {
 #endif
 	/* maybe move this section into compile_file? */
 	if (comp_flag) {
@@ -426,16 +461,15 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 		error("Could not open output file '/%s'.\n", out_ptr);
 	    }
 	    compilation_ident = 0;
-	    compile_file(f, real_name);
+	    prog = compile_file(f, real_name);
 	    fclose(compilation_output_file);
 	    if (prog) {
-		if (prog)
-		    free_prog(prog, 1);
+		free_prog(prog, 1);
 		prog = 0;
 	    }
 	} else {
 #endif
-	    compile_file(f, real_name);
+	    prog = compile_file(f, real_name);
 #ifdef LPC_TO_C
 	}
 #endif
@@ -522,7 +556,7 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 #endif
 	return ob;
     }
-    ob = get_empty_object(prog->num_variables);
+    ob = get_empty_object(prog->num_variables_total);
     /* Shared string is no good here */
     ob->name = alloc_cstring(name, "load_object");
     SET_TAG(ob->name, TAG_OBJ_NAME);
@@ -534,14 +568,14 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
     push_object(ob);
     mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
     if (mret && !MASTER_APPROVED(mret)) {
-	destruct_object_two(ob);
+	destruct_object(ob);
 	error("master object: " APPLY_VALID_OBJECT "() denied permission to load '/%s'.\n", name);
     }
 
     if (init_object(ob))
 	call_create(ob, 0);
     if (!(ob->flags & O_DESTRUCTED) &&
-	function_exists(APPLY_CLEAN_UP, ob)) {
+	function_exists(APPLY_CLEAN_UP, ob, 1)) {
 	ob->flags |= O_WILL_CLEAN_UP;
     }
     command_giver = save_command_giver;
@@ -648,7 +682,7 @@ object_t *clone_object P2(char *, str1, int, num_arg)
     /* We do not want the heart beat to be running for unused copied objects */
     if (ob->flags & O_HEART_BEAT)
 	(void) set_heart_beat(ob, 0);
-    new_ob = get_empty_object(ob->prog->num_variables);
+    new_ob = get_empty_object(ob->prog->num_variables_total);
     new_ob->name = make_new_name(ob->name);
     new_ob->flags |= (O_CLONE | (ob->flags & (O_WILL_CLEAN_UP | O_WILL_RESET)));
     new_ob->load_time = ob->load_time;
@@ -780,47 +814,43 @@ static object_t *object_present2 P2(char *, str, object_t *, ob)
     svalue_t *ret;
     char *p;
     int count = 0, length;
-    char *item;
 
-    item = alloc_cstring(str, "object_present2");
-    length = strlen(item);
-    p = item + length - 1;
-    if (*p >= '0' && *p <= '9') {
-	while (p > item && *p >= '0' && *p <= '9')
-	    p--;
-	if (p > item && *p == ' ') {
-	    count = atoi(p + 1) - 1;
-	    *p = '\0';
-	    length = p - item;	/* This is never used again ! */
+    if ((length = strlen(str))) {
+	p = str + length - 1;
+	if (isdigit(*p)) {
+	    do {
+		p--;
+	    } while (p > str && isdigit(*p));
+	    
+	    if (*p == ' ') {
+		count = atoi(p + 1) - 1;
+		length = p - str;
+	    }
 	}
     }
     for (; ob; ob = ob->next_inv) {
-	push_string(item, STRING_SHARED);
+	p = new_string(length, "object_present2");
+	memcpy(p, str, length);
+	p[length] = 0;
+	push_malloced_string(p);
 	ret = apply(APPLY_ID, ob, 1, ORIGIN_DRIVER);
-	if (ob->flags & O_DESTRUCTED) {
-	    FREE(item);
+	if (ob->flags & O_DESTRUCTED)
 	    return 0;
-	}
 	if (IS_ZERO(ret))
 	    continue;
 	if (count-- > 0)
 	    continue;
-	FREE(item);
-#if 0
-	if (ret->type == T_OBJECT)
-	    return ret->u.ob;
-	else
-#endif
-	    return ob;
+	return ob;
     }
-    FREE(item);
     return 0;
 }
 #endif
 
 void init_master P1(char *, file) {
     char buf[512];
+#ifdef LPC_TO_C
     lpc_object_t *compiled_version;
+#endif
     object_t *new_ob;
     
     if (!file || !file[0]) {
@@ -829,9 +859,11 @@ void init_master P1(char *, file) {
     }
 	
     if (!strip_name(file, buf, sizeof buf))
-	error("Illegal simul_efun file name '%s'\n", file);
+	error("Illegal master file name '%s'\n", file);
     
+#ifdef LPC_TO_C
     compiled_version = (lpc_object_t *)lookup_object_hash(buf);
+#endif
 
     if (file[strlen(file) - 2] != '.')
 	strcat(buf, ".c");
@@ -845,11 +877,19 @@ void init_master P1(char *, file) {
     set_master(new_ob);
 }
 
+static char *saved_master_name;
+static char *saved_simul_name;
+
+static void fix_object_names() {
+    master_ob->name = saved_master_name;
+    simul_efun_ob->name = saved_simul_name;
+}
+
 /*
  * Remove an object. It is first moved into the destruct list, and
  * not really destructed until later. (see destruct2()).
  */
-static void destruct_object_two P1(object_t *, ob)
+void destruct_object P1(object_t *, ob)
 {
     object_t **pp;
     int removed;
@@ -889,10 +929,9 @@ static void destruct_object_two P1(object_t *, ob)
      */
 #ifndef NO_SHADOWS
     if (ob->shadowed && !ob->shadowing) {
-	svalue_t svp;
+	object_t *otmp;
 	object_t *ob2;
 
-	svp.type = T_OBJECT;
 	/*
 	 * move from bottom to top of shadow chain
 	 */
@@ -902,12 +941,12 @@ static void destruct_object_two P1(object_t *, ob)
 	 * destructed from chain
 	 */
 	for (; ob2;) {
-	    svp.u.ob = ob2;
+	    otmp = ob2;
 	    ob2 = ob2->shadowing;
 	    if (ob2)
 		ob2->shadowed = 0;
-	    svp.u.ob->shadowing = 0;
-	    destruct_object(&svp);
+	    otmp->shadowing = 0;
+	    destruct_object(otmp);
 	}
 	return;
     }
@@ -925,7 +964,7 @@ static void destruct_object_two P1(object_t *, ob)
 
 #ifdef DEBUG
     if (d_flag > 1)
-	debug_message("Deobject_t %s (ref %d)\n", ob->name, ob->ref);
+	debug_message("Deobject_t /%s (ref %d)\n", ob->name, ob->ref);
 #endif
 
 #ifndef NO_ENVIRONMENT
@@ -933,9 +972,9 @@ static void destruct_object_two P1(object_t *, ob)
     super = ob->super;
 
     while (ob->contains) {
-	svalue_t svp;
-	svp.type = T_OBJECT;
-	svp.u.ob = ob->contains;
+	object_t *otmp;
+
+	otmp = ob->contains;
 	/*
 	 * An error here will not leave destruct() in an inconsistent
 	 * stage.
@@ -950,8 +989,8 @@ static void destruct_object_two P1(object_t *, ob)
 	restrict_destruct = save_restrict_destruct;
 	/* OUCH! we could be dested by this. -Beek */
 	if (ob->flags & O_DESTRUCTED) return;
-	if (svp.u.ob == ob->contains)
-	    destruct_object(&svp);
+	if (otmp == ob->contains)
+	    destruct_object(otmp);
     }
 #endif
     
@@ -999,19 +1038,31 @@ static void destruct_object_two P1(object_t *, ob)
      */
     if (ob == master_ob || ob == simul_efun_ob) {
 	object_t *new_ob;
-	/* hack to make sure we don't find the precompiled tag 
-	   and not ourself */
-	lpc_object_t *compiled_version;
 	char *tmp = ob->name;
+#ifdef LPC_TO_C
+	lpc_object_t *compiled_version;
+#endif
+
+	(++sp)->type = T_ERROR_HANDLER;
+	sp->u.error_handler = fix_object_names;
+	saved_master_name = master_ob->name;
+	saved_simul_name = simul_efun_ob->name;
 	
+	/* hack to make sure we don't find ourselves at several points
+	   in the following process */
 	ob->name = "";
+
+#ifdef LPC_TO_C
 	compiled_version = (lpc_object_t *)lookup_object_hash(tmp);
-	ob->name = tmp;
+#endif
 
 	/* handle these two carefully, since they are rather vital */
 	new_ob = load_object(tmp, compiled_version);
-	if (!new_ob)
+	if (!new_ob) {
+	    ob->name = tmp;
+	    sp--;
 	    error("Destruct on vital object failed: new copy failed to reload.");
+	}
 
 	free_object(ob, "vital object reference");
 	if (ob == master_ob)
@@ -1019,7 +1070,11 @@ static void destruct_object_two P1(object_t *, ob)
 	if (ob == simul_efun_ob)
 	    set_simul_efun(new_ob);
 	
-	/* be careful not to remove the new hash */
+	/* Set the name back so we can remove it from the hash table.
+	   Also be careful not to remove the new object, which has
+	   the same name. */
+	sp--; /* error handler */
+	ob->name = tmp;
 	tmp = new_ob->name;
 	new_ob->name = "";
 	remove_object_hash(ob);
@@ -1056,21 +1111,8 @@ static void destruct_object_two P1(object_t *, ob)
     set_heart_beat(ob, 0);
     ob->flags |= O_DESTRUCTED;
     /* moved this here from destruct2() -- see comments in destruct2() */
-    if (ob->interactive) {
-	remove_interactive(ob);
-    }
-}
-
-void destruct_object P1(svalue_t *, v)
-{
-    object_t *ob = (object_t *) NULL;
-
-    if (v->type == T_OBJECT) {
-	ob = v->u.ob;
-	destruct_object_two(ob);
-    } else {
-	error("destruct_object: called without an object argument\n");
-    }
+    if (ob->interactive)
+	remove_interactive(ob, 1);
 }
 
 /*
@@ -1080,16 +1122,8 @@ void destruct2 P1(object_t *, ob)
 {
 #ifdef DEBUG
     if (d_flag > 1) {
-	debug_message("Destruct-2 object %s (ref %d)\n", ob->name, ob->ref);
+	debug_message("Destruct-2 object /%s (ref %d)\n", ob->name, ob->ref);
     }
-#endif
-#if 0
-    /*
-     * moved this into destruct_object() to deal with the 0 in users() efun
-     * output problem
-     */
-    if (ob->interactive)
-	remove_interactive(ob);
 #endif
     /*
      * We must deallocate variables here, not in 'free_object()'. That is
@@ -1100,7 +1134,7 @@ void destruct2 P1(object_t *, ob)
      * continue to execute, change string and object variables into the
      * number 0.
      */
-    if (ob->prog->num_variables > 0) {
+    if (ob->prog->num_variables_total > 0) {
 	/*
 	 * Deallocate variables in this object. The space of the variables
 	 * are not deallocated until the object structure is freed in
@@ -1108,9 +1142,9 @@ void destruct2 P1(object_t *, ob)
 	 */
 	int i;
 
-	for (i = 0; i < (int) ob->prog->num_variables; i++) {
+	for (i = 0; i < (int) ob->prog->num_variables_total; i++) {
 	    free_svalue(&ob->variables[i], "destruct2");
-	    ob->variables[i] = const0n;
+	    ob->variables[i] = const0u;
 	}
     }
     free_object(ob, "destruct_object");
@@ -1197,13 +1231,13 @@ void say P2(svalue_t *, v, array_t *, avoid)
  * Sends a string to all objects inside of a specific object.
  * Revised, bobf@metronet.com 9/6/93
  */
-
+#ifdef F_TELL_ROOM
 void tell_room P3(object_t *, room, svalue_t *, v, array_t *, avoid)
 {
     object_t *ob;
     char *buff;
     int valid, j;
-    char txt_buf[LARGEST_PRINTABLE_STRING];
+    char txt_buf[LARGEST_PRINTABLE_STRING + 1];
 
     switch (v->type) {
     case T_STRING:
@@ -1255,6 +1289,7 @@ void tell_room P3(object_t *, room, svalue_t *, v, array_t *, avoid)
     }
 }
 #endif
+#endif
 
 void shout_string P1(char *, str)
 {
@@ -1283,13 +1318,15 @@ void shout_string P1(char *, str)
 #ifndef NO_ADD_ACTION
 void enable_commands P1(int, num)
 {
+#ifndef NO_ENVIRONMENT
     object_t *pp;
+#endif
 
     if (current_object->flags & O_DESTRUCTED)
 	return;
 #ifdef DEBUG
     if (d_flag > 1) {
-	debug_message("Enable commands %s (ref %d)\n",
+	debug_message("Enable commands /%s (ref %d)\n",
 		      current_object->name, current_object->ref);
     }
 #endif
@@ -1339,7 +1376,7 @@ int input_to P4(svalue_t *, fun, int, flag, int, num_arg, svalue_t *, args)
 	if (num_arg) {
 	    i = num_arg * sizeof(svalue_t);
 	    if ((x = (svalue_t *)
-		 DMALLOC(i, TAG_TEMPORARY, "input_to: 1")) == NULL)
+		 DMALLOC(i, TAG_INPUT_TO, "input_to: 1")) == NULL)
 		fatal("Out of memory!\n");
 	    memcpy(x, args, i);
 	} else
@@ -1587,7 +1624,7 @@ void move_object P2(object_t *, item, object_t *, dest)
 	}
 #ifdef DEBUG
 	if (!okey)
-	    fatal("Failed to find object %s in super list of %s.\n",
+	    fatal("Failed to find object /%s in super list of /%s.\n",
 		  item->name, item->super->name);
 #endif
     }
@@ -1666,8 +1703,10 @@ void add_light P2(object_t *, p, int, n)
     if (n == 0)
 	return;
     p->total_light += n;
+#ifndef NO_ENVIRONMENT
     while ((p = p->super))
 	p->total_light += n;
+#endif
 }
 #endif
 
@@ -1750,7 +1789,7 @@ void free_sentence P1(sentence_t *, p)
 int user_parser P1(char *, buff)
 {
     char verb_buff[MAX_VERB_BUFF];
-#ifndef NO_ADD_ACTION
+#ifndef NO_ENVIRONMENT
     object_t *super;
 #endif
     sentence_t *s;
@@ -1759,10 +1798,11 @@ int user_parser P1(char *, buff)
     object_t *save_command_giver = command_giver;
     char *user_verb = 0;
     int where;
-
+    int save_illegal_sentence_action;
+    
 #ifdef DEBUG
     if (d_flag > 1)
-	debug_message("cmd [%s]: %s\n", command_giver->name, buff);
+	debug_message("cmd [/%s]: %s\n", command_giver->name, buff);
 #endif
     /* strip trailing spaces. */
     for (p = buff + strlen(buff) - 1; p >= buff; p--) {
@@ -1800,6 +1840,7 @@ int user_parser P1(char *, buff)
 	}
     }
 
+    save_illegal_sentence_action = illegal_sentence_action;
     illegal_sentence_action = 0;
     for (s = save_command_giver->sent; s; s = s->next) {
 	svalue_t *ret;
@@ -1817,8 +1858,8 @@ int user_parser P1(char *, buff)
 	 * Now we have found a special sentence !
 	 */
 #ifdef DEBUG
-	if (d_flag > 1)
-	    debug_message("Local command %s on %s\n",
+	if (d_flag > 1 && !(s->flags & V_FUNCTION))
+	    debug_message("Local command %s on /%s\n",
 			  s->function, s->ob->name);
 #endif
 	if (s->flags & V_NOSPACE) {
@@ -1850,15 +1891,17 @@ int user_parser P1(char *, buff)
 	super = command_object->super;
 #endif
 	if (s->flags & V_NOSPACE) {
-	    push_constant_string(&buff[strlen(s->verb)]);
+	    copy_and_push_string(&buff[strlen(s->verb)]);
 	} else if (buff[length] == ' ') {
-	    push_constant_string(&buff[length + 1]);
+	    copy_and_push_string(&buff[length + 1]);
 	} else {
-	    push_null();
+	    push_undefined();
 	}
 	if (s->flags & V_FUNCTION) {
 	    ret = call_function_pointer(s->function.f, 1);
 	} else {
+	    if (s->function.s[0] == APPLY___INIT_SPECIAL_CHAR)
+		error("Illegal function name.\n");
 	    ret = apply(s->function.s, s->ob, 1, where);
 	}
 	/* s may be dangling at this point */
@@ -1893,7 +1936,8 @@ int user_parser P1(char *, buff)
 		)
 		add_moves(&command_object->stats, 1);
 #endif
-	    
+	    if (!illegal_sentence_action)
+		illegal_sentence_action = save_illegal_sentence_action;
 	    return 1;
 	}
 	if (illegal_sentence_action) {
@@ -1906,6 +1950,7 @@ int user_parser P1(char *, buff)
 	}
     }
     notify_no_command();
+    illegal_sentence_action = save_illegal_sentence_action;
     
     return 0;
 }
@@ -1949,15 +1994,19 @@ void add_action P3(svalue_t *, str, char *, cmd, int, flag)
 	)
 	return;			/* No need for an error, they know what they
 				 * did wrong. */
-#ifdef DEBUG
-    if (d_flag > 1)
-	debug_message("--Add action %s\n", str);
-#endif
     p = alloc_sentence();
     if (str->type == T_STRING) {
+#ifdef DEBUG
+	if (d_flag > 1)
+	    debug_message("--Add action %s\n", str->u.string);
+#endif
       p->function.s = make_shared_string(str->u.string);
       p->flags = flag;
     } else {
+#ifdef DEBUG
+	if (d_flag > 1)
+	    debug_message("--Add action <function>\n");
+#endif
       p->function.f = str->u.fp;
       str->u.fp->hdr.ref++;
       p->flags = flag | V_FUNCTION;
@@ -2006,6 +2055,7 @@ int remove_action P2(char *, act, char *, verb)
  * Remove all commands (sentences) defined by object 'ob' in object
  * 'user'
  */
+#ifndef NO_ENVIRONMENT
 static void remove_sent P2(object_t *, ob, object_t *, user)
 {
     sentence_t **s;
@@ -2015,7 +2065,7 @@ static void remove_sent P2(object_t *, ob, object_t *, user)
 
 	if ((*s)->ob == ob) {
 #ifdef DEBUG
-	    if (d_flag > 1)
+	    if (d_flag > 1 && !((*s)->flags & V_FUNCTION))
 		debug_message("--Unlinking sentence %s\n", (*s)->function);
 #endif
 	    tmp = *s;
@@ -2026,6 +2076,7 @@ static void remove_sent P2(object_t *, ob, object_t *, user)
 	    s = &((*s)->next);
     }
 }
+#endif
 #endif /* NO_ADD_ACTION */
 
 void fatal P1V(char *, fmt)
@@ -2054,7 +2105,7 @@ void fatal P1V(char *, fmt)
 #ifdef PACKAGE_MUDLIB_STATS
 	save_stat_files();
 #endif
-	push_string(msg_buf, STRING_CONSTANT);
+	copy_and_push_string(msg_buf);
 	if (command_giver) {
 	    push_object(command_giver);
 	} else {
@@ -2085,7 +2136,7 @@ void fatal P1V(char *, fmt)
     in_fatal = 0;
 }
 
-int num_error = 0;
+static int num_error = 0;
 
 #ifdef MUDLIB_ERROR_HANDLER
 static int num_mudlib_error = 0;
@@ -2222,9 +2273,14 @@ void error_handler P1(char *, err)
 	fatal("Catch() longjump failed");
     }
     too_deep_error = max_eval_error = 0;
+    if (num_error > 0) {
+	/* This can happen via errors in the object_name() apply. */
+	debug_message("Error '%s' while trying to print error trace -- trace suppressed.\n", err);
+	if (current_error_context)
+	    LONGJMP(current_error_context->context, 1);
+	fatal("LONGJMP failed or no error context for error.\n");
+    }
     num_error++;
-    if (num_error > 1)
-	fatal("Too many simultaneous errors.\n");
 #ifdef MUDLIB_ERROR_HANDLER
     if (num_mudlib_error) {
 	debug_message("Error in error handler: ");
@@ -2243,10 +2299,9 @@ void error_handler P1(char *, err)
 	debug_message("Heart beat in %s turned off.\n", current_heart_beat->name);
 	if (current_heart_beat->interactive)
 	    add_message(current_heart_beat, "MudOS driver tells you: You have no heart beat!\n");
-
+	
 	current_heart_beat = 0;
     }
-    num_error--;
 #else
     if (current_object) {
 #ifdef PACKAGE_MUDLIB_STATS
@@ -2291,8 +2346,8 @@ void error_handler P1(char *, err)
 
 	current_heart_beat = 0;
     }
-    num_error--;
 #endif
+    num_error--;
     if (current_error_context)
 	LONGJMP(current_error_context->context, 1);
     fatal("LONGJMP failed or no error context for error.\n");
@@ -2346,18 +2401,23 @@ void startshutdownMudOS()
 void shutdownMudOS P1(int, exit_code)
 {
     int i;
+
     shout_string("MudOS driver shouts: shutting down immediately.\n");
 #ifdef PACKAGE_MUDLIB_STATS
     save_stat_files();
 #endif
     ipc_remove();
 #ifdef PACKAGE_SOCKETS
-    for (i = 0; i < CFG_MAX_EFUN_SOCKS; i++) {
+    for (i = 0; i < max_lpc_socks; i++) {
 	if (lpc_socks[i].state == CLOSED) continue;
 	while (close(lpc_socks[i].fd) == -1 && errno == EINTR)
 	    ;
     }
 #endif
+    for (i = 0; i < max_users; i++) {
+	if (all_users[i] && !(all_users[i]->iflags & CLOSING))
+	    flush_message(all_users[i]);
+    }
 #ifdef LATTICE
     signal(SIGUSR1, SIG_IGN);
     signal(SIGTERM, SIG_IGN);
@@ -2404,7 +2464,7 @@ void slow_shut_down P1(int, minutes)
     }
 }
 
-void do_message P5(svalue_t *, class, char *, msg, array_t *, scope, array_t *, exclude, int, recurse)
+void do_message P5(svalue_t *, class, svalue_t *, msg, array_t *, scope, array_t *, exclude, int, recurse)
 {
     int i, j, valid;
     object_t *ob;
@@ -2433,7 +2493,7 @@ void do_message P5(svalue_t *, class, char *, msg, array_t *, scope, array_t *, 
 	    }
 	    if (valid) {
 		push_svalue(class);
-		push_string(msg, STRING_SHARED);
+		push_svalue(msg);
 		apply(APPLY_RECEIVE_MESSAGE, ob, 2, ORIGIN_DRIVER);
 	    }
 	}
@@ -2449,13 +2509,14 @@ void do_message P5(svalue_t *, class, char *, msg, array_t *, scope, array_t *, 
     }
 }
 
+#ifndef NO_RESETS
 #ifdef LAZY_RESETS
 void try_reset P1(object_t *, ob)
 {
     if ((ob->next_reset < current_time) && !(ob->flags & O_RESET_STATE)) {
 #ifdef DEBUG
 	if (d_flag) {
-	    debug_message("(lazy) RESET %s\n", ob->name);
+	    debug_message("(lazy) RESET /%s\n", ob->name);
 	}
 #endif
 	/* need to set the flag here to prevent infinite loops in apply_low */
@@ -2464,8 +2525,10 @@ void try_reset P1(object_t *, ob)
     }
 }
 #endif
+#endif
 
 #ifndef NO_ENVIRONMENT
+#ifdef F_FIRST_INVENTORY
 object_t *first_inventory P1(svalue_t *, arg)
 {
     object_t *ob;
@@ -2490,4 +2553,5 @@ object_t *first_inventory P1(svalue_t *, arg)
     }
     return 0;
 }
+#endif
 #endif

@@ -1,0 +1,1004 @@
+<HEAD> <TITLE> done-mudos </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> done-mudos </H1> </center>
+<p>
+See the changelogs on the Web pages for more complete info (and info after
+0.9.19)
+<p>
+0.9.18 to 0.9.19
+<p>
+. COMPAT BUSTER: array = array + scalar is no longer allowed
+  (array += scalar was already not allowed)
+<p>
+. COMPAT BUSTER: socket_accept() no longer assumes the newly created socket
+  is immediately writable; this may cause slightly different behavior (such
+  as the return of EECALLBACK on the first socket_write() whereas it never
+  happened before, or write_callbacks being called that never got called
+  before)
+<p>
+. COMPAT BUSTER: socket callbacks (including the resolve() callback) can
+  now be static and will still be callable by the driver.  this can cause
+  different previous_object() behavior, causing some old socket callback
+  security checks to behave improperly
+<p>
+. COMPAT BUSTER: fixed explode() so that explode("", "\n") does not return
+  ({ 0 })...and removed support for a string as first argument of
+  move_object().
+<p>
+. COMPAT BUSTER: removed the following efuns: cat(), log_file(), extract(),
+  shadowp(), next_living(), add_worth(), add_verb(), and add_xverb()
+<p>
+. COMPAT BUSTER: removed the 'cost' and 'worth' fields from 
+  domain/author_stats
+<p>
+. functionp() now returns 2 instead of 1 in the case where 
+  f = (: obj, ({ str, arg0, arg1, arg2, ... }) :).  (ie, the function portion 
+  is an array)
+<p>
+. geteuid() may now be used on type 'function'.  geteuid(f) where f is of
+  type function will return the euid of the constructor of 'f'.  if the
+  constructor didn't have an euid at the time of f's creation, its uid
+  is stored instead
+<p>
+. ed's indentor ('I' command) fixed
+<p>
+. fixed the usage of '!' in get_char() mode
+<p>
+. fixed several Linux crash/hang bugs
+<p>
+. mud_status() improved, total now matches up with the sum of the fields
+<p>
+. revised parse_command() and process_string() efuns, added process_value()
+  and break_string() efuns (see docs for information)
+<p>
+. added a new LPC type called 'buffer' that is a cross between the
+  LPC array type and the LPC string type.  'buffer' is intended as a way to 
+  conveniently manipulate binary data.  'buffer' is not zero-terminated 
+  (that is, it has an associated length).  A 'buffer' is an array of bytes 
+  that is implemented using one byte per element.  buf[i] = x and x = buf[i] 
+  are allowed and do work.  sizeof(buf) works.  bufferp(buf) is available.  
+  buf[i..j] should work as well.  buff = read_buffer(file_name, ...) 
+  (same args as read_bytes).  also 'int write_buffer(string file, int start, 
+  mixed source)', buf = buf1 + buf2; buf += buf1, buf = allocate_buffer(size).
+  The socket efuns have been modified to accept and return the 'buffer' type.  
+  Two new socket modes are available:  STREAM_BINARY (3), and 
+  DATAGRAM_BINARY (4).  the runtime config file now needs a 'maximum buffer
+  size' parameter in it which sets the largest 'buffer' that may be created.
+<p>
+. now possible to use write_bytes() to write past the end of the existing file
+<p>
+. read_bytes(filename) will now read the entire file (instead of requiring 
+  read_bytes(filename, 0, length_of_file)).
+<p>
+. added an 'int crc32(buffer b|string s) efun which computes a 32-bit
+  cyclic redundancy code for a given buffer or string.  This is the same 
+  algorithm (and code) that Zmodem uses for doing its CRC calculations.
+<p>
+. overloaded to_int() to accept 'buffer'.  E.g. buffer b; int x;
+  b = read_buffer(file, 0, 4); x = to_int(b);  Note that to_int() expects 
+  the integer embedded in the buffer to be in network-byte-order.
+<p>
+. In addition to 'int write_buffer(string file, int start, mixed source)'
+  there is also 'int write_buffer(buffer target, int start, mixed source)'
+  Note that write_buffer(string file, int start, int x) will write 'x'
+  into the file (or buffer) in network-byte-order.
+<p>
+. In addition to 'buffer read_buffer(string file, int start, int len)'
+  there is also 'string read_buffer(buffer b, int start, int len)' which
+  provides a way to extract part or all of a buffer into a string.
+<p>
+. added two malloc debugging efuns that provide an interface to the malloc 
+  debugging system calls provided by the NeXTSTEP OS (malloc_debug() and 
+  malloc_check()).  See NEXT_MALLOC_DEBUG in options.h for more info.  
+  These efuns aren't available on other OSes.
+<p>
+. (: "string" :) is now equivalent to (: this_object(), "string" :)
+<p>
+. added replace_program() efun, modified from Amylaar's 3.2.  
+<p>
+. added optional argument to query_heart_beat(), object to query the 
+  heart_beat of 
+<p>
+. changed set_eval_limit() so an argument of 0 resets the current eval_cost, 
+  rather than setting the eval limit to 0
+<p>
+. added support to initialize local variables.  Any valid expression
+  allowed (int x = <exp>;), as with global initializations 
+<p>
+. removed several no-longer-used options from options.h (some of the more
+  notable ones include support for driver-level host access restrictions
+  and shout logging)
+<p>
+. changed more efuns so that removing their line in func_spec.c causes most, 
+  if not all, of their code to not be compiled in to the driver
+<p>
+. removed the following items from the driver config file: "access log file",
+  "access allow file", "config directory", "allowed ed cmds" (an up-to-date
+  Config.example is in the src/ dir)
+<p>
+. the simul_efun object can now be updated and new simul_efuns will go into
+  place without having to reboot the driver
+<p>
+. hundreds of minor bug fixes and optimizations; see src/ChangeLog for a full
+  list
+<p>
+0.9.17 to 0.9.18
+<p>
+. COMPAT BUSTER: preprocessor: MUDOS_PORT changed to __PORT__, MUDOS_ARCH
+  changed to __ARCH__, MUDOS_VERSION to "2.7.2".  Added __COMPILER__,
+  __COMPILER_VERSION__, and __OPTIMIZATION__ defines.  Removed the NO_SHADOWS
+  define, and added the following possible defines: HAS_SOCKETS, 
+  HAS_SHADOWS, HAS_DEBUGMALLOC, HAS_MATH, HAS_MATRIX, HAS_ED, HAS_PRINTF,
+  HAS_PRIVS, HAS_EACH, HAS_CACHE_STATS, HAS_RUSAGE, HAS_DEBUG_LEVEL, 
+  HAS_OPCPROF.
+<p>
+. COMPAT BUSTER: rusage() efun: renamed the "usertime" field to "utime"
+  for consistency, and changed it so that the utime and stime fields are 
+  always returned in units of milliseconds.
+<p>
+. COMPAT BUSTER: removed uid checks from add_worth() efun: if you don't
+  want people calling this function, you will need a simul_efun override.
+<p>
+. call_other() on an array of objects now returns an array of the return
+  values.
+<p>
+. Changed printf() to be caught by catch_tell() (if defined in options.h)
+<p>
+. Changed notify_fail() to always return 0, allowing for simpler code,
+  ie: return notify_fail("Read what?\n");, etc
+<p>
+. (s)printf()/sscanf() improvements/fixes.
+<p>
+. New efuns: match_path(), query_heart_beat(), origin(), function_profile(),
+  strsrch(), errorp().
+<p>
+. Added the capability of saving loaded LPC programs to disk (.b files) so
+  subsequent loading is faster (added new "save binaries directory" line in
+  the runtime configuration file).
+<p>
+. Changed dump_prog() to take an optional third argument: the file to
+  dump to.
+<p>
+. Disk swapping improved: line number info is swapped out, and swapfile
+  space is reused.
+<p>
+. Added #elif (else if) to the preprocessor.
+<p>
+. LOG_CATCHES option added to options.h; if defined, errors caught by
+  catch() will still be logged to debug.log, prefixed by "caught: ".
+<p>
+. Incorporated Wildcard@TMI-2's (John Fehr: umfehr06@ccu.umanitoba.ca)
+  port of MudOS to the Amiga (running AmigaDOS).  The port was made using the
+  LATTICE C Compiler.  For those Amiga owners without the LATTICE C compiler 
+  (or the desire to compile the driver from the source), the Amiga MudOS 
+  binaries are available from actlab.rtf.utexas.edu in 
+  /MUD/LPmud/MudOS/amiga.  This port of MudOS does not fully support the 
+  socket efunctions.  Any Amiga guru wanting to make them work please feel 
+  free (and send your patches to mudos-bugs@actlab.rtf.utexas.edu!).
+<p>
+. Added @@ENDMARKER processing, which works similarly to @ENDMARKER, but
+  produces an array of strings (1 string per line in the block).  
+<p>
+. New second argument to each() efun that resets the current position in the
+  mapping kept track of by each().  each(map, 1) will reset the position.
+<p>
+. Changed objects() to take two optional parameters: objects(func, ob)
+  will pass each object as an argument to ob->func(), and will only return
+  the ones for which that function returns 1.
+<p>
+. Literally hundreds of bug fixes and optimizations--for full details,
+  read the ChangeLog in the ./src directory.
+<p>
+0.9.16 to 0.9.17
+<p>
+. MudOS now compiles and runs on the DEC Alpha running OSF/1
+<p>
+. prelang.y and postlang.y combined into compiler.y - the changes in this
+  area should allow the .y files to compile with many more yacc's than
+  before (Ultrix, Sun?)
+<p>
+. addr_server made more robust and compilable on more machines
+<p>
+. Added an OLD_ULTRIX define in port.h for some VAXes running old versions
+  of Ultrix; should allow the driver to compile/run on them
+<p>
+. Anytime an object is compiled now, valid_object(ob) is called in master.
+  If valid_object _exists_, and returns 0, then ob is destructed before
+  create() is called and the efun that caused the load errors.  (usage
+  of this, along with inherits() and 'nomask', could allow usage of things 
+  such as destruct() to be safely restricted through simul_efuns and
+  valid_override() in master)
+<p>
+. Basic optimization of numeric constants in LPC code is now done (if
+  LPC_OPTIMIZE is defined in options.h)
+<p>
+. call_other() can now take an array as a second argument, where the first 
+  item of the array is the function to call, and all following items will be 
+  passed as arguments in the order which they occur
+<p>
+. Added an LPC object disassembler (dump_prog() efun)
+<p>
+. New resolve() efun which can translate ip names to numbers and vice-versa
+  (see efun docs)
+<p>
+. Snoops will be sent to receive_snoop(msg) in the receiver object now if
+  RECEIVE_SNOOP is defined in options.h
+<p>
+. Extension to set_heart_beat(x), where if x > 1, x is used as the number
+  of heart beats inbetween heart_beat() calls (can be disabled in options.h)
+<p>
+. Extension (3rd argument) to member_array(), which, if set to 1 and using
+  a string as 1st arg, checks only the prefix of the strings in the array 
+  (similar to xverbs vs verbs)
+<p>
+. Added a new efun inherits(string filename, object base) which returns 1
+  if base inherits the latest copy of filename, 2 if it inherits an old copy,
+  and 0 if it does not inherit filename.  This efun avoids the cost of
+  creating an array via deep_inherit()
+<p>
+. Added OLD_COMMAND to options.h - if defined, the old second argument to 
+  command() will again be available
+<p>
+. Added query_shadowing(), a preferred synonym for the shadowp() efun
+<p>
+. replace_string() efun expanded to support an optional 4th and 5th 
+  argument (see efun docs)
+<p>
+. Added query_snooping() efun (inverse of query_snoop()) - might want to
+  add a simul_efun override for this
+<p>
+. Added query_privs(), set_privs() efuns and privs_file() apply in master 
+  if PRIVS is defined in options.h - read the comments there for information
+<p>
+. Added a new "function" called time_expression() that returns the number
+  of microseconds realtime that occurred during execution of the expression
+  passed to it
+<p>
+. Added rusage() support for HP-UX 8.x/9.x (if using 7.x, define OLD_HPUX
+  in port.h) and SunOS 5
+<p>
+. The writing of text (prefixed with ']') to stderr is no longer done by
+  default; can be enabled in options.h (NONINTERACTIVE_STDERR_WRITE)
+<p>
+. save_object() now inserts a "#filename" at the top of savefiles 
+  (restore_object() ignores such lines; this is useful for virtual object
+  compilers that want to figure out how to compile .o files)
+<p>
+. functionp(funp) now returns 0 if funp[0] is a destructed object
+<p>
+. Driver now calls crash() in master.c with "Host machine shutting down"
+  when SIGUSR1 is received
+<p>
+. Caught errors (via catch()) are now written to debug.log, prefixed with
+  "caught:"
+<p>
+. object::func_name() is now allowed (previously, the existence of the 
+  'object' type caused conflicts when trying to use object::)
+<p>
+. Compat buster: Fixed a bug in multiple inheritance semantics.
+   object a: bingme() { bing(); } bing() { write("bingAAA\n"); }
+   object b: bingme() { bing(); } bing() { write("bingBBB\n"); }
+   object c: inherit a; inherit b;
+             bing() { write("bingCCC\n"); }
+             create() { a::bingme(); b::bingme() }
+  The old behavior would have been to write bingCCC then bingAAA.
+  The new behavior is to write bingCCC then bingCCC.
+<p>
+. Compat buster: removed arch(), version(), and mud_name() functions.  Added
+  MUDOS_ARCH, MUDOS_VERSION, and MUD_NAME defines that are exported to all
+  LPC objects - also, the DIR define was changed to MUDOS_DIR
+<p>
+. Plenty of bug fixes and optimizations
+<p>
+0.9.15 to 0.9.16                                   
+<p>
+. Brought the documentation up-to-date.
+<p>
+. Added support for a new basic type: 'float'.  32 bit floating point
+  (decimal) numbers, and some basic efuns to deal with them: to_float(),
+  to_int(), and floatp().
+<p>
+. Added some math efuns for use with floats: cos(), sin(), tan(), asin(),
+  acos(), atan(), sqrt(), log(), pow(), exp(), floor(), ceil().  Can be 
+  removed by undef'ing MATH in options.h.
+<p>
+. Added some efuns for 3D graphics: id_matrix(), translate(), scale(), 
+  rotate_x(), rotate_y(), rotate_z(), lookat_rotate(), lookat_rotate2().  Can
+  be removed by undef'ing MATRIX in options.h.
+<p>
+. New efuns: shadowp(), set_reset(), reclaim_objects(), objects(), 
+  memory_info(), reload_object()
+<p>
+. Old efun, back again: virtualp()
+<p>
+. COMPAT BUSTER: query_snoop() can now be called from anywhere, so you might
+  want to put in a simul_efun override for it.
+<p>
+. Added a port for HP Motorola (680x0) systems running BSD 4.3.
+<p>
+. Added a port for SPARC Classic running Solaris (SunOS 5.1).
+<p>
+. Partial ports for Cray (UNICOS 6.1.7) and DEC Alpha (OSF/1 1.2).  Neither 
+  is complete as of yet.
+<p>
+. Added support for type 'function' in (s)printf()'s %O format spec
+<p>
+. SAVE_EXTENSION define is now imported to all LPC code (ie ".o")
+<p>
+. Modified save_object() so the original save file is not lost if the save 
+  fails due to disk full, quota exceeded, etc.
+<p>
+. Added support for comments in object save files (ie .o files).
+<p>
+. #ifdef'ed all of the efuns so removing an efun def from func_spec.c
+  automagically removes some of the associated code for it.
+<p>
+. Continued optimizing many things.
+<p>
+. Many more bug fixes (see src/ChangeLog for full information).
+<p>
+0.9.14 to 0.9.15
+<p>
+. added a new feature similar to the << EOF text reading feature
+  provided by Perl.  The @ character now means interpret from 'here'
+  til the end of the line as the "terminator".  Lex then considers each
+  following line up to the terminator as forming part of a string literal.
+  An example usage is as follows:
+<p>
+  x = @END
+  This is taken literally.
+  And so is this.
+  END
+  ;
+<p>
+. optimized the code produced by the LPC loop control constructs (for and
+  while). These optimizations are modeled after those appearing
+  in Amylaar's enhanced LPmud driver.  MudOS 'for loops' now contain three
+  fewer instructions per loop (the empty loop goes from 9 to 6 instructions
+  The execution speed of the MudOS empty for loop (not that this is
+  that meaningful :) is now within 1% of the speed of the empty for loop
+  in Amylaar's driver.
+<p>
+. optimized a few of the LPC operators to produce smaller code.
+<p>
+. added the moncontrol() efun which lets profiling (of the driver - an
+  in gmon.out and gprof) be turned on and off from inside the mudlib.
+<p>
+. added support for several new platforms (machines and operating systems)
+  including SGI, Linux, 386bsd, A/UX (Apple UNIX(tm)), and HP Apollo.
+<p>
+. fixed the general compile time switch case problem
+<p>
+. added an error() efun which is like a throw() that doesn't require a catch.
+<p>
+. incorporated Amylaar's latest enhanced version of smalloc (uses fast fit).
+<p>
+. added option to options.h to allow save files to have an extension other
+  than .o (for those having sysadmins who run scripts that remove .o files
+  on a periodic basis).
+<p>
+. changed save_object() and restore_object() so that variables with a value
+  of zero (0) needn't be saved to the .o file (however, the old behavior
+  is still available for those who want it).  This can produce a noticeable
+  savings in disk space.
+<p>
+0.9.0 to 0.9.14
+<p>
+. added a new data type named 'function'.  Be sure to change the names of
+  any variables you may have named 'function'.  This data type is a variant
+  on the idea of function pointers.  It may be used to store an
+  (object, function) pair in a single variable.  The constructor for function
+  variables is as follows: 
+<p>
+  function f;
+<p>
+  f = (: obj, func :);
+<p>
+  where obj and func may be anything allowed by call_other(obj, func).
+  To call the function func in object obj via function variable f, type:
+<p>
+  (*f)(arg0, arg1, ...); 
+<p>
+  You may use the new functionp() efun to detect if a variable is of type
+  function.
+<p>
+. the driver now compiles under the xlc compiler on the RS/6000 (xlc is IBM's
+  fastest of AIX 3.2 C compilers).
+<p>
+. added Mappings and Interactives fields to the stats output by mud_status().
+<p>
+. added a new efun set_eval_limit (#define SET_EVAL_LIMIT on options.h) that
+  allows an object to change the max eval cost limit.  Be sure to add
+  appropriate mudlib level security before enabling this efun (read the
+  ChangeLog 0.9.13.4).
+<p>
+. added Cynosure's livings() efun that returns an array of all objects that
+  have called enable_commands() (and haven't yet called disable_commands()).
+<p>
+. changed the behavior of nullp() and undefinedp() slightly (see 0.9.13.2
+  ChangeLog).
+<p>
+. The catch() efun may no longer be used to trap max eval_cost exceeded
+  errors (and thus hang the driver).
+<p>
+. System V Release 4 support (added M.B. Bundy's patches)
+<p>
+. Ridge (RISC/os) support added.
+<p>
+. added capability to configure the default 'What?' message via the runtime
+  config file.
+<p>
+. dramatically improved global apply_low (call_other) cache hit rates.  Many
+  muds that used to have hit rates near 40% are reporting 93% and above.
+  [This improvement results from fixing a bug we found in the LPmud 3.1.2
+   cache code.  See ChangeLog for more details.]
+<p>
+. 0.9.14 mappings use about 50% less memory overhead per mapping (compared
+  to 0.9.0).
+<p>
+. improved performance.  MudOS 0.9.14 is much faster than MudOS 0.9.0
+  at executing many of the more commonly used eoperators.
+<p>
+. created an efuns.h file that should be #include'd from any file that wants
+  to define new efunctions (see efunctions.c for example).
+<p>
+. added strcmp() efun (just like C's strcmp) that is convenient for use in
+  the compare functions used by sort_array().  sort_array() has been recoded
+  to use a robust version of qsort so that ill-behaved compare functions won't
+  crash the driver.
+<p>
+. added efuns clonedp() (detects if an object was created via clone_object),
+  functionp() (detects if a variable is of type 'function').
+<p>
+. added a new eoperator F_CALL_EXTRA that allows for 512 efuns+eopers instead
+  of the previous limit of 256 (easily extended to allow more).  This replaces
+  and enhances the F_CALL_EFUN that we had added to the previous release.
+<p>
+0.8.1 to 0.9.0
+<p>
+. Literally hundreds of bug fixes (read the ChangeLog file in the source
+  directory for complete descriptions of these if you're interested)
+<p>
+. MudOS now runs on more architectures.  See the Platforms file.
+<p>
+. (internal change) totally rewrote and replaced communication code in the
+  driver (comm.c) to be more efficient.
+<p>
+. added socket efunctions for inter-object and inter-mud communication
+  (see separate socket efun tutorial and man pages for more a detailed
+  explanation)
+        * int socket_create(int, string, string|void);
+        * int socket_bind(int, int);
+        * int socket_listen(int, string);
+        * int socket_accept(int, string, string);
+        * int socket_connect(int, string, string, string);
+        * int socket_write(int, mixed, string|void);
+        * int socket_close(int);
+        * int socket_release(int, object, string);
+        * int socket_acquire(int, string, string, string);
+        * string socket_error(int);
+        * string socket_address(int);
+        * void dump_socket_status(void);
+        * void dump_file_descriptors();
+<p>
+. added MUD mode to the LPC socket efunctions.  MUD mode allows LPC
+  data structures such as arrays, mappings, integers, and strings (all
+  except for objects) to be sent atomically via sockets.
+<p>
+. added DATAGRAM (UDP) mode to the LPC socket efunctions.
+<p>
+. (internal change) rearchitected interpret.c to use a function lookup table
+  rather than one large switch statement.  New efunctions should be added
+  to efunctions.c instead of interpret.c.  This enhancement makes it
+  easier to integrate your own efuns into the driver and it allows interpret.c
+  to compile on machines that previously had problems with it.
+<p>
+. added call to master.c::valid_override(string filename, string function)
+  for each attempt to override a simulated efunction via the
+  efun::func_name() method.  'filename' is the path to the file which
+  is attempting to call efun::func_name().  'function' is the name of
+  the efun that is to be overridden.  If valid_override returns 0, then
+  the current compilation will fail (note: valid_override is only called
+  at compile time and _not_ runtime).  valid_override allows
+  valid_destruct, valid_exec, etc. to be dispensed with since the same
+  functionality can be obtained by wrapping the efun in question with a
+  simul_efun of the same name (and including valid_* style checking in the
+  simul_efun).  Gist of the idea taken from Amylaar's done file.
+<p>
+. added the option of configuring the driver so that resets (the calling of
+  reset() in LPC objects) happen in a lazy fashion (by defining LAZY_RESETS
+  in options.h).  This option allows resets to happen in an incrementally
+  (rather than all in one pass) and it prevents resets from occuring unless
+  the object to be reset is touched (via an apply_low or move_object) after
+  the usual required reset delay has occurred.  The benefits of this option
+  are that performance is smoother (no reset lags) and memory is conserved
+  (since those object which are touched once and never again won't have reset
+  called in them and hence won't reload any objects in reset()).
+<p>
+. changed various efunctions to honor the hidden object flags so that
+  the set_hide() efunction now offers true driver-supported invisibility
+  of objects.
+<p>
+. new internal implementation of mappings (associative arrays) which is
+  faster and more robust.
+<p>
+. new efuns for mappings:
+        * keys() - this used to be named indices()
+        * values() - the inverse of keys()
+        * each() - traverse a mapping
+<p>
+. split config.h into options.h and port.h.  This simplifies the task
+  of configuring the driver to run on a particular machine.  In most
+  cases, it will be sufficient to configure options.h (options.h contains
+  configuration options pertaining to preference rather than portability).
+<p>
+. fixed make_func.y so that it correctly processes func_spec.c on the
+  HP and Sequent.
+<p>
+. added a NO_ANSI option to options.h that allows escape codes included
+  in user commands to be replaced with spaces.
+<p>
+. added a MAX_SAVE_SVALUE_DEPTH macro to options.h which solves the problem
+  of calling save_object on an object containing a data structure with
+  a circular (recursive) reference.  Admittedly, this isn't a true fix since
+  the object in question (having the circular reference) cannot be saved;
+  however, this is better than allowing the driver to hang.  (Yes I know
+  that Amylaar solved this by saving the circular reference in a recoverable
+  fashion.  I didn't consider it an important enough problem to spend the
+  time necessary to adopt his solution).
+<p>
+. added a new efunction replace_string() (see the replace_string man page)
+<p>
+. added a clonep() efunction that determines if an object was created
+  via the clone_object() efunction.
+<p>
+. added a localtime() efunction (see the localtime(3) man page)
+<p>
+. added an uptime() efunction that returns the number of seconds since
+  the driver has been running.
+<p>
+. removed the mudwho code from the driver (including clilib.c).  We have
+  implemented the mudwho protocol (same as that implemented in clilib.c)
+  in LPC using the new MudOS socket efunctions (DATAGRAM mode).  See the
+  README in the included mini-mudlib for more details.
+<p>
+. changed inherit_list() and deep_inherit_list() not to return the filename
+  which is passed to them.
+<p>
+. added a configuration option that causes this_player() to return 0 inside
+  callbacks made by call_out().
+<p>
+. heartbeat interval can be now be specified in units of microseconds on
+  those machines with the ualarm() system call.
+<p>
+. size of the call_other cache table is configurable (via the
+  APPLY_CACHE_BITS define in options.h).* (internal change)
+  totally rewrote and replaced communication code in the driver (comm.c) to
+  be more efficient.
+<p>
+. made the ed() efunction (internal editor) optional.
+<p>
+. input_to can now take extra arguments so that you can pass one or more
+  extra arguments to the function input_to calls (notice
+  that this feature makes it possible to avoid using global variables which
+  makes it easier for a single object to be designed to
+  beshared by many players [e.g. daemon-style objects]).  For example:
+<p>
+        void get_name(string name, object new_player)
+        {
+                write("\nWhat is your email address: ");
+                input_to("get_email", 0, new_player, name);
+        }
+        void get_email(string email, object new_player, string name)
+        {
+                new_player->set_email(email);
+                new_player->set_name(name);
+        }
+<p>
+. implemented variable arguments to call_out just like the additions made to
+  input_to described above.
+<p>
+. You can now compare mappings for equality using the == operator.
+<p>
+. the message() efun now works. For more info read the accompanying doc on
+  this important new efun!
+<p>
+. several new required functions to be implemented in the mudlib master.c:
+        * valid_socket - security to monitor or limit usage of the new socket efuns
+        * valid_domain - a check for domain_stats to make sure that it only keeps
+          stats on domains that you care about
+        * valid_hide - for the set_hide() efun so that who can be "hidden" is
+          controlled by master.c
+        * slow_shutdown - when the driver is running out of memory and wants a
+          nice shutdown it calls this
+<p>
+. several new additions to the runtime configuration file:
+        * inherit chain size : the maximum inheritance depth allowed.  This is
+          mainly to prevent infinite inheritance loops
+        * maximum mapping size : similar to maximum array size
+        * address server ip : machine name where an addr_server is running
+        * address server port : port number that the addr_server is listening on
+        * max users : this used to be max players (doesn't matter anyway, since
+          this is still unused by the driver here)
+        * maximum efun sockets : control the number of efun sockets open at once
+        * maximum string length: controls the maximum allowed string size
+<p>
+. wizlist() changed to domain_stats(), this is to make statistic taking more
+  consistant with the new domain model versus the wizard model previous
+  to LPmud 3.0.  See also: author_stats()
+<p>
+. valid clone - this isn't enabled by default, but with some changes to
+  options.h, clone_object will fail if an object doesn't have read permission
+  on the file being cloned. (note: this is pretty useless since inheritance
+  doesn't have a similar check)
+<p>
+. old "parser magic functions" were changed into efuns:
+        * malloc_status() - was the 'malloc' command
+        * dumpallobj() - was the command of the same name
+        * mud_status() - was 'status' (use mud_status(1) to get 'status tables'
+<p>
+. some new debugging efuns were added or changed:
+        * rusage() now returns a mapping of the values returned by the
+          getrusage() system call.
+        * debugmalloc() - if the driver is compiled with malloc debugging enabled
+          this prints out more detailed malloc information
+        * set_malloc_mask()  - control the level of info being debugged with
+          debugmalloc
+        * set_debug_level() - more control on debugging levels (see debug.h in
+          the src directory)
+        * opcprof() - dump a file detailing efun usage (usage frequencies)
+        * cache_stats() - display call_other function table cache hit rate
+          information
+<p>
+. removed the old hname process and replaced it with a new autonomous (not
+  forked from driver) addr_server program that can be shared by several
+  different drivers at once.
+<p>
+. removed the cindent() efun
+<p>
+. removed the describe() efun
+<p>
+. removed two unused variables from the runtime config system
+        * global include file
+        * max commands per heartbeat
+<p>
+. removed everything to do with the "priveleged object" concept
+        * set_priv()
+        * privp()
+<p>
+. removed everything to do with "global verbs", "global preverbs" and
+  "preverbs"
+<p>
+. all objects now call create when first loaded, even if loaded via
+  inheritance (create called in the original objects, not what's
+  being inherited)
+<p>
+. crash in master.c is now called with three args (type of crash,
+  command_giver, current_object)
+<p>
+. if the driver crashes it tries to dump its core file in <mudlib dir>/cores
+  if that dir exists and core dumping is enabled
+<p>
+. removed the global define LPCA and replaced it with MUDOS (LPC objects can
+  do #ifdef MUDOS)
+<p>
+. added AUTO_SETEUID option.  if defined, all objects do the equivalent of
+  seteuid(getuid(this_object())); when created.
+<p>
+. added AUTO_TRUST_BACKBONE define so that you could disable the automatic
+  trusting of backbone uid objects if you want.
+<p>
+. added Pinkfish's modifications to parse command package so that it 
+  actually works now. :-)
+<p>
+. added an optional integer argument to the shutdown() efun.  when an
+  argument is specified, the driver exits with that exit code.
+<p>
+. removed smalloc from the driver completely (memory alignment violations and
+  other problems made it not worth dealing with).
+<p>
+. added BSD malloc as an option (seems to work well for those machines having
+  slow system mallocs like the HP).
+<p>
+. added the concepts of "null" and "undefined" to variables and added two
+  efuns to make use of these concepts
+        * nullp() - returns true for unitiliazed variables and destructed objects
+        * undefinedp() - returns true for (1) call_others to non-existant
+          methods, (2) access to map keys that aren't in the map, and
+          (3) arguments in the formal parameter list of a function for which
+          values were not passed.
+<p>
+. there's a DROP_CORE option in options.h which allows you to specify if you
+  want the driver to try to dump core if it has crashed
+<p>
+. replaced sort_array() with a faster version.  Also changed it so that
+  it expects the callback function to return -1, 0, or 1 in a fashion
+  similar to how strcmp() does it.
+<p>
+. added an option to define the default error message users receive.  If it
+  is not defined, then all users get wizard level error messages.  This is
+  useful since players are the ones that most often experience these errors
+  and this lets players report them in a more coherent fashion (maybe?).
+<p>
+. Reworked the domain stuff (added uid.c and uid.h) by separating the
+  concept of uids and euids from that of domains and authors.  The
+  wizlist (domain list) code is no longer based on uids but rather on
+  domains.  Two new functions are required in master.c:
+  string domain_file(string domain); and string author_file(string author);
+  In addition, valid_author(string author) should be added to master if
+  you wish set_author(string author) to be functional.  Note: domain_file
+  and author_file are similar to creator_file (which returns information
+  for uids).  domain_file lets the gamedriver know which domain a given
+  object should be in an author_file lets the gamedriver know the author
+  of the file.
+<p>
+up to 0.8.1
+<p>
+. COMPAT_MODE is gone!  You will not be able to run in compatibility mode.
+  This means that MudOS cannot be used to run mudlibs designed for the
+  2.4.5 LPmud gamedriver.
+<p>
+. shadow() can be disabled at compile-time.  Check out NO_SHADOWS in
+  config.h.  Note that NO_SHADOWS will appear in LPC's preprocessor's
+  run-time table if it is defined in config.h.
+<p>
+. A runtime configuration file replaces much of config.h.  Look at the
+  file ./mudlib/config.example.  You must specify a config file as
+  an argument to the driver when starting.  It will not run without it.
+  The driver will search in CONFIG_FILE_DIR (defined in config.h) for
+  the file first and will then search the explicit path.
+<p>
+. Added Sean Reith's sprintf().  It's huge and therefore a compile-time 
+  option defined in config.h.
+<p>
+. Added RCS as a compile-time option.  This allows wizards access to
+  the new efuns ci, co and rlog if those executables exist on your
+  system.
+<p>
+. added dprint flag for .edrc file.  Dprint causes a line to be printed
+  following the deletion of some text in ed.
+<p>
+. Compatibility buster: file permission system is now object-based
+  instead of euid-based.
+<p>
+. save_object() no longer saves 0-valued variables.
+<p>
+. Virtual objects.  When the GD is asked to compile a file that
+  doesn't exist, it just forwards the request to compile the file name
+  to the master object.  The return value of compile_object(fname) will
+  be an object that will be renamed.
+<p>
+. set_prompt() from interactive object sets that object's prompt to the
+  string argument.
+<p>
+. If the function write_prompt() exists, it will get called every time
+  the driver would normally write a prompt.  (this only gets called when
+  not in ed or an input_to)
+<p>
+. Added privileged object concept.  The master object is by default
+  privileged; enable_privileges(ob) from a privileged object makes ob
+  privileged; privp(ob) returns whether or not ob is privileged.
+<p>
+. wizards() returns a string array of all the wizards in the wizlist.
+  find_wizard(wizname) returns information about that wizard, in an
+  array.  The information returned is: moves, eval cost, errors, heart
+  beats, "worth", size of arrays, and number of objects.  This is the
+  information since the last reboot.  It is guaranteed to be in this
+  order (more fields'll be added later).  If the wizard is not found, 0
+  is returned.
+<p>
+. Crash vector added.  When the game driver receives some signal such
+  as segfault, bus error, etc., crash() is called in the master object
+  with the string error that was generated.
+<p>
+. Symbol LPCA is #defined by preprocessor.
+<p>
+. input_to()'s second argument is now a bitmask number.  0 and 1 work as
+  before; 2 doesn't allow shelling out; 3 is like 1 and doesn't allow
+  shelling out.  This applies to compatibility mode too, unlike
+  receive().  Be sure to use these flags at login time...  localcmd()
+  has been removed, check out commands().
+<p>
+. Only objects with same user id as master object (root uid) or backbone 
+  uid, are allowed to add_worth().
+<p>
+. Gamedriver now keeps track of mappings on status line.  Fixed a memory leak 
+  in mapping aggregate initialization.  Mappings now appear in the arrays 
+  section of the wizlist.
+<p>
+. Preprocessor now supports token pasting.  To paste two tokens in a #define, 
+  use '##'; e.g. #define SET(str, v) set_##str(v)
+<p>
+. inherit statement now understands string expressions.
+<p>
+. You can now clone an object with an environment.
+<p>
+. Privileged objects can't be destruct()'d by non privileged objects.
+<p>
+. Snooping of ed mode looks prettier, also improved substitution.
+<p>
+. New data type added: mapping.  Usage:
+      declaration-     mapping m;
+      initialization-  m = (["fighting" : 35, "swimming" : 3]);
+      access-          if (num_users["netcom"] > 3) ...
+      modify-          skills[skill_name] += 20;
+<p>
+   Mappings are like arrays but you can index off of strings,
+      numbers (even negative ones), arrays, objects, and
+      mappings.  save_object() and restore_object() seem to
+      handle them fine.
+<p>
+   * works with mappings, as a composition operator.  Likewise '*='.
+<p>
+   Alist efuns are no longer.  Alists have been obsolesced by mappings.
+<p>
+. get_dir() now takes second optional flag argument.  Currently, the only
+  flag understood is -1.  If this flag is chosen, instead of returning
+  an array of strings get_dir() returns an array of arrays which are
+  information about the file.  Information is returned in the order:
+  filename, filesize, file update time.
+  New efun stat() acts just like get_dir(), and will replace it.
+<p>
+. Swap file name now includes port number, so that it's possible to run
+  debug mud off of same mudlib without messing things up.
+<p>
+. Third argument to add_action() is now a bitmask.  Flags:
+      1 - short verb
+      2 - xverb
+      4 - preverb (new)
+      16 - global verb (new)
+      Global verbs can only be added from privileged objects.
+      Preverbs can only be added from privileged objects or
+      the command giver.
+<p>
+  Parse order:  global preverbs, then local preverbs, then
+                local verbs, then global verbs.
+<p>
+  The "n", "s", "e", "w" hardcoded aliases have been removed
+     from the GD, you'll have to use global verbs to do the
+     same thing.
+<p>
+. Added new modifier to sscanf(): '*'.  It allows you to skip over a
+  field without having to use a dummy variable.  e.g.
+    sscanf(file_name(ob), "%*s#%d", num);
+  It's just an efficiency hack; you don't really need this.
+<p>
+. C++ style comments (//) now work.
+<p>
+. Restricted ed mode.  If this option was compiled in, if the
+  interactive object which called ed isn't a wizard (wizardp() == 0),
+  that object is in "restricted ed mode".  This only allows the user to
+  write to the file that ed was started up in ('x' is the only save
+  command which is allowed).  In addition, help messages etc. are
+  tailored to the limited set of commands.
+<p>
+. Netdeath notification.  Upon going netdead, the object which goes
+  netdead has the function "net_dead" called on it.
+<p>
+. cp is back in the parser as an efun.
+<p>
+. renamed inherit_list efun to deep_inherit_list (since this efun does
+  return ALL of the files inherited by the object in question)
+  and made a new efun called inherit_list that only returns a list of
+  the files directly inherited by the object in question.  This efun
+  will be useful when writing a deep update command.
+<p>
+. overloaded the definition for the stat() efun so that if it is applied to a
+  regular file instead of a directory, it returns information on
+  that file.  The information returned is a three element array:
+  (file_size, file_modification_time, update_time_of_associated object)
+  The times returned will be useful in writing a deep update command.
+  This overloaded version of stat requires a full pathname as an argument.
+  You can check if stat() fails by seeing if the returned vector has size 0.
+  (e.g. if (sizeof(v) == 0) handle_error())
+<p>
+. Overloaded call_other() so that it can take an array as the first
+  argument.  e.g. users()->quit(); (the return value is always 0 now)
+<p>
+. move_object(ob) is now equivalent to move_object(this_object(), ob).
+  This may phase out the latter usage.
+<p>
+. Every object now has the macro DIR defined, which is the directory 
+  that the object's .c file is in.
+<p>
+. process_input() is called on the player object if it exists for
+  every line of input passed to the parser by that player.
+  process_input should return a string.  That string is the actual
+  string which is parsed by the driver.  This allows you to do things
+  like nicknames or aliases quickly and easily.
+<p>
+. Made in_edit and in_input take an optional argument which is an
+  object, so you can check the status of other objects.
+<p>
+. New efuns:
+   userp(ob) returns whether or not ob is a user.
+<p>
+   new(obname) returns clone_object(obname).  clone_object()
+      won't be around for long.
+<p>
+   remove_action(func, verb) added.
+<p>
+   master() returns the master object.
+<p>
+   in_input() returns 1 if current object is in an input_to().
+<p>
+   in_edit() returns 1 if current object is editing.
+<p>
+   mapp() returns 1 if argument is a mapping.
+<p>
+   receive(str) sends interactive message to current object,
+      returns 1 if current object is interactive.
+<p>
+. commands() returns an array of arrays detailing the sentences of the
+  current object.  Subarray structure: 0=verb, 1=flags,2=defining
+  object.
+<p>
+. enable_wizard() makes current object into a wizard.  Wizards don't
+  add moves on the wizlist, and get better error reporting than "your
+  overly sensitive mind...".
+<p>
+. wizardp() returns whether argument is a wizard or not.
+<p>
+. ci, co, rlog (if the parser was compiled with RCS turned on).
+  ci (string filename, string log_messag, int major, int minor); 
+  co (string filenamem, int major, int minor);
+  (major and minor are the major and minor version numbers)
+  rlog (string filename);
+<p>
+. get_char().  Works exactly like input_to, except that it responds to
+  a single character of input.  Warning: this doesn't work well with
+  clients.
+<p>
+. mud_name() Returns the name of the mud as defined in the config file.
+<p>
+. allocate_mapping(int) 
+  This efun isn't strictly
+  required in order to use a mapping, it merely serves to give the gamedriver
+  a hint regarding how many elements the mapping may be expected to
+  eventually contain.  So long as the mapping contains fewer than the
+  specified maximum number of elements, the gamedriver will use
+  contiguous memory to store the elements.  Once this number of elements
+  is exceeded, the game driver begins malloc'ing the space for the
+  elements separately as needed.  Note that using "map = ([])" to
+  initialize the map is the same as using "map = allocate_mapping(0)".
+<p>
+. set_hide(int) allows a privileged object to hide itself from
+  find_living(), find_object(), find_player().
+<p>
+. map_delete(mapping,index) - removes a given pair (index, value) from
+  the mapping 'mapping'.
+<p>
+. keys(mapping) - returns an array of the indices of a mapping.
+<p>
+. undefinedp(mixed) - returns TRUE if the argument is undefined.  You can
+  check for inclusion of a given index in a mapping with undefinedp.  E.g.
+  if (undefinedp(x["index"])) write("index isn't in mapping 'x'\n");
+  This function also works on values returned from call_other.  Call_other's
+  on non-existant functions return values that cause undefinedp to evaluate
+  to TRUE.
+<p>
+. children(object) - returns an array of all the objects which were cloned
+  from the argument passed to it.
+<p>
+. message(string,string,mixed,object *) - general purpose replacement
+  This efun is a generic messaging function meant to replace all current
+  communication efuns in the future (say, shout, tell_*, printf,
+  write, etc).  It communicates directly to catch_tell in the
+  targets.
+<p>
+. Virtual objects
+   The immediately obvious thing to use them for is virtual
+   territories.  Want to create a desert with 10,000 rooms?  You
+   can, now.  You could even make it a 'sparse territory' by making
+   it mostly virtual, with some occasional detailed rooms thrown in.
+   The recommended strategy is to have the compile_object() code
+   in the master object look like:
+<p>
+    object compile_object(string fname) {
+       return (object)
+          "/secure/virtual_object"->compile_object(fname);
+    }
+<p>
+   This keeps the complexity of the master object down.  Then
+   have the virtual_object server delegate its responsibility.  e.g.
+   if an undefined room occurs in a wizard's castle, have it call
+   compile_object(fname) in that wizard's castle.c file.  Better do
+   a security check as well.

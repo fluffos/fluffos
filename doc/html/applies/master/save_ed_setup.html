@@ -1,0 +1,11 @@
+<HEAD> <TITLE> save_ed_setup - save a user's editor setup or configuration settings </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> save_ed_setup - save a user's editor setup or configuration settings </H1> </center>
+<p>
+<b> int save_ed_setup( object user, int config ); </b>
+<p>
+This master apply is called by the ed() efun to save
+a user's ed setup/configuration settings (contained in
+an int).  This function should return an int for
+success (1 or TRUE)/failure (0 or FALSE).
+<p>
+Seel also:
+<A HREF=retrieve_ed_setup.html>  retrieve_ed_setup </A>

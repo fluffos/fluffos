@@ -1,0 +1,21 @@
+clean_up - periodically called in inactive objects
+
+int clean_up( int inherited ); 
+
+The clean_up() function is called by the driver on a regular basis in all
+objects that have been inactive for the time specified for clean_up() in the
+runtime configuration file.  One flag is passed to the function, specifying
+whether or not the object has been inheritted by anything.  If clean_up()
+returns 0, clean_up() will never be called again on that object.  If it returns
+1, it will be called again when the object remains inactive for the specified
+clean_up() delay.
+
+One thing that might be commonly done by an object in this function is
+destructing itself to conserve memory.  However, one often does not want
+to destruct objects which have been inherited, as this will cause a new
+copy to be loaded next time they are inherited again, causing more than
+one copy of the code to be in memory.
+
+See also:  destruct
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

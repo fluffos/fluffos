@@ -13,7 +13,7 @@ char *error_strings[ERROR_STRINGS] =
     "Problem setting non-blocking mode",
     "No more available efun sockets",
     "Descriptor out of range",
-    "Descriptor is invalid",
+    "Socket is closed",
     "Security violation attempted",
     "Socket is already bound",
     "Address already in use",

@@ -1,0 +1,14 @@
+remove_shadow - clear all the shadows related to an object.
+
+int remove_shadow(object);
+
+This function removes ALL shadows associated with the object passed
+as the argument. Note this means all shadows ON the object, and all shadows
+ORIGINATED by the object.
+
+This function requires PACKAGE_CONTRIB to be defined in the options file.
+This function also requires that the option NO_SHADOWS be undefined.
+
+See also:
+ shadow
+

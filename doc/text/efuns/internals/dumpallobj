@@ -1,0 +1,16 @@
+dumpallobj - report various statistics on all objects that have been loaded
+
+void dumpallobj();
+
+void dumpallobj( string );
+
+This function dumps a list of statistics on all objects that have been loaded.
+If no argument is specified, then the information will be dumped to a file
+named /OBJ_DUMP.  If an argument is specified, then that name is used as
+the filename for the dump.
+
+See also:
+ mud_status,
+ debug_info
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

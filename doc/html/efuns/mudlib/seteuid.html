@@ -1,0 +1,21 @@
+<HEAD> <TITLE> seteuid - set the effective user id (euid) of an object </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> seteuid - set the effective user id (euid) of an object </H1> </center>
+<p>
+<b> int seteuid( string str ); </b>
+<p>
+This efun is only available if PACKAGE_UIDS is compiled in.
+<p>
+Set effective uid to 'str'.  valid_seteuid() in master.c controls which
+values the euid of an object may be set to.
+<p>
+When this value is 0, then the current object's uid can be changed by
+export_uid(), and only then.
+<p>
+But, when the value is 0, no objects can be loaded or cloned by this object.
+<p>
+See also:
+<A HREF=export_uid.html>  export_uid </A>,
+<A HREF=getuid.html>  getuid </A>,
+<A HREF=geteuid.html>  geteuid </A>,
+<A HREF=../../applies/master/valid_seteuid.html>  valid_seteuid </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

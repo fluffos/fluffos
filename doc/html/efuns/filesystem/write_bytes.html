@@ -1,0 +1,10 @@
+<HEAD> <TITLE> write_bytes - writes a contiguous series of bytes to a file </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> write_bytes - writes a contiguous series of bytes to a file </H1> </center>
+<p>
+<b> int write_bytes( string path, int start, string series ); </b>
+<p>
+This function writes the bytes in 'series' into the file named by 'path'
+beginning at byte # 'start'.  It returns zero (0) upon failure, 1 otherwise.
+<p>
+See also:
+<A HREF=write_file.html>  write_file </A>,
+<A HREF=read_bytes.html>  read_bytes </A>

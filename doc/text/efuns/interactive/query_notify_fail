@@ -1,0 +1,17 @@
+query_notify_fail - Query if an interactive object has a pending notify_fail()
+
+mixed query_notify_fail(void);
+
+This function returns whatever this_player()'s notify_fail value
+has been set to. This is either a string, or a function, depending
+on what it has been set to by the most recent call to notify_fail()
+that applied to this_player().
+
+This function requires PACKAGE_CONTRIB to be defined in the options file.
+This function also requires that the NO_ADD_ACTION option NOT be defined.
+
+See also:
+ add_action,
+ notify_fail
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,21 @@
+<HEAD> <TITLE> functions - list all the functions in a given object. </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> functions - list all the functions in a given object. </H1> </center>
+<p>
+<b> string array functions(object, int default: 0); </b>
+<p>
+functions() can return two different things. If the second argument is
+0 (which it is by default) it will return an array containing the names
+of all the functions in the object passed as the first argument. If the
+second argument is non-zero, more information about each function is
+given. For a non-zero second argument, each array element contains
+the following:
+<p>
+({ function_name, number_of_arguments, return_type, ... }). 
+<p>
+Where the fourth and following elements are the argument types.  If
+the save_types pragma was not in effect when the function was compiled,
+number_of_arguments will be correct, but no types will be available.
+<p>
+This efun is only available if PACKAGE_CONTRIB is defined in the
+options file.
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

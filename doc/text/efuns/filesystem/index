@@ -1,0 +1,24 @@
+Filesystem Efuns
+
+These are the efuns which are available for manipulating files.
+
+<DL>
+*  cp
+*  file_length
+*  file_size
+*  get_dir
+*  link
+*  mkdir
+*  read_bytes
+*  read_file
+*  rename
+*  rm
+*  rmdir
+*  stat
+*  tail
+*  write_bytes
+*  write_file
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

@@ -1,0 +1,55 @@
+call_other - call a function in another object
+
+mixed call_other(mixed ob, string func, ...); 
+
+mixed call_other(mixed ob, array args); 
+
+mixed call_other(array obs, string func, ...); 
+
+mixed call_other(array obs, array args); 
+
+ob is either an object pointer, or a string filename (suitable for 
+find_object()).  obs is an array of object pointers and strings.
+Using an array as the first argument does a call_other for each element of
+the array, and returns an array of the results.
+If the array form is used for args, then the first element is the function
+name, and the remainder are the arguments; e.g.:
+
+call_other(ob, ({ "foo", 1, 3, 5 }))
+
+and
+
+call_other(ob, "foo", 1, 3, 5)
+
+are equivalent.  The function foo() is called in the object ob with the
+arguments (1, 3, 5).  The return value of call_other() is the value
+returned from the foo() function.  In the case of an array of objects,
+the return value of call_other() is an array of the return values.
+
+There is a much more attractive way to do call_others;
+call_other(x, "y", z, ...) is the same as:
+
+x->y(z, ...)
+
+ie,
+
+call_other(ob, "query_name");
+
+could be written as:
+
+ob->query_name();
+
+Writing out the call_other call is mainly used when the function name
+is in a variable, i.e:
+
+<pre>
+void do_test(string fname, int x) {
+    call_other(fname, "test_" + x);
+}
+</pre>
+
+An example of using an array as the first argument:
+
+users()->quit();
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

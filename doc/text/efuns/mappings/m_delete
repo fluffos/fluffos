@@ -1,0 +1,28 @@
+m_delete - remove a key from a mapping
+
+mapping m_delete(mapping m, mixed element);
+
+This efun is only available if COMPAT_32 is defined.
+
+It behaves exactly like map_delete(), except that it returns its first
+argument.  
+
+Note: the 3.2 version actually returns a copy of the mapping,
+so for strict compatibility the following simul is suggested:
+
+<pre>
+mapping m_delete(mapping m, mixed element) 
+{
+    mapping ret = copy(m);
+    map_delete(ret, element);
+    return ret;
+}
+</pre>
+
+However, this version is significantly faster as it avoids the copy.
+
+See also:
+ map_delete
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

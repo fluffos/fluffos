@@ -1,0 +1,8 @@
+pointerp - determine whether or not a given variable is an array
+
+int pointerp( mixed arg );
+
+pointerp() is provided for compatibility; it is the same as the arrayp() efun.
+
+See also:
+ arrayp

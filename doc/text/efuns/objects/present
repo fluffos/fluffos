@@ -1,0 +1,22 @@
+present - find an object by id
+
+object present( mixed str);
+
+object present( mixed str, object ob );
+
+This efun is only available if NO_ENVIRONMENT is not compiled in.
+
+If an object for which id(str) returns true exists, return it.
+
+`str' can also be an object, in 'str' is searched for, instead of calling
+the function id().
+
+If `ob' is given, then the search is done in the inventory of `ob', otherwise
+the object is searched for in the inventory of the current object, and
+in the inventory of the environment of the current object.
+
+See also:
+ move_object,
+ environment
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,10 @@
+parse_command_adjectiv_id_list - returns a list of names to the parser
+
+string array parse_command_adjectiv_id_list(); [sic] 
+
+This routine is used to find out what adjectives the object responds to, and is
+used by the parsing package and the parse_command() efun.  In addition,
+anything returned by the master object will work on ANY object.
+
+See also:
+ parse_command

@@ -1,0 +1,47 @@
+<HEAD> <TITLE> replace_string - replace all instances of a string within a string </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> replace_string - replace all instances of a string within a string </H1> </center>
+<p>
+<b> string replace_string( string str, string pattern, string replace ); </b>
+<p>
+<b> string replace_string( string str, string pattern, string replace, int max ); </b>
+<p>
+<b> string replace_string( string str, string pattern, string replace, int first, int last ); </b>
+<p>
+replace_string() returns 'str' with all instances of 'pattern' replaced with
+'replace'.  If 'pattern' has zero length then str is returned unmodified.
+If the resultant string would exceed the maximum string length then
+replace_string() returns an undefinedp(), non-stringp() value.
+<p>
+replace_string() can be used to remove characters from a string by
+specifying a pattern and a zero-length replace parameter.  For example,
+replace_string(" 1 2 3 ", " ", "") would return "123".  replace_string()
+executes faster this way then explode()/implode().
+<p>
+The 4th and 5th arguments are optional (to retain backward compatibility.)
+The extra arguments have the following effect:
+<p>
+With 4 args:
+<p>
+The 4th argument specifies the maximum number of replacements
+to make (the count starts at 1). A value of 0 implies 'replace all', and
+thus, acts as replace_string() with 3 arguments would. E.g.,
+replace_string("xyxx", "x", "z", 2) would return "zyzx".
+<p>
+With 5 args:
+<p>
+The 4th and 5th arguments specify the range of matches to replace
+between, with the following constraints:
+<p>
+<DL>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> first < 1 : change all from the start.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> last == 0, or last > max_matches : change all to end
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> first > last : return the unmodified array.
+</DL>
+<p>
+E.g., replace_string("xyxxy", "x", "z", 2, 3) returns "xyzzy".
+<p>
+See also:
+<A HREF=sscanf.html>  sscanf </A>,
+<A HREF=explode.html>  explode </A>,
+<A HREF=strsrch.html>  strsrch </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

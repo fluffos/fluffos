@@ -1,0 +1,15 @@
+<HEAD> <TITLE> query_verb - return the name of the command currently being executed </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> query_verb - return the name of the command currently being executed </H1> </center>
+<p>
+<b> string query_verb(); </b>
+<p>
+This efun is only available if NO_ADD_ACTION is not compiled in.
+<p>
+Give the name of the current command, or 0 if not executing from a command.
+This function is useful when several commands (verbs) may cause the same
+function to execute and it is necessary to determine which verb it was
+that invoked the function.
+<p>
+See also:
+<A HREF=../interactive/add_action.html>  add_action </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

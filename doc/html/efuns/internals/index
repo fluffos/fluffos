@@ -1,0 +1,31 @@
+Internal efuns
+
+Efuns which give internal information about the driver process, or assist
+with debugging the driver itself.
+
+<DL>
+*  cache_stats
+*  debug_info
+*  debugmalloc
+*  dump_file_descriptors
+*  dump_prog
+*  dump_socket_status
+*  dumpallobj
+*  get_config
+*  malloc_status
+*  memory_info
+*  mud_status
+*  opcprof
+*  query_load_average
+*  refs
+*  rusage
+*  set_debug_level
+*  set_malloc_mask
+*  swap
+*  time_expression
+*  trace
+*  traceprefix
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

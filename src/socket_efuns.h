@@ -8,12 +8,13 @@
 #define _SOCKET_EFUNS_H_
 
 #include "std.h"
+#include "network_incl.h"
 
 enum socket_mode {
     MUD, STREAM, DATAGRAM, STREAM_BINARY, DATAGRAM_BINARY
 };
 enum socket_state {
-    CLOSED, UNBOUND, BOUND, LISTEN, DATA_XFER
+    CLOSED, FLUSHING, UNBOUND, BOUND, LISTEN, DATA_XFER
 };
 
 #define	BUF_SIZE	2048	/* max reliable packet size	   */
@@ -40,7 +41,8 @@ typedef struct {
     int w_len;
 } lpc_socket_t;
 
-extern lpc_socket_t lpc_socks[CFG_MAX_EFUN_SOCKS];
+extern lpc_socket_t *lpc_socks;
+extern int max_lpc_socks;
 
 #define	S_RELEASE	0x01
 #define	S_BLOCKED	0x02
@@ -50,8 +52,8 @@ extern lpc_socket_t lpc_socks[CFG_MAX_EFUN_SOCKS];
 #define S_READ_FP       0x20
 #define S_WRITE_FP      0x40
 #define S_CLOSE_FP      0x80
+#define S_EXTERNAL	0x100
 
-void init_sockets PROT((void));
 int check_valid_socket PROT((char *, int, object_t *, char *, int));
 void socket_read_select_handler PROT((int));
 void socket_write_select_handler PROT((int));

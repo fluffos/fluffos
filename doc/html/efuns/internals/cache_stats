@@ -1,0 +1,13 @@
+cache_stats - report various driver and mudlib statistics
+
+string cache_stats();
+
+This efun is only available if CACHE_STATS is defined in options.h at
+driver build time.  This efun returns a string containing a summary
+of the statstics on the call_other() cache hit rate.
+
+See also:
+ opcprof,
+ mud_status
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

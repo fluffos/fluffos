@@ -1,0 +1,12 @@
+eval_cost - returns the evaluation cost remaining
+
+void eval_cost()
+
+eval_cost() returns the number of instructions that can be executed
+before the driver decides it is in an infinite loop.
+
+See also:
+ set_eval_limit,
+ reset_eval_cost
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,25 @@
+trace - sets trace flags and returns the old ones
+
+int trace( int traceflags );
+
+This efun is only available if TRACE and PACKAGE_DEVELOP are compiled in.
+
+Sets the trace flags and returns the old trace flags.
+When tracing is on a lot of information is printed during execution.
+
+The trace bits are:
+<DL>
+* 1 - Trace all function calls to lfuns.
+* 2 - Trace all calls to "call_other".
+* 4 - Trace all function returns.
+* 8 - Print arguments at function calls and return values.
+* 16 - Print all executed stack machine instructions (produces a lot of output!).
+* 32 - Enable trace in heart beat functions.
+* 64 - Trace calls to apply.
+* 128 - Show object name in tracing.
+</DL>
+
+See also:
+ traceprefix
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

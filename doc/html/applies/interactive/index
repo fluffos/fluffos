@@ -1,0 +1,18 @@
+Interactive applies
+
+These are the functions called in 'user' objects:
+
+<DL>
+*  catch_tell
+*  logon
+*  net_dead
+*  process_input
+*  receive_message
+*  receive_snoop
+*  telnet_suboption
+*  terminal_type
+*  window_size
+*  write_prompt
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

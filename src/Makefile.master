@@ -45,8 +45,6 @@
 # ---- DO NOT EDIT ANYTHING BELOW HERE UNLESS YOU KNOW ALOT ABOUT HOW
 #      MUDOS WORKS INTERNALLY ----
 
-OURLIBS=packages/packages.a mudlib/mudlib.a
-
 OVERRIDES=$(MAKEOVERRIDES)
 
 SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
@@ -57,9 +55,13 @@ SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   compiler.c avltree.c icode.c trees.c generate.c scratchpad.c \
   socket_efuns.c socket_ctrl.c qsort.c eoperators.c socket_err.c md.c \
   strstr.c disassembler.c binaries.c ualarm.c $(STRFUNCS) \
-  replace_program.c functab_tree.c ccode.c cfuns.c compile_file.c
+  replace_program.c ccode.c cfuns.c compile_file.c crypt.c
 
 all: cc.h files main_build
+
+parallel:
+	$(MAKE) -k -l -j 6 cc.h files
+	$(MAKE) -k -l -j 6 main_build
 
 main_build: $(DRIVER_BIN) addr_server
 
@@ -85,8 +87,8 @@ OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   port.o reclaim.o parse.o simul_efun.o sprintf.o program.o \
   compiler.o avltree.o icode.o trees.o generate.o scratchpad.o \
   socket_efuns.o socket_ctrl.o qsort.o eoperators.o socket_err.o md.o \
-  strstr.o disassembler.o binaries.o ualarm.c $(STRFUNCS) \
-  replace_program.o functab_tree.o ccode.o cfuns.o compile_file.o
+  strstr.o disassembler.o binaries.o ualarm.o $(STRFUNCS) \
+  replace_program.o ccode.o cfuns.o compile_file.o crypt.o
 
 .c.o:
 	$(CC) $(CFLAGS) $(OPTIMIZE) -c $*.c
@@ -111,16 +113,21 @@ grammar.tab.c: grammar.y
 	-mv y.tab.h grammar.tab.h
 
 %ifdef GNU
-$(DRIVER_BIN): $(OBJ)
+packages/packages.a: packages/parser.c packages/contrib.c
 	$(MAKE) -C packages 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)'
+
+mudlib/mudlib.a:
 	$(MAKE) -C mudlib 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)'
 %else
-$(DRIVER_BIN): $(OBJ)
+packages/packages.a: packages/parser.c packages/contrib.c
 	(cd packages; $(MAKE) 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'RANLIB=$(RANLIB)')
+
+mudlib/mudlib.a:
 	(cd mudlib; $(MAKE) 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'RANLIB=$(RANLIB)')
 %endif
+$(DRIVER_BIN): packages/packages.a mudlib/mudlib.a $(OBJ)
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
-	$(PROOF) $(CC) $(CFLAGS) $(OPTIMIZE) $(OBJ) -o $(DRIVER_BIN) $(OURLIBS) `cat system_libs`
+	$(PROOF) $(CC) $(CFLAGS) $(OPTIMIZE) $(OBJ) -o $(DRIVER_BIN) packages/packages.a mudlib/mudlib.a $(EXTRALIBS) `cat system_libs`
 
 %ifdef GNU
 addr_server:  $(OBJDIR)/addr_server.o $(OBJDIR)/socket_ctrl.o $(OBJDIR)/port.o addr_server.h
@@ -181,8 +188,17 @@ make_func.tab.c: make_func.y cc.h
 	-rm -f make_func.tab.c
 	mv y.tab.c make_func.tab.c
 
-configure.h: edit_source
-	./edit_source -configure
+configure.h: edit_source build.MudOS
+	-if test \( ! -r configure.h \) -o \( ! -r configuration \); then \
+	    rm -f configuration; \
+	    touch configuration; \
+	fi
+	if test "Machine `uname -a` Configure version 5" = "`cat configuration`"; then \
+	    echo "Skipping configuration ..."; \
+	else \
+	    ./edit_source -configure; \
+	    echo "Machine `uname -a` Configure version 5" > configuration; \
+	fi
 
 %ifdef GNU
 $(OBJDIR)/edit_source.o: edit_source.c preprocess.c cc.h
@@ -243,8 +259,9 @@ nothing:
 
 # remove local configuration
 spotless: clean
-	-rm -f configure.h local_options system_libs
+	-rm -f configure.h local_options system_libs configuration
 	-rm -f options_incl.h
+	-rm -f *.diffs
 
 # get ready for recompile
 neat:
@@ -257,16 +274,21 @@ neat:
 	-rm -f malloc.c mallocwrapper.c
 	-rm -f func_spec.cpp files
 	-rm -f grammar.y comptest* a.out
-	-rm -f packages/Makefile packages/GNUmakefile
+	-rm -f packages/Makefile packages/GNUmakefile packages/packages
 
 # remove everything except configuration
 clean: neat
 	-rm -f Makefile.MudOS GNUmakefile.MudOS
 	-rm -f cc.h edit_source
-	-rm -f core y.output
-	-rm -f *.orig *.rej
-	-rm -f */*.orig */*.rej
-	-rm -f *.ln tags */*~ *~ TAGS
+	-rm -f core y.output testsuite/core testsuite/tmp/*
+	-rm -rf testsuite/binaries
+	-rm -f testsuite/OBJ_DUMP* testsuite/test_file testsuite/testfile
+	-rm -f testsuite/tmp_eval_file.c testsuite/sf.o testsuite/ed_test
+	-rm -f testsuite/log/log testsuite/log/debug.log testsuite/log/compile
+	-find . -name "*~" -print | xargs rm
+	-find . -name "*.orig" -print | xargs rm
+	-find . -name "*.rej" -print | xargs rm
+	-rm -f *.ln tags TAGS
 	-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old addr_server
 %ifdef GNU
 	-rm -f Dependencies tmpdepend

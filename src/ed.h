@@ -78,7 +78,7 @@
 
 #define LGLOB		2	/* line marked global */
 
-#define ED_MAXLINE	512	/* max number of chars per line */
+#define ED_MAXLINE	2048	/* max number of chars per line */
 #define MAXPAT		256	/* max number of chars per replacemnt pattern */
 #define MAXFNAME 	256	/* max file name size */
 

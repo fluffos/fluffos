@@ -1,0 +1,15 @@
+<HEAD> <TITLE> valid_hide - allows or disallows objects to hide and see hidden objects </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> valid_hide - allows or disallows objects to hide and see hidden objects </H1> </center>
+<p>
+<b> int valid_hide( object ob ); </b>
+<p>
+Add valid_hide to master.c in order to allow objects to hide themselves,
+or see other objects that have hidden themselves.  When an object tries to
+use the set_hide() efun to hide itself, valid_hide will be called with the
+object that is wanting to hide as the sole parameter.  It should return 1
+to allow it, or 0 to not allow it.  The same call takes place when it needs
+to be determined if a certain object should be able to see hidden objects.
+<p>
+See also:
+<A HREF=../../efuns/objects/set_hide.html>  set_hide </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

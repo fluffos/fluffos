@@ -1,0 +1,16 @@
+Mapping Efuns
+
+The following efuns operate on mappings:
+
+<DL>
+*  allocate_mapping
+*  keys
+*  map_delete
+*  map_mapping
+*  mapp
+*  match_path
+*  unique_mapping
+*  values
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

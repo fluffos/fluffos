@@ -1,0 +1,10 @@
+disable_commands - makes a living object non-living
+
+void disable_commands();
+
+This efun is only available if NO_ADD_ACTION is not defined.
+
+Causes the current object to no longer be able to execute commands.
+
+See also:
+ enable_commands

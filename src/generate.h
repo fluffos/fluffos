@@ -24,7 +24,7 @@
 
 int node_always_true PROT((parse_node_t *));
 short generate PROT((parse_node_t *));
-short generate_function PROT((function_t *, parse_node_t *, int));
+short generate_function PROT((compiler_function_t *, parse_node_t *, int));
 int generate_conditional_branch PROT((parse_node_t *));
 
 #ifdef DEBUG

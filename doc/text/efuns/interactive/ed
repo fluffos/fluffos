@@ -1,0 +1,39 @@
+ed - edit a file
+
+This efun is only available if OLD_ED is defined.
+
+void ed( string file, string exit_fn, int restricted );
+
+void ed( string file, string write_fn, string exit_fn, int restricted );
+
+This is a funny function. It will start a local editor on an optional
+file.  This editor is almost UNIX ed compatible.  When in the editor
+type 'h' for help.
+
+The 'write_fn' function allows the mudlib to handle file locks and
+administrative logging of files modified.  When the editor writes to a
+file, the driver will callback the 'write_fn' function twice.  The first
+time, the function is called before the
+write takes place -- 'flag' will be 0.  If the function returns 1,
+the write will continue,
+otherwise it will abort.  The second time, the function is called
+after the write has completed -- 'flag' will be non-zero.
+This callback function should have the form:
+
+int write_fn(string fname, int flag)
+
+When the editor is exited, the driver will callback the 'exit_fn'
+function.  This function allows the mudlib to clean up.  This 
+callback function has the form:
+
+void exit_fn()
+
+The optional 'restricted' flag limits the editor's
+capabilities, such as inserting a file, and saving using an alternate
+file name.
+
+See also:
+ regexp,
+ valid_read,
+ valid_write,
+ get_save_file_name

@@ -1,0 +1,13 @@
+query_ip_number - return the ip number for a player object
+
+string query_ip_number( object ob );
+
+Return the ip-number (dotted decimal form) for player `ob'.
+
+See also:
+ query_ip_name,
+ query_host_name,
+ resolve,
+ socket_address
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -42,6 +42,9 @@ INLINE void *debugrealloc P4(void *, ptr, int, size, int, tag, char *, desc)
 {
     void *tmp;
 
+    if (size <= 0)
+	fatal("illegal size in debugrealloc()");
+
     NOISY3("realloc: %i (%x), %s\n", size, ptr, desc);
     stats.realloc_calls++;
     tmp = (md_node_t *) ptr - 1;
@@ -57,6 +60,8 @@ INLINE void *debugmalloc P3(int, size, int, tag, char *, desc)
 {
     void *tmp;
 
+    if (size <= 0)
+	fatal("illegal size in debugmalloc()");
     stats.alloc_calls++;
     tmp = (void *) MALLOC(size + MD_OVERHEAD);
     MDmalloc(tmp, size, tag, desc);
@@ -68,6 +73,9 @@ INLINE void *debugcalloc P4(int, nitems, int, size, int, tag, char *, desc)
 {
     void *tmp;
 
+    if (size <= 0)
+	fatal("illegal size in debugcalloc()");
+
     stats.alloc_calls++;
     tmp = (void *) CALLOC(nitems * size + MD_OVERHEAD, 1);
     MDmalloc(tmp, nitems * size, tag, desc);
@@ -77,12 +85,13 @@ INLINE void *debugcalloc P4(int, nitems, int, size, int, tag, char *, desc)
 
 INLINE void debugfree P1(void *, ptr)
 {
-    void *tmp;
+    md_node_t *tmp;
 
     NOISY1("free (%x)\n", ptr);
     stats.free_calls++;
     tmp = (md_node_t *) ptr - 1;
     if (MDfree(tmp)) {
+	memset(ptr, 'x', tmp->size);
 	FREE(tmp);		/* only free if safe to do so */
     }
 }

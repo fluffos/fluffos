@@ -16,6 +16,7 @@
 #include "comm.h"
 #endif
 #include "compiler.h"
+#include "simul_efun.h"
 
 INLINE void
 dealloc_funp P1(funptr_t *, fp)
@@ -27,7 +28,7 @@ dealloc_funp P1(funptr_t *, fp)
     	fp->f.functional.prog->func_ref--;
 #ifdef DEBUG
 	if (d_flag)
-	    printf("subtr func ref %s: now %i\n",
+	    printf("subtr func ref /%s: now %i\n",
 		   fp->f.functional.prog->name,
 		   fp->f.functional.prog->func_ref);
 #endif
@@ -59,6 +60,7 @@ INLINE void f_and()
     CHECK_TYPES(sp, T_NUMBER, 2, F_AND);
     sp--;
     sp->u.number &= (sp + 1)->u.number;
+    sp->subtype = 0;
 }
 
 INLINE void
@@ -71,6 +73,7 @@ f_and_eq()
     if ((--sp)->type != T_NUMBER)
 	error("Bad right type to &=\n");
     sp->u.number = argp->u.number &= sp->u.number;
+    sp->subtype = 0;
 }
 
 INLINE void
@@ -84,6 +87,7 @@ f_div_eq()
 	{
 	    if (!sp->u.number) error("Division by 0nn\n");
 	    sp->u.number = argp->u.number /= sp->u.number;
+	    sp->subtype = 0;
 	    break;
 	}
 
@@ -125,6 +129,7 @@ f_eq()
 	{
 	    --sp;
 	    sp->u.number = sp->u.number == (sp+1)->u.number;
+	    sp->subtype = 0;
 	    return;
 	}
 	
@@ -133,6 +138,7 @@ f_eq()
 	    --sp;
 	    sp->type = T_NUMBER;
 	    sp->u.number = sp->u.real == (sp+1)->u.real;
+	    sp->subtype = 0;
 	    return;
 	}
 	
@@ -145,6 +151,7 @@ f_eq()
 		sp->u.number = sp->u.real == (sp+1)->u.number;
 		sp->type = T_NUMBER;
 	    }
+	    sp->subtype = 0;
 	    return;
 	}
 	
@@ -203,9 +210,7 @@ f_eq()
 	i = 0;
     }
     /* args are freed, stack pointer points to spot for return value */
-    sp->type = T_NUMBER;
-    sp->subtype = 0;
-    sp->u.number = i;
+    put_number(i);
 }
 
 INLINE void
@@ -215,23 +220,26 @@ f_ge()
     switch ((--sp)->type | i) {
     case T_NUMBER:
 	sp->u.number = sp->u.number >= (sp+1)->u.number;
+	sp->subtype = 0;
 	break;
     case T_REAL:
-	sp->u.number = sp->u.real >= (sp+1)->u.real;
-	sp->type = T_NUMBER;
+	i = sp->u.real >= (sp+1)->u.real;
+	put_number(i);
 	break;
     case T_NUMBER | T_REAL:
 	if (i == T_NUMBER) {
 	    sp->type = T_NUMBER;
 	    sp->u.number = sp->u.real >= (sp+1)->u.number;
-	} else sp->u.number = sp->u.number >= (sp+1)->u.real;
+	} else {
+	    sp->u.number = sp->u.number >= (sp+1)->u.real;
+	}
+	sp->subtype = 0;
 	break;
     case T_STRING:
 	i = strcmp(sp->u.string, (sp+1)->u.string) >= 0;
 	free_string_svalue(sp + 1);
 	free_string_svalue(sp);
-	sp->type = T_NUMBER;
-	sp->u.number = i;
+	put_number(i);
 	break;
     default:
 	{
@@ -254,23 +262,25 @@ f_gt() {
     switch ((--sp)->type | i) {
     case T_NUMBER:
 	sp->u.number = sp->u.number > (sp+1)->u.number;
+	sp->subtype = 0;
 	break;
     case T_REAL:
 	sp->u.number = sp->u.real > (sp+1)->u.real;
 	sp->type = T_NUMBER;
+	sp->subtype = 0;
 	break;
     case T_NUMBER | T_REAL:
 	if (i == T_NUMBER) {
 	    sp->type = T_NUMBER;
 	    sp->u.number = sp->u.real > (sp+1)->u.number;
 	} else sp->u.number = sp->u.number > (sp+1)->u.real;
+	sp->subtype = 0;
 	break;
     case T_STRING:
 	i = strcmp(sp->u.string, (sp+1)->u.string) > 0;
 	free_string_svalue(sp+1);
 	free_string_svalue(sp);
-	sp->type = T_NUMBER;
-	sp->u.number = i;
+	put_number(i);
 	break;
     default:
 	{
@@ -331,6 +341,7 @@ f_le()
 	    }
 	}
     }
+    sp->subtype = 0;
 }
 
 INLINE void
@@ -368,6 +379,7 @@ f_lt() {
 	    bad_argument(sp-1, T_NUMBER | T_STRING | T_REAL, 1, F_LT);
 	}
     }
+    sp->subtype = 0;
 }
 
 INLINE void
@@ -390,6 +402,7 @@ f_lsh_eq()
     if ((--sp)->type != T_NUMBER)
 	error("Bad right type to <<=\n");
     sp->u.number = argp->u.number <<= sp->u.number;
+    sp->subtype = 0;
 }
 
 INLINE void
@@ -404,6 +417,7 @@ f_mod_eq()
     if (sp->u.number == 0)
 	error("Modulo by 0\n");
     sp->u.number = argp->u.number %= sp->u.number;
+    sp->subtype = 0;
 }
 
 INLINE void
@@ -415,6 +429,7 @@ f_mult_eq()
 	case T_NUMBER:
 	{
 	    sp->u.number = argp->u.number *= sp->u.number;
+	    sp->subtype = 0;
 	    break;
 	}
 
@@ -464,6 +479,7 @@ f_ne()
         {
             --sp;
             sp->u.number = sp->u.number != (sp+1)->u.number;
+	    sp->subtype = 0;
             return;
 	}
 
@@ -472,6 +488,7 @@ f_ne()
             --sp;
             sp->type = T_NUMBER;
             sp->u.number = sp->u.real != (sp+1)->u.real;
+	    sp->subtype = 0;
             return;
 	}
 
@@ -484,6 +501,7 @@ f_ne()
                 sp->u.number = sp->u.real != (sp+1)->u.number;
                 sp->type = T_NUMBER;
 	    }
+	    sp->subtype = 0;
             return;
 	}
 
@@ -567,6 +585,7 @@ f_or_eq()
     if ((--sp)->type != T_NUMBER)
 	error("Bad right type to |=\n");
     sp->u.number = argp->u.number |= sp->u.number;
+    sp->subtype = 0;
 }
 
 INLINE void
@@ -624,6 +643,7 @@ f_parse_command()
      * save return value on stack
      */
     fp->u.number = i;
+    fp->subtype = 0;
 }
 
 INLINE void
@@ -645,18 +665,18 @@ f_range P1(int, code)
             to = (--sp)->u.number;
             if (code & 0x01) to = len - to;
 #ifdef OLD_RANGE_BEHAVIOR
-            if (to < 0) to += len;
+            else if (to < 0)
+		to += len;
 #endif
             from = (--sp)->u.number;
             if (code & 0x10) from = len - from;
 #ifdef OLD_RANGE_BEHAVIOR
-            if (from < 0){
-                if ((from += len) < 0) from = 0;
-            }
-#else
-            if (from < 0) from = 0;
+            else if (from < 0)
+                from += len;
 #endif
-            if (to < from || from >= len){
+            if (from < 0) from = 0;
+
+            if (to < from || from >= len) {
                 free_string_svalue(sp+2);
 		sp->type = T_STRING;
 		sp->subtype = STRING_CONSTANT;
@@ -815,6 +835,7 @@ f_rsh_eq()
     if ((--sp)->type != T_NUMBER)
 	error("Bad right type to >>=\n");
     sp->u.number = argp->u.number >>= sp->u.number;
+    sp->subtype = 0;
 }
 
 INLINE void
@@ -826,6 +847,7 @@ f_sub_eq()
 	case T_NUMBER:
 	{
 	    sp->u.number = argp->u.number -= sp->u.number;
+	    sp->subtype = 0;
 	    break;
 	}
 
@@ -908,7 +930,7 @@ f_switch()
 {
     unsigned short offset, end_off;
     int d;
-    POINTER_INT s = 0;
+    POINTER_INT s;
     POINTER_INT r;
     int i;
     char *l, *end_tab;
@@ -929,14 +951,15 @@ f_switch()
 	if (sp->type == T_NUMBER && !sp->u.number) {
 	    /* special case: 0 as a string */
 	    s = 0;
+	    sp--;
 	} else if (sp->type == T_STRING) {
-	    switch (sp->subtype) {
-	    case STRING_SHARED:
-		s = (POINTER_INT) sp->u.string;
-		break;
-	    default:
-		s = (POINTER_INT) findstring(sp->u.string);
-		break;
+	    if (sp->subtype == STRING_SHARED) {
+		s = (POINTER_INT)sp->u.string;
+		free_string(sp->u.string);
+		sp--;
+	    } else {
+		s = (POINTER_INT)findstring(sp->u.string);
+		free_string_svalue(sp--);
 	    }
 	    if (s == 0) {
 		/*
@@ -944,7 +967,6 @@ f_switch()
 		 * ZERO_AS_STR_CASE_LABEL.
 		 */
 		COPY_SHORT(&offset, pc + SW_DEFAULT);
-		pop_stack();
 		pc = current_prog->program + offset;
 		return;
 	    }
@@ -953,10 +975,9 @@ f_switch()
 	}
     } else {			/* Integer table, check type */
 	CHECK_TYPES(sp, T_NUMBER, 1, F_SWITCH);
-	s = sp->u.number;
+	s = (sp--)->u.number;
 	i = (int) pc[0] & 0xf;
     }
-    pop_stack();
     end_tab = current_prog->program + end_off;
     /*
      * i is the table size as a power of 2.  Tells us where to start
@@ -1088,39 +1109,34 @@ f_switch()
 void
 call_simul_efun P2(unsigned short, index, int, num_arg)
 {
-    function_t *funp;
     extern object_t *simul_efun_ob;
-    extern function_t **simuls;
-
+    compiler_function_t *funp;
+    
     if (current_object->flags & O_DESTRUCTED) {	/* No external calls allowed */
 	pop_n_elems(num_arg);
 	push_undefined();
 	return;
     }
 
+    if (simuls[index].func) {
 #ifdef TRACE
-    if (TRACEP(TRACE_CALL_OTHER)) {
-	do_trace("simul_efun ", simuls[index]->name, "\n");
-    }
+	if (TRACEP(TRACE_CALL_OTHER)) {
+	    do_trace("simul_efun ", simuls[index].func->name, "\n");
+	}
 #endif
-    if (simuls[index]) {
 	/* Don't need to use apply() since we have the pointer directly;
 	 * this saves function lookup.
 	 */
-	if (simul_efun_ob->flags & O_SWAPPED)
-	    load_ob_from_swap(simul_efun_ob);
+	DEBUG_CHECK(simul_efun_ob->flags & O_SWAPPED, "Simulefun object swapped!\n");
 	simul_efun_ob->time_of_ref = current_time;
-	push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE, simuls[index]);
+	push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);
 	caller_type = ORIGIN_SIMUL_EFUN;
 	csp->num_local_variables = num_arg;
 	current_prog = simul_efun_ob->prog;
-	funp = setup_new_frame(simuls[index]);
-#ifdef OLD_PREVIOUS_OBJECT_BEHAVIOUR
-	if (current_object != simul_efun_ob)
-#endif
-	    previous_ob = current_object;
+	funp = setup_new_frame(simuls[index].index);
+	previous_ob = current_object;
 	current_object = simul_efun_ob;
-	call_program(current_prog, funp->offset);
+	call_program(current_prog, funp->address);
     } else error("Function is no longer a simul_efun.\n");
 }
 
@@ -1143,6 +1159,7 @@ f_xor_eq()
     if ((--sp)->type != T_NUMBER)
 	error("Bad right type to ^=\n");
     sp->u.number = argp->u.number ^= sp->u.number;
+    sp->subtype = 0;
 }
 
 INLINE funptr_t *
@@ -1228,7 +1245,7 @@ make_functional_funp P5(short, num_arg, short, num_local, short, len, svalue_t *
     current_prog->func_ref++;
 #ifdef DEBUG
 	if (d_flag)
-	    printf("add func ref %s: now %i\n",
+	    printf("add func ref /%s: now %i\n",
 		   current_prog->name,
 		   current_prog->func_ref);
 #endif
@@ -1306,13 +1323,14 @@ f_function_constructor()
 	    break;
 	}
     case FP_ANONYMOUS:
+    case FP_ANONYMOUS | FP_NOT_BINDABLE:
 	{
 	    int num_arg, locals;
 	    
 	    num_arg = EXTRACT_UCHAR(pc++);
 	    locals = EXTRACT_UCHAR(pc++);
 	    LOAD_SHORT(index, pc); /* length */
-	    fp = make_functional_funp(num_arg, locals, index, 0, FP_NOT_BINDABLE);
+	    fp = make_functional_funp(num_arg, locals, index, 0, kind & FP_NOT_BINDABLE);
 	    break;
 	}
     default:
@@ -1387,4 +1405,5 @@ f_sscanf()
      * save number of matches on stack
      */
     fp->u.number = i;
+    fp->subtype = 0;
 }

@@ -1,0 +1,16 @@
+cp - copy a file
+
+int cp(string src, string dst);
+
+Copies the file 'src' to the file 'dst'.
+
+Returns 1 for success, returns -1 if the first src is unreadable, -2 if
+dst is unreadable, and -3 if an i/o error occurs.
+
+See also:
+ rm,
+ rmdir,
+ rename,
+ link
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

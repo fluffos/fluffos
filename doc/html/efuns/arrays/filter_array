@@ -1,0 +1,12 @@
+filter_array - return a selective sub-array
+
+array filter_array( array arr, string fun, object ob, mixed extra, ... );
+
+array filter_array( array arr, function f, mixed extra, ...);
+
+filter_array() is really the same as the filter() efun.
+
+See also:
+ filter
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

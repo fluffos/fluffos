@@ -1,0 +1,49 @@
+add_action - bind a command verb to a local function
+
+void add_action( string | function fun, string | string array cmd );
+
+void add_action( string | function fun, string | string array cmd, int flag );
+
+This efun is only available if NO_ADD_ACTION isn't defined.
+
+Set up a function 'fun' to be called the a user types the command 'cmd'.
+(What is the command is determined by the first 'word' which consists
+of all the characters before the first space, with the exception of
+verbs that don't need a space; see below).
+
+If 'cmd' is an array, then that function will be called for any of the
+commands in the array.  'fun' can either be a string which is the name
+of a function in the object adding the command, or a function pointer.
+
+Functions called by a user command will get the rest of the command line
+as a string. It must then return 0 if it was the wrong command, otherwise 1.
+If 1 is returned, no further parsing is done; if 0 is returned, other
+commands will be checked (possibly the same command added by a different
+object).  If no command is found, the default error message will be sent
+to the player (traditionally, 'What?' but see also notify_fail())
+
+For functions which can be called by more than one command, check query_verb()
+to see which command was used.
+
+Note: add_action() does not add commands globally; it only adds commands to
+this_user(), and the object must be 'close' to the user it is adding commands
+to.
+
+Usually add_action() is called only from an init() routine. The object that
+defines commands must be 'close' to the user, either being the user,
+being carried by the user, being the room around the user, or being an
+object in the same room as the user.
+
+Since init() is called when a user moves 'close' to an object, it is a
+convenient time to add such commands.  The commands are removed when the
+user moves out of range (or the object does).
+
+If argument 'flag' is 1, then only the leading characters of the command has
+to match the verb 'cmd' and the entire verb is returned by query_verb().  If 
+argument 'flag' is 2, then again, only the leading characters must match,
+but query_verb() will only return the characters following 'cmd'.
+
+See also:
+ query_verb,
+ remove_action,
+ init

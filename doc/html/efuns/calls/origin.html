@@ -1,0 +1,18 @@
+<HEAD> <TITLE> origin - determine how the current function was called </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> origin - determine how the current function was called </H1> </center>
+<p>
+<b> string origin(); </b>
+<p>
+Returns an string specifying how the current function was called.  These
+values can be found in the driver include "origin.h".  Current values are:
+<p>
+<DL>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> "driver" - from the driver: applies, heart_beats, etc
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> "local" - local function call
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> "call_other" - call_other
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> "simul" - use of a simul_efun
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> "call_out" - via a call_out
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> "efun" - from an efun that takes a function pointer (sort_array, etc)
+</DL>
+<p>
+See also:
+<A HREF=previous_object.html>  previous_object </A>

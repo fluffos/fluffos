@@ -1,0 +1,12 @@
+reset_eval_cost - resets the evaluation cost remaining
+
+void reset_eval_cost();
+
+reset_eval_cost() resets the evaluation cost remaining to the maximum
+evaluation cost.
+
+See also:
+ eval_cost,
+ set_eval_limit
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

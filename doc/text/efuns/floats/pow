@@ -1,0 +1,13 @@
+pow - find an exponent of a float
+
+float pow( float x, float y );
+
+This efun is only available if PACKAGE_MATH is defined.
+
+pow() returns x to the y power.  If x is 0.0, y must be positive.  If x is
+negative, y must be an integer.
+
+See also:
+ exp,
+ log,
+ sqrt

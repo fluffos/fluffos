@@ -1,0 +1,27 @@
+<HEAD> <TITLE> socket_close - close a socket </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> socket_close - close a socket </H1> </center>
+<p>
+<b> int socket_close( int s ); </b>
+<p>
+This efun is only available if PACKAGE_SOCKETS is compiled in.
+<p>
+socket_close() closes socket s. This frees a socket efun slot for use.
+<p>
+socket_close() returns:
+<p>
+EESUCCESS on success.
+<p>
+a negative value indicated below on error.
+<p>
+ERRORS - "socket_err.h"
+<p>
+<DL>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEFDRANGE Descriptor out of range.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEBADF Descriptor is invalid.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EESECURITY Security violation attempted.
+</DL>
+<p>
+See also:
+<A HREF=socket_accept.html>  socket_accept </A>,
+<A HREF=socket_create.html>  socket_create </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

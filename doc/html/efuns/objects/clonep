@@ -1,0 +1,24 @@
+clonep - determine whether or not a given variable points to a cloned object
+
+int clonep();
+
+int clonep(mixed arg);
+
+Returns true (1) iff the argument is objectp() and the O_CLONE flag is set.
+The driver sets the O_CLONE flag for those objects created via new()
+(clone_object()).  The clonep() efun will not return true when called on
+objects that are the blueprint copy (those that are loaded via call_other()
+or load_object()).
+
+Note that if clonep() returns true, then file_name() will return a string
+containing a '#'.  clonep() defaults to this_object().
+
+See also:
+ objectp,
+ new,
+ clone_object,
+ call_other,
+ file_name
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

@@ -25,7 +25,6 @@ static Vector *normalize_array PROT((Vector *));
 static Vector *cross_product PROT((Vector *, Vector *, Vector *));
 static Vector *points_to_array PROT((Vector *, Vector *, Vector *));
 
-#ifdef F_ID_MATRIX
 void f_id_matrix PROT((void))
 {
     array_t *matrix;
@@ -39,9 +38,7 @@ void f_id_matrix PROT((void))
     (++sp)->u.arr = matrix;
     sp->type = T_ARRAY;
 }
-#endif
 
-#ifdef F_TRANSLATE
 void f_translate PROT((void))
 {
     array_t *matrix;
@@ -87,9 +84,7 @@ void f_translate PROT((void))
 	matrix->item[i].u.real = final_matrix[i];
     }
 }
-#endif
 
-#ifdef F_SCALE
 void f_scale PROT((void))
 {
     array_t *matrix;
@@ -134,9 +129,7 @@ void f_scale PROT((void))
 	matrix->item[i].u.real = final_matrix[i];
     }
 }
-#endif
 
-#ifdef F_ROTATE_X
 void f_rotate_x PROT((void))
 {
     array_t *matrix;
@@ -172,9 +165,7 @@ void f_rotate_x PROT((void))
 	matrix->item[i].u.real = final_matrix[i];
     }
 }
-#endif
 
-#ifdef F_ROTATE_Y
 void f_rotate_y PROT((void))
 {
     array_t *matrix;
@@ -210,9 +201,7 @@ void f_rotate_y PROT((void))
 	matrix->item[i].u.real = final_matrix[i];
     }
 }
-#endif
 
-#ifdef F_ROTATE_Z
 void f_rotate_z PROT((void))
 {
     array_t *matrix;
@@ -248,9 +237,7 @@ void f_rotate_z PROT((void))
 	matrix->item[i].u.real = final_matrix[i];
     }
 }
-#endif
 
-#ifdef F_LOOKAT_ROTATE
 void f_lookat_rotate PROT((void))
 {
     array_t *matrix;
@@ -290,7 +277,6 @@ void f_lookat_rotate PROT((void))
 	matrix->item[i].u.real = lookat_matrix[i];
     }
 }
-#endif
 
 #ifdef F_LOOKAT_ROTATE2
 void f_lookat_rotate2 PROT((void))

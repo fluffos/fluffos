@@ -1,0 +1,12 @@
+floor - round a float down to the nearest integer
+
+float floor( float f );
+
+This efun is only available if PACKAGE_MATH is compiled in.
+
+Returns (as a float) the nearest integer number equal to or smaller than f.
+
+See also:
+ ceil,
+ to_int,
+ to_float

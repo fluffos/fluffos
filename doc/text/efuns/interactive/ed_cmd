@@ -1,0 +1,11 @@
+ed_cmd - perform an 'ed' command
+
+This efun is only available if OLD_ED is not defined.
+
+string ed_cmd(string cmd);
+
+Performs the ed command 'cmd'.  The result of the command is returned.
+Ed must have been started with ed_start() in order to call this efun.
+
+See also:
+ ed_start

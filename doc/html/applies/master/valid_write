@@ -1,0 +1,14 @@
+valid_write - checks if a certain object has write permission on a file
+
+int valid_write( string file, object ob, string func );
+
+Every time an object tries to write a file, the driver calls valid_write
+in the master object to check if the write should be allowed.  The
+arguments are the filename, the object making the write, and
+the calling function name (usually the name of the efun being used).
+If valid_write returns non-zero, the write is allowed.
+
+See also:
+ valid_read
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

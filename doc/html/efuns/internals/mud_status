@@ -1,0 +1,16 @@
+mud_status - report various driver and mudlib statistics
+
+string mud_status( int extra );
+
+This function returns a string containing driver and mudlib statistics.
+If extra is non-zero, then additional information about various internal
+tables is included as well.  This efun replaces the hardcoded 'status'
+and 'status tables' commands in vanilla 3.1.2.
+
+See also:
+ debug_info,
+ dumpallobj,
+ memory_info,
+ uptime
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

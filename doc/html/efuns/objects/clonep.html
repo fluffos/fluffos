@@ -1,0 +1,24 @@
+<HEAD> <TITLE> clonep - determine whether or not a given variable points to a cloned object </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> clonep - determine whether or not a given variable points to a cloned object </H1> </center>
+<p>
+<b> int clonep(); </b>
+<p>
+<b> int clonep(mixed arg); </b>
+<p>
+Returns true (1) iff the argument is objectp() and the O_CLONE flag is set.
+The driver sets the O_CLONE flag for those objects created via new()
+(clone_object()).  The clonep() efun will not return true when called on
+objects that are the blueprint copy (those that are loaded via call_other()
+or load_object()).
+<p>
+Note that if clonep() returns true, then file_name() will return a string
+containing a '#'.  clonep() defaults to this_object().
+<p>
+See also:
+<A HREF=objectp.html>  objectp </A>,
+<A HREF=new.html>  new </A>,
+<A HREF=clone_object.html>  clone_object </A>,
+<A HREF=../calls/call_other.html>  call_other </A>,
+<A HREF=file_name.html>  file_name </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>
+<p>

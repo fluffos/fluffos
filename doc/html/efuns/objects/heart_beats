@@ -1,0 +1,13 @@
+heart_beats - return an array of objects with active heartbeats
+
+object array heart_beats();
+
+Returns an array of all the objects with active heart_beats.  This efun
+is only available if PACKAGE_CONTRIB is defined.
+
+See also:
+ heart_beat,
+ set_heart_beat,
+ query_heart_beat
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,12 @@
+<HEAD> <TITLE> move_or_destruct - ask an object to move to the specified destination </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> move_or_destruct - ask an object to move to the specified destination </H1> </center>
+<p>
+<b> int move_or_destruct( object dest ); </b>
+<p>
+If an object's environment is destructed, this apply is called on it's
+contents.  'dest' will be the environment of the destructing object,
+or zero if it has none.  If the object does not move itself out of
+the object being destructed, it will be destructed as well.
+<p>
+See also:
+<A HREF=../efuns/objects/destruct.html>  destruct </A>,
+<A HREF=../efuns/objects/move_object.html>  move_object </A>

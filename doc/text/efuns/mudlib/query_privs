@@ -1,0 +1,16 @@
+query_privs - return the privs string for an object
+
+string query_privs( object ob );
+
+Returns the privs string for an object.  The privs string is determined
+at compile time via a call to privs_file() in the master object, and changeable
+via the set_privs() efun.
+
+This efun is only available if PRIVS is defined at driver compile time.
+
+See also:
+ privs_file,
+ set_privs
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

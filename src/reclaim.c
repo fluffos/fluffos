@@ -29,7 +29,7 @@ check_svalue P1(svalue_t *, v)
     case T_OBJECT:
 	if (v->u.ob->flags & O_DESTRUCTED) {
 	    free_svalue(v, "reclaim_objects");
-	    *v = const0n;
+	    *v = const0u;
 	    cleaned++;
 	}
 	break;
@@ -37,6 +37,7 @@ check_svalue P1(svalue_t *, v)
 	gc_mapping(v->u.map);
 	break;
     case T_ARRAY:
+    case T_CLASS:
 	for (idx = 0; idx < v->u.arr->size; idx++)
 	    check_svalue(&v->u.arr->item[idx]);
 	break;
@@ -68,6 +69,8 @@ gc_mapping P1(mapping_t *, m)
 	while ((elt = *prev)) {
 	    if (elt->values[0].type == T_OBJECT) {
 		if (elt->values[0].u.ob->flags & O_DESTRUCTED) {
+		    free_object(elt->values[0].u.ob, "gc_mapping");
+		    
 		    /* found one, do a map_delete() */
 		    if (!(*prev = elt->next) && !m->table[j])
 			m->unfilled++;
@@ -97,7 +100,7 @@ int reclaim_objects()
     cleaned = nested = 0;
     for (ob = obj_list; ob; ob = ob->next_all)
 	if (ob->prog)
-	    for (i = 0; i < (int) ob->prog->num_variables; i++)
+	    for (i = 0; i < (int) ob->prog->num_variables_total; i++)
 		check_svalue(&ob->variables[i]);
     return cleaned;
 }

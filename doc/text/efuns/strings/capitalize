@@ -1,0 +1,11 @@
+capitalize - capitalize a string
+
+string capitalize( string str );
+
+Convert the first character in 'str' to upper case, and return the
+new string.
+
+See also:
+ lower_case
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

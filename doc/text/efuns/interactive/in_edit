@@ -1,0 +1,14 @@
+in_edit() - determine if a player is in the editor
+
+string in_edit();
+
+string in_edit(object ob);
+
+If the given object is in the editor, the file being edited is
+returned, else zero.  If no object is given, this_object() is used.
+
+See also:
+ ed,
+ in_input
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

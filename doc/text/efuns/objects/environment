@@ -1,0 +1,11 @@
+environment - return the environment of an object
+
+object environment( object ob );
+
+This efun is only available if NO_ENVIRONMENT is not compiled in.
+
+Return the containing object (environment) of 'ob'. If no argument
+is given, 'ob' defaults to this_object().  If the object is not
+inside anything, zero is returned.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

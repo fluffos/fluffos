@@ -1,0 +1,467 @@
+COMPILING AND RUNNING MudOS ON THE AMIGA
+========================================
+
+
+1. Motivation
+   ~~~~~~~~~~
+   `My' mud switched from Amylaar to MudOS a few months back, and since I
+   do most of my developing at home, I wanted to run the MudOS driver at
+   home too. Unfortunately, this was not possible because of three reasons:
+
+   - the `ready to run' files on ftp.imaginary.com did not work with any
+     MudOS-mudlib (not Nightmare, not Lima and not TMI-2);
+   - these files were based on an too old release of v21; and
+   - my mud had a package installed which is of course not available when
+     you run those drivers.
+
+   So I had to compile my own driver. It proved to be a major hassle to
+   do this natively using SAS/C, since the Smakefile is old and lacks
+   entries where a program called edit_source is compiled and run. Hacking
+   the thing 'til it worked did not appeal to me, since it would take far
+   too much time. Besides, another person (Anton Pang) was already hard at
+   work on that, so I tried a different approach by using the GNU C-compiler.
+
+
+2. Hardware Requirements
+   ~~~~~~~~~~~~~~~~~~~~~
+   I am aware that gcc is not very popular on the Amiga due to its demand
+   for memory and processor power. However, MudOS is not exactly friendly
+   on those two either. (Friendly in Amiga-terms, not Unix-terms!)
+
+
+   2.1 Compilation
+
+   0 - 3 Mb:    forget it.
+   4 - 6 Mb:    possible, but it'll be very tight when compiling two or
+                three sources and during linking. You may need to
+                perform these by hand instead of letting make handle
+                them to conserve memory. You can use optimization level 1
+                on the smaller sources.
+       8 Mb:    similar to 6, but your Amiga will have some breath left
+                when tackling the larger files.
+      14 Mb:    my setup. I can run make and use optimization level 1
+                together. Optimization level 2 proved to be too much on
+                the 'problem sources', even when compiling by hand.
+      18 Mb:    make and optimization level 2???
+
+      Please note that I'm only sure of the 14 Mb setup. I did not test
+      anything else. I was merely looking at the Workbench memory meter
+      when compiling and noted down the lowest value reached. Based on
+      that I'd recommend 6 to 8 Mb of memory.
+
+   As for the CPU, I guess any CPU will do fine. I would not use a 68000
+   for compiling, though ;)). On my 4000/030 (68030 at 25 MHz), a full make
+   from the beginning with optimization takes 70 minutes. Later, this became
+   60 or so because a very elaborate configuration step did not have to be
+   performed anymore. Optimization takes time (especially at high levels),
+   so your mileage may vary.
+
+   Hard disk space is also a thing to consider. Count on 10 Mb for the GNU
+   system at least. The sources for MudOS are about 2.5 Mb. You need
+   the same amount to compile the driver. Mudlibs like Nightmare take 6 Mb in
+   their basic distribution form. All in all: 20 Mb of free space on your
+   hard disk. (And I didn't even count the archives -- those take another
+   10!)
+
+   I'd nearly forget the Kickstart. Anything from 2.00 and up will do
+   (v36 and higher). Lower may work, but I have no data on that. Please
+   remember that 1.x is not supported anymore by a lot of programs.
+
+
+   2.2 Running the Driver
+
+   The amount of memory required for running the driver depends on:
+
+   - the size of your driver;
+   - your mudlib; and
+   - the memory required for your TCP/IP program.
+
+   In addition, the driver requires two gcc-libraries: ixemul and ixnet.
+   I'll get to those in a moment. I lose about 4 Mb of RAM to all these
+   items when I start up the driver. After that it really depends on the
+   amount of rooms, objects and players loaded simultaneously. Developers 
+   can cut a few corners here and there, and get away with 3 or 4 Meg. For
+   serious gaming, I would triple that amount at least.
+
+   The CPU is once again not important. Running MudOS on a 68000 requires
+   patience. A lot of patience. A 68030 gives a very usuable system. Not
+   at lightning speed, but there's no annoying delays either. It feels like
+   a 'normal' mud. For a serious site, I would use a 68040, but keep in
+   mind that the most likely bottleneck is network speed. Go for
+   network speed before RAM before CPU power!
+
+   Hard disk space is not much of a problem, unless you plan on making
+   very large areas with lots of things in them. Even then, 10 Mb can
+   last a very long time.
+
+
+3. Software Requirements
+   ~~~~~~~~~~~~~~~~~~~~~
+
+   3.1 Compiler
+
+   I used the new ADE distribution of the GNU system found on
+   ftp.amigalib.com, in the directory /pub/ade/960412. 
+
+   I needed:  ADE-misc-bin.lha          setting up GNU (!!!)
+              bison-1.24-bin.lha        bison
+              binutils-2.6-bin.lha      as, ld
+              fifo-38.0-bin.lha         use unknown
+              fileutils-3.1.2-bin.lha   cp, install, mv, rm, rmdir, touch
+              gcc-2.7.2-bin.lha         only the C-compiler
+              grep-2.0-bin.lha          grep (??)
+              ixemul-43.0-bin.lha       ixemul and ixnet.library, ixprefs
+              ixemul-43.0-env-bin.lha   includes
+              libm-5.4-bin.lha          math libraries
+              make-3.74-bin.lha         make
+              os-inc-bin.lha            Amiga system includes (??)
+              os-lib-bin.lha            Amiga system link libraries (??)
+              pdksh-4.9-bin.lha         sh
+              sed-2.05-bin.lha          sed
+              textutils-1.12-bin.lha    cat, echo
+
+   You must obtain ADE-misc-bin, since it provides the directory structure
+   of the ADE distribution. Don't get all depressed because of the size
+   of these archives, you can delete a lot when you're installing them.
+
+   Some commands (like install, echo and grep) may already be present on
+   your system because they are system commands, or have already been
+   provided by other compilers. You must use the GNU commands.
+
+   I am not sure whether you require the archives marked with (??).
+
+   Make very sure you use version 43.0 or higher of ixemul and ixnet.
+
+   You do *not* need the development package of your TCP/IP-program with
+   this setup.
+
+   I did not include a diff program in the list. If you intend to
+   'follow' the development of MudOS, get one from ftp.amigalib.com. This
+   will save you hours of downloading the latest complete release of
+   the sources (diffs usually being quite small).
+
+
+   3.2 MudOS Sources
+
+   I used the v21.7b20 release of the driver for compiling, which is
+   (nearly) the latest beta release of the v21.7 driver. If you obtain
+   beta.tar.gz from ftp.imaginary.com/pub/LPC/servers/MudOS, you get
+   v21.7b21 (on 12 May 1996, anyway ;) ).
+
+   Alternatively, get a 'complete archive' which houses both a mudlib
+   and the driver sources. (Nightmare and TMI-2 are distributed in
+   such archives, but I'm not sure how you can recognize them.)
+
+
+   3.3 Mudlib
+
+   You're on your own here, I'm afraid. I did not test the resulting
+   drivers with Nightmare, Lima or TMI-2, but since 'my' mudlib worked
+   ok, I don't see why those mudlibs should fail to function. Make sure
+   it's a mudlib for MudOS -- '2.4.5' and TubMud won't work, for example.
+   See also 3.2.
+
+
+   3.4 TCP/IP Package
+
+   The reason why I insist on ixemul 43.0 is that it can work with
+   both AmiTCP and AS225, without requiring drivers specifically compiled
+   for either one. One version of the driver will work happily with
+   both network programs. Configuration is done at a click of the mouse.
+   I only have AmiTCP (4.0 demo), but I see no reason why AS225 should not
+   work. 
+
+   MudOS requires TCP/IP I'm afraid. So if you don't have a program which
+   extends your Amiga with TCP/IP, you can't run MudOS.
+
+
+4. Compiling the Driver
+   ~~~~~~~~~~~~~~~~~~~~
+
+   4.1 Introduction
+
+   The general idea is to trick MudOS into thinking it runs on a Unix
+   system (with BSD-style networking), while in reality all Unix-specific
+   system and network calls are executed by appropriate functions in the
+   ixemul and ixnet libraries. That means that every file name which is
+   'hard coded' in the driver should be written a la Unix, so instead
+   of
+
+   Work:Games/LPmud/MudOS
+
+   you must write
+
+   /Work/Games/LPmud/MudOS
+
+   Ixemul is able to cope with both naming conventions simultaneously, but
+   MudOS is not. However, there are only two or three such occurences, all
+   in configuration files -- so it's no big deal. The file system 'within'
+   the mud is a straight copy from Unix anyway.
+
+   The second side effect of that trickery is that you must UNdefine
+   anything that has to do with the Amiga, how paradoxical that may seem.
+   This is done with one argument on the command line of gcc, so that's not
+   a big deal either.
+
+
+   4.2 Patching build.MudOS
+
+   I assume you have setup the ADE distribution without changes to the
+   location of all the files. Whenever I refer to ade:bin, insert the
+   directory of your GNU binaries here.
+
+   First make a copy of the file, and rename the original. When you mess
+   up, you always have a backup. Start up your favourite editor, and change
+   the following things:
+
+   - on line number 1, change /bin/sh into ade:bin/sh
+   - on line number 5, uncomment MAKE=make by removing the '#'
+   - on line number 18, change ../bin into a correct Amiga directory. You
+     only need to do this if you plan on an automatic 'install' -- which
+     is just a copy of two files ;).
+   - on line number 21, uncomment WARN=-Wall by removing the '#'
+   - on line numbers 37 and 39, uncomment your preferred debugging level.
+     Beware though, '-g' quadruples your code size. -DDEBUG activates the
+     MudOS command line option '-d', and is handy in some cases. Though not
+     fully functional, compiling with -DDEBUG and without -g is possible.
+   - on line numbers 59 and 61, uncommment your level of optimization. Do
+     not use optimization if you have little memory.
+   - on line number 97, enter 'OSFLAGS="-UAMIGA -v -m68030 -m68881"'. Of
+     course, if your CPU is different, enter another ID here. Please note
+     that gcc does not support a '-m68882' option. If you leave out the
+     FPU ID, no problem (though your executable will be bigger).
+   - then, from line 111 onward, comment the entire check for make and
+     how to invoke it by putting '#' in front of every line. For some
+     reason, build.MudOS does not recognize the GNU distribution here.
+     Then, between the last (commented) fi and the first '#' of the check 
+     for CC enter:
+
+             MAKEFILE=GNUmakefile
+             echo MAKE=$MAKE >Makefile.tmp
+
+   There are other things you can uncomment and change as well. The list
+   above is not exhaustive; I have only mentioned the options I changed.
+   Be very sure of what you are doing!
+
+
+   4.3 Running build.MudOS
+
+   Save the build file. Then run ade:bin/sh, change to the directory where
+   your build file resides (if it is in PR:MudOS/, type cd /PR/MudOS --
+   Unix style ;) ), and type
+
+        sh build.MudOS
+
+   build.MudOS will now try and locate all kinds of programs and find out
+   how to invoke them. Ignore all errors. When the script has finished
+   executing, it should print some information on how the GNUmakefile will
+   start gcc. Leave the crummy shell sh by typing exit, and study the
+   GNUmakefile. If something is wrong, change the options at the beginning.
+   If you configured build.MudOS properly, you do not have to change
+   anything. If you did change something, make sure that when you save
+   the makefile tabs are not expanded into spaces. GoldED has this
+   annoying habit, but you can force tab-saving by checking 'save tabs'
+   in Config/Misc/Files. If you don't do this, make will play up.
+
+
+   4.4 Configuring options.h
+
+   This file configures the driver at compile-time. I can't tell you how
+   to set all options, but there are three I'd like to mention:
+
+   - define SYSMALLOC or SMALLOC for memory management; gcc does not
+     support BSDMALLOC due to a lack of sbrk();
+   - CONFIG_FILE_DIR should be written a la Unix;
+   - the run-time loading of LPC->C compiled code does not work on the
+     Amiga. So undef RUNTIME_LOADING. I think the LPC->C compiler works,
+     since I can't think of any reason why it shouldn't.
+
+
+   4.5 Actual Compiling
+
+   If you have little memory (say, 6 Mb or less), I'd advise you to reboot
+   with the smallest possible startup-sequences. Set the GCCSTACK
+   environment variable to 400000 (or lower, mail me if you discover a
+   smaller stack is ok), and assign T: to a hard disk before you execute
+   the ADE-startup script. If the compiler crashes, you may end up with a
+   corrupted hard drive. I take *no* responsibility if anything goes wrong.
+   Increase the stack so make will run (I can't give an exact value
+   here, since my stack was locked to 400000 for any program running from
+   within make), and type
+
+        make all
+
+   Now wait and watch. First, make will build a program called edit_source
+   and execute it. edit_source will invoke the gcc compiler at least 20
+   times to build a configuration file. This only needs to be done once.
+   After that, the driver is compiled. If you have little memory, watch
+   especially carefully if the compiler is busy with
+
+   - grammar.tab.c
+   - interpret.c (large troublemaker)
+   - object.c (ditto)
+   - efuns_main.c
+   - linking (ditto)
+
+   If the compiler exits (due to a lack of 'virtual memory'), you must try
+   and compile such a file by hand. Start up with an ABSOLUTE MINIMUM of
+   programs, assigns, devices, ... in your startup files and issue (after
+   executing the ADE-startup)
+
+        cd <MudOS-sources directory>
+        stack 400000 (lower value, perhaps??!)
+        gcc -UAMIGA -m68... -v -Wall -o obj/<file>.o -c <file>.c
+
+   gcc can't use less memory when compiling like this. So if this fails,
+   you're stuck. With interpret.c I estimate memory usage at 3.8 or 3.9
+   Mb -- so 4 Mb internal memory is *really* very tight. 
+
+   If you want to compile with as much optimization as possible, turn
+   on the required level of optimization in the makefile and run
+
+        make files
+
+   first. Then compile the problem files without optimization by hand
+   and finish by
+
+        make all
+
+   Please notice the 'obj/' prefix on the command line. make defines a
+   variable called OBJDIR where all object files are stored. This keeps
+   your source directory relatively clean. The makefile is built in such
+   a way that both make and gcc will always look in that directory first
+   when compiling or linking. If you do not store your compiled-by-hand
+   programs there, make will notice no object file exists, and happily
+   instruct gcc to make a new one -- probably using all the wrong options.
+
+   After an hour on a moderately fast system, gcc will enter the linking
+   stage. If this fails due to a lack of memory, you're stuck. Plain and
+   simple. You could try entering the link command by hand, but that is
+   over fifteen lines of .o-files. No shell that I know of accepts such a
+   long input string.
+   
+   If linking is succesful, you are now the proud owner of an
+   executable MudOS driver. make is not done yet, however. It will now
+   build and compile a small program called 'addr_server'. Then the
+   compiling is finished.
+
+   Move the driver executable (called 'driver' unless you gave it a
+   different name in the makefile) and the addr_server program to your
+   mud binaries directory.
+
+
+5. Running the Driver
+   ~~~~~~~~~~~~~~~~~~
+
+   5.1 Configuring the Run-Time Options
+
+   Get out the *.config file, and edit 'mudlib directory' and 'binary
+   directory' to Unix-style directory names. Use full path names, so
+   no assigned names unless they refer to a volume. For example:
+
+      Work:Games/LPmud/bin (alias MUDBIN:)
+
+   is entered as
+
+      /Work/Games/LPmud/bin
+
+   and *not* as
+
+      /MUDBIN
+
+   Take a look at 'time to swap' -- small machines with little
+   memory may need a small value here.
+
+   The rest of the values is up to you.
+
+   Finally, run the ixprefs program and enter the networking package you
+   have. I also have 'translate /', 'case sensitive pattern matching' and
+   'suppression of the requester' checked, but I don't have a clue as to
+   whether they are really necessary.
+
+
+   5.2 And Really Finally, Running the Driver
+
+   Running your driver requires three steps:
+
+   - start your TCP/IP program, and make sure it is 'online', i.e. ready
+     to be used by other programs. It does *not* mean you must have a
+     open telephone line to your Internet provider, though if you have,
+     people from outside can log in on your mud.
+   - increase the stack to 16384, and start the addr_server program
+     with one option: a port number. This number must be the same as the
+     one defined in the run-time configuration file.
+   - increase the stack to 65536, and start the driver with at least one
+     option: the name of the configuration file. I don't know whether
+     65536 bytes is enough, but you surely needn't to use more than
+     twice this amount. I run my mud with a few very complex rooms and
+     objects on 65536 bytes.
+
+   The last step is the nerve-wracking one. If all goes well, you should
+   receive a message that the driver accepts connections on a certain
+   port number (which is defined in the run-time configuration file).
+   Test with
+
+        telnet localhost <port number>
+
+   Unless you have a shell which is capable of redirecting output written
+   to stderr (that horrible sh-thing of the ADE-distribution is the only
+   one I know of which can do this), you 'loose' a shell window to the
+   driver. The advantage is that you can now simply shut down the driver
+   by pressing CTRL-C in that window. (Sending a 'c' break signal to
+   the driver process will do the same.)
+
+   PlayMUD by Lars Duening did not like my setup, and refused to connect
+   to the mud. I do not know whether this is caused by the driver or the
+   mudlib. Nightmare c.s. may behave better towards this program.
+
+   The address server program is not required by MudOS. If you decide to go
+   economical on your memory, you can leave out this program. If you want
+   to know the name of the place people are connecting from (instead of
+   just a boring IP-number), start up the program. 
+
+
+   5.3 Error! Boom! Crash!
+
+   If you receive a driver error, this is either caused by faulty LPC code
+   or a bug in the driver. Make sure you install your mudlib EXACTLY as
+   is told in the accompanying docs. Make sure you have compiled the driver
+   with EXACTLY the same options as provided in the options.h-file.
+
+   Still no luck? Darned... I wish it were different, but I am in no
+   position to help, since I can't simply compile the driver anew and check
+   with your mudlib. Besides, I only own a 68030, and though other CPU
+   code will run with this chip, the 68030 can never fully imitate that
+   other CPU.
+
+   A friend of mine uses a 68000 version of the driver, and discovered that
+   file system functions would malfunction during one call for no apparent
+   reason, and then work perfectly for a while. Whether this is due to
+   his setup, the compiler, the ix* libraries, the mudlib (which is still
+   being worked upon) neither of us knows for sure. The most important
+   thing is that the driver does not GURU, and we both felt that a working
+   driver is better than no driver at all, as is the case now.
+
+
+6. Native Amiga MudOS driver
+   ~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Currently, Anthon Pang (Robocoder, apang@mindlink.bc.ca) is working on
+   a native v21.7 MudOS driver. It supports all major compilers for
+   the Amiga (SAS/C, Dice, gcc and Aztec (!)) and it should come with a
+   'no-TCP/IP' option, so you don't require AmiTCP or AS225. Drop him
+   a line to ask how work is progressing.
+
+
+7. How to Reach Me
+   ~~~~~~~~~~~~~~~
+
+   You can reach me via e-mail on dejong@cpt6.stm.tudelft.nl. Please, do
+   *not* report MudOS errors to me; I do not develop the driver, I merely
+   compiled the thing. However, when you have suggestions relating to better
+   compilation, I'll be glad to hear from you. 
+
+
+Happing compiling and MUDding,
+Maarten de Jong
+

@@ -1,0 +1,42 @@
+<HEAD> <TITLE> error_handler - function in master object to handle errors </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> error_handler - function in master object to handle errors </H1> </center>
+<p>
+<b> void error_handler( mapping error, int caught ); </b>
+<p>
+This function is only called if MUDLIB_ERROR_HANDLER is defined.
+<p>
+This function allows the mudlib to handle <i> runtime </i> errors.
+The contents of the 'error' mapping are:
+<pre>
+    ([
+        "error"   : string,        // the error
+        "program" : string,        // the program
+        "object"  : object,        // the current object
+        "line"    : int,           // the line number
+        "trace"   : mapping array  // a trace back
+    ])
+</pre>
+Each line of traceback is a mapping containing the following:
+<pre>
+    ([
+        "function"  : string,   // the function name
+        "program"   : string,   // the program
+        "object"    : object,   // the object
+	"file"      : string,   // the file to which the line number refers
+        "line"      : int,      // the line number
+        "arguments" : array,    // function arguments
+        "locals"    : array     // local variables
+    ])
+</pre>
+<p>
+arguments and local variables are only available if ARGUMENTS_IN_TRACEBACK
+and LOCALS_IN_TRACEBACK are defined.
+<p>
+The 'caught' flag is 1 if the error was trapped by catch().
+<p>
+See also:
+<A HREF=../../efuns/calls/catch.html>  catch </A>,
+<A HREF=../../efuns/system/error.html>  error </A>,
+<A HREF=../../efuns/calls/throw.html>  throw </A>,
+<A HREF=log_error.html>  log_error </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

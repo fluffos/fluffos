@@ -35,6 +35,9 @@
 #  include <usclkc.h>
 #endif
 
+#ifdef INCL_SYS_WAIT_H
+#  include <sys/wait.h>
+#endif
 #ifdef INCL_SYS_CRYPT_H
 #  include <sys/crypt.h>
 #endif
@@ -116,8 +119,8 @@ int dos_style_link PROT((char *, char *));
 #endif
 
 /* Note: This is now only used if _both_ USHRT_MAX and MAXSHORT fail to exist*/
-#ifndef MAXSHORT
-#define MAXSHORT ((1 << (sizeof(short)*8)) - 1)
+#ifndef USHRT_MAX
+#define USHRT_MAX ((1 << (sizeof(short)*8)) - 1)
 #endif
 
 #endif

@@ -1,0 +1,12 @@
+<HEAD> <TITLE> valid_bind - determine if it is legal to bind a given function pointer to an object </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> valid_bind - determine if it is legal to bind a given function pointer to an object </H1> </center>
+<p>
+<b> int valid_bind(object doer, object owner, object victim);  </b>
+<p>
+This is called when 'doer' tries to use the bind() efun to bind a function
+pointer owned by 'owner' to the object 'victim'.  If this routine returns
+zero, the operation is disallowed.
+<p>
+See also:
+<A HREF=../../efuns/functions/bind.html>  bind </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

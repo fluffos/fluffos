@@ -74,10 +74,8 @@ void
 f_getuid PROT((void))
 {
     ob = sp->u.ob;
-#ifdef DEBUG
-    if (ob->uid == NULL)
-        fatal("UID is a null pointer\n");
-#endif
+
+    DEBUG_CHECK(ob->uid == NULL, "UID is a null pointer\n");
     put_constant_string(ob->uid->name);
     free_object(ob, "f_getuid");
 }
@@ -87,8 +85,8 @@ f_getuid PROT((void))
 void
 f_seteuid PROT((void))
 {
+    svalue_t *arg;
     svalue_t *ret;
-    char *tmp;
 
     if (sp->type & T_NUMBER) {
         if (sp->u.number)
@@ -97,16 +95,16 @@ f_seteuid PROT((void))
 	sp->u.number = 1;
         return;
     }
-    tmp = sp->u.string;
+    arg = sp;
     push_object(current_object);
-    push_constant_string(tmp);
+    push_svalue(arg);
     ret = apply_master_ob(APPLY_VALID_SETEUID, 2);
     if (!MASTER_APPROVED(ret)) {
-        free_string_svalue(sp);
+	free_string_svalue(sp);
         *sp = const0;
         return;
     }
-    current_object->euid = add_uid(tmp);
+    current_object->euid = add_uid(sp->u.string);
     free_string_svalue(sp);
     *sp = const1;
 }

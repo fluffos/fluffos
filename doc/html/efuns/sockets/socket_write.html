@@ -1,0 +1,42 @@
+<HEAD> <TITLE> socket_write - send a message from a socket </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> socket_write - send a message from a socket </H1> </center>
+<p>
+<b> int socket_write( int s, mixed message,
+                    void | string address ); </b>
+<p>
+This efun is only available if PACKAGE_SOCKETS is compiled in.
+<p>
+socket_write() sends a message on a socket s. If the socket s is of type
+STREAM or MUD, the socket must already be connected and the address is not
+specified. If the socket is of type DATAGRAM, the address must be specified.
+The address is of the form: "127.0.0.1 23".
+<p>
+socket_write() returns:
+<p>
+EESUCCESS on success.
+<p>
+a negative value indicated below on error.
+<p>
+ERRORS - these are in "socket_err.h"
+<p>
+<DL>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEFDRANGE Descriptor out of range.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEBADF Descriptor is invalid.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EESECURITY Security violation attempted.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EENOADDR Socket not bound to an address.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEBADADDR Problem with address format.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EENOTCONN Socket not connected.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEALREADY Operation already in progress.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EETYPENOTSUPP Object type not supported.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEBADDATA Sending data with too many nested levels.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EESENDTO Problem with sendto.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEMODENOTSUPP Socket mode not supported.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEWOULDBLOCK Operation would block.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EESEND Problem with send.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EECALLBACK Wait for callback.
+</DL>
+<p>
+See also:
+<A HREF=socket_connect.html>  socket_connect </A>,
+<A HREF=socket_create.html>  socket_create </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

@@ -64,6 +64,7 @@ typedef struct sentence_s {
     int flags;
 } sentence_t;
 
+#ifdef LPC_TO_C
 typedef struct { /* has to be the same as object_t below */
     unsigned short ref;
     unsigned short flags;
@@ -75,6 +76,7 @@ typedef struct { /* has to be the same as object_t below */
     void (**jump_table)();
     struct string_switch_entry_s **string_switch_tables;
 } lpc_object_t;
+#endif
 
 typedef struct object_s {
     unsigned short ref;		/* Reference count. */
@@ -86,7 +88,9 @@ typedef struct object_s {
     struct object_s *next_hash;
     /* the fields above must match lpc_object_t */
     int load_time;		/* time when this object was created */
+#ifndef NO_RESET
     int next_reset;		/* Time of next reset of this object */
+#endif
     int time_of_ref;		/* Time when last referenced. Used by swap */
     long swap_num;		/* Swap file offset. -1 is not swapped yet. */
     program_t *prog;
@@ -145,6 +149,7 @@ typedef struct object_s {
 #define ROB_CLASS_ERROR 32
 #define ROB_ERROR 63
 
+extern object_t *hashed_living[CFG_LIVING_HASH_SIZE];
 extern object_t *previous_ob;
 extern int tot_alloc_object;
 extern int tot_alloc_object_size;
@@ -169,10 +174,9 @@ INLINE int object_visible PROT((object_t *));
 void set_living_name PROT((object_t *, char *));
 void remove_living_name PROT((object_t *));
 void stat_living_objects PROT((outbuffer_t *));
-int shadow_catch_message PROT((object_t *, char *));
 void tell_npc PROT((object_t *, char *));
 void tell_object PROT((object_t *, char *));
-variable_t *find_status PROT((char *));
+int find_global_variable PROT((program_t *, char *, unsigned short *));
 void dealloc_object PROT((object_t *, char *));
 
 #endif

@@ -1,0 +1,27 @@
+keys - return an array of the keys from the (key, value) pairs in a mapping
+
+array keys( mapping m );
+
+keys() returns an array of keys (indices) corresponding to the keys in
+the (key, value) pairs stored in the mapping m.
+
+For example, if:
+
+<pre>
+mapping m;
+m = (["hp" : 35, "sp" : 42, "mass" : 100]);
+</pre>
+
+then
+
+<pre>
+keys(m) == ({"hp", "sp", "mass"})
+</pre>
+
+Note: the keys will not be returned in any apparent order.  However, they
+will be returned in the same order as the corresponding values (returned
+by the values() efun).
+
+See also:
+ values
+

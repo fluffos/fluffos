@@ -1,0 +1,13 @@
+clear_bit - zero a bit in a bit string
+
+string clear_bit( string str, int n );
+
+Return the new string where bit 'n' is cleared in string 'str'. Note that
+the old string 'str' is not modified.  See set_bit() for information on
+the format of the string.
+
+See also:
+ set_bit,
+ test_bit
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

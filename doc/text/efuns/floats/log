@@ -1,0 +1,12 @@
+log - returns the natural logarithm of a float
+
+float log( float f );
+
+This efun is only available if PACKAGE_MATH is compiled in.
+
+Returns the natural logarithm of its argument, `f'.  `f' must be positive.
+
+See also:
+ exp,
+ pow,
+ sqrt

@@ -1,0 +1,22 @@
+<HEAD> <TITLE> present - find an object by id </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> present - find an object by id </H1> </center>
+<p>
+<b> object present( mixed str) </b>;
+<p>
+<b> object present( mixed str, object ob ); </b>
+<p>
+This efun is only available if NO_ENVIRONMENT is not compiled in.
+<p>
+If an object for which id(str) returns true exists, return it.
+<p>
+`str' can also be an object, in 'str' is searched for, instead of calling
+the function id().
+<p>
+If `ob' is given, then the search is done in the inventory of `ob', otherwise
+the object is searched for in the inventory of the current object, and
+in the inventory of the environment of the current object.
+<p>
+See also:
+<A HREF=move_object.html>  move_object </A>,
+<A HREF=environment.html>  environment </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

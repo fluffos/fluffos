@@ -1,0 +1,17 @@
+store_variable - set the value of a variable
+
+void store_variable(string, mixed);
+
+Set the value of the variable specified by the first argument to the value
+specfied by the second argument. Note that the variable must be defined, and
+must be defined in this_object().
+
+This function requires PACKAGE_CONTRIB to be defined in the options file.
+
+See also:
+ restore_variable,
+ fetch_variable,
+ save_object
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

@@ -1,0 +1,15 @@
+shout - sends a message to all living objects
+
+void shout( string str );
+
+Sends the string `str' to all living objects except this_player().
+
+See also:
+ message,
+ write,
+ tell_object,
+ tell_room,
+ say
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

@@ -1,0 +1,21 @@
+Socket efuns
+
+These efuns allow TCP and UDP sockets to be created, allowing the MUD to
+create internet connections other than its login ports.
+
+<DL>
+
+*  socket_accept
+*  socket_acquire
+*  socket_address
+*  socket_bind
+*  socket_close
+*  socket_connect
+*  socket_create
+*  socket_error
+*  socket_listen
+*  socket_release
+*  socket_write
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,13 @@
+<HEAD> <TITLE> get_save_file_name - back up editor file on abnormal exit </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> get_save_file_name - back up editor file on abnormal exit </H1> </center>
+<p>
+<b> string get_save_file_name( string file, object who ); </b>
+<p>
+This master apply is called by ed() when a player disconnects
+while in the editor and editing a file.  This function
+should return an alternate file name for the file to
+be saved, to avoid overwriting the original.
+<p>
+Note: This apply used to be named get_ed_buffer_save_file_name().
+<p>
+See also:
+<A HREF=../../efuns/interactive/ed.html>  ed </A>

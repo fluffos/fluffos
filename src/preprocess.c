@@ -18,37 +18,58 @@ static void handle_cond PROT((int));
 static defn_t *defns[DEFHASH];
 static ifstate_t *iftop = 0;
 
-defn_t *lookup_define P1(char *, s)
+defn_t *lookup_definition P1(char *, s)
 {
     defn_t *p;
     int h;
 
     h = defhash(s);
     for (p = defns[h]; p; p = p->next)
-	if (!(p->flags & DEF_IS_UNDEFINED) && strcmp(s, p->name) == 0)
+	if (strcmp(s, p->name) == 0)
 	    return p;
     return 0;
 }
 
+defn_t *lookup_define P1(char *, s)
+{
+    defn_t *p = lookup_definition(s);
+
+    if (p && (p->flags & DEF_IS_UNDEFINED))
+	return 0;
+    else
+	return p;
+}
+
 static void add_define P3(char *, name, int, nargs, char *, exps)
 {
-    defn_t *p;
+    defn_t *p = lookup_definition(name);
     int h;
 
-    if ((p = lookup_define(name))) {
-	if (nargs != p->nargs || strcmp(exps, p->exps)) {
-	    char buf[200 + NSIZE];
-
-	    sprintf(buf, "redefinition of #define %s\n", name);
-	    yywarn(buf);
-
+    if (p) {
+	if (p->flags & DEF_IS_UNDEFINED) {
 	    p->exps = (char *)DREALLOC(p->exps, strlen(exps) + 1, TAG_COMPILER, "add_define: redef");
 	    strcpy(p->exps, exps);
+	    p->flags = 0;
 	    p->nargs = nargs;
-	}
+	} else {
+	    if (p->flags & DEF_IS_PREDEF) {
+		yyerror("Illegal to redefine predefined value.");
+		return;
+	    }
+	    if (nargs != p->nargs || strcmp(exps, p->exps)) {
+		char buf[200 + NSIZE];
+		
+		sprintf(buf, "redefinition of #define %s\n", name);
+		yywarn(buf);
+		
+		p->exps = (char *)DREALLOC(p->exps, strlen(exps) + 1, TAG_COMPILER, "add_define: redef");
+		strcpy(p->exps, exps);
+		p->nargs = nargs;
+	    }
 #ifndef LEXER
-	p->flags &= ~DEF_IS_NOT_LOCAL;
+	    p->flags &= ~DEF_IS_NOT_LOCAL;
 #endif
+	}
     } else {
 	p = ALLOCATE(defn_t, TAG_COMPILER, "add_define: def");
 	p->name = (char *) DXALLOC(strlen(name) + 1, TAG_COMPILER, "add_define: def name");

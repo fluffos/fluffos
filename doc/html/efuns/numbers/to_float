@@ -1,0 +1,15 @@
+to_float - convert an int to a float
+
+float to_float( int i );
+
+The to_float() call returns the number of type 'float' that is equivalent to
+the int 'i'.
+
+See also:
+ to_int,
+ read_buffer,
+ sprintf,
+ sscanf
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

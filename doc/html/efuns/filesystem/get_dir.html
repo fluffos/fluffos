@@ -1,0 +1,26 @@
+<HEAD> <TITLE> get_dir - returns information pertaining to a filesystem directory </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> get_dir - returns information pertaining to a filesystem directory </H1> </center>
+<p>
+<b> mixed array get_dir(string dir); </b>
+<p>
+<b> mixed array get_dir(string dir, int flag); </b>
+<p>
+If `dir' is a filename ('*' and '?' wildcards are supported), an array of 
+strings is returned containing all filenames that match the specification. 
+If `dir' is a directory name (ending with a slash--ie: "/u/", "/adm/", etc),
+all filenames in that directory are returned.  
+<p>
+If called with a second argument equal to -1, get_dir will return an array
+of subarrays, where the format of each subarray is:
+<p>
+  ({ filename, size_of_file, last_time_file_touched })
+<p>
+Where filename is a string and last_time_file_touched is an integer being
+number of seconds since January 1, 1970 (same format as time()).  The 
+size_of_file element is the same value that is returned by file_size(); the 
+size of the file in bytes, or -2 if it's a directory.  
+<p>
+See also: 
+<A HREF=file_size.html>  file_size </A>,
+<A HREF=stat.html>  stat </A>,
+<A HREF=../system/time.html>  time </A>,
+<A HREF=../system/ctime.html>  ctime </A>

@@ -1,0 +1,18 @@
+slow_shutdown - informs the mud that a slow shutdown is in progress
+
+int slow_shutdown( int minutes );
+
+This master apply is called when the driver can't
+allocate any more memory from the heap and had to
+use its reserved memory block.  This function can
+only be called if the "reserved size" config file
+setting was set.  The minutes remaining to driver
+shutdown is passed to this function.  If this function
+does ont exist, or returns zero, the driver shuts
+down immediately.
+
+See also:
+ crash,
+ shutdown
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,22 @@
+process_input - inspect (and possibly modify) user input
+
+mixed process_input( string );
+
+If process_input is present in the player object, then the MudOS driver
+will send it a copy of each line the player types.  If a string is returned,
+that string is used as instead of the user input for further processing.
+If a non-zero, non-string is returned, no further processing is done.
+If zero is returned, processing continues with the original input.
+Matching against add_actions is then done.
+
+Note that if the person is in ed or has a pending input_to(), this routine
+is not called.
+
+Note: If NO_ADD_ACTION is defined, then there is no more processing to be
+done after process_input.  In this case, the return value is ignored, and
+the mudlib is responsible for interpreting the string as a command (or other
+user input for non-command based uses).
+
+See also:  add_action
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

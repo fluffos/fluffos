@@ -1,0 +1,14 @@
+atan - return the tangent of a float
+
+float atan( float f );
+
+This efun is only available if PACKAGE_MATH is not compiled in.
+
+Returns the arctangent of its argument, `f', measured in radians.
+
+See also:
+ acos,
+ asin,
+ cos,
+ sin,
+ tan

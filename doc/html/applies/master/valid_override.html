@@ -1,0 +1,48 @@
+<HEAD> <TITLE> valid_override - controls the use of efun::  </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> valid_override - controls the use of efun::  </H1> </center>
+<p>
+<b> int valid_override( string file, string efun_name, string mainfile ); </b>
+<p>
+File will be the actual file the call appears in; mainfile will be the file
+being compiled (the two can differ due to #include)
+<p>
+Add valid_override to master.c in order to control the use of the efun::
+prefix.  The valid_override function in master.c will be called each
+time the driver attempts to compile a function call that begins with
+efun::.  If valid_override returns 0, then that compile will fail.  Thus
+valid_override provides a way to modify the behavior of efuns that isn't
+circumventable via the efun:: prefix (by having a simul_efun of the same
+name as the efun to be modified and having valid_override disallow that
+simul_efun from being overriden).
+<p>
+If you wish to have the original 3.1.2 efun:: behavior, simply add
+a line to master.c that looks like this:
+<p>
+<pre>
+   int valid_override(string file, string efun) { return 1; }
+</pre>
+<p>
+Here is an example valid_override that is more restrictive:
+<pre>
+  int
+  valid_override(string file, string name)
+  {
+      if (file == "/adm/obj/simul_efun") {
+          return 1;
+      }
+      if (name == "destruct")
+          return 0;
+      if (name == "shutdown")
+          return 0;
+      if (name == "snoop")
+          return 0;
+      if (name == "exec")
+          return 0;
+      return 1;
+   }
+</pre>
+<p>
+See also:
+<A HREF=valid_object.html>  valid_object </A>,
+<A HREF=../../efuns/system/function_exists.html>  function_exists </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

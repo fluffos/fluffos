@@ -1,0 +1,14 @@
+acos - return the arccosine of a float
+
+float acos( float f );
+
+This efun is available only if PACKAGE_MATH is compiled in to the driver.
+
+Returns the arccosine of its argument, `f', measured in radians.
+
+See also:
+ asin,
+ atan,
+ cos,
+ sin,
+ tan

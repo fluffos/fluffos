@@ -1,0 +1,14 @@
+preload - preload an object into memory
+
+void preload( string filename );
+
+For each string in the array returned by epilog, the driver calls 
+preload(filename).  Note that there is the equivalent of a catch() around
+these calls at the driver level, so it is not neccessary for the mudlib
+to worry about the sequence being terminated by an error.
+
+Typical behavoir is to use load_object() to attempt to load the file.
+
+See also:  preload,  catch,  load_object
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

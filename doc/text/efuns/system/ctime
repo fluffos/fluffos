@@ -1,0 +1,13 @@
+ctime - return a time string
+
+string ctime( int clock );
+
+Gives a nice string with current date and time, with the argument 'clock'
+that is the number of seconds since 1970.
+
+See also:
+ time,
+ localtime,
+ uptime
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

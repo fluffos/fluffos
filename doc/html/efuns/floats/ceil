@@ -1,0 +1,14 @@
+ceil - round a float up to the nearest integer
+
+float ceil( float f );
+
+This efun is only available if PACKAGE_MATH is compiled in.
+
+Returns (as a float) the nearest integer number equal to or greater than f.
+
+See also:
+ floor,
+ to_int,
+ to_float
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,42 @@
+error_handler - function in master object to handle errors
+
+void error_handler( mapping error, int caught );
+
+This function is only called if MUDLIB_ERROR_HANDLER is defined.
+
+This function allows the mudlib to handle runtime errors.
+The contents of the 'error' mapping are:
+<pre>
+    ([
+        "error"   : string,        // the error
+        "program" : string,        // the program
+        "object"  : object,        // the current object
+        "line"    : int,           // the line number
+        "trace"   : mapping array  // a trace back
+    ])
+</pre>
+Each line of traceback is a mapping containing the following:
+<pre>
+    ([
+        "function"  : string,   // the function name
+        "program"   : string,   // the program
+        "object"    : object,   // the object
+	"file"      : string,   // the file to which the line number refers
+        "line"      : int,      // the line number
+        "arguments" : array,    // function arguments
+        "locals"    : array     // local variables
+    ])
+</pre>
+
+arguments and local variables are only available if ARGUMENTS_IN_TRACEBACK
+and LOCALS_IN_TRACEBACK are defined.
+
+The 'caught' flag is 1 if the error was trapped by catch().
+
+See also:
+ catch,
+ error,
+ throw,
+ log_error
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

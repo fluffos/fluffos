@@ -1,0 +1,9 @@
+get_config - query various driver config settings
+
+mixed get_config( int );
+
+This efun is used to query the driver's various config
+settings.  Please refer to the "runtime_config.h"
+include file for a list of currently recognized options.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

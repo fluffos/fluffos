@@ -1,0 +1,17 @@
+<HEAD> <TITLE> allocate_buffer - allocate a buffer </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> allocate_buffer - allocate a buffer </H1> </center>
+<p>
+<b> buffer allocate_buffer( int size ); </b>
+<p>
+This efun is only available if DISALLOW_BUFFER_TYPE is not compiled in.
+<p>
+Allocate a buffer of 'size' elements.  The number of elements must be >= 0 
+and not bigger than a system maximum (usually ~10000).  All elements are 
+initialized to 0.
+<p>
+See also:
+<A HREF=bufferp.html>  bufferp </A>,
+<A HREF=read_buffer.html>  read_buffer </A>,
+<A HREF=write_buffer.html>  write_buffer </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>
+<p>

@@ -1,0 +1,13 @@
+<HEAD> <TITLE> set_malloc_mask - sets the mask controlling display of malloc debug info </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> set_malloc_mask - sets the mask controlling display of malloc debug info </H1> </center>
+<p>
+<b> void set_malloc_mask( int mask ); </b>
+<p>
+This efun is only available when PACKAGE_DEVELOP, DEBUGMALLOC and DEBUGMALLOC_EXTENSIONS are
+both defined in options.h at driver build time.  The mask controls what
+memory-related debugging information is displayed as the driver allocates
+and deallocates memory.  Read md.c in the driver source for more information.
+<p>
+See also:
+<A HREF=debugmalloc.html>  debugmalloc </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

@@ -1,0 +1,14 @@
+<HEAD> <TITLE> preload - preload an object into memory </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> preload - preload an object into memory </H1> </center>
+<p>
+<b> void preload( string filename ); </b>
+<p>
+For each string in the array returned by epilog, the driver calls 
+preload(filename).  Note that there is the equivalent of a catch() around
+these calls at the driver level, so it is not neccessary for the mudlib
+to worry about the sequence being terminated by an error.
+<p>
+Typical behavoir is to use load_object() to attempt to load the file.
+<p>
+See also: <A HREF=preload.html>  preload </A>, <A HREF=../../efuns/calls/catch.html>  catch </A>, <A HREF=../../efuns/objects/load_object.html>  load_object </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

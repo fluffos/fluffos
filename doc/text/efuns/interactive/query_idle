@@ -1,0 +1,11 @@
+query_idle - determine how many seconds an interactive player has been idle
+
+int query_idle( object ob );
+
+Query how many seconds a player object (ob) has been idling.
+
+See also:
+ in_edit,
+ in_input
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,17 @@
+<HEAD> <TITLE> stat - returns information pertaining to a file or a directory </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> stat - returns information pertaining to a file or a directory </H1> </center> 
+<p>
+<b> mixed stat(string str); </b>
+<b> mixed stat(string str, int x); </b>
+<p>
+If str is the name of a regular file (not a directory), then stat()
+will return an array of information pertaining to that file.  The
+form of the array is as follows:
+<p>
+   ({ file_size, last_time_file_touched, time_object_loaded })
+<p>
+If stat is called on a directory (not a regular file), or with a second
+argument of -1, then stat() behaves identically to get_dir().
+<p>
+See also:
+<A HREF=get_dir.html>  get_dir </A>,
+<A HREF=stat.html>  stat </A>

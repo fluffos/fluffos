@@ -1,0 +1,93 @@
+debug_info - display debug information
+
+string debug_info( int operation, ... );
+
+string debug_info( 0, object ob );
+
+string debug_info( 1, object ob );
+
+string debug_info( 2, object ob );
+
+This efun is only available if PACKAGE_DEVELOP is compiled into the driver.
+
+debug_info() is a general-purpose facility which may be used to debug the
+MudOS driver.  The debugging information requested is determined by the
+first argument.  Successive arguments are determine by the operation selected.
+
+The existing operations (0 , 1 and 2) require a second object type argument,
+and may be used to display the various fields of the MudOS object structure.
+
+The following LPC code was used to generate the sample output:
+
+<pre>
+
+create() {
+    write(debug_info(0, this_object()));
+}
+</pre>
+
+gives:
+
+<pre>
+O_HEART_BEAT      : FALSE
+O_IS_WIZARD       : FALSE
+O_ENABLE_COMMANDS : FALSE
+O_CLONE           : FALSE
+O_DESTRUCTED      : FALSE
+O_SWAPPED         : FALSE
+O_ONCE_INTERACTIVE: FALSE
+O_RESET_STATE     : FALSE
+O_WILL_CLEAN_UP   : FALSE
+O_WILL_RESET: TRUE
+total light : 0
+next_reset  : 720300560
+time_of_ref : 720299416
+ref         : 2
+swap_num    : -1
+name        : 'u/c/cynosure/di0'
+next_all    : OBJ(bin/dev/_update)
+This object is the head of the object list.
+</pre>
+
+<hr>
+
+<pre>
+
+create() {
+    write(debug_info(1, this_object()));
+}
+</pre>
+
+gives:
+
+<pre>
+program ref's 1
+Name u/c/cynosure/di1.c
+program size 10
+num func's 1 (16) 
+num strings 0
+num vars 0 (0)
+num inherits 0 (0)
+total size 104
+</pre>
+
+<hr>
+
+<pre>
+
+create() {
+    write(debug_info(2, this_object()));
+}
+</pre>
+
+ gives:
+
+<pre>
+x: "foo"
+</pre>
+
+See also:
+ dump_file_descriptors,
+ dump_socket_status
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,25 @@
+Efuns
+
+Efuns, also known as efunctions, the derivation of which is unknown to me,
+are the library functions of LPC that are available to all objects.  The
+are broken up by category:
+
+<DL>
+*  arrays
+*  buffers
+*  calls
+*  compile
+*  filesystem
+*  floats
+*  functions
+*  general
+*  interactive
+*  internals
+*  mappings
+*  mudlib
+*  numbers
+*  objects
+*  parsing
+*  sockets
+*  strings
+*  system

@@ -1,6 +1,7 @@
 #include "std.h"
 #include "network_incl.h"
 #include "lpc_incl.h"
+#include "file_incl.h"
 #include "file.h"
 
 /*
@@ -9,11 +10,6 @@
   isolates the code which sets the various socket modes since various
   machines seem to need this done in different ways.
 */
-
-#if defined(SVR4)
-#include <sys/filio.h>
-#include <sys/sockio.h>
-#endif
 
 /*
  * set process receiving SIGIO/SIGURG signals to us.

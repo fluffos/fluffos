@@ -1,0 +1,17 @@
+all_previous_objects - returns an array of objects that called the current function
+
+object array all_previous_objects();
+
+Returns an array of objects that called current function.
+Note that local function calls do not set previous_object() to the current
+object, but leave it unchanged.
+
+The first element of the array is previous_object(), followed by
+previous_object(1), etc ...
+
+See also:
+ call_other,
+ origin,
+ previous_object
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,15 @@
+inherit_list - get a list of parents of an object
+
+string array inherit_list( object obj );
+
+Returns an array of filenames of objects inherited by obj.
+If COMPAT_32 was compiled in, this behaves like deep_inherit_list(),
+otherwise it behaves like shallow_inherit_list().
+
+See also:
+ deep_inherit_list,
+ shallow_inherit_list,
+ inherits
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

@@ -1,0 +1,11 @@
+lower_case - return the lowercase version of a given string
+
+string lower_case( string str );
+
+Return the lowercase version of a given string (original string remains
+unchanged).
+
+See also:
+ capitalize
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

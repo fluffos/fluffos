@@ -1,0 +1,15 @@
+<HEAD> <TITLE> bind - bind a function pointer to a new object </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> bind - bind a function pointer to a new object </H1> </center>
+<p>
+<b> function bind(function, object); </b>
+<p>
+bind() causes a function to become owned by the new object.  This changes
+the value of this_object() when the function pointer is evaluated.  Functions
+that reference global variables or functions in the object that created
+them cannot be rebound.  Binding a function to the object it is already
+bound to will never fail.
+<p>
+Permission to use this efun is controlled by the valid_bind() master apply.
+<p>
+See also:
+<A HREF=function_owner.html>  function_owner </A>,
+<A HREF=../../applies/master/valid_bind.html>  valid_bind </A>

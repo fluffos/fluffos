@@ -1,0 +1,11 @@
+<HEAD> <TITLE> logon - initialize a logon connection </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> logon - initialize a logon connection </H1> </center>
+<p>
+<b> object logon();  </b>
+<p>
+This apply is called on the object returned by the connect() master
+apply, after that object has been made into an interactive object,
+so the object can initiate any logon sequence which is wanted.  This
+function is no longer required to exist.  this_user() will be the
+interactive object.
+<p>
+See also: <A HREF=../master/connect.html>  connect </A>

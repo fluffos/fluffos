@@ -1,0 +1,12 @@
+<HEAD> <TITLE> flush_messages - send all pending messages to a user </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> flush_messages - send all pending messages to a user </H1> </center>
+<p>
+<b> int flush_messages(); </b>
+<p>
+<b> int flush_messages(object user); </b>
+<p>
+Normally, messages are queued, then sent all at once to minimize the
+number of packets required.  This efun forces all pending messages to
+be written immediately.  If no user is specified, messages for ALL users
+are flushed.
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

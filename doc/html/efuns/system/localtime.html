@@ -1,0 +1,38 @@
+<HEAD> <TITLE> localtime - convert to local time </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> localtime - convert to local time </H1> </center>
+<p>
+<b> array localtime( int time ); </b>
+<p>
+localtime() converts a time value (as returned by time()) into an array
+of values which represents the time locally.  In the past time() was used
+to get the time in GMT (UTC), and then local definitions were used to
+determine the local offset from GMT.  This roundabout approach is no
+longer necessary.  localtime() returns the seconds, minutes and hours,
+the day, month and year, day of the week, day of the year,
+the name of the local timezone and how far the MUD is from GMT.  This
+information is retrieved directly from the operating system and made
+available to the driver without the use of MUD-specific configuration
+files.
+<p>
+localtime() returns an array containing the values specified above.
+The index for each value is defined symbolically in localtime.h.  The
+following table summarizes the array returned by localtime().
+<pre>
+	int	LT_SEC		Seconds after the minute (0..59)
+	int	LT_MIN		Minutes after the hour (0..59)
+	int	LT_HOUR		Hour since midnight (0..23)
+	int	LT_MDAY		Day of the month (1..31)
+	int	LT_MON		Months since January (0..11)
+	int	LT_YEAR		Year (guarenteed to be >= 1900)
+	int	LT_WDAY		Days since Sunday (0..6)
+	int	LT_YDAY		Days since January 1 (0..365)
+	int	LT_GMTOFF	Seconds after GMT (UTC)
+	string	LT_ZONE		Timezone name
+</pre>
+<p>
+See also:
+<A HREF=ctime.html>  ctime </A>,
+<A HREF=time.html>  time </A>,
+<A HREF=../internals/time_expression.html>  time_expression </A>,
+<A HREF=uptime.html>  uptime </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

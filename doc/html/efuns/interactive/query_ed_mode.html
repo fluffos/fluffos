@@ -1,0 +1,21 @@
+<HEAD> <TITLE> query_ed_mode - return which mode ed is in </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> query_ed_mode - return which mode ed is in </H1> </center>
+<p>
+This efun is only available if OLD_ED is not defined.
+<p>
+<b> int query_ed_mode(); </b>
+<p>
+Return value should be interpreted as follows:
+<p>
+0 = normal ed prompt
+<p>
+-1 = not in ed
+<p>
+-2 = more prompt for help
+<p>
+positive number = prompt for input for line n
+<p>
+See also:
+<A HREF=ed.html>  ed </A>,
+<A HREF=ed_start.html>  ed_start </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

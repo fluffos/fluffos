@@ -1,0 +1,13 @@
+reset - allows an object to do self-maintenance
+
+void reset();
+
+After every reset interval (whose exact length is determined on
+a mud by mud basis, but averages around every 2 hours), reset()
+is called in every object that currently exists.  If LAZY_RESETS
+is defined in options.h in the driver, reset() will only be called
+in objects when they are touched (near players), so unused objects
+will not be loaded from the swap file to reset.
+
+See also:
+ set_reset

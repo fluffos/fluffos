@@ -6,6 +6,8 @@
 #ifndef COMM_H
 #define COMM_H
 
+#include "network_incl.h"
+
 #define MAX_TEXT                   2048
 #define MAX_SOCKET_PACKET_SIZE     1024
 #define DESIRED_SOCKET_PACKET_SIZE 800
@@ -73,11 +75,35 @@ typedef struct interactive_s {
     int state;			/* Current telnet state.  Bingly wop       */
     int sb_pos;			/* Telnet suboption negotiation stuff      */
     char sb_buf[SB_SIZE];
-#ifdef DEBUG_COMM_FREEZE
-    char debug_block[1024];
-    char debug_block_size;
-#endif
 } interactive_t;
+
+ /*
+  * This macro is for testing whether ip is still valid, since many
+  * functions call LPC code, which could otherwise use
+  * enable_commands(), set_this_player(), or destruct() to cause
+  * all hell to break loose by changing or dangling command_giver
+  * or command_giver->interactive.  It also saves us a few dereferences
+  * since we know we can trust ip, and also increases code readability.
+  *
+  * Basically, this should be used as follows:
+  *
+  * (1) when using command_giver:
+  *     set a variable named ip to command_giver->interactive at a point
+  *     when you know it is valid.  Then, after a call that might have
+  *     called LPC code, check IP_VALID(command_giver), or use
+  *     VALIDATE_IP.
+  * (2) some other object:
+  *     set a variable named ip to ob->interactive, and save ob somewhere;
+  *     or if you are just dealing with an ip as input, save ip->ob somewhere.
+  *     After calling LPC code, check IP_VALID(ob), or use VALIDATE_IP.
+  * 
+  * Yes, I know VALIDATE_IP uses a goto.  It's due to C's lack of proper
+  * exception handling.  Only use it in subroutines that are set up
+  * for it (i.e. define a failure label, and are set up to deal with
+  * branching to it from arbitrary points).
+  */
+#define IP_VALID(ip, ob) (ob && ob->interactive == ip)
+#define VALIDATE_IP(ip, ob) if (!IP_VALID(ip, ob)) goto failure
 
 /*
  * comm.c
@@ -114,7 +140,8 @@ INLINE void process_io PROT((void));
 int process_user_command PROT((void));
 int replace_interactive PROT((object_t *, object_t *));
 int set_call PROT((object_t *, sentence_t *, int));
-void remove_interactive PROT((object_t *));
+void remove_interactive PROT((object_t *, int));
+int flush_message PROT((interactive_t *));
 int query_addr_number PROT((char *, char *));
 char *query_ip_name PROT((object_t *));
 char *query_ip_number PROT((object_t *));

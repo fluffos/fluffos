@@ -1,0 +1,12 @@
+move_or_destruct - ask an object to move to the specified destination
+
+int move_or_destruct( object dest );
+
+If an object's environment is destructed, this apply is called on it's
+contents.  'dest' will be the environment of the destructing object,
+or zero if it has none.  If the object does not move itself out of
+the object being destructed, it will be destructed as well.
+
+See also:
+ destruct,
+ move_object

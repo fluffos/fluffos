@@ -1,0 +1,11 @@
+set_bit - set a bit in a bitstring
+
+int test_bit( string str, int n );
+
+Returns 1 if bit 'n' was set in string 'str', and zero otherwise.
+
+See also:
+ set_bit,
+ clear_bit
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

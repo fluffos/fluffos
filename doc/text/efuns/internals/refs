@@ -1,0 +1,11 @@
+refs - return the number of references to a data structure
+
+int refs( mixed data );
+
+This efun is only available if PACKAGE_DEVELOP is compiled in.
+
+The number of references to `data' will be returned by refs().  This is 
+useful for deciding whether or not to make a copy of a data structure
+before returning it.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,13 @@
+<HEAD> <TITLE> query_heart_beat() - query the status of an object's heartbeat </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> query_heart_beat() - query the status of an object's heartbeat </H1> </center>
+<p>
+<b> int query_heart_beat( object ); </b>
+<p>
+Returns the value with which set_heart_beat() has been called with on
+'object'.  If object is not given, it defaults to the current object.  If
+the object has no heart beat, 0 will be returned.
+<p>
+See also:
+<A HREF=../../applies/heart_beat.html>  heart_beat </A>,
+<A HREF=set_heart_beat.html>  set_heart_beat </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

@@ -1,0 +1,13 @@
+interactive - detects whether or not a given object is an interactive
+
+int interactive( object ob );
+
+Return non-zero if 'ob' is an interactive player. 0 will be returned
+if he is link dead.
+
+See also:
+ query_ip_number,
+ query_ip_name,
+ enable_commands
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

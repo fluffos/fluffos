@@ -1,0 +1,15 @@
+in_input() - determines if a player is inputting to an input_to
+
+int in_input();
+
+int in_input(object ob);
+
+Returns 1 if the object is currently inputting to an input_to or get_char.
+If no object is specified, this_object() is assumed.
+
+See also:
+ get_char,
+ input_to
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

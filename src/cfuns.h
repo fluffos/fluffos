@@ -64,7 +64,7 @@ int c_next_foreach PROT((void));
 void c_exit_foreach PROT((void));
 void c_anonymous PROT((int, int, POINTER_INT));
 void c_expand_varargs PROT((int));
-void c_new_class PROT((int));
+void c_new_class PROT((int, int));
 void c_member_lvalue PROT((int));
 void c_member PROT((int));
 

@@ -1,0 +1,13 @@
+get_root_uid - get the root uid
+
+string get_root_uid();
+
+This function is only used if PACKAGE_UIDS is used.
+
+This master apply is called by the driver each time
+it loads the master object, to verify that the master
+object has loaded, and to get the root uid defined by
+the mud.  The function should return a string, eg "ROOT"
+
+See also:
+ get_bb_uid

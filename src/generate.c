@@ -58,10 +58,13 @@ optimize P1(parse_node_t *, expr) {
 	OPT(expr->l.expr);
 	if (expr->v.number == F_ASSIGN) {
 	    if (IS_NODE(expr->r.expr, NODE_OPCODE_1, F_LOCAL_LVALUE)) {
-		if (last_local_refs[expr->r.expr->l.number]
-		    && !(optimizer_state & OPTIMIZER_IN_COND)) {
-		    last_local_refs[expr->r.expr->l.number]->v.number = F_TRANSFER_LOCAL;
-		    last_local_refs[expr->r.expr->l.number] = 0;
+		if (!optimizer_state) {
+		    int x = expr->r.expr->l.number;
+
+		    if (last_local_refs[x]) {
+			last_local_refs[x]->v.number = F_TRANSFER_LOCAL;
+			last_local_refs[x] = 0;
+		    }
 		}
 	    }
 	}
@@ -84,19 +87,19 @@ optimize P1(parse_node_t *, expr) {
     case NODE_UNARY_OP_1:
 	OPT(expr->r.expr);
 	if (expr->v.number == F_VOID_ASSIGN_LOCAL) {
-	    if (last_local_refs[expr->l.number]
-		&& !(optimizer_state & OPTIMIZER_IN_COND)) {
+	    if (last_local_refs[expr->l.number]	&& !optimizer_state) {
 		last_local_refs[expr->l.number]->v.number = F_TRANSFER_LOCAL;
+		last_local_refs[expr->l.number] = 0;
 	    }
-	    last_local_refs[expr->l.number] = 0;
 	}
 	break;
     case NODE_OPCODE_1:
 	if (expr->v.number == F_LOCAL || expr->v.number == F_LOCAL_LVALUE) {
-	    if (expr->v.number == F_LOCAL &&
-		!(optimizer_state & OPTIMIZER_IN_LOOP)) {
-		last_local_refs[expr->l.number] = expr;
-		break;
+	    if (expr->v.number == F_LOCAL) {
+		if(!optimizer_state) {
+		    last_local_refs[expr->l.number] = expr;
+		    break;
+		}
 	    }
 	    last_local_refs[expr->l.number] = 0;
 	}
@@ -181,6 +184,8 @@ optimize P1(parse_node_t *, expr) {
 	OPT(expr->l.expr);
 	optimize_lvalue_list(expr->r.expr);
 	break;
+
+    case NODE_FUNCTION_CONSTRUCTOR:
 	/* Don't optimize inside of these; we'll get confused by local vars
 	 * since it's a separate frame, etc
 	 *
@@ -192,7 +197,6 @@ optimize P1(parse_node_t *, expr) {
 	 * use(local); return (: foo, local :);       // local evaluated at
 	 * use(local); return (: ... $(local) ... :); // construction time
 	 */
-    case NODE_FUNCTION_CONSTRUCTOR:
 	if (expr->r.expr)
 	    optimize_expr_list(expr->r.expr); /* arguments */
 	break;
@@ -476,7 +480,7 @@ void optimizer_end_function PROT((void)) {
 }
 
 #ifdef LPC_TO_C
-short generate_function P3(function_t *, f, parse_node_t *, node, int, num) {
+short generate_function P3(compiler_function_t *, cfp, parse_node_t *, node, int, num) {
     short ret;
     
     if (pragmas & PRAGMA_OPTIMIZE) {
@@ -486,7 +490,7 @@ short generate_function P3(function_t *, f, parse_node_t *, node, int, num) {
 	optimizer_end_function();
     }
     if (compile_to_c) {
-	c_start_function(f);
+	c_start_function(cfp->name);
 	c_analyze(node);
 	ret = generate(node);
 	c_end_function();
@@ -494,7 +498,7 @@ short generate_function P3(function_t *, f, parse_node_t *, node, int, num) {
     return ret;
 }
 #else
-short generate_function P3(function_t *, f, parse_node_t *, node, int, num) {
+short generate_function P3(compiler_function_t *, f, parse_node_t *, node, int, num) {
     short ret;
     if (pragmas & PRAGMA_OPTIMIZE) {
 	optimizer_start_function(num);

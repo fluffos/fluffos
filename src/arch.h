@@ -23,6 +23,14 @@
 #define ARCH "FreeBSD"
 #endif
 
+#ifdef __NetBSD__
+#ifdef sparc
+#define ARCH "NetBSD/sparc"
+#else
+#define ARCH "NetBSD"
+#endif
+#endif
+
 #ifdef NeXT
 #ifdef m68k
 #define ARCH "NeXT/68k"
@@ -39,29 +47,32 @@
 #define ARCH "Accel"
 #endif
 
+/* Attempt to guess whether we are running Solaris or not */
 #if defined(sun) && !defined(SunOS_5)
-#ifdef sun4
-#define ARCH "Sun4"
-#else
+#  if defined(__svr4__) || defined(__sol__) || defined(SVR4)
+#    define SunOS_5
+#  else
+#    ifdef sun4
+#      define ARCH "Sun4"
+#    else
 
-#ifdef sun3
-#define ARCH "Sun3"
-#else
-#define ARCH "Sun"
+#      ifdef sun3
+#        define ARCH "Sun3"
+#      else
+#        define ARCH "Sun"
+#      endif
+#    endif
+#  endif
 #endif
 
-#endif
-#endif
-
-#ifdef SunOS_5
+#if defined(SunOS_5)
 #define ARCH "Solaris"
 #endif
-#ifdef __386BSD__
-#define ARCH "386bsd"
-#endif
+
 #ifdef _AUX_SOURCE
 #define ARCH "A/UX"
 #endif
+
 #ifdef linux
 #  ifdef __mc68000
 #    define ARCH "Linux/m68k"
@@ -69,21 +80,29 @@
 #    define ARCH "Linux"
 #  endif
 #endif
+
 #ifdef hp68k
 #define ARCH "HP/68k"
 #endif
+
 #ifdef hppa
 #define ARCH "HP/PA-RISC"
 #endif
+
 #ifdef cray
 #define ARCH "Cray"
 #endif
+
 #ifdef __alpha
 #define ARCH "Alpha"
 #endif
 
 #if !defined(ARCH) && defined(__bsdi__)
 #define ARCH "BSDI"
+#endif
+
+#if !defined(ARCH) && defined(__386BSD__)
+#define ARCH "386bsd"
 #endif
 
 #if !defined(ARCH) && defined(ultrix)
@@ -93,9 +112,6 @@
 #if !defined(ARCH) && defined(hpux)
 #define ARCH "HP/UX"
 #endif
-
-#ifndef ARCH_H
-#define ARCH_H
 
 #if !defined(ARCH) && defined(sgi)
 #define ARCH "IRIX"
@@ -114,8 +130,7 @@
 #endif
 
 #ifndef ARCH
-#define ARCH "stuf!"
+#define ARCH "unknown architecture"
 #endif
 
-#endif
 #endif

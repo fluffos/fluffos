@@ -1,0 +1,12 @@
+disable_wizard - remove wizard priveleges from an object
+
+void disable_wizard();
+
+This efun is only available if NO_WIZARDS is not defined.
+
+The opposite of enable_wizard().  Disables wizard privileges from the
+current object.
+
+See also:
+ enable_wizard,
+ wizardp

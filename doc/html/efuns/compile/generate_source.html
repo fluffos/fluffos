@@ -1,0 +1,19 @@
+<HEAD> <TITLE> generate_source - generates the C code corresponding to a give object(s) </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> generate_source - generates the C code corresponding to a give object(s) </H1> </center>
+<p>
+<b> int generate_source(string file); </b>
+<p>
+<b> int generate_source(string array files); </b>
+<p>
+This efun is only available if LPC_TO_C is compiled into the driver.
+<p>
+generate_source() calls the LPC->C compiler to generate the source code
+for a given object or objects.  If more than one file is passed, a directory
+named 'mudlib' is created in the SAVE_BINARIES directory, and that directory
+can be copied into the driver source directory and compiled into the driver.
+<p>
+If one file is given, the C source for that file is compiled, and the driver
+attempts to link it into the running executable using the RUNTIME_LOADING
+option.
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>
+<p>

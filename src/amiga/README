@@ -1,5 +1,9 @@
 AMIGA/README
 
+***NOTE***  The following instructions are for using SAS/C.  If you wish to
+compile with gcc instead (which is in fact easier) read the file README-gcc
+instead.
+
 Compiling the driver
 ~~~~~~~~~~~~~~~~~~~~
 

@@ -1,0 +1,18 @@
+replace_program - replaces the program in this_object()
+
+void replace_program( string str );
+
+replace_program() replaces the program in this_object() with that of an 
+object it inherits.  The string argument is the filename of the object 
+whose program is to be used.  Once the replacement takes place, the current 
+object effectively becomes a clone of that other object, but with its 
+current filename and global variable values. The program is not actually 
+replaced until the current execution is completed.
+
+Note that one effect of this is that all functions defined in the object
+no longer exist, being replaced by the functions in the inherited program,
+so this routine should not be called if one of those functions might be
+called later (and in particular, create() needs to exist if you intend to
+clone from the object).
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

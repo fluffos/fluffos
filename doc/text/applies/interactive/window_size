@@ -1,0 +1,9 @@
+window_size - report the users window size
+
+void window_size(int width, int height);
+
+window_size() is called with the user's window size, as reported by telnet
+negotiation.  If the user's client never responds to the query, this is
+never called.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

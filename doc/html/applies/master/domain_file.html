@@ -1,0 +1,17 @@
+<HEAD> <TITLE> domain_file - determine the domain for a given object </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> domain_file - determine the domain for a given object </H1> </center>
+<p>
+<b> string domain_file( string file ); </b>
+<p>
+This function must exist in the master object.  It is called by the
+domain statistic functions in the driver to determine what domain a
+given object should be associated with.  This is totally arbitrary and
+up to the mudlib designers wishes.  It should be noted that the domain
+that the object is assigned to will receive "credit" for all of the
+objects behavior (errors, heart_beats, etc).
+<p>
+See also:
+<A HREF=../../efuns/mudlib/author_stats.html>  author_stats </A>,
+<A HREF=../../efuns/mudlib/domain_stats.html>  domain_stats </A>,
+<A HREF=author_file.html>  author_file </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

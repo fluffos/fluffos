@@ -1,0 +1,12 @@
+check_memory - check all allocated blocks
+
+string check_memory(int flag)
+
+returns a string describing possible memory allocation problems.  If the
+optional flag is 1, a summary of allocated memory is printed at the
+end.
+
+This efun is only available if PACKAGE_DEVELOP, DEBUGMALLOC, and
+DEBUGMALLOC_EXTENSIONS are defined.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

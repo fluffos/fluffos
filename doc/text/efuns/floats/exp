@@ -1,0 +1,14 @@
+exp - find e to the power of a float
+
+float exp( float f );
+
+This efun is only available if PACKAGE_MATH is compiled in.
+
+exp() returns e^f.
+
+See also:
+ log,
+ pow,
+ sqrt
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

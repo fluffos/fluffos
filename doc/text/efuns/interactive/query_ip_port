@@ -1,0 +1,18 @@
+query_ip_port - return the ip port of a given player object.
+
+int query_ip_port(object | void);
+
+Returns the local port that the argument object used to connect to
+the mud.  If the argument is void, return the local port that
+this_player() used to connect to the mud.  Calling this on 
+non-interactive objects will return 0.
+
+This function requires PACKAGE_CONTRIB to be defined in the options file.
+
+See also:
+ query_ip_name,
+ query_host_name,
+ resolve,
+ socket_address
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

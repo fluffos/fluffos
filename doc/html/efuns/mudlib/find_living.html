@@ -1,0 +1,21 @@
+<HEAD> <TITLE> find_living - find a living object matching a given id </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> find_living - find a living object matching a given id </H1> </center>
+<p>
+<b> object find_living( string str ); </b>
+<p>
+This efun is only available if NO_ADD_ACTION is not compiled in.
+<p>
+Find first the object that is marked as living, and answers to the
+id 'str'.  A living object is an object that has called
+enable_commands().  The object must have set a name with
+set_living_name(), so its name will be entered into the hash table
+used to speed up the search for living objects.
+<p>
+See also:
+<A HREF=living.html>  living </A>,
+<A HREF=livings.html>  livings </A>,
+<A HREF=../interactive/users.html>  users </A>,
+<A HREF=../interactive/disable_commands.html>  disable_commands </A>,
+<A HREF=../interactive/enable_commands.html>  enable_commands </A>,
+<A HREF=set_living_name.html>  set_living_name </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

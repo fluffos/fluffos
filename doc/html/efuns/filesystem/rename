@@ -1,0 +1,13 @@
+rename - rename a file
+
+int rename( string src, string dst );
+
+Renames the file 'src' to 'dst'.
+
+rename() returns zero (0) to indicate success.  Nonzero indicates failure.
+
+See also:
+ rm,
+ rmdir,
+ cp,
+ link

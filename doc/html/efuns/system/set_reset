@@ -1,0 +1,18 @@
+set_reset - modify the time until reset on an object
+
+varargs void set_reset( object ob, int time );
+
+This efun is only available if NO_RESETS is not compiled in.
+
+Sets the time until reset on 'ob' to 'time' seconds from now.  If 'time'
+is omitted, the driver's normal reset time setting formula is applied
+to 'ob', that is,
+<pre>
+reset time = current_time + reset_time / 2 + random(reset_time / 2)
+</pre>
+
+See also:
+ reset
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

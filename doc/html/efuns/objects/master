@@ -1,0 +1,10 @@
+master - returns the master object
+
+object master();
+
+Returns a pointer to the master object.
+
+See also:
+ find_object
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

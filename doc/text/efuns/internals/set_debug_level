@@ -1,0 +1,16 @@
+set_debug_level - sets the debug level used by the driver's debug() macro
+
+void set_debug_level( int level );
+
+This efun is only available when the driver is compiled with -DDEBUG_MACRO.
+The purpose of this efun is to allow the amount and type of debugging
+information produced to be controlled from within the mud (while the
+driver is running).
+
+For more information, read the file debug.h which is included with the
+driver source.
+
+See also:
+ set_malloc_mask
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

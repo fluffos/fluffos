@@ -1,0 +1,34 @@
+<HEAD> <TITLE> map_delete - remove a (key, value) pair from a mapping based on the key </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> map_delete - remove a (key, value) pair from a mapping based on the key </H1> </center>
+<p>
+<b> void map_delete( mapping m, mixed element ); </b>
+<p>
+map_delete removes the (key, value) from the mapping m that has key equal
+to element.
+<p>
+For example, given:
+<p>
+<pre>
+mapping names;
+<p>
+names = ([]);
+names["truilkan"] = "john";
+names["wayfarer"] = "erik";
+names["jacques"] = "dwayne";
+</pre>
+<p>
+Then:
+<pre>
+map_delete(names,"truilkan");
+</pre>
+<p>
+causes the mapping 'names' to be equal to:
+<pre>
+(["wayfarer" : "erik", "jacques" : "dwayne"])
+</pre>
+keys(names) will not contain "truilkan" after map_delete(names,"truilkan")
+is called [unless ("truilkan", *) is subsequently added back to the mapping].
+<p>
+See also:
+<A HREF=allocate_mapping.html>  allocate_mapping </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

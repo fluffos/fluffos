@@ -61,21 +61,23 @@ f_debug_info PROT((void))
 #ifndef NO_LIGHT
 	   outbuf_addv(&out, "total light : %d\n", ob->total_light);
 #endif
+#ifndef NO_RESETS
 	   outbuf_addv(&out, "next_reset  : %d\n", ob->next_reset);
+#endif
 	   outbuf_addv(&out, "time_of_ref : %d\n", ob->time_of_ref);
 	   outbuf_addv(&out, "ref         : %d\n", ob->ref);
 #ifdef DEBUG
 	   outbuf_addv(&out, "extra_ref   : %d\n", ob->extra_ref);
 #endif
 	   outbuf_addv(&out, "swap_num    : %d\n", ob->swap_num);
-	   outbuf_addv(&out, "name        : '%s'\n", ob->name);
-	   outbuf_addv(&out, "next_all    : OBJ(%s)\n",
+	   outbuf_addv(&out, "name        : '/%s'\n", ob->name);
+	   outbuf_addv(&out, "next_all    : OBJ(/%s)\n",
 			ob->next_all ? ob->next_all->name : "NULL");
 	    if (obj_list == ob)
 		outbuf_add(&out, "This object is the head of the object list.\n");
 	    for (obj2 = obj_list, i = 1; obj2; obj2 = obj2->next_all, i++)
 		if (obj2->next_all == ob) {
-		   outbuf_addv(&out, "Previous object in object list: OBJ(%s)\n",
+		   outbuf_addv(&out, "Previous object in object list: OBJ(/%s)\n",
 				obj2->name);
 		   outbuf_addv(&out, "position in object list:%d\n", i);
 		}
@@ -88,14 +90,18 @@ f_debug_info PROT((void))
 	    break;
 	}
 	outbuf_addv(&out, "program ref's %d\n", ob->prog->ref);
-	outbuf_addv(&out, "Name %s\n", ob->prog->name);
+	outbuf_addv(&out, "Name /%s\n", ob->prog->name);
 	outbuf_addv(&out, "program size %d\n",
 		    ob->prog->program_size);
-	outbuf_addv(&out, "num func's %d (%d) \n", ob->prog->num_functions,
-		    ob->prog->num_functions * sizeof(function_t));
+	outbuf_addv(&out, "runtime function table %d (%d) \n", 
+		    ob->prog->num_functions_total,
+		    ob->prog->num_functions_total * (sizeof(runtime_function_u)+1));
+	outbuf_addv(&out, "compiler function table %d (%d) \n", 
+		    ob->prog->num_functions_defined,
+		    ob->prog->num_functions_defined * sizeof(compiler_function_t));
 	outbuf_addv(&out, "num strings %d\n", ob->prog->num_strings);
-	outbuf_addv(&out, "num vars %d (%d)\n", ob->prog->num_variables,
-		    ob->prog->num_variables * sizeof(variable_t));
+	outbuf_addv(&out, "num vars %d (%d)\n", ob->prog->num_variables_defined,
+		    ob->prog->num_variables_defined * (sizeof(char *) + sizeof(short)));
 	outbuf_addv(&out, "num inherits %d (%d)\n", ob->prog->num_inherited,
 		    ob->prog->num_inherited * sizeof(inherit_t));
 	outbuf_addv(&out, "total size %d\n", ob->prog->total_size);
@@ -104,8 +110,9 @@ f_debug_info PROT((void))
 	{
 	    int i;
 	    ob = arg[1].u.ob;
-	    for (i=0; i<ob->prog->num_variables; i++) {
-		outbuf_addv(&out, "%s: ", ob->prog->variable_names[i].name);
+	    for (i=0; i<ob->prog->num_variables_total; i++) {
+		/* inefficient, but: */
+		outbuf_addv(&out, "%s: ", variable_name(ob->prog, i));
 		svalue_to_string(&ob->variables[i], &out, 2, 0, 0);
 		outbuf_add(&out, "\n");
 	    }

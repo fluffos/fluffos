@@ -1,0 +1,20 @@
+function_exists - find the file containing a given function in an object
+
+string function_exists( string str, object ob, int flag );
+
+Return the file name of the object that defines the function 'str' in
+object 'ob'. The returned value can be other than 'file_name(ob)' if the
+function is defined by an inherited object.
+
+0 is returned if the function was not defined.
+
+Note that function_exists() does not check shadows.
+
+If flag is omitted or zero functions that cannot be called are not returned
+(e.g. the function is returned only if call_other(ob, str) would succeed).
+If the flag is nonzero, static and private functions are returned too.
+
+See also:
+ call_other
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

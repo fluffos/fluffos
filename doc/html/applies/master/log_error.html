@@ -1,0 +1,14 @@
+<HEAD> <TITLE> log_error - log errors intelligently </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> log_error - log errors intelligently </H1> </center>
+<p>
+<b> void log_error( string file, string message ); </b>
+<p>
+Whenever an error occurs during <i> compilation </i>, the function log_error in
+the master object is called with the filename that the error occurred
+in and the error message itself.  Then, log_error is free to do
+whatever it thinks it should do with that information.  Usually this
+is deciding based on the filename where the error message should be
+logged, and then writing it to that file.  Warnings also pass through
+this routine, and can be detected since they start with "Warning:"
+<p>
+See also:
+<A HREF=error_handler.html>  error_handler </A>

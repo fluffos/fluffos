@@ -1,0 +1,14 @@
+find_call_out - find a call out scheduled to be called next
+
+int find_call_out( string func );
+
+Find the first call out due to be executed for function 'func' in the
+current object, or the call_out() which returned the integer 'handle',
+and return the time left. If it is not found, then return -1.
+
+See also:
+ call_out,
+ remove_call_out,
+ set_heart_beat
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,19 @@
+<HEAD> <TITLE> geteuid - return the effective user id of an object or function </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> geteuid - return the effective user id of an object or function </H1> </center>
+<p>
+<b> string geteuid( object|function ); </b>
+<p>
+This efun is only available if PACKAGE_UIDS is compiled into the driver.
+<p>
+If given an object argument, geteuid returns the effective user id (euid)
+of the object.  If given an argument of type 'function', it returns the
+euid of the object that created that 'function' variable.  If the object,
+at the time of the function variable's construction, had no euid, the
+object's uid is stored instead.
+<p>
+See also:
+<A HREF=seteuid.html>  seteuid </A>,
+<A HREF=getuid.html>  getuid </A>,
+<A HREF=export_uid.html>  export_uid </A>,
+<A HREF=../../applies/master/valid_seteuid.html>  valid_seteuid </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

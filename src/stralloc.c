@@ -54,9 +54,9 @@ void bp PROT((void)) {
 #ifdef STRING_STATS
 int num_distinct_strings = 0;
 int bytes_distinct_strings = 0;
+int overhead_bytes = 0;
 int allocd_strings = 0;
 int allocd_bytes = 0;
-int overhead_bytes = 0;
 int search_len = 0;
 int num_str_searches = 0;
 #endif
@@ -66,7 +66,7 @@ int num_str_searches = 0;
 #define hfindblock(s, h) sfindblock(s, h = StrHash(s))
 #define findblock(s) sfindblock(s, StrHash(s))
 
-INLINE static block_t *sfindblock PROT((char *, int));
+INLINE_STATIC block_t *sfindblock PROT((char *, int));
 
 /*
  * hash table - list of pointers to heads of string chains.
@@ -80,7 +80,7 @@ static block_t **base_table = (block_t **) 0;
 static int htable_size;
 static int htable_size_minus_one;
 
-INLINE static block_t *alloc_new_string PROT((char *, int));
+INLINE_STATIC block_t *alloc_new_string PROT((char *, int));
 static void checked PROT((char *, char *));
 
 void init_strings()
@@ -110,7 +110,7 @@ void init_strings()
  * pointer on the hash chain into fs_prev.
  */
 
-static INLINE block_t *
+INLINE_STATIC block_t *
         sfindblock P2(char *, s, int, h)
 {
     block_t *curr, *prev;
@@ -153,8 +153,8 @@ char *
 
 /* alloc_new_string: Make a space for a string.  */
 
-INLINE static block_t *
-        alloc_new_string P2(char *, string, int, h)
+INLINE_STATIC block_t *
+alloc_new_string P2(char *, string, int, h)
 {
     block_t *b;
     int len = strlen(string);
@@ -169,11 +169,11 @@ INLINE static block_t *
     STRING(b)[len] = '\0';	/* strncpy doesn't put on \0 if 'from' too
 				 * long */
     SIZE(b) = (len > USHRT_MAX ? USHRT_MAX : len);
-    REFS(b) = 0;
+    REFS(b) = 1;
     NEXT(b) = base_table[h];
     base_table[h] = b;
     ADD_NEW_STRING(SIZE(b), sizeof(block_t));
-    CHECK_STRING_STATS;
+    ADD_STRING(SIZE(b));
     return (b);
 }
 
@@ -186,16 +186,12 @@ char *
     b = hfindblock(str, h);	/* hfindblock macro sets h = StrHash(s) */
     if (!b) {
 	b = alloc_new_string(str, h);
-    }
-    /*
-     * stop keeping track of ref counts at the point where overflow would
-     * occur.
-     */
-    if (REFS(b) < USHRT_MAX) {
-	REFS(b)++;
+    } else {
+	if (REFS(b))
+	    REFS(b)++;
+	ADD_STRING(SIZE(b));
     }
     NDBG(b);
-    ADD_STRING(SIZE(b));
     return (STRING(b));
 }
 
@@ -214,9 +210,8 @@ ref_string P1(char *, str)
 	fatal("stralloc.c: called ref_string on non-shared string: %s.\n", str);
     }
 #endif				/* defined(DEBUG) */
-    if (REFS(b) < USHRT_MAX) {
+    if (REFS(b))
 	REFS(b)++;
-    }
     NDBG(b);
     ADD_STRING(SIZE(b));
     return str;
@@ -248,16 +243,16 @@ free_string P1(char *, str)
     b = BLOCK(str);
     DEBUG_CHECK1(b != findblock(str),"stralloc.c: free_string called on non-shared string: %s.\n", str);
     
-    SUB_STRING(SIZE(b));
-
     /*
      * if a string has been ref'd USHRT_MAX times then we assume that its used
      * often enough to justify never freeing it.
      */
-    if (REFS(b) == USHRT_MAX)
+    if (!REFS(b))
 	return;
 
     REFS(b)--;
+    SUB_STRING(SIZE(b));
+
     NDBG(b);
     if (REFS(b) > 0)
 	return;
@@ -312,7 +307,7 @@ add_string_status P2(outbuffer_t *, out, int, verbose)
 	outbuf_add(out, "-------------------------\t Strings    Bytes\n");
     }
     if (verbose != -1)
-	outbuf_addv(out, "All strings:\t\t%8d %8d + %d overhead\n",
+	outbuf_addv(out, "All strings:\t\t\t%7d %8d + %d overhead\n",
 	      num_distinct_strings, bytes_distinct_strings, overhead_bytes);
     if (verbose == 1) {
 	outbuf_addv(out, "Total asked for\t\t\t%8d %8d\n",
@@ -324,6 +319,8 @@ add_string_status P2(outbuffer_t *, out, int, verbose)
     }
     return (bytes_distinct_strings + overhead_bytes);
 #else
+    if (verbose)
+	outbuf_add(out, "<String statistics disabled, no information available>\n");
     return 0;
 #endif
 }
@@ -365,20 +362,24 @@ char *int_new_string P1(int, size)
 	ADD_NEW_STRING(USHRT_MAX, sizeof(malloc_block_t));
     }
     mbt->ref = 1;
+    ADD_STRING(mbt->size);
     CHECK_STRING_STATS;
     return (char *)(mbt + 1);
 }
 
 char *extend_string P2(char *, str, int, len) {
     malloc_block_t *mbt;
-    
-    ADD_STRING_SIZE(len - MSTR_SIZE(str));
+#ifdef STRING_STATS
+    int oldsize = MSTR_SIZE(str);
+#endif
+
     mbt = (malloc_block_t *)DREALLOC(MSTR_BLOCK(str), len + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, "extend_string");
     if (len < USHRT_MAX) {
 	mbt->size = len;
     } else {
 	mbt->size = USHRT_MAX;
     }
+    ADD_STRING_SIZE(mbt->size - oldsize);
     CHECK_STRING_STATS;
     
     return (char *)(mbt + 1);

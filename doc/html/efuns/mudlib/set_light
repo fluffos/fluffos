@@ -1,0 +1,17 @@
+set_light - update or query an object's light level
+
+int set_light( int light_level_adjustment );
+
+This efun is only available if NO_LIGHT is not compiled in.
+
+Passing 'light_level_adjustment' as 0 queries the object's current
+light level.  A positive number will increase the light level, while
+a negative number will decrease the light level.
+
+Note that the object's current light level includes the light it sees from
+other objects.
+
+This efun is provided mostly for backwards compatibility; it really should
+be handled by the mudlib.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,40 +1,51 @@
-The general solution to error handling is actually quite simple.  I have
-thought about adding it, but never got around to it.
+The current implementation of swapping could use alot of work.  Swapping
+an object in/out isn't that expensive CPU wise, and can save a decent amount
+of memory.  The problem is that cloned programs can't swap, which disables
+swapping for much of the mud ...
 
-  1. A new sub-type of int would be created called ERROR.
-  2. A new predicate function would exist called errorp().
-  3. All efuns would return an int/error svalue when an error is
-     detected during efun processing.
-  4. A new mudlib-imported error.h file would exist to define error
-     numbers in terms of #defines (the #defines would be used in both
-     the driver and mudlib code)
-  5. A function (call it perror()) would exist that accepted an error
-     wvalue and returned a printable string.
-  6. All efuns would be converted to use these new error svalues and
-     associated numbers.
+-Beek
 
-All mudlib code that did things that could error out would either:
+-----
 
-  data = efun(..);
-  if (!data-type-expectedp(data))
-    return;
-
-or:
-
-  data = efun(..);
-  if (errorp(data))
-    return;
-
-return would be replaced with whatever error recovery action would need to
-take place in that context.  Errors could then be trated in an integrated
-fashion throughout the driver/mudlib.
-
-        Cygnus
+7. It would be more real, if a new call_out happen after all the previous
+   call_outs of the same delay. (because it were called later)
+   example: call_out("foo",1);
+            call_out("bar",1);
+   now bar will be called first and not foo! It's unreal.
+   could be possible a call_out with 0 delay ? we would use it for
+   safe destruct object.
 
 Comment:
-    Don't forget the perror() efun mentioned in the man page.
 
-### I'm not sure this is the best way to go.  -Beek
+Ideally, a better fix would be for call_out to have a smaller
+granularity, so the second call_out follows the first by whatever the
+time difference between the two was.  This problem will always happen
+if the call_outs are within the granularity, and real small
+granularities (microsecond?) may/may not be desirable.
+
+-----
+
+It would be nice if a | operator can be used for union on arrays.
+({"a","b","c"}) | ({"c","d"}) would be ({"a","b","c","d"}) it's more
+convenient than distinct_array(({"a","b","c"})+({"c","d"}) ).
+
+-----
+
+The names of includes which define no code don't have to be saved for
+line number purposes (although they are still needed for binaries; see
+the other note about merging the two lists)
+
+-----
+
+Master applies should be cached like sefuns are.  Currently, APPLY_*
+are string constants so they always miss the call_other cache, making
+master applies slow.  APPLY_CREATE also always misses the cache, but
+it's always going to miss anyway so no problem :-).  Others like APPLY_ID
+etc should be changed to use shared strings so they can hit.
+
+-----
+
+There should be a NO_HEART_BEATS option
 
 -----
 
@@ -90,14 +101,6 @@ to do this.
 
 Or we could make a call_out2() efun that operates in the desired heartbeat units
 (name it something more appropriate than call_out2()).
-
------
-
-1) Have the z command in the editor check the user's PAGER settings.
-   ie: getenv("LINES")  much like the mudlib's more command does.  If there
-   isn't any setting, you can have it default back to the standard z length.
-
---watcher
 
 -----
 
@@ -203,9 +206,7 @@ file; lex_loaded_inherit_hook() cues lex to just return L_ALREADY_LOADED
 as the next token (note: in deep inherits this could require a rather
 deep yacc stack)
 
-Use parse trees to simplify compile time optimizations.
-
-Rewrite strings to use counted strings (strlen and refcount).
+---
 
 Set up grammar dir for pre-byacc'd and/or pre-bison'd parsers for people
   with broken 'yacc's.
@@ -227,20 +228,11 @@ corner tho.  A better interface for the mud info stuff, maybe?
 
 -----
 
-Add params to call_out_info() to limit info to particular functions
-and/or objects.
-
------
-
 Threads :)
 
 -----
 
 Exceptions :)
-
------
-
-Use shared string comparison in searching for commands
 
 -----
 
@@ -256,39 +248,14 @@ list (which was added after binaries were)
 
 -----
 
-Anonymous functions which do not reference globals etc should be rebindable.
-Currently, non of the are, because the compile time checks aren't done.
-
-I.e. bind(function(int i){return i;}, this_player())
-
-should work.
-
------
-
-How about:
-
-private:
-
-int foo;
-
-void bar() { ... }
-
-need some way to turn it off, tho, since 'public' has a different meaning.
-(i.e. there is no specifier for the 'no modifier' state.)
-
------
-
-varargs foo(int bar, int *rest ... ) 
-
-foo(1, 2, 3) would give bar == 1, rest = ({ 2, 3 })
-
-Also allow foo( ({ 1, 2 })... ) ?
-
------
+maybe:
 
 foreach (i, x in ({ 1, 2 }))
 
 foreach (x in ([ 1 : 2, 3 : 4 ]))
+
+foreach (i, j in ({ 1, 2 }), ({ 3, 4, 5 }))
+   for parallel walking
 
 ---
 
@@ -299,3 +266,23 @@ on expressions like 1 || 1 || 1;
 ---
 
 tell_room should be able to take an object as the third arg
+
+---
+
+Profiling shows that a significant amount of CPU is wasted copying stack
+values around in the parser due to the large size of %union.  In most
+cases, only 4 (assuming 32 bit) bytes is needed:
+
+4: /* most stuff */
+5: decl
+8: func_block
+
+so this is a huge waste.  The larger ones could be managed from temporary
+pools (they might even have FIFO ordering, but be careful about parse errors)
+decl seems unavoidable, but 6 should be possible, cutting the size of
+the compile stack and mem that needs to be copied down a bit.
+func_block is only used by function pointers anyway, so isn't that common.
+There is already a stack for the other function temporary and a depth limit
+...
+
+-Beek

@@ -1,0 +1,17 @@
+Array efuns
+
+These efuns exist for the manipulation of array values:
+
+<DL>
+*  allocate
+*  arrayp
+*  filter_array
+*  map_array
+*  member_array
+*  pointerp
+*  sort_array
+*  unique_array
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

@@ -1,0 +1,11 @@
+m_indices - return the keys of a mapping
+
+array m_indices(mapping);
+
+This efun is only available if COMPAT_32 is defined.  It behaves exactly
+the same as keys().
+
+See also:
+ keys
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,23 @@
+<HEAD> <TITLE> set_author - set the author associated with an object </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> set_author - set the author associated with an object </H1> </center>
+<p>
+<b> void set_author( string author ); </b>
+<p>
+Every object has both an author and a domain associated with it for
+the purposes of tracking statistics for authors and domains.  Domains
+may only be set in the master object function domain_file(), however
+authors are different.  They can be initialized to some default value
+by author_file() in the master object, but can also be changed using
+the set_author efun.
+<p>
+set_author changes the author of the object that it is called within.
+That author will get credit for all future actions of that object that
+affect mudlib statistics.
+<p>
+See also:
+<A HREF=../../applies/master/author_file.html>  author_file </A>,
+<A HREF=../../applies/master/domain_file.html>  domain_file </A>,
+<A HREF=author_stats.html>  author_stats </A>,
+<A HREF=set_author.html>  set_author </A>,
+<A HREF=domain_stats.html>  domain_stats </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

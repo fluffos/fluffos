@@ -1,0 +1,15 @@
+livings - return an array of all living objects
+
+object array livings();
+
+This efun is only available if NO_ADD_ACTION is not compiled in.
+
+Returns an array of pointers to all living objects (objects that have
+had enable_commands() called in them).
+
+See also:
+ enable_commands,
+ find_living,
+ users
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

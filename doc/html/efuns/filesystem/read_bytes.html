@@ -1,0 +1,13 @@
+<HEAD> <TITLE> read_bytes - reads a contiguous series of bytes from a file into a string </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> read_bytes - reads a contiguous series of bytes from a file into a string </H1> </center>
+<p>
+<b> string read_bytes( string path, int start, int length ); </b>
+<p>
+This function reads 'length' bytes beginning at byte # 'start' in the
+file named 'path'.  The bytes are returned as a string.  Note that
+(start + length) must not be past the end of the file or else read_bytes
+will fail.  If the second and third arguments are omitted, the entire file
+is returned.
+<p>
+See also:
+<A HREF=read_file.html>  read_file </A>,
+<A HREF=write_bytes.html>  write_bytes </A>

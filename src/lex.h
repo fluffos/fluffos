@@ -142,6 +142,8 @@ extern char yytext[1024];
 extern instr_t instrs[];
 extern keyword_t predefs[];
 
+INLINE void push_function_context PROT((void));
+void pop_function_context PROT((void));
 int yylex PROT((void));
 void init_num_args PROT((void));
 char *query_instr_name PROT((int));

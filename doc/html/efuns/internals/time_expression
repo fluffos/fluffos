@@ -1,0 +1,18 @@
+time_expression - return the amount of real time that an expression took
+
+int time_expression( mixed expr );
+
+int time_expression { ... } 
+
+Evaluate <expr> or the specified block of code.  The amount of real time
+that passes during the evaluation of <expr>, in microseconds, is returned.
+The precision of the value is
+not necessarily 1 microsecond; in fact, it probably is much less precise.
+
+See also:
+ rusage,
+ function_profile,
+ time
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

@@ -7,6 +7,7 @@
 #include "comm.h"
 #include "md.h"
 #include "file.h"
+#include "port.h"
 
 /*
  * Swap out programs from objects.
@@ -105,7 +106,7 @@ swap_seek P2(long, offset, int, flag) {
     } while (ret == -1 && errno == EINTR);
     if (ret == -1)
 	fatal("Couldn't seek the swap file, error %s, offset %d.\n",
-	      strerror(errno), offset);
+	      port_strerror(errno), offset);
 }
 
 /*
@@ -222,8 +223,6 @@ static void free_swap P2(int, start, int, length)
 static int
 swap_out P3(char *, block, int, size, int *, locp)
 {
-    extern int errno;
-    
     if (!block || time_to_swap == 0)
 	return 0;
     if (!assert_swap_file())
@@ -235,14 +234,14 @@ swap_out P3(char *, block, int, size, int *, locp)
 #ifdef SWAP_USE_FD
         if ((write(swap_file, &size, sizeof size) != sizeof size) ||
 	    write(swap_file, block, size) != size) {
-	    debug_perror("swap_out: ", swap_file);
+	    debug_perror("swap_out", swap_file);
 	    *locp = -1;
 	    return 0;
 	}
 #else
 	if (fwrite((char *) &size, sizeof size, 1, swap_file) != 1 ||
 	    fwrite(block, size, 1, swap_file) != 1) {
-	    debug_perror("swap_out:swap file:", 0);
+	    debug_perror("swap_out:swap file", 0);
 	    *locp = -1;
 	    return 0;
 	}
@@ -262,7 +261,6 @@ swap_out P3(char *, block, int, size, int *, locp)
 static int
 swap_in P2(char **, blockp, int, loc)
 {
-    extern int errno;
     int size;
     
     if (loc == -1)
@@ -309,15 +307,21 @@ locate_out P1(program_t *, prog)
 #ifdef DEBUG
     if (d_flag > 1) {
 	debug_message("locate_out: %lX %lX %lX %lX %lX %lX %lX\n",
-		      prog->program, prog->functions,
-	     prog->strings, prog->variable_names, prog->inherit,
+		      prog->program, prog->function_table,
+	     prog->strings, prog->variable_table, prog->inherit,
 		      prog->argument_types, prog->type_start);
     }
 #endif
     prog->program = (char *)DIFF(prog->program, prog);
-    prog->functions = (function_t *)DIFF(prog->functions, prog);
+    prog->function_table = (compiler_function_t *)DIFF(prog->function_table, prog);
+    prog->function_flags = (unsigned short *)DIFF(prog->function_flags, prog);
+    prog->function_offsets = (runtime_function_u *)DIFF(prog->function_offsets, prog);
+#ifdef COMPRESS_FUNCTION_TABLES
+    prog->function_compressed = (compressed_offset_table_t *)DIFF(prog->function_compressed, prog);
+#endif
     prog->strings = (char **)DIFF(prog->strings, prog);
-    prog->variable_names = (variable_t *)DIFF(prog->variable_names, prog);
+    prog->variable_table = (char **)DIFF(prog->variable_table, prog);
+    prog->variable_types = (unsigned short *)DIFF(prog->variable_types, prog);
     prog->inherit = (inherit_t *)DIFF(prog->inherit, prog);
     prog->classes = (class_def_t *)DIFF(prog->classes, prog);
     prog->class_members = (class_member_entry_t *)DIFF(prog->class_members, prog);
@@ -345,9 +349,15 @@ locate_in P1(program_t *, prog)
     if (!prog)
 	return 0;
     prog->program = ADD(prog->program, prog);
-    prog->functions = (function_t *)ADD(prog->functions, prog);
+    prog->function_table = (compiler_function_t *)ADD(prog->function_table, prog);
+    prog->function_flags = (unsigned short *)ADD(prog->function_flags, prog);
+    prog->function_offsets = (runtime_function_u *)ADD(prog->function_offsets, prog);
+#ifdef COMPRESS_FUNCTION_TABLES
+    prog->function_compressed = (compressed_offset_table_t *)ADD(prog->function_compressed, prog);
+#endif
     prog->strings = (char **)ADD(prog->strings, prog);
-    prog->variable_names = (variable_t *)ADD(prog->variable_names, prog);
+    prog->variable_table = (char **)ADD(prog->variable_table, prog);
+    prog->variable_types = (unsigned short *)ADD(prog->variable_types, prog);
     prog->inherit = (inherit_t *)ADD(prog->inherit, prog);
     prog->classes = (class_def_t *)ADD(prog->classes, prog);
     prog->class_members = (class_member_entry_t *)ADD(prog->class_members, prog);
@@ -358,8 +368,8 @@ locate_in P1(program_t *, prog)
 #ifdef DEBUG
     if (d_flag > 1) {
 	debug_message("locate_in: %lX %lX %lX %lX %lX %lX\n",
-		      prog->program, prog->functions,
-	     prog->strings, prog->variable_names, prog->inherit,
+		      prog->program, prog->function_table,
+	     prog->strings, prog->variable_table, prog->inherit,
 		      prog->argument_types, prog->type_start);
     }
 #endif
@@ -383,7 +393,7 @@ int swap P1(object_t *, ob)
 	return 0;
 #ifdef DEBUG
     if (d_flag > 1) {		/* marion */
-	debug_message("Swap object %s (ref %d)\n", ob->name, ob->ref);
+	debug_message("Swap object /%s (ref %d)\n", ob->name, ob->ref);
     }
 #endif
     if (ob->prog->line_info)
@@ -431,7 +441,7 @@ void load_ob_from_swap P1(object_t *, ob)
 	fatal("Loading not swapped object.\n");
 #ifdef DEBUG
     if (d_flag > 1) {		/* marion */
-	debug_message("Unswap object %s (ref %d)\n", ob->name, ob->ref);
+	debug_message("Unswap object /%s (ref %d)\n", ob->name, ob->ref);
     }
 #endif
     swap_in((char **) &ob->prog, ob->swap_num);
@@ -461,7 +471,7 @@ swap_line_numbers P1(program_t *, prog)
 	return 0;
 #ifdef DEBUG
     if (d_flag > 1) {
-	debug_message("Swap line numbers for %s\n", prog->name);
+	debug_message("Swap line numbers for /%s\n", prog->name);
     }
 #endif
     size = prog->file_info[0];
@@ -487,7 +497,7 @@ void load_line_numbers P1(program_t *, prog)
 	return;
 #ifdef DEBUG
     if (d_flag > 1) {
-	debug_message("Unswap line numbers for %s\n", prog->name);
+	debug_message("Unswap line numbers for /%s\n", prog->name);
     }
 #endif
     size = swap_in((char **) &prog->file_info, prog->line_swap_index);
@@ -532,7 +542,6 @@ remove_line_swap P1(program_t *, prog)
 
 void print_swap_stats P1(outbuffer_t *, out)
 {
-    extern int errno;
     int size, cnt, end;
     sw_block_t *m;
 

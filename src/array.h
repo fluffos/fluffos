@@ -13,14 +13,17 @@ typedef struct array_s {
     svalue_t item[1];
 } array_t;
 
+extern array_t the_null_array;
+
 /*
  * array.c
  */
+#ifdef ARRAY_STATS
 extern int num_arrays;
 extern int total_array_size;
+#endif
 
 int sameval PROT((svalue_t *, svalue_t *));
-array_t *null_array PROT((void));
 array_t *allocate_array PROT((int));
 array_t *allocate_empty_array PROT((int));
 void free_array PROT((array_t *));

@@ -1,0 +1,28 @@
+<HEAD> <TITLE> get_char - causes next character of input to be sent to a specified function </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> get_char - causes next character of input to be sent to a specified function </H1> </center>
+<p>
+<b> varargs void get_char( string | function fun, int flag, ... ); </b>
+<p>
+Enable next character of user input to be sent to the function `fun' as
+an argument. The input character will not be parsed by the driver.
+<p>
+Note that get_char is non-blocking which means that the object calling
+get_char does not pause waiting for input.  Instead the object continues
+to execute any statements following the get_char.  The specified function
+`fun' will not be called until the user input has been collected.
+<p>
+If "get_char()" is called more than once in the same execution, only the
+first call has any effect.
+<p>
+If optional argument `flag' is non-zero, the char given by the player will
+not be echoed, and is not seen if snooped (this is useful for collecting
+passwords).
+<p>
+The function `fun' will be called with the user input as its first argument
+(a string). Any additional arguments supplied to get_char will be passed on to
+`fun' as arguments following the user input.
+<p>
+See also:
+<A HREF=../calls/call_out.html>  call_out </A>,
+<A HREF=input_to.html>  input_to </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

@@ -1,0 +1,13 @@
+<HEAD> <TITLE> valid_link - controls the use of the link efun </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> valid_link - controls the use of the link efun </H1> </center>
+<p>
+<b> int valid_link( string from, string to ); </b>
+<p>
+The driver calls valid_link(from, to) in the master object from inside the
+link(from, to) efunction.  If valid_link() returns 0, then the link()
+will fail.  If valid_link() returns 1, then the link will succeed if
+rename() would succeed if called with the same arguments.
+<p>
+See also:
+<A HREF=../../efuns/filesystem/link.html>  link </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

@@ -1,0 +1,15 @@
+get_bb_uid - get the backbone uid
+
+string get_bb_uid();
+
+This routine is only used if PACKAGE_UIDS is used.
+
+This master apply is called by the driver on startup,
+after it has loaded the master object, to get the
+backbone uid defined by the mud.  The function should
+return a string, eg "BACKBONE"
+
+See also:
+ get_root_uid
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

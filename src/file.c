@@ -11,6 +11,7 @@
 #include "file.h"
 #include "lex.h"
 #include "md.h"
+#include "port.h"
 
 /* Removed due to hideousness: if you want to add it back, not that
  * we don't want redefinitions, and that some systems define major() in
@@ -39,17 +40,15 @@
 #include <io.h>
 #endif
 
-extern int errno;
 extern int sys_nerr;
 
 int legal_path PROT((char *));
 
 static int match_string PROT((char *, char *));
-static int isdir PROT((char *path));
 static int copy PROT((char *from, char *to));
 static int do_move PROT((char *from, char *to, int flag));
-static int pstrcmp PROT((svalue_t *, svalue_t *));
-static int parrcmp PROT((svalue_t *, svalue_t *));
+static int CDECL pstrcmp PROT((CONST void *, CONST void *));
+static int CDECL parrcmp PROT((CONST void *, CONST void *));
 static void encode_stat PROT((svalue_t *, int, char *, struct stat *));
 
 #define MAX_LINES 50
@@ -57,14 +56,20 @@ static void encode_stat PROT((svalue_t *, int, char *, struct stat *));
 /*
  * These are used by qsort in get_dir().
  */
-static int pstrcmp P2(svalue_t *, p1, svalue_t *, p2)
+static int CDECL pstrcmp P2(CONST void *, p1, CONST void *, p2)
 {
-    return strcmp(p1->u.string, p2->u.string);
+    svalue_t *x = (svalue_t *)p1;
+    svalue_t *y = (svalue_t *)p2;
+    
+    return strcmp(x->u.string, y->u.string);
 }
 
-static int parrcmp P2(svalue_t *, p1, svalue_t *, p2)
+static int CDECL parrcmp P2(CONST void *, p1, CONST void *, p2)
 {
-    return strcmp(p1->u.arr->item[0].u.string, p2->u.arr->item[0].u.string);
+    svalue_t *x = (svalue_t *)p1;
+    svalue_t *y = (svalue_t *)p2;
+    
+    return strcmp(x->u.arr->item[0].u.string, y->u.arr->item[0].u.string);
 }
 
 static void encode_stat P4(svalue_t *, vp, int, flags, char *, str, struct stat *, st)
@@ -164,15 +169,9 @@ array_t *get_dir P2(char *, path, int, flags)
 	/*
 	 * If path ends with '/' or "/." remove it
 	 */
-#ifdef WIN32
-	if ((p = strrchr(temppath, '\\')) == 0)
-	    p = temppath;
-	if (p[0] == '\\' && ((p[1] == '.' && p[2] == '\0') || p[1] == '\0'))
-#else
 	if ((p = strrchr(temppath, '/')) == 0)
 	    p = temppath;
 	if (p[0] == '/' && ((p[1] == '.' && p[2] == '\0') || p[1] == '\0'))
-#endif
 	    *p = '\0';
     }
 
@@ -191,13 +190,8 @@ array_t *get_dir P2(char *, path, int, flags)
 #endif
 	}
 	do_match = 1;
-#ifdef WIN32
-    } else if (*p != '\0' && strcmp(temppath, ".")) {
-	if (*p == '\\' && *(p + 1) != '\0')
-#else
     } else if (*p != '\0' && strcmp(temppath, ".")) {
 	if (*p == '/' && *(p + 1) != '\0')
-#endif
 	    p++;
 	v = allocate_empty_array(1);
 	encode_stat(&v->item[0], flags, p, &st);
@@ -209,7 +203,8 @@ array_t *get_dir P2(char *, path, int, flags)
 #ifdef WIN32
     FileHandle = -1;
     FileCount = 1;
-    strcat(temppath, "\\*");
+/*    strcat(temppath, "\\*"); */
+    strcat(temppath, "/*");
     if ((FileHandle = _findfirst(temppath, &FindBuffer)) == -1) return 0;
 #else
     if ((dirp = opendir(temppath)) == 0)
@@ -266,9 +261,10 @@ array_t *get_dir P2(char *, path, int, flags)
 #ifdef WIN32
     FileHandle = -1;
     if ((FileHandle = _findfirst(temppath, &FindBuffer)) == -1) return 0;
-    endtemp = temppath + strlen(tmppath) - 2;
+    endtemp = temppath + strlen(temppath) - 2;
     *endtemp = 0;
-    strcat(endtemp++, "\\");
+/*    strcat(endtemp++, "\\"); */
+    strcat(endtemp++, "/");
     i = 0;
     do {
 	if (!do_match && (!strcmp(FindBuffer.name, ".") ||
@@ -318,13 +314,8 @@ array_t *get_dir P2(char *, path, int, flags)
 #endif				/* OS2 */
 
     /* Sort the names. */
-#if 1
     qsort((void *) v->item, count, sizeof v->item[0],
-	  (int (*) ()) ((flags == -1) ? parrcmp : pstrcmp));
-#else
-    qsort((char *) v->item, count, sizeof v->item[0],
 	  (flags == -1) ? parrcmp : pstrcmp);
-#endif
     return v;
 }
 
@@ -461,8 +452,8 @@ void smart_log P4(char *, error_file, int, line, char *, what, int, flag)
 	sprintf(buff, "%s line %d: %s%s", error_file, line, what,
 		(pragmas & PRAGMA_ERROR_CONTEXT) ? show_error_context() : "\n");
     
-    push_constant_string(error_file);
-    push_constant_string(buff);
+    share_and_push_string(error_file);
+    copy_and_push_string(buff);
     mret = safe_apply_master_ob(APPLY_LOG_ERROR, 2);
     if (!mret || mret == (svalue_t *)-1) {
 	debug_message("%s", buff);
@@ -486,7 +477,7 @@ int write_file P3(char *, file, char *, str, int, flags)
 	return 0;
 #ifdef WIN32
     fmode[0] = (flags & 1) ? 'w' : 'a';
-    fmode[1] = 'b';
+    fmode[1] = 't';
     fmode[2] = '\0';
     f = fopen(file, fmode);
 #else    
@@ -494,7 +485,7 @@ int write_file P3(char *, file, char *, str, int, flags)
 #endif
     if (f == 0) {
 	error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n",
-	      file, (flags & 1) ? "overwrite" : "append", strerror(errno));
+	      file, (flags & 1) ? "overwrite" : "append", port_strerror(errno));
     }
     fwrite(str, strlen(str), 1, f);
     fclose(f);
@@ -522,7 +513,7 @@ char *read_file P3(char *, file, int, start, int, len)
     if (stat(file, &st) == -1 || (st.st_mode & S_IFDIR))
 	return 0;
 
-    f = fopen(file, "r");
+    f = fopen(file, FOPEN_READ);
     if (f == 0)
 	return 0;
 
@@ -546,6 +537,13 @@ char *read_file P3(char *, file, int, start, int, len)
 	len = READ_FILE_MAX_SIZE;
     str = new_string(size, "read_file: str");
     str[size] = '\0';
+    if (!size) {
+	/* zero length file */
+	fclose(f);
+	return str;
+    }
+    
+#ifndef WIN32
     do {
 	if ((fread(str, size, 1, f) != 1) || !size) {
 	    fclose(f);
@@ -564,11 +562,20 @@ char *read_file P3(char *, file, int, start, int, len)
 	}
     } while (start > 1);
     
-    if (len != READ_FILE_MAX_SIZE || st.st_size){
+    if (len != READ_FILE_MAX_SIZE || st.st_size) {
         for (p2 = str; p != end;) {
-	    if ((*p2++ = *p++) == '\n')
+	    char c;
+	    
+	    c = *p++;
+	    *p2++ = c;
+	    if (c == '\n') {
 	        if (!--len)
 		    break;
+	    } else if (c == '\0') {
+		fclose(f);
+		FREE_MSTR(str);
+		error("Attempted to read '\\0' into a string!\n");
+	    }
 	}
 	if (len && st.st_size) {
 	    size -= (p2 - str);
@@ -582,8 +589,13 @@ char *read_file P3(char *, file, int, start, int, len)
 		return 0;
 	    }
 	    st.st_size -= size;
-	    end = p2 + size;
+	    /* end is same */
 	    for (; p2 != end;) {
+		if (*p2 == '\0') {
+		    fclose(f);
+		    FREE_MSTR(str);
+		    error("Attempted to read '\\0' into a string!\n");
+		}
 		if (*p2++ == '\n')
 		    if (!--len)
 			break;
@@ -599,11 +611,85 @@ char *read_file P3(char *, file, int, start, int, len)
 	*p2 = '\0';
 	str = extend_string(str, p2 - str);
     } 
+#else
+    /* WIN32 defined */
+    do {
+	if ((fread(str, size, 1, f) != 1) || !size) {
+	    fclose(f);
+	    FREE_MSTR(str);
+	    return 0;
+	}
+
+	if (size > st.st_size) {
+	    size = st.st_size;
+	}		
+	st.st_size -= size;	/* It's OK, size is actual FILE size */
+	end = str + size;    /* OK */
+	for (p = str; --start && (p2 = (char *) memchr(p, '\n', end - p));) {
+	    p = p2 + 1;
+	}
+    } while (start > 1);
+
+    /* Now we have 'p' at desired position. From now on we have to translate \r\n to single \n */
+    
+    {
+	char *startline=p;
 	
+	if (len != READ_FILE_MAX_SIZE || st.st_size){
+	    for (p2 = str; p != end;) {
+		if ((*p == '\r') || (*p == 0x1a)) {
+		    p++;	/* \r will be skipped */
+		} else if ((*p2++ = *p++) == '\n') {
+		    if (!--len) break;
+		}
+	    }
+	    if (len && st.st_size) {
+		/* the next line is wrong; I have to compute this value according to 'p' (to count \r) */
+		/*	   	size -= (p2 - str); */
+		size -= (p-startline);
+		if (size > st.st_size)	size = st.st_size;
+		
+		if ((fread(p2, size, 1, f) != 1) || !size) {
+		    fclose(f);
+		    FREE_MSTR(str);
+		    return 0;
+ 	    	}
+	    	st.st_size -= size;
+
+	    	end = p2 + size;
+
+	    	for (p=p2; p != end;) {
+		    if ((*p == '\r') || (*p == 0x1a)) {
+			p++;
+		    } else if ((*p2++ = *p++) == '\n') {
+			if (!--len) break;
+		    }
+	    	}
+	    	if (st.st_size && len) {
+		    /* tried to read more than READ_MAX_FILE_SIZE */
+		    fclose(f);
+		    FREE_MSTR(str);
+		    return 0;
+	    	}
+	    }
+	} else {
+	    /* I HAVE to translate \r\n ! */
+	    for (p2 = str; p != end;) {
+		if ((*p == '\r') || (*p == 0x1a)) {
+		    p++;	/* \r will be skipped */
+		} else if ((*p2++ = *p++) == '\n') {
+		    if (!--len) break;
+		}
+	    }
+	}
+	*p2 = '\0';
+	str = extend_string(str, p2 - str);
+    } 
+#endif
+
     fclose(f);
     return str;
 }				/* read_file() */
-
 
 char *read_bytes P4(char *, file, int, start, int, len, int *, rlen)
 {
@@ -722,15 +808,40 @@ int write_bytes P4(char *, file, int, start, char *, str, int, theLength)
 int file_size P1(char *, file)
 {
     struct stat st;
+    int ret;
+#ifdef WIN32
+    int needs_free = 0, len;
+    char *p;
+#endif
 
     file = check_valid_path(file, current_object, "file_size", 0);
     if (!file)
 	return -1;
+
+#ifdef WIN32
+    len = strlen(file);
+    p = file + len - 1;
+    if (*p == '/') {
+	needs_free = 1;
+	p = file;
+	file = new_string(len - 1, "file_size");
+	memcpy(file, p, len - 1);
+	file[len] = 0;
+    }
+#endif
+
     if (stat(file, &st) == -1)
-	return -1;
-    if (S_IFDIR & st.st_mode)
-	return -2;
-    return st.st_size;
+	ret = -1;
+    else if (S_IFDIR & st.st_mode)
+	ret = -2;
+    else 
+	ret = st.st_size;
+
+#ifdef WIN32
+    if (needs_free) FREE_MSTR(file);
+#endif
+    
+    return ret;
 }
 
 
@@ -740,8 +851,6 @@ int file_size P1(char *, file)
  * The path is always treated as an absolute path, and is returned without
  * a leading '/'.
  * If the path was '/', then '.' is returned.
- * The returned string may or may not be residing inside the argument 'path',
- * so don't deallocate arg 'path' until the returned result is used no longer.
  * Otherwise, the returned path is temporarily allocated by apply(), which
  * means it will be deallocated at next apply().
  */
@@ -751,42 +860,47 @@ char *check_valid_path P4(char *, path, object_t *, call_object, char *, call_fu
 
     if (call_object == 0 || call_object->flags & O_DESTRUCTED)
 	return 0;
-    push_string(path, STRING_MALLOC);
+    /* FIXME: Ok? */
+#ifdef WIN32
+    {
+	char *p;
+	
+	for(p=path; *p; p++) if (*p == '\\') *p='/';
+    }
+#endif
+
+    copy_and_push_string(path);
     push_object(call_object);
-    push_string(call_fun, STRING_CONSTANT);
+    push_constant_string(call_fun);
     if (writeflg)
 	v = apply_master_ob(APPLY_VALID_WRITE, 3);
     else
 	v = apply_master_ob(APPLY_VALID_READ, 3);
 
-    if (v && v != (svalue_t *)-1 && v->type == T_NUMBER && v->u.number == 0)
-	return 0;
+    if (v == (svalue_t *)-1)
+	v = 0;
+    
+    if (v && v->type == T_NUMBER && v->u.number == 0) return 0;
+    if (v && v->type == T_STRING) {
+	path = v->u.string;
+    } else {
+	extern svalue_t apply_ret_value;
+	
+	free_svalue(&apply_ret_value, "check_valid_path");
+	apply_ret_value.type = T_STRING;
+	apply_ret_value.subtype = STRING_MALLOC;
+	path = apply_ret_value.u.string = string_copy(path, "check_valid_path");
+    }
+    
     if (path[0] == '/')
 	path++;
 #ifndef LATTICE
     if (path[0] == '\0')
 	path = ".";
 #endif
-    if (legal_path(path)) {
-#ifdef WIN32
-	static char paths[10][100];
-	char *fluff;
-	static int bing = 0;
-	int old_bing;
-
-	/* Mangle the path for writing to the disk. */
-	strcpy(paths[bing], path);
-	fluff = paths[bing];
-	while (fluff = strchr(fluff, '/')) {
-	    *fluff = '\\';
-	}			/* endwhile */
-	old_bing = bing;
-	bing = (bing + 1) % 10;
-	return paths[old_bing];
-#else
+    if (legal_path(path))
 	return path;
-#endif
-    }
+
     return 0;
 }
 
@@ -850,13 +964,6 @@ static int match_string P2(char *, match, char *, str)
 #define	S_ISBLK(m)	(((m)&S_IFMT) == S_IFBLK)
 #endif
 
-static int isdir P1(char *, path)
-{
-    struct stat stats;
-
-    return stat(path, &stats) == 0 && S_ISDIR(stats.st_mode);
-}
-
 static struct stat to_stats, from_stats;
 
 static int copy P2(char *, from, char *, to)
@@ -872,11 +979,11 @@ static int copy P2(char *, from, char *, to)
     if (unlink(to) && errno != ENOENT) {
 	return 1;
     }
-    ifd = open(from, O_RDONLY);
+    ifd = open(from, OPEN_READ);
     if (ifd < 0) {
 	return errno;
     }
-    ofd = open(to, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    ofd = open(to, OPEN_WRITE | O_CREAT | O_TRUNC, 0666);
     if (ofd < 0) {
 	close(ifd);
 	return 1;
@@ -961,8 +1068,8 @@ static int do_move P3(char *, from, char *, to, int, flag)
 	error("/%s: unknown error\n", to);
 	return 1;
     }
-#if defined(SYSV) && !defined(_SEQUENT_)
-    if ((flag == F_RENAME) && isdir(from)) {
+#ifdef SYSV
+    if ((flag == F_RENAME) && file_size(from) == -2) {
 	char cmd_buf[100];
 
 	sprintf(cmd_buf, "/usr/lib/mv_dir %s %s", from, to);
@@ -1011,9 +1118,9 @@ static int do_move P3(char *, from, char *, to, int, flag)
 
 void debug_perror P2(char *, what, char *, file) {
     if (file)
-	debug_message("System Error: %s:%s:%s\n", what, file, strerror(errno));
+	debug_message("System Error: %s:%s:%s\n", what, file, port_strerror(errno));
     else
-	debug_message("System Error: %s:%s\n", what, strerror(errno));
+	debug_message("System Error: %s:%s\n", what, port_strerror(errno));
 }
 
 /*
@@ -1027,7 +1134,10 @@ int do_rename P3(char *, fr, char *, t, int, flag)
     char *from, *to, tbuf[3];
     char newfrom[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
     int flen;
-    
+    static svalue_t from_sv = { T_NUMBER };
+    static svalue_t to_sv = { T_NUMBER };
+    extern svalue_t apply_ret_value;
+
     /*
      * important that the same write access checks are done for link() as are
      * done for rename().  Otherwise all kinds of security problems would
@@ -1039,9 +1149,14 @@ int do_rename P3(char *, fr, char *, t, int, flag)
     from = check_valid_path(fr, current_object, "rename", 1);
     if (!from)
 	return 1;
+
+    assign_svalue(&from_sv, &apply_ret_value);
+    
     to = check_valid_path(t, current_object, "rename", 1);
     if (!to)
 	return 1;
+
+    assign_svalue(&to_sv, &apply_ret_value);
     if (!strlen(to) && !strcmp(t, "/")) {
 	to = tbuf;
 	sprintf(to, "./");
@@ -1061,7 +1176,7 @@ int do_rename P3(char *, fr, char *, t, int, flag)
 	from = newfrom;
     }
 
-    if (isdir(to)) {
+    if (file_size(to) == -2) {
 	/* Target is a directory; build full target filename. */
 	char *cp;
 	char newto[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
@@ -1085,19 +1200,27 @@ int copy_file P2(char *, from, char *, to)
     int from_fd, to_fd;
     int num_read, num_written;
     char *write_ptr;
+    static svalue_t from_sv = { T_NUMBER };
+    static svalue_t to_sv = { T_NUMBER };
+    extern svalue_t apply_ret_value;
 
     from = check_valid_path(from, current_object, "move_file", 0);
+
+    assign_svalue(&from_sv, &apply_ret_value);
+
     to = check_valid_path(to, current_object, "move_file", 1);
     if (from == 0)
 	return -1;
     if (to == 0)
 	return -2;
 
-    from_fd = open(from, O_RDONLY);
+    assign_svalue(&to_sv, &apply_ret_value);
+
+    from_fd = open(from, OPEN_READ);
     if (from_fd < 0)
 	return (-1);
 
-    if (isdir(to)) {
+    if (file_size(to) == -2) {
 	/* Target is a directory; build full target filename. */
 	char *cp;
 	char newto[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
@@ -1112,7 +1235,7 @@ int copy_file P2(char *, from, char *, to)
 	close(from_fd);
 	return copy_file(from, newto);
     }
-    to_fd = open(to, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    to_fd = open(to, OPEN_WRITE | O_CREAT | O_TRUNC, 0666);
     if (to_fd < 0) {
 	close(from_fd);
 	return (-2);

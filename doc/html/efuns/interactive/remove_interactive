@@ -1,0 +1,12 @@
+remove_interactive - disconnect an interactive object.
+
+int remove_interactive(object);
+
+If the argument object is interactive, and not destructed, cause it to
+be disconnected. (i.e lose it's interactive status).  Returns 1 if 
+the operation succeeded, or 0 if it didn't ( object destructed, or not
+interactive)
+
+This function requires PACKAGE_CONTRIB to be defined in the options file.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,13 @@
+member_array - returns index of an occurence of a given item in an array or string
+
+int member_array( mixed item, mixed arr);
+
+int member_array( mixed item, mixed arr, int start);
+
+Returns the index of the first occurence of `item' in the array  or string
+`arr', or the first occurence at or after 'start'.
+If the item is not found, then -1 is returned.
+
+For the purpose of this efun, strings are considered to be arrays of ints.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

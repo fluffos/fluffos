@@ -1,0 +1,16 @@
+throw - forces an error to occur in an object.
+
+void throw(mixed);
+
+Throw can be used to send an arbitrary value to an enclosing catch() statement.
+If you want to raise a general error message, see error(), as that will
+behave better if it is not caught.  Control is transfered directly to the
+enclosing catch() statement, and the value of the catch() statement is the
+value thrown.
+
+See also:
+ catch,
+ error
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

@@ -1,0 +1,64 @@
+socket_create - create an efun socket
+
+int socket_create( int mode, string | function read_callback);
+
+int socket_create( int mode, string | function read_callback, string | function close_callback );
+
+This efun is only available if PACKAGE_SOCKETS is compiled in.
+
+socket_create() creates an efun socket. mode determines which type of
+socket is created. Currently supported socket modes are:
+
+<DL>
+* MUD for sending LPC data types using TCP protocol.
+* STREAM for sending raw data using TCP protocol.
+* DATAGRAM for using UDP protocol.
+</DL>
+
+The argument read_callback is the name of a function for the driver to
+call when the socket gets data from its peer. The read callback should follow
+this format:
+
+<pre>
+void read_callback(int fd, mixed message)
+</pre>
+
+Where fd is the socket which received the data, and message is the data
+which was received.
+
+The argument close_callback is the name of a function for the driver to
+call if the socket closes unexpectedly, i.e. not as the result of a
+socket_close() call. The close callback should follow this format:
+
+<pre>
+void close_callback(int fd)
+</pre>
+
+Where fd is the socket which has closed.
+NOTE: close_callback is not used with DATAGRAM mode sockets.
+
+socket_create() returns:
+
+a non-negative descriptor on success.
+
+a negative value indicated below on error.
+
+ERRORS - these are in "socket_err.h"
+
+<DL>
+* EEMODENOTSUPP Socket mode not supported.
+* EESOCKET Problem creating socket.
+* EESETSOCKOPT Problem with setsockopt.
+* EENONBLOCK Problem setting non-blocking mode.
+* EENOSOCKS No more available efun sockets.
+* EESECURITY Security violation attempted.
+
+See also:
+ socket_accept,
+ socket_bind,
+ socket_close,
+ socket_connect,
+ socket_listen,
+ socket_write
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

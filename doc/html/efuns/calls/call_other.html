@@ -1,0 +1,55 @@
+<HEAD> <TITLE> call_other - call a function in another object </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> call_other - call a function in another object </H1> </center>
+<p>
+<b> mixed call_other(mixed ob, string func, ...);  </b>
+<p>
+<b> mixed call_other(mixed ob, array args);  </b>
+<p>
+<b> mixed call_other(array obs, string func, ...);  </b>
+<p>
+<b> mixed call_other(array obs, array args);  </b>
+<p>
+ob is either an object pointer, or a string filename (suitable for 
+find_object()).  obs is an array of object pointers and strings.
+Using an array as the first argument does a call_other for each element of
+the array, and returns an array of the results.
+If the array form is used for args, then the first element is the function
+name, and the remainder are the arguments; e.g.:
+<p>
+call_other(ob, ({ "foo", 1, 3, 5 }))
+<p>
+and
+<p>
+call_other(ob, "foo", 1, 3, 5)
+<p>
+are equivalent.  The function foo() is called in the object ob with the
+arguments (1, 3, 5).  The return value of call_other() is the value
+returned from the foo() function.  In the case of an array of objects,
+the return value of call_other() is an array of the return values.
+<p>
+There is a much more attractive way to do call_others;
+call_other(x, "y", z, ...) is the same as:
+<p>
+x->y(z, ...)
+<p>
+ie,
+<p>
+call_other(ob, "query_name");
+<p>
+could be written as:
+<p>
+ob->query_name();
+<p>
+Writing out the call_other call is mainly used when the function name
+is in a variable, i.e:
+<p>
+<pre>
+void do_test(string fname, int x) {
+    call_other(fname, "test_" + x);
+}
+</pre>
+<p>
+An example of using an array as the first argument:
+<p>
+users()->quit();
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

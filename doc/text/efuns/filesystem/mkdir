@@ -1,0 +1,12 @@
+mkdir - make a directory
+
+int mkdir( string directory );
+
+Creates the specified directory.  Returns 1 if successful, 0 if not.
+
+See also:
+ rm,
+ rmdir,
+ link
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,24 @@
+<HEAD> <TITLE> implode - concatenate strings </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> implode - concatenate strings </H1> </center>
+<p>
+<b> string implode( array arr, string del ); </b>
+<p>
+<b> mixed implode( array arr, function f); </b>
+<p>
+<b> mixed implode( array arr, function f, mixed start); </b>
+<p>
+Concatenate all strings found in array 'arr', with the string 'del' between
+each element. Only strings are used from the array.  Elements that are not
+strings are ignored.
+<p>
+The second version takes the first and second values of arr and passes them
+to f, then passes that result and the third arg to f, et cetera.  It returns
+the last result of the call to f.
+<p>
+In the third case, the first call is f(start, arr[0]), then things proceed
+as above.
+<p>
+See also:
+<A HREF=explode.html>  explode </A>,
+<A HREF=sprintf.html>  sprintf </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

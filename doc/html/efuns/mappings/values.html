@@ -1,0 +1,26 @@
+<HEAD> <TITLE> values - return an array of the values from the (key, value) pairs in a mapping </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> values - return an array of the values from the (key, value) pairs in a mapping </H1> </center>
+<p>
+<b> array values( mapping m ); </b>
+<p>
+values() returns an array of values corresponding to the value elements
+in the (key, value) pairs stored in the mapping m.
+<p>
+For example, if:
+<p>
+<pre>
+mapping m;
+<p>
+m = (["hp" : 35, "sp" : 42, "mass" : 100]);
+</pre>
+<p>
+then
+<p>
+<pre>
+values(m) == ({35, 42, 100})
+</pre>
+<p>
+Note: the values will be returned in the same order as the corresponding
+keys.
+<p>
+See also:
+<A HREF=keys.html>  keys </A>

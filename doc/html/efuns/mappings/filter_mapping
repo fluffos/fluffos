@@ -1,0 +1,12 @@
+filter_mapping - return a selective sub-mapping
+
+mapping filter_mapping(mapping map, string fun, object ob, mixed extra, ...);
+
+mapping filter_array(mapping map, function f, mixed extra, ...);
+
+filter_mapping() is really the same as the filter() efun.
+
+See also:
+ filter
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

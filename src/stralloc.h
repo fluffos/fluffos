@@ -19,6 +19,13 @@
 #endif
 
 #if defined(DEBUGMALLOC_EXTENSIONS) && defined(STRING_STATS)
+/* Uncomment for very complete string ref checking, but be warned it runs
+   _very_ slowly.  A conditional definition like:
+   
+   (current_prog && strcmp(current_prog->name, "foo") == 0 ? check_string_stats(0) : 0)
+   
+   is usually best.
+ */
 #define CHECK_STRING_STATS /* check_string_stats(0) */
 #else
 #define CHECK_STRING_STATS
@@ -59,16 +66,30 @@ typedef struct malloc_block_s {
 				)
 
 #define FREE_MSTR(x) SAFE(\
-			  SUB_STRING(MSTR_SIZE(x));\
-			  SUB_NEW_STRING(MSTR_SIZE(x), \
+                          DEBUG_CHECK(MSTR_REF(x) != 1, "FREE_MSTR used on a multiply referenced string\n");\
+                          svalue_strlen_size = MSTR_SIZE(x);\
+			  SUB_NEW_STRING(svalue_strlen_size, \
 					 sizeof(malloc_block_t));\
 			  FREE(MSTR_BLOCK(x));\
+			  SUB_STRING(svalue_strlen_size);\
 		      )
 
 /* This counts on some rather crucial alignment between malloc_block_t and
-   block_t */
-#define COUNTED_STRLEN(x) ((svalue_strlen_size = MSTR_BLOCK(x)->size), svalue_strlen_size != USHRT_MAX ? svalue_strlen_size : strlen((x)+USHRT_MAX)+USHRT_MAX)
+ * block_t.  COUNTED_STRLEN(x) is the same as strlen(sv->u.string) when
+ * sv->subtype is STRING_MALLOC or STRING_SHARED, and runs significantly
+ * faster.
+ */
+#define COUNTED_STRLEN(x) ((svalue_strlen_size = MSTR_SIZE(x)), svalue_strlen_size != USHRT_MAX ? svalue_strlen_size : strlen((x)+USHRT_MAX)+USHRT_MAX)
+/* return the number of references to a STRING_MALLOC or STRING_SHARED 
+   string */
 #define COUNTED_REF(x)    MSTR_REF(x)
+
+/* ref == 0 means the string has been referenced USHRT_MAX times and is
+   immortal */
+#define INC_COUNTED_REF(x) if (MSTR_REF(x)) MSTR_REF(x)++;
+/* This is a conditional expression that evaluates to zero if the block
+   should be deallocated */
+#define DEC_COUNTED_REF(x) (!(MSTR_REF(x) == 0 || --MSTR_REF(x) > 0))
 
 typedef struct block_s {
     struct block_s *next;	/* next block in the hash chain */
@@ -78,7 +99,7 @@ typedef struct block_s {
     /* these two must be last */
     unsigned short size;	/* length of the string */
     unsigned short refs;	/* reference count    */
-}       block_t;
+} block_t;
 
 #define NEXT(x) (x)->next
 #define REFS(x) (x)->refs
@@ -93,7 +114,7 @@ typedef struct block_s {
 			  COUNTED_STRLEN((x)->u.string) : \
 			  strlen((x)->u.string))
 
-/* For quick checks.  Avoid strlen(), etc */
+/* For quick checks.  Avoid strlen(), etc.  This is  */
 #define SVALUE_STRLEN_DIFFERS(x, y) ((((x)->subtype & STRING_COUNTED) && \
 				     ((y)->subtype & STRING_COUNTED)) ? \
 				     MSTR_SIZE((x)->u.string) != \

@@ -1,0 +1,26 @@
+Predefined preprocessor #defines
+
+Note: additional predefines may be added from the command line using the -D
+flag.  Also, anything defined in either options.h will be available surrounded
+by __; e.g if FOO is defined in options.h, the __FOO__ will be defined in all
+objects.
+
+The following identifiers may be defined:
+
+<DL>
+* MUDOS: always defined
+* "2.7.2": a string representing the version of MudOS being run
+* __PORT__: archaic; the port number of the first (previously, the only) external port
+* __ARCH__: the name of the architecture of the machine
+* __COMPILER__: the compiler MudOS was compiled with
+* __OPTIMIZATION__: the optimization used
+* MUD_NAME: the MUD name from the config file
+* HAS_ED: defined if the ed() efun is available
+* HAS_PRINTF: defined if the printf() efun is available
+* HAS_RUSAGE: defined if the rusage() efun is available
+* HAS_DEBUG_LEVEL: defined if the debug_level() efun is available
+* "doc/concepts/defines.c": the file being compiled
+* __DIR__: the directory the file is in (with the trailing /)
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

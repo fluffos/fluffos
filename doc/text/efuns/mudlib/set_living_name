@@ -1,0 +1,15 @@
+set_living_name - set a living name for a living object
+
+void set_living_name( string name );
+
+This efun is only available if NO_ADD_ACTION is not compiled in.
+
+Set a living name on an object that is living. After this has been done, the
+object can be found with "find_living()".
+
+See also:
+ enable_commands,
+ find_living,
+ find_player
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

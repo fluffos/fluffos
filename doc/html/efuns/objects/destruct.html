@@ -1,0 +1,16 @@
+<HEAD> <TITLE> destruct - remove an object </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> destruct - remove an object </H1> </center>
+<p>
+<b> void destruct( object ob ); </b>
+<p>
+Completely destroy and remove object 'ob'. After the call to destruct().
+If 'ob' is this_object(), execution will continue, but it is best to return
+a value immediately.  All pointers to the object in any variable or structure
+will immediately become zero.  move_or_destruct() is called in all the
+objects inside of the object being destructed.
+<p>
+See also:
+<A HREF=clone_object.html>  clone_object </A>,
+<A HREF=new.html>  new </A>,
+<A HREF=../../applies/move_or_destruct.html>  move_or_destruct </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

@@ -1,0 +1,17 @@
+getuid - return the user id (uid) of an object
+
+string getuid( object ob );
+
+This efun is only available if PACKAGE_UIDS is compiled into the driver.
+
+Returns the user id of an object.  The uid of an object is determined at
+object creation by the creator_file() function.
+
+See also:
+ seteuid,
+ geteuid,
+ export_uid,
+ valid_seteuid,
+ creator_file
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

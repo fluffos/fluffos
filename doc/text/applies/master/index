@@ -1,0 +1,43 @@
+Master applies
+
+These are all the functions that are called in the master object by the mudlib.
+None of them are required to exist.
+
+<DL>
+*  author_file
+*  compile_object
+*  connect
+*  crash
+*  creator_file
+*  domain_file
+*  epilog
+*  error_handler
+*  flag
+*  get_bb_uid
+*  get_root_uid
+*  get_save_file_name
+*  log_error
+*  make_path_absolute
+*  object_name
+*  parse_command_all_word
+*  parse_command_prepos_list
+*  preload
+*  privs_file
+*  retrieve_ed_setup
+*  save_ed_setup
+*  slow_shutdown
+*  valid_bind
+*  valid_compile_to_c
+*  valid_hide
+*  valid_link
+*  valid_object
+*  valid_override
+*  valid_read
+*  valid_save_binary
+*  valid_seteuid
+*  valid_shadow
+*  valid_socket
+*  valid_write
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

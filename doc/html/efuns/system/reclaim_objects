@@ -1,0 +1,16 @@
+reclaim_objects - reclaim any lingering objects
+
+int reclaim_objects();
+
+Cycles through all objects that are loaded, and frees any lingering objects
+that it can.  This could result in a sizable amount of memory being freed up,
+depending on how the mud is coded.  Objects are typically left lingering
+when a global variable in more than one object contains a pointer to it,
+and the object gets destructed, but the values containing pointers to the
+object are never accessed again.  This efun returns the number of destructed
+objects encountered in variables.
+
+See also:
+ destruct
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

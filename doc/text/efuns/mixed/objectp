@@ -1,0 +1,7 @@
+objectp - determine whether or not a given variable is an object
+
+int objectp( mixed arg );
+
+Return 1 if `arg' is an object.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

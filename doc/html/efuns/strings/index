@@ -1,0 +1,28 @@
+String efuns
+
+The following efuns exist for working with strings:
+
+<DL>
+*  capitalize
+*  clear_bit
+*  crypt
+*  explode
+*  implode
+*  lower_case
+*  next_bit
+*  pluralize
+*  reg_assoc
+*  regexp
+*  replace_string
+*  set_bit
+*  sprintf
+*  sscanf
+*  strcmp
+*  stringp
+*  strlen
+*  strsrch
+*  terminal_colour
+*  test_bit
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,11 @@
+debug_message - send a message to the driver's stdout
+
+void debug_message(string);
+
+The string argument is printed on the driver's stdout, as well as being added
+to the debug.log file.
+
+See also:
+ ctime
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

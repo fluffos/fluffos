@@ -1,0 +1,19 @@
+<HEAD> <TITLE> strsrch - search for substrings in a string </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> strsrch - search for substrings in a string </H1> </center>
+<p>
+<b> int strsrch( string str, string substr | int char, int flag ); </b>
+<p>
+strsrch() searches for the first occurance of the string 'substr' in the 
+string 'str'.  The last occurance of 'substr' can be found by passing '-1' 
+as the 3rd argument (which is optional).  If the second argument is an 
+integer, that character is found (like C's strchr()/strrchr().)  The empty 
+string or null value cannot be searched for.
+<p>
+The integer offset of the first (last) match is returned.  -1 is returned
+if there was no match, or an error occurred (bad args, etc).
+<p>
+See also:
+<A HREF=sscanf.html>  sscanf </A>,
+<A HREF=replace_string.html>  replace_string </A>,
+<A HREF=regexp.html>  regexp </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

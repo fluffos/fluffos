@@ -1,0 +1,20 @@
+<HEAD> <TITLE> variables - list all the variables in a given object. </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> variables - list all the variables in a given object. </H1> </center>
+<p>
+<b> string array variables(object, int default: 0); </b>
+<p>
+variables() can return two different things. If the second argument is
+0 (which it is by default) it will return an array containing the names
+of all the variables in the object passed as the first argument. If the
+second argument is non-zero, more information about each variable is
+given. For a non-zero second argument, each array element contains
+the following:
+<p>
+({ variable_name, variable_type }). 
+<p>
+Where variable_name is the name of the given variable, and variable_type
+is the type of the variable, such as "string" or "private int" etc.
+<p>
+This efun is only available if PACKAGE_CONTRIB is defined in the
+options file.
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

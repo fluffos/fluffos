@@ -5,7 +5,13 @@
  * call_out.c
  */
 void call_out PROT((void));
+#ifdef CALLOUT_HANDLES
+int find_call_out_by_handle PROT((int));
+int remove_call_out_by_handle PROT((int));
+int new_call_out PROT((object_t *, svalue_t *, int, int, svalue_t *));
+#else
 void new_call_out PROT((object_t *, svalue_t *, int, int, svalue_t *));
+#endif
 int remove_call_out PROT((object_t *, char *));
 void remove_all_call_out PROT((object_t *));
 int find_call_out PROT((object_t *, char *));

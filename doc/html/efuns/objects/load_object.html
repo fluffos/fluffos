@@ -1,0 +1,15 @@
+<HEAD> <TITLE> load_object - find or load an object by file name </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> load_object - find or load an object by file name </H1> </center>
+<p>
+<b> object load_object( string str ); </b>
+<p>
+Find the object with the file name 'str'.  If the object is already
+loaded, it is returned (just like find_object()).  If the file exists
+and the object hasn't been loaded yet, it is loaded first, then the
+new object is returned.  Otherwise zero is returned.  An error is
+thrown only if the object has compile errors.
+<p>
+See also:
+<A HREF=file_name.html>  file_name </A>,
+<A HREF=find_object.html>  find_object </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

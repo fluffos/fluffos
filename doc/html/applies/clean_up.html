@@ -1,0 +1,21 @@
+<HEAD> <TITLE> clean_up - periodically called in inactive objects </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> clean_up - periodically called in inactive objects </H1> </center>
+<p>
+<b> int clean_up( int inherited );  </b>
+<p>
+The clean_up() function is called by the driver on a regular basis in all
+objects that have been inactive for the time specified for clean_up() in the
+runtime configuration file.  One flag is passed to the function, specifying
+whether or not the object has been inheritted by anything.  If clean_up()
+returns 0, clean_up() will never be called again on that object.  If it returns
+1, it will be called again when the object remains inactive for the specified
+clean_up() delay.
+<p>
+One thing that might be commonly done by an object in this function is
+destructing itself to conserve memory.  However, one often does not want
+to destruct objects which have been inherited, as this will cause a new
+copy to be loaded next time they are inherited again, causing more than
+one copy of the code to be in memory.
+<p>
+See also: <A HREF=../efuns/objects/destruct.html>  destruct </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

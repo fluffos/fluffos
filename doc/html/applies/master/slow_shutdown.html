@@ -1,0 +1,18 @@
+<HEAD> <TITLE> slow_shutdown - informs the mud that a slow shutdown is in progress </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> slow_shutdown - informs the mud that a slow shutdown is in progress </H1> </center>
+<p>
+<b> int slow_shutdown( int minutes ); </b>
+<p>
+This master apply is called when the driver can't
+allocate any more memory from the heap and had to
+use its reserved memory block.  This function can
+only be called if the "reserved size" config file
+setting was set.  The minutes remaining to driver
+shutdown is passed to this function.  If this function
+does ont exist, or returns zero, the driver shuts
+down immediately.
+<p>
+See also:
+<A HREF=crash.html>  crash </A>,
+<A HREF=../../efuns/system/shutdown.html>  shutdown </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

@@ -1,0 +1,14 @@
+query_shadowing - determine whether or not a given object it shadowing another
+
+object query_shadowing( object ob );
+
+This efun is only available if NO_SHADOWS is not compiled in.
+
+Returns the object that `ob' is shadowing, or zero (0) if it is not
+shadowing any object.
+
+See also:
+ shadow,
+ valid_shadow
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

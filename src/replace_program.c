@@ -31,7 +31,7 @@ void replace_programs()
 
 	if (r_ob->ob->flags & O_SWAPPED)
 	    load_ob_from_swap(r_ob->ob);
-	num_fewer = r_ob->ob->prog->num_variables - r_ob->new_prog->num_variables;
+	num_fewer = r_ob->ob->prog->num_variables_total - r_ob->new_prog->num_variables_total;
 #ifdef DEBUG
 	if (d_flag)
 	    debug_message("%d less variables\n", num_fewer);
@@ -40,29 +40,26 @@ void replace_programs()
 	if ((offset = r_ob->var_offset)) {
 	    svp = r_ob->ob->variables;
 	    /* move our variables up to the top */
-	    for (i = 0; i < r_ob->new_prog->num_variables; i++) {
+	    for (i = 0; i < r_ob->new_prog->num_variables_total; i++) {
 		free_svalue(svp, "replace_programs");
 		*svp = *(svp + offset);
-		*(svp + offset) = const0n;
+		*(svp + offset) = const0u;
 		svp++;
 	    }
 	    /* free the rest */
 	    for (i = 0; i < num_fewer; i++) {
 		free_svalue(svp, "replace_programs");
-		*svp++ = const0n;
+		*svp++ = const0u;
 	    }
 	} else {
 	    /* We just need to remove the last num_fewer variables */
-	    svp = &r_ob->ob->variables[r_ob->new_prog->num_variables];
+	    svp = &r_ob->ob->variables[r_ob->new_prog->num_variables_total];
 	    for (i = 0; i < num_fewer; i++) {
 		free_svalue(svp, "replace_programs");
-		*svp++ = const0n;
+		*svp++ = const0u;
 	    }
 	}
-#ifdef DEBUG
-	if (d_flag)
-	    debug_message("freed.\n");
-#endif
+
 	r_ob->new_prog->ref++;
 	old_prog = r_ob->ob->prog;
 	r_ob->ob->prog = r_ob->new_prog;
@@ -112,7 +109,7 @@ static program_t *search_inherited P3(char *, str, program_t *, prg, int *, offp
 #ifdef DEBUG
     if (d_flag) {
 	debug_message("search_inherited started\n");
-	debug_message("searching for PRG(%s) in PRG(%s)\n", str, prg->name);
+	debug_message("searching for PRG(/%s) in PRG(/%s)\n", str, prg->name);
 	debug_message("num_inherited=%d\n", prg->num_inherited);
     }
 #endif
@@ -120,7 +117,7 @@ static program_t *search_inherited P3(char *, str, program_t *, prg, int *, offp
 #ifdef DEBUG
 	if (d_flag) {
 	    debug_message("index %d:\n", i);
-	    debug_message("checking PRG(%s)\n", prg->inherit[i].prog->name);
+	    debug_message("checking PRG(/%s)\n", prg->inherit[i].prog->name);
 	}
 #endif
 	if (strcmp(str, prg->inherit[i].prog->name) == 0) {

@@ -1,0 +1,12 @@
+valid_bind - determine if it is legal to bind a given function pointer to an object
+
+int valid_bind(object doer, object owner, object victim); 
+
+This is called when 'doer' tries to use the bind() efun to bind a function
+pointer owned by 'owner' to the object 'victim'.  If this routine returns
+zero, the operation is disallowed.
+
+See also:
+ bind
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,23 @@
+<HEAD> <TITLE> shutdown - shutdown the driver </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> shutdown - shutdown the driver </H1> </center>
+<p>
+<b> void shutdown( int how ); </b>
+<p>
+This function shuts down the driver in a controlled fashion (as opposed to
+how a crash would shut it down).  The 'how' argument specifes what integer
+value that driver should pass to exit().  The convention is to pass 'how'
+as -1 when the script that restarts the driver should die as well.  Thus
+a reboot command would use shutdown() while a halt command would use
+shutdown(-1).  The script must explicitly check the return value to see
+if it is -1 if you wish to use this convention.  Obviously, shutdown()
+is a sensitive function and should be secured.  As with exec(), the way
+to make it secure is to add a simul_efun of the same name which does
+the appropriate security checks.  Be sure to set valid_override() up
+(in master.c) to protect against efun::shutdown().
+<p>
+See also:
+<A HREF=../../applies/master/crash.html>  crash </A>,
+<A HREF=../../applies/master/slow_shutdown.html>  slow_shutdown </A>,
+<A HREF=../../applies/master/valid_override.html>  valid_override </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>
+<p>

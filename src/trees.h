@@ -259,5 +259,6 @@ parse_node_t *make_range_node PROT((int, parse_node_t *,
 					 parse_node_t *));
 parse_node_t *insert_pop_value PROT((parse_node_t *));
 parse_node_t *optimize_loop_test PROT((parse_node_t *));
+int is_boolean PROT((parse_node_t *));
 
 #endif

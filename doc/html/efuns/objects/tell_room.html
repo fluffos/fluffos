@@ -1,0 +1,16 @@
+<HEAD> <TITLE> tell_room - send a message to all objects in a room </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> tell_room - send a message to all objects in a room </H1> </center>
+<p>
+<b> void tell_room( mixed ob, string str, object array exclude ); </b>
+<p>
+Send a message 'str' to object all objects in the room 'ob'.  'ob' can also 
+be the filename of the room (string).  If 'exclude' is specified, all
+objects in the exclude array will not receive the message.
+<p>
+See also:
+<A HREF=../interactive/write.html>  write </A>,
+<A HREF=../interactive/shout.html>  shout </A>,
+<A HREF=../interactive/say.html>  say </A>,
+<A HREF=tell_object.html>  tell_object </A>,
+<A HREF=../../applies/interactive/catch_tell.html>  catch_tell </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

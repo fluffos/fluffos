@@ -1,0 +1,15 @@
+<HEAD> <TITLE> to_int - convert a float or buffer to an int </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> to_int - convert a float or buffer to an int </H1> </center>
+<p>
+<b> int to_int( float x ); </b>
+<b> int to_int( buffer x ); </b>
+<b> int to_int( string x ); </b>
+<p>
+If 'x' is a float, the to_int() call returns the number of type 'int' that is 
+equivalent to 'x' (with any decimal stripped off).  If 'x' is a buffer, the
+call returns the integer (in network-byte-order) that is embedded in the
+buffer.  If 'x' is a string, then the string is converted to an integer.
+An undefined value is returned if the string is not a valid number.
+<p>
+See also:
+<A HREF=../numbers/to_float.html>  to_float </A>,
+<A HREF=../buffers/read_buffer.html>  read_buffer </A>

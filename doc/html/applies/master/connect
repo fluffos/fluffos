@@ -1,0 +1,17 @@
+connect - get an object for a new user
+
+object connect(int port);
+
+The driver calls connect() in the master object whenever a new user logs
+into the driver.  port is the actual port connected to; for example if
+you have two login ports defined as 2000 and 3000, either 2000 or 3000 
+will be passed to this routine.
+
+The object returned by connect() is used as the initial
+user object.  Note that it is possible to change the user object at a later
+time (for example, after determining who is logging in) using the exec()
+efun.
+
+See also:  logon,  exec
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

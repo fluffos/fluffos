@@ -1,0 +1,13 @@
+wizardp - determines if a given object had enable_wizard() performed in it
+
+int wizardp( object );
+
+This efun is only available if NO_WIZARDS is not compiled in.
+
+Returns 1 if the arg had enable_wizard() performed on it.
+
+See also:
+ disable_wizard,
+ enable_wizard
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

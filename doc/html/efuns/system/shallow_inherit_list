@@ -1,0 +1,15 @@
+shallow_inherit_list - get a list of parents of an object
+
+string array shallow_inherit_list( object obj );
+
+Returns an array of filenames of objects inherited by obj.  Only directly
+inherited files are returned.  E.g. if A inherits B which inherits C,
+inherit_list(A) will return an array with B, but not C.
+
+See also:
+ deep_inherit_list,
+ inherit_list,
+ inherits
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

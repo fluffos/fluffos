@@ -1,0 +1,17 @@
+<HEAD> <TITLE> getuid - return the user id (uid) of an object </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> getuid - return the user id (uid) of an object </H1> </center>
+<p>
+<b> string getuid( object ob ); </b>
+<p>
+This efun is only available if PACKAGE_UIDS is compiled into the driver.
+<p>
+Returns the user id of an object.  The uid of an object is determined at
+object creation by the creator_file() function.
+<p>
+See also:
+<A HREF=seteuid.html>  seteuid </A>,
+<A HREF=geteuid.html>  geteuid </A>,
+<A HREF=export_uid.html>  export_uid </A>,
+<A HREF=../../applies/master/valid_seteuid.html>  valid_seteuid </A>,
+<A HREF=../../applies/master/creator_file.html>  creator_file </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

@@ -1,0 +1,13 @@
+<HEAD> <TITLE> reset - allows an object to do self-maintenance </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> reset - allows an object to do self-maintenance </H1> </center>
+<p>
+<b> void reset(); </b>
+<p>
+After every reset interval (whose exact length is determined on
+a mud by mud basis, but averages around every 2 hours), reset()
+is called in every object that currently exists.  If LAZY_RESETS
+is defined in options.h in the driver, reset() will only be called
+in objects when they are touched (near players), so unused objects
+will not be loaded from the swap file to reset.
+<p>
+See also:
+<A HREF=../efuns/system/set_reset.html>  set_reset </A>

@@ -1,0 +1,16 @@
+cos - return the cosine of a float
+
+float cos( float f );
+
+This efun is only available if PACKAGE_MATH is compiled into the driver.
+
+Returns the cosine of its argument, `f', measured in radians.
+
+See also:
+ acos,
+ asin,
+ atan, 
+ sin,
+ tan
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

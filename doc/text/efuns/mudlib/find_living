@@ -1,0 +1,21 @@
+find_living - find a living object matching a given id
+
+object find_living( string str );
+
+This efun is only available if NO_ADD_ACTION is not compiled in.
+
+Find first the object that is marked as living, and answers to the
+id 'str'.  A living object is an object that has called
+enable_commands().  The object must have set a name with
+set_living_name(), so its name will be entered into the hash table
+used to speed up the search for living objects.
+
+See also:
+ living,
+ livings,
+ users,
+ disable_commands,
+ enable_commands,
+ set_living_name
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

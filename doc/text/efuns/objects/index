@@ -1,0 +1,51 @@
+Object efuns
+
+<H3>The efuns are for moving and managing objects:</H3>
+
+environment related efuns: (Not available with NO_ENVIRONMENT)
+
+<DL>
+*  all_inventory
+*  deep_inventory
+*  environment
+*  first_inventory
+*  move_object
+*  next_inventory
+*  present
+</DL>
+
+loading and managing objects:
+<DL>
+*  children
+*  clone_object
+*  clonep
+*  destruct
+*  file_name
+*  find_object
+*  load_object
+*  master
+*  new
+*  objectp
+*  objects
+*  reload_object
+*  restore_object
+*  save_object
+*  set_hide
+*  virtualp
+</DL>
+
+heart_beat related efuns:
+<DL>
+*  query_heart_beat
+*  set_heart_beat
+*  heart_beat_info
+*  heart_beats
+</DL>
+
+message sending efuns:
+<DL>
+*  tell_object
+*  tell_room
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

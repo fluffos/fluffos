@@ -54,66 +54,80 @@
 #define NAME_INHERITED		0x1
 #define NAME_UNDEFINED		0x2
 #define NAME_STRICT_TYPES	0x4
-#define NAME_PROTOTYPE		0x10
-#define NAME_DEF_BY_INHERIT     0x20
-#define NAME_ALIAS              0x40
-#define NAME_TRUE_VARARGS       0x80
+#define NAME_PROTOTYPE		0x8
+#define NAME_DEF_BY_INHERIT     0x10
+#define NAME_ALIAS              0x20
+#define NAME_TRUE_VARARGS       0x40
 
+#define NAME_HIDDEN	        0x0100  /* used by private vars */
+#define NAME_STATIC		0x0200	/* Static function or variable */
+#define NAME_NO_MASK		0x0400	/* The nomask => not redefineable */
+#define NAME_PRIVATE		0x0800	/* Can't be inherited */
+#define NAME_PROTECTED		0x1000
+#define NAME_PUBLIC		0x2000	/* Force inherit through private */
+#define NAME_VARARGS		0x4000	/* Used for type checking */
+
+#define NAME_TYPE_MOD		(NAME_HIDDEN | NAME_STATIC | NAME_NO_MASK | NAME_PRIVATE | NAME_PROTECTED | NAME_PUBLIC | NAME_VARARGS)
 /* only the flags that should be copied up through inheritance levels */
-#define NAME_MASK (NAME_UNDEFINED | NAME_STRICT_TYPES | NAME_PROTOTYPE)
+#define NAME_MASK (NAME_UNDEFINED | NAME_STRICT_TYPES | NAME_PROTOTYPE | NAME_TRUE_VARARGS | NAME_TYPE_MOD)
 /* a function that isn't 'real' */
 #define NAME_NO_CODE  (NAME_UNDEFINED | NAME_ALIAS | NAME_PROTOTYPE)
-#define REAL_FUNCTION(x) (!((x)->flags & (NAME_ALIAS | NAME_PROTOTYPE)) && \
-                         (((x)->flags & NAME_DEF_BY_INHERIT) || (!((x)->flags & NAME_UNDEFINED))))
+#define REAL_FUNCTION(x) (!((x) & (NAME_ALIAS | NAME_PROTOTYPE)) && \
+                         (((x) & NAME_DEF_BY_INHERIT) || (!((x) & NAME_UNDEFINED))))
 /*
  * These are or'ed in on top of the basic type.
  */
 #define TYPE_MOD_ARRAY   	0x0020	/* Pointer to a basic type */
 #define TYPE_MOD_CLASS          0x0040  /* a class */
-#define TYPE_MOD_HIDDEN         0x0080  /* used by private vars */
-#define TYPE_MOD_STATIC		0x0100	/* Static function or variable */
-#define TYPE_MOD_NO_MASK	0x0200	/* The nomask => not redefineable */
-#define TYPE_MOD_PRIVATE	0x0800	/* Can't be inherited */
-#define TYPE_MOD_PROTECTED	0x1000
-#define TYPE_MOD_PUBLIC		0x2000	/* Force inherit through private */
-#define TYPE_MOD_VARARGS	0x4000	/* Used for type checking */
-
-#define TYPE_MOD_MASK		(~(TYPE_MOD_STATIC | TYPE_MOD_NO_MASK |\
-				   TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED |\
-				   TYPE_MOD_PUBLIC | TYPE_MOD_VARARGS |\
-				   TYPE_MOD_HIDDEN))
 
 typedef struct {
-    /* these two must come first */
-    unsigned char num_arg;    /* Number of arguments needed. -1 arguments
-                               * means function not defined in this object.
-                               * Probably inherited */
-    unsigned char num_local;  /* Number of local variables */
-    unsigned char flags;	/* NAME_ . See above. */
+    unsigned char num_arg;
+    unsigned char num_local;
+    unsigned short f_index; /* Index in sorted function table */
+} runtime_defined_t;
 
-    /* wasted byte here if anyone needs one; plenty of room for more flags */
-
-    char *name;
-#ifndef LPC_TO_C
-    unsigned short offset;	/* Address of function, or inherit table
-				 * index when inherited. */
-#else
-    POINTER_INT offset;
-#endif
-    unsigned short type;      /* Return type of function. See below. */
-    /*
-     * Used so that it is possible to quickly find this function in the
-     * inherited program.
-     */
+typedef struct {
+    unsigned short offset;
     unsigned short function_index_offset;
+} runtime_inherited_t;
+
+typedef union {
+    runtime_defined_t def;
+    runtime_inherited_t inh;
+} runtime_function_u;
+
+typedef struct {
+    unsigned short first_defined;
+    unsigned short first_overload; 
+    unsigned short num_compressed;
+    unsigned short num_deleted;
+    unsigned char index[1];
+} compressed_offset_table_t;
+
+typedef struct {
+    char *name;
+    unsigned short type;
+    unsigned short runtime_index;
+#ifndef LPC_TO_C
+    unsigned short address;
+#else
+    POINTER_INT address;
+#endif
 #ifdef PROFILE_FUNCTIONS
     unsigned long calls, self, children;
 #endif
-#ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
-    unsigned short tree_l, tree_r;	/* Left and right branches. */
-    SIGNED short tree_b;	/* Balance of subtrees. */
-#endif
-} function_t;
+} compiler_function_t;
+
+typedef struct {
+    struct program_s *prog; /* inherited if nonzero */
+    union {
+	compiler_function_t *func;
+	int index;
+    } u;
+    /* For non-aliases, this is a count of the number of non-aliases we've
+       seen for this function. */
+    unsigned short alias_for;
+} compiler_temp_t;
 
 typedef struct {
     unsigned short name;
@@ -136,6 +150,7 @@ typedef struct {
     struct program_s *prog;
     unsigned short function_index_offset;
     unsigned short variable_index_offset;
+    unsigned short type_mod;
 } inherit_t;
 
 typedef struct program_s {
@@ -154,14 +169,17 @@ typedef struct program_s {
     unsigned char *line_info;   /* Line number information */
     unsigned short *file_info;
     int line_swap_index;	/* Where line number info is swapped */
-    function_t *functions;
+    compiler_function_t *function_table;
+    unsigned short *function_flags; /* separate for alignment reasons */
+    runtime_function_u *function_offsets;
+#ifdef COMPRESS_FUNCTION_TABLES
+    compressed_offset_table_t *function_compressed;
+#endif
     class_def_t *classes;
     class_member_entry_t *class_members;
-#ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
-    unsigned short tree_r;	/* function table tree's 'root' */
-#endif
     char **strings;		/* All strings uses by the program */
-    variable_t *variable_names;	/* All variables defined */
+    char **variable_table;	/* variables defined by this program */
+    unsigned short *variable_types;	/* variables defined by this program */
     inherit_t *inherit;	/* List of inherited prgms */
     int total_size;		/* Sum of all data in this struct */
     int heart_beat;		/* Index of the heart beat function. -1 means
@@ -184,9 +202,11 @@ typedef struct program_s {
      */
     unsigned short program_size;/* size of this instruction code */
     unsigned short num_classes;
-    unsigned short num_functions;
+    unsigned short num_functions_total;
+    unsigned short num_functions_defined;
     unsigned short num_strings;
-    unsigned short num_variables;
+    unsigned short num_variables_total;
+    unsigned short num_variables_defined;
     unsigned short num_inherited;
 } program_t;
 
@@ -195,5 +215,16 @@ extern int total_prog_block_size;
 void reference_prog PROT((program_t *, char *));
 void free_prog PROT((program_t *, int));
 void deallocate_program PROT((program_t *));
+char *variable_name PROT((program_t *, int));
+runtime_function_u *find_func_entry PROT((program_t *, int));
+
+/* the simple version */
+#define FUNC_ENTRY(p, i) ((p)->function_offsets + (i))
+#ifdef COMPRESS_FUNCTION_TABLES
+/* Find a function entry */
+#define FIND_FUNC_ENTRY(p, i) (((i) < (p)->function_compressed->first_defined) ? find_func_entry(p, i) : FUNC_ENTRY(p, (i) - (p)->function_compressed->num_deleted))
+#else
+#define FIND_FUNC_ENTRY(p, i) FUNC_ENTRY(p, i)
+#endif
 
 #endif

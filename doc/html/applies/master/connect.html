@@ -1,0 +1,17 @@
+<HEAD> <TITLE> connect - get an object for a new user </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> connect - get an object for a new user </H1> </center>
+<p>
+<b> object connect(int port); </b>
+<p>
+The driver calls connect() in the master object whenever a new user logs
+into the driver.  port is the actual port connected to; for example if
+you have two login ports defined as 2000 and 3000, either 2000 or 3000 
+will be passed to this routine.
+<p>
+The object returned by connect() is used as the initial
+user object.  Note that it is possible to change the user object at a later
+time (for example, after determining who is logging in) using the exec()
+efun.
+<p>
+See also: <A HREF=../interactive/logon.html>  logon </A>, <A HREF=../../efuns/interactive/exec.html>  exec </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

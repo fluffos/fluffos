@@ -1,0 +1,14 @@
+find_player - find a player by name
+
+object find_player( string str );
+
+This efun is only available when NO_ADD_ACTION is not defined.
+
+Similar to find_living(), but only searches through objects that are
+interactive, or were once interactive.
+
+See also:
+ find_living,
+ livings,
+ users,
+ set_living_name

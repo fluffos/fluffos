@@ -1,0 +1,11 @@
+repeat_string - repeat a string a specified number of times.
+
+string repeat_string(string, int);
+
+repeat_string returns a string that consists of its first argument
+repeated n times, where 'n' is repeat_string's second argument.
+So repeat_string("foo", 3) would return "foofoofoo".
+
+This function requires PACKAGE_CONTRIB to be defined in the options file.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

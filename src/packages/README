@@ -1,0 +1,12 @@
+In order to add a package, do the following:
+
+(1) Pick a name for your package (we will use 'foo' here)
+
+(2) Put the prototypes for the efuns in foo_spec.c
+
+(3) implement the efuns in foo.c
+
+(4) add #define PACKAGE_FOO to options.h or local_options
+
+(5) do a full recompile (make remake)
+

@@ -1,0 +1,64 @@
+<HEAD> <TITLE> socket_create - create an efun socket </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> socket_create - create an efun socket </H1> </center>
+<p>
+<b> int socket_create( int mode, string | function read_callback); </b>
+<p>
+<b> int socket_create( int mode, string | function read_callback, string | function close_callback ); </b>
+<p>
+This efun is only available if PACKAGE_SOCKETS is compiled in.
+<p>
+socket_create() creates an efun socket. mode determines which type of
+socket is created. Currently supported socket modes are:
+<p>
+<DL>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> MUD for sending LPC data types using TCP protocol.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> STREAM for sending raw data using TCP protocol.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> DATAGRAM for using UDP protocol.
+</DL>
+<p>
+The argument read_callback is the name of a function for the driver to
+call when the socket gets data from its peer. The read callback should follow
+this format:
+<p>
+<pre>
+void read_callback(int fd, mixed message)
+</pre>
+<p>
+Where fd is the socket which received the data, and message is the data
+which was received.
+<p>
+The argument close_callback is the name of a function for the driver to
+call if the socket closes unexpectedly, i.e. not as the result of a
+socket_close() call. The close callback should follow this format:
+<p>
+<pre>
+void close_callback(int fd)
+</pre>
+<p>
+Where fd is the socket which has closed.
+NOTE: close_callback is not used with DATAGRAM mode sockets.
+<p>
+socket_create() returns:
+<p>
+a non-negative descriptor on success.
+<p>
+a negative value indicated below on error.
+<p>
+ERRORS - these are in "socket_err.h"
+<p>
+<DL>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEMODENOTSUPP Socket mode not supported.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EESOCKET Problem creating socket.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EESETSOCKOPT Problem with setsockopt.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EENONBLOCK Problem setting non-blocking mode.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EENOSOCKS No more available efun sockets.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EESECURITY Security violation attempted.
+<p>
+See also:
+<A HREF=socket_accept.html>  socket_accept </A>,
+<A HREF=socket_bind.html>  socket_bind </A>,
+<A HREF=socket_close.html>  socket_close </A>,
+<A HREF=socket_connect.html>  socket_connect </A>,
+<A HREF=socket_listen.html>  socket_listen </A>,
+<A HREF=socket_write.html>  socket_write </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

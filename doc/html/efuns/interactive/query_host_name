@@ -1,0 +1,13 @@
+query_host_name - return the host name
+
+string query_host_name();
+
+query_host_name() returns the name of the host.
+
+See also:
+ resolve,
+ socket_address,
+ query_ip_name,
+ query_ip_number
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,0 +1,8 @@
+evaluate - evaluate a function pointer
+
+mixed evaluate(mixed f, ...);
+
+If f is a function, f is called with the rest of the arguments.
+Otherwise, f is returned.  evaluate(f, ...) is the same as (*f)(...).
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

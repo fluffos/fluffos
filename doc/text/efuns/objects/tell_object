@@ -1,0 +1,16 @@
+tell_object - send a message to an object
+
+void tell_object( object ob, string str );
+
+Send a message 'str' to object 'ob'. If it is an interactive object (a player),
+then the message will go to him, otherwise it will go to the local
+function "catch_tell()".
+
+See also:
+ write,
+ shout,
+ say,
+ tell_room,
+ catch_tell
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

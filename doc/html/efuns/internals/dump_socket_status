@@ -1,0 +1,54 @@
+dump_socket_status - display the status of each LPC socket
+
+string dump_socket_status();
+
+This efun is only available when PACKAGE_SOCKETS is compiled into the driver.
+
+dump_socket_status() is a diagnostic facility which displays the current
+status of all LPC sockets configured into the MudOS driver.  It is useful
+for debugging LPC sockets applications.  Each row in the output corresponds
+to a single LPC socket.  The first row corresponds to LPC socket descriptor 0,
+the second row, 1, etc.  The total number of sockets is configured when the
+driver is built.
+
+The first column "Fd" is the operating system file descriptor associated
+with the LPC socket.  "State" is the current operational state of the LPC
+socket.  "Mode" is the socket mode, which is passed as an argument to
+socket_create().  The local and remote addresses are the Internet address
+and port numbers in Internet dot notations.  '*' indicates an address or
+which is 0.  N.B. LPC sockets that are in the CLOSED state are not
+currently in use; therefore the data displayed for that socket may be
+idiosyncratic.
+
+The following output was generated on Portals, where the only socket
+application running at the time was MWHOD.  It indicates that two
+sockets are current in use, one is listening for connection requests
+on a STREAM mode socket.  The other is waiting for incoming data on
+a DATAGRAM mode socket.
+
+<pre>
+Fd    State      Mode      Local Address      Remote Address
+--  ---------  --------  -----------------  ------------------
+13   LISTEN     STREAM   *.6889             *.*
+14    BOUND    DATAGRAM  *.6888             *.*
+-1    CLOSED      MUD    *.*                *.*
+-1    CLOSED      MUD    *.*                *.*
+-1    CLOSED      MUD    *.*                *.*
+-1    CLOSED      MUD    *.*                *.*
+-1    CLOSED      MUD    *.*                *.*
+-1    CLOSED      MUD    *.*                *.*
+-1    CLOSED      MUD    *.*                *.*
+-1    CLOSED      MUD    *.*                *.*
+-1    CLOSED      MUD    *.*                *.*
+-1    CLOSED      MUD    *.*                *.*
+-1    CLOSED      MUD    *.*                *.*
+-1    CLOSED      MUD    *.*                *.*
+-1    CLOSED      MUD    *.*                *.*
+-1    CLOSED      MUD    *.*                *.*
+</pre>
+
+See also:
+ debug_info,
+ dump_file_descriptors
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

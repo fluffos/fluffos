@@ -1,0 +1,20 @@
+variables - list all the variables in a given object.
+
+string array variables(object, int default: 0);
+
+variables() can return two different things. If the second argument is
+0 (which it is by default) it will return an array containing the names
+of all the variables in the object passed as the first argument. If the
+second argument is non-zero, more information about each variable is
+given. For a non-zero second argument, each array element contains
+the following:
+
+({ variable_name, variable_type }). 
+
+Where variable_name is the name of the given variable, and variable_type
+is the type of the variable, such as "string" or "private int" etc.
+
+This efun is only available if PACKAGE_CONTRIB is defined in the
+options file.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

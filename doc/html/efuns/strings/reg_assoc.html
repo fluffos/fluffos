@@ -1,0 +1,55 @@
+<HEAD> <TITLE> reg_assoc - A regular pattern substring extractor </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> reg_assoc - A regular pattern substring extractor </H1> </center>
+<p>
+<b> array reg_assoc(string str, string array pat_arr, array tok_arr); </b>
+<p>
+<b> array reg_assoc(string str, string array pat_arr, array tok_arr, mixed def); </b>
+<p>
+reg_assoc() takes a string and explodes it into substrings matching 
+the regular expression pattern strings given in pat_arr and associates
+them with tokens given in tok_arr. If def (default 0) is given, it
+is associated with a non-match. The return value is an array of
+two arrays, the 1st being an array of the form 
+<pre>
+	({ non-match1, match1, non-match2, match2, ..., 
+	   non-match n, match n, non-match n+1 }) 
+</pre>
+and the 2nd holds the tokens corresponding to the matches in order:
+<pre>
+	({ def, token corresponding to match1, ...., def, 
+	   token corresponding to match n, def }).
+</pre>
+<p>
+pat_arr and tok_arr must be of the same sizes, the ith element in 
+tok_arr being the corresponding token to the ith element of pat_arr. 
+pat_arr can only hold strings. 
+<p>
+If pat_arr (and hence tok_arr) has size 0 then the return value is 
+simply ({ ({ str }), ({ def }) }).
+<p>
+EXAMPLE
+<p>
+<pre>
+ #define STRING_PAT "\e"(\e\e\e\e.|[^\e\e\e"])*\e""
+ #define NUM_PAT "[0\-9]+"
+<p>
+ #define F_STRING 1
+ #define F_NUM 2
+<p>
+ reg_assoc("Blah \e"blah\e" test 203 hhh j 308 \e"bacdcd\eb\e"acb",
+  ({ STRING_PAT, NUM_PAT }), ({ F_STRING, F_NUM }), "no-match")
+</pre>
+<p>
+will return 
+<p>
+<pre>
+({ ({ "Blah ", "\e"blah\e"", " test ", "203", " hhh j ", "308", " ",
+      "\e"bacdcd\eb\e"", "acb" }),
+   ({ "no-match", F_STRING, "no-match", F_NUM, "no-match", F_NUM, 
+      "no-match", F_STRING, "no-match" }) })
+</pre>
+<p>
+See also:
+<p>
+<A HREF=regexp.html>  regexp </A> [for regular expression syntax]
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

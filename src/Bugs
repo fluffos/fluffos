@@ -1,3 +1,261 @@
+The internal message passing functions should be cleaned up.  Currently, a lot
+of stuff calls add_message() directly, while other stuff uses tell_object()
+and friends.  One consequence of this is that even with INTERACTIVE_CATCH_TELL
+defined, not all of the output flows through catch_tell() [ed, for example,
+doesn't, as well as some other efuns].
+
+-----
+
+(: foo, $(1) :) crashes
+
+-----
+
+In the MudOS v22a36 the livings efun gives back HIDDEN things too.
+I don't know why objects used that strange construction.
+I think, it's new form would be more usable.
+As i see this HIDDEN stuff has many leaks, like:
+you can always create an object that you put into all rooms, and look
+for this_player() in the init apply.
+So even if you correct all efuns like livings, heartbeats, named_livings
+and so on, it will never be perfect.
+solve for livings and objects:
+------------------------------- cut here ----------------------------------
+1831c1831
+<     int nob, apply_valid_hide, hide_is_valid = 0;
+---
+>     int nob, display_hidden=-1;
+1836d1835
+<     apply_valid_hide = 1;
+1844,1848c1843,1845
+< 	    if (apply_valid_hide) {
+< 		apply_valid_hide = 0;
+< 		hide_is_valid = valid_hide(current_object);
+< 	    }
+< 	    if (hide_is_valid)
+---
+> 	    if (display_hidden==-1)
+> 		display_hidden = valid_hide(current_object);
+> 	    if (!display_hidden)
+1876c1873
+<     int display_hidden = 0, t_sz, i,j, num_arg = st_num_arg;
+---
+>     int display_hidden = -1, t_sz, i,j, num_arg = st_num_arg;
+1890a1888,1889
+> 	    if (display_hidden==-1)
+> 		display_hidden = valid_hide(current_object);
+1892,1893d1890
+< 		display_hidden = 1 + !!valid_hide(current_object);
+< 	    if (!(display_hidden & 2))
+---------------------------------- cut here --------------------------------
+
+Comment: possibly a better solution is to check O_HIDDEN where O_DESTRUCTED
+is checked.  valid_hide() would be checked when objects load, and would
+set a O_CAN_SEE_HIDDEN bit.  Then every time we run across a
+FRAME_OB_CHANGE, do:
+
+if (current_object & O_CAN_SEE_HIDDEN)
+    object_mask = O_DESTRUCTED;
+else
+    object_mask = O_DESTRUCTED | O_HIDDEN;
+
+Code elsewhere would then look something like:
+
+if (sv->type == T_OBJECT && (sv->u.ob->flags & object_mask)) {
+    free_object(sv->u.ob, "...");
+    *sv = const0;
+}
+
+This would be much more effective at preventing objects from detecting the
+existence of hidden objects.  It would also fix this one:
+
+Various efuns which call valid_hide() don't realize it can error, causing
+them to leak if master::valid_hide() throws an error.
+
+-----
+
+If an include file doesn't end in a newline, something screws up in the
+linked buffer code, causing odd compile errors.
+
+Line numbers get messed up when files don't end in a newline?
+
+-----
+
+RUNTIME_LOADING needs -rdynamic passed in the link on some OS's?
+(reported for a gcc-linux system; possibly a mixed a.out/elf?)
+
+-----
+
+btw.. did you know that the uids behaviour differs slightly from under Amylaar ?
+In simulate.c there is a line that has a comment: /* FIXME - is this correct */
+ - the line above this does something like  target->uid = my->uid
+ Under Amylaar an object _never_ gives away its uid to another object, it always
+ gives its euid. When I moved from Amy it took me a heck of a long time to
+figure out why i was getting all these weird bugs.. then I discovered it and 
+ made the simple patch. 
+ I just thought I'd mention it as you might wanna give Amylaar uid behaviour
+ when COMPAT_32 is defined..
+
+-Pace
+
+-----
+
+The error for new(class undefined_class name, ...) could be better.
+Currently it's a parse error.
+
+-----
+
+This gives the wrong error message:
+
+unlock the door with the key
+Trying interpretation: unlock:the:door:with:the:key:
+Trying rule: OBJ with OBJ
+  parse_rule
+    parse_obj:
+    Found noun: door
+      parse_rule
+      Matched literal: with
+        parse_obj:
+        Found noun: key
+          parse_rule
+            we_are_finished
+            Trying can_unlock_obj_with_obj ...
+            Trying can_unlock_obj_word_obj ...
+            Trying can_verb_obj_word_obj ...
+            Trying can_verb_rule ...
+            Trying can_unlock_obj_with_obj ...
+            Return value was: 1
+            Trying direct_unlock_obj_with_obj ...
+            Return value was: 1
+            Trying indirect_unlock_obj_with_obj ...
+            Return value was: 0
+            You can't unlock the thing with that.
+ 
+          exiting parse_rule ...
+        parse_rule
+        exiting parse_rule ...
+        parse_rule
+          we_are_finished
+         Trying can_unlock_obj_with_obj ...
+          Trying can_unlock_obj_word_obj ...
+          Trying can_verb_obj_word_obj ...
+          Trying can_verb_rule ...
+          Trying can_unlock_obj_with_obj ...
+          Return value was: 1
+        exiting parse_rule ...
+      Done trying to match OBJ
+    parse_rule
+    last match to error ...
+    Changing last match.
+      parse_obj:
+      Found noun: key
+        parse_rule
+          we_are_finished
+          Trying can_unlock_obj_with_obj ...
+          Trying can_unlock_obj_word_obj ...
+          Trying can_verb_obj_word_obj ...
+          Trying can_verb_rule ...
+          Trying can_unlock_obj_with_obj ...
+          Return value was: 1
+          Trying indirect_unlock_obj_with_obj ...
+          Return value was: 0
+          You can't unlock the thing with that.
+ 
+        exiting parse_rule ...
+      parse_rule
+      exiting parse_rule ...
+      parse_rule
+
+        we_are_finished
+        Trying can_unlock_obj_with_obj ...
+        Trying can_unlock_obj_word_obj ...
+        Trying can_verb_obj_word_obj ...
+        Trying can_verb_rule ...
+        Trying can_unlock_obj_with_obj ...
+        Return value was: 1
+        Have better match; aborting ...
+      exiting parse_rule ...
+    Done trying to match OBJ
+    parse_rule
+    Matched literal: with
+      parse_obj:
+      Found noun: key
+        parse_rule
+          we_are_finished
+          Trying can_unlock_obj_with_obj ...
+          Trying can_unlock_obj_word_obj ...
+          Trying can_verb_obj_word_obj ...
+          Trying can_verb_rule ...
+          Trying can_unlock_obj_with_obj ...
+          Return value was: 1
+          Trying indirect_unlock_obj_with_obj ...
+          Return value was: 0
+          You can't unlock the thing with that.
+ 
+        exiting parse_rule ...
+      parse_rule
+      exiting parse_rule ...
+      parse_rule
+        we_are_finished
+        Trying can_unlock_obj_with_obj ...
+        Trying can_unlock_obj_word_obj ...
+        Trying can_verb_obj_word_obj ...
+        Trying can_verb_rule ...
+        Trying can_unlock_obj_with_obj ...
+        Return value was: 1
+        Have better match; aborting ...
+      exiting parse_rule ...
+    Done trying to match OBJ
+    parse_rule
+    last match to error ...
+    Literal not found in forward search
+    parse_rule
+    last match to error ...
+    Literal not found in forward search
+    parse_rule
+    Ran out of words to parse.
+  Done trying to match OBJ
+There is no door here.
+
+-----
+
+It still seems possible for regexp(explode(read_file(...), "\n"), ...) to
+crash, but I can't reproduce it.
+
+-----
+
+#pragma optimize bug:
+
+;; Function room_of
+049d: local LV0
+049f: ! 
+04a0: || 0006 (04a7)
+04a3: transfer_local LV0
+04a5: objectp 
+04a6: ! 
+04a7: branch_when_zero 0003 (04ab)
+04aa: return_zero 
+04ab: branch 0007 (04b3)
+04ae: local LV1
+04b0: (void)assign_local LV0
+04b2: break_point 
+04b3: local LV0
+04b5: environment 
+04b7: local_lvalue LV1
+04b9: assign 
+04ba: bbranch_when_non_zero 000d (04ae)
+04bd: transfer_local LV0
+04bf: return 
+04c0: return_zero 
+
+object room_of(object obj) {
+    object ob;
+    if(!obj || !objectp(obj)) return 0;
+    while(ob=environment(obj)) obj=ob;
+    return obj;
+}
+
+-----
+
 heart_beat() is not shadowable
 
 -----
@@ -7,35 +265,6 @@ after it has gone down and come back up (the addr_server).  maybe
 the driver could just retry every now and then?
 
 --john
-
------
-
-read_file() doesn't guarantee that a "/" is at the start of the filename
-before passing to valid_read()...same problem might exist with
-write_file(), read_bytes(), write_bytes(), didn't check yet
-
-(ucs_brf@pip.shsu.edu)
-
-Comment:
-    This problem is rather common in the driver currently.  Internally,
-    filenames have no leading '/'.  One should probably be added every time
-    a filename is passed to the mudlib.
-
------
-
-hm, Linux apparently doesn't let you open a directory for reading. boggle.
-so all the efuns that read from a file will screw up if you try
-to use a dir as the file.  ack
-
-ucs_brf@pip.shsu.edu
-
------
-
-    sprintf.c should probably be rewritten as it has a nasty habit of
-    munging the stack and writing to places without checking the destination
-    type if it's ok; probably should also remove need for setjmp/longjmp;
-    also: err = setjmp(...) is non strict ANSI portable according to SAS
-    tech support for their C compiler (SAS/C)
 
 -----
 
@@ -53,6 +282,9 @@ Comment:
 	-Sym (note: which is not the same as if the driver errors with "Out
 	of memory)
 
+Yet another comment: Whether it evals out or runs out of mem obviously depends
+on the ratio of MAX_EVAL_COST to available memory ...
+
 -----
 
 Currently, binaries are not checked to see if they are out of date with
@@ -60,17 +292,6 @@ respect to the simul_efun object, causing wierd behavior of binaries of
 the order of the simuls changes, and then a binary is loaded.
 
 ------
-
-edit_source should check for the existence of a.out to see if compilation
-succeeded.  The exit code of the compiler is correct alot, but not on
-all systems.  Should probably use -o somefile instead of assuming a.out
-as well.
-
------
-
-Line numbers get messed up when files don't end in a newline?
-
------
 
 Range/switch search should be binary, not linear. (in LPC->C)
 
@@ -83,39 +304,9 @@ Probably need a test to see if bison's output actually compiles in
 
 -------
 
-The current implementation of swapping could use alot of work.  Swapping
-an object in/out isn't that expensive CPU wise, and can save a decent amount
-of memory.  The problem is that cloned programs can't swap, which disables
-swapping for much of the mud ...
-
--Beek
-
------
-
-eval string s = "xyz"; s[1] = 0; return s + "foo";
-
-Isn't handled right, since after s[1] = 0 the length is still 3.
-Several possible ways to fix this:
-
-(1) allow strings to contain zero, and nuke the buffer type (requires a
-    number of mods like strcpy() -> memcpy() throughout the source)
-
-(2) claim that assigning 0 to a char lvalue is a runtime error (the easy
-    way out :) )
-
-(3) Actually truncate the string and modify it's length.  This is really
-    messy b/c it requires char lvalues to keep a pointer to the start as
-    well, and also is somewhat counterintuitive.
-
----
-
 One can call private functions in inherited objects via call_out.
 
----
-
-livings() and heart_beats() don't obey set_hide()
-
----
+------
 
 verbs that no longer have handlers should be deleted from the parser list
 
@@ -149,3 +340,16 @@ so these can be ignored, which requires a check every time current_line++
 is done ...
 
 There must be a better fix :)
+
+---
+
+codefor int i,j; ({ i++, j})[1]; return i;
+
+;; Function eval_function
+0000: break_point 
+/* Missing:
+ *    local_lvalue LV0
+ *    inc(x)
+ */
+0001: local LV0
+0003: return 

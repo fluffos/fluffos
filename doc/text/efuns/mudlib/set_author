@@ -1,0 +1,23 @@
+set_author - set the author associated with an object
+
+void set_author( string author );
+
+Every object has both an author and a domain associated with it for
+the purposes of tracking statistics for authors and domains.  Domains
+may only be set in the master object function domain_file(), however
+authors are different.  They can be initialized to some default value
+by author_file() in the master object, but can also be changed using
+the set_author efun.
+
+set_author changes the author of the object that it is called within.
+That author will get credit for all future actions of that object that
+affect mudlib statistics.
+
+See also:
+ author_file,
+ domain_file,
+ author_stats,
+ set_author,
+ domain_stats
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

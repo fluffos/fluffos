@@ -1,0 +1,16 @@
+epilog - handle initialization
+
+string array epilog( int load_empty ); 
+
+The driver calls epilog() in master after the master object has been loaded.
+Required initialization may be done at this point.  If epilog() returns an
+array of filenames, the driver will attempt to load those files via the
+preload() function.
+
+The variable 'load_empty' is non-zero if the -e option was specified
+when starting up the driver, which has been historically used to mean
+no preloads, although the mudlib is free to use another interpretation.
+
+See also:  preload
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

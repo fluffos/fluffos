@@ -1,0 +1,10 @@
+parse_command_plural_id_list - returns a list of names to the parser
+
+string array parse_command_plural_id_list(); 
+
+This routine is used to find out what plural nouns the object responds to,
+and is used by the parsing package and the parse_command() efun.  In addition,
+anything returned by the master object will work on ANY object.
+
+See also:
+ parse_command

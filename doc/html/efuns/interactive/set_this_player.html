@@ -1,0 +1,15 @@
+<HEAD> <TITLE> set_this_player - change the value of the current command giver. </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> set_this_player - change the value of the current command giver. </H1> </center>
+<p>
+<b> void set_this_player(object); </b>
+<p>
+This function changes the value of what this_player() returns during the
+current execution. If the argument is an object, this_player() will return
+the argument object. If it is an int, this_player() will return 0.
+<p>
+This function requires the NO_ADD_ACTION option be defined in the
+options file.
+<p>
+See also:
+<A HREF=this_player.html>  this_player </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

@@ -1,0 +1,18 @@
+origin - determine how the current function was called
+
+string origin();
+
+Returns an string specifying how the current function was called.  These
+values can be found in the driver include "origin.h".  Current values are:
+
+<DL>
+* "driver" - from the driver: applies, heart_beats, etc
+* "local" - local function call
+* "call_other" - call_other
+* "simul" - use of a simul_efun
+* "call_out" - via a call_out
+* "efun" - from an efun that takes a function pointer (sort_array, etc)
+</DL>
+
+See also:
+ previous_object

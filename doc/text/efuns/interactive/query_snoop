@@ -1,0 +1,10 @@
+query_snoop - return the snooper of an interactive object
+
+object query_snoop( object ob );
+
+If `ob' (an interactive object) is being snooped by another interactive object,
+the snooping object is returned.  Otherwise, 0 is returned.
+
+See also:
+ snoop,
+ query_snooping

@@ -1,0 +1,8 @@
+lpc_info - return information about LPC->C compiled objects
+
+string lpc_info();
+
+lpc_info() returns a string describing which LPC->C programs are available,
+which are loaded, and which are out of date with respect to their source.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

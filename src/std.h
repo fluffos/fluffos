@@ -6,10 +6,18 @@
 /* the definition of ARCH */
 #include "arch.h"
 
-#ifndef EDIT_SOURCE
+#ifdef EDIT_SOURCE
+#define CONST
+#define INLINE
+#else
 /* all options and configuration */
 #include "options_incl.h"
 #include "configure.h"
+
+#   ifdef PEDANTIC
+#      undef INLINE
+#      define INLINE
+#   endif
 #endif
 
 #include "portability.h"
@@ -20,6 +28,10 @@
 #   ifndef NO_OPCODES
 #      include "opcodes.h"
 #   endif
+#endif
+
+#ifdef WIN32
+#  define outp outptr
 #endif
 
 #endif

@@ -1,0 +1,14 @@
+<HEAD> <TITLE> valid_read - checks if a certain person has read permission on a file </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> valid_read - checks if a certain person has read permission on a file </H1> </center>
+<p>
+<b> int valid_read( string file, object user, string func ); </b>
+<p>
+Every time an object tries to read a file, the driver calls valid_read
+in the master object to check if the read should be allowed.  The
+arguments are the filename, the object making the read, and
+the calling function name.  If valid_read returns non-zero, the read is
+allowed.
+<p>
+See also:
+<A HREF=valid_write.html>  valid_write </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>

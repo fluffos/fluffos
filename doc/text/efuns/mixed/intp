@@ -1,0 +1,7 @@
+intp - determine whether or not a given variable is an integer
+
+int intp( mixed arg );
+
+Return 1 if 'arg' is an integer number and zero (0) otherwise.
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

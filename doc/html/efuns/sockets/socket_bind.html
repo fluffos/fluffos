@@ -1,0 +1,36 @@
+<HEAD> <TITLE> socket_bind - bind a name to a socket </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> socket_bind - bind a name to a socket </H1> </center>
+<p>
+<b> int socket_bind( int s, int port ); </b>
+<p>
+This efun is only available if PACKAGE_SOCKETS is compiled in.
+<p>
+socket_bind() assigns a name to an unnamed socket. When a socket is
+created with socket_create() it exists in a name space (address family)
+but has no name assigned. socket_bind() requests that the port be assigned
+to the socket s.
+<p>
+socket_bind() returns:
+<p>
+EESUCCESS on success.
+<p>
+a negative value indicated below on error.
+<p>
+ERRORS - These errors are in "socket_err.h"
+<p>
+<DL>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEFDRANGE Descriptor out of range.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEBADF Descriptor is invalid.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EESECURITY Security violation attempted.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEISBOUND Socket is already bound.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEADDRINUSE Address already in use.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEBIND Problem with bind.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> EEGETSOCKNAME Problem with getsockname.
+</DL>
+<p>
+See also:
+<A HREF=socket_connect.html>  socket_connect </A>.
+<A HREF=socket_create.html>  socket_create </A>,
+<A HREF=socket_listen.html>  socket_listen </A>
+<p>
+<HR> <ADDRESS> <A HREF=http://wagner.princeton.edu/~tim>  Tim Hollebeek </A> <p> <A HREF="http://www.imaginary.com/~beek/">  Beek </A>@ZorkMUD, Lima Bean, IdeaExchange, TMI-2, and elsewhere </ADDRESS>
+<p>

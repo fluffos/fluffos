@@ -1,0 +1,15 @@
+set_privs - set the privs string for an object
+
+void set_privs( object ob, string privs );
+
+This efun is only available when PRIVS is compiled in.
+
+Sets the privs string for 'ob' to 'privs'.
+
+This efun is only available if PRIVS is defined at driver compile time.
+
+See also:
+ privs_file,
+ query_privs
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

@@ -1,8 +1,6 @@
 #ifndef FILE_INCL_H
 #define FILE_INCL_H
 
-#include "configure.h"
-
 #ifdef INCL_SYS_STAT_H
 #  include <sys/stat.h>
 #endif

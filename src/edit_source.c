@@ -1,4 +1,4 @@
-#define CONFIGURE_VERSION	2
+#define CONFIGURE_VERSION	5
 
 #define EDIT_SOURCE
 #define NO_MALLOC
@@ -10,6 +10,17 @@
 #include "make_func.h"
 #include "cc.h"
 #include "hash.h"
+
+#ifdef WIN32
+#include <process.h>
+#include <malloc.h>
+#endif
+
+#if defined(DEBUG) || defined(WIN32)
+#define TO_DEV_NULL ""
+#else
+#define TO_DEV_NULL ">/dev/null 2>&1"
+#endif
 
 char *outp;
 static int buffered = 0;
@@ -64,6 +75,40 @@ static incstate *inctop = 0;
 #define STRING_QUOTE 2
 
 static void add_define PROT((char *, int, char *));
+
+#ifdef WIN32
+#include <io.h>
+
+int compile(char *command) {
+   FILE *tf = fopen("trash_me.bat","wt+");
+   
+   fprintf(tf,"%s\n%s",
+      command,
+      "if errorlevel == 1 goto error\n"
+      "del trash_me.err >nul\n"
+      "goto ok\n"
+      ":error\n"
+      "echo ERROR > trash_me.err\n"
+      ":ok\n");
+   fclose(tf);
+
+   if (!system("trash_me.bat")) return 1;
+   if (_access("trash_me.err",0) ) return 1;
+   return 0;
+}
+#else
+int compile P1(char *, str) {
+    return system(str);
+}
+#endif
+
+#if defined(WIN32) || defined(LATTICE)
+int dos_style_link P2(char *, x, char *, y) {
+    char link_cmd[100];
+    sprintf(link_cmd, "copy %s %s", x, y);
+    return system(link_cmd);
+}
+#endif
 
 void yyerror P1(char *, str)
 {
@@ -692,7 +737,12 @@ preprocess() {
 		defn_t *d;
 		
 		deltrail();
-		if ((d = lookup_define(outp))) {
+		if ((d = lookup_definition(outp))) {
+		    d->flags |= DEF_IS_UNDEFINED;
+		    d->flags &= ~DEF_IS_NOT_LOCAL;
+		} else {
+		    add_define(outp, -1, " ");
+		    d = lookup_definition(outp);
 		    d->flags |= DEF_IS_UNDEFINED;
 		    d->flags &= ~DEF_IS_NOT_LOCAL;
 		}
@@ -1087,12 +1137,8 @@ static int check_include2 P4(char *, tag, char *, file,
 	    before, file, after);
      fclose(ct);
      
-#if defined(DEBUG) || defined(WIN32)
-    sprintf(buf, "%s %s -c comptest.c", COMPILER, CFLAGS);
-#else
-    sprintf(buf, "%s %s -c comptest.c >/dev/null 2>&1", COMPILER, CFLAGS);
-#endif
-    if (!system(buf)) {
+    sprintf(buf, "%s %s -c comptest.c " TO_DEV_NULL, COMPILER, CFLAGS);
+    if (!compile(buf)) {
 	fprintf(yyout, "#define %s\n", tag);
 	/* Make sure the define exists for later checks */
 	fflush(yyout);
@@ -1112,12 +1158,8 @@ static int check_include P2(char *, tag, char *, file) {
     fprintf(ct, "#include \"configure.h\"\n#include \"std_incl.h\"\n#include \"file_incl.h\"\n#include <%s>\n", file);
     fclose(ct);
     
-#ifdef DEBUG
-    sprintf(buf, "%s %s -c comptest.c", COMPILER, CFLAGS);
-#else
-    sprintf(buf, "%s %s -c comptest.c >/dev/null 2>&1", COMPILER, CFLAGS);
-#endif
-    if (!system(buf)) {
+    sprintf(buf, "%s %s -c comptest.c " TO_DEV_NULL, COMPILER, CFLAGS);
+    if (!compile(buf)) {
 	fprintf(yyout, "#define %s\n", tag);
 	/* Make sure the define exists for later checks */
 	fflush(yyout);
@@ -1137,12 +1179,8 @@ static int check_library P1(char *, lib) {
     fprintf(ct, "int main() { exit(0); }\n");
     fclose(ct);
     
-#ifdef DEBUG
-    sprintf(buf, "%s %s comptest.c %s", COMPILER, CFLAGS, lib);
-#else
-    sprintf(buf, "%s %s comptest.c %s >/dev/null 2>&1", COMPILER, CFLAGS, lib);
-#endif
-    if (!system(buf)) {
+    sprintf(buf, "%s %s comptest.c %s" TO_DEV_NULL, COMPILER, CFLAGS, lib);
+    if (!compile(buf)) {
 	fprintf(yyout, " %s", lib);
 	printf("exists\n");
 	return 1;
@@ -1182,8 +1220,8 @@ static int check_prog P4(char *, tag, char *, pre, char *, code, int, andrun) {
     fprintf(ct, "#include \"configure.h\"\n#include \"std_incl.h\"\n%s\n\nint main() {%s}\n", (pre ? pre : ""), code);
     fclose(ct);
     
-    sprintf(buf, "%s %s comptest.c -o comptest >/dev/null 2>&1", COMPILER, CFLAGS);
-    if (!system(buf) && (!andrun || !system("./comptest"))) {
+    sprintf(buf, "%s %s comptest.c -o comptest" TO_DEV_NULL, COMPILER, CFLAGS);
+    if (!compile(buf) && (!andrun || !system("./comptest"))) {
 	if (tag) {
 	    fprintf(yyout, "#define %s\n", tag);
 	    fflush(yyout);
@@ -1257,15 +1295,15 @@ static int check_configure_version() {
     fprintf(ct, "#include \"configure.h\"\n\n#if CONFIGURE_VERSION < %i\nthrash and die\n#endif\n\nint main() { }\n", CONFIGURE_VERSION);
     fclose(ct);
     
-    sprintf(buf, "%s %s comptest.c -o comptest >/dev/null 2>&1", COMPILER, CFLAGS);
-    return !system(buf);
+    sprintf(buf, "%s %s comptest.c -o comptest " TO_DEV_NULL, COMPILER, CFLAGS);
+    return !compile(buf);
 }
 
 static void handle_configure() {
     if (check_configure_version()) return;
 
     open_output_file("configure.h");
-
+    
 #ifndef WIN32
     check_include("INCL_STDLIB_H", "stdlib.h");
     check_include("INCL_UNISTD_H", "unistd.h");
@@ -1313,6 +1351,7 @@ static void handle_configure() {
     check_include("INCL_SYS_MKDEV_H", "sys/mkdev.h");
     check_include("INCL_SYS_RESOURCE_H", "sys/resource.h");
     check_include("INCL_SYS_RUSAGE_H", "sys/rusage.h");
+    check_include("INCL_SYS_WAIT_H", "sys/wait.h");
     check_include("INCL_SYS_CRYPT_H", "sys/crypt.h");
     check_include("INCL_CRYPT_H", "crypt.h");
 
@@ -1335,27 +1374,44 @@ static void handle_configure() {
 	fprintf(yyout, "#define RTLD_LAZY     1\n");
 
     printf("Checking for random number generator ...");
-    if (check_prog("DRAND48", "#include <math.h>", "srand48(0);", 0)) {
+    if (check_prog("DRAND48", 0, "srand48(0);", 0)) {
 	printf(" using drand48()\n");
     } else
-    if (check_prog("RAND", "#include <math.h>", "srand(0);", 0)) {
+    if (check_prog("RAND", 0, "srand(0);", 0)) {
 	printf(" using rand()\n");
     } else
-    if (check_prog("RANDOM", "#include <math.h>", "srandom(0);", 0)) {
+    if (check_prog("RANDOM", 0, "srandom(0);", 0)) {
 	printf("using random()\n");
     } else {
 	printf("WARNING: did not find a random number generator\n");
 	exit(-1);
     }
 
+    if (check_prog("USE_BSD_SIGNALS", 0, "SIGCHLD; wait3(0, 0, 0);", 0)) {
+	printf("Using BSD signals.\n");
+    } else {
+	printf("Using System V signals.\n");
+    }
+    
     printf("Checking if signal() returns SIG_ERR on error ...");
-    if (check_prog("SIGNAL_ERROR SIG_ERR", "#include \"configure.h\"\n#include \"std_incl.h\"\n", "if (signal(0, 0) == SIG_ERR) ;", 0)) {
+    if (check_prog("SIGNAL_ERROR SIG_ERR", 0, "if (signal(0, 0) == SIG_ERR) ;", 0)) {
 	printf(" yes\n");
     } else {
-	fprintf(yyout, "#define SIGNAL_ERROR BADSIG");
+	fprintf(yyout, "#define SIGNAL_ERROR BADSIG\n");
 	printf(" no\n");
     }
 
+    printf("Checking for inline ...");
+    if (!check_prog("INLINE inline", "inline void foo() { }", "foo();", 0)) {
+	printf(" __inline ...");
+	if (!check_prog("INLINE __inline", "__inline void foo() {}", "foo();", 0)) {
+	    fprintf(yyout, "#define INLINE\n");
+	}
+    }
+    printf(" const ...\n");
+    if (!check_prog("CONST const", "int foo(const int *, const int *);", "", 0))
+	fprintf(yyout, "#define CONST\n");
+    
     verbose_check_prog("Checking for ualarm()", "HAS_UALARM",
 		       "", "ualarm(0, 0);", 0);
     verbose_check_prog("Checking for strerror()", "HAS_STRERROR",
@@ -1388,12 +1444,25 @@ static void handle_configure() {
 	exit(-1);
     }
     
-    fprintf(yyout, "#define CONFIGURE_VERSION	%i\n", CONFIGURE_VERSION);
+    /* PACKAGE_DB stuff */
+    if (lookup_define("MSQL")) {
+	/* -I would be nicer, but we don't have an easy way to set -I paths
+	 * right now 
+	 */
+	if (!(check_include("INCL_LOCAL_MSQL_H", "/usr/local/include/msql.h")
+	      || check_include("INCL_LOCAL_MSQL_MSQL_H", "/usr/local/msql/include/msql.h")
+	      || check_include("INCL_LOCAL_MINERVA_MSQL_H", "/usr/local/Minerva/include/msql.h"))) {
+	    fprintf(stderr, "Cannot find msql.h\n");
+	    exit(-1);
+	}
+    }
+    
+    fprintf(yyout, "#define CONFIGURE_VERSION	%i\n\n", CONFIGURE_VERSION);
 
     close_output_file();
 
 #ifdef WIN32
-    system("copy Win32\\configure.h tmp.config.h");
+    system("copy windows\\configure.h tmp.config.h");
     system("type configure.h >> tmp.config.h");
     system("del configure.h");
     system("rename tmp.config.h configure.h");
@@ -1425,7 +1494,18 @@ static void handle_configure() {
 
     fprintf(stderr, "Checking for flaky Linux systems ...\n");
     check_linux_libc();
-    
+
+    /* PACKAGE_DB stuff */
+    if (lookup_define("MSQL")) {
+	if (!(check_library("-lmsql") ||
+	      check_library("-L/usr/local/lib -lmsql") ||
+	      check_library("-L/usr/local/msql/lib -lmsql") ||
+	      check_library("-L/usr/local/Minerva/lib -lmsql"))) {
+	    fprintf(stderr, "Cannot find libmsql.a\n");
+	    exit(-1);
+	}
+    }
+
     fprintf(yyout, "\n\n");
     close_output_file();
 #endif

@@ -137,20 +137,26 @@ binary_int_op P4(parse_node_t *, l, parse_node_t *, r,
     if (exact_types){
 	if (!IS_TYPE(l->type, TYPE_NUMBER)) {
 	    char buf[256];
-	    strcpy(buf, "Bad left argument to '");
-	    strcat(buf, name);
-	    strcat(buf, "' : \"");
-	    strcat(buf, get_type_name(l->type));
-	    strcat(buf, "\"");
+	    char *end = EndOf(buf);
+	    char *p;
+	    
+	    p = strput(buf, end, "Bad left argument to '");
+	    p = strput(p, end, name);
+	    p = strput(p, end, "' : \"");
+	    p = get_type_name(p, end, l->type);
+	    p = strput(p, end, "\"");
 	    yyerror(buf);
 	}
 	if (!IS_TYPE(r->type,TYPE_NUMBER)) {
 	    char buf[256];
-	    strcpy(buf, "Bad right argument to '");
-	    strcat(buf, name);
-	    strcat(buf, "' : \"");
-	    strcat(buf, get_type_name(r->type));
-	    strcat(buf, "\"");
+	    char *end = EndOf(buf);
+	    char *p;
+	    
+	    p = strput(buf, end, "Bad right argument to '");
+	    p = strput(p, end, name);
+	    p = strput(p, end, "' : \"");
+	    p = get_type_name(p, end, r->type);
+	    p = strput(p, end, "\"");
 	    yyerror(buf);
 	}
     }
@@ -362,6 +368,23 @@ parse_node_t *insert_pop_value P1(parse_node_t *, expr) {
     }
     CREATE_UNARY_OP(replacement, F_POP_VALUE, 0, expr);
     return replacement;
+}
+
+int is_boolean P1(parse_node_t *, pn) {
+    switch (pn->kind) {
+    case NODE_UNARY_OP:
+	if (pn->v.number == F_NOT)
+	    return 1;
+	return 0;
+    case NODE_BINARY_OP:
+	if (pn->v.number >= F_EQ && pn->v.number <= F_GT)
+	    return 1;
+	return 0;
+    case NODE_LAND_LOR:
+    case NODE_BRANCH_LINK:
+	return 1;
+    }
+    return 0;
 }
 
 parse_node_t *optimize_loop_test P1(parse_node_t *, pn) {

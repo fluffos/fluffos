@@ -1,0 +1,18 @@
+MudOS driver concepts
+
+This is pretty much a grab bag of stuff right now ...
+
+<DL>
+*  MudOS driver
+*  LPC
+*  message()
+*  objects
+*  OOP
+*  preprocessor
+*  simul_efuns
+*  socket_efuns
+*  defines
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

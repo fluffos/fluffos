@@ -1,0 +1,17 @@
+<HEAD> <TITLE> commands - returns some information about actions the user can take </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> commands - returns some information about actions the user can take </H1> </center>
+<p>
+<b> array commands(); </b>
+<p>
+This efun is only available if NO_ADD_ACTION is not defined.
+<p>
+Returns an array of an array of 4 items describing the actions that
+are available to this_object().  The first item is the command
+itself (as passed to add_action()).  The second is the set of
+flags (passed to add_action as the third argument, often defaulted
+to 0).  The third is the object that defined the action.  The fourth
+is the function to be called ("&#60;function&#62;" if it is a function pointer).
+<p>
+See also:
+<A HREF=add_action.html>  add_action </A>,
+<A HREF=enable_commands.html>  enable_commands </A>,
+<A HREF=disable_commands.html>  disable_commands </A>

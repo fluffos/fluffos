@@ -1,0 +1,19 @@
+socket_error - return a text description of a socket error
+
+string socket_error( int error );
+
+This efun is only available if PACKAGE_SOCKETS is compiled in.
+
+socket_error() returns a string describing the error signified by error.
+
+socket_error() returns:
+
+a string describing the error on success.
+
+"socket_error: invalid error number" on bad input.
+
+See also:
+ socket_create,
+ socket_connect
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

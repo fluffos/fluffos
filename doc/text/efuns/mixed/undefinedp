@@ -1,0 +1,18 @@
+undefinedp - determine whether or not a given value is undefined.
+
+int undefinedp( mixed arg );
+
+Return 1 if `arg' is undefined.  'arg' will be undefined in the following
+cases:
+
+<DL>
+* it is a variable set equal to the return value of a call_other to a
+non-existent method (e.g. arg = call_other(obj, "???")).
+* it is a variable set equal to the return value of an access of an
+element in a mapping that doesn't exist (e.g. arg = map[not_there]).
+* it has not yet been initialized.
+* it points to a destructed object.
+* it is a function (formal) parameter that corresponds to a missing actual argument.
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

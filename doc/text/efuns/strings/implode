@@ -1,0 +1,24 @@
+implode - concatenate strings
+
+string implode( array arr, string del );
+
+mixed implode( array arr, function f);
+
+mixed implode( array arr, function f, mixed start);
+
+Concatenate all strings found in array 'arr', with the string 'del' between
+each element. Only strings are used from the array.  Elements that are not
+strings are ignored.
+
+The second version takes the first and second values of arr and passes them
+to f, then passes that result and the third arg to f, et cetera.  It returns
+the last result of the call to f.
+
+In the third case, the first call is f(start, arr[0]), then things proceed
+as above.
+
+See also:
+ explode,
+ sprintf
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

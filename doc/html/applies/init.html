@@ -1,0 +1,28 @@
+<HEAD> <TITLE> init - function in an object called by move_object() to initialize verb/actions </TITLE> </HEAD> <BODY BACKGROUND=http://www.imaginary.com/~beek/gifs/bg.jpg TEXT=#000000 ALINK=#FFFF00 VLINK=#550000 LINK=#000099> <center> <H1> init - function in an object called by move_object() to initialize verb/actions </H1> </center>
+<p>
+<b> void init(); </b>
+<p>
+This function is not called if NO_ADD_ACTIONS is defined.
+<p>
+When the mudlib moves an object "A" inside another object "B", the
+driver (the move_object() efunction) does the following:
+<p>
+<DL>
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> if "A" is living, causes "A" to call the init() in "B"
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> causes each living object in the inventory of "B" to call init() in
+"A".  regardless of whether "A" is living or not.
+<DT> <IMG SRC = http://www.imaginary.com/Graphics/Whiteball.gif> if "A" is living, causes "A" to call the init() in each object in
+the inventory of "B".
+</DL>
+<p>
+Note: an object is considered to be living if enable_commands() has
+been called by that object.
+<p>
+Typically, the init() function in an object is used to call add_action()
+for each command that the object offers.
+<p>
+See also:
+<A HREF=../efuns/objects/move_object.html>  move_object </A>,
+<A HREF=../efuns/interactive/enable_commands.html>  enable_commands </A>,
+<A HREF=../efuns/mudlib/living.html>  living </A>,
+<A HREF=../efuns/interactive/add_action.html>  add_action </A>

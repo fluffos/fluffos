@@ -1,0 +1,14 @@
+Buffer Efuns
+
+The following efuns are available for manipulating buffer values:
+
+<DL>
+*  allocate_buffer
+*  bufferp
+*  crc32
+*  read_buffer
+*  write_buffer
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
+

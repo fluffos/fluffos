@@ -6,9 +6,9 @@ PROOF=
 STRFUNCS=
 INSTALL=install -c
 INSTALL_DIR=../bin
-OPTIMIZE=-O2 -fomit-frame-pointer -fstrength-reduce
+OPTIMIZE=-Wall -DPEDANTIC -pedantic
 CPP=gcc -E
-CFLAGS=
+CFLAGS= -g -DDEBUG
 CC=gcc
 YACC=bison -d -y
 RANLIB=ranlib
@@ -60,8 +60,6 @@ RANLIB=ranlib
 # ---- DO NOT EDIT ANYTHING BELOW HERE UNLESS YOU KNOW ALOT ABOUT HOW
 #      MUDOS WORKS INTERNALLY ----
 
-OURLIBS=packages/packages.a mudlib/mudlib.a
-
 OVERRIDES=$(MAKEOVERRIDES)
 
 SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
@@ -72,9 +70,13 @@ SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   compiler.c avltree.c icode.c trees.c generate.c scratchpad.c \
   socket_efuns.c socket_ctrl.c qsort.c eoperators.c socket_err.c md.c \
   strstr.c disassembler.c binaries.c ualarm.c $(STRFUNCS) \
-  replace_program.c functab_tree.c ccode.c cfuns.c compile_file.c
+  replace_program.c ccode.c cfuns.c compile_file.c crypt.c
 
 all: cc.h files main_build
+
+parallel:
+	$(MAKE) -k -l -j 6 cc.h files
+	$(MAKE) -k -l -j 6 main_build
 
 main_build: $(DRIVER_BIN) addr_server
 
@@ -98,11 +100,14 @@ grammar.tab.c: grammar.y
 	sed "s/y.tab.c/grammar.tab.c/g" y.tab.c  > grammar.tab.c
 	-mv y.tab.h grammar.tab.h
 
-$(DRIVER_BIN): $(OBJ)
+packages/packages.a: packages/parser.c packages/contrib.c
 	$(MAKE) -C packages 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)'
+
+mudlib/mudlib.a:
 	$(MAKE) -C mudlib 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)'
+$(DRIVER_BIN): packages/packages.a mudlib/mudlib.a $(OBJ)
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
-	$(PROOF) $(CC) $(CFLAGS) $(OPTIMIZE) $(OBJ) -o $(DRIVER_BIN) $(OURLIBS) `cat system_libs`
+	$(PROOF) $(CC) $(CFLAGS) $(OPTIMIZE) $(OBJ) -o $(DRIVER_BIN) packages/packages.a mudlib/mudlib.a $(EXTRALIBS) `cat system_libs`
 
 addr_server:  $(OBJDIR)/addr_server.o $(OBJDIR)/socket_ctrl.o $(OBJDIR)/port.o addr_server.h
 	$(CC) $(CFLAGS) $(OPTIMIZE) $(OBJDIR)/socket_ctrl.o $(OBJDIR)/addr_server.o $(OBJDIR)/port.o \
@@ -149,8 +154,17 @@ make_func.tab.c: make_func.y cc.h
 	-rm -f make_func.tab.c
 	mv y.tab.c make_func.tab.c
 
-configure.h: edit_source
-	./edit_source -configure
+configure.h: edit_source build.MudOS
+	if test \( ! -r configure.h \) -o \( ! -r configuration \); then \
+	    rm -f configuration; \
+	    touch configuration; \
+	fi
+	if test "Machine `uname -a` Configure version 5" = "`cat configuration`"; then \
+	    echo "Skipping configuration ..."; \
+	else \
+	    ./edit_source -configure; \
+	    echo "Machine `uname -a` Configure version 5" > configuration; \
+	fi
 
 $(OBJDIR)/edit_source.o: edit_source.c preprocess.c cc.h
 
@@ -187,7 +201,7 @@ nothing:
 
 # remove local configuration
 spotless: clean
-	-rm -f configure.h local_options system_libs
+	-rm -f configure.h local_options system_libs configuration
 	-rm -f options_incl.h
 
 # get ready for recompile
@@ -201,16 +215,21 @@ neat:
 	-rm -f malloc.c mallocwrapper.c
 	-rm -f func_spec.cpp files
 	-rm -f grammar.y comptest* a.out
-	-rm -f packages/Makefile packages/GNUmakefile
+	-rm -f packages/Makefile packages/GNUmakefile packages/packages
 
 # remove everything except configuration
 clean: neat
 	-rm -f Makefile.MudOS GNUmakefile.MudOS
 	-rm -f cc.h edit_source
-	-rm -f core y.output
-	-rm -f *.orig *.rej
-	-rm -f */*.orig */*.rej
-	-rm -f *.ln tags */*~ *~ TAGS
+	-rm -f core y.output testsuite/core testsuite/tmp/*
+	-rm -rf testsuite/binaries
+	-rm -f testsuite/OBJ_DUMP* testsuite/test_file testsuite/testfile
+	-rm -f testsuite/tmp_eval_file.c testsuite/sf.o testsuite/ed_test
+	-rm -f testsuite/log/log testsuite/log/debug.log testsuite/log/compile
+	-find . -name "*~" -print | xargs rm
+	-find . -name "*.orig" -print | xargs rm
+	-find . -name "*.rej" -print | xargs rm
+	-rm -f *.ln tags TAGS
 	-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old addr_server
 	-rm -f Dependencies tmpdepend
 	-touch Dependencies

@@ -1,0 +1,11 @@
+query_load_average - forces an error to occur in an object
+
+string query_load_average();
+
+This function returns a string which reports two things: 1) user commands
+per second, and 2) compiled lines per second.
+
+See also:
+ rusage
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

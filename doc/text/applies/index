@@ -1,0 +1,28 @@
+Applies
+
+Applies are functions called by the driver in objects when certain events
+occur, as opposed to functions called in objects by other objects.
+In most cases, these functions can be called even if they are private or
+static, allowing one to prevent them from being called by anything else.
+
+General applies:
+
+<DL>
+*  __INIT
+*  clean_up
+*  create
+*  id
+*  init
+*  move_or_destruct
+*  reset
+</DL>
+
+Subcategories:
+
+<DL>
+*  master
+*  parsing
+*  interactive
+</DL>
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere

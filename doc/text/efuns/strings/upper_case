@@ -1,0 +1,14 @@
+upper_case - return the uppercase version of a given string
+
+string upper_case(string);
+
+Return the uppercase version of a given string (original string remains
+unchanged).
+
+This function requires PACKAGE_CONTRIB to be defined in the options file.
+
+See also:
+ capitalize,
+ lower_case
+
+ Tim Hollebeek  Beek@ZorkMUD, Lima Bean, IdeaExchange, and elsewhere
