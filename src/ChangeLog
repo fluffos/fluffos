@@ -1,3 +1,70 @@
+Thu May 30 14:35:06 EDT 1996 (tim@wfn-shop.princeton.edu (Beek))
+	* bumped version number to v21.7
+	* new options:
+	  . NO_ENVIRONMENT
+	* features:
+	  . destruct()'ing the master or simul_efun object now fails if a
+	    new copy can't be loaded, leaving the old copy loaded
+	  . copy() supports classes
+	  . the simul_efun object is optional; simply don't specify one in
+	    the runtime config file if you don't want one
+	  . outside functions, "modifier:" can be used to make all
+	    functions, variables, and inherits automatically include
+	    "modifier" until the next such definition.  For example,
+	    "private static:" makes all definitions that follow it both
+	    private and static
+	  . ed ranges can now extend past the end of the file; any line #
+	    larger than the last one refers to the last line
+	  . foreach (int in string)
+	  . preliminary Windows 95 support, though I'd recommend using
+	    a v22 beta instead
+	* new warnings:
+	  . return type doesn't match prototype
+	* contrib efuns:
+	  . query_ip_port(), for figuring out which of the external ports
+	    an interactive object connected to (the port number is also
+	    passed to connect; this causes it to be stored internally)
+	* optimizations:
+	  . better code generation for some loops, empty blocks in if
+	    statements, x[y..<1], elimination of expressions with no
+	    side effects
+	  . sprintf() is significantly faster
+	  . most mapping operations are significantly faster
+	* memory usage:
+	  . mapping memory is down about 20%
+	* bug fixes:
+	  . A number of bugs which allowed private functions to be called
+	    were removed
+	  . problems with comments in long #define's
+	  . various problems with the 'array' keyword
+	  . testsuite works again
+	  . literally hundreds of fixes to the parsing package, though
+	    if you use it I'd suggest using a v22 beta instead.
+	  . ranlib is run on subdirectory archives, for systems that need it
+	  . using the values of (void) efuns in some cases
+	  . ... syntax varargs expansion in some cases
+	  . several bug fixes in macro expansion
+	  . @@ blocks work again
+	  . a few crasher and leak fixes in parse_command()
+	  . query_verb() returns the entire verb even when only part of it
+	    was matched again
+	  . SIGFPE and SIGPIPE no longer take down the driver on some
+	    systems
+	  . case 0 now works in string switches again
+	  . (int constant)/(real constant) is a real, not an int
+	  . the telnet option code is more robust to protect against buggy
+	    telnet clients
+	  . a number of other fixes for rare crashers
+	* COMPAT_BUSTERS:
+	  . the each() efun is gone.  Use foreach().
+	* minor changes:
+	  . objects with environments may be cloned
+	* LPC->C:
+	  . valid_compile_to_c() in the master object now controls the use
+	    of generate_source()
+	  . RUNTIME_LOADING works if your system supports dlopen()/dlsym();
+	    see ChangeLog.alpha:v21.7a1 for details
+	
 Fri Oct  6 18:58:01 EDT 1995 (tim@handel.princeton.edu (Beek))
 	* bumped version number to v21.6
 	* LPC->C support:
@@ -1017,7 +1084,7 @@ Mon Dec  5 12:14:46 EST 1994 (tim@handel.princeton.edu (Beek))
 Mon Nov 21 13:51:25 EST 1994 (tim@handel.princeton.edu (Beek))
         * raised patchlevel to v20.22
 	--- Beek section
-	* COMPAT_BUSTER: the environment_destructing() master apply has
+	* COMPAT_BUSTER: The environment_destructing() master apply has
 	  been removed.  move_or_destruct() is now called in all objects
 	  in the inventory of a destructed object, regardless of whether
 	  the object being destructed has an environment.  This

@@ -3,7 +3,6 @@
 #include "lpc_incl.h"
 #include "file.h"
 
-#ifndef OS2
 /*
   ioctl.c: part of the MudOS release -- Truilkan@TMI
 
@@ -25,7 +24,11 @@ INLINE int set_socket_owner P2(int, fd, int, which)
 #ifdef OLD_ULTRIX
     return fcntl(fd, F_SETOWN, which);
 #else
+#ifdef WINSOCK
+    return 1; /* FIXME */
+#else
     return ioctl(fd, SIOCSPGRP, &which);
+#endif
 #endif
 }
 
@@ -38,7 +41,7 @@ INLINE int set_socket_async P2(int, fd, int, which)
 #ifdef OLD_ULTRIX
     return fcntl(fd, F_SETFL, FASYNC);
 #else
-    return ioctl(fd, FIOASYNC, &which);
+    return OS_socket_ioctl(fd, FIOASYNC, &which);
 #endif
 }
 
@@ -70,7 +73,7 @@ INLINE int set_socket_nonblocking P2(int, fd, int, which)
 	flags &= ~O_NONBLOCK;
     return fcntl(fd, F_SETFL, flags);
 #else
-    result = ioctl(fd, FIONBIO, &which);
+    result = OS_socket_ioctl(fd, FIONBIO, &which);
     if (result == -1)
 	debug_perror("set_socket_nonblocking: ioctl", 0);
 #if 0
@@ -84,5 +87,3 @@ INLINE int set_socket_nonblocking P2(int, fd, int, which)
 
 #endif
 }
-
-#endif				/* OS2 */

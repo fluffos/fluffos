@@ -18,13 +18,19 @@
 #  define NDBG(x)
 #endif
 
+#if defined(DEBUGMALLOC_EXTENSIONS) && defined(STRING_STATS)
+#define CHECK_STRING_STATS /* check_string_stats(0) */
+#else
+#define CHECK_STRING_STATS
+#endif
+
 #ifdef STRING_STATS
 #define ADD_NEW_STRING(len, overhead) num_distinct_strings++; bytes_distinct_strings += len + 1; overhead_bytes += overhead
 #define SUB_NEW_STRING(len, overhead) num_distinct_strings--; bytes_distinct_strings -= len + 1; overhead_bytes -= overhead
 
-#define ADD_STRING(len) allocd_strings++; allocd_bytes += len + 1
-#define ADD_STRING_SIZE(len) allocd_bytes += len
-#define SUB_STRING(len) allocd_strings--; allocd_bytes -= len + 1
+#define ADD_STRING(len) allocd_strings++; allocd_bytes += len + 1; CHECK_STRING_STATS
+#define ADD_STRING_SIZE(len) allocd_bytes += len; bytes_distinct_strings += len
+#define SUB_STRING(len) allocd_strings--; allocd_bytes -= len + 1; CHECK_STRING_STATS
 #else
 /* Blazing fast macros :) */
 #define ADD_NEW_STRING(x, y)
@@ -49,7 +55,7 @@ typedef struct malloc_block_s {
 #define MSTR_UPDATE_SIZE(x, y) SAFE(\
 				    ADD_STRING_SIZE(y - MSTR_SIZE(x));\
 				    MSTR_BLOCK(x)->size = \
-				    (y > MAXSHORT ? MAXSHORT : y);\
+				    (y > USHRT_MAX ? USHRT_MAX : y);\
 				)
 
 #define FREE_MSTR(x) SAFE(\
@@ -61,7 +67,7 @@ typedef struct malloc_block_s {
 
 /* This counts on some rather crucial alignment between malloc_block_t and
    block_t */
-#define COUNTED_STRLEN(x) ((svalue_strlen_size = MSTR_BLOCK(x)->size), svalue_strlen_size != MAXSHORT ? svalue_strlen_size : strlen((x)+MAXSHORT)+MAXSHORT)
+#define COUNTED_STRLEN(x) ((svalue_strlen_size = MSTR_BLOCK(x)->size), svalue_strlen_size != USHRT_MAX ? svalue_strlen_size : strlen((x)+USHRT_MAX)+USHRT_MAX)
 #define COUNTED_REF(x)    MSTR_REF(x)
 
 typedef struct block_s {

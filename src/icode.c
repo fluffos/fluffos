@@ -568,9 +568,13 @@ i_generate_node P1(parse_node_t *, expr) {
 		parse_node_t *pn = expr->v.expr;
 		
 		while (pn) {
-		    if (expr->kind == NODE_SWITCH_STRINGS)
-			INS_POINTER((POINTER_INT)PROG_STRING(pn->r.number));
-		    else
+		    if (expr->kind == NODE_SWITCH_STRINGS) {
+			if (pn->r.number) {
+			    INS_POINTER((POINTER_INT)
+					PROG_STRING(pn->r.number));
+			} else 
+			    INS_POINTER((POINTER_INT)0);
+		    } else
 			INS_POINTER((POINTER_INT)pn->r.expr);
 		    ins_short((short)pn->v.number);
 		    pn = pn->l.expr;
@@ -602,6 +606,14 @@ i_generate_node P1(parse_node_t *, expr) {
 	    i_generate_node(expr->r.expr);
 	    ins_byte(F_END_CATCH);
 	    upd_short(addr, CURRENT_PROGRAM_SIZE - addr);
+	    break;
+	}
+    case NODE_TIME_EXPRESSION:
+	{
+	    end_pushes();
+	    ins_byte(F_TIME_EXPRESSION);
+	    i_generate_node(expr->r.expr);
+	    ins_byte(F_END_TIME_EXPRESSION);
 	    break;
 	}
     case NODE_LVALUE_EFUN:
@@ -666,27 +678,32 @@ i_generate_node P1(parse_node_t *, expr) {
 	    break;
 	}
     case NODE_EFUN:
-	generate_expr_list(expr->r.expr);
-	end_pushes();
-	if (expr->v.number < ONEARG_MAX) {
-	    ins_byte(expr->v.number);
-	} else {
-	    /* max_arg == -1 must use F_EFUNV so that varargs expansion works*/
-	    if (expr->l.number < 4 && instrs[expr->v.number].max_arg != -1)
-		ins_byte(F_EFUN0 + expr->l.number);
-	    else {
-		ins_byte(F_EFUNV);
-		ins_byte(expr->l.number);
+	{
+	    int novalue_used = expr->v.number & NOVALUE_USED_FLAG;
+	    int f = expr->v.number & ~NOVALUE_USED_FLAG;
+	    
+	    generate_expr_list(expr->r.expr);
+	    end_pushes();
+	    if (f < ONEARG_MAX) {
+		ins_byte(f);
+	    } else {
+		/* max_arg == -1 must use F_EFUNV so that varargs expansion works*/
+		if (expr->l.number < 4 && instrs[f].max_arg != -1)
+		    ins_byte(F_EFUN0 + expr->l.number);
+		else {
+		    ins_byte(F_EFUNV);
+		    ins_byte(expr->l.number);
+		}
+		ins_byte(f - ONEARG_MAX);
 	    }
-	    ins_byte(expr->v.number - ONEARG_MAX);
+	    if (novalue_used) {
+		/* the value of a void efun was used.  Put in a zero. */
+		ins_byte(F_CONST0);
+	    }
+	    break;
+	default:
+	    fatal("Unknown node %i in i_generate_node.\n", expr->kind);
 	}
-	if (expr->type == TYPE_NOVALUE) {
-	    /* the value of a void efun was used.  Put in a zero. */
-	    ins_byte(F_CONST0);
-	}
-	break;
-    default:
-	fatal("Unknown node %i in i_generate_node.\n", expr->kind);
     }
 }
 

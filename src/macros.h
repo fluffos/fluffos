@@ -79,7 +79,7 @@
 #endif
 
 #ifndef INLINE
-#  if defined(__GNUC__) && !defined(__STRICT_ANSI__) && !defined(lint)
+#  if defined(__GNUC__) && !defined(__STRICT_ANSI__) && !defined(lint) && !defined(PEDANTIC)
 #    define INLINE inline
 #  else
 #    ifdef LATTICE

@@ -55,6 +55,7 @@ struct svalue_s;
 
 void mark_svalue PROT((struct svalue_s *));
 void set_tag PROT((void *, int));
+void check_string_stats PROT((outbuffer_t *));
 #endif
 
 #define MAX_CATEGORY 130

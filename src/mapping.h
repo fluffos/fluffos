@@ -6,7 +6,6 @@
 typedef struct mapping_node_s {
     struct mapping_node_s *next;
     svalue_t values[2];
-    unsigned short hashval;
 } mapping_node_t;
 
 #define MNB_SIZE 256
@@ -35,11 +34,6 @@ typedef struct mapping_s {
 #ifdef PACKAGE_MUDLIB_STATS
     statgroup_t stats;		/* creators of the mapping */
 #endif
-#ifdef EACH
-    object_t *eachObj;	/* object that last called each() on this map */
-    mapping_node_t *elt;		/* keeps track of where each() is in the map */
-    unsigned short bucket;	/* keeps track of where each() currently is */
-#endif
 } mapping_t;
 
 typedef struct finfo_s {
@@ -65,9 +59,6 @@ typedef struct minfo_s {
 #define max(x,y) ((x) > (y)) ? (x) : (y)
 #endif
 
-/* used by mapHashStr: do not make larger than the size of the coeff array */
-#define MAX_KEY_LEN 25
-
 /*
  * mapping.c
  */
@@ -75,12 +66,14 @@ extern int num_mappings;
 extern int total_mapping_size;
 extern int total_mapping_nodes;
 
+int msameval PROT((svalue_t *, svalue_t *));
 int mapping_save_size PROT((mapping_t *));
 INLINE mapping_t *mapTraverse PROT((mapping_t *, int (*) (mapping_t *, mapping_node_t *, void *), void *));
 INLINE mapping_t *load_mapping_from_aggregate PROT((svalue_t *, int));
 INLINE mapping_t *allocate_mapping PROT((int));
 INLINE void free_mapping PROT((mapping_t *));
 INLINE svalue_t *find_in_mapping PROT((mapping_t *, svalue_t *));
+svalue_t *find_string_in_mapping PROT((mapping_t *, char *));
 INLINE svalue_t *find_for_insert PROT((mapping_t *, svalue_t *, int));
 INLINE void absorb_mapping PROT((mapping_t *, mapping_t *));
 INLINE void mapping_delete PROT((mapping_t *, svalue_t *));
@@ -96,7 +89,6 @@ array_t *mapping_each PROT((mapping_t *));
 char *save_mapping PROT((mapping_t *));
 void dealloc_mapping PROT((mapping_t *));
 void mark_mapping_node_blocks PROT((void));
-INLINE int mapHashstr PROT((char *));
 
 void add_mapping_pair PROT((mapping_t *, char *, int));
 void add_mapping_string PROT((mapping_t *, char *, char *));

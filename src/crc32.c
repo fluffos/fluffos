@@ -1,4 +1,5 @@
 #include "std.h"
+#define NEED_CRC_TABLE
 #include "crctab.h"		/* see this file for more CRC credits and
 				 * comments */
 

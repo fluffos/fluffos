@@ -128,17 +128,6 @@
  */
 #define SANE_EXPLODE_STRING
 
-/* EACH: define this if you want the each() operator for mappings.  Undefining
- *   EACH save about 12 bytes per allocated mapping but will make the each()
- *   efun unavailable.  Many people think each() is a bad efun to have but
- *   its here because people use it and would gripe if I took it away.  The
- *   alternative to each() is to use keys() and iterate over the returned
- *   array.
- *
- * Warning: This will probably be removed in the near future
- */
-#undef EACH
-
 /* CAST_CALL_OTHERS: define this if you want to require casting of call_other's;
  *   this was the default behavior of the driver prior to this addition.
  */
@@ -159,8 +148,13 @@
    process_input() then becomes the only way to deal with player input. */
 #undef NO_ADD_ACTION
 
+/* NO_ENVIRONMENT: define this to remove the handling of object containment
+   relationships by the driver */
+#undef NO_ENVIRONMENT
+
 /* NO_WIZARDS: for historical reasons, MudOS used to keep track of who
-   is and isn't a wizard.  Defining this removes that completely. */
+   is and isn't a wizard.  Defining this removes that completely.
+   If this is defined, the wizardp() and related efuns don't exist */
 #define NO_WIZARDS
 
 /* OLD_TYPE_BEHAVIOR: reintroduces a bug in type-checking that effectively
@@ -309,7 +303,8 @@
 
 /* NO_ANSI: define if you wish to disallow users from typing in commands that
  *   contain ANSI escape sequences.  Defining NO_ANSI causes all escapes
- *   (ASCII 27) to be replaced with a space ' '.
+ *   (ASCII 27) to be replaced with a space ' ' before the string is passed
+ *   to the action routines added with add_action.
  *
  * If you anticipate problems with users intentionally typing in ANSI codes
  * to make your terminal flash, etc define this.
@@ -421,9 +416,6 @@
  *   this returns a non-zero value, the binary is allowed to be
  *   saved.  Allowing any file by any wizard to be saved as a
  *   binary is convenient, but may take up a lot of disk space.
- *
- * WARNING: Currently, this doesn't work on 64 bit machines (ie DEC Alpha).
- *          Might not work on Linux or IRIX/
  */
 #define BINARIES
 
@@ -562,6 +554,15 @@
  */
 #define LPC_TO_C
 
+/* RUNTIME_LOADING: On systems which support it, it allows LPC->C compilation
+ * 'on the fly' without having to recompile the driver.
+ *
+ * Note: This currently only works on machines that have the dlopen() system
+ * call.  SunOS and IRIX do, as do a number of others.  AIX and Ultrix don't.
+ * Linux does if you are using ELF.
+ */
+#define RUNTIME_LOADING
+
 /* TRACE_CODE: define this to enable code tracing (the driver will print
  *   out the previous lines of code to an error) eval_instruction() runs about
  *   twice as fast when this is not defined (for the most common eoperators).
@@ -588,18 +589,18 @@
 #define MAX_SAVE_SVALUE_DEPTH 25
 
 /* Miscellaneous config options that should probably be in the runtime
- * config file.
+ * config file.  Or maybe not, in which case the rc.c references should
+ * be removed.
  */
 /* MAX_LOCAL: maximum number of local variables allowed per LPC function */
-#define MAX_LOCAL 25		/* get_config_int(8)  */
+#define CFG_MAX_LOCAL_VARIABLES 		25
 /* MAX_EFUN_SOCKS: maximum number of efun sockets */
-#define MAX_EFUN_SOCKS 16	/* get_config_int(24) */
+#define CFG_MAX_EFUN_SOCKS 			16
 
-#define EVALUATOR_STACK_SIZE 1000	/* get_config_int(4)  */
-#define COMPILER_STACK_SIZE 200	/* get_config_int(5)  */
-#define MAX_TRACE 30		/* get_config_int(6)  */
-#define LIVING_HASH_SIZE 256	/* get_config_int(20) */
-#define RUNTIME_SWITCH_STACK_SIZE 200
+#define CFG_EVALUATOR_STACK_SIZE		1000
+#define CFG_COMPILER_STACK_SIZE			200
+#define CFG_MAX_CALL_DEPTH			30
+#define CFG_LIVING_HASH_SIZE			256
 
 /* NEXT_MALLOC_DEBUG: define this if using a NeXT and you want to enable
  *   the malloc_check() and/or malloc_debug() efuns.  Run the 'man malloc_debug'

@@ -52,9 +52,9 @@ static char *sources[] = {
     "object table", "config table", "simul_efuns", "sentences", "string table",
     "free swap blocks", "uids", "object names", "predefines", "line numbers",
     "compiler local blocks", "compiled program", "users", "debugmalloc overhead",
-    "heart_beat list", "<#37>", "<#38>", "<#39>", 
-    "malloc'ed strings", "shared strings", "function pointers", "arrays",
-    "mappings", "mapping nodes", "mapping tables"
+    "heart_beat list", "parser", "<#38>", "<#39>", 
+    "strings", "malloc strings", "shared strings", "function pointers", "arrays",
+    "mappings", "mapping nodes", "mapping tables", "buffers", "classes"
 };
 
 int malloc_mask = 121;
@@ -88,7 +88,7 @@ MDmalloc P4(md_node_t *, node, int, size, int, tag, char *, desc)
 #ifdef DEBUG
 	abort();
 #endif
-	return 0;
+	return;
     }
     total_malloced += size;
     if (total_malloced > hiwater) {
@@ -287,7 +287,12 @@ static void mark_object P1(object_t *, ob) {
 	sent = sent->next;
     }
 #endif
-    
+
+#ifdef PACKAGE_PARSER
+    if (ob->pinfo)
+	parser_mark(ob->pinfo);
+#endif    
+
     if (ob->prog)
 	for (i = 0; i < ob->prog->num_variables; i++)
 	    mark_svalue(&ob->variables[i]);
@@ -329,12 +334,8 @@ void mark_svalue P1(svalue_t *, sv) {
 }
 
 static void mark_funp P1(funptr_t*, fp) {
-    svalue_t tmp;
-    if (fp->hdr.owner->extra_ref == 0 && fp->hdr.args) {
-	tmp.type = T_ARRAY;
-	tmp.u.arr = fp->hdr.args;
-	mark_svalue(&tmp);
-    }
+    if (fp->hdr.args)
+	fp->hdr.args->extra_ref++;
 
     fp->hdr.owner->extra_ref++;
     if ((fp->hdr.type & 0x0f) == FP_FUNCTIONAL) 
@@ -418,7 +419,7 @@ void mark_sockets PROT((void)) {
     int i;
     char *s;
 
-    for (i = 0; i < MAX_EFUN_SOCKS; i++) {
+    for (i = 0; i < CFG_MAX_EFUN_SOCKS; i++) {
 	if (lpc_socks[i].flags & S_READ_FP) {
 	    mark_funp(lpc_socks[i].read_callback.f);
 	} else 
@@ -436,6 +437,70 @@ void mark_sockets PROT((void)) {
 	} else 
 	if ((s = lpc_socks[i].close_callback.s)) {
 	    EXTRA_REF(BLOCK(s))++;
+	}
+    }
+}
+#endif
+
+#ifdef STRING_STATS
+static int base_overhead = 0;
+
+int check_for_large_strings() {
+    int hsh;
+    md_node_t *entry;
+    malloc_block_t *msbl;
+    
+    for (hsh = 0; hsh < TABLESIZE; hsh++) {
+	for (entry = table[hsh]; entry; entry = entry->next) {
+	    if (entry->tag == TAG_MALLOC_STRING) {
+		msbl = NODET_TO_PTR(entry, malloc_block_t*);
+		if (msbl->size == USHRT_MAX)
+		    return 1;
+	    }
+	}
+    }
+    return 0;
+}
+
+void check_string_stats P1(outbuffer_t *, out) {
+    int overhead = blocks[TAG_SHARED_STRING & 0xff] * sizeof(block_t)
+	+ blocks[TAG_MALLOC_STRING & 0xff] * sizeof(malloc_block_t);
+    int num = blocks[TAG_SHARED_STRING & 0xff] + blocks[TAG_MALLOC_STRING & 0xff];
+    int bytes = totals[TAG_SHARED_STRING & 0xff] + totals[TAG_MALLOC_STRING & 0xff];
+    
+    if (!base_overhead)
+	base_overhead = overhead_bytes - overhead;
+    overhead += base_overhead;
+
+    if (num != num_distinct_strings) {
+	if (out) {
+	    outbuf_addv(out, "WARNING: num_distinct_strings is: %i should be: %i\n",
+			num_distinct_strings, num);
+	} else {
+	    printf("WARNING: num_distinct_strings is: %i should be: %i\n",
+		   num_distinct_strings, num);
+	    abort();
+	}
+    }
+    if (overhead != overhead_bytes) {
+	if (out) {
+	    outbuf_addv(out, "WARNING: overhead_bytes is: %i should be: %i\n",
+	       overhead_bytes, overhead);
+	} else {
+	    printf("WARNING: overhead_bytes is: %i should be: %i\n",
+		   overhead_bytes, overhead);
+	    abort();
+	}
+    }
+    if (bytes - (overhead - base_overhead) != bytes_distinct_strings
+	&& !check_for_large_strings()) {
+	if (out) {
+	    outbuf_addv(out, "WARNING: bytes_distinct_strings is: %i should be: %i\n",
+			bytes_distinct_strings, bytes - (overhead - base_overhead));
+	} else {
+	    printf("WARNING: bytes_distinct_strings is: %i should be: %i\n",
+		   bytes_distinct_strings, bytes - (overhead - base_overhead));
+	    abort();
 	}
     }
 }
@@ -470,19 +535,6 @@ void check_all_blocks P1(int, flag) {
 
     outbuf_zero(&out);
     outbuf_add(&out, "Performing memory tests ...\n");
-    
-#if 0
-    for (hsh = 0; hsh < TABLESIZE; hsh++) {
-	for (entry = table[hsh]; entry; entry = entry->next) {
-	    if (strcmp(entry->desc, "apply_low")==0) {
-		if (findstring(PTR(entry)))
-		    num++;
-		total++;
-	    }
-	}
-    }
-    outbuf_addv(&out, "fraction: %d/%d\n", num, total);
-#endif
     
     for (hsh = 0; hsh < TABLESIZE; hsh++) {
 	for (entry = table[hsh]; entry; entry = entry->next) {
@@ -523,9 +575,14 @@ void check_all_blocks P1(int, flag) {
 		    char *str;
 		
 		    msbl = NODET_TO_PTR(entry, malloc_block_t *);
+		    /* don't give an error for the return value we are 
+		       constructing :) */
+		    if (msbl == MSTR_BLOCK(out.buffer))
+			break;
+
 		    str = (char *)(msbl + 1);
 		    msbl->extra_ref = 0;
-		    if (msbl->size != MAXSHORT && msbl->size != strlen(str)) {
+		    if (msbl->size != USHRT_MAX && msbl->size != strlen(str)) {
 			outbuf_addv(&out, "Malloc'ed string length is incorrect: %s %04x '%s': is: %i should be: %i\n", entry->desc, (int)entry->tag, str, msbl->size, strlen(str));
 		    }
 		    break;
@@ -555,15 +612,6 @@ void check_all_blocks P1(int, flag) {
 		buf->extra_ref = 0;
 		break;
 	    }
-#if 0
-	    if (entry->tag == TAG_STRING
-		&& strcmp(entry->desc, "assign_svalue_no_free")
-		&& strcmp(entry->desc, "restore_string")) {
-		if (findstring(PTR(entry))) {
-		    outbuf_addv(out, "Malloc'ed string is also shared: %s %04x:\n\"%s\"\n", entry->desc, (int)entry->tag, PTR(entry));
-		}
-	    }
-#endif
 	}
     }
     
@@ -609,10 +657,7 @@ void check_all_blocks P1(int, flag) {
 	outbuf_addv(&out, "WATNING: total_users is: %i should be: %i\n",
 		     total_users, blocks[TAG_INTERACTIVE & 0xff]);
 #ifdef STRING_STATS
-    if (blocks[TAG_SHARED_STRING & 0xff] + blocks[TAG_MALLOC_STRING & 0xff]
-	!= num_distinct_strings)
-	outbuf_addv(&out, "WARNING: num_distinct_strings is: %i should be: %i\n",
-		     num_distinct_strings, blocks[TAG_SHARED_STRING & 0xff] + blocks[TAG_MALLOC_STRING & 0xff]);
+    check_string_stats(&out);
 #endif
 
     /* now do a mark and sweep check to see what should be alloc'd */
@@ -646,6 +691,9 @@ void check_all_blocks P1(int, flag) {
 #ifdef PACKAGE_SOCKETS
     mark_sockets();
 #endif
+#ifdef PACKAGE_PARSER
+    parser_mark_verbs();
+#endif
 #ifdef LPC_TO_C
     mark_switch_lists();
 #endif
@@ -664,6 +712,10 @@ void check_all_blocks P1(int, flag) {
     master_ob->extra_ref++;
     simul_efun_ob->extra_ref++;
     for (ob = obj_list; ob; ob = ob->next_all) {
+	ob->extra_ref++;
+    }
+    /* objects on obj_list_destruct still have a ref too */
+    for (ob = obj_list_destruct; ob; ob = ob->next_all) {
 	ob->extra_ref++;
     }
     
@@ -793,7 +845,7 @@ void check_all_blocks P1(int, flag) {
 	    case TAG_FUNP:
 		fp = NODET_TO_PTR(entry, funptr_t *);
 		if (fp->hdr.ref != fp->hdr.extra_ref)
-		    outbuf_addv(&out, "Bad ref count for function pointer, is %d - should be %d\n", fp->hdr.ref, fp->hdr.extra_ref);
+		    outbuf_addv(&out, "Bad ref count for function pointer (owned by %s), is %d - should be %d\n", fp->hdr.owner->name, fp->hdr.ref, fp->hdr.extra_ref);
 		break;
 	    case TAG_BUFFER:
 		buf = NODET_TO_PTR(entry, buffer_t *);
@@ -831,7 +883,7 @@ void check_all_blocks P1(int, flag) {
 		/* don't give an error for the return value we are 
 		   constructing :) */
 		if (msbl == MSTR_BLOCK(out.buffer))
-		    msbl->extra_ref++;
+		    break;
 
 		if (msbl->ref != msbl->extra_ref)
 		    outbuf_addv(&out, "Bad ref count for malloc string \"%s\" %s %04x, is %d - should be %d\n", (char *)(msbl + 1), entry->desc, (int)entry->tag, msbl->ref, msbl->extra_ref);

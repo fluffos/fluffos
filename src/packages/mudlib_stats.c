@@ -313,7 +313,7 @@ static void init_author_for_ob P1(object_t *, ob)
     ret = apply_master_ob(APPLY_AUTHOR_FILE, 1);
     if (ret == (svalue_t *)-1) {
 	ob->stats.author = master_author;
-    } else if (IS_ZERO(ret)) {
+    } else if (!ret || ret->type != T_STRING) {
 	ob->stats.author = NULL;
     } else {
 	ob->stats.author = add_stat_entry(ret->u.string, &authors);
@@ -375,14 +375,12 @@ static void init_domain_for_ob P1(object_t *, ob)
     object_t *tmp_ob;
     int err;
 
-    err = assert_master_ob_loaded("[internal] init_domain_for_ob","");
-    if (err == -1)
+    if (master_ob == (object_t *)-1)
 	tmp_ob = ob;
-    else if (err == 1) {
+    else
 	tmp_ob = master_ob;
-    }
 
-    if (!master_ob || !current_object
+    if (!current_object
 #ifdef PACKAGE_UIDS
 	|| !current_object->uid
 #endif
@@ -402,11 +400,14 @@ static void init_domain_for_ob P1(object_t *, ob)
     if (!domain_file_fname)
 	domain_file_fname = make_shared_string(APPLY_DOMAIN_FILE);
     ret = apply(domain_file_fname, tmp_ob, 1, ORIGIN_DRIVER);
-    if (!ret)
-	error("No function 'domain_file' in master ob!\n");
+    if (IS_ZERO(ret)) {
+	ob->stats.domain = current_object->stats.domain;
+	return;
+    }
+    if (ret->type != T_STRING)
+	error("'domain_file' in the master object must return a string!\n");
     domain_name = ret->u.string;
-    if (IS_ZERO(ret)
-	|| strcmp(current_object->stats.domain->name, domain_name) == 0) {
+    if (strcmp(current_object->stats.domain->name, domain_name) == 0) {
 	ob->stats.domain = current_object->stats.domain;
 	return;
     }

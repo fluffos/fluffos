@@ -25,8 +25,8 @@ short compatible[11] = {
     /* UNKNOWN */  0,
     /* ANY */      0xfff,
     /* NOVALUE */  CT_SIMPLE(TYPE_NOVALUE) | CT(TYPE_VOID) | CT(TYPE_NUMBER),
-    /* VOID */     CT_SIMPLE(TYPE_VOID) | CT(TYPE_NOVALUE),
-    /* NUMBER */   CT_SIMPLE(TYPE_NUMBER) | CT(TYPE_NOVALUE) | CT(TYPE_REAL),
+    /* VOID */     CT_SIMPLE(TYPE_VOID) | CT(TYPE_NOVALUE) | CT(TYPE_NUMBER),
+    /* NUMBER */   CT_SIMPLE(TYPE_NUMBER) | CT(TYPE_NOVALUE) | CT(TYPE_REAL) | CT(TYPE_VOID),
     /* STRING */   CT_SIMPLE(TYPE_STRING),
     /* OBJECT */   CT_SIMPLE(TYPE_OBJECT),
     /* MAPPING */  CT_SIMPLE(TYPE_MAPPING),
@@ -53,7 +53,7 @@ mem_block_t mem_block[NUMAREAS];
 
 function_context_t function_context;
 
-int exact_types;
+int exact_types, global_modifiers;
 
 int current_type;
 
@@ -100,16 +100,16 @@ char *get_two_types P2(int, type1, int, type2)
 
 void init_locals()
 {
-    type_of_locals = CALLOCATE(MAX_LOCAL,unsigned short, 
+    type_of_locals = CALLOCATE(CFG_MAX_LOCAL_VARIABLES,unsigned short, 
 			       TAG_LOCALS, "init_locals:1");
-    locals = CALLOCATE(MAX_LOCAL, ident_hash_elem_t *, 
+    locals = CALLOCATE(CFG_MAX_LOCAL_VARIABLES, ident_hash_elem_t *, 
 		       TAG_LOCALS, "init_locals:2");
-    runtime_locals = CALLOCATE(MAX_LOCAL, char, 
+    runtime_locals = CALLOCATE(CFG_MAX_LOCAL_VARIABLES, char, 
 			       TAG_LOCALS, "init_locals:3");
     type_of_locals_ptr = type_of_locals;
     locals_ptr = locals;
     runtime_locals_ptr = runtime_locals;
-    locals_size = type_of_locals_size = MAX_LOCAL;
+    locals_size = type_of_locals_size = CFG_MAX_LOCAL_VARIABLES;
     current_number_of_locals = max_num_locals = 0;
 }
 
@@ -168,7 +168,7 @@ void pop_n_locals P1(int, num) {
 
 int add_local_name P2(char *, str, int, type)
 {
-    if (max_num_locals == MAX_LOCAL) {
+    if (max_num_locals == CFG_MAX_LOCAL_VARIABLES) {
 	yyerror("Too many local variables");
 	return 0;
     } else {
@@ -186,7 +186,7 @@ int add_local_name P2(char *, str, int, type)
 void reallocate_locals(){
     int offset;
     offset = type_of_locals_ptr - type_of_locals;
-    type_of_locals = RESIZE(type_of_locals, type_of_locals_size += MAX_LOCAL,
+    type_of_locals = RESIZE(type_of_locals, type_of_locals_size += CFG_MAX_LOCAL_VARIABLES,
 			    unsigned short, TAG_LOCALS, "reallocate_locals:1");
     type_of_locals_ptr = type_of_locals + offset;
     offset = locals_ptr - locals;
@@ -236,12 +236,13 @@ void copy_variables P2(program_t *, from, int, type)
      } 
 }
 
-
-
 static void copy_function_details P2(function_t *, to, function_t *, from) {
     to->offset = from->offset;
     to->function_index_offset = from->function_index_offset;
     to->type = from->type;
+    if (to->type & TYPE_MOD_PRIVATE)
+	to->type |= TYPE_MOD_HIDDEN;
+    
     to->num_local = from->num_local;
     to->num_arg = from->num_arg;
     to->flags = (from->flags & NAME_MASK) | NAME_DEF_BY_INHERIT | NAME_UNDEFINED;
@@ -257,6 +258,9 @@ static function_t *copy_function P2(function_t *, new, int, add) {
 
     ret = (function_t *)allocate_in_mem_block(A_FUNCTIONS, sizeof(function_t));
     *ret = *new;
+    if (ret->type & TYPE_MOD_PRIVATE)
+	ret->type |= TYPE_MOD_HIDDEN;
+    
     ref_string(new->name); /* increment ref count */
     /* don't propagate certain flags forward */
     ret->flags &= NAME_MASK;
@@ -353,7 +357,7 @@ static function_t *overload_function P3(int, index, program_t *, prog, int, newi
     /* Be careful with nomask; if both functions exists and either is nomask,
        we error.  */
     if (!(new->flags & NAME_NO_CODE) && REAL_FUNCTION(funp)
-        && ((new->type & TYPE_MOD_NO_MASK) || (funp->type & TYPE_MOD_NO_MASK))
+        && (funp->type & TYPE_MOD_NO_MASK)
        ) {
 	char buf[2048];
 	sprintf(buf, "Illegal to redefine 'nomask' function \"%s\"",
@@ -371,7 +375,9 @@ static function_t *overload_function P3(int, index, program_t *, prog, int, newi
      * twice.  Something should be done about that.
      */
     if ((pragmas & PRAGMA_WARNINGS) 
-	&& REAL_FUNCTION(funp) && !(new->flags & NAME_NO_CODE)) {
+	&& REAL_FUNCTION(funp) && !(new->flags & NAME_NO_CODE)
+	&& (funp->flags & NAME_UNDEFINED) /* not defined at top level yet */
+	) {
 	/* don't scream if one is private.  Why not?  Because I said so.
 	 * private is pretty screwed up anyway.  In the future there
 	 * won't be such a clash b/c private won't come up the tree.
@@ -697,8 +703,15 @@ int define_new_function P5(char *, name, int, num_arg, int, num_local,
 		yyerror("Called function not compiled with type testing.");
 	    else {
 		/* Now check that argument types wasn't changed. */
+		if ((type & TYPE_MOD_MASK) != (funp->type & TYPE_MOD_MASK)) {
+		    char buff[200];
+		    sprintf(buff, "Return type doesn't match prototype %s",
+			    get_two_types(type, funp->type));
+		    yywarn(buff);
+		}
+		
 		for (i = 0; i < num_arg; i++) {
-		    ;		/* FIXME? */
+		    /* FIXME: check arg types here */
 		}
 	    }
 	}
@@ -793,17 +806,17 @@ int define_variable P3(char *, name, int, type, int, hide)
 	}
 	/* Okay, the nasty idiots have two variables of the same name in
 	   the same object.  This causes headaches for save_object().
-	   To keep save_object sane, we need to make one static;
-	   Also, be careful not to hide the current variable with a
-	   hidden one. */
+	   To keep save_object sane, we need to make one static */
 	if (!(type & TYPE_MOD_STATIC)) {
 	    /* this one isn't static, make the other one static */
 	    VARIABLE(ihe->dn.global_num)->type |= TYPE_MOD_STATIC;
 	}
+	/* hidden variables don't cause variables that are visible to become
+	   invisible; we only add them above (in the !hide case) for better
+	   error messages */
 	if (!hide)
 	    ihe->dn.global_num = n;
     }
-    ihe->dn.global_num = n;
 
     dummy = (variable_t *)allocate_in_mem_block(A_VARIABLES,sizeof(variable_t));
     dummy->name = str;
@@ -843,7 +856,8 @@ char *get_type_name P1(int, type)
     }
     if (type & TYPE_MOD_CLASS) {
 	strcat(buff, "class ");
-	strcat(buff, PROG_STRING(CLASS(type & ~TYPE_MOD_CLASS)->name));
+	if (current_file)
+	    strcat(buff, PROG_STRING(CLASS(type & ~TYPE_MOD_CLASS)->name));
     } else {
 	DEBUG_CHECK(type >= sizeof compiler_type_names / sizeof compiler_type_names[0], "Bad type\n");
 	strcat(buff, compiler_type_names[type]);
@@ -1096,6 +1110,67 @@ parse_node_t *do_promotions P2(parse_node_t *, node, int, type) {
     return node;
 }
 
+/* Take a NODE_CALL, and discard the call, preserving only the args with
+   side effects */
+parse_node_t *
+throw_away_call P1(parse_node_t *, pn) {
+    parse_node_t *enode;
+    parse_node_t *ret = 0;
+    parse_node_t *arg;
+    
+    enode = pn->r.expr;
+    while (enode) {
+	arg = insert_pop_value(enode->v.expr);
+	if (arg) {
+	    /* woops.  Don't lose the side effect. */
+	    if (ret) {
+		parse_node_t *tmp;
+		CREATE_STATEMENTS(tmp, ret, arg);
+		ret = tmp;
+	    } else {
+		ret = arg;
+	    }
+	}
+	enode = enode->r.expr;
+    }
+    return ret;
+}
+
+parse_node_t *
+throw_away_mapping P1(parse_node_t *, pn) {
+    parse_node_t *enode;
+    parse_node_t *ret = 0;
+    parse_node_t *arg;
+    
+    enode = pn->r.expr;
+    while (enode) {
+	arg = insert_pop_value(enode->v.expr->l.expr);
+	if (arg) {
+	    /* woops.  Don't lose the side effect. */
+	    if (ret) {
+		parse_node_t *tmp;
+		CREATE_STATEMENTS(tmp, ret, arg);
+		ret = tmp;
+	    } else {
+		ret = arg;
+	    }
+	}
+	arg = insert_pop_value(enode->v.expr->r.expr);
+	if (arg) {
+	    /* woops.  Don't lose the side effect. */
+	    if (ret) {
+		parse_node_t *tmp;
+		CREATE_STATEMENTS(tmp, ret, arg);
+		ret = tmp;
+	    } else {
+		ret = arg;
+	    }
+	}
+	enode = enode->r.expr;
+    }
+    return ret;
+}
+
 parse_node_t *
 validate_efun_call P2(int, f, parse_node_t *, args) {
     int num = args->v.number;
@@ -1112,15 +1187,21 @@ validate_efun_call P2(int, f, parse_node_t *, args) {
 	/* should this move out of here? */
 	switch (predefs[f].token) {
 	case F_SIZEOF:
+	    /* Obscene crap like: sizeof( ({ 1, i++, x + 1, foo() }) )
+	     *                    -> i++, foo(), 4
+	     */
 	    if (!pn && num == 1 && 
 		IS_NODE(args->r.expr->v.expr, NODE_CALL, F_AGGREGATE)) {
-		num = args->r.expr->v.expr->l.number;
-		CREATE_NUMBER(args, num);
-		return args;
+		parse_node_t *repl, *ret, *node;
+
+		CREATE_NUMBER(node, args->r.expr->v.expr->l.number);
+		ret = throw_away_call(args->r.expr->v.expr);
+		CREATE_TWO_VALUES(repl, TYPE_NUMBER, ret, node);
+		
+		return repl;
 	    }
 	}
 
-	args->type = predefs[f].ret_type;
 	min_arg = predefs[f].min_args;
 	max_arg = predefs[f].max_args;
 
@@ -1203,6 +1284,11 @@ validate_efun_call P2(int, f, parse_node_t *, args) {
 	}
 	args->l.number = num;
 	args->v.number = predefs[f].token;
+	args->type = predefs[f].ret_type;
+	if (args->type == TYPE_NOVALUE) {
+	    args->v.number += NOVALUE_USED_FLAG;
+	    args->type = TYPE_VOID;
+	}
 	args->kind = NODE_EFUN;
     } else {
 	CREATE_ERROR(args);
@@ -1248,10 +1334,22 @@ void yywarn P1(char *, str) {
  */
 void compile_file P2(int, f, char *, name) {
     int yyparse PROT((void));
-
+    static int guard = 0;
+    
+    /* The parser isn't reentrant.  On a few occasions (compile
+     * errors, valid_override) LPC code is called during compilation,
+     * causing the possibility of arriving here again.
+     */
+    if (guard) {
+	error("Object cannot be loaded during compilation.\n");
+    }
+    guard = 1;
+    
     prolog(f, name);
     yyparse();
     epilog();
+
+    guard = 0;
 }
 
 int get_id_number() {
@@ -1479,6 +1577,7 @@ static void prolog P2(int, f, char *, name) {
     function_context.num_parameters = -1;
     prog = 0;   /* 0 means fail to load. */
     num_parse_error = 0;
+    global_modifiers = 0;
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
     a_functions_root = (unsigned short)0xffff;
 #endif
@@ -1563,12 +1662,20 @@ int case_compare P2(parse_node_t **, c1, parse_node_t **, c2) {
 }
 
 int string_case_compare P2(parse_node_t **, c1, parse_node_t **, c2) {
+    int i1, i2;
+    char *p1, *p2;
+    
     if ((*c1)->kind == NODE_DEFAULT)
 	return -1;
     if ((*c2)->kind == NODE_DEFAULT)
 	return 1;
 
-    return (PROG_STRING((*c1)->r.number) - PROG_STRING((*c2)->r.number));
+    i1 = (*c1)->r.number;
+    i2 = (*c2)->r.number;
+    p1 = (i1 ? PROG_STRING(i1) : 0);
+    p2 = (i2 ? PROG_STRING(i2) : 0);
+    
+    return (p1 - p2);
 }
 
 void prepare_cases P2(parse_node_t *, pn, int, start) {

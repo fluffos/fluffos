@@ -34,4 +34,23 @@
 #  include <resolv.h>
 #endif
 
+#ifdef WINSOCK
+/* Windows stuff */
+#  include <winsock.h>
+
+#  define WINSOCK_NO_FLAGS_SET  0
+
+#  define OS_socket_write(f, m, l) send(f, m, l, WINSOCK_NO_FLAGS_SET)
+#  define OS_socket_read(r, b, l) recv(r, b, l, WINSOCK_NO_FLAGS_SET)
+#  define OS_socket_close(f) closesocket(f)
+#  define OS_socket_ioctl(f, w, a) ioctlsocket(f, w, a)
+#else
+/* Normal UNIX */
+#  define OS_socket_write(f, m, l) write(f, m, l)
+#  define OS_socket_read(r, b, l) read(r, b, l)
+#  define OS_socket_close(f) close(f)
+#  define OS_socket_ioctl(f, w, a) ioctl(f, w, (caddr_t)a)
 #endif
+
+#endif
+

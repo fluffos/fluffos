@@ -90,9 +90,12 @@ typedef struct object_s {
     int time_of_ref;		/* Time when last referenced. Used by swap */
     long swap_num;		/* Swap file offset. -1 is not swapped yet. */
     program_t *prog;
-    struct object_s *next_all, *next_inv;
+    struct object_s *next_all;
+#ifndef NO_ENVIRONMENT
+    struct object_s *next_inv;
     struct object_s *contains;
     struct object_s *super;	/* Which object surround us ? */
+#endif
     struct interactive_s *interactive;	/* Data about an interactive user */
 #ifndef NO_LIGHT
     short total_light;

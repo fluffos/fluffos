@@ -19,7 +19,7 @@ static replace_ob_t *retrieve_replace_program_entry PROT((void));
 void replace_programs()
 {
     replace_ob_t *r_ob, *r_next;
-    int i, j;
+    int i, num_fewer, offset;
     svalue_t *svp;
 
 #ifdef DEBUG
@@ -31,38 +31,33 @@ void replace_programs()
 
 	if (r_ob->ob->flags & O_SWAPPED)
 	    load_ob_from_swap(r_ob->ob);
-	i = r_ob->ob->prog->num_variables - r_ob->new_prog->num_variables;
+	num_fewer = r_ob->ob->prog->num_variables - r_ob->new_prog->num_variables;
 #ifdef DEBUG
 	if (d_flag)
-	    debug_message("%d less variables\n", i);
+	    debug_message("%d less variables\n", num_fewer);
 #endif
-	tot_alloc_object_size -= i * sizeof(svalue_t[1]);
-	svp = r_ob->ob->variables;
-	j = r_ob->var_offset;
-	i -= j;
-#ifdef DEBUG
-	if (d_flag)
-	    debug_message("freeing %d variables:\n", j);
-#endif
-	while (--j >= 0) {
-	    free_svalue(svp, "replace_programs");
-	    *(svp++) = const0n;
-	}
-#ifdef DEBUG
-	if (d_flag)
-	    debug_message("freed.\n");
-#endif
-	if (r_ob->var_offset)
-	    for (j = 0; j < (int) r_ob->new_prog->num_variables; j++)
-		r_ob->ob->variables[j] = svp[j];
-	svp += j;
-#ifdef DEBUG
-	if (d_flag)
-	    debug_message("freeing %d variables:\n", i);
-#endif
-	while (--i >= 0) {
-	    free_svalue(svp, "replace_programs");
-	    *(svp++) = const0n;
+	tot_alloc_object_size -= num_fewer * sizeof(svalue_t[1]);
+	if ((offset = r_ob->var_offset)) {
+	    svp = r_ob->ob->variables;
+	    /* move our variables up to the top */
+	    for (i = 0; i < r_ob->new_prog->num_variables; i++) {
+		free_svalue(svp, "replace_programs");
+		*svp = *(svp + offset);
+		*(svp + offset) = const0n;
+		svp++;
+	    }
+	    /* free the rest */
+	    for (i = 0; i < num_fewer; i++) {
+		free_svalue(svp, "replace_programs");
+		*svp++ = const0n;
+	    }
+	} else {
+	    /* We just need to remove the last num_fewer variables */
+	    svp = &r_ob->ob->variables[r_ob->new_prog->num_variables];
+	    for (i = 0; i < num_fewer; i++) {
+		free_svalue(svp, "replace_programs");
+		*svp++ = const0n;
+	    }
 	}
 #ifdef DEBUG
 	if (d_flag)

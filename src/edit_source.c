@@ -1,4 +1,4 @@
-#define CONFIGURE_VERSION	1
+#define CONFIGURE_VERSION	2
 
 #define EDIT_SOURCE
 #define NO_MALLOC
@@ -1083,17 +1083,19 @@ static int check_include2 P4(char *, tag, char *, file,
 
     printf("Checking for include file <%s> ... ", file);
     ct = fopen("comptest.c", "w");
-    fprintf(ct, "#include <sys/types.h>\n%s\n#include <%s>\n%s\n", 
+    fprintf(ct, "#include \"configure.h\"\n#include \"std_incl.h\"\n%s\n#include <%s>\n%s\n", 
 	    before, file, after);
      fclose(ct);
      
-#ifdef DEBUG
+#if defined(DEBUG) || defined(WIN32)
     sprintf(buf, "%s %s -c comptest.c", COMPILER, CFLAGS);
 #else
     sprintf(buf, "%s %s -c comptest.c >/dev/null 2>&1", COMPILER, CFLAGS);
 #endif
     if (!system(buf)) {
 	fprintf(yyout, "#define %s\n", tag);
+	/* Make sure the define exists for later checks */
+	fflush(yyout);
 	printf("exists\n");
 	return 1;
     }
@@ -1107,7 +1109,7 @@ static int check_include P2(char *, tag, char *, file) {
 
     printf("Checking for include file <%s> ... ", file);
     ct = fopen("comptest.c", "w");
-    fprintf(ct, "#include \"configure.h\"\n#include \"std_incl.h\"\n#include <%s>\n", file);
+    fprintf(ct, "#include \"configure.h\"\n#include \"std_incl.h\"\n#include \"file_incl.h\"\n#include <%s>\n", file);
     fclose(ct);
     
 #ifdef DEBUG
@@ -1177,17 +1179,39 @@ static int check_prog P4(char *, tag, char *, pre, char *, code, int, andrun) {
     FILE *ct;
 
     ct = fopen("comptest.c", "w");
-    fprintf(ct, "%s\n\nint main() {%s}\n", (pre ? pre : ""), code);
+    fprintf(ct, "#include \"configure.h\"\n#include \"std_incl.h\"\n%s\n\nint main() {%s}\n", (pre ? pre : ""), code);
     fclose(ct);
     
     sprintf(buf, "%s %s comptest.c -o comptest >/dev/null 2>&1", COMPILER, CFLAGS);
     if (!system(buf) && (!andrun || !system("./comptest"))) {
-	if (tag) 
+	if (tag) {
 	    fprintf(yyout, "#define %s\n", tag);
+	    fflush(yyout);
+	}
 	return 1;
     }
 
     return 0;
+}
+
+static void check_linux_libc() {
+    char buf[1024];
+    FILE *ct;
+    
+    ct = fopen("comptest.c", "w");
+    fprintf(ct, "int main() { }\n");
+    fclose(ct);
+    
+    sprintf(buf, "%s -g comptest.c -o comptest >/dev/null 2>&1", COMPILER);
+    if (system(buf)) {
+	fprintf(stderr, "   libg.a/so installed wrong, trying workaround ...\n");
+	sprintf(buf, "%s -g comptest.c -lc -o comptest >/dev/null 2>&1", COMPILER);
+	if (system(buf)) {
+	    fprintf(stderr, "*** FAILED.\n");
+	    exit(-1);
+	}
+	fprintf(yyout, " -lc");
+    }
 }
 
 static char *memmove_prog = "\
@@ -1241,8 +1265,8 @@ static void handle_configure() {
     if (check_configure_version()) return;
 
     open_output_file("configure.h");
-    fprintf(yyout, "#define CONFIGURE_VERSION	%i\n", CONFIGURE_VERSION);
 
+#ifndef WIN32
     check_include("INCL_STDLIB_H", "stdlib.h");
     check_include("INCL_UNISTD_H", "unistd.h");
     check_include("INCL_TIME_H", "time.h");
@@ -1252,8 +1276,11 @@ static void handle_configure() {
     check_include("INCL_DOS_H", "dos.h");
     check_include("INCL_USCLKC_H", "usclkc.h");
     check_include("INCL_LIMITS_H", "limits.h");
-    if (!check_prog(0, 0, "int x = MAXSHORT;", 0))
-	check_include("INCL_VALUES_H", "values.h");
+    if (!check_prog(0, 0, "int x = USHRT_MAX;", 0)) {
+	if (!check_prog(0, 0, "int x = MAXSHORT;", 0))
+	    check_include("INCL_VALUES_H", "values.h");
+	fprintf(yyout, "#define USHRT_MAX  (MAXSHORT)\n");
+    }
     
     check_include("INCL_NETINET_IN_H", "netinet/in.h");
     check_include("INCL_ARPA_INET_H", "arpa/inet.h");
@@ -1302,6 +1329,11 @@ static void handle_configure() {
     check_include("INCL_BSTRING_H", "bstring.h");
 #endif
 
+    /* Runtime loading support */
+    check_include("INCL_DLFCN_H", "dlfcn.h");
+    if (!check_prog(0, 0, "int x = RTLD_LAZY;", 0))
+	fprintf(yyout, "#define RTLD_LAZY     1\n");
+
     printf("Checking for random number generator ...");
     if (check_prog("DRAND48", "#include <math.h>", "srand48(0);", 0)) {
 	printf(" using drand48()\n");
@@ -1335,16 +1367,18 @@ static void handle_configure() {
     verbose_check_prog("Checking for times()", "TIMES",
 		       "", "times(0);", 0);
     verbose_check_prog("Checking for gettimeofday()", "HAS_GETTIMEOFDAY",
-		       "", "gettimeofday(0);", 0);
+		       "", "gettimeofday(0, 0);", 0);
     verbose_check_prog("Checking for fchmod()", "HAS_FCHMOD",
 		       "", "fchmod(0, 0);", 0);
     
     find_memmove();
+#endif
 
     fprintf(yyout, "#define SIZEOF_INT %i\n", sizeof(int));
     fprintf(yyout, "#define SIZEOF_PTR %i\n", sizeof(char *));
     fprintf(yyout, "#define SIZEOF_SHORT %i\n", sizeof(short));
     fprintf(yyout, "#define SIZEOF_FLOAT %i\n", sizeof(float));
+
     if (sizeof(unsigned long) == 4)
 	fprintf(yyout, "#define UINT32 unsigned long\n");
     else if (sizeof(unsigned int) == 4)
@@ -1354,7 +1388,16 @@ static void handle_configure() {
 	exit(-1);
     }
     
+    fprintf(yyout, "#define CONFIGURE_VERSION	%i\n", CONFIGURE_VERSION);
+
     close_output_file();
+
+#ifdef WIN32
+    system("copy Win32\\configure.h tmp.config.h");
+    system("type configure.h >> tmp.config.h");
+    system("del configure.h");
+    system("rename tmp.config.h configure.h");
+#else
 
     open_output_file("system_libs");
     check_library("-lresolv");
@@ -1370,14 +1413,22 @@ static void handle_configure() {
     if (!check_prog(0, "", "char *x = malloc(100);", 0))
 	check_library("-lmalloc");
 
+    if (!check_prog(0, "", "void *x = dlopen(0, 0);", 0))
+	check_library("-ldl");
+    
     check_library("-lsocket");
     check_library("-linet");
     check_library("-lnsl");
     check_library("-lnsl_s");
     check_library("-lseq");
     check_library("-lm");
+
+    fprintf(stderr, "Checking for flaky Linux systems ...\n");
+    check_linux_libc();
+    
     fprintf(yyout, "\n\n");
     close_output_file();
+#endif
 }
 
 int main P2(int, argc, char **, argv) {

@@ -6,6 +6,7 @@
 #include "std.h"
 #include "addr_server.h"
 #include "socket_ctrl.h"
+#include "file_incl.h"
 #include "debug.h"
 
 #ifdef DEBUG_MACRO
@@ -80,12 +81,22 @@ void init_conn_sock P1(int, port_num)
     struct sockaddr_in sin;
     int sin_len;
     int optval;
+#ifdef WINSOCK
+    WSADATA WSAData;
+
+#define CLEANUP WSACleanup()
+
+    WSAStartup(MAKEWORD(1,1), &WSAData);
+#else
+#define CLEANUP
+#endif
 
     /*
      * create socket of proper type.
      */
     if ((conn_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 	perror("init_conn_sock: socket");
+	CLEANUP;
 	exit(1);
     }
     /*
@@ -95,6 +106,7 @@ void init_conn_sock P1(int, port_num)
     if (setsockopt(conn_fd, SOL_SOCKET, SO_REUSEADDR, (char *) &optval,
 		   sizeof(optval)) == -1) {
 	perror("init_conn_sock: setsockopt");
+	CLEANUP;
 	exit(2);
     }
     /*
@@ -108,6 +120,7 @@ void init_conn_sock P1(int, port_num)
      */
     if (bind(conn_fd, (struct sockaddr *) & sin, sizeof(sin)) == -1) {
 	perror("init_conn_sock: bind");
+	CLEANUP;
 	exit(3);
     }
     /*
@@ -116,14 +129,16 @@ void init_conn_sock P1(int, port_num)
     sin_len = sizeof(sin);
     if (getsockname(conn_fd, (struct sockaddr *) & sin, &sin_len) == -1) {
 	perror("init_conn_sock: getsockname");
+	CLEANUP;
 	exit(4);
     }
     /*
      * register signal handler for SIGPIPE.
      */
-#ifndef LATTICE
+#if !defined(LATTICE) && defined(SIGPIPE) /* windows has no SIGPIPE */
     if (signal(SIGPIPE, sigpipe_handler) == SIGNAL_ERROR) {
 	perror("init_conn_sock: signal SIGPIPE");
+	CLEANUP;
 	exit(5);
     }
 #endif
@@ -132,6 +147,7 @@ void init_conn_sock P1(int, port_num)
      */
     if (set_socket_nonblocking(conn_fd, 1) == -1) {
 	perror("init_user_conn: set_socket_nonblocking 1");
+	CLEANUP;
 	exit(8);
     }
     /*
@@ -139,6 +155,7 @@ void init_conn_sock P1(int, port_num)
      */
     if (listen(conn_fd, SOMAXCONN) == -1) {
 	perror("init_conn_sock: listen");
+	CLEANUP;
 	exit(10);
     }
     debug(512, ("addr_server: listening for connections on port %d\n",
@@ -289,8 +306,8 @@ void new_conn_handler()
 	char *message = "no available slots -- closing connection.\n";
 
 	fprintf(stderr, "new_conn_handler: no available connection slots.\n");
-	write(new_fd, message, strlen(message));
-	if (close(new_fd) == -1)
+	OS_socket_write(new_fd, message, strlen(message));
+	if (OS_socket_close(new_fd) == -1)
 	    perror("new_conn_handler: close");
 	return;
     }
@@ -332,11 +349,14 @@ void conn_data_handler P1(int, fd)
     /* append new data to end of leftover data (if any) */
     leftover = all_conns[conn_index].leftover;
     buf = (char *) &all_conns[conn_index].buf[0];
-    num_bytes = read(fd, buf + leftover, (IN_BUF_SIZE - 1) - leftover);
+    num_bytes = OS_socket_read(fd, buf + leftover, (IN_BUF_SIZE - 1) - leftover);
 
     switch (num_bytes) {
     case -1:
 	switch (errno) {
+#ifdef WIN32
+	case WSAEWOULDBLOCK:
+#endif
 	case EWOULDBLOCK:
 	    debug(512, ("conn_data_handler: read on fd %d: Operation would block.\n",
 			fd));
@@ -443,8 +463,9 @@ void conn_data_handler P1(int, fd)
 		buf_index += msglen;
 		num_bytes -= msglen;
 		expecting = 0;
-	    } else if (!ioctl(fd, FIONREAD, (caddr_t) & unread_bytes) &&
-		       unread_bytes > 0) {
+	    }
+	    else if (!OS_socket_ioctl(fd, FIONREAD, &unread_bytes) &&
+		     unread_bytes > 0) {
 		/*
 		 * msglen == num_bytes could be a complete message... if
 		 * there's unread data we'll assume it was truncated
@@ -483,7 +504,7 @@ int ip_by_name P2(int, conn_index, char *, buf)
 /* Failed :( */
 	sprintf(out_buf, "%s %s\n", &buf[sizeof(int)], "0");
 	debug(512, ("%s", out_buf));
-	write(all_conns[conn_index].fd, out_buf, strlen(out_buf));
+	OS_socket_write(all_conns[conn_index].fd, out_buf, strlen(out_buf));
 	return 0;
     } else {
 /* Success! */
@@ -491,7 +512,7 @@ int ip_by_name P2(int, conn_index, char *, buf)
 	sprintf(out_buf, "%s %s\n", &buf[sizeof(int)],
 		inet_ntoa(my_in_addr));
 	debug(512, ("%s", out_buf));
-	write(all_conns[conn_index].fd, out_buf, strlen(out_buf));
+	OS_socket_write(all_conns[conn_index].fd, out_buf, strlen(out_buf));
 	return 1;
     }
 }				/* ip_by_name() */
@@ -509,12 +530,12 @@ int name_by_ip P2(int, conn_index, char *, buf)
     if ((hp = gethostbyaddr((char *) &addr, sizeof(addr), AF_INET))) {
 	sprintf(out_buf, "%s %s\n", &buf[sizeof(int)], hp->h_name);
 	debug(512, ("%s", out_buf));
-	write(all_conns[conn_index].fd, out_buf, strlen(out_buf));
+	OS_socket_write(all_conns[conn_index].fd, out_buf, strlen(out_buf));
 	return 1;
     } else {
 	sprintf(out_buf, "%s 0\n", &buf[sizeof(int)]);
 	debug(512, ("%s", out_buf));
-	write(all_conns[conn_index].fd, out_buf, strlen(out_buf));
+	OS_socket_write(all_conns[conn_index].fd, out_buf, strlen(out_buf));
 	debug(512, ("name_by_ip: unable to resolve address.\n"));
 	return 0;
     }
@@ -543,7 +564,7 @@ void terminate P1(int, conn_index)
     }
     debug(512, ("terminating connection %d\n", conn_index));
 
-    if (close(all_conns[conn_index].fd) == -1) {
+    if (OS_socket_close(all_conns[conn_index].fd) == -1) {
 	perror("terminate: close");
 	return;
     }

@@ -22,3 +22,4 @@ string program_info();
 void store_variable(string, mixed);
 mixed fetch_variable(string);
 int remove_interactive(object);
+int query_ip_port(void | object);

@@ -126,7 +126,12 @@ void dumpstat P1(char *, tfn)
 	fprintf(f, "%-20s %i ref %2d %s %s (%d) %s\n", ob->name,
 		tmp + data_size(ob) + sizeof(object_t), ob->ref,
 		ob->flags & O_HEART_BEAT ? "HB" : "  ",
-		ob->super ? ob->super->name : "--", /* ob->cpu */ 0,
+#ifndef NO_ENVIRONMENT
+		ob->super ? ob->super->name : "--",
+#else
+		"--",
+#endif
+		/* ob->cpu */ 0,
 		(ob->swap_num >= 0) ? ((ob->flags & O_SWAPPED) ?
 				       "SWAPPED(out)" : "SWAPPED(in)") : "");
     }

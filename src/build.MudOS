@@ -218,8 +218,13 @@ else
     if test $? -eq 0; then
         CPP="cpp"
     else
-        echo "FATAL ERROR: Can't figure out how to run the C preprocessor"
-        exit
+        $CC -E -traditional-cpp comptest.c >/dev/null
+	if test $? -eq 0; then
+	    CPP="$CC -E -traditional-cpp"
+	else
+	    echo "FATAL ERROR: Can't figure out how to run the C preprocessor"
+            exit
+	fi
     fi
 fi
 
@@ -242,6 +247,26 @@ else
     else
        INSTALL="cp"
     fi
+fi
+
+cat >comptest.c <<END
+void foo() { }
+END
+$CC -c comptest.c -o comptest.o
+
+#
+# Check if ranlib exists/is needed.  Also check ar.
+#
+ar rcu comptest.a comptest.o
+if test $? -ne 0; then
+    echo "FATAL ERROR: Could not find ar."
+    exit
+fi
+ranlib comptest.a
+if test $? -eq 0; then
+    RANLIB=ranlib    
+else
+    RANLIB=/bin/true
 fi
 
 #
@@ -284,7 +309,7 @@ int main() {
 }
 END
 $CC $CFLAGS comptest.c
-ARCH=`a.out`
+ARCH=`./a.out`
 
 case $ARCH in
     AIX)
@@ -332,6 +357,7 @@ echo CPP=$CPP >>Makefile.tmp
 echo CFLAGS=$CFLAGS >>Makefile.tmp
 echo CC=$CC >>Makefile.tmp
 echo YACC=$YACC >>Makefile.tmp
+echo RANLIB=$RANLIB >>Makefile.tmp
 
 echo "***************** Configuration completed **************"
 echo "Installing MudOS on $ARCH"
@@ -353,6 +379,10 @@ all:
 	@echo MudOS is currently configured to use 'Makefile'.  Edit 'build.MudOS'
 	@echo if this is not what you want.
 
+.DEFAULT:
+	@echo MudOS is currently configured to use 'Makefile'.  Edit 'build.MudOS'
+	@echo if this is not what you want.
+
 nothing:
 
 which_makefile:
@@ -361,6 +391,10 @@ END
 else
 cat >Makefile <<END
 all:
+	@echo MudOS is currently configured to use 'GNUmakefile'.  Edit 'build.MudOS'
+	@echo if this is not what you want.
+
+.DEFAULT:
 	@echo MudOS is currently configured to use 'GNUmakefile'.  Edit 'build.MudOS'
 	@echo if this is not what you want.
 

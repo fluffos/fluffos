@@ -120,10 +120,8 @@ typedef unsigned int format_info;
 #define INFO_COLS 0x200
 #define INFO_TABLE 0x400
 
-#define BUFF_SIZE LARGEST_PRINTABLE_STRING
-
 #define ERROR(x) LONGJMP(error_jmp, x)
-#define SPRINTF_ERROR(x)  { if (clean) { free_svalue(clean, "sprintf error"); \
+#define SPRINTF_ERROR(x)  { if (clean) { free_svalue(clean, "sprintf error");\
 				  FREE(clean); clean = 0;  } ERROR(x); }
 
 #define ERR_BUFF_OVERFLOW	0x1	/* buffer overflowed */
@@ -143,49 +141,50 @@ typedef unsigned int format_info;
 					 * recover */
 
 #define ADD_CHAR(x) {\
-  buff[bpos] = x;\
+  outbuf_addchar(&obuff, x);\
   if (startignore) \
-    if (buff[bpos++] == '^') \
+    if (x == '^') \
       inignore = !inignore; \
     else \
       curpos += 2*!inignore; \
   else \
-    if (buff[bpos++] == '%') \
+    if (x == '%') \
       startignore = 1; \
     else \
       curpos += !inignore; \
-  if (bpos>= BUFF_SIZE) ERROR(ERR_BUFF_OVERFLOW); \
+  if (obuff.real_size == USHRT_MAX) ERROR(ERR_BUFF_OVERFLOW); \
 }
 
 #define M_ADD_CHAR(x) {\
-  buff[bpos] = x;\
+  outbuf_addchar(&obuff, x);\
   if (startignore) \
-    if (buff[bpos++] == '^') \
+    if (x == '^') \
       inignore = !inignore; \
     else \
       curpos += 2*!inignore; \
   else \
-    if (buff[bpos++] == '%') \
+    if (x == '%') \
       startignore = 1; \
     else \
       curpos += !inignore; \
-  if (bpos>= BUFF_SIZE) { SPRINTF_ERROR(ERR_BUFF_OVERFLOW); } \
+  if (obuff.real_size == USHRT_MAX) { SPRINTF_ERROR(ERR_BUFF_OVERFLOW); } \
 }
 
 #define T_ADD_CHAR(x) {\
-  buff[bpos] = x;\
+  outbuf_addchar(&obuff, x);\
   if (startignore) \
-    if (buff[bpos++] == '^') \
+    if (x == '^') \
       inignore = !inignore; \
     else \
       curpos += 2*!inignore; \
   else \
-    if (buff[bpos++] == '%') \
+    if (x == '%') \
       startignore = 1; \
     else \
       curpos += !inignore; \
-  if (bpos>= BUFF_SIZE) bpos--; \
+  if (obuff.real_size == USHRT_MAX) obuff.real_size--; \
 }
+
 #define GET_NEXT_ARG {\
   if (++arg >= argc) ERROR(ERR_TO_FEW_ARGS); \
   carg = (argv+arg);\
@@ -223,8 +222,8 @@ typedef struct ColumnSlashTable {
     struct ColumnSlashTable *next;
 }                cst;		/* Columns Slash Tables */
 
-static char buff[BUFF_SIZE + 1];	/* buffer for returned string */
-static unsigned int bpos;	/* position in buff */
+static char buff[LARGEST_PRINTABLE_STRING];/* buffer for returned errors */
+static outbuffer_t obuff;
 static unsigned int curpos;	/* cursor position */
 static unsigned int inignore;	/* are we not counting these characters */
 static unsigned int startignore;/* we found the first char... now for next */
@@ -424,6 +423,11 @@ void svalue_to_string P5(svalue_t *, obj, outbuffer_t *, outbuf, int, indent, in
     case T_OBJECT:
 	{
 	    svalue_t *temp;
+
+	    if (obj->u.ob->flags & O_DESTRUCTED) {
+		numadd(outbuf, 0);
+		break;
+	    }
 
 	    outbuf_add(outbuf, obj->u.ob->name);
 	    push_object(obj->u.ob);
@@ -681,6 +685,12 @@ char *string_print_formatted P3(char *, format_str, int, argc, svalue_t *, argv)
     int pres;			/* presision */
     unsigned int i;
     char *pad;			/* fs pad string */
+    char *retvalue;
+    
+    /* free anything that is sitting around here */
+    if (obuff.buffer)
+	FREE_MSTR(obuff.buffer);
+    outbuf_zero(&obuff);
 
 #ifdef cray
     if (SETJMP(error_jmp)) {	/* the cray setjmp is braindead */
@@ -747,8 +757,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, svalue_t *, argv)
 	    err = "Array expected.";
 	    break;
 	case ERR_RECOVERY_ONLY:
-	    return buff;
-	    break;
+	    return string_copy(buff, "sprintf error");
 	default:
 #ifdef RETURN_ERROR_MESSAGES
 	    sprintf(buff,
@@ -762,7 +771,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, svalue_t *, argv)
 			      current_object->name,
 			      get_line_number_if_any());
 	    }
-	    return buff;
+	    return string_copy(buff, "sprintf error");
 #else
 	    error("ERROR: (s)printf(): !feature - undefined error 0x%X !\n", i);
 #endif				/* RETURN_ERROR_MESSAGES */
@@ -778,13 +787,12 @@ char *string_print_formatted P3(char *, format_str, int, argc, svalue_t *, argv)
 			  current_object->name,
 			  get_line_number_if_any());
 	}
-	return buff;
+	return string_copy(buff, "sprintf error");
 #else
 	error("ERROR: (s)printf(): %s (arg: %d)\n", err, arg);
 #endif				/* RETURN_ERROR_MESSAGES */
     }
     arg = -1;
-    bpos = 0;
     curpos = 0;
     inignore = 0;
     startignore = 0;
@@ -1248,7 +1256,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, svalue_t *, argv)
 	}
 	ADD_CHAR(format_str[fpos]);
     }				/* end of for (fpos=0; 1; fpos++) */
-    ADD_CHAR('\0');
+
     while (saves) {
 	savechars *tmp;
 
@@ -1257,7 +1265,11 @@ char *string_print_formatted P3(char *, format_str, int, argc, svalue_t *, argv)
 	saves = saves->next;
 	FREE((char *) tmp);
     }
-    return buff;
+
+    outbuf_fix(&obuff);
+    retvalue = obuff.buffer;
+    obuff.buffer = 0;
+    return retvalue;
 }				/* end of string_print_formatted() */
 
 #endif				/* defined(F_SPRINTF) || defined(F_PRINTF) */

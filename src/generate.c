@@ -19,6 +19,9 @@ static int optimizer_num_locals;
  * that transfer_local doesn't clobber ints since it just sets type to T_NUMBER
  * This optimization also can't deal with code motion.  Since it assumes the
  * order optimized is the same as the order emitted.
+ * It also can't detect that a variable dies along multiple branches, so:
+ * if (y) { use(x); } else { use(x); } x = 1;
+ * doesn't get optimized.
  */
 
 static void
@@ -38,6 +41,7 @@ optimize_lvalue_list P1(parse_node_t *, expr) {
 
 #define OPT(x) x = optimize(x)
 #define OPTIMIZER_IN_LOOP        1
+#define OPTIMIZER_IN_COND	 2 /* switch or if or ?: */
 static int optimizer_state = 0;
 
 static parse_node_t *
@@ -47,15 +51,15 @@ optimize P1(parse_node_t *, expr) {
     switch (expr->kind) {
     case NODE_TERNARY_OP:
 	OPT(expr->l.expr);
-	expr = expr->r.expr;
-	OPT(expr->l.expr);
-	OPT(expr->r.expr);
+	OPT(expr->r.expr->l.expr);
+	OPT(expr->r.expr->r.expr);
 	break;
     case NODE_BINARY_OP:
 	OPT(expr->l.expr);
 	if (expr->v.number == F_ASSIGN) {
 	    if (IS_NODE(expr->r.expr, NODE_OPCODE_1, F_LOCAL_LVALUE)) {
-		if (last_local_refs[expr->r.expr->l.number]) {
+		if (last_local_refs[expr->r.expr->l.number]
+		    && !(optimizer_state & OPTIMIZER_IN_COND)) {
 		    last_local_refs[expr->r.expr->l.number]->v.number = F_TRANSFER_LOCAL;
 		    last_local_refs[expr->r.expr->l.number] = 0;
 		}
@@ -70,9 +74,8 @@ optimize P1(parse_node_t *, expr) {
 	break;
     case NODE_TERNARY_OP_1:
 	OPT(expr->l.expr);
-	expr = expr->r.expr;
-	OPT(expr->l.expr);
-	OPT(expr->r.expr);
+	OPT(expr->r.expr->l.expr);
+	OPT(expr->r.expr->r.expr);
 	break;
     case NODE_BINARY_OP_1:
 	OPT(expr->l.expr);
@@ -81,7 +84,8 @@ optimize P1(parse_node_t *, expr) {
     case NODE_UNARY_OP_1:
 	OPT(expr->r.expr);
 	if (expr->v.number == F_VOID_ASSIGN_LOCAL) {
-	    if (last_local_refs[expr->l.number]) {
+	    if (last_local_refs[expr->l.number]
+		&& !(optimizer_state & OPTIMIZER_IN_COND)) {
 		last_local_refs[expr->l.number]->v.number = F_TRANSFER_LOCAL;
 	    }
 	    last_local_refs[expr->l.number] = 0;
@@ -125,10 +129,17 @@ optimize P1(parse_node_t *, expr) {
     case NODE_PARAMETER_LVALUE:
 	break;
     case NODE_IF:
-	OPT(expr->v.expr);
-	OPT(expr->l.expr);
-	OPT(expr->r.expr);
-	break;
+	{
+	    int in_cond;
+	    OPT(expr->v.expr);
+	    in_cond = (optimizer_state & OPTIMIZER_IN_COND);
+	    optimizer_state |= OPTIMIZER_IN_COND;
+	    OPT(expr->l.expr);
+	    OPT(expr->r.expr);
+	    optimizer_state &= ~OPTIMIZER_IN_COND;
+	    optimizer_state |= in_cond;
+	    break;
+	}
     case NODE_LOOP:
 	{
 	    int in_loop = (optimizer_state & OPTIMIZER_IN_LOOP);
@@ -153,9 +164,16 @@ optimize P1(parse_node_t *, expr) {
     case NODE_SWITCH_NUMBERS:
     case NODE_SWITCH_DIRECT:
     case NODE_SWITCH_RANGES:
-	OPT(expr->l.expr);
-	OPT(expr->r.expr);
-	break;
+	{
+	    int in_cond;
+	    OPT(expr->l.expr);
+	    in_cond = (optimizer_state & OPTIMIZER_IN_COND);
+	    optimizer_state |= OPTIMIZER_IN_COND;
+	    OPT(expr->r.expr);
+	    optimizer_state &= ~OPTIMIZER_IN_COND;
+	    optimizer_state |= in_cond;
+	    break;
+	}
     case NODE_CATCH:
 	OPT(expr->r.expr);
 	break;
@@ -163,13 +181,22 @@ optimize P1(parse_node_t *, expr) {
 	OPT(expr->l.expr);
 	optimize_lvalue_list(expr->r.expr);
 	break;
-    case NODE_FUNCTION_CONSTRUCTOR:
-    case NODE_ANON_FUNC:
 	/* Don't optimize inside of these; we'll get confused by local vars
 	 * since it's a separate frame, etc
 	 *
 	 * OPT(expr->r.expr);
+	 *
+	 * BUT make sure to optimize the things which AREN'T part of that
+	 * frame, namely, the arguments, otherwise we will screw up:
+	 *
+	 * use(local); return (: foo, local :);       // local evaluated at
+	 * use(local); return (: ... $(local) ... :); // construction time
 	 */
+    case NODE_FUNCTION_CONSTRUCTOR:
+	if (expr->r.expr)
+	    optimize_expr_list(expr->r.expr); /* arguments */
+	break;
+    case NODE_ANON_FUNC:
 	break;
     case NODE_EFUN:
 	optimize_expr_list(expr->r.expr);
@@ -253,7 +280,7 @@ static void lpc_tree_list P2(parse_node_t *, dest, parse_node_t *, expr) {
     }
 }
 
-#define lpc_tree_opc(x, y) lpc_tree_string(x, get_f_name(y))
+#define lpc_tree_opc(x, y) lpc_tree_string(x, get_f_name(y & ~NOVALUE_USED_FLAG))
 
 #define ARG_1 dest->r.expr
 #define ARG_2 dest->r.expr->r.expr
@@ -333,8 +360,8 @@ lpc_tree_form P2(parse_node_t *, expr, parse_node_t *, dest) {
     case NODE_OPCODE_2:
 	lpc_tree(dest, 4);
 	lpc_tree_opc(ARG_2, expr->v.number);
-	lpc_tree_number(ARG_2, expr->l.number);
-	lpc_tree_number(ARG_2, expr->r.number);
+	lpc_tree_number(ARG_3, expr->l.number);
+	lpc_tree_number(ARG_4, expr->r.number);
 	break;
     case NODE_RETURN:
 	lpc_tree(dest, 2);
@@ -438,7 +465,6 @@ void optimizer_start_function P1(int, n) {
 
 void optimizer_end_function PROT((void)) {
     int i;
-
     if (last_local_refs) {
 	for (i = 0; i < optimizer_num_locals; i++) 
 	    if (last_local_refs[i]) {
@@ -470,11 +496,13 @@ short generate_function P3(function_t *, f, parse_node_t *, node, int, num) {
 #else
 short generate_function P3(function_t *, f, parse_node_t *, node, int, num) {
     short ret;
-    if (pragmas & PRAGMA_OPTIMIZE)
+    if (pragmas & PRAGMA_OPTIMIZE) {
 	optimizer_start_function(num);
-    ret = generate(node);
-    if (pragmas & PRAGMA_OPTIMIZE)
+	optimizer_state = 0;
+	node = optimize(node);
 	optimizer_end_function();
+    }
+    ret = generate(node);
     return ret;
 }
 #endif
@@ -758,7 +786,7 @@ dump_tree P1(parse_node_t *, expr) {
 	printf(")");
 	break;
     case NODE_EFUN:
-	printf("(%s ", instrs[expr->v.number].name);
+	printf("(%s ", instrs[expr->v.number & ~NOVALUE_USED_FLAG].name);
 	dump_expr_list(expr->r.expr);
 	printf(")");
 	break;

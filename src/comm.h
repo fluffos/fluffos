@@ -39,11 +39,10 @@ typedef struct interactive_s {
     object_t *ob;		/* points to the associated object         */
     sentence_t *input_to;	/* to be called with next input line       */
     int connection_type;        /* the type of connection this is          */
-#ifdef OS2
-    long named_pipe;
-#else
     int fd;			/* file descriptor for interactive object  */
     struct sockaddr_in addr;	/* socket address of interactive object    */
+#ifdef F_QUERY_IP_PORT
+    int local_port;		/* which of our ports they connected to    */
 #endif
     char *prompt;		/* prompt string for interactive object    */
     char text[MAX_TEXT];	/* input buffer for interactive object     */

@@ -40,3 +40,20 @@ driver exit codes:
     4 - getsockname() failed
     5 - error setting up SIGPIPE handler
     8 - error in set_socket_nonblocking()
+
+  129 - uncaught SIGHUP
+  130 - uncaught SIGINT  (control-C)
+  131 - uncaught SIGQUIT (control-\)
+  132 - uncaught SIGILL  (illegal instruction)
+  133 - uncaught SIGTRAP (trace trap)
+  134 - uncaught SIGABRT (MudOS abort due to failed assertion)
+  135 - uncaught SIGEMT
+  136 - uncaught SIGFPE  (arithmetic exception)
+  137 - uncaught SIGKILL
+  138 - uncaught SIGBUS  (bus error)
+  139 - uncaught SIGSEGV (seg fault)
+  140 - uncaught SIGSYS  (bad system call)
+  143 - uncaught SIGTERM
+  144 - uncaught SIGUSR1
+  145 - uncaught SIGUSR2
+  

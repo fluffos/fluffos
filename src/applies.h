@@ -46,6 +46,7 @@
 #define APPLY_TERMINAL_TYPE                 "terminal_type"
 #define APPLY_VALID_ASM                     "valid_asm"
 #define APPLY_VALID_BIND                    "valid_bind"
+#define APPLY_VALID_COMPILE_TO_C	    "valid_compile_to_c"
 #define APPLY_VALID_HIDE                    "valid_hide"
 #define APPLY_VALID_LINK                    "valid_link"
 #define APPLY_VALID_OBJECT                  "valid_object"

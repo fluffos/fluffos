@@ -1,8 +1,8 @@
 #include "std.h"
 #ifdef LPC_TO_C
 #define SUPRESS_COMPILER_INLINES
-#include "file_incl.h"
 #include "lpc_incl.h"
+#include "file_incl.h"
 #include "interface.h"
 #include "lex.h"
 #include "compiler.h"
@@ -12,6 +12,10 @@
 #include "file.h"
 #include "backend.h"
 #include "binaries.h"
+#include "cc.h"
+#ifdef INCL_DLFCN_H
+#include <dlfcn.h>
+#endif
 
 void
 link_jump_table P2(program_t *, prog, void **, jump_table)
@@ -41,7 +45,7 @@ init_lpc_to_c()
 	ob = ALLOCATE(lpc_object_t, TAG_LPC_OBJECT, "init_lpc_to_c");
 	ob->name = alloc_cstring((*p)->fname, "init_lpc_to_c");
 	SET_TAG(ob->name, TAG_OBJ_NAME);
-	enter_object_hash((object_t *)ob);
+	enter_object_hash_at_end((object_t *)ob);
 	ob->flags = O_COMPILED_PROGRAM;
 	ob->jump_table = (*p)->jump_table;
 	if ((ob->string_switch_tables = (*p)->string_switch_tables))
@@ -65,6 +69,57 @@ static void generate_identifier P2(char *, buf, char *, name)
     }
     *buf = 0;
 }
+
+#ifdef RUNTIME_LOADING
+static void compile_and_link P2(char *, file, char *, ident) {
+    char *p, command[1024];
+    char tmp[1024];
+    void *handle;
+    lpc_object_t *ob;
+    interface_t *interface;
+    
+    if ((p = strrchr(file, '.')))
+	*p = 0;
+
+    /* Do the compile */
+    sprintf(command,
+#ifdef sgi
+	    "%s %s -shared -I%s -G 0 -o %s.so %s.c > %s 2>&1",
+#else
+	    "%s %s -shared -I%s -o %s.so %s.c > %s 2>&1",
+#endif
+	    COMPILER, CFLAGS,
+	    "lpc2c", file, file, "lpc2c/errors");
+
+    if (system(command))
+	error("Compilation of generated C code failed.\n");
+
+    sprintf(tmp, "%s.so", file);
+    handle = dlopen(tmp, RTLD_LAZY);
+    if (!handle) {
+	sprintf(tmp, "dlopen() failed: %s", dlerror());
+	error(tmp);
+    }
+    
+    sprintf(tmp, "LPCINFO_%s", ident);
+    interface = dlsym(handle, tmp);
+    if (!interface) {
+	sprintf(tmp, "dlsym() failed: %s", dlerror());
+	error(tmp);
+    }
+    
+    remove_precompiled_hashes(interface->fname);
+    
+    ob = ALLOCATE(lpc_object_t, TAG_LPC_OBJECT, "compile_and_link");
+    ob->name = alloc_cstring(interface->fname, "compile_and_link");
+    SET_TAG(ob->name, TAG_OBJ_NAME);
+    enter_object_hash_at_end((object_t *)ob);
+    ob->flags = O_COMPILED_PROGRAM;
+    ob->jump_table = interface->jump_table;
+    if ((ob->string_switch_tables = interface->string_switch_tables))
+	fix_switches(ob->string_switch_tables);
+}
+#endif
 
 static char *rest_of_makefile = "interface.c\n\
 \n\
@@ -99,10 +154,18 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
     char *outp;
     char *string_needs_free;
     int index;
-    array_t tmp_arr, *arr;
+#ifdef RUNTIME_LOADING
+    array_t tmp_arr;
+#endif
+    array_t *arr;
     int f;
     int single;
     error_context_t econ;
+    svalue_t *mret;
+    
+    mret = apply_master_ob(APPLY_VALID_COMPILE_TO_C, 0);
+    if (!MASTER_APPROVED(mret))
+	error("Permission to use generate_source() denied by master::valid_compile_to_c()\n");
 
     compilation_output_file = 0;
     string_needs_free = 0;
@@ -119,16 +182,18 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
     }
 
     if (arg1->type != T_ARRAY) {
+#ifdef RUNTIME_LOADING
 	tmp_arr.size = 1;
 	tmp_arr.item[0] = *arg1;
 	arr = &tmp_arr;
 	
 	single = 1;
-	if (!out_fname) {
-	    out_fname = out_name;
-	    strcpy(out_name, SAVE_BINARIES);
-	    strcat(out_fname, "lpc_to_c.c");
-	}
+	out_fname = out_name;
+	strcpy(out_name, SAVE_BINARIES);
+	strcat(out_fname, "/");
+#else
+	error("RUNTIME_LOADING not enabled\n");
+#endif
     } else {
 	arr = arg1->u.arr;
 
@@ -165,11 +230,9 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
 	    error("Illegal path name.\n");
 	}
 
-	if (!single) {
-	    generate_identifier(ident, name);
-	    strcat(out_fname, ident);
-	    strcat(out_fname, ".c");
-	}
+	generate_identifier(ident, name);
+	strcat(out_fname, ident);
+	strcat(out_fname, ".c");
 
 	compilation_output_file = crdir_fopen(out_fname);
 	if (compilation_output_file == 0) {
@@ -302,6 +365,10 @@ int generate_source P2(svalue_t *, arg1, char *, out_fname)
 	}
 	fprintf(makefile, "%%define GNU\n\n%%include \"mudlib/Makefile.master\"\n\n");
 	fclose(makefile);
+    } else {
+#ifdef RUNTIME_LOADING
+	compile_and_link(out_fname, ident);
+#endif
     }
     pop_context(&econ);
     return 1;

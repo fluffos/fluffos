@@ -121,11 +121,7 @@ t_stat small_free_stat =
 t_stat small_chunk_stat =
 {0, 0};
 
-#ifdef OS2
-POINTER smalloc_malloc P1(unsigned int, size)
-#else
 POINTER smalloc_malloc P1(size_t, size)
-#endif
 {
     /* int i; */
     u *temp;
@@ -1355,11 +1351,7 @@ static void large_free P1(char *, ptr)
     add_to_free_list(p);
 }
 
-#ifdef OS2
-POINTER smalloc_realloc P2(POINTER, p, unsigned int, size)
-#else
 POINTER smalloc_realloc P2(POINTER, p, size_t, size)
-#endif
 {
     unsigned *q, old_size;
     char *t;

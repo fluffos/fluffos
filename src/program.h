@@ -89,6 +89,10 @@ typedef struct {
                                * means function not defined in this object.
                                * Probably inherited */
     unsigned char num_local;  /* Number of local variables */
+    unsigned char flags;	/* NAME_ . See above. */
+
+    /* wasted byte here if anyone needs one; plenty of room for more flags */
+
     char *name;
 #ifndef LPC_TO_C
     unsigned short offset;	/* Address of function, or inherit table
@@ -109,7 +113,6 @@ typedef struct {
     unsigned short tree_l, tree_r;	/* Left and right branches. */
     SIGNED short tree_b;	/* Balance of subtrees. */
 #endif
-    unsigned char flags;	/* NAME_ . See above. */
 } function_t;
 
 typedef struct {

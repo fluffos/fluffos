@@ -30,9 +30,6 @@ function_t **simuls = 0;
 static int num_simul_efun = 0;
 object_t *simul_efun_ob;
 
-/* Don't release this pointer ever. It is used elsewhere. */
-char *simul_efun_file_name = 0;
-
 static void find_or_add_simul_efun PROT((function_t *));
 static void remove_simuls PROT((void));
 
@@ -40,7 +37,6 @@ static void remove_simuls PROT((void));
 void mark_simuls() {
     int i;
 
-    EXTRA_REF(BLOCK(simul_efun_file_name))++;
     for (i = 0; i < num_simul_efun; i++) 
 	EXTRA_REF(BLOCK(simul_names[i].name))++;
 }
@@ -50,11 +46,12 @@ void mark_simuls() {
  * If there is a simul_efun file, then take care of it and extract all
  * information we need.
  */
-void set_simul_efun P1(char *, file)
+void init_simul_efun P1(char *, file)
 {
     char buf[512];
     lpc_object_t *compiled_version;
-
+    object_t *new_ob;
+    
     if (!file || !file[0]) {
 	fprintf(stderr, "No simul_efun\n");
 	return;
@@ -66,15 +63,13 @@ void set_simul_efun P1(char *, file)
 
     if (file[strlen(file) - 2] != '.')
 	strcat(buf, ".c");
-    simul_efun_file_name = make_shared_string(buf);
 
-    simul_efun_ob = 0;
-    (void) load_object(simul_efun_file_name, compiled_version);
-    if (simul_efun_ob == 0) {
-	fprintf(stderr, "The simul_efun file %s was not loaded.\n",
-		simul_efun_file_name);
+    new_ob = load_object(buf, compiled_version);
+    if (new_ob == 0) {
+	fprintf(stderr, "The simul_efun file %s was not loaded.\n", buf);
 	exit(-1);
     }
+    set_simul_efun(new_ob);
 }
 
 static void remove_simuls() {
@@ -94,6 +89,7 @@ static void remove_simuls() {
     }    
 }
 
+static
 void get_simul_efuns P1(program_t *, prog)
 {
     function_t *funp;
@@ -203,4 +199,12 @@ find_or_add_simul_efun P1(function_t *, funp) {
     ihe->sem_value++;
     ihe->dn.simul_num = num_simul_efun++;
     ref_string(funp->name);
+}
+
+void
+set_simul_efun P1(object_t *, ob) {
+    get_simul_efuns(ob->prog);
+    
+    simul_efun_ob = ob;
+    add_ref(simul_efun_ob, "set_simul_efun");
 }

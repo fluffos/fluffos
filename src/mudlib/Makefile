@@ -6,8 +6,8 @@ SRC=interface.c
 	$(CC) $(CFLAGS) -I.. -c $*.c
 
 all: $(OBJ)
-	ar rlcu mudlib.a $(OBJ)
-	ranlib mudlib.a
+	ar rcu mudlib.a $(OBJ)
+	$(RANLIB) mudlib.a
 
 clean:
 	-rm -f *.o

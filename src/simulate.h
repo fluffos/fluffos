@@ -69,6 +69,7 @@ void shout_string PROT((char *));
 
 void error_needs_free PROT((char *));
 void throw_error PROT((void));
+void error_handler PROT((char *));
 
 #ifdef SIGNAL_FUNC_TAKES_INT
 void startshutdownMudOS PROT((int));

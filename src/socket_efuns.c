@@ -22,7 +22,7 @@
 #define SC_FORCE	1
 #define SC_DO_CALLBACK	2
 
-lpc_socket_t lpc_socks[MAX_EFUN_SOCKS];
+lpc_socket_t lpc_socks[CFG_MAX_EFUN_SOCKS];
 static int socket_name_to_sin PROT((char *, struct sockaddr_in *));
 static char *inet_address PROT((struct sockaddr_in *));
 
@@ -62,7 +62,7 @@ void init_sockets()
     debug(8192, ("init_sockets: initializing %d socket descriptor(s)\n",
 		 MAX_EFUN_SOCKS));
 
-    for (i = 0; i < MAX_EFUN_SOCKS; i++) {
+    for (i = 0; i < CFG_MAX_EFUN_SOCKS; i++) {
 	lpc_socks[i].fd = -1;
 	lpc_socks[i].flags = 0;
 	lpc_socks[i].mode = MUD;
@@ -175,7 +175,7 @@ static int
 find_new_socket PROT((void)) {
     int i;
     
-    for (i = 0; i < MAX_EFUN_SOCKS; i++) {
+    for (i = 0; i < CFG_MAX_EFUN_SOCKS; i++) {
 	if (lpc_socks[i].state != CLOSED) continue;
 	set_read_callback(i, 0);
 	set_write_callback(i, 0);
@@ -226,12 +226,12 @@ socket_create P3(enum socket_mode, mode, svalue_t *, read_callback, svalue_t *, 
 	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *) &optval,
 		       sizeof(optval)) == -1) {
 	    debug_perror("socket_create: setsockopt", 0);
-	    close(fd);
+	    OS_socket_close(fd);
 	    return EESETSOCKOPT;
 	}
 	if (set_socket_nonblocking(fd, 1) == -1) {
 	    debug_perror("socket_create: set_socket_nonblocking", 0);
-	    close(fd);
+	    OS_socket_close(fd);
 	    return EENONBLOCK;
 	}
 	lpc_socks[i].fd = fd;
@@ -277,7 +277,7 @@ socket_bind P2(int, fd, int, port)
     int len;
     struct sockaddr_in sin;
 
-    if (fd < 0 || fd >= MAX_EFUN_SOCKS)
+    if (fd < 0 || fd >= CFG_MAX_EFUN_SOCKS)
 	return EEFDRANGE;
     if (lpc_socks[fd].state == CLOSED)
 	return EEBADF;
@@ -292,8 +292,13 @@ socket_bind P2(int, fd, int, port)
 
     if (bind(lpc_socks[fd].fd, (struct sockaddr *) & sin, sizeof(sin)) == -1) {
 	switch (errno) {
+#ifdef WINSOCK
+	case WSAEADDRINUSE:
+	    return EEADDRINUSE;
+#else
 	case EADDRINUSE:
 	    return EEADDRINUSE;
+#endif
 	default:
 	    debug_perror("socket_bind: bind", 0);
 	    return EEBIND;
@@ -319,7 +324,7 @@ socket_bind P2(int, fd, int, port)
 int
 socket_listen P2(int, fd, svalue_t *, callback)
 {
-    if (fd < 0 || fd >= MAX_EFUN_SOCKS)
+    if (fd < 0 || fd >= CFG_MAX_EFUN_SOCKS)
 	return EEFDRANGE;
     if (lpc_socks[fd].state == CLOSED)
 	return EEBADF;
@@ -356,7 +361,7 @@ socket_accept P3(int, fd, svalue_t *, read_callback, svalue_t *, write_callback)
     struct sockaddr_in sin;
     struct hostent *hp;
 
-    if (fd < 0 || fd >= MAX_EFUN_SOCKS)
+    if (fd < 0 || fd >= CFG_MAX_EFUN_SOCKS)
 	return EEFDRANGE;
     if (lpc_socks[fd].state == CLOSED)
 	return EEBADF;
@@ -441,7 +446,7 @@ socket_accept P3(int, fd, svalue_t *, read_callback, svalue_t *, write_callback)
 	debug(8192, ("socket_accept: accept on socket %d\n", fd));
 	debug(8192, ("socket_accept: new socket %d on fd %d\n", i, accept_fd));
     } else
-	close(accept_fd);
+	OS_socket_close(accept_fd);
 
     return i;
 }
@@ -452,7 +457,7 @@ socket_accept P3(int, fd, svalue_t *, read_callback, svalue_t *, write_callback)
 int
 socket_connect P4(int, fd, char *, name, svalue_t *, read_callback, svalue_t *, write_callback)
 {
-    if (fd < 0 || fd >= MAX_EFUN_SOCKS)
+    if (fd < 0 || fd >= CFG_MAX_EFUN_SOCKS)
 	return EEFDRANGE;
     if (lpc_socks[fd].state == CLOSED)
 	return EEBADF;
@@ -484,6 +489,16 @@ socket_connect P4(int, fd, char *, name, svalue_t *, read_callback, svalue_t *, 
 	switch (errno) {
 	case EINTR:
 	    return EEINTR;
+#ifdef WINSOCK
+	case WSAEADDRINUSE:
+	    return EEADDRINUSE;
+	case WSAEALREADY:
+	    return EEALREADY;
+	case WSAECONNREFUSED:
+	    return EECONNREFUSED;
+	case WSAEINPROGRESS:
+	    break;
+#else
 	case EADDRINUSE:
 	    return EEADDRINUSE;
 	case EALREADY:
@@ -492,6 +507,7 @@ socket_connect P4(int, fd, char *, name, svalue_t *, read_callback, svalue_t *, 
 	    return EECONNREFUSED;
 	case EINPROGRESS:
 	    break;
+#endif
 	default:
 	    debug_perror("socket_connect: connect", 0);
 	    return EECONNECT;
@@ -513,7 +529,7 @@ socket_write P3(int, fd, svalue_t *, message, char *, name)
     char *buf, *p;
     struct sockaddr_in sin;
 
-    if (fd < 0 || fd >= MAX_EFUN_SOCKS)
+    if (fd < 0 || fd >= CFG_MAX_EFUN_SOCKS)
 	return EEFDRANGE;
     if (lpc_socks[fd].state == CLOSED)
 	return EEBADF;
@@ -638,13 +654,17 @@ socket_write P3(int, fd, svalue_t *, message, char *, name)
 	return EEMODENOTSUPP;
     }
 
-    off = write(lpc_socks[fd].fd, buf, len);
+    off = OS_socket_write(lpc_socks[fd].fd, buf, len);
     if (off == -1) {
 	FREE(buf);
 	switch (errno) {
-
+#ifdef WINSOCK
+	case WSAEWOULDBLOCK:
+	    return EEWOULDBLOCK;
+#else
 	case EWOULDBLOCK:
 	    return EEWOULDBLOCK;
+#endif
 
 	default:
 	    debug_perror("socket_write: send", 0);
@@ -673,7 +693,7 @@ call_callback P3(int, fd, int, what, int, num_arg) {
     case S_CLOSE_FP: callback = lpc_socks[fd].close_callback; break;
     }
 
-    if (fd & what) {
+    if (lpc_socks[fd].flags & what) {
 	safe_call_function_pointer(callback.f, num_arg);
     } else if (callback.s) {
 	safe_apply(callback.s, lpc_socks[fd].owner_ob, num_arg, ORIGIN_DRIVER);
@@ -802,7 +822,7 @@ socket_read_select_handler P1(int, fd)
 	    value = const0;
 	    push_number(fd);
 	    if (restore_svalue(lpc_socks[fd].r_buf, &value) == 0)
-		push_svalue(&value);
+		*(++sp) = value;
 	    else
 		push_null();
 	    FREE(lpc_socks[fd].r_buf);
@@ -816,7 +836,7 @@ socket_read_select_handler P1(int, fd)
 
 	case STREAM:
 	    debug(8192, ("read_socket_handler: DATA_XFER STREAM\n"));
-	    cc = read(lpc_socks[fd].fd, buf, sizeof(buf) - 1);
+	    cc = OS_socket_read(lpc_socks[fd].fd, buf, sizeof(buf) - 1);
 	    if (cc <= 0)
 		break;
 	    debug(8192, ("read_socket_handler: read %d bytes\n", cc));
@@ -850,7 +870,11 @@ socket_read_select_handler P1(int, fd)
     }
     if (cc == -1) {
 	switch (errno) {
+#ifdef WINSOCK
+	case WSAECONNREFUSED:
+#else
 	case ECONNREFUSED:
+#endif
 	    /* Evidentally, on Linux 1.2.1, ECONNREFUSED gets returned
 	     * if an ICMP_PORT_UNREACHED error happens internally.  Why
 	     * they use this error message, I have no idea, but this seems
@@ -861,7 +885,11 @@ socket_read_select_handler P1(int, fd)
 		return;
 	    break;
 	case EINTR:
+#ifdef WINSOCK
+	case WSAEWOULDBLOCK:
+#else
 	case EWOULDBLOCK:
+#endif
 	    return;
 	default:
 	    break;
@@ -885,8 +913,9 @@ socket_write_select_handler P1(int, fd)
 	return;
 
     if (lpc_socks[fd].w_buf != NULL) {
-	cc = write(lpc_socks[fd].fd, lpc_socks[fd].w_buf + lpc_socks[fd].w_off,
-		   lpc_socks[fd].w_len);
+	cc = OS_socket_write(lpc_socks[fd].fd, 
+			     lpc_socks[fd].w_buf + lpc_socks[fd].w_off,
+			     lpc_socks[fd].w_len);
 	if (cc == -1)
 	    return;
 	lpc_socks[fd].w_off += cc;
@@ -903,7 +932,6 @@ socket_write_select_handler P1(int, fd)
 
     push_number(fd);
     call_callback(fd, S_WRITE_FP, 1);
-
 }
 
 /*
@@ -912,13 +940,13 @@ socket_write_select_handler P1(int, fd)
 int
 socket_close P2(int, fd, int, flags)
 {
-    if (fd < 0 || fd >= MAX_EFUN_SOCKS)
+    if (fd < 0 || fd >= CFG_MAX_EFUN_SOCKS)
 	return EEFDRANGE;
     if (lpc_socks[fd].state == CLOSED)
 	return EEBADF;
     if (!(flags & SC_FORCE) && lpc_socks[fd].owner_ob != current_object)
 	return EESECURITY;
-    while (close(lpc_socks[fd].fd) == -1 && errno == EINTR)
+    while (OS_socket_close(lpc_socks[fd].fd) == -1 && errno == EINTR)
 	;	/* empty while */
     lpc_socks[fd].state = CLOSED;
     if (lpc_socks[fd].r_buf != NULL)
@@ -946,7 +974,7 @@ socket_close P2(int, fd, int, flags)
 int
 socket_release P3(int, fd, object_t *, ob, svalue_t *, callback)
 {
-    if (fd < 0 || fd >= MAX_EFUN_SOCKS)
+    if (fd < 0 || fd >= CFG_MAX_EFUN_SOCKS)
 	return EEFDRANGE;
     if (lpc_socks[fd].state == CLOSED)
 	return EEBADF;
@@ -981,7 +1009,7 @@ socket_release P3(int, fd, object_t *, ob, svalue_t *, callback)
 int
 socket_acquire P4(int, fd, svalue_t *, read_callback, svalue_t *, write_callback, svalue_t *, close_callback)
 {
-    if (fd < 0 || fd >= MAX_EFUN_SOCKS)
+    if (fd < 0 || fd >= CFG_MAX_EFUN_SOCKS)
 	return EEFDRANGE;
     if (lpc_socks[fd].state == CLOSED)
 	return EEBADF;
@@ -1018,7 +1046,7 @@ char *
  */
 int get_socket_address P3(int, fd, char *, addr, int *, port)
 {
-    if (fd < 0 || fd >= MAX_EFUN_SOCKS) {
+    if (fd < 0 || fd >= CFG_MAX_EFUN_SOCKS) {
 	addr[0] = '\0';
 	*port = 0;
 	return EEFDRANGE;
@@ -1034,7 +1062,7 @@ int get_socket_address P3(int, fd, char *, addr, int *, port)
 object_t *
        get_socket_owner P1(int, fd)
 {
-    if (fd < 0 || fd >= MAX_EFUN_SOCKS)
+    if (fd < 0 || fd >= CFG_MAX_EFUN_SOCKS)
 	return (object_t *) NULL;
     if (lpc_socks[fd].state == CLOSED)
 	return (object_t *) NULL;
@@ -1089,7 +1117,7 @@ close_referencing_sockets P1(object_t *, ob)
 {
     int i;
 
-    for (i = 0; i < MAX_EFUN_SOCKS; i++)
+    for (i = 0; i < CFG_MAX_EFUN_SOCKS; i++)
 	if (lpc_socks[i].owner_ob == ob && lpc_socks[i].state != CLOSED)
 	    socket_close(i, SC_FORCE);
 }
@@ -1126,7 +1154,7 @@ void dump_socket_status P1(outbuffer_t *, out)
     outbuf_add(out, "Fd    State      Mode       Local Address          Remote Address\n");
     outbuf_add(out, "--  ---------  --------  ---------------------  ---------------------\n");
 
-    for (i = 0; i < MAX_EFUN_SOCKS; i++) {
+    for (i = 0; i < CFG_MAX_EFUN_SOCKS; i++) {
 	outbuf_addv(out, "%2d  ", lpc_socks[i].fd);
 
 	switch (lpc_socks[i].state) {

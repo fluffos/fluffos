@@ -7,19 +7,26 @@
  */
 #define ERROR_TOKEN          -1
 #define STR_TOKEN	     -2
+#define WRD_TOKEN	     -3
 
 #define LIV_MODIFIER         8
 #define VIS_ONLY_MODIFIER    16
+#define PLURAL_MODIFIER	     32
 
-#define OBJ_A_TOKEN          (-4)
-#define LIV_A_TOKEN          (-((-OBJ_A_TOKEN) | LIV_MODIFIER))
-#define OBJ_TOKEN	     (-((-OBJ_A_TOKEN) | VIS_ONLY_MODIFIER))
-#define LIV_TOKEN	     (-((-LIV_A_TOKEN) | VIS_ONLY_MODIFIER))
+#define ADD_MOD(x, y) (-((-(x)) | (y)))
+
+#define OBJ_A_TOKEN          -4
+#define LIV_A_TOKEN          ADD_MOD(OBJ_A_TOKEN, LIV_MODIFIER)
+#define OBJ_TOKEN	     ADD_MOD(OBJ_A_TOKEN, VIS_ONLY_MODIFIER)
+#define LIV_TOKEN	     ADD_MOD(LIV_A_TOKEN, VIS_ONLY_MODIFIER)
+#define OBS_TOKEN	     ADD_MOD(OBJ_A_TOKEN, PLURAL_MODIFIER)
+#define LVS_TOKEN	     ADD_MOD(LIV_A_TOKEN, PLURAL_MODIFIER)
 
 #define MAX_NUM_OBJECTS      256
 /* must be powers of 2 */
 #define HASH_SIZE            32
 #define VERB_HASH_SIZE       128
+#define SPECIAL_HASH_SIZE    16
 
 /* This is used to hash shared string pointers for various lookup tables */
 #define DO_HASH(x, n)         ((((int)x) & (n - 1)) ^ \
@@ -60,8 +67,7 @@ typedef struct {
 typedef struct {
     int type;
     char *string;
-    char *end_prev;
-    char *start_next;
+    char *start, *end;
 } word_t;
 
 /* Flags for parse_info structures.  parse_info information is cached inside
@@ -105,6 +111,17 @@ typedef struct hash_entry_s {
     parse_val_t pv;
 } hash_entry_t;
 
+typedef struct special_word_s {
+    struct special_word_s *next;
+    char *wrd;
+    short kind;
+    short arg;
+} special_word_t;
+
+enum sw_enum_s {
+    SW_NONE = 0, SW_ARTICLE, SW_SELF, SW_ORDINAL
+};
+
 /* Each node holds informations about a given rule.  The handler for the
  * rule, the literals it contains, and the token string (OBJ, "to", OBJ)
  * are stored in here.  Note that it is variable size.
@@ -112,6 +129,7 @@ typedef struct hash_entry_s {
 typedef struct verb_node_s {
     struct verb_node_s *next;
     struct object_s *handler;
+    int weight;
     short lit[2];
     int token[1];
 } verb_node_t;
@@ -120,9 +138,12 @@ typedef struct verb_node_s {
  * The entry for a verb.  Links for the verb hash table, and a linked
  * list of rules.
  */
+#define VB_HAS_OBJ   1
+
 typedef struct verb_s {
     struct verb_s *next;
     char *name;
+    int flags;
     verb_node_t *node;
 } verb_t;
 
@@ -146,7 +167,6 @@ typedef struct {
 
 typedef struct {
     int tok_index, word_index;
-    int match_level;
     int num_matches;
     int num_errors;
 } parse_state_t;
@@ -161,5 +181,7 @@ typedef struct {
     object_t *ob;
     sub_result_t res[4];
 } parse_result_t;
+
+void parse_free PROT((parse_info_t *));
 
 #endif

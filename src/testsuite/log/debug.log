@@ -1,4 +1,9 @@
-Failed to load file: read_buffer
-program: command/update.c, object: command/update line 15
-'    commandHook' in '        clone/user.c' ('        clone/user#1')line 72
-'           main' in '    command/update.c' ('      command/update')line 15
+----------------------------------------------------------------------------
+Basis (MudOS v21.7a1) starting up on IRIX - Sun Aug 20 00:18:34 1995
+
+
+Connection to address server (localhost 7374) refused.
+Initializations complete.
+
+Accepting connections on port 4000.
+Accepting connections on port 4001.

@@ -240,8 +240,6 @@ Example:
    The 'word' can not contain spaces. It must be a single word. This is so
    because the pattern is exploded on " " (space) and a pattern element can
    therefore not contain spaces.
-            This will be fixed in the future
-
 
 */
 
@@ -490,12 +488,12 @@ static svalue_t parse_ret;
  * Returns:		True if command matched pattern.
  */
 int
-parse P5(char *, cmd,		/* Command to parse */
-	       svalue_t *, ob_or_array,	/* Object or array of objects */
-	       char *, pattern,	/* Special parsing pattern */
-	       svalue_t *, stack_args,	/* Pointer to lvalue args on
-						 * stack */
-	       int, num_arg)
+parse P5(char *, 	cmd,		/* Command to parse */
+	 svalue_t *, 	ob_or_array,	/* Object or array of objects */
+	 char *, 	pattern,	/* Special parsing pattern */
+	 svalue_t *, 	stack_args,	/* Pointer to lvalue args on
+					 * stack */
+	 int, 		num_arg)
 {
     int pix, cix, six, fail, fword, ocix, fpix;
     svalue_t *pval;
@@ -526,10 +524,13 @@ parse P5(char *, cmd,		/* Command to parse */
     /* note: obarr is only put in parse_obarr if it needs freeing */
     if (ob_or_array->type == T_ARRAY)
 	obarr = ob_or_array->u.arr;
+#ifndef NO_ENVIRONMENT
     else if (ob_or_array->type == T_OBJECT) {
 	/* 1 == ob + deepinv */
 	parse_obarr = obarr = deep_inventory(ob_or_array->u.ob, 1);
-    } else 
+    }
+#endif
+    else 
 	error("Bad second argument to parse_command()\n");
 
     check_for_destr(obarr);
@@ -920,7 +921,7 @@ static char *num10[] =
  * Returns:		svalue holding result of parse.
  */
 static svalue_t *
-       number_parse P4(array_t *, obarr, array_t *, warr, int *, cix_in, int *, fail)
+number_parse P4(array_t *, obarr, array_t *, warr, int *, cix_in, int *, fail)
 {
     int cix, ten, ones, num;
     char buf[100];
@@ -1143,11 +1144,13 @@ static svalue_t *
     for (obix = 0; obix < obarr->size; obix++) {
 	*fail = 0;
 	cix = *cix_in;
-	load_lpc_info(obix, obarr->item[obix].u.ob);
+	if (obarr->item[obix].type == T_OBJECT)
+	    load_lpc_info(obix, obarr->item[obix].u.ob);
 	plur_flag = 0;
 	if (match_object(obix, warr, &cix, &plur_flag)) {
 	    *cix_in = cix + 1;
-	    return &obarr->item[obix];
+	    assign_svalue_no_free(&parse_ret, &obarr->item[obix]);
+	    return &parse_ret;
 	}
     }
     *fail = 1;

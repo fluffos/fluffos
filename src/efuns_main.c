@@ -27,9 +27,15 @@
 #include "call_out.h"
 #include "debug.h"
 #include "ed.h"
+#include "md.h"
 #ifdef LPC_TO_C
 #include "interface.h"
 #include "compile_file.h"
+#endif
+
+/* This shouldn't be here.  See binaries.c */
+#ifdef WIN32
+#include <direct.h>
 #endif
 
 int call_origin = 0;
@@ -55,12 +61,12 @@ f_add_action PROT((void))
 
 	for (i = 0; i < n; i++){
 	    if (sv[i].type == T_STRING){
-		add_action(sp-1, sv[i].u.string, flag);
+		add_action(sp-1, sv[i].u.string, flag & 3);
 	    }
 	}
 	free_array((sp--)->u.arr);
     } else {
-	add_action((sp-1), sp->u.string, flag);
+	add_action((sp-1), sp->u.string, flag & 3);
 	free_string_svalue(sp--);
     }
     pop_stack();
@@ -600,31 +606,6 @@ f_dumpallobj PROT((void))
     } else {
         dumpstat("/OBJ_DUMP");
     }
-}
-#endif
-
-/* f_each */
-
-#ifdef F_EACH
-void
-f_each PROT((void))
-{
-    mapping_t *m;
-    array_t *v;
-    int flag = (sp--)->u.number;
-
-    m = sp->u.map;
-    if (flag) {
-        m->eachObj = current_object;
-        m->bucket = 0;
-        m->elt = (mapping_node_t *) 0;
-        free_mapping(m);
-        *sp = const0;
-        return;
-    }
-    v = mapping_each(m);
-    free_mapping(m);
-    put_array(v);
 }
 #endif
 
@@ -1343,6 +1324,8 @@ void f_lpc_info PROT((void))
 	if (ob) {
 	    if (ob->flags & O_COMPILED_PROGRAM) {
 		outbuf_add(&out, " No\n");
+	    } else if (ob->flags & O_SWAPPED) {
+		outbuf_add(&out, " Yes      Swapped\n");
 	    } else if (ob->prog->program_size == 0) {
 		outbuf_add(&out, " Yes      Yes\n");
 	    } else {
@@ -1430,10 +1413,7 @@ f_map PROT((void))
 void
 f_master PROT((void))
 {
-    int err;
-    
-    err = assert_master_ob_loaded("master", "");
-    if (err != 1)
+    if (master_ob == (object_t *)-1)
 	push_number(0);
     else
 	push_object(master_ob);
@@ -1457,36 +1437,34 @@ void
 f_match_path PROT((void))
 {
     svalue_t *value;
-    svalue_t string;
     register char *src, *dst;
     svalue_t *nvalue;
     mapping_t *map;
-
+    char *tmpstr;
+    
     value = &const0u;
 
-    string.type = T_STRING;
-    string.subtype = STRING_CONSTANT;
-    string.u.string = DMALLOC(SVALUE_STRLEN(sp) + 1, TAG_STRING, "match_path");
+    tmpstr = DMALLOC(SVALUE_STRLEN(sp) + 1, TAG_STRING, "match_path");
 
     src = sp->u.string;
-    dst = string.u.string;
-
+    dst = tmpstr;
+    
     while (*src != '\0') {
 	while (*src != '/' && *src != '\0')
 	    *dst++ = *src++;
 	if (*src == '/') {
 	    while (*++src == '/');
-	    if (*src != '\0' || dst == string.u.string)
+	    if (*src != '\0' || dst == tmpstr)
 		*dst++ = '/';
 	}
 	*dst = '\0';
-	nvalue = find_in_mapping((sp - 1)->u.map, &string);
+	nvalue = find_string_in_mapping((sp - 1)->u.map, tmpstr);
+	
 	if (nvalue != &const0u)
 	    value = nvalue;
     }
 
-    FREE(string.u.string);
-
+    FREE(tmpstr);
     /* Don't free mapping first, in case sometimes one uses a ref 1 mapping */
     /* Randor - 5/29/94 */
     free_string_svalue(sp--);
@@ -1671,7 +1649,7 @@ f_mkdir PROT((void))
     char *path;
 
     path = check_valid_path(sp->u.string, current_object, "mkdir", 1);
-    if (!path || mkdir(path, 0770) == -1){
+    if (!path || OS_mkdir(path, 0770) == -1){
         free_string_svalue(sp);
         *sp = const0;
     }
@@ -1913,7 +1891,7 @@ f_previous_object PROT((void))
     int i;
 
     if ((i = sp->u.number) > 0) {
-        if (i >= MAX_TRACE) {
+        if (i >= CFG_MAX_CALL_DEPTH) {
             sp->u.number = 0;
             return;
 	}
@@ -1972,9 +1950,17 @@ void
 f_printf PROT((void))
 {
     int num_arg = st_num_arg;
-    if (command_giver)
-        tell_object(command_giver, string_print_formatted((sp - num_arg + 1)->u.string,
-                                            num_arg - 1, sp - num_arg + 2));
+    char *ret;
+    
+    if (command_giver) {
+	ret = string_print_formatted((sp - num_arg + 1)->u.string,
+				     num_arg - 1, sp - num_arg + 2);
+	if (ret) {
+	    tell_object(command_giver, ret);
+	    FREE_MSTR(ret);
+	}
+    }
+    
     pop_n_elems(num_arg);
 }
 #endif
@@ -2479,6 +2465,8 @@ f_replace_string PROT((void))
                         src += plen;
                         if (cur == last) break;
                     } else {
+			memcpy(dst2, src, plen);
+			dst2 += plen;
                         src += plen;
                     }
                 } else {
@@ -2506,14 +2494,27 @@ f_replace_string PROT((void))
 	    } else { /* rlen is zero */
 		while (*src) {
 		    if (*src++ == *pattern) {
-			dst2 = src - 1;
-			while (*src) {
-			    if (*src == *pattern) src++;
-			    else *dst2++ = *src++;
+			cur++;
+			if (cur >= first) {
+			    dst2 = src - 1;
+			    while (*src) {
+				if (*src == *pattern) {
+				    cur++;
+				    if (cur <= last) {
+					src++;
+					continue;
+				    } else {
+					while (*src)
+					    *dst2++ = *src++;
+					break;
+				    }
+				}
+				*dst2++ = *src++;
+			    }
+			    *dst2 = 0;
+			    arg->u.string = extend_string(dst1, dst2 - dst1);
+			    break;
 			}
-			*dst2 = 0;
-			arg->u.string = extend_string(dst1, dst2 - dst1);
-			break;
 		    }
 		}
 	    }
@@ -2531,18 +2532,16 @@ f_replace_string PROT((void))
                 } else if (memcmp(src, pattern, plen) == 0) {
                     cur++;
                     if ((cur >= first) && (cur <= last)) {
-                        if (rlen) {
-                            if (max_string_length - dlen <= rlen) {
-                                pop_n_elems(st_num_arg);
-                                push_svalue(&const0u);
-                                FREE_MSTR(dst1);
-                                return;
-                            }
-                            memcpy(dst2, replace, rlen);
-                            dst2 += rlen;
-                            dlen += rlen;
-                        }
-                        src += plen;
+			if (max_string_length - dlen <= rlen) {
+			    pop_n_elems(st_num_arg);
+			    push_svalue(&const0u);
+			    FREE_MSTR(dst1);
+			    return;
+			}
+			memcpy(dst2, replace, rlen);
+			dst2 += rlen;
+			dlen += rlen;
+			src += plen;
                         if (cur == last) break;
                     } else {
 			dlen += plen;
@@ -3021,19 +3020,18 @@ f_sprintf PROT((void))
     char *s;
     int num_arg = st_num_arg;
 
-    /*
-     * string_print_formatted() returns a pointer to it's internal buffer, or
-     * to an internal constant...  Either way, it must be copied before it's
-     * returned as a string.
-     */
-
     s = string_print_formatted((sp - num_arg + 1)->u.string,
                                num_arg - 1, sp - num_arg + 2);
     pop_n_elems(num_arg);
-    if (!s)
-        push_number(0);
-    else
-        push_malloced_string(string_copy(s, "f_sprintf"));
+
+    (++sp)->type = T_STRING;
+    if (!s) {
+	sp->subtype = STRING_CONSTANT;
+	sp->u.string = "";
+    } else {
+	sp->subtype = STRING_MALLOC;
+	sp->u.string = s;
+    }
 }
 #endif
 

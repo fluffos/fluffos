@@ -22,9 +22,7 @@
 #include "scratchpad.h"
 #include "preprocess.h"
 #include "md.h"
-/* whashstr */
 #include "hash.h"
-/* legal_path */
 #include "file.h"
 
 #define NELEM(a) (sizeof (a) / sizeof((a)[0]))
@@ -755,7 +753,7 @@ get_text_block P1(char *, term)
      * free chunks
      */
     for (i = curchunk; i >= 0; i--)
-	FREE(text_line[curchunk]);
+	FREE(text_line[i]);
 
     return res;
 }
@@ -875,7 +873,7 @@ static void handle_pragma P1(char *, str)
 	    return;
 	}
     }
-    yywarn("Uknown #pragma, ignored.");
+    yywarn("Unknown #pragma, ignored.");
 }
 
 char *show_error_context(){
@@ -1267,7 +1265,10 @@ int yylex()
 
 	case '$':
 	    if (function_context.num_parameters < 0) {
-		yyerror("$var illegal outside of function.");
+		if (function_context.num_parameters == -2)
+		    yyerror("$var illegal inside anonymous function pointer.");
+		else
+		    yyerror("$var illegal outside of function pointer.");
 		return '$';
 	    } else {
 		if (!isdigit(c = *outp++)) {
@@ -1286,7 +1287,7 @@ int yylex()
 		if (yylval.number < 0)
 		    yyerror("In function parameter $num, num must be >= 1.");
 		else if (yylval.number > 255)
-		    yyerror("only 255 parameters allowed.");
+		    yyerror("only 256 parameters allowed.");
 		else if (yylval.number >= function_context.num_parameters)
 		    function_context.num_parameters = yylval.number + 1;
 		return L_PARAMETER;
@@ -1451,6 +1452,13 @@ int yylex()
 		    case 'e': yylval.number = '\x1b'; break;
 		    case '\'': yylval.number = '\''; break;
 		    case '\\': yylval.number = '\\'; break;
+		    case '\n':
+			yylval.number = '\n';
+			current_line++;
+			total_lines++;
+			if ((outp = last_nl + 1))
+			    refill_buffer();
+			break;
 		    default: 
 			yywarn("Unknown \\x character.");
 			yylval.number = *(outp - 1);
@@ -1482,7 +1490,9 @@ int yylex()
 		    rc = get_array_block(terminator);
 
 		    if (rc > 0) {
-			return *outp++;
+			/* outp is pointing at "({" for histortical reasons */
+			outp += 2;
+			return L_ARRAY_OPEN;
 		    } else if (rc == -1) {
 			lexerror("End of file in array block");
 			return LEX_EOF;
@@ -1791,7 +1801,6 @@ parse_identifier:
 	char buff[100];
 
 	sprintf(buff, "Illegal character (hex %02x) '%c'", (unsigned) c, (char) c);
-	debug_message("partial = [%s]\n", partial);
 	yyerror(buff);
 #endif
 	return ' ';
@@ -2153,6 +2162,8 @@ char *get_f_name P1(int, n)
     }
 }
 
+#define get_next_char(c) if ((c = *outp++) == '\n' && outp == last_nl + 1) refill_buffer()
+
 #define GETALPHA(p, q, m) \
     while(isalunum(*p)) {\
 	*q = *p++;\
@@ -2183,7 +2194,7 @@ static int cmygetc()
     int c;
 
     for (;;) {
-	c = *outp++;
+	get_next_char(c);
 	if (c == '/') {
 	    switch(*outp++){
 		case '*': skip_comment(); break;
@@ -2203,7 +2214,7 @@ static void refill()
 
     p = yytext;
     do {
-	c = cmygetc();
+	c = *outp++;
 	if (p < yytext + MAXLINE - 5)
 	    *p++ = c;
 	else {
@@ -2515,14 +2526,22 @@ static int expand_define()
 		case '\\':
 		    if (squote || dquote) {
 			*q++ = c;
-			c = *outp++;
-		    } break;
+			get_next_char(c);
+		    }
+		    break;
 		case '\n':
 		    if (outp == last_nl + 1) refill_buffer();
 		    if (squote || dquote) {
 			lexerror("Newline in string");
 			return 0;
-		    } break;
+		    }
+		    /* Change this to a space so we don't count it a variable
+		       number of times based on how many times it is used
+		       in the expansion */
+		    current_line++;
+		    total_lines++;
+		    c = ' ';
+		    break;
 		}
 		if (c == ',' && !parcnt && !dquote && !squote) {
 		    *q++ = 0;
@@ -2545,8 +2564,9 @@ static int expand_define()
 		}
 		if (!squote && !dquote)
 		    c = cmygetc();
-		else
-		    c = *outp++;
+		else {
+		    get_next_char(c);
+		}
 	    }
 	    if (n == NARGS) {
 		lexerror("Maximum macro argument count exceeded");

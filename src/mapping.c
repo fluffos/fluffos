@@ -10,18 +10,6 @@ int num_mappings = 0;
 int total_mapping_size = 0;
 int total_mapping_nodes = 0;
 
-/* coeff taken from hash.c in Larry Wall's Perl package */
-
-static char coeff[] = {
-        61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1,
-        61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1,
-        61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1,
-        61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1,
-        61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1,
-        61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1,
-        61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1,
-        61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1};
-
 /*
  * LPC mapping (associative arrays) module.  Contains routines for
  * easy value and lvalue manipulation.
@@ -31,6 +19,8 @@ static char coeff[] = {
  * - some enhancements by Truilkan@TMI
  * - rewritten for MudOS to use an extensible hash table implementation styled
  *   after the one Perl uses in hash.c - 92/07/08 - by Truilkan@TMI
+ * - Beek reduced mem usage and improved speed 95/09/08; Sym optimized this
+ *   at some point as well.
  */
 
 /*
@@ -42,6 +32,12 @@ static char coeff[] = {
   though the entries are redistributed across the both halves of the hash
   table).
 */
+
+static INLINE int node_hash P1(mapping_node_t *, mn) {
+    int x = mn->values[0].u.number;
+    if (x < 0) return -x;
+    return x;
+}
 
 INLINE int growMap P1(mapping_t *, m)
 {
@@ -74,7 +70,7 @@ INLINE int growMap P1(mapping_t *, m)
 	    if ((elt = *a)) {
 		eltp = a, b = a + oldsize;
 		do {
-		    if (elt->hashval & oldsize){
+		    if (node_hash(elt) & oldsize){
 			*eltp = elt->next;
 			if (!(elt->next = *b)) m->unfilled--;
 			*b = elt;   
@@ -243,11 +239,6 @@ allocate_mapping P1(int, n)
 	total_mapping_size += sizeof(mapping_t) + n;
 	newmap->ref = 1;
 	newmap->count = 0;
-#ifdef EACH
-	newmap->eachObj = (object_t *)0;
-	newmap->bucket = 0;
-	newmap->elt = (mapping_node_t *)0;      /* must start at 0;see mapping_each */
-#endif
 #ifdef PACKAGE_MUDLIB_STATS
 	if (current_object) {
 	  assign_stats (&newmap->stats, current_object);
@@ -288,11 +279,6 @@ copyMapping P1(mapping_t *,m)
 			   sizeof(mapping_node_t *) * k +
 			   sizeof(mapping_node_t) * m->count);
 
-#ifdef EACH
-    newmap->eachObj = (object_t *)0;
-    newmap->bucket = 0;
-    newmap->elt = (mapping_node_t *)0;      /* must start at 0;see mapping_each */
-#endif
 #ifdef PACKAGE_MUDLIB_STATS
     if (current_object) {
 	assign_stats (&newmap->stats, current_object);
@@ -309,7 +295,6 @@ copyMapping P1(mapping_t *,m)
 
 		assign_svalue_no_free(nelt->values, elt->values);
 		assign_svalue_no_free(nelt->values + 1, elt->values + 1);
-		nelt->hashval = elt->hashval;
 		nelt->next = *a;
 		*a = nelt;
 	    } while ((elt = elt->next));
@@ -318,119 +303,53 @@ copyMapping P1(mapping_t *,m)
     return newmap;
 }
 
-/*
-   mapHashstr: based on code from hstore in Larry Wall's Perl package (hash.c)
-
-   I use this hash function instead of hash.c:hashstr() because the scheme
-   we use for growing the hash table requires the table size to be a power
-   of 2 and I don't that the other hash function performs well for non-
-   prime moduli.
-*/
-
-/* Beek - whashstr supposedly needs even power of 2 sizes; will it work
- * well for odd powers of 2?  Can it cope with the table size changing?
- * anyway, I think we can do better than this hash function ...
- */
 INLINE int
-mapHashstr P1(register char *, key)
+restore_hash_string P2(char **, val, svalue_t *, sv)
 {
-	int hash = 0, i = 0;
-
-	while (*key && (i < MAX_KEY_LEN)){
-	    hash += (*key++) * coeff[i++];
-	    hash *= 5;
-	}
-	return hash;
-}
-
-
-INLINE int
-restore_hash_string P3(char **, val, int *, a, svalue_t *, sv)
-{
-    int hash = 0, i = 0;
     register char *cp = *val;
     char c, *start = cp;
-    int len;
 
-    while ((c = *cp++) != '"'){
+    while ((c = *cp++) != '"') {
 	switch(c){
-#ifndef MSDOS
-	    case '\r':
-#else
-	    case 30:
-#endif
-	    {
-		*(cp-1) = '\n';
-		if (i < MAX_KEY_LEN){
-		    hash += '\n' * coeff[i++];
-		    hash *= 5;
-		}
-		break;
-	    }
-
-	    case '\\':
+	case '\r':
+	    *(cp-1) = '\n';
+	    break;
+	    
+	case '\\':
 	    {
                 char *new = cp - 1;
 
                 if ((c = *new++ = *cp++)) {
-		    if (i < MAX_KEY_LEN){
-			hash += c * coeff[i++];
-			hash *= 5;
-		    }
-                    while ((c = *cp++) != '"'){
-                        if (c == '\\'){
+                    while ((c = *cp++) != '"') {
+                        if (c == '\\') {
                             if (!(c = *new++ = *cp++)) return ROB_STRING_ERROR;
 			}
                         else {
-#ifndef MSDOS
                             if (c == '\r')
-#else
-                            if (c == 30)
-#endif
                                 c = *new++ = '\n';
                             else *new++ = c;
-			}
-			if (i < MAX_KEY_LEN) {
-			    hash += c * coeff[i++];
-			    hash *= 5;
 			}
 		    }
                     if (!c) return ROB_STRING_ERROR;
                     *new = '\0';
                     *val = cp;
-                    sv->u.string = new_string(len = (new - start),
-					      "restore_string");
-                    strcpy(sv->u.string, start);
+                    sv->u.string = make_shared_string(start);
 		    sv->type = T_STRING;
-		    sv->subtype = STRING_MALLOC;
-		    *a = hash;
+		    sv->subtype = STRING_SHARED;
                     return 0;
 		}
                 else return ROB_STRING_ERROR;
 	    }
 
-	    case '\0':
-	    {
-		return ROB_STRING_ERROR;
-	    }
-
-	    default:
-	    {
-		if (i < MAX_KEY_LEN){
-		    hash += c * coeff[i++];
-		    hash *= 5;
-		}
-	    }
+	case '\0':
+	    return ROB_STRING_ERROR;
 	}
     }
     *val = cp;
     *--cp = '\0';
-    len = cp - start;
-    sv->u.string = new_string(len, "restore_string");
-    strcpy(sv->u.string, start);
-    *a = hash;
+    sv->u.string = make_shared_string(start);
     sv->type = T_STRING;
-    sv->subtype = STRING_MALLOC;
+    sv->subtype = STRING_SHARED;
     return 0;
 }
     
@@ -441,31 +360,28 @@ restore_hash_string P3(char **, val, int *, a, svalue_t *, sv)
 INLINE int
 svalue_to_int P1(svalue_t *, v)
 {
-	debug(1,("mapping.c: svalue_t_to_int\n"));
-	switch (v->type) {
-	case T_NUMBER:
-	    {
-		int i;
-		return ((i = v->u.number) < 0) ? -i : i;
-	    }
-	case T_STRING:
-	    return mapHashstr(v->u.string);
-	case T_OBJECT:
-	    return mapHashstr(v->u.ob->name);
-	case T_MAPPING:
-	    return (POINTER_INT)v->u.map;
-	case T_ARRAY:
-	case T_CLASS:
-	    return (POINTER_INT)v->u.arr;
-	case T_FUNCTION:
-	    return (POINTER_INT)v->u.fp;
-	case T_REAL:
-	    return (POINTER_INT)v->u.real;
-	case T_BUFFER:
-	    return (POINTER_INT)v->u.buf;
-	default:
-	    return 0;  /* so much for our precious distribution */
-	}
+    int x;
+    
+    if (v->type == T_STRING && v->subtype != STRING_SHARED) {
+	char *p = make_shared_string(v->u.string);
+	free_string_svalue(v);
+	v->subtype = STRING_SHARED;
+	v->u.string = p;
+    }
+    x = v->u.number;
+    if (x < 0) return -x;
+    return x;
+}
+
+int msameval P2(svalue_t *, arg1, svalue_t *, arg2) {
+    switch (arg1->type | arg2->type) {
+    case T_NUMBER:
+	return arg1->u.number == arg2->u.number;
+    case T_REAL:
+	return arg1->u.real == arg2->u.real;
+    default:
+	return arg1->u.arr == arg2->u.arr;
+    }
 }
 
 /*
@@ -486,7 +402,7 @@ node_find_in_mapping P2(mapping_t *, m, svalue_t *, lv)
 	}
 	i = svalue_to_int(lv) & m->table_size;
 	for (elt = a[i]; elt; elt = elt->next) {
-		if (sameval(elt->values, lv))
+		if (msameval(elt->values, lv))
 			return elt;
 	}
 	return (mapping_node_t *)0;
@@ -504,12 +420,9 @@ INLINE void mapping_delete P2(mapping_t *,m, svalue_t *,lv)
 	   zero m->elt to prevent all hell from breaking loose if delete is
 	   called while iterating using each().
 	*/
-#ifdef EACH
-	m->elt = (mapping_node_t *)0;
-#endif
 	if ((elt = *prev)) {
 	    do {
-		if (sameval(elt->values, lv)){
+		if (msameval(elt->values, lv)){
 		    if (!(*prev = elt->next) && !m->table[i]){
 			m->unfilled++;
 			debug(1024,("mapping delete: bucket empty, unfilled = \n",
@@ -548,7 +461,7 @@ find_for_insert P3(mapping_t *, m, svalue_t *, lv, int, doTheFree)
 	debug(128,("mapping.c: hashed to %d\n", i));
 	if ((n = *a)) {
 	    do {
-		if (sameval(lv, n->values)) {
+		if (msameval(lv, n->values)) {
 		    /* normally, the f_assign would free the old value */
 		    debug(128,("mapping.c: found %x\n", n->values));
 		    if (doTheFree) free_svalue(n->values + 1, "find_for_insert");
@@ -581,7 +494,6 @@ find_for_insert P3(mapping_t *, m, svalue_t *, lv, int, doTheFree)
 	debug(128,("mapping.c: allocated a node\n"));
 	newnode = new_map_node();
 	assign_svalue_no_free(newnode->values, lv);
-	newnode->hashval = oi;
 	/* insert at head of bucket */
 	(*a = newnode)->next = n;
 	(lv = newnode->values + 1)->type = T_NUMBER;
@@ -596,7 +508,6 @@ find_for_insert P3(mapping_t *, m, svalue_t *, lv, int, doTheFree)
 typedef struct unique_node_s {
     svalue_t key;
     int count;
-    unsigned short hashval;
     struct unique_node_s *next;
     int *indices;
 } unique_node_t;
@@ -648,7 +559,7 @@ void f_unique_mapping PROT((void))
     mapping_node_t **mtable, *elt;
     int *ind, j;
 
-    if ((arg+1)->type == T_FUNCTION){
+    if ((arg+1)->type == T_FUNCTION) {
         fp = (arg+1)->u.fp;
         if (num_arg > 2) extra = arg + 2, numex = num_arg - 2;
     } else {
@@ -703,7 +614,7 @@ void f_unique_mapping PROT((void))
         i = (oi = svalue_to_int(sv)) & mask;
         if ((uptr = table[i])) {
             do {
-                if (sameval(&uptr->key, sv)){
+                if (msameval(&uptr->key, sv)){
                     ind = uptr->indices = RESIZE(uptr->indices, uptr->count+1,
 						 int, 102, "f_unique_mapping:3");
                     ind[uptr->count++] = size;
@@ -718,7 +629,6 @@ void f_unique_mapping PROT((void))
             uptr->indices = ALLOCATE(int, 104, "f_unique_mapping:5");
             uptr->indices[0] = size;
             uptr->next = table[i];
-            uptr->hashval = oi;
             table[i] = uptr;
             numkeys++;
         }
@@ -741,7 +651,8 @@ void f_unique_mapping PROT((void))
         if ((uptr = table[j])) {
             do {
                 nptr = uptr->next;
-                i = (oi = uptr->hashval) & nmask;
+		oi = uptr->key.u.number;
+                i = oi & nmask;
                 if (!mtable[i] && !(--m->unfilled)){
                     if (growMap(m)){
                         mtable = m->table;
@@ -768,7 +679,6 @@ void f_unique_mapping PROT((void))
                 }
 
                 elt = ALLOCATE(mapping_node_t, 105,"f_unique_mapping:6");
-                elt->hashval = oi;
                 *elt->values = uptr->key;
                 (elt->values + 1)->type = T_ARRAY;
                 ret = (elt->values + 1)->u.arr = allocate_empty_array(size = uptr->count);
@@ -822,7 +732,7 @@ load_mapping_from_aggregate P2(svalue_t *,sp, int, n)
 	    i = (oi = svalue_to_int(++sp)) & mask;
 	    if ((elt2 = elt = a[i])) {
 		do {
-		    if (sameval(sp, elt->values)) {
+		    if (msameval(sp, elt->values)) {
 			free_svalue(sp++, "load_mapping_from_aggregate: duplicate key");
 			free_svalue(elt->values+1, "load_mapping_from_aggregate");
 			*(elt->values+1) = *sp;
@@ -862,7 +772,6 @@ load_mapping_from_aggregate P2(svalue_t *,sp, int, n)
 	    elt = new_map_node();
 	    *elt->values = *sp++;
 	    *(elt->values + 1) = *sp;
-	    elt->hashval = oi;
 	    (a[i] = elt)->next = elt2;
 	} while (n -= 2);
 #ifdef PACKAGE_MUDLIB_STATS
@@ -883,13 +792,32 @@ find_in_mapping P2(mapping_t *, m, svalue_t *,lv)
 	mapping_node_t *n = m->table[i];
 
 	while (n){
-	    if (sameval(n->values, lv)) return n->values + 1;
+	    if (msameval(n->values, lv)) return n->values + 1;
 	    n = n->next;
 	}
 
 	return &const0u;
 }
 
+svalue_t *
+find_string_in_mapping P2(mapping_t *, m, char *, p)
+{
+    char *ss = findstring(p);
+    int i;
+    mapping_node_t *n;
+    
+    if (!ss) return &const0u;
+    i = (int)ss;
+    if (i < 0) i = -i;
+    n = m->table[i & m->table_size];
+    
+    while (n) {
+	if (n->values->type == T_STRING && n->values->u.string == ss)
+	    return n->values + 1;
+	n = n->next;
+    }
+    return &const0u;
+}
 
 /* 
     add_to_mapping: adds mapping m2 to m1 
@@ -907,11 +835,11 @@ add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int, free_flag)
 
     do {
 	for (elt2 = a2[j]; elt2; elt2 = elt2->next){
-	    i = (oi = elt2->hashval) & mask;
+	    i = (oi = node_hash(elt2)) & mask;
 	    sv = elt2->values;
 	    if ((n = elt1 = a1[i])) {
 		do {
-		    if (sameval(sv, elt1->values)){
+		    if (msameval(sv, elt1->values)){
 			assign_svalue(elt1->values + 1, sv + 1);
 			break; 
 		    }
@@ -950,7 +878,6 @@ add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int, free_flag)
 	    newnode = new_map_node();
 	    assign_svalue_no_free(newnode->values, elt2->values);
 	    assign_svalue_no_free(newnode->values+1,elt2->values+1);
-	    newnode->hashval = oi;
 	    (a1[i] = newnode)->next = n;
 	}
     } while (j--);
@@ -983,11 +910,11 @@ unique_add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int,free_flag)
 
     do {
 	for (elt2 = a2[j]; elt2; elt2 = elt2->next){
-	    i = (oi = elt2->hashval) & mask;
+	    i = (oi = node_hash(elt2)) & mask;
 	    sv = elt2->values;
 	    if ((n = elt1 = a1[i])) {
 		do {
-		    if (sameval(sv, elt1->values)) break;
+		    if (msameval(sv, elt1->values)) break;
 		} while ((elt1 = elt1->next));
 		if (elt1) continue;
 	    }
@@ -1027,7 +954,6 @@ unique_add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int,free_flag)
 	    newnode = new_map_node();
 	    assign_svalue_no_free(newnode->values, elt2->values);
 	    assign_svalue_no_free(newnode->values+1,elt2->values+1);
-	    newnode->hashval = oi;
 	    (a1[i] = newnode)->next = n;
 	}
     } while (j--);
@@ -1183,12 +1109,12 @@ filter_mapping P2(svalue_t *, arg, int, num_arg)
 		: call_function_pointer(fp, 2+numex);
 	    if (!ret) break;
 	    else if (ret->type != T_NUMBER || ret->u.number){
-		tb_index = elt->hashval & size;
+		tb_index = node_hash(elt) & size;
 		b = newmap->table + tb_index;
 		if (!(n = *b) && !(--newmap->unfilled)){
 		    size++;
 		    if (growMap(newmap)){
-			if (elt->hashval & size) tb_index |= size;
+			if (node_hash(elt) & size) tb_index |= size;
 			n = *(b = newmap->table + tb_index);
 		    } else {
 #ifdef PACKAGE_MUDLIB_STATS
@@ -1214,7 +1140,6 @@ filter_mapping P2(svalue_t *, arg, int, num_arg)
 		newnode = new_map_node();
 		assign_svalue_no_free(newnode->values, elt->values);
 		assign_svalue_no_free(newnode->values+1, elt->values+1);
-		newnode->hashval = elt->hashval;
 		(*b = newnode)->next = n;
 	    }
 	}
@@ -1256,7 +1181,7 @@ compose_mapping P3(mapping_t *,m1, mapping_t *,m2, unsigned short,flag)
 		    sv = elt->values + 1;
 		    if ((elt2 = b[svalue_to_int(sv) & mask])) {
 			do {
-			    if (sameval(sv, elt2->values)){
+			    if (msameval(sv, elt2->values)){
 				assign_svalue(sv, elt2->values + 1);
 				break;
 			    }
@@ -1328,65 +1253,19 @@ mapping_values P1(mapping_t *,m)
 	return v;
 }
 
-#ifdef EACH
-/* mapping_each */
-
-INLINE array_t *
-mapping_each P1(mapping_t *,m)
-{
-	int j;
-	array_t *v;
-
-	if (!m->count) { /* map is empty */
-		return null_array();
-	}
-	/*
-	  If each() being called by a different object than previous object,
-	  then reset so that each begins again at top of map.  This is necessary
-	  so that things aren't left in a bad state of an object errors out
-	  in the middle of traversing a map (or just doesn't traverse to the end).
-	*/
-	if (current_object != m->eachObj) {
-		m->eachObj = current_object;
-		m->bucket = 0;
-		m->elt = (mapping_node_t *)0;
-	}
-	if (!m->elt) { /* find next occupied bucket in hash table */
-		int found = 0;
-		int k = (int) m->table_size;
-	        mapping_node_t **a = m->table;
-
-		for (j = m->bucket; j <= k; j++) {
-			if (a[j]) {
-				m->bucket = j + 1;
-				m->elt = m->table[j];
-				found = 1;
-				break;
-			}
-		}
-		if (!found) {
-			m->bucket = 0;
-			m->elt = (mapping_node_t *)0;
-			return null_array();  /* have reached the end */
-		}
-	}
-	v = allocate_empty_array(2);
-	assign_svalue_no_free(v->item, m->elt->values);
-	assign_svalue_no_free(v->item + 1, m->elt->values + 1);
-	m->elt = m->elt->next;
-	return v;
-}
-#endif
-
 /* functions for building mappings */
 
 static svalue_t *insert_in_mapping P2(mapping_t *, m, char *, key) {
     svalue_t lv;
+    svalue_t *ret;
     
     lv.type = T_STRING;
     lv.subtype = STRING_CONSTANT;
     lv.u.string = key;
-    return find_for_insert(m, &lv, 1);
+    ret = find_for_insert(m, &lv, 1);
+    /* lv.u.string will have been converted to a shared string */
+    free_string(lv.u.string);
+    return ret;
 }
 
 void add_mapping_pair P3(mapping_t *, m, char *, key, int, value)

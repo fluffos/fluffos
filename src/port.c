@@ -1,6 +1,16 @@
 #include "std.h"
 #include "port.h"
 #include "lint.h"
+#include "file_incl.h"
+#include "network_incl.h"
+
+#if defined(WIN32) || defined(LATTICE)
+int dos_style_link P2(char *, x, char *, y) {
+    char link_cmd[100];
+    sprintf(link_cmd, "copy %s %s", x, y);
+    system(link_cmd);
+}
+#endif
 
 /* for get_cpu_times() */
 #ifdef GET_PROCESS_STATS
@@ -8,12 +18,6 @@
 #endif
 #ifdef RUSAGE
 #include <sys/resource.h>
-#endif
-
-/* get a value for CLK_TCK for use by times() */
-#if (defined(TIMES) && !defined(RUSAGE))
-/* this may need #ifdef'd to handle different types of machines */
-#include <limits.h>
 #endif
 
 #ifdef sun
@@ -161,9 +165,6 @@ port_sigsetmask P1(sigset_t, mask)
 int
 get_cpu_times P2(unsigned long *, secs, unsigned long *, usecs)
 {
-#ifdef OS2
-    +struct timeb tim;
-#endif
 #ifdef RUSAGE
     struct rusage rus;
 #endif
@@ -210,15 +211,7 @@ get_cpu_times P2(unsigned long *, secs, unsigned long *, usecs)
     *usecs = clock[1];
     return 1;
 #else
-
-#ifdef OS2
-    ftime(&tim);
-    *secs = tim.time;
-    *usecs = tim.millitm;
-#else
-
     return 0;
-#endif				/* end OS2 */
 #endif				/* end LATTICE */
 #endif				/* end TIMES */
 #endif				/* end else GET_PROCESS_STATS */
@@ -270,17 +263,7 @@ INLINE char *memmove P3(register char *, b, register char *, a, register int, s)
 }
 #endif
 
-#ifdef OS2
-long htonl P1(long, bing)
-{
-    return bing;
-}				/* htonl() */
-
-long ntohl P1(long, bing)
-{
-    return bing;
-}				/* ntohl() */
-
+#ifdef WIN32
 char *crypt P2(char *, str, char *, salt)
 {
     static char buf[50];
@@ -289,11 +272,4 @@ char *crypt P2(char *, str, char *, salt)
     buf[50] = 0;
     return buf;
 }				/* crypt() */
-
-int gethostname P2(char *, dest, int, siz)
-{
-    strncpy(dest, "pinkfish", siz);
-    dest[siz] = 0;
-    return 1;
-}				/* gethostname() */
-#endif				/* OS2 */
+#endif

@@ -63,7 +63,7 @@ crash(string error, object command_giver, object current_object)
 static string *
 update_file(string file)
 {
-	string *array;
+	string *arr;
 	string str;
 	int i;
 
@@ -71,13 +71,13 @@ update_file(string file)
 	if (!str) {
 		return ({});
 	}
-	array = explode(str, "\n");
-	for (i = 0; i < sizeof(array); i++) {
-		if (array[i][0] == '#') {
-			array[i] = 0;
+	arr = explode(str, "\n");
+	for (i = 0; i < sizeof(arr); i++) {
+		if (arr[i][0] == '#') {
+			arr[i] = 0;
 		}
 	}
-	return array;
+	return arr;
 }
 
 // Function name:       epilog
@@ -143,7 +143,11 @@ save_ed_setup(object who, int code)
     if (!intp(code)) {
         return 0;
     }
+#ifdef __PACKAGE_UIDS
     file = user_path(getuid(who)) + ".edrc";
+#else
+   file = "/.edrc";
+#endif
     rm(file);
     return write_file(file, code + "");
 }
@@ -157,7 +161,11 @@ retrieve_ed_setup(object who)
    string file;
    int code;
   
+#ifdef __PACKAGE_UIDS__   
     file = user_path(getuid(who)) + ".edrc";
+#else
+   file = "/.edrc";
+#endif
     if (file_size(file) <= 0) {
         return 0;
     }

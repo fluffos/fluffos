@@ -1,16 +1,50 @@
 
+# YOU DO NOT NEED TO CONFIGURE ANYTHING IN THIS FILE.
+#
+# RUN THE SHELL SCRIPT ./build.MudOS to generate the Makefiles, and follow
+# it's instructions.
+#
+############################################################################
+#
+# **** TARGETS AND THEIR CORRECT USAGE ****
+#
+# COMPILATION TARGETS:
+# 
+# all:		compile all the files
+#
+# install:	make all, then move the files to the correct directories
+#
+# remake: 	remove the object files and generated files, and recompile
+# 		     NO reconfiguration is done, etc.
+#
+# depend:	automatically create dependency info
+#
+# Makefiles:	update Makefile.in and GNUmakefile.in from Makefile.master
+#		(only necessary after making changes to Makefile.master)
+#
+# 'CLEAN' TARGETS:
+#
+# neat: 	remove object files and generated files (used by remake)
+#
+# clean:	in addition to neat, also remove .orig and .rej files,
+#		cores, lint files, emacs backups, tag files, yacc debug
+#		files, generated Makefiles, generated binaries, and
+#		generated dependency info
+#
+# spotless:	make clean, then remove ALL CONFIGURATION AND CUSTOMIZATION
+#		     useful for creating distributions
+#
+# ---- REALLY COMPLEX OPTIONS YOU PROBABLY DON'T WANT TO TOUCH -----
+#
 # NeXT: link with MallocDebug if you have a NeXT with NeXTOS 2.1 or later and
 # you wish to search for memory leaks (see /NextDeveloper/Apps/MallocDebug).
 # Note: linking with MallocDebug will cause the virtual size of the
 # driver process to reach appoximately 40MB however the amount of real memory
 # used will remain close to normal.
 #EXTRALIBS=-lMallocDebug -lsys_s
-
-#################################################
-# Don't change anything in this file            #
-#                                               #
-# RUN ./build.MudOS to generate the Makefiles   #
-#################################################
+#
+# ---- DO NOT EDIT ANYTHING BELOW HERE UNLESS YOU KNOW ALOT ABOUT HOW
+#      MUDOS WORKS INTERNALLY ----
 
 OURLIBS=packages/packages.a mudlib/mudlib.a
 
@@ -51,8 +85,8 @@ grammar.tab.c: grammar.y
 	-mv y.tab.h grammar.tab.h
 
 $(DRIVER_BIN): $(OBJ)
-	$(MAKE) -C packages 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)'
-	$(MAKE) -C mudlib 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)'
+	$(MAKE) -C packages 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)'
+	$(MAKE) -C mudlib 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)'
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
 	$(PROOF) $(CC) $(CFLAGS) $(OPTIMIZE) $(OBJ) -o $(DRIVER_BIN) $(OURLIBS) `cat system_libs`
 
@@ -62,6 +96,11 @@ addr_server:  $(OBJDIR)/addr_server.o $(OBJDIR)/socket_ctrl.o $(OBJDIR)/port.o a
 
 
 remake: neat all
+
+customize:
+	-cp ../local_options .
+	-cp ../system_libs .
+	-cp ../configure.h .
 
 depend: opcodes.h grammar.tab.c cc.h efunctions.h efun_defs.c configure.h
 	-rm tmpdepend
@@ -79,7 +118,7 @@ cc.h: GNUmakefile
 
 # the touches here are necessary to fix the modification times; link(2) does
 # 'modify' a file
-files: edit_source sysmalloc.c smalloc.c bsdmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c func_spec.c mudlib/Makefile.pre mudlib/GNUmakefile.pre packages/Makefile.pre packages/GNUmakefile.pre configure.h
+files: edit_source sysmalloc.c smalloc.c bsdmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c func_spec.c mudlib/Makefile.pre mudlib/GNUmakefile.pre packages/Makefile.pre packages/GNUmakefile.pre configure.h grammar.y.pre
 	./edit_source -options -malloc -build_func_spec '$(CPP) $(CFLAGS)' \
 	              -process grammar.y.pre
 	./edit_source -process packages/Makefile.pre
@@ -97,9 +136,7 @@ make_func.tab.c: make_func.y cc.h
 	mv y.tab.c make_func.tab.c
 
 configure.h: edit_source
-	if test ! -f configure.h; then \
-	    ./edit_source -configure; \
-	fi
+	./edit_source -configure
 
 $(OBJDIR)/edit_source.o: edit_source.c preprocess.c cc.h
 

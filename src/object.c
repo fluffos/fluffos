@@ -22,7 +22,7 @@ int tot_alloc_object, tot_alloc_object_size;
 char *save_mapping PROT ((mapping_t *m));
 INLINE static int restore_array PROT((char **str, svalue_t *));
 INLINE static int restore_class PROT((char **str, svalue_t *));
-int restore_hash_string PROT((char **str, int *a, svalue_t *));
+int restore_hash_string PROT((char **str, svalue_t *));
 
 INLINE int
 valid_hide P1(object_t *, obj)
@@ -137,11 +137,7 @@ INLINE void save_svalue P2(svalue_t *, v, char **, buf)
 		    *cp++ = '\\';
 		    *cp++ = c;
 		}
-#ifndef MSDOS
 		else *cp++ = (c == '\n') ? '\r' : c;
-#else
-		else *cp++ = (c == '\n') ? 30 : c;
-#endif
 	    }
 
 	    *cp++ = '"';
@@ -434,11 +430,7 @@ restore_interior_string P2(char **, val, svalue_t *, sv)
 
     while ((c = *cp++) != '"') {
 	switch (c){
-#ifndef MSDOS	    
 	case '\r':
-#else
-	case 30:
-#endif
 	    {
 		*(cp-1) = '\n';
 		break;
@@ -454,11 +446,7 @@ restore_interior_string P2(char **, val, svalue_t *, sv)
 			    if (!(*new++ = *cp++)) return ROB_STRING_ERROR;
 			}
 			else {
-#ifndef MSDOS
 			    if (c == '\r')
-#else
-			    if (c == 30)
-#endif
 				*new++ = '\n';
 			    else *new++ = c;
 			}
@@ -534,7 +522,7 @@ int growMap PROT((mapping_t *));
 static int
 restore_mapping P2(char **,str, svalue_t *, sv)
 {
-    int size, i, oi, mask, count = 0;
+    int size, i, mask, oi, count = 0;
     char c;
     mapping_t *m;
     svalue_t key, value;
@@ -560,7 +548,7 @@ restore_mapping P2(char **,str, svalue_t *, sv)
 	case '"':
 	    {
 		*str = cp;
-		if ((err = restore_hash_string(str, &oi, &key)))
+		if ((err = restore_hash_string(str, &key)))
 		    goto key_error;
 		cp = *str;
 		cp++;
@@ -570,23 +558,20 @@ restore_mapping P2(char **,str, svalue_t *, sv)
 	case '(':
 	    {
 		save_svalue_depth++;
-		if (*cp == '['){
+		if (*cp == '[') {
 		    *str = ++cp;
 		    if ((err = restore_mapping(str, &key)))
 			goto key_error;
-		    oi = (POINTER_INT) key.u.map;
 		}
 		else if (*cp == '{'){
 		    *str = ++cp;
 		    if ((err = restore_array(str, &key)))
 			goto key_error;
-		    oi = (POINTER_INT) key.u.arr;
 		}
 		else if (*cp == '/') {
 		    *str = ++cp;
 		    if ((err = restore_class(str, &key)))
 			goto key_error;
-		    oi = (POINTER_INT) key.u.arr;
 		}
 		else goto generic_key_error;
 		cp = *str;
@@ -596,7 +581,7 @@ restore_mapping P2(char **,str, svalue_t *, sv)
 	    
 	case ':':
 	    {
-		oi = key.u.number = 0;
+		key.u.number = 0;
 		key.type = T_NUMBER;
 		break;
 	    }
@@ -612,15 +597,15 @@ restore_mapping P2(char **,str, svalue_t *, sv)
 	    if ((c = *cp++) < '0' || c > '9') {
 		goto key_numeral_error;
 	    }
-	    PARSE_NUMERIC(oi = 0;key.u.real = -(f1+res); key.type = T_REAL,
-			  key.type = T_NUMBER; key.u.number = -(oi = res),
+	    PARSE_NUMERIC(key.u.real = -(f1+res); key.type = T_REAL,
+			  key.type = T_NUMBER; key.u.number = -res,
 			  goto key_numeral_error)
 		
 	case '0': case '1': case '2': case '3': case '4':
 	case '5': case '6': case '7': case '8': case '9':
 	    {
-		PARSE_NUMERIC(oi = 0; key.u.real = f1+res;key.type = T_REAL,
-			      key.type = T_NUMBER; oi = key.u.number = res,
+		PARSE_NUMERIC(key.u.real = f1+res;key.type = T_REAL,
+			      key.type = T_NUMBER; key.u.number = res,
 			      goto key_numeral_error)
 	    }
 	    
@@ -696,10 +681,12 @@ restore_mapping P2(char **,str, svalue_t *, sv)
 
 	/* both key and value are valid, referenced svalues */
 
+	oi = (key.u.number > 0 ? key.u.number : -key.u.number);
 	i = oi & mask;
 	if ((elt2 = elt = a[i])) {
 	    do {
-		if (sameval(&key, elt->values)){
+		/* This should never happen, but don't bail on it */
+		if (msameval(&key, elt->values)) {
 		    free_svalue(&key, "restore_mapping: duplicate key");
 		    free_svalue(elt->values+1, "restore_mapping: replaced value");
 		    *(elt->values+1) = value;
@@ -734,7 +721,6 @@ restore_mapping P2(char **,str, svalue_t *, sv)
 	elt = new_map_node();
 	*elt->values = key;
 	*(elt->values + 1) = value;
-	elt->hashval = oi;
 	(a[i] = elt)->next = elt2;
     }
 
@@ -964,11 +950,7 @@ restore_string P2(char *, val, svalue_t *, sv)
 
     while ((c = *cp++) != '"') {
         switch (c){
-#ifndef MSDOS
 	case '\r':
-#else
-	case 30:
-#endif
             {
                 *(cp-1) = '\n';
                 break;
@@ -984,11 +966,7 @@ restore_string P2(char *, val, svalue_t *, sv)
                             if (!(*new++ = *cp++)) return ROB_STRING_ERROR;
 			}
                         else {
-#ifndef MSDOS
                             if (c == '\r')
-#else
-                            if (c == 30)
-#endif
                                 *new++ = '\n';
                             else *new++ = c;
 			}
@@ -1248,7 +1226,7 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
     int len, i;
     FILE *f;
     int failed = 0;
-    char *use_name, *new_string, *p;
+    char *use_name, *new_str, *p;
     int free_use_name = 0, theSize;
     variable_t *var = ob->prog->variable_names;
     svalue_t *v = ob->variables;
@@ -1277,9 +1255,7 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
     if (!len) len = strlen(file);
     name = DXALLOC(len + strlen(SAVE_EXTENSION) + 1, TAG_TEMPORARY, "save_object: 1");
     (void)strcpy(name, file);
-#ifndef MSDOS
     (void)strcat(name + len, SAVE_EXTENSION);
-#endif
 
     /* we don't use file after this.  It's safe to free it. */
     if (free_use_name)
@@ -1289,10 +1265,12 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
      * they are on different file systems.
      */
     sprintf(tmp_name, "%s.tmp", name);
-#ifdef MSDOS
-    (void)strcat(name, SAVE_EXTENSION);
-#endif
+
+#ifdef WIN32
+    if (!(f = fopen(tmp_name, "wb"))){
+#else
     if (!(f = fopen(tmp_name, "w"))){
+#endif
 	FREE(name);
         error("Could not open /%s for a save.\n", tmp_name);
     }
@@ -1304,20 +1282,20 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
 
 	save_svalue_depth = 0;
 	theSize = svalue_save_size(v);
-	new_string = (char *)DXALLOC(theSize, TAG_TEMPORARY, "save_object: 2");
-	*new_string = '\0';
-	p = new_string;	
+	new_str = (char *)DXALLOC(theSize, TAG_TEMPORARY, "save_object: 2");
+	*new_str = '\0';
+	p = new_str;	
 	save_svalue(v++, &p);
-	if (save_zeros || strcmp(new_string,"0")) /* Armidale */
-	    if (fprintf(f, "%s %s\n", var->name, new_string) == EOF) failed = 1;
-	FREE(new_string);
+	if (save_zeros || strcmp(new_str,"0")) /* Armidale */
+	    if (fprintf(f, "%s %s\n", var->name, new_str) == EOF) failed = 1;
+	FREE(new_str);
 	var++;
     }
     if (failed) 
 	debug_message("Failed to completely save file. Disk could be full.\n");
     else {
 	(void) fclose(f);
-#ifdef OS2
+#ifdef WIN32
         /* Need to erase it to write over it. */
         unlink(name);
 #endif
@@ -1355,15 +1333,15 @@ char *
 save_variable P1(svalue_t *, var)
 {
     int theSize;
-    char *new_string, *p;
+    char *new_str, *p;
     
     save_svalue_depth = 0;
     theSize = svalue_save_size(var);
-    new_string = new_string(theSize - 1, "save_variable");
-    *new_string = '\0';
-    p = new_string;
+    new_str = new_string(theSize - 1, "save_variable");
+    *new_str = '\0';
+    p = new_str;
     save_svalue(var, &p);
-    return new_string;
+    return new_str;
 }
 
 
@@ -1484,7 +1462,7 @@ static void add_long_message P2(object_t *, who, char *, s) {
 }
 
 /*
- * tell_object: Send a message to an object.
+ * tell_object: send a message to an object.
  * If it is an interactive object, it will go to his
  * screen. Otherwise, it will go to a local function
  * catch_tell() in that object. This enables communications
@@ -1607,13 +1585,13 @@ object_t *get_empty_object P1(int, num_var)
 }
 
 #ifndef NO_ADD_ACTION
-static object_t *hashed_living[LIVING_HASH_SIZE];
+static object_t *hashed_living[CFG_LIVING_HASH_SIZE];
 
 static int num_living_names, num_searches = 1, search_length = 1;
 
 static INLINE int hash_living_name P1(char *, str)
 {
-    return whashstr(str, 20) & (LIVING_HASH_SIZE - 1);
+    return whashstr(str, 20) & (CFG_LIVING_HASH_SIZE - 1);
 }
 
 object_t *find_living_object P2(char *, str, int, user)

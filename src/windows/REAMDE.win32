@@ -1,0 +1,47 @@
+		 MudOS for Windows 95 and Windows NT
+	       Port by George Reese (Descartes of Borg)
+
+This port has a few crashers in it.  Known bugs include:
+	* connect() gives an WASEWOULDBLOCK error (*boggle*)
+	  for connecting to the address server or socket efuns
+	* bug in reading DOS files (files with \r\n)
+	  this is probably fixed in v21.6
+	* some bug in call outs 
+	* Right now the proper calls to WSAGetLastError() are not made
+
+This is not a simple compile yet, unfortunately.  Perhaps someone can
+fix the above bugs and simplify the make process?  If so, please mail
+your fixes to beek@imaginary.com.
+
+To compile MudOS for Windows NT/95, you need:
+MS VC++ 2.0 or later (dunno about Borland or other compilers)
+gnu bison and sed, get them from ftp.cc.utexas.edu in the winnt section
+
+Steps:
+0. move the .mak files in this directory to the main source directory
+1. Open up edit_source.mak
+3. Issue the following commands:
+	bison -d -y make_func.y
+	del make_func_tab.c (if it exists)
+	rename y.tab.c make_func_tab.c
+3. Add edit_source.c, hash.c and make_func_tab.c to your source list.
+4. Build edit_source.exe
+5. From the DOS command line, execute the following commands:
+	move WinDebug\edit_source.exe .
+	.\edit_source -configure
+	.\edit_source -process grammar.y.pre
+	.\edit_source -options -malloc -build_func_spec "cl /E"
+	.\edit_source -build_efuns
+	bison -d -y grammar.y
+	del grammar_tab.* (may not exist if this is first time)
+	sed "s/y.tab.c/grammar_tab.c/g" y.tab.c > grammar_tab.c
+	move y.tab.h grammar.tab.h
+/* NOTE: You will note *.tab.c is *_tab.c since VC++ only recognizes
+	C files with one extension */
+6. Open up mudos.mak
+7. Build mudos.exe
+8. Open addr_server.mak
+9. Build addr_server.exe
+10. Install your lib and run mudos
+
+

@@ -1,0 +1,142 @@
+Only in v21.7b2: .nfs952F22
+diff -cr v21.7b2/arch.h v21.7b2.mine/arch.h
+*** v21.7b2/arch.h	Sun Sep 24 22:13:10 1995
+--- v21.7b2.mine/arch.h	Tue Oct 10 02:37:59 1995
+***************
+*** 19,24 ****
+--- 19,28 ----
+  #define ARCH "Sequent DYNIX/ptx"
+  #endif
+  
++ #ifdef __FreeBSD__
++ #define ARCH "FreeBSD"
++ #endif
++ 
+  #ifdef NeXT
+  #ifdef m68k
+  #define ARCH "NeXT/68k"
+Only in v21.7b2.mine: arch.h~
+diff -cr v21.7b2/build.MudOS v21.7b2.mine/build.MudOS
+*** v21.7b2/build.MudOS	Sun Sep 24 22:13:34 1995
+--- v21.7b2.mine/build.MudOS	Tue Oct 10 02:38:40 1995
+***************
+*** 289,295 ****
+  }
+  END
+  $CC $CFLAGS comptest.c
+! ARCH=`a.out`
+  
+  case $ARCH in
+      AIX)
+--- 289,295 ----
+  }
+  END
+  $CC $CFLAGS comptest.c
+! ARCH=`./a.out`
+  
+  case $ARCH in
+      AIX)
+Only in v21.7b2.mine: build.MudOS~
+Only in v21.7b2.mine/testsuite: OBJ_DUMP
+Only in v21.7b2.mine/testsuite: OBJ_DUMP2
+Only in v21.7b2.mine/testsuite: core
+Only in v21.7b2.mine/testsuite: ed_test
+Only in v21.7b2.mine/testsuite/include: tests.h
+Only in v21.7b2.mine/testsuite/log: compile
+Only in v21.7b2.mine/testsuite/single/efuns: add_action.c
+Only in v21.7b2.mine/testsuite/single/efuns: add_light.c
+Only in v21.7b2.mine/testsuite/single/efuns: all_inventory.c
+Only in v21.7b2.mine/testsuite/single/efuns: allocate.c
+Only in v21.7b2.mine/testsuite/single/efuns: allocate_buffer.c
+Only in v21.7b2.mine/testsuite/single/efuns: allocate_mapping.c
+Only in v21.7b2.mine/testsuite/single/efuns: bind.c
+Only in v21.7b2.mine/testsuite/single/efuns: break_string.c
+Only in v21.7b2.mine/testsuite/single/efuns: cache_stats.c
+Only in v21.7b2.mine/testsuite/single/efuns: call_other.c
+Only in v21.7b2.mine/testsuite/single/efuns: call_out.c
+Only in v21.7b2.mine/testsuite/single/efuns: call_stack.c
+Only in v21.7b2.mine/testsuite/single/efuns: children.c
+Only in v21.7b2.mine/testsuite/single/efuns: clear_bit.c
+Only in v21.7b2.mine/testsuite/single/efuns: clone_object.c
+Only in v21.7b2.mine/testsuite/single/efuns: clonep.c
+Only in v21.7b2.mine/testsuite/single/efuns: command.c
+Only in v21.7b2.mine/testsuite/single/efuns: cp.c
+Only in v21.7b2.mine/testsuite/single/efuns: crc32.c
+Only in v21.7b2.mine/testsuite/single/efuns: ctime.c
+Only in v21.7b2.mine/testsuite/single/efuns: deep_inherit_list.c
+Only in v21.7b2.mine/testsuite/single/efuns: deep_inventory.c
+Only in v21.7b2.mine/testsuite/single/efuns: destruct.c
+Only in v21.7b2.mine/testsuite/single/efuns: disable_commands.c
+Only in v21.7b2.mine/testsuite/single/efuns: dumpallobj.c
+Only in v21.7b2.mine/testsuite/single/efuns: ed.c
+Only in v21.7b2.mine/testsuite/single/efuns: enable_wizard.c
+Only in v21.7b2.mine/testsuite/single/efuns: environment.c
+Only in v21.7b2.mine/testsuite/single/efuns: error.c
+Only in v21.7b2.mine/testsuite/single/efuns: exec.c
+Only in v21.7b2.mine/testsuite/single/efuns: explode.c
+Only in v21.7b2.mine/testsuite/single/efuns: file_name.c
+Only in v21.7b2.mine/testsuite/single/efuns: file_size.c
+Only in v21.7b2.mine/testsuite/single/efuns: filter.c
+Only in v21.7b2.mine/testsuite/single/efuns: find_call_out.c
+Only in v21.7b2.mine/testsuite/single/efuns: find_living.c
+Only in v21.7b2.mine/testsuite/single/efuns: find_object.c
+Only in v21.7b2.mine/testsuite/single/efuns: find_player.c
+Only in v21.7b2.mine/testsuite/single/efuns: function_exists.c
+Only in v21.7b2.mine/testsuite/single/efuns: function_profile.c
+Only in v21.7b2.mine/testsuite/single/efuns: functionp.c
+Only in v21.7b2.mine/testsuite/single/efuns: generate_source.c
+Only in v21.7b2.mine/testsuite/single/efuns: get_char.c
+Only in v21.7b2.mine/testsuite/single/efuns: get_config.c
+Only in v21.7b2.mine/testsuite/single/efuns: get_dir.c
+Only in v21.7b2.mine/testsuite/single/efuns: has_errors.c
+Only in v21.7b2.mine/testsuite/single/efuns: implode.c
+Only in v21.7b2.mine/testsuite/single/efuns: in_edit.c
+Only in v21.7b2.mine/testsuite/single/efuns: inh0.c
+Only in v21.7b2.mine/testsuite/single/efuns: inh1.c
+Only in v21.7b2.mine/testsuite/single/efuns: inh2.c
+Only in v21.7b2.mine/testsuite/single/efuns: inherit_list.c
+Only in v21.7b2.mine/testsuite/single/efuns: inherits.c
+Only in v21.7b2.mine/testsuite/single/efuns: input_to.c
+Only in v21.7b2.mine/testsuite/single/efuns: interactive.c
+Only in v21.7b2.mine/testsuite/single/efuns: intp.c
+Only in v21.7b2.mine/testsuite/single/efuns: keys.c
+Only in v21.7b2.mine/testsuite/single/efuns: living.c
+Only in v21.7b2.mine/testsuite/single/efuns: livings.c
+Only in v21.7b2.mine/testsuite/single/efuns: lower_case.c
+Only in v21.7b2.mine/testsuite/single/efuns: malloc_status.c
+Only in v21.7b2.mine/testsuite/single/efuns: map.c
+Only in v21.7b2.mine/testsuite/single/efuns: map_delete.c
+Only in v21.7b2.mine/testsuite/single/efuns: mapp.c
+Only in v21.7b2.mine/testsuite/single/efuns: master.c
+Only in v21.7b2.mine/testsuite/single/efuns: match_path.c
+Only in v21.7b2.mine/testsuite/single/efuns: member_array.c
+Only in v21.7b2.mine/testsuite/single/efuns: message.c
+Only in v21.7b2.mine/testsuite/single/efuns: mkdir.c
+Only in v21.7b2.mine/testsuite/single/efuns: move_object.c
+Only in v21.7b2.mine/testsuite/single/efuns: mud_status.c
+Only in v21.7b2.mine/testsuite/single/efuns: notify_fail.c
+Only in v21.7b2.mine/testsuite/single/efuns: nullp.c
+Only in v21.7b2.mine/testsuite/single/efuns: objectp.c
+Only in v21.7b2.mine/testsuite/single/efuns: opcprof.c
+Only in v21.7b2.mine/testsuite/single/efuns: origin.c
+Only in v21.7b2.mine/testsuite/single/efuns: pointerp.c
+Only in v21.7b2.mine/testsuite/single/efuns: present.c
+Only in v21.7b2.mine/testsuite/single/efuns: previous_object.c
+Only in v21.7b2.mine/testsuite/single/efuns: printf.c
+Only in v21.7b2.mine/testsuite/single/efuns: query_ed_mode.c
+Only in v21.7b2.mine/testsuite/single/efuns: query_idle.c
+Only in v21.7b2.mine/testsuite/single/efuns: query_ip_name.c
+Only in v21.7b2.mine/testsuite/single/efuns: query_ip_number.c
+Only in v21.7b2.mine/testsuite/single/efuns: query_load_average.c
+Only in v21.7b2.mine/testsuite/single/efuns: query_privs.c
+Only in v21.7b2.mine/testsuite/single/efuns: query_snoop.c
+Only in v21.7b2.mine/testsuite/single/efuns: query_snooping.c
+Only in v21.7b2.mine/testsuite/single/efuns: query_verb.c
+Only in v21.7b2.mine/testsuite/single/efuns: random.c
+Only in v21.7b2.mine/testsuite/single/efuns: set_debug_level.c
+Only in v21.7b2.mine/testsuite/single/efuns: unloaded.c
+Only in v21.7b2.mine/testsuite/single/efuns: users.c
+Only in v21.7b2.mine/testsuite/single/efuns: values.c
+Only in v21.7b2.mine/testsuite: test_file
+Only in v21.7b2.mine/testsuite: testfile
+Only in v21.7b2.mine/testsuite: tmp_eval_file.c

@@ -1,4 +1,222 @@
 ----------------------------------------------------------------------------
+v21.7a10 promoted to v21.7b1
+
+Fri Sep 22 22:51:20 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.7a10
+	* fixed a bug that caused case 0: to not work in string switches
+	* fixed a typo in the unknown pragma error message
+	* rule priority is now calculated beforehand in the parser; this
+	  fixes the precedence of some errors and allows earlier shortcutting
+	* 1st through 9th and first through ninth are now understood by the
+	  parser
+	* "Which X do you mean?" is now more verbose
+	* 'myself' is now the same as 'me'
+
+Mon Sep 11 03:37:53 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.7a9
+	* fixed debug_info(2, ...) to put all the info in the string;
+	  it was still sending some of it directly to this_user()
+	* slight optimization (condense two consecutive strlen() calls)
+	  in regular expressions
+	* -DPEDANTIC now allows the use of inline to be turned off, since
+	  gcc only defines __STRICT_ANSI__ when -ansi is used, and not
+	  when -pedantic is used, but -pedantic complains loudly about inline,
+	  and -ansi causes the SGI headers to break.  Unfortunately, gcc
+	  only gives some useful warnings when -pedantic is on
+	* fixed up some (unsigned char *) <-> (char *) problems
+	* fixed an optimizer bug that would clobber range expressions and
+	  generate incorrect code
+	* Added documentation of makefile targets to the makefiles
+	* Added a .DEFAULT rule for the decoy makefiles so better errors
+	  are generated when the wrong make is used with a target
+	* Made the SIGPIPE always reenable the handler, not just on Linux,
+	  since other OS's (Solaris) behave this way as well
+	* Fixed the gettimeofday() check to use two args, so it wouldn't
+	  fail on BSD based systems
+	* fixed a compile error in OPTIMIZE_FUNCTION_TABLE_SEARCH
+	* added a handler to ignore SIGFPE for those systems that raise it
+	* changed "create" to APPLY_CREATE in replaceable()
+	* fixed a parser crasher when parse_command_users() doesn't exist
+	* removed a if (pointer >= 0) check in the parser
+	* fixed a crasher in the 'last match to error' handling in the parser
+	* fixed a crasher in parse_command() when the object array had
+	  non-objects in it
+	* fixed some NO_ENVIRONMENT compilation problems, especially when
+	  NO_ADD_ACTION was NOT also defined.  (add_action w/o environments
+	  is a tad pointless, but it works now)
+	* fixed a bug that cause query_verb() to only return the matched
+	  portion and not the entire verb
+	* fixed (s)printf() to not print destructed objects
+
+Fri Sep  8 03:34:50 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.7a8
+	* updated match_path() to know about the mapping changes
+	* preliminary OBS changes; OBS and LVS are recognized as tokens now;
+	  currently they behave exactly the same as OBJ and LIV
+	* fixed a few uses of new_string as a variable name
+	* fixed a parser in generating arguments for parser callbacks
+
+Sun Sep  3 21:47:54 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.7a7
+	* cleaned up -Wall compile
+	* better code to check the string statistics, leading to:
+	* fixed the string stats bug(s); the figure should be correct again now
+	* improved the error message for "owner of function pointer destructed"
+	* removed the storing of the hash value in mapping nodes; mapping
+	  memory usage should be down ~20%; also optimized a bit, so
+	  most mapping operations should be faster
+	* crasher fix in %o case of parse_command()
+
+Wed Aug 30 19:36:35 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.7a6
+	* crasher fix in edit_source -configure from Valodin
+	* moved the CONFIGURE_VERSION define to the end of configure.h so
+	  incomplete configure.h files are detected as corrupt
+	* removed the each() efun
+	* crasher fix in the optimizer (no local variables again)
+	* updated the tag info in check_memory(1)
+	* fixed check_memory() to not accidentally complain about the string
+	  it is building
+	* fixed a bug in the mark and sweep memory debugging of the parser
+	* fixed a crasher in verb handlers that call parse_refresh()
+	* fixed a memory leak in objects that call parse_refresh()
+	* remember to add the real names when calling can_* callbacks
+	* fixed a bug that would cause parser error messages to be truncated
+	* fixed a memory leak in incoming MUD mode socket packets
+	* added a bunch of bug reports to Bugs
+	* fixed a line number bug in '\<line break>'
+	* fixed @@ to work again, evidentally noone has used in in over a
+	  year since it hasn't worked since Robocoder added L_ARRAY_OPEN ...
+	* fixed odd errors if the end of the input buffer is hit while
+	  parsing a macro expansion; found by Tensor
+	* fixed a line number bug in macro arguments with newlines in them
+
+Tue Aug 29 17:11:06 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.7a5
+	* updated with respect to v21.6b6
+	* Merged in Descartes' diffs for Windows NT and Windows 95.  Someone
+	  please check these; I fixed/changed a bunch of things, but have no
+	  way of testing them, and there are probably some mistakes.
+	* removed the old OS2 code, since noone ever got it to work ...
+	* added support for foreach (int in string)
+	* fixed a fatal error when a string > 64k in size was added to an
+	  outbuffer.
+	* changed sprintf() to use outbuffers, speeding up sprintf a bit,
+	  and expanding the size limit to 64k
+	* fixed type error for sizeof(array constant)
+	* it's now legal for an ed range to go past the end of the file;
+	  any line # greater than the file size refers to the last line.
+	* fixed a bug that caused varargs contraction to not be done when
+	  the call_other cache was hit, or when one does inh::foo()
+
+Sat Aug 26 19:37:38 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.7a4
+	* reorganized the function_t struct slightly to save a bit of memory
+	* added a warning for return types that don't match their prototypes;
+	  currently ignores modifiers, since accepted usage is so gross in
+	  this respect it isn't even funny.  The next item might help:
+	* added "private:" which makes all function definitions/globals after
+	  it private (until the next such section).  Works with any type
+	  modifier (static, private, protected, public, nomask, varargs)
+	* optimization fix: remember to put the replacement node in the tree
+	  when doing: if (x) {} else y -> if (!x) y
+	* catch, time_expression, and __TREE__ now generate explicit code
+	  to pop the value instead of doing it inside F_END_CATCH.  This
+	  makes the grammar a bit simpler, and generates better code for
+	  catch { ... } and catch(x = ...), which are common cases
+	* fixed sizeof( ({ ... }) ) to preserve side effects inside the
+	  array constant, for crappy code like sizeof( ({ i++ }) ),
+	  which now compiles to: i++, 1
+	* changed edit_source to include configuration info when doing tests,
+	  so we can check for defines in include files
+	* run ranlib on the mudlib/ and packages/ files for systems that need/
+	  like it.
+	* added a WRD token in the parser, which is just like a STR but only
+	  matches one WoRD.
+	* fixed a bug that chopped a letter off the results returned by STR
+	  rules
+	* xxx_verb_yyy() callbacks now include the name of the verb in the
+	  'real names' part of the argument list, so for example "kick! beek"
+	  would call (among other things):
+	  can_verb_obj("kick", OBJ(beek), "kick!", "beek")
+	  This should satisfy the people who have been mailbombing me asking
+	  for a way to get at the real form of the verb :)
+	* fixed a few warnings in the parser
+	* When the return value of a construct is unused, and the construct
+	  has no side effects, replace it by it's arguments (recursively)
+	  possibly eliminating the construct entirely.
+	  i.e. the following generates no code:
+	
+	int x; class bar y; array z;
+	((({ ~x })[!x..<x+3] ? (y->foo)[(x*2)-1..] : ([1:2, 3:x])), -z[x]);
+
+Thu Aug 24 06:58:46 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.7a3
+	* configuration checks for broken libg.a Linux configurations,
+	  <dlfcn.h>, -ldl, RTLD_LAZY
+	* try cc -E -traditional-cpp as a possible preprocessor in build.MudOS
+	* Use ANSI USHRT_MAX instead of MAXSHORT if availiable
+	* reworked the handling of novalue efuns to be more robust; fixed
+	  crashers in (void efun) || (void efun) among other things.
+	* Patches from Symmetry:
+	  . made Config.Example match the testsuite setup
+	  . fixed mapping case in dump_variable() for testsuite
+	  . bugfix in resolve_path() in testsuite
+	  . allow (: function() { return $1; } :)
+	  . optimize x[y..<1] to x[y..]
+	  . optimize dested obs in F_TRANSFER_LOCAL
+	  . crasher fix for swapped objects in program_info()
+	  . fixed disassembly of efun function pointers
+
+Mon Aug 21 03:58:32 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.7a2
+	* fixes from Symmetry for #undef RUNTIME_LOADING
+	* added Zakk's query_ip_port() contrib efun for finding out which
+	  port an object connected to
+	* fixed a parser bug that would sometimes cause objects to fail
+	  to be recognized the first time they were referenced.  Many, many
+	  thanks to Deathblade for helping to track down this one
+	* Added filenames to the parser error messages
+	* improved the handling of punctuation; verbs do NOT include
+	  punctuation again, although this may change; stay tuned ...
+
+Thu Aug  3 20:25:27 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* created v21.7a1 from v21.6b3
+	* valid_compile_to_c() in the master object now controls the use
+	  of the generate_source efun.
+	* RUNTIME_LOADING works if your system supports dlopen()/dlsym();
+	  define it in options.h, then use generate_source(filename)
+	  to load the object.  Note that /lpc2c in the mudlib must be
+	  a symbolic link to the driver source.  Objects loaded in this
+	  manner do not show up on lpc_info() [yet]
+	* The restriction which disallowed cloning of objects with
+	  environments was removed
+	* destruct()'ing the master or simul_efun object now fails if a new
+	  copy can't be loaded.  This means that once the mud starts, a
+	  master or simul_object is ALWAYS loaded.
+	* preliminary changes for disallowing calls to private functions;
+	  you can still get past it in odd cases (e.g. calling the function
+	  before you inherit it)  More changes in a patchlevel or two.
+	* fixed a bug that caused // and /* to be interpreted as comments
+	  within continuation lines in #define's
+	* fixed the F_WHILE_DEC optimization, and added support for it
+	  in loops of the form 'for (...; x--; ...) { ... }'.  Centralized
+	  the handling of loop test optimization.
+	* optimize empty blocks for if's
+	* removed some mentions of 'actlab' in the docs
+	* added some new exit codes to the Exit_Codes doc
+	* added NO_ENVIRONMENT in options.h
+	* fixed the disassembly of F_LOOP_COND_NUMBER
+	* fixed a crasher/wierd behavior in using 'array' to declare arrays
+	* fixed a bug that made using a (blank) simul_efun object necessary
+	* added DEBUGMALLOC support for the parsing package
+	* added support for classes in copy()
+	* fixed a bug that chopped the last letter off of some
+	  parser error messages
+	* updated the testsuite lib to run under the default driver 
+	  configuration
+
+----------------------------------------------------------------------------
 (v21.6a11 promoted to v21.6b1)
 
 Tue Jul 18 02:23:22 EDT 1995 (tim@handel.princeton.edu (Beek))

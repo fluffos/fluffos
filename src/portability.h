@@ -33,9 +33,18 @@
 #  endif
 #endif
 
-/* evidentally, gcc on OS/2 defines virtually nothing of use? */
-#ifdef __EMX__
-#  define OS2
+#if defined(WINNT) || defined(WIN95)
+#  ifndef WIN32
+#    define WIN32
+     typedef char * caddr_t;
+#  endif
+#endif
+
+#ifdef WIN32
+#  define WINSOCK
+#  ifdef sun
+#    undef sun
+#  endif
 #endif
 
 #if defined(SunOS_5) && !defined(SVR4)
@@ -158,24 +167,30 @@ asking your system adminstrator.
 /* otherwise make_func will break */
 #ifndef _FUNC_SPEC_
 /* these should be obtained from .h files when Linux .h structure stabilizes */
-#if defined(linux) || defined(_M_UNIX)
+#  if defined(linux) || defined(_M_UNIX)
 /* This has FD_SETSIZE on some Linux's (Linuces?) */
-#include <sys/time.h>
-#ifndef SOMAXCONN
-#define SOMAXCONN 5
-#endif
-#ifndef FD_SETSIZE
-#define FD_SETSIZE 256
-#endif
-#endif
+#    include <sys/time.h>
+/* This has SOMAXCONN on newer Linux */
+#    include <sys/socket.h>
+#    ifndef SOMAXCONN
+#      define SOMAXCONN 5
+#    endif
+#    ifndef FD_SETSIZE
+#      define FD_SETSIZE 256
+#    endif
+#  endif
 #endif
 
 #if defined(cray) && !defined(MAXPATHLEN)
-#define MAXPATHLEN PATH_MAX
+#  define MAXPATHLEN PATH_MAX
+#endif
+
+#if defined(WIN32) && !defined(MAXPATHLEN)
+#  define MAXPATHLEN 512
 #endif
 
 #if defined(_M_UNIX) && !defined(MAXPATHLEN)
-#define MAXPATHLEN 1024
+#  define MAXPATHLEN 1024
 #endif
 
 /*

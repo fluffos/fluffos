@@ -10,6 +10,7 @@
 #include "strstr.h"
 #include "file.h"
 #include "lex.h"
+#include "md.h"
 
 /* Removed due to hideousness: if you want to add it back, not that
  * we don't want redefinitions, and that some systems define major() in
@@ -31,10 +32,11 @@
 #endif
 #endif
 
-#ifdef OS2
-#define INCL_DOSFILEMGR
-#include <os2.h>
-#define FILE_ATTRS (FILE_DIRECTORY|FILE_ARCHIVED|FILE_READONLY)
+/* see binaries.c.  We don't want no $@$(*)@# system dependent mess of
+   includes */
+#ifdef WIN32
+#include <direct.h>
+#include <io.h>
 #endif
 
 extern int errno;
@@ -44,7 +46,6 @@ int legal_path PROT((char *));
 
 static int match_string PROT((char *, char *));
 static int isdir PROT((char *path));
-static void strip_trailing_slashes PROT((char *path));
 static int copy PROT((char *from, char *to));
 static int do_move PROT((char *from, char *to, int flag));
 static int pstrcmp PROT((svalue_t *, svalue_t *));
@@ -110,19 +111,24 @@ static void encode_stat P4(svalue_t *, vp, int, flags, char *, str, struct stat 
  *    size of file,
  *    last update of file.
  */
+/* WIN32 should be fixed to do this correctly (i.e. no ifdefs for it) */
 #define MAX_FNAME_SIZE 255
 #define MAX_PATH_LEN   1024
 array_t *get_dir P2(char *, path, int, flags)
 {
     array_t *v;
     int i, count = 0;
+#ifndef WIN32
     DIR *dirp;
+#endif
     int namelen, do_match = 0;
 
+#ifndef WIN32
 #ifdef USE_STRUCT_DIRENT
     struct dirent *de;
 #else
     struct direct *de;
+#endif
 #endif
     struct stat st;
     char *endtemp;
@@ -130,10 +136,9 @@ array_t *get_dir P2(char *, path, int, flags)
     char regexppath[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
     char *p;
 
-#ifdef OS2
-    FILEFINDBUF3 FindBuffer;
+#ifdef WIN32
+    struct _finddata_t FindBuffer;
     long FileHandle, FileCount;
-
 #endif
 
     if (!path)
@@ -159,7 +164,7 @@ array_t *get_dir P2(char *, path, int, flags)
 	/*
 	 * If path ends with '/' or "/." remove it
 	 */
-#ifdef OS2
+#ifdef WIN32
 	if ((p = strrchr(temppath, '\\')) == 0)
 	    p = temppath;
 	if (p[0] == '\\' && ((p[1] == '.' && p[2] == '\0') || p[1] == '\0'))
@@ -186,7 +191,7 @@ array_t *get_dir P2(char *, path, int, flags)
 #endif
 	}
 	do_match = 1;
-#ifdef OS2
+#ifdef WIN32
     } else if (*p != '\0' && strcmp(temppath, ".")) {
 	if (*p == '\\' && *(p + 1) != '\0')
 #else
@@ -201,14 +206,11 @@ array_t *get_dir P2(char *, path, int, flags)
 /*#ifdef LATTICE
 	if (temppath[0]=='.') temppath[0]=0;
 #endif*/
-#ifdef OS2
-    FileHandle = 1;
+#ifdef WIN32
+    FileHandle = -1;
     FileCount = 1;
     strcat(temppath, "\\*");
-    if (DosFindFirst(temppath, &FileHandle, FILE_ATTRS, (PVOID) & FindBuffer, sizeof(FindBuffer),
-		     &FileCount, FIL_STANDARD)) {
-	return 0;
-    }				/* endif */
+    if ((FileHandle = _findfirst(temppath, &FindBuffer)) == -1) return 0;
 #else
     if ((dirp = opendir(temppath)) == 0)
 	return 0;
@@ -217,22 +219,22 @@ array_t *get_dir P2(char *, path, int, flags)
     /*
      * Count files
      */
-#ifdef OS2
+#ifdef WIN32
     do {
-	if (!do_match && (!strcmp(FindBuffer.achName, ".") ||
-			  !strcmp(FindBuffer.achName, ".."))) {
+	if (!do_match && (!strcmp(FindBuffer.name, ".") ||
+			  !strcmp(FindBuffer.name, ".."))) {
 	    continue;
 	}
-	if (do_match && !match_string(regexppath, FindBuffer.achName)) {
+	if (do_match && !match_string(regexppath, FindBuffer.name)) {
 	    continue;
 	}
 	count++;
-	if (count >= max_array_size)
+	if (count >= max_array_size) {
 	    break;
-    } while (!DosFindNext(FileHandle, (PVOID) & FindBuffer, sizeof(FindBuffer), &FileCount));
-
-    DosFindClose(FileHandle);
-#else				/* OS2 */
+	}
+    } while (!_findnext(FileHandle, &FindBuffer));
+    _findclose(FileHandle);
+#else
     for (de = readdir(dirp); de; de = readdir(dirp)) {
 #ifdef USE_STRUCT_DIRENT
 	namelen = strlen(de->d_name);
@@ -256,38 +258,31 @@ array_t *get_dir P2(char *, path, int, flags)
     v = allocate_empty_array(count);
     if (count == 0) {
 	/* This is the easy case :-) */
-#ifndef OS2
+#ifndef WIN32
 	closedir(dirp);
 #endif
 	return v;
     }
-#ifdef OS2
-    FileHandle = FileCount = 1;
-    if (DosFindFirst(temppath, &FileHandle, FILE_ATTRS, (PVOID) & FindBuffer, sizeof(FindBuffer),
-		     &FileCount, FIL_STANDARD)) {
-	return 0;
-    }				/* endif */
-    endtemp = temppath + strlen(temppath) - 2;	/* The \* needed for the dir
-						 * searching */
-    *endtemp = 0;		/* Make it zero terminated */
+#ifdef WIN32
+    FileHandle = -1;
+    if ((FileHandle = _findfirst(temppath, &FindBuffer)) == -1) return 0;
+    endtemp = temppath + strlen(tmppath) - 2;
+    *endtemp = 0;
     strcat(endtemp++, "\\");
     i = 0;
     do {
-	if (!do_match && (!strcmp(FindBuffer.achName, ".") ||
-			  !strcmp(FindBuffer.achName, ".."))) {
-	    continue;
-	}
-	if (do_match && !match_string(regexp, FindBuffer.achName)) {
-	    continue;
-	}
+	if (!do_match && (!strcmp(FindBuffer.name, ".") ||
+			  !strcmp(FindBuffer.name, ".."))) continue;
+	if (do_match && !match_string(regexppath, FindBuffer.name)) continue;
 	if (flags == -1) {
-	    strcpy(endtemp, FindBuffer.achName);
+	    strcpy(endtemp, FindBuffer.name);
 	    stat(temppath, &st);
 	}
-	encode_stat(&v->item[i], flags, FindBuffer.achName, &st);
+	encode_stat(&v->item[i], flags, FindBuffer.name, &st);
 	i++;
-    } while (!DosFindNext(FileHandle, (PVOID) & FindBuffer, sizeof(FindBuffer), &FileCount));
-#else				/* OS2 */
+    } while (!_findnext(FileHandle, &FindBuffer));
+    _findclose(FileHandle);
+#else				/* WIN32 */
     rewinddir(dirp);
     endtemp = temppath + strlen(temppath);
 
@@ -388,7 +383,7 @@ int legal_path P1(char *, path)
 {
     char *p;
 
-    if (path == NULL || strchr(path, ' '))
+    if (path == NULL)
 	return 0;
     if (path[0] == '/')
 	return 0;
@@ -399,10 +394,6 @@ int legal_path P1(char *, path)
     if (strchr(path, '#')) {
 	return 0;
     }
-#ifdef MSDOS
-    if (!valid_msdos(path))
-	return (0);
-#endif
     p = path;
     while (p) {			/* Zak, 930530 - do better checking */
 	if (p[0] == '.') {
@@ -417,7 +408,7 @@ int legal_path P1(char *, path)
 	if (p)
 	    p++;		/* step over `/' */
     }
-#if defined(AMIGA) || defined(LATTICE) || defined(OS2)
+#if defined(AMIGA) || defined(LATTICE) || defined(WIN32)
     /*
      * I don't know what the proper define should be, just leaving an
      * appropriate place for the right stuff to happen here - Wayfarer
@@ -486,10 +477,21 @@ int write_file P3(char *, file, char *, str, int, flags)
 {
     FILE *f;
 
+#ifdef WIN32
+    char fmode[3];
+#endif
+
     file = check_valid_path(file, current_object, "write_file", 1);
     if (!file)
 	return 0;
+#ifdef WIN32
+    fmode[0] = (flags & 1) ? 'w' : 'a';
+    fmode[1] = 'b';
+    fmode[2] = '\0';
+    f = fopen(file, fmode);
+#else    
     f = fopen(file, (flags & 1) ? "w" : "a");
+#endif
     if (f == 0) {
 	error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n",
 	      file, (flags & 1) ? "overwrite" : "append", strerror(errno));
@@ -545,12 +547,7 @@ char *read_file P3(char *, file, int, start, int, len)
     str = new_string(size, "read_file: str");
     str[size] = '\0';
     do {
-#ifdef OS2
-	/* It does \n mangleing.  Sigh.... */
-	if (((st.st_size = fread(str, 1, size, f)) <= 0) || !size) {
-#else
 	if ((fread(str, size, 1, f) != 1) || !size) {
-#endif
 	    fclose(f);
 	    FREE_MSTR(str);
 	    return 0;
@@ -771,7 +768,7 @@ char *check_valid_path P4(char *, path, object_t *, call_object, char *, call_fu
 	path = ".";
 #endif
     if (legal_path(path)) {
-#ifdef OS2
+#ifdef WIN32
 	static char paths[10][100];
 	char *fluff;
 	static int bing = 0;
@@ -860,15 +857,6 @@ static int isdir P1(char *, path)
     return stat(path, &stats) == 0 && S_ISDIR(stats.st_mode);
 }
 
-static void strip_trailing_slashes P1(char *, path)
-{
-    int last;
-
-    last = strlen(path) - 1;
-    while (last > 0 && path[last] == '/')
-	path[last--] = '\0';
-}
-
 static struct stat to_stats, from_stats;
 
 static int copy P2(char *, from, char *, to)
@@ -952,11 +940,11 @@ static int do_move P3(char *, from, char *, to, int, flag)
 	return 1;
     }
     if (lstat(to, &to_stats) == 0) {
-#ifndef MSDOS
+#ifdef WIN32
+	if (!strcmp(from, to))
+#else
 	if (from_stats.st_dev == to_stats.st_dev
 	    && from_stats.st_ino == to_stats.st_ino)
-#else
-	if (same_file(from, to))
 #endif
 	{
 	    error("`/%s' and `/%s' are the same file", from, to);
@@ -966,6 +954,9 @@ static int do_move P3(char *, from, char *, to, int, flag)
 	    error("/%s: cannot overwrite directory", to);
 	    return 1;
 	}
+#ifdef WIN32
+	unlink(to);
+#endif
     } else if (errno != ENOENT) {
 	error("/%s: unknown error\n", to);
 	return 1;
@@ -981,8 +972,14 @@ static int do_move P3(char *, from, char *, to, int, flag)
     if ((flag == F_RENAME) && (rename(from, to) == 0))
 	return 0;
 #ifdef F_LINK
-    else if ((flag == F_LINK) && (link(from, to) == 0))	/* hard link */
-	return 0;
+    else if (flag == F_LINK) {
+#ifdef WIN32
+	error("link() not supported.\n");
+#else
+	if (link(from, to) == 0)
+	    return 0;
+#endif
+    }
 #endif
 
     if (errno != EXDEV) {
@@ -1028,7 +1025,9 @@ void debug_perror P2(char *, what, char *, file) {
 int do_rename P3(char *, fr, char *, t, int, flag)
 {
     char *from, *to, tbuf[3];
-
+    char newfrom[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
+    int flen;
+    
     /*
      * important that the same write access checks are done for link() as are
      * done for rename().  Otherwise all kinds of security problems would
@@ -1047,7 +1046,21 @@ int do_rename P3(char *, fr, char *, t, int, flag)
 	to = tbuf;
 	sprintf(to, "./");
     }
-    strip_trailing_slashes(from);
+
+    /* Strip trailing slashes */
+    flen = strlen(from);
+    if (flen > 1 && from[flen - 1] == '/') {
+	char *p = from + flen - 2;
+	int n;
+	
+	while (*p == '/' && (p > from))
+	    p--;
+	n = p - from + 1;
+	memcpy(newfrom, from, n);
+	newfrom[n] = 0;
+	from = newfrom;
+    }
+
     if (isdir(to)) {
 	/* Target is a directory; build full target filename. */
 	char *cp;
@@ -1142,7 +1155,7 @@ void dump_file_descriptors P1(outbuffer_t *, out)
 	if (fstat(i, &stbuf) == -1)
 	    continue;
 
-#if !defined(LATTICE) && !defined(OS2)
+#if !defined(LATTICE) && !defined(WIN32)
 	if (S_ISCHR(stbuf.st_mode) || S_ISBLK(stbuf.st_mode))
 	    dev = stbuf.st_rdev;
 	else
@@ -1150,13 +1163,7 @@ void dump_file_descriptors P1(outbuffer_t *, out)
 	    dev = stbuf.st_dev;
 
 	outbuf_addv(out, "%2d", i);
-/* #if !defined(LATTICE) && !defined(OS2) */
-#if 0
-	outbuf_addv(out, "%6x", major(dev));
-	outbuf_addv(out, "%7x", minor(dev));
-#else
 	outbuf_addv(out, "%13x", dev);
-#endif
 	outbuf_addv(out, "%9d", stbuf.st_ino);
 	outbuf_add(out, "  ");
 

@@ -3,6 +3,7 @@
 #include "otable.h"
 #include "comm.h"
 #include "hash.h"
+#include "simul_efun.h"
 
 /*
  * Object name hash table.  Object names are unique, so no special
@@ -85,6 +86,9 @@ static object_t *find_obj_n P1(char *, s)
 
 /*
  * Add an object to the table - can't have duplicate names.
+ * 
+ * Exception: Precompiled objects have a dummy entry here, but it is
+ * guaranteed to be behind the real entry if a real entry exists.
  */
 
 static int objs_in_table = 0;
@@ -95,6 +99,9 @@ void enter_object_hash P1(object_t *, ob)
 
     s = find_obj_n(ob->name); /* This sets h */
 
+#ifdef DEBUG
+    /* when these reload, the new copy comes in before the old goes out */
+    if (s != master_ob && s != simul_efun_ob) {
 #ifdef LPC_TO_C
     DEBUG_CHECK1(s && s != ob && (!(s->flags & O_COMPILED_PROGRAM)),
 		 "Duplicate object \"/%s\" in object hash table",
@@ -104,9 +111,31 @@ void enter_object_hash P1(object_t *, ob)
 		 "Duplicate object \"/%s\" in object hash table",
 		 ob->name);
 #endif
+    }
+#endif
 
     ob->next_hash = obj_table[h];
     obj_table[h] = ob;
+    objs_in_table++;
+    return;
+}
+
+/* for adding a precompiled entry (dynamic loading) since it is possible
+ * that the real object exists.
+ */ 
+void enter_object_hash_at_end P1(object_t *, ob)
+{
+    object_t *s;
+    object_t **op;
+    
+    s = find_obj_n(ob->name); /* This sets h */
+
+    ob->next_hash = 0;
+
+    op = &obj_table[h];
+    while (*op)
+	op = &((*op)->next_hash);
+    *op = ob;
     objs_in_table++;
     return;
 }
@@ -130,6 +159,26 @@ void remove_object_hash P1(object_t *, ob)
     objs_in_table--;
     return;
 }
+
+#ifdef LPC_TO_C
+void remove_precompiled_hashes P1(char *, name) {
+    int h = ObjHash(name);
+    object_t **p;
+    object_t *curr;
+    
+    p = &obj_table[h];
+    
+    while (*p) {
+	if (((*p)->flags & O_COMPILED_PROGRAM) && !strcmp((*p)->name, name)) {
+	    curr = *p;
+	    FREE(curr->name);
+	    FREE(curr);
+	    (*p) = (*p)->next_hash;
+	} else
+	    p = &((*p)->next_hash);
+    }
+}
+#endif
 
 /*
  * Lookup an object in the hash table; if it isn't there, return null.

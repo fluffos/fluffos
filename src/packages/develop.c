@@ -2,10 +2,12 @@
 #include "/lpc_incl.h"
 #include "/comm.h"
 #include "/md.h"
+#include "/sprintf.h"
 #else
 #include "../lpc_incl.h"
 #include "../comm.h"
 #include "../md.h"
+#include "../sprintf.h"
 #endif
 
 static object_t *ob;
@@ -104,7 +106,7 @@ f_debug_info PROT((void))
 	    ob = arg[1].u.ob;
 	    for (i=0; i<ob->prog->num_variables; i++) {
 		outbuf_addv(&out, "%s: ", ob->prog->variable_names[i].name);
-		print_svalue(&ob->variables[i]);
+		svalue_to_string(&ob->variables[i], &out, 2, 0, 0);
 		outbuf_add(&out, "\n");
 	    }
 	    break;

@@ -7,8 +7,20 @@
 #define ARCH "Sequent DYNIX"
 #endif
 
+#ifdef WINNT
+#define ARCH "Microsoft Windows NT"
+#endif
+
+#ifdef WIN95
+#define ARCH "Microsoft Windows 95"
+#endif
+
 #ifdef _SEQUENT_
 #define ARCH "Sequent DYNIX/ptx"
+#endif
+
+#ifdef __FreeBSD__
+#define ARCH "FreeBSD"
 #endif
 
 #ifdef NeXT
@@ -51,7 +63,11 @@
 #define ARCH "A/UX"
 #endif
 #ifdef linux
-#define ARCH "Linux"
+#  ifdef __mc68000
+#    define ARCH "Linux/m68k"
+#  else
+#    define ARCH "Linux"
+#  endif
 #endif
 #ifdef hp68k
 #define ARCH "HP/68k"

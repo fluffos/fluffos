@@ -92,6 +92,7 @@ static unsigned short crctab[256] =
 /*     hardware you could probably optimize the shift in assembler by  */
 /*     using byte-swap instructions.                                   */
 
+#ifdef NEED_CRC_TABLE
 static long cr3tab[] =
 {				/* CRC polynomial 0xedb88320 */
     0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
@@ -159,6 +160,7 @@ static long cr3tab[] =
     0xb3667a2e, 0xc4614ab8, 0x5d681b02, 0x2a6f2b94, 0xb40bbe37, 0xc30c8ea1,
     0x5a05df1b, 0x2d02ef8d
 };
+#endif
 
 #ifdef NFGM
 long UPDC32(b, c)

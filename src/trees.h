@@ -16,7 +16,7 @@ enum node_type {
     NODE_SWITCH_DIRECT, NODE_SWITCH_NUMBERS, NODE_CASE_NUMBER,
     NODE_CASE_STRING, NODE_DEFAULT, NODE_IF, NODE_BRANCH_LINK, NODE_PARAMETER,
     NODE_PARAMETER_LVALUE, NODE_EFUN, NODE_ANON_FUNC, NODE_REAL, NODE_NUMBER,
-    NODE_STRING, NODE_FUNCTION_CONSTRUCTOR, NODE_CATCH
+    NODE_STRING, NODE_FUNCTION_CONSTRUCTOR, NODE_CATCH, NODE_TIME_EXPRESSION
 };
 
 enum control_jump_type {
@@ -229,6 +229,13 @@ typedef struct parse_node_block_s {
 				  (vn)->type = TYPE_ANY;\
 				  (vn)->r.expr = pn;\
 				  )
+#define CREATE_TIME_EXPRESSION(vn, pn) SAFE(\
+                                          (vn) = new_node();\
+                                          (vn)->kind = NODE_TIME_EXPRESSION;\
+                                          (vn)->type = TYPE_ANY;\
+                                          (vn)->r.expr = pn;\
+                                          )
+
 #define NODE_NO_LINE(x,y) SAFE(\
 			       (x) = new_node_no_line();\
 			       (x)->kind = y;\
@@ -251,5 +258,6 @@ parse_node_t *make_range_node PROT((int, parse_node_t *,
 					 parse_node_t *,
 					 parse_node_t *));
 parse_node_t *insert_pop_value PROT((parse_node_t *));
+parse_node_t *optimize_loop_test PROT((parse_node_t *));
 
 #endif

@@ -135,16 +135,12 @@ void set_defaults P1(char *, filename)
     if (def) {
 	fprintf(stderr, "using config file: %s\n", filename);
     } else {
-#ifdef OS2
-	sprintf(defaults, "%s\\%s", CONFIG_FILE_DIR, filename);
-#else
 #ifdef LATTICE
 	if (strchr(CONFIG_FILE_DIR, ':'))
 	    sprintf(defaults, "%s%s", CONFIG_FILE_DIR, filename);
 	else
 #endif
 	    sprintf(defaults, "%s/%s", CONFIG_FILE_DIR, filename);
-#endif
 
 	def = fopen(defaults, "r");
 	if (def) {
@@ -307,12 +303,12 @@ void set_defaults P1(char *, filename)
     /*
      * from options.h
      */
-    config_int[__MAX_EFUN_SOCKS__ - BASE_CONFIG_INT] = MAX_EFUN_SOCKS;
-    config_int[__COMPILER_STACK_SIZE__ - BASE_CONFIG_INT] = COMPILER_STACK_SIZE;
-    config_int[__EVALUATOR_STACK_SIZE__ - BASE_CONFIG_INT] = EVALUATOR_STACK_SIZE;
-    config_int[__MAX_LOCAL_VARIABLES__ - BASE_CONFIG_INT] = MAX_LOCAL;
-    config_int[__MAX_CALL_DEPTH__ - BASE_CONFIG_INT] = MAX_TRACE;
-    config_int[__LIVING_HASH_TABLE_SIZE__ - BASE_CONFIG_INT] = LIVING_HASH_SIZE;
+    config_int[__MAX_EFUN_SOCKS__ - BASE_CONFIG_INT] = CFG_MAX_EFUN_SOCKS;
+    config_int[__COMPILER_STACK_SIZE__ - BASE_CONFIG_INT] = CFG_COMPILER_STACK_SIZE;
+    config_int[__EVALUATOR_STACK_SIZE__ - BASE_CONFIG_INT] = CFG_EVALUATOR_STACK_SIZE;
+    config_int[__MAX_LOCAL_VARIABLES__ - BASE_CONFIG_INT] = CFG_MAX_LOCAL_VARIABLES;
+    config_int[__MAX_CALL_DEPTH__ - BASE_CONFIG_INT] = CFG_MAX_CALL_DEPTH;
+    config_int[__LIVING_HASH_TABLE_SIZE__ - BASE_CONFIG_INT] = CFG_LIVING_HASH_SIZE;
 }
 
 int get_config_item P2(svalue_t *, res, svalue_t *, arg)

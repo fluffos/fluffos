@@ -41,7 +41,7 @@ typedef struct {
 #define A_CLASS_MEMBER          8
 #define A_ARGUMENT_TYPES	9	/* */
 #define A_ARGUMENT_INDEX	10	/* */
-#define NUMPAREAS		10
+#define NUMPAREAS		11
 #define A_CASES                 11      /* keep track of cases */
 #define A_STRING_NEXT		12	/* next prog string in hash chain */
 #define A_STRING_REFS		13	/* reference count of prog string */
@@ -96,6 +96,9 @@ extern function_context_t function_context;
  * Some good macros to have.
  */
 
+#define IS_CLASS(t) ((t & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) == TYPE_MOD_CLASS)
+#define CLASS_IDX(t) (t & (TYPE_MOD_MASK & ~TYPE_MOD_CLASS))
+
 #define COMP_TYPE(e, t) (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) \
 			 || (compatible[(unsigned char)e] & (1 << (t))))
 #define IS_TYPE(e, t) (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) \
@@ -119,11 +122,12 @@ extern function_context_t function_context;
 #define ARG_IS_PROTO             1
 #define ARG_IS_VARARGS           2
 
+#define NOVALUE_USED_FLAG        1024
 
 int validate_function_call PROT((function_t *, int, parse_node_t *));
 parse_node_t *validate_efun_call PROT((int, parse_node_t *));
 extern mem_block_t mem_block[];
-extern int exact_types;
+extern int exact_types, global_modifiers;
 extern int current_type;
 extern int current_block;
 extern char *prog_code;
@@ -194,6 +198,8 @@ void pop_func_block PROT((void));
 parse_node_t *promote_to_float PROT((parse_node_t *));
 parse_node_t *promote_to_int PROT((parse_node_t *));
 parse_node_t *do_promotions PROT((parse_node_t *, int));
+parse_node_t *throw_away_call PROT((parse_node_t *));
+parse_node_t *throw_away_mapping PROT((parse_node_t *));
 
 #ifndef SUPPRESS_COMPILER_INLINES
 /* inlines - if we're lucky, they'll get honored. */

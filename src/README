@@ -33,17 +33,11 @@ to allow affected mudlibs to be fixed).
  
 Notes:
  
-Send bug reports to mudos-bugs@actlab.rtf.utexas.edu.  Be sure to include 
+Send bug reports to beek@imaginary.com.  Be sure to include 
 relevant information along with the problem description including: Type of 
 machine (e.g. Sun3, NeXT, RS/6000, etc), operating system (e.g. SunOS 4.1, 
 NeXTSTEP 3.0, AIX 3.2, etc), and version of MudOS (e.g. 0.9.14.17).  
 Include any other information you feel may help.
- 
-Send mail to mudos-info-request@actlab.rtf.utexas.edu to be added to the 
-MudOS information mailing list (info on new releases etc).
- 
-Discuss the MudOS driver on the mudos@actlab.rtf.utexas.edu mailing list 
-(request to be added at mudos-request@actlab.rtf.utexas.edu).
  
 The 'addr_server' file replaces the old hname program.  Unlike hname, 
 addr_server must be started up manually (it takes a single argument which 

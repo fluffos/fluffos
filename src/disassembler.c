@@ -390,6 +390,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	    pc++;
 	    break;
 	case F_LOOP_COND_NUMBER:
+	    i = EXTRACT_UCHAR(pc++);
 	    COPY_INT(&iarg, pc);
 	    pc += 4;
 	    COPY_SHORT(&sarg, pc);
@@ -399,6 +400,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 		    i, iarg, sarg, offset);
 	    break;
 	case F_LOOP_COND_LOCAL:
+	    i = EXTRACT_UCHAR(pc++);
 	    iarg = *pc++;
 	    COPY_SHORT(&sarg, pc);
 	    offset = (pc - code) - (unsigned short) sarg;
@@ -430,17 +432,15 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	case F_FUNCTION_CONSTRUCTOR:
 	    switch (EXTRACT_UCHAR(pc++)) {
 	    case FP_SIMUL:
-		COPY_SHORT(&sarg, pc);
+		LOAD_SHORT(sarg, pc);
 		sprintf(buff, "<simul_efun> \"%s\"", simuls[sarg]->name);
-		pc += 2;
 		break;
 	    case FP_EFUN:
-		COPY_SHORT(&sarg, pc);
+		LOAD_SHORT(sarg, pc);
 		sprintf(buff, "<efun> %s", instrs[sarg].name);
 		break;
 	    case FP_LOCAL:
-		COPY_SHORT(&sarg, pc);
-		pc += 2;
+		LOAD_SHORT(sarg, pc);
 		if (sarg < NUM_FUNS)
 		    sprintf(buff, "<local_fun> %s", FUNS[sarg].name);
 		else

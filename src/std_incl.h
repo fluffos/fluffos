@@ -71,23 +71,20 @@
 #  include "amiga/socket.h"
 #endif
 
-#if defined(LATTICE) || defined(OS2)
-#define link(x,y) { \
-    char link_cmd[100]; \
-    sprintf(link_cmd, "copy %s %s", x, y); \
-    system(link_cmd); \
-}
+#if defined(WIN32) || defined(LATTICE)
+int dos_style_link PROT((char *, char *));
+#define link(x, y) dos_style_link(x, y)
 #endif
 
 #ifdef NeXT
 #  include <libc.h>
 #endif
 
-#ifdef OS2
+#ifdef WIN32
 #  include <sys/timeb.h>
 #endif
 
-#if !defined(NeXT) && !defined(LATTICE)
+#if !defined(NeXT) && !defined(LATTICE) && !defined(WIN32)
 #  include <sys/param.h>
 #endif
 
@@ -118,7 +115,7 @@
 #include <bstring.h>
 #endif
 
-/* Add stuff we didn't get that we need */
+/* Note: This is now only used if _both_ USHRT_MAX and MAXSHORT fail to exist*/
 #ifndef MAXSHORT
 #define MAXSHORT ((1 << (sizeof(short)*8)) - 1)
 #endif

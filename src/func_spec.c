@@ -24,12 +24,10 @@ object clone_object(string, ...);
 unknown call_other(object | string | object *, string | mixed *,...);
 mixed evaluate(mixed, ...);
 function bind(function, object);
-object present(object | string, void | object);
 object this_object();
 object this_player(int default: 0);
 object this_interactive this_player( int default: 1);
 object this_user this_player( int default: 0);
-void move_object(object | string);
 mixed previous_object(int default: 0);
 object *all_previous_objects previous_object(int default: -1);
 mixed *call_stack(int default: 0);
@@ -37,17 +35,25 @@ int sizeof(mixed);
 int strlen sizeof(string);
 void destruct(object);
 string file_name(object default: F_THIS_OBJECT);
-object environment(void | object);
 string capitalize(string);
 string *explode(string, string);
 mixed implode(mixed *, string | function, void | mixed);
-object *all_inventory(object default: F_THIS_OBJECT);
-object first_inventory(object|string default: F_THIS_OBJECT);
-object next_inventory(object default: F_THIS_OBJECT);
 void call_out(string | function, int,...);
 int member_array(mixed, string | mixed *, void | int);
 int input_to(string | function,...);
 int random(int);
+
+#ifndef NO_ENVIRONMENT
+object environment(void | object);
+object *all_inventory(object default: F_THIS_OBJECT);
+object *deep_inventory(object);
+object first_inventory(object|string default: F_THIS_OBJECT);
+object next_inventory(object default: F_THIS_OBJECT);
+void say(string, void | object | object *);
+void tell_room(object | string, string | object | int | float, void | object *);
+object present(object | string, void | object);
+void move_object(object | string);
+#endif
 
 #ifndef NO_ADD_ACTION
 void add_action(string | function, string | string *, void | int);
@@ -81,10 +87,8 @@ int strsrch(string, string | int, int default: 0);
 
 void write(mixed);
 void tell_object(object, string);
-void say(string, void | object | object *);
 void shout(string);
 void receive(string);
-void tell_room(object | string, string | object | int | float, void | object *);
 void message(mixed, string, string | string * | object | object *,
 	          void | object | object *);
 
@@ -101,9 +105,6 @@ void message(mixed, string, string | string * | object | object *,
     mixed *values(mapping);
     mixed *keys(mapping);
 
-#ifdef EACH
-    mixed *each(mapping, int default: 0);
-#endif
     mixed match_path(mapping, string);
 
 /* all the *p() type functions */
@@ -163,7 +164,7 @@ void message(mixed, string, string | string * | object | object *,
     string read_file(string, void | int, void | int);
     int cp(string, string);
 
-#if !defined(LATTICE) && !defined(OS2)
+#ifndef LATTICE
     int link(string, string);
 #endif
     int mkdir(string);
@@ -260,9 +261,11 @@ void message(mixed, string, string | string * | object | object *,
     int uptime();
     int strcmp(string, string);
 
+#ifndef WIN32
 #if (defined(RUSAGE) || defined(GET_PROCESS_STATS) || defined(TIMES)) || defined(LATTICE)
     mapping rusage();
 #endif				/* RUSAGE */
+#endif
 
 #ifdef OLD_ED
     void ed(string | void, string | void, string | int | void, int | void);
@@ -275,8 +278,6 @@ void message(mixed, string, string | string * | object | object *,
 #ifdef CACHE_STATS
     string cache_stats();
 #endif
-
-    object *deep_inventory(object);
 
     mixed filter(mixed * | mapping, string | function, mixed | void, ...);
     mixed filter_array filter(mixed *, string | function, mixed | void, ...);

@@ -15,6 +15,7 @@
 #include "eoperators.h"
 #include "ed.h"
 #include "file.h"
+#include "packages/parser.h"
 
 /*
  * 'inherit_file' is used as a flag. If it is set to a string
@@ -52,12 +53,13 @@ static int init_object PROT((object_t *));
 static svalue_t *load_virtual_object PROT((char *));
 static char *make_new_name PROT((char *));
 static void destruct_object_two PROT((object_t *));
+#ifndef NO_ENVIRONMENT
 static void send_say PROT((object_t *, char *, array_t *));
+#endif
 static sentence_t *alloc_sentence PROT((void));
 #ifndef NO_ADD_ACTION
 static void remove_sent PROT((object_t *, object_t *));
 #endif
-void error_handler PROT((char *));
 
 INLINE void check_legal_string P1(char *, s)
 {
@@ -75,10 +77,8 @@ init_privs_for_object P1(object_t *, ob)
 {
     object_t *tmp_ob;
     svalue_t *value;
-    int err;
 
-    err = assert_master_ob_loaded("[internal] init_privs_for_object", "");
-    if (err == -1) {
+    if (master_ob == (object_t *)-1) {
 	tmp_ob = ob;
     } else {
 	tmp_ob = master_ob;
@@ -112,14 +112,8 @@ static int give_uid_to_object P1(object_t *, ob)
 {
     svalue_t *ret;
     char *creator_name;
-    int err;
 
-    err = assert_master_ob_loaded("[internal] give_uid_to_object", "");
-    if (err == -1) {
-	/*
-	 * Only for the master and void object. Note that back_bone_uid is
-	 * not defined when master.c is being loaded.
-	 */
+    if (master_ob == (object_t *)-1) {
 	ob->uid = add_uid("NONAME");
 #ifdef AUTO_SETEUID
 	ob->euid = ob->uid;
@@ -249,8 +243,13 @@ void set_master P1(object_t *, ob) {
 #else
     ret = apply_master_ob(APPLY_GET_ROOT_UID, 0);
     /* can't be -1 or we wouldn't be here */
-    if (ret == 0 || ret->type != T_STRING) {
-        debug_message("%s() in master object does not work\n",
+    if (!ret) {
+        debug_message("No function %s() in master object; possibly the mudlib doesn't want PACKAGE_UIDS to be defined.\n",
+		    APPLY_GET_ROOT_UID);
+	exit(-1);
+    }
+    if (ret->type != T_STRING) {
+        debug_message("%s() in master object does not work.\n",
 		    APPLY_GET_ROOT_UID);
 	exit(-1);
     }
@@ -343,12 +342,10 @@ int strip_name P3(char *, src, char *, dest, int, size) {
 object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 {
     int f;
-
     object_t *ob, *save_command_giver = command_giver;
     svalue_t *mret;
     struct stat c_st;
     char real_name[200], name[200];
-    int is_master_ob=0;
 #ifdef LPC_TO_C
     char out_name[200];
     char *out_ptr = out_name;
@@ -356,7 +353,7 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 #endif
 
     if (++num_objects_this_thread > INHERIT_CHAIN_SIZE)
-	error("Inherit chain too deep: > %d\n", INHERIT_CHAIN_SIZE);
+	error("Inherit chain too deep: > %d when trying to load '%s'.", INHERIT_CHAIN_SIZE, lname);
 #ifdef PACKAGE_UIDS
     if (current_object && current_object->euid == NULL)
 	error("Can't load objects when no effective user.\n");
@@ -365,36 +362,15 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 	error("Filenames with consecutive /'s in them aren't allowed (%s).\n",
 	      lname);
 
-    if (!master_ob_is_loading && !strcmp(name, master_file_name)) {
-	master_ob_is_loading = 1;
-	is_master_ob = 1;
-	/* free the old copy */
-	if (master_ob && master_ob != (object_t *)-1) {
-	    free_object(master_ob, "apply_master_ob");
-	    master_ob = 0;
-	}
-    }
     /*
      * First check that the c-file exists.
      */
     (void) strcpy(real_name, name);
     (void) strcat(real_name, ".c");
-    if (!simul_efun_is_loading && simul_efun_file_name && !strcmp(real_name, simul_efun_file_name)){
-        simul_efun_is_loading = 1;
-    }
+
     if (stat(real_name, &c_st) == -1) {
 	svalue_t *v;
 
-	if (is_master_ob) {
-	    master_ob_is_loading = 0;
-	    num_objects_this_thread--;
-	    return 0;
-	}
-	if (simul_efun_is_loading){
-	    simul_efun_is_loading = 0;
-	    num_objects_this_thread--;
-	    return 0;
-	}
 	if (!(v = load_virtual_object(name))) {
 	    num_objects_this_thread--;
 	    return 0;
@@ -423,8 +399,6 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
      * Check if it's a legal name.
      */
     if (!legal_path(real_name)) {
-	if (is_master_ob) master_ob_is_loading = 0;
-	if (simul_efun_is_loading) simul_efun_is_loading = 0;
 	debug_message("Illegal pathname: /%s\n", real_name);
 	error("Illegal path name '/%s'.\n", real_name);
 	return 0;
@@ -441,8 +415,6 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 	}
 	f = open(real_name, O_RDONLY);
 	if (f == -1) {
-	    if (is_master_ob) master_ob_is_loading = 0;
-	    if (simul_efun_is_loading) simul_efun_is_loading = 0;
 	    debug_perror("compile_file", real_name);
 	    error("Could not read the file '/%s'.\n", real_name);
 	}
@@ -450,8 +422,6 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 	if (compile_to_c) {
 	    compilation_output_file = crdir_fopen(out_ptr);
 	    if (compilation_output_file == 0) {
-		if (is_master_ob) master_ob_is_loading = 0;
-		if (simul_efun_is_loading) simul_efun_is_loading = 0;
 		debug_perror("compile_to_c", out_ptr);
 		error("Could not open output file '/%s'.\n", out_ptr);
 	    }
@@ -480,8 +450,6 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 
     /* Sorry, can't handle objects without programs yet. */
     if (inherit_file == 0 && (num_parse_error > 0 || prog == 0)) {
-	if (is_master_ob) master_ob_is_loading = 0;
-	if (simul_efun_is_loading) simul_efun_is_loading = 0;
 	if (prog)
 	    free_prog(prog, 1);
 	if (num_parse_error == 0 && prog == 0)
@@ -508,14 +476,9 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 	    prog = 0;
 	}
 	if (strcmp(inhbuf, name) == 0) {
-	    if (is_master_ob) master_ob_is_loading = 0;
-	    if (simul_efun_is_loading) simul_efun_is_loading = 0;
 	    error("Illegal to inherit self.\n");
 	}
-	/*
-	 * Beek - all the flags refer to this file and shouldn't be passed
-	 * down
-	 */
+
 	if ((inh_obj = lookup_object_hash(inhbuf))) {
 #ifdef LPC_TO_C
 	    DEBUG_CHECK(!(inh_obj->flags & O_COMPILED_PROGRAM), "Inherited object is already loaded!\n");
@@ -549,15 +512,11 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 	    /* I don't think this is possible, but ... */
 	    ob = load_object(name, (lpc_object_t *)ob);
 	    /* sigh, loading the inherited file removed us */
-	    if (!ob) return 0;
+	    if (!ob) { num_objects_this_thread--; return 0; }
 	    ob->load_time = current_time;
 	}
 #endif
 	num_objects_this_thread--;
-	if (is_master_ob) {
-	  master_ob_is_loading = 0;
-	  set_master(ob);
-	}
 #ifdef LPC_TO_C
 	compile_to_c = save_compile_to_c;
 #endif
@@ -575,20 +534,8 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
     push_object(ob);
     mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
     if (mret && !MASTER_APPROVED(mret)) {
-        if (simul_efun_is_loading) simul_efun_is_loading = 0;
 	destruct_object_two(ob);
 	error("master object: " APPLY_VALID_OBJECT "() denied permission to load '/%s'.\n", name);
-    }
-    /* allow updating of simul_efun and adding of new functions -bobf */
-    /* moved to here by Beek so we can set the simul_efun_ob */
-    if (simul_efun_is_loading && prog && simul_efun_file_name &&
-	(strcmp(prog->name, simul_efun_file_name) == 0)) {
-        simul_efun_is_loading = 0;
-	get_simul_efuns(ob->prog);
-	if (simul_efun_ob)
-	    free_object(simul_efun_ob, "load_object");
-	simul_efun_ob = ob;
-	add_ref(simul_efun_ob, "load_object");
     }
 
     if (init_object(ob))
@@ -604,10 +551,6 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 #endif
     ob->load_time = current_time;
     num_objects_this_thread--;
-    if (is_master_ob) {
-      master_ob_is_loading = 0;
-      set_master(ob);
-    }
 #ifdef LPC_TO_C
     compile_to_c = save_compile_to_c;
 #endif
@@ -650,8 +593,6 @@ object_t *clone_object P2(char *, str1, int, num_arg)
 	pop_n_elems(num_arg);
 	return (0);
     }
-    if (ob->super)
-	error("Cannot clone a object which has an environment.\n");
     if (ob->flags & O_CLONE)
 	if (!(ob->flags & O_VIRTUAL) || strrchr(str1, '#'))
 	    error("Cannot clone from a clone\n");
@@ -673,7 +614,11 @@ object_t *clone_object P2(char *, str1, int, num_arg)
 	    if (!(str1 = check_name(str1))) 
 		error("Filenames with consecutive /'s in them aren't allowed (%s).\n", str1);
 
-	    if (ob->ref == 1 && !ob->super && !ob->contains) {
+	    if (ob->ref == 1
+#ifndef NO_ENVIRONMENT
+		&& !ob->super && !ob->contains
+#endif
+		) {
 		/*
 		 * ob unused so reuse it instead to save space. (possibly
 		 * loaded just for cloning)
@@ -724,6 +669,7 @@ object_t *clone_object P2(char *, str1, int, num_arg)
     return (new_ob);
 }
 
+#ifndef NO_ENVIRONMENT
 object_t *environment P1(svalue_t *, arg)
 {
     object_t *ob = current_object;
@@ -736,6 +682,7 @@ object_t *environment P1(svalue_t *, arg)
 	error("environment() of destructed object.\n");
     return ob->super;
 }
+#endif
 
 /*
  * Execute a command for an object. Copy the command into a
@@ -773,8 +720,8 @@ int command_for_object P1(char *, str)
  */
 
 
+#ifndef NO_ENVIRONMENT
 static object_t *object_present2 PROT((char *, object_t *));
-
 
 object_t *object_present P2(svalue_t *, v, object_t *, ob)
 {
@@ -869,6 +816,34 @@ static object_t *object_present2 P2(char *, str, object_t *, ob)
     FREE(item);
     return 0;
 }
+#endif
+
+void init_master P1(char *, file) {
+    char buf[512];
+    lpc_object_t *compiled_version;
+    object_t *new_ob;
+    
+    if (!file || !file[0]) {
+	fprintf(stderr, "No master object specified in config file\n");
+	exit(-1);
+    }
+	
+    if (!strip_name(file, buf, sizeof buf))
+	error("Illegal simul_efun file name '%s'\n", file);
+    
+    compiled_version = (lpc_object_t *)lookup_object_hash(buf);
+
+    if (file[strlen(file) - 2] != '.')
+	strcat(buf, ".c");
+    
+    new_ob = load_object(file, compiled_version);
+    if (new_ob == 0) {
+	fprintf(stderr, "The master file %s was not loaded.\n",
+		file);
+	exit(-1);
+    }
+    set_master(new_ob);
+}
 
 /*
  * Remove an object. It is first moved into the destruct list, and
@@ -876,13 +851,16 @@ static object_t *object_present2 P2(char *, str, object_t *, ob)
  */
 static void destruct_object_two P1(object_t *, ob)
 {
-    object_t *super;
     object_t **pp;
     int removed;
+#ifndef NO_ENVIRONMENT
+    object_t *super;
     object_t *save_restrict_destruct = restrict_destruct;
+#endif
 
     if (restrict_destruct && restrict_destruct != ob)
 	error("Only this_object() can be destructed from move_or_destruct.\n");
+
 #ifdef PACKAGE_SOCKETS
     /*
      * check if object has an efun socket referencing it for a callback. if
@@ -950,6 +928,7 @@ static void destruct_object_two P1(object_t *, ob)
 	debug_message("Deobject_t %s (ref %d)\n", ob->name, ob->ref);
 #endif
 
+#ifndef NO_ENVIRONMENT
     /* try to move our contents somewhere */
     super = ob->super;
 
@@ -974,6 +953,7 @@ static void destruct_object_two P1(object_t *, ob)
 	if (svp.u.ob == ob->contains)
 	    destruct_object(&svp);
     }
+#endif
     
 #ifdef PACKAGE_MUDLIB_STATS
     add_objects(&ob->stats, -1);
@@ -987,6 +967,7 @@ static void destruct_object_two P1(object_t *, ob)
 	ob->flags &= ~O_IN_EDIT;
     }
 #endif
+#ifndef NO_ENVIRONMENT
     /*
      * Remove us out of this current room (if any). Remove all sentences
      * defined by this object from all objects here.
@@ -1010,6 +991,42 @@ static void destruct_object_two P1(object_t *, ob)
 		*pp = (*pp)->next_inv;
 	}
     }
+#endif
+
+    /* At this point, we can still back out, but this is the very last
+     * minute we can do so.  Make sure we have a new object to replace
+     * us if this is a vital object.
+     */
+    if (ob == master_ob || ob == simul_efun_ob) {
+	object_t *new_ob;
+	/* hack to make sure we don't find the precompiled tag 
+	   and not ourself */
+	lpc_object_t *compiled_version;
+	char *tmp = ob->name;
+	
+	ob->name = "";
+	compiled_version = (lpc_object_t *)lookup_object_hash(tmp);
+	ob->name = tmp;
+
+	/* handle these two carefully, since they are rather vital */
+	new_ob = load_object(tmp, compiled_version);
+	if (!new_ob)
+	    error("Destruct on vital object failed: new copy failed to reload.");
+
+	free_object(ob, "vital object reference");
+	if (ob == master_ob)
+	    set_master(new_ob);
+	if (ob == simul_efun_ob)
+	    set_simul_efun(new_ob);
+	
+	/* be careful not to remove the new hash */
+	tmp = new_ob->name;
+	new_ob->name = "";
+	remove_object_hash(ob);
+	new_ob->name = tmp;
+    } else
+	remove_object_hash(ob);
+
     /*
      * Now remove us out of the list of all objects. This must be done last,
      * because an error in the above code would halt execution.
@@ -1020,7 +1037,6 @@ static void destruct_object_two P1(object_t *, ob)
 	    continue;
 	*pp = (*pp)->next_all;
 	removed = 1;
-	remove_object_hash(ob);
 	break;
     }
     DEBUG_CHECK(!removed, "Failed to delete object.\n");
@@ -1030,9 +1046,11 @@ static void destruct_object_two P1(object_t *, ob)
 	remove_living_name(ob);
     ob->flags &= ~O_ENABLE_COMMANDS;
 #endif
+#ifndef NO_ENVIRONMENT
     ob->super = 0;
     ob->next_inv = 0;
     ob->contains = 0;
+#endif
     ob->next_all = obj_list_destruct;
     obj_list_destruct = ob;
     set_heart_beat(ob, 0);
@@ -1112,6 +1130,7 @@ void destruct2 P1(object_t *, ob)
  * rewritten, bobf@metronet.com (Blackthorn) 9/6/93
  */
 
+#ifndef NO_ENVIRONMENT
 static void send_say P3(object_t *, ob, char *, text, array_t *, avoid)
 {
     int valid, j;
@@ -1130,7 +1149,9 @@ static void send_say P3(object_t *, ob, char *, text, array_t *, avoid)
 
     tell_object(ob, text);
 }
+#endif
 
+#ifndef NO_ENVIRONMENT
 void say P2(svalue_t *, v, array_t *, avoid)
 {
     object_t *ob, *origin, *save_command_giver = command_giver;
@@ -1233,6 +1254,7 @@ void tell_room P3(object_t *, room, svalue_t *, v, array_t *, avoid)
 	}
     }
 }
+#endif
 
 void shout_string P1(char *, str)
 {
@@ -1242,7 +1264,10 @@ void shout_string P1(char *, str)
 
     for (ob = obj_list; ob; ob = ob->next_all) {
 	if (!(ob->flags & O_LISTENER) || (ob == command_giver)
-	    || !ob->super)
+#ifndef NO_ENVIRONMENT
+	    || !ob->super
+#endif
+	    )
 	    continue;
 	tell_object(ob, str);
     }
@@ -1275,6 +1300,7 @@ void enable_commands P1(int, num)
 	/*
 	 * Remove all sentences defined by this object from all objects here.
 	 */
+#ifndef NO_ENVIRONMENT
 	if (current_object->flags & O_ENABLE_COMMANDS) {
 	    if (current_object->super) {
 		if (current_object->flags & O_ENABLE_COMMANDS)
@@ -1285,6 +1311,7 @@ void enable_commands P1(int, num)
 		}
 	    }
 	}
+#endif
 	current_object->flags &= ~O_ENABLE_COMMANDS;
 	command_giver = 0;
     }
@@ -1498,6 +1525,7 @@ object_t *find_object2 P1(char *, str)
     return 0;
 }
 
+#ifndef NO_ENVIRONMENT
 /*
  * Transfer an object.
  * The object has to be taken from one inventory list and added to another.
@@ -1625,6 +1653,7 @@ void move_object P2(object_t *, item, object_t *, dest)
     command_giver = save_cmd;
 #endif
 }
+#endif
 
 #ifndef NO_LIGHT
 /*
@@ -1637,7 +1666,7 @@ void add_light P2(object_t *, p, int, n)
     if (n == 0)
 	return;
     p->total_light += n;
-    while (p = p->super)
+    while ((p = p->super))
 	p->total_light += n;
 }
 #endif
@@ -1721,7 +1750,9 @@ void free_sentence P1(sentence_t *, p)
 int user_parser P1(char *, buff)
 {
     char verb_buff[MAX_VERB_BUFF];
+#ifndef NO_ADD_ACTION
     object_t *super;
+#endif
     sentence_t *s;
     char *p;
     int length;
@@ -1790,9 +1821,19 @@ int user_parser P1(char *, buff)
 	    debug_message("Local command %s on %s\n",
 			  s->function, s->ob->name);
 #endif
-	last_verb = verb_buff;
-	if (s->verb && s->verb[0]) {
-	    strcpy(verb_buff, s->verb);
+	if (s->flags & V_NOSPACE) {
+	    int l1 = strlen(s->verb);
+	    int l2 = strlen(verb_buff);
+	    
+	    if (l1 < l2)
+		last_verb = verb_buff + l1;
+	    else
+		last_verb = "";
+	} else {
+	    if (!s->verb[0] || (s->flags & V_SHORT))
+		last_verb = verb_buff;
+	    else
+		last_verb = s->verb;
 	}
 	/*
 	 * If the function is static and not defined by current object, then
@@ -1805,7 +1846,9 @@ int user_parser P1(char *, buff)
 	 * Remember the object, to update moves.
 	 */
 	command_object = s->ob;
+#ifndef NO_ENVIRONMENT
 	super = command_object->super;
+#endif
 	if (s->flags & V_NOSPACE) {
 	    push_constant_string(&buff[strlen(s->verb)]);
 	} else if (buff[length] == ' ') {
@@ -1898,8 +1941,12 @@ void add_action P3(svalue_t *, str, char *, cmd, int, flag)
 #endif
     if (command_giver == 0 || (command_giver->flags & O_DESTRUCTED))
 	return;
-    if (ob != command_giver && ob->super != command_giver &&
-	ob->super != command_giver->super && ob != command_giver->super)
+    if (ob != command_giver
+#ifndef NO_ENVIRONMENT
+	&& ob->super != command_giver &&
+	ob->super != command_giver->super && ob != command_giver->super
+#endif
+	)
 	return;			/* No need for an error, they know what they
 				 * did wrong. */
 #ifdef DEBUG
@@ -2145,7 +2192,6 @@ void error_handler P1(char *, err)
 #endif
 
     /* in case we're going to jump out of load_object */
-    master_ob_is_loading = 0;
     restrict_destruct = 0;
     num_objects_this_thread = 0;/* reset the count */
 
@@ -2306,7 +2352,7 @@ void shutdownMudOS P1(int, exit_code)
 #endif
     ipc_remove();
 #ifdef PACKAGE_SOCKETS
-    for (i = 0; i < MAX_EFUN_SOCKS; i++) {
+    for (i = 0; i < CFG_MAX_EFUN_SOCKS; i++) {
 	if (lpc_socks[i].state == CLOSED) continue;
 	while (close(lpc_socks[i].fd) == -1 && errno == EINTR)
 	    ;
@@ -2390,13 +2436,16 @@ void do_message P5(svalue_t *, class, char *, msg, array_t *, scope, array_t *, 
 		push_string(msg, STRING_SHARED);
 		apply(APPLY_RECEIVE_MESSAGE, ob, 2, ORIGIN_DRIVER);
 	    }
-	} else if (recurse) {
+	}
+#ifndef NO_ENVIRONMENT
+	else if (recurse) {
 	    array_t *tmp;
 
 	    tmp = all_inventory(ob, 1);
 	    do_message(class, msg, tmp, exclude, 0);
 	    free_array(tmp);
 	}
+#endif
     }
 }
 
@@ -2416,6 +2465,7 @@ void try_reset P1(object_t *, ob)
 }
 #endif
 
+#ifndef NO_ENVIRONMENT
 object_t *first_inventory P1(svalue_t *, arg)
 {
     object_t *ob;
@@ -2440,3 +2490,4 @@ object_t *first_inventory P1(svalue_t *, arg)
     }
     return 0;
 }
+#endif

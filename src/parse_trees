@@ -8,7 +8,7 @@ NODE_BINARY_OP:
 
 NODE_UNARY_OP:
     v.number: opcode
-    r.node: argument
+    r.expr: argument
 
 NODE_OPCODE:
     v.number: opcode
@@ -91,5 +91,5 @@ NODE_LVALUE_EFUN:
 
 NODE_EFUN:
     r.expr: expr_list
-    v.number: opcode
+    v.number: opcode    ( + 1024 if void valued efun is used)
     l.number: num args

@@ -60,7 +60,6 @@ static int assert_swap_file()
 {
     if (swap_file == NULL) {
 #ifdef SWAP_USE_FD
-#  ifndef MSDOS
 	char host[50];
 
 	gethostname(host, sizeof host);
@@ -70,12 +69,7 @@ static int assert_swap_file()
 	if (file_name[0] == '/')
 	    file_name++;
         swap_file = open(file_name, O_RDWR | O_CREAT | O_TRUNC);
-#  else
-	swap_file = open(strcpy(file_name, "LPMUD.SWAP"),
-	                 O_RDWR | O_CREAT | O_TRUNC);
-#  endif
 #else
-#  ifndef MSDOS
 	char host[50];
 
 	gethostname(host, sizeof host);
@@ -84,14 +78,7 @@ static int assert_swap_file()
 	file_name = file_name_buf;
 	if (file_name[0] == '/')
 	    file_name++;
-#    ifdef OS2
 	swap_file = fopen(file_name, "w+b");
-#    else
-	swap_file = fopen(file_name, "w+");
-#    endif
-#  else
-	swap_file = fopen(strcpy(file_name, "LPMUD.SWAP"), "w+b");
-#  endif
 #endif
 	swap_free = 0;
 	last_data = 0;
@@ -584,12 +571,7 @@ void unlink_swap_file()
     close(swap_file);
     unlink(file_name);
 #else
-#  ifndef MSDOS
     unlink(file_name);  /* why is this backwards ? */
     fclose(swap_file);
-#  else
-    fclose(swap_file);
-    unlink(file_name);
-#  endif
 #endif
 }

@@ -12,12 +12,9 @@
 #include "port.h"
 #include "lint.h"
 
-#if defined(OS2)
-#define INCL_DOSPROCESS
-#define INCL_DOSSEMAPHORE
-#include <os2.h>
-
-extern HEV mudos_event_sem;
+#ifdef WIN32
+#include <process.h>
+void alarm_loop PROT((void *));
 #endif
 
 error_context_t *current_error_context = 0;
@@ -59,15 +56,15 @@ void clear_state()
 
 #ifdef DEBUG
 static void report_holes() {
-    if (current_object)
+    if (current_object && current_object->name)
 	debug_message("current_object is %s\n", current_object->name);
-    if (command_giver)
+    if (command_giver && command_giver->name)
 	debug_message("command_giver is %s\n", command_giver->name);
-    if (current_interactive)
+    if (current_interactive && current_interactive->name)
 	debug_message("current_interactive is %s\n", current_interactive->name);
-    if (previous_ob)
+    if (previous_ob && previous_ob->name)
 	debug_message("previous_ob is %s\n", previous_ob->name);
-    if (current_prog)
+    if (current_prog && current_prog->name)
 	debug_message("current_prog is %s\n", current_prog->name);
     if (caller_type)
 	debug_message("caller_type is %s\n", caller_type);
@@ -135,7 +132,9 @@ void backend()
 	debug_message("No external ports specified.\n");
 
     init_user_conn();		/* initialize user connection socket */
+#ifdef SIGHUP
     signal(SIGHUP, startshutdownMudOS);
+#endif
     if (!t_flag)
 	call_heart_beat();
     clear_state();
@@ -143,34 +142,6 @@ void backend()
     if (SETJMP(econ.context))
 	restore_context(&econ);
 
-#ifdef OS2
-    do {
-	long rc_wait;
-
-	remove_destructed_objects();
-	eval_cost = 0;
-	if (MudOS_is_being_shut_down) {
-	    shutdownMudOS(0);
-	}
-	if (slow_shut_down_to_do) {
-	    int tmp = slow_shut_down_to_do;
-
-	    slow_shut_down_to_do = 0;
-	    slow_shut_down(tmp);
-	}
-	rc_wait = DosWaitEventSem(mudos_event_sem, -1);
-	DosResetEventSem(mudos_event_sem, &i);
-	process_io();
-	if (heart_beat_flag) call_heart_beat();
-	/*
-	 * process user commands.
-	 */
-	/* This should probably be done better */
-	i = max_users;
-	while (process_user_command() && i--)
-	    ;
-    } while (1);
-#else
     while (1) {
 	/*
 	 * The call of clear_state() should not really have to be done once
@@ -245,7 +216,6 @@ void backend()
 	    call_heart_beat();
 	}
     }
-#endif
 }				/* backend() */
 
 /*
@@ -400,40 +370,43 @@ static int num_hb_to_do = 0;
 static int num_hb_calls = 0;	/* starts */
 static float perc_hb_probes = 100.0;	/* decaying avge of how many complete */
 
-#ifdef OS2
-void alarm_loop()
+#ifdef WIN32
+void alarm_loop P1(void *, ignore)
 {
     while (1) {
-	DosSleep(HEARTBEAT_INTERVAL / 1000);
+	_sleep(HEARTBEAT_INTERVAL / 1000);
 	heart_beat_flag = 1;
-	DosPostEventSem(mudos_event_sem);
     }
 }				/* alarm_loop() */
 #endif
 
 static void call_heart_beat()
 {
+#ifdef PEDANTIC
+    /* IRIX 5.2 bug: not prototyped anywhere in the system includes */
+    void ualarm(int, int);
+#endif
     object_t *ob;
     heart_beat_t *curr_hb;
 
-#ifdef OS2
-    static TID bing = 0;
+#ifdef WIN32
+    static long Win32Thread = -1;
 #endif
 
     heart_beat_flag = 0;
-
+#ifdef SIGALRM
     signal(SIGALRM, sigalrm_handler);
-#if !defined(OS2)
+#endif
+
 #ifdef HAS_UALARM
     ualarm(HEARTBEAT_INTERVAL, 0);
 #else
+#  ifdef WIN32
+    if (Win32Thread == -1) Win32Thread = _beginthread(alarm_loop, 256, 0);
+#  else
     alarm(SYSV_HEARTBEAT_INTERVAL);	/* defined in config.h */
+#  endif
 #endif
-#else
-    if (!bing) {
-	DosCreateThread(&bing, alarm_loop, 0, 0, 100);
-    }
-#endif				/* OS2 */
 
     debug(256, ("."));
 
@@ -531,10 +504,10 @@ int set_heart_beat P2(object_t *, ob, int, to)
 	if (index < 0) return 0;
 
 	if (num_hb_to_do) {
-	    if (index < num_hb_to_do) {
+	    if (index <= heart_beat_index)
 		heart_beat_index--;
+	    if (index < num_hb_to_do)
 		num_hb_to_do--;
-	    }
 	}
 	
 	if ((num = (num_hb_objs - (index + 1))))

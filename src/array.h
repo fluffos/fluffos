@@ -49,6 +49,7 @@ array_t *make_unique PROT((array_t *, char *, funptr_t *, svalue_t *));
 void map_string PROT((svalue_t *arg, int num_arg));
 void map_array PROT((svalue_t *arg, int num_arg));
 array_t *intersect_array PROT((array_t *, array_t *));
+int match_single_regexp PROT((char *, char *));
 array_t *match_regexp PROT((array_t *, char *, int));
 array_t *reg_assoc PROT((char *, array_t *, array_t *, svalue_t *));
 void dealloc_array PROT((array_t *));

@@ -858,7 +858,11 @@ static int getlst()
     int num;
 
     P_LINE2 = 0;
-    for (P_NLINES = 0; (num = getone()) >= 0;) {
+    for (P_NLINES = 0; (num = getone()) >= 0 || (num == BAD_LINE_NUMBER);) {
+	/* if it's out of bounds, go to the end of the file. */
+	if (num == BAD_LINE_NUMBER)
+	    num = P_LASTLN;
+	
 	P_LINE1 = P_LINE2;
 	P_LINE2 = num;
 	P_NLINES++;
@@ -1121,7 +1125,7 @@ static regexp *optpat()
 	return (P_OLDPAT);
     if (P_OLDPAT)
 	FREE((char *) P_OLDPAT);
-    return P_OLDPAT = regcomp(str, P_EXCOMPAT);
+    return P_OLDPAT = regcomp((unsigned char *)str, P_EXCOMPAT);
 }
 
 static int set()
@@ -1271,9 +1275,8 @@ static int subst P4(regexp *, pat, char *, sub, int, gflg, int, pflag)
  * Indent code from DGD editor (v0.1), adapted.  No attempt has been made to
  * optimize for this editor.   Dworkin 920510
  */
-#ifdef OLD_ED
 #define error(s)               { ED_OUTPUTV(ED_DEST, s, lineno); errs++; return; }
-#endif
+
 #define bool char
 static int lineno, errs;
 static int shi;			/* the current shift (negative for left
@@ -1662,6 +1665,7 @@ static void indent P1(char *, buf)
 		    }
 		case LOPERATOR:
 		case LHOOK:
+		case LHOOK2: /* Is this right? */
 		    {
 			/* half indent after ( [ ({ ([ */
 			i += P_SHIFTWIDTH / 2;
@@ -1962,13 +1966,13 @@ static int docmd P1(int, glob)
 	    return CHANGED;
 	/* FALL THROUGH */
     case 'Q':
-	clrbuf();
 	if (*inptr != NL)
 	    return SYNTAX_ERROR;
-	if (P_NLINES > 0)
-	    return LINE_OR_RANGE_ILL;
 	if (glob)
 	    return SYNTAX_ERROR;
+	clrbuf();
+	if (P_NLINES > 0)
+	    return LINE_OR_RANGE_ILL;
 	return (EOF);
 
     case 'r':
@@ -2358,7 +2362,8 @@ void save_ed_buffer P1(object_t *, who)
 
     push_string(P_FNAME, STRING_SHARED);
     push_object(who);
-    stmp = apply_master_ob(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME, 2);
+    /* must be safe; we get called by remove_interactive() */
+    stmp = safe_apply_master_ob(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME, 2);
     if (stmp && stmp != (svalue_t *)-1) {
 	if (stmp->type == T_STRING) {
 	    fname = stmp->u.string;
@@ -2588,7 +2593,7 @@ static void print_help2()
     ED_OUTPUT(ED_DEST, "o\tsame as 'a'\n");
     ED_OUTPUT(ED_DEST, "p\tprint line(s) in range\n");
     ED_OUTPUT(ED_DEST, "q\tquit editor\n");
-    ED_OUTPUT(ED_DEST, "Q\tquit editor even if file modified and not saved");
+    ED_OUTPUT(ED_DEST, "Q\tquit editor even if file modified and not saved\n");
     ED_OUTPUT(ED_DEST, "r\tread file into editor at end of file or behind the given line\n");
     ED_OUTPUT(ED_DEST, "s\tsearch and replace\n");
     ED_OUTPUT(ED_DEST, "set\tquery, change or save option settings\n");

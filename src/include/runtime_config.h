@@ -55,9 +55,7 @@
 #define __TIME_TO_CLEAN_UP__        CFG_INT(2)
 #define __TIME_TO_RESET__           CFG_INT(3)
 #define __TIME_TO_SWAP__            CFG_INT(4)
-
 #define __MAX_EFUN_SOCKS__          CFG_INT(5)
-
 #define __COMPILER_STACK_SIZE__     CFG_INT(6)
 #define __EVALUATOR_STACK_SIZE__    CFG_INT(7)
 #define __INHERIT_CHAIN_SIZE__      CFG_INT(8)

@@ -84,6 +84,11 @@ void c_foreach P3(int, flags, int, idx1, int, idx2) {
 	    sp->u.lvalue = &current_object->variables[idx1 + variable_index_offset];
 	else
 	    sp->u.lvalue = fp + idx1;
+    } else 
+    if (sp->type == T_STRING) {
+	(++sp)->type = T_NUMBER;
+	sp->u.lvalue_byte = (unsigned char *)((sp-1)->u.string);
+	sp->subtype = SVALUE_STRLEN(sp - 1);
     } else {
 	CHECK_TYPES(sp, T_ARRAY, 2, F_FOREACH);
 
@@ -149,9 +154,12 @@ void c_exit_foreach PROT((void)) {
 	free_array((sp--)->u.arr);
 	free_mapping((sp--)->u.map);
     } else {
-	/* array */
+	/* array or string */
 	sp -= 2;
-	free_array((sp--)->u.arr);
+	if (sp->type == T_STRING)
+	    free_string_svalue(sp--);
+	else
+	    free_array((sp--)->u.arr);
     }
 }
 
@@ -167,9 +175,15 @@ int c_next_foreach PROT((void)) {
 	    return 1;
 	}
     } else {
-	/* array */
+	/* array or string */
 	if ((sp-1)->subtype--) {
-	    assign_svalue(sp->u.lvalue, (sp-1)->u.lvalue++);
+	    if ((sp-2)->type == T_STRING) {
+		free_svalue(sp->u.lvalue, "string foreach");
+		sp->u.lvalue->type = T_NUMBER;
+		sp->u.lvalue->u.number = *((sp-1)->u.lvalue_byte)++;
+	    } else {
+		assign_svalue(sp->u.lvalue, (sp-1)->u.lvalue++);
+	    }
 	    return 1;
 	}
     }
@@ -1347,7 +1361,6 @@ void c_caught_error P1(error_context_t *, econ) {
 }
     
 void c_end_catch P1(error_context_t *, econ) {
-    pop_stack();/* discard expression value */
     free_svalue(&catch_value, "F_END_CATCH");
     catch_value = const0;
     /* We come here when no longjmp() was executed */

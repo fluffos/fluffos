@@ -1085,14 +1085,11 @@ f_switch()
     pc = current_prog->program + offset;
 }
 
-int simul_efun_is_loading = 0;
-
 void
 call_simul_efun P2(unsigned short, index, int, num_arg)
 {
     function_t *funp;
     extern object_t *simul_efun_ob;
-    extern char *simul_efun_file_name;
     extern function_t **simuls;
 
     if (current_object->flags & O_DESTRUCTED) {	/* No external calls allowed */
@@ -1101,14 +1098,6 @@ call_simul_efun P2(unsigned short, index, int, num_arg)
 	return;
     }
 
-    if (!simul_efun_ob || (simul_efun_ob->flags & O_DESTRUCTED)) {
-	if (simul_efun_is_loading)
-	    error("Attempt to call a simul_efun while compiling the simul_efun object.\n");
-	/* if it failed to load, we're in trouble */
-	if (!load_object(simul_efun_file_name, 0) || !simul_efun_ob
-	    || (simul_efun_ob->flags & O_DESTRUCTED))
-	    error("No simul_efun object for simul_efun.\n");
-    }
 #ifdef TRACE
     if (TRACEP(TRACE_CALL_OTHER)) {
 	do_trace("simul_efun ", simuls[index]->name, "\n");

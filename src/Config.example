@@ -15,7 +15,7 @@ address server ip : localhost
 address server port : 7374
 
 # absolute pathname of mudlib
-mudlib directory : /usr/local/mud/libs/basis
+mudlib directory : /usr/local/mud/testsuite
 
 # absolute pathname of driver/config dir
 binary directory : /usr/local/mud/bin
@@ -31,13 +31,13 @@ include directories : /include
 save binaries directory : /binaries
 
 # the file which defines the master object
-master file : /adm/master
+master file : /single/master
 
 # the file where all global simulated efuns are defined.
-simulated efun file : /adm/simul_efun
+simulated efun file : /single/simul_efun
 
 # file to swap out objects; not used if time to swap is 0
-swap file : /adm/swapfile
+swap file : /single/swapfile
 
 # alternate debug.log file name (assumed to be in specified 'log directory')
 debug log file : debug.log

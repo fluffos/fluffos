@@ -59,10 +59,10 @@ dump_variable(mixed arg)
    mixed x, y;
    
    switch(typeof(arg)){
-   case T_OBJECT: return "("+file_name(arg)+")";
-   case T_STRING: return "\""+arg+"\"";
-   case T_NUMBER: return "#"+arg;
-   case T_ARRAY: 
+   case OBJECT: return "("+file_name(arg)+")";
+   case STRING: return "\""+arg+"\"";
+   case INT: return "#"+arg;
+   case ARRAY: 
        {
 	   rtn = "ARRAY\n";
 	   foreach (y in arg) 
@@ -71,17 +71,18 @@ dump_variable(mixed arg)
 	   return rtn;
        }
  
-   case T_MAPPING:
+   case MAPPING:
        {
-	   rtn = "MAPPING\n";
-	   foreach (x, y in arg)
-	       rtn += sprintf("[%s] == %s\n", dump_variable(x), dump_variable(y));
+	   rtn = "MAPPING\n" +
+	       implode(values(map_mapping(arg,
+					  (: sprintf("[%s] == %s", $1, $2) :))));
+	   return return;
        }
   
-     case T_FUNCTION:
-     case T_CLASS:
-     case T_REAL:
-     case T_BUFFER:
+     case FUNCTION:
+     case CLASS:
+     case FLOAT:
+     case BUFFER:
        {
 	   return sprintf("%O\n", arg);
        }
@@ -111,7 +112,13 @@ string resolve_path(string curr, string newer) {
 	if (newer[0..1] == "~/") newer = user_path((string)this_player()->query_name()) + newer[2..];
 	else {
 	    switch(newer[0]){
-	    case '~': newer = user_path(newer[1..]); break;
+	    case '~':
+	    {
+		i = strsrch(newer, '/');
+		if (i < 0) newer = user_path(newer[1..]);
+		else newer = user_path(newer[1..i-1]) + newer[i..];
+		break;
+	    }
 	    case '/': break;
 	    default: newer[<0..<1] = curr + "/";
 	    }

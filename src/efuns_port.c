@@ -115,7 +115,7 @@ f_localtime PROT((void))
 	vec->item[LT_ZONE].u.string = string_copy(tzname[1], "f_localtime");
     }
 #else
-#ifndef OS2
+#ifndef WIN32
     vec->item[LT_GMTOFF].u.number = tm->tm_gmtoff;
     vec->item[LT_ZONE].u.string = string_copy(tm->tm_zone, "f_localtime");
 #endif
@@ -127,6 +127,13 @@ f_localtime PROT((void))
 #endif
 
 #ifdef F_RUSAGE
+#ifdef WIN32
+void f_rusage PROT((void))
+{
+    error("rusage() not supported under Windows.\n");
+}
+#else
+	
 #ifdef RUSAGE
 void
 f_rusage PROT((void))
@@ -257,6 +264,8 @@ f_rusage PROT((void))
 #endif				/* GET_PROCESS_STATS */
 
 #endif				/* RUSAGE */
+
+#endif				/* WIN32 */
 
 #endif
 

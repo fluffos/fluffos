@@ -9,8 +9,6 @@
 
 #include "std.h"
 
-#ifndef OS2
-
 enum socket_mode {
     MUD, STREAM, DATAGRAM, STREAM_BINARY, DATAGRAM_BINARY
 };
@@ -42,7 +40,7 @@ typedef struct {
     int w_len;
 } lpc_socket_t;
 
-extern lpc_socket_t lpc_socks[MAX_EFUN_SOCKS];
+extern lpc_socket_t lpc_socks[CFG_MAX_EFUN_SOCKS];
 
 #define	S_RELEASE	0x01
 #define	S_BLOCKED	0x02
@@ -72,7 +70,5 @@ int socket_close PROT((int, int));
 int socket_release PROT((int, object_t *, svalue_t *));
 int socket_acquire PROT((int, svalue_t *, svalue_t *, svalue_t *));
 char *socket_error PROT((int));
-
-#endif				/* OS2 */
 
 #endif				/* _SOCKET_EFUNS_H_ */

@@ -23,6 +23,11 @@
 #include "../compiler.h"
 #endif
 
+/* should be done in configure */
+#ifdef WIN32
+#define strcasecmp(X, Y) stricmp(X, Y)
+#endif
+
 /* I forgot who wrote this, please claim it :) */
 #ifdef F_REMOVE_SHADOW
 void
@@ -168,10 +173,11 @@ mapping_t *deep_copy_mapping P1( mapping_t *, arg ) {
 void deep_copy_svalue P2(svalue_t *, from, svalue_t *, to) {
     switch (from->type) {
     case T_ARRAY:
+    case T_CLASS:
 	depth++;
 	if (depth > MAX_SAVE_SVALUE_DEPTH) {
 	    depth = 0;
-	    error("Mappings and/or arrays nested too deep (%d) for copy()\n",
+	    error("Mappings, arrays and/or classes nested too deep (%d) for copy()\n",
 		  MAX_SAVE_SVALUE_DEPTH);
 	}
 	*to = *from;
@@ -182,7 +188,7 @@ void deep_copy_svalue P2(svalue_t *, from, svalue_t *, to) {
 	depth++;
 	if (depth > MAX_SAVE_SVALUE_DEPTH) {
 	    depth = 0;
-	    error("Mappings and/or arrays nested too deep (%d) for copy()\n",
+	    error("Mappings, arrays and/or classes nested too deep (%d) for copy()\n",
 		  MAX_SAVE_SVALUE_DEPTH);
 	}
 	*to = *from;
@@ -362,7 +368,8 @@ f_terminal_colour P2( int, num_arg, int, instruction)
     char *instr, *cp, *savestr, *deststr, **parts;
     int num, i, j, k, *lens;
     mapping_node_t *elt, **mtab;
-
+    int tmp;
+    
     cp = instr = (sp-1)->u.string;
     do {
 	cp = strchr(cp,'%');
@@ -429,15 +436,20 @@ f_terminal_colour P2( int, num_arg, int, instruction)
     {
 	for (j = i = 0, k = sp->u.map->table_size; i < num; i++)
 	{
-	    cp = parts[i];
-	    for (elt = mtab[mapHashstr(cp) & k]; elt; elt = elt->next)
-		if ( elt->values->type == T_STRING && 
-		     (elt->values + 1)->type == T_STRING &&
-		     strcmp(cp,elt->values->u.string) == 0 )
-		     {
-			cp = parts[i] = (elt->values + 1)->u.string;
-			break;
-		     }
+	    if ((cp = findstring(parts[i]))) {
+		tmp = (int)cp;
+		if (tmp < 0) tmp = -tmp;
+		for (elt = mtab[tmp & k]; elt; elt = elt->next)
+		    if ( elt->values->type == T_STRING && 
+			(elt->values + 1)->type == T_STRING &&
+			cp == elt->values->u.string)
+			{
+			    cp = parts[i] = (elt->values + 1)->u.string;
+			    break;
+			}
+	    } else {
+		cp = parts[i];
+	    }
 	    lens[i] = strlen(cp);
 	    j += lens[i];
 	}
@@ -504,9 +516,8 @@ char *pluralize P1(char *, str) {
     int found = 0;
     char *suffix = "s";
     
-    sz = strlen(str);
-    if (sz <= 1) return 0;
-
+    if (!(sz = strlen(str))) return 0;
+    
     /* if it is of the form 'X of Y', pluralize the 'X' part */
     if ((p = strstr(str, " of "))) {
 	of_buf = alloc_cstring(p, "pluralize: of");
@@ -612,6 +623,10 @@ char *pluralize P1(char *, str) {
     case 'h':
 	if (!strcasecmp(rel + 1, "uman"))
 	    found = PLURAL_SUFFIX;
+	else if (!strcasecmp(rel + 1, "ave")) {
+	    found = PLURAL_CHOP + 2;
+	    suffix = "s";
+	}	    
 	break;
     case 'I':
     case 'i':
@@ -666,6 +681,11 @@ char *pluralize P1(char *, str) {
 	break;
     case 'T':
     case 't':
+	if (!strcasecmp(rel + 1, "heif")) {
+	    found = PLURAL_CHOP + 1;
+	    suffix = "ves";
+	    break;
+	}
 	if (!strcasecmp(rel + 1, "ooth")) {
 	    found = PLURAL_CHOP + 4;
 	    suffix = "eeth";
@@ -780,8 +800,10 @@ char *pluralize P1(char *, str) {
 	    break;
 	case 'Y': case 'y':
 	    if (end[-2] != 'a' && end[-2] != 'e' && end[-2] != 'i'
-	    && end[-2] != 'o' && end[-2] != 'u')
+		&& end[-2] != 'o' && end[-2] != 'u') {
+		found = PLURAL_CHOP + 1;    
 		suffix = "ies";
+	    }
 	    break;
 	case 'Z': case 'z':
 	    if (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o'
@@ -845,25 +867,28 @@ int file_length P1(char *, file)
   struct stat st;
   FILE *f;
   int ret = 0;
+  int num;
   char buf[2049];
-  char *p, *end;
+  char *p, *newp;
 
   file = check_valid_path(file, current_object, "file_size", 0);
   
   if (!file) return -1;
   if (stat(file, &st) == -1)
       return -1;
-  if (st.st_mode == S_IFDIR)
+  if (st.st_mode & S_IFDIR)
       return -2;
   if (!(f = fopen(file, "r")))
       return -1;
   
   do {
-      end = buf + fread(buf, 2048, 1, f);
-      *end = 0;
+      num = fread(buf, 1, 2048, f);
       p = buf - 1;
-      while ((p = strchr(p + 1, '\n')) && p < end)
+      while ((newp = memchr(p + 1, '\n', num))) {
+	  num -= (newp - p);
+	  p = newp;
 	  ret++;
+      }
   } while (!feof(f));
 
   fclose(f);
@@ -916,7 +941,7 @@ void f_replaceable PROT((void)) {
     
     for (i = 0; i < num; i++) {
 	if (functions[i].flags & (NAME_INHERITED | NAME_NO_CODE)) continue;
-	if (strcmp(functions[i].name, "create")==0) continue;
+	if (strcmp(functions[i].name, APPLY_CREATE)==0) continue;
 	break;
     }
     free_svalue(sp, "f_replaceable");
@@ -940,7 +965,7 @@ void f_program_info PROT((void)) {
     for (i=0; i < 10; i++)
 	num_pushes[i]=0;
     for (ob = obj_list; ob; ob = ob->next_all) {
-	if (ob->flags & O_CLONE) continue;
+	if (ob->flags & (O_CLONE|O_SWAPPED)) continue;
 	hdr_size += sizeof(program_t);
 	prog_size += ob->prog->program_size;
 	func_size += ob->prog->num_functions * sizeof(function_t);
@@ -973,6 +998,7 @@ void f_program_info PROT((void)) {
  * interactive object, ie, Linkdead reconnection)
  */
 
+#ifdef F_REMOVE_INTERACTIVE
 void f_remove_interactive PROT((void)) {
     if( (sp->u.ob->flags & O_DESTRUCTED) || !(sp->u.ob->interactive) ) {
 	free_object(sp->u.ob, "f_remove_interactive");
@@ -985,3 +1011,33 @@ void f_remove_interactive PROT((void)) {
 	*sp = const1;
     }
 }
+#endif
+
+/* Zakk - August 23 1995
+ * return the port number the interactive object used to connect to the
+ * mud.
+ */
+#ifdef F_QUERY_IP_PORT
+int query_ip_port P1(object_t *, ob)
+{
+    if (!ob || ob->interactive == 0)
+	return 0;
+    return ob->interactive->local_port;
+}    
+
+void
+f_query_ip_port PROT((void))
+{
+    int tmp;
+    
+    if (st_num_arg) {
+	tmp = query_ip_port(sp->u.ob);
+	free_object(sp->u.ob, "f_query_ip_port");
+    } else {
+	tmp = query_ip_port(command_giver);
+	sp++;
+    }
+    put_number(tmp);
+}
+#endif
+

@@ -21,6 +21,11 @@
 #include "compile_file.h"
 #include "hash.h"
 
+/* This should be a configure check.  What the heck is it needed for, anyway?*/
+#ifdef WIN32
+#include <direct.h>
+#endif
+
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
 #include "functab_tree.h"
 #endif
@@ -49,70 +54,31 @@ do_stat P3(char *, fname, struct stat *, st, char *, pathname)
     int i;
     char buf[256];
 
-#ifdef OS2
-    int bing = 1;
-
-    if ((i = stat(fname, st)) == -1) {
-	getcwd(buf, 256);
-	strcat(buf, argv[0]);
-	if ((i = stat(buf, st)) == -1) {
-	    if (pathname) {
-		strcat(buf, ".exe");
-		if ((i = stat(buf, st)) == -1)
-		    bing = 0;
-	    } else
-		bing = 0
-	}
-    }
-    if (bing) {
-#else
     if ((i = stat(fname, st)) != -1) {
-#endif
 	if (pathname)
 	    strcpy(pathname, fname);
 	return i;
     }
     /* look in CONFIG_FILE_DIR */
     if (!pathname) {
-#ifdef OS2
-	sprintf(buf, "%s\\%s", CONFIG_FILE_DIR, fname);
-#else
 #ifdef LATTICE
 	if (strchr(CONFIG_FILE_DIR, ':'))
 	    sprintf(buf, "%s%s", CONFIG_FILE_DIR, fname);
 	else
 #endif
 	    sprintf(buf, "%s/%s", CONFIG_FILE_DIR, fname);
-#endif
 	if ((i = stat(buf, st)) != -1)
 	    return i;
     }
     /* look in BIN_DIR */
-#ifdef OS2
-    sprintf(buf, "%s\\%s", BIN_DIR, fname);
-#else
 #ifdef LATTICE
     if (strchr(BIN_DIR, ':'))
 	sprintf(buf, "%s%s", BIN_DIR, fname);
     else
 #endif
 	sprintf(buf, "%s/%s", BIN_DIR, fname);
-#endif
 	
-#ifdef OS2
-    bing = 1;
-    if ((i = stat(buf, st)) == -1) {
-	if (pathname) {
-	    strcat(buf, ".exe");
-	    if ((i = stat(buf, st)) == -1)
-		bing = 0;
-	} else
-	    bing = 0;
-    }
-    if (bing) {
-#else
     if ((i = stat(buf, st)) != -1) {
-#endif
 	if (pathname)
 	    strcpy(pathname, buf);
 	return i;
@@ -138,8 +104,8 @@ void save_binary P3(program_t *, prog, mem_block_t *, includes, mem_block_t *, p
     ret = safe_apply_master_ob(APPLY_VALID_SAVE_BINARY, 1);
     if (!MASTER_APPROVED(ret))
 	return;
-    if (prog->total_size > (int) MAXSHORT ||
-	includes->current_size > (int) MAXSHORT)
+    if (prog->total_size > (int) USHRT_MAX ||
+	includes->current_size > (int) USHRT_MAX)
 	/* assume all other sizes ok */
 	return;
 
@@ -223,7 +189,7 @@ void save_binary P3(program_t *, prog, mem_block_t *, includes, mem_block_t *, p
     /* string table */
     for (i = 0; i < (int) p->num_strings; i++) {
 	tmp = SHARED_STRLEN(p->strings[i]);
-	if (tmp > (int) MAXSHORT) {	/* possible? */
+	if (tmp > (int) USHRT_MAX) {	/* possible? */
 	    fclose(f);
 	    unlink(file_name);
 	    error("String to long for save_binary.\n");
@@ -294,31 +260,13 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
     len = strlen(file_name);
     file_name[len - 1] = (lpc_obj ? 'B' : 'b');	/* change .c ending to .b */
 
-#ifdef OS2
-    /* Put /'s in all the right places.... */
-    {
-	char *bing = file_name;
-
-	while (bing) {
-	    bing = strchr(bing, '/');
-	    if (bing)
-		*bing = '\\';
-	}
-    }
-#endif
-
     if (stat(file_name, &st) != -1)
 	mtime = st.st_mtime;
     else 
 	return OUT_OF_DATE;
 
-#ifdef OS2
-    if (!(f = fopen(file_name, "rb")))
-	return OUT_OF_DATE;
-#else
     if (!(f = fopen(file_name, "r")))
 	return OUT_OF_DATE;
-#endif
 
     if (comp_flag) {
 	debug_message(" loading binary %s ... ", name);
@@ -566,19 +514,6 @@ static int check_times P2(time_t, mtime, char *, nm)
 {
     struct stat st;
 
-#ifdef OS2
-    char *tmp, *c;
-
-    /* um ... doesn't this leak horridly? */
-    tmp = alloc_cstring(nm, "check_times");
-    while ((c = strchr(tmp, '/')))
-	*c = '\\';
-    if (stat(tmp, &st) == -1)
-	return -1;
-    if (st.st_mtime > mtime)
-	return 0;
-    return 1;
-#else
 #ifdef LATTICE
     if (*nm == '/')
 	nm++;
@@ -589,7 +524,6 @@ static int check_times P2(time_t, mtime, char *, nm)
 	return 0;
     }
     return 1;
-#endif
 }				/* check_times() */
 
 /*
@@ -689,60 +623,27 @@ FILE *crdir_fopen P1(char *, file_name)
     struct stat st;
     FILE *ret;
 
-#ifdef OS2
-    char *newy;
-
-    /* Take a copy as it could be a shared string */
-    newy = alloc_cstring(file_name, "crdir_fopen");
-#endif
-
     /*
      * Beek - These directories probably exist most of the time, so let's
      * optimize by trying the fopen first
      */
-#ifdef OS2
-    if ((ret = fopen(newy, "wb")) != NULL) {
-	FREE(newy);
-	return ret;
-    }
-    p = newy;
-#else
-    if ((ret = fopen(file_name, "w")) != NULL) {
+    if ((ret = fopen(file_name, "wb")) != NULL) {
 	return ret;
     }
     p = file_name;
-#endif
 
     while (*p && (p = (char *) strchr(p, '/'))) {
 	*p = '\0';
-#ifdef OS2
-	if (stat(newy, &st) == -1) {
-	    /* make this dir */
-	    if (mkdir(newy, 0770) == -1) {
-		*p = '\\';
-		FREE(newy);
-		return (FILE *) 0;
-	    }
-	}
-	*p = '\\';
-#else
 	if (stat(file_name, &st) == -1) {
 	    /* make this dir */
-	    if (mkdir(file_name, 0770) == -1) {
+	    if (OS_mkdir(file_name, 0770) == -1) {
 		*p = '/';
 		return (FILE *) 0;
 	    }
 	}
 	*p = '/';
-#endif
 	p++;
     }
 
-#ifdef OS2
-    f = fopen(newy, "wb");
-    FREE(newy);
-    return f;
-#else
     return fopen(file_name, "wb");
-#endif
 }				/* crdir_fopen() */
