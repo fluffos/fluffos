@@ -16,6 +16,13 @@
 void CDECL alarm_loop PROT((void *));
 #endif
 
+#ifdef USE_FLUFF_MOD
+#include <unistd.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#endif
 error_context_t *current_error_context = 0;
 
 /*
@@ -82,13 +89,23 @@ void logon P1(object_t *, ob)
  */
 int eval_cost;
 long time_used;
-
+#ifndef USE_FLUFF_MOD
 int query_time_used() {
   long secs, usecs;
   
   get_cpu_times((unsigned long *) &secs, (unsigned long *) &usecs);
   return (secs * 1000000) + usecs;
 }
+#else
+
+int *fluffpage = 0;
+
+int query_time_used() {
+  if(fluffpage)
+    return *fluffpage;
+}
+#endif
+
 
 void backend()
 {
@@ -97,6 +114,9 @@ void backend()
     volatile int first_call = 1;
     int there_is_a_port = 0;
     error_context_t econ;
+#ifdef USE_FLUFF_MOD
+    fluffpage = mmap(0, 4000, PROT_READ, MAP_SHARED, open("/dev/fluff", O_RDONLY), 0);
+#endif
 
     debug_message("Initializations complete.\n\n");
     for (i = 0; i < 5; i++) {
