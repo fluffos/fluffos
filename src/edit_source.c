@@ -1316,6 +1316,22 @@ static int check_prog P4(char *, tag, char *, pre, char *, code, int, andrun) {
     return 0;
 }
 
+static int check_code P2(char *, pre, char *, code) {
+    char buf[1024];
+    FILE *ct;
+    int rc;
+
+    ct = fopen("comptest.c", "w");
+    fprintf(ct, "#include \"configure.h\"\n#include \"std_incl.h\"\n%s\n\nint main() {%s}\n", (pre ? pre : ""), code);
+    fclose(ct);
+
+    sprintf(buf, "%s %s comptest.c -o comptest" TO_DEV_NULL, COMPILER, CFLAGS);
+    if (compile(buf) || (rc = system("./comptest")) == 127 || rc == -1) {
+	return -1;
+    }
+    return rc;
+}
+
 static void check_linux_libc() {
     char buf[1024];
     FILE *ct;
@@ -1533,6 +1549,14 @@ static void handle_configure() {
 		       "", "gettimeofday(0, 0);", 0);
     verbose_check_prog("Checking for fchmod()", "HAS_FCHMOD",
 		       "", "fchmod(0, 0);", 0);
+
+    printf("Checking for big or little endian ... ");
+    if (!check_code("char num[] = { 0x11, 0x22, 0x33, 0x44 }; int *foo = (int *)num;",
+		    "return (*foo == 0x44332211);")) {
+	printf("big\n");
+	fprintf(yyout, "#define BIGENDIAN 1");
+	fflush(yyout);
+    } else printf("little\n");
     
     find_memmove();
 #endif

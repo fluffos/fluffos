@@ -21,8 +21,9 @@ IBM PC (System V Release 4)
 IBM PC (NetBSD, FreeBSD, 386BSD, etc.)
 IBM PC (Windows 95/NT using Visual C++; see the windows/ subdirectory)
 Amiga (AmigaDOS using the LATTICE C or SAS/C compiler, or Linux, or gcc)
+Macintosh OS X (Darwin)
 
-*Send mail to mmessier@prilnari.com if you experience any problems
+*Send mail to marius@mudos.org if you experience any problems
 compiling or running on these systems.  Note that some of these machines have 
 old versions of yacc and do require bison (a yacc replacement) to compile 
 MudOS correctly.  If you manage to compile and run MudOS on a system other 

@@ -37,7 +37,7 @@ int external_start P5(int, which, svalue_t *, args,
 	set_close_callback(fd, arg3);
 	lpc_socks[fd].owner_ob = current_object;
 	lpc_socks[fd].mode = STREAM;
-	lpc_socks[fd].state = DATA_XFER;
+	lpc_socks[fd].state = STATE_DATA_XFER;
 	memset((char *) &lpc_socks[fd].l_addr, 0, sizeof(lpc_socks[fd].l_addr));
 	memset((char *) &lpc_socks[fd].r_addr, 0, sizeof(lpc_socks[fd].r_addr));
 	lpc_socks[fd].owner_ob = current_object;

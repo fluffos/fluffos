@@ -130,6 +130,11 @@ EXTRALIBS=-Lzlib
 
 echo "Trying out some stuff to see what works; ignore errors ..."
 
+# Mac OS X needs this in order to build properly
+if test "`uname`" = "Darwin"; then
+    NEED_OLD_CPP=-traditional-cpp
+fi
+
 # 
 # Figure out what make is, and how to invoke it
 # 

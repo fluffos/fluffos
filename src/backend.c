@@ -116,6 +116,7 @@ void backend()
     error_context_t econ;
 #ifdef USE_FLUFF_MOD
     fluffpage = mmap(0, 4000, PROT_READ, MAP_SHARED, open("/dev/fluff", O_RDONLY), 0);
+    time_used = *fluffpage;
 #endif
 
     debug_message("Initializations complete.\n\n");
@@ -719,17 +720,38 @@ char *query_load_av()
 
 #ifdef F_HEART_BEATS
 array_t *get_heart_beats() {
-    int n = num_hb_objs;
-    heart_beat_t *hb = heart_beats;
-    array_t *arr;
-    
-    arr = allocate_empty_array(n);
-    while (n--) {
-  arr->item[n].type = T_OBJECT;
-  arr->item[n].u.ob = hb->ob;
-  add_ref(hb->ob, "get_heart_beats");
-  hb++;
+  int nob = 0, n = num_hb_objs;
+  heart_beat_t *hb = heart_beats;
+  object_t **obtab;
+  array_t *arr;
+#ifdef F_SET_HIDE
+  int apply_valid_hide = 1, display_hidden = 0;
+#endif
+  
+  obtab = CALLOCATE(n, object_t *, TAG_TEMPORARY, "heart_beats");
+  while (n--) {
+#ifdef F_SET_HIDE
+    if (hb->ob->flags & O_HIDDEN) {
+      if (apply_valid_hide) {
+        apply_valid_hide = 0;
+        display_hidden = valid_hide(current_object);
+      }
+      if (!display_hidden)
+        continue;
     }
-    return arr;
+#endif
+    obtab[nob++] = (hb++)->ob;
+  }
+  
+  arr = allocate_empty_array(nob);
+  while (nob--) {
+    arr->item[n].type = T_OBJECT;
+    arr->item[n].u.ob = obtab[nob];
+    add_ref(arr->item[nob].u.ob, "get_heart_beats");
+  }
+  
+  FREE(obtab);
+ 
+  return arr;
 }
 #endif

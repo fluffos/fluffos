@@ -2664,6 +2664,9 @@ static void object_free_ed_buffer() {
 char *object_ed_start P3(object_t *, ob, char *, fname, int, restricted) {
     svalue_t *setup;
 
+    /* ensure that the result buffer is initialized */
+    outbuf_zero(&current_ed_results);
+
     regexp_user = ED_REGEXP;
     current_ed_buffer = add_ed_buffer(ob);
 

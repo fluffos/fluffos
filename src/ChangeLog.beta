@@ -1,4 +1,24 @@
-Fri Mar 30 17:14:07 2001 (mmessier@prilnari.com (Marius))
+Thu Feb  7 18:39:16 2002 (marius@mduso.org (Marius))
+	* raised patchlevel to v22.2b12
+	* #152: Fixed a crasher using nested references.  Fix supplied
+	  by Avenger@AtP.
+	* #153: Fixed crasher in debug builds with an invalid assert.
+	  [reported by Pickett@Sumu]
+	* #159, #162: Fixed a crasher in repeat_string() when the max
+	  string length is exceeded [reported by Eleinor@Arkansia]
+	* Ported to Mac OS X (Darwin)
+	* #166: this_player() will now always be this_object() when
+	  the net_dead apply is called from remove_interactive().  This
+	  should fix the write() oddities reported by Uranus.  I'm not
+	  labelling this as a COMPAT BUSTER because previously there was
+	  no guarantee what this_player() would be.
+	* #165: pluralizing -ff words gives incorrect -fves suffix
+	  [reported by Avenger@AtP]
+	* #161: everyone can see hidden object in named_livings() and
+	  heart_beats().  Applied the fixes suggested by Ben Hoogterp.
+	  [reported by Eleinor@Arkansia]
+
+Fri Mar 30 17:14:07 2001 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2b11
 	* #143: Fixed crashes when destructing various objects involved
 	  in APPLY_INIT calls.  Based on patches from Mark G. Adams
@@ -23,7 +43,7 @@ Fri Mar 30 17:14:07 2001 (mmessier@prilnari.com (Marius))
 	  of string in 'locals'.  Should be fixed up now [reported by
 	  Javelin@Vincent's Hollow]
 
-Mon Feb 12 16:09:42 2001 (mmessier@prilnari.com (Marius))
+Mon Feb 12 16:09:42 2001 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2b10
 	* #129: Added SLC_NAMELIST to the telnet.h included with MudOS
 	  for broken systems that are missing <arpa/telnet.h>
@@ -43,7 +63,7 @@ Mon Feb 12 16:09:42 2001 (mmessier@prilnari.com (Marius))
 	  letter.  Successive characters may be digits [reported by
 	  Arren@Anarres II]
 
-Mon Nov  6 18:48:25 2000 (mmessier@prilnari.com (Marius))
+Mon Nov  6 18:48:25 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2b9
 	* #104: Corrected the spelling of "ninth" which is used by
 	  the parse_sentence() efun.  [reported by lundberg@vr.net]
@@ -61,7 +81,7 @@ Mon Nov  6 18:48:25 2000 (mmessier@prilnari.com (Marius))
 	  will run, and the time will continue to advance.  This is a
 	  bug that is older than old [reported by Scatter]
 
-Wed Sep 27 08:20:05 2000 (mmessier@prilnari.com (Marius))
+Wed Sep 27 08:20:05 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2b8
 	* #83: Fixed get_char() when GET_CHAR_IS_BUFFERED is enabled.
 	  Make sure that the string returned is null terminated and
@@ -86,7 +106,7 @@ Wed Sep 27 08:20:05 2000 (mmessier@prilnari.com (Marius))
 	* #81: Filled in missing definitions for reference support for
 	  LPC_TO_C [reported by Uranus]
 
-Thu Sep 21 14:16:49 2000 (mmessier@prilnari.com (Marius))
+Thu Sep 21 14:16:49 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2b7
 	* #75: Fixed a typo in C_TRANSFER_LOCAL macro added in v22.2b6
 	  [reported by Uranus]
@@ -103,7 +123,7 @@ Thu Sep 21 14:16:49 2000 (mmessier@prilnari.com (Marius))
 	  has been modified (in addition to driver, includes, config,
 	  etc.) [from Bugs]
 
-Mon Sep 18 20:19:20 2000 (mmessier@prilnari.com (Marius))
+Mon Sep 18 20:19:20 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2b6
 	* #57: Fixed a problem with single quotes inside of a macro
 	  expansion [reported by Mystic]
@@ -123,7 +143,7 @@ Mon Sep 18 20:19:20 2000 (mmessier@prilnari.com (Marius))
 	* #50: Fixed a crasher with recursive inherits deeper than the
 	  maximum call depth [reported by Beyond]
 
-Sat Sep  9 16:16:54 2000 (mmessier@prilnari.com (Marius))
+Sat Sep  9 16:16:54 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2b5
 	* #16: 'ref' works in foreach again [originally reported by
 	  Uranus]
@@ -141,7 +161,7 @@ Sat Sep  9 16:16:54 2000 (mmessier@prilnari.com (Marius))
 	  now is that comments are not considered whitespace everywhere
 	  that they should be.
 
-Sat Sep  2 09:40:38 2000 (mmessier@prilnari.com (Marius))
+Sat Sep  2 09:40:38 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2b4
 	* updated with respect to v22.1pre4
 	* #40: Fixed compilation error in add_action.c [reported by
@@ -159,7 +179,7 @@ Sat Sep  2 09:40:38 2000 (mmessier@prilnari.com (Marius))
 	  end result is the same -- at least it's supposed to be.  1
 	  works, -1 doesn't.  [reported by Zifnab@Red Dragon]
 
-Mon Aug 28 08:16:50 2000 (mmessier@prilnari.com (Marius))
+Mon Aug 28 08:16:50 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2b3
 	* updated with respect to v22.1pre3
 	* #15: Picked up the fix from v22.1pre2 that was missed in the
@@ -175,7 +195,7 @@ Mon Aug 28 08:16:50 2000 (mmessier@prilnari.com (Marius))
 	  freed properly when the object is deallocated [reported by
 	  Uranus]
 
-Wed Aug 23 05:08:05 2000 (mmessier@prilnari.com (Marius))
+Wed Aug 23 05:08:05 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2b2
 	* updated with respect to v22.1pre2
 	* #4: fixed a problem with using the third defined class in an
@@ -190,7 +210,7 @@ Wed Aug 23 05:08:05 2000 (mmessier@prilnari.com (Marius))
 	* #23: Corrected arguments passed to compile_object() master
 	  apply when cloning a virtual object [reported by Uranus]
 
-Sun Aug 13 22:25:28 CDT 2000 (mmessier@prilnari.com (Marius))
+Sun Aug 13 22:25:28 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2b1
 	* updated with respect to v22.1pre1
 	* fixed a memory leak with MUD port external ports leaking
@@ -236,7 +256,7 @@ Sun Aug 13 22:25:28 CDT 2000 (mmessier@prilnari.com (Marius))
 	  assorted nonsense [reported by Mystic]
 
 -----------------------------------------------------------------------
-Wed Aug 30 18:58:56 2000 (mmessier@prilnari.com (Marius))
+Wed Aug 30 18:58:56 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1pre4
 	* Backported a fix from v22.2a24 for add_slash() to not prepend
 	a slash when the filename is '<function>'
@@ -248,7 +268,7 @@ Wed Aug 30 18:58:56 2000 (mmessier@prilnari.com (Marius))
 	* #30: Fixed a problem with marking references for objects in
 	  sentences with get_char() and input_to() [reported by Uranus]
 
-Mon Aug 28 08:11:42 2000 (mmessier@prilnari.com (Marius))
+Mon Aug 28 08:11:42 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1pre3
 	* Check for INADDR_NONE is now done in edit_source rather than
 	  on os specific check in portability.h.  [suggested by Beek]
@@ -278,7 +298,7 @@ Mon Aug 28 08:11:42 2000 (mmessier@prilnari.com (Marius))
           in the sentence chain for command_giver and returning 1 from
           the function.  [reported by Loriel@NS and Uranus]
 
-Wed Aug 23 04:59:44 2000 (mmessier@prilnari.com (Marius))
+Wed Aug 23 04:59:44 2000 (marius@mudos.org (Marius))
         * raised patchlevel to v22.1pre2
         * #1: fixed compilation error on Solaris where INADDR_NONE is
           not defined in system headers [reported by Dvarsk@Nightmare]
@@ -311,7 +331,7 @@ Wed Aug 23 04:59:44 2000 (mmessier@prilnari.com (Marius))
           apply restriction to be lifted.  Fixes error handler crashes
           [reported by Zifnab@Red Dragon]
 
-Wed Aug 13 22:03:44 CDT 2000 (mmessier@prilnari.com (Marius))
+Wed Aug 13 22:03:44 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1pre1
 	* patched a memory leak with MUD type LPC sockets
 	  leaking arrays/strings/mappings/classes received.
@@ -332,7 +352,7 @@ Wed Aug 13 22:03:44 CDT 2000 (mmessier@prilnari.com (Marius))
 	* more fixes to socket efuns to help prevent hangs on FreeBSD
 	  when a socket closes unexpectedly.
 
-Sat Jul 29 21:30:19 CDT 2000 (mmessier@prilnari.com (Marius))
+Sat Jul 29 21:30:19 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1b32
 	* fixed a crasher with reclaim_objects() and function
 	  pointers introduced in b31 [reported by Skullslayer@RoD]
@@ -348,7 +368,7 @@ Sat Jul 29 21:30:19 CDT 2000 (mmessier@prilnari.com (Marius))
 	* display a more appropriate error message when the global include
 	  file cannot be included for some reason [reported by Mystic]
 
-Fri Jul  7 20:43:00 CDT 2000 (mmessier@prilnari.com (Marius))
+Fri Jul  7 20:43:00 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1b31
 	* objectp() efun now returns 0 for a destructed object
 	  [reported by Ehan@MedievalTimes]
@@ -372,7 +392,7 @@ Fri Jul  7 20:43:00 CDT 2000 (mmessier@prilnari.com (Marius))
 	* fixed crasher when MAX_NUM_OBJECTS objects are found by the
 	  parser using plural modifier [reported by Dvarsk@Nightmare]
 
-Tue Jul  4 19:36:09 CDT 2000 (mmessier@prilnari.com (Marius))
+Tue Jul  4 19:36:09 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1b30
 	* virtual objects can be cloned again
 	* moved STACK_INC into interpret.h from interpret.c so
@@ -395,7 +415,7 @@ Tue Jul  4 19:36:09 CDT 2000 (mmessier@prilnari.com (Marius))
 	  caused by a bad call to free_object() when dereferencing
 	  a class member that held a destructed object
 
-Sat Jul  1 13:14:32 CDT 2000 (mmessier@prilnari.com (Marius))
+Sat Jul  1 13:14:32 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1b29
 	* various fixes from Alaron@RetroMud:
 	  . make db.c compile
@@ -425,7 +445,7 @@ Sat Jul  1 13:14:32 CDT 2000 (mmessier@prilnari.com (Marius))
 	  undefined class name and attempting to create an instance
 	  of an undefined class with new()
 
-Tue Jun 20 18:40:18 CDT 2000 (mmessier@prilnari.com (Marius))
+Tue Jun 20 18:40:18 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1b28
 	* fixed the changes made to ed in the last revision.  Turrican's
 	  patches were merged in wrong.
@@ -447,7 +467,7 @@ Tue Jun 20 18:40:18 CDT 2000 (mmessier@prilnari.com (Marius))
 	* raise class redefinition error only if member names and/or types differ
 	  [reported by Pinkfish@Discworld]
 
-Thu Jun 15 17:07:32 CDT 2000 (mmessier@prilnari.com (Marius))
+Thu Jun 15 17:07:32 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1b27
 	* if ARGUMENTS_IN_TRACEBACK or LOCALS_IN_TRACEBACK is defined, save
 	  error context in dump_trace() so as to maintain a consistent state if
@@ -478,7 +498,7 @@ Thu Jun 15 17:07:32 CDT 2000 (mmessier@prilnari.com (Marius))
 	* fix another crasher returning from a catch { ... } block [reported by
 	  Mystic]
 
-Mon Jun 12 08:46:33 CDT 2000 (mmessier@prilnari.com (Marius))
+Mon Jun 12 08:46:33 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1b26
 	* don't shut down the driver if a new connection fails to set
 	  non-blocking on linux, just dump the connection and move on
@@ -501,7 +521,7 @@ Mon Jun 12 08:46:33 CDT 2000 (mmessier@prilnari.com (Marius))
 	* correct index to local variable for warning about unused local
 	  variables [reported by Andrew@Nanvaent]
 
-Mon Jun  5 13:05:02 CDT 2000 (mmessier@prilnari.com (Marius))
+Mon Jun  5 13:05:02 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1b25
 	* several fixes to the terminal_colour() contrib efun:
 	  . bad stack/crash when string contains only %^'s
@@ -529,7 +549,7 @@ Mon Jun  5 13:05:02 CDT 2000 (mmessier@prilnari.com (Marius))
 	* added exceptions for plum and virus in the contrib efun pluralize().
 	  [reported by Avenger@AtP]
 
-Wed May 24 12:00:20 CDT 2000 (mmessier@prilnari.com (Marius))
+Wed May 24 12:00:20 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.1b24
 	* updated contact information for reporting bugs
 	* remove undefined status with += when rhs is real (completes

@@ -564,7 +564,7 @@ INLINE void assign_svalue_no_free P2(svalue_t *, to, svalue_t *, from)
 {
     DEBUG_CHECK(from == 0, "Attempt to assign_svalue() from a null ptr.\n");
     DEBUG_CHECK(to == 0, "Attempt to assign_svalue() to a null ptr.\n");
-    DEBUG_CHECK(from->type & (from->type - 1), "from->type is corrupt; >1 bit set.\n");
+    DEBUG_CHECK((from->type & (from->type - 1)) & ~T_FREED, "from->type is corrupt; >1 bit set.\n");
     
     if (from->type == T_OBJECT && (!from->u.ob || (from->u.ob->flags & O_DESTRUCTED))) {
   *to = const0u;
@@ -1980,8 +1980,8 @@ eval_instruction P1(char *, p)
        */
       ref = make_ref();
       ref->lvalue = sp->u.lvalue;
-      if (op != F_GLOBAL_LVALUE && op != F_LOCAL_LVALUE) {
-    ref->sv.type = lv_owner_type;
+      if (op != F_GLOBAL_LVALUE && op != F_LOCAL_LVALUE && op != F_REF_LVALUE) {
+        ref->sv.type = lv_owner_type;
     ref->sv.subtype = STRING_MALLOC; /* ignored if non-string */
     if (lv_owner_type == T_STRING) {
         ref->sv.u.string = (char *)lv_owner;

@@ -280,7 +280,7 @@ inheritance:
 		if (!($1 & DECL_ACCESS)) $1 |= DECL_PUBLIC;
 		
 		if (func_present)
-		    error("Illegal to inherit after defining functions.");
+		    yyerror("Illegal to inherit after defining functions.");
 
 		if (var_defined)
 		    yyerror("Illegal to inherit after defining global variables.");

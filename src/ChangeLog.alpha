@@ -1,7 +1,7 @@
 -------------------------------------------------------------
 (v22.2a37 promoted to v22.2b1)
 
-Sat Jul 29 21:32:05 CDT 2000 (mmessier@prilnari.com (Marius))
+Sat Jul 29 21:32:05 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2a37
 	* updated with respect to v22.1b32
 	* fixed miscellaneous typos and compile errors in a36
@@ -19,7 +19,7 @@ Sat Jul 29 21:32:05 CDT 2000 (mmessier@prilnari.com (Marius))
 	  in the master object or do not work.  Error messages were
 	  causing a crash [reported by Mystic]
 
-Fri Jul  7 21:16:16 CDT 2000 (mmessier@prilnari.com (Marius))
+Fri Jul  7 21:16:16 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2a36
 	* updated with respect to v22.1b31
 	* fixed process_input() so that the modified command is passed
@@ -35,7 +35,7 @@ Fri Jul  7 21:16:16 CDT 2000 (mmessier@prilnari.com (Marius))
 	  support running on port 23.  the implementation is partial
 	  at present, but sufficient to serve its purpose.
 
-Tue Jul  4 19:45:03 CDT 2000 (mmessier@prilnari.com (Marius))
+Tue Jul  4 19:45:03 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2a35
 	* updated with respect to v22.1b30
 	* fixed escape_command() so that ! command escaping
@@ -46,7 +46,7 @@ Tue Jul  4 19:45:03 CDT 2000 (mmessier@prilnari.com (Marius))
 	* removed recently added debug checks for destructed
 	  objects pushed onto/assigned into the stack.
 
-Sun Jul  2 19:00:55 CDT 2000 (mmessier@prilnari.com (Marius))
+Sun Jul  2 19:00:55 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2a34
 	* updated with respect to v22.1b29
 	* fixed lower_case() and upper_case(), both broken in a32 by
@@ -70,14 +70,14 @@ Sun Jul  2 19:00:55 CDT 2000 (mmessier@prilnari.com (Marius))
 	  can't find msql.h, mysql.h, libmsql.a, or libmysql.a.  If they
 	  can't be found, you'll have to hack the source for now.
 
-Sat Jul  1 13:18:19 CDT 2000 (mmessier@prilnari.com (Marius))
+Sat Jul  1 13:18:19 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2a33
 	* don't save command_giver on the runtime stack.  use a separate
 	  stack instead.
 	* add missing add_ref in save_command_giver() to match the
 	  free_object() in restore_command_giver()
 
-Tue Jun 20 18:41:51 CDT 2000 (mmessier@prilnari.com (Marius))
+Tue Jun 20 18:41:51 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2a32
 	* updated with respect to v22.1b28
 	* for the network_stats() contrib efun, return the external ports with
@@ -92,7 +92,7 @@ Tue Jun 20 18:41:51 CDT 2000 (mmessier@prilnari.com (Marius))
 	  object.  This resolves problems with class related errors when the
 	  simul_efun object is involved [reported by Pinkfish@Discworld]
 
-Sat Jun 17 12:15:08 CDT 2000 (mmessier@prilnari.com (Marius))
+Sat Jun 17 12:15:08 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2a31
 	* updated with respect to v22.1b27
 	* added extensive packet/volume statistic gathering to comm.c and
@@ -104,14 +104,14 @@ Sat Jun 17 12:15:08 CDT 2000 (mmessier@prilnari.com (Marius))
 	  . added an optional 2nd argument to socket_address efun to return the
 	    socket's local address when specified as non-zero
 
-Thu Jun 15 17:11:07 CDT 2000 (mmessier@prilnari.com (Marius))
+Thu Jun 15 17:11:07 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2a30
 	* NUL terminate user input buffer before passing it to handle_snoop().
 	  [reported by Passerby@IoT]
 	* correct handling of cr/lf when processing commands [reported by
 	  Loriel@Lima Bean]
 
-Mon Jun 12 09:06:09 CDT 2000 (mmessier@prilnari.com (Marius))
+Mon Jun 12 09:06:09 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2a29
 	* updated with respect to v22.1b26
 	* handle backspace in user input because some clients send everything
@@ -138,7 +138,7 @@ Mon Jun 12 09:06:09 CDT 2000 (mmessier@prilnari.com (Marius))
 	* removed dead telnet_neg() function from comm.c
 	* check for tzset() and the need to prototype it in configure phase
 
-Mon Jun  5 13:16:25 CDT 2000 (mmessier@prilnari.com (Marius))
+Mon Jun  5 13:16:25 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2a28
 	* updated with respect to v22.1b25
 	* rewrote user command handling in comm.c:
@@ -164,7 +164,7 @@ Mon Jun  5 13:16:25 CDT 2000 (mmessier@prilnari.com (Marius))
 	* fix a parser crasher in interrogate_object() when the object has
 	  both PI_SETUP and PI_REFRESH flags [reported by Dvarsk@Nightmare]
 
-Wed May 24 12:01:34 CDT 2000 (mmessier@prilnari.com (Marius))
+Wed May 24 12:01:34 CDT 2000 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2a27
 	* updated with respect to v22.1b24
 	* fixed (s)printf() to be re-entrant.  This allows for the removal
