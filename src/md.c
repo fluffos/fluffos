@@ -7,6 +7,7 @@
 #include "lex.h"
 #include "simul_efun.h"
 #include "swap.h"
+#include "call_out.h"
 #include "mapping.h"
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 #include "socket_efuns.h"
@@ -50,13 +51,13 @@ int blocks[MAX_CATEGORY];
 static char *sources[] = { 
     "*", "temporary blocks", "permanent blocks", "compiler blocks", 
     "data blocks", "miscellaneous blocks", "<#6>", "<#7>", "<#8>", "<#9>",
-    "<#10>", "program blocks", "interpreter", "interactives", "ed blocks", 
+    "<#10>", "program blocks", "call_out blocks", "interactives", "ed blocks", 
     "<#15>", "include list", "permanent identifiers", 
     "identifier hash table", "reserved block", "mudlib stats", "objects",
     "object table", "config table", "simul_efuns", "sentences", "string table",
     "free swap blocks", "uids", "object names", "predefines", "line numbers",
     "compiler local blocks", "compiled program", "users", "debugmalloc overhead",
-    "<unused>", "parser", "input_to", "sockets", 
+    "heart_beat list", "parser", "input_to", "sockets", 
     "strings", "malloc strings", "shared strings", "function pointers", "arrays",
     "mappings", "mapping nodes", "mapping tables", "buffers", "classes"
 };
@@ -702,21 +703,16 @@ void check_all_blocks P1(int, flag) {
 	    outbuf_add(&out, "WARNING: more than one identifier hash table allocated.\n");
 	if (blocks[TAG_RESERVED & 0xff] > 1)
 	    outbuf_add(&out, "WARNING: more than one reserved block allocated.\n");
-#ifdef NO_ADD_ACTION
 	if (blocks[TAG_OBJ_TBL & 0xff] > 1)
-	    outbuf_add(&out, "WARNING: more than one object table allocated.\n");
-#else
-	if (blocks[TAG_OBJ_TBL & 0xff] > 2)
-	    outbuf_add(&out, "WARNING: more than two object tables allocated.\n");
-#endif
+	    outbuf_add(&out, "WARNING: more than object table allocated.\n");
 	if (blocks[TAG_CONFIG & 0xff] > 1)
 	    outbuf_add(&out, "WARNING: more than config file table allocated.\n");
 	if (blocks[TAG_STR_TBL & 0xff] > 1)
 	    outbuf_add(&out, "WARNING: more than string table allocated.\n");
+	if (totals[TAG_CALL_OUT & 0xff] != print_call_out_usage(&out, -1))
+	    outbuf_add(&out, "WARNING: wrong number of call_out blocks allocated.\n");
 	if (blocks[TAG_LOCALS & 0xff] > 3)
 	    outbuf_add(&out, "WARNING: more than 3 local blocks allocated.\n");
-	if (blocks[TAG_INTERPRETER & 0xff] > 3)
-	    outbuf_addv(&out, "WARNING: more than 3 interpreter blocks allocated (%i).\n", blocks[TAG_INTERPRETER & 0xff]);
 	
 	if (blocks[TAG_SENTENCE & 0xff] != tot_alloc_sentence)
 	    outbuf_addv(&out, "WARNING: tot_alloc_sentence is: %i should be: %i\n",
@@ -790,6 +786,9 @@ void check_all_blocks P1(int, flag) {
 #ifdef PACKAGE_UIDS
 	mark_all_uid_nodes();
 #endif
+#ifdef PACKAGE_MUDLIB_STATS
+	mark_mudlib_stats();
+#endif
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 	mark_sockets();
 #endif
@@ -805,6 +804,7 @@ void check_all_blocks P1(int, flag) {
 	mark_iptable();
 	mark_stack();
 	mark_command_giver_stack();
+	mark_call_outs();
 	mark_simuls();
 	mark_apply_low_cache();
 	mark_mapping_node_blocks();
@@ -938,6 +938,9 @@ void check_all_blocks P1(int, flag) {
 	for (hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
 	    for (entry = table[hsh]; entry; entry = entry->next) {
 		switch (entry->tag) {
+		case TAG_MUDLIB_STATS:
+		    outbuf_addv(&out, "WARNING: Found orphan mudlib stat block: %s %04x\n", entry->desc, (int)entry->tag);
+		    break;
 		case TAG_PROGRAM:
 		    prog = NODET_TO_PTR(entry, program_t *);
 		    if (prog->ref != prog->extra_ref)

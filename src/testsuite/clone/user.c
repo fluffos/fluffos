@@ -184,8 +184,12 @@ receive_message(string newclass, string msg)
 void
 setup()
 {
+    set_heart_beat(1);
 #ifdef __PACKAGE_UIDS__
     seteuid(getuid(this_object()));
+#endif
+#ifndef __NO_WIZARDS__
+    enable_wizard();
 #endif
 #ifndef __NO_ADD_ACTION__
     set_living_name(query_name());
@@ -209,6 +213,7 @@ void tell_room(object ob, string msg) {
 void
 net_dead()
 {
+    set_heart_beat(0);
 #ifndef __NO_ENVIRONMENT__
     tell_room(environment(), query_name() + " is link-dead.\n");
 #endif
@@ -219,6 +224,7 @@ net_dead()
 void
 reconnect()
 {
+    set_heart_beat(1);
 #ifndef __NO_ENVIRONMENT__
     tell_room(environment(), "Reconnected.\n");
     tell_room(environment(), query_name() + " has reconnected.\n");

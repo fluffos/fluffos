@@ -71,4 +71,5 @@ operator parse_command;
 
 operator new_class, new_empty_class;
 operator expand_varargs;
+operator type_check;
 

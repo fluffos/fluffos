@@ -121,7 +121,7 @@ t_stat small_free_stat =
 t_stat small_chunk_stat =
 {0, 0};
 
-POINTER smalloc_malloc P1(size_t, size)
+POINTER CDECL smalloc_malloc P1(size_t, size)
 {
     /* int i; */
     u *temp;
@@ -212,7 +212,7 @@ static int malloced_size P1(POINTER, ptr)
     return (int) (((u *) ptr)[-1] & MASK);
 }
 
-SFREE_RETURN_TYPE smalloc_free P1(POINTER, ptr)
+SFREE_RETURN_TYPE CDECL smalloc_free P1(POINTER, ptr)
 {
     u *block;
     u i;
@@ -1351,7 +1351,7 @@ static void large_free P1(char *, ptr)
     add_to_free_list(p);
 }
 
-POINTER smalloc_realloc P2(POINTER, p, size_t, size)
+POINTER CDECL smalloc_realloc P2(POINTER, p, size_t, size)
 {
     unsigned *q, old_size;
     char *t;
@@ -1411,7 +1411,7 @@ void show_mstats P2(outbuffer_t *, ob, char *, s)
 /*
  * calloc() is provided because some stdio packages uses it.
  */
-POINTER smalloc_calloc P2(size_t, nelem, size_t, sizel)
+POINTER CDECL smalloc_calloc P2(size_t, nelem, size_t, sizel)
 {
     char *p;
 

@@ -30,6 +30,7 @@ void debug_level_clear PROT((char *));
 #endif
 
 /* Would be nice to have tons of these; should go to arbitrary bitsets */
+#define DBG_call_out	 	1
 #define DBG_addr_server		2
 #define DBG_d_flag		4
 #define DBG_connections		8

@@ -8,6 +8,6 @@ main(string arg)
 	destruct(find_object("/tmp_eval_file"));
 
     write_file("/tmp_eval_file.c","mixed eval() { "+arg+"; }\n");
-    write(sprintf("Result = %O\n", "/tmp_eval_file"->eval()));
+    printf("Result = %O\n", "/tmp_eval_file"->eval());
     return 1;
 }

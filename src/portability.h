@@ -23,6 +23,26 @@
 /* define this if you're using HP-UX 7.x (or below?) */
 #undef OLD_HPUX
 
+#if defined(WINNT) || defined(WIN95)
+#  ifndef WIN32
+#    define WIN32
+#      ifndef _FUNC_SPEC_
+         typedef char * caddr_t;
+#      endif
+#  endif
+#  define symlink(x, y) dos_style_link(x, y)
+#  define CDECL __cdecl
+#else
+#  define CDECL
+#endif
+
+#ifdef WIN32
+#  define WINSOCK
+#  ifdef sun
+#    undef sun
+#  endif
+#endif
+
 #if defined(SunOS_5) && !defined(SVR4)
 #  define SVR4
 #endif
@@ -151,6 +171,10 @@
 #  define MAXPATHLEN PATH_MAX
 #endif
 
+#if defined(WIN32) && !defined(MAXPATHLEN)
+#  define MAXPATHLEN 512
+#endif
+
 #if defined(_M_UNIX) && !defined(MAXPATHLEN)
 #  define MAXPATHLEN 1024
 #endif
@@ -181,6 +205,59 @@
 #  define port_strerror strerror
 #endif
 
+#ifdef WINSOCK
+/* Windows stuff */
+
+#  define WINSOCK_NO_FLAGS_SET  0
+
+#  define OS_socket_write(f, m, l) send(f, m, l, WINSOCK_NO_FLAGS_SET)
+#  define OS_socket_read(r, b, l) recv(r, b, l, WINSOCK_NO_FLAGS_SET)
+#  define OS_socket_close(f) closesocket(f)
+#  define OS_socket_ioctl(f, w, a) ioctlsocket(f, w, a)
+#  define EWOULDBLOCK             WSAEWOULDBLOCK
+#  define EINPROGRESS             WSAEINPROGRESS
+#  define EALREADY                WSAEALREADY
+#  define ENOTSOCK                WSAENOTSOCK
+#  define EDESTADDRREQ            WSAEDESTADDRREQ
+#  define EMSGSIZE                WSAEMSGSIZE
+#  define EPROTOTYPE              WSAEPROTOTYPE
+#  define ENOPROTOOPT             WSAENOPROTOOPT
+#  define EPROTONOSUPPORT         WSAEPROTONOSUPPORT
+#  define ESOCKTNOSUPPORT         WSAESOCKTNOSUPPORT
+#  define EOPNOTSUPP              WSAEOPNOTSUPP
+#  define EPFNOSUPPORT            WSAEPFNOSUPPORT
+#  define EAFNOSUPPORT            WSAEAFNOSUPPORT
+#  define EADDRINUSE              WSAEADDRINUSE
+#  define EADDRNOTAVAIL           WSAEADDRNOTAVAIL
+#  define ENETDOWN                WSAENETDOWN
+#  define ENETUNREACH             WSAENETUNREACH
+#  define ENETRESET               WSAENETRESET
+#  define ECONNABORTED            WSAECONNABORTED
+#  define ECONNRESET              WSAECONNRESET
+#  define ENOBUFS                 WSAENOBUFS
+#  define EISCONN                 WSAEISCONN
+#  define ENOTCONN                WSAENOTCONN
+#  define ESHUTDOWN               WSAESHUTDOWN
+#  define ETOOMANYREFS            WSAETOOMANYREFS
+#  define ETIMEDOUT               WSAETIMEDOUT
+#  define ECONNREFUSED            WSAECONNREFUSED
+#  define ELOOP                   WSAELOOP
+#  define EHOSTDOWN               WSAEHOSTDOWN
+#  define EHOSTUNREACH            WSAEHOSTUNREACH
+#  define EPROCLIM                WSAEPROCLIM
+#  define EUSERS                  WSAEUSERS
+#  define EDQUOT                  WSAEDQUOT
+#  define ESTALE                  WSAESTALE
+#  define EREMOTE                 WSAEREMOTE
+#  define socket_errno WSAGetLastError()
+#  define socket_perror(x, y) SocketPerror(x, y)
+
+#  define FOPEN_READ "rb"
+#  define FOPEN_WRITE "wb"
+#  define OPEN_WRITE (O_WRONLY | O_BINARY)
+#  define OPEN_READ (O_RDONLY | O_BINARY)
+#else
+/* Normal UNIX */
 #  define OS_socket_write(f, m, l) send(f, m, l, 0)
 #  define OS_socket_read(r, b, l) recv(r, b, l, 0)
 #  define OS_socket_close(f) close(f)
@@ -194,9 +271,12 @@
 #  define FOPEN_WRITE "w"
 #  define OPEN_WRITE O_WRONLY
 #  define OPEN_READ O_RDONLY
+#endif
 
-#if !defined(EWOULDBLOCK) && defined(EAGAIN)
-#  define EWOULDBLOCK EAGAIN
+#ifndef EWOULDBLOCK
+#ifdef EAGAIN
+#define EWOULDBLOCK EAGAIN
+#endif
 #endif
 
 #endif				/* _PORT_H */

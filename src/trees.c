@@ -428,3 +428,11 @@ parse_node_t *optimize_loop_test P1(parse_node_t *, pn) {
     
     return ret;
 }
+
+
+
+
+
+
+
+

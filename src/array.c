@@ -3,6 +3,7 @@
 #include "comm.h"
 #include "regexp.h"
 #include "backend.h"
+#include "qsort.h"
 #include "md.h"
 #include "efun_protos.h"
 
@@ -41,6 +42,24 @@ array_t the_null_array =
     0,				/* size */
 };
 
+#ifdef PACKAGE_MUDLIB_STATS
+static void ms_setup_stats P1(array_t *, p) {
+    if (current_object) {
+	assign_stats(&p->stats, current_object);
+	add_array_size(&p->stats, p->size);
+    } else {
+	null_stats(&p->stats);
+    }
+}
+
+#define ms_remove_stats(p) add_array_size(&(p)->stats, -(int)((p)->size))
+#define ms_add_array_size(p, n) add_array_size(p, n)
+#else
+#define ms_setup_stats(x)
+#define ms_remove_stats(x)
+#define ms_add_array_size(p, n)
+#endif
+
 /* Array allocation routines:
  *
  * the prefix int_ indicates error checking is not performed.  It is up to
@@ -65,6 +84,7 @@ static array_t *int_allocate_empty_array P1(int, n) {
     p = ALLOC_ARRAY(n);
     p->ref = 1;
     p->size = n;
+    ms_setup_stats(p);
 
     return p;
 }
@@ -124,6 +144,7 @@ array_t *allocate_array2 P2(int, n, svalue_t *, svp) {
 }
 
 static void dealloc_empty_array P1(array_t *, p) {
+    ms_remove_stats(p);
 #ifdef ARRAY_STATS
     num_arrays--;
     total_array_size -= sizeof(array_t) + sizeof(svalue_t) *
@@ -159,13 +180,14 @@ void free_empty_array P1(array_t *, p)
 
 /* Finish setting up an array allocated with ALLOC_ARRAY, resizing it to
    size n */
-INLINE_STATIC array_t *fix_array P2(array_t *, p, int, n) {
+static array_t *fix_array P2(array_t *, p, int, n) {
 #ifdef ARRAY_STATS
     num_arrays++;
     total_array_size += sizeof(array_t) + sizeof(svalue_t) * (n-1);
 #endif
     p->size = n;
     p->ref = 1;
+    ms_setup_stats(p);
     return RESIZE_ARRAY(p, n);
 }
 
@@ -173,10 +195,12 @@ INLINE_STATIC array_t *resize_array P2(array_t *, p, int, n) {
 #ifdef ARRAY_STATS
     total_array_size += (n - p->size) * sizeof(svalue_t);
 #endif
+    ms_remove_stats(p);
     p = RESIZE_ARRAY(p, n);
     if (!p)
 	fatal("Out of memory.\n");
     p->size = n;
+    ms_setup_stats(p);
     
     return p;
 }
@@ -594,33 +618,35 @@ filter_array P2(svalue_t *, arg, int, num_arg)
 	return;
     }
     else {
+	char *flags;
 	svalue_t *v;
 	int res = 0, cnt;
 	function_to_call_t ftc;
 	
 	process_efun_callback(1, &ftc, F_FILTER);
 
-	/* allocate a full size array and push it onto the stack so that if an
-	 * error occurs, it'll get cleaned up.  can't use empty array because
-	 * if an error occurs, it'll contain garbage and crash the driver
-	 */
-	r = allocate_array(size);
-	push_refed_array(r);
+	flags = new_string(size, "TEMP: filter: flags");
+	push_malloced_string(flags);
 
 	for (cnt = 0; cnt < size; cnt++) {
 	    push_svalue(vec->item + cnt);
 	    v = call_efun_callback(&ftc, 1);
-	    if (!IS_ZERO(v))
-		assign_svalue_no_free(&r->item[res++], vec->item + cnt);
+	    if (!IS_ZERO(v)) {
+		flags[cnt] = 1;
+		res++;
+	    } else
+		flags[cnt] = 0;
+	}
+	r = allocate_empty_array(res);
+	if (res) {
+	    while (cnt--) {
+		if (flags[cnt])
+		    assign_svalue_no_free(&r->item[--res], vec->item+cnt);
+	    }
 	}
 
-	sp--;	/* pull the work array off the stack without freeing it */
-	if (res) {
-	    r = resize_array(r, res);
-	} else {
-	    free_array(r);
-	    r = &the_null_array;
-	}
+	FREE_MSTR(flags);
+	sp--;
 	pop_n_elems(num_arg - 1);
 	free_array(vec);
 	sp->u.arr = r;
@@ -1064,8 +1090,7 @@ static function_to_call_t *sort_array_ftc;
 array_t *builtin_sort_array P2(array_t *, inlist, int, dir)
 {
     quickSort((char *) inlist->item, inlist->size, sizeof(inlist->item),
-	      (dir<0) ? (qsort_comparefn_t)builtin_sort_array_cmp_rev :
-			(qsort_comparefn_t)builtin_sort_array_cmp_fwd);
+	      (dir<0) ? builtin_sort_array_cmp_rev : builtin_sort_array_cmp_fwd);
 
     return inlist;
 }
@@ -1226,7 +1251,7 @@ f_sort_array PROT((void))
 	    process_efun_callback(1, &ftc, F_SORT_ARRAY);
 
 	    tmp = copy_array(tmp);
-	    quickSort((char *) tmp->item, tmp->size, sizeof(tmp->item), (qsort_comparefn_t)sort_array_cmp);
+	    quickSort((char *) tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
 	    sort_array_ftc = old_ptr;
 	    break;
 	}

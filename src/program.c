@@ -57,7 +57,9 @@ void deallocate_program P1(program_t *, progp)
 void free_prog P2(program_t *, progp, int, free_sub_strings)
 {
     progp->ref--;
-    if (progp->ref > 0 || progp->func_ref > 0)
+    if (progp->ref > 0)
+	return;
+    if (progp->func_ref > 0)
 	return;
 
     if (free_sub_strings) 
@@ -69,14 +71,14 @@ void free_prog P2(program_t *, progp, int, free_sub_strings)
     }
 }
 
-char *variable_name P2(program_t *, prog, int, idx)
-{
+char *variable_name P2(program_t *, prog, int, idx) {
     int i = prog->num_inherited - 1;
     int first;
 
-    if (i <= -1)
+    if (i > -1)
+	first = prog->inherit[i].variable_index_offset + prog->inherit[i].prog->num_variables_total;
+    else
 	return prog->variable_table[idx];
-    first = prog->inherit[i].variable_index_offset + prog->inherit[i].prog->num_variables_total;
     if (idx >= first)
 	return prog->variable_table[idx - first];
     while (idx < prog->inherit[i].variable_index_offset)
@@ -84,13 +86,14 @@ char *variable_name P2(program_t *, prog, int, idx)
     return variable_name(prog->inherit[i].prog, idx - prog->inherit[i].variable_index_offset);
 }
 
-function_t *find_func_entry P5(program_t *, prog, int, index, program_t **, prog_out, int *, index_out, int, update_indices)
-{
+function_t *find_func_entry P2(program_t *, prog, int, index) {
     register int low, mid, high;
+    
 
     /* Walk up the inheritance tree to the real definition */	
-    if (prog->function_flags[index] & FUNC_ALIAS)
+    if (prog->function_flags[index] & FUNC_ALIAS) {
 	index = prog->function_flags[index] & ~FUNC_ALIAS;
+    }
     
     while (prog->function_flags[index] & FUNC_INHERITED) {
 	low = 0;
@@ -103,27 +106,11 @@ function_t *find_func_entry P5(program_t *, prog, int, index, program_t **, prog
 	    else low = mid;
 	}
 	index -= prog->inherit[low].function_index_offset;
-	if (update_indices) {
-	    function_index_offset += prog->inherit[low].function_index_offset;
-	    variable_index_offset += prog->inherit[low].variable_index_offset;
-	}
 	prog = prog->inherit[low].prog;
     }
     
     index -= prog->last_inherited;
 
-    if (prog_out)
-	*prog_out = prog;
-    if (index_out)
-	*index_out = index;
-
     return prog->function_table + index;
 }
 
-char *function_name P2(program_t *, prog, int, index)
-{
-    function_t *funp;
-
-    funp = find_func_entry(prog, index, 0, 0, 0);
-    return funp->name;
-}

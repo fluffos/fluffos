@@ -18,7 +18,11 @@
 #include "file_incl.h"
 #include "lpc_incl.h"
 #include "compiler.h"
-#include "grammar.tab.h"
+#ifdef WIN32
+#  include "grammar_tab.h"
+#else
+#  include "grammar.tab.h"
+#endif
 #include "scratchpad.h"
 #include "preprocess.h"
 #include "md.h"
@@ -66,7 +70,9 @@ static char **inc_list;
 static int inc_list_size;
 static int defines_need_freed = 0;
 static char *last_nl;
+static int nexpands = 0;
 
+#define EXPANDMAX 25000
 static char *expands[EXPANDMAX];
 static int expand_depth = 0;
 
@@ -196,9 +202,9 @@ static ident_hash_elem_t *ident_dirty_list = 0;
 
 instr_t instrs[MAX_INSTRS];
 
-#define TERM_ADD_INPUT	0x1
-#define TERM_INCLUDE	0x2
-#define TERM_START	0x4
+#define TERM_ADD_INPUT 1
+#define TERM_INCLUDE 2
+#define TERM_START 4
 
 typedef struct linked_buf_s {
     struct linked_buf_s *prev;
@@ -207,7 +213,6 @@ typedef struct linked_buf_s {
     char *buf_end;
     char *outp;
     char *last_nl;
-    char *end_deadzone;
 } linked_buf_t;
 
 static linked_buf_t head_lbuf = { NULL, TERM_START };
@@ -218,7 +223,7 @@ static void free_defines PROT((void));
 static void add_define PROT((char *, int, char *));
 static void add_predefine PROT((char *, int, char *));
 static int expand_define PROT((void));
-static void add_input PROT((char *, int));
+static void add_input PROT((char *));
 static int cond_get_exp PROT((int));
 static void merge PROT((char *name, char *dest));
 static void add_quoted_predefine PROT((char *, char *));
@@ -592,8 +597,8 @@ get_array_block P1(char *, term)
 		outp = --yyp;	/* some operating systems give EOF only once */
 
 		for (i = curchunk; i > startchunk; i--)
-		    add_input(array_line[i], 0);
-		add_input(array_line[startchunk] + startpos + termlen, 0);
+		    add_input(array_line[i]);
+		add_input(array_line[startchunk] + startpos + termlen);
 	    }
 
 	    /*
@@ -607,7 +612,7 @@ get_array_block P1(char *, term)
 	    *--outp = ')';
 	    *--outp = '}';
 	    for (i = startchunk; i >= 0; i--)
-		add_input(array_line[i], 0);
+		add_input(array_line[i]);
 
 	    res = 1;
 	    break;
@@ -743,7 +748,7 @@ get_text_block P1(char *, term)
 			*q = 0;
 		    }
 			
-		    add_input(text_line[i], 0);
+		    add_input(text_line[i]);
 		}
 		p = text_line[startchunk] + startpos + termlen;
 		while (*p && *p != '\\')
@@ -756,7 +761,7 @@ get_text_block P1(char *, term)
 		    } while (*p);
 		    *q = 0;
 		}
-		add_input(text_line[startchunk] + startpos + termlen, 0);
+		add_input(text_line[startchunk] + startpos + termlen);
 	    }
 
 	    /*
@@ -771,7 +776,7 @@ get_text_block P1(char *, term)
 	    *--outp = '"';
 
 	    for (i = startchunk; i >= 0; i--)
-		add_input(text_line[i], 0);
+		add_input(text_line[i]);
 
 	    res = 1;
 	    break;
@@ -824,7 +829,7 @@ get_text_block P1(char *, term)
     return res;
 }
 
-static void skip_line PROT((void))
+static void skip_line()
 {
     unsigned char c;
     register char *yyp = outp;
@@ -836,7 +841,7 @@ static void skip_line PROT((void))
     outp = yyp;
 }
 
-static void skip_comment PROT((void))
+static void skip_comment()
 {
     unsigned char c = '*';
     register char *yyp = outp;
@@ -849,6 +854,7 @@ static void skip_comment PROT((void))
 		return;
 	    }
 	    if (c == '\n') {
+		nexpands = 0;
 		current_line++;
 		if (yyp == last_nl + 1) {
 		    outp = yyp;
@@ -865,6 +871,7 @@ static void skip_comment PROT((void))
 		return;
 	    }
 	    if (c == '\n') {
+		nexpands = 0;
 		current_line++;
 		if (yyp == last_nl + 1) {
 		    outp = yyp;
@@ -940,7 +947,7 @@ static void handle_pragma P1(char *, str)
     yywarn("Unknown #pragma, ignored.");
 }
 
-char *show_error_context PROT((void)) {
+char *show_error_context() {
     static char buf[60];
     extern int yychar;
     char sub_context[25];
@@ -973,7 +980,26 @@ char *show_error_context PROT((void)) {
     return buf;
 }
 
-static void refill_buffer PROT((void)) {
+#ifdef WIN32
+int correct_read(int handle, char *buf, unsigned int count)
+{
+    unsigned int tmp,size=0;
+
+    do {
+	tmp=read(handle,buf,count);
+	if (tmp < 0) return tmp;
+	if (tmp == 0) return size;
+	size+=tmp;
+	count-=tmp;
+	buf+=tmp;
+    } while (count>0);
+    return size;
+}
+#else
+#define correct_read read
+#endif
+
+static void refill_buffer() {
     if (cur_lbuf != &head_lbuf) {
 	if (outp >= cur_lbuf->buf_end && 
 	    cur_lbuf->term_type == TERM_ADD_INPUT) {
@@ -995,9 +1021,6 @@ static void refill_buffer PROT((void)) {
     /* Assume outp is one beyond a newline at last_nl */
     /* or after an #include .... */
 
-    if (outp > cur_lbuf->end_deadzone)
-	cur_lbuf->end_deadzone = 0;
-
     {
 	char *end;
 	char *p;
@@ -1017,7 +1040,7 @@ static void refill_buffer PROT((void)) {
 		p = outp + size - 1;
 	    }
 		
-            size = read(yyin_desc, p, MAXLINE);
+            size = correct_read(yyin_desc, p, MAXLINE);
 	    cur_lbuf->buf_end = p += size;
 	    if (size < MAXLINE) { *(last_nl = p) = LEX_EOF; return; }
 	    while (*--p != '\n');
@@ -1059,7 +1082,6 @@ static void refill_buffer PROT((void)) {
 		cur_lbuf->outp = outp;
 		new_lbuf->prev = cur_lbuf;
 		new_lbuf->term_type = TERM_INCLUDE;
-		new_lbuf->end_deadzone = 0;
 		new_outp = new_lbuf->buf + DEFMAX - MAXLINE - size - 5;
 		memcpy(new_outp - 1, outp - 1, size);
 		cur_lbuf = new_lbuf;
@@ -1068,7 +1090,7 @@ static void refill_buffer PROT((void)) {
 		flag = 1;
 	    }
 
-	    size = read(yyin_desc, p, MAXLINE);
+	    size = correct_read(yyin_desc, p, MAXLINE);
 	    end = p += size;
 	    if (flag) cur_lbuf->buf_end = p;
 	    if (size < MAXLINE) { 
@@ -1088,7 +1110,7 @@ static void refill_buffer PROT((void)) {
 	
 static int function_flag = 0;
 
-INLINE void push_function_context PROT((void)) {
+INLINE void push_function_context() {
     function_context_t *fc;
     parse_node_t *node;
 
@@ -1110,14 +1132,14 @@ INLINE void push_function_context PROT((void)) {
     current_function_context = fc;
 }
 
-void pop_function_context PROT((void)) {
+void pop_function_context() {
     current_function_context = current_function_context->parent;
     last_function_context--;
 }
 
-static int old_func PROT((void)) {
-    add_input(" ", 0);
-    add_input(yytext, 0);
+static int old_func() {
+    add_input(" ");
+    add_input(yytext);
     push_function_context();
     return L_FUNCTION_OPEN;
 }
@@ -1127,10 +1149,10 @@ static int old_func PROT((void)) {
 
 /* To halt execution when a #breakpoint line is encountered, set a breakpoint
    at this function */
-static void lex_breakpoint PROT((void)) {
+static void lex_breakpoint() {
 }
 
-int yylex PROT((void))
+int yylex()
 {
     static char partial[MAXLINE + 5];	/* extra 5 for safety buffer */
     static char terminator[MAXLINE + 5];
@@ -1163,6 +1185,7 @@ int yylex PROT((void))
 		   to the file we're returning to */
 		current_line_base += current_line - current_line_saved;
 		free_string(current_file);
+		nexpands = 0;
 		if (outp >= cur_lbuf->buf_end) {
 		    linked_buf_t *prev_lbuf;
 		    if ((prev_lbuf = cur_lbuf->prev)) {
@@ -1199,6 +1222,7 @@ int yylex PROT((void))
 	    return -1;
 	case '\n':
 	    {
+		nexpands = 0;
 		current_line++;
 		total_lines++;
 		if (outp == last_nl + 1) refill_buffer();
@@ -1497,7 +1521,7 @@ int yylex PROT((void))
 			int cond;
 
 			*--outp = '\0';
-			add_input(sp, 0);
+			add_input(sp);
 			cond = cond_get_exp(0);
 			if (*outp++) {
 			    yyerror("Condition too complex in #if");
@@ -1922,13 +1946,28 @@ parse_identifier:
 		    SAVEC;
 		}
 		*yyp = 0;
-		if (partp != partial) {
+		if (c == '#') {
+		    if (*outp++ != '#')
+			lexerror("Single '#' in identifier -- use '##' for token pasting");
+		    outp -= 2;
+		    if (!expand_define()) {
+			if (partp + (r = strlen(yytext)) + (function_flag ? 3 : 0) - partial > MAXLINE)
+			    lexerror("Pasted token is too long");
+			if (function_flag) {
+			    strcpy(partp, "(: ");
+			    partp += 3;
+			}
+			strcpy(partp, yytext);
+			partp += r;
+			outp += 2;
+		    }
+		} else if (partp != partial) {
 		    outp--;
 		    if (!expand_define())
-			add_input(yytext, 0);
+			add_input(yytext);
 		    while ((c = *outp++) == ' ');
 		    outp--;
-		    add_input(partial, 0);
+		    add_input(partial);
 		    partp = partial;
 		    partial[0] = 0;
 		} else {
@@ -1939,7 +1978,7 @@ parse_identifier:
 			    if (ihe->token & IHE_RESWORD) {
 				if (function_flag) {
 				    function_flag = 0;
-				    add_input(yytext, 0);
+				    add_input(yytext);
 				    push_function_context();
 				    return L_FUNCTION_OPEN;
 				}
@@ -1985,7 +2024,7 @@ parse_identifier:
 		    }
 		    if (function_flag) {
 			function_flag = 0;
-			add_input("(:", 0);
+			add_input("(:");
 		    }
 		}
 		break;
@@ -2007,7 +2046,7 @@ parse_identifier:
 
 extern YYSTYPE yylval;
 
-void end_new_file PROT((void))
+void end_new_file()
 {
     while (inctop) {
 	incstate_t *p;
@@ -2053,7 +2092,7 @@ static void add_quoted_predefine P2(char *, def, char *, val)
     add_predefine(def, -1, save_buf);
 }
 
-void add_predefines PROT(())
+void add_predefines()
 {
     char save_buf[80];
     int i;
@@ -2132,9 +2171,9 @@ void start_new_file P1(int, f)
     current_function_context = 0;
     cur_lbuf = &head_lbuf;
     cur_lbuf->outp = cur_lbuf->buf_end = outp = cur_lbuf->buf + (DEFMAX >> 1);
-    cur_lbuf->end_deadzone = 0;
     *(last_nl = outp - 1) = '\n';
     pragmas = DEFAULT_PRAGMAS;
+    nexpands = 0;
     incnum = 0;
     current_line = 1;
     current_line_base = 0;
@@ -2185,7 +2224,7 @@ static void int_add_instr_name P3(char *, name, int, n, short, t)
 }
 #endif
 
-static void init_instrs PROT((void))
+static void init_instrs()
 {
     int i, n;
 
@@ -2366,7 +2405,7 @@ static void init_instrs PROT((void))
 
 #define GETALPHA(p, q, m, e) \
     if (*p == '_' || uisalpha(*p)) {\
-	while (isalunum((unsigned char)*p)) {\
+	while(isalunum((unsigned char)*p)) {\
 	    *q = *p++;\
 	    if (q < (m))\
 		q++;\
@@ -2378,7 +2417,7 @@ static void init_instrs PROT((void))
     } else lexerror(e);\
     *q++ = 0
 
-static int cmygetc PROT((void))
+static int cmygetc()
 {
     int c;
 
@@ -2396,7 +2435,7 @@ static int cmygetc PROT((void))
     }
 }
 
-static void refill PROT((void))
+static void refill()
 {
     char *p;
     unsigned char c;
@@ -2414,6 +2453,7 @@ static void refill PROT((void))
     if ((c == '\n') && (outp == last_nl + 1)) refill_buffer();
     p[-1] = ' ';
     *p = 0;
+    nexpands = 0;
     current_line++;
 }
 
@@ -2501,7 +2541,7 @@ static void handle_define P1(char *, yyt)
 		squote ^= !dquote;
 	    }
 
-	    if (*p++ == MARKS && !dquote && !squote)
+	    if (*p++ == MARKS)
 		*++q = MARKS;
 	    if (q < mtext + MLEN - 2)
 		q++;
@@ -2541,7 +2581,7 @@ static void handle_define P1(char *, yyt)
 }
 
 /* IDEA: linked buffers, to allow "unlimited" buffer expansion */
-static void add_input P2(char *, p, int, length)
+static void add_input P1(char *, p)
 {
     int l = strlen(p);
 
@@ -2578,21 +2618,16 @@ static void add_input P2(char *, p, int, length)
 	memcpy(new_outp, p, l);
 	memcpy(new_outp + l, outp, (q - outp) + 1);
 	outp = new_outp;
-	if (length) cur_lbuf->end_deadzone = outp + length;
-	else cur_lbuf->end_deadzone = 0;
 	*(last_nl + 1) = 0;
 	return;
     }
 
     outp -= l;
     strncpy(outp, p, l);
-
-    if (length)
-	cur_lbuf->end_deadzone = outp + length;
 }
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-void mark_all_defines PROT((void)) {
+void mark_all_defines() {
     int i;
     defn_t *tmp;
 
@@ -2640,7 +2675,7 @@ static void add_predefine P3(char *, name, int, nargs, char *, exps)
     }
 }
 
-static void free_defines PROT((void))
+static void free_defines()
 {
     defn_t *p, *q;
     int i;
@@ -2663,21 +2698,18 @@ static void free_defines PROT((void))
 	    p = p->next;
 	}
     }
+    nexpands = 0;
 }
 
-#define SKIPW\
-        if (!src)\
-            do {\
-                c = cmygetc();\
-            } while (is_wspace(c));\
-        else\
-            do { c = *(*src)++; \
+#define SKIPW \
+        do {\
+            c = cmygetc();\
         } while (is_wspace(c));
 
-static int extract_args P3(char **, argv, outbuffer_t *, argb, char **, src)
+static int extract_args P2(char **, argv, char *, argb)
 {
-    int argc = 0, dquote = 0, parcnt = 0, squote = 0, argi[NARGS], i;
-    char *save;
+    int argc = 0, dquote = 0, parcnt = 0, squote = 0;
+    char *out;
     unsigned char c;
 
     SKIPW;
@@ -2691,7 +2723,7 @@ static int extract_args P3(char **, argv, outbuffer_t *, argb, char **, src)
     if (c == ')')
 	return 0;
 
-    argi[0] = 0;
+    argv[0] = out = argb;
     while (argc < NARGS) {
 	switch (c) {
 	    case '\"':
@@ -2704,9 +2736,8 @@ static int extract_args P3(char **, argv, outbuffer_t *, argb, char **, src)
 		break;
 	    case '\\':
 		if (squote || dquote) {
-		    outbuf_addchar(argb, c);
-                    if (src) c = *(*src)++;
-                    else get_next_char(c);
+		    *out++ = c;
+		    get_next_char(c);
 		}
 		break;
 	    case '(':
@@ -2728,7 +2759,6 @@ static int extract_args P3(char **, argv, outbuffer_t *, argb, char **, src)
 		total_lines++;
 		c = ' ';
 		break;
-	    case 0:
 	    case LEX_EOF:
 		lexerror("Unexpected end of file");
 		return -1;
@@ -2739,23 +2769,23 @@ static int extract_args P3(char **, argv, outbuffer_t *, argb, char **, src)
 	    char *exp;
 
 	    /* strip off trailing whitespace char if there was one */
-	    if (argb->buffer && uisspace(*(argb->buffer + argb->real_size - 1)))
-		*(argb->buffer + --argb->real_size) = 0;
-	    if (parcnt < 0) {
-		for (i = 0;  i < argc + 1;  i++)
-		    argv[i] = argb->buffer + argi[i];
+	    if (uisspace(*(out - 1))) *(out - 1) = 0;
+	    else *out++ = 0;
+	    if (parcnt < 0)
 		return argc + 1;
-	    }
-	    outbuf_addchar(argb, 0);
-	    argi[++argc] = argb->real_size;
+	    argv[++argc] = out;
 	} else {
 	    /* don't save leading whitespace and don't accumulate trailing whitespace */
-	    if (!uisspace(c) || dquote || squote || (argb->real_size > argi[argc] && !uisspace(*(argb->buffer + argb->real_size - 1))))
-		outbuf_addchar(argb, c);
+	    if (!uisspace(c) || dquote || squote || (out > argv[argc] && !uisspace(*(out - 1)))) {
+		if (out >= argb + DEFMAX - NARGS) {
+		    lexerror("Macro argument overflow");
+		    return -1;
+		}
+		*out++ = c;
+	    }
 	}
 
-        if (src) c = *(*src)++;
-        else if (!squote && !dquote) c = cmygetc();
+	if (!squote && !dquote) c = cmygetc();
 	else get_next_char(c);
     }
 
@@ -2764,249 +2794,154 @@ static int extract_args P3(char **, argv, outbuffer_t *, argb, char **, src)
 }
 
 /* Check if yytext is a macro and expand if it is. */
-static char *expand_define2 P2(char *, text, char **, src)
+static char *expand_define2 P1(char *, text)
 {
-    int argc = 0, i, paste = 0;
-    int dquote, squote;
+    int argc = 0, i, paste = 0, pasting = 0;
     defn_t *macro;
-    outbuffer_t argbuf, expbuf, outbuf, tmpbuf;
-    char *argv[NARGS], *out, *base, *in, *tmp, *exp;
+    char expbuf[DEFMAX], *argv[NARGS], *expand_buffer, *in, *out, *freeme = 0;
 
-    /* special handling for __LINE__ macro */
-    if (!strcmp(text, "__LINE__")) {
-	char buf[12];
-
-	sprintf(buf, "%i", current_line);
-	return string_copy(buf, "expand_define2");
-    }
-
-    /* is this a macro?  if not, nothing to do */
-    macro = lookup_define(text);
-    if (!macro)
-	return 0;
-
-    /* have we already expanded this macro?  if so, don't do it again */
+    /* have we already expanded this macro? */
     for (i = 0;  i < expand_depth;  i++) {
 	if (!strcmp(expands[i], text))
 	    return 0;
     }
-    if (expand_depth == EXPANDMAX) {
+    expands[expand_depth++] = text;
+
+    if (nexpands++ > EXPANDMAX) {
+	expand_depth--;
 	lexerror("Too many macro expansions");
 	return 0;
     }
-    expands[expand_depth++] = text;
 
-    /* if the macro has arguments, extract them from the input stream */
-    outbuf_zero(&argbuf);
+    macro = lookup_define(text);
+    if (!macro) {
+	expand_depth--;
+	return 0;
+    }
+
     if (macro->nargs >= 0) {
-	if ((argc = extract_args(argv, &argbuf, src)) == -1) {
-	    outbuf_free(&argbuf);
+	if ((argc = extract_args(argv, expbuf)) == -1) {
 	    expand_depth--;
 	    return 0;
 	}
 	if (argc != macro->nargs) {
-	    outbuf_free(&argbuf);
 	    expand_depth--;
 	    yyerror("Wrong number of macro arguments");
 	    return 0;
 	}
     }
 
-    outbuf_zero(&expbuf);
-    if (macro->nargs >= 0) {
-	int pasting = 0;
-
-	dquote = squote = 0;
-	for (in = macro->exps;  *in;  in++) {
-	    if (squote || dquote) {
-		switch (*in) {
-		    case '\'':
-			if (!dquote)
-			    squote ^= 1;
-			break;
-		    case '\"':
-			if (!squote)
-			    dquote ^= 1;
-			break;
-		    case '\\':
-			outbuf_addchar(&expbuf, *in++);
-			break;
-		}
-		outbuf_addchar(&expbuf, *in);
-		continue;
-	    }
-	    if ((dquote = (*in == '\"')) || (squote = (*in == '\''))) {
-		outbuf_addchar(&expbuf, *in);
-		continue;
-	    }
-	    if (*in == '#' && *(in + 1) == '#') {
-		/* skip backwards over whitespace */
-		while (expbuf.real_size && uisspace(*(expbuf.buffer + expbuf.real_size - 1)))
-		    *(expbuf.buffer + --expbuf.real_size) = 0;
-		/* skip ahead over whitespace */
-		for (in += 2;  *in && uisspace(*in);  in++);
-		in--;	/* shave one off because the continue will inc by one */
-		pasting = 1;
-		continue;
-	    }
-	    if (!dquote && !squote) {
-		if (*in == '#' && *(in + 1) == MARKS && *(in + 2) != MARKS) {
-		    in += 2;
-		    outbuf_addchar(&expbuf, '\"');
-		    for (tmp = argv[*in - MARKS - 1];  *tmp;  tmp++) {
-			if (*tmp == '\\' || *tmp == '\"')
-			    outbuf_addchar(&expbuf, '\\');
-			outbuf_addchar(&expbuf, *tmp);
-		    }
-		    outbuf_addchar(&expbuf, '\"');
-		    continue;
-		}
-		if (*in == MARKS && *++in != MARKS) {
-		    int was_pasting = pasting;
-		    int arg = *in - MARKS - 1;
-
-		    /* skip ahead to see if we're followed by ## for token pasting */
-		    if (!pasting) {
-			for (tmp = in + 1;  *tmp && uisspace(*tmp);  tmp++);
-			if (*tmp == '#' && *(tmp + 1) == '#') {
-			    for (tmp += 2;  *tmp && uisspace(*tmp);  tmp++);
-			    in = tmp - 1;
-			    pasting = 1;
-			}
-		    }
-		    if (!pasting) {
-			/* expand any macros contained within the argument */
-			outbuf_zero(&tmpbuf);
-			for (tmp = argv[arg];  *tmp;  tmp++) {
-			    if (!dquote && !squote &&
-				((!tmpbuf.real_size && (uisalpha(*tmp) || (*tmp == '_')) ||
-				(tmpbuf.real_size && isalunum(*tmp))))) {
-				outbuf_addchar(&tmpbuf, *tmp);
-			    } else {
-				if (tmpbuf.real_size) {
-				    if ((exp = expand_define2(tmpbuf.buffer, &tmp)) != 0) {
-					outbuf_add(&expbuf, exp);
-					FREE_MSTR(exp);
-				    } else outbuf_add(&expbuf, tmpbuf.buffer);
-				    outbuf_free(&tmpbuf);
-				    tmp--;
-				    continue;
-				}
-				if (dquote || squote) {
-				    switch (*tmp) {
-					case '\'':
-					    if (!dquote)
-						squote ^= 1;
-					    break;
-					case '\"':
-					    if (!squote)
-						dquote ^= 1;
-					    break;
-					case '\\':
-					    outbuf_addchar(&expbuf, *tmp++);
-					    break;
-				    }
-				} else {
-				    (dquote = (*tmp == '\"')) || (squote = (*tmp == '\''));
-				}
-
-				outbuf_addchar(&expbuf, *tmp);
-			    }
-			}
-			if (tmpbuf.real_size) {
-			    if ((exp = expand_define2(tmpbuf.buffer, &in)) != 0) {
-				outbuf_add(&expbuf, exp);
-				FREE_MSTR(exp);
-			    } else outbuf_add(&expbuf, tmpbuf.buffer);
-			    outbuf_free(&tmpbuf);
-			}
-			dquote = squote = 0;
-		    } else {
-			outbuf_add(&expbuf, argv[arg]);
-		    }
-		    pasting = (pasting && !was_pasting);
-		    continue;
-		}
-	    }
-	    pasting = 0;
-	    outbuf_addchar(&expbuf, *in);
-	}
-    } else {
-	outbuf_add(&expbuf, macro->exps);
+    if (!argc) {
+	expand_buffer = (char *)DXALLOC(strlen(macro->exps) + 1, TAG_COMPILER, "expand_define2");
+	strcpy(expand_buffer, macro->exps);
+	expand_depth--;
+	return expand_buffer;
     }
 
-    /* now we've got expbuf -- this is the macro expansion with arguments
-     * substituted and expanded as well as tokens pasted.  process this
-     * buffer once more, expanding macros as necessary
-     */
-    dquote = squote = 0;
-    outbuf_zero(&outbuf);
-    outbuf_zero(&tmpbuf);
-    if (!expbuf.buffer)
-	expbuf.buffer = string_copy("", "expand_define2");
-    for (in = expbuf.buffer;  *in;  in++) {
-	if (!dquote && !squote &&
-	    ((!tmpbuf.real_size && (uisalpha(*in) || (*in == '_')) ||
-	      (tmpbuf.real_size && isalunum(*in))))) {
-	    outbuf_addchar(&tmpbuf, *in);
-	} else {
-	    if (tmpbuf.real_size) {
-		if ((exp = expand_define2(tmpbuf.buffer, &in)) != 0) {
-		    outbuf_add(&outbuf, exp);
-		    FREE_MSTR(exp);
-		} else outbuf_add(&outbuf, tmpbuf.buffer);
-		outbuf_free(&tmpbuf);
-		in--;
-		continue;
-	    }
+    /* Perform expansion with args */
+    in  = macro->exps;
+    out = expand_buffer = (char *)DXALLOC(DEFMAX, TAG_COMPILER, "expand_define2");
 
-	    if (dquote || squote) {
-		switch (*in) {
-		    case '\'':
-			if (!dquote)
-			    squote ^= 1;
-			break;
-		    case '\"':
-			if (!squote)
-			    dquote ^= 1;
-			break;
-		    case '\\':
-			outbuf_addchar(&outbuf, *in++);
-			break;
+#define SAVECHAR(x) SAFE(\
+		    if (out + 1 < expand_buffer + DEFMAX) {\
+			*out++ = (x);\
+		    } else {\
+			if (freeme) FREE(freeme);\
+			FREE(expand_buffer);\
+			lexerror("Macro expansion overflow");\
+			expand_depth--;\
+			return 0;\
+		    })
+
+#define SAVESTR(x, y)	SAFE(\
+			if (out + (y) < expand_buffer + DEFMAX) {\
+			    memcpy(out, (x), (y));\
+			    out += (y);\
+			} else {\
+			    if (freeme) FREE(freeme);\
+			    FREE(expand_buffer);\
+			    lexerror("Macro expansion overflow");\
+			    expand_depth--;\
+			    return 0;\
+			}\
+			if (freeme) {\
+			    FREE(freeme);\
+			    freeme = 0;\
+			})
+
+    while (*in) {
+	char *skip = in + 1;
+
+	if (*in == MARKS && *++in != MARKS) {
+	    char *exp;
+
+	    exp = argv[*in++ - MARKS - 1];
+
+	    if (paste) {
+		paste = 0;
+		*(out - 1) = '\"';
+		while (*exp) {
+		    switch (*exp) {
+			case '\"':
+			    SAVECHAR('\\');
+			    break;
+			case '\\':
+			    SAVECHAR(*exp);
+			    exp++;
+			    break;
+		    }
+		    SAVECHAR(*exp);
+		    exp++;
 		}
+		SAVECHAR('\"');
 	    } else {
-		(dquote = (*in == '\"')) || (squote = (*in == '\''));
-	    }
+		int len;
 
-	    outbuf_addchar(&outbuf, *in);
+		/* don't expand if token pasting with ## */
+		if (!pasting && (freeme = expand_define2(exp)) != 0)
+		    exp = freeme;
+		len = strlen(exp);
+		SAVESTR(exp, len);
+	    }
+	} else {
+	    paste = (*in == '#');
+	    /* FIXME: Here we need to recursively expand any macros that we
+	     * come across.  This cannot possibly be done the way lex.c is
+	     * currently architected.  I've tried.  This all needs to be
+	     * redone anyway, but this just going to have to do for now :-(
+	     */
+	    SAVECHAR(*in);
+	    in++;
+	}
+
+	/* skip over whitespace and see if we've got ## for token pasting.  if
+	 * we do, skip over it and continue at the first non-whitespace char.
+	 * note that comments are not considered whitespace here like they
+	 * should be.
+	 */
+	pasting = 0;
+	while (*skip && uisspace(*skip)) skip++;
+	if (*skip == '#' && *(skip + 1) == '#') {
+	    skip += 2;
+	    /* guaranteed by add_define to not have end of input before non-whitespace */
+	    while (uisspace(*skip)) skip++;
+	    in = skip;
+	    pasting = (*in == MARKS && *(in + 1) != MARKS);
 	}
     }
-    if (tmpbuf.real_size) {
-	if ((exp = expand_define2(tmpbuf.buffer, src)) != 0) {
-	    outbuf_add(&outbuf, exp);
-	    FREE_MSTR(exp);
-	} else outbuf_add(&outbuf, tmpbuf.buffer);
-	outbuf_free(&tmpbuf);
-    }
 
+    *out = 0;
     expand_depth--;
-    outbuf_free(&argbuf);
-    outbuf_free(&expbuf);
-    outbuf_fix(&outbuf);
-    return (outbuf.buffer ? outbuf.buffer : string_copy("", "expand_define2"));
+    return expand_buffer;
 }
 
 int expand_define PROT((void))
 {
     char *expand_buffer;
 
-    /* don't do macro expansion if we're processing expanded data */
-    if (cur_lbuf->end_deadzone && outp <= cur_lbuf->end_deadzone)
-	return 0;
-
-    if ((expand_buffer = expand_define2(yytext, 0)) != 0) {
-	add_input(expand_buffer, MSTR_SIZE(expand_buffer));
-	FREE_MSTR(expand_buffer);
+    if ((expand_buffer = expand_define2(yytext)) != 0) {
+	add_input(expand_buffer);
+	FREE(expand_buffer);
 	return 1;
     }
 
@@ -3018,7 +2953,7 @@ int expand_define PROT((void))
 */
 #define SKPW 	do c = *outp++; while(is_wspace(c)); outp--
 
-static int exgetc PROT((void))
+static int exgetc()
 {
     unsigned char c;
     char *yyp;
@@ -3068,12 +3003,12 @@ static int exgetc PROT((void))
 		flag = (lookup_define(yytext) != 0);
 	    }
 	    if (flag)
-		add_input(" 1 ", 0);
+		add_input(" 1 ");
 	    else
-		add_input(" 0 ", 0);
+		add_input(" 0 ");
 	} else {
 	    if (!expand_define())
-		add_input(" 0 ", 0);
+		add_input(" 0 ");
 	}
 	c = *outp++;
     }
@@ -3129,7 +3064,7 @@ void set_inc_list P1(char *, list)
 	list[strlen(list)] = ':';
 }
 
-char *main_file_name PROT((void))
+char *main_file_name()
 {
     incstate_t *is;
 
@@ -3316,7 +3251,7 @@ void debug_dump_ident_hash_table P1(int, noisy) {
 }
 #endif
 
-void free_unused_identifiers PROT((void)) {
+void free_unused_identifiers() {
     ident_hash_elem_list_t *ihel, *next;
     lname_linked_buf_t *lnb, *lnbn;
     int i;
@@ -3364,7 +3299,7 @@ void free_unused_identifiers PROT((void)) {
 #endif
 }
 
-static ident_hash_elem_t *quick_alloc_ident_entry PROT((void)) {
+static ident_hash_elem_t *quick_alloc_ident_entry() {
     if (num_free) {
 	num_free--;
 	return &(ihe_list->items[num_free]);
@@ -3451,7 +3386,7 @@ static void add_keyword_t P2(char *, name, keyword_t *, entry) {
     entry->token |= IHE_RESWORD;
 }
 
-void init_identifiers PROT((void)) {
+void init_identifiers() {
     int i;
     ident_hash_elem_t *ihe;
 
@@ -3496,3 +3431,4 @@ void init_identifiers PROT((void)) {
 	ihe->dn.efun_num = i;
     }
 }
+

@@ -7,7 +7,7 @@
 
 #define MAX_VERB_BUFF 100
 
-object_t **hashed_living = 0;
+object_t *  hashed_living[CFG_LIVING_HASH_SIZE] = { 0 };
 
 static int	    num_living_names;
 static int	    num_searches = 1;
@@ -15,23 +15,6 @@ static int	    search_length = 1;
 static int	    illegal_sentence_action;
 static char *	    last_verb;
 static object_t *   illegal_sentence_ob;
-
-void init_living_table PROT((void))
-{
-    int i = LIVING_HASH_TABLE_SIZE;
-
-    /* validate the living hash table size from the configuration file */
-    if (LIVING_HASH_TABLE_SIZE !=    4 && LIVING_HASH_TABLE_SIZE !=   16 &&
-	LIVING_HASH_TABLE_SIZE !=   64 && LIVING_HASH_TABLE_SIZE !=  256 &&
-	LIVING_HASH_TABLE_SIZE != 1024 && LIVING_HASH_TABLE_SIZE != 4096) {
-	fprintf(stderr, "living hash table size must be 4, 16, 64, 256, 1024 or 4096 ONLY!\n");
-	exit(-1);
-    }
-
-    hashed_living = CALLOCATE(i, object_t *, TAG_OBJ_TBL, "init_living_table");
-    while (--i >= 0)
-	hashed_living[i] = 0;
-}
 
 static void notify_no_command PROT((void))
 {
@@ -81,7 +64,7 @@ void clear_notify P1(object_t *, ob)
 
 INLINE_STATIC int hash_living_name P1(char *, str)
 {
-    return whashstr(str, 20) & (LIVING_HASH_TABLE_SIZE - 1);
+    return whashstr(str, 20) & (CFG_LIVING_HASH_SIZE - 1);
 }
 
 object_t *find_living_object P2(char *, str, int, user)
@@ -407,6 +390,14 @@ static int user_parser P1(char *, buff)
 	}
 	
 	if (ret && (ret->type != T_NUMBER || ret->u.number != 0)) {
+#ifdef PACKAGE_MUDLIB_STATS
+	    if (command_giver && command_giver->interactive
+#ifndef NO_WIZARDS
+		&& !(command_giver->flags & O_IS_WIZARD)
+#endif
+		)
+		add_moves(&command_object->stats, 1);
+#endif
 	    if (!illegal_sentence_action)
 		illegal_sentence_action = save_illegal_sentence_action;
 	    return 1;

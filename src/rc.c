@@ -143,7 +143,7 @@ static char *process_config_string(char *str) {
 void set_defaults P1(char *, filename)
 {
     FILE *def;
-    char defaults[100];
+    char defaults[SMALL_STRING_SIZE];
     char *p;
     char tmp[MAX_LINE_LENGTH];
     char kind[MAX_LINE_LENGTH];
@@ -206,8 +206,12 @@ void set_defaults P1(char *, filename)
     CONFIG_STR(__LOG_DIR__) = alloc_cstring(tmp, "config file: ld");
     scan_config_line("include directories : %[^\n]", tmp, 1);
     CONFIG_STR(__INCLUDE_DIRS__) = alloc_cstring(tmp, "config file: id");
+#ifdef BINARIES
     scan_config_line("save binaries directory : %[^\n]", tmp, 1);
     CONFIG_STR(__SAVE_BINARIES_DIR__) = alloc_cstring(tmp, "config file: sbd");
+#else
+    CONFIG_STR(__SAVE_BINARIES_DIR__) = alloc_cstring("", "config file: sbd");
+#endif
 
     scan_config_line("master file : %[^\n]", tmp, 1);
     CONFIG_STR(__MASTER_FILE__) = alloc_cstring(tmp, "config file: mf");
@@ -225,9 +229,6 @@ void set_defaults P1(char *, filename)
 
     scan_config_line("mud ip : %[^\n]", tmp, 0);
     CONFIG_STR(__MUD_IP__) = alloc_cstring(tmp, "config file: mi");
-
-    scan_config_line("escape characters : %[^\n]", tmp, 1);
-    CONFIG_STR(__ESCAPE_CHARACTERS__) = alloc_cstring(tmp, "config file: ec");
 
     if (scan_config_line("fd6 kind : %[^\n]", tmp, 0)) {
 	if (!strcasecmp(tmp, "telnet"))
@@ -254,8 +255,6 @@ void set_defaults P1(char *, filename)
     
     scan_config_line("address server port : %d\n",
 		     &CONFIG_INT(__ADDR_SERVER_PORT__), 0);
-    scan_config_line("address server reconnect : %d\n",
-		     &CONFIG_INT(__ADDR_SERVER_RECONNECT__), 0);
 
     scan_config_line("fd6 port : %d\n", &CONFIG_INT(__FD6_PORT__), 0);
 
@@ -265,20 +264,20 @@ void set_defaults P1(char *, filename)
 		     &CONFIG_INT(__TIME_TO_RESET__), 1);
     scan_config_line("time to swap : %d\n",
 		     &CONFIG_INT(__TIME_TO_SWAP__), 1);
-    scan_config_line("pulse interval : %d\n",
-		     &CONFIG_INT(__PULSE_INTERVAL__), -1);
 
+#if 0
+    /*
+     * not currently used...see options.h
+     */
     scan_config_line("evaluator stack size : %d\n", 
-		     &CONFIG_INT(__EVALUATOR_STACK_SIZE__), 1);
-
+		     &CONFIG_INT(__EVALUATOR_STACK_SIZE__), 0);
     scan_config_line("maximum local variables : %d\n",
-		     &CONFIG_INT(__MAX_LOCAL_VARIABLES__), 1);
-
+		     &CONFIG_INT(__MAX_LOCAL_VARIABLES__), 0);
     scan_config_line("maximum call depth : %d\n",
-		     &CONFIG_INT(__MAX_CALL_DEPTH__), 1);
-
+		     &CONFIG_INT(__MAX_CALL_DEPTH__), 0);
     scan_config_line("living hash table size : %d\n",
-		     &CONFIG_INT(__LIVING_HASH_TABLE_SIZE__), 1);
+		     &CONFIG_INT(__LIVING_HASH_TABLE_SIZE__), 0);
+#endif
 
     scan_config_line("inherit chain size : %d\n",
 		     &CONFIG_INT(__INHERIT_CHAIN_SIZE__), 1);
@@ -297,8 +296,6 @@ void set_defaults P1(char *, filename)
 		     &CONFIG_INT(__MAX_STRING_LENGTH__), 1);
     scan_config_line("maximum bits in a bitfield : %d\n",
 		     &CONFIG_INT(__MAX_BITFIELD_BITS__), 1);
-    scan_config_line("maximum svalue save depth : %d\n",
-		     &CONFIG_INT(__MAX_SAVE_SVALUE_DEPTH__), 1);
 
     scan_config_line("maximum byte transfer : %d\n", 
 		     &CONFIG_INT(__MAX_BYTE_TRANSFER__), 1);
@@ -367,6 +364,14 @@ void set_defaults P1(char *, filename)
 
     FREE(buff);
     fclose(def);
+
+    /*
+     * from options.h
+     */
+    config_int[__EVALUATOR_STACK_SIZE__ - BASE_CONFIG_INT] = CFG_EVALUATOR_STACK_SIZE;
+    config_int[__MAX_LOCAL_VARIABLES__ - BASE_CONFIG_INT] = CFG_MAX_LOCAL_VARIABLES;
+    config_int[__MAX_CALL_DEPTH__ - BASE_CONFIG_INT] = CFG_MAX_CALL_DEPTH;
+    config_int[__LIVING_HASH_TABLE_SIZE__ - BASE_CONFIG_INT] = CFG_LIVING_HASH_SIZE;
 }
 
 int get_config_item P2(svalue_t *, res, svalue_t *, arg)

@@ -1,10 +1,3 @@
-/*
- * Author: Unknown (Beek?)
- * Description: An LPC implementation of the parse_command() efun that is still
- *              in the driver, much to my dismay.  I have no idea what state
- *              this code is in.  Use at your own risk -- Marius
- */
-
 private mixed *ret;
 private mixed value;
 
@@ -63,8 +56,8 @@ mixed *parse_command(string cmd, mixed obarr, string pattern) {
     /* pattern and command cannot be empty */
     if (cmd == "" || pattern = "") return ({ });
 
-    if (!stringp(cmd)) error("Bad argument 1 to parse_command()\n");
-    if (!stringp(pattern)) error("Bad argument 3 to parse_command()\n");
+    if (!stringp(cmd)) error("Bad argument 1 to parse_command().\n");
+    if (!stringp(pattern)) error("Bad argument 3 to parse_command().\n");
 
     /* array of words in command */
     parse_warr = explode(cmd, " ");
@@ -76,7 +69,7 @@ mixed *parse_command(string cmd, mixed obarr, string pattern) {
     if (objectp(obarr))
 	obarr = ({ obarr }) + deep_inventory(obarr);
 #endif
-    if (!arrayp(obarr)) error("Bad argument 2 to parse_command()\n");
+    if (!arrayp(obarr)) error("Bad argument 2 to parse_command().\n");
     
     id_list = allocate(sizeof(obarr));
     pluid_list = allocate(sizeof(obarr));
@@ -324,7 +317,7 @@ one_parse(mixed *obarr, string pat, mixed *warr, int ref cix_in)
 }
 
 string *ord1 = ({"", "first", "second", "third", "fourth", "fifth",
- "sixth", "seventh", "eighth", "ninth", "tenth",
+ "sixth", "seventh", "eighth", "nineth", "tenth",
  "eleventh", "twelfth", "thirteenth", "fourteenth",
  "fifteenth", "sixteenth", "seventeenth",
  "eighteenth", "nineteenth" });

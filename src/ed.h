@@ -109,9 +109,14 @@ typedef struct ed_buffer_s {
     int flags;
     int appending;
     int moring;			/* used for the wait line of help */
-    function_to_call_t write_fn;
+#ifdef OLD_ED
+    char *exit_fn;		/* Function to be called when user exits */
+    char *write_fn;             /* Function to be called when user writes */
+    object_t *exit_ob;	/* in this object */
+#else
     object_t *owner;
     struct ed_buffer_s *next_ed_buf;
+#endif
     int shiftwidth;
     int leading_blanks;
     int cur_autoindent;
@@ -125,12 +130,19 @@ void ed_start PROT((char *, char *, char *, int, object_t *));
 void ed_cmd PROT((char *));
 void save_ed_buffer PROT((object_t *));
 
+#ifdef OLD_ED
+#define ED_OUTPUT(x, y)	add_message(x, y, strlen(y))
+#define ED_OUTPUTV      add_vmessage
+#define ED_DEST         command_giver
+#else
 #define ED_OUTPUT       outbuf_add
 #define ED_OUTPUTV      outbuf_addv
 #define ED_DEST         &current_ed_results
+#endif
 
+#ifndef OLD_ED
 char *object_ed_cmd PROT((object_t *, char *));
-char *object_ed_start PROT((object_t *, char *, int, function_to_call_t *));
+char *object_ed_start PROT((object_t *, char *, int));
 int object_ed_mode PROT((object_t *));
 void object_save_ed_buffer PROT((object_t *));
 ed_buffer_t *find_ed_buffer PROT((object_t *));
@@ -138,5 +150,6 @@ void object_ed_output PROT((char *));
 void object_ed_outputv PROT1V(char *);
 
 extern outbuffer_t current_ed_results;
+#endif
 
 #endif

@@ -54,12 +54,12 @@ OVERRIDES=$(MAKEOVERRIDES)
 # **************************************************************************
 SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   backend.c array.c mapping.c comm.c ed.c regexp.c swap.c buffer.c crc32.c \
-  malloc.c mallocwrapper.c class.c efuns_main.c efuns_port.c addr_client.c \
-  otable.c dumpstat.c stralloc.c hash.c util.c \
-  port.c parse.c simul_efun.c sprintf.c program.c \
+  malloc.c mallocwrapper.c class.c efuns_main.c efuns_port.c \
+  call_out.c otable.c dumpstat.c stralloc.c hash.c \
+  port.c reclaim.c parse.c simul_efun.c sprintf.c program.c \
   compiler.c avltree.c icode.c trees.c generate.c scratchpad.c \
-  socket_efuns.c socket_ctrl.c eoperators.c socket_err.c md.c \
-  disassembler.c binaries.c $(STRFUNCS) \
+  socket_efuns.c socket_ctrl.c qsort.c eoperators.c socket_err.c md.c \
+  disassembler.c binaries.c ualarm.c $(STRFUNCS) \
   replace_program.c ccode.c cfuns.c compile_file.c master.c function.c \
   debug.c crypt.c applies_table.c add_action.c
 
@@ -187,13 +187,16 @@ install: all
 	$(INSTALL) addr_server $(INSTALL_DIR)
 	$(INSTALL) portbind $(INSTALL_DIR)
 
-Makefiles: Makefile.in GNUmakefile.in
+Makefiles: Makefile.in GNUmakefile.in NMakefile.in
 
 Makefile.in: edit_source Makefile.in.pre Makefile.master
 	./edit_source -process Makefile.in.pre
 
 GNUmakefile.in: edit_source GNUmakefile.in.pre Makefile.master
 	./edit_source -process GNUmakefile.in.pre
+
+NMakefile.in: edit_source NMakefile.in.pre Makefile.master
+	./edit_source -process NMakefile.in.pre
 
 nothing:
 
@@ -202,7 +205,6 @@ spotless: clean
 	-rm -f configure.h local_options system_libs configuration
 	-rm -f options_incl.h
 	-rm -f *.diffs
-	-rm -rf tmp
 	-find . -name "*~" -print | xargs rm
 
 # get ready for recompile

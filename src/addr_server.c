@@ -84,6 +84,12 @@ void init_conn_sock P2(int, port_num, char *, ipaddress)
     struct sockaddr_in sin;
     int sin_len;
     int optval;
+#ifdef WINSOCK
+    WSADATA WSAData;
+
+    WSAStartup(MAKEWORD(1,1), &WSAData);
+    atexit(cleanup_sockets);
+#endif
 
     /*
      * create socket of proper type.
@@ -626,3 +632,19 @@ int main P2(int, argc, char **, argv)
     /*NOTREACHED*/
     return 0;			/* never reached */
 }
+
+#ifdef WIN32
+void debug_message P1V(char *, fmt)
+{
+    static char deb_buf[100];
+    static char *deb = deb_buf;
+    va_list args;
+    V_DCL(char *fmt);
+
+    V_START(args, fmt);
+    V_VAR(char *, fmt, args);
+    vfprintf(stderr, fmt, args);
+    fflush(stderr);
+    va_end(args);
+}
+#endif

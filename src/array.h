@@ -10,6 +10,9 @@ typedef struct array_s {
     int extra_ref;
 #endif
     unsigned short size;
+#ifdef PACKAGE_MUDLIB_STATS
+    statgroup_t stats;		/* creator of the array */
+#endif
     svalue_t item[1];
 } array_t;
 

@@ -8,6 +8,7 @@
 
 extern char driver_name[];
 
+FILE *crdir_fopen PROT((char *));
 void init_binaries PROT((int, char **));
 #ifdef LPC_TO_C
 #define load_binary(x, y) int_load_binary(x, y)

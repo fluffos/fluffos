@@ -30,7 +30,7 @@
  * functions must be done K&R (b/c va_dcl is K&R style) so don't prototype
  * vararg function arguments under AIX
  */
-#if defined(__STDC__)
+#if defined(__STDC__) || defined(WIN32)
 #  define PROT(x) x
 #  define P1(t1, v1) (t1 v1)
 #  define P2(t1, v1, t2, v2) (t1 v1, t2 v2)
@@ -273,7 +273,12 @@
 #endif
 
 #ifndef INLINE
-#  define INLINE
+#  ifdef WIN32
+#    define INLINE extern __inline
+#    define INLINE_STATIC __inline
+#  else
+#    define INLINE
+#  endif
 #endif
 
 #ifndef INLINE_STATIC

@@ -57,10 +57,8 @@
  * to the "private" reganch field in the struct regexp.
  */
 
-/* if you don't want ed, remove ed_start(), ed_cmd() and query_ed_mode() from
- * func_spec.c
- */
-#ifdef F_ED_START
+/* if you don't want ed, define OLD_ED and remove ed() from func_spec.c */
+#if defined(F_ED) || !defined(OLD_ED)
 
 /**  Global variables  **/
 
@@ -105,9 +103,11 @@ static void indent PROT((char *));
 static int indent_code PROT((void));
 static void report_status PROT((int));
 
+#ifndef OLD_ED
 static char *object_ed_results PROT((void));
 static ed_buffer_t *add_ed_buffer PROT((object_t *));
 static void object_free_ed_buffer PROT((void));
+#endif
 
 static void print_help PROT((int arg));
 static void print_help2 PROT((void));
@@ -119,6 +119,11 @@ static object_t *current_editor;        /* the object responsible */
 outbuffer_t current_ed_results;
 
 #define ED_BUFFER       (current_ed_buffer)
+#ifdef OLD_ED
+#define P_NET_DEAD      (command_giver->interactive->iflags & NET_DEAD)
+#else
+#define P_NET_DEAD      0 /* objects are never net dead :) */
+#endif
 #define P_NONASCII	(ED_BUFFER->nonascii)
 #define P_NULLCHAR	(ED_BUFFER->nullchar)
 #define P_TRUNCATED	(ED_BUFFER->truncated)
@@ -236,6 +241,9 @@ static int append P2(int, line, int, glob)
 	ED_OUTPUTV(ED_DEST, "%6d. ", P_CURLN + 1);
     if (P_CUR_AUTOIND)
 	ED_OUTPUTV(ED_DEST, "%*s", P_LEADBLANKS, "");
+#ifdef OLD_ED
+    set_prompt("*\b");
+#endif
     return 0;
 }
 
@@ -243,6 +251,9 @@ static int more_append P1(char *, str)
 {
     if (str[0] == '.' && str[1] == '\0') {
 	P_APPENDING = 0;
+#ifdef OLD_ED
+	set_prompt(":");
+#endif
 	return (0);
     }
     if (P_NFLG)
@@ -457,7 +468,7 @@ static int doprnt P2(int, from, int, to)
 	setCurLn(from);
 	while (P_CURLN <= to) {
 	    prntln(gettxtl(P_CURPTR), P_LFLG, (P_NFLG ? P_CURLN : 0));
-	    if (P_CURLN == to)
+	    if (P_NET_DEAD || (P_CURLN == to))
 		break;
 	    nextCurLn();
 	}
@@ -468,19 +479,38 @@ static int doprnt P2(int, from, int, to)
 static void free_ed_buffer P1(object_t *, who)
 {
     clrbuf();
-    if (ED_BUFFER->write_fn.ob) {
-	FREE(ED_BUFFER->write_fn.f.str);
-	free_object(ED_BUFFER->write_fn.ob, "ed EOF");
-    } else {
-	if (ED_BUFFER->write_fn.f.fp)
-	    free_funp(ED_BUFFER->write_fn.f.fp);
+#ifdef OLD_ED
+    if (ED_BUFFER->write_fn) {
+        FREE(ED_BUFFER->write_fn);
+        free_object(ED_BUFFER->exit_ob, "ed EOF");
     }
-    while (ED_BUFFER->write_fn.narg--)
-	free_svalue(&ED_BUFFER->write_fn.args[ED_BUFFER->write_fn.narg], "ed EOF");
+    if (ED_BUFFER->exit_fn) {
+	char *exit_fn = ED_BUFFER->exit_fn;
+	object_t *exit_ob = ED_BUFFER->exit_ob;
+
+	if (P_OLDPAT)
+	    FREE((char *) P_OLDPAT);
+	FREE((char *) ED_BUFFER);
+	who->interactive->ed_buffer = 0;
+	set_prompt("> ");
+
+	/* make this "safe" */
+	safe_apply(exit_fn, exit_ob, 0, ORIGIN_INTERNAL);
+	FREE(exit_fn);
+	free_object(exit_ob, "ed EOF");
+	return;
+    }
+#endif
 
     if (P_OLDPAT)
 	FREE((char *) P_OLDPAT);
+#ifdef OLD_ED
+    FREE((char *) ED_BUFFER);
+    who->interactive->ed_buffer = 0;
+    set_prompt("> ");
+#else
     object_free_ed_buffer();
+#endif
     return;
 }
 
@@ -619,15 +649,17 @@ static int dowrite P4(int, from, int, to, char *, fname, int, apflg)
     err = 0;
     lines = bytes = 0;
 
-    if (ED_BUFFER->write_fn.ob || ED_BUFFER->write_fn.f.fp) {
+#ifdef OLD_ED
+    if (ED_BUFFER->write_fn) {
         svalue_t *res;
 
         push_malloced_string(add_slash(fname));
         push_number(0);
-	res = safe_call_efun_callback(&ED_BUFFER->write_fn, 2);
+        res = safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_INTERNAL);
         if (IS_ZERO(res))
             return (ERR);
     }
+#endif
 
     if (!P_RESTRICT)
 	ED_OUTPUTV(ED_DEST, "\"/%s\" ", fname);
@@ -656,11 +688,13 @@ static int dowrite P4(int, from, int, to, char *, fname, int, apflg)
 	ED_OUTPUTV(ED_DEST, "%u lines %lu bytes\n", lines, bytes);
     fclose(fp);
 
-    if (ED_BUFFER->write_fn.ob || ED_BUFFER->write_fn.f.fp) {
+#ifdef OLD_ED
+    if (ED_BUFFER->write_fn) {
         push_malloced_string(add_slash(fname));
         push_number(1);
-	safe_call_efun_callback(&ED_BUFFER->write_fn, 2);
+        safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_INTERNAL);
     }
+#endif
 
     return (err);
 }				/* dowrite */
@@ -1279,10 +1313,12 @@ static void shift P1(register char *, text)
 
 	    p = buffer;
 	    /* fill with leading ws */
+#ifdef USE_TABS
 	    while (indent_index >= 8) {
 		*p++ = '\t';
 		indent_index -= 8;
 	    }
+#endif
 	    while (indent_index > 0) {
 		*p++ = ' ';
 		--indent_index;
@@ -2112,6 +2148,138 @@ static int doglob()
     return (P_CURLN);
 }				/* doglob */
 
+
+/*
+ * Start the editor. Because several users can edit simultaneously,
+ * they will each need a separate editor data block.
+ *
+ * If a write_fn and exit_ob is given, then call exit_ob->write_fn after
+ * any time the editor contents are written out to a file. The purpose is
+ * make it possible for external LPC code to do more admin logging of
+ * files modified.
+ *
+ * If an exit_fn and exit_ob is given, then call exit_ob->exit_fn at
+ * exit of editor. The purpose is to make it possible for external LPC
+ * code to maintain a list of locked files.
+ */
+#ifdef OLD_ED
+void ed_start P5(char *, file_arg, char *, write_fn, char *, exit_fn, int, restricted, object_t *, exit_ob)
+{
+    svalue_t *setup;
+
+    regexp_user = ED_REGEXP;
+    if (!command_giver)
+	error("No current user for ed().\n");
+    if (!command_giver->interactive)
+	error("Tried to start an ed session on a non-interactive user.\n");
+    if (command_giver->interactive->ed_buffer)
+	error("Tried to start an ed session, when already active.\n");
+
+    current_ed_buffer = command_giver->interactive->ed_buffer =
+	ALLOCATE(ed_buffer_t, TAG_ED, "ed_start: ED_BUFFER");
+    memset((char *) ED_BUFFER, '\0', sizeof(ed_buffer_t));
+
+    current_editor = command_giver;
+
+    ED_BUFFER->flags |= EIGHTBIT_MASK;
+    ED_BUFFER->shiftwidth = 4;
+    push_object(current_editor);
+    setup = apply_master_ob(APPLY_RETRIEVE_ED_SETUP, 1);
+    if (setup && setup != (svalue_t *)-1 && 
+	setup->type == T_NUMBER && setup->u.number) {
+	ED_BUFFER->flags = setup->u.number & ALL_FLAGS_MASK;
+	ED_BUFFER->shiftwidth = setup->u.number & SHIFTWIDTH_MASK;
+    }
+    ED_BUFFER->CurPtr = &ED_BUFFER->Line0;
+
+#if defined(RESTRICTED_ED) && !defined(NO_WIZARDS)
+    if (current_editor->flags & O_IS_WIZARD) {
+	P_RESTRICT = 0;
+    } else {
+	P_RESTRICT = 1;
+    }
+#endif				/* RESTRICTED_ED */
+    if (restricted) {
+	P_RESTRICT = 1;
+    }
+    if (write_fn) {
+        ED_BUFFER->write_fn = alloc_cstring(write_fn, "ed_start");
+        exit_ob->ref++;
+    } else {
+        ED_BUFFER->write_fn = 0;
+    }
+    if (exit_fn) {
+	ED_BUFFER->exit_fn = alloc_cstring(exit_fn, "ed_start");
+	exit_ob->ref++;
+    } else {
+	ED_BUFFER->exit_fn = 0;
+    }
+    ED_BUFFER->exit_ob = exit_ob;
+    set_ed_buf();
+
+    /*
+     * Check for read on startup, since the buffer is read in. But don't
+     * check for write, since we may want to change the file name. 
+     */
+    if (file_arg
+	&& (file_arg =
+	    check_valid_path(file_arg, current_editor,
+			     "ed_start", 0))
+	&& !doread(0, file_arg)) {
+	setCurLn(1);
+    }
+    if (file_arg) {
+	strncpy(P_FNAME, file_arg, MAXFNAME - 1);
+	P_FNAME[MAXFNAME - 1] = 0;
+    } else {
+	ED_OUTPUT(ED_DEST, "No file.\n");
+    }
+    set_prompt(":");
+    return;
+}
+#endif
+
+#ifdef OLD_ED
+void ed_cmd P1(char *, str)
+{
+    int status = 0;
+
+    regexp_user = ED_REGEXP;
+    current_ed_buffer = command_giver->interactive->ed_buffer;
+    current_editor = command_giver;
+
+    if (P_MORE) {
+	print_help2();
+	return;
+    }
+    if (P_APPENDING) {
+	more_append(str);
+	return;
+    }
+
+    strncpy(inlin, str, ED_MAXLINE - 2);
+    inlin[ED_MAXLINE - 2] = 0;
+    strcat(inlin, "\n");
+
+    inptr = inlin;
+    if ((status = getlst()) >= 0 || status == NO_LINE_RANGE) {
+	if ((status = ckglob()) != 0) {
+	    if (status >= 0 && (status = doglob()) >= 0) {
+		setCurLn(status);
+		return;
+	    }
+	} else {
+	    if ((status = docmd(0)) >= 0) {
+		if (status == 1)
+		    doprnt(P_CURLN, P_CURLN);
+		return;
+	    }
+	}
+    }
+    report_status(status);
+}
+#endif
+
 static void report_status P1(int, status) {
     switch (status) {
     case EOF:
@@ -2176,6 +2344,32 @@ static void report_status P1(int, status) {
 	ED_OUTPUT(ED_DEST, "Failed command.\n");
     }
 }
+
+#ifdef OLD_ED
+void save_ed_buffer P1(object_t *, who)
+{
+    svalue_t *stmp;
+    char *fname;
+
+    regexp_user = ED_REGEXP;
+    current_ed_buffer = who->interactive->ed_buffer;
+    current_editor = who;
+
+    push_malloced_string(add_slash(P_FNAME));
+    push_object(who);
+    /* must be safe; we get called by remove_interactive() */
+    stmp = safe_apply_master_ob(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME, 2);
+    if (stmp && stmp != (svalue_t *)-1) {
+	if (stmp->type == T_STRING) {
+	    fname = stmp->u.string;
+	    if (*fname == '/')
+		fname++;
+	    dowrite(1, P_LASTLN, fname, 0);
+	}
+    }
+    free_ed_buffer(who);
+}
+#endif
 
 static void print_help P1(int, arg)
 {
@@ -2417,6 +2611,7 @@ static void print_help2()
   Stuff below here is for the new ed() interface. -Beek 
  ****************************************************************/
 
+#ifndef OLD_ED
 static char *object_ed_results() {
     char *ret;
 
@@ -2466,23 +2661,11 @@ static void object_free_ed_buffer() {
     current_editor->flags &= ~O_IN_EDIT;
 }
 
-char *object_ed_start P4(object_t *, ob, char *, fname, int, restricted, function_to_call_t *, write_fn) {
+char *object_ed_start P3(object_t *, ob, char *, fname, int, restricted) {
     svalue_t *setup;
 
     regexp_user = ED_REGEXP;
     current_ed_buffer = add_ed_buffer(ob);
-
-    ED_BUFFER->write_fn.ob = write_fn->ob;
-    if (write_fn->ob) {
-	ED_BUFFER->write_fn.f.str = alloc_cstring(write_fn->f.str, "object_ed_start");
-	write_fn->ob->ref++;
-    } else {
-	ED_BUFFER->write_fn.f.fp = write_fn->f.fp;
-	if (write_fn->f.fp)
-	    write_fn->f.fp->hdr.ref++;
-    }
-    ED_BUFFER->write_fn.narg = write_fn->narg;
-    ED_BUFFER->write_fn.args = write_fn->args;
 
     ED_BUFFER->flags |= EIGHTBIT_MASK;
     ED_BUFFER->shiftwidth = 4;
@@ -2598,3 +2781,5 @@ char *object_ed_cmd P2(object_t *, ob, char *, str)
     report_status(status);
     return object_ed_results();
 }
+#endif
+

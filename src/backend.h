@@ -13,17 +13,25 @@
  * backend.c
  */
 extern int current_time;
+extern int heart_beat_flag;
+extern object_t *current_heart_beat;
 extern int eval_cost;
 extern error_context_t *current_error_context;
+extern long time_used;
 
 void backend PROT((void));
 void clear_state PROT((void));
+void logon PROT((object_t *));
 int parse_command PROT((char *, object_t *));
+int set_heart_beat PROT((object_t *, int));
+int query_heart_beat PROT((object_t *));
+int heart_beat_status PROT((outbuffer_t *, int));
 void preload_objects PROT((int));
 INLINE void remove_destructed_objects PROT((void));
 void update_load_av PROT((void));
 void update_compile_av PROT((int));
 char *query_load_av PROT((void));
-void set_pulse_interval PROT((int));
+array_t *get_heart_beats PROT((void));
+int query_time_used PROT((void));
 
 #endif

@@ -45,11 +45,6 @@ static void add_define P3(char *, name, int, nargs, char *, exps)
     defn_t *p = lookup_definition(name);
     int h, len;
 
-    if (!strcmp(name, "__LINE__")) {
-	yyerror("Illegal to redefine predefined value.");
-	return;
-    }
-
     /* trim off leading and trailing whitespace */
     while (uisspace(*exps)) exps++;
     for (len = strlen(exps);  len && uisspace(exps[len - 1]);  len--);
@@ -122,7 +117,7 @@ static void handle_elif()
 
 #ifdef LEXER
 	    *--outp = '\0';
-	    add_input(sp, 0);
+	    add_input(sp);
 #endif
 	    cond = cond_get_exp(0);
 #ifdef LEXER

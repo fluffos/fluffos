@@ -4,7 +4,7 @@
 
   This is mostly original code by Darin Johnson.  Ideas came from CD,
   including crdir_fopen().  Feel free to use this code but please keep
-  credits intact.  Note: crdir_fopen() has been moved to util.c
+  credits intact.
 */
 
 #define SUPPRESS_COMPILER_INLINES
@@ -16,9 +16,16 @@
 #include "backend.h"
 #include "swap.h"
 #include "compile_file.h"
+#include "hash.h"
 #include "master.h"
 
 /* This should be a configure check.  What the heck is it needed for, anyway?*/
+#ifdef WIN32
+#include <direct.h>
+#endif
+
+#ifdef BINARIES
+
 static char *magic_id = "MUDB";
 static time_t driver_id;
 static time_t config_id;
@@ -284,7 +291,7 @@ program_t *int_load_binary P1(char *, name)
 	fclose(f);
 	return OUT_OF_DATE;
     }
-    buf = DXALLOC(buf_size = 100, TAG_TEMPORARY, "ALLOC_BUF");
+    buf = DXALLOC(buf_size = SMALL_STRING_SIZE, TAG_TEMPORARY, "ALLOC_BUF");
 
     /*
      * Read preamble.  This must match, or we assume a different driver or
@@ -609,7 +616,44 @@ static void patch_in P3(program_t *, prog, short *, patches, int, len)
 	    /* sort so binary search still works */
 	    quickSort(&p[start + i + 1], 
 		      (break_addr - start) / SWITCH_CASE_SIZE, 
-		      SWITCH_CASE_SIZE, (qsort_comparefn_t)str_case_cmp);
+		      SWITCH_CASE_SIZE, str_case_cmp);
 	}
     } 
 }				/* patch_in() */
+
+#endif
+
+/*
+ * open file for writing, creating intermediate directories if needed.
+ */
+FILE *crdir_fopen P1(char *, file_name)
+{
+    char *p;
+    struct stat st;
+    FILE *ret;
+
+    /*
+     * Beek - These directories probably exist most of the time, so let's
+     * optimize by trying the fopen first
+     */
+    if ((ret = fopen(file_name, "wb")) != NULL) {
+	return ret;
+    }
+    p = file_name;
+
+    while (*p && (p = (char *) strchr(p, '/'))) {
+	*p = '\0';
+	if (stat(file_name, &st) == -1) {
+	    /* make this dir */
+	    if (OS_mkdir(file_name, 0770) == -1) {
+		*p = '/';
+		return (FILE *) 0;
+	    }
+	}
+	*p = '/';
+	p++;
+    }
+
+    return fopen(file_name, "wb");
+}				
+/* crdir_fopen() */

@@ -84,7 +84,7 @@
 #  include "amiga/socket.h"
 #endif
 
-#if defined(LATTICE)
+#if defined(WIN32) || defined(LATTICE)
 int dos_style_link PROT((char *, char *));
 #define link(x, y) dos_style_link(x, y)
 #endif
@@ -93,7 +93,11 @@ int dos_style_link PROT((char *, char *));
 #  include <libc.h>
 #endif
 
-#if !defined(NeXT) && !defined(LATTICE)
+#ifdef WIN32
+#  include <sys/timeb.h>
+#endif
+
+#if !defined(NeXT) && !defined(LATTICE) && !defined(WIN32)
 #  include <sys/param.h>
 #endif
 

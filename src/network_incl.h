@@ -32,4 +32,8 @@
 #  include <resolv.h>
 #endif
 
+#ifdef WINSOCK
+#  include <winsock.h>
+#endif
+
 #endif

@@ -6,8 +6,10 @@
 #include "comm.h"
 #include "swap.h"
 #include "socket_efuns.h"
+#include "call_out.h"
 #include "port.h"
 #include "file.h"
+#include "hash.h"
 #include "master.h"
 #include "add_action.h"
 
@@ -576,6 +578,9 @@ INLINE_STATIC void add_map_stats P2(mapping_t *, m, int, count)
 {
     total_mapping_nodes += count;
     total_mapping_size += count * sizeof(mapping_node_t);
+#ifdef PACKAGE_MUDLIB_STATS
+    add_array_size(&m->stats, count << 1);
+#endif
     m->count = count;
 }
 
@@ -1155,6 +1160,110 @@ int find_global_variable P4(program_t *, prog, char *, name,
     return -1;
 }
 
+void
+restore_object_from_line P3(object_t *, ob, char *, line, int, noclear)
+{
+    char *tmp;
+    char *space;
+    svalue_t *v;
+    // Put this on the main heap so we don't make it and throw it away all
+    // the time.
+    static char var[100];
+    int idx;
+    svalue_t *sv = ob->variables;
+    int rc;
+    unsigned short t;
+    
+
+    if (line[0] == '#') { /* ignore 'comments' in savefiles */
+        return ;
+    }
+    space = strchr(line, ' ');
+    if (!space || ((space - line) >= sizeof(var))) {
+        error("restore_object(): Illegal file format - 1 (%s).\n", line);
+    }
+    (void)strncpy(var, line, space - line);
+    var[space - line] = '\0';
+    idx = find_global_variable(current_object->prog, var, &t, 1);
+    if (idx == -1) {
+        return ;
+    }
+
+    v = &sv[idx];
+    if (noclear) {
+        rc = safe_restore_svalue(space+1, v);
+    } else {
+        rc = restore_svalue(space+1, v);
+    }
+
+    if (rc & ROB_ERROR) {
+        if (rc & ROB_GENERAL_ERROR) {
+	    error("restore_object(): Illegal general format while restoring %s.\n", var);
+        } else if (rc & ROB_NUMERAL_ERROR) {
+	    error("restore_object(): Illegal numeric format while restoring %s.\n", var);
+        } else if (rc & ROB_ARRAY_ERROR) {
+                   error("restore_object(): Illegal array format while restoring %s.\n", var);
+        } else if (rc & ROB_MAPPING_ERROR) {
+                   error("restore_object(): Illegal mapping format while restoring %s.\n", var);
+        } else if (rc & ROB_STRING_ERROR) {
+	    error("restore_object(): Illegal string format while restoring %s.\n", var);
+        } else if (rc & ROB_CLASS_ERROR) {
+	    error("restore_object(): Illegal class format while restoring %s.\n", var);
+        }
+    }
+}
+
+#ifdef HAVE_ZLIB
+void
+restore_object_from_gzip P3(object_t *, ob,
+                            gzFile, gzf,
+			    int, noclear)
+{
+    static char *buff = NULL;
+    char* tmp;
+    int idx;
+    int t;
+    int igloo;
+    
+    t = 40960;
+    if (buff) {
+        FREE(buff);
+        buff = NULL;
+    }
+    buff = DXALLOC(t, TAG_TEMPORARY, "restore_object: 6");
+    while (!gzeof(gzf)) {
+        idx = 0;
+        buff[t - 2] = 0;
+        // gzgets appaears to pay attension to zero termination even on short
+        // strings
+        buff[0] = 0;
+        tmp = gzgets(gzf, buff, t);
+        while (buff[t - 2] != 0 && buff[t - 2] != '\n' && !gzeof(gzf)) {
+	   if(tmp == Z_NULL) {
+ 	       error("Could not read compressed file");
+	   }
+           idx = t;
+           t += 40960;
+           buff = REALLOC(buff, t);
+           buff[t - 2] = 0;
+           tmp = gzgets(gzf, buff + idx - 1, t - (idx - 1));
+        }
+        if (buff[0]) {
+            tmp = strchr(buff, '\n');
+            if (tmp) {
+                *tmp = '\0';
+	        if (tmp > buff && tmp[-1] == '\r') {
+		    *(--tmp) = '\0';
+                }
+            }
+            restore_object_from_line(ob, buff, noclear);
+        }
+    }
+    FREE(buff);
+    buff = NULL;
+}
+#else
+
 static void
 restore_object_from_buff P3(object_t *, ob, char *, theBuff,
 			    int, noclear)
@@ -1178,42 +1287,10 @@ restore_object_from_buff P3(object_t *, ob, char *, theBuff,
         } else {
             nextBuff = 0;
         }
-        if (buff[0] == '#') /* ignore 'comments' in savefiles */
-            continue;
-        space = strchr(buff, ' ');
-        if (!space || ((space - buff) >= sizeof(var))) {
-            FREE(theBuff);
-            error("restore_object(): Illegal file format.\n");
-        }
-        (void)strncpy(var, buff, space - buff);
-        var[space - buff] = '\0';
-	idx = find_global_variable(current_object->prog, var, &t, 1);
-        if (idx == -1)
-	    continue;
-
-        v = &sv[idx];
-	if (noclear)
-	    rc = safe_restore_svalue(space+1, v);
-	else
-	    rc = restore_svalue(space+1, v);
-        if (rc & ROB_ERROR) {
-            FREE(theBuff);
-
-	    if (rc & ROB_GENERAL_ERROR)
-		error("restore_object(): Illegal general format while restoring %s.\n", var);
-	    else if (rc & ROB_NUMERAL_ERROR)
-		error("restore_object(): Illegal numeric format while restoring %s.\n", var);
-	    else if (rc & ROB_ARRAY_ERROR)
-                error("restore_object(): Illegal array format while restoring %s.\n", var);
-            else if (rc & ROB_MAPPING_ERROR)
-                error("restore_object(): Illegal mapping format while restoring %s.\n", var);
-	    else if (rc & ROB_STRING_ERROR)
-		error("restore_object(): Illegal string format while restoring %s.\n", var);
-	    else if (rc & ROB_CLASS_ERROR)
-		error("restore_object(): Illegal class format while restoring %s.\n", var);
-        }
+	restore_object_from_line(ob, buff, noclear);
     }
 }
+#endif
 
 /*
  * Save an object to a file.
@@ -1221,23 +1298,40 @@ restore_object_from_buff P3(object_t *, ob, char *, theBuff,
  * to assertain that the write is legal.
  * If 'save_zeros' is set, 0 valued variables will be saved
  */
+#ifdef HAVE_ZLIB
+static int save_object_recurse P6(program_t *, prog, svalue_t **,
+				  svp, int, type, int, save_zeros,
+				  FILE *, f, gzFile, gzf)
+#else
 static int save_object_recurse P5(program_t *, prog, svalue_t **,
 				  svp, int, type, int, save_zeros,
-				  FILE *, f) {
+				  FILE *, f) 
+#endif
+{
     int i;
     int theSize;
+    int oldSize;
     char *new_str, *p;
     
     for (i = 0; i < prog->num_inherited; i++) {
+#ifdef HAVE_ZLIB
+        if (!save_object_recurse(prog->inherit[i].prog, svp,
+				 prog->inherit[i].type_mod | type,
+				 save_zeros, f, gzf))
+#else
+
 	if (!save_object_recurse(prog->inherit[i].prog, svp, 
 				 prog->inherit[i].type_mod | type,
 				 save_zeros, f))
+#endif
 	    return 0;
     }
     if (type & DECL_NOSAVE) {
 	(*svp) += prog->num_variables_defined;
 	return 1;
     }
+    oldSize = -1;
+    new_str = NULL;
     for (i = 0; i < prog->num_variables_defined; i++) {
 	if (prog->variable_types[i] & DECL_NOSAVE) {
 	    (*svp)++;
@@ -1245,24 +1339,49 @@ static int save_object_recurse P5(program_t *, prog, svalue_t **,
 	}
 	save_svalue_depth = 0;
 	theSize = svalue_save_size(*svp);
+	// Try not to malloc/free too much.
+	if (theSize > oldSize) {
+	    if (new_str) {
+	        FREE(new_str);
+	    }
 	new_str = (char *)DXALLOC(theSize, TAG_TEMPORARY, "save_object: 2");
+            oldSize = theSize;
+	}
+
 	*new_str = '\0';
 	p = new_str;
 	save_svalue((*svp)++, &p);
 	DEBUG_CHECK(p - new_str != theSize - 1, "Length miscalculated in save_object!");
 	/* FIXME: shouldn't use fprintf() */
-	if (save_zeros || new_str[0] != '0' || new_str[1] != 0) /* Armidale */
+	if (save_zeros || new_str[0] != '0' || new_str[1] != 0) { /* Armidale */
+#ifdef HAVE_ZLIB
+	    if (gzf) {
+	        gzputs(gzf, prog->variable_table[i]);
+		gzputs(gzf, " ");
+		gzputs(gzf, new_str);
+		gzputs(gzf, "\n");
+	    } else
+#endif
+	    {
 	    if (fprintf(f, "%s %s\n", prog->variable_table[i], new_str) < 0) {
 		debug_perror("save_object: fprintf", 0);
 		FREE(new_str);
 		return 0;
 	    }
+	    }
+	}
+    }
+    if (new_str) {
 	FREE(new_str);
     }
     return 1;
 }
 
 int sel = -1;
+
+#ifdef HAVE_ZLIB
+int gz_sel = -1;
+#endif
 
 int
 save_object P3(object_t *, ob, char *, file, int, save_zeros)
@@ -1273,6 +1392,18 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
     FILE *f;
     int success;
     svalue_t *v;
+#ifdef HAVE_ZLIB
+    gzFile gzf;
+    int save_compressed;
+    int pos;
+    
+    if (save_zeros & 2) {
+        save_compressed = 1;
+	save_zeros &= ~2;
+    } else {
+        save_compressed = 0;
+    }
+#endif
 
     if (ob->flags & O_DESTRUCTED)
         return 0;
@@ -1284,10 +1415,21 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
     if (sel == -1) sel = strlen(SAVE_EXTENSION);
     if (strcmp(file + len - sel, SAVE_EXTENSION) == 0)
 	len -= sel;
-    
-    name = new_string(len + strlen(SAVE_EXTENSION), "save_object");
+#ifdef HAVE_ZLIB
+    if (gz_sel == -1) {
+        gz_sel = strlen(SAVE_GZ_EXTENSION);
+    }
+    if (save_compressed) {
+        name = new_string(len + gz_sel, "save_object");
+	strcpy(name, file);
+	strcpy(name + len, SAVE_GZ_EXTENSION);
+    } else
+#endif
+    {
+        name = new_string(len + sel, "save_object");
     strcpy(name, file);
     strcpy(name + len, SAVE_EXTENSION);
+    }
 
     push_malloced_string(name);    /* errors */
 
@@ -1309,14 +1451,37 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
      */
     sprintf(tmp_name, "%.250s.tmp", file);
 
+#ifdef HAVE_ZLIB
+    gzf = NULL;
+    f = NULL;
+    if (save_compressed) {
+        gzf = gzopen(tmp_name, "w");
+	if (!gzf) {
+	    error("Could not open /%s for a save.\n", tmp_name);
+	}
+	if (!gzprintf(gzf, "#/%s\n", ob->prog->name)) {
+	    error("Could not open /%s for a save.\n", tmp_name);
+	}
+    } else
+#endif
+    {
     if (!(f = fopen(tmp_name, "w")) || fprintf(f, "#/%s\n", save_name) < 0) {
         error("Could not open /%s for a save.\n", tmp_name);
     }
-
+    }
     v = ob->variables;
+#ifdef HAVE_ZLIB
+    success = save_object_recurse(ob->prog, &v, 0, save_zeros, f, gzf);
+    
+    if (gzf && gzclose(gzf)) {
+        debug_perror("save_object", file);
+	success = 0;
+    }
+#else
     success = save_object_recurse(ob->prog, &v, 0, save_zeros, f);
+#endif
 
-    if (fclose(f) < 0) {
+    if (f && fclose(f) < 0) {
 	debug_perror("save_object", file);
 	success = 0;
     }
@@ -1325,6 +1490,10 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
 	debug_message("Failed to completely save file. Disk could be full.\n");
 	unlink(tmp_name);
     } else {
+#ifdef WIN32
+        /* Need to erase it to write over it. */
+        unlink(file);
+#endif
 	if (rename(tmp_name, file) < 0)	{
 #ifdef LATTICE
 	    /* AmigaDOS won't overwrite when renaming */
@@ -1340,6 +1509,15 @@ save_object P3(object_t *, ob, char *, file, int, save_zeros)
 	    debug_message("Failed to save object!\n");
 	    unlink(tmp_name);
 	}
+#ifdef HAVE_ZLIB
+	else if (save_compressed) {
+	    // When compressed, unlink the uncompressed name too.
+	    len = strlen(file) - gz_sel;
+            strcpy(file + len, SAVE_EXTENSION);
+	    unlink(file);
+	}
+#endif
+
     }
 
     return 1;
@@ -1399,11 +1577,20 @@ static void clear_non_statics P1(object_t *, ob) {
 
 int restore_object P3(object_t *, ob, char *, file, int, noclear)
 {
-    char *name, *theBuff;
+    char *name;
     int len, i;
-    FILE *f;
     object_t *save = current_object;
     struct stat st;
+#ifdef HAVE_ZLIB
+    int pos;
+    gzFile gzf;
+#else
+    FILE *f;
+    // Try and keep one buffer for droping all the restores into
+    static char *theBuff = NULL;
+    static int buff_len = 0;
+    int tmp_len;
+#endif
 
     if (ob->flags & O_DESTRUCTED)
         return 0;
@@ -1416,9 +1603,30 @@ int restore_object P3(object_t *, ob, char *, file, int, noclear)
     if (strcmp(file + len - sel, SAVE_EXTENSION) == 0)
 	len -= sel;
 
-    name = new_string(len + strlen(SAVE_EXTENSION), "restore_object");
+#ifdef HAVE_ZLIB
+    else {
+      if (gz_sel == -1) gz_sel = strlen(SAVE_GZ_EXTENSION);
+      if (strcmp(file + len - gz_sel, SAVE_GZ_EXTENSION) == 0)
+	  len -= gz_sel;
+    }
+    name = new_string(len + gz_sel, "restore_object");
+    strncpy(name, file, len);
+    strcpy(name + len, SAVE_GZ_EXTENSION);
+    pos = 0;
+    while (name[pos] == '/') {
+        pos++;
+    }
+    // See if the gz file exists.
+    if (stat(name + pos, &st) == -1)
+    {
+        FREE_MSTR(name);
+#else
+    {
+#endif
+        name = new_string(len + sel, "restore_object");
     strncpy(name, file, len);
     strcpy(name + len, SAVE_EXTENSION);
+    }
 
     push_malloced_string(name);    /* errors */
 
@@ -1426,6 +1634,33 @@ int restore_object P3(object_t *, ob, char *, file, int, noclear)
     free_string_svalue(sp--);
     if (!file) error("Denied read permission in restore_object().\n");
 
+
+#ifdef HAVE_ZLIB
+#  ifdef LATTICE
+    gzf = NULL;
+    if ((stat(file, &st) == -1) || !(gzf = fopen(file, "r"))) {
+#  else
+    gzf = gzopen(file, "r");
+    if (!gzf) {
+#  endif
+        if (gzf) {
+            (void)gzclose(gzf);
+        }
+        return 0;
+    }
+
+    /* This next bit added by Armidale@Cyberworld 1/1/93
+     * If 'noclear' flag is not set, all non-static variables will be
+     * initialized to 0 when restored.
+     */
+    if (!noclear) {
+	clear_non_statics(ob);
+    }
+    
+    restore_object_from_gzip(ob, gzf, noclear);
+    gzclose(gzf);
+
+#else
 #ifdef LATTICE
     f = NULL;
     if ((stat(file, &st) == -1) || !(f = fopen(file, "r"))) {
@@ -1438,14 +1673,26 @@ int restore_object P3(object_t *, ob, char *, file, int, noclear)
         return 0;
     }
 
-    if (!(i = st.st_size)) {
+    if (!(tmp_len = st.st_size)) {
         (void)fclose(f);
         return 0;
     }
-    theBuff = DXALLOC(i + 1, TAG_TEMPORARY, "restore_object: 4");
-    fread(theBuff, 1, i, f);
+    
+    if (tmp_len > buff_len) {
+        if (theBuff) {
+	    FREE(theBuff);
+	}
+	theBuff = DXALLOC(tmp_len + 1, TAG_TEMPORARY, "restore_object: 4");
+	buff_len = tmp_len;
+    }
+#ifdef WIN32
+    tmp_len = read(_fileno(f), theBuff, i);
+#else
+    fread(theBuff, 1, tmp_len, f);
+#endif
+
     fclose(f);
-    theBuff[i] = '\0';
+    theBuff[tmp_len] = '\0';
     current_object = ob;
     
     /* This next bit added by Armidale@Cyberworld 1/1/93
@@ -1456,10 +1703,10 @@ int restore_object P3(object_t *, ob, char *, file, int, noclear)
 	clear_non_statics(ob);
     
     restore_object_from_buff(ob, theBuff, noclear);
+#endif
     current_object = save;
     debug(d_flag, ("Object /%s restored from /%s.\n", ob->name, file));
 
-    FREE(theBuff);
     return 1;
 }
 
@@ -1702,6 +1949,8 @@ void reload_object P1(object_t *, obj)
     obj->shadowed = 0;
 #endif
     remove_living_name(obj);
+    set_heart_beat(obj, 0);
+    remove_all_call_out(obj);
 #ifndef NO_LIGHT
     add_light(obj, -(obj->total_light));
 #endif
@@ -1747,14 +1996,8 @@ void get_objects P4(object_t ***, list, int *, size, get_objectsfn_t, callback, 
     }
 }
 
-static object_t **command_giver_stack;
-object_t **cgsp = 0;
-
-void init_objects PROT((void))
-{
-    command_giver_stack = CALLOCATE(MAX_CALL_DEPTH, object_t *, TAG_INTERPRETER, "init_objects");
-    cgsp = command_giver_stack;
-}
+static object_t *command_giver_stack[CFG_MAX_CALL_DEPTH];
+object_t **cgsp = command_giver_stack;
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_command_giver_stack PROT((void))
@@ -1773,7 +2016,7 @@ void mark_command_giver_stack PROT((void))
 /* set a new command giver, saving the old one */
 void save_command_giver P1(object_t *, ob)
 {
-    DEBUG_CHECK(cgsp == &command_giver_stack[MAX_CALL_DEPTH], "command_giver stack overflow");
+    DEBUG_CHECK(cgsp == &command_giver_stack[CFG_MAX_CALL_DEPTH], "command_giver stack overflow");
     *(++cgsp) = command_giver;
 
     command_giver = ob;

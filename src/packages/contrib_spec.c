@@ -13,6 +13,10 @@ void set_prompt(string, void|object);
 mixed copy(mixed);
 string *functions(object, int default: 0);
 string *variables(object, int default: 0);
+object *heart_beats();
+#ifdef COMPAT_32
+object *heart_beat_info heart_beats();
+#endif
 string terminal_colour(string, mapping, void | int, void | int);
 string pluralize(string);
 int file_length(string);
@@ -33,3 +37,4 @@ string repeat_string(string, int);
 mapping memory_summary();
 string query_replaced_program(void|object);
 mapping network_stats();
+int real_time();

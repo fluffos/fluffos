@@ -2,9 +2,8 @@
 #define ADD_ACTION_H 1
 
 #ifndef NO_ADD_ACTION
-extern object_t **hashed_living;
+extern object_t *hashed_living[CFG_LIVING_HASH_SIZE];
 
-void        init_living_table   PROT((void));
 int	    parse_command	PROT((char *, object_t *));
 void	    clear_notify	PROT((object_t *));
 void	    stat_living_objects	PROT((outbuffer_t *));
@@ -16,7 +15,6 @@ void	    remove_sent		PROT((object_t *, object_t *));
 #endif
 #else
 /* STUBS */
-#define init_living_table()	    do{}while(0)
 #define parse_command(x, y)	    do{}while(0)
 #define clear_notify(x)		    do{}while(0)
 #define stat_living_objects(x)	    do{}while(0)

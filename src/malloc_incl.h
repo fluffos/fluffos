@@ -1,6 +1,19 @@
 #ifndef MALLOC_INCL_H
 #define MALLOC_INCL_H
 
+typedef struct {
+    int real_size;
+    char *buffer;
+} outbuffer_t;
+
+void outbuf_zero PROT((outbuffer_t *));
+void outbuf_add PROT((outbuffer_t *, char *));
+void outbuf_addchar PROT((outbuffer_t *, char));
+void CDECL outbuf_addv PROT2V(outbuffer_t *, char *);
+void outbuf_fix PROT((outbuffer_t *));
+void outbuf_push PROT((outbuffer_t *));
+int outbuf_extend PROT((outbuffer_t *, int));
+
 #include "bsdmalloc.h"
 #include "smalloc.h"
 #include "wrappedmalloc.h"
@@ -16,7 +29,7 @@
 #define TAG_MARKED          (1 << 12)
 
 #define TAG_PROGRAM         (TAG_PERMANENT + 11)
-#define TAG_INTERPRETER     (TAG_PERMANENT + 12)
+#define TAG_CALL_OUT        (TAG_PERMANENT + 12)
 #define TAG_INTERACTIVE     (TAG_PERMANENT + 13)
 #define TAG_ED              (TAG_PERMANENT + 14)
 
@@ -24,7 +37,7 @@
 #define TAG_PERM_IDENT      (TAG_PERMANENT + 17)
 #define TAG_IDENT_TABLE     (TAG_PERMANENT + 18)
 #define TAG_RESERVED        (TAG_PERMANENT + 19)
-#define TAG_OBSOLETE        (TAG_PERMANENT + 20)
+#define TAG_MUDLIB_STATS    (TAG_PERMANENT + 20)
 #define TAG_OBJECT          (TAG_PERMANENT + 21)
 #define TAG_OBJ_TBL         (TAG_PERMANENT + 22)
 #define TAG_CONFIG          (TAG_PERMANENT + 23)
@@ -40,7 +53,7 @@
 #define TAG_LPC_OBJECT      (TAG_PERMANENT + 33)
 #define TAG_USERS           (TAG_PERMANENT + 34)
 #define TAG_DEBUGMALLOC     (TAG_PERMANENT + 35)
-#define TAG_UNUSED2	    (TAG_PERMANENT + 36)
+#define TAG_HEART_BEAT      (TAG_PERMANENT + 36)
 #ifdef PACKAGE_PARSER
 #define TAG_PARSER          (TAG_PERMANENT + 37)
 #endif
@@ -49,6 +62,7 @@
 #ifdef PACKAGE_DB
 #define TAG_DB		    (TAG_PERMANENT + 40)
 #endif
+#define TAG_INTERPRETER	    (TAG_PERMANENT + 41)
 
 #define TAG_STRING          (TAG_DATA + 40)
 #define TAG_MALLOC_STRING   (TAG_DATA + 41)

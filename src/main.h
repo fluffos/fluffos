@@ -44,4 +44,6 @@ extern char *reserved_area;
 extern double consts[];
 extern int slow_shut_down_to_do;
 
+void CDECL debug_message PROT1V(char *);
+
 #endif

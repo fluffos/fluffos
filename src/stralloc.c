@@ -1,6 +1,7 @@
 #include "std.h"
 #include "lpc_incl.h"
 #include "stralloc.h"
+#include "hash.h"
 #include "comm.h"
 
 /* used temporarily by SVALUE_STRLEN() */
@@ -379,52 +380,4 @@ char *int_alloc_cstring P1(char *, str)
     ret = (char *)DXALLOC(strlen(str) + 1, TAG_STRING, tag);
     strcpy(ret, str);
     return ret;
-}
-
-#ifdef DEBUGMALLOC
-char *int_string_copy P2(char *, str, char *, tag)
-#else
-char *int_string_copy P1(char *, str)
-#endif
-{
-    char *p;
-    int len;
-
-    DEBUG_CHECK(!str, "Null string passed to string_copy.\n");
-    len = strlen(str);
-    if (len > max_string_length) {
-	len = max_string_length;
-	p = new_string(len, tag);
-	strncpy(p, str, len);
-	p[len] = 0;
-    } else {
-	p = new_string(len, tag);
-	strncpy(p, str, len + 1);
-    }
-    return p;
-}
-
-#ifdef DEBUGMALLOC
-char *int_string_unlink P2(char *, str, char *, tag)
-#else
-char *int_string_unlink P1(char *, str)
-#endif
-{
-    int l;
-    malloc_block_t *mbt, *newmbt;
-
-    mbt = ((malloc_block_t *)str) - 1;
-    mbt->ref--;
-
-    if ((l = mbt->size) == USHRT_MAX)
-	l = strlen(str + USHRT_MAX) + USHRT_MAX; /* ouch */
-
-    newmbt = (malloc_block_t *)DXALLOC(l + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, tag);
-    memcpy((char *)(newmbt + 1), (char *)(mbt + 1), l + 1);
-    newmbt->size = mbt->size;
-    newmbt->ref = 1;
-    ADD_NEW_STRING(newmbt->size, sizeof(malloc_block_t));
-    CHECK_STRING_STATS;
-
-    return (char *)(newmbt + 1);
 }

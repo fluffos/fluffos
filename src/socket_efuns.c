@@ -520,6 +520,14 @@ int socket_connect P4(int, fd, char *, name, svalue_t *, read_callback, svalue_t
 
     current_object->flags |= O_EFUN_SOCKET;
 
+#ifdef WINSOCK
+    /* Turn on blocking for connect to ensure correct errors */
+    if (set_socket_nonblocking(lpc_socks[fd].fd, 0) == -1) {
+	socket_perror("socket_connect: set_socket_nonblocking 0", 0);
+	OS_socket_close(fd);
+	return EENONBLOCK;
+    }
+#endif
     if (connect(lpc_socks[fd].fd, (struct sockaddr *) & lpc_socks[fd].r_addr,
 		sizeof(struct sockaddr_in)) == -1) {
 	switch (socket_errno) {
@@ -538,6 +546,13 @@ int socket_connect P4(int, fd, char *, name, svalue_t *, read_callback, svalue_t
 	    return EECONNECT;
 	}
     }
+#ifdef WINSOCK
+    if (set_socket_nonblocking(lpc_socks[fd].fd, 1) == -1) {
+	socket_perror("socket_connect: set_socket_nonblocking 1", 0);
+	OS_socket_close(fd);
+	return EENONBLOCK;
+    }
+#endif
     lpc_socks[fd].state = DATA_XFER;
     lpc_socks[fd].flags |= S_BLOCKED;
 
@@ -658,7 +673,7 @@ int socket_write P3(int, fd, svalue_t *, message, char *, name)
 	    if ((off = sendto(lpc_socks[fd].fd, (char *)message->u.string,
 		       strlen(message->u.string) + 1, 0,
 		       (struct sockaddr *) & sin, sizeof(sin))) == -1) {
-		socket_perror("socket_write: sendto", 0);
+	      //socket_perror("socket_write: sendto", 0);
 		return EESENDTO;
 	    }
 	    break;
@@ -668,7 +683,7 @@ int socket_write P3(int, fd, svalue_t *, message, char *, name)
 	    if ((off = sendto(lpc_socks[fd].fd, (char *)message->u.buf->item,
 		       message->u.buf->size, 0,
 		       (struct sockaddr *) & sin, sizeof(sin))) == -1) {
-		socket_perror("socket_write: sendto", 0);
+	      //socket_perror("socket_write: sendto", 0);
 		return EESENDTO;
 	    }
 	    break;
@@ -707,7 +722,7 @@ int socket_write P3(int, fd, svalue_t *, message, char *, name)
 	if (off == -1 && socket_errno == EINTR)
 	    return EEINTR;
 	
-	socket_perror("socket_write: send", 0);
+	//socket_perror("socket_write: send", 0);
 	lpc_socks[fd].flags |= S_LINKDEAD;
 	socket_close(fd, SC_FORCE | SC_DO_CALLBACK | SC_FINAL_CLOSE);
 	return EESEND;

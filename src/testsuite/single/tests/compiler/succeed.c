@@ -11,6 +11,7 @@ void foo(int);
 int ident;
 #define X1 id
 #define X2 ent
+int paste = X1##X2;
 string x = @END
 xxx
 END;

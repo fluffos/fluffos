@@ -1,6 +1,7 @@
 #include "std.h"
 #include "otable.h"
 #include "comm.h"
+#include "hash.h"
 #include "simul_efun.h"
 #include "master.h"
 
@@ -149,6 +150,8 @@ void remove_object_hash P1(object_t *, ob)
     object_t *s;
 
     s = find_obj_n(ob->name); /* this sets h, and cycles the ob to the front */
+    if(!s)
+      return;
 
     DEBUG_CHECK1(s != ob, "Remove object \"/%s\": found a different object!",
 		 ob->name);

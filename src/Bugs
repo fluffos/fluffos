@@ -12,8 +12,8 @@ I think, it's new form would be more usable.
 As i see this HIDDEN stuff has many leaks, like:
 you can always create an object that you put into all rooms, and look
 for this_player() in the init apply.
-So even if you correct all efuns like livings, named_livings and so on, it will
-never be perfect.
+So even if you correct all efuns like livings, heartbeats, named_livings
+and so on, it will never be perfect.
 solve for livings and objects:
 ------------------------------- cut here ----------------------------------
 1831c1831
@@ -195,6 +195,11 @@ There is no door here.
 
 -----
 
+It still seems possible for regexp(explode(read_file(...), "\n"), ...) to
+crash, but I can't reproduce it.
+
+-----
+
 #pragma optimize bug:
 
 ;; Function room_of
@@ -228,6 +233,10 @@ object room_of(object obj) {
 
 -----
 
+heart_beat() is not shadowable
+
+-----
+
     mixed a;
     do {} while (a = ({ a, "" }));
 
@@ -257,6 +266,10 @@ Probably need a test to see if bison's output actually compiles in
 -Beek
 
 -------
+
+One can call private functions in inherited objects via call_out.
+
+------
 
 verbs that no longer have handlers should be deleted from the parser list
 

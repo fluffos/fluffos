@@ -115,6 +115,7 @@ INSTALL_DIR="../bin"
 # SCO 3.2v4.2
 # ARCH: *sigh* and this one ...
 #OSFLAGS=-DSCO
+OSFLAGS=-DHAVE_ZLIB
 
 # try uncommenting this if you are using gcc and at runtime you see socket
 # errors saying that the "set socket nonblocking" operation is not supported.
@@ -124,7 +125,7 @@ INSTALL_DIR="../bin"
 
 # Location of libmsgql.a, if you are using PACKAGE_DB
 #EXTRALIBS=-L/usr/local/lib -lmsql
-
+EXTRALIBS=-Lzlib
 ####### END OF USER CONFIGURABLE OPTIONS
 
 echo "Trying out some stuff to see what works; ignore errors ..."
@@ -258,14 +259,11 @@ fi
 #
 # Figure out what to use for install
 #
-if ! test -d tmp; then
-    mkdir tmp
-else
-    rm tmp/insttest
-fi
+mkdir tmp
 cat >insttest <<END
 whatever
 END
+rm tmp/insttest
 install -f insttest tmp
 if test $? -eq 0 && test -f tmp/insttest; then
     INSTALL="install -f"
@@ -278,7 +276,6 @@ else
        INSTALL="cp"
     fi
 fi
-rm -rf insttest tmp
 
 cat >comptest.c <<END
 void foo() { }

@@ -29,7 +29,7 @@ void do_tests() {
 }
 
 object foo() {
-    write(sprintf("%O\n", file_name()));
+    printf("%O\n", file_name());
     return this_object();
 }
 

@@ -1,63 +1,11 @@
-/******************************************************************************
-****
-****    Database package for the MudOS driver
-****
-****    History:
-****        Sometime:
-****            Descartes@Nightmare created and added mSQL support
-****
-****        Feb 1999:
-****            Andrew@Nanvaent restructured to add MySQL support and a
-****            framework for other databases to be added.
-****
-****        Jul 2000:
-****            Andrew@Nanvaent's work included in the MudOS proper
-****
-****    Notes:
-****      . This package has been restructured so that it can be compiled into
-****        a driver without any database types defined so that you can write
-****        stuff without necessarily having the database.
-****
-****      . No database type has been added that supports commit or rollback,
-****        so these functions have not been fully implemented, particularly
-****        with regard to error handling.
-****
-****      . Support for multiple database types is present, if obscure.  When
-****        you have multiple types you should have DEFAULT_DB defined to be
-****        the default one, and USE_MYSQL/USE_MSQL should be defined to be
-****        numbers in the local_options file or equivalent, e.g.:
-****            #define USE_MSQL 1
-****            #define USE_MYSQL 2
-****            #define DEFAULT_DB USE_MSQL
-****
-****        The value that you defined it to will be that expected when you
-****        make a call to db_connect( ... ) as the fourth argument.  Without
-****        the fourth argument, the value used will be that for DEFAULT_DB.
-****
-****      . Adding another database type should involve:
-****        + picking your own define name
-****        + editing db.h and adding an appropriate member to the dbconn_t
-****          union
-****        + adding a dbdefn_t definition for it in this file
-****        + playing around with the code for deciding between databases in
-****          f_db_connect()
-****        + writing all the required interface functions as you've defined
-****          for the dbdefn_t structure.  Minimum requirements would be
-****          connect, close, fetch and execute and cleanup if you need to
-****          cleanup memory allocated between searches.
-****
-****    TODO:
-****      . Decent Error Message reporting
-****      . Function for showing the current connections (incomplete)
-****      . Standardise on return values (only db_exec is nonstandard)
-****      . Documentation
-****      . Add more databases
-****
-******************************************************************************/
+/*    Database package for the MudOS driver
+ *    Designed to allow people to write datbase independent LPC
+ *    Currently supports MSQL
+ *    created 960124 by George Reese
+ */
 
-#include "../std.h"
-#include "../md.h"
-#include "../master.h"
+#include "std.h"
+#include "md.h"
 #include "../lpc_incl.h"
 #include "../mapping.h"
 #include "../comm.h"
@@ -67,85 +15,9 @@
 #include "../eoperators.h"
 #include "../backend.h"
 #include "../swap.h"
-
 #include "db.h"
 
-static int  dbConnAlloc, dbConnUsed;
-static db_t *dbConnList;
-
-static db_t * find_db_conn PROT((int));
-static int    create_db_conn PROT((void));
-static void   free_db_conn PROT((db_t *));
-
-#ifdef USE_MSQL
-static int      msql_connect  PROT((dbconn_t *, char *, char *, char *, char *));
-static int      msql_close    PROT((dbconn_t *));
-static int      msql_execute  PROT((dbconn_t *, char *));
-static array_t *msql_fetch    PROT((dbconn_t *, int));
-static void     msql_cleanup  PROT((dbconn_t *));
-static char *   msql_errormsg PROT((dbconn_t *));
-
-static db_defn_t msql = {
-    "mSQL", msql_connect, msql_close, msql_execute, msql_fetch, NULL, NULL, msql_cleanup, NULL, msql_errormsg
-};
-#endif
-
-#ifdef USE_MYSQL
-static int      MySQL_connect  PROT((dbconn_t *, char *, char *, char *, char *));
-static int      MySQL_close    PROT((dbconn_t *));
-static int      MySQL_execute  PROT((dbconn_t *, char *));
-static array_t *MySQL_fetch    PROT((dbconn_t *, int));
-static void     MySQL_cleanup  PROT((dbconn_t *));
-static char *   MySQL_errormsg PROT((dbconn_t *));
-
-static db_defn_t mysql = {
-    "MySQL", MySQL_connect, MySQL_close, MySQL_execute, MySQL_fetch, NULL, NULL, MySQL_cleanup, NULL, MySQL_errormsg
-};
-#endif
-
-#ifdef USE_POSTGRESQL
-static int	PGSQL_connect	PROT((dbconn_t *, char *, char *, char *, char *));
-static int	PGSQL_close	PROT((dbconn_t *));
-static int	PGSQL_execute	PROT((dbconn_t *, char *));
-static array_t *PGSQL_fetch	PROT((dbconn_t *, int));
-static void	PGSQL_cleanup	PROT((dbconn_t *));
-static char *	PGSQL_errormsg	PROT((dbconn_t *));
-
-static db_defn_t postgresql = {
-    "PostgreSQL", PGSQL_connect, PGSQL_close, PGSQL_execute, PGSQL_fetch, NULL, NULL, PGSQL_cleanup, NULL, PGSQL_errormsg
-};
-#endif
-
-static db_defn_t no_db = {
-    "None", NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
-};
-
-/* valid_database
- *
- * Calls APPLY_VALID_DATABASE in the master object to provide some
- * security on which objects can tweak your database (we don't want
- * people doing "DELETE * FROM *" or equivalent for us)
- */
-static svalue_t *valid_database P2(char *, action, array_t *, info)
-{
-    svalue_t *ret;
-
-    /*
-     * Call valid_database(object ob, string action, mixed *info)
-     *
-     * Return: string - password for access
-     *         int    - 1 for no password, accept, 0 deny
-     */
-    push_object(current_object);
-    push_constant_string(action);
-    push_refed_array(info);
-
-    ret = apply_master_ob(APPLY_VALID_DATABASE, 3);
-    if (ret && (ret == (svalue_t *)-1 || (ret->type == T_STRING || (ret->type == T_NUMBER && ret->u.number))))
-	return ret;
-
-    error("Database security violation attempted\n");
-}
+db_t *dbConnList = (db_t *)NULL;
 
 /* int db_close(int handle);
  *
@@ -154,33 +26,24 @@ static svalue_t *valid_database P2(char *, action, array_t *, info)
  * Returns 1 on success, 0 on failure
  */
 #ifdef F_DB_CLOSE
-void f_db_close PROT((void))
-{
-    int ret = 0;
-    db_t *db;
+void f_db_close PROT((void)) {
+    int sock;
     
-    valid_database("close", &the_null_array);
-
-    db = find_db_conn(sp->u.number);
-    if (!db) {
-	error("Attempt to close an invalid database handle\n");
-    }
-
-    /* Cleanup any memory structures left around */
-    if (db->type->cleanup) {
-	db->type->cleanup(&(db->c));
-    }
-
-    if (db->type->close) {
-	ret = db->type->close(&(db->c));
-    }
-
-    /* Remove the entry from the linked list */
-    free_db_conn(db);
-
-    sp->u.number = ret;
+    sock = sp->u.number;
+    if( !valid_db_conn(sock) )
+      error("Attempt to close an invalid database handle.\n");
+#ifdef MSQL
+    msqlClose(sock);
+#elif defined(MY_SQL)
+    /* nothing */
+#else
+    error("No database engine exists.\n");
+#endif /* MSQL */
+    free_db_conn(sock);
+    pop_stack();
+    push_number(1);
 }
-#endif
+#endif /* F_DB_CLOSE */
 
 /* int db_commit(int handle);
  *
@@ -193,125 +56,91 @@ void f_db_close PROT((void))
  * Returns 1 on success, 0 on failure
  */
 #ifdef F_DB_COMMIT
-void f_db_commit PROT((void))
-{
-    int ret = 0;
-    db_t *db;
-
-    valid_database("commit", &the_null_array);
-
-    db = find_db_conn(sp->u.number);
-    if (!db) {
-	error("Attempt to commit an invalid database handle\n");
-    }
-
-    if (db->type->commit) {
-	ret = db->type->commit(&(db->c));
-    }
-
-    sp->u.number = ret;
+void f_db_commit PROT((void)) {
+#if defined(MSQL) || defined(MY_SQL)
+    /* do nothing, transaction was committed */
+#else
+    error("No database engine exists.\n");
+#endif    
+    pop_stack();
+    push_number(1);
 }
-#endif
+#endif /* F_DB_COMMIT */
 
-/* int db_connect(string host, string database, string user, int type)
+/* int db_connect(string host, string database, string name, string password)
  *
  * Creates a database connection to the database named by the
  * second argument found on the host named by the first argument.
  * Note that this means you can connect to database servers running on
  * machines other than the one on which the mud is running.  It will
  * connect based on settings established at compile time for the
- * user id and password (if required).
+ * user id and password (if required) when using the MSQL engine.
+ * When using the MySQL engine the name and password arguments are used
+ * to connect.
  *
  * Returns a new database handle.
  */
 #ifdef F_DB_CONNECT
-void f_db_connect PROT((void))
-{
-    char *database, *host, *user = "", *errormsg = 0;
+void f_db_connect PROT((void)) {
+    char *database;
+    char *host;
+    int sock;
+    svalue_t *arg;
+    int num_arg = st_num_arg;
+#ifdef MY_SQL
+    MYSQL *handle;
     db_t *db;
-    array_t *info;
-    svalue_t *mret;
-    int handle, ret = 0, args = 0, type;
-
-#ifdef DEFAULT_DB
-    type = DEFAULT_DB;
-#else
-    type = 0;
+    char *err, *name, *password;
 #endif
 
-    switch (st_num_arg) {
-	case 4: type     = (sp - (args++))->u.number;
-	case 3: user     = (sp - (args++))->u.string;
-	case 2: database = (sp - (args++))->u.string;
-	case 1: host     = (sp - (args++))->u.string;
+    arg = sp - num_arg + 1;
+    host = arg[0].u.string;
+    database = arg[1].u.string;
+#ifdef MSQL
+    sock = msqlConnect(host);
+    if( sock < 1 ) error_needs_free(db_error(-1));
+    if( msqlSelectDB(sock, database) == -1 ) {
+	msqlClose(sock);
+	error_needs_free(db_error(-1));
     }
-
-    info = allocate_empty_array(3);
-    info->item[0].type = info->item[1].type = info->item[2].type = T_STRING;
-    info->item[0].subtype = info->item[1].subtype = info->item[2].subtype = STRING_MALLOC;
-    info->item[0].u.string = string_copy(database, "f_db_connect:1");
-    if (*host)
-	info->item[1].u.string = string_copy(host, "f_db_connect:2");
-    else
-	info->item[1] = const0;
-    info->item[2].u.string = string_copy(user, "f_db_connect:3");
-
-    mret = valid_database("connect", info);
-
-    handle = create_db_conn();
-    if (!handle) {
-	pop_n_elems(args);
-	push_number(0);
-	return;
-    }
-    db = find_db_conn(handle);
-
-    switch (type) {
-	default:
-	    /* fallthrough */
-#ifdef USE_MSQL
-#if USE_MSQL - 0
-	case USE_MSQL:
-#endif
-	    db->type = &msql;
-	    break;
-#endif
-#ifdef USE_MYSQL
-#if USE_MYSQL - 0
-	case USE_MYSQL:
-#endif
-	    db->type = &mysql;
-	    break;
-#endif
-#ifdef USE_POSTGRESQL
-#if USE_POSTGRESQL - 0
-	case USE_POSTGRESQL:
-#endif
-	    db->type = &postgresql;
-	    break;
-#endif
-    }
-
-    if (db->type->connect) {
-	ret = db->type->connect(&(db->c), host, database, user,
-		(mret != (svalue_t *)-1 && mret->type == T_STRING ? mret->u.string : 0));
-    }
-
-    pop_n_elems(args);
-
-    if (!ret) {
-	if (db->type->error) {
-	    errormsg = db->type->error(&(db->c));
-	    push_malloced_string(errormsg);
+    (void)create_db_conn(sock);
+#elif defined(MY_SQL)
+    name = password = (char *)NULL;
+    if (num_arg >= 3) {
+	if (arg[2].type != T_STRING) {
+	    bad_arg(3, F_DB_CONNECT);
 	} else {
-	    push_number(0);
+	    name = arg[2].u.string;
 	}
-	free_db_conn(db);
-    } else {
-	push_number(handle);
     }
+    if (num_arg == 4) {
+	if (arg[3].type != T_STRING) {
+	    bad_arg(4, F_DB_CONNECT);
+	} else {
+	    password = arg[3].u.string;
+	}
+    }
+    handle = ALLOCATE(MYSQL, TAG_DB, "db_connect");
+    if (!mysql_connect(handle, host, name, password)) {
+	err = mysql_db_error(handle);
+	mysql_close(handle);
+	error_needs_free(err);
+    }
+    if (mysql_select_db(handle, database)) {
+	err = mysql_db_error(handle);
+	mysql_close(handle);
+	error_needs_free(err);
+    }
+    sock = handle->net.fd;
+    db = create_db_conn(sock);
+    db->my_handle = handle;
+#else
+    error("No database engine exists.\n");
+#endif /* MSQL */
+    pop_n_elems(num_arg);
+    push_number(sock);
 }
-#endif
+#endif /* F_DB_CONNECT */
 
 /* mixed db_exec(int handle, string sql)
  *
@@ -324,47 +153,67 @@ void f_db_connect PROT((void))
  * be zero since there is no result set.
  */
 #ifdef F_DB_EXEC
-void f_db_exec PROT((void))
-{
-    int ret = 0;
-    char *errormsg;
+void f_db_exec PROT((void)) {
+    char *s;
     db_t *db;
-    array_t *info;
-
-    info = allocate_empty_array(1);
-    info->item[0].type = T_STRING;
-    info->item[0].subtype = STRING_MALLOC;
-    info->item[0].u.string = string_copy(sp->u.string, "f_db_exec");
-    valid_database("exec", info);
-
-    db = find_db_conn((sp-1)->u.number);
-    if (!db) {
-	error("Attempt to exec on an invalid database handle\n");
+    int sock;
+    
+    sock = (sp-1)->u.number;
+    s = sp->u.string;
+    if( (db = valid_db_conn(sock)) == (db_t *)NULL )
+      error("Invalid database handle.\n");
+#ifdef MSQL
+    if( db->result_set != (m_result *)NULL ) {
+        msqlFreeResult(db->result_set);
+	db->result_set = (m_result *)NULL;
     }
+    if( msqlQuery(sock, s) == -1 ) {
+        char * tmperr;
 
-    if (db->type->cleanup) {
-	db->type->cleanup(&(db->c));
-    }
-
-    if (db->type->execute) {
-	ret = db->type->execute(&(db->c), sp->u.string);
-    }
-
-    pop_stack();
-    if (ret == -1) {
-	if (db->type->error) {
-	    char *errormsg;
-
-	    errormsg = db->type->error(&(db->c));
-	    put_malloced_string(errormsg);
-	} else {
-	    put_constant_string("Unknown error");
+	/* ERROR */
+	if( (tmperr = db_error(sock)) == (char *)NULL ) {
+            pop_n_elems(2);           
+	    push_malloced_string(string_copy(db->errmsg, "f_db_exec"));
 	}
-    } else {
-	sp->u.number = ret;
+	else error_needs_free(tmperr);
+	return;
     }
+    if( (db->result_set = msqlStoreResult()) == (m_result *)NULL ) {
+        pop_n_elems(2);
+        push_number(0);            /* UPDATE or INSERT or DELETE */
+        return;
+    }
+    pop_n_elems(2);
+    push_number(msqlNumRows(db->result_set));
+#elif defined(MY_SQL)
+    if (db->result_set != (MYSQL_RES *)NULL) {
+	mysql_free_result(db->result_set);
+	db->result_set = (MYSQL_RES *)NULL;
+    }
+    if (mysql_query(db->my_handle, s)) {
+	char *tmperr;
+
+	/* ERROR */
+	if ((tmperr = mysql_db_error(db->my_handle)) == (char *)NULL) {
+	    pop_n_elems(2);
+	    push_malloced_string(string_copy(db->errmsg, "f_db_exec"));
+	} else {
+	    error_needs_free(tmperr);
+	}
+	return;
+    }
+    if ((db->result_set = mysql_store_result(db->my_handle)) == (MYSQL_RES *)NULL) {
+	pop_n_elems(2);
+	push_number(0);
+	return;
+    }
+    pop_n_elems(2);
+    push_number(mysql_num_rows(db->result_set));
+#else 
+    error("No database engine exists.\n");
+#endif /* MSQL */    
 }
-#endif
+#endif /* F_DB_EXEC */
 
 /* array db_fetch(int db_handle, int row);
  *
@@ -380,8 +229,8 @@ void f_db_exec PROT((void))
  *     if( dbconn < 1 ) return 0;
  *     rows = db_exec(dbconn, "SELECT player_name from t_player");
  *     if( !rows ) write("No rows returned.");
- *     else if( stringp(rows) ) write(rows);
- *     else for(i=1; i<=rows; i++) {
+ *     else if( stringp(rows) ) write(rows); 
+ *     for(i=1; i<=rows; i++) {
  *         res = db_fetch(dbconn, i);
  *         write(res[0]);
  *     }
@@ -391,39 +240,160 @@ void f_db_exec PROT((void))
  * Returns an array of columns from the named row on success.
  */
 #ifdef F_DB_FETCH
-void f_db_fetch PROT((void))
-{
-    db_t *db;
-    array_t *ret;
-
-    valid_database("fetch", &the_null_array);
-
-    db = find_db_conn((sp-1)->u.number);
-    if (!db) {
-	error("Attempt to fetch from an invalid database handle\n");
-    }
-
-    if (db->type->fetch) {
-	ret = db->type->fetch(&(db->c), sp->u.number);
-    } else {
-	ret = &the_null_array;
-    }
-
-    pop_stack();
-    if (!ret) {
-	if (db->type->error) {
-	    char *errormsg;
-
-	    errormsg = db->type->error(&(db->c));
-	    put_malloced_string(errormsg);
-	} else {
-	    sp->u.number = 0;
-	}
-    } else {
-	put_array(ret);
-    }
-}
+void f_db_fetch PROT((void)) {
+#ifdef MSQL
+    m_row this_row;
+#elif defined(MY_SQL)
+    MYSQL_ROW this_row;
 #endif
+    db_t *db;
+    array_t *v;
+    int row, num_cols, hdl, i;
+
+    hdl = (sp-1)->u.number;
+    row = sp->u.number;
+    if( (db = valid_db_conn(hdl)) == (db_t *)NULL )
+      error("Invalid database handle.\n");
+#ifdef MSQL    
+    if( db->result_set == (m_result *)NULL ) {
+	pop_n_elems(2);
+	push_refed_array(&the_null_array);
+	return;
+    }
+    if( row < 1 || row > msqlNumRows(db->result_set) )
+      error("Attempt to fetch an invalid row through db_fetch().\n");
+    num_cols = msqlNumFields(db->result_set);
+    if( num_cols < 1) {
+        pop_n_elems(2);
+	push_refed_array(&the_null_array);
+	return;
+    }
+    msqlDataSeek(db->result_set, row-1);
+    this_row = msqlFetchRow(db->result_set);
+    if( this_row == NULL ) {
+        pop_n_elems(2);
+	push_refed_array(&the_null_array);
+	return;
+    }
+    v = allocate_empty_array(num_cols);	
+    for(i=0; i<num_cols; i++) {
+        m_field *this_field;
+	    
+	this_field = msqlFetchField(db->result_set);
+	if( this_field == (m_field *)NULL || this_row[i] == NULL )
+	  v->item[i] = const0u;
+	else {
+	    switch(this_field->type) {
+	        case INT_TYPE:
+		  v->item[i].type = T_NUMBER;
+		  v->item[i].u.number = atoi(this_row[i]);
+		  break;
+		  
+	        case REAL_TYPE:
+		  v->item[i].type = T_REAL;
+		  v->item[i].u.real = atof(this_row[i]);
+		  break;
+		
+	        case CHAR_TYPE:
+		  v->item[i].type = T_STRING;
+		  v->item[i].subtype = STRING_MALLOC;
+		  v->item[i].u.string = string_copy(this_row[i], "f_db_fetch");
+		  break;
+		  
+                default:
+		  v->item[i] = const0u;
+		  break;
+	    }
+	}
+    }
+    msqlFieldSeek(db->result_set, 0);
+#elif defined(MY_SQL)
+    if (db->result_set == (MYSQL_RES *)NULL) {
+	pop_n_elems(2);
+	push_refed_array(&the_null_array);
+	return;
+    }
+    if (row < 0 || row > mysql_num_rows(db->result_set)) {
+	error("Attempt to fetch an invalid row through db_fetch().\n");
+    }
+    num_cols = mysql_num_fields(db->result_set);
+    if (num_cols < 1) {
+        pop_n_elems(2);
+	push_refed_array(&the_null_array);
+	return;
+    }
+    if (row > 0) {
+	mysql_data_seek(db->result_set, row-1);
+	this_row = mysql_fetch_row(db->result_set);
+	if (this_row == NULL) {
+	    pop_n_elems(2);
+	    push_refed_array(&the_null_array);
+	    return;
+	}
+    }
+    v = allocate_empty_array(num_cols);	
+    for (i = 0; i < num_cols; i++) {
+        MYSQL_FIELD *this_field;
+	    
+	this_field = (MYSQL_FIELD *)mysql_fetch_field(db->result_set);
+	if (row == 0) {
+	    if (this_field == (MYSQL_FIELD *)NULL) {
+		v->item[i] = const0u;
+	    } else {
+		v->item[i].type = T_STRING;
+		v->item[i].subtype = STRING_MALLOC;
+		v->item[i].u.string = string_copy(this_field->name, "f_db_fetch");
+	    }
+	    continue;
+	}
+	if (this_field == (MYSQL_FIELD *)NULL || this_row[i] == NULL) {
+	    v->item[i] = const0u;
+	} else {
+	    switch (this_field->type) {
+	    case FIELD_TYPE_TINY:
+	    case FIELD_TYPE_SHORT:
+	    case FIELD_TYPE_INT24:
+	    case FIELD_TYPE_LONG:
+	    case FIELD_TYPE_YEAR:
+		v->item[i].type = T_NUMBER;
+		v->item[i].u.number = atoi(this_row[i]);
+		break;
+	    case FIELD_TYPE_DECIMAL:
+	    case FIELD_TYPE_FLOAT:
+		v->item[i].type = T_REAL;
+		v->item[i].u.real = atof(this_row[i]);
+		break;
+	    case FIELD_TYPE_DATE:
+	    case FIELD_TYPE_TIME:
+	    case FIELD_TYPE_DATETIME:
+	    case FIELD_TYPE_NEWDATE:
+	    case FIELD_TYPE_STRING:
+	    case FIELD_TYPE_VAR_STRING:
+	    case FIELD_TYPE_TINY_BLOB:
+	    case FIELD_TYPE_MEDIUM_BLOB:
+	    case FIELD_TYPE_LONG_BLOB:
+	    case FIELD_TYPE_BLOB:
+	    case FIELD_TYPE_ENUM:
+	    case FIELD_TYPE_SET:
+	    case FIELD_TYPE_LONGLONG:
+	    case FIELD_TYPE_TIMESTAMP:
+	    case FIELD_TYPE_DOUBLE:
+		v->item[i].type = T_STRING;
+		v->item[i].subtype = STRING_MALLOC;
+		v->item[i].u.string = string_copy(this_row[i], "f_db_fetch");
+		break;
+	    default:
+		v->item[i] = const0u;
+		break;
+	    }
+	}
+    }
+    mysql_field_seek(db->result_set, 0);
+#endif
+    pop_n_elems(2);
+    push_refed_array(v);
+}
+#endif /* F_DB_FETCH */
 
 /* int db_rollback(int handle)
  *
@@ -434,504 +404,135 @@ void f_db_fetch PROT((void))
  * Returns 1 on success, 0 on failure
  */
 #ifdef F_DB_ROLLBACK
-void f_db_rollback PROT((void))
-{
-    int ret = 0;
+void f_db_rollback PROT((void)) {
+#ifdef MSQL
+    error("MSQL does not support transaction rollbacks.\n");
+#elif defined(MY_SQL)
+    error("MySQL does not support transaction rollbacks.\n");
+#else
+    error("No database engine exists.\n");
+#endif /* MSQL */
+    pop_stack();
+    push_number(0);
+}
+#endif /* F_DB_ROLLBACK */
+
+#ifdef MSQL
+char *db_error P1(int, hdl) {
     db_t *db;
+    int len;
 
-    valid_database("rollback", &the_null_array);
+    len = strlen(msqlErrMsg);
+    if( len > 252 ) len = 252;
+    if( hdl == -1 || (db = valid_db_conn(hdl)) == (db_t *)NULL) {
+        char *tmp;
 
-    db = find_db_conn(sp->u.number);
-    if (!db) {
-	error("Attempt to rollback an invalid database handle\n");
+	tmp = new_string(len+2, "foo");
+	memcpy(tmp, msqlErrMsg, len);
+	tmp[len] = '\n';
+	tmp[len + 1] = '\0';
+	return tmp;
     }
-
-    if (db->type->rollback) {
-	ret = db->type->rollback(&(db->c));
-    }
-
-    if (ret > 0) {
-	if (db->type->cleanup) {
-	    db->type->cleanup(&(db->c));
-	}
-    }
-
-    sp->u.number = ret;
+    memcpy(db->errmsg, msqlErrMsg, len);
+    db->errmsg[len] = '\n';
+    db->errmsg[len + 1] = '\0';
+    return (char *)NULL;
 }
+#endif /* MSQL */
+
+#ifdef MY_SQL
+char *mysql_db_error P1(MYSQL *, hdl) {
+    db_t *db;
+    int len;
+    char *err;
+
+    if (hdl == (MYSQL *)NULL) {
+	err = new_string(15, "foo");
+	memcpy(err, "Unknown error\n\0", 15);
+	return err;
+    }
+    err = mysql_error(hdl);
+    len = strlen(err);
+    if (len > 252) {
+	len = 252;
+    }
+    if ((db = valid_db_conn(hdl->net.fd)) == (db_t *)NULL) {
+        char *tmp;
+
+	tmp = new_string(len+2, "foo");
+	memcpy(tmp, err, len);
+	tmp[len] = '\n';
+	tmp[len + 1] = '\0';
+	return tmp;
+    }
+    memcpy(db->errmsg, err, len);
+    db->errmsg[len] = '\0';
+    return (char *)NULL;
+}
+#endif /* MY_SQL */
+    
+db_t *create_db_conn P1(int, sock) {
+    db_t *db;
+    
+    db = ALLOCATE(db_t, TAG_DB, "create_db_conn");
+    db->handle = sock;
+    db->errmsg[0] = '\0';
+#ifdef MSQL
+    db->result_set = (m_result *)NULL;
+#elif defined(MY_SQL)
+    db->result_set = (MYSQL_RES *)NULL;
 #endif
-
-/* string db_status()
- *
- * Returns a string describing the database package's current status
- */
-#ifdef F_DB_STATUS
-void f_db_status PROT((void))
-{
-    int i;
-    outbuffer_t out;
-
-    outbuf_zero(&out);
-
-    for (i = 0;  i < dbConnAlloc;  i++) {
-	if (dbConnList[i].flags & DB_FLAG_EMPTY) {
-	    continue;
-	}
-
-	outbuf_addv(&out, "Handle: %d (%s)\n", i + 1, dbConnList[i].type->name);
-	if (dbConnList[i].type->status != NULL) {
-	    dbConnList[i].type->status(&(dbConnList[i].c), &out);
-	}
+    if( dbConnList == (db_t *)NULL ) {
+        db->prior = (db_t *)NULL;
+	db->next = (db_t *)NULL;
+	dbConnList = db;
     }
+    else {
+        db_t *tmp;
 
-    outbuf_push(&out);
+	for (tmp = dbConnList; tmp->next != (db_t *)NULL; tmp = tmp->next);
+	db->prior = tmp;
+	db->next = (db_t *)NULL;
+	tmp->next = db;
+    }
+    return db;
 }
+
+void free_db_conn P1(int, sock) {
+    db_t *tmp, *nextdb, *priordb;
+
+    tmp = dbConnList;
+    if( tmp == NULL ) return;
+    while( tmp->handle != sock ) {
+        if( tmp->next == (db_t *)NULL ) return;
+        tmp = tmp->next;
+    }
+    nextdb = tmp->next;
+    priordb = tmp->prior;
+    if( priordb != (db_t *)NULL ) priordb->next = nextdb;
+    else dbConnList = nextdb;
+    if( nextdb != (db_t *)NULL ) nextdb->prior = priordb;
+#ifdef MSQL
+    if( tmp->result_set != (m_result *)NULL )
+	msqlFreeResult(tmp->result_set);
+#elif defined(MY_SQL)
+    if (tmp->result_set != (MYSQL_RES *)NULL) {
+	mysql_free_result(tmp->result_set);
+    }
+    mysql_close(tmp->my_handle);
+    FREE(tmp->my_handle);
 #endif
-
-void db_cleanup PROT((void))
-{
-    int i;
-
-    for (i = 0;  i < dbConnAlloc;  i++) {
-	if (!(dbConnList[i].flags & DB_FLAG_EMPTY)) {
-	    if (dbConnList[i].type->cleanup) {
-		dbConnList[i].type->cleanup(&(dbConnList[i].c));
-	    }
-
-	    if (dbConnList[i].type->close) {
-		dbConnList[i].type->close(&(dbConnList[i].c));
-	    }
-
-	    dbConnList[i].flags = DB_FLAG_EMPTY;
-	    dbConnUsed--;
-	}
-    }
+    FREE(tmp);
 }
 
-int create_db_conn PROT((void))
-{
-    int i;
+db_t *valid_db_conn P1(int, hdl) {
+    db_t *tmp;
 
-    /* allocate more slots if we need them */
-    if (dbConnAlloc == dbConnUsed) {
-	i = dbConnAlloc;
-	dbConnAlloc += 10;
-	if (!dbConnList) {
-	    dbConnList = CALLOCATE(dbConnAlloc, db_t, TAG_DB, "create_db_conn");
-	} else {
-	    dbConnList = RESIZE(dbConnList, dbConnAlloc, db_t, TAG_DB, "create_db_conn");
-	}
-	while (i < dbConnAlloc) {
-	    dbConnList[i++].flags = DB_FLAG_EMPTY;
-	}
+    tmp = dbConnList;
+    if( tmp == (db_t *)NULL ) return (db_t *)NULL;
+    while( tmp->handle != hdl ) {
+        if( tmp->next == (db_t *)NULL ) return (db_t *)NULL;
+	tmp = tmp->next;
     }
-
-    for (i = 0;  i < dbConnAlloc;  i++) {
-	if (dbConnList[i].flags & DB_FLAG_EMPTY) {
-	    dbConnList[i].flags = 0;
-	    dbConnList[i].type = &no_db;
-	    dbConnUsed++;
-	    return i + 1;
-	}
-    }
-
-    fatal("dbConnAlloc != dbConnUsed, but no empty slots");
+    return tmp;
 }
-
-db_t *find_db_conn P1(int, handle)
-{
-    if (handle < 1 || handle > dbConnAlloc || dbConnList[handle - 1].flags & DB_FLAG_EMPTY)
-	return 0;
-    return &(dbConnList[handle - 1]);
-}
-
-void free_db_conn P1(db_t *, db)
-{
-    DEBUG_CHECK(db->flags & DB_FLAG_EMPTY, "Freeing DB connection that is already freed\n");
-    DEBUG_CHECK(!dbConnUsed, "Freeing DB connection when dbConnUsed == 0\n");
-    dbConnUsed--;
-    db->flags |= DB_FLAG_EMPTY;
-}
-
-/*
- * MySQL support
- */
-#ifdef USE_MYSQL
-static void MySQL_cleanup P1(dbconn_t *, c)
-{
-    *(c->mysql.errormsg) = 0;
-    if (c->mysql.results) {
-	mysql_free_result(c->mysql.results);
-	c->mysql.results = 0;
-    }
-}
-
-static char *MySQL_errormsg P1(dbconn_t *, c)
-{
-    if (*(c->mysql.errormsg)) {
-	return string_copy(c->mysql.errormsg, "MySQL_errormsg:1");
-    }
-
-    return string_copy(mysql_error(c->mysql.handle), "MySQL_errormsg:2");
-}
-
-static int MySQL_close P1(dbconn_t *, c)
-{
-    mysql_close(c->mysql.handle);
-    FREE(c->mysql.handle);
-    c->mysql.handle = 0;
-
-    return 1;
-}
-
-static int MySQL_execute P2(dbconn_t *, c, char *, s)
-{
-    if (!mysql_query(c->mysql.handle, s)) {
-	c->mysql.results = mysql_store_result(c->mysql.handle);
-	if (c->mysql.results) {
-	    return mysql_num_rows(c->mysql.results);
-	}
-
-	/* Queries returning no input can return a NULL handle */
-	if (!mysql_errno(c->mysql.handle)) {
-	    return 0;
-	}
-    }
-
-    return -1;
-}
-
-static array_t *MySQL_fetch P2(dbconn_t *, c, int, row)
-{
-    array_t *v;
-    MYSQL_ROW target_row;
-    unsigned int i, num_fields;
-
-    if (!c->mysql.results) {
-	return &the_null_array;
-    }
-    if (row < 1 || row > mysql_num_rows(c->mysql.results)) {
-	return &the_null_array;
-    }
-
-    num_fields = mysql_num_fields(c->mysql.results);
-    if (num_fields < 1) {
-	return &the_null_array;
-    }
-
-    mysql_data_seek(c->mysql.results, row - 1);
-    target_row = mysql_fetch_row(c->mysql.results);
-    if (!target_row) {
-	return &the_null_array;
-    }
-
-    v = allocate_empty_array(num_fields);
-    for (i = 0;  i < num_fields;  i++) {
-	MYSQL_FIELD *field;
-
-	field = mysql_fetch_field(c->mysql.results);
-	if (!field) {
-	    v->item[i] = const0u;
-	} else {
-	    switch (field->type) {
-		case FIELD_TYPE_TINY:
-		case FIELD_TYPE_SHORT:
-		case FIELD_TYPE_DECIMAL:
-		case FIELD_TYPE_LONG:
-		    v->item[i].type = T_NUMBER;
-		    v->item[i].u.number = atoi(target_row[i]);
-		    break;
-
-		case FIELD_TYPE_FLOAT:
-		case FIELD_TYPE_DOUBLE:
-		    v->item[i].type = T_REAL;
-		    v->item[i].u.real = atof(target_row[i]);
-		    break;
-
-		case FIELD_TYPE_TINY_BLOB:
-		case FIELD_TYPE_MEDIUM_BLOB:
-		case FIELD_TYPE_LONG_BLOB:
-		case FIELD_TYPE_BLOB:
-		case FIELD_TYPE_STRING:
-		case FIELD_TYPE_VAR_STRING:
-		    if (field->flags & BINARY_FLAG) {
-#ifndef NO_BUFFER_TYPE
-			v->item[i].type = T_BUFFER;
-			v->item[i].u.buf = allocate_buffer(field->length);
-			write_buffer(v->item[i].u.buf, 0, target_row[i], field->length);
-#else
-			v->item[i] = const0u;
-#endif
-		    } else {
-			v->item[i].type = T_STRING;
-			if (target_row[i]) {
-			    v->item[i].subtype = STRING_MALLOC;
-			    v->item[i].u.string = string_copy(target_row[i], "MySQL_fetch");
-			} else {
-			    v->item[i].subtype = STRING_CONSTANT;
-			    v->item[i].u.string = "";
-			}
-		    }
-		    break;
-
-		default:
-		    v->item[i] = const0u;
-		    break;
-	    }
-	}
-    }
-
-    mysql_field_seek(c->mysql.results, 0);
-    return v;
-}
-
-static int MySQL_connect P5(dbconn_t *, c, char *, host, char *, database, char *, username, char *, password)
-{
-    int ret;
-    MYSQL *tmp;
-
-    tmp = ALLOCATE(MYSQL, TAG_DB, "MySQL_connect");
-    *(c->mysql.errormsg) = 0;
-
-    c->mysql.handle = mysql_connect(tmp, host, username, password);
-    if (!c->mysql.handle) {
-	strncpy(c->mysql.errormsg, mysql_error(tmp), sizeof(c->mysql.errormsg));
-	c->mysql.errormsg[sizeof(c->mysql.errormsg) - 1] = 0;
-	FREE(tmp);
-	return 0;
-    }
-
-    ret = mysql_select_db(c->mysql.handle, database);
-    if (ret) {
-	strncpy(c->mysql.errormsg, mysql_error(c->mysql.handle), sizeof(c->mysql.errormsg));
-	c->mysql.errormsg[sizeof(c->mysql.errormsg) - 1] = 0;
-	mysql_close(c->mysql.handle);
-	c->mysql.handle = 0;
-	FREE(tmp);
-	return 0;
-    }
-
-    c->mysql.results = 0;
-    return 1;
-}
-#endif
-
-/*
- * mSQL support
- */
-#ifdef USE_MSQL
-static void msql_cleanup P1(dbconn_t *, c)
-{
-    if (c->msql.result_set) {
-	msqlFreeResult(c->msql.result_set);
-	c->msql.result_set = 0;
-    }
-}
-
-static int msql_close P1(dbconn_t *, c)
-{
-    msqlClose(c->msql.handle);
-    c->msql.handle = -1;
-
-    return 1;
-}
-
-static int msql_execute P2(dbconn_t *, c, char *, s)
-{
-    if (msqlQuery(c->msql.handle, s) != -1) {
-	c->msql.result_set = msqlStoreResult();
-	if (!c->msql.result_set) {
-	    /* Query was an UPDATE or INSERT or DELETE */
-	    return 0;
-	}
-	return msqlNumRows(c->msql.result_set);
-    }
-
-    return -1;
-}
-
-static array_t *msql_fetch P2(dbconn_t *, c, int, row)
-{
-    int i, num_fields;
-    m_row this_row;
-    array_t *v;
-
-    if (!c->msql.result_set) {
-	return &the_null_array;
-    }
-    if (row < 1 || row > msqlNumRows(c->msql.result_set)) {
-	return &the_null_array;
-    }
-
-    num_fields = msqlNumFields(c->msql.result_set);
-    if (num_fields < 1) {
-	return &the_null_array;
-    }
-
-    msqlDataSeek(c->msql.result_set, row - 1);
-    this_row = msqlFetchRow(c->msql.result_set);
-    if (!this_row) {
-	return &the_null_array;
-    }
-
-    v = allocate_empty_array(num_fields);
-    for (i = 0;  i < num_fields;  i++) {
-	m_field *field;
-
-	field = msqlFetchField(c->msql.result_set);
-	if (!field || !this_row[i]) {
-	    v->item[i] = const0u;
-	} else {
-	    switch (field->type) {
-		case INT_TYPE:
-		case UINT_TYPE:
-		    v->item[i].type = T_NUMBER;
-		    v->item[i].u.number = atoi(this_row[i]);
-		    break;
-
-		case REAL_TYPE:
-		case MONEY_TYPE:
-		    v->item[i].type = T_REAL;
-		    v->item[i].u.real = atof(this_row[i]);
-		    break;
-
-		case CHAR_TYPE:
-		case TEXT_TYPE:
-		case DATE_TYPE:
-		case TIME_TYPE:
-		    v->item[i].type = T_STRING;
-		    v->item[i].subtype = STRING_MALLOC;
-		    v->item[i].u.string = string_copy(this_row[i], "msql_fetch");
-		    break;
-
-		default:
-		    v->item[i] = const0u;
-		    break;
-	    }
-	}
-    }
-
-    msqlFieldSeek(c->msql.result_set, 0);
-    return v;
-}
-
-static int msql_connect P5(dbconn_t *, c, char *, host, char *, database, char *, username, char *, password)
-{
-    c->msql.handle = msqlConnect(host);
-    if (c->msql.handle < 1) {
-	return 0;
-    }
-
-    if (msqlSelectDB(c->msql.handle, database) == -1) {
-	msqlClose(c->msql.handle);
-	return 0;
-    }
-
-    c->msql.result_set = 0;
-    return 1;
-}
-
-static char *msql_errormsg P1(dbconn_t *, c)
-{
-    return string_copy(msqlErrMsg, "msql_errormsg");
-}
-#endif
-
-#ifdef USE_POSTGRESQL
-static int PGSQL_connect P5(dbconn_t *, c, char *, host, char *, database, char *, username, char *, password)
-{
-    c->postgresql.handle = PQsetdbLogin(host, NULL, NULL, NULL, database, username, password);
-    if (!c->postgresql.handle)
-	return 0;
-
-    if (PQstatus(c->postgresql.handle) != CONNECTION_OK) {
-	PQfinish(c->postgresql.handle);
-	return 0;
-    }
-
-    c->postgresql.result = 0;
-    return 1;
-}
-
-static int PGSQL_close P1(dbconn_t *, c)
-{
-    PQfinish(c->postgresql.handle);
-    c->postgresql.handle = NULL;
-
-    return 1;
-}
-
-static char *PGSQL_errormsg P1(dbconn_t *, c)
-{
-    return string_copy(PQerrorMessage(c->postgresql.handle), "PGSQL_errormsg");
-}
-
-static void PGSQL_cleanup P1(dbconn_t *, c)
-{
-    if (c->postgresql.result) {
-	PQclear(c->postgresql.result);
-	c->postgresql.result = 0;
-    }
-}
-
-static int PGSQL_execute P2(dbconn_t *, c, char *, s)
-{
-    PGresult *result;
-    ExecStatusType status;
-
-    result = PQexec(c->postgresql.handle, s);
-    status = PQresultStatus(result);
-    if (status != PGRES_COMMAND_OK && status != PGRES_TUPLES_OK)
-	return -1;
-
-    c->postgresql.result = result;
-    return PQntuples(result);
-}
-
-static array_t *PGSQL_fetch P2(dbconn_t *, c, int, row)
-{
-    array_t *v;
-    int binary, i, num_fields;
-
-    if (!c->postgresql.result)
-	return &the_null_array;
-    if (row < 1 || row > PQntuples(c->postgresql.result))
-	return &the_null_array;
-    if ((num_fields = PQnfields(c->postgresql.result)) < 1)
-	return &the_null_array;
-
-    v = allocate_empty_array(num_fields);
-    binary = PQbinaryTuples(c->postgresql.result);
-    for (i = 0;  i < num_fields;  i++) {
-	char *value;
-
-	value = PQgetvalue(c->postgresql.result, row - 1, i);
-	if (binary) {
-	    v->item[i].type = T_STRING;
-	    v->item[i].subtype = STRING_MALLOC;
-	    v->item[i].u.string = string_copy(value, "PGSQL_fetch");
-	    continue;
-	} else {
-	    /* This is a really ugly limitation that needs to be lifted.  The
-	     * problem is that PostgreSQL doesn't make its datatypes easily
-	     * available for inclusion.  I am not at all familiar with the API
-	     * and have basically pulled the existing support here completely
-	     * out of my ass, so this is going to stay this way until someone
-	     * can contribute code that'll handle the individual datatypes in
-	     * a reasonable fashion.	    -- Marius, 19-Sep-2000
-	     */
-#ifndef NO_BUFFER_TYPE
-	    int length = PQgetlength(c->postgresql.result, row - 1, i);
-
-	    v->item[i].type = T_BUFFER;
-	    v->item[i].u.buf = allocate_buffer(length);
-	    write_buffer(v->item[i].u.buf, 0, value, length);
-#else
-	    v->item[i] = const0u;
-#endif
-	}
-    }
-
-    return v;
-}
-
-#endif

@@ -45,6 +45,7 @@
    int atoi PROT((const char *));
    int setsockopt PROT((int, int, int, char *, int));
    int fseek PROT_STDIO((FILE *, long, int));
+   unsigned int alarm PROT((unsigned int));
    int ioctl PROT((int,...));
    extern int rename PROT((char *, char *));
    int readlink PROT((char *, char *, int));
@@ -70,6 +71,13 @@
 #  ifdef RANDOM
      long random PROT((void));
 #  endif
+
+/* SGI is missing some prototypes in the .h files */
+#ifdef PEDANTIC
+#  ifdef sgi
+     void ualarm PROT((int, int));
+#  endif
+#endif
 
 #endif
 

@@ -1,0 +1,266 @@
+
+# YOU DO NOT NEED TO CONFIGURE ANYTHING IN THIS FILE.
+#
+# RUN THE SHELL SCRIPT ./build.MudOS to generate the Makefiles, and follow
+# its instructions.
+#
+############################################################################
+#
+# **** TARGETS AND THEIR CORRECT USAGE ****
+#
+# COMPILATION TARGETS:
+# 
+# all:		compile all the files
+#
+# install:	make all, then move the files to the correct directories
+#
+# remake: 	remove the object files and generated files, and recompile
+# 		     NO reconfiguration is done, etc.
+#
+# depend:	automatically create dependency info
+#
+# Makefiles:	update Makefile.in and GNUmakefile.in from Makefile.master
+#		(only necessary after making changes to Makefile.master)
+#
+# 'CLEAN' TARGETS:
+#
+# neat: 	remove object files and generated files (used by remake)
+#
+# clean:	in addition to neat, also remove .orig and .rej files,
+#		cores, lint files, emacs backups, tag files, yacc debug
+#		files, generated Makefiles, generated binaries, and
+#		generated dependency info
+#
+# spotless:	make clean, then remove ALL CONFIGURATION AND CUSTOMIZATION
+#		     useful for creating distributions
+#
+# ---- REALLY COMPLEX OPTIONS YOU PROBABLY DON'T WANT TO TOUCH -----
+#
+# NeXT: link with MallocDebug if you have a NeXT with NeXTOS 2.1 or later and
+# you wish to search for memory leaks (see /NextDeveloper/Apps/MallocDebug).
+# Note: linking with MallocDebug will cause the virtual size of the
+# driver process to reach appoximately 40MB however the amount of real memory
+# used will remain close to normal.
+#EXTRALIBS=-lMallocDebug -lsys_s
+#
+# ---- DO NOT EDIT ANYTHING BELOW HERE UNLESS YOU KNOW ALOT ABOUT HOW
+#      MUDOS WORKS INTERNALLY ----
+
+OVERRIDES=$(MAKEOVERRIDES)
+
+# **************************************************************************
+# **** NOTE: If you add something here, also add it to the OBJ= rule below,
+# **** or non-GNU makes will die
+# **************************************************************************
+SRC=grammar$(TAB_EXT).c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
+  backend.c array.c mapping.c comm.c ed.c regexp.c swap.c buffer.c crc32.c \
+  malloc.c mallocwrapper.c class.c efuns_main.c efuns_port.c \
+  call_out.c otable.c dumpstat.c stralloc.c hash.c \
+  port.c reclaim.c parse.c simul_efun.c sprintf.c program.c \
+  compiler.c avltree.c icode.c trees.c generate.c scratchpad.c \
+  socket_efuns.c socket_ctrl.c qsort.c eoperators.c socket_err.c md.c \
+  disassembler.c binaries.c $(STRFUNCS) \
+  replace_program.c ccode.c cfuns.c compile_file.c master.c function.c \
+  debug.c crypt.c applies_table.c add_action.c
+
+all: utils cc.h files main_build
+
+main_build: $(DRIVER_BIN) addr_server
+
+
+OBJ=$(OBJDIR)\grammar$(TAB_EXT).obj $(OBJDIR)\lex.obj $(OBJDIR)\main.obj $(OBJDIR)\rc.obj $(OBJDIR)\interpret.obj \
+	$(OBJDIR)\simulate.obj $(OBJDIR)\file.obj $(OBJDIR)\object.obj $(OBJDIR)\backend.obj $(OBJDIR)\array.obj \
+	$(OBJDIR)\mapping.obj $(OBJDIR)\comm.obj $(OBJDIR)\ed.obj $(OBJDIR)\regexp.obj $(OBJDIR)\swap.obj \
+	$(OBJDIR)\buffer.obj $(OBJDIR)\crc32.obj $(OBJDIR)\malloc.obj $(OBJDIR)\mallocwrapper.obj \
+	$(OBJDIR)\class.obj $(OBJDIR)\efuns_main.obj $(OBJDIR)\efuns_port.obj $(OBJDIR)\call_out.obj \
+	$(OBJDIR)\otable.obj $(OBJDIR)\dumpstat.obj $(OBJDIR)\stralloc.obj $(OBJDIR)\hash.obj $(OBJDIR)\port.obj \
+	$(OBJDIR)\reclaim.obj $(OBJDIR)\parse.obj $(OBJDIR)\simul_efun.obj $(OBJDIR)\sprintf.obj \
+	$(OBJDIR)\program.obj $(OBJDIR)\compiler.obj $(OBJDIR)\avltree.obj $(OBJDIR)\icode.obj $(OBJDIR)\trees.obj \
+	$(OBJDIR)\generate.obj $(OBJDIR)\scratchpad.obj $(OBJDIR)\socket_efuns.obj $(OBJDIR)\socket_ctrl.obj \
+	$(OBJDIR)\qsort.obj $(OBJDIR)\eoperators.obj $(OBJDIR)\socket_err.obj $(OBJDIR)\md.obj \
+	$(OBJDIR)\disassembler.obj $(OBJDIR)\binaries.obj $(OBJDIR)\add_action.obj \
+	$(OBJDIR)\replace_program.obj $(OBJDIR)\ccode.obj $(OBJDIR)\cfuns.obj $(OBJDIR)\compile_file.obj \
+	$(OBJDIR)\crypt.obj $(OBJDIR)\debug.obj $(OBJDIR)\master.obj $(OBJDIR)\function.obj $(OBJDIR)\applies_table.obj
+
+.c{$(OBJDIR)/}.obj:
+	$(CC) $(CFLAGS) $(OPTIMIZE) -Fo$(OBJDIR)\ -c $<
+
+$(OBJDIR)/lex.obj: lex.c preprocess.c cc.h grammar$(TAB_EXT).c
+
+$(OBJDIR)/grammar$(TAB_EXT).obj: grammar$(TAB_EXT).c opcodes.h
+
+which_makefile:
+	echo MakeIsNmake
+
+grammar$(TAB_EXT).c: grammar.y
+	$(YACC) grammar.y
+	-rm -f grammar$(TAB_EXT).*
+	sed "s/y$(TAB_EXT).c/grammar$(TAB_EXT).c/g" y$(TAB_EXT).c > grammar$(TAB_EXT).c
+	-mv y$(TAB_EXT).h grammar$(TAB_EXT).h
+
+packages/packages.lib: packages/parser.c packages/contrib.c
+	cd packages
+	$(MAKE) /nologo "CC=$(CC)" "CFLAGS=$(CFLAGS) $(OPTIMIZE)" "OBJDIR=../$(OBJDIR)" \
+	"RANLIB=$(RANLIB)" "O=$(O)" "A=$(A)"
+	cd ..
+
+mudlib/mudlib.lib:
+	cd mudlib
+	$(MAKE) /nologo "CC=$(CC)" "CFLAGS=$(CFLAGS) $(OPTIMIZE)" "OBJDIR=../$(OBJDIR)" \
+	"RANLIB=$(RANLIB)" "O=$(O)" "A=$(A)"
+	cd ..
+$(DRIVER_BIN): $(DRIVER_BIN).exe
+
+$(DRIVER_BIN).exe: packages/packages.lib mudlib/mudlib.lib $(OBJ)
+	-mv -f $(DRIVER_BIN).exe $(DRIVER_BIN).old
+	$(CC) $(CFLAGS) $(OPTIMIZE) $(OBJ) -Fe$(DRIVER_BIN).exe packages/packages.lib mudlib/mudlib.lib \
+	$(EXTRALIBS) @system_libs
+
+addr_server: addr_server.exe
+
+addr_server.exe: $(OBJDIR)/addr_server.obj $(OBJDIR)/socket_ctrl.obj $(OBJDIR)/port.obj addr_server.h
+	$(CC) $(CFLAGS) $(OPTIMIZE) $(OBJDIR)/socket_ctrl.obj $(OBJDIR)/addr_server.obj $(OBJDIR)/port.obj \
+	-Feaddr_server.exe @system_libs
+
+remake: neat all
+
+customize: cp.bat
+	-cp ..\local_options .
+	-cp ..\system_libs .
+	-cp ..\configure.h .
+
+cc.h: Makefile
+	rm -f cc.h
+	echo /* this file automatically generated by the Makefile */ > cc.h
+	echo #define COMPILER "$(CC)" >> cc.h
+	echo #define OPTIMIZE "$(OPTIMIZE)" >> cc.h
+	echo #define CFLAGS   "$(CFLAGS) $(OPTIMIZE)" >> cc.h
+	echo #define OBJDIR   "$(OBJDIR)" >> cc.h
+
+# the touches here are necessary to fix the modification times; link(2) does
+# 'modify' a file
+files: edit_source sysmalloc.c smalloc.c bsdmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c func_spec.c mudlib/Makefile.pre mudlib/GNUmakefile.pre packages/Makefile.pre packages/GNUmakefile.pre configure.h grammar.y.pre
+	.\edit_source -options -malloc -build_func_spec "$(CPP) $(CFLAGS)" \
+	              -process grammar.y.pre
+	.\edit_source -process packages/Makefile.pre
+	.\edit_source -process packages/GNUmakefile.pre
+	.\edit_source -process mudlib/Makefile.pre
+	.\edit_source -process mudlib/GNUmakefile.pre
+	.\edit_source -build_efuns -build_applies
+	touch mallocwrapper.c
+	touch malloc.c
+	touch files
+
+make_func$(TAB_EXT).c: make_func.y cc.h
+	$(YACC) $(YFLAGS) make_func.y
+	-rm -f make_func$(TAB_EXT).c
+	mv y$(TAB_EXT).c make_func$(TAB_EXT).c
+
+configure.h: edit_source.exe build.MudOS
+	if not exist configure.h rm -f configuration
+	touch configuration
+	.\edit_source -configure
+
+build.MudOS: buildMudOS.bat
+
+$(OBJDIR)/crypt.obj: ./amiga/crypt.c
+	$(CC) $(CFLAGS) $(OPTIMIZE) -Fo$(OBJDIR)\ -c .\amiga\crypt.c
+
+utils: touch.exe mudlib/ar.exe packages/ar.exe mv.bat rm.bat packages/rm.bat mudlib/rm.bat cp.bat
+
+rm.bat: Win32/rm.bat
+	copy Win32\rm.bat .
+
+packages/rm.bat: Win32/rm.bat
+	copy Win32\rm.bat packages
+
+mudlib/rm.bat: Win32/rm.bat
+	copy Win32\rm.bat mudlib
+
+mv.bat: Win32/mv.bat
+	copy Win32\mv.bat .
+
+cp.bat: Win32/cp.bat
+	copy Win32\cp.bat .
+
+touch.exe: Win32/touch.c
+	$(CC) Win32/touch.c
+
+packages/ar.exe: mudlib/ar.exe
+	copy mudlib\ar.exe packages
+
+mudlib/ar.exe: Win32/ar.c
+	$(CC) -Femudlib/ Win32/ar.c
+
+
+$(OBJDIR)/edit_source.obj: edit_source.c preprocess.c cc.h
+
+edit_source: edit_source.exe
+
+edit_source.exe: $(OBJDIR)/edit_source.obj $(OBJDIR)/hash.obj $(OBJDIR)/make_func$(TAB_EXT).obj
+	$(CC) $(CFLAGS) $(OBJDIR)\edit_source.obj $(OBJDIR)\hash.obj $(OBJDIR)\make_func$(TAB_EXT).obj -Feedit_source.exe
+
+# don't optimize these two
+$(OBJDIR)/edit_source.obj: edit_source.c
+	$(CC) $(CFLAGS) -Fo$(OBJDIR)\ -c edit_source.c
+
+$(OBJDIR)/make_func$(TAB_EXT).obj: make_func$(TAB_EXT).c
+	$(CC) $(CFLAGS) -Fo$(OBJDIR)\ -c make_func$(TAB_EXT).c
+
+install: all
+	-mkdir $(INSTALL_DIR)
+	$(INSTALL) $(DRIVER_BIN).exe $(INSTALL_DIR)
+	$(INSTALL) addr_server.exe $(INSTALL_DIR)
+
+Makefiles: utils Makefile.in GNUmakefile.in NMakefile.in
+
+Makefile.in: edit_source.exe Makefile.in.pre Makefile.master
+	.\edit_source -process Makefile.in.pre
+
+GNUmakefile.in: edit_source.exe GNUmakefile.in.pre Makefile.master
+	.\edit_source -process GNUmakefile.in.pre
+
+NMakefile.in: edit_source.exe NMakefile.in.pre Makefile.master
+	.\edit_source -process NMakefile.in.pre
+
+nothing:
+
+# remove local configuration
+spotless: clean
+	-rm -f configure.h local_options system_libs configuration
+	-rm -f options_incl.h
+	-rm -f *.diffs
+	-find . -name "*~" -print | xargs rm
+	-rm -f touch.exe mudlib\ar.exe packages\ar.exe mv.bat packages\rm.bat mudlib\rm.bat cp.bat
+	del rm.bat
+
+# get ready for recompile
+neat: rm.bat packages/rm.bat mudlib/rm.bat
+	-cd packages
+	-$(MAKE) /nologo "O=$(O)" "A=$(A)" clean
+	-cd..
+	-cd mudlib
+	-$(MAKE) /nologo "O=$(O)" "A=$(A)" clean
+	-cd..
+	-deltree /y $(OBJDIR)
+	-rm *.obj *$(TAB_EXT).c *$(TAB_EXT).h trash_me.bat *.ilk *.pdb
+	-rm -f efun_defs.c option_defs.c
+	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
+	-rm -f malloc.c mallocwrapper.c
+	-rm -f func_spec.cpp applies.h applies_table.c files
+	-rm -f grammar.y comptest* a.out
+	-rm packages\Makefile packages\GNUmakefile packages\packages
+	-rm packages\*.pdb mudlib\*.pdb
+
+# remove everything except configuration
+clean: neat
+	-rm -f cc.h edit_source.exe
+	-rm core y.output testsuite\core testsuite\single\swapfile.*
+	-rm testsuite\OPCPROF.* testsuite\opc.*
+	-echo y | del testsuite\tmp\*
+	-deltree /y testsuite\binaries
+	-rm testsuite\OBJ_DUMP* testsuite\test_file testsuite\testfile
+	-rm testsuite\tmp_eval_file.c testsuite\sf.o testsuite\ed_test
+	-rm testsuite\log\log testsuite\log\debug.log testsuite\log\compile
+	-rm -f $(DRIVER_BIN).exe $(DRIVER_BIN).old addr_server.exe
+# DO NOT DELETE THIS LINE -- make depend depends on it.

@@ -1,0 +1,14 @@
+del efunction*.h
+del efun_d*.c
+del efun_p*.h
+del func_s*.cpp
+del grammar_tab.c
+del grammar_tab.h
+del grammar.y
+del make_f*.c
+del malloc.c
+del mallocwrapper.c
+del opc.h
+del opcodes.h
+del option_defs.*
+del configure.h

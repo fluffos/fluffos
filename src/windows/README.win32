@@ -1,0 +1,36 @@
+		 MudOS for Windows 95 and Windows NT
+	       Port by George Reese (Descartes of Borg)
+
+This port has a few crashers in it.  Known bugs include:
+	* connect() gives an WASEWOULDBLOCK error (*boggle*)
+	  for connecting to the address server or socket efuns
+	* bug in reading DOS files (files with \r\n)
+	  this is probably fixed in v21.6
+	* some bug in call outs 
+	* Right now the proper calls to WSAGetLastError() are not made
+
+This is not a simple compile yet, unfortunately.  Perhaps someone can
+fix the above bugs and simplify the make process?  If so, please mail
+your fixes to beek@imaginary.com.
+
+To compile MudOS for Windows NT/95, you need:
+MS VC++ 2.0 or later (dunno about Borland or other compilers)
+gnu bison and sed, get them from ftp.cc.utexas.edu in the winnt section
+
+Steps:
+0. move the .mak and .bat files in this directory to the main source directory
+   and run CLEAN.BAT - this removes all files generated during compile
+1. Open up edit_source.mak
+2. From the command prompt run STEP1.BAT
+3. Build edit_source.exe
+4. From the DOS command line, execute STEPDBG.BAT (in case you're building
+    debug version) or STEPREL.BAT (in case you're building release ver)
+5. Open up mudos.mak
+6. Build mudos.exe
+7. Open addr_server.mak
+8. Build addr_server.exe
+9. Install your lib and run mudos
+
+Note: if you want to create a DEBUG version of MudOS you have to define
+DEBUG symbol either in STD.H or in project setting in both EDIT_SOURCE and
+MUDOS.

@@ -26,6 +26,19 @@
 #include "../add_action.h"
 #endif
 
+/* should be done in configure */
+#ifdef WIN32
+#define strcasecmp(X, Y) stricmp(X, Y)
+#endif
+
+#ifdef F_REAL_TIME
+void
+f_real_time PROT((void))
+{
+    push_number(time(NULL));
+}
+#endif
+
 /*
  * This differs from the livings() efun in that this efun only returns
  * objects which have had set_living_name() called as well as 
@@ -49,7 +62,7 @@ void f_named_livings() {
 
     obtab = CALLOCATE(max_array_size, object_t *, TAG_TEMPORARY, "named_livings");
 
-    for (i = 0; i < LIVING_HASH_TABLE_SIZE; i++) {
+    for (i = 0; i < CFG_LIVING_HASH_SIZE; i++) {
 	for (ob = hashed_living[i]; ob; ob = ob->next_hashed_living) {
 	    if (!(ob->flags & O_ENABLE_COMMANDS))
 		continue;
@@ -315,7 +328,33 @@ void f_functions PROT((void)) {
     i = num;
     
     while (i--) {
-        funp = find_func_entry(sp->u.ob->prog, i, &prog, &index, 0);
+	unsigned short low, high, mid;
+	
+	prog = sp->u.ob->prog;
+	index = i;
+
+	/* Walk up the inheritance tree to the real definition */	
+	if (prog->function_flags[index] & FUNC_ALIAS) {
+	    index = prog->function_flags[index] & ~FUNC_ALIAS;
+	}
+	
+	while (prog->function_flags[index] & FUNC_INHERITED) {
+	    low = 0;
+	    high = prog->num_inherited -1;
+	    
+	    while (high > low) {
+		mid = (low + high + 1) >> 1;
+		if (prog->inherit[mid].function_index_offset > index)
+		    high = mid -1;
+		else low = mid;
+	    }
+	    index -= prog->inherit[low].function_index_offset;
+	    prog = prog->inherit[low].prog;
+	}
+    
+	index -= prog->last_inherited;
+
+	funp = prog->function_table + index;
 
 	if (flag) {
 	    if (prog->type_start && prog->type_start[index] != INDEX_START_NONE)
@@ -408,6 +447,13 @@ void f_variables PROT((void)) {
     
     pop_stack();
     push_refed_array(arr);
+}
+#endif
+
+/* also Beek */
+#ifdef F_HEART_BEATS
+void f_heart_beats PROT((void)) {
+    push_refed_array(get_heart_beats());
 }
 #endif
 
@@ -893,7 +939,7 @@ static char *pluralize P1(char *, str) {
 	break;
     case 'D':
     case 'd':
-	if (!strcasecmp(rel + 1, "atum")) {
+	if (!strcasecmp(rel + 1, "datum")) {
 	    found = PLURAL_CHOP + 2;
 	    suffix = "a";
 	} else
@@ -966,10 +1012,10 @@ static char *pluralize P1(char *, str) {
 	    found = PLURAL_CHOP + 4;
 	    suffix = "ice";
 	}
-	if (!strcasecmp(rel + 1, "otus")) {
-	    found = PLURAL_SUFFIX;
-	    break;
-	}
+        if (!strcasecmp(rel + 1, "otus")) {
+            found = PLURAL_SUFFIX;
+            break;
+        }
 	break;
     case 'M':
     case 'm':
@@ -1099,8 +1145,7 @@ static char *pluralize P1(char *, str) {
 	    }
 	    break;
 	case 'F': case 'f':
-	    if (end[-2] == 'e' || end[-2] == 'E' ||
-		end[-2] == 'f' || end[-2] == 'F')
+	    if (end[-2] == 'e' || end[-2] == 'E')
 		break;
 	    found = PLURAL_CHOP + 1;
 	    suffix = "ves";
@@ -1324,7 +1369,7 @@ void f_replaceable PROT((void)) {
     for (i = 0; i < num; i++) {
 	if (prog->function_flags[i] & (FUNC_INHERITED | FUNC_NO_CODE)) continue;
 	for (j = 0; j < numignore; j++)
-	    if (ignore[j] == find_func_entry(prog, i, 0, 0, 0)->name)
+	    if (ignore[j] == find_func_entry(prog, i)->name)
 		break;
 	if (j == numignore)
 	    break;
@@ -1697,7 +1742,6 @@ static int memory_share P1(svalue_t *, sv) {
     case T_MAPPING:
         if (++depth > 100)
             return 0;
-
 	subtotal = sizeof(mapping_t);
 	mapTraverse(sv->u.map, node_share, &subtotal);
         depth--;

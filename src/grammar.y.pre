@@ -12,6 +12,9 @@
 #include "master.h"
 
 /* gross. Necessary? - Beek */
+#ifdef WIN32
+#define MSDOS
+#endif
 %line
 /*
  * This is the grammar definition of LPC, and its parse tree generator.
@@ -28,7 +31,7 @@
  */
 int context;
 int num_refs;
-
+int func_present;
 /*
  * bison & yacc don't prototype this in y.tab.h
  */
@@ -276,6 +279,9 @@ inheritance:
 		
 		if (!($1 & DECL_ACCESS)) $1 |= DECL_PUBLIC;
 		
+		if (func_present)
+		    error("Illegal to inherit after defining functions.");
+
 		if (var_defined)
 		    yyerror("Illegal to inherit after defining global variables.");
 		ob = find_object2($3);
@@ -391,7 +397,7 @@ def:
 %ifdef SENSIBLE_MODIFIERS
                 int acc_mod;
 %endif
-		
+                func_present = 1;
 		flags = ($1 >> 16);
 		
 		flags |= global_modifiers;
@@ -557,6 +563,7 @@ type_decl:
 			   FOA_GLOBAL_SCOPE);
 		if (ihe->dn.class_num == -1) {
 		    ihe->sem_value++;
+		    ihe->dn.class_num = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
 		    if (ihe->dn.class_num > CLASS_NUM_MASK){
 			char buf[256];
 			char *p;
@@ -566,7 +573,6 @@ type_decl:
 			yyerror(buf);
 		    }
 
-		    ihe->dn.class_num = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
 		    scratch_free($3);
 		    $<ihe>2 = 0;
 		}
@@ -2506,6 +2512,8 @@ lvalue:
 #define LV_INDEX 4
                 /* Restrictive lvalues, but I think they make more sense :) */
                 $$ = $1;
+		if($$->kind == NODE_BINARY_OP && $$->v.number == F_TYPE_CHECK) 
+		    $$ = $$->l.expr;
                 switch($$->kind) {
 		default:
 		    yyerror("Illegal lvalue");
@@ -2674,7 +2682,7 @@ expr4:
 		      p = strput(buf, end, "Undefined variable '");
 		      p = strput(p, end, $1->name);
 		      p = strput(p, end, "'");
-		      if (current_number_of_locals < MAX_LOCAL_VARIABLES) {
+		      if (current_number_of_locals < CFG_MAX_LOCAL_VARIABLES) {
 			  add_local_name($1->name, TYPE_ANY);
 		      }
 		      CREATE_ERROR($$);
@@ -2690,7 +2698,7 @@ expr4:
 		p = strput(buf, end, "Undefined variable '");
 		p = strput(p, end, $1);
 		p = strput(p, end, "'");
-                if (current_number_of_locals < MAX_LOCAL_VARIABLES) {
+                if (current_number_of_locals < CFG_MAX_LOCAL_VARIABLES) {
                     add_local_name($1, TYPE_ANY);
                 }
                 CREATE_ERROR($$);
@@ -2824,6 +2832,8 @@ expr4:
 		    default:
 			if ($1->type & TYPE_MOD_ARRAY) {
 			    $$->type = $1->type & ~TYPE_MOD_ARRAY;
+			    if ($$->type != TYPE_ANY)
+			        $$ = add_type_check($$, $$->type); 
 			    if (!IS_TYPE($4->type,TYPE_NUMBER))
 				type_error("Bad type of index", $4->type);
 			} else {
@@ -2878,6 +2888,8 @@ expr4:
 		    default:
 			if ($1->type & TYPE_MOD_ARRAY) {
 			    $$->type = $1->type & ~TYPE_MOD_ARRAY;
+			    if($$->type != TYPE_ANY)
+			        $$ = add_type_check($$, $$->type);
 			    if (!IS_TYPE($3->type,TYPE_NUMBER))
 				type_error("Bad type of index", $3->type);
 			} else {
@@ -2904,7 +2916,7 @@ expr4:
 		$<func_block>$.context = context;
 		$<func_block>$.save_current_type = current_type;
 		$<func_block>$.save_exact_types = exact_types;
-	        if (type_of_locals_ptr + max_num_locals + MAX_LOCAL_VARIABLES >= &type_of_locals[type_of_locals_size])
+	        if (type_of_locals_ptr + max_num_locals + CFG_MAX_LOCAL_VARIABLES >= &type_of_locals[type_of_locals_size])
 		    reallocate_locals();
 		deactivate_current_locals();
 		locals_ptr += current_number_of_locals;

@@ -34,67 +34,6 @@ same(mixed x, mixed y) {
     }
 }
 
-// NOTE: This implementation differs slightly from the old driver version in
-//       that it doesn't not support NONINTERACTIVE_STDERR_WRITE.  That could
-//       be roughly approximated with debug_message() if you really want that.
-void tell_object(object ob, string str)
-{
-    if (!ob)
-        return;
-
-#ifndef __INTERACTIVE_CATCH_TELL__
-    if (interactive(ob))
-    {
-        if (strlen(str) > __LARGEST_PRINTABLE_STRING__)
-            error("Printable strings limited to length of " + __LARGEST_PRINTABLE_STRING__ + ".\n");
-        evaluate(bind((: receive, str :), ob));
-        return;
-    }
-#endif
-
-    evaluate(bind((: $(ob)->catch_tell($(str)) :), ob));
-}
-
-void write(mixed msg)
-{
-    object ob;
-
-    ob = this_player();
-#ifndef __NO_SHADOWS__
-    if (!ob && shadow(previous_object(), 0))
-        ob = previous_object();
-    if (ob)
-    {
-        object s;
-
-        while ((s = shadow(previous_object(), 0)))
-            ob = s;
-    }
-#else
-    if (!ob)
-        ob = previous_object();
-#endif
-
-    switch (typeof(msg))
-    {
-        case "array":    msg = "<ARRAY>";                      break;
-#ifndef __NO_BUFFER_TYPE__
-        case "buffer":   msg = "<BUFFER>";                     break;
-#endif
-        case "float":    msg = msg + "";                       break;
-        case "function": msg = "<FUNCTION>";                   break;
-        case "int":      msg = msg + "";                       break;
-        case "mapping":  msg = "<MAPPING>";                    break;
-        case "object":   msg = "OBJ(" + file_name(msg) + ")";  break;
-        case "string":                                         break;
-        default:         msg = "<UNKNOWN>";                    break;
-    }
-
-    if (strlen(msg) > __LARGEST_PRINTABLE_STRING__)
-        error("Printable strings limited to length of " + __LARGEST_PRINTABLE_STRING__ + ".\n");
-    tell_object(ob, msg);
-}
-
 void
 cat(string file)
 {

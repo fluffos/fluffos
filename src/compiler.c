@@ -4,6 +4,7 @@
 #include "generate.h"
 #include "swap.h"
 #include "scratchpad.h"
+#include "qsort.h"
 #include "file.h"
 #include "binaries.h"
 /* This should be moved with initializers move out of here */
@@ -97,13 +98,13 @@ char *get_two_types P4(char *, where, char *, end, int, type1, int, type2)
 
 void init_locals()
 {
-    type_of_locals = CALLOCATE(MAX_LOCAL_VARIABLES, unsigned short, 
+    type_of_locals = CALLOCATE(CFG_MAX_LOCAL_VARIABLES,unsigned short, 
 			       TAG_LOCALS, "init_locals:1");
-    locals = CALLOCATE(MAX_LOCAL_VARIABLES, local_info_t, 
+    locals = CALLOCATE(CFG_MAX_LOCAL_VARIABLES, local_info_t, 
 		       TAG_LOCALS, "init_locals:2");
     type_of_locals_ptr = type_of_locals;
     locals_ptr = locals;
-    locals_size = type_of_locals_size = MAX_LOCAL_VARIABLES;
+    locals_size = type_of_locals_size = CFG_MAX_LOCAL_VARIABLES;
     current_number_of_locals = max_num_locals = 0;
 }
 
@@ -192,7 +193,7 @@ void pop_n_locals P1(int, num) {
 
 int add_local_name P2(char *, str, int, type)
 {
-    if (max_num_locals == MAX_LOCAL_VARIABLES) {
+    if (max_num_locals == CFG_MAX_LOCAL_VARIABLES) {
 	yyerror("Too many local variables");
 	return 0;
     } else {
@@ -211,7 +212,7 @@ int add_local_name P2(char *, str, int, type)
 void reallocate_locals() {
     int offset;
     offset = type_of_locals_ptr - type_of_locals;
-    type_of_locals = RESIZE(type_of_locals, type_of_locals_size += MAX_LOCAL_VARIABLES,
+    type_of_locals = RESIZE(type_of_locals, type_of_locals_size += CFG_MAX_LOCAL_VARIABLES,
 			    unsigned short, TAG_LOCALS, "reallocate_locals:1");
     type_of_locals_ptr = type_of_locals + offset;
     offset = locals_ptr - locals;
@@ -491,12 +492,11 @@ static void check_class P4(char *, name, program_t *, prog, int, idx, int, nidx)
     for (i = 0; i < n; i++) {
 	int newtype;
 
-	newtype = sme2[i].type;
-
+	newtype = sme1[i].type;
 
 	fix_class_type(&newtype, prog);
 
-	if (sme1[i].type != newtype ||
+	if (sme2[i].type != newtype ||
 	    prog->strings[sme1[i].name] != PROG_STRING(sme2[i].name)) {
 	    char buf[512];
 	    char *end = EndOf(buf);
@@ -763,11 +763,9 @@ static void overload_function P6(program_t *, prog, int, index,
  */
 int copy_functions P2(program_t *, from, int, typemod)
 {
-    int initializer = -1;
-    int i, index, num_functions;
-    program_t *prog;
-    function_t *funp;
+    int i, initializer = -1, num_functions;
     ident_hash_elem_t *ihe;
+    int num;
 
     num_functions = from->num_functions_defined + from->last_inherited;
     
@@ -776,17 +774,43 @@ int copy_functions P2(program_t *, from, int, typemod)
         initializer = --num_functions;
 
     for (i = 0; i < num_functions; i++) {
-	funp = find_func_entry(from, i, &prog, &index, 0);
-	ihe  = lookup_ident(funp->name);
+	program_t *prog = from;
+	int index = i;
+	function_t *funp;
+	int low, mid, high;
 
-	if (ihe && ihe->dn.function_num != -1) {
-	    /* The function has already been defined in this object */
-	    overload_function(from, i, prog, index, ihe->dn.function_num, typemod);
+	/* Walk up the inheritance tree to the real definition */	
+	if (prog->function_flags[index] & FUNC_ALIAS) {
+	    index = prog->function_flags[index] & ~FUNC_ALIAS;
+	}
+	
+	while (prog->function_flags[index] & FUNC_INHERITED) {
+	    low = 0;
+	    high = prog->num_inherited -1;
+	    
+	    while (high > low) {
+		mid = (low + high + 1) >> 1;
+		if (prog->inherit[mid].function_index_offset > index)
+		    high = mid -1;
+		else low = mid;
+	    }
+	    index -= prog->inherit[low].function_index_offset;
+	    prog = prog->inherit[low].prog;
+	}
+
+	index -= prog->last_inherited;
+
+	funp = prog->function_table + index;
+	
+	
+	ihe = lookup_ident(funp->name);
+	if (ihe && ((num = ihe->dn.function_num)!=-1)) {
+	  /* The function has already been defined in this object */
+	    overload_function(from, i, prog,index, num, typemod);
 	} else {
 	    copy_new_function(from, i, prog, index, typemod);
 	}
     }
-
     return initializer;
 }
 
@@ -1091,14 +1115,18 @@ int define_new_function P5(char *, name, int, num_arg, int, num_local,
 		    char *p;
 		    
 		    if (FUNCTION_TEMP(oldindex)->prog) {
-			p = strput(buff, end, "Function inherited from '/");
+			p = strput(buff, end, "Function ");
+			p = strput(p, end, name);
+			p = strput(p, end, " inherited from '/");
 			p = strput(p, end, FUNCTION_TEMP(oldindex)->prog->name);
 			p = strput(p, end, "' does not match ");
 		    } else {
 			if (funflags & FUNC_PROTOTYPE)
 			    p = strput(buff, end, "Previous function prototype ");
 			else p = strput(buff, end, "Previous function declaration ");
-			p = strput(p, end, "does not match ");
+			p = strput(p, end, "for ");
+			p = strput(p, end, name);
+			p = strput(p, end, " does not match ");
 		    }
 		    p = strput(p, end, "current function in return type ");
 		    p = get_two_types(p, end, funtype, type);
@@ -1687,6 +1715,51 @@ promote_to_int P1(parse_node_t *, node) {
     return expr;
 }
 
+
+parse_node_t *add_type_check P2(parse_node_t *, node, int, intype) {
+    parse_node_t *expr, *expr2;
+    int type;
+    
+    switch(intype & (~DECL_MODS)) {
+    case 0:
+        //error situation, don't bother
+        return node;
+    case TYPE_NUMBER:
+        type = T_NUMBER;
+        break;
+    case TYPE_STRING:
+        type = T_STRING;
+        break;
+    case TYPE_OBJECT:
+        type = T_OBJECT;
+        break;
+    case TYPE_MAPPING:
+        type = T_MAPPING;
+        break;
+    case TYPE_FUNCTION:
+        type = T_FUNCTION;
+        break;
+    case TYPE_REAL:
+        type = T_REAL;
+        break;
+    case TYPE_BUFFER:
+        type = T_BUFFER;
+        break;
+    default:
+        if(intype & TYPE_MOD_ARRAY)
+            type = T_ARRAY;
+        else if(intype & TYPE_MOD_CLASS)
+            type = T_CLASS;
+        else
+            fatal("unknown type %d in type check\n", intype);
+    }
+        
+    CREATE_NUMBER(expr2, type);
+    CREATE_BINARY_OP(expr, F_TYPE_CHECK, intype, node, expr2); 
+    return expr;
+}
+
+
 parse_node_t *do_promotions P2(parse_node_t *, node, int, type) {
     if (type == TYPE_REAL) {
 	if (node->type == TYPE_NUMBER || node->kind == NODE_NUMBER)
@@ -1694,6 +1767,9 @@ parse_node_t *do_promotions P2(parse_node_t *, node, int, type) {
     }
     if (type == TYPE_NUMBER && node->type == TYPE_REAL)
 	return promote_to_int(node);
+    if(type != TYPE_ANY && type != node->type)
+        return add_type_check(node, type);
+    
     return node;
 }
 
@@ -1917,6 +1993,9 @@ void yyerror P1(char *, str)
 	return;
     }
     smart_log(current_file, current_line, str, 0);
+#ifdef PACKAGE_MUDLIB_STATS
+    add_errors_for_file (current_file, 1);
+#endif
     num_parse_error++;
 }
 
@@ -1934,6 +2013,7 @@ compile_file P2(int, f, char *, name) {
     int yyparse PROT((void));
     static int guard = 0;
     program_t *prog;
+    extern int func_present;
     
     /* The parser isn't reentrant.  On a few occasions (compile
      * errors, valid_override) LPC code is called during compilation,
@@ -1945,6 +2025,7 @@ compile_file P2(int, f, char *, name) {
     guard = 1;
     
     prolog(f, name);
+    func_present = 0;
     yyparse();
     prog = epilog();
 
@@ -2026,7 +2107,7 @@ static void handle_functions() {
 	while (i--) func_index_map[i] = i;
 	
 	quickSort(func_index_map, num_func, sizeof(unsigned short), 
-		  (qsort_comparefn_t)compare_funcs);
+		  compare_funcs);
 	
 	i = num_func;
 	while (i--)
@@ -2218,6 +2299,14 @@ static program_t *epilog PROT((void)) {
     prog->total_size = size;
     prog->ref = 0;
     prog->func_ref = 0;
+    ihe = lookup_ident("heart_beat");
+    if (ihe && ihe->dn.function_num != -1) {
+	prog->heart_beat = comp_def_index_map[ihe->dn.function_num] + 1;
+	if (prog_flags && prog_flags[prog->heart_beat-1] & 
+	    (FUNC_PROTOTYPE|FUNC_UNDEFINED))
+	    prog->heart_beat = 0;
+    } else
+	prog->heart_beat = 0;
     prog->name = current_file;
 
     current_file = 0;
@@ -2327,6 +2416,7 @@ static program_t *epilog PROT((void)) {
 	fprintf(stderr, "is: %i, expected: %i\n", p-(char *)prog, (int) size);
     }
 #endif
+#ifdef BINARIES
     if ((pragmas & PRAGMA_SAVE_BINARY)
 #ifdef LPC_TO_C
     || compile_to_c
@@ -2334,6 +2424,7 @@ static program_t *epilog PROT((void)) {
     ) {
 	save_binary(prog, &mem_block[A_INCLUDES], &mem_block[A_PATCH]);
     }
+#endif
 
     swap_line_numbers(prog); /* do this after saving binary */
 
@@ -2529,10 +2620,10 @@ void prepare_cases P2(parse_node_t *, pn, int, start) {
 
     if (pn->kind == NODE_SWITCH_STRINGS)
 	quickSort((char *)ce_start, ce_end - ce_start, sizeof(parse_node_t *),
-		  (qsort_comparefn_t)string_case_compare);
+		  string_case_compare);
     else
 	quickSort((char *)ce_start, ce_end - ce_start, sizeof(parse_node_t *),
-		  (qsort_comparefn_t)case_compare);
+		  case_compare);
 
     ce = ce_start;
     if ((*ce)->kind == NODE_DEFAULT) {

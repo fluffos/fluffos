@@ -14,6 +14,9 @@
 #include "master.h"
 #include "add_action.h"
 
+#define TELOPT_COMPRESS 85
+#define TELOPT_COMPRESS2 86
+
 static char telnet_break_response[] = {  28, IAC, WILL, TELOPT_TM };
 static char telnet_ip_response[]    = { 127, IAC, WILL, TELOPT_TM };
 static char telnet_abort_response[] = { IAC, DM };
@@ -31,21 +34,27 @@ static char telnet_line_mode[]      = { IAC, DO, TELOPT_LINEMODE };
 static char telnet_lm_mode[]        = { IAC, SB, TELOPT_LINEMODE, LM_MODE, MODE_EDIT | MODE_TRAPSIG, IAC, SE };
 static char telnet_char_mode[]	    = { IAC, DONT, TELOPT_LINEMODE };
 
-#ifdef MCCP_SUPPORT
-
-#define TELOPT_COMPRESS	    85
-#define TELOPT_COMPRESS2    86
-
-static char telnet_mccp_request[]   = { IAC, WILL, TELOPT_COMPRESS2, IAC, WILL, TELOPT_COMPRESS };
-static char telnet_mccp1_response[] = { IAC, SB, TELOPT_COMPRESS, WILL, SE };	/* yes, this is right, the protocol is broken, sigh */
-static char telnet_mccp2_response[] = { IAC, SB, TELOPT_COMPRESS2, IAC, SE };	/* this is the only diff between v1 and v2 */
-
-#endif
-
 static char slc_default_flags[] = { SLC_NOSUPPORT, SLC_CANTCHANGE, SLC_CANTCHANGE, SLC_CANTCHANGE, SLC_CANTCHANGE, SLC_NOSUPPORT,
 				    SLC_NOSUPPORT, SLC_NOSUPPORT, SLC_CANTCHANGE, SLC_CANTCHANGE, SLC_NOSUPPORT, SLC_NOSUPPORT,
 				    SLC_NOSUPPORT, SLC_NOSUPPORT, SLC_NOSUPPORT, SLC_NOSUPPORT, SLC_NOSUPPORT, SLC_NOSUPPORT };
-static char slc_default_chars[] = { 0x00, BREAK, IP, AO, AYT, 0x00, 0x00, 0x00, SUSP, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+static char slc_default_chars[] = { 0x00, BREAK, IP, AO, AYT, 0x00, 0x00, 0x00,
+                                    SUSP, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                    0x00, 0x00, 0x00 };
+#ifdef HAVE_ZLIB
+static char telnet_compress_send_request_v2[] = { IAC, WILL,
+						  TELOPT_COMPRESS2 };
+
+static char telnet_compress_send_request_v1[] = { IAC, WILL,
+						  TELOPT_COMPRESS };
+
+static char telnet_compress_v1_response[] = { IAC, SB,
+                                              TELOPT_COMPRESS, WILL,
+                                              SE };
+static char telnet_compress_v2_response[] = { IAC, SB,
+                                              TELOPT_COMPRESS2, IAC,
+                                              SE };
+#endif
+   
 #ifdef DEBUG
 static char *slc_names[] = { SLC_NAMELIST };
 #endif
@@ -59,17 +68,22 @@ static void sigpipe_handler PROT((int));
 static void sigpipe_handler PROT((void));
 #endif
 
+static void hname_handler PROT((void));
 static void get_user_data PROT((interactive_t *));
 static char *get_user_command PROT((void));
 static char *first_cmd_in_buf PROT((interactive_t *));
 static int cmd_in_buf PROT((interactive_t *));
 static int call_function_interactive PROT((interactive_t *, char *));
 static void print_prompt PROT((interactive_t *));
+static void query_addr_name PROT((object_t *));
+static void got_addr_number PROT((char *, char *));
+static void add_ip_entry PROT((long, char *));
 static void new_user_handler PROT((int));
-#ifdef MCCP_SUPPORT
 static void end_compression PROT((interactive_t *));
-static int start_compression PROT((interactive_t *));
-#endif
+static void start_compression PROT((interactive_t *));
+static int send_compressed PROT((interactive_t *ip, char* data, int length));
+
+
 
 #ifdef NO_SNOOP
 #  define handle_snoop(str, len, who)
@@ -109,6 +123,11 @@ int inet_packets = 0;
 int inet_volume = 0;
 interactive_t **all_users = 0;
 int max_users = 0;
+
+/*
+ * private local variables.
+ */
+static int addr_server_fd = -1;
 
 static
 void set_linemode P1(interactive_t *, ip)
@@ -286,6 +305,81 @@ void ipc_remove()
     debug_message("closed external ports\n");
 }
 
+void init_addr_server P2(char *, hostname, int, addr_server_port)
+{
+    struct sockaddr_in server;
+    struct hostent *hp;
+    int server_fd;
+    int optval;
+    long addr;
+
+    if (addr_server_fd >= 0)
+	return;
+
+    if (!hostname) return;
+
+    /*
+     * get network host data for hostname.
+     */
+    if (hostname[0] >= '0' && hostname[0] <= '9' &&
+          (addr = inet_addr(hostname)) != -1) {
+        hp = gethostbyaddr((char *)&addr, sizeof(addr), AF_INET);
+    } else {
+        hp = gethostbyname(hostname);
+    }
+    if (hp == NULL) {
+	socket_perror("init_addr_server: gethostbyname", 0);
+	return;
+    }
+
+    /*
+     * set up address information for server.
+     */
+    server.sin_family = AF_INET;
+    server.sin_port = htons((u_short) addr_server_port);
+    server.sin_addr.s_addr = inet_addr(hostname);
+    memcpy((char *) &server.sin_addr, (char *) hp->h_addr, hp->h_length);
+    /*
+     * create socket of proper type.
+     */
+    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd == INVALID_SOCKET) {	/* problem opening socket */
+	socket_perror("init_addr_server: socket", 0);
+	return;
+    }
+    /*
+     * enable local address reuse.
+     */
+    optval = 1;
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, (char *) &optval,
+		   sizeof(optval)) == -1) {
+	socket_perror("init_addr_server: setsockopt", 0);
+	return;
+    }
+    /*
+     * connect socket to server address.
+     */
+    if (connect(server_fd, (struct sockaddr *) & server, sizeof(server)) == -1) {
+	if (socket_errno == ECONNREFUSED)
+	    debug_message("Connection to address server (%s %d) refused.\n",
+			  hostname, addr_server_port);
+	else 
+	    socket_perror("init_addr_server: connect", 0);
+	OS_socket_close(server_fd);
+	return;
+    }
+    addr_server_fd = server_fd;
+    debug_message("Connected to address server on %s port %d\n", hostname,
+	    addr_server_port);
+    /*
+     * set socket non-blocking.
+     */
+    if (set_socket_nonblocking(server_fd, 1) == -1) {
+	socket_perror("init_addr_server: set_socket_nonblocking 1", 0);
+	return;
+    }
+}
+
 /*
  * If there is a shadow for this object, then the message should be
  * sent to it. But only if catch_tell() is defined. Beware that one of the
@@ -319,91 +413,6 @@ static int shadow_catch_message P2(object_t *, ob, char *, str)
     return 0;
 }
 #endif
-
-/*
- * Reads data from a socket
- * >0 - number of bytes read
- * 0  - no data available, but no error
- * <0 - error occured, check rc, if rc 0, connection lost
- */
-static int read_from_ip P4(interactive_t *, ip, char *, buf, int, len, int *, rc)
-{
-    int nb;
-
-    *rc = 0;
-    if ((nb = OS_socket_read(ip->fd, buf, len)) == 0) {
-	/* connection lost */
-	nb = -1;
-    } else {
-	if (nb == -1) {
-#ifdef EWOULDBLOCK
-	    if (socket_errno == EWOULDBLOCK)
-		return 0;
-#endif
-	    if (socket_errno == EINTR)
-		return 0;
-	    *rc = socket_errno;
-	}
-    }
-
-    return nb;
-}
-
-/*
- * Writes data to a socket
- * >0 - number of bytes read
- * 0  - no data available, but no error
- * <0 - error occured, check rc, if rc 0, connection lost
- */
-static int write_to_ip P4(interactive_t *, ip, char *, buf, int, len, int *, rc)
-{
-    int nb, res;
-
-    *rc = 0;
-
-#ifdef MCCP_SUPPORT
-    if (ip->compress_stream) {
-	ip->compress_stream->next_in = buf;
-	ip->compress_stream->avail_in = len;
-
-	if (ip->compress_stream->avail_in > 0) {
-	    if (ip->compress_stream->avail_out)
-		deflate(ip->compress_stream, Z_SYNC_FLUSH);
-	    res = len - ip->compress_stream->avail_in;
-	} else res = 0;
-
-	buf = ip->compress_buf;
-	len = COMPRESS_BUF_SIZE - ip->compress_stream->avail_out;
-    }
-#endif
-
-    if ((nb = OS_socket_write(ip->fd, buf, len)) == 0) {
-	/* connection lost */
-	nb = -1;
-    } else {
-	if (nb == -1) {
-#ifdef EWOULDBLOCK
-	    if (socket_errno == EWOULDBLOCK)
-		return 0;
-#endif
-	    if (socket_errno == EINTR)
-		return 0;
-	    *rc = socket_errno;
-	}
-#ifdef MCCP_SUPPORT
-	else if (ip->compress_stream)
-	{
-	    if ((len -= nb) > 0)
-		memmove(ip->compress_buf, ip->compress_buf + nb, len);
-	    ip->compress_stream->next_out -= nb;
-	    ip->compress_stream->avail_out += nb;
-	    nb = res;
-	}
-#endif
-    }
-
-    return nb;
-}
 
 /*
  * Send a message to an interactive object. If that object is shadowed,
@@ -622,50 +631,67 @@ void add_binary_message P3(object_t *, who, char *, data, int, len)
     add_message_calls++;
 }
 
-static int pending_user_output P1(interactive_t *, ip)
-{
-#ifdef MCCP_SUPPORT
-    if (ip->compress_stream && ip->compress_stream->avail_out < COMPRESS_BUF_SIZE)
-	return 1;
-#endif
-
-    return (ip->message_length > 0);
-}
-
 /*
  * Flush outgoing message buffer of current interactive object.
  */
 int flush_message P1(interactive_t *, ip)
 {
-    int length, num_bytes, sock_error;
+    int length, num_bytes;
 
     /*
      * if ip is not valid, do nothing.
      */
     if (!ip || (ip->iflags & (NET_DEAD | CLOSING))) {
-	debug(connections, ("flush_message: invalid target!\n"));
+      //debug(connections, ("flush_message: invalid target!\n"));
 	return 0;
     }
-
-    while (pending_user_output(ip)) {
+    /*
+     * write ip->message_buf[] to socket.
+     */
+    while (ip->message_length != 0) {
 	if (ip->message_consumer < ip->message_producer) {
 	    length = ip->message_producer - ip->message_consumer;
 	} else {
 	    length = MESSAGE_BUF_SIZE - ip->message_consumer;
 	}
-
-	num_bytes = write_to_ip(ip, ip->message_buf + ip->message_consumer, length, &sock_error);
-	if (!num_bytes)
-	    continue;
-
-	if (num_bytes == -1) {
+/* Need to use send to get out of band data
+   num_bytes = write(ip->fd,ip->message_buf + ip->message_consumer,length);
+ */
+#ifdef HAVE_ZLIB
+        if (ip->compressed_stream) {
+          num_bytes = send_compressed(ip, ip->message_buf +
+                                      ip->message_consumer,  length);
+        } else {
+#endif
+	num_bytes = send(ip->fd, ip->message_buf + ip->message_consumer,
+			 length, ip->out_of_band);
+#ifdef HAVE_ZLIB
+        }
+#endif
+	if (!num_bytes) {
 	    ip->iflags |= NET_DEAD;
-	    if (sock_error)
-		socket_perror("flush_message: write", 0);
 	    return 0;
 	}
-
-	ip->message_consumer = (ip->message_consumer + num_bytes) % MESSAGE_BUF_SIZE;
+	if (num_bytes == -1) {
+#ifdef EWOULDBLOCK
+	    if (socket_errno == EWOULDBLOCK) {
+	      //debug(connections, ("flush_message: write: Operation would block\n"));
+		return 1;
+#else
+	    if (0) {
+		;
+#endif
+	    } else if (socket_errno == EINTR) {
+	      //debug(connections, ("flush_message: write: Interrupted system call"));
+		return 1;
+	    } else {
+	      //socket_perror("flush_message: write", 0);
+		ip->iflags |= NET_DEAD;
+		return 0;
+	    }
+	}
+	ip->message_consumer = (ip->message_consumer + num_bytes) %
+	    MESSAGE_BUF_SIZE;
 	ip->message_length -= num_bytes;
 	ip->out_of_band = 0;
 	inet_packets++;
@@ -830,23 +856,18 @@ static void copy_chars P3(interactive_t *, ip, char *, from, int, num_bytes)
 		    case TELOPT_ECHO:
 			/* do nothing, but don't send a wont response */
 			break;
-
-#ifdef MCCP_SUPPORT
-		    /* Unfortunately MCCP provides no mechanism for failure, so
-		     * we just have to hope that start_compression will succeed
-		     * Chances of failure are slim to none anyway     -- Marius
-		     */
-		    case TELOPT_COMPRESS:
-			add_binary_message(ip->ob, telnet_mccp1_response, sizeof(telnet_mccp1_response));
-			start_compression(ip);
-			break;
-
-		    case TELOPT_COMPRESS2:
-			add_binary_message(ip->ob, telnet_mccp2_response, sizeof(telnet_mccp2_response));
-			start_compression(ip);
-			break;
+#ifdef HAVE_ZLIB
+                    case TELOPT_COMPRESS :
+                      add_binary_message(ip->ob, telnet_compress_v1_response,
+                                  sizeof(telnet_compress_v1_response));
+                      start_compression(ip);
+                      break;
+                    case TELOPT_COMPRESS2 :
+                      add_binary_message(ip->ob, telnet_compress_v2_response,
+                                  sizeof(telnet_compress_v2_response));
+                      start_compression(ip);
+                      break;
 #endif
-
 		    default:
 			wont_response[2] = from[i];
 			add_binary_message(ip->ob, wont_response, sizeof(wont_response));
@@ -862,6 +883,11 @@ static void copy_chars P3(interactive_t *, ip, char *, from, int, num_bytes)
 			    ip->iflags &= ~SUPPRESS_GA;
 			    add_binary_message(ip->ob, telnet_no_single, sizeof(telnet_no_single));
 			}
+			break;
+		    case TELOPT_COMPRESS2:
+		        // If we are told not to use v2, then try v1.
+		        add_binary_message(ip->ob, telnet_compress_send_request_v1,
+				    sizeof(telnet_compress_send_request_v1));
 			break;
 		}
 		ip->state = TS_DATA;
@@ -1073,7 +1099,7 @@ static void copy_chars P3(interactive_t *, ip, char *, from, int, num_bytes)
  */
 static void get_user_data P1(interactive_t *, ip)
 {
-    int  num_bytes, sock_error, text_space;
+    int  num_bytes, text_space;
     char buf[MAX_TEXT];
 
     /* compute how much data we can read right now */
@@ -1113,21 +1139,26 @@ static void get_user_data P1(interactive_t *, ip)
     }
 
     /* read the data from the socket */
-    debug(connections, ("get_user_data: read on fd %d\n", ip->fd));
-    if (!(num_bytes = read_from_ip(ip, buf, text_space, &sock_error)))
-	return;	/* no data available, but no error either */
+    //debug(connections, ("get_user_data: read on fd %d\n", ip->fd));
+    num_bytes = OS_socket_read(ip->fd, buf, text_space);
+
+    if (!num_bytes) {
+      //if (ip->iflags & CLOSING)
+      //    debug_message("get_user_data: tried to read from closing fd.\n");
+	ip->iflags |= NET_DEAD;
+	remove_interactive(ip->ob, 0);
+	return;
+    }
 
     if (num_bytes == -1) {
-	if (!sock_error) {
-	    if (ip->iflags & CLOSING)
-		debug_message("get_user_data: tried to read from closing fd.\n");
-	    ip->iflags |= NET_DEAD;
-	    remove_interactive(ip->ob, 0);
+#ifdef EWOULDBLOCK
+	if (socket_errno == EWOULDBLOCK) {
+	  //	    debug(connections, ("get_user_data: read on fd %d: Operation would block.\n", ip->fd));
 	    return;
 	}
-
-	debug_message("get_user_data: read on fd %d\n", ip->fd);
-	socket_perror("get_user_data: read", 0);
+#endif
+	//	debug_message("get_user_data: read on fd %d\n", ip->fd);
+	//	socket_perror("get_user_data: read", 0);
 	ip->iflags |= NET_DEAD;
 	remove_interactive(ip->ob, 0);
 	return;
@@ -1277,7 +1308,9 @@ static int cmd_in_buf P1(interactive_t *, ip)
 static char *first_cmd_in_buf P1(interactive_t *, ip)
 {
     char *p;
+#ifdef GET_CHAR_IS_BUFFERED
     static char tmp[2];
+#endif
 
     /* do standard input buffer cleanup */
     if (!clean_buf(ip))
@@ -1287,13 +1320,20 @@ static char *first_cmd_in_buf P1(interactive_t *, ip)
 
     /* if we're in single character mode, we've got input */
     if (ip->iflags & SINGLE_CHAR) {
-	if (*p == 8 || *p == 127)   /* for compatibility, yuk */
+	if (*p == 8 || *p == 127)
 	    *p = 0;
+#ifndef GET_CHAR_IS_BUFFERED
+	ip->text_start++;
+	if (!clean_buf(ip))
+	    ip->iflags &= ~CMD_IN_BUF;
+	return p;
+#else
 	tmp[0] = *p;
 	ip->text[ip->text_start++] = 0;
 	if (!clean_buf(ip))
 	    ip->iflags &= ~CMD_IN_BUF;
 	return tmp;
+#endif
     }
 
     /* search for the newline */
@@ -1313,7 +1353,6 @@ static char *first_cmd_in_buf P1(interactive_t *, ip)
 
     return p;
 }
-
 /*
  * SIGPIPE handler -- does very little for now.
  */
@@ -1326,6 +1365,18 @@ void sigpipe_handler()
     debug(connections, ("SIGPIPE received."));
     signal(SIGPIPE, sigpipe_handler);
 }				/* sigpipe_handler() */
+
+/*
+ * SIGALRM handler.
+ */
+#ifdef SIGNAL_FUNC_TAKES_INT
+void sigalrm_handler P1(int, sig)
+#else
+void sigalrm_handler()
+#endif
+{
+    heart_beat_flag = 1;
+}				/* sigalrm_handler() */
 
 INLINE void make_selectmasks()
 {
@@ -1354,7 +1405,7 @@ INLINE void make_selectmasks()
 	 * fd so we can get it.
 	 */
 	FD_SET(all_users[i]->fd, &readmask);
-	if (pending_user_output(all_users[i]))
+	if (all_users[i]->message_length != 0)
 	    FD_SET(all_users[i]->fd, &writemask);
     }
     /*
@@ -1532,9 +1583,13 @@ static void new_user_handler P1(int, which)
     master_ob->interactive->trace_level = 0;
     master_ob->interactive->trace_prefix = 0;
 #endif
-#ifdef MCCP_SUPPORT
-    master_ob->interactive->compress_stream = NULL;
+#ifdef OLD_ED
+    master_ob->interactive->ed_buffer = 0;
 #endif
+#ifdef HAVE_ZLIB
+    master_ob->interactive->compressed_stream = NULL;
+#endif
+         
     master_ob->interactive->message_producer = 0;
     master_ob->interactive->message_consumer = 0;
     master_ob->interactive->message_length = 0;
@@ -1603,10 +1658,7 @@ static void new_user_handler P1(int, which)
     add_ref(ob, "new_user");
     set_command_giver(ob);
     if (addr_server_fd >= 0) {
-	char addr[20];
-
-	sprintf(addr, "%s", inet_ntoa(ob->interactive->addr.sin_addr));
-	request_resolution(addr, NAMEBYIP);
+	query_addr_name(ob);
     }
     
     if (external_port[which].kind == PORT_TELNET) {
@@ -1614,16 +1666,13 @@ static void new_user_handler P1(int, which)
 	add_binary_message(ob, telnet_do_ttype, sizeof(telnet_do_ttype));
 	/* Ask them for their window size */
 	add_binary_message(ob, telnet_do_naws, sizeof(telnet_do_naws));
-#ifdef MCCP_SUPPORT
-	/* Enable MCCP if the client supports it */
-	add_binary_message(ob, telnet_mccp_request, sizeof(telnet_mccp_request));
+#ifdef HAVE_ZLIB
+        add_binary_message(ob, telnet_compress_send_request_v2,
+                    sizeof(telnet_compress_send_request_v2));
 #endif
     }
     
-    /* current_object no longer set */
-    apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
-    /* function not existing is no longer fatal */
-
+    logon(ob);
     debug(connections, ("new_user_handler: end\n"));
     set_command_giver(0);
 }				/* new_user_handler() */
@@ -1674,7 +1723,11 @@ static char *get_user_command()
     debug(connections, ("get_user_command: user_command = (%s)\n", user_command));
     save_command_giver(ip->ob);
 
+#ifndef GET_CHAR_IS_BUFFERED
+    if (ip->iflags & NOECHO) {
+#else
     if ((ip->iflags & NOECHO) && !(ip->iflags & SINGLE_CHAR)) {
+#endif
 	/* must not enable echo before the user input is received */
 	add_binary_message(command_giver, telnet_no_echo, sizeof(telnet_no_echo));
 	ip->iflags &= ~NOECHO;
@@ -1686,11 +1739,15 @@ static char *get_user_command()
 
 static int escape_command P2(interactive_t *, ip, char *, user_command)
 {
+    if (user_command[0] != '!')
+	return 0;
+#ifdef OLD_ED
+    if (ip->ed_buffer)
+	return 1;
+#endif
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
-    if (ESCAPE_CHARACTERS && ip->input_to && !(ip->iflags & NOESC)) {
-	if (strchr(ESCAPE_CHARACTERS, user_command[0]))
-	    return 1;
-    }
+    if (ip->input_to && !(ip->iflags & NOESC))
+	return 1;
 #endif
     return 0;
 }
@@ -1761,7 +1818,9 @@ int process_user_command()
 	    /* only 1 char ... switch to line buffer mode */
 	    ip->iflags |= WAS_SINGLE_CHAR;
 	    ip->iflags &= ~SINGLE_CHAR;
+#ifdef GET_CHAR_IS_BUFFERED
 	    ip->text_start = ip->text_end = *ip->text = 0;
+#endif
 	    set_linemode(ip);
 	} else {
 	    if (ip->iflags & WAS_SINGLE_CHAR) {
@@ -1779,6 +1838,13 @@ int process_user_command()
 
 	goto exit;
     }
+
+#ifdef OLD_ED
+    if (ip->ed_buffer) {
+	ed_cmd(user_command);
+	goto exit;
+    }
+#endif
 
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
     if (call_function_interactive(ip, user_command)) {
@@ -1798,6 +1864,71 @@ exit:
     current_interactive = 0;
     restore_command_giver();
     return 1;
+}
+
+#define HNAME_BUF_SIZE 200
+/*
+ * This is the hname input data handler. This function is called by the
+ * master handler when data is pending on the hname socket (addr_server_fd).
+ */
+
+static void hname_handler()
+{
+    static char hname_buf[HNAME_BUF_SIZE];
+    static int hname_buf_pos;
+    int num_bytes;
+
+    num_bytes = HNAME_BUF_SIZE - hname_buf_pos - 1; /* room for nul */
+    num_bytes = OS_socket_read(addr_server_fd, hname_buf + hname_buf_pos, num_bytes);
+    if (num_bytes <= 0) {
+	if (num_bytes == -1) {
+#ifdef EWOULDBLOCK
+	    if (socket_errno == EWOULDBLOCK) {
+		debug(connections, ("hname_handler: read on fd %d: Operation would block.\n",
+			    addr_server_fd));
+		return;
+	    }
+#endif
+	    debug_message("hname_handler: read on fd %d\n", addr_server_fd);
+	    socket_perror("hname_handler: read", 0);
+	} else {
+	    debug_message("hname_handler: closing address server connection.\n");
+	}
+	OS_socket_close(addr_server_fd);
+	addr_server_fd = -1;
+	return;
+    }
+
+    hname_buf_pos += num_bytes;
+    hname_buf[hname_buf_pos] = 0;
+    debug(connections, ("hname_handler: address server replies: %s", hname_buf));
+
+    while (hname_buf_pos) {
+	char *nl, *pp;
+	    
+	/* if there's no newline, there's more data to come */
+	if (!(nl = strchr(hname_buf, '\n')))
+	    break;
+	*nl++ = 0;
+
+	if ((pp = strchr(hname_buf, ' ')) != 0) {
+	    *pp++ = 0;
+	    got_addr_number(pp, hname_buf);
+
+	    if (isdigit(hname_buf[0])) {
+		unsigned long laddr;
+
+		if ((laddr = inet_addr(hname_buf)) != INADDR_NONE) {
+		    if (strcmp(pp, "0") != 0)
+			add_ip_entry(laddr, pp);
+		}
+	    }
+	}
+
+	hname_buf_pos -= (nl - hname_buf);
+	if (hname_buf_pos)
+	    memmove(hname_buf, nl, hname_buf_pos + 1); /* be sure to get the nul */
+    }
 }
 
 /*
@@ -1828,10 +1959,16 @@ void remove_interactive P2(object_t *, ob, int, dested)
     flush_message(ip);
     ip->iflags |= CLOSING;
 
+#ifdef OLD_ED
+    if (ip->ed_buffer) {
+ 	save_ed_buffer(ob);
+    }
+#else
     if (ob->flags & O_IN_EDIT) {
 	object_save_ed_buffer(ob);
 	ob->flags &= ~O_IN_EDIT;
     }
+#endif
 
     if (!dested) {
         /*
@@ -1847,11 +1984,12 @@ void remove_interactive P2(object_t *, ob, int, dested)
     }
 #endif
 
-#ifdef MCCP_SUPPORT
-    if (ip->compress_stream)
-	end_compression(ip);
+#ifdef HAVE_ZLIB
+    if (ip->compressed_stream) {
+      end_compression(ip);
+    }
 #endif
-
+         
     debug(connections, ("remove_interactive: closing fd %d\n", ip->fd));
     if (OS_socket_close(ip->fd) == -1) {
  	socket_perror("remove_interactive: close", 0);
@@ -1892,8 +2030,10 @@ static int call_function_interactive P2(interactive_t *, i, char *, str)
     svalue_t *args;
     sentence_t *sent;
     int num_arg;
+#ifdef GET_CHAR_IS_BUFFERED
     int was_single = 0;
     int was_noecho = 0;
+#endif
 
     i->iflags &= ~NOESC;
     if (!(sent = i->input_to))
@@ -1953,11 +2093,15 @@ static int call_function_interactive P2(interactive_t *, i, char *, str)
 	 * clear single character mode
 	 */
 	i->iflags &= ~SINGLE_CHAR;
+#ifndef GET_CHAR_IS_BUFFERED
+	set_linemode(i);
+#else
 	was_single = 1;
 	if (i->iflags & NOECHO) {
 	    was_noecho = 1;
 	    i->iflags &= ~NOECHO;
 	}
+#endif
     }
 
     copy_and_push_string(str);
@@ -1980,6 +2124,7 @@ static int call_function_interactive P2(interactive_t *, i, char *, str)
 
     pop_stack();		/* remove `function' from stack */
 
+#ifdef GET_CHAR_IS_BUFFERED
     if (IP_VALID(i, ob)) {
 	if (was_single && !(i->iflags & SINGLE_CHAR)) {
 	    i->text_start = i->text_end = 0;
@@ -1990,6 +2135,7 @@ static int call_function_interactive P2(interactive_t *, i, char *, str)
 	if (was_noecho && !(i->iflags & NOECHO))
 	    add_binary_message(i->ob, telnet_no_echo, sizeof(telnet_no_echo));
     }
+#endif
 
     return (1);
 }				/* call_function_interactive() */
@@ -2030,6 +2176,10 @@ static void print_prompt P1(interactive_t*, ip)
 	/* give user object a chance to write its own prompt */
 	if (!(ip->iflags & HAS_WRITE_PROMPT))
 	    tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
+#ifdef OLD_ED
+	else if (ip->ed_buffer)
+	    tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
+#endif
 	else if (!apply(APPLY_WRITE_PROMPT, ip->ob, 0, ORIGIN_DRIVER)) {
 	    if (!IP_VALID(ip, ob)) return;
 	    ip->iflags &= ~HAS_WRITE_PROMPT;
@@ -2123,6 +2273,256 @@ int new_set_snoop P2(object_t *, by, object_t *, victim)
 }				/* set_new_snoop() */
 #endif
 
+static void query_addr_name P1(object_t *, ob)
+{
+    static char buf[100];
+    static char *dbuf = &buf[sizeof(int) + sizeof(int) + sizeof(int)];
+    int msglen;
+    int msgtype;
+
+    sprintf(dbuf, "%s", query_ip_number(ob));
+    msglen = sizeof(int) + strlen(dbuf) +1;
+
+    msgtype = DATALEN;
+    memcpy(buf, (char *) &msgtype, sizeof(msgtype));
+    memcpy(&buf[sizeof(int)], (char *) &msglen, sizeof(msglen));
+
+    msgtype = NAMEBYIP;
+    memcpy(&buf[sizeof(int) + sizeof(int)], (char *) &msgtype, sizeof(msgtype));
+    debug(connections, ("query_addr_name: sent address server %s\n", dbuf));
+
+    if (OS_socket_write(addr_server_fd, buf, msglen + sizeof(int) + sizeof(int)) == -1) {
+	switch (socket_errno) {
+	case EBADF:
+	    debug_message("Address server has closed connection.\n");
+	    addr_server_fd = -1;
+	    break;
+	default:
+	    socket_perror("query_addr_name: write", 0);
+	    break;
+	}
+    }
+}				/* query_addr_name() */
+
+#define IPSIZE 200
+typedef struct {
+    char *name;
+    svalue_t call_back;
+    object_t *ob_to_call;
+} ipnumberentry_t;
+
+static ipnumberentry_t ipnumbertable[IPSIZE];
+
+/*
+ * Does a call back on the current_object with the function call_back.
+ */
+int query_addr_number P2(char *, name, svalue_t *, call_back)
+{
+    static char buf[100];
+    static char *dbuf = &buf[sizeof(int) + sizeof(int) + sizeof(int)];
+    int msglen;
+    int msgtype;
+
+    if ((addr_server_fd < 0) || (strlen(name) >=
+		  100 - (sizeof(msgtype) + sizeof(msglen) + sizeof(int)))) {
+	share_and_push_string(name);
+	push_undefined();
+	if (call_back->type == T_STRING)
+	    apply(call_back->u.string, current_object, 2, ORIGIN_INTERNAL);
+	else
+	    call_function_pointer(call_back->u.fp, 2);
+	return 0;
+    }
+    strcpy(dbuf, name);
+    msglen = sizeof(int) + strlen(name) +1;
+
+    msgtype = DATALEN;
+    memcpy(buf, (char *) &msgtype, sizeof(msgtype));
+    memcpy(&buf[sizeof(int)], (char *) &msglen, sizeof(msglen));
+
+    msgtype = (name[0] >= '0' && name[0] <= '9') ? NAMEBYIP : IPBYNAME;
+    memcpy(&buf[sizeof(int) + sizeof(int)], (char *) &msgtype, sizeof(msgtype));
+
+    debug(connections, ("query_addr_number: sent address server %s\n", dbuf));
+
+    if (OS_socket_write(addr_server_fd, buf, msglen + sizeof(int) + sizeof(int)) == -1) {
+	switch (socket_errno) {
+	case EBADF:
+	    debug_message("Address server has closed connection.\n");
+	    addr_server_fd = -1;
+	    break;
+	default:
+	    socket_perror("query_addr_name: write", 0);
+	    break;
+	}
+	share_and_push_string(name);
+	push_undefined();
+	if (call_back->type == T_STRING)
+	    apply(call_back->u.string, current_object, 2, ORIGIN_INTERNAL);
+	else
+	    call_function_pointer(call_back->u.fp, 2);
+	return 0;
+    } else {
+	int i;
+
+/* We put ourselves into the pending name lookup entry table */
+/* Find the first free entry */
+	for (i = 0; i < IPSIZE && ipnumbertable[i].name; i++)
+	    ;
+	if (i == IPSIZE) {
+/* We need to error...  */
+	    share_and_push_string(name);
+	    push_undefined();
+	    if (call_back->type == T_STRING)
+		apply(call_back->u.string, current_object, 2, ORIGIN_INTERNAL);
+	    else
+		call_function_pointer(call_back->u.fp, 2);
+	    return 0;
+	}
+/* Create our entry... */
+	ipnumbertable[i].name = make_shared_string(name);
+	assign_svalue_no_free(&ipnumbertable[i].call_back, call_back);
+	ipnumbertable[i].ob_to_call = current_object;
+	add_ref(current_object, "query_addr_number: ");
+	return i + 1;
+    }
+}				/* query_addr_number() */
+
+static void got_addr_number P2(char *, number, char *, name)
+{
+    int i;
+    char *theName, *theNumber;
+
+    /* First remove all the dested ones... */
+    for (i = 0; i < IPSIZE; i++)
+	if (ipnumbertable[i].name
+	    && ipnumbertable[i].ob_to_call->flags & O_DESTRUCTED) {
+	    free_svalue(&ipnumbertable[i].call_back, "got_addr_number");
+	    free_string(ipnumbertable[i].name);
+	    free_object(ipnumbertable[i].ob_to_call, "got_addr_number: ");
+	    ipnumbertable[i].name = NULL;
+	}
+    for (i = 0; i < IPSIZE; i++) {
+	if (ipnumbertable[i].name && strcmp(name, ipnumbertable[i].name)== 0) {
+	    /* Found one, do the call back... */
+	    theName = ipnumbertable[i].name;
+	    theNumber = number;
+	    
+	    if (uisdigit(theName[0])) {
+		char *tmp;
+		
+		tmp = theName;
+		theName = theNumber;
+		theNumber = tmp;
+	    }
+	    if (strcmp(theName, "0")) {
+		share_and_push_string(theName);
+	    } else {
+		push_undefined();
+	    }
+	    if (strcmp(theNumber, "0")) {
+		share_and_push_string(theNumber);
+	    } else {
+		push_undefined();
+	    }
+	    push_number(i + 1);
+	    if (ipnumbertable[i].call_back.type == T_STRING)
+		safe_apply(ipnumbertable[i].call_back.u.string, 
+			   ipnumbertable[i].ob_to_call,
+			   3, ORIGIN_INTERNAL);
+	    else
+		safe_call_function_pointer(ipnumbertable[i].call_back.u.fp, 3);
+	    free_svalue(&ipnumbertable[i].call_back, "got_addr_number");
+	    free_string(ipnumbertable[i].name);
+	    free_object(ipnumbertable[i].ob_to_call, "got_addr_number: ");
+	    ipnumbertable[i].name = NULL;
+	}
+    }
+}				/* got_addr_number() */
+
+#undef IPSIZE
+#define IPSIZE 200
+typedef struct {
+    long addr;
+    char *name;
+} ipentry_t;
+
+static ipentry_t iptable[IPSIZE];
+static int ipcur;
+
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_iptable() {
+    int i;
+
+    for (i=0; i < IPSIZE; i++)
+	if (iptable[i].name)
+	    EXTRA_REF(BLOCK(iptable[i].name))++;
+}
+#endif
+
+char *query_ip_name P1(object_t *, ob)
+{
+    int i;
+
+    if (ob == 0)
+	ob = command_giver;
+    if (!ob || ob->interactive == 0)
+	return NULL;
+    for (i = 0; i < IPSIZE; i++) {
+	if (iptable[i].addr == ob->interactive->addr.sin_addr.s_addr &&
+	    iptable[i].name)
+	    return (iptable[i].name);
+    }
+    return (inet_ntoa(ob->interactive->addr.sin_addr));
+}
+
+static void add_ip_entry P2(long, addr, char *, name)
+{
+    int i;
+
+    for (i = 0; i < IPSIZE; i++) {
+	if (iptable[i].addr == addr)
+	    return;
+    }
+    iptable[ipcur].addr = addr;
+    if (iptable[ipcur].name)
+	free_string(iptable[ipcur].name);
+    iptable[ipcur].name = make_shared_string(name);
+    ipcur = (ipcur + 1) % IPSIZE;
+}
+
+char *query_ip_number P1(object_t *, ob)
+{
+    if (ob == 0)
+	ob = command_giver;
+    if (!ob || ob->interactive == 0)
+	return 0;
+    return (inet_ntoa(ob->interactive->addr.sin_addr));
+}
+
+#ifndef INET_NTOA_OK
+/*
+ * Note: if the address string is "a.b.c.d" the address number is
+ *       a * 256^3 + b * 256^2 + c * 256 + d
+ */
+char *inet_ntoa P1(struct in_addr, ad)
+{
+    u_long s_ad;
+    int a, b, c, d;
+    static char addr[20];	/* 16 + 1 should be enough */
+
+    s_ad = ad.s_addr;
+    d = s_ad % 256;
+    s_ad /= 256;
+    c = s_ad % 256;
+    s_ad /= 256;
+    b = s_ad % 256;
+    a = s_ad / 256;
+    sprintf(addr, "%d.%d.%d.%d", a, b, c, d);
+    return (addr);
+}
+#endif				/* INET_NTOA_OK */
+
 char *query_host_name()
 {
     static char name[40];
@@ -2198,56 +2598,272 @@ int replace_interactive P2(object_t *, ob, object_t *, obfrom)
 }				/* replace_interactive() */
 #endif
 
-#ifdef MCCP_SUPPORT
-void *zlib_alloc P3(void *, opaque, unsigned int, items, unsigned int, size)
+void outbuf_zero P1(outbuffer_t *, outbuf) {
+    outbuf->real_size = 0;
+    outbuf->buffer = 0;
+}
+
+int outbuf_extend P2(outbuffer_t *, outbuf, int, l)
 {
+    int limit;
+
+    DEBUG_CHECK(l < 0, "Negative length passed to outbuf_extend.\n");
+    
+    if (outbuf->buffer) {
+	limit = MSTR_SIZE(outbuf->buffer);
+	if (outbuf->real_size + l > limit) {
+	    if (outbuf->real_size == USHRT_MAX) return 0; /* TRUNCATED */
+
+	    /* assume it's going to grow some more */
+	    limit = (outbuf->real_size + l) * 2;
+	    if (limit > USHRT_MAX) {
+		limit = outbuf->real_size + l;
+		if (limit > USHRT_MAX) {
+		    outbuf->buffer = extend_string(outbuf->buffer, USHRT_MAX);
+		    return USHRT_MAX - outbuf->real_size;
+		}
+	    }
+	    outbuf->buffer = extend_string(outbuf->buffer, limit);
+	}
+    } else {
+	outbuf->buffer = new_string(l, "outbuf_add");
+	outbuf->real_size = 0;
+    }
+    return l;
+}
+
+void outbuf_add P2(outbuffer_t *, outbuf, char *, str)
+{
+    int l, limit;
+    
+    if (!outbuf) return;
+    l = strlen(str);
+    if (outbuf->buffer) {
+	limit = MSTR_SIZE(outbuf->buffer);
+	if (outbuf->real_size + l > limit) {
+	    if (outbuf->real_size == USHRT_MAX) return; /* TRUNCATED */
+
+	    /* assume it's going to grow some more */
+	    limit = (outbuf->real_size + l) * 2;
+	    if (limit > USHRT_MAX) {
+		limit = outbuf->real_size + l;
+		if (limit > USHRT_MAX) {
+		    outbuf->buffer = extend_string(outbuf->buffer, USHRT_MAX);
+		    strncpy(outbuf->buffer + outbuf->real_size, str,
+			    USHRT_MAX - outbuf->real_size);
+		    outbuf->buffer[USHRT_MAX] = 0;
+		    outbuf->real_size = USHRT_MAX;
+		    return;
+		}
+	    }
+	    outbuf->buffer = extend_string(outbuf->buffer, limit);
+	}
+    } else {
+	outbuf->buffer = new_string(l, "outbuf_add");
+	outbuf->real_size = 0;
+    }
+    strcpy(outbuf->buffer + outbuf->real_size, str);
+    outbuf->real_size += l;
+}
+
+void outbuf_addchar P2(outbuffer_t *, outbuf, char, c)
+{
+    int limit;
+    
+    if (!outbuf) return;
+
+    if (outbuf->buffer) {
+	limit = MSTR_SIZE(outbuf->buffer);
+	if (outbuf->real_size + 1 > limit) {
+	    if (outbuf->real_size == USHRT_MAX) return; /* TRUNCATED */
+
+	    /* assume it's going to grow some more */
+	    limit = (outbuf->real_size + 1) * 2;
+	    if (limit > USHRT_MAX) {
+		limit = outbuf->real_size + 1;
+		if (limit > USHRT_MAX) {
+		    outbuf->buffer = extend_string(outbuf->buffer, USHRT_MAX);
+		    *(outbuf->buffer + outbuf->real_size) = c;
+		    outbuf->buffer[USHRT_MAX] = 0;
+		    outbuf->real_size = USHRT_MAX;
+		    return;
+		}
+	    }
+	    outbuf->buffer = extend_string(outbuf->buffer, limit);
+	}
+    } else {
+	outbuf->buffer = new_string(80, "outbuf_add");
+	outbuf->real_size = 0;
+    }
+    *(outbuf->buffer + outbuf->real_size++) = c;
+    *(outbuf->buffer + outbuf->real_size) = 0;
+}
+
+void outbuf_addv P2V(outbuffer_t *, outbuf, char *, format)
+{
+    char buf[LARGEST_PRINTABLE_STRING + 1];
+    va_list args;
+    V_DCL(char *format);
+    V_DCL(outbuffer_t *outbuf);
+
+    V_START(args, format);
+    V_VAR(outbuffer_t *, outbuf, args);
+    V_VAR(char *, format, args);
+
+    vsprintf(buf, format, args);
+    va_end(args);
+
+    if (!outbuf) return;
+    
+    outbuf_add(outbuf, buf);
+}
+
+void outbuf_fix P1(outbuffer_t *, outbuf) {
+    if (outbuf && outbuf->buffer)
+	outbuf->buffer = extend_string(outbuf->buffer, outbuf->real_size);
+}
+
+void outbuf_push P1(outbuffer_t *, outbuf) {
+    STACK_INC;
+    sp->type = T_STRING;
+    if (outbuf && outbuf->buffer) {
+	outbuf->buffer = extend_string(outbuf->buffer, outbuf->real_size);
+	
+	sp->subtype = STRING_MALLOC;
+	sp->u.string = outbuf->buffer;
+    } else {
+	sp->subtype = STRING_CONSTANT;
+	sp->u.string = "";
+    }
+}
+
+#ifdef HAVE_ZLIB
+void* zlib_alloc(void* opaque, unsigned int items, unsigned int size) {
     return CALLOC(items, size);
 }
 
-void zlib_free P2(void *, opaque, void *, address)
-{
+void zlib_free(void* opaque, void* address) {
     FREE(address);
 }
 
-static void end_compression P1(interactive_t *, ip)
-{
-    if (ip->message_consumer < ip->message_producer)
-	ip->compress_stream->avail_in = ip->message_producer - ip->message_consumer;
-    else
-	ip->compress_stream->avail_in = MESSAGE_BUF_SIZE - ip->message_consumer;
-    ip->compress_stream->next_in = ip->message_buf + ip->message_consumer;
-
-    do {
-	ip->compress_stream->avail_out = COMPRESS_BUF_SIZE;
-	ip->compress_stream->next_out  = ip->compress_buf;
-    } while (deflate(ip->compress_stream, Z_FINISH) != Z_STREAM_END);
-
-    deflateEnd(ip->compress_stream);
-    FREE(ip->compress_stream);
-    ip->compress_stream = NULL;
+static void end_compression (interactive_t *ip) {
+    unsigned char dummy[1];
+  
+    if (!ip->compressed_stream) {
+        return ;
+    }
+    
+    ip->compressed_stream->avail_in = 0;
+    ip->compressed_stream->next_in = dummy;
+      
+    if (deflate(ip->compressed_stream, Z_FINISH) != Z_STREAM_END) {
+    }
+        
+    deflateEnd(ip->compressed_stream);
+    FREE(ip->compressed_stream);
+    ip->compressed_stream = NULL;
 }
 
-static int start_compression P1(interactive_t *, ip)
-{
-    if (!ip->compress_stream) {
-	z_stream *compress;
-
-	compress = (z_stream *)DXALLOC(sizeof(z_stream), TAG_INTERACTIVE, "start_compression");
-	compress->next_in   = NULL;
-	compress->avail_in  = 0;
-	compress->next_out  = ip->compress_buf;
-	compress->avail_out = COMPRESS_BUF_SIZE;
-	compress->zalloc    = zlib_alloc;
-	compress->zfree     = zlib_free;
-	compress->opaque    = NULL;
-
-	if (deflateInit(compress, 9) != Z_OK) {
-	    FREE(compress);
-	    return 0;
-	}
-
-	ip->compress_stream = compress;
+static void start_compression (interactive_t *ip) {
+    z_stream* compress;
+  
+    if (ip->compressed_stream) {
+        return ;
     }
-    return 1;
+    compress = (z_stream *) DXALLOC(sizeof(z_stream), TAG_INTERACTIVE,
+                                    "start_compression");
+    compress->next_in = NULL;
+    compress->avail_in = 0;
+    compress->next_out = ip->compress_buf;
+    compress->avail_out = COMPRESS_BUF_SIZE;
+    compress->zalloc = zlib_alloc;
+    compress->zfree = zlib_free;
+    compress->opaque = NULL;
+    
+    if (deflateInit(compress, 9) != Z_OK) {
+        FREE(compress);
+        fprintf(stderr, "Compression failed.\n");
+        return ;
+    }
+      
+    // Ok, compressing.
+    ip->compressed_stream = compress;
+}
+
+static int flush_compressed_output (interactive_t *ip) {
+    int iStart, nBlock, nWrite, len;
+    z_stream* compress;
+    
+    if (!ip->compressed_stream) {
+        return TRUE;
+    }
+    
+    compress = ip->compressed_stream;
+      
+    /* Try to write out some data.. */
+    len = compress->next_out - ip->compress_buf;
+    if (len > 0) {
+        /* we have some data to write */
+
+        nWrite = 0;
+        for (iStart = 0; iStart < len; iStart += nWrite)
+            {
+                if (len - iStart < 4096) {
+                    nBlock =len - iStart;
+                } else {
+                    nBlock =  4096;
+                }
+                nWrite = send (ip->fd, &ip->compress_buf[iStart], nBlock,
+                               ip->out_of_band);
+                if (nWrite < 0) {
+                    fprintf(stderr, "Error sending compressed data (%d)\n",
+                            errno);
+                        
+                    if (errno == EAGAIN || errno == ENOSR) {
+                        break;
+                    }
+     
+                    return FALSE; /* write error */
+                }
+   
+                if (nWrite <= 0) {
+                    break;
+                }
+            }
+ 
+        if (iStart) {
+            /* We wrote "iStart" bytes */
+            if (iStart < len) {
+                memmove(ip->compress_buf, ip->compress_buf+iStart, len -
+                        iStart);
+                
+            }
+ 
+            compress->next_out = ip->compress_buf + len - iStart;
+        }
+    }
+        
+    return TRUE;
+}
+
+
+static int send_compressed (interactive_t *ip, char* data, int length) {
+    z_stream* compress;
+  
+    compress = ip->compressed_stream;
+    compress->next_in = data;
+    compress->avail_in = length;
+    while (compress->avail_in) {
+        compress->avail_out = COMPRESS_BUF_SIZE - (compress->next_out -
+                                                   ip->compress_buf);
+        
+        if (compress->avail_out) {
+            deflate(compress, Z_SYNC_FLUSH);
+        }
+        
+        flush_compressed_output(ip);
+    }
+    return length;
 }
 #endif
+  

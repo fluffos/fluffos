@@ -98,7 +98,7 @@
 			      push_number(*global_lvalue_byte.u.lvalue_byte);\
 			  else {\
 			      if (lval->type == T_OBJECT && (lval->u.ob->flags & O_DESTRUCTED))\
-				  assign_svalue(lval, &const0);\
+			          assign_svalue(lval, &const0);\
 			      push_svalue(lval);\
 			  }\
 		      } else error("Non-reference value passed as reference argument.\n");\
@@ -112,7 +112,7 @@
 				 } else error("Reference is invalid.\n");\
 			     } else error("Non-reference value passed as reference argument.\n");\
 			     )
-			  
+
 void c_efun_return PROT((int));
 
 #endif

@@ -1203,7 +1203,7 @@ void regdump P1(regexp *, r)
     register char op = EXACTLY;	/* Arbitrary non-END op. */
     register char *nxt;
 
-#ifndef _AIX
+#ifdef _AIX
     extern char *strchr();
 
 #endif				/* _AIX */

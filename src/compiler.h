@@ -239,6 +239,7 @@ parse_node_t *reorder_class_values PROT((int, parse_node_t *));
 
 parse_node_t *promote_to_float PROT((parse_node_t *));
 parse_node_t *promote_to_int PROT((parse_node_t *));
+parse_node_t *add_type_check PROT((parse_node_t *, int));
 parse_node_t *do_promotions PROT((parse_node_t *, int));
 parse_node_t *throw_away_call PROT((parse_node_t *));
 parse_node_t *throw_away_mapping PROT((parse_node_t *));
