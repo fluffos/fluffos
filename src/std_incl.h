@@ -101,4 +101,8 @@
 #  include <varargs.h>
 #endif
 
+#ifdef INCL_BSTRING_H
+#include <bstring.h>
+#endif
+
 #endif

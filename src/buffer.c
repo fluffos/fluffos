@@ -3,6 +3,7 @@
 #include "std.h"
 #include "crctab.h"
 #include "lpc_incl.h"
+#include "stralloc.h"
 
 buffer_t null_buf =
 {
@@ -75,11 +76,11 @@ int write_buffer P4(buffer_t *, buf, int, start, char *, str, int, theLength)
 }				/* write_buffer() */
 
 char *
-     read_buffer P4(buffer_t *, b, int, start, int, len, int *, rlen)
+read_buffer P4(buffer_t *, b, int, start, int, len, int *, rlen)
 {
     char *str;
     unsigned int size;
-
+    
     if (len < 0)
 	return 0;
 
@@ -99,20 +100,11 @@ char *
     if ((start + len) > size) {
 	len = (size - start);
     }
-    str = (char *) DXALLOC(len + 1, TAG_STRING, "read_buffer: str");
-    memcpy(str, b->item + start, len);
+    for (str = (char *)b->item + start, size = 0; *str && size < len; str++, size++)
+	;
+    str = new_string(size, "read_buffer: str");
+    memcpy(str, b->item + start, size);
+    str[*rlen = size] = '\0';
 
-    /*
-     * The string has to end to '\0'!!!
-     */
-    str[len] = '\0';
-    if ((*rlen = strlen(str)) != len) {
-	char *p;
-
-	p = str;
-	str = string_copy(p, "read_buffer");
-	*rlen = strlen(str);
-	FREE(p);
-    }
     return str;
 }				/* read_buffer() */

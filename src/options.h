@@ -64,7 +64,7 @@
  *   * Incurs a fair amount of overhead (both memory and CPU)
  */
 #undef WRAPPEDMALLOC
-#undef DEBUGMALLOC
+#define DEBUGMALLOC
 
 /* The following add certain bells and whistles to malloc: */
 
@@ -96,14 +96,14 @@
  * bytes per malloc down to 8.  This macro has no effect if DEBUGMALLOC isn't
  * defined.
  */
-#undef DEBUGMALLOC_EXTENSIONS
+#define DEBUGMALLOC_EXTENSIONS
 
 /* CHECK_MEMORY: defining this (in addition to DEBUGMALLOC) causes the driver
  * to check for memory corruption due to writing before the start or end
  * of a block.  This also adds the check_memory() efun.  Takes a considerable
  * ammount more memory.  Mainly for debugging.
  */
-#undef CHECK_MEMORY
+#define CHECK_MEMORY
 
 /****************************************************************************
  *                          COMPATIBILITY                                   *
@@ -188,6 +188,13 @@
  *          instructions for details.                                       *
  ****************************************************************************/
 
+/*
+ * Keep statistics about allocated strings, etc.  Which can be veiwed with
+ * the mud_status() efun.  If this is off, mud_status() and memory_info()
+ * ignore allocated strings, but string operations run faster.
+ */
+#define STRING_STATS
+
 /* LOG_CATCHES: define this to cause errors that are catch()'d to be
  *   sent to the debug log anyway.
  *
@@ -245,7 +252,7 @@
  *   always specify a full path to the config file when starting the driver.
  */
 #ifndef LATTICE
-#define CONFIG_FILE_DIR "/usr/local/mud/mudos/etc"
+#define CONFIG_FILE_DIR "/u/tim/COMP/bin"
 #else
 #define CONFIG_FILE_DIR "etc:"
 #endif
@@ -443,7 +450,7 @@
 #undef PACKAGE_COMPAT
 
 /* various miscellaneous efuns */
-#undef PACKAGE_CONTRIB
+#define PACKAGE_CONTRIB
 
 /* efuns that are only of use to those that know something about driver
    internals */
@@ -556,14 +563,7 @@
  *
  *   Don't define this for now, work in progress -Beek
  */
-#define LPC_TO_C
-
-/* ALWAYS_SAVE_COMPILED_BINARIES: define this to cause every file that
- *   is compiled to C code to behave as if it contains a line
- *   '#pragma save_binary'.  This #define has no affect if BINARIES and
- *   LPC_TO_C are not defined.
- */
-#undef ALWAYS_SAVE_COMPILED_BINARIES
+#undef LPC_TO_C
 
 /* TRACE_CODE: define this to enable code tracing (the driver will print
  *   out the previous lines of code to an error) eval_instruction() runs about
@@ -588,8 +588,6 @@
  */
 /* MAX_LOCAL: maximum number of local variables allowed per LPC function */
 #define MAX_LOCAL 25		/* get_config_int(8)  */
-/* MAX_USERS: maximum number of simultaneous interactive users allowed */
-#define MAX_USERS 40	        /* get_config_int(12) */
 /* MAX_EFUN_SOCKS: maximum number of efun sockets */
 #define MAX_EFUN_SOCKS 16	/* get_config_int(24) */
 

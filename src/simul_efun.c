@@ -2,6 +2,7 @@
 #include "lpc_incl.h"
 #include "lex.h"
 #include "simul_efun.h"
+#include "otable.h"
 
 /*
  * This file rewritten by Beek because it was inefficient and slow.  We
@@ -52,20 +53,23 @@ void mark_simuls() {
 void set_simul_efun P1(char *, file)
 {
     char buf[512];
+    lpc_object_t *compiled_version;
 
     if (!file) {
 	fprintf(stderr, "No simul_efun\n");
 	return;
     }
-    while (file[0] == '/')
-	file++;
-    strcpy(buf, file);
+    if (!strip_name(file, buf, sizeof buf))
+	error("Ilegal simul_efun file name '%s'\n", file);
+    
+    compiled_version = (lpc_object_t *)lookup_object_hash(buf);
+
     if (file[strlen(file) - 2] != '.')
 	strcat(buf, ".c");
     simul_efun_file_name = make_shared_string(buf);
 
     simul_efun_ob = 0;
-    (void) load_object(simul_efun_file_name, 0);
+    (void) load_object(simul_efun_file_name, compiled_version);
     if (simul_efun_ob == 0) {
 	fprintf(stderr, "The simul_efun file %s was not loaded.\n",
 		simul_efun_file_name);
@@ -81,7 +85,7 @@ static void remove_simuls() {
 	simuls[i]=0;
     }
     for (i=0; i<num_simul_efun; i++) {
-	if (ihe = lookup_ident(simul_names[i].name)) {
+	if ((ihe = lookup_ident(simul_names[i].name))) {
 	    if (ihe->dn.simul_num != -1)
 		ihe->sem_value--;
 	    ihe->dn.simul_num = -1;

@@ -233,15 +233,27 @@ pointers of size other than 4 or 8 not implemented
    char *xalloc PROT((int));
 #  ifdef DEBUGMALLOC
       char *int_string_copy PROT((char *, char *));
+      char *int_string_unlink PROT((char *, char *));
+      char *int_new_string PROT((int, char *));
+      char *int_alloc_cstring PROT((char *, char *));
 #  else
       char *int_string_copy PROT((char *));
+      char *int_string_unlink PROT((char *));
+      char *int_new_string PROT((int));
+      char *int_alloc_cstring PROT((char *));
 #  endif
 #endif
 
 #ifdef DEBUGMALLOC
 #   define string_copy(x, y) int_string_copy(x, y)
+#   define string_unlink(x, y) int_string_unlink(x, y)
+#   define new_string(x, y) int_new_string(x, y)
+#   define alloc_cstring(x, y) int_alloc_cstring(x, y)
 #else
 #   define string_copy(x, y) int_string_copy(x)
+#   define string_unlink(x, y) int_string_unlink(x)
+#   define new_string(x, y) int_new_string(x)
+#   define alloc_cstring(x, y) int_alloc_cstring(x)
 #endif
 
 #endif

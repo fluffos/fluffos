@@ -18,7 +18,9 @@ INLINE static void ins_f_byte PROT((unsigned int));
 static void write_number PROT((int));
 static short read_short PROT((int));
 static void ins_int PROT((int));
+#if 0
 static void ins_long PROT((long));
+#endif
 void i_generate_node PROT((parse_node_t *));
 static void i_generate_if_branch PROT((parse_node_t *));
 /*
@@ -105,6 +107,7 @@ static void ins_int P1(int, l)
  * Store a 8 byte number. It is stored in such a way as to be sure
  * that correct byte order is used, regardless of machine architecture.
  */
+#if 0
 static void ins_long P1(long, l)
 {
     if (prog_code + 8 > prog_code_max) {
@@ -117,6 +120,7 @@ static void ins_long P1(long, l)
     }
     STORE_PTR(prog_code, l);
 }
+#endif
 
 static void upd_short P2(int, offset, short, l)
 {
@@ -252,12 +256,12 @@ generate_expr_list P1(parse_node_t *, expr) {
     if (!expr) return;
     do {
       i_generate_node(expr->v.expr);
-    } while (expr = expr->r.expr);
+    } while ((expr = expr->r.expr));
 }
 
 static void
 generate_lvalue_list P1(parse_node_t *, expr) {
-    while (expr = expr->r.expr) {
+    while ((expr = expr->r.expr)) {
       i_generate_node(expr->l.expr);
       ins_f_byte(F_VOID_ASSIGN);
     }
@@ -689,8 +693,6 @@ i_generate_node P1(parse_node_t *, expr) {
 	}
     case NODE_CONDITIONAL:
 	{
-	    int addr;
-	    
 	    i_generate_if_branch(expr->l.expr);
 	    i_generate_node(expr->r.expr->l.expr);
 	    i_generate_else();
@@ -1002,7 +1004,8 @@ void i_update_forward_branch_links P2(char, kind, parse_node_t *, link_start){
 void
 i_branch_backwards P2(char, b, int, addr) {
     if (b) {
-	ins_f_byte(b);
+	if (b != F_WHILE_DEC)
+	    ins_f_byte(b);
 	ins_short(CURRENT_PROGRAM_SIZE - addr);
     } 
 }
@@ -1076,6 +1079,7 @@ void
 i_initialize_parser() {
     switches = 0;
     break_ptr = &break_dummy;
+    break_dummy.type = 1;
     cont_ptr = 0;
     /* This is just to be safe */
     break_dummy.type = 128;

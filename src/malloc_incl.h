@@ -1,6 +1,10 @@
 #ifndef MALLOC_INCL_H
 #define MALLOC_INCL_H
 
+/* used by some debugging info calls */
+void add_vmessage PROTVARGS(());
+void add_message PROT((char *));
+
 #include "bsdmalloc.h"
 #include "smalloc.h"
 #include "wrappedmalloc.h"
@@ -39,6 +43,7 @@
 #define TAG_LOCALS          (TAG_PERMANENT + 32)
 #define TAG_ARGUMENTS       (TAG_PERMANENT + 33)
 #define TAG_LPC_OBJECT      (TAG_PERMANENT + 34)
+#define TAG_USERS           (TAG_PERMANENT + 35)
 
 #define TAG_STRING          (TAG_DATA + 40)
 #define TAG_SHARED_STRING   (TAG_DATA + 41)

@@ -1,5 +1,9 @@
 /* this file was manually generated -- don't delete it */
 
+INLINE void f_ge PROT((void));
+INLINE void f_le PROT((void));
+INLINE void f_lt PROT((void));
+INLINE void f_gt PROT((void));
 INLINE void f_and PROT((void));
 INLINE void f_and_eq PROT((void));
 INLINE void f_div_eq PROT((void));
@@ -34,3 +38,6 @@ INLINE void free_funp PROT((funptr_t *));
 int merge_arg_lists PROT((int, array_t *, int));
 void call_simul_efun PROT((unsigned short, int));
 
+INLINE funptr_t *make_efun_funp PROT((int, svalue_t *));
+INLINE funptr_t *make_lfun_funp PROT((int, svalue_t *));
+INLINE funptr_t *make_simul_funp PROT((int, svalue_t *));

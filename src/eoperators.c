@@ -14,14 +14,11 @@
 #ifdef TRACE
 #include "comm.h"
 #endif
+#include "compiler.h"
 
 INLINE void
-free_funp P1(funptr_t *, fp)
+dealloc_funp P1(funptr_t *, fp)
 {
-    fp->hdr.ref--;
-    if (fp->hdr.ref > 0) {
-	return;
-    }
     free_object(fp->hdr.owner, "free_funp");
     if (fp->hdr.args)
 	free_array(fp->hdr.args);
@@ -32,6 +29,16 @@ free_funp P1(funptr_t *, fp)
 	    deallocate_program(fp->f.functional.prog);
     }
     FREE(fp);
+}
+
+INLINE void
+free_funp P1(funptr_t *, fp)
+{
+    fp->hdr.ref--;
+    if (fp->hdr.ref > 0) {
+	return;
+    }
+    dealloc_funp(fp);
 }
 
 INLINE void f_and()
@@ -82,7 +89,7 @@ f_div_eq()
 
 	case T_NUMBER|T_REAL:
 	{
-	    if (sp->type & T_NUMBER){
+	    if (sp->type == T_NUMBER){
 		if (!sp->u.number) error("Division by 0rn\n");
 		sp->u.real = argp->u.real /= sp->u.number;
 		sp->type = T_REAL;
@@ -124,7 +131,7 @@ f_eq()
 	
     case T_NUMBER|T_REAL:
 	{
-	    if ((--sp)->type & T_NUMBER){
+	    if ((--sp)->type == T_NUMBER){
 		sp->u.number = sp->u.number == (sp+1)->u.real;
 	    }
 	    else {
@@ -204,7 +211,7 @@ f_ge()
 	sp->type = T_NUMBER;
 	break;
     case T_NUMBER | T_REAL:
-	if (i & T_NUMBER) {
+	if (i == T_NUMBER) {
 	    sp->type = T_NUMBER;
 	    sp->u.number = sp->u.real >= (sp+1)->u.number;
 	} else sp->u.number = sp->u.number >= (sp+1)->u.real;
@@ -243,7 +250,7 @@ f_gt() {
 	sp->type = T_NUMBER;
 	break;
     case T_NUMBER | T_REAL:
-	if (i & T_NUMBER) {
+	if (i == T_NUMBER) {
 	    sp->type = T_NUMBER;
 	    sp->u.number = sp->u.real > (sp+1)->u.number;
 	} else sp->u.number = sp->u.number > (sp+1)->u.real;
@@ -285,7 +292,7 @@ f_le()
 	break;
 	
     case T_NUMBER|T_REAL:
-	if (i & T_NUMBER){
+	if (i == T_NUMBER){
 	    sp->type = T_NUMBER;
 	    sp->u.number = sp->u.real <= (sp+1)->u.number;
 	} else sp->u.number = sp->u.number <= (sp+1)->u.real;
@@ -328,7 +335,7 @@ f_lt() {
 	sp->type = T_NUMBER;
 	break;
     case T_NUMBER|T_REAL:
-	if (i & T_NUMBER) {
+	if (i == T_NUMBER) {
 	    sp->type = T_NUMBER;
 	    sp->u.number = sp->u.real < (sp+1)->u.number;
 	} else sp->u.number = sp->u.number < (sp+1)->u.real;
@@ -409,7 +416,7 @@ f_mult_eq()
 
 	case T_NUMBER|T_REAL:
 	{
-	    if (sp->type & T_NUMBER){
+	    if (sp->type == T_NUMBER){
 		sp->type = T_REAL;
 		sp->u.real = argp->u.real *= sp->u.number;
 	    }
@@ -460,7 +467,7 @@ f_ne()
 
     case T_NUMBER|T_REAL:
         {
-            if ((--sp)->type & T_NUMBER){
+            if ((--sp)->type == T_NUMBER){
                 sp->u.number = sp->u.number != (sp+1)->u.real;
 	    }
             else {
@@ -638,7 +645,9 @@ f_range(int code)
 #endif
             if (to < from || from >= len){
                 free_string_svalue(sp+2);
-                put_constant_string("");
+		sp->type = T_STRING;
+		sp->subtype = STRING_CONSTANT;
+		sp->u.string = "";
                 return;
             }
 
@@ -646,7 +655,7 @@ f_range(int code)
                 put_malloced_string(string_copy(res + from, "f_range"));
             } else {
                 char *tmp;
-                tmp = DXALLOC(to - from + 2, TAG_STRING, "f_range");
+                tmp = new_string(to - from + 1, "f_range");
                 strncpy(tmp, res + from, to - from + 1);
                 tmp[to - from + 1] = '\0';
                 put_malloced_string(tmp);
@@ -809,7 +818,7 @@ f_sub_eq()
 
 	case T_NUMBER|T_REAL:
 	{
-	    if (sp->type & T_NUMBER){
+	    if (sp->type == T_NUMBER){
 		sp->type = T_REAL;
 		sp->u.real = argp->u.real -= sp->u.number;
 	    } else sp->u.real = argp->u.number -= sp->u.real;
@@ -1166,7 +1175,10 @@ make_efun_funp P2(int, opcode, svalue_t *, args)
     if (instrs[opcode].min_arg != instrs[opcode].max_arg)
 	fp->f.efun.opcodes[i++] = 0; /* filled in when evaluated */
     
-    fp->f.efun.opcodes[i++] = F_RETURN;
+    if (instrs[opcode].ret_type == TYPE_NOVALUE)
+	fp->f.efun.opcodes[i++] = F_RETURN_ZERO;
+    else
+	fp->f.efun.opcodes[i++] = F_RETURN;
     
     if (args->type == T_ARRAY) {
 	fp->hdr.args = args->u.arr;

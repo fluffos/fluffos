@@ -7,10 +7,10 @@
 #include "backend.h"
 #include "simul_efun.h"
 #include "debug.h"
+#include "eoperators.h"
 #include "efunctions.h"
 #include "lex.h"
 #include "functab_tree.h"
-#include "eoperators.h"
 #include "sprintf.h"
 #include "swap.h"
 #include "comm.h"
@@ -78,7 +78,6 @@ static int cmpopc PROT((opc_t *, opc_t *));
 int last_instructions PROT((void));
 #endif
 static float _strtof PROT((char *, char **));
-static svalue_t *sapply PROT((char *, object_t *, int));
 #ifdef TRACE_CODE
 static char *get_arg PROT((int, int));
 #endif
@@ -345,12 +344,44 @@ static INLINE svalue_t *find_value P1(int, num)
 INLINE void
 free_string_svalue P1(svalue_t *, v)
 {
-    switch (v->subtype) {
+    char *str = v->u.string;
+
+    if (v->subtype & STRING_COUNTED) {
+	SUB_STRING(COUNTED_STRLEN(str));
+	if (!(--(COUNTED_REF(str)))) {
+	    if (v->subtype & STRING_HASHED) {
+		SUB_NEW_STRING(COUNTED_STRLEN(str), sizeof(block_t));
+		deallocate_string(str);
+	    } else {
+		SUB_NEW_STRING(COUNTED_STRLEN(str), sizeof(malloc_block_t));
+		FREE(MSTR_BLOCK(str));
+	    }
+	}
+    }
+}
+
+void unlink_string_svalue P1(svalue_t *, s) {
+    char *str;
+
+    switch (s->subtype) {
     case STRING_MALLOC:
-	FREE(v->u.string);
+	if (MSTR_REF(s->u.string) > 1)
+	    s->u.string = string_unlink(s->u.string, "unlink_string_svalue");
 	break;
     case STRING_SHARED:
-	free_string(v->u.string);
+	{
+	    int l = SHARED_STRLEN(s->u.string);
+
+	    str = new_string(l, "unlink_string_svalue");
+	    strncpy(str, s->u.string, l + 1);
+	    free_string(s->u.string);
+	    s->subtype = STRING_MALLOC;
+	    s->u.string = str;
+	    break;
+	}
+    case STRING_CONSTANT:
+	s->u.string = string_copy(sp->u.string, "unlink_string_svalue");
+	s->subtype = STRING_MALLOC;
 	break;
     }
 }
@@ -366,44 +397,53 @@ INLINE void int_free_svalue P2(svalue_t *, v, char *, tag)
      INLINE void int_free_svalue P1(svalue_t *, v)
 #endif
 {
-    switch (v->type) {
-    case T_STRING:
-	switch (v->subtype) {
-	case STRING_MALLOC:
-	    FREE(v->u.string);
-	    break;
-	case STRING_SHARED:
-	    free_string(v->u.string);
-	    break;
+    if (v->type == T_STRING) {
+	char *str = v->u.string;
+	
+	if (v->subtype & STRING_COUNTED) {
+	    SUB_STRING(COUNTED_STRLEN(str));
+	    if (!(--(COUNTED_REF(str)))) {
+		if (v->subtype & STRING_HASHED) {
+		    SUB_NEW_STRING(COUNTED_STRLEN(str), sizeof(block_t));
+		    deallocate_string(str);
+		} else {
+		    SUB_NEW_STRING(COUNTED_STRLEN(str), sizeof(malloc_block_t));
+		    FREE(MSTR_BLOCK(str));
+		}
+	    }
 	}
-	break;
-    case T_OBJECT:
-	free_object(v->u.ob, "free_svalue");
-	break;
-    case T_ARRAY:
-    case T_CLASS:
-	free_array(v->u.arr);
-	break;
-    case T_BUFFER:
-	free_buffer(v->u.buf);
-	break;
-    case T_MAPPING:
-	free_mapping(v->u.map);
-	break;
-    case T_FUNCTION:
-	free_funp(v->u.fp);
-	break;
-    case T_ERROR_HANDLER:
+    } else if (v->type & T_REFED) {
+	if (!(--v->u.refed->ref)) {
+	    switch (v->type) {
+	    case T_OBJECT:
+		dealloc_object(v->u.ob, "free_svalue");
+		break;
+	    case T_ARRAY:
+	    case T_CLASS:
+		dealloc_array(v->u.arr);
+		break;
+	    case T_BUFFER:
+		if (v->u.buf != &null_buf)
+		    FREE((char *)v->u.buf);
+		break;
+	    case T_MAPPING:
+		dealloc_mapping(v->u.map);
+		break;
+	    case T_FUNCTION:
+		dealloc_funp(v->u.fp);
+		break;
+	    }
+	}
+    } else if (v->type == T_ERROR_HANDLER) {
 	(*v->u.error_handler)();
-	break;
- #ifdef DEBUG
-    case T_FREED:
-	fatal("T_FREED svalue freed.  Previously freed by %s.\n", v->u.string);
-	break;
- #endif
     }
-    IF_DEBUG(v->type = T_FREED);
-    IF_DEBUG(v->u.string = tag);
+#ifdef DEBUG
+    else if (v->type == T_FREED) {
+	fatal("T_FREED svalue freed.  Previously freed by %s.\n", v->u.string);
+    }
+    v->type = T_FREED;
+    v->u.string = tag;
+#endif
 }
 
 /*
@@ -424,7 +464,7 @@ char *add_slash P1(char *, str)
 {
     char *tmp;
 
-    tmp = DXALLOC(strlen(str) + 2, TAG_STRING, "add_slash");
+    tmp = new_string(strlen(str) + 1, "add_slash");
     *tmp = '/';
     strcpy(tmp + 1, str);
     return tmp;
@@ -442,41 +482,13 @@ INLINE void assign_svalue_no_free P2(svalue_t *, to, svalue_t *, from)
     DEBUG_CHECK(to == 0, "Attempt to assign_svalue() to a null ptr.\n");
     *to = *from;
 
-    switch (from->type) {
-    case T_STRING:
-	switch (from->subtype) {
-	case STRING_MALLOC:	/* No idea to make the string shared */
-	    to->u.string = string_copy(from->u.string, "assign_svalue_no_free");
-	    break;
-	case STRING_CONSTANT:	/* Good idea to make it shared */
-	    to->subtype = STRING_SHARED;
-	    to->u.string = make_shared_string(from->u.string);
-	    break;
-	case STRING_SHARED:	/* It already is shared */
-	    to->u.string = ref_string(from->u.string);
-	    break;
- #ifdef DEBUG
-	default:
-	    fatal("Bad string type %d\n", from->subtype);
- #endif
+    if (from->type == T_STRING) {
+	if (from->subtype & STRING_COUNTED) {
+	    ADD_STRING(COUNTED_STRLEN(to->u.string));
+	    COUNTED_REF(to->u.string)++;
 	}
-	break;
-    case T_OBJECT:
-	add_ref(to->u.ob, "asgn to var");
-	break;
-    case T_ARRAY:
-    case T_CLASS:
-	to->u.arr->ref++;
-	break;
-    case T_MAPPING:
-	to->u.map->ref++;
-	break;
-    case T_FUNCTION:
-	to->u.fp->hdr.ref++;
-	break;
-    case T_BUFFER:
-	to->u.buf->ref++;
-	break;
+    } else if (from->type & T_REFED) {
+	from->u.refed->ref++;
     }
 }
 
@@ -533,7 +545,7 @@ INLINE void transfer_push_some_svalues P2(svalue_t *, v, int, num)
 
      if (sp->type == T_LVALUE){
 	 lv = sp->u.lvalue;
-	 if (!code && lv->type & T_MAPPING){
+	 if (!code && lv->type == T_MAPPING){
 	     sp--;
 	     if (!(lv = find_for_insert(lv->u.map, sp, 0)))
 		 mapping_too_large();
@@ -543,7 +555,7 @@ INLINE void transfer_push_some_svalues P2(svalue_t *, v, int, num)
 	     return;
 	 }
 
-	 if (!((--sp)->type & T_NUMBER))
+	 if (!((--sp)->type == T_NUMBER))
 	     error("Illegal type of index\n");
 
 	 ind = sp->u.number;
@@ -551,21 +563,15 @@ INLINE void transfer_push_some_svalues P2(svalue_t *, v, int, num)
 	 switch(lv->type){
 	     case T_STRING:
 	     {
-		 char *tmp = lv->u.string;
 		 int len = SVALUE_STRLEN(lv);
 
 		 if (code) ind = len - ind;
 		 if (ind >= len || ind < 0)
 		     error("Index out of bounds in string index lvalue.\n");
-		 if (lv->subtype != STRING_MALLOC){
-		     tmp = string_copy(tmp, "push_indexed_lvalue: 1");
-		     if (lv->subtype & STRING_SHARED) free_string(lv->u.string);
-		     lv->u.string = tmp;
-		     lv->subtype = STRING_MALLOC;
-		   }
+		 unlink_string_svalue(lv);
 		 sp->type = T_LVALUE;
 		 sp->u.lvalue = &glb;
-		 glb.u.lvalue_byte = (unsigned char *)&tmp[ind];
+		 glb.u.lvalue_byte = (unsigned char *)&lv->u.string[ind];
 		 break;
 	     }
 
@@ -598,7 +604,7 @@ INLINE void transfer_push_some_svalues P2(svalue_t *, v, int, num)
 	 /* Where x is a _valid_ lvalue */
 	 /* Hence the reference to sp is at least 2 :) */
 
-	 if (!code && (sp->type & T_MAPPING)){
+	 if (!code && (sp->type == T_MAPPING)){
 	     if (!(lv = find_for_insert(sp->u.map, sp-1, 0)))
 		 mapping_too_large();
 	     sp->u.map->ref--;
@@ -608,7 +614,7 @@ INLINE void transfer_push_some_svalues P2(svalue_t *, v, int, num)
 	     return;
 	 }
 
-	 if (!((sp-1)->type & T_NUMBER))
+	 if (!((sp-1)->type == T_NUMBER))
 	     error("Illegal type of index\n");
 
 	 ind = (sp-1)->u.number;
@@ -663,35 +669,30 @@ INLINE void transfer_push_some_svalues P2(svalue_t *, v, int, num)
 
      if (sp->type == T_LVALUE){
 	 switch((lv = glr.owner = sp->u.lvalue)->type){
-	     case T_ARRAY:
-		 size = lv->u.arr->size;
-		 break;
-		 case T_STRING: {
-		 char *tmp = lv->u.string;
-		 size = SVALUE_STRLEN(lv);
-		 if (lv->subtype != STRING_MALLOC){
-		     tmp = string_copy(tmp, "push_lvalue_range");
-		     if (lv->subtype & STRING_SHARED) free_string(lv->u.string);
-		     lv->u.string = tmp;
-		     lv->subtype = STRING_MALLOC;
-		 }
-		 break;
-	     }
-	     case T_BUFFER:
-		 size = lv->u.buf->size;
-		 break;
-	     default: error("Range lvalue on illegal type\n");
+	 case T_ARRAY:
+	     size = lv->u.arr->size;
+	     break;
+	 case T_STRING: {
+	     size = SVALUE_STRLEN(lv);
+	     unlink_string_svalue(lv);
+	     break;
 	 }
-     } else error("Range lvalue on illegal type\n");
-
-     if (!((--sp)->type & T_NUMBER)) error("Illegal 2nd index type to range lvalue\n");
+	 case T_BUFFER:
+	     size = lv->u.buf->size;
+	     break;
+	 default:
+	     error("Range lvalue on illegal type\n");
+	 }
+     } else
+	 error("Range lvalue on illegal type\n");
+     
+     if (!((--sp)->type == T_NUMBER)) error("Illegal 2nd index type to range lvalue\n");
 
      ind2 = (code & 0x01) ? (size - sp->u.number) : sp->u.number;
      if (++ind2 < 0 || (ind2 > size))
 	 error("The 2nd index to range lvalue must be >= -1 and < sizeof(indexed value)\n");
 
-
-     if (!((--sp)->type & T_NUMBER)) error("Illegal 1st index type to range lvalue\n");
+     if (!((--sp)->type == T_NUMBER)) error("Illegal 1st index type to range lvalue\n");
      ind1 = (code & 0x10) ? (size - sp->u.number) : sp->u.number;
 
      if (ind1 < 0 || ind1 > size)
@@ -715,7 +716,7 @@ INLINE void transfer_push_some_svalues P2(svalue_t *, v, int, num)
      owner = glr.owner;
 
      switch(owner->type){
-	 case T_ARRAY:
+     case T_ARRAY:
 	 {
 	     array_t *fv, *dv;
 	     svalue_t *fptr, *dptr;
@@ -781,7 +782,7 @@ INLINE void transfer_push_some_svalues P2(svalue_t *, v, int, num)
 	     } else {
 		 char *tmp, *dstr = owner->u.string;
 
-		 owner->u.string = tmp = DXALLOC(size - ind2 + ind1 + fsize + 1, TAG_STRING, "copy_lvalue_range");
+		 owner->u.string = tmp = new_string(size - ind2 + ind1 + fsize + 1, "copy_lvalue_range");
 		 if (ind1 >= 1){
 		     strncpy(tmp, dstr, ind1);
 		     tmp += ind1;
@@ -794,7 +795,7 @@ INLINE void transfer_push_some_svalues P2(svalue_t *, v, int, num)
 		     strncpy(tmp, dstr + ind2, size);
 		     *(tmp + size) = 0;
 		 }
-		 FREE(dstr);
+		 FREE_MSTR(dstr);
 	     }
 	     free_string_svalue(from);
 	     break;
@@ -890,7 +891,7 @@ INLINE void transfer_push_some_svalues P2(svalue_t *, v, int, num)
 	     } else {
 		 char *tmp, *dstr = owner->u.string;
 
-		 owner->u.string = tmp = DXALLOC(size - ind2 + ind1 + fsize + 1, TAG_STRING, "assign_lvalue_range");
+		 owner->u.string = tmp = new_string(size - ind2 + ind1 + fsize + 1, "assign_lvalue_range");
 		 if (ind1 >= 1){
 		     strncpy(tmp, dstr, ind1);
 		     tmp += ind1;
@@ -903,7 +904,7 @@ INLINE void transfer_push_some_svalues P2(svalue_t *, v, int, num)
 		     strncpy(tmp, dstr + ind2, size);
 		     *(tmp + size) = 0;
 		 }
-		 FREE((char *) dstr);
+		 FREE_MSTR(dstr);
 	     }
 	     break;
 	 }
@@ -985,7 +986,7 @@ void bad_argument P4(svalue_t *, val, int, type, int, arg, int, instr)
     int j = TYPE_CODES_START;
     int k = 0;
 
-    buf = (char *) DMALLOC(300, TAG_TEMPORARY, "bad_argument");
+    buf = new_string(300, "bad_argument");
     sprintf(buf, "Bad argument %d to %s%s\nExpected: ", arg, 
 	    get_f_name(instr), (instr < BASE ? "" : "()"));
 
@@ -999,8 +1000,10 @@ void bad_argument P4(svalue_t *, val, int, type, int, arg, int, instr)
     } while (!((j <<= 1) & TYPE_CODES_END));
 
     strcat(buf, " Got: ");
+    MSTR_UPDATE_SIZE(buf, strlen(buf));
     svalue_to_string(val, &buf, 300, 0, 0, 0);
     strcat(buf, ".\n");
+    /* no need to fix length */
     error_needs_free(buf);
 }
 
@@ -1159,14 +1162,16 @@ INLINE void push_malloced_string P1(char *, p)
 
 /*
  * Push a string on the stack that is already constant.
+ * um.  yeah.  Name for historical reasons.  
+ * See push_string(..., STRING_CONSTANT) for stuff that is really constant.
  */
 INLINE
 void push_constant_string P1(char *, p)
 {
     sp++;
     sp->type = T_STRING;
-    sp->u.string = p;
-    sp->subtype = STRING_CONSTANT;
+    sp->u.string = make_shared_string(p);
+    sp->subtype = STRING_SHARED;
 }
 
 #ifdef TRACE
@@ -1340,9 +1345,7 @@ void cfp_error P1(char *, s) {
 svalue_t *
 call_function_pointer P2(funptr_t *, funp, int, num_arg)
 {
-    object_t *ob;
     function_t *func;
-    char *funcname;
     int i, def;
 
     setup_fake_frame(funp);
@@ -1401,8 +1404,6 @@ call_function_pointer P2(funptr_t *, funp, int, num_arg)
 	    funp->f.efun.opcodes[(i > 255 ? 2 : 1)] = num_arg;
 	}
 	eval_instruction((char*)&funp->f.efun.opcodes[0]);
-	if (instrs[i].ret_type == TYPE_NOVALUE) 
-	    return &const0;
 	free_svalue(&apply_ret_value, "call_function_pointer");
 	apply_ret_value = *sp--;
 	return &apply_ret_value;
@@ -1548,7 +1549,7 @@ void check_for_destr P1(array_t *, v)
     int i = v->size;
     
     while (i--) {
-	if ((v->item[i].type & T_OBJECT) && (v->item[i].u.ob->flags & O_DESTRUCTED)) {
+	if ((v->item[i].type == T_OBJECT) && (v->item[i].u.ob->flags & O_DESTRUCTED)) {
 	    free_svalue(&v->item[i], "check_for_destr");
 	    v->item[i] = const0;
 	}
@@ -1793,11 +1794,10 @@ eval_instruction P1(char *, p)
 	    {
 		svalue_t *s;
 
-		s = fp + EXTRACT_UCHAR(pc);
-		pc += 2;	/* skip the BBRANCH */
-		if (s->type & T_NUMBER) {
+		s = fp + EXTRACT_UCHAR(pc++);
+		if (s->type == T_NUMBER) {
 		    i = s->u.number--;
-		} else if (s->type & T_REAL) {
+		} else if (s->type == T_REAL) {
 		    i = s->u.real--;
 		} else {
 		    error("-- of non-numeric argument\n");
@@ -1893,7 +1893,7 @@ eval_instruction P1(char *, p)
 		pc += 2;
 	    break;
 	case F_BRANCH_WHEN_ZERO: /* relative offset */
-	    if (sp->type & T_NUMBER) {
+	    if (sp->type == T_NUMBER) {
 		if (!((sp--)->u.number)) {
 		    COPY_SHORT(&offset, pc);
 		    pc += offset;
@@ -1903,7 +1903,7 @@ eval_instruction P1(char *, p)
 	    pc += 2;		/* skip over the offset */
 	    break;
 	case F_BRANCH_WHEN_NON_ZERO: /* relative offset */
-	    if (sp->type & T_NUMBER) {
+	    if (sp->type == T_NUMBER) {
 		if (!((sp--)->u.number)) {
 		    pc += 2;
 		    break;
@@ -1913,7 +1913,7 @@ eval_instruction P1(char *, p)
 	    pc += offset;
 	    break;
 	case F_BBRANCH_WHEN_ZERO: /* relative backwards offset */
-	    if (sp->type & T_NUMBER) {
+	    if (sp->type == T_NUMBER) {
 		if (!((sp--)->u.number)) {
 		    COPY_SHORT(&offset, pc);
 		    pc -= offset;
@@ -1923,7 +1923,7 @@ eval_instruction P1(char *, p)
 	    pc += 2;
 	    break;
 	case F_BBRANCH_WHEN_NON_ZERO: /* relative backwards offset */
-	    if (sp->type & T_NUMBER) {
+	    if (sp->type == T_NUMBER) {
 		if (!((sp--)->u.number)) {
 		    pc += 2;
 		    break;
@@ -1934,7 +1934,7 @@ eval_instruction P1(char *, p)
 	    break;
 	case F_LOR:
 	    /* replaces F_DUP; F_BRANCH_WHEN_NON_ZERO; F_POP */
-	    if (sp->type & T_NUMBER) {
+	    if (sp->type == T_NUMBER) {
 		if (!sp->u.number) {
 		    pc += 2;
 		    sp--;
@@ -1946,7 +1946,7 @@ eval_instruction P1(char *, p)
 	    break;
 	case F_LAND:
 	    /* replaces F_DUP; F_BRANCH_WHEN_ZERO; F_POP */
-	    if (sp->type & T_NUMBER) {
+	    if (sp->type == T_NUMBER) {
 		if (!sp->u.number) {
 		    COPY_SHORT(&offset, pc);
 		    pc += offset;
@@ -1962,9 +1962,9 @@ eval_instruction P1(char *, p)
 		svalue_t *s;
 		
 		s = fp + EXTRACT_UCHAR(pc++);
-		if (s->type & T_NUMBER) {
+		if (s->type == T_NUMBER) {
 		    s->u.number++;
-		} else if (s->type & T_REAL) {
+		} else if (s->type == T_REAL) {
 		    s->u.real++;
 		} else {
 		    error("++ of non-numeric argument\n");
@@ -1989,7 +1989,7 @@ eval_instruction P1(char *, p)
 		 * If variable points to a destructed object, replace it
 		 * with 0, otherwise, fetch value of variable.
 		 */
-		if ((s->type & T_OBJECT) && (s->u.ob->flags & O_DESTRUCTED)) {
+		if ((s->type == T_OBJECT) && (s->u.ob->flags & O_DESTRUCTED)) {
 		    *++sp = const0;
 		    assign_svalue(s, &const0);
 		} else {
@@ -2005,7 +2005,7 @@ eval_instruction P1(char *, p)
 		switch (sp->type) {
 		case T_BUFFER:
 		    {
-			if (!((sp-1)->type & T_BUFFER)) {
+			if (!((sp-1)->type == T_BUFFER)) {
 			    error("Bad type argument to +. Had %s and %s.\n",
 				  type_name((sp - 1)->type), type_name(sp->type));
 			} else {
@@ -2070,7 +2070,7 @@ eval_instruction P1(char *, p)
 		    } /* end of x + T_REAL */
 		case T_ARRAY:
 		    {
-			if (!((sp-1)->type & T_ARRAY)) {
+			if (!((sp-1)->type == T_ARRAY)) {
 			    error("Bad type argument to +. Had %s and %s\n",
 				  type_name((sp - 1)->type), type_name(sp->type));
 			} else {
@@ -2082,7 +2082,7 @@ eval_instruction P1(char *, p)
 		    } /* end of x + T_ARRAY */
 		case T_MAPPING:
 		    {
-			if ((sp-1)->type & T_MAPPING) {
+			if ((sp-1)->type == T_MAPPING) {
 			    mapping_t *map;
 			
 			    map = add_mapping((sp - 1)->u.map, sp->u.map);
@@ -2142,12 +2142,12 @@ eval_instruction P1(char *, p)
 	    case T_STRING:
 		if (sp->type == T_STRING) {
 		    SVALUE_STRING_JOIN(lval, sp, "f_add_eq: 1");
-		} else if (sp->type & T_NUMBER) {
+		} else if (sp->type == T_NUMBER) {
 		    char buff[20];
 		     
 		    sprintf(buff, "%d", sp->u.number);
 		    EXTEND_SVALUE_STRING(lval, buff, "f_add_eq: 2");
-		} else if (sp->type & T_REAL) {
+		} else if (sp->type == T_REAL) {
 		    char buff[40];
 		     
 		    sprintf(buff, "%f", sp->u.real);
@@ -2157,10 +2157,10 @@ eval_instruction P1(char *, p)
 		}
 		break;
 	    case T_NUMBER:
-		if (sp->type & T_NUMBER) {
+		if (sp->type == T_NUMBER) {
 		    lval->u.number += sp->u.number;
 		    /* both sides are numbers, no freeing required */
-		} else if (sp->type & T_REAL) {
+		} else if (sp->type == T_REAL) {
 		    lval->u.number += sp->u.real;
 		    /* both sides are numbers, no freeing required */
 		} else {
@@ -2168,11 +2168,11 @@ eval_instruction P1(char *, p)
 		}
 		break;
 	    case T_REAL:
-		if (sp->type & T_NUMBER) {
+		if (sp->type == T_NUMBER) {
 		    lval->u.real += sp->u.number;
 		    /* both sides are numerics, no freeing required */
 		}
-		if (sp->type & T_REAL) {
+		if (sp->type == T_REAL) {
 		    lval->u.real += sp->u.real;
 		    /* both sides are numerics, no freeing required */
 		} else {
@@ -2501,7 +2501,7 @@ eval_instruction P1(char *, p)
 		    
 		case T_NUMBER|T_REAL:
 		    {
-			if ((sp--)->type & T_NUMBER){
+			if ((sp--)->type == T_NUMBER){
 			    if (!((sp+1)->u.number)) error("Division by zero\n");
 			    sp->u.real /= (sp+1)->u.number;
 			} else {
@@ -2787,7 +2787,7 @@ eval_instruction P1(char *, p)
 		     
 		case T_NUMBER|T_REAL:
 		    {
-			if ((--sp)->type & T_NUMBER){
+			if ((--sp)->type == T_NUMBER){
 			    sp->type = T_REAL;
 			    sp->u.real = sp->u.number * (sp+1)->u.real;
 			}
@@ -3033,7 +3033,7 @@ eval_instruction P1(char *, p)
 		    break;
 
 		case T_NUMBER | T_REAL:
-		    if (sp->type & T_REAL) sp->u.real -= (sp+1)->u.number;
+		    if (sp->type == T_REAL) sp->u.real -= (sp+1)->u.number;
 		    else {
 			sp->type = T_REAL;
 			sp->u.real = sp->u.number - (sp+1)->u.real;
@@ -4003,11 +4003,13 @@ char *dump_trace P1(int, how)
 		if (i) {
 		    debug_message(",");
 		}
-		buf = (char *) DMALLOC(50, TAG_TEMPORARY, "dump_trace:1");
+		buf = new_string(50, "dump_trace:1");
 		*buf = 0;
+		MSTR_UPDATE_SIZE(buf, 0);
 		svalue_to_string(&ptr[i], &buf, 50, 0, 0, 0);
+		/* no need to fix length */
 		debug_message("%s", buf);
-		FREE(buf);
+		FREE_MSTR(buf);
 	    }
 	    debug_message(")\n");
 	}
@@ -4022,11 +4024,13 @@ char *dump_trace P1(int, how)
 		if (i) {
 		    debug_message(",");
 		}
-		buf = (char *) DMALLOC(50, TAG_TEMPORARY, "dump_trace:2");
+		buf = new_string(50, "dump_trace:2");
 		*buf = 0;
+		MSTR_UPDATE_SIZE(buf, 0);
 		svalue_to_string(&ptr[i], &buf, 50, 0, 0, 0);
+		/* no need to fix length */
 		debug_message("%s", buf);
-		FREE(buf);
+		FREE_MSTR(buf);
 	    }	
 	    debug_message("\n");
 	}
@@ -4068,11 +4072,13 @@ char *dump_trace P1(int, how)
 	    if (i) {
 		debug_message(",");
 	    }
-	    buf = (char *) DMALLOC(50, TAG_TEMPORARY, "dump_trace:3");
+	    buf = new_string(50, "dump_trace:3");
 	    *buf = 0;
+	    MSTR_UPDATE_SIZE(buf, 0);
 	    svalue_to_string(&fp[i], &buf, 50, 0, 0, 0);
+	    /* no need to fix length */
 	    debug_message("%s", buf);
-	    FREE(buf);
+	    FREE_MSTR(buf);
 	}
 	debug_message(")\n");
     }
@@ -4087,11 +4093,13 @@ char *dump_trace P1(int, how)
 	    if (i) {
 		debug_message(",");
 	    }
-	    buf = (char *) DMALLOC(50, TAG_TEMPORARY, "dump_trace:4");
+	    buf = new_string(50, "dump_trace:4");
 	    *buf = 0;
+	    MSTR_UPDATE_SIZE(buf, 0);
 	    svalue_to_string(&ptr[i], &buf, 50, 0, 0, 0);
+	    /* no need to fix length */
 	    debug_message("%s", buf);
-	    FREE(buf);
+	    FREE_MSTR(buf);
 	}
 	debug_message("\n");
     }
@@ -4433,7 +4441,7 @@ int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_ar
 	    if (!skipme) {
 		char *match;
 
-		match = DXALLOC(i + 1, TAG_STRING, "inter_scanf");
+		match = new_string(i, "inter_scanf");
 		(void) strncpy(match, in_string, i);
 		match[i] = '\0';
 		SSCANF_ASSIGN_SVALUE_STRING(match);
@@ -4452,7 +4460,7 @@ int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_ar
 		 * Found a match !
 		 */
 		if (!skipme) {
-		    match = DXALLOC(i + 1, TAG_STRING, "inter_scanf");
+		    match = new_string(i, "inter_scanf");
 		    (void) strncpy(match, in_string, i);
 		    match[i] = '\0';
 		    SSCANF_ASSIGN_SVALUE_STRING(match);

@@ -40,7 +40,10 @@ INSTALL_DIR="../bin"
 # Compile in debug() macro code
 #DEBUG_MACRO="-DDEBUG_MACRO"
  
-# define this if you want (compiler) optimization enabled.
+# define this if you want to specify (compiler) optimization.
+# 
+# if nothing is defined here, and DEBUG is not defined, something appropriate
+# to the compiler in question is used.
 #
 # *WARNING* using high levels of optimization (e.g. -O3) can cause some
 # compilers to produce incorrect code.  If the driver is behaving
@@ -66,7 +69,7 @@ INSTALL_DIR="../bin"
 # DEC Ultrix's cc's highest optimization:
 #OPTIMIZE=-O2 -Olimit 5000
 # high optimization for cc on SGI
-#OPTIMIZE=-O2 -Olimit 2500
+#OPTIMIZE="-O2 -Olimit 2500"
  
 # System V Release 4 (386/486 or if using Sun's cc under Solaris 2.x)
 # ARCH: need a way to detect this
@@ -141,6 +144,7 @@ else
         CC=gcc
         if test "${DEBUG-x}" = "x"; then
             OPTIMIZE=${OPTIMIZE-"-O2 -fomit-frame-pointer -fstrength-reduce"}
+	    GNUC=1
         fi
     else
         clcc comptest.c
@@ -155,12 +159,32 @@ else
                 CC=cc
                 if test "${DEBUG-x}" = "x"; then
                     OPTIMIZE=${OPTIMIZE-"-O"}
+		    cat >comptest.c <<END
+#ifndef __GNUC__
+Oh darn it's not gcc
+#endif
+END
+		    cc comptest.c
+		    if test $? -eq 0; then
+			OPTIMIZE=${OPTIMIZE-"-O2 -fomit-frame-pointer -fstrength-reduce"}
+			GNUC=1
+		    fi
                 fi
             else
                 echo "FATAL ERROR: Cannot find a C compiler"
                 exit
             fi
         fi
+    fi
+fi
+
+#
+# are we using gcc on a 486?
+#
+if test $GNUC; then
+    tmp=`uname -a | grep i486`
+    if test "x$tmp" != "x"; then
+        OPTIMIZE="$OPTIMIZE -m486"
     fi
 fi
 
@@ -258,25 +282,29 @@ esac
 #
 # check for some missing functions
 #
+rm a.out
 cat >comptest.c <<END
 int main() {
 strchr(0,0); strrchr(0,0);
 }
 END
 $CC $CFLAGS comptest.c
-if test $? -ne 0; then
+if test ! -f a.out; then
     STR="-Dstrchr=index -Dstrrchr=rindex"
 fi
 
+rm a.out
 cat >comptest.c <<END
 int main() {
 memcpy(0,0,0);memset(0,0,0);strtol(0,0,0);strcspn(0,0);
 }
 END
 $CC $CFLAGS comptest.c
-if test $? -ne 0; then
+if test ! -f a.out; then
     STRFUNCS=strfuncs.o
 fi
+
+mkdir $OBJDIR
 
 echo SHELL=/bin/sh >>Makefile.tmp
 echo OBJDIR=$OBJDIR >>Makefile.tmp

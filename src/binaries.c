@@ -17,6 +17,8 @@
 #include "backend.h"
 #include "swap.h"
 #include "qsort.h"
+#include "compile_file.h"
+#include "hash.h"
 
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
 #include "functab_tree.h"
@@ -152,7 +154,12 @@ void save_binary P3(program_t *, prog, mem_block_t *, includes, mem_block_t *, p
     strcat(file_name, "/");
     strcat(file_name, prog->name);
     len = strlen(file_name);
-    file_name[len - 1] = 'b';	/* change .c ending to .b */
+#ifdef LPC_TO_C
+    if (compile_to_c)
+	file_name[len - 1] = 'B';	/* change .c ending to .B */
+    else
+#endif
+	file_name[len - 1] = 'b';	/* change .c ending to .b */
 
     if (!(f = crdir_fopen(file_name)))
 	return;
@@ -200,7 +207,7 @@ void save_binary P3(program_t *, prog, mem_block_t *, includes, mem_block_t *, p
      * write out prog.  The prog structure is mostly setup, but strings will
      * have to be stored specially.
      */
-    len = strlen(p->name);
+    len = SHARED_STRLEN(p->name);
     fwrite((char *) &len, sizeof len, 1, f);
     fwrite(p->name, sizeof(char), len, f);
 
@@ -211,14 +218,14 @@ void save_binary P3(program_t *, prog, mem_block_t *, includes, mem_block_t *, p
 
     /* inherit names */
     for (i = 0; i < (int) p->num_inherited; i++) {
-	len = strlen(p->inherit[i].prog->name);
+	len = SHARED_STRLEN(p->inherit[i].prog->name);
 	fwrite((char *) &len, sizeof len, 1, f);
 	fwrite(p->inherit[i].prog->name, sizeof(char), len, f);
     }
 
     /* string table */
     for (i = 0; i < (int) p->num_strings; i++) {
-	tmp = strlen(p->strings[i]);
+	tmp = SHARED_STRLEN(p->strings[i]);
 	if (tmp > (int) MAXSHORT) {	/* possible? */
 	    fclose(f);
 	    unlink(file_name);
@@ -232,14 +239,14 @@ void save_binary P3(program_t *, prog, mem_block_t *, includes, mem_block_t *, p
 
     /* var names */
     for (i = 0; i < (int) p->num_variables; i++) {
-	len = strlen(p->variable_names[i].name);
+	len = SHARED_STRLEN(p->variable_names[i].name);
 	fwrite((char *) &len, sizeof len, 1, f);
 	fwrite(p->variable_names[i].name, sizeof(char), len, f);
     }
 
     /* function names */
     for (i = 0; i < (int) p->num_functions; i++) {
-	len = strlen(p->functions[i].name);
+	len = SHARED_STRLEN(p->functions[i].name);
 	fwrite((char *) &len, sizeof len, 1, f);
 	fwrite(p->functions[i].name, sizeof(char), len, f);
     }
@@ -265,6 +272,9 @@ void save_binary P3(program_t *, prog, mem_block_t *, includes, mem_block_t *, p
 #define ALLOC_BUF(size) \
     if ((size) > buf_size) { FREE(buf); buf = DXALLOC(buf_size = size, TAG_TEMPORARY, "ALLOC_BUF"); }
 
+/* crude hack to check both .B and .b */
+#define OUT_OF_DATE (lpc_obj ? load_binary(name, 0) : 0)
+
 int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
 {
     char file_name_buf[400];
@@ -277,12 +287,6 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
     object_t *ob;
     struct stat st;
 
-#ifdef LPC_TO_C
-    void (**jump_table) (svalue_t *);
-    int err;
-    char *code;
-#endif
-
     /* stuff from prolog() */
     prog = 0;
     num_parse_error = 0;
@@ -291,7 +295,7 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
     if (file_name[0] == '/')
 	file_name++;
     len = strlen(file_name);
-    file_name[len - 1] = 'b';	/* change .c ending to .b */
+    file_name[len - 1] = (lpc_obj ? 'B' : 'b');	/* change .c ending to .b */
 
 #ifdef OS2
     /* Put /'s in all the right places.... */
@@ -308,15 +312,15 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
 
     if (stat(file_name, &st) != -1)
 	mtime = st.st_mtime;
-    else
-	return 0;
+    else 
+	return OUT_OF_DATE;
 
 #ifdef OS2
     if (!(f = fopen(file_name, "rb")))
-	return 0;
+	return OUT_OF_DATE;
 #else
     if (!(f = fopen(file_name, "r")))
-	return 0;
+	return OUT_OF_DATE;
 #endif
 
     if (comp_flag) {
@@ -330,7 +334,7 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
 	if (comp_flag)
 	    fprintf(stderr, "out of date (source file newer).\n");
 	fclose(f);
-	return 0;
+	return OUT_OF_DATE;
     }
     buf = DXALLOC(buf_size = SMALL_STRING_SIZE, TAG_TEMPORARY, "ALLOC_BUF");
 
@@ -344,7 +348,7 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
 	    fprintf(stderr, "out of date. (bad magic number)\n");
 	fclose(f);
 	FREE(buf);
-	return 0;
+	return OUT_OF_DATE;
     }
     if ((fread((char *) &i, sizeof i, 1, f) != 1 || driver_id != i)
 	&& (!lpc_obj)) {
@@ -352,14 +356,14 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
 	    fprintf(stderr, "out of date. (driver changed)\n");
 	fclose(f);
 	FREE(buf);
-	return 0;
+	return OUT_OF_DATE;
     }
     if (fread((char *) &i, sizeof i, 1, f) != 1 || config_id != i) {
 	if (comp_flag)
 	    fprintf(stderr, "out of date. (config file changed)\n");
 	fclose(f);
 	FREE(buf);
-	return 0;
+	return OUT_OF_DATE;
     }
     /*
      * read list of includes and check times
@@ -373,7 +377,7 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
 		fprintf(stderr, "out of date (include file newer).\n");
 	    fclose(f);
 	    FREE(buf);
-	    return 0;
+	    return OUT_OF_DATE;
 	}
     }
 
@@ -387,7 +391,7 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
 	    fprintf(stderr, "binary name inconsistent with file.\n");
 	fclose(f);
 	FREE(buf);
-	return 0;
+	return OUT_OF_DATE;
     }
     /*
      * Read program structure.
@@ -423,7 +427,7 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
 	    free_string(p->name);
 	    FREE(p);
 	    FREE(buf);
-	    return 0;
+	    return OUT_OF_DATE;
 	}
 	/* find inherited program (maybe load it here?) */
 	ob = find_object2(buf);
@@ -510,14 +514,14 @@ int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
 
 #ifdef LPC_TO_C
     if (prog->program_size == 0) {
-	if (comp_flag)
-	    fprintf(stderr, "linking jump table ...\n");
 	if (lpc_obj) {
-	    link_jump_table(prog, lpc_obj->jump_table);
+	    if (comp_flag)
+		fprintf(stderr, "linking jump table ...\n");
+	    link_jump_table(prog, (void **)lpc_obj->jump_table);
 	} else {
 	    if (prog)
 		free_prog(prog, 1);
-	    return 0;
+	    return OUT_OF_DATE;
 	}
     }
 #endif
@@ -568,7 +572,8 @@ static int check_times P2(time_t, mtime, char *, nm)
 #ifdef OS2
     char *tmp, *c;
 
-    tmp = string_copy(nm, "check_times");
+    /* um ... doesn't this leak horridly? */
+    tmp = alloc_cstring(nm, "check_times");
     while ((c = strchr(tmp, '/')))
 	*c = '\\';
     if (stat(tmp, &st) == -1)
@@ -603,7 +608,7 @@ FILE *crdir_fopen P1(char *, file_name)
     char *newy;
 
     /* Take a copy as it could be a shared string */
-    newy = string_copy(file_name, "crdir_fopen");
+    newy = alloc_cstring(file_name, "crdir_fopen");
 #endif
 
     /*

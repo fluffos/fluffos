@@ -1,6 +1,4 @@
-#define _FUNC_SPEC_
-#define EDIT_SOURCE
-#include "std.h"
+#include "spec.h"
 
 #include "op_spec.c"
 /*
@@ -24,13 +22,14 @@
 
 object clone_object(string, ...);
 unknown call_other(object | string | object *, string | mixed *,...);
-unknown evaluate(mixed, ...);
-unknown apply(mixed, mixed *);
+mixed evaluate(mixed, ...);
+mixed apply(mixed, mixed *);
 function bind(function, object);
 object present(object | string, void | object);
 object this_object();
 object this_player(int default: F_CONST0);
 object this_interactive this_player( int default: F_CONST1 );
+object this_user this_player( int default: F_CONST0 );
 void move_object(object | string);
 mixed previous_object(int default: F_CONST0);
 object *all_previous_objects previous_object(int default: F_NBYTE 1);

@@ -49,7 +49,7 @@ release_tree() {
     
     free_tree();
     next_block = free_block_list;
-    while (cur_block = next_block) {
+    while ((cur_block = next_block)) {
 	next_block = cur_block->next;
 	FREE(cur_block);
     }
@@ -69,7 +69,7 @@ new_node() {
     }
 
     /* no more nodes in the current block; do we have a free one? */
-    if (cur_block = free_block_list) {
+    if ((cur_block = free_block_list)) {
 	free_block_list = cur_block->next;
     } else {
 	cur_block = ALLOCATE(parse_node_block_t, TAG_COMPILER, "new_node");
@@ -98,7 +98,7 @@ new_node_no_line() {
       return next_node++;
     }    
     /* no more nodes in the current block; do we have a free one? */
-    if (cur_block = free_block_list) {
+    if ((cur_block = free_block_list)) {
       free_block_list = cur_block->next;
     } else {
 	cur_block = ALLOCATE(parse_node_block_t, TAG_COMPILER, "new_node");

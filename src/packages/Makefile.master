@@ -1,13 +1,13 @@
-%pragma insert_packages
+%include "packages/packages"
 
 %ifdef GNU
 OBJ=$(addprefix $(OBJDIR)/,$(subst .c,.o,$(SRC)))
 
-$(OBJDIR)/%.o: %.c $(OBJDIR)
-	$(CC) -I$(OBJDIR) $(CFLAGS) -o $@ -c $<
+$(OBJDIR)/%.o: %.c
+	$(CC) -I$(OBJDIR) -I.. $(CFLAGS) -o $@ -c $<
 %else
 .c.o:
-	$(CC) $(CFLAGS) -c $*.c
+	$(CC) $(CFLAGS) -I.. -c $*.c
 %endif
 
 all: $(OBJ)

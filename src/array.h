@@ -28,8 +28,8 @@ void free_empty_array PROT((array_t *));
 array_t *add_array PROT((array_t *, array_t *));
 array_t *subtract_array PROT((array_t *, array_t *));
 array_t *slice_array PROT((array_t *, int, int));
-array_t *explode_string PROT((char *, char *));
-char *implode_string PROT((array_t *, char *));
+array_t *explode_string PROT((char *, int, char *, int));
+char *implode_string PROT((array_t *, char *, int));
 array_t *users PROT((void));
 array_t *commands PROT((object_t *));
 void filter_array PROT((svalue_t *, int));
@@ -50,6 +50,7 @@ void map_array PROT((svalue_t *arg, int num_arg));
 array_t *intersect_array PROT((array_t *, array_t *));
 array_t *match_regexp PROT((array_t *, char *, int));
 array_t *reg_assoc PROT((char *, array_t *, array_t *, svalue_t *));
+void dealloc_array PROT((array_t *));
 
 #define ALLOC_ARRAY(nelem) \
     (array_t *)DXALLOC(sizeof (array_t) + \

@@ -72,7 +72,7 @@ generate_expr_list P1(parse_node_t *, expr) {
     if (!expr) return;
     do {
       c_generate_node(expr->v.expr);
-    } while (expr = expr->r.expr);
+    } while ((expr = expr->r.expr));
 }
 
 static void upd_jump P2(int, addr, int, label) {
@@ -152,7 +152,7 @@ static int ins_jump() {
 
 static void
 generate_lvalue_list P1(parse_node_t *, expr) {
-    while (expr = expr->r.expr) {
+    while ((expr = expr->r.expr)) {
       c_generate_node(expr->l.expr);
       ins_string("c_void_assign();\n");
     }
@@ -313,7 +313,7 @@ c_generate_node P1(parse_node_t *, expr) {
 	if (expr->l.expr->kind == F_LOCAL_LVALUE) {
 	    c_generate_node(expr->r.expr);
 	    ins_vstring("c_void_assign_local(fp + %i);\n", 
-		       expr->l.expr->v.number);
+			expr->l.expr->v.number);
 	    break;
 	}
     case F_ASSIGN: /* note these are backwards */
@@ -369,9 +369,9 @@ c_generate_node P1(parse_node_t *, expr) {
         break;
     case F_STRING:
 	if (pragmas & PRAGMA_EFUN) {
-	    ins_string("push_constant_string(\"");
+	    ins_string("push_string(\"");
 	    ins_quoted_string(PROG_STRING(expr->v.number));
-	    ins_string("\");\n");
+	    ins_string("\", STRING_CONSTANT);\n");
 	} else 
 	    ins_vstring("C_STRING(%i);\n", expr->v.number);
 	break;
@@ -560,7 +560,6 @@ c_generate_node P1(parse_node_t *, expr) {
     case NODE_SWITCH_RANGES:
     case NODE_SWITCH_DIRECT:
 	{
-	    int addr;
 	    parse_node_t *pn;
 	    int save_switch_type = switch_type;
 	    int save_case_number = case_number;
@@ -581,13 +580,13 @@ c_generate_node P1(parse_node_t *, expr) {
 		break;
 	    case NODE_SWITCH_DIRECT:
 	    case NODE_SWITCH_NUMBERS:
-		ins_string("i = (sp--)->u.number;\n");
+		ins_string("lpc_int = (sp--)->u.number;\n");
 		break;
 	    case NODE_SWITCH_RANGES:
-		ins_vstring("i = c_range_switch_lookup((sp--)->u.number, %i);\n", range_switches++);
+		ins_vstring("lpc_int = c_range_switch_lookup((sp--)->u.number, %i);\n", range_switches++);
 		break;
 	    }
-	    ins_string("switch (i) {\n");
+	    ins_string("switch (lpc_int) {\n");
 	    c_generate_node(expr->r.expr);
 	    notreached = 0;
 	    ins_string("}\n");
@@ -616,7 +615,7 @@ c_generate_node P1(parse_node_t *, expr) {
 	    int addr1, addr2;
 	    
 	    c_generate_node(expr->l.expr);
-	    ins_string("C_CHECK_TRUE();\nif (!i) ");
+	    ins_string("C_CHECK_TRUE();\nif (!lpc_int) ");
 	    addr1 = ins_jump();
 	    notreached = 0;
 
@@ -631,9 +630,7 @@ c_generate_node P1(parse_node_t *, expr) {
 	break;
     case F_CATCH:
 	{
-	    int addr;
-
-	    ins_string("if (c_catch()) {\n");
+	    ins_string("c_prepare_catch();\nif (SETJMP(error_recover_context)) {\nc_caught_error();\n} else {\n");
 	    c_generate_node(expr->r.expr);
 	    ins_string("c_end_catch();\n}\n");
 	    break;
@@ -658,11 +655,11 @@ c_generate_node P1(parse_node_t *, expr) {
 	break;
     case F_TO_FLOAT:
 	generate_expr_list(expr->r.expr);
-	ins_string("CHECK_TYPES(sp, T_STRING | T_FLOAT | T_NUMBER, 1, F_TO_FLOAT);\nf_to_float();\n");
+	ins_string("CHECK_TYPES(sp, T_STRING | T_REAL | T_NUMBER, 1, F_TO_FLOAT);\nf_to_float();\n");
 	break;
     case F_TO_INT:
 	generate_expr_list(expr->r.expr);
-	ins_string("CHECK_TYPES(sp, T_STRING | T_FLOAT | T_NUMBER | T_BUFFER, 1, F_TO_INT);\nf_to_int();\n");
+	ins_string("CHECK_TYPES(sp, T_STRING | T_REAL | T_NUMBER | T_BUFFER, 1, F_TO_INT);\nf_to_int();\n");
 	break;
     case F_GLOBAL_LVALUE:
 	if (pragmas & PRAGMA_EFUN)
@@ -765,8 +762,6 @@ c_generate_node P1(parse_node_t *, expr) {
 	break;
     case NODE_ANON_FUNC:
 	{
-	    int addr;
-	    
 /*	    ins_f_byte(F_FUNCTION_CONSTRUCTOR);
 	    ins_byte(FP_ANONYMOUS);
 	    ins_byte(expr->v.number);
@@ -910,7 +905,12 @@ c_branch_backwards P2(char, b, int, addr) {
 	ins_vstring("goto label%03i;\n", addr);
 	notreached = 1;
 	break;
-    } 
+    case F_BBRANCH_LT:
+	ins_vstring("C_BBRANCH_LT(goto label%03i);\n", addr);
+	break;
+    case F_WHILE_DEC:
+	ins_vstring("goto label%03i;\n", addr);
+    }
 }
 
 static void
@@ -976,6 +976,7 @@ c_initialize_parser() {
     notreached = 0;
 }
 
+#if 0
 static char *protect_allocated_string = 0;
 
 static char *
@@ -1012,6 +1013,7 @@ protect P1(char *, str) {
 	return protect_allocated_string;
     }	
 }
+#endif
 
 void
 c_generate_final_program P1(int, x) {
@@ -1042,7 +1044,7 @@ c_generate_final_program P1(int, x) {
 		}
 		st = st->next;
 	    }
-	    fprintf(f_out, "static string_switch_entry_t *string_switch_tables_%s[] = {\n", compilation_ident);
+	    fprintf(f_out, "static string_switch_entry_t *string_switch_tables[] = {\n");
 	    for (i = 0; i < index; i++)
 		fprintf(f_out, "string_switch_table_%s_%02i,\n", compilation_ident, i);
 	    fprintf(f_out, "0\n};\n\n");
@@ -1082,13 +1084,34 @@ c_generate_final_program P1(int, x) {
 	current_block = A_PROGRAM;
 	prog_code = mem_block[A_PROGRAM].block;
 
-	fprintf(f_out, "\n\nvoid (*LPCFUNCS_%s[])() = {\n", compilation_ident);
+	fprintf(f_out, "\n\nstatic void (*functions[])() = {\n");
 	for (i = 0; i < mem_block[A_FUNCTIONS].current_size; i += sizeof *funp) {
 	    funp = (function_t *)(mem_block[A_FUNCTIONS].block + i);
-	    if (!(funp->flags & NAME_NO_CODE))
-		fprintf(f_out, "LPC_%s__%s,\n", compilation_ident, funp->name);
+	    if (!(funp->flags & NAME_NO_CODE)) {
+		if (funp->name[0] == APPLY___INIT_SPECIAL_CHAR)
+		    fprintf(f_out, "LPCINIT_%s,\n", compilation_ident);
+		else
+		    fprintf(f_out, "LPC_%s__%s,\n", compilation_ident,
+			    funp->name);
+	    }
 	}
 	fprintf(f_out, "0\n};\n");
+	{
+	    char buf[1024];
+	    int l;
+
+	    strcpy(buf, current_file);
+	    l = strlen(current_file);
+	    if (buf[l-1] == 'c' && buf[l-2] == '.')
+		buf[l-2] = 0;
+	    fprintf(f_out, "\ninterface_t LPCINFO_%s = {\n    \"%s\",\n", 
+		    compilation_ident, buf);
+	}
+	fprintf(f_out, "    functions,\n");
+	if (string_switches)
+	    fprintf(f_out, "    string_switch_tables\n};\n");
+	else
+	    fprintf(f_out, "    0\n};\n");
     }
 }
 #endif

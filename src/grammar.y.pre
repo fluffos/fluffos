@@ -210,7 +210,7 @@ inheritance:
 
 		ob = find_object2($3);
 		if (ob == 0) {
-		    inherit_file = string_copy($3, "inherit");
+		    inherit_file = alloc_cstring($3, "inherit");
 		    /* Return back to load_object() */
 		    YYACCEPT;
 		}
@@ -292,7 +292,23 @@ identifier:
      ;
 
 def:
-	type optional_star identifier '(' argument ')'
+	type optional_star identifier 
+            {
+		/* Handle type checking here so we know whether to typecheck
+		   'argument' */
+		if ($1 & TYPE_MOD_MASK) {
+		    exact_types = $1 | $2;
+		} else {
+		    if (pragmas & PRAGMA_STRICT_TYPES) {
+			if (strcmp($3, "create") != 0)
+			    yyerror("\"#pragma strict_types\" requires type of function");
+			else
+			    exact_types = TYPE_VOID; /* default for create() */
+		    } else
+			exact_types = 0;
+		}
+	    }
+        '(' argument ')'
 	    {
 		char *p = $3;
 		$3 = make_shared_string($3);
@@ -301,50 +317,37 @@ def:
 		/* If we had nested functions, we would need to check */
 		/* here if we have enough space for locals */
 
-		if ($1 & TYPE_MOD_MASK) {
-		    exact_types = $1 | $2;
-		} else {
-		/* force strict types - no more compat mode */
-
-		    if (pragmas & PRAGMA_STRICT_TYPES) {
-			if (strcmp($3, "create") != 0)
-			    yyerror("\"#pragma strict_types\" requires type of function");
-			else
-			    exact_types = TYPE_VOID;
-		    }
-		}
-
 		/*
 		 * Define a prototype. If it is a real function, then the
 		 * prototype will be replaced below.
 		 */
-		define_new_function($3, $5.num_arg, 0,
+		define_new_function($3, $6.num_arg, 0,
 				    NAME_UNDEFINED|NAME_PROTOTYPE, $1 | $2);
 	    }
 	block_or_semi
 	    {
 		/* Either a prototype or a block */
-		if ($8) {
+		if ($9) {
 		    int fun;
 
-		    if (!($8->kind == F_RETURN) &&
-			!(($8->kind == NODE_STATEMENTS) 
-			  && $8->r.expr->kind == F_RETURN)) {
+		    if (!($9->kind == F_RETURN) &&
+			!(($9->kind == NODE_STATEMENTS) 
+			  && $9->r.expr->kind == F_RETURN)) {
 			parse_node_t *replacement;
 			parse_node_t *sub_node;
 			NODE_NO_LINE(sub_node, F_RETURN_ZERO);
 			NODE_NO_LINE(replacement, NODE_STATEMENTS);
-			replacement->l.expr = $8;
+			replacement->l.expr = $9;
 			replacement->r.expr = sub_node;
-			$8 = replacement;
+			$9 = replacement;
 		    }
-		    if ($5.is_proto) {
+		    if ($6.is_proto) {
 			yyerror("Missing name for function argument");
 		    }
-		    fun = define_new_function($3, $5.num_arg, 
-					      max_num_locals - $5.num_arg,
+		    fun = define_new_function($3, $6.num_arg, 
+					      max_num_locals - $6.num_arg,
 					      0, $1 | $2);
-		    FUNCTION(fun)->offset = generate_function(FUNCTION(fun), $8);
+		    FUNCTION(fun)->offset = generate_function(FUNCTION(fun), $9);
 		}
 		free_all_local_names();
 		free_string($3);
@@ -1316,7 +1319,7 @@ get_two_types(t1, t3));
 		    if ($3->type != TYPE_STRING && $3->type != TYPE_ANY)
 			$$ = make_branched_node(F_ADD, result_type, $3, $1);
 		    else
-			$$ = make_branched_node(F_ADD, result_type, $3, $1);
+			$$ = make_branched_node(F_ADD, result_type, $1, $3);
 		    break;
 		case F_REAL:
 		    if ($3->kind == F_NUMBER) {
@@ -1333,7 +1336,7 @@ get_two_types(t1, t3));
 		    if ($3->type != TYPE_STRING && $3->type != TYPE_ANY)
 			$$ = make_branched_node(F_ADD, result_type, $3, $1);
 		    else
-			$$ = make_branched_node(F_ADD, result_type, $3, $1);
+			$$ = make_branched_node(F_ADD, result_type, $1, $3);
 		    break;
 		case F_STRING:
 		    if ($3->kind == F_STRING) {
@@ -2138,7 +2141,6 @@ expr4:
 	    }
     |   expr4 L_ARROW identifier
             {
-		ident_hash_elem_t *ihe;
 		class_def_t *cd;
 		class_member_entry_t *cme;
 		int i;
@@ -2781,13 +2783,13 @@ function_name:
 		int z, l = strlen($3) + 1;
 		char *p;
 		/* <type> and "name" -> ":type::name" */
-		z = strlen(type_names[$1]) + 3; /* length of :type:: */
+		z = strlen(compiler_type_names[$1]) + 3; /* length of :type:: */
 		$$ = scratch_realloc($3, l + z);
 		p = $$ + l;
 		while (p--,l--)
 		    *(p+z) = *p;
 		$$[0] = ':';
-		strncpy($$ + 1, type_names[$1], z - 3);
+		strncpy($$ + 1, compiler_type_names[$1], z - 3);
 		$$[z-2] = ':';
 		$$[z-1] = ':';
 	    }

@@ -170,7 +170,7 @@ void call_out()
 	 */
 	if (call_list && cop->delta < 0)
 	    call_list->delta += cop->delta;
-	if (cop->ob && cop->ob->flags & O_DESTRUCTED) {
+	if (cop->ob && (cop->ob->flags & O_DESTRUCTED)) {
 	    free_call(cop);
 	} else {
 	    if (SETJMP(error_recovery_context)) {
@@ -374,7 +374,8 @@ remove_all_call_out P1(object_t *, obj)
 
     copp = &call_list;
     while (*copp) {
-	if (((*copp)->ob == obj) || ((*copp)->ob->flags & O_DESTRUCTED)) {
+	if ((*copp)->ob &&
+	    (((*copp)->ob == obj) || ((*copp)->ob->flags & O_DESTRUCTED))) {
 	    cop = *copp;
 	    if (cop->next)
 		cop->next->delta += cop->delta;

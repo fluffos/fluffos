@@ -124,8 +124,6 @@ static object_t *current_editor;        /* the object responsible */
 #else
 #define P_NET_DEAD      0 /* objects are never net dead :) */
 #endif
-#define P_DIAG		(ED_BUFFER->diag)
-#define P_TRUNCFLG	(ED_BUFFER->truncflg)
 #define P_NONASCII	(ED_BUFFER->nonascii)
 #define P_NULLCHAR	(ED_BUFFER->nullchar)
 #define P_TRUNCATED	(ED_BUFFER->truncated)
@@ -159,8 +157,10 @@ static object_t *current_editor;        /* the object responsible */
 #define P_EXCOMPAT	( P_FLAGS & EXCOMPAT_MASK )
 #define DPRINT_MASK     0x0400
 #define P_DPRINT        ( P_FLAGS & DPRINT_MASK )
+#define VERBOSE_MASK    0x0800
+#define P_VERBOSE       ( P_FLAGS & VERBOSE_MASK )
 #define SHIFTWIDTH_MASK	0x000f
-#define ALL_FLAGS_MASK	0x07f0
+#define ALL_FLAGS_MASK	0x0ff0
 #define P_APPENDING	(ED_BUFFER->appending)
 #define P_MORE		(ED_BUFFER->moring)
 #define P_LEADBLANKS	(ED_BUFFER->leading_blanks)
@@ -190,6 +190,8 @@ static struct tbl {
     { "noexcompatible",       ~EXCOMPAT_MASK,         FALSE           },
     { "dprint",               ~FALSE,                 DPRINT_MASK     },
     { "nodprint",             ~DPRINT_MASK,           FALSE           },
+    { "verbose",              ~FALSE,                 VERBOSE_MASK    },
+    { "noverbose",            ~VERBOSE_MASK,          FALSE           },
 };
 
 
@@ -600,7 +602,7 @@ static int doread P2(int, lin, char *, fname)
     err = 0;
     P_NONASCII = P_NULLCHAR = P_TRUNCATED = 0;
 
-    if (P_DIAG)
+    if (P_VERBOSE)
 	ED_OUTPUTV("\"%s\" ", fname);
     if ((fp = fopen(fname, "r")) == NULL) {
 	ED_OUTPUT(" isn't readable.\n");
@@ -618,7 +620,7 @@ static int doread P2(int, lin, char *, fname)
     fclose(fp);
     if (err < 0)
 	return (err);
-    if (P_DIAG) {
+    if (P_VERBOSE) {
 	ED_OUTPUTV("%u lines %u bytes", lines, bytes);
 	if (P_NONASCII)
 	    ED_OUTPUTV(" [%d non-ascii]", P_NONASCII);
@@ -1752,7 +1754,7 @@ static int docmd P1(int, glob)
 	if (P_NLINES == 2) {
 	    if (P_LINE1 > P_LINE2 || P_LINE1 <= 0)
 		return BAD_LINE_RANGE;
-	    if (st = doprnt(P_LINE1, P_LINE2))
+	    if ((st = doprnt(P_LINE1, P_LINE2)))
 		return st;
 	    return 0;
 	}
@@ -1920,7 +1922,6 @@ static int docmd P1(int, glob)
 	    P_FLAGS &= ~NFLG_MASK;
 	else
 	    P_FLAGS |= NFLG_MASK;
-	P_DIAG = !P_DIAG;
 	ED_OUTPUTV("number %s, list %s\n",
 		    P_NFLG ? "on" : "off", P_LFLG ? "on" : "off");
 	break;
@@ -2169,12 +2170,12 @@ void ed_start P5(char *, file_arg, char *, write_fn, char *, exit_fn, int, restr
 
     current_editor = command_giver;
 
-    ED_BUFFER->truncflg = 1;
     ED_BUFFER->flags |= EIGHTBIT_MASK;
     ED_BUFFER->shiftwidth = 4;
     push_object(current_editor);
     setup = apply_master_ob(APPLY_RETRIEVE_ED_SETUP, 1);
-    if (setup && setup != (svalue_t *)-1 && setup->type == T_NUMBER && setup->u.number) {
+    if (setup && setup != (svalue_t *)-1 && 
+	setup->type == T_NUMBER && setup->u.number) {
 	ED_BUFFER->flags = setup->u.number & ALL_FLAGS_MASK;
 	ED_BUFFER->shiftwidth = setup->u.number & SHIFTWIDTH_MASK;
     }
@@ -2191,13 +2192,13 @@ void ed_start P5(char *, file_arg, char *, write_fn, char *, exit_fn, int, restr
 	P_RESTRICT = 1;
     }
     if (write_fn) {
-        ED_BUFFER->write_fn = string_copy(exit_fn, "ed_start");
+        ED_BUFFER->write_fn = alloc_cstring(exit_fn, "ed_start");
         exit_ob->ref++;
     } else {
         ED_BUFFER->write_fn = 0;
     }
     if (exit_fn) {
-	ED_BUFFER->exit_fn = string_copy(exit_fn, "ed_start");
+	ED_BUFFER->exit_fn = alloc_cstring(exit_fn, "ed_start");
 	exit_ob->ref++;
     } else {
 	ED_BUFFER->exit_fn = 0;
@@ -2632,19 +2633,17 @@ void object_ed_outputv PVARGS(va_alist)
     l = strlen(buf);
 
     if (current_results) {
-	if (size + l + 1 > max_size) {
+	if (size + l > max_size) {
 	    /* assume it's going to grow some more */
 	    max_size = size + l + 1024;
-	    current_results = (char *)DREALLOC(current_results, max_size,
-					       TAG_STRING, "ed_results");
-	    
+	    current_results = extend_string(current_results, max_size);
 	}
     } else {
-	max_size = l + 1;
-	current_results = (char *)DXALLOC(max_size, TAG_STRING, "ed_results");
+	max_size = l;
+	current_results = new_string(max_size, "ed_results");
 	size = 0;
     }
-			      
+
     strcpy(current_results + size, buf);
     size += l;
 }
@@ -2656,16 +2655,14 @@ void object_ed_output P1(char *, str)
     l = strlen(str);
 
     if (current_results) {
-	if (size + l + 1 > max_size) {
+	if (size + l > max_size) {
 	    /* assume it's going to grow some more */
 	    max_size = size + l + 1024;
-	    current_results = (char *)DREALLOC(current_results, max_size,
-					       TAG_STRING, "ed_results");
-	    
+	    current_results = extend_string(current_results, max_size);	    
 	}
     } else {
-	max_size = l + 1;
-	current_results = (char *)DXALLOC(max_size, TAG_STRING, "ed_results");
+	max_size = l;
+	current_results = new_string(max_size, "ed_results");
 	size = 0;
     }
 			      
@@ -2677,8 +2674,8 @@ static char *object_ed_results() {
     char *ret;
     
     ret = current_results;
-    if (max_size > size + 1)
-	ret = (char *)DREALLOC(ret, size+1, TAG_STRING, "ed_results");
+    if (max_size > size)
+	ret = extend_string(ret, size); /* yes, it handles contraction too */
     current_results = 0;
     size = 0;
     max_size = 0;
@@ -2730,7 +2727,6 @@ char *object_ed_start P3(object_t *, ob, char *, fname, int, restricted) {
     regexp_user = ED_REGEXP;
     current_ed_buffer = add_ed_buffer(ob);
 
-    ED_BUFFER->truncflg = 1;
     ED_BUFFER->flags |= EIGHTBIT_MASK;
     ED_BUFFER->shiftwidth = 4;
 

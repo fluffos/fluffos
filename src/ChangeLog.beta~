@@ -1,10 +1,52 @@
+Mon May 15 02:58:25 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.3b6
+
+Mon May 15 02:46:10 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.3b5
+	* fixed a bug in code generation for addition; would produce incorrect
+	  code when LHS was a number or real and RHS was type string or mixed
+
+Sat Apr 29 23:59:18 CDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.3b4
+	* fixed a badly indented line in the GNUmakefile
+	* fixed some OBJDIR rules to not cause recompilation of alot of
+	  things when using GNU make
+	* fixed generation of package Makefiles
+
+Sat Apr 29 23:59:18 CDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.3b3
+	* fixed some compilation problems with LPC->C off
+	* put in a better fix for the function pointer to void valued efun
+	  problem; a debug check was erroneously misfiring on the old
+	  version
+
+Sat Apr 29 20:58:34 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.3b2
+	* changed some #ifdef 0's to #if 0's
+	* added a check to use -m486 when compiling using gcc on a 486
+	* fixed a crasher in self-destructing objects with call_outs
+	* fixed a crasher with calling reload_object() when call_outs to
+	  function pointers existed
+	* fixed TELOPT_NAWS to properly handle zero bytes; caused the
+	  reported screen size to be in the 17000 range
+	* fixed a typo in the missing type for argument fix in v21.3a7
+	* fixed a macro that xlc complained about in lex.c
+	* fixed a crasher in calling reload_object() on a swapped object
+	* fixed a crasher in reclaim_objects() with function pointers with
+	  no arguments
+	* fixed a crasher in edit_source
+	* #ifdefs are now legal in packages/*_spec.c
+	* updated 'Install' with the new build procedure
+
+Sat Apr 29 20:58:34 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* v21.3a7 promoted to v21.3b1
+
+---------------------------------------------------------------------------
+(v21.2b8 promoted to v21.3a1)
+
 Sun Apr 23 21:02:52 EDT 1995 (tim@handel.princeton.edu (Beek))
 	* raised patchlevel to v21.2b8
 	* fixed a crasher in efun pointers to void valued efuns
-
-Sat Apr 22 04:04:38 EDT 1995 (tim@handel.princeton.edu (Beek))
-	* raised patchlevel to v21.2b7
-	* fixed a crasher in anonymous function pointer generation
 
 Fri Apr 21 01:17:24 EDT 1995 (tim@handel.princeton.edu (Beek))
 	* raised patchlevel to v21.2b6
@@ -87,14 +129,15 @@ Fri Apr 7 12:57:56 EDT 1995 (tim@handel.princeton.edu (Beek))
 	  . Don't free 'use_name' until after we're done using 'file' since
 	    'file' may point at it
 
---- is this v21.2b1 ?
 Fri Mar 24 20:59:08 EST 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.2b1
 	* v21.1b7 promoted to minor version status (see v21.1)
 	* Changed the error message for arr[<x] where x > sizeof(arr)
 	  to 'Array index out of bounds' from 'Negative index passed to array'
 	* fixed the extern definition of control_stack[] to use MAX_TRACE
 	  instead of being hardcoded at the default
 
+------------------------------------------------------------------------------
 Fri Mar 24 20:59:08 EST 1995 (tim@handel.princeton.edu (Beek))
 	* raised patchlevel to v21.1b7
 	* fixed a crasher in call_out(function, ...) when NO_SHADOWS

@@ -71,7 +71,7 @@ INLINE int growMap P1(mapping_t *, m)
 	memset(a += oldsize, 0, oldsize * sizeof(mapping_node_t *));
 	i = oldsize;
 	while (a--, i--){
-	    if (elt = *a){
+	    if ((elt = *a)) {
 		eltp = a, b = a + oldsize;
 		do {
 		    if (elt->hashval & oldsize){
@@ -118,12 +118,8 @@ void *extra;
 /* free_mapping */
  
 INLINE void
-free_mapping P1(mapping_t *, m)
+dealloc_mapping P1(mapping_t *, m)
 {
-	debug(64,("mapping.c: free_mapping begin, ptr = %x\n", m));
-	/* some other object is still referencing this mapping */
-	if (--m->ref > 0)
-		return;
 	debug(1024,("mapping.c: actual free of %x\n", m));
 	num_mappings--;
 	{
@@ -159,6 +155,16 @@ free_mapping P1(mapping_t *, m)
 	debug(64,("mapping.c: free_mapping end\n"));
 }
 
+INLINE void
+free_mapping P1(mapping_t *, m)
+{
+	debug(64,("mapping.c: free_mapping begin, ptr = %x\n", m));
+	/* some other object is still referencing this mapping */
+	if (--m->ref > 0)
+		return;
+	dealloc_mapping(m);
+}
+
 static mapping_node_t *free_nodes = 0;
 mapping_node_block_t *mapping_node_blocks = 0;
 
@@ -178,7 +184,7 @@ mapping_node_t *new_map_node() {
     mapping_node_t *ret;
     int i;
 
-    if (ret = free_nodes) {
+    if ((ret = free_nodes)) {
 	free_nodes = ret->next;
     } else {
 	mnb = ALLOCATE(mapping_node_block_t, TAG_MAP_NODE_BLOCK, "new_map_node");
@@ -296,7 +302,7 @@ copyMapping P1(mapping_t *,m)
 #endif
     num_mappings++;
     while (k--){
-	if (elt = b[k]){
+	if ((elt = b[k])) {
 	    a = c + k;
 	    do {
 		nelt = new_map_node();
@@ -306,7 +312,7 @@ copyMapping P1(mapping_t *,m)
 		nelt->hashval = elt->hashval;
 		nelt->next = *a;
 		*a = nelt;
-	    } while (elt = elt->next);
+	    } while ((elt = elt->next));
 	}
     }
     return newmap;
@@ -366,7 +372,7 @@ restore_hash_string P3(char **, val, int *, a, svalue_t *, sv)
 	    {
                 char *new = cp - 1;
 
-                if (c = *new++ = *cp++){
+                if ((c = *new++ = *cp++)) {
 		    if (i < MAX_KEY_LEN){
 			hash += c * coeff[i++];
 			hash *= 5;
@@ -392,8 +398,8 @@ restore_hash_string P3(char **, val, int *, a, svalue_t *, sv)
                     if (!c) return ROB_STRING_ERROR;
                     *new = '\0';
                     *val = cp;
-                    sv->u.string = DXALLOC((len = (new - start)) + 1, 102,
-                                "restore_string");
+                    sv->u.string = new_string(len = (new - start),
+					      "restore_string");
                     strcpy(sv->u.string, start);
 		    sv->type = T_STRING;
 		    sv->subtype = STRING_MALLOC;
@@ -420,7 +426,7 @@ restore_hash_string P3(char **, val, int *, a, svalue_t *, sv)
     *val = cp;
     *--cp = '\0';
     len = cp - start;
-    sv->u.string = DXALLOC(len + 1, TAG_STRING, "restore_string");
+    sv->u.string = new_string(len, "restore_string");
     strcpy(sv->u.string, start);
     *a = hash;
     sv->type = T_STRING;
@@ -501,7 +507,7 @@ INLINE void mapping_delete P2(mapping_t *,m, svalue_t *,lv)
 #ifdef EACH
 	m->elt = (mapping_node_t *)0;
 #endif
-	if (elt = *prev){
+	if ((elt = *prev)) {
 	    do {
 		if (sameval(elt->values, lv)){
 		    if (!(*prev = elt->next) && !m->table[i]){
@@ -520,7 +526,7 @@ INLINE void mapping_delete P2(mapping_t *,m, svalue_t *,lv)
 
 		}
 		prev = &(elt->next);
-	    } while (elt = elt->next);
+	    } while ((elt = elt->next));
 
 	} 
 }
@@ -540,7 +546,7 @@ find_for_insert P3(mapping_t *, m, svalue_t *, lv, int, doTheFree)
 	mapping_node_t *n, *newnode, **a = m->table + i;
  
 	debug(128,("mapping.c: hashed to %d\n", i));
-	if (n = *a){
+	if ((n = *a)) {
 	    do {
 		if (sameval(lv, n->values)) {
 		    /* normally, the f_assign would free the old value */
@@ -548,7 +554,7 @@ find_for_insert P3(mapping_t *, m, svalue_t *, lv, int, doTheFree)
 		    if (doTheFree) free_svalue(n->values + 1, "find_for_insert");
 		    return n->values + 1;
 		}
-	    } while (n = n->next);
+	    } while ((n = n->next));
 	    debug(128,("mapping.c: didn't find %x\n", lv));
 	    n = *a;
 	}
@@ -613,13 +619,13 @@ void unique_mapping_error_handler PROT((void))
     g_u_m_list = g_u_m_list->next;
 
     do {
-        if (uptr = table[mask]){
+        if ((uptr = table[mask])) {
             do {
                 nptr = uptr->next;
 		free_svalue(&uptr->key, "unique_mapping_error_handler");
                 FREE((char *) uptr->indices);
                 FREE((char *) uptr);
-            } while (uptr = nptr);
+            } while ((uptr = nptr));
         }
     } while (mask--);
     FREE((char *) table);
@@ -642,15 +648,15 @@ void f_unique_mapping PROT((void))
     mapping_node_t **mtable, *elt;
     int *ind, j;
 
-    if ((arg+1)->type & T_FUNCTION){
+    if ((arg+1)->type == T_FUNCTION){
         fp = (arg+1)->u.fp;
         if (num_arg > 2) extra = arg + 2, numex = num_arg - 2;
     } else {
         func = (arg+1)->u.string;
         if (num_arg < 3) ob = current_object;
         else {
-            if ((arg +2)->type & T_OBJECT) ob = (arg+2)->u.ob;
-            else if ((arg+2)->type & T_STRING){
+            if ((arg +2)->type == T_OBJECT) ob = (arg+2)->u.ob;
+            else if ((arg+2)->type == T_STRING){
                 if ((ob = find_object(arg[2].u.string)) && !object_visible(ob)) ob = 0;
             }
             if (!ob) bad_argument(arg+2, T_STRING | T_OBJECT, 3, F_UNIQUE_MAPPING);
@@ -695,7 +701,7 @@ void f_unique_mapping PROT((void))
         if (numex) push_some_svalues(extra, numex);
         sv = ob ? apply(func, ob, 1 + numex, ORIGIN_EFUN) : call_function_pointer(fp, 1 + numex);
         i = (oi = svalue_to_int(sv)) & mask;
-        if (uptr = table[i]){
+        if ((uptr = table[i])) {
             do {
                 if (sameval(&uptr->key, sv)){
                     ind = uptr->indices = RESIZE(uptr->indices, uptr->count+1,
@@ -703,7 +709,7 @@ void f_unique_mapping PROT((void))
                     ind[uptr->count++] = size;
                     break;
                 }
-            } while (uptr = uptr->next);
+            } while ((uptr = uptr->next));
         }
         if (!uptr){
             uptr = ALLOCATE(unique_node_t, 103, "f_unique_mapping:4");
@@ -732,7 +738,7 @@ void f_unique_mapping PROT((void))
     sv = v->item;
 
     do {
-        if (uptr = table[j]){
+        if ((uptr = table[j])) {
             do {
                 nptr = uptr->next;
                 i = (oi = uptr->hashval) & nmask;
@@ -748,7 +754,7 @@ void f_unique_mapping PROT((void))
 				free_svalue(&uptr->key, "f_unique_mapping");
 				FREE((char *) uptr->indices);
 				FREE((char *) uptr);
-			    } while (uptr = nptr);
+			    } while ((uptr = nptr));
 			    uptr = table[--j];
 			} while (j >= 0);
 #ifdef PACKAGE_MUDLIB_STATS
@@ -775,7 +781,7 @@ void f_unique_mapping PROT((void))
                 FREE((char *) ind);
                 FREE((char *) uptr);
                 numkeys++;
-            } while (uptr = nptr);
+            } while ((uptr = nptr));
         }
     } while (j--);
 
@@ -814,7 +820,7 @@ load_mapping_from_aggregate P2(svalue_t *,sp, int, n)
 	a = m->table;
 	do {
 	    i = (oi = svalue_to_int(++sp)) & mask;
-	    if (elt2 = elt = a[i]){
+	    if ((elt2 = elt = a[i])) {
 		do {
 		    if (sameval(sp, elt->values)) {
 			free_svalue(sp++, "load_mapping_from_aggregate: duplicate key");
@@ -822,7 +828,7 @@ load_mapping_from_aggregate P2(svalue_t *,sp, int, n)
 			*(elt->values+1) = *sp;
 			break;
 		    }
-		} while (elt = elt->next);
+		} while ((elt = elt->next));
 		if (elt) continue;
 	    }
 	    else if (!(--m->unfilled)){
@@ -903,13 +909,13 @@ add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int, free_flag)
 	for (elt2 = a2[j]; elt2; elt2 = elt2->next){
 	    i = (oi = elt2->hashval) & mask;
 	    sv = elt2->values;
-	    if (n = elt1 = a1[i]){
+	    if ((n = elt1 = a1[i])) {
 		do {
 		    if (sameval(sv, elt1->values)){
 			assign_svalue(elt1->values + 1, sv + 1);
 			break; 
 		    }
-		} while (elt1 = elt1->next);
+		} while ((elt1 = elt1->next));
 		if (elt1) continue;
 	    } else if (!(--m1->unfilled)){
 		if (growMap(m1)){
@@ -979,10 +985,10 @@ unique_add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int,free_flag)
 	for (elt2 = a2[j]; elt2; elt2 = elt2->next){
 	    i = (oi = elt2->hashval) & mask;
 	    sv = elt2->values;
-	    if (n = elt1 = a1[i]){
+	    if ((n = elt1 = a1[i])) {
 		do {
 		    if (sameval(sv, elt1->values)) break;
-		} while (elt1 = elt1->next);
+		} while ((elt1 = elt1->next));
 		if (elt1) continue;
 	    }
 	    else if (!(--m1->unfilled)){
@@ -1112,7 +1118,7 @@ map_mapping P2(svalue_t *, arg, int, num_arg)
     debug(1,("mapping.c: map_mapping\n"));
     do {
 	for (elt = a[j]; elt ; elt = elt->next){
-	    push_svalue(elt->values);
+	    push_svalue(elt->values+1);
 	    if (numex) push_some_svalues(extra, numex);
 	    ret = ob ? apply(func, ob, 1+numex, ORIGIN_EFUN) 
 		: call_function_pointer(fp, 1+numex);
@@ -1243,16 +1249,16 @@ compose_mapping P3(mapping_t *,m1, mapping_t *,m2, unsigned short,flag)
 	a = m1->table;
 
 	do {
-	    if (elt = *(prev = a)){
+	    if ((elt = *(prev = a))) {
 		do {
 		    sv = elt->values + 1;
-		    if (elt2 = b[svalue_to_int(sv) & mask]){
+		    if ((elt2 = b[svalue_to_int(sv) & mask])) {
 			do {
 			    if (sameval(sv, elt2->values)){
 				assign_svalue(sv, elt2->values + 1);
 				break;
 			    }
-			} while (elt2 = elt2->next);
+			} while ((elt2 = elt2->next));
 		    }
 		    if (!elt2){
 			if (!(*prev = elt->next) && !(*a)) m1->unfilled++;
@@ -1262,7 +1268,7 @@ compose_mapping P3(mapping_t *,m1, mapping_t *,m2, unsigned short,flag)
 			free_node(elt);
 		    }
 		    prev = &(elt->next);
-		} while (elt = elt->next);
+		} while ((elt = elt->next));
 	    }
 	} while (a++, j--);
 

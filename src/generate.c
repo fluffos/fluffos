@@ -13,12 +13,12 @@ optimize_expr_list P1(parse_node_t *, expr) {
     if (!expr) return;
     do {
 	optimize(expr->v.expr);
-    } while (expr = expr->r.expr);
+    } while ((expr = expr->r.expr));
 }
 
 static void
 optimize_lvalue_list P1(parse_node_t *, expr) {
-    while (expr = expr->r.expr) {
+    while ((expr = expr->r.expr)) {
 	optimize(expr->l.expr);
     }
 }
@@ -194,10 +194,16 @@ generate_conditional_branch P1(parse_node_t *, node) {
 		branch = F_BBRANCH;
 	    node = 0;
 	}
-	if (node && node->kind == F_LT) {
-	    generate(node->l.expr);
-	    generate(node->r.expr);
-	    return F_BBRANCH_LT;
+	if (node) {
+	    if (node->kind == F_LT) {
+		generate(node->l.expr);
+		generate(node->r.expr);
+		return F_BBRANCH_LT;
+	    }
+	    if (node->kind == F_WHILE_DEC) {
+		generate(node);
+		return F_WHILE_DEC;
+	    }
 	}
     }
     generate(node);
@@ -210,7 +216,7 @@ dump_expr_list P2(parse_node_t *, expr, int, indent) {
     if (!expr) return;
     do {
       dump_tree(expr->v.expr, indent);
-    } while (expr = expr->r.expr);
+    } while ((expr = expr->r.expr));
 }
 
 static void
@@ -220,7 +226,7 @@ dump_lvalue_list P2(parse_node_t *, expr, int, indent) {
     for (i=0; i<indent; i++) 
         putchar(' ');
     printf("lvalue_list\n");
-    while (expr = expr->r.expr)
+    while ((expr = expr->r.expr))
       dump_tree(expr->l.expr, indent + 2);
 }
 

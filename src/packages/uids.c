@@ -7,7 +7,6 @@
 #endif
 
 static object_t *ob;
-static svalue_t *argp;
 
 #ifdef F_EXPORT_UID
 void

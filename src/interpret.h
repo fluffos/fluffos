@@ -103,14 +103,14 @@ typedef struct error_context_stack_s {
 #define EXTEND_SVALUE_STRING(x, y, z) \
     do { char *ess_res; \
       int ess_len, ess_r; \
-      ess_len = (ess_r = SVALUE_STRLEN(x)) + strlen(y) + 1; \
-      if (sp->subtype == STRING_MALLOC) { \
-          ess_res = (char *) DREALLOC(x->u.string, ess_len, TAG_STRING, z); \
+      ess_len = (ess_r = SVALUE_STRLEN(x)) + strlen(y); \
+      if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) { \
+          ess_res = (char *) extend_string((x)->u.string, ess_len); \
           if (!ess_res) fatal("Out of memory!\n"); \
           strcpy(ess_res + ess_r, (y)); \
       } else { \
-	  ess_res = DXALLOC(ess_len, TAG_STRING, z); \
-	  strcpy(ess_res, x->u.string); \
+	  ess_res = new_string(ess_len, z); \
+	  strcpy(ess_res, (x)->u.string); \
 	  strcpy(ess_res + ess_r, (y)); \
 	  free_string_svalue(x); \
 	  (x)->subtype = STRING_MALLOC; \
@@ -120,8 +120,8 @@ typedef struct error_context_stack_s {
 /* <something that needs no free> + string svalue */
 #define SVALUE_STRING_ADD_LEFT(y, z) \
     do { char *pss_res; int pss_r, pss_len; \
-        pss_len = SVALUE_STRLEN(sp) + (pss_r = strlen(y)) + 1; \
-        pss_res = DXALLOC(pss_len, TAG_STRING, z); \
+        pss_len = SVALUE_STRLEN(sp) + (pss_r = strlen(y)); \
+        pss_res = new_string(pss_len, z); \
         strcpy(pss_res, y); \
         strcpy(pss_res + pss_r, sp->u.string); \
         free_string_svalue(sp--); \
@@ -134,14 +134,14 @@ typedef struct error_context_stack_s {
 #define SVALUE_STRING_JOIN(x, y, z) \
     do { char *ssj_res; int ssj_r, ssj_len; \
         ssj_r = SVALUE_STRLEN(x); \
-        ssj_len = ssj_r + SVALUE_STRLEN(y) + 1; \
-        if ((x)->subtype == STRING_MALLOC) { \
-            ssj_res = (char *) DREALLOC((x)->u.string, ssj_len, TAG_STRING, z); \
+        ssj_len = ssj_r + SVALUE_STRLEN(y); \
+        if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) { \
+            ssj_res = (char *) extend_string((x)->u.string, ssj_len); \
             if (!ssj_res) fatal("Out of memory!\n"); \
             (void) strcpy(ssj_res + ssj_r, (y)->u.string); \
             free_string_svalue(y); \
         } else { \
-            ssj_res = (char *) DXALLOC(ssj_len, TAG_STRING, z); \
+            ssj_res = (char *) new_string(ssj_len, z); \
 	    strcpy(ssj_res, (x)->u.string); \
 	    strcpy(ssj_res + ssj_r, (y)->u.string); \
 	    free_string_svalue(y); \
@@ -173,8 +173,9 @@ typedef struct error_context_stack_s {
    add_ref((x), y); } while (0)
 #define put_unrefed_object(x,y) do { if ((x)->flags & O_DESTRUCTED) put_number(0); \
                            else put_unrefed_undested_object(x,y); } while (0)
-#define put_constant_string(x) do { sp->type = T_STRING;sp->subtype = STRING_CONSTANT; \
-                sp->u.string = (x); } while (0)
+/* see comments on push_constant_string */
+#define put_constant_string(x) do { sp->type = T_STRING;sp->subtype = STRING_SHARED; \
+                sp->u.string = make_shared_string(x); } while (0)
 #define put_malloced_string(x) do { sp->type = T_STRING; sp->subtype = STRING_MALLOC; \
                 sp->u.string = (x); } while (0)
 #define put_array(x) do { sp->type = T_ARRAY; sp->u.arr = (x); } while (0)
@@ -263,6 +264,7 @@ void call_function PROT((program_t *, function_t *));
 svalue_t *apply_master_ob PROT((char *, int));
 svalue_t *safe_apply_master_ob PROT((char *, int));
 int assert_master_ob_loaded PROT((char *, char *));
+void mark_apply_low_cache();
 
 void translate_absolute_line PROT((int, unsigned short *, int *, int *));
 char *add_slash PROT((char *));
@@ -277,6 +279,9 @@ char *get_line_number PROT((char *, program_t *));
 void get_line_number_info PROT((char **, int *));
 void get_version PROT((char *));
 void reset_machine PROT((int));
+void unlink_string_svalue PROT((svalue_t *));
+void copy_lvalue_range PROT((svalue_t *));
+void assign_lvalue_range PROT((svalue_t *));
 
 #ifndef NO_SHADOWS
 int validate_shadowing PROT((object_t *));
@@ -292,6 +297,7 @@ INLINE function_t *setup_new_frame PROT((function_t *));
 INLINE void push_control_stack PROT((int, void *));
 
 #ifdef DEBUGMALLOC_EXTENSIONS
+void mark_svalue PROT((svalue_t *));
 void mark_stack PROT((void));
 #endif
 

@@ -5,6 +5,7 @@
 #include "/file_incl.h"
 #include "/file.h"
 #include "/object.h"
+#include "/eoperators.h"
 #else
 #include "../lpc_incl.h"
 #include "../mapping.h"
@@ -12,6 +13,7 @@
 #include "../file_incl.h"
 #include "../file.h"
 #include "../object.h"
+#include "../eoperators.h"
 #endif
 
 /* I forgot who wrote this, please claim it :) */
@@ -52,7 +54,7 @@ f_query_notify_fail PROT((void)) {
 	if (command_giver->interactive->iflags & NOTIFY_FAIL_FUNC) {
 	    push_funp(command_giver->interactive->default_err_message.f);
 	    return;
-	} else if (p = command_giver->interactive->default_err_message.s) {
+	} else if ((p = command_giver->interactive->default_err_message.s)) {
 	    sp++;
 	    sp->type = T_STRING;
 	    sp->subtype = STRING_SHARED;
@@ -197,23 +199,62 @@ void f_copy PROT((void))
 #endif    
 
 /* Gudu@VR */    
-/* This should have flag and other function info etc -Beek */
+/* flag and extra info by Beek */
 #ifdef F_FUNCTIONS
 void f_functions PROT((void)) {
-    int i, num;
-    array_t *vec;
-    function_t *functions;
-    
+    int i, j, num;
+    array_t *vec, *subvec;
+    function_t *functions, *funp;
+    program_t *prog;
+    int flag = (sp--)->u.number;
+    unsigned short *types;
+
     num = sp->u.ob->prog->num_functions;
     functions = sp->u.ob->prog->functions;
-    
+
     vec = allocate_empty_array(num);
     i = num;
     
     while (i--) {
-	vec->item[i].type = T_STRING;
-	vec->item[i].subtype = STRING_SHARED;
-	vec->item[i].u.string = ref_string(functions[i].name);
+	if (flag) {
+	    funp = functions + i;
+	    prog = sp->u.ob->prog;
+
+	    while (funp->flags & NAME_INHERITED) {
+		prog = prog->inherit[funp->offset].prog;
+		funp = &prog->functions[funp->function_index_offset];
+	    }
+
+	    if (prog->type_start && prog->type_start[i] != INDEX_START_NONE)
+		types = &prog->argument_types[prog->type_start[i]];
+	    else
+		types = 0;
+
+	    vec->item[i].type = T_ARRAY;
+	    subvec = vec->item[i].u.arr = allocate_empty_array(3 + funp->num_arg);
+	    
+	    subvec->item[0].type = T_STRING;
+	    subvec->item[0].subtype = STRING_SHARED;
+	    subvec->item[0].u.string = ref_string(funp->name);
+
+	    subvec->item[1].type = T_NUMBER;
+	    subvec->item[1].subtype = 0;
+	    subvec->item[1].u.number = funp->num_arg;
+
+	    subvec->item[2].type = T_NUMBER;
+	    subvec->item[2].subtype = 0;
+	    subvec->item[2].u.number = funp->type;
+
+	    for (j = 0; j < funp->num_arg; j++) {
+		subvec->item[3 + j].type = T_NUMBER;
+		subvec->item[3 + j].subtype = 0;
+		subvec->item[3 + j].u.number = (types ? types[j] : 0);
+	    }
+	} else {
+	    vec->item[i].type = T_STRING;
+	    vec->item[i].subtype = STRING_SHARED;
+	    vec->item[i].u.string = ref_string(functions[i].name);
+	}
     }
     
     pop_stack();
@@ -403,13 +444,13 @@ char *pluralize P1(char *, str) {
     char *pre, *rel, *end;
     char *p, of_buf[256];
     int has_of = 0;
-    int i, sz;
+    int sz;
     
     sz = strlen(str);
     if (sz <= 1) return 0;
 
     /* if it is of the form 'X of Y', pluralize the 'X' part */
-    if (p = strstr(str, " of ")) {
+    if ((p = strstr(str, " of "))) {
 	strcpy(p, of_buf);
 	has_of = 1;
 	sz = p - str;
@@ -441,7 +482,7 @@ char *pluralize P1(char *, str) {
     /*
      * only pluralize the last word, ie: lose adjectives.
      */
-    if (p = strrchr(pre, ' '))
+    if ((p = strrchr(pre, ' ')))
 	rel = p + 1;
     else
 	rel = pre;
@@ -744,7 +785,9 @@ void f_program_info PROT((void)) {
 	string_size += ob->prog->num_strings * sizeof(char *);
 	var_size += ob->prog->num_variables * sizeof(variable_t);
 	inherit_size += ob->prog->num_inherited * sizeof(inherit_t);
+#if 0
 	walk_program_code(num_pushes, ob->prog);
+#endif
     }
     for (i=0; i <10; i++)
 	add_vmessage("%i ", num_pushes[i]);

@@ -134,8 +134,8 @@ static program_t *search_inherited P3(char *, str, program_t *, prg, int *, offp
 #endif
 	    *offpnt = prg->inherit[i].variable_index_offset;
 	    return prg->inherit[i].prog;
-	} else if (tmp = search_inherited(str, prg->inherit[i].prog,
-					  offpnt)) {
+	} else if ((tmp = search_inherited(str, prg->inherit[i].prog,
+					  offpnt))) {
 #ifdef DEBUG
 	    if (d_flag)
 		debug_message("deferred match found\n");

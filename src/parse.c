@@ -506,13 +506,16 @@ parse P5(char *, cmd,		/* Command to parse */
     /*
      * Pattern and commands can not be empty
      */
-    if (!strlen(cmd) || !strlen(pattern))
+    if (!*cmd || !*pattern)
 	return 0;
 
     push_parse_globals();
 
-    parse_warr = explode_string(cmd, " ");	/* Array of words in command */
-    parse_patarr = explode_string(pattern, " ");	/* Array of pattern elements */
+    /* Array of words in command */
+    parse_warr = explode_string(cmd, strlen(cmd), " ", 1);
+    
+    /* Array of pattern elements */
+    parse_patarr = explode_string(pattern, strlen(pattern), " ", 1);
 
     /*
      * Explode can return '0'.
@@ -566,7 +569,7 @@ parse P5(char *, cmd,		/* Command to parse */
 
     pval = apply_master_ob(QGET_ALLWORD, 0);
     if (pval && pval->type == T_STRING)
-	gAllword = string_copy(pval->u.string, "parse");
+	gAllword = alloc_cstring(pval->u.string, "parse");
 
     /*
      * Loop through the pattern. Handle %s but not '/'
@@ -699,7 +702,7 @@ store_words_slice P6(svalue_t *, sp, int, pos, int, num, array_t *, warr, int, f
 
 	if (slice->size) {
 	    ret->subtype = STRING_MALLOC;
-	    ret->u.string = implode_string(slice, " ");
+	    ret->u.string = implode_string(slice, " ", 1);
 	    free_array(slice);
 	    return;
 	}
@@ -1002,7 +1005,7 @@ static svalue_t *
     /* in case of errors */
     push_refed_array(tmp);
     
-    if (pval = number_parse(obarr, warr, cix_in, fail))
+    if ((pval = number_parse(obarr, warr, cix_in, fail)))
 	tmp->item[0] = *pval;
 
     if (pval) {
@@ -1193,13 +1196,13 @@ prepos_parse P4(array_t *, warr, int *, cix_in, int *, fail, svalue_t *, prepos)
 		break;
 	    }
 	} else {
-	    tarr = explode_string(tmp, " ");
+	    tarr = explode_string(tmp, strlen(tmp), " ", 1);
 	    for (tix = 0; tix < tarr->size; tix++) {
 		if ((*cix_in + tix >= warr->size) ||
 		    (!EQ(warr->item[*cix_in + tix].u.string, tarr->item[tix].u.string)))
 		    break;
 	    }
-	    if (tix = (tix == tarr->size) ? 1 : 0)
+	    if ((tix = (tix == tarr->size) ? 1 : 0))
 		(*cix_in) += tarr->size;
 	    free_array(tarr);
 	    if (tix)
@@ -1336,7 +1339,7 @@ find_string P3(char *, str, array_t *, warr, int *, cix_in)
 	if (*cix_in == (warr->size - 1))
 	    continue;
 
-	split = explode_string(str, " ");
+	split = explode_string(str, strlen(str), " ", 1);
 
 	/*
 	 * warr->size - *cix_in ==	
@@ -1494,7 +1497,7 @@ static char *
     if (!(strchr(str, ' ')))
 	return string_copy(parse_one_plural(str), "parse_to_plural");
 
-    words = explode_string(str, " ");
+    words = explode_string(str, strlen(str), " ", 1);
 
     for (changed = 0, il = 1; il < words->size; il++) {
 	if ((EQ(words->item[il].u.string, "of")) ||
@@ -1512,9 +1515,9 @@ static char *
     }
     if (!changed) {
 	free_array(words);
-	return str;
+	return string_copy(str, "parse_to_plural");
     }
-    sp = implode_string(words, " ");
+    sp = implode_string(words, " ", 1);
     free_array(words);
     return sp;
 }
@@ -1628,7 +1631,6 @@ char *
     object_t *old_cur = current_object;
     int pr_start, il, changed;
     char *p1, *p2, *p3, *buf;
-    char *process_part();
 #ifdef PACKAGE_UIDS
     userid_t *old_euid;
 #endif
@@ -1657,7 +1659,7 @@ char *
 	}
 #endif
     }
-    arr = explode_string(str, "@@");
+    arr = explode_string(str, strlen(str), "@@", 2);
 
     /*
      * If the first two chars is '@@' then arr[0] is a potential VBFC
@@ -1691,7 +1693,7 @@ char *
     }
 
     if (changed)
-	buf = implode_string(arr, "");
+	buf = implode_string(arr, "", 0);
     else
 	buf = 0;
 
@@ -1835,7 +1837,7 @@ char *
 	    istr[il] = ' ';
 	istr[il] = 0;
     } else if (indent->type == T_STRING)
-	istr = string_copy(indent->u.string, "break_string");
+	istr = alloc_cstring(indent->u.string, "break_string");
     else
 	return fstr;
 
@@ -1874,9 +1876,9 @@ char *
     /*
      * Explode into array
      */
-    lines = explode_string(fstr, "\n");
+    lines = explode_string(fstr, MSTR_SIZE(fstr), "\n", 1);
 
-    FREE(fstr);
+    FREE_MSTR(fstr);
 
     /*
      * Calculate size of the indented string
@@ -1885,9 +1887,10 @@ char *
 	nchar += indlen + strlen(lines->item[il].u.string) + 1;
     }
 
-    fstr = XALLOC(nchar + 1);
+    fstr = new_string(nchar, "break_string");
     fstr[0] = 0;
 
+    /* Damn, this is pathetically inefficient -Beek */
     for (il = 0; il < lines->size; il++) {
 	strcat(fstr, istr);
 	strcat(fstr, lines->item[il].u.string);

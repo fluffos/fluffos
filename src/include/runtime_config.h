@@ -56,31 +56,30 @@
 #define __TIME_TO_RESET__           CFG_INT(3)
 #define __TIME_TO_SWAP__            CFG_INT(4)
 
-#define __MAX_USERS__               CFG_INT(5)
-#define __MAX_EFUN_SOCKS__          CFG_INT(6)
+#define __MAX_EFUN_SOCKS__          CFG_INT(5)
 
-#define __COMPILER_STACK_SIZE__     CFG_INT(7)
-#define __EVALUATOR_STACK_SIZE__    CFG_INT(8)
-#define __INHERIT_CHAIN_SIZE__      CFG_INT(9)
-#define __MAX_EVAL_COST__           CFG_INT(10)
-#define __MAX_LOCAL_VARIABLES__     CFG_INT(11)
-#define __MAX_CALL_DEPTH__          CFG_INT(12)
-#define __MAX_ARRAY_SIZE__          CFG_INT(13)
-#define __MAX_BUFFER_SIZE__         CFG_INT(14)
-#define __MAX_MAPPING_SIZE__        CFG_INT(15)
-#define __MAX_STRING_LENGTH__       CFG_INT(16)
-#define __MAX_BITFIELD_BITS__       CFG_INT(17)
+#define __COMPILER_STACK_SIZE__     CFG_INT(6)
+#define __EVALUATOR_STACK_SIZE__    CFG_INT(7)
+#define __INHERIT_CHAIN_SIZE__      CFG_INT(8)
+#define __MAX_EVAL_COST__           CFG_INT(9)
+#define __MAX_LOCAL_VARIABLES__     CFG_INT(10)
+#define __MAX_CALL_DEPTH__          CFG_INT(11)
+#define __MAX_ARRAY_SIZE__          CFG_INT(12)
+#define __MAX_BUFFER_SIZE__         CFG_INT(13)
+#define __MAX_MAPPING_SIZE__        CFG_INT(14)
+#define __MAX_STRING_LENGTH__       CFG_INT(15)
+#define __MAX_BITFIELD_BITS__       CFG_INT(16)
 
-#define __MAX_BYTE_TRANSFER__       CFG_INT(18)
-#define __MAX_READ_FILE_SIZE__      CFG_INT(19)
+#define __MAX_BYTE_TRANSFER__       CFG_INT(17)
+#define __MAX_READ_FILE_SIZE__      CFG_INT(18)
 
-#define __RESERVED_MEM_SIZE__       CFG_INT(20)
+#define __RESERVED_MEM_SIZE__       CFG_INT(19)
 
-#define __SHARED_STRING_HASH_TABLE_SIZE__ CFG_INT(21)
-#define __OBJECT_HASH_TABLE_SIZE__        CFG_INT(22)
-#define __LIVING_HASH_TABLE_SIZE__        CFG_INT(23)
+#define __SHARED_STRING_HASH_TABLE_SIZE__ CFG_INT(20)
+#define __OBJECT_HASH_TABLE_SIZE__        CFG_INT(21)
+#define __LIVING_HASH_TABLE_SIZE__        CFG_INT(22)
 
-#define RUNTIME_CONFIG_NEXT CFG_INT(24)
+#define RUNTIME_CONFIG_NEXT CFG_INT(23)
 
 /*
  * The following are obsolete.

@@ -1,2 +1,2 @@
-LIBS= -lbsd -ly -lcrypt -lmalloc -lm
+LIBS= -lbsd -ly -lcrypt -lm
 

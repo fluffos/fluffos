@@ -33,8 +33,8 @@ int check_valid_socket P5(char *, what, int, fd, object_t *, owner,
     info->item[0].u.number = fd;
     assign_socket_owner(&info->item[1], owner);
     info->item[2].type = T_STRING;
-    info->item[2].subtype = STRING_CONSTANT;
-    info->item[2].u.string = addr;
+    info->item[2].subtype = STRING_SHARED;
+    info->item[2].u.string = make_shared_string(addr);
     info->item[3].type = T_NUMBER;
     info->item[3].u.number = port;
 
@@ -642,6 +642,11 @@ socket_read_select_handler P1(int, fd)
 		       ORIGIN_DRIVER);
 	    current_object = save_current_object;
 	    return;
+#ifdef DEBUG
+	    /* shut up gcc */
+	case STREAM_BINARY:
+	case DATAGRAM_BINARY:
+#endif
 	}
 	break;
 
@@ -743,6 +748,11 @@ socket_read_select_handler P1(int, fd)
 	    safe_apply(lpc_socks[fd].read_callback, lpc_socks[fd].owner_ob, 2, ORIGIN_DRIVER);
 	    current_object = save_current_object;
 	    return;
+#ifdef DEBUG
+	    /* shut up gcc */
+	case STREAM_BINARY:
+	case DATAGRAM_BINARY:
+#endif
 	}
 	break;
     }

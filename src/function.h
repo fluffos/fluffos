@@ -50,4 +50,7 @@ union string_or_func {
     char *s;
 };
 
+void dealloc_funp PROT((funptr_t *));
+void push_refed_funp PROT((funptr_t *));
+
 #endif

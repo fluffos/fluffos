@@ -34,7 +34,7 @@ static void look_for_objects_to_swap PROT((void));
 static void call_heart_beat PROT((void));
 INLINE static void cycle_hb_list PROT((void));
 
-#ifdef DEBUG
+#if 0
 static void report_holes PROT((void));
 #endif
 
@@ -59,7 +59,7 @@ void clear_state()
     reset_machine(0);		/* Pop down the stack. */
 }				/* clear_state() */
 
-#ifdef DEBUG
+#if 0
 static void report_holes() {
     if (current_object)
 	fprintf(stderr, "current_object is %s\n", current_object->name);
@@ -110,7 +110,7 @@ int parse_command P2(char *, str, object_t *, ob)
 }				/* parse_command() */
 #endif
 
-#define NUM_COMMANDS MAX_USERS
+#define NUM_COMMANDS max_users
 
 /*
  * This is the backend. We will stay here for ever (almost).
@@ -636,7 +636,7 @@ void preload_objects P1(int, eflag)
 
 	eval_cost = max_cost;
 
-	push_string(prefiles->item[ix].u.string, STRING_MALLOC);
+	push_svalue(prefiles->item + ix);
 	(void) apply_master_ob(APPLY_PRELOAD, 1);
     }
     free_array(prefiles);

@@ -48,7 +48,7 @@ static void read_config_file P1(FILE *, file)
 	    break;
 	len = strlen(str);
 	if (len > MAX_LINE_LENGTH) {
-	    fprintf(stderr, "*Error in config file: line too long:\n%s...\n, str");
+	    fprintf(stderr, "*Error in config file: line too long:\n%s...\n", str);
 	    exit(-1);
 	}
 	if (str[0] != '#' && str[0] != '\n') {
@@ -81,7 +81,7 @@ static int scan_config_line P3(char *, fmt, void *, dest, int, required)
     *((int *)dest) = 0;
     tmp = buff;
     while (tmp) {
-	while (tmp = (char *) strchr(tmp, '\n')) {
+	while ((tmp = (char *) strchr(tmp, '\n'))) {
 	    if (*(++tmp) == fmt[0]) break;
 	}
 	/* don't allow sscanf() to scan to next line for blank entries */
@@ -107,6 +107,7 @@ static int scan_config_line P3(char *, fmt, void *, dest, int, required)
 		missing_line);
 	exit(-1);
     }
+    return 1;
 }
 
 void set_defaults P1(char *, filename)
@@ -147,7 +148,7 @@ void set_defaults P1(char *, filename)
     read_config_file(def);
 
     scan_config_line("global include file : %[^\n]", tmp, 0);
-    p = CONFIG_STR(__GLOBAL_INCLUDE_FILE__) = string_copy(tmp, "config file");
+    p = CONFIG_STR(__GLOBAL_INCLUDE_FILE__) = alloc_cstring(tmp, "config file");
 
     /* check if the global include file is quoted */
     if (*p && *p != '\"' && *p != '<') {
@@ -166,37 +167,37 @@ void set_defaults P1(char *, filename)
     }
 
     scan_config_line("name : %[^\n]", tmp, 1);
-    CONFIG_STR(__MUD_NAME__) = string_copy(tmp, "config file");
+    CONFIG_STR(__MUD_NAME__) = alloc_cstring(tmp, "config file");
     scan_config_line("address server ip : %[^\n]", tmp, 1);
-    CONFIG_STR(__ADDR_SERVER_IP__) = string_copy(tmp, "config file");
+    CONFIG_STR(__ADDR_SERVER_IP__) = alloc_cstring(tmp, "config file");
 
     scan_config_line("mudlib directory : %[^\n]", tmp, 1);
-    CONFIG_STR(__MUD_LIB_DIR__) = string_copy(tmp, "config file");
+    CONFIG_STR(__MUD_LIB_DIR__) = alloc_cstring(tmp, "config file");
     scan_config_line("binary directory : %[^\n]", tmp, 1);
-    CONFIG_STR(__BIN_DIR__) = string_copy(tmp, "config file");
+    CONFIG_STR(__BIN_DIR__) = alloc_cstring(tmp, "config file");
 
     scan_config_line("log directory : %[^\n]", tmp, 1);
-    CONFIG_STR(__LOG_DIR__) = string_copy(tmp, "config file");
+    CONFIG_STR(__LOG_DIR__) = alloc_cstring(tmp, "config file");
     scan_config_line("include directories : %[^\n]", tmp, 1);
-    CONFIG_STR(__INCLUDE_DIRS__) = string_copy(tmp, "config file");
+    CONFIG_STR(__INCLUDE_DIRS__) = alloc_cstring(tmp, "config file");
 #ifdef BINARIES
     scan_config_line("save binaries directory : %[^\n]", tmp, 1);
-    CONFIG_STR(__SAVE_BINARIES_DIR__) = string_copy(tmp, "config file");
+    CONFIG_STR(__SAVE_BINARIES_DIR__) = alloc_cstring(tmp, "config file");
 #endif
 
     scan_config_line("master file : %[^\n]", tmp, 1);
-    CONFIG_STR(__MASTER_FILE__) = string_copy(tmp, "config file");
+    CONFIG_STR(__MASTER_FILE__) = alloc_cstring(tmp, "config file");
     scan_config_line("simulated efun file : %[^\n]", tmp, 0);
-    CONFIG_STR(__SIMUL_EFUN_FILE__) = string_copy(tmp, "config file");
+    CONFIG_STR(__SIMUL_EFUN_FILE__) = alloc_cstring(tmp, "config file");
     scan_config_line("swap file : %[^\n]", tmp, 1);
-    CONFIG_STR(__SWAP_FILE__) = string_copy(tmp, "config file");
+    CONFIG_STR(__SWAP_FILE__) = alloc_cstring(tmp, "config file");
     scan_config_line("debug log file : %[^\n]", tmp, -1);
-    CONFIG_STR(__DEBUG_LOG_FILE__) = string_copy(tmp, "config file");
+    CONFIG_STR(__DEBUG_LOG_FILE__) = alloc_cstring(tmp, "config file");
 
     scan_config_line("default error message : %[^\n]", tmp, 0);
-    CONFIG_STR(__DEFAULT_ERROR_MESSAGE__) = string_copy(tmp, "config file");
+    CONFIG_STR(__DEFAULT_ERROR_MESSAGE__) = alloc_cstring(tmp, "config file");
     scan_config_line("default fail message : %[^\n]", tmp, 0);
-    CONFIG_STR(__DEFAULT_FAIL_MESSAGE__) = string_copy(tmp, "config file");
+    CONFIG_STR(__DEFAULT_FAIL_MESSAGE__) = alloc_cstring(tmp, "config file");
 
     if (scan_config_line("port number : %d\n", &CONFIG_INT(__MUD_PORT__), 0)) {
 	external_port[0].port = PORTNO;
@@ -218,8 +219,6 @@ void set_defaults P1(char *, filename)
     /*
      * not currently used...see options.h
      */
-    scan_config_line("maximum users : %d\n",
-		     &CONFIG_INT(__MAX_USERS__), 0);
     scan_config_line("maximum efun sockets : %d\n",
 		     &CONFIG_INT(__MAX_EFUN_SOCKS__), 0);
     scan_config_line("compiler stack size : %d\n",
@@ -298,7 +297,6 @@ void set_defaults P1(char *, filename)
     /*
      * from options.h
      */
-    config_int[__MAX_USERS__ - BASE_CONFIG_INT] = MAX_USERS;
     config_int[__MAX_EFUN_SOCKS__ - BASE_CONFIG_INT] = MAX_EFUN_SOCKS;
     config_int[__COMPILER_STACK_SIZE__ - BASE_CONFIG_INT] = COMPILER_STACK_SIZE;
     config_int[__EVALUATOR_STACK_SIZE__ - BASE_CONFIG_INT] = EVALUATOR_STACK_SIZE;

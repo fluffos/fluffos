@@ -7,14 +7,16 @@ STRFUNCS=
 INSTALL=install -c
 INSTALL_DIR=../bin
 OPTIMIZE=
-CPP=cc -E
+CPP=gcc -E
 CFLAGS=-g -DDEBUG
-CC=cc
+CC=gcc
 YACC=bison -d -y
 
 #################################################
 # the meat of things                            #
 # don't change anything below this section      #
+#                                               #
+# RUN ./build.MudOS to generate the Makefiles   #
 #################################################
 
 SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
@@ -51,6 +53,9 @@ Makefile.MudOS: edit_source
 which_makefile:
 	echo MakeIsMake
 
+hash.o: hash.c
+	$(CC) $(CFLAGS) $(OPTIMIZE) -c hash.c
+
 remake: neat all
 
 depend: opcodes.h efun_protos.h grammar.tab.h cc.h efunctions.h efun_defs.c
@@ -68,15 +73,20 @@ cc.h: Makefile
 	echo '#define OBJDIR   "$(OBJDIR)"' >> cc.h
 
 # The long list in the first ./edit_source depend on -options
-opcodes.h: options.h func_spec.c op_spec.c edit_source
+opcodes.h: options.h func_spec.c op_spec.c edit_source mudlib
 	./edit_source -options -build_func_spec '$(CPP) $(CFLAGS)' \
 		      -process packages/Makefile.pre \
                       -process packages/GNUmakefile.pre
+	./edit_source -process mudlib/Makefile.pre
+	./edit_source -process mudlib/GNUmakefile.pre
 	./edit_source -build_efuns
 
+# the touches here are necessary to fix the modification times; link(2) does
+# 'modify' a file
 malloc.c: sysmalloc.c smalloc.c bsdmalloc.c wrappedmalloc.c debugmalloc.c options.h edit_source
 	./edit_source -malloc
 	touch mallocwrapper.c
+	touch malloc.c
 
 make_func.tab.c: make_func.y cc.h
 	$(YACC) $(YFLAGS) make_func.y

@@ -7,6 +7,7 @@
 #define NO_OPCODES
 #include "std.h"
 #include "malloc.h"
+#include "lpc_incl.h"
 #include "comm.h"
 
 typedef struct stats_s {

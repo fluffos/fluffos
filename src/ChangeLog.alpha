@@ -1,3 +1,144 @@
+---------------------------------------------------------------------------
+(v21.3a7 promoted to v21.3b1)
+
+Tue Apr 25 15:43:47 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.3a7
+	* updated with respect to v21.2b8
+	* added Robocoder's optimization to read_buffer()
+	* fixed alot of things gcc -Wall complained about
+	* fixed a crasher in disassembling code involving classes
+	* fixed type checking to not give an error for missing type
+	  for arguments when type checking is off
+	* fixed a bug which could cause type errors in non-type checked
+	  functions, especially wrt 'return x;'
+	* fixed a problem that would cause edit_source -configure to run
+	  on every make
+	* check return values and report file errors in edit_source -malloc
+	* configure checks for <sys/sysmacros.h>, and <bstring.h> if DEBUG
+	  is on (sgi prototypes for bzero, which is used by FD_ZERO is there)
+	* only add -lmalloc if malloc() isn't in a standard library
+	
+Tue Apr 25 15:25:06 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.3a6
+	* fixed misoptimizations of nullp() and undefinedp()
+	* fixed a bug in array subtraction, intersection, and other
+	  operations (next person who uses & when they mean == will be
+	  shot)
+	* fixed two typos in the build.MudOS script
+
+Sun Apr 23 18:53:24 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.3a5
+	* updated with respect to v21.2b7
+	* fixed a bug in the STRFUNCS check in ./build.MudOS
+	* fixed some compilation problems with string functions and
+	  DEBUGMALLOC
+
+Sat Apr 22 21:38:11 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.3a4
+	* fixed some compilation problems with DEBUGMALLOC tags in function
+	  calls
+	* fixed a typo in the T_REFED optimization that would cause the
+	  gamedriver to crash right after booting
+	* fixed save/restore of classes
+	* fixed reclaim_objects() to correctly handle destructed objects
+	  as mapping keys; the equivalent of map_delete() is now done
+	  on them
+	* optimized free_string() with some ideas from Armand@TMI-2
+
+Fri Apr 21 02:06:38 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.3a3
+	* updated with respect to v21.2b6
+	* optimized free_svalue() and assign_svalue_no_free() by
+	  handling all refed objects similarly and saving a switch()
+	* fixed some compilation problems in interpret.c
+	* fixed some of the tagged routines to depend on DEBUGMALLOC,
+	  not DEBUG
+	* fixed the external declaration of svalue_strlen_size
+
+Tue Apr 11 12:23:36 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.3a2
+	* updated with respect to v21.2b5
+	* fixed a variable name clash (type_names) between interpret.c and
+	  compiler.c
+	* edit_source -configure now checks for the existence of strerror()
+	  for better POSIX compatibility
+	* fixed catch() to work from LPC->C code
+	* if the compiler found is 'cc', check if it is gcc and if so use
+	  gcc's optimization flags
+	* MAX_USERS no longer exists; instead, space is allocated as needed.
+	  a limit should probably be enforced by the mudlib to avoid running
+	  out of file descriptors ...
+	* new efun alias: this_user() == this_player()
+	* compile hash.o with optimization since it is used in the main
+	  driver as well as edit_source
+	* added an optional flag to the functions() contrib efun:
+	  functions(object, 1) returns:
+	  ({ "function_name", num_arg, ret_type, arg1type, arg2type, ... })
+	  where the types are the type numbers given by typeof()
+	* COMPAT BUSTER: map_mapping now passes the value, not the key,
+	  to the function pointer.
+	* evaluate() and apply() now return 'mixed' and don't need casting
+	  with CAST_CALL_OTHERS defined
+	* rewrote malloc'ed strings to be ref counted and remember their
+	  lengths.  This gives a factor of 2-5 speed gain on many string
+	  operations at the cost of 4 bytes of memory per string.  However,
+	  the reference counts means that malloc'ed strings are not duplicated
+	  when copied, so despite the new overhead, many muds may see a
+	  reduction in memory used by strings.  Note: If you are trying
+	  to test this, note that check_memory() and mud_status() now
+	  report ALL memory used by strings; previously only the memory
+	  used by shared strings was reported, the memory used by malloc'ed
+	  strings wasn't reported anywhere.
+	* made strings statistics optional since they can have an impact
+	  on the speed of string operations.
+	* driver guru info:
+	  where you used to do:          now do:
+	  x = (char *)DXALLOC(n+1, ...   x = new_string(n, "foo")
+	  FREE(x)                        FREE_MSTR(x)
+	  x = DREALLOC(x, ...            x = extend_string(x, ...
+	  strlen(shared_string)          SHARED_STRLEN(shared_string)
+
+	  note that string_copy() now returns a ref'd, counted string.
+	  if you really do just want a copy of an area as a normal
+	  allocated block, see alloc_cstring()
+
+	  Also, it isn't safe to assume you can write into a malloc'ed
+	  string now.  See unlink_string_svalue() if you need to do it.
+	* optimized explode() and implode() to use SVALUE_STRLEN to
+	  find the length of their arguments
+	* removed some unused ed flags
+	* added a new ed set option 'verbose' which shows number of lines
+	  and bytes in files, etc
+	* added a check not to add -lcrypt if crypt() is defined in libc.a
+
+Tue Apr 11 00:36:00 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.3a1
+	* updated with respect to v21.2b3
+	* successfully compiled and ran the driver with all loaded objects
+	  compiled into the driver (LPC->C); the only things that may not
+	  work are catch() and defining functionals/expression pointers
+	  (although calling function pointers will work fine)
+	* fixed a typo in the type checking code generated for to_float/to_int
+	  (LPC->C)
+	* precompiled objects now depend upon binaries which are saved with
+	  the .B extension so they don't conflict with normal binaries
+	* fixed in generation of the following LPC->C code:
+	  . while (i--) ...
+	  . for or while (x < y) ...
+	* added support for (--x), (++x), void_assign_local, x--, (-x), (~x),
+	  x[<y], (: ... :) in LPC->C compiled code
+	* generate_source() now sends precompiled objects into a mudlib/
+	  subdir of the binaries dir if passed an array of files, and
+	  creates multiple source files there instead of one huge source
+	  file.  The mudlib/ dir can be copied unchanged into the driver
+	  source dir and compiled.
+	* removed support for ALWAYS_SAVE_COMPILED_BINARIES
+	* made the output of lpc_info() more readable
+	* F_WHILE_DEC now uses up one less byte
+	* removed an unused version of find_status()
+	* fixed a bug in sprintf's column option that would omit a character
+	  if a line was too wide
+
 ----------------------------------------------------------------------------
 Thu Mar 30 15:45:30 EST 1995
 	* promoted to beta status (see v21.1b1)
@@ -145,6 +286,7 @@ Wed Mar 22 23:37:55 EST 1995 (tim@handel.princeton.edu (Beek))
 	  via GNUmakefile.pre and Makefile.pre; one side effect of this is
 	  that you can use 'make Makefiles' to return your Makefile to
 	  it's unedited state
+	* fixed a crasher in objects dested from some socket callbacks
 	  
 Sun Mar 19 02:32:56 EST 1995 (tim@handel.princeton.edu (Beek))
 	* bumped patchlevel to v21.2a4

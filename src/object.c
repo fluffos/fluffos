@@ -10,6 +10,7 @@
 #include "call_out.h"
 #include "port.h"
 #include "file.h"
+#include "hash.h"
 
 #define too_deep_save_error() \
     error("Mappings and/or arrays nested too deep (%d) for save_object\n",\
@@ -23,6 +24,7 @@ static void remove_all_objects PROT((void));
 #endif
 char *save_mapping PROT ((mapping_t *m));
 INLINE static int restore_array PROT((char **str, svalue_t *));
+INLINE static int restore_class PROT((char **str, svalue_t *));
 int restore_hash_string PROT((char **str, int *a, svalue_t *));
 
 INLINE int
@@ -51,7 +53,7 @@ INLINE int svalue_save_size P1(svalue_t *, v)
 	    char c;
 	    int size = 0;
 
-	    while (c = *cp++){
+	    while ((c = *cp++)) {
 		if (c == '\\' || c == '\"') size++;
 		size++;
 	    }
@@ -133,7 +135,7 @@ INLINE void save_svalue P2(svalue_t *, v, char **, buf)
 	    char c;
 
 	    *cp++ = '"';
-	    while (c = *str++){
+	    while ((c = *str++)) {
 		if (c == '"' || c == '\\'){
 		    *cp++ = '\\';
 		    *cp++ = c;
@@ -178,7 +180,7 @@ INLINE void save_svalue P2(svalue_t *, v, char **, buf)
 		save_svalue(sv++, buf);
 		*(*buf)++ = ',';
 	    }
-	    *(*buf)++ = '}';
+	    *(*buf)++ = '/';
 	    *(*buf)++ = ')';
 	    *(*buf) = '\0';
 	    return;
@@ -240,7 +242,7 @@ restore_internal_size P3(char **, str, int, is_mapping, int, depth)
     char c, delim, index = 0;
 
     delim = is_mapping ? ':' : ',';
-    while (c = *cp++){
+    while ((c = *cp++)) {
 	switch(c){
 	case '\"':
 	    {
@@ -265,7 +267,10 @@ restore_internal_size P3(char **, str, int, is_mapping, int, depth)
 		    *str = ++cp;
 		    if (!restore_internal_size(str, 1, save_svalue_depth++)){ return 0;}
 		}
-		else { return 0;}
+		else if (*cp == '/') {
+		    if (!restore_internal_size(str, 0, save_svalue_depth++))
+			return 0;
+		} else { return 0;}
 		
 		if (*(cp = *str) != delim){ return 0;}
 		cp++;
@@ -294,6 +299,7 @@ restore_internal_size P3(char **, str, int, is_mapping, int, depth)
 		else { return 0; }
 	    }
 
+	case '/':
 	case '}':
 	    {
 		if (*cp++ == ')' && !is_mapping){
@@ -346,7 +352,7 @@ restore_size P2(char **, str, int, is_mapping)
 
     delim = is_mapping ? ':' : ',';
 
-    while (c = *cp++){
+    while ((c = *cp++)) {
 	switch(c){
 	case '\"':
 	    {
@@ -368,7 +374,10 @@ restore_size P2(char **, str, int, is_mapping)
 		    *str = ++cp;
 		    if (!restore_internal_size(str, 1, save_svalue_depth++)) return -1;
 		}
-		else { return -1; }
+		else if (*cp == '/'){
+		    *str = ++cp;
+		    if (!restore_internal_size(str, 0, save_svalue_depth++)) return -1;
+		} else { return -1; }
 		
 		if (*(cp = *str) != delim) { return -1;}
 		cp++;
@@ -386,6 +395,7 @@ restore_size P2(char **, str, int, is_mapping)
 		else { return -1;}
 	    }
 
+	case '/':
 	case '}':
 	    {
 		save_svalue_depth = 0;
@@ -440,7 +450,7 @@ restore_interior_string P2(char **, val, svalue_t *, sv)
 	    {
 		char *new = cp - 1;
 
-		if (*new++ = *cp++){
+		if ((*new++ = *cp++)) {
 		    while ((c = *cp++) != '"'){
 			if (c == '\\'){
 			    if (!(*new++ = *cp++)) return ROB_STRING_ERROR;
@@ -458,8 +468,8 @@ restore_interior_string P2(char **, val, svalue_t *, sv)
 		    if (c == '\0') return ROB_STRING_ERROR;
 		    *new = '\0';
 		    *val = cp;
-		    sv->u.string = DXALLOC((len = (new - start)) + 1, TAG_STRING,
-				"restore_string");
+		    sv->u.string = new_string(len = (new - start),
+					      "restore_string");
 		    strcpy(sv->u.string, start);
 		    sv->type = T_STRING;
 		    sv->subtype = STRING_MALLOC;
@@ -479,7 +489,7 @@ restore_interior_string P2(char **, val, svalue_t *, sv)
     *val = cp;
     *--cp = '\0';
     len = cp - start;
-    sv->u.string = DXALLOC(len + 1, TAG_STRING, "restore_string");
+    sv->u.string = new_string(len, "restore_string");
     strcpy(sv->u.string, start);
     sv->type = T_STRING;
     sv->subtype = STRING_MALLOC;
@@ -552,7 +562,7 @@ restore_mapping P2(char **,str, svalue_t *, sv)
 	case '"':
 	    {
 		*str = cp;
-		if (err = restore_hash_string(str, &oi, &key))
+		if ((err = restore_hash_string(str, &oi, &key)))
 		    goto key_error;
 		cp = *str;
 		cp++;
@@ -564,21 +574,20 @@ restore_mapping P2(char **,str, svalue_t *, sv)
 		save_svalue_depth++;
 		if (*cp == '['){
 		    *str = ++cp;
-		    if (err = restore_mapping(str, &key))
+		    if ((err = restore_mapping(str, &key)))
 			goto key_error;
 		    oi = (int) key.u.map;
 		}
 		else if (*cp == '{'){
 		    *str = ++cp;
-		    if (err = restore_array(str, &key))
+		    if ((err = restore_array(str, &key)))
 			goto key_error;
 		    oi = (int) key.u.arr;
 		}
 		else if (*cp == '/') {
 		    *str = ++cp;
-		    if (err = restore_array(str, &key))
+		    if ((err = restore_class(str, &key)))
 			goto key_error;
-		    key.type = T_CLASS;
 		    oi = (int) key.u.arr;
 		}
 		else goto generic_key_error;
@@ -628,7 +637,7 @@ restore_mapping P2(char **,str, svalue_t *, sv)
 	case '"':
 	    {
 		*str = cp;
-		if (err = restore_interior_string(str, &value))
+		if ((err = restore_interior_string(str, &value)))
 		    goto value_error;
 		cp = *str;
 		cp++;
@@ -640,18 +649,17 @@ restore_mapping P2(char **,str, svalue_t *, sv)
 		save_svalue_depth++;
 		if (*cp == '['){
 		    *str = ++cp;
-		    if (err = restore_mapping(str, &value))
+		    if ((err = restore_mapping(str, &value)))
 			goto value_error;
 		}
 		else if (*cp == '{'){
 		    *str = ++cp;
-		    if (err = restore_array(str, &value))
+		    if ((err = restore_array(str, &value)))
 			goto value_error;
 		} else if (*cp == '/') {
 		    *str = ++cp;
-		    if (err = restore_array(str, &value))
+		    if ((err = restore_class(str, &value)))
 			goto value_error;
-		    value.type = T_CLASS;
 		}
 		else goto generic_value_error;
 		cp = *str;
@@ -691,7 +699,7 @@ restore_mapping P2(char **,str, svalue_t *, sv)
 	/* both key and value are valid, referenced svalues */
 
 	i = oi & mask;
-	if (elt2 = elt = a[i]){
+	if ((elt2 = elt = a[i])) {
 	    do {
 		if (sameval(&key, elt->values)){
 		    free_svalue(&key, "restore_mapping: duplicate key");
@@ -699,7 +707,7 @@ restore_mapping P2(char **,str, svalue_t *, sv)
 		    *(elt->values+1) = value;
 		    break;
 		}
-	    } while (elt = elt->next);
+	    } while ((elt = elt->next));
 	    if (elt)
 		continue;
 	} else if (!(--m->unfilled)){
@@ -755,6 +763,103 @@ restore_mapping P2(char **,str, svalue_t *, sv)
 
 
 INLINE static int
+restore_class P2(char **, str, svalue_t *, ret)
+{   
+    int size;
+    char c;
+    array_t *v;
+    svalue_t *sv;
+    register char *cp = *str;
+    int err;
+
+    if (save_svalue_depth) size = sizes[save_svalue_depth-1];
+    else if ((size = restore_size(str,0)) < 0) return ROB_CLASS_ERROR; 
+
+    v = allocate_array(size); /* after this point we have to clean up
+				 or we'll leak */
+    sv = v->item;
+
+    while (size--) {
+	switch (c = *cp++) {
+	case '"':
+	    *str = cp;
+	    if ((err = restore_interior_string(str, sv)))
+		goto generic_error;
+	    cp = *str;
+	    cp++;
+	    sv++;
+	    break;
+
+	case ',':
+	    sv++;
+	    break;
+
+	case '(':
+	    {
+		save_svalue_depth++;
+		if (*cp == '['){
+		    *str = ++cp;
+		    if ((err = restore_mapping(str, sv)))
+			goto error;
+		}
+		else if (*cp == '{'){
+		    *str = ++cp;
+		    if ((err = restore_array(str, sv)))
+			goto error;
+		}
+		else if (*cp == '/') {
+		    *str = ++cp;
+		    if ((err = restore_class(str, sv)))
+			goto error;
+		}
+		else goto generic_error;
+		sv++;
+		cp = *str;
+		cp++;
+		break;
+	    }
+
+	case '-':
+	    {
+		if ((c = *cp++) < '0' || c > '9') {
+		    err = ROB_NUMERAL_ERROR;
+		    goto error;
+		}
+		PARSE_NUMERIC((sv->u.real = -(f1+res), (sv++)->type = T_REAL),
+			      ((sv++)->u.number = -res),
+			      goto numeral_error)
+	    }
+
+	case '0': case '1': case '2': case '3': case '4':
+	case '5': case '6': case '7': case '8': case '9':
+	    {
+		PARSE_NUMERIC((sv->u.real = (f1+res), (sv++)->type = T_REAL),
+			      ((sv++)->u.number = res),
+			      goto numeral_error)
+	    }
+
+	default:
+	    goto generic_error;
+	}
+    }
+
+    cp += 2;
+    *str = cp;
+    ret->u.arr = v;
+    ret->type = T_CLASS;
+    return 0;
+    /* something went wrong */
+ numeral_error:
+    err = ROB_NUMERAL_ERROR;
+    goto error;
+ generic_error:
+    err = ROB_CLASS_ERROR;
+ error:
+    free_array(v);
+    return err;
+}
+
+INLINE static int
 restore_array P2(char **, str, svalue_t *, ret)
 {   
     int size;
@@ -775,7 +880,7 @@ restore_array P2(char **, str, svalue_t *, ret)
 	switch (c = *cp++) {
 	case '"':
 	    *str = cp;
-	    if (err = restore_interior_string(str, sv))
+	    if ((err = restore_interior_string(str, sv)))
 		goto generic_error;
 	    cp = *str;
 	    cp++;
@@ -791,19 +896,18 @@ restore_array P2(char **, str, svalue_t *, ret)
 		save_svalue_depth++;
 		if (*cp == '['){
 		    *str = ++cp;
-		    if (err = restore_mapping(str, sv))
+		    if ((err = restore_mapping(str, sv)))
 			goto error;
 		}
 		else if (*cp == '{'){
 		    *str = ++cp;
-		    if (err = restore_array(str, sv))
+		    if ((err = restore_array(str, sv)))
 			goto error;
 		}
 		else if (*cp == '/') {
 		    *str = ++cp;
-		    if (err = restore_array(str, sv))
+		    if ((err = restore_class(str, sv)))
 			goto error;
-		    sv->type = T_CLASS;
 		}
 		else goto generic_error;
 		sv++;
@@ -876,7 +980,7 @@ restore_string P2(char *, val, svalue_t *, sv)
             {
                 char *new = cp - 1;
 
-                if (*new++ = *cp++){
+                if ((*new++ = *cp++)) {
                     while ((c = *cp++) != '"'){
                         if (c == '\\'){
                             if (!(*new++ = *cp++)) return ROB_STRING_ERROR;
@@ -893,8 +997,8 @@ restore_string P2(char *, val, svalue_t *, sv)
 		    }
                     if ((c == '\0') || (*cp != '\0')) return ROB_STRING_ERROR;
                     *new = '\0';
-                    sv->u.string = DXALLOC(new - start + 1, TAG_STRING,
-					   "restore_string");
+                    sv->u.string = new_string(new - start,
+					      "restore_string");
                     strcpy(sv->u.string, start);
 		    sv->type = T_STRING;
 		    sv->subtype = STRING_MALLOC;
@@ -914,7 +1018,7 @@ restore_string P2(char *, val, svalue_t *, sv)
     if (*cp--) return ROB_STRING_ERROR;
     *cp = '\0';
     len = cp - start;
-    sv->u.string = DXALLOC(len + 1, TAG_STRING, "restore_string");
+    sv->u.string = new_string(len, "restore_string");
     strcpy(sv->u.string, start);
     sv->type = T_STRING;
     sv->subtype = STRING_MALLOC;
@@ -934,14 +1038,11 @@ restore_svalue P2(char *, cp, svalue_t *, v)
 	    if (*cp == '{'){
 		cp++;
 		return restore_array(&cp, v);
-	    } else if (*cp++ == '[') {
+	    } else if (*cp == '[') {
+		cp++;
 		return restore_mapping(&cp, v);
 	    } else if (*cp++ == '/') {
-		int tmp;
-		if (tmp = restore_array(&cp, v))
-		    return tmp;
-		v->type = T_CLASS;
-		return 0;
+		return restore_class(&cp, v);
 	    }
 	    else return ROB_GENERAL_ERROR;
 	}
@@ -984,18 +1085,18 @@ safe_restore_svalue P2(char *, cp, svalue_t *, v)
     val.type = T_NUMBER;
     switch(*cp++) {
     case '\"':
-	if (ret = restore_string(cp, &val)) return ret;
+	if ((ret = restore_string(cp, &val))) return ret;
 	break;
     case '(':
 	{
 	    if (*cp == '{'){
 		cp++;
-		if (ret = restore_array(&cp, &val)) return ret;
-	    } else if (*cp++ == '[') {
-		if (ret = restore_mapping(&cp, &val)) return ret;
+		if ((ret = restore_array(&cp, &val))) return ret;
+	    } else if (*cp == '[') {
+		cp++;
+		if ((ret = restore_mapping(&cp, &val))) return ret;
 	    } else if (*cp++ == '/') {
-		if (ret = restore_array(&cp, &val)) return ret;
-		val.type = T_CLASS;
+		if ((ret = restore_class(&cp, &val))) return ret;
 	    }
 	    else return ROB_GENERAL_ERROR;
 	    break;
@@ -1030,13 +1131,15 @@ safe_restore_svalue P2(char *, cp, svalue_t *, v)
 }
 
 static int var_index = 0;
+/* optimized to start where we left off, so that walking the variables in
+   order is O(N) instead of O(N^2) -Beek */
 
 variable_t *find_status P1(char *, str) {
     int i;
     variable_t *vars = current_object->prog->variable_names;
     int n = current_object->prog->num_variables;
     
-    if (str = findstring(str)) {
+    if ((str = findstring(str))) {
 	for (i=var_index; i < n; i++) {
 	    if (vars[i].name == str) {
 		var_index = i+1;
@@ -1114,6 +1217,8 @@ restore_object_from_buff P4(object_t *, ob, char *, theBuff, char *, name,
                 error("restore_object(): Illegal mapping format while restoring %s.\n", var);
 	    else if (rc & ROB_STRING_ERROR)
 		error("restore_object(): Illegal string format while restoring %s.\n", var);
+	    else if (rc & ROB_CLASS_ERROR)
+		error("restore_object(): Illegal class format while restoring %s.\n", var);
         }
     }
 }
@@ -1242,7 +1347,7 @@ save_variable P1(svalue_t *, var)
     
     save_svalue_depth = 0;
     theSize = svalue_save_size(var);
-    new_string = (char *)DXALLOC(theSize, TAG_STRING, "save_object: 2");
+    new_string = new_string(theSize - 1, "save_variable");
     *new_string = '\0';
     p = new_string;
     save_svalue(var, &p);
@@ -1406,21 +1511,12 @@ void tell_object P2(object_t *, ob, char *, str)
 #endif
 }
 
-void free_object P2(object_t *, ob, char *, from)
+void dealloc_object P2(object_t *, ob, char *, from)
 {
 #ifndef NO_ADD_ACTION
     sentence_t *s;
 #endif
 
-    ob->ref--;
-#ifdef DEBUG
-    if (d_flag > 1)
-	printf("Subtr ref to ob %s: %u (%s)\n", ob->name,
-	       ob->ref, from);
-#endif
-    debug(16384, ("subtr ref to ob %s: %d (%s)\n", ob->name, ob->ref, from));
-    if (ob->ref > 0)
-	return;
 #ifdef DEBUG
     if (d_flag)
 	printf("free_object: %s.\n", ob->name);
@@ -1469,6 +1565,15 @@ void free_object P2(object_t *, ob, char *, from)
     }
     tot_alloc_object--;
     FREE((char *) ob);
+}
+
+void free_object P2(object_t *, ob, char *, from)
+{
+    ob->ref--;
+
+    if (ob->ref > 0)
+	return;
+    dealloc_object(ob, from);
 }
 
 /*
@@ -1730,6 +1835,10 @@ void reload_object P1(object_t *, obj)
 	close_referencing_sockets(obj);
     }
 #endif
+
+    if (obj->flags & O_SWAPPED)
+	load_ob_from_swap(obj);
+    
     /*
      * If this is the first object being shadowed by another object, then
      * destruct the whole list of shadows.

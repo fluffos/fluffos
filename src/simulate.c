@@ -13,6 +13,7 @@
 #include "md.h"
 #include "eoperators.h"
 #include "ed.h"
+#include "file.h"
 
 /*
  * 'inherit_file' is used as a flag. If it is set to a string
@@ -88,7 +89,7 @@ init_privs_for_object P1(object_t *, ob)
 	ob->privs = NULL;
 	return;
     }
-    push_string(ob->name, STRING_CONSTANT);
+    push_string(ob->name, STRING_SHARED);
     if (!privs_file_fname)
 	privs_file_fname = make_shared_string(APPLY_PRIVS_FILE);
     value = apply(privs_file_fname, tmp_ob, 1, ORIGIN_DRIVER);
@@ -128,7 +129,7 @@ static int give_uid_to_object P1(object_t *, ob)
     /*
      * Ask master object who the creator of this object is.
      */
-    push_string(ob->name, STRING_CONSTANT);
+    push_string(ob->name, STRING_SHARED);
     if (!creator_file_fname)
 	creator_file_fname = make_shared_string(APPLY_CREATOR_FILE);
     ret = apply_master_ob(creator_file_fname, 1);
@@ -218,6 +219,7 @@ static svalue_t *
     svalue_t *v;
 
     if (master_ob == (object_t *)-1) return 0;
+    /* FIXME */
     push_string(name, STRING_MALLOC);
     v = apply_master_ob(APPLY_COMPILE_OBJECT, 1);
     if (!v || (v->type != T_OBJECT)) {
@@ -250,7 +252,7 @@ void set_master P1(object_t *, ob) {
     ret = apply_master_ob(APPLY_GET_ROOT_UID, 0);
     /* can't be -1 or we wouldn't be here */
     if (ret == 0 || ret->type != T_STRING) {
-        fprintf("%s() in master object does not work\n",
+        fprintf(stderr, "%s() in master object does not work\n",
 		    APPLY_GET_ROOT_UID);
 	exit(-1);
     }
@@ -262,7 +264,7 @@ void set_master P1(object_t *, ob) {
 #  endif
       ret = apply_master_ob(APPLY_GET_BACKBONE_UID, 0);
       if (ret == 0 || ret->type != T_STRING) {
-	  fprintf("%s() in the master file does not work\n",
+	  fprintf(stderr, "%s() in the master file does not work\n",
 		  APPLY_GET_BACKBONE_UID);
 	  exit(-1);
       }
@@ -337,7 +339,6 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
     svalue_t *mret;
     struct stat c_st;
     char real_name[200], name[200];
-    char *p;
     int is_master_ob=0;
 #ifdef LPC_TO_C
     char out_name[200];
@@ -391,7 +392,7 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 	remove_object_hash(ob);
 	if (ob->name)
 	    FREE(ob->name);
-	ob->name = string_copy(name, "load_object");
+	ob->name = alloc_cstring(name, "load_object");
 	SET_TAG(ob->name, TAG_OBJ_NAME);
 	enter_object_hash(ob);
 	ob->flags |= O_VIRTUAL;
@@ -481,26 +482,37 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
      * "inherit_file" will be set by lang.y to point to a file name.
      */
     if (inherit_file) {
-	char *tmp = inherit_file;
+	object_t *inh_obj;
+	char inhbuf[MAX_OBJECT_NAME_SIZE];
 
+	if (!strip_name(inherit_file, inhbuf, sizeof inhbuf))
+	    strcpy(inhbuf, inherit_file);
+	FREE(inherit_file);
+	inherit_file = 0;
+	
 	if (prog) {
 	    free_prog(prog, 1);
 	    prog = 0;
 	}
-	if (strcmp(inherit_file, name) == 0) {
+	if (strcmp(inhbuf, name) == 0) {
 	    if (is_master_ob) master_ob_is_loading = 0;
 	    if (simul_efun_is_loading) simul_efun_is_loading = 0;
-	    FREE(inherit_file);
-	    inherit_file = 0;
 	    error("Illegal to inherit self.\n");
 	}
-	inherit_file = 0;
 	/*
 	 * Beek - all the flags refer to this file and shouldn't be passed
 	 * down
 	 */
-	load_object(tmp, 0);
-	FREE(tmp);
+	if ((inh_obj = lookup_object_hash(inhbuf))) {
+#ifdef LPC_TO_C
+	    DEBUG_CHECK(!(inh_obj->flags & O_COMPILED_PROGRAM), "Inherited object is already loaded!\n");
+	    load_object(inhbuf, (lpc_object_t *)inh_obj);
+#else
+	    IF_DEBUG(fatal("Inherited object is already loaded!"));
+#endif
+	} else {
+	    load_object(inhbuf, 0);
+	}
 
 	/*
 	 * Yes, the following is necessary.  It is possible that when we
@@ -531,7 +543,7 @@ object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
     }
     ob = get_empty_object(prog->num_variables);
     /* Shared string is no good here */
-    ob->name = string_copy(name, "load_object");
+    ob->name = alloc_cstring(name, "load_object");
     SET_TAG(ob->name, TAG_OBJ_NAME);
     ob->prog = prog;
     ob->flags |= O_WILL_RESET;	/* must be before reset is first called */
@@ -627,7 +639,6 @@ object_t *clone_object P2(char *, str1, int, num_arg)
 	     * it.
 	     */
 	    svalue_t *v;
-	    char *p;
 
 	    pop_n_elems(num_arg); /* possibly this should be smarter */
 	                          /* but then, this whole section is a
@@ -775,7 +786,7 @@ object_t *object_present P2(svalue_t *, v, object_t *, ob)
     if (specific)
 	return 0;
     if (ob->super) {
-	push_string(v->u.string, STRING_CONSTANT);
+	push_svalue(v);
 	ret = apply(APPLY_ID, ob->super, 1, ORIGIN_DRIVER);
 	if (ob->super->flags & O_DESTRUCTED)
 	    return 0;
@@ -804,7 +815,7 @@ static object_t *object_present2 P2(char *, str, object_t *, ob)
     int count = 0, length;
     char *item;
 
-    item = string_copy(str, "object_present2");
+    item = alloc_cstring(str, "object_present2");
     length = strlen(item);
     p = item + length - 1;
     if (*p >= '0' && *p <= '9') {
@@ -817,7 +828,7 @@ static object_t *object_present2 P2(char *, str, object_t *, ob)
 	}
     }
     for (; ob; ob = ob->next_inv) {
-	push_string(item, STRING_CONSTANT);
+	push_string(item, STRING_SHARED);
 	ret = apply(APPLY_ID, ob, 1, ORIGIN_DRIVER);
 	if (ob->flags & O_DESTRUCTED) {
 	    FREE(item);
@@ -1419,14 +1430,12 @@ void do_write P1(svalue_t *, arg)
 object_t *find_object P1(char *, str)
 {
     object_t *ob;
-    char *p;
-    register int length;
     char tmpbuf[MAX_OBJECT_NAME_SIZE];
 
     if (!strip_name(str, tmpbuf, sizeof tmpbuf))
 	return 0;
 
-    if (ob = lookup_object_hash(tmpbuf)) {
+    if ((ob = lookup_object_hash(tmpbuf))) {
 #ifdef LPC_TO_C
 	if (ob->flags & O_COMPILED_PROGRAM) {
 	    ob = load_object(tmpbuf, (lpc_object_t *)ob);
@@ -1450,7 +1459,6 @@ object_t *find_object P1(char *, str)
 object_t *find_object2 P1(char *, str)
 {
     register object_t *ob;
-    register int length;
     char p[MAX_OBJECT_NAME_SIZE];
 
     if (!strip_name(str, p, sizeof p))
@@ -2107,8 +2115,6 @@ static void error_handler P1(char *, err)
     num_objects_this_thread = 0;/* reset the count */
     if (error_recovery_context_exists == CATCH_ERROR_CONTEXT) {	
         /* user catches this error */
-	svalue_t v;
-	
 #ifdef LOG_CATCHES
 	/* This is added so that catches generate messages in the log file. */
 #ifdef MUDLIB_ERROR_HANDLER
@@ -2177,8 +2183,7 @@ static void error_handler P1(char *, err)
 	add_mapping_pair(m, "line", line);
 	num_error--;
 	reset_machine(0);
-	push_mapping(m);
-	m->ref--;
+	push_refed_mapping(m);
 	mret = apply_master_ob(APPLY_ERROR_HANDLER, 1);
 	if ((mret == (svalue_t *)-1) || !mret) {
 	    debug_message("No error handler for error: ");
@@ -2272,7 +2277,7 @@ void error_needs_free P1(char *, s)
     strncpy(err_buf + 1, s, 2047);
     err_buf[0] = '*';		/* all system errors get a * at the start */
     err_buf[1999] = '\0';
-    FREE(s);
+    FREE_MSTR(s);
 
     error_handler(err_buf);
 }
@@ -2415,7 +2420,7 @@ void do_message P5(svalue_t *, class, char *, msg, array_t *, scope, array_t *, 
 	    }
 	    if (valid) {
 		push_svalue(class);
-		push_string(msg, STRING_CONSTANT);
+		push_string(msg, STRING_SHARED);
 		apply(APPLY_RECEIVE_MESSAGE, ob, 2, ORIGIN_DRIVER);
 	    }
 	} else if (recurse) {

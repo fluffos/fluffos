@@ -62,7 +62,7 @@ static sp_block_t scratch_head = { 0, 0 };
 unsigned char *scr_last = &scratchblock[2], *scr_tail = &scratchblock[2];
 unsigned char *scratch_end = scratchblock + SCRATCHPAD_SIZE;
 
-#ifdef DEBUG
+#if 0
 static void scratch_summary PROT((void));
 
 static void scratch_summary() {
@@ -164,7 +164,8 @@ char *scratch_large_alloc P1(int, size) {
     SDEBUG(printf("scratch_large_alloc(%i)\n", size));
 
     spt = (sp_block_t *)DMALLOC(SIZE_WITH_HDR(size), TAG_COMPILER, "scratch_alloc");
-    if (spt->next = scratch_head.next) spt->next->prev = spt;
+    if ((spt->next = scratch_head.next))
+	spt->next->prev = spt;
     spt->prev = (sp_block_t *)&scratch_head;
     spt->block[0] = SCRATCH_MAGIC;
     scratch_head.next = spt;

@@ -12,6 +12,8 @@
 #include "port.h"
 #include "md.h"
 #include "main.h"
+#include "compile_file.h"
+#include "socket_efuns.h"
 
 port_def_t external_port[5];
 
@@ -102,7 +104,7 @@ int main(argc, argv)
 	getcwd(bing, 80);
 	strcat(bing, "\\");
 	strcat(bing, argv[0]);
-	argv[0] = string_copy(bing, "main");
+	argv[0] = alloc_cstring(bing, "main");
     }
     startup_windows(argc, argv);
 }				/* main() */
@@ -123,7 +125,9 @@ int main(argc, argv)
     int no_ip_demon = 0;
     char *p;
     char version_buf[80];
+#if 0
     int dtablesize;
+#endif
 
 #if !defined(LATTICE) && !defined(OLD_ULTRIX) && !defined(sequent) && \
     !defined(sgi)
@@ -251,6 +255,9 @@ int main(argc, argv)
     init_otable();		/* in otable.c */
     init_identifiers();		/* in lex.c */
     init_locals();              /* in compiler.c */
+
+/* disable this for now */
+#if 0
     /*
      * We estimate that we will need MAX_USERS + MAX_EFUN_SOCKS + 10 file
      * descriptors if the maximum number of users were to log in and all LPC
@@ -299,6 +306,7 @@ int main(argc, argv)
      */
     fprintf(stderr, "%d file descriptors were allocated, (%d were requested).\n",
 	    getdtablesize(), dtablesize);
+#endif
 #endif
     time_to_clean_up = TIME_TO_CLEAN_UP;
     time_to_swap = TIME_TO_SWAP;
@@ -353,7 +361,7 @@ int main(argc, argv)
 	    continue;
 #endif				/* YYDEBUG */
 	case 'm':
-	    mud_lib = string_copy(argv[i] + 2, "mudlib dir");
+	    mud_lib = alloc_cstring(argv[i] + 2, "mudlib dir");
 	    if (chdir(mud_lib) == -1) {
 		fprintf(stderr, "Bad mudlib directory: %s\n", mud_lib);
 		exit(-1);
@@ -490,14 +498,41 @@ char *int_string_copy P1(char *, str)
     len = strlen(str);
     if (len > max_string_length) {
 	len = max_string_length;
-	p = DXALLOC(len + 1, TAG_STRING, desc);
+	p = new_string(len, desc);
 	(void) strncpy(p, str, len);
 	p[len] = '\0';
     } else {
-	p = DXALLOC(len + 1, TAG_STRING, desc);
+	p = new_string(len, desc);
 	(void) strncpy(p, str, len + 1);
     }
     return p;
+}
+
+#ifdef DEBUGMALLOC
+char *int_string_unlink P2(char *, str, char *, desc)
+#else
+char *int_string_unlink P1(char *, str)
+#endif
+{
+    malloc_block_t *mbt, *newmbt;
+
+    mbt = ((malloc_block_t *)str) - 1;
+    mbt->ref--;
+    
+    if (!(~mbt->size)) {
+	int l = strlen(str + 0xffff) + 0xffff; /* ouch */
+
+	newmbt = (malloc_block_t *)DXALLOC(l + sizeof(malloc_block_t) + 1, TAG_STRING, desc);
+	memcpy((char *)(newmbt + 1), (char *)(mbt + 1), l+1);
+	newmbt->size = 0xffff;
+    } else {
+	newmbt = (malloc_block_t *)DXALLOC(mbt->size + sizeof(malloc_block_t) + 1, TAG_STRING, desc);
+	memcpy((char *)(newmbt + 1), (char *)(mbt + 1), mbt->size+1);
+	newmbt->size = mbt->size;
+    }
+    newmbt->ref = 1;
+
+    return (char *)(newmbt + 1);
 }
 
 void debug_message PVARGS(va_alist)

@@ -312,9 +312,12 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 	    break;
 
 	case F_NEW_CLASS:
-	    sprintf(buff, "class %s", CLSS[EXTRACT_UCHAR(pc++)]);
-	    break;
-
+	    {
+		int which = EXTRACT_UCHAR(pc++);
+		
+		sprintf(buff, "class %s", STRS[CLSS[which].name]);
+		break;
+	    }
 	case F_CALL_FUNCTION_BY_ADDRESS:
 	    COPY_SHORT(&sarg, pc);
 	    pc += 3;
@@ -547,12 +550,8 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 static void
 do_walk_program P4(int *, data, char *, code, int, start, int, end)
 {
-    int i, instr, iarg, is_efun;
-    unsigned short sarg;
-    unsigned short offset;
+    int i, instr, is_efun;
     char *pc;
-    int next_func;
-    short *offsets;
 
     int is_push;
     int push_count = 0;
@@ -624,8 +623,6 @@ do_walk_program P4(int *, data, char *, code, int, start, int, end)
 
 	case F_CALL_INHERITED:
 	{
-	    program_t *newprog;
-
 	    pc++;
 	    pc += 3;
 	    break;

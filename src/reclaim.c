@@ -11,9 +11,7 @@
 
 #define MAX_RECURSION 25
 
-static void gc_indices PROT((mapping_t *));
-static void gc_values PROT((mapping_t *));
-static int gcOne PROT((mapping_t *, mapping_node_t *, vinfo_t *));
+static void gc_mapping PROT((mapping_t *));
 static void check_svalue PROT((svalue_t *));
 
 static int cleaned, nested;
@@ -36,8 +34,7 @@ check_svalue P1(svalue_t *, v)
 	}
 	break;
     case T_MAPPING:
-	gc_values(v->u.map);
-	gc_indices(v->u.map);
+	gc_mapping(v->u.map);
 	break;
     case T_ARRAY:
 	for (idx = 0; idx < v->u.arr->size; idx++)
@@ -47,8 +44,8 @@ check_svalue P1(svalue_t *, v)
 	{
 	    svalue_t tmp;
 	    tmp.type = T_ARRAY;
-	    tmp.u.arr = v->u.fp->hdr.args;
-	    check_svalue(&tmp);
+	    if ((tmp.u.arr = v->u.fp->hdr.args))
+		check_svalue(&tmp);
 	    break;
 	}
     }
@@ -56,28 +53,40 @@ check_svalue P1(svalue_t *, v)
     return;
 }
 
-static int gcOne P3(mapping_t *, m, mapping_node_t *, elt, vinfo_t *, info)
-{
-    check_svalue(&elt->values[info->w]);
-    return 0;
-}
-
 static void
-gc_indices P1(mapping_t *, m)
+gc_mapping P1(mapping_t *, m)
 {
-    vinfo_t info;
+    /* Be careful to correctly handle destructed mapping keys.  We can't
+     * just call check_svalue() b/c the hash would be wrong and the '0'
+     * element we add would be unreferenceable (in most cases)
+     */
+    mapping_node_t **prev, *elt;
+    int j = (int) m->table_size;
 
-    info.w = 0;
-    mapTraverse(m, (int (*) ()) gcOne, &info);
-}
-
-static void
-gc_values P1(mapping_t *, m)
-{
-    vinfo_t info;
-
-    info.w = 1;
-    mapTraverse(m, (int (*) ()) gcOne, &info);
+    do {
+	prev = m->table + j;
+	while ((elt = *prev)) {
+	    if (elt->values[0].type == T_OBJECT) {
+		if (elt->values[0].u.ob->flags & O_DESTRUCTED) {
+		    /* found one, do a map_delete() */
+		    if (!(*prev = elt->next) && !m->table[j])
+			m->unfilled++;
+		    cleaned++;
+		    m->count--;
+		    total_mapping_nodes--;
+		    total_mapping_size -= sizeof(mapping_node_t);
+		    free_svalue(elt->values + 1, "gc_mapping");
+		    free_node(elt);
+		    continue;
+		}
+	    } else {
+		/* in case the key is a mapping or something */
+		check_svalue(elt->values);
+	    }
+	    check_svalue(elt->values+1);
+	    prev = &(elt->next);
+	}
+    } while (j--);
 }
 
 int reclaim_objects()

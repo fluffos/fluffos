@@ -98,17 +98,13 @@ array_t *allocate_empty_array P1(int, n)
     return p;
 }
 
-void free_array P1(array_t *, p)
+void dealloc_array P1(array_t *, p)
 {
     int i;
 
-    /*
-     * don't keep track of the null array since many muds reference it
-     * enough times to overflow the ref count which is a short int.
-     */
-    if ((--(p->ref) > 0) || (p == &the_null_array)) {
+    if (p == &the_null_array)
 	return;
-    }
+
     for (i = p->size; i--;)
 	free_svalue(&p->item[i], "free_array");
 #ifdef PACKAGE_MUDLIB_STATS
@@ -118,6 +114,14 @@ void free_array P1(array_t *, p)
     total_array_size -= sizeof(array_t) + sizeof(svalue_t) *
 	(p->size - 1);
     FREE((char *) p);
+}
+
+void free_array P1(array_t *, p)
+{
+    if (--(p->ref) > 0)
+	return;
+
+    dealloc_array(p);
 }
 
 void free_empty_array P1(array_t *, p)
@@ -134,21 +138,21 @@ void free_empty_array P1(array_t *, p)
     FREE((char *) p);
 }
 
-array_t *explode_string P2(char *, str, char *, del)
+array_t *explode_string P4(char *, str, int, slen, char *, del, int, len)
 {
     char *p, *beg, *lastdel = (char *) NULL;
-    int num, len, j, slen, limit;
+    int num, j, limit;
     array_t *ret;
     char *buff, *tmp;
-
-    len = strlen(del);
-    slen = strlen(str);
+    short sz;
 
     if (!slen)
 	return null_array();
 
     /* return an array of length strlen(str) -w- one character per element */
     if (len == 0) {
+	sz = 1;
+
 	if (slen > max_array_size) {
 	    slen = max_array_size;
 	}
@@ -156,10 +160,9 @@ array_t *explode_string P2(char *, str, char *, del)
 	for (j = 0; j < slen; j++) {
 	    ret->item[j].type = T_STRING;
 	    ret->item[j].subtype = STRING_MALLOC;
-	    tmp = (char *) DXALLOC(2, TAG_STRING, "explode_string: tmp");
+	    ret->item[j].u.string = tmp = new_string(1, "explode_string: tmp");
 	    tmp[0] = str[j];
 	    tmp[1] = '\0';
-	    ret->item[j].u.string = tmp;
 	}
 	return ret;
     }
@@ -209,10 +212,10 @@ array_t *explode_string P2(char *, str, char *, del)
 	for (p = str, beg = str, num = 0; *p && (num < limit);) {
 	    if (*p == delimeter) {
 		DEBUG_CHECK(num >= ret->size, "Index out of bounds in explode!\n");
+		sz = p - beg;
 		ret->item[num].type = T_STRING;
 		ret->item[num].subtype = STRING_MALLOC;
-		ret->item[num].u.string = buff =
-		    DXALLOC(p - beg + 1, TAG_STRING, "explode_string: buff");
+		ret->item[num].u.string = buff = new_string(p - beg, "explode_string: buff");
 
 		strncpy(buff, beg, p - beg);
 		buff[p - beg] = '\0';
@@ -277,8 +280,8 @@ array_t *explode_string P2(char *, str, char *, del)
 
 	    ret->item[num].type = T_STRING;
 	    ret->item[num].subtype = STRING_MALLOC;
-	    ret->item[num].u.string = buff =
-		DXALLOC(p - beg + 1, TAG_STRING, "explode_string: buff");
+	    ret->item[num].u.string = buff = new_string(p - beg, 
+						     "explode_string: buff");
 
 	    strncpy(buff, beg, p - beg);
 	    buff[p - beg] = '\0';
@@ -299,32 +302,30 @@ array_t *explode_string P2(char *, str, char *, del)
     return ret;
 }
 
-char *implode_string P2(array_t *, arr, char *, del)
+char *implode_string P3(array_t *, arr, char *, del, int, del_len)
 {
     int size, i, num;
     char *p, *q;
-    int del_len;
     svalue_t *sv = arr->item;
 
     for (i = arr->size, size = 0, num = 0; i--;) {
-	if (sv[i].type & T_STRING) {
-	    size += strlen(sv[i].u.string);
+	if (sv[i].type == T_STRING) {
+	    size += SVALUE_STRLEN(&sv[i]);
 	    num++;
 	}
     }
     if (num == 0)
 	return string_copy("", "implode_string");
 
-    del_len = strlen(del);
-    p = DXALLOC(size + (num - 1) * del_len + 1, TAG_STRING, "implode_string: p");
+    p = new_string(size + (num - 1) * del_len, "implode_string: p");
     q = p;
     for (i = 0, num = 0; i < arr->size; i++) {
-	if (sv[i].type & T_STRING) {
+	if (sv[i].type == T_STRING) {
 	    if (num) {
 		strncpy(p, del, del_len);
 		p += del_len;
 	    }
-	    size = strlen(sv[i].u.string);
+	    size = SVALUE_STRLEN(&sv[i]);
 	    strncpy(p, sv[i].u.string, size);
 	    p += size;
 	    num++;
@@ -349,7 +350,7 @@ array_t *users()
 	}
     }
     ret = allocate_empty_array(num_user - (display_hidden ? 0 : num_hidden));
-    for (i = j = 0; i < MAX_USERS; i++) {
+    for (i = j = 0; i < max_users; i++) {
 	if (!all_users[i]) {
 	    continue;
 	}
@@ -497,7 +498,7 @@ filter_array P2(svalue_t *, arg, int, num_arg)
 	object_t *ob = 0;
 	char *func;
 
-	char *flags = DXALLOC(size+1, TAG_TEMPORARY, "filter: flags");
+	char *flags = new_string(size, "TEMP: filter: flags");
 	svalue_t *extra, *v;
 	int res = 0, cnt, numex = 0;
 
@@ -537,7 +538,7 @@ filter_array P2(svalue_t *, arg, int, num_arg)
 	    }
 	}
 
-	FREE(flags);
+	FREE_MSTR(flags);
 	sp--;
 	pop_n_elems(num_arg - 1);
 	free_array(vec);
@@ -653,12 +654,12 @@ void f_unique_array PROT((void)){
 
     if (num_arg == 3) {
 	skipval = sp;
-	if ((sp-1)->type & T_FUNCTION) fp = (sp-1)->u.fp;
+	if ((sp-1)->type == T_FUNCTION) fp = (sp-1)->u.fp;
 	else func = (sp-1)->u.string;
     }
     else {
 	skipval = &const0;
-	if (sp->type & T_FUNCTION) fp = sp->u.fp;
+	if (sp->type == T_FUNCTION) fp = sp->u.fp;
 	else func = sp->u.string;
     }
 
@@ -675,7 +676,7 @@ void f_unique_array PROT((void)){
 	if (fp) {
 	    push_svalue(v->item + i);
 	    sv = call_function_pointer(fp, 1);
-	} else if ((v->item + i)->type & T_OBJECT) {
+	} else if ((v->item + i)->type == T_OBJECT) {
 	    sv = apply(func, (v->item + i)->u.ob, 0, ORIGIN_EFUN);
 	} else sv = 0;
 
@@ -955,12 +956,8 @@ map_string P2(svalue_t *, arg, int, num_arg)
        Put our result string on the stack where it belongs in case of an
        error (note it is also in the right spot for the return value).
      */
-    if (arg->subtype != STRING_MALLOC) {
-	arr = string_copy(arr, "map_string");
-	free_string_svalue(arg);
-	arg->subtype = STRING_MALLOC;
-	arg->u.string = arr;
-    }
+    unlink_string_svalue(arg);
+    arr = arg->u.string;
 
     if (arg[1].type == T_FUNCTION) {
 	fp = arg[1].u.fp;
@@ -984,11 +981,12 @@ map_string P2(svalue_t *, arg, int, num_arg)
 	push_number((unsigned char)*p);
 	if (numex) push_some_svalues(extra, numex);
 	v = fp ? call_function_pointer(fp, numex + 1) : apply(func, ob, 1 + numex, ORIGIN_EFUN);
-	/* no function or illegal return value becomes a ' '.
+	/* no function or illegal return value is unaltered.
 	 * Anyone got a better idea?  A few idea:
 	 * (1) insert strings? - algorithm needs changing
 	 * (2) ignore them? - again, could require a realloc, since size would
 	 *                    change
+	 * (3) become ' ' or something
 	 */
 	if (!v) break;
 	if (v->type == T_NUMBER && v->u.number != 0) *p = ((unsigned char)(v->u.number));
@@ -1174,9 +1172,9 @@ f_sort_array PROT((void))
 	    if (num_arg == 2) {
 		sort_array_cmp_ob = current_object;
 		if (sort_array_cmp_ob->flags & O_DESTRUCTED) sort_array_cmp_ob = 0;
-	    } else if (arg[2].type & T_OBJECT)
+	    } else if (arg[2].type == T_OBJECT)
 		sort_array_cmp_ob = arg[2].u.ob;
-	    else if (arg[2].type & T_STRING) {
+	    else if (arg[2].type == T_STRING) {
 		sort_array_cmp_ob = find_object(arg[2].u.string);
 		if (sort_array_cmp_ob && !object_visible(sort_array_cmp_ob)) sort_array_cmp_ob = 0;
 	    }
@@ -1312,20 +1310,20 @@ INLINE static svalue_t *alist_sort P1(array_t *, inlist) {
     char *str;
 
     if (!(size = inlist->size)) return (svalue_t *)NULL;
-    if (flag = (inlist->ref > 1)) {
+    if ((flag = (inlist->ref > 1))) {
 	sv_tab = CALLOCATE(size, svalue_t, TAG_TEMPORARY, "alist_sort: sv_tab");
 	sv_ptr = inlist->item;
 	for (j = 0; j < size; j++) {
-	    if (((tmp = (sv_ptr + j))->type & T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
+	    if (((tmp = (sv_ptr + j))->type == T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
 		free_object(tmp->u.ob, "alist_sort");
 		sv_tab[j] = *tmp = const0;
-	    } else if ((tmp->type & T_STRING) && !(tmp->subtype & STRING_SHARED)) {
+	    } else if ((tmp->type == T_STRING) && !(tmp->subtype == STRING_SHARED)) {
 		sv_tab[j].u.string = make_shared_string(tmp->u.string);
 		(tmp = sv_tab + j)->subtype = STRING_SHARED;
 		tmp->type = T_STRING;
 	    } else assign_svalue_no_free(sv_tab + j, tmp);
 
-	    if (curix = j){
+	    if ((curix = j)) {
 		val = *tmp;
 
 		do {
@@ -1334,23 +1332,23 @@ INLINE static svalue_t *alist_sort P1(array_t *, inlist) {
 			sv_tab[curix] = sv_tab[parix];
 			sv_tab[parix] = val;
 		    }
-		} while (curix = parix);
+		} while ((curix = parix));
 	    }
 	}
     } else {
 	sv_tab = inlist->item;
 	for (j = 0; j < size; j++){
-	    if (((tmp = (sv_tab + j))->type & T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
+	    if (((tmp = (sv_tab + j))->type == T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
 		free_object(tmp->u.ob, "alist_sort");
 		*tmp = const0;
-	    } else if ((tmp->type & T_STRING) && !(tmp->subtype & STRING_SHARED)) {
+	    } else if ((tmp->type == T_STRING) && !(tmp->subtype == STRING_SHARED)) {
 		str = make_shared_string(tmp->u.string);
 		free_string_svalue(tmp);
 		tmp->u.string = str;
 		tmp->subtype = STRING_SHARED;
 	    }
 
-	    if (curix = j){
+	    if ((curix = j)) {
 		val = *tmp;
 	    
 		do {
@@ -1359,7 +1357,7 @@ INLINE static svalue_t *alist_sort P1(array_t *, inlist) {
 			sv_tab[curix] = sv_tab[parix];
 			sv_tab[parix] = val;
 		    }
-		} while (curix = parix);
+		} while ((curix = parix));
 	    }
 	}
     }
@@ -1412,17 +1410,17 @@ array_t *subtract_array P2(array_t *, minuend, array_t *, subtrahend) {
 	l = 0;
 	o = (h = size - 1) >> 1;
 
-	if ((source->type & T_OBJECT) && (source->u.ob->flags & O_DESTRUCTED)) {
+	if ((source->type == T_OBJECT) && (source->u.ob->flags & O_DESTRUCTED)) {
 	    free_object(source->u.ob, "subtract_array");
 	    *source = const0;
-	} else if ((source->type & T_STRING) && !(source->subtype & STRING_SHARED)) {
+	} else if ((source->type == T_STRING) && !(source->subtype == STRING_SHARED)) {
 	    svalue_t stmp = {T_STRING, STRING_SHARED};
 	    
 	    if (!(stmp.u.string = findstring(source->u.string))){
 	        assign_svalue_no_free(dest++, source);
 		continue;
 	    }
-	    while (d = alist_cmp(&stmp, svt + o)){
+	    while ((d = alist_cmp(&stmp, svt + o))) {
 		if (d < 0) h = o - 1;
 		else l = o + 1;
 		if (l > h){
@@ -1434,7 +1432,7 @@ array_t *subtract_array P2(array_t *, minuend, array_t *, subtrahend) {
 	    continue;
 	}
 	
-	while (d = alist_cmp(source, svt + o)) {
+	while ((d = alist_cmp(source, svt + o))) {
 	    if (d < 0) h = o - 1;
 	    else l = o + 1;
 	    if (l > h) {
@@ -1494,20 +1492,20 @@ array_t *intersect_array P2(array_t *, a1, array_t *, a2) {
     }
 
     svt_1 = alist_sort(a1);
-    if (flag = (a2->ref > 1)) {
+    if ((flag = (a2->ref > 1))) {
 	sv_tab = CALLOCATE(a2s, svalue_t, TAG_TEMPORARY, "intersect_array: sv2_tab");
 	sv_ptr = a2->item;
 	for (j = 0; j < a2s; j++) {
-	    if (((tmp = (sv_ptr + j))->type & T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
+	    if (((tmp = (sv_ptr + j))->type == T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
 		free_object(tmp->u.ob, "intersect_array");
 		sv_tab[j] = *tmp = const0;
-	    } else if ((tmp->type & T_STRING) && !(tmp->subtype & STRING_SHARED)) {
+	    } else if ((tmp->type == T_STRING) && !(tmp->subtype == STRING_SHARED)) {
 		sv_tab[j].u.string = make_shared_string(tmp->u.string);
 		(tmp = sv_tab + j)->subtype = STRING_SHARED;
 		tmp->type = T_STRING;
 	    } else assign_svalue_no_free(sv_tab + j, tmp);
 	    
-	    if (curix = j){
+	    if ((curix = j)) {
 		val = *tmp;
 
 		do {
@@ -1516,7 +1514,7 @@ array_t *intersect_array P2(array_t *, a1, array_t *, a2) {
 			sv_tab[curix] = sv_tab[parix];
 			sv_tab[parix] = val;
 		    }
-		} while (curix = parix);
+		} while ((curix = parix));
 	    } 
 	}
     } else {
@@ -1524,17 +1522,17 @@ array_t *intersect_array P2(array_t *, a1, array_t *, a2) {
 
 	sv_tab = a2->item;
 	for (j = 0; j < a2s; j++) {
-	    if (((tmp = (sv_tab + j))->type & T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
+	    if (((tmp = (sv_tab + j))->type == T_OBJECT) && (tmp->u.ob->flags & O_DESTRUCTED)) {
 		free_object(tmp->u.ob, "alist_sort");
 		*tmp = const0;
-	    } else if ((tmp->type & T_STRING) && !(tmp->subtype & STRING_SHARED)) {
+	    } else if ((tmp->type == T_STRING) && !(tmp->subtype == STRING_SHARED)) {
 		str = make_shared_string(tmp->u.string);
 		free_string_svalue(tmp);
 		tmp->u.string = str;
 		tmp->subtype = STRING_SHARED;
 	    }
 
-	    if (curix = j){
+	    if ((curix = j)) {
 		val = *tmp;
 
 		do {
@@ -1543,7 +1541,7 @@ array_t *intersect_array P2(array_t *, a1, array_t *, a2) {
 			sv_tab[curix] = sv_tab[parix];
 			sv_tab[parix] = val;
 		    }
-		} while (curix = parix);
+		} while ((curix = parix));
 	    } 	    
 	}
     }
@@ -1646,7 +1644,7 @@ array_t *match_regexp P3(array_t *, v, char *, pattern, int, flag) {
     sv1 = v->item + size;
     num_match = 0;
     while (size--){
-        if (!((--sv1)->type & T_STRING) || (regexec(reg, sv1->u.string) != match)){
+        if (!((--sv1)->type == T_STRING) || (regexec(reg, sv1->u.string) != match)){
             res[size] = 0;
 	} else {
 	    res[size] = 1;
@@ -1666,20 +1664,11 @@ array_t *match_regexp P3(array_t *, v, char *, pattern, int, flag) {
 	    }
             (--sv2)->type = T_STRING;
             sv1 = v->item + size;
-            switch(sv1->subtype){
-		case STRING_MALLOC:
-		    sv2->subtype = STRING_MALLOC;
-		    sv2->u.string = string_copy(sv1->u.string, "match_regexp");
-                    break;
-	        case STRING_SHARED:
-                    sv2->subtype = STRING_SHARED;
-                    sv2->u.string = ref_string(sv1->u.string);
-                    break;
-	        case STRING_CONSTANT:
-                    sv2->subtype = STRING_SHARED;
-                    sv2->u.string = make_shared_string(sv1->u.string);
-                    break;
-		}
+	    *sv2 = *sv1;
+	    if (sv1->subtype & STRING_COUNTED) {
+		ADD_STRING(COUNTED_STRLEN(sv1->u.string));
+		COUNTED_REF(sv1->u.string)++;
+	    }
             if (!--num_match) break;
 	}
     }
@@ -1863,14 +1852,14 @@ void f_objects PROT((void))
     svalue_t *v;
 
     if (!num_arg) func = 0;
-    else if (sp->type & T_FUNCTION) f = sp->u.fp;
+    else if (sp->type == T_FUNCTION) f = sp->u.fp;
     else func = sp->u.string;
 	
-    if (!(tmp = CALLOCATE(t_sz = 1000, object_t *, TAG_TEMPORARY, "objects: tmp")))
+    if (!(tmp = (object_t **)new_string( (t_sz = 1000)*sizeof(object_t *),
+					"TMP: objects: tmp")))
 	fatal("Out of memory!\n");
 
-    /* disguise DMALLOC()'d array */
-    push_malloced_string((char *) tmp);
+    push_malloced_string((char *)tmp);
 
     for (i = 0, ob = obj_list; ob; ob = ob->next_all) {
 	if (ob->flags & O_HIDDEN) {
@@ -1883,7 +1872,7 @@ void f_objects PROT((void))
 	    push_object(ob);
 	    v = call_function_pointer(f, 1);
 	    if (!v){
-		FREE((void *) tmp);
+		FREE_MSTR((char *)tmp);
 		sp--;
 		free_svalue(sp,"f_objects");
 		*sp = const0;
@@ -1894,19 +1883,18 @@ void f_objects PROT((void))
 	    push_object(ob);
 	    v = apply(func, current_object, 1, ORIGIN_EFUN);
             if (!v){
-                FREE((void *) tmp);
+                FREE_MSTR((char *)tmp);
                 sp--;
                 free_svalue(sp,"f_objects");
                 *sp = const0;
                 return;
 	    }
-            if ((v->type & T_NUMBER) && !v->u.number) continue;
+            if ((v->type == T_NUMBER) && !v->u.number) continue;
 	}
 
 	tmp[i] = ob;
 	if (++i == t_sz) {
-	    if (!(tmp = RESIZE(tmp, t_sz += 1000, object_t *,
-			       TAG_TEMPORARY, "objects: tmp: realloc")))
+	    if (!(tmp = (object_t **)extend_string((char *)tmp, (t_sz += 1000)*sizeof(object_t *))))
 		fatal("Out of memory!\n");
 	    else
 		sp->u.string = (char *) tmp;
@@ -1921,7 +1909,7 @@ void f_objects PROT((void))
 	add_ref(tmp[j], "objects");
     }
 
-    FREE((void *) tmp);
+    FREE_MSTR((char *)tmp);
     sp--;
     pop_n_elems(num_arg);
     (++sp)->type = T_ARRAY;
@@ -1951,7 +1939,7 @@ array_t *reg_assoc P4(char *, str, array_t *, pat, array_t *, tok, svalue_t *, d
 	error("Pattern and token array sizes must be identical.\n");
     
     for (i = 0; i < size; i++) {
-	if (!(pat->item[i].type & T_STRING))
+	if (!(pat->item[i].type == T_STRING))
 	    error("Non-string found in pattern array.\n");
     }
     
@@ -2044,8 +2032,7 @@ array_t *reg_assoc P4(char *, str, array_t *, pat, array_t *, tok, svalue_t *, d
 	    length = rmp->begin - tmp;
 	    sv1->type = T_STRING;
             sv1->subtype = STRING_MALLOC;
-	    svtmp = sv1->u.string =
-		(char *) DXALLOC(length + 1, TAG_STRING, "reg_assoc : sv1");
+	    svtmp = sv1->u.string = new_string(length, "reg_assoc : sv1");
 	    strncpy(svtmp, tmp, length);
 	    svtmp[length] = 0;
 	    sv1++;
@@ -2054,8 +2041,7 @@ array_t *reg_assoc P4(char *, str, array_t *, pat, array_t *, tok, svalue_t *, d
 	    length = rmp->end - rmp->begin;
 	    sv1->type = T_STRING;
 	    sv1->subtype = STRING_MALLOC;
-	    svtmp = sv1->u.string =
-		(char *) DXALLOC(length + 1, TAG_STRING, "reg_assoc : sv1");
+	    svtmp = sv1->u.string = new_string(length, "reg_assoc : sv1");
 	    strncpy(svtmp, tmp, length);
 	    svtmp[length] = 0;
 	    sv1++;
@@ -2071,7 +2057,7 @@ array_t *reg_assoc P4(char *, str, array_t *, pat, array_t *, tok, svalue_t *, d
 	    FREE((char *)rgpp[i]);
 	FREE((char *) rgpp);
 	
-	while (rmp = rmph){
+	while ((rmp = rmph)) {
 	    rmph = rmp->next;
 	    FREE((char *) rmp);
  	}

@@ -1,6 +1,8 @@
 #################################################
 # the meat of things                            #
 # don't change anything below this section      #
+#                                               #
+# RUN ./build.MudOS to generate the Makefiles   #
 #################################################
 
 SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
@@ -18,19 +20,19 @@ VPATH = $(OBJDIR)
 
 OBJ=$(addprefix $(OBJDIR)/,$(subst .c,.o,$(SRC)))
 
-$(OBJDIR)/%.o: %.c $(OBJDIR)
+$(OBJDIR)/%.o: %.c
 	$(CC) -I$(OBJDIR) $(CFLAGS) -o $@ -c $<
 
-all: GNUmakefile.MudOS $(OBJDIR) grammar.y cc.h opcodes.h malloc.c
+all: GNUmakefile.MudOS grammar.y cc.h opcodes.h malloc.c
 	$(MAKE) -f GNUmakefile.MudOS  'DRIVER_BIN=$(DRIVER_BIN)' \
 	'OBJ=$(OBJ)' 'MAKE=$(MAKE)' 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' \
 	'PROOF=$(PROOF)' 'OBJDIR=$(OBJDIR)' 'SRC=$(SRC)' 'YACC=$(YACC)'
 
+$(OBJDIR)/hash.o: hash.c
+	$(CC) -I$(OBJDIR) $(CFLAGS) $(OPTIMIZE) -o $(OBJDIR)/hash.o -c hash.c
+
 GNUmakefile.MudOS: edit_source
 	./edit_source -process GNUmakefile.MudOS.pre
-
-$(OBJDIR):
-	mkdir $(OBJDIR)
 
 which_makefile:
 	echo MakeIsGNU
@@ -58,6 +60,9 @@ Makefile.MudOS: edit_source
 
 which_makefile:
 	echo MakeIsMake
+
+hash.o: hash.c
+	$(CC) $(CFLAGS) $(OPTIMIZE) -c hash.c
 %endif
 
 remake: neat all
@@ -87,16 +92,20 @@ cc.h: Makefile
 	echo '#define CFLAGS   "$(CFLAGS) $(OPTIMIZE)"' >> cc.h
 	echo '#define OBJDIR   "$(OBJDIR)"' >> cc.h
 
-# The long list in the first ./edit_source depend on -options
-opcodes.h: options.h func_spec.c op_spec.c edit_source
-	./edit_source -options -build_func_spec '$(CPP) $(CFLAGS)' \
-		      -process packages/Makefile.pre \
-                      -process packages/GNUmakefile.pre
+opcodes.h: options.h func_spec.c op_spec.c edit_source mudlib
+	./edit_source -options -build_func_spec '$(CPP) $(CFLAGS)'
+	./edit_source -process packages/Makefile.pre
+	./edit_source -process packages/GNUmakefile.pre
+	./edit_source -process mudlib/Makefile.pre
+	./edit_source -process mudlib/GNUmakefile.pre
 	./edit_source -build_efuns
 
+# the touches here are necessary to fix the modification times; link(2) does
+# 'modify' a file
 malloc.c: sysmalloc.c smalloc.c bsdmalloc.c wrappedmalloc.c debugmalloc.c options.h edit_source
 	./edit_source -malloc
 	touch mallocwrapper.c
+	touch malloc.c
 
 make_func.tab.c: make_func.y cc.h
 	$(YACC) $(YFLAGS) make_func.y
@@ -145,7 +154,8 @@ Makefiles: edit_source
 neat:
 	-(cd packages; $(MAKE) clean)
 	-(cd mudlib; $(MAKE) clean)
-	-rm -rf obj *.o *.tab.c *.tab.h
+	-rm -rf $(OBJDIR) *.o *.tab.c *.tab.h
+	mkdir $(OBJDIR)
 	-rm -f efun_defs.c option_defs.c
 	-rm -f cc.h configure.h
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h

@@ -42,7 +42,7 @@ char lex_ctype[256] = {0,0,0,0,0,0,0,0,0,1,0,1,1,1,0,0,0,0,0,0,0,0,0,
                        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
                        0,0,0};
 
-#define is_wspace(c) lex_ctype[c]
+#define is_wspace(c) lex_ctype[(unsigned char)(c)]
 
 int current_line;               /* line number in this file */
 int current_line_base;          /* number of lines from other files */
@@ -70,7 +70,6 @@ static int nexpands = 0;
 #define EXPANDMAX 25000
 
 char yytext[MAXLINE];
-static char defbuf[DEFMAX];
 static char *outp;
 
 typedef struct incstate_s {
@@ -188,7 +187,6 @@ static int expand_define PROT((void));
 static void add_input PROT((char *));
 static int cond_get_exp PROT((int));
 static void merge PROT((char *name, char *dest));
-static void add_quoted_define PROT((char *, char *));
 static void add_quoted_predefine PROT((char *, char *));
 static INLINE int mygetc PROT((void));
 static void lexerror PROT((char *));
@@ -1087,7 +1085,7 @@ int yylex()
 		nexpands = 0;
 		if (outp >= cur_lbuf->buf_end){
 		    linked_buf_t *prev_lbuf;
-		    if (prev_lbuf = cur_lbuf->prev) {
+		    if ((prev_lbuf = cur_lbuf->prev)) {
 			FREE(cur_lbuf);
 			cur_lbuf = prev_lbuf;
 		    }
@@ -1245,7 +1243,7 @@ int yylex()
 		    } else {
 			while (isspace(c)){
 			    if (c == '\n'){
-				if (yyp = last_nl + 1){
+				if ((yyp = last_nl + 1)) {
 				    outp = yyp;
 				    refill_buffer();
 				    yyp = outp;
@@ -1732,7 +1730,7 @@ parse_identifier:
 		    outp--;
 		    if (!expand_define()) {
 			ident_hash_elem_t *ihe;
-			if (ihe = lookup_ident(yytext)) {
+			if ((ihe = lookup_ident(yytext))) {
 			    if (ihe->token & IHE_RESWORD) {
 				if (function_flag){
 				    function_flag = 0;
@@ -1832,16 +1830,6 @@ void end_new_file()
 	    cur_lbuf = prev_lbuf;
 	}
     }
-}
-
-static void add_quoted_define P2(char *, def, char *, val)
-{
-    char save_buf[1024];
-
-    strcpy(save_buf, "\"");
-    strcat(save_buf, val);
-    strcat(save_buf, "\"");
-    add_define(def, -1, save_buf);
 }
 
 static void add_quoted_predefine P2(char *, def, char *, val)
@@ -1945,7 +1933,7 @@ void start_new_file P1(int, f)
 	char *gifile;
 
 	/* need a writable copy */
-	gifile = string_copy(GLOBAL_INCLUDE_FILE, "global include");
+	gifile = alloc_cstring(GLOBAL_INCLUDE_FILE, "global include");
 	handle_include(gifile);
 	FREE(gifile);
     } else refill_buffer();
@@ -2734,7 +2722,7 @@ ident_hash_elem_t *lookup_ident P1(char *, name) {
     int h = IdentHash(name);
     ident_hash_elem_t *hptr, *hptr2;
 
-    if (hptr = ident_hash_table[h]) {
+    if ((hptr = ident_hash_table[h])) {
 	CHECK_ELEM(hptr, name, return hptr;);
 	hptr2 = hptr->next;
 	while (hptr2 != hptr) {
@@ -2749,7 +2737,7 @@ ident_hash_elem_t *find_or_add_perm_ident P1(char *, name) {
     int h = IdentHash(name);
     ident_hash_elem_t *hptr, *hptr2;
 
-    if (hptr = ident_hash_table[h]) {
+    if ((hptr = ident_hash_table[h])) {
 	if (!strcmp(hptr->name, name)) return hptr;
 	hptr2 = hptr->next;
 	while (hptr2 != hptr) {
@@ -2900,7 +2888,7 @@ void free_unused_identifiers() {
     }
 
     for (i = 0; i < IDENT_HASH_SIZE; i++)
-	if (ident_hash_table[i] = ident_hash_head[i])
+	if ((ident_hash_table[i] = ident_hash_head[i]))
 	    ident_hash_tail[i]->next = ident_hash_head[i];
 
     ihel = ihe_list;
@@ -2945,7 +2933,7 @@ find_or_add_ident P2(char *, name, int, flags) {
     int h = IdentHash(name);
     ident_hash_elem_t *hptr, *hptr2;
 
-    if (hptr = ident_hash_table[h]) {
+    if ((hptr = ident_hash_table[h])) {
 	if (!strcmp(hptr->name, name)) {
 	    if ((hptr->token & IHE_PERMANENT) && (flags & FOA_GLOBAL_SCOPE)
 		&& (hptr->dn.function_num==-1)&&(hptr->dn.global_num==-1)

@@ -3,6 +3,7 @@
  */
 
 /* crctab calculated by Mark G. Mendel, Network Systems Corporation */
+#if 0
 static unsigned short crctab[256] =
 {
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50a5, 0x60c6, 0x70e7,
@@ -38,6 +39,7 @@ static unsigned short crctab[256] =
     0xef1f, 0xff3e, 0xcf5d, 0xdf7c, 0xaf9b, 0xbfba, 0x8fd9, 0x9ff8,
     0x6e17, 0x7e36, 0x4e55, 0x5e74, 0x2e93, 0x3eb2, 0x0ed1, 0x1ef0
 };
+#endif
 
 /*
  * updcrc macro derived from article Copyright (C) 1986 Stephen Satchell.
@@ -166,6 +168,5 @@ long UPDC32(b, c)
 }
 
 #else
-
 #define UPDC32(b, c) (cr3tab[((int)c ^ b) & 0xff] ^ ((c >> 8) & 0x00FFFFFF))
 #endif

@@ -6,6 +6,9 @@
 #include "comm.h"
 #include "lex.h"
 #include "simul_efun.h"
+#include "swap.h"
+#include "call_out.h"
+#include "mapping.h"
 #endif
 
 /*
@@ -41,7 +44,7 @@ static char *sources[] = {
     "object table", "config table", "simul_efuns", "sentences", "string table",
     "free swap blocks", "uids", "object names", "predefines", "line numbers",
     "compiler local blocks", "function arguments", "compiled program",
-    "<#35>", "<#36>", "<#37>", "<#38>", "<#39>", 
+    "users", "<#36>", "<#37>", "<#38>", "<#39>", 
     "malloc'ed strings", "shared strings", "function pointers", "arrays",
     "mappings", "mapping nodes", "mapping tables"
 };
@@ -299,7 +302,7 @@ void mark_svalue P1(svalue_t *, sv) {
     case T_STRING:
 	switch (sv->subtype) {
 	case STRING_MALLOC:
-	    DO_MARK(sv->u.string, TAG_STRING);
+	    DO_MARK(MSTR_BLOCK(sv->u.string), TAG_STRING);
 	    break;
 	case STRING_SHARED:
 	    EXTRA_REF(BLOCK(sv->u.string))++;
@@ -397,7 +400,6 @@ void check_all_blocks P1(int, flag) {
     int tmp;
     md_node_t *entry;
     object_t *ob;
-    svalue_t *sv;
     array_t *vec;
     mapping_t *map;
     buffer_t *buf;
@@ -409,7 +411,9 @@ void check_all_blocks P1(int, flag) {
     block_t *ssbl;
     extern svalue_t apply_ret_value;
 
+#if 0
     int num = 0, total = 0;
+#endif
     
     /* need to unswap everything first */
     for (ob = obj_list; ob; ob = ob->next_all) {
@@ -544,12 +548,14 @@ void check_all_blocks P1(int, flag) {
     if (blocks[TAG_INTERACTIVE & 0xff] != total_users)
 	add_vmessage("WATNING: total_users is: %i should be: %i\n",
 		     total_users, blocks[TAG_INTERACTIVE & 0xff]);
+#ifdef STRING_STATS
     if (blocks[TAG_SHARED_STRING & 0xff] != num_distinct_strings)
 	add_vmessage("WARNING: num_distinct_strings is: %i should be: %i\n",
 		     num_distinct_strings, blocks[TAG_SHARED_STRING & 0xff]);
+#endif
     
     /* now do a mark and sweep check to see what should be alloc'd */
-    for (i = 0; i < MAX_USERS; i++)
+    for (i = 0; i < max_users; i++)
 	if (all_users[i]) {
 	    DO_MARK(all_users[i], TAG_INTERACTIVE);
 	    all_users[i]->ob->extra_ref++;

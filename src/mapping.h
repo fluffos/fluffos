@@ -94,6 +94,9 @@ array_t *mapping_indices PROT((mapping_t *));
 array_t *mapping_values PROT((mapping_t *));
 array_t *mapping_each PROT((mapping_t *));
 char *save_mapping PROT((mapping_t *));
+void dealloc_mapping PROT((mapping_t *));
+void mark_mapping_node_blocks();
+INLINE int mapHashstr PROT((char *));
 
 void add_mapping_pair PROT((mapping_t *, char *, int));
 void add_mapping_string PROT((mapping_t *, char *, char *));

@@ -2,6 +2,7 @@
 #include "lpc_incl.h"
 #include "otable.h"
 #include "comm.h"
+#include "hash.h"
 
 /*
  * Object name hash table.  Object names are unique, so no special

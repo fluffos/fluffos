@@ -109,10 +109,6 @@ Comment: with some of the optimizations lately, the subtype of numbers is
 
 -----
 
-file_length() efun that returns the number of lines in a file
-
------
-
 An option for persistent swap files (that the driver can restore/recover
 from), saving clones and the contents of variables.
 
@@ -179,6 +175,36 @@ restart the compile) if an inherited object isn't defined yet.
 
 Note: This would entail requiring the use of bison or pre-yacc'ed grammars
 since most versions of yacc parsers aren't reentrant. -Beek
+
+Actually, I take this back.  One could make the inherit rule look like:
+
+inheritance: type_modifier_list L_INHERIT string_con1 ';'
+    {
+       ...
+       ob = find_object2(file);
+       if (ob == 0) {
+           push_compiler_globals();
+           lex_inherit_hook(file);
+       } else {
+           lex_loaded_inherit_hook();
+       }
+    }
+  program terminator
+    {
+       ... import symbols ...
+    }
+
+terminator:
+    L_ALREADY_LOADED
+  | L_JUST_LOADED
+    {
+       pop_compiler_globals();
+    }
+
+etc ... lex_inherit_hook() cues lex to push it's globals and start a new
+file; lex_loaded_inherit_hook() cues lex to just return L_ALREADY_LOADED
+as the next token (note: in deep inherits this could require a rather
+deep yacc stack)
 
 Use parse trees to simplify compile time optimizations.
 

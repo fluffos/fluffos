@@ -1,3 +1,35 @@
+Wed May 17 14:54:59 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* bumped version number to v21.3
+	* features:
+	  . new ed option 'verbose'
+	  . optional flag to functions() contrib efun gives more extensive
+	    info
+	  . this_user() is now equivalent to this_player()
+	* fixed crashers in:
+	  . self-destructing objects with call_outs
+	  . call_outs to function pointers
+	  . reload_object() on a swapped object
+	  . reclaim_objects() and function pointers with no arguments
+	* bugfixes:
+	  . problems with too wide columns in sprintf's column mode
+	  . calling reclaim_objects() no longer corrupts mappings whose
+	    keys contain destructed objects
+	  . classes now save/restore correctly
+	  . various fixes to the configure scripts
+	  . fixed non-typechecked functions to not give type errors
+	  . TELOPT_NAWS fixed to handle zero bytes correctly
+	  . fixed a bug in adding an int to a string
+	* optimizations:
+	  . explode() and implode()
+	  . counted strings
+	  . eliminated switches over types for all refcounted types
+	  . shared string frees
+	  . read_buffer()
+	* COMPAT BUSTERS:
+	  . ALWAYS_SAVE_COMPILED_BINARIES removed
+	  . map_mapping() now passes the value, not the key, to the
+	    function pointer
+
 Fri Apr 28 20:24:42 EDT 1995 (tim@handel.princeton.edu (Beek))
 	* bumped version number to v21.2
 	* features:

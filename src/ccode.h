@@ -11,5 +11,6 @@ void c_generate_final_program PROT((int));
 void c_generate___INIT();
 void c_initialize_parser();
 void c_generate_node PROT((parse_node_t *));
+void c_generate_inherited_init_call PROT((int, short));
 
 #endif

@@ -11,16 +11,26 @@
 #include "file.h"
 #include "lex.h"
 
-#if defined(SunOS_5)
-#undef major
-#undef minor
-#undef makedev
+/* Removed due to hideousness: if you want to add it back, not that
+ * we don't want redefinitions, and that some systems define major() in
+ * one place, some in both, etc ...
+ */
+#if 0
+#ifdef INCL_SYS_SYSMACROS_H
+/* Why yes, this *is* a kludge! */
+#  ifdef major
+#    undef major
+#  endif
+#  ifdef minor
+#    undef minor
+#  endif
+#  ifdef makedev
+#    undef makedev
+#  endif
+#  include <sys/sysmacros.h>
 #endif
-#if (defined(_SEQUENT_) || defined(hpux) || defined(sgi) \
-	|| defined(_AUX_SOURCE) || defined(linux) || defined(cray) \
-	|| defined(SunOS_5) || defined(_M_UNIX))
-#include <sys/sysmacros.h>
 #endif
+
 #ifdef OS2
 #define INCL_DOSFILEMGR
 #include <os2.h>
@@ -481,12 +491,8 @@ int write_file P3(char *, file, char *, str, int, flags)
 	return 0;
     f = fopen(file, (flags & 1) ? "w" : "a");
     if (f == 0) {
-	if (errno < sys_nerr) {
-	    error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n",
-		  file, (flags & 1) ? "overwrite" : "append", sys_errlist[errno]);
-	} else {
-	    error("Wrong permissions for opening file /%s for %s.\n", file, (flags & 1) ? "overwrite" : "append");
-	}
+	error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n",
+	      file, (flags & 1) ? "overwrite" : "append", strerror(errno));
     }
     fwrite(str, strlen(str), 1, f);
     fclose(f);
@@ -536,7 +542,7 @@ char *read_file P3(char *, file, int, start, int, len)
 	start = 1;
     if (!len)
 	len = READ_FILE_MAX_SIZE;
-    str = DXALLOC(size + 1, TAG_STRING, "read_file: str");
+    str = new_string(size, "read_file: str");
     str[size] = '\0';
     do {
 #ifdef OS2
@@ -546,7 +552,7 @@ char *read_file P3(char *, file, int, start, int, len)
 	if ((fread(str, size, 1, f) != 1) || !size) {
 #endif
 	    fclose(f);
-	    FREE(str);
+	    FREE_MSTR(str);
 	    return 0;
 	}
 
@@ -575,7 +581,7 @@ char *read_file P3(char *, file, int, start, int, len)
 
 	    if ((fread(p2, size, 1, f) != 1) || !size) {
 		fclose(f);
-		FREE(str);
+		FREE_MSTR(str);
 		return 0;
 	    }
 	    st.st_size -= size;
@@ -589,7 +595,7 @@ char *read_file P3(char *, file, int, start, int, len)
 	    if (st.st_size && len) {
 		/* tried to read more than READ_MAX_FILE_SIZE */
 		fclose(f);
-		FREE(str);
+		FREE_MSTR(str);
 		return 0;
 	    }
 	}
@@ -645,14 +651,14 @@ char *read_bytes P4(char *, file, int, start, int, len, int *, rlen)
     if ((size = fseek(fp, start, 0)) < 0)
 	return 0;
 
-    str = DXALLOC(len + 1, TAG_STRING, "read_bytes: str");
+    str = new_string(len, "read_bytes: str");
 
     size = fread(str, 1, len, fp);
 
     fclose(fp);
 
     if (size <= 0) {
-	FREE(str);
+	FREE_MSTR(str);
 	return 0;
     }
     /*
@@ -1136,7 +1142,8 @@ void dump_file_descriptors()
 	    dev = stbuf.st_dev;
 
 	add_vmessage("%2d", i);
-#if !defined(LATTICE) && !defined(OS2)
+/* #if !defined(LATTICE) && !defined(OS2) */
+#if 0
 	add_vmessage("%6x", major(dev));
 	add_vmessage("%7x", minor(dev));
 #else

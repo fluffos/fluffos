@@ -57,6 +57,7 @@
 #include "simul_efun.h"
 #include "ignore.h"
 #include "lex.h"
+#include "stralloc.h"
 
 /*
  * If this #define is defined then error messages are returned,
@@ -240,16 +241,20 @@ static int add_table PROT((cst ** table, short int trailing));
 
 /*
  * Probably should make this a #define...
+ *
+ * Oh god, no. -Beek
  */
 static void stradd P3(char **, dst, int *, size, char *, add)
 {
-    int i;
+    int i, l;
 
-    if ((i = (strlen(*dst) + strlen(add))) >= *size) {
+    l = strlen(add);
+    if ((i = (MSTR_SIZE(*dst) + l)) >= *size) {
 	*size += i + 1;
-	*dst = (char *) DREALLOC(*dst, *size, TAG_STRING, "stradd");
+	*dst = extend_string(*dst, *size);
     }
     strcat(*dst, add);
+    MSTR_UPDATE_SIZE(*dst, i);
 }				/* end of stradd() */
 
 static void numadd P3(char **, dst, int *, size, int, num)
@@ -259,16 +264,19 @@ static void numadd P3(char **, dst, int *, size, int, num)
 
     if (num < 0) {
 	/* Beek: yes, it's possible for num < 0, and num * -1 < 0. */
+	/* Beek: This shouldn't be a hardcoded const (assumes int is 4 bytes)*/
 	num = (num * -1) & 0x7fffffff;
 	nve = 1;
     } else
 	nve = 0;
     for (i = num / 10, num_l = nve + 1; i; i /= 10, num_l++);
-    i = strlen(*dst);		/* i = length of constructed string so far */
+    i = MSTR_SIZE(*dst);	/* i = length of constructed string so far */
     if ((i + num_l) >= *size) {
 	*size += i + num_l + 2;
-	*dst = (char *) DREALLOC(*dst, *size, TAG_STRING, "stradd");
+	*dst = extend_string(*dst, *size);
     }
+    /* do this before we clobber num_l */
+    MSTR_UPDATE_SIZE(*dst, i + num_l);
     (*dst)[i + num_l] = '\0';
     if (nve)
 	(*dst)[i] = '-';
@@ -287,12 +295,13 @@ static void floatadd P3(char **, dst, int *, size, double, flt)
     sprintf(buf, "%g", flt);
     flt_l = strlen(buf) + 1;
 
-    i = strlen(*dst);		/* i = length of constructed string so far */
+    i = MSTR_SIZE(*dst);	/* i = length of constructed string so far */
     if ((i + flt_l) >= *size) {
 	*size += i + flt_l + 2;
-	*dst = (char *) DREALLOC(*dst, *size, TAG_STRING, "stradd");
+	*dst = extend_string(*dst, *size);
     }
     sprintf(*dst + i, "%s", buf);
+    MSTR_UPDATE_SIZE(*dst, i + flt_l);
 }				/* end of floatadd() */
 
 /*
@@ -303,11 +312,12 @@ static void add_indent P3(char **, dst, int *, size, int, indent)
 {
     int i;
 
-    i = strlen(*dst);
+    i = MSTR_SIZE(*dst);
     if ((i + indent) >= *size) {
 	*size += i + indent + 1;
-	*dst = (char *) DREALLOC(*dst, *size, TAG_STRING, "add_indent");
+	*dst = extend_string(*dst, *size);
     }
+    MSTR_UPDATE_SIZE(*dst, i + indent);
     for (; indent; indent--)
 	(*dst)[i++] = ' ';
     (*dst)[i] = '\0';
@@ -351,7 +361,7 @@ void svalue_to_string P6(svalue_t *, obj, char **, str, int, size, int, indent, 
     case T_CLASS:
 	stradd(str, &size, "CLASS( ");
 	numadd(str, &size, obj->u.arr->size);
-	stradd(str, &size, "elements\n");
+	stradd(str, &size, " elements\n");
 	for (i = 0; i < (obj->u.arr->size) - 1; i++)
 	    svalue_to_string(&(obj->u.arr->item[i]), str, size, indent + 2, 1, 0);
 	svalue_to_string(&(obj->u.arr->item[i]), str, size, indent + 2, 0, 0);
@@ -489,6 +499,8 @@ void svalue_to_string P6(svalue_t *, obj, char **, str, int, size, int, indent, 
 /* The ignore strlen is so that the pading will work with our wonderful
  * ansi colour stuff.  bing onwards.  This was hacked in by Pinkfish
  * so you may hold me responsible if you wish
+ *
+ * Beek: Can I press charges?
  */
 static int ignorestrlen P1(char *, str)
 {
@@ -515,10 +527,13 @@ static int ignorestrlen P1(char *, str)
  * "str" is unmodified.  trailing is, of course, ignored in the case
  * of right justification.
  */
-/* In the following actually use T_ADD_CHAR (truncating if length is too long :)) */
-/* It's better to be consistent to free clean maybe, but that requires passing */
-/* it to add_justified. It's even better to rewrite it - volunteers? :)  */
-/* Sym */
+/* In the following actually use T_ADD_CHAR (truncating if length is too
+ * long :) )   It's better to be consistent to free clean maybe, but that
+ * requires passing it to add_justified. It's even better to rewrite it
+ * - volunteers? :)
+ *
+ * Sym
+ */
 static void add_justified P5(char *, str, char *, pad, int, fs, format_info, finfo, short int, trailing)
 {
     int i, len, len2;
@@ -598,6 +613,7 @@ static int add_column P2(cst **, column, short int, trailing)
     register unsigned int done, off = 0, inadd_off = 0, first_ig = 0;
     unsigned int save;
     static char tmp_buf[2049];	/* hmm, is this always enough? */
+    int ret;
 
 #define COL (*column)
 #define COL_D (COL->d.col)
@@ -638,19 +654,19 @@ static int add_column P2(cst **, column, short int, trailing)
 /*
   COL_D[done] = save;
 */
-    COL_D += done;		/* inc'ed below ... */
+    COL_D += done;
+    ret = 1;
+    if (*COL_D == '\n') {
+	COL_D++;
+	ret = 2;
+    }
     /*
-     * if this or the next character is a NULL then take this column out of
+     * if the next character is a NULL then take this column out of
      * the list.
      */
-    if (!(*COL_D) || !(*(++COL_D))) {
+    if (!(*COL_D)) {
 	cst *temp;
-	int ret;
 
-	if (*(COL_D - 1) == '\n')
-	    ret = 2;
-	else
-	    ret = 1;
 	temp = COL->next;
 	FREE((char *) COL);
 	COL = temp;
@@ -1039,8 +1055,9 @@ char *string_print_formatted P3(char *, format_str, int, argc, svalue_t *, argv)
 		    clean = ALLOCATE(svalue_t, TAG_TEMPORARY, "string_print: 1");
 		    clean->type = T_STRING;
 		    clean->subtype = STRING_MALLOC;
-		    clean->u.string = (char *) DXALLOC(500, TAG_STRING, "string_print: 2");
+		    clean->u.string = new_string(500, "string_print: 2");
 		    clean->u.string[0] = '\0';
+		    MSTR_UPDATE_SIZE(clean->u.string, 0);
 		    svalue_to_string(carg, &(clean->u.string), 500, 0, 0, 0);
 		    carg = clean;
 		    finfo ^= INFO_T_LPC;
@@ -1065,15 +1082,13 @@ char *string_print_formatted P3(char *, format_str, int, argc, svalue_t *, argv)
 			clean = ALLOCATE(svalue_t, TAG_TEMPORARY, "string_print: z1");
 			clean->type = T_STRING;
 			clean->subtype = STRING_MALLOC;
-			clean->u.string = (char *) DXALLOC(sizeof(NULL_MSG),
-						   TAG_STRING, "string_print: z2");
-			strcpy(clean->u.string, NULL_MSG);
+			clean->u.string = string_copy(NULL_MSG, "sprintf NULL");
 			carg = clean;
 		    }
 		    if (carg->type != T_STRING) {
 			SPRINTF_ERROR(ERR_INCORRECT_ARG_S);
 		    }
-		    slen = strlen(carg->u.string);
+		    slen = SVALUE_STRLEN(carg);
 		    if ((finfo & INFO_COLS) || (finfo & INFO_TABLE)) {
 			cst **temp;
 

@@ -129,7 +129,7 @@ f_socket_connect PROT((void))
 	int start = 0;
 
 	addr[0] = '\0';
-	if (s = strchr((sp - 2)->u.string, ' ')) {
+	if ((s = strchr((sp - 2)->u.string, ' '))) {
 	    /*
 	     * use specified address and port
 	     */
@@ -206,7 +206,7 @@ f_socket_release PROT((void))
 {
     int fd, port;
     char addr[ADDR_BUF_SIZE];
-
+    
     if (sp->type != T_STRING) {
 	bad_arg(3, F_SOCKET_RELEASE);
     }
@@ -218,7 +218,9 @@ f_socket_release PROT((void))
 	EESECURITY;
 
     free_string_svalue(sp--);
-    free_object(sp->u.ob, "socket_release()");
+    /* the object might have been dested an removed from the stack */
+    if (sp->type == T_OBJECT)
+	free_object(sp->u.ob, "socket_release()");
     sp--;
 }
 #endif

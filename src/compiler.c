@@ -315,20 +315,6 @@ void copy_structures P1(program_t *, prog) {
     }
 }
 
-static char *get_inherit_name P1(int, index) {
-    inherit_t *ip;
-    int num_inherits = mem_block[A_INHERITS].current_size /
-	sizeof(inherit_t);
-    
-    ip = (inherit_t *) mem_block[A_INHERITS].block + num_inherits;
-    while (num_inherits--){
-        ip--;
-        if (ip->function_index_offset <= index) return ip->prog->name;
-    }
-    IF_DEBUG(fatal("dropped off the end of get_inherit_name"));
-    /* NOTREACHED */
-}
-
 typedef struct ovlwarn_s {
     struct ovlwarn_s *next;
     char *func;
@@ -412,7 +398,7 @@ static function_t *overload_function P3(int, index, program_t *, prog, int, newi
 	    ow = ALLOCATE(ovlwarn_t, TAG_COMPILER, "overload warning");
 	    ow->next = overload_warnings;
 	    ow->func = funp->name;
-	    ow->warn = string_copy(buf, "overload warning");
+	    ow->warn = alloc_cstring(buf, "overload warning");
 	    overload_warnings = ow;
 	}
     }
@@ -834,9 +820,9 @@ int define_variable P3(char *, name, int, type, int, hide)
     return n;
 }
 
-char *type_names[] = {"unknown", "mixed", "void", "void", 
-		      "int", "string", "object", "mapping",
-		      "function", "float", "buffer" };
+char *compiler_type_names[] = {"unknown", "mixed", "void", "void", 
+		               "int", "string", "object", "mapping",
+		               "function", "float", "buffer" };
 
 char *get_type_name P1(int, type)
 {
@@ -865,9 +851,8 @@ char *get_type_name P1(int, type)
 	strcat(buff, "class ");
 	strcat(buff, PROG_STRING(CLASS(type & ~TYPE_MOD_CLASS)->name));
     } else {
-	if (type >= sizeof type_names / sizeof type_names[0])
-	    fatal("Bad type\n");
-	strcat(buff, type_names[type]);
+	DEBUG_CHECK(type >= sizeof compiler_type_names / sizeof compiler_type_names[0], "Bad type\n");
+	strcat(buff, compiler_type_names[type]);
     }
     strcat(buff, " ");
     if (pointer)
@@ -1242,8 +1227,6 @@ int get_id_number() {
     return current_id_number++;
 }
 
-static short zero = 0;
-
 /*
  * The program has been compiled. Prepare a 'program_t' to be returned.
  */
@@ -1426,11 +1409,11 @@ static void epilog() {
 	prog->type_start = 0;
     }
 #ifdef BINARIES
-#  if defined(LPC_TO_C) && defined(ALWAYS_SAVE_COMPILED_BINARIES)
-    if (pragmas & PRAGMA_SAVE_BINARY || prog->program_size == 0) {
-#  else
-    if (pragmas & PRAGMA_SAVE_BINARY) {
-#  endif
+    if ((pragmas & PRAGMA_SAVE_BINARY)
+#ifdef LPC_TO_C
+    || compile_to_c
+#endif
+    ) {
 	save_binary(prog, &mem_block[A_INCLUDES], &mem_block[A_PATCH]);
     }
 #endif
@@ -1493,8 +1476,6 @@ static void clean_parser() {
     function_t *funp;
     variable_t dummy;
     char *s;
-    class_def_t *cd;
-    class_member_entry_t *cme;
 
     /*
      * Free function stuff.
@@ -1531,7 +1512,7 @@ the_file_name P1(char *, name)
     if (len < 3) {
 	return string_copy(name, "the_file_name");
     }
-    tmp = (char *)DXALLOC(len, TAG_STRING, "the_file_name");
+    tmp = new_string(len - 1, "the_file_name");
     if (!tmp) {
 	return string_copy(name, "the_file_name");
     }

@@ -90,16 +90,16 @@ extern int inet_packets;
 extern int inet_volume;
 extern int num_user;
 extern int num_hidden;
-extern interactive_t *all_users[];
 extern int add_message_calls;
+
+extern interactive_t **all_users;
+extern int max_users;
 
 #ifdef SIGNAL_FUNC_TAKES_INT
 void sigalrm_handler PROT((int));
 #else
 void sigalrm_handler PROT((void));
 #endif
-void add_vmessage PROTVARGS(());
-void add_message PROT((char *));
 void update_ref_counts_for_users PROT((void));
 INLINE void make_selectmasks PROT((void));
 void init_user_conn PROT((void));

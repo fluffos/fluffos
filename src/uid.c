@@ -58,7 +58,7 @@ userid_t *add_uid P1(char *, name)
 
     sname = make_shared_string(name);
     t_uid.name = sname;
-    if (uid = (userid_t *) tree_srch(uids, uidcmp, (char *) &t_uid)) {
+    if ((uid = (userid_t *) tree_srch(uids, uidcmp, (char *) &t_uid))) {
 	free_string(sname);
     } else {
 	uid = ALLOCATE(userid_t, TAG_UID, "add_uid");

@@ -29,6 +29,7 @@
 #include "ed.h"
 #ifdef LPC_TO_C
 #include "interface.h"
+#include "compile_file.h"
 #endif
 
 int call_origin = 0;
@@ -229,7 +230,7 @@ f_call_other PROT((void))
         svalue_t *sv;
 
         check_for_destr(v);
-        if (((i = v->size) < 1) || !((sv = v->item)->type & T_STRING))
+        if (((i = v->size) < 1) || !((sv = v->item)->type == T_STRING))
             error("call_other: 1st elem of array for arg 2 must be a string\n");
         funcname = sv->u.string;
         num_arg = 2 + merge_arg_lists(num_arg - 2, v, 1);
@@ -300,19 +301,9 @@ f_call_out_info PROT((void))
 void
 f_capitalize PROT((void))
 {
-    char *str;
-
-    str = sp->u.string;
-    if (islower(str[0])) {
-        if (sp->subtype & STRING_MALLOC) {
-            str[0] += 'A' - 'a';
-	} else {
-            str = string_copy(str, "capitalize");
-            str[0] += 'A' - 'a';
-            free_string_svalue(sp);
-            sp->subtype = STRING_MALLOC;
-            sp->u.string = str;
-	}
+    if (islower(sp->u.string[0])) {
+	unlink_string_svalue(sp);
+	sp->u.string[0] += 'A' - 'a';
     }
 }
 #endif
@@ -346,13 +337,8 @@ f_clear_bit PROT((void))
     len = SVALUE_STRLEN(sp);
     if (ind >= len) 
 	return;         /* return first arg unmodified */
-    if (!(sp->subtype & STRING_MALLOC)){
-        str = DXALLOC(len + 1, TAG_STRING, "f_clear_bit: str");
-        memcpy(str, sp->u.string, len + 1);       /* including null byte */
-	free_string_svalue(sp);
-	sp->u.string = str;
-	sp->subtype = STRING_MALLOC;
-    } else str = sp->u.string;
+    unlink_string_svalue(sp);
+    str = sp->u.string;
 
     if (str[ind] > 0x3f + ' ' || str[ind] < ' ')
         error("Illegal bit pattern in clear_bit character %d\n", ind);
@@ -364,7 +350,7 @@ f_clear_bit PROT((void))
 void
 f_clonep PROT((void))
 {
-    if ((sp->type & T_OBJECT) && (sp->u.ob->flags & O_CLONE)){
+    if ((sp->type == T_OBJECT) && (sp->u.ob->flags & O_CLONE)){
         free_object(sp->u.ob, "f_clonep");
         *sp = const1;
     } else {
@@ -393,13 +379,11 @@ f_clone_object PROT((void))
 void
 f_command PROT((void))
 {
-    int i, num_arg = st_num_arg;
-    svalue_t *arg;
+    int i;
 
-    arg = sp - num_arg + 1;
-    i = command_for_object(arg[0].u.string);
-    pop_n_elems(num_arg);
-    push_number(i);
+    i = command_for_object(sp->u.string);
+    free_string_svalue(sp);
+    put_number(i);
 }
 #endif
 
@@ -432,10 +416,10 @@ f_crc32 PROT((void))
     unsigned char *buf;
     UINT32 crc;
 
-    if (sp->type & T_STRING) {
+    if (sp->type == T_STRING) {
         len = SVALUE_STRLEN(sp);
         buf = (unsigned char *) sp->u.string;
-    } else if (sp->type & T_BUFFER) {
+    } else if (sp->type == T_BUFFER) {
         len = sp->u.buf->size;
         buf = sp->u.buf->item;
     } else {
@@ -467,14 +451,20 @@ f_creator PROT((void))
 void
 f_ctime PROT((void))
 {
-    char *cp;
+    char *cp, *nl, *p;
+    int l;
+    
+    cp = time_string(sp->u.number);
 
-    cp = string_copy(time_string(sp->u.number), "ctime");
-    put_malloced_string(cp);
-    /* Now strip the newline. */
-    cp = strchr(cp, '\n');
-    if (cp)
-        *cp = '\0';
+    if ((nl = strchr(cp, '\n')))
+	l = nl - cp;
+    else
+	l = strlen(cp);
+
+    p = new_string(l, "f_ctime");
+    strncpy(p, cp, l);
+    p[l] = '\0';
+    put_malloced_string(p);
 }
 #endif
 
@@ -595,10 +585,10 @@ f_ed PROT((void))
         pop_2_elems();
     } else if (st_num_arg == 3) {
         /* ed(fname,exitfn,restricted) / ed(fname,writefn,exitfn) */
-        if (sp->type & T_NUMBER) {
+        if (sp->type == T_NUMBER) {
             ed_start((sp - 2)->u.string, 0, (sp - 1)->u.string, sp->u.number,
                      current_object);
-	} else if (sp->type & T_STRING) {
+	} else if (sp->type == T_STRING) {
             ed_start((sp - 2)->u.string, (sp - 1)->u.string, sp->u.string, 0,
                      current_object);
 	} else {
@@ -607,9 +597,9 @@ f_ed PROT((void))
         pop_3_elems();
     } else {                    /* st_num_arg == 4 */
         /* ed(fname,writefn,exitfn,restricted) */
-        if (!((sp - 1)->type & T_STRING))
+        if (!((sp - 1)->type == T_STRING))
             bad_argument(sp - 1, T_STRING, 3, F_ED);
-        if (!(sp->type & T_NUMBER))
+        if (!(sp->type == T_NUMBER))
             bad_argument(sp, T_NUMBER, 4, F_ED);
         ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string,
                  sp->u.number, current_object);
@@ -736,8 +726,12 @@ f_exec PROT((void))
     int i;
 
     i = replace_interactive((sp - 1)->u.ob, sp->u.ob);
-    free_object(sp->u.ob, "f_exec:1");
-    free_object((--sp)->u.ob, "f_exec:2");
+
+    /* They might have been destructed */
+    if (sp->type == T_OBJECT)
+	free_object(sp->u.ob, "f_exec:1");
+    if ((--sp)->type == T_OBJECT)
+	free_object(sp->u.ob, "f_exec:2");
     put_number(i);
 }
 #endif
@@ -748,7 +742,8 @@ f_explode PROT((void))
 {
     array_t *vec;
 
-    vec = explode_string((sp - 1)->u.string, sp->u.string);
+    vec = explode_string((sp - 1)->u.string, SVALUE_STRLEN(sp-1),
+			 sp->u.string, SVALUE_STRLEN(sp));
     free_string_svalue(sp--);
     free_string_svalue(sp);
     put_array(vec);
@@ -784,7 +779,7 @@ f_filter PROT((void))
 {
     svalue_t *arg = sp - st_num_arg + 1;
 
-    if (arg->type & T_MAPPING) filter_mapping(arg, st_num_arg);
+    if (arg->type == T_MAPPING) filter_mapping(arg, st_num_arg);
     else filter_array(arg, st_num_arg);
 }
 #endif
@@ -881,15 +876,20 @@ f_function_profile PROT((void))
 void
 f_function_exists PROT((void))
 {
-    char *str;
+    char *str, *res;
+    int l;
 
     str = function_exists((sp - 1)->u.string, sp->u.ob);
     free_object((sp--)->u.ob, "f_function_exists");
     free_string_svalue(sp);
     if (str) {
-        char *res = add_slash(str);
-        if ((str = strrchr(res, '.'))) *str = 0;
-        sp->subtype = STRING_MALLOC;
+	l = SHARED_STRLEN(str) - 2; /* no .c */
+	res = new_string(l + 1, "function_exists");
+	res[0] = '/';
+	strncpy(res + 1, str, l);
+	res[l + 1] = 0;
+
+	sp->subtype = STRING_MALLOC;
         sp->u.string = res;
     } else *sp = const0;
 }
@@ -919,7 +919,7 @@ f_get_char PROT((void))
     int flag;
 
     arg = sp - st_num_arg + 1;  /* Points arg at first argument. */
-    if (st_num_arg == 1 || !(arg[1].type & T_NUMBER)) {
+    if (st_num_arg == 1 || !(arg[1].type == T_NUMBER)) {
         tmp = 0;
         flag = 0;
     } else {
@@ -964,7 +964,7 @@ f_implode PROT((void))
     char *str;
 
     check_for_destr((sp - 1)->u.arr);
-    str = implode_string((sp - 1)->u.arr, sp->u.string);
+    str = implode_string((sp - 1)->u.arr, sp->u.string, SVALUE_STRLEN(sp));
     free_string_svalue(sp--);
     free_array(sp->u.arr);
     put_malloced_string(str);
@@ -1073,7 +1073,7 @@ f_input_to PROT((void))
     int flag;
 
     arg = sp - st_num_arg + 1;  /* Points arg at first argument. */
-    if ((st_num_arg == 1) || !(arg[1].type & T_NUMBER)) {
+    if ((st_num_arg == 1) || !(arg[1].type == T_NUMBER)) {
         tmp = flag = 0;
     } else {
         tmp = 1;
@@ -1118,7 +1118,7 @@ f_functionp PROT((void))
 {
     int i;
     
-    if (sp->type & T_FUNCTION) {
+    if (sp->type == T_FUNCTION) {
         i = sp->u.fp->hdr.type;
         if (sp->u.fp->hdr.args) 
 	    i |= FP_HAS_ARGUMENTS;
@@ -1163,8 +1163,8 @@ f_link PROT((void))
     svalue_t *ret;
     int i;
 
-    push_string((sp - 1)->u.string, STRING_CONSTANT);
-    push_string(sp->u.string, STRING_CONSTANT);
+    push_svalue(sp - 1);
+    push_svalue(sp);
     ret = apply_master_ob(APPLY_VALID_LINK, 2);
     if (MASTER_APPROVED(ret))
         i = do_rename((sp - 1)->u.string, sp->u.string, F_LINK);
@@ -1203,42 +1203,32 @@ f_lower_case PROT((void))
 {
     register char *str;
 
-    if (sp->subtype & STRING_MALLOC) {
-        str = sp->u.string;
-
-        for (; *str; str++)
-            if (isupper(*str))
-                *str += 'a' - 'A';
-    } else {
-        char *result;
-
-        result = str = string_copy(sp->u.string, "lower_case");
-        for (; *str; str++)
-            if (isupper(*str))
-                *str += 'a' - 'A';
-        free_string_svalue(sp);
-        sp->subtype = STRING_MALLOC;
-        sp->u.string = result;
-    }
+    unlink_string_svalue(sp);
+    str = sp->u.string;
+	
+    for (; *str; str++)
+	if (isupper(*str))
+	    *str += 'a' - 'A';
 }
 #endif
 
 #ifdef F_LPC_INFO
 void f_lpc_info PROT((void))
 {
-    interface_item_t *p = interface;
+    interface_t **p = interface;
     object_t *ob;
 
-    while (p->fname) {
-	add_vmessage("%s: ", p->fname);
-	ob = lookup_object_hash(p->fname);
+    add_vmessage("%30s  Loaded  Using compiled program\n", "Program");
+    while (*p) {
+	add_vmessage("%30s: ", (*p)->fname);
+	ob = lookup_object_hash((*p)->fname);
 	if (ob) {
 	    if (ob->flags & O_COMPILED_PROGRAM) {
-		add_message("Not loaded, compiled version exists.\n");
+		add_message(" No\n");
 	    } else if (ob->prog->program_size == 0) {
-		add_message("loaded, compiled version in use.\n");
+		add_message(" Yes      Yes\n");
 	    } else {
-		add_message("loaded, but not using the compiled version.\n");
+		add_message(" Yes      No\n");
 	    }
 	} else {
 	    add_message("Something REALLY wierd happened; no record of the object.\n");
@@ -1294,7 +1284,7 @@ f_map_delete PROT((void))
 void
 f_mapp PROT((void))
 {
-    if (sp->type & T_MAPPING){
+    if (sp->type == T_MAPPING){
         free_mapping(sp->u.map);
         *sp = const1;
     } else {
@@ -1310,8 +1300,8 @@ f_map PROT((void))
 {
     svalue_t *arg = sp - st_num_arg + 1;
 
-    if (arg->type & T_MAPPING) map_mapping(arg, st_num_arg);
-    else if (arg->type & T_ARRAY) map_array(arg, st_num_arg);
+    if (arg->type == T_MAPPING) map_mapping(arg, st_num_arg);
+    else if (arg->type == T_ARRAY) map_array(arg, st_num_arg);
     else map_string(arg, st_num_arg);
 }
 #endif
@@ -1355,8 +1345,8 @@ f_match_path PROT((void))
     value = &const0u;
 
     string.type = T_STRING;
-    string.subtype = STRING_MALLOC;
-    string.u.string = (char *) DMALLOC(strlen(sp->u.string) + 1, TAG_STRING, "match_path");
+    string.subtype = STRING_CONSTANT;
+    string.u.string = DMALLOC(SVALUE_STRLEN(sp) + 1, TAG_STRING, "match_path");
 
     src = sp->u.string;
     dst = string.u.string;
@@ -1399,11 +1389,11 @@ f_member_array PROT((void))
         if (i<0) bad_arg(3, F_MEMBER_ARRAY);
     } else i = 0;
 
-    if (sp->type & T_STRING) {
+    if (sp->type == T_STRING) {
         char *res;
         CHECK_TYPES(sp-1, T_NUMBER, 1, F_MEMBER_ARRAY);
         if (i > SVALUE_STRLEN(sp)) error("Index to start search from in member_array() is > string length.\n");
-        if (res = strchr(sp->u.string + i, (sp-1)->u.number))
+        if ((res = strchr(sp->u.string + i, (sp-1)->u.number)))
             i = res - sp->u.string;
         else
             i = -1;
@@ -1448,9 +1438,9 @@ f_member_array PROT((void))
                 if (find->u.buf == sv->u.buf) break;
                 continue;
             default:
-                if (sv->type & T_OBJECT && sv->u.ob->flags & O_DESTRUCTED){
+                if (sv->type == T_OBJECT && sv->u.ob->flags & O_DESTRUCTED){
                     assign_svalue(sv, &const0);
-                    if (find->type & T_NUMBER && !find->u.number) break;
+                    if (find->type == T_NUMBER && !find->u.number) break;
 		}
                 continue;
 	    }
@@ -1569,7 +1559,7 @@ f_move_object PROT((void))
     object_t *o1, *o2;
 
     /* get destination */
-    if (sp->type & T_OBJECT)
+    if (sp->type == T_OBJECT)
         o2 = sp->u.ob;
     else {
         if (!(o2 = find_object(sp->u.string)) || !object_visible(o2))
@@ -1600,7 +1590,7 @@ void f_mud_status PROT((void))
 	char dir_buf[1024];
 	FILE *testfp;
 
-	if (testfp = fopen(".mudos_test_file", "w")) {
+	if ((testfp = fopen(".mudos_test_file", "w"))) {
 	    fclose(testfp);
 	    add_message("Open-file-test succeeded.\n");
 	    unlink(".mudos_test_file");
@@ -1690,8 +1680,8 @@ f_notify_fail PROT((void))
 void
 f_nullp PROT((void))
 {
-    if (sp->type & T_NUMBER){
-        if (!sp->u.number && sp->subtype & T_NULLVALUE){
+    if (sp->type == T_NUMBER){
+        if (!sp->u.number && (sp->subtype == T_NULLVALUE)) {
 	    sp->subtype = 0;
             sp->u.number = 1;
 	} else sp->u.number = 0;
@@ -1706,7 +1696,7 @@ f_nullp PROT((void))
 void
 f_objectp PROT((void))
 {
-    if (sp->type & T_OBJECT){
+    if (sp->type == T_OBJECT){
         free_object(sp->u.ob, "f_objectp");
         *sp = const1;
     } else {
@@ -1740,7 +1730,7 @@ f_origin PROT((void))
 void
 f_pointerp PROT((void))
 {
-    if (sp->type & T_ARRAY){
+    if (sp->type == T_ARRAY){
         free_array(sp->u.arr);
         *sp = const1;
     } else {
@@ -1891,7 +1881,7 @@ f_query_host_name PROT((void))
 {
     char *tmp;
 
-    if (tmp = query_host_name())
+    if ((tmp = query_host_name()))
         push_constant_string(tmp);
     else
         push_number(0);
@@ -2064,7 +2054,7 @@ f_read_buffer PROT((void))
         memcpy(buf->item, str, rlen);
         (++sp)->u.buf = buf;
         sp->type = T_BUFFER;
-        FREE(str);
+        FREE_MSTR(str);
     } else {                    /* T_BUFFER */
         push_malloced_string(str);
     }
@@ -2118,7 +2108,7 @@ f_reg_assoc PROT((void)) {
 
     arg = sp - st_num_arg + 1;
     
-    if (!(arg[2].type & T_ARRAY))
+    if (!(arg[2].type == T_ARRAY))
 	error("Bad argument 3 to reg_assoc()\n");
     
     vec = reg_assoc(arg[0].u.string, arg[1].u.arr, arg[2].u.arr, st_num_arg > 3 ? &arg[3] : &const0);
@@ -2141,7 +2131,7 @@ f_regexp PROT((void))
     int flag;
     
     if (st_num_arg > 2){
-        if (!(sp->type & T_NUMBER)) error("Bad argument 3 to regexp()\n");
+        if (!(sp->type == T_NUMBER)) error("Bad argument 3 to regexp()\n");
 	flag = (sp--)->u.number;
     } else flag = 0;
     v = match_regexp((sp - 1)->u.arr, sp->u.string, flag);
@@ -2230,8 +2220,6 @@ f_replace_string PROT((void))
     arg = sp - st_num_arg + 1;
     CHECK_TYPES((arg + 2), T_STRING, 3, F_REPLACE_STRING);
     src = arg->u.string;
-    pattern = (arg+1)->u.string;
-    replace = (arg+2)->u.string;
     first = 0;
     last = 0;
 
@@ -2255,18 +2243,21 @@ f_replace_string PROT((void))
         pop_n_elems(st_num_arg - 1);
         return;
     }
-    plen = strlen(pattern);
+    pattern = (arg+1)->u.string;
+    plen = SVALUE_STRLEN(arg+1);
     if (!plen) {
         pop_n_elems(st_num_arg - 1);    /* just return it */
         return;
     }
-    rlen = strlen(replace);
+    replace = (arg+2)->u.string;
+    rlen = SVALUE_STRLEN(arg+2);
     dlen = 0;
     cur = 0;
 
-    if ((arg->subtype & STRING_MALLOC) && rlen <= plen) {
+    if (rlen <= plen) {
         /* in string replacement */
-        dst2 = dst1 = src;
+	unlink_string_svalue(arg);
+        dst2 = dst1 = src = arg->u.string;
 
         /* assume source string is a string < maximum string length */
         while (*src != '\0') {
@@ -2289,11 +2280,11 @@ f_replace_string PROT((void))
          */
         if (rlen < plen) {
             *dst2 = '\0';
-            arg->u.string = (char *) DREALLOC(dst1, dst2 - dst1 + 2, TAG_STRING, "f_replace_string: 1");
+            arg->u.string = extend_string(dst1, dst2 - dst1);
 	}
         pop_n_elems(st_num_arg - 1);
     } else {
-        dst2 = dst1 = (char *) DMALLOC(max_string_length, TAG_STRING, "f_replace_string: 2");
+        dst2 = dst1 = (char *) new_string(max_string_length, "f_replace_string: 2");
 
         while (*src != '\0') {
             if (strncmp(src, pattern, plen) == 0) {
@@ -2303,7 +2294,7 @@ f_replace_string PROT((void))
                         if (max_string_length - dlen <= rlen) {
                             pop_n_elems(st_num_arg);
                             push_svalue(&const0u);
-                            FREE(dst1);
+                            FREE_MSTR(dst1);
                             return;
 			}
                         strncpy(dst2, replace, rlen);
@@ -2317,7 +2308,7 @@ f_replace_string PROT((void))
             if (max_string_length - dlen <= 1) {
                 pop_n_elems(st_num_arg);
                 push_svalue(&const0u);
-                FREE(dst1);
+                FREE_MSTR(dst1);
                 return;
 	    }
             *dst2++ = *src++;
@@ -2328,7 +2319,7 @@ f_replace_string PROT((void))
         /*
          * shrink block or make a copy of exact size
          */
-        push_malloced_string((char *) DREALLOC(dst1, dst2 - dst1 + 2, TAG_STRING, "f_replace_string: 3"));
+        push_malloced_string(extend_string(dst1, dst2 - dst1));
     }
 }
 #endif
@@ -2363,13 +2354,12 @@ f_restore_object PROT((void))
 void
 f_restore_variable PROT((void)) {
     svalue_t v;
-    char *s = string_copy(sp->u.string, "restore_variable");
-    
+
+    unlink_string_svalue(sp);
     v.type = T_NUMBER;
 
-    restore_variable(&v, s);
-    free_string_svalue(sp);
-    FREE(s);
+    restore_variable(&v, sp->u.string);
+    FREE_MSTR(sp->u.string);
     *sp = v;
 }
 #endif
@@ -2503,18 +2493,21 @@ f_set_bit PROT((void))
     old_len = len = SVALUE_STRLEN(sp);
     if (ind >= len)
         len = ind + 1;
-    if (ind >= old_len || !(sp->subtype & STRING_MALLOC)){
-        str = DXALLOC(len + 1, TAG_STRING, "f_set_bit: str");
-        str[len] = '\0';
-        if (old_len)
-            memcpy(str, sp->u.string, old_len);
-        if (len > old_len)
-            memset(str + old_len, ' ', len - old_len);
-	free_string_svalue(sp);
-	sp->u.string = str;
-	sp->subtype = STRING_MALLOC;
-    } else
+    if (ind < old_len) {
+	unlink_string_svalue(sp);
 	str = sp->u.string;
+    } else {
+	str = new_string(len, "f_set_bit: str");
+	str[len] = '\0';
+	if (old_len)
+	    memcpy(str, sp->u.string, old_len);
+	if (len > old_len)
+	    memset(str + old_len, ' ', len - old_len);
+	free_string_svalue(sp);
+	sp->subtype = STRING_MALLOC;
+	sp->u.string = str;
+    }
+
     if (str[ind] > 0x3f + ' ' || str[ind] < ' ')
         error("Illegal bit pattern in set_bit character %d\n", ind);
     str[ind] = ((str[ind] - ' ') | (1 << bit)) + ' ';
@@ -2594,7 +2587,7 @@ f_set_privs PROT((void))
     ob = (sp - 1)->u.ob;
     if (ob->privs != NULL)
         free_string(ob->privs);
-    if (!(sp->type & T_STRING))
+    if (!(sp->type == T_STRING))
         ob->privs = NULL;
     else
         ob->privs = make_shared_string(sp->u.string);
@@ -2807,14 +2800,19 @@ f_strsrch PROT((void))
 
     sp--;
     big = (sp - 1)->u.string;
-    if (sp->type & T_NUMBER) {
-        buf[0] = (char) sp->u.number;
+    blen = SVALUE_STRLEN(sp - 1);
+    if (sp->type == T_NUMBER) {
         little = buf;
-    } else
+        if ((buf[0] = (char) sp->u.number))
+	    llen = 1;
+	else
+	    llen = 0;
+    } else {
         little = sp->u.string;
+	llen = SVALUE_STRLEN(sp);
+    }
 
-    /* little == ""  or  len(big) < len(little) */
-    if (!little[0] || (blen = strlen(big)) < (llen = strlen(little))) {
+    if (!llen || blen < llen) {
         pos = NULL;
 
         /* start at left */
@@ -2851,7 +2849,7 @@ f_strsrch PROT((void))
         i = -1;
     else
         i = (int) (pos - big);
-    if (sp->type & T_STRING) free_string_svalue(sp);
+    if (sp->type == T_STRING) free_string_svalue(sp);
     free_string_svalue(--sp);
     put_number(i);
 }				/* strsrch */
@@ -2874,7 +2872,7 @@ f_strcmp PROT((void))
 void
 f_stringp PROT((void))
 {
-    if (sp->type & T_STRING){
+    if (sp->type == T_STRING){
         free_string_svalue(sp);
         *sp = const1;
     }
@@ -2889,7 +2887,7 @@ f_stringp PROT((void))
 void
 f_bufferp PROT((void))
 {
-    if (sp->type & T_BUFFER) {
+    if (sp->type == T_BUFFER) {
         free_buffer(sp->u.buf);
         *sp = const1;
     } else {
@@ -2953,7 +2951,7 @@ f_tell_room PROT((void))
     int num_arg = st_num_arg;
     svalue_t *arg = sp - num_arg + 1;
 
-    if (arg->type & T_OBJECT) {
+    if (arg->type == T_OBJECT) {
         ob = arg[0].u.ob;
     } else {                    /* must be a string... */
         ob = find_object(arg[0].u.string);
@@ -3029,7 +3027,7 @@ f_this_player PROT((void))
 void
 f_set_this_player PROT((void))
 {
-    if (sp->type & T_NUMBER)
+    if (sp->type == T_NUMBER)
 	command_giver = 0;
     else
 	command_giver = sp->u.ob;
@@ -3126,8 +3124,8 @@ f_typeof PROT((void))
 void
 f_undefinedp PROT((void))
 {
-    if (sp->type & T_NUMBER){
-        if (!sp->u.number && sp->subtype & T_UNDEFINED) {
+    if (sp->type == T_NUMBER){
+        if (!sp->u.number && (sp->subtype == T_UNDEFINED)) {
 	    *sp = const1;
         } else *sp = const0;
     } else {
@@ -3229,7 +3227,7 @@ f_write_bytes PROT((void))
         case T_STRING:
         {
             i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number,
-                            sp->u.string, strlen(sp->u.string));
+                            sp->u.string, SVALUE_STRLEN(sp));
             break;
 	}
 
@@ -3250,7 +3248,7 @@ f_write_buffer PROT((void))
 {
     int i;
 
-    if ((sp-2)->type & T_STRING){
+    if ((sp-2)->type == T_STRING){
         f_write_bytes();
         return;
     }
@@ -3280,7 +3278,7 @@ f_write_buffer PROT((void))
         case T_STRING:
         {
             i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number,
-                            sp->u.string, strlen(sp->u.string));
+                            sp->u.string, SVALUE_STRLEN(sp));
             break;
 	}
 
@@ -3379,7 +3377,7 @@ f_reload_object PROT((void))
 void
 f_query_shadowing PROT((void))
 {
-    if ((sp->type & T_OBJECT) && (ob = sp->u.ob)->shadowing) {
+    if ((sp->type == T_OBJECT) && (ob = sp->u.ob)->shadowing) {
         add_ref(ob->shadowing, "query_shadowing(ob)");
         sp->u.ob = ob->shadowing;
         free_object(ob, "f_query_shadowing");
@@ -3410,7 +3408,7 @@ f_set_reset PROT((void))
 void
 f_floatp PROT((void))
 {
-    if (sp->type & T_REAL){
+    if (sp->type == T_REAL){
         sp->type = T_NUMBER;
         sp->u.number = 1;
     }

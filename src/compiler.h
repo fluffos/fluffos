@@ -72,6 +72,7 @@ typedef struct {
 #define TYPE_BUFFER     10
 
 extern mem_block_t mem_block[NUMAREAS];
+extern char *compiler_type_names[];
 
 #define LOOP_CONTEXT            0x1
 #define SWITCH_CONTEXT          0x2
@@ -94,9 +95,9 @@ extern function_context_t function_context;
  */
 
 #define COMP_TYPE(e, t) (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) \
-			 || (compatible[e] & (1 << (t))))
+			 || (compatible[(unsigned char)e] & (1 << (t))))
 #define IS_TYPE(e, t) (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) \
-		       || (is_type[e] & (1 << (t))))
+		       || (is_type[(unsigned char)e] & (1 << (t))))
 
 #define FUNCTION(n) ((function_t *)mem_block[A_FUNCTIONS].block + (n))
 #define VARIABLE(n) ((variable_t *)mem_block[A_VARIABLES].block + (n))
@@ -112,8 +113,6 @@ extern function_context_t function_context;
 
 #define SOME_NUMERIC_CASE_LABELS 0x40000
 #define NO_STRING_CASE_LABELS    0x80000
-
-extern char *type_names[];
 
 int validate_function_call PROT((function_t *, int, parse_node_t *));
 parse_node_t *validate_efun_call PROT((int, parse_node_t *));
@@ -169,6 +168,7 @@ int get_id_number PROT((void));
 void compile_file PROT((int, char *));
 void reset_function_blocks PROT((void));
 void copy_variables PROT((program_t *, int));
+void copy_structures PROT((program_t *));
 int copy_functions PROT((program_t *, int));
 void type_error PROT((char *, int));
 int compatible_types PROT((int, int));

@@ -29,6 +29,8 @@
  * minimal includes here, in case this module isn't used
  */
 #include "std.h"
+#include "lpc_incl.h"
+#include "simulate.h"
 
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
 #include "functab_tree.h"

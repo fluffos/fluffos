@@ -58,6 +58,7 @@
 #include "std.h"
 #include "regexp.h"
 #include "lpc_incl.h"
+#include "comm.h"
 #include "ed.h"
 
 /*

@@ -74,7 +74,6 @@
 
 #define	BUFFER_SIZE	2048	/* stream-buffer size:  == 1 hd cluster */
 
-#define LINFREE		1	/* entry not in use */
 #define LGLOB		2	/* line marked global */
 
 #define ED_MAXLINE	512	/* max number of chars per line */
@@ -89,8 +88,6 @@ typedef struct ed_line_s {
 } ed_line_t;
 
 typedef struct ed_buffer_s {
-    int diag;			/* diagnostic-output? flag */
-    int truncflg;		/* truncate long line flag */
     int nonascii;		/* count of non-ascii chars read */
     int nullchar;		/* count of null chars read */
     int truncated;		/* count of lines truncated */

@@ -71,7 +71,7 @@ op: ID
 	char f_name[500],c;
 	int i = 2;
 	sprintf(f_name, "F_%s", $1);
-	while (c = f_name[i]){
+	while ((c = f_name[i])) {
 	    if (islower(c)) f_name[i++] = toupper(c);
 	    else i++;
 	}
@@ -311,6 +311,8 @@ char *etype P1(int, n)
       strcpy(buff, "T_ANY");
     return buff;
 }
+
+int ident PROT((int));
 
 int yylex() {
     register int c;

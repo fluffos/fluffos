@@ -7,6 +7,7 @@
 #include "preprocess.h"
 #include "make_func.h"
 #include "cc.h"
+#include "hash.h"
 
 char *outp;
 static int buffered = 0;
@@ -20,6 +21,7 @@ FILE *yyin = 0, *yyout = 0;
  *
  * TODO: teach this file how to fix bugs in the source code :)
  */
+#define PACKAGES          "packages/packages"
 #define OPTIONS_H         "options.h"
 #define OPTION_DEFINES    "option_defs.c"
 #define FUNC_SPEC         "func_spec.c"
@@ -56,6 +58,8 @@ static incstate *inctop = 0;
 
 #define CHAR_QUOTE 1
 #define STRING_QUOTE 2
+
+static void add_define PROT((char *, int, char *));
 
 void mf_fatal P1(char *, str)
 {
@@ -607,15 +611,6 @@ handle_pragma P1(char *, name)
         pragmas |= PRAGMA_NOTE_CASE_START;
     else if (!strcmp(name, "no_auto_note_compiler_case_start"))
         pragmas &= ~PRAGMA_NOTE_CASE_START;
-    else if (!strcmp(name, "insert_packages")) {
-	fprintf(yyout, "SRC=");
-	for (i=0; i < num_packages; i++)
-	    fprintf(yyout, "%s.c ", packages[i]);
-	fprintf(yyout, "\nOBJ=");
-	for (i=0; i < num_packages; i++)
-	    fprintf(yyout, "%s.o ", packages[i]);
-	fprintf(yyout, "\n");
-    }
     else if (!strncmp(name, "ppchar:", 7) && *(name + 8))
         ppchar = *(name + 8);
     else yyerrorp("Unidentified %cpragma");
@@ -739,7 +734,7 @@ preprocess() {
 		}
 		
 		if (in_c_case){
-		    while (c = *yyp2++){
+		    while ((c = *yyp2++)) {
 			switch(c){
 			  case '{':
 			    {
@@ -818,7 +813,7 @@ preprocess() {
       inctop = p->next;
       free((char *) p);
       preprocess();
-    } else yyout = 0;
+    }
 }
 
 void make_efun_tables()
@@ -923,14 +918,25 @@ static void handle_options() {
 static void handle_build_func_spec P1(char *, command) {
     char buf[1024];
     int i;
+    FILE *f;
 
     sprintf(buf, "%s %s >%s", command, FUNC_SPEC, FUNC_SPEC_CPP);
     system(buf);
     for (i = 0; i < num_packages; i++) {
-	sprintf(buf, "%s packages/%s_spec.c >>%s", 
+	sprintf(buf, "%s -I. packages/%s_spec.c >>%s", 
 		command, packages[i], FUNC_SPEC_CPP);
 	system(buf);
     }
+
+    open_output_file(PACKAGES);
+    fprintf(yyout, "SRC=");
+    for (i=0; i < num_packages; i++)
+	fprintf(yyout, "%s.c ", packages[i]);
+    fprintf(yyout, "\nOBJ=");
+    for (i=0; i < num_packages; i++)
+	fprintf(yyout, "%s.o ", packages[i]);
+    fprintf(yyout, "\n");
+    close_output_file();
 }
 
 static void handle_process P1(char *, file) {
@@ -983,17 +989,22 @@ static void handle_malloc() {
     fprintf(stderr, "Memory package and/or malloc wrapper incorrectly specified in options.h\n");
     exit(-1);
 #endif
-    unlink("malloc.c");
-    unlink("mallocwrapper.c");
+    if (unlink("malloc.c") == -1)
+	perror("unlink malloc.c");
+    if (unlink("mallocwrapper.c") == -1)
+	perror("unlink mallocwrapper.c");
 #ifdef THE_WRAPPER
     printf("Using memory allocation package: %s\n\t\tWrapped with: %s\n",
 	   THE_MALLOC, THE_WRAPPER);
-    link(THE_WRAPPER, "mallocwrapper.c");
+    if (link(THE_WRAPPER, "mallocwrapper.c") == -1)
+	perror("link mallocwrapper.c");
 #else
     printf("Using memory allocation package: %s\n", THE_MALLOC);
-    link("plainwrapper.c", "mallocwrapper.c");
+    if (link("plainwrapper.c", "mallocwrapper.c") == -1)
+	perror("link mallocwrapper.c");
 #endif
-    link(THE_MALLOC, "malloc.c");
+    if (link(THE_MALLOC, "malloc.c") == -1)
+	perror("link malloc.c");
 }
 
 static int check_include2 P4(char *, tag, char *, file,
@@ -1005,8 +1016,8 @@ static int check_include2 P4(char *, tag, char *, file,
     ct = fopen("comptest.c", "w");
     fprintf(ct, "#include <sys/types.h>\n%s\n#include <%s>\n%s\n", 
 	    before, file, after);
-    fclose(ct);
-    
+     fclose(ct);
+     
 #ifdef DEBUG
     sprintf(buf, "%s %s -c comptest.c", COMPILER, CFLAGS);
 #else
@@ -1069,6 +1080,7 @@ static int check_library P1(char *, lib) {
     return 0;
 }
 
+#if 0 /* not used any more */
 static int check_ret_type P4(char *, tag, char *, pre,
 			     char *, type, char *, func) {
     char buf[1024];
@@ -1088,7 +1100,9 @@ static int check_ret_type P4(char *, tag, char *, pre,
     printf("does not return %s\n", type);
     return 0;
 }
+#endif
 
+/* This should check a.out existence, not exit value */
 static int check_prog P3(char *, tag, char *, pre, char *, code) {
     char buf[1024];
     FILE *ct;
@@ -1099,7 +1113,8 @@ static int check_prog P3(char *, tag, char *, pre, char *, code) {
     
     sprintf(buf, "%s %s comptest.c -o comptest >/dev/null 2>&1", COMPILER, CFLAGS);
     if (!system(buf)) {
-	fprintf(yyout, "#define %s\n", tag);
+	if (tag) 
+	    fprintf(yyout, "#define %s\n", tag);
 	return 1;
     }
     return 0;
@@ -1123,7 +1138,7 @@ static void handle_configure() {
     check_include("INCL_SYS_SOCKET_H", "sys/socket.h");
     check_include("INCL_NETDB_H", "netdb.h");
     /* TELOPT_NAWS is missing from <arpa/telnet.h> on some systems */
-    check_include("INCL_ARPA_TELNET_H", "arpa/telnet.h", "", "int i=TELOPT_MAWS;");
+    check_include2("INCL_ARPA_TELNET_H", "arpa/telnet.h", "", "int i=TELOPT_NAWS;");
     check_include("INCL_SYS_SEMA_H", "sys/sema.h");
     check_include("INCL_SYS_SOCKETVAR_H", "sys/socketvar.h");
     check_include("INCL_SOCKET_H", "socket.h");
@@ -1131,13 +1146,15 @@ static void handle_configure() {
 
     check_include("INCL_SYS_STAT_H", "sys/stat.h");
 
-    /* sys/dir.h is BSD, dirent is sys V */
-    if (check_include("INCL_DIRENT_H", "dirent.h")) {
-	check_include("INCL_SYS_DIRENT_H", "sys/dirent.h");
-	check_ret_type("USE_STRUCT_DIRENT", 
-		       "#include <dirent.h>", "struct dirent *", "readdir");
+    /* sys/dir.h is BSD, dirent is sys V.  Try to do */
+    /* Try to do it the BSD way first.  If that fails, fall back to sys V */
+    if (check_include("INCL_SYS_DIR_H", "sys/dir.h")) {
+	/* do nothing; BSD will be used */
     } else {
-	check_include("INCL_SYS_DIR_H", "sys/dir.h");
+	/* could be either of these */
+	check_include("INCL_DIRENT_H", "dirent.h");
+	check_include("INCL_SYS_DIRENT_H", "sys/dirent.h");
+	fprintf(yyout, "#define USE_STRUCT_DIRENT\n");
     }
 
     check_include("INCL_SYS_FILIO_H", "sys/filio.h");
@@ -1147,12 +1164,21 @@ static void handle_configure() {
     check_include("INCL_SYS_RUSAGE_H", "sys/rusage.h");
     check_include("INCL_SYS_CRYPT_H", "sys/crypt.h");
 
+    /* figure out what we need to do to get major()/minor() */
+    check_include("INCL_SYS_SYSMACROS_H", "sys/sysmacros.h");
+
+#ifdef DEBUG
+    /* includes just to shut up gcc's warnings on some systems */
+    check_include("INCL_BSTRING_H", "bstring.h");
+#endif
+
     if (!check_prog("DRAND48", "#include <math.h>", "srand48(0);"))
 	if (!check_prog("RAND", "#include <math.h>", "srand(0);"))
 	    if (!check_prog("RANDOM", "#include <math.h>", "srandom(0);"))
 		printf("WARNING: did not find a random number generator\n");
 
     check_prog("HAS_UALARM", "", "ualarm(0, 0);");
+    check_prog("HAS_STRERROR", "", "strerror(12);");
 
     fprintf(yyout, "#define SIZEOF_INT %i\n", sizeof(int));
     fprintf(yyout, "#define SIZEOF_PTR %i\n", sizeof(char *));
@@ -1167,13 +1193,20 @@ static void handle_configure() {
     check_library("-lbsd");
     check_library("-lBSD");
     check_library("-ly");
-    check_library("-lcrypt");
+
+    /* don't add -lcrypt if crypt() is in libc.a */
+    if (!check_prog(0, "#include \"lint.h\"", 
+		    "char *x = crypt(\"foo\", \"bar\");"))
+	check_library("-lcrypt");
+    /* don't add -lmalloc if malloc() works */
+    if (!check_prog(0, "", "char *x = malloc(100);"))
+	check_library("-lmalloc");
+
     check_library("-lsocket");
     check_library("-linet");
     check_library("-lnsl");
     check_library("-lnsl_s");
     check_library("-lseq");
-    check_library("-lmalloc");
     check_library("-lm");
     fprintf(yyout, "\n\n");
     close_output_file();

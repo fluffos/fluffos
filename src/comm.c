@@ -13,6 +13,7 @@
 #include "socket_ctrl.h"
 #include "eoperators.h"
 #include "debug.h"
+#include "ed.h"
 
 #define TELOPTS
 #ifdef OS2
@@ -79,7 +80,8 @@ int num_hidden;			/* for the O_HIDDEN flag.  This counter must
 int add_message_calls = 0;
 int inet_packets = 0;
 int inet_volume = 0;
-interactive_t *all_users[MAX_USERS];
+interactive_t **all_users = 0;
+int max_users = 0;
 
 /*
  * private local variables.
@@ -116,6 +118,7 @@ void spawn_new_listen_pipe()
     int rc;
     HPIPE listen_pipe;
 
+    /* Hmm ... what should MAX_USERS be here? */
     rc = DosCreateNPipe("\\PIPE\\MUD_DRIVER", &listen_pipe, OPEN_MODE,
 			PIPE_MODE | (MAX_USERS + 1), OUTBUF_SIZE, INBUF_SIZE,
 			TIMEOUT);
@@ -129,7 +132,7 @@ void check_for_data_thread()
     int i;
 
     do {
-	for (i = 0; i < MAX_USERS; i++) {
+	for (i = 0; i < max_users; i++) {
 	    long state, br;
 	    AVAILDATA avail;
 	    char buf[3];
@@ -764,12 +767,16 @@ static int copy_chars P4(unsigned char *, from, unsigned char *, to, int, n, int
 		    ip->iflags |= USING_TELNET;
 		} else
 		if (ip->sb_buf[0]==TELOPT_NAWS) {
-		    int w, h;
+		    int w, h, i, c[4];
 
-		    w = ((unsigned char)ip->sb_buf[1]) * 256
-			+ ((unsigned char)ip->sb_buf[2]);
-		    h = ((unsigned char)ip->sb_buf[3]) * 256
-			+ ((unsigned char)ip->sb_buf[4]);
+		    /* (char)0 is stored as 'I'; convert back */
+		    for (i = 0; i < 4; i++)
+			c[i] = (ip->sb_buf[i+1] == 'I' ? 0 : ip->sb_buf[i+1]);
+		    
+		    w = ((unsigned char)c[0]) * 256
+			+ ((unsigned char)c[1]);
+		    h = ((unsigned char)c[2]) * 256
+			+ ((unsigned char)c[3]);
 		    push_number(w);
 		    push_number(h);
 		    apply(APPLY_WINDOW_SIZE, ip->ob, 2, ORIGIN_DRIVER);
@@ -874,7 +881,7 @@ INLINE void make_selectmasks()
     /*
      * set user fds in readmask.
      */
-    for (i = 0; i < MAX_USERS; i++) {
+    for (i = 0; i < max_users; i++) {
 	if (!all_users[i] || (all_users[i]->iflags & (CLOSING | CMD_IN_BUF)))
 	    continue;
 	/*
@@ -920,7 +927,7 @@ INLINE void process_io()
 	new_user_handle = 0;
 	spawn_new_listen_pipe();
     }
-    for (i = 0; i < MAX_USERS; i++) {
+    for (i = 0; i < max_users; i++) {
 	long state, br;
 	AVAILDATA avail;
 	char buf[3];
@@ -963,7 +970,7 @@ INLINE void process_io()
     /*
      * check for data pending on user connections.
      */
-    for (i = 0; i < MAX_USERS; i++) {
+    for (i = 0; i < max_users; i++) {
 	if (!all_users[i] || (all_users[i]->iflags & (CLOSING | CMD_IN_BUF)))
 	    continue;
 	if (all_users[i]->iflags & NET_DEAD) {
@@ -1022,7 +1029,6 @@ static void new_user_handler P1(int, which)
 #endif
     int length;
     int i;
-    char *full_message;
     object_t *ob;
     svalue_t *ret;
     int err;
@@ -1051,133 +1057,131 @@ static void new_user_handler P1(int, which)
 	exit(8);
     }
 #endif				/* linux */
-    for (i = 0; i < MAX_USERS; i++) {
-	if (all_users[i] != 0)
-	    continue;
-	err = assert_master_ob_loaded("[internal] new_user_handler","");
-	if (err != 1) {
-	    fprintf(stderr, "Can't connect with no master object.\n");
-	    close(new_socket_fd);
-#ifndef OS2
-	    fprintf(stderr, "Connection from %s aborted.\n", inet_ntoa(addr.sin_addr));
-#endif
-	    return;
-	}
-	command_giver = master_ob;
-	master_ob->interactive =
-	    (interactive_t *)
-	    DXALLOC(sizeof(interactive_t), TAG_INTERACTIVE,
-		    "new_user_handler");
-	total_users++;
-#ifndef NO_ADD_ACTION
-	master_ob->interactive->default_err_message.s = 0;
-#endif
-	master_ob->interactive->connection_type = external_port[which].kind;
-	master_ob->flags |= O_ONCE_INTERACTIVE;
-	/*
-	 * initialize new user interactive data structure.
-	 */
-	master_ob->interactive->ob = master_ob;
-	master_ob->interactive->input_to = 0;
-	master_ob->interactive->iflags = 0;
-	master_ob->interactive->text[0] = '\0';
-	master_ob->interactive->text_end = 0;
-	master_ob->interactive->text_start = 0;
-	master_ob->interactive->carryover = NULL;
-	master_ob->interactive->snoop_on = 0;
-	master_ob->interactive->snoop_by = 0;
-	master_ob->interactive->last_time = current_time;
-#ifdef TRACE
-	master_ob->interactive->trace_level = 0;
-	master_ob->interactive->trace_prefix = 0;
-#endif
-#ifdef OLD_ED
-	master_ob->interactive->ed_buffer = 0;
-#endif
-	master_ob->interactive->message_producer = 0;
-	master_ob->interactive->message_consumer = 0;
-	master_ob->interactive->message_length = 0;
-	master_ob->interactive->num_carry = 0;
-	master_ob->interactive->state = TS_DATA;
-	master_ob->interactive->out_of_band = 0;
-	all_users[i] = master_ob->interactive;
-#ifdef OS2
-	all_users[i]->named_pipe = new_user_handle;
-	new_user_handle = 0;
-#else
-	all_users[i]->fd = new_socket_fd;
-#endif
-	set_prompt("> ");
+    for (i = 0; i < max_users; i++)
+	if (!all_users[i]) break;
 
-#ifndef OS2
-	memcpy((char *) &all_users[i]->addr, (char *) &addr, length);
-	debug(512, ("New connection from %s.\n", inet_ntoa(addr.sin_addr)));
-#endif
-	num_user++;
-	/*
-	 * The user object has one extra reference. It is asserted that the
-	 * master_ob is loaded.
-	 */
-	add_ref(master_ob, "new_user");
-	push_number(external_port[which].port);
-	ret = apply_master_ob(APPLY_CONNECT, 1);
-	if (ret == 0 || ret == (svalue_t *)-1 || ret->type != T_OBJECT) {
-	    remove_interactive(master_ob);
-#ifndef OS2
-	    fprintf(stderr, "Connection from %s aborted.\n", inet_ntoa(addr.sin_addr));
-#endif
-	    return;
+    if (i == max_users) {
+	if (all_users) {
+	    all_users = RESIZE(all_users, max_users + 10, interactive_t *,
+			       TAG_USERS, "new_user_handler");
+	} else {
+	    all_users = CALLOCATE(10, interactive_t *,
+				  TAG_USERS, "new_user_handler");
 	}
-	/*
-	 * There was an object returned from connect(). Use this as the user
-	 * object.
-	 */
-	ob = ret->u.ob;
-	if (ob->flags & O_HIDDEN)
-	    num_hidden++;
-	ob->interactive = master_ob->interactive;
-	ob->interactive->ob = ob;
-	ob->flags |= O_ONCE_INTERACTIVE;
-	/*
-	 * assume the existance of write_prompt and process_input in user.c
-	 * until proven wrong (after trying to call them).
-	 */
-	ob->interactive->iflags |= (HAS_WRITE_PROMPT | HAS_PROCESS_INPUT);
+	while (max_users < i + 10)
+	    all_users[max_users++] = 0;
+    }
 
-	master_ob->flags &= ~O_ONCE_INTERACTIVE;
-	master_ob->interactive = 0;
-	free_object(master_ob, "reconnect");
-	add_ref(ob, "new_user");
-	command_giver = ob;
+    err = assert_master_ob_loaded("[internal] new_user_handler","");
+    if (err != 1) {
+	fprintf(stderr, "Can't connect with no master object.\n");
+	close(new_socket_fd);
 #ifndef OS2
-	if (addr_server_fd >= 0) {
-	    query_addr_name(ob);
-	}
+	fprintf(stderr, "Connection from %s aborted.\n", inet_ntoa(addr.sin_addr));
 #endif
-
-	if (external_port[which].kind == PORT_TELNET) {
-	    /* Ask permission to ask them for their terminal type */
-	    add_message(telnet_do_ttype);
-	    /* Ask them for their window size */
-	    add_message(telnet_do_naws);
-	}
-
-	logon(ob);
-	debug(512, ("new_user_handler: end\n"));
 	return;
     }
-    full_message = "No user slots available: closing connection...\r\n";
+    command_giver = master_ob;
+    master_ob->interactive =
+	(interactive_t *)
+	    DXALLOC(sizeof(interactive_t), TAG_INTERACTIVE,
+		    "new_user_handler");
+    total_users++;
+#ifndef NO_ADD_ACTION
+    master_ob->interactive->default_err_message.s = 0;
+#endif
+    master_ob->interactive->connection_type = external_port[which].kind;
+    master_ob->flags |= O_ONCE_INTERACTIVE;
+    /*
+     * initialize new user interactive data structure.
+     */
+    master_ob->interactive->ob = master_ob;
+    master_ob->interactive->input_to = 0;
+    master_ob->interactive->iflags = 0;
+    master_ob->interactive->text[0] = '\0';
+    master_ob->interactive->text_end = 0;
+    master_ob->interactive->text_start = 0;
+    master_ob->interactive->carryover = NULL;
+    master_ob->interactive->snoop_on = 0;
+    master_ob->interactive->snoop_by = 0;
+    master_ob->interactive->last_time = current_time;
+#ifdef TRACE
+    master_ob->interactive->trace_level = 0;
+    master_ob->interactive->trace_prefix = 0;
+#endif
+#ifdef OLD_ED
+    master_ob->interactive->ed_buffer = 0;
+#endif
+    master_ob->interactive->message_producer = 0;
+    master_ob->interactive->message_consumer = 0;
+    master_ob->interactive->message_length = 0;
+    master_ob->interactive->num_carry = 0;
+    master_ob->interactive->state = TS_DATA;
+    master_ob->interactive->out_of_band = 0;
+    all_users[i] = master_ob->interactive;
 #ifdef OS2
-    DosWrite(new_user_handle, full_message, strlen(full_message), &i);
-    DosDisConnectNPipe(new_user_handle);
-    DosClose(new_user_handle);
+    all_users[i]->named_pipe = new_user_handle;
     new_user_handle = 0;
 #else
-    write(new_socket_fd, full_message, strlen(full_message));
-    if (close(new_socket_fd) == -1) {
-	perror("new_user_handler: close");
+    all_users[i]->fd = new_socket_fd;
+#endif
+    set_prompt("> ");
+    
+#ifndef OS2
+    memcpy((char *) &all_users[i]->addr, (char *) &addr, length);
+    debug(512, ("New connection from %s.\n", inet_ntoa(addr.sin_addr)));
+#endif
+    num_user++;
+    /*
+     * The user object has one extra reference. It is asserted that the
+     * master_ob is loaded.
+     */
+    add_ref(master_ob, "new_user");
+    push_number(external_port[which].port);
+    ret = apply_master_ob(APPLY_CONNECT, 1);
+    if (ret == 0 || ret == (svalue_t *)-1 || ret->type != T_OBJECT) {
+	remove_interactive(master_ob);
+#ifndef OS2
+	fprintf(stderr, "Connection from %s aborted.\n", inet_ntoa(addr.sin_addr));
+#endif
+	return;
+    }
+    /*
+     * There was an object returned from connect(). Use this as the user
+     * object.
+     */
+    ob = ret->u.ob;
+    if (ob->flags & O_HIDDEN)
+	num_hidden++;
+    ob->interactive = master_ob->interactive;
+    ob->interactive->ob = ob;
+    ob->flags |= O_ONCE_INTERACTIVE;
+    /*
+     * assume the existance of write_prompt and process_input in user.c
+     * until proven wrong (after trying to call them).
+     */
+    ob->interactive->iflags |= (HAS_WRITE_PROMPT | HAS_PROCESS_INPUT);
+    
+    master_ob->flags &= ~O_ONCE_INTERACTIVE;
+    master_ob->interactive = 0;
+    free_object(master_ob, "reconnect");
+    add_ref(ob, "new_user");
+    command_giver = ob;
+#ifndef OS2
+    if (addr_server_fd >= 0) {
+	query_addr_name(ob);
     }
 #endif
+    
+    if (external_port[which].kind == PORT_TELNET) {
+	/* Ask permission to ask them for their terminal type */
+	add_message(telnet_do_ttype);
+	/* Ask them for their window size */
+	add_message(telnet_do_naws);
+    }
+    
+    logon(ob);
+    debug(512, ("new_user_handler: end\n"));
 }				/* new_user_handler() */
 
 /*
@@ -1510,7 +1514,7 @@ static void get_user_data P1(interactive_t *, ip)
 		memcpy(temp + old_num, buf, num_bytes);
 		temp[num_bytes + old_num] = 0;
 		p = temp;
-		while (nl = strchr(p, '\n')) {
+		while ((nl = strchr(p, '\n'))) {
 		    *nl = 0;
 		    if (!(command_giver->flags & O_DESTRUCTED)) {
 			push_string(p, STRING_MALLOC);
@@ -1549,11 +1553,11 @@ static void get_user_data P1(interactive_t *, ip)
  * This should also return a value if there is something in the
  * buffer and we are supposed to be in single character mode.
  */
-#define StartCmdGiver   (MAX_USERS-1)
+#define StartCmdGiver   (max_users-1)
 #define IncCmdGiver     NextCmdGiver = (NextCmdGiver == 0? StartCmdGiver: \
                                         NextCmdGiver - 1)
 
-static int NextCmdGiver = StartCmdGiver;
+static int NextCmdGiver = 0;
 
 #ifdef DEBUG_COMM_FREEZE
 static char *debug_dump P2(char *, block, int, size) {
@@ -1594,7 +1598,7 @@ static char *get_user_command()
     /*
      * find and return a user command.
      */
-    for (i = 0; i < MAX_USERS; i++) {
+    for (i = 0; i < max_users; i++) {
 	ip = all_users[NextCmdGiver];
 	if (ip && (ip->iflags & CMD_IN_BUF)) {
 	    user_command = first_cmd_in_buf(ip);
@@ -1787,7 +1791,7 @@ void remove_interactive P1(object_t *, ob)
     if (!ob->interactive) {
 	return;
     }
-    for (i = 0; i < MAX_USERS; i++) {
+    for (i = 0; i < max_users; i++) {
 	if (all_users[i] != ob->interactive)
 	    continue;
 	if (ob->interactive->iflags & CLOSING) {
@@ -2499,7 +2503,7 @@ void update_ref_counts_for_users()
 {
     int i;
 
-    for (i = 0; i < MAX_USERS; i++) {
+    for (i = 0; i < max_users; i++) {
 	if (all_users[i] == 0)
 	    continue;
 	all_users[i]->ob->extra_ref++;

@@ -23,7 +23,7 @@ OURLIBS=packages/packages.a mudlib/mudlib.a
 all: $(DRIVER_BIN) addr_server
 
 %ifdef GNU
-$(OBJDIR)/%.o: %.c $(OBJDIR)
+$(OBJDIR)/%.o: %.c
 	$(CC) -I$(OBJDIR) $(CFLAGS) -o $@ -c $<
 
 $(OBJDIR)/interpret.o: interpret.c patchlevel.h
@@ -53,7 +53,7 @@ grammar.tab.c: grammar.y
 # For Sequent DYNIX/ptx compile $(OBJ) is parallel:
 # $(DRIVER_BIN):& $(OBJ)
 %ifdef GNU
-$(DRIVER_BIN): $(OBJDIR) $(OBJ)
+$(DRIVER_BIN): $(OBJ)
 	$(MAKE) -C packages 'CC=$(CC)' 'CFLAGS=$(CFLAGS)' 'OBJDIR=../$(OBJDIR)'
 	$(MAKE) -C mudlib 'CC=$(CC)' 'CFLAGS=$(CFLAGS)' 'OBJDIR=../$(OBJDIR)'
 %else

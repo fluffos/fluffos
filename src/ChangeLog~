@@ -1,3 +1,45 @@
+Fri Apr 28 20:24:42 EDT 1995 (tim@handel.princeton.edu (Beek))
+	* bumped version number to v21.2
+	* features:
+	  . packages are now specified in options.h; #define
+	    PACKAGE_ANYTHING in options.h will cause packages/anything.c
+	    to be compiled in
+	  . classes can contain instances of themselves now
+	  . NAWS window size negotiation: the callback is 
+	    window_size(int width, int height)
+	  . to compile MudOS, now type './build.MudOS' and follow the
+	    instructions
+	  . support for multiple login ports, as well as binary/ascii
+	    ports as well as telnet; see ChangeLog.alpha
+	  . sockets are now initialized before preload() is called so
+	    socket objects can preload normally
+	* Two new contrib efuns
+	  . store_variable/fetch_variable
+	* fixed crashers in:
+	  . pointers to void valued efuns
+	  . anonymous function pointers
+	  . set_hide()
+	* bugfixes:
+	  . fixed a bug where 'continue' would some jump to the wrong
+	    point
+	  . typeof() efun
+	  . a strsrch() hanger
+	* optimizations:
+	  . assignment to locals
+	  . pushing of call_out arguments
+	  . return zero, loop conditions, logical expressions
+	  . multiple pushes
+	* source changes:
+	  . merged intermediate programs that edit the source code into one
+	    main program
+	* COMPAT BUSTERS:
+	  . privs_file() is now called to get new privs for virtual
+	    objects; see ChangeLog.alpha for full details
+	  . a bunch of LPC predefines which weren't of the __FOO__
+	    variety changed names; see ChangeLog.alpha for a list
+	  . 'efun', 'new', and 'asm' are no longer valid variable/function
+	    names
+
 Thu Mar 30 14:56:48 EST 1995 (tim@handel.princeton.edu (Beek))
 	* bumped version number to v21.1
 	* three new contrib efuns:

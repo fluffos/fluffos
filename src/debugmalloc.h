@@ -13,5 +13,9 @@ void dump_malloc_data PROT((void));
 void set_malloc_mask PROT((int));
 void dump_debugmalloc PROT((char *, int));
 #    endif
+#  else
+   /* not DEBUGMALLOC */
+#    undef DEBUGMALLOC_EXTENSIONS
+#    undef CHECK_MEMORY
 #  endif
 #endif

@@ -68,22 +68,23 @@ typedef struct sentence_s {
 } sentence_t;
 
 typedef struct { /* has to be the same as object_t below */
-    unsigned int ref;
+    unsigned short ref;
+    unsigned short flags;
 #ifdef DEBUG
     unsigned int extra_ref;
 #endif
-    unsigned short flags;
     char *name;
     struct object_s *next_hash;
     void (**jump_table)();
+    struct string_switch_entry_s **string_switch_tables;
 } lpc_object_t;
 
 typedef struct object_s {
-    unsigned int ref;		/* Reference count. */
+    unsigned short ref;		/* Reference count. */
+    unsigned short flags;	/* Bits or'ed together from above */
 #ifdef DEBUG
     unsigned int extra_ref;	/* Used to check ref count. */
 #endif
-    unsigned short flags;	/* Bits or'ed together from above */
     char *name;
     struct object_s *next_hash;
     /* the fields above must match lpc_object_t */
@@ -136,11 +137,9 @@ typedef struct object_s {
 #define ROB_MAPPING_ERROR 4
 #define ROB_NUMERAL_ERROR 8
 #define ROB_GENERAL_ERROR 16
-#define ROB_ERROR 31
+#define ROB_CLASS_ERROR 32
+#define ROB_ERROR 63
 
-/*
- * object.c
- */
 extern object_t *previous_ob;
 extern int tot_alloc_object;
 extern int tot_alloc_object_size;
@@ -169,18 +168,6 @@ int shadow_catch_message PROT((object_t *, char *));
 void tell_npc PROT((object_t *, char *));
 void tell_object PROT((object_t *, char *));
 variable_t *find_status PROT((char *));
-/*
- * ed.c
- */
-void ed_start PROT((char *, char *, char *, int, object_t *));
-void ed_cmd PROT((char *));
-void save_ed_buffer PROT((void));
-void regerror PROT((char *));
-
-/*
- * hash.c
- */
-int hashstr PROT((char *, int, int));
-int whashstr PROT((char *, int));
+void dealloc_object PROT((object_t *, char *));
 
 #endif

@@ -3,8 +3,15 @@
 #ifdef LPC_TO_C
 #include "lpc_incl.h"
 #include "backend.h"
-#include "cfuns.h"
+#include "lpc_to_c.h"
 #include "stralloc.h"
+#include "eoperators.h"
+
+/* temporaries for LPC->C code */
+int lpc_int;
+svalue_t *lpc_svp;
+array_t *lpc_arr;
+mapping_t *lpc_map;
 
 static svalue_t *lval;
 
@@ -48,8 +55,8 @@ void c_call_inherited P3(int, inh, int, func, int, num_arg) {
     
     funp = setup_inherited_frame(funp);
     csp->pc = pc;
-    pc = current_prog->program + funp->offset;
-    csp->extern_call = 0;
+
+    call_program(current_prog, funp->offset);
 }
 
 void c_call P2(int, func, int, num_arg) {
@@ -188,6 +195,54 @@ void c_post_inc() {
     }
 }
 
+void c_pre_dec() {
+    svalue_t *lval;
+
+    DEBUG_CHECK(sp->type != T_LVALUE, 
+		"non-lvalue argument to --\n");
+    lval = sp->u.lvalue;
+    switch (lval->type) {
+    case T_NUMBER:
+	sp->type = T_NUMBER;
+	sp->u.number = --(lval->u.number);
+	break;
+    case T_REAL:
+	sp->type = T_REAL;
+	sp->u.real = --(lval->u.real);
+	break;
+    case T_LVALUE_BYTE:
+	sp->type = T_NUMBER;
+	sp->u.number = --(*glb.u.lvalue_byte);
+	break;
+    default:
+	error("-- of non-numeric argument\n");
+    }
+}
+
+void c_pre_inc() {
+    svalue_t *lval;
+
+    DEBUG_CHECK(sp->type != T_LVALUE,
+		"non-lvalue argument to ++\n");
+    lval = sp->u.lvalue;
+    switch (lval->type) {
+    case T_NUMBER:
+	sp->type = T_NUMBER;
+	sp->u.number = ++lval->u.number;
+	break;
+    case T_REAL:
+	sp->type = T_REAL;
+	sp->u.real = ++lval->u.number;
+	break;
+    case T_LVALUE_BYTE:
+	sp->type = T_NUMBER;
+	sp->u.number = ++*glb.u.lvalue_byte;
+	break;
+    default:
+	error("++ of non-numeric argument\n");
+    }
+}
+
 void c_assign() {
 #ifdef DEBUG
     if (sp->type != T_LVALUE) fatal("Bad argument to F_ASSIGN\n");
@@ -209,6 +264,15 @@ void c_assign() {
     }
     sp--;              /* ignore lvalue */
     /* rvalue is already in the correct place */
+}
+
+void c_void_assign_local P1(svalue_t *, var) {
+    if (sp->type == T_INVALID) {
+	sp--;
+	return;
+    }
+    free_svalue(var, "c_void_assign_local");
+    *var = *sp--;
 }
 
 void c_index() {
@@ -282,6 +346,95 @@ void c_index() {
     }
 }
 
+void c_rindex() {
+    int i;
+
+    switch (sp->type) {
+    case T_BUFFER:
+	{
+	    if ((sp-1)->type != T_NUMBER)
+		error("Indexing a buffer with an illegal type.\n");
+	    
+	    i = sp->u.buf->size - (sp - 1)->u.number;
+	    if ((i > sp->u.buf->size) || (i < 0))
+		error("Buffer index out of bounds.\n");
+
+	    i = sp->u.buf->item[i];
+	    free_buffer(sp->u.buf);
+	    (--sp)->u.number = i;
+	    break;
+	}
+    case T_STRING:
+	{
+	    int len = SVALUE_STRLEN(sp);
+	    if ((sp-1)->type != T_NUMBER) {
+		error("Indexing a string with an illegal type.\n");
+	    }
+	    i = len - (sp - 1)->u.number;
+	    if ((i > len) || (i < 0))
+		error("String index out of bounds.\n");
+	    i = (unsigned char) sp->u.string[i];
+	    free_string_svalue(sp);
+	    (--sp)->u.number = i;
+	    break;
+	}
+    case T_ARRAY:
+	{
+	    array_t *vec = sp->u.arr;
+	    
+	    if ((sp-1)->type != T_NUMBER)
+		error("Indexing an array with an illegal type\n");
+	    i = vec->size - (sp - 1)->u.number;
+	    if (i < 0 || i >= vec->size) error("Array index out of bounds.\n");
+	    assign_svalue_no_free(--sp, &vec->item[i]);
+	    free_array(vec);
+	    break;
+	}
+    default:
+	error("Indexing from the right on illegal type.\n");
+    }
+    
+    /*
+     * Fetch value of a variable. It is possible that it is a
+     * variable that points to a destructed object. In that case,
+     * it has to be replaced by 0.
+     */
+    if (sp->type == T_OBJECT && (sp->u.ob->flags & O_DESTRUCTED)) {
+	free_object(sp->u.ob, "F_RINDEX");
+	sp->type = T_NUMBER;
+	sp->u.number = 0;
+    }
+}
+
+void
+c_function_constructor P2(int, kind, int, arg)
+{
+    funptr_t *fp;
+
+    switch (kind) {
+    case FP_EFUN:
+	fp = make_efun_funp(arg, sp);
+	pop_stack();
+	break;
+    case FP_LOCAL:
+	fp = make_lfun_funp(arg, sp); 
+	pop_stack();
+	break;
+    case FP_SIMUL:
+	fp = make_simul_funp(arg, sp); 
+	pop_stack();
+	break;
+    case FP_FUNCTIONAL:
+    case FP_FUNCTIONAL | FP_NOT_BINDABLE:
+	/* */
+    case FP_ANONYMOUS:
+	/* */
+    default:
+	fatal("Tried to make unknown type of function pointer.\n");
+    }
+    push_refed_funp(fp);
+}
+
 void c_not() {
     if (sp->type == T_NUMBER)
 	sp->u.number = !sp->u.number;
@@ -306,12 +459,12 @@ void c_add_eq P1(int, is_void) {
     case T_STRING:
 	if (sp->type == T_STRING) {
 	    SVALUE_STRING_JOIN(lval, sp, "f_add_eq: 1");
-	} else if (sp->type & T_NUMBER) {
+	} else if (sp->type == T_NUMBER) {
 	    char buff[20];
 	    
 	    sprintf(buff, "%d", sp->u.number);
 	    EXTEND_SVALUE_STRING(lval, buff, "f_add_eq: 2");
-	} else if (sp->type & T_REAL) {
+	} else if (sp->type == T_REAL) {
 	    char buff[40];
 	    
 	    sprintf(buff, "%f", sp->u.real);
@@ -322,10 +475,10 @@ void c_add_eq P1(int, is_void) {
 	}
 	break;
     case T_NUMBER:
-	if (sp->type & T_NUMBER) {
+	if (sp->type == T_NUMBER) {
 	    lval->u.number += sp->u.number;
 	    /* both sides are numbers, no freeing required */
-	} else if (sp->type & T_REAL) {
+	} else if (sp->type == T_REAL) {
 	    lval->u.number += sp->u.real;
 	    /* both sides are numbers, no freeing required */
 	} else {
@@ -333,11 +486,11 @@ void c_add_eq P1(int, is_void) {
 	}
 	break;
     case T_REAL:
-	if (sp->type & T_NUMBER) {
+	if (sp->type == T_NUMBER) {
 	    lval->u.real += sp->u.number;
 	    /* both sides are numerics, no freeing required */
 	}
-	if (sp->type & T_REAL) {
+	if (sp->type == T_REAL) {
 	    lval->u.real += sp->u.real;
 	    /* both sides are numerics, no freeing required */
 	} else {
@@ -414,7 +567,7 @@ void c_divide() {
 	
     case T_NUMBER|T_REAL:
 	{
-	    if ((sp--)->type & T_NUMBER){
+	    if ((sp--)->type == T_NUMBER){
 		if (!((sp+1)->u.number)) error("Division by zero\n");
 		sp->u.real /= (sp+1)->u.number;
 	    } else {
@@ -453,7 +606,7 @@ void c_multiply() {
 	
     case T_NUMBER|T_REAL:
 	{
-	    if ((--sp)->type & T_NUMBER){
+	    if ((--sp)->type == T_NUMBER){
 		sp->type = T_REAL;
 		sp->u.real = sp->u.number * (sp+1)->u.real;
 	    }
@@ -502,6 +655,27 @@ void c_inc() {
     }
 }
 
+void c_dec() {
+    svalue_t *lval;
+
+    DEBUG_CHECK(sp->type != T_LVALUE,
+		"non-lvalue argument to --\n");
+    lval = (sp--)->u.lvalue;
+    switch (lval->type) {
+    case T_NUMBER:
+	lval->u.number--;
+	break;
+    case T_REAL:
+	lval->u.real--;
+	break;
+    case T_LVALUE_BYTE:
+	--(*glb.u.lvalue_byte);
+	break;
+    default:
+	error("-- of non-numeric argument\n");
+    }
+}
+
 void c_le() {
     int i = sp->type;
 
@@ -516,7 +690,7 @@ void c_le() {
 	break;
 	
     case T_NUMBER|T_REAL:
-	if (i & T_NUMBER){
+	if (i == T_NUMBER){
 	    sp->type = T_NUMBER;
 	    sp->u.number = sp->u.real <= (sp+1)->u.number;
 	} else sp->u.number = sp->u.number <= (sp+1)->u.real;
@@ -558,7 +732,7 @@ void c_lt() {
 	sp->type = T_NUMBER;
 	break;
     case T_NUMBER|T_REAL:
-	if (i & T_NUMBER) {
+	if (i == T_NUMBER) {
 	    sp->type = T_NUMBER;
 	    sp->u.number = sp->u.real < (sp+1)->u.number;
 	} else sp->u.number = sp->u.number < (sp+1)->u.real;
@@ -594,7 +768,7 @@ void c_gt() {
 	sp->type = T_NUMBER;
 	break;
     case T_NUMBER | T_REAL:
-	if (i & T_NUMBER) {
+	if (i == T_NUMBER) {
 	    sp->type = T_NUMBER;
 	    sp->u.number = sp->u.real > (sp+1)->u.number;
 	} else sp->u.number = sp->u.number > (sp+1)->u.real;
@@ -632,7 +806,7 @@ void c_ge() {
 	sp->type = T_NUMBER;
 	break;
     case T_NUMBER | T_REAL:
-	if (i & T_NUMBER) {
+	if (i == T_NUMBER) {
 	    sp->type = T_NUMBER;
 	    sp->u.number = sp->u.real >= (sp+1)->u.number;
 	} else sp->u.number = sp->u.number >= (sp+1)->u.real;
@@ -671,7 +845,7 @@ void c_subtract() {
 	break;
 	
     case T_NUMBER | T_REAL:
-	if (sp->type & T_REAL) sp->u.real -= (sp+1)->u.number;
+	if (sp->type == T_REAL) sp->u.real -= (sp+1)->u.number;
 	else {
 	    sp->type = T_REAL;
 	    sp->u.real = sp->u.number - (sp+1)->u.real;
@@ -697,11 +871,26 @@ void c_subtract() {
     }
 }
 
+void c_negate() {
+    if (sp->type == T_NUMBER)
+	sp->u.number = -sp->u.number;
+    else if (sp->type == T_REAL)
+	sp->u.real = -sp->u.real;
+    else
+	error("Bad argument to unary minus\n");
+}
+
+void c_compl() {
+    if (sp->type != T_NUMBER)
+	error("Bad argument to ~\n");
+    sp->u.number = ~sp->u.number;
+}
+
 void c_add() {
     switch (sp->type) {
     case T_BUFFER:
 	{
-	    if (!((sp-1)->type & T_BUFFER)) {
+	    if (!((sp-1)->type == T_BUFFER)) {
 		error("Bad type argument to +. Had %s and %s.\n",
 		      type_name((sp - 1)->type), type_name(sp->type));
 	    } else {
@@ -766,7 +955,7 @@ void c_add() {
 	} /* end of x + T_REAL */
     case T_ARRAY:
 	{
-	    if (!((sp-1)->type & T_ARRAY)) {
+	    if (!((sp-1)->type == T_ARRAY)) {
 		error("Bad type argument to +. Had %s and %s\n",
 		      type_name((sp - 1)->type), type_name(sp->type));
 	    } else {
@@ -778,7 +967,7 @@ void c_add() {
 	} /* end of x + T_ARRAY */
     case T_MAPPING:
 	{
-	    if ((sp-1)->type & T_MAPPING) {
+	    if ((sp-1)->type == T_MAPPING) {
 		mapping_t *map;
 		
 		map = add_mapping((sp - 1)->u.map, sp->u.map);
@@ -861,6 +1050,7 @@ int c_loop_cond_compare P2(svalue_t *, s1, svalue_t *, s2) {
 	    error("Bad 1st argument to <.\n");
 	}
     }
+    return 0;
 }
 
 void c_sscanf P1(int, num_arg) {
@@ -903,8 +1093,7 @@ void c_sscanf P1(int, num_arg) {
     fp->u.number = i;
 }
 
-/* this may or may not work ... */
-int c_catch() {
+void c_prepare_catch() {
     push_control_stack(FRAME_CATCH, 0);
     /* next two probably not necessary... */
     csp->num_local_variables = (csp - 1)->num_local_variables;	/* marion */
@@ -916,27 +1105,21 @@ int c_catch() {
 
     /* signal catch OK - print no err msg */
     error_recovery_context_exists = CATCH_ERROR_CONTEXT;
-    if (SETJMP(error_recovery_context)) {
-	/*
-	 * They did a throw() or error. That means that the control stack
-	 * must be restored manually here.
-	 */
-	push_pop_error_context(-1);
-	pop_control_stack();
-	sp++;
-	*sp = catch_value;
-	assign_svalue_no_free(&catch_value, &const1);
-	
-	/* if it's too deep or max eval, we can't let them catch it */
-	if (max_eval_error)
-	    error("Can't catch eval cost too big error.\n");
-	if (too_deep_error)
-	    error("Can't catch too deep recursion error.\n");
-	return 0;
-    } else {
-	assign_svalue(&catch_value, &const1);
-	return 1;
-    }
+    assign_svalue(&catch_value, &const1);
+}
+
+void c_caught_error() {
+    push_pop_error_context(-1);
+    pop_control_stack();
+    sp++;
+    *sp = catch_value;
+    assign_svalue_no_free(&catch_value, &const1);
+
+    /* if it's too deep or max eval, we can't let them catch it */
+    if (max_eval_error)
+	error("Can't catch eval cost too big error.\n");
+    if (too_deep_error)
+	error("Can't catch too deep recursion error.\n");
 }
     
 void c_end_catch() {
@@ -983,5 +1166,6 @@ int c_string_switch_lookup P2(svalue_t *, str, string_switch_entry_t *, table) {
 
 int c_range_switch_lookup P2(int, num, range_switch_entry_t *, table) {
     /* future work */
+    return 0;
 }
 #endif

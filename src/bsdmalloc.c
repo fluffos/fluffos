@@ -106,7 +106,6 @@ union overhead {
  */
 #define	NBUCKETS 30
 static union overhead *nextf[NBUCKETS];
-extern void *sbrk();
 
 static int pagesz;		/* page size */
 static int pagebucket;		/* page size bucket */
@@ -161,7 +160,7 @@ void *bsdmalloc_malloc P1(size_t, nbytes)
 	if (n < 0)
 	    n += pagesz;
 	if (n) {
-	    if (sbrk(n) == (char *) -1)
+	    if ((char *)sbrk(n) == (char *) -1)
 		return (NULL);
 	}
 	bucket = 0;

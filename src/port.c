@@ -163,20 +163,16 @@ get_cpu_times P2(unsigned long *, secs, unsigned long *, usecs)
 {
 #ifdef OS2
     +struct timeb tim;
-
 #endif
 #ifdef RUSAGE
     struct rusage rus;
-
 #endif
 #if defined(TIMES) && !defined(RUSAGE)
     struct tms t;
     unsigned long total;
-
 #endif
 #ifdef GET_PROCESS_STATS
     struct process_stats ps;
-
 #endif
 
 #ifdef RUSAGE			/* start RUSAGE */
@@ -222,15 +218,10 @@ get_cpu_times P2(unsigned long *, secs, unsigned long *, usecs)
 #else
 
     return 0;
-
 #endif				/* end OS2 */
-
 #endif				/* end LATTICE */
-
 #endif				/* end TIMES */
-
 #endif				/* end else GET_PROCESS_STATS */
-
 #endif				/* end else RUSAGE */
 }
 
@@ -247,13 +238,12 @@ char *
 #endif
 }
 
-#if defined(_AUX_SOURCE) || defined(SunOS_4)
+#ifndef HAS_STRERROR
 /* for those systems without strerror() but with sys_errlist, sys_nerr */
 extern char *sys_errlist[];
 extern int sys_nerr;
 
-char *
-     strerror P1(int, which)
+char *strerror P1(int, which)
 {
     if ((which < 0) || (which >= sys_nerr)) {
 	return "unknown error";
