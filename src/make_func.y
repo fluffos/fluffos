@@ -6,9 +6,6 @@
 #define _YACC_
 #include "lint.h"
 #include "lex.h"
-#include "mudlib_stats.h"
-#include "interpret.h"
-#include "mapping.h"
 #include "hash.h"
 #include "cc.h"
 
@@ -264,7 +261,8 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 	    $1 = MIXED;
 	}
      	sprintf(buff, "{\"%s\",%s,0,0,%d,%d,%s,%s,%s,%d,%s},\n",
-		$2, f_name, min_arg, limit_max ? -1 : $5, ctype($1),
+		$2, f_name, min_arg, limit_max ? -1 : $5, 
+		$1 != VOID ? ctype($1) : "TYPE_NOVALUE",
 		etype(0), etype(1), i, $6);
 	if (strlen(buff) > sizeof buff)
 	    mf_fatal("Local buffer overwritten !\n");
@@ -1525,7 +1523,7 @@ char *etype1(n)
     int n;
 {
     if (n & 0x10000)
-	return "T_POINTER";
+	return "T_ARRAY";
     switch(n) {
     case FLOAT:
     return "T_REAL";
@@ -1594,7 +1592,7 @@ char *ctype(n)
     char *p = (char *)NULL;
 
     if (n & 0x10000)
-	strcpy(buff, "TYPE_MOD_POINTER|");
+	strcpy(buff, "TYPE_MOD_ARRAY|");
     else
 	buff[0] = '\0';
     n &= ~0x10000;

@@ -1,8 +1,6 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#include "std.h"
-
 /*
  * main.c
  */
@@ -22,14 +20,14 @@ extern int max_buffer_size;
 extern int max_string_length;
 extern char *master_file_name;
 extern char *reserved_area;
-extern struct svalue const0;
-extern struct svalue const1;
-extern struct svalue const0u;
-extern struct svalue const0n;
+extern svalue_t const0;
+extern svalue_t const1;
+extern svalue_t const0u;
+extern svalue_t const0n;
 extern int st_num_arg;
 extern double consts[];
 extern int slow_shut_down_to_do;
-extern struct object *master_ob;
+extern object_t *master_ob;
 
 void debug_message PROTVARGS(());
 

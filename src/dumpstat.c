@@ -1,22 +1,23 @@
 #include "std.h"
 #include "lpc_incl.h"
 #include "comm.h"
+#include "file.h"
 
 /*
  * Write statistics about objects on file.
  */
 
-static int sumSizes PROT((struct mapping *, struct node *, int *));
-static int svalue_size PROT((struct svalue *));
+static int sumSizes PROT((mapping_t *, mapping_node_t *, int *));
+static int svalue_size PROT((svalue_t *));
 
-static int sumSizes P3(struct mapping *, m, struct node *, elt, int *, t)
+static int sumSizes P3(mapping_t *, m, mapping_node_t *, elt, int *, t)
 {
     *t += (svalue_size(&elt->values[0]) + svalue_size(&elt->values[1]));
-    *t += sizeof(struct node);
+    *t += sizeof(mapping_node_t);
     return 0;
 }
 
-static int svalue_size P1(struct svalue *, v)
+static int svalue_size P1(svalue_t *, v)
 {
     int i, total;
 
@@ -27,30 +28,45 @@ static int svalue_size P1(struct svalue *, v)
 	return 0;
     case T_STRING:
 	return (int) (strlen(v->u.string) + 1);
-    case T_POINTER:
-	/* first svalue is stored inside the vector struct */
-	total = sizeof(struct vector) - sizeof(struct svalue);
-	for (i = 0, total = 0; i < v->u.vec->size; i++) {
-	    total += svalue_size(&v->u.vec->item[i]) + sizeof(struct svalue);
+    case T_ARRAY:
+    case T_CLASS:
+	/* first svalue is stored inside the array struct */
+	total = sizeof(array_t) - sizeof(svalue_t);
+	for (i = 0, total = 0; i < v->u.arr->size; i++) {
+	    total += svalue_size(&v->u.arr->item[i]) + sizeof(svalue_t);
 	}
 	return total;
     case T_MAPPING:
-	total = sizeof(struct mapping);
+	total = sizeof(mapping_t);
 	mapTraverse(v->u.map, (int (*) ()) sumSizes, &total);
 	return total;
     case T_FUNCTION:
-#ifdef NEW_FUNCTIONS
-	total = (int)(sizeof(struct funp)) + svalue_size(&v->u.fp->args);
-	if (v->u.fp->type == FP_CALL_OTHER)
-	    total += svalue_size(&v->u.fp->f.obj);
-	return total;
-#else
-	return (int) (sizeof(struct funp) + svalue_size(&v->u.fp->obj) +
-		      svalue_size(&v->u.fp->fun));
-#endif
+	{
+	    svalue_t tmp;
+	    tmp.type = T_ARRAY;
+	    tmp.u.arr = v->u.fp->hdr.args;
+
+	    total = (int)(sizeof(funptr_hdr_t) + svalue_size(&tmp));
+	    switch (v->u.fp->hdr.type) {
+	    case FP_EFUN:
+		total += sizeof(efun_ptr_t);
+		break;
+	    case FP_LOCAL | FP_NOT_BINDABLE:
+		total += sizeof(local_ptr_t);
+		break;
+	    case FP_SIMUL:
+		total += sizeof(simul_ptr_t);
+		break;
+	    case FP_FUNCTIONAL:
+	    case FP_FUNCTIONAL | FP_NOT_BINDABLE:
+		total += sizeof(functional_t);
+		break;
+	    }
+	    return total;
+	}
     case T_BUFFER:
 	/* first byte is stored inside the buffer struct */
-	return (int) (sizeof(struct buffer) + v->u.buf->size - 1);
+	return (int) (sizeof(buffer_t) + v->u.buf->size - 1);
     case T_ANY:
 	break;
     default:
@@ -60,13 +76,13 @@ static int svalue_size P1(struct svalue *, v)
     return 0;
 }
 
-int data_size P1(struct object *, ob)
+int data_size P1(object_t *, ob)
 {
     int total = 0, i;
 
     if (ob->prog) {
-	for (i = 0; i < (int) ob->prog->p.i.num_variables; i++) {
-	    total += svalue_size(&ob->variables[i]) + sizeof(struct svalue);
+	for (i = 0; i < (int) ob->prog->num_variables; i++) {
+	    total += svalue_size(&ob->variables[i]) + sizeof(svalue_t);
 	}
     }
     return total;
@@ -75,7 +91,7 @@ int data_size P1(struct object *, ob)
 void dumpstat P1(char *, tfn)
 {
     FILE *f;
-    struct object *ob;
+    object_t *ob;
     char *fn;
     int display_hidden;
 
@@ -101,12 +117,12 @@ void dumpstat P1(char *, tfn)
 	    if (!display_hidden)
 		continue;
 	}
-	if (ob->prog && (ob->prog->p.i.ref == 1 || !(ob->flags & O_CLONE)))
-	    tmp = ob->prog->p.i.total_size;
+	if (ob->prog && (ob->prog->ref == 1 || !(ob->flags & O_CLONE)))
+	    tmp = ob->prog->total_size;
 	else
 	    tmp = 0;
 	fprintf(f, "%-20s %i ref %2d %s %s (%d) %s\n", ob->name,
-		tmp + data_size(ob) + sizeof(struct object), ob->ref,
+		tmp + data_size(ob) + sizeof(object_t), ob->ref,
 		ob->flags & O_HEART_BEAT ? "HB" : "  ",
 		ob->super ? ob->super->name : "--", /* ob->cpu */ 0,
 		(ob->swap_num >= 0) ? ((ob->flags & O_SWAPPED) ?

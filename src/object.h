@@ -1,10 +1,6 @@
 #ifndef OBJECT_H
 #define OBJECT_H
 
-#include "mapping.h"
-#include "interpret.h"
-#include "program.h"
-
 /*
  * Definition of an object.
  * If the object is inherited, then it must not be destructed !
@@ -17,6 +13,9 @@
  */
 
 #include "uid.h"
+#include "mudlib_stats.h"
+
+#define MAX_OBJECT_NAME_SIZE 2048
 
 #define O_HEART_BEAT		0x01	/* Does it have an heart beat ?      */
 #ifndef NO_WIZARDS
@@ -45,6 +44,10 @@
 #ifndef OLD_ED
 #define O_IN_EDIT               0x2000  /* object has an ed buffer open      */
 #endif
+#ifdef LPC_TO_C
+#define O_COMPILED_PROGRAM      0x4000  /* this is a marker for a compiled   */
+                                        /* program                           */
+#endif
 
 #if 0
 /*
@@ -54,33 +57,56 @@
 #define O_UNUSED2               0x8000	/* reserved for future expansion     */
 #endif
 
-typedef struct object {
+typedef struct sentence_s {
+#ifndef NO_ADD_ACTION
+    char *verb;
+#endif
+    struct sentence_s *next;
+    struct object_s *ob;
+    union string_or_func function;
+    int flags;
+} sentence_t;
+
+typedef struct { /* has to be the same as object_t below */
+    unsigned int ref;
+#ifdef DEBUG
+    unsigned int extra_ref;
+#endif
+    unsigned short flags;
+    char *name;
+    struct object_s *next_hash;
+    void (**jump_table)();
+} lpc_object_t;
+
+typedef struct object_s {
     unsigned int ref;		/* Reference count. */
 #ifdef DEBUG
     unsigned int extra_ref;	/* Used to check ref count. */
 #endif
     unsigned short flags;	/* Bits or'ed together from above */
+    char *name;
+    struct object_s *next_hash;
+    /* the fields above must match lpc_object_t */
     short heart_beat_ticks, time_to_heart_beat;
     int load_time;		/* time when this object was created */
     int next_reset;		/* Time of next reset of this object */
     int time_of_ref;		/* Time when last referenced. Used by swap */
     long swap_num;		/* Swap file offset. -1 is not swapped yet. */
-    struct program *prog;
-    char *name;
-    struct object *next_all, *next_inv, *next_heart_beat, *next_hash;
-    struct object *contains;
-    struct object *super;	/* Which object surround us ? */
-    struct interactive *interactive;	/* Data about an interactive user */
+    program_t *prog;
+    struct object_s *next_all, *next_inv, *next_heart_beat;
+    struct object_s *contains;
+    struct object_s *super;	/* Which object surround us ? */
+    struct interactive_s *interactive;	/* Data about an interactive user */
 #ifndef NO_LIGHT
     short total_light;
 #endif
 #ifndef NO_SHADOWS
-    struct object *shadowing;	/* Is this object shadowing ? */
-    struct object *shadowed;	/* Is this object shadowed ? */
+    struct object_s *shadowing;	/* Is this object shadowing ? */
+    struct object_s *shadowed;	/* Is this object shadowed ? */
 #endif				/* NO_SHADOWS */
 #ifndef NO_ADD_ACTION
-    struct sentence *sent;
-    struct object *next_hashed_living;
+    sentence_t *sent;
+    struct object_s *next_hashed_living;
     char *living_name;		/* Name of living object if in hash */
 #endif
 #ifndef NO_UIDS
@@ -93,9 +119,9 @@ typedef struct object {
 #ifndef NO_MUDLIB_STATS
     statgroup_t stats;		/* mudlib stats */
 #endif
-    svalue variables[1];	/* All variables to this program */
+    svalue_t variables[1];	/* All variables to this program */
     /* The variables MUST come last in the struct */
-}      object_t;
+} object_t;
 
 #ifdef DEBUG
 #define add_ref(ob, str) do { ob->ref++; \
@@ -115,37 +141,37 @@ typedef struct object {
 /*
  * object.c
  */
-extern struct object *previous_ob;
+extern object_t *previous_ob;
 extern int tot_alloc_object;
 extern int tot_alloc_object_size;
 extern int save_svalue_depth;
 
 void bufcat PROT((char **, char *));
-INLINE int svalue_save_size PROT((struct svalue *));
-INLINE void save_svalue PROT((struct svalue *, char **));
-INLINE int restore_svalue PROT((char *, struct svalue *));
-int save_object PROT((struct object *, char *, int));
-char *save_variable PROT((struct svalue *));
-int restore_object PROT((struct object *, char *, int));
-void restore_variable PROT((struct svalue *, char *));
-struct object *get_empty_object PROT((int));
-void reset_object PROT((struct object *));
-void call_create PROT((struct object *, int));
-void reload_object PROT((struct object *));
-void free_object PROT((struct object *, char *));
-struct object *find_living_object PROT((char *, int));
-INLINE int valid_hide PROT((struct object *));
-INLINE int object_visible PROT((struct object *));
-void set_living_name PROT((struct object *, char *));
-void remove_living_name PROT((struct object *));
+INLINE int svalue_save_size PROT((svalue_t *));
+INLINE void save_svalue PROT((svalue_t *, char **));
+INLINE int restore_svalue PROT((char *, svalue_t *));
+int save_object PROT((object_t *, char *, int));
+char *save_variable PROT((svalue_t *));
+int restore_object PROT((object_t *, char *, int));
+void restore_variable PROT((svalue_t *, char *));
+object_t *get_empty_object PROT((int));
+void reset_object PROT((object_t *));
+void call_create PROT((object_t *, int));
+void reload_object PROT((object_t *));
+void free_object PROT((object_t *, char *));
+object_t *find_living_object PROT((char *, int));
+INLINE int valid_hide PROT((object_t *));
+INLINE int object_visible PROT((object_t *));
+void set_living_name PROT((object_t *, char *));
+void remove_living_name PROT((object_t *));
 void stat_living_objects PROT((void));
-int shadow_catch_message PROT((struct object *, char *));
-void tell_npc PROT((struct object *, char *));
-void tell_object PROT((struct object *, char *));
+int shadow_catch_message PROT((object_t *, char *));
+void tell_npc PROT((object_t *, char *));
+void tell_object PROT((object_t *, char *));
 /*
  * ed.c
  */
-void ed_start PROT((char *, char *, char *, int, struct object *));
+void ed_start PROT((char *, char *, char *, int, object_t *));
 void ed_cmd PROT((char *));
 void save_ed_buffer PROT((void));
 void regerror PROT((char *));

@@ -122,14 +122,6 @@
  */
 #undef HAS_STATUS_TYPE
 
-/* OLD_COMMAND: if this is defined, then the command() efun may take a 2nd
- *   argument specifying on which object to perform the command.
- *
- * It was removed for security reasons, as this allows any object to mimic
- * a user typing a command.
- */
-#undef OLD_COMMAND
-
 /* SANE_EXPLODE_STRING: define this if you want to prevent explode_string
  *   from stripping off more than one leading delimeters.  #undef it for the
  *   old behavior.
@@ -145,14 +137,6 @@
  */
 #undef EACH
 
-/* OLD_HEARTBEAT: define this if you want the old heartbeat semantics.
- *   In the new semantics, set_heart_beat(ticks), specifies the number of
- *   HEARTBEAT_INTERVAL ticks to be used, where ticks can be > 1 for
- *   multiple tick intervals.  If you define this all values for ticks > 1
- *   will be mapped to ticks = 1.
- */
-#undef OLD_HEARTBEAT
-
 /* CAST_CALL_OTHERS: define this if you want to require casting of call_other's;
  *   this was the default behavior of the driver prior to this addition.
  */
@@ -167,7 +151,7 @@
 /* NO_LIGHT: define this to disable the set_light() and driver maintenance
  *   of light levels in objects.  You can simulate it via LPC if you want...
  */
-#undef NO_LIGHT
+#define NO_LIGHT
 
 /* NO_MUDLIB_STATS: define this to disable domain and author stats
  *   maintenance by the driver.  These mudlib stats are more domain
@@ -182,12 +166,6 @@
 /* NO_WIZARDS: for historical reasons, MudOS used to keep track of who
    is and isn't a wizard.  Defining this removes that completely. */
 #undef NO_WIZARDS
-
-/*
- * NEW_FUNCTIONS: define this to allow the extended function pointers
- * introduced in v20.
- */
-#define NEW_FUNCTIONS
 
 /* OLD_TYPE_BEHAVIOR: reintroduces a bug in type-checking that effectively
  * renders compile time type checking useless.  For backwards compatibility.
@@ -236,10 +214,9 @@
  * '           main' in '    command/update.c' ('      command/update')line 15
  * arguments were ("/read_buffer.c")
  *
- * Off by default because it produces somewhat longer error logs (that can
- * be a good thing, tho ...)
+ * The only down side is some people like their logs shorter
  */
-#undef ARGUMENTS_IN_TRACEBACK
+#define ARGUMENTS_IN_TRACEBACK
 
 /* LOCALS_IN_TRACEBACK: similar to ARGUMENTS_IN_TRACEBACK, but for local
  *   variables.  The output looks more or less like:
@@ -249,7 +226,7 @@
  * Same as above.  Tends to produce even longer logs, but very useful for
  * tracking errors.
  */
-#undef LOCALS_IN_TRACEBACK
+#define LOCALS_IN_TRACEBACK
 
 /* MUDLIB_ERROR_HANDLER: If you define this, the driver doesn't do any
  *   handling of runtime errors, other than to turn the heartbeats of
@@ -304,13 +281,15 @@
  *                      your code
  * PRAGMA_SAVE_TYPES:   save the types of function arguments for checking
  *                      calls to functions in this object by objects that
- *                    inherit it.
+ *                      inherit it.
  * PRAGMA_SAVE_BINARY:  save a compiled binary version of this file for
  *                      faster loading next time it is needed.
  * PRAGMA_OPTIMIZE:     make a second pass over the generated code to
  *                      optimize it further.  currently does jump threading.
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
  *                      compilation error occured.
+ * PRAGMA_EFUN:         when using generate_source(), generate efun code
+ *                      instead of object code
  */
 #define DEFAULT_PRAGMAS 0
 
@@ -341,21 +320,9 @@
  */
 #define SAVE_EXTENSION ".o"
 
-/* STRICT_TYPE_CHECKING: define this if you wish to force formal parameter
- *   to include types.  If this is undef'd, then grossnesses like:
- *   func(obj) { string foo;  foo = allocate(3); } are allowed.
- */
-#undef STRICT_TYPE_CHECKING
-
-/* IGNORE_STRICT_PRAGMA: define this if you wish the #pragma strict_types to
- *   be ignored.  This should normally be #undef'd but is useful in
- *   certain situations.
- */
-#undef IGNORE_STRICT_PRAGMA
-
 /* NO_ANSI: define if you wish to disallow users from typing in commands that
  *   contain ANSI escape sequences.  Defining NO_ANSI causes all escapes
- *   (ASCII 27) in user input to be replaced with a space ' '.
+ *   (ASCII 27) to be replaced with a space ' '.
  *
  * If you anticipate problems with users intentionally typing in ANSI codes
  * to make your terminal flash, etc define this.
@@ -366,6 +333,13 @@
  *   of the # of times each efun is invoked (via the opcprof() efun).
  */
 #undef OPCPROF
+
+/* OPCPROF_2D: define this if you wish to enable 2-D OPC profiling. Allows a 
+ *   dump of the # of times each *pair* of eoperators is invoked.
+ *
+ * You can't use this and OPCPROF at the same time.
+ */
+#undef OPCPROF_2D
 
 /* TRAP_CRASHES:  define this if you want MudOS to call crash() in master.c
  *   and then shutdown when signals are received that would normally crash the
@@ -387,7 +361,7 @@
 /* THIS_PLAYER_IN_CALL_OUT: define this if you wish this_player() to be
  *   usable from within call_out() callbacks.
  */
-#undef THIS_PLAYER_IN_CALL_OUT
+#define THIS_PLAYER_IN_CALL_OUT
 
 /* PRIVS: define this if you want object privledges.  Your mudlib must
  *   explicitly make use of this functionality to be useful.  Defining this
@@ -465,12 +439,6 @@
  *          Might not work on Linux or IRIX/
  */
 #define BINARIES
-
-/* ALWAYS_SAVE_BINARIES: define this to cause every LPC file to behave
- *   as if it contains a line '#pragma save_binary'.  This #define has no
- *   affect if BINARIES is not defined.
-*/
-#undef ALWAYS_SAVE_BINARIES
 
 /* ARRAY_RESERVED_WORD: If this is defined then the word 'array' can
  *   be used to define arrays, as in:
@@ -556,6 +524,25 @@
  *   (keeping this undefined will cause the driver to run faster).
  */
 #undef TRACE
+
+/* LPC_TO_C: define this to enable LPC->C compilation.
+ *
+ * [NOTE: In addition, you must uncomment the C_EFUNS line in your
+ *  Makefile or GNUmakefile.  This is done separately to save non-LPC_TO_C
+ *  users from having to yacc & compile unused files.]
+ * [NOTE: BINARIES must also be defined for LPC->C to work.  Actually
+ *  using binaries is not required, though.]
+ *
+ *   Don't define this for now, work in progress -Beek
+ */
+#undef LPC_TO_C
+
+/* ALWAYS_SAVE_COMPILED_BINARIES: define this to cause every file that
+ *   is compiled to C code to behave as if it contains a line
+ *   '#pragma save_binary'.  This #define has no affect if BINARIES and
+ *   LPC_TO_C are not defined.
+ */
+#undef ALWAYS_SAVE_COMPILED_BINARIES
 
 /* TRACE_CODE: define this to enable code tracing (the driver will print
  *   out the previous lines of code to an error) eval_instruction() runs about

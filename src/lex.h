@@ -2,7 +2,6 @@
 #define _LEX_H_
 
 #include "std.h"
-#include "instrs.h"
 
 #define DEFMAX 10000
 #define MAXLINE 1024
@@ -21,21 +20,16 @@
 #define PRAGMA_SAVE_BINARY     8
 #define PRAGMA_OPTIMIZE       16
 #define PRAGMA_ERROR_CONTEXT  32
-
-/* With this on, compiler is allowed to
- * assume types are correct
- */
-#define OPTIMIZE_HIGH          1				    
-#define OPTIMIZE_ALL           OPTIMIZE_HIGH
-
+#define PRAGMA_OPTIMIZE_HIGH  64
+#define PRAGMA_EFUN          128
 /* for find_or_add_ident */
 #define FOA_GLOBAL_SCOPE       0x1
 #define FOA_NEEDS_MALLOC       0x2
 
 typedef struct {
   SIGNED short local_num, global_num, efun_num;
-  SIGNED short function_num, simul_num;
-} defined_name;
+  SIGNED short function_num, simul_num, class_num;
+} defined_name_t;
 
 /* to speed up cleaning the hash table, and identify the union */
 #define IHE_RESWORD    0x8000
@@ -46,21 +40,21 @@ typedef struct {
 
 #define INDENT_HASH_SIZE 1024 /* must be a power of 2 */
 
-struct ident_hash_elem {
+typedef struct ident_hash_elem_s {
     char *name;
     short token; /* only flags */
     short sem_value; /* for these, a count of the ambiguity */
-    struct ident_hash_elem *next;
-/* the fields above must correspond to struct keyword */
-    struct ident_hash_elem *next_dirty;
-    defined_name dn;
-};
+    struct ident_hash_elem_s *next;
+/* the fields above must correspond to struct keyword_t */
+    struct ident_hash_elem_s *next_dirty;
+    defined_name_t dn;
+} ident_hash_elem_t;
 
 typedef struct {
     char *word;
     unsigned short token;       /* flags here too */
     short sem_value;            /* semantic value for predefined tokens */
-    struct ident_hash_elem *next;
+    ident_hash_elem_t *next;
 /* the fields above must correspond to struct ident_hash_elem */
     short min_args;		/* Minimum number of arguments. */
     short max_args;		/* Maximum number of arguments. */
@@ -70,23 +64,44 @@ typedef struct {
     short arg_index;		/* Index pointing to where to find arg type */
     short Default;		/* an efun to use as default for last
 				 * argument */
-} keyword;
+} keyword_t;
 
-struct lpc_predef_s {
+typedef struct lpc_predef_s {
     char *flag;
     struct lpc_predef_s *next;
-};
+} lpc_predef_t;
 
 #define EXPECT_ELSE 1
 #define EXPECT_ENDIF 2
 
-extern struct lpc_predef_s *lpc_predefs;
+extern lpc_predef_t *lpc_predefs;
 
 #define isalunum(c) (isalnum(c) || (c) == '_')
 
 /*
+ * Information about all instructions. This is not really needed as the
+ * automatically generated efun_arg_types[] should be used.
+ */
+
+/* indicates that the instruction is only used at compile time */
+#define F_ALIAS_FLAG 1024
+
+typedef struct {
+    short max_arg, min_arg;  /* Can't use char to represent -1 */
+    short type[2];	     /* need a short to hold the biggest type flag */
+    short Default;
+    short ret_type;
+    char *name;
+#ifdef LPC_TO_C
+    char *routine;
+#endif
+    int arg_index;
+} instr_t;
+
+/*
  * lex.c
  */
+extern instr_t instrs[512];
 extern int current_line;
 extern int current_line_base;
 extern int current_line_saved;
@@ -94,13 +109,12 @@ extern int total_lines;
 extern char *current_file;
 extern int current_file_id;
 extern int pragmas;
-extern int optimization;
 extern int num_parse_error;
-extern struct lpc_predef_s *lpc_predefs;
+extern lpc_predef_t *lpc_predefs;
 extern int efun_arg_types[];
 extern char yytext[1024];
-extern struct instr instrs[];
-extern keyword predefs[];
+extern instr_t instrs[];
+extern keyword_t predefs[];
 
 int yylex PROT((void));
 void init_num_args PROT((void));
@@ -112,10 +126,10 @@ void end_new_file PROT((void));
 int lookup_predef PROT((char *));
 void add_predefines PROT((void));
 char *main_file_name PROT((void));
-char *get_defined_name PROT((defined_name *));
-struct ident_hash_elem *find_or_add_ident PROT((char *, int));
-struct ident_hash_elem *find_or_add_perm_ident PROT((char *));
-struct ident_hash_elem *lookup_ident PROT((char *));
+char *get_defined_name PROT((defined_name_t *));
+ident_hash_elem_t *find_or_add_ident PROT((char *, int));
+ident_hash_elem_t *find_or_add_perm_ident PROT((char *));
+ident_hash_elem_t *lookup_ident PROT((char *));
 void free_unused_identifiers PROT((void));
 void init_identifiers PROT((void));
 char *show_error_context PROT((void));

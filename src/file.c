@@ -3,12 +3,13 @@
  * description: handle all file based efuns
  */
 
-#include "lex.h"
 #include "std.h"
 #include "lpc_incl.h"
 #include "file_incl.h"
 #include "comm.h"
 #include "strstr.h"
+#include "file.h"
+#include "lex.h"
 
 #if defined(SunOS_5)
 #undef major
@@ -36,29 +37,29 @@ static int isdir PROT((char *path));
 static void strip_trailing_slashes PROT((char *path));
 static int copy PROT((char *from, char *to));
 static int do_move PROT((char *from, char *to, int flag));
-static int pstrcmp PROT((struct svalue *, struct svalue *));
-static int parrcmp PROT((struct svalue *, struct svalue *));
-static void encode_stat PROT((struct svalue *, int, char *, struct stat *));
+static int pstrcmp PROT((svalue_t *, svalue_t *));
+static int parrcmp PROT((svalue_t *, svalue_t *));
+static void encode_stat PROT((svalue_t *, int, char *, struct stat *));
 
 #define MAX_LINES 50
 
 /*
  * These are used by qsort in get_dir().
  */
-static int pstrcmp P2(struct svalue *, p1, struct svalue *, p2)
+static int pstrcmp P2(svalue_t *, p1, svalue_t *, p2)
 {
     return strcmp(p1->u.string, p2->u.string);
 }
 
-static int parrcmp P2(struct svalue *, p1, struct svalue *, p2)
+static int parrcmp P2(svalue_t *, p1, svalue_t *, p2)
 {
-    return strcmp(p1->u.vec->item[0].u.string, p2->u.vec->item[0].u.string);
+    return strcmp(p1->u.arr->item[0].u.string, p2->u.arr->item[0].u.string);
 }
 
-static void encode_stat P4(struct svalue *, vp, int, flags, char *, str, struct stat *, st)
+static void encode_stat P4(svalue_t *, vp, int, flags, char *, str, struct stat *, st)
 {
     if (flags == -1) {
-	struct vector *v = allocate_empty_array(3);
+	array_t *v = allocate_empty_array(3);
 
 	v->item[0].type = T_STRING;
 	v->item[0].subtype = STRING_MALLOC;
@@ -68,8 +69,8 @@ static void encode_stat P4(struct svalue *, vp, int, flags, char *, str, struct 
 	    ((st->st_mode & S_IFDIR) ? -2 : st->st_size);
 	v->item[2].type = T_NUMBER;
 	v->item[2].u.number = st->st_mtime;
-	vp->type = T_POINTER;
-	vp->u.vec = v;
+	vp->type = T_ARRAY;
+	vp->u.arr = v;
     } else {
 	vp->type = T_STRING;
 	vp->subtype = STRING_MALLOC;
@@ -101,9 +102,9 @@ static void encode_stat P4(struct svalue *, vp, int, flags, char *, str, struct 
  */
 #define MAX_FNAME_SIZE 255
 #define MAX_PATH_LEN   1024
-struct vector *get_dir P2(char *, path, int, flags)
+array_t *get_dir P2(char *, path, int, flags)
 {
-    struct vector *v;
+    array_t *v;
     int i, count = 0;
     DIR *dirp;
     int namelen, do_match = 0;
@@ -435,7 +436,7 @@ int legal_path P1(char *, path)
 void smart_log P4(char *, error_file, int, line, char *, what, int, flag)
 {
     char *buff;
-    struct svalue *mret;
+    svalue_t *mret;
     extern int pragmas;
 
     buff = (char *)
@@ -468,7 +469,7 @@ void smart_log P4(char *, error_file, int, line, char *, what, int, flag)
     push_constant_string(error_file);
     push_constant_string(buff);
     mret = safe_apply_master_ob(APPLY_LOG_ERROR, 2);
-    if (!mret || mret == (struct svalue *)-1) {
+    if (!mret || mret == (svalue_t *)-1) {
 	fprintf(stderr, "%s", buff);
     }
     FREE(buff);
@@ -746,9 +747,9 @@ int file_size P1(char *, file)
  * Otherwise, the returned path is temporarily allocated by apply(), which
  * means it will be deallocated at next apply().
  */
-char *check_valid_path P4(char *, path, struct object *, call_object, char *, call_fun, int, writeflg)
+char *check_valid_path P4(char *, path, object_t *, call_object, char *, call_fun, int, writeflg)
 {
-    struct svalue *v;
+    svalue_t *v;
 
     if (call_object == 0 || call_object->flags & O_DESTRUCTED)
 	return 0;
@@ -760,7 +761,7 @@ char *check_valid_path P4(char *, path, struct object *, call_object, char *, ca
     else
 	v = apply_master_ob(APPLY_VALID_READ, 3);
 
-    if (v && v != (struct svalue *)-1 && v->type == T_NUMBER && v->u.number == 0)
+    if (v && v != (svalue_t *)-1 && v->type == T_NUMBER && v->u.number == 0)
 	return 0;
     if (path[0] == '/')
 	path++;

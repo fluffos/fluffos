@@ -57,6 +57,7 @@
 
 #include "std.h"
 #include "regexp.h"
+#include "lpc_incl.h"
 #include "ed.h"
 
 /*
@@ -157,6 +158,8 @@
  * but allows patterns to get big without disasters.
  */
 #define	OP(p)	(*(p))
+/* stralloc.h */
+#undef NEXT
 #define	NEXT(p)	(((*((p)+1)&0377)<<8) + (*((p)+2)&0377))
 #define	OPERAND(p)	((p) + 3)
 
@@ -210,6 +213,9 @@
 /*
  * Global work variables for regcomp().
  */
+int regexp_user;
+char *regexp_error;
+
 static short *regparse;		/* Input-scan pointer. */
 static int regnpar;		/* () count. */
 static char regdummy;
@@ -235,8 +241,18 @@ STATIC void regoptail PROT((char *, char *));
 
 #ifdef STRCSPN
 STATIC int strcspn();
-
 #endif
+
+void regerror P1(char *, s) {
+    switch (regexp_user) {
+    case ED_REGEXP:
+	ED_OUTPUTV("ed: regular expression error: %s\n", s);
+	break;
+    case EFUN_REGEXP:
+	regexp_error = s;
+	break;
+    }
+}
 
 /*
  - regcomp - compile a regular expression into internal code

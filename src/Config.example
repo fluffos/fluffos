@@ -120,7 +120,7 @@ object table size : 1501
 default fail message : What?
 
 # default message when error() occurs (optional)
-default error message : Something *REALLY* bad just happened.
+default error message :
 
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #

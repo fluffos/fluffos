@@ -1,6 +1,6 @@
 #include "std.h"
+#include "lpc_incl.h"
 #include "scratchpad.h"
-#include "simulate.h"
 #include "compiler.h"
 
 /*
@@ -54,11 +54,11 @@
 
 /* not strictly ANSI, but should always work ... */
 #define HDR_SIZE ((char *)&scratch_head.block[2] - (char *)&scratch_head)
-#define FIND_HDR(x) ((struct sp_block_t *)(x - HDR_SIZE))
+#define FIND_HDR(x) ((sp_block_t *)(x - HDR_SIZE))
 #define SIZE_WITH_HDR(x) (x + HDR_SIZE)
 
 static unsigned char scratchblock[SCRATCHPAD_SIZE];
-static struct sp_block_t scratch_head = { 0, 0 };
+static sp_block_t scratch_head = { 0, 0 };
 unsigned char *scr_last = &scratchblock[2], *scr_tail = &scratchblock[2];
 unsigned char *scratch_end = scratchblock + SCRATCHPAD_SIZE;
 
@@ -86,7 +86,7 @@ static void scratch_summary() {
 #endif
 
 void scratch_destroy() {
-    struct sp_block_t *next, *this = scratch_head.next;
+    sp_block_t *next, *this = scratch_head.next;
 
     SDEBUG(printf("scratch_destroy\n"));
 
@@ -142,7 +142,7 @@ void scratch_free P1(char *, ptr) {
 	SDEBUG2(printf("last freed\n"));
 	scratch_free_last();
     } else if (*(Ptr - 2)) {
-	struct sp_block_t *sbt;
+	sp_block_t *sbt;
 
 	DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC, "scratch_free called on non-scratchpad string.\n");
 	SDEBUG(printf("block freed\n"));
@@ -159,13 +159,13 @@ void scratch_free P1(char *, ptr) {
 }
 
 char *scratch_large_alloc P1(int, size) {
-    struct sp_block_t *spt;
+    sp_block_t *spt;
 
     SDEBUG(printf("scratch_large_alloc(%i)\n", size));
 
-    spt = (struct sp_block_t *)DMALLOC(SIZE_WITH_HDR(size), TAG_COMPILER, "scratch_alloc");
+    spt = (sp_block_t *)DMALLOC(SIZE_WITH_HDR(size), TAG_COMPILER, "scratch_alloc");
     if (spt->next = scratch_head.next) spt->next->prev = spt;
-    spt->prev = (struct sp_block_t *)&scratch_head;
+    spt->prev = (sp_block_t *)&scratch_head;
     spt->block[0] = SCRATCH_MAGIC;
     scratch_head.next = spt;
     return (char *)&spt->block[2];
@@ -190,13 +190,13 @@ char *scratch_realloc P2(char *, ptr, int, size) {
 	     return res;
 	 }
      } else if (*(Ptr - 2)) {
-	 struct sp_block_t *sbt, *newsbt;
+	 sp_block_t *sbt, *newsbt;
 
 	DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC, "scratch_realloc on non-scratchpad string.\n");
 	 SDEBUG(printf("block\n"));
 	 sbt = FIND_HDR(ptr);
-	 newsbt = (struct sp_block_t *)DREALLOC(sbt, SIZE_WITH_HDR(size),
-						TAG_COMPILER, "scratch_realloc");
+	 newsbt = (sp_block_t *)DREALLOC(sbt, SIZE_WITH_HDR(size),
+					 TAG_COMPILER, "scratch_realloc");
 	 newsbt->prev->next = newsbt;
 	 if (newsbt->next)
 	     newsbt->next->prev = newsbt;

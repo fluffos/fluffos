@@ -21,24 +21,21 @@
 
 /* most frequently used functions */
 
+object clone_object(string, ...);
 unknown call_other(object | string | object *, string | mixed *,...);
-#ifdef NEW_FUNCTIONS
 unknown evaluate(mixed, ...);
 unknown apply(mixed, mixed *);
 function bind(function, object);
-#endif
 object present(object | string, void | object);
 object this_object();
 object this_player(int default: F_CONST0);
 object this_interactive this_player( int default: F_CONST1 );
-object new(string, ...);
-object clone_object new(string, ...);
-void move_object(object | string, void | object | string);
+void move_object(object | string);
 mixed previous_object(int default: F_CONST0);
 object *all_previous_objects previous_object(int default: F_NBYTE 1);
 int sizeof(mixed);
 int strlen sizeof(string);
-int destruct(object);
+void destruct(object);
 string file_name(object default:F_THIS_OBJECT);
 object environment(void | object);
 string capitalize(string);
@@ -55,7 +52,7 @@ int random(int);
 #ifndef NO_ADD_ACTION
 void add_action(string | function, string | string *, void | int);
 string query_verb();
-int command(string, void | object);
+int command(string);
 int remove_action(string, string);
 int living(object);
 mixed *commands();
@@ -65,7 +62,7 @@ void set_living_name(string);
 object *livings();
 object find_living(string);
 object find_player(string);
-int notify_fail(string | function);
+void notify_fail(string | function);
 #else
 void set_this_player(object | int);
 #endif
@@ -86,7 +83,7 @@ void write(mixed);
 void tell_object(object, string);
 void say(string, void | object | object *);
 void shout(string);
-int receive(string);
+void receive(string);
 void tell_room(object | string, string | object | int | float, void | object *);
 void message(mixed, string, string | string * | object | object *,
 	          void | object | object *);
@@ -171,7 +168,7 @@ void message(mixed, string, string | string * | object | object *,
 #endif
     int mkdir(string);
     int rm(string);
-    void rmdir(string);
+    int rmdir(string);
 
 /* the bit string functions */
 
@@ -196,12 +193,13 @@ void message(mixed, string, string | string * | object | object *,
     object query_snoop(object);
     object query_snooping(object);
     int remove_call_out(string);
-    int set_heart_beat(int);
+    void set_heart_beat(int);
     int query_heart_beat(object default:F_THIS_OBJECT);
     void set_hide(int);
 
 #ifdef LPC_TO_C
-    int generate_source(string, void | string);
+    int generate_source(string | string *, void | string);
+    void lpc_info();
 #endif
 
     void set_reset(object, void | int);
@@ -212,7 +210,7 @@ void message(mixed, string, string | string * | object | object *,
 #endif
     object snoop(object, void | object);
     mixed *sort_array(mixed *, int | string | function, void | object | string);
-    void tail(string);
+    int tail(string);
     void throw(mixed);
     int time();
     mixed *unique_array(mixed *, string | function, void | mixed);
@@ -260,7 +258,7 @@ void message(mixed, string, string | string * | object | object *,
     void set_privs(object, int | string);
 #endif				/* PRIVS */
 
-    void get_char(string | function,...);
+    int get_char(string | function,...);
     object *children(string);
 
     void reload_object(object);
@@ -270,7 +268,6 @@ void message(mixed, string, string | string * | object | object *,
 #endif				/* SOCKET_EFUNS */
 
     void error(string);
-    int errorp(mixed);
     int uptime();
     int strcmp(string, string);
 
@@ -336,8 +333,8 @@ void message(mixed, string, string | string * | object | object *,
 
     int reclaim_objects();
 
-    void set_eval_limit(int);
-    void reset_eval_cost set_eval_limit(int default: F_CONST0);
+    int set_eval_limit(int);
+    int reset_eval_cost set_eval_limit(int default: F_CONST0);
     int eval_cost set_eval_limit(int default: F_NBYTE 1);
     int max_eval_cost set_eval_limit(int default: F_CONST1);
 
@@ -345,7 +342,7 @@ void message(mixed, string, string | string * | object | object *,
     void set_debug_level(int);
 #endif
 
-#ifdef OPCPROF
+#if defined(OPCPROF) || defined(OPCPROF_2D)
     void opcprof(string | void);
 #endif
 

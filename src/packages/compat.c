@@ -8,7 +8,7 @@
 void
 f_cat PROT((void))
 {
-    struct svalue *arg;
+    svalue_t *arg;
     int i, start = 0, len = 0;
 
     arg = sp - st_num_arg + 1;
@@ -34,6 +34,7 @@ f_log_file PROT((void))
 {
     log_file((sp-1)->u.string, sp->u.string);
     free_string_svalue(sp--);
+    free_string_svalue(sp--);
 }
 #endif
 
@@ -42,7 +43,7 @@ void
 f_extract PROT((void))
 {
   int len, from, to;
-  struct svalue *arg;
+  svalue_t *arg;
   char *res;
 
   arg = sp - st_num_arg + 1;

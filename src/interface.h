@@ -1,8 +1,6 @@
-#include "interpret.h"
-
-struct interface_item {
+typedef struct {
     char *fname;
-    void (**jump_table) (struct svalue *);
-};
+    void (**jump_table) ();
+} interface_item_t;
 
-extern struct interface_item interface[];
+extern interface_item_t interface[];

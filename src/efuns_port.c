@@ -54,7 +54,7 @@ void
 f_localtime PROT((void))
 {
     struct tm *tm;
-    struct vector *vec;
+    array_t *vec;
     time_t lt;
 
 #ifdef sequent
@@ -121,7 +121,7 @@ f_localtime PROT((void))
 #endif
 #endif				/* sequent */
 #endif				/* BSD42 */
-    put_vector(vec);
+    put_array(vec);
 }
 #endif
 
@@ -131,7 +131,7 @@ void
 f_rusage PROT((void))
 {
     struct rusage rus;
-    struct mapping *m;
+    mapping_t *m;
     long usertime, stime;
     int maxrss;
 
@@ -176,7 +176,7 @@ void
 f_rusage PROT((void))
 {
     struct process_stats ps;
-    struct mapping *m;
+    mapping_t *m;
     int utime, stime, maxrss;
 
     if (get_process_stats(NULL, PS_SELF, &ps, NULL) == -1)
@@ -221,7 +221,7 @@ f_rusage PROT((void))
 void
 f_rusage PROT((void))
 {
-    struct mapping *m;
+    mapping_t *m;
     struct tms t;
 
     times(&t);
@@ -238,7 +238,7 @@ f_rusage PROT((void))
 void
 f_rusage PROT((void))
 {
-    struct mapping *m;
+    mapping_t *m;
     int i;
     unsigned int clock[2];
 

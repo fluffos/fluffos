@@ -24,7 +24,7 @@ void
 f_socket_create PROT((void))
 {
     int fd, num_arg = st_num_arg;
-    struct svalue *arg;
+    svalue_t *arg;
 
     arg = sp - num_arg + 1;
     if ((num_arg == 3) && (arg[2].type != T_STRING)) {
@@ -163,7 +163,7 @@ void
 f_socket_write PROT((void))
 {
     int i, fd, port;
-    struct svalue *arg;
+    svalue_t *arg;
     char addr[ADDR_BUF_SIZE];
     int num_arg = st_num_arg;
 
@@ -298,7 +298,6 @@ void
 f_dump_socket_status PROT((void))
 {
     dump_socket_status();
-    *++sp = const0;
 }
 #endif
 

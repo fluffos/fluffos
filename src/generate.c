@@ -1,16 +1,15 @@
 #include "std.h"
+#include "lpc_incl.h"
 #include "generate.h"
 #include "compiler.h"
 #include "icode.h"
 #include "lex.h"
-#include "simulate.h"
-#include "include/function.h"
 
-void dump_tree PROT((struct parse_node *, int));
-static struct parse_node *optimize PROT((struct parse_node *));
+void dump_tree PROT((parse_node_t *, int));
+static parse_node_t *optimize PROT((parse_node_t *));
 
 static void
-optimize_expr_list P1(struct parse_node *, expr) {
+optimize_expr_list P1(parse_node_t *, expr) {
     if (!expr) return;
     do {
 	optimize(expr->v.expr);
@@ -18,14 +17,14 @@ optimize_expr_list P1(struct parse_node *, expr) {
 }
 
 static void
-optimize_lvalue_list P1(struct parse_node *, expr) {
+optimize_lvalue_list P1(parse_node_t *, expr) {
     while (expr = expr->r.expr) {
 	optimize(expr->l.expr);
     }
 }
 
-static struct parse_node *
-optimize P1(struct parse_node *, expr) {
+static parse_node_t *
+optimize P1(parse_node_t *, expr) {
     if (!expr) return 0;
     switch (expr->kind) {
     case F_NN_RANGE:
@@ -114,29 +113,13 @@ optimize P1(struct parse_node *, expr) {
 	optimize_lvalue_list(expr->r.expr);
 	break;
     case F_EVALUATE:
-#ifdef NEW_FUNCTIONS
 	optimize_expr_list(expr->r.expr);
-#else
-	expr->l.expr = optimize(expr->l.expr);
-	expr->r.expr = optimize(expr->r.expr);
-#endif
 	break;
     case F_FUNCTION_CONSTRUCTOR:
-#ifdef NEW_FUNCTIONS
-	if ((expr->v.number & 0xff) == FP_CALL_OTHER) {
-	    expr->l.expr = optimize(expr->l.expr);
-	    expr->r.expr = optimize(expr->r.expr);
-	    break;
-	}
 	if (expr->r.expr)
 	    optimize_expr_list(expr->r.expr);
 	if ((expr->v.number & 0xff) == FP_FUNCTIONAL)
 	    expr->l.expr = optimize(expr->l.expr);
-#else
-	if (expr->l.expr)
-	    expr->l.expr = optimize(expr->l.expr);
-	expr->r.expr = optimize(expr->r.expr);
-#endif
 	break;
     default:
 	if (expr->kind > BASE)
@@ -146,7 +129,7 @@ optimize P1(struct parse_node *, expr) {
 }
 
 short
-generate P1(struct parse_node *, node) {
+generate P1(parse_node_t *, node) {
     short where = CURRENT_PROGRAM_SIZE;
 
     if (num_parse_error) return 0;
@@ -164,15 +147,30 @@ generate P1(struct parse_node *, node) {
     return where;
 }
 
+#ifdef LPC_TO_C
+short generate_function P2(function_t *, f, parse_node_t *, node) {
+    if (compile_to_c) {
+	c_start_function(f);
+	generate(node);
+	c_end_function();
+	return 0;
+    } else return generate(node);
+}
+#else
+short generate_function P2(function_t *, f, parse_node_t *, node) {
+    return generate(node);
+}
+#endif
+
 int
-node_always_true P1(struct parse_node *, node) {
+node_always_true P1(parse_node_t *, node) {
     if (node->kind == F_NUMBER)
 	return node->v.number;
     return 0;
 }
 
 int
-generate_conditional_branch P1(struct parse_node *, node) {
+generate_conditional_branch P1(parse_node_t *, node) {
     int branch;
 
     /* only have to handle while (x != 0) since while (x == 0) will be
@@ -203,7 +201,7 @@ generate_conditional_branch P1(struct parse_node *, node) {
 
 #ifdef DEBUG
 void
-dump_expr_list P2(struct parse_node *, expr, int, indent) {
+dump_expr_list P2(parse_node_t *, expr, int, indent) {
     if (!expr) return;
     do {
       dump_tree(expr->v.expr, indent);
@@ -211,7 +209,7 @@ dump_expr_list P2(struct parse_node *, expr, int, indent) {
 }
 
 static void
-dump_lvalue_list P2(struct parse_node *, expr, int, indent) {
+dump_lvalue_list P2(parse_node_t *, expr, int, indent) {
     int i;
 
     for (i=0; i<indent; i++) 
@@ -222,7 +220,7 @@ dump_lvalue_list P2(struct parse_node *, expr, int, indent) {
 }
 
 void
-dump_tree P2(struct parse_node *, expr, int, indent) {
+dump_tree P2(parse_node_t *, expr, int, indent) {
     int i;
     if (!expr) return;
     for (i=0; i<indent; i++) 

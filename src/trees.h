@@ -32,24 +32,25 @@
 #define NODE_NE_RANGE_LVALUE    -22
 #define NODE_RE_RANGE_LVALUE    -23
 #define NODE_BRANCH_LINK        -24
+#define NODE_SWITCH_RANGES      -25
 
 union parse_value {
     int number;
     float real;
-    struct parse_node *expr;
+    struct parse_node_s *expr;
 };
 
-struct parse_node {
+typedef struct parse_node_s {
     short kind;
     short line;
     char type;
     union parse_value v, l, r; /* left, right, and value */
-};
+} parse_node_t;
 
-struct parse_node_block {
-    struct parse_node_block *next;
-    struct parse_node nodes[NODES_PER_BLOCK];
-};
+typedef struct parse_node_block_s {
+    struct parse_node_block_s *next;
+    parse_node_t nodes[NODES_PER_BLOCK];
+} parse_node_block_t;
 
 #define CREATE_NODE(x,y) (x) = new_node(); (x)->kind = y;
 #define NODE_NO_LINE(x,y) (x) = new_node_no_line(); (x)->kind = y;
@@ -61,16 +62,16 @@ void release_tree PROT((void));
 void lock_expressions PROT((void));
 void unlock_expressions PROT((void));
 /* node functions */
-struct parse_node *new_node PROT((void));
-struct parse_node *new_node_no_line PROT((void));
-struct parse_node *make_branched_node PROT((short, char, 
-				struct parse_node *, struct parse_node *));
+parse_node_t *new_node PROT((void));
+parse_node_t *new_node_no_line PROT((void));
+parse_node_t *make_branched_node PROT((short, char, 
+				       parse_node_t *, parse_node_t *));
 /* parser grammar functions */
-struct parse_node *binary_int_op PROT((struct parse_node *, 
-				       struct parse_node *, char, char *));
-struct parse_node *make_range_node PROT((int, struct parse_node *,
-					 struct parse_node *,
-					 struct parse_node *));
-struct parse_node *insert_pop_value PROT((struct parse_node *));
+parse_node_t *binary_int_op PROT((parse_node_t *, parse_node_t *, 
+				  char, char *));
+parse_node_t *make_range_node PROT((int, parse_node_t *,
+					 parse_node_t *,
+					 parse_node_t *));
+parse_node_t *insert_pop_value PROT((parse_node_t *));
 
 #endif

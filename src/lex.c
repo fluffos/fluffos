@@ -15,21 +15,16 @@
 
 #include "std.h"
 #include "file_incl.h"
+#include "lpc_incl.h"
 #include "lex.h"
-#include "config.h"
 #include "compiler.h"
 #include "grammar.tab.h"
-#include "interpret.h"
-#include "stralloc.h"
 #include "scratchpad.h"
 #include "md.h"
-/* fatal */
-#include "simulate.h"
 /* whashstr */
 #include "hash.h"
 /* legal_path */
 #include "file.h"
-#include "include/function.h"
 
 #define NELEM(a) (sizeof (a) / sizeof((a)[0]))
 #define LEX_EOF ((char) EOF)
@@ -60,7 +55,6 @@ int current_file_id;
 
 /* Bit flags for pragmas in effect */
 int pragmas;
-int optimization;
 
 int num_parse_error;		/* Number of errors in the parser. */
 
@@ -78,34 +72,38 @@ static int nexpands;
 
 char yytext[MAXLINE];
 
-struct defn {
-    struct defn *next;
+typedef struct defn_s {
+    struct defn_s *next;
     char *name;
     char *exps;
     int flags;
     int nargs;
-};
+} defn_t;
 
 #define DEF_IS_UNDEFINED 1
 #define DEF_IS_PREDEF    2
 
-static struct ifstate {
-    struct ifstate *next;
+typedef struct ifstate_s {
+    struct ifstate_s *next;
     int state;
-}      *iftop = 0;
+} ifstate_t;
+
+static ifstate_t *iftop = 0;
 
 #define EXPECT_ELSE 1
 #define EXPECT_ENDIF 2
 
-static struct incstate {
-    struct incstate *next;
+typedef struct incstate_s {
+    struct incstate_s *next;
     int yyin_desc;
     int line;
     char *file;
     int file_id;
     char *last_nl;
     char *outp;
-}       *inctop = 0;
+} incstate_t;
+
+static incstate_t *inctop = 0;
 
 /* prevent unbridled recursion */
 #define MAX_INCLUDE_DEPTH 32
@@ -124,16 +122,18 @@ static int incnum;
  * The argument types are currently not checked by the compiler,
  * only by the runtime.
  */
-keyword predefs[] =
+keyword_t predefs[] =
 #include "efun_defs.c"
 
 char *option_defs[] = 
 #include "option_defs.c"
 
-static keyword efun_keyword = { "efun", L_EFUN | IHE_RESWORD, 0};
-static keyword asm_keyword = { "asm", L_ASM | IHE_RESWORD, 0};
+static keyword_t efun_keyword_t = { "efun", L_EFUN | IHE_RESWORD, 0};
+static keyword_t asm_keyword_t = { "asm", L_ASM | IHE_RESWORD, 0};
+static keyword_t new_keyword_t = { "new", L_NEW | IHE_RESWORD, 0};
+static int efun_hash, asm_hash, new_hash;
 
-static keyword reswords[] =
+static keyword_t reswords[] =
 {
 #ifdef ARRAY_RESERVED_WORD
     {"array", '*', 0},
@@ -144,6 +144,7 @@ static keyword reswords[] =
 #endif
     {"case", L_CASE, 0},
     {"catch", L_CATCH, 0},
+    {"class", L_CLASS, 0},
     {"continue", L_CONTINUE, 0},
     {"default", L_DEFAULT, 0},
     {"do", L_DO, 0},
@@ -176,30 +177,30 @@ static keyword reswords[] =
     {"while", L_WHILE, 0},
 };
 
-static struct ident_hash_elem **ident_hash_table;
-static struct ident_hash_elem **ident_hash_head;
-static struct ident_hash_elem **ident_hash_tail;
+static ident_hash_elem_t **ident_hash_table;
+static ident_hash_elem_t **ident_hash_head;
+static ident_hash_elem_t **ident_hash_tail;
 
-static struct ident_hash_elem *ident_dirty_list = 0;
+static ident_hash_elem_t *ident_dirty_list = 0;
 
-struct instr instrs[MAX_INSTRS];
+instr_t instrs[MAX_INSTRS];
 static char num_buf[20];
 
 #define TERM_ADD_INPUT 1
 #define TERM_INCLUDE 2
 #define TERM_START 4
 
-struct linked_buf {
-    struct linked_buf *prev;
+typedef struct linked_buf_s {
+    struct linked_buf_s *prev;
     char term_type;
     char buf[DEFMAX];
     char *buf_end;
     char *outp;
     char *last_nl;
-};
+} linked_buf_t;
 
-static struct linked_buf head_lbuf = { NULL, TERM_START };
-static struct linked_buf *cur_lbuf;
+static linked_buf_t head_lbuf = { NULL, TERM_START };
+static linked_buf_t *cur_lbuf;
 static char *outp;
 
 static void handle_define PROT((char *));
@@ -212,7 +213,7 @@ static int cond_get_exp PROT((int));
 static void merge PROT((char *name, char *dest));
 static void add_quoted_define PROT((char *, char *));
 static void add_quoted_predefine PROT((char *, char *));
-static struct defn *lookup_define PROT((char *s));
+static defn_t *lookup_define PROT((char *s));
 static INLINE int mygetc PROT((void));
 static void lexerror PROT((char *));
 static int skip_to PROT((char *, char *));
@@ -226,14 +227,13 @@ static void skip_line PROT((void));
 static void skip_comment PROT((void));
 static void deltrail PROT((char *));
 static void handle_pragma PROT((char *));
-static void add_instr_name PROT((char *, int, short));
 static int cmygetc PROT((void));
 static void refill PROT((void));
 static void refill_buffer PROT((void));
 static INLINE void reset_function_context PROT((void));
 static int exgetc PROT((void));
 static old_func PROT((void));
-static struct ident_hash_elem *quick_alloc_ident_entry PROT((void));
+static ident_hash_elem_t *quick_alloc_ident_entry PROT((void));
 
 static void merge P2(char *, name, char *, dest)
 {
@@ -357,12 +357,12 @@ skip_to P2(char *, token, char *, atoken)
 static void
 handle_cond P1(int, c)
 {
-    struct ifstate *p;
+    ifstate_t *p;
 
 
     if (!c)
 	skip_to("else", "endif");
-    p = ALLOCATE(struct ifstate, TAG_COMPILER, "handle_cond");
+    p = ALLOCATE(ifstate_t, TAG_COMPILER, "handle_cond");
     p->next = iftop;
     iftop = p;
     p->state = c ? EXPECT_ENDIF : EXPECT_ELSE;
@@ -399,7 +399,7 @@ handle_include P1(char *, name)
 {
     char *p;
     static char buf[1024];
-    struct incstate *is;
+    incstate_t *is;
     int delim, f;
 
 #if 0
@@ -409,7 +409,7 @@ handle_include P1(char *, name)
     }
 #endif
     if (*name != '"' && *name != '<') {
-	struct defn *d;
+	defn_t *d;
 
 	if ((d = lookup_define(name)) && d->nargs == -1) {
 	    char *q;
@@ -437,7 +437,7 @@ handle_include P1(char *, name)
     if (++incnum == MAX_INCLUDE_DEPTH) {
 	yyerror("Maximum include depth exceeded.");
     } else if ((f = inc_open(buf, name)) != -1) {
-	is = ALLOCATE(struct incstate, TAG_COMPILER, "handle_include: 1");
+	is = ALLOCATE(incstate_t, TAG_COMPILER, "handle_include: 1");
 	is->yyin_desc = yyin_desc;
 	is->line = current_line;
 	is->file = current_file;
@@ -858,33 +858,58 @@ deltrail P1(char *, sp)
        break;\
     }
 
+typedef struct {
+    char *name;
+    int value;
+} pragma_t;
+
+static pragma_t our_pragmas[] = {
+    { "strict_types", PRAGMA_STRICT_TYPES },
+    { "save_types", PRAGMA_SAVE_TYPES },
+#ifdef BINARIES
+    { "save_binary", PRAGMA_SAVE_BINARY },
+#endif
+#ifdef LPC_TO_C
+    { "efun", PRAGMA_EFUN },
+#endif
+    { "warnings", PRAGMA_WARNINGS },
+    { "optimize", PRAGMA_OPTIMIZE },
+    { "show_error_context", PRAGMA_ERROR_CONTEXT },
+    { 0, 0 }
+};
+
 static void handle_pragma P1(char *, str)
 {
-    if (strcmp(str, "strict_types") == 0) {
-#ifndef IGNORE_STRICT_PRAGMA
-	pragmas |= PRAGMA_STRICT_TYPES;
+    int i;
+    int no_flag;
+
+    if (strncmp(str, "no_", 3) == 0) {
+	str += 3;
+	no_flag = 1;
+    } else
+	no_flag = 0;
+
+    for (i = 0; our_pragmas[i].name; i++) {
+	if (strcmp(our_pragmas[i].name, str) == 0) {
+	    if (no_flag) {
+#ifdef LPC_TO_C
+		if (our_pragmas[i].value == PRAGMA_SAVE_TYPES)
+		    pragmas &= ~PRAGMA_EFUN;
 #endif
-    } else if (strcmp(str, "save_types") == 0) {
-	pragmas |= PRAGMA_SAVE_TYPES;
-#ifdef BINARIES
-    } else if (strcmp(str, "save_binary") == 0) {
-	pragmas |= PRAGMA_SAVE_BINARY;
+		pragmas &= ~our_pragmas[i].value;
+	    } else {
+#ifdef LPC_TO_C
+		if (our_pragmas[i].value == PRAGMA_EFUN) {
+		    if (!compile_to_c) return;
+		    pragmas |= PRAGMA_SAVE_TYPES;
+		}
 #endif
-    } else if (strcmp(str, "warnings") ==0 ) {
-	pragmas |= PRAGMA_WARNINGS;
-    } else if (strncmp(str, "optimize", 8) == 0) {
-        pragmas |= PRAGMA_OPTIMIZE;
-	optimization = 0;
-	if (str[8] == ' ') {
-	  if (strcmp(str + 9, "all") == 0) {
-	    optimization = OPTIMIZE_ALL;
-	  } else if (strcmp(str + 9, "high") == 0) {
-	    optimization = OPTIMIZE_HIGH;
-	  }
+		pragmas |= our_pragmas[i].value;
+	    }
+	    return;
 	}
-    } else if (!strcmp(str, "show_error_context")){
-	pragmas |= PRAGMA_ERROR_CONTEXT;
-    } else yywarn("unknown pragma, ignored");
+    }
+    yywarn("Uknown #pragma, ignored.");
 }
 
 char *show_error_context(){
@@ -921,7 +946,7 @@ static void refill_buffer(){
 	    cur_lbuf->term_type == TERM_ADD_INPUT) {
 	    /* In this case it cur_lbuf cannot have been 
 	       allocated due to #include */
-	    struct linked_buf *prev_lbuf = cur_lbuf->prev;
+	    linked_buf_t *prev_lbuf = cur_lbuf->prev;
 
 	    FREE(cur_lbuf);
 	    cur_lbuf = prev_lbuf;
@@ -987,10 +1012,10 @@ static void refill_buffer(){
 		outp -= MAXLINE;
 		p = outp + size - 1;
 	    } else {    /* No space, need to allocate new buffer */
-		struct linked_buf *new_lbuf;
+		linked_buf_t *new_lbuf;
 		char *new_outp;
 
-		if (!(new_lbuf = ALLOCATE(struct linked_buf, TAG_COMPILER, "refill_bufer"))){
+		if (!(new_lbuf = ALLOCATE(linked_buf_t, TAG_COMPILER, "refill_bufer"))){
 		    lexerror("Out of memory when allocating new buffer.\n");
 		    return;
 		}
@@ -1024,11 +1049,10 @@ static void refill_buffer(){
     }
 }
 	
-#ifdef NEW_FUNCTIONS
 static int function_flag = 0;
 
 static INLINE void reset_function_context() {
-    struct parse_node *node;
+    parse_node_t *node;
 
     function_context.num_parameters = 0;
     function_context.num_locals = 0;
@@ -1046,7 +1070,6 @@ static int old_func() {
     reset_function_context();
     return L_FUNCTION_OPEN;
 }
-#endif
 
 #define return_assign(opcode) { yylval.number = opcode; return L_ASSIGN; }
 #define return_order(opcode) { yylval.number = opcode; return L_ORDER; }
@@ -1074,7 +1097,7 @@ int yylex()
 	switch (c = *outp++){
 	case LEX_EOF:
 	    if (inctop) {
-		struct incstate *p;
+		incstate_t *p;
 
 		p = inctop;
 		close(yyin_desc);
@@ -1086,7 +1109,7 @@ int yylex()
 		free_string(current_file);
 		nexpands = 0;
 		if (outp >= cur_lbuf->buf_end){
-		    struct linked_buf *prev_lbuf;
+		    linked_buf_t *prev_lbuf;
 		    if (prev_lbuf = cur_lbuf->prev) {
 			FREE(cur_lbuf);
 			cur_lbuf = prev_lbuf;
@@ -1108,7 +1131,7 @@ int yylex()
 		break;
 	    }
 	    if (iftop) {
-		struct ifstate *p = iftop;
+		ifstate_t *p = iftop;
 				
 		yyerror(p->state == EXPECT_ENDIF ? "Missing #endif" : "Missing #else/#elif");
 		while (iftop) {
@@ -1243,7 +1266,6 @@ int yylex()
 			outp = yyp -= 2;
 			return '(';
 		    } else {
-#ifdef NEW_FUNCTIONS
 			while (isspace(c)){
 			    if (c == '\n'){
 				if (yyp = last_nl + 1){
@@ -1266,7 +1288,6 @@ int yylex()
 			outp--;
 			yylval.context = function_context;
 			reset_function_context();
-#endif
 			return L_FUNCTION_OPEN;
 		    }
 			
@@ -1278,7 +1299,6 @@ int yylex()
 		}
 	    }
 
-#ifdef NEW_FUNCTIONS
 	case '$':
 	    if (function_context.num_parameters < 0) {
 		yyerror("$var illegal outside of function.");
@@ -1305,7 +1325,6 @@ int yylex()
 		    function_context.num_parameters = yylval.number + 1;
 		return L_PARAMETER;
 	    }
-#endif
 	case ')':
 	case '{':
 	case '}':
@@ -1430,7 +1449,7 @@ int yylex()
 			    if (iftop->state == EXPECT_ELSE) {
 				/* last cond was false... */
 				int cond;
-				struct ifstate *p = iftop;
+				ifstate_t *p = iftop;
 
 				/* pop previous condition */
 				iftop = p->next;
@@ -1466,7 +1485,7 @@ int yylex()
 		    } else if (strcmp("endif", yytext) == 0) {
 			if (iftop && (iftop->state == EXPECT_ENDIF ||
 				      iftop->state == EXPECT_ELSE)) {
-			    struct ifstate *p = iftop;
+			    ifstate_t *p = iftop;
 
 			    iftop = p->next;
 			    FREE((char *) p);
@@ -1474,7 +1493,7 @@ int yylex()
 			    yyerror("Unexpected #endif");
 			}
 		    } else if (strcmp("undef", yytext) == 0) {
-			struct defn *d;
+			defn_t *d;
 
 			deltrail(sp);
 			if ((d = lookup_define(sp)))
@@ -1749,27 +1768,18 @@ parse_identifier:
 			break;
 		    SAVEC;
 		}
-#ifdef WANT_MISSING_SPACE_BUG
-		while (c == ' ')
-		    c = *outp++;
-#endif
 		*yyp = 0;
 		if (c == '#') {
 		    if (*outp++ != '#')
 			lexerror("Single '#' in identifier -- use '##' for token pasting");
 		    outp -= 2;
 		    if (!expand_define()) {
-#ifdef NEW_FUNCTIONS
 			if (partp + (r = strlen(yytext)) + (function_flag ? 3 : 0) - partial > MAXLINE)
 			    lexerror("Pasted token is too long");
 			if (function_flag){
 			    strcpy(partp, "(: ");
 			    partp += 3;
 			}
-#else
-                        if (partp + (r = strlen(yytext)) - partial > MAXLINE)
-                            lexerror("Pasted token is too long");
-#endif
 			strcpy(partp, yytext);
 			partp += r;
 			outp += 2;
@@ -1786,10 +1796,9 @@ parse_identifier:
 		} else {
 		    outp--;
 		    if (!expand_define()) {
-			struct ident_hash_elem *ihe;
+			ident_hash_elem_t *ihe;
 			if (ihe = lookup_ident(yytext)) {
 			    if (ihe->token & IHE_RESWORD) {
-#ifdef NEW_FUNCTIONS
 				if (function_flag){
 				    function_flag = 0;
 				    add_input(yytext);
@@ -1797,11 +1806,9 @@ parse_identifier:
 				    reset_function_context();
 				    return L_FUNCTION_OPEN;
 				}
-#endif
 				yylval.number = ihe->sem_value;
 				return ihe->token & TOKEN_MASK;
 			    }
-#ifdef NEW_FUNCTIONS
 			    if (function_flag){
 				int val;
 
@@ -1825,19 +1832,16 @@ parse_identifier:
 				} else return old_func();
 				return L_NEW_FUNCTION_OPEN;
 			    }
-#endif
 			    yylval.ihe = ihe;
 			    return L_DEFINED_NAME;
 			}
 			yylval.string = scratch_copy(yytext);
 			return L_IDENTIFIER;
 		    }
-#ifdef NEW_FUNCTIONS
 		    if (function_flag) {
 			function_flag = 0;
 			add_input("(:");
 		    }
-#endif
 		}
 		break;
 	    }
@@ -1862,7 +1866,7 @@ extern YYSTYPE yylval;
 void end_new_file()
 {
     while (inctop) {
-	struct incstate *p;
+	incstate_t *p;
 
 	p = inctop;
 	close(yyin_desc);
@@ -1874,7 +1878,7 @@ void end_new_file()
     }
     inctop = 0;
     while (iftop) {
-	struct ifstate *p;
+	ifstate_t *p;
 
 	p = iftop;
 	iftop = p->next;
@@ -1885,7 +1889,7 @@ void end_new_file()
 	defines_need_freed = 0;
     }
     if (cur_lbuf != &head_lbuf){
-        struct linked_buf *prev_lbuf;
+        linked_buf_t *prev_lbuf;
 
 	while (cur_lbuf != &head_lbuf){
 	    prev_lbuf = cur_lbuf->prev;
@@ -2044,7 +2048,6 @@ void start_new_file P1(int, f)
     cur_lbuf->outp = cur_lbuf->buf_end = outp = cur_lbuf->buf + (DEFMAX >> 1);
     *(last_nl = outp - 1) = '\n';
     pragmas = DEFAULT_PRAGMAS;
-    optimization = 0;
     nexpands = 0;
     incnum = 0;
     current_line = 1;
@@ -2073,11 +2076,24 @@ char *query_instr_name P1(int, instr)
     }
 }
 
-static void add_instr_name P3(char *, name, int, n, short, t)
+#ifdef LPC_TO_C
+#define add_instr_name(w, x, y, z) int_add_instr_name(w, x, y, z)
+
+static void int_add_instr_name P4(char *, name, char *, routine, int, n, short, t)
+{
+    instrs[n].name = name;
+    if (routine) instrs[n].routine = routine;
+    instrs[n].ret_type = t;
+}
+#else
+#define add_instr_name(w, x, y, z) int_add_instr_name(w, y, z)
+
+static void int_add_instr_name P3(char *, name, int, n, short, t)
 {
     instrs[n].name = name;
     instrs[n].ret_type = t;
 }
+#endif
 
 void init_num_args()
 {
@@ -2085,6 +2101,9 @@ void init_num_args()
 
     for (i = 0; i < BASE; i++) {
 	instrs[i].ret_type = -1;
+#ifdef LPC_TO_C
+	instrs[i].routine = "???();\n";
+#endif
     }
     for (i = 0; i < NELEM(predefs); i++) {
 	n = predefs[i].token;
@@ -2105,113 +2124,124 @@ void init_num_args()
      * eoperators have a return type now.  T_* is used instead of TYPE_*
      * since operators can return multiple types.
      */
-    add_instr_name("<", F_LT, T_NUMBER);
-    add_instr_name(">", F_GT, T_NUMBER);
-    add_instr_name("<=", F_LE, T_NUMBER);
-    add_instr_name(">=", F_GE, T_NUMBER);
-    add_instr_name("==", F_EQ, T_NUMBER);
-    add_instr_name("+=", F_ADD_EQ, T_ANY);
-    add_instr_name("(void)+=", F_VOID_ADD_EQ, T_NUMBER);
-    add_instr_name("!", F_NOT, T_NUMBER);
-    add_instr_name("&", F_AND, T_POINTER | T_NUMBER);
-    add_instr_name("&=", F_AND_EQ, T_NUMBER);
-    add_instr_name("index", F_INDEX, T_ANY);
-    add_instr_name("rindex", F_RINDEX, T_ANY);
-    add_instr_name("loop_cond", F_LOOP_COND, -1);
-    add_instr_name("loop_incr", F_LOOP_INCR, -1);
-    add_instr_name("index_lvalue", F_INDEX_LVALUE, T_LVALUE|T_LVALUE_BYTE);
-    add_instr_name("rindex_lvalue", F_RINDEX_LVALUE, T_LVALUE|T_LVALUE_BYTE);
-    add_instr_name("nn_range_lvalue", F_NN_RANGE_LVALUE, T_LVALUE_RANGE);
-    add_instr_name("nr_range_lvalue", F_NR_RANGE_LVALUE, T_LVALUE_RANGE);
-    add_instr_name("rr_range_lvalue", F_RR_RANGE_LVALUE, T_LVALUE_RANGE);
-    add_instr_name("rn_range_lvalue", F_RN_RANGE_LVALUE, T_LVALUE_RANGE);
-    add_instr_name("nn_range", F_NN_RANGE, T_BUFFER|T_POINTER|T_STRING);
-    add_instr_name("rr_range", F_RR_RANGE, T_BUFFER|T_POINTER|T_STRING);
-    add_instr_name("nr_range", F_NR_RANGE, T_BUFFER|T_POINTER|T_STRING);
-    add_instr_name("rn_range", F_RN_RANGE, T_BUFFER|T_POINTER|T_STRING);
-    add_instr_name("re_range", F_RE_RANGE, T_BUFFER|T_POINTER|T_STRING);
-    add_instr_name("ne_range", F_NE_RANGE, T_BUFFER|T_POINTER|T_STRING);
-    add_instr_name("global", F_GLOBAL, T_ANY);
-    add_instr_name("local", F_LOCAL, T_ANY);
-    add_instr_name("number", F_NUMBER, T_NUMBER);
-    add_instr_name("real", F_REAL, T_REAL);
-    add_instr_name("local_lvalue", F_LOCAL_LVALUE, T_LVALUE);
-    add_instr_name("const1", F_CONST1, T_NUMBER);
-    add_instr_name("subtract", F_SUBTRACT, T_NUMBER | T_REAL | T_POINTER);
-    add_instr_name("(void)assign", F_VOID_ASSIGN, T_NUMBER);
-    add_instr_name("assign", F_ASSIGN, T_ANY);
-    add_instr_name("branch", F_BRANCH, -1);
-    add_instr_name("bbranch", F_BBRANCH, -1);
-    add_instr_name("byte", F_BYTE, T_NUMBER);
-    add_instr_name("-byte", F_NBYTE, T_NUMBER);
-    add_instr_name("bbranch_when_zero", F_BBRANCH_WHEN_ZERO, -1);
-    add_instr_name("bbranch_when_non_zero", F_BBRANCH_WHEN_NON_ZERO, -1);
-    add_instr_name("branch_when_zero", F_BRANCH_WHEN_ZERO, -1);
-    add_instr_name("branch_when_non_zero", F_BRANCH_WHEN_NON_ZERO, -1);
-    add_instr_name("pop", F_POP_VALUE, -1);
-    add_instr_name("const0", F_CONST0, T_NUMBER);
+    add_instr_name("<", "c_lt();\n", F_LT, T_NUMBER);
+    add_instr_name(">", "c_gt();\n", F_GT, T_NUMBER);
+    add_instr_name("<=", "c_le();\n", F_LE, T_NUMBER);
+    add_instr_name(">=", "c_ge();\n", F_GE, T_NUMBER);
+    add_instr_name("==", "f_eq();\n", F_EQ, T_NUMBER);
+    add_instr_name("+=", "c_add_eq(0);\n", F_ADD_EQ, T_ANY);
+    add_instr_name("(void)+=", "c_add_eq(1);\n", F_VOID_ADD_EQ, T_NUMBER);
+    add_instr_name("!", "c_not();\n", F_NOT, T_NUMBER);
+    add_instr_name("&", "f_and();\n", F_AND, T_ARRAY | T_NUMBER);
+    add_instr_name("&=", "f_and_eq();\n", F_AND_EQ, T_NUMBER);
+    add_instr_name("index", "c_index();\n", F_INDEX, T_ANY);
+    add_instr_name("member", 0, F_MEMBER, T_ANY);
+    add_instr_name("rindex", "c_rindex();\n", F_RINDEX, T_ANY);
+    add_instr_name("loop_cond", "c_loop_cond();\n", F_LOOP_COND, -1);
+    add_instr_name("loop_incr", "c_loop_incr();\n", F_LOOP_INCR, -1);
+    add_instr_name("member_lvalue", 0, F_MEMBER_LVALUE, T_LVALUE);
+    add_instr_name("index_lvalue", "push_indexed_lvalue(0);\n", 
+		   F_INDEX_LVALUE, T_LVALUE|T_LVALUE_BYTE);
+    add_instr_name("rindex_lvalue", "push_indexed_lvalue(1);\n",
+		   F_RINDEX_LVALUE, T_LVALUE|T_LVALUE_BYTE);
+    add_instr_name("nn_range_lvalue", "push_lvalue_range(0x00);\n",
+		   F_NN_RANGE_LVALUE, T_LVALUE_RANGE);
+    add_instr_name("nr_range_lvalue", "push_lvalue_range(0x01);\n",
+		   F_NR_RANGE_LVALUE, T_LVALUE_RANGE);
+    add_instr_name("rr_range_lvalue", "push_lvalue_range(0x11);\n",
+		   F_RR_RANGE_LVALUE, T_LVALUE_RANGE);
+    add_instr_name("rn_range_lvalue", "push_lvalue_range(0x10);\n",
+		   F_RN_RANGE_LVALUE, T_LVALUE_RANGE);
+    add_instr_name("nn_range", "f_range(0x00);\n",
+		   F_NN_RANGE, T_BUFFER|T_ARRAY|T_STRING);
+    add_instr_name("rr_range", "f_range(0x11);\n", 
+		   F_RR_RANGE, T_BUFFER|T_ARRAY|T_STRING);
+    add_instr_name("nr_range", "f_range(0x01);\n",
+		   F_NR_RANGE, T_BUFFER|T_ARRAY|T_STRING);
+    add_instr_name("rn_range", "f_range(0x10);\n",
+		   F_RN_RANGE, T_BUFFER|T_ARRAY|T_STRING);
+    add_instr_name("re_range", "f_extract_range(1);\n",
+		   F_RE_RANGE, T_BUFFER|T_ARRAY|T_STRING);
+    add_instr_name("ne_range", "f_extract_range(0);\n",
+		   F_NE_RANGE, T_BUFFER|T_ARRAY|T_STRING);
+    add_instr_name("global", 0, F_GLOBAL, T_ANY);
+    add_instr_name("local", 0, F_LOCAL, T_ANY);
+    add_instr_name("number", 0, F_NUMBER, T_NUMBER);
+    add_instr_name("real", 0, F_REAL, T_REAL);
+    add_instr_name("local_lvalue", 0, F_LOCAL_LVALUE, T_LVALUE);
+    add_instr_name("const1", "push_number(1);\n", F_CONST1, T_NUMBER);
+    add_instr_name("subtract", "c_subtract();\n", F_SUBTRACT, T_NUMBER | T_REAL | T_ARRAY);
+    add_instr_name("(void)assign", "c_void_assign();\n", F_VOID_ASSIGN, T_NUMBER);
+    add_instr_name("assign", "c_assign();\n", F_ASSIGN, T_ANY);
+    add_instr_name("branch", 0, F_BRANCH, -1);
+    add_instr_name("bbranch", 0, F_BBRANCH, -1);
+    add_instr_name("byte", 0, F_BYTE, T_NUMBER);
+    add_instr_name("-byte", 0, F_NBYTE, T_NUMBER);
+    add_instr_name("bbranch_when_zero", 0, F_BBRANCH_WHEN_ZERO, -1);
+    add_instr_name("bbranch_when_non_zero", 0, F_BBRANCH_WHEN_NON_ZERO, -1);
+    add_instr_name("branch_when_zero", 0, F_BRANCH_WHEN_ZERO, -1);
+    add_instr_name("branch_when_non_zero", 0, F_BRANCH_WHEN_NON_ZERO, -1);
+    add_instr_name("pop", "pop_stack();\n", F_POP_VALUE, -1);
+    add_instr_name("const0", "push_number(0);\n", F_CONST0, T_NUMBER);
 #ifdef F_JUMP_WHEN_ZERO
     add_instr_name("jump_when_zero", F_JUMP_WHEN_ZERO, -1);
     add_instr_name("jump_when_non_zero", F_JUMP_WHEN_NON_ZERO, -1);
 #endif
 #ifdef F_LOR
-    add_instr_name("||", F_LOR, -1);
-    add_instr_name("&&", F_LAND, -1);
+    add_instr_name("||", 0, F_LOR, -1);
+    add_instr_name("&&", 0, F_LAND, -1);
 #endif
-    add_instr_name("-=", F_SUB_EQ, T_ANY);
+    add_instr_name("-=", "f_sub_eq();\n", F_SUB_EQ, T_ANY);
 #ifdef F_JUMP
     add_instr_name("jump", F_JUMP, -1);
 #endif
-    add_instr_name("return", F_RETURN, -1);
-    add_instr_name("sscanf", F_SSCANF, T_NUMBER);
-    add_instr_name("parse_command", F_PARSE_COMMAND, T_NUMBER);
-    add_instr_name("string", F_STRING, T_STRING);
-    add_instr_name("short_string", F_SHORT_STRING, T_STRING);
-    add_instr_name("call", F_CALL_FUNCTION_BY_ADDRESS, T_ANY);
-    add_instr_name("call_inherited", F_CALL_INHERITED, T_ANY);
-    add_instr_name("aggregate_assoc", F_AGGREGATE_ASSOC, T_MAPPING);
+    add_instr_name("return", 0, F_RETURN, -1);
+    add_instr_name("sscanf", 0, F_SSCANF, T_NUMBER);
+    add_instr_name("parse_command", 0, F_PARSE_COMMAND, T_NUMBER);
+    add_instr_name("string", 0, F_STRING, T_STRING);
+    add_instr_name("short_string", 0, F_SHORT_STRING, T_STRING);
+    add_instr_name("call", 0, F_CALL_FUNCTION_BY_ADDRESS, T_ANY);
+    add_instr_name("call_inherited", 0, F_CALL_INHERITED, T_ANY);
+    add_instr_name("aggregate_assoc", 0, F_AGGREGATE_ASSOC, T_MAPPING);
 #ifdef DEBUG
-    add_instr_name("break_point", F_BREAK_POINT, -1);
+    add_instr_name("break_point", "f_break_point();\n", F_BREAK_POINT, -1);
 #endif
-    add_instr_name("call_extra", F_CALL_EXTRA, -1);
-    add_instr_name("aggregate", F_AGGREGATE, T_POINTER);
-    add_instr_name("(::)", F_FUNCTION_CONSTRUCTOR, T_FUNCTION);
-#ifndef NEW_FUNCTIONS
-    add_instr_name("evaluate", F_EVALUATE, -1);
-#endif
-    add_instr_name("simul_efun", F_SIMUL_EFUN, T_ANY);
-    add_instr_name("global_lvalue", F_GLOBAL_LVALUE, T_LVALUE);
-    add_instr_name("|", F_OR, T_NUMBER);
-    add_instr_name("<<", F_LSH, T_NUMBER);
-    add_instr_name(">>", F_RSH, T_NUMBER);
-    add_instr_name(">>=", F_RSH_EQ, T_NUMBER);
-    add_instr_name("<<=", F_LSH_EQ, T_NUMBER);
-    add_instr_name("^", F_XOR, T_NUMBER);
-    add_instr_name("^=", F_XOR_EQ, T_NUMBER);
-    add_instr_name("|=", F_OR_EQ, T_NUMBER);
-    add_instr_name("+", F_ADD, T_ANY);
-    add_instr_name("!=", F_NE, T_NUMBER);
-    add_instr_name("catch", F_CATCH, T_ANY);
-    add_instr_name("end_catch", F_END_CATCH, -1);
-    add_instr_name("-", F_NEGATE, T_NUMBER | T_REAL);
-    add_instr_name("~", F_COMPL, T_NUMBER);
-    add_instr_name("++x", F_PRE_INC, T_NUMBER | T_REAL);
-    add_instr_name("--x", F_PRE_DEC, T_NUMBER | T_REAL);
-    add_instr_name("*", F_MULTIPLY, T_REAL | T_NUMBER | T_MAPPING);
-    add_instr_name("*=", F_MULT_EQ, T_REAL | T_NUMBER | T_MAPPING);
-    add_instr_name("/", F_DIVIDE, T_REAL | T_NUMBER);
-    add_instr_name("/=", F_DIV_EQ, T_NUMBER | T_REAL);
-    add_instr_name("%", F_MOD, T_NUMBER);
-    add_instr_name("%=", F_MOD_EQ, T_NUMBER);
-    add_instr_name("inc(x)", F_INC, -1);
-    add_instr_name("dec(x)", F_DEC, -1);
-    add_instr_name("x++", F_POST_INC, T_NUMBER | T_REAL);
-    add_instr_name("x--", F_POST_DEC, T_NUMBER | T_REAL);
-    add_instr_name("switch", F_SWITCH, -1);
-    add_instr_name("break", F_BREAK, -1);
-    add_instr_name("pop_break", F_POP_BREAK, -1);
-    add_instr_name("time_expression", F_TIME_EXPRESSION, -1);
-    add_instr_name("end_time_expression", F_END_TIME_EXPRESSION, T_NUMBER);
+    add_instr_name("call_extra", 0, F_CALL_EXTRA, -1);
+    add_instr_name("aggregate", 0, F_AGGREGATE, T_ARRAY);
+    add_instr_name("(::)", 0, F_FUNCTION_CONSTRUCTOR, T_FUNCTION);
+    add_instr_name("simul_efun", 0, F_SIMUL_EFUN, T_ANY);
+    add_instr_name("global_lvalue", 0, F_GLOBAL_LVALUE, T_LVALUE);
+    add_instr_name("|", "f_or();\n", F_OR, T_NUMBER);
+    add_instr_name("<<", "f_lsh();\n", F_LSH, T_NUMBER);
+    add_instr_name(">>", "f_rsh();\n", F_RSH, T_NUMBER);
+    add_instr_name(">>=", "f_rsh_eq();\n", F_RSH_EQ, T_NUMBER);
+    add_instr_name("<<=", "f_lsh_eq();\n", F_LSH_EQ, T_NUMBER);
+    add_instr_name("^", "f_xor();\n", F_XOR, T_NUMBER);
+    add_instr_name("^=", "f_xor_eq();\n", F_XOR_EQ, T_NUMBER);
+    add_instr_name("|=", "f_or_eq();\n", F_OR_EQ, T_NUMBER);
+    add_instr_name("+", "c_add();\n", F_ADD, T_ANY);
+    add_instr_name("!=", "f_ne();\n", F_NE, T_NUMBER);
+    add_instr_name("catch", 0, F_CATCH, T_ANY);
+    add_instr_name("end_catch", 0, F_END_CATCH, -1);
+    add_instr_name("-", "c_negate();\n", F_NEGATE, T_NUMBER | T_REAL);
+    add_instr_name("~", "c_compl();\n", F_COMPL, T_NUMBER);
+    add_instr_name("++x", "c_pre_inc();\n", F_PRE_INC, T_NUMBER | T_REAL);
+    add_instr_name("--x", "c_pre_dec();\n", F_PRE_DEC, T_NUMBER | T_REAL);
+    add_instr_name("*", "c_multiply();\n", F_MULTIPLY, T_REAL | T_NUMBER | T_MAPPING);
+    add_instr_name("*=", "f_mult_eq();\n", F_MULT_EQ, T_REAL | T_NUMBER | T_MAPPING);
+    add_instr_name("/", "c_divide();\n", F_DIVIDE, T_REAL | T_NUMBER);
+    add_instr_name("/=", "f_div_eq();\n", F_DIV_EQ, T_NUMBER | T_REAL);
+    add_instr_name("%", "c_mod();\n", F_MOD, T_NUMBER);
+    add_instr_name("%=", "f_mod_eq();\n", F_MOD_EQ, T_NUMBER);
+    add_instr_name("inc(x)", "c_inc();\n", F_INC, -1);
+    add_instr_name("dec(x)", "c_dec();\n", F_DEC, -1);
+    add_instr_name("x++", "c_post_inc();\n", F_POST_INC, T_NUMBER | T_REAL);
+    add_instr_name("x--", "c_post_dec();\n", F_POST_DEC, T_NUMBER | T_REAL);
+    add_instr_name("switch", 0, F_SWITCH, -1);
+    add_instr_name("break", "break;\n", F_BREAK, -1);
+    add_instr_name("pop_break", 0, F_POP_BREAK, -1);
+    add_instr_name("time_expression", 0, F_TIME_EXPRESSION, -1);
+    add_instr_name("end_time_expression", 0, F_END_TIME_EXPRESSION, T_NUMBER);
 }
 
 char *get_f_name P1(int, n)
@@ -2408,7 +2438,7 @@ static void add_input P1(char *, p)
 
     if (outp < l + 5 + cur_lbuf->buf){
 	/* Not enough space, so let's move it up another linked_buf */
-	struct linked_buf *new_lbuf;
+	linked_buf_t *new_lbuf;
 	char *q, *new_outp, *buf;
 	int size;
 
@@ -2424,7 +2454,7 @@ static void add_input P1(char *, p)
 	cur_lbuf->outp = q + 1;
 	cur_lbuf->last_nl = last_nl;
 
-	new_lbuf = ALLOCATE(struct linked_buf, TAG_COMPILER, "add_input");
+	new_lbuf = ALLOCATE(linked_buf_t, TAG_COMPILER, "add_input");
 	new_lbuf->term_type = TERM_ADD_INPUT;
 	new_lbuf->prev = cur_lbuf;
 	buf = new_lbuf->buf;
@@ -2444,14 +2474,14 @@ static void add_input P1(char *, p)
 
 /* must be a power of four */
 #define DEFHASH 64
-static struct defn *defns[DEFHASH];
+static defn_t *defns[DEFHASH];
 
 #define defhash(s) (whashstr((s), 10) & (DEFHASH - 1))
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_all_defines() {
     int i;
-    struct defn *tmp;
+    defn_t *tmp;
 
     for (i = 0; i < inc_list_size; i++) 
 	EXTRA_REF(BLOCK(inc_list[i]))++;
@@ -2470,7 +2500,7 @@ void mark_all_defines() {
 
 static void add_define P3(char *, name, int, nargs, char *, exps)
 {
-    struct defn *p;
+    defn_t *p;
     int h;
 
     if ((p = lookup_define(name))) {
@@ -2484,7 +2514,7 @@ static void add_define P3(char *, name, int, nargs, char *, exps)
 	strcpy(p->exps, exps);
 	p->nargs = nargs;
     } else {
-	p = ALLOCATE(struct defn, TAG_COMPILER, "add_define: def");
+	p = ALLOCATE(defn_t, TAG_COMPILER, "add_define: def");
 	p->name = (char *) DXALLOC(strlen(name) + 1, TAG_COMPILER, "add_define: def name");
 	strcpy(p->name, name);
 	p->exps = (char *) DXALLOC(strlen(exps) + 1, TAG_COMPILER, "add_define: def exps");
@@ -2499,7 +2529,7 @@ static void add_define P3(char *, name, int, nargs, char *, exps)
 
 static void add_predefine P3(char *, name, int, nargs, char *, exps)
 {
-    struct defn *p;
+    defn_t *p;
     int h;
 
     if ((p = lookup_define(name))) {
@@ -2513,7 +2543,7 @@ static void add_predefine P3(char *, name, int, nargs, char *, exps)
 	strcpy(p->exps, exps);
 	p->nargs = nargs;
     } else {
-	p = ALLOCATE(struct defn, TAG_PREDEFINES, "add_define: def");
+	p = ALLOCATE(defn_t, TAG_PREDEFINES, "add_define: def");
 	p->name = (char *) DXALLOC(strlen(name) + 1, TAG_PREDEFINES, "add_define: def name");
 	strcpy(p->name, name);
 	p->exps = (char *) DXALLOC(strlen(exps) + 1, TAG_PREDEFINES, "add_define: def exps");
@@ -2528,7 +2558,7 @@ static void add_predefine P3(char *, name, int, nargs, char *, exps)
 
 static void free_defines()
 {
-    struct defn *p, *q;
+    defn_t *p, *q;
     int i;
 
     for (i = 0; i < DEFHASH; i++) {
@@ -2552,10 +2582,10 @@ static void free_defines()
     nexpands = 0;
 }
 
-static struct defn *
+static defn_t *
      lookup_define P1(char *, s)
 {
-    struct defn *p;
+    defn_t *p;
     int h;
 
     h = defhash(s);
@@ -2574,7 +2604,7 @@ static struct defn *
 /* Check if yytext is a macro and expand if it is. */
 static int expand_define()
 {
-    struct defn *p;
+    defn_t *p;
     char expbuf[DEFMAX];
     char *args[NARGS];
     char buf[DEFMAX];
@@ -3043,7 +3073,7 @@ void set_inc_list P1(char *, list)
 
 char *main_file_name()
 {
-    struct incstate *is;
+    incstate_t *is;
 
     if (inctop == 0)
 	return current_file;
@@ -3081,9 +3111,9 @@ char *main_file_name()
       if (((x)->token & IHE_RESWORD) || ((x)->sem_value)) { z } \
       else return 0; }
 
-struct ident_hash_elem *lookup_ident P1(char *, name) {
+ident_hash_elem_t *lookup_ident P1(char *, name) {
     int h = IdentHash(name);
-    struct ident_hash_elem *hptr, *hptr2;
+    ident_hash_elem_t *hptr, *hptr2;
 
     if (hptr = ident_hash_table[h]) {
 	CHECK_ELEM(hptr, name, return hptr;);
@@ -3093,15 +3123,19 @@ struct ident_hash_elem *lookup_ident P1(char *, name) {
 	    hptr2 = hptr2->next;
 	}
     }
-    /* efun and asm are special cases, as they are redefinable keywords */
-    if (strcmp("efun", name)==0) return (struct ident_hash_elem *)&efun_keyword;
-    if (strcmp("asm", name)==0) return (struct ident_hash_elem *)&asm_keyword;
+    /* efun, new and asm are special cases, as they are redefinable keyword_ts */
+    if (h == efun_hash && strcmp("efun", name)==0) 
+	return (ident_hash_elem_t *)&efun_keyword_t;
+    if (h == asm_hash && strcmp("asm", name)==0)
+	return (ident_hash_elem_t *)&asm_keyword_t;
+    if (h == new_hash && strcmp("new", name)==0)
+	return (ident_hash_elem_t *)&new_keyword_t;
     return 0;
 }
 
-struct ident_hash_elem *find_or_add_perm_ident P1(char *, name) {
+ident_hash_elem_t *find_or_add_perm_ident P1(char *, name) {
     int h = IdentHash(name);
-    struct ident_hash_elem *hptr, *hptr2;
+    ident_hash_elem_t *hptr, *hptr2;
 
     if (hptr = ident_hash_table[h]) {
 	if (!strcmp(hptr->name, name)) return hptr;
@@ -3110,13 +3144,13 @@ struct ident_hash_elem *find_or_add_perm_ident P1(char *, name) {
 	    if (!strcmp(hptr2->name, name)) return hptr2;
 	    hptr2 = hptr2->next;
 	}
-	hptr = ALLOCATE(struct ident_hash_elem, TAG_PERM_IDENT, "find_or_add_perm_ident:1");
+	hptr = ALLOCATE(ident_hash_elem_t, TAG_PERM_IDENT, "find_or_add_perm_ident:1");
 	hptr->next = ident_hash_head[h]->next;
 	ident_hash_head[h]->next = hptr;
 	if (ident_hash_head[h] == ident_hash_tail[h])
 	    ident_hash_tail[h] = hptr;
     } else {
-	hptr = (ident_hash_table[h] = ALLOCATE(struct ident_hash_elem, TAG_PERM_IDENT,
+	hptr = (ident_hash_table[h] = ALLOCATE(ident_hash_elem_t, TAG_PERM_IDENT,
 					       "find_or_add_perm_ident:2"));
 	ident_hash_head[h] = hptr;
 	ident_hash_tail[h] = hptr;
@@ -3130,13 +3164,16 @@ struct ident_hash_elem *find_or_add_perm_ident P1(char *, name) {
     hptr->dn.global_num = -1;
     hptr->dn.efun_num = -1;
     hptr->dn.function_num = -1;
+    hptr->dn.class_num = -1;
     return hptr;
 }
 
-struct lname_linked_buf {
-    struct lname_linked_buf *next;
+typedef struct lname_linked_buf_s {
+    struct lname_linked_buf_s *next;
     char block[4096];
-} *lnamebuf = 0;
+} lname_linked_buf_t;
+
+lname_linked_buf_t *lnamebuf = 0;
 
 int lb_index = 4096;
 
@@ -3145,8 +3182,8 @@ static char *alloc_local_name P1(char *, name) {
     char *res;
 
     if (lb_index + len > 4096) {
-	struct lname_linked_buf *new_buf;
-	new_buf = ALLOCATE(struct lname_linked_buf, TAG_COMPILER, "alloc_local_name");
+	lname_linked_buf_t *new_buf;
+	new_buf = ALLOCATE(lname_linked_buf_t, TAG_COMPILER, "alloc_local_name");
 	new_buf->next = lnamebuf;
 	lnamebuf = new_buf;
 	lb_index = 0;
@@ -3159,13 +3196,15 @@ static char *alloc_local_name P1(char *, name) {
 
 int num_free = 0;
 
-struct ident_hash_elem_list {
-    struct ident_hash_elem_list *next;
-    struct ident_hash_elem items[128];
-} *ihe_list = 0;
+typedef struct ident_hash_elem_list_s {
+    struct ident_hash_elem_list_s *next;
+    ident_hash_elem_t items[128];
+} ident_hash_elem_list_t;
+
+ident_hash_elem_list_t *ihe_list = 0;
 
 #ifdef DEBUG
-void dump_ihe P2(struct ident_hash_elem *, ihe, int, noisy) {
+void dump_ihe P2(ident_hash_elem_t *, ihe, int, noisy) {
     int sv = 0;
     if (ihe->token & IHE_RESWORD) {
 	if (noisy) printf("%s ", ihe->name);
@@ -3203,7 +3242,7 @@ void dump_ihe P2(struct ident_hash_elem *, ihe, int, noisy) {
 void debug_dump_ident_hash_table P1(int, noisy) {
     int zeros = 0;
     int i;
-    struct ident_hash_elem *ihe, *ihe2;
+    ident_hash_elem_t *ihe, *ihe2;
 
     if (noisy) printf("\n\nIdentifier Hash Table:\n");
     for (i = 0; i < IDENT_HASH_SIZE; i++) {
@@ -3227,8 +3266,8 @@ void debug_dump_ident_hash_table P1(int, noisy) {
 #endif
 
 void free_unused_identifiers() {
-    struct ident_hash_elem_list *ihel, *next;
-    struct lname_linked_buf *lnb, *lnbn;
+    ident_hash_elem_list_t *ihel, *next;
+    lname_linked_buf_t *lnb, *lnbn;
     int i;
 
     /* clean up dirty idents */
@@ -3239,6 +3278,10 @@ void free_unused_identifiers() {
 	}
 	if (ident_dirty_list->dn.global_num != -1) {
 	    ident_dirty_list->dn.global_num = -1;
+	    ident_dirty_list->sem_value--;
+	}
+	if (ident_dirty_list->dn.class_num != -1) {
+	    ident_dirty_list->dn.class_num = -1;
 	    ident_dirty_list->sem_value--;
 	}
 	ident_dirty_list = ident_dirty_list->next_dirty;
@@ -3270,13 +3313,13 @@ void free_unused_identifiers() {
 #endif
 }
 
-static struct ident_hash_elem *quick_alloc_ident_entry() {
+static ident_hash_elem_t *quick_alloc_ident_entry() {
     if (num_free) {
 	num_free--;
 	return &(ihe_list->items[num_free]);
     } else {
-	struct ident_hash_elem_list *ihel;
-	ihel = ALLOCATE(struct ident_hash_elem_list, TAG_COMPILER,
+	ident_hash_elem_list_t *ihel;
+	ihel = ALLOCATE(ident_hash_elem_list_t, TAG_COMPILER,
 			"quick_alloc_ident_entry");
 	ihel->next = ihe_list;
 	ihe_list = ihel;
@@ -3285,15 +3328,16 @@ static struct ident_hash_elem *quick_alloc_ident_entry() {
     }
 }
 
-struct ident_hash_elem *
+ident_hash_elem_t *
 find_or_add_ident P2(char *, name, int, flags) {
     int h = IdentHash(name);
-    struct ident_hash_elem *hptr, *hptr2;
+    ident_hash_elem_t *hptr, *hptr2;
 
     if (hptr = ident_hash_table[h]) {
 	if (!strcmp(hptr->name, name)) {
 	    if ((hptr->token & IHE_PERMANENT) && (flags & FOA_GLOBAL_SCOPE)
-		&& (hptr->dn.function_num==-1)&&(hptr->dn.global_num==-1)) {
+		&& (hptr->dn.function_num==-1)&&(hptr->dn.global_num==-1)
+		&& (hptr->dn.class_num==-1)) {
 		hptr->next_dirty = ident_dirty_list;
 		ident_dirty_list = hptr;
 	    }
@@ -3303,7 +3347,8 @@ find_or_add_ident P2(char *, name, int, flags) {
 	while (hptr2 != hptr) {
 	    if (!strcmp(hptr2->name, name)) {
 		if ((hptr2->token & IHE_PERMANENT)&&(flags & FOA_GLOBAL_SCOPE)
-		 && (hptr2->dn.function_num==-1)&&(hptr2->dn.global_num==-1)){
+		 && (hptr2->dn.function_num==-1)&&(hptr2->dn.global_num==-1)
+		    && (hptr2->dn.class_num == -1)){
 		    hptr2->next_dirty = ident_dirty_list;
 		    ident_dirty_list = hptr2;
 		}
@@ -3334,35 +3379,36 @@ find_or_add_ident P2(char *, name, int, flags) {
     hptr->dn.global_num = -1;
     hptr->dn.efun_num = -1;
     hptr->dn.function_num = -1;
+    hptr->dn.class_num = -1;
     return hptr;
 }
 
-static void add_keyword P2(char *, name, keyword *, entry) {
+static void add_keyword_t P2(char *, name, keyword_t *, entry) {
     int h = IdentHash(name);
 
     if (ident_hash_table[h]) {
 	entry->next = ident_hash_head[h]->next;
-	ident_hash_head[h]->next = (struct ident_hash_elem *)entry;
+	ident_hash_head[h]->next = (ident_hash_elem_t *)entry;
 	if (ident_hash_head[h] == ident_hash_tail[h])
-	    ident_hash_tail[h] = (struct ident_hash_elem *)entry;
+	    ident_hash_tail[h] = (ident_hash_elem_t *)entry;
     } else {
-	ident_hash_head[h] = (struct ident_hash_elem *)entry;
-	ident_hash_tail[h] = (struct ident_hash_elem *)entry;
-	ident_hash_table[h] = (struct ident_hash_elem *)entry;
-	entry->next = (struct ident_hash_elem *)entry;
+	ident_hash_head[h] = (ident_hash_elem_t *)entry;
+	ident_hash_tail[h] = (ident_hash_elem_t *)entry;
+	ident_hash_table[h] = (ident_hash_elem_t *)entry;
+	entry->next = (ident_hash_elem_t *)entry;
     }
     entry->token |= IHE_RESWORD;
 }
 
 void init_identifiers() {
     int i;
-    struct ident_hash_elem *ihe;
+    ident_hash_elem_t *ihe;
     
     /* allocate all three tables together */
-    ident_hash_table = CALLOCATE(IDENT_HASH_SIZE * 3, struct ident_hash_elem *,
+    ident_hash_table = CALLOCATE(IDENT_HASH_SIZE * 3, ident_hash_elem_t *,
 				 TAG_IDENT_TABLE, "init_identifiers");
-    ident_hash_head = (struct ident_hash_elem **)&ident_hash_table[IDENT_HASH_SIZE];
-    ident_hash_tail = (struct ident_hash_elem **)&ident_hash_table[2*IDENT_HASH_SIZE];
+    ident_hash_head = (ident_hash_elem_t **)&ident_hash_table[IDENT_HASH_SIZE];
+    ident_hash_tail = (ident_hash_elem_t **)&ident_hash_table[2*IDENT_HASH_SIZE];
 
     /* clean all three tables */
     for (i=0; i<IDENT_HASH_SIZE * 3; i++) {
@@ -3370,7 +3416,7 @@ void init_identifiers() {
     }
     /* add the reserved words */
     for (i=0; i<NELEM(reswords); i++) {
-	add_keyword(reswords[i].word, &reswords[i]);
+	add_keyword_t(reswords[i].word, &reswords[i]);
     }
     /* add the efuns */
     for (i=0; i<NELEM(predefs); i++) {
@@ -3379,5 +3425,9 @@ void init_identifiers() {
 	ihe->sem_value++;
 	ihe->dn.efun_num = i;
     }
+    /* add the three special ones ... */
+    efun_hash = IdentHash("efun");
+    asm_hash = IdentHash("asm");
+    new_hash = IdentHash("new");
 }
 

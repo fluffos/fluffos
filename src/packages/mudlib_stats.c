@@ -11,7 +11,7 @@
 void
 f_domain_stats PROT((void))
 {
-    struct mapping *m;
+    mapping_t *m;
 
     if (st_num_arg) {
         m = get_domain_stats(sp->u.string);
@@ -33,6 +33,7 @@ void
 f_set_author PROT((void))
 {
     set_author(sp->u.string);
+    free_string_svalue(sp--);
 }
 #endif
 
@@ -40,7 +41,7 @@ f_set_author PROT((void))
 void
 f_author_stats PROT((void))
 {
-    struct mapping *m;
+    mapping_t *m;
 
     if (st_num_arg) {
         m = get_author_stats(sp->u.string);

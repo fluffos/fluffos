@@ -3,10 +3,6 @@
 #ifndef INTERPRET_H
 #define INTERPRET_H
 
-#include "uid.h"
-#include "mudlib_stats.h"
-#include "program.h"
-
 #define SWITCH_CASE_SIZE ((int)(2 + sizeof(char *)))
 
 /* Trace defines */
@@ -38,118 +34,6 @@
 #define EXTRACT_UCHAR(p) (*p < 0 ? *p + 0x100 : *p)
 #endif				/* HAS_UNSIGNED_CHAR */
 
-union u {
-    char *string;
-    int number;
-    float real;
-    struct buffer *buf;
-    struct object *ob;
-    struct vector *vec;
-    struct mapping *map;
-    struct funp *fp;
-    struct svalue *lvalue;
-    unsigned char *lvalue_byte;
-    void (*error_handler) PROT((void));
-};
-
-/*
- * The value stack element.
- * If it is a string, then the way that the string has been allocated
- * differently, which will affect how it should be freed.
- */
-typedef struct svalue {
-    short type;
-    short subtype;
-    union u u;
-}      svalue;
-
-/* These flags are used by load_object() */
-#define LO_DONT_RESET   0x1
-#define LO_SAVE_OUTPUT  0x2
-
-/* values for type field of svalue struct */
-#define T_INVALID	0x0
-#define T_LVALUE	0x1
-
-#define T_NUMBER	0x2
-#define T_STRING	0x4
-#define T_POINTER	0x8
-#define T_OBJECT	0x10
-#define T_MAPPING	0x20
-#define T_FUNCTION      0x40
-#define T_REAL          0x80
-#define T_BUFFER        0x100
-
-#define T_LVALUE_BYTE   0x200	/* byte-sized lvalue */
-#define T_LVALUE_RANGE  0x400
-#define T_ERROR_HANDLER 0x800
-#ifdef DEBUG
-#define T_FREED         0x1000
-#endif
-
-#define T_ANY T_STRING|T_NUMBER|T_POINTER|T_OBJECT|T_MAPPING|T_FUNCTION| \
-	T_REAL|T_BUFFER
-
-/* values for subtype field of svalue struct */
-#define STRING_MALLOC	0x1	/* Allocated by malloc() */
-#define STRING_CONSTANT	0x2	/* Do not has to be freed at all */
-#define STRING_SHARED	0x4	/* Allocated by the shared string library */
-#define T_UNDEFINED     0x4	/* undefinedp() returns true */
-#define T_NULLVALUE     0x8	/* nullp() returns true */
-#define T_REMOTE        0x10	/* remote object (subtype of object) */
-#define T_ERROR         0x20	/* error code */
-
-#ifdef NEW_FUNCTIONS
-struct afp {
-    /* first two must match the function struct */
-    unsigned char num_args;
-    unsigned char num_locals;
-    short offset;
-    short fio, vio;
-    struct program *prog;
-};
-
-struct funp {
-    unsigned short ref;
-#ifdef DEBUG
-    int extra_ref;
-#endif
-    struct object *owner;
-    short type;                 /* FP_* is used */
-    union {
-	struct svalue obj;      /* for call_other function pointers */
-	short index;            /* lfuns and simul_efuns */
-	/* worst case here is F_CALL_EXTRA F_EFUN <num_arg> F_RETURN */
-	unsigned char opcodes[4]; /* for efun function pointers */
-	struct afp a;           /* for functionals */
-    } f;
-    struct svalue args;         /* includes the function for call_other */
-};
-#else
-struct funp {	
-    unsigned short ref;
-#ifdef DEBUG
-    int extra_ref;
-#endif
-    struct svalue obj, fun;
-#ifndef NO_UIDS
-    userid_t *euid;
-#endif
-};
-#endif
-
-struct vector {
-    unsigned short ref;
-#ifdef DEBUG
-    int extra_ref;
-#endif
-    unsigned short size;
-#ifndef NO_MUDLIB_STATS
-    statgroup_t stats;		/* creator of the array */
-#endif
-    struct svalue item[1];
-};
-
 /*
  * Control stack element.
  * 'prog' is usually same as 'ob->prog' (current_object), except when
@@ -161,41 +45,41 @@ struct vector {
 #define FRAME_CATCH        2
 #define FRAME_FAKE         3
 
-struct control_stack {
+typedef struct {
 #ifdef PROFILE_FUNCTIONS
     unsigned long entry_secs, entry_usecs;
 #endif
     /* Only used for tracebacks */
     short framekind;
     union {
-      struct function *func;
-      struct funp *funp;
+	function_t *func;
+	funptr_t *funp;
     } fr;
-    struct object *ob;		/* Current object */
-    struct object *prev_ob;	/* Save previous object */
-    struct program *prog;	/* Current program */
+    object_t *ob;		/* Current object */
+    object_t *prev_ob;	/* Save previous object */
+    program_t *prog;	/* Current program */
     int num_local_variables;	/* Local + arguments */
     char *pc;
-    struct svalue *fp;
+    svalue_t *fp;
     int extern_call;		/* Flag if evaluator should return */
     int function_index_offset;	/* Used when executing functions in inherited
 				 * programs */
     int variable_index_offset;	/* Same */
     short *break_sp;
     short caller_type;		/* was this a locally called function? */
-};
+} control_stack_t;
 
-struct error_context_stack {
+typedef struct error_context_stack_s {
     jmp_buf old_error_context;
     int old_exists_flag;
-    struct control_stack *save_csp;
-    struct object *save_command_giver;
-    struct svalue *save_sp;
-    struct error_context_stack *next;
-};
+    control_stack_t *save_csp;
+    object_t *save_command_giver;
+    svalue_t *save_sp;
+    struct error_context_stack_s *next;
+} error_context_stack_t;
 
 /* for apply_master_ob */
-#define MASTER_APPROVED(x) (((x)==(struct svalue *)-1) || ((x) && (((x)->type != T_NUMBER) || (x)->u.number))) 
+#define MASTER_APPROVED(x) (((x)==(svalue_t *)-1) || ((x) && (((x)->type != T_NUMBER) || (x)->u.number))) 
 
 #define IS_ZERO(x) (!(x) || (((x)->type == T_NUMBER) && ((x)->u.number == 0)))
 #define IS_UNDEFINED(x) (!(x) || (((x)->type == T_NUMBER) && \
@@ -262,7 +146,7 @@ struct error_context_stack {
 /* macro calls */
 #ifndef LPC_TO_C
 #define call_program(prog, offset) \
-        eval_instruction(prog->p.i.program + offset)
+        eval_instruction(prog->program + offset)
 #endif
 
 #ifdef DEBUG
@@ -285,21 +169,21 @@ struct error_context_stack {
                 sp->u.string = (x); } while (0)
 #define put_malloced_string(x) do { sp->type = T_STRING; sp->subtype = STRING_MALLOC; \
                 sp->u.string = (x); } while (0)
-#define put_vector(x) do { sp->type = T_POINTER; sp->u.vec = (x); } while (0)
+#define put_array(x) do { sp->type = T_ARRAY; sp->u.arr = (x); } while (0)
 #define put_shared_string(x) do { sp->type = T_STRING; sp->subtype = STRING_SHARED; \
                 sp->u.string = (x); } while (0)
 
-extern struct program *current_prog;
+extern program_t *current_prog;
 extern short caller_type;
 extern char *pc;
-extern struct svalue *sp;
-extern struct svalue *fp;
+extern svalue_t *sp;
+extern svalue_t *fp;
 extern short *break_sp;
 extern short *start_of_switch_stack;
-extern struct svalue catch_value;
-extern struct control_stack control_stack[30];
-extern struct control_stack *csp;
-extern struct error_context_stack *ecsp;
+extern svalue_t catch_value;
+extern control_stack_t control_stack[MAX_TRACE];
+extern control_stack_t *csp;
+extern error_context_stack_t *ecsp;
 extern int too_deep_error;
 extern int max_eval_error;
 extern int function_index_offset;
@@ -311,90 +195,91 @@ extern unsigned int apply_low_collisions;
 extern int function_index_offset;
 extern int master_ob_is_loading;
 extern int simul_efun_is_loading;
-#ifdef NEW_FUNCTIONS
-extern struct program fake_prog;
-#endif
+extern program_t fake_prog;
 
 /* with LPC_TO_C off, these are defines using eval_instruction */
 #ifdef LPC_TO_C
-void call_program PROT((struct program *, int));
+void call_program PROT((program_t *, int));
 #endif
 void eval_instruction PROT((char *p));
-INLINE void assign_svalue PROT((struct svalue *, struct svalue *));
-INLINE void assign_svalue_no_free PROT((struct svalue *, struct svalue *));
-INLINE void copy_some_svalues PROT((struct svalue *, struct svalue *, int));
-INLINE void transfer_push_some_svalues PROT((struct svalue *, int));
-INLINE void push_some_svalues PROT((struct svalue *, int));
+INLINE void assign_svalue PROT((svalue_t *, svalue_t *));
+INLINE void assign_svalue_no_free PROT((svalue_t *, svalue_t *));
+INLINE void copy_some_svalues PROT((svalue_t *, svalue_t *, int));
+INLINE void transfer_push_some_svalues PROT((svalue_t *, int));
+INLINE void push_some_svalues PROT((svalue_t *, int));
 #ifdef DEBUG
-INLINE void int_free_svalue PROT((struct svalue *, char *));
+INLINE void int_free_svalue PROT((svalue_t *, char *));
 #else
-INLINE void int_free_svalue PROT((struct svalue *));
+INLINE void int_free_svalue PROT((svalue_t *));
 #endif
-INLINE void free_string_svalue PROT((struct svalue *));
-INLINE void free_some_svalues PROT((struct svalue *, int));
-INLINE void push_object PROT((struct object *));
+INLINE void free_string_svalue PROT((svalue_t *));
+INLINE void free_some_svalues PROT((svalue_t *, int));
+INLINE void push_object PROT((object_t *));
 INLINE void push_number PROT((int));
 INLINE void push_real PROT((double));
 INLINE void push_undefined PROT((void));
 INLINE void push_null PROT((void));
 INLINE void push_string PROT((char *, int));
-INLINE void push_vector PROT((struct vector *));
-INLINE void push_refed_vector PROT((struct vector *));
-INLINE void push_buffer PROT((struct buffer *));
-INLINE void push_refed_buffer PROT((struct buffer *));
-INLINE void push_mapping PROT((struct mapping *));
-INLINE void push_refed_mapping PROT((struct mapping *));
+INLINE void push_array PROT((array_t *));
+INLINE void push_refed_array PROT((array_t *));
+INLINE void push_buffer PROT((buffer_t *));
+INLINE void push_refed_buffer PROT((buffer_t *));
+INLINE void push_mapping PROT((mapping_t *));
+INLINE void push_refed_mapping PROT((mapping_t *));
+INLINE void push_class PROT((array_t *));
+INLINE void push_refed_class PROT((array_t *));
 INLINE void push_malloced_string PROT((char *));
 INLINE void push_constant_string PROT((char *));
 INLINE void pop_stack PROT((void));
 INLINE void pop_n_elems PROT((int));
 INLINE void pop_2_elems PROT((void));
 INLINE void pop_3_elems PROT((void));
-void remove_object_from_stack PROT((struct object *));
-void setup_fake_frame PROT((struct funp *));
+INLINE function_t *setup_inherited_frame PROT((function_t *));
+void remove_object_from_stack PROT((object_t *));
+void setup_fake_frame PROT((funptr_t *));
 void remove_fake_frame PROT((void));
 
 char *type_name PROT((int c));
 void bad_arg PROT((int, int));
-void bad_argument PROT((struct svalue *, int, int, int));
-void check_for_destr PROT((struct vector *));
-int is_static PROT((char *, struct object *));
-int apply_low PROT((char *, struct object *, int));
-struct svalue *apply PROT((char *, struct object *, int, int));
-struct svalue *call_function_pointer PROT((struct funp *, int));
-struct svalue *safe_apply PROT((char *, struct object *, int, int));
-void call___INIT PROT((struct object *));
-struct vector *call_all_other PROT((struct vector *, char *, int));
-char *function_exists PROT((char *, struct object *));
-void call_function PROT((struct program *, struct function *));
-struct svalue *apply_master_ob PROT((char *, int));
-struct svalue *safe_apply_master_ob PROT((char *, int));
+void bad_argument PROT((svalue_t *, int, int, int));
+void check_for_destr PROT((array_t *));
+int is_static PROT((char *, object_t *));
+int apply_low PROT((char *, object_t *, int));
+svalue_t *apply PROT((char *, object_t *, int, int));
+svalue_t *call_function_pointer PROT((funptr_t *, int));
+svalue_t *safe_apply PROT((char *, object_t *, int, int));
+void call___INIT PROT((object_t *));
+array_t *call_all_other PROT((array_t *, char *, int));
+char *function_exists PROT((char *, object_t *));
+void call_function PROT((program_t *, function_t *));
+svalue_t *apply_master_ob PROT((char *, int));
+svalue_t *safe_apply_master_ob PROT((char *, int));
 int assert_master_ob_loaded PROT((char *, char *));
 
 void translate_absolute_line PROT((int, unsigned short *, int *, int *));
 char *add_slash PROT((char *));
 int strpref PROT((char *, char *));
-struct vector *get_svalue_trace PROT((void));
+array_t *get_svalue_trace PROT((void));
 void do_trace PROT((char *, char *, char *));
 char *dump_trace PROT((int));
 void opcdump PROT((char *));
-int inter_sscanf PROT((struct svalue *, struct svalue *, struct svalue *, int));
+int inter_sscanf PROT((svalue_t *, svalue_t *, svalue_t *, int));
 char * get_line_number_if_any PROT((void));
 void get_line_number_info PROT((char **, int *));
 void get_version PROT((char *));
 void reset_machine PROT((int));
 
 #ifndef NO_SHADOWS
-int validate_shadowing PROT((struct object *));
+int validate_shadowing PROT((object_t *));
 #endif
 
 #ifdef LAZY_RESETS
-void try_reset PROT((struct object *));
+void try_reset PROT((object_t *));
 #endif
 
 void push_pop_error_context PROT((int));
 void pop_control_stack PROT((void));
-INLINE struct function *setup_new_frame PROT((struct function *));
+INLINE function_t *setup_new_frame PROT((function_t *));
 INLINE void push_control_stack PROT((int, void *));
 
 #ifdef DEBUGMALLOC_EXTENSIONS

@@ -1,49 +1,60 @@
 #ifndef ARRAY_H
 #define ARRAY_H
 
+typedef struct array_s {
+    unsigned short ref;
+#ifdef DEBUG
+    int extra_ref;
+#endif
+    unsigned short size;
+#ifndef NO_MUDLIB_STATS
+    statgroup_t stats;		/* creator of the array */
+#endif
+    svalue_t item[1];
+} array_t;
+
 /*
  * array.c
  */
-extern struct vector null_vector;
 extern int num_arrays;
 extern int total_array_size;
 
-int sameval PROT((struct svalue *, struct svalue *));
-INLINE struct vector *null_array PROT((void));
-struct vector *allocate_array PROT((int));
-struct vector *allocate_empty_array PROT((int));
-void free_vector PROT((struct vector *));
-void free_empty_vector PROT((struct vector *));
-struct vector *add_array PROT((struct vector *, struct vector *));
-struct vector *subtract_array PROT((struct vector *, struct vector *));
-struct vector *slice_array PROT((struct vector *, int, int));
-struct vector *explode_string PROT((char *, char *));
-char *implode_string PROT((struct vector *, char *));
-struct vector *users PROT((void));
-struct vector *commands PROT((struct object *));
-void filter_array PROT((struct svalue *, int));
-struct vector *deep_inherit_list PROT((struct object *));
-struct vector *inherit_list PROT((struct object *));
-struct vector *children PROT((char *));
-struct vector *livings PROT((void));
-struct vector *objects PROT((struct funp *));
-struct vector *all_inventory PROT((struct object *, int));
-struct vector *deep_inventory PROT((struct object *, int));
-struct vector *filter PROT((struct vector *, struct funp *, struct svalue *));
-struct vector *builtin_sort_array PROT((struct vector *, int));
-struct vector *fp_sort_array PROT((struct vector *, struct funp *));
-struct vector *sort_array PROT((struct vector *, char *, struct object *));
-struct vector *make_unique PROT((struct vector *, char *, struct funp *, struct svalue *));
-void map_string PROT((struct svalue *arg, int num_arg));
-void map_array PROT((struct svalue *arg, int num_arg));
-struct vector *intersect_array PROT((struct vector *, struct vector *));
-struct vector *match_regexp PROT((struct vector *, char *, int));
-struct vector *reg_assoc PROT((char *, struct vector *, struct vector *, struct svalue *));
+int sameval PROT((svalue_t *, svalue_t *));
+array_t *null_array PROT((void));
+array_t *allocate_array PROT((int));
+array_t *allocate_empty_array PROT((int));
+void free_array PROT((array_t *));
+void free_empty_array PROT((array_t *));
+array_t *add_array PROT((array_t *, array_t *));
+array_t *subtract_array PROT((array_t *, array_t *));
+array_t *slice_array PROT((array_t *, int, int));
+array_t *explode_string PROT((char *, char *));
+char *implode_string PROT((array_t *, char *));
+array_t *users PROT((void));
+array_t *commands PROT((object_t *));
+void filter_array PROT((svalue_t *, int));
+array_t *deep_inherit_list PROT((object_t *));
+array_t *inherit_list PROT((object_t *));
+array_t *children PROT((char *));
+array_t *livings PROT((void));
+array_t *objects PROT((funptr_t *));
+array_t *all_inventory PROT((object_t *, int));
+array_t *deep_inventory PROT((object_t *, int));
+array_t *filter PROT((array_t *, funptr_t *, svalue_t *));
+array_t *builtin_sort_array PROT((array_t *, int));
+array_t *fp_sort_array PROT((array_t *, funptr_t *));
+array_t *sort_array PROT((array_t *, char *, object_t *));
+array_t *make_unique PROT((array_t *, char *, funptr_t *, svalue_t *));
+void map_string PROT((svalue_t *arg, int num_arg));
+void map_array PROT((svalue_t *arg, int num_arg));
+array_t *intersect_array PROT((array_t *, array_t *));
+array_t *match_regexp PROT((array_t *, char *, int));
+array_t *reg_assoc PROT((char *, array_t *, array_t *, svalue_t *));
 
-#define ALLOC_VECTOR(nelem) \
-    (struct vector *)DXALLOC(sizeof (struct vector) + \
-	  sizeof(struct svalue) * (nelem - 1), TAG_VECTOR, "ALLOC_VECTOR")
-#define RESIZE_VECTOR(vec, nelem) \
-    (struct vector *)DREALLOC(vec, sizeof (struct vector) + \
-	  sizeof(struct svalue) * (nelem - 1), TAG_VECTOR, "RESIZE_VECTOR")
+#define ALLOC_ARRAY(nelem) \
+    (array_t *)DXALLOC(sizeof (array_t) + \
+	  sizeof(svalue_t) * (nelem - 1), TAG_ARRAY, "ALLOC_ARRAY")
+#define RESIZE_ARRAY(vec, nelem) \
+    (array_t *)DREALLOC(vec, sizeof (array_t) + \
+	  sizeof(svalue_t) * (nelem - 1), TAG_ARRAY, "RESIZE_ARRAY")
 #endif

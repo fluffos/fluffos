@@ -9,21 +9,22 @@
 #include "comm.h"
 #include "swap.h"
 #include "lex.h"
+#include "file.h"
 
 #ifdef F_DUMP_PROG
-void dump_prog PROT((struct program *, char *, int));
-static void disassemble PROT((FILE *, char *, int, int, struct program *));
+void dump_prog PROT((program_t *, char *, int));
+static void disassemble PROT((FILE *, char *, int, int, program_t *));
 static char *disassem_string PROT((char *));
 static int short_compare PROT((unsigned short *, unsigned short *));
-static void dump_line_numbers PROT((FILE *, struct program *));
+static void dump_line_numbers PROT((FILE *, program_t *));
 
 void
 f_dump_prog PROT((void))
 {
-    struct program *prog;
+    program_t *prog;
     char *where;
     int d;
-    struct object *ob;
+    object_t *ob;
 
     if (st_num_arg == 2) {
 	ob = sp[-1].u.ob;
@@ -47,7 +48,6 @@ f_dump_prog PROT((void))
 	}
 	dump_prog(prog, where, d);
     }
-    push_number(0);
 }
 
 /* Current flags:
@@ -55,7 +55,7 @@ f_dump_prog PROT((void))
  * 2 - dump line number table
  */
 void
-dump_prog P3(struct program *, prog, char *, fn, int, flags)
+dump_prog P3(program_t *, prog, char *, fn, int, flags)
 {
     char *fname;
     FILE *f;
@@ -77,27 +77,27 @@ dump_prog P3(struct program *, prog, char *, fn, int, flags)
     fprintf(f, "INHERITS:\n");
     fprintf(f, "\tname                    fio    vio\n");
     fprintf(f, "\t----------------        ---    ---\n");
-    for (i = 0; i < (int) prog->p.i.num_inherited; i++)
+    for (i = 0; i < (int) prog->num_inherited; i++)
 	fprintf(f, "\t%-20s  %5d  %5d\n",
-		prog->p.i.inherit[i].prog->name,
-		(int)prog->p.i.inherit[i].function_index_offset,
-		(int)prog->p.i.inherit[i].variable_index_offset
+		prog->inherit[i].prog->name,
+		(int)prog->inherit[i].function_index_offset,
+		(int)prog->inherit[i].variable_index_offset
 	    );
     fprintf(f, "PROGRAM:");
-    for (i = 0; i < (int) prog->p.i.program_size; i++) {
+    for (i = 0; i < (int) prog->program_size; i++) {
 	if (i % 16 == 0)
 	    fprintf(f, "\n\t%04x: ", (unsigned int) i);
-	fprintf(f, "%02d ", (unsigned char) prog->p.i.program[i]);
+	fprintf(f, "%02d ", (unsigned char) prog->program[i]);
     }
     fputc('\n', f);
     fprintf(f, "FUNCTIONS:\n");
     fprintf(f, "      name        offset    fio   flags   # locals  # args\n");
     fprintf(f, "      ----------- ------    ---  -------  --------  ------\n");
-    for (i = 0; i < (int) prog->p.i.num_functions; i++) {
+    for (i = 0; i < (int) prog->num_functions; i++) {
 	char sflags[8];
 	int flags;
 
-	flags = prog->p.i.functions[i].flags;
+	flags = prog->functions[i].flags;
 	sflags[6] = '\0';
 	sflags[0] = (flags & NAME_INHERITED) ? 'i' : '-';
 	sflags[1] = (flags & NAME_UNDEFINED) ? 'u' : '-';
@@ -107,25 +107,25 @@ dump_prog P3(struct program *, prog, char *, fn, int, flags)
 	sflags[5] = (flags & NAME_ALIAS) ? 'a' : '-';
 	fprintf(f, "%4d: %-12s %5d  %5d  %7s  %8d  %6d\n",
 		i,
-		prog->p.i.functions[i].name,
-		(int)prog->p.i.functions[i].offset,
-		prog->p.i.functions[i].function_index_offset,
+		prog->functions[i].name,
+		(int)prog->functions[i].offset,
+		prog->functions[i].function_index_offset,
 		sflags,
-		prog->p.i.functions[i].num_local,
-		prog->p.i.functions[i].num_arg
+		prog->functions[i].num_local,
+		prog->functions[i].num_arg
 	    );
     }
     fprintf(f, "VARIABLES:\n");
-    for (i = 0; i < (int) prog->p.i.num_variables; i++)
+    for (i = 0; i < (int) prog->num_variables; i++)
 	fprintf(f, "%4d: %-12s\n", i,
-		prog->p.i.variable_names[i].name);
+		prog->variable_names[i].name);
     fprintf(f, "STRINGS:\n");
-    for (i = 0; i < (int) prog->p.i.num_strings; i++) {
+    for (i = 0; i < (int) prog->num_strings; i++) {
 	fprintf(f, "%4d: ", i);
 	for (j = 0; j < 32; j++) {
 	    char c;
 
-	    if (!(c = prog->p.i.strings[i][j]))
+	    if (!(c = prog->strings[i][j]))
 		break;
 	    else if (c == '\n')
 		fprintf(f, "\\n");
@@ -137,7 +137,7 @@ dump_prog P3(struct program *, prog, char *, fn, int, flags)
 
     if (flags & 1) {
 	fprintf(f, "\n;;;  *** Disassembly ***\n");
-	disassemble(f, prog->p.i.program, 0, prog->p.i.program_size, prog);
+	disassemble(f, prog->program, 0, prog->program_size, prog);
     }
     if (flags & 2) {
 	fprintf(f, "\n;;;  *** Line Number Info ***\n");
@@ -171,12 +171,13 @@ static char *disassem_string P1(char *, str)
     return buf;
 }
 
-#define FUNS     prog->p.i.functions
-#define NUM_FUNS prog->p.i.num_functions
-#define VARS     prog->p.i.variable_names
-#define NUM_VARS prog->p.i.num_variables
-#define STRS     prog->p.i.strings
-#define NUM_STRS prog->p.i.num_strings
+#define FUNS     prog->functions
+#define NUM_FUNS prog->num_functions
+#define VARS     prog->variable_names
+#define NUM_VARS prog->num_variables
+#define STRS     prog->strings
+#define NUM_STRS prog->num_strings
+#define CLSS     prog->classes
 
 static int
 short_compare P2(unsigned short *, a, unsigned short *, b)
@@ -185,7 +186,7 @@ short_compare P2(unsigned short *, a, unsigned short *, b)
 }
 
 static void
-disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, prog)
+disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 {
     int i, instr, iarg, is_efun;
     unsigned short sarg;
@@ -285,6 +286,15 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 	    pc += 2;
 	    break;
 
+	case F_MEMBER:
+	case F_MEMBER_LVALUE:
+	    sprintf(buff, "%d", (int)EXTRACT_UCHAR(pc++));
+	    break;
+
+	case F_NEW_CLASS:
+	    sprintf(buff, "class %s", CLSS[EXTRACT_UCHAR(pc++)]);
+	    break;
+
 	case F_CALL_FUNCTION_BY_ADDRESS:
 	    COPY_SHORT(&sarg, pc);
 	    pc += 3;
@@ -297,14 +307,14 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 
 	case F_CALL_INHERITED:
 	{
-	    struct program *newprog;
+	    program_t *newprog;
 
-	    newprog = (prog->p.i.inherit + EXTRACT_UCHAR(pc++))->prog;
+	    newprog = (prog->inherit + EXTRACT_UCHAR(pc++))->prog;
 	    COPY_SHORT(&sarg, pc);
 	    pc += 3;
-	    if (sarg < newprog->p.i.num_functions)
+	    if (sarg < newprog->num_functions)
 		sprintf(buff, "%30s::%-12s %5d", newprog->name,
-			newprog->p.i.functions[sarg].name, (int) sarg);
+			newprog->functions[sarg].name, (int) sarg);
 	    else sprintf(buff, "<out of range in %30s - %d>", newprog->name,
 			 (int) sarg);
 	    break;
@@ -370,12 +380,6 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 
 	case F_FUNCTION_CONSTRUCTOR:
 	    switch (EXTRACT_UCHAR(pc++)) {
-	    case FP_CALL_OTHER | FP_THIS_OBJECT:
-		strcpy(buff, "<this_object call_other>");
-		break;
-	    case FP_CALL_OTHER:
-		strcpy(buff, "<call_other>");
-		break;
 	    case FP_SIMUL:
 		COPY_SHORT(&sarg, pc);
 		sprintf(buff, "<simul_efun> \"%s\"", simuls[sarg]->name);
@@ -522,7 +526,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, struct program *, 
 #define INCLUDE_DEPTH 10
 
 static void
-dump_line_numbers P2(FILE *, f, struct program *, prog) {
+dump_line_numbers P2(FILE *, f, program_t *, prog) {
     unsigned short *fi;
     unsigned char *li_start;
     unsigned char *li_end;
@@ -531,15 +535,15 @@ dump_line_numbers P2(FILE *, f, struct program *, prog) {
     int sz;
     short s;
 
-    if (!prog->p.i.line_info) {
+    if (!prog->line_info) {
 	load_line_numbers(prog);
-	if (!prog->p.i.line_info) {
+	if (!prog->line_info) {
 	    fprintf(f, "Failed to load line numbers\n");
 	    return;
 	}
     }
 
-    fi = prog->p.i.file_info;
+    fi = prog->file_info;
     li_end = (unsigned char *)(((char *)fi) + fi[0]);
     li_start = (unsigned char *)(fi + fi[1]);
     
@@ -547,7 +551,7 @@ dump_line_numbers P2(FILE *, f, struct program *, prog) {
     fprintf(f, "\nabsolute line -> (file, line) table:\n");
     while (fi < (unsigned short *)li_start) {
 	fprintf(f, "%i lines from %i [%s]\n", (int)fi[0], (int)fi[1], 
-		prog->p.i.strings[fi[1]-1]);
+		prog->strings[fi[1]-1]);
 	fi += 2;
     }
 

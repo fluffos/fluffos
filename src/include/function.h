@@ -1,6 +1,5 @@
 /* codes returned by the functionp() efun */
 
-#define FP_CALL_OTHER         1
 #define FP_LOCAL              2
 #define FP_EFUN               3
 #define FP_SIMUL              4

@@ -1,18 +1,13 @@
-
 /* 
  * code generator for runtime LPC code
- * 
- * Currently only generates code for expressions
  */
 #include "std.h"
+#include "lpc_incl.h"
 #include "icode.h"
 #include "trees.h"
 #include "compiler.h"
-#include "include/function.h"
 #include "lex.h"
-#include "interpret.h"
 #include "generate.h"
-#include "simulate.h"
 
 static void ins_real PROT((double));
 static void ins_short PROT((short));
@@ -24,7 +19,7 @@ static void write_number PROT((int));
 static short read_short PROT((int));
 static void ins_int PROT((int));
 static void ins_long PROT((long));
-void i_generate_node PROT((struct parse_node *));
+void i_generate_node PROT((parse_node_t *));
 
 /*
    this variable is used to properly adjust the 'break_sp' stack in
@@ -38,18 +33,18 @@ static int current_num_values;
 static int last_size_generated;
 static int line_being_generated;
 
-static struct parse_node break_dummy = { NODE_BREAK, 0, 1 };
-static struct parse_node cont_dummy = { NODE_CONTINUE, 0, 1 };
+static parse_node_t break_dummy = { NODE_BREAK, 0, 1 };
+static parse_node_t cont_dummy = { NODE_CONTINUE, 0, 1 };
 
-static struct parse_node *break_ptr;
-static struct parse_node *cont_ptr;
+static parse_node_t *break_ptr;
+static parse_node_t *cont_ptr;
 
 static void ins_real P1(double, l)
 {
     float f = (float)l;
 
     if (prog_code + 4 > prog_code_max) {
-	struct mem_block *mbp = &mem_block[current_block];
+	mem_block_t *mbp = &mem_block[current_block];
 
 	UPDATE_PROGRAM_SIZE;
 	realloc_mem_block(mbp, mbp->current_size * 2);
@@ -68,7 +63,7 @@ static void ins_real P1(double, l)
 static void ins_short P1(short, l)
 {
     if (prog_code + 2 > prog_code_max) {
-	struct mem_block *mbp = &mem_block[current_block];
+	mem_block_t *mbp = &mem_block[current_block];
 	UPDATE_PROGRAM_SIZE;
 	realloc_mem_block(mbp, mbp->current_size * 2);
 	
@@ -93,7 +88,7 @@ static short read_short P1(int, offset)
 static void ins_int P1(int, l)
 {
     if (prog_code + 4 > prog_code_max) {
-	struct mem_block *mbp = &mem_block[current_block];
+	mem_block_t *mbp = &mem_block[current_block];
 	UPDATE_PROGRAM_SIZE;
 	realloc_mem_block(mbp, mbp->current_size * 2);
 	
@@ -110,7 +105,7 @@ static void ins_int P1(int, l)
 static void ins_long P1(long, l)
 {
     if (prog_code + 8 > prog_code_max) {
-	struct mem_block *mbp = &mem_block[current_block];
+	mem_block_t *mbp = &mem_block[current_block];
 	UPDATE_PROGRAM_SIZE;
 	realloc_mem_block(mbp, mbp->current_size * 2);
 	
@@ -132,7 +127,7 @@ static void upd_short P2(int, offset, short, l)
 static void ins_byte P1(unsigned char, b)
 {
     if (prog_code == prog_code_max) {
-	struct mem_block *mbp = &mem_block[current_block];
+	mem_block_t *mbp = &mem_block[current_block];
 	UPDATE_PROGRAM_SIZE;
 	realloc_mem_block(mbp, mbp->current_size * 2);
 	
@@ -190,7 +185,7 @@ static void write_number P1(int, val)
 }
 
 static void
-generate_expr_list P1(struct parse_node *, expr) {
+generate_expr_list P1(parse_node_t *, expr) {
     if (!expr) return;
     do {
       i_generate_node(expr->v.expr);
@@ -198,7 +193,7 @@ generate_expr_list P1(struct parse_node *, expr) {
 }
 
 static void
-generate_lvalue_list P1(struct parse_node *, expr) {
+generate_lvalue_list P1(parse_node_t *, expr) {
     while (expr = expr->r.expr) {
       i_generate_node(expr->l.expr);
       ins_f_byte(F_VOID_ASSIGN);
@@ -233,7 +228,7 @@ switch_to_line P1(int, line) {
 }
 
 void
-i_generate_node P1(struct parse_node *, expr) {
+i_generate_node P1(parse_node_t *, expr) {
     if (!expr) return;
 
     if (expr->line && expr->line != line_being_generated)
@@ -343,6 +338,13 @@ i_generate_node P1(struct parse_node *, expr) {
 	ins_f_byte(F_REAL);
 	ins_real(expr->v.real);
 	break;
+    case F_NEW_CLASS:
+	ins_f_byte(F_NEW_CLASS);
+	ins_byte(expr->v.number);
+	break;
+    case F_MEMBER:
+    case F_MEMBER_LVALUE:
+	i_generate_node(expr->r.expr);
     case F_NBYTE:
     case F_BYTE:
 	ins_f_byte(expr->kind);
@@ -492,7 +494,7 @@ i_generate_node P1(struct parse_node *, expr) {
     case NODE_CASE_NUMBER:
     case NODE_CASE_STRING:
 	if (expr->v.expr) {
-	    struct parse_node *other = expr->v.expr;
+	    parse_node_t *other = expr->v.expr;
 	    expr->v.number = 1;
 	    other->l.expr = expr->l.expr;
 	    other->v.number = CURRENT_PROGRAM_SIZE;
@@ -507,6 +509,7 @@ i_generate_node P1(struct parse_node *, expr) {
     case NODE_SWITCH_STRINGS:
     case NODE_SWITCH_NUMBERS:
     case NODE_SWITCH_DIRECT:
+    case NODE_SWITCH_RANGES:
 	{
 	    int addr;
 
@@ -537,7 +540,7 @@ i_generate_node P1(struct parse_node *, expr) {
 	    }
 #endif
 	    if (expr->kind == NODE_SWITCH_DIRECT) {
-		struct parse_node *pn = expr->v.expr;
+		parse_node_t *pn = expr->v.expr;
 		while (pn) {
 		    ins_short((short)pn->v.number);
 		    pn = pn->l.expr;
@@ -548,10 +551,13 @@ i_generate_node P1(struct parse_node *, expr) {
 		int table_size = 0;
 		int power_of_two = 1;
 		int i = 0;
-		struct parse_node *pn = expr->v.expr;
+		parse_node_t *pn = expr->v.expr;
 		
 		while (pn) {
-		    INS_POINTER((POINTER_INT)pn->r.expr);
+		    if (expr->kind == NODE_SWITCH_STRINGS)
+			INS_POINTER((POINTER_INT)PROG_STRING(pn->r.number));
+		    else
+			INS_POINTER((POINTER_INT)pn->r.expr);
 		    ins_short((short)pn->v.number);
 		    pn = pn->l.expr;
 		    table_size += 1;
@@ -560,7 +566,7 @@ i_generate_node P1(struct parse_node *, expr) {
 		    power_of_two <<= 1;
 		    i++;
 		}
-		if (expr->kind == NODE_SWITCH_NUMBERS)
+		if (expr->kind != NODE_SWITCH_STRINGS)
 		    mem_block[current_block].block[addr-1] = (char)(0xf0+i);
 		else
 		    mem_block[current_block].block[addr-1] = (char)(i*0x10+0x0f);
@@ -673,26 +679,11 @@ i_generate_node P1(struct parse_node *, expr) {
 	ins_byte((expr->r.expr ? expr->r.expr->kind : 0));
 	break;
     case F_EVALUATE:
-#ifdef NEW_FUNCTIONS
 	generate_expr_list(expr->r.expr);
 	ins_f_byte(F_EVALUATE);
-#else
-	i_generate_node(expr->l.expr);
-	ins_f_byte(F_EVALUATE);
-	generate_expr_list(expr->r.expr);
-	ins_f_byte(F_CALL_OTHER);
-#endif
 	ins_byte(expr->v.number);
 	break;
     case F_FUNCTION_CONSTRUCTOR:
-#ifdef NEW_FUNCTIONS
-	if ((expr->v.number & 0xff) == FP_CALL_OTHER) {
-	    i_generate_node(expr->l.expr);
-	    i_generate_node(expr->r.expr);
-	    ins_f_byte(F_FUNCTION_CONSTRUCTOR);
-	    ins_f_byte(FP_CALL_OTHER);
-	    break;
-	}
 	if (expr->r.expr) {
 	    generate_expr_list(expr->r.expr);
 	    ins_f_byte(F_AGGREGATE);
@@ -725,14 +716,7 @@ i_generate_node P1(struct parse_node *, expr) {
 		break;
 	    }
 	}
-#else
-	if (expr->l.expr) i_generate_node(expr->l.expr);
-	i_generate_node(expr->r.expr);
-	ins_f_byte(F_FUNCTION_CONSTRUCTOR);
-	ins_byte(expr->v.number);
-#endif
 	break;
-#ifdef NEW_FUNCTIONS
     case NODE_ANON_FUNC:
 	{
 	    int addr;
@@ -747,7 +731,6 @@ i_generate_node P1(struct parse_node *, expr) {
 	    upd_short(addr, CURRENT_PROGRAM_SIZE - addr - 2);
 	    break;
 	}
-#endif
     default:
 	DEBUG_CHECK1(expr->kind < BASE,
 		     "Unknown eoperator %s in i_generate_node.\n",
@@ -756,14 +739,11 @@ i_generate_node P1(struct parse_node *, expr) {
 	ins_f_byte(expr->kind);
 	if (expr->v.number != -1)
 	    ins_byte(expr->v.number);
+	if (expr->type == TYPE_NOVALUE) {
+	    /* the value of a void efun was used.  Put in a zero. */
+	    ins_byte(F_CONST0);
+	}
    }
-}
-
-void
-i_generate_function_call P2(short, f, char, num) {
-  ins_f_byte(F_CALL_FUNCTION_BY_ADDRESS);
-  ins_short(f);
-  ins_byte(0);
 }
 
 void
@@ -773,20 +753,6 @@ i_generate_inherited_init_call P2(int, index, short, f) {
   ins_short(f);
   ins_byte(0);
   ins_f_byte(F_POP_VALUE);
-}
-
-void
-i_pop_value() {
-  ins_f_byte(F_POP_VALUE);
-}
-
-void i_generate_return P1(struct parse_node *, node) {
-  if (node) {
-    i_generate_node(node);
-  } else {
-    ins_f_byte(F_CONST0);
-  }
-  ins_f_byte(F_RETURN);
 }
 
 void i_generate___INIT() {
@@ -819,7 +785,7 @@ i_update_forward_branch() {
     current_forward_branch = i;
 }
 
-void i_update_forward_branch_links P2(char, kind, struct parse_node *, link_start){
+void i_update_forward_branch_links P2(char, kind, parse_node_t *, link_start){
     int i;
     i = read_short(current_forward_branch);
     upd_short(current_forward_branch, CURRENT_PROGRAM_SIZE - current_forward_branch);

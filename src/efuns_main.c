@@ -8,14 +8,13 @@
 */
 
 #include "std.h"
-#include "comm.h"
-#include "ed.h"
 #include "lpc_incl.h"
 #include "file_incl.h"
+#include "file.h"
+#include "comm.h"
 #include "parse.h"
 #include "sprintf.h"
 #include "backend.h"
-#include "array.h"
 #include "port.h"
 #include "swap.h"
 #include "strstr.h"
@@ -26,17 +25,18 @@
 #include "dumpstat.h"
 #include "efuns_main.h"
 #include "call_out.h"
-#include "array.h"
-#include "mapping.h"
 #include "debug.h"
 #include "ed.h"
+#ifdef LPC_TO_C
+#include "interface.h"
+#endif
 
 int call_origin = 0;
 
-static struct object *ob;
+static object_t *ob;
 
-int data_size PROT((struct object * ob));
-void reload_object PROT((struct object * obj));
+int data_size PROT((object_t * ob));
+void reload_object PROT((object_t * obj));
 
 #ifdef F_ADD_ACTION
 void
@@ -49,22 +49,21 @@ f_add_action PROT((void))
 	flag = (sp--)->u.number;
     } else flag = 0;
 
-    if (st_num_arg > 1){
-	if (sp->type == T_POINTER){
-	    int i, n = sp->u.vec->size;
-	    struct svalue *sv = sp->u.vec->item;
+    if (sp->type == T_ARRAY){
+	int i, n = sp->u.arr->size;
+	svalue_t *sv = sp->u.arr->item;
 
-	    for (i = 0; i < n; i++){
-		if (sv[i].type == T_STRING){
-		    add_action(sp-1, sv[i].u.string, flag);
-		}
+	for (i = 0; i < n; i++){
+	    if (sv[i].type == T_STRING){
+		add_action(sp-1, sv[i].u.string, flag);
 	    }
-	    free_vector((sp--)->u.vec);
-	} else {
-	    add_action((sp-1), sp->u.string, flag);
-	    free_string_svalue(sp--);
 	}
-    } else add_action(sp, 0, 0);
+	free_array((sp--)->u.arr);
+    } else {
+	add_action((sp-1), sp->u.string, flag);
+	free_string_svalue(sp--);
+    }
+    pop_stack();
 }
 #endif
 
@@ -72,10 +71,10 @@ f_add_action PROT((void))
 void
 f_all_inventory PROT((void))
 {
-    struct vector *vec = all_inventory(sp->u.ob, 0);
+    array_t *vec = all_inventory(sp->u.ob, 0);
     free_object(sp->u.ob, "f_all_inventory");
-    sp->type = T_POINTER;
-    sp->u.vec = vec;
+    sp->type = T_ARRAY;
+    sp->u.arr = vec;
 }
 #endif
 
@@ -83,8 +82,8 @@ f_all_inventory PROT((void))
 void
 f_allocate PROT((void))
 {
-    sp->u.vec = allocate_array(sp->u.number);
-    sp->type = T_POINTER;
+    sp->u.arr = allocate_array(sp->u.number);
+    sp->type = T_ARRAY;
 }
 #endif
 
@@ -92,7 +91,7 @@ f_allocate PROT((void))
 void
 f_allocate_buffer PROT((void))
 {
-    struct buffer *buf;
+    buffer_t *buf;
 
     buf = allocate_buffer(sp->u.number);
     if (buf) {
@@ -117,14 +116,14 @@ f_allocate_mapping PROT((void))
 void
 f_bind PROT((void))
 {
-    struct object *ob = sp->u.ob;
-    struct funp *old_fp = (sp-1)->u.fp;
-    struct funp *new_fp;
-    struct svalue *res;
+    object_t *ob = sp->u.ob;
+    funptr_t *old_fp = (sp-1)->u.fp;
+    funptr_t *new_fp;
+    svalue_t *res;
 
-    if (old_fp->type == (FP_LOCAL | FP_NOT_BINDABLE))
+    if (old_fp->hdr.type == (FP_LOCAL | FP_NOT_BINDABLE))
 	error("Illegal to rebind a pointer to a local function.\n");
-    if (old_fp->type & FP_NOT_BINDABLE)
+    if (old_fp->hdr.type & FP_NOT_BINDABLE)
 	error("Illegal to rebind a functional that references globals or local functions.\n");
     
     /* the object doing the binding */
@@ -134,10 +133,10 @@ f_bind PROT((void))
 	push_object(current_object);
 
     /* the old owner */
-    if (old_fp->owner->flags & O_DESTRUCTED)
+    if (old_fp->hdr.owner->flags & O_DESTRUCTED)
 	push_number(0);
     else
-	push_object(old_fp->owner);
+	push_object(old_fp->hdr.owner);
 
     /* the new owner */
     push_object(ob);
@@ -146,13 +145,12 @@ f_bind PROT((void))
     if (!MASTER_APPROVED(res))
 	error("Master object denied permission to bind() function pointer.\n");
     
-    new_fp = ALLOCATE(struct funp, TAG_FUNP, "f_bind");
+    new_fp = ALLOCATE(funptr_t, TAG_FUNP, "f_bind");
     *new_fp = *old_fp;
-    new_fp->owner = ob; /* one ref from being on stack */
-    assign_svalue_no_free(&new_fp->args, &old_fp->args);
-
-    if ((new_fp->type & 0x0f) == FP_FUNCTIONAL) 
-	new_fp->f.a.prog->p.i.func_ref++;
+    new_fp->hdr.owner = ob; /* one ref from being on stack */
+    new_fp->hdr.args->ref++;
+    if (old_fp->hdr.type & 0x0f == FP_FUNCTIONAL)
+	new_fp->f.functional.prog->func_ref++;
 
     free_funp(old_fp);
     sp--;
@@ -165,11 +163,11 @@ void
 f_break_string PROT((void))
 {
     char *str;
-    struct svalue *arg = sp - st_num_arg + 1;
+    svalue_t *arg = sp - st_num_arg + 1;
 
     if (arg->type == T_STRING) {
 	str = break_string(arg[0].u.string, arg[1].u.number,
-			   (st_num_arg > 2 ? &arg[2] : (struct svalue *) 0));
+			   (st_num_arg > 2 ? &arg[2] : (svalue_t *) 0));
 	if (st_num_arg > 2) free_svalue(sp--, "f_break_string");
 	free_string_svalue(--sp);
 	sp->subtype = STRING_MALLOC;
@@ -211,7 +209,7 @@ void f_cache_stats PROT((void))
 void
 f_call_other PROT((void))
 {
-    struct svalue *arg;
+    svalue_t *arg;
     char *funcname;
     int i;
     int num_arg = st_num_arg;
@@ -225,33 +223,28 @@ f_call_other PROT((void))
     arg = sp - num_arg + 1;
     if (arg[1].type == T_STRING)
 	funcname = arg[1].u.string;
-    else {			/* must be T_POINTER then */
-        struct vector *v = arg[1].u.vec;
-        struct svalue *sv;
+    else {			/* must be T_ARRAY then */
+        array_t *v = arg[1].u.arr;
+        svalue_t *sv;
 
         check_for_destr(v);
         if (((i = v->size) < 1) || !((sv = v->item)->type & T_STRING))
             error("call_other: 1st elem of array for arg 2 must be a string\n");
         funcname = sv->u.string;
-#ifdef NEW_FUNCTIONS
         num_arg = 2 + merge_arg_lists(num_arg - 2, v, 1);
-#else
-        while (--i) push_svalue(++sv);
-        num_arg += v->size - 1;
-#endif
     }
     if (arg[0].type == T_OBJECT)
 	ob = arg[0].u.ob;
-    else if (arg[0].type == T_POINTER) {
-	struct vector *ret;
+    else if (arg[0].type == T_ARRAY) {
+	array_t *ret;
 
-	ret = call_all_other(arg[0].u.vec, funcname, num_arg - 2);
+	ret = call_all_other(arg[0].u.arr, funcname, num_arg - 2);
         pop_stack();
-        free_vector(arg->u.vec);
-        sp->u.vec = ret;
+        free_array(arg->u.arr);
+        sp->u.arr = ret;
 	return;
     } else {
-        struct object *old_ob;
+        object_t *old_ob;
 	ob = find_object(arg[0].u.string);
 	if (!(old_ob = ob) || !object_visible(ob))
 	    error("call_other() couldn't find object\n");
@@ -284,14 +277,13 @@ f_call_other PROT((void))
 void
 f_call_out PROT((void))
 {
-    struct svalue *arg;
+    svalue_t *arg;
 
     arg = sp - st_num_arg + 1;
     if (!(current_object->flags & O_DESTRUCTED))
 	new_call_out(current_object, arg, arg[1].u.number,
 		     st_num_arg - 3, (st_num_arg >= 3) ? &arg[2] : 0);
     pop_n_elems(st_num_arg);
-    push_number(0);
 }
 #endif
 
@@ -299,7 +291,7 @@ f_call_out PROT((void))
 void
 f_call_out_info PROT((void))
 {
-    push_refed_vector(get_all_call_outs());
+    push_refed_array(get_all_call_outs());
 }
 #endif
 
@@ -328,11 +320,11 @@ f_capitalize PROT((void))
 void
 f_children PROT((void))
 {
-    struct vector *vec;
+    array_t *vec;
 
     vec = children(sp->u.string);
     free_string_svalue(sp);
-    put_vector(vec);
+    put_array(vec);
 }
 #endif
 
@@ -381,22 +373,30 @@ f_clonep PROT((void))
 }
 #endif
 
+#if defined(F_CLONE_OBJECT)
+void
+f_clone_object PROT((void))
+{
+    svalue_t *arg = sp - st_num_arg + 1;
+
+    CHECK_TYPES(arg, T_STRING, 1, F_CLONE_OBJECT);
+    ob = clone_object(arg->u.string, st_num_arg - 1);
+    free_string_svalue(sp);
+    if (ob) {
+	put_unrefed_undested_object(ob, "f_clone_object");
+    } else *sp = const0;
+}
+#endif
+
 #ifdef F_COMMAND
 void
 f_command PROT((void))
 {
     int i, num_arg = st_num_arg;
-    struct svalue *arg;
+    svalue_t *arg;
 
     arg = sp - num_arg + 1;
-#ifdef OLD_COMMAND
-    i = command_for_object(arg->u.string, (num_arg == 2) ? (arg+1)->u.ob : 0);
-#else
-    if ((num_arg == 2) && (arg[1].u.ob != current_object)) {
-        error("Use command(cmd) or command(cmd, this_object()).\n");
-    }
-    i = command_for_object(arg[0].u.string, 0);
-#endif
+    i = command_for_object(arg[0].u.string);
     pop_n_elems(num_arg);
     push_number(i);
 }
@@ -406,7 +406,7 @@ f_command PROT((void))
 void
 f_commands PROT((void))
 {
-    push_refed_vector(commands(current_object));
+    push_refed_array(commands(current_object));
 }
 #endif
 
@@ -481,7 +481,7 @@ f_ctime PROT((void))
 void
 f_deep_inherit_list PROT((void))
 {
-    struct vector *vec;
+    array_t *vec;
 
     if (!(sp->u.ob->flags & O_SWAPPED)) {
         vec = deep_inherit_list(sp->u.ob);
@@ -489,7 +489,7 @@ f_deep_inherit_list PROT((void))
         vec = null_array();
     }
     free_object(sp->u.ob, "f_deep_inherit_list");
-    put_vector(vec);
+    put_array(vec);
 }
 #endif
 
@@ -499,8 +499,7 @@ f_deep_inherit_list PROT((void))
 void
 f_set_debug_level PROT((void))
 {
-    debug_level = sp->u.number;
-    sp->u.number = 0;
+    debug_level = (sp--)->u.number;
 }
 #endif
 
@@ -510,11 +509,11 @@ f_set_debug_level PROT((void))
 void
 f_deep_inventory PROT((void))
 {
-    struct vector *vec;
+    array_t *vec;
 
     vec = deep_inventory(sp->u.ob, 0);
     free_object(sp->u.ob, "f_deep_inventory");
-    put_vector(vec);
+    put_array(vec);
 }
 #endif
 
@@ -523,7 +522,7 @@ void
 f_destruct PROT((void))
 {
     destruct_object(sp);
-    sp->u.number = 1; /* Reminder: remove_object_from_stack - Sym */
+    sp--; /* Ok since the object was removed from the stack */
 }
 #endif
 
@@ -532,7 +531,6 @@ void
 f_disable_commands PROT((void))
 {
     enable_commands(0);
-    push_number(0);
 }
 #endif
 
@@ -542,11 +540,9 @@ f_dumpallobj PROT((void))
 {
     if (st_num_arg) {
         dumpstat(sp->u.string);
-        free_string_svalue(sp);
-        put_number(0);
+        free_string_svalue(sp--);
     } else {
         dumpstat("/OBJ_DUMP");
-        push_number(0);
     }
 }
 #endif
@@ -557,22 +553,22 @@ f_dumpallobj PROT((void))
 void
 f_each PROT((void))
 {
-    struct mapping *m;
-    struct vector *v;
+    mapping_t *m;
+    array_t *v;
     int flag = (sp--)->u.number;
 
     m = sp->u.map;
     if (flag) {
         m->eachObj = current_object;
         m->bucket = 0;
-        m->elt = (struct node *) 0;
+        m->elt = (mapping_node_t *) 0;
         free_mapping(m);
         *sp = const0;
         return;
     }
     v = mapping_each(m);
     free_mapping(m);
-    put_vector(v);
+    put_array(v);
 }
 #endif
 
@@ -581,24 +577,21 @@ void
 f_ed PROT((void))
 {
     if (!command_giver || !command_giver->interactive) {
-        if (st_num_arg)
-            pop_n_elems(st_num_arg - 1);
-        else
-            push_number(0);
+	pop_n_elems(st_num_arg);
         return;
     }
 
     if (!st_num_arg) {
         /* ed() */
         ed_start(0, 0, 0, 0, 0);
-        push_number(1);
     } else if (st_num_arg == 1) {
         /* ed(fname) */
         ed_start(sp->u.string, 0, 0, 0, 0);
+	pop_stack();
     } else if (st_num_arg == 2) {
         /* ed(fname,exitfn) */
         ed_start((sp - 1)->u.string, 0, sp->u.string, 0, current_object);
-        pop_stack();
+        pop_2_elems();
     } else if (st_num_arg == 3) {
         /* ed(fname,exitfn,restricted) / ed(fname,writefn,exitfn) */
         if (sp->type & T_NUMBER) {
@@ -610,7 +603,7 @@ f_ed PROT((void))
 	} else {
             bad_argument(sp, T_NUMBER | T_STRING, 3, F_ED);
 	}
-        pop_n_elems(2);
+        pop_3_elems();
     } else {                    /* st_num_arg == 4 */
         /* ed(fname,writefn,exitfn,restricted) */
         if (!((sp - 1)->type & T_STRING))
@@ -619,6 +612,7 @@ f_ed PROT((void))
             bad_argument(sp, T_NUMBER, 4, F_ED);
         ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string,
                  sp->u.number, current_object);
+	pop_n_elems(4);
     }
 }
 #endif
@@ -687,7 +681,6 @@ void
 f_enable_commands PROT((void))
 {
     enable_commands(1);
-    push_number(1);
 }
 #endif
 
@@ -695,11 +688,8 @@ f_enable_commands PROT((void))
 void
 f_enable_wizard PROT((void))
 {
-    if (current_object->interactive) {
+    if (current_object->interactive)
 	current_object->flags |= O_IS_WIZARD;
-	push_number(1);
-    } else
-	push_number(0);
 }
 #endif
 
@@ -711,28 +701,12 @@ f_error PROT((void))
 }
 #endif
 
-#ifdef F_ERRORP
-void
-f_errorp PROT((void))
-{
-    if ((sp->type & T_NUMBER) && (sp->subtype & T_ERROR)) {
-        sp->u.number = 1;
-    } else {
-        free_svalue(sp, "f_errorp");
-        *sp = const0;
-    }
-}
-#endif
-
 #ifdef F_DISABLE_WIZARD
 void
 f_disable_wizard PROT((void))
 {
-    if (current_object->interactive) {
+    if (current_object->interactive)
 	current_object->flags &= ~O_IS_WIZARD;
-	push_number(1);
-    } else
-	push_number(0);
 }
 #endif
 
@@ -771,12 +745,12 @@ f_exec PROT((void))
 void
 f_explode PROT((void))
 {
-    struct vector *vec;
+    array_t *vec;
 
     vec = explode_string((sp - 1)->u.string, sp->u.string);
     free_string_svalue(sp--);
     free_string_svalue(sp);
-    put_vector(vec);
+    put_array(vec);
 }
 #endif
 
@@ -807,7 +781,7 @@ f_file_size PROT((void))
 void
 f_filter PROT((void))
 {
-    struct svalue *arg = sp - st_num_arg + 1;
+    svalue_t *arg = sp - st_num_arg + 1;
 
     if (arg->type & T_MAPPING) filter_mapping(arg, st_num_arg);
     else filter_array(arg, st_num_arg);
@@ -846,7 +820,7 @@ f_find_object PROT((void))
         ob = find_object2(sp->u.string);
     free_string_svalue(sp);
     if (ob) {
-	struct object *old_ob = ob;
+	object_t *old_ob = ob;
 	/* object_visible might change ob, a global - Sym */
         if (object_visible(ob)) { 
 	  /* find_object only returns undested objects */
@@ -875,9 +849,9 @@ f_find_player PROT((void))
 void
 f_function_profile PROT((void))
 {
-    struct vector *vec;
-    struct mapping *map;
-    struct program *prog;
+    array_t *vec;
+    mapping_t *map;
+    program_t *prog;
     int nf, j;
 
     ob = sp->u.ob;
@@ -885,20 +859,20 @@ f_function_profile PROT((void))
 	load_ob_from_swap(ob);
     }
     prog = ob->prog;
-    nf = prog->p.i.num_functions;
+    nf = prog->num_functions;
     vec = allocate_empty_array(nf);
     for (j = 0; j < nf; j++) {
 	map = allocate_mapping(3);
-	add_mapping_pair(map, "calls", prog->p.i.functions[j].calls);
-	add_mapping_pair(map, "self", prog->p.i.functions[j].self
-			 - prog->p.i.functions[j].children);
-	add_mapping_pair(map, "children", prog->p.i.functions[j].children);
-	add_mapping_shared_string(map, "name", prog->p.i.functions[j].name);
+	add_mapping_pair(map, "calls", prog->functions[j].calls);
+	add_mapping_pair(map, "self", prog->functions[j].self
+			 - prog->functions[j].children);
+	add_mapping_pair(map, "children", prog->functions[j].children);
+	add_mapping_shared_string(map, "name", prog->functions[j].name);
 	vec->item[j].type = T_MAPPING;
 	vec->item[j].u.map = map;
     }
     free_object(ob, "f_function_profile");
-    put_vector(vec);
+    put_array(vec);
 }
 #endif
 
@@ -926,14 +900,12 @@ void f_generate_source PROT((void))
     int i;
 
     if (st_num_arg == 2) {
-	i = generate_source((sp - 1)->u.string, sp->u.string);
+	i = generate_source(sp - 1, sp->u.string);
 	pop_stack();
     } else
-	i = generate_source(sp->u.string, 0);
+	i = generate_source(sp, 0);
     free_svalue(sp, "f_generate_source");
-    sp->type = T_NUMBER;
-    sp->subtype = 0;
-    sp->u.number = i;
+    put_number(i);
 }
 #endif
 
@@ -941,7 +913,7 @@ void f_generate_source PROT((void))
 void
 f_get_char PROT((void))
 {
-    struct svalue *arg;
+    svalue_t *arg;
     int i, tmp;
     int flag;
 
@@ -975,11 +947,11 @@ f_get_config PROT((void))
 void
 f_get_dir PROT((void))
 {
-    struct vector *vec;
+    array_t *vec;
 
     vec = get_dir((sp - 1)->u.string, sp->u.number);
     free_string_svalue(--sp);
-    if (vec) { put_vector(vec); }
+    if (vec) { put_array(vec); }
     else *sp = const0;
 }
 #endif
@@ -990,10 +962,10 @@ f_implode PROT((void))
 {
     char *str;
 
-    check_for_destr((sp - 1)->u.vec);
-    str = implode_string((sp - 1)->u.vec, sp->u.string);
+    check_for_destr((sp - 1)->u.arr);
+    str = implode_string((sp - 1)->u.arr, sp->u.string);
     free_string_svalue(sp--);
-    free_vector(sp->u.vec);
+    free_array(sp->u.arr);
     put_malloced_string(str);
 }
 #endif
@@ -1003,7 +975,7 @@ void
 f_in_edit PROT((void))
 {
     char *fn;
-    struct ed_buffer *eb = 0;
+    ed_buffer_t *eb = 0;
 
 #ifdef OLD_ED
     if (sp->u.ob->interactive)
@@ -1037,13 +1009,13 @@ f_in_input PROT((void))
 
 #ifdef F_INHERITS
 int
-inherits P2(struct program *, prog, struct program *, thep)
+inherits P2(program_t *, prog, program_t *, thep)
 {
-    int j, k = prog->p.i.num_inherited;
-    struct program *pg;
+    int j, k = prog->num_inherited;
+    program_t *pg;
 
     for (j = 0; j < k; j++) {
-        if ((pg = prog->p.i.inherit[j].prog) == thep)
+        if ((pg = prog->inherit[j].prog) == thep)
             return 1;
         if (!strcmp(pg->name, thep->name))
             return 2;
@@ -1056,7 +1028,7 @@ inherits P2(struct program *, prog, struct program *, thep)
 void
 f_inherits PROT((void))
 {
-    struct object *ob, *base;
+    object_t *ob, *base;
     int i;
 
     base = (sp--)->u.ob;
@@ -1079,7 +1051,7 @@ f_inherits PROT((void))
 void
 f_inherit_list PROT((void))
 {
-    struct vector *vec;
+    array_t *vec;
 
     if (!(sp->u.ob->flags & O_SWAPPED)) {
         vec = inherit_list(sp->u.ob);
@@ -1087,7 +1059,7 @@ f_inherit_list PROT((void))
         vec = null_array();
     }
     free_object(sp->u.ob, "f_inherit_list");
-    put_vector(vec);
+    put_array(vec);
 }
 #endif
 
@@ -1095,7 +1067,7 @@ f_inherit_list PROT((void))
 void
 f_input_to PROT((void))
 {
-    struct svalue *arg;
+    svalue_t *arg;
     int i, tmp;
     int flag;
 
@@ -1143,35 +1115,17 @@ f_intp PROT((void))
 void
 f_functionp PROT((void))
 {
-#ifdef NEW_FUNCTIONS
     int i;
-#endif
     
     if (sp->type & T_FUNCTION) {
-#ifdef NEW_FUNCTIONS
-        i = sp->u.fp->type;
-        if (sp->u.fp->args.type & T_POINTER) 
+        i = sp->u.fp->hdr.type;
+        if (sp->u.fp->hdr.args) 
 	    i |= FP_HAS_ARGUMENTS;
-	if (sp->u.fp->owner->flags & O_DESTRUCTED)
+	if (sp->u.fp->hdr.owner->flags & O_DESTRUCTED)
 	    i |= FP_OWNER_DESTED;
         free_funp(sp->u.fp);
         put_number(i);
         return;
-#else
-        if (((sp->u.fp->obj.type & T_OBJECT) &&
-             !(sp->u.fp->obj.u.ob->flags & O_DESTRUCTED)) ||
-            (sp->u.fp->obj.type & T_STRING))
-            {
-                if (sp->u.fp->fun.type & T_STRING) {
-                    assign_svalue(sp, &const1);
-                    return;
-		} else if (sp->u.fp->fun.type & T_POINTER) {
-                    pop_stack();
-                    push_number(2);
-                    return;
-		}
-	    }
-#endif
     }
     assign_svalue(sp, &const0);
 }
@@ -1181,11 +1135,11 @@ f_functionp PROT((void))
 void
 f_keys PROT((void))
 {
-    struct vector *vec;
+    array_t *vec;
 
     vec = mapping_indices(sp->u.map);
     free_mapping(sp->u.map);
-    put_vector(vec);
+    put_array(vec);
 }
 #endif
 
@@ -1193,11 +1147,11 @@ f_keys PROT((void))
 void
 f_values PROT((void))
 {
-    struct vector *vec;
+    array_t *vec;
 
     vec = mapping_values(sp->u.map);
     free_mapping(sp->u.map);
-    put_vector(vec);
+    put_array(vec);
 }
 #endif
 
@@ -1205,7 +1159,7 @@ f_values PROT((void))
 void
 f_link PROT((void))
 {
-    struct svalue *ret;
+    svalue_t *ret;
     int i;
 
     push_string((sp - 1)->u.string, STRING_CONSTANT);
@@ -1238,7 +1192,7 @@ f_living PROT((void))
 void
 f_livings PROT((void))
 {
-    push_refed_vector(livings());
+    push_refed_array(livings());
 }
 #endif
 
@@ -1252,18 +1206,43 @@ f_lower_case PROT((void))
         str = sp->u.string;
 
         for (; *str; str++)
-            if (isalpha(*str))
-                *str |= 'a' - 'A';
+            if (isupper(*str))
+                *str += 'a' - 'A';
     } else {
         char *result;
 
-        result = str = string_copy(sp->u.string, "lowercase");
+        result = str = string_copy(sp->u.string, "lower_case");
         for (; *str; str++)
-            if (isalpha(*str))
-                *str |= 'a' - 'A';
+            if (isupper(*str))
+                *str += 'a' - 'A';
         free_string_svalue(sp);
         sp->subtype = STRING_MALLOC;
         sp->u.string = result;
+    }
+}
+#endif
+
+#ifdef F_LPC_INFO
+void f_lpc_info PROT((void))
+{
+    interface_item_t *p = interface;
+    object_t *ob;
+
+    while (p->fname) {
+	add_vmessage("%s: ", p->fname);
+	ob = lookup_object_hash(p->fname);
+	if (ob) {
+	    if (ob->flags & O_COMPILED_PROGRAM) {
+		add_message("Not loaded, compiled version exists.\n");
+	    } else if (ob->prog->program_size == 0) {
+		add_message("loaded, compiled version in use.\n");
+	    } else {
+		add_message("loaded, but not using the compiled version.\n");
+	    }
+	} else {
+	    add_message("Something REALLY wierd happened; no record of the object.\n");
+	}
+	p++;
     }
 }
 #endif
@@ -1297,7 +1276,6 @@ void f_malloc_status PROT((void))
 #if (defined(WRAPPEDMALLOC) || defined(DEBUGMALLOC))
     dump_malloc_data();
 #endif
-    push_number(0);
 }
 #endif
 
@@ -1306,8 +1284,8 @@ void
 f_map_delete PROT((void))
 {
     mapping_delete((sp - 1)->u.map, sp);
-    pop_stack();		/* all functions must leave exactly 1 element
-				 * on stack */
+    pop_stack();
+    free_mapping((sp--)->u.map);
 }
 #endif
 
@@ -1329,10 +1307,10 @@ f_mapp PROT((void))
 void
 f_map PROT((void))
 {
-    struct svalue *arg = sp - st_num_arg + 1;
+    svalue_t *arg = sp - st_num_arg + 1;
 
     if (arg->type & T_MAPPING) map_mapping(arg, st_num_arg);
-    else if (arg->type & T_POINTER) map_array(arg, st_num_arg);
+    else if (arg->type & T_ARRAY) map_array(arg, st_num_arg);
     else map_string(arg, st_num_arg);
 }
 #endif
@@ -1367,11 +1345,11 @@ efun.
 void
 f_match_path PROT((void))
 {
-    struct svalue *value;
-    struct svalue string;
+    svalue_t *value;
+    svalue_t string;
     register char *src, *dst;
-    struct svalue *nvalue;
-    struct mapping *map;
+    svalue_t *nvalue;
+    mapping_t *map;
 
     value = &const0u;
 
@@ -1411,7 +1389,7 @@ f_match_path PROT((void))
 void
 f_member_array PROT((void))
 {
-    struct vector *v;
+    array_t *v;
     int i;
 
     if (st_num_arg > 2) {
@@ -1430,9 +1408,9 @@ f_member_array PROT((void))
             i = -1;
         free_string_svalue(sp--);
     } else {
-        int size = (v = sp->u.vec)->size;
-        struct svalue *sv;
-	struct svalue *find;
+        int size = (v = sp->u.arr)->size;
+        svalue_t *sv;
+	svalue_t *find;
 
         find = (sp - 1);
 
@@ -1447,8 +1425,8 @@ f_member_array PROT((void))
             case T_REAL:
                 if (find->u.real == sv->u.real) break;
                 continue;
-            case T_POINTER:
-                if (find->u.vec == sv->u.vec) break;
+            case T_ARRAY:
+                if (find->u.arr == sv->u.arr) break;
                 continue;
             case T_OBJECT:
 	    {
@@ -1479,7 +1457,7 @@ f_member_array PROT((void))
 	}
         if (i == size)
             i = -1;                     /* Return -1 for failure */
-        free_vector(v);
+        free_array(v);
 	free_svalue(find, "f_member_array");
 	sp--;
     }
@@ -1491,11 +1469,11 @@ f_member_array PROT((void))
 void
 f_message PROT((void))
 {
-    struct vector *use, *avoid;
+    array_t *use, *avoid;
     int num_arg = st_num_arg;
-    struct svalue *args;
+    svalue_t *args;
 
-    static struct vector vtmp1 =
+    static array_t vtmp1 =
     {1,
 #ifdef DEBUG
      1,
@@ -1505,7 +1483,7 @@ f_message PROT((void))
      {(mudlib_stats_t *) NULL, (mudlib_stats_t *) NULL}
 #endif
     };
-    static struct vector vtmp2 =
+    static array_t vtmp2 =
     {1,
 #ifdef DEBUG
      1,
@@ -1523,8 +1501,8 @@ f_message PROT((void))
 	vtmp1.item[0].u.ob = args[2].u.ob;
 	use = &vtmp1;
 	break;
-    case T_POINTER:
-	use = args[2].u.vec;
+    case T_ARRAY:
+	use = args[2].u.arr;
 	break;
     case T_STRING:
 	vtmp1.item[0].type = T_STRING;
@@ -1538,11 +1516,10 @@ f_message PROT((void))
 	    check_legal_string(args[1].u.string);
 	    add_message(args[1].u.string);
 	    pop_n_elems(num_arg);
-	    push_number(0);
 	    return;
 	}
     default:
-	bad_argument(&args[2], T_OBJECT | T_STRING | T_POINTER | T_NUMBER,
+	bad_argument(&args[2], T_OBJECT | T_STRING | T_ARRAY | T_NUMBER,
 		     3, F_MESSAGE);
     }
     if (num_arg == 4) {
@@ -1552,8 +1529,8 @@ f_message PROT((void))
 	    vtmp2.item[0].u.ob = args[3].u.ob;
 	    avoid = &vtmp2;
 	    break;
-	case T_POINTER:
-	    avoid = args[3].u.vec;
+	case T_ARRAY:
+	    avoid = args[3].u.arr;
 	    break;
 	default:
 	    avoid = null_array();
@@ -1562,7 +1539,6 @@ f_message PROT((void))
 	avoid = null_array();
     do_message(&args[0], args[1].u.string, use, avoid, 1);
     pop_n_elems(num_arg);
-    push_number(0);
     return;
 }
 #endif
@@ -1589,7 +1565,7 @@ f_mkdir PROT((void))
 void
 f_move_object PROT((void))
 {
-    struct object *o1, *o2;
+    object_t *o1, *o2;
 
     /* get destination */
     if (sp->type & T_OBJECT)
@@ -1598,24 +1574,12 @@ f_move_object PROT((void))
         if (!(o2 = find_object(sp->u.string)) || !object_visible(o2))
             error("move_object failed: could not find destination\n");
     }
-
-    /* get source */
-    if (st_num_arg == 1) {
-        if ((o1 = current_object)->flags & O_DESTRUCTED)
-            error("move_object(): can't move a destructed object\n");
-
-	move_object(o1, o2);
-    } else {
-        if ((sp - 1)->type & T_OBJECT)
-            o1 = (sp - 1)->u.ob;
-        else {
-            if (!(o1 = find_object((sp - 1)->u.string)))
-                error("move_object(): can't move non-existent object\n");
-	}
-	move_object(o1, o2);
-	pop_stack();
-    }
-
+    
+    if ((o1 = current_object)->flags & O_DESTRUCTED)
+	error("move_object(): can't move a destructed object\n");
+    
+    move_object(o1, o2);
+    pop_stack();
 }
 #endif
 
@@ -1624,8 +1588,7 @@ void f_mud_status PROT((void))
 {
     int tot, res, verbose = 0;
 
-    verbose = sp->u.number;
-    pop_stack();
+    verbose = (sp--)->u.number;
 
     if (reserved_area)
 	res = RESERVED_SIZE;
@@ -1673,7 +1636,7 @@ void f_mud_status PROT((void))
     } else {
 	/* !verbose */
 	add_vmessage("Sentences:\t\t\t%8d %8d\n", tot_alloc_sentence,
-		    tot_alloc_sentence * sizeof(struct sentence));
+		    tot_alloc_sentence * sizeof(sentence_t));
 	add_vmessage("Objects:\t\t\t%8d %8d\n",
 		    tot_alloc_object, tot_alloc_object_size);
 	add_vmessage("Prog blocks:\t\t\t%8d %8d\n",
@@ -1684,7 +1647,7 @@ void f_mud_status PROT((void))
 		    total_mapping_size);
 	add_vmessage("Mappings(nodes):\t\t%8d\n", total_mapping_nodes);
 	add_vmessage("Interactives:\t\t\t%8d %8d\n", total_users,
-		    total_users * sizeof(struct interactive));
+		    total_users * sizeof(interactive_t));
 
 	tot = show_otable_status(verbose) +
 	    heart_beat_status(verbose) +
@@ -1695,32 +1658,15 @@ void f_mud_status PROT((void))
     tot += total_prog_block_size +
 	total_array_size +
 	total_mapping_size +
-	tot_alloc_sentence * sizeof(struct sentence) +
+	tot_alloc_sentence * sizeof(sentence_t) +
 	tot_alloc_object_size +
-	total_users * sizeof(struct interactive) +
+	total_users * sizeof(interactive_t) +
 	res;
 
     if (!verbose) {
 	add_message("\t\t\t\t\t --------\n");
 	add_vmessage("Total:\t\t\t\t\t %8d\n", tot);
     }
-
-    push_number(0);
-}
-#endif
-
-#if defined(F_NEW)
-void
-f_new PROT((void))
-{
-    struct svalue *arg = sp - st_num_arg + 1;
-
-    CHECK_TYPES(arg, T_STRING, 1, F_NEW);
-    ob = clone_object(arg->u.string, st_num_arg - 1);
-    free_string_svalue(sp);
-    if (ob) {
-	put_unrefed_undested_object(ob, "F_NEW");
-    } else *sp = const0;
 }
 #endif
 
@@ -1730,13 +1676,12 @@ f_notify_fail PROT((void))
 {
     if (sp->type == T_STRING) {
 	set_notify_fail_message(sp->u.string);
-	free_string_svalue(sp);
+	free_string_svalue(sp--);
     }
     else {
 	set_notify_fail_function(sp->u.fp);
-	free_funp(sp->u.fp);
+	free_funp((sp--)->u.fp);
     }
-    *sp = const0;
 }
 #endif
 
@@ -1776,12 +1721,9 @@ f_opcprof PROT((void))
 {
     if (st_num_arg == 1) {
         opcdump(sp->u.string);
-        free_string_svalue(sp);
-        *sp = const0;
-        return;
-    }
-    opcdump("/OPCPROF");
-    *++sp = const0;
+        free_string_svalue(sp--);
+    } else
+	opcdump("/OPCPROF");
 }
 #endif
 
@@ -1797,8 +1739,8 @@ f_origin PROT((void))
 void
 f_pointerp PROT((void))
 {
-    if (sp->type & T_POINTER){
-        free_vector(sp->u.vec);
+    if (sp->type & T_ARRAY){
+        free_array(sp->u.arr);
         *sp = const1;
     } else {
         free_svalue(sp, "f_pointerp");
@@ -1812,7 +1754,7 @@ void
 f_present PROT((void))
 {
     int num_arg = st_num_arg;
-    struct svalue *arg = sp - num_arg + 1;
+    svalue_t *arg = sp - num_arg + 1;
 
 #ifdef LAZY_RESETS
     if (num_arg == 2) {
@@ -1830,7 +1772,7 @@ f_present PROT((void))
 void
 f_previous_object PROT((void))
 {
-    struct control_stack *p;
+    control_stack_t *p;
     int i;
 
     if ((i = sp->u.number) > 0) {
@@ -1847,7 +1789,7 @@ f_previous_object PROT((void))
 	    }
 	} while (--p >= control_stack);
     } else if (i == -1) {
-        struct vector *v;
+        array_t *v;
 
         i = previous_ob ? 1 : 0;
         p = csp;
@@ -1874,7 +1816,7 @@ f_previous_object PROT((void))
 		i++;
 	    }
 	} while (--p >= control_stack);
-        put_vector(v);
+        put_array(v);
         return;
     } else if (i < 0) {
         error("Illegal negative argument to previous_object()\n");
@@ -1896,7 +1838,7 @@ f_printf PROT((void))
     if (command_giver)
         tell_object(command_giver, string_print_formatted((sp - num_arg + 1)->u.string,
                                             num_arg - 1, sp - num_arg + 2));
-    pop_n_elems(num_arg - 1);
+    pop_n_elems(num_arg);
 }
 #endif
 
@@ -1918,7 +1860,7 @@ f_process_string PROT((void))
 void
 f_process_value PROT((void))
 {
-    struct svalue *ret;
+    svalue_t *ret;
 
     ret = process_value(sp->u.string);
     free_string_svalue(sp);
@@ -2070,7 +2012,7 @@ f_read_bytes PROT((void))
 {
     char *str;
     int start = 0, len = 0, rlen = 0, num_arg = st_num_arg;
-    struct svalue *arg;
+    svalue_t *arg;
 
     arg = sp - num_arg + 1;
     if (num_arg > 1)
@@ -2096,7 +2038,7 @@ f_read_buffer PROT((void))
     char *str;
     int start = 0, len = 0, rlen = 0, num_arg = st_num_arg;
     int from_file = 0;          /* new line */
-    struct svalue *arg = sp - num_arg + 1;
+    svalue_t *arg = sp - num_arg + 1;
 
     if (num_arg > 1) {
        start = arg[1].u.number;
@@ -2115,7 +2057,7 @@ f_read_buffer PROT((void))
     if (str == 0) {
         push_number(0);
     } else if (from_file) {     /* changed */
-        struct buffer *buf;
+        buffer_t *buf;
 
         buf = allocate_buffer(rlen);
         memcpy(buf->item, str, rlen);
@@ -2155,39 +2097,38 @@ void
 f_receive PROT((void))
 {
     if (current_object->interactive) {
-	struct object *save_command_giver = command_giver;
+	object_t *save_command_giver = command_giver;
 
 	check_legal_string(sp->u.string);
 	command_giver = current_object;
 	add_message(sp->u.string);
 	command_giver = save_command_giver;
 	assign_svalue(sp, &const1);
-    } else {
-	assign_svalue(sp, &const0);
     }
+    free_string_svalue(sp--);
 }
 #endif
 
 #ifdef F_REG_ASSOC
 void
 f_reg_assoc PROT((void)) {
-    struct svalue *arg;
-    struct vector *vec;
+    svalue_t *arg;
+    array_t *vec;
 
     arg = sp - st_num_arg + 1;
     
-    if (!(arg[2].type & T_POINTER))
+    if (!(arg[2].type & T_ARRAY))
 	error("Bad argument 3 to reg_assoc()\n");
     
-    vec = reg_assoc(arg[0].u.string, arg[1].u.vec, arg[2].u.vec, st_num_arg > 3 ? &arg[3] : &const0);
+    vec = reg_assoc(arg[0].u.string, arg[1].u.arr, arg[2].u.arr, st_num_arg > 3 ? &arg[3] : &const0);
 
     if (st_num_arg == 4)
 	pop_3_elems();
     else
 	pop_2_elems();
     free_string_svalue(sp);
-    sp->type = T_POINTER;
-    sp->u.vec = vec;
+    sp->type = T_ARRAY;
+    sp->u.arr = vec;
 }
 #endif
 
@@ -2195,19 +2136,19 @@ f_reg_assoc PROT((void)) {
 void
 f_regexp PROT((void))
 {
-    struct vector *v;
+    array_t *v;
     int flag;
     
     if (st_num_arg > 2){
         if (!(sp->type & T_NUMBER)) error("Bad argument 3 to regexp()\n");
 	flag = (sp--)->u.number;
     } else flag = 0;
-    v = match_regexp((sp - 1)->u.vec, sp->u.string, flag);
+    v = match_regexp((sp - 1)->u.arr, sp->u.string, flag);
 
     free_string_svalue(sp--);
-    free_vector(sp->u.vec);
+    free_array(sp->u.arr);
     if (!v) *sp = const0;
-    else sp->u.vec = v;
+    else sp->u.arr = v;
 }
 #endif
 
@@ -2278,7 +2219,7 @@ f_replace_string PROT((void))
     int plen, rlen, dlen, first, last, cur;
     char *src, *pattern, *replace;
     register char *dst1, *dst2;
-    struct svalue *arg;
+    svalue_t *arg;
 
     if (st_num_arg > 5) {
         error("Too many args to replace_string.\n");
@@ -2420,7 +2361,7 @@ f_restore_object PROT((void))
 #ifdef F_RESTORE_VARIABLE
 void
 f_restore_variable PROT((void)) {
-    struct svalue v;
+    svalue_t v;
     char *s = string_copy(sp->u.string, "restore_variable");
     
     v.type = T_NUMBER;
@@ -2490,8 +2431,8 @@ f_save_variable PROT((void)) {
 void
 f_say PROT((void))
 {
-    struct vector *avoid;
-    static struct vector vtmp =
+    array_t *avoid;
+    static array_t vtmp =
     {1,
 #ifdef DEBUG
      1,
@@ -2505,16 +2446,17 @@ f_say PROT((void))
     if (st_num_arg == 1) {
 	avoid = null_array();
 	say(sp, avoid);
+	pop_stack();
     } else {
 	if (sp->type == T_OBJECT) {
 	    vtmp.item[0].type = T_OBJECT;
 	    vtmp.item[0].u.ob = sp->u.ob;
 	    avoid = &vtmp;
-	} else {		/* must be a vector... */
-	    avoid = sp->u.vec;
+	} else {		/* must be a array... */
+	    avoid = sp->u.arr;
 	}
 	say(sp - 1, avoid);
-	pop_stack();
+	pop_2_elems();
     }
 }
 #endif
@@ -2582,7 +2524,7 @@ f_set_bit PROT((void))
 void
 f_set_heart_beat PROT((void))
 {
-    sp->u.number = set_heart_beat(current_object, sp->u.number);
+    set_heart_beat(current_object, (sp--)->u.number);
 }
 #endif
 
@@ -2601,7 +2543,7 @@ f_set_hide PROT((void))
 {
     if (!valid_hide(current_object))
 	return;
-    if (sp->u.number) {
+    if ((sp--)->u.number) {
 	if (!(current_object->flags & O_HIDDEN) && current_object->interactive)
 	    num_hidden++;
 	current_object->flags |= O_HIDDEN;
@@ -2617,7 +2559,7 @@ f_set_hide PROT((void))
 void
 f_set_light PROT((void))
 {
-    struct object *o1;
+    object_t *o1;
 
 #ifdef NO_LIGHT
     sp->u.number = 1;
@@ -2636,6 +2578,7 @@ void
 f_set_living_name PROT((void))
 {
     set_living_name(current_object, sp->u.string);
+    free_string_svalue(sp--);
 }
 #endif
 
@@ -2643,7 +2586,7 @@ f_set_living_name PROT((void))
 void
 f_set_privs PROT((void))
 {
-    struct object *ob;
+    object_t *ob;
 
     ob = (sp - 1)->u.ob;
     if (ob->privs != NULL)
@@ -2654,7 +2597,7 @@ f_set_privs PROT((void))
         ob->privs = make_shared_string(sp->u.string);
     free_string_svalue(sp--);
     free_object(ob, "f_set_privs");
-    *sp = const0;
+    sp--;
 }
 #endif
 
@@ -2662,7 +2605,7 @@ f_set_privs PROT((void))
 void
 f_shadow PROT((void))
 {
-    struct object *ob;
+    object_t *ob;
 
     ob = (sp - 1)->u.ob;
     if (!((sp--)->u.number)) {
@@ -2706,6 +2649,7 @@ void
 f_shout PROT((void))
 {
     shout_string(sp->u.string);
+    free_string_svalue(sp--);
 }
 #endif
 
@@ -2724,9 +2668,9 @@ f_sizeof PROT((void))
     int i;
 
     switch (sp->type) {
-    case T_POINTER:
-	i = sp->u.vec->size;
-	free_vector(sp->u.vec);
+    case T_ARRAY:
+	i = sp->u.arr->size;
+	free_array(sp->u.arr);
 	break;
     case T_MAPPING:
 	i = sp->u.map->count;
@@ -2805,7 +2749,7 @@ f_stat PROT((void))
 {
     struct stat buf;
     char *path;
-    struct vector *v;
+    array_t *v;
 
     path = check_valid_path((--sp)->u.string, current_object, "stat", 0);
     if (!path) {
@@ -2829,13 +2773,13 @@ f_stat PROT((void))
             else
                 v->item[2].u.number = 0;
             free_string_svalue(sp);
-            put_vector(v);
+            put_array(v);
             return;
 	}
     }
     v = get_dir(sp->u.string, (sp+1)->u.number);
     free_string_svalue(sp);
-    if (v) { put_vector(v); }
+    if (v) { put_array(v); }
     else *sp = const0;
 }
 #endif
@@ -2956,16 +2900,20 @@ f_bufferp PROT((void))
 void
 f_swap PROT((void))
 {
-    struct object *ob = sp->u.ob;
-    struct control_stack *p;
+    object_t *ob = sp->u.ob;
+    control_stack_t *p;
 
     /* a few sanity checks */
-    if (ob->flags & O_SWAPPED) return;
-    if (ob == current_object) return;
-    for (p = csp; p >= control_stack; p--)
-	if (ob == csp->ob) return;
+    if (!(ob->flags & O_SWAPPED) && (ob != current_object)) {
+	for (p = csp; p >= control_stack; p--)
+	    if (ob == csp->ob) {
+		pop_stack();
+		return;
+	    }
+	(void) swap(sp->u.ob);
+    }
 
-    (void) swap(sp->u.ob);
+    pop_stack();
 }
 #endif
 
@@ -2990,6 +2938,7 @@ f_tell_object PROT((void))
 {
     tell_object((sp - 1)->u.ob, sp->u.string);
     free_string_svalue(sp--);
+    pop_stack();
 }
 #endif
 
@@ -2997,9 +2946,9 @@ f_tell_object PROT((void))
 void
 f_tell_room PROT((void))
 {
-    struct vector *avoid;
+    array_t *avoid;
     int num_arg = st_num_arg;
-    struct svalue *arg = sp - num_arg + 1;
+    svalue_t *arg = sp - num_arg + 1;
 
     if (arg->type & T_OBJECT) {
         ob = arg[0].u.ob;
@@ -3012,15 +2961,15 @@ f_tell_room PROT((void))
     if (num_arg == 2) {
         avoid = null_array();
     } else {
-        CHECK_TYPES(arg + 2, T_POINTER, 3, F_TELL_ROOM);
-        avoid = arg[2].u.vec;
+        CHECK_TYPES(arg + 2, T_ARRAY, 3, F_TELL_ROOM);
+        avoid = arg[2].u.arr;
     }
 
     tell_room(ob, &arg[1], avoid);
-    free_vector(avoid);
+    free_array(avoid);
     free_svalue(arg + 1, "f_tell_room");
     free_svalue(arg, "f_tell_room");
-    *(sp = arg) = const0;
+    sp = arg - 1;
 }
 #endif
 
@@ -3079,8 +3028,9 @@ f_set_this_player PROT((void))
 {
     if (sp->type & T_NUMBER)
 	command_giver = 0;
-    else 
+    else
 	command_giver = sp->u.ob;
+    pop_stack();
 }
 #endif
 
@@ -3205,7 +3155,7 @@ f_userp PROT((void))
 void
 f_users PROT((void))
 {
-    push_refed_vector(users());
+    push_refed_array(users());
 }
 #endif
 
@@ -3238,8 +3188,7 @@ void
 f_write PROT((void))
 {
     do_write(sp);
-    free_svalue(sp, "f_write");
-    *sp = const0;
+    pop_stack();
 }
 #endif
 
@@ -3362,7 +3311,6 @@ void
 f_dump_file_descriptors PROT((void))
 {
     dump_file_descriptors();
-    *++sp = const0;
 }
 #endif
 
@@ -3390,8 +3338,8 @@ f_memory_info PROT((void))
 	    total_array_size +
 	    total_mapping_size +
 	    tot_alloc_object_size +
-	    tot_alloc_sentence * sizeof(struct sentence) +
-	    total_users * sizeof(struct interactive) +
+	    tot_alloc_sentence * sizeof(sentence_t) +
+	    total_users * sizeof(interactive_t) +
 	    show_otable_status(-1) +
 	    heart_beat_status(-1) +
 	    add_string_status(-1) +
@@ -3402,11 +3350,11 @@ f_memory_info PROT((void))
     if (sp->type != T_OBJECT)
 	bad_argument(sp, T_OBJECT, 1, F_MEMORY_INFO);
     ob = sp->u.ob;
-    if (ob->prog && (ob->prog->p.i.ref == 1 || !(ob->flags & O_CLONE)))
-	mem = ob->prog->p.i.total_size;
+    if (ob->prog && (ob->prog->ref == 1 || !(ob->flags & O_CLONE)))
+	mem = ob->prog->total_size;
     else
 	mem = 0;
-    mem += (data_size(ob) + sizeof(struct object));
+    mem += (data_size(ob) + sizeof(object_t));
     free_object(ob, "f_memory_info");
     put_number(mem);
 }
@@ -3417,8 +3365,7 @@ void
 f_reload_object PROT((void))
 {
     reload_object(sp->u.ob);
-    free_object(sp->u.ob, "f_reload_object");
-    *sp = const0;
+    free_object((sp--)->u.ob, "f_reload_object");
 }
 #endif
 
@@ -3444,12 +3391,11 @@ f_set_reset PROT((void))
     if (st_num_arg == 2) {
         (sp - 1)->u.ob->next_reset = current_time + sp->u.number;
         free_object((--sp)->u.ob, "f_set_reset:1");
-        *sp = const0;
+        sp--;
     } else {
         sp->u.ob->next_reset = current_time + TIME_TO_RESET / 2 +
             random_number(TIME_TO_RESET / 2);
-        free_object(sp->u.ob, "f_set_reset:2");
-        *sp = const0;
+        free_object((sp--)->u.ob, "f_set_reset:2");
     }
 }
 #endif
@@ -3488,7 +3434,7 @@ f_next_inventory PROT((void))
     free_object(sp->u.ob, "f_next_inventory");
     while (ob) {
         if (ob->flags & O_HIDDEN) {
-	    struct object *old_ob = ob;
+	    object_t *old_ob = ob;
             if (object_visible(ob)) {
 	        add_ref(old_ob, "next_inventory(ob) : 1");
                 sp->u.ob = old_ob;

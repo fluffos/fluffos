@@ -56,6 +56,7 @@
 #include "efuns_incl.h"
 #include "simul_efun.h"
 #include "ignore.h"
+#include "lex.h"
 
 /*
  * If this #define is defined then error messages are returned,
@@ -317,7 +318,7 @@ static void add_indent P3(char **, dst, int *, size, int, indent)
  * and returns a pointer to this string.
  * Scary number of parameters for a recursive function.
  */
-void svalue_to_string P6(struct svalue *, obj, char **, str, int, size, int, indent, int, trailing, int, indent2)
+void svalue_to_string P6(svalue_t *, obj, char **, str, int, size, int, indent, int, trailing, int, indent2)
 {
     int i;
 
@@ -347,16 +348,27 @@ void svalue_to_string P6(struct svalue *, obj, char **, str, int, size, int, ind
 	stradd(str, &size, obj->u.string);
 	stradd(str, &size, "\"");
 	break;
-    case T_POINTER:
-	if (!(obj->u.vec->size)) {
+    case T_CLASS:
+	stradd(str, &size, "CLASS( ");
+	numadd(str, &size, obj->u.arr->size);
+	stradd(str, &size, "elements\n");
+	for (i = 0; i < (obj->u.arr->size) - 1; i++)
+	    svalue_to_string(&(obj->u.arr->item[i]), str, size, indent + 2, 1, 0);
+	svalue_to_string(&(obj->u.arr->item[i]), str, size, indent + 2, 0, 0);
+	stradd(str, &size, "\n");
+	add_indent(str, &size, indent);
+	stradd(str, &size, " )");
+	break;
+    case T_ARRAY:
+	if (!(obj->u.arr->size)) {
 	    stradd(str, &size, "({ })");
 	} else {
 	    stradd(str, &size, "({ /* sizeof() == ");
-	    numadd(str, &size, obj->u.vec->size);
+	    numadd(str, &size, obj->u.arr->size);
 	    stradd(str, &size, " */\n");
-	    for (i = 0; i < (obj->u.vec->size) - 1; i++)
-		svalue_to_string(&(obj->u.vec->item[i]), str, size, indent + 2, 1, 0);
-	    svalue_to_string(&(obj->u.vec->item[i]), str, size, indent + 2, 0, 0);
+	    for (i = 0; i < (obj->u.arr->size) - 1; i++)
+		svalue_to_string(&(obj->u.arr->item[i]), str, size, indent + 2, 1, 0);
+	    svalue_to_string(&(obj->u.arr->item[i]), str, size, indent + 2, 0, 0);
 	    stradd(str, &size, "\n");
 	    add_indent(str, &size, indent);
 	    stradd(str, &size, "})");
@@ -366,64 +378,56 @@ void svalue_to_string P6(struct svalue *, obj, char **, str, int, size, int, ind
 	stradd(str, &size, "<buffer>");
 	break;
     case T_FUNCTION:
-	stradd(str, &size, "(: ");
-#ifdef NEW_FUNCTIONS
-	switch (obj->u.fp->type) {
-	case FP_CALL_OTHER:
-	    svalue_to_string(&(obj->u.fp->f.obj), str, size, indent, trailing, 0);
-	    if (obj->u.fp->args.type != T_POINTER){
-		stradd(str, &size, ", ");
-		svalue_to_string(&(obj->u.fp->args), str, size, indent, 0, 0);
-	    }
-	    break;
-	case FP_LOCAL | FP_NOT_BINDABLE:
-	    stradd(str, &size, 
-		   obj->u.fp->owner->prog->p.i.functions[obj->u.fp->f.index].name);
-	    break;
-	case FP_SIMUL:
-	    stradd(str, &size, simuls[obj->u.fp->f.index]->name);
-	    break;
-	case FP_FUNCTIONAL:
-	case FP_FUNCTIONAL | FP_NOT_BINDABLE:
-	    {
-		char buf[10];
-		int n = obj->u.fp->f.a.num_args;
+	{
+	    svalue_t tmp;
+	    tmp.type = T_ARRAY;
 
-		stradd(str, &size, "<code>(");
-		for (i=1; i < n; i++) {
-		     sprintf(buf, "$%i, ", i);
-		     stradd(str, &size, buf);
-		}
-		if (n) {
-		     sprintf(buf, "$%i", n);
-		     stradd(str, &size, buf);
-		}
-		stradd(str, &size, ")");
+	    stradd(str, &size, "(: ");
+	    switch (obj->u.fp->hdr.type) {
+	    case FP_LOCAL | FP_NOT_BINDABLE:
+		stradd(str, &size, 
+		       obj->u.fp->hdr.owner->prog->functions[obj->u.fp->f.local.index].name);
 		break;
-	    }
-	case FP_EFUN:
-	    {
-		int i;
-		i = obj->u.fp->f.opcodes[0];
+	    case FP_SIMUL:
+		stradd(str, &size, simuls[obj->u.fp->f.simul.index]->name);
+		break;
+	    case FP_FUNCTIONAL:
+	    case FP_FUNCTIONAL | FP_NOT_BINDABLE:
+		{
+		    char buf[10];
+		    int n = obj->u.fp->f.functional.num_arg;
+		    
+		    stradd(str, &size, "<code>(");
+		    for (i=1; i < n; i++) {
+			sprintf(buf, "$%i, ", i);
+			stradd(str, &size, buf);
+		    }
+		    if (n) {
+			sprintf(buf, "$%i", n);
+			stradd(str, &size, buf);
+		    }
+		    stradd(str, &size, ")");
+		    break;
+		}
+	    case FP_EFUN:
+		{
+		    int i;
+		    i = obj->u.fp->f.efun.opcodes[0];
 #ifdef NEEDS_CALL_EXTRA
-		if (i == F_CALL_EXTRA) {
-		    i = obj->u.fp->f.opcodes[1] + 0xff;
+		    if (i == F_CALL_EXTRA) {
+			i = obj->u.fp->f.efun.opcodes[1] + 0xff;
+		    }
+#endif
+		    stradd(str, &size, instrs[i].name);
+		    break;
 		}
-#endif
-		stradd(str, &size, instrs[i].name);
-		break;
 	    }
+	    if (obj->u.fp->hdr.args) {
+		stradd(str, &size, ", ");
+		for (i=0; i<obj->u.fp->hdr.args->size; i++)
+		    svalue_to_string(&(obj->u.fp->hdr.args->item[i]), str, size, indent, 0, 0);
+	    } 
 	}
-	if (obj->u.fp->args.type == T_POINTER) {
-	    stradd(str, &size, ", ");
-	    for (i=0; i<obj->u.fp->args.u.vec->size; i++)
-		svalue_to_string(&(obj->u.fp->args.u.vec->item[i]), str, size, indent, 0, 0);
-	} 
-#else
-        svalue_to_string(&(obj->u.fp->obj), str, size, indent + 2, trailing, 0);
-        stradd(str, &size, ", ");
-        svalue_to_string(&(obj->u.fp->fun), str, size, indent + 2, trailing, 0);
-#endif
 	stradd(str, &size, " :)");
 	break;
     case T_MAPPING:
@@ -434,7 +438,7 @@ void svalue_to_string P6(struct svalue *, obj, char **, str, int, size, int, ind
 	    numadd(str, &size, obj->u.map->count);
 	    stradd(str, &size, " */\n");
 	    for (i = 0; i <= (int) (obj->u.map->table_size); i++) {
-		struct node *elm;
+		mapping_node_t *elm;
 
 		for (elm = obj->u.map->table[i]; elm; elm = elm->next) {
 		    svalue_to_string(&(elm->values[0]), str, size, indent + 2, 0, 0);
@@ -448,7 +452,7 @@ void svalue_to_string P6(struct svalue *, obj, char **, str, int, size, int, ind
 	break;
     case T_OBJECT:
 	{
-	    struct svalue *temp;
+	    svalue_t *temp;
 
 	    stradd(str, &size, obj->u.ob->name);
 	    push_object(obj->u.ob);
@@ -701,12 +705,12 @@ static int add_table P2(cst **, table, short int, trailing)
  * this function is called again, or if it's going to be modified (esp.
  * if it risks being free()ed).
  */
-char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, argv)
+char *string_print_formatted P3(char *, format_str, int, argc, svalue_t *, argv)
 {
     format_info finfo;
     savechars *saves = 0;	/* chars to restore */
     cst *csts;			/* list of columns/tables to be done */
-    struct svalue *carg;	/* current arg */
+    svalue_t *carg;	/* current arg */
     VOLATILE unsigned int nelemno = 0;	/* next offset into array */
     unsigned int fpos;		/* position in format_str */
     VOLATILE SIGNED int arg = 0;	/* current arg number */
@@ -1018,20 +1022,20 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 	     * now handle the different arg types...
 	     */
 	    if (finfo & INFO_ARRAY) {
-		if (carg->type != T_POINTER)
+		if (carg->type != T_ARRAY)
 		    ERROR(ERR_ARRAY_EXPECTED);
-		if (carg->u.vec->size == 0) {
+		if (carg->u.arr->size == 0) {
 		    fpos--;	/* 'bout to get incremented */
 		    continue;
 		}
-		carg = (argv + arg)->u.vec->item;
+		carg = (argv + arg)->u.arr->item;
 		nelemno = 1;	/* next element number */
 	    }
 	    while (1) {
-	        struct svalue *clean = 0;
+	        svalue_t *clean = 0;
 
 		if ((finfo & INFO_T) == INFO_T_LPC) {
-		    clean = ALLOCATE(struct svalue, TAG_TEMPORARY, "string_print: 1");
+		    clean = ALLOCATE(svalue_t, TAG_TEMPORARY, "string_print: 1");
 		    clean->type = T_STRING;
 		    clean->subtype = STRING_MALLOC;
 		    clean->u.string = (char *) DXALLOC(500, TAG_STRING, "string_print: 2");
@@ -1057,7 +1061,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 		     * <zak@rmit.oz.au>
 		     */
 		    if (carg->type == T_NUMBER && carg->u.number == 0) {
-			clean = ALLOCATE(struct svalue, TAG_TEMPORARY, "string_print: z1");
+			clean = ALLOCATE(svalue_t, TAG_TEMPORARY, "string_print: z1");
 			clean->type = T_STRING;
 			clean->subtype = STRING_MALLOC;
 			clean->u.string = (char *) DXALLOC(sizeof(NULL_MSG),
@@ -1090,7 +1094,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 			    (*temp)->start = curpos;
 			    if ((add_column(temp, (((format_str[fpos] != '\n')
 						    && (format_str[fpos] != '\0')) || ((finfo & INFO_ARRAY)
-			    && (nelemno < (argv + arg)->u.vec->size)))) == 2)
+			    && (nelemno < (argv + arg)->u.arr->size)))) == 2)
 				&& !format_str[fpos]) {
 				M_ADD_CHAR('\n');
 			    }
@@ -1158,7 +1162,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 			  add_table_now:
 			    add_table(temp, (((format_str[fpos] != '\n')
 					      && (format_str[fpos] != '\0')) || ((finfo & INFO_ARRAY)
-				&& (nelemno < (argv + arg)->u.vec->size))));
+				&& (nelemno < (argv + arg)->u.arr->size))));
 			}
 		    } else {	/* not column or table */
 			if (pres && pres < slen) {
@@ -1170,7 +1174,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 			if (fs && fs > slen) {
 			    add_justified(carg->u.string, pad, fs, finfo,
 					  (((format_str[fpos] != '\n') && (format_str[fpos] != '\0'))
-					   || ((finfo & INFO_ARRAY) && (nelemno < (argv + arg)->u.vec->size)))
+					   || ((finfo & INFO_ARRAY) && (nelemno < (argv + arg)->u.arr->size)))
 				       || carg->u.string[slen - 1] != '\n');
 			} else {
 			    for (i = 0; i < slen; i++)
@@ -1255,7 +1259,7 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 			if (tmpl < fs)
 			    add_justified(temp, pad, fs, finfo,
 					  (((format_str[fpos] != '\n') && (format_str[fpos] != '\0'))
-					   || ((finfo & INFO_ARRAY) && (nelemno < (argv + arg)->u.vec->size))));
+					   || ((finfo & INFO_ARRAY) && (nelemno < (argv + arg)->u.arr->size))));
 			else
 			    for (i = 0; i < tmpl; i++)
 				ADD_CHAR(temp[i]);
@@ -1269,9 +1273,9 @@ char *string_print_formatted P3(char *, format_str, int, argc, struct svalue *, 
 		}
 		if (!(finfo & INFO_ARRAY))
 		    break;
-		if (nelemno >= (argv + arg)->u.vec->size)
+		if (nelemno >= (argv + arg)->u.arr->size)
 		    break;
-		carg = (argv + arg)->u.vec->item + nelemno++;
+		carg = (argv + arg)->u.arr->item + nelemno++;
 	    }			/* end of while (1) */
 	    fpos--;		/* bout to get incremented */
 	    continue;

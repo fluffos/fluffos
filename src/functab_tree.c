@@ -32,7 +32,7 @@
 
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
 #include "functab_tree.h"
-#include "simulate.h"
+#include "program.h"
 
 /*
  * The function table tree is accomplished by augmenting the function
@@ -62,7 +62,7 @@
 /*
  * Prototypes for local functions
  */
-static void functab_tree_add(struct function *, unsigned short *, int, SIGNED short *);
+static void functab_tree_add(function_t *, unsigned short *, int, SIGNED short *);
 
 /*
  * The address comparison routine.
@@ -79,7 +79,7 @@ static void functab_tree_add(struct function *, unsigned short *, int, SIGNED sh
  * Example of usage:
  *   fnum = lookup_function(prog->p.i.functions, prog->p.i.tree_r, name);
  */
-int lookup_function P3(struct function *, functab, /* function table to search */
+int lookup_function P3(function_t *, functab, /* function table to search */
                        int, f_index,               /* initially, functab tree's root */
                        char *, funcname)           /* name of function */
 {
@@ -114,7 +114,7 @@ int lookup_function P3(struct function *, functab, /* function table to search *
  * Example of usage:
  *   add_function(prog->p.i.functions, &prog->p.i.tree_r, fnum);
  */
-void add_function P3(struct function *, functab,	/* function table */
+void add_function P3(function_t *, functab,	/* function table */
 		                  unsigned short *, root,	/* functab tree's root */
 		                  int, newfunc)
 {
@@ -132,7 +132,7 @@ void add_function P3(struct function *, functab,	/* function table */
 /*
  * Do the real work of inserting node and rebalancing tree...
  */
-static void functab_tree_add P4(struct function *, functab,
+static void functab_tree_add P4(function_t *, functab,
       unsigned short *, root, int, newfunc, SIGNED short *, balance)
 {
     SIGNED int i;

@@ -1,0 +1,165 @@
+###############################################################################
+#                  Customizable runtime config file for MudOS                 #
+###############################################################################
+# NOTE: All paths specified here are relative to the mudlib directory except  #
+#       for mudlib directory, and binary directory.                           #
+# Lines beginning with a # or a newline are ignored.                          #
+###############################################################################
+
+# Name of this lpmud
+name : testsuite
+
+# Define what port number the game is to use.
+port number : 4444
+
+# Maximum number of users in the game.
+# (currently this option is unused)
+maximum users : 40
+
+mudlib directory : /ufs/comp/garnett/m/0.9.18.19/testsuite
+binary directory : /usr/local/mud/bin
+
+# This is the subdirectory where all the domain directorys are placed.
+domain directory : d
+
+# where to swap out objects. This file is not used if Time to Swap is 0
+swap file : /adm/tmp/swap
+
+# Define this to be a directory which allows all objects within it to
+# become any euid they wish.
+secure directory : /single
+
+# the file which defines the master object
+# (should be in the secure directory)
+master file : /single/master
+
+# This is where the mud configuration files belong (access.allow, etc)
+config directory : /etc
+
+# This is where log files will be placed by default.
+log directory : /log
+
+# The directories which are searched by #include
+# for multiple dirs, separate each path with a ':'
+include directories : /include
+
+# This is the file where all global simulated efuns are defined.
+simulated efun file : /single/simul_efun
+
+# This is an include file which is automatically #include'd in all objects
+# This is an optional define, and currently doesn't work.
+#global include file : "/include/config.h"
+
+# the file which contains host access restrictions
+access allow file : /etc/access.allow
+
+# the file where host access is logged
+# (if enabled in access_check.c)
+access log file : /log/access.allow.log
+
+# If an object is left alone for a certain time, then the
+# function clean_up will be called. This function can do anything,
+# like destructing the object. If the function isn't defined by the
+# object, then nothing will happen.
+#
+# This time should be substantially longer than the swapping time.
+time to clean up : 180
+
+# How long time until an unused object is swapped out.
+# Machine with too many players and too little memory: 900 (15 minutes)
+# Machine with few players and lot of memory: 10000
+# Machine with infinite memory: 0 (never swap).
+time to swap : 120
+
+# How many seconds until an object is reset again.
+# Set this value high if big system, otherwise low.
+# No castles:   1800   (30 minutes)
+# >100 castles:10000   (almost 3 hours).
+time to reset : 1800
+
+# When uploading files, we want fast response; however, normal players
+# shouldn't be able to hog the system in this way.  Define Allowed Ed Commands
+# to be the ratio of the no of ed cmds executed per player cmd.
+allowed ed commands : 20
+
+# Define the maximum stack size of the stack machine. This stack will also
+# contain all local variables and arguments.
+evaluator stack size : 1000
+
+# Define the size of the compiler stack. This defines how complex
+# expressions the compiler can parse. The value should be big enough.
+compiler stack size : 200
+
+# Define the maximum call depth for functions.
+maximum call depth : 30
+
+# Maximum number of bits in a bit field. They are stored in printable
+# strings, 6 bits per byte.
+maximum bits in a bitfield : 1200
+
+# Max number of local variables in a function.
+maximum local variables : 30
+
+# Maximum number of evaluated nodes/loop.
+# If this is exceeded, current function is halted.
+# The worst case yet encountered is 3600       (dec 1989)
+maximum evaluation cost : 100000
+
+# This is the maximum array size allowed for one single array.
+maximum array size : 15000
+
+# This is the maximum buffer size allowed for one single buffer.
+maximum buffer size : 400000
+
+maximum mapping size : 15000
+
+inherit chain size : 30
+
+# Define the maximum size of log files (in bytes).
+maximum log size : 200000
+
+maximum string length : 200000
+
+# Max size of a file allowed to be read by 'read_file()'.
+maximum read file size : 200000 
+
+# Maximum number of buffered player commands that the system will accept in
+# each heartbeat interval. (not implemented)
+maximum commands per heartbeat : 5
+
+# Define MAX_BYTE_TRANSFER to the number of bytes you allow to be read
+# and written with read_bytes and write_bytes
+maximum byte transfer : 10000
+
+# Reserve an extra memory area from malloc(), to free when we run out
+# of memory to get some warning and start Armageddon.
+# If this value is 0, no area will be reserved.
+# (on a NeXT, set this to 0, since malloc never fails.)
+reserved size : 0
+
+# Define the size of the shared string hash table.  This number should
+# be a power of 4 (4, 16, 64, 256, 1024, 4096, 16384, 65536, ...).
+# If you set it to about 1/5th of the number of distinct strings you have,
+# you will get a hit ratio (number of comparisons to find a string) very
+# close to 1, as found strings are automatically moved to the head of a
+# hash chain.  You will never need more, and you will still get good
+# results with a smaller table.
+hash table size : 4096
+
+# There is a hash table for living objects, used by find_living().
+living hash table size : 100
+
+# Object hash table size.
+# Define this like you did with the strings; probably set to about 1/4 of
+# the number of objects in a game, as the distribution of accesses to
+# objects is somewhat more uniform than that of strings.
+object table size : 1024
+
+# hname stuff
+address server ip : localhost
+address server port : 7374
+
+default fail message : What?
+
+# directory to save binaries in
+save binaries directory : /binaries

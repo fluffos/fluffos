@@ -1,7 +1,9 @@
+#include "std.h"
+
 #ifdef LPC_TO_C
 #include "interface.h"
 
-struct interface_item interface[] =
+interface_item_t interface[] =
 {
     {0, 0}
 };

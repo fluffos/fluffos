@@ -30,8 +30,8 @@ struct lpc_socket {
     struct sockaddr_in l_addr;
     struct sockaddr_in r_addr;
     char name[ADDR_BUF_SIZE];
-    struct object *owner_ob;
-    struct object *release_ob;
+    object_t *owner_ob;
+    object_t *release_ob;
     char read_callback[CALLBK_BUF_SIZE];
     char write_callback[CALLBK_BUF_SIZE];
     char close_callback[CALLBK_BUF_SIZE];
@@ -52,22 +52,22 @@ extern struct lpc_socket lpc_socks[MAX_EFUN_SOCKS];
 #define S_BINARY    0x10
 
 void init_sockets PROT((void));
-int check_valid_socket PROT((char *, int, struct object *, char *, int));
+int check_valid_socket PROT((char *, int, object_t *, char *, int));
 void socket_read_select_handler PROT((int));
 void socket_write_select_handler PROT((int));
-void assign_socket_owner PROT((struct svalue *, struct object *));
-struct object *get_socket_owner PROT((int));
+void assign_socket_owner PROT((svalue_t *, object_t *));
+object_t *get_socket_owner PROT((int));
 void dump_socket_status PROT((void));
-void close_referencing_sockets PROT((struct object *));
+void close_referencing_sockets PROT((object_t *));
 int get_socket_address PROT((int, char *, int *));
 int socket_bind PROT((int, int));
 int socket_create PROT((enum socket_mode, char *, char *));
 int socket_listen PROT((int, char *));
 int socket_accept PROT((int, char *, char *));
 int socket_connect PROT((int, char *, char *, char *));
-int socket_write PROT((int, struct svalue *, char *));
+int socket_write PROT((int, svalue_t *, char *));
 int socket_close PROT((int));
-int socket_release PROT((int, struct object *, char *));
+int socket_release PROT((int, object_t *, char *));
 int socket_acquire PROT((int, char *, char *, char *));
 char *socket_error PROT((int));
 

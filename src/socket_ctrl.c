@@ -48,7 +48,6 @@ INLINE int set_socket_nonblocking P2(int, fd, int, which)
 {
 #if !defined(OLD_ULTRIX) && !defined(_SEQUENT_)
     int result;
-
 #endif
 
 #ifdef OLD_ULTRIX

@@ -6,8 +6,8 @@
 #include "../eoperators.h"
 #endif
 
-static struct object *ob;
-static struct svalue *argp;
+static object_t *ob;
+static svalue_t *argp;
 
 #ifdef F_EXPORT_UID
 void
@@ -44,20 +44,12 @@ f_geteuid PROT((void))
             return;
 	}
     } else if (sp->type & T_FUNCTION) {
-        struct funp *fp;
-#ifdef NEW_FUNCTIONS
-        if ((fp = sp->u.fp)->owner && fp->owner->euid) {
-            put_constant_string(fp->owner->euid->name);
+        funptr_t *fp;
+        if ((fp = sp->u.fp)->hdr.owner && fp->hdr.owner->euid) {
+            put_constant_string(fp->hdr.owner->euid->name);
             free_funp(fp);
             return;
 	} 
-#else
-        if ((fp = sp->u.fp)->euid) {
-            put_constant_string(fp->euid->name);
-            free_funp(fp);
-            return;
-	}
-#endif
 	free_funp(fp);
 	*sp = const0;
     }
@@ -82,7 +74,7 @@ f_getuid PROT((void))
 void
 f_seteuid PROT((void))
 {
-    struct svalue *ret;
+    svalue_t *ret;
     char *tmp;
 
     if (sp->type & T_NUMBER) {

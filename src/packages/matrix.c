@@ -22,14 +22,14 @@ static Matrix identity =
  0., 0., 0., 1.};
 
 static void print_matrix PROT((Matrix, char *));
-static void print_vector PROT((Vector *, char *));
-static Vector *normalize_vector PROT((Vector *));
+static void print_array PROT((Vector *, char *));
+static Vector *normalize_array PROT((Vector *));
 static Vector *cross_product PROT((Vector *, Vector *, Vector *));
-static Vector *points_to_vector PROT((Vector *, Vector *, Vector *));
+static Vector *points_to_array PROT((Vector *, Vector *, Vector *));
 
 void f_id_matrix PROT((void))
 {
-    struct vector *matrix;
+    array_t *matrix;
     int i;
 
     matrix = allocate_empty_array(16);
@@ -37,13 +37,13 @@ void f_id_matrix PROT((void))
         matrix->item[i].type = T_REAL;
         matrix->item[i].u.real = identity[i];
     }
-    (++sp)->u.vec = matrix;
-    sp->type = T_POINTER;
+    (++sp)->u.arr = matrix;
+    sp->type = T_ARRAY;
 }
 
 void f_translate PROT((void))
 {
-    struct vector *matrix;
+    array_t *matrix;
     double x, y, z;
     Matrix current_matrix;
     Matrix trans_matrix;
@@ -59,7 +59,7 @@ void f_translate PROT((void))
     /*
      * get arguments from stack.
      */
-    matrix = (sp - 3)->u.vec;
+    matrix = (sp - 3)->u.arr;
     x = (sp - 2)->u.real;
     y = (sp - 1)->u.real;
     z = sp->u.real;
@@ -89,7 +89,7 @@ void f_translate PROT((void))
 
 void f_scale PROT((void))
 {
-    struct vector *matrix;
+    array_t *matrix;
     double x, y, z;
     Matrix current_matrix;
     Matrix scaling_matrix;
@@ -105,7 +105,7 @@ void f_scale PROT((void))
     /*
      * get arguments from stack.
      */
-    matrix = (sp - 3)->u.vec;
+    matrix = (sp - 3)->u.arr;
     x = (sp - 2)->u.real;
     y = (sp - 1)->u.real;
     z = sp->u.real;
@@ -134,7 +134,7 @@ void f_scale PROT((void))
 
 void f_rotate_x PROT((void))
 {
-    struct vector *matrix;
+    array_t *matrix;
     double angle;
     Matrix current_matrix;
     Matrix rot_matrix;
@@ -144,7 +144,7 @@ void f_rotate_x PROT((void))
     /*
      * get arguments from stack.
      */
-    matrix = (sp - 1)->u.vec;
+    matrix = (sp - 1)->u.arr;
     angle = (sp--)->u.real;
     /*
      * convert vec matrix to float matrix.
@@ -170,7 +170,7 @@ void f_rotate_x PROT((void))
 
 void f_rotate_y PROT((void))
 {
-    struct vector *matrix;
+    array_t *matrix;
     double angle;
     Matrix current_matrix;
     Matrix rot_matrix;
@@ -180,7 +180,7 @@ void f_rotate_y PROT((void))
     /*
      * get arguments from stack.
      */
-    matrix = (sp - 1)->u.vec;
+    matrix = (sp - 1)->u.arr;
     angle = (sp--)->u.real;
     /*
      * convert vec matrix to float matrix.
@@ -206,7 +206,7 @@ void f_rotate_y PROT((void))
 
 void f_rotate_z PROT((void))
 {
-    struct vector *matrix;
+    array_t *matrix;
     double angle;
     Matrix current_matrix;
     Matrix rot_matrix;
@@ -216,7 +216,7 @@ void f_rotate_z PROT((void))
     /*
      * get arguments from stack.
      */
-    matrix = (sp - 1)->u.vec;
+    matrix = (sp - 1)->u.arr;
     angle = (sp--)->u.real;
     /*
      * convert vec matrix to float matrix.
@@ -242,7 +242,7 @@ void f_rotate_z PROT((void))
 
 void f_lookat_rotate PROT((void))
 {
-    struct vector *matrix;
+    array_t *matrix;
     double x, y, z;
     Matrix current_matrix;
     Matrix lookat_matrix;
@@ -257,7 +257,7 @@ void f_lookat_rotate PROT((void))
     /*
      * get arguments from stack.
      */
-    matrix = (sp - 3)->u.vec;
+    matrix = (sp - 3)->u.arr;
     x = (sp - 2)->u.real;
     y = (sp - 1)->u.real;
     z = sp->u.real;
@@ -282,7 +282,7 @@ void f_lookat_rotate PROT((void))
 
 void f_lookat_rotate2 PROT((void))
 {
-    struct vector *matrix;
+    array_t *matrix;
     double ex, ey, ez, lx, ly, lz;
     Matrix current_matrix;
     Matrix lookat_matrix;
@@ -296,7 +296,7 @@ void f_lookat_rotate2 PROT((void))
     /*
      * get arguments from stack.
      */
-    matrix = (sp - 6)->u.vec;
+    matrix = (sp - 6)->u.arr;
     ex = (sp - 5)->u.real;
     ey = (sp - 4)->u.real;
     ez = (sp - 3)->u.real;
@@ -304,7 +304,7 @@ void f_lookat_rotate2 PROT((void))
     ly = (sp - 1)->u.real;
     lz = sp->u.real;
     sp -= 5;
-    free_vector((sp--)->u.vec);
+    free_array((sp--)->u.arr);
 
     /*
      * convert vec matrix to float matrix.
@@ -338,13 +338,13 @@ static void print_matrix P2(Matrix, m, char *, label)
     }
 }
 
-static void print_vector P2(Vector *, v, char *, label)
+static void print_array P2(Vector *, v, char *, label)
 {
     fprintf(stderr, "%s:\t%f\t%f\t%f\n", label, v->x, v->y, v->z);
 }
 
 
-static Vector *normalize_vector P1(Vector *, v)
+static Vector *normalize_array P1(Vector *, v)
 {
     double xx, yy, zz, mm, m;
 
@@ -369,7 +369,7 @@ static Vector *cross_product P3(Vector *, v, Vector *, va, Vector *, vb)
     return (v);
 }
 
-static Vector *points_to_vector P3(Vector *, v, Vector *, pa, Vector *, pb)
+static Vector *points_to_array P3(Vector *, v, Vector *, pa, Vector *, pb)
 {
     v->x = pa->x - pb->x;
     v->y = pa->y - pb->y;
@@ -388,17 +388,17 @@ void lookat_rotate P5(Matrix, T, double, x, double, y, double, z, Matrix, M)
     ep.x = T[12];
     ep.y = T[13];
     ep.z = T[14];
-    points_to_vector(&N, &lp, &ep);
-    normalize_vector(&N);
+    points_to_array(&N, &lp, &ep);
+    normalize_array(&N);
 
     U.x = T[0];
     U.y = T[4];
     U.z = T[8];
     cross_product(&V, &N, &U);
-    normalize_vector(&V);
+    normalize_array(&V);
 
     cross_product(&U, &V, &N);
-    normalize_vector(&U);
+    normalize_array(&U);
 
     M[0] = U.x;
     M[1] = V.x;
@@ -429,11 +429,11 @@ void lookat_rotate P5(Matrix, T, double, x, double, y, double, z, Matrix, M)
     M[15] = 1.;
 
 #ifdef DEBUG
-    print_vector(&lp, "look point");
-    print_vector(&ep, "eye point");
-    print_vector(&N, "normal vector");
-    print_vector(&V, "V = N x U");
-    print_vector(&U, "U = V x N");
+    print_array(&lp, "look point");
+    print_array(&ep, "eye point");
+    print_array(&N, "normal array");
+    print_array(&V, "V = N x U");
+    print_array(&U, "U = V x N");
     print_matrix(M, "final matrix");
 #endif				/* DEBUG */
 }
@@ -449,17 +449,17 @@ void lookat_rotate2 P7(double, ex, double, ey, double, ez, double, lx, double, l
     lp.x = lx;
     lp.y = ly;
     lp.z = lz;
-    points_to_vector(&N, &lp, &ep);
-    normalize_vector(&N);
+    points_to_array(&N, &lp, &ep);
+    normalize_array(&N);
 
     U.x = 0.;
     U.y = 1.;
     U.z = 0.;
     cross_product(&V, &N, &U);
-    normalize_vector(&V);
+    normalize_array(&V);
 
     cross_product(&U, &V, &N);
-    normalize_vector(&U);
+    normalize_array(&U);
 
     M[0] = U.x;
     M[1] = V.x;
@@ -490,11 +490,11 @@ void lookat_rotate2 P7(double, ex, double, ey, double, ez, double, lx, double, l
     M[15] = 1.;
 
 #ifdef DEBUG
-    print_vector(&lp, "look point");
-    print_vector(&ep, "eye point");
-    print_vector(&N, "normal vector");
-    print_vector(&V, "V = N x U");
-    print_vector(&U, "U = V x N");
+    print_array(&lp, "look point");
+    print_array(&ep, "eye point");
+    print_array(&N, "normal array");
+    print_array(&V, "V = N x U");
+    print_array(&U, "U = V x N");
     print_matrix(M, "final matrix");
 #endif				/* DEBUG */
 }

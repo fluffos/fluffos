@@ -3,27 +3,32 @@
 #ifndef _MAPPING_H
 #define _MAPPING_H
 
-#include "interpret.h"
-
-struct node {
-    svalue values[2];
-    struct node *next;
+typedef struct mapping_node_s {
+    struct mapping_node_s *next;
+    svalue_t values[2];
     unsigned short hashval;
-};
+} mapping_node_t;
+
+#define MNB_SIZE 256
+
+typedef struct mapping_node_block_s {
+    struct mapping_node_block_s *next;
+    mapping_node_t nodes[MNB_SIZE];
+} mapping_node_block_t;
 
 #define MAX_TABLE_SIZE 32768
 #define MAP_HASH_TABLE_SIZE 8	/* must be a power of 2 */
 #define FILL_PERCENT 80		/* must not be larger than 99 */
 
-#define MAPSIZE(size) sizeof(struct mapping)
+#define MAPSIZE(size) sizeof(mapping_t)
 
-struct mapping {
+typedef struct mapping_s {
     unsigned short ref;		/* how many times this map has been
 				 * referenced */
 #ifdef DEBUG
     int extra_ref;
 #endif
-    struct node **table;	/* the hash table */
+    mapping_node_t **table;	/* the hash table */
     unsigned short table_size;	/* # of buckets in hash table == power of 2 */
     unsigned short unfilled;	/* # of buckets among 80% of total buckets that do not have entries */
     int count;			/* total # of nodes actually in mapping  */
@@ -31,26 +36,26 @@ struct mapping {
     statgroup_t stats;		/* creators of the mapping */
 #endif
 #ifdef EACH
-    struct object *eachObj;	/* object that last called each() on this map */
-    struct node *elt;		/* keeps track of where each() is in the map */
+    object_t *eachObj;	/* object that last called each() on this map */
+    mapping_node_t *elt;		/* keeps track of where each() is in the map */
     unsigned short bucket;	/* keeps track of where each() currently is */
 #endif
-};
+} mapping_t;
 
 typedef struct finfo_s {
     char *func;
-    struct object *obj;
-    struct svalue *extra;
-    struct funp *fp;
+    object_t *obj;
+    svalue_t *extra;
+    funptr_t *fp;
 }       finfo_t;
 
 typedef struct vinfo_s {
-    struct vector *v;
+    array_t *v;
     int pos, size, w;
 }       vinfo_t;
 
 typedef struct minfo_s {
-    struct mapping *map, *newmap;
+    mapping_t *map, *newmap;
 }       minfo_t;
 
 #define mapping_too_large() \
@@ -70,29 +75,31 @@ extern int num_mappings;
 extern int total_mapping_size;
 extern int total_mapping_nodes;
 
-int mapping_save_size PROT((struct mapping *));
-INLINE struct mapping *mapTraverse PROT((struct mapping *, int (*) (struct mapping *, struct node *, void *), void *));
-INLINE struct mapping *load_mapping_from_aggregate PROT((struct svalue *, int));
-INLINE struct mapping *allocate_mapping PROT((int));
-INLINE void free_mapping PROT((struct mapping *));
-INLINE struct svalue *find_in_mapping PROT((struct mapping *, struct svalue *));
-INLINE struct svalue *find_for_insert PROT((struct mapping *, struct svalue *, int));
-INLINE void absorb_mapping PROT((struct mapping *, struct mapping *));
-INLINE void mapping_delete PROT((struct mapping *, struct svalue *));
-INLINE struct mapping *add_mapping PROT((struct mapping *, struct mapping *));
-void map_mapping PROT((struct svalue *, int));
-void filter_mapping PROT((struct svalue *, int));
-INLINE struct mapping *compose_mapping PROT((struct mapping *, struct mapping *, unsigned short));
-struct vector *mapping_indices PROT((struct mapping *));
-struct vector *mapping_values PROT((struct mapping *));
-struct vector *mapping_each PROT((struct mapping *));
-char *save_mapping PROT((struct mapping *));
+int mapping_save_size PROT((mapping_t *));
+INLINE mapping_t *mapTraverse PROT((mapping_t *, int (*) (mapping_t *, mapping_node_t *, void *), void *));
+INLINE mapping_t *load_mapping_from_aggregate PROT((svalue_t *, int));
+INLINE mapping_t *allocate_mapping PROT((int));
+INLINE void free_mapping PROT((mapping_t *));
+INLINE svalue_t *find_in_mapping PROT((mapping_t *, svalue_t *));
+INLINE svalue_t *find_for_insert PROT((mapping_t *, svalue_t *, int));
+INLINE void absorb_mapping PROT((mapping_t *, mapping_t *));
+INLINE void mapping_delete PROT((mapping_t *, svalue_t *));
+INLINE mapping_t *add_mapping PROT((mapping_t *, mapping_t *));
+mapping_node_t *new_map_node PROT((void));
+void free_node PROT((mapping_node_t *));
+void map_mapping PROT((svalue_t *, int));
+void filter_mapping PROT((svalue_t *, int));
+INLINE mapping_t *compose_mapping PROT((mapping_t *, mapping_t *, unsigned short));
+array_t *mapping_indices PROT((mapping_t *));
+array_t *mapping_values PROT((mapping_t *));
+array_t *mapping_each PROT((mapping_t *));
+char *save_mapping PROT((mapping_t *));
 
-void add_mapping_pair PROT((struct mapping *, char *, int));
-void add_mapping_string PROT((struct mapping *, char *, char *));
-void add_mapping_malloced_string PROT((struct mapping *, char *, char *));
-void add_mapping_object PROT((struct mapping *, char *, struct object *));
-void add_mapping_array PROT((struct mapping *, char *, struct vector *));
-void add_mapping_shared_string PROT((struct mapping *, char *, char *));
+void add_mapping_pair PROT((mapping_t *, char *, int));
+void add_mapping_string PROT((mapping_t *, char *, char *));
+void add_mapping_malloced_string PROT((mapping_t *, char *, char *));
+void add_mapping_object PROT((mapping_t *, char *, object_t *));
+void add_mapping_array PROT((mapping_t *, char *, array_t *));
+void add_mapping_shared_string PROT((mapping_t *, char *, char *));
 
 #endif				/* _MAPPING_H */

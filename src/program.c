@@ -6,17 +6,17 @@
 
 int total_num_prog_blocks, total_prog_block_size;
 
-void reference_prog P2(struct program *, progp, char *, from)
+void reference_prog P2(program_t *, progp, char *, from)
 {
-    progp->p.i.ref++;
+    progp->ref++;
 #ifdef DEBUG
     if (d_flag)
 	printf("reference_prog: %s ref %d (%s)\n",
-	       progp->name, progp->p.i.ref, from);
+	       progp->name, progp->ref, from);
 #endif
 }
 
-void deallocate_program P1(struct program *, progp)
+void deallocate_program P1(program_t *, progp)
 {
     int i;
 
@@ -25,41 +25,33 @@ void deallocate_program P1(struct program *, progp)
 	printf("free_prog: %s\n", progp->name);
 #endif
     
-    total_prog_block_size -= progp->p.i.total_size;
+    total_prog_block_size -= progp->total_size;
     total_num_prog_blocks -= 1;
 
     /* Free all function names. */
-    for (i = 0; i < (int) progp->p.i.num_functions; i++)
-	if (progp->p.i.functions[i].name)
-	    free_string(progp->p.i.functions[i].name);
+    for (i = 0; i < (int) progp->num_functions; i++)
+	if (progp->functions[i].name)
+	    free_string(progp->functions[i].name);
     /* Free all strings */
-    for (i = 0; i < (int) progp->p.i.num_strings; i++)
-	free_string(progp->p.i.strings[i]);
+    for (i = 0; i < (int) progp->num_strings; i++)
+	free_string(progp->strings[i]);
     /* Free all variable names */
-    for (i = 0; i < (int) progp->p.i.num_variables; i++)
-	free_string(progp->p.i.variable_names[i].name);
+    for (i = 0; i < (int) progp->num_variables; i++)
+	free_string(progp->variable_names[i].name);
     /* Free all inherited objects */
-    for (i = 0; i < (int) progp->p.i.num_inherited; i++)
-	free_prog(progp->p.i.inherit[i].prog, 1);
+    for (i = 0; i < (int) progp->num_inherited; i++)
+	free_prog(progp->inherit[i].prog, 1);
     free_string(progp->name);
 
     /*
      * We're going away for good, not just being swapped, so free up
      * line_number stuff.
      */
-    if (progp->p.i.line_swap_index != -1)
+    if (progp->line_swap_index != -1)
 	remove_line_swap(progp);
-    if (progp->p.i.file_info)
-	FREE(progp->p.i.file_info);
+    if (progp->file_info)
+	FREE(progp->file_info);
     
-#ifdef LPC_TO_C
-    /*
-     * more stuff for compiled objects; will swapping a compiled object
-     * crash?  -Beek
-     */
-    if (!progp->p.i.program_size)
-	FREE(progp->p.i.program);
-#endif
     FREE((char *) progp);
 }
 
@@ -70,23 +62,23 @@ void deallocate_program P1(struct program *, progp)
  * as we want to be able to read the program in again from the swap area.
  * That means that strings are not swapped.
  */
-void free_prog P2(struct program *, progp, int, free_sub_strings)
+void free_prog P2(program_t *, progp, int, free_sub_strings)
 {
-    progp->p.i.ref--;
-    if (progp->p.i.ref > 0)
+    progp->ref--;
+    if (progp->ref > 0)
 	return;
-    if (progp->p.i.func_ref > 0)
+    if (progp->func_ref > 0)
 	return;
 
 #ifdef DEBUG
-    if (progp->p.i.ref < 0)
+    if (progp->ref < 0)
 	fatal("Negative ref count for prog ref.\n");
 #endif
 
     if (free_sub_strings) 
 	deallocate_program(progp);
     else {
-	total_prog_block_size -= progp->p.i.total_size;
+	total_prog_block_size -= progp->total_size;
 	total_num_prog_blocks -= 1;
 	FREE((char *) progp);
     }

@@ -3,7 +3,7 @@
 #ifndef _BUFFER_H_
 #define _BUFFER_H_
 
-struct buffer {
+typedef struct buffer_s {
     /* first two elements of struct must be 'ref' followed by 'size' */
     unsigned short ref;
     unsigned int size;
@@ -11,17 +11,17 @@ struct buffer {
     unsigned short extra_ref;
 #endif
     unsigned char item[1];
-};
+} buffer_t;
 
 /*
  * buffer.c
  */
-extern struct buffer null_buf;
+extern buffer_t null_buf;
 
-INLINE struct buffer *null_buffer PROT((void));
-INLINE void free_buffer PROT((struct buffer *));
-struct buffer *allocate_buffer PROT((int));
-int write_buffer PROT((struct buffer *, int, char *, int));
-char *read_buffer PROT((struct buffer *, int, int, int *));
+INLINE buffer_t *null_buffer PROT((void));
+INLINE void free_buffer PROT((buffer_t *));
+buffer_t *allocate_buffer PROT((int));
+int write_buffer PROT((buffer_t *, int, char *, int));
+char *read_buffer PROT((buffer_t *, int, int, int *));
 
 #endif

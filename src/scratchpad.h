@@ -19,10 +19,10 @@
 
 #define SCRATCH_MAGIC ((unsigned char)0xbb)
 
-struct sp_block_t {
-    struct sp_block_t *next, *prev;
+typedef struct sp_block_s {
+    struct sp_block_s *next, *prev;
     char block[2]; /* block[0] must be nonzero, usually SCRATCH_MAGIC */
-};
+} sp_block_t;
 
 #define scratch_free_last() \
     scr_tail = --scr_last; \

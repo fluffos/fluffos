@@ -49,6 +49,7 @@
 #include "std.h"
 #include "lpc_incl.h"
 #include "comm.h"
+#include "file.h"
 #include "regexp.h"
 #include "ed.h"
 
@@ -85,7 +86,7 @@ static char *getfn PROT((int));
 static int getnum PROT((int));
 static int getone PROT((void));
 static int getlst PROT((void));
-static LINE *getptr PROT((int));
+static ed_line_t *getptr PROT((int));
 static int getrhs PROT((char *));
 static int ins PROT((char *));
 static int join PROT((int, int));
@@ -107,7 +108,7 @@ static void report_status PROT((int));
 static void object_ed_output PROT((char *));
 static void object_ed_outputv PROTVARGS(());
 static char *object_ed_results PROT((void));
-static struct ed_buffer *add_ed_buffer PROT((struct object *));
+static ed_buffer_t *add_ed_buffer PROT((object_t *));
 static void object_free_ed_buffer PROT((void));
 #endif
 
@@ -116,16 +117,8 @@ static void print_help2 PROT((void));
 static void count_blanks PROT((int line));
 static void _count_blanks PROT((char *str, int blanks));
 
-static struct ed_buffer *current_ed_buffer;
-static struct object *current_editor;        /* the object responsible */
-
-#ifdef OLD_ED
-#define ED_OUTPUT       add_message
-#define ED_OUTPUTV      add_vmessage
-#else
-#define ED_OUTPUT       object_ed_output
-#define ED_OUTPUTV      object_ed_outputv
-#endif
+static ed_buffer_t *current_ed_buffer;
+static object_t *current_editor;        /* the object responsible */
 
 #define ED_BUFFER       (current_ed_buffer)
 #ifdef OLD_ED
@@ -177,7 +170,7 @@ static struct object *current_editor;        /* the object responsible */
 #define P_RESTRICT	(ED_BUFFER->restricted)
 
 
-static char inlin[MAXLINE];
+static char inlin[ED_MAXLINE];
 static char *inptr;		/* tty input buffer */
 
 static struct tbl {
@@ -278,8 +271,8 @@ static int more_append P1(char *, str)
 	}
 	for (i = 0; i < P_LEADBLANKS;)
 	    inlin[i++] = ' ';
-	strncpy(inlin + P_LEADBLANKS, str, MAXLINE - P_LEADBLANKS);
-	inlin[MAXLINE - 1] = '\0';
+	strncpy(inlin + P_LEADBLANKS, str, ED_MAXLINE - P_LEADBLANKS);
+	inlin[ED_MAXLINE - 1] = '\0';
 	_count_blanks(inlin, 0);
 	ED_OUTPUTV("%*s", P_LEADBLANKS, "");
 	if (!*str && less_indent_flag)
@@ -306,7 +299,7 @@ static void _count_blanks P2(char *, str, int, blanks)
 	else
 	    break;
     }
-    P_LEADBLANKS = blanks < MAXLINE ? blanks : MAXLINE;
+    P_LEADBLANKS = blanks < ED_MAXLINE ? blanks : ED_MAXLINE;
 }
 
 /*	ckglob.c	*/
@@ -316,7 +309,7 @@ static int ckglob()
     regexp *glbpat;
     char c, delim, *lin;
     int num;
-    LINE *ptr;
+    ed_line_t *ptr;
 
     c = *inptr;
 
@@ -384,7 +377,7 @@ static int deflt P2(int, def1, int, def2)
 
 static int del P2(int, from, int, to)
 {
-    LINE *first, *last, *next, *tmp;
+    ed_line_t *first, *last, *next, *tmp;
 
     if (P_LASTLN == 0)
 	return (0);		/* nothing to delete */
@@ -521,15 +514,15 @@ static void free_ed_buffer()
 
 static void prntln P3(char *, str, int, vflg, int, len)
 {
-    char *line, start[MAXLINE + 2];
+    char *line, start[ED_MAXLINE + 2];
 
     line = start;
     if (len)
 	ED_OUTPUTV("%3d  ", len);
     while (*str && *str != NL) {
-	if ((line - start) > MAXLINE) {
+	if ((line - start) > ED_MAXLINE) {
 	    free_ed_buffer();
-	    error("Bad file format. Ed can't handle lines longer than %d.\n", MAXLINE);
+	    error("Bad file format. Ed can't handle lines longer than %d.\n", ED_MAXLINE);
 	}
 	if (*str < ' ' || *str >= DEL) {
 	    switch (*str) {
@@ -604,7 +597,7 @@ static int doread P2(int, lin, char *, fname)
     int err;
     unsigned int bytes;
     unsigned int lines;
-    static char str[MAXLINE];
+    static char str[ED_MAXLINE];
 
     err = 0;
     P_NONASCII = P_NULLCHAR = P_TRUNCATED = 0;
@@ -616,7 +609,7 @@ static int doread P2(int, lin, char *, fname)
 	return (ERR);
     }
     setCurLn(lin);
-    for (lines = 0, bytes = 0; (err = egets(str, MAXLINE, fp)) > 0;) {
+    for (lines = 0, bytes = 0; (err = egets(str, ED_MAXLINE, fp)) > 0;) {
 	bytes += err;
 	if (ins(str) < 0) {
 	    err = MEM_FAIL;
@@ -647,14 +640,14 @@ static int dowrite P4(int, from, int, to, char *, fname, int, apflg)
     unsigned int lines;
     unsigned int bytes;
     char *str;
-    LINE *lptr;
+    ed_line_t *lptr;
 
     err = 0;
     lines = bytes = 0;
 
 #ifdef OLD_ED
     if (ED_BUFFER->write_fn) {
-        struct svalue *res;
+        svalue_t *res;
 
         push_constant_string(fname);
         push_number(0);
@@ -707,7 +700,7 @@ static int dowrite P4(int, from, int, to, char *, fname, int, apflg)
 static int find P2(regexp *, pat, int, dir)
 {
     int i, num;
-    LINE *lin;
+    ed_line_t *lin;
 
     if (!pat)
 	return (ERR);
@@ -738,7 +731,7 @@ static char *getfn P1(int, writeflg)
     static char file[MAXFNAME];
     char *cp;
     char *file2;
-    struct svalue *ret;
+    svalue_t *ret;
 
     if (*inptr == NL) {
 	P_NOFNAME = TRUE;
@@ -761,8 +754,8 @@ static char *getfn P1(int, writeflg)
 
     if (file[0] != '/') {
 	push_string(file, STRING_MALLOC);
-	ret = apply_master_ob(APPLY_MAKE_PATH_ABSOLUTE,1 );
-	if ((ret == 0) || (ret == (struct svalue *)-1) || ret->type != T_STRING)
+	ret = apply_master_ob(APPLY_MAKE_PATH_ABSOLUTE, 1);
+	if ((ret == 0) || (ret == (svalue_t *)-1) || ret->type != T_STRING)
 	    return NULL;
 	strncpy(file, ret->u.string, sizeof file - 1);
 	file[MAXFNAME - 1] = '\0';
@@ -884,9 +877,9 @@ static int getlst()
 
 /*	getptr.c	*/
 
-static LINE *getptr P1(int, num)
+static ed_line_t *getptr P1(int, num)
 {
-    LINE *ptr;
+    ed_line_t *ptr;
     int j;
 
     if (2 * num > P_LASTLN && num <= P_LASTLN) {	/* high line numbers */
@@ -979,7 +972,7 @@ static int getrhs P1(char *, sub)
 static int ins P1(char *, str)
 {
     char *cp;
-    LINE *new, *nxt;
+    ed_line_t *new, *nxt;
     int len;
 
     do {
@@ -987,7 +980,8 @@ static int ins P1(char *, str)
 	len = cp - str;
 	/* cp now points to end of first or only line */
 
-	if ((new = (LINE *) DXALLOC(sizeof(LINE) + len, TAG_ED, "ins: new")) == NULL)
+	if ((new = (ed_line_t *) DXALLOC(sizeof(ed_line_t) + len, 
+					 TAG_ED, "ins: new")) == NULL)
 	    return (MEM_FAIL);	/* no memory */
 
 	new->l_stat = 0;
@@ -1010,9 +1004,9 @@ static int ins P1(char *, str)
 
 static int join P2(int, first, int, last)
 {
-    char buf[MAXLINE];
+    char buf[ED_MAXLINE];
     char *cp = buf, *str;
-    LINE *lin;
+    ed_line_t *lin;
     int num;
 
     if (first <= 0 || first > last || last > P_LASTLN)
@@ -1025,7 +1019,7 @@ static int join P2(int, first, int, last)
     for (num = first; num <= last; num++) {
 	str = gettxtl(lin);
 	while (*str) {
-	    if (cp >= buf + MAXLINE - 1) {
+	    if (cp >= buf + ED_MAXLINE - 1) {
 		ED_OUTPUT("line too long\n");
 		return ERR;
 	    }
@@ -1049,7 +1043,7 @@ static int join P2(int, first, int, last)
 static int move P1(int, num)
 {
     int range;
-    LINE *before, *first, *last, *after;
+    ed_line_t *before, *first, *last, *after;
 
     if (P_LINE1 <= num && num <= P_LINE2)
 	return BAD_LINE_RANGE;
@@ -1166,7 +1160,7 @@ static int set()
 	}
     }
     if (!strcmp(word, "save")) {
-	struct svalue *ret;
+	svalue_t *ret;
 
 	if (P_RESTRICT)
 	    return (SET_FAIL);
@@ -1209,10 +1203,10 @@ static int subst P4(regexp *, pat, char *, sub, int, gflg, int, pflag)
 {
     int nchngd = 0;
     char *txtptr;
-    char *new, *old, buf[MAXLINE];
+    char *new, *old, buf[ED_MAXLINE];
     int space;			/* amylaar */
     int still_running = 1;
-    LINE *lastline = getptr(P_LINE2);
+    ed_line_t *lastline = getptr(P_LINE2);
 
     if (P_LINE1 <= 0)
 	return (SUB_FAIL);
@@ -1221,7 +1215,7 @@ static int subst P4(regexp *, pat, char *, sub, int, gflg, int, pflag)
     for (setCurLn(prevln(P_LINE1)); still_running;) {
 	nextCurLn();
 	new = buf;
-	space = MAXLINE;	/* amylaar */
+	space = ED_MAXLINE;	/* amylaar */
 	if (P_CURPTR == lastline)
 	    still_running = 0;
 	if (regexec(pat, txtptr = gettxtl(P_CURPTR))) {
@@ -1305,8 +1299,8 @@ static void shift P1(register char *, text)
 
     if (*text != '\0') {	/* don't shift lines with ws only */
 	indent_index += shi;
-	if (indent_index < MAXLINE) {
-	    char buffer[MAXLINE];
+	if (indent_index < ED_MAXLINE) {
+	    char buffer[ED_MAXLINE];
 	    register char *p;
 
 	    p = buffer;
@@ -1319,7 +1313,7 @@ static void shift P1(register char *, text)
 		*p++ = ' ';
 		--indent_index;
 	    }
-	    if (p - buffer + strlen(text) < MAXLINE) {
+	    if (p - buffer + strlen(text) < ED_MAXLINE) {
 		strcpy(p, text);
 		del(lineno, lineno);
 		ins(buffer);
@@ -1352,15 +1346,15 @@ static void shift P1(register char *, text)
 static char *stack, *stackbot;	/* token stack */
 static int *ind, *indbot;	/* indent stack */
 static char quote;		/* ' or " */
-static bool in_ppcontrol, after_keyword, in_mblock;	/* status */
+static bool in_ppcontrol, after_keyword_t, in_mblock;	/* status */
 int in_comment;
-static char last_term[MAXLINE+5];
+static char last_term[ED_MAXLINE+5];
 static int last_term_len;
 
 /*
  * NAME:        indent(char*)
  * ACTION:      Parse and indent a line of text. This isn't perfect, as
- *              keywords could be defined as macros, comments are very hard to
+ *              keyword_ts could be defined as macros, comments are very hard to
  *              handle properly, (, [ and ({ will match any of ), ] and }),
  *              and last but not least everyone has his own taste of
  *              indentation.
@@ -1371,7 +1365,7 @@ static void indent P1(char *, buf)
     {7, 1, 7, 1, 2, 1, 1, 6, 4, 2, 6, 7, 7, 2, 0,};
     static char g[] =
     {2, 2, 1, 7, 1, 5, 5, 1, 3, 6, 2, 2, 2, 2, 0,};
-    char text[MAXLINE], ident[MAXLINE];
+    char text[ED_MAXLINE], ident[ED_MAXLINE];
     register char *p, *sp;
     register int *ip;
     register long indent_index;
@@ -1530,11 +1524,11 @@ static void indent P1(char *, buf)
 		break;
 
 	    case '(':
-		if (after_keyword) {
+		if (after_keyword_t) {
 		    /*
 		     * LOPERATOR & ROPERATOR are a kludge. The operator
 		     * precedence parser that is used could not work if
-		     * parenthesis after keywords was not treated specially.
+		     * parenthesis after keyword_ts was not treated specially.
 		     */
 		    token = LOPERATOR;
 		    break;
@@ -1584,7 +1578,7 @@ static void indent P1(char *, buf)
 		if (isalpha(*--p) || *p == '_') {
 		    register char *q;
 
-		    /* Identifier. See if it's a keyword. */
+		    /* Identifier. See if it's a keyword_t. */
 		    q = ident;
 		    do {
 			*q++ = *p++;
@@ -1601,7 +1595,7 @@ static void indent P1(char *, buf)
 			token = WHILE;
 		    else if (strcmp(ident, "do") == 0)
 			token = XDO;
-		    else	/* not a keyword */
+		    else	/* not a keyword_t */
 			token = TOKEN;
 		} else {
 		    /* anything else is a "token" */
@@ -1692,7 +1686,7 @@ static void indent P1(char *, buf)
 	}
 	stack = sp;
 	ind = ip;
-	after_keyword = (token >= IF);	/* but not after ELSE */
+	after_keyword_t = (token >= IF);	/* but not after ELSE */
     }
 }
 
@@ -2118,7 +2112,7 @@ static int doglob()
 {
     int lin, status = 0;
     char *cmd;
-    LINE *ptr;
+    ed_line_t *ptr;
 
     cmd = inptr;
 
@@ -2159,10 +2153,11 @@ static int doglob()
  * code to maintain a list of locked files.
  */
 #ifdef OLD_ED
-void ed_start P5(char *, file_arg, char *, write_fn, char *, exit_fn, int, restricted, struct object *, exit_ob)
+void ed_start P5(char *, file_arg, char *, write_fn, char *, exit_fn, int, restricted, object_t *, exit_ob)
 {
-    struct svalue *setup;
+    svalue_t *setup;
 
+    regexp_user = ED_REGEXP;
     if (!command_giver)
 	error("No current user for ed().\n");
     if (!command_giver->interactive)
@@ -2171,8 +2166,8 @@ void ed_start P5(char *, file_arg, char *, write_fn, char *, exit_fn, int, restr
 	error("Tried to start an ed session, when already active.\n");
 
     current_ed_buffer = command_giver->interactive->ed_buffer =
-	ALLOCATE(struct ed_buffer, TAG_ED, "ed_start: ED_BUFFER");
-    memset((char *) ED_BUFFER, '\0', sizeof(struct ed_buffer));
+	ALLOCATE(ed_buffer_t, TAG_ED, "ed_start: ED_BUFFER");
+    memset((char *) ED_BUFFER, '\0', sizeof(ed_buffer_t));
 
     current_editor = command_giver;
 
@@ -2181,7 +2176,7 @@ void ed_start P5(char *, file_arg, char *, write_fn, char *, exit_fn, int, restr
     ED_BUFFER->shiftwidth = 4;
     push_object(current_editor);
     setup = apply_master_ob(APPLY_RETRIEVE_ED_SETUP, 1);
-    if (setup && setup != (struct svalue *)-1 && setup->type == T_NUMBER && setup->u.number) {
+    if (setup && setup != (svalue_t *)-1 && setup->type == T_NUMBER && setup->u.number) {
 	ED_BUFFER->flags = setup->u.number & ALL_FLAGS_MASK;
 	ED_BUFFER->shiftwidth = setup->u.number & SHIFTWIDTH_MASK;
     }
@@ -2239,6 +2234,7 @@ void ed_cmd P1(char *, str)
 {
     int status = 0;
 
+    regexp_user = ED_REGEXP;
     current_ed_buffer = command_giver->interactive->ed_buffer;
     current_editor = command_giver;
 
@@ -2250,11 +2246,11 @@ void ed_cmd P1(char *, str)
 	more_append(str);
 	return;
     }
-    if (strlen(str) < MAXLINE)
+    if (strlen(str) < ED_MAXLINE)
 	strcat(str, "\n");
 
-    strncpy(inlin, str, MAXLINE - 1);
-    inlin[MAXLINE - 1] = 0;
+    strncpy(inlin, str, ED_MAXLINE - 1);
+    inlin[ED_MAXLINE - 1] = 0;
     inptr = inlin;
     if (getlst() >= 0)
 	if ((status = ckglob()) != 0) {
@@ -2351,15 +2347,16 @@ static void report_status P1(int, status) {
 #ifdef OLD_ED
 void save_ed_buffer()
 {
-    struct svalue *stmp;
+    svalue_t *stmp;
     char *fname;
 
+    regexp_user = ED_REGEXP;
     current_ed_buffer = command_giver->interactive->ed_buffer;
     current_editor = command_giver;
 
     push_string(P_FNAME, STRING_SHARED);
     stmp = apply_master_ob(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME, 1);
-    if (stmp && stmp != (svalue *)-1) {
+    if (stmp && stmp != (svalue_t *)-1) {
 	if (stmp->type == T_STRING) {
 	    fname = stmp->u.string;
 	    if (*fname == '/')
@@ -2607,12 +2604,6 @@ static void print_help2()
 }
 #endif				/* ED */
 
-/* regerror.c (used by regexp.c) */
-void regerror P1(char *, s)
-{
-    ED_OUTPUTV("ed: %s\n", s);
-}
-
 /****************************************************************
   Stuff below here is for the new ed() interface. -Beek 
  ****************************************************************/
@@ -2696,13 +2687,13 @@ static char *object_ed_results() {
     return ret;
 }
 
-static struct ed_buffer *ed_buffer_list;
+static ed_buffer_t *ed_buffer_list;
 
-static struct ed_buffer *add_ed_buffer P1(struct object *, ob) {
-    struct ed_buffer *ret;
+static ed_buffer_t *add_ed_buffer P1(object_t *, ob) {
+    ed_buffer_t *ret;
     
-    ret = ALLOCATE(struct ed_buffer, TAG_ED, "ed_start: ED_BUFFER");
-    memset((char *)ret, '\0', sizeof(struct ed_buffer));
+    ret = ALLOCATE(ed_buffer_t, TAG_ED, "ed_start: ED_BUFFER");
+    memset((char *)ret, '\0', sizeof(ed_buffer_t));
 
     ob->flags |= O_IN_EDIT;
 
@@ -2713,8 +2704,8 @@ static struct ed_buffer *add_ed_buffer P1(struct object *, ob) {
     return ret;
 }
 
-struct ed_buffer *find_ed_buffer P1(struct object *, ob) {
-    struct ed_buffer *p;
+ed_buffer_t *find_ed_buffer P1(object_t *, ob) {
+    ed_buffer_t *p;
 
     for (p = ed_buffer_list; p && p->owner != ob; p = p->next_ed_buf)
 	;
@@ -2722,8 +2713,8 @@ struct ed_buffer *find_ed_buffer P1(struct object *, ob) {
 }
 
 static void object_free_ed_buffer() {
-    struct ed_buffer **p = &ed_buffer_list;
-    struct ed_buffer *tmp;
+    ed_buffer_t **p = &ed_buffer_list;
+    ed_buffer_t *tmp;
 
     while ((*p)->owner != current_editor)
 	p = &((*p)->next_ed_buf);
@@ -2735,9 +2726,10 @@ static void object_free_ed_buffer() {
     current_editor->flags &= ~O_IN_EDIT;
 }
 
-char *object_ed_start P3(struct object *, ob, char *, fname, int, restricted) {
-    struct svalue *setup;
+char *object_ed_start P3(object_t *, ob, char *, fname, int, restricted) {
+    svalue_t *setup;
 
+    regexp_user = ED_REGEXP;
     current_ed_buffer = add_ed_buffer(ob);
 
     ED_BUFFER->truncflg = 1;
@@ -2746,7 +2738,7 @@ char *object_ed_start P3(struct object *, ob, char *, fname, int, restricted) {
 
     push_object(current_editor);
     setup = apply_master_ob(APPLY_RETRIEVE_ED_SETUP, 1);
-    if (setup && setup != (struct svalue *)-1 && setup->type == T_NUMBER && setup->u.number) {
+    if (setup && setup != (svalue_t *)-1 && setup->type == T_NUMBER && setup->u.number) {
 	ED_BUFFER->flags = setup->u.number & ALL_FLAGS_MASK;
 	ED_BUFFER->shiftwidth = setup->u.number & SHIFTWIDTH_MASK;
     }
@@ -2777,17 +2769,18 @@ char *object_ed_start P3(struct object *, ob, char *, fname, int, restricted) {
     return object_ed_results();
 }
 
-void object_save_ed_buffer P1(struct object *, ob)
+void object_save_ed_buffer P1(object_t *, ob)
 {
-    struct svalue *stmp;
+    svalue_t *stmp;
     char *fname;
 
+    regexp_user = ED_REGEXP;
     current_ed_buffer = find_ed_buffer(ob);
     current_editor = ob;
 
     push_string(P_FNAME, STRING_SHARED);
     stmp = apply_master_ob(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME, 1);
-    if (stmp && stmp != (svalue *)-1) {
+    if (stmp && stmp != (svalue_t *)-1) {
 	if (stmp->type == T_STRING) {
 	    fname = stmp->u.string;
 	    if (*fname == '/')
@@ -2798,7 +2791,8 @@ void object_save_ed_buffer P1(struct object *, ob)
     free_ed_buffer();
 }
 
-int object_ed_mode P1(struct object *, ob) {
+int object_ed_mode P1(object_t *, ob) {
+    regexp_user = ED_REGEXP;
     current_ed_buffer = find_ed_buffer(ob);
     current_editor = ob;
 
@@ -2810,10 +2804,11 @@ int object_ed_mode P1(struct object *, ob) {
     return 0;
 }
 
-char *object_ed_cmd P2(struct object *, ob, char *, str)
+char *object_ed_cmd P2(object_t *, ob, char *, str)
 {
     int status = 0;
 
+    regexp_user = ED_REGEXP;
     current_ed_buffer = find_ed_buffer(ob);
     current_editor = ob;
 
@@ -2826,8 +2821,8 @@ char *object_ed_cmd P2(struct object *, ob, char *, str)
 	return object_ed_results();
     }
 
-    strncpy(inlin, str, MAXLINE - 2);
-    inlin[MAXLINE - 2] = 0;
+    strncpy(inlin, str, ED_MAXLINE - 2);
+    inlin[ED_MAXLINE - 2] = 0;
     strcat(inlin, "\n");
 
     inptr = inlin;

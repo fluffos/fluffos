@@ -1,17 +1,11 @@
 #include "std.h"
 #include "file_incl.h"
-#include "config.h"
-#include "rc.h"
-#include "applies.h"
+#include "lpc_incl.h"
 #include "lex.h"
-#include "program.h"
 #include "backend.h"
 #include "simul_efun.h"
-#include "simulate.h"
 #include "binaries.h"
 #include "main.h"
-#include "interpret.h"
-#include "stralloc.h"
 #include "otable.h"
 #include "comm.h"
 #include "compiler.h"
@@ -38,13 +32,13 @@ static int reserved_size;
 char *reserved_area;		/* reserved for MALLOC() */
 static char *mud_lib;
 
-struct svalue const0, const1, const0u, const0n;
+svalue_t const0, const1, const0u, const0n;
 
 double consts[NUM_CONSTS];
 
 /* -1 indicates that we have never had a master object.  This is so the
  * simul_efun object can load before the master. */
-struct object *master_ob = (struct object *) -1;
+object_t *master_ob = (object_t *) -1;
 
 #ifndef NO_IP_DEMON
 void init_addr_server();
@@ -171,9 +165,7 @@ int main(argc, argv)
     const0n.subtype = T_NULLVALUE;
     const0n.u.number = 0;
 
-#ifdef NEW_FUNCTIONS
-    fake_prog.p.i.program_size = 0;
-#endif
+    fake_prog.program_size = 0;
 
     /*
      * Check that the definition of EXTRACT_UCHAR() is correct.

@@ -1,9 +1,7 @@
 #include "std.h"
-#include "config.h"
+#include "lpc_incl.h"
 #include "stralloc.h"
-#include "main.h"
 #include "hash.h"
-#include "simulate.h"
 #include "comm.h"
 
 /* ref-count debugging code */
@@ -308,7 +306,7 @@ add_string_status P1(int, verbose)
 	add_message("-------------------------\t Strings    Bytes\n");
     }
     if (verbose != -1)
-	add_vmessage("Strings malloced\t\t%8d %8d + %d overhead\n",
+	add_vmessage("Shared strings\t\t%8d %8d + %d overhead\n",
 	      num_distinct_strings, bytes_distinct_strings, overhead_bytes);
     if (verbose == 1) {
 	add_vmessage("Total asked for\t\t\t%8d %8d\n",

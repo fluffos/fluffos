@@ -1,23 +1,27 @@
 #include "std.h"
+#include "lpc_incl.h"
 #include "compiler.h"
 #include "trees.h"
 #include "lex.h"
-#include "applies.h"
-#include "stralloc.h"
-#include "simulate.h"
 #include "functab_tree.h"
 #include "generate.h"
 #include "swap.h"
 #include "scratchpad.h"
 #include "qsort.h"
 #include "file.h"
-#include "interpret.h"
 #include "binaries.h"
+/* This should be moved with initializers move out of here */
+#include "icode.h"
 
 static void clean_parser PROT((void));
 static void prolog PROT((int, char *));
 static void epilog PROT((void));
 static void show_overload_warnings PROT((void));
+
+short compatible[11] = { 0x000, 0xfff, 0x01e, 0x01e, 0x21e, 0x022,
+			 0x042, 0x082, 0x102, 0x212, 0x402 };
+short is_type[11] = { 0x000, 0xfff, 0x00e, 0x00e, 0x012, 0x022,
+		      0x042, 0x082, 0x102, 0x202, 0x402 };
 
 #ifdef DEBUG
 int dump_function_table() {
@@ -26,12 +30,12 @@ int dump_function_table() {
     printf("FUNCTIONS:\n");
     printf("      name                          offset    fio  flags  # locals  # args\n");
     printf("      -----------                   ------    ---  -----  --------  ------\n");
-    for (i = 0; i < mem_block[A_FUNCTIONS].current_size/sizeof(struct function); i++) {
+    for (i = 0; i < mem_block[A_FUNCTIONS].current_size/sizeof(function_t); i++) {
 	char sflags[7];
 	int flags;
-	struct function *funp;
+	function_t *funp;
 
-	funp = (struct function *)(mem_block[A_FUNCTIONS].block + i * sizeof(struct function));
+	funp = (function_t *)(mem_block[A_FUNCTIONS].block + i * sizeof(function_t));
 	flags = funp->flags;
 	sflags[5] = '\0';
 	sflags[0] = (flags & NAME_INHERITED) ? 'i' : '-';
@@ -53,11 +57,9 @@ int dump_function_table() {
 }
 #endif
 
-struct mem_block mem_block[NUMAREAS];
+mem_block_t mem_block[NUMAREAS];
 
-#ifdef NEW_FUNCTIONS
-struct function_context_t function_context;
-#endif
+function_context_t function_context;
 
 int exact_types;
 int approved_object;
@@ -68,20 +70,20 @@ int current_block;
 char *prog_code;
 char *prog_code_max;
 
-struct program NULL_program;
+program_t NULL_program;
 
-struct program *prog;
+program_t *prog;
 
 static short string_idx[0x100];
 unsigned char string_tags[0x20];
 short freed_string;
 
 unsigned short *type_of_locals;
-struct ident_hash_elem **locals;
+ident_hash_elem_t **locals;
 char *runtime_locals;
 
 unsigned short *type_of_locals_ptr;
-struct ident_hash_elem **locals_ptr;
+ident_hash_elem_t **locals_ptr;
 char *runtime_locals_ptr;
 
 int locals_size = 0;
@@ -109,7 +111,7 @@ void init_locals()
 {
     type_of_locals = CALLOCATE(MAX_LOCAL,unsigned short, 
 			       TAG_LOCALS, "init_locals:1");
-    locals = CALLOCATE(MAX_LOCAL, struct ident_hash_elem *, 
+    locals = CALLOCATE(MAX_LOCAL, ident_hash_elem_t *, 
 		       TAG_LOCALS, "init_locals:2");
     runtime_locals = CALLOCATE(MAX_LOCAL, char, 
 			       TAG_LOCALS, "init_locals:3");
@@ -179,7 +181,7 @@ int add_local_name P2(char *, str, int, type)
 	yyerror("Too many local variables");
 	return 0;
     } else {
-	struct ident_hash_elem *ihe;
+	ident_hash_elem_t *ihe;
 
 	ihe = find_or_add_ident(str,FOA_NEEDS_MALLOC);
 	type_of_locals_ptr[max_num_locals] = type;
@@ -198,7 +200,7 @@ void reallocate_locals(){
     type_of_locals_ptr = type_of_locals + offset;
     offset = locals_ptr - locals;
     locals = RESIZE(locals, locals_size, 
-		    struct ident_hash_elem *, TAG_LOCALS, "reallocate_locals:2");
+		    ident_hash_elem_t *, TAG_LOCALS, "reallocate_locals:2");
     locals_ptr = locals + offset;
     runtime_locals = RESIZE(runtime_locals, locals_size, char,
 			    TAG_LOCALS, "reallocate_locals:3");
@@ -210,11 +212,11 @@ void reallocate_locals(){
  * It is very important that they are stored in the same order with the
  * same index.
  */
-void copy_variables P2(struct program *, from, int, type)
+void copy_variables P2(program_t *, from, int, type)
 {
-    int i, numvars = from->p.i.num_variables, n;
-    struct variable *from_vars = from->p.i.variable_names;
-    struct ident_hash_elem *ihe;
+    int i, numvars = from->num_variables, n;
+    variable_t *from_vars = from->variable_names;
+    ident_hash_elem_t *ihe;
     int new_type;
 
     for (i = 0; (unsigned) i < numvars; i++) {
@@ -227,7 +229,7 @@ void copy_variables P2(struct program *, from, int, type)
         if (from_vars[i].type & TYPE_MOD_PUBLIC)
             new_type &= ~TYPE_MOD_PRIVATE;
 
-        if ((ihe = lookup_ident(from->p.i.variable_names[i].name)) &&
+        if ((ihe = lookup_ident(from->variable_names[i].name)) &&
 	    ((n = ihe->dn.global_num) != -1)) {
             char tmp[2048];
 
@@ -237,15 +239,15 @@ void copy_variables P2(struct program *, from, int, type)
                 yyerror(tmp);
 	    }
 	}
-        define_variable(from->p.i.variable_names[i].name,
-                        from->p.i.variable_names[i].type | new_type,
-                        from->p.i.variable_names[i].type & TYPE_MOD_PRIVATE);
+        define_variable(from->variable_names[i].name,
+                        from->variable_names[i].type | new_type,
+                        from->variable_names[i].type & TYPE_MOD_PRIVATE);
      } 
 }
 
 
 
-static void copy_function_details P2(struct function *, to, struct function *, from) {
+static void copy_function_details P2(function_t *, to, function_t *, from) {
     to->offset = from->offset;
     to->function_index_offset = from->function_index_offset;
     to->type = from->type;
@@ -257,12 +259,12 @@ static void copy_function_details P2(struct function *, to, struct function *, f
 /* copy a function verbatim into this object, and possibly add it to the
    list of functions in this object, as well
  */
-static struct function *copy_function P2(struct function *, new, int, add) {
-    struct function *ret;
-    int num = mem_block[A_FUNCTIONS].current_size/sizeof(struct function);
-    struct ident_hash_elem *ihe;
+static function_t *copy_function P2(function_t *, new, int, add) {
+    function_t *ret;
+    int num = mem_block[A_FUNCTIONS].current_size/sizeof(function_t);
+    ident_hash_elem_t *ihe;
 
-    ret = (struct function *)allocate_in_mem_block(A_FUNCTIONS, sizeof(struct function));
+    ret = (function_t *)allocate_in_mem_block(A_FUNCTIONS, sizeof(function_t));
     *ret = *new;
     ref_string(new->name); /* increment ref count */
     /* don't propagate certain flags forward */
@@ -272,7 +274,7 @@ static struct function *copy_function P2(struct function *, new, int, add) {
 
     if (add) {
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
-	add_function((struct function *) mem_block[A_FUNCTIONS].block,
+	add_function((function_t *) mem_block[A_FUNCTIONS].block,
 		     &a_functions_root, num);
 #endif
 	/* add the identifier */
@@ -284,12 +286,41 @@ static struct function *copy_function P2(struct function *, new, int, add) {
     return ret;
 }
 
+void copy_structures P1(program_t *, prog) {
+    class_def_t *sd;
+    class_member_entry_t *sme;
+    ident_hash_elem_t *ihe;
+    char *str;
+    int sm_off = mem_block[A_CLASS_MEMBER].current_size / sizeof(class_member_entry_t);
+    int sd_off = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
+    int i, num = 0;
+
+    sd = (class_def_t *)allocate_in_mem_block(A_CLASS_DEF, prog->num_classes * sizeof(class_def_t));
+    for (i = 0; i < prog->num_classes; i++) {
+	sd[i].size = prog->classes[i].size;
+	num += sd[i].size;
+	sd[i].index = prog->classes[i].index + sm_off;
+	str = prog->strings[prog->classes[i].name];
+	sd[i].name = store_prog_string(str);
+	ihe = find_or_add_ident(str, FOA_GLOBAL_SCOPE);
+	if (ihe->dn.class_num == -1)
+	    ihe->sem_value++;
+	ihe->dn.class_num = i + sd_off;
+    }
+
+    sme = (class_member_entry_t *)allocate_in_mem_block(A_CLASS_MEMBER, sizeof(class_member_entry_t) * num);
+    while (num--) {
+	sme[num].type = prog->class_members[num].type;
+	sme[num].name = store_prog_string(prog->strings[prog->class_members[num].name]);
+    }
+}
+
 static char *get_inherit_name P1(int, index) {
-    struct inherit *ip;
+    inherit_t *ip;
     int num_inherits = mem_block[A_INHERITS].current_size /
-	sizeof(struct inherit);
+	sizeof(inherit_t);
     
-    ip = (struct inherit *) mem_block[A_INHERITS].block + num_inherits;
+    ip = (inherit_t *) mem_block[A_INHERITS].block + num_inherits;
     while (num_inherits--){
         ip--;
         if (ip->function_index_offset <= index) return ip->prog->name;
@@ -298,15 +329,17 @@ static char *get_inherit_name P1(int, index) {
     /* NOTREACHED */
 }
 
-struct ovlwarn {
-    struct ovlwarn *next;
+typedef struct ovlwarn_s {
+    struct ovlwarn_s *next;
     char *func;
     char *warn;
-} *overload_warnings = 0;
+} ovlwarn_t;
+
+ovlwarn_t *overload_warnings = 0;
 
 static void remove_overload_warnings P1(char *, func) {
-    struct ovlwarn **p;
-    struct ovlwarn *tmp;
+    ovlwarn_t **p;
+    ovlwarn_t *tmp;
 
     p = &overload_warnings;
     while (*p) {
@@ -321,7 +354,7 @@ static void remove_overload_warnings P1(char *, func) {
 }
 
 static void show_overload_warnings() {
-    struct ovlwarn *p, *next;
+    ovlwarn_t *p, *next;
     p = overload_warnings;
     while (p) {
 	yywarn(p->warn);
@@ -334,12 +367,12 @@ static void show_overload_warnings() {
 }
 
 /* Overload the function index with the new definition */
-static struct function *overload_function P3(int, index, struct program *, prog, int, newindex) {
-    struct function *funp, *alias;
-    struct function *new;
+static function_t *overload_function P3(int, index, program_t *, prog, int, newindex) {
+    function_t *funp, *alias;
+    function_t *new;
 
-    new = &prog->p.i.functions[newindex];
-    funp = (struct function *)mem_block[A_FUNCTIONS].block + index;
+    new = &prog->functions[newindex];
+    funp = (function_t *)mem_block[A_FUNCTIONS].block + index;
     /* Be careful with nomask; if both functions exists and either is nomask,
        we error.  */
     if (!(new->flags & NAME_NO_CODE) && REAL_FUNCTION(funp)
@@ -371,12 +404,12 @@ static struct function *overload_function P3(int, index, struct program *, prog,
 	if (!(funp->type & TYPE_MOD_PRIVATE) && !(new->type & TYPE_MOD_PRIVATE)) {
 	    char buf[1024];
 	    char *from1 ;
-	    struct ovlwarn *ow;
+	    ovlwarn_t *ow;
 	    
-	    from1 = ((struct inherit *) mem_block[A_INHERITS].block + funp->offset)->prog->name;
+	    from1 = ((inherit_t *) mem_block[A_INHERITS].block + funp->offset)->prog->name;
 	    sprintf(buf, "%s() inherited from both %s and %s; using the definition in %s.", funp->name, from1, prog->name, prog->name);
 	
-	    ow = ALLOCATE(struct ovlwarn, TAG_COMPILER, "overload warning");
+	    ow = ALLOCATE(ovlwarn_t, TAG_COMPILER, "overload warning");
 	    ow->next = overload_warnings;
 	    ow->func = funp->name;
 	    ow->warn = string_copy(buf, "overload warning");
@@ -390,7 +423,7 @@ static struct function *overload_function P3(int, index, struct program *, prog,
     alias = copy_function(new, 0);
     /* Ick! copy_functions calls allocate_in_mem_block(), so funp might
        be dangling now.  Be safe and find it again. */
-    funp = (struct function *)mem_block[A_FUNCTIONS].block + index;
+    funp = (function_t *)mem_block[A_FUNCTIONS].block + index;
     alias->flags = NAME_ALIAS;
     /* offset to the real def */
     alias->offset = alias - funp;
@@ -417,14 +450,14 @@ static struct function *overload_function P3(int, index, struct program *, prog,
  * definition). If an function defined by inheritance is called, then one
  * special definition will be made at first call.
  */
-int copy_functions P2(struct program *, from, int, type)
+int copy_functions P2(program_t *, from, int, type)
 {
-    int i, initializer = -1, num_functions = from->p.i.num_functions;
+    int i, initializer = -1, num_functions = from->num_functions;
     unsigned short tmp_short;
-    struct function *from_funcs = from->p.i.functions;
-    struct function *funp;
+    function_t *from_funcs = from->functions;
+    function_t *funp;
     int new_type;
-    struct ident_hash_elem *ihe;
+    ident_hash_elem_t *ihe;
     int num;
 
 
@@ -447,7 +480,7 @@ int copy_functions P2(struct program *, from, int, type)
 	if (funp) {
 	    /* point the new function entry at the one in the inherited file,
 	       in case it's not overloaded and this becomes a real function */
-	    funp->offset = mem_block[A_INHERITS].current_size / sizeof(struct inherit) - 1;
+	    funp->offset = mem_block[A_INHERITS].current_size / sizeof(inherit_t) - 1;
 	    funp->function_index_offset = i;
 
 #ifdef PROFILE_FUNCTIONS
@@ -478,16 +511,16 @@ int copy_functions P2(struct program *, from, int, type)
 	 * available.
 	 */
 	tmp_short = INDEX_START_NONE;	/* Presume not available. */
-	if (from->p.i.type_start != 0 && from->p.i.type_start[i] != INDEX_START_NONE) {
+	if (exact_types && from->type_start != 0 && from->type_start[i] != INDEX_START_NONE) {
 	    /*
 	     * They are available for function number 'i'. Copy types of
 	     * all arguments, and remember where they started.
 	     */
 	    tmp_short = mem_block[A_ARGUMENT_TYPES].current_size /
-		sizeof from->p.i.argument_types[0];
+		sizeof from->argument_types[0];
 	    add_to_mem_block(A_ARGUMENT_TYPES, 
-			     (char *) &from->p.i.argument_types[from->p.i.type_start[i]],
-			     sizeof(unsigned short) * from->p.i.functions[i].num_arg);
+			     (char *) &from->argument_types[from->type_start[i]],
+			     sizeof(unsigned short) * from->functions[i].num_arg);
 	}
 	/*
 	 * Save the index where they started. Every function will have an
@@ -521,27 +554,26 @@ void type_error P2(char *, str, int, type)
 
 int compatible_types P2(int, t1, int, t2)
 {
-    if (t1 == TYPE_UNKNOWN || t2 == TYPE_UNKNOWN)
-#ifdef CAST_CALL_OTHERS
-	return 0;
+#ifdef OLD_TYPE_BEHAVIOR
+    /* The old version effectively was almost always was true */
+    return 1;
 #else
+    t1 &= TYPE_MOD_MASK;
+    t2 &= TYPE_MOD_MASK;
+    if (t1 == TYPE_ANY || t2 == TYPE_ANY) return 1;
+    if ((t1 == (TYPE_ANY | TYPE_MOD_ARRAY) && (t2 & TYPE_MOD_ARRAY)))
 	return 1;
-#endif
-    if (t1 == t2)
+    if ((t2 == (TYPE_ANY | TYPE_MOD_ARRAY) && (t1 & TYPE_MOD_ARRAY)))
 	return 1;
-
-/* The only version of the if effectively always was true */
-#ifndef OLD_TYPE_BEHAVIOR
-    if ((t1 == TYPE_NUMBER || t1 == TYPE_REAL) && (t2 == TYPE_NUMBER || t2 == TYPE_REAL))
-#endif
-	return 1;
-    if (t1 == TYPE_ANY || t2 == TYPE_ANY)
-	return 1;
-    if ((t1 & TYPE_MOD_POINTER) && (t2 & TYPE_MOD_POINTER)) {
-	return ((t1 & TYPE_MOD_MASK) == (TYPE_ANY | TYPE_MOD_POINTER) ||
-	    (t2 & TYPE_MOD_MASK) == (TYPE_ANY | TYPE_MOD_POINTER));
+    if (t1 & TYPE_MOD_CLASS)
+	return t1 == t2;
+    if (t1 & TYPE_MOD_ARRAY) {
+	if (!(t2 & TYPE_MOD_ARRAY)) return 0;
+	return t1 == (TYPE_MOD_ARRAY | TYPE_ANY) ||
+	       t2 == (TYPE_MOD_ARRAY | TYPE_ANY) || (t1 == t2);
     }
-    return 0;
+    return compatible[t1] & (1 << t2);
+#endif
 }
 
 /*
@@ -554,10 +586,10 @@ int compatible_types P2(int, t1, int, t2)
  *
  * Note: this function is now only used for resolving :: references
  */
-void arrange_call_inherited P2(char *, name, struct parse_node *, node)
+void arrange_call_inherited P2(char *, name, parse_node_t *, node)
 {
     int i;
-    struct inherit *ip;
+    inherit_t *ip;
     int num_inherits, super_length = 0;
     char *super_name = 0, *p, *real_name = name;
     char *shared_string;
@@ -570,10 +602,10 @@ void arrange_call_inherited P2(char *, name, struct parse_node *, node)
         super_length = real_name - super_name - 2;
     }
     num_inherits = mem_block[A_INHERITS].current_size /
-	sizeof(struct inherit);
+	sizeof(inherit_t);
     /* no need to look for it unless its in the shared string table */
     if ((shared_string = findstring(real_name))) {
-	ip = (struct inherit *) mem_block[A_INHERITS].block;
+	ip = (inherit_t *) mem_block[A_INHERITS].block;
 	for (; num_inherits > 0; ip++, num_inherits--) {
 	    if (super_name) {
 		int l = strlen(ip->prog->name);	/* Including .c */
@@ -587,21 +619,21 @@ void arrange_call_inherited P2(char *, name, struct parse_node *, node)
                     continue;
 	    }
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
-	    i = lookup_function(ip->prog->p.i.functions,
-				ip->prog->p.i.tree_r, shared_string);
-	    if (i != -1 && !(ip->prog->p.i.functions[i].flags
+	    i = lookup_function(ip->prog->functions,
+				ip->prog->tree_r, shared_string);
+	    if (i != -1 && !(ip->prog->functions[i].flags
 			     & NAME_UNDEFINED)) {
 #else
-	    for (i = 0; (unsigned) i < ip->prog->p.i.num_functions; i++) {
-		if (ip->prog->p.i.functions[i].flags & NAME_UNDEFINED)
+	    for (i = 0; (unsigned) i < ip->prog->num_functions; i++) {
+		if (ip->prog->functions[i].flags & NAME_UNDEFINED)
 		    continue;
 		    /* can use pointer compare because both are shared */
-		if (ip->prog->p.i.functions[i].name != shared_string)
+		if (ip->prog->functions[i].name != shared_string)
 		    continue;
 #endif
 		node->kind = F_CALL_INHERITED;
-	        node->v.number = (ip - (struct inherit *) mem_block[A_INHERITS].block) | (i << 8);
-		node->type = ip->prog->p.i.functions[i].type;
+	        node->v.number = (ip - (inherit_t *) mem_block[A_INHERITS].block) | (i << 8);
+		node->type = ip->prog->functions[i].type;
 		return;
 	    }
 	}
@@ -622,17 +654,17 @@ void arrange_call_inherited P2(char *, name, struct parse_node *, node)
  * function. Thus, there are tests to avoid generating error messages more
  * than once by looking at (flags & NAME_PROTOTYPE).
  */
-int define_new_function P6(char *, name, int, num_arg, int, num_local,
-                           int, offset, int, flags, int, type)
+int define_new_function P5(char *, name, int, num_arg, int, num_local,
+                           int, flags, int, type)
 {
     int num;
-    struct function fun;
+    function_t fun;
     unsigned short argument_start_index;
-    struct ident_hash_elem *ihe;
+    ident_hash_elem_t *ihe;
 
     num = (ihe = lookup_ident(name)) ? ihe->dn.function_num : -1;
     if (num >= 0) {
-	struct function *funp;
+	function_t *funp;
 
 	/*
 	 * The function was already defined. It may be one of several
@@ -644,7 +676,7 @@ int define_new_function P6(char *, name, int, num_arg, int, num_local,
 	 * 4.	The function is doubly defined.
 	 * 5.	A "late" prototype has been encountered.
 	 */
-	funp = (struct function *) (mem_block[A_FUNCTIONS].block) + num;
+	funp = (function_t *) (mem_block[A_FUNCTIONS].block) + num;
 	if (!(funp->flags & NAME_UNDEFINED) &&
 	    !(flags & NAME_PROTOTYPE)) {
 	    char buff[500];
@@ -672,9 +704,12 @@ int define_new_function P6(char *, name, int, num_arg, int, num_local,
 	    sprintf(p, "Illegal to redefine 'nomask' function \"%s\"", name);
 	    yyerror(p);
 	}
-	if (exact_types && funp->type == NAME_PROTOTYPE && funp->type != TYPE_UNKNOWN) {
+	/* only check prototypes for matching.  It shouldn't be required that
+	   overloading a function must have the same signature */
+	if (exact_types && (funp->flags & NAME_PROTOTYPE) && funp->type != TYPE_UNKNOWN) {
 	    int i;
 
+	    /* This should be changed to catch two prototypes which disagree */
 	    if (funp->num_arg != num_arg && !(funp->type & TYPE_MOD_VARARGS)
 		&& !(flags & NAME_PROTOTYPE))
 		yyerror("Number of arguments disagrees with previous definition.");
@@ -698,7 +733,7 @@ int define_new_function P6(char *, name, int, num_arg, int, num_local,
 	funp->num_arg = num_arg;
 	funp->num_local = num_local;
 	funp->flags = flags;
-	funp->offset = offset;
+	funp->offset = 0;
 	funp->function_index_offset = 0;
 	funp->type = type;
 	if (exact_types)
@@ -706,7 +741,7 @@ int define_new_function P6(char *, name, int, num_arg, int, num_local,
 	return num;
     }
     fun.name = make_shared_string(name);
-    fun.offset = offset;
+    fun.offset = 0;
     fun.flags = flags;
     fun.num_arg = num_arg;
     fun.num_local = num_local;
@@ -724,7 +759,7 @@ int define_new_function P6(char *, name, int, num_arg, int, num_local,
     /* Number of local variables will be updated later */
     add_to_mem_block(A_FUNCTIONS, (char *) &fun, sizeof fun);
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
-    add_function((struct function *) mem_block[A_FUNCTIONS].block,
+    add_function((function_t *) mem_block[A_FUNCTIONS].block,
 		 &a_functions_root, num);
 #endif
 
@@ -756,14 +791,14 @@ int define_new_function P6(char *, name, int, num_arg, int, num_local,
 
 int define_variable P3(char *, name, int, type, int, hide)
 {
-    struct variable *dummy;
+    variable_t *dummy;
     int n;
     char *str;
-    struct ident_hash_elem *ihe;
+    ident_hash_elem_t *ihe;
 
     str = make_shared_string(name);
 
-    n = (mem_block[A_VARIABLES].current_size / sizeof(struct variable));
+    n = (mem_block[A_VARIABLES].current_size / sizeof(variable_t));
 
     ihe = find_or_add_ident(str, FOA_GLOBAL_SCOPE);
     if (ihe->dn.global_num == -1) {
@@ -788,8 +823,9 @@ int define_variable P3(char *, name, int, type, int, hide)
 	if (!hide)
 	    ihe->dn.global_num = n;
     }
+    ihe->dn.global_num = n;
 
-    dummy = (struct variable *)allocate_in_mem_block(A_VARIABLES,sizeof(struct variable));
+    dummy = (variable_t *)allocate_in_mem_block(A_VARIABLES,sizeof(variable_t));
     dummy->name = str;
     dummy->type = type;
 
@@ -802,9 +838,9 @@ char *get_type_name P1(int, type)
 {
     static char buff[100];
     static char *type_name[] =
-    {"unknown", "void", "int", "string",
-     "object", "mapping", "function",
-     "float", "buffer", "mixed"};
+    {"unknown", "mixed", "void", "void", 
+     "int", "string", "object", "mapping",
+     "function", "float", "buffer" };
     int pointer = 0;
 
     buff[0] = 0;
@@ -821,13 +857,18 @@ char *get_type_name P1(int, type)
     if (type & TYPE_MOD_VARARGS)
 	strcat(buff, "varargs ");
     type &= TYPE_MOD_MASK;
-    if (type & TYPE_MOD_POINTER) {
+    if (type & TYPE_MOD_ARRAY) {
 	pointer = 1;
-	type &= ~TYPE_MOD_POINTER;
+	type &= ~TYPE_MOD_ARRAY;
     }
-    if (type >= sizeof type_name / sizeof type_name[0])
-	fatal("Bad type\n");
-    strcat(buff, type_name[type]);
+    if (type & TYPE_MOD_CLASS) {
+	strcat(buff, "class ");
+	strcat(buff, PROG_STRING(CLASS(type & ~TYPE_MOD_CLASS)->name));
+    } else {
+	if (type >= sizeof type_name / sizeof type_name[0])
+	    fatal("Bad type\n");
+	strcat(buff, type_name[type]);
+    }
     strcat(buff, " ");
     if (pointer)
 	strcat(buff, "* ");
@@ -955,7 +996,7 @@ void free_prog_string P1(short, num)
     }
 }
 
-int validate_function_call P3(struct function *, funp, int, f, struct parse_node *, args)
+int validate_function_call P3(function_t *, funp, int, f, parse_node_t *, args)
 {
     int num_arg = ( args ? args->kind : 0 );
 
@@ -987,14 +1028,14 @@ int validate_function_call P3(struct function *, funp, int, f, struct parse_node
 	!= INDEX_START_NONE) {
 	int i, first, tmp;
 	unsigned short *arg_types;
-	struct parse_node *enode = args;
+	parse_node_t *enode = args;
 
 	arg_types = (unsigned short *) mem_block[A_ARGUMENT_TYPES].block;
 	first = *(unsigned short *) &mem_block[A_ARGUMENT_INDEX].block[f * sizeof(unsigned short)];
 	for (i = 0; (unsigned) i < funp->num_arg && i < num_arg; i++) {
 	    tmp = enode->v.expr->type;
 
-	    if (!TYPE(tmp, arg_types[first + i])) {
+	    if (!compatible_types(tmp, arg_types[first + i])) {
 		char buff[100];
 
 		sprintf(buff, "Bad type for argument %d %s", i + 1,
@@ -1007,8 +1048,44 @@ int validate_function_call P3(struct function *, funp, int, f, struct parse_node
     return funp->type & TYPE_MOD_MASK;
 }
 
-struct parse_node *
-validate_efun_call P2(int, f, struct parse_node *, args) {
+parse_node_t *
+promote_to_float P1(parse_node_t *, node) {
+    parse_node_t *expr;
+    if (node->kind == F_NUMBER) {
+	node->kind = F_REAL;
+	node->v.real = node->v.number;
+    }
+    expr = make_branched_node(0, 0, 0, 0);
+    expr->v.expr = node;
+    expr = make_branched_node(F_TO_FLOAT, TYPE_REAL, 0, expr);
+    expr->v.number = 1;
+    return expr;
+}
+
+parse_node_t *
+promote_to_int P1(parse_node_t *, node) {
+    parse_node_t *expr;
+    if (node->kind == F_REAL) {
+	node->kind = F_NUMBER;
+	node->v.number = node->v.real;
+    }
+    expr = make_branched_node(0, 0, 0, 0);
+    expr->v.expr = node;
+    expr = make_branched_node(F_TO_INT, TYPE_NUMBER, 0, expr);
+    expr->v.number = 1;
+    return expr;
+}
+
+parse_node_t *do_promotions P2(parse_node_t *, node, int, type) {
+    if (type == TYPE_REAL && node->type == TYPE_NUMBER)
+	return promote_to_float(node);
+    if (type == TYPE_NUMBER && node->type == TYPE_REAL)
+	return promote_to_int(node);
+    return node;
+}
+
+parse_node_t *
+validate_efun_call P2(int, f, parse_node_t *, args) {
     int num = args->v.number;
     int min_arg, max_arg, def, *argp;
     
@@ -1032,7 +1109,7 @@ validate_efun_call P2(int, f, struct parse_node *, args) {
 
 	def = predefs[f].Default;
 	if (def && num == min_arg -1) {
-	    struct parse_node *tmp;
+	    parse_node_t *tmp;
 	    tmp = new_node_no_line();
 	    tmp->r.expr = 0;
 	    args->l.expr->r.expr = tmp;
@@ -1061,7 +1138,7 @@ validate_efun_call P2(int, f, struct parse_node *, args) {
 	     */
 	    int i, argn, tmp;
 	    char buff[100];
-	    struct parse_node *enode = args;
+	    parse_node_t *enode = args;
 	    argp = &efun_arg_types[predefs[f].arg_index];
 	    
 	    for (argn = 0; argn < num; argn++) {
@@ -1069,10 +1146,25 @@ validate_efun_call P2(int, f, struct parse_node *, args) {
 		tmp = enode->v.expr->type;
 		for (i=0; !compatible_types(argp[i], tmp) && argp[i] != 0; i++)
 		    ;
+
 		if (argp[i] == 0) {
 		    sprintf(buff, "Bad argument %d to efun %s()",
 			    argn+1, predefs[f].word);
 		    yyerror(buff);
+		} else {
+		    /* check for (int) -> (float) promotion */
+		    if (tmp == TYPE_NUMBER && argp[i] == TYPE_REAL) {
+			for (i++; argp[i] && argp[i] != TYPE_NUMBER; i++)
+			    ;
+			if (!argp[i])
+			    enode->v.expr = promote_to_float(enode->v.expr);
+		    }
+		    else if (tmp == TYPE_REAL && argp[i] == TYPE_NUMBER) {
+			for (i++; argp[i] && argp[i] != TYPE_REAL; i++)
+			    ;
+			if (!argp[i])
+			    enode->v.expr = promote_to_int(enode->v.expr);
+		    }
 		}
 		while (argp[i] != 0)
 		    i++;
@@ -1117,9 +1209,7 @@ void yyerror P1(char *, str)
 {
     extern int num_parse_error;
 
-#ifdef NEW_FUNCTIONS
     function_context.num_parameters = -1;
-#endif
     if (num_parse_error > 5)
 	return;
     smart_log(current_file, current_line, str, 0);
@@ -1152,14 +1242,16 @@ int get_id_number() {
     return current_id_number++;
 }
 
+static short zero = 0;
+
 /*
- * The program has been compiled. Prepare a 'struct program' to be returned.
+ * The program has been compiled. Prepare a 'program_t' to be returned.
  */
 static void epilog() {
     int size, i, lnsz, lnoff;
     char *p;
-    struct function *funp;
-    struct ident_hash_elem *ihe;
+    function_t *funp;
+    ident_hash_elem_t *ihe;
 
     /* don't need the parse trees any more */
     release_tree();
@@ -1186,15 +1278,17 @@ static void epilog() {
     UPDATE_PROGRAM_SIZE;
 
     if (mem_block[A_INITIALIZER].current_size) {
-	struct parse_node *pn;
+	parse_node_t *pn;
+	int fun;
 	/* end the __INIT function */
 	start_initializer();
 	CREATE_NODE(pn, F_RETURN);
 	CREATE_NODE(pn->r.expr, F_CONST0);
 	generate(pn);
 	end_initializer();
-	define_new_function(APPLY___INIT, 0, 0, CURRENT_PROGRAM_SIZE,
+ 	fun = define_new_function(APPLY___INIT, 0, 0, 
 			    NAME_STRICT_TYPES, TYPE_VOID | TYPE_MOD_PRIVATE);
+	FUNCTION(fun)->offset = CURRENT_PROGRAM_SIZE;
 	generate___INIT();
     }
 
@@ -1210,7 +1304,7 @@ static void epilog() {
      * they're all the same again.
      */
     for (i = 0; i < mem_block[A_FUNCTIONS].current_size; i += sizeof *funp) {
-	funp = (struct function *)(mem_block[A_FUNCTIONS].block + i);
+	funp = (function_t *)(mem_block[A_FUNCTIONS].block + i);
 	if ((funp->flags & NAME_UNDEFINED) && (funp->flags & NAME_DEF_BY_INHERIT))
 	    funp->flags = (funp->flags & ~NAME_UNDEFINED) | NAME_INHERITED;
 	if (funp->flags & NAME_ALIAS) {
@@ -1220,7 +1314,7 @@ static void epilog() {
     }
     generate_final_program(1);
 
-    size = align(sizeof (struct program));
+    size = align(sizeof (program_t));
     for (i=0; i<NUMPAREAS; i++)
 	if (i != A_LINENUMBERS && i != A_ARGUMENT_TYPES && i != A_ARGUMENT_INDEX)
 	    size += align(mem_block[i].current_size);
@@ -1228,100 +1322,117 @@ static void epilog() {
     ihe = lookup_ident("heart_beat");
 
     p = (char *)DXALLOC(size, TAG_PROGRAM, "epilog: 1");
-    prog = (struct program *)p;
+    prog = (program_t *)p;
     *prog = NULL_program;
-    prog->p.i.total_size = size;
-    prog->p.i.ref = 0;
-    prog->p.i.func_ref = 0;
-    prog->p.i.heart_beat = (ihe ? ihe->dn.function_num : -1);
+    prog->total_size = size;
+    prog->ref = 0;
+    prog->func_ref = 0;
+    prog->heart_beat = (ihe ? ihe->dn.function_num : -1);
     prog->name = current_file;
     current_file = 0;
 
-    prog->p.i.id_number = get_id_number();
-    total_prog_block_size += prog->p.i.total_size;
+    prog->id_number = get_id_number();
+    total_prog_block_size += prog->total_size;
     total_num_prog_blocks += 1;
 
-    prog->p.i.line_swap_index = -1;
+    prog->line_swap_index = -1;
     /* Format is now:
      * <short total size> <short line_info_offset> <file info> <line info>
      */
     lnoff = 2 + (mem_block[A_FILE_INFO].current_size / sizeof(short));
     lnsz = lnoff * sizeof(short) + mem_block[A_LINENUMBERS].current_size;
 
-    prog->p.i.file_info = (unsigned short *)DXALLOC(lnsz, TAG_LINENUMBERS
+    prog->file_info = (unsigned short *)DXALLOC(lnsz, TAG_LINENUMBERS
 						    , "epilog");
-    prog->p.i.file_info[0] = (unsigned short)lnsz;
-    prog->p.i.file_info[1] = (unsigned short)lnoff;
+    prog->file_info[0] = (unsigned short)lnsz;
+    prog->file_info[1] = (unsigned short)lnoff;
 
-    memcpy(((char*)&prog->p.i.file_info[2]),
+    memcpy(((char*)&prog->file_info[2]),
 	  mem_block[A_FILE_INFO].block,
 	  mem_block[A_FILE_INFO].current_size);
 
-    prog->p.i.line_info = (unsigned char *)(&prog->p.i.file_info[lnoff]);
-    memcpy(((char*)&prog->p.i.file_info[lnoff]),
+    prog->line_info = (unsigned char *)(&prog->file_info[lnoff]);
+    memcpy(((char*)&prog->file_info[lnoff]),
 	   mem_block[A_LINENUMBERS].block,
 	   mem_block[A_LINENUMBERS].current_size);
 
-    p += align(sizeof (struct program));
-    prog->p.i.program = p;
+    p += align(sizeof (program_t));
+    prog->program = p;
     if (mem_block[A_PROGRAM].current_size)
 	memcpy(p, mem_block[A_PROGRAM].block,
 	      mem_block[A_PROGRAM].current_size);
-    prog->p.i.program_size = mem_block[A_PROGRAM].current_size;
+    prog->program_size = mem_block[A_PROGRAM].current_size;
 
     p += align(mem_block[A_PROGRAM].current_size);
-    prog->p.i.functions = (struct function *)p;
-    prog->p.i.num_functions = mem_block[A_FUNCTIONS].current_size /
-	  sizeof (struct function);
+    prog->functions = (function_t *)p;
+    prog->num_functions = mem_block[A_FUNCTIONS].current_size /
+	  sizeof (function_t);
     if (mem_block[A_FUNCTIONS].current_size)
 	memcpy(p, mem_block[A_FUNCTIONS].block,
 	      mem_block[A_FUNCTIONS].current_size);
 
+    p += align(mem_block[A_FUNCTIONS].current_size);
+    prog->classes = (class_def_t *)p;
+    prog->num_classes = mem_block[A_CLASS_DEF].current_size /
+	  sizeof (class_def_t);
+    if (mem_block[A_CLASS_DEF].current_size)
+	memcpy(p, mem_block[A_CLASS_DEF].block,
+	      mem_block[A_CLASS_DEF].current_size);
+
+    p += align(mem_block[A_CLASS_DEF].current_size);
+    prog->class_members = (class_member_entry_t *)p;
+    if (mem_block[A_CLASS_MEMBER].current_size)
+	memcpy(p, mem_block[A_CLASS_MEMBER].block,
+	      mem_block[A_CLASS_MEMBER].current_size);
+
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
-    prog->p.i.tree_r = a_functions_root;
+    prog->tree_r = a_functions_root;
 #endif
 
-    p += align(mem_block[A_FUNCTIONS].current_size);
-    prog->p.i.strings = (char **)p;
-    prog->p.i.num_strings = mem_block[A_STRINGS].current_size /
+    p += align(mem_block[A_CLASS_MEMBER].current_size);
+    prog->strings = (char **)p;
+    prog->num_strings = mem_block[A_STRINGS].current_size /
 	  sizeof (char *);
     if (mem_block[A_STRINGS].current_size)
 	memcpy(p, mem_block[A_STRINGS].block,
 	      mem_block[A_STRINGS].current_size);
 
     p += align(mem_block[A_STRINGS].current_size);
-    prog->p.i.variable_names = (struct variable *)p;
-    prog->p.i.num_variables = mem_block[A_VARIABLES].current_size /
-	  sizeof (struct variable);
+    prog->variable_names = (variable_t *)p;
+    prog->num_variables = mem_block[A_VARIABLES].current_size /
+	  sizeof (variable_t);
     if (mem_block[A_VARIABLES].current_size)
 	memcpy(p, mem_block[A_VARIABLES].block,
 	      mem_block[A_VARIABLES].current_size);
 
     p += align(mem_block[A_VARIABLES].current_size);
-    prog->p.i.num_inherited = mem_block[A_INHERITS].current_size /
-	  sizeof (struct inherit);
-    if (prog->p.i.num_inherited) {
+    prog->num_inherited = mem_block[A_INHERITS].current_size /
+	  sizeof (inherit_t);
+    if (prog->num_inherited) {
 	memcpy(p, mem_block[A_INHERITS].block,
 	      mem_block[A_INHERITS].current_size);
-	prog->p.i.inherit = (struct inherit *)p;
+	prog->inherit = (inherit_t *)p;
     } else
-	prog->p.i.inherit = 0;
+	prog->inherit = 0;
 
-    prog->p.i.argument_types = 0;       /* For now. Will be fixed someday */
-    prog->p.i.type_start = 0;
-
+    if (pragmas & PRAGMA_SAVE_TYPES && (size = mem_block[A_ARGUMENT_TYPES].current_size)) {
+	prog->argument_types = (unsigned short *) DXALLOC(size, TAG_ARGUMENTS, "epilog: argument_types");
+	memcpy((char *) prog->argument_types, mem_block[A_ARGUMENT_TYPES].block, size);
+	size = mem_block[A_ARGUMENT_INDEX].current_size;
+	prog->type_start = (unsigned short *) DXALLOC(size, TAG_ARGUMENTS, "epilog: type_start");
+	memcpy((char *) prog->type_start, mem_block[A_ARGUMENT_INDEX].block, size);
+    } else {
+	prog->argument_types = 0;
+	prog->type_start = 0;
+    }
 #ifdef BINARIES
-#  ifdef ALWAYS_SAVE_BINARIES
-    save_binary(prog, &mem_block[A_INCLUDES], &mem_block[A_PATCH]);
+#  if defined(LPC_TO_C) && defined(ALWAYS_SAVE_COMPILED_BINARIES)
+    if (pragmas & PRAGMA_SAVE_BINARY || prog->program_size == 0) {
 #  else
-#    if defined(LPC_TO_C) && defined(ALWAYS_SAVE_COMPILED_BINARIES)
-    if (pragmas & PRAGMA_SAVE_BINARY || prog->p.i.program_size == 0) {
-#    else
     if (pragmas & PRAGMA_SAVE_BINARY) {
-#    endif
+#  endif
 	save_binary(prog, &mem_block[A_INCLUDES], &mem_block[A_PATCH]);
     }
-#  endif
 #endif
 
     swap_line_numbers(prog); /* do this after saving binary */
@@ -1335,8 +1446,8 @@ static void epilog() {
 	loaded and not the last inherited
     */
     reference_prog (prog, "epilog");
-    for (i = 0; (unsigned)i < prog->p.i.num_inherited; i++) {
-	reference_prog (prog->p.i.inherit[i].prog, "inheritance");
+    for (i = 0; (unsigned)i < prog->num_inherited; i++) {
+	reference_prog (prog->inherit[i].prog, "inheritance");
     }
     scratch_destroy();
     clean_up_locals();
@@ -1350,9 +1461,7 @@ static void epilog() {
 static void prolog P2(int, f, char *, name) {
     int i;
 
-#ifdef NEW_FUNCTIONS
     function_context.num_parameters = -1;
-#endif
     approved_object = 0;
     prog = 0;   /* 0 means fail to load. */
     num_parse_error = 0;
@@ -1381,15 +1490,17 @@ static void prolog P2(int, f, char *, name) {
  */
 static void clean_parser() {
     int i;
-    struct function *funp;
-    struct variable dummy;
+    function_t *funp;
+    variable_t dummy;
     char *s;
+    class_def_t *cd;
+    class_member_entry_t *cme;
 
     /*
      * Free function stuff.
      */
     for (i = 0; i < mem_block[A_FUNCTIONS].current_size; i += sizeof *funp) {
-	funp = (struct function *)(mem_block[A_FUNCTIONS].block + i);
+	funp = (function_t *)(mem_block[A_FUNCTIONS].block + i);
 	if (funp->name)
 	    free_string(funp->name);
     }
@@ -1430,7 +1541,7 @@ the_file_name P1(char *, name)
     return tmp;
 }
 
-int case_compare P2(struct parse_node **, c1, struct parse_node **, c2) {
+int case_compare P2(parse_node_t **, c1, parse_node_t **, c2) {
     if ((*c1)->kind == NODE_DEFAULT)
 	return -1;
     if ((*c2)->kind == NODE_DEFAULT)
@@ -1439,14 +1550,23 @@ int case_compare P2(struct parse_node **, c1, struct parse_node **, c2) {
     return ((*c1)->r.number - (*c2)->r.number);
 }
 
-void prepare_cases P2(struct parse_node *, pn, int, start) {
-    struct parse_node **ce_start, **ce_end, **ce;
+int string_case_compare P2(parse_node_t **, c1, parse_node_t **, c2) {
+    if ((*c1)->kind == NODE_DEFAULT)
+	return -1;
+    if ((*c2)->kind == NODE_DEFAULT)
+	return 1;
+
+    return (PROG_STRING((*c1)->r.number) - PROG_STRING((*c2)->r.number));
+}
+
+void prepare_cases P2(parse_node_t *, pn, int, start) {
+    parse_node_t **ce_start, **ce_end, **ce;
     int end, last_key, this_key;
     int direct = 1;
     
-    ce_start = (struct parse_node **)&mem_block[A_CASES].block[start];
+    ce_start = (parse_node_t **)&mem_block[A_CASES].block[start];
     end = mem_block[A_CASES].current_size;
-    ce_end = (struct parse_node **)&mem_block[A_CASES].block[end];
+    ce_end = (parse_node_t **)&mem_block[A_CASES].block[end];
 
     if (ce_start == ce_end) {
 	/* no cases */
@@ -1455,8 +1575,12 @@ void prepare_cases P2(struct parse_node *, pn, int, start) {
 	return;
     }
 
-    quickSort((char *)ce_start, ce_end - ce_start, sizeof(struct parse_node *),
-	      case_compare);
+    if (pn->kind == NODE_SWITCH_STRINGS)
+	quickSort((char *)ce_start, ce_end - ce_start, sizeof(parse_node_t *),
+		  string_case_compare);
+    else
+	quickSort((char *)ce_start, ce_end - ce_start, sizeof(parse_node_t *),
+		  case_compare);
 
     ce = ce_start;
     if ((*ce)->kind == NODE_DEFAULT) {
@@ -1478,7 +1602,7 @@ void prepare_cases P2(struct parse_node *, pn, int, start) {
     ce++;
     while (ce < ce_end) {
 	this_key = (*ce)->r.number;
-	if (this_key <= last_key) {
+	if (pn->kind == NODE_SWITCH_RANGES && this_key <= last_key) {
 	    char buf[1024];
 	    char *f1, *f2;
 	    int fi1, fi2;

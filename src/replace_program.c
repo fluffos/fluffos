@@ -11,32 +11,32 @@
  * Ported from Amylaars LP 3.2 driver
  */
 
-struct replace_ob *obj_list_replace = (struct replace_ob *) 0;
+replace_ob_t *obj_list_replace = 0;
 
-static struct program *search_inherited PROT((char *, struct program *, int *));
-static struct replace_ob *retrieve_replace_program_entry PROT((void));
+static program_t *search_inherited PROT((char *, program_t *, int *));
+static replace_ob_t *retrieve_replace_program_entry PROT((void));
 
 void replace_programs()
 {
-    struct replace_ob *r_ob, *r_next;
+    replace_ob_t *r_ob, *r_next;
     int i, j;
-    struct svalue *svp;
+    svalue_t *svp;
 
 #ifdef DEBUG
     if (d_flag)
 	debug_message("start of replace_programs\n");
 #endif
     for (r_ob = obj_list_replace; r_ob; r_ob = r_next) {
-	struct program *old_prog;
+	program_t *old_prog;
 
 	if (r_ob->ob->flags & O_SWAPPED)
 	    load_ob_from_swap(r_ob->ob);
-	i = r_ob->ob->prog->p.i.num_variables - r_ob->new_prog->p.i.num_variables;
+	i = r_ob->ob->prog->num_variables - r_ob->new_prog->num_variables;
 #ifdef DEBUG
 	if (d_flag)
 	    debug_message("%d less variables\n", i);
 #endif
-	tot_alloc_object_size -= i * sizeof(struct svalue[1]);
+	tot_alloc_object_size -= i * sizeof(svalue_t[1]);
 	svp = r_ob->ob->variables;
 	j = r_ob->var_offset;
 	i -= j;
@@ -52,7 +52,7 @@ void replace_programs()
 	if (d_flag)
 	    debug_message("freed.\n");
 #endif
-	for (j = 0; j < (int) r_ob->new_prog->p.i.num_variables; j++)
+	for (j = 0; j < (int) r_ob->new_prog->num_variables; j++)
 	    r_ob->ob->variables[j] = svp[j];
 	svp += j;
 #ifdef DEBUG
@@ -67,7 +67,7 @@ void replace_programs()
 	if (d_flag)
 	    debug_message("freed.\n");
 #endif
-	r_ob->new_prog->p.i.ref++;
+	r_ob->new_prog->ref++;
 	old_prog = r_ob->ob->prog;
 	r_ob->ob->prog = r_ob->new_prog;
 	r_next = r_ob->next;
@@ -100,7 +100,7 @@ void replace_programs()
 #endif
 	FREE((char *) r_ob);
     }
-    obj_list_replace = (struct replace_ob *) 0;
+    obj_list_replace = (replace_ob_t *) 0;
 #ifdef DEBUG
     if (d_flag)
 	debug_message("end of replace_programs\n");
@@ -108,39 +108,39 @@ void replace_programs()
 }
 
 #ifdef F_REPLACE_PROGRAM
-static struct program *search_inherited P3(char *, str, struct program *, prg, int *, offpnt)
+static program_t *search_inherited P3(char *, str, program_t *, prg, int *, offpnt)
 {
-    struct program *tmp;
+    program_t *tmp;
     int i;
 
 #ifdef DEBUG
     if (d_flag) {
 	debug_message("search_inherited started\n");
 	debug_message("searching for PRG(%s) in PRG(%s)\n", str, prg->name);
-	debug_message("num_inherited=%d\n", prg->p.i.num_inherited);
+	debug_message("num_inherited=%d\n", prg->num_inherited);
     }
 #endif
-    for (i = 0; i < (int) prg->p.i.num_inherited; i++) {
+    for (i = 0; i < (int) prg->num_inherited; i++) {
 #ifdef DEBUG
 	if (d_flag) {
 	    debug_message("index %d:\n", i);
-	    debug_message("checking PRG(%s)\n", prg->p.i.inherit[i].prog->name);
+	    debug_message("checking PRG(%s)\n", prg->inherit[i].prog->name);
 	}
 #endif
-	if (strcmp(str, prg->p.i.inherit[i].prog->name) == 0) {
+	if (strcmp(str, prg->inherit[i].prog->name) == 0) {
 #ifdef DEBUG
 	    if (d_flag)
 		debug_message("match found\n");
 #endif
-	    *offpnt = prg->p.i.inherit[i].variable_index_offset;
-	    return prg->p.i.inherit[i].prog;
-	} else if (tmp = search_inherited(str, prg->p.i.inherit[i].prog,
+	    *offpnt = prg->inherit[i].variable_index_offset;
+	    return prg->inherit[i].prog;
+	} else if (tmp = search_inherited(str, prg->inherit[i].prog,
 					  offpnt)) {
 #ifdef DEBUG
 	    if (d_flag)
 		debug_message("deferred match found\n");
 #endif
-	    *offpnt += prg->p.i.inherit[i].variable_index_offset;
+	    *offpnt += prg->inherit[i].variable_index_offset;
 	    return tmp;
 	}
     }
@@ -148,12 +148,12 @@ static struct program *search_inherited P3(char *, str, struct program *, prg, i
     if (d_flag)
 	debug_message("search_inherited failed\n");
 #endif
-    return (struct program *) 0;
+    return (program_t *) 0;
 }
 
-static struct replace_ob *retrieve_replace_program_entry()
+static replace_ob_t *retrieve_replace_program_entry()
 {
-    struct replace_ob *r_ob;
+    replace_ob_t *r_ob;
 
     for (r_ob = obj_list_replace; r_ob; r_ob = r_ob->next) {
 	if (r_ob->ob == current_object) {
@@ -166,10 +166,10 @@ static struct replace_ob *retrieve_replace_program_entry()
 void
 f_replace_program P2(int, num_arg, int, instruction)
 {
-    struct replace_ob *tmp;
+    replace_ob_t *tmp;
     int name_len;
     char *name, *xname;
-    struct program *new_prog;
+    program_t *new_prog;
     int var_offset;
 
     if (sp->type != T_STRING)
@@ -183,7 +183,7 @@ f_replace_program P2(int, num_arg, int, instruction)
     if (current_object == simul_efun_ob)
 	error("replace_program on simul_efun object\n");
 
-    if (current_object->prog->p.i.func_ref)
+    if (current_object->prog->func_ref)
 	error("cannot replace a program with function references.\n");
 
     name_len = strlen(sp->u.string);
@@ -200,7 +200,7 @@ f_replace_program P2(int, num_arg, int, instruction)
 	error("program to replace the current with has to be inherited\n");
     }
     if (!(tmp = retrieve_replace_program_entry())) {
-	tmp = ALLOCATE(struct replace_ob, TAG_TEMPORARY, "replace_program");
+	tmp = ALLOCATE(replace_ob_t, TAG_TEMPORARY, "replace_program");
 	tmp->ob = current_object;
 	tmp->next = obj_list_replace;
 	obj_list_replace = tmp;
@@ -211,6 +211,7 @@ f_replace_program P2(int, num_arg, int, instruction)
     if (d_flag)
 	debug_message("replace_program finished\n");
 #endif
+    free_string_svalue(sp--);
 }
 
 #endif

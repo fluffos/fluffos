@@ -23,10 +23,10 @@ static char *inet_address PROT((struct sockaddr_in *));
 /*
  * check permission
  */
-int check_valid_socket P5(char *, what, int, fd, struct object *, owner,
+int check_valid_socket P5(char *, what, int, fd, object_t *, owner,
 			  char *, addr, int, port) {
-    struct vector *info;
-    struct svalue *mret;
+    array_t *info;
+    svalue_t *mret;
     
     info = allocate_empty_array(4);
     info->item[0].type = T_NUMBER;
@@ -40,7 +40,7 @@ int check_valid_socket P5(char *, what, int, fd, struct object *, owner,
 
     push_object(current_object);
     push_string(what, STRING_CONSTANT);
-    push_refed_vector(info);
+    push_refed_array(info);
 
     mret = apply_master_ob(APPLY_VALID_SOCKET, 3);
     return MASTER_APPROVED(mret);
@@ -425,7 +425,7 @@ socket_connect P4(int, fd, char *, name, char *, read_callback, char *, write_ca
  * Write a message on an LPC efun socket
  */
 int
-socket_write P3(int, fd, struct svalue *, message, char *, name)
+socket_write P3(int, fd, svalue_t *, message, char *, name)
 {
     int len, off;
     char *buf, *p;
@@ -494,16 +494,16 @@ socket_write P3(int, fd, struct svalue *, message, char *, name)
 		crash_MudOS("Out of memory");
 	    strcpy(buf, message->u.string);
 	    break;
-	case T_POINTER:
+	case T_ARRAY:
 	    {
 		int i, limit;
-		struct svalue *el;
+		svalue_t *el;
 
-		len = message->u.vec->size * sizeof(int);
-		buf = (char *) DMALLOC(len + 1, TAG_TEMPORARY, "socket_write: T_POINTER");
+		len = message->u.arr->size * sizeof(int);
+		buf = (char *) DMALLOC(len + 1, TAG_TEMPORARY, "socket_write: T_ARRAY");
 		if (buf == NULL)
 		    crash_MudOS("Out of memory");
-		el = message->u.vec->item;
+		el = message->u.arr->item;
 		limit = len / sizeof(int);
 		for (i = 0; i < limit; i++) {
 		    switch (el[i].type) {
@@ -589,9 +589,9 @@ socket_read_select_handler P1(int, fd)
 {
     int cc = 0, addrlen;
     char buf[BUF_SIZE], addr[ADDR_BUF_SIZE];
-    struct svalue value;
+    svalue_t value;
     struct sockaddr_in sin;
-    struct object *save_current_object;
+    object_t *save_current_object;
 
     debug(8192, ("read_socket_handler: fd %d state %d\n",
 		 fd, lpc_socks[fd].state));
@@ -622,7 +622,7 @@ socket_read_select_handler P1(int, fd)
 		    (int)ntohs(sin.sin_port));
 	    push_number(fd);
 	    if (lpc_socks[fd].flags & S_BINARY) {
-		struct buffer *b;
+		buffer_t *b;
 
 		b = allocate_buffer(cc);
 		if (b) {
@@ -724,7 +724,7 @@ socket_read_select_handler P1(int, fd)
 	    buf[cc] = '\0';
 	    push_number(fd);
 	    if (lpc_socks[fd].flags & S_BINARY) {
-		struct buffer *b;
+		buffer_t *b;
 
 		b = allocate_buffer(cc);
 		if (b) {
@@ -775,7 +775,7 @@ void
 socket_write_select_handler P1(int, fd)
 {
     int cc;
-    struct object *save_current_object;
+    object_t *save_current_object;
 
     debug(8192, ("write_socket_handler: fd %d state %d\n",
 		 fd, lpc_socks[fd].state));
@@ -834,9 +834,9 @@ socket_close P1(int, fd)
  * Release an LPC efun socket to another object
  */
 int
-socket_release P3(int, fd, struct object *, ob, char *, callback)
+socket_release P3(int, fd, object_t *, ob, char *, callback)
 {
-    struct object *save_current_object;
+    object_t *save_current_object;
 
     if (fd < 0 || fd >= MAX_EFUN_SOCKS)
 	return EEFDRANGE;
@@ -925,13 +925,13 @@ int get_socket_address P3(int, fd, char *, addr, int *, port)
 /*
  * Return the current socket owner
  */
-struct object *
+object_t *
        get_socket_owner P1(int, fd)
 {
     if (fd < 0 || fd >= MAX_EFUN_SOCKS)
-	return (struct object *) NULL;
+	return (object_t *) NULL;
     if (lpc_socks[fd].state == CLOSED)
-	return (struct object *) NULL;
+	return (object_t *) NULL;
     return lpc_socks[fd].owner_ob;
 }
 
@@ -939,7 +939,7 @@ struct object *
  * Initialize a T_OBJECT svalue
  */
 void
-assign_socket_owner P2(struct svalue *, sv, struct object *, ob)
+assign_socket_owner P2(svalue_t *, sv, object_t *, ob)
 {
     if (ob != NULL) {
 	sv->type = T_OBJECT;
@@ -979,10 +979,10 @@ socket_name_to_sin P2(char *, name, struct sockaddr_in *, sin)
  * Close any sockets owned by ob
  */
 void
-close_referencing_sockets P1(struct object *, ob)
+close_referencing_sockets P1(object_t *, ob)
 {
     int i;
-    struct object *save_current_object;
+    object_t *save_current_object;
 
     save_current_object = current_object;
 
@@ -1000,7 +1000,7 @@ close_referencing_sockets P1(struct object *, ob)
 static char *
      inet_address P1(struct sockaddr_in *, sin)
 {
-    static char addr[23], port[7];
+    char addr[23], port[7];
 
     if (ntohl(sin->sin_addr.s_addr) == INADDR_ANY)
 	strcpy(addr, "*");

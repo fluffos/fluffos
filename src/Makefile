@@ -135,7 +135,15 @@ CPP=$(CC) -E
 # used by ioctl on some systems.
 #NEED_OLD_CPP=-traditional-cpp
 
+# May be needed by SunOS for LPC->C support
+#STATIC=-static
+ 
 CFLAGS= $(STATIC) $(OSFLAGS) $(OPTIMIZE) $(WARN) $(PROFIL) $(DEBUG) \
+   $(DEBUG_MACRO) $(DEBUG_NON_FATAL) $(STR) $(PIPE) $(NEED_OLD_CPP)
+
+# Flags to be used by the LPC->C compiler
+# remove optimization or make other modifications here
+CFLAGS2= $(STATIC) $(OSFLAGS) $(OPTIMIZE) $(WARN) $(DEBUG) \
    $(DEBUG_MACRO) $(DEBUG_NON_FATAL) $(STR) $(PIPE) $(NEED_OLD_CPP)
  
 # set CC=cc on a NeXT and to gcc on other machines (if possible)
@@ -204,13 +212,13 @@ YFLAGS = -d
 # SCO 3.2v4.2
 #EXTRALIBS=-lsocket -lnsl_s -lcrypt
 
-# CX/UX: This seems wierd, but DrFeelgood claims it's right.
-#EXTRALIBS=-lcurses
-
 # Don't change this line.  Define EXTRALIBS before this line if you
 # wish to add any libraries.
 LIBS=-lm $(EXTRALIBS)
 
+# Uncomment this for LPC->C support
+#EXTRA_OBJS=compile_file.o interface.o ccode.o cfuns.o
+ 
 #################################################
 # the meat of things                            #
 # don't change anything below this section      #
@@ -220,7 +228,7 @@ EFUNS=efuns_main.o efuns_port.o $(EXTRA_EFUNS)
 
 OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   backend.o array.o mapping.o comm.o ed.o regexp.o swap.o buffer.o crc32.o \
-  malloc.o mallocwrapper.o \
+  malloc.o mallocwrapper.o class.o \
   call_out.o otable.o dumpstat.o stralloc.o hash.o mudlib_stats.o \
   port.o reclaim.o parse.o simul_efun.o sprintf.o uid.o program.o \
   compiler.o avltree.o icode.o trees.o generate.o scratchpad.o \
@@ -229,7 +237,7 @@ OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   $(EFUNS) replace_program.o functab_tree.o $(EXTRA_OBJS) \
   packages/*.o
 
-all: $(DRIVER_BIN) addr_server
+all: $(DRIVER_BIN) addr_server lpc_to_c.h
 
 remake: neat all
 
@@ -238,6 +246,9 @@ remake: neat all
 $(DRIVER_BIN): $(OBJ)
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
 	$(PROOF) $(CC) $(CFLAGS) $(OBJ) -o $(DRIVER_BIN) $(LIBS)
+
+lpc_to_c.h: cfuns.h virtual_architecture.h
+	-cat cfuns.h virtual_architecture.h > lpc_to_c.h
 
 depend: opcodes.h efun_protos.h grammar.tab.h cc.h efunctions.h efun_defs.c
 	makedepend *.c
@@ -305,7 +316,7 @@ efun_defs.c opcodes.h grammar.y: malloc.c func_spec.c make_func options.h func_s
 	./make_func > efun_defs.c
 
 malloc.c: options.h make_malloc
-	./make_malloc 
+	./make_malloc $(MALLOC_C)
 	touch malloc.c
 	$(CC) $(CFLAGS) -c malloc.c
 	touch mallocwrapper.c

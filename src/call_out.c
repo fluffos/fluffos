@@ -15,31 +15,31 @@
 
 #define CHUNK_SIZE	20
 
-struct call {
+typedef struct pending_call_s {
     int delta;
     union string_or_func function;
-    struct object *ob;
-    struct svalue v;
-    struct vector *vs;
-    struct call *next;
+    object_t *ob;
+    svalue_t v;
+    array_t *vs;
+    struct pending_call_s *next;
 #ifdef THIS_PLAYER_IN_CALL_OUT
-    struct object *command_giver;
+    object_t *command_giver;
 #endif
-};
+} pending_call_t;
 
-static struct call *call_list, *call_list_free;
+static pending_call_t *call_list, *call_list_free;
 static int num_call;
 
-static void free_call PROT((struct call *));
-void remove_all_call_out PROT((struct object *));
+static void free_call PROT((pending_call_t *));
+void remove_all_call_out PROT((object_t *));
 
 /*
  * Free a call out structure.
  */
-static void free_call P1(struct call *, cop)
+static void free_call P1(pending_call_t *, cop)
 {
     if (cop->vs) {
-	free_vector(cop->vs);
+	free_array(cop->vs);
     }
     free_svalue(&cop->v, "free_call");
     cop->v = const0n;
@@ -62,16 +62,16 @@ static void free_call P1(struct call *, cop)
 /*
  * Setup a new call out.
  */
-void new_call_out P5(struct object *, ob, struct svalue *, fun, int, delay, int, num_args, struct svalue *, arg)
+void new_call_out P5(object_t *, ob, svalue_t *, fun, int, delay, int, num_args, svalue_t *, arg)
 {
-    struct call *cop, **copp;
+    pending_call_t *cop, **copp;
 
     if (delay < 1)
 	delay = 1;
     if (!call_list_free) {
 	int i;
 
-	call_list_free = CALLOCATE(CHUNK_SIZE, struct call,
+	call_list_free = CALLOCATE(CHUNK_SIZE, pending_call_t,
 				   TAG_CALL_OUT, "new_call_out: call_list_free");
 	for (i = 0; i < CHUNK_SIZE - 1; i++)
 	    call_list_free[i].next = &call_list_free[i + 1];
@@ -87,7 +87,7 @@ void new_call_out P5(struct object *, ob, struct svalue *, fun, int, delay, int,
 	add_ref(ob, "call_out");
     } else {
 	cop->function.f = fun->u.fp;
-	fun->u.fp->ref++;
+	fun->u.fp->hdr.ref++;
 	cop->ob = 0;
     }
 #ifdef THIS_PLAYER_IN_CALL_OUT
@@ -132,10 +132,10 @@ void new_call_out P5(struct object *, ob, struct svalue *, fun, int, delay, int,
  */
 void call_out()
 {
-    struct call *cop;
+    pending_call_t *cop;
     jmp_buf save_error_recovery_context;
     int save_rec_exists;
-    struct object *save_command_giver;
+    object_t *save_command_giver;
     static int last_time;
 
     if (call_list == 0) {
@@ -171,20 +171,21 @@ void call_out()
 		clear_state();
 		debug_message("Error in call out.\n");
 	    } else {
-		struct svalue v;
-		struct object *ob;
+		svalue_t v;
+		object_t *ob;
 
 		ob = cop->ob;
 #ifndef NO_SHADOWS
-		while (ob->shadowing)
-		    ob = ob->shadowing;
+		if (ob)
+		    while (ob->shadowing)
+			ob = ob->shadowing;
 #endif				/* NO_SHADOWS */
 		command_giver = 0;
 #ifdef THIS_PLAYER_IN_CALL_OUT
 		if (cop->command_giver &&
 		    !(cop->command_giver->flags & O_DESTRUCTED)) {
 		    command_giver = cop->command_giver;
-		} else if (ob->flags & O_LISTENER) {
+		} else if (ob && (ob->flags & O_LISTENER)) {
 		    command_giver = ob;
 		}
 #endif
@@ -230,9 +231,9 @@ void call_out()
  * The time left until execution is returned.
  * -1 is returned if no call out pending.
  */
-int remove_call_out P2(struct object *, ob, char *, fun)
+int remove_call_out P2(object_t *, ob, char *, fun)
 {
-    struct call **copp, *cop;
+    pending_call_t **copp, *cop;
     int delay = 0;
 
     if (!ob) return -1;
@@ -250,9 +251,9 @@ int remove_call_out P2(struct object *, ob, char *, fun)
     return -1;
 }
 
-int find_call_out P2(struct object *, ob, char *, fun)
+int find_call_out P2(object_t *, ob, char *, fun)
 {
-    struct call **copp;
+    pending_call_t **copp;
     int delay = 0;
 
     if (!ob) return -1;
@@ -268,7 +269,7 @@ int find_call_out P2(struct object *, ob, char *, fun)
 int print_call_out_usage P1(int, verbose)
 {
     int i;
-    struct call *cop;
+    pending_call_t *cop;
 
     for (i = 0, cop = call_list; cop; cop = cop->next)
 	i++;
@@ -277,20 +278,20 @@ int print_call_out_usage P1(int, verbose)
 	add_message("Call out information:\n");
 	add_message("---------------------\n");
 	add_vmessage("Number of allocated call outs: %8d, %8d bytes\n",
-		    num_call, num_call * sizeof(struct call));
+		    num_call, num_call * sizeof(pending_call_t));
 	add_vmessage("Current length: %d\n", i);
     } else {
 	if (verbose != -1)
 	    add_vmessage("call out:\t\t\t%8d %8d (current length %d)\n", num_call,
-			num_call * sizeof(struct call), i);
+			num_call * sizeof(pending_call_t), i);
     }
-    return (int) (num_call * sizeof(struct call));
+    return (int) (num_call * sizeof(pending_call_t));
 }
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_call_outs()
 {
-    struct call *cop;
+    pending_call_t *cop;
 
     for (cop = call_list; cop; cop = cop->next) {
 	mark_svalue(&cop->v);
@@ -314,59 +315,53 @@ void mark_call_outs()
  * 2:	The delay.
  * 3:	The argument.
  */
-struct vector *get_all_call_outs()
+array_t *get_all_call_outs()
 {
     int i, next_time;
-    struct call *cop;
-    struct vector *v;
+    pending_call_t *cop;
+    array_t *v;
 
-/* Zap all of the dested ones from the array... */
-    remove_all_call_out((struct object *) NULL);
     for (i = 0, cop = call_list; cop; i++, cop = cop->next)
 	;
     v = allocate_empty_array(i);
     next_time = 0;
 
     for (i = 0, cop = call_list; cop; i++, cop = cop->next) {
-	struct vector *vv;
+	array_t *vv;
 
 	next_time += cop->delta;
 	if (cop->ob && cop->ob->flags & O_DESTRUCTED)
 	    continue;  /* This should be smarter.  -Beek */
 	vv = allocate_empty_array(4);
-#ifdef NEW_FUNCTIONS
 	if (cop->ob) {
-#endif
 	    vv->item[0].type = T_OBJECT;
 	    vv->item[0].u.ob = cop->ob;
 	    add_ref(cop->ob, "get_all_call_outs");
 	    vv->item[1].type = T_STRING;
 	    vv->item[1].subtype = STRING_SHARED;
 	    vv->item[1].u.string = make_shared_string(cop->function.s);
-#ifdef NEW_FUNCTIONS
 	} else {
 	    vv->item[0].type = T_OBJECT;
-	    vv->item[0].u.ob = cop->function.f->owner;
-	    add_ref(cop->function.f->owner, "get_all_call_outs");
+	    vv->item[0].u.ob = cop->function.f->hdr.owner;
+	    add_ref(cop->function.f->hdr.owner, "get_all_call_outs");
 	    vv->item[1].type = T_STRING;
 	    vv->item[1].subtype = STRING_SHARED;
 	    vv->item[1].u.string = make_shared_string("<function>");
 	}
-#endif
 	vv->item[2].u.number = next_time;
 	vv->item[2].type = T_NUMBER;
 	assign_svalue_no_free(&vv->item[3], &cop->v);
 
-	v->item[i].type = T_POINTER;
-	v->item[i].u.vec = vv;	/* Ref count is already 1 */
+	v->item[i].type = T_ARRAY;
+	v->item[i].u.arr = vv;	/* Ref count is already 1 */
     }
     return v;
 }
 
 void
-remove_all_call_out P1(struct object *, obj)
+remove_all_call_out P1(object_t *, obj)
 {
-    struct call **copp, *cop;
+    pending_call_t **copp, *cop;
 
     copp = &call_list;
     while (*copp) {

@@ -7,7 +7,7 @@ operator pop_value;
 
 operator number, real, byte, nbyte, string, short_string, const0, const1;
 
-operator index, rindex, nn_range, rn_range, rr_range, nr_range, ne_range, re_range;
+operator member, index, rindex, nn_range, rn_range, rr_range, nr_range, ne_range, re_range;
 operator aggregate, aggregate_assoc;
 #ifdef DEBUG
 operator break_point;
@@ -39,6 +39,7 @@ operator inc, dec, pre_inc, post_inc, pre_dec, post_dec;
 operator local, global;
 operator local_lvalue, global_lvalue;
 operator index_lvalue, rindex_lvalue;
+operator member_lvalue;
 
 operator add, void_add_eq, add_eq;
 operator subtract, sub_eq;
@@ -55,13 +56,12 @@ operator negate, compl;
 operator assign, void_assign;
 
 operator function_constructor;
-#ifndef NEW_FUNCTIONS
-operator evaluate;
-#endif
 operator simul_efun;
 
 operator sscanf;
 operator parse_command;
+
+operator new_class;
 
 operator nn_range_lvalue, rn_range_lvalue, nr_range_lvalue, rr_range_lvalue;
 operator call_extra;

@@ -4,14 +4,14 @@
 #include "crctab.h"
 #include "lpc_incl.h"
 
-struct buffer null_buf =
+buffer_t null_buf =
 {
     1,				/* Ref count, which will ensure that it will
 				 * never be deallocated */
     0				/* size */
 };
 
-INLINE struct buffer *
+INLINE buffer_t *
        null_buffer()
 {
     null_buf.ref++;
@@ -19,7 +19,7 @@ INLINE struct buffer *
 }				/* null_buffer() */
 
 INLINE void
-free_buffer P1(struct buffer *, b)
+free_buffer P1(buffer_t *, b)
 {
     b->ref--;
     /* don't try to free the null_buffer (ref count might overflow) */
@@ -29,10 +29,10 @@ free_buffer P1(struct buffer *, b)
     FREE((char *) b);
 }				/* free_buffer() */
 
-struct buffer *
+buffer_t *
        allocate_buffer P1(int, size)
 {
-    struct buffer *buf;
+    buffer_t *buf;
 
 #ifndef DISALLOW_BUFFER_TYPE
     if ((size < 0) || (size > max_buffer_size)) {
@@ -42,7 +42,7 @@ struct buffer *
 	return null_buffer();
     }
     /* using calloc() so that memory will be zero'd out when allocated */
-    buf = (struct buffer *) DCALLOC(sizeof(struct buffer) + size - 1, 1,
+    buf = (buffer_t *) DCALLOC(sizeof(buffer_t) + size - 1, 1,
 				    TAG_BUFFER, "allocate_buffer");
     buf->size = size;
     buf->ref = 1;
@@ -52,7 +52,7 @@ struct buffer *
 #endif
 }
 
-int write_buffer P4(struct buffer *, buf, int, start, char *, str, int, theLength)
+int write_buffer P4(buffer_t *, buf, int, start, char *, str, int, theLength)
 {
     int size;
 
@@ -75,7 +75,7 @@ int write_buffer P4(struct buffer *, buf, int, start, char *, str, int, theLengt
 }				/* write_buffer() */
 
 char *
-     read_buffer P4(struct buffer *, b, int, start, int, len, int *, rlen)
+     read_buffer P4(buffer_t *, b, int, start, int, len, int *, rlen)
 {
     char *str;
     unsigned int size;

@@ -1,5 +1,4 @@
 #include "std.h"
-#include "config.h"
 #include "lpc_incl.h"
 #include "file_incl.h"
 #include "otable.h"
@@ -10,25 +9,26 @@
 #include "socket_efuns.h"
 #include "call_out.h"
 #include "port.h"
+#include "file.h"
 
 #define too_deep_save_error() \
     error("Mappings and/or arrays nested too deep (%d) for save_object\n",\
 	  MAX_SAVE_SVALUE_DEPTH);
 
-struct object *previous_ob;
+object_t *previous_ob;
 int tot_alloc_object, tot_alloc_object_size;
 
 #ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
 static void remove_all_objects PROT((void));
 #endif
-char *save_mapping PROT ((struct mapping *m));
-INLINE static int restore_array PROT((char **str, struct svalue *));
-int restore_hash_string PROT((char **str, int *a, struct svalue *));
+char *save_mapping PROT ((mapping_t *m));
+INLINE static int restore_array PROT((char **str, svalue_t *));
+int restore_hash_string PROT((char **str, int *a, svalue_t *));
 
 INLINE int
-valid_hide P1(struct object *, obj)
+valid_hide P1(object_t *, obj)
 {
-    struct svalue *ret;
+    svalue_t *ret;
 
     if (!obj) {
 	return 0;
@@ -42,7 +42,7 @@ valid_hide P1(struct object *, obj)
 int save_svalue_depth = 0, max_depth;
 int *sizes = 0;
 
-INLINE int svalue_save_size P1(struct svalue *, v)
+INLINE int svalue_save_size P1(svalue_t *, v)
 {
     switch(v->type){
     case T_STRING:
@@ -58,10 +58,23 @@ INLINE int svalue_save_size P1(struct svalue *, v)
 	    return 3 + size;
 	}
 
-    case T_POINTER:
+    case T_ARRAY:
 	{
-	    struct svalue *sv = v->u.vec->item;
-	    int i = v->u.vec->size, size = 0;
+	    svalue_t *sv = v->u.arr->item;
+	    int i = v->u.arr->size, size = 0;
+
+	    if (++save_svalue_depth > MAX_SAVE_SVALUE_DEPTH){
+		too_deep_save_error();
+	    }
+	    while (i--) size += svalue_save_size(sv++);
+	    save_svalue_depth--;
+	    return size + 5;
+	}
+
+    case T_CLASS:
+	{
+	    svalue_t *sv = v->u.arr->item;
+	    int i = v->u.arr->size, size = 0;
 
 	    if (++save_svalue_depth > MAX_SAVE_SVALUE_DEPTH){
 		too_deep_save_error();
@@ -73,7 +86,7 @@ INLINE int svalue_save_size P1(struct svalue *, v)
 
     case T_MAPPING:
 	{
-	    struct node **a = v->u.map->table, *elt;
+	    mapping_node_t **a = v->u.map->table, *elt;
 	    int j = v->u.map->table_size, size = 0;
 
 	    if (++save_svalue_depth > MAX_SAVE_SVALUE_DEPTH){
@@ -111,7 +124,7 @@ INLINE int svalue_save_size P1(struct svalue *, v)
     }
 }
 
-INLINE void save_svalue P2(struct svalue *, v, char **, buf)
+INLINE void save_svalue P2(svalue_t *, v, char **, buf)
 {
     switch(v->type){
     case T_STRING:
@@ -137,13 +150,30 @@ INLINE void save_svalue P2(struct svalue *, v, char **, buf)
 	    return;
 	}
 
-    case T_POINTER:
+    case T_ARRAY:
 	{
-	    int i = v->u.vec->size;
-	    struct svalue *sv = v->u.vec->item;
+	    int i = v->u.arr->size;
+	    svalue_t *sv = v->u.arr->item;
 
 	    *(*buf)++ = '(';
 	    *(*buf)++ = '{';
+	    while (i--){
+		save_svalue(sv++, buf);
+		*(*buf)++ = ',';
+	    }
+	    *(*buf)++ = '}';
+	    *(*buf)++ = ')';
+	    *(*buf) = '\0';
+	    return;
+	}
+
+    case T_CLASS:
+	{
+	    int i = v->u.arr->size;
+	    svalue_t *sv = v->u.arr->item;
+
+	    *(*buf)++ = '(';
+	    *(*buf)++ = '/';  /* Why yes, this *is* a kludge! */
 	    while (i--){
 		save_svalue(sv++, buf);
 		*(*buf)++ = ',';
@@ -181,7 +211,7 @@ INLINE void save_svalue P2(struct svalue *, v, char **, buf)
     case T_MAPPING:
 	{
 	    int j = v->u.map->table_size;
-	    struct node **a = v->u.map->table, *elt;
+	    mapping_node_t **a = v->u.map->table, *elt;
 
 	    *(*buf)++ = '(';
 	    *(*buf)++ = '[';
@@ -387,7 +417,7 @@ restore_size P2(char **, str, int, is_mapping)
 }
 
 INLINE static int
-restore_interior_string P2(char **, val, struct svalue *, sv)
+restore_interior_string P2(char **, val, svalue_t *, sv)
 {
     register char *cp = *val;
     char *start = cp;
@@ -481,26 +511,26 @@ restore_interior_string P2(char **, val, struct svalue *, sv)
                 break; \
     } \
 
-INLINE static void add_map_stats P2(struct mapping *, m, int, count)
+INLINE static void add_map_stats P2(mapping_t *, m, int, count)
 {
     total_mapping_nodes += count;
-    total_mapping_size += count * sizeof(struct node);
+    total_mapping_size += count * sizeof(mapping_node_t);
 #ifndef NO_MUDLIB_STATS
     add_array_size(&m->stats, count << 1);
 #endif
     m->count = count;
 }
 
-int growMap PROT((struct mapping *));
+int growMap PROT((mapping_t *));
 
 static int
-restore_mapping P2(char **,str, struct svalue *, sv)
+restore_mapping P2(char **,str, svalue_t *, sv)
 {
     int size, i, oi, mask, count = 0;
     char c;
-    struct mapping *m;
-    struct svalue key, value;
-    struct node **a, *elt, *elt2;
+    mapping_t *m;
+    svalue_t key, value;
+    mapping_node_t **a, *elt, *elt2;
     register char *cp = *str;
     int err;
 
@@ -542,7 +572,14 @@ restore_mapping P2(char **,str, struct svalue *, sv)
 		    *str = ++cp;
 		    if (err = restore_array(str, &key))
 			goto key_error;
-		    oi = (int) key.u.vec;
+		    oi = (int) key.u.arr;
+		}
+		else if (*cp == '/') {
+		    *str = ++cp;
+		    if (err = restore_array(str, &key))
+			goto key_error;
+		    key.type = T_CLASS;
+		    oi = (int) key.u.arr;
 		}
 		else goto generic_key_error;
 		cp = *str;
@@ -610,6 +647,11 @@ restore_mapping P2(char **,str, struct svalue *, sv)
 		    *str = ++cp;
 		    if (err = restore_array(str, &value))
 			goto value_error;
+		} else if (*cp == '/') {
+		    *str = ++cp;
+		    if (err = restore_array(str, &value))
+			goto value_error;
+		    value.type = T_CLASS;
 		}
 		else goto generic_value_error;
 		cp = *str;
@@ -683,7 +725,7 @@ restore_mapping P2(char **,str, struct svalue *, sv)
 	    mapping_too_large();
 	}
 	
-	elt = ALLOCATE(struct node, TAG_MAP_NODE, "restore_mapping");
+	elt = new_map_node();
 	*elt->values = key;
 	*(elt->values + 1) = value;
 	elt->hashval = oi;
@@ -713,12 +755,12 @@ restore_mapping P2(char **,str, struct svalue *, sv)
 
 
 INLINE static int
-restore_array P2(char **, str, struct svalue *, ret)
+restore_array P2(char **, str, svalue_t *, ret)
 {   
     int size;
     char c;
-    struct vector *v;
-    struct svalue *sv;
+    array_t *v;
+    svalue_t *sv;
     register char *cp = *str;
     int err;
 
@@ -757,6 +799,12 @@ restore_array P2(char **, str, struct svalue *, ret)
 		    if (err = restore_array(str, sv))
 			goto error;
 		}
+		else if (*cp == '/') {
+		    *str = ++cp;
+		    if (err = restore_array(str, sv))
+			goto error;
+		    sv->type = T_CLASS;
+		}
 		else goto generic_error;
 		sv++;
 		cp = *str;
@@ -790,8 +838,8 @@ restore_array P2(char **, str, struct svalue *, ret)
 
     cp += 2;
     *str = cp;
-    ret->u.vec = v;
-    ret->type = T_POINTER;
+    ret->u.arr = v;
+    ret->type = T_ARRAY;
     return 0;
     /* something went wrong */
  numeral_error:
@@ -800,12 +848,12 @@ restore_array P2(char **, str, struct svalue *, ret)
  generic_error:
     err = ROB_ARRAY_ERROR;
  error:
-    free_vector(v);
+    free_array(v);
     return err;
 }
 
 INLINE int
-restore_string P2(char *, val, struct svalue *, sv)
+restore_string P2(char *, val, svalue_t *, sv)
 {
     register char *cp = val;
     char *start = cp;
@@ -876,7 +924,7 @@ restore_string P2(char *, val, struct svalue *, sv)
 /* for this case, the variable in question has been set to zero already,
    and we don't have to worry about preserving it */
 INLINE int
-restore_svalue P2(char *, cp, struct svalue *, v)
+restore_svalue P2(char *, cp, svalue_t *, v)
 {
     switch(*cp++) {
     case '\"':
@@ -888,6 +936,12 @@ restore_svalue P2(char *, cp, struct svalue *, v)
 		return restore_array(&cp, v);
 	    } else if (*cp++ == '[') {
 		return restore_mapping(&cp, v);
+	    } else if (*cp++ == '/') {
+		int tmp;
+		if (tmp = restore_array(&cp, v))
+		    return tmp;
+		v->type = T_CLASS;
+		return 0;
 	    }
 	    else return ROB_GENERAL_ERROR;
 	}
@@ -922,10 +976,10 @@ restore_svalue P2(char *, cp, struct svalue *, v)
 /* for this case, we're being careful and want to leave the value alone on
    an error */
 INLINE int
-safe_restore_svalue P2(char *, cp, struct svalue *, v)
+safe_restore_svalue P2(char *, cp, svalue_t *, v)
 {
     int ret;
-    struct svalue val;
+    svalue_t val;
 
     val.type = T_NUMBER;
     switch(*cp++) {
@@ -939,6 +993,9 @@ safe_restore_svalue P2(char *, cp, struct svalue *, v)
 		if (ret = restore_array(&cp, &val)) return ret;
 	    } else if (*cp++ == '[') {
 		if (ret = restore_mapping(&cp, &val)) return ret;
+	    } else if (*cp++ == '/') {
+		if (ret = restore_array(&cp, &val)) return ret;
+		val.type = T_CLASS;
 	    }
 	    else return ROB_GENERAL_ERROR;
 	    break;
@@ -974,10 +1031,10 @@ safe_restore_svalue P2(char *, cp, struct svalue *, v)
 
 static int var_index = 0;
 
-static struct variable *find_status P1(char *, str) {
+static variable_t *find_status P1(char *, str) {
     int i;
-    struct variable *vars = current_object->prog->p.i.variable_names;
-    int n = current_object->prog->p.i.num_variables;
+    variable_t *vars = current_object->prog->variable_names;
+    int n = current_object->prog->num_variables;
     
     if (str = findstring(str)) {
 	for (i=var_index; i < n; i++) {
@@ -998,20 +1055,20 @@ static struct variable *find_status P1(char *, str) {
 }
 
 void
-restore_object_from_buff P4(struct object *, ob, char *, theBuff, char *, name,
+restore_object_from_buff P4(object_t *, ob, char *, theBuff, char *, name,
 			    int, noclear)
 {
     char *buff, *nextBuff, *tmp,  *space;
     char var[100];
-    struct variable *p, *var_start = ob->prog->p.i.variable_names;
-    struct svalue *sv = ob->variables;
+    variable_t *p, *var_start = ob->prog->variable_names;
+    svalue_t *sv = ob->variables;
     int rc;
  
     var_index = 0;
 
     nextBuff = theBuff;
     while ((buff = nextBuff) && *buff) {
-        struct svalue *v;
+        svalue_t *v;
  
         if ((tmp = strchr(buff, '\n'))) {
             *tmp = '\0';
@@ -1068,7 +1125,7 @@ restore_object_from_buff P4(struct object *, ob, char *, theBuff, char *, name,
  * If 'save_zeros' is set, 0 valued variables will be saved
  */
 int
-save_object P3(struct object *, ob, char *, file, int, save_zeros)
+save_object P3(object_t *, ob, char *, file, int, save_zeros)
 {
     char *name;
     static char tmp_name[80];
@@ -1077,8 +1134,8 @@ save_object P3(struct object *, ob, char *, file, int, save_zeros)
     int failed = 0;
     char *use_name, *new_string, *p;
     int free_use_name = 0, theSize;
-    struct variable *var = ob->prog->p.i.variable_names;
-    struct svalue *v = ob->variables;
+    variable_t *var = ob->prog->variable_names;
+    svalue_t *v = ob->variables;
 
     if (ob->flags & O_DESTRUCTED)
         return 0;
@@ -1120,7 +1177,7 @@ save_object P3(struct object *, ob, char *, file, int, save_zeros)
     }
     fprintf(f, "#%s\n", ob->prog->name);
 
-    i = ob->prog->p.i.num_variables;
+    i = ob->prog->num_variables;
     while (i--){
 	if (var->type & TYPE_MOD_STATIC) { v++; var++; continue; }
 
@@ -1173,7 +1230,7 @@ save_object P3(struct object *, ob, char *, file, int, save_zeros)
  * would write it.
  */
 char *
-save_variable P1(struct svalue *, var)
+save_variable P1(svalue_t *, var)
 {
     int theSize;
     char *new_string, *p;
@@ -1188,12 +1245,12 @@ save_variable P1(struct svalue *, var)
 }
 
 
-int restore_object P3(struct object *, ob, char *, file, int, noclear)
+int restore_object P3(object_t *, ob, char *, file, int, noclear)
 {
     char *name, *theBuff;
     int len, i;
     FILE *f;
-    struct object *save = current_object;
+    object_t *save = current_object;
     struct stat st;
 
     if (ob->flags & O_DESTRUCTED)
@@ -1205,12 +1262,7 @@ int restore_object P3(struct object *, ob, char *, file, int, noclear)
     len = strlen(file);
     name = DXALLOC(len + strlen(SAVE_EXTENSION) + 1, TAG_TEMPORARY, "restore_object: 2");
     (void)strcpy(name, file);
-    if (name[len-2] == '.' &&
-#ifndef LPC_TO_C
-        name[len - 1] == 'c')
-#else
-        (name[len - 1] == 'c' || name[len - 1] == 'C'))
-#endif
+    if (name[len-2] == '.' && name[len - 1] == 'c')
         name[len-2] = 0;
     (void)strcat(name, SAVE_EXTENSION);
 #ifdef LATTICE
@@ -1242,10 +1294,10 @@ int restore_object P3(struct object *, ob, char *, file, int, noclear)
      * initialized to 0 when restored.
      */
     if (!noclear) {
-	struct variable *v = ob->prog->p.i.variable_names;
-	struct svalue *sv = ob->variables;
+	variable_t *v = ob->prog->variable_names;
+	svalue_t *sv = ob->variables;
 
-	i = ob->prog->p.i.num_variables; 
+	i = ob->prog->num_variables; 
 	while (i--) {
 	    if (!((v++)->type & TYPE_MOD_STATIC))
 		assign_svalue(sv++, &const0n);
@@ -1264,7 +1316,7 @@ int restore_object P3(struct object *, ob, char *, file, int, noclear)
     return 1;
 }
 
-void restore_variable P2(struct svalue *, var, char *, str)
+void restore_variable P2(svalue_t *, var, char *, str)
 {
     int rc;
 
@@ -1289,9 +1341,9 @@ void restore_variable P2(struct svalue *, var, char *, str)
     }
 }
 
-void tell_npc P2(struct object *, ob, char *, str)
+void tell_npc P2(object_t *, ob, char *, str)
 {
-    push_constant_string(str);
+    push_string(str, STRING_MALLOC);
     (void) apply(APPLY_CATCH_TELL, ob, 1, ORIGIN_DRIVER);
 }
 
@@ -1324,9 +1376,9 @@ static void add_long_message P1(char *, s) {
  * goes to catch_tell unless the target of tell_object is interactive
  * and is the current_object in which case it is written via add_message().
  */
-void tell_object P2(struct object *, ob, char *, str)
+void tell_object P2(object_t *, ob, char *, str)
 {
-    struct object *save_command_giver;
+    object_t *save_command_giver;
     
     save_command_giver = command_giver;
     if (!ob || (ob->flags & O_DESTRUCTED)) {
@@ -1349,10 +1401,10 @@ void tell_object P2(struct object *, ob, char *, str)
 #endif
 }
 
-void free_object P2(struct object *, ob, char *, from)
+void free_object P2(object_t *, ob, char *, from)
 {
 #ifndef NO_ADD_ACTION
-    struct sentence *s;
+    sentence_t *s;
 #endif
 
     ob->ref--;
@@ -1373,8 +1425,7 @@ void free_object P2(struct object *, ob, char *, from)
 	fatal("FATAL: Object 0x%x %s ref count 0, but not destructed (from %s).\n",
 	      ob, ob->name, from);
     }
-    DEBUG_CHECK(ob->interactive,
-		"Tried to free an interactive object.\n");
+    DEBUG_CHECK(ob->interactive, "Tried to free an interactive object.\n");
     /*
      * If the program is freed, then we can also free the variable
      * declarations.
@@ -1383,14 +1434,14 @@ void free_object P2(struct object *, ob, char *, from)
 	remove_swap_file(ob);	/* do this before prog is freed */
     if (ob->prog) {
 	tot_alloc_object_size -=
-	    (ob->prog->p.i.num_variables - 1) * sizeof(struct svalue) +
-	    sizeof(struct object);
+	    (ob->prog->num_variables - 1) * sizeof(svalue_t) +
+	    sizeof(object_t);
 	free_prog(ob->prog, 1);
 	ob->prog = 0;
     }
 #ifndef NO_ADD_ACTION
     for (s = ob->sent; s;) {
-	struct sentence *next;
+	sentence_t *next;
 
 	next = s->next;
 	free_sentence(s);
@@ -1417,21 +1468,21 @@ void free_object P2(struct object *, ob, char *, from)
 
 /*
  * Allocate an empty object, and set all variables to 0. Note that a
- * 'struct object' already has space for one variable. So, if no variables
- * are needed, we allocate a space that is smaller than 'struct object'. This
+ * 'object_t' already has space for one variable. So, if no variables
+ * are needed, we allocate a space that is smaller than 'object_t'. This
  * unused (last) part must of course (and will not) be referenced.
  */
-struct object *get_empty_object P1(int, num_var)
+object_t *get_empty_object P1(int, num_var)
 {
-    static struct object NULL_object;
-    struct object *ob;
-    int size = sizeof(struct object) +
-    (num_var - !!num_var) * sizeof(struct svalue);
+    static object_t NULL_object;
+    object_t *ob;
+    int size = sizeof(object_t) +
+    (num_var - !!num_var) * sizeof(svalue_t);
     int i;
 
     tot_alloc_object++;
     tot_alloc_object_size += size;
-    ob = (struct object *) DXALLOC(size, TAG_OBJECT, "get_empty_object");
+    ob = (object_t *) DXALLOC(size, TAG_OBJECT, "get_empty_object");
     /*
      * marion Don't initialize via memset, this is incorrect. E.g. the bull
      * machines have a (char *)0 which is not zero. We have structure
@@ -1448,8 +1499,8 @@ struct object *get_empty_object P1(int, num_var)
 #ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
 static void remove_all_objects()
 {
-    struct object *ob;
-    struct svalue v;
+    object_t *ob;
+    svalue_t v;
 
     v.type = T_OBJECT;
     while (1) {
@@ -1469,9 +1520,9 @@ static void remove_all_objects()
 /*
  * For debugging purposes.
  */
-void check_ob_ref P2(struct object *, ob, char *, from)
+void check_ob_ref P2(object_t *, ob, char *, from)
 {
-    struct object *o;
+    object_t *o;
     int i;
 
     for (o = obj_list, i = 0; o; o = o->next_all) {
@@ -1493,7 +1544,7 @@ void check_ob_ref P2(struct object *, ob, char *, from)
 #endif				/* CHECK_OB_REF */
 
 #ifndef NO_ADD_ACTION
-static struct object *hashed_living[LIVING_HASH_SIZE];
+static object_t *hashed_living[LIVING_HASH_SIZE];
 
 static int num_living_names, num_searches = 1, search_length = 1;
 
@@ -1502,10 +1553,10 @@ static INLINE int hash_living_name P1(char *, str)
     return whashstr(str, 20) & (LIVING_HASH_SIZE - 1);
 }
 
-struct object *find_living_object P2(char *, str, int, user)
+object_t *find_living_object P2(char *, str, int, user)
 {
-    struct object **obp, *tmp;
-    struct object **hl;
+    object_t **obp, *tmp;
+    object_t **hl;
 
     if (!str)
 	return 0;
@@ -1536,9 +1587,9 @@ struct object *find_living_object P2(char *, str, int, user)
     return tmp;
 }
 
-void set_living_name P2(struct object *, ob, char *, str)
+void set_living_name P2(object_t *, ob, char *, str)
 {
-    struct object **hl;
+    object_t **hl;
 
     if (ob->flags & O_DESTRUCTED)
 	return;
@@ -1553,9 +1604,9 @@ void set_living_name P2(struct object *, ob, char *, str)
     return;
 }
 
-void remove_living_name P1(struct object *, ob)
+void remove_living_name P1(object_t *, ob)
 {
-    struct object **hl;
+    object_t **hl;
 
     num_living_names--;
     if (!ob->living_name)
@@ -1584,16 +1635,16 @@ void stat_living_objects()
 }
 #endif /* NO_ADD_ACTION */
 
-void reset_object P1(struct object *, ob)
+void reset_object P1(object_t *, ob)
 {
-    struct object *save_command_giver;
+    object_t *save_command_giver;
 
     /* Be sure to update time first ! */
     ob->next_reset = current_time + TIME_TO_RESET / 2 +
 	random_number(TIME_TO_RESET / 2);
 
     save_command_giver = command_giver;
-    command_giver = (struct object *) 0;
+    command_giver = (object_t *) 0;
     if (!apply(APPLY_RESET, ob, 0, ORIGIN_DRIVER)) {
 	/* no reset() in the object */
 	ob->flags &= ~O_WILL_RESET;	/* don't call it next time */
@@ -1602,7 +1653,7 @@ void reset_object P1(struct object *, ob)
     ob->flags |= O_RESET_STATE;
 }
 
-void call_create P2(struct object *, ob, int, num_arg)
+void call_create P2(object_t *, ob, int, num_arg)
 {
     /* Be sure to update time first ! */
     ob->next_reset = current_time + TIME_TO_RESET / 2 +
@@ -1628,7 +1679,7 @@ void call_create P2(struct object *, ob, int, num_arg)
  * before that shadow.
  */
 #ifndef NO_SHADOWS
-int shadow_catch_message P2(struct object *, ob, char *, str)
+int shadow_catch_message P2(object_t *, ob, char *, str)
 {
     if (!ob->shadowed)
 	return 0;
@@ -1648,7 +1699,7 @@ int shadow_catch_message P2(struct object *, ob, char *, str)
 }
 #endif
 
-INLINE int object_visible P1(struct object *, ob)
+INLINE int object_visible P1(object_t *, ob)
 {
     if (ob->flags & O_HIDDEN) {
 	if (current_object->flags & O_HIDDEN) {
@@ -1660,13 +1711,13 @@ INLINE int object_visible P1(struct object *, ob)
     }
 }
 
-void reload_object P1(struct object *, obj)
+void reload_object P1(object_t *, obj)
 {
     int i;
 
     if (!obj->prog)
 	return;
-    for (i = 0; i < (int) obj->prog->p.i.num_variables; i++) {
+    for (i = 0; i < (int) obj->prog->num_variables; i++) {
 	free_svalue(&obj->variables[i], "reload_object");
 	obj->variables[i] = const0n;
     }
@@ -1681,8 +1732,8 @@ void reload_object P1(struct object *, obj)
      */
 #ifndef NO_SHADOWS
     if (obj->shadowed && !obj->shadowing) {
-	struct svalue svp;
-	struct object *ob2;
+	svalue_t svp;
+	object_t *ob2;
 
 	svp.type = T_OBJECT;
 	for (ob2 = obj->shadowed; ob2;) {

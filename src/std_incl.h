@@ -4,7 +4,7 @@
 #if defined(NeXT) || defined(__386BSD__) || defined(LATTICE) || defined(SunOS_5)
 #  include <stdlib.h>
 #endif
-#if defined(__386BSD__) || defined(LATTICE) || defined(SunOS_5)
+#if defined(__386BSD__) || defined(LATTICE) || defined(SunOS_5) || defined(sgi)
 #  include <unistd.h>
 #endif
 

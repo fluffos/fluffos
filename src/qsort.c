@@ -10,7 +10,7 @@
 #include "std.h"
 #include "qsort.h"
 
-#define LEN sizeof(struct svalue)
+#define LEN sizeof(svalue_t)
 #define MAX_LEN 1000
 
 INLINE static void doSwap PROT((char *, char *, int));

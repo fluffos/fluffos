@@ -16,7 +16,7 @@
 #define NO_OPCODES
 #include "std.h"
 #include "file_incl.h"
-#include "interpret.h"
+#include "lpc_incl.h"
 #include "simulate.h"
 #include "comm.h"
 
@@ -177,6 +177,7 @@ POINTER smalloc_malloc P1(size_t, size)
 	*next_unused = (u) last_small_chunk;
 	last_small_chunk = next_unused++;
 	count_up(small_chunk_stat, SMALL_CHUNK_SIZE + SIZEOF_PTR);
+	count_up(small_alloc_stat, SIZEOF_PTR);
 	unused_size = SMALL_CHUNK_SIZE;
     } else
 	fake("Allocated from chunk.");
@@ -185,11 +186,11 @@ POINTER smalloc_malloc P1(size_t, size)
     *s_size_ptr(next_unused) = size >> 2;
     unused_size -= size;
     if (unused_size < (SINT + SIZEOF_PTR)) {
+	count_up(small_alloc_stat, unused_size);
 	if ((size + unused_size) < (SMALL_BLOCK_MAX_BYTES + SINT)) {
 	    /*
 	     * try to avoid waste
 	     */
-	    count_up(small_alloc_stat, unused_size);
 	    size += unused_size;
 	    *s_size_ptr(next_unused) = size >> 2;
 	}
@@ -256,7 +257,6 @@ SFREE_RETURN_TYPE smalloc_free P1(POINTER, ptr)
 /* if this is a constant, evaluate at compile-time.... */
 #ifndef fit_style
 int fit_style = BEST_FIT;
-
 #endif
 
 #define l_size_ptr(p)		(p)
@@ -290,28 +290,41 @@ typedef short balance_t;
 #define NO_BARREL_SHIFT
 #endif
 
-struct free_block {
+typedef struct free_block_s {
     u size;
-    struct free_block *parent, *left, *right;
+    struct free_block_s *parent, *left, *right;
     balance_t balance;
     short align_dummy;
-};
+} free_block_t;
 
 /* prepare two nodes for the free tree that will never be removed,
    so that we can always assume that the tree is and remains non-empty. */
 /* some compilers don't understand forward declarations of static vars. */
-extern struct free_block dummy2;
-static struct free_block dummy =
-{ /* size */ 0, /* parent */ &dummy2, /* left */ 0, /* right */ 0, /* balance */ 0};
-struct free_block dummy2 =
-{ /* size */ 0, /* parent */ 0, /* left */ &dummy, /* right */ 0, /* balance */ -1};
+extern free_block_t dummy2;
 
-static struct free_block *free_tree = &dummy2;
+static free_block_t dummy = { 
+    /* size */ 0, 
+    /* parent */ &dummy2,
+    /* left */ 0,
+    /* right */ 0,
+    /* balance */ 0
+};
+
+free_block_t dummy2 =
+{
+    /* size */ 0,
+    /* parent */ 0, 
+    /* left */ &dummy, 
+    /* right */ 0,
+    /* balance */ -1
+};
+
+static free_block_t *free_tree = &dummy2;
 
 #ifdef DEBUG_AVL
 static int inconsistency = 0;
 
-static int check_avl P2(struct free_block *, parent, struct free_block *, p)
+static int check_avl P2(free_block_t *, parent, free_block_t *, p)
 {
     int left, right;
 
@@ -362,10 +375,10 @@ static int do_check_avl()
 t_stat large_free_stat;
 static void remove_from_free_list P1(u *, ptr)
 {
-    struct free_block *p, *q, *r, *s, *t;
+    free_block_t *p, *q, *r, *s, *t;
 
     fake((do_check_avl(), "remove_from_free_list called"));
-    p = (struct free_block *) (ptr + 1);
+    p = (free_block_t *) (ptr + 1);
     count_back(large_free_stat, p->size << 2);
 #ifdef DEBUG_AVL
     printf("node:%x\n", p);
@@ -685,7 +698,7 @@ static void remove_from_free_list P1(u *, ptr)
 static void add_to_free_list P1(u *, ptr)
 {
     u size;
-    struct free_block *p, *q, *r;
+    free_block_t *p, *q, *r;
 
     /*
      * When there is a distinction between data and address registers and/or
@@ -698,13 +711,13 @@ static void add_to_free_list P1(u *, ptr)
 #ifdef DEBUG_AVL
     printf("size:%d\n", size);
 #endif
-    q = (struct free_block *) size;	/* this assignment is a hint for
+    q = (free_block_t *) size;	/* this assignment is a hint for
 					 * register choice */
-    r = (struct free_block *) (ptr + 1);
+    r = (free_block_t *) (ptr + 1);
     count_up(large_free_stat, size << 2);
     q = free_tree;
     for (;; /* p = q */ ) {
-	p = (struct free_block *) q;
+	p = (free_block_t *) q;
 #ifdef DEBUG_AVL
 	printf("checked node size %d\n", p->size);
 #endif
@@ -734,7 +747,7 @@ static void add_to_free_list P1(u *, ptr)
     printf("p->balance:%d\n", p->balance);
 #endif
     do {
-	struct free_block *s;
+	free_block_t *s;
 
 	if (r == p->left) {
 	    balance_t b;
@@ -775,7 +788,7 @@ static void add_to_free_list P1(u *, ptr)
 		} else {	/* r->balance == +1 */
 		    /* LR-Rotation */
 		    balance_t b2;
-		    struct free_block *t = r->right;
+		    free_block_t *t = r->right;
 
 #ifdef DEBUG_AVL
 		    fake("LR-Rotation");
@@ -862,7 +875,7 @@ static void add_to_free_list P1(u *, ptr)
 		} else {	/* r->balance == -1 */
 		    /* RL-Rotation */
 		    balance_t b2;
-		    struct free_block *t = r->left;
+		    free_block_t *t = r->left;
 
 #ifdef DEBUG_AVL
 		    fake("RL-Rotation");
@@ -1082,7 +1095,7 @@ static char *large_malloc P2(u, size, int, force_more)
     if (!force_more) {
 #ifdef FIT_STYLE_FAST_FIT
 
-	struct free_block *p, *q, *r;
+	free_block_t *p, *q, *r;
 	u minsplit;
 	u tempsize;
 

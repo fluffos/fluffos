@@ -6,17 +6,10 @@
 #include "compiler.h"
 #include "lex.h"
 #include "scratchpad.h"
-#include "stralloc.h"
+
+#include "lpc_incl.h"
 #include "simul_efun.h"
-/* inherit_file and find_object2 */
-#include "simulate.h"
-/* APPLY___INIT */
-#include "applies.h"
-/* d_flag */
-#include "main.h"
-/* generate_function_call, generate, pop_value */
 #include "generate.h"
-#include "include/function.h"
 
 %line
 /*
@@ -29,6 +22,7 @@
       LOOP_CONTEXT       - we're inside a loop
       SWITCH_STRINGS     - a string case has been found
       SWITCH_NUMBERS     - a non-zero numeric case has been found
+      SWITCH_RANGES      - a range has been found
       SWITCH_DEFAULT     - a default has been found
  */
 int context;
@@ -74,10 +68,8 @@ int yyparse PROT((void));
 
 %token L_SSCANF L_CATCH
 %token L_PARSE_COMMAND L_TIME_EXPRESSION
-%token L_ASM
-%ifdef NEW_FUNCTIONS
+%token L_ASM L_CLASS L_NEW
 %token L_PARAMETER
-%endif
 
 /*
  * 'Dangling else' shift/reduce conflict is well known...
@@ -116,17 +108,15 @@ int yyparse PROT((void));
     float real;
     unsigned int address;       /* Address of an instruction */
     char *string;
-    short type;
+    int type;
     struct { short num_arg; char is_proto; } argument;
-    struct ident_hash_elem *ihe;
-    struct function *funp;
-#ifdef NEW_FUNCTIONS
-    struct function_context_t context;
-#endif
-    struct parse_node *node;
+    ident_hash_elem_t *ihe;
+    function_t funp;
+    function_context_t context;
+    parse_node_t *node;
     struct {
         char num;
-	struct parse_node *node;
+	parse_node_t *node;
     } decl;
     struct { 
 	char num_local; 
@@ -145,9 +135,7 @@ int yyparse PROT((void));
 %type <number> efun_override L_ASSIGN L_ORDER
 
 /* Holds a variable index */
-%ifdef NEW_FUNCTIONS
 %type <number> L_PARAMETER
-%endif
 
 /* These hold arbitrary numbers */
 %type <number> L_NUMBER constant
@@ -165,8 +153,8 @@ int yyparse PROT((void));
 %type <ihe> L_DEFINED_NAME
 
 /* These hold a type */
-%type <number> type optional_star type_modifier_list 
-%type <number> opt_basic_type L_TYPE_MODIFIER L_BASIC_TYPE 
+%type <type> type optional_star type_modifier_list 
+%type <type> opt_basic_type L_TYPE_MODIFIER L_BASIC_TYPE basic_type
 %type <type> cast
 
 /* This holds compressed and less flexible def_name information */
@@ -213,11 +201,12 @@ possible_semi_colon:
 	    }
     ;
 
+
 inheritance:
 	type_modifier_list L_INHERIT string_con1 ';'
 	    {
-		struct object *ob;
-		struct inherit inherit;
+		object_t *ob;
+		inherit_t inherit;
 		int initializer;
 
 		ob = find_object2($3);
@@ -230,12 +219,13 @@ inheritance:
 		inherit.prog = ob->prog;
 		inherit.function_index_offset =
 		      mem_block[A_FUNCTIONS].current_size /
-		      sizeof (struct function);
+		      sizeof (function_t);
 		inherit.variable_index_offset =
 		      mem_block[A_VARIABLES].current_size /
-		      sizeof (struct variable);
+		      sizeof (variable_t);
 		add_to_mem_block(A_INHERITS, (char *)&inherit, sizeof inherit);
 		copy_variables(ob->prog, $1);
+		copy_structures(ob->prog);
 		initializer = copy_functions(ob->prog, $1);
 		if (initializer > 0) {
 		    /* initializer is an index into the object we're
@@ -243,7 +233,7 @@ inheritance:
 		       appropriate entry in our table and generates
 		       a call to it */
 		    start_initializer();
-		    generate_inherited_init_call(mem_block[A_INHERITS].current_size/sizeof(struct inherit) - 1, initializer);
+		    generate_inherited_init_call(mem_block[A_INHERITS].current_size/sizeof(inherit_t) - 1, initializer);
 		    end_initializer();
 		}
 	    }
@@ -272,7 +262,7 @@ optional_star:
 	    }
     |   '*'
 	    {
-		$$ = TYPE_MOD_POINTER;
+		$$ = TYPE_MOD_ARRAY;
 	    }
     ;
 
@@ -305,6 +295,10 @@ not_efun_ident:
             {
               $$ = scratch_copy("asm");
             }
+     |  L_NEW
+            {
+	      $$ = scratch_copy("new");
+	    }
      ;
 
 identifier:
@@ -330,11 +324,6 @@ def:
 		} else {
 		/* force strict types - no more compat mode */
 
-#ifdef STRICT_TYPE_CHECKING
-		    exact_types = TYPE_ANY;
-#else
-		    exact_types = 0;
-#endif
 		    if (pragmas & PRAGMA_STRICT_TYPES) {
 			if (strcmp($3, "create") != 0)
 			    yyerror("\"#pragma strict_types\" requires type of function");
@@ -347,20 +336,20 @@ def:
 		 * Define a prototype. If it is a real function, then the
 		 * prototype will be replaced below.
 		 */
-		define_new_function($3, $5.num_arg, 0, 0,
+		define_new_function($3, $5.num_arg, 0,
 				    NAME_UNDEFINED|NAME_PROTOTYPE, $1 | $2);
 	    }
 	block_or_semi
 	    {
 		/* Either a prototype or a block */
 		if ($8) {
-		    int func_start;
+		    int fun;
 
 		    if (!($8->kind == F_RETURN) &&
 			!(($8->kind == NODE_STATEMENTS) 
 			  && $8->r.expr->kind == F_RETURN)) {
-			struct parse_node *replacement;
-			struct parse_node *sub_node;
+			parse_node_t *replacement;
+			parse_node_t *sub_node;
 			NODE_NO_LINE(sub_node, F_RETURN);
 			NODE_NO_LINE(sub_node->r.expr, F_CONST0);
 			NODE_NO_LINE(replacement, NODE_STATEMENTS);
@@ -368,13 +357,13 @@ def:
 			replacement->r.expr = sub_node;
 			$8 = replacement;
 		    }
-		    func_start = generate($8);
 		    if ($5.is_proto) {
 			yyerror("Missing name for function argument");
 		    }
-		    define_new_function($3, $5.num_arg, 
-			  max_num_locals - $5.num_arg,
-			  func_start, 0, $1 | $2);
+		    fun = define_new_function($3, $5.num_arg, 
+					      max_num_locals - $5.num_arg,
+					      0, $1 | $2);
+		    FUNCTION(fun)->offset = generate_function(FUNCTION(fun), $8);
 		}
 		free_all_local_names();
 		free_string($3);
@@ -384,6 +373,62 @@ def:
 		if (!$1) yyerror("Missing type");
 	    }
     |   inheritance
+    |   type_decl
+    ;
+
+member_name:
+        optional_star identifier
+            {
+		add_local_name($2, current_type | $1);
+		scratch_free($2);
+	    }
+     ;
+
+member_name_list:
+        member_name
+    |   member_name ',' member_name_list
+    ;
+
+member_list:
+            /* empty */
+    | member_list type member_name_list ';'
+    ;
+
+type_decl:
+      type_modifier_list L_CLASS identifier '{' member_list '}'
+            {
+		class_def_t *sd;
+		class_member_entry_t *sme;
+		ident_hash_elem_t *ihe;
+		int index, i;
+
+		index = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
+		sd = (class_def_t *)allocate_in_mem_block(A_CLASS_DEF, sizeof(class_def_t));
+		sd->size = current_number_of_locals;
+		sd->index = mem_block[A_CLASS_MEMBER].current_size / sizeof(class_member_entry_t);
+		sd->name = store_prog_string($3);
+
+		sme = (class_member_entry_t *)allocate_in_mem_block(A_CLASS_MEMBER, sizeof(class_member_entry_t) * current_number_of_locals);
+
+		for (i = 0; i < current_number_of_locals; i++) {
+		    sme[i].name = store_prog_string(locals_ptr[i]->name);
+		    sme[i].type = type_of_locals_ptr[i];
+		}
+		ihe = find_or_add_ident(PROG_STRING(sd->name), FOA_GLOBAL_SCOPE);
+		if (ihe->dn.class_num == -1)
+		    ihe->sem_value++;
+		else {
+		    /* Possibly, this should check if the definitions are
+		       consistent */
+		    char buf[1024];
+		    sprintf(buf,"Illegal to redefine class %s", $3);
+		    yyerror(buf);
+		}
+		ihe->dn.class_num = index;
+
+		free_all_local_names();
+		scratch_free($3);
+	    }
     ;
 
 new_local_name:
@@ -396,6 +441,10 @@ new_local_name:
             {
 		$$ = scratch_copy("efun");
 	    }
+      | L_NEW
+            {
+		$$ = scratch_copy("new");
+	    }
       | L_DEFINED_NAME
             {
 		if ($1->dn.local_num != -1) {
@@ -407,13 +456,27 @@ new_local_name:
 	    }
       ;
 
+basic_type:
+        L_BASIC_TYPE 
+      | L_CLASS L_DEFINED_NAME
+            {
+		if ($2->dn.class_num == -1) {
+		    char buf[MAXLINE + 30];
+		    sprintf(buf, "Undefined class '%s'", $2->name);
+		    yyerror(buf);
+		    $$ = TYPE_ANY;
+		} else 
+		    $$ = $2->dn.class_num | TYPE_MOD_CLASS;
+	    }
+       ;
+
 new_arg:
-        L_BASIC_TYPE optional_star
+        basic_type optional_star
             {
                 $$ = 1;
                 add_local_name("", $1 | $2);
             }
-      | L_BASIC_TYPE optional_star new_local_name
+      | basic_type optional_star new_local_name
 	    {
                 add_local_name($3, $1 | $2);
 		scratch_free($3);
@@ -473,14 +536,14 @@ type:
     ;
 
 cast:
-	'(' L_BASIC_TYPE optional_star ')'
+	'(' basic_type optional_star ')'
 	    {
 		$$ = $2 | $3;
 	    }
     ;
 
 opt_basic_type:
-        L_BASIC_TYPE
+        basic_type
     |   /* empty */
 	    {
 		$$ = TYPE_UNKNOWN;
@@ -500,25 +563,27 @@ new_name:
 	    }
     |   optional_star identifier L_ASSIGN expr0
 	    {
-		struct parse_node *expr;
+		parse_node_t *expr;
+		int type = (current_type | $1) & TYPE_MOD_MASK;
 
 		if ($3 != F_ASSIGN)
 		    yyerror("Only '=' is legal in initializers.");
 
 		start_initializer();
-		if (!compatible_types((current_type | $1) & TYPE_MOD_MASK,
-		      $4->type)) {
+		if (!compatible_types(type, $4->type)) {
 		    char buff[100];
 
 		    sprintf(buff, "Type mismatch %s when initializing %s",
-			  get_two_types((current_type | $1) & TYPE_MOD_MASK,
-					$4->type), $2);
+			  get_two_types(type, $4->type), $2);
 		    yyerror(buff);
 		}
 
+		$4 = do_promotions($4, type);
+
 		expr = make_branched_node(F_VOID_ASSIGN, 0, 0, $4);
 		CREATE_NODE(expr->l.expr, F_GLOBAL_LVALUE);
-		expr->l.expr->v.number = define_variable($2, current_type | $1, 0);
+		expr->l.expr->v.number = define_variable($2, 
+							 current_type | $1, 0);
 		generate(expr);
 		end_initializer();
 		scratch_free($2);
@@ -543,7 +608,7 @@ block:
                 $$.node = 0;
                 $$.num = 0;
             }
-    |   local_declarations L_BASIC_TYPE
+    |   local_declarations basic_type
             {
                 /* can't do this in basic_type b/c local_name_list contains
                  * expr0 which contains cast which contains basic_type
@@ -571,15 +636,19 @@ block:
 	    }
     |   optional_star new_local_name L_ASSIGN expr0
 	    {
+		int type = (current_type | $1) & TYPE_MOD_MASK;
+
 		if ($3 != F_ASSIGN)
 		    yyerror("Only '=' is allowed in initializers.");
-		if (!compatible_types((current_type | $1) & TYPE_MOD_MASK, $4->type)) {
+		if (!compatible_types(type, $4->type)) {
 		    char buff[100];
 
 		    sprintf(buff, "Type mismatch %s when initializing %s",
-			  get_two_types((current_type | $1) & TYPE_MOD_MASK, $4->type), $2);
+			  get_two_types(type, $4->type), $2);
 		    yyerror(buff);
 		}
+		
+		$4 = do_promotions($4, type);
 
 		$$ = make_branched_node(F_VOID_ASSIGN, 0, 0, $4);
 		CREATE_NODE($$->l.expr, F_LOCAL_LVALUE);
@@ -604,7 +673,6 @@ block:
                 $$.num = 1 + $3.num;
             }
     ;
-
 
 statements:
 	/* empty */
@@ -631,7 +699,7 @@ statement:
 		$$ = insert_pop_value($1);
 #ifdef DEBUG
 		if (d_flag) {
-		    struct parse_node *replacement;
+		    parse_node_t *replacement;
 		    NODE_NO_LINE(replacement, NODE_STATEMENTS);
 		    replacement->l.expr = $$;
 		    NODE_NO_LINE(replacement->r.expr, F_BREAK_POINT);
@@ -718,7 +786,7 @@ for:
 	    }
         statement
             {
-		struct parse_node *sub_node;
+		parse_node_t *sub_node;
 
 		if ($5->kind == F_LT && $5->l.expr->kind == F_LOCAL
 		    && ($5->r.expr->kind == F_LOCAL ||
@@ -756,17 +824,22 @@ for_expr:
 
 first_for_expr:
         for_expr
-    |   L_BASIC_TYPE optional_star new_local_name L_ASSIGN expr0
+    |   basic_type optional_star new_local_name L_ASSIGN expr0
             {
+		int type = $1 | $2;
+
 		if ($4 != F_ASSIGN)
 		    yyerror("Only '=' is allowed in initializers.");
-		if (!compatible_types($1 | $2, $5->type)) {
+		if (!compatible_types(type, $5->type)) {
 		    char buff[100];
 
 		    sprintf(buff, "Type mismatch %s when initializing %s",
-			  get_two_types($1 | $2, $5->type), $3);
+			  get_two_types(type, $5->type), $3);
 		    yyerror(buff);
 		}
+
+		$5 = do_promotions($5, type);
+
 		CREATE_NODE($$, F_ASSIGN);
 		$$->r.expr = $5;
 		CREATE_NODE($$->l.expr, F_LOCAL_LVALUE);
@@ -785,7 +858,7 @@ first_for_expr:
             }
        '{' local_declarations case switch_block '}'
             {
-                struct parse_node *node1, *node2;
+                parse_node_t *node1, *node2;
 
                 if ($9) {
                     NODE_NO_LINE(node1, NODE_STATEMENTS);
@@ -795,7 +868,9 @@ first_for_expr:
 
                 if (context & SWITCH_STRINGS) {
                     NODE_NO_LINE(node2, NODE_SWITCH_STRINGS);
-                } else {
+                } else if (context & SWITCH_RANGES) {
+		    NODE_NO_LINE(node2, NODE_SWITCH_RANGES);
+		} else {
                     NODE_NO_LINE(node2, NODE_SWITCH_NUMBERS);
                 }
                 node2->l.expr = $3;
@@ -846,6 +921,8 @@ first_for_expr:
                     yyerror("String case labels not allowed as range bounds");
                 if ($2->r.number > $4->r.number) break;
 
+		context |= SWITCH_RANGES;
+
                 $$ = $2;
                 $$->v.expr = $4;
 
@@ -873,7 +950,7 @@ first_for_expr:
 
                 if ($1) context |= SWITCH_NUMBERS;
                 CREATE_NODE($$, NODE_CASE_NUMBER);
-                $$->r.expr = (struct parse_node *)$1;
+                $$->r.expr = (parse_node_t *)$1;
             }
     |   string_con1
             {
@@ -885,7 +962,7 @@ first_for_expr:
                     yyerror("Mixed case label list not allowed");
                 context |= SWITCH_STRINGS;
                 CREATE_NODE($$, NODE_CASE_STRING);
-                $$->r.expr = (struct parse_node *)(PROG_STRING(str));
+                $$->r.number = str;
             }
     ;
 
@@ -984,7 +1061,7 @@ comma_expr:
 expr0:
 	lvalue L_ASSIGN expr0
 	    {
-	        struct parse_node *l = $1, *r = $3;
+	        parse_node_t *l = $1, *r = $3;
 		/* set this up here so we can change it below */
 		$$ = make_branched_node($2, r->type, l, r);
 
@@ -996,19 +1073,7 @@ expr0:
 		    yyerror(buf);
 		}
 
-		if ((l->type == TYPE_REAL) && (r->type == TYPE_NUMBER)) {
-		    struct parse_node *expr;
-		    expr = make_branched_node(0, 0, 0, 0);
-		    expr->v.expr = r;
-		    $$->r.expr = make_branched_node(F_TO_FLOAT, TYPE_REAL, 0, expr);
-		    $$->v.number = 1;
-		} else if ((l->type == TYPE_NUMBER) && (r->type == TYPE_REAL)) {
-		    struct parse_node *expr;
-		    expr = make_branched_node(0, 0, 0, 0);
-		    expr->v.expr = r;
-		    $$->r.expr = make_branched_node(F_TO_INT, TYPE_NUMBER, 0, expr);
-		    $$->v.number = 1;
-		}
+		$$->r.expr = do_promotions(r, l->type);
 	    }
     |   error L_ASSIGN expr0
 	    {
@@ -1018,7 +1083,7 @@ expr0:
 	    }
     |   expr0 '?' expr0 ':' expr0 %prec '?'
 	    {
-		struct parse_node *p1 = $3, *p2 = $5;
+		parse_node_t *p1 = $3, *p2 = $5;
 
 		CREATE_TYPED_NODE($$, NODE_CONDITIONAL, TYPE_ANY);
 		if (exact_types && !compatible_types(p1->type, p2->type)) {
@@ -1064,17 +1129,17 @@ expr0:
     |   expr0 '&' expr0
 	    {
 		int t1 = $1->type, t3 = $3->type;
-		if ((t1 & TYPE_MOD_POINTER) || (t3 & TYPE_MOD_POINTER)){
+		if ((t1 & TYPE_MOD_ARRAY) || (t3 & TYPE_MOD_ARRAY)){
 		    if (t1 == t3){
 			$$ = make_branched_node(F_AND, t1, $1, $3);
 		    } else if ((t1 == TYPE_ANY) || (t3 == TYPE_ANY) ||
-			       (t1 & t3 & TYPE_MOD_POINTER)){
-			$$ = make_branched_node(F_AND, TYPE_ANY|TYPE_MOD_POINTER, $1, $3);
+			       (t1 & t3 & TYPE_MOD_ARRAY)){
+			$$ = make_branched_node(F_AND, TYPE_ANY|TYPE_MOD_ARRAY, $1, $3);
 		    } else {
 			char buf[200];
 			sprintf(buf, "Incompatible types for & %s.", get_two_types(t1,t3));
 			yyerror(buf);
-			$$ = make_branched_node(F_AND, TYPE_ANY|TYPE_MOD_POINTER, $1, $3);
+			$$ = make_branched_node(F_AND, TYPE_ANY|TYPE_MOD_ARRAY, $1, $3);
 		    } 
 		} else $$ = binary_int_op($1, $3, F_AND, "&");
 	    }
@@ -1115,10 +1180,11 @@ expr0:
 	    {
 %ifndef OLD_TYPE_BEHAVIOR
 		if (exact_types){
-		    int t1 = $1->type, t3 = $3->type;
+		    int t1 = $1->type;
+		    int t3 = $3->type;
 
-		    if (!BASIC_TYPE(t1, TYPE_NUMBER) && t1 != TYPE_STRING && 
-			t1 != TYPE_REAL){
+		    if (!COMP_TYPE(t1, TYPE_NUMBER) 
+			&& !COMP_TYPE(t1, TYPE_STRING)) {
 			char buf[200];
 			strcpy(buf, "Bad left argument to '");
 			strcat(buf, get_f_name($2));
@@ -1126,8 +1192,8 @@ expr0:
 			strcat(buf, get_type_name(t1));
 			strcat(buf, "\"");
 			yyerror(buf);
-		    } else if (!BASIC_TYPE(t3, TYPE_NUMBER) && t3 != TYPE_STRING &&
-			       t3 != TYPE_REAL){
+		    } else if (!COMP_TYPE(t3, TYPE_NUMBER) 
+			       && !COMP_TYPE(t3, TYPE_STRING)) {
                         char buf[200];
                         strcpy(buf, "Bad right argument to '");
                         strcat(buf, get_f_name($2));
@@ -1151,15 +1217,15 @@ expr0:
                 if (exact_types){
                     int t1 = $1->type, t3 = $3->type;
 
-                    if (!BASIC_TYPE(t1, TYPE_NUMBER) && t1 != TYPE_STRING &&
-                        t1 != TYPE_REAL){
+                    if (!COMP_TYPE(t1, TYPE_NUMBER) 
+			&& !COMP_TYPE(t1, TYPE_STRING)) {
                         char buf[200];
                         strcpy(buf, "Bad left argument to '<' : \"");
                         strcat(buf, get_type_name(t1));
                         strcat(buf, "\"");
                         yyerror(buf);
-                    } else if (!BASIC_TYPE(t3, TYPE_NUMBER) && t3 != TYPE_STRING &&
-                               t3 != TYPE_REAL){
+                    } else if (!COMP_TYPE(t3, TYPE_NUMBER)
+			       && !COMP_TYPE(t3, TYPE_STRING)) {
                         char buf[200];
                         strcpy(buf, "Bad right argument to '<' : \"");
                         strcat(buf, get_type_name(t3));
@@ -1235,8 +1301,8 @@ expr0:
 			    }
 			    default:
 			    {
-				if (t1 & t3 & TYPE_MOD_POINTER) {
-				    result_type = TYPE_ANY|TYPE_MOD_POINTER;
+				if (t1 & t3 & TYPE_MOD_ARRAY) {
+				    result_type = TYPE_ANY|TYPE_MOD_ARRAY;
 				    break;
 				}
 add_error:
@@ -1348,7 +1414,7 @@ get_two_types(t1, t3));
 			        result_type = t1;
 				break;
 			    default:
-				if (!(t1 & TYPE_MOD_POINTER)){
+				if (!(t1 & TYPE_MOD_ARRAY)){
 				    type_error("Bad argument number 1 to '-'", t1);
 				    result_type = TYPE_ANY;
 				} else result_type = t1;
@@ -1360,7 +1426,7 @@ get_two_types(t1, t3));
 			        result_type = t3;
 				break;
 			    default:
-				if (!(t3 & TYPE_MOD_POINTER)){
+				if (!(t3 & TYPE_MOD_ARRAY)){
 				    type_error("Bad argument number 2 to '-'", t3);
 				    result_type = TYPE_ANY;
 				} else result_type = t3;
@@ -1372,7 +1438,7 @@ get_two_types(t1, t3));
 			        result_type = t1;
 				break;
 			    default:
-				if (!(t1 & TYPE_MOD_POINTER)){
+				if (!(t1 & TYPE_MOD_ARRAY)){
 				    type_error("Bad argument number 1 to '-'", t1);
 				    result_type = TYPE_ANY;
 				} else result_type = t1;
@@ -1380,8 +1446,8 @@ get_two_types(t1, t3));
 		    } else if ((t1 == TYPE_REAL && t3 == TYPE_NUMBER) ||
 			       (t3 == TYPE_REAL && t1 == TYPE_NUMBER)){
 			result_type = TYPE_REAL;
-		    } else if (t1 & t3 & TYPE_MOD_POINTER){
-			result_type = TYPE_MOD_POINTER|TYPE_ANY;
+		    } else if (t1 & t3 & TYPE_MOD_ARRAY){
+			result_type = TYPE_MOD_ARRAY|TYPE_ANY;
 		    } else {
 			char buf[300];
 			sprintf(buf, "Invalid types to '-' %s", get_two_types(t1, t3));
@@ -1595,7 +1661,8 @@ get_two_types(t1, t3));
 	    {
 		$$ = $2;
 		$$->type = $1;
-		if (exact_types && $2->type != TYPE_ANY && $2->type != TYPE_UNKNOWN &&
+		if (exact_types && $2->type != TYPE_ANY && 
+		    $2->type != TYPE_UNKNOWN &&
 		      $1 != TYPE_VOID) {
 		    char tname[100];
 		    char buf[1000];
@@ -1659,7 +1726,7 @@ get_two_types(t1, t3));
 	    }
     |   '~' expr0
 	    {
-		if (exact_types && !BASIC_TYPE($2->type, TYPE_NUMBER))
+		if (exact_types && !IS_TYPE($2->type, TYPE_NUMBER))
 		    type_error("Bad argument to ~", $2->type);
 		if ($2->kind == F_NUMBER) {
 		    $$ = $2;
@@ -1675,7 +1742,7 @@ get_two_types(t1, t3));
 		int result_type;
                 if (exact_types){
 		    int t = $2->type;
-		    if (!BASIC_TYPE(t, TYPE_NUMBER) && t != TYPE_REAL){
+		    if (!COMP_TYPE(t, TYPE_NUMBER)){
 			type_error("Bad argument to unary '-'", t);
 			result_type = TYPE_ANY;
 		    } else result_type = t;
@@ -1747,7 +1814,7 @@ get_two_types(t1, t3));
 return:
 	L_RETURN ';'
 	    {
-		if (exact_types && !TYPE(exact_types, TYPE_VOID))
+		if (exact_types && !IS_TYPE(exact_types, TYPE_VOID))
 		    yyerror("Non-void functions must return a value.");
 		CREATE_NODE($$, F_RETURN);
 		CREATE_TYPED_NODE($$->r.expr, F_NUMBER, TYPE_NUMBER);
@@ -1802,7 +1869,7 @@ expr_list2:
 	    }
     |   expr_list2 ',' expr0
 	    {
-		struct parse_node *expr;
+		parse_node_t *expr;
 
 		expr = new_node_no_line();
 		expr->kind = 0;
@@ -1850,7 +1917,7 @@ expr_list4:
             }
     |   expr_list4 ',' assoc_pair
 	    {
-		struct parse_node *expr;
+		parse_node_t *expr;
 
 		expr = new_node_no_line();
 		expr->kind = 0;
@@ -1871,7 +1938,7 @@ assoc_pair:
             }
     ;
 
- lvalue:
+lvalue:
         expr4
             {
 #define LV_ILLEGAL 1
@@ -1880,118 +1947,127 @@ assoc_pair:
                 /* Restrictive lvalues, but I think they make more sense :) */
                 $$ = $1;
                 switch($$->kind){
-                    case F_LOCAL: $$->kind = F_LOCAL_LVALUE; break;
-		    case NODE_PARAMETER: $$->kind = NODE_PARAMETER_LVALUE; break;
-                    case F_GLOBAL: $$->kind = F_GLOBAL_LVALUE; break;
-                    case F_INDEX:
-                    case F_RINDEX:
-                    case F_NN_RANGE:
-                    case F_RN_RANGE:
-                    case F_NR_RANGE:
-                    case F_RR_RANGE:
-                    case F_NE_RANGE:
-                    case F_RE_RANGE:
-		    case NODE_VALUE:
+		case F_LOCAL:
+		    $$->kind = F_LOCAL_LVALUE;
+		    break;
+		case NODE_PARAMETER:
+		    $$->kind = NODE_PARAMETER_LVALUE;
+		    break;
+		case F_GLOBAL:
+		    $$->kind = F_GLOBAL_LVALUE;
+		    break;
+		case F_MEMBER:
+		    $$->kind = F_MEMBER_LVALUE;
+		    break;
+		case F_INDEX:
+		case F_RINDEX:
+		case F_NN_RANGE:
+		case F_RN_RANGE:
+		case F_NR_RANGE:
+		case F_RR_RANGE:
+		case F_NE_RANGE:
+		case F_RE_RANGE:
+		case NODE_VALUE:
                     {
-                        struct parse_node *node = $$;
+                        parse_node_t *node = $$;
                         int flag = 0;
                         do {
                             switch(node->kind){
-                                case F_INDEX:
-                                    node->kind = F_INDEX_LVALUE;
-                                    flag |= LV_INDEX;
-                                    break;
-			        case F_RINDEX:
-                                    node->kind = F_RINDEX_LVALUE;
-                                    flag |= LV_INDEX;
-                                    break;
-				case NODE_VALUE:
-				    node->kind = NODE_LVALUE;
+			    case F_INDEX:
+				node->kind = F_INDEX_LVALUE;
+				flag |= LV_INDEX;
+				break;
+			    case F_RINDEX:
+				node->kind = F_RINDEX_LVALUE;
+				flag |= LV_INDEX;
+				break;
+			    case NODE_VALUE:
+				node->kind = NODE_LVALUE;
+				flag |= LV_ILLEGAL;
+				break;
+			    case F_NN_RANGE:
+			    case F_RN_RANGE:
+			    case F_NR_RANGE:
+			    case F_RR_RANGE:
+			    case F_NE_RANGE:
+			    case F_RE_RANGE:
+				if (flag & LV_RANGE){
+				    yyerror("Can't do range lvalue of range lvalue.\n");
 				    flag |= LV_ILLEGAL;
 				    break;
-				case F_NN_RANGE:
-				case F_RN_RANGE:
-				case F_NR_RANGE:
-				case F_RR_RANGE:
-				case F_NE_RANGE:
-				case F_RE_RANGE:
-                                    if (flag & LV_RANGE){
-                                        yyerror("Can't do range lvalue of range lvalue.\n");
-                                        flag |= LV_ILLEGAL;
-                                        break;
-                                    }
-                                    if (flag & LV_INDEX){
-                                        yyerror("Can't do indexed lvalue of range lvalue.\n");
-                                        flag |= LV_ILLEGAL;
-                                        break;
-                                    }
-                                    switch(node->kind){
-                                        case F_NN_RANGE: node->kind = F_NN_RANGE_LVALUE; break;
-                                        case F_RN_RANGE: node->kind = F_RN_RANGE_LVALUE; break;
-                                        case F_NR_RANGE: node->kind = F_NR_RANGE_LVALUE; break;
-                                        case F_RR_RANGE: node->kind = F_RR_RANGE_LVALUE; break;
-                                        case F_NE_RANGE: node->kind = NODE_NE_RANGE_LVALUE; break;
-                                        case F_RE_RANGE: node->kind = NODE_RE_RANGE_LVALUE; break;
-                                    }
-                                    flag |= LV_RANGE;
-                                    node = node->v.expr;
-                                    continue;
-				case F_LOCAL:
-                                    node->kind = F_LOCAL_LVALUE;
-                                    flag |= LV_ILLEGAL;
-                                    break;
-				case F_GLOBAL:
-                                    node->kind = F_GLOBAL_LVALUE;
-                                    flag |= LV_ILLEGAL;
-                                    break;
-				case NODE_PARAMETER:
-                                    node->kind = NODE_PARAMETER_LVALUE;
+				}
+				if (flag & LV_INDEX){
+				    yyerror("Can't do indexed lvalue of range lvalue.\n");
 				    flag |= LV_ILLEGAL;
 				    break;
-			        case F_ADD_EQ:
-				case F_SUB_EQ:
-				case F_AND_EQ:
-				case F_OR_EQ:
-				case F_XOR_EQ:
-				case F_LSH_EQ:
-				case F_RSH_EQ:
-				case F_MULT_EQ:
-				case F_DIV_EQ:
-				case F_MOD_EQ:
-			        case F_ASSIGN:
+				}
+				switch(node->kind){
+				case F_NN_RANGE: node->kind = F_NN_RANGE_LVALUE; break;
+				case F_RN_RANGE: node->kind = F_RN_RANGE_LVALUE; break;
+				case F_NR_RANGE: node->kind = F_NR_RANGE_LVALUE; break;
+				case F_RR_RANGE: node->kind = F_RR_RANGE_LVALUE; break;
+				case F_NE_RANGE: node->kind = NODE_NE_RANGE_LVALUE; break;
+				case F_RE_RANGE: node->kind = NODE_RE_RANGE_LVALUE; break;
+				}
+				flag |= LV_RANGE;
+				node = node->v.expr;
+				continue;
+			    case F_LOCAL:
+				node->kind = F_LOCAL_LVALUE;
+				flag |= LV_ILLEGAL;
+				break;
+			    case F_GLOBAL:
+				node->kind = F_GLOBAL_LVALUE;
+				flag |= LV_ILLEGAL;
+				break;
+			    case NODE_PARAMETER:
+				node->kind = NODE_PARAMETER_LVALUE;
+				flag |= LV_ILLEGAL;
+				break;
+			    case F_ADD_EQ:
+			    case F_SUB_EQ:
+			    case F_AND_EQ:
+			    case F_OR_EQ:
+			    case F_XOR_EQ:
+			    case F_LSH_EQ:
+			    case F_RSH_EQ:
+			    case F_MULT_EQ:
+			    case F_DIV_EQ:
+			    case F_MOD_EQ:
+			    case F_ASSIGN:
 				{
                                     if (!(flag & LV_INDEX)){
                                         yyerror("Illegal lvalue, a possible lvalue is (x <assign> y)[a]");
                                     }
                                     switch(node->l.expr->kind){
-                                        case F_NN_RANGE_LVALUE:
-                                        case F_RN_RANGE_LVALUE:
-                                        case F_NR_RANGE_LVALUE:
-                                        case F_RR_RANGE_LVALUE:
-                                        case NODE_NE_RANGE_LVALUE:
-                                        case NODE_RE_RANGE_LVALUE:
-                                            yyerror("Illegal to have (x[a..b] <assign> y) to be the beginning of an lvalue");
+				    case F_NN_RANGE_LVALUE:
+				    case F_RN_RANGE_LVALUE:
+				    case F_NR_RANGE_LVALUE:
+				    case F_RR_RANGE_LVALUE:
+				    case NODE_NE_RANGE_LVALUE:
+				    case NODE_RE_RANGE_LVALUE:
+					yyerror("Illegal to have (x[a..b] <assign> y) to be the beginning of an lvalue");
 				    }
                                     flag = LV_ILLEGAL;
                                     break;
                                 }
-				default:
-                                    yyerror("Illegal lvalue");
-                                    flag = LV_ILLEGAL;
-                                    break;
+			    default:
+				yyerror("Illegal lvalue");
+				flag = LV_ILLEGAL;
+				break;
 			    }   
                             if ((flag & LV_ILLEGAL) || !(node = node->l.expr)) break;
                         } while (1);
                         break;
                     }
-                    default:
+		default:
                     {
                         yyerror("Illegal lvalue");
                         break;
                     }
                 }
             }
-       ;
+        ;
 
 
 expr4:
@@ -2002,16 +2078,12 @@ expr4:
               if ((i = $1->dn.local_num) != -1) {
                   CREATE_TYPED_NODE($$, F_LOCAL, type_of_locals_ptr[i]);
                   $$->v.number = i & 0xff;
-#ifdef NEW_FUNCTIONS
 		  if (function_context.num_parameters >= 0)
 		      function_context.num_locals++;
-#endif
               } else
 		  if ((i = $1->dn.global_num) != -1) {
-#ifdef NEW_FUNCTIONS
 		      if (function_context.num_parameters >= 0)
 			  function_context.bindable = FP_NOT_BINDABLE;
-#endif
 		      CREATE_TYPED_NODE($$, F_GLOBAL, VARIABLE(i)->type & TYPE_MOD_MASK);
 		      $$->v.number = i;
 		      if (VARIABLE(i)->type & TYPE_MOD_HIDDEN) {
@@ -2051,7 +2123,6 @@ expr4:
                 yyerror(buf);
                 scratch_free($1);
             }
-%ifdef NEW_FUNCTIONS
     |   L_PARAMETER
             {
 		CREATE_TYPED_NODE($$, NODE_PARAMETER, TYPE_ANY);
@@ -2068,7 +2139,7 @@ expr4:
             }
         comma_expr ')'
             {
-		struct parse_node *node;
+		parse_node_t *node;
 
 		function_context.num_parameters = $<number>3;
 
@@ -2088,7 +2159,40 @@ expr4:
 		    node->v.expr = $4;
 		}
 	    }
-%endif
+    |   expr4 L_ARROW identifier
+            {
+		ident_hash_elem_t *ihe;
+		class_def_t *cd;
+		class_member_entry_t *cme;
+		int i;
+
+		if (!($1->type & TYPE_MOD_CLASS)) {
+		    yyerror("Left argument of -> is not a class");
+		    CREATE_NODE($$, F_CONST0);
+		} else {
+		    CREATE_NODE($$, F_MEMBER);
+		    $$->r.expr = $1;
+		    cd = ((class_def_t *)mem_block[A_CLASS_DEF].block)
+			+ ($1->type & (TYPE_MOD_MASK & ~TYPE_MOD_CLASS));
+		    cme = ((class_member_entry_t *)mem_block[A_CLASS_MEMBER].block) + cd->index;
+		    for (i=0; i < cd->size; i++) {
+			if (strcmp(PROG_STRING(cme[i].name), $3) == 0)
+			    break;
+		    }
+		    if (i == cd->size) {
+			char buf[256];
+
+			sprintf(buf, "Class '%s' has no member '%s'",
+				PROG_STRING(cd->name), $3);
+			yyerror(buf);
+			$$->type = TYPE_ANY;
+		    } else {
+			$$->v.number = i;
+			$$->type = cme[i].type;
+		    }
+		}
+		scratch_free($3);
+            }
     |   expr4 '[' comma_expr L_RANGE comma_expr ']'
             {
                 $$ = make_range_node(F_NN_RANGE, $1, $3, $5);
@@ -2120,7 +2224,7 @@ expr4:
                     if (i < 1 || i > $1->v.number)
                         yyerror("Illegal index to array constant.\n");
                     else {
-                        struct parse_node *node = $1->r.expr;
+                        parse_node_t *node = $1->r.expr;
                         i = $1->v.number - i;
                         while (i--)
                             node = node->r.expr;
@@ -2144,14 +2248,14 @@ expr4:
                                 break;
 
 			    default:
-                                if ($1->type & TYPE_MOD_POINTER)
-                                    $$->type = $1->type & ~TYPE_MOD_POINTER;
+                                if ($1->type & TYPE_MOD_ARRAY)
+                                    $$->type = $1->type & ~TYPE_MOD_ARRAY;
                                 else{
                                     type_error("Value indexed has a bad type ", $1->type);
                                     $$->type = TYPE_ANY;
                                 }
 			    }
-                        if (!BASIC_TYPE($4->type,TYPE_NUMBER))
+                        if (!IS_TYPE($4->type,TYPE_NUMBER))
                             type_error("Bad type of index", $4->type);
                     }
                 } else $$->type = TYPE_ANY;
@@ -2163,7 +2267,7 @@ expr4:
                     if (i < 0 || i >= $1->v.number)
                         yyerror("Illegal index to array constant.\n");
                     else {
-                        struct parse_node *node = $1->r.expr;
+                        parse_node_t *node = $1->r.expr;
                         while (i--)
                             node = node->r.expr;
                         $$ = node->v.expr;
@@ -2186,14 +2290,14 @@ expr4:
                                 break;
 
 			    default:
-                                if ($1->type & TYPE_MOD_POINTER)
-                                    $$->type = $1->type & ~TYPE_MOD_POINTER;
+                                if ($1->type & TYPE_MOD_ARRAY)
+                                    $$->type = $1->type & ~TYPE_MOD_ARRAY;
                                 else{
                                     type_error("Value indexed has a bad type ", $1->type);
                                     $$->type = TYPE_ANY;
                                 }
 			}
-                        if (!BASIC_TYPE($3->type,TYPE_NUMBER))
+                        if (!IS_TYPE($3->type,TYPE_NUMBER))
                             type_error("Bad type of index", $3->type);
                     }
                 } else $$->type = TYPE_ANY;
@@ -2204,7 +2308,6 @@ expr4:
 		$$ = $2;
 	    }
     |   catch
-%ifdef NEW_FUNCTIONS
     |   L_BASIC_TYPE
             {
 	        if ($1 != TYPE_FUNCTION) yyerror("A reserved type name cannot be used as a function name.\n");
@@ -2230,8 +2333,8 @@ expr4:
 		if (!($6.node->kind == F_RETURN) &&
 		    !(($6.node->kind == NODE_STATEMENTS)
 		      && $6.node->r.expr->kind == F_RETURN)) {
-		    struct parse_node *replacement;
-		    struct parse_node *sub_node;
+		    parse_node_t *replacement;
+		    parse_node_t *sub_node;
 		    NODE_NO_LINE(sub_node, F_RETURN);
 		    NODE_NO_LINE(sub_node->r.expr, F_CONST0);
 		    NODE_NO_LINE(replacement, NODE_STATEMENTS);
@@ -2308,7 +2411,7 @@ expr4:
 		     */
 		    int i, argn, tmp;
 		    char buff[100];
-		    struct parse_node *enode = $3;
+		    parse_node_t *enode = $3;
 		    argp = &efun_arg_types[predefs[f].arg_index];
 		    
 		    for (argn = 0; argn < num; argn++) {
@@ -2319,6 +2422,21 @@ expr4:
 			sprintf(buff, "Bad argument %d to efun %s()",
 				argn+1, predefs[f].word);
 			yyerror(buff);
+		      } else {
+			  /* this little section necessary b/c in the case
+			     float | int we dont want to do promoting. */
+			  if (tmp == TYPE_NUMBER && argp[i] == TYPE_REAL) {
+			      for (i++; argp[i] && argp[i] != TYPE_NUMBER; i++)
+				  ;
+			      if (!argp[i])
+				  enode->v.expr = promote_to_float(enode->v.expr);
+			  }
+			  if (tmp == TYPE_REAL && argp[i] == TYPE_NUMBER) {
+			      for (i++; argp[i] && argp[i] != TYPE_REAL; i++)
+				  ;
+			      if (!argp[i])
+				  enode->v.expr = promote_to_int(enode->v.expr);
+			  }
 		      }
 		      while (argp[i] != 0)
 			i++;
@@ -2334,7 +2452,7 @@ expr4:
 		  break;
 		}
 	      }
-      |   L_FUNCTION_OPEN expr0 ':' ')'
+      |   L_FUNCTION_OPEN comma_expr ':' ')'
              {
 		 if (function_context.num_locals)
 		   yyerror("Illegal to use local variable in functional.");
@@ -2347,28 +2465,6 @@ expr4:
 		     + (function_context.num_parameters << 8);
 		 function_context = $1;
              }
-%else
-      |   L_FUNCTION_OPEN expr0 ':' ')'
-             {
-		 CREATE_TYPED_NODE($$, F_FUNCTION_CONSTRUCTOR, TYPE_FUNCTION);
-		 $$->v.number = FP_CALL_OTHER | FP_THIS_OBJECT;
-		 $$->l.expr = 0;
-		 $$->r.expr = $2;
- 	    }
-%endif
-     |   L_FUNCTION_OPEN expr0 ',' expr0 ':' ')'
- 	    {
-	      $$ = make_branched_node(F_FUNCTION_CONSTRUCTOR, TYPE_FUNCTION,
-				      $2, $4);
-#ifdef NEW_FUNCTIONS
-              if (function_context.num_parameters > 0) 
-		  yyerror("Illegal use of $var in call_other function pointer.");
-              if (function_context.values_list->kind > 0) 
-		  yyerror("Illegal use of $(expression) in call_other function pointer.");
-              function_context = $1;
-#endif
-	      $$->v.number = FP_CALL_OTHER;
- 	    }
     |   L_MAPPING_OPEN expr_list3 ']' ')'
 	    {
 	        $$ = $2;
@@ -2379,7 +2475,7 @@ expr4:
 	    {
 		$$ = $2;
 		$$->kind = F_AGGREGATE;
-		$$->type = TYPE_MOD_POINTER | TYPE_ANY;
+		$$->type = TYPE_MOD_ARRAY | TYPE_ANY;
 	    }
     ;
 
@@ -2394,7 +2490,7 @@ catch:
 sscanf:
 	L_SSCANF '(' expr0 ',' expr0 lvalue_list ')'
 	    {
-	        struct parse_node *expr;
+	        parse_node_t *expr;
 		expr = new_node_no_line();
 		expr->l.expr = $3;
 		expr->r.expr = $5;
@@ -2406,8 +2502,8 @@ sscanf:
 parse_command:
 	L_PARSE_COMMAND '(' expr0 ',' expr0 ',' expr0 lvalue_list ')'
 	    {
-	      struct parse_node *expr;
-	      struct parse_node *sub_expr;
+	      parse_node_t *expr;
+	      parse_node_t *sub_expr;
 
 	      sub_expr = new_node_no_line();
 	      sub_expr->l.expr = $5;
@@ -2477,17 +2573,35 @@ function_call:
 	    {
 	      $$ = validate_efun_call($1,$3);
 	    }
+        | L_NEW '(' expr_list ')'
+            {
+		ident_hash_elem_t *ihe;
+
+		ihe = lookup_ident("clone_object");
+		$$ = validate_efun_call(ihe->dn.efun_num, $3);
+            }
+        | L_NEW '(' L_CLASS L_DEFINED_NAME ')'
+            {
+		if ($4->dn.class_num == -1) {
+		    char buf[MAXLINE + 30];
+		    sprintf(buf, "Undefined class '%s'", $4->name);
+		    yyerror(buf);
+		    CREATE_NODE($$, F_CONST0);
+		} else {
+		    CREATE_TYPED_NODE($$, F_NEW_CLASS, 
+				      $4->dn.class_num | TYPE_MOD_CLASS);
+		    $$->v.number = $4->dn.class_num;
+		}
+            }
 	| L_DEFINED_NAME '(' expr_list ')'
 	    {
 	      int f;
-	      struct function *funp;
+	      function_t *funp;
 
 	      $$ = $3;
 	      if ((f = $1->dn.function_num) != -1) {
-#ifdef NEW_FUNCTIONS
 		  if (function_context.num_parameters >= 0)
 		      function_context.bindable = FP_NOT_BINDABLE;
-#endif
 
 		  $$->kind = F_CALL_FUNCTION_BY_ADDRESS;
 		  $$->v.number = f;
@@ -2512,14 +2626,12 @@ function_call:
 		 * Don't complain, just grok it.
 		 */
 		int f;
-		struct function *funp;
+		function_t *funp;
 
-#ifdef NEW_FUNCTIONS
 		if (function_context.num_parameters >= 0)
 		    function_context.bindable = FP_NOT_BINDABLE;
-#endif
 		
-		f = define_new_function($1->name, 0, 0, 0, NAME_UNDEFINED, 0);
+		f = define_new_function($1->name, 0, 0, NAME_UNDEFINED, 0);
 		$$->kind = F_CALL_FUNCTION_BY_ADDRESS;
 		$$->v.number = f;
 		$$->type = TYPE_ANY; /* just a guess */
@@ -2550,20 +2662,18 @@ function_call:
 		  arrange_call_inherited(name + 1, $$);
 	      } else {
 		  int f;
-		  struct function *funp;
-		  struct ident_hash_elem *ihe;
+		  function_t *funp;
+		  ident_hash_elem_t *ihe;
 		  
-#ifdef NEW_FUNCTIONS
 		  if (function_context.num_parameters >= 0)
 		      function_context.bindable = FP_NOT_BINDABLE;
-#endif
 
 		  f = (ihe = lookup_ident(name)) ? ihe->dn.function_num : -1;
 		  $$->kind = F_CALL_FUNCTION_BY_ADDRESS;
 		  if (f!=-1) {
 		      /* The only way this can happen is if function_name
 		       * below made the function name.  The lexer would
-		       * return L_DEFINED_FUNCTION instead.
+		       * return L_DEFINED_NAME instead.
 		       */
 		      $$->v.number = f;
 		      funp = FUNCTION(f);
@@ -2571,7 +2681,7 @@ function_call:
 		      $$->type = validate_function_call(funp, f, $3->r.expr);
 		  } else {
 		      
-		      f = define_new_function(name, 0, 0, 0, 
+		      f = define_new_function(name, 0, 0, 
 					      NAME_UNDEFINED, 0);
 		      funp = FUNCTION(f);
 		  }
@@ -2601,7 +2711,7 @@ function_call:
 	  }
     |   expr4 L_ARROW identifier '(' expr_list ')'
 	    {
-		struct parse_node *expr, *expr2;
+		parse_node_t *expr, *expr2;
 		$$ = $5;
 		$$->kind = F_CALL_OTHER;
 		$$->v.number += 2;
@@ -2625,27 +2735,26 @@ function_call:
 	    }
     |   '(' '*' comma_expr ')' '(' expr_list ')'
             {
-	        struct parse_node *expr;
+	        parse_node_t *expr;
 
 		$$ = $6;
 		$$->kind = F_EVALUATE;
+#ifdef CAST_CALL_OTHERS
 		$$->type = TYPE_UNKNOWN;
-#ifdef NEW_FUNCTIONS
+#else
+		$$->type = TYPE_ANY;
+#endif
 		expr = new_node_no_line();
 		expr->v.expr = $3;
 		expr->r.expr = $$->r.expr;
 		$$->r.expr = expr;
 		$$->v.number++;
-#else
-                $$->v.number += 2; /* The two args from the fp split */
-                $$->l.expr = $3;
-#endif
 	    }
     ;
 
 efun_override: L_EFUN L_COLON_COLON identifier {
-	struct svalue *res;
-	struct ident_hash_elem *ihe;
+	svalue_t *res;
+	ident_hash_elem_t *ihe;
 
 	$$ = (ihe = lookup_ident($3)) ? ihe->dn.efun_num : -1;
 	if ($$ == -1) {
@@ -2654,14 +2763,20 @@ efun_override: L_EFUN L_COLON_COLON identifier {
 	    yyerror(buff);
 	    $$ = 0;
 	} else {
-	  push_malloced_string(the_file_name(current_file));
-	  push_constant_string($3);
-	  push_constant_string(main_file_name());
-	  res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
-	  if (!MASTER_APPROVED(res)) {
-	    yyerror("Invalid simulated efunction override");
-	    $$ = 0;
-	  }
+#ifdef LPC_TO_C
+	    if (!(pragmas & PRAGMA_EFUN)) {
+#endif
+		push_malloced_string(the_file_name(current_file));
+		push_constant_string($3);
+		push_constant_string(main_file_name());
+		res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
+		if (!MASTER_APPROVED(res)) {
+		    yyerror("Invalid simulated efunction override");
+		    $$ = 0;
+		}
+#ifdef LPC_TO_C
+	    }
+#endif
 	}
 	scratch_free($3);
       }	

@@ -125,22 +125,6 @@ mudlib_stats uses a linked list, it is fast for insertion; however
 
 -----
 
-get_char() flag that respects input_to()-like option for bang escaped
-commands (ie via !)
-
--- Demon
-
------
-
-swap.c: use unbuffered I/O functions (eg read() and seek()) instead of
-          buffered I/O functions (eg fread() and fseek())
-        use mmap() instead of read(), write() on systems where available
-          for further speed up
-
-  -- Hyp
-
------
-
 #pragma no_inherit
 #pragma no_clone
 

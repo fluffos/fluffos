@@ -1,8 +1,6 @@
 #include "std.h"
-#include "config.h"
+#include "lpc_incl.h"
 #include "otable.h"
-#include "object.h"
-#include "simulate.h"
 #include "comm.h"
 
 /*
@@ -17,7 +15,7 @@
 static int otable_size;
 static int otable_size_minus_one;
 
-static struct object *find_obj_n PROT((char *));
+static object_t *find_obj_n PROT((char *));
 
 /*
  * Object hash function, ripped off from stralloc.c.
@@ -29,7 +27,7 @@ static struct object *find_obj_n PROT((char *));
  * Each object in chain has a pointer, next_hash, to the next object.
  */
 
-static struct object **obj_table = 0;
+static object_t **obj_table = 0;
 
 void init_otable()
 {
@@ -40,7 +38,7 @@ void init_otable()
     for (otable_size = 1; otable_size < y; otable_size *= 2)
 	;
     otable_size_minus_one = otable_size - 1;
-    obj_table = CALLOCATE(otable_size, struct object *, 
+    obj_table = CALLOCATE(otable_size, object_t *, 
 			  TAG_OBJ_TBL, "init_otable");
 
     for (x = 0; x < otable_size; x++)
@@ -53,12 +51,14 @@ void init_otable()
 
 static int obj_searches = 0, obj_probes = 0, objs_found = 0;
 
-static struct object *find_obj_n P1(char *, s)
+/* A global.  *shhhh* don't tell. */
+static int h;
+
+static object_t *find_obj_n P1(char *, s)
 {
-    struct object *curr, *prev;
+    object_t *curr, *prev;
 
-    int h = ObjHash(s);
-
+    h = ObjHash(s);
     curr = obj_table[h];
     prev = 0;
 
@@ -88,19 +88,21 @@ static struct object *find_obj_n P1(char *, s)
 
 static int objs_in_table = 0;
 
-void enter_object_hash P1(struct object *, ob)
+void enter_object_hash P1(object_t *, ob)
 {
-    int h = ObjHash(ob->name);
-    IF_DEBUG(struct object *s);
+    object_t *s;
 
-    IF_DEBUG(s = find_obj_n(ob->name));
+    s = find_obj_n(ob->name); /* This sets h */
 
-    DEBUG_CHECK1(s && s != ob, "Duplicate object \"%s\" in object hash table",
+#ifdef LPC_TO_C
+    DEBUG_CHECK1(s && s != ob && (!(s->flags & O_COMPILED_PROGRAM)),
+		 "Duplicate object \"%s\" in object hash table",
 		 ob->name);
-    DEBUG_CHECK1(s, "Entering object \"%s\" twice in object table",
+#else
+    DEBUG_CHECK1(s && s != ob,
+		 "Duplicate object \"%s\" in object hash table",
 		 ob->name);
-    DEBUG_CHECK1(ob->next_hash,
-		 "Object \"%s\" not found in object table but next link not null", ob->name);
+#endif
 
     ob->next_hash = obj_table[h];
     obj_table[h] = ob;
@@ -113,12 +115,11 @@ void enter_object_hash P1(struct object *, ob)
  * is removed from the next_all list - i.e. in destruct.
  */
 
-void remove_object_hash P1(struct object *, ob)
+void remove_object_hash P1(object_t *, ob)
 {
-    int h = ObjHash(ob->name);
-    struct object *s;
+    object_t *s;
 
-    s = find_obj_n(ob->name);
+    s = find_obj_n(ob->name); /* this sets h, and cycles the ob to the front */
 
     DEBUG_CHECK1(s != ob, "Remove object \"%s\": found a different object!",
 		 ob->name);
@@ -137,9 +138,9 @@ void remove_object_hash P1(struct object *, ob)
 
 static int user_obj_lookups = 0, user_obj_found = 0;
 
-struct object *lookup_object_hash P1(char *, s)
+object_t *lookup_object_hash P1(char *, s)
 {
-    struct object *ob = find_obj_n(s);
+    object_t *ob = find_obj_n(s);
 
     user_obj_lookups++;
     if (ob)
@@ -170,12 +171,12 @@ int show_otable_status P1(int, verbose)
 	add_vmessage("External lookups (succeeded):    %lu (%lu)\n",
 		    user_obj_lookups, user_obj_found);
     }
-    starts = (int) OTABLE_SIZE *sizeof(struct object *) +
-                objs_in_table * sizeof(struct object);
+    starts = (int) OTABLE_SIZE *sizeof(object_t *) +
+                objs_in_table * sizeof(object_t);
 
     if (!verbose) {
 	add_vmessage("Obj table overhead:\t\t%8d %8d\n",
-		    OTABLE_SIZE * sizeof(struct object *), starts);
+		    OTABLE_SIZE * sizeof(object_t *), starts);
     }
     return starts;
 }

@@ -3,11 +3,10 @@
 /*
  * rc.c
  */
-#include "interpret.h"
 
 void set_defaults PROT((char *));
 int get_config_int PROT((int));
 char *get_config_str PROT((int));
-int get_config_item PROT((struct svalue *, struct svalue *));
+int get_config_item PROT((svalue_t *, svalue_t *));
 
 #endif

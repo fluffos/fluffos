@@ -67,7 +67,8 @@
 /*
  * These are or'ed in on top of the basic type.
  */
-#define TYPE_MOD_POINTER	0x0040	/* Pointer to a basic type */
+#define TYPE_MOD_ARRAY   	0x0020	/* Pointer to a basic type */
+#define TYPE_MOD_CLASS          0x0040  /* a class */
 #define TYPE_MOD_HIDDEN         0x0080  /* used by private vars */
 #define TYPE_MOD_STATIC		0x0100	/* Static function or variable */
 #define TYPE_MOD_NO_MASK	0x0200	/* The nomask => not redefineable */
@@ -81,20 +82,20 @@
 				   TYPE_MOD_PUBLIC | TYPE_MOD_VARARGS |\
 				   TYPE_MOD_HIDDEN))
 
-struct function {
+typedef struct {
     /* these two must come first */
     unsigned char num_arg;    /* Number of arguments needed. -1 arguments
                                * means function not defined in this object.
                                * Probably inherited */
     unsigned char num_local;  /* Number of local variables */
     char *name;
-    unsigned short type;      /* Return type of function. See below. */
 #ifndef LPC_TO_C
     unsigned short offset;	/* Address of function, or inherit table
 				 * index when inherited. */
 #else
     unsigned long offset;
 #endif
+    unsigned short type;      /* Return type of function. See below. */
     /*
      * Used so that it is possible to quickly find this function in the
      * inherited program.
@@ -108,27 +109,36 @@ struct function {
     SIGNED short tree_b;	/* Balance of subtrees. */
 #endif
     unsigned char flags;	/* NAME_ . See above. */
-};
+} function_t;
 
-struct variable {
+typedef struct {
+    unsigned short name;
+    unsigned short type;
+    unsigned short size;
+    unsigned short index;
+} class_def_t;
+
+typedef struct {
+    unsigned short name;
+    unsigned short type;
+} class_member_entry_t;
+
+typedef struct {
     char *name;
-    unsigned short type;	/* Type of variable. See below. TYPE_ */
-};
+    unsigned short type;	/* Type of variable. See above. TYPE_ */
+} variable_t;
 
-struct inherit {
-    struct program *prog;
+typedef struct {
+    struct program_s *prog;
     unsigned short function_index_offset;
     unsigned short variable_index_offset;
-};
+} inherit_t;
 
-struct external_program {
-    int (*interface) PROT((char *, int));
-    void *data;
-};
-
-struct internal_program {
-    int ref;			/* Reference count */
-    int func_ref;
+typedef struct program_s {
+    char *name;			/* Name of file that defined prog */
+    int flags;
+    unsigned short ref;			/* Reference count */
+    unsigned short func_ref;
 #ifdef DEBUG
     int extra_ref;		/* Used to verify ref count */
     int extra_func_ref;
@@ -140,13 +150,15 @@ struct internal_program {
     unsigned char *line_info;   /* Line number information */
     unsigned short *file_info;
     int line_swap_index;	/* Where line number info is swapped */
-    struct function *functions;
+    function_t *functions;
+    class_def_t *classes;
+    class_member_entry_t *class_members;
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
     unsigned short tree_r;	/* function table tree's 'root' */
 #endif
     char **strings;		/* All strings uses by the program */
-    struct variable *variable_names;	/* All variables defined */
-    struct inherit *inherit;	/* List of inherited prgms */
+    variable_t *variable_names;	/* All variables defined */
+    inherit_t *inherit;	/* List of inherited prgms */
     int total_size;		/* Sum of all data in this struct */
     int heart_beat;		/* Index of the heart beat function. -1 means
 				 * no heart beat */
@@ -167,27 +179,17 @@ struct internal_program {
      * And now some general size information.
      */
     unsigned short program_size;/* size of this instruction code */
+    unsigned short num_classes;
     unsigned short num_functions;
     unsigned short num_strings;
     unsigned short num_variables;
     unsigned short num_inherited;
-};
-
-union pu {
-    struct internal_program i;
-    struct external_program e;
-};
-
-struct program {
-    char *name;			/* Name of file that defined prog */
-    int flags;
-    union pu p;
-};
+} program_t;
 
 extern int total_num_prog_blocks;
 extern int total_prog_block_size;
-void reference_prog PROT((struct program *, char *));
-void free_prog PROT((struct program *, int));
-void deallocate_program PROT((struct program *));
+void reference_prog PROT((program_t *, char *));
+void free_prog PROT((program_t *, int));
+void deallocate_program PROT((program_t *));
 
 #endif

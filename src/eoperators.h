@@ -22,17 +22,15 @@ INLINE void f_switch PROT((void));
 INLINE void f_xor PROT((void));
 INLINE void f_xor_eq PROT((void));
 INLINE void f_function_constructor PROT((void));
-#ifndef NEW_FUNCTIONS
 INLINE void f_evaluate PROT((void));
-#endif
 INLINE void f_sscanf PROT((void));
 
 /*
  * eoperators.c
  */
-INLINE struct funp *make_funp PROT((struct svalue *, struct svalue *));
-INLINE void push_funp PROT((struct funp *));
-INLINE void free_funp PROT((struct funp *));
-int merge_arg_lists PROT((int, struct vector *, int));
+INLINE funptr_t *make_funp PROT((svalue_t *, svalue_t *));
+INLINE void push_funp PROT((funptr_t *));
+INLINE void free_funp PROT((funptr_t *));
+int merge_arg_lists PROT((int, array_t *, int));
 void call_simul_efun PROT((unsigned short, int));
 

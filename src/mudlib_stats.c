@@ -11,8 +11,8 @@
 
 #ifndef NO_MUDLIB_STATS
 
-#include "mudlib_stats.h"
 #include "lpc_incl.h"
+#include "mudlib_stats.h"
 #include "backend.h"
 #include "md.h"
 
@@ -23,14 +23,14 @@ static mudlib_stats_t *master_author = 0;
 
 static mudlib_stats_t *find_stat_entry PROT((char *, mudlib_stats_t *));
 static mudlib_stats_t *add_stat_entry PROT((char *, mudlib_stats_t **));
-static void init_author_for_ob PROT((struct object *));
+static void init_author_for_ob PROT((object_t *));
 static char *author_for_file PROT((char *));
-static void init_domain_for_ob PROT((struct object *));
+static void init_domain_for_ob PROT((object_t *));
 static char *domain_for_file PROT((char *));
 static void save_stat_list PROT((char *, mudlib_stats_t *));
 static void restore_stat_list PROT((char *, mudlib_stats_t **));
-static struct mapping *get_info PROT((mudlib_stats_t *));
-static struct mapping *get_stats PROT((char *, mudlib_stats_t *));
+static mapping_t *get_info PROT((mudlib_stats_t *));
+static mapping_t *get_stats PROT((char *, mudlib_stats_t *));
 static mudlib_stats_t *insert_stat_entry PROT((mudlib_stats_t *, mudlib_stats_t **));
 #ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
 static void free_mudlib_stats PROT((void));
@@ -112,7 +112,7 @@ static mudlib_stats_t *add_stat_entry P2(char *, str, mudlib_stats_t **, list)
  **************************************/
 
 
-void assign_stats P2(statgroup_t *, st, struct object *, ob)
+void assign_stats P2(statgroup_t *, st, object_t *, ob)
 {
     st->domain = ob->stats.domain;
     st->author = ob->stats.author;
@@ -126,7 +126,7 @@ void null_stats P1(statgroup_t *, st)
     }
 }
 
-void init_stats_for_object P1(struct object *, ob)
+void init_stats_for_object P1(object_t *, ob)
 {
     init_domain_for_ob(ob);
     init_author_for_ob(ob);
@@ -274,13 +274,13 @@ static void free_mudlib_stats()
  Author specific functions
  *************************/
 
-static void init_author_for_ob P1(struct object *, ob)
+static void init_author_for_ob P1(object_t *, ob)
 {
-    struct svalue *ret;
+    svalue_t *ret;
 
     push_string(ob->name, STRING_CONSTANT);
     ret = apply_master_ob(APPLY_AUTHOR_FILE, 1);
-    if (ret == (struct svalue *)-1) {
+    if (ret == (svalue_t *)-1) {
 	ob->stats.author = master_author;
     } else if (IS_ZERO(ret)) {
 	ob->stats.author = NULL;
@@ -291,12 +291,12 @@ static void init_author_for_ob P1(struct object *, ob)
 
 void set_author P1(char *, name)
 {
-    struct object *ob;
+    object_t *ob;
 
     if (!current_object)
 	return;
     ob = current_object;
-    if (master_ob == (struct object *)-1) {
+    if (master_ob == (object_t *)-1) {
 	ob->stats.author = NULL;
 	return;
     }
@@ -321,12 +321,12 @@ mudlib_stats_t *set_master_author P1(char *, str)
 
 static char *author_for_file P1(char *, file)
 {
-    struct svalue *ret;
+    svalue_t *ret;
     static char buff[50];
 
     push_string(file, STRING_CONSTANT);
     ret = apply_master_ob(APPLY_AUTHOR_FILE, 1);
-    if (ret == 0 || ret == (struct svalue*)-1 || ret->type != T_STRING)
+    if (ret == 0 || ret == (svalue_t*)-1 || ret->type != T_STRING)
 	return 0;
     strcpy(buff, ret->u.string);
     return buff;
@@ -337,11 +337,11 @@ static char *author_for_file P1(char *, file)
  Domain specific functions
  *************************/
 
-static void init_domain_for_ob P1(struct object *, ob)
+static void init_domain_for_ob P1(object_t *, ob)
 {
-    struct svalue *ret;
+    svalue_t *ret;
     char *domain_name;
-    struct object *tmp_ob;
+    object_t *tmp_ob;
     int err;
 
     err = assert_master_ob_loaded("[internal] init_domain_for_ob","");
@@ -413,12 +413,12 @@ mudlib_stats_t *set_backbone_domain P1(char *, str)
  */
 static char *domain_for_file P1(char *, file)
 {
-    struct svalue *ret;
+    svalue_t *ret;
     static char buff[50];
 
     push_string(file, STRING_CONSTANT);
     ret = apply_master_ob(APPLY_DOMAIN_FILE, 1);
-    if (ret == 0 || ret == (struct svalue*)-1 || ret->type != T_STRING)
+    if (ret == 0 || ret == (svalue_t*)-1 || ret->type != T_STRING)
 	return 0;
     strcpy(buff, ret->u.string);
     return buff;
@@ -516,10 +516,10 @@ void restore_stat_files()
  * that describe the statistics for authors and domains.
  **************************************/
 
-static struct mapping *
+static mapping_t *
         get_info P1(mudlib_stats_t *, dl)
 {
-    struct mapping *ret;
+    mapping_t *ret;
 
     ret = allocate_mapping(8);
     add_mapping_pair(ret, "moves", dl->moves);
@@ -530,12 +530,12 @@ static struct mapping *
     return ret;
 }
 
-static struct mapping *
+static mapping_t *
         get_stats P2(char *, str, mudlib_stats_t *, list)
 {
     mudlib_stats_t *dl;
-    struct mapping *m;
-    struct svalue lv, *s;
+    mapping_t *m;
+    svalue_t lv, *s;
 
     if (str) {
 	for (dl = list; dl; dl = dl->next) {
@@ -543,7 +543,7 @@ static struct mapping *
 		break;
 	}
 	if (dl) {
-	    struct mapping *tmp;
+	    mapping_t *tmp;
 
 	    tmp = get_info(dl);
 	    tmp->ref--;
@@ -566,13 +566,13 @@ static struct mapping *
     return m;
 }
 
-struct mapping *
+mapping_t *
         get_domain_stats P1(char *, str)
 {
     return get_stats(str, domains);
 }
 
-struct mapping *
+mapping_t *
         get_author_stats P1(char *, str)
 {
     return get_stats(str, authors);

@@ -1,464 +1,45 @@
 #include "std.h"
 #include "file_incl.h"
-
-#if defined(LPC_TO_C) && defined(RUNTIME_LOADING)
-
-#include "cc.h"
-
-#undef DEBUG_LINKER
-
-/* portability stuff, if you have to fool with this, mail me.  -Beek */
-
-#ifndef _AIX
-#undef NO_A_OUT_H
-#undef ALIGN_CODE
-
-#if defined(sgi) || defined(_AIX)
-#define HAS_NLIST
-#define NO_STRUCT_EXEC
-#endif
-
-/* AIX seems to be missing N_TXTOFF */
-#if defined (_AIX)
-#define N_TXTOFF(file, aout)  (aout).o_text_start
-#endif
-
-#ifdef NO_A_OUT_H
-#include <sys/exec.h>
-#else
-#include <a.out.h>
-#endif
-
-#ifdef HAS_NLIST
-#include <nlist.h>
-#endif
-
-#include <sys/file.h>
-#endif
-
-/* END */
-
-link_jump_table(prog, jump_table, code)
-    struct program *prog;
-    void (**jump_table) (struct svalue *);
-    char *code;
-{
-    int num = prog->p.i.num_functions;
-    struct function *funp = prog->p.i.functions;
-    int i;
-
-    for (i = 0; i < num; i++, funp++)
-	if (jump_table[i])
-	    funp->offset = (unsigned long) jump_table[i];
-    prog->p.i.program = code;
-}
-
-#ifndef _AIX
-compile_and_link(input_name, the_funcs, code, error_name, output_name)
-    char *input_name;
-    char **code;
-    char *output_name, *error_name;
-    void (**the_funcs) ();
-{
-    char *p, command[1024];
-    char module_name[256];
-
-    /* A quick security check to make the system() calls below safe */
-    p = module_name;
-    while (*input_name) {
-	if ((*input_name >= 'A' && *input_name <= 'Z')
-	    || (*input_name >= 'a' && *input_name <= 'z')
-	    || (*input_name >= '0' && *input_name <= '9')
-	  || *input_name == '/' || *input_name == '.' || *input_name == '_')
-	    *p++ = *input_name++;
-	else
-	    return -1;
-    }
-
-    /* Chop off everything from the . on to make the rest easier */
-    if (p = (char *) rindex(module_name, '.'))
-	*p = '\0';
-    else {
-	return 1;
-    }
-
-    /* Do the compile */
-    sprintf(command,
-#ifdef sgi
-	    "%s %s -I%s -c -G 0 -o %s.B %s.c > %s 2>&1",
-#else
-	    "%s %s -I%s -c -o %s.B %s.c > %s 2>&1",
-#endif
-	    COMPILER, CFLAGS2,
-	    "lpc2c", module_name, module_name, error_name);
-
-#ifdef DEBUG_LINKER
-    printf("compile command: %s\n", command);
-#endif
-
-    if (system(command)) {
-	return 2;
-    }
-    return runtime_link(module_name, the_funcs, code, error_name, output_name);
-}
-
-runtime_link(module_name, the_funcs, code, error_name, output_name)
-    char *module_name;
-    char **code;
-    char *output_name, *error_name;
-    void (**the_funcs) ();
-{
-    char command[1024], *func, *func1, address[20], *p, symbol_name[256];
-    int fd;
-    int size_needed;
-    char code_name[256];
-
-#ifndef HAS_NLIST
-    register struct nlist *nlst, *nlp, *nlstend;
-    struct nlist *namelist();
-    char *stbl;
-
-#else
-    struct nlist nl[3];
-
-#endif
-
-#ifdef NO_STRUCT_EXEC
-    struct {
-	struct filehdr ex_f;
-	struct aouthdr ex_o;
-    }      hdr;
-
-#else
-    struct exec hdr;
-
-#endif
-
-#ifdef DEBUG_LINKER
-    unsigned long c;
-
-#endif
-
-    strcpy(code_name, module_name);
-    strcat(code_name, ".B");
-    if ((fd = open(code_name, O_RDONLY)) < 0)
-	return 4;
-
-#ifndef HAS_NLIST
-    nlst = namelist(fd, &hdr, &stbl);
-    if (nlst == (struct nlist *) NULL)
-#else
-    /* Read in exec header from object file */
-    lseek(fd, (long) 0, L_SET);
-    if ((read(fd, &hdr, sizeof(hdr))) != sizeof(hdr))
-#endif
-    {
-#ifndef HAS_NLIST
-	FREE(stbl);
-#endif
-	return 5;
-    }
-#ifndef HAS_NLIST
-    size_needed = (int) (hdr.a_text + hdr.a_data);
-#else
-    size_needed = (int) (hdr.ex_o.tsize + hdr.ex_o.dsize);
-#endif
-
-#if ALIGN_CODE
-    size_needed += 2048;
-    func = (char *) DMALLOC(size_needed, 0, "lpc->c code block");
-    func1 = (char *) ((((int) func) + 2047) & ~0x7ff);
-#else
-    func = func1 = (char *) DMALLOC(size_needed, 0, "lpc->c code block");
-#endif
-
-    close(fd);
-
-    sprintf(command,
-	    "ld -x -N -A %s -T %x -o %s %s.B -lm -lc > %s 2>&1",
-	    driver_name, func1, output_name, module_name,
-	    error_name);
-
-#ifdef DEBUG_LINKER
-    printf("link command: %s\n", command);
-#endif
-
-    if (system(command))
-	return 3;
-
-    /* Now find the symbol in the symbol table */
-    if ((fd = open(output_name, O_RDONLY)) < 0)
-	return 4;
-
-#ifndef HAS_NLIST
-    nlst = namelist(fd, &hdr, &stbl);
-    if (nlst == (struct nlist *) NULL)
-#else
-    /* Read in exec header from object file */
-    lseek(fd, (long) 0, L_SET);
-    if ((read(fd, &hdr, sizeof(hdr))) != sizeof(hdr))
-#endif
-
-    {
-#ifndef HAS_NLIST
-	FREE(stbl);
-#endif
-	return 5;
-    }
-#ifdef DEBUG_LINKER
-#ifndef HAS_NLIST
-    printf("Magic number: %o\n", hdr.a_magic);
-    printf("Text          %d\n", hdr.a_text);
-    printf("Data          %d\n", hdr.a_data);
-    printf("BSS           %d\n", hdr.a_bss);
-    printf("Offset: %d\n", N_TXTOFF(hdr));
-#else
-    printf("Magic number: %o\n", hdr.ex_o.magic);
-    printf("Text          %d\n", hdr.ex_o.tsize);
-    printf("Data          %d\n", hdr.ex_o.dsize);
-    printf("BSS           %d\n", hdr.ex_o.bsize);
-    printf("Offset: %d\n", N_TXTOFF(hdr.ex_f, hdr.ex_o));
-#endif
-#endif
-
-#ifndef HAS_NLIST
-    lseek(fd, (off_t) N_TXTOFF(hdr), L_SET);
-    read(fd, func1, size_needed);
-#else
-    lseek(fd, (off_t) N_TXTOFF(hdr.ex_f, hdr.ex_o), L_SET);
-    read(fd, func1, size_needed);
-#endif
-
-#if 0
-#ifndef HAS_NLIST
-    for (p = func1, c = hdr.a_text + hdr.a_data; c; --c, ++p)
-	printf("%x %x\n", p, *p);
-    printf("Found it at location %x\n", func1);
-#else
-    for (p = func1, c = hdr.ex_o.tsize + hdr.ex_o.dsize; c; --c, ++p)
-	printf("%x %x\n", p, *p);
-    printf("Found it at location %x\n", func1);
-#endif
-#endif
-
-    /* Come up with the entry symbol for the __FUNCS structure */
-    (void) strcpy(symbol_name, "__FUNCS");
-#ifndef HAS_NLIST
-    nlstend = nlst + (hdr.a_syms / sizeof(struct nlist));
-    for (nlp = nlstend - 1; nlp >= nlst; nlp--) {
-	if (!strcmp(symbol_name, nlp->n_un.n_name)) {
-	    /* Fill in the symbol and code pointers */
-	    *the_funcs = (void (*) ()) nlp->n_value;
-	    *code = func;
-	    FREE(stbl);
-	    return 0;
-	}
-    }
-#else
-    (void) strcpy(code_name, p);
-    (void) strcat(code_name, "_main");
-    nl[0].n_name = symbol_name;
-    nl[1].n_name = code_name;
-    nl[2].n_name = NULL;
-    nlist(output_name, nl);
-    if (nl[0].n_type != 0 || nl[1].n_type != 0) {
-	*the_funcs = (void (*) ()) nl[0].n_value;
-	*code = (char *) nl[1].n_value;
-	return 0;
-    }
-#endif
-    FREE(func);
-#ifndef HAS_NLIST
-    FREE(stbl);
-#endif
-    return 6;
-}
-#endif
-
-void
-compile_file_error P2(int, err, char *, routine)
-{
-    char *why;
-    char buf[1024];
-
-    switch (err) {
-    case -1:
-	why = "Illegal file name to compile.\n";
-	break;
-    case 1:
-	why = "Error parsing program name.\n";
-	break;
-    case 2:
-	why = "Error in compiled C code.\n   see /errors for compiler error messages.\n";
-	break;
-    case 3:
-	why = "Error linking C code.\n   see /errors for linker error messages.\n";
-	break;
-    case 4:
-	why = "Error opening .o file.\n";
-	break;
-    case 5:
-	why = "Error reading .o file.\n";
-	break;
-    case 6:
-	why = "Failed to find symbol in symbol table.\n";
-	break;
-    }
-    sprintf(buf, "%s failed: %s", routine, why);
-    error(buf);
-}
-
-#if !defined(HAS_NLIST) && !defined(_AIX)
-/*
-** Returns the entire symbol table of the given executable.
-** If anything goes wrong, NULL is returned.
-*/
-struct nlist *
-      namelist P3(int, fd,	/* (seekable) File descriptor of executable  */
-		        struct exec *, hdr,	/* Pointer to exec struct
-						 * which is filled in */
-		        char **, stbl)
-{
-    register struct nlist *nlst, *nlstend;	/* Name list */
-    register struct nlist *nlp;	/* Pointer into list */
-    int size;			/* String table size */
-
-    /* Snarf the header out of the file. */
-
-    lseek(fd, (long) 0, L_SET);
-    if ((read(fd, (char *) hdr, sizeof(*hdr))) != sizeof(*hdr))
-	return ((struct nlist *) 0);
-
-    /* Allocate a buffer for and read the symbol table */
-
-    nlst = (struct nlist *) DMALLOC((unsigned) hdr->a_syms, "namelist");
-    lseek(fd, (long) N_SYMOFF(*hdr), L_SET);
-    if ((read(fd, (char *) nlst, (int) hdr->a_syms)) != hdr->a_syms) {
-	FREE((char *) nlst);
-	return ((struct nlist *) 0);
-    }
-    /* Now, read the string table size. */
-
-    lseek(fd, (long) N_STROFF(*hdr), L_SET);
-    if ((read(fd, (char *) &size, sizeof(int))) != sizeof(int)) {
-	FREE((char *) nlst);
-	return ((struct nlist *) 0);
-    }
-    /* Allocate a buffer and read the string table out of the file. */
-
-    *stbl = (char *) DMALLOC((unsigned) size, "namelist: 2");
-    lseek(fd, (long) N_STROFF(*hdr), L_SET);
-    if ((read(fd, *stbl, size)) != size) {
-	FREE((char *) nlst);
-	FREE(*stbl);
-	return ((struct nlist *) 0);
-    }
-    /*
-     * Rearrange the namelist to point at the character strings rather than
-     * have offsets from the start of the string table.
-     */
-    nlstend = nlst + (hdr->a_syms / sizeof(struct nlist));
-    for (nlp = nlst; nlp < nlstend; nlp++)
-	nlp->n_un.n_name = nlp->n_un.n_strx + *stbl;
-
-    /* Return the namelist we just constructed. */
-    return (nlst);
-}
-#endif
-
-/* AIX is so odd, we might as well keep it separate */
-#ifdef _AIX
-
-/* from opcode.h; will clash otherwise */
-#undef F_EXEC
-#include <nlist.h>
-
-compile_and_link(input_name, the_funcs, code, error_name, output_name)
-    char *input_name;
-    char **code;
-    char *output_name, *error_name;
-    void (**the_funcs) ();
-{
-    char *p, command[1024];
-    char module_name[256];
-
-    /* A quick security check to make the system() calls below safe */
-    p = module_name;
-    while (*input_name) {
-	if ((*input_name >= 'A' && *input_name <= 'Z')
-	    || (*input_name >= 'a' && *input_name <= 'z')
-	    || (*input_name >= '0' && *input_name <= '9')
-	  || *input_name == '/' || *input_name == '.' || *input_name == '_')
-	    *p++ = *input_name++;
-	else
-	    return -1;
-    }
-
-    /* Chop off everything from the . on to make the rest easier */
-    if (p = (char *) rindex(module_name, '.'))
-	*p = '\0';
-    else {
-	return 1;
-    }
-
-    /* Do the compile */
-    sprintf(command, "%s %s -I%s -c -o %s.B %s.c > %s 2>&1",
-	    COMPILER, CFLAGS2,
-	    "lpc2c", module_name, module_name, error_name);
-
-#ifdef DEBUG_LINKER
-    printf("compile command: %s\n", command);
-#endif
-
-    if (system(command)) {
-	return 2;
-    }
-    return runtime_link(module_name, the_funcs, code, error_name, output_name);
-}
-
-runtime_link(module_name, the_funcs, code, error_name, output_name)
-    char *module_name;
-    char **code;
-    char *output_name, *error_name;
-    void (**the_funcs) ();
-{
-    char command[1024];
-    char *p;
-    struct nlist nl[2];
-    char *address;
-
-    sprintf(command,
-	    "%s -o %s -bM:SRE -e__nostart -bE:lpc2c/aix.exp %s.B > %s 2>&1",
-	    COMPILER, output_name, module_name, error_name);
-
-#ifdef DEBUG_LINKER
-    printf("link command: %s\n", command);
-#endif
-
-    if (system(command))
-	return 3;
-
-    if ((p = (char*)load(output_name, 1, getenv("LIBPATH"))) == NULL)
-	return 5;
-
-    memset(nl, 0, 2 * sizeof(struct nlist));
-    nl[0]._n._n_name = "__FUNCS";
-    nlist(output_name, nl);
-    if (nl[0].n_type != 0) {
-	address = p + nl[0].n_value;
-	*the_funcs = (void (*) ()) address;
-	*code = p;
-	return 0;
-    }
-    return 6;
-}
-#endif
-#endif
+#include "lpc_incl.h"
+#include "interface.h"
+#include "lex.h"
+#include "compiler.h"
+#include "md.h"
 
 #ifdef LPC_TO_C
+void
+link_jump_table P2(program_t *, prog, void **, jump_table)
+{
+    int num = prog->num_functions;
+    function_t *funcs = prog->functions;
+    int i;
+    int j;
+
+    for (i = 0, j = 0; i < num; i++) {
+	if (funcs[i].flags & (NAME_NO_CODE | NAME_INHERITED)) continue;
+	if (jump_table[j])
+	    funcs[i].offset = (unsigned long) jump_table[j];
+	else
+	    funcs[i].offset = 0;
+	j++;
+    }
+}
+
+void
 init_lpc_to_c()
 {
-    struct interface_item *p = interface;
+    interface_item_t *p = interface;
+    lpc_object_t *ob;
+
+    while (p->fname) {
+	ob = ALLOCATE(lpc_object_t, TAG_LPC_OBJECT, "init_lpc_to_c");
+	ob->name = string_copy(p->fname, "init_lpc_to_c");
+	SET_TAG(ob->name, TAG_OBJ_NAME);
+	enter_object_hash(ob);
+	ob->flags = O_COMPILED_PROGRAM;
+	ob->jump_table = p->jump_table;
+	p++;
+    }    
 }
 #endif
 
@@ -477,107 +58,207 @@ static void generate_identifier P2(char *, buf, char *, name)
     *buf = 0;
 }
 
-int generate_source P2(char *, lname, char *, out_fname)
+int generate_source P2(svalue_t *, arg1, char *, out_fname)
 {
     FILE *crdir_fopen();
-    FILE *f;
+    FILE *specfile;
+    int len;
+
     struct stat c_st;
     char real_name[200];
     char name[200];
     char out_name[200];
     char ident[205];
-    int done = 0;
+    int done;
     char *p;
-    int name_length;
+    int index;
+    array_t tmp_arr, *arr;
+    int f;
 
-    p = lname;
-    while (*p) {
-	if (*p == '/' && *(p + 1) == '/') {
-	    error("Filenames with consecutive /'s in them aren't allowed.\n");
-	    return 0;
-	}
-	p++;
-    }
-    while (lname[0] == '/')
-	lname++;
-    strncpy(name, lname, sizeof(name) - 1);
-    name[sizeof name - 1] = '\0';
-    name_length = strlen(name);
-    if (name_length > sizeof name - 4)
-	name_length = sizeof name - 4;
-    name[name_length] = '\0';
-    if (name[name_length - 2] == '.' &&
-	(name[name_length - 1] == 'c' || name[name_length - 1] == 'C')) {
-	name_length -= 2;
-	name[name_length] = '\0';
-    }
-    /*
-     * First check that the c-file exists.
-     */
-    (void) strcpy(real_name, name);
-    (void) strcat(real_name, ".c");
-    if (stat(real_name, &c_st) == -1) {
-	real_name[strlen(real_name) - 1] = 'C';
-	if (stat(real_name, &c_st) == -1) {
-	    return 0;
-	}
-    }
-    if (!legal_path(real_name)) {
-	fprintf(stderr, "Illegal pathname: %s\n", real_name);
-	error("Illegal path name.\n");
-	return 0;
-    }
-    if (!out_fname) {
-	out_fname = out_name;
-	strcpy(out_name, SAVE_BINARIES);
-	if (*out_fname == '/')
+    if (out_fname)
+	while (*out_fname == '/')
 	    out_fname++;
-	strcat(out_fname, "/");
-	strcat(out_fname, name);
-	strcat(out_fname, ".c");
-    }
-    while (!done) {
-	if (comp_flag)
-	    fprintf(stderr, " compiling %s ...", real_name);
-	f = open(real_name, O_RDONLY);
-	if (f == -1) {
-	    perror(real_name);
-	    error("Could not read the file.\n");
-	}
-	compilation_output_file = crdir_fopen(out_fname);
-	if (compilation_output_file == 0) {
-	    perror(out_fname);
-	    error("Could not open output file '%s'.\n", out_fname);
-	}
-	current_file = string_copy(real_name);
-	generate_identifier(ident, name);
-	compilation_ident = ident;
-	compile_file(f, real_name);
-	fclose(compilation_output_file);
-	if (comp_flag)
-	    fprintf(stderr, " done\n");
-	update_compile_av(total_lines);
-	(void) close(f);
-	total_lines = 0;
-	FREE(current_file);
-	current_file = 0;
-	if (inherit_file) {
-	    char *tmp = inherit_file;
+    compilation_output_file = 0;
 
-	    if (prog) {
-		free_prog(prog, 1);
-		prog = 0;
+    if (arg1->type != T_ARRAY) {
+	tmp_arr.size = 1;
+	tmp_arr.item[0] = arg1->u.arr->item[0];
+	arr = &tmp_arr;
+    } else {
+	arr = arg1->u.arr;
+	
+	if (!out_fname) {
+	    out_fname = out_name;
+	    strcpy(out_name, SAVE_BINARIES);
+	    strcat(out_fname, "/interface.c");
+	    while (*out_fname == '/')
+		out_fname++;
+	}
+	
+	compilation_output_file = crdir_fopen(out_fname);
+	fprintf(compilation_output_file, "#include \"std.h\"\n\n#include \"interface.h\"\n\n");
+    }
+
+    for (index = 0; index < arr->size; index++) {
+	if (arr->item[index].type != T_STRING) {
+	    if (arg1->type == T_ARRAY)
+		fclose(compilation_output_file);
+	    error("Bad type for filename in generate_source()\n");
+	}
+	if (!strip_name(arr->item[index].u.string, name, sizeof name)) {
+	    if (arg1->type == T_ARRAY)
+		fclose(compilation_output_file);
+	    error("Filenames with consecutive /'s in them aren't allowed.\n");
+	}
+	/*
+	 * First check that the c-file exists.
+	 */
+	(void) strcpy(real_name, name);
+	(void) strcat(real_name, ".c");
+	if (stat(real_name, &c_st) == -1) {
+	    if (arg1->type == T_ARRAY)
+		fclose(compilation_output_file);
+	    return 0;
+	}
+	if (!legal_path(real_name)) {
+	    fprintf(stderr, "Illegal pathname: %s\n", real_name);
+	    if (arg1->type == T_ARRAY)
+		fclose(compilation_output_file);
+	    error("Illegal path name.\n");
+	    return 0;
+	}
+	if (!out_fname && arg1->type != T_ARRAY) {
+	    out_fname = out_name;
+	    strcpy(out_name, SAVE_BINARIES);
+	    strcat(out_fname, "/");
+	    strcat(out_fname, name);
+	    strcat(out_fname, ".c");
+	    while (*out_fname == '/')
+		out_fname++;
+	}
+	
+	done = 0;
+	while (!done) {
+	    if (comp_flag)
+		fprintf(stderr, " compiling %s ...", real_name);
+	    f = open(real_name, O_RDONLY);
+	    if (f == -1) {
+		if (arg1->type == T_ARRAY)
+		    fclose(compilation_output_file);
+		perror(real_name);
+		error("Could not read the file '%s'.\n", real_name);
 	    }
-	    if (strcmp(inherit_file, name) == 0) {
-		FREE(inherit_file);
+	    if (arg1->type == T_STRING) {
+		compilation_output_file = crdir_fopen(out_fname);
+		if (compilation_output_file == 0) {
+		    perror(out_fname);
+		    error("Could not open output file '%s'.\n", out_fname);
+		}
+	    }
+	    generate_identifier(ident, name);
+	    compilation_ident = ident;
+	    compile_to_c = 1;
+	    compile_file(f, real_name);
+	    compile_to_c = 0;
+	    if (arg1->type == T_STRING)
+		fclose(compilation_output_file);
+	    if (comp_flag)
+		fprintf(stderr, " done\n");
+	    update_compile_av(total_lines);
+	    close(f);
+	    total_lines = 0;
+	    
+	    if (inherit_file == 0 && (num_parse_error > 0 || !prog)) {
+		if (arg1->type == T_ARRAY)
+		    fclose(compilation_output_file);
+		if (prog)
+		    free_prog(prog, 1);
+		return 0;
+	    }
+	    
+	    if (inherit_file) {
+		char *tmp = inherit_file;
+		
+		if (prog) {
+		    free_prog(prog, 1);
+		    prog = 0;
+		}
+		if (strcmp(inherit_file, name) == 0) {
+		    FREE(inherit_file);
+		    inherit_file = 0;
+		    error("Illegal to inherit self.\n");
+		}
 		inherit_file = 0;
-		error("Illegal to inherit self.\n");
+		load_object(tmp, 0);
+		FREE(tmp);
+	    } else {
+		done = 1;
+		if (pragmas & PRAGMA_EFUN) {
+		    strcpy(out_name, out_fname);
+		    len = strlen(out_name);
+		    if (out_name[len-1] == 'c' && out_name[len-2] == '.') {
+			len -= 2;
+			out_name[len] = '\0';
+		    }
+		    strcat(out_name, ".spec");
+		    specfile = crdir_fopen(out_name);
+		    if (specfile == 0) {
+			if (arg1->type == T_ARRAY)
+			    fclose(compilation_output_file);
+			perror(out_fname);
+			error("Could not open output file '%s.'\n", out_fname);
+		    }
+		    out_name[len] = '\0';
+		    fprintf(specfile, "package %s;\n\n", out_name);
+		    if (prog) {
+			int n = prog->num_functions;
+			function_t *functions = prog->functions;
+			unsigned short *types;
+			while (n--) {
+			    int i = 0;
+			    
+			    if (prog->type_start && prog->type_start[n] != INDEX_START_NONE)
+				types = &prog->argument_types[prog->type_start[n]];
+			    else 
+				types = 0;
+			    
+			    if (functions[n].flags & 
+				(NAME_NO_CODE | NAME_INHERITED)) continue;
+			    
+			    fprintf(specfile, "%s%s( ", 
+				    get_type_name(functions[n].type & TYPE_MOD_MASK),
+				    functions[n].name);
+			    if (functions[n].num_arg)
+				while (1) {
+				    fprintf(specfile, "%s%s",
+					    (functions[n].type & TYPE_MOD_VARARGS) ?
+					    "void | " : "", get_type_name(types[i]));
+				    if (++i != functions[n].num_arg)
+					fprintf(specfile, ", ");
+				    else break;
+				}
+			    fprintf(specfile, ");\n");
+		    }
+		    }
+		    fclose(specfile);
+		}
 	    }
-	    inherit_file = 0;
-	    load_object(tmp, 0);
-	    FREE(tmp);
-	} else
-	    done = 1;
+	}
+	if (prog) {
+	    free_prog(prog, 1);
+	    prog = 0;
+	}
+    }
+    if (arg1->type == T_ARRAY) {
+	fprintf(compilation_output_file, "\n\ninterface_item_t interface[] = {\n");
+	for (index = 0; index < arr->size; index++) {
+	    strip_name(arr->item[index].u.string, name, sizeof name);
+	    generate_identifier(ident, name);
+	    fprintf(compilation_output_file, "    { \"%s\", LPCFUNCS_%s },\n",
+		    name, ident);
+	}
+	fprintf(compilation_output_file, "    { 0, 0 }\n};\n");
+	fclose(compilation_output_file);
     }
     return 1;
 }

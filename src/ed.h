@@ -77,19 +77,18 @@
 #define LINFREE		1	/* entry not in use */
 #define LGLOB		2	/* line marked global */
 
-#define MAXLINE		512	/* max number of chars per line */
+#define ED_MAXLINE	512	/* max number of chars per line */
 #define MAXPAT		256	/* max number of chars per replacemnt pattern */
 #define MAXFNAME 	256	/* max file name size */
 
-struct line {
+typedef struct ed_line_s {
     int l_stat;			/* empty, mark */
-    struct line *l_prev;
-    struct line *l_next;
+    struct ed_line_s *l_prev;
+    struct ed_line_s *l_next;
     char l_buff[1];
-};
-typedef struct line LINE;
+} ed_line_t;
 
-struct ed_buffer {
+typedef struct ed_buffer_s {
     int diag;			/* diagnostic-output? flag */
     int truncflg;		/* truncate long line flag */
     int nonascii;		/* count of non-ascii chars read */
@@ -101,9 +100,9 @@ struct ed_buffer {
     int mark['z' - 'a' + 1];
     regexp *oldpat;
 
-    LINE Line0;
+    ed_line_t Line0;
     int CurLn;
-    LINE *CurPtr;		/* CurLn and CurPtr must be kept in step */
+    ed_line_t *CurPtr;		/* CurLn and CurPtr must be kept in step */
     int LastLn;
     int Line1, Line2, nlines;
     int flags;
@@ -112,31 +111,38 @@ struct ed_buffer {
 #ifdef OLD_ED
     char *exit_fn;		/* Function to be called when user exits */
     char *write_fn;             /* Function to be called when user writes */
-    struct object *exit_ob;	/* in this object */
+    object_t *exit_ob;	/* in this object */
 #else
-    struct object *owner;
-    struct ed_buffer *next_ed_buf;
+    object_t *owner;
+    struct ed_buffer_s *next_ed_buf;
 #endif
     int shiftwidth;
     int leading_blanks;
     int cur_autoindent;
     int restricted;		/* restricted access ed */
-};
+} ed_buffer_t;
 
 /*
  * ed.c
  */
-void ed_start PROT((char *, char *, char *, int, struct object *));
+void ed_start PROT((char *, char *, char *, int, object_t *));
 void ed_cmd PROT((char *));
 void save_ed_buffer PROT((void));
-void regerror PROT((char *));
+
+#ifdef OLD_ED
+#define ED_OUTPUT       add_message
+#define ED_OUTPUTV      add_vmessage
+#else
+#define ED_OUTPUT       object_ed_output
+#define ED_OUTPUTV      object_ed_outputv
+#endif
 
 #ifndef OLD_ED
-char *object_ed_cmd PROT((struct object *, char *));
-char *object_ed_start PROT((struct object *, char *, int));
-int object_ed_mode PROT((struct object *));
-void object_save_ed_buffer PROT((struct object *));
-struct ed_buffer *find_ed_buffer PROT((struct object *));
+char *object_ed_cmd PROT((object_t *, char *));
+char *object_ed_start PROT((object_t *, char *, int));
+int object_ed_mode PROT((object_t *));
+void object_save_ed_buffer PROT((object_t *));
+ed_buffer_t *find_ed_buffer PROT((object_t *));
 #endif
 
 #endif

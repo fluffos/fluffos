@@ -1,8 +1,8 @@
 #include "std.h"
+#include "lpc_incl.h"
+#include "file.h"
 #include "md.h"
 #ifdef DEBUGMALLOC_EXTENSIONS
-#include "program.h"
-#include "lpc_incl.h"
 #include "comm.h"
 #include "lex.h"
 #include "simul_efun.h"
@@ -14,13 +14,14 @@
 
    This module introduces quite a lot of overhead but it can be useful
    for tracking down memory leaks or for catching the freeing on non-malloc'd
-   data.
+   data.  This module could easily be extended to allow the malloced memory
+   chunks to be tagged with a string label.
 */
 
 #ifdef DEBUGMALLOC
 
 #define LEFT_MAGIC(node) ((node)->magic)
-#define RIGHT_MAGIC_ADDR(node) ((char *)(node) + sizeof(node_t) + (node)->size)
+#define RIGHT_MAGIC_ADDR(node) ((char *)(node) + sizeof(md_node_t) + (node)->size)
 #define STORE_RIGHT_MAGIC(node) \
      *(RIGHT_MAGIC_ADDR(node)) = (char)(MD_MAGIC >> 24) & 0xff; \
      *(RIGHT_MAGIC_ADDR(node)+1) = (char)(MD_MAGIC >> 16) & 0xff; \
@@ -39,15 +40,15 @@ static char *sources[] = {
     "identifier hash table", "reserved block", "mudlib stats", "objects",
     "object table", "config table", "simul_efuns", "sentences", "string table",
     "free swap blocks", "uids", "object names", "predefines", "line numbers",
-    "compiler local blocks",
-    "<#33>", "<#34>", "<#35>", "<#36>", "<#37>", "<#38>", "<#39>", 
+    "compiler local blocks", "function arguments", "compiled program",
+    "<#35>", "<#36>", "<#37>", "<#38>", "<#39>", 
     "malloc'ed strings", "shared strings", "function pointers", "arrays",
     "mappings", "mapping nodes", "mapping tables"
 };
 
 int malloc_mask = 121;
 
-static node_t **table;
+static md_node_t **table;
 unsigned int total_malloced = 0L;
 unsigned int hiwater = 0L;
 
@@ -55,14 +56,14 @@ void MDinit()
 {
     int j;
 
-    table = (node_t **) calloc(TABLESIZE, sizeof(node_t *));
+    table = (md_node_t **) calloc(TABLESIZE, sizeof(md_node_t *));
     for (j = 0; j < MAX_CATEGORY; j++) {
 	totals[j] = 0;
     }
 }
 
 void
-MDmalloc P4(node_t *, node, int, size, int, tag, char *, desc)
+MDmalloc P4(md_node_t *, node, int, size, int, tag, char *, desc)
 {
     unsigned int h;
     static int count = 0;
@@ -101,7 +102,7 @@ MDmalloc P4(node_t *, node, int, size, int, tag, char *, desc)
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void set_tag P2(void *, ptr, int, tag) {
-    node_t *node = PTR_TO_NODET(ptr);
+    md_node_t *node = PTR_TO_NODET(ptr);
     
     if ((node->tag & 0xff) < MAX_CATEGORY) {
 	totals[node->tag & 0xff] -= node->size;
@@ -128,7 +129,7 @@ MDfree P1(void *, ptr)
 {
     unsigned int h;
     int tmp;
-    node_t *entry, **oentry;
+    md_node_t *entry, **oentry;
 
     h = (unsigned int) ptr % TABLESIZE;
     oentry = &table[h];
@@ -181,7 +182,7 @@ void dump_debugmalloc P2(char *, tfn, int, mask)
 {
     int j, total = 0, chunks = 0, total2 = 0;
     char *fn;
-    node_t *entry;
+    md_node_t *entry;
     FILE *fp;
 
     fn = check_valid_path(tfn, current_object, "debugmalloc", 1);
@@ -231,12 +232,12 @@ void set_malloc_mask P1(int, mask)
 }
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-static void mark_object P1(struct object *, ob) {
-    struct sentence *sent;
+static void mark_object P1(object_t *, ob) {
+    sentence_t *sent;
     int i;
 
     if (ob->prog)
-	ob->prog->p.i.extra_ref++;
+	ob->prog->extra_ref++;
 
     if (ob->name) {
 	DO_MARK(ob->name, TAG_OBJ_NAME);
@@ -256,7 +257,7 @@ static void mark_object P1(struct object *, ob) {
     while (sent) {
 	DO_MARK(sent, TAG_SENTENCE);
 	if (sent->flags & V_FUNCTION)
-	    sent->function.f->extra_ref++;
+	    sent->function.f->hdr.extra_ref++;
 	else {
 	    if (sent->function.s)
 		EXTRA_REF(BLOCK(sent->function.s))++;
@@ -268,26 +269,29 @@ static void mark_object P1(struct object *, ob) {
 #endif
     
     if (ob->prog)
-	for (i = 0; i < ob->prog->p.i.num_variables; i++)
+	for (i = 0; i < ob->prog->num_variables; i++)
 	    mark_svalue(&ob->variables[i]);
     else
 	add_vmessage("can't mark variables; %s is swapped.\n",
 		    ob->name);
 }
 
-void mark_svalue P1(struct svalue *, sv) {
+void mark_svalue P1(svalue_t *, sv) {
     switch (sv->type) {
     case T_OBJECT:
 	sv->u.ob->extra_ref++;
 	break;
-    case T_POINTER:
-	sv->u.vec->extra_ref++;
+    case T_ARRAY:
+	sv->u.arr->extra_ref++;
+	break;
+    case T_CLASS:
+	sv->u.arr->extra_ref++;
 	break;
     case T_MAPPING:
 	sv->u.map->extra_ref++;
 	break;
     case T_FUNCTION:
-	sv->u.fp->extra_ref++;
+	sv->u.fp->hdr.extra_ref++;
 	break;
     case T_BUFFER:
 	sv->u.buf->extra_ref++;
@@ -304,22 +308,20 @@ void mark_svalue P1(struct svalue *, sv) {
     }    
 }
 
-static void mark_funp P1(struct funp*, fp) {
-#ifdef NEW_FUNCTIONS
-    fp->owner->extra_ref++;
-    if (fp->type == FP_CALL_OTHER)
-      mark_svalue(&fp->f.obj);
-    else if ((fp->type & 0x0f) == FP_FUNCTIONAL) {
-      fp->f.a.prog->p.i.extra_func_ref++;
+static void mark_funp P1(funptr_t*, fp) {
+    svalue_t tmp;
+    if (fp->hdr.args) {
+	tmp.type = T_ARRAY;
+	tmp.u.arr = fp->hdr.args;
+	mark_svalue(&tmp);
     }
-    mark_svalue(&fp->args);
-#else
-    mark_svalue(&fp->obj);
-    mark_svalue(&fp->fun);
-#endif
+
+    fp->hdr.owner->extra_ref++;
+    if (fp->hdr.type & 0x0f == FP_FUNCTIONAL) 
+	fp->f.functional.prog->extra_func_ref++;
 }
 
-static void mark_sentence P1(struct sentence *, sent) {
+static void mark_sentence P1(sentence_t *, sent) {
     if (sent->flags & V_FUNCTION) {
       if (sent->function.f)
           mark_funp(sent->function.f);
@@ -333,7 +335,7 @@ static void mark_sentence P1(struct sentence *, sent) {
 
 static int print_depth = 0;
 
-static void md_print_vector  P1(struct vector *, vec) {
+static void md_print_array  P1(array_t *, vec) {
     int i;
 
     add_message("({ ");
@@ -351,14 +353,17 @@ static void md_print_vector  P1(struct vector *, vec) {
       case T_STRING:
           add_vmessage("\"%s\"", vec->item[i].u.string);
           break;
-      case T_POINTER:
+      case T_ARRAY:
           if (print_depth < 2) {
               print_depth++;
-              md_print_vector(vec->item[i].u.vec);
+              md_print_array(vec->item[i].u.arr);
           } else {
               add_message("({ ... })");
           }
           break;
+      case T_CLASS:
+	  add_message("<class>");
+	  break;
       case T_BUFFER:
           add_message("<buffer>");
           break;
@@ -385,19 +390,19 @@ static void md_print_vector  P1(struct vector *, vec) {
 void check_all_blocks P1(int, flag) {
     int i, j, hsh;
     int tmp;
-    node_t *entry;
-    struct object *ob;
-    struct svalue *sv;
-    struct vector *vec;
-    struct mapping *map;
-    struct buffer *buf;
-    struct funp *fp;
-    struct node *node;
-    struct program *prog;
-    struct sentence *sent;
+    md_node_t *entry;
+    object_t *ob;
+    svalue_t *sv;
+    array_t *vec;
+    mapping_t *map;
+    buffer_t *buf;
+    funptr_t *fp;
+    mapping_node_t *node;
+    program_t *prog;
+    sentence_t *sent;
     char *ptr;
     block_t *ssbl;
-    extern struct svalue apply_ret_value;
+    extern svalue_t apply_ret_value;
 
     int num = 0, total = 0;
     
@@ -439,7 +444,8 @@ void check_all_blocks P1(int, flag) {
 		add_vmessage("WARNING: Found temporary block: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
 	    case TAG_COMPILER:
-		add_vmessage("Found compiler block: %s %04x\n", entry->desc, (int)entry->tag);
+		if (!(flag & 2))
+		    add_vmessage("Found compiler block: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
 	    case TAG_MISC:
 		add_vmessage("Found miscellaneous block: %s %04x\n", entry->desc, (int)entry->tag);
@@ -447,32 +453,36 @@ void check_all_blocks P1(int, flag) {
 	    }
 	    switch (entry->tag) {
 	    case TAG_OBJECT:
-		ob = NODET_TO_PTR(entry, struct object *);
+		ob = NODET_TO_PTR(entry, object_t *);
 		ob->extra_ref = 0;
 		break;
 	    case TAG_PROGRAM:
-		prog = NODET_TO_PTR(entry, struct program *);
-		prog->p.i.extra_ref = 0;
-		prog->p.i.extra_func_ref = 0;
+		prog = NODET_TO_PTR(entry, program_t *);
+		prog->extra_ref = 0;
+		prog->extra_func_ref = 0;
 		break;
 	    case TAG_SHARED_STRING:
 		ssbl = NODET_TO_PTR(entry, block_t *);
 		EXTRA_REF(ssbl) = 0;
 		break;
-	    case TAG_VECTOR: 
-		vec = NODET_TO_PTR(entry, struct vector *);
+	    case TAG_ARRAY: 
+		vec = NODET_TO_PTR(entry, array_t *);
+		vec->extra_ref = 0;
+		break;
+	    case TAG_CLASS: 
+		vec = NODET_TO_PTR(entry, array_t *);
 		vec->extra_ref = 0;
 		break;
 	    case TAG_MAPPING:
-		map = NODET_TO_PTR(entry, struct mapping *);
+		map = NODET_TO_PTR(entry, mapping_t *);
 		map->extra_ref = 0;
 		break;
 	    case TAG_FUNP:
-		fp = NODET_TO_PTR(entry, struct funp *);
-		fp->extra_ref = 0;
+		fp = NODET_TO_PTR(entry, funptr_t *);
+		fp->hdr.extra_ref = 0;
 		break;
 	    case TAG_BUFFER:
-		buf = NODET_TO_PTR(entry, struct buffer *);
+		buf = NODET_TO_PTR(entry, buffer_t *);
 		buf->extra_ref = 0;
 		break;
 	    }
@@ -517,18 +527,15 @@ void check_all_blocks P1(int, flag) {
     if (blocks[TAG_PROGRAM & 0xff] != total_num_prog_blocks)
 	add_vmessage("WARNING: total_num_prog_blocks is: %i should be: %i\n",
 		     total_num_prog_blocks, blocks[TAG_PROGRAM & 0xff]);
-    if (blocks[TAG_VECTOR & 0xff] != num_arrays)
+    if (blocks[TAG_ARRAY & 0xff] != num_arrays)
 	add_vmessage("WARNING: num_arrays is: %i should be: %i\n",
-		     num_arrays, blocks[TAG_VECTOR & 0xff]);
+		     num_arrays, blocks[TAG_ARRAY & 0xff]);
     if (blocks[TAG_MAPPING & 0xff] != num_mappings)
 	add_vmessage("WARNING: num_mappings is: %i should be: %i\n",
 		     num_mappings, blocks[TAG_MAPPING & 0xff]);
     if (blocks[TAG_MAP_TBL & 0xff] != num_mappings)
 	add_vmessage("WARNING: %i tables for %i mappings\n",
 		     blocks[TAG_MAP_TBL & 0xff], num_mappings);
-    if (blocks[TAG_MAP_NODE & 0xff] != total_mapping_nodes)
-	add_vmessage("WARNING: total_mapping_nodes is: %i should be: %i\n",
-		     total_mapping_nodes, blocks[TAG_MAP_NODE & 0xff]);
     if (blocks[TAG_INTERACTIVE & 0xff] != total_users)
 	add_vmessage("WATNING: total_users is: %i should be: %i\n",
 		     total_users, blocks[TAG_INTERACTIVE & 0xff]);
@@ -552,7 +559,7 @@ void check_all_blocks P1(int, flag) {
 	    
 #ifndef NO_ADD_ACTION
 	    if (all_users[i]->iflags & NOTIFY_FAIL_FUNC)
-		all_users[i]->default_err_message.f->extra_ref++;
+		all_users[i]->default_err_message.f->hdr.extra_ref++;
 	    else if (all_users[i]->default_err_message.s)
 		EXTRA_REF(BLOCK(all_users[i]->default_err_message.s))++;
 #endif
@@ -571,6 +578,7 @@ void check_all_blocks P1(int, flag) {
     mark_call_outs();
     mark_simuls();
     mark_apply_low_cache();
+    mark_mapping_node_blocks();
 
     mark_svalue(&apply_ret_value);
 
@@ -584,18 +592,18 @@ void check_all_blocks P1(int, flag) {
 	for (entry = table[hsh]; entry; entry = entry->next) {
 	    switch (entry->tag & ~TAG_MARKED) {
 	    case TAG_IDENT_TABLE: {
-		struct ident_hash_elem *hptr, *first;
-		struct ident_hash_elem **table;
+		ident_hash_elem_t *hptr, *first;
+		ident_hash_elem_t **table;
 		int size;
 		
-		table = NODET_TO_PTR(entry, struct ident_hash_elem **);
-		size = (entry->size / 3) / sizeof(struct ident_hash_elem *);
+		table = NODET_TO_PTR(entry, ident_hash_elem_t **);
+		size = (entry->size / 3) / sizeof(ident_hash_elem_t *);
 		for (i = 0; i < size; i++) {
 		    first = table[i];
 		    if (first) {
 			hptr = first;
 			do {
-			    if (!(hptr->token & IHE_RESWORD)) {
+			    if (hptr->token & (IHE_SIMUL | IHE_EFUN)) {
 				DO_MARK(hptr, TAG_PERM_IDENT);
 			    }
 			    hptr = hptr->next;
@@ -605,53 +613,55 @@ void check_all_blocks P1(int, flag) {
 		break;
 	    }
 	    case TAG_FUNP:
-		fp = NODET_TO_PTR(entry, struct funp *);
+		fp = NODET_TO_PTR(entry, funptr_t *);
 		mark_funp(fp);
 		break;
-	    case TAG_VECTOR:		
-		vec = NODET_TO_PTR(entry, struct vector *);
-		if (entry->size != sizeof(struct vector) + sizeof(struct svalue[1]) * (vec->size - 1))
-		    add_vmessage("vector size doesn't match block size: %s %04x\n", entry->desc, (int)entry->tag);
+	    case TAG_ARRAY:
+		vec = NODET_TO_PTR(entry, array_t *);
+		if (entry->size != sizeof(array_t) + sizeof(svalue_t[1]) * (vec->size - 1))
+		    add_vmessage("array size doesn't match block size: %s %04x\n", entry->desc, (int)entry->tag);
 		for (i = 0; i < vec->size; i++) mark_svalue(&vec->item[i]);
 		break;
-	    case TAG_MAP_NODE:
-		node = NODET_TO_PTR(entry, struct node *);
-		mark_svalue(node->values);
-		mark_svalue(node->values + 1);
+	    case TAG_CLASS:
+		vec = NODET_TO_PTR(entry, array_t *);
+		if (entry->size != sizeof(array_t) + sizeof(svalue_t[1]) * (vec->size - 1))
+		    add_vmessage("class size doesn't match block size: %s %04x\n", entry->desc, (int)entry->tag);
+		for (i = 0; i < vec->size; i++) mark_svalue(&vec->item[i]);
 		break;
 	    case TAG_MAPPING:		
-		map = NODET_TO_PTR(entry, struct mapping *);
+		map = NODET_TO_PTR(entry, mapping_t *);
 		DO_MARK(map->table, TAG_MAP_TBL);
 		
 		i = map->table_size;
 		do {
 		    for (node = map->table[i]; node; node = node->next) {
-			DO_MARK(node, TAG_MAP_NODE);
+			mark_svalue(node->values);
+			mark_svalue(node->values + 1);
 		    }
 		} while (i--);
 		break;
 	    case TAG_OBJECT:
-		ob = NODET_TO_PTR(entry, struct object *);
+		ob = NODET_TO_PTR(entry, object_t *);
 		mark_object(ob);
 		break;
 	    case TAG_PROGRAM:
-		prog = NODET_TO_PTR(entry, struct program *);
+		prog = NODET_TO_PTR(entry, program_t *);
 		
-		if (prog->p.i.line_info)
-		    DO_MARK(prog->p.i.file_info, TAG_LINENUMBERS);
+		if (prog->line_info)
+		    DO_MARK(prog->file_info, TAG_LINENUMBERS);
 		
-		for (i = 0; i < (int) prog->p.i.num_inherited; i++)
-		    prog->p.i.inherit[i].prog->p.i.extra_ref++;
+		for (i = 0; i < (int) prog->num_inherited; i++)
+		    prog->inherit[i].prog->extra_ref++;
 		
-		for (i = 0; i < (int) prog->p.i.num_functions; i++)
-		    if (prog->p.i.functions[i].name)
-			EXTRA_REF(BLOCK(prog->p.i.functions[i].name))++;
+		for (i = 0; i < (int) prog->num_functions; i++)
+		    if (prog->functions[i].name)
+			EXTRA_REF(BLOCK(prog->functions[i].name))++;
 		
-		for (i = 0; i < (int) prog->p.i.num_strings; i++)
-		    EXTRA_REF(BLOCK(prog->p.i.strings[i]))++;
+		for (i = 0; i < (int) prog->num_strings; i++)
+		    EXTRA_REF(BLOCK(prog->strings[i]))++;
 
-		for (i = 0; i < (int) prog->p.i.num_variables; i++)
-		    EXTRA_REF(BLOCK(prog->p.i.variable_names[i].name))++;
+		for (i = 0; i < (int) prog->num_variables; i++)
+		    EXTRA_REF(BLOCK(prog->variable_names[i].name))++;
 		
 		EXTRA_REF(BLOCK(prog->name))++;
 	    }
@@ -663,9 +673,9 @@ void check_all_blocks P1(int, flag) {
 	for (entry = table[hsh]; entry; entry = entry->next) {
 	    switch (entry->tag) {
 	    case TAG_ERROR_CONTEXT: {
-		struct error_context_stack *ec, *tmp;
+		error_context_stack_t *ec, *tmp;
 		
-		ec = NODET_TO_PTR(entry, struct error_context_stack *);
+		ec = NODET_TO_PTR(entry, error_context_stack_t *);
 		tmp = ecsp;
 		while (tmp) {
 		    if (tmp == ec) break;
@@ -679,37 +689,42 @@ void check_all_blocks P1(int, flag) {
 		add_vmessage("WARNING: Found orphan mudlib stat block: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
 	    case TAG_PROGRAM:
-		prog = NODET_TO_PTR(entry, struct program *);
-		if (prog->p.i.ref != prog->p.i.extra_ref)
-		    add_vmessage("Bad ref count for program %s, is %d - should be %d\n", prog->name, prog->p.i.ref, prog->p.i.extra_ref);
-		if (prog->p.i.func_ref != prog->p.i.extra_func_ref)
-		    add_vmessage("Bad function ref count for program %s, is %d - should be %d\n", prog->name, prog->p.i.func_ref, prog->p.i.extra_func_ref);
+		prog = NODET_TO_PTR(entry, program_t *);
+		if (prog->ref != prog->extra_ref)
+		    add_vmessage("Bad ref count for program %s, is %d - should be %d\n", prog->name, prog->ref, prog->extra_ref);
+		if (prog->func_ref != prog->extra_func_ref)
+		    add_vmessage("Bad function ref count for program %s, is %d - should be %d\n", prog->name, prog->func_ref, prog->extra_func_ref);
 		break;
 	    case TAG_OBJECT:
-		ob = NODET_TO_PTR(entry, struct object *);
+		ob = NODET_TO_PTR(entry, object_t *);
 		if (ob->ref != ob->extra_ref)
 		    add_vmessage("Bad ref count for object %s, is %d - should be %d\n", ob->name, ob->ref, ob->extra_ref);
 		break;
-	    case TAG_VECTOR:
-		vec = NODET_TO_PTR(entry, struct vector *);
+	    case TAG_ARRAY:
+		vec = NODET_TO_PTR(entry, array_t *);
 		if (vec->ref != vec->extra_ref) {
 		    add_vmessage("Bad ref count for array, is %d - should be %d\n", vec->ref, vec->extra_ref);
 		    print_depth = 0;
-		    md_print_vector(vec);
+		    md_print_array(vec);
 		}
 		break;
+	    case TAG_CLASS:
+		vec = NODET_TO_PTR(entry, array_t *);
+		if (vec->ref != vec->extra_ref)
+		    add_vmessage("Bad ref count for class, is %d - should be %d\n", vec->ref, vec->extra_ref);
+		break;
 	    case TAG_MAPPING:
-		map = NODET_TO_PTR(entry, struct mapping *);
+		map = NODET_TO_PTR(entry, mapping_t *);
 		if (map->ref != map->extra_ref)
 		    add_vmessage("Bad ref count for mapping, is %d - should be %d\n", map->ref, map->extra_ref);
 		break;
 	    case TAG_FUNP:
-		fp = NODET_TO_PTR(entry, struct funp *);
-		if (fp->ref != fp->extra_ref)
-		    add_vmessage("Bad ref count for function pointer, is %d - should be %d\n", fp->ref, fp->extra_ref);
+		fp = NODET_TO_PTR(entry, funptr_t *);
+		if (fp->hdr.ref != fp->hdr.extra_ref)
+		    add_vmessage("Bad ref count for function pointer, is %d - should be %d\n", fp->hdr.ref, fp->hdr.extra_ref);
 		break;
 	    case TAG_BUFFER:
-		buf = NODET_TO_PTR(entry, struct buffer *);
+		buf = NODET_TO_PTR(entry, buffer_t *);
 		if (buf->ref != buf->extra_ref)
 		    add_vmessage("Bad ref count for buffer, is %d - should be %d\n", buf->ref, buf->extra_ref);
 		break;
@@ -729,7 +744,7 @@ void check_all_blocks P1(int, flag) {
 		add_vmessage("WARNING: Found orphan uid node: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
 	    case TAG_SENTENCE:
-		sent = NODET_TO_PTR(entry, struct sentence *);
+		sent = NODET_TO_PTR(entry, sentence_t *);
 		add_vmessage("WARNING: Found orphan sentence: %s:%s - %s %04x\n", sent->ob->name, sent->function, entry->desc, (int)entry->tag);
 		break;
 	    case TAG_PERM_IDENT:
@@ -750,15 +765,15 @@ void check_all_blocks P1(int, flag) {
 	    case TAG_MAP_TBL:
 		add_vmessage("WARNING: Found orphan mapping table: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
-	    case TAG_MAP_NODE:
-		add_vmessage("WARNING: Found orphan mapping table: %s %04x\n", entry->desc, (int)entry->tag);
+	    case TAG_MAP_NODE_BLOCK:
+		add_vmessage("WARNING: Found orphan mapping node block: %s %04x\n", entry->desc, (int)entry->tag);
 		break;
 	    }
 	    entry->tag &= ~TAG_MARKED;
 	}
     }
 
-    if (flag) {
+    if (flag & 1) {
 	add_message("\n\n");
 	add_message("      source         blks  total\n");
 	add_message("-------------------- ---- --------\n");

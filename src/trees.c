@@ -8,25 +8,25 @@
  */
 
 #include "std.h"
+#include "lpc_incl.h"
 #include "trees.h"
 #include "compiler.h"
 #include "opcodes.h"
 #include "lex.h"
-#include "simulate.h"
 
 /* our globals */
-static struct parse_node_block *parse_block_list = 0;
-static struct parse_node_block *free_block_list = 0;
+static parse_node_block_t *parse_block_list = 0;
+static parse_node_block_t *free_block_list = 0;
 
-static struct parse_node *next_node = 0;
-static struct parse_node *last_node = 0;
+static parse_node_t *next_node = 0;
+static parse_node_t *last_node = 0;
 
 static int last_prog_size = 1;
 
 /* called by code generation when it is done with the tree */
 void
 free_tree() {
-    struct parse_node_block *cur_block;
+    parse_node_block_t *cur_block;
 
     if (!(cur_block = parse_block_list))
 	return;
@@ -44,8 +44,8 @@ free_tree() {
 /* called when the parser cleans up */
 void
 release_tree() {
-    struct parse_node_block *cur_block;
-    struct parse_node_block *next_block;
+    parse_node_block_t *cur_block;
+    parse_node_block_t *next_block;
     
     free_tree();
     next_block = free_block_list;
@@ -58,9 +58,9 @@ release_tree() {
 }
 
 /* get a new node to add to the tree */
-struct parse_node *
+parse_node_t *
 new_node() {
-    struct parse_node_block *cur_block;
+    parse_node_block_t *cur_block;
 
     /* fast case */
     if (next_node < last_node) {
@@ -72,7 +72,7 @@ new_node() {
     if (cur_block = free_block_list) {
 	free_block_list = cur_block->next;
     } else {
-	cur_block = ALLOCATE(struct parse_node_block, TAG_COMPILER, "new_node");
+	cur_block = ALLOCATE(parse_node_block_t, TAG_COMPILER, "new_node");
     }
     /* add to block list */
     cur_block->next = parse_block_list;
@@ -88,9 +88,9 @@ new_node() {
  * This should be used for nodes that hold expressions together but don't
  * generate any code themselves (NODE_IF, etc)
  */
-struct parse_node *
+parse_node_t *
 new_node_no_line() {
-    struct parse_node_block *cur_block;
+    parse_node_block_t *cur_block;
 
     /* fast case */
     if (next_node < last_node) {
@@ -101,7 +101,7 @@ new_node_no_line() {
     if (cur_block = free_block_list) {
       free_block_list = cur_block->next;
     } else {
-	cur_block = ALLOCATE(struct parse_node_block, TAG_COMPILER, "new_node");
+	cur_block = ALLOCATE(parse_node_block_t, TAG_COMPILER, "new_node");
     }
     /* add to block list */
     cur_block->next = parse_block_list;
@@ -114,10 +114,10 @@ new_node_no_line() {
 }
 
 /* quick routine to make a generic branched node */
-struct parse_node *
+parse_node_t *
 make_branched_node P4(short, kind, char, type, 
-		      struct parse_node *, l, struct parse_node *, r) {
-    struct parse_node *ret;
+		      parse_node_t *, l, parse_node_t *, r) {
+    parse_node_t *ret;
 
     ret = new_node();
     ret->kind = kind;
@@ -128,11 +128,11 @@ make_branched_node P4(short, kind, char, type,
 }
 
 /* create an optimized typical binary integer operator */
-struct parse_node *
-binary_int_op P4(struct parse_node *, l, struct parse_node *, r,
+parse_node_t *
+binary_int_op P4(parse_node_t *, l, parse_node_t *, r,
 		 char, op, char *, name) {
     if (exact_types){
-	if (!BASIC_TYPE(l->type, TYPE_NUMBER)){
+	if (!IS_TYPE(l->type, TYPE_NUMBER)){
 	    char buf[256];
 	    strcpy(buf, "Bad left argument to '");
 	    strcat(buf, name);
@@ -141,7 +141,7 @@ binary_int_op P4(struct parse_node *, l, struct parse_node *, r,
 	    strcat(buf, "\"");
 	    yyerror(buf);
 	}
-	if (!BASIC_TYPE(r->type,TYPE_NUMBER)) {
+	if (!IS_TYPE(r->type,TYPE_NUMBER)) {
 	    char buf[256];
 	    strcpy(buf, "Bad right argument to '");
 	    strcat(buf, name);
@@ -179,10 +179,10 @@ binary_int_op P4(struct parse_node *, l, struct parse_node *, r,
     return make_branched_node(op, TYPE_NUMBER, l, r);
 }
 
-struct parse_node *make_range_node P4(int, code, struct parse_node *, expr,
-                                      struct parse_node *, l,
-                                      struct parse_node *, r) {
-    struct parse_node *newnode;
+parse_node_t *make_range_node P4(int, code, parse_node_t *, expr,
+                                      parse_node_t *, l,
+                                      parse_node_t *, r) {
+    parse_node_t *newnode;
 
     newnode = make_branched_node(code, 0, l, r);
     newnode->v.expr = expr;
@@ -196,24 +196,28 @@ struct parse_node *make_range_node P4(int, code, struct parse_node *, expr,
                 break;
 
             default:
-                if (expr->type & TYPE_MOD_POINTER) newnode->type = expr->type;
+                if (expr->type & TYPE_MOD_ARRAY) newnode->type = expr->type;
                 else{
                     type_error("Bad type of argument used for range: ", expr->type);
                     newnode->type = TYPE_ANY;
                 }
         }
 
-        if (!BASIC_TYPE(l->type, TYPE_NUMBER))
+        if (!IS_TYPE(l->type, TYPE_NUMBER))
             type_error("Bad type of left index to range operator", l->type);
-        if (r && !BASIC_TYPE(r->type, TYPE_NUMBER))
+        if (r && !IS_TYPE(r->type, TYPE_NUMBER))
             type_error("Bad type of right index to range operator", r->type);
     } else newnode->type = TYPE_ANY;
     return newnode;
 }
 
-struct parse_node *insert_pop_value P1(struct parse_node *, expr) {
-    struct parse_node *replacement;
+parse_node_t *insert_pop_value P1(parse_node_t *, expr) {
+    parse_node_t *replacement;
 
+    if (expr->type == TYPE_NOVALUE) {
+	expr->type = TYPE_VOID;
+	return expr;
+    }
     switch (expr->kind) {
     case F_ASSIGN: expr->kind = F_VOID_ASSIGN; break;
     case F_ADD_EQ: expr->kind = F_VOID_ADD_EQ; break;

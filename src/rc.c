@@ -7,8 +7,7 @@
 
 #include "std.h"
 #include "include/runtime_config.h"
-#include "interpret.h"
-#include "simulate.h"
+#include "lpc_incl.h"
 
 #define MAX_LINE_LENGTH 120
 
@@ -79,7 +78,7 @@ static void read_config_file P1(FILE *, file)
  */
 static void scan_config_line P4(char *, start, char *, fmt, void *, dest, int, required)
 {
-    char *tmp;
+    char *tmp, *end;
     char missing_line[MAX_LINE_LENGTH];
 
     tmp = start;
@@ -87,7 +86,16 @@ static void scan_config_line P4(char *, start, char *, fmt, void *, dest, int, r
 	while (tmp = (char *) strchr(tmp, '\n')) {
 	    if (*(++tmp) == fmt[0]) break;
 	}
-	if (tmp && sscanf(tmp, fmt, dest) == 1) break;
+	/* don't allow sscanf() to scan to next line for blank entries */
+	if (tmp) {
+	    end = strchr(tmp, '\n');
+	    if (end) *end = '\0';
+	} else end = 0;
+	if (tmp && sscanf(tmp, fmt, dest) == 1) {
+	    if (end) *end = '\n';
+	    break;
+	}
+	if (end) *end = '\n';
     }
     if (!tmp) {
 	strcpy(missing_line, fmt);
@@ -229,7 +237,7 @@ void set_defaults P1(char *, filename)
     config_int[__LIVING_HASH_TABLE_SIZE__ - BASE_CONFIG_INT] = LIVING_HASH_SIZE;
 }
 
-int get_config_item P2(struct svalue *, res, struct svalue *, arg)
+int get_config_item P2(svalue_t *, res, svalue_t *, arg)
 {
     int num;
 

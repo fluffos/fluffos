@@ -7,8 +7,8 @@
  * functab_tree.c
  */
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
-int lookup_function PROT((struct function *, int, char *));
-void add_function PROT((struct function *, unsigned short *, int));
+int lookup_function PROT((function_t *, int, char *));
+void add_function PROT((function_t *, unsigned short *, int));
 #endif
 
 #endif

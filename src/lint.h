@@ -70,12 +70,6 @@
 #endif
 
 #if !defined(MSDOS) && !defined(SunOS_5) && !defined(NeXT)
-#  if !defined(_AIX) && !defined(_SEQUENT_) && !defined(_YACC_) && \
-	!defined(linux) && !defined(sun) && !defined(sgi) && !defined(LATTICE)
-     void *malloc PROT((unsigned));
-     void *realloc PROT((void *, unsigned));
-     void free PROT((void *));
-#  endif
 #  ifndef sgi
 #    ifndef LATTICE
        int fclose PROT_STDIO((FILE *));

@@ -1,5 +1,4 @@
 #include "std.h"
-#include "config.h"
 #include "lpc_incl.h"
 #include "file_incl.h"
 #include "backend.h"
@@ -11,9 +10,9 @@
 #include "binaries.h"
 #include "swap.h"
 #include "socket_efuns.h"
-#include "interpret.h"
 #include "md.h"
 #include "eoperators.h"
+#include "ed.h"
 
 /*
  * 'inherit_file' is used as a flag. If it is set to a string
@@ -31,39 +30,39 @@ char *compilation_ident;
    No, mark-and-sweep solution won't work.  Exercise for reader.  */
 static int num_objects_this_thread = 0;
 
-static struct object *restrict_destruct;
+static object_t *restrict_destruct;
 
 char *last_verb = 0;
 
-struct object *obj_list, *obj_list_destruct;
-struct object *current_object;	/* The object interpreting a function. */
-struct object *command_giver;	/* Where the current command came from. */
-struct object *current_interactive;	/* The user who caused this execution */
+object_t *obj_list, *obj_list_destruct;
+object_t *current_object;	/* The object interpreting a function. */
+object_t *command_giver;	/* Where the current command came from. */
+object_t *current_interactive;	/* The user who caused this execution */
 
 #ifdef PRIVS
-static void init_privs_for_object PROT((struct object *));
+static void init_privs_for_object PROT((object_t *));
 #endif
 #ifndef NO_UIDS
-static int give_uid_to_object PROT((struct object *));
+static int give_uid_to_object PROT((object_t *));
 #endif
-static int init_object PROT((struct object *));
-static struct svalue *load_virtual_object PROT((char *));
+static int init_object PROT((object_t *));
+static svalue_t *load_virtual_object PROT((char *));
 static char *make_new_name PROT((char *));
-static void destruct_object_two PROT((struct object *));
-static void send_say PROT((struct object *, char *, struct vector *));
-static struct sentence *alloc_sentence PROT((void));
+static void destruct_object_two PROT((object_t *));
+static void send_say PROT((object_t *, char *, array_t *));
+static sentence_t *alloc_sentence PROT((void));
 #ifndef NO_ADD_ACTION
-static void remove_sent PROT((struct object *, struct object *));
+static void remove_sent PROT((object_t *, object_t *));
 #endif
-static void error_handler PROT((void));
+static void error_handler PROT((char *));
 
-struct variable *find_status P2(char *, str, int, must_find)
+variable_t *find_status P2(char *, str, int, must_find)
 {
     int i;
 
-    for (i = 0; i < (int) current_object->prog->p.i.num_variables; i++) {
-	if (strcmp(current_object->prog->p.i.variable_names[i].name, str) == 0)
-	    return &current_object->prog->p.i.variable_names[i];
+    for (i = 0; i < (int) current_object->prog->num_variables; i++) {
+	if (strcmp(current_object->prog->variable_names[i].name, str) == 0)
+	    return &current_object->prog->variable_names[i];
     }
     if (!must_find)
 	return 0;
@@ -84,10 +83,10 @@ INLINE void check_legal_string P1(char *, s)
 static char *privs_file_fname = (char *) 0;
 
 static void
-init_privs_for_object P1(struct object *, ob)
+init_privs_for_object P1(object_t *, ob)
 {
-    struct object *tmp_ob;
-    struct svalue *value;
+    object_t *tmp_ob;
+    svalue_t *value;
     int err;
 
     err = assert_master_ob_loaded("[internal] init_privs_for_object", "");
@@ -121,9 +120,9 @@ init_privs_for_object P1(struct object *, ob)
 #ifndef NO_UIDS
 static char *creator_file_fname = (char *) 0;
 
-static int give_uid_to_object P1(struct object *, ob)
+static int give_uid_to_object P1(object_t *, ob)
 {
-    struct svalue *ret;
+    svalue_t *ret;
     char *creator_name;
     int err;
 
@@ -150,14 +149,14 @@ static int give_uid_to_object P1(struct object *, ob)
     ret = apply_master_ob(creator_file_fname, 1);
     if (!ret)
 	error("master object: No function " APPLY_CREATOR_FILE "() defined!\n");
-    if (!ret || ret == (struct svalue *)-1 || ret->type != T_STRING) {
-	struct svalue arg;
+    if (!ret || ret == (svalue_t *)-1 || ret->type != T_STRING) {
+	svalue_t arg;
 
 	arg.type = T_OBJECT;
 	arg.u.ob = ob;
 	destruct_object(&arg);
 	if (!ret) error("Master object has no function " APPLY_CREATOR_FILE "().\n");
-	if (ret == (struct svalue *)-1) error("Can't load objects without a master object.");
+	if (ret == (svalue_t *)-1) error("Can't load objects without a master object.");
 	error("Illegal object to load: return value of master::" APPLY_CREATOR_FILE "() was not a string.\n");
     }
     creator_name = ret->u.string;
@@ -205,7 +204,7 @@ static int give_uid_to_object P1(struct object *, ob)
 }
 #endif
 
-static int init_object P1(struct object *, ob)
+static int init_object P1(object_t *, ob)
 {
 #ifndef NO_MUDLIB_STATS
     init_stats_for_object(ob);
@@ -228,12 +227,12 @@ static int init_object P1(struct object *, ob)
 }
 
 
-static struct svalue *
+static svalue_t *
        load_virtual_object P1(char *, name)
 {
-    struct svalue *v;
+    svalue_t *v;
 
-    if (master_ob == (struct object *)-1) return 0;
+    if (master_ob == (object_t *)-1) return 0;
     push_string(name, STRING_MALLOC);
     v = apply_master_ob(APPLY_COMPILE_OBJECT, 1);
     if (!v || (v->type != T_OBJECT)) {
@@ -244,12 +243,12 @@ static struct svalue *
     return v;
 }
 
-void set_master P1(struct object *, ob) {
+void set_master P1(object_t *, ob) {
 #if !defined(NO_UIDS) || !defined(NO_MUDLIB_STATS)
-    int first_load = (master_ob == (struct object *)-1);
+    int first_load = (master_ob == (object_t *)-1);
 #endif
 #ifndef NO_UIDS
-    struct svalue *ret;
+    svalue_t *ret;
 #endif
 
     master_ob = ob;
@@ -290,6 +289,36 @@ void set_master P1(struct object *, ob) {
 #endif
  }
 
+char *check_name P1(char *, src) {
+    char *p;
+    while (*src == '/') src++;
+    p = src;
+    while (*p) {
+	if (*p == '/' && *(p + 1) == '/')
+	    return 0;
+	p++;
+    }
+    return src;
+}
+
+int strip_name P3(char *, src, char *, dest, int, size) {
+    char last_c;
+    char *p = dest;
+    char *end = dest + size - 1;
+
+    while (*src == '/') src++;
+
+    while (*src && p < end) {
+	if (last_c == '/' && *src == '/') return 0;
+	*p++ = *src++;
+    }
+    if (p - dest > 2 && p[-1] == 'c' && p[-2] == '.') 
+	p[-2] = 0;
+    else
+	*p = 0;
+    return 1;
+}
+
 /*
  * Load an object definition from file. If the object wants to inherit
  * from an object that is not loaded, discard all, load the inherited object,
@@ -309,30 +338,22 @@ void set_master P1(struct object *, ob) {
  * it.
  *
  */
-/* Beek - changed dont_reset to flags.  It's backwards compatible since
- *        LO_DONT_RESET = 1.  The new flag (LO_SAVE_OUTPUT indicates that
- *        the intermediate C file should not be deleted, allowing it to
- *        be optimized/customized
+/* Beek - changed dont_reset to flags.  
+ *        LO_COMPILED_EXISTS : compiled LPC program exists
  */
-struct object *load_object P2(char *, lname, int, flags)
+object_t *load_object P2(char *, lname, lpc_object_t *, lpc_obj)
 {
     int f;
 
-    struct object *ob, *save_command_giver = command_giver;
-    struct svalue *mret;
+    object_t *ob, *save_command_giver = command_giver;
+    svalue_t *mret;
     struct stat c_st;
-    int name_length;
     char real_name[200], name[200];
     char *p;
     int is_master_ob=0;
 #ifdef LPC_TO_C
     char out_name[200];
     char *out_ptr = out_name;
-#ifdef RUNTIME_LOADING
-    char *code;
-    void (**jump_table) (struct svalue *);
-    int err;
-#endif
     int save_compile_to_c = compile_to_c;
 #endif
 
@@ -342,39 +363,14 @@ struct object *load_object P2(char *, lname, int, flags)
     if (current_object && current_object->euid == NULL)
 	error("Can't load objects when no effective user.\n");
 #endif
-    /* don't allow consecutive "/"'s - Wayfarer */
-    p = lname;
-    while (*p) {
-	if (*p == '/' && *(p + 1) == '/') {
-	    error("Filenames with consecutive /'s in them aren't allowed.\n");
-	    return 0;
-	}
-	p++;
-    }
-    /* Truncate possible .c in the object name. */
-    /* Remove leading '/' if any. */
-    while (lname[0] == '/')
-	lname++;
-    strncpy(name, lname, sizeof(name) - 1);
-    name[sizeof name - 1] = '\0';
-    name_length = strlen(name);
-    if (name_length > sizeof name - 4)
-	name_length = sizeof name - 4;
-    name[name_length] = '\0';
-    if (name[name_length - 2] == '.' &&
-#ifndef LPC_TO_C
-	name[name_length - 1] == 'c') {
-#else
-	(name[name_length - 1] == 'c' || name[name_length - 1] == 'C')) {
-#endif
-	name[name_length - 2] = '\0';
-	name_length -= 2;
-    }
+    if (!strip_name(lname, name, sizeof name))
+	error("Filenames with consecutive /'s in them aren't allowed.\n");
+
     if (!master_ob_is_loading && !strcmp(name, master_file_name)) {
 	master_ob_is_loading = 1;
 	is_master_ob = 1;
 	/* free the old copy */
-	if (master_ob && master_ob != (struct object *)-1) {
+	if (master_ob && master_ob != (object_t *)-1) {
 	    free_object(master_ob, "apply_master_ob");
 	    master_ob = 0;
 	}
@@ -388,56 +384,33 @@ struct object *load_object P2(char *, lname, int, flags)
         simul_efun_is_loading = 1;
     }
     if (stat(real_name, &c_st) == -1) {
-#ifdef LPC_TO_C
-	real_name[strlen(real_name) - 1] = 'C';
+	svalue_t *v;
 
-	if (stat(real_name, &c_st) != -1) {
-	    struct svalue *mret;
-
-	    /* will get copied */
-	    push_string(real_name, STRING_MALLOC);
-	    mret = apply_master_ob(APPLY_VALID_COMPILE_TO_C, 1);
-	    if (MASTER_APPROVED(mret)) {
-		compile_to_c = 1;
-		strcpy(out_ptr, SAVE_BINARIES);
-		if (*out_ptr == '/')
-		    out_ptr++;
-		strcat(out_ptr, "/");
-		strcat(out_ptr, name);
-		strcat(out_ptr, ".c");
-	    }
-	} else {
-#endif
-	    struct svalue *v;
-
-	    if (is_master_ob) {
-		master_ob_is_loading = 0;
-		return 0;
-	    }
-	    if (simul_efun_is_loading){
-	        simul_efun_is_loading = 0;
-                return 0;
-	    }
-	    if (!(v = load_virtual_object(name))) {
-		return 0;
-	    }
-	    /* Now set the file name of the specified object correctly... */
-	    ob = v->u.ob;
-	    remove_object_hash(ob);
-	    if (ob->name)
-		FREE(ob->name);
-	    ob->name = string_copy(name, "load_object");
-	    SET_TAG(ob->name, TAG_OBJ_NAME);
-	    enter_object_hash(ob);
-	    ob->flags |= O_VIRTUAL;
-	    ob->load_time = current_time;
-#ifndef LPC_TO_C
-	    return ob;
-#else
-	    compile_to_c = save_compile_to_c;
-	    return ob;
+	if (is_master_ob) {
+	    master_ob_is_loading = 0;
+	    return 0;
 	}
+	if (simul_efun_is_loading){
+	    simul_efun_is_loading = 0;
+	    return 0;
+	}
+	if (!(v = load_virtual_object(name))) {
+	    return 0;
+	}
+	/* Now set the file name of the specified object correctly... */
+	ob = v->u.ob;
+	remove_object_hash(ob);
+	if (ob->name)
+	    FREE(ob->name);
+	ob->name = string_copy(name, "load_object");
+	SET_TAG(ob->name, TAG_OBJ_NAME);
+	enter_object_hash(ob);
+	ob->flags |= O_VIRTUAL;
+	ob->load_time = current_time;
+#ifdef LPC_TO_C
+	compile_to_c = save_compile_to_c;
 #endif
+	return ob;
     }
     /*
      * Check if it's a legal name.
@@ -450,7 +423,7 @@ struct object *load_object P2(char *, lname, int, flags)
 	return 0;
     }
 #ifdef BINARIES
-    if (!load_binary(real_name)) {
+    if (!load_binary(real_name, lpc_obj)) {
 #endif
 	/* maybe move this section into compile_file? */
 	if (comp_flag) {
@@ -479,23 +452,10 @@ struct object *load_object P2(char *, lname, int, flags)
 	    compile_file(f, real_name);
 	    fclose(compilation_output_file);
 	    if (prog) {
-#ifdef RUNTIME_LOADING
-		err = compile_and_link(out_ptr, &jump_table, &code, "errors", "OUT");
-		if (err) {
-		    compile_file_error(err, "compile_and_link");
-		    if (prog)
-			free_prog(prog, 1);
-		    prog = 0;
-		} else
-		    link_jump_table(prog, jump_table, code);
-#else
 		if (prog)
 		    free_prog(prog, 1);
 		prog = 0;
-#endif
 	    }
-	    if (!(flags & LO_SAVE_OUTPUT))
-		unlink(out_ptr);
 	} else {
 #endif
 	    compile_file(f, real_name);
@@ -542,16 +502,11 @@ struct object *load_object P2(char *, lname, int, flags)
 	    error("Illegal to inherit self.\n");
 	}
 	inherit_file = 0;
-#if 0				/* MUDLIB3_NEED, It's very awkard to have to
-				 * have a debug3 /JnA */
-	load_object(tmp, LO_DONT_RESET);
-#else
 	/*
 	 * Beek - all the flags refer to this file and shouldn't be passed
 	 * down
 	 */
-	load_object(tmp, 0);	/* Remove this feature for now */
-#endif
+	load_object(tmp, 0);
 	FREE(tmp);
 
 	/*
@@ -561,9 +516,16 @@ struct object *load_object P2(char *, lname, int, flags)
 	 * -Beek
 	 */
 	if (!(ob = lookup_object_hash(name))) {
-	    ob = load_object(name, flags);
+	    ob = load_object(name, 0);
 	    ob->load_time = current_time;
 	}
+#ifdef LPC_TO_C
+	else if (ob->flags & O_COMPILED_PROGRAM) {
+	    /* I don't think this is possible, but ... */
+	    ob = load_object(name, (lpc_object_t *)ob);
+	    ob->load_time = current_time;
+	}
+#endif
 	num_objects_this_thread--;
 	if (is_master_ob) {
 	  master_ob_is_loading = 0;
@@ -574,7 +536,7 @@ struct object *load_object P2(char *, lname, int, flags)
 #endif
 	return ob;
     }
-    ob = get_empty_object(prog->p.i.num_variables);
+    ob = get_empty_object(prog->num_variables);
     /* Shared string is no good here */
     ob->name = string_copy(name, "load_object");
     SET_TAG(ob->name, TAG_OBJ_NAME);
@@ -602,7 +564,7 @@ struct object *load_object P2(char *, lname, int, flags)
 	add_ref(simul_efun_ob, "load_object");
     }
 
-    if (init_object(ob) && !(flags & LO_DONT_RESET))
+    if (init_object(ob))
 	call_create(ob, 0);
     if (!(ob->flags & O_DESTRUCTED) &&
 	function_exists(APPLY_CLEAN_UP, ob)) {
@@ -640,10 +602,10 @@ static char *make_new_name P1(char *, str)
  * Save the command_giver, because reset() in the new object might change
  * it.
  */
-struct object *clone_object P2(char *, str1, int, num_arg)
+object_t *clone_object P2(char *, str1, int, num_arg)
 {
-    struct object *ob, *new_ob;
-    struct object *save_command_giver = command_giver;
+    object_t *ob, *new_ob;
+    object_t *save_command_giver = command_giver;
 
 #ifndef NO_UIDS
     if (current_object && current_object->euid == 0) {
@@ -671,7 +633,7 @@ struct object *clone_object P2(char *, str1, int, num_arg)
 	     * well... it's a virtual object.  So now we're going to "clone"
 	     * it.
 	     */
-	    struct svalue *v;
+	    svalue_t *v;
 	    char *p;
 
 	    pop_n_elems(num_arg); /* possibly this should be smarter */
@@ -681,18 +643,10 @@ struct object *clone_object P2(char *, str1, int, num_arg)
 				     Note that create() never gets called
 				     in clones of virtual objects.
 				     -Beek */
-	    
-	    /* Remove leading '/' if any. */
-	    while (str1[0] == '/')
-		str1++;
-	    p = str1;
-	    while (*p) {
-		if (*p == '/' && *(p + 1) == '/') {
-		    error("Filenames with consecutive /'s in them aren't allowed.\n");
-		    return (0);
-		}
-		p++;
-	    }
+
+	    if (!(str1 = check_name(str1))) 
+		error("Filenames with consecutive /'s in them aren't allowed.\n");
+
 	    if (ob->ref == 1 && !ob->super && !ob->contains) {
 		/*
 		 * ob unused so reuse it instead to save space. (possibly
@@ -724,7 +678,7 @@ struct object *clone_object P2(char *, str1, int, num_arg)
     /* We do not want the heart beat to be running for unused copied objects */
     if (ob->flags & O_HEART_BEAT)
 	(void) set_heart_beat(ob, 0);
-    new_ob = get_empty_object(ob->prog->p.i.num_variables);
+    new_ob = get_empty_object(ob->prog->num_variables);
     new_ob->name = make_new_name(ob->name);
     new_ob->flags |= (O_CLONE | (ob->flags & (O_WILL_CLEAN_UP | O_WILL_RESET)));
     new_ob->load_time = ob->load_time;
@@ -745,9 +699,9 @@ struct object *clone_object P2(char *, str1, int, num_arg)
     return (new_ob);
 }
 
-struct object *environment P1(struct svalue *, arg)
+object_t *environment P1(svalue_t *, arg)
 {
-    struct object *ob = current_object;
+    object_t *ob = current_object;
 
     if (arg && arg->type == T_OBJECT)
 	ob = arg->u.ob;
@@ -768,20 +722,19 @@ struct object *environment P1(struct svalue *, arg)
  * When failure, return 0.
  */
 #ifndef NO_ADD_ACTION
-int command_for_object P2(char *, str, struct object *, ob)
+int command_for_object P1(char *, str)
 {
     char buff[1000];
     int save_eval_cost = eval_cost;
 
     if (strlen(str) > sizeof(buff) - 1)
 	error("Too long command.\n");
-    if (ob == 0)
-	ob = current_object;
-    else if (ob->flags & O_DESTRUCTED)
+
+    else if (current_object->flags & O_DESTRUCTED)
 	return 0;
     strncpy(buff, str, sizeof buff);
     buff[sizeof buff - 1] = '\0';
-    if (parse_command(buff, ob))
+    if (parse_command(buff, current_object))
 	return save_eval_cost - eval_cost;
     else
 	return 0;
@@ -796,13 +749,13 @@ int command_for_object P2(char *, str, struct object *, ob)
  */
 
 
-static struct object *object_present2 PROT((char *, struct object *));
+static object_t *object_present2 PROT((char *, object_t *));
 
 
-struct object *object_present P2(struct svalue *, v, struct object *, ob)
+object_t *object_present P2(svalue_t *, v, object_t *, ob)
 {
-    struct svalue *ret;
-    struct object *ret_ob;
+    svalue_t *ret;
+    object_t *ret_ob;
     int specific = 0;
 
     if (ob == 0)
@@ -851,9 +804,9 @@ struct object *object_present P2(struct svalue *, v, struct object *, ob)
     return 0;
 }
 
-static struct object *object_present2 P2(char *, str, struct object *, ob)
+static object_t *object_present2 P2(char *, str, object_t *, ob)
 {
-    struct svalue *ret;
+    svalue_t *ret;
     char *p;
     int count = 0, length;
     char *item;
@@ -897,12 +850,12 @@ static struct object *object_present2 P2(char *, str, struct object *, ob)
  * Remove an object. It is first moved into the destruct list, and
  * not really destructed until later. (see destruct2()).
  */
-static void destruct_object_two P1(struct object *, ob)
+static void destruct_object_two P1(object_t *, ob)
 {
-    struct object *super;
-    struct object **pp;
+    object_t *super;
+    object_t **pp;
     int removed;
-    struct object *save_restrict_destruct = restrict_destruct;
+    object_t *save_restrict_destruct = restrict_destruct;
 
     if (restrict_destruct && restrict_destruct != ob)
 	error("Only this_object() can be destructed from move_or_destruct.\n");
@@ -928,8 +881,8 @@ static void destruct_object_two P1(struct object *, ob)
      */
 #ifndef NO_SHADOWS
     if (ob->shadowed && !ob->shadowing) {
-	struct svalue svp;
-	struct object *ob2;
+	svalue_t svp;
+	object_t *ob2;
 
 	svp.type = T_OBJECT;
 	/*
@@ -964,14 +917,14 @@ static void destruct_object_two P1(struct object *, ob)
 
 #ifdef DEBUG
     if (d_flag > 1)
-	debug_message("Destruct object %s (ref %d)\n", ob->name, ob->ref);
+	debug_message("Deobject_t %s (ref %d)\n", ob->name, ob->ref);
 #endif
 
     /* try to move our contents somewhere */
     super = ob->super;
 
     while (ob->contains) {
-	struct svalue svp;
+	svalue_t svp;
 	svp.type = T_OBJECT;
 	svp.u.ob = ob->contains;
 	/*
@@ -995,23 +948,20 @@ static void destruct_object_two P1(struct object *, ob)
 #ifndef NO_MUDLIB_STATS
     add_objects(&ob->stats, -1);
 #endif
-    if (ob->interactive) {
-	struct object *save = command_giver;
+#ifdef OLD_ED
+    if (ob->interactive && ob->interactive->ed_buffer) {
+	object_t *save = command_giver;
 
 	command_giver = ob;
-#ifdef F_ED
-	if (ob->interactive->ed_buffer) {
-	    save_ed_buffer();
-	}
-#endif
-#ifndef OLD_ED
-	if (ob->flags & O_IN_EDIT) {
-	    object_save_ed_buffer(ob);
-	    ob->flags &= ~O_IN_EDIT;
-	}
-#endif
+	save_ed_buffer();
 	command_giver = save;
     }
+#else
+    if (ob->flags & O_IN_EDIT) {
+	object_save_ed_buffer(ob);
+	ob->flags &= ~O_IN_EDIT;
+    }
+#endif
     /*
      * Remove us out of this current room (if any). Remove all sentences
      * defined by this object from all objects here.
@@ -1068,9 +1018,9 @@ static void destruct_object_two P1(struct object *, ob)
     }
 }
 
-void destruct_object P1(struct svalue *, v)
+void destruct_object P1(svalue_t *, v)
 {
-    struct object *ob = (struct object *) NULL;
+    object_t *ob = (object_t *) NULL;
 
     if (v->type == T_OBJECT) {
 	ob = v->u.ob;
@@ -1083,7 +1033,7 @@ void destruct_object P1(struct svalue *, v)
 /*
  * This one is called when no program is executing from the main loop.
  */
-void destruct2 P1(struct object *, ob)
+void destruct2 P1(object_t *, ob)
 {
 #ifdef DEBUG
     if (d_flag > 1) {
@@ -1107,7 +1057,7 @@ void destruct2 P1(struct object *, ob)
      * continue to execute, change string and object variables into the
      * number 0.
      */
-    if (ob->prog->p.i.num_variables > 0) {
+    if (ob->prog->num_variables > 0) {
 	/*
 	 * Deallocate variables in this object. The space of the variables
 	 * are not deallocated until the object structure is freed in
@@ -1115,7 +1065,7 @@ void destruct2 P1(struct object *, ob)
 	 */
 	int i;
 
-	for (i = 0; i < (int) ob->prog->p.i.num_variables; i++) {
+	for (i = 0; i < (int) ob->prog->num_variables; i++) {
 	    free_svalue(&ob->variables[i], "destruct2");
 	    ob->variables[i] = const0n;
 	}
@@ -1132,12 +1082,12 @@ void destruct2 P1(struct object *, ob)
  * when there is no command_giver, current_object is used as the source,
  *  otherwise, command_giver is used.
  *
- * message never goes to objects in the avoid vector, or the source itself.
+ * message never goes to objects in the avoid array, or the source itself.
  *
  * rewritten, bobf@metronet.com (Blackthorn) 9/6/93
  */
 
-static void send_say P3(struct object *, ob, char *, text, struct vector *, avoid)
+static void send_say P3(object_t *, ob, char *, text, array_t *, avoid)
 {
     int valid, j;
 
@@ -1156,9 +1106,9 @@ static void send_say P3(struct object *, ob, char *, text, struct vector *, avoi
     tell_object(ob, text);
 }
 
-void say P2(struct svalue *, v, struct vector *, avoid)
+void say P2(svalue_t *, v, array_t *, avoid)
 {
-    struct object *ob, *origin, *save_command_giver = command_giver;
+    object_t *ob, *origin, *save_command_giver = command_giver;
     char *buff;
 
     check_legal_string(v->u.string);
@@ -1202,12 +1152,12 @@ void say P2(struct svalue *, v, struct vector *, avoid)
  * Revised, bobf@metronet.com 9/6/93
  */
 
-void tell_room P3(struct object *, room, struct svalue *, v, struct vector *, avoid)
+void tell_room P3(object_t *, room, svalue_t *, v, array_t *, avoid)
 {
-    struct object *ob;
+    object_t *ob;
     char *buff;
     int valid, j;
-    static char txt_buf[LARGEST_PRINTABLE_STRING];
+    char txt_buf[LARGEST_PRINTABLE_STRING];
 
     switch (v->type) {
     case T_STRING:
@@ -1260,7 +1210,7 @@ void tell_room P3(struct object *, room, struct svalue *, v, struct vector *, av
 
 void shout_string P1(char *, str)
 {
-    struct object *ob;
+    object_t *ob;
 
     check_legal_string(str);
 
@@ -1282,7 +1232,7 @@ void shout_string P1(char *, str)
 #ifndef NO_ADD_ACTION
 void enable_commands P1(int, num)
 {
-    struct object *pp;
+    object_t *pp;
 
     if (current_object->flags & O_DESTRUCTED)
 	return;
@@ -1319,10 +1269,10 @@ void enable_commands P1(int, num)
  * Set up a function in this object to be called with the next
  * user input string.
  */
-int input_to P4(struct svalue *, fun, int, flag, int, num_arg, struct svalue *, args)
+int input_to P4(svalue_t *, fun, int, flag, int, num_arg, svalue_t *, args)
 {
-    struct sentence *s;
-    struct svalue *x;
+    sentence_t *s;
+    svalue_t *x;
     int i;
 
     if (!command_giver || command_giver->flags & O_DESTRUCTED)
@@ -1334,8 +1284,8 @@ int input_to P4(struct svalue *, fun, int, flag, int, num_arg, struct svalue *, 
 	 * (elsewhere) to avoid double free_svalue()'s
 	 */
 	if (num_arg) {
-	    i = num_arg * sizeof(struct svalue);
-	    if ((x = (struct svalue *)
+	    i = num_arg * sizeof(svalue_t);
+	    if ((x = (svalue_t *)
 		 DMALLOC(i, TAG_TEMPORARY, "input_to: 1")) == NULL)
 		fatal("Out of memory!\n");
 	    memcpy(x, args, i);
@@ -1349,7 +1299,7 @@ int input_to P4(struct svalue *, fun, int, flag, int, num_arg, struct svalue *, 
 	    s->flags = 0;
 	} else {
 	    s->function.f = fun->u.fp;
-	    fun->u.fp->ref++;
+	    fun->u.fp->hdr.ref++;
 	    s->flags = V_FUNCTION;
 	}
 	s->ob = current_object;
@@ -1364,10 +1314,10 @@ int input_to P4(struct svalue *, fun, int, flag, int, num_arg, struct svalue *, 
  * Set up a function in this object to be called with the next
  * user input character.
  */
-int get_char P4(struct svalue *, fun, int, flag, int, num_arg, struct svalue *, args)
+int get_char P4(svalue_t *, fun, int, flag, int, num_arg, svalue_t *, args)
 {
-    struct sentence *s;
-    struct svalue *x;
+    sentence_t *s;
+    svalue_t *x;
     int i;
 
     if (!command_giver || command_giver->flags & O_DESTRUCTED)
@@ -1379,8 +1329,8 @@ int get_char P4(struct svalue *, fun, int, flag, int, num_arg, struct svalue *, 
 	 * (elsewhere) to avoid double free_svalue()'s
 	 */
 	if (num_arg) {
-	    i = num_arg * sizeof(struct svalue);
-	    if ((x = (struct svalue *)
+	    i = num_arg * sizeof(svalue_t);
+	    if ((x = (svalue_t *)
 		 DMALLOC(i, TAG_TEMPORARY, "get_char: 1")) == NULL)
 		fatal("Out of memory!\n");
 	    memcpy(x, args, i);
@@ -1394,7 +1344,7 @@ int get_char P4(struct svalue *, fun, int, flag, int, num_arg, struct svalue *, 
            s->flags = 0;
 	} else {
 	    s->function.f = fun->u.fp;
-	    fun->u.fp->ref++;
+	    fun->u.fp->hdr.ref++;
 	    s->flags = V_FUNCTION;
 	}
 	s->ob = current_object;
@@ -1405,9 +1355,9 @@ int get_char P4(struct svalue *, fun, int, flag, int, num_arg, struct svalue *, 
     return 0;
 }
 
-void print_svalue P1(struct svalue *, arg)
+void print_svalue P1(svalue_t *, arg)
 {
-    static char tbuf[2048];
+    char tbuf[2048];
 
     if (arg == 0) {
 	tell_object(command_giver, "<NULL>");
@@ -1429,7 +1379,7 @@ void print_svalue P1(struct svalue *, arg)
 	    sprintf(tbuf, "%g", arg->u.real);
 	    tell_object(command_giver, tbuf);
 	    break;
-	case T_POINTER:
+	case T_ARRAY:
 	    tell_object(command_giver, "<ARRAY>");
 	    break;
 	case T_MAPPING:
@@ -1448,9 +1398,9 @@ void print_svalue P1(struct svalue *, arg)
     return;
 }
 
-void do_write P1(struct svalue *, arg)
+void do_write P1(svalue_t *, arg)
 {
-    struct object *save_command_giver = command_giver;
+    object_t *save_command_giver = command_giver;
 
 #ifndef NO_SHADOWS
     if (command_giver == 0 && current_object->shadowing)
@@ -1473,26 +1423,29 @@ void do_write P1(struct svalue *, arg)
  * returned.
  */
 
-struct object *find_object P1(char *, str)
+object_t *find_object P1(char *, str)
 {
-    struct object *ob;
+    object_t *ob;
     char *p;
+    register int length;
+    char tmpbuf[MAX_OBJECT_NAME_SIZE];
 
-    /* don't allow consecutive "/"'s - Wayfarer */
-    p = str;
-    while (*p) {
-	if (*p == '/' && *(p + 1) == '/')
-	    return 0;
-	p++;
-    }
+    if (!strip_name(str, tmpbuf, sizeof tmpbuf))
+	return 0;
 
-    /* Remove leading '/' if any. */
-    while (str[0] == '/')
-	str++;
-    ob = find_object2(str);
-    if (ob)
+    if (ob = lookup_object_hash(tmpbuf)) {
+#ifdef LPC_TO_C
+	if (ob->flags & O_COMPILED_PROGRAM) {
+	    ob = load_object(tmpbuf, (lpc_object_t *)ob);
+	    if (!ob || (ob->flags & O_DESTRUCTED))	/* *sigh* */
+		return 0;
+	}
+#endif
+	if (ob->flags & O_SWAPPED)
+	    load_ob_from_swap(ob);
 	return ob;
-    ob = load_object(str, 0);
+    }
+    ob = load_object(tmpbuf, 0);
     if (!ob || (ob->flags & O_DESTRUCTED))	/* *sigh* */
 	return 0;
     if (ob && ob->flags & O_SWAPPED)
@@ -1500,32 +1453,21 @@ struct object *find_object P1(char *, str)
     return ob;
 }
 
-#define MAX_OBJECT_NAME_SIZE 2048
-
 /* Look for a loaded object. Return 0 if non found. */
-struct object *find_object2 P1(char *, str)
+object_t *find_object2 P1(char *, str)
 {
-    register struct object *ob;
+    register object_t *ob;
     register int length;
     char p[MAX_OBJECT_NAME_SIZE];
 
-    /* Remove leading '/' if any. */
-    while (str[0] == '/')
-	str++;
-    /* Truncate possible .c in the object name. */
-    length = strlen(str);
-    if (str[length - 2] == '.' &&
-#ifndef LPC_TO_C
-	str[length - 1] == 'c') {
-#else
-	(str[length - 1] == 'c' || str[length - 1] == 'C')) {
+    if (!strip_name(str, p, sizeof p))
+	return 0;
+
+    if ((ob = lookup_object_hash(p))) {
+#ifdef LPC_TO_C
+	if (ob->flags & O_COMPILED_PROGRAM)
+	    return 0;
 #endif
-	/* A new writeable copy of the name is needed. */
-	strncpy(p, str, MAX_OBJECT_NAME_SIZE);
-	str = p;
-	str[length - 2] = '\0';
-    }
-    if ((ob = lookup_object_hash(str))) {
 	if (ob->flags & O_SWAPPED)
 	    load_ob_from_swap(ob);
 	return ob;
@@ -1539,16 +1481,14 @@ struct object *find_object2 P1(char *, str)
  * The main work is to update all command definitions, depending on what is
  * living or not. Note that all objects in the same inventory are affected.
  */
-void move_object P2(struct object *, item, struct object *, dest)
+void move_object P2(object_t *, item, object_t *, dest)
 {
-    struct object **pp, *ob;
+    object_t **pp, *ob;
 #ifndef NO_ADD_ACTION
-    struct object *next_ob;
-    struct object *save_cmd = command_giver;
+    object_t *next_ob;
+    object_t *save_cmd = command_giver;
 #endif
 
-    if (item != current_object)
-	error("move_object(): can't move anything other than this_object()\n");
     /* Recursive moves are not allowed. */
     for (ob = dest; ob; ob = ob->super)
 	if (ob == item)
@@ -1594,9 +1534,11 @@ void move_object P2(struct object *, item, struct object *, dest)
 	    *pp = item->next_inv;
 	    okey = 1;
 	}
+#ifdef DEBUG
 	if (!okey)
 	    fatal("Failed to find object %s in super list of %s.\n",
 		  item->name, item->super->name);
+#endif
     }
     /*
      * link object into target's inventory list
@@ -1667,7 +1609,7 @@ void move_object P2(struct object *, item, struct object *, dest)
  * Update this.
  */
 
-void add_light P2(struct object *, p, int, n)
+void add_light P2(object_t *, p, int, n)
 {
     if (n == 0)
 	return;
@@ -1677,15 +1619,15 @@ void add_light P2(struct object *, p, int, n)
 }
 #endif
 
-static struct sentence *sent_free = 0;
+static sentence_t *sent_free = 0;
 int tot_alloc_sentence;
 
-static struct sentence *alloc_sentence()
+static sentence_t *alloc_sentence()
 {
-    struct sentence *p;
+    sentence_t *p;
 
     if (sent_free == 0) {
-	p = ALLOCATE(struct sentence, TAG_SENTENCE, "alloc_sentence");
+	p = ALLOCATE(sentence_t, TAG_SENTENCE, "alloc_sentence");
 	tot_alloc_sentence++;
     } else {
 	p = sent_free;
@@ -1702,7 +1644,7 @@ static struct sentence *alloc_sentence()
 #ifdef free
 void free_all_sent()
 {
-    struct sentence *p;
+    sentence_t *p;
 
     for (; sent_free; sent_free = p) {
 	p = sent_free->next;
@@ -1713,7 +1655,7 @@ void free_all_sent()
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_free_sentences() {
-    struct sentence *sent = sent_free;
+    sentence_t *sent = sent_free;
 
 #ifndef NO_UIDS
     if (creator_file_fname)
@@ -1737,7 +1679,7 @@ void mark_free_sentences() {
 }
 #endif
 
-void free_sentence P1(struct sentence *, p)
+void free_sentence P1(sentence_t *, p)
 {
     if (p->flags & V_FUNCTION) {
       if (p->function.f)
@@ -1768,11 +1710,11 @@ void free_sentence P1(struct sentence *, p)
 int user_parser P1(char *, buff)
 {
     static char verb_buff[MAX_VERB_BUFF];
-    struct object *super;
-    struct sentence *s;
+    object_t *super;
+    sentence_t *s;
     char *p;
     int length;
-    struct object *save_current_object = current_object, *save_command_giver = command_giver;
+    object_t *save_current_object = current_object, *save_command_giver = command_giver;
     char *user_verb = 0;
     int where;
 
@@ -1818,11 +1760,9 @@ int user_parser P1(char *, buff)
     /* clear_notify(); *//* moved to process_user_command() */
     s = save_command_giver->sent;
     for (; s; s = s->next) {
-	struct svalue *ret;
-	struct object *command_object;
+	svalue_t *ret;
+	object_t *command_object;
 
-	if (s->verb == 0)
-	    error("No action linked to verb.\n");
 	if (s->flags & (V_NOSPACE | V_SHORT)) {
 	    if (strncmp(buff, s->verb, strlen(s->verb)) != 0)
 		continue;
@@ -1879,7 +1819,7 @@ int user_parser P1(char *, buff)
 	/*
 	 * prevent an action from moving its associated object into another
 	 * another object prior to returning 0.  closes a security hole which
-	 * was making the static keyword of no use on actions.
+	 * was making the static keyword_t of no use on actions.
 	 * 
 	 * BE CAREFUL HERE!.  if the command giver was moved as a result
 	 * of the command, or several other likely possibilities, then
@@ -1939,10 +1879,10 @@ int user_parser P1(char *, buff)
  * If the call is from a shadow, make it look like it is really from
  * the shadowed object.
  */
-void add_action P3(struct svalue *, str, char *, cmd, int, flag)
+void add_action P3(svalue_t *, str, char *, cmd, int, flag)
 {
-    struct sentence *p;
-    struct object *ob;
+    sentence_t *p;
+    object_t *ob;
 
     if (current_object->flags & O_DESTRUCTED)
 	return;
@@ -1972,15 +1912,12 @@ void add_action P3(struct svalue *, str, char *, cmd, int, flag)
       p->flags = flag;
     } else {
       p->function.f = str->u.fp;
-      str->u.fp->ref++;
+      str->u.fp->hdr.ref++;
       p->flags = flag | V_FUNCTION;
     }
     p->ob = ob;
     p->next = command_giver->sent;
-    if (cmd)
-	p->verb = make_shared_string(cmd);
-    else
-	p->verb = 0;
+    p->verb = make_shared_string(cmd);
     command_giver->sent = p;
 }
 
@@ -1991,8 +1928,8 @@ void add_action P3(struct svalue *, str, char *, cmd, int, flag)
  */
 int remove_action P2(char *, act, char *, verb)
 {
-    struct object *ob;
-    struct sentence **s;
+    object_t *ob;
+    sentence_t **s;
 
     if (command_giver)
 	ob = command_giver;
@@ -2001,7 +1938,7 @@ int remove_action P2(char *, act, char *, verb)
 
     if (ob) {
 	for (s = &ob->sent; *s; s = &((*s)->next)) {
-	    struct sentence *tmp;
+	    sentence_t *tmp;
 
 	    if (((*s)->ob == current_object) && (!((*s)->flags & V_FUNCTION))
 		&& !strcmp((*s)->function.s, act) &&
@@ -2020,12 +1957,12 @@ int remove_action P2(char *, act, char *, verb)
  * Remove all commands (sentences) defined by object 'ob' in object
  * 'user'
  */
-static void remove_sent P2(struct object *, ob, struct object *, user)
+static void remove_sent P2(object_t *, ob, object_t *, user)
 {
-    struct sentence **s;
+    sentence_t **s;
 
     for (s = &user->sent; *s;) {
-	struct sentence *tmp;
+	sentence_t *tmp;
 
 	if ((*s)->ob == ob) {
 #ifdef DEBUG
@@ -2044,7 +1981,7 @@ static void remove_sent P2(struct object *, ob, struct object *, user)
 void debug_fatal PVARGS(va_alist)
 {
     va_list args;
-    static char msg_buf[2049];
+    char msg_buf[2049];
     char *fmt;
     static int in_fatal = 0;
 
@@ -2080,7 +2017,7 @@ void fatal PVARGS(va_alist)
 {
     va_list args;
     char *fmt;
-    static char msg_buf[2049];
+    char msg_buf[2049];
 
 #ifdef HAS_STDARG_H
     va_start(args, va_alist);
@@ -2126,13 +2063,11 @@ void throw_error()
     error("Throw with no catch.\n");
 }
 
-static char emsg_buf[2000];
-
-static void error_handler()
-{				/* message is in emsg_buf */
+static void error_handler P1(char *, err)
+{
 #ifdef MUDLIB_ERROR_HANDLER
-    struct mapping *m;
-    struct svalue *mret;
+    mapping_t *m;
+    svalue_t *mret;
     char *file;
     int line;
 #else
@@ -2145,7 +2080,7 @@ static void error_handler()
     num_objects_this_thread = 0;/* reset the count */
     if (error_recovery_context_exists == CATCH_ERROR_CONTEXT) {	
         /* user catches this error */
-	struct svalue v;
+	svalue_t v;
 	
 #ifdef LOG_CATCHES
 	/* This is added so that catches generate messages in the log file. */
@@ -2153,7 +2088,7 @@ static void error_handler()
 	if (num_mudlib_error) {
 	    debug_message("Error in error handler: ");
 #endif
-	    debug_message(emsg_buf);
+	    debug_message(err);
 	    if (current_object)
 		debug_message("program: %s, object: %s, file: %s\n",
 			      current_prog ? current_prog->name : "",
@@ -2165,7 +2100,7 @@ static void error_handler()
 	} else {
 	    num_mudlib_error++;
 	    m = allocate_mapping(6);
-	    add_mapping_string(m, "error", emsg_buf);
+	    add_mapping_string(m, "error", err);
 	    if (current_prog)
 		add_mapping_string(m, "program", current_prog->name);
 	    if (current_object)
@@ -2177,9 +2112,9 @@ static void error_handler()
 	    push_refed_mapping(m);
 	    *(++sp) = const1;
 	    mret = apply_master_ob(APPLY_ERROR_HANDLER,2);
-	    if ((mret == (struct svalue *)-1) || !mret) {
+	    if ((mret == (svalue_t *)-1) || !mret) {
 		debug_message("No error handler for error: ");
-		debug_message(emsg_buf);
+		debug_message(err);
 		if (current_object)
 		    debug_message("program: %s, object: %s, file: %s\n",
 				  current_prog ? current_prog->name : "",
@@ -2193,10 +2128,10 @@ static void error_handler()
 	}
 #endif
 #endif
-	v.type = T_STRING;
-	v.u.string = emsg_buf;
-	v.subtype = STRING_MALLOC;	/* Always reallocate */
-	assign_svalue(&catch_value, &v);
+	free_svalue(&catch_value, "caught error");
+	catch_value.type = T_STRING;
+	catch_value.subtype = STRING_MALLOC;
+	catch_value.u.string = string_copy(err, "caught error");
 	LONGJMP(error_recovery_context, 1);
 	fatal("Catch() longjump failed");
     }
@@ -2208,7 +2143,7 @@ static void error_handler()
     if (num_mudlib_error || (error_recovery_context_exists & SAFE_APPLY_ERROR_CONTEXT)) {
         if (num_mudlib_error)
 	    debug_message("Error in error handler: ");
-	debug_message("%s", emsg_buf);
+	debug_message("%s", err);
 	if (current_object)
 	    debug_message("program: %s, object: %s, file: %s\n",
 			  current_prog ? current_prog->name : "",
@@ -2219,7 +2154,7 @@ static void error_handler()
     } else {
 	num_mudlib_error++;
 	m = allocate_mapping(6);
-	add_mapping_string(m, "error", emsg_buf);
+	add_mapping_string(m, "error", err);
 	if (current_prog)
 	    add_mapping_string(m, "program", current_prog->name);
 	if (current_object)
@@ -2233,9 +2168,9 @@ static void error_handler()
 	push_mapping(m);
 	m->ref--;
 	mret = apply_master_ob(APPLY_ERROR_HANDLER, 1);
-	if ((mret == (struct svalue *)-1) || !mret) {
+	if ((mret == (svalue_t *)-1) || !mret) {
 	    debug_message("No error handler for error: ");
-	    debug_message(emsg_buf);
+	    debug_message(err);
 	    if (current_object)
 		debug_message("program: %s, object: %s, file: %s\n",
 			      current_prog ? current_prog->name : "",
@@ -2250,7 +2185,7 @@ static void error_handler()
 	set_heart_beat(current_heart_beat, 0);
 	debug_message("Heart beat in %s turned off.\n", current_heart_beat->name);
 	if (current_heart_beat->interactive) {
-	    struct object *save_cmd = command_giver;
+	    object_t *save_cmd = command_giver;
 
 	    command_giver = current_heart_beat;
 	    add_message("MudOS driver tells you: You have no heart beat!\n");
@@ -2260,7 +2195,7 @@ static void error_handler()
     }
     num_error--;
 #else
-    debug_message("%s", emsg_buf + 1);
+    debug_message("%s", err + 1);
     if (current_object) {
 #ifndef NO_MUDLIB_STATS
 	add_errors(&current_object->stats, 1);
@@ -2276,7 +2211,7 @@ static void error_handler()
     object_name = dump_trace(0);
 #endif
     if (object_name) {
-	struct object *ob;
+	object_t *ob;
 
 	ob = find_object2(object_name);
 	if (!ob) {
@@ -2302,7 +2237,7 @@ static void error_handler()
 #ifndef NO_WIZARDS
 	if ((command_giver->flags & O_IS_WIZARD) || !strlen(DEFAULT_ERROR_MESSAGE)) {
 #endif
-	    add_message(emsg_buf + 1);
+	    add_message(err + 1);
 	    if (current_object)
 		add_vmessage("program: %s, object: %s, file: %s\n",
 			    current_prog ? current_prog->name : "",
@@ -2318,7 +2253,7 @@ static void error_handler()
 	set_heart_beat(current_heart_beat, 0);
 	debug_message("Heart beat in %s turned off.\n", current_heart_beat->name);
 	if (current_heart_beat->interactive) {
-	    struct object *save_cmd = command_giver;
+	    object_t *save_cmd = command_giver;
 
 	    command_giver = current_heart_beat;
 	    add_message("MudOS driver tells you: You have no heart beat!\n");
@@ -2335,18 +2270,20 @@ static void error_handler()
 
 void error_needs_free P1(char *, s)
 {
-    strncpy(emsg_buf + 1, s, 1998);
-    emsg_buf[0] = '*';		/* all system errors get a * at the start */
-    emsg_buf[1999] = '\0';
+    char err_buf[2048];
+    strncpy(err_buf + 1, s, 2047);
+    err_buf[0] = '*';		/* all system errors get a * at the start */
+    err_buf[1999] = '\0';
     FREE(s);
 
-    error_handler();
+    error_handler(err_buf);
 }
 
 void error PVARGS(va_alist)
 {
     va_list args;
     char *fmt;
+    char err_buf[2048];
 
 #ifdef HAS_STDARG_H
     va_start(args, va_alist);
@@ -2355,11 +2292,11 @@ void error PVARGS(va_alist)
     va_start(args);
     fmt = va_arg(args, char *);
 #endif
-    vsprintf(emsg_buf + 1, fmt, args);
+    vsprintf(err_buf + 1, fmt, args);
     va_end(args);
-    emsg_buf[0] = '*';		/* all system errors get a * at the start */
+    err_buf[0] = '*';		/* all system errors get a * at the start */
 
-    error_handler();
+    error_handler(err_buf);
 }
 
 /*
@@ -2428,14 +2365,14 @@ void slow_shut_down P1(int, minutes)
     /*
      * Swap out objects, and free some memory.
      */
-    struct svalue *amo;
+    svalue_t *amo;
 
     push_number(minutes);
     amo = apply_master_ob(APPLY_SLOW_SHUTDOWN, 1);
     /* in this case, approved means the mudlib will handle it */
     if (!MASTER_APPROVED(amo))
     {
-	struct object *save_current = current_object, *save_command = command_giver;
+	object_t *save_current = current_object, *save_command = command_giver;
 
 	command_giver = 0;
 	current_object = 0;
@@ -2451,10 +2388,10 @@ void slow_shut_down P1(int, minutes)
     }
 }
 
-void do_message P5(struct svalue *, class, char *, msg, struct vector *, scope, struct vector *, exclude, int, recurse)
+void do_message P5(svalue_t *, class, char *, msg, array_t *, scope, array_t *, exclude, int, recurse)
 {
     int i, j, valid;
-    struct object *ob;
+    object_t *ob;
 
     for (i = 0; i < scope->size; i++) {
 	switch (scope->item[i].type) {
@@ -2484,17 +2421,17 @@ void do_message P5(struct svalue *, class, char *, msg, struct vector *, scope, 
 		apply(APPLY_RECEIVE_MESSAGE, ob, 2, ORIGIN_DRIVER);
 	    }
 	} else if (recurse) {
-	    struct vector *tmp;
+	    array_t *tmp;
 
 	    tmp = all_inventory(ob, 1);
 	    do_message(class, msg, tmp, exclude, 0);
-	    free_vector(tmp);
+	    free_array(tmp);
 	}
     }
 }
 
 #ifdef LAZY_RESETS
-INLINE void try_reset P1(struct object *, ob)
+INLINE void try_reset P1(object_t *, ob)
 {
     if ((ob->next_reset < current_time) && !(ob->flags & O_RESET_STATE)) {
 #ifdef DEBUG
@@ -2509,9 +2446,9 @@ INLINE void try_reset P1(struct object *, ob)
 }
 #endif
 
-struct object *first_inventory P1(struct svalue *, arg)
+object_t *first_inventory P1(svalue_t *, arg)
 {
-    struct object *ob;
+    object_t *ob;
 
     if (arg->type == T_STRING) {
 	ob = find_object(arg->u.string);

@@ -39,7 +39,7 @@ int total_users = 0;
  * local function prototypes.
  */
 static int flush_message PROT((void));
-static int copy_chars PROT((unsigned char *, unsigned char *, int, struct interactive *));
+static int copy_chars PROT((unsigned char *, unsigned char *, int, interactive_t *));
 
 #ifdef SIGNAL_FUNC_TAKES_INT
 static void sigpipe_handler PROT((int));
@@ -47,15 +47,15 @@ static void sigpipe_handler PROT((int));
 static void sigpipe_handler PROT((void));
 #endif
 static void hname_handler PROT((void));
-static void get_user_data PROT((struct interactive *));
+static void get_user_data PROT((interactive_t *));
 static char *get_user_command PROT((void));
-static char *first_cmd_in_buf PROT((struct interactive *));
-static int cmd_in_buf PROT((struct interactive *));
-static void next_cmd_in_buf PROT((struct interactive *));
-static int call_function_interactive PROT((struct interactive *, char *));
+static char *first_cmd_in_buf PROT((interactive_t *));
+static int cmd_in_buf PROT((interactive_t *));
+static void next_cmd_in_buf PROT((interactive_t *));
+static int call_function_interactive PROT((interactive_t *, char *));
 static void print_prompt PROT((void));
 static void telnet_neg PROT((char *, char *));
-static void query_addr_name PROT((struct object *));
+static void query_addr_name PROT((object_t *));
 static void got_addr_number PROT((char *, char *));
 static void add_ip_entry PROT((long, char *));
 #ifndef NO_ADD_ACTION
@@ -63,7 +63,7 @@ static void clear_notify PROT((void));
 #endif
 static void new_user_handler PROT((void));
 #ifdef RECEIVE_SNOOP
-static void receive_snoop PROT((char *, struct object * ob));
+static void receive_snoop PROT((char *, object_t * ob));
 #endif
 
 /*
@@ -79,7 +79,7 @@ int num_hidden;			/* for the O_HIDDEN flag.  This counter must
 int add_message_calls = 0;
 int inet_packets = 0;
 int inet_volume = 0;
-struct interactive *all_users[MAX_USERS];
+interactive_t *all_users[MAX_USERS];
 
 /*
  * private local variables.
@@ -92,7 +92,7 @@ static int addr_server_fd = -1;
 #endif
 #ifdef RECEIVE_SNOOP
 static void
-receive_snoop P2(char *, buf, struct object *, ob)
+receive_snoop P2(char *, buf, object_t *, ob)
 {
     push_constant_string(buf);
     apply(APPLY_RECEIVE_SNOOP, ob, 1, ORIGIN_DRIVER);
@@ -318,9 +318,9 @@ void init_addr_server P2(char *, hostname, int, addr_server_port)
  */
 void add_message P1(char *, data)
 {
-    struct interactive *ip;
+    interactive_t *ip;
     char *cp;
-    struct object *save_command_giver;
+    object_t *save_command_giver;
 
     /*
      * if command_giver->interactive is not valid, write message on stderr.
@@ -421,9 +421,9 @@ void add_vmessage PVARGS(va_alist)
 {
     va_list args;
     char *format;
-    struct interactive *ip;
+    interactive_t *ip;
     char *cp, new_string_data[LARGEST_PRINTABLE_STRING];
-    struct object *save_command_giver;
+    object_t *save_command_giver;
 
 #ifdef HAS_STDARG_H
     va_start(args, va_alist);
@@ -542,7 +542,7 @@ void add_vmessage PVARGS(va_alist)
  */
 static int flush_message()
 {
-    struct interactive *ip;
+    interactive_t *ip;
     int length, num_bytes;
 
     /*
@@ -628,22 +628,34 @@ static int flush_message()
  * (Pinkfish change)
  */
 /* the codes we send ... */
-static char telnet_break_response[] = { 28, IAC, WILL, TELOPT_TM, 0 };
-static char telnet_interrupt_response[] = { 127, IAC, WILL, TELOPT_TM, 0 };
-static char telnet_abort_response[] = { IAC, DM, 0 };
-static char telnet_do_tm_response[] = { IAC, WILL, TELOPT_TM, 0 };
-static char telnet_term_query[] = { IAC, SB, TELOPT_TTYPE, TELQUAL_SEND, 
-				      IAC, SE, 0 };
-static char telnet_no_echo[] = { IAC, WONT, TELOPT_ECHO, 0 };
-static char telnet_no_single[] = { IAC, WONT, TELOPT_SGA, 0 };
-static char telnet_yes_echo[] = { IAC, WILL, TELOPT_ECHO, 0 };
-static char telnet_yes_single[] = { IAC, WILL, TELOPT_SGA, 0 };
-static char telnet_ga[] = { IAC, GA, 0 };
+#define SCHAR SIGNED char
 
-static int copy_chars P4(unsigned char *, from, unsigned char *, to, int, n, struct interactive *, ip)
+static char telnet_break_response[] = 
+    { 28, (SCHAR)IAC, (SCHAR)WILL, TELOPT_TM, 0 };
+static char telnet_interrupt_response[] = 
+    { 127, (SCHAR)IAC, (SCHAR)WILL, TELOPT_TM, 0 };
+static char telnet_abort_response[] = 
+    { (SCHAR)IAC, (SCHAR)DM, 0 };
+static char telnet_do_tm_response[] = 
+    { (SCHAR)IAC, (SCHAR)WILL, TELOPT_TM, 0 };
+static char telnet_term_query[] = 
+    { (SCHAR)IAC, (SCHAR)SB, TELOPT_TTYPE, TELQUAL_SEND, 
+	  (SCHAR)IAC, (SCHAR)SE, 0 };
+static char telnet_no_echo[] = 
+    { (SCHAR)IAC, (SCHAR)WONT, TELOPT_ECHO, 0 };
+static char telnet_no_single[] = 
+    { (SCHAR)IAC, (SCHAR)WONT, TELOPT_SGA, 0 };
+static char telnet_yes_echo[] = 
+    { (SCHAR)IAC, (SCHAR)WILL, TELOPT_ECHO, 0 };
+static char telnet_yes_single[] = 
+    { (SCHAR)IAC, (SCHAR)WILL, TELOPT_SGA, 0 };
+static char telnet_ga[] = 
+    { (SCHAR)IAC, (SCHAR)GA, 0 };
+
+static int copy_chars P4(unsigned char *, from, unsigned char *, to, int, n, interactive_t *, ip)
 {
     int i;
-    struct object *save_command_giver;
+    object_t *save_command_giver;
     unsigned char *start = to;
 
     for (i = 0; i < n; i++) {
@@ -898,7 +910,7 @@ INLINE void process_io()
     }
 #else
     int i;
-    struct object *save_command_giver;
+    object_t *save_command_giver;
 
     debug(256, ("@"));
     /*
@@ -973,8 +985,8 @@ static void new_user_handler()
     int length;
     int i;
     char *full_message;
-    struct object *ob;
-    struct svalue *ret;
+    object_t *ob;
+    svalue_t *ret;
     int err;
 
 #ifndef OS2
@@ -1014,8 +1026,8 @@ static void new_user_handler()
 	}
 	command_giver = master_ob;
 	master_ob->interactive =
-	    (struct interactive *)
-	    DXALLOC(sizeof(struct interactive), TAG_INTERACTIVE, "new_user_handler");
+	    (interactive_t *)
+	    DXALLOC(sizeof(interactive_t), TAG_INTERACTIVE, "new_user_handler");
 	total_users++;
 #ifndef NO_ADD_ACTION
 	master_ob->interactive->default_err_message.s = 0;
@@ -1067,7 +1079,7 @@ static void new_user_handler()
 	 */
 	add_ref(master_ob, "new_user");
 	ret = apply_master_ob(APPLY_CONNECT, 0);
-	if (ret == 0 || ret == (struct svalue *)-1 || ret->type != T_OBJECT) {
+	if (ret == 0 || ret == (svalue_t *)-1 || ret->type != T_OBJECT) {
 	    remove_interactive(master_ob);
 #ifndef OS2
 	    fprintf(stderr, "Connection from %s aborted.\n", inet_ntoa(addr.sin_addr));
@@ -1132,9 +1144,9 @@ int process_user_command()
 {
     char *user_command;
     static char buf[MAX_TEXT], *tbuf;
-    struct object *save_current_object = current_object;
-    struct object *save_command_giver = command_giver;
-    struct svalue *ret;
+    object_t *save_current_object = current_object;
+    object_t *save_command_giver = command_giver;
+    svalue_t *ret;
 
     buf[MAX_TEXT - 1] = '\0';
     if ((user_command = get_user_command())) {
@@ -1151,31 +1163,47 @@ int process_user_command()
 	tbuf = user_command;
 	if ((user_command[0] == '!') && (
 #ifdef OLD_ED
-				    command_giver->interactive->ed_buffer ||
+	      command_giver->interactive->ed_buffer ||
 #endif
-				    (command_giver->interactive->input_to
-				  && !(command_giver->interactive->iflags & NOESC)))) {
-	    if (command_giver->interactive->iflags & HAS_PROCESS_INPUT) {
-		push_constant_string(user_command + 1);	/* not malloc'ed */
-		ret = apply(APPLY_PROCESS_INPUT, command_giver, 1, ORIGIN_DRIVER);
+	      (command_giver->interactive->input_to
+	      && !(command_giver->interactive->iflags & NOESC)))) {
+
+            if (command_giver->interactive->iflags & SINGLE_CHAR) {
+                /* only 1 char ... switch to line buffer mode */
+                command_giver->interactive->iflags |= WAS_SINGLE_CHAR;
+                command_giver->interactive->iflags &= ~SINGLE_CHAR;
+                add_message(telnet_no_single);
+                /* come back later */
+            } else {
+                if (command_giver->interactive->iflags & WAS_SINGLE_CHAR) {
+                    /* we now have a string ... switch back to char mode */
+                    command_giver->interactive->iflags &= ~WAS_SINGLE_CHAR;
+                    command_giver->interactive->iflags |= SINGLE_CHAR;
+                    add_message(telnet_yes_single);
+                }
+
+	        if (command_giver->interactive->iflags & HAS_PROCESS_INPUT) {
+		    push_constant_string(user_command + 1);	/* not malloc'ed */
+		    ret = apply(APPLY_PROCESS_INPUT, command_giver, 1, ORIGIN_DRIVER);
 #ifdef NO_ADD_ACTION
-		if (!ret && command_giver->interactive)
-		    command_giver->interactive->iflags &= ~HAS_PROCESS_INPUT;
+		    if (!ret && command_giver->interactive)
+		        command_giver->interactive->iflags &= ~HAS_PROCESS_INPUT;
 #else
-		if (ret && (ret->type == T_STRING) && ret->u.string) {
-		    strncpy(buf + 1, ret->u.string, MAX_TEXT - 2);
-		    tbuf = buf;
-		} else if (command_giver->interactive) {
-		    command_giver->interactive->iflags &= ~HAS_PROCESS_INPUT;
-		}
+		    if (ret && (ret->type == T_STRING) && ret->u.string) {
+		        strncpy(buf + 1, ret->u.string, MAX_TEXT - 2);
+		        tbuf = buf;
+		    } else if (command_giver->interactive) {
+		        command_giver->interactive->iflags &= ~HAS_PROCESS_INPUT;
+		    }
 #endif
-	    }
-	    if (!command_giver || (command_giver->flags & O_DESTRUCTED)) {
-		return 1;
-	    }
+	        }
+	        if (!command_giver || (command_giver->flags & O_DESTRUCTED)) {
+		    return 1;
+	        }
 #ifndef NO_ADD_ACTION
-	    parse_command(tbuf + 1, command_giver);
+	        parse_command(tbuf + 1, command_giver);
 #endif
+            }
 #ifdef OLD_ED
 	} else if (command_giver->interactive->ed_buffer) {
 	    ed_cmd(user_command);
@@ -1311,9 +1339,9 @@ static void hname_handler()
  * Read pending data for a user into user->interactive->text.
  * This also does telnet negotiation.
  */
-static void get_user_data P1(struct interactive *, ip)
+static void get_user_data P1(interactive_t *, ip)
 {
-    struct object *save_command_giver;
+    object_t *save_command_giver;
     static char buf[MAX_TEXT];
     int text_space;
     int num_bytes;
@@ -1466,7 +1494,7 @@ static char *debug_dump P2(char *, block, int, size) {
 static char *get_user_command()
 {
     int i;
-    struct interactive *ip;
+    interactive_t *ip;
     char *user_command = NULL;
     static char buf[MAX_TEXT];
 
@@ -1538,7 +1566,7 @@ static char *get_user_command()
  * This should return true when in single char mode and there is
  * Anything at all in the buffer.
  */
-static char *first_cmd_in_buf P1(struct interactive *, ip)
+static char *first_cmd_in_buf P1(interactive_t *, ip)
 {
     char *p, *q;
 
@@ -1598,7 +1626,7 @@ static char *first_cmd_in_buf P1(struct interactive *, ip)
 /*
  * return(1) if there is a complete command in ip->text, otherwise return(0).
  */
-static int cmd_in_buf P1(struct interactive *, ip)
+static int cmd_in_buf P1(interactive_t *, ip)
 {
     char *p;
 
@@ -1636,7 +1664,7 @@ static int cmd_in_buf P1(struct interactive *, ip)
 /*
  * move pointers to next cmd, or clear buf.
  */
-static void next_cmd_in_buf P1(struct interactive *, ip)
+static void next_cmd_in_buf P1(interactive_t *, ip)
 {
     char *p = ip->text + ip->text_start;
 
@@ -1658,9 +1686,9 @@ static void next_cmd_in_buf P1(struct interactive *, ip)
 /*
  * Remove an interactive user immediately.
  */
-void remove_interactive P1(struct object *, ob)
+void remove_interactive P1(object_t *, ob)
 {
-    struct object *save_command_giver = command_giver;
+    object_t *save_command_giver = command_giver;
     int i;
 
     if (!ob->interactive) {
@@ -1736,13 +1764,13 @@ void remove_interactive P1(struct object *, ob)
     abort();
 }				/* remove_interactive() */
 
-static int call_function_interactive P2(struct interactive *, i, char *, str)
+static int call_function_interactive P2(interactive_t *, i, char *, str)
 {
-    struct object *ob;
-    struct funp *funp;
+    object_t *ob;
+    funptr_t *funp;
     char *function;
-    struct svalue *args;
-    struct sentence *sent;
+    svalue_t *args;
+    sentence_t *sent;
     int num_arg;
 
     i->iflags &= ~NOESC;
@@ -1775,7 +1803,7 @@ static int call_function_interactive P2(struct interactive *, i, char *, str)
       function = 0;
       sp->type = T_FUNCTION;
       sp->u.fp = funp = sent->function.f;
-      funp->ref++;
+      funp->hdr.ref++;
     } else {
       sp->type = T_STRING;
       sp->subtype = STRING_SHARED;
@@ -1827,9 +1855,9 @@ static int call_function_interactive P2(struct interactive *, i, char *, str)
     return (1);
 }				/* call_function_interactive() */
 
-int set_call P3(struct object *, ob, struct sentence *, sent, int, flags)
+int set_call P3(object_t *, ob, sentence_t *, sent, int, flags)
 {
-    struct object *save_command_giver = command_giver;
+    object_t *save_command_giver = command_giver;
 
     if (ob == 0 || sent == 0)
 	return (0);
@@ -1895,9 +1923,9 @@ static void print_prompt()
  * not. The old routine let everyone snoop anyone. This routine also returns
  * 0 or 1 depending on success.
  */
-int new_set_snoop P2(struct object *, me, struct object *, you)
+int new_set_snoop P2(object_t *, me, object_t *, you)
 {
-    struct interactive *on, *by, *tmp;
+    interactive_t *on, *by, *tmp;
 
     /*
      * Stop if people managed to quit before we got this far.
@@ -1985,7 +2013,7 @@ static void telnet_neg P2(char *, to, char *, from)
 }				/* telnet_neg() */
 
 #ifndef OS2
-static void query_addr_name P1(struct object *, ob)
+static void query_addr_name P1(object_t *, ob)
 {
     static char buf[100];
     static char *dbuf = &buf[sizeof(int) + sizeof(int) + sizeof(int)];
@@ -2017,10 +2045,12 @@ static void query_addr_name P1(struct object *, ob)
 }				/* query_addr_name() */
 
 #define IPSIZE 200
-static struct ipnumberentry {
+typedef struct {
     char *name, *call_back;
-    struct object *ob_to_call;
-}             ipnumbertable[IPSIZE];
+    object_t *ob_to_call;
+} ipnumberentry_t;
+
+static ipnumberentry_t ipnumbertable[IPSIZE];
 
 /*
  * Does a call back on the current_object with the function call_back.
@@ -2138,10 +2168,12 @@ static void got_addr_number P2(char *, number, char *, name)
 
 #undef IPSIZE
 #define IPSIZE 200
-static struct ipentry {
+typedef struct {
     long addr;
     char *name;
-}       iptable[IPSIZE];
+} ipentry_t;
+
+static ipentry_t iptable[IPSIZE];
 static int ipcur;
 
 #ifdef DEBUGMALLOC_EXTENSIONS
@@ -2154,7 +2186,7 @@ void mark_iptable() {
 }
 #endif
 
-char *query_ip_name P1(struct object *, ob)
+char *query_ip_name P1(object_t *, ob)
 {
     int i;
 
@@ -2185,7 +2217,7 @@ static void add_ip_entry P2(long, addr, char *, name)
     ipcur = (ipcur + 1) % IPSIZE;
 }
 
-char *query_ip_number P1(struct object *, ob)
+char *query_ip_number P1(object_t *, ob)
 {
     if (ob == 0)
 	ob = command_giver;
@@ -2219,12 +2251,12 @@ char *inet_ntoa P1(struct in_addr, ad)
 
 #else
 /* OS2 */
-char *query_ip_name P1(struct object *, ob)
+char *query_ip_name P1(object_t *, ob)
 {
     return "ip.name";
 }				/* query_ip_name() */
 
-char *query_ip_number P1(struct object *, ob)
+char *query_ip_number P1(object_t *, ob)
 {
     return "42.42.42.42";
 }				/* query_ip_number() */
@@ -2247,21 +2279,21 @@ char *query_host_name()
     return (name);
 }				/* query_host_name() */
 
-struct object *query_snoop P1(struct object *, ob)
+object_t *query_snoop P1(object_t *, ob)
 {
     if (!ob->interactive || (ob->interactive->snoop_by == 0))
 	return (0);
     return (ob->interactive->snoop_by->ob);
 }				/* query_snoop() */
 
-struct object *query_snooping P1(struct object *, ob)
+object_t *query_snooping P1(object_t *, ob)
 {
     if (!ob->interactive || (ob->interactive->snoop_on == 0))
 	return (0);
     return (ob->interactive->snoop_on->ob);
 }				/* query_snooping() */
 
-int query_idle P1(struct object *, ob)
+int query_idle P1(object_t *, ob)
 {
     if (!ob->interactive)
 	error("query_idle() of non-interactive object.\n");
@@ -2272,7 +2304,7 @@ int query_idle P1(struct object *, ob)
 void notify_no_command()
 {
     union string_or_func p;
-    struct svalue *v;
+    svalue_t *v;
 
     if (!command_giver || !command_giver->interactive)
 	return;
@@ -2321,18 +2353,18 @@ void set_notify_fail_message P1(char *, str)
     command_giver->interactive->default_err_message.s = make_shared_string(str);
 }				/* set_notify_fail_message() */
 
-void set_notify_fail_function P1(struct funp *, fp)
+void set_notify_fail_function P1(funptr_t *, fp)
 {
     if (!command_giver || !command_giver->interactive)
 	return;
     clear_notify();
     command_giver->interactive->iflags |= NOTIFY_FAIL_FUNC;
     command_giver->interactive->default_err_message.f = fp;
-    fp->ref++;
+    fp->hdr.ref++;
 }				/* set_notify_fail_message() */
 #endif /* NO_ADD_ACTION */
 
-int replace_interactive P2(struct object *, ob, struct object *, obfrom)
+int replace_interactive P2(object_t *, ob, object_t *, obfrom)
 {
     /* fprintf(stderr,"DEBUG: %s,%s\n",ob->name,obfrom->name); */
     if (ob->interactive) {

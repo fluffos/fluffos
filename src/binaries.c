@@ -34,8 +34,8 @@ char driver_name[512];
 #define MAXSHORT ((1 << (sizeof(short)*8)) - 1)
 #endif
 
-static void patch_out PROT((struct program *, short *, int));
-static void patch_in PROT((struct program *, short *, int));
+static void patch_out PROT((program_t *, short *, int));
+static void patch_in PROT((program_t *, short *, int));
 static int str_case_cmp PROT((char *, char *));
 static int check_times PROT((time_t, char *));
 static int do_stat PROT((char *, struct stat *, char *));
@@ -63,9 +63,9 @@ do_stat P3(char *, fname, struct stat *, st, char *, pathname)
 		    bing = 0;
 	    } else
 		bing = 0
-		}
-		}
-	    if (bing) {
+	}
+    }
+    if (bing) {
 #else
     if ((i = stat(fname, st)) != -1) {
 #endif
@@ -99,7 +99,7 @@ do_stat P3(char *, fname, struct stat *, st, char *, pathname)
 #endif
 	sprintf(buf, "%s/%s", BIN_DIR, fname);
 #endif
-
+	
 #ifdef OS2
     bing = 1;
     if ((i = stat(buf, st)) == -1) {
@@ -121,17 +121,17 @@ do_stat P3(char *, fname, struct stat *, st, char *, pathname)
     return -1;
 }				/* do_stat() */
 
-void save_binary P3(struct program *, prog, struct mem_block *, includes, struct mem_block *, patches)
+void save_binary P3(program_t *, prog, mem_block_t *, includes, mem_block_t *, patches)
 {
     char file_name_buf[200];
     char *file_name = file_name_buf;
     FILE *f;
     int i, tmp;
     short len;
-    struct program *p;
+    program_t *p;
     struct stat st;
 
-    struct svalue *ret;
+    svalue_t *ret;
     char *nm;
 
     nm = add_slash(prog->name);
@@ -139,7 +139,7 @@ void save_binary P3(struct program *, prog, struct mem_block *, includes, struct
     ret = safe_apply_master_ob(APPLY_VALID_SAVE_BINARY, 1);
     if (!MASTER_APPROVED(ret))
 	return;
-    if (prog->p.i.total_size > (int) MAXSHORT ||
+    if (prog->total_size > (int) MAXSHORT ||
 	includes->current_size > (int) MAXSHORT)
 	/* assume all other sizes ok */
 	return;
@@ -185,10 +185,10 @@ void save_binary P3(struct program *, prog, struct mem_block *, includes, struct
     /*
      * copy and patch program
      */
-    p = (struct program *) DXALLOC(prog->p.i.total_size, TAG_TEMPORARY, "save_binary");
+    p = (program_t *) DXALLOC(prog->total_size, TAG_TEMPORARY, "save_binary");
     /* convert to relative pointers, copy, then convert back */
     locate_out(prog);
-    memcpy(p, prog, prog->p.i.total_size);
+    memcpy(p, prog, prog->total_size);
     locate_in(prog);
     if (patches->current_size) {
 	locate_in(p);
@@ -204,21 +204,21 @@ void save_binary P3(struct program *, prog, struct mem_block *, includes, struct
     fwrite((char *) &len, sizeof len, 1, f);
     fwrite(p->name, sizeof(char), len, f);
 
-    fwrite((char *) &p->p.i.total_size, sizeof p->p.i.total_size, 1, f);
-    fwrite((char *) p, p->p.i.total_size, 1, f);
+    fwrite((char *) &p->total_size, sizeof p->total_size, 1, f);
+    fwrite((char *) p, p->total_size, 1, f);
     FREE(p);
     p = prog;
 
     /* inherit names */
-    for (i = 0; i < (int) p->p.i.num_inherited; i++) {
-	len = strlen(p->p.i.inherit[i].prog->name);
+    for (i = 0; i < (int) p->num_inherited; i++) {
+	len = strlen(p->inherit[i].prog->name);
 	fwrite((char *) &len, sizeof len, 1, f);
-	fwrite(p->p.i.inherit[i].prog->name, sizeof(char), len, f);
+	fwrite(p->inherit[i].prog->name, sizeof(char), len, f);
     }
 
     /* string table */
-    for (i = 0; i < (int) p->p.i.num_strings; i++) {
-	tmp = strlen(p->p.i.strings[i]);
+    for (i = 0; i < (int) p->num_strings; i++) {
+	tmp = strlen(p->strings[i]);
 	if (tmp > (int) MAXSHORT) {	/* possible? */
 	    fclose(f);
 	    unlink(file_name);
@@ -227,30 +227,30 @@ void save_binary P3(struct program *, prog, struct mem_block *, includes, struct
 	}
 	len = tmp;
 	fwrite((char *) &len, sizeof len, 1, f);
-	fwrite(p->p.i.strings[i], sizeof(char), len, f);
+	fwrite(p->strings[i], sizeof(char), len, f);
     }
 
     /* var names */
-    for (i = 0; i < (int) p->p.i.num_variables; i++) {
-	len = strlen(p->p.i.variable_names[i].name);
+    for (i = 0; i < (int) p->num_variables; i++) {
+	len = strlen(p->variable_names[i].name);
 	fwrite((char *) &len, sizeof len, 1, f);
-	fwrite(p->p.i.variable_names[i].name, sizeof(char), len, f);
+	fwrite(p->variable_names[i].name, sizeof(char), len, f);
     }
 
     /* function names */
-    for (i = 0; i < (int) p->p.i.num_functions; i++) {
-	len = strlen(p->p.i.functions[i].name);
+    for (i = 0; i < (int) p->num_functions; i++) {
+	len = strlen(p->functions[i].name);
 	fwrite((char *) &len, sizeof len, 1, f);
-	fwrite(p->p.i.functions[i].name, sizeof(char), len, f);
+	fwrite(p->functions[i].name, sizeof(char), len, f);
     }
 
     /* line_numbers */
-    if (p->p.i.line_info)
-	len = p->p.i.file_info[0];
+    if (p->line_info)
+	len = p->file_info[0];
     else
 	len = 0;
     fwrite((char *) &len, sizeof len, 1, f);
-    fwrite((char *) p->p.i.file_info, len, 1, f);
+    fwrite((char *) p->file_info, len, 1, f);
 
     /*
      * patches
@@ -265,7 +265,7 @@ void save_binary P3(struct program *, prog, struct mem_block *, includes, struct
 #define ALLOC_BUF(size) \
     if ((size) > buf_size) { FREE(buf); buf = DXALLOC(buf_size = size, TAG_TEMPORARY, "ALLOC_BUF"); }
 
-int load_binary P1(char *, name)
+int load_binary P2(char *, name, lpc_object_t *, lpc_obj)
 {
     char file_name_buf[400];
     char *buf, *iname, *file_name = file_name_buf, *file_name_two = &file_name_buf[200];
@@ -273,12 +273,12 @@ int load_binary P1(char *, name)
     int i, buf_size, ilen;
     time_t mtime;
     short len;
-    struct program *p;
-    struct object *ob;
+    program_t *p;
+    object_t *ob;
     struct stat st;
 
 #ifdef LPC_TO_C
-    void (**jump_table) (struct svalue *);
+    void (**jump_table) (svalue_t *);
     int err;
     char *code;
 #endif
@@ -346,7 +346,8 @@ int load_binary P1(char *, name)
 	FREE(buf);
 	return 0;
     }
-    if (fread((char *) &i, sizeof i, 1, f) != 1 || driver_id != i) {
+    if ((fread((char *) &i, sizeof i, 1, f) != 1 || driver_id != i)
+	&& (!lpc_obj)) {
 	if (comp_flag)
 	    fprintf(stderr, "out of date. (driver changed)\n");
 	fclose(f);
@@ -392,13 +393,13 @@ int load_binary P1(char *, name)
      * Read program structure.
      */
     fread((char *) &ilen, sizeof ilen, 1, f);
-    p = (struct program *) DXALLOC(ilen, TAG_PROGRAM, "load_binary");
+    p = (program_t *) DXALLOC(ilen, TAG_PROGRAM, "load_binary");
     fread((char *) p, ilen, 1, f);
     locate_in(p);		/* from swap.c */
     p->name = make_shared_string(name);
 
     /* Read inherit names and find prog.  Check mod times also. */
-    for (i = 0; i < (int) p->p.i.num_inherited; i++) {
+    for (i = 0; i < (int) p->num_inherited; i++) {
 	fread((char *) &len, sizeof len, 1, f);
 	ALLOC_BUF(len + 1);
 	fread(buf, sizeof(char), len, f);
@@ -435,52 +436,52 @@ int load_binary P1(char *, name)
 	    inherit_file = buf;	/* freed elsewhere */
 	    return 1;		/* not 0 */
 	}
-	p->p.i.inherit[i].prog = ob->prog;
+	p->inherit[i].prog = ob->prog;
     }
 
     /* Read string table */
-    for (i = 0; i < (int) p->p.i.num_strings; i++) {
+    for (i = 0; i < (int) p->num_strings; i++) {
 	fread((char *) &len, sizeof len, 1, f);
 	ALLOC_BUF(len + 1);
 	fread(buf, sizeof(char), len, f);
 	buf[len] = '\0';
-	p->p.i.strings[i] = make_shared_string(buf);
+	p->strings[i] = make_shared_string(buf);
     }
 
     /* var names */
-    for (i = 0; i < (int) p->p.i.num_variables; i++) {
+    for (i = 0; i < (int) p->num_variables; i++) {
 	fread((char *) &len, sizeof len, 1, f);
 	ALLOC_BUF(len + 1);
 	fread(buf, sizeof(char), len, f);
 	buf[len] = '\0';
-	p->p.i.variable_names[i].name = make_shared_string(buf);
+	p->variable_names[i].name = make_shared_string(buf);
     }
 
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
     /* function table tree's root */
-    p->p.i.tree_r = (unsigned short) 0xffff;
+    p->tree_r = (unsigned short) 0xffff;
 #endif
 
     /* function names */
-    for (i = 0; i < (int) p->p.i.num_functions; i++) {
+    for (i = 0; i < (int) p->num_functions; i++) {
 	fread((char *) &len, sizeof len, 1, f);
 	ALLOC_BUF(len + 1);
 	fread(buf, sizeof(char), len, f);
 	buf[len] = '\0';
-	p->p.i.functions[i].name = make_shared_string(buf);
+	p->functions[i].name = make_shared_string(buf);
 
 #ifdef OPTIMIZE_FUNCTION_TABLE_SEARCH
 	/* rebuild function table tree */
-	if (!(p->p.i.functions[i].flags & NAME_ALIAS))
-	    add_function(p->p.i.functions, &p->p.i.tree_r, i);
+	if (!(p->functions[i].flags & NAME_ALIAS))
+	    add_function(p->functions, &p->tree_r, i);
 #endif
     }
 
     /* line numbers */
     fread((char *) &len, sizeof len, 1, f);
-    p->p.i.file_info = (unsigned short *) DXALLOC(len, TAG_LINENUMBERS, "load binary");
-    fread((char *) p->p.i.file_info, len, 1, f);
-    p->p.i.line_info = (unsigned char *)&p->p.i.file_info[p->p.i.file_info[1]];
+    p->file_info = (unsigned short *) DXALLOC(len, TAG_LINENUMBERS, "load binary");
+    fread((char *) p->file_info, len, 1, f);
+    p->line_info = (unsigned char *)&p->file_info[p->file_info[1]];
 
     /* patches */
     fread((char *) &len, sizeof len, 1, f);
@@ -496,59 +497,28 @@ int load_binary P1(char *, name)
      * Now finish everything up.  (stuff from epilog())
      */
     prog = p;
-    prog->p.i.id_number = get_id_number();
+    prog->id_number = get_id_number();
 
-    total_prog_block_size += prog->p.i.total_size;
+    total_prog_block_size += prog->total_size;
     total_num_prog_blocks += 1;
 
     swap_line_numbers(prog);
     reference_prog(prog, "load_binary");
-    for (i = 0; (unsigned) i < prog->p.i.num_inherited; i++) {
-	reference_prog(prog->p.i.inherit[i].prog, "inheritance");
+    for (i = 0; (unsigned) i < prog->num_inherited; i++) {
+	reference_prog(prog->inherit[i].prog, "inheritance");
     }
 
 #ifdef LPC_TO_C
-    if (prog->p.i.program_size == 0) {
-#ifdef RUNTIME_LOADING
-	/*
-	 * The binary we just loaded was a compiled file.  Look for the
-	 * corresponding .B file, and link it.  Or possibly use a modified .c
-	 * file if it exists.
-	 */
-
-	file_name[strlen(file_name) - 1] = 'B';	/* change .b ending to .B */
-
-	/*
-	 * check if a .c exists and is newer than the .B file.
-	 */
-	if (stat(file_name, &st) == -1) {
-	    fprintf(stderr, "Missing .B file\n");
-	    return 0;
-	}
-	mtime = st.st_mtime;
-
-	file_name[strlen(file_name) - 1] = 'c';	/* Can you say too many
-						 * extensions? */
-
-	if (check_times(mtime, file_name) == 0) {
-	    /* the .c file needs to be recompiled */
-	    err = compile_and_link(file_name, &jump_table, &code, "errors", "OUT");
+    if (prog->program_size == 0) {
+	if (comp_flag)
+	    fprintf(stderr, "linking jump table ...\n");
+	if (lpc_obj) {
+	    link_jump_table(prog, lpc_obj->jump_table);
 	} else {
-	    file_name[strlen(file_name) - 2] = 0;
-	    err = runtime_link(file_name, &jump_table, &code, "errors", "OUT");
-	}
-	if (err) {
-	    compile_file_error(err, "runtime_link");
 	    if (prog)
 		free_prog(prog, 1);
 	    return 0;
-	} else
-	    link_jump_table(prog, jump_table, code);
-#else
-	if (prog)
-	    free_prog(prog, 1);
-	return 0;
-#endif
+	}
     }
 #endif
 
@@ -694,12 +664,12 @@ FILE *crdir_fopen P1(char *, file_name)
  * I set things up so these routines can be used with other things
  * that might need patching.
  */
-static void patch_out P3(struct program *, prog, short *, patches, int, len)
+static void patch_out P3(program_t *, prog, short *, patches, int, len)
 {
     int i;
     char *p;
 
-    p = prog->p.i.program;
+    p = prog->program;
     while (len > 0) {
 	i = patches[--len];
 	if (p[i] == F_SWITCH && p[i + 1] >> 4 != 0xf) {	/* string switch */
@@ -737,12 +707,12 @@ static int str_case_cmp P2(char *, a, char *, b)
     return s1 - s2;
 }				/* str_case_cmp() */
 
-static void patch_in P3(struct program *, prog, short *, patches, int, len)
+static void patch_in P3(program_t *, prog, short *, patches, int, len)
 {
     int i;
     char *p;
 
-    p = prog->p.i.program;
+    p = prog->program;
     while (len > 0) {
 	i = patches[--len];
 	if (p[i] == F_SWITCH && p[i + 1] >> 4 != 0xf) {	/* string switch */
@@ -762,7 +732,7 @@ static void patch_in P3(struct program *, prog, short *, patches, int, len)
 		if (s == (char *)-1)
 		    s = 0;
 		else
-		    s = prog->p.i.strings[(int)s];
+		    s = prog->strings[(int)s];
 		COPY_PTR(p + offset, &s);
 		offset += SWITCH_CASE_SIZE;
 	    }

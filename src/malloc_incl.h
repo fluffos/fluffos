@@ -37,15 +37,18 @@
 #define TAG_PREDEFINES      (TAG_PERMANENT + 30)
 #define TAG_LINENUMBERS     (TAG_PERMANENT + 31)
 #define TAG_LOCALS          (TAG_PERMANENT + 32)
+#define TAG_ARGUMENTS       (TAG_PERMANENT + 33)
+#define TAG_LPC_OBJECT      (TAG_PERMANENT + 34)
 
 #define TAG_STRING          (TAG_DATA + 40)
 #define TAG_SHARED_STRING   (TAG_DATA + 41)
 #define TAG_FUNP            (TAG_DATA + 42)
-#define TAG_VECTOR          (TAG_DATA + 43)
+#define TAG_ARRAY           (TAG_DATA + 43)
 #define TAG_MAPPING         (TAG_DATA + 44)
-#define TAG_MAP_NODE        (TAG_DATA + 45)
+#define TAG_MAP_NODE_BLOCK  (TAG_DATA + 45)
 #define TAG_MAP_TBL         (TAG_DATA + 46)
 #define TAG_BUFFER          (TAG_DATA + 47)
+#define TAG_CLASS           (TAG_DATA + 48)
 #endif
 
 #endif

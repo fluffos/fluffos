@@ -1,0 +1,82 @@
+Fri Mar 24 20:59:08 EST 1995 (tim@handel.princeton.edu (Beek))
+	* v21.1b7 promoted to minor version status (see v21.1)
+	* Changed the error message for arr[<x] where x > sizeof(arr)
+	  to 'Array index out of bounds' from 'Negative index passed to array'
+	* fixed the extern definition of control_stack[] to use MAX_TRACE
+	  instead of being hardcoded at the default
+
+Fri Mar 24 20:59:08 EST 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.1b7
+	* fixed a crasher in call_out(function, ...) when NO_SHADOWS
+	  was off
+	* removed a check for destructed objects in get_all_call_outs()
+	  which:
+	  (a) didn't remove destructed objects
+	  (b) removed call_outs to function pointers
+	* added in the config file crasher fix from v21.2a5
+
+Sun Mar 19 21:02:18 EST 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.1b6
+	* fixed a small optimization to backend.c introduced in v21.1b5
+	* fixed a typo in the v21.1b5 type check fix
+	* Robocoder: in config files, restrict sscanf() matches to
+	  the current line
+
+Sat Mar  4 16:04:43 EST 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.1b5
+	* some amiga compilation fixes from Robocoder
+	* added some smalloc accounting fixes from Robocoder; keep track
+	  of wasted memory as well as some more overhead
+	* cast IAC to signed char so it is compatible with (char *)
+	* fixed a bug in type checking that made (class foo *) and (mixed *)
+	  incompatible
+	* fixed a typo in the prototype fix from v21.1b4
+	* defining two classes with the same name is now an error
+	* compilation fix for IRIX 5.3 (needs <unistd.h>)
+	
+Sat Mar  4 16:04:43 EST 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.1b4
+	* fixed a ref count error/crasher in inherits()
+	* fixed a ref count bug/memory leak (programs referenced by 
+	  non-bindable function pointers weren't being freed)
+	* added code to check function references to programs in md.c
+	* added in some porting fixes for CX/UX 6.1 (from DrFeelgood)
+	* fixed a memory munger in regular expressions that end in '\'
+	* fixed inherited functions which have a different number of
+	  arguments than the functions they replace to not error
+
+Sat Mar  4 16:04:43 EST 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.1b3
+	* removed some debugging code in lex.c
+	* fixed a typo that prevented #undef OLD_ED compilation
+	* fixed compilation with #undef NO_MUDLIB_STATS
+	* fixed a crasher in type errors in division
+	* fixed a division error message that erroneously indicated
+	  multiplication
+	* fixed a type error in locals used in anonymous functions
+	* fixed a bug in smalloc accounting
+
+Wed Mar  1 18:14:01 EST 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.1b2
+	* brought up to date with respect to v21c1
+
+Wed Mar  1 18:14:01 EST 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.1b1
+	* added three new contrib efuns:
+	  . int replaceable(object) - returns 1 if the object consists only
+	           of a create() function and inherited functions
+	  . void program_info() - prints out memory usage of programs
+	           divided up by sections
+	  . string upper_case() - similar to lower_case(), but ... :)
+	* fixed a crasher in the compilation of switch tables to C code
+	* rewrote/optimized some of the compile time type checking
+	* void efuns no longer return a value on the stack.  If the value
+	  is used (c.f. x = write("hi")) a F_CONST0 instruction is inserted
+	* removed the errorp() efun
+	* added a customized allocator for mapping nodes.  This should reduce
+	  memory usage and increase speed of additions/deletions
+	* removed RUNTIME_LOADING from options.h
+	* fixed a crasher involving finding duplicate objects in the hash
+	  table with LPC objects precompiled and DEBUG on
+	* changed program ref counts to shorts
+

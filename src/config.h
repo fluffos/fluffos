@@ -7,7 +7,6 @@
 #define _CONFIG_H_
 
 #include "include/runtime_config.h"
-#include "rc.h"
 
 /*
  * runtime config strings.  change these values in the runtime configuration

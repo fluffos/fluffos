@@ -1,0 +1,147 @@
+----------------------------------------------------------------------------
+Wed Mar  1 18:14:01 EST 1995 (tim@handel.princeton.edu (Beek))
+	* v21.1a5 promoted to beta status (see v21.1b1)
+
+Fri Feb 24 23:48:38 EST 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.1a5
+	* brought up to date with respect to v21b15
+	* MASSIVE source cleanup
+	  . 'arrays' are always refered to as arrays and never vectors/pointers
+	  . all types now use foo_t syntax instead of struct foo
+	  . several header files cleaned up and includes reorganized
+	  . removed internal distinction between internal and external
+	    programs (i.e. foo->p.i.bar is now foo->bar)
+	* centralized the processing of "/foo/bar.c" -> "foo/bar"
+	* removed support for RUNTIME_LOADING
+	* removed support for #undef NEW_FUNCTIONS
+	* in addition to the above, call_other pointers are gone.
+	  (: x, y :) should be converted to (: call_other, x, y :)
+	  the functionality remains unchanged, since that's all they really
+	  did ...
+	* function pointers reorganized to use less memory (the size is
+	  now variable based on the ammount of space needed, so a lfun
+	  pointer can be significantly smaller)
+	* added OPCPROF_2D which keeps statistics on the most commonly
+	  executed *pairs* of instructions
+	* regexp errors in regexp efuns now use error(), instead of printing
+	  a message to this_player() which eroneously refers to ed ...
+	* LPC_TO_C now works for compiling objects into the driver.
+	  (1) make sure #pragma save_binary is on in all objects to be compiled
+	  (2) do a generate_source( <array of filenames> )
+	  (3) copy /binaries/interface.c into your source dir (replacing the
+	      provided one)
+	  (4) recompile the driver
+	  (5) the lpc_info() efun can be used to see if the new programs are
+	      being used; other than that there should be no visible
+	      difference, other than speed.
+
+Wed Feb  15 00:16:55 EST 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.1a4
+	* brought up to date with respect to v21b10
+	* optimized the handling of the redefinable keywords 'efun', 'asm',
+	  and 'new'
+	* Floats and ints are now automatically interconverted in the
+	  following cases:
+	  . Passing an int to a efun that takes a float and not an int, and
+	    vice versa.  Hence, sqrt(5) is legal.
+	  . during initialization (as in float x = 5)
+	  . Note: the above depends on compile time checks so if you exploit
+	    mixed, etc to put an int in a float variable it will misbehave
+	* added limited support for classes (no member functions):
+	  . structure definitions are stored in programs, which means they
+	    can be passed down via inheritance
+
+	  . definition of the type is as follows:
+	    class <class_name> {
+              <type> <member>;
+              ...
+            }
+	    Ex: class my_first_class { int my_number; string my_string; }
+
+          . declaring a variable of that type:
+            class <class_name> <var_name>;
+	    Ex: class my_first_class my_var;
+
+	  . instantiating a class:
+	    <var_name> = new(class <class_name>);
+	    Ex: my_var = new(class my_first_class);
+	
+          . assigning to/using a member
+            <var_name> -> <member> = whatever ...	
+	    Ex: my_var->my_string = "It worked!";
+
+Thu Feb  2 00:16:55 EST 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.1a3
+	* brought up to date with respect to v21b8
+	* fixed the define used by cfuns.h to be different from the one
+	  ccode.h used
+	* generate_source() now returns zero if there were compilation errors
+	* modified lower_case() to be slightly more portable and easier to
+	  read
+	* inlined sapply() into apply() and apply_master_ob() by hand
+	* fixed a unrecognized #pragma crasher (the list wasn't terminated)
+	* fiddled with the default settings of options.h
+	* new contrib efuns:
+	  string pluralize(string)
+	  int file_length(string)
+	  string upper_case(string)
+
+Thu Feb  2 00:16:55 EST 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.1a2
+	* brought up to date with respect to v21b7
+	* added prototypes for all the c_* functions in ccode.c
+	* fixed the Makefile and GNUmakefile; removed obsolete files
+	* fixed generate_source() to use 'package fname;' instead of
+	  'package lpc_to_c;' when outputting to 'fname.c' and 'fname.spec'
+	* removed support for add_action(string); all it did was cause
+	  errors anyway ...
+
+Thu Feb  2 00:16:55 EST 1995 (tim@handel.princeton.edu (Beek))
+	* raised patchlevel to v21.1a1
+	* brought up to date with respect to v21b5
+	* COMPAT_BUSTER: removed the following options.h defines and 
+	  related behavior: OLD_HEARTBEAT, OLD_COMMAND, IGNORE_STRICT_PRAGMA
+	* COMPAT_BUSTER: STRICT_TYPE_CHECKING removed, use 
+	  PRAGMA_STRICT_TYPES as a default pragma
+	* COMPAT_BUSTER: ALWAYS_SAVE_BINARIES removed, use 
+	  PRAGMA_SAVE_BINARY as a default pragma
+	* COMPAT_BUSTER: move_object only takes 1 argument.
+	  change move_object(this_object(), foo) to move_object(foo)
+	* LPC->C restored to working condition in a limited sense:
+	  . new pragma #pragma efun ignored during regular compiling
+	  . generate_source("source_file.c", "destination_file.c")
+	    will compile "source_file.c" into an efun package made
+	    up of "destination_file.c" and "destination_file.spec"
+	    which can be linked into the driver
+	  . note that it is illegal to do the following in an efun:
+	    - call a local function -> this really can't be done
+	    - call a simul_efun -> see above.  Use efun:: to get around
+	      write simul_efuns, etc; the driver won't complain about
+	      illegal overrides while generating efun source
+	    - use a global variable -> wait for future fixes
+	  . LPC->C for objects doesn't work as of this release; only
+	    creation of efuns in packages (useful for efunizing simuls)
+	  . various things not supported yet; most notably functionals,
+	    also string switches are supported but buggy; let me know
+	    if you have other problems (esp. linking errors)
+	* added some internal stuff for structures; work in progress.
+	  ignore the 1 shift/reduce conflict as it won't affect normal
+	  LPC code.
+	* define_new_function() doesn't take the offset any more; this
+	  is set explicitly where needed (2 places)
+	* argument types are actually saved why #pragma save_types is
+	  used.  They still aren't used yet tho.
+	* the format of switch parse trees was tweaked a bit to help
+	  LPC->C compilation
+	* removed some unused i_generate_* functions
+	* push_indexed_lvalue in interpret.c is no longer static; compiled
+	  C code needs it
+	* removed call_absolute()
+	* removed optimization flag, as it was unused
+	* rewrote pragma handling to work off of a table for easier addition
+	  of pragmas
+	* added #pragma no_whatever which turns off the effect of
+	  #pragma whatever
+	* added program argument types to md.c's list of permanent blocks;
+	  not checked for leakage yet tho
+	

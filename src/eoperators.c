@@ -6,6 +6,7 @@
 #include "std.h"
 #include "lpc_incl.h"
 #include "efuns_incl.h"
+#include "lex.h"
 #include "backend.h"
 #include "eoperators.h"
 #include "parse.h"
@@ -15,35 +16,29 @@
 #endif
 
 INLINE void
-free_funp P1(struct funp *, fp)
+free_funp P1(funptr_t *, fp)
 {
-    fp->ref--;
-    if (fp->ref > 0) {
+    fp->hdr.ref--;
+    if (fp->hdr.ref > 0) {
 	return;
     }
-#ifdef NEW_FUNCTIONS
-    free_object(fp->owner, "free_funp");
-    if (fp->type == FP_CALL_OTHER)
-	free_svalue(&fp->f.obj, "free_funp");
-    else if (fp->type == FP_FUNCTIONAL 
-	  || fp->type == (FP_FUNCTIONAL | FP_NOT_BINDABLE)) {
-	fp->f.a.prog->p.i.func_ref--;
-	if (fp->f.a.prog->p.i.func_ref == 0 && fp->f.a.prog->p.i.ref == 0)
-	    deallocate_program(fp->f.a.prog);
+    free_object(fp->hdr.owner, "free_funp");
+    if (fp->hdr.args)
+	free_array(fp->hdr.args);
+    if ((fp->hdr.type & 0x0f) == FP_FUNCTIONAL) {
+    	fp->f.functional.prog->func_ref--;
+	if (fp->f.functional.prog->func_ref == 0 
+	    && fp->f.functional.prog->ref == 0)
+	    deallocate_program(fp->f.functional.prog);
     }
-    free_svalue(&fp->args, "free_funp");
-#else
-    free_svalue(&fp->obj, "free_funp");
-    free_svalue(&fp->fun, "free_funp");
-#endif
     FREE(fp);
 }
 
 INLINE void f_and()
 {
-    if (sp->type == T_POINTER && (sp - 1)->type == T_POINTER) {
+    if (sp->type == T_ARRAY && (sp - 1)->type == T_ARRAY) {
 	sp--;
-	sp->u.vec = intersect_array((sp + 1)->u.vec, sp->u.vec);
+	sp->u.arr = intersect_array((sp + 1)->u.arr, sp->u.arr);
 	return;
     }
     CHECK_TYPES(sp - 1, T_NUMBER, 1, F_AND);
@@ -55,7 +50,7 @@ INLINE void f_and()
 INLINE void
 f_and_eq()
 {
-    struct svalue *argp;
+    svalue_t *argp;
 
     if ((argp = sp->u.lvalue)->type != T_NUMBER)
 	error("Bad left type to &=\n");
@@ -67,7 +62,7 @@ f_and_eq()
 INLINE void
 f_div_eq()
 {
-    struct svalue *argp = (sp--)->u.lvalue;
+    svalue_t *argp = (sp--)->u.lvalue;
 
     switch (argp->type | sp->type){
 
@@ -139,11 +134,11 @@ f_eq()
 	    return;
 	}
 	
-    case T_POINTER:
+    case T_ARRAY:
 	{
-	    i = (sp-1)->u.vec == sp->u.vec;
-	    free_vector((sp--)->u.vec);
-	    free_vector(sp->u.vec);
+	    i = (sp-1)->u.arr == sp->u.arr;
+	    free_array((sp--)->u.arr);
+	    free_array(sp->u.arr);
 	    break;
 	}
 	
@@ -208,7 +203,7 @@ f_lsh()
 INLINE void
 f_lsh_eq()
 {
-    struct svalue *argp;
+    svalue_t *argp;
 
 
     if ((argp = sp->u.lvalue)->type != T_NUMBER)
@@ -221,7 +216,7 @@ f_lsh_eq()
 INLINE void
 f_mod_eq()
 {
-    struct svalue *argp;
+    svalue_t *argp;
 
     if ((argp = sp->u.lvalue)->type != T_NUMBER)
 	error("Bad left type to %=\n");
@@ -235,7 +230,7 @@ f_mod_eq()
 INLINE void
 f_mult_eq()
 {
-    struct svalue *argp = (sp--)->u.lvalue;
+    svalue_t *argp = (sp--)->u.lvalue;
 
     switch(argp->type | sp->type) {
 	case T_NUMBER:
@@ -264,7 +259,7 @@ f_mult_eq()
 
 	case T_MAPPING:
 	{
-	    struct mapping *m = compose_mapping(argp->u.map, sp->u.map,0);
+	    mapping_t *m = compose_mapping(argp->u.map, sp->u.map,0);
 	    pop_stack();
 	    push_mapping(m);
 	    assign_svalue(argp, sp);
@@ -313,11 +308,11 @@ f_ne()
             return;
 	}
 
-    case T_POINTER:
+    case T_ARRAY:
         {
-            i = (sp-1)->u.vec != sp->u.vec;
-	    free_vector((sp--)->u.vec);
-	    free_vector(sp->u.vec);
+            i = (sp-1)->u.arr != sp->u.arr;
+	    free_array((sp--)->u.arr);
+	    free_array(sp->u.arr);
             break;
 	}
 
@@ -383,7 +378,7 @@ f_or()
 INLINE void
 f_or_eq()
 {
-    struct svalue *argp;
+    svalue_t *argp;
 
     if ((argp = sp->u.lvalue)->type != T_NUMBER)
 	error("Bad left type to |=\n");
@@ -395,8 +390,8 @@ f_or_eq()
 INLINE void
 f_parse_command()
 {
-    struct svalue *arg;
-    struct svalue *fp;
+    svalue_t *arg;
+    svalue_t *fp;
     int i;
     int num_arg;
 
@@ -411,7 +406,7 @@ f_parse_command()
      */
     arg = sp - 2;
     CHECK_TYPES(&arg[0], T_STRING, 1, F_PARSE_COMMAND);
-    CHECK_TYPES(&arg[1], T_OBJECT | T_POINTER, 2, F_PARSE_COMMAND);
+    CHECK_TYPES(&arg[1], T_OBJECT | T_ARRAY, 2, F_PARSE_COMMAND);
     CHECK_TYPES(&arg[2], T_STRING, 3, F_PARSE_COMMAND);
 
     /*
@@ -499,7 +494,7 @@ f_range(int code)
         }
         case T_BUFFER:
         {
-            struct buffer *rbuf = sp->u.buf;
+            buffer_t *rbuf = sp->u.buf;
 
             len = rbuf->size;
             to = (--sp)->u.number;
@@ -523,7 +518,7 @@ f_range(int code)
             }
             if (to >= len) to = len - 1;
             {
-                struct buffer *nbuf = allocate_buffer(to - from + 1);
+                buffer_t *nbuf = allocate_buffer(to - from + 1);
                 memcpy(nbuf->item, rbuf->item + from, to - from + 1);
                 free_buffer(rbuf);
                 put_buffer(nbuf);
@@ -531,14 +526,14 @@ f_range(int code)
             break;
         }
 
-        case T_POINTER:
+        case T_ARRAY:
         {
-            struct vector *v = sp->u.vec;
+            array_t *v = sp->u.arr;
             to = (--sp)->u.number;
             if (code & 0x01) to = v->size - to;
             from = (--sp)->u.number;
             if (code & 0x10) from = v->size - from;
-            put_vector(slice_array(v, from, to));
+            put_array(slice_array(v, from, to));
             break;
         }
 
@@ -576,8 +571,8 @@ f_extract_range P1(int, code)
         }
         case T_BUFFER:
         {
-            struct buffer *rbuf = sp->u.buf;
-            struct buffer *nbuf;
+            buffer_t *rbuf = sp->u.buf;
+            buffer_t *nbuf;
 
 
             len = rbuf->size;
@@ -597,12 +592,12 @@ f_extract_range P1(int, code)
             break;
         }
 
-        case T_POINTER:
+        case T_ARRAY:
         {
-            struct vector *v = sp->u.vec;
+            array_t *v = sp->u.arr;
             from = (--sp)->u.number;
             if (code) from = v->size - from;
-            put_vector(slice_array(v, from, v->size - 1));
+            put_array(slice_array(v, from, v->size - 1));
             break;
         }
 
@@ -623,7 +618,7 @@ f_rsh()
 INLINE void
 f_rsh_eq()
 {
-    struct svalue *argp;
+    svalue_t *argp;
 
     if ((argp = sp->u.lvalue)->type != T_NUMBER)
 	error("Bad left type to >>=\n");
@@ -635,7 +630,7 @@ f_rsh_eq()
 INLINE void
 f_sub_eq()
 {
-    struct svalue *argp = (sp--)->u.lvalue;
+    svalue_t *argp = (sp--)->u.lvalue;
 
     switch(argp->type | sp->type){
 	case T_NUMBER:
@@ -659,17 +654,17 @@ f_sub_eq()
 	    break;
 	}
 
-	case T_POINTER:
+	case T_ARRAY:
 	{
-	    sp->u.vec = argp->u.vec = subtract_array(argp->u.vec, sp->u.vec);
-	    sp->u.vec->ref++;
+	    sp->u.arr = argp->u.arr = subtract_array(argp->u.arr, sp->u.arr);
+	    sp->u.arr->ref++;
 	    break;
 	}
 
 	default:
 	{
-	    if (!(sp->type & (T_NUMBER|T_REAL|T_POINTER))) error("Bad right type to -=\n");
-	    else if (!(argp->type & (T_NUMBER|T_REAL|T_POINTER))) error("Bad left type to -=\n");
+	    if (!(sp->type & (T_NUMBER|T_REAL|T_ARRAY))) error("Bad right type to -=\n");
+	    else if (!(argp->type & (T_NUMBER|T_REAL|T_ARRAY))) error("Bad left type to -=\n");
 	    else error("Arguments to -= do not match in type.\n");
 	}
     }	   
@@ -763,7 +758,7 @@ f_switch()
 		 */
 		COPY_SHORT(&offset, pc + SW_DEFAULT);
 		pop_stack();
-		pc = current_prog->p.i.program + offset;
+		pc = current_prog->program + offset;
 		return;
 	    }
 	} else {
@@ -775,7 +770,7 @@ f_switch()
 	i = (int) pc[0] & 0xf;
     }
     pop_stack();
-    end_tab = current_prog->p.i.program + break_adr;
+    end_tab = current_prog->program + break_adr;
     /*
      * i is the table size as a power of 2.  Tells us where to start
      * searching.  i==14 is a special case.
@@ -783,19 +778,19 @@ f_switch()
     if (i >= 14)
 	if (i == 14) {
 	    /* fastest switch format : lookup table */
-	    l = current_prog->p.i.program + offset;
+	    l = current_prog->program + offset;
 	    COPY_INT(&d, end_tab - 4);
 	    /* d is minimum value - see if in range or not */
 	    if (s >= d && l + (s = (s - d) * sizeof(short)) < (end_tab - 4)) {
 		COPY_SHORT(&offset, &l[s]);
 		if (offset) {
-		    pc = current_prog->p.i.program + offset;
+		    pc = current_prog->program + offset;
 		    return;
 		}
 	    }
 	    /* default */
 	    COPY_SHORT(&offset, pc + SW_DEFAULT);
-	    pc = current_prog->p.i.program + offset;
+	    pc = current_prog->program + offset;
 	    return;
 	} else
 	    fatal("unsupported switch table format.\n");
@@ -806,7 +801,7 @@ f_switch()
      * s - key we're looking for 
      * r - key l is pointing at
      */
-    l = current_prog->p.i.program + offset + off_tab[i];
+    l = current_prog->program + offset + off_tab[i];
     d = (int) (off_tab[i] + SWITCH_CASE_SIZE) >> 1;
     if (d < SWITCH_CASE_SIZE)
 	d = 0;
@@ -824,7 +819,7 @@ f_switch()
 			COPY_SHORT(&offset, l + U_ADDR);
 			if (!offset) {
 			    /* range with lookup table */
-			    l = current_prog->p.i.program + offset +
+			    l = current_prog->program + offset +
 				(s - r) * sizeof(short);
 			    COPY_SHORT(&offset, l);
 			}	/* else normal range and offset is correct */
@@ -850,7 +845,7 @@ f_switch()
 			COPY_SHORT(&offset, l + L_ADDR);
 			if (!offset) {
 			    /* range with lookup table */
-			    l = current_prog->p.i.program + offset +
+			    l = current_prog->program + offset +
 				(s - r) * sizeof(short);
 			    COPY_SHORT(&offset, l);
 			}	/* else normal range and offset is correct */
@@ -885,14 +880,14 @@ f_switch()
 	    if (!l[U_TYPE] && !l[U_TYPE + 1]) {
 		/* end of range with lookup table */
 		COPY_PTR(&r, l + U_LOWER);
-		l = current_prog->p.i.program + offset + (s - r) * sizeof(short);
+		l = current_prog->program + offset + (s - r) * sizeof(short);
 		COPY_SHORT(&offset, l);
 	    }
 	    if (offset <= 1) {
 		COPY_SHORT(&offset, l + L_ADDR);
 		if (!offset) {
 		    /* start of range with lookup table */
-		    l = current_prog->p.i.program + offset;
+		    l = current_prog->program + offset;
 		    COPY_SHORT(&offset, l);
 		}		/* else normal range, offset is correct */
 	    }
@@ -900,7 +895,7 @@ f_switch()
 	}
     }
     /* now do jump */
-    pc = current_prog->p.i.program + offset;
+    pc = current_prog->program + offset;
 }
 
 int simul_efun_is_loading = 0;
@@ -908,10 +903,10 @@ int simul_efun_is_loading = 0;
 void
 call_simul_efun P2(unsigned short, index, int, num_arg)
 {
-    struct function *funp;
-    extern struct object *simul_efun_ob;
+    function_t *funp;
+    extern object_t *simul_efun_ob;
     extern char *simul_efun_file_name;
-    extern struct function **simuls;
+    extern function_t **simuls;
 
     if (current_object->flags & O_DESTRUCTED) {	/* No external calls allowed */
 	pop_n_elems(num_arg);
@@ -974,7 +969,7 @@ f_xor()
 INLINE void
 f_xor_eq()
 {
-    struct svalue *argp;
+    svalue_t *argp;
 
     if ((argp = sp->u.lvalue)->type != T_NUMBER)
 	error("Bad left type to ^=\n");
@@ -983,151 +978,124 @@ f_xor_eq()
     sp->u.number = argp->u.number ^= sp->u.number;
 }
 
-#ifdef NEW_FUNCTIONS
-INLINE struct funp *
-make_efun_funp P2(int, opcode, svalue *, args)
+INLINE funptr_t *
+make_efun_funp P2(int, opcode, svalue_t *, args)
 {
-    struct funp *fp;
+    funptr_t *fp;
     int i=0;
     
-    fp = ALLOCATE(struct funp, TAG_FUNP, "make_efun_funp");
-    fp->owner = current_object;
+    fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(efun_ptr_t),
+			     TAG_FUNP, "make_efun_funp");
+    fp->hdr.owner = current_object;
     add_ref( current_object, "make_efun_funp" );
-    fp->type = FP_EFUN;
+    fp->hdr.type = FP_EFUN;
     
 #ifdef NEEDS_CALL_EXTRA
     if (opcode >= 0xff) {
-	fp->f.opcodes[i++] = F_CALL_EXTRA;
-	fp->f.opcodes[i++] = opcode - 0xff;
+	fp->f.efun.opcodes[i++] = F_CALL_EXTRA;
+	fp->f.efun.opcodes[i++] = opcode - 0xff;
     } else { 
 #endif
-	fp->f.opcodes[i++] = opcode;
+	fp->f.efun.opcodes[i++] = opcode;
 #ifdef NEEDS_CALL_EXTRA
     }
 #endif
     
     if (instrs[opcode].min_arg != instrs[opcode].max_arg)
-	fp->f.opcodes[i++] = 0; /* filled in when evaluated */
+	fp->f.efun.opcodes[i++] = 0; /* filled in when evaluated */
     
-    fp->f.opcodes[i++] = F_RETURN;
+    fp->f.efun.opcodes[i++] = F_RETURN;
     
-    if (args) 
-	assign_svalue_no_free(&fp->args, args);
-    else
-	fp->args.type = T_NUMBER;
+    if (args->type == T_ARRAY) {
+	fp->hdr.args = args->u.arr;
+	args->u.arr->ref++;
+    } else
+	fp->hdr.args = 0;
     
-    fp->ref = 1;
+    fp->hdr.ref = 1;
     return fp;
 }
 
-INLINE struct funp *
-make_lfun_funp P2(int, index, svalue *, args)
+INLINE funptr_t *
+make_lfun_funp P2(int, index, svalue_t *, args)
 {
-    struct funp *fp;
+    funptr_t *fp;
     
-    fp = ALLOCATE(struct funp, TAG_FUNP, "make_efun_funp");
-    fp->owner = current_object;
+    fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(local_ptr_t),
+			     TAG_FUNP, "make_efun_funp");
+    fp->hdr.owner = current_object;
     add_ref( current_object, "make_efun_funp" );
-    fp->type = FP_LOCAL | FP_NOT_BINDABLE;
+    fp->hdr.type = FP_LOCAL | FP_NOT_BINDABLE;
     
-    fp->f.index = index + function_index_offset;
+    fp->f.local.index = index + function_index_offset;
     
-    if (args) 
-	assign_svalue_no_free(&fp->args, args);
-    else
-	fp->args.type = T_NUMBER;
+    if (args->type == T_ARRAY) {
+	fp->hdr.args = args->u.arr;
+	args->u.arr++;
+    } else
+	fp->hdr.args = 0;
     
-    fp->ref = 1;
+    fp->hdr.ref = 1;
     return fp;
 }
 
-INLINE struct funp *
-make_simul_funp P2(int, index, svalue *, args)
+INLINE funptr_t *
+make_simul_funp P2(int, index, svalue_t *, args)
 {
-    struct funp *fp;
+    funptr_t *fp;
     
-    fp = ALLOCATE(struct funp, TAG_FUNP, "make_efun_funp");
-    fp->owner = current_object;
+    fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(simul_ptr_t),
+			     TAG_FUNP, "make_efun_funp");
+    fp->hdr.owner = current_object;
     add_ref( current_object, "make_efun_funp" );
-    fp->type = FP_SIMUL;
+    fp->hdr.type = FP_SIMUL;
     
-    fp->f.index = index;
+    fp->f.simul.index = index;
     
-    if (args) 
-	assign_svalue_no_free(&fp->args, args);
-    else
-	fp->args.type = T_NUMBER;
+    if (args->type == T_ARRAY) {
+	fp->hdr.args = args->u.arr;
+	args->u.arr++;
+    } else
+	fp->hdr.args = 0;
     
-    fp->ref = 1;
+    fp->hdr.ref = 1;
     return fp;
 }
 
-INLINE struct funp *
-make_functional_funp P5(short, num_arg, short, num_local, short, len, svalue *, args, int, flag)
+INLINE funptr_t *
+make_functional_funp P5(short, num_arg, short, num_local, short, len, svalue_t *, args, int, flag)
 {
-    struct funp *fp;
+    funptr_t *fp;
     
-    fp = ALLOCATE(struct funp, TAG_FUNP, "make_functional_funp");
-    fp->owner = current_object;
+    fp = (funptr_t *)DXALLOC(sizeof(funptr_hdr_t) + sizeof(functional_t), 
+			     TAG_FUNP, "make_functional_funp");
+    fp->hdr.owner = current_object;
     add_ref( current_object, "make_functional_funp" );
-    fp->type = FP_FUNCTIONAL + flag;
+    fp->hdr.type = FP_FUNCTIONAL + flag;
 
-    current_prog->p.i.func_ref++;
+    current_prog->func_ref++;
     
-    fp->f.a.prog = current_prog;
-    fp->f.a.offset = pc - current_prog->p.i.program;
-    fp->f.a.num_args = num_arg;
-    fp->f.a.num_locals = num_local;
-    fp->f.a.fio = function_index_offset;
-    fp->f.a.vio = variable_index_offset;
+    fp->f.functional.prog = current_prog;
+    fp->f.functional.offset = pc - current_prog->program;
+    fp->f.functional.num_arg = num_arg;
+    fp->f.functional.num_local = num_local;
+    fp->f.functional.fio = function_index_offset;
+    fp->f.functional.vio = variable_index_offset;
     pc += len;
     
-    if (args) {
-	assign_svalue_no_free(&fp->args, args);
-	if (args->type == T_POINTER)
-	    fp->f.a.num_args += args->u.vec->size;
+    if (args->type == T_ARRAY) {
+	fp->hdr.args = args->u.arr;
+	args->u.arr->ref++;
+	fp->f.functional.num_arg += args->u.arr->size;
     } else
-	fp->args.type = T_NUMBER;
+	fp->hdr.args = 0;
 
-    fp->ref = 1;
-    return fp;
-}
-#endif
-
-INLINE struct funp *
-make_funp P2(struct svalue *,sobj, struct svalue *,sfun)
-{
-    struct funp *fp;
-    
-    fp = ALLOCATE(struct funp, TAG_FUNP, "make_funp");
-#ifdef NEW_FUNCTIONS
-    fp->owner = current_object;
-    add_ref( current_object, "make_funp" );
-    fp->type = FP_CALL_OTHER;
-    
-    assign_svalue_no_free(&fp->f.obj, sobj);
-    assign_svalue_no_free(&fp->args, sfun);
-#else
-#ifndef NO_UIDS
-    if (current_object) {
-	if (current_object->euid) {
-	    fp->euid = current_object->euid;
-	} else {
-	    fp->euid = current_object->uid;
-	}
-    } else {
-	fp->euid = NULL;
-    }
-#endif
-    assign_svalue_no_free(&fp->obj, sobj);
-    assign_svalue_no_free(&fp->fun, sfun);
-#endif
-    fp->ref = 1;
+    fp->hdr.ref = 1;
     return fp;
 }
 
 INLINE void
-push_refed_funp P1(struct funp *, fp)
+push_refed_funp P1(funptr_t *, fp)
 {
     sp++;
     sp->type = T_FUNCTION;
@@ -1135,25 +1103,24 @@ push_refed_funp P1(struct funp *, fp)
 }
 
 INLINE void
-push_funp P1(struct funp *, fp)
+push_funp P1(funptr_t *, fp)
 {
     sp++;
     sp->type = T_FUNCTION;
     sp->u.fp = fp;
-    fp->ref++;
+    fp->hdr.ref++;
 }
 
 INLINE void
 f_function_constructor()
 {
-    struct funp *fp;
+    funptr_t *fp;
     int kind;
     unsigned short index;
 
     kind = EXTRACT_UCHAR(pc++);
 
     switch (kind) {
-#ifdef NEW_FUNCTIONS
     case FP_EFUN:
 	kind = EXTRACT_UCHAR(pc++);
 #ifdef NEEDS_CALL_EXTRA
@@ -1165,20 +1132,6 @@ f_function_constructor()
 	fp = make_efun_funp(kind, sp);
 	pop_stack();
 	break;
-#endif
-    case FP_CALL_OTHER:
-	fp = make_funp(sp - 1, sp);
-	pop_2_elems();
-	break;
-    case FP_CALL_OTHER | FP_THIS_OBJECT:
-	if (current_object->flags & O_DESTRUCTED)
-	    push_number(0);
-	else
-	    push_object(current_object);
-	fp = make_funp(sp, sp - 1);
-	pop_2_elems();
-	break;
-#ifdef NEW_FUNCTIONS
     case FP_LOCAL:
 	LOAD_SHORT(index, pc);
 	fp = make_lfun_funp(index, sp); 
@@ -1210,21 +1163,19 @@ f_function_constructor()
 	    fp = make_functional_funp(num_arg, locals, index, 0, FP_NOT_BINDABLE);
 	    break;
 	}
-#endif
     default:
 	fatal("Tried to make unknown type of function pointer.\n");
     }
     push_refed_funp(fp);
 }
 
-#ifdef NEW_FUNCTIONS
 void
 f_apply PROT((void))
 {
-    struct svalue *v;
+    svalue_t *v;
     int num;
-    struct funp *f;
-    struct vector *vec;
+    funptr_t *f;
+    array_t *vec;
 
     if ((sp - 1)->type != T_FUNCTION) {
 	pop_stack();
@@ -1236,11 +1187,11 @@ f_apply PROT((void))
 	return;
     }
 
-    vec = (sp--)->u.vec;
+    vec = (sp--)->u.arr;
     f = sp->u.fp;
     if (vec->ref == 1) {
 	transfer_push_some_svalues(vec->item, num = vec->size);
-	free_empty_vector(vec);
+	free_empty_array(vec);
     } else {
 	push_some_svalues(vec->item, num = vec->size);
 	vec->ref--;
@@ -1253,8 +1204,8 @@ f_apply PROT((void))
 INLINE void
 f_evaluate PROT((void))
 {
-    struct svalue *v;
-    struct svalue *arg = sp - st_num_arg + 1;
+    svalue_t *v;
+    svalue_t *arg = sp - st_num_arg + 1;
 
     if (arg->type != T_FUNCTION) {
 	pop_n_elems(st_num_arg-1);
@@ -1269,35 +1220,11 @@ f_evaluate PROT((void))
     free_funp(arg->u.fp);
     assign_svalue_no_free(sp, v);
 }
-#else
-INLINE void
-f_evaluate()
-{
-    struct svalue *obj, *fun;
-    struct funp *tmp;
-
-    CHECK_TYPES(sp, T_FUNCTION, 1, F_EVALUATE);
-    obj = &sp->u.fp->obj;
-    fun = &sp->u.fp->fun;
-    tmp = sp->u.fp;
-    sp--;			/* don't free the funp here since that would
-				 * also free obj and fun */
-    if ((obj->type == T_OBJECT) && (obj->u.ob->flags & O_DESTRUCTED)) {
-	assign_svalue(obj, &const0n);
-	push_null();
-    } else {
-	push_svalue(obj);
-    }
-    push_svalue(fun);
-    free_funp(tmp);		/* go ahead and free it here since the pushes
-				 * make it ok */
-}
-#endif
 
 INLINE void
 f_sscanf()
 {
-    struct svalue *fp;
+    svalue_t *fp;
     int i;
     int num_arg;
 

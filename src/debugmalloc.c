@@ -9,7 +9,6 @@
 #include "debugmalloc.h"
 #include "malloc.h"
 #include "md.h"
-#include "comm.h"
 
 #undef NOISY_MALLOC
 
@@ -45,11 +44,11 @@ INLINE void *debugrealloc P4(void *, ptr, int, size, int, tag, char *, desc)
 
     NOISY3("realloc: %i (%x), %s\n", size, ptr, desc);
     stats.realloc_calls++;
-    tmp = (node_t *) ptr - 1;
+    tmp = (md_node_t *) ptr - 1;
     if (MDfree(tmp)) {
 	tmp = (void *) REALLOC(tmp, size + MD_OVERHEAD);
 	MDmalloc(tmp, size, tag, desc);
-	return (node_t *) tmp + 1;
+	return (md_node_t *) tmp + 1;
     }
     return (void *) 0;
 }
@@ -61,8 +60,8 @@ INLINE void *debugmalloc P3(int, size, int, tag, char *, desc)
     stats.alloc_calls++;
     tmp = (void *) MALLOC(size + MD_OVERHEAD);
     MDmalloc(tmp, size, tag, desc);
-    NOISY3("malloc: %i (%x), %s\n", size, (node_t *)tmp + 1, desc);
-    return (node_t *) tmp + 1;
+    NOISY3("malloc: %i (%x), %s\n", size, (md_node_t *)tmp + 1, desc);
+    return (md_node_t *) tmp + 1;
 }
 
 INLINE void *debugcalloc P4(int, nitems, int, size, int, tag, char *, desc)
@@ -72,8 +71,8 @@ INLINE void *debugcalloc P4(int, nitems, int, size, int, tag, char *, desc)
     stats.alloc_calls++;
     tmp = (void *) CALLOC(nitems * size + MD_OVERHEAD, 1);
     MDmalloc(tmp, nitems * size, tag, desc);
-    NOISY3("calloc: %i (%x), %s\n", nitems*size, (node_t *)tmp + 1, desc);
-    return (node_t *) tmp + 1;
+    NOISY3("calloc: %i (%x), %s\n", nitems*size, (md_node_t *)tmp + 1, desc);
+    return (md_node_t *) tmp + 1;
 }
 
 INLINE void debugfree P1(void *, ptr)
@@ -82,7 +81,7 @@ INLINE void debugfree P1(void *, ptr)
 
     NOISY1("free (%x)\n", ptr);
     stats.free_calls++;
-    tmp = (node_t *) ptr - 1;
+    tmp = (md_node_t *) ptr - 1;
     if (MDfree(tmp)) {
 	FREE(tmp);		/* only free if safe to do so */
     }
@@ -97,7 +96,7 @@ void dump_malloc_data()
     add_vmessage("total malloc'd:   %10lu\n", total_malloced);
     add_vmessage("high water mark:  %10lu\n", hiwater);
     add_vmessage("overhead:         %10lu\n",
-		(TABLESIZE * sizeof(node_t *)) + (net * MD_OVERHEAD));
+		(TABLESIZE * sizeof(md_node_t *)) + (net * MD_OVERHEAD));
     add_vmessage("#alloc calls:     %10lu\n", stats.alloc_calls);
     add_vmessage("#free calls:      %10lu\n", stats.free_calls);
     add_vmessage("#alloc - #free:   %10lu\n", net);

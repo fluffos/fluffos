@@ -1,0 +1,2 @@
+This directory is to contain files that serve as the templates for clones
+(created via new() or clone_object()).

@@ -1,7 +1,41 @@
+Thu Mar 30 14:56:48 EST 1995 (tim@handel.princeton.edu (Beek))
+	* bumped version number to v21.1
+	* three new contrib efuns:
+	  . int replaceable(object) - returns 1 if the object consists only
+	           of a create() function and inherited functions
+	  . void program_info() - prints out memory usage of programs
+	           divided up by sections
+	  . string upper_case() - similar to lower_case(), but ... :)
+	* fixed a crasher in the compilation of switch tables to C code
+	* rewrote/optimized some of the compile time type checking
+	* void valued efuns no longer return a value on the stack; if the
+	  result is used, zero will be substituted
+	* removed errorp() efun
+	* added a customized allocator for mapping nodes.  This should reduce
+	  memory usage and increase speed of additions/deletions
+	* removed RUNTIME_LOADING from options.h
+	* fixed a crasher involving finding duplicate objects in the hash
+	  table with LPC objects precompiled and DEBUG on
+	* changed program ref counts to shorts
+	* fixed a crasher in type errors in division
+	* fixed a division error message that erroneously indicated
+	  multiplication
+	* fixed a type error in locals used in anonymous functions
+	* fixed a bug in smalloc accounting; more overhead accounted for
+	  as well as some wasted mem
+	* fixed a refcount error/crasher in inherits()
+	* fixed a ref count bug/memory leak with non-bindable function
+	  pointers
+	* porting fixes for CX/UX 6.1, IRIX 5.3, amiga
+	* crasher fix in call_out(function, ...)
+	* fixed some bugs in type checking involving classes
+	* fixed a memory munger in regular expressions that end in '\'
+	* fixed inherited functions which have a different number of
+	  arguments than the functions they replace to not error
+	
 Fri Mar 10 11:03:09 EST 1995 (tim@handel.princeton.edu (Beek))
 	* bumped version number to v21
-	* In addition, many of the beta bug fixes up to v21.1b4 are added
-	  in here
+        * fixes up to v21.1b4 included.
 	--- Robocoder
 	* fixed smalloc accounting stats, and small leak in small block handler
 	* more amiga fixes, and compilation tweaks

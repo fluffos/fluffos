@@ -15,7 +15,6 @@
 #    include <sys/socketvar.h>
 #  endif
 #endif
-
 #ifdef LATTICE
 #  include <socket.h>
 #endif

@@ -113,8 +113,16 @@ OPTIMIZE=-O
 # used by ioctl on some systems.
 #NEED_OLD_CPP=-traditional-cpp
 
+# May be needed by SunOS for LPC->C support
+#STATIC=-static
+ 
 DEFINES=$(DEBUG) $(DEBUG_MACRO) $(DEBUG_NON_FATAL) $(OSFLAGS) $(MIRE)
 CFLAGS= $(STATIC) $(WARN) $(OPTIMIZE) $(PROFIL) $(STR) $(PIPE) $(DEFINES) \
+	$(NEED_OLD_CPP)
+ 
+# These are the flags used by the LPC->C compiler.  Make any modifications
+# you want here
+CFLAGS2= $(STATIC) $(WARN) $(OPTIMIZE) $(STR) $(PIPE) $(DEFINES) \
 	$(NEED_OLD_CPP)
  
 # set CC=cc on a NeXT (or gcc if you have a newer version than the NeXT
@@ -185,13 +193,16 @@ YFLAGS = -d -y
 # wish to add any libraries.
 LIBS=-lm $(EXTRALIBS) $(MIRELIBS)
  
+# use this line when enabling the LPC->C option
+#EXTRA_SRC=compile_file.c interface.c cfuns.c ccode.c
+
 EFUNS=efuns_main.c efuns_port.c $(EXTRA_EFUNS)
 
 SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   array.c mapping.c comm.c ed.c regexp.c mudlib_stats.c swap.c malloc.c \
   call_out.c otable.c dumpstat.c stralloc.c hash.c port.c buffer.c crc32.c \
   replace_program.c parse.c simul_efun.c sprintf.c reclaim.c backend.c \
-  generate.c scratchpad.c program.c mallocwrapper.c \
+  generate.c scratchpad.c program.c mallocwrapper.c class.c \
   strstr.c socket_efuns.c socket_ctrl.c qsort.c eoperators.c compiler.c \
   avltree.c trees.c socket_err.c md.c uid.c disassembler.c $(MIRE_C) $(EFUNS) \
   binaries.c functab_tree.c icode.c $(UALARM) $(STRFUNCS) $(EXTRA_SRC)
@@ -206,9 +217,12 @@ VPATH = $(OBJDIR)
 
 OBJ=$(addprefix $(OBJDIR)/,$(subst .c,.o,$(SRC))) $(OBJDIR)/packages/*.o
 
-all: $(DRIVER_BIN) addr_server
+all: $(DRIVER_BIN) addr_server lpc_to_c.h
 
 remake: neat all
+
+lpc_to_c.h: cfuns.h virtual_architecture.h
+	-cat cfuns.h virtual_architecture.h > lpc_to_c.h
 
 $(DRIVER_BIN): $(OBJDIR) $(OBJ)
 	-mv $(DRIVER_BIN) $(DRIVER_BIN).old

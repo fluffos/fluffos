@@ -2,9 +2,8 @@
 #define COMPILER_H
 
 #include "std.h"
-#include "incralloc.h"
 #include "trees.h"
-#include "instrs.h"
+#include "lex.h"
 #include "program.h"
 
 #define _YACC_
@@ -13,6 +12,20 @@
 #endif
 
 #define YYMAXDEPTH    600
+
+/*
+ * Information for allocating a block that can grow dynamically
+ * using realloc. That means that no pointers should be kept into such
+ * an area, as it might be moved.
+ */
+
+typedef struct {
+    char *block;
+    int current_size;
+    int max_size;
+} mem_block_t;
+
+#define START_BLOCK_SIZE	4096
 
 /* NUMPAREAS ares are saved with the program code after compilation,
  * the rest are only temporary.
@@ -24,16 +37,21 @@
 #define A_LINENUMBERS		4	/* linenumber information */
 #define A_FILE_INFO             5       /* start of file line nos */
 #define A_INHERITS		6	/* table of inherited progs */
-#define A_ARGUMENT_TYPES	7	/* */
-#define A_ARGUMENT_INDEX	8	/* */
-#define NUMPAREAS		8
-#define A_CASES                 9       /* keep track of cases */
-#define A_STRING_NEXT		10	/* next prog string in hash chain */
-#define A_STRING_REFS		11	/* reference count of prog string */
-#define A_INCLUDES		12	/* list of included files */
-#define A_PATCH			13	/* for save_binary() */
-#define A_INITIALIZER           14
-#define NUMAREAS		15
+#define A_CLASS_DEF             7
+#define A_CLASS_MEMBER          8
+#define A_ARGUMENT_TYPES	9	/* */
+#define A_ARGUMENT_INDEX	10	/* */
+#define NUMPAREAS		10
+#define A_CASES                 11      /* keep track of cases */
+#define A_STRING_NEXT		12	/* next prog string in hash chain */
+#define A_STRING_REFS		13	/* reference count of prog string */
+#define A_INCLUDES		14	/* list of included files */
+#define A_PATCH			15	/* for save_binary() */
+#define A_INITIALIZER           16
+#define NUMAREAS		17
+
+#define CURRENT_PROGRAM_SIZE prog_code - mem_block[current_block].block
+#define UPDATE_PROGRAM_SIZE mem_block[current_block].current_size = CURRENT_PROGRAM_SIZE
 
 /*
  * Types available. The number '0' is valid as any type. These types
@@ -42,55 +60,49 @@
  */
 
 #define TYPE_UNKNOWN	0	/* This type must be casted */
-#define TYPE_VOID       1
-#define TYPE_NUMBER     2
-#define TYPE_STRING     3
-#define TYPE_OBJECT     4
-#define TYPE_MAPPING    5
-#define TYPE_FUNCTION   6
-#define TYPE_REAL       7
-#define TYPE_BUFFER     8
-#define TYPE_ANY        9	/* Will match any type */
+#define TYPE_ANY        1	/* Will match any type */
+#define TYPE_NOVALUE    2
+#define TYPE_VOID       3
+#define TYPE_NUMBER     4
+#define TYPE_STRING     5
+#define TYPE_OBJECT     6
+#define TYPE_MAPPING    7
+#define TYPE_FUNCTION   8
+#define TYPE_REAL       9
+#define TYPE_BUFFER     10
 
-extern struct mem_block mem_block[NUMAREAS];
-
-#define CURRENT_PROGRAM_SIZE prog_code - mem_block[current_block].block
-#define UPDATE_PROGRAM_SIZE mem_block[current_block].current_size = CURRENT_PROGRAM_SIZE
+extern mem_block_t mem_block[NUMAREAS];
 
 #define LOOP_CONTEXT            0x1
 #define SWITCH_CONTEXT          0x2
 #define SWITCH_STRINGS          0x4
 #define SWITCH_NUMBERS          0x8
 #define SWITCH_DEFAULT          0x10
+#define SWITCH_RANGES           0x20
 
-#ifdef NEW_FUNCTIONS
-struct function_context_t {
+typedef struct {
     short bindable;
     short num_parameters;
     short num_locals;
-    struct parse_node *values_list;
-};
+    parse_node_t *values_list;
+} function_context_t;
 
-extern struct function_context_t function_context;
-#endif
+extern function_context_t function_context;
 
 /*
  * Some good macros to have.
  */
 
-#define BASIC_TYPE(e,t) ((e) == TYPE_ANY ||\
-                         (e) == (t) ||\
-                         (t) == TYPE_ANY)
+#define COMP_TYPE(e, t) (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) \
+			 || (compatible[e] & (1 << (t))))
+#define IS_TYPE(e, t) (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) \
+		       || (is_type[e] & (1 << (t))))
 
-#define TYPE(e,t) (BASIC_TYPE((e) & TYPE_MOD_MASK, (t) & TYPE_MOD_MASK) ||\
-                (((e) & TYPE_MOD_POINTER) && ((t) & TYPE_MOD_POINTER) &&\
-                BASIC_TYPE((e) & (TYPE_MOD_MASK & ~TYPE_MOD_POINTER),\
-                (t) & (TYPE_MOD_MASK & ~TYPE_MOD_POINTER))))
-
-#define FUNCTION(n) ((struct function *)mem_block[A_FUNCTIONS].block + (n))
-#define VARIABLE(n) ((struct variable *)mem_block[A_VARIABLES].block + (n))
+#define FUNCTION(n) ((function_t *)mem_block[A_FUNCTIONS].block + (n))
+#define VARIABLE(n) ((variable_t *)mem_block[A_VARIABLES].block + (n))
 #define SIMUL(n)    (simuls[n])
 #define PROG_STRING(n)   (((char **)mem_block[A_STRINGS].block)[n])
+#define CLASS(n)    ((class_def_t *)mem_block[A_CLASS_DEF].block + (n))
 
 #if !defined(__alpha) && !defined(cray)
 #define align(x) (((x) + 3) & ~3)
@@ -101,26 +113,26 @@ extern struct function_context_t function_context;
 #define SOME_NUMERIC_CASE_LABELS 0x40000
 #define NO_STRING_CASE_LABELS    0x80000
 
-int validate_function_call PROT((struct function *, int, struct parse_node *));
-struct parse_node *validate_efun_call PROT((int, struct parse_node *));
-extern struct mem_block mem_block[];
+int validate_function_call PROT((function_t *, int, parse_node_t *));
+parse_node_t *validate_efun_call PROT((int, parse_node_t *));
+extern mem_block_t mem_block[];
 extern int exact_types;
 extern int approved_object;
 extern int current_type;
 extern int current_block;
 extern char *prog_code;
 extern char *prog_code_max;
-extern struct program NULL_program;
-extern struct program *prog;
+extern program_t NULL_program;
+extern program_t *prog;
 extern unsigned char string_tags[0x20];
 extern short freed_string;
-extern struct ident_hash_elem **locals;
+extern ident_hash_elem_t **locals;
 extern unsigned short *type_of_locals;
 extern char *runtime_locals;
 extern int current_number_of_locals;
 extern int max_num_locals;
 extern unsigned short *type_of_locals_ptr;
-extern struct ident_hash_elem **locals_ptr;
+extern ident_hash_elem_t **locals_ptr;
 extern char *runtime_locals_ptr;
 
 extern int type_of_locals_size;
@@ -128,8 +140,9 @@ extern int locals_size;
 extern int current_number_of_locals;
 extern int max_num_locals;
 extern unsigned short a_functions_root;
-extern struct mem_block type_of_arguments;
-extern struct function_block_info_t *func_block;
+extern mem_block_t type_of_arguments;
+extern short compatible[11];
+extern short is_type[11];
 
 char *get_two_types PROT((int, int));
 char *get_type_name PROT((int));
@@ -153,33 +166,37 @@ void initialize_locals PROT((void));
 int get_id_number PROT((void));
 void compile_file PROT((int, char *));
 void reset_function_blocks PROT((void));
-void copy_variables PROT((struct program *, int));
-int copy_functions PROT((struct program *, int));
+void copy_variables PROT((program_t *, int));
+int copy_functions PROT((program_t *, int));
 void type_error PROT((char *, int));
 int compatible_types PROT((int, int));
-void arrange_call_inherited PROT((char *, struct parse_node *));
+void arrange_call_inherited PROT((char *, parse_node_t *));
 void add_arg_type PROT((unsigned short));
-int find_in_table PROT((struct function *, int));
-void find_inherited PROT((struct function *));
-int define_new_function PROT((char *, int, int, int, int, int));
+int find_in_table PROT((function_t *, int));
+void find_inherited PROT((function_t *));
+int define_new_function PROT((char *, int, int, int, int));
 int define_variable PROT((char *, int, int));
 short store_prog_string PROT((char *));
 void free_prog_string PROT((short));
 #ifdef DEBUG
 int dump_function_table PROT((void));
 #endif
-void prepare_cases PROT((struct parse_node *, int));
+void prepare_cases PROT((parse_node_t *, int));
 void push_func_block PROT((void));
 void pop_func_block PROT((void));
 
+parse_node_t *promote_to_float PROT((parse_node_t *));
+parse_node_t *promote_to_int PROT((parse_node_t *));
+parse_node_t *do_promotions PROT((parse_node_t *, int));
+
 /* inlines - if we're lucky, they'll get honored. */
-INLINE static void realloc_mem_block PROT((struct mem_block *, int));
+INLINE static void realloc_mem_block PROT((mem_block_t *, int));
 INLINE static void add_to_mem_block PROT((int, char *, int));
 INLINE static void insert_in_mem_block PROT((int, int, int));
 INLINE static char *allocate_in_mem_block PROT((int, int));
 
 INLINE static
-void realloc_mem_block P2(struct mem_block *, m, int, size)
+void realloc_mem_block P2(mem_block_t *, m, int, size)
 {
     while (size > m->max_size) {
 	m->max_size <<= 1;
@@ -191,7 +208,7 @@ void realloc_mem_block P2(struct mem_block *, m, int, size)
 INLINE static
 void add_to_mem_block P3(int, n, char *, data, int, size)
 {
-    struct mem_block *mbp = &mem_block[n];
+    mem_block_t *mbp = &mem_block[n];
 
     if (mbp->current_size + size > mbp->max_size)
 	realloc_mem_block(mbp, mbp->current_size + size);
@@ -203,7 +220,7 @@ void add_to_mem_block P3(int, n, char *, data, int, size)
 INLINE static
 char *allocate_in_mem_block P2(int, n, int, size)
 {
-    struct mem_block *mbp = &mem_block[n];
+    mem_block_t *mbp = &mem_block[n];
     char *ret;
 
     if (mbp->current_size + size > mbp->max_size)
@@ -216,7 +233,7 @@ char *allocate_in_mem_block P2(int, n, int, size)
 INLINE static
 void insert_in_mem_block P3(int, n, int, where, int, size)
 {
-    struct mem_block *mbp = &mem_block[n];
+    mem_block_t *mbp = &mem_block[n];
     char *p;
 
     if (mbp->current_size + size > mbp->max_size)

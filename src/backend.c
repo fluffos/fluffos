@@ -29,7 +29,7 @@ int current_time;
 
 int heart_beat_flag = 0;
 
-struct object *current_heart_beat;
+object_t *current_heart_beat;
 static void look_for_objects_to_swap PROT((void));
 static void call_heart_beat PROT((void));
 INLINE static void cycle_hb_list PROT((void));
@@ -70,9 +70,9 @@ static void report_holes() {
 }
 #endif
 
-void logon P1(struct object *, ob)
+void logon P1(object_t *, ob)
 {
-    struct svalue *ret;
+    svalue_t *ret;
 
     /* current_object no longer set */
     ret = apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
@@ -88,9 +88,9 @@ void logon P1(struct object *, ob)
  * The command can also come from a NPC.
  * Beware that 'str' can be modified and extended !
  */
-int parse_command P2(char *, str, struct object *, ob)
+int parse_command P2(char *, str, object_t *, ob)
 {
-    struct object *save = command_giver;
+    object_t *save = command_giver;
     int res;
 
     /* disallow users to issue commands containing ansi escape codes */
@@ -123,7 +123,7 @@ void backend()
     int nb;
     int i;
 
-    fprintf(stderr, "Setting up IPC on port %d.\n", (int) PORTNO);
+    fprintf(stderr, "Accepting user connections on port %d.\n", (int) PORTNO);
     init_user_conn();		/* initialize user connection socket */
 #ifdef SOCKET_EFUNS
     init_sockets();		/* initialize efun sockets           */
@@ -170,9 +170,13 @@ void backend()
 	 * *sigh* /Lars
 	 */
         /* Well, let's do it and see what happens - Sym */
-	/* What happens is random crashes at odd times.  It's too close
-	   to v21 to deal with this ... -Beek */
+#ifdef DEBUG
+#if 0
+	report_holes();
+#endif
+#else
 	clear_state();
+#endif
 	eval_cost = max_cost;
 
 	remove_destructed_objects();
@@ -253,11 +257,11 @@ void backend()
 static void look_for_objects_to_swap()
 {
     static int next_time;
-    struct object *ob;
-    struct object *next_ob;
+    object_t *ob;
+    object_t *next_ob;
     jmp_buf save_error_recovery_context;
     int save_rec_exists;
-    struct object *save;
+    object_t *save;
 
     if (current_time < next_time)
 	return;			/* Not time to look yet */
@@ -271,7 +275,7 @@ static void look_for_objects_to_swap()
      * this_user() (usually this isn't the user of the object).
      */
     save = command_giver;
-    command_giver = (struct object *) 0;
+    command_giver = (object_t *) 0;
     /*
      * Objects object can be destructed, which means that next object to
      * investigate is saved in next_ob. If very unlucky, that object can be
@@ -325,7 +329,7 @@ static void look_for_objects_to_swap()
 	    if (current_time - ob->time_of_ref > time_to_clean_up
 		&& (ob->flags & O_WILL_CLEAN_UP)) {
 		int save_reset_state = ob->flags & O_RESET_STATE;
-		struct svalue *svp;
+		svalue_t *svp;
 
 #ifdef DEBUG
 		if (d_flag)
@@ -339,7 +343,7 @@ static void look_for_objects_to_swap()
 		 * pointer).
 		 */
 
-		push_number(ob->flags & (O_CLONE | O_SWAPPED) ? 0 : ob->prog->p.i.ref);
+		push_number(ob->flags & (O_CLONE | O_SWAPPED) ? 0 : ob->prog->ref);
 		svp = apply(APPLY_CLEAN_UP, ob, 1, ORIGIN_DRIVER);
 		if (ob->flags & O_DESTRUCTED)
 		    continue;
@@ -354,7 +358,7 @@ static void look_for_objects_to_swap()
 	     * out.
 	     */
 
-	    if (ob->prog && ob->prog->p.i.line_info)
+	    if (ob->prog && ob->prog->line_info)
 		swap_line_numbers(ob->prog);
 	    if (ob->flags & O_SWAPPED || !ready_for_swap)
 		continue;
@@ -387,8 +391,8 @@ static void look_for_objects_to_swap()
  * is shadowed, check the shadowed object if living. There is no need to save
  * the value of the command_giver, as the caller resets it to 0 anyway.  */
 
-static struct object *hb_list = 0;	/* head */
-static struct object *hb_tail = 0;	/* for sane wrap around */
+static object_t *hb_list = 0;	/* head */
+static object_t *hb_tail = 0;	/* for sane wrap around */
 
 static int num_hb_objs = 0;	/* so we know when to stop! */
 static int num_hb_calls = 0;	/* starts */
@@ -407,14 +411,13 @@ void alarm_loop()
 
 static void call_heart_beat()
 {
-    struct object *ob;
-    struct object *save_current_object = current_object;
-    struct object *save_command_giver = command_giver;
+    object_t *ob;
+    object_t *save_current_object = current_object;
+    object_t *save_command_giver = command_giver;
     int num_done = 0;
 
 #ifdef OS2
     static TID bing = 0;
-
 #endif
 
     heart_beat_flag = 0;
@@ -443,14 +446,14 @@ static void call_heart_beat()
 	    num_done++;
 	    cycle_hb_list();
 	    ob = hb_tail;	/* now at end */
-	    if (!(ob->flags & O_HEART_BEAT))
-		fatal("Heartbeat not set in object on heart beat list!");
-	    if (ob->flags & O_SWAPPED)
-		fatal("Heart beat in swapped object.\n");
+	    DEBUG_CHECK(!(ob->flags & O_HEART_BEAT),
+			"Heartbeat not set in object on heart beat list!");
+	    DEBUG_CHECK(ob->flags & O_SWAPPED,
+			"Heart beat in swapped object.\n");
 	    /* is it time to do a heartbeat ? */
 	    ob->heart_beat_ticks--;
 	    /* move ob to end of list, do ob */
-	    if (ob->prog->p.i.heart_beat == -1)
+	    if (ob->prog->heart_beat == -1)
 		continue;
 	    if (ob->heart_beat_ticks < 1) {
 		ob->heart_beat_ticks = ob->time_to_heart_beat;
@@ -471,7 +474,7 @@ static void call_heart_beat()
 #endif
 		eval_cost = max_cost;
 		call_function(ob->prog,
-			&ob->prog->p.i.functions[ob->prog->p.i.heart_beat]);
+			&ob->prog->functions[ob->prog->heart_beat]);
 	    }
 	}
 	if (num_hb_objs)
@@ -494,7 +497,7 @@ static void call_heart_beat()
  */
 INLINE static void cycle_hb_list()
 {
-    struct object *ob;
+    object_t *ob;
 
     if (!hb_list)
 	fatal("Cycle heart beat list with empty list!");
@@ -508,7 +511,7 @@ INLINE static void cycle_hb_list()
 }				/* cycle_hb_list() */
 
 int
-query_heart_beat P1(struct object *, ob)
+query_heart_beat P1(object_t *, ob)
 {
     if (!(ob->flags & O_HEART_BEAT)) {
 	return 0;
@@ -522,17 +525,14 @@ query_heart_beat P1(struct object *, ob)
  * various pointers in call_heart_beat could be stuffed, so we must
  * check current_heart_beat and adjust pointers.  */
 
-int set_heart_beat P2(struct object *, ob, int, to)
+int set_heart_beat P2(object_t *, ob, int, to)
 {
-    struct object *o = hb_list;
-    struct object *oprev = 0;
+    object_t *o = hb_list;
+    object_t *oprev = 0;
 
     if (ob->flags & O_DESTRUCTED)
 	return (0);
-#ifdef OLD_HEARTBEAT
-    if (to)
-	to = 1;
-#endif
+
     while (o && o != ob) {
 	if (!(o->flags & O_HEART_BEAT))
 	    fatal("Found disabled object in the active heart beat list!\n");
@@ -602,8 +602,8 @@ int heart_beat_status P1(int, verbose)
  */
 void preload_objects P1(int, eflag)
 {
-    struct vector *prefiles;
-    struct svalue *ret;
+    array_t *prefiles;
+    svalue_t *ret;
     VOLATILE int ix;
 
     if (SETJMP(error_recovery_context)) {
@@ -615,19 +615,21 @@ void preload_objects P1(int, eflag)
     error_recovery_context_exists = NORMAL_ERROR_CONTEXT;
     push_number(eflag);
     ret = apply_master_ob(APPLY_EPILOG, 1);
-    if ((ret == 0) || (ret == (svalue *)-1) || (ret->type != T_POINTER))
+    if ((ret == 0) || (ret == (svalue_t *)-1) || (ret->type != T_ARRAY))
 	return;
     else
-	prefiles = ret->u.vec;
+	prefiles = ret->u.arr;
     if ((prefiles == 0) || (prefiles->size < 1))
 	return;
     prefiles->ref++;
-    ix = -1;
+    ix = 0;
+    /* in case of an error, effectively do a 'continue' */
     if (SETJMP(error_recovery_context)) {
 	clear_state();
 	add_message("error in preload() in the master object.\n");
+	ix++;
     }
-    while (++ix < prefiles->size) {
+    for ( ; ix < prefiles->size; ix++) {
 	if (prefiles->item[ix].type != T_STRING)
 	    continue;
 
@@ -636,7 +638,7 @@ void preload_objects P1(int, eflag)
 	push_string(prefiles->item[ix].u.string, STRING_MALLOC);
 	(void) apply_master_ob(APPLY_PRELOAD, 1);
     }
-    free_vector(prefiles);
+    free_array(prefiles);
     error_recovery_context_exists = NULL_ERROR_CONTEXT;
 }				/* preload_objects() */
 
@@ -645,7 +647,7 @@ void preload_objects P1(int, eflag)
 
 INLINE void remove_destructed_objects()
 {
-    struct object *ob, *next;
+    object_t *ob, *next;
 
     if (obj_list_replace)
 	replace_programs();

@@ -8,6 +8,9 @@
  * not the System V one.
  */
 
+#define EFUN_REGEXP 1
+#define ED_REGEXP   2
+
 #define NSUBEXP  10
 typedef struct regexp {
     char *startp[NSUBEXP];
@@ -20,6 +23,8 @@ typedef struct regexp {
 }      regexp;
 
 extern int regnarrate;
+extern int regexp_user;
+extern char *regexp_error;
 
 void regdump PROT((regexp *));
 regexp *regcomp PROT((char *, int));

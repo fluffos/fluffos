@@ -3,6 +3,7 @@
 
 #include "lint.h"
 #include "trees.h"
+#include "program.h"
 #include "icode.h"
 
 #ifdef LPC_TO_C
@@ -21,13 +22,14 @@
 #define initialize_parser i_initialize_parser
 #endif
 
-int node_always_true PROT((struct parse_node *));
-short generate PROT((struct parse_node *));
-int generate_conditional_branch PROT((struct parse_node *));
+int node_always_true PROT((parse_node_t *));
+short generate PROT((parse_node_t *));
+short generate_function PROT((function_t *, parse_node_t *));
+int generate_conditional_branch PROT((parse_node_t *));
 
 #ifdef DEBUG
-void dump_expr_list PROT((struct parse_node *, int));
-void dump_tree PROT((struct parse_node *, int));
+void dump_expr_list PROT((parse_node_t *, int));
+void dump_tree PROT((parse_node_t *, int));
 #endif
 
 #endif
