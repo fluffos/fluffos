@@ -1339,6 +1339,9 @@ void f_malloc_status PROT((void))
 
     outbuf_zero(&ob);
 
+#ifdef MMALLOC
+    outbuf_add(&ob, "Using mmap malloc");
+#endif
 #ifdef BSDMALLOC
     outbuf_add(&ob, "Using BSD malloc");
 #endif

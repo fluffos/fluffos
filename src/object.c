@@ -1990,7 +1990,7 @@ void get_objects P4(object_t ***, list, int *, size, get_objectsfn_t, callback, 
     *list = (object_t **)new_string((tot_alloc_object * sizeof(object_t *)) - 1, "get_objects");
 #endif
 
-    if (!list)
+    if (!*list)
         fatal("Out of memory!\n");
     push_malloced_string((char *)*list);
 

@@ -295,6 +295,13 @@ static void deep_copy_svalue P2(svalue_t *, from, svalue_t *, to) {
         to->u.map = deep_copy_mapping( from->u.map );
         depth--;
         break;
+#ifndef NO_BUFFER_TYPE
+    case T_BUFFER:
+        *to = *from;
+        to->u.buf = allocate_buffer(from->u.buf->size);
+        memcpy(to->u.buf->item, from->u.buf->item, from->u.buf->size);
+        break;
+#endif
     default:
         assign_svalue_no_free( to, from );
     }

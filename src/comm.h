@@ -170,7 +170,7 @@ extern int max_users;
 
 void CDECL add_vmessage PROT2V(object_t *, char *);
 void add_message PROT((object_t *, char *, int));
-void add_binary_message PROT((object_t *, char *, int));
+void add_binary_message PROT((object_t *, unsigned char *, int));
 
 #ifdef SIGNAL_FUNC_TAKES_INT
 void sigalrm_handler PROT((int));

@@ -137,6 +137,12 @@ void kill_ref P1(ref_t *, ref) {
       unlock_mapping(ref->sv.u.map);
     }
     free_svalue(&ref->sv, "kill_ref");
+    if(ref->next)
+      ref->next->prev = ref->prev;
+    if(ref->prev)
+      ref->prev->next = ref->next;
+    else
+      global_ref_list = ref->next;
     if (ref->ref > 0) {
   /* still referenced */
   ref->lvalue = 0;
@@ -148,6 +154,9 @@ void kill_ref P1(ref_t *, ref) {
 ref_t *make_ref PROT((void)) {
     ref_t *ref = ALLOCATE(ref_t, TAG_TEMPORARY, "make_ref");
     ref->next = global_ref_list;
+    ref->prev = NULL;
+    if(ref->next)
+      ref->next->prev = ref;
     global_ref_list = ref;
     ref->csp = csp;
     ref->ref = 1;
@@ -464,9 +473,7 @@ INLINE void int_free_svalue P1(svalue_t *, v)
     break;
       case T_REF:
         if (!v->u.ref->lvalue){
-          if(v->u.ref == global_ref_list)
-            global_ref_list = global_ref_list->next;
-        FREE(v->u.ref);
+           kill_ref(v->u.ref);
         }
     break;
       }
@@ -2007,11 +2014,8 @@ eval_instruction P1(char *, p)
   {
       int num = EXTRACT_UCHAR(pc++);
       
-      while (num--) {
-    ref_t *ref = global_ref_list;
-    global_ref_list = global_ref_list->next;
-    kill_ref(ref);
-      }
+      while (num--) 
+         kill_ref(global_ref_list);
       break;
   }
   case F_REF:
@@ -3972,13 +3976,21 @@ void check_co_args2 P4(unsigned short *, types, int, num_arg, char *, name, char
       continue;
     
     if((sp-argc)->type != exptype){
+      char buf[1024];
       if((sp-argc)->type == T_NUMBER && !(sp-argc)->u.number)
         continue;
-      if(!current_prog)
-        current_prog = master_ob->prog;
-      error("Bad argument %d in call to %s in %s()\nExpected: %s Got %s.\n",
+      sprintf(buf, "Bad argument %d in call to %s() in %s\nExpected: %s Got %s.\n",
             num_arg - argc, name, ob_name, 
             type_name(exptype), type_name((sp-argc)->type));
+#ifdef CALL_OTHER_WARN
+      if(current_prog){
+        find_line(pc, current_prog, &current_file, &current_line);
+        smart_log(current_file, current_line, buf, 1);
+      } else 
+        smart_log("driver", 0, buf, 1);
+#else
+      error(buf);
+#endif
     }
   } while (argc);
 }
@@ -3986,9 +3998,19 @@ void check_co_args2 P4(unsigned short *, types, int, num_arg, char *, name, char
 void check_co_args P4(int, num_arg, program_t *, prog, function_t *, fun, int, index) {
 #ifdef CALL_OTHER_TYPE_CHECK
   if(num_arg != fun->num_arg){
-    if(!current_prog)
-      current_prog = master_ob->prog;
-    error("Wrong number of arguments to %s in %s.\n", fun->name, prog->name);
+    char buf[255];
+    //if(!current_prog) what do i need this for again?
+    // current_prog = master_ob->prog;
+    sprintf(buf, "Wrong number of arguments to %s in %s.\n", fun->name, prog->name);
+#ifdef CALL_OTHER_WARN
+    if(current_prog){
+      find_line(pc, current_prog, &current_file, &current_line);
+      smart_log(current_file, current_line, buf, 1);
+    } else
+      smart_log("driver", 0, buf, 1);
+#else
+    error(buf);
+#endif
   }
           
   if(num_arg && prog->type_start &&

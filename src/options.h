@@ -68,6 +68,7 @@
 #define SYSMALLOC
 #undef SMALLOC
 #undef BSDMALLOC
+#undef MMALLOC
 
 /* You may optionally choose one (or none) of these malloc wrappers.  These
  * can be used in conjunction with any of the above malloc packages.
@@ -870,4 +871,7 @@
  * (-> operator on objects)
  */
 #undef CALL_OTHER_TYPE_CHECK
+
+/* CALL_OTHER_WARN, make it warning instead of errors */
+#undef CALL_OTHER_WARN
 #endif

@@ -17,40 +17,40 @@
 #define TELOPT_COMPRESS 85
 #define TELOPT_COMPRESS2 86
 
-static char telnet_break_response[] = {  28, IAC, WILL, TELOPT_TM };
-static char telnet_ip_response[]    = { 127, IAC, WILL, TELOPT_TM };
-static char telnet_abort_response[] = { IAC, DM };
-static char telnet_do_tm_response[] = { IAC, WILL, TELOPT_TM };
-static char telnet_do_naws[]        = { IAC, DO, TELOPT_NAWS };
-static char telnet_do_ttype[]       = { IAC, DO, TELOPT_TTYPE };
-static char telnet_term_query[]     = { IAC, SB, TELOPT_TTYPE, TELQUAL_SEND, IAC, SE };
-static char telnet_no_echo[]        = { IAC, WONT, TELOPT_ECHO };
-static char telnet_no_single[]      = { IAC, WONT, TELOPT_SGA };
-static char telnet_yes_echo[]       = { IAC, WILL, TELOPT_ECHO };
-static char telnet_yes_single[]     = { IAC, WILL, TELOPT_SGA };
-static char telnet_ga[]             = { IAC, GA };
-static char telnet_ayt_response[]   = { '\n', '[', '-', 'Y', 'e', 's', '-', ']', ' ', '\n' };
-static char telnet_line_mode[]      = { IAC, DO, TELOPT_LINEMODE };
-static char telnet_lm_mode[]        = { IAC, SB, TELOPT_LINEMODE, LM_MODE, MODE_EDIT | MODE_TRAPSIG, IAC, SE };
-static char telnet_char_mode[]      = { IAC, DONT, TELOPT_LINEMODE };
+static unsigned char telnet_break_response[] = {  28, IAC, WILL, TELOPT_TM };
+static unsigned char telnet_ip_response[]    = { 127, IAC, WILL, TELOPT_TM };
+static unsigned char telnet_abort_response[] = { IAC, DM };
+static unsigned char telnet_do_tm_response[] = { IAC, WILL, TELOPT_TM };
+static unsigned char telnet_do_naws[]        = { IAC, DO, TELOPT_NAWS };
+static unsigned char telnet_do_ttype[]       = { IAC, DO, TELOPT_TTYPE };
+static unsigned char telnet_term_query[]     = { IAC, SB, TELOPT_TTYPE, TELQUAL_SEND, IAC, SE };
+static unsigned char telnet_no_echo[]        = { IAC, WONT, TELOPT_ECHO };
+static unsigned char telnet_no_single[]      = { IAC, WONT, TELOPT_SGA };
+static unsigned char telnet_yes_echo[]       = { IAC, WILL, TELOPT_ECHO };
+static unsigned char telnet_yes_single[]     = { IAC, WILL, TELOPT_SGA };
+static unsigned char telnet_ga[]             = { IAC, GA };
+static unsigned char telnet_ayt_response[]   = { '\n', '[', '-', 'Y', 'e', 's', '-', ']', ' ', '\n' };
+static unsigned char telnet_line_mode[]      = { IAC, DO, TELOPT_LINEMODE };
+static unsigned char telnet_lm_mode[]        = { IAC, SB, TELOPT_LINEMODE, LM_MODE, MODE_EDIT | MODE_TRAPSIG, IAC, SE };
+static unsigned char telnet_char_mode[]      = { IAC, DONT, TELOPT_LINEMODE };
 
-static char slc_default_flags[] = { SLC_NOSUPPORT, SLC_CANTCHANGE, SLC_CANTCHANGE, SLC_CANTCHANGE, SLC_CANTCHANGE, SLC_NOSUPPORT,
+static unsigned char slc_default_flags[] = { SLC_NOSUPPORT, SLC_CANTCHANGE, SLC_CANTCHANGE, SLC_CANTCHANGE, SLC_CANTCHANGE, SLC_NOSUPPORT,
                                     SLC_NOSUPPORT, SLC_NOSUPPORT, SLC_CANTCHANGE, SLC_CANTCHANGE, SLC_NOSUPPORT, SLC_NOSUPPORT,
                                     SLC_NOSUPPORT, SLC_NOSUPPORT, SLC_NOSUPPORT, SLC_NOSUPPORT, SLC_NOSUPPORT, SLC_NOSUPPORT };
-static char slc_default_chars[] = { 0x00, BREAK, IP, AO, AYT, 0x00, 0x00, 0x00,
+static unsigned char slc_default_chars[] = { 0x00, BREAK, IP, AO, AYT, 0x00, 0x00, 0x00,
                                     SUSP, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00,
                                     0x00, 0x00, 0x00 };
 #ifdef HAVE_ZLIB
-static char telnet_compress_send_request_v2[] = { IAC, WILL,
+static unsigned char telnet_compress_send_request_v2[] = { IAC, WILL,
                                                   TELOPT_COMPRESS2 };
 
-static char telnet_compress_send_request_v1[] = { IAC, WILL,
+static unsigned char telnet_compress_send_request_v1[] = { IAC, WILL,
                                                   TELOPT_COMPRESS };
 
-static char telnet_compress_v1_response[] = { IAC, SB,
+static unsigned char telnet_compress_v1_response[] = { IAC, SB,
                                               TELOPT_COMPRESS, WILL,
                                               SE };
-static char telnet_compress_v2_response[] = { IAC, SB,
+static unsigned char telnet_compress_v2_response[] = { IAC, SB,
                                               TELOPT_COMPRESS2, IAC,
                                               SE };
 #endif
@@ -81,7 +81,7 @@ static void add_ip_entry PROT((long, char *));
 static void new_user_handler PROT((int));
 static void end_compression PROT((interactive_t *));
 static void start_compression PROT((interactive_t *));
-static int send_compressed PROT((interactive_t *ip, char* data, int length));
+static int send_compressed PROT((interactive_t *ip, unsigned char* data, int length));
 
 
 
@@ -177,7 +177,7 @@ receive_snoop P3(char *, buf, int, len, object_t *, snooper)
 void init_user_conn()
 {
     struct sockaddr_in sin;
-    int sin_len;
+    unsigned int sin_len;
     int optval;
     int i;
     int have_fd6;
@@ -595,10 +595,10 @@ void add_vmessage P2V(object_t *, who, char *, format)
     add_message_calls++;
 }                               /* add_message() */
 
-void add_binary_message P3(object_t *, who, char *, data, int, len)
+void add_binary_message P3(object_t *, who, unsigned char *, data, int, len)
 {
     interactive_t *ip;
-    char *cp, *end;
+    unsigned char *cp, *end;
     
     /*
      * if who->interactive is not valid, bail
@@ -709,8 +709,8 @@ int flush_message P1(interactive_t *, ip)
 static void copy_chars P3(interactive_t *, ip, char *, from, int, num_bytes)
 {
     int i, start, x;
-    char dont_response[3] = { IAC, DONT, 0 };
-    char wont_response[3] = { IAC, WONT, 0 };
+    unsigned char dont_response[3] = { IAC, DONT, 0 };
+    unsigned char wont_response[3] = { IAC, WONT, 0 };
 
     start = ip->text_end;
     for (i = 0;  i < num_bytes;  i++) {
@@ -920,7 +920,7 @@ static void copy_chars P3(interactive_t *, ip, char *, from, int, num_bytes)
                                     case LM_MODE:
                                         /* Don't do anything with an ACK */
                                         if (!(ip->sb_buf[2] & MODE_ACK)) {
-                                            char sb_ack[] = { IAC, SB, TELOPT_LINEMODE, LM_MODE, MODE_EDIT | MODE_TRAPSIG | MODE_ACK, IAC, SE };
+                                            unsigned char sb_ack[] = { IAC, SB, TELOPT_LINEMODE, LM_MODE, MODE_EDIT | MODE_TRAPSIG | MODE_ACK, IAC, SE };
 
                                             /* Accept only EDIT and TRAPSIG && force them too */
                                             add_binary_message(ip->ob, sb_ack, sizeof(sb_ack));
@@ -930,7 +930,7 @@ static void copy_chars P3(interactive_t *, ip, char *, from, int, num_bytes)
                                     case LM_SLC:
                                         {
                                             int slc_length = 4;
-                                            char slc_response[SB_SIZE + 6] = { IAC, SB, TELOPT_LINEMODE, LM_SLC };
+                                            unsigned char slc_response[SB_SIZE + 6] = { IAC, SB, TELOPT_LINEMODE, LM_SLC };
 
                                             for (x = 2;  x < ip->sb_pos;  x += 3) {
                                                 /* no response for an ack */
@@ -940,7 +940,7 @@ static void copy_chars P3(interactive_t *, ip, char *, from, int, num_bytes)
                                                 /* If we get { 0, SLC_DEFAULT, 0 } or { 0, SLC_VARIABLE, 0 } return a list of values */
                                                 /* If it's SLC_DEFAULT, reset to defaults first */
                                                 if (!ip->sb_buf[x] && !ip->sb_buf[x + 2]) {
-                                                    if (ip->sb_buf[x] == SLC_DEFAULT || ip->sb_buf[x] == SLC_VARIABLE) {
+                                                    if (ip->sb_buf[x + 1] == SLC_DEFAULT || ip->sb_buf[x + 1] == SLC_VARIABLE) {
                                                         int n;
 
                                                         for (n = 0;  n < NSLC;  n++) {
@@ -965,6 +965,8 @@ static void copy_chars P3(interactive_t *, ip, char *, from, int, num_bytes)
                                                 if (ip->sb_buf[x] >= NSLC || slc_default_flags[(int)ip->sb_buf[x]] == SLC_NOSUPPORT) {
                                                     slc_response[slc_length++] = SLC_NOSUPPORT;
                                                     slc_response[slc_length++] = ip->sb_buf[x + 2];
+                                                    if ((unsigned char)ip->sb_buf[x + 2] == IAC)
+                                                       slc_response[slc_length++] = IAC;
                                                     continue;
                                                 }
 
@@ -1010,6 +1012,8 @@ static void copy_chars P3(interactive_t *, ip, char *, from, int, num_bytes)
                                                     default:
                                                         slc_response[slc_length++] = SLC_NOSUPPORT;
                                                         slc_response[slc_length++] = ip->sb_buf[x + 2];
+                                                        if ((unsigned char)slc_response[slc_length - 1] == IAC)
+                                                           slc_response[slc_length++] = IAC;
                                                         break;
                                                 }
                                             }
@@ -1025,7 +1029,7 @@ static void copy_chars P3(interactive_t *, ip, char *, from, int, num_bytes)
 
                                     case DO:
                                         {
-                                            char sb_wont[] = { IAC, SB, TELOPT_LINEMODE, WONT, 0, IAC, SE };
+                                            unsigned char sb_wont[] = { IAC, SB, TELOPT_LINEMODE, WONT, 0, IAC, SE };
 
                                             /* send back IAC SB TELOPT_LINEMODE WONT x IAC SE */
                                             sb_wont[4] = ip->sb_buf[2];
@@ -1035,7 +1039,7 @@ static void copy_chars P3(interactive_t *, ip, char *, from, int, num_bytes)
 
                                     case WILL:
                                         {
-                                            char sb_dont[] = { IAC, SB, TELOPT_LINEMODE, DONT, 0, IAC, SE };
+                                            unsigned char sb_dont[] = { IAC, SB, TELOPT_LINEMODE, DONT, 0, IAC, SE };
 
                                             /* send back IAC SB TELOPT_LINEMODE DONT x IAC SE */
                                             sb_dont[4] = ip->sb_buf[2];
@@ -1500,7 +1504,7 @@ static void new_user_handler P1(int, which)
 {
     int new_socket_fd;
     struct sockaddr_in addr;
-    int length;
+    unsigned int length;
     int i, x;
     object_t *master, *ob;
     svalue_t *ret;
@@ -1508,7 +1512,7 @@ static void new_user_handler P1(int, which)
     length = sizeof(addr);
     debug(connections, ("new_user_handler: accept on fd %d\n", external_port[which].fd));
     new_socket_fd = accept(external_port[which].fd,
-                           (struct sockaddr *) & addr, (int *) &length);
+                           (struct sockaddr *) & addr, (unsigned int *) &length);
     if (new_socket_fd < 0) {
 #ifdef EWOULDBLOCK
         if (socket_errno == EWOULDBLOCK) {
@@ -2610,6 +2614,8 @@ int outbuf_extend P2(outbuffer_t *, outbuf, int, l)
     int limit;
 
     DEBUG_CHECK(l < 0, "Negative length passed to outbuf_extend.\n");
+
+    l = (l > USHRT_MAX ? USHRT_MAX : l);
     
     if (outbuf->buffer) {
         limit = MSTR_SIZE(outbuf->buffer);
@@ -2626,8 +2632,7 @@ int outbuf_extend P2(outbuffer_t *, outbuf, int, l)
             outbuf->buffer = extend_string(outbuf->buffer, limit);
         }
     } else {
-        l = (l > USHRT_MAX ? USHRT_MAX : l);
-        outbuf->buffer = new_string(l, "outbuf_add");
+        outbuf->buffer = new_string(l, "outbuf_extend");
         outbuf->real_size = 0;
     }
     return l;
@@ -2639,19 +2644,16 @@ void outbuf_add P2(outbuffer_t *, outbuf, char *, str)
     
     if (!outbuf) return;
     l = strlen(str);
-    limit = outbuf_extend(outbuf, l);
-    strncpy(outbuf->buffer + outbuf->real_size, str, limit);
-    outbuf->real_size += (l > limit ? limit : l);
-    *(outbuf->buffer + outbuf->real_size) = 0;
+    if ((limit = outbuf_extend(outbuf, l)) > 0) {
+       strncpy(outbuf->buffer + outbuf->real_size, str, limit);
+       outbuf->real_size += (l > limit ? limit : l);
+       *(outbuf->buffer + outbuf->real_size) = 0;
+    }
 }
 
 void outbuf_addchar P2(outbuffer_t *, outbuf, char, c)
 {
-    int limit;
-    
-    if (!outbuf) return;
-    limit = outbuf_extend(outbuf, 1);
-    if(limit) {
+    if(outbuf && (outbuf_extend(outbuf, 1) > 0)) {
       *(outbuf->buffer + outbuf->real_size++) = c;
       *(outbuf->buffer + outbuf->real_size) = 0;
     }
@@ -2805,7 +2807,7 @@ static int flush_compressed_output (interactive_t *ip) {
 }
 
 
-static int send_compressed (interactive_t *ip, char* data, int length) {
+static int send_compressed (interactive_t *ip, unsigned char* data, int length) {
     z_stream* compress;
     compress = ip->compressed_stream;
     compress->next_in = data;

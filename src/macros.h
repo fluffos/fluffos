@@ -90,7 +90,7 @@
 
    Please refer to options.h for selecting malloc package and wrapper.
 */
-#if (defined(SYSMALLOC) + defined(SMALLOC) + defined(BSDMALLOC)) > 1
+#if (defined(SYSMALLOC) + defined(SMALLOC) + defined(BSDMALLOC) + defined(MMALLOC)) > 1
 !Only one malloc package should be defined
 #endif
 

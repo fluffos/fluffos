@@ -6,7 +6,7 @@
  */
 #if defined(SYSMALLOC) || \
     (defined(SMALLOC) && defined(SBRK_OK)) || \
-    defined(BSDMALLOC)
+    defined(BSDMALLOC) || defined(MMALLOC)
 #define MALLOC(x)       malloc(x)
 #define FREE(x)         free(x)
 #define REALLOC(x,y)    realloc(x,y)
@@ -37,9 +37,15 @@
 #  define bsdmalloc_calloc      calloc
 #endif
 
+#ifdef MMALLOC
+#  define mmalloc      malloc
+#  define mfree        free
+#  define mrealloc     realloc
+#  define mcalloc      calloc
+#endif
+
 #define DXALLOC(x,tag,desc)     xalloc(x)
 #define DMALLOC(x,tag,desc)     MALLOC(x)
 #define DREALLOC(x,y,tag,desc)  REALLOC(x,y)
 #define DCALLOC(x,y,tag,desc)   CALLOC(x,y)
-
 #endif /* MY_MALLOC_H */

@@ -36,9 +36,7 @@ void query_multiple_short P6(svalue_t *, arg, char *, type, int, no_dollars, int
     int i;
     int len;
     int total_len;
-    char *pos;
     char *str, *res;
-    char *tmp;
     object_t *ob;
     char *fun; 
 
@@ -574,7 +572,6 @@ void
 f_shuffle PROT((void))
 {
     svalue_t *sv = sp - st_num_arg + 1;
-    int num_arg = st_num_arg;
 
     if (sv->type == T_ARRAY && sv->u.arr) {
         shuffle(sv->u.arr);

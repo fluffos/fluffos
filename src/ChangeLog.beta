@@ -1,4 +1,35 @@
-Thu Feb  7 18:39:16 2002 (marius@mduso.org (Marius))
+Sun Sep 15 17:53:16 2002 (marius@mudos.org (Marius))
+	* raised patchlevel to v22.2b13
+	* added a newline after the BIGENDIAN define in edit_source.
+	* fixed extra_ref accesses in the parser package when DEBUG
+	  is not defined [reported by Tigran@Lima Bean]
+	* #167: Sprintf missing vars [reported by Andrew@Nanvaent]
+	* #170: Fixed up some reference problems where dangling
+	  pointers could be left in any number of places. [reported
+	  by Uranus]
+	* #168: Buffer overflow on doing sprintf("%*d", 300, 1);
+	  [reported by Andrew@Nanvaent]
+	* #171: Crasher caused by array overflow [reported by
+	  Andrew@Nanvaent]
+	* #172: Crashers due to outbuf_* failing [reported by
+	  Andrew@Nanvaent]
+	* #173: Crasher when heart_beats() is called [reported by
+	  Andrew@Nanvaent]
+	* #180: copy() on a buffer performs no useful action
+	  [reported by Beyond, fixed by Andrew@Nanvaent]
+	* #181: Memory allocation success not checked properly
+	  [reported by Andrew@Nanvaent]
+	* #182: Telnet handling flaws [reported by Andrew@Nanvaent]
+	* #185: allocate_mapping() not freeing input arrays
+	  [reported by Reio Remma]
+	* #186: check_memory() leaving a string with bad refs
+	  [reported by Reio Remma]
+	* #178: Oddity in unlink_string_svalue() [reported by
+	  Andrew@Nanvaent]
+	* #184: Crasher in debug mode while calling clean_up().
+	  [reported by Reio Remma]
+
+Thu Feb  7 18:39:16 2002 (marius@mudos.org (Marius))
 	* raised patchlevel to v22.2b12
 	* #152: Fixed a crasher using nested references.  Fix supplied
 	  by Avenger@AtP.

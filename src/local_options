@@ -65,9 +65,10 @@
  *   * Faster than SMALLOC but more memory overhead.
  *   * Requires sbrk().
  */
-#define SYSMALLOC
+#undef SYSMALLOC
 #undef SMALLOC
 #undef BSDMALLOC
+#define MMALLOC
 
 /* You may optionally choose one (or none) of these malloc wrappers.  These
  * can be used in conjunction with any of the above malloc packages.
@@ -837,7 +838,7 @@
  * [NOTE: malloc_debug(6) is a good compromise between efficiency and
  *  completeness of malloc debugging (malloc/free will be about half as fast).]
  */
-#define NEXT_MALLOC_DEBUG
+#undef NEXT_MALLOC_DEBUG
 
 
 /* GET_CHAR_IS_BUFFERED: Normally get_char() is unbuffered.  That is, once
@@ -854,5 +855,6 @@
 #define SAVE_GZ_EXTENSION ".o.gz"
 #define USE_FLUFF_MOD
 #undef CALL_OTHER_TYPE_CHECK 
+#define CALL_OTHER_WARN
 #define PACKAGE_DWLIB
 #endif

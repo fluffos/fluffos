@@ -1,6 +1,12 @@
 As MudOS is moving to slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
+new in FluffOS 1.12
+updated with respect to MudOS v22.2b12
+removed some mixing of signed and unsigned chars
+added mmap based malloc option (MMALLOC)
+added option to make call_other type errors warnings
+
 new in FluffOS 1.11
 shuffle() efun by Taffyd
 crasher fixes (copied from divided skys)

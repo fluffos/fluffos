@@ -1409,9 +1409,10 @@ char *get_type_name P3(char *, where, char *, end, int, type)
     }
     if (type & TYPE_MOD_CLASS) {
         where = strput(where, end, "class ");
-        /* we're sometimes called from outside the compiler */
+        /* we're sometimes called from outside the compiler * /
         if (current_file)
             where = strput(where, end, PROG_STRING(CLASS(type & ~TYPE_MOD_CLASS)->name));
+	    and that just doesn't work */
     } else {
         DEBUG_CHECK(type >= sizeof compiler_type_names / sizeof compiler_type_names[0], "Bad type\n");
         where = strput(where, end, compiler_type_names[type]);

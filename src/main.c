@@ -614,7 +614,7 @@ static void CDECL PSIG(sig_int)
 #ifndef DEBUG
 static void CDECL PSIG(sig_segv)
 {
-    error("Segmentation fault");
+    fatal("Segmentation fault");
 }
 
 static void CDECL PSIG(sig_bus)

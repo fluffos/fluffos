@@ -1049,10 +1049,12 @@ void check_all_blocks P1(int, flag) {
             if (i == 5) outbuf_add(&out, "\n");
         }
     }
-    //    if (!(flag & 2)) apparently this fucks up some strings
+    if (!(flag & 2))
         outbuf_push(&out);
-        //else
-        //push_number(0);
+    else {
+      FREE_MSTR(out.buffer);
+      push_number(0);
+    }
 }
 #endif                          /* DEBUGMALLOC_EXTENSIONS */
 #endif                          /* DEBUGMALLOC */
