@@ -1,0 +1,21 @@
+.\"returns an array of the filenames of the objects to be preloaded.
+.TH EPILOG 4
+
+.SH NAME
+epilog - returns an array of the filenames of the objects to be preloaded.
+
+.SH SYNOPSIS
+.nf
+string *epilog();
+void preload(string filename);
+
+.SH DESCRIPTION
+The driver calls epilog() in master after the master object has been loaded.
+Mudlibs typically use epilog to initialize data structures in master (such
+as security tables etc).  epilog() should returns an array of filenames
+which correspond to objects that the mudlib wants to have preloaded; that is,
+loaded before the first player logs in.  For each filename returned in the
+array, the driver will called preload(filename) in master.
+
+.SH SEE ALSO
+epilog(4)

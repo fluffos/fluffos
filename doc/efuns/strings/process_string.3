@@ -1,0 +1,26 @@
+.\"returns a value by function call (call-other in string form...)
+.TH process_string 3
+
+.SH NAME
+process_string() - returns a value by function call
+
+.SH SYNOPSIS
+string process_string(string str);
+
+.SH DESCRIPTION
+Returns a value by function call (call-other in string form...)
+.PP
+examples:
+.PP
+.nf
+   process_string("<func>:<file>|arg1|arg2|arg3...|argn);
+
+   this would produce a call_other of the form:
+      file->func(arg1,arg2,arg3...,argn);
+.fi
+.PP
+The file name is options (Otherwise it's assumed to be in this_object())
+As well as all the arguments.
+
+.SH SEE ALSO
+call_other(3)

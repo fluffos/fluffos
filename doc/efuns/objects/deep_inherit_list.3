@@ -1,0 +1,15 @@
+.\"get a list of ancestors of an object
+.TH deep_inherit_list 3
+
+.SH NAME
+deep_inherit_list() - get a list of ancestors of an object
+
+.SH SYNOPSIS
+string *deep_inherit_list(object obj);
+
+.SH DESCRIPTION
+Returns an array of filenames of all objects inherited (directly and
+indirectly) by obj.
+
+.SH SEE ALSO
+inherit_list(3)

@@ -1,0 +1,17 @@
+.\"move an object to another environment
+.TH move_object 3
+
+.SH NAME
+move_object() - move an object to another environment
+
+.SH SYNOPSIS
+void move_object(mixed item, mixed dest);
+
+.SH DESCRIPTION
+Move the object `item' into the object `dest'.  'item' must be this_object().
+move_object may be optionally called with one argument in which case
+'item' is implicitly this_object() and the passed argument is 'dest'.
+move_object() is usually called from an inherited "move.c" module.
+
+.SH SEE ALSO
+this_object(3).

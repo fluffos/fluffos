@@ -1,4 +1,12 @@
+/*
+ * file: file.c
+ * description: handle all file based efuns
+ */
+
 #include <sys/types.h>
+#if (defined(_SEQUENT_) || defined(hpux))
+#include <sys/sysmacros.h>
+#endif
 #include <sys/stat.h>
 #include <sys/dir.h>
 #include <fcntl.h>
@@ -10,18 +18,23 @@
 #if defined(sun)
 #include <alloca.h>
 #endif
-#ifdef M_UNIX
+#if defined(M_UNIX) || defined(_SEQUENT_)
 #include <dirent.h>
+#endif
+#if defined(SVR4)
+#include <dirent.h>
+#include <sys/filio.h>
+#include <sys/sockio.h>
+#include <sys/mkdev.h>
 #endif
 #include <ctype.h>
 
-#include "lint.h"
 #include "config.h"
+#include "lint.h"
 #include "lang.tab.h"
 #include "interpret.h"
 #include "object.h"
 #include "sent.h"
-#include "wiz_list.h"
 #include "exec.h"
 #include "comm.h"
 
@@ -34,14 +47,18 @@ char *inherit_file;
 #ifndef NeXT
 extern int readlink PROT((char *, char *, int));
 extern int symlink PROT((char *, char *));
-#ifndef MSDOS
-extern int lstat PROT((char *, struct stat *));
-#else
+#ifdef MSDOS
 #define lstat stat
+#else
+#if !defined(hpux) && !defined(SVR4)
+extern int lstat PROT((char *, struct stat *));
+#endif
 #endif
 #endif /* NeXT */
 
-extern int fchmod PROT((int, int));     
+#if !defined(hpux) && !defined(_AIX)
+extern int fchmod PROT((int, int));
+#endif /* !defined(hpux) && !defined(_AIX) */
 
 extern int legal_path PROT((char *));
 
@@ -73,28 +90,28 @@ int flags;
 char *str;
 struct stat *st;
 {
-   if (flags) {
+   if (flags == -1) {
       struct vector *v = allocate_array(3);
+
       v->item[0].type = T_STRING;
       v->item[0].subtype = STRING_MALLOC;
       v->item[0].u.string = string_copy(str);
       v->item[1].type = T_NUMBER;
       v->item[1].u.number =
-        (st->st_mode & S_IFDIR ? -2 : st->st_size);
+        ((st->st_mode & S_IFDIR) ? -2 : st->st_size);
       v->item[2].type = T_NUMBER; 
-      v->item[2].u.number =
-        st->st_mtime;
+      v->item[2].u.number = st->st_mtime;
       vp->type = T_POINTER;
       vp->u.vec = v;
-      return;
-    }
-   vp->type = T_STRING;
-   vp->subtype = STRING_MALLOC;
-   vp->u.string = string_copy(str);
+    } else {
+		vp->type = T_STRING;
+		vp->subtype = STRING_MALLOC;
+		vp->u.string = string_copy(str);
+	}
 }
 /*
  * List files in directory. This function do same as standard list_files did,
- * but instead writing files right away to player this returns an array
+ * but instead writing files right away to user this returns an array
  * containing those files. Actually most of code is copied from list_files()
  * function.
  * Differences with list_files:
@@ -107,14 +124,15 @@ struct stat *st;
  *   - file_list("/");, file_list("."); and file_list("/."); return contents
  *     of directory "/"
  *
- * With second argument equal to -1 (NOT 1), the function will instead of
- * returning an array of strings, return an array of arrays about files.
+ * With second argument equal to non-zero, instead of returning an array
+ * of strings, the function will return an array of arrays about files.
  * The information in each array is supplied in the order:
  *    name of file,
  *    last update of file,
  *    size of file (-2 means file doesn't exist).
  */
-#define MAX_FNAME_SIZE 30
+#define MAX_FNAME_SIZE 255
+#define MAX_PATH_LEN   1024
 struct vector *get_dir(path, flags)
     char *path;
     int flags;
@@ -123,15 +141,16 @@ struct vector *get_dir(path, flags)
     int i, count = 0;
     DIR *dirp;
     int namelen, do_match = 0;
-#if defined(_AIX) || defined(M_UNIX)
+#if defined(_AIX) || defined(M_UNIX) || defined(_SEQUENT_) || defined(SVR4)
     struct dirent *de;
 #else
     struct direct *de;
 #endif
     struct stat st;
-    char *temppath, *endtemp;
+    char *endtemp;
+	char temppath[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
+	char regexp[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
     char *p;
-    char *regexp = 0;
 
     if (!path)
 	return 0;
@@ -141,18 +160,12 @@ struct vector *get_dir(path, flags)
     if (path == 0)
 	return 0;
 
-    /*
-     * We need to modify the returned path, and thus to make a
-     * writeable copy.
-     * The path "" needs 2 bytes to store ".\0".
-     */
-    temppath = (char *)alloca(strlen(path)+MAX_FNAME_SIZE+2);
     if (strlen(path)<2) {
 	temppath[0]=path[0]?path[0]:'.';
 	temppath[1]='\000';
 	p = temppath;
     } else {
-	strcpy(temppath, path);
+	strncpy(temppath, path, MAX_FNAME_SIZE + MAX_PATH_LEN + 2);
 	/*
 	 * If path ends with '/' or "/." remove it
 	 */
@@ -165,7 +178,6 @@ struct vector *get_dir(path, flags)
     if (stat(temppath, &st) < 0) {
 	if (*p == '\0')
 	    return 0;
-	regexp = (char *)alloca(strlen(p)+2);
 	if (p != temppath) {
 	    strcpy(regexp, p + 1);
 	    *p = '\0';
@@ -189,7 +201,7 @@ struct vector *get_dir(path, flags)
      *  Count files
      */
     for (de = readdir(dirp); de; de = readdir(dirp)) {
-#ifdef M_UNIX
+#if defined(M_UNIX) || defined(_SEQUENT_) || defined(SVR4)
 	namelen = strlen(de->d_name);
 #else
 	namelen = de->d_namlen;
@@ -200,7 +212,7 @@ struct vector *get_dir(path, flags)
 	if (do_match && !match_string(regexp, de->d_name))
 	    continue;
 	count++;
-	if ( count >= max_array_size)
+	if (count >= max_array_size)
 	    break;
     }
     /*
@@ -216,7 +228,7 @@ struct vector *get_dir(path, flags)
     endtemp = temppath + strlen(temppath);
     strcat(endtemp++, "/");
     for(i = 0, de = readdir(dirp); i < count; de = readdir(dirp)) {
-#ifdef M_UNIX
+#if defined(M_UNIX) || defined(_SEQUENT_) || defined(SVR4)
         namelen = strlen(de->d_name);
 #else
 	namelen = de->d_namlen;
@@ -227,19 +239,24 @@ struct vector *get_dir(path, flags)
 	if (do_match && !match_string(regexp, de->d_name))
 	    continue;
 	de->d_name[namelen] = '\0';
-        if (flags) {
+        if (flags == -1) {
            /* We'll have to .... sigh.... stat() the file to
               get some add'tl info.  */
            strcpy(endtemp, de->d_name);
-           stat(endtemp, &st);  /* We assume it works. */
+           stat(temppath, &st);  /* We assume it works. */
         }
         encode_stat(&v->item[i], flags, de->d_name, &st);
 	i++;
     }
     closedir(dirp);
     /* Sort the names. */
+#ifdef _SEQUENT_
+    qsort((void *)v->item, count, sizeof v->item[0],
+          (int (*)())((flags == -1) ? parrcmp : pstrcmp));
+#else
     qsort((char *)v->item, count, sizeof v->item[0],
-          flags ? parrcmp : pstrcmp);
+          (flags == -1) ? parrcmp : pstrcmp);
+#endif
     return v;
 }
 
@@ -361,18 +378,34 @@ int legal_path(path)
 	return 0;
     if (path[0] == '/')
         return 0;
+	/* disallowing # seems the easiest way to solve a bug involving
+	   loading files containing that character
+	*/
+	if (strchr(path, '#')) {
+		return 0;
+	}
 #ifdef MSDOS
     if (!valid_msdos(path)) return(0);
 #endif
     for(p = strchr(path, '.'); p; p = strchr(p+1, '.')) {
 	if (p[1] == '.')
 	    return 0;
+	if (p[1] == '/') /* disallow paths like /data/./mail/buddha-mbox.o */
+	    return 0;
     }
+#ifdef AMIGA /* I don't know what the proper define should be, just leaving
+		an appropriate place for the right stuff to happen here 
+		- Wayfarer */
+    /* fail if there's a ':' since on AmigaDOS this means it's a
+       logical device! */
+    if (strchr(path, ':'))
+      return 0;
+#endif
     return 1;
 }
 
 /*
- * There is an error in a specific file. Ask the game driver to log the
+ * There is an error in a specific file. Ask the MudOS driver to log the
  * message somewhere.
  */
 void smart_log(error_file, line, what, flush)
@@ -383,13 +416,19 @@ void smart_log(error_file, line, what, flush)
   static int count = 0;
   int i;
   
+  if (count > 5)
+    fatal ("Fatal error in smart_log\n");
+
   if (count == 5)
     flush = 1;
 
   if (error_file) 
     {
-      buff[count] = (char *) MALLOC(strlen(error_file)+strlen(what)+15);
-      files[count] = (char *) MALLOC(strlen(error_file)+1);
+      /* the +30 is more than is needed, but what the heck? */
+      buff[count] = (char *)
+		DMALLOC(strlen(error_file)+strlen(what)+30, 128, "smart_log: 1");
+      files[count] = (char *)
+		DMALLOC(strlen(error_file)+1, 128, "smart_log: 2");
       sprintf (buff[count], "%s line %d:%s\n", error_file, line, what);
       strcpy (files[count],error_file);
       count ++;
@@ -457,7 +496,7 @@ char *read_file(file,start,len)
     }
     if (!start) start = 1;
     if (!len) len = READ_FILE_MAX_SIZE;
-    str = xalloc(size + 1);
+    str = DXALLOC(size + 1, 128, "read_file: str");
     str[size] = '\0';
     do {
 	if (size > st.st_size)
@@ -505,16 +544,6 @@ char *read_file(file,start,len)
     }
     *p2='\0';
     fclose(f);
-#if 0 /* caller immediately frees the string again,
-       * so there's no use to make it smaller now
-       */
-    if ( st.st_size > (p2-str) ) {
-/* can't allocate shared string when string type isn't passed to the caller */
-	p2=strdup(str);
-	FREE(str);
-	return p2;
-    }
-#endif
     return str;
 }
 
@@ -556,7 +585,7 @@ char *read_bytes(file,start,len)
     if ((size = lseek(f,start, 0)) < 0)
 	return 0;
 
-    str = xalloc(len + 1);
+    str = DXALLOC(len + 1, 128, "read_bytes: str");
 
     size = read(f, str, len);
 
@@ -614,11 +643,15 @@ int write_bytes(file,start,str)
 	close(f);
 	return 0;
     }
-    if ((start+strlen(str)) > size) 
+    if ((start+strlen(str)) > size) {
+	close(f);
 	return 0;
+    }
 
-    if ((size = lseek(f,start, 0)) < 0)
+    if ((size = lseek(f,start, 0)) < 0) {
+	close(f);
 	return 0;
+    }
 
     size = write(f, str, strlen(str));
 
@@ -646,90 +679,6 @@ int file_size(file)
     return st.st_size;
 }
 
-#if 0  /* currently unsafe to use */
-/* 
- * Get RHS of string in file [Associative lookup].
- * Return RHS if found, otherwise 0.
- */
-#define MAXLINE 128
-char *assoc_get(fname, pname)
-   char *fname, *pname;
-{
-   char buff[MAXLINE];
-   FILE *fp;
-   int len, i, blen;
-   if (!fname || !pname) return (char *) 0;
-   fname = check_valid_path(fname, current_object, "afgets", 0);
-   if (!fname) return (char *) 0;
-   if ((len = strlen(pname)) <= 0) return (char *) 0;
-   fp = fopen(fname, "r");
-   if (!fp)
-      return (char *) 0;
-   i = 0;
-   while ( fgets(buff,MAXLINE,fp) != NULL ) {
-      i = 0;
-      if ( (blen=strlen(buff)) >= len+1) {
-         while (i < len && pname[i] == buff[i])
-            i++;
-         if (i==len && buff[i] == ' ') {
-            i++;
-            break;
-           }
-        }
-     }
-   fclose(fp);
-   if (i == len+1) {
-      buff[blen-1] = '\0';
-      return buff + len + 1;
-   }
-   return (char *) 0;
-}
-
-int assoc_put(fname, pname, str)
-   char *fname, *pname, *str;
-{
-   char buff[MAXLINE];
-   FILE *fin, *fout;
-   int len, i, blen;
-   if (!fname || !pname) return 0;
-   fname = check_valid_path(fname, current_object, "afputs", 1);
-   if (!fname) return 0;
-   if ((len = strlen(pname)) <= 0) return 0;
-   fin = fopen(fname, "r");
-   if (!fin) {
-      fout = fopen(fname, "w");
-      if (!fout)
-         return 0;
-      fprintf(fout, "%s %s\n", pname, str);
-      fclose(fout);
-      return 0;
-   }
-   fout = fopen("../afputs_scratch", "w");
-   if (!fout)
-      error ("Could not open scratch file.\n");
-   while ( fgets(buff,MAXLINE,fin) != NULL ) {
-      i = 0;
-      if ( strlen(buff) >= len+1) {
-         while (i < len && pname[i] == buff[i])
-            i++;
-         if (i==len && buff[i] == ' ') {
-            i++;
-            break;
-         }
-         fputs(buff, fout);
-      }
-   }
-   if (i == len+1) {
-      if (str) fprintf(fout, "%s %s\n", pname, str);
-   } else if (str)
-      fprintf(fout, "%s %s\n", pname, str);
-   fclose(fin);
-   fclose(fout);
-   unlink(fname);
-   rename("../afputs_scratch", fname);
-   return 1;
-}
-#endif
 
 /*
  * Check that a path to a file is valid for read or write.
@@ -820,6 +769,14 @@ int match_string(match, str)
 
 #ifndef S_ISREG
 #define	S_ISREG(m)	(((m)&S_IFMT) == S_IFREG)
+#endif
+
+#ifndef S_ISCHR
+#define	S_ISCHR(m)	(((m)&S_IFMT) == S_IFCHR)
+#endif
+
+#ifndef S_ISBLK
+#define	S_ISBLK(m)	(((m)&S_IFMT) == S_IFBLK)
 #endif
 
 int
@@ -937,88 +894,87 @@ copy (from, to)
 
 #ifdef F_RENAME
 int
-do_move (from, to, flag)
-	char *from;
-	char *to;
-	int flag;
+  do_move (from, to, flag)
+char *from;
+char *to;
+int flag;
 {
-  if (lstat (from, &from_stats) != 0)
-    {
-      error ("%s: lstat failed\n", from);
-      return 1;
-    }
-
-  if (lstat (to, &to_stats) == 0)
-    {
+   if (lstat (from, &from_stats) != 0)
+     {
+	error ("%s: lstat failed\n", from);
+	return 1;
+     }
+   
+   if (lstat (to, &to_stats) == 0)
+     {
 #ifndef MSDOS
-      if (from_stats.st_dev == to_stats.st_dev
-	  && from_stats.st_ino == to_stats.st_ino)
+	if (from_stats.st_dev == to_stats.st_dev
+	    && from_stats.st_ino == to_stats.st_ino)
 #else
-      if (same_file(from,to))
+	  if (same_file(from,to))
 #endif
-	{
-	  error ("`%s' and `%s' are the same file", from, to);
-	  return 1;
-	}
-
-      if (S_ISDIR (to_stats.st_mode))
-	{
-	  error ("%s: cannot overwrite directory", to);
-	  return 1;
-	}
-
-    }
-  else if (errno != ENOENT)
-    {
-      error ("%s: unknown error\n", to);
-      return 1;
-    }
+	    {
+	       error ("`%s' and `%s' are the same file", from, to);
+	       return 1;
+	    }
+	
+	if (S_ISDIR (to_stats.st_mode))
+	  {
+	     error ("%s: cannot overwrite directory", to);
+	     return 1;
+	  }
+	
+     }
+   else if (errno != ENOENT)
+     {
+	error ("%s: unknown error\n", to);
+	return 1;
+     }
 #ifdef SYSV
-  if ((flag == F_RENAME) && isdir(from)) {
+   if ((flag == F_RENAME) && isdir(from)) {
       char cmd_buf[100];
       sprintf(cmd_buf, "/usr/lib/mv_dir %s %s", from, to);
       return system(cmd_buf);
-  } else
+   } else
 #endif /* SYSV */      
-	if ((flag == F_RENAME) && (rename(from, to) == 0))
-		return 0;
+     if ((flag == F_RENAME) && (rename(from, to) == 0))
+       return 0;
 #ifdef F_LINK
-	else if ((flag == F_LINK) && (link(from,to) == 0)) /* hard link */
-		return 0;
+     else if ((flag == F_LINK) && (link(from,to) == 0)) /* hard link */
+       return 0;
 #endif
-
-	if (errno != EXDEV) {
-		if (flag == F_RENAME)
-			error ("cannot move `%s' to `%s'", from, to);
-		else
-			error ("cannot link `%s' to `%s'", from, to);
-		return 1;
-    }
-
-  /* rename failed on cross-filesystem link.  Copy the file instead. */
-
-	if (flag == F_RENAME) {
-		if (copy (from, to))
-			return 1;
-		if (unlink (from)) {
-			error ("cannot remove `%s'", from);
-			return 1;
-		}
-	}
+   
+   if (errno != EXDEV) {
+      if (flag == F_RENAME)
+	error ("cannot move `%s' to `%s'", from, to);
+      else
+	error ("cannot link `%s' to `%s'", from, to);
+      return 1;
+   }
+   
+   /* rename failed on cross-filesystem link.  Copy the file instead. */
+   
+   if (flag == F_RENAME) {
+      if (copy (from, to))
+	return 1;
+      if (unlink (from)) {
+	 error ("cannot remove `%s'", from);
+	 return 1;
+      }
+   }
 #ifdef F_LINK
-	else if (flag == F_LINK) {
-		if (symlink(from, to) == 0) /* symbolic link */
-			return 0;
-	}
-#endif
+   else if (flag == F_LINK) {
+      if (symlink(from, to) == 0) /* symbolic link */
 	return 0;
+   }
+#endif
+   return 0;
 }
 #endif
     
 /*
  * do_rename is used by the efun rename. It is basically a combination
- * of the unix system call rename and the unix command mv. Please shoot
- * the people at ATT who made Sys V.
+ * of the unix system call rename and the unix command mv.
  */
 
 #ifdef F_RENAME
@@ -1027,44 +983,43 @@ do_rename(fr, t, flag)
     char *fr, *t;
 	int flag;
 {
-    char *from, *to;
-    
-	/* important that the same write access checks are done for link()
-	   as are done for rename().  Otherwise all kinds of security problems
-	   would arise (e.g. creating links to files in protected directories
-	   and then modifying the protected file by modifying the linked file).
-	   The idea is prevent linking to a file unless the person doing the
-	   linking has permission to move the file.
-	*/
-    from = check_valid_path(fr, current_object, "do_rename", 1);
-    if(!from)
-	return 1;
-    to = check_valid_path(t, current_object, "do_rename", 1);
-    if(!to)
-	return 1;
-    if(!strlen(to) && !strcmp(t, "/")) {
-	to = (char *)alloca(3);
-	sprintf(to, "./");
-    }
-    strip_trailing_slashes (from);
-    if (isdir (to))
-	{
-	    /* Target is a directory; build full target filename. */
-	    char *cp;
-	    char *newto;
-	    
-	    cp = strrchr (from, '/');
-	    if (cp)
-		cp++;
-	    else
-		cp = from;
-	    
-	    newto = (char *) alloca (strlen (to) + 1 + strlen (cp) + 1);
-	    sprintf (newto, "%s/%s", to, cp);
-	    return do_move (from, newto, flag);
-	}
-    else
-	return do_move (from, to, flag);
+   char *from, *to, tbuf[3];
+   
+   /* important that the same write access checks are done for link()
+      as are done for rename().  Otherwise all kinds of security problems
+      would arise (e.g. creating links to files in protected directories
+      and then modifying the protected file by modifying the linked file).
+      The idea is prevent linking to a file unless the person doing the
+      linking has permission to move the file.
+      */
+   from = check_valid_path(fr, current_object, "do_rename", 1);
+   if(!from)
+     return 1;
+   to = check_valid_path(t, current_object, "do_rename", 1);
+   if(!to)
+     return 1;
+   if(!strlen(to) && !strcmp(t, "/")) {
+      to = tbuf;
+      sprintf(to, "./");
+   }
+   strip_trailing_slashes (from);
+   if (isdir (to))
+     {
+	/* Target is a directory; build full target filename. */
+	char *cp;
+	char newto[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
+	
+	cp = strrchr (from, '/');
+	if (cp)
+	  cp++;
+	else
+	  cp = from;
+	
+	sprintf (newto, "%s/%s", to, cp);
+	return do_move (from, newto, flag);
+     }
+   else
+     return do_move (from, to, flag);
 }
 #endif /* F_RENAME */
 
@@ -1076,7 +1031,7 @@ int copy_file (from, to)
    int num_read, num_written;
    char *write_ptr;
    
-   from = check_valid_path (from, current_object, "move_file", 1);
+   from = check_valid_path (from, current_object, "move_file", 0);
    to = check_valid_path (to, current_object, "move_file", 1);
    if (from == 0)
      return -1;
@@ -1091,7 +1046,7 @@ int copy_file (from, to)
      {
 	/* Target is a directory; build full target filename. */
 	char *cp;
-	char *newto;
+	char newto[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
 	
 	cp = strrchr (from, '/');
 	if (cp)
@@ -1099,17 +1054,22 @@ int copy_file (from, to)
 	else
 	  cp = from;
 	
-	newto = (char *) alloca (strlen (to) + 1 + strlen (cp) + 1);
 	sprintf (newto, "%s/%s", to, cp);
+	close(from_fd);
 	return copy_file (from, newto);
      }
    to_fd = open (to, O_WRONLY|O_CREAT|O_TRUNC, 0777);
    if (to_fd < 0)
-     return (-2);
+     {
+	close (from_fd);
+	return (-2);
+     }
    
    while ((num_read = read (from_fd, buf, 128)) != 0) {
       if (num_read < 0) {
 	 perror ("error in read in copy_file()");
+	 close (from_fd);
+	 close (to_fd);
 	 return (-3);
       }
       
@@ -1118,12 +1078,77 @@ int copy_file (from, to)
 	 num_written = write (to_fd, write_ptr, num_read);
 	 if (num_written < 0) {
 	    perror ("error in write in copy_file()");
+	    close (from_fd);
+	    close (to_fd);
 	    return (-3);
 	 }
 	 write_ptr += num_written;
       }
    }
+   close (from_fd);
+   close (to_fd);
    return 1;
 }
 
+void
+dump_file_descriptors() {
+    int i;
+    dev_t dev;
+    struct stat stbuf;
 
+    add_message("Fd  Device Number  Inode   Mode    Uid    Gid      Size\n");
+    add_message("--  -------------  -----  ------  -----  -----  ----------\n");
+
+    for (i = 0; i < FD_SETSIZE; i++) {
+	/* bug in NeXT OS 2.1, st_mode == 0 for sockets */
+	if (fstat(i, &stbuf) == -1)
+	    continue;
+
+	if (S_ISCHR(stbuf.st_mode) || S_ISBLK(stbuf.st_mode))
+	    dev = stbuf.st_rdev;
+	else
+	    dev = stbuf.st_dev;
+
+	add_message("%2d", i);
+	add_message("%6x", major(dev));
+	add_message("%7x", minor(dev));
+	add_message("%9d", stbuf.st_ino);
+	add_message("  ");
+
+	switch (stbuf.st_mode & S_IFMT) {
+
+	case S_IFDIR:
+	    add_message("d");
+	    break;
+	case S_IFCHR:
+	    add_message("c");
+	    break;
+	case S_IFBLK:
+	    add_message("b");
+	    break;
+	case S_IFREG:
+	    add_message("f");
+	    break;
+	case S_IFIFO:
+	    add_message("p");
+	    break;
+	case S_IFLNK:
+	    add_message("l");
+	    break;
+#ifdef S_IFSOCK
+	case S_IFSOCK:
+	    add_message("s");
+	    break; 
+#endif
+	default:
+	    add_message("?");
+	    break;
+	}
+
+	add_message("%5o", stbuf.st_mode & ~S_IFMT);
+	add_message("%7d", stbuf.st_uid);
+	add_message("%7d", stbuf.st_gid);
+	add_message("%12d", stbuf.st_size);
+	add_message("\n");
+    }
+}

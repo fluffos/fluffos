@@ -1,0 +1,29 @@
+This is a short summary (from a description provided by Lars) of how
+special types are handled.  It describes how the static, private, nomask,
+and public type modifiers affect the definition of variables.  Any of
+these type modifiers may precede a variable or function declaration.
+E.g. a static integer variable x would be declared as follows:
+
+static int x;
+
+A private static function xyz that returns a string would be declared as
+follows:
+
+private static string xzy();
+
+o 'static' variables: Will not be saved at save_object(), nor modified at
+  restore_object(). 'static' functions can not be called through
+  call_other(). 'static' inheritance will make all inherited definitions
+  'static'.
+
+o 'private' variables and functions: Can not be accessed by an object
+  inheriting their definitions. Functions can not be called through
+  call_other(). 'private' inheritance will make all variables and functions
+  'private'.
+
+o 'nomask' functions and variables can not be redefined by a subclass.
+  'nomask' inheritance will make all inherited definitions 'nomask'.
+
+o 'public' variables and functions can be redefined by a subclass, even if
+  they have been inherited using 'private'. 'public' inheritance will make all
+  inherited definitions 'public'.

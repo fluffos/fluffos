@@ -1,0 +1,15 @@
+.\"allocate an array
+.TH allocate 3
+
+.SH NAME
+allocate() - allocate an array
+
+.SH SYNOPSIS
+mixed *allocate( int size );
+
+.SH DESCRIPTION
+Allocate an array of <size> elements. The number of elements must
+be >= 0 and not bigger than a system maximum (usually 1000).
+
+.SH SEE ALSO
+sizeof(3)

@@ -1,0 +1,16 @@
+.\"remove a pending call_out
+.TH remove_call_out 3
+
+.SH NAME
+remove_call_out() - remove a pending call_out
+
+.SH SYNOPSIS
+int remove_call_out(string fun);
+
+.SH DESCRIPTION
+Remove next pending call out for function `fun' in the current object.
+The return value is the time remaining before the callback is to be called.
+The returned value is -1 if there were no call out pending to this function.
+
+.SH SEE ALSO
+call_out(3), call_out_info(3).

@@ -2,17 +2,16 @@
 /* needs to be a C program so that it can include config.h */
 
 #include "config.h"
+#ifdef NeXT
+#include <libc.h>
+#endif
 
 #ifdef SYSMALLOC
 #define THE_MALLOC "sysmalloc.c"
 #endif
 
-#ifdef SMALLOC
-#define THE_MALLOC "smalloc.c"
-#endif
-
-#ifdef SMALLOC2
-#define THE_MALLOC "smalloc2.c"
+#ifdef WRAPPEDMALLOC
+#define THE_MALLOC "wrappedmalloc.c"
 #endif
 
 #ifdef GCMALLOC
@@ -23,9 +22,14 @@
 #define THE_MALLOC "gmalloc.c"
 #endif
 
-main()
+#ifdef DEBUGMALLOC
+#define THE_MALLOC "debugmalloc.c"
+#endif
+
+int main()
 {
 	unlink("malloc.c");
+	printf("Using memory allocation package: %s\n", THE_MALLOC);
 	link(THE_MALLOC,"malloc.c");
 	return 0;
 }

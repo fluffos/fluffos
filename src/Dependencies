@@ -1,0 +1,73 @@
+obj/access_check.o : access_check.c config.h port.h options.h 
+obj/addr_server.o : addr_server.c debug.h addr_server.h config.h port.h options.h \
+  lint.h 
+obj/alloca.o : alloca.c config.h port.h options.h lint.h 
+obj/array.o : array.c config.h port.h options.h lint.h interpret.h mudlib_stats.h \
+  object.h uid.h regexp.h exec.h sent.h debug.h 
+obj/backend.o : backend.c config.h port.h options.h lint.h interpret.h mudlib_stats.h \
+  object.h uid.h exec.h comm.h debug.h 
+obj/bsdmalloc.o : bsdmalloc.c config.h port.h options.h lint.h 
+obj/call_out.o : call_out.c config.h port.h options.h lint.h interpret.h mudlib_stats.h \
+  object.h uid.h mapping.h 
+obj/comm.o : comm.c config.h port.h options.h lint.h interpret.h mudlib_stats.h \
+  comm.h socket_efuns.h object.h uid.h sent.h patchlevel.h debug.h 
+obj/debugmalloc.o : debugmalloc.c config.h port.h options.h lint.h interpret.h mudlib_stats.h \
+  md.h 
+obj/dumpstat.o : dumpstat.c config.h port.h options.h lint.h interpret.h mudlib_stats.h \
+  mapping.h object.h uid.h exec.h 
+obj/ed.o : ed.c config.h port.h options.h lint.h regexp.h interpret.h mudlib_stats.h \
+  object.h uid.h exec.h comm.h 
+obj/efunctions.o : efunctions.c config.h port.h options.h lint.h interpret.h mudlib_stats.h \
+  mapping.h object.h uid.h exec.h efun_protos.h comm.h localtime.h socket_efuns.h \
+  socket_errors.h lang.tab.h switch.h sent.h debug.h 
+obj/eoperators.o : eoperators.c config.h port.h options.h lint.h interpret.h mudlib_stats.h \
+  mapping.h object.h uid.h exec.h efun_protos.h comm.h lang.tab.h switch.h debug.h 
+obj/extern.o : extern.c 
+obj/file.o : file.c config.h port.h options.h lint.h lang.tab.h interpret.h mudlib_stats.h \
+  object.h uid.h sent.h exec.h comm.h 
+obj/func_spec.o : func_spec.c config.h port.h options.h 
+obj/hash.o : hash.c 
+obj/interpret.o : interpret.c config.h port.h options.h lint.h lang.tab.h exec.h \
+  interpret.h mudlib_stats.h mapping.h object.h uid.h instrs.h patchlevel.h comm.h \
+  switch.h efun_protos.h efunctions.h base.h socket_efuns.h eoperators.h opc.h 
+obj/lex.o : lex.c instrs.h config.h port.h options.h lint.h interpret.h mudlib_stats.h \
+  lang.tab.h exec.h lex.h efun_defs.c 
+obj/main.o : main.c config.h port.h options.h interpret.h mudlib_stats.h lint.h \
+  object.h uid.h lex.h sent.h md.h 
+obj/make_malloc.o : make_malloc.c config.h port.h options.h 
+obj/malloc.o : malloc.c 
+obj/mapping.o : mapping.c config.h port.h options.h interpret.h mudlib_stats.h mapping.h \
+  lint.h object.h uid.h regexp.h debug.h 
+obj/md.o : md.c config.h port.h options.h lint.h interpret.h mudlib_stats.h object.h \
+  uid.h md.h 
+obj/mire.o : mire.c 
+obj/mudlib_stats.o : mudlib_stats.c config.h port.h options.h lint.h interpret.h \
+  mudlib_stats.h 
+obj/object.o : object.c config.h port.h options.h lint.h interpret.h mudlib_stats.h \
+  mapping.h object.h uid.h sent.h exec.h 
+obj/otable.o : otable.c config.h port.h options.h lint.h interpret.h mudlib_stats.h \
+  object.h uid.h 
+obj/parse.o : parse.c config.h port.h options.h lint.h interpret.h mudlib_stats.h \
+  object.h uid.h 
+obj/port.o : port.c config.h port.h options.h lint.h 
+obj/rc.o : rc.c config.h port.h options.h lint.h 
+obj/regexp.o : regexp.c regexp.h config.h port.h options.h lint.h 
+obj/simul_efun.o : simul_efun.c config.h port.h options.h lint.h interpret.h mudlib_stats.h \
+  object.h uid.h exec.h 
+obj/simulate.o : simulate.c config.h port.h options.h lint.h lang.tab.h interpret.h \
+  mudlib_stats.h object.h uid.h sent.h exec.h comm.h debug.h 
+obj/socket_ctrl.o : socket_ctrl.c config.h port.h options.h lint.h 
+obj/socket_efuns.o : socket_efuns.c config.h port.h options.h lint.h interpret.h \
+  mudlib_stats.h object.h uid.h exec.h debug.h socket_efuns.h socket_errors.h 
+obj/socket_errors.o : socket_errors.c socket_errors.h 
+obj/sprintf.o : sprintf.c config.h port.h options.h lint.h lang.tab.h interpret.h \
+  mudlib_stats.h object.h uid.h sent.h 
+obj/stralloc.o : stralloc.c config.h port.h options.h lint.h stralloc.h 
+obj/strfuncs.o : strfuncs.c config.h port.h options.h 
+obj/swap.o : swap.c config.h port.h options.h lint.h interpret.h mudlib_stats.h \
+  object.h uid.h exec.h 
+obj/sysmalloc.o : sysmalloc.c 
+obj/ualarm.o : ualarm.c options.h 
+obj/uid.o : uid.c config.h port.h options.h lint.h uid.h 
+obj/wrappedmalloc.o : wrappedmalloc.c config.h port.h options.h lint.h interpret.h \
+  mudlib_stats.h 

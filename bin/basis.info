@@ -1,0 +1,43 @@
+#
+# file:    basis.info
+# date:    1992 October 21
+# note:    included by startmud
+
+# name by which you refer to your mudlib when you start the driver
+MUDNAME=basis
+
+# directory containing driver-related log files
+LOGDIR=../mudlib/log/driver
+
+# name of the driver binary (don't specify the full path)
+DRIVER=driver
+
+# name of the address server (don't specify the full path)
+ASERVER=addr_server
+
+# port number on which the address server is to listen
+APORT=6364
+
+# name of the ftpd daemon (don't specify the full path)
+FTPD=ftpd
+
+# driver config file
+CONFIG=config.$MUDNAME
+
+# logfile showing dates when driver starts up and goes down
+UP=driver
+
+# driver logfile
+LOG=driver.log
+
+# driver logfile for output sent to stderr
+ERR=driver.err
+
+# address server stdout server log file
+ALOG=aserver.log
+
+# address server stderr log file
+AERR=aserver.err
+
+# file containing process id
+PIDFILE=.$MUDNAME.pid

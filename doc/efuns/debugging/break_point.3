@@ -1,0 +1,13 @@
+.\"checks the program stack
+.TH break_point 3
+
+.SH NAME
+break_point() - checks the program stack to make sure it's valid
+
+.SH SYNOPSIS
+void break_point();
+
+.SH DESCRIPTION
+This efun checks to make sure that the driver has kept the stack
+correctly.  The currently running program will bomb if the stack
+is incorrect.  Useful for debugging the driver.

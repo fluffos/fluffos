@@ -1,0 +1,17 @@
+.\"report various driver and mudlib statistics
+.TH mud_status 3
+
+.SH NAME
+mud_status() - report various driver and mudlib statistics
+
+.SH SYNOPSIS
+void mud_status(int extra);
+
+.SH DESCRIPTION
+This function writes driver and mudlib statistics to the caller's screen.
+If extra is non-zero, then additional information will be written.  This
+function replaces the hardcoded 'status' and 'status tables' commands
+in vanilla 3.1.2.
+
+.SH SEE ALSO
+debug_info(3), dumpallobj(3)

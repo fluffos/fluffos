@@ -1,5 +1,5 @@
 /*
- * sprintf.c v1.04 for LPMud 3.0.52
+ * sprintf.c v1.05 for LPMud 3.0.52
  *
  * An implementation of (s)printf() for LPC, with quite a few
  * extensions (note that as no floating point exists, some parameters
@@ -57,9 +57,13 @@
 #include "config.h"
 #include "lint.h"
 #include "lang.tab.h"
+#include "stdio.h"
 #include "interpret.h"
+#include "mapping.h"
 #include "object.h"
 #include "sent.h"
+#include "ignore.h"
+#include "exec.h"
 
 /*
  * If this #define is defined then error messages are returned,
@@ -70,7 +74,7 @@
 #if defined(F_SPRINTF) || defined(F_PRINTF)
 
 extern char *xalloc(), *string_copy();
-extern void free_svalue PROT((struct svalue *));
+extern INLINE void free_svalue PROT((struct svalue *));
 
 extern struct object *current_object;
 
@@ -126,7 +130,7 @@ typedef unsigned int format_info;
 
 #define BUFF_SIZE 10000
 
-#define ERROR(x) longjmp(error_jmp, x)
+#define ERROR(x) LONGJMP(error_jmp, x)
 #define ERR_BUFF_OVERFLOW	0x1	/* buffer overflowed */
 #define ERR_TO_FEW_ARGS		0x2	/* more arguments spec'ed than passed */
 #define ERR_INVALID_STAR	0x3	/* invalid arg to * */
@@ -139,11 +143,21 @@ typedef unsigned int format_info;
 #define ERR_QUOTE_EXPECTED	0xA	/* expected ' not found */
 #define ERR_UNEXPECTED_EOS	0xB	/* fs terminated unexpectedly */
 #define ERR_NULL_PS		0xC	/* pad string is null */
+#define ERR_ARRAY_EXPECTED      0xD     /* Yep!  You guessed it. */
 
 #define ADD_CHAR(x) {\
-  buff[bpos++] = x;\
+  buff[bpos] = x;\
+  if (startignore) \
+    if (buff[bpos++] == '^') \
+      inignore = !inignore; \
+    else \
+      curpos += 2*!inignore; \
+  else \
+    if (buff[bpos++] == '%') \
+      startignore = 1; \
+    else \
+      curpos += !inignore; \
   if (bpos>BUFF_SIZE) ERROR(ERR_BUFF_OVERFLOW); \
-  curpos++;\
 }
 
 #define GET_NEXT_ARG {\
@@ -153,7 +167,7 @@ typedef unsigned int format_info;
 
 #define SAVE_CHAR(pointer) {\
   savechars *new;\
-  new = (savechars *)xalloc(sizeof(savechars));\
+  new = (savechars *)DXALLOC(sizeof(savechars), 1048576, "SAVE_CHAR");\
   new->what = *(pointer);\
   new->where = pointer;\
   new->next = saves;\
@@ -186,7 +200,9 @@ typedef struct ColumnSlashTable {
 static char buff[BUFF_SIZE];	/* buffer for returned string */
 unsigned int bpos;		/* position in buff */
 unsigned int curpos;		/* cursor position */
-jmp_buf error_jmp;		/* for error longjmp()s */
+unsigned int inignore;          /* are we not counting these characters */
+unsigned int startignore;       /* we found the first char... now for next */
+jmp_buf error_jmp;              /* LONGJMP() buffer for error catching */
 
 /*
  * Probably should make this a #define...
@@ -198,8 +214,8 @@ void stradd(dst, size, add)
   int i;
 
   if ((i = (strlen(*dst) + strlen(add))) >= *size) {
-    *size = i + 1;
-    *dst = (char *)REALLOC(*dst, *size);
+    *size += i + 1;
+    *dst = (char *)DREALLOC(*dst, *size, 1048576, "stradd");
   }
   strcat(*dst, add);
 } /* end of stradd() */
@@ -208,17 +224,20 @@ void numadd(dst, size, num)
   char **dst;
   int *size, num;
 {
-  int i,j;
+  int i,
+      num_l, /* length of num as a string */
+      nve;   /* true if num negative */
 
-  for (i=10, j=1; num >= i; i*=10, j++) ;
-  i = strlen(*dst);
-  if ((i + j) >= *size) {
-    *size = i + j + 1;
-    *dst = (char *)REALLOC(*dst, *size);
+  if (num < 0) { num *= -1; nve=1; } else nve=0;
+  for (i=num/10, num_l=nve+1; i; i /= 10, num_l++) ;
+  i = strlen(*dst); /* i = length ofconstructed string so far */
+  if ((i + num_l) >= *size) {
+    *size += i + num_l + 2;
+    *dst = (char *)DREALLOC(*dst, *size, 1048576, "stradd");
   }
-  (*dst)[i+j] = '\0';
-  i--;
-  for (; j; j--, num /= 10) (*dst)[i+j] = (num%10) + '0';
+  (*dst)[i+num_l] = '\0';
+  if (nve) (*dst)[i] = '-'; else i--;
+  for (num_l-=nve; num_l; num_l--, num /= 10) (*dst)[i+num_l] = (num%10) + '0';
 } /* end of num_add() */
 
 /*
@@ -233,8 +252,8 @@ void add_indent(dst, size, indent)
 
   i = strlen(*dst);
   if ((i + indent) >= *size) {
-    *size = i + indent + 1;
-    *dst = (char *)REALLOC(*dst, *size);
+    *size += i + indent + 1;
+    *dst = (char *)DREALLOC(*dst, *size, 1048576, "add_indent");
   }
   for (;indent;indent--) (*dst)[i++] = ' ';
   (*dst)[i] = '\0';
@@ -245,14 +264,15 @@ void add_indent(dst, size, indent)
  * and returns a pointer to this string.
  * Scary number of parameters for a recursive function.
  */
-void svalue_to_string(obj, str, size, indent, trailing)
+void svalue_to_string(obj, str, size, indent, trailing, indent2)
   struct svalue *obj;
   char **str;
-  int size, indent, trailing;
+  int size, indent, trailing, indent2;
 {
   int i;
 
-  add_indent(str, &size, indent);
+  if (!indent2)
+    add_indent(str, &size, indent);
   switch (obj->type) {
     case T_INVALID:
       stradd(str,&size,"T_INVALID");
@@ -277,11 +297,31 @@ void svalue_to_string(obj, str, size, indent, trailing)
         numadd(str, &size, obj->u.vec->size);
         stradd(str, &size, " */\n");
         for (i=0; i<(obj->u.vec->size)-1; i++)
-          svalue_to_string(&(obj->u.vec->item[i]), str, size, indent+2, 1);
-        svalue_to_string(&(obj->u.vec->item[i]), str, size, indent+2, 0);
+          svalue_to_string(&(obj->u.vec->item[i]), str, size, indent+2, 1, 0);
+        svalue_to_string(&(obj->u.vec->item[i]), str, size, indent+2, 0, 0);
         stradd(str, &size, "\n");
         add_indent(str, &size, indent);
         stradd(str, &size, "})");
+      }
+      break;
+    case T_MAPPING:
+      if (!(obj->u.map->table_size)) {
+        stradd(str, &size, "([ ])");
+      } else {
+        stradd(str, &size, "([ /* sizeof() == ");
+        numadd(str, &str, obj->u.map->table_size);
+        stradd(str, &size, " */\n");
+        for (i=0;i<(obj->u.map->table_size)-1;i++) {
+          struct node *elm;
+
+          for (elm = obj->u.map->table[i];elm;elm = elm->next) {
+            svalue_to_string(&(elm->values[0]), str, size, indent+2, 0, 0);
+            stradd(str, &size, " : ");
+            svalue_to_string(&(elm->values[1]), str, size, indent+4, 1, 1);
+          }
+        }
+        add_indent(str, &size, indent);
+        stradd(str, &size, "])");
       }
       break;
     case T_OBJECT:
@@ -306,7 +346,7 @@ void svalue_to_string(obj, str, size, indent, trailing)
       if (obj->u.ob->flags & O_DESTRUCTED) stradd(str,&size," (destructed)");
       if (obj->u.ob->flags & O_SWAPPED) stradd(str,&size," (swapped)");
       if (obj->u.ob->flags & O_ONCE_INTERACTIVE) stradd(str,&size," (x-activ)");
-      if (obj->u.ob->flags & O_PRIVILEGED) stradd(str,&size," (priv)");
+      if (obj->u.ob->flags & O_APPROVED) stradd(str,&size," (ok)");
       if (obj->u.ob->flags & O_RESET_STATE) stradd(str,&size," (reset)");
       if (obj->u.ob->flags & O_WILL_CLEAN_UP) stradd(str,&size," (clean up)");
        */
@@ -317,6 +357,30 @@ void svalue_to_string(obj, str, size, indent, trailing)
   } /* end of switch (obj->type) */
   if (trailing) stradd(str, &size, ",\n");
 } /* end of svalue_to_string() */
+
+/* The ignore strlen is so that the pading will work with our wonderful
+ * ansi colour stuff.  bing onwards.  This was hacked in by Pinkfish
+ * so you may hold me responsible if you wish
+ */
+int ignorestrlen(str)
+  char *str;
+{
+  int len=0, inignore=0, first=0;
+
+  while (*str++) {
+    if (first) {
+      if (*str == IGNORE_C2)
+        inignore = !inignore;
+      len += !inignore;
+      first = 0;
+    }
+    if (*str == IGNORE_C1)
+      first = 1;
+    else
+      len += !inignore;
+  }
+  return len;
+}
 
 /*
  * Adds the string "str" to the buff after justifying it within "fs".
@@ -330,9 +394,10 @@ void add_justified(str, pad, fs, finfo, trailing)
   format_info finfo;
   short int trailing;
 {
-  int i, len;
+  int i, len, len2;
 
   len = strlen(str);
+  len2 = ignorestrlen(str);
   switch(finfo & INFO_J) {
     case INFO_J_LEFT:
       for (i=0; i<len; i++) ADD_CHAR(str[i]);
@@ -347,13 +412,18 @@ void add_justified(str, pad, fs, finfo, trailing)
       int j, l;
 
       l = strlen(pad);
-      j = (fs - len)/2 + (fs - len)%2;
+      if (!l) {
+/* Irk! */
+        l = 1;
+        pad = " ";
+      }
+      j = (fs - len2)/2 + (fs - len2)%2;
       for (i=0; i<j; i++) {
-        if (pad[i%len] == '\\') { i++; j++; }
+        if (pad[i%l] == '\\') { i++; j++; }
         ADD_CHAR(pad[i%l]);
       }
       for (i=0; i<len; i++) ADD_CHAR(str[i]);
-      j = (fs - len)/2;
+      j = (fs - len2)/2;
       if (trailing) for (i=0; i<j; i++) {
         if (pad[i%l] == '\\') { i++; j++; }
         ADD_CHAR(pad[i%l]);
@@ -363,7 +433,7 @@ void add_justified(str, pad, fs, finfo, trailing)
     default: { /* std (s)printf defaults to right justification */
       int l;
 
-      fs -= len;
+      fs -= len2;
       l = strlen(pad);
       for (i=0; i<fs; i++) {
         if (pad[i%l] == '\\') { i++; fs++; }
@@ -384,12 +454,24 @@ int add_column(column, trailing)
   cst **column;
   short int trailing;
 {
-  register unsigned int done;
+  register unsigned int done, off=0, inadd_off=0, first_ig=0;
   unsigned int save;
 #define COL (*column)
 #define COL_D (COL->d.col)
 
-  for (done=0;(done<COL->pres) && COL_D[done] && (COL_D[done]!='\n');done++);
+  for (done=0;((done-off)<COL->pres) && COL_D[done] && (COL_D[done]!='\n');done++) {
+    if (first_ig) {
+      if (COL_D[done] == IGNORE_C2) {
+        inadd_off = !inadd_off;
+        off += 2;
+      } else
+        done--;
+      first_ig = 0;
+    } else if (COL_D[done] == IGNORE_C1)
+      first_ig = 1;
+    else
+      off += inadd_off;
+  }
   if (COL_D[done] && (COL_D[done]!='\n')) {
     save = done;
     for (; done && (COL_D[done]!=' '); done--);
@@ -464,7 +546,7 @@ int add_table(table, trailing)
  * It returns a pointer to it's internal buffer (or a string in the text
  * segment) thus, the string must be copied if it has to survive after
  * this function is called again, or if it's going to be modified (esp.
- * if it risks being FREE()ed).
+ * if it risks being free()ed).
  */
 char *string_print_formatted(format_str, argc, argv)
   char *format_str;
@@ -477,13 +559,13 @@ char *string_print_formatted(format_str, argc, argv)
   struct svalue *carg;	/* current arg */
   unsigned int nelemno;	/* next offset into array */
   unsigned int fpos;	/* position in format_str */
-  unsigned int arg;	/* current arg number */
+  unsigned int arg = 0;	/* current arg number */
   unsigned int fs;	/* field size */
   int pres;		/* presision */
   unsigned int i;
   char *pad;		/* fs pad string */
 
-  if ((i = setjmp(error_jmp))) { /* error handling */
+  if ((i = SETJMP(error_jmp))) { /* error handling */
     char *err;
 
     switch(i) {
@@ -523,27 +605,49 @@ char *string_print_formatted(format_str, argc, argv)
       case ERR_NULL_PS:
         err = "Null pad string specified.";
         break;
+      case ERR_ARRAY_EXPECTED:
+        err = "Array expected.";
+        break;
       default:
 #ifdef RETURN_ERROR_MESSAGES
+        debug_message("%s", 
+          "ERROR: (s)printf(): !feature - undefined error 0x%X !\n", i);
+        if (current_object) {
+	     debug_message("program: %s, object: %s line %d\n",
+		    current_prog ? current_prog->name : "",
+		    current_object->name,
+		    get_line_number_if_any());
+        }
         sprintf(buff,
           "ERROR: (s)printf(): !feature - undefined error 0x%X !\n", i);
-        fprintf(stderr, "%s: %s", current_object->name, buff);
+        fprintf(stderr, "%s:%d: %s", current_object->name,
+                                     get_line_number_if_any(), buff);
         return buff;
 #else
         error("ERROR: (s)printf(): !feature - undefined error 0x%X !\n", i);
 #endif /* RETURN_ERROR_MESSAGES */
     }
 #ifdef RETURN_ERROR_MESSAGES
-    sprintf(buff, "ERROR: (s)printf(): %s\n", err);
-    fprintf(stderr, "%s: %s", current_object->name, buff);
+    sprintf(buff, "ERROR: (s)printf(): %s in arg %u\n", err, arg);
+    fprintf(stderr, "%s:%d: %s", current_object->name,
+                                 get_line_number_if_any(), buff);
+    debug_message("%s", "ERROR: (s)printf(): %s in arg %u\n", err, arg);
+    if (current_object) {
+        debug_message("program: %s, object: %s line %d\n",
+		    current_prog ? current_prog->name : "",
+		    current_object->name,
+		    get_line_number_if_any());
+    }
     return buff;
 #else
-    error("ERROR: (s)printf(): %s\n", err);
+    error("ERROR: (s)printf(): %s in arg %d\n", err, arg);
 #endif /* RETURN_ERROR_MESSAGES */
   }
   arg = -1;
   bpos = 0;
   curpos = 0;
+  inignore = 0;
+  startignore = 0;
   csts = 0;
   saves = 0;
   for (fpos=0; 1; fpos++) {
@@ -554,10 +658,14 @@ char *string_print_formatted(format_str, argc, argv)
         if (!format_str[fpos]) break;
         ADD_CHAR('\n');
         curpos = 0;
+        inignore = 0;
+        startignore = 0;
         continue;
       }
       ADD_CHAR('\n');
       curpos = 0;
+      inignore = 0;
+      startignore = 0;
       while (csts) {
         cst **temp;
 
@@ -576,6 +684,8 @@ char *string_print_formatted(format_str, argc, argv)
         } /* of while (*temp) */
         if (csts || format_str[fpos] == '\n')
           ADD_CHAR('\n');
+        inignore = 0;
+        startignore = 0;
         curpos = 0;
       } /* of while (csts) */
       if (column_stat == 2) ADD_CHAR('\n');
@@ -681,6 +791,8 @@ char *string_print_formatted(format_str, argc, argv)
        * now handle the different arg types...
        */
       if (finfo & INFO_ARRAY) {
+        if (carg->type != T_POINTER)
+           ERROR(ERR_ARRAY_EXPECTED);
         if (carg->u.vec->size == 0) {
           fpos--; /* 'bout to get incremented */
           continue;
@@ -692,10 +804,11 @@ char *string_print_formatted(format_str, argc, argv)
         struct svalue *clean = 0;
 
         if ((finfo & INFO_T) == INFO_T_LPC) {
-          clean = (struct svalue *)xalloc(sizeof(struct svalue));
+          clean = (struct svalue *)
+			DXALLOC(sizeof(struct svalue), 1048576, "string_print: 1");
           clean->type = T_STRING;
           clean->subtype = STRING_MALLOC;
-          clean->u.string = (char *)xalloc(500);
+          clean->u.string = (char *)DXALLOC(500, 1048576, "string_print: 2");
           clean->u.string[0] = '\0';
           svalue_to_string(carg, &(clean->u.string), 500, 0, 0);
           carg = clean;
@@ -724,7 +837,7 @@ char *string_print_formatted(format_str, argc, argv)
             temp = &csts;
             while (*temp) temp = &((*temp)->next);
             if (finfo & INFO_COLS) {
-              *temp = (cst *)xalloc(sizeof(cst));
+              *temp = (cst *)DXALLOC(sizeof(cst), 1048576, "string_print: 3");
               (*temp)->next = 0;
               (*temp)->d.col = carg->u.string;
               (*temp)->pad = pad;
@@ -739,10 +852,11 @@ char *string_print_formatted(format_str, argc, argv)
                 ADD_CHAR('\n');
               }
             } else { /* (finfo & INFO_TABLE) */
+#undef max
               unsigned int n, len, max;
 
 #define TABLE carg->u.string
-              (*temp) = (cst *)xalloc(sizeof(cst));
+              (*temp) = (cst *)DXALLOC(sizeof(cst), 1048576, "string_print: 4");
               (*temp)->pad = pad;
               (*temp)->info = finfo;
               (*temp)->start = curpos;
@@ -769,8 +883,9 @@ char *string_print_formatted(format_str, argc, argv)
               len = n/pres; /* length of average column */
               if (n < pres) pres = n;
               if (len*pres < n) len++;
-              if (len > 1) pres -= (pres - n%pres)/len; /* trust me...  */
-              (*temp)->d.tab = (char **)xalloc(pres*sizeof(char *));
+              if (len > 1 && n%pres) pres -= (pres - n%pres)/len;
+              (*temp)->d.tab = (char **)
+				DXALLOC(pres*sizeof(char *), 1048576, "string_print: 5");
               (*temp)->nocols = pres; /* heavy sigh */
               (*temp)->d.tab[0] = TABLE;
               if (pres == 1) goto add_table_now;
@@ -788,11 +903,9 @@ char *string_print_formatted(format_str, argc, argv)
                 }
               }
 add_table_now:
-printf("BING\n");
               add_table(temp, (((format_str[fpos] != '\n')
                 && (format_str[fpos] != '\0')) || ((finfo & INFO_ARRAY)
                   && (nelemno < (argv+arg)->u.vec->size))));
-printf("BONG\n");
             }
           } else { /* not column or table */
             if (pres && pres<slen) {
@@ -832,7 +945,8 @@ printf("BONG\n");
             sprintf(buff,
               "ERROR: (s)printf(): incorrect argument type to %%%c.\n",
               cheat[i-1]);
-            fprintf(stderr, "%s: %s", current_object->name, buff);
+            fprintf(stderr, "%s:%d: %s", current_object->name,
+                                         get_line_number_if_any(), buff);
             return buff;
 #else
             error("ERROR: (s)printf(): incorrect argument type to %%%c.\n",

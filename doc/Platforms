@@ -1,0 +1,9 @@
+Platforms on which MudOS 0.9 has been tested:
+-------------------------------------------
+Sun4 (Sparc) running SunOS 4.1.1
+NeXT running NeXTOS 2.1 and NeXTOS 3.0
+RS/6000 running AIX 3.1
+HP systems (running HP-UX 8.x)
+VAX running Ultrix (3.x and 4.x)
+DECStation running Ultrix
+Sequent running DYNIX/ptx

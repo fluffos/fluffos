@@ -1,0 +1,15 @@
+.\"return the user id (uid) of an object
+.TH getuid 3
+
+.SH NAME
+getuid() - return the user id (uid) of an object
+
+.SH SYNOPSIS
+string getuid(object ob);
+
+.SH DESCRIPTION
+Returns the user id of an object.  The uid of an object is determined at
+object creation time by the creator_file() simulated efunction.
+
+.SH SEE ALSO
+seteuid(3), geteuid(3).

@@ -1,0 +1,26 @@
+.\"sort an array
+.TH sort_array 3
+
+.SH NAME
+sort_array() - sort an array
+
+.SH SYNOPSIS
+mixed *sort_array( mixed *arr, string fun, object ob );
+
+.SH DESCRIPTION
+Returns an array with the same elements as `arr', but quicksorted in
+descending order according to the rules in `ob->fun()'.  `ob->fun()' will
+be passed two arguments for each call.  It should return -1, 0, or 1,
+depending on the relationship of the two arguments (lesser, equal to,
+greater than).
+.PP
+Here are two common forms for the compare function to take:
+.IP
+.nf
+int compare(string one, two) {
+    return strcmp(one, two);
+}
+
+int compare(int one, two) {
+    return (one - two);
+}

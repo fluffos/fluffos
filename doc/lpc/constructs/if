@@ -1,0 +1,30 @@
+* The if else statement:
+
+LPC's if statement is identical to that provided by C.  Syntax is as follows:
+
+if (expression)
+	statement;
+
+Alternately:
+
+if (expression) {
+	statements;
+}
+
+Alternately:
+
+if (expression0) {
+	statements;
+} else {
+	statements1;
+}
+
+Alternately:
+
+if (expression0) {
+	statements0;
+} else if (expression1) {
+	statements1;
+}
+
+The number of else clauses is not explicitly limited.

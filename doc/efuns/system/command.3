@@ -1,0 +1,20 @@
+.\"execute a command as if given by the player
+.TH command 3
+
+.SH NAME
+command() - exectue a command as if given by the player
+
+.SH SYNOPSIS
+int command( string str );
+
+.SH DESCRIPTION
+Execute <str> as a command given directly by the player.
+Any effects of the command will apply to the current object.
+There was a second argument, which is not supported any longer.
+.PP
+Return value is 0 for failure. Otherwise, a numeric value is returned, which
+tells the evaluation cost. Bigger number means higher cost. The evaluation
+cost is approximately the number of of machine code instructions executed.
+
+.SH SEE ALSO
+enable_commands(3)

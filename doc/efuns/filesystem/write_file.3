@@ -1,0 +1,15 @@
+.\"appends a string to a file
+.TH write_file 3
+
+.SH NAME
+write_file() - appends a string to a file
+
+.SH SYNOPSIS
+int write_file(string file, string str);
+
+.SH DESCRIPTION
+Append the string `str' into the file `file'. Returns 0 or 1 for
+failure or success.
+
+.SH SEE ALSO
+file_size(3), cat(3), log_file(3).

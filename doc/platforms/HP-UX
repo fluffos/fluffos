@@ -1,0 +1,14 @@
+MudOS hints file for HP-UX:
+
+in the Makefile,
+ comment out RESOLV
+ uncomment ALLOCA_C and ALLOCA_O
+ uncomment UALARM_C and UALARM_O
+ for maximum optimization with cc, use: OPTIMIZE=+O3 +Obb3000
+ uncomment EXTRALIBS=-lBSD
+
+HP-UX's malloc performs terribly in profiles, you should probably use
+BSDMALLOC in options.h
+Varargs doesn't function properly in gcc 2.2 for HP (and possibly later
+versions of gcc will be messed up as well).  Part of the MudOS driver
+depends on varargs (the vprintf).  You'll probably need to use cc to get it to work.

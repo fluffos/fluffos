@@ -1,0 +1,23 @@
+.\"output part or all of a file
+.TH cat 3
+
+.SH NAME
+cat() - output part or all of a file
+
+.SH SYNOPSIS
+int varargs cat( string path, int start, int num );
+
+.SH DESCRIPTION
+List the file found at <path>. It is not legal to have '.' or spaces
+in the path. This commands is normally connected to the cat command
+that wizards have. It is also used by the help command. The optional
+arguments <start> and <num> are the starting line number, and number of lines.
+If they are not given, the whole file is printed from the beginning.
+.PP
+The total number lines will not exceed a system limit, which normally
+is 40 lines.
+.PP
+cat() returns 1 if success, 0 if no such file or no such lines.
+
+.SH SEE ALSO
+ls(3), file_size(3), read_file(3)

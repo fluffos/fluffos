@@ -1,0 +1,135 @@
+Wish list for MudOS 1.0
+-----------------------
+
+public variables accessible via ->  (e.g. x->y++ where x
+is an object and y a public variable in that object.  We should probably
+make allow for read-only access as well as read-write) (Whiplash)
+
+support for new LPC data type "float" (in printf too?) (Jacques?)
+
+support indexed strings as lvalues (e.g. str[i] = 'x') (Wing)
+
+fix inheritance so that if you have an object c that inherits objects a
+and b (in that order), and a, b, and c all have a function with the same name,
+then when that function is called from inside b, it should call the one
+in c and not the one in a.  (this may be a problem in find_inherited()) (?)
+
+make ~username work in #include statements e.g.
+#include "~truilkan/include/config.h" (Shadowhawk)
+
+make a version of call_other that accepts an array as the argument list.
+it should copy the array into a temp variable and then pop the array from
+the stack.  it should then push each element of the array onto the stack
+as a separate parameter.  it should then call the normal call_other.
+
+fix sprintf() to do more intelligent things when types don't match
+e.g. printf("%s", 24) should convert 24 to a string like
+write("number: " + 24 + "\n") would do.
+
+add another version of __INIT that doesn't get used for anything by the
+driver itself (so that wizzes can safely use it for initializing objects
+without having to worry about if inheriting objects call ::create() or not)
+
+enhance the swapfile code so that slots get reused.
+
+the process_io() loop should be redone to be driven by nb and the file
+descriptor mask instead of polling each fd.  Also when initializing the
+read mask we should count the number of bits set and pass that number in.
+This allow great select performance.  (Cynosure)
+
+add a struct data type.  This will require some fairly tricky yacc
+hacking.  This will constitute adding user-definable types.  However the
+actual internal implementation of the struct could be an LPC array.
+References of the form s.field could be translated into an access to an
+appropriate array element at compile time.
+
+remove wizardp() and enable_wizard() from driver and split into
+functions that allow error messages and unrestricted ed (which are the
+only two current uses of enable_wizard (other than mudlib uses).
+
+fix driver not to lock player up when ^C is received (Telnet DO TIMING)
+
+replace the goto label crap with while (1) loops (if possible)
+
+fix it so that dested objects which have been used as indices to a mapping
+don't waste memory (only is wasted until map is freed)
+
+consider adding an unshadow efun so that a shadow can be removed and
+reused (without recloning)
+
+disallow new logins during a shutdown
+
+make it so that 'z' in ed uses getenv("LINES") to see how much to list
+
+introduce some mechanism for explicit type conversion (not just casting)
+
+seems to be a bug when using += on an empty array..
+messages = ({});
+messages += ({msg}); doesn't do what is expected (it prefixes a 0 element
+to the array
+
+make possible for object to say it doesn't want to be swapped out
+
+add enum to LPC (and maybe typedef)
+
+put a struct in interactive for recording info on player terminal
+characteristics (lines, cols, etc).  add an efun for setting those values.
+
+implement auto line wrap.
+
+implement support for linking muds (metamud) -- possible that jacques's
+comm.c mods will be useful for this.
+
+add runtime type checking to call_other
+
+add another version of __INIT that doesn't get used for anything by the
+driver itself (so that wizzes can safely use it)
+
+consider putting "ls" back into the GD
+
+fix sscanf using %*s so that it reports the correct number of items matched
+
+make the compile handle #include correctly with respect to line numbers
+in error reports
+
+check out the object loading code in Amylaar's driver (up to 2x faster than
+lars apparently -- according to Buddha).
+
+maybe change driver so that clean_up also checks for zombied objects
+(objects that aren't referenced by another object (ref count = 0)
+and have no pending call_outs and don't have an init() function can
+be nuked.
+
+identify objects internally with filename and timestamp so we can do the
+persistent mud.  modify find_object and restore_object.  cause save_object
+to save a value for variables of type object.
+
+stat probably shouldn't be a synonym for get_dir.  It should be restricted for
+operations on a single file (like in UNIX(tm)).
+
+add a new remote object type that looks like this when written out:
+(<string mudname, string objectname>).  This would let object variables
+be saved and restored with save_object and restore_object.  All efuns
+taking objects as arguments would need to be modified to allow these
+new remote objects.  When an efun is called on a remote object it
+calls remote_call(string efun_name, mixed *arguments) in master.c.  master.c
+is then responsible for initiating communication with the remote mud
+in order to have the remote mud apply the efun on the object in question
+(with the specified arguments).  master.c should compute an integer key value
+which is returned to the calling efun which in turn is returned to the
+LPC object (caller).  Calling delayedp(key) should return TRUE.  This
+lets the caller know that it will later receive a callback from master
+specifying the key value together with the actual return value of the
+remote efun as returned by the remote mud.  (note only a wrapper needs
+to be in master.c, the actual remote call_other daemon could be anywhere).
+Note: since save_object and restore_object functions are used to encode
+variables sent in MUD mode of the socket efuns, objects will automatically
+be converted to the "remote" (<...>) form before being passed to the
+remote efun.  --Truilkan (1992/09/20)
+
+write a routine to copy a compiled object to disk in such a way that
+it can be read back in
+
+driver compiles fine (albeit with a few extra warnings) with -ansi
+option of gcc 2.2 on except for the usage of fileno() in file.c (which
+is not an ANSI C function).

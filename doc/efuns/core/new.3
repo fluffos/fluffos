@@ -1,0 +1,16 @@
+.\"load a copy of an object
+.TH clone_object 3
+
+.SH NAME
+clone_object() - load a copy of an object
+
+.SH SYNOPSIS
+object clone_object( string name );
+
+.SH DESCRIPTION
+Load a new object from definition <name>, and give it a new unique
+name. Return the new object.  The original used for cloning, should
+not be used in the game, only used for cloning.
+
+.SH SEE ALSO
+destruct(3), move_object(3)

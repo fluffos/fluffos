@@ -5,10 +5,10 @@
 #include <memory.h>
 #endif
 
+#include "config.h"
 #include "lint.h"
 #include "interpret.h"
 #include "object.h"
-#include "config.h"
 #include "exec.h"
 
 /*
@@ -44,26 +44,26 @@ locate_out (prog) struct program *prog; {
     if (!prog) return 0;
     if (d_flag > 1) {
 	debug_message ("locate_out: %lX %lX %lX %lX %lX %lX %lX %lX\n",
-	    prog->program, prog->line_numbers, prog->functions,
-	    prog->strings, prog->variable_names, prog->inherit,
-	    prog->argument_types, prog->type_start);
+	    prog->p.i.program, prog->p.i.line_numbers, prog->p.i.functions,
+	    prog->p.i.strings, prog->p.i.variable_names, prog->p.i.inherit,
+	    prog->p.i.argument_types, prog->p.i.type_start);
     }
-    prog->program	= &p[prog->program - (char *)prog];
-    prog->line_numbers	= (unsigned short *)
-	&p[(char *)prog->line_numbers - (char *)prog];
-    prog->functions	= (struct function *)
-	&p[(char *)prog->functions - (char *)prog];
-    prog->strings	= (char **)
-	&p[(char *)prog->strings - (char *)prog];
-    prog->variable_names= (struct variable *)
-	&p[(char *)prog->variable_names - (char *)prog];
-    prog->inherit	= (struct inherit *)
-	&p[(char *)prog->inherit - (char *)prog];
-    if (prog->type_start) {
-	prog->argument_types = (unsigned short *)
-	    &p[(char *)prog->argument_types - (char *)prog];
-	prog->type_start = (unsigned short *)
-	    &p[(char *)prog->type_start - (char *)prog];
+    prog->p.i.program	= &p[prog->p.i.program - (char *)prog];
+    prog->p.i.line_numbers	= (unsigned short *)
+	&p[(char *)prog->p.i.line_numbers - (char *)prog];
+    prog->p.i.functions	= (struct function *)
+	&p[(char *)prog->p.i.functions - (char *)prog];
+    prog->p.i.strings	= (char **)
+	&p[(char *)prog->p.i.strings - (char *)prog];
+    prog->p.i.variable_names= (struct variable *)
+	&p[(char *)prog->p.i.variable_names - (char *)prog];
+    prog->p.i.inherit	= (struct inherit *)
+	&p[(char *)prog->p.i.inherit - (char *)prog];
+    if (prog->p.i.type_start) {
+	prog->p.i.argument_types = (unsigned short *)
+	    &p[(char *)prog->p.i.argument_types - (char *)prog];
+	prog->p.i.type_start = (unsigned short *)
+	    &p[(char *)prog->p.i.type_start - (char *)prog];
     }
     return 1;
 }
@@ -85,28 +85,28 @@ locate_in (prog) struct program *prog; {
     char *p = (char *)prog;
 
     if (!prog) return 0;
-    prog->program	= &p[prog->program - (char *)0];
-    prog->line_numbers	= (unsigned short *)
-	&p[(char *)prog->line_numbers - (char *)0];
-    prog->functions	= (struct function *)
-	&p[(char *)prog->functions - (char *)0];
-    prog->strings	= (char **)
-	&p[(char *)prog->strings - (char *)0];
-    prog->variable_names= (struct variable *)
-	&p[(char *)prog->variable_names - (char *)0];
-    prog->inherit	= (struct inherit *)
-	&p[(char *)prog->inherit - (char *)0];
-    if (prog->type_start) {
-	prog->argument_types = (unsigned short *)
-	    &p[(char *)prog->argument_types - (char *)0];
-	prog->type_start     = (unsigned short *)
-	    &p[(char *)prog->type_start - (char *)0];
+    prog->p.i.program	= &p[prog->p.i.program - (char *)0];
+    prog->p.i.line_numbers	= (unsigned short *)
+	&p[(char *)prog->p.i.line_numbers - (char *)0];
+    prog->p.i.functions	= (struct function *)
+	&p[(char *)prog->p.i.functions - (char *)0];
+    prog->p.i.strings	= (char **)
+	&p[(char *)prog->p.i.strings - (char *)0];
+    prog->p.i.variable_names= (struct variable *)
+	&p[(char *)prog->p.i.variable_names - (char *)0];
+    prog->p.i.inherit	= (struct inherit *)
+	&p[(char *)prog->p.i.inherit - (char *)0];
+    if (prog->p.i.type_start) {
+	prog->p.i.argument_types = (unsigned short *)
+	    &p[(char *)prog->p.i.argument_types - (char *)0];
+	prog->p.i.type_start     = (unsigned short *)
+	    &p[(char *)prog->p.i.type_start - (char *)0];
     }
     if (d_flag > 1) {
 	debug_message ("locate_in: %lX %lX %lX %lX %lX %lX %lX\n",
-	    prog->program, prog->line_numbers, prog->functions,
-	    prog->strings, prog->variable_names, prog->inherit,
-	    prog->argument_types, prog->type_start);
+	    prog->p.i.program, prog->p.i.line_numbers, prog->p.i.functions,
+	    prog->p.i.strings, prog->p.i.variable_names, prog->p.i.inherit,
+	    prog->p.i.argument_types, prog->p.i.type_start);
     }
     return 1;
 }
@@ -152,7 +152,7 @@ int swap(ob)
 	}
 	return 0;
     }
-    if (ob->prog->ref > 1 || ob->interactive) {
+    if (ob->prog->p.i.ref > 1 || ob->interactive) {
 	if (d_flag > 1) {
 	    debug_message ("  object not swapped - inherited or interactive.\n");
 	}
@@ -163,7 +163,7 @@ int swap(ob)
      * Then it is very easy to swap it out again.
      */
     if (ob->swap_num >= 0) {
-	total_bytes_swapped += ob->prog->total_size;
+	total_bytes_swapped += ob->prog->p.i.total_size;
 	free_prog(ob->prog, 0);		/* Do not free the strings */
 	ob->prog = 0;
 	ob->flags |= O_SWAPPED;
@@ -178,12 +178,12 @@ int swap(ob)
      */
     ob->swap_num = ftell(swap_file);
     locate_out (ob->prog); /* relocate the internal pointers */
-    if (fwrite((char *)ob->prog, ob->prog->total_size, 1, swap_file) != 1) {
+    if (fwrite((char *)ob->prog, ob->prog->p.i.total_size, 1, swap_file) != 1) {
 	debug_message("I/O error in swap.\n");
 	ob->swap_num = -1;
 	return 0;
     }
-    total_bytes_swapped += ob->prog->total_size;
+    total_bytes_swapped += ob->prog->p.i.total_size;
     num_swapped++;
     free_prog(ob->prog, 0);	/* Don't free the shared strings */
     ob->prog = 0;
@@ -214,10 +214,11 @@ void load_ob_from_swap(ob)
     if (fread((char *)&tmp_prog, sizeof tmp_prog, 1, swap_file) != 1) {
 	fatal("Couldn't read the swap file.\n");
     }
-    ob->prog = (struct program *)xalloc(tmp_prog.total_size);
+    ob->prog = (struct program *)
+		DXALLOC(tmp_prog.p.i.total_size, 4194304, "load_ob_from_swap");
     memcpy((char *)ob->prog, (char *)&tmp_prog, sizeof tmp_prog);
     fread((char *)ob->prog + sizeof tmp_prog,
-	  tmp_prog.total_size - sizeof tmp_prog, 1, swap_file);
+	  tmp_prog.p.i.total_size - sizeof tmp_prog, 1, swap_file);
     /*
      * to be relocated:
      *   program
@@ -233,9 +234,9 @@ void load_ob_from_swap(ob)
 
     /* The reference count will already be 1 ! */
     ob->flags &= ~O_SWAPPED;
-    total_bytes_swapped -= ob->prog->total_size;
+    total_bytes_swapped -= ob->prog->p.i.total_size;
     num_swapped--;
-    total_prog_block_size += ob->prog->total_size;
+    total_prog_block_size += ob->prog->p.i.total_size;
     total_num_prog_blocks += 1;
     if (fseek(swap_file, 0L, 2) == -1) { /* marion - seek back for more swap */
 	fatal("Couldn't seek end the swap file, errno %d.\n", errno);

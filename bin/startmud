@@ -1,0 +1,87 @@
+#! /bin/sh
+#
+# file:    startmud (linked to stopmud)
+# version: 0.92
+# date:    1992 August 9
+# desc:    Bourne shell script for starting the MudOS driver and related
+#          binaries. (replaces restart_mud)
+#
+
+# directory for MudOS-related binaries (driver, addr_server, ftpd, etc)
+BINDIR=/usr/local/mud/bin
+
+# don't change anything below this line unless you know what you are doing.
+
+if test $# -ne 1
+then
+	echo "usage: $0 mud_name"
+	exit 1
+fi
+
+# source the info on the mud
+if test -f ${BINDIR}/$1.info
+then
+	. $1.info
+else
+	echo "$0: Unable to find info file '$1.info'"
+	exit 2
+fi
+
+
+if test "$0" = "stopmud"
+then
+	PID=`cat ${BINDIR}/${PIDFILE}`
+	echo "killing ${PID}"
+	kill ${PID}
+	exit 0
+fi
+
+if test -d ${BINDIR}
+then
+	true
+else
+	echo "$0: couldn't find binaries directory: ${BINDIR}"
+	exit 3
+fi
+
+echo $$ > ${BINDIR}/${PIDFILE}
+
+#if test -f ${BINDIR}/${FTPD}
+#then
+#	${BINDIR}/${FTPD} -l
+#else
+#	echo "$0: Unable to find the ftp daemon:\n\t${BINDIR}/${FTPD}."
+#	echo "Continuing anyway."
+#fi
+
+if test -f ${BINDIR}/${ASERVER}
+then
+	${BINDIR}/${ASERVER} ${APORT} >> ${LOGDIR}/${ALOG} 2> ${LOGDIR}/${AERR} &
+else
+	echo "$0: Unable to find the address server:\n\t${BINDIR}/${ASERVER}."
+	echo "Continuing anyway."
+fi
+
+if test -f ${BINDIR}/${DRIVER}
+then
+	while true
+	do
+		echo -n "Driver came up: " >> ${LOGDIR}/${UP}
+		date >> ${LOGDIR}/${UP}
+		${BINDIR}/${DRIVER} ${CONFIG} > ${LOGDIR}/${LOG} 2> ${LOGDIR}/${ERR}
+		ERROR=$?
+		echo -n "Driver went down (exit code: ${ERROR}): " >> ${LOGDIR}/${UP}
+		date >> ${LOGDIR}/${UP}
+		mv ${LOGDIR}/${LOG} ${LOGDIR}/${LOG}.old
+		mv ${LOGDIR}/${ERR} ${LOGDIR}/${ERR}.old
+		if test $ERROR -eq 255
+		then
+			echo "Driver exited with -1.  Halting." >> ${LOGDIR}/${UP}
+			echo "Halting"
+			exit 255
+		fi
+	done
+else
+	echo "$0: Unable to find the gamedriver executable:\n\t${BINDIR}/${DRIVER}"
+	echo "Halting."
+fi

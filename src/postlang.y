@@ -1,10 +1,4 @@
 /* NOTE: This is the 3.1.1 version with 3.0.53-A3.1 code patched in */
-/*
- * These are token values that needn't have an associated code for the
- * compiled file
- */
-
-%token F_CASE F_DEFAULT F_RANGE
 
 %union
 {
@@ -19,7 +13,6 @@
 %type <number> assign F_NUMBER constant F_LOCAL_NAME expr_list
 %type <number> const1 const2 const3 const4 const5 const6 const7 const8 const9
 %type <number> lvalue_list argument type basic_type optional_star expr_list2
-/* following line from 3.0.53-A3.1 - LPCA */
 %type <number> expr_list3 expr_list4 assoc_pair
 %type <number> type_modifier type_modifier_list opt_basic_type block_or_semi
 %type <number> argument_list
@@ -29,7 +22,7 @@
 
 /* The following symbols return type information */
 
-%type <type> function_call lvalue string cast expr01 comma_expr
+%type <type> function_call lvalue string cast expr01 comma_expr for_expr
 %type <type> expr2 expr211 expr1 expr212 expr213 expr22 expr23 expr25
 %type <type> expr27 expr28 expr24 expr3 expr31 expr4 number expr0
 %%
@@ -110,7 +103,12 @@ def: type optional_star F_IDENTIFIER
 	    } else {
 		if (pragma_strict_types)
 		    yyerror("\"#pragma strict_types\" requires type of function");
+		/* force strict types - no more compat mode */
+#ifdef STRICT_TYPE_CHECKING
+		exact_types = TYPE_ANY; /* default to return type of mixed */
+#else
 		exact_types = 0;
+#endif
 	    }
 	}
 	'(' argument ')'
@@ -180,7 +178,8 @@ basic_type: F_STATUS { $$ = TYPE_NUMBER; current_type = $$; }
 	| F_INT { $$ = TYPE_NUMBER; current_type = $$; }
 	| F_STRING_DECL { $$ = TYPE_STRING; current_type = $$; }
 	| F_OBJECT { $$ = TYPE_OBJECT; current_type = $$; }
-	| F_MAPPING { $$ = TYPE_MAPPING; current_type = $$; } /* LPCA */
+	| F_MAPPING { $$ = TYPE_MAPPING; current_type = $$; }
+	| F_FUNCTION { $$ = TYPE_FUNCTION; current_type = $$; }
 	| F_VOID {$$ = TYPE_VOID; current_type = $$; }
 	| F_MIXED { $$ = TYPE_ANY; current_type = $$; } ;
 
@@ -257,12 +256,16 @@ statement: comma_expr ';'
 		{
 		    if (current_continue_address == 0)
 			yyerror("continue statement outside loop");
+                    if (switches) {
+                         ins_f_byte(F_POP_BREAK); ins_short(switches);
+                    }
 		    ins_f_byte(F_JUMP); ins_short(current_continue_address);
 		}
          ;
 
 while:  {   push_explicit(current_continue_address);
 	    push_explicit(current_break_address);
+            push_switches();
 	    current_continue_address = mem_block[A_PROGRAM].current_size;
 	} F_WHILE '(' comma_expr ')'
 	{
@@ -279,10 +282,13 @@ while:  {   push_explicit(current_continue_address);
 		    mem_block[A_PROGRAM].current_size);
 	  current_break_address = pop_address();
 	  current_continue_address = pop_address();
+          pop_switches();
         }
 
 do: {
         int tmp_save;
+
+        push_switches();
         push_explicit(current_continue_address);
 	push_explicit(current_break_address);
 	/* Jump to start of loop. */
@@ -302,10 +308,12 @@ do: {
 	upd_short(pop_address(), mem_block[A_PROGRAM].current_size);
 	current_break_address = pop_address();
 	current_continue_address = pop_address();
+        pop_switches();
     }
 
 for: F_FOR '('	  { push_explicit(current_continue_address);
-		    push_explicit(current_break_address); }
+		    push_explicit(current_break_address);
+                    push_switches(); }
      for_expr ';' {   ins_f_byte(F_POP_VALUE);
 		      push_address();
 		  }
@@ -331,6 +339,7 @@ for: F_FOR '('	  { push_explicit(current_continue_address);
        upd_short(current_break_address+1, mem_block[A_PROGRAM].current_size);
        current_break_address = pop_address();
        current_continue_address = pop_address();
+       pop_switches();
    }
 
 for_expr: /* EMPTY */ { ins_f_byte(F_CONST1); }
@@ -338,6 +347,7 @@ for_expr: /* EMPTY */ { ins_f_byte(F_CONST1); }
 
 switch: F_SWITCH '(' comma_expr ')'
     {
+	switches++;
         current_break_stack_need += sizeof(short);
         if ( current_break_stack_need > max_break_stack_need )
             max_break_stack_need = current_break_stack_need;
@@ -524,6 +534,7 @@ switch: F_SWITCH '(' comma_expr ')'
     	current_case_string_heap = pop_address();
     	current_case_number_heap = pop_address();
         current_break_stack_need -= sizeof(short);
+        switches--;
     } ;
 
 case: F_CASE case_label ':'
@@ -560,7 +571,7 @@ case_label: constant
         {
 	    if ( !(zero_case_label & NO_STRING_CASE_LABELS) )
 		yyerror("Mixed case label list not allowed");
-	    if ( $$.key = $1 )
+	    if ( ($$.key = $1) )
 	        zero_case_label |= SOME_NUMERIC_CASE_LABELS;
 	    else
 		zero_case_label |= mem_block[A_PROGRAM].current_size;
@@ -711,7 +722,6 @@ expr_list: /* empty */		{ $$ = 0; }
 expr_list2: expr0		{ $$ = 1; add_arg_type($1); }
          | expr_list2 ',' expr0	{ $$ = $1 + 1; add_arg_type($3); } ;
 
-/* expr_list3 4 and assoc_pair from LPCA */
 expr_list3: /* empty */         { $$ = 0; }
            | expr_list4           { $$ = $1; }
            | expr_list4 ','       { $$ = $1; } ; /* Allow terminating comma */
@@ -848,14 +858,6 @@ expr25: expr27
 	{	ins_f_byte(F_ADD);
 		if ($1 == $3)
 			$$ = $1;
-#if 0 /*  this causes many peoples' mudlib code to complain i guess -- tru */
-		if (TYPE($1, TYPE_NUMBER) && TYPE($3, TYPE_NUMBER))
-			$$ = TYPE_NUMBER;
-		else if (TYPE($1, TYPE_MAPPING) && TYPE($3, TYPE_MAPPING))
-			$$ = TYPE_MAPPING;
-		else if (TYPE($1, TYPE_STRING) || TYPE($3, TYPE_STRING))
-			$$ = TYPE_STRING;
-#endif
 		else
 			$$ = TYPE_ANY;
 	};
@@ -887,7 +889,7 @@ expr25: expr27
 expr27: expr28
       | expr27 '*' expr3
 	{
-		if (!TYPE($1, TYPE_MAPPING) || !TYPE($3, TYPE_MAPPING)) {
+		if (($1 != TYPE_MAPPING) || ($3 != TYPE_MAPPING)) {
 			if (exact_types && !TYPE($1, TYPE_NUMBER))
 				type_error("Bad argument number 1 to '*'", $1);
 			if (exact_types && !TYPE($3, TYPE_NUMBER))
@@ -1000,12 +1002,13 @@ expr4: function_call
      | catch { $$ = TYPE_ANY; }
      | sscanf { $$ = TYPE_NUMBER; }
      | parse_command { $$ = TYPE_NUMBER; }
+     | '(' ':' expr0 ',' expr0 ':' ')'
+         {
+             ins_f_byte(F_FUNCTION_CONSTRUCTOR);
+             $$ = TYPE_FUNCTION;
+         }
      | '(' '[' expr_list3 ']' ')' 
-         { /* from LPCA */
-#if USE_BUGGY_CODE
-/* this is an error - since expr_list3 never adds anything to the arg_stack */
-             pop_arg_stack($3);
-#endif
+         { 
              ins_f_byte(F_AGGREGATE_ASSOC);
              ins_short($3);
              $$ = TYPE_MAPPING;
@@ -1021,13 +1024,7 @@ expr4: function_call
 catch: F_CATCH { ins_f_byte(F_CATCH); push_address(); ins_short(0);}
        '(' comma_expr ')'
 	       {
-		   ins_f_byte(F_POP_VALUE);
-#if 1
-		   ins_f_byte(F_CONST0);
-		   ins_f_byte(F_THROW);
-#else
-		   ins_f_byte(F_RETURN);
-#endif
+	       ins_f_byte(F_END_CATCH);
 		   upd_short(pop_address(),
 			     mem_block[A_PROGRAM].current_size);
 	       };
@@ -1086,7 +1083,7 @@ lvalue: F_IDENTIFIER
 		  type_error("Bad type of argument used for range", $1);
 	  };
 	| expr4 '[' comma_expr ']'
-	{ /* copied from LPCA */
+	{ 
                last_push_indexed = mem_block[A_PROGRAM].current_size;
                if (TYPE($1, TYPE_MAPPING)) {
                   ins_f_byte(F_PUSH_INDEXED_LVALUE);
@@ -1126,7 +1123,7 @@ string_constant: string_con1
 string_con1: F_STRING
 	   | string_con1 '+' F_STRING
 	{
-	    $$ = xalloc( strlen($1) + strlen($3) + 1 );
+	    $$ = DXALLOC( strlen($1) + strlen($3) + 1, 33554432, "string_con1" );
 	    strcpy($$, $1);
 	    strcat($$, $3);
 	    FREE($1);
@@ -1207,7 +1204,7 @@ function_call: function_name
 		arg_types = (unsigned short *)
 		    mem_block[A_ARGUMENT_TYPES].block;
 		first = *(unsigned short *)&mem_block[A_ARGUMENT_INDEX].block[f * sizeof (unsigned short)];
-		for (i=0; i < funp->num_arg && i < $4; i++) {
+		for (i=0; (unsigned)i < funp->num_arg && i < $4; i++) {
 		    int tmp = get_argument_type(i, $4);
 		    if (!TYPE(tmp, arg_types[first + i])) {
 			char buff[100];
@@ -1320,21 +1317,53 @@ function_call: function_name
 	ins_byte($6 + 2);
 	$$ = TYPE_UNKNOWN;
 	pop_arg_stack($6);	/* No good need of these arguments */
+    }
+| '(' '*' comma_expr ')'
+    {
+		ins_f_byte(F_FUNCTION_SPLIT);
+    }
+     '(' expr_list ')'
+    {
+		ins_f_byte(F_CALL_OTHER);
+		ins_byte($7 + 2);
+		ins_f_byte(F_POP_VALUE);
+		$$ = TYPE_UNKNOWN;
+		pop_arg_stack($7);	/* No good need of these arguments */
     };
 
 function_name: F_IDENTIFIER
 	     | F_COLON_COLON F_IDENTIFIER
 		{
-		    char *p = xalloc(strlen($2) + 3);
+		    char *p = DXALLOC(strlen($2) + 3, 33554432, "function_name: 1");
 		    strcpy(p, "::"); strcat(p, $2); FREE($2);
 		    $$ = p;
 		}
 	      | F_IDENTIFIER F_COLON_COLON F_IDENTIFIER
 		{
-		    char *p = xalloc(strlen($1) + strlen($3) + 3);
-		    strcpy(p, $1); strcat(p, "::"); strcat(p, $3);
-		    FREE($1); FREE($3);
-		    $$ = p;
+		    char *p;
+			struct svalue *res;
+			extern struct object *master_ob;
+			int invalid = 0;
+
+			if (master_ob && (strcmp($1, "efun") == 0)) {
+				push_malloced_string(the_file_name(current_file));
+				push_constant_string($3);
+				res = safe_apply_master_ob("valid_override", 2);
+				if (IS_ZERO(res)) {
+					yyerror("Invalid simulated efunction override");
+					invalid = 1;
+				}
+			}
+			if (invalid) {
+				FREE($1);
+				$$ = $3;
+			} else {
+				p = DXALLOC(strlen($1) + strlen($3) + 3, 33554432,
+					"function_name: 2");
+				strcpy(p, $1); strcat(p, "::"); strcat(p, $3);
+				FREE($1); FREE($3);
+				$$ = p;
+			}
 		};
 
 cond: condStart
@@ -1370,8 +1399,7 @@ char *str;
 		  current_line);
     fflush(stderr);
     smart_log(current_file, current_line, str,0);
-    if (num_parse_error == 0)
-	save_error(str, current_file, current_line);
+    add_errors_for_file (current_file, 1);
     num_parse_error++;
 }
 
@@ -1452,14 +1480,14 @@ static int copy_functions(from, type)
     int i, initializer = -1;
     unsigned short tmp_short;
 
-    for (i=0; i < from->num_functions; i++) {
+    for (i=0; (unsigned)i < from->p.i.num_functions; i++) {
 	/* Do not call define_new_function() from here, as duplicates would
 	 * be removed.
 	 */
 	struct function fun;
 	int new_type;
 
-	fun = from->functions[i];	/* Make a copy */
+	fun = from->p.i.functions[i];	/* Make a copy */
 	/* Prepare some data to be used if this function will not be
 	 * redefined.
 	 */
@@ -1475,7 +1503,8 @@ static int copy_functions(from, type)
 		!(((struct function *)mem_block[A_FUNCTIONS].block)[n].flags &
 		  NAME_UNDEFINED))
 	    {
-		char *p = (char *)alloca(80 + strlen(fun.name));
+		char p[2048];
+
 		sprintf(p, "Illegal to redefine 'nomask' function \"%s\"",
 			fun.name);
 		yyerror(p);
@@ -1511,7 +1540,7 @@ static int copy_functions(from, type)
 	 * available.
 	 */
 	tmp_short = INDEX_START_NONE;	/* Presume not available. */
-	if (from->type_start != 0 && from->type_start[i] != INDEX_START_NONE)
+	if (from->p.i.type_start != 0 && from->p.i.type_start[i] != INDEX_START_NONE)
 	{
 	    int arg;
 	    /*
@@ -1519,10 +1548,10 @@ static int copy_functions(from, type)
 	     * all arguments, and remember where they started.
 	     */
 	    tmp_short = mem_block[A_ARGUMENT_TYPES].current_size /
-		sizeof from->argument_types[0];
-	    for (arg = 0; arg < fun.num_arg; arg++) {
+		sizeof from->p.i.argument_types[0];
+	    for (arg = 0; (unsigned)arg < fun.num_arg; arg++) {
 		add_to_mem_block(A_ARGUMENT_TYPES,
-				 &from->argument_types[from->type_start[i]],
+				 &from->p.i.argument_types[from->p.i.type_start[i]],
 				 sizeof (unsigned short));
 	    }
 	}
@@ -1546,13 +1575,13 @@ static void copy_variables(from, type)
 {
     int i;
 
-    for (i=0; i<from->num_variables; i++) {
+    for (i=0; (unsigned)i<from->p.i.num_variables; i++) {
 	int new_type = type;
-	int n = check_declared(from->variable_names[i].name);
+	int n = check_declared(from->p.i.variable_names[i].name);
 
 	if (n != -1 && (VARIABLE(n)->type & TYPE_MOD_NO_MASK)) {
-	    char *p = (char *)alloca(80 +
-				     strlen(from->variable_names[i].name));
+	    char p[2048];
+
 	    sprintf(p, "Illegal to redefine 'nomask' variable \"%s\"",
 		    VARIABLE(n)->name);
 	    yyerror(p);
@@ -1561,11 +1590,11 @@ static void copy_variables(from, type)
 	 * 'public' variables should not become private when inherited
 	 * 'private'.
 	 */
-	if (from->variable_names[i].type & TYPE_MOD_PUBLIC)
+	if (from->p.i.variable_names[i].type & TYPE_MOD_PUBLIC)
 	    new_type &= ~TYPE_MOD_PRIVATE;
-	define_variable(from->variable_names[i].name,
-			from->variable_names[i].type | new_type,
-			from->variable_names[i].type & TYPE_MOD_PRIVATE ?
+	define_variable(from->p.i.variable_names[i].name,
+			from->p.i.variable_names[i].type | new_type,
+			from->p.i.variable_names[i].type & TYPE_MOD_PRIVATE ?
 			    NAME_HIDDEN : 0);
     }
 }
@@ -1591,7 +1620,7 @@ static char *get_type_name(type)
 {
     static char buff[100];
     static char *type_name[] = { "unknown", "int", "string",
-				     "void", "object", "mapping", "mixed", };
+				     "void", "object", "mapping", "mixed", "function", };
     int pointer = 0;
 
     buff[0] = 0;
@@ -1712,67 +1741,67 @@ void epilog() {
     size = align(sizeof (struct program));
     for (i=0; i<NUMPAREAS; i++)
 	size += align(mem_block[i].current_size);
-    p = (char *)xalloc(size);
+    p = (char *)DXALLOC(size, 33554432, "epilog: 1");
     prog = (struct program *)p;
     *prog = NULL_program;
-    prog->total_size = size;
-    prog->ref = 0;
-    prog->heart_beat = heart_beat;
+    prog->p.i.total_size = size;
+    prog->p.i.ref = 0;
+    prog->p.i.heart_beat = heart_beat;
     prog->name = string_copy(current_file);
-    prog->id_number = current_id_number++;
-    total_prog_block_size += prog->total_size;
+    prog->p.i.id_number = current_id_number++;
+    total_prog_block_size += prog->p.i.total_size;
     total_num_prog_blocks += 1;
 
     p += align(sizeof (struct program));
-    prog->program = p;
+    prog->p.i.program = p;
     if (mem_block[A_PROGRAM].current_size)
 	memcpy(p, mem_block[A_PROGRAM].block,
 	       mem_block[A_PROGRAM].current_size);
-    prog->program_size = mem_block[A_PROGRAM].current_size;
+    prog->p.i.program_size = mem_block[A_PROGRAM].current_size;
 
     p += align(mem_block[A_PROGRAM].current_size);
-    prog->line_numbers = (unsigned short *)p;
+    prog->p.i.line_numbers = (unsigned short *)p;
     if (mem_block[A_LINENUMBERS].current_size)
 	memcpy(p, mem_block[A_LINENUMBERS].block,
 	       mem_block[A_LINENUMBERS].current_size);
 
     p += align(mem_block[A_LINENUMBERS].current_size);
-    prog->functions = (struct function *)p;
-    prog->num_functions = mem_block[A_FUNCTIONS].current_size /
+    prog->p.i.functions = (struct function *)p;
+    prog->p.i.num_functions = mem_block[A_FUNCTIONS].current_size /
 	sizeof (struct function);
     if (mem_block[A_FUNCTIONS].current_size)
 	memcpy(p, mem_block[A_FUNCTIONS].block,
 	       mem_block[A_FUNCTIONS].current_size);
 
     p += align(mem_block[A_FUNCTIONS].current_size);
-    prog->strings = (char **)p;
-    prog->num_strings = mem_block[A_STRINGS].current_size /
+    prog->p.i.strings = (char **)p;
+    prog->p.i.num_strings = mem_block[A_STRINGS].current_size /
 	sizeof (char *);
     if (mem_block[A_STRINGS].current_size)
 	memcpy(p, mem_block[A_STRINGS].block,
 	       mem_block[A_STRINGS].current_size);
 
     p += align(mem_block[A_STRINGS].current_size);
-    prog->variable_names = (struct variable *)p;
-    prog->num_variables = mem_block[A_VARIABLES].current_size /
+    prog->p.i.variable_names = (struct variable *)p;
+    prog->p.i.num_variables = mem_block[A_VARIABLES].current_size /
 	sizeof (struct variable);
     if (mem_block[A_VARIABLES].current_size)
 	memcpy(p, mem_block[A_VARIABLES].block,
 	       mem_block[A_VARIABLES].current_size);
 
     p += align(mem_block[A_VARIABLES].current_size);
-    prog->num_inherited = mem_block[A_INHERITS].current_size /
+    prog->p.i.num_inherited = mem_block[A_INHERITS].current_size /
 	sizeof (struct inherit);
-    if (prog->num_inherited) {
+    if (prog->p.i.num_inherited) {
 	memcpy(p, mem_block[A_INHERITS].block,
 	       mem_block[A_INHERITS].current_size);
-	prog->inherit = (struct inherit *)p;
+	prog->p.i.inherit = (struct inherit *)p;
     } else
-	prog->inherit = 0;
+	prog->p.i.inherit = 0;
     
-    prog->argument_types = 0;	/* For now. Will be fixed someday */
+    prog->p.i.argument_types = 0;	/* For now. Will be fixed someday */
 
-    prog->type_start = 0;
+    prog->p.i.type_start = 0;
     for (i=0; i<NUMAREAS; i++)
         FREE((char *)mem_block[i].block);
 
@@ -1782,8 +1811,8 @@ void epilog() {
 	loaded and not the last inherited
     */
     reference_prog (prog, "epilog");
-    for (i = 0; i < prog->num_inherited; i++) {
-	reference_prog (prog->inherit[i].prog, "inheritance");
+    for (i = 0; (unsigned)i < prog->p.i.num_inherited; i++) {
+	reference_prog (prog->p.i.inherit[i].prog, "inheritance");
     }
 }
 
@@ -1793,9 +1822,12 @@ void epilog() {
 static void prolog() {
     int i;
 
+    switches = 0;
+    switch_sptr = 0;
     if (type_of_arguments.block == 0) {
 	type_of_arguments.max_size = 100;
-	type_of_arguments.block = xalloc(type_of_arguments.max_size);
+	type_of_arguments.block =
+		DXALLOC(type_of_arguments.max_size, 33554432, "prolog: 1");
     }
     type_of_arguments.current_size = 0;
     approved_object = 0;
@@ -1813,7 +1845,7 @@ static void prolog() {
      * will be stored.
      */
     for (i=0; i < NUMAREAS; i++) {
-	mem_block[i].block = xalloc(START_BLOCK_SIZE);
+	mem_block[i].block = DXALLOC(START_BLOCK_SIZE, 33554432, "prolog: 2");
 	mem_block[i].current_size = 0;
 	mem_block[i].max_size = START_BLOCK_SIZE;
     }
@@ -1831,4 +1863,56 @@ void add_new_init_jump() {
     ins_f_byte(F_JUMP);
     last_initializer_end = mem_block[A_PROGRAM].current_size;
     ins_short(0);
+}
+
+/*
+   push_switches should be called at the beginning of the parsing of
+   any loop construct.
+*/
+
+void push_switches()
+{
+#ifdef DEBUG
+    if (switch_sptr == SWITCH_STACK_SIZE) {
+        fatal("switch_stack overflow\n");
+    }
+#endif
+    switch_stack[switch_sptr++] = switches;
+    switches = 0;
+}
+
+/*
+   pop_switches should be called at the end of the parsing of any loop
+   construct.
+*/
+
+void pop_switches()
+{
+#ifdef DEBUG
+    if (switch_sptr == 0) {
+       fatal("switch_stack underflow\n");
+    }
+#endif
+    switches = switch_stack[--switch_sptr];
+}
+
+char *
+the_file_name(name)
+char *name;
+{
+	char *tmp;
+	int len;
+
+	len = strlen(name);
+	if (len < 3) {
+		return string_copy(name);
+	}
+	tmp = (char *)DXALLOC(len, 33554432, "the_file_name");
+	if (!tmp) {
+		return string_copy(name);
+	}
+	strcpy(tmp, "/");
+	strncpy(tmp + 1, name, len - 2);
+	tmp[len - 1] = '\0';
+	return tmp;
 }

@@ -1,0 +1,23 @@
+#define PORT 7000
+#define MUD_PATH "/usr/local/mud/tmi/lib"
+#define FTPD_LOG "/usr/local/mud/tmi/ftpd.log"
+
+struct mudpw {
+	char pw_name[14];
+	char pw_passwd[26];
+	int pw_level;
+	char pw_dir[256];
+};
+
+#define SENIOR 100
+#define ELDER 500
+#define GOD 10000
+#define APPRENTICE 20
+#define WIZARD 21
+
+#define EDIT_STANDARD 700
+#define ALL_POWER GOD
+
+#define ED_OTHERS   SENIOR
+#define ED_LOG	    ELDER
+#define READ_OTHERS 40

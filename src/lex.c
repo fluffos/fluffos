@@ -3,11 +3,11 @@
 #include <string.h>
 
 #include "instrs.h"
+#include "config.h"
 #include "lint.h"
+#include "interpret.h"
 #include "lang.tab.h"
 #include "string.h"
-#include "config.h"
-#include "interpret.h"
 #include "exec.h"
 #include "lex.h"
 
@@ -35,8 +35,8 @@ static int exgetc();
 static FILE *yyin;
 static int lex_fatal;
 static char **inc_list;
-static char *auto_inc_file = (char *) 0;
 static int inc_list_size;
+static int defines_need_freed = 0;
 
 #define EXPANDMAX 25000
 static int nexpands;
@@ -96,7 +96,7 @@ void merge(name, dest)
     char *from;
 
     strcpy(dest, current_file);
-    if (from = strrchr(dest, '/'))   /* strip filename */
+    if ((from = strrchr(dest, '/')))   /* strip filename */
 	*from = 0;
     else
 	/* current_file was the file_name */
@@ -248,7 +248,7 @@ int c;
 
 /*fprintf(stderr, "cond %d\n", c);*/
     if (c || skip_to("else", "endif")) {
-	p = (struct ifstate *)xalloc(sizeof(struct ifstate));
+	p = (struct ifstate *)DXALLOC(sizeof(struct ifstate), 512, "handle_cond");
 	p->next = iftop;
 	iftop = p;
 	p->state = c ? EXPECT_ELSE : EXPECT_ENDIF;
@@ -329,7 +329,8 @@ char *name;
     }
     *p = 0;
     if ((f = inc_open(buf, name)) != NULL) {
-	is = (struct incstate *)xalloc(sizeof(struct incstate));
+	is = (struct incstate *)
+		DXALLOC(sizeof(struct incstate), 256, "handle_include: 1");
 	is->yyin = yyin;
 	is->line = current_line;
 	is->file = current_file;
@@ -340,7 +341,7 @@ char *name;
 	pragma_strict_types = 0;
 	inctop = is;
 	current_line = 1;
-	current_file = xalloc(strlen(buf)+1);
+	current_file = DXALLOC(strlen(buf)+1, 256, "handle_include: 2");
 	strcpy(current_file, buf);
 	slast = lastchar = '\n';
 	yyin = f;
@@ -362,7 +363,9 @@ skip_line()
       }        
     if (inctop == 0)        
       store_line_number_info();
-    current_line++;
+    if (c == '\n') {
+		myungetc(c);
+	}
 }
 
 static void
@@ -443,8 +446,6 @@ yylex1()
   partp=partial;	/* Xeno */
   partial[0]=0;		/* Xeno */
 
-  if (auto_inc_file)
-     handle_include(auto_inc_file);
   for(;;) {
     if (lex_fatal) {
 	return -1;
@@ -580,7 +581,7 @@ yylex1()
 
 		if (c == '"')
 		    quote ^= 1;
-		while(!quote && c == '/') { /*gc - handle comments cpp-like! 1.6.91 */
+		if (!quote && c == '/') { /*gc - handle comments cpp-like! 1.6.91 */
 		    if (gobble('*')) { 
 				skip_comment();
 				c = mygetc();
@@ -588,7 +589,6 @@ yylex1()
 				skip_line();
 				c = mygetc();
 			}
-			break;
 		  }
 
 		if (!sp && isspace(c))
@@ -609,42 +609,6 @@ yylex1()
 	    if (strcmp("define", yytext) == 0) {
 		handle_define(sp);
 	    } else if (strcmp("if", yytext) == 0) {
-#if 0
-		short int nega=0; /*@@@ allow #if !VAR gc 1.6.91*/
-		if (*sp=='!'){ sp++; nega=1;}
-		if (isdigit(*sp)) {
-		    char *p;
-		    long l;
-		    l = strtol(sp, &p, 10);
-		    while(isspace(*p))
-			p++;
-		    if (*p)
-			yyerror("Condition too complex in #if");
-		    else
-			handle_cond(nega?!(int)l:(int)l);
-		} else if (isalunum(*sp)) {
-		    char *p = sp;
-		    while(isalunum(*p))
-			p++;
-		    if (*p) {
-			*p++ = 0;
-			while(isspace(*p))
-			    p++;
-		    }
-		    if (*p)
-			yyerror("Condition too complex in #if");
-		    else {
-			struct defn *d;
-			d = lookup_define(sp);
-			if (d) {
-			    handle_cond(nega?!atoi(d->exps):atoi(d->exps));/* a hack! */
-			} else {
-			    handle_cond(nega?1:0); /* cpp-like gc*/
-			}
-		    }
-		} else
-		    yyerror("Condition too complex in #if");
-#else
 		int cond;
 
 		myungetc(0);
@@ -655,7 +619,6 @@ yylex1()
 		    while ( mygetc() ) ;
 		} else
 		    handle_cond(cond);
-#endif
 	    } else if (strcmp("ifdef", yytext) == 0) {
 		deltrail(sp);
 		handle_cond(lookup_define(sp) != 0);
@@ -690,7 +653,7 @@ yylex1()
 		struct defn *d;
 
 		deltrail(sp);
-		if (d = lookup_define(sp))
+		if ((d = lookup_define(sp)))
 		    d->undef++;
 	    } else if (strcmp("echo", yytext) == 0) {
 		fprintf(stderr, "%s\n", sp);
@@ -707,11 +670,23 @@ yylex1()
 	} else
 	    goto badlex;
     case '\'':
+
 	yylval.number = mygetc();
-	if (yylval.number == '\\')
-	    yylval.number = mygetc();
+	if (yylval.number == '\\') { 
+		int tmp = mygetc();
+		if (tmp == 'n') { /* fix from Wing@TMI 92/08/21 */
+			yylval.number = '\n';
+		} else if (tmp == 't') {
+			yylval.number = '\t';
+		} else if (tmp == 'r') {
+			yylval.number = '\r';
+		} else if (tmp == 'b') {
+			yylval.number = '\b';
+		} else
+			yylval.number = tmp;
+	}
 	if (!gobble('\''))
-	    yyerror("Illegal characterx constant");
+	    yyerror("Illegal character constant");
 	return F_NUMBER;
     case '"':
 	yyp = yytext;
@@ -838,7 +813,8 @@ yylex1()
     }
   }
  badlex:
-  { char buff[100]; sprintf(buff, "Illegal character (hex %02x) '%c'", c, c);
+  { char buff[100];
+    sprintf(buff, "Illegal character (hex %02x) '%c'", (unsigned)c, (char)c);
     fprintf(stderr,"partial = %s\n",partial);
     yyerror(buff); return ' '; }
   }
@@ -890,7 +866,7 @@ static int string(str)
     if (!*str) {
 	str = "\"\"";
     }
-    p = xalloc(strlen(str));
+    p = DXALLOC(strlen(str), 256, "string: p");
     yylval.string = p;
     for (str++; str[0] && str[1] ; str++, p++) {
 	if (str[0] == '\\') {
@@ -938,6 +914,10 @@ void end_new_file()
 	iftop = p->next;
 	FREE((char *)p);
     }
+	if (defines_need_freed) {
+		free_defines();
+		defines_need_freed = 0;
+	}
 }
 
 void start_new_file(f)
@@ -946,21 +926,27 @@ void start_new_file(f)
     struct lpc_predef_s *tmpf;
     char *dir, *tmp;
 
-    free_defines();
+	if (defines_need_freed) {
+		free_defines();
+	}
+	defines_need_freed = 1;
     add_define("LPC3", -1, "");
-    add_define("LPCA", -1, "");
+    add_define("MUDOS", -1, "");
     if (current_file)
       {
-	dir = (char *)MALLOC(strlen(current_file)+3);
+	dir = (char *)DMALLOC(strlen(current_file)+3, 256, "start_new_file");
 	sprintf (dir,"\"%s",current_file);
 	tmp = strrchr (dir,'/');
-	sprintf (tmp+1,"\"\0");
+	if (tmp) {
+	    tmp[1] = '"';
+	    tmp[2] = 0;
+	}
 #if 1	
 	add_define("DIR",-1,dir);
 #endif
 	FREE(dir);
       }
-#ifndef NO_SHADOWS /* LPCA */
+#ifndef NO_SHADOWS 
         add_define("NO_SHADOWS", -1, "");
 #endif
         add_define("USE_EUID", -1, "");
@@ -1020,6 +1006,7 @@ static struct keyword reswords[] = {
 { "do",			F_DO, },
 { "else",		F_ELSE, },
 { "for",		F_FOR, },
+{ "function",   F_FUNCTION, },
 { "if",			F_IF, },
 { "inherit",		F_INHERIT, },
 { "int",		F_INT, },
@@ -1042,7 +1029,22 @@ static struct keyword reswords[] = {
 { "while",		F_WHILE, },
 };
 
-struct instr instrs[256];
+struct instr instrs[MAX_INSTRS];
+static char num_buf[20];
+
+char *query_instr_name(instr)
+int instr;
+{
+	char *name;
+
+	name = instrs[instr - F_OFFSET].name;
+	if (name) {
+		return name;
+	} else {
+		sprintf(num_buf, "%d", instr);
+		return num_buf;
+	}
+}
 
 static void add_instr_name(name, n)
     char *name;
@@ -1098,6 +1100,8 @@ void init_num_args()
     add_instr_name("string", F_STRING);
     add_instr_name("call", F_CALL_FUNCTION_BY_ADDRESS);
     add_instr_name("aggregate", F_AGGREGATE);
+    add_instr_name("(::)", F_FUNCTION_CONSTRUCTOR);
+    add_instr_name("(*)", F_FUNCTION_SPLIT);
     add_instr_name("push_identifier_lvalue", F_PUSH_IDENTIFIER_LVALUE);
     add_instr_name("+", F_ADD);
     add_instr_name("!=", F_NE);
@@ -1108,6 +1112,7 @@ void init_num_args()
     add_instr_name("x--", F_POST_DEC);
     add_instr_name("switch",F_SWITCH);
     add_instr_name("break",F_BREAK);
+    add_instr_name("pop_break",F_POP_BREAK);
     add_instr_name("range",F_RANGE);
     instrs[F_RANGE-F_OFFSET].type[0] = T_POINTER|T_STRING;
 }
@@ -1368,7 +1373,7 @@ int nargs;
     struct defn *p;
     int h;
 
-    if (p = lookup_define(name)) {
+    if ((p = lookup_define(name))) {
 	if (nargs != p->nargs || strcmp(exps, p->exps) != 0) {
 	    char buf[200+NSIZE];
 	    sprintf(buf, "Redefinition of #define %s", name);
@@ -1376,17 +1381,17 @@ int nargs;
 	}
 	return;
     }
-    p = (struct defn *)xalloc(sizeof(struct defn));
-    p->name = xalloc(strlen(name)+1);
+    p = (struct defn *)DXALLOC(sizeof(struct defn), 256, "add_define: 1");
+    p->name = DXALLOC(strlen(name)+1, 256, "add_define: 2");
     strcpy(p->name, name);
     p->undef = 0;
     p->nargs = nargs;
-    p->exps = xalloc(strlen(exps)+1);
+    p->exps = DXALLOC(strlen(exps)+1, 256, "add_define: 3");
     strcpy(p->exps, exps);
     h = defhash(name);
     p->next = defns[h];
     defns[h] = p;
-/*fprintf(stderr, "define '%s' %d '%s'\n", name, nargs, exps);*/
+/* fprintf(stderr, "define '%s' %d '%s'\n", name, nargs, exps); */
 }
 
 static void
@@ -1515,7 +1520,7 @@ expand_define()
 	b = buf;
 	e = p->exps;
 	while(*e) {
-            if (*e == '#' && *(++e) == '#') e++;
+            if (*e == '#' && *(e + 1) == '#') e += 2;
 	    if (*e == MARKS) {
 		if (*++e == MARKS)
 		    *b++ = *e++;
@@ -1714,8 +1719,18 @@ int priority;
     value2=cond_get_exp(optab2[x+2]);
     switch ( optab2[x+1] ) {
       case MULT : value *= value2;	break;
-      case DIV  : value /= value2;	break;
-      case MOD  : value %= value2;	break;
+      case DIV  :
+           if (value2)
+              value /= value2;
+           else
+              yyerror("division by 0 in #if");
+           break;
+      case MOD  :
+           if (value2)
+              value %= value2;
+           else
+              yyerror("modulo by 0 in #if");
+           break;
       case BPLUS  : value += value2;	break;
       case BMINUS : value -= value2;	break;
       case LSHIFT : value <<= value2;	break;
@@ -1750,18 +1765,6 @@ int priority;
   return value;
 }
 
-void set_global_include(file)
-    char *file;
-{
-  if (!file || !strlen(file))
-    {
-      /* don't set the global include file after all */
-      /* no need to barf on it though. */
-      return;
-    }
-  auto_inc_file = string_copy(file);
-}
-
 void set_inc_list (list)
      char *list;
 {
@@ -1784,7 +1787,7 @@ void set_inc_list (list)
       size++;
       p++;
     }
-  inc_list = (char **)xalloc(size * sizeof (char *));
+  inc_list = (char **)DXALLOC(size * sizeof (char *), 256, "set_inc_list");
   inc_list_size = size;
   for (i=size-1; i >= 0; i--) 
     {
@@ -1806,7 +1809,7 @@ void set_inc_list (list)
       if (*p == '/')
 	p++;
       /*
-       * Even make sure that the game administrator has not made an error.
+       * Even make sure that the mud administrator has not made an error.
        */
       if (!legal_path(p)) 
 	{

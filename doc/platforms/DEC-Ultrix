@@ -1,0 +1,4 @@
+MudOS hints file for DECStation Ultrix:
+
+in the Makefile, uncomment UALARM_C and UALARM_O
+also in the Makefile, comment out RESOLV

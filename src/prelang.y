@@ -16,15 +16,23 @@
 #if defined(sun)
 #include <alloca.h>
 #endif
+#ifdef NeXT
+#include <stdlib.h>
+#endif
 
-#include "lint.h"
+#include "mudlib_stats.h"
 #include "interpret.h"
+#include "config.h"
+#define _YACC_
+#include "lint.h"
 #include "object.h"
 #include "exec.h"
-#include "config.h"
 #include "instrs.h"
 #include "incralloc.h"
 #include "switch.h"
+#include "base.h"
+
+extern int base_code, call_extra_code;
 
 #define YYMAXDEPTH	600
 
@@ -47,11 +55,21 @@
 #define BREAK_ON_STACK		0x40000
 #define BREAK_FROM_CASE		0x80000
 
+#define SWITCH_STACK_SIZE  100
+
 /* make sure that this struct has a size that is a power of two */
 struct case_heap_entry { int key; short addr; short line; };
 #define CASE_HEAP_ENTRY_ALIGN(offset) offset &= -sizeof(struct case_heap_entry)
 
 static struct mem_block mem_block[NUMAREAS];
+
+/*
+   these three variables used to properly adjust the 'break_sp' stack in
+   the event a 'continue' statement is issued from inside a 'switch'.
+*/
+static short switches = 0;
+static int switch_sptr = 0;
+static short switch_stack[SWITCH_STACK_SIZE];
 
 /*
  * Some good macros to have.
@@ -131,7 +149,7 @@ static void copy_variables();
 static int copy_functions PROT((struct program *, int type));
 void type_error PROT((char *, int));
 
-char *xalloc(), *string_copy();
+char *string_copy();
 
 extern int current_line;
 /*
@@ -163,11 +181,16 @@ struct program *prog;	/* Is returned to the caller of yyparse */
 /*
  * Compare two types, and return true if they are compatible.
  */
+
 static int compatible_types(t1, t2)
     int t1, t2;
 {
     if (t1 == TYPE_UNKNOWN || t2 == TYPE_UNKNOWN)
+#ifdef CAST_CALL_OTHERS      
 	return 0;
+#else  
+	return 1;
+#endif
     if (t1 == t2)
 	return 1;
     if (t1 == TYPE_ANY || t2 == TYPE_ANY)
@@ -189,7 +212,8 @@ static void add_arg_type(type)
     struct mem_block *mbp = &type_of_arguments;
     while (mbp->current_size + sizeof type > mbp->max_size) {
 	mbp->max_size <<= 1;
-	mbp->block = (char *)REALLOC((char *)mbp->block, mbp->max_size);
+	mbp->block = (char *)DREALLOC((char *)mbp->block, mbp->max_size, 16777216,
+		"add_arg_type");
     }
     memcpy(mbp->block + mbp->current_size, &type, sizeof type);
     mbp->current_size += sizeof type;
@@ -227,7 +251,8 @@ static void add_to_mem_block(n, data, size)
     struct mem_block *mbp = &mem_block[n];
     while (mbp->current_size + size > mbp->max_size) {
 	mbp->max_size <<= 1;
-	mbp->block = (char *)REALLOC((char *)mbp->block, mbp->max_size);
+	mbp->block = (char *)
+	DREALLOC((char *)mbp->block, mbp->max_size, 1677216, "add_to_mem_block");
     }
     memcpy(mbp->block + mbp->current_size, data, size);
     mbp->current_size += size;
@@ -283,9 +308,14 @@ static void ins_long(l)
 }
 
 static void ins_f_byte(b)
-    unsigned int b;
+unsigned int b;
 {
-    ins_byte((char)(b - F_OFFSET));
+	if (b >= (F_OFFSET + 0xff)) {
+		ins_byte((char)call_extra_code);
+		ins_byte((char)(b - F_OFFSET - 0xff));
+	} else {
+		ins_byte((char)(b - F_OFFSET));
+	}
 }
 
 /*
@@ -365,7 +395,7 @@ static void find_inherited(funp)
     real_name = funp->name;
     if (real_name[0] == ':')
 	real_name = real_name + 2;	/* There will be exactly two ':' */
-    else if (p = strchr(real_name, ':')) {
+    else if ((p = strchr(real_name, ':'))) {
 	real_name = p+2;
 	super_name = funp->name;
 	super_length = real_name - super_name - 2;
@@ -382,16 +412,16 @@ static void find_inherited(funp)
 			super_length) != 0)
 		continue;
 	}
-	for (i=0; i < ip->prog->num_functions; i++) {
-	    if (ip->prog->functions[i].flags & (NAME_UNDEFINED|NAME_HIDDEN))
+	for (i=0; (unsigned)i < ip->prog->p.i.num_functions; i++) {
+	    if (ip->prog->p.i.functions[i].flags & (NAME_UNDEFINED|NAME_HIDDEN))
 		continue;
-	    if (strcmp(ip->prog->functions[i].name, real_name) != 0)
+	    if (strcmp(ip->prog->p.i.functions[i].name, real_name) != 0)
 		continue;
 	    funp->offset = ip - (struct inherit *)mem_block[A_INHERITS].block;
-	    funp->flags = ip->prog->functions[i].flags | NAME_INHERITED;
-	    funp->num_local = ip->prog->functions[i].num_local;
-	    funp->num_arg = ip->prog->functions[i].num_arg;
-	    funp->type = ip->prog->functions[i].type;
+	    funp->flags = ip->prog->p.i.functions[i].flags | NAME_INHERITED;
+	    funp->num_local = ip->prog->p.i.functions[i].num_local;
+	    funp->num_arg = ip->prog->p.i.functions[i].num_arg;
+	    funp->type = ip->prog->p.i.functions[i].type;
 	    funp->function_index_offset = i;
 	    return;
 	}
@@ -452,7 +482,7 @@ static int define_new_function(name, num_arg, num_local, offset, flags, type)
 	    !(funp->flags & NAME_PROTOTYPE) &&
 	    !(flags & NAME_PROTOTYPE))
 	{
-	    char *p = (char *)alloca(80 + strlen(name));
+	    char p[2048];
 	    sprintf(p, "Illegal to redefine 'nomask' function \"%s\"",name);
 	    yyerror(p);
 	}
@@ -528,7 +558,8 @@ static void define_variable(name, type, flags)
 
     n = check_declared(name);
     if (n != -1 && (VARIABLE(n)->type & TYPE_MOD_NO_MASK)) {
-	char *p = (char *)alloca(80 + strlen(name));
+	char p[2048];
+
 	sprintf(p, "Illegal to redefine 'nomask' variable \"%s\"", name);
 	yyerror(p);
     }
@@ -619,6 +650,7 @@ void add_new_init_jump();
  * These are the predefined functions that can be accessed from LPC.
  */
 
+%token F_CALL_EXTRA F_CASE F_DEFAULT F_RANGE
 %token F_IF F_IDENTIFIER F_LAND F_LOR F_STATUS
 %token F_RETURN F_STRING
 %token F_INC F_DEC
@@ -628,17 +660,18 @@ void add_new_init_jump();
 %token F_NE
 %token F_ADD_EQ F_SUB_EQ F_DIV_EQ F_MULT_EQ
 %token F_NEGATE
-%token F_SUBSCRIPT F_WHILE F_BREAK
+%token F_SUBSCRIPT F_WHILE F_BREAK F_POP_BREAK
 %token F_DO F_FOR F_SWITCH
 %token F_SSCANF F_PARSE_COMMAND F_STRING_DECL F_LOCAL_NAME
-%token F_ELSE F_DESCRIBE
+%token F_ELSE
 %token F_CONTINUE
 %token F_MOD F_MOD_EQ F_INHERIT F_COLON_COLON
 %token F_STATIC
 %token F_ARROW F_AGGREGATE F_AGGREGATE_ASSOC
 %token F_COMPL F_AND F_AND_EQ F_OR F_OR_EQ F_XOR F_XOR_EQ
 %token F_LSH F_LSH_EQ F_RSH F_RSH_EQ
-%token F_CATCH
+%token F_CATCH F_END_CATCH
 %token F_MAPPING F_OBJECT F_VOID F_MIXED F_PRIVATE F_NO_MASK F_NOT
 %token F_PROTECTED F_PUBLIC
+%token F_FUNCTION F_FUNCTION_CALL F_FUNCTION_SPLIT F_FUNCTION_CONSTRUCTOR
 %token F_VARARGS

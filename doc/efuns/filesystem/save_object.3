@@ -1,0 +1,17 @@
+.\"save the values of variables in an object into a file
+.TH save_object 3
+
+.SH NAME
+save_object() - save the values of variables in an object into a file
+
+.SH SYNOPSIS
+void save_object(string name)
+
+.SH DESCRIPTION
+Save all values of variables of this object in the file "name".
+It is illegal to have '.' or space in the field name.  The valid_write()
+function in master.c determines whether or not the save_object is allowed
+to write the save file.
+
+.SH SEE ALSO
+restore_object(3).

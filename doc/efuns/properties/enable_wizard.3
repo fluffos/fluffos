@@ -1,0 +1,26 @@
+.\"allow object to use 'player' commands
+.TH enable_wizard 3
+
+.SH NAME
+enable_wizard() - allow object to use 'player' commands
+
+.SH SYNOPSIS
+void enable_wizard();
+
+.SH DESRIPTION
+Any interactive object that calls enable_wizard() will cause wizardp()
+to return true if called on that object.  enable_wizard() gives three
+privileges to the interactive object in question:
+.TP
+1.
+ability to use restricted modes of ed when the RESTRICTED_ED option
+is compiled into the driver.
+.TP
+2.
+privilege of receiving descriptive runtime error messages.
+.TP
+3.
+privilege of using the trace(3) and traceprefix(3) efuns.
+
+.SH SEE ALSO
+wizardp(3)

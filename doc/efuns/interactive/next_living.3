@@ -1,0 +1,16 @@
+.\"returns the next living object in the living object hash list
+.TH next_living 3
+
+.SH NAME
+next_living() - returns the next living object in the living object hash list
+
+.SH SYNOPSIS
+object next_living(object);
+
+.SH DESCRIPTION
+Living objects have pointers to the living objects set living before them
+in the driver.  This (low-level) efun provides access to that by
+returning the next object in that list after the given object.
+
+.SH SEE ALSO
+enable_commands(3), disable_commands(3)

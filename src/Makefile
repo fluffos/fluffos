@@ -6,79 +6,182 @@
 # setup and configuration #
 ###########################
 
-# edit config.h to choose which malloc you would like to use.
+# Note: this Makefile may need modified depending upon which type of machine
+# you are to compile the driver.  In particular, if you are using an HP,
+# Sequent, or RS/6000, be sure to search the Makefile for all comments
+# pertaining to your machine.
+#
+# Edit options.h to choose which malloc you would like to use.
+#
+# If you get some weird compile-time error message from "make" about not being
+# able to find some .h file, then try one of the following two things:
+#
+# 1) type "make depend"
+# 2) deleting all of the lines below the comment that mentions "make depend"
+#    (near the bottom of this file).
 
-# define this to be -lresolv if your machine has it
-RESOLV=
+# change this if you wish the driver binary to be named anything other than
+# driver (we call it driver because it does more than parse)
+DRIVER_BIN = driver
+
+# define this to be -lresolv if your machine has it.
+# HP and NeXT don't have it.
+RESOLV=-lresolv
+
+# uncomment MALLOC* if you wish to use BSD malloc or Smalloc.
+#   Both of these require the sbrk() system call.  Be sure to read the
+#   comments in the bsdmalloc.c file before deciding on BSDMALLOC.
+#   note: These mallocs may not work correctly on the NeXT or other systems
+#   that don't fully support sbrk().  It is okay not to use either of these
+#   two mallocs in which case you will get system malloc (read the comments
+#   in options.h for choices on malloc statistics and debugging).
+# uncomment these two lines for BSD Malloc.
+#MALLOC_C=bsdmalloc.c
+#MALLOC_O=bsdmalloc.o
+# uncomment these two lines for Smalloc (not generally recommended)
+# Warning: smalloc seems not to return memory to the system upon reboot
+# of the driver on some systems (so far only noticed this on HP Snakes).
+#MALLOC_C=smalloc.c
+#MALLOC_O=smalloc.o
+
+# uncomment STRFUNCS* if your machine is missing memcpy(), memset(), strtol(),
+# and strcspn().
+#STRFUNCS_C=strfuncs.c
+#STRFUNCS_O=strfuncs.o
+
+# uncomment UALARM* if your machine is missing ualarm().
+# uncomment for the HP.
+#UALARM_C=ualarm.c
+#UALARM_O=ualarm.o
+
+# Command used to install executables in the INSTALL_DIR
+INSTALL = install -c
+#INSTALL = cp
 
 # Set INSTALL_DIR to the directory where you want to install the executables.
-INSTALL_DIR = /home/dogstar/worlds/bin
+INSTALL_DIR = ../bin
 
-#Enable warnings from the compiler, if wanted.
-WARN=
+#Enable warnings from the compiler (gcc), if wanted.
+#WARN=-Wall
 
 # define profiling if you want it
-#PROFIL=-pg
+# note: the gmon.out file will likely be written in the mudlib dir
+#PROFIL=-pg -DPROFILING
 
 # Enable run time debugging.
-#DEBUG=-DDEBUG
+#DEBUG=-g -DDEBUG
+# compile in debug() macro code
 #DEBUG_MACRO=-DDEBUG_MACRO
+# prevent -DDEBUG from aborting the driver (when in -DDEBUG mode)
+#DEBUG_NON_FATAL=-DDEBUG_NON_FATAL
 
-# If you don't have 'strchr', then add next flag to CFLAGS.
-# -Dstrchr=index -Dstrrchr=rindex
+# If you don't have strchr() and strrchr(), then uncomment the following line
+#STR=-Dstrchr=index -Dstrrchr=rindex
 
-CFLAGS= -g $(WARN) $(PROFIL) $(DEBUG) $(DEBUG_MACRO)
+# define this if you want (compiler) optimization enabled.
+# *WARNING* using high levels of optimization (e.g. -O3) can cause some
+# compilers to produce incorrect code.  If the driver is behaving
+# inexplicably, try using a lower level of optimization (or none).
+# Uncomment one or none of the following optimization lines.
+# 
+# -O is usually a safe level of optimization for most compilers
+OPTIMIZE=-O
+# uncomment for gcc
+#OPTIMIZE=-O2 -fomit-frame-pointer -fstrength-reduce
+# uncomment below for RS/6000(AIX) xlc compiler only.
+#OPTIMIZE=-O -Q
+# uncomment for HP's cc (not sure if this works on any but the Snake)
+#OPTIMIZE=+O3 +Obb3000
+
+# RS/6000 AIX: use this OSFLAGS line (required).
+#OSFLAGS=-D_BSD -D_ALL_SOURCE
+
+# System V Release 4 (386/486)
+#OSFLAGS=-DSVR4
+
+# if you use gcc (including NeXT cc) and have lots of RAM, try uncommenting
+#  this for speedier compiles:
+#PIPE=-pipe
+
+CFLAGS= $(OSFLAGS) $(OPTIMIZE) $(WARN) $(PROFIL) $(DEBUG) $(DEBUG_MACRO) \
+   $(DEBUG_NON_FATAL) $(STR) $(PIPE)
 
 # set CC=cc on a NeXT and to gcc on other machines (if possible)
+# Note: at this time gcc (2.2.2) for HP doesn't implement varargs properly;
+# if you have problems compiling on an HP, try using cc instead of gcc.
+# You may want to use xlc on an RS/6000 (produces faster code).
 CC=cc
+#CC=gcc
+#CC=xlc
 
 # define this to be bison if you have it, and yacc otherwise
 YACC=yacc
 YFLAGS = -d
 
-# Add extra libraries here.
-# This is the default case.
-LIBS= -lm
-# link with MallocDebug if you have a NeXT with NeXTOS 2.1 or later and
+# Add extra libraries here (using EXTRALIBS)
+
+# HP-UX: use this EXTRALIBS line for HP-UX (required).
+#EXTRALIBS=-lBSD
+
+# RS/6000 AIX: use this EXTRALIBS line (required).
+#EXTRALIBS=-lbsd
+
+# NeXT: link with MallocDebug if you have a NeXT with NeXTOS 2.1 or later and
 # you wish to search for memory leaks (see /NextDeveloper/Apps/MallocDebug).
-#LIBS= -lm -lMallocDebug -lsys_s
+# Note: linking with MallocDebug will cause the virtual size of the
+# driver process to reach appoximately 40MB however the amount of real memory
+# used will remain close to normal.
+#EXTRALIBS=-lMallocDebug -lsys_s
+
+# Sequent DYNIX/ptx: use this EXTRALIBS line (required).
+#EXTRALIBS=-lsocket -linet -lnsl -lseq
+
+# System V Release 4 (386/486)
+#EXTRALIBS=-lsocket -lnsl
+
+# Don't change this line.  Define EXTRALIBS before this line if you
+# wish to add any libraries.
+LIBS=-lm $(EXTRALIBS)
 
 #################################################
 # the meat of things                            #
 # don't change anything below this section      #
 #################################################
 
-# Add str.c here if you don't have memcpy() or strtol()
-# add alloca.c here if you don't have alloc()
-#
 SRC=lex.c main.c rc.c interpret.c simulate.c object.c backend.c file.c\
-  array.c mapping.c comm1.c ed.c regexp.c wiz_list.c swap.c malloc.c\
-  call_out.c otable.c dumpstat.c stralloc.c hash.c indentp.c port.c\
-  access_check.c clilib.c parse.c prelang.y postlang.y \
-  simul_efun.c sprintf.c
+  array.c mapping.c comm.c ed.c regexp.c swap.c malloc.c\
+  call_out.c otable.c dumpstat.c stralloc.c hash.c port.c\
+  access_check.c parse.c prelang.y postlang.y mudlib_stat.c \
+  simul_efun.c sprintf.c uid.c socket_efuns.c efunctions.c eoperators.c \
+  socket_ctrl.c socket_errors.c qsort.c \
+  md.c $(UALARM_C) $(STRFUNCS_C) $(MALLOC_C)
 
-# Add str.o here if you don't have memcpy() or strtol().
-# Add alloca.o if you don't have alloca() on your machine.
-#
 OBJ=lang.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
-  backend.o array.o mapping.o comm1.o ed.o regexp.o wiz_list.o swap.o \
-  malloc.o call_out.o otable.o dumpstat.o stralloc.o hash.o indentp.o \
-  port.o access_check.o clilib.o parse.o simul_efun.o sprintf.o
+  backend.o array.o mapping.o comm.o ed.o regexp.o swap.o \
+  malloc.o call_out.o otable.o dumpstat.o stralloc.o hash.o mudlib_stats.o \
+  port.o access_check.o parse.o simul_efun.o sprintf.o uid.o \
+  socket_efuns.o efunctions.o eoperators.o socket_ctrl.o qsort.o \
+  socket_errors.o md.o $(UALARM_O) $(STRFUNCS_O) $(MALLOC_O)
 
-driver: $(OBJ)
-	-mv driver driver.old
-	$(CC) $(CFLAGS) $(OBJ) -o driver $(LIBS)
+all: $(DRIVER_BIN) addr_server
 
-all: driver hname
+# For Sequent DYNIX/ptx compile $(OBJ) is parallel:
+# $(DRIVER_BIN):& $(OBJ)
+$(DRIVER_BIN): $(OBJ)
+	-mv $(DRIVER_BIN) $(DRIVER_BIN).old
+	$(CC) $(CFLAGS) $(OBJ) -o $(DRIVER_BIN) $(LIBS)
+
+all: $(DRIVER_BIN) addr_server
 
 depend:
 	makedepend *.c
 
-hname:  hname.c
-	$(CC) hname.c $(RESOLV) -o hname
+addr_server:  addr_server.o socket_ctrl.o port.o addr_server.h
+	$(CC) $(CFLAGS) socket_ctrl.o addr_server.o port.o $(RESOLV) -o addr_server \
+	$(EXTRALIBS)
 
 .c.o:
-	$(CC) $(CFLAGS) -o $@ -c $*.c
+	$(CC) $(CFLAGS) -c $*.c
 
 list_funcs:
 	@$(CC) -E $(CFLAGS) func_spec.c
@@ -88,7 +191,10 @@ make_func.tab.c: make_func.y
 	mv y.tab.c make_func.tab.c
 
 make_func: make_func.tab.o
-	$(CC) make_func.tab.o -o make_func
+	$(CC) $(CFLAGS) make_func.tab.o -o make_func
+
+make_malloc: make_malloc.o
+	$(CC) $(CFLAGS) make_malloc.o -o make_malloc
 
 make_malloc.c: config.h
 
@@ -107,19 +213,22 @@ malloc.c: config.h make_malloc
 	touch malloc.c
 	$(CC) $(CFLAGS) -c malloc.c
 
+config.h: options.h
+
 tags: $(SRC)
 	ctags $(SRC)
 
 TAGS: $(SRC)
 	etags $(SRC)
 
-install: driver hname
-	install -c driver $(INSTALL_DIR)/driver
-	install -c hname $(INSTALL_DIR)/hname
+install: $(DRIVER_BIN) addr_server
+	$(INSTALL) $(DRIVER_BIN) $(INSTALL_DIR)/$(DRIVER_BIN)
+	$(INSTALL) addr_server $(INSTALL_DIR)/addr_server
 
 clean:
-	-rm -rf obj *.o mon.out gmon.out *.tab.c *.tab.h
+	-rm -rf obj *.o mon.out gmon.out *.tab.c *.tab.h *.orig *.rej
 	-rm -f lang.h lang.y efun_defs.c *.ln tags *~ TAGS
-	-rm -f make_func make_malloc driver driver.old hname
+	-rm -f efunctions.h base.h efun_protos.h
+	-rm -f make_func make_malloc $(DRIVER_BIN) $(DRIVER_BIN).old addr_server
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.

@@ -3,12 +3,16 @@
 
 #include "config.h"
 #include "lint.h"
+#include "stralloc.h"
 
 /*
    this code is not the same as the original code.  I cleaned it up to
    use structs to: 1) make it easier to check the driver for memory leaks
    (using MallocDebug on a NeXT) and 2) because it looks cleaner this way.
    --Truilkan@TMI 92/04/19
+   
+   modified to make calls to strlen() unnecessary and to remove superfluous
+   calls to findblock().  -- Truilkan@TMI, 1992/08/05
 */
 
 /*
@@ -41,7 +45,9 @@
  * next element in the chain (which you specify when you call the functions).
  */
 
-#define	MAXSHORT	(1 << (sizeof(short)*8 - 2))
+#define	MAXSHORT (unsigned short)((1 << (sizeof(short)*8)) - 1)
+
+extern int max_string_length;
 
 char * xalloc();
 #ifndef _AIX
@@ -56,14 +62,10 @@ int overhead_bytes = 0;
 static int search_len = 0;
 static int num_str_searches = 0;
 
-typedef struct block_s {
-	struct block_s *next;
-	short refs;
-	char *s;
-} block_t;
+#define StrHash(s) hashstr(s, 20, htable_size)
 
-#define	NEXT(x)	x->next
-#define	REFS(x)	x->refs
+#define hfindblock(s, h) sfindblock(s, h = StrHash(s))
+#define findblock(s) sfindblock(s, StrHash(s))
 
 /*
  * hash table - list of pointers to heads of string chains.
@@ -74,30 +76,21 @@ typedef struct block_s {
  */
 
 static block_t **base_table = (block_t **)0;
+static int htable_size;
 
-static void init_strings()
+void
+init_strings()
 {
 	int x;
 
-	base_table = (block_t **) xalloc(sizeof(block_t *) * HTABLE_SIZE);
-	overhead_bytes += (sizeof(block_t *) * HTABLE_SIZE);
+	htable_size = HTABLE_SIZE;
+	base_table = (block_t **)
+		DXALLOC(sizeof(block_t *) * htable_size, 2097152, "init_strings");
+	overhead_bytes += (sizeof(block_t *) * htable_size);
 
-	for (x=0; x < HTABLE_SIZE; x++)
+	for (x = 0; x < htable_size; x++) {
 		base_table[x] = 0;
-}
-
-/*
- * generic hash function.  This is probably overkill; I haven't checked the
- * stats for different prime numbers, etc.
- */
-
-static int StrHash(s)
-char * s;
-{
-	if (!base_table)
-		init_strings();
-
-	return hashstr(s, 20, HTABLE_SIZE);
+	}
 }
 
 /*
@@ -107,19 +100,20 @@ char * s;
  * pointer on the hash chain into fs_prev.
  */
 
-block_t * findblock(s)
+INLINE block_t *
+sfindblock(s, h)
 char *s;
+int h;
 {
 	block_t *curr, *prev;
-	int h = StrHash(s);
 
 	curr = base_table[h];
-	prev = 0;
+	prev = NULL;
 	num_str_searches++;
 
 	while (curr) {
 		search_len++;
-		if (*(curr->s) == *s && !strcmp(curr->s, s)) { /* found it */
+		if (*(STRING(curr)) == *s && !strcmp(STRING(curr), s)) { /* found it */
 			if (prev) { /* not at head of list */
 				NEXT(prev) = NEXT(curr);
 				NEXT(curr) = base_table[h];
@@ -133,33 +127,38 @@ char *s;
 	return((block_t *)0); /* not found */
 }
 
-char *findstring(s)
+char *
+findstring(s)
 char *s;
 {
 	block_t *b;
 
-	if (b = findblock(s))
-		return b->s;
-	else
-		return((char *)0);
+	if ((b = findblock(s))) {
+		return STRING(b);
+	} else {
+		return(NULL);
+	}
 }
 
-/*
- * Make a space for a string.  This is rather nasty, as we want to use
- * alloc/free, but malloc overhead is generally severe.  Later, we
- * will have to compact strings...
- */
+/* alloc_new_string: Make a space for a string.  */
 
-static block_t *alloc_new_string(string,size)
+INLINE static block_t *
+alloc_new_string(string, h)
 char * string;
-int size;
+int h;
 {
-	int h = StrHash(string);
-	block_t *b = (block_t *)xalloc(size);
+	block_t *b;
+	int len = strlen(string);
+	int size;
 
-	/* pointer arithmetic increments b by sizeof(block_t) */
-	b->s = (char *)(b + 1);
-	strcpy(b->s, string);
+	if (len > max_string_length) {
+		len = max_string_length;
+	}
+	size = sizeof(block_t) + len + 1;
+	b = (block_t *)DXALLOC(size, 2097152, "alloc_new_string");
+	strncpy(STRING(b), string, len);
+	STRING(b)[len] = '\0'; /* strncpy doesn't put on \0 if 'from' too long */
+	SIZE(b) = size;
 	REFS(b) = 0;
 	NEXT(b) = base_table[h];
 	base_table[h] = b;
@@ -169,94 +168,112 @@ int size;
 	return(b);
 }
 
-char * make_shared_string(str)
-char * str;
+char *
+make_shared_string(str)
+char *str;
 {
 	block_t *b;
-	int size = sizeof(block_t) + strlen(str) + 1;
+	int h;
 
-	b = findblock(str);
-	if (!b)
-		b = alloc_new_string(str,size);
-	REFS(b)++;
+	b = hfindblock(str, h);  /* hfindblock macro sets h = StrHash(s) */
+	if (!b) {
+		b = alloc_new_string(str, h);
+	}
+	/* stop keeping track of ref counts at the point where overflow would
+	   occur.
+	*/
+	if (REFS(b) < MAXSHORT) {
+		REFS(b)++;
+	}
 	allocd_strings++;
-	allocd_bytes += size;
-	return(b->s);
+	allocd_bytes += SIZE(b);
+	return(STRING(b));
 }
 
 /*
-   ref_string: this is the only routine that was slowed down by cleaning
-   up the data structures.  and this routine is only currently called from
-   two rarely called places anyway.
+   ref_string: Fatal to call this function on a string that isn't shared.
 */
 
-char *ref_string(str)
-char *str;
-/* Doesn't do any good to call this unless the string is in fact shared */
+char *
+ref_string(str)
+     char *str;
 {
-	block_t *b;
+  block_t *b;
 
-	if (b = findblock(str)) {
-		REFS(b)++;
-		return b->s;
-	}
-	return str;
+  b = BLOCK(str);
+#ifdef DEBUG
+  if (b != findblock(str)) {
+    fatal("stralloc.c: called ref_string on non-shared string: %s.\n",str);
+  }
+#endif /* defined(DEBUG) */
+  REFS(b)++;
+  allocd_strings++;
+  allocd_bytes += SIZE(b);
+  return STRING(b);
 }
-
-/*
- * free_string - reduce the ref count on a string.  Various sanity
- * checks applied.
- */
 
 /*
  * function called on free_string detected errors; things return checked(s).
  */
 
-static void checked(s, str)
+static void
+checked(s, str)
 char *s, *str;
 {
 	fprintf(stderr, "%s (\"%s\")\n", s, str);
 	fatal(s); /* brutal - debugging */
 }
 
-void free_string(str)
+/* free_string: fatal to call free_string on a non-shared string */
+/*
+ * free_string - reduce the ref count on a string.  Various sanity
+ * checks applied.
+ */
+
+void
+free_string(str)
 char * str;
 {
-	block_t *b;
+  block_t *b;
 
-	allocd_strings--;
-	allocd_bytes -= (strlen(str) + 1 + sizeof(block_t));
 
-	b = findblock(str); /* moves it to head of table if found */
+  b = BLOCK(str);
+#ifdef DEBUG
+  if (b != findblock(str)) {
+    fatal("stralloc.c: free_string called on non-shared string: %s.\n",str);
+  }
+#endif /* defined(DEBUG) */
+
+  allocd_strings--;
+  allocd_bytes -= SIZE(b);
+  
+  /* if a string has been ref'd MAXSHORT times then we assume that its
+     used often enough to justify never freeing it.
+     */
+  if (REFS(b) >= MAXSHORT)
+    return;
+
+  REFS(b)--;
+  if (REFS(b) > 0) return;
+
+  b = findblock(str); /* findblock moves str to head of hash chain */
 #ifndef	BUG_FREE
-	if (!b) {
-	    checked("Free string: not found in string table!", str);
-	    return;
-	}
-	if (b->s != str) {
-	    checked("Free string: string didnt hash to the same spot!", str);
-	    return;
-	}
+  if (!b) {
+    checked("free_string: not found in string table!", str);
+    return;
+  }
+  if (STRING(b) != str) {
+    checked("free_string: string didn't hash to the same spot!", str);
+    return;
+  }
 
-	if (REFS(b) <= 0) {
-	    checked("Free String: String refs zero or -ve!", str);
-	    return;
-	}
 #endif	/* BUG_FREE */
-
-	if (REFS(b) > MAXSHORT) return;
-	REFS(b)--;
-	if (REFS(b) > 0) return;
-
 	/* It will be at the head of the hash chain */
-	base_table[StrHash(str)] = NEXT(b);
-	num_distinct_strings--;
-	/* We know how much overhead malloc has */
-	bytes_distinct_strings-= (sizeof(block_t) + strlen(str) + 1);
-	overhead_bytes -= sizeof(block_t);
-	FREE(b);
-
-	return;
+  base_table[StrHash(str)] = NEXT(b);
+  num_distinct_strings--;
+  bytes_distinct_strings -= SIZE(b);
+  overhead_bytes -= sizeof(block_t);
+  FREE(b);
 }
 
 /*
@@ -264,8 +281,9 @@ char * str;
  * GNU malloc overhead!  tee hee!
  */
 
-int add_string_status(verbose)
-    int verbose;
+int
+add_string_status(verbose)
+int verbose;
 {
     if (verbose) {
 	add_message("\nShared string hash table:\n");

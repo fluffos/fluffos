@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 #ifdef sun
 #include <alloca.h>
@@ -6,15 +7,15 @@
 #include "lint.h"
 #include "interpret.h"
 #include "object.h"
-#include "wiz_list.h"
 #include "regexp.h"
 #include "exec.h"
 #include "sent.h"
+#include "debug.h"
 
 /*
  * This file contains functions used to manipulate arrays.
  * Some of them are connected to efuns, and some are only used internally
- * by the game driver.
+ * by the MudOS driver.
  */
 
 extern int d_flag;
@@ -32,6 +33,13 @@ struct vector null_vector = {
     1	/* Ref count, which will ensure that it will never be deallocated */
 };
 
+INLINE struct vector *
+null_array()
+{
+	null_vector.ref++;
+	return &null_vector;
+}
+
 /*
  * Allocate an array of size 'n'.
  */
@@ -45,9 +53,7 @@ struct vector *allocate_array(n)
     if (n < 0 || n > max_array_size)
 	error("Illegal array size.\n");
     if (n == 0) {
-        p = &null_vector;
-	p->ref++;
-	return p;
+		return null_array();
     }
     num_arrays++;
     total_array_size += sizeof (struct vector) + sizeof (struct svalue) *
@@ -55,9 +61,12 @@ struct vector *allocate_array(n)
     p = ALLOC_VECTOR(n);
     p->ref = 1;
     p->size = n;
-    p->user = current_object->user;
-    if (p->user)
-	p->user->size_array += n;
+    if (current_object) {
+      assign_stats(&p->stats, current_object);
+      add_array_size (&p->stats, n);
+    } else {
+      null_stats (&p->stats);
+    }
     for (i=0; i<n; i++)
 	p->item[i] = const0;
     return p;
@@ -67,21 +76,22 @@ void free_vector(p)
     struct vector *p;
 {
     int i;
-    p->ref--;
-    if (p->ref > 0)
-	return;
-#ifdef DEBUG
-    if (p == &null_vector)
-	fatal("Tried to free the zero-size shared vector.\n");
-#endif
-    for (i=0; i<p->size; i++)
-	free_svalue(&p->item[i]);
-    if (p->user)
-	p->user->size_array -= p->size;
-    num_arrays--;
-    total_array_size -= sizeof (struct vector) + sizeof (struct svalue) *
-	(p->size-1);
-    FREE((char *)p);
+
+	p->ref--;
+	/* don't keep track of the null vector since many muds reference it enough
+	   times to overflow the ref count which is a short int.
+	*/
+	if ((p->ref > 0) || (p == &null_vector)) {
+		return;
+	}
+
+	for (i=0; i<p->size; i++)
+		free_svalue(&p->item[i]);
+	add_array_size (&p->stats, - p->size);
+	num_arrays--;
+	total_array_size -= sizeof (struct vector) + sizeof (struct svalue) *
+		(p->size-1);
+	FREE((char *)p);
 }
 
 struct vector *shrink_array(p, n)
@@ -96,8 +106,7 @@ struct vector *shrink_array(p, n)
 	return res;
     }
     total_array_size += sizeof (struct svalue) * (n - p->size);
-    if (p->user)
-	p->user->size_array += n - p->size;
+    add_array_size (&p->stats, n - p->size);
     p->size = n;
     return p;
 }
@@ -105,76 +114,93 @@ struct vector *shrink_array(p, n)
 struct vector *explode_string(str, del)
     char *str, *del;
 {
-    char *p, *beg;
-    int num, len;
-    struct vector *ret;
-    char *buff;
+	char *p, *beg, *lastdel;
+	int num, len, j, slen, limit;
+	struct vector *ret;
+	char *buff, *tmp;
 
-    len = strlen(del);
-    /*
-     * Take care of the case where the delimiter is an
-     * empty string. Then, return an array with only one element,
-     * which is the original string.
-     */
-    if (len == 0) {
-	ret = allocate_array(1);
-	ret->item[0].type = T_STRING;
-	ret->item[0].subtype = STRING_MALLOC;
-	ret->item[0].u.string = string_copy(str);
-	return ret;
-    }
-    /*
-     * Skip leading 'del' strings, if any.
-     */
-    while(strncmp(str, del, len) == 0) {
-	str += len;
-	if (str[0] == '\0')
-	    return 0; /* Should we return empty array here? /Johan */
-    }
+	len = strlen(del);
+	slen = strlen(str);
+	/* return an array of length strlen(str) -w- one character per element */
+	if (len == 0) {
+		if (slen > max_array_size) {
+			slen = max_array_size;
+		}
+		ret = allocate_array(slen);
+		for (j = 0; j < slen; j++) {
+			ret->item[j].type = T_STRING;
+			ret->item[j].subtype = STRING_MALLOC;
+			tmp = (char *)DXALLOC(2, 8, "explode_string: tmp");
+			tmp[0] = str[j];
+			tmp[1] = '\0';
+			ret->item[j].u.string = tmp;
+		}
+		return ret;
+	}
+	/*
+	 *Skip leading 'del' strings, if any.
+	 */
+	while(strncmp(str, del, len) == 0) {
+		str += len;
+		slen -= len;
+		if (str[0] == '\0') {
+			return null_array();
+		}
+#ifdef SANE_EXPLODE_STRING
+		break;
+#endif
+	}
     /*
      * Find number of occurences of the delimiter 'del'.
      */
-    for (p=str, num=0; *p;) {
-	if (strncmp(p, del, len) == 0) {
-	    num++;
-	    p += len;
-	} else
-	    p += 1;
-    }
+	for (p=str, num=0; *p; ) {
+		if (strncmp(p, del, len) == 0) {
+			num++;
+			lastdel = p;
+			p += len;
+		} else {
+			p++;
+		}
+	}
     /*
      * Compute number of array items. It is either number of delimiters,
      * or, one more.
      */
-    if (strlen(str) < len || strcmp(str + strlen(str) - len, del) != 0)
-	num++;
-    buff = xalloc(strlen(str) + 1);
-    ret = allocate_array(num);
-    for (p=str, beg = str, num=0; *p; ) {
-	if (strncmp(p, del, len) == 0) {
-	    strncpy(buff, beg, p - beg);
-	    buff[p-beg] = '\0';
-	    if (num >= ret->size)
-		fatal("Too big index in explode !\n");
-	    /* free_svalue(&ret->item[num]); Not needed for new array */
-	    ret->item[num].type = T_STRING;
-	    ret->item[num].subtype = STRING_MALLOC;
-	    ret->item[num].u.string = string_copy(buff);
-	    num++;
-	    beg = p + len;
-	    p = beg;
-	} else {
-	    p += 1;
+	if ((slen < len) || (lastdel != (str + slen - len))) {
+		num++;
 	}
+	if (num > max_array_size) {
+		num = max_array_size;
+	}
+	buff = DXALLOC(slen + 1, 8, "explode_string: buff");
+	ret = allocate_array(num);
+	limit = max_array_size - 1; /* extra element can be added after loop */
+	for (p=str, beg = str, num=0; *p && (num < limit); ) {
+		if (strncmp(p, del, len) == 0) {
+			strncpy(buff, beg, p - beg);
+			buff[p-beg] = '\0';
+			if (num >= ret->size)
+				fatal("Index out of bounds in explode!\n");
+			/* free_svalue(&ret->item[num]); Not needed for new array */
+			ret->item[num].type = T_STRING;
+			ret->item[num].subtype = STRING_MALLOC;
+			ret->item[num].u.string = string_copy(buff);
+			num++;
+			beg = p + len;
+			p = beg;
+		} else {
+			p++;
+		}
     }
     /* Copy last occurence, if there was not a 'del' at the end. */
     if (*beg != '\0') {
-	free_svalue(&ret->item[num]);
-	ret->item[num].type = T_STRING;
-	ret->item[num].subtype = STRING_MALLOC;
-	ret->item[num].u.string = string_copy(beg);
-    }
-    FREE(buff);
-    return ret;
+		/* free_svalue(&ret->item[num]); */
+		ret->item[num].type = T_STRING;
+		ret->item[num].subtype = STRING_MALLOC;
+		ret->item[num].u.string = string_copy(beg);
+	}
+	FREE(buff);
+	return ret;
 }
 
 char *implode_string(arr, del)
@@ -192,7 +218,7 @@ char *implode_string(arr, del)
     }
     if (num == 0)
 	return string_copy("");
-    p = xalloc(size + (num-1) * strlen(del) + 1);
+    p = DXALLOC(size + (num-1) * strlen(del) + 1, 8, "implode_string: p");
     q = p;
     p[0] = '\0';
     for (i=0, size=0, num=0; i < arr->size; i++) {
@@ -209,19 +235,42 @@ char *implode_string(arr, del)
     return q;
 }
 
-struct vector *users() {
-    struct object *ob;
-    extern int num_player; /* set by comm1.c */
-    int i;
-    struct vector *ret;
+struct vector *
+users()
+{
+	struct object *ob;
+	extern int num_user, num_hidden; /* set by comm1.c */
+	int i, j;
+	int display_hidden;
+	struct vector *ret;
+	struct svalue *r;
 
-    ret = allocate_array(num_player);
-    for (i = 0; i < num_player; i++) {
-	ret->item[i].type = T_OBJECT;
-	ret->item[i].u.ob = ob = get_interactive_object(i);
-	add_ref(ob, "users");
-    }
-    return ret;
+	if (num_hidden > 0) {
+		if (current_object->flags & O_HIDDEN) {
+			display_hidden = 1;
+		} else {
+			push_object(current_object);
+			r = apply_master_ob("valid_hide", 1);
+			if (!IS_ZERO(r)) {
+				display_hidden = 1;
+			} else {
+				display_hidden = 0;
+			}
+		}
+	}
+
+	ret = allocate_array(num_user - (display_hidden ? 0 : num_hidden));
+	for (i = j = 0; i < num_user; i++) {
+		ob = get_interactive_object(i);
+		if (!display_hidden && (ob->flags & O_HIDDEN)) {
+			continue;
+		}
+		ret->item[j].type = T_OBJECT;
+		ret->item[j].u.ob = ob;
+		add_ref(ob, "users");
+		j++;
+	}
+	return ret;
 }
 
 /*
@@ -233,8 +282,6 @@ static void check_for_recursion(vec, v)
     register int i;
     extern int eval_cost;
 
-    if (vec->user)
-	vec->user->cost++;
     eval_cost++;
     if (v == vec)
 	error("Recursive asignment of vectors.\n");
@@ -258,11 +305,11 @@ struct vector *slice_array(p,from,to)
     if (from < 0)
 	from = 0;
     if (from >= p->size)
-	return allocate_array(0); /* Slice starts above array */
+	return null_array(); /* Slice starts above array */
     if (to >= p->size)
 	to = p->size-1;
     if (to < from)
-	return allocate_array(0); 
+	return null_array(); 
     
     d = allocate_array(to-from+1);
     for (cnt=from;cnt<=to;cnt++) 
@@ -271,122 +318,7 @@ struct vector *slice_array(p,from,to)
     return d;
 }
 
-#if 0
 
-struct vector *mud_status (tables)
-     int tables;
-{
-  extern char *reserved_area;
-  extern int tot_alloc_object,
-  tot_alloc_object_size, num_swapped, total_bytes_swapped,
-  num_arrays, total_array_size, num_mappings,
-  total_mapping_size;
-  extern int total_num_prog_blocks, total_prog_block_size;
-#ifdef COMM_STAT
-  extern int add_message_calls,inet_packets,inet_volume;
-#endif
-  struct vector *ret;
-  int num_lines, i;
-  char string[120];
-
-   if (tables) 
-     {
-       num_lines = 26;
-#ifdef COMM_STAT
-       num_lines += 2;
-#endif
-     }
-   else
-     {
-       num_lines = 11;
-     }
-   ret = allocate_array(i);
-   for (i = 0; i < num_lines; i++)
-     {
-       ret->item[i].type = T_STRING;
-       ret->item[i].subtype = STRING_MALLOC;
-     }
-   if (!tables)
-     {
-       sprintf (string,"Sentences:\t\t\t%8d %8d\n", tot_alloc_sentence,
-                        tot_alloc_sentence * sizeof (struct sentence));
-       ret->item[0].u.string = string_copy(string);
-       sprintf(string,"Objects:\t\t\t%8d %8d\n",
-		   tot_alloc_object, tot_alloc_object_size);
-       ret->item[1].u.string = string_copy(string);
-       sprintf(string,"Arrays:\t\t\t\t%8d %8d\n", num_arrays,
-		   total_array_size);
-       ret->item[2].u.string = string_copy(string);
-       sprintf(string,"Mappings:\t\t\t%8d %8d\n", num_mappings,
-		   total_mapping_size);
-       ret->item[3].u.string = string_copy(string);
-       sprintf(string,"Prog blocks:\t\t\t%8d %8d (%d swapped, %d Kbytes)\n",
-		   total_num_prog_blocks, total_prog_block_size,
-		   num_swapped, total_bytes_swapped / 1024);
-       ret->item[4].u.string = string_copy(string);
-       sprintf(string,"Memory reserved:\t\t\t %8d\n", res);
-       ret->item[5].u.string = string_copy(string);
-       ret->item[6].u.string = string_copy(string);
-       ret->item[7].u.string = string_copy(string);
-       ret->item[8].u.string = string_copy(string);
-       sprintf(string,"Hash table overhead:\t\t\t %8d\n",
-	       show_otable_status(0));
-       ret->item[9].u.string = string_copy(string);
-       sprintf(string,"\t\t\t\t\t --------\n");
-       ret->item[10].u.string = string_copy(string);
-       sprintf(string,"Total:\t\t\t\t\t %8d\n", tot);
-       ret->item[11].u.string = string_copy(string);
-     }
-   return ret;
-}
-
-#endif
-
-struct vector *wizards() 
-{
-   extern struct wiz_list *all_wiz;   /* used in wiz_list.c */
-   int i;
-   struct wiz_list *wl;
-   struct vector *ret;
-   
-   for (wl = all_wiz, i = 0; wl; i++)
-      wl = wl->next;
-   ret = allocate_array(i+1);
-   for (wl = all_wiz, i = 0; wl; i++) {
-      ret->item[i].type = T_STRING;
-      ret->item[i].u.string = ref_string(wl->name);
-      ret->item[i].subtype = STRING_SHARED;
-      wl = wl->next;
-   }
-   return ret;
-}
-
-struct vector *find_wizard(str) 
-   char *str;
-{
-   extern struct wiz_list *find_wiz();
-   struct wiz_list *wl;
-   struct vector *ret;
-
-   wl = find_wiz(str);
-   if (!wl) return 0;
-   ret = allocate_array(7);
-   ret->item[0].type = T_NUMBER;
-   ret->item[0].u.number = wl->moves;  
-   ret->item[1].type = T_NUMBER;
-   ret->item[1].u.number = wl->cost;
-   ret->item[2].type = T_NUMBER;
-   ret->item[2].u.number = wl->errors;
-   ret->item[3].type = T_NUMBER;
-   ret->item[3].u.number = wl->heart_beats;
-   ret->item[4].type = T_NUMBER;
-   ret->item[4].u.number = wl->total_worth;
-   ret->item[5].type = T_NUMBER;
-   ret->item[5].u.number = wl->size_array;
-   ret->item[6].type = T_NUMBER;
-   ret->item[6].u.number = wl->objects;
-   return ret;
-}
 
 struct vector *commands(ob)
     struct object *ob;
@@ -440,9 +372,9 @@ struct vector *filter (p, func, ob, extra)
 	return 0;
     }
     if (p->size<1)
-	return allocate_array(0);
+	return null_array();
 
-    flags=xalloc(p->size+1); 
+    flags=DXALLOC(p->size+1, 8, "filter: flags"); 
     for (cnt=0;cnt<p->size;cnt++) {
 	flags[cnt]=0;
 	push_svalue(&p->item[cnt]);
@@ -452,9 +384,8 @@ struct vector *filter (p, func, ob, extra)
 	} else {
 	    v = apply (func, ob, 1);
 	}
-	if ((v) && (v->type==T_NUMBER)) {
-	    if (v->u.number) { flags[cnt]=1; res++; }
-	}
+	if (!IS_ZERO(v)) { flags[cnt]=1; res++; }
+	if (v) free_svalue(v); /* in case a non-integer is returned */
     }
     r = allocate_array(res);
     if (res) {
@@ -532,7 +463,8 @@ static int put_in(ulist,marker,elem)
 	if ((!fixed) && (sameval(marker,&(llink->mark)))) {
 	    for (tlink=llink;tlink->same;tlink=tlink->same) (tlink->count)++;
 	    (tlink->count)++;
-	    slink = (struct unique *) xalloc(sizeof(struct unique));
+	    slink = (struct unique *) DXALLOC(sizeof(struct unique),8,
+			"put_in: slink");
 	    slink->count = 1;
 	    assign_svalue_no_free(&slink->mark,marker);
 	    slink->val = elem;
@@ -544,7 +476,8 @@ static int put_in(ulist,marker,elem)
 	llink=llink->next; cnt++;
     }
     if (fixed) return cnt;
-    llink = (struct unique *) xalloc(sizeof(struct unique));
+    llink = (struct unique *) DXALLOC(sizeof(struct unique), 8,
+		"put_in: llink");
     llink->count = 1;
     assign_svalue_no_free(&llink->mark,marker);
     llink->val = elem;
@@ -568,7 +501,7 @@ make_unique(arr,func,skipnum)
     int cnt,ant,cnt2;
     
     if (arr->size < 1)
-	return allocate_array(0);
+	return null_array();
 
     head = 0; ant=0; arr->ref++;
     for(cnt=0;cnt<arr->size;cnt++) if (arr->item[cnt].type == T_OBJECT) {
@@ -624,6 +557,11 @@ struct vector *add_array(p,r)
     return d;
 }
 
+/* fix subtract_array to use "cosequential processing" to make this
+   operation order N instead of N^2 (discounting the cost of sorting which
+   is being done anyway) -- Truilkan 1992/07/20
+*/
+
 struct vector *subtract_array(minuend, subtrahend)
     struct vector *minuend, *subtrahend;
 {
@@ -631,18 +569,18 @@ struct vector *subtract_array(minuend, subtrahend)
     struct vector *vtmpp;
     static struct vector vtmp = { 1, 1,
 #ifdef DEBUG
-	1,
+				    1,
 #endif
-	0,
-	{ { T_POINTER } }
-	};
+                                  {(mudlib_stats_t *)NULL,
+                                     (mudlib_stats_t *)NULL},
+				    { { T_POINTER } }
+				};
     struct vector *difference;
-    struct svalue *source,*dest;
+    struct svalue *source, *dest;
     int i;
 
     vtmp.item[0].u.vec = subtrahend;
     vtmpp = order_alist(&vtmp);
-    free_vector(subtrahend);
     subtrahend = vtmpp->item[0].u.vec;
     difference = allocate_array(minuend->size);
     for (source = minuend->item, dest = difference->item, i = minuend->size;
@@ -656,9 +594,8 @@ struct vector *subtract_array(minuend, subtrahend)
 	    assign_svalue_no_free(dest++, source);
     }
     free_vector(vtmpp);
-    return shrink_array(difference, dest-difference->item);
+    return shrink_array(difference, dest - difference->item);
 }
-
 
 /* Returns an array of all objects contained in 'ob'
  */
@@ -668,18 +605,39 @@ struct vector *all_inventory(ob)
     struct vector *d;
     struct object *cur;
     int cnt,res;
-    
+    int display_hidden;
+    struct svalue *r;
+
+    display_hidden = -1;
     cnt=0;
     for (cur=ob->contains; cur; cur = cur->next_inv)
-	cnt++;
+    {
+       if (cur->flags & O_HIDDEN)
+       {
+           if (display_hidden == -1)
+           {
+               push_object(current_object);
+               r = apply_master_ob("valid_hide", 1);
+               display_hidden = !IS_ZERO(r);
+           }
+           if (display_hidden)
+               cnt++;
+       } else cnt++;
+    }
     
     if (!cnt)
-	return allocate_array(0);
+	return null_array();
 
     d = allocate_array(cnt);
     cur=ob->contains;
     
     for (res=0;res<cnt;res++) {
+        if ((cur->flags & O_HIDDEN) && !display_hidden)
+        {
+            cur = cur->next_inv;
+            res--;
+            continue;
+        }
 	d->item[res].type=T_OBJECT;
 	d->item[res].u.ob = cur;
 	add_ref(cur,"all_inventory");
@@ -703,7 +661,7 @@ struct vector *map_array (arr, func, ob, extra)
     int cnt;
     
     if (arr->size < 1) 
-	return allocate_array(0);
+	return null_array();
 
     r = allocate_array(arr->size);
     
@@ -728,86 +686,53 @@ struct vector *map_array (arr, func, ob, extra)
     return r;
 }
 
-static INLINE int sort_array_cmp(func, ob, p1, p2)
-    char *func;
-    struct object *ob;
-    struct svalue *p1,*p2;
-{
-    struct svalue *d;
-
-    if (ob->flags & O_DESTRUCTED)
-        error("object used by sort_array destructed");
-    push_svalue(p1);
-    push_svalue(p2);
-    d = apply(func, ob, 2);
-    if (!d) return 0;
-    if (d->type != T_NUMBER) {
-	/* Amylaar: we expect the object to return a number, and there is
-	 *	    no need to use free_svalue on numbers. If, however,
-	 *	    some stupid LPC-programmer returns a non-number, memory
-	 *	    might be lost unless we free the svalue
-	 */
-	free_svalue(d);
-	return 1;
-    }
-    return d->u.number > 0;
-}
+static struct object *sort_array_cmp_ob;
+static char *sort_array_cmp_func;
+INLINE static int sort_array_cmp();
 
 struct vector *sort_array(inlist, func, ob)
     struct vector *inlist;
     char *func;
     struct object *ob;
 {
-    struct vector *outlist;
-    struct svalue *root, *inpnt;
-    int keynum, j;
-
-    keynum = inlist->size;
-    root = inlist->item;
-    /* transform inlist->item[j] into a heap, starting at the top */
-    for(j=0,inpnt=root; j<keynum; j++,inpnt++) {
-        extern struct svalue const0;
-	int curix, parix;
-	struct svalue insval;
-
-	/* propagate the new element up in the heap as much as necessary */
-	if (inpnt->type == T_OBJECT && inpnt->u.ob->flags & O_DESTRUCTED)
-	    assign_svalue(inpnt, &const0);
-	insval = *inpnt;
-	for(curix = j; curix; curix=parix) {
-	    parix = (curix-1)>>1;
-	    if ( sort_array_cmp(func, ob, &root[parix], &root[curix] ) ) {
-		root[curix] = root[parix];
-		root[parix] = insval;
-	    }
+    /*
+     * Make func and ob globally available for sort_array_cmp used by qsort
+     */
+    sort_array_cmp_func = func;
+    sort_array_cmp_ob = ob;
+ 
+    /*
+     * Do the sort.  Use quickSort (in qsort.c) rather than qsort()
+     * because qsort() isn't tolerant of bad compare functions.
+     */
+    quickSort((char *)inlist->item, inlist->size, sizeof(inlist->item),
+		sort_array_cmp);
+ 
+    return inlist;
+}
+ 
+ 
+INLINE static int sort_array_cmp(p1, p2)
+struct svalue *p1, *p2;
+{
+	int ret;
+	struct svalue *d;
+ 
+	if (sort_array_cmp_ob->flags & O_DESTRUCTED)
+		error("object used by sort_array destructed");
+	push_svalue(p1);
+	push_svalue(p2);
+	d = apply(sort_array_cmp_func, sort_array_cmp_ob, 2);
+	if (!d) {
+		return 0;
 	}
-    }
-    outlist = allocate_array(keynum);
-    for(j=0; j<keynum; j++) {
-	int curix;
-
-	outlist->item[j] = *root;
-	for (curix=0; ; ) {
-	    int child, child2;
-
-	    child = curix+curix+1;
-	    child2 = child+1;
-	    if (child2<keynum && root[child2].type != T_INVALID
-	      && (root[child].type == T_INVALID ||
-		sort_array_cmp(func, ob, &root[child], &root[child2] )
-		) )
-	    {
-		child = child2;
-	    }
-	    if (child<keynum && root[child].type != T_INVALID) {
-		root[curix] = root[child];
-		curix = child;
-	    } else break;
+	if (d->type != T_NUMBER) {    /* In case it's not a number --Amylaar */
+		free_svalue(d);
+		ret = 0;
+	} else {
+		ret = d->u.number;
 	}
-	root[curix].type = T_INVALID;
-    }
-    free_vector(inlist);
-    return outlist;
+	return ret;
 }
 
 /* Turns a structured array of elements into a flat array of elements.
@@ -832,7 +757,7 @@ struct vector *flatten_array(arr)
     struct vector *res, *dres;
     
     if (arr->size < 1) 
-	return allocate_array(0);
+	return null_array();
 
     max = num_elems(arr);
 
@@ -840,7 +765,7 @@ struct vector *flatten_array(arr)
 	return arr;
 
     if (max == 0) 	    /* In the case arr is an array of empty arrays */
-	return allocate_array(0);
+	return null_array();
 
     res = allocate_array(max); 
 
@@ -933,7 +858,7 @@ struct svalue *sum_array (arr, func, ob, extra)
 	    v = *ret;
     }
 
-    ret = (struct svalue *) xalloc(sizeof(struct svalue));
+    ret = (struct svalue *) DXALLOC(sizeof(struct svalue), 8, "sum_array");
     *ret = v;
 
     return ret;
@@ -945,8 +870,8 @@ static INLINE int alist_cmp(p1, p2)
 {
     register int d;
 
-    if (d = p1->u.number - p2->u.number) return d;
-    if (d = p1->type - p2->type) return d;
+    if ((d = p1->u.number - p2->u.number)) return d;
+    if ((d = p1->type - p2->type)) return d;
     return 0;
 }
 
@@ -962,7 +887,8 @@ struct vector *order_alist(inlist)
     keynum = inlists[0].u.vec->size;
     root = inlists[0].u.vec->item;
     /* transform inlists[i].u.vec->item[j] into a heap, starting at the top */
-    insval = (struct svalue*)xalloc(sizeof(struct svalue[1])*listnum);
+    insval = (struct svalue*)
+		DXALLOC(sizeof(struct svalue[1])*listnum, 8, "order_alist: insval");
     for(j=0,inpnt=root; j<keynum; j++,inpnt++) {
 	int curix, parix;
 
@@ -1144,11 +1070,12 @@ struct vector *intersect_array(a1, a2)
     struct vector *vtmpp1,*vtmpp2,*vtmpp3;
     static struct vector vtmp = { 1, 1,
 #ifdef DEBUG
-	1,
+				    1,
 #endif
-	0,
-	{ { T_POINTER } }
-	};
+				    {(mudlib_stats_t *)NULL,
+				       (mudlib_stats_t *)NULL},
+				    { { T_POINTER } }
+				};
 
     if (a1->ref > 1) {
 	a1->ref--;
@@ -1181,11 +1108,11 @@ struct vector *match_regexp(v, pattern)
     extern int eval_cost;
 
     if (v->size == 0)
-	return allocate_array(0);
+	return null_array();
     reg = regcomp(pattern, 0);
     if (reg == 0)
 	return 0;
-    res = (char *)alloca(v->size);
+    res = (char *)DMALLOC(v->size, 8, "match_regexp: res");
     for (num_match=i=0; i < v->size; i++) {
 	res[i] = 0;
 	if (v->item[i].type != T_STRING)
@@ -1203,6 +1130,7 @@ struct vector *match_regexp(v, pattern)
 	assign_svalue_no_free(&ret->item[num_match], &v->item[i]);
 	num_match++;
     }
+	FREE(res);
     FREE((char *)reg);
     return ret;
 }
@@ -1225,15 +1153,16 @@ struct vector *deep_inherit_list(ob)
     for (; cur < next && next < 256; cur++)
     {
 	pr = plist[cur];
-	for (il2 = 0; il2 < pr->num_inherited; il2++)
-	    plist[next++] = pr->inherit[il2].prog;
+	for (il2 = 0; (unsigned)il2 < pr->p.i.num_inherited; il2++)
+	    plist[next++] = pr->p.i.inherit[il2].prog;
     }
 	    
+	next--;
     ret = allocate_array(next);
 
     for (il = 0; il < next; il++)
     {
-	pr = plist[il];
+	pr = plist[il + 1];
 	ret->item[il].type = T_STRING;
 	ret->item[il].subtype = STRING_SHARED;
 	ret->item[il].u.string = 
@@ -1249,20 +1178,22 @@ struct vector *deep_inherit_list(ob)
 struct vector *inherit_list(ob)
 struct object *ob;
 {
-    struct vector *ret;
-    struct program *pr, *plist[256];
-    int il, il2, next, cur;
+	struct vector *ret;
+	struct program *pr, *plist[256];
+	int il, il2, next, cur;
 
-    plist[0] = ob->prog; next = 1; cur = 0;
+	plist[0] = ob->prog; next = 1; cur = 0;
     
 	pr = plist[cur];
-	for (il2 = 0; il2 < pr->num_inherited; il2++)
-	    plist[next++] = pr->inherit[il2].prog;
-	    
-    ret = allocate_array(next);
+	for (il2 = 0; (unsigned)il2 < pr->p.i.num_inherited; il2++) {
+		plist[next++] = pr->p.i.inherit[il2].prog;
+	}
+ 
+	next--; /* don't count the file itself */
+	ret = allocate_array(next);
 
-    for (il = 0; il < next; il++) {
-		pr = plist[il];
+	for (il = 0; il < next; il++) {
+		pr = plist[il + 1];
 		ret->item[il].type = T_STRING;
 		ret->item[il].subtype = STRING_SHARED;
 		ret->item[il].u.string = make_shared_string(pr->name);
@@ -1270,59 +1201,127 @@ struct object *ob;
 	return ret;
 }
 
-struct vector *children(str)
+struct vector *
+children(str)
 char *str;
 {
-   extern struct object *obj_list;
-   int i,j;
-   int t_sz;
-   int sl;
-   struct object *ob;
-   struct object **tmp_children;
-   struct vector *ret;
-   
-    /* Remove leading '/' if any. */
-    while(str[0] == '/')
-	str++;
-    /* Truncate possible .c in the object name. */
-    sl = strlen(str);
-    if (str[sl-2] == '.' && str[sl-1] == 'c') {
-	/* A new writreable copy of the name is needed. */
-	char *p;
-	p = (char *)alloca(strlen(str)+1);
-	strcpy(p, str);
-	str = p;
-	str[sl-2] = '\0';
-    }
-   sl = strlen(str);
-   if(!(tmp_children = (struct object **)
-      MALLOC(sizeof(struct object *) * (t_sz = 50))))
-      return allocate_array(0);
-   for(i = 0, ob = obj_list; ob; ob = ob->next_all)
-   {
-      if((ob->name[sl] == '#' || !ob->name[sl]) &&
-         !strncmp(str,ob->name,sl))
-      {
-         tmp_children[i] = ob;
-         if(++i == t_sz)
-            if(!(tmp_children = (struct object **)REALLOC((void *)tmp_children,
-               sizeof(struct object *) * (t_sz += 50))))
-            {
-               FREE((void *)tmp_children);
-               return allocate_array(0);
-            }
-      }
-   }
-   if(i > MAX_ARRAY_SIZE)
-      i = MAX_ARRAY_SIZE;
-   ret = allocate_array(i);
+	extern struct object *obj_list;
+	int i,j;
+	int t_sz;
+	int sl, ol, needs_freed = 0;
+	struct object *ob;
+	struct object **tmp_children;
+	struct vector *ret;
+        int display_hidden;
 
-   for(j = 0; j < i; j++)
-   {
-      ret->item[j].type = T_OBJECT;
-      ret->item[j].u.ob = tmp_children[j];
-      add_ref(tmp_children[j],"children");
-   }
-   FREE((void *)tmp_children);
-   return ret;
+        display_hidden = -1;
+	/* Skip over leading '/' if any. */
+	while(str[0] == '/') {
+		str++;
+	}
+	/* Truncate possible .c in the object name. */
+	sl = strlen(str);
+	if ((sl > 2) && (str[sl-2] == '.') && (str[sl-1] == 'c')) {
+		char *p;
+		/*
+		  A new writable copy of the name is needed.
+		*/
+		/* (sl - 1) == minus ".c" plus "\0" */
+		p = (char *)DMALLOC(sl - 1, 8, "children: p"); 
+		strncpy(p, str, sl - 2);
+		p[sl - 2] = '\0';
+		sl -= 2; /* removed the ".c" */
+		str = p;
+		needs_freed = 1;
+    }
+	if (!(tmp_children = (struct object **)
+		DMALLOC(sizeof(struct object *) * (t_sz = 50),
+			8, "children: tmp_children")))
+	{
+		if (needs_freed) FREE(str);
+		return null_array(); /* unable to malloc enough temp space */
+	}
+	for (i = 0, ob = obj_list; ob; ob = ob->next_all) {
+		ol = strlen(ob->name);
+		if (((ol == sl) || ((ol > sl) && (ob->name[sl] == '#')))
+			&& !strncmp(str,ob->name,sl))
+		{
+                if (ob->flags & O_HIDDEN)
+                {
+                    if (display_hidden == -1)
+                    {
+                  struct svalue *r;
+                      push_object(current_object);
+                  r = apply_master_ob("valid_hide", 1);
+                  display_hidden = !IS_ZERO(r);
+                    }
+                    if (!display_hidden) continue;
+                }
+			tmp_children[i] = ob;
+			if ((++i == t_sz) &&(!(tmp_children
+				= (struct object **)DREALLOC((void *)tmp_children,
+					sizeof(struct object *) * (t_sz += 50),
+					8, "children: tmp_children: realloc"))))
+			{   /* unable to REALLOC more space (tmp_children is now NULL) */
+				if (needs_freed) FREE(str);
+				return null_array();
+			}
+		}
+	}
+	if(i > max_array_size) {
+		i = max_array_size;
+	}
+	ret = allocate_array(i);
+	for (j = 0; j < i; j++) {
+		ret->item[j].type = T_OBJECT;
+		ret->item[j].u.ob = tmp_children[j];
+		add_ref(tmp_children[j],"children");
+	}
+	if (needs_freed) {
+		FREE(str);
+	}
+	FREE((void *)tmp_children);
+	return ret;
+}
+
+struct vector *
+livings()
+{
+    int nob, apply_valid_hide, valid_hide;
+    struct object *ob, **obtab;
+    struct vector *vec;
+
+    nob = 0;
+    apply_valid_hide = 1;
+
+    obtab = (struct object **)
+		DMALLOC(max_array_size * sizeof(struct object **), 8, "livings");
+
+    for (ob = obj_list; ob != NULL; ob = ob->next_all) {
+	if ((ob->flags & O_ENABLE_COMMANDS) == 0)
+	    continue;
+	if (ob->flags & O_HIDDEN) {
+	    if (apply_valid_hide) {
+		apply_valid_hide = 0;
+		push_object(current_object);
+		valid_hide = !IS_ZERO(apply_master_ob("valid_hide", 1));
+	    }
+	    if (valid_hide)
+		continue;
+	}
+	if (nob == max_array_size)
+	    break;
+	obtab[nob++] = ob;
+    }
+
+    vec = allocate_array(nob);
+    while (--nob >= 0) {
+	vec->item[nob].type = T_OBJECT;
+	vec->item[nob].u.ob = obtab[nob];
+	add_ref(obtab[nob], "livings");
+    }
+
+    FREE(obtab);
+
+    return vec;
 }

@@ -1,0 +1,107 @@
+\."parse commands given in a string according to a specified pattern
+.TH parse_command 3
+
+.SH NAME
+parse_command() - parse commands given in a string
+
+.SH SYNOPSIS
+int parse_command(string str, object source, string pattern, var1, var2 ...);
+
+.SH DESCRIPTION
+Parses commands given in `str' against the pattern in `pattern' and
+returns 1 if it matches. `source' is either an object or an array of objects.
+This is essentially a 'hotted' sscanf and it has a similar syntax, although
+parse_command works on word basis where sscanf works on character basis.
+.TP 10
+`str'
+Given command.
+.TP
+`source'
+source is either an object or an array of objects.
+.TP
+array
+array holding the accessible objects
+.TP
+object
+object from which to recurse and create the list of accessible objects,
+normally ob = environment(this_player())
+.TP 
+`pattern'
+Parse pattern as list of words and formats:
+.TP 10
+word
+obligatory text (One word)
+.TP
+[word]
+optional text (One word)
+.TP
+/
+Alternative marker
+.TP
+%o
+Single item, object
+.TP
+%l
+Single living object
+.TP
+%s
+Any text (multiple words)
+.TP
+%w
+Any word
+.TP
+%p
+Preposition
+.TP
+%i
+Any items
+.TP
+%d
+Number 0- or tx(0-99)
+Example string: " 'get' / 'take' %i "
+Items as in %o and %i be can on many forms. Some examples:
+apple, two apples, twentyfirst apple
+apples, all apples, all green apples, all green ones
+.TP
+`varN'
+This is the list of result variables as in sscanf.
+One variable is needed for each %_
+The return types of different %_ are:
+.TP
+%o
+Returns an object
+.TP
+%l
+Returns an object
+.TP
+%s
+Returns a string of words
+.TP
+%w
+Returns a string of one word
+.TP
+%p
+Can on entry hold a list of word in array
+or an empty variable
+Returns:
+if empty variable: a string
+if array: array[0]=matched word
+.TP
+%i
+Returns a special array on the form:
+[0] = (int) given numeric prefix
+    =0: all or a pluralform given
+    >0: numeral given: two, three, four...
+    <0: order given: second, third ...
+[1..n] (object) Objectpointers
+    A list of the POSSIBLE objects that can match
+    the given %i. No choosing of third or such.
+.TP
+%d
+Returns a number
+ Example:
+a = parse_command("take apple",environment(this_player()),
+	 " 'get' / 'take' %i ",items);
+
+.SH SEE ALSO
+sscanf(3), explode(3)

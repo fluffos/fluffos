@@ -1,16 +1,23 @@
+/* interpret.h */
+
+#ifndef _INTERPRET_H
+#define _INTERPRET_H
+
+
 union u {
     char *string;
     int number;
     struct object *ob;
     struct vector *vec;
     struct mapping *map;
+    struct funp    *fp;
     struct svalue *lvalue;
 };
 
 /*
  * The value stack element.
- * If it is a string, then the way that the string has been allocated differ,
- * wich will affect how it should be freed.
+ * If it is a string, then the way that the string has been allocated
+ * differently, which will affect how it should be freed.
  */
 struct svalue {
     short type;
@@ -26,14 +33,21 @@ struct svalue {
 #define T_POINTER	0x8
 #define T_OBJECT	0x10
 #define T_MAPPING	0x20
-#define T_MARK          0x40 /* bogus type, used in mappings only */
-#define T_ANY           T_STRING|T_NUMBER|T_POINTER|T_OBJECT
+#define T_FUNCTION  0x40
+#define T_ANY       T_STRING|T_NUMBER|T_POINTER|T_OBJECT|T_MAPPING|T_FUNCTION
 
 /* values for subtype field of svalue struct */
-#define STRING_MALLOC	0x0	/* Allocated by malloc() */
-#define STRING_CONSTANT	0x1	/* Do not has to be freed at all */
-#define STRING_SHARED	0x2	/* Allocated by the shared string library */
-#define T_UNDEFINED     0x4
+#define STRING_MALLOC	0x0	   /* Allocated by malloc() */
+#define STRING_CONSTANT	0x1	   /* Do not has to be freed at all */
+#define STRING_SHARED	0x2	   /* Allocated by the shared string library */
+#define T_UNDEFINED     0x4    /* undefinedp() returns true */
+#define T_NULLVALUE     0x8    /* nullp() returns true */
+#define T_REMOTE        0x10   /* remote object (subtype of object) */
+
+struct funp {
+	struct svalue obj, fun;
+	short ref;
+};
 
 struct vector {
     short size;
@@ -41,39 +55,15 @@ struct vector {
 #ifdef DEBUG
     int extra_ref;
 #endif
-    struct wiz_list *user;	/* Save who made the vector */
+    statgroup_t stats;      /* creator of the array */
     struct svalue item[1];
 };
 
-struct node {
-   struct svalue values[2];
-   struct node *left,
-               *right;
-   short deleted;
-};
- 
-struct mapping {
-	struct node *nod;
-	short ref;
-	short orig_size;
-	struct wiz_list *user;     /* Who owns the mapping */
-	int size; /* number of nodes in mapping */
-	/* block points to the original block reserved for map entries */
-	struct node *block;
-	struct node *cur; /* cur points to the next available map entry */
-};
- 
-#define ALLOC_MAPPING(n) \
-   (struct mapping *) xalloc(sizeof(struct mapping) + \
-                             n * sizeof(struct node)) /* changed from n - 1 */
-
 #define ALLOC_VECTOR(nelem) \
-    (struct vector *)xalloc(sizeof (struct vector) + \
-			    sizeof(struct svalue) * (nelem - 1))
-
+    (struct vector *)DXALLOC(sizeof (struct vector) + \
+			    sizeof(struct svalue) * (nelem - 1), 8, "ALLOC_VECTOR")
 
 struct lnode_def;
-void free_vector PROT((struct vector *)), free_all_values();
 
 /*
  * Control stack element.
@@ -96,6 +86,10 @@ struct control_stack {
     short *break_sp;
 };
 
-#define IS_ZERO(x) (((x)->type == T_NUMBER) && ((x)->u.number == 0))
-#define IS_UNDEFINED(x) (((x)->type == T_NUMBER) && \
-	((x)->subtype == T_UNDEFINED) && ((x)->u.number == 0))
+#define IS_ZERO(x) (!(x) || (((x)->type == T_NUMBER) && ((x)->u.number == 0)))
+#define IS_UNDEFINED(x) (!(x) || (((x)->type == T_NUMBER) && \
+	((x)->subtype == T_UNDEFINED) && ((x)->u.number == 0)))
+#define IS_NULL(x) (!(x) || (((x)->type == T_NUMBER) && \
+	((x)->subtype == T_NULLVALUE) && ((x)->u.number == 0)))
+
+#endif /* _INTERPRET_H */

@@ -42,6 +42,9 @@
 #define NAME_HIDDEN		0x8	/* Not visible for inheritance */
 #define NAME_PROTOTYPE		0x10	/* Defined by a prototype only */
 
+#define T_INTERNAL_PROGRAM 0x0
+#define T_EXTERNAL_PROGRAM 0x1
+
 struct function {
     char *name;
     unsigned short offset;	/* Address of function,
@@ -70,15 +73,19 @@ struct inherit {
     unsigned short variable_index_offset;
 };
 
-struct program {
+struct external_program {
+	int (*interface) PROT((char *, int));
+	void *data;
+};
+
+struct internal_program {
     int ref;				/* Reference count */
 #ifdef DEBUG
     int extra_ref;			/* Used to verify ref count */
 #endif
     char *program;			/* The binary instructions */
-    char *name;				/* Name of file that defined prog */
     int  id_number;			/* used to associate information with
-					  this prog block without needing to
+					   this prog block without needing to
 					   increase the reference count     */
     unsigned short *line_numbers;	/* Line number information */
     struct function *functions;
@@ -112,6 +119,16 @@ struct program {
     unsigned short num_inherited;
 };
 
+union pu {
+	struct internal_program i;
+	struct external_program e;
+};
+
+struct program {
+	char *name;				/* Name of file that defined prog */
+	union pu p;
+};
+
 extern struct program *current_prog;
 
 /*
@@ -126,7 +143,8 @@ extern struct program *current_prog;
 #define TYPE_VOID	3
 #define TYPE_OBJECT	4
 #define TYPE_MAPPING	5
-#define TYPE_ANY	6	/* Will match any type */
+#define TYPE_FUNCTION 6
+#define TYPE_ANY	7	/* Will match any type */
 
 /*
  * These are or'ed in on top of the basic type.

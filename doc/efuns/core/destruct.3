@@ -1,0 +1,24 @@
+.\"remove an object from the game
+.TH destruct 3
+
+.SH NAME
+destruct() - remove an object from the games
+
+.SH SYNOPSIS
+void destruct( {object|string} ob );
+
+.SH DESCRIPTION
+Completely destroy and remove object <ob>. The argument can also be a string. 
+After the call to destruct(), no global variables will exist any longer,
+only local, and arguments.
+.PP
+If an object self-destructs, it will immediately terminate execution and
+return 0. There is one exception: if the destruct statement is followed by
+a 'return 1' immediately after, then this return statement will be executed.
+.PP
+This should NOT be used on normal objects in the game, instead use the lfun
+'remove' in the object you want removed (i.e. ob->remove();). This will
+ensure correct update of weights, volumes etc.
+
+.SH SEE ALSO
+clone_object(3), remove(l)

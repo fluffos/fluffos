@@ -1,0 +1,29 @@
+.\"call a function in another object
+.TH call_other 3
+
+.SH NAME
+call_other() - call a function in another object
+
+.SH SYNOPSIS
+unknown call_other( object ob, string str, mixed arg );
+
+.SH DESCRIPTION
+Call function in another object with an argument. The return value is
+returned from the other object. The compiler don't know the return type,
+so it must be cast.
+.PP
+There is a syntactically more attractive way to do call_others:
+.IP
+ob -> func( args... );
+.PP
+Which is equivalent to call_other( "func", args... );
+If the first argument passed to call_other() is an array, then "func"
+will be called on each element of the array which is an object.  Here
+are some example usages of this MudOS feature:
+.PP
+all_inventory(ob)->move(dest);
+.PP
+users()->quit();
+
+.SH SEE ALSO
+present(3), find_living(3)

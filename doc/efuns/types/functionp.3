@@ -1,0 +1,17 @@
+.\"determine whether or not a given variable is a function pointer
+.TH functionp 3
+
+.SH NAME
+functionp() - determine whether or not a given variable is a function pointer.
+
+.SH SYNOPSIS
+int functionp(mixed arg);
+
+.SH DESCRIPTION
+Return 1 if `arg' is a function pointer and zero (0) otherwise.  Function
+pointers are variables of type 'function' and are constructed as follows:
+
+f = (: obj, func :);
+
+.SH SEE ALSO
+stringp(3), pointerp(3), objectp(3), lpc/types/function

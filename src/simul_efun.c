@@ -43,13 +43,13 @@ void set_simul_efun(file)
 	  exit(1);
 	}
     }
-  num_simul_efun = ob->prog->num_functions;
+  num_simul_efun = ob->prog->p.i.num_functions;
   if (num_simul_efun == 0)
     return;
-  funp = ob->prog->functions;
+  funp = ob->prog->p.i.functions;
   simul_efunp = (struct function *)
-    MALLOC(sizeof (struct function) * num_simul_efun);
-  for (i=0; i < ob->prog->num_functions; i++) {
+    DMALLOC(sizeof (struct function) * num_simul_efun,131072,"set_simul_efun");
+  for (i=0; (unsigned)i < ob->prog->p.i.num_functions; i++) {
     simul_efunp[i].name = make_shared_string(funp[i].name);
     simul_efunp[i].flags = funp[i].flags;
     simul_efunp[i].num_arg = funp[i].num_arg;

@@ -1,0 +1,23 @@
+.\"determine whether or not a given variable is undefined.
+.TH undefinedp 3
+
+.SH NAME
+undefinedp() - determine whether or not a given variable is undefined.
+
+.SH SYNOPSIS
+int undefinedp(mixed arg);
+
+.SH DESCRIPTION
+Return 1 if `arg' is undefined.  'arg' will be undefined in the following
+cases:
+.TP
+1.
+it is a variable set equal to the return value of a call_other to a
+non-existent method (e.g. arg = call_other(obj, "???")).
+.TP
+2.
+it is a variable set equal to the return value of an access of an
+element in a mapping that doesn't exist (e.g. arg = map[not_there]).
+
+.SH SEE ALSO
+nullp(3), mapp(3), stringp(3), pointerp(3), objectp(3), intp(3).

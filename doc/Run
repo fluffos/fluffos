@@ -1,0 +1,93 @@
+Running MudOS (1992/12/12)
+
+This file describes how to run the driver once you have it installed.
+
+This installation file assumes you wish to refer to your mud by the name
+of 'basis'.  If this is not the case, simply use the name of your choice
+whenever this file mentions the word 'basis'.
+
+0) Read the 'Install' file if you have not yet done so.
+
+1) Check the value of INSTALL_DIR that you set in the Makefile.  Make sure
+   that startmud and basis.info (from the bin subdirectory) are in that
+   directory.  Edit basis.info so that the values for the various macros
+   are appropriate for your setup.  Macros that you will likely need to
+   change include MUDNAME and APORT.  You also may need to change LOGDIR.
+   Edit 'startmud' and make sure the value of $BINDIR is the same as that
+   of $INSTALL_DIR (again, as specified in the Makefile).
+
+2) Check the value you set for CONFIG_FILE_DIR in src/options.h.  Make sure
+   etc/config.basis is in the CONFIG_FILE_DIR directory that you specified.
+
+3) Edit $CONFIG_FILE_DIR/config.basis so that it is customized to
+   be the way you want it.
+
+4) Move (if necessary) the your mudlib subdirectory so that the value
+   you specified for "mudlib directory" in config.basis is correct.  If
+   you have ftp'd an existing mudlib that is meant to work with MudOS 0.9,
+   then you should follow the instructions included with that mudlib.  In
+   general, just make sure that the value for "mudlib directory" in
+   config.basis is correct.  The mudlib basis-18.tar.Z (on the same ftp
+   site as the driver) is a more complete version of the mini-lib that was
+   previously included with MudOS.  In addition, the TMI-2 beta mudlib release
+   is now available.
+
+5) Test the setup by starting the driver from the command line (without
+   using the startmud script).  Do this by switching into the INSTALL_DIR
+   and typing:
+
+   ./driver config.basis
+
+   If the driver doesn't startup smoothly at this point then put on your
+   thinking cap and start tracking down the source of the problem (hint:
+   reread the Install file and this file to see if you can find a place
+   where you made a mistake).  If you can't find any mistakes on your part,
+   then we may have made one when writing up these instructions.  In that
+   case, you may look for our mistake (please let us know if we made one).
+   Note: the 'init_addr_server: connect: Connection refused message' is
+   normal at this point.  Also, the two *Warning messages dealing with
+   'default error message' and 'maximum efun sockets' may be ignored.
+
+6) Telnet into your running mud by typing:
+
+   telnet localhost 6363
+
+   (you will need to use a different number than 6363 if you changed the
+   port number in config.basis).  After you've finished playing around
+   in the mud, type 'halt' to shutdown the mud.
+
+7) Switch into $INSTALL_DIR and type: nohup startmud basis &
+
+   This command will start a script that will run the driver.  If the
+   driver crashes or is rebooted, the script will restart the driver.
+   The script writes information into various different log files when the
+   driver reboots or crashes (read the startmud script and basis.info to
+   see where the logfiles will be).  If the driver exits with an exit code
+   of -1 then the script will stop (and the driver will not be restarted).
+
+8) Note that the startmud script attempts to start the addr_server as
+   well as the driver.  The addr_server is an autonomous replacement for
+   the old hname binary.  Be sure that addr_server is started with
+   an argument specifying a port # the same as the port # listed for the
+   address server in config.basis (note: the addr_server must run on a
+   different port than does MudOS).
+
+9) If you wish to stop the mud, either type 'halt' from inside the mud
+   or type 'stopmud basis' from outside the mud.  Stopping the mud from
+   the inside is the preferred method (when possible).  If you have ftp'd
+   a mudlib, the halt command may be named something different.  Read the
+   help files that came with your mudlib for more information.
+
+10) If you merely wish to reboot the mud, then type 'reboot' from inside
+   the mud (again, this command may be named differently in your mudlib).
+
+11) If you wish to run more than on MudOS mudlib on the same machine,
+    there is no need to recompile the driver since you can use the same
+    driver binary for each mudlib by adding additonal runtime config files
+    (in the same directory as config.basis) for any new mudlibs.  In addition
+    multiple instances of the driver can communicate with the same addr_server.
+    This feature is very useful when you need to run a test system on a
+    different port (your main system and test system can even use the same
+    mudlib).  If you do this, you may wish to make logfile names based on
+    the value returned by mud_name() (give the two muds different names in
+    the runtime config file).

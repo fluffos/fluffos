@@ -12,4 +12,4 @@ struct instr {
     int arg_index;
 };
 
-extern struct instr instrs[256];
+extern struct instr instrs[];

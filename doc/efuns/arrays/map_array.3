@@ -1,0 +1,19 @@
+.\"modify an array
+.TH map_array 3
+
+.SH NAME
+map_array() - modify an array of elements via application of a function
+
+.SH SYNOPSIS
+mixed *map_array(mixed *arr, string fun, object ob, mixed extra);
+
+.SH DESCRIPTION
+Returns an array holding the items of `arr' mapped through `ob->fun()'.
+The function `fun' in `ob' is called for each element in `arr' with that
+element as parameter. A second parameter `extra' is sent in each call if
+given. Principal function: 
+.IP
+`foreach (index) arr[index] = ob->fun(arr[index],extra);'
+.PP
+The value returned by `ob->fun(arr[.index.], extra)' replaces the existing 
+element in the array. If `arr' is not an array, then 0 will be returned.

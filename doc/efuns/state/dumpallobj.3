@@ -1,0 +1,18 @@
+.\"report various statistics on all objects that have been loaded
+.TH dumpallobj 3
+
+.SH NAME
+dumpallobj() - report various statistics on all objects that have been loaded
+
+.SH SYNOPSIS
+void dumpallobj(string|void);
+
+.SH DESCRIPTION
+This function dumps a list of statistics on all objects that have been loaded.
+If no argument is specified, then the information will be dumped to a file
+named /OBJ_DUMP.  If an argument is specified, then that name is used as
+the filename for the dump.  This function replaces the hardcoded 'dumpallobj'
+command in vanilla 3.1.2.
+
+.SH SEE ALSO
+mud_status(3), debug_info(3)

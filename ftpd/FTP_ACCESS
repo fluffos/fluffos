@@ -1,0 +1,21 @@
+# This file, to be used, should be in :
+#
+#         "/<your mudlib path>/secure"
+#
+# This file is basically for the certain access rights of specific
+# wizards in your mud.  The allowable access are :
+#     ROOT       <->    all access
+#     ELDER      <->    read access to all files, write to wiz
+#                       directories.
+#     LORD       <->    read access to their realm and wiz directories
+#                       write access to realm
+#     WIZARD     <->    read access to realm and personal directory
+#                       write access to their personal realm directory and 
+#                       personal directory.
+#     RESTRICTED <->    NO ACCESS AT ALL
+#
+# Each access has it's right plus the rights of it's lower access.
+#
+# The format for rights are :    <wizard_name>::<rights>
+#
+gunther::ROOT

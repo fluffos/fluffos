@@ -10,7 +10,6 @@ struct sentence {
 #define V_NOSPACE	2
 #define V_PREVERB	4
 #define V_REPLACE	8
-#define V_GLOBAL	16
 
 struct sentence *alloc_sentence();
 

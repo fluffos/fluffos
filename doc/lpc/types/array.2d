@@ -1,0 +1,48 @@
+2D arrays can be done in lpc, quite simply.  Just treat them as an array
+of arrays.  So,
+
+   a = allocate(10);
+   a[0] = allocate(10);
+
+etc...
+
+and you can reference array 0, element 0, by
+
+   a[0][0]
+
+That's been around since arrays have been around.  You can't declare an 
+array of more than 1 dimension (using the type * notation, if you have
+type checking on), but you can have array of more than one dimension.  If
+you have type checking on, you have to declare them as mixed * type, though.
+
+This also works:
+
+mixed *a;
+
+a = ({ ({1, 2, 3}), ({1, 2, 3}) });
+
+So, a[0] would be ({1, 2, 3}), and a[0][2] would be 3.
+
+Or this:
+
+mixed *a;  /* please note the mixed * declaration is only for type checking 
+              and means that this is an array of any type */
+
+a = ({0, 0, 0, 0});  /* just to get the array to size 4 */
+a[0] = ({1, 2, 3});
+a[1] = ({1, 2, 3});
+etc...
+
+I use multidimensional arrays everywhere, usually doing things in a loop:
+
+a = allocate(10);
+for (i=0; i<10; ++i)
+{
+   string str;
+   str = read_file(path, i+1);
+   str = extract(str, 0, strlen(str)-2); /* to get rid of the \n */
+   a[i] = explode(str, '#');
+}
+
+
+(thanks to John Price, a.k.a. Raistlin for this explanation)

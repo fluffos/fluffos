@@ -1,0 +1,15 @@
+.\"sets an object to have wizard privileges
+.TH enable_wizard 3
+
+.SH NAME
+enable_wizard() - sets an object to have wizard privileges
+
+.SH SYNOPSIS
+int enable_wizard(object);
+
+.SH DESCRIPTION
+Gives the arg wizard privileges and returns 1, if the object is
+interactive.  If the object is not interactive, it returns 0.
+
+.SH SEE ALSO
+wizardp(3), interactive(3)

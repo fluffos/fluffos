@@ -1,0 +1,24 @@
+MudOS has a variable type named 'function'.  Variables of this type may
+be used to point to (object, function) pairs.  Here is an example usage:
+
+void
+test(string arg)
+{
+    write(arg + "\n");
+}
+
+void
+create()
+{
+    function f;
+
+    f = (: this_object(), "test" :);
+    (*f)("hello, world!");
+    write("functionp(f) == " + functionp(f) + "\n");
+}
+
+Note, (*f)(args) is internally translated to obj->func(args) where
+f == (: obj, func :).  In (: obj, func :), obj and func may be any
+type allowed by call_other(obj, func).
+
+Author: Truilkan, December 1992

@@ -6,21 +6,17 @@
 ** It expects an equal number of future requests as small
 ** block deallocations.
 */
-
 #include <stdio.h>
 #include <memory.h>
-#include "lint.h"
 
 #ifdef MSDOS
 #define char void
 #endif
 
-#define smalloc(x) malloc(x)
-#define sfree(x) free(x)
-#define srealloc(x,y) realloc(x,y)
-#define scalloc(x,y) calloc(x,y)
-
 #define fake(s)
+#define smalloc malloc
+#define sfree free
+#define srealloc realloc
 
 #define SMALL_BLOCK_MAX_BYTES	32
 #define SMALL_CHUNK_SIZE	0x4000
@@ -34,6 +30,8 @@
 #define MASK		0x0FFFFFFF
 
 #define MAGIC		0x17952932
+
+extern int using_smalloc;
 
 /* SMALL BLOCK info */
 
@@ -55,7 +53,7 @@ static int small_total[SMALL_BLOCK_MAX];
 static int small_max[SMALL_BLOCK_MAX];
 static int small_free[SMALL_BLOCK_MAX];
 
-typedef struct { unsigned counter, size; } stats;
+typedef struct { unsigned counter, size; } stat;
 #define count(a,b) { a.size+=(b); if ((b)<0) --a.counter; else ++a.counter; }
 
 int debugmalloc;	/* Only used when debuging malloc() */
@@ -70,9 +68,9 @@ static void large_free();
 #define s_size_ptr(p)	(p)
 #define s_next_ptr(p)	((u **) (p+1))
 
-stats small_alloc_stat;
-stats small_free_stat;
-stats small_chunk_stat;
+stat small_alloc_stat;
+stat small_free_stat;
+stat small_chunk_stat;
 
 char *smalloc(size)
   u size;
@@ -182,7 +180,7 @@ void show_free_list()
    printf("\n");
 }
 
-stats large_free_stat;     
+stat large_free_stat;     
 void remove_from_free_list(ptr)
 u *ptr;
 {
@@ -233,7 +231,7 @@ u *ptr;
  * It is system dependent how sbrk() aligns data, so we simpy use brk()
  * to insure that we have enough.
  */
-stats sbrk_stat;
+stat sbrk_stat;
 static char *esbrk(size)
 u size;
 {
@@ -250,7 +248,7 @@ u size;
   return current_break - size;
 }
 
-stats large_alloc_stat;
+stat large_alloc_stat;
 static char *large_malloc(size, force_more)
 u size;
 int force_more;
@@ -388,17 +386,20 @@ char *p; unsigned size;
    if (old_size >= size)
       return p;
 
-   t = smalloc(size);
+   t = malloc(size);
    if (t == 0) return (char *) 0;
 
    memcpy(t, p, old_size);
-   sfree(p);
+   free(p);
    return t;
 }
 
+
+
 int resort_free_list() { return 0; }
 #define dump_stat(str,stat) add_message(str,stat.counter,stat.size)
-void dump_malloc_data()
+void show_mstats(dummy)
+     char *dummy;
 {
   add_message("Type                   Count      Space (bytes)\n");
   dump_stat("sbrk requests:     %8d        %10d (a)\n",sbrk_stat);
@@ -424,7 +425,7 @@ void dump_malloc_data()
 /*
  * calloc() is provided because some stdio packages uses it.
  */
-char *scalloc(nelem, sizel)
+char *calloc(nelem, sizel)
 #ifndef MSDOS
     int nelem, sizel;
 #else
@@ -435,7 +436,7 @@ char *scalloc(nelem, sizel)
 
     if (nelem == 0 || sizel == 0)
 	return 0;
-    p = smalloc(nelem * sizel);
+    p = malloc(nelem * sizel);
     if (p == 0)
 	return 0;
     (void)memset(p, '\0', nelem * sizel);
@@ -516,7 +517,8 @@ verify_free(ptr)
 }
 
 apa() {
-	abort();
+    int i;
+    i/0;
 }
 
 static char *ref;

@@ -1,0 +1,589 @@
+/--------------------------------------------\
+| Current driver release number: MudOS 0.8.1 |
+\--------------------------------------------/
+
+This document is divided into six sections.
+(1) Changes that have occured from pre-3.0 to Lars' 3.0.
+    (keyword: LPC3)
+(2) Changes that have occured from 3.0 to MudOS version.
+    (keyword: MUDOS)
+(3) Design tips: Using the 'new' capabilities.
+    (keyword: DESIGN)
+ 
+/-----------\
+| (1) LPC3  |
+\-----------/
+ 
+(Identical to 3.0.53, swedish version, except as detailed in LPCA.)
+
+Admin-level changes:
+   Tons and tons of bugs fixed.
+   The game executable has been renamed to 'driver'.  The default
+     port is now 3000.
+   A superior access permission system has been added; check out
+     ./ACCESS_ALLOW, and the ACCESS_RESTRICTED flag in config.h.
+   Runtime flags:
+     -m   specify another mudlib directory
+     -p   specify another port
+     -D   specify a globally #defined symbol
+     -f   call flag() with specified string in the master object
+     -s   specify a different swap time than in config.h
+   Game should be compilable on MSDOS, SCO Unix, AIX, 
+     IRIS 4D/340, and NeXT machines.  Check out config.h.
+   'configure' is a utility that will help you configure the      
+     game.  Once you have the source, type 'configure'.
+   Some utilities have been supplied with the game, although
+     you don't have to use any of them to get the game to
+     work.  One such utility is the gethostname (hname) util,
+     which gets the hostname of players.  Another is the
+     'indent' (LPC code indenter), and the 'restart_mud'
+     utility.  They are in the util/ directory.
+   The game uses resources somewhat more efficiently.  The
+     compiler doesn't use 'i-files' anymore; the C preprocessor
+     is built into the compiler.
+   A 'mudwho' server is supplied with the game though you
+     don't have to use it.  Peek through config.h.
+   The game file permission system is handled through a special
+     object called the master object.  The master object handles
+     all the gamedriver-mudlib interfaces.  A sample master       
+     object is supplied with the source; it may actually work.
+     In 'compatibility mode', the master object should be put
+     in /obj/master.c.  In 'incompatibility' or 'native' mode, 
+     the master object should be put in /secure/master.c.
+   A 'simulated efun' object should make it easier to upgrade
+     without killing the game.  The nonstatic functions defined
+     in it become functions usable by the entire game.  Look
+     at the master object for details.
+ 
+God-level changes:
+   Hardcoded protection against snoop loops.
+   Error detection with throw() and catch().  catch(statement)
+     returns the error string if statement causes an error, and
+     more importantly, prevents an error from occuring.
+     throw(str) generates the error str.
+   snoop() has new syntax: snoop(who, what).  Returns what if
+     success.  valid_snoop(who, what) in master object must
+     return 1 for this to work.  No error messages displayed
+     by this; it's left up to the mudlib.
+   define_include_dirs() in the master object should return
+     an array of strings of files that are searched when an
+     #include is done.  It's only called once, so you can't
+     have this array change from file to file :(.  The master
+     object, natch, doesn't have any include search path when
+     it compiles, so use absolute pathnames in its #include's.
+   Compiler can now handle global auto initializations.  It does
+     this by defining a function __INIT() in the object.
+   Local functions override efuns in the simul_efun object.  This
+     can be over-riden with "efun::<function name>;".
+   The preprocessor defines the flags LPC3 and COMPAT_MODE
+     (the last, only if you are running in compatibility
+      mode).
+   Game now bases file permissions on effective-user-id.
+   ls(), cp() [in some versions] efuns gone.
+   call_out_info() returns information about all existing
+     call_out()'s.
+   Associative lists added, but don't get excited, because
+     mappings in -A are much better, so alists'll be taken
+     out soon.
+   Swapping algorithm changed.  If an object has the function
+     'clean_up' in it at swaptime, it'll be called.  This gives
+     the object the chance to self-destruct, even for cloned
+     objects.  Self-destructing is better than swapping out,
+     because the swapper only swaps out the program associated
+     with the object.  The argument to clean_up is nonzero
+     if the object is inherited.  And if the return value
+     is nonzero, it'll never be called again in that object.
+   The compiler accepts some new types:  'unknown', 'mixed',
+     'void', 'status', and '<basic type> *'.
+   Players not yet in a room don't see shout()'s.
+   You can make the compiler do strict typechecking by using
+     #pragma strict_types at the head of the file.
+   The compiler checks number of arguments when possible.
+     This can be disabled on a function-by-function basis
+     with the 'varargs' type modifier.
+   It's possible to inherit several files at once.  In cases
+     of identifier conflicts, use ::, as in the example:
+      inherit "/basic/eyeball";
+      inherit "/basic/nose";
+      create() {
+         nose::create();
+         eyeball::create();
+      }
+   Type modifier 'private' makes a variable or function invisible
+     to the heirs of an object.  'private inherit' makes all the
+     functions private.  'public' overrides this though.
+   create(), reset() work differently.  When an object is
+     first created, create() is called in the object.
+     Periodically after that, reset(0) is called in the
+     object.
+   command() returns the evaluation cost if successful, other-
+     wise 0.  (The method for computing evaluation costs is
+     seriously screwed, though.)  It only takes one argument,
+     the string.
+   exec() can be used to switch a player's connection from one
+     object to another.  It won't work unless the function
+     valid_exec(old, new) [in the master object] returns 1.
+   move_object()'s first argument must be "this_object()".
+     And exit() isn't called anymore when a living object
+     leaves a room.
+   transfer() doesn't exist.
+   save_object(), restore_object() can now handle arrays.
+     They can also be used by any object now.
+   You can prevent shadow()'ing of a function by using the
+     type modifier 'nomask' on that function declaration.
+   LPC preprocessor smarter; #if understands expressions.
+   file_name() and function_exists() return leading '/'
+     on file name, which didn't happen before.
+   trace() efun should aid debugging.
+   For now, you have to cast return value from call_other().
+   /room/init_file is no longer The Way to preload objects.
+     Instead, the epilog() function is called in the master
+     object to preload objects.
+   /room/void is no longer needed; when an object's environment
+     gets destructed, a function in the master object gets
+     called (destruct_environment_of(), one arg, that being
+     every object in the room, one at a time).  The master object
+     is supposed to handle this situation.
+   Master object has some support functions for parse_command().
+   move(to, 1) is called internally in objects by the game
+     driver when it needs to move them.  The '1' is supposed
+     to mean an equivalent of a transfer().
+ 
+Wizard-level:
+  There's some interesting operator overloading.  '+' works
+    between two arrays, returning a new array with all
+    the elements of both.  Likewise +=.  += also works for
+    strings, now.  & between two arrays returns the               
+    intersection of those arrays.  - between two arrays
+    is like set subtraction.
+  ?: ternary operator exists, read about it in K&R.
+  write() output is now seen by NPCs.
+  You can effectively redefine functions in an object
+    by shadow()'ing it.  All call_other()'s, tell_object()'s
+    get redirected to an object's shadow if it has one. 
+    Only objects for which query_allow_shadow() in the
+    master object returns 1 will be shadowable this way.
+    When an object is destruct()'ed, so are its shadows.
+  rename(x,y) renames file x to file y.
+  Editor now has help screens and indent feature.  The
+    indentation is just for really ugly code, since it
+    doesn't do such a hot job either. 
+  switch(), read K&R.  The case labels also handle
+    subranges and strings.
+  You can use subranges as indices to arrays or strings
+    to get subarrays or substrings.  ( write(str[0..5]); )
+  Compiler now understands hexadecimal numbers.
+  call_out() now saves this_player().  This is not thought
+    to be a smart move.  It'll be removed sometime soon.
+  process_string() is automatically called on the error
+    notification string (remember notify_fail()?).
+  tell_room() takes third optional argument, an array
+    of objects to be excluded.  Likewise the second argument
+    to say() works this way.
+ 
+New efuns/new efun behavior:
+  version() returns string: game version.
+  process_string() speeds up 'value by function call'             
+    processing.  Usage: process_string("<func>:<file>|arg|arg2...")
+    returns a processed string, file->func(arg, arg2...).  E.g.
+    process_string("query_notify_fail|What ?");
+    The filename is optional as are the arguments.
+  all_inventory(ob) returns array inventory of ob.
+  deep_inventory(ob) returns array inventory of ob and
+    all subinventories of ob.  The array is flat.
+  member_array(elem, arr) returns index of arr in which
+    elem can be found, -1 if not found.
+  read_file(file, start, num_lines) returns a string containing
+    lines from start to start+num_lines lines.  read_file(file) (no args)
+    would return the entire file in one string.
+  regexp(pattern, arr) returns an array of all strings in
+    arr that match the regular expression 'pattern'.
+  get_dir(file) returns an array of files in the directory.
+    Note that for it to work as expected, the filename
+    must end in '/.'; i.e. get_dir("/w/.");  Otherwise
+    it would return just the filename itself in the array.
+    (get_dir() actually matches regular expressions, up to
+    a point, which is why it works this way).
+  sort_array(arr, gfun, ob) returns an array sorted by
+    return value of function gfun in ob.  ob->gfun(a,b)
+    should return 1 if a '>' b.
+  read_bytes() and write_bytes(), not sure on these.
+  this_player(1) returns current_interactive.
+  filter_array(arr, ob, fun, extra) returns an array
+    of elements in arr for which ob->fun(elem, extra)
+    returned nonzero.
+  map_array(arr, ob, fun, extra) returns an array of
+    the return values of ob->fun(elem, extra).
+  getuid(ob) replaces creator(ob).
+  geteuid(ob) returns 'effective user id' of ob.
+  seteuid(new) sets eff-user of ob to new.  This won't
+    work unless, in master object, valid_seteuid(ob, new)
+    returns 1.
+  cat() returns the number of lines printed.
+  query_ip_name(ob) returns hostname of ob.  An asynchronous
+    process does this, so your game performance doesn't suffer
+    (but your machine performance does).
+ 
+
+/-----------\
+| (2) MUDOS |
+\-----------/
+
+MudOS is meant to be a combined mudlib and gaamedriver release.  The
+major and minor version numbers (0.8) represent the level of the
+combined release.  The mudlib and the driver will each have their own
+patchlevel at the end of the version number, so that minor changes and
+bug fixes can be released between major releases.  As long as the
+major and minor version numbers of the mudlib and driver are the same,
+they will work together.  They may work together if they don't agree,
+but there are no guarantees there.  So for example, the release might
+have the following version numbers:
+
+	MudOS 0.8
+		driver 0.8.1  (one patch since the original release)
+		mudlib 0.8.5  (five patches since the original release)
+
+
+Changes from the 3.1.2 release of the LPmud driver from Lars Pensj|:
+____________________________________________________________________
+
+[Admin level changes]
+	
+- COMPAT_MODE is gone!  You will not be able to run in compatibility mode.
+  This means that MudOS cannot be used to run mudlibs designed for the
+  2.4.5 LPmud gamedriver.
+
+- shadow() can be disabled at compile-time.  Check out NO_SHADOWS in
+config.h.  Note that NO_SHADOWS will appear in LPC's preprocessor's
+run-time table if it is defined in config.h.
+   
+- A runtime configuration file replaces much of config.h.  Look at the
+file ./mudlib/config.example.  You must specify a config file as
+an argument to the driver when starting.  It will not run without it.
+The driver will search in CONFIG_FILE_DIR (defined in config.h) for
+the file first and will then search the explicit path.
+ 
+- Added Sean Reith's sprintf().  It's huge and therefore a
+compile-time option defined in config.h.
+
+- Added RCS as a compile-time option.  This allows wizards access to
+the new efuns ci, co and rlog if those executables exist on your
+system.
+
+- Added restricted ed mode.  This is a compile-time option as well,
+and basically restricts commands on 
+
+
+[Wizard-level changes]
+
+- added dprint flag for .edrc file.  Dprint causes a line to be printed
+  following the deletion of some text in ed.
+
+- Compatibility buster: file permission system is now object-based
+instead of euid-based.
+
+- save_object() no longer saves 0-valued variables.
+
+- Virtual objects.  When the GD is asked to compile a file that
+doesn't exist, it just forwards the request to compile the file name
+to the master object.  The return value of compile_object(fname) will
+be an object that will be renamed.
+
+- set_prompt() from interactive object sets that object's prompt to the
+string argument.
+
+- If the function write_prompt() exists, it will get called every time
+the driver would normally write a prompt.  (this only gets called when
+not in ed or an input_to)
+
+- Added privileged object concept.  The master object is by default
+privileged; enable_privileges(ob) from a privileged object makes ob
+privileged; privp(ob) returns whether or not ob is privileged.
+
+- add_verb() and add_xverb() will be going soon.
+
+- wizards() returns a string array of all the wizards in the wizlist.
+find_wizard(wizname) returns information about that wizard, in an
+array.  The information returned is: moves, eval cost, errors, heart
+beats, "worth", size of arrays, and number of objects.  This is the
+information since the last reboot.  It is guaranteed to be in this
+order (more fields'll be added later).  If the wizard is not found, 0
+is returned.
+
+- Crash vector added.  When the game driver receives some signal such
+as segfault, bus error, etc., crash() is called in the master object
+with the string error that was generated.
+
+- Symbol LPCA is #defined by preprocessor.
+
+### FUTURE ADDITION
+- Compatibility buster: tell_object() now always calls catch_tell() in
+argument.  So players cannot see anything unless their catch_tell()
+function receive()'s it.
+###
+
+- input_to()'s second argument is now a bitmask number.  0 and 1 work as
+before; 2 doesn't allow shelling out; 3 is like 1 and doesn't allow
+shelling out.  This applies to compatibility mode too, unlike
+receive().  Be sure to use these flags at login time...  localcmd()
+has been removed, check out commands().
+
+
+   In native mode only:  only objects with same user id as master
+     object (root uid) or backbone uid, are allowed to add_worth().
+
+   Gamedriver now keeps track of mappings on status line.  Fixed a
+     memory leak in mapping aggregate initialization.  Mappings
+     now appear in the arrays section of the wizlist.
+
+   Preprocessor now supports token pasting.  To paste two
+      tokens in a #define, use '##'; e.g.
+      #define SET(str, v) set_##str(v)
+
+   inherit statement now understands string expressions.
+
+   You can now clone an object with an environment.
+
+   Privileged objects can't be destruct()'d by non privileged
+      objects.
+
+   Snooping of ed mode looks prettier, also improved
+      substitution.
+
+   New data type added: mapping.  Usage:
+      declaration-     mapping m;
+      initialization-  m = (["fighting" : 35, "swimming" : 3]);
+      access-          if (num_users["netcom"] > 3) ...
+      modify-          skills[skill_name] += 20;
+
+   Mappings are like arrays but you can index off of strings,
+      numbers (even negative ones), arrays, objects, and
+      mappings.  save_object() and restore_object() seem to
+      handle them fine.
+
+   * works with mappings, as a composition operator.  Likewise '*='.
+
+   Alist efuns are no longer.  Alists have been obsolesced by mappings.
+
+   get_dir() now takes second optional flag argument.  Currently, the only
+     flag understood is -1.  If this flag is chosen, instead of returning
+     an array of strings get_dir() returns an array of arrays which are
+     information about the file.  Information is returned in the order:
+      filename, filesize, file update time.
+   New efun stat() acts just like get_dir(), and will replace it.
+
+   Swap file name now includes port number, so that it's possible to run
+      debug mud off of same mudlib without messing things up.
+
+   Third argument to add_action() is now a bitmask.  Flags:
+      1 - short verb
+      2 - xverb
+      4 - preverb (new)
+      16 - global verb (new)
+      Global verbs can only be added from privileged objects.
+      Preverbs can only be added from privileged objects or
+      the command giver.
+
+   Parse order:  global preverbs, then local preverbs, then
+      local verbs, then global verbs.
+
+   The "n", "s", "e", "w" hardcoded aliases have been removed
+      from the GD, you'll have to use global verbs to do the
+      same thing.
+ 
+   Gamedriver now keeps track of mappings on status line.  Fixed a
+     memory leak in mapping aggregate initialization.  Mappings
+     now appear in the arrays section of the wizlist.
+
+   Added new modifier to sscanf(): '*'.  It allows you to skip over a
+      field without having to use a dummy variable.  e.g.
+         sscanf(file_name(ob), "%*s#%d", num);
+      It's just an efficiency hack; you don't really need this.
+   
+   C++ style comments (//) now work.
+
+- Restricted ed mode.  If this option was compiled in, if the
+interactive object which called ed isn't a wizard (wizardp() == 0),
+that object is in "restricted ed mode".  This only allows the user to
+write to the file that ed was started up in ('x' is the only save
+command which is allowed).  In addition, help messages etc. are
+tailored to the limited set of commands.
+
+- Netdeath notification.  Upon going netdead, the object which goes
+netdead has the function "net_dead" called on it.
+
+- cp is back in the parser as an efun.
+
+- renamed inherit_list efun to deep_inherit_list (since this efun does
+  return ALL of the files inherited by the object in question)
+  and made a new efun called inherit_list that only returns a list of
+  the files directly inherited by the object in question.  This efun
+  will be useful when writing a deep update command.
+
+- overloaded the definition for the stat() efun so that if it is applied to a
+  regular file instead of a directory, it returns information on
+  that file.  The information returned is a three element array:
+  (file_size, file_modification_time, update_time_of_associated object)
+  The times returned will be useful in writing a deep update command.
+  This overloaded version of stat requires a full pathname as an argument.
+  You can check if stat() fails by seeing if the returned vector has size 0.
+  (e.g. if (sizeof(v) == 0) handle_error())
+
+- Overloaded call_other() so that it can take an array as the first
+  argument.  e.g. users()->quit(); (the return value is always 0 now)
+
+- move_object(ob) is now equivalent to move_object(this_object(), ob).
+  This may phase out the latter usage.
+
+- Every object now has the macro DIR defined, which is the directory 
+  that the object's .c file is in.
+
+- process_input() is called on the player object if it exists for
+  every line of input passed to the parser by that player.
+  process_input should return a string.  That string is the actual
+  string which is parsed by the driver.  This allows you to do things
+  like nicknames or aliases quickly and easily.
+
+- Made in_edit and in_input take an optional argument which is an
+  object, so you can check the status of other objects.
+
+
+New efuns:
+   userp(ob) returns whether or not ob is a user.
+
+   new(obname) returns clone_object(obname).  clone_object()
+      won't be around for long.
+
+   remove_action(func, verb) added.
+
+   master() returns the master object.
+
+   in_input() returns 1 if current object is in an input_to().
+
+   in_edit() returns 1 if current object is editing.
+
+   mapp() returns 1 if argument is a mapping.
+
+   receive(str) sends interactive message to current object,
+      returns 1 if current object is interactive.
+
+- commands() returns an array of arrays detailing the sentences of the
+current object.  Subarray structure: 0=verb, 1=flags,2=defining
+object.
+ 
+- enable_wizard() makes current object into a wizard.  Wizards don't
+add moves on the wizlist, and get better error reporting than "your
+overly sensitive mind...".
+
+- wizardp() returns whether argument is a wizard or not.
+
+- ci, co, rlog (if the parser was compiled with RCS turned on).
+ ci (string filename, string log_messag, int major, int minor); 
+ co (string filenamem, int major, int minor);
+ (major and minor are the major and minor version numbers)
+ rlog (string filename);
+
+- get_char().  Works exactly like input_to, except that it responds to
+a single character of input.  Warning: this doesn't work well with
+clients.
+
+- mud_name() Returns the name of the mud as defined in the config
+file.
+
+- allocate_mapping(int) This efun isn't strictly
+  required in order to use a mapping, it merely serves to give the gamedriver
+  a hint regarding how many elements the mapping may be expected to
+  eventually contain.  So long as the mapping contains fewer than the
+  specified maximum number of elements, the gamedriver will use
+  contiguous memory to store the elements.  Once this number of elements
+  is exceeded, the game driver begins malloc'ing the space for the
+  elements separately as needed.  Note that using "map = ([])" to
+  initialize the map is the same as using "map = allocate_mapping(0)".
+
+- set_hide(int) allows a privileged object to hide itself from
+  find_living(), find_object(), find_player().
+
+- map_delete(mapping,index) - removes a given pair (index, value) from
+  the mapping 'mapping'.
+
+- keys(mapping) - returns an array of the indices of a mapping.
+
+- undefinedp(mixed) - returns TRUE if the argument is undefined.  You can
+  check for inclusion of a given index in a mapping with undefinedp.  E.g.
+  if (undefinedp(x["index"])) write("index isn't in mapping 'x'\n");
+  This function also works on values returned from call_other.  Call_other's
+  on non-existant functions return values that cause undefinedp to evaluate
+  to TRUE.
+
+- children(object) - returns an array of all the objects which were cloned
+  from the argument passed to it.
+
+- message(string,string,mixed,object *) - general purpose replacement
+  This efun is a generic messaging function meant to replace all current
+  communication efuns in the future (say, shout, tell_*, printf,
+  write, etc).  It communicates directly to catch_tell in the
+  targets.
+
+/--------\
+| DESIGN |
+\--------/
+ 
+File permissions:
+   The standard way they're done is to assign them based on
+effective user-id.  You can think of an euid as a compact
+representation of an object's privileges; i.e. "larry" means an
+object is allowed to write to /w/larry, "Root" means an object is
+allowed to write anywhere.  It's definitely a lot faster to
+compute file permissions this way.
+   However, you should probably give player objects a different
+kind of permission system, so that you can allow dynamic
+promotion/demotion of wizards.  i.e. base it on result of
+valid_write/valid_read in player if the object was a player, euid
+otherwise.
+   A good idea might be to go to a strict hierarchical permission
+system, i.e. an object can only write to its directory or
+subdirectories.  (And a different system for wizards).
+ 
+Virtual objects:
+   The immediately obvious thing to use them for is virtual
+territories.  Want to create a desert with 10,000 rooms?  You
+can, now.  You could even make it a 'sparse territory' by making
+it mostly virtual, with some occasional detailed rooms thrown in.
+   The recommended strategy is to have the compile_object() code
+in the master object look like:
+ 
+    object compile_object(string fname) {
+       return (object)
+          "/secure/virtual_object"->compile_object(fname);
+    }
+ 
+   This keeps the complexity of the master object down.  Then
+have the virtual_object server delegate its responsibility.  e.g.
+if an undefined room occurs in a wizard's castle, have it call
+compile_object(fname) in that wizard's castle.c file.  Better do
+a security check as well.
+ 
+Privileged objects:
+   The best way to allow objects to be privileged is to put the
+function
+ 
+    int request_privileges()
+ 
+   in the master object.  When an object wants to be privileged
+it can call that function, which does appropriate checks and
+grants privileges in previous_object() if appropriate.
+ 
+Global verbs:
+   You'll need to add these for 'n', 's', etc.  You could also
+put all the player commands up as global verbs (of course all the
+living objects would see them; but maybe that's a good idea...?),
+saving a lot of sentence space that way.
+   You could limit the number of player commands per heart beat
+very easily this way.  (Plea from an avid player:  Please don't
+do this!  It's stupid!)  Or at the very least, 'lock' a player
+when you need to.
+ 
+ 
+Mappings:
+   A good skill system would be easy with them.
+

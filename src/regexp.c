@@ -250,8 +250,10 @@ int		excompat;	/* \( \) operators like in unix ex */
     if (exp == (char *)NULL)
 	FAIL("NULL argument");
 
-    exp2=(short*)xalloc( (strlen(exp)+1) * (sizeof(short[8])/sizeof(char[8])) );
-    for ( scan=exp,dest=exp2; c= *scan++; ) {
+    exp2=(short*)
+	DXALLOC( (strlen(exp)+1) * (sizeof(short[8])/sizeof(char[8])), 65536,
+		"regcomp: 1" );
+    for ( scan=exp,dest=exp2; (c= *scan++); ) {
 	switch (c) {
 	    case '(':
 	    case ')':
@@ -305,7 +307,8 @@ int		excompat;	/* \( \) operators like in unix ex */
 	FAIL("regexp too big");
 
     /* Allocate space. */
-    r = (regexp *) xalloc(sizeof(regexp) + (unsigned) regsize);
+    r = (regexp *) DXALLOC(sizeof(regexp) + (unsigned) regsize, 65536,
+		"regcomp: 2");
     if (r == (regexp *) NULL)
 	FAIL("out of space");
 
@@ -1166,18 +1169,19 @@ regexp         *r;
     register char  *s;
     register char   op = EXACTLY;	/* Arbitrary non-END op. */
     register char  *nxt;
+#ifndef _AIX
     extern char    *strchr();
-
+#endif /* _AIX */
 
     s = r->program + 1;
     while (op != END) {		/* While that wasn't END last time... */
 	op = OP(s);
-	printf("%2d%s", s - r->program, regprop(s));	/* Where, what. */
+	printf("%2d%s", (int)(s - r->program), regprop(s));	/* Where, what. */
 	nxt = regnext(s);
 	if (nxt == (char *)NULL)	/* nxt ptr. */
 	    printf("(0)");
 	else
-	    printf("(%d)", (s - r->program) + (nxt - s));
+	    printf("(%ld)", (s - r->program) + (nxt - s));
 	s += 3;
 	if (op == ANYOF || op == ANYBUT || op == EXACTLY) {
 	    /* Literal string, where present. */
@@ -1402,19 +1406,3 @@ int		n;
 }
 
 
-#if 0	/* Use the local regerror() in ed.c */
-#ifdef __STDC__
-
-void regerror(char *s)
-
-#else
-
-void regerror(s)
-char           *s;
-
-#endif
-{
-    fprintf(stderr, "regexp(3): %s", s);
-    exit(1);
-}
-#endif /* 0 */

@@ -1,0 +1,18 @@
+.\"returns information pertaining to a file or a directory
+.TH stat 3
+
+.SH NAME
+stat() - returns information pertaining to a file or a directory
+
+.SH SYNOPSIS
+mixed *stat(string str, int default: F_CONST0);
+
+.SH DESCRIPTION
+If str is the name of a regular file (not a directory), then stat()
+will return an array of information pertaining to that file.  The
+form of the array is as follows:
+.IP
+   ({ file_size, last_time_file_touched, time_object_loaded })
+.PP
+If stat is called on a directory (not a regular file), then stat
+behaves identically to get_dir().

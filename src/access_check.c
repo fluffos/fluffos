@@ -76,11 +76,13 @@ check_read_file (name)
 	  addr_tab_size = 10;
 	  addr_tab_index = 0;
 	  addr_tab = (struct access_address *)
-	      MALLOC(addr_tab_size * sizeof (struct access_address));
+	      DMALLOC(addr_tab_size * sizeof (struct access_address),
+			4, "check_read_file: addr_tab");
 	  class_tab_size = 10;
 	  class_tab_index = 0;
 	  class_tab = (struct access_class *)
-	      MALLOC(class_tab_size * sizeof (struct access_class));
+	      DMALLOC(class_tab_size * sizeof (struct access_class),
+			4, "check_read_file: class_tab");
 	  
 	  if (in = fopen (name, "r"))
 	    {
@@ -129,8 +131,9 @@ check_read_file (name)
 			{
 			  class_tab_size <<= 1;
 			  class_tab = (struct access_class *)
-			      REALLOC((char *)class_tab,
-				       class_tab_size * sizeof (struct access_class));
+			      DREALLOC((char *)class_tab,
+				       class_tab_size * sizeof (struct access_class),
+						4, "check_read_file: class_tab: realloc");
 			}
 
 		      aa.ac = &class_tab[i];
@@ -148,8 +151,9 @@ check_read_file (name)
 		    {
 		      addr_tab_size <<= 1;
 		      addr_tab = (struct access_address *)
-			  REALLOC((char *)addr_tab,
-				   addr_tab_size * sizeof (struct access_address));
+			  DREALLOC((char *)addr_tab,
+				   addr_tab_size * sizeof (struct access_address),
+					4, "check_read_file: addr_tab: realloc");
 		    }
 		} /* over total input */
 	      fclose (in);
@@ -178,7 +182,8 @@ allow_host_access (sockfd, outfd)
   int i;
 #define STRING(str) str,strlen(str)
   
-  fname = (char *)MALLOC(strlen(ACCESS_FILE) + 1);
+  fname = (char *)DMALLOC(strlen(ACCESS_FILE) + 1, 4,
+	"allow_host_access: fname");
   sprintf (fname,"%s",ACCESS_FILE);
   if (fname[0] == '/')
     strcpy (fname,fname+1);
@@ -189,10 +194,10 @@ allow_host_access (sockfd, outfd)
   if (getpeername (sockfd, (struct sockaddr *)&apa, &len) == -1)
     {
       perror ("getpeername");
-      write (outfd, STRING ("Sorry, internal game error.\n"));
+      write (outfd, STRING ("Sorry, internal MudOS error.\n"));
       return 0;
     }
-#ifdef NeXT
+#if !defined(NeXT) && !defined(__SEQUENT__)
   ipname = inet_ntoa(apa.sin_addr);
 #else
   ipname = inet_ntoa(ntohl(apa.sin_addr));
@@ -274,7 +279,7 @@ log_access (addr, ok)
   char *fname;
   FILE *log;
 
-  fname = MALLOC(strlen(ACCESS_LOG)+1);
+  fname = DMALLOC(strlen(ACCESS_LOG)+1, 4, "log_access: fname");
   sprintf (fname,"%s",ACCESS_LOG);
   if (fname[0] == '/')
     strcpy (fname,fname+1);

@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "lint.h"
 #include "config.h"
+#include "lint.h"
 #include "interpret.h"
 #include "object.h"
 
@@ -17,6 +17,13 @@
 
 char * xalloc();
 
+static int otable_size;
+
+/*
+ * Object hash function, ripped off from stralloc.c.
+ */
+#define ObjHash(s) hashstr(s, 100, otable_size)
+
 /*
  * hash table - list of pointers to heads of object chains.
  * Each object in chain has a pointer, next_hash, to the next object.
@@ -27,27 +34,16 @@ char * xalloc();
 
 static struct object ** obj_table = 0;
 
-static void init_otable()
+void init_otable()
 {
 	int x;
+
+	otable_size = OTABLE_SIZE;
 	obj_table = (struct object **)
-			xalloc(sizeof(struct object *) * OTABLE_SIZE);
+		DXALLOC(sizeof(struct object *) * otable_size, 8192, "init_otable");
 
-	for (x=0; x<OTABLE_SIZE; x++)
+	for (x=0; x < otable_size; x++)
 		obj_table[x] = 0;
-}
-
-/*
- * Object hash function, ripped off from stralloc.c.
- */
-
-static int ObjHash(s)
-char * s;
-{
-	if (!obj_table)
-		init_otable();
-
-	return hashstr(s, 100, OTABLE_SIZE);
 }
 
 /*

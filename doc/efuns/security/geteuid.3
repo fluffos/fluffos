@@ -1,0 +1,15 @@
+.\"return the effective user id (euid) of an object
+.TH geteuid 3
+
+.SH NAME
+geteuid() - return the effective user id of an object
+
+.SH SYNOPSIS
+string geteuid(object ob);
+
+.SH DESCRIPTION
+Returns the effective user id of an object.  This value is set via
+the seteuid efun.
+
+.SH SEE ALSO
+seteuid(3), getuid(3).

@@ -1,0 +1,14 @@
+1992/12/12
+
+Since TMI-2 has released its beta mudlib (tmi.iastate.edu 5555) and since
+Basis is available elsewhere (basis-18.tar.Z), we have decided to
+discontinue including the mini-Basis mudlib with MudOS.  The Nightmare
+creators also reportedly plan to release a publically available mudlib
+(orlith.bates.edu 2999).  Also, the Portals mudlib may eventually be
+released.
+
+The Basis mudlib may be found in the /pub/games/lpmud/MudOS
+directory on ucbvax.berkeley.edu for mudlibs that will run under MudOS.  
+
+TMI-2 is available via anonymous ftp (login as ftp) from
+tmi.iastate.edu 5554:/pub/mudlibs (yes, ftp to the port).

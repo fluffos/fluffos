@@ -1,0 +1,168 @@
+Types Declaration
+
+* Basic Types
+* Arrays
+* Special Types
+
+Types can be used at four places:
+
+ Declaring type of global variables.
+ Declaring type of functions.
+ Declaring type of arguments to functions.
+ Declaring type of local variables to functions.
+
+Normally, the type information is completely ignored, and can be
+regarded purely as documentation. However, when the basic type of
+a function is declared, then a more strict type checking will be
+enforced. That means that the type of all arguments must be defined.
+And, the variables can only be used to store values of the declared
+type. The function  @dfn{call_other} is defined to return an unkown type,
+as the compiler can't know the type. This value must always be casted
+(when strict type checking is enabled). Casting a type is done by putting
+the type name inside a pair of '(' and ')'.
+
+An example when querying the short description of an object:
+
+(string)call_other(ob, "short");
+
+When a function is compiled with strict type testing, it can only call other
+functions that are defined. If they are not yet defined, prototypes can
+be defined.
+
+string func(int arg);
+
+Note the ';' instead of a body to the function. All arguments must be
+givenby names, but does not have to have the same names as in the real
+definition. All types must of course be the same.
+
+There is currently a bug (3.0.36) that recursive calls can not be done if
+the function is not also defined by a prototype. That is because a function
+is not really defined until the whole function has been compiled. Don't rely
+on this behaviour, which will hopefully soon be fixed. A dangerous effect
+is that it is possible to redefine efun's, and let the new definition
+call the old before it is replaced. Such code will break sooner or later.
+
+If an efun is to be redefined to get some new enhancements, always define
+a new with a new name.
+
+There are two kinds of types. Basic types, and special types.
+There can be at most one basic type, but any number of special types.
+The strict type checking is only used by the compiler, not by the
+runtime. Hence, it is actually possible to store a number in a string
+variable even when strict type checking is enabled.
+
+Why use strict type checking? It is really recommended, because the
+compiler will find many errors at compile time, which will save a lot
+of hard work. It is in general much harder to trace an error occuring
+at run time. I recommend, that when a wizard is having problem with an
+object and wants help, that he first must make all functions have declared
+types.
+
+The basic types can be divided in to groups. Those that are referenced
+by value, and those that are referenced by address. The types int and 
+string are always representing different entities. But the type object 
+is a pointer to an object. If a value of this type is assigned to a 
+variable or passed as argument, they will all point to the same object. 
+The same goes for arrays. That means that if the value of an element in 
+an array is changed, then it can modify all other variables pointing to 
+the same array. Changing the size of the array will always allocate a 
+new one, though. The comparation operator, ==, will compare the actual 
+value for the group of types above. But for arrays and objects, it will 
+simply check if it is the same object (or array). That has the very 
+important implication that the expression ({}) == ({}) will always 
+evaluate to false becaus the array construction operator-pair, ({ }) 
+always generates a new array.
+
+
+Basic types
+
+int
+  An integer 32 bit number.
+
+object
+  Pointer to an object.
+  An object pointer can mainly be used for two things. Either
+  giving as argument to functions, or used for calling functions
+  defined by that object with its specific instance of variables.
+
+string
+  An unlimited string of characters. A lot of operators are
+  allowed for strings, like + and [] etc.
+
+mixed
+  This type is special, in that it is valid to use in any context.
+  Thus, if everything was declared @code{mixed}, then the compiler would
+  never complain. This is of course not the idea. It is really only
+  supposed to be used when a variable really is going to contain
+  different types of values. This @strong{should} be avoided if possible.
+  It is @strong{not} good coding practice, to allow a function for example
+  to return different types.
+
+void
+  This type is only usable for functions. It means that the function
+  will not return any value. The compiler will complain (when type
+  checking is enabled) if the return value is used.
+
+Arrays
+
+Arrays are declared using a '*' with a basic type. For example, declaring an
+array of numbers: @samp{int *arr;}. Use the type mixed if you want an array of
+arrays, or a @code{mixed} combination of types.
+
+Special types
+
+There are some special types, which can be given before the basic type.
+These special types can also be combined. When using special type @code{T}
+before an @dfn{inherit} statement, all symbols defined by inheritance will
+also get the special type @code{T}. The only special case is @dfn{public}--defined
+symbols, which can not be redefined as @dfn{private} in a private inheritance
+statement.
+
+varargs
+  A function of this type can be called with a variable number of arguments.
+  Otherwise, the number of arguments is checked, and can generate an error.
+
+private
+  Can be given for both functions and variables. Functions that
+  are private in object @code{A} can not be called through @dfn{call_other}
+  from another object. And, they are not accessible to any object
+  that inherits @code{A}.
+
+static
+  This special type behaves different for variables and functions.
+  It is similar to private for functions, in that they can not be
+  called from other objects. static variables will be neither saved
+  nor restored when calling @dfn{save_object()} or @dfn{restore_object()}.
+
+public
+  A function defined as public will always be accessible from other
+  objects, even if private inheritance is used.
+
+nomask
+  All symbols defined as nomask can not be redefined by inheritance.
+  They can still be used and accessed as usual.
+
+
+Access of data and programs in other objects
+	Data in other objects
+	Access of data in other objects
+	Programs in other objects
+
+There is a function call_other(), that can be used to call functions in other 
+objects. All functions can be called except those declared static or private.
+
+Functions, Predefined Functions, for more information.
+
+There is another syntax that will do the same thing: 
+ob->func(args)
+This will call function func in object ob.
+This is a much better way to do it.
+
+There has been a lot of questions why this syntax hasn't been used to
+allow for accessing variables in other objects.
+There are some good reasons for that.
+
+- It conflicts with the idea of programming in an object-oriented way.
+- It makes the programming less structured, as there are more dependencies.
+- If a variable name is changed, code can be broken.
+- Sometimes, you don't even want to keep the variable at all any longer.

@@ -1,0 +1,5 @@
+MudOS hints file for the NeXT:
+
+use SYSMALLOC, DEBUGMALLOC, or WRAPPEDMALLOC for the memory management package.
+
+in the Makefile, comment out RESOLV

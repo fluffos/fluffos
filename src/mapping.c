@@ -8,184 +8,334 @@
 #include "config.h"
 #include "lint.h"
 #include "interpret.h"
+#include "mapping.h"
 #include "object.h"
-#include "wiz_list.h"
 #include "regexp.h"
 
 #include "debug.h" /* added by Truilkan */
 
-/*
-   this INLINE def should be moved into some global include file so
-   that the same one can be used by all source modules
-*/
-#if defined(__GNUC__) && !defined(lint)
-#define INLINE inline
-#else
-#define INLINE
-#endif
-
 extern int sameval PROT((struct svalue *, struct svalue *));
 extern int d_flag;
-extern struct object *master_ob,
-                     *current_object;
-extern struct svalue const0u;
-extern int max_array_size;
+extern object_t *master_ob, *current_object;
+extern struct svalue const0u, const0n;
 
 INLINE void node_copy PROT((struct node *, struct mapping *));
 
 int num_mappings = 0;
 int total_mapping_size = 0;
-int aggregate = 0;
+int total_mapping_nodes = 0;
+
+/* coeff taken from hash.c in Larry Wall's Perl package */
+
+static char coeff[] = {
+        61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1,
+        61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1,
+        61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1,
+        61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1,
+        61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1,
+        61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1,
+        61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1,
+        61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1};
 
 /*
- * LPC mapping (associative arrays) package.  Contains routines for
+ * LPC mapping (associative arrays) module.  Contains routines for
  * easy value and lvalue manipulation.  Will grow in the near future.
  *
- * original version for LPC-A - written by Whiplash (JTR)
+ * original version for LPC-A - written by Whiplash (JTR) (used a binary tree)
  * - some enhancements by Truilkan@TMI
- */
- 
-/*
- * About the implementation:
- *  Naturally, it was essential to allow mappings to grow and/or
- *  shrink without having to create a new mapping.  Hence the
- *  tree structure.  An earlier implementation used a handle
- *  to a hash table.  When it came time to upsize, it doubled
- *  the size and allocated a new hash table to which everything
- *  was copied.  But the problem with that was that LPC lvalues
- *  need the pointers to values within data structures to remain
- *  unchanged, usually for the entire lifetime of the data
- *  structure.  Trees allow this to be done.
- *  [Actually hash tables could be used without running into the above
- *  mentioned difficulties if you used double indirection.]
- *
- *  I sort of solved the memory fragmentation problem (and malloc overhead
- *  problem) by making the initial mapping a contiguous block in memory.
- *
- *  Performance:
- *  o Best as an aggregate (or restored from an object - same
- *    thing).  It gives the best memory usage, about 50% more
- *    than an array would take up.
- *  o It's ok at insertion, good at 'deletion'  (mainly because
- *    it doesn't downsize), good at retrieval, good at storage.
- *  o It's intended to be friendly to what's probably the most
- *    common usage, a glorified lookup table.  It'd be really
- *    suited to a good skill package, esp. since indexed mappings
- *    can be lvalues:
- *      skills["fighting"] += 30;
- *    (Ooops, sorry for mentioning an actual application for
- *     this code :))
- *  o These beat out arrays in terms of speed and efficiency,
- *    PROVIDED you're indexing off of non-integer values.
- *    (you gain the efficiency because you don't have to write LPC code
- *    for converting the indices to integers, nyet?)
- *  o They can also be used for sparse arrays, sacrificing
- *    a tiny amount of speed (which you'd lose anyway in the
- *    LPC implementation of sparse arrays), and gaining quite
- *    a bit of memory.
+ * - rewritten for MudOS to use an extensible hash table implementation styled
+ *   after the one Perl uses in hash.c - 92/07/08 - by Truilkan@TMI
  */
 
-/* free_node */
-
-INLINE void
-free_node(n, m)
-struct node *n;
-struct mapping *m;
+void mapping_too_large()
 {
-	debug(1,("mapping.c: free_node begin\n"));
-	if (n->right) free_node(n->right, m); 
-	if (n->left) free_node(n->left, m);
-	free_svalue(&n->values[1]);
-	free_svalue(&n->values[0]);
-	/* if in the original block then don't free it */
-	if ((n >= m->block) && (n < (m->block + m->orig_size)))
-		return; 
-	total_mapping_size -= sizeof(struct node);
-	if (m->user)
-		m->user->size_array -= 2;
-	FREE((char *) n);
-	debug(1,("mapping.c: free_node end\n"));
+	error("Mapping exceeded maximum allowed size of %d.\n",MAX_MAPPING_SIZE);
 }
 
+/*
+  growMap: based on hash.c:hsplit() from Larry Wall's Perl.
+
+  growMap doubles the size of the hash table.  It is called when FILL_PERCENT
+  of the buckets in the hash table contain values.  This routine is
+  efficient since the entries in the table don't need to be rehashed (even
+  though the entries are redistributed across the both halves of the hash
+  table).
+*/
+
+void growMap(m)
+struct mapping *m;
+{
+	int oldsize = m->table_size;
+	int newsize = oldsize * 2;
+	int theMask = newsize - 1;
+	int i;
+	struct node **a, **b, **eltp, *elt;
+
+	/* resize the hash table to be twice the old size */
+	a = (struct node **)
+		DREALLOC(m->table, newsize * sizeof(struct node *), 1024, "growMap");
+	if (!a) {
+		/*
+		  We couldn't grow the hash table.  Rather than die, we just
+		  accept the performance hit resulting from having an overfull table.
+		*/
+		return;
+	}
+	/* hash table doubles in size -- keep track of the memory used */
+	total_mapping_size += (sizeof(struct node *) * oldsize);
+	debug(1024,("mapping.c: growMap ptr = %x, size = %d\n", m, newsize));
+	m->table = a;
+	m->table_size = newsize;
+	m->do_split = m->table_size * FILL_PERCENT / 100;
+	/* zero out the new storage area (2nd half of table) */
+	memset(&a[oldsize], 0, oldsize * sizeof(struct node *));
+	for (i = 0; i < oldsize; i++, a++) {
+		if (!*a) {
+			continue;
+		}
+		b = a + oldsize;  /* points to the ith element in the new half */
+		for (eltp = a, elt = *a; elt; elt = *eltp) {
+			/* if needs rehashed, then displace element by 'oldsize' buckets */
+			if ((elt->hashval & theMask) != i) {  /* should move element? */
+				*eltp = elt->next;
+				elt->next = *b;
+				if (!*b) {  /* *b used to be empty */
+					m->filled++;
+				}
+				*b = elt;
+				continue;
+			} else {
+				eltp = &elt->next;
+			}
+		}
+		if (!*a) { /* everything that was in the bucket moved */
+			m->filled--;
+		}
+	}
+}
+
+/*
+  mapTraverse: iterate over the mapping, calling function 'func(elt, extra)'
+  for each element 'elt'.  This is an attempt to encapsulate some of the
+  specifics of the particular data structure being used so that it won't be
+  so difficult to change the data structure if the need arises.
+  -- Truilkan 92/07/19
+*/
+
+INLINE struct mapping *
+mapTraverse(m, func, extra)
+struct mapping *m;
+int (*func) PROT((struct mapping *, struct node *, void *));
+void *extra;
+{
+	struct node *elt, *nelt;
+	int j;
+	
+	debug(128,("mapTraverse %x\n", m));
+	for (j = 0; j < m->table_size; j++) {
+		for (elt = m->table[j]; elt; elt = nelt) {
+			nelt = elt->next;
+			if ((*func)(m, elt, extra))
+				return m;
+		}
+	}
+	return m;
+}
+
+/*
+  doInsert: called from mapTraverse() (via copyMapping etc.)
+*/
+
+int
+doInsert(m, elt, dest)
+struct mapping *m;
+struct node *elt;
+struct mapping *dest;
+{
+	struct svalue *v;
+
+	v = find_for_insert(dest, &elt->values[0], 1);
+	if (v) {
+		assign_svalue_no_free(v, &elt->values[1]);
+	} else {
+		mapping_too_large();
+		return 1;
+	}
+	return 0;
+}
+
+/* doFree: called from mapTraverse() via free_mapping */
+
+int
+doFree(m, elt, extra)
+struct mapping *m;
+struct node *elt;
+void *extra;
+{
+	free_svalue(&elt->values[1]);
+	free_svalue(&elt->values[0]);
+	total_mapping_size -= sizeof(struct node);
+	FREE((char *) elt);
+	return 0;
+}
+ 
 /* free_mapping */
  
 void
 free_mapping(m)
 struct mapping *m;
 {
-	debug(64,("mapping.c: free_mapping begin\n"));
+	debug(64,("mapping.c: free_mapping begin, ptr = %x\n", m));
 	m->ref--;
-	if (m->ref > 0) return;
+	if (m->ref > 0) /* some other object is still referencing this mapping */
+		return;
+	debug(1024,("mapping.c: actual free of %x\n", m));
 	num_mappings--;
-	if (m->nod)
-		free_node(m->nod, m);
-	total_mapping_size -= sizeof(struct mapping)
-		+ m->orig_size * sizeof(struct node);
-	if (m->user)
-		m->user->size_array -= m->orig_size * 2;
+	total_mapping_size -= MAPSIZE(m->count);
+	total_mapping_nodes -= m->count;
+	add_array_size (&m->stats, - (m->count * 2));
+
+	mapTraverse(m, doFree, NULL);
+
+	debug(2048, ("in free_mapping: before table\n"));
+	FREE((char *)m->table);
+	total_mapping_size -= (sizeof(struct node *) * m->table_size);
+	debug(2048, ("in free_mapping: after table\n"));
 	FREE((char *) m);
-	debug(1,("mapping.c: free_mapping end\n"));
+	debug(2048, ("in free_mapping: after m\n"));
+	debug(64,("mapping.c: free_mapping end\n"));
 }
 
-/* allocate_mapping */
+/* allocate_mapping(int n)
+   
+   call with n == 0 if you will be doing many deletions from the map.
+   call with n == "approx. # of insertions you plan to do" if you won't be
+   doing many deletions from the map.
+*/
  
 INLINE struct mapping *
 allocate_mapping(n)
 int n;
 {
 	struct mapping *newmap;
+	int size, k;
 
-	debug(64,("mapping.c: allocate_mapping begin\n"));
-	newmap = ALLOC_MAPPING(n);
-	total_mapping_size += sizeof(struct mapping) + n * sizeof(struct node);
-	newmap->orig_size = n;
-	/* do we need to add a ref to current_object->user ? -- Tru */
-	newmap->user = current_object->user;
-	if (newmap->user)
-		newmap->user->size_array += n * 2;
-	newmap->nod = (struct node *) 0;
+	if (n > MAX_MAPPING_SIZE) {
+		n = MAX_MAPPING_SIZE;
+	}
+	if (n < 0) {
+		n = 0;
+	}
+	size = MAPSIZE(n);
+	newmap = (struct mapping *)DXALLOC(size, 1024, "allocate_mapping: 1");
+	debug(1024,("mapping.c: allocate_mapping begin, newmap = %x\n", newmap));
+	if (newmap == NULL) {
+		n = 0;
+		size = MAPSIZE(0);
+		newmap = (struct mapping *)DXALLOC(size, 1024, "allocate_mapping: 2");
+	}
+	total_mapping_size += size;
+	for (k = MAP_HASH_TABLE_SIZE; k < n; k *= 2)
+		;
+	newmap->table_size = k;
+	newmap->do_split = newmap->table_size * FILL_PERCENT / 100;
+	newmap->table = (struct node **)DXALLOC(sizeof(struct node *)
+		* newmap->table_size, 1024, "allocate_mapping: 3");
+	total_mapping_size += (sizeof(struct node *) * newmap->table_size);
+	/* zero out the hash table */
+	memset(newmap->table, 0, newmap->table_size * sizeof(struct node *));
 	newmap->ref = 1;
-	newmap->size = 0;
-	/* here we only add 1 to newmap since we are using pointer arithmetic */
-	newmap->block = (struct node *)(newmap + 1);
-	newmap->cur = newmap->block;
+	newmap->count = 0;
+	newmap->filled = 0;
+#ifdef EACH
+	newmap->eachObj = (struct object *)0;
+	newmap->bucket = newmap->table_size - 1; /* must start at table_size - 1 */
+	newmap->elt = (struct node *)0;      /* must start at 0;see mapping_each */
+#endif
+	if (current_object) {
+	  assign_stats (&newmap->stats, current_object);
+	  add_array_size (&newmap->stats, n * 2);
+	} else {
+	  null_stats (&newmap->stats);
+	}
 	num_mappings++;
-	debug(1,("mapping.c: allocate_mapping end\n"));
+	debug(64,("mapping.c: allocate_mapping end\n"));
 	return newmap;
+}
+
+/*
+  copyMapping: make a copy of a mapping
+  This could be made more efficient by avoiding the rehash caused
+  by find_for_insert in doInsert (since we already know to what its going
+  to hash).
+*/
+
+INLINE struct mapping *
+copyMapping(m)
+struct mapping *m;
+{
+	struct mapping *newmap;
+
+	newmap = allocate_mapping(0);
+	mapTraverse(m, (int (*)())doInsert, newmap);
+	return newmap;
+}
+
+/*
+   mapHashstr: based on code from hstore in Larry Wall's Perl package (hash.c)
+
+   I use this hash function instead of hash.c:hashstr() because the scheme
+   we use for growing the hash table requires the table size to be a power
+   of 2 and I don't that the other hash function performs well for non-
+   prime moduli.
+*/
+
+INLINE int
+mapHashstr(key)
+char *key;
+{
+	int hash, i;
+	char *s;
+
+	for (s = key,i = 0,hash = 0; *s && (i<MAX_KEY_LEN); s++, i++, hash *= 5) {
+		hash += *s * coeff[i];
+	}
+	return hash;
 }
  
 /*
- * svalue_to_int: Converts an svalue into an integer index.
- * At an attempt to get good distribution so that our tree structure
- * doesn't get too imbalanced, the index will always be a
- * number between 0 and (arbitrary_prime - 1).
+ * struct svalue_to_int: Converts an svalue into an integer index.
  */
-#define A_PRIME 3217
 
-int
+INLINE int
 svalue_to_int(v)
 struct svalue *v;
 {
    int i;
 
-	debug(1,("mapping.c: svalue_to_int\n"));
+	debug(1,("mapping.c: struct svalue_to_int\n"));
 	switch (v->type) {
 	case T_NUMBER:
 		i = v->u.number;
-		if (i < 0) i = -i;
-		return i % A_PRIME;
+		if (i < 0)
+			i = -i;
+		return i;
 	case T_STRING:
-		return hashstr(v->u.string, 12, A_PRIME);
+		return mapHashstr(v->u.string);
 	case T_OBJECT:
-		return hashstr(v->u.ob->name, 12, A_PRIME);
+		return mapHashstr(v->u.ob->name);
+	case T_MAPPING :
+		return (int)v->u.map;
+	case T_POINTER :
+		return (int)v->u.vec;
 	default:
-	return A_PRIME;  /* so much for our precious distribution*/
+		return 0;  /* so much for our precious distribution */
 	}
 }
 
 /*
  * node_find_in_mapping: Like find_for_insert(), but doesn't attempt
- * to add anything if a value is not found.  The pointer returned won't
+ * to add anything if a value is not found.  The returned pointer won't
  * necessarily have any meaningful value.
  */
 
@@ -195,45 +345,61 @@ struct mapping *m;
 struct svalue *lv;
 {
 	int i;
-	struct node *n;
+	struct node *elt;
  
 	debug(1,("mapping.c: find_in_mapping\n"));
-	if (!(n = m->nod)) return (struct node *)0;
-	i = svalue_to_int(lv);
-	while (n) {
-		int nodval; 
-
-		nodval = svalue_to_int(&n->values[0]);
-		if (i < nodval)
-			n = n->left;  
-		else {
-			if (i == nodval && !n->deleted && sameval(&n->values[0], lv))
-				return n;
-			n = n->right;
-		}
+	if (!m->table) {
+		return (struct node *)0;
+	}
+	i = svalue_to_int(lv) & (m->table_size - 1);
+	for (elt = m->table[i]; elt; elt = elt->next) {
+		if (sameval(&elt->values[0], lv))
+			return elt;
 	}
 	return (struct node *)0;
 }
 
 /*
-   mapping_delete: delete an element from the mapping (actually just mark
-   as deleted [available for reuse] since we are using a plain binary tree).
+   mapping_delete: delete an element from the mapping
 */
 
 void mapping_delete(m, lv)
 struct mapping *m;
 struct svalue *lv;
 {
-	struct node *n;
+	struct node **n, **prev, *elt;
+	int i;
 
-	n = node_find_in_mapping(m, lv);
-	if (!n)
+	if (!(n = m->table))
 		return;
 
-	debug(64,("mapping delete: found element\n"));
-	free_svalue(&n->values[1]);
-	m->size--;
-	n->deleted = 1;
+	/*
+	   zero m->elt to prevent all hell from breaking loose if delete is
+	   called while iterating using each().
+	*/
+#ifdef EACH
+	m->elt = (struct node *)0;
+#endif
+	i = svalue_to_int(lv) & (m->table_size - 1);
+	prev = n + i;
+	for (elt = n[i]; elt; elt = elt->next) {
+		if (sameval(&elt->values[0], lv)) {
+			*prev = elt->next;
+			break;
+		}
+		prev = &elt->next;
+	}
+	if (!elt)
+		return;
+	debug(1024,("mapping delete: found element\n"));
+	if (!n[i]) { /* caused bucket to become empty */
+		m->filled--;
+		debug(1024,("mapping delete: bucket empty, filled = \n", m->filled));
+	}
+	m->count--;
+	total_mapping_nodes--;
+	debug(1024,("mapping delete: count = \n", m->count));
+	doFree(m, elt, NULL);
 }
  
 /*
@@ -244,66 +410,60 @@ struct svalue *lv;
  */
 
 struct svalue *
-find_for_insert(m, lv)
+find_for_insert(m, lv, doTheFree)
 struct mapping *m;
 struct svalue *lv;
+int doTheFree;
 {
-   int i, nodval;
-   struct node *n, *newnode, *prev = (struct node *) 0;
+	int oi, i;
+	struct node *n, *newnode;
  
-	debug(1,("mapping.c: find_for_insert\n"));
-	i = svalue_to_int(lv);
-	n = m->nod;
-	while (n) {
-		nodval = svalue_to_int(&n->values[0]);
-		if (i < nodval) {
-			prev = n;
-			n = n->left;
-		} else /* if (i >= nodval) */ {
-			if (i == nodval && (n->deleted || (sameval(lv, &n->values[0])))) {
-				/* special case, we just replace rvalue. */
-				if (aggregate && !n->deleted) {
-				/* we're doing an aggregate initialization. the
-				   agg. initialzation won't free this value... */ 
+	oi = svalue_to_int(lv);
+	i = oi & (m->table_size - 1);
+	debug(128,("mapping.c: hashed to %d\n", i));
+	for (n = m->table[i]; n; n = n->next) {
+		if (sameval(lv, &n->values[0])) {
+			/* normally, the f_assign would free the old value */
+			debug(128,("mapping.c: found %x\n", &n->values[0]));
+			if (doTheFree) {
 				free_svalue(&n->values[1]);
 			}
-			n->deleted = 0;
 			return &n->values[1];
-			}
-			prev = n;
-			n = n->right;
 		}
 	}
-	if (m->size < m->orig_size) { /* Tru - 92/02/08 */
-		newnode = m->cur;
-		m->cur++;
-	} else {
-		if (m->user)
-			m->user->size_array += 2;
-		total_mapping_size += sizeof(struct node);
-		newnode = (struct node *) xalloc(sizeof(struct node));
+	debug(128,("mapping.c: didn't find %x\n", lv));
+	if (m->count > MAX_MAPPING_SIZE) {
+		debug(128,("mapping.c: too full\n", lv));
+		return (struct svalue *)0;
 	}
-	newnode->deleted = 0;
-	newnode->left = (struct node *) 0;
-	newnode->right = (struct node *) 0;
+	add_array_size (&m->stats, 2);
+	total_mapping_size += sizeof(struct node);
+	debug(128,("mapping.c: allocated a node\n"));
+	newnode = (struct node *) DXALLOC(sizeof(struct node), 1024,
+		"find_for_insert");
 	assign_svalue_no_free(&newnode->values[0], lv);
 	newnode->values[1].type = T_NUMBER;
+	newnode->values[1].subtype = T_NULLVALUE;
 	newnode->values[1].u.number = 0;
-	if (prev) {
-		if (i < nodval) /* we're to the left */
-			prev->left = newnode;
-		else
-			prev->right = newnode;
-	} else {
-		m->nod = newnode;
+	newnode->hashval = oi;
+	/* insert at head of bucket */
+	n = m->table[i];
+	if (!n) {       /* bucket was empty */
+		m->filled++;
 	}
-	m->size++; /* increment count of number of nodes in mapping */
+	m->table[i] = newnode;
+	newnode->next = n;
+	m->count++; /* increment count of number of nodes in mapping */
+	total_mapping_nodes++;
+	if (m->filled == m->do_split) {
+		growMap(m);  /* double the size of the hash table */
+	}
 	return &newnode->values[1];
 }
  
 /*
  * load_mapping_from_aggregate: Create a new mapping, loading from an
- * array of svalues. Format of data: LHS RHS LHS2 RHS2...
+ * array of svalues. Format of data: LHS RHS LHS2 RHS2... (uses hash table)
  */
 
 struct mapping *
@@ -315,24 +475,28 @@ int n;
 	struct mapping *m;
 	struct svalue *v;
  
-	debug(1,("mapping.c: load_mapping_from_aggregate begin\n"));
-	aggregate = 1; /* indicate doing a load mapping from aggregate */
-	m = allocate_mapping(n);
+	debug(128,("mapping.c: load_mapping_from_aggregate begin, size = %d\n", n));
+	m = allocate_mapping(n / 2);
 	for (i = 0; i < n; i += 2) {
-		v = find_for_insert(m, sp + i);
-		assign_svalue_no_free(v, sp + i + 1);
+		v = find_for_insert(m, sp + i, 1);
+		if (v) {
+			assign_svalue_no_free(v, sp + i + 1);
+		} else {
+			mapping_too_large();
+			break;
+		}
 	}
-	aggregate = 0; /* no longer doing a load mapping from aggregate */
-	debug(1,("mapping.c: load_mapping_from_aggregate end\n"));
+	debug(128,("mapping.c: load_mapping_from_aggregate end\n"));
 	return m;
 }
 
-struct svalue *
+/* is ok */
+
+INLINE struct svalue *
 find_in_mapping(m, lv)
 struct mapping *m;
 struct svalue *lv;
 {
-   int i;
    struct node *n;
  
 	n = node_find_in_mapping(m, lv);
@@ -343,80 +507,48 @@ struct svalue *lv;
 
 /*
    add_mapping: returns a new mapping that contains everything
-   in two old mappings.
+   in two old mappings.  (uses hash table)
 */
 
-struct mapping *
+INLINE struct mapping *
 add_mapping(m1, m2)
 struct mapping *m1, *m2;
 {
 	struct mapping *newmap;
  
-	debug(1,("mapping.c: add_mapping begin\n"));
-	newmap = allocate_mapping(m1->size + m2->size);
-	/*
-	  Note there's some memory wasted (not leaked, wasted).
-      The second mapping may duplicate some or all of the
-      lvalues in the first mapping.  Currently it doesn't
-      look like it's worth the effort to save the memory. -JTR
-	*/
-	aggregate = 1; /* find_for_insert will be called from inside this module */
-	if (m1->nod) node_copy(m1->nod, newmap);
-	if (m2->nod) node_copy(m2->nod, newmap);
-	debug(1,("mapping.c: add_mapping end\n"));
-	aggregate = 0; /* find_for_insert may be called from outside this module */
+	debug(128,("mapping.c: add_mapping begin: %x, %x\n", m1, m2));
+	newmap = allocate_mapping(m1->count);
+	if (m1->count)
+		mapTraverse(m1, (int (*)())doInsert, newmap);
+	if (m2->count)
+		mapTraverse(m2, (int (*)())doInsert, newmap);
+	debug(128,("mapping.c: add_mapping end\n"));
 	return newmap;
 }
 
-/* node_copy */
- 
-INLINE void
-node_copy(src, dst)
-struct node *src;
-struct mapping *dst;
-{
-   struct svalue *v;
+/*
+  doTransform: called by mapTraverse (via map_mapping)
+*/
 
-	debug(1,("mapping.c: node_copy\n"));
-	if (!src->deleted) {
-		v = find_for_insert(dst, &src->values[0]);
-		assign_svalue_no_free(v, &src->values[1]);
-	}
-	if (src->left)
-		node_copy(src->left, dst);
-	if (src->right)
-		node_copy(src->right, dst);
-}
-
-
-/* map_nodes */
- 
-void
-map_nodes(nod, accp, cntp, func, ob, extra)
-struct node *nod;
-struct svalue *accp;
-int *cntp;
-struct object *ob;
-char *func;
-struct svalue *extra;
+int doTransform(m, elt, info)
+struct mapping *m;
+struct node *elt;
+finfo_t *info;
 {
 	struct svalue *ret;
- 
-	debug(1,("mapping.c: map_nodes\n"));
-	push_svalue(&nod->values[1]);
-	if (extra) {
-		push_svalue(extra);
-		ret = apply(func, ob, 2);
-	} else
-		ret = apply(func, ob, 1);
-	if (ret && (ret->type != T_NUMBER || ret->u.number != 0)) {
-		assign_svalue_no_free(&accp[*cntp++], &nod->values[0]);
-		assign_svalue_no_free(&accp[*cntp++], ret);
+
+	push_svalue(&elt->values[1]);
+	if (info->extra) {
+		push_svalue(info->extra);
+		ret = apply(info->func, info->obj, 2);
 	}
-	if (nod->left)
-		map_nodes(nod->left, accp, cntp, func, ob, extra);
-	if (nod->right)
-		map_nodes(nod->right, accp, cntp, func, ob, extra);
+	ret = apply(info->func, info->obj, 1);
+	if (ret) {
+		assign_svalue(&elt->values[1], ret);
+		return 0;
+	}
+	/* might as well stop traversing if func doesn't exist in object */
+	return 1;
 }
  
 /*
@@ -427,51 +559,37 @@ struct svalue *extra;
 struct mapping *
 map_mapping(m, func, ob, extra)
 struct mapping *m;
-struct object *ob;
+object_t *ob;
 char *func;
 struct svalue *extra;
 {
-	struct vector *v;
-	int cnt = 0;
-	struct mapping *newmap;
+	finfo_t info;
  
 	debug(1,("mapping.c: map_mapping\n"));
-	v = allocate_array(MAX_ARRAY_SIZE * 2);
-	if (m->nod)
-		map_nodes(m->nod, &v->item[0], &cnt, func, ob, extra);
-	newmap = load_mapping_from_aggregate(&v->item[0], cnt);
-	free_vector(v);
-	return newmap;
+	info.func = func;
+	info.obj = ob;
+	info.extra = extra;
+	return mapTraverse(copyMapping(m), (int (*)())doTransform, &info);
 }
 
-/* count_match_nodes */
-
-int
-count_match_nodes(n1, m2, svp)
-struct node *n1;
-struct mapping *m2;
-struct svalue *svp;
+int doCompose(m, elt, info)
+struct mapping *m;
+struct node *elt;
+minfo_t *info;
 {
-	struct svalue *newv;
-	int x;
+	struct node *node;
+	struct svalue *value;
 
-	debug(1,("mapping.c: count_match_nodes\n"));
-	if (!n1)
-		return 0;
-	x = 0;
-	if (!n1->deleted) {
-		newv = find_in_mapping(m2, &n1->values[1]);
-		if (!IS_UNDEFINED(newv)) {
-			if (svp) {
-				assign_svalue_no_free(svp++, &n1->values[0]);
-				assign_svalue_no_free(svp++, newv);
-				/* return 2 since each map entry consists of two elements */
-				x = 2;
-			}
+	if ((node = node_find_in_mapping(info->map, &elt->values[1]))) {
+		value = find_for_insert(info->newmap, &elt->values[1], 1);
+		if (value) {
+			assign_svalue_no_free(value, &node->values[1]);
+		} else {
+			mapping_too_large();
+			return 1;
 		}
 	}
-	return x + count_match_nodes(n1->left, m2, svp) +
-		count_match_nodes(n1->right, m2, svp);
+	return 0;
 }
 
 /* compose_mapping */
@@ -480,60 +598,28 @@ struct mapping *
 compose_mapping(m1, m2)
 struct mapping *m1, *m2;
 {
-   int cnt;
-   struct vector *v;
-   struct mapping *newmap;
+	minfo_t info;
 
 	debug(1,("mapping.c: compose_mapping\n"));
-	/* First count the number of pairs that'd result. */
-	cnt = count_match_nodes(m1->nod, m2, (struct svalue *) 0);
-	v = allocate_array(cnt);
-	(void) count_match_nodes(m1->nod, m2, &v->item[0]);
-	newmap = load_mapping_from_aggregate(&v->item[0], cnt);
-	free_vector(v);
-	return newmap;
+	info.map = m2;
+	info.newmap = allocate_mapping(0);
+	mapTraverse(m1, (int (*)())doCompose, &info);
+	return info.newmap;
 }
 
-/* Some stuff to support mapping indices */
-INLINE int
-count_node_lhs(n)
-struct node *n;
+/*
+  doGetKey: called by mapTraverse from mapping_indices
+*/
+
+int doGetOne(m, elt, info)
+struct mapping *m;
+struct node *elt;
+vinfo_t *info;
 {
-	int i = 0;
-
-	if (n->left)
-		i = count_node_lhs(n->left);
-	if (n->right)
-		i += count_node_lhs(n->right);
-	debug(64,("n->deleted = %d\n",n->deleted));
-	if (!n->deleted)
-		i++;
-	return i;
-}
-
-INLINE int 
-copy_node_indices(nod, sp, n)
-struct node *nod;
-struct svalue *sp;
-int n;
-{
-	int cnt, ret = 0;
-
-	if (!nod)
-		return 0;
-	if (nod->left) {
-		cnt = copy_node_indices(nod->left, sp, n);
-		n -= cnt;
-		ret += cnt;
-	}
-	if (nod->right) {
-		cnt = copy_node_indices(nod->right, sp, n);
-		n -= cnt;
-		ret += cnt;
-	}
-	if (!n || nod->deleted) return ret;
-	assign_svalue_no_free(sp+n-1, &nod->values[0]);
-	return ++ret;
+	if (info->pos == info->size)
+		return 1;
+	assign_svalue_no_free(&info->v->item[info->pos++], &elt->values[info->w]);
+	return 0;
 }
 
 /* mapping_indices */
@@ -542,37 +628,137 @@ struct vector *
 mapping_indices(m)
 struct mapping *m;
 {
-	int siz;
-	struct vector *v;
+	int size;
+	vinfo_t info;
 
-	siz = m->nod ? count_node_lhs(m->nod) : 0;
-	if (siz > MAX_ARRAY_SIZE) siz = MAX_ARRAY_SIZE;
-	v = allocate_array(siz); /* assigns ref count equal to 1 */
-	v->ref--;  /* decrement ref count since F_ASSIGN increments it */
-	debug(64,("siz = %d\n",siz));
-	if (m->nod)
-		(void) copy_node_indices(m->nod, &v->item[0], siz);
-	return v;
+	size = m->count;
+	if (size > MAX_ARRAY_SIZE)
+		size = MAX_ARRAY_SIZE;
+	debug(128,("mapping_indices: size = %d\n",size));
+	info.v = allocate_array(size); /* assigns ref count equal to 1 */
+	info.pos = 0;
+	info.size = size;
+	info.w = 0;
+	mapTraverse(m, (int (*)())doGetOne, &info);
+	return info.v;
 }
 
-/*
-   combine_mapping: same as add_mapping except we first check to see if
-   m1 has room for m2 so that we can try to get by without allocating a
-   new mapping -- Tru@TMI.  This function was intended to be called
-   from F_ADD_EQ (+=) in interpret.c but it isn't safe to use this until
-   F_ASSIGN for mappings is changed to make a copy of the RHS instead
-   of just making the LHS an alias for the RHS.
-*/
+/* mapping_values */
 
-struct mapping
-*combine_mapping(m1, m2)
-struct mapping *m1, *m2;
+struct vector *
+mapping_values(m)
+struct mapping *m;
 {
-	if (m2->size < (m1->orig_size - m1->size)) {
-		if (m2->nod)
-			node_copy(m2->nod,m1);
-		return m1;
+	int size;
+	vinfo_t info;
+
+	size = m->count;
+	if (size > MAX_ARRAY_SIZE)
+		size = MAX_ARRAY_SIZE;
+	debug(64,("size = %d\n",size));
+	info.v = allocate_array(size); /* assigns ref count equal to 1 */
+	info.pos = 0;
+	info.size = size;
+	info.w = 1;
+	mapTraverse(m, (int (*)())doGetOne, &info);
+	return info.v;
+}
+
+#ifdef EACH
+/* mapping_each */
+
+INLINE struct vector *
+mapping_each(m)
+struct mapping *m;
+{
+	int j;
+	struct vector *v;
+
+	if (!m->count) { /* map is empty */
+		return null_array();
 	}
-	else
-		return add_mapping(m1,m2);
+	/*
+	  If each() being called by a different object than previous object,
+	  then reset so that each begins again at top of map.  This is necessary
+	  so that things aren't left in a bad state of an object errors out
+	  in the middle of traversing a map (or just doesn't traverse to the end.
+	*/
+	if (current_object != m->eachObj) {
+		m->eachObj = current_object;
+		m->bucket = m->table_size - 1;
+		m->elt = (struct node *)0;
+	}
+	if (!m->elt) { /* find next occupied bucket in hash table */
+		for (j = (m->bucket + 1) % m->table_size; j < m->table_size; j++) {
+			if (m->table[j]) {
+				m->bucket = j;
+				m->elt = m->table[j];
+				break;
+			}
+		}
+		if (j == m->table_size) {
+			m->bucket = m->table_size - 1;
+			m->elt = (struct node *)0;
+			return null_array();  /* have reached the end */
+		}
+	}
+	v = allocate_array(2);
+	assign_svalue_no_free(&v->item[0], &m->elt->values[0]);
+	assign_svalue_no_free(&v->item[1], &m->elt->values[1]);
+	m->elt = m->elt->next;
+	return v;
+}
+#endif
+
+int doSummation(m, elt, size)
+struct mapping *m;
+struct node *elt;
+int *size;
+{
+	/* don't need to account for : and , since the other "size"
+	   computing functions account for the following delimeter */
+	*size += svalue_save_size(&elt->values[0]) +
+		svalue_save_size(&elt->values[1]); 
+	return 0;
+}
+
+int mapping_save_size(m)
+struct mapping *m;
+{
+	int size;
+
+	size = 0;
+	mapTraverse(m, (int (*)())doSummation, &size);
+	return size;
+}
+
+
+/*
+ * Encode a mapping of elements into a contiguous string.
+ */
+
+int doEncode(m, elt, buf)
+struct mapping *m;
+struct node *elt;
+char *buf;
+{
+	save_svalue(&elt->values[0], buf);
+	strcat(buf, ":");
+	save_svalue(&elt->values[1], buf);
+	strcat(buf, ",");
+	return 0;
+}
+
+char *save_mapping(m)
+struct mapping *m;
+{
+	char *buf;
+
+	/* 5 == strlen("([])") */
+	buf = DXALLOC(mapping_save_size(m) + 5, 1024, "save_mapping");
+
+	strcpy(buf, "([");
+	mapTraverse(m, (int (*)())doEncode, buf);
+	strcat(buf, "])");
+	return buf;
 }

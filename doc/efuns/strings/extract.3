@@ -1,0 +1,17 @@
+.\"extract a substring from a string
+.TH extract 3
+
+.SH NAME
+extract() - extract a substring from a string
+
+.SH SYNOPSIS
+string extract( string str, int from, int to );
+
+.SH DESCRIPTION
+extract() returns as a string the characters in <str> from <from> to
+<to>, inclusive.  The first character in the string is number 0.  If
+<to> isn't specified, the string will be from character <from> to the
+end of the string.
+
+.SH SEE ALSO
+sscanf(3), explode(3)

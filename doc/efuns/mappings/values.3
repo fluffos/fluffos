@@ -1,0 +1,31 @@
+.\"return an array of the values from the (key, value) pairs in a mapping
+.TH values 3
+
+.SH NAME
+values() - return an array of the values from the (key, value) pairs in a
+mapping
+
+.SH SYNOPSIS
+mixed * values(mapping m)
+
+.SH DESCRIPTION
+values() returns an array of values corresponding to the value elements
+in the (key, value) pairs stored in the mapping m.
+.PP
+For example, if:
+.IP
+.nf
+mapping m;
+
+m = (["hp" : 35, "sp" : 42, "mass" : 100]);
+.PP
+then
+.IP
+values(m) == ({35, 42, 100})
+.PP
+.fi
+Note: the values will be returned in the same order as the corresponding
+keys.
+
+.SH SEE ALSO
+keys()

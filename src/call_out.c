@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <setjmp.h>
 #include <memory.h>
 #include <string.h>
@@ -6,6 +7,7 @@
 #include "lint.h"
 #include "interpret.h"
 #include "object.h"
+#include "mapping.h"
 
 /*
  * This file implements delayed calls of functions.
@@ -26,8 +28,11 @@ struct call {
     char *function;
     struct object *ob;
     struct svalue v;
+    struct vector *vs;
     struct call *next;
+#ifdef THIS_PLAYER_IN_CALL_OUT
     struct object *command_giver;
+#endif
 };
 
 static struct call *call_list, *call_list_free;
@@ -40,13 +45,18 @@ extern int d_flag;
 static void free_call(cop)
     struct call *cop;
 {
+    if (cop->vs) {
+        free_vector(cop->vs);
+    }
     free_svalue(&cop->v);
     cop->next = call_list_free;
-    FREE(cop->function);
+    free_string(cop->function);
     cop->function = 0;
     free_object(cop->ob, "free_call");
+#ifdef THIS_PLAYER_IN_CALL_OUT
     if (cop->command_giver)
 	free_object(cop->command_giver, "free_call");
+#endif
     cop->ob = 0;
     call_list_free = cop;
 }
@@ -54,10 +64,10 @@ static void free_call(cop)
 /*
  * Setup a new call out.
  */
-void new_call_out(ob, fun, delay, arg)
+void new_call_out(ob, fun, delay, num_args, arg)
     struct object *ob;
     char *fun;
-    int delay;
+    int delay, num_args;
     struct svalue *arg;
 {
     struct call *cop, **copp;
@@ -67,7 +77,8 @@ void new_call_out(ob, fun, delay, arg)
     if (!call_list_free) {
 	int i;
 	call_list_free =
-	    (struct call *)xalloc(CHUNK_SIZE * sizeof (struct call));
+	    (struct call *)DXALLOC(CHUNK_SIZE * sizeof (struct call),
+			16, "new_call_out: call_list_free");
 	for (i=0; i<CHUNK_SIZE - 1; i++)
 	    call_list_free[i].next  = &call_list_free[i+1];
 	call_list_free[CHUNK_SIZE-1].next = 0;
@@ -75,16 +86,28 @@ void new_call_out(ob, fun, delay, arg)
     }
     cop = call_list_free;
     call_list_free = call_list_free->next;
-    cop->function = string_copy(fun);
-    cop->command_giver = command_giver; /* save current player context */
+    cop->function = make_shared_string(fun);
+#ifdef THIS_PLAYER_IN_CALL_OUT
+    cop->command_giver = command_giver; /* save current user context */
     if (command_giver)
 		add_ref(command_giver, "new_call_out");		/* Bump its ref */
+#endif
     cop->ob = ob;
     add_ref(ob, "call_out");
     cop->v.type = T_NUMBER;
     cop->v.u.number = 0;
-    if (arg)
-	assign_svalue(&cop->v, arg);
+    cop->vs = NULL; 
+    if (arg) {
+    	assign_svalue(&cop->v, arg);
+    }
+    if (num_args > 0) {
+        int j;
+
+        cop->vs = allocate_array(num_args);
+        for (j = 0; j < num_args; j++) {
+            assign_svalue_no_free(&cop->vs->item[j], &arg[j+1]);
+        }
+    }
     for (copp = &call_list; *copp; copp = &(*copp)->next) {
 	if ((*copp)->delta >= delay) {
 	    (*copp)->delta -= delay;
@@ -105,7 +128,8 @@ void new_call_out(ob, fun, delay, arg)
  * if it is a living object. Check for shadowing objects, which may also
  * be living objects.
  */
-void call_out() {
+void call_out()
+{
     struct call *cop;
     jmp_buf save_error_recovery_context;
     int save_rec_exists;
@@ -145,7 +169,7 @@ void call_out() {
 	if (call_list && cop->delta < 0)
 	    call_list->delta += cop->delta;
 	if (!(cop->ob->flags & O_DESTRUCTED)) {
-	    if (setjmp(error_recovery_context)) {
+	    if (SETJMP(error_recovery_context)) {
 		extern void clear_state();
 		clear_state();
 		debug_message("Error in call out.\n");
@@ -154,11 +178,12 @@ void call_out() {
 		struct object *ob;
 
 		ob = cop->ob;
-#ifndef NO_SHADOWS /* LPCA */
+#ifndef NO_SHADOWS
 		while(ob->shadowing)
 		    ob = ob->shadowing;
-#endif NO_SHADOWS
+#endif /* NO_SHADOWS */
 		command_giver = 0;
+#ifdef THIS_PLAYER_IN_CALL_OUT
 		if (cop->command_giver &&
 		    !(cop->command_giver->flags & O_DESTRUCTED))
 		{
@@ -166,6 +191,7 @@ void call_out() {
 		} else if (ob->flags & O_ENABLE_COMMANDS) {
 		    command_giver = ob;
 		}
+#endif
 		v.type = cop->v.type;
 		v.u = cop->v.u;
 		v.subtype = cop->v.subtype;	/* Not always used */
@@ -176,7 +202,15 @@ void call_out() {
 		save_current_object = current_object;
 		current_object = cop->ob;
 		push_svalue(&v);
-		(void)apply(cop->function, cop->ob, 1);
+	    if (cop->vs) {
+	    	int j;
+
+            check_for_destr(cop->vs);
+	        for (j = 0; j < cop->vs->size; j++) {
+	    	    push_svalue(&cop->vs->item[j]);
+	    	}
+	    }
+		(void)apply(cop->function, cop->ob, 1 + (cop->vs ? cop->vs->size : 0));
 		current_object = save_current_object;
 	    }
 	}
@@ -252,22 +286,38 @@ int print_call_out_usage(verbose)
 }
 
 #ifdef DEBUG
+INLINE static void
+count_refs(v)
+struct svalue *v;
+{
+	switch(v->type)
+	{
+        case T_POINTER:
+	    v->u.vec->extra_ref++;
+	    break;
+        case T_MAPPING:
+	    v->u.map->extra_ref++;
+	    break;
+        case T_OBJECT:
+	    v->u.ob->extra_ref++;
+	    break;
+	}
+}
+
 void count_ref_from_call_outs()
 {
     struct call *cop;
+	int j;
 
     for (cop = call_list; cop; cop = cop->next) {
-	switch(cop->v.type)
-	{
-        case T_POINTER:
-	    cop->v.u.vec->extra_ref++;
-	    break;
-        case T_OBJECT:
-	    cop->v.u.ob->extra_ref++;
-	    break;
+	    count_refs(&cop->v);
+		if (cop->vs) {
+			for (j = 0; j < cop->vs->size; j++) {
+				count_refs(&cop->vs->item[j]);
+			}
+		}
+		cop->ob->extra_ref++;
 	}
-	cop->ob->extra_ref++;
-    }
 }
 #endif
 

@@ -1,0 +1,18 @@
+*  lvalue lifetime bug: There isn't an easy fix for it and it leads to delayed
+   and unpredictable crashes. It's simplest form is something like a[0]=(a=0).
+   There the reference to a[0] is pushed on the stack, a gets freed and then
+   the area formerly occupied by a gets assigned something. This leads to
+   especially nasty effects if you do something more on the right hand side,
+   i.e. a function call which deallocates a and then loads an object into the
+   free space - has rather devastating effects, I assure you. Fixing that means
+   major changes in the gamedriver.
+
+*  save_object() within objects containing circular arrays. Example:
+   mixed *a; create() { a = allocate(1); a[0]=a; save_object(SOME_FILE); }
+   Easy fix: disallow saving of objects with arrays more than a given depth.
+   Difficult fix (employed by Amylaar): save the circular structure in a special
+   format and make it recoverable by restore_object().
+
+*  telnet_neg() in comm.c seems not to handle some clients correctly.
+   In particular, carriage returns and line feeds aren't deal with as
+   expected.  This may be a problem with the clients.  Not sure.

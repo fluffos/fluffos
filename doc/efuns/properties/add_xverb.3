@@ -1,0 +1,17 @@
+.\"add a verb that doesn't require a trailing separate space
+.TH add_xverb 3
+
+.SH NAME
+add_xverb() - add a verb that doesn't require a trailing separate space
+
+.SH SYNOPSIS
+void add_xverb(string str);
+
+.SH DESCRIPTION
+Similar to add_verb except that the verb is recognized even if not
+separated from the rest of the sentence by a space.  This function
+is useful when implementing the usual abbreviation ' for say
+and : for emote.
+
+.SH SEE ALSO
+add_action(3), add_verb(3).

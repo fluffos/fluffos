@@ -1,0 +1,15 @@
+.\"detects whether or not a given object is "living"
+.TH living 3
+
+.SH NAME
+living() - detects whether or not a given object is "living"
+
+.SH SYNOPSIS
+int living(object ob);
+
+.SH DESCRIPTION
+Return true if `ob' is a living object (that is, if "enable_commands()" has
+been called by `ob').
+
+.SH SEE ALSO
+interactive()

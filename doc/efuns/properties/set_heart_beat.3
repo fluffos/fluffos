@@ -1,0 +1,20 @@
+.\"enable or disable an object's heartbeat
+.TH set_heart_beat 3
+
+.SH NAME
+set_heart_beat() - enable or disable an object's heartbeat
+
+.SH SYNOPSIS
+int set_heart_beat(int flag);
+
+.SH DESCRIPTION
+Enable (flag == 1) or disable heart beat (flag == 0). If the heart beat
+is not needed for the moment, then do disable it. This will reduce system
+overhead.
+.PP
+Return true for success, and false for failure.  Specifically, it will
+fail if the heart beat function has been disabled, which it will be
+if there is a run time error in the object.
+
+.SH SEE ALSO
+lfun/heart_beat.
