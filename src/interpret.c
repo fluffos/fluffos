@@ -249,11 +249,19 @@ static char *check_shadow_functions P2(program_t *, shadow, program_t *, victim)
   int i;
   int pindex, runtime_index;
   program_t *prog;
+  char *fun;
     
   for (i = 0; i < shadow->num_functions_defined; i++) {
     prog = ffbn_recurse(victim, shadow->function_table[i].funcname, &pindex, &runtime_index);
     if (prog && (victim->function_flags[runtime_index] & DECL_NOMASK))
       return prog->function_table[pindex].funcname;
+  }
+
+  /* Loop through all the inherits of the program also */
+  for (i = 0; i < shadow->num_inherited; i++) {
+      fun = check_shadow_functions(shadow->inherit[i].prog, victim);
+      if (fun)
+          return fun;
   }
   return 0;
 }
@@ -3982,8 +3990,8 @@ unsigned int apply_low_collisions = 0;
 #endif
 
 typedef struct cache_entry_s {
-  const program_t *oprogp;
-  const program_t *progp;
+  program_t *oprogp;
+  program_t *progp;
   function_t *funp;
   unsigned short function_index_offset;
   unsigned short variable_index_offset;

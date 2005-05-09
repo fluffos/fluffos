@@ -858,4 +858,5 @@
 #define CALL_OTHER_WARN
 #define PACKAGE_DWLIB
 #define MMAP_SBRK
+#define WARN_TAB
 #endif

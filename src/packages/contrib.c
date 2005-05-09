@@ -665,6 +665,12 @@ f_terminal_colour PROT((void))
                 resetstrname == elt->values->u.string) {
                resetstr = (elt->values + 1)->u.string;
                resetstrlen = strlen((elt->values + 1)->u.string);
+	       if(!resetstrlen) {
+		 //we really really need one, but it shouldn't be visible!
+		 resetstr = "\xff\xf9"; //telnet go ahead
+		 resetstrlen = 2;
+		 add_mapping_string(sp->u.map, "RESET", resetstr);
+	       }
                break;
            }
        }

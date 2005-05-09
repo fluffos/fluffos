@@ -870,4 +870,10 @@
 
 /* CALL_OTHER_WARN, make it warning instead of errors */
 #undef CALL_OTHER_WARN
+
+/* WARN_TAB: Some versions of the editor built in indent function use
+ *   tabs for indenting. This options turns on a warning message for
+ *   files indented with tabs instead of spaces.
+ */
+#define WARN_TAB
 #endif

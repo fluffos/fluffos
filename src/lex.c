@@ -1222,17 +1222,18 @@ int yylex()
             return -1;
         case '\r':
 	    yywarn("^M");
-	    if(0)
-        case '\t':
+	    break;
+	case '\t':
+#ifdef WARN_TAB
 	    yywarn("<TAB>");
-	    else if(0)
+	    break;
+#endif
         case '\n':
-            {
-                nexpands = 0;
-                current_line++;
-                total_lines++;
-                if (outp == last_nl + 1) refill_buffer();
-            }
+	    nexpands = 0;
+	    current_line++;
+	    total_lines++;
+	    if (outp == last_nl + 1) 
+	      refill_buffer();
         case ' ':
         case '\f':
         case '\v':
