@@ -3085,7 +3085,7 @@ eval_instruction P1(char *, p)
         break;
       case T_REAL:
         sp->type = T_REAL;
-        sp->u.real = ++lval->u.number;
+        sp->u.real = ++lval->u.real;
         break;
       case T_LVALUE_BYTE:
         if (global_lvalue_byte.subtype == 0 &&

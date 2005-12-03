@@ -6,17 +6,14 @@ PROOF=
 STRFUNCS=
 INSTALL=install -c
 INSTALL_DIR=../bin
-OPTIMIZE=-O2
-CPP=gcc -E
+OPTIMIZE=-O2 -fstrength-reduce
+CPP=gcc -m32 -E
 CFLAGS=-D__USE_FIXED_PROTOTYPES__ -rdynamic
-#CC=gcc
-CC=icc -ip -wd864,1173 -xK
-#CC=tcc -DTCC 
-YACC=bison -d -y
+CC=gcc -m32
+YACC=byacc -d
 RANLIB=ranlib
 A=a
 O=o
-
 # YOU DO NOT NEED TO CONFIGURE ANYTHING IN THIS FILE.
 #
 # RUN THE SHELL SCRIPT ./build.MudOS to generate the Makefiles, and follow
@@ -37,8 +34,6 @@ O=o
 #
 # depend:	automatically create dependency info
 #
-# Makefiles:	update Makefile.in and GNUmakefile.in from Makefile.master
-#		(only necessary after making changes to Makefile.master)
 #
 # 'CLEAN' TARGETS:
 #
@@ -81,19 +76,17 @@ SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   replace_program.c ccode.c cfuns.c compile_file.c master.c function.c \
   debug.c crypt.c applies_table.c add_action.c eval.c
 
-all: $(OBJDIR) cc.h files main_build
+all: $(OBJDIR) cc.h main_build
+main_build2: $(DRIVER_BIN) addr_server portbind
 
-main_build: $(DRIVER_BIN) addr_server portbind
-
-parallel:
-	$(MAKE) -k -l -j 6 cc.h files
-	$(MAKE) -k -l -j 6 main_build
+main_build: files
+	$(MAKE) main_build2
 
 VPATH = $(OBJDIR)
 
 OBJ=$(addprefix $(OBJDIR)/,$(subst .c,.o,$(SRC)))
 
-$(OBJDIR)/%.o: %.c
+$(OBJDIR)/%.o: %.c $(OBJDIR)
 	$(CC) $(CFLAGS) $(OPTIMIZE) -o $@ -c $<
 
 $(OBJDIR)/lex.o: lex.c preprocess.c cc.h grammar.tab.c
@@ -205,13 +198,10 @@ install: all
 	$(INSTALL) addr_server $(INSTALL_DIR)
 	$(INSTALL) portbind $(INSTALL_DIR)
 
-Makefiles: Makefile.in GNUmakefile.in NMakefile.in
+Makefiles: Makefile.in NMakefile.in
 
 Makefile.in: edit_source Makefile.in.pre Makefile.master
 	./edit_source -process Makefile.in.pre
-
-GNUmakefile.in: edit_source GNUmakefile.in.pre Makefile.master
-	./edit_source -process GNUmakefile.in.pre
 
 NMakefile.in: edit_source NMakefile.in.pre Makefile.master
 	./edit_source -process NMakefile.in.pre

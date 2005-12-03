@@ -857,6 +857,6 @@
 #undef CALL_OTHER_TYPE_CHECK 
 #define CALL_OTHER_WARN
 #define PACKAGE_DWLIB
-#define MMAP_SBRK
+#undef MMAP_SBRK
 #define WARN_TAB
 #endif

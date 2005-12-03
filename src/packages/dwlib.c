@@ -1,4 +1,3 @@
-
 #include "../lpc_incl.h"
 #include "../comm.h"
 #include "../file_incl.h"
@@ -541,8 +540,7 @@ f_reference_allowed PROT((void))
 void f_element_of PROT((void)){
   array_t *arr = sp->u.arr;
   if(!arr->size){
-    free_array(arr);
-    error("Can't take element from empty array");
+    error("Can't take element from empty array.\n");
   }
   assign_svalue_no_free(sp, &arr->item[random_number(arr->size)]);
   free_array(arr);
@@ -607,3 +605,283 @@ void f_set_check_limit PROT((void)){
 }
 #endif
 
+#ifdef F_MAX
+
+void
+f_max PROT((void)) {
+   svalue_t *sarr = sp - st_num_arg + 1;
+   array_t *arr = sarr->u.arr;
+   int find_index = 0;
+   int max_index = 0;
+   int i;
+
+   if( !arr->size ) {
+      error( "Can't find max of an empty array.\n" );
+   }
+
+   if( arr->item->type != T_NUMBER && arr->item->type != T_REAL &&
+            arr->item->type != T_STRING ) {
+      error( "Array must consist of ints, floats or strings.\n" );
+   }
+
+   for( i = 1; i < arr->size; i++ ) {
+      // Check the type of this element.
+      switch( arr->item[i].type ) {
+         case T_NUMBER:
+            switch( arr->item[max_index].type ) {
+               case T_NUMBER:
+                  if( arr->item[i].u.number > arr->item[max_index].u.number )
+                     max_index = i;
+                  break;
+               case T_REAL:
+                  if( arr->item[i].u.number > arr->item[max_index].u.real )
+                     max_index = i;
+                  break;
+               default:
+                  error( "Inhomogeneous array.\n" );
+            }
+            break;
+         case T_REAL:
+            switch( arr->item[max_index].type ) {
+               case T_NUMBER:
+                  if( arr->item[i].u.real > arr->item[max_index].u.number )
+                     max_index = i;
+                  break;
+               case T_REAL:
+                  if( arr->item[i].u.real > arr->item[max_index].u.real )
+                     max_index = i;
+                  break;
+               default:
+                  error( "Inhomogeneous array.\n" );
+            }
+            break;
+         case T_STRING:
+            if( arr->item[max_index].type != T_STRING ) {
+               error( "Inhomogeneous array.\n" );
+            }
+            if( strcmp( arr->item[i].u.string,
+                     arr->item[max_index].u.string ) > 0 )
+               max_index = i;
+            break;
+         default:
+            error( "Array must consist of ints, floats or strings.\n" );
+      }
+   }
+
+   if( st_num_arg == 2 && sp->u.number != 0 )
+      find_index = 1;
+
+   pop_n_elems( st_num_arg );
+
+   if( find_index != 0 )
+      push_number( max_index );
+   else {
+      switch( arr->item[max_index].type ) {
+         case T_STRING:
+            share_and_push_string( arr->item[max_index].u.string );
+            break;
+         case T_NUMBER:
+            push_number( arr->item[max_index].u.number );
+            break;
+         default:
+            push_real( arr->item[max_index].u.real );
+      }
+   }
+
+}
+
+#endif
+
+#ifdef F_MIN
+
+void
+f_min PROT((void)) {
+   svalue_t *sarr = sp - st_num_arg + 1;
+   array_t *arr = sarr->u.arr;
+   int find_index = 0;
+   int min_index = 0;
+   int i;
+
+   if( !arr->size ) {
+      error( "Can't find min of an empty array.\n" );
+   }
+
+   if( arr->item->type != T_NUMBER && arr->item->type != T_REAL &&
+            arr->item->type != T_STRING ) {
+      error( "Array must consist of ints, floats or strings.\n" );
+   }
+
+   for( i = 1; i < arr->size; i++ ) {
+      // Check the type of this element.
+      switch( arr->item[i].type ) {
+         case T_NUMBER:
+            switch( arr->item[min_index].type ) {
+               case T_NUMBER:
+                  if( arr->item[i].u.number < arr->item[min_index].u.number )
+                     min_index = i;
+                  break;
+               case T_REAL:
+                  if( arr->item[i].u.number < arr->item[min_index].u.real )
+                     min_index = i;
+                  break;
+               default:
+                  error( "Inhomogeneous array.\n" );
+            }
+            break;
+         case T_REAL:
+            switch( arr->item[min_index].type ) {
+               case T_NUMBER:
+                  if( arr->item[i].u.real < arr->item[min_index].u.number )
+                     min_index = i;
+                  break;
+               case T_REAL:
+                  if( arr->item[i].u.real < arr->item[min_index].u.real )
+                     min_index = i;
+                  break;
+               default:
+                  error( "Inhomogeneous array.\n" );
+            }
+            break;
+         case T_STRING:
+            if( arr->item[min_index].type != T_STRING ) {
+               error( "Inhomogeneous array.\n" );
+            }
+            if( strcmp( arr->item[i].u.string,
+                     arr->item[min_index].u.string ) < 0 )
+               min_index = i;
+            break;
+         default:
+            error( "Array must consist of ints, floats or strings.\n" );
+      }
+   }
+
+   if( st_num_arg == 2 && sp->u.number != 0 )
+      find_index = 1;
+
+   pop_n_elems( st_num_arg );
+
+   if( find_index != 0 )
+      push_number( min_index );
+   else {
+      switch( arr->item[min_index].type ) {
+         case T_STRING:
+            share_and_push_string( arr->item[min_index].u.string );
+            break;
+         case T_NUMBER:
+            push_number( arr->item[min_index].u.number );
+            break;
+         default:
+            push_real( arr->item[min_index].u.real );
+      }
+   }
+
+}
+#endif
+
+#ifdef F_ROLL_MDN
+
+void
+f_roll_MdN PROT((void)) {
+   int roll = 0;
+
+   if ( (sp - 1)->u.number > 0 && sp->u.number > 0 ) {
+      while( (sp - 1)->u.number-- )
+         roll += 1 + random_number( sp->u.number );
+   }
+
+   pop_stack();            // Pop one...
+   sp->u.number = roll;    // And change the other!
+}
+
+#endif
+
+#ifdef F_ADD_A
+
+void
+f_add_a PROT((void)) {
+   const char *str = sp->u.string;
+   char *ret;
+   char *p;
+   int len;
+
+   while( *str == ' ' )
+      str++;
+
+   // If *str is 0, it was only spaces.  Return "a ".
+   if( *str == 0 ) {
+      pop_stack();
+      copy_and_push_string( "a " );
+      return;
+   }
+
+   len = strlen( str );
+   // Don't add anything if it already begins with a or an.
+   if( strncmp( str, "a ", 2 ) == 0 || strncmp( str, "an ", 3 ) == 0 ) {
+      return;
+   }
+
+   switch( *str ) {
+      case 'a':
+      case 'e':
+      case 'i':
+      case 'o':
+      case 'u':
+      case 'A':
+      case 'E':
+      case 'I':
+      case 'O':
+      case 'U':
+         // Add an.
+         if( len + 3 > max_string_length ) {
+            free_string_svalue( sp );
+            error( "add_a() exceeded max string length.\n" );
+         }
+         ret = new_string( len + 3, "f_add_a" );
+         memcpy( ret, "an ", 3 );
+         p = ret + 3;
+         break;
+      default:
+         // Add a.
+         if( len + 2 > max_string_length ) {
+            free_string_svalue( sp );
+            error( "add_a() exceeded max string length.\n" );
+         }
+         ret = new_string( len + 2, "f_add_a" );
+         memcpy( ret, "a ", 2 );
+         p = ret + 2;
+         break;
+   }
+
+   // Add the rest of the string.
+   memcpy( p, str, len + 1 );    // + 1: get the \0.
+   free_string_svalue( sp );
+   sp->type = T_STRING;
+   sp->subtype = STRING_MALLOC;
+   sp->u.string = ret;
+}
+
+#endif
+// This along with add_a() is the only sfun in /secure/simul_efun/add_a.c
+#ifdef F_VOWEL
+void
+f_vowel PROT((void)) {
+   char v = (char)sp->u.number;
+
+   if( v == 'a' || v == 'e' || v == 'i' || v == 'o' || v == 'u' ||
+          v == 'A' || v == 'E' || v == 'I' || v == 'O' || v == 'U' )
+      sp->u.number = 1;
+   else
+      sp->u.number = 0;
+}
+#endif
+
+#ifdef F_NUM_CLASSES
+
+void
+f_num_classes PROT((void)) {
+   int i = sp->u.ob->prog->num_classes;
+   pop_stack();
+   push_number( i );
+}
+
+#endif

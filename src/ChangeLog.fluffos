@@ -1,5 +1,14 @@
-As MudOS is moving to slow to keep our driver hacks apart, we now call our own
+As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :)
+
+new in FluffOS 1.33
+Fixed typo in above line
+Added vowel/add_a and num_classes efuns (Woom)
+Added max/min/rell_MdN efuns (Woom)
+Corrected functions/variables prototype (reported by Woom)
+Changed makefile so make -j<number> works most of the time
+Fixed ++ on LPC floats (reported by Woom)
+Fixed error message + crasher in element_of()
 
 new in FluffOS 1.32
 Fix for nomask and shadows (simon@boo.org)

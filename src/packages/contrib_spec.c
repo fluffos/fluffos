@@ -11,8 +11,8 @@ object *named_livings();
 void set_prompt(string, void|object);
 #endif
 mixed copy(mixed);
-string *functions(object, int default: 0);
-string *variables(object, int default: 0);
+mixed *functions(object, int default: 0);
+mixed *variables(object, int default: 0);
 object *heart_beats();
 #ifdef COMPAT_32
 object *heart_beat_info heart_beats();

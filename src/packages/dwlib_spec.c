@@ -7,3 +7,9 @@ mixed element_of(mixed *);
 #ifdef DEBUG
 int set_check_limit(int);
 #endif
+mixed max( mixed *, int | void );
+mixed min( mixed *, int | void );
+int roll_MdN( int, int );
+string add_a( string );
+int vowel( int );
+int num_classes( object );

@@ -1,3 +1,4 @@
+
 # YOU DO NOT NEED TO CONFIGURE ANYTHING IN THIS FILE.
 #
 # RUN THE SHELL SCRIPT ./build.MudOS to generate the Makefiles, and follow
@@ -62,15 +63,21 @@ SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
 
 all: $(OBJDIR) cc.h main_build
 main_build2: $(DRIVER_BIN) addr_server portbind
++
++main_build: files
++       $(MAKE) main_build2
 
-main_build: files
-	$(MAKE) main_build2
+main_build: $(DRIVER_BIN) addr_server portbind
+
+parallel:
+	$(MAKE) -k -l -j 6 cc.h files
+	$(MAKE) -k -l -j 6 main_build
 
 VPATH = $(OBJDIR)
 
 OBJ=$(addprefix $(OBJDIR)/,$(subst .c,.o,$(SRC)))
 
-$(OBJDIR)/%.o: %.c $(OBJDIR)
+$(OBJDIR)/%.o: %.c
 	$(CC) $(CFLAGS) $(OPTIMIZE) -o $@ -c $<
 
 $(OBJDIR)/lex.o: lex.c preprocess.c cc.h grammar.tab.c
