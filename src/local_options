@@ -65,9 +65,9 @@
  *   * Faster than SMALLOC but more memory overhead.
  *   * Requires sbrk().
  */
-#undef SYSMALLOC
+#define SYSMALLOC
 #undef SMALLOC
-#define BSDMALLOC
+#undef BSDMALLOC
 #undef MMALLOC
 
 /* You may optionally choose one (or none) of these malloc wrappers.  These
@@ -807,8 +807,8 @@
 /* MAX_LOCAL: maximum number of local variables allowed per LPC function */
 #define CFG_MAX_LOCAL_VARIABLES		50
 
-#define CFG_EVALUATOR_STACK_SIZE 	3000
-#define CFG_COMPILER_STACK_SIZE		600
+#define CFG_EVALUATOR_STACK_SIZE 	3000000
+#define CFG_COMPILER_STACK_SIZE		600000
 #define CFG_MAX_CALL_DEPTH		150
 /* This must be one of 4, 16, 64, 256, 1024, 4096 */
 #define CFG_LIVING_HASH_SIZE		256

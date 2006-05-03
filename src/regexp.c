@@ -1317,6 +1317,7 @@ static char *regprop P1(char *, op)
         p = "PLUS";
         break;
     default:
+        p = (char *) NULL;
         regerror("corrupted opcode\n");
         break;
     }

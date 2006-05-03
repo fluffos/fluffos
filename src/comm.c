@@ -59,9 +59,9 @@ static unsigned char telnet_compress_v2_response[] = { IAC, SB,
 static unsigned char telnet_do_mxp[]     = { IAC, DO, TELOPT_MXP };
 static unsigned char telnet_will_mxp[]     = { IAC, WILL, TELOPT_MXP };
    
-#ifdef DEBUG
-static char *slc_names[] = { SLC_NAMELIST };
-#endif
+//#ifdef DEBUG
+//static char *slc_names[] = { SLC_NAMELIST };
+//#endif
 
 /*
  * local function prototypes.
@@ -1828,6 +1828,10 @@ int process_user_command()
     clear_notify(ip->ob);
     update_load_av();
     debug(connections, ("process_user_command: command_giver = /%s\n", command_giver->obname));
+
+    if(!ip)
+      goto exit;
+
     if(ip->iflags & USING_MXP && user_command[0] == ' ' && user_command[1] == '[' && user_command[3] == 'z' ){
       svalue_t *ret;
       copy_and_push_string(user_command);

@@ -188,7 +188,7 @@ if test $? -eq 0; then
 else
     gcc comptest.c
     if test $? -eq 0; then
-        CC="gcc -m32"
+        CC="gcc"
         if test "${DEBUG-x}" = "x"; then
             OPTIMIZE=${OPTIMIZE-"-O2 -fstrength-reduce"}
         fi

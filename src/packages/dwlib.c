@@ -668,26 +668,18 @@ f_max PROT((void)) {
       }
    }
 
-   if( st_num_arg == 2 && sp->u.number != 0 )
-      find_index = 1;
+   if( st_num_arg == 2 ) {
+     if( sp->u.number != 0 ) {
+       pop_n_elems( 2 );
+       push_number( max_index );
+       return;
+     }
 
-   pop_n_elems( st_num_arg );
-
-   if( find_index != 0 )
-      push_number( max_index );
-   else {
-      switch( arr->item[max_index].type ) {
-         case T_STRING:
-            share_and_push_string( arr->item[max_index].u.string );
-            break;
-         case T_NUMBER:
-            push_number( arr->item[max_index].u.number );
-            break;
-         default:
-            push_real( arr->item[max_index].u.real );
-      }
+     pop_stack();
    }
 
+   assign_svalue_no_free( sp, &arr->item[max_index] );
+   free_array( arr );
 }
 
 #endif
@@ -755,26 +747,18 @@ f_min PROT((void)) {
       }
    }
 
-   if( st_num_arg == 2 && sp->u.number != 0 )
-      find_index = 1;
+   if( st_num_arg == 2 ) {
+     if( sp->u.number != 0 ) {
+       pop_n_elems( 2 );
+       push_number( min_index );
+       return;
+     }
 
-   pop_n_elems( st_num_arg );
-
-   if( find_index != 0 )
-      push_number( min_index );
-   else {
-      switch( arr->item[min_index].type ) {
-         case T_STRING:
-            share_and_push_string( arr->item[min_index].u.string );
-            break;
-         case T_NUMBER:
-            push_number( arr->item[min_index].u.number );
-            break;
-         default:
-            push_real( arr->item[min_index].u.real );
-      }
+     pop_stack();
    }
 
+   assign_svalue_no_free( sp, &arr->item[min_index] );
+   free_array( arr );
 }
 #endif
 

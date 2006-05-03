@@ -138,7 +138,7 @@ typedef struct interactive_s {
   * for it (i.e. define a failure label, and are set up to deal with
   * branching to it from arbitrary points).
   */
-#define IP_VALID(ip, ob) (ob && ob->interactive == ip)
+#define IP_VALID(ip, ob) (ob && ip && ob->interactive == ip)
 #define VALIDATE_IP(ip, ob) if (!IP_VALID(ip, ob)) goto failure
 
 /*

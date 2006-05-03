@@ -142,20 +142,24 @@ void kill_ref P1(ref_t *, ref) {
     if (!r)
       unlock_mapping(ref->sv.u.map);
   }
-  free_svalue(&ref->sv, "kill_ref");
+  if(ref->lvalue)
+    free_svalue(&ref->sv, "kill_ref");
   if(ref->next)
     ref->next->prev = ref->prev;
   if(ref->prev)
     ref->prev->next = ref->next;
-  else{
-    if(ref == global_ref_list)
-      global_ref_list = ref->next;
+  else {
+    global_ref_list = ref->next;
+    if(global_ref_list)
+      global_ref_list->prev = 0;
   }
   if (ref->ref > 0) {
     /* still referenced */
     ref->lvalue = 0;
+    ref->prev = ref; //so it doesn't get set to the global list above
+    ref->next = ref;
   } else {
-    FREE(ref);
+    FREE(ref); 
   }
 }
 
@@ -461,7 +465,7 @@ INLINE void int_free_svalue P2(svalue_t *, v, char *, tag)
   } else if ((v->type & T_REFED) && !(v->type & T_FREED)) {
 #ifdef DEBUG_MACRO
     if (v->type == T_OBJECT)
-      debug(d_flag, ("Free_svalue %s (%d) from %s\n", v->u.ob->name, v->u.ob->ref - 1, tag));
+      debug(d_flag, ("Free_svalue %s (%d) from %s\n", v->u.ob->obname, v->u.ob->ref - 1, tag));
 #endif
     if (!(--v->u.refed->ref)) {
       switch (v->type) {
@@ -2041,7 +2045,6 @@ eval_instruction P1(char *, p)
     case F_KILL_REFS:
       {
         int num = EXTRACT_UCHAR(pc++);
-        //TODO check if num is really wrong, or something else is borken
         while (num--) 
           kill_ref(global_ref_list);
         break;
@@ -3781,7 +3784,7 @@ eval_instruction P1(char *, p)
         if(size)
           fatal("Bad object after efun %d\n", instruction);
         pop_n_elems(1);
-      } 
+      }
 #endif
     } /* switch (instruction) */
     DEBUG_CHECK1(sp < fp + csp->num_local_variables - 1,
@@ -5797,7 +5800,7 @@ void pop_context P1(error_context_t *, econ) {
 
 /* can the error handler do this ? */
 void restore_context P1(error_context_t *, econ) {
-  ref_t **refp;
+  ref_t *refp;
 #ifdef PACKAGE_DWLIB
   extern int _in_reference_allowed;
   _in_reference_allowed = 0;
@@ -5820,14 +5823,14 @@ void restore_context P1(error_context_t *, econ) {
     pop_control_stack();
   }
   pop_n_elems(sp - econ->save_sp);
-  refp = &global_ref_list;
-  while (*refp) {
-    if ((*refp)->csp >= csp) {
-      ref_t *ref = *refp;
-      *refp = (*refp)->next;
+  refp = global_ref_list;
+  while (refp) {
+    if (refp->csp >= csp) {
+      ref_t *ref = refp;
+      refp = refp->next;
       kill_ref(ref);
     } else
-      refp = &((*refp)->next);
+      refp = refp->next;
   }
 }
 

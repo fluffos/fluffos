@@ -1,6 +1,13 @@
 As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
+new in FluffOS 1.34
+Fixed crashers in the reference keeping linked list
+Fixed crasher when connections are not routed to any object
+Changed compiling for -DDEBUG to work with modern glibc (turrican)
+Fixed bug in regprop() (turrican)
+Fixed crasher in max/min (woom)
+
 new in FluffOS 1.33
 Fixed typo in above line
 Added vowel/add_a and num_classes efuns (Woom)
