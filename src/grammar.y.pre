@@ -3039,8 +3039,8 @@ expr4:
 		    int f = $1 >>8;
 		    int num = $3->kind;
 		    int max_arg = predefs[f].max_args;
-		    
-		    if (num > max_arg && max_arg != -1) {
+		    if(f!=-1)
+		      if (num > max_arg && max_arg != -1) {
 			parse_node_t *pn = $3;
 			
 			while (pn) {
@@ -3057,7 +3057,7 @@ expr4:
 			    p = strput(p, end, predefs[f].word);
 			    yyerror(bff);
 			}
-		    } else if (max_arg != -1 && exact_types) {
+		      } else if (max_arg != -1 && exact_types) {
 			/*
 			 * Now check all types of arguments to efuns.
 			 */
@@ -3105,7 +3105,7 @@ expr4:
 			    argp += i + 1;
 			    enode = enode->r.expr;
 			}
-		    }
+		      }
 		    break;
 		}
 		case FP_L_VAR:

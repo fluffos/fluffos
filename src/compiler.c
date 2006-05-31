@@ -231,6 +231,7 @@ static void fix_class_type P2(int *, t, program_t *, from) {
         if (ihe && ((num = ihe->dn.class_num) != -1)) {
             (*t) = (*t & ~CLASS_NUM_MASK) | num;
         } else {
+	  if(!num_parse_error)
             fatal("Cannot find class %s (%s,%d).\n",from->strings[from->classes[(*t) & CLASS_NUM_MASK].classname], current_file, current_line);
         }
     }

@@ -1,6 +1,10 @@
 As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
+new in FluffOS 1.35
+Fixed crasher when too many classes are used (parser using error result)
+Fixed crasher with efun:: in function pointers when the efun override wasn't allowed
+
 new in FluffOS 1.34
 Fixed crashers in the reference keeping linked list
 Fixed crasher when connections are not routed to any object
