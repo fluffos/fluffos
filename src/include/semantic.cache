@@ -1,0 +1,15 @@
+;; Object include/
+;; SEMANTICDB Tags save file
+(semanticdb-project-database-file "include/"
+  :tables (list 
+   (semanticdb-table "function.h"
+    :major-mode 'c-mode
+    :tags '(("FP_LOCAL" variable (:constant-flag t :default-value (nil)) nil [47 78]) ("FP_EFUN" variable (:constant-flag t :default-value (nil)) nil [79 110]) ("FP_SIMUL" variable (:constant-flag t :default-value (nil)) nil [111 142]) ("FP_FUNCTIONAL" variable (:constant-flag t :default-value (nil)) nil [143 174]) ("FP_G_VAR" variable (:constant-flag t :default-value (nil)) nil [195 226]) ("FP_L_VAR" variable (:constant-flag t :default-value (nil)) nil [227 258]) ("FP_ANONYMOUS" variable (:constant-flag t :default-value (nil)) nil [259 290]) ("FP_MASK" variable (:constant-flag t :default-value (nil)) nil [315 347]) ("FP_HAS_ARGUMENTS" variable (:constant-flag t :default-value (nil)) nil [348 380]) ("FP_OWNER_DESTED" variable (:constant-flag t :default-value (nil)) nil [381 413]) ("FP_NOT_BINDABLE" variable (:constant-flag t :default-value (nil)) nil [414 446]))
+    :file "function.h"
+    :pointmax 447
+    )
+   )
+  :file "semantic.cache"
+  :semantic-tag-version "2.0pre3"
+  :semanticdb-version "2.0pre3"
+  )

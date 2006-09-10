@@ -375,11 +375,12 @@ void svalue_to_string P5(svalue_t *, obj, outbuffer_t *, outbuf, int, indent, in
             outbuf_add(outbuf, "CLASS( ");
             numadd(outbuf, n);
             outbuf_add(outbuf, n == 1 ? " element\n" : " elements\n");
-            for (i = 0; i < (obj->u.arr->size) - 1; i++)
+            for (i = 0; i < n - 1; i++)
                 svalue_to_string(&(obj->u.arr->item[i]), outbuf,
                                  indent + 2, 1, 0);
-            svalue_to_string(&(obj->u.arr->item[i]), outbuf, 
-                             indent + 2, 0, 0);
+	    if(n)
+	      svalue_to_string(&(obj->u.arr->item[i]), outbuf, 
+			       indent + 2, 0, 0);
             outbuf_add(outbuf, "\n");
             add_space(outbuf, indent);
             outbuf_add(outbuf, " )");

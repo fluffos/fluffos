@@ -1406,8 +1406,8 @@ int yylex()
                 yylval.number = atoi(yytext) - 1;
                 if (yylval.number < 0)
                     yyerror("In function parameter $num, num must be >= 1.");
-                else if (yylval.number > 255)
-                    yyerror("only 256 parameters allowed.");
+                else if (yylval.number > 254)
+                    yyerror("only 255 parameters allowed.");
                 else if (yylval.number >= current_function_context->num_parameters)
                     current_function_context->num_parameters = yylval.number + 1;
                 return L_PARAMETER;

@@ -20,8 +20,10 @@ void free_class P1(array_t *, p)
 array_t *allocate_class P2(class_def_t *, cld, int, has_values) {
     array_t *p;
     int n = cld->size;
-
+    if(!n)
+	n++;
     p = (array_t *)DXALLOC(sizeof(array_t) + sizeof(svalue_t) * (n - 1), TAG_CLASS, "allocate_class");
+    n = cld->size;
     p->ref = 1;
     p->size = n;
     if (has_values) {

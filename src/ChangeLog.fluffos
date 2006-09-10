@@ -1,5 +1,8 @@
 As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :)
+new in FluffOS 1.36
+Fixed crasher when doing restore_variable("(//)")
+Fixed crasher when using 256 local variables in a function pointer
 
 new in FluffOS 1.35
 Fixed crasher when too many classes are used (parser using error result)
