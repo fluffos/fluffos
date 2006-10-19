@@ -13,3 +13,4 @@ int roll_MdN( int, int );
 string add_a( string );
 int vowel( int );
 int num_classes( object );
+string replace(string, string *|string, string|void);

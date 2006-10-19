@@ -8,6 +8,12 @@
     :file "function.h"
     :pointmax 447
     )
+   (semanticdb-table "parser_error.h"
+    :major-mode 'c-mode
+    :tags '(("PARSER_ERROR_H" variable (:constant-flag t) nil [24 49]) ("ERR_IS_NOT" variable (:constant-flag t :default-value (nil)) nil [48 69]) ("ERR_NOT_LIVING" variable (:constant-flag t :default-value (nil)) nil [70 95]) ("ERR_NOT_ACCESSIBLE" variable (:constant-flag t :default-value (nil)) nil [96 124]) ("ERR_AMBIG" variable (:constant-flag t :default-value (nil)) nil [125 145]) ("ERR_ORDINAL" variable (:constant-flag t :default-value (nil)) nil [146 168]) ("ERR_ALLOCATED" variable (:constant-flag t :default-value (nil)) nil [169 193]) ("ERR_THERE_IS_NO" variable (:constant-flag t :default-value (nil)) nil [194 220]) ("ERR_BAD_MULTIPLE" variable (:constant-flag t :default-value (nil)) nil [221 247]) ("ERR_MANY_PATHS" variable (:constant-flag t :default-value (nil)) nil [248 275]))
+    :file "parser_error.h"
+    :pointmax 284
+    )
    )
   :file "semantic.cache"
   :semantic-tag-version "2.0pre3"

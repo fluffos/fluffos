@@ -276,7 +276,8 @@ static object_t *load_virtual_object P2(const char *, name, int, clone)
             destruct_object(new_ob);
             error("Virtual object name duplicates an existing object name.\n");
         }
-
+        /* Make sure O_CLONE is NOT set */
+	new_ob->flags &= ~O_CLONE;
         new_name = alloc_cstring(name, "load_virtual_object");
         SET_TAG(new_name, TAG_OBJ_NAME);
     } else {
@@ -616,19 +617,18 @@ object_t *clone_object P2(const char *, str1, int, num_arg)
         pop_n_elems(num_arg);
         return (0);
     }
-    if (ob->flags & O_CLONE) {
-        if (!(ob->flags & O_VIRTUAL) || strrchr(str1, '#')) {
-            error("Cannot clone from a clone\n");
-        } else {
-            new_ob = load_virtual_object(ob->obname, 1 + num_arg);
-            restore_command_giver();
-            return new_ob;
+    if (ob->flags & O_CLONE) 
+      error("Cannot clone from a clone\n");
 
-            /*
-             * we can skip all of the stuff below since we were already
-             * cloned once to have gotten to this stage.
-             */
-        }
+    if(ob->flags & O_VIRTUAL) {
+      new_ob = load_virtual_object(ob->obname, 1 + num_arg);
+      restore_command_giver();
+      return new_ob;
+      
+      /*
+       * we can skip all of the stuff below since we were already
+       * cloned once to have gotten to this stage.
+       */
     }
     
     /* We do not want the heart beat to be running for unused copied objects */

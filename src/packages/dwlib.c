@@ -869,3 +869,32 @@ f_num_classes PROT((void)) {
 }
 
 #endif
+
+#ifdef F_REPLACE
+
+void f_replace PROT((void)){
+    svalue_t *arg2 = sp - st_num_arg + 2;
+    if(arg2->type == T_STRING){
+	return f_replace_string();
+    } else {
+	array_t *arr = arg2->u.arr;
+	int i = 0;
+	if(arr->size & 1){
+	    error("Wrong array size for replace.\n");
+	}
+	pop_n_elems(st_num_arg-2);
+	sp--;
+	
+	for (i=0;i<arr->size;i+=2){
+	    if(arr->item[i].type == T_STRING && arr->item[i+1].type == T_STRING){
+		share_and_push_string(arr->item[i].u.string);
+		share_and_push_string(arr->item[i+1].u.string);
+		st_num_arg = 3;
+		f_replace_string();
+	    }
+	}
+	free_array(arr);
+    }
+}
+
+#endif
