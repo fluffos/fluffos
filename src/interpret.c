@@ -1217,16 +1217,26 @@ void pop_control_stack()
   if ((csp->framekind & FRAME_MASK) == FRAME_FUNCTION) {
     long secs, usecs, dsecs;
     function_t *cfp = &current_prog->function_table[csp->fr.table_index];
-  
+    int stof = 0;
+
     get_cpu_times((unsigned long *) &secs, (unsigned long *) &usecs);
     dsecs = (((secs - csp->entry_secs) * 1000000)
              + (usecs - csp->entry_usecs));
     cfp->self += dsecs;
+
+    while((csp-stof) != control_stack){
+      if (((csp-stof-1)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
+	(csp-stof)->prog->function_table[(csp-stof-1)->fr.table_index].children += dsecs;
+	break;
+      }
+      stof++;
+    }
+    /*
     if (csp != control_stack) {
       if (((csp - 1)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
         csp->prog->function_table[(csp-1)->fr.table_index].children += dsecs;
       }
-    }
+      }*/
   }
 #endif
   current_object = csp->ob;

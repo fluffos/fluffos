@@ -1,5 +1,9 @@
 As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :)
+new in FluffOS 1.37
+fixed memory leak in restoring gzipped save files (from 2.2)
+improved LPC function profiling (from 2.2)
+
 new in FluffOS 1.36
 Fixed crasher when doing restore_variable("(//)")
 Fixed crasher when using 256 local variables in a function pointer

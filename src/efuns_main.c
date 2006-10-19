@@ -921,7 +921,7 @@ f_function_profile PROT((void))
         add_mapping_pair(map, "self", prog->function_table[j].self
                          - prog->function_table[j].children);
         add_mapping_pair(map, "children", prog->function_table[j].children);
-        add_mapping_shared_string(map, "name", prog->function_table[j].name);
+        add_mapping_shared_string(map, "name", prog->function_table[j].funcname);
         vec->item[j].type = T_MAPPING;
         vec->item[j].u.map = map;
         prog->function_table[j].calls = 0;

@@ -1224,20 +1224,27 @@ restore_object_from_line P3(object_t *, ob, char *, line, int, noclear)
 int
 restore_object_from_gzip P4(object_t *, ob,
                             gzFile, gzf,
-                            int, noclear, int, count)
+                            int, noclear, int *, count)
 {
     static char *buff = NULL;
+    static long buffsize = 0;
     const char* tmp = "";
     int idx;
     int t;
     
-    t = 65536 << count; //should be big enough most of the time
-    if (buff) {
+    t = 65536 << *count; //should be big enough most of the time
+    if (buff && buffsize < t) {
         FREE(buff);
         buff = NULL;
     }
 
-    buff = DXALLOC(t, TAG_TEMPORARY, "restore_object: 6");
+    if(!buff){
+      buff = DXALLOC(t, TAG_TEMPORARY, "restore_object: 6");
+      buffsize = t;
+    }
+
+    t = buffsize;
+
     while (!gzeof(gzf) && tmp != Z_NULL) {
         idx = 0;
         buff[t - 2] = 0;
@@ -1247,6 +1254,12 @@ restore_object_from_gzip P4(object_t *, ob,
         tmp = gzgets(gzf, buff, t);
 
         if (buff[t - 2] != 0 && buff[t - 2] != '\n' && !gzeof(gzf)) {
+	   //prevent trying smaller buffers again
+	   t/=65536;
+	   *count = 0;
+	   while(t>>=1){
+	       (*count)++;
+	   }
            return -1; //retry with bigger buffer
         }
         
@@ -1261,8 +1274,6 @@ restore_object_from_gzip P4(object_t *, ob,
             restore_object_from_line(ob, buff, noclear);
         }
     }
-    FREE(buff);
-    buff = NULL;
     return 0;
 }
 #else
@@ -1668,8 +1679,13 @@ int restore_object P3(object_t *, ob, const char *, file, int, noclear)
     if (!noclear) {
         clear_non_statics(ob);
     }
-    while((restore_object_from_gzip(ob, gzf, noclear, count++)))
+    while((restore_object_from_gzip(ob, gzf, noclear, &count))){
+          count++;
           gzseek(gzf, 0, SEEK_SET);
+	  if (!noclear) {
+	      clear_non_statics(ob);
+	  }
+    }
     gzclose(gzf);
 
 #else
