@@ -1,1 +1,1 @@
-#define PATCH_LEVEL "v1.38"
+#define PATCH_LEVEL "v1.39"

@@ -891,6 +891,8 @@ void f_replace PROT((void)){
 		share_and_push_string(arr->item[i+1].u.string);
 		st_num_arg = 3;
 		f_replace_string();
+		if(sp->type != T_STRING)
+		  break;
 	    }
 	}
 	free_array(arr);

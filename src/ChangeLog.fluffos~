@@ -1,8 +1,5 @@
 As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :)
-new in FluffOS 1.39
-fixed crasher in the replace efun
-
 new in FluffOS 1.38
 replace efun (from 2.3)
 make virtual base obs real base obs (from 2.3)
