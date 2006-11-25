@@ -2132,21 +2132,30 @@ void event P4 (svalue_t *, event_ob, const char *, event_fun, int, numparam,
       apply (name, event_ob->u.ob, numparam + 1, ORIGIN_EFUN);
 
       /* And then call it on it's inventory... */
-
-      for (ob = event_ob->u.ob->contains; ob; ob = ob->next_inv)
-        {
-          if (ob == origin)
-            continue;
-
-          if (ob->flags & O_DESTRUCTED)
-            continue;
-
-          push_object (origin);
-          for (i = 0; i < numparam; i++)
-            push_svalue (event_param + i);
-
-          apply (name, ob, numparam + 1, ORIGIN_EFUN);
-        }
+      int count = 0;
+      for (ob = event_ob->u.ob->contains; ob; ob = ob->next_inv){
+	if (ob == origin)
+	  continue;
+	
+	if (ob->flags & O_DESTRUCTED)
+	  continue;
+	
+	push_object(ob);
+	count++;
+      }
+      while(count--){
+	ob = sp->u.ob;
+	pop_stack();
+	if(ob->flags & O_DESTRUCTED)
+	  continue;
+	else {
+	  push_object(origin);
+	  for (i = 0; i < numparam; i++)
+	    push_svalue (event_param + i);
+	
+	  apply (name, ob, numparam + 1, ORIGIN_EFUN);
+	}
+      }
     }
   sp--;
   FREE_MSTR (name);

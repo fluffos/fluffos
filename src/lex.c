@@ -2143,6 +2143,13 @@ void add_predefines()
             fatal("MLEN exceeded");
         add_predefine(namebuf, -1, mtext);
     }
+    sprintf(save_buf, "%d", sizeof(int));
+    add_predefine("SIZEOFINT", -1, save_buf);
+    int tmp = 1<<31;
+    if(tmp > 0)
+      tmp = 1<<63;
+    sprintf(save_buf, "%d", tmp-1);
+    add_predefine("MAX_INT", -1, save_buf);
 }
 
 void start_new_file P1(int, f)

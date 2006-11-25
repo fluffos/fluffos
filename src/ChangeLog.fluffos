@@ -1,5 +1,9 @@
 As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :)
+new in FluffOS 1.40
+fixed bug in event()
+added SIZEOFINT and MAX_INT predefines (from 2.3)
+
 new in FluffOS 1.39
 fixed crasher in the replace efun
 
