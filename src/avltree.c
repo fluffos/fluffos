@@ -41,14 +41,14 @@ this code, please leave my name (and Wirth's) in the comments.
 /*
  * Prototypes for local functions
  */
-static void sprout PROT((tree **, char *, int *, int (*) (), int (*) ()));
-static int delete PROT((tree **, int (*) (), char *, int (*) (), int *, int *));
-static void del PROT((tree **, int *, tree **, int (*) (), int *));
-static void balanceL PROT((tree **, int *));
-static void balanceR PROT((tree **, int *));
+static void sprout (tree **, char *, int *, int (*) (), int (*) ());
+static int delete (tree **, int (*) (), char *, int (*) (), int *, int *);
+static void del (tree **, int *, tree **, int (*) (), int *);
+static void balanceL (tree **, int *);
+static void balanceR (tree **, int *);
 
 
-void tree_init P1(tree **, ppr_tree)
+void tree_init (tree ** ppr_tree)
 {
     *ppr_tree = NULL;
     return;
@@ -57,7 +57,7 @@ void tree_init P1(tree **, ppr_tree)
 
 char *tree_srch(ppr_tree, pfi_compare, pc_user)
     tree *ppr_tree;
-    int (*pfi_compare) PROT((void *, void *));
+    int (*pfi_compare) (void *, void *);
     char *pc_user;
 {
     register int i_comp;
@@ -102,8 +102,8 @@ static void sprout(ppr, pc_data, pi_balance, pfi_compare, pfi_delete)
     tree **ppr;
     char *pc_data;
     int *pi_balance;
-    int (*pfi_compare) PROT((void *, void *));
-    int (*pfi_delete) PROT((void *));
+    int (*pfi_compare) (void *, void *);
+    int (*pfi_delete) (void *);
 {
     tree *p1, *p2;
     int cmp;
@@ -249,9 +249,9 @@ int tree_delete(ppr_p, pfi_compare, pc_user, pfi_uar)
 static int delete(ppr_p, pfi_compare, pc_user, pfi_uar,
 		      pi_balance, pi_uar_called)
     tree **ppr_p;
-    int (*pfi_compare) PROT((void *, void *));
+    int (*pfi_compare) (void *, void *);
     char *pc_user;
-    int (*pfi_uar) PROT((void *));
+    int (*pfi_uar) (void *);
     int *pi_balance;
     int *pi_uar_called;
 {
@@ -299,7 +299,7 @@ static void del(ppr_r, pi_balance, ppr_q, pfi_uar, pi_uar_called)
     tree **ppr_r;
     int *pi_balance;
     tree **ppr_q;
-    int (*pfi_uar) PROT((void *));
+    int (*pfi_uar) (void *);
     int *pi_uar_called;
 {
     if ((*ppr_r)->tree_r != NULL) {
@@ -321,7 +321,7 @@ static void del(ppr_r, pi_balance, ppr_q, pfi_uar, pi_uar_called)
 }
 
 
-static void balanceL P2(tree **, ppr_p, int *, pi_balance)
+static void balanceL (tree ** ppr_p, int * pi_balance)
 {
     tree *p1, *p2;
     int b1, b2;
@@ -372,7 +372,7 @@ static void balanceL P2(tree **, ppr_p, int *, pi_balance)
 }
 
 
-static void balanceR P2(tree **, ppr_p, int *, pi_balance)
+static void balanceR (tree ** ppr_p, int * pi_balance)
 {
     tree *p1, *p2;
     int b1, b2;
@@ -425,7 +425,7 @@ static void balanceR P2(tree **, ppr_p, int *, pi_balance)
 
 int tree_trav(ppr_tree, pfi_uar)
     tree **ppr_tree;
-    int (*pfi_uar) PROT((void *));
+    int (*pfi_uar) (void *);
 {
     if (!*ppr_tree)
 	return 1;
@@ -442,7 +442,7 @@ int tree_trav(ppr_tree, pfi_uar)
 
 void tree_mung(ppr_tree, pfi_uar)
     tree **ppr_tree;
-    int (*pfi_uar) PROT((void *));
+    int (*pfi_uar) (void *);
 {
     if (*ppr_tree) {
 	tree_mung(&(**ppr_tree).tree_l, pfi_uar);

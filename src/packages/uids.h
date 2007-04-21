@@ -19,11 +19,11 @@ typedef struct _uid {
 extern userid_t *backbone_uid;
 extern userid_t *root_uid;
 
-userid_t *add_uid PROT((const char *name));
-userid_t *set_root_uid PROT((const char *name));
-userid_t *set_backbone_uid PROT((const char *name));
+userid_t *add_uid (const char *name);
+userid_t *set_root_uid (const char *name);
+userid_t *set_backbone_uid (const char *name);
 #ifdef DEBUGMALLOC_EXTENSIONS
-void mark_all_uid_nodes PROT((void));
+void mark_all_uid_nodes (void);
 #endif
 
 #endif

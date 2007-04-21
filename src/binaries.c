@@ -14,8 +14,6 @@
 #include "binaries.h"
 #include "lex.h"
 #include "backend.h"
-#include "swap.h"
-#include "compile_file.h"
 #include "hash.h"
 #include "master.h"
 #include "qsort.h"
@@ -33,18 +31,78 @@ static time_t config_id;
 
 char driver_name[512];
 
-static void patch_out PROT((program_t *, short *, int));
-static void patch_in PROT((program_t *, short *, int));
-static int str_case_cmp PROT((char *, char *));
-static int check_times PROT((time_t, char *));
-static int do_stat PROT((char *, struct stat *, char *));
+static void patch_out (program_t *, short *, int);
+static void patch_in (program_t *, short *, int);
+static int str_case_cmp (char *, char *);
+static int check_times (time_t, char *);
+static int do_stat (char *, struct stat *, char *);
+
+#define DIFF(x, y) ((char *)(x) - (char *)(y))
+#define ADD(x, y) (&(((char *)(y))[(POINTER_INT)x]))
+
+
+static int locate_out (program_t *prog)
+{
+    if (!prog)
+        return 0;
+    debug(d_flag, ("locate_out: %p %p %p %p %p %p %p\n",
+                      prog->program, prog->function_table,
+             prog->strings, prog->variable_table, prog->inherit,
+                      prog->argument_types, prog->type_start));
+
+    prog->program = (char *)DIFF(prog->program, prog);
+    prog->function_table = (function_t *)DIFF(prog->function_table, prog);
+    prog->function_flags = (unsigned short *)DIFF(prog->function_flags, prog);
+    prog->strings = (char **)DIFF(prog->strings, prog);
+    prog->variable_table = (char **)DIFF(prog->variable_table, prog);
+    prog->variable_types = (unsigned short *)DIFF(prog->variable_types, prog);
+    prog->inherit = (inherit_t *)DIFF(prog->inherit, prog);
+    prog->classes = (class_def_t *)DIFF(prog->classes, prog);
+    prog->class_members = (class_member_entry_t *)DIFF(prog->class_members, prog
+);
+    if (prog->type_start) {
+        prog->argument_types = (unsigned short *)DIFF(prog->argument_types, prog
+);
+        prog->type_start = (unsigned short *)DIFF(prog->type_start, prog);
+    }
+    return 1;
+}
+
+static int locate_in (program_t *prog)
+{
+    if (!prog)
+        return 0;
+    prog->program = ADD(prog->program, prog);
+    prog->function_table = (function_t *)ADD(prog->function_table, prog);
+    prog->function_flags = (unsigned short *)ADD(prog->function_flags, prog);
+    prog->strings = (char **)ADD(prog->strings, prog);
+    prog->variable_table = (char **)ADD(prog->variable_table, prog);
+    prog->variable_types = (unsigned short *)ADD(prog->variable_types, prog);
+    prog->inherit = (inherit_t *)ADD(prog->inherit, prog);
+    prog->classes = (class_def_t *)ADD(prog->classes, prog);
+    prog->class_members = (class_member_entry_t *)ADD(prog->class_members, prog)
+;
+    if (prog->type_start) {
+        prog->argument_types = (unsigned short *)ADD(prog->argument_types, prog)
+;
+        prog->type_start = (unsigned short *)ADD(prog->type_start, prog);
+    }
+    debug(d_flag, ("locate_in: %p %p %p %p %p %p %p\n",
+                      prog->program, prog->function_table,
+             prog->strings, prog->variable_table, prog->inherit,
+                      prog->argument_types, prog->type_start));
+
+    return 1;
+}
+
+
 
 /*
  * stats fname or CONFIG_FILE_DIR/fname (for finding config files) and/or
  * BIN_DIR/fname (for finding config files and/or driver), whichever exists.
  */
 static int
-do_stat P3(char *, fname, struct stat *, st, char *, pathname)
+do_stat (char * fname, struct stat * st, char * pathname)
 {
     int i;
     char buf[256];
@@ -81,7 +139,7 @@ do_stat P3(char *, fname, struct stat *, st, char *, pathname)
     return -1;
 }                               /* do_stat() */
 
-void save_binary P3(program_t *, prog, mem_block_t *, includes, mem_block_t *, patches)
+void save_binary (program_t * prog, mem_block_t * includes, mem_block_t * patches)
 {
     char file_name_buf[200];
     char *file_name = file_name_buf;
@@ -112,12 +170,7 @@ void save_binary P3(program_t *, prog, mem_block_t *, includes, mem_block_t *, p
     strcat(file_name, "/");
     strcat(file_name, prog->filename);
     len = strlen(file_name);
-#ifdef LPC_TO_C
-    if (compile_to_c)
-        file_name[len - 1] = 'B';       /* change .c ending to .B */
-    else
-#endif
-        file_name[len - 1] = 'b';       /* change .c ending to .b */
+    file_name[len - 1] = 'b';       /* change .c ending to .b */
 
     if (!(f = crdir_fopen(file_name)))
         return;
@@ -236,17 +289,9 @@ void save_binary P3(program_t *, prog, mem_block_t *, includes, mem_block_t *, p
     if ((size) > buf_size) { FREE(buf); buf = DXALLOC(buf_size = size, TAG_TEMPORARY, "ALLOC_BUF"); }
 
 /* crude hack to check both .B and .b */
-#ifdef LPC_TO_C
-#define OUT_OF_DATE (lpc_obj ? load_binary(name, 0) : 0)
-#else
 #define OUT_OF_DATE 0
-#endif
 
-#ifdef LPC_TO_C
-program_t *int_load_binary P2(char *, name, lpc_object_t *, lpc_obj)
-#else
-program_t *int_load_binary P1(char *, name)
-#endif
+program_t *int_load_binary (char * name)
 {
     char file_name_buf[400];
     char *buf, *iname, *file_name = file_name_buf, *file_name_two = &file_name_buf[200];
@@ -265,11 +310,7 @@ program_t *int_load_binary P1(char *, name)
     if (file_name[0] == '/')
         file_name++;
     len = strlen(file_name);
-#ifdef LPC_TO_C
-    file_name[len - 1] = (lpc_obj ? 'B' : 'b'); /* change .c ending to .b */
-#else
     file_name[len - 1] = 'b';
-#endif
 
     if (stat(file_name, &st) != -1)
         mtime = st.st_mtime;
@@ -306,11 +347,7 @@ program_t *int_load_binary P1(char *, name)
         FREE(buf);
         return OUT_OF_DATE;
     }
-    if ((fread((char *) &i, sizeof i, 1, f) != 1 || driver_id != i)
-#ifdef LPC_TO_C
-        && !lpc_obj
-#endif
-            ) {
+    if ((fread((char *) &i, sizeof i, 1, f) != 1 || driver_id != i)) {
         if (comp_flag)
             debug_message("out of date. (driver changed)\n");
         fclose(f);
@@ -365,7 +402,7 @@ program_t *int_load_binary P1(char *, name)
     fread((char *) &ilen, sizeof ilen, 1, f);
     p = (program_t *) DXALLOC(ilen, TAG_PROGRAM, "load_binary");
     fread((char *) p, ilen, 1, f);
-    locate_in(p);               /* from swap.c */
+    locate_in(p);              
     p->filename = make_shared_string(name);
 
     /* Read inherit names and find prog.  Check mod times also. */
@@ -460,32 +497,17 @@ program_t *int_load_binary P1(char *, name)
     total_prog_block_size += prog->total_size;
     total_num_prog_blocks += 1;
 
-    swap_line_numbers(prog);
     reference_prog(prog, "load_binary");
     for (i = 0; (unsigned) i < prog->num_inherited; i++) {
         reference_prog(prog->inherit[i].prog, "inheritance");
     }
-
-#ifdef LPC_TO_C
-    if (prog->program_size == 0) {
-        if (lpc_obj) {
-            if (comp_flag)
-                debug_message("linking jump table ...\n");
-            link_jump_table(prog, (void **)lpc_obj->jump_table);
-        } else {
-            if (prog)
-                free_prog(prog, 1);
-            return OUT_OF_DATE;
-        }
-    }
-#endif
 
     if (comp_flag)
         debug_message("done.\n");
     return prog;
 }                               /* load_binary() */
 
-void init_binaries P2(int, argc, char **, argv)
+void init_binaries (int argc, char ** argv)
 {
     struct stat st;
     int arg_id, i;
@@ -519,7 +541,7 @@ void init_binaries P2(int, argc, char **, argv)
  * Test against modification times.  -1 if file doesn't exist,
  * 0 if out of date, and 1 if it's ok.
  */
-static int check_times P2(time_t, mtime, char *, nm)
+static int check_times (time_t mtime, char * nm)
 {
     struct stat st;
 
@@ -542,7 +564,7 @@ static int check_times P2(time_t, mtime, char *, nm)
  * I set things up so these routines can be used with other things
  * that might need patching.
  */
-static void patch_out P3(program_t *, prog, short *, patches, int, len)
+static void patch_out (program_t * prog, short * patches, int len)
 {
     int i;
     char *p;
@@ -575,7 +597,7 @@ static void patch_out P3(program_t *, prog, short *, patches, int, len)
     }
 }                               /* patch_out() */
 
-static int str_case_cmp P2(char *, a, char *, b)
+static int str_case_cmp (char * a, char * b)
 {
     char *s1, *s2;
 
@@ -585,7 +607,7 @@ static int str_case_cmp P2(char *, a, char *, b)
     return s1 - s2;
 }                               /* str_case_cmp() */
 
-static void patch_in P3(program_t *, prog, short *, patches, int, len)
+static void patch_in (program_t * prog, short * patches, int len)
 {
     int i;
     char *p;
@@ -627,7 +649,7 @@ static void patch_in P3(program_t *, prog, short *, patches, int, len)
 /*
  * open file for writing, creating intermediate directories if needed.
  */
-FILE *crdir_fopen P1(char *, file_name)
+FILE *crdir_fopen (char * file_name)
 {
     char *p;
     struct stat st;

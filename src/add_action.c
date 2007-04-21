@@ -16,7 +16,7 @@ static int	    illegal_sentence_action;
 static char *	    last_verb;
 static object_t *   illegal_sentence_ob;
 
-static void notify_no_command PROT((void))
+static void notify_no_command (void)
 {
     union string_or_func p;
     svalue_t *v;
@@ -47,7 +47,7 @@ static void notify_no_command PROT((void))
     }
 }
 
-void clear_notify P1(object_t *, ob)
+void clear_notify (object_t * ob)
 {
     union string_or_func dem;
     interactive_t *ip = ob->interactive;
@@ -62,12 +62,12 @@ void clear_notify P1(object_t *, ob)
     ip->default_err_message.s = 0;
 }
 
-INLINE_STATIC int hash_living_name P1(char *, str)
+INLINE_STATIC int hash_living_name (char * str)
 {
     return whashstr(str, 20) & (CFG_LIVING_HASH_SIZE - 1);
 }
 
-object_t *find_living_object P2(char *, str, int, user)
+object_t *find_living_object (char * str, int user)
 {
     object_t **obp, *tmp;
     object_t **hl;
@@ -103,7 +103,7 @@ object_t *find_living_object P2(char *, str, int, user)
     return tmp;
 }
 
-void remove_living_name P1(object_t *, ob)
+void remove_living_name (object_t * ob)
 {
     object_t **hl;
 
@@ -128,7 +128,7 @@ void remove_living_name P1(object_t *, ob)
     ob->living_name = 0;
 }
 
-static void set_living_name P2(object_t *, ob, char *, str)
+static void set_living_name (object_t * ob, char * str)
 {
     int flags = ob->flags & O_ENABLE_COMMANDS;
     object_t **hl;
@@ -144,7 +144,7 @@ static void set_living_name P2(object_t *, ob, char *, str)
     ob->flags |= flags;
 }
 
-void stat_living_objects P1(outbuffer_t *, out)
+void stat_living_objects (outbuffer_t * out)
 {
     outbuf_add(out, "Hash table of living objects:\n");
     outbuf_add(out, "-----------------------------\n");
@@ -152,7 +152,7 @@ void stat_living_objects P1(outbuffer_t *, out)
 		num_living_names, (double) search_length / num_searches);
 }
 
-void setup_new_commands P2(object_t *, dest, object_t *, item)
+void setup_new_commands (object_t * dest, object_t * item)
 {
     object_t *next_ob, *ob;
 
@@ -217,7 +217,7 @@ void setup_new_commands P2(object_t *, dest, object_t *, item)
  * Also check if the user is a wizard. Wizards must not affect the
  * value of the wizlist ranking.
  */
-static void enable_commands P1(int, num)
+static void enable_commands (int num)
 {
 #ifndef NO_ENVIRONMENT
     object_t *pp;
@@ -256,7 +256,7 @@ static void enable_commands P1(int, num)
  * Return success status.
  */
 
-static int user_parser P1(char *, buff)
+static int user_parser (char * buff)
 {
     char verb_buff[MAX_VERB_BUFF];
     sentence_t *s;
@@ -422,7 +422,7 @@ static int user_parser P1(char *, buff)
  * The command can also come from a NPC.
  * Beware that 'str' can be modified and extended !
  */
-int parse_command P2(char *, str, object_t *, ob)
+int parse_command (char * str, object_t * ob)
 {
     int res;
 
@@ -456,7 +456,7 @@ int parse_command P2(char *, str, object_t *, ob)
  * If the call is from a shadow, make it look like it is really from
  * the shadowed object.
  */
-static void add_action P3(svalue_t *, str, char *, cmd, int, flag)
+static void add_action (svalue_t * str, char * cmd, int flag)
 {
     sentence_t *p;
     object_t *ob;
@@ -507,7 +507,7 @@ static void add_action P3(svalue_t *, str, char *, cmd, int, flag)
  * if success.  If command_giver, remove his action, otherwise
  * remove current_object's action.
  */
-static int remove_action P2(char *, act, char *, verb)
+static int remove_action (char * act, char * verb)
 {
     object_t *ob;
     sentence_t **s;
@@ -541,7 +541,7 @@ static int remove_action P2(char *, act, char *, verb)
  * 'user'
  */
 #ifndef NO_ENVIRONMENT
-void remove_sent P2(object_t *, ob, object_t *, user)
+void remove_sent (object_t * ob, object_t * user)
 {
     sentence_t **s;
 
@@ -570,7 +570,7 @@ void remove_sent P2(object_t *, ob, object_t *, user)
 
 #ifdef F_ADD_ACTION
 void
-f_add_action PROT((void))
+f_add_action (void)
 {
     int flag;
 
@@ -606,7 +606,7 @@ f_add_action PROT((void))
  * Return cost of the command executed if success (> 0).
  * When failure, return 0.
  */
-void f_command PROT((void))
+void f_command (void)
 {
     int rc = 0;
 
@@ -631,28 +631,28 @@ void f_command PROT((void))
 #endif
 
 #ifdef F_COMMANDS
-void f_commands PROT((void))
+void f_commands (void)
 {
     push_refed_array(commands(current_object));
 }
 #endif
 
 #ifdef F_DISABLE_COMMANDS
-void f_disable_commands PROT((void))
+void f_disable_commands (void)
 {
     enable_commands(0);
 }
 #endif
 
 #ifdef F_ENABLE_COMMANDS
-void f_enable_commands PROT((void))
+void f_enable_commands (void)
 {
     enable_commands(1);
 }
 #endif
 
 #ifdef F_FIND_LIVING
-void f_find_living PROT((void))
+void f_find_living (void)
 {
     object_t *ob;
 
@@ -668,7 +668,7 @@ void f_find_living PROT((void))
 #endif
 
 #ifdef F_FIND_PLAYER
-void f_find_player PROT((void))
+void f_find_player (void)
 {
     object_t *ob;
 
@@ -684,7 +684,7 @@ void f_find_player PROT((void))
 #endif
 
 #ifdef F_LIVING
-void f_living PROT((void))
+void f_living (void)
 {
     if (sp->u.ob->flags & O_ENABLE_COMMANDS) {
 	free_object(sp->u.ob, "f_living:1");
@@ -697,14 +697,14 @@ void f_living PROT((void))
 #endif
 
 #ifdef F_LIVINGS
-void f_livings PROT((void))
+void f_livings (void)
 {
     push_refed_array(livings());
 }
 #endif
 
 #ifdef F_NOTIFY_FAIL
-void f_notify_fail PROT((void))
+void f_notify_fail (void)
 {
     if (command_giver && command_giver->interactive) {
 	clear_notify(command_giver);
@@ -721,7 +721,7 @@ void f_notify_fail PROT((void))
 #endif
 
 #ifdef F_QUERY_VERB
-void f_query_verb PROT((void))
+void f_query_verb (void)
 {
     if (!last_verb) {
 	push_number(0);
@@ -732,7 +732,7 @@ void f_query_verb PROT((void))
 #endif
 
 #ifdef F_REMOVE_ACTION
-void f_remove_action PROT((void))
+void f_remove_action (void)
 {
     int success;
 
@@ -744,7 +744,7 @@ void f_remove_action PROT((void))
 #endif
 
 #ifdef F_SET_LIVING_NAME
-void f_set_living_name PROT((void))
+void f_set_living_name (void)
 {
     set_living_name(current_object, sp->u.string);
     free_string_svalue(sp--);

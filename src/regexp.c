@@ -8,11 +8,7 @@
  *      make it consistent with the rest of the code, you will find a
  *      modified version of Henry Specer's regular expression library.
  *      Henry's functions were modified to provide the minimal regular
- *      expression matching, as required by P1003.  Henry's code was
- *      copyrighted, and copy of the copyright message and restrictions
- *      are provided, verbatim, below:
- *
- *      Copyright (c) 1986 by University of Toronto.
+ *      expression matching, as required by (c) 1986 by University of Toronto.
  *      Written by Henry Spencer.  Not derived from licensed software.
  *
  *      Permission is granted to anyone to use this software for any
@@ -239,22 +235,22 @@ static int regsize;             /* Code size. */
 #ifndef STATIC
 #define STATIC  static
 #endif
-STATIC char *reg PROT((int, int *));
-STATIC char *regbranch PROT((int *));
-STATIC char *regpiece PROT((int *));
-STATIC char *regatom PROT((int *));
-STATIC char *regnode PROT((char));
-STATIC char *regnext PROT((char *));
-STATIC void regc PROT((char));
-STATIC void reginsert PROT((char, char *));
-STATIC void regtail PROT((char *, char *));
-STATIC void regoptail PROT((char *, char *));
+STATIC char *reg (int, int *);
+STATIC char *regbranch (int *);
+STATIC char *regpiece (int *);
+STATIC char *regatom (int *);
+STATIC char *regnode (char);
+STATIC char *regnext (char *);
+STATIC void regc (char);
+STATIC void reginsert (char, char *);
+STATIC void regtail (char *, char *);
+STATIC void regoptail (char *, char *);
 
 #ifdef STRCSPN
 STATIC int strcspn();
 #endif
 
-STATIC void regerror P1(const char *, s) {
+STATIC void regerror (const char * s) {
     switch (regexp_user) {
     case ED_REGEXP:
         ED_OUTPUTV(ED_DEST, "ed: regular expression error: %s", s);
@@ -280,8 +276,8 @@ STATIC void regerror P1(const char *, s) {
  * Beware that the optimization-preparation code in here knows about some
  * of the structure of the compiled regexp.
  */
-regexp *regcomp P2(unsigned char *, exp,
-                   int, excompat)       /* \( \) operators like in unix ex */
+regexp *regcomp (unsigned char * exp,
+                   int excompat)       /* \( \) operators like in unix ex */
 {
     register regexp *r;
     register unsigned char *scan;
@@ -437,8 +433,8 @@ regexp *regcomp P2(unsigned char *, exp,
  * is a trifle forced, but the need to tie the tails of the branches to what
  * follows makes it hard to avoid.
  */
-static char *reg P2(int, paren, /* Parenthesized? */
-                         int *, flagp)
+static char *reg (int paren, /* Parenthesized? */
+                         int * flagp)
 {
     register char *ret;
     register char *br;
@@ -506,7 +502,7 @@ static char *reg P2(int, paren, /* Parenthesized? */
  *
  * Implements the concatenation operator.
  */
-static char *regbranch P1(int *, flagp)
+static char *regbranch (int * flagp)
 {
     register char *ret;
     register char *chain;
@@ -543,7 +539,7 @@ static char *regbranch P1(int *, flagp)
  * seem that this node could be dispensed with entirely, but the endmarker
  * role is not redundant.
  */
-static char *regpiece P1(int *, flagp)
+static char *regpiece (int * flagp)
 {
     register char *ret;
     register short op;
@@ -603,7 +599,7 @@ static char *regpiece P1(int *, flagp)
  * it can turn them into a single node, which is smaller to store and
  * faster to run.
  */
-static char *regatom P1(int *, flagp)
+static char *regatom (int * flagp)
 {
     register char *ret;
     int flags;
@@ -714,7 +710,7 @@ static char *regatom P1(int *, flagp)
 /*
  - regnode - emit a node
  */
-static char *regnode P1(char, op)
+static char *regnode (char op)
 {
     register char *ret;
     register char *ptr;
@@ -736,7 +732,7 @@ static char *regnode P1(char, op)
 /*
  - regc - emit (if appropriate) a byte of code
  */
-static void regc P1(char, b)
+static void regc (char b)
 {
     if (regcode != &regdummy)
         *regcode++ = b;
@@ -749,7 +745,7 @@ static void regc P1(char, b)
  *
  * Means relocating the operand.
  */
-static void reginsert P2(char, op, char *, opnd)
+static void reginsert (char op, char * opnd)
 {
     register char *src;
     register char *dst;
@@ -774,7 +770,7 @@ static void reginsert P2(char, op, char *, opnd)
 /*
  - regtail - set the next-pointer at the end of a node chain
  */
-static void regtail P2(char *, p, char *, val)
+static void regtail (char * p, char * val)
 {
     register char *scan;
     register char *temp;
@@ -803,7 +799,7 @@ static void regtail P2(char *, p, char *, val)
 /*
  - regoptail - regtail on operand of first argument; nop if operandless
  */
-static void regoptail P2(char *, p, char *, val)
+static void regoptail (char * p, char * val)
 {
     /* "Operandless" and "op != BRANCH" are synonymous in practice. */
     if (p == (char *) NULL || p == &regdummy || OP(p) != BRANCH)
@@ -826,21 +822,21 @@ static const char **regendp;    /* Ditto for endp. */
 /*
  * Forwards.
  */
-STATIC int regtry PROT((regexp *, const char *));
-STATIC int regmatch PROT((char *));
-STATIC int regrepeat PROT((char *));
+STATIC int regtry (regexp *, const char *);
+STATIC int regmatch (char *);
+STATIC int regrepeat (char *);
 
 #ifdef DEBUG
 int regnarrate = 0;
-void regdump PROT((regexp *));
-STATIC char *regprop PROT((char *));
+void regdump (regexp *);
+STATIC char *regprop (char *);
 
 #endif
 
 /*
  - regexec - match a regexp against a string
  */
-int regexec P2(register regexp *, prog, register const char *, string)
+int regexec (register regexp * prog, register const char * string)
 {
     register const char *s;
 
@@ -895,7 +891,7 @@ int regexec P2(register regexp *, prog, register const char *, string)
 /*
  - regtry - try match at specific point
  */
-static int regtry P2(regexp *, prog, const char *, string)
+static int regtry (regexp * prog, const char * string)
 {
     register int i;
     register const char **sp;
@@ -929,7 +925,7 @@ static int regtry P2(regexp *, prog, const char *, string)
  * need to know whether the rest of the match failed) by a loop instead of
  * by recursion.
  */
-static int regmatch P1(char *, prog)
+static int regmatch (char * prog)
 {
     register char *scan;        /* Current node. */
     char *nxt;                  /* nxt node. */
@@ -1128,7 +1124,7 @@ static int regmatch P1(char *, prog)
 /*
  - regrepeat - repeatedly match something simple, report how many
  */
-static int regrepeat P1(char *, p)
+static int regrepeat (char * p)
 {
     register int count = 0;
     register const char *scan;
@@ -1173,7 +1169,7 @@ static int regrepeat P1(char *, p)
 /*
  - regnext - dig the "nxt" pointer out of a node
  */
-static char *regnext P1(register char *, p)
+static char *regnext (register char * p)
 {
     register int offset;
 
@@ -1192,12 +1188,12 @@ static char *regnext P1(register char *, p)
 
 #ifdef DEBUG
 
-STATIC char *regprop PROT((char *));
+STATIC char *regprop (char *);
 
 /*
  - regdump - dump a regexp onto stdout in vaguely comprehensible form
  */
-void regdump P1(regexp *, r)
+void regdump (regexp * r)
 {
     register char *s;
     register char op = EXACTLY; /* Arbitrary non-END op. */
@@ -1242,7 +1238,7 @@ void regdump P1(regexp *, r)
 /*
  - regprop - printable representation of opcode
  */
-static char *regprop P1(char *, op)
+static char *regprop (char * op)
 {
     register char *p;
     static char buf[50];
@@ -1338,7 +1334,7 @@ static char *regprop P1(char *, op)
  * strcspn - find length of initial segment of s1 consisting entirely
  * of characters not from s2
  */
-static int strcspn P2(char *, s1, char *, s2)
+static int strcspn (char * s1, char * s2)
 {
     register char *scan1;
     register char *scan2;
@@ -1359,7 +1355,7 @@ static int strcspn P2(char *, s1, char *, s2)
 /*
  - regsub - perform substitutions after a regexp match
  */
-char *regsub P4(regexp *, prog, char *, source, char *, dest, int, n)
+char *regsub (regexp * prog, char * source, char * dest, int n)
 {
     register char *src;
     register char *dst;

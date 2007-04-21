@@ -63,6 +63,6 @@
 /*
  * missing from the "standard" include files
  */
-int gethostname PROT((char *, int));
+int gethostname (char *, int);
 
 #endif

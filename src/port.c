@@ -7,7 +7,7 @@
 #include <sys/mman.h>
 
 #if defined(WIN32) || defined(LATTICE)
-int dos_style_link P2(char *, x, char *, y) {
+int dos_style_link (char * x, char * y) {
     char link_cmd[100];
     sprintf(link_cmd, "copy %s %s", x, y);
     return system(link_cmd);
@@ -23,13 +23,13 @@ int dos_style_link P2(char *, x, char *, y) {
 #endif
 
 #ifdef sun
-time_t time PROT((time_t *));
+time_t time (time_t *);
 #endif
 
 /*
  * Return a pseudo-random number in the range 0 .. n-1
  */
-int random_number P1(int, n)
+int random_number (int n)
 {
 #if defined(RAND) || defined(DRAND48)
     static char called = 0;
@@ -73,9 +73,12 @@ int get_current_time()
     return (int) time(0l);	/* Just use the old time() for now */
 }
 
-char *time_string P1(time_t, t)
+char *time_string (time_t t)
 {
-    return ctime(&t);
+    char *res = ctime(&t);
+    if(!res)
+      res = "ctime failed";
+    return res;
 }
 
 /*
@@ -92,7 +95,7 @@ void init_usec_clock()
  * Get a microsecond clock sample.
  */
 void
-get_usec_clock P2(long *, sec, long *, usec)
+get_usec_clock (long * sec, long * usec)
 {
 #ifdef HAS_GETTIMEOFDAY
     struct timeval tv;
@@ -125,7 +128,7 @@ get_usec_clock P2(long *, sec, long *, usec)
 
 #ifdef USE_POSIX_SIGNALS
 int
-port_sigblock P1(sigset_t, mask)
+port_sigblock (sigset_t mask)
 {
     sigset_t omask;
 
@@ -134,7 +137,7 @@ port_sigblock P1(sigset_t, mask)
 }
 
 int
-port_sigmask P1(int, sig)
+port_sigmask (int sig)
 {
     sigset_t set;
 
@@ -159,7 +162,7 @@ void
 }
 
 int
-port_sigsetmask P1(sigset_t, mask)
+port_sigsetmask (sigset_t mask)
 {
     sigset_t omask;
 
@@ -169,7 +172,7 @@ port_sigsetmask P1(sigset_t, mask)
 #endif
 
 int
-get_cpu_times P2(unsigned long *, secs, unsigned long *, usecs)
+get_cpu_times (unsigned long * secs, unsigned long * usecs)
 {
 #ifdef RUSAGE
     struct rusage rus;
@@ -226,7 +229,7 @@ get_cpu_times P2(unsigned long *, secs, unsigned long *, usecs)
 
 /* return the current working directory */
 char *
-     get_current_dir P2(char *, buf, int, limit)
+     get_current_dir (char * buf, int limit)
 {
 #ifdef HAS_GETCWD
     return getcwd(buf, limit);	/* POSIX */
@@ -242,7 +245,7 @@ char *
 extern char *sys_errlist[];
 extern int sys_nerr;
 
-char *port_strerror P1(int, which)
+char *port_strerror (int which)
 {
     if ((which < 0) || (which >= sys_nerr)) {
 	return "unknown error";
@@ -254,7 +257,7 @@ char *port_strerror P1(int, which)
 
 #ifdef MEMMOVE_MISSING
 /* for those without memmove() and a working bcopy() that can handle overlaps */
-INLINE char *memmove P3(register char *, b, register char *, a, register int, s)
+INLINE char *memmove (register char * b, register char * a, register int s)
 {
     char *r = b;
 
@@ -312,7 +315,7 @@ void * sbrkx(long size){
 
 #else
 
-void *sbrkx(int size){
+void *sbrkx(long size){
   return sbrk(size);
 }
 #endif

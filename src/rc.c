@@ -20,9 +20,9 @@ int config_int[NUM_CONFIG_INTS];
 static char *buff;
 static int buff_size;
 
-static void read_config_file PROT((FILE *));
-static int scan_config_line PROT((const char *, void *, int));
-static void config_init PROT((void)); /* don't ask */
+static void read_config_file (FILE *);
+static int scan_config_line (const char *, void *, int);
+static void config_init (void); /* don't ask */
 
 static void config_init() {
     int i;
@@ -36,7 +36,7 @@ static void config_init() {
     
 }
 
-static void read_config_file P1(FILE *, file)
+static void read_config_file (FILE * file)
 {
     char str[MAX_LINE_LENGTH * 4];
     int size = 2, len, tmp;
@@ -82,7 +82,7 @@ static void read_config_file P1(FILE *, file)
       1  : Must have
       0  : optional
       -1 : warn if missing */
-static int scan_config_line P3(const char *, fmt, void *, dest, int, required)
+static int scan_config_line (const char * fmt, void * dest, int required)
 {
     char *tmp, *end;
     char missing_line[MAX_LINE_LENGTH];
@@ -140,7 +140,7 @@ static char *process_config_string(char *str) {
 }
 #endif
 
-void set_defaults P1(char *, filename)
+void set_defaults (char * filename)
 {
     FILE *def;
     char defaults[SMALL_STRING_SIZE];
@@ -374,7 +374,7 @@ void set_defaults P1(char *, filename)
     config_int[__LIVING_HASH_TABLE_SIZE__ - BASE_CONFIG_INT] = CFG_LIVING_HASH_SIZE;
 }
 
-int get_config_item P2(svalue_t *, res, svalue_t *, arg)
+int get_config_item (svalue_t * res, svalue_t * arg)
 {
     int num;
 

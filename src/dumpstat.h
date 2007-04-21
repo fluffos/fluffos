@@ -6,7 +6,7 @@
 /*
  * dumpstat.c
  */
-int data_size PROT((object_t *));
-void dumpstat PROT((const char *));
+int data_size (object_t *);
+void dumpstat (const char *);
 
 #endif

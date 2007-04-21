@@ -21,7 +21,7 @@ typedef struct md_node_s {
 #define MD_OVERHEAD (sizeof(md_node_t) + sizeof(int))
 #define MD_MAGIC 0x4bee4bee
 
-void check_all_blocks PROT((int));
+void check_all_blocks (int);
 #else
 #define MD_OVERHEAD (sizeof(md_node_t))
 #endif
@@ -48,16 +48,16 @@ void check_all_blocks PROT((int));
 extern int malloc_mask;
 extern unsigned int total_malloced;
 extern unsigned int hiwater;
-void MDinit PROT((void));
-void MDmalloc PROT((md_node_t *, int, int, char *));
-int MDfree PROT((void *));
+void MDinit (void);
+void MDmalloc (md_node_t *, int, int, char *);
+int MDfree (void *);
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 struct svalue_s;
 
-void mark_svalue PROT((struct svalue_s *));
-void set_tag PROT((void *, int));
-void check_string_stats PROT((outbuffer_t *));
+void mark_svalue (struct svalue_s *);
+void set_tag (void *, int);
+void check_string_stats (outbuffer_t *);
 #endif
 
 #define MAX_CATEGORY 130

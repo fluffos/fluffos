@@ -7,9 +7,9 @@
  * rc.c
  */
 
-void set_defaults PROT((char *));
-int get_config_int PROT((int));
-char *get_config_str PROT((int));
-int get_config_item PROT((svalue_t *, svalue_t *));
+void set_defaults (char *);
+int get_config_int (int);
+char *get_config_str (int);
+int get_config_item (svalue_t *, svalue_t *);
 
 #endif

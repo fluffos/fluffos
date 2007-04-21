@@ -33,27 +33,27 @@ typedef struct _statgroup {
 #define DOMAIN_STATS_FILE_NAME "domain_stats"
 #define AUTHOR_STATS_FILE_NAME "author_stats"
 
-void assign_stats PROT((statgroup_t *, struct object_s *));
-void null_stats PROT((statgroup_t *));
-void init_stats_for_object PROT((struct object_s *));
+void assign_stats (statgroup_t *, struct object_s *);
+void null_stats (statgroup_t *);
+void init_stats_for_object (struct object_s *);
 
-void add_moves PROT((statgroup_t *, int));
-INLINE void add_heart_beats PROT((statgroup_t *, int));
-void add_array_size PROT((statgroup_t *, int));
-void add_errors PROT((statgroup_t *, int));
-void add_errors_for_file PROT((char *, int));
-void add_objects PROT((statgroup_t *, int));
-struct mapping_s *get_domain_stats PROT((char *));
-struct mapping_s *get_author_stats PROT((char *));
-void mudlib_stats_decay PROT((void));
-void save_stat_files PROT((void));
-void restore_stat_files PROT((void));
-void set_author PROT((char *));
-mudlib_stats_t *set_master_author PROT((char *));
-mudlib_stats_t *set_backbone_domain PROT((char *));
-int check_valid_stat_entry PROT((mudlib_stats_t *));
+void add_moves (statgroup_t *, int);
+INLINE void add_heart_beats (statgroup_t *, int);
+void add_array_size (statgroup_t *, int);
+void add_errors (statgroup_t *, int);
+void add_errors_for_file (char *, int);
+void add_objects (statgroup_t *, int);
+struct mapping_s *get_domain_stats (char *);
+struct mapping_s *get_author_stats (char *);
+void mudlib_stats_decay (void);
+void save_stat_files (void);
+void restore_stat_files (void);
+void set_author (char *);
+mudlib_stats_t *set_master_author (char *);
+mudlib_stats_t *set_backbone_domain (char *);
+int check_valid_stat_entry (mudlib_stats_t *);
 #ifdef DEBUGMALLOC_EXTENSIONS
-void mark_mudlib_stats PROT((void));
+void mark_mudlib_stats (void);
 #endif
 
 #endif

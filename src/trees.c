@@ -116,8 +116,8 @@ new_node_no_line() {
 
 /* quick routine to make a generic branched node */
 parse_node_t *
-make_branched_node P4(short, kind, char, type, 
-                      parse_node_t *, l, parse_node_t *, r) {
+make_branched_node (short kind, char type, 
+                      parse_node_t * l, parse_node_t * r) {
     parse_node_t *ret;
 
     ret = new_node();
@@ -130,8 +130,8 @@ make_branched_node P4(short, kind, char, type,
 
 /* create an optimized typical binary integer operator */
 parse_node_t *
-binary_int_op P4(parse_node_t *, l, parse_node_t *, r,
-                 char, op, const char *, name) {
+binary_int_op (parse_node_t * l, parse_node_t * r,
+                 char op, const char * name) {
     parse_node_t *ret;
     
     if (exact_types) {
@@ -190,9 +190,9 @@ binary_int_op P4(parse_node_t *, l, parse_node_t *, r,
     return ret;
 }
 
-parse_node_t *make_range_node P4(int, code, parse_node_t *, expr,
-                                      parse_node_t *, l,
-                                      parse_node_t *, r) {
+parse_node_t *make_range_node (int code, parse_node_t * expr,
+                                      parse_node_t * l,
+                                      parse_node_t * r) {
     parse_node_t *newnode;
 
     if (r) {
@@ -225,7 +225,7 @@ parse_node_t *make_range_node P4(int, code, parse_node_t *, expr,
     return newnode;
 }
 
-parse_node_t *insert_pop_value P1(parse_node_t *, expr) {
+parse_node_t *insert_pop_value (parse_node_t * expr) {
     parse_node_t *replacement;
 
     if (!expr)
@@ -343,7 +343,7 @@ parse_node_t *insert_pop_value P1(parse_node_t *, expr) {
             break;
         case F_ASSIGN:
             if (IS_NODE(expr->r.expr, NODE_OPCODE_1, F_LOCAL_LVALUE)) {
-                int tmp = expr->r.expr->l.number;
+                long tmp = expr->r.expr->l.number;
                 expr->kind = NODE_UNARY_OP_1;
                 expr->r.expr = expr->l.expr;
                 expr->v.number = F_VOID_ASSIGN_LOCAL;
@@ -368,7 +368,7 @@ parse_node_t *insert_pop_value P1(parse_node_t *, expr) {
     return replacement;
 }
 
-parse_node_t *pop_value P1(parse_node_t *, pn) {
+parse_node_t *pop_value (parse_node_t * pn) {
     if (pn) {
         parse_node_t *ret = insert_pop_value(pn);
 
@@ -385,7 +385,7 @@ parse_node_t *pop_value P1(parse_node_t *, pn) {
     return 0;
 }
 
-int is_boolean P1(parse_node_t *, pn) {
+int is_boolean (parse_node_t * pn) {
     switch (pn->kind) {
     case NODE_UNARY_OP:
         if (pn->v.number == F_NOT)
@@ -402,7 +402,7 @@ int is_boolean P1(parse_node_t *, pn) {
     return 0;
 }
 
-parse_node_t *optimize_loop_test P1(parse_node_t *, pn) {
+parse_node_t *optimize_loop_test (parse_node_t * pn) {
     parse_node_t *ret;
 
     if (!pn) return 0;
@@ -421,7 +421,7 @@ parse_node_t *optimize_loop_test P1(parse_node_t *, pn) {
             ret = pn;
     } else if (IS_NODE(pn, NODE_UNARY_OP, F_POST_DEC) &&
                IS_NODE(pn->r.expr, NODE_OPCODE_1, F_LOCAL_LVALUE)) {
-        int lvar = pn->r.expr->l.number;
+        long lvar = pn->r.expr->l.number;
         CREATE_OPCODE_1(ret, F_WHILE_DEC, 0, lvar);
     } else
         ret = pn;

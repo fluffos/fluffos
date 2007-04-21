@@ -126,9 +126,9 @@ typedef struct ed_buffer_s {
 /*
  * ed.c
  */
-void ed_start PROT((const char *, const char *, const char *, int, object_t *));
-void ed_cmd PROT((char *));
-void save_ed_buffer PROT((object_t *));
+void ed_start (const char *, const char *, const char *, int, object_t *);
+void ed_cmd (char *);
+void save_ed_buffer (object_t *);
 
 #ifdef OLD_ED
 #define ED_OUTPUT(x, y) add_message(x, y, strlen(y))
@@ -141,12 +141,12 @@ void save_ed_buffer PROT((object_t *));
 #endif
 
 #ifndef OLD_ED
-char *object_ed_cmd PROT((object_t *, char *));
-char *object_ed_start PROT((object_t *, char *, int));
-int object_ed_mode PROT((object_t *));
-void object_save_ed_buffer PROT((object_t *));
-ed_buffer_t *find_ed_buffer PROT((object_t *));
-void object_ed_output PROT((char *));
+char *object_ed_cmd (object_t *, char *);
+char *object_ed_start (object_t *, char *, int);
+int object_ed_mode (object_t *);
+void object_save_ed_buffer (object_t *);
+ed_buffer_t *find_ed_buffer (object_t *);
+void object_ed_output (char *);
 void object_ed_outputv PROT1V(char *);
 
 extern outbuffer_t current_ed_results;

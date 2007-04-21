@@ -117,9 +117,6 @@ typedef struct {
     short Default;
     short ret_type;
     const char *name;
-#ifdef LPC_TO_C
-    char *routine;
-#endif
     int arg_index;
 } instr_t;
 
@@ -142,27 +139,27 @@ extern keyword_t predefs[];
 extern int lex_fatal;
 extern int arrow_efun, evaluate_efun, this_efun, to_float_efun, to_int_efun, new_efun;
 
-INLINE void push_function_context PROT((void));
-void pop_function_context PROT((void));
-int yylex PROT((void));
-void init_num_args PROT((void));
-const char *query_instr_name PROT((int));
-char *get_f_name PROT((int));
-void set_inc_list PROT((char *));
-void start_new_file PROT((int));
-void end_new_file PROT((void));
-int lookup_predef PROT((char *));
-void add_predefines PROT((void));
-char *main_file_name PROT((void));
-char *get_defined_name PROT((defined_name_t *));
-ident_hash_elem_t *find_or_add_ident PROT((const char *, int));
-ident_hash_elem_t *find_or_add_perm_ident PROT((const char *));
-ident_hash_elem_t *lookup_ident PROT((const char *));
-void free_unused_identifiers PROT((void));
-void init_identifiers PROT((void));
-char *show_error_context PROT((void));
+INLINE void push_function_context (void);
+void pop_function_context (void);
+int yylex (void);
+void init_num_args (void);
+const char *query_instr_name (int);
+char *get_f_name (int);
+void set_inc_list (char *);
+void start_new_file (int);
+void end_new_file (void);
+int lookup_predef (char *);
+void add_predefines (void);
+char *main_file_name (void);
+char *get_defined_name (defined_name_t *);
+ident_hash_elem_t *find_or_add_ident (const char *, int);
+ident_hash_elem_t *find_or_add_perm_ident (const char *);
+ident_hash_elem_t *lookup_ident (const char *);
+void free_unused_identifiers (void);
+void init_identifiers (void);
+char *show_error_context (void);
 #ifdef DEBUGMALLOC_EXTENSIONS
-void mark_all_defines PROT((void));
+void mark_all_defines (void);
 #endif
 
 #endif

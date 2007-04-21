@@ -91,7 +91,7 @@ typedef struct _db {
     dbconn_t c;
 } db_t;
 
-void db_cleanup PROT((void));
+void db_cleanup (void);
 
 #endif  /* PACKAGES_DB */
 

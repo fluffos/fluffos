@@ -34,15 +34,22 @@
 #define FREE(x)         bsdmalloc_free(x)
 #define REALLOC(x,y)    bsdmalloc_realloc(x,y)
 #define CALLOC(x,y)     bsdmalloc_calloc(x,y)
-
+#ifndef _FUNC_SPEC_
+#include "bsdmalloc.h"
+#endif
 #endif
 
-#ifdef MMALLOC
+#ifdef MMALLOC 
 #define MALLOC(x)       mmalloc(x)
 #define FREE(x)         mfree(x)
 #define REALLOC(x,y)    mrealloc(x,y)
 #define CALLOC(x,y)     mcalloc(x,y)
-
+#ifndef _FUNC_SPEC_
+void mfree(void *block);
+void *mrealloc(void *block, int size);
+void *mcalloc(int num, int size);
+void *mmalloc(int size);
+#endif
 #endif
 
 #ifdef GNUMALLOC

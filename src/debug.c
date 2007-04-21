@@ -3,7 +3,7 @@
 
 #ifdef DEBUG_MACRO
 
-mapping_t *debug_levels PROT((void));
+mapping_t *debug_levels (void);
 
 typedef struct {
     char *name;
@@ -41,7 +41,7 @@ mapping_t *debug_levels() {
     return ret;
 }
 
-void debug_level_set P1(char *, level) {
+void debug_level_set (char * level) {
     int i;
     
     for (i = 0; i < NELEM(levels); i++) {
@@ -52,7 +52,7 @@ void debug_level_set P1(char *, level) {
     }
 }
 
-void debug_level_clear P1(char *, level) {
+void debug_level_clear (char * level) {
     int i;
     
     for (i = 0; i < NELEM(levels); i++) {

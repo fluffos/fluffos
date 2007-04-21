@@ -107,9 +107,9 @@ static union overhead *nextf[NBUCKETS];
 static int pagesz;		/* page size */
 static int pagebucket;		/* page size bucket */
 
-static void morecore PROT((int));
-static int findbucket PROT((union overhead *, int));
-
+static void morecore (int);
+static int findbucket (union overhead *, int);
+void *sbrkx(long);
 #ifdef DO_MSTATS
 /*
  * nmalloc[i] is the difference between the number of mallocs and frees
@@ -125,7 +125,7 @@ static u_int nmalloc[NBUCKETS];
 #else
 #define ASSERT(p)   if (!(p)) botch("?")
 #endif
-static int botch P1(char *, s)
+static int botch (char * s)
 {
     debug_message("\r\nassertion botched: %s\r\n", s);
     (void) fflush(stderr);	/* just in case user buffered it */
@@ -140,10 +140,10 @@ static int botch P1(char *, s)
 /* linux */
 #undef malloc
 #endif
-void *bsdmalloc_malloc P1(size_t, nbytes)
+void *bsdmalloc_malloc (size_t nbytes)
 {
     register union overhead *op;
-    register int bucket, n;
+    register long bucket, n;
     register unsigned amt;
 
     /*
@@ -157,7 +157,7 @@ void *bsdmalloc_malloc P1(size_t, nbytes)
 	pagesz = n = getpagesize();
 #endif
 	op = (union overhead *) sbrkx(0);
-	n = n - sizeof(*op) - ((int) op & (n - 1));
+	n = n - sizeof(*op) - ((long) op & (n - 1));
 	if (n < 0)
 	    n += pagesz;
 	if (n) {
@@ -185,7 +185,7 @@ void *bsdmalloc_malloc P1(size_t, nbytes)
 	amt = 16;		/* size of first bucket */
 	bucket = 1;
 #endif
-	n = -((int) sizeof(*op) + RSLOP);
+	n = -(sizeof(*op) + RSLOP);
     } else {
 	amt = pagesz;
 	bucket = pagebucket;
@@ -227,7 +227,7 @@ void *bsdmalloc_malloc P1(size_t, nbytes)
  * Allocate more memory to the indicated bucket.
  */
 static void
-morecore P1(int, bucket)
+morecore (int bucket)
 {
     register union overhead *op;
     register int sz;		/* size of desired block */
@@ -254,7 +254,7 @@ morecore P1(int, bucket)
     }
     op = (union overhead *) sbrkx(amt);
     /* no more room! */
-    if ((int) op == -1)
+    if ((long) op == -1)
 	return;
     /*
      * Add new memory allocated to that on free list for this hash bucket.
@@ -267,7 +267,7 @@ morecore P1(int, bucket)
 }
 
 INLINE void
-bsdmalloc_free P1(void *, cp)
+bsdmalloc_free (void * cp)
 {
     register int size;
     register union overhead *op;
@@ -307,7 +307,7 @@ bsdmalloc_free P1(void *, cp)
  */
 int realloc_srchlen = 4;	/* 4 should be plenty, -1 =>'s whole list */
 
-void *bsdmalloc_realloc P2(void *, cp, size_t, nbytes)
+void *bsdmalloc_realloc (void * cp, size_t nbytes)
 {
     register u_int onb;
     register int i;
@@ -374,7 +374,7 @@ void *bsdmalloc_realloc P2(void *, cp, size_t, nbytes)
  * Return bucket number, or -1 if not found.
  */
 static int
-findbucket P2(union overhead *, freep, int, srchlen)
+findbucket (union overhead * freep, int srchlen)
 {
     register union overhead *p;
     register int i, j;
@@ -399,7 +399,7 @@ findbucket P2(union overhead *, freep, int, srchlen)
  * frees for each size category.
  */
 void
-show_mstats P2(outbuffer_t *, ob, char *, s)
+show_mstats (outbuffer_t * ob, char * s)
 {
     register int i, j;
     register union overhead *p;
@@ -426,7 +426,7 @@ show_mstats P2(outbuffer_t *, ob, char *, s)
 /* linux */
 #undef calloc
 #endif
-INLINE void *bsdmalloc_calloc P2(size_t, num, register size_t, size)
+INLINE void *bsdmalloc_calloc (size_t num, register size_t size)
 {
     register void *p;
 

@@ -8,8 +8,8 @@ INSTALL=install -c
 INSTALL_DIR=../bin
 OPTIMIZE=
 CPP=gcc -E
-CFLAGS=-D__USE_FIXED_PROTOTYPES__ -g  
-CC=gcc
+CFLAGS=-D__USE_FIXED_PROTOTYPES__ -g -O3
+CC=gcc34
 YACC=bison -d -y
 RANLIB=ranlib
 A=a
@@ -66,15 +66,15 @@ OVERRIDES=$(MAKEOVERRIDES)
 # **** or non-GNU makes will die
 # **************************************************************************
 SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
-  backend.c array.c mapping.c comm.c ed.c regexp.c swap.c buffer.c crc32.c \
+  backend.c array.c mapping.c comm.c ed.c regexp.c buffer.c crc32.c \
   malloc.c mallocwrapper.c class.c efuns_main.c efuns_port.c \
   call_out.c otable.c dumpstat.c stralloc.c hash.c \
   port.c reclaim.c parse.c simul_efun.c sprintf.c program.c \
   compiler.c avltree.c icode.c trees.c generate.c scratchpad.c \
   socket_efuns.c socket_ctrl.c qsort.c eoperators.c socket_err.c md.c \
   disassembler.c binaries.c ualarm.c $(STRFUNCS) \
-  replace_program.c ccode.c cfuns.c compile_file.c master.c function.c \
-  debug.c crypt.c applies_table.c add_action.c eval.c
+  replace_program.c master.c function.c \
+  debug.c crypt.c applies_table.c add_action.c eval.c fliconv.c
 
 all: $(OBJDIR) cc.h main_build
 main_build2: $(DRIVER_BIN) addr_server portbind
@@ -108,11 +108,9 @@ grammar.tab.c: grammar.y
 packages/packages.a: packages/parser.c packages/contrib.c
 	$(MAKE) -C packages 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)' 'A=$(A)' 'O=$(O)'
 
-mudlib/mudlib.a:
-	$(MAKE) -C mudlib 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)' 'A=$(A)' 'O=$(O)'
-$(DRIVER_BIN): packages/packages.a mudlib/mudlib.a $(OBJ)
+$(DRIVER_BIN): packages/packages.a $(OBJ)
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
-	$(PROOF) $(CC) $(CFLAGS) $(OPTIMIZE) $(OBJ) -o $(DRIVER_BIN) packages/packages.a mudlib/mudlib.a $(EXTRALIBS) `cat system_libs`
+	$(PROOF) $(CC) $(CFLAGS) $(OPTIMIZE) $(OBJ) -o $(DRIVER_BIN) packages/packages.a $(EXTRALIBS) `cat system_libs`
 
 addr_server: files $(OBJDIR)/addr_server.o $(OBJDIR)/socket_ctrl.o $(OBJDIR)/port.o addr_server.h
 	$(CC) $(CFLAGS) $(OPTIMIZE) $(OBJDIR)/socket_ctrl.o $(OBJDIR)/addr_server.o $(OBJDIR)/port.o \
@@ -145,13 +143,11 @@ cc.h: GNUmakefile
 
 # the touches here are necessary to fix the modification times; link(2) does
 # 'modify' a file
-files: edit_source sysmalloc.c smalloc.c bsdmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c func_spec.c mudlib/Makefile.pre mudlib/GNUmakefile.pre packages/Makefile.pre packages/GNUmakefile.pre configure.h grammar.y.pre
+files: edit_source sysmalloc.c smalloc.c bsdmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c func_spec.c packages/Makefile.pre packages/GNUmakefile.pre configure.h grammar.y.pre
 	./edit_source -options -malloc -build_func_spec '$(CPP) $(CFLAGS)' \
 	              -process grammar.y.pre
 	./edit_source -process packages/Makefile.pre
 	./edit_source -process packages/GNUmakefile.pre
-	./edit_source -process mudlib/Makefile.pre
-	./edit_source -process mudlib/GNUmakefile.pre
 	./edit_source -build_efuns -build_applies
 	touch mallocwrapper.c
 	touch malloc.c
@@ -218,7 +214,6 @@ spotless: clean
 # get ready for recompile
 neat:
 	-(cd packages; $(MAKE) "A=$(A)" "O=$(O)" clean)
-	-(cd mudlib; $(MAKE) "A=$(A)" "O=$(O)" clean)
 	-rm -rf $(OBJDIR) *.$(O) *.tab.c *.tab.h
 	-rm -f efun_defs.c option_defs.c
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h

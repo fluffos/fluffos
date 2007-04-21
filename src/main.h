@@ -32,7 +32,6 @@ extern char *external_cmd[NUM_EXTERNAL_CMDS];
 
 extern int t_flag;
 extern int comp_flag;
-extern int time_to_swap;
 extern int time_to_clean_up;
 extern const char *default_fail_message;
 extern int boot_time;
@@ -44,6 +43,6 @@ extern char *reserved_area;
 extern double consts[];
 extern int slow_shut_down_to_do;
 
-void CDECL debug_message PROT1V(const char *);
+void CDECL debug_message(const char *, ...);
 
 #endif

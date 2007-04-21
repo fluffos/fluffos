@@ -25,7 +25,7 @@ enum control_jump_type {
 };
 
 union parse_value {
-    int number;
+    long number;
     float real;
     struct parse_node_s *expr;
 };
@@ -252,24 +252,24 @@ typedef struct parse_node_block_s {
                                )
 
 /* tree functions */
-void free_tree PROT((void));
-void release_tree PROT((void));
-void lock_expressions PROT((void));
-void unlock_expressions PROT((void));
+void free_tree (void);
+void release_tree (void);
+void lock_expressions (void);
+void unlock_expressions (void);
 /* node functions */
-parse_node_t *new_node PROT((void));
-parse_node_t *new_node_no_line PROT((void));
-parse_node_t *make_branched_node PROT((short, char, 
-                                       parse_node_t *, parse_node_t *));
+parse_node_t *new_node (void);
+parse_node_t *new_node_no_line (void);
+parse_node_t *make_branched_node (short, char, 
+                                       parse_node_t *, parse_node_t *);
 /* parser grammar functions */
-parse_node_t *binary_int_op PROT((parse_node_t *, parse_node_t *, 
-                                  char, const char *));
-parse_node_t *make_range_node PROT((int, parse_node_t *,
+parse_node_t *binary_int_op (parse_node_t *, parse_node_t *, 
+                                  char, const char *);
+parse_node_t *make_range_node (int, parse_node_t *,
                                          parse_node_t *,
-                                         parse_node_t *));
-parse_node_t *insert_pop_value PROT((parse_node_t *));
-parse_node_t *pop_value PROT((parse_node_t *));
-parse_node_t *optimize_loop_test PROT((parse_node_t *));
-int is_boolean PROT((parse_node_t *));
+                                         parse_node_t *);
+parse_node_t *insert_pop_value (parse_node_t *);
+parse_node_t *pop_value (parse_node_t *);
+parse_node_t *optimize_loop_test (parse_node_t *);
+int is_boolean (parse_node_t *);
 
 #endif

@@ -22,11 +22,11 @@ typedef struct buffer_s {
  */
 extern buffer_t null_buf;
 
-INLINE buffer_t *null_buffer PROT((void));
-INLINE void free_buffer PROT((buffer_t *));
-buffer_t *allocate_buffer PROT((int));
-int write_buffer PROT((buffer_t *, int, const char *, int));
-char *read_buffer PROT((buffer_t *, int, int, int *));
+INLINE buffer_t *null_buffer (void);
+INLINE void free_buffer (buffer_t *);
+buffer_t *allocate_buffer (int);
+int write_buffer (buffer_t *, int, const char *, int);
+char *read_buffer (buffer_t *, int, int, int *);
 #endif
 
 #endif

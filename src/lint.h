@@ -41,41 +41,41 @@
 #  endif
    int sscanf(char *, char *,...);
    void perror(char *);
-   int system PROT((char *));
-   int atoi PROT((const char *));
-   int setsockopt PROT((int, int, int, char *, int));
+   int system (char *);
+   int atoi (const char *);
+   int setsockopt (int, int, int, char *, int);
    int fseek PROT_STDIO((FILE *, long, int));
-   unsigned int alarm PROT((unsigned int));
-   int ioctl PROT((int,...));
-   extern int rename PROT((char *, char *));
-   int readlink PROT((char *, char *, int));
-   int symlink PROT((char *, char *));
-   extern int fchmod PROT((int, int));
+   unsigned int alarm (unsigned int);
+   int ioctl (int,...);
+   extern int rename (char *, char *);
+   int readlink (char *, char *, int);
+   int symlink (char *, char *);
+   extern int fchmod (int, int);
 #endif
 
 #if (defined(SVR4) && !defined(sgi)) || defined(__386BSD__)
-   void exit PROT((int));
+   void exit (int);
 #endif
 
 #if !defined(SunOS_5) && !defined(NeXT)
 #  ifdef sun
-     char *_crypt PROT((char *, char *));
+     char *_crypt (char *, char *);
 #  endif
 
 #  ifdef DRAND48
 #    ifndef sgi
-       double drand48 PROT((void));
-       void srand48 PROT((long));
+       double drand48 (void);
+       void srand48 (long);
 #    endif
 #  endif
 #  ifdef RANDOM
-     long random PROT((void));
+     long random (void);
 #  endif
 
 /* SGI is missing some prototypes in the .h files */
 #ifdef PEDANTIC
 #  ifdef sgi
-     void ualarm PROT((int, int));
+     void ualarm (int, int);
 #  endif
 #endif
 

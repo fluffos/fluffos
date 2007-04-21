@@ -757,13 +757,6 @@
  */
 #define TRACE
 
-/* LPC_TO_C: define this to enable LPC->C compilation.
- *
- * [NOTE: BINARIES must also be defined for LPC->C to work.  Actually
- *  using binaries is not required, though.]
- */
-#define LPC_TO_C
-
 /* RUNTIME_LOADING: On systems which support it, it allows LPC->C compilation
  * 'on the fly' without having to recompile the driver.
  *
@@ -876,4 +869,14 @@
  *   files indented with tabs instead of spaces.
  */
 #define WARN_TAB
+
+/* USE_ICONV: Use iconv to translate input and output from/to the users char 
+ * encoding
+ */
+#define USE_ICONV
+
+/* WOMBLES: don't allow spaces between start/end of array/mapping/functional token chars so ({1,2,3}) still works, but ( { 1 , 2 , 3 } ) doesn't and ({ 1 , 2 , 3 }) does.*/
+#undef WOMBLES
+
 #endif
+

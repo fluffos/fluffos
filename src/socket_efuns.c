@@ -25,15 +25,15 @@ lpc_socket_t *lpc_socks = 0;
 int max_lpc_socks = 0;
 
 #ifdef PACKAGE_SOCKETS
-static int socket_name_to_sin PROT((const char *, struct sockaddr_in *));
-static char *inet_address PROT((struct sockaddr_in *));
+static int socket_name_to_sin (const char *, struct sockaddr_in *);
+static char *inet_address (struct sockaddr_in *);
 #endif
 
 /*
  * check permission
  */
-int check_valid_socket P5(const char * const, what, int, fd, object_t *, owner,
-                          const char * const, addr, int, port)
+int check_valid_socket (const char * const what, int fd, object_t * owner,
+                          const char * const addr, int port)
 {
     array_t *info;
     svalue_t *mret;
@@ -56,7 +56,7 @@ int check_valid_socket P5(const char * const, what, int, fd, object_t *, owner,
     return MASTER_APPROVED(mret);
 }
 
-static void clear_socket P2(int, which, int, dofree)
+static void clear_socket (int which, int dofree)
 {
     if (dofree) {
         set_read_callback(which, 0);
@@ -107,7 +107,7 @@ static int more_lpc_sockets()
 /*
  * Set the callbacks for a socket
  */
-void set_read_callback P2(int, which, svalue_t *, cb)
+void set_read_callback (int which, svalue_t * cb)
 {
     char *s;
 
@@ -129,7 +129,7 @@ void set_read_callback P2(int, which, svalue_t *, cb)
         lpc_socks[which].read_callback.s = 0;
 }
 
-void set_write_callback P2(int, which, svalue_t *, cb)
+void set_write_callback (int which, svalue_t * cb)
 {
     char *s;
 
@@ -151,7 +151,7 @@ void set_write_callback P2(int, which, svalue_t *, cb)
         lpc_socks[which].write_callback.s = 0;
 }
 
-void set_close_callback P2(int, which, svalue_t *, cb)
+void set_close_callback (int which, svalue_t * cb)
 {
     char *s;
 
@@ -175,7 +175,7 @@ void set_close_callback P2(int, which, svalue_t *, cb)
 
 #ifdef PACKAGE_SOCKETS
 
-static void copy_close_callback P2(int, to, int, from)
+static void copy_close_callback (int to, int from)
 {
     char *s;
 
@@ -198,7 +198,7 @@ static void copy_close_callback P2(int, to, int, from)
 
 #endif
 
-int find_new_socket PROT((void))
+int find_new_socket (void)
 {
     int i;
     
@@ -214,7 +214,7 @@ int find_new_socket PROT((void))
 /*
  * Create an LPC efun socket
  */
-int socket_create P3(enum socket_mode, mode, svalue_t *, read_callback, svalue_t *, close_callback)
+int socket_create (enum socket_mode mode, svalue_t * read_callback, svalue_t * close_callback)
 {
     int type, i, fd, optval;
 #ifndef NO_BUFFER_TYPE
@@ -299,7 +299,7 @@ int socket_create P3(enum socket_mode, mode, svalue_t *, read_callback, svalue_t
 /*
  * Bind an address to an LPC efun socket
  */
-int socket_bind P3(int, fd, int, port, const char *, addr)
+int socket_bind (int fd, int port, const char * addr)
 {
     int len;
     struct sockaddr_in sin;
@@ -353,7 +353,7 @@ int socket_bind P3(int, fd, int, port, const char *, addr)
 /*
  * Listen for connections on an LPC efun socket
  */
-int socket_listen P2(int, fd, svalue_t *, callback)
+int socket_listen (int fd, svalue_t * callback)
 {
     if (fd < 0 || fd >= max_lpc_socks)
         return EEFDRANGE;
@@ -386,7 +386,7 @@ int socket_listen P2(int, fd, svalue_t *, callback)
 /*
  * Accept a connection on an LPC efun socket
  */
-int socket_accept P3(int, fd, svalue_t *, read_callback, svalue_t *, write_callback)
+int socket_accept (int fd, svalue_t * read_callback, svalue_t * write_callback)
 {
     int len, accept_fd, i;
     struct sockaddr_in sin;
@@ -489,7 +489,7 @@ int socket_accept P3(int, fd, svalue_t *, read_callback, svalue_t *, write_callb
 /*
  * Connect an LPC efun socket
  */
-int socket_connect P4(int, fd, const char *, name, svalue_t *, read_callback, svalue_t *, write_callback)
+int socket_connect (int fd, const char * name, svalue_t * read_callback, svalue_t * write_callback)
 {
     if (fd < 0 || fd >= max_lpc_socks)
         return EEFDRANGE;
@@ -562,7 +562,7 @@ int socket_connect P4(int, fd, const char *, name, svalue_t *, read_callback, sv
 /*
  * Write a message on an LPC efun socket
  */
-int socket_write P3(int, fd, svalue_t *, message, const char *, name)
+int socket_write (int fd, svalue_t * message, const char * name)
 {
     int len, off;
     char *buf, *p;
@@ -751,7 +751,7 @@ int socket_write P3(int, fd, svalue_t *, message, const char *, name)
 
 #endif  /* PACKAGE_SOCKETS */
 
-static void call_callback P3(int, fd, int, what, int, num_arg)
+static void call_callback (int fd, int what, int num_arg)
 {
     union string_or_func callback;
 
@@ -773,7 +773,7 @@ static void call_callback P3(int, fd, int, what, int, num_arg)
 /*
  * Handle LPC efun socket read select events
  */
-void socket_read_select_handler P1(int, fd)
+void socket_read_select_handler (int fd)
 {
     int cc = 0, addrlen;
     char buf[BUF_SIZE], addr[ADDR_BUF_SIZE];
@@ -1002,7 +1002,7 @@ void socket_read_select_handler P1(int, fd)
 /*
  * Handle LPC efun socket write select events
  */
-void socket_write_select_handler P1(int, fd)
+void socket_write_select_handler (int fd)
 {
     int cc;
 
@@ -1067,7 +1067,7 @@ void socket_write_select_handler P1(int, fd)
 /*
  * Close an LPC efun socket
  */
-int socket_close P2(int, fd, int, flags)
+int socket_close (int fd, int flags)
 {
     if (fd < 0 || fd >= max_lpc_socks)
         return EEFDRANGE;
@@ -1114,7 +1114,7 @@ int socket_close P2(int, fd, int, flags)
 /*
  * Release an LPC efun socket to another object
  */
-int socket_release P3(int, fd, object_t *, ob, svalue_t *, callback)
+int socket_release (int fd, object_t * ob, svalue_t * callback)
 {
     if (fd < 0 || fd >= max_lpc_socks)
         return EEFDRANGE;
@@ -1149,7 +1149,7 @@ int socket_release P3(int, fd, object_t *, ob, svalue_t *, callback)
 /*
  * Aquire an LPC efun socket from another object
  */
-int socket_acquire P4(int, fd, svalue_t *, read_callback, svalue_t *, write_callback, svalue_t *, close_callback)
+int socket_acquire (int fd, svalue_t * read_callback, svalue_t * write_callback, svalue_t * close_callback)
 {
     if (fd < 0 || fd >= max_lpc_socks)
         return EEFDRANGE;
@@ -1175,7 +1175,7 @@ int socket_acquire P4(int, fd, svalue_t *, read_callback, svalue_t *, write_call
 /*
  * Return the string representation of a socket error
  */
-const char *socket_error P1(int, error)
+const char *socket_error (int error)
 {
     error = -(error + 1);
     if (error < 0 || error >= ERROR_STRINGS - 1)
@@ -1186,7 +1186,7 @@ const char *socket_error P1(int, error)
 /*
  * Return the remote address for an LPC efun socket
  */
-int get_socket_address P4(int, fd, char *, addr, int *, port, int, local)
+int get_socket_address (int fd, char * addr, int * port, int local)
 {
     struct sockaddr_in *addr_in;
 
@@ -1204,7 +1204,7 @@ int get_socket_address P4(int, fd, char *, addr, int *, port, int, local)
 /*
  * Return the current socket owner
  */
-object_t *get_socket_owner P1(int, fd)
+object_t *get_socket_owner (int fd)
 {
     if (fd < 0 || fd >= max_lpc_socks)
         return (object_t *) NULL;
@@ -1219,7 +1219,7 @@ object_t *get_socket_owner P1(int, fd)
 /*
  * Initialize a T_OBJECT svalue
  */
-void assign_socket_owner P2(svalue_t *, sv, object_t *, ob)
+void assign_socket_owner (svalue_t * sv, object_t * ob)
 {
     if (ob != NULL) {
         sv->type = T_OBJECT;
@@ -1234,7 +1234,7 @@ void assign_socket_owner P2(svalue_t *, sv, object_t *, ob)
 /*
  * Convert a string representation of an address to a sockaddr_in
  */
-static int socket_name_to_sin P2(const char *, name, struct sockaddr_in *, sin)
+static int socket_name_to_sin (const char * name, struct sockaddr_in * sin)
 {
     int port;
     char *cp, addr[ADDR_BUF_SIZE];
@@ -1261,7 +1261,7 @@ static int socket_name_to_sin P2(const char *, name, struct sockaddr_in *, sin)
 /*
  * Close any sockets owned by ob
  */
-void close_referencing_sockets P1(object_t *, ob)
+void close_referencing_sockets (object_t * ob)
 {
     int i;
 
@@ -1277,7 +1277,7 @@ void close_referencing_sockets P1(object_t *, ob)
 /*
  * Return the string representation of a sockaddr_in
  */
-static char *inet_address P1(struct sockaddr_in *, sin)
+static char *inet_address (struct sockaddr_in * sin)
 {
     static char addr[32], port[7];
 
@@ -1315,7 +1315,7 @@ const char *socket_states[] = {
 /*
  * Return an array containing info for a socket
  */
-array_t *socket_status P1(int, which)
+array_t *socket_status (int which)
 {
     array_t *ret;
     

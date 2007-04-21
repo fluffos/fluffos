@@ -4,6 +4,6 @@
 /*
  * crc32.c
  */
-UINT32 compute_crc32 PROT((unsigned char *, int));
+UINT32 compute_crc32 (unsigned char *, int);
 
 #endif

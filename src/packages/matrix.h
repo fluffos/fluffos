@@ -16,21 +16,21 @@ typedef struct {
     float z;
 }      Vector;
 
-void translate_matrix PROT((double x, double y, double z, Matrix m));
+void translate_matrix (double x, double y, double z, Matrix m);
 
-void scale_matrix PROT((double x, double y, double z, Matrix m));
+void scale_matrix (double x, double y, double z, Matrix m);
 
-void rotate_x_matrix PROT((double a, Matrix m));
+void rotate_x_matrix (double a, Matrix m);
 
-void rotate_y_matrix PROT((double a, Matrix m));
+void rotate_y_matrix (double a, Matrix m);
 
-void rotate_z_matrix PROT((double a, Matrix m));
+void rotate_z_matrix (double a, Matrix m);
 
-void lookat_rotate PROT((Matrix T, double x, double y, double z, Matrix m));
+void lookat_rotate (Matrix T, double x, double y, double z, Matrix m);
 
 void lookat_rotate2
-     PROT((double a, double b, double c, double d, double e, double f, Matrix m));
+     (double a, double b, double c, double d, double e, double f, Matrix m);
 
-void mult_matrix PROT((Matrix m1, Matrix m2, Matrix m));
+void mult_matrix (Matrix m1, Matrix m2, Matrix m);
 
 #endif				/* _MATRIX_H_ */

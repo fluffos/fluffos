@@ -12,7 +12,6 @@
 #include "port.h"
 #include "md.h"
 #include "main.h"
-#include "compile_file.h"
 #include "socket_efuns.h"
 #include "master.h"
 #include "eval.h"
@@ -23,7 +22,6 @@ static int e_flag = 0;    /* Load empty, without preloads. */
 int t_flag = 0;     /* Disable heart beat and reset */
 int comp_flag = 0;    /* Trace compilations */
 int max_cost;
-int time_to_swap;
 int time_to_clean_up;
 const char *default_fail_message;
 int boot_time;
@@ -42,10 +40,10 @@ void init_addr_server();
 #endif        /* NO_IP_DEMON */
 
 #ifdef SIGNAL_FUNC_TAKES_INT
-#define SIGPROT PROT((int))
-#define PSIG(z) z P1(int, sig)
+#define SIGPROT (int)
+#define PSIG(z) z (int sig)
 #else
-#define SIGPROT PROT((void))
+#define SIGPROT (void)
 #define PSIG(z) z()
 #endif
 
@@ -75,7 +73,7 @@ static void CDECL sig_hup SIGPROT,
 int debug_level = 0;
 #endif
 
-int main P2(int, argc, char **, argv)
+int main (int argc, char ** argv)
 {
     time_t tm;
     int i, new_mudlib = 0, got_defaults = 0;
@@ -235,7 +233,6 @@ int main P2(int, argc, char **, argv)
 #endif
 #endif
     time_to_clean_up = TIME_TO_CLEAN_UP;
-    time_to_swap = TIME_TO_SWAP;
     max_cost = MAX_COST;
     reserved_size = RESERVED_SIZE;
     max_array_size = MAX_ARRAY_SIZE;
@@ -299,9 +296,6 @@ int main P2(int, argc, char **, argv)
 
 #ifdef BINARIES
     init_binaries(argc, argv);
-#endif
-#ifdef LPC_TO_C
-    init_lpc_to_c();
 #endif
     add_predefines();
 #ifdef WIN32
@@ -438,9 +432,9 @@ int main P2(int, argc, char **, argv)
 }
 
 #ifdef DEBUGMALLOC
-char *int_string_copy P2(const char * const, str, char *, desc)
+char *int_string_copy (const char * const str, char * desc)
 #else
-char *int_string_copy P1(const char * const, str)
+char *int_string_copy (const char * const str)
 #endif
 {
     char *p;
@@ -461,9 +455,9 @@ char *int_string_copy P1(const char * const, str)
 }
 
 #ifdef DEBUGMALLOC
-char *int_string_unlink P2(const char *, str, char *, desc)
+char *int_string_unlink (const char * str, char * desc)
 #else
-char *int_string_unlink P1(const char *, str)
+char *int_string_unlink (const char * str)
 #endif
 {
     malloc_block_t *mbt, *newmbt;
@@ -492,12 +486,11 @@ char *int_string_unlink P1(const char *, str)
 
 static FILE *debug_message_fp = 0;
 
-void debug_message P1V(const char *, fmt)
+void debug_message (const char *fmt, ...)
 {
     static char deb_buf[1024];
     static char *deb = deb_buf;
     va_list args;
-    V_DCL(char *fmt);
 
     if (!debug_message_fp) {
   /*
@@ -531,7 +524,7 @@ void debug_message P1V(const char *, fmt)
 
 int slow_shut_down_to_do = 0;
 
-char *xalloc P1(int, size)
+char *xalloc (int size)
 {
     char *p;
     const char *t;

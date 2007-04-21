@@ -1,4 +1,0 @@
-%define GNU
-
-%include "mudlib/Makefile.master"
-

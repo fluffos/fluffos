@@ -14,7 +14,7 @@
 
 #ifdef F_COS
 void
-f_cos PROT((void))
+f_cos (void)
 {
     sp->u.real = cos(sp->u.real);
 }
@@ -22,14 +22,14 @@ f_cos PROT((void))
 
 #ifdef F_SIN
 void
-f_sin PROT((void))
+f_sin (void)
 {
     sp->u.real = sin(sp->u.real);
 }
 #endif
 #ifdef F_TAN
 void
-f_tan PROT((void))
+f_tan (void)
 {
     /*
      * maybe should try to check that tan won't blow up (x != (Pi/2 + N*Pi))
@@ -40,7 +40,7 @@ f_tan PROT((void))
 
 #ifdef F_ASIN
 void
-f_asin PROT((void))
+f_asin (void)
 {
     if (sp->u.real < -1.0) {
         error("math: asin(x) with (x < -1.0)\n");
@@ -55,7 +55,7 @@ f_asin PROT((void))
 
 #ifdef F_ACOS
 void
-f_acos PROT((void))
+f_acos (void)
 {
     if (sp->u.real < -1.0) {
         error("math: acos(x) with (x < -1.0)\n");
@@ -70,7 +70,7 @@ f_acos PROT((void))
 
 #ifdef F_ATAN
 void
-f_atan PROT((void))
+f_atan (void)
 {
     sp->u.real = atan(sp->u.real);
 }
@@ -78,7 +78,7 @@ f_atan PROT((void))
 
 #ifdef F_SQRT
 void
-f_sqrt PROT((void))
+f_sqrt (void)
 {
     if (sp->u.real < 0.0) {
         error("math: sqrt(x) with (x < 0.0)\n");
@@ -90,7 +90,7 @@ f_sqrt PROT((void))
 
 #ifdef F_LOG
 void
-f_log PROT((void))
+f_log (void)
 {
     if (sp->u.real <= 0.0) {
         error("math: log(x) with (x <= 0.0)\n");
@@ -102,7 +102,7 @@ f_log PROT((void))
 
 #ifdef F_LOG10
 void
-f_log10 PROT((void))
+f_log10 (void)
 {
     if (sp->u.real <= 0.0) {
         error("math: log10(x) with (x <= 0.0)\n");
@@ -114,7 +114,7 @@ f_log10 PROT((void))
 
 #ifdef F_POW
 void
-f_pow PROT((void))
+f_pow (void)
 {
     (sp - 1)->u.real = pow((sp - 1)->u.real, sp->u.real);
     sp--;
@@ -123,7 +123,7 @@ f_pow PROT((void))
 
 #ifdef F_EXP
 void
-f_exp PROT((void))
+f_exp (void)
 {
     sp->u.real = exp(sp->u.real);
 }
@@ -131,7 +131,7 @@ f_exp PROT((void))
 
 #ifdef F_FLOOR
 void
-f_floor PROT((void))
+f_floor (void)
 {
     sp->u.real = floor(sp->u.real);
 }
@@ -139,7 +139,7 @@ f_floor PROT((void))
 
 #ifdef F_CEIL
 void
-f_ceil PROT((void))
+f_ceil (void)
 {
     sp->u.real = ceil(sp->u.real);
 }

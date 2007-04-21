@@ -27,10 +27,8 @@ void store_variable(string, mixed);
 mixed fetch_variable(string);
 int remove_interactive(object);
 int query_ip_port(void | object);
-#if 0
 string zonetime(string, int);
 int is_daylight_savings_time(string, int);
-#endif
 void debug_message(string);
 object function_owner(function);
 string repeat_string(string, int);

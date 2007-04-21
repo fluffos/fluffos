@@ -1,7 +1,6 @@
 #include "std.h"
 #include "replace_program.h"
 #include "simul_efun.h"
-#include "swap.h"
 #include "efun_protos.h"
 
 /*
@@ -13,10 +12,10 @@
 
 replace_ob_t *obj_list_replace = 0;
 
-static program_t *search_inherited PROT((char *, program_t *, int *));
-static replace_ob_t *retrieve_replace_program_entry PROT((void));
+static program_t *search_inherited (char *, program_t *, int *);
+static replace_ob_t *retrieve_replace_program_entry (void);
 
-int replace_program_pending P1(object_t *, ob)
+int replace_program_pending (object_t * ob)
 {
     replace_ob_t *r_ob;
 
@@ -28,7 +27,7 @@ int replace_program_pending P1(object_t *, ob)
     return 0;
 }
 
-void replace_programs PROT((void))
+void replace_programs (void)
 {
     replace_ob_t *r_ob, *r_next;
     int i, num_fewer, offset;
@@ -39,8 +38,6 @@ void replace_programs PROT((void))
     for (r_ob = obj_list_replace; r_ob; r_ob = r_next) {
         program_t *old_prog;
 
-        if (r_ob->ob->flags & O_SWAPPED)
-            load_ob_from_swap(r_ob->ob);
         num_fewer = r_ob->ob->prog->num_variables_total - r_ob->new_prog->num_variables_total;
 
         debug(d_flag, ("%d less variables\n", num_fewer));
@@ -79,7 +76,7 @@ void replace_programs PROT((void))
         old_prog = r_ob->ob->prog;
         r_ob->ob->prog = r_ob->new_prog;
         r_next = r_ob->next;
-        free_prog(old_prog, 1);
+        free_prog(old_prog);
 
         debug(d_flag, ("program freed."));
 #ifndef NO_SHADOWS
@@ -111,7 +108,7 @@ void replace_programs PROT((void))
 }
 
 #ifdef F_REPLACE_PROGRAM
-static program_t *search_inherited P3(char *, str, program_t *, prg, int *, offpnt)
+static program_t *search_inherited (char * str, program_t * prg, int * offpnt)
 {
     program_t *tmp;
     int i;
@@ -142,7 +139,7 @@ static program_t *search_inherited P3(char *, str, program_t *, prg, int *, offp
     return (program_t *) 0;
 }
 
-static replace_ob_t *retrieve_replace_program_entry PROT((void))
+static replace_ob_t *retrieve_replace_program_entry (void)
 {
     replace_ob_t *r_ob;
 
@@ -155,7 +152,7 @@ static replace_ob_t *retrieve_replace_program_entry PROT((void))
 }
 
 void
-f_replace_program PROT((void))
+f_replace_program (void)
 {
     replace_ob_t *tmp;
     int name_len;

@@ -7,7 +7,7 @@
 
 /* implementation */
 #ifdef NOISY_DEBUG
-   void bp PROT((void));
+   void bp (void);
 #  ifdef NOISY_STRING
 #    define NDBG(x) if (strcmp(STRING(x), NOISY_STRING)==0) \
                     debug_message("%s - %d\n", STRING(x), REFS(x)), bp()
@@ -122,15 +122,15 @@ typedef struct block_s {
 /*
  * stralloc.c
  */
-void init_strings PROT((void));
-char *findstring PROT((const char *));
-char *make_shared_string PROT((const char *));
-const char *ref_string PROT((const char *));
-void free_string PROT((const char *));
-void deallocate_string PROT((char *));
-int add_string_status PROT((outbuffer_t *, int));
+void init_strings (void);
+char *findstring (const char *);
+char *make_shared_string (const char *);
+const char *ref_string (const char *);
+void free_string (const char *);
+void deallocate_string (char *);
+int add_string_status (outbuffer_t *, int);
 
-char *extend_string PROT((const char *, int));
+char *extend_string (const char *, int);
 
 extern int svalue_strlen_size;
 

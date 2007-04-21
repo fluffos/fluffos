@@ -29,7 +29,7 @@ static object_t *ob;
 
 #ifdef F_EXPORT_UID
 void
-f_export_uid PROT((void))
+f_export_uid (void)
 {
     if (current_object->euid == NULL)
         error("Illegal to export uid 0\n");
@@ -48,7 +48,7 @@ f_export_uid PROT((void))
 
 #ifdef F_GETEUID
 void
-f_geteuid PROT((void))
+f_geteuid (void)
 {
     if (sp->type & T_OBJECT) {
         ob = sp->u.ob;
@@ -76,7 +76,7 @@ f_geteuid PROT((void))
 
 #ifdef F_GETUID
 void
-f_getuid PROT((void))
+f_getuid (void)
 {
     ob = sp->u.ob;
 
@@ -88,7 +88,7 @@ f_getuid PROT((void))
 
 #ifdef F_SETEUID
 void
-f_seteuid PROT((void))
+f_seteuid (void)
 {
     svalue_t *arg;
     svalue_t *ret;
@@ -121,7 +121,7 @@ userid_t *backbone_uid = NULL;
 userid_t *root_uid = NULL;
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-static void mark_uid_tree P1(tree *, tr) {
+static void mark_uid_tree (tree * tr) {
     DO_MARK(tr, TAG_UID);
     DO_MARK(tr->tree_p, TAG_UID);
     
@@ -138,9 +138,9 @@ void mark_all_uid_nodes() {
 }
 #endif
 
-static int uidcmp PROT((userid_t *, userid_t *));
+static int uidcmp (userid_t *, userid_t *);
 
-static int uidcmp P2(userid_t *, uid1, userid_t *, uid2)
+static int uidcmp (userid_t * uid1, userid_t * uid2)
 {
     register char *name1, *name2;
 
@@ -149,7 +149,7 @@ static int uidcmp P2(userid_t *, uid1, userid_t *, uid2)
     return (name1 < name2 ? -1 : (name1 > name2 ? 1 : 0));
 }
 
-userid_t *add_uid P1(const char *, name)
+userid_t *add_uid (const char * name)
 {
     userid_t *uid, t_uid;
     char *sname;
@@ -166,7 +166,7 @@ userid_t *add_uid P1(const char *, name)
     return uid;
 }
 
-userid_t *set_root_uid P1(const char *, name)
+userid_t *set_root_uid (const char * name)
 {
     if (!root_uid)
         return root_uid = add_uid(name);
@@ -177,7 +177,7 @@ userid_t *set_root_uid P1(const char *, name)
     return root_uid;
 }
 
-userid_t *set_backbone_uid P1(const char *, name)
+userid_t *set_backbone_uid (const char * name)
 {
     if (!backbone_uid)
         return backbone_uid = add_uid(name);

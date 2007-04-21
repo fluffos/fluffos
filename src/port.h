@@ -5,18 +5,18 @@
  * port.c
  */
 #ifndef _FUNC_SPEC_
-int random_number PROT((int));
-int get_current_time PROT((void));
-char *time_string PROT((time_t));
-void init_usec_clock PROT((void));
-void get_usec_clock PROT((long *, long *));
-int get_cpu_times PROT((unsigned long *, unsigned long *));
-char *get_current_dir PROT((char *, int));
+int random_number (int);
+int get_current_time (void);
+char *time_string (time_t);
+void init_usec_clock (void);
+void get_usec_clock (long *, long *);
+int get_cpu_times (unsigned long *, unsigned long *);
+char *get_current_dir (char *, int);
 #ifdef DRAND48
-double drand48 PROT((void));
+double drand48 (void);
 #endif
 #ifndef HAS_STRERROR
-char *port_strerror PROT((int));
+char *port_strerror (int);
 #endif
 #endif
 

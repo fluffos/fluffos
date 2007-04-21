@@ -1,4 +1,0 @@
-%define NORMAL
-
-%include "mudlib/Makefile.master"
-

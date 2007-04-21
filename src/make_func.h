@@ -23,7 +23,7 @@ extern char *key[MAX_FUNC], *buf[MAX_FUNC];
 
 extern int arg_types[400], last_current_type;
 
-char *ctype PROT((int));
-char *etype PROT((int));
+char *ctype (int);
+char *etype (int);
 
 #endif

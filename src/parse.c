@@ -286,30 +286,30 @@ static parse_global_t *globals = 0;
 #define parse_patarr   (globals->patarr)
 #define parse_obarr    (globals->obarr)
 
-static void load_lpc_info PROT((int, object_t *));
-static void parse_clean_up PROT((void));
-static void push_parse_globals PROT((void));
-static void pop_parse_globals PROT((void));
-static void store_value PROT((svalue_t *, int, int, svalue_t *));
-static void store_words_slice PROT((svalue_t *, int, int, 
-                                    array_t *, int, int));
-static svalue_t *sub_parse PROT((array_t *, array_t *, int *, 
-                                 array_t *, int *, int *, svalue_t *));
-static svalue_t *one_parse PROT((array_t *, const char *, array_t *, 
-                                 int *, int *, svalue_t *));
-static svalue_t *number_parse PROT((array_t *, array_t *, int *, int *));
-static svalue_t *item_parse PROT((array_t *, array_t *, int *, int *));
+static void load_lpc_info (int, object_t *);
+static void parse_clean_up (void);
+static void push_parse_globals (void);
+static void pop_parse_globals (void);
+static void store_value (svalue_t *, int, int, svalue_t *);
+static void store_words_slice (svalue_t *, int, int, 
+                                    array_t *, int, int);
+static svalue_t *sub_parse (array_t *, array_t *, int *, 
+                                 array_t *, int *, int *, svalue_t *);
+static svalue_t *one_parse (array_t *, const char *, array_t *, 
+                                 int *, int *, svalue_t *);
+static svalue_t *number_parse (array_t *, array_t *, int *, int *);
+static svalue_t *item_parse (array_t *, array_t *, int *, int *);
 #ifndef NO_ADD_ACTION
-static svalue_t *living_parse PROT((array_t *, array_t *, int *, int *));
+static svalue_t *living_parse (array_t *, array_t *, int *, int *);
 #endif
-static svalue_t *single_parse PROT((array_t *, array_t *, int *, int *));
-static svalue_t *prepos_parse PROT((array_t *, int *, int *, svalue_t *));
-static int match_object PROT((int, array_t *, int *, int *));
-static int find_string PROT((const char *, array_t *, int *));
-static int check_adjectiv PROT((int, array_t *, int, int));
-static int member_string PROT((const char *, array_t *));
-static const char *parse_to_plural PROT((const char *));
-static const char *parse_one_plural PROT((const char *));
+static svalue_t *single_parse (array_t *, array_t *, int *, int *);
+static svalue_t *prepos_parse (array_t *, int *, int *, svalue_t *);
+static int match_object (int, array_t *, int *, int *);
+static int find_string (const char *, array_t *, int *);
+static int check_adjectiv (int, array_t *, int, int);
+static int member_string (const char *, array_t *);
+static const char *parse_to_plural (const char *);
+static const char *parse_one_plural (const char *);
 
 /*
  * Function name:       load_lpc_info
@@ -322,7 +322,7 @@ static const char *parse_one_plural PROT((const char *));
  *                      ob: The object to call for information.
  */
 static void
-load_lpc_info P2(int, ix, object_t *, ob)
+load_lpc_info (int ix, object_t * ob)
 {
     array_t *tmp, *sing;
     svalue_t *ret;
@@ -469,12 +469,12 @@ static svalue_t parse_ret;
  * Returns:             True if command matched pattern.
  */
 int
-parse P5(const char *,        cmd,            /* Command to parse */
-         svalue_t *,    ob_or_array,    /* Object or array of objects */
-         const char *,        pattern,        /* Special parsing pattern */
-         svalue_t *,    stack_args,     /* Pointer to lvalue args on
+parse (const char *        cmd,            /* Command to parse */
+         svalue_t *    ob_or_array,    /* Object or array of objects */
+         const char *        pattern,        /* Special parsing pattern */
+         svalue_t *    stack_args,     /* Pointer to lvalue args on
                                          * stack */
-         int,           num_arg)
+         int           num_arg)
 {
     int pix, cix, six, fail, fword, ocix, fpix;
     svalue_t *pval;
@@ -643,7 +643,7 @@ parse P5(const char *,        cmd,            /* Command to parse */
 }
 
 static void
-store_value P4(svalue_t *, sp, int, pos, int, num, svalue_t *, what)
+store_value (svalue_t * sp, int pos, int num, svalue_t * what)
 {
     svalue_t *ret;
 
@@ -665,7 +665,7 @@ store_value P4(svalue_t *, sp, int, pos, int, num, svalue_t *, what)
  * Returns:             A pointer to a static svalue now containing string.
  */
 static void
-store_words_slice P6(svalue_t *, sp, int, pos, int, num, array_t *, warr, int, from, int, to)
+store_words_slice (svalue_t * sp, int pos, int num, array_t * warr, int from, int to)
 {
     svalue_t *ret;
     array_t *slice;
@@ -701,7 +701,7 @@ store_words_slice P6(svalue_t *, sp, int, pos, int, num, array_t *, warr, int, f
  *                      handles alternate patterns but not "%s"
  */
 static svalue_t *
-       sub_parse P7(array_t *, obarr, array_t *, patarr, int *, pix_in, array_t *, warr, int *, cix_in, int *, fail, svalue_t *, sp)
+       sub_parse (array_t * obarr, array_t * patarr, int * pix_in, array_t * warr, int * cix_in, int * fail, svalue_t * sp)
 {
     int cix, pix, subfail;
     svalue_t *pval;
@@ -772,7 +772,7 @@ static svalue_t *
  * Returns:             svalue holding result of parse.
  */
 static svalue_t *
-one_parse P6(array_t *, obarr, const char *, pat, array_t *, warr, int *, cix_in, int *, fail, svalue_t *, prep_param)
+one_parse (array_t * obarr, const char * pat, array_t * warr, int * cix_in, int * fail, svalue_t * prep_param)
 {
     char ch;
     svalue_t *pval;
@@ -902,7 +902,7 @@ static const char *num10[] =
  * Returns:             svalue holding result of parse.
  */
 static svalue_t *
-number_parse P4(array_t *, obarr, array_t *, warr, int *, cix_in, int *, fail)
+number_parse (array_t * obarr, array_t * warr, int * cix_in, int * fail)
 {
     int cix, ten, ones, num;
     char buf[100];
@@ -974,7 +974,7 @@ number_parse P4(array_t *, obarr, array_t *, warr, int *, cix_in, int *, fail)
  * Returns:             svalue holding result of parse.
  */
 static svalue_t *
-       item_parse P4(array_t *, obarr, array_t *, warr, int *, cix_in, int *, fail)
+       item_parse (array_t * obarr, array_t * warr, int * cix_in, int * fail)
 {
     array_t *tmp, *ret;
     svalue_t *pval;
@@ -1057,7 +1057,7 @@ static svalue_t *
  */
 #ifndef NO_ADD_ACTION
 static svalue_t *
-       living_parse P4(array_t *, obarr, array_t *, warr, int *, cix_in, int *, fail)
+       living_parse (array_t * obarr, array_t * warr, int * cix_in, int * fail)
 {
     array_t *live;
     svalue_t *pval;
@@ -1118,7 +1118,7 @@ static svalue_t *
  * Returns:             svalue holding result of parse.
  */
 static svalue_t *
-       single_parse P4(array_t *, obarr, array_t *, warr, int *, cix_in, int *, fail)
+       single_parse (array_t * obarr, array_t * warr, int * cix_in, int * fail)
 {
     int cix, obix, plur_flag;
 
@@ -1154,7 +1154,7 @@ static svalue_t *
  * Returns:             svalue holding result of parse.
  */
 static svalue_t *
-prepos_parse P4(array_t *, warr, int *, cix_in, int *, fail, svalue_t *, prepos)
+prepos_parse (array_t * warr, int * cix_in, int * fail, svalue_t * prepos)
 {
     array_t *parr, *tarr;
     const char *tmp;
@@ -1222,7 +1222,7 @@ prepos_parse P4(array_t *, warr, int *, cix_in, int *, fail, svalue_t *, prepos)
  * Returns:             True if object matches.
  */
 static int
-match_object P4(int, obix, array_t *, warr, int *, cix_in, int *, plur)
+match_object (int obix, array_t * warr, int * cix_in, int * plur)
 {
     array_t *ids;
     int il, pos, cplur, old_cix;
@@ -1295,7 +1295,7 @@ match_object P4(int, obix, array_t *, warr, int *, cix_in, int *, plur)
  * Returns:             Pos in array if string found or -1
  */
 static int
-find_string P3(const char *, str, array_t *, warr, int *, cix_in)
+find_string (const char * str, array_t * warr, int * cix_in)
 {
     int fpos;
     const char *p1, *p2;
@@ -1360,7 +1360,7 @@ find_string P3(const char *, str, array_t *, warr, int *, cix_in)
  * Returns:             True if a match is made.
  */
 static int
-check_adjectiv P4(int, obix, array_t *, warr, int, from, int, to)
+check_adjectiv (int obix, array_t * warr, int from, int to)
 {
     int il, back, sum, fail;
     char *adstr;
@@ -1440,7 +1440,7 @@ check_adjectiv P4(int, obix, array_t *, warr, int, from, int, to)
  * Returns:             Pos if found else -1.
  */
 static int
-member_string P2(const char *, str, array_t *, sarr)
+member_string (const char * str, array_t * sarr)
 {
     int il;
 
@@ -1466,7 +1466,7 @@ member_string P2(const char *, str, array_t *, sarr)
  * Returns:             Sentence in plural form.
  */
 static const char *
-     parse_to_plural P1(const char *, str)
+     parse_to_plural (const char * str)
 {
     array_t *words;
     const char *sp;
@@ -1508,7 +1508,7 @@ static const char *
  * Returns:             Word in plural form.
  */
 static const char *
-     parse_one_plural P1(const char *, str)
+     parse_one_plural (const char * str)
 {
     char ch, ch2, ch3;
     int sl;

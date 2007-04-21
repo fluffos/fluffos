@@ -39,14 +39,14 @@ static char sccsid[] = "@(#)ualarm.c	5.5 (Berkeley) 2/23/91";
 
 #define	USPS	1000000		/* # of microseconds in a second */
 
-unsigned ualarm PROT((register unsigned, register unsigned));
+unsigned ualarm (register unsigned, register unsigned);
 
 /*
  * Generate a SIGALRM signal in ``usecs'' microseconds.
  * If ``reload'' is non-zero, keep generating SIGALRM
  * every ``reload'' microseconds after the first signal.
  */
-unsigned ualarm P2(register unsigned, usecs, register unsigned, reload) {
+unsigned ualarm (register unsigned usecs, register unsigned reload) {
     struct itimerval new, old;
 
     new.it_interval.tv_usec = reload % USPS;

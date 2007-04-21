@@ -9,11 +9,11 @@
  */
 extern int call_origin;
 
-int inherits PROT((program_t *, program_t *));
-void add_mapping_pair PROT((mapping_t *, const char *, int));
-void add_mapping_string PROT((mapping_t *, const char *, const char *));
-void add_mapping_object PROT((mapping_t *, const char *, object_t *));
-void add_mapping_array PROT((mapping_t *, const char *, array_t *));
-void add_mapping_shared_string PROT((mapping_t *, char *, char *));
+int inherits (program_t *, program_t *);
+void add_mapping_pair (mapping_t *, const char *, long);
+void add_mapping_string (mapping_t *, const char *, const char *);
+void add_mapping_object (mapping_t *, const char *, object_t *);
+void add_mapping_array (mapping_t *, const char *, array_t *);
+void add_mapping_shared_string (mapping_t *, char *, char *);
 
 #endif

@@ -7,10 +7,10 @@
  * Write statistics about objects on file.
  */
 
-static int sumSizes PROT((mapping_t *, mapping_node_t *, void *));
-static int svalue_size PROT((svalue_t *));
+static int sumSizes (mapping_t *, mapping_node_t *, void *);
+static int svalue_size (svalue_t *);
 
-static int sumSizes P3(mapping_t *, m, mapping_node_t *, elt, void *, tp)
+static int sumSizes (mapping_t * m, mapping_node_t * elt, void * tp)
 {
     int *t = (int *)tp;
 
@@ -21,7 +21,7 @@ static int sumSizes P3(mapping_t *, m, mapping_node_t *, elt, void *, tp)
 
 int depth = 0;
 
-static int svalue_size P1(svalue_t *, v)
+static int svalue_size (svalue_t * v)
 {
     int i, total;
 
@@ -98,7 +98,7 @@ static int svalue_size P1(svalue_t *, v)
     return 0;
 }
 
-int data_size P1(object_t *, ob)
+int data_size (object_t * ob)
 {
     int total = 0, i;
 
@@ -111,7 +111,7 @@ int data_size P1(object_t *, ob)
     return total;
 }
 
-void dumpstat P1(const char *, tfn)
+void dumpstat (const char * tfn)
 {
     FILE *f;
     object_t *ob;
@@ -150,7 +150,7 @@ void dumpstat P1(const char *, tfn)
             tmp = ob->prog->total_size;
         else
             tmp = 0;
-        fprintf(f, "%-20s %i ref %2d %s %s (%d) %s\n", ob->obname,
+        fprintf(f, "%-20s %i ref %2d %s %s (%d)\n", ob->obname,
                 tmp + data_size(ob) + sizeof(object_t), ob->ref,
                 ob->flags & O_HEART_BEAT ? "HB" : "  ",
 #ifndef NO_ENVIRONMENT
@@ -158,9 +158,7 @@ void dumpstat P1(const char *, tfn)
 #else
                 "--",
 #endif
-                /* ob->cpu */ 0,
-                (ob->swap_num >= 0) ? ((ob->flags & O_SWAPPED) ?
-                                       "SWAPPED(out)" : "SWAPPED(in)") : "");
+                /* ob->cpu */ 0);
     }
     fclose(f);
 }

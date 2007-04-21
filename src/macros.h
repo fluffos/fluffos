@@ -13,71 +13,32 @@
  * Some useful macros...
  */
 #ifdef BUFSIZ
-#  define PROT_STDIO(x) PROT(x)
-#else                           /* BUFSIZ */
-#  define PROT_STDIO(x) ()
+#  define PROT_STDIO(x) (x ()
 #endif                          /* BUFSIZ */
 
 /* ANSI/K&R compatibility stuff;
  *
  * The correct way to prototype a function now is:
  *
- * foobar PROT((int, char *));
+ * foobar (int, char *);
  *
- * foobar P2(int, x, char *, y) { ... }
+ * foobar (int x, char * y) { ... }
  */
 /* xlc can't handle an ANSI protoype followed by a K&R def, and varargs
  * functions must be done K&R (b/c va_dcl is K&R style) so don't prototype
  * vararg function arguments under AIX
  */
 #if defined(__STDC__) || defined(WIN32)
-#  define PROT(x) x
-#  define P1(t1, v1) (t1 v1)
-#  define P2(t1, v1, t2, v2) (t1 v1, t2 v2)
-#  define P3(t1, v1, t2, v2, t3, v3) (t1 v1, t2 v2, t3 v3)
-#  define P4(t1, v1, t2, v2, t3, v3, t4, v4) (t1 v1, t2 v2, t3 v3, t4 v4)
-#  define P5(t1, v1, t2, v2, t3, v3, t4, v4, t5, v5) (t1 v1, t2 v2, t3 v3, t4 v4, t5 v5)
-#  define P6(t1, v1, t2, v2, t3, v3, t4, v4, t5, v5, t6, v6) (t1 v1, t2 v2, t3 v3, t4 v4, t5 v5, t6 v6)
-#  define P7(t1, v1, t2, v2, t3, v3, t4, v4, t5, v5, t6, v6, t7, v7) (t1 v1, t2 v2, t3 v3, t4 v4, t5 v5, t6 v6, t7 v7)
 #  define VOLATILE volatile
 #  define SIGNED signed
 #else                           /* __STDC__ */
-#  define PROT(x) ()
-#  define P1(t1, v1) (v1) t1 v1;
-#  define P2(t1, v1, t2, v2) (v1, v2) t1 v1; t2 v2;
-#  define P3(t1, v1, t2, v2, t3, v3) (v1, v2, v3) t1 v1; t2 v2; t3 v3;
-#  define P4(t1, v1, t2, v2, t3, v3, t4, v4) (v1, v2, v3, v4) t1 v1; t2 v2; t3 v3; t4 v4;
-#  define P5(t1, v1, t2, v2, t3, v3, t4, v4, t5, v5) (v1, v2, v3, v4, v5) t1 v1; t2 v2; t3 v3; t4 v4; t5 v5;
-#  define P6(t1, v1, t2, v2, t3, v3, t4, v4, t5, v5, t6, v6) (v1, v2, v3, v4, v5, v6) t1 v1; t2 v2; t3 v3; t4 v4; t5 v5; t6 v6;
-#  define P7(t1, v1, t2, v2, t3, v3, t4, v4, t5, v5, t6, v6, t7, v7) (v1, v2, v3, v4, v5, v6, v7) t1 v1; t2 v2; t3 v3; t4 v4; t5 v5; t6 v6; t7 v7;
 #  define VOLATILE
 #  define SIGNED
 #endif                          /* __STDC__ */
 
 /* do things both ways ... */
-#ifdef INCL_STDARG_H
-#  define PROT1V(x) (x, ...)
-#  define P1V(t1, x1) (t1 x1, ...)
-#  define V_START(vlist, last_arg) va_start(vlist, last_arg)
-
-#  define PROT2V(x, y) (x, y, ...)
-#  define P2V(t1, x1, t2, x2) (t1 x1, t2 x2, ...)
-#  define V_START(vlist, last_arg) va_start(vlist, last_arg)
-
-#  define V_VAR(type, var, vlist)
-#  define V_DCL(x)
-#else
-#  define PROT1V(x) ()
-#  define P1V(t1, x) (va_alist) va_dcl
-#  define V_START(vlist, last_arg) va_start(vlist)
-
-#  define PROT2V(x, y) ()
-#  define P2V(t1, x1, t2, x2) (va_alist) va_dcl
-
-#  define V_VAR(type, var, vlist) var = va_arg(vlist, type)
-#  define V_DCL(x) x
-#endif
-
+#define V_START(vlist, last_arg) va_start(vlist, last_arg)
+#define V_VAR(type, var, vlist)
 #define SAFE(x) do { x } while (0)
  
 
@@ -208,12 +169,21 @@
 #endif
 
 #if SIZEOF_INT == 4
+#define INT_32 int
+#endif
+
+#if SIZEOF_LONG == 4
 #define COPY_INT(x, y) COPY4(x,y)
 #define LOAD_INT(x, y) LOAD4(x,y)
 #define STORE_INT(x, y) STORE4(x,y)
-#define INT_32 int
+#else
+#if SIZEOF_LONG == 8
+#define COPY_INT(x, y) COPY8(x,y)
+#define LOAD_INT(x, y) LOAD8(x,y)
+#define STORE_INT(x, y) STORE8(x,y)
 #else
 !ints of size other than 4 not implemented
+#endif
 #endif
 
 #if SIZEOF_FLOAT == 4
@@ -246,17 +216,17 @@
 #endif
 
 #ifndef _FUNC_SPEC_
-   char *xalloc PROT((int));
+   char *xalloc (int);
 #  ifdef DEBUGMALLOC
-      char *int_string_copy PROT((const char * const, char *));
-      char *int_string_unlink PROT((const char *, char *));
-      char *int_new_string PROT((int, char *));
-      char *int_alloc_cstring PROT((const char *, char *));
+      char *int_string_copy (const char * const, char *);
+      char *int_string_unlink (const char *, char *);
+      char *int_new_string (int, char *);
+      char *int_alloc_cstring (const char *, char *);
 #  else
-      char *int_string_copy PROT((const char * const));
-      char *int_string_unlink PROT((const char *));
-      char *int_new_string PROT((int));
-      char *int_alloc_cstring PROT((const char *));
+      char *int_string_copy (const char * const);
+      char *int_string_unlink (const char *);
+      char *int_new_string (int);
+      char *int_alloc_cstring (const char *);
 #  endif
 #endif
 

@@ -7,22 +7,22 @@
 #include "compiler.h"
 #include "generate.h"
 
-static void ins_real PROT((double));
-static void ins_short PROT((short));
-static void upd_short PROT((int, int, const char *));
-static void ins_byte PROT((unsigned char));
-static void upd_byte PROT((int, unsigned char));
-static void write_number PROT((int));
-static void ins_int PROT((int));
+static void ins_real (double);
+static void ins_short (short);
+static void upd_short (int, int, const char *);
+static void ins_byte (unsigned char);
+static void upd_byte (int, unsigned char);
+static void write_number (long);
+static void ins_int (long);
 #if SIZEOF_PTR == 8
-static void ins_long PROT((long));
+static void ins_long (long);
 #endif
-void i_generate_node PROT((parse_node_t *));
-static void i_generate_if_branch PROT((parse_node_t *, int));
-static void i_generate_loop PROT((int, parse_node_t *, parse_node_t *, 
-                                  parse_node_t *));
-static void i_update_branch_list PROT((parse_node_t *, const char *));
-static int try_to_push PROT((int, int));
+void i_generate_node (parse_node_t *);
+static void i_generate_if_branch (parse_node_t *, int);
+static void i_generate_loop (int, parse_node_t *, parse_node_t *, 
+                                  parse_node_t *);
+static void i_update_branch_list (parse_node_t *, const char *);
+static int try_to_push (int, int);
 
 static int foreach_depth = 0;
 
@@ -38,7 +38,7 @@ static parse_node_t *branch_list[3];
 static int nforward_branches, nforward_branches_max;
 static int *forward_branches = 0;
 
-static void ins_real P1(double, l)
+static void ins_real (double l)
 {
     float f = (float)l;
 
@@ -59,7 +59,7 @@ static void ins_real P1(double, l)
  * that correct byte order is used, regardless of machine architecture.
  * Also beware that some machines can't write a word to odd addresses.
  */
-static void ins_short P1(short, l)
+static void ins_short (short l)
 {
     if (prog_code + 2 > prog_code_max) {
         mem_block_t *mbp = &mem_block[A_PROGRAM];
@@ -76,10 +76,10 @@ static void ins_short P1(short, l)
  * Store a 4 byte number. It is stored in such a way as to be sure
  * that correct byte order is used, regardless of machine architecture.
  */
-static void ins_int P1(int, l)
+static void ins_int (long l)
 {
 
-    if (prog_code + 4 > prog_code_max) {
+    if (prog_code + SIZEOF_LONG > prog_code_max) {
         mem_block_t *mbp = &mem_block[A_PROGRAM];
         UPDATE_PROGRAM_SIZE;
         realloc_mem_block(mbp);
@@ -95,7 +95,7 @@ static void ins_int P1(int, l)
  * that correct byte order is used, regardless of machine architecture.
  */
 #if SIZEOF_PTR == 8
-static void ins_long P1(long, l)
+static void ins_long (long l)
 {
     if (prog_code + 8 > prog_code_max) {
         mem_block_t *mbp = &mem_block[A_PROGRAM];
@@ -109,7 +109,7 @@ static void ins_long P1(long, l)
 }
 #endif
 
-static void upd_short P3(int, offset, int, l, const char *, where)
+static void upd_short (int offset, int l, const char * where)
 {
     unsigned short s;
     
@@ -129,7 +129,7 @@ static void upd_short P3(int, offset, int, l, const char *, where)
     COPY_SHORT(mem_block[A_PROGRAM].block + offset, &s);
 }
 
-static void ins_rel_short P1(int, l)
+static void ins_rel_short (int l)
 {
     if (l > USHRT_MAX) {
         char buf[256];
@@ -141,7 +141,7 @@ static void ins_rel_short P1(int, l)
     ins_short(l);
 }
 
-static void ins_byte P1(unsigned char, b)
+static void ins_byte (unsigned char b)
 {
     if (prog_code == prog_code_max) {
         mem_block_t *mbp = &mem_block[A_PROGRAM];
@@ -154,7 +154,7 @@ static void ins_byte P1(unsigned char, b)
     *prog_code++ = b;
 }
 
-static void upd_byte P2(int, offset, unsigned char, b)
+static void upd_byte (int offset, unsigned char b)
 {
     IF_DEBUG(UPDATE_PROGRAM_SIZE);
     DEBUG_CHECK2(offset > CURRENT_PROGRAM_SIZE,
@@ -163,7 +163,7 @@ static void upd_byte P2(int, offset, unsigned char, b)
     mem_block[A_PROGRAM].block[offset] = b;
 }
 
-static void end_pushes PROT((void)) {
+static void end_pushes (void) {
     if (push_state) {
         if (push_state > 1)
             upd_byte(push_start, push_state);
@@ -177,7 +177,7 @@ static void end_pushes PROT((void)) {
 // the stack and rewriting the mult-push into the stack.
 //
 
-static void initialize_push PROT((void)) {
+static void initialize_push (void) {
     int what = mem_block[A_PROGRAM].block[push_start];
     int arg = 0;
 
@@ -218,13 +218,13 @@ static void initialize_push PROT((void)) {
  * This varies since there are several opcodes (for
  * optimizing speed and/or size).
  */
-static void write_small_number P1(int, val) {
+static void write_small_number (int val) {
     if (try_to_push(PUSH_NUMBER, val)) return;
     ins_byte(F_BYTE);
     ins_byte(val);
 }
 
-static void write_number P1(int, val)
+static void write_number (long val)
 {
     if ((val & ~0xff) == 0)
         write_small_number(val);
@@ -238,13 +238,17 @@ static void write_number P1(int, val)
             ins_short(val);
         } else {
             ins_byte(F_NUMBER);
+#if SIZEOF_LONG == 4
             ins_int(val);
+#else
+	    ins_long(val);
+#endif
         }
     }
 }
 
 static void
-generate_expr_list P1(parse_node_t *, expr) {
+generate_expr_list (parse_node_t * expr) {
     parse_node_t *pn;
     int n, flag;
     
@@ -271,7 +275,7 @@ generate_expr_list P1(parse_node_t *, expr) {
 }
 
 static void
-generate_lvalue_list P1(parse_node_t *, expr) {
+generate_lvalue_list (parse_node_t * expr) {
     while ((expr = expr->r.expr)) {
       i_generate_node(expr->l.expr);
       end_pushes();
@@ -280,7 +284,7 @@ generate_lvalue_list P1(parse_node_t *, expr) {
 }
 
 INLINE_STATIC void
-switch_to_line P1(int, line) {
+switch_to_line (int line) {
     int sz = CURRENT_PROGRAM_SIZE - last_size_generated;
     ADDRESS_TYPE s;
     unsigned char *p;
@@ -292,7 +296,7 @@ switch_to_line P1(int, line) {
         while (sz > 255) {
             p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS, sizeof(ADDRESS_TYPE) + 1);
             *p++ = 255;
-#if !defined(USE_32BIT_ADDRESSES) && !defined(LPC_TO_C)
+#if !defined(USE_32BIT_ADDRESSES) 
             STORE_SHORT(p, s);
 #else
             STORE_INT(p, s);
@@ -301,7 +305,7 @@ switch_to_line P1(int, line) {
         }
         p = (unsigned char *)allocate_in_mem_block(A_LINENUMBERS, sizeof(ADDRESS_TYPE) + 1);
         *p++ = sz;
-#if !defined(USE_32BIT_ADDRESSES) && !defined(LPC_TO_C)
+#if !defined(USE_32BIT_ADDRESSES) 
         STORE_SHORT(p, s);
 #else
         STORE_INT(p, s);
@@ -311,7 +315,7 @@ switch_to_line P1(int, line) {
 }
 
 static int
-try_to_push P2(int, kind, int, value) {
+try_to_push (int kind, int value) {
     if (push_state) {
         if (value <= PUSH_MASK) {
             if (push_state == 1)
@@ -346,7 +350,7 @@ try_to_push P2(int, kind, int, value) {
 }
 
 void
-i_generate_node P1(parse_node_t *, expr) {
+i_generate_node (parse_node_t * expr) {
     if (!expr) return;
     
     if (expr->line && expr->line != line_being_generated)
@@ -406,7 +410,11 @@ i_generate_node P1(parse_node_t *, expr) {
         ins_byte(expr->v.number);
         ins_byte(expr->l.number);
         if (expr->v.number == F_LOOP_COND_NUMBER)
-            ins_int(expr->r.number);
+#if SIZEOF_LONG == 8
+            ins_long(expr->r.number);
+#else
+	    ins_int(expr->r.number);
+#endif
         else 
             ins_byte(expr->r.number);
         break;
@@ -573,7 +581,7 @@ i_generate_node P1(parse_node_t *, expr) {
     case NODE_SWITCH_DIRECT:
     case NODE_SWITCH_RANGES:
         {
-            int addr, last_break;
+            long addr, last_break;
             parse_node_t *sub = expr->l.expr;
             parse_node_t *save_switch_breaks = branch_list[CJ_BREAK_SWITCH];
             
@@ -779,8 +787,8 @@ i_generate_node P1(parse_node_t *, expr) {
     }
 }
 
-static void i_generate_loop P4(int, test_first, parse_node_t *, block,
-                               parse_node_t *, inc, parse_node_t *, test) {
+static void i_generate_loop (int test_first, parse_node_t * block,
+                               parse_node_t * inc, parse_node_t * test) {
     parse_node_t *save_breaks = branch_list[CJ_BREAK];
     parse_node_t *save_continues = branch_list[CJ_CONTINUE];
     int forever = node_always_true(test);
@@ -809,7 +817,7 @@ static void i_generate_loop P4(int, test_first, parse_node_t *, block,
 }
 
 static void
-i_generate_if_branch P2(parse_node_t *, node, int, invert) {
+i_generate_if_branch (parse_node_t * node, int invert) {
     int generate_both = 0;
     int branch = (invert ? F_BRANCH_WHEN_NON_ZERO : F_BRANCH_WHEN_ZERO);
     
@@ -866,7 +874,7 @@ i_generate_if_branch P2(parse_node_t *, node, int, invert) {
 }
 
 void
-i_generate_inherited_init_call P2(int, index, short, f) {
+i_generate_inherited_init_call (int index, short f) {
     end_pushes();
     ins_byte(F_CALL_INHERITED);
     ins_byte(index);
@@ -875,7 +883,7 @@ i_generate_inherited_init_call P2(int, index, short, f) {
     ins_byte(F_POP_VALUE);
 }
 
-void i_generate_forward_branch P1(char, b) {
+void i_generate_forward_branch (char b) {
     end_pushes();
     ins_byte(b);
     if (nforward_branches == nforward_branches_max) {
@@ -889,7 +897,7 @@ void i_generate_forward_branch P1(char, b) {
 }
 
 void
-i_update_forward_branch P1(const char *, what) {
+i_update_forward_branch (const char * what) {
     end_pushes();
     nforward_branches--;
     upd_short(forward_branches[nforward_branches],
@@ -897,7 +905,7 @@ i_update_forward_branch P1(const char *, what) {
               what);
 }
 
-void i_update_forward_branch_links P2(char, kind, parse_node_t *, link_start) {
+void i_update_forward_branch_links (char kind, parse_node_t * link_start) {
     int i;
 
     end_pushes();
@@ -914,7 +922,7 @@ void i_update_forward_branch_links P2(char, kind, parse_node_t *, link_start) {
 }
 
 void
-i_branch_backwards P2(char, b, int, addr) {
+i_branch_backwards (char b, int addr) {
     end_pushes();
     if (b) {
         if (b != F_WHILE_DEC)
@@ -924,7 +932,7 @@ i_branch_backwards P2(char, b, int, addr) {
 }
 
 static void
-i_update_branch_list P2(parse_node_t *, bl, const char *, what) {
+i_update_branch_list (parse_node_t * bl, const char * what) {
     int current_size;
     
     end_pushes();
@@ -992,7 +1000,7 @@ i_uninitialize_parser() {
 }
 
 void
-i_generate_final_program P1(int, x) {
+i_generate_final_program (int x) {
     if (!x) {
         UPDATE_PROGRAM_SIZE;
 /* This needs work
@@ -1008,7 +1016,7 @@ i_generate_final_program P1(int, x) {
  * - jump threading
  */
 void
-optimize_icode P3(char *, start, char *, pc, char *, end) {
+optimize_icode (char * start, char * pc, char * end) {
     int instr;
     if (start == 0) {
         /* we don't optimize the initializer block right now b/c all the
@@ -1024,11 +1032,18 @@ optimize_icode P3(char *, start, char *, pc, char *, end) {
     }
     while (pc < end) {
         switch (instr = EXTRACT_UCHAR(pc++)) {
+#if SIZEOF_LONG == 4
         case F_NUMBER:
+#endif
         case F_REAL:
         case F_CALL_INHERITED:
             pc += 4;
             break;
+#if SIZEOF_LONG == 8
+	case F_NUMBER:
+	    pc += 8;
+	    break;
+#endif
         case F_SIMUL_EFUN:
         case F_CALL_FUNCTION_BY_ADDRESS:
             pc += 3;

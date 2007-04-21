@@ -10,7 +10,7 @@ typedef struct {
 
 union u {
     const char *string;
-    int number;
+    long number;
     float real;
 
     refed_t *refed; /* any of the block below */
@@ -26,7 +26,7 @@ union u {
     struct svalue_s *lvalue;
     struct ref_s *ref;
     unsigned char *lvalue_byte;
-    void (*error_handler) PROT((void));
+    void (*error_handler) (void);
 };
 
 /*

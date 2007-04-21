@@ -31,21 +31,21 @@
 #endif
 #endif
 
-int legal_path PROT((const char *));
+int legal_path (const char *);
 
-static int match_string PROT((char *, char *));
-static int copy PROT((const char *from, const char *to));
-static int do_move PROT((const char *from, const char *to, int flag));
-static int CDECL pstrcmp PROT((CONST void *, CONST void *));
-static int CDECL parrcmp PROT((CONST void *, CONST void *));
-static void encode_stat PROT((svalue_t *, int, char *, struct stat *));
+static int match_string (char *, char *);
+static int copy (const char *from, const char *to);
+static int do_move (const char *from, const char *to, int flag);
+static int CDECL pstrcmp (CONST void *, CONST void *);
+static int CDECL parrcmp (CONST void *, CONST void *);
+static void encode_stat (svalue_t *, int, char *, struct stat *);
 
 #define MAX_LINES 50
 
 /*
  * These are used by qsort in get_dir().
  */
-static int CDECL pstrcmp P2(CONST void *, p1, CONST void *, p2)
+static int CDECL pstrcmp (CONST void * p1, CONST void * p2)
 {
     svalue_t *x = (svalue_t *)p1;
     svalue_t *y = (svalue_t *)p2;
@@ -53,7 +53,7 @@ static int CDECL pstrcmp P2(CONST void *, p1, CONST void *, p2)
     return strcmp(x->u.string, y->u.string);
 }
 
-static int CDECL parrcmp P2(CONST void *, p1, CONST void *, p2)
+static int CDECL parrcmp (CONST void * p1, CONST void * p2)
 {
     svalue_t *x = (svalue_t *)p1;
     svalue_t *y = (svalue_t *)p2;
@@ -61,7 +61,7 @@ static int CDECL parrcmp P2(CONST void *, p1, CONST void *, p2)
     return strcmp(x->u.arr->item[0].u.string, y->u.arr->item[0].u.string);
 }
 
-static void encode_stat P4(svalue_t *, vp, int, flags, char *, str, struct stat *, st)
+static void encode_stat (svalue_t * vp, int flags, char * str, struct stat * st)
 {
     if (flags == -1) {
         array_t *v = allocate_empty_array(3);
@@ -108,7 +108,7 @@ static void encode_stat P4(svalue_t *, vp, int, flags, char *, str, struct stat 
 /* WIN32 should be fixed to do this correctly (i.e. no ifdefs for it) */
 #define MAX_FNAME_SIZE 255
 #define MAX_PATH_LEN   1024
-array_t *get_dir P2(const char *, path, int, flags)
+array_t *get_dir (const char * path, int flags)
 {
     array_t *v;
     int i, count = 0;
@@ -308,7 +308,7 @@ array_t *get_dir P2(const char *, path, int, flags)
     return v;
 }
 
-int remove_file P1(const char *, path)
+int remove_file (const char * path)
 {
     path = check_valid_path(path, current_object, "remove_file", 1);
 
@@ -322,7 +322,7 @@ int remove_file P1(const char *, path)
 /*
  * Check that it is an legal path. No '..' are allowed.
  */
-int legal_path P1(const char *, path)
+int legal_path (const char * path)
 {
     const char *p;
 
@@ -371,7 +371,7 @@ int legal_path P1(const char *, path)
  * There is an error in a specific file. Ask the MudOS driver to log the
  * message somewhere.
  */
-void smart_log P4(const char *, error_file, int, line, const char *, what, int, flag)
+void smart_log (const char * error_file, int line, const char * what, int flag)
 {
     char *buff;
     svalue_t *mret;
@@ -409,7 +409,7 @@ void smart_log P4(const char *, error_file, int, line, const char *, what, int, 
 /*
  * Append string to file. Return 0 for failure, otherwise 1.
  */
-int write_file P3(const char *, file, const char *, str, int, flags)
+int write_file (const char * file, const char * str, int flags)
 {
     FILE *f;
 
@@ -437,7 +437,7 @@ int write_file P3(const char *, file, const char *, str, int, flags)
     return 1;
 }
 
-char *read_file P3(const char *, file, int, start, int, len) {
+char *read_file (const char * file, int start, int len) {
     struct stat st;
     FILE *f;
     int lastchunk, chunk, ssize, fsize;
@@ -554,7 +554,7 @@ char *read_file P3(const char *, file, int, start, int, len) {
     return 0;
 }
 
-char *read_bytes P4(const char *, file, int, start, int, len, int *, rlen)
+char *read_bytes (const char * file, int start, int len, int * rlen)
 {
     struct stat st;
     FILE *fptr;
@@ -620,7 +620,7 @@ char *read_bytes P4(const char *, file, int, start, int, len, int *, rlen)
     return str;
 }
 
-int write_bytes P4(const char *, file, int, start, const char *, str, int, theLength)
+int write_bytes (const char * file, int start, const char * str, int theLength)
 {
     struct stat st;
     int size;
@@ -671,10 +671,10 @@ int write_bytes P4(const char *, file, int, start, const char *, str, int, theLe
     return 1;
 }
 
-int file_size P1(const char *, file)
+int file_size (const char * file)
 {
     struct stat st;
-    int ret;
+    long ret;
 #ifdef WIN32
     int needs_free = 0, len;
     char *p;
@@ -720,7 +720,7 @@ int file_size P1(const char *, file)
  * Otherwise, the returned path is temporarily allocated by apply(), which
  * means it will be deallocated at next apply().
  */
-const char *check_valid_path P4(const char *, path, object_t *, call_object, const char * const , call_fun, int, writeflg)
+const char *check_valid_path (const char * path, object_t * call_object, const char * const  call_fun, int writeflg)
 {
     svalue_t *v;
 
@@ -770,7 +770,7 @@ const char *check_valid_path P4(const char *, path, object_t *, call_object, con
     return 0;
 }
 
-static int match_string P2(char *, match, char *, str)
+static int match_string (char * match, char * str)
 {
     int i;
 
@@ -811,7 +811,7 @@ static int match_string P2(char *, match, char *, str)
 
 static struct stat to_stats, from_stats;
 
-static int copy P2(const char *, from, const char *, to)
+static int copy (const char * from, const char * to)
 {
     int ifd;
     int ofd;
@@ -885,7 +885,7 @@ static int copy P2(const char *, from, const char *, to)
    Return 0 if successful, 1 if an error occurred.  */
 
 #ifdef F_RENAME
-static int do_move P3(const char *, from, const char *, to, int, flag)
+static int do_move (const char * from, const char * to, int flag)
 {
     if (lstat(from, &from_stats) != 0) {
         error("/%s: lstat failed\n", from);
@@ -961,7 +961,7 @@ static int do_move P3(const char *, from, const char *, to, int, flag)
 }
 #endif
 
-void debug_perror P2(const char *, what, const char *, file) {
+void debug_perror (const char * what, const char * file) {
     if (file)
         debug_message("System Error: %s:%s:%s\n", what, file, port_strerror(errno));
     else
@@ -984,7 +984,7 @@ void mark_file_sv() {
 #endif
 
 #ifdef F_RENAME
-int do_rename P3(const char *, fr, const char *, t, int, flag)
+int do_rename (const char * fr, const char * t, int flag)
 {
     const char *from;
     const char *to;
@@ -1047,7 +1047,7 @@ int do_rename P3(const char *, fr, const char *, t, int, flag)
 }
 #endif                          /* F_RENAME */
 
-int copy_file P2(const char *, from, const char *, to)
+int copy_file (const char * from, const char * to)
 {
     char buf[128];
     int from_fd, to_fd;
@@ -1134,7 +1134,7 @@ int copy_file P2(const char *, from, const char *, to)
     return 1;
 }
 
-void dump_file_descriptors P1(outbuffer_t *, out)
+void dump_file_descriptors (outbuffer_t * out)
 {
     int i;
     dev_t dev;

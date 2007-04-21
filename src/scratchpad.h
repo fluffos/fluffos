@@ -40,15 +40,15 @@ extern unsigned char *scratch_end;
 /*
  *  scratchpad.c
  */
-void scratch_destroy PROT((void));
-char *scratch_copy PROT((const char *));
-char *scratch_alloc PROT((int));
-void scratch_free PROT((char *));
-char *scratch_join PROT((char *, char *));
-char *scratch_join2 PROT((char *, char *));
-char *scratch_realloc PROT((char *, int));
-char *scratch_copy_string PROT((char *));
-char *scratch_large_alloc PROT((int));
+void scratch_destroy (void);
+char *scratch_copy (const char *);
+char *scratch_alloc (int);
+void scratch_free (char *);
+char *scratch_join (char *, char *);
+char *scratch_join2 (char *, char *);
+char *scratch_realloc (char *, int);
+char *scratch_copy_string (char *);
+char *scratch_large_alloc (int);
 
 #endif
 

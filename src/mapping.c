@@ -35,11 +35,11 @@ mapping_node_t *locked_map_nodes = 0;
   table).
 */
 
-INLINE_STATIC int node_hash P1(mapping_node_t *, mn) {
+INLINE_STATIC int node_hash (mapping_node_t * mn) {
     return MAP_POINTER_HASH(mn->values[0].u.number);
 }
 
-INLINE int growMap P1(mapping_t *, m)
+INLINE int growMap (mapping_t * m)
 {
         int oldsize = m->table_size + 1;
         int newsize = oldsize << 1;
@@ -97,7 +97,7 @@ INLINE int growMap P1(mapping_t *, m)
 INLINE mapping_t *
 mapTraverse (m, func, extra)
 mapping_t *m;
-int (*func) PROT((mapping_t *, mapping_node_t *, void *));
+int (*func) (mapping_t *, mapping_node_t *, void *);
 void *extra;
 {
         mapping_node_t *elt, *nelt;
@@ -116,7 +116,7 @@ void *extra;
 /* free_mapping */
  
 INLINE void
-dealloc_mapping P1(mapping_t *, m)
+dealloc_mapping (mapping_t * m)
 {
         debug(mapping,("mapping.c: actual free of %p\n", m));
         num_mappings--;
@@ -152,7 +152,7 @@ dealloc_mapping P1(mapping_t *, m)
 }
 
 INLINE void
-free_mapping P1(mapping_t *, m)
+free_mapping (mapping_t * m)
 {
         debug(mapping,("mapping.c: free_mapping begin, ptr = %p\n", m));
         /* some other object is still referencing this mapping */
@@ -195,7 +195,7 @@ mapping_node_t *new_map_node() {
     return ret;
 } 
 
-void unlock_mapping P1(mapping_t *, m) {
+void unlock_mapping (mapping_t * m) {
     mapping_node_t **mn = &locked_map_nodes;
     mapping_node_t *tmp;
     
@@ -214,7 +214,7 @@ void unlock_mapping P1(mapping_t *, m) {
     m->count &= ~MAP_LOCKED;
 }
 
-void free_node P2(mapping_t *, m, mapping_node_t *, mn) {
+void free_node (mapping_t * m, mapping_node_t * mn) {
     if (m->count & MAP_LOCKED) {
         mn->next = locked_map_nodes;
         locked_map_nodes = mn;
@@ -234,7 +234,7 @@ void free_node P2(mapping_t *, m, mapping_node_t *, mn) {
 */
  
 INLINE mapping_t *
-allocate_mapping P1(int, n)
+allocate_mapping (int n)
 {
         mapping_t *newmap;
         mapping_node_t **a;
@@ -279,7 +279,7 @@ allocate_mapping P1(int, n)
 }
 
 INLINE mapping_t *
-allocate_mapping2 P2(array_t *, arr, svalue_t *, sv)
+allocate_mapping2 (array_t * arr, svalue_t * sv)
 {
     mapping_t *newmap;
     int i;
@@ -306,7 +306,7 @@ allocate_mapping2 P2(array_t *, arr, svalue_t *, sv)
 }
 
 INLINE mapping_t *
-mkmapping P2(array_t *, k, array_t *, v) {
+mkmapping (array_t * k, array_t * v) {
     mapping_t *newmap;
     int i;
     
@@ -326,7 +326,7 @@ mkmapping P2(array_t *, k, array_t *, v) {
 */
 
 INLINE_STATIC mapping_t *
-copyMapping P1(mapping_t *,m)
+copyMapping (mapping_t *m)
 {
     mapping_t *newmap;
     int k = m->table_size;
@@ -374,7 +374,7 @@ copyMapping P1(mapping_t *,m)
 }
 
 INLINE int
-restore_hash_string P2(char **, val, svalue_t *, sv)
+restore_hash_string (char ** val, svalue_t * sv)
 {
     register char *cp = *val;
     char c, *start = cp;
@@ -428,7 +428,7 @@ restore_hash_string P2(char **, val, svalue_t *, sv)
  */
 
 INLINE_STATIC int
-svalue_to_int P1(svalue_t *, v)
+svalue_to_int (svalue_t * v)
 {
     if (v->type == T_STRING && v->subtype != STRING_SHARED) {
         char *p = make_shared_string(v->u.string);
@@ -443,7 +443,7 @@ svalue_to_int P1(svalue_t *, v)
     return MAP_POINTER_HASH(v->u.number);
 }
 
-int msameval P2(svalue_t *, arg1, svalue_t *, arg2) {
+int msameval (svalue_t * arg1, svalue_t * arg2) {
     switch (arg1->type | arg2->type) {
     case T_NUMBER:
         return arg1->u.number == arg2->u.number;
@@ -461,7 +461,7 @@ int msameval P2(svalue_t *, arg1, svalue_t *, arg2) {
  * necessarily have any meaningful value.
  */
 INLINE_STATIC mapping_node_t *
-node_find_in_mapping P2(mapping_t *, m, svalue_t *, lv)
+node_find_in_mapping (mapping_t * m, svalue_t * lv)
 {
         int i;
         mapping_node_t *elt, **a = m->table;
@@ -481,7 +481,7 @@ node_find_in_mapping P2(mapping_t *, m, svalue_t *, lv)
    mapping_delete: delete an element from the mapping
 */
 
-INLINE void mapping_delete P2(mapping_t *,m, svalue_t *,lv)
+INLINE void mapping_delete (mapping_t *m, svalue_t *lv)
 {
         int i = svalue_to_int(lv) & m->table_size;
         mapping_node_t **prev = m->table + i, *elt;
@@ -517,7 +517,7 @@ INLINE void mapping_delete P2(mapping_t *,m, svalue_t *,lv)
  */
 
 INLINE svalue_t *
-find_for_insert P3(mapping_t *, m, svalue_t *, lv, int, doTheFree)
+find_for_insert (mapping_t * m, svalue_t * lv, int doTheFree)
 {
         int oi = svalue_to_int(lv);
         unsigned short i = oi & m->table_size;
@@ -585,7 +585,7 @@ typedef struct unique_m_list_s {
 
 static unique_m_list_t *g_u_m_list = 0;
 
-static void unique_mapping_error_handler PROT((void))
+static void unique_mapping_error_handler (void)
 {
     unique_m_list_t *nlist = g_u_m_list;
     unique_node_t **table = nlist->utable;
@@ -608,7 +608,7 @@ static void unique_mapping_error_handler PROT((void))
     FREE((char *) nlist);
 }
 
-void f_unique_mapping PROT((void))
+void f_unique_mapping (void)
 {
     unique_m_list_t *nlist;
     svalue_t *arg = sp - st_num_arg + 1, *sv;
@@ -766,7 +766,7 @@ void f_unique_mapping PROT((void))
  */
 
 INLINE mapping_t *
-load_mapping_from_aggregate P2(svalue_t *,sp, int, n)
+load_mapping_from_aggregate (svalue_t *sp, int n)
 {
         mapping_t *m;
         int mask, i, oi, count = 0;
@@ -835,7 +835,7 @@ load_mapping_from_aggregate P2(svalue_t *,sp, int, n)
 /* is ok */
 
 INLINE svalue_t *
-find_in_mapping P2(mapping_t *, m, svalue_t *,lv)
+find_in_mapping (mapping_t * m, svalue_t *lv)
 {
         int i = svalue_to_int(lv) & m->table_size;
         mapping_node_t *n = m->table[i];
@@ -849,7 +849,7 @@ find_in_mapping P2(mapping_t *, m, svalue_t *,lv)
 }
 
 svalue_t *
-find_string_in_mapping P2(mapping_t *, m, char *, p)
+find_string_in_mapping (mapping_t * m, char * p)
 {
     char *ss = findstring(p);
     int i;
@@ -872,7 +872,7 @@ find_string_in_mapping P2(mapping_t *, m, char *, p)
 */
 
 INLINE_STATIC void
-add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int, free_flag)
+add_to_mapping (mapping_t *m1, mapping_t *m2, int free_flag)
 {
     int mask = m1->table_size, j = m2->table_size;
     int count = MAP_COUNT(m1);
@@ -948,7 +948,7 @@ add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int, free_flag)
 */
 
 INLINE_STATIC void
-unique_add_to_mapping P3(mapping_t *,m1, mapping_t *,m2, int,free_flag)
+unique_add_to_mapping (mapping_t *m1, mapping_t *m2, int free_flag)
 {
     int mask = m1->table_size, j = m2->table_size;
     int count = MAP_COUNT(m1);
@@ -1034,7 +1034,7 @@ mapping_t *m1, *m2;
 */
 
 INLINE mapping_t *
-add_mapping P2(mapping_t *,m1, mapping_t *,m2)
+add_mapping (mapping_t *m1, mapping_t *m2)
 {
         mapping_t *newmap;
  
@@ -1061,7 +1061,7 @@ add_mapping P2(mapping_t *,m1, mapping_t *,m2)
 
 #ifdef F_MAP
 void
-map_mapping P2(svalue_t *, arg, int, num_arg)
+map_mapping (svalue_t * arg, int num_arg)
 {
     mapping_t *m;
     mapping_node_t **a, *elt;
@@ -1098,7 +1098,7 @@ map_mapping P2(svalue_t *, arg, int, num_arg)
 
 #ifdef F_FILTER
 void
-filter_mapping P2(svalue_t *, arg, int, num_arg)
+filter_mapping (svalue_t * arg, int num_arg)
 {
     mapping_t *m, *newmap;
     mapping_node_t **a, *elt;
@@ -1187,7 +1187,7 @@ filter_mapping P2(svalue_t *, arg, int, num_arg)
 /* compose_mapping */
 
 INLINE mapping_t *
-compose_mapping P3(mapping_t *,m1, mapping_t *,m2, unsigned short,flag)
+compose_mapping (mapping_t *m1, mapping_t *m2, unsigned short flag)
 {
     mapping_node_t *elt, *elt2, **a, **b = m2->table, **prev;
     unsigned short j = m1->table_size, deleted = 0;
@@ -1235,7 +1235,7 @@ compose_mapping P3(mapping_t *,m1, mapping_t *,m2, unsigned short,flag)
 /* mapping_indices */
 
 array_t *
-mapping_indices P1(mapping_t *,m)
+mapping_indices (mapping_t *m)
 {
         array_t *v;
         int j = m->table_size;
@@ -1256,7 +1256,7 @@ mapping_indices P1(mapping_t *,m)
 /* mapping_values */
 
 array_t *
-mapping_values P1(mapping_t *,m)
+mapping_values (mapping_t *m)
 {
         array_t *v;
         int j = m->table_size;
@@ -1276,7 +1276,7 @@ mapping_values P1(mapping_t *,m)
 
 /* functions for building mappings */
 
-static svalue_t *insert_in_mapping P2(mapping_t *, m, const char *, key) {
+static svalue_t *insert_in_mapping (mapping_t * m, const char * key) {
     svalue_t lv;
     svalue_t *ret;
     
@@ -1289,7 +1289,7 @@ static svalue_t *insert_in_mapping P2(mapping_t *, m, const char *, key) {
     return ret;
 }
 
-void add_mapping_pair P3(mapping_t *, m, const char *, key, int, value)
+void add_mapping_pair (mapping_t * m, const char * key, long value)
 {
     svalue_t *s;
 
@@ -1299,7 +1299,7 @@ void add_mapping_pair P3(mapping_t *, m, const char *, key, int, value)
     s->u.number = value;
 }
 
-void add_mapping_string P3(mapping_t *, m, const char *, key, const char *, value)
+void add_mapping_string (mapping_t * m, const char * key, const char * value)
 {
     svalue_t *s;
 
@@ -1309,7 +1309,7 @@ void add_mapping_string P3(mapping_t *, m, const char *, key, const char *, valu
     s->u.string = make_shared_string(value);
 }
 
-void add_mapping_malloced_string P3(mapping_t *, m, const char *, key, char *, value)
+void add_mapping_malloced_string (mapping_t * m, const char * key, char * value)
 {
     svalue_t *s;
 
@@ -1319,7 +1319,7 @@ void add_mapping_malloced_string P3(mapping_t *, m, const char *, key, char *, v
     s->u.string = value;
 }
 
-void add_mapping_object P3(mapping_t *, m, const char *, key, object_t *, value)
+void add_mapping_object (mapping_t * m, const char * key, object_t * value)
 {
     svalue_t *s;
 
@@ -1330,7 +1330,7 @@ void add_mapping_object P3(mapping_t *, m, const char *, key, object_t *, value)
     add_ref(value, "add_mapping_object");
 }
 
-void add_mapping_array P3(mapping_t *, m, const char *, key, array_t *, value)
+void add_mapping_array (mapping_t * m, const char * key, array_t * value)
 {
     svalue_t *s;
 
@@ -1341,7 +1341,7 @@ void add_mapping_array P3(mapping_t *, m, const char *, key, array_t *, value)
     value->ref++;
 }
 
-void add_mapping_shared_string P3(mapping_t *, m, char *, key, char *, value)
+void add_mapping_shared_string (mapping_t * m, char * key, char * value)
 {
     svalue_t *s;
 

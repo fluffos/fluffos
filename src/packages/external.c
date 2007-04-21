@@ -8,8 +8,8 @@
 char *external_cmd[NUM_EXTERNAL_CMDS];
 
 #ifdef F_EXTERNAL_START
-int external_start P5(int, which, svalue_t *, args,
-                      svalue_t *, arg1, svalue_t *, arg2, svalue_t *, arg3) {
+int external_start (int which, svalue_t * args,
+                      svalue_t * arg1, svalue_t * arg2, svalue_t * arg3) {
     int sv[2];
     char *cmd;
     int fd;
@@ -120,7 +120,7 @@ int external_start P5(int, which, svalue_t *, args,
     }
 }
 
-void f_external_start PROT((void))
+void f_external_start (void)
 {
     int fd, num_arg = st_num_arg;
     svalue_t *arg = sp - num_arg + 1;

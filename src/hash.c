@@ -30,9 +30,9 @@ static int T[] =
 };
 
 INLINE int
-hashstr P3(char *, s,           /* string to hash */
-                   int, maxn,   /* maximum number of chars to consider */
-                   int, hashs)
+hashstr (char * s,           /* string to hash */
+                   int maxn,   /* maximum number of chars to consider */
+                   int hashs)
 {
     register unsigned int h;
     register unsigned char *p;
@@ -61,7 +61,7 @@ hashstr P3(char *, s,           /* string to hash */
  */
 
 INLINE int
-whashstr P2(const char *, s, int, maxn)
+whashstr (const char * s, int maxn)
 {
     register unsigned char oh, h;
     register unsigned char *p;

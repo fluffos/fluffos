@@ -26,9 +26,9 @@ extern int regnarrate;
 extern int regexp_user;
 extern const char *regexp_error;
 
-void regdump PROT((regexp *));
-regexp *regcomp PROT((unsigned char *, int));
-int regexec PROT((regexp *, const char *));
-char *regsub PROT((regexp *, char *, char *, int));
+void regdump (regexp *);
+regexp *regcomp (unsigned char *, int);
+int regexec (regexp *, const char *);
+char *regsub (regexp *, char *, char *, int);
 
 #endif

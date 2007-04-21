@@ -8,9 +8,9 @@
 
 extern object_t *master_ob;
 
-svalue_t *apply_master_ob PROT((int, int));
-svalue_t *safe_apply_master_ob PROT((int, int));
-void init_master PROT((void));
-void set_master PROT((object_t *));
+svalue_t *apply_master_ob (int, int);
+svalue_t *safe_apply_master_ob (int, int);
+void init_master (void);
+void set_master (object_t *);
 
 #endif

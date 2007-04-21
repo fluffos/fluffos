@@ -64,7 +64,7 @@ unsigned char *scr_last = &scratchblock[2], *scr_tail = &scratchblock[2];
 unsigned char *scratch_end = scratchblock + SCRATCHPAD_SIZE;
 
 #if 0
-static void scratch_summary PROT((void));
+static void scratch_summary (void);
 
 static void scratch_summary() {
     unsigned char *p = scratchblock;
@@ -102,7 +102,7 @@ void scratch_destroy() {
 }
 
 
-char *scratch_copy P1(const char *, str) {
+char *scratch_copy (const char * str) {
     unsigned char *from, *to, *end;
 
     SDEBUG2(printf("scratch_copy(%s):", str));
@@ -131,7 +131,7 @@ char *scratch_copy P1(const char *, str) {
     return (char *)to;
 }
 
-void scratch_free P1(char *, ptr) {
+void scratch_free (char * ptr) {
     /* how do we know what this is?  first we check if it's the last string
        we made.  Otherwise, take advantage of the fact that things on the
        scratchpad have a zero two before them.  Things not on it wont
@@ -159,7 +159,7 @@ void scratch_free P1(char *, ptr) {
     }
 }
 
-char *scratch_large_alloc P1(int, size) {
+char *scratch_large_alloc (int size) {
     sp_block_t *spt;
 
     SDEBUG(printf("scratch_large_alloc(%i)\n", size));
@@ -174,7 +174,7 @@ char *scratch_large_alloc P1(int, size) {
 }
 
 /* warning: unlike REALLOC(), this one only allows increases */
-char *scratch_realloc P2(char *, ptr, int, size) {
+char *scratch_realloc (char * ptr, int size) {
     SDEBUG(printf("scratch_realloc(%s): ", ptr));
 
      if (Ptr == scr_last) {
@@ -226,7 +226,7 @@ char *scratch_realloc P2(char *, ptr, int, size) {
 }
 
 /* the routines above are better than this */
-char *scratch_alloc P1(int, size) {
+char *scratch_alloc (int size) {
     SDEBUG(printf("scratch_alloc(%i)\n", size));
     if (size < 256 && (scr_tail + size + 1) < scratch_end) {
         scr_last = scr_tail + 1;
@@ -237,7 +237,7 @@ char *scratch_alloc P1(int, size) {
         return scratch_large_alloc(size);
 }
 
-char *scratch_join P2(char *, s1, char *, s2) {
+char *scratch_join (char * s1, char * s2) {
     char *res;
     int tmp;
 
@@ -277,7 +277,7 @@ char *scratch_join P2(char *, s1, char *, s2) {
     }
 }
 
-char *scratch_copy_string P1(char *,s) {
+char *scratch_copy_string (char *s) {
     int l;
     register unsigned char *to = scr_tail + 1;
     char *res;

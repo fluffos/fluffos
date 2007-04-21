@@ -2,7 +2,6 @@
 #include "lpc_incl.h"
 #include "compiler.h"
 #include "generate.h"
-#include "swap.h"
 #include "scratchpad.h"
 #include "qsort.h"
 #include "file.h"
@@ -12,10 +11,10 @@
 #include "lex.h"
 #include "simul_efun.h"
 
-static void clean_parser PROT((void));
-static void prolog PROT((int, char *));
-static program_t *epilog PROT((void));
-static void show_overload_warnings PROT((void));
+static void clean_parser (void);
+static void prolog (int, char *);
+static program_t *epilog (void);
+static void show_overload_warnings (void);
 
 #define CT(x) (1 << (x))
 #define CT_SIMPLE(x) (CT(TYPE_ANY) | CT(x))
@@ -85,7 +84,7 @@ int current_number_of_locals = 0;
 int max_num_locals = 0;
 
 /* This function has strput() semantics; see comments in simulate.c */
-char *get_two_types P4(char *, where, char *, end, int, type1, int, type2)
+char *get_two_types (char * where, char * end, int type1, int type2)
 {
     where = strput(where, end, "( ");
     where = get_type_name(where, end, type1);
@@ -108,7 +107,7 @@ void init_locals()
     current_number_of_locals = max_num_locals = 0;
 }
 
-void free_all_local_names P1(int, flag)
+void free_all_local_names (int flag)
 {
     int i;
 
@@ -161,7 +160,7 @@ void clean_up_locals()
     type_of_locals_ptr = type_of_locals;
 }
 
-void pop_n_locals P1(int, num) {
+void pop_n_locals (int num) {
     int lcur_start;
     int ltype_start, i1;
 
@@ -191,7 +190,7 @@ void pop_n_locals P1(int, num) {
     }
 }
 
-int add_local_name P2(const char *, str, int, type)
+int add_local_name (const char * str, int type)
 {
     if (max_num_locals == CFG_MAX_LOCAL_VARIABLES) {
         yyerror("Too many local variables");
@@ -222,7 +221,7 @@ void reallocate_locals() {
 }
 
 /* Fix a inherited class type for the current program */
-static void fix_class_type P2(int *, t, program_t *, from) {
+static void fix_class_type (int * t, program_t * from) {
     ident_hash_elem_t *ihe;
     int num;
 
@@ -231,8 +230,8 @@ static void fix_class_type P2(int *, t, program_t *, from) {
         if (ihe && ((num = ihe->dn.class_num) != -1)) {
             (*t) = (*t & ~CLASS_NUM_MASK) | num;
         } else {
-	  if(!num_parse_error)
-            fatal("Cannot find class %s (%s,%d).\n",from->strings[from->classes[(*t) & CLASS_NUM_MASK].classname], current_file, current_line);
+	    if(!num_parse_error)
+		fatal("Cannot find class %s (%s,%d).\n",from->strings[from->classes[(*t) & CLASS_NUM_MASK].classname], current_file, current_line);
         }
     }
 }
@@ -243,7 +242,7 @@ static void fix_class_type P2(int *, t, program_t *, from) {
  * It is very important that they are stored in the same order with the
  * same index.
  */
-void copy_variables P2(program_t *, from, int, type) {
+void copy_variables (program_t * from, int type) {
     int i;
     
     for (i = 0; i < from->num_inherited; i++) {
@@ -296,9 +295,9 @@ static int add_new_function_entry() {
    removed. - Sym 
  */
 
-static void copy_new_function P5(program_t *, prog, int, index,
-                                 program_t *, defprog, int, defindex,
-                                 int, typemod) {
+static void copy_new_function (program_t * prog, int index,
+                                 program_t * defprog, int defindex,
+                                 int typemod) {
     ident_hash_elem_t *ihe;
     
     int where = add_new_function_entry();
@@ -330,7 +329,7 @@ static void copy_new_function P5(program_t *, prog, int, index,
     ihe->dn.function_num = where;
 }
 
-static int find_class_member P3(int, which, char *, name, unsigned char *, type) {
+static int find_class_member (int which, char * name, unsigned char * type) {
     int i;
     class_def_t *cd;
     class_member_entry_t *cme;
@@ -352,7 +351,7 @@ static int find_class_member P3(int, which, char *, name, unsigned char *, type)
     }
 }
 
-int lookup_any_class_member P2(char *, name, unsigned char *, type) {
+int lookup_any_class_member (char * name, unsigned char * type) {
     int nc = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
     int i, ret = -1, nret;
     char *s = findstring(name);
@@ -389,7 +388,7 @@ int lookup_any_class_member P2(char *, name, unsigned char *, type) {
     return ret;
 }
 
-int lookup_class_member P3(int, which, char *, name, unsigned char *, type) {
+int lookup_class_member (int which, char * name, unsigned char * type) {
     char *s = findstring(name);
     int ret;
     
@@ -415,7 +414,7 @@ int lookup_class_member P3(int, which, char *, name, unsigned char *, type) {
     return ret;
 }       
 
-parse_node_t *reorder_class_values P2(int, which, parse_node_t *, node) {
+parse_node_t *reorder_class_values (int which, parse_node_t * node) {
     class_def_t *cd;
     parse_node_t **tmp;
     int i;
@@ -466,7 +465,7 @@ parse_node_t *reorder_class_values P2(int, which, parse_node_t *, node) {
     return node;
 }
 
-static void check_class P4(char *, name, program_t *, prog, int, idx, int, nidx) {
+static void check_class (char * name, program_t * prog, int idx, int nidx) {
     class_def_t *sd1, *sd2;
     class_member_entry_t *sme1, *sme2;
     int i, n;
@@ -512,7 +511,7 @@ static void check_class P4(char *, name, program_t *, prog, int, idx, int, nidx)
     }
 }
 
-void copy_structures P1(program_t *, prog) {
+void copy_structures (program_t * prog) {
     class_def_t *sd;
     class_member_entry_t *sme;
     ident_hash_elem_t *ihe;
@@ -568,7 +567,7 @@ typedef struct ovlwarn_s {
 
 ovlwarn_t *overload_warnings = 0;
 
-static void remove_overload_warnings P1(char *, func) {
+static void remove_overload_warnings (char * func) {
     ovlwarn_t **p;
     ovlwarn_t *tmp;
 
@@ -613,9 +612,9 @@ static void show_overload_warnings() {
    1st inh defined < .. < last inh defined <
    defined
  */
-static void overload_function P6(program_t *, prog, int, index,
-                                 program_t *, defprog, int, defindex,
-                                 int, oldindex, int, typemod) {
+static void overload_function (program_t * prog, int index,
+                                 program_t * defprog, int defindex,
+                                 int oldindex, int typemod) {
     int f;
     int oldflags = FUNCTION_FLAGS(oldindex);
     function_t *definition = &defprog->function_table[defindex];
@@ -762,7 +761,7 @@ static void overload_function P6(program_t *, prog, int, index,
  * definition). If an function defined by inheritance is called, then one
  * special definition will be made at first call.
  */
-int copy_functions P2(program_t *, from, int, typemod)
+int copy_functions (program_t * from, int typemod)
 {
     int i, initializer = -1, num_functions;
     ident_hash_elem_t *ihe;
@@ -815,7 +814,7 @@ int copy_functions P2(program_t *, from, int, typemod)
     return initializer;
 }
 
-void type_error P2(const char *, str, int, type)
+void type_error (const char * str, int type)
 {
     static char buff[512];
     char *end = EndOf(buff);
@@ -833,7 +832,7 @@ void type_error P2(const char *, str, int, type)
  */
 
 /* This one really is t1->t2; it isn't symmetric, since int->void isn't allowed. */
-int compatible_types P2(int, t1, int, t2)
+int compatible_types (int t1, int t2)
 {
 #ifdef OLD_TYPE_BEHAVIOR
     /* The old version effectively was almost always was true */
@@ -859,7 +858,7 @@ int compatible_types P2(int, t1, int, t2)
 }
 
 /* This one is symmetric.  Used for comparison operators, etc */
-int compatible_types2 P2(int, t1, int, t2)
+int compatible_types2 (int t1, int t2)
 {
 #ifdef OLD_TYPE_BEHAVIOR
     /* The old version effectively was almost always was true */
@@ -896,8 +895,8 @@ int compatible_types2 P2(int, t1, int, t2)
  *
  * Note: this function is now only used for resolving :: references
  */
-static int find_matching_function P3(program_t *, prog, char *, name,
-                                     parse_node_t *, node) {
+static int find_matching_function (program_t * prog, char * name,
+                                     parse_node_t * node) {
     int high = prog->num_functions_defined - 1;
     int low = 0;
     int i, res;
@@ -950,7 +949,7 @@ static int find_matching_function P3(program_t *, prog, char *, name,
     return 0;
 }
 
-int arrange_call_inherited P2(char *, name, parse_node_t *, node)
+int arrange_call_inherited (char * name, parse_node_t * node)
 {
     inherit_t *ip;
     int num_inherits, super_length;
@@ -1029,8 +1028,8 @@ int arrange_call_inherited P2(char *, name, parse_node_t *, node)
 /* Warning: returns an index into A_FUNCTIONS, not the full
  * function list
  */
-int define_new_function P5(const char *, name, int, num_arg, int, num_local,
-                           int, flags, int, type)
+int define_new_function (const char * name, int num_arg, int num_local,
+                           int flags, int type)
 {
     int oldindex, num, newindex;
     unsigned short argument_start_index;
@@ -1249,7 +1248,7 @@ int define_new_function P5(const char *, name, int, num_arg, int, num_local,
     return newindex;
 }
 
-int define_variable P2(char *, name, int, type)
+int define_variable (char * name, int type)
 {
     variable_t *dummy;
     int n;
@@ -1305,7 +1304,7 @@ int define_variable P2(char *, name, int, type)
     return n;
 }
 
-int define_new_variable P2(char *, name, int, type) {
+int define_new_variable (char * name, int type) {
     int n;
     unsigned short *tp;
     char **np;
@@ -1321,7 +1320,7 @@ int define_new_variable P2(char *, name, int, type) {
     return n;
 }
 
-parse_node_t *check_refs P3(int, num, parse_node_t *, elist, parse_node_t *, pn) {
+parse_node_t *check_refs (int num, parse_node_t * elist, parse_node_t * pn) {
     int tmp = num;
     
     elist = elist->r.expr;
@@ -1349,7 +1348,7 @@ parse_node_t *check_refs P3(int, num, parse_node_t *, elist, parse_node_t *, pn)
 }
 
 /* we know here that x has two modifiers, and hidden isn't one of them */
-int decl_fix P1(int, x) {
+int decl_fix (int x) {
     int rest = x & ~DECL_ACCESS;
 
 #ifndef SENSIBLE_MODIFIERS
@@ -1369,7 +1368,7 @@ const char *compiler_type_names[] = {"unknown", "mixed", "void", "void",
 
 /* This routine has the semantics of strput(); see comments in simulate.c */
 
-char *get_type_modifiers P3(char *, where, char *, end, int, type)
+char *get_type_modifiers (char * where, char * end, int type)
 {
 #ifdef SENSIBLE_MODIFIERS
     if (type & DECL_HIDDEN)
@@ -1399,7 +1398,7 @@ char *get_type_modifiers P3(char *, where, char *, end, int, type)
     return where;
 }
 
-char *get_type_name P3(char *, where, char *, end, int, type)
+char *get_type_name (char * where, char * end, int type)
 {
     int pointer = 0;
 
@@ -1439,7 +1438,7 @@ char *get_type_name P3(char *, where, char *, end, int, type)
     var = (long)str ^ (long)str >> 16; \
     var = (var ^ var >> 8) & 0xff;
 
-short store_prog_string P1(const char *, str)
+short store_prog_string (const char * str)
 {
     short i, next, *next_tab, *idxp;
     char **p;
@@ -1504,7 +1503,7 @@ short store_prog_string P1(const char *, str)
     return i;
 }
 
-void free_prog_string P1(short, num)
+void free_prog_string (short num)
 {
     short i, prv, *next_tab, top, *idxp;
     char **p, *str;
@@ -1556,7 +1555,7 @@ void free_prog_string P1(short, num)
     }
 }
 
-int validate_function_call P2(int, f, parse_node_t *, args)
+int validate_function_call (int f, parse_node_t * args)
 {
     function_t *funp = FUNCTION_DEF(f);
     int funflags = FUNCTION_FLAGS(f);
@@ -1675,7 +1674,7 @@ int validate_function_call P2(int, f, parse_node_t *, args)
 }
 
 parse_node_t *
-promote_to_float P1(parse_node_t *, node) {
+promote_to_float (parse_node_t * node) {
     parse_node_t *expr;
     if (node->kind == NODE_NUMBER) {
         node->kind = NODE_REAL;
@@ -1697,7 +1696,7 @@ promote_to_float P1(parse_node_t *, node) {
 }
 
 parse_node_t *
-promote_to_int P1(parse_node_t *, node) {
+promote_to_int (parse_node_t * node) {
     parse_node_t *expr;
     if (node->kind == NODE_REAL) {
         node->kind = NODE_NUMBER;
@@ -1718,7 +1717,7 @@ promote_to_int P1(parse_node_t *, node) {
     return expr;
 }
 
-int convert_type P1(int, type){
+int convert_type (int type){
     switch(type & (~DECL_MODS)) {
     case TYPE_UNKNOWN:
     case TYPE_NOVALUE:
@@ -1750,7 +1749,7 @@ int convert_type P1(int, type){
     }
 }
 
-parse_node_t *add_type_check P2(parse_node_t *, node, int, intype) {
+parse_node_t *add_type_check (parse_node_t * node, int intype) {
     parse_node_t *expr, *expr2;
     int type;
     
@@ -1795,7 +1794,7 @@ parse_node_t *add_type_check P2(parse_node_t *, node, int, intype) {
 }
 
 
-parse_node_t *do_promotions P2(parse_node_t *, node, int, type) {
+parse_node_t *do_promotions (parse_node_t * node, int type) {
     if (type == TYPE_REAL) {
         if (node->type == TYPE_NUMBER || node->kind == NODE_NUMBER)
             return promote_to_float(node);
@@ -1811,7 +1810,7 @@ parse_node_t *do_promotions P2(parse_node_t *, node, int, type) {
 /* Take a NODE_CALL, and discard the call, preserving only the args with
    side effects */
 parse_node_t *
-throw_away_call P1(parse_node_t *, pn) {
+throw_away_call (parse_node_t * pn) {
     parse_node_t *enode;
     parse_node_t *ret = 0;
     parse_node_t *arg;
@@ -1835,7 +1834,7 @@ throw_away_call P1(parse_node_t *, pn) {
 }
 
 parse_node_t *
-throw_away_mapping P1(parse_node_t *, pn) {
+throw_away_mapping (parse_node_t * pn) {
     parse_node_t *enode;
     parse_node_t *ret = 0;
     parse_node_t *arg;
@@ -1870,7 +1869,7 @@ throw_away_mapping P1(parse_node_t *, pn) {
 }
 
 parse_node_t *
-validate_efun_call P2(int, f, parse_node_t *, args) {
+validate_efun_call (int f, parse_node_t * args) {
     int num = args->v.number;
     int min_arg, max_arg, def, *argp;
     int num_var = 0;
@@ -2018,7 +2017,7 @@ validate_efun_call P2(int, f, parse_node_t *, args) {
     return args;
 }
 
-void yyerror P1(const char *, str)
+void yyerror (const char * str)
 {
     extern int num_parse_error;
 
@@ -2034,7 +2033,7 @@ void yyerror P1(const char *, str)
     num_parse_error++;
 }
 
-void yywarn P1(const char *, str) {
+void yywarn (const char * str) {
     if (!(pragmas & PRAGMA_WARNINGS)) return;
     
     smart_log(current_file, current_line, str, 1);
@@ -2044,8 +2043,8 @@ void yywarn P1(const char *, str) {
  * Compile an LPC file.
  */
 program_t *
-compile_file P2(int, f, char *, name) {
-    int yyparse PROT((void));
+compile_file (int f, char * name) {
+    int yyparse (void);
     static int guard = 0;
     program_t *prog;
     extern int func_present;
@@ -2073,7 +2072,7 @@ int get_id_number() {
     return current_id_number++;
 }
 
-INLINE_STATIC void copy_in P2(int, which, char **, start) {
+INLINE_STATIC void copy_in (int which, char ** start) {
     char *block;
     int size;
 
@@ -2086,7 +2085,7 @@ INLINE_STATIC void copy_in P2(int, which, char **, start) {
     *start += align(size);
 }
 
-static int compare_funcs P2(unsigned short *, x, unsigned short *, y) {
+static int compare_funcs (unsigned short * x, unsigned short * y) {
     char *n1 = FUNC(*x)->funcname;
     char *n2 = FUNC(*y)->funcname;
     int sp1, sp2;
@@ -2222,7 +2221,7 @@ static void handle_functions() {
 /*
  * The program has been compiled. Prepare a 'program_t' to be returned.
  */
-static program_t *epilog PROT((void)) {
+static program_t *epilog (void) {
     int size, i, lnsz, lnoff;
     char *p;
     int num_func;
@@ -2349,8 +2348,6 @@ static program_t *epilog PROT((void)) {
     total_num_prog_blocks++;
     total_prog_block_size += size;
 
-    prog->line_swap_index = -1;
-
     /* Format is now:
      * <short total size> <short line_info_offset> <file info> <line info>
      */
@@ -2452,16 +2449,10 @@ static program_t *epilog PROT((void)) {
     }
 #endif
 #ifdef BINARIES
-    if ((pragmas & PRAGMA_SAVE_BINARY)
-#ifdef LPC_TO_C
-    || compile_to_c
-#endif
-    ) {
+    if (pragmas & PRAGMA_SAVE_BINARY) {
         save_binary(prog, &mem_block[A_INCLUDES], &mem_block[A_PATCH]);
     }
 #endif
-
-    swap_line_numbers(prog); /* do this after saving binary */
 
     for (i = 0; i < mem_block[A_FUNCTION_DEFS].current_size / sizeof(*fundefp); i++) {
         fundefp = FUNCTION_TEMP(i)->next;
@@ -2499,7 +2490,7 @@ static program_t *epilog PROT((void)) {
 /*
  * Initialize the environment that the compiler needs.
  */
-static void prolog P2(int, f, char *, name) {
+static void prolog (int f, char * name) {
     int i;
 
     function_context.num_parameters = -1;
@@ -2590,7 +2581,7 @@ static void clean_parser() {
 }
 
 char *
-the_file_name P1(char *, name)
+the_file_name (char * name)
 {
     char *tmp;
     int len;
@@ -2609,7 +2600,7 @@ the_file_name P1(char *, name)
     return tmp;
 }
 
-static int case_compare P2(parse_node_t **, c1, parse_node_t **, c2) {
+static int case_compare (parse_node_t ** c1, parse_node_t ** c2) {
     if ((*c1)->kind == NODE_DEFAULT)
         return -1;
     if ((*c2)->kind == NODE_DEFAULT)
@@ -2620,7 +2611,7 @@ static int case_compare P2(parse_node_t **, c1, parse_node_t **, c2) {
     return 0;
 }
 
-static int string_case_compare P2(parse_node_t **, c1, parse_node_t **, c2) {
+static int string_case_compare (parse_node_t ** c1, parse_node_t ** c2) {
     int i1, i2;
     const char *p1, *p2;
     
@@ -2637,9 +2628,9 @@ static int string_case_compare P2(parse_node_t **, c1, parse_node_t **, c2) {
     return (p1 - p2);
 }
 
-void prepare_cases P2(parse_node_t *, pn, int, start) {
+void prepare_cases (parse_node_t * pn, int start) {
     parse_node_t **ce_start, **ce_end, **ce;
-    int end, last_key, this_key;
+    long end, last_key, this_key;
     int direct = 1;
     
     ce_start = (parse_node_t **)&mem_block[A_CASES].block[start];
@@ -2736,7 +2727,7 @@ void prepare_cases P2(parse_node_t *, pn, int, start) {
 }
 
 void
-save_file_info P2(int, file_id, int, lines) {
+save_file_info (int file_id, int lines) {
     short fi[2];
 
     fi[0] = lines;
@@ -2745,7 +2736,7 @@ save_file_info P2(int, file_id, int, lines) {
 }
 
 int
-add_program_file P2(char *, name, int, top) {
+add_program_file (char * name, int top) {
     if (!top)
         add_to_mem_block(A_INCLUDES, name, strlen(name)+1);
     return store_prog_string(name) + 1;

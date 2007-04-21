@@ -12,7 +12,7 @@ function_lookup_info_t *master_applies = 0;
  * hasn't loaded yet.  In that case, we return (svalue_t *)-1, and the
  * calling routine should let the check succeed.
  */
-svalue_t *apply_master_ob P2(int, fun, int, num_arg)
+svalue_t *apply_master_ob (int fun, int num_arg)
 {
     if (!master_ob) {
         pop_n_elems(num_arg);
@@ -25,7 +25,6 @@ svalue_t *apply_master_ob P2(int, fun, int, num_arg)
             do_trace("master apply", master_applies[fun].func->funcname, "\n");
         }
 #endif
-        DEBUG_CHECK(master_ob->flags & O_SWAPPED, "Master object swapped!\n");
 
         call_direct(master_ob, master_applies[fun].index,
                     ORIGIN_DRIVER, num_arg);
@@ -39,7 +38,7 @@ svalue_t *apply_master_ob P2(int, fun, int, num_arg)
 }
 
 /* Hmm, need something like a safe_call_direct() to do this one */
-svalue_t *safe_apply_master_ob P2(int, fun, int, num_arg)
+svalue_t *safe_apply_master_ob (int fun, int num_arg)
 {
     if (!master_ob) {
         pop_n_elems(num_arg);
@@ -50,18 +49,11 @@ svalue_t *safe_apply_master_ob P2(int, fun, int, num_arg)
 
 void init_master() {
     char buf[512];
-#ifdef LPC_TO_C
-    lpc_object_t *compiled_version;
-#endif
     object_t *new_ob;
 
     if (!strip_name(MASTER_FILE, buf, sizeof buf))
         error("Illegal master file name '%s'\n", MASTER_FILE);
     
-#ifdef LPC_TO_C
-    compiled_version = (lpc_object_t *)lookup_object_hash(buf);
-#endif
-
     new_ob = load_object(buf, compiled_version);
     if (new_ob == 0) {
         fprintf(stderr, "The master file %s was not loaded.\n",
@@ -71,7 +63,7 @@ void init_master() {
     set_master(new_ob);
 }
 
-static void get_master_applies P1(object_t *, ob) {
+static void get_master_applies (object_t * ob) {
     int i;
     
     /* master_applies will be allocated if we're recompiling master_ob */
@@ -93,7 +85,7 @@ static void get_master_applies P1(object_t *, ob) {
     }
 }
 
-void set_master P1(object_t *, ob) {
+void set_master (object_t * ob) {
 #if defined(PACKAGE_UIDS) || defined(PACKAGE_MUDLIB_STATS)
     int first_load = (!master_ob);
 #endif

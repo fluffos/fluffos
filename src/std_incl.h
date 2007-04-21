@@ -85,7 +85,7 @@
 #endif
 
 #if defined(WIN32) || defined(LATTICE)
-int dos_style_link PROT((char *, char *));
+int dos_style_link (char *, char *);
 #define link(x, y) dos_style_link(x, y)
 #endif
 
@@ -118,16 +118,7 @@ int dos_style_link PROT((char *, char *));
 #  include <alloca.h>
 #endif
 
-#if (defined(__APPLE__) && defined(__GNUC__)) || __GNUC__ > 2
-/* varargs.h distributed with Mac OSX is broken */
 #include <stdarg.h>
-#else
-#ifdef INCL_STDARG_H
-#  include <stdarg.h>
-#else
-#  include <varargs.h>
-#endif
-#endif
 
 #ifdef INCL_BSTRING_H
 #include <bstring.h>

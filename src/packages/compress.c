@@ -20,7 +20,7 @@
 #define COMPRESS_BUF_SIZE 8096
 
 #ifdef F_COMPRESS_FILE
-void f_compress_file PROT((void))
+void f_compress_file (void)
 {
    int readb;
    int len;
@@ -116,7 +116,7 @@ void f_compress_file PROT((void))
 #endif
 
 #ifdef F_UNCOMPRESS_FILE
-void f_uncompress_file PROT((void))
+void f_uncompress_file (void)
 {
    int readb;
    int len;
@@ -215,7 +215,7 @@ void f_uncompress_file PROT((void))
 #endif
 
 #ifdef F_COMPRESS
-void f_compress PROT((void))
+void f_compress (void)
 {
    unsigned char* buffer;
    unsigned char* input;
@@ -258,7 +258,7 @@ static void zlib_free(void* opaque, void* address) {
    FREE(address);
 }
 
-void f_uncompress PROT((void))
+void f_uncompress (void)
 {
    z_stream* compressed;
    unsigned char compress_buf[COMPRESS_BUF_SIZE];

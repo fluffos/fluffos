@@ -15,7 +15,7 @@ static object_t *ob;
 
 #ifdef F_DEBUG_INFO
 void
-f_debug_info PROT((void))
+f_debug_info (void)
 {
     svalue_t *arg;
     outbuffer_t out;
@@ -49,8 +49,6 @@ f_debug_info PROT((void))
                         flags & O_VIRTUAL ? "TRUE" : "FALSE");
            outbuf_addv(&out, "O_DESTRUCTED      : %s\n",
                         flags & O_DESTRUCTED ? "TRUE" : "FALSE");
-           outbuf_addv(&out, "O_SWAPPED         : %s\n",
-                        flags & O_SWAPPED ? "TRUE" : "FALSE");
            outbuf_addv(&out, "O_ONCE_INTERACTIVE: %s\n",
                         flags & O_ONCE_INTERACTIVE ? "TRUE" : "FALSE");
            outbuf_addv(&out, "O_RESET_STATE     : %s\n",
@@ -79,7 +77,6 @@ f_debug_info PROT((void))
 #ifdef DEBUG
            outbuf_addv(&out, "extra_ref   : %d\n", ob->extra_ref);
 #endif
-           outbuf_addv(&out, "swap_num    : %d\n", ob->swap_num);
            outbuf_addv(&out, "name        : '/%s'\n", ob->obname);
            outbuf_addv(&out, "next_all    : OBJ(/%s)\n",
                         ob->next_all ? ob->next_all->obname : "NULL");
@@ -95,10 +92,7 @@ f_debug_info PROT((void))
         }
     case 1:
         ob = arg[1].u.ob;
-        if (ob->flags & O_SWAPPED) {
-            outbuf_add(&out, "Swapped\n");
-            break;
-        }
+
         outbuf_addv(&out, "program ref's %d\n", ob->prog->ref);
         outbuf_addv(&out, "Name /%s\n", ob->prog->filename);
         outbuf_addv(&out, "program size %d\n",
@@ -139,7 +133,7 @@ f_debug_info PROT((void))
 
 #ifdef F_REFS
 void
-f_refs PROT((void))
+f_refs (void)
 {
     int r;
 
@@ -162,6 +156,12 @@ f_refs PROT((void))
         r = sp->u.buf->ref;
         break;
 #endif
+    case T_STRING:
+      if(sp->subtype & STRING_COUNTED)
+	r = MSTR_REF(sp->u.string);
+      else
+	r = 0;
+      break;
     default:
         r = 0;
         break;
@@ -173,7 +173,7 @@ f_refs PROT((void))
 #endif
 
 #ifdef F_DESTRUCTED_OBJECTS
-void f_destructed_objects PROT((void))
+void f_destructed_objects (void)
 {
     int i;
     array_t *ret;
@@ -201,7 +201,7 @@ void f_destructed_objects PROT((void))
 #if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
 #ifdef F_DEBUGMALLOC
 void
-f_debugmalloc PROT((void))
+f_debugmalloc (void)
 {
     char *res;
     
@@ -214,7 +214,7 @@ f_debugmalloc PROT((void))
 
 #ifdef F_SET_MALLOC_MASK
 void
-f_set_malloc_mask PROT((void))
+f_set_malloc_mask (void)
 {
     set_malloc_mask((sp--)->u.number);
 }
@@ -222,7 +222,7 @@ f_set_malloc_mask PROT((void))
 
 #ifdef F_CHECK_MEMORY
 void
-f_check_memory PROT((void))
+f_check_memory (void)
 {
     check_all_blocks((sp--)->u.number);
 }
@@ -232,7 +232,7 @@ f_check_memory PROT((void))
 
 #ifdef F_TRACE
 void
-f_trace PROT((void))
+f_trace (void)
 {
     int ot = -1;
 
@@ -246,7 +246,7 @@ f_trace PROT((void))
 
 #ifdef F_TRACEPREFIX
 void
-f_traceprefix PROT((void))
+f_traceprefix (void)
 {
     char *old = 0;
 

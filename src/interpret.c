@@ -10,7 +10,6 @@
 #include "eoperators.h"
 #include "efunctions.h"
 #include "sprintf.h"
-#include "swap.h"
 #include "comm.h"
 #include "port.h"
 #include "qsort.h"
@@ -23,11 +22,6 @@
 #include "opc.h"
 
 static int opc_eoper[BASE];
-#endif
-
-#ifdef DEBUG
-int checkobs P2(object_t, *ob, void, *data);
-int check_limit = NUM_OPCODES;
 #endif
 
 #ifdef OPCPROF_2D
@@ -55,28 +49,28 @@ extern userid_t *backbone_uid;
 #endif
 extern int max_cost;
 extern int call_origin;
-
-INLINE void push_indexed_lvalue PROT((int));
+static int find_line (char *, const program_t *, const char **, int *);
+INLINE void push_indexed_lvalue (int);
 #ifdef TRACE
-static void do_trace_call PROT((int));
+static void do_trace_call (int);
 #endif
-void break_point PROT((void));
-INLINE_STATIC void do_loop_cond_number PROT((void));
-INLINE_STATIC void do_loop_cond_local PROT((void));
-static void do_catch PROT((char *, unsigned short));
+void break_point (void);
+INLINE_STATIC void do_loop_cond_number (void);
+INLINE_STATIC void do_loop_cond_local (void);
+static void do_catch (char *, unsigned short);
 #ifdef DEBUG
-int last_instructions PROT((void));
+int last_instructions (void);
 #endif
-static float _strtof PROT((char *, char **));
+static float _strtof (char *, char **);
 #ifdef TRACE_CODE
-static char *get_arg PROT((int, int));
+static char *get_arg (int, int);
 #endif
 
 #ifdef DEBUG
 int stack_in_use_as_temporary = 0;
 #endif
 
-int inter_sscanf PROT((svalue_t *, svalue_t *, svalue_t *, int));
+int inter_sscanf (svalue_t *, svalue_t *, svalue_t *, int);
 program_t *current_prog;
 short int caller_type;
 static int tracedepth;
@@ -128,7 +122,7 @@ int too_deep_error = 0, max_eval_error = 0;
 
 ref_t *global_ref_list = 0;
 
-void kill_ref P1(ref_t *, ref) {
+void kill_ref (ref_t * ref) {
   if (ref->sv.type == T_MAPPING && (ref->sv.u.map->count & MAP_LOCKED)) {
     ref_t *r = global_ref_list;
     
@@ -163,7 +157,7 @@ void kill_ref P1(ref_t *, ref) {
   }
 }
 
-ref_t *make_ref PROT((void)) {
+ref_t *make_ref (void) {
   ref_t *ref = ALLOCATE(ref_t, TAG_TEMPORARY, "make_ref");
   ref->next = global_ref_list;
   ref->prev = NULL;
@@ -175,7 +169,7 @@ ref_t *make_ref PROT((void)) {
   return ref;
 }
 
-void get_version P1(char *, buff)
+void get_version (char * buff)
 {
   sprintf(buff, "FluffOS %s", PATCH_LEVEL);
 }
@@ -204,7 +198,7 @@ void get_version P1(char *, buff)
  * A destructed object must never be pushed onto the stack.
  */
 INLINE
-void push_object P1(object_t *, ob)
+void push_object (object_t * ob)
 {
   STACK_INC;
 
@@ -218,7 +212,7 @@ void push_object P1(object_t *, ob)
   add_ref(ob, "push_object");
 }
 
-const char * type_name P1(int, c) { 
+const char * type_name (int c) { 
   int j = 0; 
   int limit = TYPE_CODES_START;
 
@@ -244,12 +238,12 @@ const char * type_name P1(int, c) {
  * function names are pointers to shared strings, which means that equality
  * can be tested simply through pointer comparison.
  */
-static program_t *ffbn_recurse PROT((program_t *, char *, int *, int *));
-static program_t *ffbn_recurse2 PROT((program_t *, const char *, int *, int *, int *, int *));
+static program_t *ffbn_recurse (program_t *, char *, int *, int *);
+static program_t *ffbn_recurse2 (program_t *, const char *, int *, int *, int *, int *);
 
 #ifndef NO_SHADOWS
 
-static char *check_shadow_functions P2(program_t *, shadow, program_t *, victim) {
+static char *check_shadow_functions (program_t * shadow, program_t * victim) {
   int i;
   int pindex, runtime_index;
   program_t *prog;
@@ -270,7 +264,7 @@ static char *check_shadow_functions P2(program_t *, shadow, program_t *, victim)
   return 0;
 }
 
-int validate_shadowing P1(object_t *, ob)
+int validate_shadowing (object_t * ob)
 {
   program_t *shadow = current_object->prog, *victim = ob->prog;
   svalue_t *ret;
@@ -305,7 +299,7 @@ int validate_shadowing P1(object_t *, ob)
  * Push a number on the value stack.
  */
 INLINE void
-push_number P1(int, n)
+push_number (long n)
 {
   STACK_INC;
   sp->type = T_NUMBER;
@@ -314,7 +308,7 @@ push_number P1(int, n)
 }
 
 INLINE void
-push_real P1(float, n)
+push_real (float n)
 {
   STACK_INC;
   sp->type = T_REAL;
@@ -331,14 +325,14 @@ void push_undefined()
   *sp = const0u;
 }
 
-INLINE_STATIC void push_undefineds P1(int, num)
+INLINE_STATIC void push_undefineds (int num)
 {
   CHECK_STACK_OVERFLOW(num);
   while (num--) *++sp = const0u;
 }
 
 INLINE
-void copy_and_push_string P1(const char *, p) {
+void copy_and_push_string (const char * p) {
   STACK_INC;
   sp->type = T_STRING;
   sp->subtype = STRING_MALLOC;
@@ -346,7 +340,7 @@ void copy_and_push_string P1(const char *, p) {
 }
 
 INLINE
-void share_and_push_string P1(const char *, p) {
+void share_and_push_string (const char * p) {
   STACK_INC;
   sp->type = T_STRING;
   sp->subtype = STRING_SHARED;
@@ -357,7 +351,7 @@ void share_and_push_string P1(const char *, p) {
  * Get address to a valid global variable.
  */
 #ifdef DEBUG
-INLINE_STATIC svalue_t *find_value P1(int, num)
+INLINE_STATIC svalue_t *find_value (int num)
 {
   DEBUG_CHECK2(num >= (int) current_object->prog->num_variables_total,
                "Illegal variable access %d(%d).\n",
@@ -369,7 +363,7 @@ INLINE_STATIC svalue_t *find_value P1(int, num)
 #endif
 
 INLINE void
-free_string_svalue P1(svalue_t *, v)
+free_string_svalue (svalue_t * v)
 {
   const char *str = v->u.string;
 
@@ -396,7 +390,7 @@ free_string_svalue P1(svalue_t *, v)
   }
 }
 
-void unlink_string_svalue P1(svalue_t *, s) {
+void unlink_string_svalue (svalue_t * s) {
   char *str;
 
   switch (s->subtype) {
@@ -428,9 +422,9 @@ void unlink_string_svalue P1(svalue_t *, s) {
  * Use the free_svalue() define to call this
  */
 #ifdef DEBUG
-INLINE void int_free_svalue P2(svalue_t *, v, char *, tag)
+INLINE void int_free_svalue (svalue_t * v, char * tag)
 #else
-     INLINE void int_free_svalue P1(svalue_t *, v)
+     INLINE void int_free_svalue (svalue_t * v)
 #endif
 {
   /* Marius, 30-Mar-2001: T_FREED could be OR'd in with the type now if the
@@ -510,7 +504,7 @@ INLINE void int_free_svalue P2(svalue_t *, v, char *, tag)
 #endif
 }
 
-void process_efun_callback P3(int, narg, function_to_call_t *, ftc, int, f) {
+void process_efun_callback (int narg, function_to_call_t * ftc, int f) {
   int argc = st_num_arg;
   svalue_t *arg = sp - argc + 1 + narg;
   
@@ -544,7 +538,7 @@ void process_efun_callback P3(int, narg, function_to_call_t *, ftc, int, f) {
   }
 }
 
-svalue_t *call_efun_callback P2(function_to_call_t *, ftc, int, n) {
+svalue_t *call_efun_callback (function_to_call_t * ftc, int n) {
   svalue_t *v;
     
   if (ftc->narg)
@@ -562,7 +556,7 @@ svalue_t *call_efun_callback P2(function_to_call_t *, ftc, int, n) {
  * Free several svalues, and free up the space used by the svalues.
  * The svalues must be sequentially located.
  */
-INLINE void free_some_svalues P2(svalue_t *, v, int, num)
+INLINE void free_some_svalues (svalue_t * v, int num)
 {
   while (num--)
     free_svalue(v + num, "free_some_svalues");
@@ -572,7 +566,7 @@ INLINE void free_some_svalues P2(svalue_t *, v, int, num)
 /*
  * Prepend a slash in front of a string.
  */
-char *add_slash P1(const char * const, str)
+char *add_slash (const char * const str)
 {
   char *tmp;
 
@@ -590,7 +584,7 @@ char *add_slash P1(const char * const, str)
  * (as all identifiers are kept in a array pointed to by the object).
  */
 
-INLINE void assign_svalue_no_free P2(svalue_t *, to, svalue_t *, from)
+INLINE void assign_svalue_no_free (svalue_t * to, svalue_t * from)
 {
   DEBUG_CHECK(from == 0, "Attempt to assign_svalue() from a null ptr.\n");
   DEBUG_CHECK(to == 0, "Attempt to assign_svalue() to a null ptr.\n");
@@ -622,14 +616,14 @@ INLINE void assign_svalue_no_free P2(svalue_t *, to, svalue_t *, from)
   }
 }
 
-INLINE void assign_svalue P2(svalue_t *, dest, svalue_t *, v)
+INLINE void assign_svalue (svalue_t * dest, svalue_t * v)
 {
   /* First deallocate the previous value. */
   free_svalue(dest, "assign_svalue");
   assign_svalue_no_free(dest, v);
 }
 
-INLINE void push_some_svalues P2(svalue_t *, v, int, num)
+INLINE void push_some_svalues (svalue_t * v, int num)
 {
   while (num--) push_svalue(v++);
 }
@@ -638,13 +632,13 @@ INLINE void push_some_svalues P2(svalue_t *, v, int, num)
  * Copies an array of svalues to another location, which should be
  * free space.
  */
-INLINE void copy_some_svalues P3(svalue_t *, dest, svalue_t *, v, int, num)
+INLINE void copy_some_svalues (svalue_t * dest, svalue_t * v, int num)
 {
   while (num--)
     assign_svalue_no_free(dest+num, v+num);
 }
 
-INLINE void transfer_push_some_svalues P2(svalue_t *, v, int, num)
+INLINE void transfer_push_some_svalues (svalue_t * v, int num)
 {
   CHECK_STACK_OVERFLOW(num);
   memcpy(sp + 1, v, num * sizeof(svalue_t));
@@ -670,7 +664,7 @@ refed_t *lv_owner;
 /*
  * Compute the address of an array element.
  */
-INLINE void push_indexed_lvalue P1(int, code)
+INLINE void push_indexed_lvalue (int code)
 {
   int ind;
   svalue_t *lv;
@@ -833,7 +827,7 @@ static struct lvalue_range {
 
 static svalue_t global_lvalue_range_sv = { T_LVALUE_RANGE };
 
-INLINE_STATIC void push_lvalue_range P1(int, code)
+INLINE_STATIC void push_lvalue_range (int code)
 {
   int ind1, ind2, size;
   svalue_t *lv;
@@ -879,7 +873,7 @@ INLINE_STATIC void push_lvalue_range P1(int, code)
   sp->u.lvalue = &global_lvalue_range_sv;
 }
 
-INLINE void copy_lvalue_range P1(svalue_t *, from)
+INLINE void copy_lvalue_range (svalue_t * from)
 {
   int ind1, ind2, size, fsize;
   svalue_t *owner;
@@ -1008,7 +1002,7 @@ INLINE void copy_lvalue_range P1(svalue_t *, from)
   }
 }
 
-INLINE void assign_lvalue_range P1(svalue_t *, from)
+INLINE void assign_lvalue_range (svalue_t * from)
 {
   int ind1, ind2, size, fsize;
   svalue_t *owner;
@@ -1123,7 +1117,7 @@ INLINE void assign_lvalue_range P1(svalue_t *, from)
  * Deallocate 'n' values from the stack.
  */
 INLINE void
-pop_n_elems P1(int, n)
+pop_n_elems (int n)
 {
   DEBUG_CHECK1(n < 0, "pop_n_elems: %d elements.\n", n);
   while (n--) {
@@ -1154,12 +1148,12 @@ pop_3_elems()
   free_svalue(sp--, "pop_3_elems");
 }
 
-void bad_arg P2(int, arg, int, instr)
+void bad_arg (int arg, int instr)
 {
   error("Bad Argument %d to %s()\n", arg, query_instr_name(instr));
 }
 
-void bad_argument P4(svalue_t *, val, int, type, int, arg, int, instr)
+void bad_argument (svalue_t * val, int type, int arg, int instr)
 {
   outbuffer_t outbuf;
   int flag = 0;
@@ -1187,7 +1181,7 @@ void bad_argument P4(svalue_t *, val, int, type, int, arg, int, instr)
 }
 
 INLINE void
-push_control_stack P1(int, frkind)
+push_control_stack (int frkind)
 {
   if (csp == &control_stack[CFG_MAX_CALL_DEPTH - 1]) {
     too_deep_error = 1;
@@ -1223,7 +1217,7 @@ void pop_control_stack()
     dsecs = (((secs - csp->entry_secs) * 1000000)
              + (usecs - csp->entry_usecs));
     cfp->self += dsecs;
-
+    
     while((csp-stof) != control_stack){
       if (((csp-stof-1)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
 	(csp-stof)->prog->function_table[(csp-stof-1)->fr.table_index].children += dsecs;
@@ -1231,10 +1225,15 @@ void pop_control_stack()
       }
       stof++;
     }
-    /*
-    if (csp != control_stack) {
+    /* if (csp != control_stack) {
       if (((csp - 1)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
         csp->prog->function_table[(csp-1)->fr.table_index].children += dsecs;
+      } else if((csp - 1)->framekind & FRAME_FAKE){
+	if((csp - 1) != control_stack){
+	  if (((csp - 2)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
+	    (csp-1)->prog->function_table[(csp-2)->fr.table_index].children += dsecs;
+	  }
+	}
       }
       }*/
   }
@@ -1255,7 +1254,7 @@ void pop_control_stack()
  * is incremented. Newly created arrays normally have a reference count
  * initialized to 1.
  */
-INLINE void push_array P1(array_t *, v)
+INLINE void push_array (array_t * v)
 {
   STACK_INC;
   v->ref++;
@@ -1263,7 +1262,7 @@ INLINE void push_array P1(array_t *, v)
   sp->u.arr = v;
 }
 
-INLINE void push_refed_array P1(array_t *, v)
+INLINE void push_refed_array (array_t * v)
 {
   STACK_INC;
   sp->type = T_ARRAY;
@@ -1272,7 +1271,7 @@ INLINE void push_refed_array P1(array_t *, v)
 
 #ifndef NO_BUFFER_TYPE
 INLINE void
-push_buffer P1(buffer_t *, b)
+push_buffer (buffer_t * b)
 {
   STACK_INC;
   b->ref++;
@@ -1281,7 +1280,7 @@ push_buffer P1(buffer_t *, b)
 }
 
 INLINE void
-push_refed_buffer P1(buffer_t *, b)
+push_refed_buffer (buffer_t * b)
 {
   STACK_INC;
   sp->type = T_BUFFER;
@@ -1293,7 +1292,7 @@ push_refed_buffer P1(buffer_t *, b)
  * Push a mapping on the stack.  See push_array(), above.
  */
 INLINE void
-push_mapping P1(mapping_t *, m)
+push_mapping (mapping_t * m)
 {
   STACK_INC;
   m->ref++;
@@ -1302,7 +1301,7 @@ push_mapping P1(mapping_t *, m)
 }
 
 INLINE void
-push_refed_mapping P1(mapping_t *, m)
+push_refed_mapping (mapping_t * m)
 {
   STACK_INC;
   sp->type = T_MAPPING;
@@ -1313,7 +1312,7 @@ push_refed_mapping P1(mapping_t *, m)
  * Push a class on the stack.  See push_array(), above.
  */
 INLINE void
-push_class P1(array_t *, v)
+push_class (array_t * v)
 {
   STACK_INC;
   v->ref++;
@@ -1322,7 +1321,7 @@ push_class P1(array_t *, v)
 }
 
 INLINE void
-push_refed_class P1(array_t *, v)
+push_refed_class (array_t * v)
 {
   STACK_INC;
   sp->type = T_CLASS;
@@ -1332,7 +1331,7 @@ push_refed_class P1(array_t *, v)
 /*
  * Push a string on the stack that is already malloced.
  */
-INLINE void push_malloced_string P1(char *, p)
+INLINE void push_malloced_string (char * p)
 {
   STACK_INC;
   sp->type = T_STRING;
@@ -1344,7 +1343,7 @@ INLINE void push_malloced_string P1(char *, p)
  * Pushes a known shared string.  Note that this references, while 
  * push_malloced_string doesn't.
  */
-INLINE void push_shared_string P1(char *, p) {
+INLINE void push_shared_string (char * p) {
   STACK_INC;
   sp->type = T_STRING;
   sp->u.string = p;
@@ -1356,7 +1355,7 @@ INLINE void push_shared_string P1(char *, p) {
  * Push a string on the stack that is already constant.
  */
 INLINE
-void push_constant_string P1(const char *, p)
+void push_constant_string (const char * p)
 {
   STACK_INC;
   sp->type = T_STRING;
@@ -1365,7 +1364,7 @@ void push_constant_string P1(const char *, p)
 }
 
 #ifdef TRACE
-static void do_trace_call P1(int, offset)
+static void do_trace_call (int offset)
 {
   do_trace("Call direct ", current_prog->function_table[offset].funcname, " ");
   if (TRACEHB) {
@@ -1391,7 +1390,7 @@ static void do_trace_call P1(int, offset)
  * There is a number of arguments on the stack. Normalize them and initialize
  * local variables, so that the called function is pleased.
  */
-INLINE void setup_variables P3(int, actual, int, local, int, num_arg) {
+INLINE void setup_variables (int actual, int local, int num_arg) {
   int tmp;
     
   if ((tmp = actual - num_arg) > 0) {
@@ -1405,7 +1404,7 @@ INLINE void setup_variables P3(int, actual, int, local, int, num_arg) {
   fp = sp - (csp->num_local_variables = local + num_arg) + 1;
 }
 
-INLINE_STATIC void setup_varargs_variables P3(int, actual, int, local, int, num_arg) {
+INLINE_STATIC void setup_varargs_variables (int actual, int local, int num_arg) {
   array_t *arr;
   if (actual >= num_arg) {
     int n = actual - num_arg + 1;
@@ -1424,7 +1423,7 @@ INLINE_STATIC void setup_varargs_variables P3(int, actual, int, local, int, num_
 }
 
 INLINE function_t *
-setup_new_frame P1(int, findex)
+setup_new_frame (int findex)
 {
   function_t *func_entry;
   register int low, high, mid;
@@ -1483,7 +1482,7 @@ setup_new_frame P1(int, findex)
   return &current_prog->function_table[findex];
 }
 
-INLINE function_t *setup_inherited_frame P1(int, findex)
+INLINE function_t *setup_inherited_frame (int findex)
 {
   function_t *func_entry;
   register int low, high, mid;
@@ -1552,7 +1551,7 @@ void break_point()
 }
 #endif
 
-const program_t fake_prog = { "<driver>" };
+program_t fake_prog = { "<driver>" };
 unsigned char fake_program = F_RETURN;
 
 /*
@@ -1563,7 +1562,7 @@ unsigned char fake_program = F_RETURN;
  * object that define the function pointer. 
  * These frames are the ones that show up as <function> in error traces.
  */
-void setup_fake_frame P1(funptr_t *, fun) {
+void setup_fake_frame (funptr_t * fun) {
   if (csp == &control_stack[CFG_MAX_CALL_DEPTH-1]) {
     too_deep_error = 1;
     error("Too deep recursion.\n");
@@ -1619,7 +1618,7 @@ void remove_fake_frame() {
  * to save space it is preferable that destructed objects are freed soon.
  *   amylaar
  */
-void check_for_destr P1(array_t *, v)
+void check_for_destr (array_t * v)
 {
   int i = v->size;
     
@@ -1697,7 +1696,7 @@ INLINE_STATIC void do_loop_cond_local()
 INLINE_STATIC void do_loop_cond_number()
 {
   svalue_t *s1;
-  int i;
+  long i;
     
   s1 = fp + EXTRACT_UCHAR(pc++); /* a from (a < b) */
   LOAD_INT(i, pc);
@@ -1718,22 +1717,8 @@ INLINE_STATIC void do_loop_cond_number()
   } else error("Right side of < is a number, left side is not.\n");
 }
 
-#ifdef LPC_TO_C
-void
-call_program P2(program_t *, prog, POINTER_INT, offset) {
-  if (prog->program_size)
-    eval_instruction(prog->program + offset);
-  else {
-    DEBUG_CHECK(!offset, "Null function pointer in jump_table.\n");
-    (*
-     ( void (*) PROT((void)) ) offset /* cast to a function pointer */
-     )();
-  }
-}
-#endif
-
 #ifdef DEBUG_MACRO
-static void show_lpc_line P2(char *, f, int, l) {
+static void show_lpc_line (char * f, int l) {
   static FILE *fp = 0;
   static char *fn = 0;
   static int lastline, offset;
@@ -1842,12 +1827,12 @@ static int last;
 #endif
 
 void
-eval_instruction P1(char *, p)
+eval_instruction (char * p)
 {
 #ifdef DEBUG
   int num_arg;
 #endif
-  int i, n;
+  long i, n;
   float real;
   svalue_t *lval;
   int instruction;
@@ -1867,27 +1852,6 @@ eval_instruction P1(char *, p)
   csp->framekind |= FRAME_EXTERNAL;
   pc = p;
   while (1) {
-#ifdef PACKAGE_DWLIB_DEBUG
-    {
-      extern void *fluffpage;
-      static object_t *player;
-      static function_t *func;
-      if(!player && fluffpage)
-	player = find_object2("/global/player");
-      if(player){
-	if(player->flags & O_DESTRUCTED){
-	  player = 0;
-	  func = 0;
-	} else {
-	  if(!func)
-	    func = player->prog->function_table;
-	  if(func != player->prog->function_table)
-	    fatal("player ob corrupted");
-	}
-      }
-    }
-#endif
-
 #  ifdef DEBUG_MACRO
     if (debug_level & DBG_LPC) { 
       char *f;
@@ -2350,9 +2314,9 @@ eval_instruction P1(char *, p)
               break;
             case T_STRING:
               {
-                char buff[20];
+                char buff[30];
 
-                sprintf(buff, "%d", (sp+1)->u.number);
+                sprintf(buff, "%ld", (sp+1)->u.number);
                 EXTEND_SVALUE_STRING(sp, buff, "f_add: 2");
                 break;
               }
@@ -2417,9 +2381,9 @@ eval_instruction P1(char *, p)
             switch ((sp-1)->type) {
             case T_NUMBER:
               {
-                char buff[20];
+                char buff[30];
             
-                sprintf(buff, "%d", (sp-1)->u.number);
+                sprintf(buff, "%ld", (sp-1)->u.number);
                 SVALUE_STRING_ADD_LEFT(buff, "f_add: 3");
                 break;
               } /* end of T_NUMBER + T_STRING */
@@ -2461,9 +2425,9 @@ eval_instruction P1(char *, p)
         if (sp->type == T_STRING) {
           SVALUE_STRING_JOIN(lval, sp, "f_add_eq: 1");
         } else if (sp->type == T_NUMBER) {
-          char buff[20];
+          char buff[30];
          
-          sprintf(buff, "%d", sp->u.number);
+          sprintf(buff, "%ld", sp->u.number);
           EXTEND_SVALUE_STRING(lval, buff, "f_add_eq: 2");
         } else if (sp->type == T_REAL) {
           char buff[40];
@@ -2903,24 +2867,12 @@ eval_instruction P1(char *, p)
          */
         csp->num_local_variables = EXTRACT_UCHAR(pc++) + num_varargs;
         num_varargs = 0;
-	if(offset > USHRT_MAX)
-	  error("Broken function table");
+	//if(offset > USHRT_MAX)
+	//error("Broken function table"); offset is a USHRT, so this just can't happen!
         funp = setup_new_frame(offset);
         csp->pc = pc; /* The corrected return address */
 
-#ifdef LPC_TO_C
-        if (current_prog->program_size) {
-#endif
           pc = current_prog->program + funp->address;
-#ifdef LPC_TO_C
-        } else {
-          DEBUG_CHECK(!(funp->address),
-                      "Null function pointer in jump_table.\n");
-          (*
-           ( void (*) PROT((void)) ) (funp->address)
-           )();
-        }
-#endif
       }
       break;
     case F_CALL_INHERITED:
@@ -2944,19 +2896,7 @@ eval_instruction P1(char *, p)
     
         funp = setup_inherited_frame(offset);
         csp->pc = pc;
-#ifdef LPC_TO_C
-        if (current_prog->program_size) {
-#endif
-          pc = current_prog->program + funp->address;
-#ifdef LPC_TO_C
-        } else {
-          DEBUG_CHECK(!(funp->address),
-                      "Null function pointer in jump_table.\n");
-          (*
-           ( void (*) PROT((void)) ) (funp->address)
-           )();
-        }
-#endif
+	pc = current_prog->program + funp->address;
       }
       break;
     case F_COMPL:
@@ -3787,14 +3727,6 @@ eval_instruction P1(char *, p)
         fatal("Bad stack after efun. Instruction %d, num arg %d\n",
               instruction, num_arg);
       instruction += ONEARG_MAX;
-      if(instruction > check_limit){
-        int size;
-        object_t **obj;
-        get_objects(&obj, &size, checkobs, 0);
-        if(size)
-          fatal("Bad object after efun %d\n", instruction);
-        pop_n_elems(1);
-      }
 #endif
     } /* switch (instruction) */
     DEBUG_CHECK1(sp < fp + csp->num_local_variables - 1,
@@ -3803,16 +3735,8 @@ eval_instruction P1(char *, p)
   } /* while (1) */
 }
 
-#ifdef DEBUG 
-int checkobs(object_t *ob, void *data){
-  if(ob->prog && strlen(ob->prog->filename)<6)
-    return 1;
-  return 0;
-}
-#endif
-
 static void
-do_catch P2(char *, pc, unsigned short, new_pc_offset)
+do_catch (char * pc, unsigned short new_pc_offset)
 {
   error_context_t econ;
     
@@ -3855,8 +3779,8 @@ do_catch P2(char *, pc, unsigned short, new_pc_offset)
   pop_context(&econ);
 }
 
-static program_t *ffbn_recurse P4(program_t *, prog, char *, name,
-                                  int *, indexp, int *, runtime_index) {
+static program_t *ffbn_recurse (program_t * prog, char * name,
+                                  int * indexp, int * runtime_index) {
   register int high = prog->num_functions_defined - 1;
   register int low = 0, mid;
   int ri;
@@ -3895,9 +3819,9 @@ static program_t *ffbn_recurse P4(program_t *, prog, char *, name,
   return 0;
 }
 
-static program_t *ffbn_recurse2 P6(program_t *, prog, const char *, name,
-                                   int *, indexp, int *, runtime_index,
-                                   int *, fio, int *, vio) {
+static program_t *ffbn_recurse2 (program_t * prog, const char * name,
+                                   int * indexp, int * runtime_index,
+                                   int * fio, int * vio) {
   register int high = prog->num_functions_defined - 1;
   register int low = 0, mid;
   int ri;
@@ -3940,8 +3864,8 @@ static program_t *ffbn_recurse2 P6(program_t *, prog, const char *, name,
 }
 
 INLINE program_t *
-find_function_by_name P4(object_t *, ob, const char *, name, 
-                         int *, indexp, int *, runtime_index) {
+find_function_by_name (object_t * ob, const char * name, 
+                         int * indexp, int * runtime_index) {
   char *funname = findstring(name);
     
   if (!funname) return 0;
@@ -3949,9 +3873,9 @@ find_function_by_name P4(object_t *, ob, const char *, name,
 }
 
 INLINE_STATIC program_t *
-find_function_by_name2 P6(object_t *, ob, const char **, name, 
-                          int *, indexp, int *, runtime_index, 
-                          int *, fio, int *, vio) {
+find_function_by_name2 (object_t * ob, const char ** name, 
+                          int * indexp, int * runtime_index, 
+                          int * fio, int * vio) {
   if (!(*name = findstring(*name))) return 0;
   return ffbn_recurse2(ob->prog, *name, indexp, runtime_index, fio, vio);
 }
@@ -4026,7 +3950,7 @@ void mark_apply_low_cache() {
 }
 #endif
 
-void check_co_args2 P4(unsigned short *, types, int, num_arg, char *, name, char *, ob_name){
+void check_co_args2 (unsigned short * types, int num_arg, char * name, char * ob_name){
   int argc = num_arg;
   int exptype, i = 0;
   do{
@@ -4057,7 +3981,7 @@ void check_co_args2 P4(unsigned short *, types, int, num_arg, char *, name, char
   } while (argc);
 }
 
-void check_co_args P4(int, num_arg, const program_t *, prog, function_t *, fun, int, findex) {
+void check_co_args (int num_arg, const program_t * prog, function_t * fun, int findex) {
 #ifdef CALL_OTHER_TYPE_CHECK
   if(num_arg != fun->num_arg){
     char buf[1024];
@@ -4085,7 +4009,7 @@ void check_co_args P4(int, num_arg, const program_t *, prog, function_t *, fun, 
 }
 
 
-int apply_low P3(const char *, fun, object_t *, ob, int, num_arg)
+int apply_low (const char * fun, object_t * ob, int num_arg)
 {
   /*
    * static memory is initialized to zero by the system or so Jacques says
@@ -4131,8 +4055,6 @@ int apply_low P3(const char *, fun, object_t *, ob, int, num_arg)
     ob = ob->shadowed;
  retry_for_shadow:
 #endif
-  if (ob->flags & O_SWAPPED)
-    load_ob_from_swap(ob);
   
   progp = ob->prog;
   DEBUG_CHECK(ob->flags & O_DESTRUCTED,"apply() on destructed object\n");
@@ -4213,9 +4135,9 @@ int apply_low P3(const char *, fun, object_t *, ob, int, num_arg)
     /* we have to search the function */
 
     if (entry->oprogp)
-      free_prog(entry->oprogp, 1);
+      free_prog(entry->oprogp);
     if (entry->progp) {
-      free_prog(entry->progp, 1);
+      free_prog(entry->progp);
     } else {
       if (entry->funp)
         free_string((char *)entry->funp);
@@ -4336,8 +4258,8 @@ int apply_low P3(const char *, fun, object_t *, ob, int, num_arg)
  * are deallocated.
  */
     
-svalue_t *apply P4(const char *, fun, object_t *, ob, int, num_arg,
-                   int, where)
+svalue_t *apply (const char * fun, object_t * ob, int num_arg,
+                   int where)
 {
   IF_DEBUG(svalue_t *expected_sp);
     
@@ -4364,7 +4286,7 @@ svalue_t *apply P4(const char *, fun, object_t *, ob, int, num_arg,
 /* The following is to be called only from reset_object for */
 /* otherwise extra checks are needed - Sym                  */
 
-void call___INIT P1(object_t *, ob)
+void call___INIT (object_t * ob)
 {
   program_t *progp;
   function_t *cfp;
@@ -4428,7 +4350,7 @@ void call___INIT P1(object_t *, ob)
  */
 
 svalue_t *
-safe_apply P4(const char *, fun, object_t *, ob, int, num_arg, int, where)
+safe_apply (const char * fun, object_t * ob, int num_arg, int where)
 {
   svalue_t *ret;
   error_context_t econ;
@@ -4451,7 +4373,7 @@ safe_apply P4(const char *, fun, object_t *, ob, int, num_arg, int, where)
 /*
  * Call a function in all objects in a array.
  */
-array_t *call_all_other P3(array_t *, v, const char *, func, int, numargs)
+array_t *call_all_other (array_t * v, const char * func, int numargs)
 {
   int size;
   svalue_t *tmp, *vptr, *rptr;
@@ -4484,7 +4406,7 @@ array_t *call_all_other P3(array_t *, v, const char *, func, int, numargs)
   return ret;
 }
 
-char *function_name P2(program_t *, prog, int, findex) {
+char *function_name (program_t * prog, int findex) {
   register int low, high, mid;
 
   /* Walk up the inheritance tree to the real definition */ 
@@ -4511,8 +4433,8 @@ char *function_name P2(program_t *, prog, int, findex) {
   return prog->function_table[findex].funcname;
 }
  
-static void get_trace_details P5(const program_t *, prog, int, findex,
-                                 char **, fname, int *, na, int *, nl) {
+static void get_trace_details (const program_t * prog, int findex,
+                                 char ** fname, int * na, int * nl) {
   function_t *cfp = &prog->function_table[findex];
 
   *fname = cfp->funcname;
@@ -4527,7 +4449,7 @@ static void get_trace_details P5(const program_t *, prog, int, findex,
  * functions exist.  Note that if you actually intend to call the function,
  * it's faster to just try to call it and check if apply() returns zero.
  */
-const char *function_exists P3(const char *, fun, object_t *, ob, int, flag) {
+const char *function_exists (const char * fun, object_t * ob, int flag) {
   int findex, runtime_index;
   program_t *prog;
   int flags;
@@ -4535,9 +4457,6 @@ const char *function_exists P3(const char *, fun, object_t *, ob, int, flag) {
   DEBUG_CHECK(ob->flags & O_DESTRUCTED,
               "function_exists() on destructed object\n");
     
-  if (ob->flags & O_SWAPPED)
-    load_ob_from_swap(ob);
-
   if (fun[0] == APPLY___INIT_SPECIAL_CHAR)
     return 0;
 
@@ -4557,7 +4476,7 @@ const char *function_exists P3(const char *, fun, object_t *, ob, int, flag) {
   is_static: returns 1 if a function named 'fun' is declared 'static' in 'ob';
   0 otherwise.
 */
-int is_static P2(char *, fun, object_t *, ob)
+int is_static (char * fun, object_t * ob)
 {
   int findex;
   int runtime_index;
@@ -4566,9 +4485,6 @@ int is_static P2(char *, fun, object_t *, ob)
     
   DEBUG_CHECK(ob->flags & O_DESTRUCTED,
               "is_static() on destructed object\n");
-
-  if (ob->flags & O_SWAPPED)
-    load_ob_from_swap(ob);
 
   prog = find_function_by_name(ob, fun, &findex, &runtime_index);
   if (!prog) return 0;
@@ -4589,7 +4505,7 @@ int is_static P2(char *, fun, object_t *, ob)
  * The return value is left on the stack.
  * Currently: heart_beats, simul_efuns, master applies.
  */
-void call_direct P4(object_t *, ob, int, offset, int, origin, int, num_arg) {
+void call_direct (object_t * ob, int offset, int origin, int num_arg) {
   function_t *funp;
   program_t *prog = ob->prog;
 
@@ -4604,8 +4520,8 @@ void call_direct P4(object_t *, ob, int, offset, int, origin, int, num_arg) {
   call_program(current_prog, funp->address);
 }
 
-void translate_absolute_line P4(int, abs_line, unsigned short *, file_info,
-                                int *, ret_file, int *, ret_line) {
+void translate_absolute_line (int abs_line, unsigned short * file_info,
+                                int * ret_file, int * ret_line) {
   unsigned short *p1, *p2;
   int file;
   int line_tmp = abs_line;
@@ -4629,8 +4545,8 @@ void translate_absolute_line P4(int, abs_line, unsigned short *, file_info,
   *ret_file = file;
 }
 
-static int find_line P4(char *, p, const program_t *, progp,
-                        const char **, ret_file, int *, ret_line )
+static int find_line (char * p, const program_t * progp,
+                        const char ** ret_file, int * ret_line )
 {
   int offset;
   unsigned char *lns;
@@ -4643,22 +4559,9 @@ static int find_line P4(char *, p, const program_t *, progp,
   if (!progp) return 1;
   if (progp == &fake_prog) return 2;
     
-#if defined(LPC_TO_C)
-  /* currently no line number info for compiled programs */
-  if (progp->program_size == 0) 
-    return 3;
-#endif
-    
-  /*
-   * Load line numbers from swap if necessary.  Leave them in memory until
-   * look_for_objects_to_swap() swaps them back out, since more errors are
-   * likely.
-   */
-  if (!progp->line_info) {
-    load_line_numbers(progp);
-    if (!progp->line_info)
+  if (!progp->line_info) 
       return 4;
-  }
+
   offset = p - progp->program;
   DEBUG_CHECK2(offset > (int) progp->program_size,
                "Illegal offset %d in object /%s\n", offset, progp->filename);
@@ -4669,10 +4572,10 @@ static int find_line P4(char *, p, const program_t *, progp,
     lns += (sizeof(ADDRESS_TYPE) + 1);
   }
     
-#if !defined(USE_32BIT_ADDRESSES) && !defined(LPC_TO_C)
+#if !defined(USE_32BIT_ADDRESSES) 
   COPY_SHORT(&abs_line, lns + 1);
 #else
-  COPY_INT(&abs_line, lns + 1);
+  COPY4(&abs_line, lns + 1);
 #endif
     
   translate_absolute_line(abs_line, &progp->file_info[2], 
@@ -4682,21 +4585,21 @@ static int find_line P4(char *, p, const program_t *, progp,
   return 0;
 }
 
-static void get_explicit_line_number_info P4(char *, p, const program_t *, prog,
-                                             const char **, ret_file, int *, ret_line) {
+static void get_explicit_line_number_info (char * p, const program_t * prog,
+                                             const char ** ret_file, int * ret_line) {
   find_line(p, prog, ret_file, ret_line);
   if (!(*ret_file))
     *ret_file = prog->filename;
 }
 
-void get_line_number_info P2(const char **, ret_file, int *, ret_line)
+void get_line_number_info (const char ** ret_file, int * ret_line)
 {
   find_line(pc, current_prog, ret_file, ret_line);
   if (!(*ret_file))
     *ret_file = current_prog->filename;
 }
 
-char* get_line_number P2(char *, p, const program_t *, progp)
+char* get_line_number (char * p, const program_t * progp)
 {
   static char buf[256];
   int i;
@@ -4728,8 +4631,8 @@ char* get_line_number P2(char *, p, const program_t *, progp)
   return buf;
 }
 
-static void dump_trace_line P4(const char *, fname, const char *, pname,
-                               const char * const, obname, char *, where) {
+static void dump_trace_line (const char * fname, const char * pname,
+                               const char * const obname, char * where) {
   char line[256];
   char *end = EndOf(line);
   char *p;
@@ -4754,7 +4657,7 @@ static void dump_trace_line P4(const char *, fname, const char *, pname,
  * Write out a trace. If there is a heart_beat(), then return the
  * object that had that heart beat.
  */
-const char *dump_trace P1(int, how)
+const char *dump_trace (int how)
 {
   control_stack_t *p;
   const char * ret = 0;
@@ -5165,7 +5068,7 @@ arg--; \
 num_arg--
 
 /* arg points to the same place it used to */
-int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_arg)
+int inter_sscanf (svalue_t * arg, svalue_t * s0, svalue_t * s1, int num_arg)
 {
   const char *fmt;      /* Format description */
   const char *in_string;    /* The string to be parsed. */
@@ -5524,7 +5427,7 @@ int inter_sscanf P4(svalue_t *, arg, svalue_t *, s0, svalue_t *, s1, int, num_ar
 
 /* dump # of times each efun has been used */
 #ifdef OPCPROF
-void opcdump P1(char *, tfn)
+void opcdump (char * tfn)
 {
   int i, len, limit;
   char tbuf[SMALL_STRING_SIZE], *fn;
@@ -5579,11 +5482,11 @@ typedef struct {
   int num_calls;
 } sort_elem_t;
 
-int sort_elem_cmp P2(sort_elem_t *, se1, sort_elem_t *, se2) {
+int sort_elem_cmp (sort_elem_t * se1, sort_elem_t * se2) {
   return se2->num_calls - se1->num_calls;
 }
 
-void opcdump P1(char *, tfn)
+void opcdump (char * tfn)
 {
   int ind, i, j, len;
   char tbuf[SMALL_STRING_SIZE], *fn;
@@ -5628,7 +5531,7 @@ void opcdump P1(char *, tfn)
 /*
  * Reset the virtual stack machine.
  */
-void reset_machine P1(int, first)
+void reset_machine (int first)
 {
   csp = control_stack - 1;
   if (first)
@@ -5640,7 +5543,7 @@ void reset_machine P1(int, first)
 }
 
 #ifdef TRACE_CODE
-static char *get_arg P2(int, a, int, b)
+static char *get_arg (int a, int b)
 {
   static char buff[10];
   char *from, *to;
@@ -5694,13 +5597,13 @@ int last_instructions()
 
 #ifdef TRACE
 /* Generate a debug message to the user */
-void do_trace P3(char *, msg, char *, fname, char *, post)
+void do_trace (char * msg, char * fname, char * post)
 {
   char *objname;
 
   if (!TRACEHB)
     return;
-  objname = TRACETST(TRACE_OBJNAME) ? (current_object && current_object->obname ? current_object->obname : "??") : "";
+  objname = TRACETST(TRACE_OBJNAME) ? (current_object && current_object->name ? current_object->name : "??") : "";
   add_vmessage(command_giver, "*** %d %*s %s %s %s%s", tracedepth, tracedepth, "", msg, objname, fname, post);
 }
 #endif
@@ -5709,7 +5612,7 @@ void do_trace P3(char *, msg, char *, fname, char *, post)
  * When an object is destructed, all references to it must be removed
  * from the stack.
  */
-void remove_object_from_stack P1(object_t *, ob)
+void remove_object_from_stack (object_t * ob)
 {
   svalue_t *svp;
 
@@ -5724,7 +5627,7 @@ void remove_object_from_stack P1(object_t *, ob)
   }
 }
 
-int strpref P2(char *, p, char *, s)
+int strpref (char * p, char * s)
 {
   while (*p)
     if (*p++ != *s++)
@@ -5732,7 +5635,7 @@ int strpref P2(char *, p, char *, s)
   return 1;
 }
 
-static float _strtof P2(char *, nptr, char **, endptr)
+static float _strtof (char * nptr, char ** endptr)
 {
   register char *s = nptr;
   register float acc;
@@ -5789,7 +5692,7 @@ void mark_stack() {
 
 /* Be careful.  This assumes there will be a frame pushed right after this,
    as we use econ->save_csp + 1 to restore */
-int save_context P1(error_context_t *, econ) {
+int save_context (error_context_t * econ) {
   if (csp == &control_stack[CFG_MAX_CALL_DEPTH - 1]) {
     /* Attempting to push the frame will give Too deep recursion.
        fail now. */
@@ -5804,12 +5707,12 @@ int save_context P1(error_context_t *, econ) {
   return 1;
 }
 
-void pop_context P1(error_context_t *, econ) {
+void pop_context (error_context_t * econ) {
   current_error_context = econ->save_context;
 }
 
 /* can the error handler do this ? */
-void restore_context P1(error_context_t *, econ) {
+void restore_context (error_context_t * econ) {
   ref_t *refp;
 #ifdef PACKAGE_DWLIB
   extern int _in_reference_allowed;

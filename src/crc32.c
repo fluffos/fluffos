@@ -11,7 +11,7 @@
 */
 
 UINT32
-compute_crc32 P2(unsigned char *, buf, int, len)
+compute_crc32 (unsigned char * buf, int len)
 {
     register UINT32 crc = 0xFFFFFFFFL;
     register int j;

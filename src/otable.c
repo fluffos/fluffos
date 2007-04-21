@@ -17,7 +17,7 @@
 static int otable_size;
 static int otable_size_minus_one;
 
-static object_t *find_obj_n PROT((const char *));
+static object_t *find_obj_n (const char *);
 
 /*
  * Object hash function, ripped off from stralloc.c.
@@ -56,7 +56,7 @@ static int obj_searches = 0, obj_probes = 0, objs_found = 0;
 /* A global.  *shhhh* don't tell. */
 static int h;
 
-static object_t *find_obj_n P1(const char *, s)
+static object_t *find_obj_n (const char * s)
 {
     object_t *curr, *prev;
 
@@ -93,7 +93,7 @@ static object_t *find_obj_n P1(const char *, s)
 
 static int objs_in_table = 0;
 
-void enter_object_hash P1(object_t *, ob)
+void enter_object_hash (object_t * ob)
 {
     object_t *s;
 
@@ -102,15 +102,9 @@ void enter_object_hash P1(object_t *, ob)
 #ifdef DEBUG
     /* when these reload, the new copy comes in before the old goes out */
     if (s != master_ob && s != simul_efun_ob) {
-#ifdef LPC_TO_C
-    DEBUG_CHECK1(s && s != ob && (!(s->flags & O_COMPILED_PROGRAM)),
-                 "Duplicate object \"/%s\" in object hash table",
-                 ob->name);
-#else
     DEBUG_CHECK1(s && s != ob,
                  "Duplicate object \"/%s\" in object hash table",
                  ob->obname);
-#endif
     }
 #endif
 
@@ -123,7 +117,7 @@ void enter_object_hash P1(object_t *, ob)
 /* for adding a precompiled entry (dynamic loading) since it is possible
  * that the real object exists.
  */ 
-void enter_object_hash_at_end P1(object_t *, ob)
+void enter_object_hash_at_end (object_t * ob)
 {
     object_t *s;
     object_t **op;
@@ -145,7 +139,7 @@ void enter_object_hash_at_end P1(object_t *, ob)
  * is removed from the next_all list - i.e. in destruct.
  */
 
-void remove_object_hash P1(object_t *, ob)
+void remove_object_hash (object_t * ob)
 {
     object_t *s;
 
@@ -162,26 +156,6 @@ void remove_object_hash P1(object_t *, ob)
     return;
 }
 
-#ifdef LPC_TO_C
-void remove_precompiled_hashes P1(char *, name) {
-    int h = ObjHash(name);
-    object_t **p;
-    object_t *curr;
-    
-    p = &obj_table[h];
-    
-    while (*p) {
-        if (((*p)->flags & O_COMPILED_PROGRAM) && !strcmp((*p)->name, name)) {
-            curr = *p;
-            FREE(curr->name);
-            FREE(curr);
-            (*p) = (*p)->next_hash;
-        } else
-            p = &((*p)->next_hash);
-    }
-}
-#endif
-
 /*
  * Lookup an object in the hash table; if it isn't there, return null.
  * This is only different to find_object_n in that it collects different
@@ -190,7 +164,7 @@ void remove_precompiled_hashes P1(char *, name) {
 
 static int user_obj_lookups = 0, user_obj_found = 0;
 
-object_t *lookup_object_hash P1(const char *, s)
+object_t *lookup_object_hash (const char * s)
 {
     object_t *ob = find_obj_n(s);
 
@@ -207,7 +181,7 @@ object_t *lookup_object_hash P1(const char *, s)
 
 static char sbuf[100];
 
-int show_otable_status P2(outbuffer_t *, out, int, verbose)
+int show_otable_status (outbuffer_t * out, int verbose)
 {
     int starts;
 

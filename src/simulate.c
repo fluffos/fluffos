@@ -8,7 +8,6 @@
 #include "otable.h"
 #include "comm.h"
 #include "binaries.h"
-#include "swap.h"
 #include "socket_efuns.h"
 #include "md.h"
 #include "eoperators.h"
@@ -26,11 +25,6 @@
  * and the original object must be loaded again.
  */
 char *inherit_file;
-#ifdef LPC_TO_C
-int compile_to_c;
-FILE *compilation_output_file;
-char *compilation_ident;
-#endif
 
 /* prevents infinite inherit loops.
    No, mark-and-sweep solution won't work.  Exercise for reader.  */
@@ -50,19 +44,19 @@ object_t *command_giver;        /* Where the current command came from. */
 object_t *current_interactive;  /* The user who caused this execution */
 
 #ifdef PRIVS
-static void init_privs_for_object PROT((object_t *));
+static void init_privs_for_object (object_t *);
 #endif
 #ifdef PACKAGE_UIDS
-static int give_uid_to_object PROT((object_t *));
+static int give_uid_to_object (object_t *);
 #endif
-static int init_object PROT((object_t *));
-static object_t *load_virtual_object PROT((const char *, int));
-static char *make_new_name PROT((const char *));
+static int init_object (object_t *);
+static object_t *load_virtual_object (const char *, int);
+static char *make_new_name (const char *);
 #ifndef NO_ENVIRONMENT
-static void send_say PROT((object_t *, const char *, array_t *));
+static void send_say (object_t *, const char *, array_t *);
 #endif
 
-INLINE void check_legal_string P1(const char *, s)
+INLINE void check_legal_string (const char * s)
 {
     if (strlen(s) > LARGEST_PRINTABLE_STRING) {
         error("Printable strings limited to length of %d.\n",
@@ -86,7 +80,7 @@ INLINE void check_legal_string P1(const char *, s)
  * p = strput(p, end, ...);
  * p = strput(p, end, ...);
  */
-char *strput P3(char *, x, char *, limit, const char *, y) {
+char *strput (char * x, char * limit, const char * y) {
     while ((*x++ = *y++)) {
         if (x == limit) {
             *(x-1) = 0;
@@ -96,7 +90,7 @@ char *strput P3(char *, x, char *, limit, const char *, y) {
     return x - 1;
 }
 
-char *strput_int P3(char *, x, char *, limit, int, num) {
+char *strput_int (char * x, char * limit, int num) {
     char buf[20];
     sprintf(buf, "%d", num);
     return strput(x, limit, buf);
@@ -104,7 +98,7 @@ char *strput_int P3(char *, x, char *, limit, int, num) {
 
 #ifdef PRIVS
 static void
-init_privs_for_object P1(object_t *, ob)
+init_privs_for_object (object_t * ob)
 {
     svalue_t *value;
 
@@ -134,7 +128,7 @@ init_privs_for_object P1(object_t *, ob)
  * Give the correct uid and euid to a created object.
  */
 #ifdef PACKAGE_UIDS
-static int give_uid_to_object P1(object_t *, ob)
+static int give_uid_to_object (object_t * ob)
 {
     svalue_t *ret;
     const char *creator_name;
@@ -212,7 +206,7 @@ static int give_uid_to_object P1(object_t *, ob)
 }
 #endif
 
-static int init_object P1(object_t *, ob)
+static int init_object (object_t * ob)
 {
 #ifdef PACKAGE_MUDLIB_STATS
     init_stats_for_object(ob);
@@ -236,7 +230,7 @@ static int init_object P1(object_t *, ob)
 }
 
 
-static object_t *load_virtual_object P2(const char *, name, int, clone)
+static object_t *load_virtual_object (const char * name, int clone)
 {
     int argc = 2;
     char *new_name;
@@ -276,7 +270,7 @@ static object_t *load_virtual_object P2(const char *, name, int, clone)
             destruct_object(new_ob);
             error("Virtual object name duplicates an existing object name.\n");
         }
-        /* Make sure O_CLONE is NOT set */
+	/* Make sure O_CLONE is NOT set */
 	new_ob->flags &= ~O_CLONE;
         new_name = alloc_cstring(name, "load_virtual_object");
         SET_TAG(new_name, TAG_OBJ_NAME);
@@ -316,7 +310,7 @@ static object_t *load_virtual_object P2(const char *, name, int, clone)
     return new_ob;
 }
 
-int strip_name P3(const char *, src, char *, dest, int, size) {
+int strip_name (const char * src, char * dest, int size) {
     char last_c = 0;
     char *p = dest;
     char *end = dest + size - 1;
@@ -367,11 +361,7 @@ int strip_name P3(const char *, src, char *, dest, int, size) {
  * it.
  *
  */
-#ifdef LPC_TO_C
-object_t *int_load_object P2(const char *, lname, lpc_object_t *, lpc_obj)
-#else
-object_t *int_load_object P1(const char *, lname)
-#endif
+object_t *int_load_object (const char * lname)
 {
     int f;
     program_t *prog;
@@ -379,11 +369,6 @@ object_t *int_load_object P1(const char *, lname)
     svalue_t *mret;
     struct stat c_st;
     char real_name[200], name[200];
-#ifdef LPC_TO_C
-    char out_name[200];
-    char *out_ptr = out_name;
-    int save_compile_to_c = compile_to_c;
-#endif
 
     if (++num_objects_this_thread > INHERIT_CHAIN_SIZE)
         error("Inherit chain too deep: > %d when trying to load '%s'.\n", INHERIT_CHAIN_SIZE, lname);
@@ -407,9 +392,6 @@ object_t *int_load_object P1(const char *, lname)
         save_command_giver(command_giver);
         ob = load_virtual_object(name, 0);
         restore_command_giver();
-#ifdef LPC_TO_C
-        compile_to_c = save_compile_to_c;
-#endif
         num_objects_this_thread--;
         return ob;
     }
@@ -435,30 +417,9 @@ object_t *int_load_object P1(const char *, lname)
             debug_perror("compile_file", real_name);
             error("Could not read the file '/%s'.\n", real_name);
         }
-#ifdef LPC_TO_C
-        if (compile_to_c) {
-            compilation_output_file = crdir_fopen(out_ptr);
-            if (compilation_output_file == 0) {
-                debug_perror("compile_to_c", out_ptr);
-                error("Could not open output file '/%s'.\n", out_ptr);
-            }
-            compilation_ident = 0;
-            save_command_giver(command_giver);
-            prog = compile_file(f, real_name);
-            restore_command_giver();
-            fclose(compilation_output_file);
-            if (prog) {
-                free_prog(prog, 1);
-                prog = 0;
-            }
-        } else {
-#endif
-            save_command_giver(command_giver);
-            prog = compile_file(f, real_name);
-            restore_command_giver();
-#ifdef LPC_TO_C
-        }
-#endif
+	save_command_giver(command_giver);
+	prog = compile_file(f, real_name);
+	restore_command_giver();
         if (comp_flag)
             debug_message(" done\n");
         update_compile_av(total_lines);
@@ -471,7 +432,7 @@ object_t *int_load_object P1(const char *, lname)
     /* Sorry, can't handle objects without programs yet. */
     if (inherit_file == 0 && (num_parse_error > 0 || prog == 0)) {
         if (prog)
-            free_prog(prog, 1);
+            free_prog(prog);
         if (num_parse_error == 0 && prog == 0)
             error("No program in object '/%s'!\n", name);
         error("Error in loading object '/%s'\n", name);
@@ -492,7 +453,7 @@ object_t *int_load_object P1(const char *, lname)
         inherit_file = 0;
         
         if (prog) {
-            free_prog(prog, 1);
+            free_prog(prog);
             prog = 0;
         }
         if (strcmp(inhbuf, name) == 0) {
@@ -500,12 +461,7 @@ object_t *int_load_object P1(const char *, lname)
         }
 
         if ((inh_obj = lookup_object_hash(inhbuf))) {
-#ifdef LPC_TO_C
-            DEBUG_CHECK(!(inh_obj->flags & O_COMPILED_PROGRAM), "Inherited object is already loaded!\n");
-            inh_obj = load_object(inhbuf, (lpc_object_t *)inh_obj);
-#else
-            IF_DEBUG(fatal("Inherited object is already loaded!"));
-#endif
+	    IF_DEBUG(fatal("Inherited object is already loaded!"));
         } else {
             inh_obj = load_object(inhbuf, 0);
         }
@@ -527,19 +483,7 @@ object_t *int_load_object P1(const char *, lname)
             }
             ob->load_time = current_time;
         }
-#ifdef LPC_TO_C
-        else if (ob->flags & O_COMPILED_PROGRAM) {
-            /* I don't think this is possible, but ... */
-            ob = load_object(name, (lpc_object_t *)ob);
-            /* sigh, loading the inherited file removed us */
-            if (!ob) { num_objects_this_thread--; return 0; }
-            ob->load_time = current_time;
-        }
-#endif
         num_objects_this_thread--;
-#ifdef LPC_TO_C
-        compile_to_c = save_compile_to_c;
-#endif
         return ob;
     }
     ob = get_empty_object(prog->num_variables_total);
@@ -549,6 +493,9 @@ object_t *int_load_object P1(const char *, lname)
     ob->prog = prog;
     ob->flags |= O_WILL_RESET;  /* must be before reset is first called */
     ob->next_all = obj_list;
+    ob->prev_all = 0;
+    if(obj_list)
+      obj_list->prev_all = ob;
     obj_list = ob;
     enter_object_hash(ob);      /* add name to fast object lookup table */
     save_command_giver(command_giver);
@@ -572,13 +519,11 @@ object_t *int_load_object P1(const char *, lname)
 
     ob->load_time = current_time;
     num_objects_this_thread--;
-#ifdef LPC_TO_C
-    compile_to_c = save_compile_to_c;
-#endif
+
     return ob;
 }
 
-static char *make_new_name P1(const char *, str)
+static char *make_new_name (const char * str)
 {
     static int i;
     char *p = DXALLOC(strlen(str) + 10, TAG_OBJ_NAME, "make_new_name");
@@ -593,7 +538,7 @@ static char *make_new_name P1(const char *, str)
  * Save the command_giver, because reset() in the new object might change
  * it.
  */
-object_t *clone_object P2(const char *, str1, int, num_arg)
+object_t *clone_object (const char * str1, int num_arg)
 {
     object_t *ob, *new_ob;
 
@@ -617,14 +562,14 @@ object_t *clone_object P2(const char *, str1, int, num_arg)
         pop_n_elems(num_arg);
         return (0);
     }
+    
     if (ob->flags & O_CLONE) 
       error("Cannot clone from a clone\n");
-
+    
     if(ob->flags & O_VIRTUAL) {
       new_ob = load_virtual_object(ob->obname, 1 + num_arg);
       restore_command_giver();
       return new_ob;
-      
       /*
        * we can skip all of the stuff below since we were already
        * cloned once to have gotten to this stage.
@@ -645,6 +590,8 @@ object_t *clone_object P2(const char *, str1, int, num_arg)
     init_object(new_ob);
 
     new_ob->next_all = obj_list;
+    obj_list->prev_all = new_ob;
+    new_ob->prev_all = 0;
     obj_list = new_ob;
     enter_object_hash(new_ob);  /* Add name to fast object lookup table */
     call_create(new_ob, num_arg);
@@ -656,7 +603,7 @@ object_t *clone_object P2(const char *, str1, int, num_arg)
 }
 
 #ifndef NO_ENVIRONMENT
-object_t *environment P1(svalue_t *, arg)
+object_t *environment (svalue_t * arg)
 {
     object_t *ob = current_object;
 
@@ -679,9 +626,9 @@ object_t *environment P1(svalue_t *, arg)
 
 
 #ifdef F_PRESENT
-static object_t *object_present2 PROT((const char *, object_t *));
+static object_t *object_present2 (const char *, object_t *);
 
-object_t *object_present P2(svalue_t *, v, object_t *, ob)
+object_t *object_present (svalue_t * v, object_t * ob)
 {
     svalue_t *ret;
     object_t *ret_ob;
@@ -733,7 +680,7 @@ object_t *object_present P2(svalue_t *, v, object_t *, ob)
     return 0;
 }
 
-static object_t *object_present2 P2(const char *, str, object_t *, ob)
+static object_t *object_present2 (const char * str, object_t * ob)
 {
     svalue_t *ret;
     const char *p;
@@ -785,10 +732,10 @@ static void fix_object_names() {
  * Remove an object. It is first moved into the destruct list, and
  * not really destructed until later. (see destruct2()).
  */
-void destruct_object P1(object_t *, ob)
+void destruct_object (object_t * ob)
 {
     object_t **pp;
-    int removed;
+    //int removed;
 #ifndef NO_ENVIRONMENT
     object_t *super;
     object_t *save_restrict_destruct = restrict_destruct;
@@ -816,8 +763,6 @@ void destruct_object P1(object_t *, ob)
     if (ob->flags & O_DESTRUCTED) {
         return;
     }
-    if (ob->flags & O_SWAPPED)
-        load_ob_from_swap(ob);
     remove_object_from_stack(ob);
     /*
      * If this is the first object being shadowed by another object, then
@@ -936,9 +881,6 @@ void destruct_object P1(object_t *, ob)
     if (ob == master_ob || ob == simul_efun_ob) {
         object_t *new_ob;
         const char *tmp = ob->obname;
-#ifdef LPC_TO_C
-        lpc_object_t *compiled_version;
-#endif
 
         STACK_INC;
         sp->type = T_ERROR_HANDLER;
@@ -949,10 +891,6 @@ void destruct_object P1(object_t *, ob)
         /* hack to make sure we don't find ourselves at several points
            in the following process */
         SETOBNAME(ob, "");
-
-#ifdef LPC_TO_C
-        compiled_version = (lpc_object_t *)lookup_object_hash(tmp);
-#endif
 
         /* handle these two carefully, since they are rather vital */
         new_ob = load_object(tmp, compiled_version);
@@ -984,15 +922,24 @@ void destruct_object P1(object_t *, ob)
      * Now remove us out of the list of all objects. This must be done last,
      * because an error in the above code would halt execution.
      */
-    removed = 0;
+    //removed = 0;
+    if(ob->prev_all){
+      ob->prev_all->next_all = ob->next_all;
+      if(ob->next_all)
+	ob->next_all->prev_all = ob->prev_all;
+    }else{
+      obj_list = ob->next_all;
+      obj_list->prev_all = 0;
+    }
+    /*
     for (pp = &obj_list; *pp; pp = &(*pp)->next_all) {
         if (*pp != ob)
             continue;
         *pp = (*pp)->next_all;
         removed = 1;
         break;
-    }
-    DEBUG_CHECK(!removed, "Failed to delete object.\n");
+	}
+	DEBUG_CHECK(!removed, "Failed to delete object.\n");//*/
 
     remove_living_name(ob);
 #ifndef NO_ENVIRONMENT
@@ -1001,6 +948,9 @@ void destruct_object P1(object_t *, ob)
     ob->contains = 0;
 #endif
     ob->next_all = obj_list_destruct;
+    if(obj_list_destruct)
+      obj_list_destruct->prev_all = ob;
+    ob->prev_all = 0;
     obj_list_destruct = ob;
     set_heart_beat(ob, 0);
     ob->flags |= O_DESTRUCTED;
@@ -1016,7 +966,7 @@ void destruct_object P1(object_t *, ob)
 /*
  * This one is called when no program is executing from the main loop.
  */
-void destruct2 P1(object_t *, ob)
+void destruct2 (object_t * ob)
 {
 #ifndef NO_ADD_ACTION
     sentence_t *s;
@@ -1088,7 +1038,7 @@ void destruct2 P1(object_t *, ob)
  */
 
 #ifndef NO_ENVIRONMENT
-static void send_say P3(object_t *, ob, const char *, text, array_t *, avoid)
+static void send_say (object_t * ob, const char * text, array_t * avoid)
 {
     int valid, j;
 
@@ -1107,7 +1057,7 @@ static void send_say P3(object_t *, ob, const char *, text, array_t *, avoid)
     tell_object(ob, text, strlen(text));
 }
 
-void say P2(svalue_t *, v, array_t *, avoid)
+void say (svalue_t * v, array_t * avoid)
 {
     object_t *ob, *origin;
     const char *buff;
@@ -1155,7 +1105,7 @@ void say P2(svalue_t *, v, array_t *, avoid)
  * Revised, bobf@metronet.com 9/6/93
  */
 #ifdef F_TELL_ROOM
-void tell_room P3(object_t *, room, svalue_t *, v, array_t *, avoid)
+void tell_room (object_t * room, svalue_t * v, array_t * avoid)
 {
     object_t *ob;
     const char *buff;
@@ -1172,7 +1122,7 @@ void tell_room P3(object_t *, room, svalue_t *, v, array_t *, avoid)
         break;
     case T_NUMBER:
         buff = txt_buf;
-        sprintf(txt_buf, "%d", v->u.number);
+        sprintf(txt_buf, "%ld", v->u.number);
         break;
     case T_REAL:
         buff = txt_buf;
@@ -1214,7 +1164,7 @@ void tell_room P3(object_t *, room, svalue_t *, v, array_t *, avoid)
 #endif
 #endif
 
-void shout_string P1(const char *, str)
+void shout_string (const char * str)
 {
     object_t *ob;
 
@@ -1236,7 +1186,7 @@ void shout_string P1(const char *, str)
  * Set up a function in this object to be called with the next
  * user input string.
  */
-int input_to P4(svalue_t *, fun, int, flag, int, num_arg, svalue_t *, args)
+int input_to (svalue_t * fun, int flag, int num_arg, svalue_t * args)
 {
     sentence_t *s;
     svalue_t *x;
@@ -1283,7 +1233,7 @@ int input_to P4(svalue_t *, fun, int, flag, int, num_arg, svalue_t *, args)
  * user input character.
  */
 #ifdef F_GET_CHAR
-int get_char P4(svalue_t *, fun, int, flag, int, num_arg, svalue_t *, args)
+int get_char (svalue_t * fun, int flag, int num_arg, svalue_t * args)
 {
     sentence_t *s;
     svalue_t *x;
@@ -1325,7 +1275,7 @@ int get_char P4(svalue_t *, fun, int, flag, int, num_arg, svalue_t *, args)
 }
 #endif
 
-void print_svalue P1(svalue_t *, arg)
+void print_svalue (svalue_t * arg)
 {
     char tbuf[2048];
     int len;
@@ -1348,7 +1298,7 @@ void print_svalue P1(svalue_t *, arg)
             tell_object(command_giver, tbuf, strlen(tbuf));
             break;
         case T_NUMBER:
-            sprintf(tbuf, "%d", arg->u.number);
+            sprintf(tbuf, "%ld", arg->u.number);
             tell_object(command_giver, tbuf, strlen(tbuf));
             break;
         case T_REAL:
@@ -1376,7 +1326,7 @@ void print_svalue P1(svalue_t *, arg)
     return;
 }
 
-void do_write P1(svalue_t *, arg)
+void do_write (svalue_t * arg)
 {
     object_t *ob = command_giver;
 
@@ -1402,7 +1352,7 @@ void do_write P1(svalue_t *, arg)
  * returned.
  */
 
-object_t *find_object P1(const char *, str)
+object_t *find_object (const char * str)
 {
     object_t *ob;
     char tmpbuf[MAX_OBJECT_NAME_SIZE];
@@ -1411,27 +1361,16 @@ object_t *find_object P1(const char *, str)
         return 0;
 
     if ((ob = lookup_object_hash(tmpbuf))) {
-#ifdef LPC_TO_C
-        if (ob->flags & O_COMPILED_PROGRAM) {
-            ob = load_object(tmpbuf, (lpc_object_t *)ob);
-            if (!ob || (ob->flags & O_DESTRUCTED))      /* *sigh* */
-                return 0;
-        }
-#endif
-        if (ob->flags & O_SWAPPED)
-            load_ob_from_swap(ob);
         return ob;
     }
     ob = load_object(tmpbuf, 0);
     if (!ob || (ob->flags & O_DESTRUCTED))      /* *sigh* */
         return 0;
-    if (ob && ob->flags & O_SWAPPED)
-        load_ob_from_swap(ob);
     return ob;
 }
 
 /* Look for a loaded object. Return 0 if non found. */
-object_t *find_object2 P1(const char *, str)
+object_t *find_object2 (const char * str)
 {
     register object_t *ob;
     char p[MAX_OBJECT_NAME_SIZE];
@@ -1440,12 +1379,6 @@ object_t *find_object2 P1(const char *, str)
         return 0;
 
     if ((ob = lookup_object_hash(p))) {
-#ifdef LPC_TO_C
-        if (ob->flags & O_COMPILED_PROGRAM)
-            return 0;
-#endif
-        if (ob->flags & O_SWAPPED)
-            load_ob_from_swap(ob);
         return ob;
     }
     return 0;
@@ -1458,7 +1391,7 @@ object_t *find_object2 P1(const char *, str)
  * The main work is to update all command definitions, depending on what is
  * living or not. Note that all objects in the same inventory are affected.
  */
-void move_object P2(object_t *, item, object_t *, dest)
+void move_object (object_t * item, object_t * dest)
 {
     object_t **pp, *ob;
 
@@ -1524,7 +1457,7 @@ void move_object P2(object_t *, item, object_t *, dest)
  * Update this.
  */
 
-void add_light P2(object_t *, p, int, n)
+void add_light (object_t * p, int n)
 {
     if (n == 0)
         return;
@@ -1575,7 +1508,7 @@ void mark_free_sentences() {
 }
 #endif
 
-void free_sentence P1(sentence_t *, p)
+void free_sentence (sentence_t * p)
 {
     if (p->flags & V_FUNCTION) {
       if (p->function.f)
@@ -1595,12 +1528,11 @@ void free_sentence P1(sentence_t *, p)
     sent_free = p;
 }
 
-void fatal P1V(const char *, fmt)
+void fatal (const char *fmt, ...)
 {
   static int in_fatal = 0;
   char msg_buf[2049];
   va_list args;
-  V_DCL(char *fmt);
   
   switch (in_fatal) {
   default:
@@ -1677,7 +1609,7 @@ void throw_error()
     error("Throw with no catch.\n");
 }
 
-static void debug_message_with_location P1(char *, err) {
+static void debug_message_with_location (char * err) {
     if (current_object && current_prog) {
         debug_message("%sprogram: /%s, object: /%s, file: %s\n",
                       err,
@@ -1694,7 +1626,7 @@ static void debug_message_with_location P1(char *, err) {
     }
 }
 
-static void add_message_with_location P1(char *, err) {
+static void add_message_with_location (char * err) {
     if (current_object && current_prog) {
         add_vmessage(command_giver, "%sprogram: /%s, object: /%s, file: %s\n",
                      err,
@@ -1712,7 +1644,7 @@ static void add_message_with_location P1(char *, err) {
 }
 
 #ifdef MUDLIB_ERROR_HANDLER
-static void mudlib_error_handler P2(char *, err, int, catch) {
+static void mudlib_error_handler (char * err, int catch) {
     mapping_t *m;
     const char *file;
     int line;
@@ -1747,7 +1679,7 @@ static void mudlib_error_handler P2(char *, err, int, catch) {
 }
 #endif
 
-void error_handler P1(char *, err)
+void error_handler (char * err)
 {
     const char *object_name;
 
@@ -1864,7 +1796,7 @@ void error_handler P1(char *, err)
     fatal("LONGJMP failed or no error context for error.\n");
 }
 
-void error_needs_free P1(char *, s)
+void error_needs_free (char * s)
 {
     char err_buf[2048];
     strncpy(err_buf + 1, s, 2047);
@@ -1875,11 +1807,10 @@ void error_needs_free P1(char *, s)
     error_handler(err_buf);
 }
 
-void error P1V(const char * const, fmt)
+void error (const char * const fmt, ...)
 {
     char err_buf[2048];
     va_list args;
-    V_DCL(char *fmt);
 
     V_START(args, fmt);
     V_VAR(char *, fmt, args);
@@ -1896,7 +1827,7 @@ void error P1V(const char * const, fmt)
 int MudOS_is_being_shut_down;
 
 #ifdef SIGNAL_FUNC_TAKES_INT
-void startshutdownMudOS P1(int, sig)
+void startshutdownMudOS (int sig)
 #else
 void startshutdownMudOS()
 #endif
@@ -1909,7 +1840,7 @@ void startshutdownMudOS()
  * We don't call it directly from HUP, because it is dangerous when being
  * in an interrupt.
  */
-void shutdownMudOS P1(int, exit_code)
+void shutdownMudOS (int exit_code)
 {
     int i;
 
@@ -1939,7 +1870,6 @@ void shutdownMudOS P1(int, exit_code)
     signal(SIGHUP, SIG_IGN);
     signal(SIGALRM, SIG_IGN);
 #endif
-    unlink_swap_file();
 #ifdef PROFILING
     monitor(0, 0, 0, 0, 0);     /* cause gmon.out to be written */
 #endif
@@ -1950,10 +1880,10 @@ void shutdownMudOS P1(int, exit_code)
  * Call this one when there is only little memory left. It will start
  * Armageddon.
  */
-void slow_shut_down P1(int, minutes)
+void slow_shut_down (int minutes)
 {
     /*
-     * Swap out objects, and free some memory.
+     *free some memory.
      */
     svalue_t *amo;
 
@@ -1978,7 +1908,7 @@ void slow_shut_down P1(int, minutes)
     }
 }
 
-void do_message P5(svalue_t *, class, svalue_t *, msg, array_t *, scope, array_t *, exclude, int, recurse)
+void do_message (svalue_t * class, svalue_t * msg, array_t * scope, array_t * exclude, int recurse)
 {
     int i, j, valid;
     object_t *ob;
@@ -2024,7 +1954,7 @@ void do_message P5(svalue_t *, class, svalue_t *, msg, array_t *, scope, array_t
 }
 
 #if !defined(NO_RESETS) && defined(LAZY_RESETS)
-void try_reset P1(object_t *, ob)
+void try_reset (object_t * ob)
 {
     if ((ob->next_reset < current_time) && !(ob->flags & O_RESET_STATE)) {
         debug(d_flag, ("(lazy) RESET /%s\n", ob->name));
@@ -2038,7 +1968,7 @@ void try_reset P1(object_t *, ob)
 
 #ifndef NO_ENVIRONMENT
 #ifdef F_FIRST_INVENTORY
-object_t *first_inventory P1(svalue_t *, arg)
+object_t *first_inventory (svalue_t * arg)
 {
     object_t *ob;
 

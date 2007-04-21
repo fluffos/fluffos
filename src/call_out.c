@@ -40,14 +40,14 @@ static int num_call;
 static int unique = 0;
 #endif
 
-static void free_call PROT((pending_call_t *));
-static void free_called_call PROT((pending_call_t *));
-void remove_all_call_out PROT((object_t *));
+static void free_call (pending_call_t *);
+static void free_called_call (pending_call_t *);
+void remove_all_call_out (object_t *);
 
 /*
  * Free a call out structure.
  */
-static void free_called_call P1(pending_call_t *, cop)
+static void free_called_call (pending_call_t * cop)
 {
     cop->next = call_list_free;
     if (cop->ob) {
@@ -65,7 +65,7 @@ static void free_called_call P1(pending_call_t *, cop)
     call_list_free = cop;
 }
 
-INLINE_STATIC void free_call P1(pending_call_t *, cop)
+INLINE_STATIC void free_call (pending_call_t * cop)
 {
     if (cop->vs)
   free_array(cop->vs);
@@ -80,8 +80,8 @@ int
 #else
 void
 #endif
-new_call_out P5(object_t *, ob, svalue_t *, fun, int, delay, 
-    int, num_args, svalue_t *, arg)
+new_call_out (object_t * ob, svalue_t * fun, int delay, 
+    int num_args, svalue_t * arg)
 {
     pending_call_t *cop, **copp;
     int tm;
@@ -293,7 +293,7 @@ void call_out()
     pop_context(&econ);
 }
 
-static int time_left P2(int, slot, int, delay) {
+static int time_left (int slot, int delay) {
     int current_slot = current_time & (CALLOUT_CYCLE_SIZE - 1);
     if (slot >= current_slot) {
   return (slot - current_slot) + delay * CALLOUT_CYCLE_SIZE;
@@ -307,7 +307,7 @@ static int time_left P2(int, slot, int, delay) {
  * The time left until execution is returned.
  * -1 is returned if no call out pending.
  */
-int remove_call_out P2(object_t *, ob, const char *, fun)
+int remove_call_out (object_t * ob, const char * fun)
 {
     pending_call_t **copp, *cop;
     int delay;
@@ -318,27 +318,27 @@ int remove_call_out P2(object_t *, ob, const char *, fun)
     DBG(("remove_call_out: /%s \"%s\"", ob->obname, fun));
 
     for (i = 0; i < CALLOUT_CYCLE_SIZE; i++) {
-  delay = 0;
-  for (copp = &call_list[i]; *copp; copp = &(*copp)->next) {
-      DBG(("   Slot: %i\n", i));
-      delay += (*copp)->delta;
-      if ((*copp)->ob == ob && strcmp((*copp)->function.s, fun) == 0) {
-    cop = *copp;
-    if (cop->next)
-        cop->next->delta += cop->delta;
-    *copp = cop->next;
-    free_call(cop);
-    DBG(("   found."));
-    return time_left(i, delay);
+      delay = 0;
+      for (copp = &call_list[i]; *copp; copp = &(*copp)->next) {
+	DBG(("   Slot: %i\n", i));
+	delay += (*copp)->delta;
+	if ((*copp)->ob == ob && strcmp((*copp)->function.s, fun) == 0) {
+	  cop = *copp;
+	  if (cop->next)
+	    cop->next->delta += cop->delta;
+	  *copp = cop->next;
+	  free_call(cop);
+	  DBG(("   found."));
+	  return time_left(i, delay);
+	}
       }
-  }
     }
     DBG(("   not found."));
     return -1;
 }
 
 #ifdef CALLOUT_HANDLES
-int remove_call_out_by_handle P1(int, handle)
+int remove_call_out_by_handle (int handle)
 {
     pending_call_t **copp, *cop;
     int delay = 0;
@@ -360,7 +360,7 @@ int remove_call_out_by_handle P1(int, handle)
     return -1;
 }
 
-int find_call_out_by_handle P1(int, handle) 
+int find_call_out_by_handle (int handle) 
 {
     pending_call_t *cop;
     int delay = 0;
@@ -377,7 +377,7 @@ int find_call_out_by_handle P1(int, handle)
 }
 #endif
   
-int find_call_out P2(object_t *, ob, const char *, fun)
+int find_call_out (object_t * ob, const char * fun)
 {
     pending_call_t *cop;
     int delay;
@@ -399,7 +399,7 @@ int find_call_out P2(object_t *, ob, const char *, fun)
     return -1;
 }
 
-int print_call_out_usage P2(outbuffer_t *, ob, int, verbose)
+int print_call_out_usage (outbuffer_t * ob, int verbose)
 {
     int i, j;
     pending_call_t *cop;
@@ -519,7 +519,7 @@ array_t *get_all_call_outs()
 }
 
 void
-remove_all_call_out P1(object_t *, obj)
+remove_all_call_out (object_t * obj)
 {
     pending_call_t **copp, *cop;
     int i;

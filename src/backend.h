@@ -12,24 +12,24 @@
 /*
  * backend.c
  */
-extern int current_time;
+extern long current_time;
 extern object_t *current_heart_beat;
 extern error_context_t *current_error_context;
 
-void backend PROT((void));
-void clear_state PROT((void));
-void logon PROT((object_t *));
-int parse_command PROT((char *, object_t *));
-int set_heart_beat PROT((object_t *, int));
-int query_heart_beat PROT((object_t *));
-int heart_beat_status PROT((outbuffer_t *, int));
-void preload_objects PROT((int));
-INLINE void remove_destructed_objects PROT((void));
-void update_load_av PROT((void));
-void update_compile_av PROT((int));
-char *query_load_av PROT((void));
-array_t *get_heart_beats PROT((void));
-int query_time_used PROT((void));
-void call_heart_beat PROT((void));
+void backend (void);
+void clear_state (void);
+void logon (object_t *);
+int parse_command (char *, object_t *);
+int set_heart_beat (object_t *, int);
+int query_heart_beat (object_t *);
+int heart_beat_status (outbuffer_t *, int);
+void preload_objects (int);
+INLINE void remove_destructed_objects (void);
+void update_load_av (void);
+void update_compile_av (int);
+char *query_load_av (void);
+array_t *get_heart_beats (void);
+int query_time_used (void);
+void call_heart_beat (void);
 
 #endif

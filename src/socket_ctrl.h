@@ -4,13 +4,13 @@
 /*
  * socket_ctrl.c
  */
-int set_socket_nonblocking PROT((int, int));
-int set_socket_owner PROT((int, int));
-int set_socket_async PROT((int, int));
+int set_socket_nonblocking (int, int);
+int set_socket_owner (int, int);
+int set_socket_async (int, int);
 
 #ifdef WIN32
-void SocketPerror PROT((char *, char *));
-void CDECL cleanup_sockets PROT((void));
+void SocketPerror (char *, char *);
+void CDECL cleanup_sockets (void);
 #endif
 
 #endif

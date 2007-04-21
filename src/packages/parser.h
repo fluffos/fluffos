@@ -225,11 +225,11 @@ typedef struct {
     sub_result_t res[4];
 } parse_result_t;
 
-void parse_free PROT((parse_info_t *));
+void parse_free (parse_info_t *);
 #ifdef DEBUGMALLOC_EXTENSIONS
 void parser_mark_verbs();
-void parser_mark PROT((parse_info_t *));
-void mark_hash_entry PROT((char *));
+void parser_mark (parse_info_t *);
+void mark_hash_entry (char *);
 #endif
 
 #endif

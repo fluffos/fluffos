@@ -96,19 +96,19 @@ int debugmalloc = 0;		/* Only used when debuging malloc() */
 /*  SMALL BLOCK HANDLER					*/
 /********************************************************/
 
-static char *large_malloc PROT((u, int));
-static void large_free PROT((char *));
-static int malloc_size_mask PROT((void));
-static int malloced_size PROT((POINTER));
-static void show_block PROT((u *));
-static void remove_from_free_list PROT((u *));
-static void add_to_free_list PROT((u *));
-static void build_block PROT((u *, u));
-static void mark_block PROT((u *));
-static char *esbrk PROT((u));
-static int resort_free_list PROT((void));
+static char *large_malloc (u, int);
+static void large_free (char *);
+static int malloc_size_mask (void);
+static int malloced_size (POINTER);
+static void show_block (u *);
+static void remove_from_free_list (u *);
+static void add_to_free_list (u *);
+static void build_block (u *, u);
+static void mark_block (u *);
+static char *esbrk (u);
+static int resort_free_list (void);
 #ifdef DEBUG
-static void walk_new_small_malloced PROT((void (*) ()));
+static void walk_new_small_malloced (void (* ()));
 #endif
 
 #define s_size_ptr(p)	(p)
@@ -121,7 +121,7 @@ t_stat small_free_stat =
 t_stat small_chunk_stat =
 {0, 0};
 
-POINTER CDECL smalloc_malloc P1(size_t, size)
+POINTER CDECL smalloc_malloc (size_t size)
 {
     /* int i; */
     u *temp;
@@ -207,12 +207,12 @@ static int malloc_size_mask()
     return MASK;
 }
 
-static int malloced_size P1(POINTER, ptr)
+static int malloced_size (POINTER ptr)
 {
     return (int) (((u *) ptr)[-1] & MASK);
 }
 
-SFREE_RETURN_TYPE CDECL smalloc_free P1(POINTER, ptr)
+SFREE_RETURN_TYPE CDECL smalloc_free (POINTER ptr)
 {
     u *block;
     u i;
@@ -263,7 +263,7 @@ int fit_style = BEST_FIT;
 #define l_prev_free(p)		(!(*p & PREV_BLOCK))
 #define l_next_free(p)		(!(*l_next_block(p) & THIS_BLOCK))
 
-static void show_block P1(u *, ptr)
+static void show_block (u * ptr)
 {
     printf("[%c%d: %d]  ", (*ptr & THIS_BLOCK ? '+' : '-'),
 	   (int) ptr, (int)(*ptr & MASK));
@@ -320,7 +320,7 @@ static free_block_t *free_tree = &dummy2;
 #ifdef DEBUG_AVL
 static int inconsistency = 0;
 
-static int check_avl P2(free_block_t *, parent, free_block_t *, p)
+static int check_avl (free_block_t * parent, free_block_t * p)
 {
     int left, right;
 
@@ -369,7 +369,7 @@ static int do_check_avl()
 #endif				/* DEBUG_AVL */
 
 t_stat large_free_stat;
-static void remove_from_free_list P1(u *, ptr)
+static void remove_from_free_list (u * ptr)
 {
     free_block_t *p, *q, *r, *s, *t;
 
@@ -691,7 +691,7 @@ static void remove_from_free_list P1(u *, ptr)
     }
 }
 
-static void add_to_free_list P1(u *, ptr)
+static void add_to_free_list (u * ptr)
 {
     u size;
     free_block_t *p, *q, *r;
@@ -949,7 +949,7 @@ void show_free_list()
 }
 
 t_stat large_free_stat;
-void remove_from_free_list P1(u *, ptr)
+void remove_from_free_list (u * ptr)
 {
     count_back(large_free_stat, (*ptr & MASK) << 2);
 
@@ -962,7 +962,7 @@ void remove_from_free_list P1(u *, ptr)
 	l_prev_ptr(l_next_ptr(ptr)) = l_prev_ptr(ptr);
 }
 
-void add_to_free_list P1(u *, ptr)
+void add_to_free_list (u * ptr)
 {
     extern int puts();
 
@@ -981,8 +981,8 @@ void add_to_free_list P1(u *, ptr)
 }
 #endif				/* FIT_STYLE_FAST_FIT */
 
-static void build_block P2(	/* build a properly annotated unalloc block */
-			                  u *, ptr, u, size)
+static void build_block (	/* build a properly annotated unalloc block */
+			                  u * ptr, u size)
 {
     u tmp;
 
@@ -992,8 +992,8 @@ static void build_block P2(	/* build a properly annotated unalloc block */
     *(ptr + size) &= ~PREV_BLOCK;	/* unmark previous block */
 }
 
-static void mark_block P1(	/* mark this block as allocated */
-			                u *, ptr)
+static void mark_block (	/* mark this block as allocated */
+			                u * ptr)
 {
     *l_next_block(ptr) |= PREV_BLOCK;
     *ptr |= THIS_BLOCK;
@@ -1004,7 +1004,7 @@ static void mark_block P1(	/* mark this block as allocated */
  * to insure that we have enough.
  */
 t_stat sbrk_stat;
-static char *esbrk P1(u, size)
+static char *esbrk (u size)
 {
 #ifdef SBRK_OK
 #ifdef NeXT
@@ -1073,7 +1073,7 @@ static char *esbrk P1(u, size)
 }
 
 t_stat large_alloc_stat;
-static char *large_malloc P2(u, size, int, force_more)
+static char *large_malloc (u size, int force_more)
 {
     u real_size;
     u *ptr;
@@ -1327,7 +1327,7 @@ static char *large_malloc P2(u, size, int, force_more)
     return (char *) (ptr + 1);
 }
 
-static void large_free P1(char *, ptr)
+static void large_free (char * ptr)
 {
     u size, *p;
 
@@ -1351,7 +1351,7 @@ static void large_free P1(char *, ptr)
     add_to_free_list(p);
 }
 
-POINTER CDECL smalloc_realloc P2(POINTER, p, size_t, size)
+POINTER CDECL smalloc_realloc (POINTER p, size_t size)
 {
     unsigned *q, old_size;
     char *t;
@@ -1383,7 +1383,7 @@ static int resort_free_list()
 }
 #ifdef DO_MSTATS
 #define dump_stat(str,stat) outbuf_addv(ob, str,stat.counter,stat.size)
-void show_mstats P2(outbuffer_t *, ob, char *, s)
+void show_mstats (outbuffer_t * ob, char * s)
 {
     outbuf_addv(ob, "Memory allocation statistics %s\n", s);
     outbuf_add(ob, "Type                   Count      Space (bytes)\n");
@@ -1411,7 +1411,7 @@ void show_mstats P2(outbuffer_t *, ob, char *, s)
 /*
  * calloc() is provided because some stdio packages uses it.
  */
-POINTER CDECL smalloc_calloc P2(size_t, nelem, size_t, sizel)
+POINTER CDECL smalloc_calloc (size_t nelem, size_t sizel)
 {
     char *p;
 
@@ -1430,7 +1430,7 @@ POINTER CDECL smalloc_calloc P2(size_t, nelem, size_t, sizel)
  */
 
 static void walk_new_small_malloced(func)
-    void (*func) PROT((POINTER, int));
+    void (*func) (POINTER, int);
 {
     int i;
     u *p, *q;
@@ -1502,7 +1502,7 @@ verify_sfltable()
     }
 }
 
-verify_free P1(u *, ptr)
+verify_free (u * ptr)
 {
     u *p;
     int i, j;
@@ -1544,7 +1544,7 @@ apa()
 }
 
 static char *ref;
-test_malloc P1(char *, p)
+test_malloc (char * p)
 {
     if (p == ref)
 	printf("Found 0x%x\n", p);

@@ -77,7 +77,7 @@ static char *expands[EXPANDMAX];
 static int expand_depth = 0;
 
 char yytext[MAXLINE];
-static char *outp;
+char *outp;
 
 typedef struct incstate_s {
     struct incstate_s *next;
@@ -218,40 +218,40 @@ typedef struct linked_buf_s {
 static linked_buf_t head_lbuf = { NULL, TERM_START };
 static linked_buf_t *cur_lbuf;
 
-static void handle_define PROT((char *));
-static void free_defines PROT((void));
-static void add_define PROT((const char *, int, char *));
-static void add_predefine PROT((const char *, int, const char *));
-static int expand_define PROT((void));
-static void add_input PROT((const char *));
-static int cond_get_exp PROT((int));
-static void merge PROT((char *name, char *dest));
-static void add_quoted_predefine PROT((const char *, const char *));
-static void lexerror PROT((const char *));
-static int skip_to PROT((const char *, const char *));
-static void handle_cond PROT((int));
-static int inc_open PROT((char *, char *, int));
-static void include_error PROT((const char *, int));
-static void handle_include PROT((char *, int));
-static int get_terminator PROT((char *));
-static int get_array_block PROT((char *));
-static int get_text_block PROT((char *));
-static void skip_line PROT((void));
-static void skip_comment PROT((void));
-static void deltrail PROT((char *));
-static void handle_pragma PROT((char *));
-static int cmygetc PROT((void));
-static void refill PROT((void));
-static void refill_buffer PROT((void));
-static int exgetc PROT((void));
-static int old_func PROT((void));
-static ident_hash_elem_t *quick_alloc_ident_entry PROT((void));
-static void yyerrorp PROT((const char *));
+static void handle_define (char *);
+static void free_defines (void);
+static void add_define (const char *, int, char *);
+static void add_predefine (const char *, int, const char *);
+static int expand_define (void);
+static void add_input (const char *);
+static int cond_get_exp (int);
+static void merge (char *name, char *dest);
+static void add_quoted_predefine (const char *, const char *);
+static void lexerror (const char *);
+static int skip_to (const char *, const char *);
+static void handle_cond (int);
+static int inc_open (char *, char *, int);
+static void include_error (const char *, int);
+static void handle_include (char *, int);
+static int get_terminator (char *);
+static int get_array_block (char *);
+static int get_text_block (char *);
+static void skip_line (void);
+static void skip_comment (void);
+static void deltrail (char *);
+static void handle_pragma (char *);
+static int cmygetc (void);
+static void refill (void);
+static void refill_buffer (void);
+static int exgetc (void);
+static int old_func (void);
+static ident_hash_elem_t *quick_alloc_ident_entry (void);
+static void yyerrorp (const char *);
 
 #define LEXER
 #include "preprocess.c"
 
-static void merge P2(char *, name, char *, dest)
+static void merge (char * name, char * dest)
 {
     char *from;
 
@@ -305,7 +305,7 @@ static void merge P2(char *, name, char *, dest)
 }
 
 static void
-yyerrorp P1(const char *, s) {
+yyerrorp (const char * s) {
     char buf[200];
     sprintf(buf, s, '#');
     yyerror(buf);
@@ -313,14 +313,14 @@ yyerrorp P1(const char *, s) {
 }
 
 static void
-lexerror P1(const char *, s)
+lexerror (const char * s)
 {
     yyerror(s);
     lex_fatal++;
 }
 
 static int
-skip_to P2(const char *, token, const char *, atoken)
+skip_to (const char * token, const char * atoken)
 {
     char b[20], *p;
     unsigned char c;
@@ -375,7 +375,7 @@ skip_to P2(const char *, token, const char *, atoken)
 }
 
 static int
-inc_open P3(char *, buf, char *, name, int, check_local)
+inc_open (char * buf, char * name, int check_local)
 {
     int i, f;
     char *p;
@@ -402,7 +402,7 @@ inc_open P3(char *, buf, char *, name, int, check_local)
 }
 
 static void
-include_error P2(const char *, msg, int, global)
+include_error (const char * msg, int global)
 {
     current_line--;
 
@@ -420,7 +420,7 @@ include_error P2(const char *, msg, int, global)
 }
 
 static void
-handle_include P2(char *, name, int, global)
+handle_include (char * name, int global)
 {
     char *p, *nameptr;
     static char buf[1024];
@@ -485,7 +485,7 @@ handle_include P2(char *, name, int, global)
 }
 
 static int
-get_terminator P1(char *, terminator)
+get_terminator (char * terminator)
 {
     unsigned char c;
     int j = 0;
@@ -527,7 +527,7 @@ get_terminator P1(char *, terminator)
     }
 
 static int
-get_array_block P1(char *, term)
+get_array_block (char * term)
 {
     int termlen;                /* length of terminator */
     char *array_line[NUMCHUNKS];/* allocate memory in chunks */
@@ -668,7 +668,7 @@ get_array_block P1(char *, term)
 }
 
 static int
-get_text_block P1(char *, term)
+get_text_block (char * term)
 {
     int termlen;                /* length of terminator */
     char *text_line[NUMCHUNKS]; /* allocate memory in chunks */
@@ -884,7 +884,7 @@ static void skip_comment()
 }
 
 static void
-deltrail P1(char *, sp)
+deltrail (char * sp)
 {
     char *p;
 
@@ -923,7 +923,7 @@ static pragma_t our_pragmas[] = {
     { 0, 0 }
 };
 
-static void handle_pragma P1(char *, str)
+static void handle_pragma (char * str)
 {
     int i;
     int no_flag;
@@ -1330,6 +1330,9 @@ int yylex()
             return L_ASSIGN;
         case '(':
             yyp = outp;
+#ifdef WOMBLES
+            c = *yyp++;
+#else
             while (isspace(c = *yyp++)) {
                 if (c == '\n') {
                     current_line++;
@@ -1340,7 +1343,7 @@ int yylex()
                     }
                 } 
             }
-
+#endif
             switch(c) {
                 case '{' : { outp = yyp; return L_ARRAY_OPEN; }
                 case '[' : { outp = yyp; return L_MAPPING_OPEN; }
@@ -1403,7 +1406,7 @@ int yylex()
                 }
                 outp--;
                 *yyp = 0;
-                yylval.number = atoi(yytext) - 1;
+                yylval.number = atol(yytext) - 1;
                 if (yylval.number < 0)
                     yyerror("In function parameter $num, num must be >= 1.");
                 else if (yylval.number > 254)
@@ -1895,7 +1898,7 @@ int yylex()
                         break;
                 }
                 outp--;
-                yylval.number = (int) strtol(yytext, (char **) NULL, 0x10);
+                yylval.number = strtol(yytext, (char **) NULL, 0x10);
                 return L_NUMBER;
             }
             outp--;
@@ -1934,7 +1937,7 @@ int yylex()
                 yylval.real = (float)myreal;
                 return L_REAL;
             } else {
-                yylval.number = atoi(yytext);
+                yylval.number = atol(yytext);
                 return L_NUMBER;
             }
         default:
@@ -2087,7 +2090,7 @@ void end_new_file()
     }
 }
 
-static void add_quoted_predefine P2(const char *, def, const char *, val)
+static void add_quoted_predefine (const char * def, const char * val)
 {
     char save_buf[1024];
 
@@ -2143,16 +2146,16 @@ void add_predefines()
             fatal("MLEN exceeded");
         add_predefine(namebuf, -1, mtext);
     }
-    sprintf(save_buf, "%d", sizeof(int));
+    sprintf(save_buf, "%d", sizeof(long));
     add_predefine("SIZEOFINT", -1, save_buf);
-    int tmp = 1<<31;
+    long tmp = (long)1<<31;
     if(tmp > 0)
-      tmp = 1<<63;
-    sprintf(save_buf, "%d", tmp-1);
+      tmp = (long)1<<63;
+    sprintf(save_buf, "%ld", tmp-1);
     add_predefine("MAX_INT", -1, save_buf);
 }
 
-void start_new_file P1(int, f)
+void start_new_file (int f)
 {
     if (defines_need_freed) {
         free_defines();
@@ -2201,7 +2204,7 @@ void start_new_file P1(int, f)
     } else refill_buffer();
 }
 
-const char *query_instr_name P1(int, instr)
+const char *query_instr_name (int instr)
 {
     const char *name;
     static char num_buf[20];
@@ -2217,24 +2220,13 @@ const char *query_instr_name P1(int, instr)
     }
 }
 
-#ifdef LPC_TO_C
-#define add_instr_name(w, x, y, z) int_add_instr_name(w, x, y, z)
-
-static void int_add_instr_name P4(const char *, name, char *, routine, int, n, short, t)
-{
-    instrs[n].name = name;
-    if (routine) instrs[n].routine = routine;
-    instrs[n].ret_type = t;
-}
-#else
 #define add_instr_name(w, x, y, z) int_add_instr_name(w, y, z)
 
-static void int_add_instr_name P3(const char *, name, int, n, short, t)
+static void int_add_instr_name (const char * name, int n, short t)
 {
     instrs[n].name = name;
     instrs[n].ret_type = t;
 }
-#endif
 
 static void init_instrs()
 {
@@ -2242,9 +2234,6 @@ static void init_instrs()
 
     for (i = 0; i < BASE; i++) {
         instrs[i].ret_type = -1;
-#ifdef LPC_TO_C
-        instrs[i].routine = "???();\n";
-#endif
     }
     for (i = 0; i < NELEM(predefs); i++) {
         n = predefs[i].token;
@@ -2469,7 +2458,7 @@ static void refill()
     current_line++;
 }
 
-static void handle_define P1(char *, yyt)
+static void handle_define (char * yyt)
 {
     char namebuf[NSIZE];
     char args[NARGS][NSIZE];
@@ -2593,7 +2582,7 @@ static void handle_define P1(char *, yyt)
 }
 
 /* IDEA: linked buffers, to allow "unlimited" buffer expansion */
-static void add_input P1(const char *, p)
+static void add_input (const char * p)
 {
     int l = strlen(p);
 
@@ -2658,7 +2647,7 @@ void mark_all_defines() {
 }
 #endif
 
-static void add_predefine P3(const char *, name, int, nargs, const char *, exps)
+static void add_predefine (const char * name, int nargs, const char * exps)
 {
     defn_t *p;
     int h;
@@ -2718,7 +2707,7 @@ static void free_defines()
             c = cmygetc();\
         } while (is_wspace(c));
 
-static int extract_args P2(char **, argv, char *, argb)
+static int extract_args (char ** argv, char * argb)
 {
     int argc = 0, dquote = 0, parcnt = 0, squote = 0;
     char *out;
@@ -2778,7 +2767,6 @@ static int extract_args P2(char **, argv, char *, argb)
 
         /* negative parcnt means we're done collecting args */
         if (parcnt < 0 || (c == ',' && !parcnt && !dquote && !squote)) {
-            char *exp;
 
             /* strip off trailing whitespace char if there was one */
             if (uisspace(*(out - 1))) *(out - 1) = 0;
@@ -2806,7 +2794,7 @@ static int extract_args P2(char **, argv, char *, argb)
 }
 
 /* Check if yytext is a macro and expand if it is. */
-static char *expand_define2 P1(char *, text)
+static char *expand_define2 (char * text)
 {
     int argc = 0, i, paste = 0, pasting = 0;
     defn_t *macro;
@@ -2947,7 +2935,7 @@ static char *expand_define2 P1(char *, text)
     return expand_buffer;
 }
 
-int expand_define PROT((void))
+int expand_define (void)
 {
     char *expand_buffer;
 
@@ -3027,7 +3015,7 @@ static int exgetc()
     return c;
 }
 
-void set_inc_list P1(char *, list)
+void set_inc_list (char * list)
 {
     int i, size;
     char *p;
@@ -3116,7 +3104,7 @@ char *main_file_name()
       if (((x)->token & IHE_RESWORD) || ((x)->sem_value)) { z } \
       else return 0; }
 
-ident_hash_elem_t *lookup_ident P1(const char *, name) {
+ident_hash_elem_t *lookup_ident (const char * name) {
     int h = IdentHash(name);
     ident_hash_elem_t *hptr, *hptr2;
 
@@ -3131,7 +3119,7 @@ ident_hash_elem_t *lookup_ident P1(const char *, name) {
     return 0;
 }
 
-ident_hash_elem_t *find_or_add_perm_ident P1(const char *, name) {
+ident_hash_elem_t *find_or_add_perm_ident (const char * name) {
     int h = IdentHash(name);
     ident_hash_elem_t *hptr, *hptr2;
 
@@ -3175,7 +3163,7 @@ lname_linked_buf_t *lnamebuf = 0;
 
 int lb_index = 4096;
 
-static char *alloc_local_name P1(const char *, name) {
+static char *alloc_local_name (const char * name) {
     int len = strlen(name)+1;
     char *res;
 
@@ -3202,7 +3190,7 @@ typedef struct ident_hash_elem_list_s {
 ident_hash_elem_list_t *ihe_list = 0;
 
 #if 0
-void dump_ihe P2(ident_hash_elem_t *, ihe, int, noisy) {
+void dump_ihe (ident_hash_elem_t * ihe, int noisy) {
     int sv = 0;
     if (ihe->token & IHE_RESWORD) {
         if (noisy) printf("%s ", ihe->name);
@@ -3237,7 +3225,7 @@ void dump_ihe P2(ident_hash_elem_t *, ihe, int, noisy) {
     }
 }
 
-void debug_dump_ident_hash_table P1(int, noisy) {
+void debug_dump_ident_hash_table (int noisy) {
     int zeros = 0;
     int i;
     ident_hash_elem_t *ihe, *ihe2;
@@ -3327,7 +3315,7 @@ static ident_hash_elem_t *quick_alloc_ident_entry() {
 }
 
 ident_hash_elem_t *
-find_or_add_ident P2(const char *, name, int, flags) {
+find_or_add_ident (const char * name, int flags) {
     int h = IdentHash(name);
     ident_hash_elem_t *hptr, *hptr2;
 
@@ -3381,7 +3369,7 @@ find_or_add_ident P2(const char *, name, int, flags) {
     return hptr;
 }
 
-static void add_keyword_t P2(const char *, name, keyword_t *, entry) {
+static void add_keyword_t (const char * name, keyword_t * entry) {
     int h = IdentHash(name);
 
     if (ident_hash_table[h]) {

@@ -1,8 +1,12 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-void *mmalloc(size_t size){
+void *mmalloc(int size){
   register int *res = mmap(0,size+4,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,0,0);
+  if(res == -1){
+    perror("malloc: ");
+    exit(-1);
+  }
   *res=size;
   return &res[1];
 }
@@ -10,7 +14,8 @@ void *mmalloc(size_t size){
 void mfree(void *p){
   register int *mem = p;
   mem--;
-  munmap(mem, 4+*mem);
+  //munmap(mem, 4+*mem);
+  mprotect(mem, *mem, PROT_NONE);
 }
 
 void *mrealloc(void *p, int size){
@@ -20,10 +25,10 @@ void *mrealloc(void *p, int size){
   oldsize = 4 + *mem;
   mem = mremap(mem, oldsize, size+4, 1);
   *mem = size;
-  return &mem[1];
+  return (void *)&mem[1];
 }
   
-void *mcalloc(size_t num, size_t size){
+void *mcalloc(int num, int size){
   register void *p;
 
   size *= num;

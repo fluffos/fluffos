@@ -58,7 +58,6 @@
 #include "lex.h"
 #include "stralloc.h"
 #include "master.h"
-#include "swap.h"
 
 #if defined(F_SPRINTF) || defined(F_PRINTF)
 
@@ -177,21 +176,21 @@ typedef struct _sprintf_state {
 
 static sprintf_state_t  *sprintf_state = NULL;
 
-static void numadd PROT((outbuffer_t *, int num));
-static void add_space PROT((outbuffer_t *, int indent));
-static void add_justified PROT((const char *str, int slen, pad_info_t *pad, int fs, format_info finfo, short int trailing));
-static int add_column PROT((cst ** column, int trailing));
-static int add_table PROT((cst ** table));
+static void numadd (outbuffer_t *, long num);
+static void add_space (outbuffer_t *, int indent);
+static void add_justified (const char *str, int slen, pad_info_t *pad, int fs, format_info finfo, short int trailing);
+static int add_column (cst ** column, int trailing);
+static int add_table (cst ** table);
 
 #define ERROR(x) sprintf_error(x, 0)
 
-static void pop_sprintf_state PROT((void)) {
+static void pop_sprintf_state (void) {
     sprintf_state_t *state;
 
     state = sprintf_state;
     sprintf_state = sprintf_state->next;
 
-    if (error && state->obuff.buffer) {
+    if (state->obuff.buffer) {
         FREE_MSTR(state->obuff.buffer);
     }
     while (state->csts) {
@@ -209,7 +208,7 @@ static void pop_sprintf_state PROT((void)) {
     FREE(state);
 }
 
-static void push_sprintf_state PROT((void)) {
+static void push_sprintf_state (void) {
     sprintf_state_t *state;
 
     state = ALLOCATE(sprintf_state_t, TAG_TEMPORARY, "push_sprintf_state");
@@ -226,7 +225,7 @@ static void push_sprintf_state PROT((void)) {
  * Anything that has been allocated should be somewhere it can be found and
  * freed later.
  */
-static void sprintf_error P2(int, which, char *, premade) {
+static void sprintf_error (int which, char * premade) {
     char lbuf[2048];
     const char *err;
     
@@ -281,9 +280,9 @@ static void sprintf_error P2(int, which, char *, premade) {
     error(lbuf);
 }
 
-static void numadd P2(outbuffer_t *, outbuf, int, num)
+static void numadd (outbuffer_t * outbuf, long num)
 {
-    int i, num_l,               /* length of num as a string */
+    long i, num_l,               /* length of num as a string */
         nve;                    /* true if num negative */
     int space;
     int chop;
@@ -292,7 +291,12 @@ static void numadd P2(outbuffer_t *, outbuf, int, num)
     if (num < 0) {
         /* Beek: yes, it's possible for num < 0, and num * -1 < 0. */
         /* Beek: This shouldn't be a hardcoded const (assumes int is 4 bytes)*/
+        /* Wodan: indeed! */
+#if SIZEOF_LONG==4
         num = (num * -1) & 0x7fffffff;
+#else
+	num = (num * -1) & 0x7fffffffffffffff;
+#endif
         nve = 1;
     } else
         nve = 0;
@@ -315,7 +319,7 @@ static void numadd P2(outbuffer_t *, outbuf, int, num)
     }
 }                               /* end of numadd() */
 
-static void add_space P2(outbuffer_t *, outbuf, int, indent)
+static void add_space (outbuffer_t * outbuf, int indent)
 {
     int l;
     
@@ -331,7 +335,7 @@ static void add_space P2(outbuffer_t *, outbuf, int, indent)
  * and returns a pointer to this string.
  * Scary number of parameters for a recursive function.
  */
-void svalue_to_string P5(svalue_t *, obj, outbuffer_t *, outbuf, int, indent, int, trailing, int, indent2)
+void svalue_to_string (svalue_t * obj, outbuffer_t * outbuf, int indent, int trailing, int indent2)
 {
     int i;
 
@@ -375,10 +379,10 @@ void svalue_to_string P5(svalue_t *, obj, outbuffer_t *, outbuf, int, indent, in
             outbuf_add(outbuf, "CLASS( ");
             numadd(outbuf, n);
             outbuf_add(outbuf, n == 1 ? " element\n" : " elements\n");
-            for (i = 0; i < n - 1; i++)
+            for (i = 0; i < (obj->u.arr->size) - 1; i++)
                 svalue_to_string(&(obj->u.arr->item[i]), outbuf,
                                  indent + 2, 1, 0);
-	    if(n)
+	    if(obj->u.arr->size)
 	      svalue_to_string(&(obj->u.arr->item[i]), outbuf, 
 			       indent + 2, 0, 0);
             outbuf_add(outbuf, "\n");
@@ -420,8 +424,6 @@ void svalue_to_string P5(svalue_t *, obj, outbuffer_t *, outbuf, int, indent, in
                     outbuf_add(outbuf, "0");
                     break;
                 }
-                if (ob->flags & O_SWAPPED)
-                    load_ob_from_swap(ob);
                 outbuf_add(outbuf, function_name(ob->prog,
                                                  obj->u.fp->f.local.index));
                 break;
@@ -513,7 +515,7 @@ void svalue_to_string P5(svalue_t *, obj, outbuffer_t *, outbuf, int, indent, in
         outbuf_add(outbuf, ",\n");
 }                               /* end of svalue_to_string() */
 
-static void add_pad P2(pad_info_t *, pad, int, len) {
+static void add_pad (pad_info_t * pad, int len) {
     char *p;
     int padlen;
     
@@ -543,7 +545,7 @@ static void add_pad P2(pad_info_t *, pad, int, len) {
         memset(p, ' ', len);
 }
 
-INLINE_STATIC void add_nstr P2(const char *, str, int, len) {
+INLINE_STATIC void add_nstr (const char * str, int len) {
     if (outbuf_extend(&(sprintf_state->obuff), len) < len)
         ERROR(ERR_BUFF_OVERFLOW);
     memcpy(sprintf_state->obuff.buffer + sprintf_state->obuff.real_size, str, len);
@@ -557,8 +559,8 @@ INLINE_STATIC void add_nstr P2(const char *, str, int, len) {
  * "str" is unmodified.  trailing is, of course, ignored in the case
  * of right justification.
  */
-static void add_justified P6(const char *, str, int, slen, pad_info_t *, pad,
-                             int, fs, format_info, finfo, short int, trailing)
+static void add_justified (const char * str, int slen, pad_info_t * pad,
+                             int fs, format_info finfo, short int trailing)
 {
     fs -= slen;
 
@@ -601,7 +603,7 @@ static void add_justified P6(const char *, str, int, slen, pad_info_t *, pad,
  * Returns 1 if column completed.
  * Returns 2 if column completed has a \n at the end.
  */
-static int add_column P2(cst **, column, int, trailing)
+static int add_column (cst ** column, int trailing)
 {
     register unsigned int done;
     char c;
@@ -655,7 +657,7 @@ static int add_column P2(cst **, column, int, trailing)
  * Returns 0 if table not completed.
  * Returns 1 if table completed.
  */
-static int add_table P1(cst **, table)
+static int add_table (cst ** table)
 {
     int done, i;
     cst *tab = *table;                  /* always (*table) */
@@ -716,7 +718,7 @@ static int get_curpos() {
 /* We can't use a pointer to a local in a table or column, since it
  * could get overwritten by another on the same line.
  */
-static pad_info_t *make_pad P1(pad_info_t *, p) {
+static pad_info_t *make_pad (pad_info_t * p) {
     pad_info_t *x;
     if (p->len == 0) return 0;
     x = ALLOCATE(pad_info_t, TAG_TEMPORARY, "make_pad");
@@ -732,7 +734,7 @@ static pad_info_t *make_pad P1(pad_info_t *, p) {
  * this function is called again, or if it's going to be modified (esp.
  * if it risks being free()ed).
  */
-char *string_print_formatted P3(const char *, format_str, int, argc, svalue_t *, argv)
+char *string_print_formatted (const char * format_str, int argc, svalue_t * argv)
 {
     format_info finfo;
     svalue_t *carg;     /* current arg */
@@ -1122,7 +1124,7 @@ char *string_print_formatted P3(const char *, format_str, int, argc, svalue_t *,
                     } else {    /* not column or table */
                         if (pres && pres < slen)
                             slen = pres;
-			char *tmp = carg->u.string; //work around tcc bug;
+			const char *tmp = carg->u.string; //work around tcc bug;
                         add_justified(tmp, slen, &pad, fs, finfo,
                                       (((format_str[fpos] != '\n') && (format_str[fpos] != '\0'))
                                        || ((finfo & INFO_ARRAY) && (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size)))
@@ -1130,7 +1132,7 @@ char *string_print_formatted P3(const char *, format_str, int, argc, svalue_t *,
                     }
                 } else if (finfo & INFO_T_INT) {        /* one of the integer
                                                          * types */
-                    char cheat[8];
+                    char cheat[20];
                     char temp[100];
 
                     *cheat = '%';
@@ -1154,6 +1156,7 @@ char *string_print_formatted P3(const char *, format_str, int, argc, svalue_t *,
                     }
                     switch (finfo & INFO_T) {
                     case INFO_T_INT:
+                        cheat[i++] = 'l';
                         cheat[i++] = 'd';
                         break;
                     case INFO_T_FLOAT:

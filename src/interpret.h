@@ -26,10 +26,6 @@
 #  define TRACE_HEART_BEAT 32
 #  define TRACE_APPLY 64
 #  define TRACE_OBJNAME 128
-#  ifdef LPC_TO_C
-#    define TRACE_COMPILED 256
-#    define TRACE_LPC_EXEC 512
-#  endif
 #  define TRACETST(b) (command_giver->interactive->trace_level & (b))
 #  define TRACEP(b) \
     (command_giver && command_giver->interactive && TRACETST(b) && \
@@ -69,7 +65,7 @@ typedef struct control_stack_s {
     } fr;
     object_t *ob;               /* Current object */
     object_t *prev_ob;  /* Save previous object */
-    const program_t *prog;    /* Current program */
+    program_t *prog;    /* Current program */
     int num_local_variables;    /* Local + arguments */
     char *pc;
     svalue_t *fp;
@@ -171,10 +167,8 @@ typedef struct {
     )
 
 /* macro calls */
-#ifndef LPC_TO_C
 #define call_program(prog, offset) \
         eval_instruction(prog->program + offset)
-#endif
 
 #ifdef DEBUG
 #define free_svalue(x,y) int_free_svalue(x,y)
@@ -260,7 +254,7 @@ extern unsigned int apply_low_slots_used;
 extern unsigned int apply_low_collisions;
 extern int function_index_offset;
 extern int simul_efun_is_loading;
-extern const program_t fake_prog;
+extern program_t fake_prog;
 extern svalue_t global_lvalue_byte;
 extern int num_varargs;
 extern int st_num_arg;
@@ -272,118 +266,114 @@ extern ref_t *global_ref_list;
 extern int lv_owner_type;
 extern refed_t *lv_owner;
 
-void kill_ref PROT((ref_t *));
-ref_t *make_ref PROT((void));
+void kill_ref (ref_t *);
+ref_t *make_ref (void);
 
-/* with LPC_TO_C off, these are defines using eval_instruction */
-#ifdef LPC_TO_C
-void call_program PROT((program_t *, POINTER_INT));
-#endif
-void init_interpreter PROT((void));
-void call_direct PROT((object_t *, int, int, int));
-void eval_instruction PROT((char *p));
-INLINE void assign_svalue PROT((svalue_t *, svalue_t *));
-INLINE void assign_svalue_no_free PROT((svalue_t *, svalue_t *));
-INLINE void copy_some_svalues PROT((svalue_t *, svalue_t *, int));
-INLINE void transfer_push_some_svalues PROT((svalue_t *, int));
-INLINE void push_some_svalues PROT((svalue_t *, int));
+void init_interpreter (void);
+void call_direct (object_t *, int, int, int);
+void eval_instruction (char *p);
+INLINE void assign_svalue (svalue_t *, svalue_t *);
+INLINE void assign_svalue_no_free (svalue_t *, svalue_t *);
+INLINE void copy_some_svalues (svalue_t *, svalue_t *, int);
+INLINE void transfer_push_some_svalues (svalue_t *, int);
+INLINE void push_some_svalues (svalue_t *, int);
 #ifdef DEBUG
-INLINE void int_free_svalue PROT((svalue_t *, char *));
+INLINE void int_free_svalue (svalue_t *, char *);
 #else
-INLINE void int_free_svalue PROT((svalue_t *));
+INLINE void int_free_svalue (svalue_t *);
 #endif
-INLINE void free_string_svalue PROT((svalue_t *));
-INLINE void free_some_svalues PROT((svalue_t *, int));
-INLINE void push_object PROT((object_t *));
-INLINE void push_number PROT((int));
-INLINE void push_real PROT((float));
-INLINE void push_undefined PROT((void));
-INLINE void copy_and_push_string PROT((const char *));
-INLINE void share_and_push_string PROT((const char *));
-INLINE void push_array PROT((array_t *));
-INLINE void push_refed_array PROT((array_t *));
+INLINE void free_string_svalue (svalue_t *);
+INLINE void free_some_svalues (svalue_t *, int);
+INLINE void push_object (object_t *);
+INLINE void push_number (long);
+INLINE void push_real (float);
+INLINE void push_undefined (void);
+INLINE void copy_and_push_string (const char *);
+INLINE void share_and_push_string (const char *);
+INLINE void push_array (array_t *);
+INLINE void push_refed_array (array_t *);
 #ifndef NO_BUFFER_TYPE
-INLINE void push_buffer PROT((buffer_t *));
-INLINE void push_refed_buffer PROT((buffer_t *));
+INLINE void push_buffer (buffer_t *);
+INLINE void push_refed_buffer (buffer_t *);
 #endif
-INLINE void push_mapping PROT((mapping_t *));
-INLINE void push_refed_mapping PROT((mapping_t *));
-INLINE void push_class PROT((array_t *));
-INLINE void push_refed_class PROT((array_t *));
-INLINE void push_malloced_string PROT((char *));
-INLINE void push_shared_string PROT((char *));
-INLINE void push_constant_string PROT((const char *));
-INLINE void pop_stack PROT((void));
-INLINE void pop_n_elems PROT((int));
-INLINE void pop_2_elems PROT((void));
-INLINE void pop_3_elems PROT((void));
-INLINE function_t *setup_inherited_frame PROT((int));
-INLINE program_t *find_function_by_name PROT((object_t *, const char *, int *, int *));
-char *function_name PROT((program_t *, int));
-void remove_object_from_stack PROT((object_t *));
-void setup_fake_frame PROT((funptr_t *));
-void remove_fake_frame PROT((void));
-void push_indexed_lvalue PROT((int));
-void setup_variables PROT((int, int, int));
+INLINE void push_mapping (mapping_t *);
+INLINE void push_refed_mapping (mapping_t *);
+INLINE void push_class (array_t *);
+INLINE void push_refed_class (array_t *);
+INLINE void push_malloced_string (char *);
+INLINE void push_shared_string (char *);
+INLINE void push_constant_string (const char *);
+INLINE void pop_stack (void);
+INLINE void pop_n_elems (int);
+INLINE void pop_2_elems (void);
+INLINE void pop_3_elems (void);
+INLINE function_t *setup_inherited_frame (int);
+INLINE program_t *find_function_by_name (object_t *, const char *, int *, int *);
+char *function_name (program_t *, int);
+void remove_object_from_stack (object_t *);
+void setup_fake_frame (funptr_t *);
+void remove_fake_frame (void);
+void push_indexed_lvalue (int);
+void setup_variables (int, int, int);
 
-void process_efun_callback PROT((int, function_to_call_t *, int));
-svalue_t *call_efun_callback PROT((function_to_call_t *, int));
-const char *type_name PROT((int c));
-void bad_arg PROT((int, int));
-void bad_argument PROT((svalue_t *, int, int, int));
-void check_for_destr PROT((array_t *));
-int is_static PROT((char *, object_t *));
-int apply_low PROT((const char *, object_t *, int));
-svalue_t *apply PROT((const char *, object_t *, int, int));
-svalue_t *call_function_pointer PROT((funptr_t *, int));
-svalue_t *safe_call_function_pointer PROT((funptr_t *, int));
-svalue_t *safe_apply PROT((const char *, object_t *, int, int));
-void call___INIT PROT((object_t *));
-array_t *call_all_other PROT((array_t *, const char *, int));
-const char *function_exists PROT((const char *, object_t *, int));
-void call_function PROT((program_t *, int));
-void mark_apply_low_cache PROT((void));
-void translate_absolute_line PROT((int, unsigned short *, int *, int *));
-char *add_slash PROT((const char * const));
-int strpref PROT((char *, char *));
-array_t *get_svalue_trace PROT((void));
-void do_trace PROT((char *, char *, char *));
-const char *dump_trace PROT((int));
-void opcdump PROT((char *));
-int inter_sscanf PROT((svalue_t *, svalue_t *, svalue_t *, int));
-char * get_line_number_if_any PROT((void));
-char *get_line_number PROT((char *, const program_t *));
-void get_line_number_info PROT((const char **, int *));
-void get_version PROT((char *));
-void reset_machine PROT((int));
-void unlink_string_svalue PROT((svalue_t *));
-void copy_lvalue_range PROT((svalue_t *));
-void assign_lvalue_range PROT((svalue_t *));
-void debug_perror PROT((const char *, const char *));
+void process_efun_callback (int, function_to_call_t *, int);
+svalue_t *call_efun_callback (function_to_call_t *, int);
+const char *type_name (int c);
+void bad_arg (int, int);
+void bad_argument (svalue_t *, int, int, int);
+void check_for_destr (array_t *);
+int is_static (char *, object_t *);
+int apply_low (const char *, object_t *, int);
+svalue_t *apply (const char *, object_t *, int, int);
+svalue_t *call_function_pointer (funptr_t *, int);
+svalue_t *safe_call_function_pointer (funptr_t *, int);
+svalue_t *safe_apply (const char *, object_t *, int, int);
+void call___INIT (object_t *);
+array_t *call_all_other (array_t *, const char *, int);
+const char *function_exists (const char *, object_t *, int);
+void call_function (program_t *, int);
+void mark_apply_low_cache (void);
+void translate_absolute_line (int, unsigned short *, int *, int *);
+char *add_slash (const char * const);
+int strpref (char *, char *);
+array_t *get_svalue_trace (void);
+void do_trace (char *, char *, char *);
+const char *dump_trace (int);
+void opcdump (char *);
+int inter_sscanf (svalue_t *, svalue_t *, svalue_t *, int);
+char * get_line_number_if_any (void);
+char *get_line_number (char *, const program_t *);
+void get_line_number_info (const char **, int *);
+void get_version (char *);
+void reset_machine (int);
+void unlink_string_svalue (svalue_t *);
+void copy_lvalue_range (svalue_t *);
+void assign_lvalue_range (svalue_t *);
+void debug_perror (const char *, const char *);
 
-static int find_line PROT((char *, const program_t *, const char **, int *));
+
 
 #ifndef NO_SHADOWS
-int validate_shadowing PROT((object_t *));
+int validate_shadowing (object_t *);
 #endif
 
 #if !defined(NO_RESETS) && defined(LAZY_RESETS)
-void try_reset PROT((object_t *));
+void try_reset (object_t *);
 #endif
 
-void pop_context PROT((error_context_t *));
-void restore_context PROT((error_context_t *));
-int save_context PROT((error_context_t *));
+void pop_context (error_context_t *);
+void restore_context (error_context_t *);
+int save_context (error_context_t *);
 
-void pop_control_stack PROT((void));
-INLINE function_t *setup_new_frame PROT((int));
-INLINE void push_control_stack PROT((int));
+void pop_control_stack (void);
+INLINE function_t *setup_new_frame (int);
+INLINE void push_control_stack (int);
 
-void break_point PROT((void));
+void break_point (void);
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-void mark_svalue PROT((svalue_t *));
-void mark_stack PROT((void));
+void mark_svalue (svalue_t *);
+void mark_stack (void);
 #endif
 
 #endif                          /* _INTERPRET_H */

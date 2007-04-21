@@ -9,7 +9,6 @@
 #include "efuns_incl.h"
 #include "backend.h"
 #include "parse.h"
-#include "swap.h"
 #ifdef TRACE
 #include "comm.h"
 #endif
@@ -656,7 +655,7 @@ f_parse_command()
 }
 
 INLINE void
-f_range P1(int, code)
+f_range (int code)
 {
     int from, to, len;
 
@@ -759,7 +758,7 @@ f_range P1(int, code)
 }
 
 INLINE void
-f_extract_range P1(int, code)
+f_extract_range (int code)
 {
     int from,  len;
 
@@ -955,10 +954,10 @@ INLINE void
 f_switch()
 {
     unsigned short offset, end_off;
-    int d;
+    long d;
     POINTER_INT s;
     POINTER_INT r;
-    int i;
+    long i;
     char *l, *end_tab;
     static unsigned short off_tab[] =
     {
@@ -967,7 +966,7 @@ f_switch()
         63 * SWITCH_CASE_SIZE, 127 * SWITCH_CASE_SIZE, 
         255 * SWITCH_CASE_SIZE, 511 * SWITCH_CASE_SIZE, 
         1023 * SWITCH_CASE_SIZE, 2047 * SWITCH_CASE_SIZE, 
-        4095 * SWITCH_CASE_SIZE, 8191 * SWITCH_CASE_SIZE,
+        4095 * SWITCH_CASE_SIZE, 
     };
 
     COPY_SHORT(&offset, pc + SW_TABLE);
@@ -1003,17 +1002,17 @@ f_switch()
     } else {                    /* Integer table, check type */
         CHECK_TYPES(sp, T_NUMBER, 1, F_SWITCH);
         s = (sp--)->u.number;
-        i = (int) pc[0] & 0xf;
+        i = pc[0] & 0xf;
     }
     end_tab = pc + end_off;
     /*
      * i is the table size as a power of 2.  Tells us where to start
      * searching.  i==14 is a special case.
      */
-    if (i >= 14) {
+
+    if (i >= 13) {
         if (i == 14) {
-            char *zz = end_tab - 4;
-            
+            char *zz = end_tab - SIZEOF_LONG;
             /* fastest switch format : lookup table */
             l = pc + offset;
             COPY_INT(&d, zz);
@@ -1041,7 +1040,7 @@ f_switch()
      * r - key l is pointing at
      */
     l = pc + offset + off_tab[i];
-    d = (int) (off_tab[i] + SWITCH_CASE_SIZE) >> 1;
+    d = (off_tab[i] + SWITCH_CASE_SIZE) >> 1;
     if (d < SWITCH_CASE_SIZE)
         d = 0;
     for (;;) {
@@ -1137,7 +1136,7 @@ f_switch()
 }
 
 void
-call_simul_efun P2(unsigned short, index, int, num_arg)
+call_simul_efun (unsigned short index, int num_arg)
 {
     extern object_t *simul_efun_ob;
     
@@ -1156,7 +1155,6 @@ call_simul_efun P2(unsigned short, index, int, num_arg)
         /* Don't need to use apply() since we have the pointer directly;
          * this saves function lookup.
          */
-        DEBUG_CHECK(simul_efun_ob->flags & O_SWAPPED, "Simulefun object swapped!\n");
         call_direct(simul_efun_ob, simuls[index].index, 
                     ORIGIN_SIMUL_EFUN, num_arg);
     } else
@@ -1238,7 +1236,7 @@ f_function_constructor()
 }
 
 INLINE void
-f__evaluate PROT((void))
+f__evaluate (void)
 {
     svalue_t *v;
     svalue_t *arg = sp - st_num_arg + 1;

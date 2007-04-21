@@ -12,6 +12,7 @@
   
 #include "lpc_incl.h"
 #include "network_incl.h"
+#include "fliconv.h"
 
 #define MAX_TEXT                   2048
 #define MAX_SOCKET_PACKET_SIZE     1024
@@ -106,9 +107,10 @@ typedef struct interactive_s {
     int message_length;         /* message buffer length */
     char message_buf[MESSAGE_BUF_SIZE]; /* message buffer */
     int iflags;                 /* interactive flags */
-    int out_of_band;            /* Send a telnet sync operation            */
+    char out_of_band;           /* Send a telnet sync operation            */
     int state;                  /* Current telnet state.  Bingly wop       */
     int sb_pos;                 /* Telnet suboption negotiation stuff      */
+    struct translation *trans;
     char sb_buf[SB_SIZE];
     char slc[NSLC][2];
 } interactive_t;
@@ -169,40 +171,40 @@ extern int add_message_calls;
 extern interactive_t **all_users;
 extern int max_users;
 
-void CDECL add_vmessage PROT2V(object_t *, const char *);
-void add_message PROT((object_t *, const char *, int));
-void add_binary_message PROT((object_t *, unsigned char *, int));
+void CDECL add_vmessage (object_t *, const char *, ...);
+void add_message (object_t *, const char *, int);
+void add_binary_message (object_t *, unsigned char *, int);
 
 #ifdef SIGNAL_FUNC_TAKES_INT
-void sigalrm_handler PROT((int));
+void sigalrm_handler (int);
 #else
-void sigalrm_handler PROT((void));
+void sigalrm_handler (void);
 #endif
-void update_ref_counts_for_users PROT((void));
-INLINE void make_selectmasks PROT((void));
-void init_user_conn PROT((void));
-void init_addr_server PROT((char *, int));
-void ipc_remove PROT((void));
-void set_prompt PROT((const char *));
-INLINE void process_io PROT((void));
-int process_user_command PROT((void));
-int replace_interactive PROT((object_t *, object_t *));
-int set_call PROT((object_t *, sentence_t *, int));
-void remove_interactive PROT((object_t *, int));
-int flush_message PROT((interactive_t *));
-int query_addr_number PROT((const char *, svalue_t *));
-char *query_ip_name PROT((object_t *));
-char *query_ip_number PROT((object_t *));
-char *query_host_name PROT((void));
-int query_idle PROT((object_t *));
+void update_ref_counts_for_users (void);
+INLINE void make_selectmasks (void);
+void init_user_conn (void);
+void init_addr_server (char *, int);
+void ipc_remove (void);
+void set_prompt (const char *);
+INLINE void process_io (void);
+int process_user_command (void);
+int replace_interactive (object_t *, object_t *);
+int set_call (object_t *, sentence_t *, int);
+void remove_interactive (object_t *, int);
+int flush_message (interactive_t *);
+int query_addr_number (const char *, svalue_t *);
+char *query_ip_name (object_t *);
+char *query_ip_number (object_t *);
+char *query_host_name (void);
+int query_idle (object_t *);
 #ifndef NO_SNOOP
-int new_set_snoop PROT((object_t *, object_t *));
-object_t *query_snoop PROT((object_t *));
-object_t *query_snooping PROT((object_t *));
+int new_set_snoop (object_t *, object_t *);
+object_t *query_snoop (object_t *);
+object_t *query_snooping (object_t *);
 #endif
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-void mark_iptable PROT((void));
+void mark_iptable (void);
 #endif
 
 #endif                          /* COMM_H */

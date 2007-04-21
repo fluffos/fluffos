@@ -12,13 +12,13 @@
 
 #define MAX_RECURSION 25
 
-static void gc_mapping PROT((mapping_t *));
-static void check_svalue PROT((svalue_t *));
+static void gc_mapping (mapping_t *);
+static void check_svalue (svalue_t *);
 
 static int cleaned, nested;
 
 static void
-check_svalue P1(svalue_t *, v)
+check_svalue (svalue_t * v)
 {
     register int idx;
 
@@ -72,7 +72,7 @@ check_svalue P1(svalue_t *, v)
 }
 
 static void
-gc_mapping P1(mapping_t *, m)
+gc_mapping (mapping_t * m)
 {
     /* Be careful to correctly handle destructed mapping keys.  We can't
      * just call check_svalue() b/c the hash would be wrong and the '0'

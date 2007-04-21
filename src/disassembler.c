@@ -7,20 +7,19 @@
 #include "efuns_incl.h"
 #include "simul_efun.h"
 #include "comm.h"
-#include "swap.h"
 #include "lex.h"
 #include "file.h"
 #include "program.h"
 
 #ifdef F_DUMP_PROG
-void dump_prog PROT((program_t *, const char *, int));
-static void disassemble PROT((FILE *, char *, int, int, program_t *));
-static const char *disassem_string PROT((const char *));
-static int CDECL short_compare PROT((CONST void *, CONST void *));
-static void dump_line_numbers PROT((FILE *, program_t *));
+void dump_prog (program_t *, const char *, int);
+static void disassemble (FILE *, char *, int, int, program_t *);
+static const char *disassem_string (const char *);
+static int CDECL short_compare (CONST void *, CONST void *);
+static void dump_line_numbers (FILE *, program_t *);
 
 void
-f_dump_prog PROT((void))
+f_dump_prog (void)
 {
     program_t *prog;
     const char *where;
@@ -57,7 +56,7 @@ f_dump_prog PROT((void))
  * 2 - dump line number table
  */
 void
-dump_prog P3(program_t *, prog, const char *, fn, int, flags)
+dump_prog (program_t * prog, const char * fn, int flags)
 {
     const char *fname;
     FILE *f;
@@ -181,7 +180,7 @@ dump_prog P3(program_t *, prog, const char *, fn, int, flags)
     fclose(f);
 }
 
-static const char *disassem_string P1(const char *, str)
+static const char *disassem_string (const char * str)
 {
     static char buf[30];
     char *b;
@@ -214,7 +213,7 @@ static const char *disassem_string P1(const char *, str)
 #define CLSS     prog->classes
 
 static int CDECL
-short_compare P2(CONST void *, a, CONST void *, b)
+short_compare (CONST void * a, CONST void * b)
 {
     int x = *(unsigned short *)a;
     int y = *(unsigned short *)b;
@@ -225,11 +224,11 @@ short_compare P2(CONST void *, a, CONST void *, b)
 static const char *pushes[] = { "string", "number", "global", "local" };
 
 static void
-disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
+disassemble (FILE * f, char * code, int start, int end, program_t * prog)
 {
     extern int num_simul_efun;
 
-    int i, j, instr, iarg, is_efun, ri;
+    long i, j, instr, iarg, is_efun, ri;
     unsigned short sarg;
     unsigned short offset;
     char *pc, buff[2048];
@@ -287,7 +286,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
             i = EXTRACT_UCHAR(pc++);
             while (i--) {
                 j = EXTRACT_UCHAR(pc++);
-                fprintf(f, "%s %i", pushes[(j & PUSH_WHAT) >> 6], 
+                fprintf(f, "%s %ld", pushes[(j & PUSH_WHAT) >> 6], 
                         j & PUSH_MASK);
                 if (i)
                     fprintf(f, ", ");
@@ -433,7 +432,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
             if ((unsigned) (iarg = EXTRACT_UCHAR(pc)) < NUM_VARS)
                 sprintf(buff, "%s", variable_name(prog, iarg));
             else
-                sprintf(buff, "<out of range %d>", iarg);
+                sprintf(buff, "<out of range %ld>", iarg);
             pc++;
             break;
 
@@ -464,7 +463,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
             COPY_SHORT(&sarg, pc);
             offset = (pc - code) - (unsigned short) sarg;
             pc += 2;
-            sprintf(buff, "LV%d < %d bbranch_when_non_zero %04x (%04x)",
+            sprintf(buff, "LV%ld < %ld bbranch_when_non_zero %04x (%04x)",
                     i, iarg, sarg, offset);
             break;
         case F_LOOP_COND_LOCAL:
@@ -473,7 +472,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
             COPY_SHORT(&sarg, pc);
             offset = (pc - code) - (unsigned short) sarg;
             pc += 2;
-            sprintf(buff, "LV%d < LV%d bbranch_when_non_zero %04x (%04x)",
+            sprintf(buff, "LV%ld < LV%ld bbranch_when_non_zero %04x (%04x)",
                     i, iarg, sarg, offset);
             break;
         case F_STRING:
@@ -533,9 +532,14 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
             break;
 
         case F_NUMBER:
+
             COPY_INT(&iarg, pc);
-            sprintf(buff, "%d", iarg);
+            sprintf(buff, "%ld", iarg);
+#if SIZEOF_LONG == 4
             pc += 4;
+#else
+            pc += 8;
+#endif
             break;
 
         case F_REAL:
@@ -597,11 +601,11 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
                     i = 0;
                     while (pc < aptr + etable - 4) {
                         COPY_SHORT(&sarg, pc);
-                        fprintf(f, "\t%2d: %04x\n", i++, addr + sarg);
+                        fprintf(f, "\t%2ld: %04x\n", i++, addr + sarg);
                         pc += 2;
                     }
                     COPY_INT(&iarg, pc);
-                    fprintf(f, "\tminval = %d\n", iarg);
+                    fprintf(f, "\tminval = %ld\n", iarg);
                     pc += 4;
                 } else {
                     while (pc < aptr + etable) {
@@ -609,9 +613,9 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
                         COPY_SHORT(&sarg, pc + SIZEOF_PTR);
                         if (ttype == 1 || !parg) {
                             if (sarg == 1)
-                                fprintf(f, "\t%-4d\t<range start>\n", (int)parg);
+                                fprintf(f, "\t%-4ld\t<range start>\n", (long)parg);
                             else
-                                fprintf(f, "\t%-4d\t%04x\n", (int)parg, addr+sarg);
+                                fprintf(f, "\t%-4ld\t%04x\n", (long)parg, addr+sarg);
                         } else {
                             fprintf(f, "\t\"%s\"\t%04x\n",
                             disassem_string(parg), addr+sarg);
@@ -631,7 +635,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
         case F_EFUN3:
             instr = EXTRACT_UCHAR(pc++) + ONEARG_MAX;
             if (instrs[instr].min_arg != instrs[instr].max_arg) {
-                sprintf(buff, "%d", instr - F_EFUN0);
+                sprintf(buff, "%ld", instr - F_EFUN0);
             }
             break;
         case 0:
@@ -648,7 +652,7 @@ disassemble P5(FILE *, f, char *, code, int, start, int, end, program_t *, prog)
 #define INCLUDE_DEPTH 10
 
 static void
-dump_line_numbers P2(FILE *, f, program_t *, prog) {
+dump_line_numbers (FILE * f, program_t * prog) {
     unsigned short *fi;
     unsigned char *li_start;
     unsigned char *li_end;
@@ -658,11 +662,8 @@ dump_line_numbers P2(FILE *, f, program_t *, prog) {
     ADDRESS_TYPE s;
 
     if (!prog->line_info) {
-        load_line_numbers(prog);
-        if (!prog->line_info) {
-            fprintf(f, "Failed to load line numbers\n");
-            return;
-        }
+	fprintf(f, "Failed to load line numbers\n");
+	return;
     }
 
     fi = prog->file_info;
@@ -682,7 +683,7 @@ dump_line_numbers P2(FILE *, f, program_t *, prog) {
     fprintf(f,"\naddress -> absolute line table:\n");
     while (li < li_end) {
         sz = *li++;
-#if !defined(USE_32BIT_ADDRESSES) && !defined(LPC_TO_C)
+#if !defined(USE_32BIT_ADDRESSES) 
         COPY_SHORT(&s, li);
 #else
         COPY_INT(&s, li);

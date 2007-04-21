@@ -9,7 +9,7 @@
 			islower(x) ? (x) + 10 - 'a' : (x) + 10 - 'A')
 #define MBASE	('z' - 'a' + 1 + 10)
 
-long strtol P3(register char *, str, char **, ptr, register int, base)
+long strtol (register char * str, char ** ptr, register int base)
 {
     register long val;
     register int c;
@@ -53,7 +53,7 @@ long strtol P3(register char *, str, char **, ptr, register int, base)
     return (neg ? val : -val);
 }
 
-strcspn P2(register char *, s, char *, set)
+strcspn (register char * s, char * set)
 {
     register char *t;
     register int count = 0;
@@ -73,7 +73,7 @@ strcspn P2(register char *, s, char *, set)
 }
 
 
-INLINE char *memset P3(char *, s, int, c, int, n)
+INLINE char *memset (char * s, int c, int n)
 {
     if (c == 0)
 	bzero(s, n);
@@ -83,7 +83,7 @@ INLINE char *memset P3(char *, s, int, c, int, n)
     }
 }
 
-INLINE char *memcpy P3(char *, b, char *, a, int, s)
+INLINE char *memcpy (char * b, char * a, int s)
 {
     bcopy(a, b, s);
     return b;

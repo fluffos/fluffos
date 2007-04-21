@@ -3,8 +3,8 @@
 
 #include "lpc_incl.h"
 
-int replace_program_pending PROT((object_t *));
-void replace_programs PROT((void));
+int replace_program_pending (object_t *);
+void replace_programs (void);
 
 typedef struct replace_ob_s {
     object_t *ob;

@@ -29,8 +29,8 @@ function_lookup_info_t *simuls = 0;
 int num_simul_efun = 0;
 object_t *simul_efun_ob;
 
-static void find_or_add_simul_efun PROT((function_t *, int));
-static void remove_simuls PROT((void));
+static void find_or_add_simul_efun (function_t *, int);
+static void remove_simuls (void);
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_simuls() {
@@ -45,12 +45,9 @@ void mark_simuls() {
  * If there is a simul_efun file, then take care of it and extract all
  * information we need.
  */
-void init_simul_efun P1(char *, file)
+void init_simul_efun (char * file)
 {
     char buf[512];
-#ifdef LPC_TO_C
-    lpc_object_t *compiled_version;
-#endif
     object_t *new_ob;
     
     if (!file || !file[0]) {
@@ -60,10 +57,6 @@ void init_simul_efun P1(char *, file)
     if (!strip_name(file, buf, sizeof buf))
         error("Ilegal simul_efun file name '%s'\n", file);
     
-#ifdef LPC_TO_C
-    compiled_version = (lpc_object_t *)lookup_object_hash(buf);
-#endif
-
     if (file[strlen(file) - 2] != '.')
         strcat(buf, ".c");
 
@@ -95,7 +88,7 @@ static void remove_simuls() {
 }
 
 static
-void get_simul_efuns P1(program_t *, prog)
+void get_simul_efuns (program_t * prog)
 {
     int i;
     int num_new = prog->num_functions_defined + prog->last_inherited;
@@ -140,7 +133,7 @@ void get_simul_efuns P1(program_t *, prog)
  * Define a new simul_efun
  */
 static void
-find_or_add_simul_efun P2(function_t *, funp, int, runtime_index) {
+find_or_add_simul_efun (function_t * funp, int runtime_index) {
     ident_hash_elem_t *ihe;
     int first = 0;
     int last = num_simul_efun - 1;
@@ -176,7 +169,7 @@ find_or_add_simul_efun P2(function_t *, funp, int, runtime_index) {
 }
 
 void
-set_simul_efun P1(object_t *, ob) {
+set_simul_efun (object_t * ob) {
     get_simul_efuns(ob->prog);
     
     simul_efun_ob = ob;

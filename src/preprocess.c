@@ -1,8 +1,8 @@
 /* WARNING: This file is #included into two places, since the definition
    of malloc() differs.  Be careful. */
 
-static int cond_get_exp PROT((int));
-static void handle_cond PROT((int));
+static int cond_get_exp (int);
+static void handle_cond (int);
 
 #ifndef LEXER
 #undef DXALLOC
@@ -18,7 +18,7 @@ static void handle_cond PROT((int));
 static defn_t *defns[DEFHASH];
 static ifstate_t *iftop = 0;
 
-static defn_t *lookup_definition P1(const char *, s)
+static defn_t *lookup_definition (const char * s)
 {
     defn_t *p;
     int h;
@@ -30,7 +30,7 @@ static defn_t *lookup_definition P1(const char *, s)
     return 0;
 }
 
-defn_t *lookup_define P1(const char *, s)
+defn_t *lookup_define (const char * s)
 {
     defn_t *p = lookup_definition(s);
 
@@ -40,7 +40,7 @@ defn_t *lookup_define P1(const char *, s)
         return p;
 }
 
-static void add_define P3(const char *, name, int, nargs, char *, exps)
+static void add_define (const char * name, int nargs, char * exps)
 {
     defn_t *p = lookup_definition(name);
     int h, len;
@@ -100,7 +100,7 @@ static void add_define P3(const char *, name, int, nargs, char *, exps)
 }
 
 #ifdef LEXER
-static void handle_elif P1(char *, sp) 
+static void handle_elif (char * sp) 
 #else
 static void handle_elif() 
 #endif
@@ -141,7 +141,7 @@ static void handle_elif()
     }
 }
 
-static void handle_else PROT((void)) {
+static void handle_else (void) {
     if (iftop) {
         if (iftop->state == EXPECT_ELSE) {
             iftop->state = EXPECT_ENDIF;
@@ -153,7 +153,7 @@ static void handle_else PROT((void)) {
     }
 }
 
-static void handle_endif PROT((void)) {
+static void handle_endif (void) {
     if (iftop && (iftop->state == EXPECT_ENDIF ||
                   iftop->state == EXPECT_ELSE)) {
         ifstate_t *p = iftop;
@@ -203,7 +203,7 @@ static char optab2[] =
 
 #define optab1 (_optab-' ')
 
-static int cond_get_exp P1(int, priority)
+static int cond_get_exp (int priority)
 {
     int c;
     int value, value2, x;
@@ -410,7 +410,7 @@ static int cond_get_exp P1(int, priority)
 }
 
 static void
-handle_cond P1(int, c)
+handle_cond (int c)
 {
     ifstate_t *p;
 

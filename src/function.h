@@ -20,11 +20,7 @@ typedef struct {
     /* these two must come first */
     unsigned char num_arg;
     unsigned char num_local;
-#ifndef LPC_TO_C
     short offset;
-#else
-    POINTER_INT offset;
-#endif
     struct program_s *prog;
     short fio, vio;
     char lpccode[80];
@@ -56,15 +52,15 @@ union string_or_func {
     char *s;
 };
 
-void dealloc_funp PROT((funptr_t *));
-void push_refed_funp PROT((funptr_t *));
-INLINE void push_funp PROT((funptr_t *));
-INLINE void free_funp PROT((funptr_t *));
-int merge_arg_lists PROT((int, struct array_s *, int));
-INLINE funptr_t *make_efun_funp PROT((int, struct svalue_s *));
-INLINE funptr_t *make_lfun_funp PROT((int, struct svalue_s *));
-INLINE funptr_t *make_simul_funp PROT((int, struct svalue_s *));
-INLINE funptr_t *make_functional_funp PROT((short, short, short, 
-					    struct svalue_s *, int));
+void dealloc_funp (funptr_t *);
+void push_refed_funp (funptr_t *);
+INLINE void push_funp (funptr_t *);
+INLINE void free_funp (funptr_t *);
+int merge_arg_lists (int, struct array_s *, int);
+INLINE funptr_t *make_efun_funp (int, struct svalue_s *);
+INLINE funptr_t *make_lfun_funp (int, struct svalue_s *);
+INLINE funptr_t *make_simul_funp (int, struct svalue_s *);
+INLINE funptr_t *make_functional_funp (short, short, short, 
+					    struct svalue_s *, int);
 
 #endif

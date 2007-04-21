@@ -6,13 +6,13 @@ typedef struct {
     char *buffer;
 } outbuffer_t;
 
-void outbuf_zero PROT((outbuffer_t *));
-void outbuf_add PROT((outbuffer_t *, const char *));
-void outbuf_addchar PROT((outbuffer_t *, char));
-void CDECL outbuf_addv PROT2V(outbuffer_t *, const char *);
-void outbuf_fix PROT((outbuffer_t *));
-void outbuf_push PROT((outbuffer_t *));
-int outbuf_extend PROT((outbuffer_t *, int));
+void outbuf_zero (outbuffer_t *);
+void outbuf_add (outbuffer_t *, const char *);
+void outbuf_addchar (outbuffer_t *, char);
+void CDECL outbuf_addv (outbuffer_t *, const char *, ...);
+void outbuf_fix (outbuffer_t *);
+void outbuf_push (outbuffer_t *);
+int outbuf_extend (outbuffer_t *, int);
 
 #include "bsdmalloc.h"
 #include "smalloc.h"

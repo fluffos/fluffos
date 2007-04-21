@@ -64,7 +64,12 @@ object *all_previous_objects previous_object(int default: -1);
 mixed *call_stack(int default: 0);
 int sizeof(mixed);
 int strlen sizeof(string);
-void destruct(object);
+#ifdef USE_ICONV
+int strwidth(string);
+#else
+int strwidth sizeof(string);
+#endif
+void destruct(object default: F__THIS_OBJECT);
 string file_name(object default: F__THIS_OBJECT);
 string capitalize(string);
 string *explode(string, string);
@@ -165,7 +170,7 @@ void message(mixed, mixed, string | string * | object | object *,
     int nullp undefinedp(mixed);
     int floatp(mixed);
     int stringp(mixed);
-    int virtualp(object);
+    int virtualp(object default: F__THIS_OBJECT);
     int functionp(mixed);
 #ifdef COMPAT_32
     int closurep functionp(mixed);
@@ -181,7 +186,7 @@ void message(mixed, mixed, string | string * | object | object *,
     buffer allocate_buffer(int);
 #endif
 
-    int inherits(string, object);
+    int inherits(string, object default: F__THIS_OBJECT);
     void replace_program(string);
 
     mixed regexp(string | string *, string, void | int);
@@ -224,7 +229,7 @@ void message(mixed, mixed, string | string * | object | object *,
     string crypt(string, string | int);
     string oldcrypt(string, string | int);
    
-    string ctime(int);
+    string ctime(int|void);
     int exec(object, object);
     mixed *localtime(int);
     string function_exists(string, void | object, void | int);
@@ -247,11 +252,6 @@ void message(mixed, mixed, string | string * | object | object *,
     void set_heart_beat(int);
     int query_heart_beat(object default:F__THIS_OBJECT);
     void set_hide(int);
-
-#ifdef LPC_TO_C
-    int generate_source(string | string *, void | string);
-    string lpc_info();
-#endif
 
 #ifndef NO_RESETS
     void set_reset(object, void | int);
@@ -392,10 +392,17 @@ void message(mixed, mixed, string | string * | object | object *,
     mapping *function_profile(object default:F__THIS_OBJECT);
 #endif
 
-#ifdef DEBUG
-    void swap(object);          /* Only used for debugging */
-#endif
     int resolve(string, string|function);
-
+#ifdef USE_ICONV
+    int set_encoding(string);
+    string to_utf8(string, string);
+    string utf8_to(string, string);
+    int *str_to_arr(string);
+    string arr_to_str(int *);
+#endif
+    void act_mxp();
+    void request_term_type();
+    void start_request_term_type();
+    void request_term_size();
 /* shutdown is at the end because it is only called once per boot cycle :) */
     void shutdown(void | int);

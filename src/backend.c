@@ -5,7 +5,6 @@
 #include "comm.h"
 #include "replace_program.h"
 #include "socket_efuns.h"
-#include "swap.h"
 #include "call_out.h"
 #include "port.h"
 #include "lint.h"
@@ -14,7 +13,7 @@
 
 #ifdef WIN32
 #include <process.h>
-void CDECL alarm_loop PROT((void *));
+void CDECL alarm_loop (void *);
 #endif
 
 error_context_t *current_error_context = 0;
@@ -22,14 +21,14 @@ error_context_t *current_error_context = 0;
 /*
  * The 'current_time' is updated in the call_out cycles
  */
-int current_time;
+long current_time;
 
 object_t *current_heart_beat;
-static void look_for_objects_to_swap PROT((void));
-void call_heart_beat PROT((void));
+static void look_for_objects_to_swap (void);
+void call_heart_beat (void);
 
 #if 0
-static void report_holes PROT((void));
+static void report_holes (void);
 #endif
 
 /*
@@ -69,7 +68,7 @@ static void report_holes() {
 }
 #endif
 
-void logon P1(object_t *, ob)
+void logon (object_t * ob)
 {
   if(ob->flags & O_DESTRUCTED){
     return;
@@ -178,8 +177,7 @@ void backend()
  *     delay to next reset has passed, then reset() will be done.
  *
  *   . If the object has a existed more than the time limit given for swapping,
- *     then 'clean_up' will first be called in the object, after which it will
- *     be swapped out if it still exists.
+ *     then 'clean_up' will first be called in the object
  *
  * There are some problems if the object self-destructs in clean_up, so
  * special care has to be taken of how the linked list is used.
@@ -223,7 +221,6 @@ static void look_for_objects_to_swap()
   restore_context(&econ);
     
     while ((ob = (object_t *)next_ob)) {
-  int ready_for_swap = 0;
   int ready_for_clean_up = 0;
 
   set_eval(max_cost);
@@ -235,8 +232,6 @@ static void look_for_objects_to_swap()
   /*
    * Check reference time before reset() is called.
    */
-  if (current_time - ob->time_of_ref > time_to_swap)
-      ready_for_swap = 1;
   if (current_time - ob->time_of_ref > time_to_clean_up)
       ready_for_clean_up = 1;
 #if !defined(NO_RESETS) && !defined(LAZY_RESETS)
@@ -285,7 +280,7 @@ static void look_for_objects_to_swap()
      * keeping them around seems justified.
      */
 
-    push_number(ob->flags & (O_CLONE | O_SWAPPED) ? 0 : ob->prog->ref);
+    push_number(ob->flags & (O_CLONE) ? 0 : ob->prog->ref);
     svp = apply(APPLY_CLEAN_UP, ob, 1, ORIGIN_DRIVER);
     if (ob->flags & O_DESTRUCTED)
         continue;
@@ -293,24 +288,6 @@ static void look_for_objects_to_swap()
         ob->flags &= ~O_WILL_CLEAN_UP;
     ob->flags |= save_reset_state;
       }
-  }
-  if (time_to_swap > 0) {
-      /*
-       * At last, there is a possibility that the object can be swapped
-       * out.  Always swap out line number information.  If already
-       * swapped, not time yet, or the object has a heart_beat, don't
-       * swap.
-       */
-
-      if (ob->prog && ob->prog->line_info)
-    swap_line_numbers(ob->prog);
-      if (ob->flags & O_SWAPPED || !ready_for_swap)
-    continue;
-      if (ob->flags & O_HEART_BEAT)
-    continue;
-
-      debug(d_flag, ("swap /%s\n", ob->obname));
-      swap(ob);   /* See if it is possible to swap out to disk */
   }
     }
     pop_context(&econ);
@@ -345,7 +322,7 @@ static int num_hb_calls = 0;  /* starts */
 static float perc_hb_probes = 100.0;  /* decaying avge of how many complete */
 
 #ifdef WIN32
-void CDECL alarm_loop P1(void *, ignore)
+void CDECL alarm_loop (void * ignore)
 {
     while (1) {
   Sleep(HEARTBEAT_INTERVAL / 1000);
@@ -378,8 +355,6 @@ void call_heart_beat()
       ob = (curr_hb = &heart_beats[heart_beat_index])->ob;
       DEBUG_CHECK(!(ob->flags & O_HEART_BEAT),
 		  "Heartbeat not set in object on heartbeat list!");
-      DEBUG_CHECK(ob->flags & O_SWAPPED,
-		  "Heartbeat in swapped object.\n");
       /* is it time to do a heart beat ? */
       curr_hb->heart_beat_ticks--;
       
@@ -434,7 +409,7 @@ void call_heart_beat()
 }       /* call_heart_beat() */
 
 int
-query_heart_beat P1(object_t *, ob)
+query_heart_beat (object_t * ob)
 {
     int index;
     
@@ -452,7 +427,7 @@ query_heart_beat P1(object_t *, ob)
  * various pointers in call_heart_beat could be stuffed, so we must
  * check current_heart_beat and adjust pointers.  */
 
-int set_heart_beat P2(object_t *, ob, int, to)
+int set_heart_beat (object_t * ob, int to)
 {
     int index;
     
@@ -518,7 +493,7 @@ int set_heart_beat P2(object_t *, ob, int, to)
     return 1;
 }
 
-int heart_beat_status P2(outbuffer_t *, ob, int, verbose)
+int heart_beat_status (outbuffer_t * ob, int verbose)
 {
     char buf[20];
 
@@ -543,7 +518,7 @@ int heart_beat_status P2(outbuffer_t *, ob, int, verbose)
  *
  * The master object is asked to do the actual loading.
  */
-void preload_objects P1(int, eflag)
+void preload_objects (int eflag)
 {
     VOLATILE array_t *prefiles;
     svalue_t *ret;
@@ -629,7 +604,7 @@ void update_load_av()
 static double compile_av = 0.0;
 
 void
-update_compile_av P1(int, lines)
+update_compile_av (int lines)
 {
     static int last_time;
     int n;

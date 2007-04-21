@@ -28,32 +28,32 @@ static int conn_fd;
 
 fd_set readmask;
 
-int name_by_ip PROT((int, char *));
-int ip_by_name PROT((int, char *));
-INLINE_STATIC void process_queue PROT((void));
-void init_conns PROT((void));
-void init_conn_sock PROT((int, char *));
+int name_by_ip (int, char *);
+int ip_by_name (int, char *);
+INLINE_STATIC void process_queue (void);
+void init_conns (void);
+void init_conn_sock (int, char *);
 
 #ifdef SIGNAL_FUNC_TAKES_INT
-void sigpipe_handler PROT((int));
+void sigpipe_handler (int);
 #else
-void sigpipe_handler PROT((void));
+void sigpipe_handler (void);
 #endif
 
-INLINE void aserv_process_io PROT((int));
-void enqueue_datapending PROT((int, int));
-void handle_top_event PROT((void));
-void dequeue_top_event PROT((void));
-void pop_queue_element PROT((queue_element_ptr *));
-void push_queue_element PROT((queue_element_ptr));
-void new_conn_handler PROT((void));
-void conn_data_handler PROT((int));
-int index_by_fd PROT((int));
-void terminate PROT((int));
+INLINE void aserv_process_io (int);
+void enqueue_datapending (int, int);
+void handle_top_event (void);
+void dequeue_top_event (void);
+void pop_queue_element (queue_element_ptr *);
+void push_queue_element (queue_element_ptr);
+void new_conn_handler (void);
+void conn_data_handler (int);
+int index_by_fd (int);
+void terminate (int);
 
-void debug_perror PROT((char *, char *));
+void debug_perror (char *, char *);
 
-void debug_perror P2(char *, what, char *, file) {
+void debug_perror (char * what, char * file) {
     if (file)
 	fprintf(stderr, "System Error: %s:%s:%s\n", what, file, port_strerror(errno));
     else
@@ -79,7 +79,7 @@ void init_conns()
 /*
  * Initialize connection socket.
  */
-void init_conn_sock P2(int, port_num, char *, ipaddress)
+void init_conn_sock (int port_num, char * ipaddress)
 {
     struct sockaddr_in sin;
     int sin_len;
@@ -158,7 +158,7 @@ void init_conn_sock P2(int, port_num, char *, ipaddress)
  * SIGPIPE handler -- does very little for now.
  */
 #ifdef SIGNAL_FUNC_TAKES_INT
-void sigpipe_handler P1(int, sig)
+void sigpipe_handler (int sig)
 {
 #else
 void sigpipe_handler()
@@ -170,7 +170,7 @@ void sigpipe_handler()
 /*
  * I/O handler.
  */
-INLINE void aserv_process_io P1(int, nb)
+INLINE void aserv_process_io (int nb)
 {
     int i;
 
@@ -211,7 +211,7 @@ INLINE_STATIC void process_queue()
     }
 }
 
-void enqueue_datapending P2(int, fd, int, fd_type)
+void enqueue_datapending (int fd, int fd_type)
 {
     queue_element_ptr new_queue_element;
 
@@ -240,7 +240,7 @@ void dequeue_top_event()
     }
 }
 
-void pop_queue_element P1(queue_element_ptr *, the_queue_element)
+void pop_queue_element (queue_element_ptr * the_queue_element)
 {
     if ((*the_queue_element = stack_head))
 	stack_head = stack_head->next;
@@ -249,7 +249,7 @@ void pop_queue_element P1(queue_element_ptr *, the_queue_element)
     queue_length++;
 }
 
-void push_queue_element P1(queue_element_ptr, the_queue_element)
+void push_queue_element (queue_element_ptr the_queue_element)
 {
     the_queue_element->next = stack_head;
     stack_head = the_queue_element;
@@ -329,7 +329,7 @@ void new_conn_handler()
     fprintf(stderr, "new_conn_handler: sanity check failed!\n");
 }
 
-void conn_data_handler P1(int, fd)
+void conn_data_handler (int fd)
 {
     int conn_index;
     int buf_index;
@@ -490,7 +490,7 @@ void conn_data_handler P1(int, fd)
 
 #define OUT_BUF_SIZE 80
 
-int ip_by_name P2(int, conn_index, char *, buf)
+int ip_by_name (int conn_index, char * buf)
 {
     struct hostent *hp;
     struct in_addr my_in_addr;
@@ -514,7 +514,7 @@ int ip_by_name P2(int, conn_index, char *, buf)
     }
 }				/* ip_by_name() */
 
-int name_by_ip P2(int, conn_index, char *, buf)
+int name_by_ip (int conn_index, char * buf)
 {
     long addr;
     struct hostent *hp;
@@ -540,7 +540,7 @@ int name_by_ip P2(int, conn_index, char *, buf)
     }
 }
 
-int index_by_fd P1(int, fd)
+int index_by_fd (int fd)
 {
     int i;
 
@@ -551,7 +551,7 @@ int index_by_fd P1(int, fd)
     return (-1);
 }
 
-void terminate P1(int, conn_index)
+void terminate (int conn_index)
 {
     if (conn_index < 0 || conn_index >= MAX_CONNS) {
 	fprintf(stderr, "terminate: conn_index %d out of range.\n", conn_index);
@@ -571,7 +571,7 @@ void terminate P1(int, conn_index)
     total_conns--;
 }
 
-int main P2(int, argc, char **, argv)
+int main (int argc, char ** argv)
 {
     int addr_server_port;
     struct timeval timeout;

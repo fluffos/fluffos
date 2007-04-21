@@ -1,6 +1,7 @@
 /* This is to make emacs edit this in C mode: -*-C-*- */
 
 %{
+extern char *outp;
 #include "std.h"
 #include "compiler.h"
 #include "lex.h"
@@ -36,7 +37,7 @@ int func_present;
 /*
  * bison & yacc don't prototype this in y.tab.h
  */
-int yyparse PROT((void));
+int yyparse (void);
 
 %}
 /*
@@ -129,7 +130,7 @@ int yyparse PROT((void));
 %union
 {
     POINTER_INT pointer_int;
-    int number;
+    long number;
     float real;
     char *string;
     int type;
@@ -1187,7 +1188,7 @@ for:
 		$7 = pop_value($7);
 		if ($7 && IS_NODE($7, NODE_UNARY_OP, F_INC)
 		    && IS_NODE($7->r.expr, NODE_OPCODE_1, F_LOCAL_LVALUE)) {
-		    int lvar = $7->r.expr->l.number;
+		    long lvar = $7->r.expr->l.number;
 		    CREATE_OPCODE_1($7, F_LOOP_INCR, 0, lvar);
 		}
 
@@ -1380,6 +1381,33 @@ first_for_expr:
                 $$->v.expr = $4;
 
                 add_to_mem_block(A_CASES, (char *)&($2), sizeof($2));
+            }
+    |   L_CASE case_label L_RANGE ':'
+            {
+	        if ( $2->kind != NODE_CASE_NUMBER )
+                    yyerror("String case labels not allowed as range bounds");
+
+		context |= SWITCH_RANGES;
+
+                $$ = $2;
+                $$->v.expr = new_node();
+		$$->v.expr->kind = NODE_CASE_NUMBER;
+		$$->v.expr->r.number = ((unsigned long)-1)/2; //maxint
+
+                add_to_mem_block(A_CASES, (char *)&($2), sizeof($2));
+            }
+    |   L_CASE L_RANGE case_label ':'
+            {
+	      if ( $3->kind != NODE_CASE_NUMBER )
+                    yyerror("String case labels not allowed as range bounds");
+
+		context |= SWITCH_RANGES;
+		$$ = new_node();
+		$$->kind = NODE_CASE_NUMBER;
+                $$->r.number = (long) 1+ ((unsigned long)-1)/2; //maxint +1 wraps to min_int, on all computers i know, just not in the C standard iirc 
+                $$->v.expr = $3;
+
+                add_to_mem_block(A_CASES, (char *)&($$), sizeof($$));
             }
     |  L_DEFAULT ':'
             {
@@ -1577,7 +1605,6 @@ expr0:
 		    char buf[256];
 		    char *end = EndOf(buf);
 		    char *p;
-		    
 		    p = strput(buf, end, "Bad assignment ");
 		    p = get_two_types(p, end, l->type, r->type);
 		    p = strput(p, end, ".");
@@ -1930,7 +1957,7 @@ add_error:
 		case NODE_STRING:
 		    if ($3->kind == NODE_STRING) {
 			/* Combine strings */
-			int n1, n2;
+			long n1, n2;
 			const char *s1, *s2;
 			char *new;
 			int l;
@@ -2994,6 +3021,10 @@ expr4:
     |   l_new_function_open ':' ')'
 %endif
             {
+#ifdef WOMBLES
+	        if(*(outp-2) != ':')
+		  yyerror("End of functional not found");
+#endif
 		$$ = new_node();
 		$$->kind = NODE_FUNCTION_CONSTRUCTOR;
 		$$->type = TYPE_FUNCTION;
@@ -3027,6 +3058,10 @@ expr4:
 	    }
     |   l_new_function_open ',' expr_list2 ':' ')'
             {
+#ifdef WOMBLES
+	        if(*(outp-2) != ':')
+		  yyerror("End of functional not found");
+#endif
 		$$ = new_node();
 		$$->kind = NODE_FUNCTION_CONSTRUCTOR;
 		$$->type = TYPE_FUNCTION;
@@ -3039,7 +3074,7 @@ expr4:
 		    int f = $1 >>8;
 		    int num = $3->kind;
 		    int max_arg = predefs[f].max_args;
-		    if(f!=-1)
+		    if(f!=-1){
 		      if (num > max_arg && max_arg != -1) {
 			parse_node_t *pn = $3;
 			
@@ -3106,6 +3141,7 @@ expr4:
 			    enode = enode->r.expr;
 			}
 		      }
+		    }
 		    break;
 		}
 		case FP_L_VAR:
@@ -3116,6 +3152,10 @@ expr4:
 	    }
     |   L_FUNCTION_OPEN comma_expr ':' ')'
              {
+#ifdef WOMBLES
+	         if(*(outp-2) != ':')
+		   yyerror("End of functional not found");
+#endif
 		 if (current_function_context->num_locals)
 		     yyerror("Illegal to use local variable in functional.");
 		 if (current_function_context->values_list->r.expr)
@@ -3134,10 +3174,18 @@ expr4:
              }
     |   L_MAPPING_OPEN expr_list3 ']' ')'
 	    {
+#ifdef WOMBLES
+	        if(*(outp-2) != ']')
+		  yyerror("End of mapping not found");
+#endif
 		CREATE_CALL($$, F_AGGREGATE_ASSOC, TYPE_MAPPING, $2);
 	    }
     |   L_ARRAY_OPEN expr_list '}' ')'
 	    {
+#ifdef WOMBLES
+	        if(*(outp-2) != '}')
+		  yyerror("End of array not found");
+#endif  
 		CREATE_CALL($$, F_AGGREGATE, TYPE_ANY | TYPE_MOD_ARRAY, $2);
 	    }
     ;

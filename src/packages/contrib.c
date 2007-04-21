@@ -5,7 +5,6 @@
 #include "/file_incl.h"
 #include "/file.h"
 #include "/backend.h"
-#include "/swap.h"
 #include "/compiler.h"
 #include "/main.h"
 #include "/eoperators.h"
@@ -17,7 +16,6 @@
 #include "../file_incl.h"
 #include "../file.h"
 #include "../backend.h"
-#include "../swap.h"
 #include "../compiler.h"
 #include "../main.h"
 #include "../eoperators.h"
@@ -35,14 +33,14 @@
 
 #ifdef F_REAL_TIME
 void
-f_real_time PROT((void))
+f_real_time (void)
 {
     push_number(time(NULL));
 }
 #endif
 
 #ifdef F_COMPRESSEDP
-void f_compressedp PROT((void))
+void f_compressedp (void)
 {
   int i;
 
@@ -111,7 +109,7 @@ void f_named_livings() {
 /* I forgot who wrote this, please claim it :) */
 #ifdef F_REMOVE_SHADOW
 void
-f_remove_shadow PROT((void))
+f_remove_shadow (void)
 {
     object_t *ob;
     
@@ -137,7 +135,7 @@ f_remove_shadow PROT((void))
    when I added it (added function support, etc) -Beek */
 #ifdef F_QUERY_NOTIFY_FAIL
 void
-f_query_notify_fail PROT((void)) {
+f_query_notify_fail (void) {
     char *p;
 
     if (command_giver && command_giver->interactive) {
@@ -160,7 +158,7 @@ f_query_notify_fail PROT((void)) {
 /* Beek again */
 #ifdef F_STORE_VARIABLE
 void
-f_store_variable PROT((void)) {
+f_store_variable (void) {
     int idx;
     svalue_t *sv;
     unsigned short type;
@@ -177,7 +175,7 @@ f_store_variable PROT((void)) {
 
 #ifdef F_FETCH_VARIABLE
 void
-f_fetch_variable PROT((void)) {
+f_fetch_variable (void) {
     int idx;
     svalue_t *sv;
     unsigned short type;
@@ -194,7 +192,7 @@ f_fetch_variable PROT((void)) {
 /* Beek */
 #ifdef F_SET_PROMPT
 void
-f_set_prompt PROT((void)) {
+f_set_prompt (void) {
     object_t *who;
     if (st_num_arg == 2) {
         who = sp->u.ob;
@@ -217,9 +215,9 @@ f_set_prompt PROT((void)) {
 #ifdef F_COPY
 static int depth;
 
-static void deep_copy_svalue PROT((svalue_t *, svalue_t *));
+static void deep_copy_svalue (svalue_t *, svalue_t *);
 
-static array_t *deep_copy_array P1( array_t *, arg ) {
+static array_t *deep_copy_array ( array_t * arg ) {
     array_t *vec;
     int i;
     
@@ -230,7 +228,7 @@ static array_t *deep_copy_array P1( array_t *, arg ) {
     return vec;
 }
 
-static array_t *deep_copy_class P1(array_t *, arg) {
+static array_t *deep_copy_class (array_t * arg) {
     array_t *vec;
     int i;
     
@@ -241,7 +239,7 @@ static array_t *deep_copy_class P1(array_t *, arg) {
     return vec;
 }
 
-static int doCopy P3( mapping_t *, map, mapping_node_t *, elt, mapping_t *, dest) {
+static int doCopy ( mapping_t * map, mapping_node_t * elt, mapping_t * dest) {
     svalue_t *sv;
     
     sv = find_for_insert(dest, &elt->values[0], 1);
@@ -254,7 +252,7 @@ static int doCopy P3( mapping_t *, map, mapping_node_t *, elt, mapping_t *, dest
     return 0;
 }
 
-static mapping_t *deep_copy_mapping P1( mapping_t *, arg ) {
+static mapping_t *deep_copy_mapping ( mapping_t * arg ) {
     mapping_t *map;
     
     map = allocate_mapping( 0 ); /* this should be fixed.  -Beek */
@@ -262,7 +260,7 @@ static mapping_t *deep_copy_mapping P1( mapping_t *, arg ) {
     return map;
 }
 
-static void deep_copy_svalue P2(svalue_t *, from, svalue_t *, to) {
+static void deep_copy_svalue (svalue_t * from, svalue_t * to) {
     switch (from->type) {
     case T_ARRAY:
         depth++;
@@ -309,7 +307,7 @@ static void deep_copy_svalue P2(svalue_t *, from, svalue_t *, to) {
     }
 }
 
-void f_copy PROT((void))
+void f_copy (void)
 {
     svalue_t ret;
     
@@ -323,7 +321,7 @@ void f_copy PROT((void))
 /* Gudu@VR */    
 /* flag and extra info by Beek */
 #ifdef F_FUNCTIONS
-void f_functions PROT((void)) {
+void f_functions (void) {
     int i, j, num, ind;
     array_t *vec, *subvec;
     function_t *funp;
@@ -334,9 +332,6 @@ void f_functions PROT((void)) {
     char *end = EndOf(buf);
     program_t *progp;
     
-    if (sp->u.ob->flags & O_SWAPPED) 
-        load_ob_from_swap(sp->u.ob);
-
     progp = sp->u.ob->prog;
     num = progp->num_functions_defined + progp->last_inherited;
     if (progp->num_functions_defined &&
@@ -423,7 +418,7 @@ void f_functions PROT((void)) {
 
 /* Beek */
 #ifdef F_VARIABLES
-static void fv_recurse P5(array_t *, arr, int *, idx, program_t *, prog, int, type, int, flag) {
+static void fv_recurse (array_t * arr, int * idx, program_t * prog, int type, int flag) {
     int i;
     array_t *subarr;
     char buf[256];
@@ -453,14 +448,11 @@ static void fv_recurse P5(array_t *, arr, int *, idx, program_t *, prog, int, ty
     *idx += prog->num_variables_defined;
 }
 
-void f_variables PROT((void)) {
+void f_variables (void) {
     int idx = 0;
     array_t *arr;
     int flag = (sp--)->u.number;
     program_t *prog = sp->u.ob->prog;
-    
-    if (sp->u.ob->flags & O_SWAPPED)
-        load_ob_from_swap(sp->u.ob);
     
     arr = allocate_empty_array(prog->num_variables_total);
     fv_recurse(arr, &idx, prog, 0, flag);
@@ -472,7 +464,7 @@ void f_variables PROT((void)) {
 
 /* also Beek */
 #ifdef F_HEART_BEATS
-void f_heart_beats PROT((void)) {
+void f_heart_beats (void) {
     push_refed_array(get_heart_beats());
 }
 #endif
@@ -527,17 +519,17 @@ static int at_end(int i, int imax, int z, int *lens) {
 }
 
 void 
-f_terminal_colour PROT((void))
+f_terminal_colour (void)
 {
     const char *instr, *cp, **parts;
     char *savestr, *deststr, *ncp;
     char curcolour[MAX_COLOUR_STRING];
     char colouratstartword[MAX_COLOUR_STRING];
     int curcolourlen;
-    int colourstartlen;
-    const char *resetstr;
+    int colourstartlen=0;
+    const char *resetstr = 0;
     char *resetstrname;
-    int resetstrlen;
+    int resetstrlen = 0;
     int num, i, j, k, col, start, space, *lens, maybe_at_end;
     int space_garbage = 0;
     mapping_node_t *elt, **mtab;
@@ -665,15 +657,16 @@ f_terminal_colour PROT((void))
                 resetstrname == elt->values->u.string) {
                resetstr = (elt->values + 1)->u.string;
                resetstrlen = strlen((elt->values + 1)->u.string);
-	       if(!resetstrlen) {
-		 //we really really need one, but it shouldn't be visible!
-		 resetstr = "\xff\xf9"; //telnet go ahead
-		 resetstrlen = 2;
-		 add_mapping_string(sp->u.map, "RESET", resetstr);
-	       }
                break;
            }
        }
+    } 
+    
+    if(!resetstrlen) {
+	//we really really need one, but it shouldn't be visible!
+	resetstr = "\xff\xf9"; //telnet go ahead
+	resetstrlen = 2;
+	add_mapping_string(sp->u.map, "RESET", resetstr);
     }
 
     /* Do the the pointer replacement and calculate the lengths */
@@ -981,7 +974,7 @@ f_terminal_colour PROT((void))
 /* number to chop is added */
 #define PLURAL_CHOP    2
 
-static char *pluralize P1(const char *, str) {
+static char *pluralize (const char * str) {
     char *pre, *rel, *end;
     char *p, *of_buf;
     int of_len = 0, plen, slen;
@@ -1055,7 +1048,8 @@ static char *pluralize P1(const char *, str) {
         if (!strcasecmp(rel + 1, "us")) {
             found = PLURAL_SUFFIX;
             suffix = "es";
-        } else
+	    break;
+        } 
         if (!strcasecmp(rel + 1, "onus")) {
             found = PLURAL_SUFFIX;
             suffix = "es";
@@ -1066,25 +1060,34 @@ static char *pluralize P1(const char *, str) {
         if (!strcasecmp(rel + 1, "hild")) {
             found = PLURAL_SUFFIX;
             suffix = "ren";
+	    break;
+        }
+	if (!strcasecmp(rel + 1, "liff")) {
+            found = PLURAL_SUFFIX;
+            suffix = "s";
         }
         break;
     case 'D':
     case 'd':
-        if (!strcasecmp(rel + 1, "datum")) {
+        if (!strcasecmp(rel + 1, "atum")) {
             found = PLURAL_CHOP + 2;
             suffix = "a";
-        } else
+	    break;
+        }
         if (!strcasecmp(rel + 1, "ie")) {
             found = PLURAL_CHOP + 1;
             suffix = "ce";
-        } else
+	    break;
+        }
         if (!strcasecmp(rel + 1, "eer")) {
             found = PLURAL_SAME;
-        } else
+	    break;	    
+        }
         if (!strcasecmp(rel + 1, "o")) {
             found = PLURAL_SUFFIX;
             suffix = "es";
-        } else
+	    break;
+        }
         if (!strcasecmp(rel + 1, "ynamo"))
             found = PLURAL_SUFFIX;
         break;
@@ -1099,11 +1102,11 @@ static char *pluralize P1(const char *, str) {
             found = PLURAL_SAME;
             break;
         }
-        if (!strcasecmp(rel + 1, "forum")) {
+        if (!strcasecmp(rel + 1, "orum")) {
             found = PLURAL_CHOP + 2;
             suffix = "a";
             break;
-        }
+	} 
         if (!strcasecmp(rel + 1, "ife"))
             found = PLURAL_SUFFIX;
         break;
@@ -1112,20 +1115,29 @@ static char *pluralize P1(const char *, str) {
         if (!strcasecmp(rel + 1, "oose")) {
             found = PLURAL_CHOP + 4;
             suffix = "eese";
-        } else
+	    break;
+        } 
         if (!strcasecmp(rel + 1, "o")) {
             found = PLURAL_SUFFIX;
             suffix = "es";
-        } else
+	    break;
+        } 
         if (!strcasecmp(rel + 1, "um")) {
             found = PLURAL_SUFFIX;
+	    break;
+        } 
+	if (!strcasecmp(rel + 1, "iraffe")) {
+            found = PLURAL_SUFFIX;
+            suffix = "s";
         }
         break;
     case 'H':
     case 'h':
-        if (!strcasecmp(rel + 1, "uman"))
-            found = PLURAL_SUFFIX;
-        else if (!strcasecmp(rel + 1, "ave")) {
+        if (!strcasecmp(rel + 1, "uman")){
+	  found = PLURAL_SUFFIX;
+	  break;
+	}
+        if (!strcasecmp(rel + 1, "ave")) {
             found = PLURAL_CHOP + 2;
             suffix = "s";
         }           
@@ -1142,6 +1154,7 @@ static char *pluralize P1(const char *, str) {
         if (!strcasecmp(rel + 1, "ouse")) {
             found = PLURAL_CHOP + 4;
             suffix = "ice";
+	    break;
         }
         if (!strcasecmp(rel + 1, "otus")) {
             found = PLURAL_SUFFIX;
@@ -1153,7 +1166,7 @@ static char *pluralize P1(const char *, str) {
         if (!strcasecmp(rel + 1, "ackerel")) {
             found = PLURAL_SAME;
             break;
-        }
+        } 
         if (!strcasecmp(rel + 1, "oose")) {
             found = PLURAL_SAME;
             break;
@@ -1166,6 +1179,7 @@ static char *pluralize P1(const char *, str) {
         if (!strcasecmp(rel + 1, "atrix")) {
             found = PLURAL_CHOP + 1;
             suffix = "ces";
+	    break;
         }
         break;
     case 'O':
@@ -1179,6 +1193,11 @@ static char *pluralize P1(const char *, str) {
     case 'p':
       if (!strcasecmp(rel + 1, "ants"))
 	found = PLURAL_SAME;
+      break;
+    case 'Q':
+    case 'q':
+      if (!strcasecmp(rel + 1, "uaff"))
+	found = PLURAL_SUFFIX;
       break;
     case 'R':
     case 'r':
@@ -1222,13 +1241,19 @@ static char *pluralize P1(const char *, str) {
         if (!strcasecmp(rel + 1, "ooth")) {
             found = PLURAL_CHOP + 4;
             suffix = "eeth";
+	    break;
         }
-        break;
+	if (!strcasecmp(rel + 1, "alisman")) {
+	    found = PLURAL_SUFFIX;
+	    suffix = "s";
+        }
+	break;
     case 'V':
     case 'v':
         if (!strcasecmp(rel + 1, "ax")) {
             found = PLURAL_SUFFIX;
             suffix = "en";
+	    break;
         }
         if (!strcasecmp(rel + 1, "irus")) {
             found = PLURAL_SUFFIX;
@@ -1389,7 +1414,7 @@ static char *pluralize P1(const char *, str) {
 } /* end of pluralize() */
 
 void 
-f_pluralize PROT((void))
+f_pluralize (void)
 {
    char *s;
 
@@ -1407,7 +1432,7 @@ f_pluralize PROT((void))
  * file_length() efun, returns the number of lines in a file.
  * Returns -1 if no privs or file doesn't exist.
  */
-static int file_length P1(const char *, file)
+static int file_length (const char * file)
 {
   struct stat st;
   FILE *f;
@@ -1441,7 +1466,7 @@ static int file_length P1(const char *, file)
 } /* end of file_length() */
 
 void 
-f_file_length PROT((void))
+f_file_length (void)
 {
     int l;
     
@@ -1453,7 +1478,7 @@ f_file_length PROT((void))
 
 #ifdef F_UPPER_CASE
 void
-f_upper_case PROT((void))
+f_upper_case (void)
 {
     const char *str;
 
@@ -1477,7 +1502,7 @@ f_upper_case PROT((void))
 #endif
 
 #ifdef F_REPLACEABLE
-void f_replaceable PROT((void)) {
+void f_replaceable (void) {
     object_t *obj;
     program_t *prog;
     int i, j, num, numignore, replaceable;
@@ -1532,7 +1557,7 @@ void f_replaceable PROT((void)) {
 #endif
 
 #ifdef F_PROGRAM_INFO
-void f_program_info PROT((void)) {
+void f_program_info (void) {
     int func_size = 0;
     int string_size = 0;
     int var_size = 0;
@@ -1550,7 +1575,7 @@ void f_program_info PROT((void)) {
     if (st_num_arg == 1) {
         ob = sp->u.ob;
         prog = ob->prog;
-        if (!(ob->flags & (O_CLONE|O_SWAPPED))) {
+        if (!(ob->flags & O_CLONE)) {
             hdr_size += sizeof(program_t);
             prog_size += prog->program_size;
             
@@ -1585,7 +1610,7 @@ void f_program_info PROT((void)) {
         pop_stack();
     } else {
         for (ob = obj_list; ob; ob = ob->next_all) {
-            if (ob->flags & (O_CLONE|O_SWAPPED)) continue;
+            if (ob->flags & O_CLONE) continue;
             prog = ob->prog;
             hdr_size += sizeof(program_t);
             prog_size += prog->program_size;
@@ -1645,7 +1670,7 @@ void f_program_info PROT((void)) {
  */
 
 #ifdef F_REMOVE_INTERACTIVE
-void f_remove_interactive PROT((void)) {
+void f_remove_interactive (void) {
     if( (sp->u.ob->flags & O_DESTRUCTED) || !(sp->u.ob->interactive) ) {
         free_object(sp->u.ob, "f_remove_interactive");
         *sp = const0;
@@ -1664,7 +1689,7 @@ void f_remove_interactive PROT((void)) {
  * mud.
  */
 #ifdef F_QUERY_IP_PORT
-static int query_ip_port P1(object_t *, ob)
+static int query_ip_port (object_t * ob)
 {
     if (!ob || ob->interactive == 0)
         return 0;
@@ -1672,7 +1697,7 @@ static int query_ip_port P1(object_t *, ob)
 }    
 
 void
-f_query_ip_port PROT((void))
+f_query_ip_port (void)
 {
     int tmp;
     
@@ -1697,111 +1722,85 @@ f_query_ip_port PROT((void))
 
 #ifdef F_ZONETIME
 
-char *
-set_timezone (char * timezone)
+char *set_timezone (const char * timezone)
 {
-  char put_tz[20];
+  static char put_tz[80];
   char *old_tz;
 
   old_tz = getenv("TZ");
-  sprintf (put_tz, "TZ=%s", timezone);
-  putenv (put_tz);
-  tzset ();
+  sprintf(put_tz, "TZ=%s", timezone);
+  putenv(put_tz);
+  tzset();
   return old_tz;
 }
 
-void 
-reset_timezone (char *old_tz)
+void reset_timezone (const char *old_tz)
 {
-  int  i = 0;
-  int  env_size = 0;
-  char put_tz[20];
-
-  if (!old_tz)
-    {
-      while (environ[env_size] != NULL)
-        {
-          if (strlen (environ[env_size]) > 3 && environ[env_size][2] == '='
-             && environ[env_size][1] == 'Z' && environ[env_size][0] == 'T')
-            {
-              i = env_size;
-            }
-          env_size++;
-        }
-      if ((i+1) == env_size)
-        {
-          environ[i] = NULL;
-        }
-      else
-        {
-          environ[i] = environ[env_size-1];
-          environ[env_size-1] = NULL;
-        }
-    }
-  else
-    {
-      sprintf (put_tz, "TZ=%s", old_tz);
-      putenv (put_tz);
-    }
+  int i = 0;
+  int env_size = 0;
+  static char put_tz[80];
+  if(old_tz){
+    sprintf(put_tz, "TZ=%s", old_tz);
+    putenv(put_tz);
+  }else
+    unsetenv("TZ");
   tzset ();
 }
 
-void 
-f_zonetime PROT((void))
+void f_zonetime (void)
 {
-  char *timezone, *old_tz;
+  const char *timezone, *old_tz;
   char *retv;
-  int  time_val;
-  int  len;
+  long time_val;
+  int len;
   
-  time_val   = sp->u.number;
-  pop_stack ();
-  timezone   = sp->u.string;
-  pop_stack ();
+  time_val = sp->u.number;
+  pop_stack();
+  timezone = sp->u.string;
+  pop_stack();
 
-  old_tz = set_timezone (timezone);
-  retv = ctime ((time_t *)&time_val);
-  len  = strlen (retv);
+  old_tz = set_timezone(timezone);
+  retv = ctime((time_t *)&time_val);
+  len = strlen(retv);
   retv[len-1] = '\0';
-  reset_timezone (old_tz);
+  reset_timezone(old_tz);
   push_malloced_string (string_copy(retv, "zonetime"));
   
 }
 #endif
 
 #ifdef F_IS_DAYLIGHT_SAVINGS_TIME
-void
-f_is_daylight_savings_time PROT((void))
+void f_is_daylight_savings_time (void)
 {
   struct tm *t;
-  int       time_to_check;
-  char      *timezone;
-  char      *old_tz;
+  long time_to_check;
+  const char *timezone;
+  char *old_tz;
 
   time_to_check = sp->u.number;
-  pop_stack ();
+  pop_stack();
   timezone = sp->u.string;
-  pop_stack ();
+  pop_stack();
 
-  old_tz = set_timezone (timezone);
+  old_tz = set_timezone(timezone);
  
-  t = localtime ((time_t *)&time_to_check);
+  t = localtime((time_t *)&time_to_check);
 
-  push_number ((t->tm_isdst) > 0);
+  push_number((t->tm_isdst) > 0);
 
-  reset_timezone (old_tz);
+  reset_timezone(old_tz);
 }
 #endif
 
 #ifdef F_DEBUG_MESSAGE
-void f_debug_message PROT((void)) {
+void f_debug_message (void) {
     debug_message("%s\n", sp->u.string);
     free_string_svalue(sp--);
 }
 #endif
 
 #ifdef F_FUNCTION_OWNER
-void f_function_owner PROT((void)) {
+void f_function_owner (void) {
     object_t *owner = sp->u.fp->hdr.owner;
     
     free_funp(sp->u.fp);
@@ -1810,7 +1809,7 @@ void f_function_owner PROT((void)) {
 #endif
 
 #ifdef F_REPEAT_STRING
-void f_repeat_string PROT((void)) {
+void f_repeat_string (void) {
     const char *str;
     int repeat, len, newlen;
     char *ret, *p;
@@ -1844,9 +1843,9 @@ void f_repeat_string PROT((void)) {
 #endif
 
 #ifdef F_MEMORY_SUMMARY
-static int memory_share PROT((svalue_t *));
+static int memory_share (svalue_t *);
 
-static int node_share P3(mapping_t *, m, mapping_node_t *, elt, void *, tp) {
+static int node_share (mapping_t * m, mapping_node_t * elt, void * tp) {
     int *t = (int *)tp;
     
     *t += sizeof(mapping_node_t) - 2*sizeof(svalue_t);
@@ -1856,7 +1855,7 @@ static int node_share P3(mapping_t *, m, mapping_node_t *, elt, void *, tp) {
     return 0;
 }
 
-static int memory_share P1(svalue_t *, sv) {
+static int memory_share (svalue_t * sv) {
     int i, total = sizeof(svalue_t);
     int subtotal;
     static int calldepth = 0;
@@ -1942,8 +1941,8 @@ static int memory_share P1(svalue_t *, sv) {
  * map["program name"]["variable name"] = memory usage
  */
 #ifdef F_MEMORY_SUMMARY
-static void fms_recurse P4(mapping_t *, map, object_t *, ob, 
-                           int *, idx, program_t *, prog) {
+static void fms_recurse (mapping_t * map, object_t * ob, 
+                           int * idx, program_t * prog) {
     int i;
     svalue_t *entry;
     svalue_t sv;
@@ -1964,7 +1963,7 @@ static void fms_recurse P4(mapping_t *, map, object_t *, ob,
     *idx += prog->num_variables_defined;
 }
 
-void f_memory_summary PROT((void)) {
+void f_memory_summary (void) {
     mapping_t *result = allocate_mapping(8);
     object_t *ob;
     int idx;
@@ -1976,9 +1975,6 @@ void f_memory_summary PROT((void)) {
     for (ob = obj_list; ob; ob = ob->next_all) {
         svalue_t *entry;
         
-        if (ob->flags & O_SWAPPED) 
-            load_ob_from_swap(ob);
-
         sv.u.string = ob->prog->filename;
         entry = find_for_insert(result, &sv, 0);
         if (entry->type == T_NUMBER) {
@@ -1996,7 +1992,7 @@ void f_memory_summary PROT((void)) {
 
 /* Marius */
 #ifdef F_QUERY_REPLACED_PROGRAM
-void f_query_replaced_program PROT((void))
+void f_query_replaced_program (void)
 {
     char *res = 0;
 
@@ -2023,7 +2019,7 @@ void f_query_replaced_program PROT((void))
 
 /* Skullslayer@Realms of the Dragon */
 #ifdef F_NETWORK_STATS
-void f_network_stats PROT((void))
+void f_network_stats (void)
 {
     mapping_t *m;
     int i, ports = 0;
@@ -2086,8 +2082,8 @@ void f_network_stats PROT((void))
 
 #define EVENT_PREFIX "event_"
 
-void event P4 (svalue_t *, event_ob, const char *, event_fun, int, numparam,
-               svalue_t *, event_param){
+void event (svalue_t * event_ob, const char * event_fun, int numparam,
+               svalue_t * event_param){
 
   object_t *ob, *origin;
   char *name;
@@ -2139,21 +2135,20 @@ void event P4 (svalue_t *, event_ob, const char *, event_fun, int, numparam,
 	
 	if (ob->flags & O_DESTRUCTED)
 	  continue;
-	
 	push_object(ob);
 	count++;
       }
       while(count--){
 	ob = sp->u.ob;
 	pop_stack();
-	if(ob->flags & O_DESTRUCTED)
+	if(!ob || ob->flags & O_DESTRUCTED)
 	  continue;
 	else {
-	  push_object(origin);
-	  for (i = 0; i < numparam; i++)
-	    push_svalue (event_param + i);
-	
-	  apply (name, ob, numparam + 1, ORIGIN_EFUN);
+	  push_object (origin);
+          for (i = 0; i < numparam; i++)
+            push_svalue (event_param + i);
+
+          apply (name, ob, numparam + 1, ORIGIN_EFUN);
 	}
       }
     }
@@ -2161,7 +2156,7 @@ void event P4 (svalue_t *, event_ob, const char *, event_fun, int, numparam,
   FREE_MSTR (name);
 }
 
-void f_event PROT ((void)){
+void f_event (void){
 
   int num;
 
@@ -2175,7 +2170,7 @@ void f_event PROT ((void)){
 
 
 #ifdef F_QUERY_NUM
-void number_as_string P2(char *, buf, int, n){
+void number_as_string (char * buf, long n){
   const char *low[] =  { "ten", "eleven", "twelve", "thirteen",
                      "fourteen", "fifteen", "sixteen", "seventeen",
                      "eighteen", "nineteen" };
@@ -2202,10 +2197,10 @@ void number_as_string P2(char *, buf, int, n){
   strcat(buf, single[n]);
 }
 
-void f_query_num PROT((void)){
+void f_query_num (void){
   char ret[100];
   int i;
-  int n, limit;
+  long n, limit;
   int changed = 0;
   char *res;
 
@@ -2270,7 +2265,7 @@ void f_query_num PROT((void)){
 #endif
       
 #ifdef F_BASE_NAME
-void f_base_name PROT((void)) {
+void f_base_name (void) {
   char *name, *tmp;
   int i;
 
@@ -2303,12 +2298,16 @@ void f_base_name PROT((void)) {
 #endif
 
 #ifdef F_GET_GARBAGE
-int garbage_check P2(object_t *, ob, void *, data){
+int garbage_check (object_t * ob, void * data){
   return (ob->ref == 1) && (ob->flags & O_CLONE) && 
-    !(ob->super || ob->shadowing);
+    !(ob->super 
+#ifndef NO_SHADOWS
+      || ob->shadowing
+#endif
+      );
 }
 
-void f_get_garbage PROT((void)){
+void f_get_garbage (void){
   int count, i;
   object_t **obs;
   array_t *ret;
@@ -2327,3 +2326,4 @@ void f_get_garbage PROT((void)){
   push_refed_array(ret);
 }
 #endif
+

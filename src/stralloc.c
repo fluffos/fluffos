@@ -8,7 +8,7 @@
 int svalue_strlen_size;
 
 #ifdef NOISY_DEBUG
-void bp PROT((void)) {
+void bp (void) {
 }
 #endif
 /*
@@ -66,7 +66,7 @@ int num_str_searches = 0;
 #define hfindblock(s, h) sfindblock(s, h = StrHash(s))
 #define findblock(s) sfindblock(s, StrHash(s))
 
-INLINE_STATIC block_t *sfindblock PROT((const char *, int));
+INLINE_STATIC block_t *sfindblock (const char *, int);
 
 /*
  * hash table - list of pointers to heads of string chains.
@@ -80,7 +80,7 @@ static block_t **base_table = (block_t **) 0;
 static int htable_size;
 static int htable_size_minus_one;
 
-INLINE_STATIC block_t *alloc_new_string PROT((const char *, int));
+INLINE_STATIC block_t *alloc_new_string (const char *, int);
 
 void init_strings()
 {
@@ -110,7 +110,7 @@ void init_strings()
  */
 
 INLINE_STATIC block_t *
-        sfindblock P2(const char *, s, int, h)
+        sfindblock (const char * s, int h)
 {
     block_t *curr, *prev;
 
@@ -139,7 +139,7 @@ INLINE_STATIC block_t *
 }
 
 char *
-     findstring P1(const char *, s)
+     findstring (const char * s)
 {
     block_t *b;
 
@@ -153,7 +153,7 @@ char *
 /* alloc_new_string: Make a space for a string.  */
 
 INLINE_STATIC block_t *
-alloc_new_string P2(const char *, string, int, h)
+alloc_new_string (const char * string, int h)
 {
     block_t *b;
     int len = strlen(string);
@@ -177,7 +177,7 @@ alloc_new_string P2(const char *, string, int, h)
 }
 
 char *
-     make_shared_string P1(const char *, str)
+     make_shared_string (const char * str)
 {
     block_t *b;
     int h;
@@ -199,7 +199,7 @@ char *
 */
 
 const char *
-ref_string P1(const char *, str)
+ref_string (const char * str)
 {
     block_t *b;
 
@@ -223,7 +223,7 @@ ref_string P1(const char *, str)
  */
 
 void
-free_string P1(const char *, str)
+free_string (const char * str)
 {
     block_t **prev, *b;
     int h;
@@ -263,7 +263,7 @@ free_string P1(const char *, str)
 }
 
 void
-deallocate_string P1(char *, str)
+deallocate_string (char * str)
 {
     int h;
     block_t *b, **prev;
@@ -283,7 +283,7 @@ deallocate_string P1(char *, str)
 }
 
 int
-add_string_status P2(outbuffer_t *, out, int, verbose)
+add_string_status (outbuffer_t * out, int verbose)
 {
 #ifdef STRING_STATS
     if (verbose == 1) {
@@ -322,9 +322,9 @@ char *the_null_string = (char *)&the_null_string_blocks[1];
 */
 
 #ifdef DEBUGMALLOC
-char *int_new_string P2(int, size, char *, tag)
+char *int_new_string (int size, char * tag)
 #else
-char *int_new_string P1(int, size)
+char *int_new_string (int size)
 #endif
 {
     malloc_block_t *mbt;
@@ -351,7 +351,7 @@ char *int_new_string P1(int, size)
     return (char *)(mbt + 1);
 }
 
-char *extend_string P2(const char *, str, int, len) {
+char *extend_string (const char * str, int len) {
     malloc_block_t *mbt;
 #ifdef STRING_STATS
     int oldsize = MSTR_SIZE(str);
@@ -370,9 +370,9 @@ char *extend_string P2(const char *, str, int, len) {
 }
 
 #ifdef DEBUGMALLOC
-char *int_alloc_cstring P2(const char *, str, char *, tag)
+char *int_alloc_cstring (const char * str, char * tag)
 #else
-char *int_alloc_cstring P1(const char *, str)
+char *int_alloc_cstring (const char * str)
 #endif
 {
     char *ret;

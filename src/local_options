@@ -859,4 +859,6 @@
 #define PACKAGE_DWLIB
 #undef MMAP_SBRK
 #define WARN_TAB
+#define USE_ICONV
+#undef WOMBLES
 #endif

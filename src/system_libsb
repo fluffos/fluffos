@@ -1,0 +1,2 @@
+ -lresolv -lcrypt -ldl -lnsl -lm -lz -L/usr/local/lib/mysql/ -lmysqlclient 
+

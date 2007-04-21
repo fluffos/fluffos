@@ -1,17 +1,16 @@
 #include "std.h"
 #include "lpc_incl.h"
-#include "swap.h"
 
 int total_num_prog_blocks, total_prog_block_size;
 
-void reference_prog P2(program_t *, progp, const char *, from)
+void reference_prog (program_t * progp, const char * from)
 {
     progp->ref++;
     debug(d_flag, ("reference_prog: /%s ref %d (%s)\n",
                progp->filename, progp->ref, from));
 }
 
-void deallocate_program P1(program_t *, progp)
+void deallocate_program (program_t * progp)
 {
     int i;
 
@@ -32,15 +31,13 @@ void deallocate_program P1(program_t *, progp)
         free_string(progp->variable_table[i]);
     /* Free all inherited objects */
     for (i = 0; i < (int) progp->num_inherited; i++)
-        free_prog(progp->inherit[i].prog, 1);
+        free_prog(progp->inherit[i].prog);
     free_string(progp->filename);
 
     /*
      * We're going away for good, not just being swapped, so free up
      * line_number stuff.
      */
-    if (progp->line_swap_index != -1)
-        remove_line_swap(progp);
     if (progp->file_info)
         FREE(progp->file_info);
     
@@ -54,7 +51,7 @@ void deallocate_program P1(program_t *, progp)
  * as we want to be able to read the program in again from the swap area.
  * That means that strings are not swapped.
  */
-void free_prog P2(program_t *, progp, int, free_sub_strings)
+void free_prog (program_t *progp)
 {
     progp->ref--;
     if (progp->ref > 0)
@@ -62,16 +59,10 @@ void free_prog P2(program_t *, progp, int, free_sub_strings)
     if (progp->func_ref > 0)
         return;
 
-    if (free_sub_strings) 
-        deallocate_program(progp);
-    else {
-        total_prog_block_size -= progp->total_size;
-        total_num_prog_blocks -= 1;
-        FREE((char *) progp);
-    }
+    deallocate_program(progp);
 }
 
-char *variable_name P2(program_t *, prog, int, idx) {
+char *variable_name (program_t * prog, int idx) {
     int i = prog->num_inherited - 1;
     int first;
 
@@ -86,7 +77,7 @@ char *variable_name P2(program_t *, prog, int, idx) {
     return variable_name(prog->inherit[i].prog, idx - prog->inherit[i].variable_index_offset);
 }
 
-function_t *find_func_entry P2(program_t *, prog, int, index) {
+function_t *find_func_entry (program_t * prog, int index) {
     register int low, mid, high;
     
 

@@ -3,7 +3,6 @@
 #include "../file_incl.h"
 #include "../file.h"
 #include "../backend.h"
-#include "../swap.h"
 #include "../compiler.h"
 #include "../main.h"
 #include "../eoperators.h"
@@ -14,11 +13,11 @@
 #include "../array.h"
 #include "../master.h"
 #include "../port.h"
-
+#include "../array.h"
 
 #ifdef F_QUERY_MULTIPLE_SHORT
 /* Hideous mangling of C code by Taffyd. */ 
-void query_multiple_short P6(svalue_t *, arg, const char *, type, int, no_dollars, int, quiet, int, dark, int, num_arg) { 
+void query_multiple_short(svalue_t * arg, const char * type, int no_dollars, int quiet, int dark, int num_arg) { 
     char m[] = "$M$";
     char s[] = "_short";
     char default_function[] = "a_short";
@@ -256,7 +255,7 @@ void query_multiple_short P6(svalue_t *, arg, const char *, type, int, no_dollar
 
 
 void
-f_query_multiple_short PROT((void))
+f_query_multiple_short()
 {
     svalue_t *sv = sp - st_num_arg + 1;
     const char *type = NULL;
@@ -302,7 +301,7 @@ f_query_multiple_short PROT((void))
 
 int _in_reference_allowed = 0;
 
-int reference_allowed P3(object_t *, referee, object_t *, referrer_obj, const char *, referrer_name) 
+int reference_allowed(object_t * referee, object_t * referrer_obj, const char * referrer_name) 
 {
     int invis = 0;
     int referee_creator = 0;
@@ -475,7 +474,7 @@ int reference_allowed P3(object_t *, referee, object_t *, referrer_obj, const ch
 }
 
 void
-f_reference_allowed PROT((void))
+f_reference_allowed()
   {
     svalue_t *sv = sp - st_num_arg + 1;
     svalue_t *v;
@@ -537,7 +536,7 @@ f_reference_allowed PROT((void))
 #endif
 
 #ifdef F_ELEMENT_OF
-void f_element_of PROT((void)){
+void f_element_of(){
   array_t *arr = sp->u.arr;
   if(!arr->size){
     error("Can't take element from empty array.\n");
@@ -552,7 +551,7 @@ void f_element_of PROT((void)){
  * conversion by Taffyd.
  */
 
-void shuffle P1(array_t *, args) {
+void shuffle(array_t * args) {
     int i, j;
     svalue_t temp;
 
@@ -579,7 +578,7 @@ void shuffle P1(array_t *, args) {
 }
 
 void
-f_shuffle PROT((void))
+f_shuffle()
 {
     svalue_t *sv = sp - st_num_arg + 1;
 
@@ -592,26 +591,12 @@ f_shuffle PROT((void))
 }
 #endif
 
-#ifdef F_SET_CHECK_LIMIT
-extern int check_limit;
-
-void f_set_check_limit PROT((void)){
-  check_limit = sp->u.number;
-  if(check_limit > NUM_OPCODES)
-    check_limit = NUM_OPCODES;
-  if(check_limit < BASE)
-    check_limit = BASE;
-  sp->u.number = check_limit;
-}
-#endif
-
 #ifdef F_MAX
 
 void
-f_max PROT((void)) {
+f_max() {
    svalue_t *sarr = sp - st_num_arg + 1;
    array_t *arr = sarr->u.arr;
-   int find_index = 0;
    int max_index = 0;
    int i;
 
@@ -687,10 +672,9 @@ f_max PROT((void)) {
 #ifdef F_MIN
 
 void
-f_min PROT((void)) {
+f_min() {
    svalue_t *sarr = sp - st_num_arg + 1;
    array_t *arr = sarr->u.arr;
-   int find_index = 0;
    int min_index = 0;
    int i;
 
@@ -762,11 +746,22 @@ f_min PROT((void)) {
 }
 #endif
 
+#ifdef F_ABS
+
+void
+f_abs() {
+   if( sp->type == T_REAL && sp->u.real < 0.0 )
+      sp->u.real = -sp->u.real;
+   else if( sp->type == T_NUMBER && sp->u.number < 0 )
+      sp->u.number = -sp->u.number;
+}
+#endif
+
 #ifdef F_ROLL_MDN
 
 void
-f_roll_MdN PROT((void)) {
-   int roll = 0;
+f_roll_MdN() {
+   long roll = 0;
 
    if ( (sp - 1)->u.number > 0 && sp->u.number > 0 ) {
       while( (sp - 1)->u.number-- )
@@ -781,12 +776,13 @@ f_roll_MdN PROT((void)) {
 
 #ifdef F_ADD_A
 
-void
-f_add_a PROT((void)) {
+void f_add_a() {
    const char *str = sp->u.string;
    char *ret;
    char *p;
+   char first;
    int len;
+   int an;
 
    while( *str == ' ' )
       str++;
@@ -799,12 +795,28 @@ f_add_a PROT((void)) {
    }
 
    len = strlen( str );
-   // Don't add anything if it already begins with a or an.
-   if( strncmp( str, "a ", 2 ) == 0 || strncmp( str, "an ", 3 ) == 0 ) {
+// Don't add anything if it already begins with a or an.
+   if( !strncasecmp( str, "a ", 2 ) || !strncasecmp( str, "an ", 3 ) ) {
       return;
    }
 
-   switch( *str ) {
+   first = *str;
+   an = 0;
+
+   // Some special cases.
+   // If it begins with "us", check the following letter.
+   // "a use", "a usurper", "a user", but "an usher".
+   if( !strncasecmp( str, "us", 2 ) ) {
+      first = str[2];
+      an = 1;
+   }
+
+   // "hour*" gets "an".
+   if( !strncasecmp( str, "hour", 4 ) ) {
+      first = 'o';
+   }
+
+   switch( first ) {
       case 'a':
       case 'e':
       case 'i':
@@ -815,25 +827,29 @@ f_add_a PROT((void)) {
       case 'I':
       case 'O':
       case 'U':
-         // Add an.
-         if( len + 3 > max_string_length ) {
-            free_string_svalue( sp );
-            error( "add_a() exceeded max string length.\n" );
-         }
-         ret = new_string( len + 3, "f_add_a" );
-         memcpy( ret, "an ", 3 );
-         p = ret + 3;
+         an = !an;
          break;
       default:
-         // Add a.
-         if( len + 2 > max_string_length ) {
-            free_string_svalue( sp );
-            error( "add_a() exceeded max string length.\n" );
-         }
-         ret = new_string( len + 2, "f_add_a" );
-         memcpy( ret, "a ", 2 );
-         p = ret + 2;
          break;
+   }
+
+   if( an ) {  // Add an.
+      if( len + 3 > max_string_length ) {
+         free_string_svalue( sp );
+         error( "add_a() exceeded max string length.\n" );
+      }
+      ret = new_string( len + 3, "f_add_a" );
+      memcpy( ret, "an ", 3 );
+      p = ret + 3;
+   }
+   else {      // Add a.
+      if( len + 2 > max_string_length ) {
+         free_string_svalue( sp );
+         error( "add_a() exceeded max string length.\n" );
+      }
+      ret = new_string( len + 2, "f_add_a" );
+      memcpy( ret, "a ", 2 );
+      p = ret + 2;
    }
 
    // Add the rest of the string.
@@ -847,8 +863,7 @@ f_add_a PROT((void)) {
 #endif
 // This along with add_a() is the only sfun in /secure/simul_efun/add_a.c
 #ifdef F_VOWEL
-void
-f_vowel PROT((void)) {
+void f_vowel() {
    char v = (char)sp->u.number;
 
    if( v == 'a' || v == 'e' || v == 'i' || v == 'o' || v == 'u' ||
@@ -862,7 +877,7 @@ f_vowel PROT((void)) {
 #ifdef F_NUM_CLASSES
 
 void
-f_num_classes PROT((void)) {
+f_num_classes() {
    int i = sp->u.ob->prog->num_classes;
    pop_stack();
    push_number( i );
@@ -870,32 +885,97 @@ f_num_classes PROT((void)) {
 
 #endif
 
+#ifdef F_ASSEMBLE_CLASS
+void
+f_assemble_class() {
+   array_t *arr = copy_array( sp->u.arr );
+   pop_stack();
+   push_refed_array(arr);
+   sp->type = T_CLASS;
+}
+
+#endif
+
+#ifdef F_DISASSEMBLE_CLASS
+void
+f_disassemble_class() {
+   array_t *arr;
+   if( sp->type != T_CLASS )
+     error( "Argument to disassemble_class() not a class.\n" );
+   arr = copy_array( sp->u.arr );
+   pop_stack();
+   push_refed_array(arr);
+}
+#endif
+
+#ifdef F_FETCH_CLASS_MEMBER
+
+void f_fetch_class_member() {
+   int pos = sp->u.number;
+   array_t *arr;
+
+   pos = sp->u.number;
+   pop_stack();
+
+   if( sp->type != T_CLASS )
+      error( "Argument to fetch_class_member() not a class.\n" );
+
+   arr = sp->u.arr;
+
+   if( pos < 0 || pos >= arr->size )
+      error( "Class index out of bounds.\n" );
+
+   assign_svalue_no_free( sp, &arr->item[pos] );
+   free_array( arr );
+}
+#endif
+
+#ifdef F_STORE_CLASS_MEMBER
+
+void f_store_class_member() {
+   int pos = ( sp - 1 )->u.number;
+   array_t *arr;
+
+   if( ( sp - 2 )->type != T_CLASS )
+      error( "Argument to store_class_member() not a class.\n" );
+
+   arr = ( sp - 2 )->u.arr;
+
+   if( pos < 0 || pos >= arr->size )
+      error( "Class index out of bounds.\n" );
+
+   assign_svalue(&arr->item[pos], sp);
+
+   pop_2_elems();
+}
+#endif
+
 #ifdef F_REPLACE
 
-void f_replace PROT((void)){
+void f_replace(){
     svalue_t *arg2 = sp - st_num_arg + 2;
     if(arg2->type == T_STRING){
-	return f_replace_string();
+        return f_replace_string();
     } else {
-	array_t *arr = arg2->u.arr;
-	int i = 0;
-	if(arr->size & 1){
-	    error("Wrong array size for replace.\n");
-	}
-	pop_n_elems(st_num_arg-2);
-	sp--;
-	
-	for (i=0;i<arr->size;i+=2){
-	    if(arr->item[i].type == T_STRING && arr->item[i+1].type == T_STRING){
-		share_and_push_string(arr->item[i].u.string);
-		share_and_push_string(arr->item[i+1].u.string);
-		st_num_arg = 3;
-		f_replace_string();
+        array_t *arr = arg2->u.arr;
+        int i = 0;
+        if(arr->size & 1){
+            error("Wrong array size for replace.\n");
+        }
+        pop_n_elems(st_num_arg-2);
+        sp--;
+
+        for (i=0;i<arr->size;i+=2){
+            if(arr->item[i].type == T_STRING && arr->item[i+1].type == T_STRING){
+                share_and_push_string(arr->item[i].u.string);
+                share_and_push_string(arr->item[i+1].u.string);
+                st_num_arg = 3;
+                f_replace_string();
 		if(sp->type != T_STRING)
 		  break;
-	    }
-	}
-	free_array(arr);
+            }
+        }
+        free_array(arr);
     }
 }
 

@@ -24,7 +24,7 @@
 
 #ifdef F_DOMAIN_STATS
 void
-f_domain_stats PROT((void))
+f_domain_stats (void)
 {
     mapping_t *m;
 
@@ -45,7 +45,7 @@ f_domain_stats PROT((void))
 
 #ifdef F_SET_AUTHOR
 void
-f_set_author PROT((void))
+f_set_author (void)
 {
     set_author(sp->u.string);
     free_string_svalue(sp--);
@@ -54,7 +54,7 @@ f_set_author PROT((void))
 
 #ifdef F_AUTHOR_STATS
 void
-f_author_stats PROT((void))
+f_author_stats (void)
 {
     mapping_t *m;
 
@@ -79,21 +79,21 @@ static mudlib_stats_t *backbone_domain = 0;
 static mudlib_stats_t *authors = 0;
 static mudlib_stats_t *master_author = 0;
 
-static mudlib_stats_t *find_stat_entry PROT((char *, mudlib_stats_t *));
-static mudlib_stats_t *add_stat_entry PROT((char *, mudlib_stats_t **));
-static void init_author_for_ob PROT((object_t *));
-static char *author_for_file PROT((char *));
-static void init_domain_for_ob PROT((object_t *));
-static char *domain_for_file PROT((char *));
-static void save_stat_list PROT((char *, mudlib_stats_t *));
-static void restore_stat_list PROT((char *, mudlib_stats_t **));
-static mapping_t *get_info PROT((mudlib_stats_t *));
-static mapping_t *get_stats PROT((char *, mudlib_stats_t *));
-static mudlib_stats_t *insert_stat_entry PROT((mudlib_stats_t *, mudlib_stats_t **));
+static mudlib_stats_t *find_stat_entry (char *, mudlib_stats_t *);
+static mudlib_stats_t *add_stat_entry (char *, mudlib_stats_t **);
+static void init_author_for_ob (object_t *);
+static char *author_for_file (char *);
+static void init_domain_for_ob (object_t *);
+static char *domain_for_file (char *);
+static void save_stat_list (char *, mudlib_stats_t *);
+static void restore_stat_list (char *, mudlib_stats_t **);
+static mapping_t *get_info (mudlib_stats_t *);
+static mapping_t *get_stats (char *, mudlib_stats_t *);
+static mudlib_stats_t *insert_stat_entry (mudlib_stats_t *, mudlib_stats_t **);
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 /* debugging */
-int check_valid_stat_entry P1(mudlib_stats_t *, se) {
+int check_valid_stat_entry (mudlib_stats_t * se) {
     mudlib_stats_t *tmp;
 
     tmp = domains;
@@ -114,7 +114,7 @@ int check_valid_stat_entry P1(mudlib_stats_t *, se) {
  * stat list manipulation
  **************************/
 
-static mudlib_stats_t *insert_stat_entry P2(mudlib_stats_t *, entry, mudlib_stats_t **, list)
+static mudlib_stats_t *insert_stat_entry (mudlib_stats_t * entry, mudlib_stats_t ** list)
 {
     entry->next = *list;
     *list = entry;
@@ -126,7 +126,7 @@ static mudlib_stats_t *insert_stat_entry P2(mudlib_stats_t *, entry, mudlib_stat
  * this uses a simple linear search.  it's a good thing that most muds
  * will have a relatively small number of domains
  */
-static mudlib_stats_t *find_stat_entry P2(char *, name, mudlib_stats_t *, list)
+static mudlib_stats_t *find_stat_entry (char * name, mudlib_stats_t * list)
 {
     int length;
 
@@ -140,7 +140,7 @@ static mudlib_stats_t *find_stat_entry P2(char *, name, mudlib_stats_t *, list)
 /*
  * add a new domain to the domain list.  If it exists, do nothing.
  */
-static mudlib_stats_t *add_stat_entry P2(char *, str, mudlib_stats_t **, list)
+static mudlib_stats_t *add_stat_entry (char * str, mudlib_stats_t ** list)
 {
     mudlib_stats_t *entry;
 
@@ -165,13 +165,13 @@ static mudlib_stats_t *add_stat_entry P2(char *, str, mudlib_stats_t **, list)
  **************************************/
 
 
-void assign_stats P2(statgroup_t *, st, object_t *, ob)
+void assign_stats (statgroup_t * st, object_t * ob)
 {
     st->domain = ob->stats.domain;
     st->author = ob->stats.author;
 }
 
-void null_stats P1(statgroup_t *, st)
+void null_stats (statgroup_t * st)
 {
     if (st) {
 	st->domain = NULL;
@@ -179,7 +179,7 @@ void null_stats P1(statgroup_t *, st)
     }
 }
 
-void init_stats_for_object P1(object_t *, ob)
+void init_stats_for_object (object_t * ob)
 {
     init_domain_for_ob(ob);
     init_author_for_ob(ob);
@@ -189,7 +189,7 @@ void init_stats_for_object P1(object_t *, ob)
 /*
  * Add moves to an existing domain.
  */
-void add_moves P2(statgroup_t *, st, int, moves)
+void add_moves (statgroup_t * st, int moves)
 {
     if (st) {
 	if (st->domain)
@@ -199,7 +199,7 @@ void add_moves P2(statgroup_t *, st, int, moves)
     }
 }
 
-INLINE void add_heart_beats P2(statgroup_t *, st, int, hbs)
+INLINE void add_heart_beats (statgroup_t * st, int hbs)
 {
     if (st) {
 	if (st->domain)
@@ -209,7 +209,7 @@ INLINE void add_heart_beats P2(statgroup_t *, st, int, hbs)
     }
 }
 
-void add_array_size P2(statgroup_t *, st, int, size)
+void add_array_size (statgroup_t * st, int size)
 {
     if (st) {
 	if (st->domain)
@@ -219,7 +219,7 @@ void add_array_size P2(statgroup_t *, st, int, size)
     }
 }
 
-void add_errors P2(statgroup_t *, st, int, errors)
+void add_errors (statgroup_t * st, int errors)
 {
     if (st) {
 	if (st->domain)
@@ -229,7 +229,7 @@ void add_errors P2(statgroup_t *, st, int, errors)
     }
 }
 
-void add_errors_for_file P2(char *, file, int, errors)
+void add_errors_for_file (char * file, int errors)
 {
     mudlib_stats_t *entry;
     char *name;
@@ -248,7 +248,7 @@ void add_errors_for_file P2(char *, file, int, errors)
     }
 }
 
-void add_objects P2(statgroup_t *, st, int, objects)
+void add_objects (statgroup_t * st, int objects)
 {
     if (st) {
 	if (st->domain)
@@ -303,7 +303,7 @@ void mark_mudlib_stats() {
  Author specific functions
  *************************/
 
-static void init_author_for_ob P1(object_t *, ob)
+static void init_author_for_ob (object_t * ob)
 {
     svalue_t *ret;
 
@@ -318,7 +318,7 @@ static void init_author_for_ob P1(object_t *, ob)
     }
 }
 
-void set_author P1(char *, name)
+void set_author (char * name)
 {
     object_t *ob;
 
@@ -338,7 +338,7 @@ void set_author P1(char *, name)
     }
 }
 
-mudlib_stats_t *set_master_author P1(char *, str)
+mudlib_stats_t *set_master_author (char * str)
 {
     mudlib_stats_t *author;
 
@@ -348,7 +348,7 @@ mudlib_stats_t *set_master_author P1(char *, str)
     return author;
 }
 
-static char *author_for_file P1(char *, file)
+static char *author_for_file (char * file)
 {
     svalue_t *ret;
     static char buff[50];
@@ -366,7 +366,7 @@ static char *author_for_file P1(char *, file)
  Domain specific functions
  *************************/
 
-static void init_domain_for_ob P1(object_t *, ob)
+static void init_domain_for_ob (object_t * ob)
 {
     svalue_t *ret;
     char *domain_name;
@@ -422,7 +422,7 @@ static void init_domain_for_ob P1(object_t *, ob)
     return;
 }
 
-mudlib_stats_t *set_backbone_domain P1(char *, str)
+mudlib_stats_t *set_backbone_domain (char * str)
 {
     mudlib_stats_t *dom;
 
@@ -437,7 +437,7 @@ mudlib_stats_t *set_backbone_domain P1(char *, str)
  * Argument is a file name, which we want to get the domain of.
  * Ask the master object.
  */
-static char *domain_for_file P1(char *, file)
+static char *domain_for_file (char * file)
 {
     svalue_t *ret;
     static char buff[512];
@@ -455,7 +455,7 @@ static char *domain_for_file P1(char *, file)
  * save and restore stats to a file *
  ************************************/
 
-static void save_stat_list P2(char *, file, mudlib_stats_t *, list)
+static void save_stat_list (char * file, mudlib_stats_t * list)
 {
     FILE *f;
     char fname_buf[MAXPATHLEN];
@@ -489,7 +489,7 @@ static void save_stat_list P2(char *, file, mudlib_stats_t *, list)
     fclose(f);
 }
 
-static void restore_stat_list P2(char *, file, mudlib_stats_t **, list)
+static void restore_stat_list (char * file, mudlib_stats_t ** list)
 {
     FILE *f;
     char fname_buf[MAXPATHLEN];
@@ -543,7 +543,7 @@ void restore_stat_files()
  **************************************/
 
 static mapping_t *
-        get_info P1(mudlib_stats_t *, dl)
+        get_info (mudlib_stats_t * dl)
 {
     mapping_t *ret;
 
@@ -557,7 +557,7 @@ static mapping_t *
 }
 
 static mapping_t *
-        get_stats P2(char *, str, mudlib_stats_t *, list)
+        get_stats (char * str, mudlib_stats_t * list)
 {
     mudlib_stats_t *dl;
     mapping_t *m;
@@ -593,13 +593,13 @@ static mapping_t *
 }
 
 mapping_t *
-        get_domain_stats P1(char *, str)
+        get_domain_stats (char * str)
 {
     return get_stats(str, domains);
 }
 
 mapping_t *
-        get_author_stats P1(char *, str)
+        get_author_stats (char * str)
 {
     return get_stats(str, authors);
 }

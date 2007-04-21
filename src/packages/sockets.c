@@ -22,7 +22,7 @@
 
 #ifdef F_SOCKET_CREATE
 void
-f_socket_create PROT((void))
+f_socket_create (void)
 {
     int fd, num_arg = st_num_arg;
     svalue_t *arg;
@@ -48,7 +48,7 @@ f_socket_create PROT((void))
 
 #ifdef F_SOCKET_BIND
 void
-f_socket_bind PROT((void))
+f_socket_bind (void)
 {
     int i, fd, port, num_arg = st_num_arg;
     svalue_t *arg;
@@ -75,7 +75,7 @@ f_socket_bind PROT((void))
 
 #ifdef F_SOCKET_LISTEN
 void
-f_socket_listen PROT((void))
+f_socket_listen (void)
 {
     int i, fd, port;
     char addr[ADDR_BUF_SIZE];
@@ -96,7 +96,7 @@ f_socket_listen PROT((void))
 
 #ifdef F_SOCKET_ACCEPT
 void
-f_socket_accept PROT((void))
+f_socket_accept (void)
 {
     int port, fd;
     char addr[ADDR_BUF_SIZE];
@@ -115,7 +115,7 @@ f_socket_accept PROT((void))
 
 #ifdef F_SOCKET_CONNECT
 void
-f_socket_connect PROT((void))
+f_socket_connect (void)
 {
     int i, fd, port;
     char addr[ADDR_BUF_SIZE];
@@ -165,7 +165,7 @@ f_socket_connect PROT((void))
 
 #ifdef F_SOCKET_WRITE
 void
-f_socket_write PROT((void))
+f_socket_write (void)
 {
     int i, fd, port;
     svalue_t *arg;
@@ -193,7 +193,7 @@ f_socket_write PROT((void))
 
 #ifdef F_SOCKET_CLOSE
 void
-f_socket_close PROT((void))
+f_socket_close (void)
 {
     int fd, port;
     char addr[ADDR_BUF_SIZE];
@@ -207,7 +207,7 @@ f_socket_close PROT((void))
 
 #ifdef F_SOCKET_RELEASE
 void
-f_socket_release PROT((void))
+f_socket_release (void)
 {
     int fd, port;
     char addr[ADDR_BUF_SIZE];
@@ -232,7 +232,7 @@ f_socket_release PROT((void))
 
 #ifdef F_SOCKET_ACQUIRE
 void
-f_socket_acquire PROT((void))
+f_socket_acquire (void)
 {
     int fd, port;
     char addr[ADDR_BUF_SIZE];
@@ -256,7 +256,7 @@ f_socket_acquire PROT((void))
 
 #ifdef F_SOCKET_ERROR
 void
-f_socket_error PROT((void))
+f_socket_error (void)
 {
     put_constant_string(socket_error(sp->u.number));
 }
@@ -264,7 +264,7 @@ f_socket_error PROT((void))
 
 #ifdef F_SOCKET_ADDRESS
 void
-f_socket_address PROT((void))
+f_socket_address (void)
 {
     char *str;
     int local, port;
@@ -304,7 +304,7 @@ f_socket_address PROT((void))
 
 #ifdef F_SOCKET_STATUS
 void
-f_socket_status PROT((void))
+f_socket_status (void)
 {
      array_t *info;
      int i;
