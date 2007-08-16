@@ -38,7 +38,7 @@ void
 f_all_inventory (void)
 {
     array_t *vec = all_inventory(sp->u.ob, 0);
-    free_object(sp->u.ob, "f_all_inventory");
+    free_object(&sp->u.ob, "f_all_inventory");
     sp->type = T_ARRAY;
     sp->u.arr = vec;
 }
@@ -114,7 +114,7 @@ f_bind (void)
 
     if (ob == old_fp->hdr.owner) {
         /* no change */
-        free_object(ob, "bind nop");
+        free_object(&ob, "bind nop");
         sp--;
         return;
     }
@@ -449,7 +449,7 @@ void
 f_clonep (void)
 {
     if ((sp->type == T_OBJECT) && (sp->u.ob->flags & O_CLONE)) {
-        free_object(sp->u.ob, "f_clonep");
+        free_object(&sp->u.ob, "f_clonep");
         *sp = const1;
     } else {
         free_svalue(sp, "f_clonep");
@@ -550,7 +550,7 @@ f_deep_inherit_list (void)
     array_t *vec;
 
     vec = deep_inherit_list(sp->u.ob);
-    free_object(sp->u.ob, "f_deep_inherit_list");
+    free_object(&sp->u.ob, "f_deep_inherit_list");
     put_array(vec);
 }
 #endif
@@ -592,7 +592,7 @@ f_deep_inventory (void)
     array_t *vec;
 
     vec = deep_inventory(sp->u.ob, 0);
-    free_object(sp->u.ob, "f_deep_inventory");
+    free_object(&sp->u.ob, "f_deep_inventory");
     put_array(vec);
 }
 #endif
@@ -692,7 +692,7 @@ void f_ed_cmd (void)
 void f_ed_start (void)
 {
     char *res;
-    char *fname;
+    const char *fname;
     int restr = 0;
 
     if (st_num_arg == 2)
@@ -775,7 +775,7 @@ f_environment (void)
         if ((ob = sp->u.ob)->flags & O_DESTRUCTED)
             error("environment() of destructed object.\n");
         ob = ob->super;
-        free_object((sp--)->u.ob, "f_environment");
+        free_object(&(sp--)->u.ob, "f_environment");
     } else if (!(current_object->flags & O_DESTRUCTED))
         ob = current_object->super;
     else 
@@ -798,9 +798,9 @@ f_exec (void)
 
     /* They might have been destructed */
     if (sp->type == T_OBJECT)
-        free_object(sp->u.ob, "f_exec:1");
+        free_object(&sp->u.ob, "f_exec:1");
     if ((--sp)->type == T_OBJECT)
-        free_object(sp->u.ob, "f_exec:2");
+        free_object(&sp->u.ob, "f_exec:2");
     put_number(i);
 }
 #endif
@@ -829,7 +829,7 @@ f_file_name (void)
 
     /* This function now returns a leading '/' */
     res = (char *) add_slash(sp->u.ob->obname);
-    free_object(sp->u.ob, "f_file_name");
+    free_object(&sp->u.ob, "f_file_name");
     put_malloced_string(res);
 }
 #endif
@@ -924,7 +924,7 @@ f_function_profile (void)
         prog->function_table[j].children = 0;
 
     }
-    free_object(ob, "f_function_profile");
+    free_object(&ob, "f_function_profile");
     put_array(vec);
 }
 #endif
@@ -942,8 +942,8 @@ f_function_exists (void)
     if (st_num_arg > 1) {
         if (st_num_arg > 2)
             flag = (sp--)->u.number;
-        ob = (sp--)->u.ob;
-        free_object(ob, "f_function_exists");
+        ob = sp->u.ob;
+        free_object(&(sp--)->u.ob, "f_function_exists");
     } else {
         if (current_object->flags & O_DESTRUCTED) {
             free_string_svalue(sp);
@@ -1086,11 +1086,11 @@ f_in_edit (void)
         eb = find_ed_buffer(sp->u.ob);
 #endif
     if (eb && (fn = eb->fname)) {
-        free_object(sp->u.ob, "f_in_edit:1");
+        free_object(&sp->u.ob, "f_in_edit:1");
         put_malloced_string(add_slash(fn));
         return;
     }
-    free_object(sp->u.ob, "f_in_edit:1");
+    free_object(&sp->u.ob, "f_in_edit:1");
     *sp = const0;
     return;
 }
@@ -1103,7 +1103,7 @@ f_in_input (void)
     int i;
 
     i = sp->u.ob->interactive && sp->u.ob->interactive->input_to;
-    free_object(sp->u.ob, "f_in_input");
+    free_object(&sp->u.ob, "f_in_input");
     put_number(i != 0);
 }
 #endif
@@ -1135,12 +1135,12 @@ f_inherits (void)
     base = (sp--)->u.ob;
     ob = find_object2(sp->u.string);
     if (!ob) {
-        free_object(base, "f_inherits");
+        free_object(&base, "f_inherits");
         assign_svalue(sp, &const0);
         return;
     }
     i = inherits(base->prog, ob->prog);
-    free_object(base, "f_inherits");
+    free_object(&base, "f_inherits");
     free_string_svalue(sp);
     put_number(i);
 }
@@ -1153,7 +1153,7 @@ f_shallow_inherit_list (void)
     array_t *vec;
 
     vec = inherit_list(sp->u.ob);
-    free_object(sp->u.ob, "f_inherit_list");
+    free_object(&sp->u.ob, "f_inherit_list");
     put_array(vec);
 }
 #endif
@@ -1189,7 +1189,7 @@ f_interactive (void)
     int i;
 
     i = (sp->u.ob->interactive != 0);
-    free_object(sp->u.ob, "f_interactive");
+    free_object(&sp->u.ob, "f_interactive");
     put_number(i);
 }
 #endif
@@ -1205,7 +1205,7 @@ f_has_mxp (void)
        i = sp->u.ob->interactive->iflags & USING_MXP;
        i = !!i; //force 1 or 0
     }
-    free_object(sp->u.ob, "f_has_mxp");
+    free_object(&sp->u.ob, "f_has_mxp");
     put_number(i);
 }
 #endif
@@ -1770,7 +1770,7 @@ void
 f_objectp (void)
 {
     if (sp->type == T_OBJECT && !(sp->u.ob->flags & O_DESTRUCTED)) {
-        free_object(sp->u.ob, "f_objectp");
+        free_object(&sp->u.ob, "f_objectp");
         *sp = const1;
     } else {
         free_svalue(sp, "f_objectp");
@@ -1981,7 +1981,7 @@ f_query_idle (void)
     int i;
 
     i = query_idle(sp->u.ob);
-    free_object(sp->u.ob, "f_query_idle");
+    free_object(&sp->u.ob, "f_query_idle");
     put_number(i);
 }
 #endif
@@ -1993,7 +1993,7 @@ f_query_ip_name (void)
     char *tmp;
 
     tmp = query_ip_name(st_num_arg ? sp->u.ob : 0);
-    if (st_num_arg) free_object((sp--)->u.ob, "f_query_ip_name");
+    if (st_num_arg) free_object(&(sp--)->u.ob, "f_query_ip_name");
     if (!tmp) push_number(0);
     else share_and_push_string(tmp);
 }
@@ -2006,7 +2006,7 @@ f_query_ip_number (void)
     char *tmp;
 
     tmp = query_ip_number(st_num_arg ? sp->u.ob : 0);
-    if (st_num_arg) free_object((sp--)->u.ob, "f_query_ip_number");
+    if (st_num_arg) free_object(&(sp--)->u.ob, "f_query_ip_number");
     if (!tmp) push_number(0);
     else share_and_push_string(tmp);
 }
@@ -2028,12 +2028,12 @@ f_query_privs (void)
     
     ob = sp->u.ob;
     if (ob->privs != NULL) {
-        free_object(ob, "f_query_privs");
         sp->type = T_STRING;
         sp->u.string = make_shared_string(ob->privs);
         sp->subtype = STRING_SHARED;
+	free_object(&ob, "f_query_privs");
     } else {
-        free_object(ob, "f_query_privs");
+        free_object(&ob, "f_query_privs");
         *sp = const0;
     }
 }
@@ -2046,7 +2046,7 @@ f_query_snooping (void)
     object_t *ob;
     
     ob = query_snooping(sp->u.ob);
-    free_object(sp->u.ob, "f_query_snooping");
+    free_object(&sp->u.ob, "f_query_snooping");
     if (ob) { put_unrefed_undested_object(ob, "query_snooping"); }
     else *sp = const0;
 }
@@ -2059,7 +2059,7 @@ f_query_snoop (void)
     object_t *ob;
     
     ob = query_snoop(sp->u.ob);
-    free_object(sp->u.ob, "f_query_snoop");
+    free_object(&sp->u.ob, "f_query_snoop");
     if (ob) { put_unrefed_undested_object(ob, "query_snoop"); }
     else *sp = const0;
 }
@@ -2797,10 +2797,9 @@ f_set_heart_beat (void)
 void
 f_query_heart_beat (void)
 {
-    object_t *ob;
-    
-    free_object(ob = sp->u.ob, "f_query_heart_beat");
-    put_number(query_heart_beat(ob));
+    int num = query_heart_beat(sp->u.ob);
+    free_object(&sp->u.ob, "f_query_heart_beat");
+    put_number(num);
 }
 #endif
 
@@ -2858,7 +2857,7 @@ f_set_privs (void)
         ob->privs = make_shared_string(sp->u.string);
         free_string_svalue(sp--);
     }       
-    free_object(ob, "f_set_privs");
+    free_object(&ob, "f_set_privs");
     sp--;
 }
 #endif
@@ -2872,7 +2871,7 @@ f_shadow (void)
     ob = (sp - 1)->u.ob;
     if (!((sp--)->u.number)) {
         ob = ob->shadowed;
-        free_object(sp->u.ob, "f_shadow:1");
+        free_object(&sp->u.ob, "f_shadow:1");
         if (ob) {
           add_ref(ob, "shadow(ob, 0)");
           sp->u.ob = ob;
@@ -2885,7 +2884,7 @@ f_shadow (void)
     }
     if (validate_shadowing(ob)) {
         if (current_object->flags & O_DESTRUCTED) {
-            free_object(ob, "f_shadow:2");
+            free_object(&ob, "f_shadow:2");
             *sp = const0;
             return;
         }
@@ -2896,12 +2895,12 @@ f_shadow (void)
             ob = ob->shadowed;
         current_object->shadowing = ob;
         ob->shadowed = current_object;
-        free_object(sp->u.ob, "f_shadow:3");
+        free_object(&sp->u.ob, "f_shadow:3");
         add_ref(ob, "shadow(ob, 1)");
         sp->u.ob = ob;
         return;
     }
-    free_object(sp->u.ob, "f_shadow:4");
+    free_object(&sp->u.ob, "f_shadow:4");
     *sp = const0;
 }
 #endif
@@ -2976,17 +2975,17 @@ f_snoop (void)
      */
     if (st_num_arg == 1) {
         if (!new_set_snoop(sp->u.ob, 0) || (sp->u.ob->flags & O_DESTRUCTED)) {
-            free_object(sp->u.ob, "f_snoop:1");
+            free_object(&sp->u.ob, "f_snoop:1");
             *sp = const0;
         }
     } else {
         if (!new_set_snoop((sp - 1)->u.ob, sp->u.ob) || 
             (sp->u.ob->flags & O_DESTRUCTED)) {
-            free_object((sp--)->u.ob, "f_snoop:2");
-            free_object(sp->u.ob, "f_snoop:3");
+            free_object(&(sp--)->u.ob, "f_snoop:2");
+            free_object(&sp->u.ob, "f_snoop:3");
             *sp = const0;
         } else {
-            free_object((--sp)->u.ob, "f_snoop:4");
+            free_object(&(--sp)->u.ob, "f_snoop:4");
             sp->u.ob = (sp+1)->u.ob;
         }
     }
@@ -3493,7 +3492,7 @@ f_userp (void)
     int i;
 
     i = (int) sp->u.ob->flags & O_ONCE_INTERACTIVE;
-    free_object(sp->u.ob, "f_userp");
+    free_object(&sp->u.ob, "f_userp");
     put_number(i != 0);
 }
 #endif
@@ -3513,7 +3512,7 @@ f_wizardp (void)
     int i;
 
     i = (int) sp->u.ob->flags & O_IS_WIZARD;
-    free_object(sp->u.ob, "f_wizardp");
+    free_object(&sp->u.ob, "f_wizardp");
     put_number(i != 0);
 }
 #endif
@@ -3525,7 +3524,7 @@ f_virtualp (void)
     int i;
 
     i = (int) sp->u.ob->flags & O_VIRTUAL;
-    free_object(sp->u.ob, "f_virtualp");
+    free_object(&sp->u.ob, "f_virtualp");
     put_number(i != 0);
 }
 #endif
@@ -3716,7 +3715,7 @@ f_memory_info (void)
        included or not to be more accurate -- Marius, 30-Jul-2000 */
     mem = ob->prog->total_size;
     mem += (data_size(ob) + sizeof(object_t));
-    free_object(ob, "f_memory_info");
+    free_object(&ob, "f_memory_info");
     put_number(mem);
 }
 #endif
@@ -3726,7 +3725,7 @@ void
 f_reload_object (void)
 {
     reload_object(sp->u.ob);
-    free_object((sp--)->u.ob, "f_reload_object");
+    free_object(&(sp--)->u.ob, "f_reload_object");
 }
 #endif
 
@@ -3739,7 +3738,7 @@ f_query_shadowing (void)
     if ((sp->type == T_OBJECT) && (ob = sp->u.ob)->shadowing) {
         add_ref(ob->shadowing, "query_shadowing(ob)");
         sp->u.ob = ob->shadowing;
-        free_object(ob, "f_query_shadowing");
+        free_object(&ob, "f_query_shadowing");
     } else {
         free_svalue(sp, "f_query_shadowing");
         *sp = const0;
@@ -3753,12 +3752,12 @@ f_set_reset (void)
 {
     if (st_num_arg == 2) {
         (sp - 1)->u.ob->next_reset = current_time + sp->u.number;
-        free_object((--sp)->u.ob, "f_set_reset:1");
+        free_object(&(--sp)->u.ob, "f_set_reset:1");
         sp--;
     } else {
         sp->u.ob->next_reset = current_time + TIME_TO_RESET / 2 +
             random_number(TIME_TO_RESET / 2);
-        free_object((sp--)->u.ob, "f_set_reset:2");
+        free_object(&(sp--)->u.ob, "f_set_reset:2");
     }
 }
 #endif
@@ -3816,7 +3815,7 @@ f_next_inventory (void)
     object_t *ob;
     
     ob = sp->u.ob->next_inv;
-    free_object(sp->u.ob, "f_next_inventory");
+    free_object(&sp->u.ob, "f_next_inventory");
 
 #ifdef F_SET_HIDE
     while (ob && (ob->flags & O_HIDDEN) && !object_visible(ob))

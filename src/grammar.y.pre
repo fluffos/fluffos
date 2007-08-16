@@ -280,17 +280,23 @@ inheritance:
 %endif
 		
 		if (!($1 & DECL_ACCESS)) $1 |= DECL_PUBLIC;
-		
+#ifndef ALLOW_INHERIT_AFTER_FUNCTION
 		if (func_present)
 		    yyerror("Illegal to inherit after defining functions.");
-
+#endif
 		if (var_defined)
 		    yyerror("Illegal to inherit after defining global variables.");
+#ifndef ALLOW_INHERIT_AFTER_FUNCTION
 		if (func_present || var_defined){
+#else
+		if (var_defined){
+#endif
 		  inherit_file = 0;
 		  YYACCEPT;
 		}
-		  
+#ifdef NEVER
+		} //stupid bison
+#endif
 		ob = find_object2($3);
 		if (ob == 0) {
 		    inherit_file = alloc_cstring($3, "inherit");
@@ -1577,13 +1583,12 @@ expr0:
 		case NODE_UNARY_OP_1:
 		case NODE_BINARY_OP:
 		    op = $2->v.number;
-		    if (op > F_RINDEX_LVALUE) {
+		    if (op > F_RINDEX_LVALUE) 
 			yyerror("Illegal to make reference to range");
-			break;
-		    }
 		    break;
 		default:
-		    fatal("unknown lvalue kind");
+		    op=0; //0 is harmless, i hope
+		    yyerror("unknown lvalue kind");
 		}
 		CREATE_UNARY_OP_1($$, F_MAKE_REF, TYPE_ANY, $2, op);
 	    }
@@ -1600,8 +1605,8 @@ expr0:
 
 		if (exact_types && !compatible_types(r->type, l->type) &&
 		    !($2 == F_ADD_EQ
-		      && r->type == TYPE_STRING && 
-		      COMP_TYPE(l->type, TYPE_NUMBER))) {
+		      && l->type == TYPE_STRING && 
+		      (COMP_TYPE(r->type, TYPE_NUMBER))||r->type == TYPE_OBJECT)) {
 		    char buf[256];
 		    char *end = EndOf(buf);
 		    char *p;
@@ -1860,45 +1865,50 @@ expr0:
 			} else result_type = t1;
 		    } else {
 			switch(t1) {
-			    case TYPE_STRING:
-			    {
-				if (t3 == TYPE_REAL || t3 == TYPE_NUMBER){
-				    result_type = TYPE_STRING;
-				} else goto add_error;
-				break;
-			    }
-			    case TYPE_NUMBER:
-			    {
-				if (t3 == TYPE_REAL || t3 == TYPE_STRING)
-				    result_type = t3;
-				else goto add_error;
-				break;
-			    }
+			case TYPE_OBJECT:
+			  if(t3 == TYPE_STRING){
+			    result_type = TYPE_STRING;
+			  } else goto add_error;
+			  break;
+			case TYPE_STRING:
+			  {
+			    if (t3 == TYPE_REAL || t3 == TYPE_NUMBER || t3 == TYPE_OBJECT){
+			      result_type = TYPE_STRING;
+			    } else goto add_error;
+			    break;
+			  }
+			case TYPE_NUMBER:
+			  {
+			    if (t3 == TYPE_REAL || t3 == TYPE_STRING)
+			      result_type = t3;
+			    else goto add_error;
+			    break;
+			  }
 			case TYPE_REAL:
-			    {
-				if (t3 == TYPE_NUMBER) result_type = TYPE_REAL;
-				else if (t3 == TYPE_STRING) result_type = TYPE_STRING;
-				else goto add_error;
-				break;
+			  {
+			    if (t3 == TYPE_NUMBER) result_type = TYPE_REAL;
+			    else if (t3 == TYPE_STRING) result_type = TYPE_STRING;
+			    else goto add_error;
+			    break;
+			  }
+			default:
+			  {
+			    if (t1 & t3 & TYPE_MOD_ARRAY) {
+			      result_type = TYPE_ANY|TYPE_MOD_ARRAY;
+			      break;
 			    }
-			    default:
+			  add_error:
 			    {
-				if (t1 & t3 & TYPE_MOD_ARRAY) {
-				    result_type = TYPE_ANY|TYPE_MOD_ARRAY;
-				    break;
-				}
-add_error:
-				{
-				    char buf[256];
-				    char *end = EndOf(buf);
-				    char *p;
-				    
-				    p = strput(buf, end, "Invalid argument types to '+' ");
-				    p = get_two_types(p, end, t1, t3);
-				    yyerror(buf);
-				    result_type = TYPE_ANY;
-				}
+			      char buf[256];
+			      char *end = EndOf(buf);
+			      char *p;
+			      
+			      p = strput(buf, end, "Invalid argument types to '+' ");
+			      p = get_two_types(p, end, t1, t3);
+			      yyerror(buf);
+			      result_type = TYPE_ANY;
 			    }
+			  }
 			}
 		    }
 		} else 

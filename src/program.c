@@ -31,7 +31,7 @@ void deallocate_program (program_t * progp)
         free_string(progp->variable_table[i]);
     /* Free all inherited objects */
     for (i = 0; i < (int) progp->num_inherited; i++)
-        free_prog(progp->inherit[i].prog);
+        free_prog(&progp->inherit[i].prog);
     free_string(progp->filename);
 
     /*
@@ -51,15 +51,20 @@ void deallocate_program (program_t * progp)
  * as we want to be able to read the program in again from the swap area.
  * That means that strings are not swapped.
  */
-void free_prog (program_t *progp)
+void free_prog (program_t **progp)
 {
-    progp->ref--;
-    if (progp->ref > 0)
+    (*progp)->ref--;
+    if ((*progp)->ref > 0) {
+      *progp = (program_t *)2;//NULL;
         return;
-    if (progp->func_ref > 0)
+    }
+    if ((*progp)->func_ref > 0) {
+      *progp = (program_t *)3;//NULL;
         return;
+    }
 
-    deallocate_program(progp);
+    deallocate_program(*progp);
+    *progp = (program_t *)4;//NULL;
 }
 
 char *variable_name (program_t * prog, int idx) {

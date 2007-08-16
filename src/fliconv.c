@@ -99,7 +99,7 @@ char *translate(iconv_t tr, const char *mes, int inlen, int *outlen){
 #else
 char *translate(iconv_t tr, const char *mes, int inlen, int *outlen){
   *outlen = inlen;
-  return mes;
+  return (char *)mes;
 }
 #endif
 

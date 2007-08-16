@@ -1752,6 +1752,9 @@ int convert_type (int type){
 parse_node_t *add_type_check (parse_node_t * node, int intype) {
     parse_node_t *expr, *expr2;
     int type;
+
+    if(!(pragmas & PRAGMA_STRICT_TYPES))
+      return node;
     
     switch(intype & (~DECL_MODS)) {
     case 0:

@@ -10,6 +10,8 @@
 #include "my_malloc.h"
 #include "md.h"
 
+void fatal (const char *, ...);
+
 #undef NOISY_MALLOC
 
 #ifdef NOISY_MALLOC
@@ -23,8 +25,6 @@
 #define NOISY2(x,y,z) 
 #define NOISY3(w,x,y,z) 
 #endif
-
-void fatal PROT1V(char *);
 
 typedef struct stats_s {
     unsigned int free_calls, alloc_calls, realloc_calls;

@@ -307,7 +307,7 @@ static void init_author_for_ob (object_t * ob)
 {
     svalue_t *ret;
 
-    push_malloced_string(add_slash(ob->name));
+    push_malloced_string(add_slash(ob->obname));
     ret = apply_master_ob(APPLY_AUTHOR_FILE, 1);
     if (ret == (svalue_t *)-1) {
 	ob->stats.author = master_author;
@@ -387,7 +387,7 @@ static void init_domain_for_ob (object_t * ob)
     /*
      * Ask master object who the creator of this object is.
      */
-    push_malloced_string(add_slash(ob->name));
+    push_malloced_string(add_slash(ob->obname));
 
     if (master_ob)
 	ret = apply_master_ob(APPLY_DOMAIN_FILE, 1);

@@ -93,7 +93,7 @@ void MDinit()
 void
 MDmalloc (md_node_t * node, int size, int tag, char * desc)
 {
-    unsigned int h;
+    unsigned long h;
     static int count = 0;
 
     if (!size) {
@@ -127,15 +127,15 @@ MDmalloc (md_node_t * node, int size, int tag, char * desc)
     node->id = count++;
     node->desc = desc ? desc : "default";
     if (malloc_mask == node->tag) {
-        debug_message("MDmalloc: %5d, [%-25s], %8x:(%d)\n",
-                node->tag, node->desc, (unsigned int) PTR(node), node->size);
+        debug_message("MDmalloc: %5d, [%-25s], %8lx:(%d)\n",
+                node->tag, node->desc, PTR(node), node->size);
     }
 #endif
     table[h] = node;
 }
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-void set_tag (void * ptr, int tag) {
+void set_tag (const void * ptr, int tag) {
     md_node_t *node = PTR_TO_NODET(ptr);
     
     if ((node->tag & 0xff) < MAX_CATEGORY) {
@@ -161,7 +161,7 @@ void set_tag (void * ptr, int tag) {
 int
 MDfree (void * ptr)
 {
-    unsigned int h;
+    unsigned long h;
     int tmp;
     md_node_t *entry, **oentry;
 
@@ -177,11 +177,11 @@ MDfree (void * ptr)
     if (entry) {
 #ifdef CHECK_MEMORY
         if (LEFT_MAGIC(entry) != MD_MAGIC) {
-            debug_message("MDfree: left side of entry corrupt: %s %04x at %x\n", entry->desc, (int)entry->tag, (int)entry);
+            debug_message("MDfree: left side of entry corrupt: %s %04x at %lx\n", entry->desc, entry->tag, entry);
         }
         FETCH_RIGHT_MAGIC(tmp, entry);
         if (tmp != MD_MAGIC) {
-            debug_message("MDfree: right side of entry corrupt: %s %04x at %x\n", entry->desc, (int)entry->tag, (int)entry);
+            debug_message("MDfree: right side of entry corrupt: %s %04x at %lx\n", entry->desc, entry->tag, entry);
         }
 #endif
 #ifdef DEBUGMALLOC_EXTENSIONS
@@ -194,13 +194,13 @@ MDfree (void * ptr)
             blocks[(entry->tag >> 8) & 0xff]--;
         }
         if (malloc_mask == entry->tag) {
-            debug_message("MDfree: %5d, [%-25s], %8x:(%d)\n",
-            entry->tag, entry->desc, (unsigned int) PTR(entry), entry->size);
+            debug_message("MDfree: %5d, [%-25s], %8lx:(%d)\n",
+            entry->tag, entry->desc, (unsigned long) PTR(entry), entry->size);
         }
 #endif
     } else {
-        debug_message("md: debugmalloc: attempted to free non-malloc'd pointer %04x\n",
-                (unsigned int) ptr);
+        debug_message("md: debugmalloc: attempted to free non-malloc'd pointer %08lx\n",
+                (unsigned long) ptr);
 #ifdef DEBUG
         abort();
 #endif
@@ -213,7 +213,7 @@ MDfree (void * ptr)
 char *dump_debugmalloc (char * tfn, int mask)
 {
     int j, total = 0, chunks = 0, total2 = 0;
-    char *fn;
+    const char *fn;
     md_node_t *entry;
     FILE *fp;
 
@@ -229,9 +229,9 @@ char *dump_debugmalloc (char * tfn, int mask)
     for (j = 0; j < MD_TABLE_SIZE; j++) {
         for (entry = table[j]; entry; entry = entry->next) {
             if (!mask || (entry->tag == mask)) {
-                fprintf(fp, "%-30s: sz %7d: id %6d: tag %08x, a %8x\n",
+                fprintf(fp, "%-30s: sz %7d: id %6d: tag %08x, a %8lx\n",
                         entry->desc, entry->size, entry->id, entry->tag,
-                        (unsigned int) PTR(entry));
+                        (unsigned long) PTR(entry));
                 total += entry->size;
                 chunks++;
             }
@@ -608,11 +608,11 @@ void check_all_blocks (int flag) {
             entry->tag &= ~TAG_MARKED;
 #ifdef CHECK_MEMORY
             if (LEFT_MAGIC(entry) != MD_MAGIC) {
-                outbuf_addv(&out, "WARNING: left side of entry corrupt: %s %04x at %x\n", entry->desc, (int)entry->tag, (int)entry);
+                outbuf_addv(&out, "WARNING: left side of entry corrupt: %s %08lx at %lx\n", entry->desc, entry->tag, entry);
             }
             FETCH_RIGHT_MAGIC(tmp, entry);
             if (tmp != MD_MAGIC) {
-                outbuf_addv(&out, "WARNING: right side of entry corrupt: %s %04x at %x\n", entry->desc, (int)entry->tag, (int)entry);
+                outbuf_addv(&out, "WARNING: right side of entry corrupt: %s %08lx at %lx\n", entry->desc, entry->tag, entry);
             }
 #endif
             switch (entry->tag & 0xff00) {

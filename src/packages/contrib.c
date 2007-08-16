@@ -45,14 +45,14 @@ void f_compressedp (void)
   int i;
 
   i = sp->u.ob->interactive && sp->u.ob->interactive->compressed_stream;
-  free_object(sp->u.ob, "f_compressedp");
+  free_object(&sp->u.ob, "f_compressedp");
   put_number(i != 0);
 }
 #endif
 
 /*
  * This differs from the livings() efun in that this efun only returns
- * objects which have had set_living_name() called as well as 
+ * objects which have had set_living_name() called as well as
  * enable_commands().  The other major difference is that this is
  * substantially faster.
  */
@@ -103,7 +103,7 @@ void f_named_livings() {
     FREE(obtab);
 
     push_refed_array(vec);
-}    
+}
 #endif
 
 /* I forgot who wrote this, please claim it :) */
@@ -112,7 +112,7 @@ void
 f_remove_shadow (void)
 {
     object_t *ob;
-    
+
     ob = current_object;
     if (st_num_arg) {
         ob = sp->u.ob;
@@ -162,7 +162,7 @@ f_store_variable (void) {
     int idx;
     svalue_t *sv;
     unsigned short type;
-    
+
     idx = find_global_variable(current_object->prog, (sp-1)->u.string, &type, 0);
     if (idx == -1)
         error("No variable named '%s'!\n", (sp-1)->u.string);
@@ -179,7 +179,7 @@ f_fetch_variable (void) {
     int idx;
     svalue_t *sv;
     unsigned short type;
-    
+
     idx = find_global_variable(current_object->prog, sp->u.string, &type, 0);
     if (idx == -1)
         error("No variable named '%s'!\n", sp->u.string);
@@ -198,10 +198,10 @@ f_set_prompt (void) {
         who = sp->u.ob;
         pop_stack();
     } else who = command_giver;
-    
+
     if (!who || who->flags & O_DESTRUCTED || !who->interactive)
         error("Prompts can only be set for interactives.\n");
-    
+
     /* Future work */
     /* ed() will nuke this; also we have to make sure the string will get
      * freed */
@@ -220,7 +220,7 @@ static void deep_copy_svalue (svalue_t *, svalue_t *);
 static array_t *deep_copy_array ( array_t * arg ) {
     array_t *vec;
     int i;
-    
+
     vec = allocate_empty_array(arg->size);
     for (i = 0; i < arg->size; i++)
         deep_copy_svalue(&arg->item[i], &vec->item[i]);
@@ -231,7 +231,7 @@ static array_t *deep_copy_array ( array_t * arg ) {
 static array_t *deep_copy_class (array_t * arg) {
     array_t *vec;
     int i;
-    
+
     vec = allocate_empty_class_by_size(arg->size);
     for (i = 0; i < arg->size; i++)
         deep_copy_svalue(&arg->item[i], &vec->item[i]);
@@ -241,20 +241,20 @@ static array_t *deep_copy_class (array_t * arg) {
 
 static int doCopy ( mapping_t * map, mapping_node_t * elt, mapping_t * dest) {
     svalue_t *sv;
-    
+
     sv = find_for_insert(dest, &elt->values[0], 1);
     if (!sv) {
         mapping_too_large();
         return 1;
     }
-    
+
     deep_copy_svalue(&elt->values[1], sv);
     return 0;
 }
 
 static mapping_t *deep_copy_mapping ( mapping_t * arg ) {
     mapping_t *map;
-    
+
     map = allocate_mapping( 0 ); /* this should be fixed.  -Beek */
     mapTraverse( arg, (int (*)()) doCopy, map); /* Not horridly efficient either */
     return map;
@@ -310,15 +310,15 @@ static void deep_copy_svalue (svalue_t * from, svalue_t * to) {
 void f_copy (void)
 {
     svalue_t ret;
-    
+
     depth = 0;
     deep_copy_svalue(sp, &ret);
     free_svalue(sp, "f_copy");
     *sp = ret;
 }
-#endif    
+#endif
 
-/* Gudu@VR */    
+/* Gudu@VR */
 /* flag and extra info by Beek */
 #ifdef F_FUNCTIONS
 void f_functions (void) {
@@ -331,32 +331,32 @@ void f_functions (void) {
     char buf[256];
     char *end = EndOf(buf);
     program_t *progp;
-    
+
     progp = sp->u.ob->prog;
     num = progp->num_functions_defined + progp->last_inherited;
     if (progp->num_functions_defined &&
         progp->function_table[progp->num_functions_defined-1].funcname[0]
         == APPLY___INIT_SPECIAL_CHAR)
         num--;
-        
+
     vec = allocate_empty_array(num);
     i = num;
-    
+
     while (i--) {
         unsigned short low, high, mid;
-        
+
         prog = sp->u.ob->prog;
         ind = i;
 
-        /* Walk up the inheritance tree to the real definition */       
+        /* Walk up the inheritance tree to the real definition */
         if (prog->function_flags[ind] & FUNC_ALIAS) {
             ind = prog->function_flags[ind] & ~FUNC_ALIAS;
         }
-        
+
         while (prog->function_flags[ind] & FUNC_INHERITED) {
             low = 0;
             high = prog->num_inherited -1;
-            
+
             while (high > low) {
                 mid = (low + high + 1) >> 1;
                 if (prog->inherit[mid].function_index_offset > ind)
@@ -366,7 +366,7 @@ void f_functions (void) {
             ind -= prog->inherit[low].function_index_offset;
             prog = prog->inherit[low].prog;
         }
-    
+
         ind -= prog->last_inherited;
 
         funp = prog->function_table + ind;
@@ -379,7 +379,7 @@ void f_functions (void) {
 
             vec->item[i].type = T_ARRAY;
             subvec = vec->item[i].u.arr = allocate_empty_array(3 + funp->num_arg);
-            
+
             subvec->item[0].type = T_STRING;
             subvec->item[0].subtype = STRING_SHARED;
             subvec->item[0].u.string = make_shared_string(funp->funcname);
@@ -410,7 +410,7 @@ void f_functions (void) {
             vec->item[i].u.string = make_shared_string(funp->funcname);
         }
     }
-    
+
     pop_stack();
     push_refed_array(vec);
 }
@@ -423,9 +423,9 @@ static void fv_recurse (array_t * arr, int * idx, program_t * prog, int type, in
     array_t *subarr;
     char buf[256];
     char *end = EndOf(buf);
-    
+
     for (i = 0; i < prog->num_inherited; i++) {
-        fv_recurse(arr, idx, prog->inherit[i].prog, 
+        fv_recurse(arr, idx, prog->inherit[i].prog,
                    type | prog->inherit[i].type_mod, flag);
     }
     for (i = 0; i < prog->num_variables_defined; i++) {
@@ -453,10 +453,10 @@ void f_variables (void) {
     array_t *arr;
     int flag = (sp--)->u.number;
     program_t *prog = sp->u.ob->prog;
-    
+
     arr = allocate_empty_array(prog->num_variables_total);
     fv_recurse(arr, &idx, prog, 0, flag);
-    
+
     pop_stack();
     push_refed_array(arr);
 }
@@ -497,7 +497,7 @@ void f_heart_beats (void) {
    from the pointer array.
 
    Further speed is gained by the fact that no parsing is
-   done if the input string does not contain any "%^" 
+   done if the input string does not contain any "%^"
    delimiter sequence.
 
    by Aleas@Nightmare, dec-94 */
@@ -518,7 +518,7 @@ static int at_end(int i, int imax, int z, int *lens) {
     return 1;
 }
 
-void 
+void
 f_terminal_colour (void)
 {
     const char *instr, *cp, **parts;
@@ -554,7 +554,7 @@ f_terminal_colour (void)
     cp = instr = (sp-1)->u.string;
     do {
         cp = strchr(cp, TC_FIRST_CHAR);
-        if (cp) 
+        if (cp)
         {
             if (cp[1] == TC_SECOND_CHAR)
             {
@@ -605,7 +605,7 @@ f_terminal_colour (void)
                 if (newstr > instr) {
                     if (num && num % NSTRSEGS == 0) {
                         // Increase the size of the parts array.
-                        parts = (const char **) RESIZE(parts, num + NSTRSEGS, char *, 
+                        parts = (const char **) RESIZE(parts, num + NSTRSEGS, char *,
                                        TAG_TEMPORARY, "f_terminal_colour: parts realloc");
                     }
                     // Put it in at the current location in the parts array.
@@ -652,7 +652,7 @@ f_terminal_colour (void)
     if (resetstrname) {
        int tmp = MAP_POINTER_HASH(resetstrname);
        for (elt = mtab[tmp & k]; elt; elt = elt->next) {
-           if ( elt->values->type == T_STRING && 
+           if ( elt->values->type == T_STRING &&
                 (elt->values + 1)->type == T_STRING &&
                 resetstrname == elt->values->u.string) {
                resetstr = (elt->values + 1)->u.string;
@@ -660,8 +660,8 @@ f_terminal_colour (void)
                break;
            }
        }
-    } 
-    
+    }
+
     if(!resetstrlen) {
 	//we really really need one, but it shouldn't be visible!
 	resetstr = "\xff\xf9"; //telnet go ahead
@@ -680,7 +680,7 @@ f_terminal_colour (void)
         if ((cp = findstring(parts[i]))) {
             int tmp = MAP_POINTER_HASH(cp);
             for (elt = mtab[tmp & k]; elt; elt = elt->next) {
-                if ( elt->values->type == T_STRING && 
+                if ( elt->values->type == T_STRING &&
                      (elt->values + 1)->type == T_STRING &&
                      cp == elt->values->u.string) {
                     parts[i] = (elt->values + 1)->u.string;
@@ -819,14 +819,14 @@ f_terminal_colour (void)
 
     if (wrap && buflen > max_buflen)
         max_buflen = buflen;
-    
-    /* now we have the final string in parts and length in j. 
+
+    /* now we have the final string in parts and length in j.
        let's compose it, wrapping if necessary */
     ncp = deststr = new_string(j, "f_terminal_colour: deststr");
     if (wrap) {
         char *tmp = new_string(max_buflen, "f_terminal_colour: wrap");
         char *pt = tmp;
-        
+
         col = 0;
         start = -1;
         space = 0;
@@ -876,7 +876,7 @@ f_terminal_colour (void)
                         pt--;
                         buflen--;
                     }
-                    
+
                     if (col > start && c == '\t')
                         col += (8 - ((col - 1) % 8));
                     if (c == ' ' || c == '\t') {
@@ -983,7 +983,7 @@ static char *pluralize (const char * str) {
     /* default rule */
     int found = 0;
     const char * suffix = "s";
-    
+
     sz = strlen(str);
     if (!sz) return 0;
 
@@ -996,8 +996,8 @@ static char *pluralize (const char * str) {
 
     /*
      * first, get rid of determiners.  pluralized forms never have them ;)
-     * They can have 'the' so don't remove that 
-     */  
+     * They can have 'the' so don't remove that
+     */
     if (str[0] == 'a' || str[0] == 'A') {
         if (str[1] == ' ') {
             plen = sz - 2;
@@ -1026,7 +1026,7 @@ static char *pluralize (const char * str) {
         rel = p + 1;
     else
         rel = pre;
-        
+
     end = rel + strlen(rel);
 
     /*
@@ -1049,7 +1049,7 @@ static char *pluralize (const char * str) {
             found = PLURAL_SUFFIX;
             suffix = "es";
 	    break;
-        } 
+        }
         if (!strcasecmp(rel + 1, "onus")) {
             found = PLURAL_SUFFIX;
             suffix = "es";
@@ -1081,7 +1081,7 @@ static char *pluralize (const char * str) {
         }
         if (!strcasecmp(rel + 1, "eer")) {
             found = PLURAL_SAME;
-	    break;	    
+	    break;
         }
         if (!strcasecmp(rel + 1, "o")) {
             found = PLURAL_SUFFIX;
@@ -1106,7 +1106,7 @@ static char *pluralize (const char * str) {
             found = PLURAL_CHOP + 2;
             suffix = "a";
             break;
-	} 
+	}
         if (!strcasecmp(rel + 1, "ife"))
             found = PLURAL_SUFFIX;
         break;
@@ -1116,16 +1116,16 @@ static char *pluralize (const char * str) {
             found = PLURAL_CHOP + 4;
             suffix = "eese";
 	    break;
-        } 
+        }
         if (!strcasecmp(rel + 1, "o")) {
             found = PLURAL_SUFFIX;
             suffix = "es";
 	    break;
-        } 
+        }
         if (!strcasecmp(rel + 1, "um")) {
             found = PLURAL_SUFFIX;
 	    break;
-        } 
+        }
 	if (!strcasecmp(rel + 1, "iraffe")) {
             found = PLURAL_SUFFIX;
             suffix = "s";
@@ -1140,7 +1140,7 @@ static char *pluralize (const char * str) {
         if (!strcasecmp(rel + 1, "ave")) {
             found = PLURAL_CHOP + 2;
             suffix = "s";
-        }           
+        }
         break;
     case 'I':
     case 'i':
@@ -1166,7 +1166,7 @@ static char *pluralize (const char * str) {
         if (!strcasecmp(rel + 1, "ackerel")) {
             found = PLURAL_SAME;
             break;
-        } 
+        }
         if (!strcasecmp(rel + 1, "oose")) {
             found = PLURAL_SAME;
             break;
@@ -1228,7 +1228,7 @@ static char *pluralize (const char * str) {
             found = PLURAL_SUFFIX;
             break;
         }
-        if (!strcasecmp(rel + 1, "haman")) 
+        if (!strcasecmp(rel + 1, "haman"))
             found = PLURAL_SUFFIX;
         break;
     case 'T':
@@ -1371,7 +1371,7 @@ static char *pluralize (const char * str) {
         case 'Y': case 'y':
             if ((end-pre) > 1 && end[-2] != 'a' && end[-2] != 'e' && end[-2] != 'i'
                 && end[-2] != 'o' && end[-2] != 'u') {
-                found = PLURAL_CHOP + 1;    
+                found = PLURAL_CHOP + 1;
                 suffix = "ies";
             }
             break;
@@ -1400,9 +1400,9 @@ static char *pluralize (const char * str) {
 
     p = new_string(sz, "pluralize");
     p[sz] = 0;
-    
+
     strncpy(p, pre, plen);
-    if (slen) 
+    if (slen)
         strncpy(p + plen, suffix, slen);
     if (of_len) {
         strcpy(p + plen + slen, of_buf);
@@ -1413,7 +1413,7 @@ static char *pluralize (const char * str) {
     return p;
 } /* end of pluralize() */
 
-void 
+void
 f_pluralize (void)
 {
    char *s;
@@ -1442,7 +1442,7 @@ static int file_length (const char * file)
   char *p, *newp;
 
   file = check_valid_path(file, current_object, "file_size", 0);
-  
+
   if (!file) return -1;
   if (stat(file, &st) == -1)
       return -1;
@@ -1450,7 +1450,7 @@ static int file_length (const char * file)
       return -2;
   if (!(f = fopen(file, "r")))
       return -1;
-  
+
   do {
       num = fread(buf, 1, 2048, f);
       p = buf - 1;
@@ -1465,11 +1465,11 @@ static int file_length (const char * file)
   return ret;
 } /* end of file_length() */
 
-void 
+void
 f_file_length (void)
 {
     int l;
-    
+
     l = file_length(sp->u.string);
     pop_stack();
     push_number(l);
@@ -1507,7 +1507,7 @@ void f_replaceable (void) {
     program_t *prog;
     int i, j, num, numignore, replaceable;
     char **ignore;
-    
+
     if (st_num_arg == 2) {
         numignore = sp->u.arr->size;
         if (numignore)
@@ -1531,10 +1531,10 @@ void f_replaceable (void) {
         ignore[1] = findstring(APPLY___INIT);
         obj = sp->u.ob;
     }
-    
+
     prog = obj->prog;
     num = prog->num_functions_defined + prog->last_inherited;
-    
+
     for (i = 0; i < num; i++) {
         if (prog->function_flags[i] & (FUNC_INHERITED | FUNC_NO_CODE)) continue;
         for (j = 0; j < numignore; j++)
@@ -1578,13 +1578,13 @@ void f_program_info (void) {
         if (!(ob->flags & O_CLONE)) {
             hdr_size += sizeof(program_t);
             prog_size += prog->program_size;
-            
+
             /* function flags */
             func_size += (prog->last_inherited +
-                          prog->num_functions_defined) *sizeof(unsigned short); 
-                 
+                          prog->num_functions_defined) *sizeof(unsigned short);
+
             /* definitions */
-            func_size += prog->num_functions_defined * 
+            func_size += prog->num_functions_defined *
              sizeof(function_t);
 
             string_size += prog->num_strings * sizeof(char *);
@@ -1610,17 +1610,18 @@ void f_program_info (void) {
         pop_stack();
     } else {
         for (ob = obj_list; ob; ob = ob->next_all) {
-            if (ob->flags & O_CLONE) continue;
+            if (ob->flags & O_CLONE)
+                continue;
             prog = ob->prog;
             hdr_size += sizeof(program_t);
             prog_size += prog->program_size;
 
             /* function flags */
             func_size += (prog->last_inherited +
-                          prog->num_functions_defined) << 1; 
-                          
+                          prog->num_functions_defined) << 1;
+
             /* definitions */
-            func_size += prog->num_functions_defined * 
+            func_size += prog->num_functions_defined *
               sizeof(function_t);
 
 
@@ -1672,13 +1673,13 @@ void f_program_info (void) {
 #ifdef F_REMOVE_INTERACTIVE
 void f_remove_interactive (void) {
     if( (sp->u.ob->flags & O_DESTRUCTED) || !(sp->u.ob->interactive) ) {
-        free_object(sp->u.ob, "f_remove_interactive");
+        free_object(&sp->u.ob, "f_remove_interactive");
         *sp = const0;
     } else {
         remove_interactive(sp->u.ob, 0);
         /* It may have been dested */
         if (sp->type == T_OBJECT)
-            free_object(sp->u.ob, "f_remove_interactive");
+            free_object(&sp->u.ob, "f_remove_interactive");
         *sp = const1;
     }
 }
@@ -1694,16 +1695,16 @@ static int query_ip_port (object_t * ob)
     if (!ob || ob->interactive == 0)
         return 0;
     return ob->interactive->local_port;
-}    
+}
 
 void
 f_query_ip_port (void)
 {
     int tmp;
-    
+
     if (st_num_arg) {
         tmp = query_ip_port(sp->u.ob);
-        free_object(sp->u.ob, "f_query_ip_port");
+        free_object(&sp->u.ob, "f_query_ip_port");
     } else {
         tmp = query_ip_port(command_giver);
         STACK_INC;
@@ -1714,9 +1715,9 @@ f_query_ip_port (void)
 
 /*
 ** John Viega (rust@lima.imaginary.com) Jan, 1996
-** efuns for doing time zone conversions.  Much friendlier 
+** efuns for doing time zone conversions.  Much friendlier
 ** than doing all the lookup tables in LPC.
-** most muds have traditionally just used an offset of the 
+** most muds have traditionally just used an offset of the
 ** mud time or GMT, and this isn't always correct.
 */
 
@@ -1753,7 +1754,7 @@ void f_zonetime (void)
   char *retv;
   long time_val;
   int len;
-  
+
   time_val = sp->u.number;
   pop_stack();
   timezone = sp->u.string;
@@ -1765,7 +1766,7 @@ void f_zonetime (void)
   retv[len-1] = '\0';
   reset_timezone(old_tz);
   push_malloced_string (string_copy(retv, "zonetime"));
-  
+
 }
 #endif
 
@@ -1783,7 +1784,7 @@ void f_is_daylight_savings_time (void)
   pop_stack();
 
   old_tz = set_timezone(timezone);
- 
+
   t = localtime((time_t *)&time_to_check);
 
   push_number((t->tm_isdst) > 0);
@@ -1802,7 +1803,7 @@ void f_debug_message (void) {
 #ifdef F_FUNCTION_OWNER
 void f_function_owner (void) {
     object_t *owner = sp->u.fp->hdr.owner;
-    
+
     free_funp(sp->u.fp);
     put_unrefed_object(owner, "f_function_owner");
 }
@@ -1814,8 +1815,8 @@ void f_repeat_string (void) {
     int repeat, len, newlen;
     char *ret, *p;
     int i;
-    
-    repeat = (sp--)->u.number;    
+
+    repeat = (sp--)->u.number;
     if (repeat > 0) {
         str = sp->u.string;
         len = SVALUE_STRLEN(sp);
@@ -1847,7 +1848,7 @@ static int memory_share (svalue_t *);
 
 static int node_share (mapping_t * m, mapping_node_t * elt, void * tp) {
     int *t = (int *)tp;
-    
+
     *t += sizeof(mapping_node_t) - 2*sizeof(svalue_t);
     *t += memory_share(&elt->values[0]);
     *t += memory_share(&elt->values[1]);
@@ -1859,16 +1860,16 @@ static int memory_share (svalue_t * sv) {
     int i, total = sizeof(svalue_t);
     int subtotal;
     static int calldepth = 0;
-    
+
     switch (sv->type) {
     case T_STRING:
         switch (sv->subtype) {
         case STRING_MALLOC:
-            return total + 
+            return total +
                 (1 + COUNTED_STRLEN(sv->u.string) + sizeof(malloc_block_t))/
                 (COUNTED_REF(sv->u.string));
         case STRING_SHARED:
-            return total + 
+            return total +
                 (1 + COUNTED_STRLEN(sv->u.string) + sizeof(block_t))/
                 (COUNTED_REF(sv->u.string));
         }
@@ -1937,16 +1938,16 @@ static int memory_share (svalue_t * sv) {
 
 /*
  * The returned mapping is:
- * 
+ *
  * map["program name"]["variable name"] = memory usage
  */
 #ifdef F_MEMORY_SUMMARY
-static void fms_recurse (mapping_t * map, object_t * ob, 
+static void fms_recurse (mapping_t * map, object_t * ob,
                            int * idx, program_t * prog) {
     int i;
     svalue_t *entry;
     svalue_t sv;
-    
+
     sv.type = T_STRING;
     sv.subtype = STRING_SHARED;
 
@@ -1955,7 +1956,7 @@ static void fms_recurse (mapping_t * map, object_t * ob,
 
     for (i = 0; i < prog->num_variables_defined; i++) {
         int size = memory_share(ob->variables + *idx + i);
-        
+
         sv.u.string = prog->variable_table[i];
         entry = find_for_insert(map, &sv, 0);
         entry->u.number += size;
@@ -1968,13 +1969,13 @@ void f_memory_summary (void) {
     object_t *ob;
     int idx;
     svalue_t sv;
-    
+
     sv.type = T_STRING;
     sv.subtype = STRING_SHARED;
-    
+
     for (ob = obj_list; ob; ob = ob->next_all) {
         svalue_t *entry;
-        
+
         sv.u.string = ob->prog->filename;
         entry = find_for_insert(result, &sv, 0);
         if (entry->type == T_NUMBER) {
@@ -2000,7 +2001,7 @@ void f_query_replaced_program (void)
     {
         if (sp->u.ob->replaced_program)
             res = add_slash(sp->u.ob->replaced_program);
-        free_object(sp->u.ob, "f_query_replaced_program");
+        free_object(&sp->u.ob, "f_query_replaced_program");
     }
     else
     {
@@ -2132,7 +2133,7 @@ void event (svalue_t * event_ob, const char * event_fun, int numparam,
       for (ob = event_ob->u.ob->contains; ob; ob = ob->next_inv){
 	if (ob == origin)
 	  continue;
-	
+
 	if (ob->flags & O_DESTRUCTED)
 	  continue;
 	push_object(ob);
@@ -2209,11 +2210,11 @@ void f_query_num (void){
   pop_stack();
   n = sp->u.number;
   //  pop_stack();
-  
+
   if ((limit && n>limit) || (n<0) || (n>99999)) {
     strcpy(ret,  "many"); /* this is a little pointless ... */
     goto q_n_end;
-  } 
+  }
 
   if ((i = n/1000)) {
     n = n%1000;
@@ -2227,7 +2228,7 @@ void f_query_num (void){
     strcat(ret, " thousand");
     changed = 1;
   }
-  
+
   if ((i = n/100)) {
     n = n%100;
     if (changed) {
@@ -2263,7 +2264,7 @@ void f_query_num (void){
 }
 
 #endif
-      
+
 #ifdef F_BASE_NAME
 void f_base_name (void) {
   char *name, *tmp;
@@ -2271,7 +2272,7 @@ void f_base_name (void) {
 
   if( sp->type == T_OBJECT ) {
     if( sp->u.ob->flags & O_DESTRUCTED ) {
-      free_object( sp->u.ob, "f_base_name");
+      free_object( &sp->u.ob, "f_base_name");
       *sp = const0;
       return;
     }
@@ -2299,8 +2300,8 @@ void f_base_name (void) {
 
 #ifdef F_GET_GARBAGE
 int garbage_check (object_t * ob, void * data){
-  return (ob->ref == 1) && (ob->flags & O_CLONE) && 
-    !(ob->super 
+  return (ob->ref == 1) && (ob->flags & O_CLONE) &&
+    !(ob->super
 #ifndef NO_SHADOWS
       || ob->shadowing
 #endif
@@ -2312,7 +2313,7 @@ void f_get_garbage (void){
   object_t **obs;
   array_t *ret;
   get_objects(&obs, &count, garbage_check, 0);
-  
+
   if (count > max_array_size)
     count = max_array_size;
   ret = allocate_empty_array(count);
@@ -2322,7 +2323,7 @@ void f_get_garbage (void){
         add_ref(obs[i], "f_get_garbage");
   }
 
-  pop_n_elems(1); 
+  pop_n_elems(1);
   push_refed_array(ret);
 }
 #endif

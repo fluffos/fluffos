@@ -876,7 +876,9 @@
 #define USE_ICONV
 
 /* WOMBLES: don't allow spaces between start/end of array/mapping/functional token chars so ({1,2,3}) still works, but ( { 1 , 2 , 3 } ) doesn't and ({ 1 , 2 , 3 }) does.*/
-#undef WOMBLES
+#define WOMBLES
 
+/* ALLOW_INHERIT_AFTER_FUNCTION: allow inheriting after functions have been defined (this includes prototypes). This caused crashes in v22.2a but it may have been fixed since */
+#undef ALLOW_INHERIT_AFTER_FUNCTION
 #endif
 

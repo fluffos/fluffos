@@ -1,6 +1,25 @@
 As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
+Fluffos 2.7:
+Fixes to compile with a Dead Souls config
+Changed free_object() and free_program() to overwrite the freed address 
+	(idea and first version by Pinkfish)
+terminate string results of filter_string() 
+disable run time type checking if strict types isn't on
+allow adding objects to strings (adds filename)
+fixed crasher in DEBUG mode
+send too long eval errors to the mudlib error handler, there's no real reason 
+     not to!
+fixed crasher for 64 bit dead souls
+possibly fixed some bugs in shuffling around code for free_object
+allow string a="dsfsd"; a+=10; it used to give a parse error! the code to 
+      handle it was there though
+read_file() can now read compressed files.
+write_file() now has an extra flag (2) that can be ORed with the existing one 
+	     to write/append compressed files
+add_ref() destruct objects with high ref counts (they're usually on the way to
+	  wrap around to 0, which is where you crash).
 Fluffos 2.6:
 current_time is now 64 bit on 64 bit platforms, all ready for 2038 now, I think :)
 fixed crasher in ed on big files with long lines (i hope)

@@ -141,13 +141,13 @@ void save_ed_buffer (object_t *);
 #endif
 
 #ifndef OLD_ED
-char *object_ed_cmd (object_t *, char *);
-char *object_ed_start (object_t *, char *, int);
+char *object_ed_cmd (object_t *, const char *);
+char *object_ed_start (object_t *, const char *, int);
 int object_ed_mode (object_t *);
 void object_save_ed_buffer (object_t *);
 ed_buffer_t *find_ed_buffer (object_t *);
 void object_ed_output (char *);
-void object_ed_outputv PROT1V(char *);
+void object_ed_outputv(char *, ...);
 
 extern outbuffer_t current_ed_results;
 #endif

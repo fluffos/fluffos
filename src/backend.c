@@ -89,7 +89,7 @@ void backend()
   volatile int first_call = 1;
   int there_is_a_port = 0;
   error_context_t econ;
-  
+
   debug_message("Initializations complete.\n\n");
   for (i = 0; i < 5; i++) {
     if (external_port[i].port) {
@@ -98,10 +98,10 @@ void backend()
       there_is_a_port = 1;
     }
   }
-  
+
   if (!there_is_a_port)
     debug_message("No external ports specified.\n");
-  
+
   init_user_conn();   /* initialize user connection socket */
 #ifdef SIGHUP
   signal(SIGHUP, startshutdownMudOS);
@@ -114,15 +114,15 @@ void backend()
     first_call = 0;
     call_heart_beat();
   }
-  
-  while (1) { 
+
+  while (1) {
     /* Has to be cleared if we jumped out of process_user_command() */
     current_interactive = 0;
     set_eval(max_cost);
-    
+
     if (obj_list_replace || obj_list_destruct)
       remove_destructed_objects();
-    
+
     /*
      * shut down MudOS if MudOS_is_being_shut_down is set.
      */
@@ -130,7 +130,7 @@ void backend()
       shutdownMudOS(0);
     if (slow_shut_down_to_do) {
       int tmp = slow_shut_down_to_do;
-      
+
       slow_shut_down_to_do = 0;
       slow_shut_down(tmp);
     }
@@ -156,7 +156,7 @@ void backend()
      */
     for (i = 0; process_user_command() && i < max_users; i++)
       ;
-    
+
     /*
      * call outs
      */
@@ -195,19 +195,19 @@ static void look_for_objects_to_swap()
 
 #ifndef NO_IP_DEMON
     if (current_time >= next_server_time) {
-  /* initialize the address server.  if it is already initialized, then
-   * this is a nop.  this will cause the driver to reattempt connecting
-   * to the address server once every 15 minutes in the event that it
-   * has gone down.
-   */
-  if (!no_ip_demon && next_server_time)
-      init_addr_server(ADDR_SERVER_IP, ADDR_SERVER_PORT);
-  next_server_time = current_time + 15 * 60;
+      /* initialize the address server.  if it is already initialized, then
+       * this is a nop.  this will cause the driver to reattempt connecting
+       * to the address server once every 15 minutes in the event that it
+       * has gone down.
+       */
+        if (!no_ip_demon && next_server_time)
+            init_addr_server(ADDR_SERVER_IP, ADDR_SERVER_PORT);
+        next_server_time = current_time + 15 * 60;
     }
 #endif
 
     if (current_time < next_time)
-  return;     /* Not time to look yet */
+        return;     /* Not time to look yet */
     next_time = current_time + 5 * 60; /* Next time is in 5 minutes */
 
     /*
@@ -218,77 +218,77 @@ static void look_for_objects_to_swap()
     next_ob = obj_list;
     save_context(&econ);
     if (SETJMP(econ.context))
-  restore_context(&econ);
-    
+        restore_context(&econ);
+
     while ((ob = (object_t *)next_ob)) {
-  int ready_for_clean_up = 0;
+        int ready_for_clean_up = 0;
 
-  set_eval(max_cost);
+        if (ob->flags & O_DESTRUCTED)
+            ob = obj_list;  /* restart */
+        next_ob = ob->next_all;
 
-  if (ob->flags & O_DESTRUCTED)
-      ob = obj_list;  /* restart */
-  next_ob = ob->next_all;
-
-  /*
-   * Check reference time before reset() is called.
-   */
-  if (current_time - ob->time_of_ref > time_to_clean_up)
-      ready_for_clean_up = 1;
-#if !defined(NO_RESETS) && !defined(LAZY_RESETS)
-  /*
-   * Should this object have reset(1) called ?
-   */
-  if ((ob->flags & O_WILL_RESET) && (ob->next_reset < current_time)
-      && !(ob->flags & O_RESET_STATE)) {
-      debug(d_flag, ("RESET /%s\n", ob->obname));
-      reset_object(ob);
-      if(ob->flags & O_DESTRUCTED)
-        continue;
-  }
-#endif
-  if (time_to_clean_up > 0) {
       /*
-       * Has enough time passed, to give the object a chance to
-       * self-destruct ? Save the O_RESET_STATE, which will be cleared.
-       * 
-       * Only call clean_up in objects that has defined such a function.
-       * 
-       * Only if the clean_up returns a non-zero value, will it be called
-       * again.
+       * Check reference time before reset() is called.
        */
+        if (current_time - ob->time_of_ref > time_to_clean_up)
+            ready_for_clean_up = 1;
+#if !defined(NO_RESETS) && !defined(LAZY_RESETS)
+          /*
+           * Should this object have reset(1) called ?
+           */
+        if ((ob->flags & O_WILL_RESET) && (ob->next_reset < current_time)
+             && !(ob->flags & O_RESET_STATE)) {
+            debug(d_flag, ("RESET /%s\n", ob->obname));
+            set_eval(max_cost);
+            reset_object(ob);
+            if(ob->flags & O_DESTRUCTED)
+                continue;
+        }
+#endif
+        if (time_to_clean_up > 0) {
+              /*
+               * Has enough time passed, to give the object a chance to
+               * self-destruct ? Save the O_RESET_STATE, which will be cleared.
+               *
+               * Only call clean_up in objects that has defined such a function.
+               *
+               * Only if the clean_up returns a non-zero value, will it be called
+               * again.
+               */
 
-      if (ready_for_clean_up && (ob->flags & O_WILL_CLEAN_UP)) {
-    int save_reset_state = ob->flags & O_RESET_STATE;
-    svalue_t *svp;
+            if (ready_for_clean_up && (ob->flags & O_WILL_CLEAN_UP)) {
+                int save_reset_state = ob->flags & O_RESET_STATE;
+                svalue_t *svp;
 
-    debug(d_flag, ("clean up /%s\n", ob->obname));
+                debug(d_flag, ("clean up /%s\n", ob->obname));
 
-    /*
-     * Supply a flag to the object that says if this program is
-     * inherited by other objects. Cloned objects might as well
-     * believe they are not inherited. Swapped objects will not
-     * have a ref count > 1 (and will have an invalid ob->prog
-     * pointer).
-     *
-     * Note that if it is in the apply_low cache, it will also
-     * get a flag of 1, which may cause the mudlib not to clean
-     * up the object.  This isn't bad because:
-     * (1) one expects it is rare for objects that have untouched
-     * long enough to clean_up to still be in the cache, especially
-     * on busy MUDs.
-     * (2) the ones that are are the more heavily used ones, so
-     * keeping them around seems justified.
-     */
+                /*
+                 * Supply a flag to the object that says if this program is
+                 * inherited by other objects. Cloned objects might as well
+                 * believe they are not inherited. Swapped objects will not
+                 * have a ref count > 1 (and will have an invalid ob->prog
+                 * pointer).
+                 *
+                 * Note that if it is in the apply_low cache, it will also
+                 * get a flag of 1, which may cause the mudlib not to clean
+                 * up the object.  This isn't bad because:
+                 * (1) one expects it is rare for objects that have untouched
+                 * long enough to clean_up to still be in the cache, especially
+                 * on busy MUDs.
+                 * (2) the ones that are are the more heavily used ones, so
+                 * keeping them around seems justified.
+                 */
 
-    push_number(ob->flags & (O_CLONE) ? 0 : ob->prog->ref);
-    svp = apply(APPLY_CLEAN_UP, ob, 1, ORIGIN_DRIVER);
-    if (ob->flags & O_DESTRUCTED)
-        continue;
-    if (!svp || (svp->type == T_NUMBER && svp->u.number == 0))
-        ob->flags &= ~O_WILL_CLEAN_UP;
-    ob->flags |= save_reset_state;
-      }
-  }
+                push_number(ob->flags & (O_CLONE) ? 0 : ob->prog->ref);
+                set_eval(max_cost);
+                svp = apply(APPLY_CLEAN_UP, ob, 1, ORIGIN_DRIVER);
+                if (ob->flags & O_DESTRUCTED)
+                    continue;
+                if (!svp || (svp->type == T_NUMBER && svp->u.number == 0))
+                    ob->flags &= ~O_WILL_CLEAN_UP;
+                ob->flags |= save_reset_state;
+            }
+        }
     }
     pop_context(&econ);
 }       /* look_for_objects_to_swap() */
@@ -335,7 +335,7 @@ void call_heart_beat()
   object_t *ob;
   heart_beat_t *curr_hb;
   error_context_t econ;
-  
+
 #ifdef WIN32
   static long Win32Thread = -1;
   if (Win32Thread == -1) Win32Thread = _beginthread(
@@ -344,9 +344,9 @@ void call_heart_beat()
 						    (void (__cdecl *)(void *))
 						    alarm_loop, 256, 0);
 #endif
-  
+
   current_interactive = 0;
-  
+
   if ((num_hb_to_do = num_hb_objs)) {
     num_hb_calls++;
     heart_beat_index = 0;
@@ -357,7 +357,7 @@ void call_heart_beat()
 		  "Heartbeat not set in object on heartbeat list!");
       /* is it time to do a heart beat ? */
       curr_hb->heart_beat_ticks--;
-      
+
       if (ob->prog->heart_beat != 0) {
 	if (curr_hb->heart_beat_ticks < 1) {
 	  object_t *new_command_giver;
@@ -376,7 +376,7 @@ void call_heart_beat()
 	  add_heart_beats(&ob->stats, 1);
 #endif
 	  set_eval(max_cost);
-	  
+
 	  if (SETJMP(econ.context)) {
 	    restore_context(&econ);
 	  } else {
@@ -386,7 +386,7 @@ void call_heart_beat()
 	    pop_stack(); /* pop the return value */
 	    restore_command_giver();
 	  }
-	  
+
 	  current_object = 0;
 	}
       }
@@ -412,11 +412,11 @@ int
 query_heart_beat (object_t * ob)
 {
     int index;
-    
+
     if (!(ob->flags & O_HEART_BEAT))  return 0;
     index = num_hb_objs;
     while (index--) {
-  if (heart_beats[index].ob == ob) 
+  if (heart_beats[index].ob == ob)
       return heart_beats[index].time_to_heart_beat;
     }
     return 0;
@@ -430,12 +430,12 @@ query_heart_beat (object_t * ob)
 int set_heart_beat (object_t * ob, int to)
 {
     int index;
-    
+
     if (ob->flags & O_DESTRUCTED) return 0;
 
     if (!to) {
   int num;
-  
+
   index = num_hb_objs;
   while (index--) {
       if (heart_beats[index].ob == ob) break;
@@ -448,18 +448,18 @@ int set_heart_beat (object_t * ob, int to)
       if (index < num_hb_to_do)
     num_hb_to_do--;
   }
-  
+
   if ((num = (num_hb_objs - (index + 1))))
       memmove(heart_beats + index, heart_beats + (index + 1), num * sizeof(heart_beat_t));
-  
+
   num_hb_objs--;
   ob->flags &= ~O_HEART_BEAT;
   return 1;
     }
-    
+
     if (ob->flags & O_HEART_BEAT) {
   if (to < 0) return 0;
-  
+
   index = num_hb_objs;
   while (index--) {
       if (heart_beats[index].ob == ob) {
@@ -470,7 +470,7 @@ int set_heart_beat (object_t * ob, int to)
   DEBUG_CHECK(index < 0, "Couldn't find enabled object in heart_beat list!\n");
     } else {
   heart_beat_t *hb;
-  
+
   if (!max_heart_beats)
       heart_beats = CALLOCATE(max_heart_beats = HEART_BEAT_CHUNK,
             heart_beat_t, TAG_HEART_BEAT,
@@ -481,7 +481,7 @@ int set_heart_beat (object_t * ob, int to)
          heart_beat_t, TAG_HEART_BEAT,
          "set_heart_beat: 1");
   }
-  
+
   hb = &heart_beats[num_hb_objs++];
   hb->ob = ob;
   if (to < 0) to = 1;
@@ -489,7 +489,7 @@ int set_heart_beat (object_t * ob, int to)
   hb->heart_beat_ticks = to;
   ob->flags |= O_HEART_BEAT;
     }
-    
+
     return 1;
 }
 
@@ -502,7 +502,7 @@ int heart_beat_status (outbuffer_t * ob, int verbose)
   outbuf_add(ob, "-----------------------\n");
   outbuf_addv(ob, "Number of objects with heart beat: %d, starts: %d\n",
         num_hb_objs, num_hb_calls);
-  
+
   /* passing floats to varargs isn't highly portable so let sprintf
      handle it */
   sprintf(buf, "%.2f", perc_hb_probes);
@@ -571,10 +571,10 @@ INLINE void remove_destructed_objects()
     object_t *ob, *next;
 
     if (obj_list_replace)
-  replace_programs();
+        replace_programs();
     for (ob = obj_list_destruct; ob; ob = next) {
-  next = ob->next_all;
-  destruct2(ob);
+        next = ob->next_all;
+        destruct2(ob);
     }
     obj_list_destruct = 0;
 }       /* remove_destructed_objects() */
@@ -641,7 +641,7 @@ array_t *get_heart_beats() {
 #ifdef F_SET_HIDE
   int apply_valid_hide = 1, display_hidden = 0;
 #endif
-  
+
   obtab = CALLOCATE(n, object_t *, TAG_TEMPORARY, "heart_beats");
   while (n--) {
 #ifdef F_SET_HIDE
@@ -656,16 +656,16 @@ array_t *get_heart_beats() {
 #endif
     obtab[nob++] = (hb++)->ob;
   }
-  
+
   arr = allocate_empty_array(nob);
   while (nob--) {
     arr->item[nob].type = T_OBJECT;
     arr->item[nob].u.ob = obtab[nob];
     add_ref(arr->item[nob].u.ob, "get_heart_beats");
   }
-  
+
   FREE(obtab);
- 
+
   return arr;
 }
 #endif

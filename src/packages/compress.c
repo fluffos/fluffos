@@ -235,9 +235,9 @@ void f_compress (void)
       return ;
    }
 
-   new_size = size;
+   new_size = compressBound(size);
    // Make it a little larger as specified in the docs.
-   buffer = (unsigned char*)DXALLOC(size * 101 / 100 + 12, TAG_TEMPORARY, "compress");
+   buffer = (unsigned char*)DXALLOC(new_size, TAG_TEMPORARY, "compress");
    compress(buffer, &new_size, input, size);
 
    // Shrink it down.
@@ -290,15 +290,14 @@ void f_uncompress (void)
    if (inflateInit(compressed) != Z_OK) {
       FREE(compressed);
       pop_n_elems(st_num_arg);
-      push_undefined();
-      return ;
+      error("inflateInit failed");
    }
 
    len = 0;
    output_data = NULL;
    do {
       ret = inflate(compressed, 0);
-      if (ret == Z_OK) {
+      if (ret == Z_OK || ret == Z_STREAM_END) {
          pos = len;
          len += COMPRESS_BUF_SIZE - compressed->avail_out;
          if (!output_data) {
@@ -318,11 +317,11 @@ void f_uncompress (void)
 
    if (ret == Z_STREAM_END) {
       buffer = allocate_buffer(len);
-      memcpy(buffer->item, output_data, len);
+      write_buffer(buffer, 0, output_data, len);
       FREE(output_data);
       push_buffer(buffer);
    } else {
-      push_undefined();
+      error("inflate: no ZSTREAM_END\n");
    }
 }
 #endif

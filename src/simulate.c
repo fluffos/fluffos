@@ -18,6 +18,7 @@
 #include "master.h"
 #include "add_action.h"
 #include "object.h"
+#include "eval.h"
 
 /*
  * 'inherit_file' is used as a flag. If it is set to a string
@@ -66,7 +67,7 @@ INLINE void check_legal_string (const char * s)
 
 /* equivalent to strcpy(x, y); return x + strlen(y), but faster and safer */
 /* Code like:
- * 
+ *
  * char buf[256];
  * strcpy(buf, ...);
  * strcat(buf, ...);
@@ -110,7 +111,7 @@ init_privs_for_object (object_t * ob)
         ob->privs = NULL;
         return;
     }
-    push_malloced_string(add_slash(ob->name));
+    push_malloced_string(add_slash(ob->obname));
 
     if (master_ob)
         value = apply_master_ob(APPLY_PRIVS_FILE, 1);
@@ -137,7 +138,7 @@ static int give_uid_to_object (object_t * ob)
         ob->uid = add_uid("NONAME");
 #ifdef AUTO_SETEUID
         ob->euid = ob->uid;
-#else   
+#else
         ob->euid = NULL;
 #endif
         return 1;
@@ -192,7 +193,7 @@ static int give_uid_to_object (object_t * ob)
      * can't be trusted, so we give it the same uid as the creator. Also give
      * it eff_user 0, which means that user 'a' can't use objects from user
      * 'b' to load new objects nor modify files owned by user 'b'.
-     * 
+     *
      * If this effect is wanted, user 'b' must let his object do 'seteuid()' to
      * himself. That is the case for most rooms.
      */
@@ -335,7 +336,7 @@ int strip_name (const char * src, char * dest, int size) {
      *
      * The first solution is the one currently in use.
      */
-    while (p - dest > 2 && p[-1] == 'c' && p[-2] == '.') 
+    while (p - dest > 2 && p[-1] == 'c' && p[-2] == '.')
         p -= 2;
 
     *p = 0;
@@ -431,10 +432,12 @@ object_t *int_load_object (const char * lname)
 
     /* Sorry, can't handle objects without programs yet. */
     if (inherit_file == 0 && (num_parse_error > 0 || prog == 0)) {
-        if (prog)
-            free_prog(prog);
         if (num_parse_error == 0 && prog == 0)
             error("No program in object '/%s'!\n", name);
+
+	if (prog) {
+            free_prog(&prog);
+        }
         error("Error in loading object '/%s'\n", name);
     }
     /*
@@ -451,9 +454,9 @@ object_t *int_load_object (const char * lname)
             strcpy(inhbuf, inherit_file);
         FREE(inherit_file);
         inherit_file = 0;
-        
+
         if (prog) {
-            free_prog(prog);
+            free_prog(&prog);
             prog = 0;
         }
         if (strcmp(inhbuf, name) == 0) {
@@ -477,7 +480,7 @@ object_t *int_load_object (const char * lname)
         if (!(ob = lookup_object_hash(name))) {
             ob = load_object(name, 0);
             /* sigh, loading the inherited file removed us */
-            if (!ob) { 
+            if (!ob) {
                 num_objects_this_thread--;
                 return 0;
             }
@@ -562,10 +565,10 @@ object_t *clone_object (const char * str1, int num_arg)
         pop_n_elems(num_arg);
         return (0);
     }
-    
-    if (ob->flags & O_CLONE) 
+
+    if (ob->flags & O_CLONE)
       error("Cannot clone from a clone\n");
-    
+
     if(ob->flags & O_VIRTUAL) {
       new_ob = load_virtual_object(ob->obname, 1 + num_arg);
       restore_command_giver();
@@ -575,7 +578,7 @@ object_t *clone_object (const char * str1, int num_arg)
        * cloned once to have gotten to this stage.
        */
     }
-    
+
     /* We do not want the heart beat to be running for unused copied objects */
     if (ob->flags & O_HEART_BEAT)
         (void) set_heart_beat(ob, 0);
@@ -687,14 +690,14 @@ static object_t *object_present2 (const char * str, object_t * ob)
     int count = 0, length;
 
     length = strlen(str);
-    
+
     if (length) {
         p = str + length - 1;
         if (uisdigit(*p)) {
             do {
                 p--;
             } while (p > str && uisdigit(*p));
-            
+
             if (*p == ' ') {
                 count = atoi(p + 1) - 1;
                 length = p - str;
@@ -818,7 +821,7 @@ void destruct_object (object_t * ob)
          * stage.
          */
         push_object(super);
-            
+
         restrict_destruct = ob->contains;
         (void)apply(APPLY_MOVE, ob->contains, 1, ORIGIN_DRIVER);
         restrict_destruct = save_restrict_destruct;
@@ -828,7 +831,7 @@ void destruct_object (object_t * ob)
             destruct_object(otmp);
     }
 #endif
-    
+
 #ifdef PACKAGE_MUDLIB_STATS
     add_objects(&ob->stats, -1);
 #endif
@@ -879,7 +882,7 @@ void destruct_object (object_t * ob)
      * us if this is a vital object.
      */
     if (ob == master_ob || ob == simul_efun_ob) {
-        object_t *new_ob;
+        object_t *new_ob, *tmp_ob;
         const char *tmp = ob->obname;
 
         STACK_INC;
@@ -887,7 +890,7 @@ void destruct_object (object_t * ob)
         sp->u.error_handler = fix_object_names;
         saved_master_name = master_ob->obname;
         saved_simul_name = simul_efun_ob->obname;
-        
+
         /* hack to make sure we don't find ourselves at several points
            in the following process */
         SETOBNAME(ob, "");
@@ -900,12 +903,11 @@ void destruct_object (object_t * ob)
             error("Destruct on vital object failed: new copy failed to reload.");
         }
 
-        free_object(ob, "vital object reference");
         if (ob == master_ob)
             set_master(new_ob);
         if (ob == simul_efun_ob)
             set_simul_efun(new_ob);
-        
+
         /* Set the name back so we can remove it from the hash table.
            Also be careful not to remove the new object, which has
            the same name. */
@@ -915,6 +917,9 @@ void destruct_object (object_t * ob)
         SETOBNAME(new_ob, "");
         remove_object_hash(ob);
         SETOBNAME(new_ob, tmp);
+	tmp_ob = ob;
+	free_object(&tmp_ob, "vital object reference");
+	// still need ob below!
     } else
         remove_object_hash(ob);
 
@@ -924,12 +929,12 @@ void destruct_object (object_t * ob)
      */
     //removed = 0;
     if(ob->prev_all){
-      ob->prev_all->next_all = ob->next_all;
-      if(ob->next_all)
-	ob->next_all->prev_all = ob->prev_all;
+        ob->prev_all->next_all = ob->next_all;
+        if(ob->next_all)
+            ob->next_all->prev_all = ob->prev_all;
     }else{
-      obj_list = ob->next_all;
-      obj_list->prev_all = 0;
+        obj_list = ob->next_all;
+        obj_list->prev_all = 0;
     }
     /*
     for (pp = &obj_list; *pp; pp = &(*pp)->next_all) {
@@ -1017,10 +1022,12 @@ void destruct2 (object_t * ob)
 #ifdef DEBUG
     tot_dangling_object++;
     ob->next_all = obj_list_dangling;
+    if(obj_list_dangling)
+       obj_list_dangling->prev_all = ob;
     obj_list_dangling = ob;
 #endif
 
-    free_object(ob, "destruct_object");
+    free_object(&ob, "destruct_object");
 }
 
 /*
@@ -1279,7 +1286,7 @@ void print_svalue (svalue_t * arg)
 {
     char tbuf[2048];
     int len;
-    
+
     if (arg == 0) {
         tell_object(command_giver, "<NULL>", 6);
     } else
@@ -1533,7 +1540,7 @@ void fatal (const char *fmt, ...)
   static int in_fatal = 0;
   char msg_buf[2049];
   va_list args;
-  
+
   switch (in_fatal) {
   default:
     debug_message("Fatal error while shutting down.  Aborting.\n");
@@ -1549,9 +1556,9 @@ void fatal (const char *fmt, ...)
       debug_message("(occured during compilation of %s at line %d)\n", current_file, current_line);
     if (current_object)
       debug_message("(current object was /%s)\n", current_object->obname);
-    
+
     dump_trace(1);
-    
+
 #ifdef PACKAGE_MUDLIB_STATS
         save_stat_files();
 #endif
@@ -1573,7 +1580,7 @@ void fatal (const char *fmt, ...)
 #ifdef SIGIOT
   signal(SIGIOT, SIG_DFL);
 #endif
-  
+
 #if !defined(DEBUG_NON_FATAL) || !defined(DEBUG)
   abort();
 #endif
@@ -1704,7 +1711,10 @@ void error_handler (char * err)
             num_error--;
             num_mudlib_error = 0;
         } else {
-            if (!max_eval_error && !too_deep_error) {
+    	    if(max_eval_error)
+	        outoftime = 0;
+
+            if (!too_deep_error) {
                 num_mudlib_error++;
                 mudlib_error_handler(err, 1);
                 num_mudlib_error--;
@@ -1712,6 +1722,8 @@ void error_handler (char * err)
         }
 #endif
 #endif
+        if(max_eval_error)
+	    outoftime = 1;
         free_svalue(&catch_value, "caught error");
         catch_value.type = T_STRING;
         catch_value.subtype = STRING_MALLOC;
@@ -1719,21 +1731,23 @@ void error_handler (char * err)
         LONGJMP(current_error_context->context, 1);
         fatal("Catch() longjump failed");
     }
-    too_deep_error = max_eval_error = 0;
+
     if (num_error > 0) {
         /* This can happen via errors in the object_name() apply. */
         debug_message("Error '%s' while trying to print error trace -- trace suppressed.\n", err);
+	too_deep_error = max_eval_error = 0;
         if (current_error_context)
             LONGJMP(current_error_context->context, 1);
         fatal("LONGJMP failed or no error context for error.\n");
     }
+
     num_error++;
 #ifdef PACKAGE_MUDLIB_STATS
     if (current_object)
         add_errors(&current_object->stats, 1);
 #endif
 #ifdef MUDLIB_ERROR_HANDLER
-    if (!max_eval_error && !too_deep_error) {
+    if (!too_deep_error) {
         if (num_mudlib_error) {
             debug_message("Error in error handler: ");
             debug_message_with_location(err);
@@ -1742,7 +1756,10 @@ void error_handler (char * err)
         } else {
             num_mudlib_error++;
             num_error--;
+	    outoftime = 0;
             mudlib_error_handler(err, 0);
+	    if(max_eval_error)
+	      outoftime = 1;
             num_mudlib_error--;
             num_error++;
         }
@@ -1786,11 +1803,12 @@ void error_handler (char * err)
             debug_message("Heart beat in /%s turned off.\n", current_heart_beat->obname);
             if (current_heart_beat->interactive)
                 add_message(current_heart_beat, hb_message, sizeof(hb_message)-1);
-        
+
             current_heart_beat = 0;
         }
     }
     num_error--;
+    too_deep_error = max_eval_error = 0;
     if (current_error_context)
         LONGJMP(current_error_context->context, 1);
     fatal("LONGJMP failed or no error context for error.\n");
@@ -1957,7 +1975,7 @@ void do_message (svalue_t * class, svalue_t * msg, array_t * scope, array_t * ex
 void try_reset (object_t * ob)
 {
     if ((ob->next_reset < current_time) && !(ob->flags & O_RESET_STATE)) {
-        debug(d_flag, ("(lazy) RESET /%s\n", ob->name));
+        debug(d_flag, ("(lazy) RESET /%s\n", ob->obname));
 
         /* need to set the flag here to prevent infinite loops in apply_low */
         ob->flags |= O_RESET_STATE;
@@ -1986,7 +2004,7 @@ object_t *first_inventory (svalue_t * arg)
     while (ob && (ob->flags & O_HIDDEN) && !object_visible(ob))
         ob = ob->next_inv;
 #endif
-    
+
     return ob;
 }
 #endif

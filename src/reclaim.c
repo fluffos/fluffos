@@ -56,7 +56,7 @@ check_svalue (svalue_t * v)
                     if (!prog->ref && !prog->func_ref)
                         deallocate_program(prog);
                 }
-                free_object(v->u.fp->hdr.owner, "reclaim_objects");
+                free_object(&v->u.fp->hdr.owner, "reclaim_objects");
                 v->u.fp->hdr.owner = 0;
                 cleaned++;
             }
@@ -86,8 +86,8 @@ gc_mapping (mapping_t * m)
         while ((elt = *prev)) {
             if (elt->values[0].type == T_OBJECT) {
                 if (elt->values[0].u.ob->flags & O_DESTRUCTED) {
-                    free_object(elt->values[0].u.ob, "gc_mapping");
-                    
+                    free_object(&elt->values[0].u.ob, "gc_mapping");
+		    elt->values[0].u.ob = 0;
                     /* found one, do a map_delete() */
                     if (!(*prev = elt->next) && !m->table[j])
                         m->unfilled++;

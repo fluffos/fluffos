@@ -8,7 +8,7 @@ int	    parse_command	(char *, object_t *);
 void	    clear_notify	(object_t *);
 void	    stat_living_objects	(outbuffer_t *);
 void	    remove_living_name	(object_t *);
-object_t *  find_living_object	(char *, int);
+object_t *  find_living_object	(const char *, int);
 void	    setup_new_commands	(object_t *, object_t *);
 #ifndef NO_ENVIRONMENT
 void	    remove_sent		(object_t *, object_t *);

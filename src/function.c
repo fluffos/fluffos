@@ -22,7 +22,7 @@ dealloc_funp (funptr_t * fp)
     }
 
     if (fp->hdr.owner)
-        free_object(fp->hdr.owner, "free_funp");
+        free_object(&fp->hdr.owner, "free_funp");
     if (fp->hdr.args)
         free_array(fp->hdr.args);
 

@@ -20,9 +20,10 @@ typedef struct {
     /* these two must come first */
     unsigned char num_arg;
     unsigned char num_local;
-    short offset;
+    short fio;
     struct program_s *prog;
-    short fio, vio;
+    long offset;
+    short vio;
     char lpccode[80];
 } functional_t;
 

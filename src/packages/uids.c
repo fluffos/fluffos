@@ -35,12 +35,12 @@ f_export_uid (void)
         error("Illegal to export uid 0\n");
     ob = sp->u.ob;
     if (ob->euid) {
-        free_object(ob, "f_export_uid:1");
+        free_object(&ob, "f_export_uid:1");
         *sp = const0;
     }
     else {
         ob->uid = current_object->euid;
-        free_object(ob, "f_export_uid:2");
+        free_object(&ob, "f_export_uid:2");
         *sp = const1;
     }
 }
@@ -54,10 +54,10 @@ f_geteuid (void)
         ob = sp->u.ob;
         if (ob->euid) {
             put_constant_string(ob->euid->name);
-            free_object(ob, "f_geteuid:1");
+            free_object(&ob, "f_geteuid:1");
             return;
         } else {
-            free_object(ob, "f_geteuid:2");
+            free_object(&ob, "f_geteuid:2");
             *sp = const0;
             return;
         }
@@ -82,7 +82,7 @@ f_getuid (void)
 
     DEBUG_CHECK(ob->uid == NULL, "UID is a null pointer\n");
     put_constant_string(ob->uid->name);
-    free_object(ob, "f_getuid");
+    free_object(&ob, "f_getuid");
 }
 #endif
 

@@ -1611,6 +1611,9 @@ static void new_user_handler (int which)
     master_ob->interactive->out_of_band = 0;
 #ifdef USE_ICONV
     master_ob->interactive->trans = get_translator("UTF-8");
+#else
+    master_ob->interactive->trans = (struct translation *) master_ob; 
+    //never actually used, but avoids multiple ifdefs later on!
 #endif
     for (x = 0;  x < NSLC;  x++) {
         master_ob->interactive->slc[x][0] = slc_default_flags[x];
@@ -1647,7 +1650,7 @@ static void new_user_handler (int which)
         if (master_ob->interactive)
             remove_interactive(master_ob, 0);
         else
-            free_object(master, "new_user");
+            free_object(&master, "new_user");
         debug_message("Connection from %s aborted.\n", inet_ntoa(addr.sin_addr));
         return;
     }
@@ -1655,7 +1658,6 @@ static void new_user_handler (int which)
      * There was an object returned from connect(). Use this as the user
      * object.
      */
-    free_object(master, "new_user");
     ob = ret->u.ob;
 #ifdef F_SET_HIDE
     if (ob->flags & O_HIDDEN)
@@ -1670,6 +1672,8 @@ static void new_user_handler (int which)
      */
     ob->interactive->iflags |= (HAS_WRITE_PROMPT | HAS_PROCESS_INPUT);
     
+    free_object(&master, "new_user");
+
     master_ob->flags &= ~O_ONCE_INTERACTIVE;
     master_ob->interactive = 0;
     add_ref(ob, "new_user");
@@ -2038,7 +2042,7 @@ void remove_interactive (object_t * ob, int dested)
     clear_notify(ip->ob);
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
     if (ip->input_to) {
-        free_object(ip->input_to->ob, "remove_interactive");
+        free_object(&ip->input_to->ob, "remove_interactive");
         free_sentence(ip->input_to);
         if (ip->num_carry > 0)
             free_some_svalues(ip->carryover, ip->num_carry);
@@ -2053,7 +2057,7 @@ void remove_interactive (object_t * ob, int dested)
     FREE(ip);
     ob->interactive = 0;
     all_users[idx] = 0;
-    free_object(ob, "remove_interactive");
+    free_object(&ob, "remove_interactive");
     return;
 }                               /* remove_interactive() */
 
@@ -2081,7 +2085,7 @@ static int call_function_interactive (interactive_t * i, char * str)
      */
     if (sent->ob->flags & O_DESTRUCTED) {
         /* Sorry, the object has selfdestructed ! */
-        free_object(sent->ob, "call_function_interactive");
+        free_object(&sent->ob, "call_function_interactive");
         free_sentence(sent);
         i->input_to = 0;
         if (i->num_carry)
@@ -2094,7 +2098,7 @@ static int call_function_interactive (interactive_t * i, char * str)
      * We must all references to input_to fields before the call to apply(),
      * because someone might want to set up a new input_to().
      */
-    free_object(sent->ob, "call_function_interactive");
+
     /* we put the function on the stack in case of an error */
     STACK_INC;
     if (sent->flags & V_FUNCTION) {
@@ -2109,6 +2113,8 @@ static int call_function_interactive (interactive_t * i, char * str)
       ref_string(function);
     }
     ob = sent->ob;
+
+    free_object(&sent->ob, "call_function_interactive");
     free_sentence(sent);
 
     /*
@@ -2443,7 +2449,7 @@ static void got_addr_number (char * number, char * name)
             && ipnumbertable[i].ob_to_call->flags & O_DESTRUCTED) {
             free_svalue(&ipnumbertable[i].call_back, "got_addr_number");
             free_string(ipnumbertable[i].name);
-            free_object(ipnumbertable[i].ob_to_call, "got_addr_number: ");
+            free_object(&ipnumbertable[i].ob_to_call, "got_addr_number: ");
             ipnumbertable[i].name = NULL;
         }
     for (i = 0; i < IPSIZE; i++) {
@@ -2478,7 +2484,7 @@ static void got_addr_number (char * number, char * name)
                 safe_call_function_pointer(ipnumbertable[i].call_back.u.fp, 3);
             free_svalue(&ipnumbertable[i].call_back, "got_addr_number");
             free_string(ipnumbertable[i].name);
-            free_object(ipnumbertable[i].ob_to_call, "got_addr_number: ");
+            free_object(&ipnumbertable[i].ob_to_call, "got_addr_number: ");
             ipnumbertable[i].name = NULL;
         }
     }
@@ -2634,10 +2640,11 @@ int replace_interactive (object_t * ob, object_t * obfrom)
     ob->flags |= O_ONCE_INTERACTIVE;
     obfrom->flags &= ~O_ONCE_INTERACTIVE;
     add_ref(ob, "exec");
-    free_object(obfrom, "exec");
     if (obfrom == command_giver) {
         set_command_giver(ob);
     }
+    
+    free_object(&obfrom, "exec");
     return (1);
 }                               /* replace_interactive() */
 #endif

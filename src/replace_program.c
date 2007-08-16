@@ -76,7 +76,7 @@ void replace_programs (void)
         old_prog = r_ob->ob->prog;
         r_ob->ob->prog = r_ob->new_prog;
         r_next = r_ob->next;
-        free_prog(old_prog);
+        free_prog(&old_prog);
 
         debug(d_flag, ("program freed."));
 #ifndef NO_SHADOWS

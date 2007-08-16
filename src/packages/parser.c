@@ -203,20 +203,18 @@ void parser_mark (parse_info_t * pinfo) {
 
 #if defined(DEBUG) || defined(PARSE_DEBUG)
 /* Usage:  DEBUG_P(("foo: %s:%i", str, i)); */
-static void debug_parse P1V(char *, fmt) {
+static void debug_parse(char *fmt, ...) {
     va_list args;
     char buf[2048];
     char *p = buf;
     int n = debug_parse_depth - 1;
-    V_DCL(char *fmt);
     
     while (n--) {
         *p++ = ' ';
         *p++ = ' ';
     }
     
-    V_START(args, fmt);
-    V_VAR(char *, fmt, args);
+    va_start(args, fmt);
     vsprintf(p, fmt, args);
     va_end(args);
 
@@ -366,7 +364,7 @@ static void add_special_word (char * wrd, int kind, int arg) {
     special_table[h] = swp;
 }
 
-static int check_special_word (char * wrd, int * arg) {
+static int check_special_word (char * wrd, long *arg) {
     int h = DO_HASH(wrd, SPECIAL_HASH_SIZE);
     special_word_t *swp = special_table[h];
 
@@ -381,7 +379,7 @@ static int check_special_word (char * wrd, int * arg) {
     if (isdigit(*wrd)) {
         char *p;
 
-        *arg = (int)strtol(wrd, &p, 10);
+        *arg = strtol(wrd, &p, 10);
         if (p && *p) {
             char *ending = "th";
 
@@ -593,7 +591,7 @@ static void free_parse_result (parse_result_t * pr) {
     int i, j;
 
     if (pr->ob)
-        free_object(pr->ob, "free_parse_result");
+        free_object(&pr->ob, "free_parse_result");
     if (pr->parallel)
         clear_parallel_errors(&pr->parallel);
     
@@ -635,7 +633,7 @@ static void free_parse_globals (void) {
     hash_clean();
     if (objects_loaded) {
         for (i = 0; i < num_objects; i++)
-            free_object(loaded_objects[i], "free_parse_globals");
+            free_object(&loaded_objects[i], "free_parse_globals");
         objects_loaded = 0;
     }
 }
@@ -1147,7 +1145,7 @@ static void load_objects (void) {
     for (i = 0; i < num_objects; i++)
         interrogate_object(loaded_objects[i]);
     for (i = 0; i < num_objects; i++)
-        free_object(loaded_objects[i], "load_objects");
+        free_object(&loaded_objects[i], "load_objects");
     /* Step 3: */
     num_objects = 0;
     me_object = -1;
@@ -1332,7 +1330,8 @@ static void parse_obj (int tok, parse_state_t * state,
     char *str;
     hash_entry_t *hnode, *last_adj = 0;
     int multiple_adj = 0;
-    int tmp, ord_legal = (ordinal == 0), singular_legal = 1;
+    int ord_legal = (ordinal == 0), singular_legal = 1;
+    long tmp;
     match_t *mp;
 
     DEBUG_INC;
@@ -1642,7 +1641,7 @@ static int parallel_process_answer (parse_state_t * state, svalue_t * sv,
                              int which) {
     if (!sv) return 0;
     if (sv->type == T_NUMBER) {
-        DEBUG_P(("Return value was: %i", sv->u.number));
+        DEBUG_P(("Return value was: %li", sv->u.number));
         if (sv->u.number)
             return 1;
         
@@ -2621,7 +2620,7 @@ static void do_the_call (void) {
              */
             while (n--) {
                 if ((++sp)->type == T_OBJECT && (sp->u.ob->flags & O_DESTRUCTED)) {
-                    free_object(sp->u.ob, "do_the_call");
+                    free_object(&sp->u.ob, "do_the_call");
                     *sp = const0u;
                 }
             }
@@ -3140,7 +3139,7 @@ void f_parse_my_rules (void) {
                 memcpy((char *)arr->item, best_result->res[3].args, n*sizeof(svalue_t));
                 while (n--) {
                     if (arr->item[n].type == T_OBJECT && arr->item[n].u.ob->flags & O_DESTRUCTED) {
-                        free_object(arr->item[n].u.ob, "parse_my_rules");
+                        free_object(&arr->item[n].u.ob, "parse_my_rules");
                         arr->item[n] = const0u;
                     }
                 }

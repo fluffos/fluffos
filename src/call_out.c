@@ -51,15 +51,17 @@ static void free_called_call (pending_call_t * cop)
 {
     cop->next = call_list_free;
     if (cop->ob) {
-  free_string(cop->function.s);
-  free_object(cop->ob, "free_call");
+      free_string(cop->function.s);
+      free_object(&cop->ob, "free_call");
     } else {
-  free_funp(cop->function.f);
+      free_funp(cop->function.f);
     }
     cop->function.s = 0;
 #ifdef THIS_PLAYER_IN_CALL_OUT
-    if (cop->command_giver)
-  free_object(cop->command_giver, "free_call");
+    if (cop->command_giver){
+      free_object(&cop->command_giver, "free_call");
+      cop->command_giver = 0;
+    }
 #endif
     cop->ob = 0;
     call_list_free = cop;
@@ -246,7 +248,7 @@ void call_out()
 	      while (svp-- > vec->item) {
 		if (svp->type == T_OBJECT && 
 		    (svp->u.ob->flags & O_DESTRUCTED)) {
-		  free_object(svp->u.ob, "call_out");
+		  free_object(&svp->u.ob, "call_out");
 		  *svp = const0u;
 		}
 	      }
@@ -556,7 +558,7 @@ void reclaim_call_outs() {
   cop = call_list[i];
   while (cop) {
       if (cop->command_giver && (cop->command_giver->flags & O_DESTRUCTED)) {
-    free_object(cop->command_giver, "reclaim_call_outs");
+    free_object(&cop->command_giver, "reclaim_call_outs");
     cop->command_giver = 0;
       }
       cop = cop->next;

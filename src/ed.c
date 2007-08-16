@@ -67,7 +67,7 @@ static int version = 601;
 static int EdErr = 0;
 
 static int append (int, int);
-static int more_append (char *);
+static int more_append (const char *);
 static int ckglob (void);
 static int deflt (int, int);
 static int del (int, int);
@@ -87,7 +87,7 @@ static int getone (void);
 static int getlst (void);
 static ed_line_t *getptr (int);
 static int getrhs (char *);
-static int ins (char *);
+static int ins (const char *);
 static int join (int, int);
 static int move (int);
 static int transfer (int);
@@ -247,7 +247,7 @@ static int append (int line, int glob)
     return 0;
 }
 
-static int more_append (char * str)
+static int more_append (const char *str)
 {
     if (str[0] == '.' && str[1] == '\0') {
         P_APPENDING = 0;
@@ -481,8 +481,9 @@ static void free_ed_buffer (object_t * who)
     clrbuf();
 #ifdef OLD_ED
     if (ED_BUFFER->write_fn) {
+	object_t *exit_ob = ED_BUFFER->exit_ob;
         FREE(ED_BUFFER->write_fn);
-        free_object(ED_BUFFER->exit_ob, "ed EOF");
+        free_object(&exit_ob, "ed EOF");
     }
     if (ED_BUFFER->exit_fn) {
         char *exit_fn = ED_BUFFER->exit_fn;
@@ -497,7 +498,7 @@ static void free_ed_buffer (object_t * who)
         /* make this "safe" */
         safe_apply(exit_fn, exit_ob, 0, ORIGIN_INTERNAL);
         FREE(exit_fn);
-        free_object(exit_ob, "ed EOF");
+        free_object(&exit_ob, "ed EOF");
         return;
     }
 #endif
@@ -979,9 +980,9 @@ static int getrhs (char * sub)
 
 /*      ins.c   */
 
-static int ins (char * str)
+static int ins (const char *str)
 {
-    char *cp;
+    const char *cp;
     ed_line_t *new, *nxt;
     int len;
 
@@ -2661,7 +2662,7 @@ static void object_free_ed_buffer() {
     current_editor->flags &= ~O_IN_EDIT;
 }
 
-char *object_ed_start (object_t * ob, char * fname, int restricted) {
+char *object_ed_start (object_t * ob, const char *fname, int restricted) {
     svalue_t *setup;
 
     /* ensure that the result buffer is initialized */
@@ -2709,7 +2710,7 @@ char *object_ed_start (object_t * ob, char * fname, int restricted) {
 void object_save_ed_buffer (object_t * ob)
 {
     svalue_t *stmp;
-    char *fname;
+    const char *fname;
 
     regexp_user = ED_REGEXP;
     current_ed_buffer = find_ed_buffer(ob);
@@ -2745,7 +2746,7 @@ int object_ed_mode (object_t * ob) {
     return 0;
 }
 
-char *object_ed_cmd (object_t * ob, char * str)
+char *object_ed_cmd (object_t * ob, const char *str)
 {
     int status = 0;
 

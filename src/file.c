@@ -11,6 +11,7 @@
 #include "port.h"
 #include "master.h"
 
+
 /* Removed due to hideousness: if you want to add it back, note that
  * we don't want redefinitions, and that some systems define major() in
  * one place, some in both, etc ...
@@ -29,6 +30,10 @@
 #  endif
 #  include <sys/sysmacros.h>
 #endif
+#endif
+
+#ifdef PACKAGE_COMPRESS
+#include <zlib.h>
 #endif
 
 int legal_path (const char *);
@@ -412,7 +417,9 @@ void smart_log (const char * error_file, int line, const char * what, int flag)
 int write_file (const char * file, const char * str, int flags)
 {
     FILE *f;
-
+#ifdef PACKAGE_COMPRESS
+    gzFile gf;
+#endif
 #ifdef WIN32
     char fmode[3];
 #endif
@@ -420,6 +427,14 @@ int write_file (const char * file, const char * str, int flags)
     file = check_valid_path(file, current_object, "write_file", 1);
     if (!file)
         return 0;
+#ifdef PACKAGE_COMPRESS
+    if(flags & 2){
+      gf = gzopen(file, (flags & 1)?"w":"a");
+      if(!gf)
+	error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n",
+	      file, (flags & 1) ? "overwrite" : "append", port_strerror(errno));
+    } else {
+#endif
 #ifdef WIN32
     fmode[0] = (flags & 1) ? 'w' : 'a';
     fmode[1] = 't';
@@ -429,18 +444,33 @@ int write_file (const char * file, const char * str, int flags)
     f = fopen(file, (flags & 1) ? "w" : "a");
 #endif
     if (f == 0) {
-        error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n",
-              file, (flags & 1) ? "overwrite" : "append", port_strerror(errno));
+      error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n",
+	    file, (flags & 1) ? "overwrite" : "append", port_strerror(errno));
     }
-    fwrite(str, strlen(str), 1, f);
-    fclose(f);
+#ifdef PACKAGE_COMPRESS
+    }
+    if(flags & 2){
+      gzwrite(gf, str, strlen(str));
+    }else
+#endif
+      fwrite(str, strlen(str), 1, f);
+#ifdef PACKAGE_COMPRESS
+    if(flags & 2)
+      gzclose(gf);
+    else
+#endif
+      fclose(f);
     return 1;
 }
 
 char *read_file (const char * file, int start, int len) {
     struct stat st;
+#ifndef PACKAGE_COMPRESS
     FILE *f;
-    int lastchunk, chunk, ssize, fsize;
+#else
+    gzFile f;
+#endif
+    int chunk;
     char *str, *p, *p2;
     
     if (len < 0)
@@ -456,81 +486,75 @@ char *read_file (const char * file, int start, int len) {
      */
     if (stat(file, &st) == -1 || (st.st_mode & S_IFDIR))
         return 0;
-
+#ifndef PACKAGE_COMPRESS
     f = fopen(file, FOPEN_READ);
+#else
+    f = gzopen(file, "rb");
+#endif
     if (f == 0)
         return 0;
     
-#ifndef LATTICE
-    if (fstat(fileno(f), &st) == -1)
-        fatal("Could not stat an open file.\n");
-#endif
-
-    /* lastchunk = the size of the last chunk we read
-     * chunk = size of the next chunk we will read (always < fsize)
-     * fsize = amount left in file
-     */
-    lastchunk = chunk = ssize = fsize = st.st_size;
-    if (fsize > READ_FILE_MAX_SIZE)
-        lastchunk = chunk = ssize = READ_FILE_MAX_SIZE;
-
-    /* Can't shortcut out if size > max even if start and len aren't
-       specified, since we still need to check for \0, and \r's may pull the
-       size into range */
-
     if (start < 1) start = 1; 
     if (len == 0) len = READ_FILE_MAX_SIZE; 
     
-    str = new_string(ssize, "read_file: str"); 
-    if (fsize == 0) { 
+    str = new_string(READ_FILE_MAX_SIZE, "read_file: str"); 
+    if (st.st_size== 0) { 
         /* zero length file */ 
         str[0] = 0; 
+#ifndef PACKAGE_COMPRESS
         fclose(f);
+#else
+	gzclose(f);
+#endif
         return str;
     }
 
-    do {
-        /* read another chunk */
-        if (fsize == 0 || fread(str, chunk, 1, f) != 1)
-            goto free_str;
-        p = str;
-        lastchunk = chunk;
-        fsize -= chunk;
-        if (chunk > fsize) chunk = fsize;
-    
-        while (start > 1) {
-            /* skip newlines */
-            p2 = memchr(p, '\n', str + lastchunk - p);
-            if (p2) {
-                p = p2 + 1;
-                start--;
-            } else
-                break; /* get another chunk */
-        }
-    } while (start > 1); /* until we've skipped enough */
+    do{
+#ifndef PACKAGE_COMPRESS
+      chunk = fread(str, 1, READ_FILE_MAX_SIZE, f);
+#else 
+      chunk = gzread(f, str, READ_FILE_MAX_SIZE);
+#endif
+      if(chunk < 1)
+	goto free_str;
+      p = str;
+      while (start > 1) {
+	/* skip newlines */
+	p2 = memchr(p, '\n', READ_FILE_MAX_SIZE+str-p);
+	if (p2) {
+	  p = p2 + 1;
+	  start--;
+	} else
+	  break;
+      } 
+    } while (start > 1);
 
     p2 = str;
     while (1) {
         char c;
 
-        if (p == str + lastchunk) {
-            /* need another chunk */
-            if (chunk > ssize - (p2 - str))
-                chunk = ssize - (p2 - str); /* space remaining */
-            if (fsize == 0) break; /* nothing left */
-            if (chunk == 0 || fread(p2, chunk, 1, f) != 1)
-                goto free_str;
-            p = p2;
-            lastchunk = chunk + (p2 - str); /* fudge since we didn't
-                                               start at str */
-            fsize -= chunk;
-            if (chunk > fsize) chunk = fsize;
-        }
-
         c = *p++;
+	if(p-str > chunk){
+	  if(chunk == READ_FILE_MAX_SIZE){
+	    if(p2 < p){
+#ifndef PACKAGE_COMPRESS
+	      chunk = p-str+fread(p2, 1, READ_FILE_MAX_SIZE+str-p, f);
+#else
+	      chunk = p-str+gzread(f, p2, READ_FILE_MAX_SIZE+str-p);
+#endif
+	      p=p2;
+	    } else
+	      goto free_str; //file too big
+	  } else
+	    break; //reached the end
+	}
         if (c == '\0') {
             FREE_MSTR(str);
+#ifndef PACKAGE_COMPRESS
             fclose(f);
+#else
+	    gzclose(f);
+#endif
             error("Attempted to read '\\0' into string!\n");    
         }
         if (c != '\r' || *p != '\n') {
@@ -542,7 +566,12 @@ char *read_file (const char * file, int start, int len) {
 
     *p2 = 0;
     str = extend_string(str, p2 - str); /* fix string length */
+
+#ifndef PACKAGE_COMPRESS
     fclose(f);
+#else
+    gzclose(f);
+#endif
     
     return str;
     
@@ -550,7 +579,11 @@ char *read_file (const char * file, int start, int len) {
 
   free_str:
     FREE_MSTR(str);
+#ifndef PACKAGE_COMPRESS
     fclose(f);
+#else
+    gzclose(f);
+#endif
     return 0;
 }
 

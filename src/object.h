@@ -123,13 +123,16 @@ typedef int (* get_objectsfn_t) (object_t *, void *);
 
 #ifdef DEBUG
 #define add_ref(ob, str) SAFE(\
-                              ob->ref++; \
+                              if(ob->ref++ > 32000){\
+				destruct_object(ob);\
+				error("ref count too high!\n");\
+			      } \
                               debug(d_flag, \
                               ("Add_ref %s (%d) from %s\n", \
                                      ob->obname, ob->ref, str));\
                               )
 #else
-#define add_ref(ob, str) ob->ref++
+#define add_ref(ob, str) if(ob->ref++ > 32000){destruct_object(ob);error("ref count too high!\n");}
 #endif
 
 #define ROB_STRING_ERROR 1
@@ -163,7 +166,7 @@ object_t *get_empty_object (int);
 void reset_object (object_t *);
 void call_create (object_t *, int);
 void reload_object (object_t *);
-void free_object (object_t *, const char * const);
+void free_object (object_t **, const char * const);
 #ifdef F_SET_HIDE
 INLINE int valid_hide (object_t *);
 INLINE int object_visible (object_t *);

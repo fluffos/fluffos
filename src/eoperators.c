@@ -167,8 +167,8 @@ f_eq()
     case T_OBJECT:
         {
             i = (sp-1)->u.ob == sp->u.ob;
-            free_object((sp--)->u.ob, "f_eq: 1");
-            free_object(sp->u.ob, "f_eq: 2");
+            free_object(&(sp--)->u.ob, "f_eq: 1");
+            free_object(&sp->u.ob, "f_eq: 2");
             break;
         }
         
@@ -528,8 +528,8 @@ f_ne()
     case T_OBJECT:
         {
             i = (sp-1)->u.ob != sp->u.ob;
-            free_object((sp--)->u.ob, "f_ne: 1");
-            free_object(sp->u.ob, "f_ne: 2");
+            free_object(&(sp--)->u.ob, "f_ne: 1");
+            free_object(&sp->u.ob, "f_ne: 2");
             break;
         }
 

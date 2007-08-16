@@ -225,7 +225,7 @@ f_socket_release (void)
     pop_stack();
     /* the object might have been dested an removed from the stack */
     if (sp->type == T_OBJECT)
-	free_object(sp->u.ob, "socket_release()");
+	free_object(&sp->u.ob, "socket_release()");
     sp--;
 }
 #endif
@@ -283,7 +283,7 @@ f_socket_address (void)
 /* This is so we can get the address of interactives as well. */
 
         if (!sp->u.ob->interactive) {
-            free_object(sp->u.ob, "f_socket_address:1");
+            free_object(&sp->u.ob, "f_socket_address:1");
             *sp = const0u;
             return;
 	}
@@ -291,7 +291,7 @@ f_socket_address (void)
         sprintf(buf, "%s %d", tmp, 
 		ntohs(sp->u.ob->interactive->addr.sin_port));
 	str = string_copy(buf, "f_socket_address");
-        free_object(sp->u.ob, "f_socket_address:2");
+        free_object(&sp->u.ob, "f_socket_address:2");
         put_malloced_string(str);
         return;
     }

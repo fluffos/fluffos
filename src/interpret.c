@@ -1663,11 +1663,11 @@ INLINE_STATIC void do_loop_cond_local()
     break;
   default:
     if (s1->type == T_OBJECT && (s1->u.ob->flags & O_DESTRUCTED)) {
-      free_object(s1->u.ob, "do_loop_cond:1");
+      free_object(&s1->u.ob, "do_loop_cond:1");
       *s1 = const0u;
     }
     if (s2->type == T_OBJECT && (s2->u.ob->flags & O_DESTRUCTED)) {
-      free_object(s2->u.ob, "do_loop_cond:2");
+      free_object(&s2->u.ob, "do_loop_cond:2");
       *s2 = const0u;
     }
     if (s1->type == T_NUMBER && s2->type == T_NUMBER) {
@@ -2379,6 +2379,15 @@ eval_instruction (char * p)
         case T_STRING:
           {
             switch ((sp-1)->type) {
+	    case T_OBJECT:
+	      {
+		char buff[1024];
+		object_t *ob = (sp-1)->u.ob;
+		sprintf(buff, "/%s", ob->obname);
+                SVALUE_STRING_ADD_LEFT(buff, "f_add: 3");
+		free_object(&ob, "f_add: 3");
+                break;
+	      }
             case T_NUMBER:
               {
                 char buff[30];
@@ -2407,7 +2416,21 @@ eval_instruction (char * p)
             }
             break;
           } /* end of x + T_STRING */
-         
+	case T_OBJECT:
+	  switch ((sp-1)->type) {
+	    case T_STRING:
+	      {
+		const char *fname = sp->u.ob->obname;
+		free_object(&(sp--)->u.ob, "f_add: str+ob");
+		EXTEND_SVALUE_STRING(sp, "/", "f_add: str ob");
+		EXTEND_SVALUE_STRING(sp, fname, "f_add: str ob");
+		break;
+	      }
+	     default:
+	       error("Bad type argument to +.  Had %s and %s.\n",
+		     type_name(sp->type), type_name((sp+1)->type));
+	  }
+	  break;
         default:
           error("Bad type argument to +.  Had %s and %s.\n",
                 type_name((sp-1)->type), type_name(sp->type));
@@ -2434,8 +2457,13 @@ eval_instruction (char * p)
          
           sprintf(buff, "%f", sp->u.real);
           EXTEND_SVALUE_STRING(lval, buff, "f_add_eq: 2");
+	} else if(sp->type == T_OBJECT) {
+	  const char *fname = sp->u.ob->obname;
+	  free_object(&(sp--)->u.ob, "f_add_eq: 2");
+	  EXTEND_SVALUE_STRING(lval, "/", "f_add: str ob");
+	  EXTEND_SVALUE_STRING(lval, fname, "f_add_eq: 2");
         } else {
-          bad_argument(sp, T_STRING | T_NUMBER | T_REAL, 2, instruction);
+          bad_argument(sp, T_OBJECT | T_STRING | T_NUMBER | T_REAL, 2, instruction);
         }
         break;
       case T_NUMBER:
@@ -3767,7 +3795,7 @@ do_catch (char * pc, unsigned short new_pc_offset)
       pop_context(&econ);
       error("Can't catch eval cost too big error.\n");
     }
-    if (too_deep_error) {
+    if (0 && too_deep_error) {//can't we??
       pop_context(&econ);
       error("Can't catch too deep recursion error.\n");
     }
@@ -3990,7 +4018,7 @@ void check_co_args (int num_arg, const program_t * prog, function_t * fun, int f
     sprintf(buf, "Wrong number of arguments to %s in %s.\n", fun->funcname, prog->filename);
 #ifdef CALL_OTHER_WARN
     if(current_prog){
-      char *file;
+      const char *file;
       int line;
       find_line(pc, current_prog, &file, &line);
       smart_log(file, line, buf, 1);
@@ -4134,13 +4162,18 @@ int apply_low (const char * fun, object_t * ob, int num_arg)
     int findex, runtime_index, fio, vio;
     /* we have to search the function */
 
-    if (entry->oprogp)
-      free_prog(entry->oprogp);
+    if (entry->oprogp) {
+      free_prog(&entry->oprogp);
+      entry->oprogp = 0;
+    }
     if (entry->progp) {
-      free_prog(entry->progp);
+      free_prog(&entry->progp);
+      entry->progp = 0;
     } else {
-      if (entry->funp)
+      if (entry->funp){
         free_string((char *)entry->funp);
+	entry->funp = 0;
+      }
     }
   
 #ifdef CACHE_STATS
@@ -4476,7 +4509,7 @@ const char *function_exists (const char * fun, object_t * ob, int flag) {
   is_static: returns 1 if a function named 'fun' is declared 'static' in 'ob';
   0 otherwise.
 */
-int is_static (char * fun, object_t * ob)
+int is_static (const char *fun, object_t * ob)
 {
   int findex;
   int runtime_index;
@@ -4685,7 +4718,7 @@ const char *dump_trace (int how)
    * won't make the object_name() apply and save_context() might fail
    * here (too deep recursion)
    */
-  if (!max_eval_error && !too_deep_error) {
+  if (!too_deep_error) {
     if (!save_context(&econ))
       return 0;
     context_saved = 1;
@@ -5427,10 +5460,11 @@ int inter_sscanf (svalue_t * arg, svalue_t * s0, svalue_t * s1, int num_arg)
 
 /* dump # of times each efun has been used */
 #ifdef OPCPROF
-void opcdump (char * tfn)
+void opcdump (const char *tfn)
 {
   int i, len, limit;
-  char tbuf[SMALL_STRING_SIZE], *fn;
+  char tbuf[SMALL_STRING_SIZE];
+  const char *fn;
   FILE *fp;
 
   if ((len = strlen(tfn)) >= (SMALL_STRING_SIZE - 7)) {
@@ -5621,7 +5655,7 @@ void remove_object_from_stack (object_t * ob)
       continue;
     if (svp->u.ob != ob)
       continue;
-    free_object(svp->u.ob, "remove_object_from_stack");
+    free_object(&svp->u.ob, "remove_object_from_stack");
     svp->type = T_NUMBER;
     svp->u.number = 0;
   }
