@@ -6,6 +6,7 @@
 #include "lex.h"
 #include "preprocess.h"
 #include "edit_source.h"
+#include <stdlib.h>
 
 #ifdef WIN32
 #define MSDOS
@@ -13,7 +14,8 @@
 #endif
 
     void mf_fatal(char *);
-    
+    void yyerror(char const *);
+
     int num_buff = 0;
     int op_code, efun_code, efun1_code;
     char *oper_codes[MAX_FUNC];
@@ -22,7 +24,7 @@
     char *key[MAX_FUNC], *buf[MAX_FUNC];
 
     int min_arg = -1, limit_max = 0;
-    
+
 /*
  * arg_types is the types of all arguments. A 0 is used as a delimiter,
  * marking next argument. An argument can have several types.
@@ -70,9 +72,9 @@ struct type {
 specs: /* empty */ | specs spec ;
 
 spec: operator | func;
-    
+
 operator: OPERATOR op_list ';' ;
-    
+
 op_list: op | op_list ',' op ;
 
 op: ID
@@ -93,15 +95,15 @@ op: ID
 
 optional_ID: ID | /* empty */ { $$ = ""; } ;
 
-optional_default: /* empty */ { $$="DEFAULT_NONE"; } 
+optional_default: /* empty */ { $$="DEFAULT_NONE"; }
                 | DEFAULT ':' NUM
                   {
 		      static char buf[40];
                       sprintf(buf, "%i", $3);
                       $$ = buf;
 		  }
-                | DEFAULT ':' ID 
-                  { 
+                | DEFAULT ':' ID
+                  {
                       if (strcmp($3, "F__THIS_OBJECT"))
                           yyerror("Illegal default");
                       $$ = "DEFAULT_THIS_OBJECT";
@@ -170,7 +172,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 	    $1 = MIXED;
 	}
      	sprintf(buff, "{\"%s\",%s,0,0,%d,%d,%s,%s,%s,%s,%s,%d,%s},\n",
-		$2, f_name, min_arg, limit_max ? -1 : $5, 
+		$2, f_name, min_arg, limit_max ? -1 : $5,
 		$1 != VOID ? ctype($1) : "TYPE_NOVALUE",
 		etype(0), etype(1), etype(2), etype(3), i, $6);
 	if (strlen(buff) > sizeof buff)
@@ -321,7 +323,7 @@ char *etype (int n)
 	}
 	strcat(buff, etype1(curr_arg_types[i]));
     }
-    if (!strcmp(buff, "")) 
+    if (!strcmp(buff, ""))
       strcpy(buff, "T_ANY");
     return buff;
 }
@@ -330,7 +332,7 @@ int ident (int);
 
 int yylex() {
     register int c;
-    
+
     for(;;) {
 	switch(c = getc(yyin)){
 	case ' ':

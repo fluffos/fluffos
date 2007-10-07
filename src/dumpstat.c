@@ -31,7 +31,7 @@ static int svalue_size (svalue_t * v)
     case T_NUMBER:
         return 0;
     case T_STRING:
-        return (int) (strlen(v->u.string) + 1);
+        return (strlen(v->u.string) + 1);
     case T_ARRAY:
     case T_CLASS:
         if (++depth > 100)
@@ -61,9 +61,9 @@ static int svalue_size (svalue_t * v)
                 return 0;
 
             if (tmp.u.arr)
-                total = (int)(sizeof(funptr_hdr_t) + svalue_size(&tmp));
+                total = sizeof(funptr_hdr_t) + svalue_size(&tmp);
             else
-                total = (int)(sizeof(funptr_hdr_t));
+                total = sizeof(funptr_hdr_t);
             switch (v->u.fp->hdr.type) {
             case FP_EFUN:
                 total += sizeof(efun_ptr_t);
@@ -86,7 +86,7 @@ static int svalue_size (svalue_t * v)
 #ifndef NO_BUFFER_TYPE
     case T_BUFFER:
         /* first byte is stored inside the buffer struct */
-        return (int) (sizeof(buffer_t) + v->u.buf->size - 1);
+        return sizeof(buffer_t) + v->u.buf->size - 1;
 #endif
     default:
       //some freed value or a reference (!) to one (in all my test cases
@@ -103,7 +103,7 @@ int data_size (object_t * ob)
     int total = 0, i;
 
     if (ob->prog) {
-        for (i = 0; i < (int) ob->prog->num_variables_total; i++) {
+        for (i = 0; i < ob->prog->num_variables_total; i++) {
             depth = 0;
             total += svalue_size(&ob->variables[i]) + sizeof(svalue_t);
         }
@@ -150,7 +150,7 @@ void dumpstat (const char * tfn)
             tmp = ob->prog->total_size;
         else
             tmp = 0;
-        fprintf(f, "%-20s %i ref %2d %s %s (%d)\n", ob->obname,
+        fprintf(f, "%-20s %ld ref %2d %s %s (%d)\n", ob->obname,
                 tmp + data_size(ob) + sizeof(object_t), ob->ref,
                 ob->flags & O_HEART_BEAT ? "HB" : "  ",
 #ifndef NO_ENVIRONMENT

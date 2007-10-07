@@ -464,12 +464,9 @@ f__new (void)
 {
     svalue_t *arg = sp - st_num_arg + 1;
     object_t *ob;
-    int tmp_eval = get_eval();
 
     ob = clone_object(arg->u.string, st_num_arg - 1);
     
-    set_eval(tmp_eval);
-
     free_string_svalue(sp);
     if (ob) {
         put_unrefed_undested_object(ob, "f_clone_object");
@@ -2598,11 +2595,7 @@ f_restore_object (void)
 
     flag = (st_num_arg > 1) ? (sp--)->u.number : 0;
 
-    tmp_eval = get_eval();
-
     flag = restore_object(current_object, sp->u.string, flag);
-
-    set_eval(tmp_eval);
 
     free_string_svalue(sp);
     put_number(flag);
@@ -2666,12 +2659,8 @@ f_save_object (void)
         flag = 0;
     }
     
-    tmp_eval = get_eval();
-
     flag = save_object(current_object, sp->u.string, flag);
 
-    set_eval(tmp_eval);
-    
     free_string_svalue(sp);
     put_number(flag);
 }
@@ -3093,13 +3082,13 @@ f_strsrch (void)
         /* start at left */
     } else if (!((sp+1)->u.number)) {
         if (!little[1])         /* 1 char srch pattern */
-            pos = strchr(big, (int) little[0]);
+            pos = strchr(big, little[0]);
         else
             pos = (char *)strstr(big, little);
         /* start at right */
     } else {                    /* XXX: maybe test for -1 */
         if (!little[1])         /* 1 char srch pattern */
-            pos = strrchr(big, (int) little[0]);
+            pos = strrchr(big, little[0]);
         else {
             char c = *little;
 
@@ -3123,7 +3112,7 @@ f_strsrch (void)
     if (!pos)
         i = -1;
     else
-        i = (int) (pos - big);
+        i = pos - big;
     if (sp->type == T_STRING) free_string_svalue(sp);
     free_string_svalue(--sp);
     put_number(i);
@@ -3396,7 +3385,7 @@ f__to_int (void)
     switch(sp->type) {
         case T_REAL:
             sp->type = T_NUMBER;
-            sp->u.number = (int) sp->u.real;
+            sp->u.number = (long) sp->u.real;
             break;
         case T_STRING:
         {
@@ -3491,7 +3480,7 @@ f_userp (void)
 {
     int i;
 
-    i = (int) sp->u.ob->flags & O_ONCE_INTERACTIVE;
+    i = sp->u.ob->flags & O_ONCE_INTERACTIVE;
     free_object(&sp->u.ob, "f_userp");
     put_number(i != 0);
 }
@@ -3511,7 +3500,7 @@ f_wizardp (void)
 {
     int i;
 
-    i = (int) sp->u.ob->flags & O_IS_WIZARD;
+    i = sp->u.ob->flags & O_IS_WIZARD;
     free_object(&sp->u.ob, "f_wizardp");
     put_number(i != 0);
 }
@@ -3523,7 +3512,7 @@ f_virtualp (void)
 {
     int i;
 
-    i = (int) sp->u.ob->flags & O_VIRTUAL;
+    i = sp->u.ob->flags & O_VIRTUAL;
     free_object(&sp->u.ob, "f_virtualp");
     put_number(i != 0);
 }

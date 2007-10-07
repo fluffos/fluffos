@@ -45,8 +45,8 @@ typedef struct defn_s {
 } defn_t;
 
 /* must be a power of 4 */
-#define DEFHASH 64
-#define defhash(s) (whashstr((s), 10) & (DEFHASH - 1))
+#define DEFHASH 128
+#define defhash(s) (whashstr((s)) & (DEFHASH - 1))
 
 #define DEF_IS_UNDEFINED 1
 #define DEF_IS_PREDEF    2

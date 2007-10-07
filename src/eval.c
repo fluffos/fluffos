@@ -1,20 +1,14 @@
 #include "std.h"
 #include "main.h"
 #include "comm.h"
+#include "uvalarm.h"
 
 int outoftime = 0;
 
 void set_eval(int time){
 #ifndef WIN32
-#ifdef SIGALRM
-  signal(SIGALRM, sigalrm_handler);
-#endif
-  
-#ifdef HAS_UALARM
-  ualarm(max_cost, 0);
-#else
-  alarm(max_cost/1000000); /* defined in config.h */
-#endif
+  signal(SIGVTALRM, sigalrm_handler);
+  uvalarm(max_cost, 0);
 #endif
   outoftime = 0;
 }
@@ -22,15 +16,11 @@ void set_eval(int time){
 int get_eval(){
   int ret;
 #ifndef WIN32
-#ifdef HAS_UALARM
-  ret = ualarm(2*max_cost, 0);
-  ualarm(ret, 0);
+  ret = uvalarm(2*max_cost, 0);
+  uvalarm(ret, 0);
   return ret;
 #else
-  ret = alarm(0);
-  alarm(ret);
-  return ret*1000000;
-#endif
+  return 100;
 #endif
 }
 

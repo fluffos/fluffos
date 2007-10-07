@@ -64,7 +64,7 @@ void clear_notify (object_t * ob)
 
 INLINE_STATIC int hash_living_name (const char *str)
 {
-    return whashstr(str, 20) & (CFG_LIVING_HASH_SIZE - 1);
+    return whashstr(str) & (CFG_LIVING_HASH_SIZE - 1);
 }
 
 object_t *find_living_object (const char* str, int user)

@@ -2146,7 +2146,7 @@ void add_predefines()
             fatal("MLEN exceeded");
         add_predefine(namebuf, -1, mtext);
     }
-    sprintf(save_buf, "%d", sizeof(long));
+    sprintf(save_buf, "%ld", sizeof(long));
     add_predefine("SIZEOFINT", -1, save_buf);
     long tmp = (long)1<<31;
     if(tmp > 0)
@@ -2800,6 +2800,13 @@ static char *expand_define2 (char * text)
     defn_t *macro;
     char expbuf[DEFMAX], *argv[NARGS], *expand_buffer, *in, *out, *freeme = 0;
 
+    /* special handling for __LINE__ macro */
+    if (!strcmp(text, "__LINE__")) {
+      expand_buffer = (char *)DXALLOC(20, TAG_COMPILER, "expand_define2");
+      sprintf(expand_buffer, "%i", current_line);
+      return expand_buffer;
+    }
+
     /* have we already expanded this macro? */
     for (i = 0;  i < expand_depth;  i++) {
         if (!strcmp(expands[i], text))
@@ -3078,7 +3085,7 @@ char *main_file_name()
 
 /* identifier hash table stuff, size must be an even power of two */
 #define IDENT_HASH_SIZE 1024
-#define IdentHash(s) (whashstr((s), 20) & (IDENT_HASH_SIZE - 1))
+#define IdentHash(s) (whashstr((s)) & (IDENT_HASH_SIZE - 1))
 
 /* The identifier table is hashed for speed.  The hash chains are circular
  * linked lists, so that we can rotate them, since identifier lookup is

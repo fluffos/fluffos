@@ -63,6 +63,7 @@ array_t *reg_assoc (const char *, array_t *, array_t *, svalue_t *);
 void dealloc_array (array_t *);
 array_t *union_array (array_t *, array_t *);
 array_t *copy_array (array_t * p);
+array_t *resize_array (array_t * p, unsigned short n);
 
 #define ALLOC_ARRAY(nelem) \
     (array_t *)DXALLOC(sizeof (array_t) + \

@@ -818,7 +818,7 @@ void socket_read_select_handler (int fd)
             debug(sockets, ("read_socket_handler: read %d bytes\n", cc));
             buf[cc] = '\0';
             sprintf(addr, "%s %d", inet_ntoa(sin.sin_addr),
-                    (int)ntohs(sin.sin_port));
+                    ntohs(sin.sin_port));
             push_number(fd);
 #ifndef NO_BUFFER_TYPE
             if (lpc_socks[fd].flags & S_BINARY) {
@@ -1196,7 +1196,7 @@ int get_socket_address (int fd, char * addr, int * port, int local)
         return EEFDRANGE;
     }
     addr_in = (local ? &lpc_socks[fd].l_addr : &lpc_socks[fd].r_addr);
-    *port = (int) ntohs(addr_in->sin_port);
+    *port = ntohs(addr_in->sin_port);
     strcpy(addr, inet_ntoa(addr_in->sin_addr));
     return EESUCCESS;
 }
@@ -1289,7 +1289,7 @@ static char *inet_address (struct sockaddr_in * sin)
     if (ntohs(sin->sin_port) == 0)
         strcpy(port, "*");
     else
-        sprintf(port, "%d", (int)ntohs(sin->sin_port));
+        sprintf(port, "%d", ntohs(sin->sin_port));
     strcat(addr, port);
 
     return (addr);

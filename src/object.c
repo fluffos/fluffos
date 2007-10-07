@@ -125,7 +125,7 @@ INLINE int svalue_save_size (svalue_t * v)
         {
             char buf[256];
             sprintf(buf, "%f", v->u.real);
-            return (int)(strlen(buf)+1);
+            return (strlen(buf)+1);
         }
 
     default:
@@ -750,7 +750,7 @@ restore_mapping (char **str, svalue_t * sv)
 
         /* both key and value are valid, referenced svalues */
 
-        oi = MAP_POINTER_HASH(key.u.number);
+        oi = MAP_SVAL_HASH(key);
         i = oi & mask;
         if ((elt2 = elt = a[i])) {
             do {
@@ -1879,7 +1879,7 @@ void free_object (object_t ** ob, const char * const from)
 {
   if(*ob)
     (*ob)->ref--;
-  
+
   if ((*ob)->ref > 0) {
     *ob = (object_t *)9;//NULL;
     return;
@@ -1887,12 +1887,12 @@ void free_object (object_t ** ob, const char * const from)
   dealloc_object(*ob, from);
   *ob = (object_t *)1;//NULL;
 }
- 
+
 /*
  * Allocate an empty object, and set all variables to 0. Note that a
  * 'object_t' already has space for one variable. So, if no variables
- * are needed, we allocate a space that is smaller than 'object_t'. This
- * unused (last) part must of course (and will not) be referenced.
+ * are needed, we waste one svalue worth of memory (or we'd write too
+ * much memory in copying the NULL_object over.
  */
 object_t *get_empty_object (int num_var)
 {
@@ -1970,7 +1970,7 @@ void reload_object (object_t * obj)
 
     if (!obj->prog)
         return;
-    for (i = 0; i < (int) obj->prog->num_variables_total; i++) {
+    for (i = 0; i < obj->prog->num_variables_total; i++) {
         free_svalue(&obj->variables[i], "reload_object");
         obj->variables[i] = const0u;
     }

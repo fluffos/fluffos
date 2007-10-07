@@ -52,7 +52,7 @@ static void ms_setup_stats (array_t * p) {
     }
 }
 
-#define ms_remove_stats(p) add_array_size(&(p)->stats, -(int)((p)->size))
+#define ms_remove_stats(p) add_array_size(&(p)->stats, -((p)->size))
 #define ms_add_array_size(p, n) add_array_size(p, n)
 #else
 #define ms_setup_stats(x)
@@ -191,7 +191,7 @@ static array_t *fix_array (array_t * p, unsigned short n) {
     return RESIZE_ARRAY(p, n);
 }
 
-INLINE_STATIC array_t *resize_array (array_t * p, unsigned short n) {
+array_t *resize_array (array_t * p, unsigned short n) {
 #ifdef ARRAY_STATS
     total_array_size += (n - p->size) * sizeof(svalue_t);
 #endif
@@ -611,7 +611,7 @@ array_t *commands (object_t * ob)
 
 #ifdef F_FILTER
 void
-filter_array (svalue_t * arg, int num_arg)
+filter_array(svalue_t * arg, int num_arg)
 {
     array_t *vec = arg->u.arr, *r;
     int size;
@@ -620,35 +620,34 @@ filter_array (svalue_t * arg, int num_arg)
         pop_n_elems(num_arg - 1);
         return;
     } else {
-        char *flags;
         svalue_t *v;
         int res = 0, cnt;
         function_to_call_t ftc;
 
         process_efun_callback(1, &ftc, F_FILTER);
 
-        flags = new_string(size, "TEMP: filter: flags");
-        push_malloced_string(flags);
+	/* allocate a full size array and push it onto the stack so that if an
+         * error occurs, it'll get cleaned up.  can't use empty array because
+         * if an error occurs, it'll contain garbage and crash the driver
+         */
+        r = allocate_array(size);
+        push_refed_array(r);
 
         for (cnt = 0; cnt < size; cnt++) {
             push_svalue(&vec->item[cnt]);
             v = call_efun_callback(&ftc, 1);
-            if (!IS_ZERO(v)) {
-                flags[cnt] = 1;
-                res++;
-            } else
-                flags[cnt] = 0;
-        }
-        r = allocate_empty_array(res);
-        if (res) {
-            while (cnt--) {
-                if (flags[cnt])
-                    assign_svalue_no_free(&r->item[--res], &vec->item[cnt]);
-            }
+            if (!IS_ZERO(v)) 
+                assign_svalue_no_free(&r->item[res++], &vec->item[cnt]);
         }
 
-        FREE_MSTR(flags);
-        sp--;
+	sp--;/* pull the work array off the stack without freeing it */
+        if (res) 
+	  r = resize_array(r, res);
+        else {
+	  free_array(r);
+	  r = &the_null_array;
+	}
+
         pop_n_elems(num_arg - 1);
         free_array(vec);
         sp->u.arr = r;
@@ -1909,7 +1908,7 @@ array_t *deep_inherit_list (object_t * ob)
 
     for (; cur < next && next < 256; cur++) {
         pr = plist[cur];
-        for (il2 = 0; il2 < (int) pr->num_inherited; il2++)
+        for (il2 = 0; il2 < pr->num_inherited; il2++)
             plist[next++] = pr->inherit[il2].prog;
     }
 
@@ -1940,7 +1939,7 @@ array_t *inherit_list (object_t * ob)
     cur = 0;
 
     pr = plist[cur];
-    for (il2 = 0; il2 < (int) pr->num_inherited; il2++) {
+    for (il2 = 0; il2 < pr->num_inherited; il2++) {
         plist[next++] = pr->inherit[il2].prog;
     }
 
@@ -1953,44 +1952,6 @@ array_t *inherit_list (object_t * ob)
         ret->item[il].subtype = STRING_MALLOC;
         ret->item[il].u.string = add_slash(pr->filename);
     }
-    return ret;
-}
-
-typedef struct children_filter_s {
-    int len;
-    char buf[MAX_OBJECT_NAME_SIZE];
-} children_filter_t;
-
-static int children_filter (object_t * ob, children_filter_t * cf)
-{
-    int ol = strlen(ob->obname);
-    return ((ol == cf->len || (ol > cf->len && ob->obname[cf->len] == '#')) && !strncmp(ob->obname, cf->buf, cf->len));
-}
-
-array_t *
-children (const char * str)
-{
-    int count;
-    children_filter_t cf;
-    object_t **list;
-    array_t *ret;
-
-    if (!strip_name(str, cf.buf, sizeof(cf.buf)))
-        return &the_null_array;
-    cf.len = strlen(cf.buf);
-
-    get_objects(&list, &count, (get_objectsfn_t)children_filter, (void *)&cf);
-
-    if (count > max_array_size)
-        count = max_array_size;
-    ret = allocate_empty_array(count);
-    while (count--) {
-        ret->item[count].type = T_OBJECT;
-        ret->item[count].u.ob = list[count];
-        add_ref(list[count], "children");
-    }
-
-    pop_stack();
     return ret;
 }
 

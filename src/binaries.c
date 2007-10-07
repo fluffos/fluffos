@@ -157,8 +157,8 @@ void save_binary (program_t * prog, mem_block_t * includes, mem_block_t * patche
     ret = safe_apply_master_ob(APPLY_VALID_SAVE_BINARY, 1);
     if (!MASTER_APPROVED(ret))
         return;
-    if (prog->total_size > (int) USHRT_MAX ||
-        includes->current_size > (int) USHRT_MAX)
+    if (prog->total_size > USHRT_MAX ||
+        includes->current_size > USHRT_MAX)
         /* assume all other sizes ok */
         return;
 
@@ -232,16 +232,16 @@ void save_binary (program_t * prog, mem_block_t * includes, mem_block_t * patche
     p = prog;
 
     /* inherit names */
-    for (i = 0; i < (int) p->num_inherited; i++) {
+    for (i = 0; i < p->num_inherited; i++) {
         len = SHARED_STRLEN(p->inherit[i].prog->filename);
         fwrite((char *) &len, sizeof len, 1, f);
         fwrite(p->inherit[i].prog->filename, sizeof(char), len, f);
     }
 
     /* string table */
-    for (i = 0; i < (int) p->num_strings; i++) {
+    for (i = 0; i < p->num_strings; i++) {
         tmp = SHARED_STRLEN(p->strings[i]);
-        if (tmp > (int) USHRT_MAX) {    /* possible? */
+        if (tmp > USHRT_MAX) {    /* possible? yes, if you try hard enough*/
             fclose(f);
             unlink(file_name);
             error("String too long for save_binary.\n");
@@ -253,14 +253,14 @@ void save_binary (program_t * prog, mem_block_t * includes, mem_block_t * patche
     }
 
     /* var names */
-    for (i = 0; i < (int) p->num_variables_defined; i++) {
+    for (i = 0; i < p->num_variables_defined; i++) {
         len = SHARED_STRLEN(p->variable_table[i]);
         fwrite((char *) &len, sizeof len, 1, f);
         fwrite(p->variable_table[i], sizeof(char), len, f);
     }
 
     /* function names */
-    for (i = 0; i < (int) p->num_functions_defined; i++) {
+    for (i = 0; i < p->num_functions_defined; i++) {
         len = SHARED_STRLEN(p->function_table[i].funcname);
         fwrite((char *) &len, sizeof len, 1, f);
         fwrite(p->function_table[i].funcname, sizeof(char), len, f);
@@ -406,7 +406,7 @@ program_t *int_load_binary (char * name)
     p->filename = make_shared_string(name);
 
     /* Read inherit names and find prog.  Check mod times also. */
-    for (i = 0; i < (int) p->num_inherited; i++) {
+    for (i = 0; i < p->num_inherited; i++) {
         fread((char *) &len, sizeof len, 1, f);
         ALLOC_BUF(len + 1);
         fread(buf, sizeof(char), len, f);
@@ -447,7 +447,7 @@ program_t *int_load_binary (char * name)
     }
 
     /* Read string table */
-    for (i = 0; i < (int) p->num_strings; i++) {
+    for (i = 0; i <  p->num_strings; i++) {
         fread((char *) &len, sizeof len, 1, f);
         ALLOC_BUF(len + 1);
         fread(buf, sizeof(char), len, f);
@@ -456,7 +456,7 @@ program_t *int_load_binary (char * name)
     }
 
     /* var names */
-    for (i = 0; i < (int) p->num_variables_defined; i++) {
+    for (i = 0; i < p->num_variables_defined; i++) {
         fread((char *) &len, sizeof len, 1, f);
         ALLOC_BUF(len + 1);
         fread(buf, sizeof(char), len, f);
@@ -465,7 +465,7 @@ program_t *int_load_binary (char * name)
     }
 
     /* function names */
-    for (i = 0; i < (int) p->num_functions_defined; i++) {
+    for (i = 0; i < p->num_functions_defined; i++) {
         fread((char *) &len, sizeof len, 1, f);
         ALLOC_BUF(len + 1);
         fread(buf, sizeof(char), len, f);
@@ -530,7 +530,7 @@ void init_binaries (int argc, char ** argv)
             else
                 config_id = current_time;
         } else if (argv[i][1] == 'D' || argv[i][1] == 'm') {
-            arg_id = (arg_id << 1) ^ whashstr(argv[i] + 2, 32);
+            arg_id = (arg_id << 1) ^ whashstr(argv[i] + 2);
         }
     }
 

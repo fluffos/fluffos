@@ -116,7 +116,7 @@ typedef struct compiler_temp_t {
     struct program_s *prog; /* inherited if nonzero */
     union {
         function_t *func;
-        int index;
+        long index;
     } u;
     struct compiler_temp_t *next;
 } compiler_temp_t;

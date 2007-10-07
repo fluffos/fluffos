@@ -74,6 +74,7 @@ typedef struct object_s {
 #endif
     const char * const obname;
     struct object_s *next_hash;
+    struct object_s *next_ch_hash;
     /* the fields above must match lpc_object_t */
     int load_time;              /* time when this object was created */
 #ifndef NO_RESET

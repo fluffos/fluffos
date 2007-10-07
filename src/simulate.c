@@ -996,7 +996,7 @@ void destruct2 (object_t * ob)
          */
         int i;
 
-        for (i = 0; i < (int) ob->prog->num_variables_total; i++) {
+        for (i = 0; i < ob->prog->num_variables_total; i++) {
             free_svalue(&ob->variables[i], "destruct2");
             ob->variables[i] = const0u;
         }

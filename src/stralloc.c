@@ -61,7 +61,7 @@ int search_len = 0;
 int num_str_searches = 0;
 #endif
 
-#define StrHash(s) (whashstr((s), 20) & (htable_size_minus_one))
+#define StrHash(s) (whashstr((s)) & (htable_size_minus_one))
 
 #define hfindblock(s, h) sfindblock(s, h = StrHash(s))
 #define findblock(s) sfindblock(s, StrHash(s))
@@ -170,6 +170,7 @@ alloc_new_string (const char * string, int h)
     SIZE(b) = (len > USHRT_MAX ? USHRT_MAX : len);
     REFS(b) = 1;
     NEXT(b) = base_table[h];
+    HASH(b) = h;
     base_table[h] = b;
     ADD_NEW_STRING(SIZE(b), sizeof(block_t));
     ADD_STRING(SIZE(b));

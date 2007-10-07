@@ -29,7 +29,7 @@ time_t time (time_t *);
 /*
  * Return a pseudo-random number in the range 0 .. n-1
  */
-int random_number (int n)
+long random_number (long n)
 {
 #if defined(RAND) || defined(DRAND48)
     static char called = 0;
@@ -46,9 +46,9 @@ int random_number (int n)
 	called = 1;
     }				/* endif */
 #  ifdef RAND
-    return 1 + (int) ((float)n * rand() / (RAND_MAX+1.0);
+    return 1 + (long) ((float)n * rand() / (RAND_MAX+1.0);
 #  else
-    return (int)(drand48() * n);
+    return (long)(drand48() * n);
 #  endif
 #else
 #  ifdef RANDOM
@@ -68,9 +68,9 @@ int random_number (int n)
  * of seconds since 1970.
  */
 
-int get_current_time()
+long get_current_time()
 {
-    return (int) time(0l);	/* Just use the old time() for now */
+    return time(0l);	/* Just use the old time() for now */
 }
 
 char *time_string (time_t t)

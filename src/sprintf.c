@@ -472,7 +472,7 @@ void svalue_to_string (svalue_t * obj, outbuffer_t * outbuf, int indent, int tra
             outbuf_add(outbuf, "([ /* sizeof() == ");
             numadd(outbuf, obj->u.map->count);
             outbuf_add(outbuf, " */\n");
-            for (i = 0; i <= (int) (obj->u.map->table_size); i++) {
+            for (i = 0; i <= obj->u.map->table_size; i++) {
                 mapping_node_t *elm;
 
                 for (elm = obj->u.map->table[i]; elm; elm = elm->next) {
@@ -1148,7 +1148,7 @@ char *string_print_formatted (const char * format_str, int argc, svalue_t * argv
                     if (pres) {
                         cheat[i++] = '.';
                         if(pres >= sizeof(temp))
-                           sprintf(cheat + i, "%d", sizeof(temp) - 1);
+                           sprintf(cheat + i, "%ld", sizeof(temp) - 1);
                         else
                            sprintf(cheat + i, "%d", pres);
                         

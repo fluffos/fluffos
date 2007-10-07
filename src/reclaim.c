@@ -79,7 +79,7 @@ gc_mapping (mapping_t * m)
      * element we add would be unreferenceable (in most cases)
      */
     mapping_node_t **prev, *elt;
-    int j = (int) m->table_size;
+    int j = m->table_size;
 
     do {
         prev = m->table + j;
@@ -118,7 +118,7 @@ int reclaim_objects()
     cleaned = nested = 0;
     for (ob = obj_list; ob; ob = ob->next_all)
         if (ob->prog)
-            for (i = 0; i < (int) ob->prog->num_variables_total; i++)
+            for (i = 0; i < ob->prog->num_variables_total; i++)
                 check_svalue(&ob->variables[i]);
     
     return cleaned;

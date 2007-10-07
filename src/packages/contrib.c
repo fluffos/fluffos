@@ -330,10 +330,11 @@ void f_functions (void) {
     unsigned short *types;
     char buf[256];
     char *end = EndOf(buf);
-    program_t *progp;
-
-    progp = sp->u.ob->prog;
-    num = progp->num_functions_defined + progp->last_inherited;
+    program_t *progp = sp->u.ob->prog;
+    int offset = (flag&2)?progp->last_inherited:0;
+  
+    num = (flag&2)?progp->num_functions_defined:progp->num_functions_defined + progp->last_inherited;
+  
     if (progp->num_functions_defined &&
         progp->function_table[progp->num_functions_defined-1].funcname[0]
         == APPLY___INIT_SPECIAL_CHAR)
@@ -346,7 +347,7 @@ void f_functions (void) {
         unsigned short low, high, mid;
 
         prog = sp->u.ob->prog;
-        ind = i;
+        ind = i+offset;
 
         /* Walk up the inheritance tree to the real definition */
         if (prog->function_flags[ind] & FUNC_ALIAS) {
@@ -371,7 +372,7 @@ void f_functions (void) {
 
         funp = prog->function_table + ind;
 
-        if (flag) {
+        if (flag&1) {
             if (prog->type_start && prog->type_start[ind] != INDEX_START_NONE)
                 types = &prog->argument_types[prog->type_start[ind]];
             else
@@ -650,7 +651,9 @@ f_terminal_colour (void)
     resetstrname = findstring("RESET");
     k = sp->u.map->table_size;
     if (resetstrname) {
-       int tmp = MAP_POINTER_HASH(resetstrname);
+       static svalue_t str = {T_STRING, STRING_SHARED};
+       str.u.string = resetstrname;
+       int tmp = MAP_SVAL_HASH(str);
        for (elt = mtab[tmp & k]; elt; elt = elt->next) {
            if ( elt->values->type == T_STRING &&
                 (elt->values + 1)->type == T_STRING &&
@@ -663,10 +666,10 @@ f_terminal_colour (void)
     }
 
     if(!resetstrlen) {
-	//we really really need one, but it shouldn't be visible!
-	resetstr = "\xff\xf9"; //telnet go ahead
-	resetstrlen = 2;
-	add_mapping_string(sp->u.map, "RESET", resetstr);
+        //we really really need one, so just default to ansi reset
+        resetstr = "\e[49;49m\e[0;10m";
+        resetstrlen = 15;
+        add_mapping_string(sp->u.map, "RESET", resetstr);
     }
 
     /* Do the the pointer replacement and calculate the lengths */
@@ -678,7 +681,9 @@ f_terminal_colour (void)
     for (j = i = 0, k = sp->u.map->table_size; i < num; i++) {
         // Look it up in the mapping.
         if ((cp = findstring(parts[i]))) {
-            int tmp = MAP_POINTER_HASH(cp);
+            static svalue_t str = {T_STRING, STRING_SHARED};
+            str.u.string = cp;
+            int tmp = MAP_SVAL_HASH(str);
             for (elt = mtab[tmp & k]; elt; elt = elt->next) {
                 if ( elt->values->type == T_STRING &&
                      (elt->values + 1)->type == T_STRING &&
@@ -1737,8 +1742,6 @@ char *set_timezone (const char * timezone)
 
 void reset_timezone (const char *old_tz)
 {
-  int i = 0;
-  int env_size = 0;
   static char put_tz[80];
   if(old_tz){
     sprintf(put_tz, "TZ=%s", old_tz);

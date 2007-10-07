@@ -317,7 +317,7 @@ void f_uncompress (void)
 
    if (ret == Z_STREAM_END) {
       buffer = allocate_buffer(len);
-      write_buffer(buffer, 0, output_data, len);
+      write_buffer(buffer, 0, (char *)output_data, len);
       FREE(output_data);
       push_buffer(buffer);
    } else {

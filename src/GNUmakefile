@@ -8,7 +8,7 @@ INSTALL=install -c
 INSTALL_DIR=../bin
 OPTIMIZE=
 CPP=gcc -E
-CFLAGS=-D__USE_FIXED_PROTOTYPES__ -g
+CFLAGS=-D__USE_FIXED_PROTOTYPES__ -g -O3
 CC=gcc #/home/wodan/gcc/bin/gcc
 YACC=bison -d -y
 RANLIB=ranlib
@@ -72,7 +72,7 @@ SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   port.c reclaim.c parse.c simul_efun.c sprintf.c program.c \
   compiler.c avltree.c icode.c trees.c generate.c scratchpad.c \
   socket_efuns.c socket_ctrl.c qsort.c eoperators.c socket_err.c md.c \
-  disassembler.c binaries.c ualarm.c $(STRFUNCS) \
+  disassembler.c binaries.c uvalarm.c $(STRFUNCS) \
   replace_program.c master.c function.c \
   debug.c crypt.c applies_table.c add_action.c eval.c fliconv.c
 

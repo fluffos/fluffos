@@ -209,7 +209,7 @@ static int malloc_size_mask()
 
 static int malloced_size (POINTER ptr)
 {
-    return (int) (((u *) ptr)[-1] & MASK);
+    return (((u *) ptr)[-1] & MASK);
 }
 
 SFREE_RETURN_TYPE CDECL smalloc_free (POINTER ptr)
@@ -266,7 +266,7 @@ int fit_style = BEST_FIT;
 static void show_block (u * ptr)
 {
     printf("[%c%d: %d]  ", (*ptr & THIS_BLOCK ? '+' : '-'),
-	   (int) ptr, (int)(*ptr & MASK));
+	   ptr, (*ptr & MASK));
 }
 
 #ifdef FIT_STYLE_FAST_FIT

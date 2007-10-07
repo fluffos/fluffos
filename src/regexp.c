@@ -192,19 +192,19 @@
 #  ifndef CHARBITS
 #    define CHARBITS      0xff
 #  endif
-#  define UCHARAT(p)    ((int)*(unsigned char *)(p))
+#  define UCHARAT(p)    (*(unsigned char *)(p))
 #else
 #  ifndef CHARBITS
 #    define CHARBITS      0xff
-#    define       UCHARAT(p)      ((int)*(unsigned char *)(p))
+#    define       UCHARAT(p)      (*(unsigned char *)(p))
 #  else
-#    define       UCHARAT(p)      ((int)*(p)&CHARBITS)
+#    define       UCHARAT(p)      (*(p)&CHARBITS)
 #  endif
 #endif
 #else
 #  undef CHARBITS
 #  define CHARBITS 0xff
-#  define UCHARAT(p)      ((int) *(unsigned char *)(p))
+#  define UCHARAT(p)      (*(unsigned char *)(p))
 #endif
 
 #define ISWORDPART(c) ( isalnum((unsigned char)c) || (c) == '_' )
@@ -1207,12 +1207,12 @@ void regdump (regexp * r)
     s = r->program + 1;
     while (op != END) {         /* While that wasn't END last time... */
         op = OP(s);
-        printf("%2d%s", (int) (s - r->program), regprop(s));    /* Where, what. */
+        printf("%2d%s", (s - r->program), regprop(s));    /* Where, what. */
         nxt = regnext(s);
         if (nxt == (char *) NULL)       /* nxt ptr. */
             printf("(0)");
         else
-            printf("(%d)", (int) ((s - r->program) + (nxt - s)));
+            printf("(%d)", ((s - r->program) + (nxt - s)));
         s += 3;
         if (op == ANYOF || op == ANYBUT || op == EXACTLY) {
             /* Literal string, where present. */

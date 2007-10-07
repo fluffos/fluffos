@@ -253,7 +253,7 @@ f_traceprefix (void)
     if (command_giver && command_giver->interactive) {
         old = command_giver->interactive->trace_prefix;
         if (sp->type & T_STRING) {
-            char *p = sp->u.string;
+            const char *p = sp->u.string;
             if (*p == '/') p++;
             
             command_giver->interactive->trace_prefix = make_shared_string(p);

@@ -6,7 +6,23 @@
 #ifndef _MAPPING_H
 #define _MAPPING_H
 
-#define MAP_POINTER_HASH(x) (((POINTER_INT)x) >> 4)
+#define MAP_SVAL_HASH(x) sval_hash(x)
+#include "hash.h"
+#include "stralloc.h"
+//#define MAP_SVAL_HASH(x) (((POINTER_INT)((x).u.number)) >> 5)
+static long sval_hash(svalue_t x){
+    switch(x.type)
+    {
+        case T_STRING:
+            return HASH(BLOCK(x.u.string));
+        case T_NUMBER:
+            return x.u.number;
+        case T_OBJECT:
+            return HASH(BLOCK(x.u.ob->obname));
+        default:
+            return (((POINTER_INT)((x).u.number)) >> 5);
+    }
+}
 
 typedef struct mapping_node_s {
     struct mapping_node_s *next;

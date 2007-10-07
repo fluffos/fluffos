@@ -139,6 +139,7 @@ void backend()
      */
     make_selectmasks();
     timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
 #ifndef hpux
     nb = select(FD_SETSIZE, &readmask, &writemask, (fd_set *) 0, &timeout);
 #else

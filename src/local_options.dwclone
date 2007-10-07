@@ -632,7 +632,7 @@
 #endif
 
 /* PACKAGE_DB: efuns for external database access using msql */
-#define PACKAGE_DB
+#undef PACKAGE_DB
 
 /* If PACKAGE_DB is defined above, you must pick ONE of the following supported
  * databases
@@ -750,7 +750,7 @@
 /* TRACE: define this to enable the trace() and traceprefix() efuns.
  *   (keeping this undefined will cause the driver to run faster).
  */
-#undef TRACE
+#define TRACE
 
 /* LPC_TO_C: define this to enable LPC->C compilation.
  *

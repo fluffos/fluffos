@@ -16,3 +16,5 @@ mixed *disassemble_class( mixed );
 mixed fetch_class_member( mixed, int );
 mixed store_class_member( mixed, int, mixed );
 string replace(string, string *|string, string|void);
+string replace_html(string);
+string replace_mxp(string);

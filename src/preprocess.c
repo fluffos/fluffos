@@ -8,10 +8,13 @@ static void handle_cond (int);
 #undef DXALLOC
 #define DXALLOC(x, y, z) malloc(x)
 #undef FREE
+void free(void *);
 #define FREE(x)   free(x)
 #undef ALLOCATE
+void *malloc(size_t);
 #define ALLOCATE(x, y, z) (x *)malloc(sizeof(x))
 #undef DREALLOC
+void *realloc(void *, size_t);
 #define DREALLOC(w, x, y, z) realloc(w, x)
 #endif
 

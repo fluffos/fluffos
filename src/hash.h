@@ -4,7 +4,6 @@
 /*
  * hash.c
  */
-int hashstr (char *, int, int);
-int whashstr (const char *, int);
+unsigned int whashstr (const char *);
 
 #endif

@@ -58,9 +58,7 @@ void break_point (void);
 INLINE_STATIC void do_loop_cond_number (void);
 INLINE_STATIC void do_loop_cond_local (void);
 static void do_catch (char *, unsigned short);
-#ifdef DEBUG
 int last_instructions (void);
-#endif
 static float _strtof (char *, char **);
 #ifdef TRACE_CODE
 static char *get_arg (int, int);
@@ -353,7 +351,7 @@ void share_and_push_string (const char * p) {
 #ifdef DEBUG
 INLINE_STATIC svalue_t *find_value (int num)
 {
-  DEBUG_CHECK2(num >= (int) current_object->prog->num_variables_total,
+  DEBUG_CHECK2(num >= current_object->prog->num_variables_total,
                "Illegal variable access %d(%d).\n",
                num, current_object->prog->num_variables_total);
   return &current_object->variables[num];
@@ -1225,17 +1223,6 @@ void pop_control_stack()
       }
       stof++;
     }
-    /* if (csp != control_stack) {
-      if (((csp - 1)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
-        csp->prog->function_table[(csp-1)->fr.table_index].children += dsecs;
-      } else if((csp - 1)->framekind & FRAME_FAKE){
-	if((csp - 1) != control_stack){
-	  if (((csp - 2)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
-	    (csp-1)->prog->function_table[(csp-2)->fr.table_index].children += dsecs;
-	  }
-	}
-      }
-      }*/
   }
 #endif
   current_object = csp->ob;
@@ -1928,7 +1915,7 @@ eval_instruction (char * p)
           push_svalue(lval);
           break;
         case PUSH_GLOBAL:
-          lval = find_value((int)((i & PUSH_MASK) + variable_index_offset));
+          lval = find_value(((i & PUSH_MASK) + variable_index_offset));
           if ((lval->type == T_OBJECT) && (lval->u.ob->flags & O_DESTRUCTED))
             assign_svalue(lval, &const0u);
           push_svalue(lval);
@@ -2083,7 +2070,7 @@ eval_instruction (char * p)
       push_number(EXTRACT_UCHAR(pc++));
       break;
     case F_NBYTE:
-      push_number(-((int)EXTRACT_UCHAR(pc++)));
+      push_number(-(EXTRACT_UCHAR(pc++)));
       break;
 #ifdef F_JUMP_WHEN_NON_ZERO
     case F_JUMP_WHEN_NON_ZERO:
@@ -2580,7 +2567,7 @@ eval_instruction (char * p)
           STACK_INC;
           sp->type = T_LVALUE;
           if (flags & FOREACH_LEFT_GLOBAL) {
-            sp->u.lvalue = find_value((int)(EXTRACT_UCHAR(pc++) + variable_index_offset));
+            sp->u.lvalue = find_value(EXTRACT_UCHAR(pc++) + variable_index_offset);
           } else {
             sp->u.lvalue = fp + EXTRACT_UCHAR(pc++);
           }
@@ -2602,7 +2589,7 @@ eval_instruction (char * p)
         if (flags & FOREACH_RIGHT_GLOBAL) {
           STACK_INC;
           sp->type = T_LVALUE;
-          sp->u.lvalue = find_value((int)(EXTRACT_UCHAR(pc++) + variable_index_offset));
+          sp->u.lvalue = find_value((EXTRACT_UCHAR(pc++) + variable_index_offset));
         } else if (flags & FOREACH_REF) {
           ref_t *ref = make_ref();
           svalue_t *loc = fp + EXTRACT_UCHAR(pc++);
@@ -2759,7 +2746,7 @@ eval_instruction (char * p)
         LOAD_SHORT(offset, pc);
         offset += num_varargs;
         num_varargs = 0;
-        v = allocate_empty_array((int) offset);
+        v = allocate_empty_array(offset);
         /*
          * transfer svalues in reverse...popping stack as we go
          */
@@ -3043,7 +3030,7 @@ eval_instruction (char * p)
       {
         svalue_t *s;
     
-        s = find_value((int) (EXTRACT_UCHAR(pc++) + variable_index_offset));
+        s = find_value((EXTRACT_UCHAR(pc++) + variable_index_offset));
     
         /*
          * If variable points to a destructed object, replace it
@@ -3420,7 +3407,7 @@ eval_instruction (char * p)
     case F_GLOBAL_LVALUE:
       STACK_INC;
       sp->type = T_LVALUE;
-      sp->u.lvalue = find_value((int) (EXTRACT_UCHAR(pc++) +
+      sp->u.lvalue = find_value((EXTRACT_UCHAR(pc++) +
                                        variable_index_offset));
       break;
     case F_INDEX_LVALUE:
@@ -4301,7 +4288,12 @@ svalue_t *apply (const char * fun, object_t * ob, int num_arg,
     
 #ifdef TRACE
   if (TRACEP(TRACE_APPLY)) {
-    do_trace("Apply", "", "\n");
+    static int inapply = 0;
+    if(!inapply){
+      inapply = 1;
+      do_trace("Apply", "", "\n");
+      inapply = 0;
+    }
   }
 #endif
     
@@ -4596,7 +4588,7 @@ static int find_line (char * p, const program_t * progp,
       return 4;
 
   offset = p - progp->program;
-  DEBUG_CHECK2(offset > (int) progp->program_size,
+  DEBUG_CHECK2(offset > progp->program_size,
                "Illegal offset %d in object /%s\n", offset, progp->filename);
     
   lns = progp->line_info;
@@ -5173,7 +5165,7 @@ int inter_sscanf (svalue_t * arg, svalue_t * s0, svalue_t * s1, int num_arg)
     case 'd':
       {
         tmp = in_string;
-        num = (int) strtol((char *)in_string, (char **)&in_string, base);
+        num = strtol((char *)in_string, (char **)&in_string, base);
         if (tmp == in_string) return number_of_matches;
         if (!skipme) {
           SSCANF_ASSIGN_SVALUE_NUMBER(num);
@@ -5394,7 +5386,7 @@ int inter_sscanf (svalue_t * arg, svalue_t * s0, svalue_t * s1, int num_arg)
         base = 16;
       case 'd':
         {
-          num = (int) strtol((char *)in_string, (char **)&in_string, base);
+          num = strtol((char *)in_string, (char **)&in_string, base);
           /* We already knew it would be matched - Sym */
           if (!skipme2) {
             SSCANF_ASSIGN_SVALUE_NUMBER(num);
@@ -5594,7 +5586,7 @@ static char *get_arg (int a, int b)
     short arg;
 
     COPY_SHORT(&arg, from + 1);
-    sprintf(buff, "%d", (int)arg);
+    sprintf(buff, "%d", arg);
     return buff;
   }
   if (to - from == 5) {
@@ -5631,13 +5623,13 @@ int last_instructions()
 
 #ifdef TRACE
 /* Generate a debug message to the user */
-void do_trace (char * msg, char * fname, char * post)
+void do_trace (const char * msg, const char * fname, const char * post)
 {
-  char *objname;
+  const char *objname;
 
   if (!TRACEHB)
     return;
-  objname = TRACETST(TRACE_OBJNAME) ? (current_object && current_object->name ? current_object->name : "??") : "";
+  objname = TRACETST(TRACE_OBJNAME) ? (current_object && current_object->obname ? current_object->obname : "??") : "";
   add_vmessage(command_giver, "*** %d %*s %s %s %s%s", tracedepth, tracedepth, "", msg, objname, fname, post);
 }
 #endif
@@ -5661,7 +5653,7 @@ void remove_object_from_stack (object_t * ob)
   }
 }
 
-int strpref (char * p, char * s)
+int strpref (const char * p, const char * s)
 {
   while (*p)
     if (*p++ != *s++)

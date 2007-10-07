@@ -841,8 +841,7 @@ void f_add_a() {
       ret = new_string( len + 3, "f_add_a" );
       memcpy( ret, "an ", 3 );
       p = ret + 3;
-   }
-   else {      // Add a.
+   } else {      // Add a.
       if( len + 2 > max_string_length ) {
          free_string_svalue( sp );
          error( "add_a() exceeded max string length.\n" );
@@ -978,5 +977,62 @@ void f_replace(){
         free_array(arr);
     }
 }
+
+#endif
+
+#if defined(F_REPLACE_MXP) || defined(F_REPLACE_HTML)
+void replace_mxp_html(int html, int mxp){
+  char *dst = new_string(max_string_length+8, "f_replace_mxp_html: 2");
+  const char *src = sp->u.string;
+  char *dst2 = dst;
+  while(*src && dst2-dst < max_string_length){
+    switch(*src){
+    case '&':
+      strcpy(dst2, "&amp;");
+      dst2 += 5;
+      break;
+    case '<':
+      strcpy(dst2, "&lt;");
+      dst2 += 4;
+      break;
+    case '>':
+      strcpy(dst2, "&gt;");
+      dst2 += 4;
+      break;
+    case '\n':
+      if(mxp){
+	strcpy(dst2, "\e[4z<BR>");
+	dst2 += 8;
+      }else 
+	goto def;
+      break;
+    case '"':
+      if(html){
+	strcpy(dst2, "&quot;");
+	dst2 += 6;
+	break;
+      }
+    default:
+    def:
+      *dst2++ = *src;
+    }
+    src++;
+  }
+  pop_stack();
+  *dst2 = 0;
+  push_malloced_string(extend_string(dst, dst2 - dst));
+}
+
+#endif
+
+#ifdef F_REPLACE_HTML
+
+void f_replace_html(){replace_mxp_html(1,0);}
+
+#endif
+
+#ifdef F_REPLACE_MXP
+
+void f_replace_mxp(){replace_mxp_html(0,1);}
 
 #endif

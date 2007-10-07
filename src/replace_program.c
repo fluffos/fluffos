@@ -117,7 +117,7 @@ static program_t *search_inherited (char * str, program_t * prg, int * offpnt)
     debug(d_flag, ("searching for PRG(/%s) in PRG(/%s)", str, prg->filename));
     debug(d_flag, ("num_inherited=%d\n", prg->num_inherited));
 
-    for (i = 0; i < (int) prg->num_inherited; i++) {
+    for (i = 0; i < prg->num_inherited; i++) {
         debug(d_flag, ("index %d:", i));
         debug(d_flag, ("checking PRG(/%s)", prg->inherit[i].prog->filename));
 

@@ -20,17 +20,17 @@ void deallocate_program (program_t * progp)
     total_num_prog_blocks -= 1;
 
     /* Free all function names. */
-    for (i = 0; i < (int) progp->num_functions_defined; i++)
+    for (i = 0; i < progp->num_functions_defined; i++)
         if (progp->function_table[i].funcname)
             free_string(progp->function_table[i].funcname);
     /* Free all strings */
-    for (i = 0; i < (int) progp->num_strings; i++)
+    for (i = 0; i < progp->num_strings; i++)
         free_string(progp->strings[i]);
     /* Free all variable names */
-    for (i = 0; i < (int) progp->num_variables_defined; i++)
+    for (i = 0; i < progp->num_variables_defined; i++)
         free_string(progp->variable_table[i]);
     /* Free all inherited objects */
-    for (i = 0; i < (int) progp->num_inherited; i++)
+    for (i = 0; i < progp->num_inherited; i++)
         free_prog(&progp->inherit[i].prog);
     free_string(progp->filename);
 

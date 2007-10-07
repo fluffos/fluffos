@@ -22,7 +22,7 @@ typedef struct {
     unsigned char num_local;
     short fio;
     struct program_s *prog;
-    long offset;
+    int offset;
     short vio;
     char lpccode[80];
 } functional_t;

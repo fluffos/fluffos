@@ -1,9 +1,32 @@
 As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :)
 
-Fluffos 2.7:
-Fixes to compile with a Dead Souls config
-Changed free_object() and free_program() to overwrite the freed address 
+FluffOS 2.8:
+use a hash table for the children() efun
+set the usec field in the select timeout
+fixed sending sending byte value 255 (this will break any code that tries to 
+	send telnet code, but that shouldn't be needed anyway and it didn't work
+	on UTF enabled drivers already.
+removed a lot of casts to int, C does that by default, so it's not needed.
+replaced whashstr with a simpler, faster (on modern CPUs) hash that isn't
+	limited to 16 bit results
+fixed to_int so it doesn't truncate to 32 bit on 64 bit systems
+now fills in maxrss in rusage on linux
+changed from SIGALRM to SIGVTALRM, so other processes can't mess up the eval
+	time
+added a __LINE__ predefine for the line number
+changed mappings to use the hash function rather than pointer values for a 
+	better spread over the hash table
+the flag argument to functions() now uses 1 for extra info, 2 for limiting
+	the returned functions to those that are not inherited, those can be
+	combined (3)
+replace_html and replace_mxp do the < to &lt; etc conversions
+random() can now return larger than 32 bit numbers
+commented out a recursion check in the parser so DS can parse its commands
+
+FluffOS 2.7:
+fixes to compile with a Dead Souls config
+changed free_object() and free_program() to overwrite the freed address 
 	(idea and first version by Pinkfish)
 terminate string results of filter_string() 
 disable run time type checking if strict types isn't on
@@ -20,7 +43,8 @@ write_file() now has an extra flag (2) that can be ORed with the existing one
 	     to write/append compressed files
 add_ref() destruct objects with high ref counts (they're usually on the way to
 	  wrap around to 0, which is where you crash).
-Fluffos 2.6:
+	  
+FluffOS 2.6:
 current_time is now 64 bit on 64 bit platforms, all ready for 2038 now, I think :)
 fixed crasher in ed on big files with long lines (i hope)
 new default arguments for destruct, virtualp, inherits (this_object) and ctime (time())
@@ -44,11 +68,11 @@ made the objects list double linked so destruct doesn't have to walk the whole
 	list to find the previous object in the list.
 fixed compiling without shadows support
 
-Fluffos 2.5:
+FluffOS 2.5:
 some pluralize() fixes (woom)
 fixed zonetime() and is_daylight_savings_time()
 
-Fluffos 2.4:
+FluffOS 2.4:
 new efuns for sending telnet sequences:
 	void request_term_type();
 	void start_request_term_type();
@@ -59,7 +83,7 @@ restore_object now calls restore_lost_variable() if a variable in the save file
 fixed crasher in event() when one of the earlier objects destructs an object
 	that still would have gotten the event.
 
-Fluffos 2.3:
+FluffOS 2.3:
 fixed event efun (from 1.40)
 added MAX_INT and SIZEOFINT predefines (from 1.40)
 fixed leftover PROT1V macro use
@@ -80,7 +104,7 @@ fixed refs() for strings
 FluffOS 2.0:
 different from Fluffos 1.36:
 
-Changed integer type to 64 bit, and some other 64 bit cleanups, as 64 bit ints
+changed integer type to 64 bit, and some other 64 bit cleanups, as 64 bit ints
 change the way things work for the LPC side of things, I changed the major
 number to 2.
 removed swapping, the OS can do it much better than us.

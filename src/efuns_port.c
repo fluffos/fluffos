@@ -15,6 +15,7 @@
 #include "port.h"
 #include "crypt.h"
 #include "efun_protos.h"
+#include <stdio.h>
 
 /* get a value for CLK_TCK for use by times() */
 #if (defined(TIMES) && !defined(RUSAGE))
@@ -37,14 +38,14 @@ f_crypt (void)
         p = sp->u.string;
     } else {
         int i;
-        
+
         for (i = 0; i < SALT_LEN; i++)
             salt[i] = choice[random_number(strlen(choice))];
 
         salt[SALT_LEN] = 0;
         p = salt;
     }
-    
+
     res = string_copy(CRYPT((sp-1)->u.string, p), "f_crypt");
     pop_stack();
     free_string_svalue(sp);
@@ -168,7 +169,7 @@ void f_rusage (void)
     error("rusage() not supported under Windows.\n");
 }
 #else
-        
+
 #ifdef RUSAGE
 void
 f_rusage (void)
@@ -181,16 +182,20 @@ f_rusage (void)
     if (getrusage(RUSAGE_SELF, &rus) < 0) {
         m = allocate_mapping(0);
     } else {
-#if 1 /* Was !SunOS_5 */
         usertime = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
         stime = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_usec / 1000;
-#else
-        usertime = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_nsec / 1000000;
-        stime = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_nsec / 1000000;
-#endif
         maxrss = rus.ru_maxrss;
 #ifdef sun
         maxrss *= getpagesize() / 1024;
+#else
+#ifdef __linux__
+        int fd = open("/proc/self/statm", O_RDONLY);
+        char buf[256];
+        buf[read(fd, buf, 256)] = 0;
+        close(fd);
+        sscanf(buf, "%*d %d %*s", &maxrss);
+        maxrss *= getpagesize() / 1024;
+#endif
 #endif
         m = allocate_mapping(16);
         add_mapping_pair(m, "utime", usertime);

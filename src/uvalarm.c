@@ -1,5 +1,5 @@
 #include "std.h"
-#ifndef HAS_UALARM
+#include "uvalarm.h"
 /*
  * Copyright (c) 1985 Regents of the University of California.
  * All rights reserved.
@@ -39,14 +39,12 @@ static char sccsid[] = "@(#)ualarm.c	5.5 (Berkeley) 2/23/91";
 
 #define	USPS	1000000		/* # of microseconds in a second */
 
-unsigned ualarm (register unsigned, register unsigned);
-
 /*
  * Generate a SIGALRM signal in ``usecs'' microseconds.
  * If ``reload'' is non-zero, keep generating SIGALRM
  * every ``reload'' microseconds after the first signal.
  */
-unsigned ualarm (register unsigned usecs, register unsigned reload) {
+unsigned uvalarm (unsigned int usecs, unsigned int reload) {
     struct itimerval new, old;
 
     new.it_interval.tv_usec = reload % USPS;
@@ -55,9 +53,9 @@ unsigned ualarm (register unsigned usecs, register unsigned reload) {
     new.it_value.tv_usec = usecs % USPS;
     new.it_value.tv_sec = usecs / USPS;
 
-    if (setitimer(ITIMER_REAL, &new, &old) == 0)
+    if (setitimer(ITIMER_VIRTUAL, &new, &old) == 0)
 	return old.it_value.tv_sec * USPS + old.it_value.tv_usec;
     /* else */
     return -1;
 }
-#endif
+

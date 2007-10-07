@@ -78,14 +78,14 @@ dump_prog (program_t * prog, const char * fn, int flags)
     fprintf(f, "INHERITS:\n");
     fprintf(f, "\tname                    fio    vio\n");
     fprintf(f, "\t----------------        ---    ---\n");
-    for (i = 0; i < (int) prog->num_inherited; i++)
+    for (i = 0; i < prog->num_inherited; i++)
         fprintf(f, "\t%-20s  %5d  %5d\n",
                 prog->inherit[i].prog->filename,
-                (int)prog->inherit[i].function_index_offset,
-                (int)prog->inherit[i].variable_index_offset
+                prog->inherit[i].function_index_offset,
+                prog->inherit[i].variable_index_offset
             );
     fprintf(f, "PROGRAM:");
-    for (i = 0; i < (int) prog->program_size; i++) {
+    for (i = 0; i <  prog->program_size; i++) {
         if (i % 16 == 0)
             fprintf(f, "\n\t%04x: ", (unsigned int) i);
         fprintf(f, "%02d ", (unsigned char) prog->program[i]);
@@ -145,16 +145,16 @@ dump_prog (program_t * prog, const char * fn, int flags)
                     i, func_entry->funcname,
                     runtime_index - prog->last_inherited
                     ,sflags,
-                    (int) func_entry->num_arg,
-                    (int) func_entry->num_local);
+                    func_entry->num_arg,
+                    func_entry->num_local);
         }
     }
     fprintf(f, "VARIABLES:\n");
-    for (i = 0; i < (int) prog->num_variables_defined; i++)
+    for (i = 0; i < prog->num_variables_defined; i++)
         fprintf(f, "%4d: %-12s\n", i,
                 prog->variable_table[i]);
     fprintf(f, "STRINGS:\n");
-    for (i = 0; i < (int) prog->num_strings; i++) {
+    for (i = 0; i < prog->num_strings; i++) {
         fprintf(f, "%4d: ", i);
         for (j = 0; j < 32; j++) {
             char c;
@@ -239,7 +239,7 @@ disassemble (FILE * f, char * code, int start, int end, program_t * prog)
     if (start == 0) {
         /* sort offsets of functions */
         offsets = (short *) malloc(NUM_FUNS_D * 2 * sizeof(short));
-        for (i = 0; i < (int) NUM_FUNS_D; i++) {
+        for (i = 0; i < NUM_FUNS_D; i++) {
             ri = i + prog->last_inherited;
             
             if (prog->function_flags[ri] & FUNC_NO_CODE) {
@@ -268,7 +268,7 @@ disassemble (FILE * f, char * code, int start, int end, program_t * prog)
         if ((next_func >= 0) && ((pc - code) >= offsets[next_func])) {
             fprintf(f, "\n;; Function %s\n", prog->function_table[offsets[next_func + 1]].funcname);
             next_func += 2;
-            if (next_func >= ((int) NUM_FUNS_D * 2))
+            if (next_func >= ( NUM_FUNS_D * 2))
                 next_func = -1;
         }
 
@@ -371,7 +371,7 @@ disassemble (FILE * f, char * code, int start, int end, program_t * prog)
         case F_AGGREGATE:
         case F_AGGREGATE_ASSOC:
             COPY_SHORT(&sarg, pc);
-            sprintf(buff, "%d", (int)sarg);
+            sprintf(buff, "%d", sarg);
             pc += 2;
             break;
 
@@ -379,7 +379,7 @@ disassemble (FILE * f, char * code, int start, int end, program_t * prog)
         case F_KILL_REFS:
         case F_MEMBER:
         case F_MEMBER_LVALUE:
-            sprintf(buff, "%d", (int)EXTRACT_UCHAR(pc++));
+            sprintf(buff, "%d", EXTRACT_UCHAR(pc++));
             break;
 
         case F_EXPAND_VARARGS:
@@ -407,9 +407,9 @@ disassemble (FILE * f, char * code, int start, int end, program_t * prog)
             pc += 3;
             if (sarg < NUM_FUNS)
                 sprintf(buff, "%-12s %5d", function_name(prog, sarg),
-                        (int)sarg);
+                        sarg);
             else
-                sprintf(buff, "<out of range %d>", (int)sarg);
+                sprintf(buff, "<out of range %d>", sarg);
             break;
 
         case F_CALL_INHERITED:
@@ -422,9 +422,9 @@ disassemble (FILE * f, char * code, int start, int end, program_t * prog)
             if (sarg < (newprog->num_functions_defined + 
                         newprog->last_inherited))
                 sprintf(buff, "%30s::%-12s %5d", newprog->filename,
-                        function_name(newprog, sarg), (int) sarg);
+                        function_name(newprog, sarg), sarg);
             else sprintf(buff, "<out of range in %30s - %d>", newprog->filename,
-                         (int) sarg);
+                         sarg);
             break;
         }
         case F_GLOBAL_LVALUE:
@@ -480,7 +480,7 @@ disassemble (FILE * f, char * code, int start, int end, program_t * prog)
             if (sarg < NUM_STRS)
                 sprintf(buff, "\"%s\"", disassem_string(STRS[sarg]));
             else
-                sprintf(buff, "<out of range %d>", (int)sarg);
+                sprintf(buff, "<out of range %d>", sarg);
             pc += 2;
             break;
         case F_SHORT_STRING:
@@ -514,18 +514,18 @@ disassemble (FILE * f, char * code, int start, int end, program_t * prog)
                 if (sarg < NUM_FUNS)
                     sprintf(buff, "<local_fun> %s", function_name(prog, sarg));
                 else
-                    sprintf(buff, "<local_fun> <out of range %d>", (int)sarg);
+                    sprintf(buff, "<local_fun> <out of range %d>", sarg);
                 break;
             case FP_FUNCTIONAL:
             case FP_FUNCTIONAL | FP_NOT_BINDABLE:
-                sprintf(buff, "<functional, %d args>\nCode:", (int)pc[0]);
+                sprintf(buff, "<functional, %d args>\nCode:", pc[0]);
                 pc += 3;
                 break;
             case FP_ANONYMOUS:
             case FP_ANONYMOUS | FP_NOT_BINDABLE:
                 COPY_SHORT(&sarg, &pc[2]);
                 sprintf(buff, "<anonymous function, %d args, %d locals, ends at %04x>\nCode:",
-                        (int)pc[0], (int)pc[1], (int) (pc + 3 + sarg - code));
+                        pc[0], pc[1], (pc + 3 + sarg - code));
                 pc += 4;
                 break;
             }
@@ -673,7 +673,7 @@ dump_line_numbers (FILE * f, program_t * prog) {
     fi += 2;
     fprintf(f, "\nabsolute line -> (file, line) table:\n");
     while (fi < (unsigned short *)li_start) {
-        fprintf(f, "%i lines from %i [%s]\n", (int)fi[0], (int)fi[1], 
+        fprintf(f, "%i lines from %i [%s]\n", fi[0], fi[1], 
                 prog->strings[fi[1]-1]);
         fi += 2;
     }
@@ -689,7 +689,7 @@ dump_line_numbers (FILE * f, program_t * prog) {
         COPY_INT(&s, li);
 #endif
         li += sizeof(ADDRESS_TYPE);
-        fprintf(f, "%4x-%4x: %i\n", addr, addr + sz - 1, (int)s);
+        fprintf(f, "%4x-%4x: %i\n", addr, addr + sz - 1, s);
         addr += sz;
     }
 }

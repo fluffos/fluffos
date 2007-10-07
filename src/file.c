@@ -536,7 +536,7 @@ char *read_file (const char * file, int start, int len) {
         c = *p++;
 	if(p-str > chunk){
 	  if(chunk == READ_FILE_MAX_SIZE){
-	    if(p2 < p){
+	    if(p2 < (p-1)){
 #ifndef PACKAGE_COMPRESS
 	      chunk = p-str+fread(p2, 1, READ_FILE_MAX_SIZE+str-p, f);
 #else
