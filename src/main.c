@@ -402,7 +402,7 @@ int main (int argc, char ** argv)
     signal(SIGTERM, sig_term);
     signal(SIGINT, sig_int);
 #ifndef DEBUG
-#if defined(SIGABRT) && !defined(LATTICE)
+#if defined(SIGABRT) 
     signal(SIGABRT, sig_abrt);
 #endif
 #ifdef SIGIOT
@@ -414,10 +414,8 @@ int main (int argc, char ** argv)
 #ifdef SIGBUS
     signal(SIGBUS, sig_bus);
 #endif
-#ifndef LATTICE
     signal(SIGSEGV, sig_segv);
     signal(SIGILL, sig_ill);
-#endif
 #endif        /* DEBUG */
 #endif
 #ifndef WIN32

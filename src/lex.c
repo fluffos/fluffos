@@ -18,7 +18,7 @@
 #include "file_incl.h"
 #include "lpc_incl.h"
 #include "compiler.h"
-#ifdef WIN32
+#if defined(WIN32) && !defined(MINGW)
 #  include "grammar_tab.h"
 #else
 #  include "grammar.tab.h"
@@ -423,7 +423,7 @@ static void
 handle_include (char * name, int global)
 {
     char *p, *nameptr;
-    static char buf[1024];
+    static char buf[MAXLINE];
     incstate_t *is;
     int delim, f;
 
@@ -1226,8 +1226,8 @@ int yylex()
 	case '\t':
 #ifdef WARN_TAB
 	    yywarn("<TAB>");
-	    break;
 #endif
+	    break;
         case '\n':
 	    nexpands = 0;
 	    current_line++;
@@ -2092,7 +2092,7 @@ void end_new_file()
 
 static void add_quoted_predefine (const char * def, const char * val)
 {
-    char save_buf[1024];
+    char save_buf[MAXLINE];
 
     strcpy(save_buf, "\"");
     strcat(save_buf, val);
@@ -2128,7 +2128,7 @@ void add_predefines()
 #ifdef F_PRINTF
     add_predefine("HAS_PRINTF", -1, "");
 #endif
-#if (defined(RUSAGE) || defined(GET_PROCESS_STATS) || defined(TIMES)) || defined(LATTICE)
+#if (defined(RUSAGE) || defined(GET_PROCESS_STATS) || defined(TIMES)) 
     add_predefine("HAS_RUSAGE", -1, "");
 #endif
 #ifdef DEBUG_MACRO

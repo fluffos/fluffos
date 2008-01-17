@@ -114,22 +114,12 @@ do_stat (char * fname, struct stat * st, char * pathname)
     }
     /* look in CONFIG_FILE_DIR */
     if (!pathname) {
-#ifdef LATTICE
-        if (strchr(CONFIG_FILE_DIR, ':'))
-            sprintf(buf, "%s%s", CONFIG_FILE_DIR, fname);
-        else
-#endif
-            sprintf(buf, "%s/%s", CONFIG_FILE_DIR, fname);
-        if ((i = stat(buf, st)) != -1)
-            return i;
+      sprintf(buf, "%s/%s", CONFIG_FILE_DIR, fname);
+      if ((i = stat(buf, st)) != -1)
+	return i;
     }
     /* look in BIN_DIR */
-#ifdef LATTICE
-    if (strchr(BIN_DIR, ':'))
-        sprintf(buf, "%s%s", BIN_DIR, fname);
-    else
-#endif
-        sprintf(buf, "%s/%s", BIN_DIR, fname);
+    sprintf(buf, "%s/%s", BIN_DIR, fname);
         
     if ((i = stat(buf, st)) != -1) {
         if (pathname)
@@ -177,9 +167,6 @@ void save_binary (program_t * prog, mem_block_t * includes, mem_block_t * patche
 
     if (comp_flag) {
         debug_message(" saving binary ... ");
-#ifdef LATTICE
-        fflush(stderr);
-#endif
     }
     /*
      * Write out preamble.  Includes magic number, etc, all of which must
@@ -322,9 +309,6 @@ program_t *int_load_binary (char * name)
 
     if (comp_flag) {
         debug_message(" loading binary %s ... ", name);
-#ifdef LATTICE
-        fflush(stderr);
-#endif
     }
     /* see if we're out of date with source */
     if (check_times(mtime, name) <= 0) {
@@ -545,10 +529,6 @@ static int check_times (time_t mtime, char * nm)
 {
     struct stat st;
 
-#ifdef LATTICE
-    if (*nm == '/')
-        nm++;
-#endif
     if (stat(nm, &st) == -1)
         return -1;
     if (st.st_mtime > mtime) {

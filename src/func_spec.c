@@ -212,9 +212,7 @@ void message(mixed, mixed, string | string * | object | object *,
     string read_file(string, void | int, void | int);
     int cp(string, string);
 
-#ifndef LATTICE
     int link(string, string);
-#endif
     int mkdir(string);
     int rm(string);
     int rmdir(string);
@@ -323,7 +321,7 @@ void message(mixed, mixed, string | string * | object | object *,
     int strcmp(string, string);
 
 #ifndef WIN32
-#if (defined(RUSAGE) || defined(GET_PROCESS_STATS) || defined(TIMES)) || defined(LATTICE)
+#if (defined(RUSAGE) || defined(GET_PROCESS_STATS) || defined(TIMES))
     mapping rusage();
 #endif                          /* RUSAGE */
 #endif

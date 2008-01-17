@@ -36,8 +36,20 @@ mapping memory_summary();
 string query_replaced_program(void|object);
 mapping network_stats();
 int real_time();
+#ifdef PACKAGE_COMPRESS
 int compressedp(object);
+#endif
 void event(object|object *, string, ...);
 string query_num(int, int default:0);
 string base_name( string | object default: F__THIS_OBJECT);
 object *get_garbage();
+int num_classes( object );
+mixed assemble_class( mixed * );
+mixed *disassemble_class( mixed );
+mixed fetch_class_member( mixed, int );
+mixed store_class_member( mixed, int, mixed );
+mixed *shuffle(mixed *);
+mixed element_of(mixed *);
+mixed max( mixed *, int | void );
+mixed min( mixed *, int | void );
+mixed abs( int | float );

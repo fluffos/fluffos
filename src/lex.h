@@ -1,8 +1,8 @@
 #ifndef _LEX_H_
 #define _LEX_H_
 
-#define DEFMAX 10000
-#define MAXLINE 1024
+#define DEFMAX 20000 //at least 4 times MAXLINE
+#define MAXLINE 4096
 #define MLEN 4096
 #define NSIZE 256
 #define MAX_INSTRS 512
@@ -134,7 +134,7 @@ extern int pragmas;
 extern int num_parse_error;
 extern lpc_predef_t *lpc_predefs;
 extern int efun_arg_types[];
-extern char yytext[1024];
+extern char yytext[MAXLINE];
 extern keyword_t predefs[];
 extern int lex_fatal;
 extern int arrow_efun, evaluate_efun, this_efun, to_float_efun, to_int_efun, new_efun;

@@ -4,7 +4,7 @@
 
 #ifndef _TREES_H
 #define _TREES_H
-
+#include "std.h"
 #define NODES_PER_BLOCK         256
 
 enum node_type {
@@ -32,7 +32,11 @@ union parse_value {
 
 typedef struct parse_node_s {
     short kind;
+#if !defined(USE_32BIT_ADDRESSES) 
     short line;
+#else
+    unsigned int line;
+#endif
     unsigned char type;
     union parse_value v, l, r; /* left, right, and value */
 } parse_node_t;

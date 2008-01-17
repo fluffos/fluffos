@@ -409,9 +409,6 @@ object_t *int_load_object (const char * lname)
         /* maybe move this section into compile_file? */
         if (comp_flag) {
             debug_message(" compiling /%s ...", real_name);
-#ifdef LATTICE
-            fflush(stderr);
-#endif
         }
         f = open(real_name, O_RDONLY);
         if (f == -1) {
@@ -666,16 +663,6 @@ object_t *object_present (svalue_t * v, object_t * ob)
         if (ob->super->flags & O_DESTRUCTED)
             return 0;
         if (!IS_ZERO(ret)) {
-#if 0
-            /*
-             * if id() returns a value of type object then query that object.
-             * this will allow container objects to allow objects inside them
-             * to be referred to (for attack or whatever).
-             */
-            if (ret->type == T_OBJECT)
-                return ret->u.ob;
-            else
-#endif                          /* 0 */
                 return ob->super;
         }
         return object_present2(v->u.string, ob->super->contains);
@@ -1881,13 +1868,6 @@ void shutdownMudOS (int exit_code)
         if (all_users[i] && !(all_users[i]->iflags & CLOSING))
             flush_message(all_users[i]);
     }
-#ifdef LATTICE
-    signal(SIGUSR1, SIG_IGN);
-    signal(SIGTERM, SIG_IGN);
-    signal(SIGINT, SIG_IGN);
-    signal(SIGHUP, SIG_IGN);
-    signal(SIGALRM, SIG_IGN);
-#endif
 #ifdef PROFILING
     monitor(0, 0, 0, 0, 0);     /* cause gmon.out to be written */
 #endif

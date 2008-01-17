@@ -37,13 +37,6 @@
 #  include <crypt.h>
 #endif
 
-#if defined(LATTICE) || defined(__SASC)
-#undef close
-#undef ioctl
-#undef write
-#undef read
-#endif
-
 #ifdef WIN32
 #  include <direct.h>
 #  include <io.h>

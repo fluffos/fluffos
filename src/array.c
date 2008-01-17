@@ -25,7 +25,7 @@ INLINE_STATIC int sort_array_cmp (svalue_t *, svalue_t *);
 static int deep_inventory_count (object_t *);
 static void deep_inventory_collect (object_t *, array_t *, int *);
 #endif
-INLINE_STATIC int alist_cmp (svalue_t *, svalue_t *);
+INLINE_STATIC long alist_cmp (svalue_t *, svalue_t *);
 
 /*
  * Make an empty array for everyone to use, never to be deallocated.
@@ -561,7 +561,7 @@ array_t *copy_array (array_t * p)
     d = allocate_empty_array(n = p->size);
     sv2 = d->item;
     while (n--)
-        assign_svalue_no_free(sv2 + n, sv1 + n);
+        assign_svalue_no_free(&sv2[n], &sv1[n]);
     return d;
 }
 
@@ -1397,9 +1397,9 @@ array_t *deep_inventory (object_t * ob, int take_top)
 }
 #endif
 
-INLINE_STATIC int alist_cmp (svalue_t * p1, svalue_t * p2)
+INLINE_STATIC long alist_cmp (svalue_t * p1, svalue_t * p2)
 {
-    register int d;
+    long d;
 
     if ((d = p1->u.number - p2->u.number))
         return d;

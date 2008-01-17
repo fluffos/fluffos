@@ -284,7 +284,7 @@ void init_user_conn()
     /*
      * register signal handler for SIGPIPE.
      */
-#if !defined(LATTICE) && defined(SIGPIPE)
+#if defined(SIGPIPE) && defined(SIGNAL_ERROR)
     if (signal(SIGPIPE, sigpipe_handler) == SIGNAL_ERROR) {
         debug_perror("init_user_conn: signal SIGPIPE",0);
         exit(5);
@@ -311,6 +311,11 @@ void ipc_remove()
 
 void init_addr_server (char * hostname, int addr_server_port)
 {
+#ifdef WIN32
+        WORD wVersionRequested = MAKEWORD(1,1);
+        WSADATA wsaData;
+        WSAStartup(wVersionRequested, &wsaData);
+#endif
     struct sockaddr_in server;
     struct hostent *hp;
     int server_fd;
@@ -382,6 +387,9 @@ void init_addr_server (char * hostname, int addr_server_port)
         socket_perror("init_addr_server: set_socket_nonblocking 1", 0);
         return;
     }
+#ifdef WIN32
+        WSACleanup();
+#endif
 }
 
 /*
@@ -438,9 +446,6 @@ void add_message (object_t * who, const char * data, int len)
 #ifdef NONINTERACTIVE_STDERR_WRITE
         putc(']', stderr);
         fwrite(data, len, 1, stderr);
-#endif
-#ifdef LATTICE
-        fflush(stderr);
 #endif
         return;
     }
@@ -525,9 +530,6 @@ void add_vmessage (object_t *who, const char *format, ...)
         vfprintf(stderr, format, args);
 #endif
         va_end(args);
-#ifdef LATTICE
-        fflush(stderr);
-#endif
         return;
     }
     ip = who->interactive;
@@ -894,11 +896,13 @@ static void copy_chars (interactive_t * ip, char * from, int num_bytes)
                             add_binary_message(ip->ob, telnet_no_single, sizeof(telnet_no_single));
                         }
                         break;
+#ifdef HAVE_ZLIB
                     case TELOPT_COMPRESS2:
                         // If we are told not to use v2, then try v1.
                         add_binary_message(ip->ob, telnet_compress_send_request_v1,
                                     sizeof(telnet_compress_send_request_v1));
                         break;
+#endif
                 }
                 ip->state = TS_DATA;
                 break;

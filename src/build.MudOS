@@ -390,7 +390,12 @@ strchr(0,0); strrchr(0,0);
 END
 $CC $CFLAGS comptest.c
 if test ! -f a.out; then
-    STR="-Dstrchr=index -Dstrrchr=rindex"
+    if uname -a | grep "MINGW" | grep -v grep ; then
+	echo "MinGW detected. Skipping weird strchr thing."
+    else
+	echo "MinGW not detected, and no a.out."
+	STR="-Dstrchr=index -Dstrrchr=rindex"
+    fi
 fi
 
 rm a.out

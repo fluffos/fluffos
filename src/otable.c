@@ -126,7 +126,7 @@ array_t *children(const char * s) {
 		curr = curr->next_ch_hash;
 	}
 
-	resize_array(vec, count);
+	vec = resize_array(vec, count);
 	return (vec);
 }
 

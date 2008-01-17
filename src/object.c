@@ -1275,12 +1275,6 @@ restore_object_from_gzip (object_t * ob,
         tmp = gzgets(gzf, buff, t);
 
         if (buff[t - 2] != 0 && buff[t - 2] != '\n' && !gzeof(gzf)) {
-	    //prevent trying smaller buffers again
-	   t/=65536;
-	   *count = 0;
-	   while(t>>=1){
-	       (*count)++;
-	   }
            return -1; //retry with bigger buffer
         }
 
@@ -1536,15 +1530,6 @@ save_object (object_t * ob, const char * file, int save_zeros)
         unlink(file);
 #endif
         if (rename(tmp_name, file) < 0) {
-#ifdef LATTICE
-            /* AmigaDOS won't overwrite when renaming */
-            if (errno == EEXIST) {
-                unlink(file);
-                if (rename(tmp_name, file) >= 0) {
-                    return success;
-                }
-            }
-#endif
             debug_perror("save_object", file);
             debug_message("Failed to rename /%s to /%s\n", tmp_name, file);
             debug_message("Failed to save object!\n");
@@ -1627,7 +1612,7 @@ int restore_object (object_t * ob, const char * file, int noclear)
 #ifdef HAVE_ZLIB
     int pos;
     gzFile gzf;
-    int count = 0;
+    static int count = 0;
 #else
     FILE *f;
     // Try and keep one buffer for droping all the restores into
@@ -1680,13 +1665,8 @@ int restore_object (object_t * ob, const char * file, int noclear)
 
 
 #ifdef HAVE_ZLIB
-#  ifdef LATTICE
-    gzf = NULL;
-    if ((stat(file, &st) == -1) || !(gzf = fopen(file, "r"))) {
-#  else
     gzf = gzopen(file, "r");
     if (!gzf) {
-#  endif
         if (gzf) {
             (void)gzclose(gzf);
         }
@@ -1710,13 +1690,8 @@ int restore_object (object_t * ob, const char * file, int noclear)
     gzclose(gzf);
 
 #else
-#ifdef LATTICE
-    f = NULL;
-    if ((stat(file, &st) == -1) || !(f = fopen(file, "r"))) {
-#else
     f = fopen(file, "r");
     if (!f || fstat(fileno(f), &st) == -1) {
-#endif
         if (f)
             (void)fclose(f);
         return 0;
@@ -1735,7 +1710,7 @@ int restore_object (object_t * ob, const char * file, int noclear)
         buff_len = tmp_len;
     }
 #ifdef WIN32
-    tmp_len = read(_fileno(f), theBuff, i);
+    tmp_len = read(_fileno(f), theBuff, tmp_len);
 #else
     fread(theBuff, 1, tmp_len, f);
 #endif

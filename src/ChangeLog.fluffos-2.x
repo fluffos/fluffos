@@ -1,6 +1,45 @@
 As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :)
-
+FluffOS 2.9:
+removed amiga support.
+included most DS changes, should work on windows now (except for over
+	 evaluation errors)
+changed alist_cmp to work on longs rather than int, and store program offsets
+	as 32 bit ints (instead of 64 (with room for 32) which fixed crashing 
+	with 64 bit on solaris and stopped crashing on linux when using over 
+	2GB memory.
+added package async for async read and write support.
+removed some dead code
+fixed crasher in read_file() (i hope)
+fixed makefile so it doesn't rebuild everything all the time
+slightly bigger buffers for lex.c so it can load files quicker.
+made buffer handling in loading compressed save files a bit smarter
+fixed bug in children()
+actually calculate the hash values for objects again, oops.
+fixed crasher in event()
+moved some functions to package contrib:
+int num_classes( object );
+    returns the amount of class definitions in the object
+mixed assemble_class( mixed * );
+    returns a class with fields filled in from the array arg
+mixed *disassemble_class( mixed );
+    returns an array with all class elements
+mixed fetch_class_member( mixed, int );
+    same as disassemble_class(mixed)[int];
+mixed store_class_member( mixed, int, mixed );
+    set a class member by offset
+mixed *shuffle(mixed *);
+    shuffle array members around and return the array (original is changed as 
+    well!)
+mixed element_of(mixed *);
+    same as array[random(sizeof(array))]
+mixed max( mixed *, int | void );
+    returns the max value in the array, or the index of that value if the
+    second argument is present and not 0
+mixed min( mixed *, int | void );
+    see max, but then lowest
+mixed abs( int | float );
+    guess.
 FluffOS 2.8:
 use a hash table for the children() efun
 set the usec field in the select timeout

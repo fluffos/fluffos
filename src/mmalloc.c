@@ -2,7 +2,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#define MINSIZE 4*1024-8+rsize
+#define MINSIZE 0;//4*1024-8+rsize
 //(long)5*1024*1024*1024-8+rsize
 
 void *mmalloc(int rrsize){

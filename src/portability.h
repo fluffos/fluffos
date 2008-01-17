@@ -64,12 +64,6 @@
 #  define OSF
 #endif
 
-#if !defined(AMIGA) && ( \
-    ((defined(LATTICE) || defined(__SASC)) && defined(_AMIGA)) || \
-    (defined(AZTEC_C) && defined(MCH_AMIGA)) )
-#  define AMIGA
-#endif
-
 /* HAS_MONCONTROL: define this if you wish to do profiling of the driver
    on a machine that has the moncontrol() system call.
 */

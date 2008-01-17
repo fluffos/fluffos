@@ -20,7 +20,6 @@ IBM PC (Linux 2.2.x and higher)
 IBM PC (System V Release 4)
 IBM PC (NetBSD, FreeBSD, 386BSD, etc.)
 IBM PC (Windows 95/NT using Visual C++; see the windows/ subdirectory)
-Amiga (AmigaDOS using the LATTICE C or SAS/C compiler, or Linux, or gcc)
 Macintosh OS X (Darwin)
 
 *Send mail to marius@mudos.org if you experience any problems

@@ -14,6 +14,7 @@
 #include "network_incl.h"
 #include "fliconv.h"
 
+
 #define MAX_TEXT                   2048
 #define MAX_SOCKET_PACKET_SIZE     1024
 #define DESIRED_SOCKET_PACKET_SIZE 800
@@ -25,6 +26,10 @@
 #define I_SINGLE_CHAR              0x4  /* get_char */
 #define I_WAS_SINGLE_CHAR          0x8  /* was get_char */
 #define SB_SIZE                    (NSLC * 3 + 3)
+
+#ifdef MINGW
+#define SIGPIPE                13
+#endif
 
 #ifdef HAVE_ZLIB
 #define COMPRESS_BUF_SIZE MESSAGE_BUF_SIZE

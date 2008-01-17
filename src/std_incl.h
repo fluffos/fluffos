@@ -61,10 +61,6 @@
 #  include <dlfcn.h>
 #endif
 
-#ifdef LATTICE
-#  undef VOID
-#endif
-
 #ifndef _AUX_SOURCE
 /* supposedly, memmove is in here, but not defined in any lib */
 #  include <string.h>
@@ -78,13 +74,8 @@
 #    include <arpa/inet.h>
 #  endif
 #endif
-#if defined(LATTICE) || defined(__SASC)
-#  include "amiga/amiga.h"
-#  include "amiga/nsignal.h"
-#  include "amiga/socket.h"
-#endif
 
-#if defined(WIN32) || defined(LATTICE)
+#if defined(WIN32)
 int dos_style_link (char *, char *);
 #define link(x, y) dos_style_link(x, y)
 #endif
@@ -97,7 +88,7 @@ int dos_style_link (char *, char *);
 #  include <sys/timeb.h>
 #endif
 
-#if !defined(NeXT) && !defined(LATTICE) && !defined(WIN32)
+#if !defined(NeXT) && !defined(WIN32)
 #  include <sys/param.h>
 #endif
 

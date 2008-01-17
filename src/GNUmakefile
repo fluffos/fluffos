@@ -8,7 +8,7 @@ INSTALL=install -c
 INSTALL_DIR=../bin
 OPTIMIZE=
 CPP=gcc -E
-CFLAGS=-D__USE_FIXED_PROTOTYPES__ -g -O3
+CFLAGS=-D__USE_FIXED_PROTOTYPES__ -g3 # -O3
 CC=gcc #/home/wodan/gcc/bin/gcc
 YACC=bison -d -y
 RANLIB=ranlib
@@ -86,7 +86,7 @@ VPATH = $(OBJDIR)
 
 OBJ=$(addprefix $(OBJDIR)/,$(subst .c,.o,$(SRC)))
 
-$(OBJDIR)/%.o: %.c $(OBJDIR)
+$(OBJDIR)/%.o: %.c 
 	$(CC) $(CFLAGS) $(OPTIMIZE) -o $@ -c $<
 
 $(OBJDIR)/lex.o: lex.c preprocess.c cc.h grammar.tab.c
@@ -105,7 +105,7 @@ grammar.tab.c: grammar.y
 	sed "s/y.tab.c/grammar.tab.c/g" y.tab.c  > grammar.tab.c
 	-mv y.tab.h grammar.tab.h
 
-packages/packages.a: packages/parser.c packages/contrib.c
+packages/packages.a: packages/*.c
 	$(MAKE) -C packages 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)' 'A=$(A)' 'O=$(O)'
 
 $(DRIVER_BIN): packages/packages.a $(OBJ)

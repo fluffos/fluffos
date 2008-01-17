@@ -112,7 +112,7 @@ int compile (char * str) {
 }
 #endif
 
-#if defined(WIN32) || defined(LATTICE)
+#if defined(WIN32) 
 int dos_style_link (char * x, char * y) {
     char link_cmd[100];
     sprintf(link_cmd, "copy %s %s", x, y);
@@ -1538,8 +1538,6 @@ static void handle_configure() {
     if (!check_prog("CONST const", "int foo(const int *, const int *);", "", 0))
         fprintf(yyout, "#define CONST\n");
 
-    verbose_check_prog("Checking for ualarm()", "HAS_UALARM",
-                       "", "ualarm(0, 0);", 0);
     verbose_check_prog("Checking for strerror()", "HAS_STRERROR",
                        "", "strerror(12);", 0);
     verbose_check_prog("Checking for POSIX getcwd()", "HAS_GETCWD",

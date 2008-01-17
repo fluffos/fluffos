@@ -243,12 +243,7 @@
 #endif
 
 #ifndef INLINE
-#  ifdef WIN32
-#    define INLINE extern __inline
-#    define INLINE_STATIC __inline
-#  else
-#    define INLINE
-#  endif
+#define INLINE
 #endif
 
 #ifndef INLINE_STATIC

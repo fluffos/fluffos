@@ -1033,19 +1033,6 @@ static char *esbrk (u size)
     return (addr);
 
 #else
-#ifdef LATTICE
-
-    extern void *sbrkx();
-    void *addr = NULL;
-
-    addr = (char *)sbrkx(size);
-    if ((char *) addr == (char *) (-1))
-	return NULL;
-
-    count_up(sbrk_stat, size);
-    return addr;
-
-#else
 
 #ifndef linux
     extern char *sbrkx();
@@ -1062,7 +1049,6 @@ static char *esbrk (u size)
     current_break += size;
     return current_break - size;
 
-#endif				/* LATTICE */
 #endif				/* NeXT */
 #else				/* not SBRK_OK */
 

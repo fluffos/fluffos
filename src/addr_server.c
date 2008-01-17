@@ -131,7 +131,7 @@ void init_conn_sock (int port_num, char * ipaddress)
     /*
      * register signal handler for SIGPIPE.
      */
-#if !defined(LATTICE) && defined(SIGPIPE) /* windows has no SIGPIPE */
+#if defined(SIGPIPE) && defined(SIGNAL_ERROR)/* windows has no SIGPIPE */
     if (signal(SIGPIPE, sigpipe_handler) == SIGNAL_ERROR) {
 	socket_perror("init_conn_sock: signal SIGPIPE", 0);
 	exit(5);
@@ -594,9 +594,6 @@ int main (int argc, char ** argv)
 	fprintf(stderr, "addr_server: first arg must be port number.\n");
 	exit(1);
     }
-#if defined(LATTICE) && defined(AMITCP)
-    init_conns();
-#endif
     init_conn_sock(addr_server_port, ipaddress);
     while (1) {
 	/*
@@ -634,12 +631,11 @@ int main (int argc, char ** argv)
 }
 
 #ifdef WIN32
-void debug_message P1V(char *, fmt)
+void debug_message(char *fmt, ...)
 {
-    static char deb_buf[100];
+    static char deb_buf[1024];
     static char *deb = deb_buf;
     va_list args;
-    V_DCL(char *fmt);
 
     V_START(args, fmt);
     V_VAR(char *, fmt, args);

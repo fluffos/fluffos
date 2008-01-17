@@ -4,9 +4,10 @@
 #include "file_incl.h"
 #include "network_incl.h"
 #include <unistd.h>
+#ifndef MINGW
 #include <sys/mman.h>
-
-#if defined(WIN32) || defined(LATTICE)
+#endif
+#if defined(WIN32) 
 int dos_style_link (char * x, char * y) {
     char link_cmd[100];
     sprintf(link_cmd, "copy %s %s", x, y);
@@ -46,7 +47,11 @@ long random_number (long n)
 	called = 1;
     }				/* endif */
 #  ifdef RAND
+#    ifdef MINGW
+    return rand() % n;
+#    else
     return 1 + (long) ((float)n * rand() / (RAND_MAX+1.0);
+#endif
 #  else
     return (long)(drand48() * n);
 #  endif
@@ -108,20 +113,8 @@ get_usec_clock (long * sec, long * usec)
            *sec = 0;
     *usec = GETUSCLK();
 #else
-#ifdef LATTICE
-    unsigned int clock[2];
-
-    if (timer(clock)) {
-	*sec = time(0);
-	*usec = 0;
-    } else {
-	*sec = clock[0];
-	*usec = clock[1];
-    }
-#else
     *sec = time(0);
     *usec = 0;
-#endif
 #endif
 #endif
 }
@@ -210,18 +203,7 @@ get_cpu_times (unsigned long * secs, unsigned long * usecs)
     return 1;
 #else				/* end then TIMES */
 
-#ifdef LATTICE			/* start LATTICE */
-    unsigned int clock[2];
-
-    if (timer(clock))
-	return 0;
-
-    *secs = clock[0];
-    *usecs = clock[1];
-    return 1;
-#else
     return 0;
-#endif				/* end LATTICE */
 #endif				/* end TIMES */
 #endif				/* end else GET_PROCESS_STATS */
 #endif				/* end else RUSAGE */
@@ -316,6 +298,8 @@ void * sbrkx(long size){
 #else
 
 void *sbrkx(long size){
+#ifndef MINGW
   return sbrk(size);
+#endif
 }
 #endif

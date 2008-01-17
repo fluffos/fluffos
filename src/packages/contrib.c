@@ -1,16 +1,4 @@
 #define SUPPRESS_COMPILER_INLINES
-#ifdef LATTICE
-#include "/lpc_incl.h"
-#include "/comm.h"
-#include "/file_incl.h"
-#include "/file.h"
-#include "/backend.h"
-#include "/compiler.h"
-#include "/main.h"
-#include "/eoperators.h"
-#include "/simul_efun.h"
-#include "/add_action.h"
-#else
 #include "../lpc_incl.h"
 #include "../comm.h"
 #include "../file_incl.h"
@@ -22,7 +10,6 @@
 #include "../efun_protos.h"
 #include "../simul_efun.h"
 #include "../add_action.h"
-#endif
 
 #define MAX_COLOUR_STRING 200
 
@@ -2086,78 +2073,75 @@ void f_network_stats (void)
 
 #define EVENT_PREFIX "event_"
 
-void event (svalue_t * event_ob, const char * event_fun, int numparam,
-               svalue_t * event_param){
+void event(svalue_t * event_ob, const char * event_fun, int numparam,
+		svalue_t * event_param) {
 
-  object_t *ob, *origin;
-  char *name;
-  int i;
+	object_t *ob, *origin;
+	char *name;
+	int i;
 
-  origin = current_object;
+	origin = current_object;
 
-  name = new_string(strlen (event_fun) + strlen (EVENT_PREFIX) + 1,
-                    "newmoon.c: au_event");
-  push_malloced_string (name);
+	name = new_string(strlen (event_fun) + strlen (EVENT_PREFIX) + 1,
+			"newmoon.c: au_event");
+	push_malloced_string(name);
 
-  strcpy (name, EVENT_PREFIX);
-  strcat (name, event_fun);
+	strcpy(name, EVENT_PREFIX);
+	strcat(name, event_fun);
 
-  if (event_ob->type == T_ARRAY)
-    {
-      int ind;
+	if (event_ob->type == T_ARRAY) {
+		int ind;
 
-      for (ind = 0; ind < event_ob->u.arr->size; ind++)
-        {
-          if (event_ob->u.arr->item[ind].type != T_OBJECT ||
-              event_ob->u.arr->item[ind].u.ob->flags &
-              O_DESTRUCTED)
-            continue;
+		for (ind = 0; ind < event_ob->u.arr->size; ind++) {
+			if (event_ob->u.arr->item[ind].type != T_OBJECT
+					|| event_ob->u.arr->item[ind].u.ob->flags & O_DESTRUCTED)
+				continue;
 
-          push_object (origin);
-          for (i = 0; i < numparam; i++)
-            push_svalue (event_param + i);
+			push_object(origin);
+			for (i = 0; i < numparam; i++)
+				push_svalue (event_param + i);
 
-                    apply (name, event_ob->u.arr->item[ind].u.ob,
-                 numparam + 1, ORIGIN_EFUN);
-        }
-    }
-  else if(event_ob->type == T_OBJECT)
-    {
-      /* First we call the event on the object itself */
+			apply(name, event_ob->u.arr->item[ind].u.ob, numparam + 1,
+					ORIGIN_EFUN);
+		}
+	} else if (event_ob->type == T_OBJECT) {
+		/* First we call the event on the object itself */
 
-      push_object (origin);
-      for (i = 0; i < numparam; i++)
-        push_svalue (event_param + i);
+		push_object(origin);
+		for (i = 0; i < numparam; i++)
+			push_svalue (event_param + i);
 
-      apply (name, event_ob->u.ob, numparam + 1, ORIGIN_EFUN);
+		apply(name, event_ob->u.ob, numparam + 1, ORIGIN_EFUN);
 
-      /* And then call it on it's inventory... */
-      int count = 0;
-      for (ob = event_ob->u.ob->contains; ob; ob = ob->next_inv){
-	if (ob == origin)
-	  continue;
+		/* And then call it on it's inventory..., if it's still around! */
+		int count = 0;
+		if (event_ob && event_ob->u.ob && !(event_ob->u.ob->flags
+				& O_DESTRUCTED))
+			for (ob = event_ob->u.ob->contains; ob; ob = ob->next_inv) {
+				if (ob == origin)
+					continue;
 
-	if (ob->flags & O_DESTRUCTED)
-	  continue;
-	push_object(ob);
-	count++;
-      }
-      while(count--){
-	ob = sp->u.ob;
-	pop_stack();
-	if(!ob || ob->flags & O_DESTRUCTED)
-	  continue;
-	else {
-	  push_object (origin);
-          for (i = 0; i < numparam; i++)
-            push_svalue (event_param + i);
+				if (ob->flags & O_DESTRUCTED)
+					continue;
+				push_object(ob);
+				count++;
+			}
+		while (count--) {
+			ob = sp->u.ob;
+			pop_stack();
+			if (!ob || ob->flags & O_DESTRUCTED)
+				continue;
+			else {
+				push_object(origin);
+				for (i = 0; i < numparam; i++)
+					push_svalue (event_param + i);
 
-          apply (name, ob, numparam + 1, ORIGIN_EFUN);
+				apply(name, ob, numparam + 1, ORIGIN_EFUN);
+			}
+		}
 	}
-      }
-    }
-  sp--;
-  FREE_MSTR (name);
+	sp--;
+	FREE_MSTR (name);
 }
 
 void f_event (void){
@@ -2331,3 +2315,318 @@ void f_get_garbage (void){
 }
 #endif
 
+#ifdef F_NUM_CLASSES
+
+void
+f_num_classes() {
+	int i = sp->u.ob->prog->num_classes;
+	pop_stack();
+	push_number( i );
+}
+
+#endif
+
+#ifdef F_ASSEMBLE_CLASS
+void
+f_assemble_class() {
+	array_t *arr = copy_array( sp->u.arr );
+	pop_stack();
+	push_refed_array(arr);
+	sp->type = T_CLASS;
+}
+
+#endif
+
+#ifdef F_DISASSEMBLE_CLASS
+void
+f_disassemble_class() {
+	array_t *arr;
+	if( sp->type != T_CLASS )
+	error( "Argument to disassemble_class() not a class.\n" );
+	arr = copy_array( sp->u.arr );
+	pop_stack();
+	push_refed_array(arr);
+}
+#endif
+
+#ifdef F_FETCH_CLASS_MEMBER
+
+void f_fetch_class_member() {
+	int pos = sp->u.number;
+	array_t *arr;
+
+	pos = sp->u.number;
+	pop_stack();
+
+	if( sp->type != T_CLASS )
+	error( "Argument to fetch_class_member() not a class.\n" );
+
+	arr = sp->u.arr;
+
+	if( pos < 0 || pos >= arr->size )
+	error( "Class index out of bounds.\n" );
+
+	assign_svalue_no_free( sp, &arr->item[pos] );
+	free_array( arr );
+}
+#endif
+
+#ifdef F_STORE_CLASS_MEMBER
+
+void f_store_class_member() {
+	int pos = ( sp - 1 )->u.number;
+	array_t *arr;
+
+	if( ( sp - 2 )->type != T_CLASS )
+	error( "Argument to store_class_member() not a class.\n" );
+
+	arr = ( sp - 2 )->u.arr;
+
+	if( pos < 0 || pos >= arr->size )
+	error( "Class index out of bounds.\n" );
+
+	assign_svalue(&arr->item[pos], sp);
+
+	pop_2_elems();
+}
+#endif
+
+
+#ifdef F_ELEMENT_OF
+void f_element_of() {
+	array_t *arr = sp->u.arr;
+	if(!arr->size) {
+		error("Can't take element from empty array.\n");
+	}
+	assign_svalue_no_free(sp, &arr->item[random_number(arr->size)]);
+	free_array(arr);
+}
+#endif
+#ifdef F_SHUFFLE
+
+/* shuffle efun, based on LPC shuffle simul efun.
+ * conversion by Taffyd.
+ */
+
+void shuffle(array_t * args) {
+	int i, j;
+	svalue_t temp;
+
+	/* Hrm, if we have less than two elements, then the order isn't 
+	 * going to change! Let's just leave the old array on the stack. 
+	 */
+	if ( args->size < 2 ) {
+		return;
+	}
+
+	for ( i = 0; i < args->size; i++ ) {
+		j = random_number( i + 1 );
+
+		if ( i == j ) {
+			continue;
+		}
+
+		temp = args->item[i];
+		args->item[i] = args->item[j];
+		args->item[j] = temp;
+	}
+
+	/* Well, that's it. We don't need to push or anything. */
+}
+
+void
+f_shuffle()
+{
+	svalue_t *sv = sp - st_num_arg + 1;
+
+	if (sv->type == T_ARRAY && sv->u.arr) {
+		shuffle(sv->u.arr);
+	}
+	else {
+		push_refed_array(&the_null_array);
+	}
+}
+#endif
+
+#ifdef F_MAX
+
+void
+f_max() {
+	svalue_t *sarr = sp - st_num_arg + 1;
+	array_t *arr = sarr->u.arr;
+	int max_index = 0;
+	int i;
+
+	if( !arr->size ) {
+		error( "Can't find max of an empty array.\n" );
+	}
+
+	if( arr->item->type != T_NUMBER && arr->item->type != T_REAL &&
+			arr->item->type != T_STRING ) {
+		error( "Array must consist of ints, floats or strings.\n" );
+	}
+
+	for( i = 1; i < arr->size; i++ ) {
+		// Check the type of this element.
+		switch( arr->item[i].type ) {
+			case T_NUMBER:
+			switch( arr->item[max_index].type ) {
+				case T_NUMBER:
+				if( arr->item[i].u.number > arr->item[max_index].u.number )
+				max_index = i;
+				break;
+				case T_REAL:
+				if( arr->item[i].u.number > arr->item[max_index].u.real )
+				max_index = i;
+				break;
+				default:
+				error( "Inhomogeneous array.\n" );
+			}
+			break;
+			case T_REAL:
+			switch( arr->item[max_index].type ) {
+				case T_NUMBER:
+				if( arr->item[i].u.real > arr->item[max_index].u.number )
+				max_index = i;
+				break;
+				case T_REAL:
+				if( arr->item[i].u.real > arr->item[max_index].u.real )
+				max_index = i;
+				break;
+				default:
+				error( "Inhomogeneous array.\n" );
+			}
+			break;
+			case T_STRING:
+			if( arr->item[max_index].type != T_STRING ) {
+				error( "Inhomogeneous array.\n" );
+			}
+			if( strcmp( arr->item[i].u.string,
+							arr->item[max_index].u.string ) > 0 )
+			max_index = i;
+			break;
+			default:
+			error( "Array must consist of ints, floats or strings.\n" );
+		}
+	}
+
+	if( st_num_arg == 2 ) {
+		if( sp->u.number != 0 ) {
+			pop_n_elems( 2 );
+			push_number( max_index );
+			return;
+		}
+
+		pop_stack();
+	}
+
+	assign_svalue_no_free( sp, &arr->item[max_index] );
+	free_array( arr );
+}
+
+#endif
+
+#ifdef F_MIN
+
+void
+f_min() {
+	svalue_t *sarr = sp - st_num_arg + 1;
+	array_t *arr = sarr->u.arr;
+	int min_index = 0;
+	int i;
+
+	if( !arr->size ) {
+		error( "Can't find min of an empty array.\n" );
+	}
+
+	if( arr->item->type != T_NUMBER && arr->item->type != T_REAL &&
+			arr->item->type != T_STRING ) {
+		error( "Array must consist of ints, floats or strings.\n" );
+	}
+
+	for( i = 1; i < arr->size; i++ ) {
+		// Check the type of this element.
+		switch( arr->item[i].type ) {
+			case T_NUMBER:
+			switch( arr->item[min_index].type ) {
+				case T_NUMBER:
+				if( arr->item[i].u.number < arr->item[min_index].u.number )
+				min_index = i;
+				break;
+				case T_REAL:
+				if( arr->item[i].u.number < arr->item[min_index].u.real )
+				min_index = i;
+				break;
+				default:
+				error( "Inhomogeneous array.\n" );
+			}
+			break;
+			case T_REAL:
+			switch( arr->item[min_index].type ) {
+				case T_NUMBER:
+				if( arr->item[i].u.real < arr->item[min_index].u.number )
+				min_index = i;
+				break;
+				case T_REAL:
+				if( arr->item[i].u.real < arr->item[min_index].u.real )
+				min_index = i;
+				break;
+				default:
+				error( "Inhomogeneous array.\n" );
+			}
+			break;
+			case T_STRING:
+			if( arr->item[min_index].type != T_STRING ) {
+				error( "Inhomogeneous array.\n" );
+			}
+			if( strcmp( arr->item[i].u.string,
+							arr->item[min_index].u.string ) < 0 )
+			min_index = i;
+			break;
+			default:
+			error( "Array must consist of ints, floats or strings.\n" );
+		}
+	}
+
+	if( st_num_arg == 2 ) {
+		if( sp->u.number != 0 ) {
+			pop_n_elems( 2 );
+			push_number( min_index );
+			return;
+		}
+
+		pop_stack();
+	}
+
+	assign_svalue_no_free( sp, &arr->item[min_index] );
+	free_array( arr );
+}
+#endif
+
+#ifdef F_ABS
+
+void
+f_abs() {
+	if( sp->type == T_REAL && sp->u.real < 0.0 )
+	sp->u.real = -sp->u.real;
+	else if( sp->type == T_NUMBER && sp->u.number < 0 )
+	sp->u.number = -sp->u.number;
+}
+#endif
+
+#ifdef F_ROLL_MDN
+
+void
+f_roll_MdN() {
+	long roll = 0;
+
+	if ( (sp - 1)->u.number > 0 && sp->u.number > 0 ) {
+		while( (sp - 1)->u.number-- )
+		roll += 1 + random_number( sp->u.number );
+	}
+
+	pop_stack(); // Pop one...
+	sp->u.number = roll; // And change the other!
+}
+
+#endif

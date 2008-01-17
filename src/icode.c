@@ -28,8 +28,8 @@ static int foreach_depth = 0;
 
 static int current_num_values;
 
-static int last_size_generated;
-static int line_being_generated;
+static unsigned int last_size_generated;
+static unsigned int line_being_generated;
 
 static int push_state;
 static int push_start;
@@ -284,8 +284,8 @@ generate_lvalue_list (parse_node_t * expr) {
 }
 
 INLINE_STATIC void
-switch_to_line (int line) {
-    int sz = CURRENT_PROGRAM_SIZE - last_size_generated;
+switch_to_line (unsigned int line) {
+    unsigned int sz = CURRENT_PROGRAM_SIZE - last_size_generated;
     ADDRESS_TYPE s;
     unsigned char *p;
 
@@ -299,7 +299,7 @@ switch_to_line (int line) {
 #if !defined(USE_32BIT_ADDRESSES) 
             STORE_SHORT(p, s);
 #else
-            STORE_INT(p, s);
+            STORE4(p, s);
 #endif
             sz -= 255;
         }
@@ -308,7 +308,7 @@ switch_to_line (int line) {
 #if !defined(USE_32BIT_ADDRESSES) 
         STORE_SHORT(p, s);
 #else
-        STORE_INT(p, s);
+        STORE4(p, s);
 #endif
     }
     line_being_generated = line;

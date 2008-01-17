@@ -18,7 +18,7 @@ static long sval_hash(svalue_t x){
         case T_NUMBER:
             return x.u.number;
         case T_OBJECT:
-            return HASH(BLOCK(x.u.ob->obname));
+            //return HASH(BLOCK(x.u.ob->obname));
         default:
             return (((POINTER_INT)((x).u.number)) >> 5);
     }

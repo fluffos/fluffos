@@ -66,10 +66,6 @@
 #define SETJMP(x) setjmp(x)
 #define LONGJMP(x,y) longjmp(x,y)
 
-#ifndef HAS_UALARM
-#define SYSV_HEARTBEAT_INTERVAL  ((HEARTBEAT_INTERVAL+999999)/1000000)
-#endif
-
 #define APPLY_CACHE_SIZE (1 << APPLY_CACHE_BITS)
 
 #define NUM_CONSTS 5

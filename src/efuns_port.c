@@ -25,6 +25,9 @@
 
 #ifdef F_CRYPT
 #define SALT_LEN        8
+#ifdef CUSTOM_CRYPT
+#define CRYPT(x, y) custom_crypt(x, y, 0)
+#endif
 
 void
 f_crypt (void)
@@ -57,6 +60,8 @@ f_crypt (void)
 #ifdef F_OLDCRYPT
 void
 f_oldcrypt (void) {
+#ifndef WIN32
+
     char *res, salt[3];
     const char *choice =
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./";
@@ -75,6 +80,7 @@ f_oldcrypt (void) {
     free_string_svalue(sp);
     sp->subtype = STRING_MALLOC;
     sp->u.string = res;
+#endif
 }
 #endif
 
@@ -134,13 +140,13 @@ f_localtime (void)
 #else                           /* sequent */
 #if (defined(hpux) || defined(_SEQUENT_) || defined(_AIX) || defined(SunOS_5) \
         || defined(SVR4) || defined(sgi) || defined(linux) || defined(cray) \
-        || defined(LATTICE) || defined(SCO))
+       )
     if (!tm->tm_isdst) {
         vec->item[LT_GMTOFF].u.number = timezone;
         vec->item[LT_ZONE].u.string = string_copy(tzname[0], "f_localtime");
     } else {
 #if (defined(_AIX) || defined(hpux) || defined(linux) || defined(cray) \
-        || defined(LATTICE))
+        )
         vec->item[LT_GMTOFF].u.number = timezone;
 #else
         vec->item[LT_GMTOFF].u.number = altzone;
@@ -280,24 +286,6 @@ f_rusage (void)
 }
 
 #else
-
-#ifdef LATTICE
-
-void
-f_rusage (void)
-{
-    mapping_t *m;
-    int i;
-    unsigned int clock[2];
-
-    i = timer(clock);           /* returns 0 if success, -1 otherwise */
-    m = allocate_mapping(2);
-    add_mapping_pair(m, "utime", i ? 0 : clock[0] * 1000 + clock[1] / 1000);
-    add_mapping_pair(m, "stime", i ? 0 : clock[0] * 1000 + clock[1] / 1000);
-    push_refed_mapping(m);
-}
-
-#endif                          /* LATTICE */
 
 #endif                          /* TIMES */
 

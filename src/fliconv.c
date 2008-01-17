@@ -26,7 +26,9 @@ struct translation *get_translator(char *encoding){
     ret = MALLOC(sizeof(struct translation));
     char *name = MALLOC(strlen(encoding)+18+1);
     strcpy(name, encoding);
+#ifdef linux
     strcat(name, "//TRANSLIT//IGNORE");
+#endif
     ret->name = name;
     ret->incoming = iconv_open("UTF-8", encoding);
     ret->outgoing = iconv_open(name, "UTF-8");

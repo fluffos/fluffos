@@ -11,6 +11,10 @@
 #include "master.h"
 #include "eval.h"
 
+#ifdef PACKAGE_ASYNC
+#include "packages/async.h"
+#endif
+
 #ifdef WIN32
 #include <process.h>
 void CDECL alarm_loop (void *);
@@ -162,6 +166,9 @@ void backend()
      * call outs
      */
     call_out();
+#ifdef PACKAGE_ASYNC
+    check_reqs();
+#endif
   }
 }       /* backend() */
 
@@ -322,29 +329,11 @@ static int num_hb_to_do = 0;
 static int num_hb_calls = 0;  /* starts */
 static float perc_hb_probes = 100.0;  /* decaying avge of how many complete */
 
-#ifdef WIN32
-void CDECL alarm_loop (void * ignore)
-{
-    while (1) {
-  Sleep(HEARTBEAT_INTERVAL / 1000);
-    }
-}       /* alarm_loop() */
-#endif
-
 void call_heart_beat()
 {
   object_t *ob;
   heart_beat_t *curr_hb;
   error_context_t econ;
-
-#ifdef WIN32
-  static long Win32Thread = -1;
-  if (Win32Thread == -1) Win32Thread = _beginthread(
-						    /* This shouldn't be necessary b/c alarm_loop is already declared as this.
-						       Microsoft lossage? -Beek */
-						    (void (__cdecl *)(void *))
-						    alarm_loop, 256, 0);
-#endif
 
   current_interactive = 0;
 

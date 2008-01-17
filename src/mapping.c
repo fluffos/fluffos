@@ -456,29 +456,6 @@ int msameval (svalue_t * arg1, svalue_t * arg2) {
     }*/
 }
 
-#if 0
-/*
- * node_find_in_mapping: Like find_for_insert(), but doesn't attempt
- * to add anything if a value is not found.  The returned pointer won't
- * necessarily have any meaningful value.
- */
-INLINE_STATIC mapping_node_t *
-node_find_in_mapping (mapping_t * m, svalue_t * lv)
-{
-        int i;
-        mapping_node_t *elt, **a = m->table;
-
-        debug(mapping,("mapping.c: find_in_mapping\n"));
-
-        i = svalue_to_int(lv) & m->table_size;
-        for (elt = a[i]; elt; elt = elt->next) {
-                if (msameval(elt->values, lv))
-                        return elt;
-        }
-        return (mapping_node_t *)0;
-}
-#endif
-
 /*
    mapping_delete: delete an element from the mapping
 */

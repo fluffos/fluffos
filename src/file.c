@@ -11,27 +11,6 @@
 #include "port.h"
 #include "master.h"
 
-
-/* Removed due to hideousness: if you want to add it back, note that
- * we don't want redefinitions, and that some systems define major() in
- * one place, some in both, etc ...
- */
-#if 0
-#ifdef INCL_SYS_SYSMACROS_H
-/* Why yes, this *is* a kludge! */
-#  ifdef major
-#    undef major
-#  endif
-#  ifdef minor
-#    undef minor
-#  endif
-#  ifdef makedev
-#    undef makedev
-#  endif
-#  include <sys/sysmacros.h>
-#endif
-#endif
-
 #ifdef PACKAGE_COMPRESS
 #include <zlib.h>
 #endif
@@ -149,11 +128,7 @@ array_t *get_dir (const char * path, int flags)
         return 0;
 
     if (strlen(path) < 2) {
-#ifndef LATTICE
         temppath[0] = path[0] ? path[0] : '.';
-#else
-        temppath[0] = path[0];
-#endif
         temppath[1] = '\000';
         p = temppath;
     } else {
@@ -177,11 +152,7 @@ array_t *get_dir (const char * path, int flags)
             *p = '\0';
         } else {
             strcpy(regexppath, p);
-#ifndef LATTICE
             strcpy(temppath, ".");
-#else
-            strcpy(temppath, "");
-#endif
         }
         do_match = 1;
     } else if (*p != '\0' && strcmp(temppath, ".")) {
@@ -191,9 +162,6 @@ array_t *get_dir (const char * path, int flags)
         encode_stat(&v->item[0], flags, p, &st);
         return v;
     }
-/*#ifdef LATTICE
-        if (temppath[0]=='.') temppath[0]=0;
-#endif*/
 #ifdef WIN32
     FileHandle = -1;
     FileCount = 1;
@@ -276,10 +244,7 @@ array_t *get_dir (const char * path, int flags)
     rewinddir(dirp);
     endtemp = temppath + strlen(temppath);
 
-#ifdef LATTICE
-    if (endtemp != temppath)
-#endif
-        strcat(endtemp++, "/");
+    strcat(endtemp++, "/");
 
     for (i = 0, de = readdir(dirp); i < count; de = readdir(dirp)) {
 #ifdef USE_STRUCT_DIRENT
@@ -356,14 +321,10 @@ int legal_path (const char * path)
         if (p)
             p++;                /* step over `/' */
     }
-#if defined(AMIGA) || defined(LATTICE) || defined(WIN32)
+#if defined(WIN32)
     /*
      * I don't know what the proper define should be, just leaving an
      * appropriate place for the right stuff to happen here - Wayfarer
-     */
-    /*
-     * fail if there's a ':' since on AmigaDOS this means it's a logical
-     * device!
      */
     /* Could be a drive thingy for os2. */
     if (strchr(path, ':'))
@@ -536,14 +497,6 @@ char *read_file (const char * file, int start, int len) {
         c = *p++;
 	if(p-str > chunk){
 	  if(chunk == READ_FILE_MAX_SIZE){
-	    if(p2 < (p-1)){
-#ifndef PACKAGE_COMPRESS
-	      chunk = p-str+fread(p2, 1, READ_FILE_MAX_SIZE+str-p, f);
-#else
-	      chunk = p-str+gzread(f, p2, READ_FILE_MAX_SIZE+str-p);
-#endif
-	      p=p2;
-	    } else
 	      goto free_str; //file too big
 	  } else
 	    break; //reached the end
@@ -600,17 +553,11 @@ char *read_bytes (const char * file, int start, int len, int * rlen)
                             "read_bytes", 0);
     if (!file)
         return 0;
-#ifdef LATTICE
-    if (stat(file, &st) == -1)
-        return 0;
-#endif
     fptr = fopen(file, "rb");
     if (fptr == NULL)
         return 0;
-#ifndef LATTICE
     if (fstat(fileno(fptr), &st) == -1)
         fatal("Could not stat an open file.\n");
-#endif
     size = st.st_size;
     if (start < 0)
         start = size + start;
@@ -679,10 +626,8 @@ int write_bytes (const char * file, int start, const char * str, int theLength)
     if (fptr == NULL) {
         return 0;
     }
-#ifndef LATTICE
     if (fstat(fileno(fptr), &st) == -1)
         fatal("Could not stat an open file.\n");
-#endif
     size = st.st_size;
     if (start < 0)
         start = size + start;
@@ -710,7 +655,7 @@ int file_size (const char * file)
     long ret;
 #ifdef WIN32
     int needs_free = 0, len;
-    char *p;
+    const char *p;
 #endif
 
     file = check_valid_path(file, current_object, "file_size", 0);
@@ -793,10 +738,8 @@ const char *check_valid_path (const char * path, object_t * call_object, const c
     
     if (path[0] == '/')
         path++;
-#ifndef LATTICE
     if (path[0] == '\0')
         path = ".";
-#endif
     if (legal_path(path))
         return path;
 
@@ -1181,7 +1124,7 @@ void dump_file_descriptors (outbuffer_t * out)
         if (fstat(i, &stbuf) == -1)
             continue;
 
-#if !defined(LATTICE) && !defined(WIN32)
+#if !defined(WIN32)
         if (S_ISCHR(stbuf.st_mode) || S_ISBLK(stbuf.st_mode))
             dev = stbuf.st_rdev;
         else
