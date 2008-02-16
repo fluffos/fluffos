@@ -33,7 +33,7 @@ char driver_name[512];
 
 static void patch_out (program_t *, short *, int);
 static void patch_in (program_t *, short *, int);
-static int str_case_cmp (char *, char *);
+static int str_case_cmp (void *, void *);
 static int check_times (time_t, char *);
 static int do_stat (char *, struct stat *, char *);
 
@@ -577,7 +577,7 @@ static void patch_out (program_t * prog, short * patches, int len)
     }
 }                               /* patch_out() */
 
-static int str_case_cmp (char * a, char * b)
+static int str_case_cmp (void *a, void *b)
 {
     char *s1, *s2;
 

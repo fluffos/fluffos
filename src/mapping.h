@@ -99,7 +99,7 @@ INLINE mapping_t *allocate_mapping (int);
 INLINE mapping_t *allocate_mapping2 (array_t *, svalue_t *);
 INLINE void free_mapping (mapping_t *);
 INLINE svalue_t *find_in_mapping (mapping_t *, svalue_t *);
-svalue_t *find_string_in_mapping (mapping_t *, char *);
+svalue_t *find_string_in_mapping (mapping_t *, const char *);
 INLINE svalue_t *find_for_insert (mapping_t *, svalue_t *, int);
 INLINE void absorb_mapping (mapping_t *, mapping_t *);
 INLINE void mapping_delete (mapping_t *, svalue_t *);

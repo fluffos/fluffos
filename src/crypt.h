@@ -26,7 +26,7 @@
 
 typedef unsigned char BytE;
 
-char *custom_crypt(char *key, char *salt, unsigned char *rawout);
+char *custom_crypt(const char *key, const char *salt, unsigned char *rawout);
 
 int MD5Digest ( BytE *, unsigned long buflen, BytE *);
 int encode ( unsigned char *, BytE *, int );

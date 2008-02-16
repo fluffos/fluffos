@@ -14,10 +14,10 @@ typedef struct tree_s {
 }      tree;
 
 void tree_init (tree **);
-char *tree_srch (tree *, int (*) (), char *);
-void tree_add (tree **, int (*) (), char *, int (*) ());
-int tree_delete (tree **, int (*) (), char *, int (*) ());
-int tree_trav (tree **, int (*) ());
-void tree_mung (tree **, int (*) ());
+char *tree_srch (tree *, int (*) (void *, void *), char *);
+void tree_add (tree **, int (*) (void *, void *), char *, int (*) (void *));
+int tree_delete (tree **, int (*) (void *, void *), char *, int (*) (void *));
+int tree_trav (tree **, int (*) (void *));
+void tree_mung (tree **, int (*) (void *));
 
 #endif				/* _AVLTREE_H_ */

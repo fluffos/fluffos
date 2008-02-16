@@ -7,7 +7,6 @@
 #include "socket_efuns.h"
 #include "call_out.h"
 #include "port.h"
-#include "lint.h"
 #include "master.h"
 #include "eval.h"
 

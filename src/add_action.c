@@ -2,7 +2,7 @@
 #include "comm.h"
 #include "backend.h"
 #include "add_action.h"
-
+#include "eval.h"
 #ifndef NO_ADD_ACTION
 
 #define MAX_VERB_BUFF 100

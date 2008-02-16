@@ -1318,7 +1318,7 @@ push_refed_class (array_t * v)
 /*
  * Push a string on the stack that is already malloced.
  */
-INLINE void push_malloced_string (char * p)
+INLINE void push_malloced_string (const char * p)
 {
   STACK_INC;
   sp->type = T_STRING;
@@ -1330,7 +1330,7 @@ INLINE void push_malloced_string (char * p)
  * Pushes a known shared string.  Note that this references, while 
  * push_malloced_string doesn't.
  */
-INLINE void push_shared_string (char * p) {
+INLINE void push_shared_string (const char * p) {
   STACK_INC;
   sp->type = T_STRING;
   sp->u.string = p;

@@ -138,14 +138,14 @@ void mark_all_uid_nodes() {
 }
 #endif
 
-static int uidcmp (userid_t *, userid_t *);
+static int uidcmp (void *, void *);
 
-static int uidcmp (userid_t * uid1, userid_t * uid2)
+static int uidcmp (void *uid1, void *uid2)
 {
     register char *name1, *name2;
 
-    name1 = uid1->name;
-    name2 = uid2->name;
+    name1 = ((userid_t *)uid1)->name;
+    name2 = ((userid_t *)uid2)->name;
     return (name1 < name2 ? -1 : (name1 > name2 ? 1 : 0));
 }
 

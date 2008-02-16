@@ -10,6 +10,7 @@
 #include "../efun_protos.h"
 #include "../simul_efun.h"
 #include "../add_action.h"
+#include "../port.h"
 
 #define MAX_COLOUR_STRING 200
 
@@ -226,10 +227,10 @@ static array_t *deep_copy_class (array_t * arg) {
     return vec;
 }
 
-static int doCopy ( mapping_t * map, mapping_node_t * elt, mapping_t * dest) {
+static int doCopy ( mapping_t * map, mapping_node_t * elt, void *dest) {
     svalue_t *sv;
 
-    sv = find_for_insert(dest, &elt->values[0], 1);
+    sv = find_for_insert((mapping_t *)dest, &elt->values[0], 1);
     if (!sv) {
         mapping_too_large();
         return 1;
@@ -243,7 +244,7 @@ static mapping_t *deep_copy_mapping ( mapping_t * arg ) {
     mapping_t *map;
 
     map = allocate_mapping( 0 ); /* this should be fixed.  -Beek */
-    mapTraverse( arg, (int (*)()) doCopy, map); /* Not horridly efficient either */
+    mapTraverse( arg, doCopy, map); /* Not horridly efficient either */
     return map;
 }
 
@@ -993,20 +994,20 @@ static char *pluralize (const char * str) {
     if (str[0] == 'a' || str[0] == 'A') {
         if (str[1] == ' ') {
             plen = sz - 2;
-            pre = DXALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
+            pre = (char *)DXALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
             strncpy(pre, str + 2, plen);
         } else if (sz > 2 && str[1] == 'n' && str[2] == ' ') {
             plen = sz - 3;
-            pre = DXALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
+            pre = (char *)DXALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
             strncpy(pre, str + 3, plen);
         } else {
             plen = sz;
-            pre = DXALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
+            pre = (char *)DXALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
             strncpy(pre, str, plen);
         }
     } else {
         plen = sz;
-        pre = DXALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
+        pre = (char *)DXALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre");
         strncpy(pre, str, plen);
     }
     pre[plen] = 0;
@@ -1446,7 +1447,7 @@ static int file_length (const char * file)
   do {
       num = fread(buf, 1, 2048, f);
       p = buf - 1;
-      while ((newp = memchr(p + 1, '\n', num))) {
+      while ((newp = (char *)memchr(p + 1, '\n', num))) {
           num -= (newp - p);
           p = newp;
           ret++;
@@ -1734,7 +1735,12 @@ void reset_timezone (const char *old_tz)
     sprintf(put_tz, "TZ=%s", old_tz);
     putenv(put_tz);
   }else
+#ifndef MINGW
     unsetenv("TZ");
+#else
+    putenv("TZ=");
+#endif
+
   tzset ();
 }
 

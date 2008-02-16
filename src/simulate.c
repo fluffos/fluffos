@@ -526,7 +526,7 @@ object_t *int_load_object (const char * lname)
 static char *make_new_name (const char * str)
 {
     static int i;
-    char *p = DXALLOC(strlen(str) + 10, TAG_OBJ_NAME, "make_new_name");
+    char *p = (char *)DXALLOC(strlen(str) + 10, TAG_OBJ_NAME, "make_new_name");
 
     (void) sprintf(p, "%s#%d", str, i);
     i++;
@@ -1638,7 +1638,7 @@ static void add_message_with_location (char * err) {
 }
 
 #ifdef MUDLIB_ERROR_HANDLER
-static void mudlib_error_handler (char * err, int catch) {
+static void mudlib_error_handler (char * err, int katch) {
     mapping_t *m;
     const char *file;
     int line;
@@ -1656,7 +1656,7 @@ static void mudlib_error_handler (char * err, int catch) {
     add_mapping_pair(m, "line", line);
 
     push_refed_mapping(m);
-    if (catch) {
+    if (katch) {
         STACK_INC;
         *sp = const1;
         mret = apply_master_ob(APPLY_ERROR_HANDLER,2);
@@ -1906,7 +1906,7 @@ void slow_shut_down (int minutes)
     }
 }
 
-void do_message (svalue_t * class, svalue_t * msg, array_t * scope, array_t * exclude, int recurse)
+void do_message (svalue_t * lclass, svalue_t * msg, array_t * scope, array_t * exclude, int recurse)
 {
     int i, j, valid;
     object_t *ob;
@@ -1934,7 +1934,7 @@ void do_message (svalue_t * class, svalue_t * msg, array_t * scope, array_t * ex
                 }
             }
             if (valid) {
-                push_svalue(class);
+                push_svalue(lclass);
                 push_svalue(msg);
                 apply(APPLY_RECEIVE_MESSAGE, ob, 2, ORIGIN_DRIVER);
             }
@@ -1944,7 +1944,7 @@ void do_message (svalue_t * class, svalue_t * msg, array_t * scope, array_t * ex
             array_t *tmp;
 
             tmp = all_inventory(ob, 1);
-            do_message(class, msg, tmp, exclude, 0);
+            do_message(lclass, msg, tmp, exclude, 0);
             free_array(tmp);
         }
 #endif

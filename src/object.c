@@ -463,23 +463,23 @@ restore_interior_string (char ** val, svalue_t * sv)
 
         case '\\':
             {
-                char *new = cp - 1;
+                char *news = cp - 1;
 
-                if ((*new++ = *cp++)) {
+                if ((*news++ = *cp++)) {
                     while ((c = *cp++) != '"') {
                         if (c == '\\') {
-                            if (!(*new++ = *cp++)) return ROB_STRING_ERROR;
+                            if (!(*news++ = *cp++)) return ROB_STRING_ERROR;
                         }
                         else {
                             if (c == '\r')
-                                *new++ = '\n';
-                            else *new++ = c;
+                                *news++ = '\n';
+                            else *news++ = c;
                         }
                     }
                     if (c == '\0') return ROB_STRING_ERROR;
-                    *new = '\0';
+                    *news = '\0';
                     *val = cp;
-                    newstr = new_string(len = (new - start),
+                    newstr = new_string(len = (news - start),
                                               "restore_string");
                     strcpy(newstr, start);
                     sv->u.string = newstr;
@@ -1007,22 +1007,22 @@ restore_string (char * val, svalue_t * sv)
 
         case '\\':
             {
-                char *new = cp - 1;
+                char *news = cp - 1;
 
-                if ((*new++ = *cp++)) {
+                if ((*news++ = *cp++)) {
                     while ((c = *cp++) != '"') {
                         if (c == '\\') {
-                            if (!(*new++ = *cp++)) return ROB_STRING_ERROR;
+                            if (!(*news++ = *cp++)) return ROB_STRING_ERROR;
                         }
                         else {
                             if (c == '\r')
-                                *new++ = '\n';
-                            else *new++ = c;
+                                *news++ = '\n';
+                            else *news++ = c;
                         }
                     }
                     if ((c == '\0') || (*cp != '\0')) return ROB_STRING_ERROR;
-                    *new = '\0';
-                    newstr = new_string(new - start,
+                    *news = '\0';
+                    newstr = new_string(news - start,
                                               "restore_string");
                     strcpy(newstr, start);
                     sv->u.string = newstr;
@@ -1260,7 +1260,7 @@ restore_object_from_gzip (object_t * ob,
     }
 
     if(!buff){
-	buff = DXALLOC(t, TAG_TEMPORARY, "restore_object: 6");
+      buff = (char *)DXALLOC(t, TAG_TEMPORARY, "restore_object: 6");
 	buffsize = t;
     }
 
@@ -1871,7 +1871,7 @@ void free_object (object_t ** ob, const char * const from)
  */
 object_t *get_empty_object (int num_var)
 {
-    static object_t NULL_object;
+  //static object_t NULL_object;
     object_t *ob;
     int size = sizeof(object_t) +
     (num_var - !!num_var) * sizeof(svalue_t);
@@ -1886,7 +1886,9 @@ object_t *get_empty_object (int num_var)
      * assignment, so use it.
      */
     //*ob = NULL_object; gives a warning on const pointers
-    memcpy(ob, &NULL_object, sizeof NULL_object);
+    //memcpy(ob, &NULL_object, sizeof NULL_object);
+    //screw the "bull machines" we're in the 21st century now
+    memset(ob, 0, sizeof(object_t));
     ob->ref = 1;
     for (i = 0; i < num_var; i++)
         ob->variables[i] = const0u;

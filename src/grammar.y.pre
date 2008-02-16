@@ -1969,16 +1969,16 @@ expr0:
 			/* Combine strings */
 			long n1, n2;
 			const char *s1, *s2;
-			char *new;
+			char *news;
 			int l;
 
 			n1 = $1->v.number;
 			n2 = $3->v.number;
 			s1 = PROG_STRING(n1);
 			s2 = PROG_STRING(n2);
-			new = (char *)DXALLOC( (l = strlen(s1))+strlen(s2)+1, TAG_COMPILER, "combine string" );
-			strcpy(new, s1);
-			strcat(new + l, s2);
+			news = (char *)DXALLOC( (l = strlen(s1))+strlen(s2)+1, TAG_COMPILER, "combine string" );
+			strcpy(news, s1);
+			strcat(news + l, s2);
 			/* free old strings (ordering may help shrink table) */
 			if (n1 > n2) {
 			    free_prog_string(n1); free_prog_string(n2);
@@ -1986,8 +1986,8 @@ expr0:
 			    free_prog_string(n2); free_prog_string(n1);
 			}
 			$$ = $1;
-			$$->v.number = store_prog_string(new);
-			FREE(new);
+			$$->v.number = store_prog_string(news);
+			FREE(news);
 			break;
 		    }
 		    /* Yes, this can actually happen for absurd code like:

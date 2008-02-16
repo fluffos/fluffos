@@ -114,14 +114,14 @@ typedef struct parse_info_s {
  */
 typedef struct hash_entry_s {
     struct hash_entry_s *next;
-    char *name;
+    const char *name;
     int flags;
     parse_val_t pv;
 } hash_entry_t;
 
 typedef struct special_word_s {
     struct special_word_s *next;
-    char *wrd;
+    const char *wrd;
     short kind;
     short arg;
 } special_word_t;
@@ -152,22 +152,22 @@ typedef struct verb_node_s {
 typedef struct verb_s {
     struct verb_s *next;
     int flags;
-    char *match_name; 
-    char *real_name;
+    const char *match_name; 
+    const char *real_name;
     verb_node_t *node;
 } verb_t;
 
 typedef struct verb_syn_s {
     struct verb_s *next;
     int flags;
-    char *match_name; 
-    char *real_name;
+    const char *match_name; 
+    const char *real_name;
     verb_t *real;
 } verb_syn_t;
 
 /* A token definition for the token lookup table */
 typedef struct {
-    char *name;
+    const char *name;
     int token;
     int mod_legal;
 } token_def_t;
@@ -179,7 +179,7 @@ union parser_error_u {
     } str_problem;
     bitvec_t obs;
     int ord_error;
-    char *str;
+    const char *str;
     struct saved_error_s *parallel;
 };
 
@@ -214,7 +214,7 @@ typedef struct {
 } parse_state_t;
 
 typedef struct {
-    char *func;
+    const char *func;
     int num;
     svalue_t *args;
 } sub_result_t;
@@ -229,7 +229,7 @@ void parse_free (parse_info_t *);
 #ifdef DEBUGMALLOC_EXTENSIONS
 void parser_mark_verbs();
 void parser_mark (parse_info_t *);
-void mark_hash_entry (char *);
+void mark_hash_entry (const char *);
 #endif
 
 #endif

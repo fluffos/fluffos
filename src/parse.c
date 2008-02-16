@@ -1388,7 +1388,7 @@ check_adjectiv (int obix, array_t * warr, int from, int to)
     if (from == to)
         return 0;
 
-    adstr = DXALLOC(sum, TAG_TEMPORARY, "check_adjectiv");
+    adstr = (char *)DXALLOC(sum, TAG_TEMPORARY, "check_adjectiv");
 
     /*
      * If we now have: "adj1 adj2 adj3 ... adjN"

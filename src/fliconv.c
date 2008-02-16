@@ -23,8 +23,8 @@ struct translation *get_translator(char *encoding){
     struct translation *ret = find_translator(encoding);
     if(ret)
 	return ret;
-    ret = MALLOC(sizeof(struct translation));
-    char *name = MALLOC(strlen(encoding)+18+1);
+    ret = (struct translation *)MALLOC(sizeof(struct translation));
+    char *name = (char *)MALLOC(strlen(encoding)+18+1);
     strcpy(name, encoding);
 #ifdef linux
     strcat(name, "//TRANSLIT//IGNORE");
@@ -60,7 +60,7 @@ char *translate(iconv_t tr, const char *mes, int inlen, int *outlen){
     char *tmp2;
 
     if(!res){
-	res = MALLOC(1);
+      res = (char *)MALLOC(1);
 	reslen = 1;
     }
  
@@ -80,11 +80,11 @@ char *translate(iconv_t tr, const char *mes, int inlen, int *outlen){
 	    } else {
 
 		if(E2BIG == errno){
-		  tmp = (char *)mes;
+		  tmp = (unsigned char *)mes;
 		    len = strlen(mes)+1;
 		    FREE(res);
 		    reslen *= 2;
-		    res = MALLOC(reslen);
+		    res = (char *)MALLOC(reslen);
 		    tmp2 = res;
 		    len2 = reslen;
 		    continue;
@@ -181,7 +181,7 @@ void f_arr_to_str(){
     newt = get_translator("UTF-32");
   }
   int len = sp->u.arr->size;
-  int *in = MALLOC(sizeof(int)*(len+1));
+  int *in = (int *)MALLOC(sizeof(int)*(len+1));
   char *trans;
   in[len] = 0;
   while(len--)

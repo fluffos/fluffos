@@ -4,6 +4,6 @@
 /*
  * qsort.c
  */
-void quickSort (void *, int, int, int (*) ());
+void quickSort (void *, int, int, int (*) (void *, void *));
 
 #endif

@@ -87,14 +87,14 @@ static void scratch_summary() {
 #endif
 
 void scratch_destroy() {
-    sp_block_t *next, *this = scratch_head.next;
+    sp_block_t *next, *thisb = scratch_head.next;
 
     SDEBUG(printf("scratch_destroy\n"));
 
-    while (this) {
-        next = this->next;
-        FREE(this);
-        this = next;
+    while (thisb) {
+        next = thisb->next;
+        FREE(thisb);
+        thisb = next;
     }
     scratch_head.next = 0;
     scr_last = &scratchblock[2];

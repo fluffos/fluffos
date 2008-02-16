@@ -303,7 +303,7 @@ void f_uncompress (void)
          if (!output_data) {
             output_data = (unsigned char*)DXALLOC(len, TAG_TEMPORARY, "uncompress");
          } else {
-            output_data = REALLOC(output_data, len);
+	   output_data = (unsigned char *)REALLOC(output_data, len);
          }
          memcpy(output_data + pos, compress_buf, len - pos);
          compressed->next_out = compress_buf;

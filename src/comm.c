@@ -665,7 +665,7 @@ int flush_message (interactive_t * ip)
  */
 #ifdef HAVE_ZLIB
         if (ip->compressed_stream) {
-          num_bytes = send_compressed(ip, ip->message_buf +
+          num_bytes = send_compressed(ip, (unsigned char *)ip->message_buf +
                                       ip->message_consumer,  length);
         } else {
 #endif
@@ -1231,7 +1231,7 @@ static void get_user_data (interactive_t * ip)
                 ip->text_end += num_bytes;
 
                 p = ip->text + ip->text_start;
-                while ((nl = memchr(p, '\n', ip->text_end - ip->text_start))) {
+                while ((nl = ( char *)memchr(p, '\n', ip->text_end - ip->text_start))) {
                     ip->text_start = (nl + 1) - ip->text;
 
                     *nl = 0;
@@ -2827,8 +2827,12 @@ static int flush_compressed_output (interactive_t *ip) {
                   fprintf(stderr, "Error sending compressed data (%d)\n",
                           errno);
 
-                    if (errno == EAGAIN || errno == ENOSR) {
-		        ret = 2;
+                    if (errno == EAGAIN
+#ifndef WIN32
+                    		|| errno == ENOSR
+#endif
+                    		) {
+                    	ret = 2;
                         break;
                     }
 

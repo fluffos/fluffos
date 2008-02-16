@@ -18,9 +18,9 @@ int num_arrays;
 int total_array_size;
 #endif
 
-INLINE_STATIC int builtin_sort_array_cmp_fwd (svalue_t *, svalue_t *);
-INLINE_STATIC int builtin_sort_array_cmp_rev (svalue_t *, svalue_t *);
-INLINE_STATIC int sort_array_cmp (svalue_t *, svalue_t *);
+INLINE_STATIC int builtin_sort_array_cmp_fwd (void *, void *);
+INLINE_STATIC int builtin_sort_array_cmp_rev (void *, void *);
+INLINE_STATIC int sort_array_cmp (void *, void *);
 #ifndef NO_ENVIRONMENT
 static int deep_inventory_count (object_t *);
 static void deep_inventory_collect (object_t *, array_t *, int *);
@@ -776,7 +776,8 @@ static void unique_array_error_handler (void) {
 
 void f_unique_array (void) {
     array_t *v, *ret;
-    int size, i, numkeys = 0, *ind, num_arg = st_num_arg;
+    long size, i, numkeys = 0, num_arg = st_num_arg;
+    int *ind;
     svalue_t *skipval, *sv, *svp;
     unique_list_t *unlist;
     unique_t **head, *uptr, *nptr;
@@ -1115,8 +1116,10 @@ array_t *builtin_sort_array (array_t * inlist, int dir)
     return inlist;
 }
 
-INLINE_STATIC int builtin_sort_array_cmp_fwd (svalue_t * p1, svalue_t * p2)
+INLINE_STATIC int builtin_sort_array_cmp_fwd (void *vp1, void *vp2)
 {
+    svalue_t *p1 = (svalue_t *)vp1;
+    svalue_t *p2 = (svalue_t *)vp2;
     switch(p1->type | p2->type) {
         case T_STRING:
         {
@@ -1168,8 +1171,10 @@ INLINE_STATIC int builtin_sort_array_cmp_fwd (svalue_t * p1, svalue_t * p2)
     return 0;
 }
 
-INLINE_STATIC int builtin_sort_array_cmp_rev (svalue_t * p1, svalue_t * p2)
+INLINE_STATIC int builtin_sort_array_cmp_rev (void *vp1, void *vp2)
 {
+    svalue_t *p1 = (svalue_t *)vp1;
+    svalue_t *p2 = (svalue_t *)vp2;
     switch(p1->type | p2->type) {
         case T_STRING:
         {
@@ -1222,7 +1227,9 @@ INLINE_STATIC int builtin_sort_array_cmp_rev (svalue_t * p1, svalue_t * p2)
 }
 
 INLINE_STATIC
-int sort_array_cmp (svalue_t * p1, svalue_t * p2) {
+int sort_array_cmp (void *vp1, void *vp2) {
+    svalue_t *p1 = (svalue_t *)vp1;
+    svalue_t *p2 = (svalue_t *)vp2;
     svalue_t *d;
 
     push_svalue(p1);
@@ -1401,15 +1408,18 @@ INLINE_STATIC long alist_cmp (svalue_t * p1, svalue_t * p2)
 {
     long d;
 
-    if ((d = p1->u.number - p2->u.number))
+    if ((d = p1->u.number - p2->u.number)){
+    	if(d == LONG_MIN)
+    		d = p1->u.number > p2->u.number;
         return d;
+    }
     if ((d = p1->type - p2->type))
         return d;
     return 0;
 }
 
 INLINE_STATIC svalue_t *alist_sort (array_t * inlist) {
-    int size, j, curix, parix, child1, child2, flag;
+    long size, j, curix, parix, child1, child2, flag;
     svalue_t *sv_tab, *tmp, *table, *sv_ptr, val;
     char *str;
 
@@ -1496,7 +1506,7 @@ INLINE_STATIC svalue_t *alist_sort (array_t * inlist) {
 array_t *subtract_array (array_t * minuend, array_t * subtrahend) {
     array_t *difference;
     svalue_t *source, *dest, *svt;
-    int i, size, o, d, l, h, msize;
+    long i, size, o, d, l, h, msize;
 
     if (!(size = subtrahend->size)) {
         subtrahend->ref--;
@@ -1562,9 +1572,9 @@ array_t *subtract_array (array_t * minuend, array_t * subtrahend) {
 
 array_t *intersect_array (array_t * a1, array_t * a2) {
     array_t *a3;
-    int d, l, j, i, a1s = a1->size, a2s = a2->size, flag;
+    long d, l, j, i, a1s = a1->size, a2s = a2->size, flag;
     svalue_t *svt_1, *ntab, *sv_tab, *sv_ptr, val, *tmp;
-    int curix, parix, child1, child2;
+    long curix, parix, child1, child2;
 
     if (!a1s || !a2s) {
         free_array(a1);
@@ -1688,10 +1698,10 @@ array_t *intersect_array (array_t * a1, array_t * a2) {
 
 array_t *union_array (array_t * a1, array_t * a2) {
     int a1s = a1->size, a2s = a2->size;
-    int d, l, j, i, cnt, flag;
+    long d, l, j, i, cnt, flag;
     array_t *a3; /* destination */
     svalue_t *svt_1, *ntab, *sv_tab, *tmp, *sv_ptr, val;
-    int curix, parix, child1, child2;
+    long curix, parix, child1, child2;
 
     if (a1s == 0) {
         a1->ref--;

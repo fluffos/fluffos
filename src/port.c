@@ -1,6 +1,5 @@
 #include "std.h"
 #include "port.h"
-#include "lint.h"
 #include "file_incl.h"
 #include "network_incl.h"
 #include <unistd.h>

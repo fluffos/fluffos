@@ -2088,9 +2088,9 @@ INLINE_STATIC void copy_in (int which, char ** start) {
     *start += align(size);
 }
 
-static int compare_funcs (unsigned short * x, unsigned short * y) {
-    char *n1 = FUNC(*x)->funcname;
-    char *n2 = FUNC(*y)->funcname;
+static int compare_funcs (void *x, void *y) {
+    char *n1 = FUNC(*(unsigned short *)x)->funcname;
+    char *n2 = FUNC(*(unsigned short *)y)->funcname;
     int sp1, sp2;
     
     /* make sure #global_init# stays last; also shuffle empty entries to
@@ -2098,14 +2098,14 @@ static int compare_funcs (unsigned short * x, unsigned short * y) {
      */
     if (n1[0] == '#')
         sp1 = 1;
-    else if (FUNC(*x)->address == ADDRESS_MAX)
+    else if (FUNC(*(unsigned short *)x)->address == ADDRESS_MAX)
         sp1 = 2;
     else
         sp1 = 0;
     
     if (n2[0] == '#')
         sp2 = 1;
-    else if (FUNC(*y)->address == ADDRESS_MAX)
+    else if (FUNC(*(unsigned short *)y)->address == ADDRESS_MAX)
         sp2 = 2;
     else
         sp2 = 0;
@@ -2505,7 +2505,7 @@ static void prolog (int f, char * name) {
      * will be stored.
      */
     for (i=0; i < NUMAREAS; i++) {
-        mem_block[i].block = DXALLOC(START_BLOCK_SIZE, TAG_COMPILER, "prolog: 2");
+      mem_block[i].block = (char *)DXALLOC(START_BLOCK_SIZE, TAG_COMPILER, "prolog: 2");
         mem_block[i].current_size = 0;
         mem_block[i].max_size = START_BLOCK_SIZE;
     }
@@ -2603,28 +2603,28 @@ the_file_name (char * name)
     return tmp;
 }
 
-static int case_compare (parse_node_t ** c1, parse_node_t ** c2) {
-    if ((*c1)->kind == NODE_DEFAULT)
+static int case_compare(void *c1, void *c2) {
+    if ((*(parse_node_t **)c1)->kind == NODE_DEFAULT)
         return -1;
-    if ((*c2)->kind == NODE_DEFAULT)
+    if ((*(parse_node_t **)c2)->kind == NODE_DEFAULT)
         return 1;
 
-    if ((*c1)->r.number > (*c2)->r.number) return 1;
-    if ((*c1)->r.number < (*c2)->r.number) return -1;
+    if ((*(parse_node_t **)c1)->r.number > (*(parse_node_t **)c2)->r.number) return 1;
+    if ((*(parse_node_t **)c1)->r.number < (*(parse_node_t **)c2)->r.number) return -1;
     return 0;
 }
 
-static int string_case_compare (parse_node_t ** c1, parse_node_t ** c2) {
+static int string_case_compare(void *c1, void *c2) {
     int i1, i2;
     const char *p1, *p2;
     
-    if ((*c1)->kind == NODE_DEFAULT)
+    if ((*(parse_node_t **)c1)->kind == NODE_DEFAULT)
         return -1;
-    if ((*c2)->kind == NODE_DEFAULT)
+    if ((*(parse_node_t **)c2)->kind == NODE_DEFAULT)
         return 1;
 
-    i1 = (*c1)->r.number;
-    i2 = (*c2)->r.number;
+    i1 = (*(parse_node_t **)c1)->r.number;
+    i2 = (*(parse_node_t **)c2)->r.number;
     p1 = (i1 ? PROG_STRING(i1) : 0);
     p2 = (i2 ? PROG_STRING(i2) : 0);
     

@@ -481,7 +481,7 @@ char *read_file (const char * file, int start, int len) {
       p = str;
       while (start > 1) {
 	/* skip newlines */
-	p2 = memchr(p, '\n', READ_FILE_MAX_SIZE+str-p);
+	p2 = (char *)memchr(p, '\n', READ_FILE_MAX_SIZE+str-p);
 	if (p2) {
 	  p = p2 + 1;
 	  start--;
@@ -653,6 +653,7 @@ int file_size (const char * file)
 {
     struct stat st;
     long ret;
+    char *t;
 #ifdef WIN32
     int needs_free = 0, len;
     const char *p;
@@ -668,9 +669,10 @@ int file_size (const char * file)
     if (*p == '/') {
         needs_free = 1;
         p = file;
-        file = new_string(len - 1, "file_size");
-        memcpy(file, p, len - 1);
-        file[len-1] = 0;
+        t = new_string(len - 1, "file_size");
+        memcpy(t, p, len - 1);
+        t[len-1] = 0;
+        file = t;
     }
 #endif
 

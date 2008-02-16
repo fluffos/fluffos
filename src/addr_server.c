@@ -51,9 +51,9 @@ void conn_data_handler (int);
 int index_by_fd (int);
 void terminate (int);
 
-void debug_perror (char *, char *);
+void debug_perror (const char *, const char *);
 
-void debug_perror (char * what, char * file) {
+void debug_perror (const char * what, const char * file) {
     if (file)
 	fprintf(stderr, "System Error: %s:%s:%s\n", what, file, port_strerror(errno));
     else
@@ -82,7 +82,7 @@ void init_conns()
 void init_conn_sock (int port_num, char * ipaddress)
 {
     struct sockaddr_in sin;
-    int sin_len;
+    socklen_t sin_len;
     int optval;
 #ifdef WINSOCK
     WSADATA WSAData;
@@ -283,13 +283,13 @@ void handle_top_event()
 void new_conn_handler()
 {
     struct sockaddr_in client;
-    int client_len;
+    socklen_t client_len;
     struct hostent *c_hostent;
     int new_fd;
     int conn_index;
 
     client_len = sizeof(client);
-    new_fd = accept(conn_fd, (struct sockaddr *) & client, (int *) &client_len);
+    new_fd = accept(conn_fd, (struct sockaddr *) & client, &client_len);
     if (new_fd == -1) {
 	socket_perror("new_conn_handler: accept", 0);
 	return;

@@ -1,5 +1,11 @@
 As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :)
+FluffOS 2.10:
+can be compiled with g++
+fix bugs in using arrays as sets 
+    int *a=({1<<31,0}); return a-a
+fixed crash in the children efun (hamlet)
+
 FluffOS 2.9:
 removed amiga support.
 included most DS changes, should work on windows now (except for over

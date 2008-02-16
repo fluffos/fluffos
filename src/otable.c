@@ -45,7 +45,7 @@ static char *basename(const char *full, int *size) {
 		*size = tmp-name;
 	}
 	while (*size > 2&& name[*size-1] == 'c'&& name[*size-2] == '.')
-		size -= 2;
+		*size -= 2;
 	name[*size] = 0;
 
 	return name;

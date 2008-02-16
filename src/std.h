@@ -31,10 +31,6 @@
 #endif
 #include "debug.h"
 
-#ifdef WIN32
-#  define outp outptr
-#endif
-
 #endif
 
 

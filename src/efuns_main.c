@@ -1418,7 +1418,7 @@ f_match_path (void)
     
     value = &const0u;
 
-    tmpstr = DMALLOC(SVALUE_STRLEN(sp) + 1, TAG_STRING, "match_path");
+    tmpstr = (char *)DMALLOC(SVALUE_STRLEN(sp) + 1, TAG_STRING, "match_path");
 
     src = sp->u.string;
     dst = tmpstr;

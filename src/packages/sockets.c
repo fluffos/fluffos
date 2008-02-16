@@ -21,8 +21,7 @@
 #define VALID_SOCKET(x) check_valid_socket((x), fd, get_socket_owner(fd), addr, port)
 
 #ifdef F_SOCKET_CREATE
-void
-f_socket_create (void)
+void f_socket_create (void)
 {
     int fd, num_arg = st_num_arg;
     svalue_t *arg;
@@ -33,9 +32,9 @@ f_socket_create (void)
     }
     if (check_valid_socket("create", -1, current_object, "N/A", -1)) {
 	if (num_arg == 2)
-	    fd = socket_create(arg[0].u.number, &arg[1], NULL);
+	    fd = socket_create((enum socket_mode)arg[0].u.number, &arg[1], NULL);
 	else {
-	    fd = socket_create(arg[0].u.number, &arg[1], &arg[2]);
+	    fd = socket_create((enum socket_mode)arg[0].u.number, &arg[1], &arg[2]);
 	}
         pop_n_elems(num_arg - 1);
         sp->u.number = fd;

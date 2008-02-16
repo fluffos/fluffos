@@ -308,7 +308,7 @@ void crunchbuffer(BytE *buf,            /* Buffer to be crunched.       */
  * At this point, custom_crypt() should never return NULL.
  *
  */
-char *custom_crypt(char *key, char *salt, unsigned char *rawout)
+char *custom_crypt(const char *key, const char *salt, unsigned char *rawout)
 {
         BytE Digest[16];
         static BytE buffer[MD5_MAXLEN],

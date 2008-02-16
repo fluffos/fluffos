@@ -1,7 +1,6 @@
 #ifndef _GENERATE_H
 #define _GENERATE_H
 
-#include "lint.h"
 #include "trees.h"
 #include "lpc_incl.h"
 #include "icode.h"

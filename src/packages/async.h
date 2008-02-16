@@ -7,7 +7,8 @@ typedef struct aiocb aiob;
 
 enum atypes {
 		aread,
-		awrite
+		awrite,
+		done
 };
 
 struct request{

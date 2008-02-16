@@ -12,7 +12,7 @@
 
 typedef struct _mstats {
     /* the name of the stat group */
-    char *name;
+    const char *name;
     int length;
     /* the next data element in the linked list */
     struct _mstats *next;
@@ -41,16 +41,16 @@ void add_moves (statgroup_t *, int);
 INLINE void add_heart_beats (statgroup_t *, int);
 void add_array_size (statgroup_t *, int);
 void add_errors (statgroup_t *, int);
-void add_errors_for_file (char *, int);
+void add_errors_for_file (const char *, int);
 void add_objects (statgroup_t *, int);
-struct mapping_s *get_domain_stats (char *);
-struct mapping_s *get_author_stats (char *);
+struct mapping_s *get_domain_stats (const char *);
+struct mapping_s *get_author_stats (const char *);
 void mudlib_stats_decay (void);
 void save_stat_files (void);
 void restore_stat_files (void);
-void set_author (char *);
-mudlib_stats_t *set_master_author (char *);
-mudlib_stats_t *set_backbone_domain (char *);
+void set_author (const char *);
+mudlib_stats_t *set_master_author (const char *);
+mudlib_stats_t *set_backbone_domain (const char *);
 int check_valid_stat_entry (mudlib_stats_t *);
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_mudlib_stats (void);

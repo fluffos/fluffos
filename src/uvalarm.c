@@ -1,5 +1,6 @@
 #include "std.h"
 #include "uvalarm.h"
+#ifndef WIN32
 /*
  * Copyright (c) 1985 Regents of the University of California.
  * All rights reserved.
@@ -45,17 +46,17 @@ static char sccsid[] = "@(#)ualarm.c	5.5 (Berkeley) 2/23/91";
  * every ``reload'' microseconds after the first signal.
  */
 unsigned uvalarm (unsigned int usecs, unsigned int reload) {
-    struct itimerval new, old;
+    struct itimerval newv, old;
 
-    new.it_interval.tv_usec = reload % USPS;
-    new.it_interval.tv_sec = reload / USPS;
+    newv.it_interval.tv_usec = reload % USPS;
+    newv.it_interval.tv_sec = reload / USPS;
 
-    new.it_value.tv_usec = usecs % USPS;
-    new.it_value.tv_sec = usecs / USPS;
+    newv.it_value.tv_usec = usecs % USPS;
+    newv.it_value.tv_sec = usecs / USPS;
 
-    if (setitimer(ITIMER_VIRTUAL, &new, &old) == 0)
+    if (setitimer(ITIMER_VIRTUAL, &newv, &old) == 0)
 	return old.it_value.tv_sec * USPS + old.it_value.tv_usec;
     /* else */
     return -1;
 }
-
+#endif

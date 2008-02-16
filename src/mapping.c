@@ -94,12 +94,7 @@ INLINE int growMap (mapping_t * m)
   -- Truilkan 92/07/19
 */
 
-INLINE mapping_t *
-mapTraverse (m, func, extra)
-mapping_t *m;
-int (*func) (mapping_t *, mapping_node_t *, void *);
-void *extra;
-{
+INLINE mapping_t *mapTraverse (mapping_t *m, int (*func) (mapping_t *, mapping_node_t *, void *), void *extra){
         mapping_node_t *elt, *nelt;
         int j = m->table_size;
 
@@ -387,21 +382,21 @@ restore_hash_string (char ** val, svalue_t * sv)
 
         case '\\':
             {
-                char *new = cp - 1;
+                char *news = cp - 1;
 
-                if ((c = *new++ = *cp++)) {
+                if ((c = *news++ = *cp++)) {
                     while ((c = *cp++) != '"') {
                         if (c == '\\') {
-                            if (!(c = *new++ = *cp++)) return ROB_STRING_ERROR;
+                            if (!(c = *news++ = *cp++)) return ROB_STRING_ERROR;
                         }
                         else {
                             if (c == '\r')
-                                c = *new++ = '\n';
-                            else *new++ = c;
+                                c = *news++ = '\n';
+                            else *news++ = c;
                         }
                     }
                     if (!c) return ROB_STRING_ERROR;
-                    *new = '\0';
+                    *news = '\0';
                     *val = cp;
                     sv->u.string = make_shared_string(start);
                     sv->type = T_STRING;
@@ -828,7 +823,7 @@ find_in_mapping (mapping_t * m, svalue_t *lv)
 }
 
 svalue_t *
-find_string_in_mapping (mapping_t * m, char * p)
+find_string_in_mapping (mapping_t * m, const char * p)
 {
     char *ss = findstring(p);
     int i;
@@ -998,10 +993,7 @@ unique_add_to_mapping (mapping_t *m1, mapping_t *m2, int free_flag)
     m1->count += count;
 }
 
-INLINE void
-absorb_mapping(m1, m2)
-mapping_t *m1, *m2;
-{
+INLINE void absorb_mapping(mapping_t *m1, mapping_t *m2){
     if (MAP_COUNT(m2)) {
         if (m1 != m2)
             add_to_mapping(m1, m2, 0);

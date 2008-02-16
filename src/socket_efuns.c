@@ -301,7 +301,7 @@ int socket_create (enum socket_mode mode, svalue_t * read_callback, svalue_t * c
  */
 int socket_bind (int fd, int port, const char * addr)
 {
-    int len;
+    socklen_t len;
     struct sockaddr_in sin;
 
     if (fd < 0 || fd >= max_lpc_socks)
@@ -388,7 +388,8 @@ int socket_listen (int fd, svalue_t * callback)
  */
 int socket_accept (int fd, svalue_t * read_callback, svalue_t * write_callback)
 {
-    int len, accept_fd, i;
+    int accept_fd, i;
+    socklen_t len;
     struct sockaddr_in sin;
 
     if (fd < 0 || fd >= max_lpc_socks)
@@ -406,7 +407,7 @@ int socket_accept (int fd, svalue_t * read_callback, svalue_t * write_callback)
     lpc_socks[fd].flags &= ~S_WACCEPT;
 
     len = sizeof(sin);
-    accept_fd = accept(lpc_socks[fd].fd, (struct sockaddr *) & sin, (int *) &len);
+    accept_fd = accept(lpc_socks[fd].fd, (struct sockaddr *) & sin, &len);
     if (accept_fd == -1) {
         switch (socket_errno) {
 #ifdef EWOULDBLOCK
@@ -775,7 +776,8 @@ static void call_callback (int fd, int what, int num_arg)
  */
 void socket_read_select_handler (int fd)
 {
-    int cc = 0, addrlen;
+    int cc = 0;
+    socklen_t addrlen;
     char buf[BUF_SIZE], addr[ADDR_BUF_SIZE];
     svalue_t value;
     struct sockaddr_in sin;

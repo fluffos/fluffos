@@ -79,16 +79,16 @@ static mudlib_stats_t *backbone_domain = 0;
 static mudlib_stats_t *authors = 0;
 static mudlib_stats_t *master_author = 0;
 
-static mudlib_stats_t *find_stat_entry (char *, mudlib_stats_t *);
-static mudlib_stats_t *add_stat_entry (char *, mudlib_stats_t **);
+static mudlib_stats_t *find_stat_entry (const char *, mudlib_stats_t *);
+static mudlib_stats_t *add_stat_entry (const char *, mudlib_stats_t **);
 static void init_author_for_ob (object_t *);
-static char *author_for_file (char *);
+static const char *author_for_file (const char *);
 static void init_domain_for_ob (object_t *);
-static char *domain_for_file (char *);
-static void save_stat_list (char *, mudlib_stats_t *);
-static void restore_stat_list (char *, mudlib_stats_t **);
+static const char *domain_for_file (const char *);
+static void save_stat_list (const char *, mudlib_stats_t *);
+static void restore_stat_list (const char *, mudlib_stats_t **);
 static mapping_t *get_info (mudlib_stats_t *);
-static mapping_t *get_stats (char *, mudlib_stats_t *);
+static mapping_t *get_stats (const char *, mudlib_stats_t *);
 static mudlib_stats_t *insert_stat_entry (mudlib_stats_t *, mudlib_stats_t **);
 
 #ifdef DEBUGMALLOC_EXTENSIONS
@@ -126,7 +126,7 @@ static mudlib_stats_t *insert_stat_entry (mudlib_stats_t * entry, mudlib_stats_t
  * this uses a simple linear search.  it's a good thing that most muds
  * will have a relatively small number of domains
  */
-static mudlib_stats_t *find_stat_entry (char * name, mudlib_stats_t * list)
+static mudlib_stats_t *find_stat_entry (const char * name, mudlib_stats_t * list)
 {
     int length;
 
@@ -140,7 +140,7 @@ static mudlib_stats_t *find_stat_entry (char * name, mudlib_stats_t * list)
 /*
  * add a new domain to the domain list.  If it exists, do nothing.
  */
-static mudlib_stats_t *add_stat_entry (char * str, mudlib_stats_t ** list)
+static mudlib_stats_t *add_stat_entry (const char * str, mudlib_stats_t ** list)
 {
     mudlib_stats_t *entry;
 
@@ -229,10 +229,10 @@ void add_errors (statgroup_t * st, int errors)
     }
 }
 
-void add_errors_for_file (char * file, int errors)
+void add_errors_for_file (const char * file, int errors)
 {
     mudlib_stats_t *entry;
-    char *name;
+    const char *name;
 
     name = domain_for_file(file);
     if (name && domains) {
@@ -318,7 +318,7 @@ static void init_author_for_ob (object_t * ob)
     }
 }
 
-void set_author (char * name)
+void set_author (const char *name)
 {
     object_t *ob;
 
@@ -338,7 +338,7 @@ void set_author (char * name)
     }
 }
 
-mudlib_stats_t *set_master_author (char * str)
+mudlib_stats_t *set_master_author (const char * str)
 {
     mudlib_stats_t *author;
 
@@ -348,7 +348,7 @@ mudlib_stats_t *set_master_author (char * str)
     return author;
 }
 
-static char *author_for_file (char * file)
+static const char *author_for_file (const char * file)
 {
     svalue_t *ret;
     static char buff[50];
@@ -369,7 +369,7 @@ static char *author_for_file (char * file)
 static void init_domain_for_ob (object_t * ob)
 {
     svalue_t *ret;
-    char *domain_name;
+    const char *domain_name;
 
     if (!current_object
 #ifdef PACKAGE_UIDS
@@ -422,7 +422,7 @@ static void init_domain_for_ob (object_t * ob)
     return;
 }
 
-mudlib_stats_t *set_backbone_domain (char * str)
+mudlib_stats_t *set_backbone_domain (const char * str)
 {
     mudlib_stats_t *dom;
 
@@ -437,7 +437,7 @@ mudlib_stats_t *set_backbone_domain (char * str)
  * Argument is a file name, which we want to get the domain of.
  * Ask the master object.
  */
-static char *domain_for_file (char * file)
+static const char *domain_for_file (const char * file)
 {
     svalue_t *ret;
     static char buff[512];
@@ -455,7 +455,7 @@ static char *domain_for_file (char * file)
  * save and restore stats to a file *
  ************************************/
 
-static void save_stat_list (char * file, mudlib_stats_t * list)
+static void save_stat_list (const char * file, mudlib_stats_t * list)
 {
     FILE *f;
     char fname_buf[MAXPATHLEN];
@@ -489,7 +489,7 @@ static void save_stat_list (char * file, mudlib_stats_t * list)
     fclose(f);
 }
 
-static void restore_stat_list (char * file, mudlib_stats_t ** list)
+static void restore_stat_list (const char * file, mudlib_stats_t ** list)
 {
     FILE *f;
     char fname_buf[MAXPATHLEN];
@@ -557,7 +557,7 @@ static mapping_t *
 }
 
 static mapping_t *
-        get_stats (char * str, mudlib_stats_t * list)
+        get_stats (const char * str, mudlib_stats_t * list)
 {
     mudlib_stats_t *dl;
     mapping_t *m;
@@ -592,14 +592,10 @@ static mapping_t *
     return m;
 }
 
-mapping_t *
-        get_domain_stats (char * str)
-{
+mapping_t *get_domain_stats (const char * str){
     return get_stats(str, domains);
 }
 
-mapping_t *
-        get_author_stats (char * str)
-{
+mapping_t *get_author_stats (const char * str){
     return get_stats(str, authors);
 }

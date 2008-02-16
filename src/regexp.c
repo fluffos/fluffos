@@ -624,7 +624,7 @@ static char *regatom (int * flagp)
         ret = regnode(WORDEND);
         break;
     case LSQBRAC:{
-            register int class;
+            register int classs;
             register int classend;
 
             if (*regparse == CARET) {   /* Complement of range. */
@@ -640,12 +640,12 @@ static char *regatom (int * flagp)
                     if (*regparse == RSQBRAC || *regparse == '\0')
                         regc('-');
                     else {
-                        class = (CHARBITS & *(regparse - 2)) + 1;
+                        classs = (CHARBITS & *(regparse - 2)) + 1;
                         classend = (CHARBITS & *(regparse));
-                        if (class > classend + 1)
+                        if (classs > classend + 1)
                             FAIL("invalid [] range\n");
-                        for (; class <= classend; class++)
-                            regc(class);
+                        for (; classs <= classend; classs++)
+                            regc(classs);
                         regparse++;
                     }
                 } else

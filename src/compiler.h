@@ -249,7 +249,7 @@ parse_node_t *throw_away_mapping (parse_node_t *);
 #define realloc_mem_block(m) do { \
     mem_block_t *M = m; \
     M->max_size <<= 1; \
-    M->block = DREALLOC(M->block, M->max_size, TAG_COMPILER, "realloc_mem_block"); \
+    M->block = (char *)DREALLOC(M->block, M->max_size, TAG_COMPILER, "realloc_mem_block"); \
 } while (0)
 
 #define add_to_mem_block(n, data, size) do { \
@@ -261,7 +261,7 @@ parse_node_t *throw_away_mapping (parse_node_t *);
             mbp->max_size <<= 1; \
         } while (mbp->current_size + Size > mbp->max_size); \
         \
-        mbp->block = DREALLOC(mbp->block, mbp->max_size, TAG_COMPILER, "insert_in_mem_block"); \
+        mbp->block = (char *)DREALLOC(mbp->block, mbp->max_size, TAG_COMPILER, "insert_in_mem_block"); \
     } \
     memcpy(mbp->block + mbp->current_size, data, Size); \
     mbp->current_size += Size; \
@@ -279,7 +279,7 @@ char *allocate_in_mem_block (int n, int size)
             mbp->max_size <<= 1;
         } while (mbp->current_size + size > mbp->max_size);
         
-        mbp->block = DREALLOC(mbp->block, mbp->max_size, TAG_COMPILER, "insert_in_mem_block");
+        mbp->block = (char *)DREALLOC(mbp->block, mbp->max_size, TAG_COMPILER, "insert_in_mem_block");
     }
     ret = mbp->block + mbp->current_size;
     mbp->current_size += size;
