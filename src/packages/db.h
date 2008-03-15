@@ -22,6 +22,7 @@
 #endif
 
 #ifdef USE_MYSQL
+#define USE_OLD_FUNCTIONS
 #ifndef TCC
 #ifdef INCL_LOCAL_MYSQL_H
 #include "/usr/local/include/mysql.h"
@@ -49,6 +50,7 @@
 #include <mysql/mysql.h>
 #endif
 #endif
+#undef USE_OLD_FUNCTIONS
 #endif
 
 typedef union dbconn_u {

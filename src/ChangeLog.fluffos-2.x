@@ -1,11 +1,16 @@
 As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :)
+FluffOS 2.11:
+stop eval_cost() adding to the time you're allowed to run. (libc return a time
+     longer than the set time if you query the remaining time right after 
+     restarting the timer!
+reset_eval_cost() now stops working after 100*max eval cost.
+hopefully fixed readfile with lines beyond max readsize.
 FluffOS 2.10:
 can be compiled with g++
 fix bugs in using arrays as sets 
     int *a=({1<<31,0}); return a-a
 fixed crash in the children efun (hamlet)
-
 FluffOS 2.9:
 removed amiga support.
 included most DS changes, should work on windows now (except for over

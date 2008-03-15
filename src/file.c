@@ -424,120 +424,126 @@ int write_file (const char * file, const char * str, int flags)
     return 1;
 }
 
-char *read_file (const char * file, int start, int len) {
-    struct stat st;
+char *read_file(const char * file, int start, int len) {
+	struct stat st;
 #ifndef PACKAGE_COMPRESS
-    FILE *f;
+	FILE *f;
 #else
-    gzFile f;
+	gzFile f;
 #endif
-    int chunk;
-    char *str, *p, *p2;
-    
-    if (len < 0)
-        return 0;
-    
-    file = check_valid_path(file, current_object, "read_file", 0);
-    
-    if (!file)
-        return 0;
-    
-    /*
-     * file doesn't exist, or is really a directory
-     */
-    if (stat(file, &st) == -1 || (st.st_mode & S_IFDIR))
-        return 0;
+	int chunk;
+	char *str, *p, *p2;
+
+	if (len < 0)
+		return 0;
+
+	file = check_valid_path(file, current_object, "read_file", 0);
+
+	if (!file)
+		return 0;
+
+	/*
+	 * file doesn't exist, or is really a directory
+	 */
+	if (stat(file, &st) == -1 || (st.st_mode & S_IFDIR))
+		return 0;
 #ifndef PACKAGE_COMPRESS
-    f = fopen(file, FOPEN_READ);
+	f = fopen(file, FOPEN_READ);
 #else
-    f = gzopen(file, "rb");
+	f = gzopen(file, "rb");
 #endif
-    if (f == 0)
-        return 0;
-    
-    if (start < 1) start = 1; 
-    if (len == 0) len = READ_FILE_MAX_SIZE; 
-    
-    str = new_string(READ_FILE_MAX_SIZE, "read_file: str"); 
-    if (st.st_size== 0) { 
-        /* zero length file */ 
-        str[0] = 0; 
+	if (f == 0)
+		return 0;
+
+	if (start < 1)
+		start = 1;
+	if (len == 0)
+		len = 2*READ_FILE_MAX_SIZE;
+
+	str = new_string(2*READ_FILE_MAX_SIZE, "read_file: str");
+	if (st.st_size== 0) {
+		/* zero length file */
+		str[0] = 0;
 #ifndef PACKAGE_COMPRESS
-        fclose(f);
+		fclose(f);
+#else
+		gzclose(f);
+#endif
+		return str;
+	}
+
+	do {
+#ifndef PACKAGE_COMPRESS
+		chunk = fread(str, 1, 2*READ_FILE_MAX_SIZE, f);
+#else 
+		chunk = gzread(f, str, 2*READ_FILE_MAX_SIZE);
+#endif
+		if (chunk < 1)
+			goto free_str;
+		p = str;
+		while (start > 1) {
+			/* skip newlines */
+			p2 = (char *)memchr(p, '\n', 2*READ_FILE_MAX_SIZE+str-p);
+			if (p2) {
+				p = p2 + 1;
+				start--;
+			} else
+				break;
+		}
+	} while (start > 1);
+
+	p2 = str;
+	while (1) {
+		char c;
+
+		c = *p++;
+		if (p-str > chunk) {
+			if (chunk == 2*READ_FILE_MAX_SIZE) {
+				goto free_str;	//file too big
+			} else
+				break; //reached the end
+		}
+		
+		if (p2-str > READ_FILE_MAX_SIZE)
+			goto free_str;  //file too big
+		
+		if (c == '\0') {
+			FREE_MSTR(str);
+#ifndef PACKAGE_COMPRESS
+			fclose(f);
+#else
+			gzclose(f);
+#endif
+			error("Attempted to read '\\0' into string!\n");
+		}
+		if (c != '\r' || *p != '\n') {
+			*p2++ = c;
+			if (c == '\n' && --len == 0)
+				break; /* done */
+		}
+	}
+
+	*p2 = 0;
+	str = extend_string(str, p2 - str); /* fix string length */
+
+#ifndef PACKAGE_COMPRESS
+	fclose(f);
 #else
 	gzclose(f);
 #endif
-        return str;
-    }
 
-    do{
+	return str;
+
+	/* Error path: unwind allocated resources */
+
+free_str: 
+	FREE_MSTR(str);
 #ifndef PACKAGE_COMPRESS
-      chunk = fread(str, 1, READ_FILE_MAX_SIZE, f);
-#else 
-      chunk = gzread(f, str, READ_FILE_MAX_SIZE);
-#endif
-      if(chunk < 1)
-	goto free_str;
-      p = str;
-      while (start > 1) {
-	/* skip newlines */
-	p2 = (char *)memchr(p, '\n', READ_FILE_MAX_SIZE+str-p);
-	if (p2) {
-	  p = p2 + 1;
-	  start--;
-	} else
-	  break;
-      } 
-    } while (start > 1);
-
-    p2 = str;
-    while (1) {
-        char c;
-
-        c = *p++;
-	if(p-str > chunk){
-	  if(chunk == READ_FILE_MAX_SIZE){
-	      goto free_str; //file too big
-	  } else
-	    break; //reached the end
-	}
-        if (c == '\0') {
-            FREE_MSTR(str);
-#ifndef PACKAGE_COMPRESS
-            fclose(f);
+	fclose(f);
 #else
-	    gzclose(f);
+	gzclose(f);
 #endif
-            error("Attempted to read '\\0' into string!\n");    
-        }
-        if (c != '\r' || *p != '\n') {
-            *p2++ = c;
-            if (c == '\n' && --len == 0)
-                break; /* done */
-        }
-    }
-
-    *p2 = 0;
-    str = extend_string(str, p2 - str); /* fix string length */
-
-#ifndef PACKAGE_COMPRESS
-    fclose(f);
-#else
-    gzclose(f);
-#endif
-    
-    return str;
-    
-    /* Error path: unwind allocated resources */
-
-  free_str:
-    FREE_MSTR(str);
-#ifndef PACKAGE_COMPRESS
-    fclose(f);
-#else
-    gzclose(f);
-#endif
-    return 0;
+	return 0;
 }
 
 char *read_bytes (const char * file, int start, int len, int * rlen)

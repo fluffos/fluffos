@@ -1,0 +1,491 @@
+obj/add_action.o: add_action.c std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h std_incl.h malloc_incl.h \
+  bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h \
+  comm.h lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h network_incl.h fliconv.h backend.h add_action.h eval.h
+obj/addr_server.o: addr_server.c std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h std_incl.h malloc_incl.h \
+  bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h \
+  addr_server.h network_incl.h socket_ctrl.h file_incl.h port.h
+obj/applies_table.o: applies_table.c
+obj/array.o: array.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h comm.h \
+  network_incl.h fliconv.h regexp.h backend.h qsort.h md.h efun_protos.h
+obj/avltree.o: avltree.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h avltree.h
+obj/backend.o: backend.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h backend.h comm.h \
+  network_incl.h fliconv.h replace_program.h socket_efuns.h call_out.h \
+  port.h master.h eval.h
+obj/binaries.o: binaries.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h file_incl.h \
+  binaries.h compiler.h trees.h lex.h backend.h master.h qsort.h
+obj/bsdmalloc.o: bsdmalloc.c std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h std_incl.h malloc_incl.h \
+  bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h debug.h main.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h
+obj/buffer.o: buffer.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h crctab.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h
+obj/call_out.o: call_out.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h call_out.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h backend.h comm.h network_incl.h fliconv.h port.h eoperators.h \
+  sprintf.h eval.h
+obj/class.o: class.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h
+obj/comm.o: comm.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h comm.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h network_incl.h fliconv.h socket_efuns.h backend.h socket_ctrl.h \
+  ed.h regexp.h file.h file_incl.h master.h add_action.h eval.h
+obj/compiler.o: compiler.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h compiler.h \
+  trees.h lex.h generate.h icode.h scratchpad.h qsort.h file.h \
+  file_incl.h binaries.h simul_efun.h
+obj/comptest.o: comptest.c
+obj/crc32.o: crc32.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h crc32.h \
+  crctab.h
+obj/crypt.o: crypt.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h port.h \
+  crypt.h
+obj/debug.o: debug.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h
+obj/debugmalloc.o: debugmalloc.c std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h std_incl.h malloc_incl.h \
+  bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h debug.h md.h
+obj/disassembler.o: disassembler.c std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h std_incl.h malloc_incl.h \
+  bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h efuns_incl.h efun_protos.h simul_efun.h comm.h network_incl.h \
+  fliconv.h lex.h file.h file_incl.h
+obj/dumpstat.o: dumpstat.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h dumpstat.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h comm.h network_incl.h fliconv.h file.h file_incl.h
+obj/ed.o: ed.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h ed.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h regexp.h comm.h network_incl.h fliconv.h file.h file_incl.h \
+  master.h
+obj/edit_source.o: edit_source.c std.h arch.h portability.h macros.h \
+  my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h smalloc.h \
+  wrappedmalloc.h debugmalloc.h debug.h lex.h preprocess.h make_func.h \
+  cc.h hash.h preprocess.c
+obj/efun_defs.o: efun_defs.c
+obj/efuns_main.o: efuns_main.c std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h std_incl.h malloc_incl.h \
+  bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h \
+  efuns_main.h lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h file_incl.h file.h comm.h network_incl.h fliconv.h parse.h \
+  sprintf.h backend.h port.h otable.h crc32.h reclaim.h dumpstat.h \
+  call_out.h ed.h regexp.h md.h master.h efun_protos.h add_action.h \
+  eval.h
+obj/efuns_port.o: efuns_port.c std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h std_incl.h malloc_incl.h \
+  bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h file_incl.h include/localtime.h port.h crypt.h efun_protos.h
+obj/eoperators.o: eoperators.c std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h std_incl.h malloc_incl.h \
+  bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h efuns_incl.h efun_protos.h backend.h parse.h comm.h \
+  network_incl.h fliconv.h compiler.h trees.h lex.h simul_efun.h \
+  eoperators.h
+obj/eval.o: eval.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h main.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  comm.h network_incl.h fliconv.h uvalarm.h backend.h
+obj/file.o: file.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h file.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h file_incl.h comm.h network_incl.h fliconv.h lex.h md.h port.h \
+  master.h
+obj/fliconv.o: fliconv.c fliconv.h std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h std_incl.h malloc_incl.h \
+  bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h comm.h network_incl.h
+obj/func_spec.o: func_spec.c spec.h std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h debug.h op_spec.c
+obj/function.o: function.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h eoperators.h \
+  compiler.h trees.h lex.h replace_program.h
+obj/generate.o: generate.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h generate.h \
+  trees.h lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h icode.h compiler.h lex.h
+obj/gnumalloc.o: gnumalloc.c gnumalloc.h
+obj/grammar.tab.o: grammar.tab.c std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h std_incl.h malloc_incl.h \
+  bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h \
+  compiler.h trees.h lex.h program.h scratchpad.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  lpc.h function.h buffer.h object.h packages/uids.h packages/../std.h \
+  packages/mudlib_stats.h array.h mapping.h hash.h stralloc.h class.h \
+  simulate.h interpret.h rc.h main.h simul_efun.h generate.h icode.h \
+  master.h
+obj/hash.o: hash.c std.h arch.h portability.h macros.h my_malloc.h std_incl.h \
+  malloc_incl.h bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h \
+  debug.h hash.h
+obj/icode.o: icode.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h icode.h trees.h \
+  compiler.h lex.h generate.h
+obj/interpret.o: interpret.c std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h std_incl.h malloc_incl.h \
+  bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h efuns_incl.h efun_protos.h file.h file_incl.h patchlevel.h \
+  backend.h simul_efun.h eoperators.h efunctions.h sprintf.h comm.h \
+  network_incl.h fliconv.h port.h qsort.h compiler.h trees.h lex.h \
+  regexp.h master.h eval.h
+obj/lex.o: lex.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h file_incl.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h compiler.h trees.h lex.h grammar.tab.h scratchpad.h preprocess.h \
+  md.h file.h cc.h efun_defs.c option_defs.c preprocess.c
+obj/main.o: main.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h file_incl.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h backend.h simul_efun.h binaries.h compiler.h trees.h lex.h \
+  otable.h comm.h network_incl.h fliconv.h port.h md.h socket_efuns.h \
+  master.h eval.h
+obj/make_func.tab.o: make_func.tab.c std.h arch.h portability.h macros.h \
+  my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h smalloc.h \
+  wrappedmalloc.h debugmalloc.h debug.h make_func.h lex.h preprocess.h \
+  edit_source.h
+obj/make_malloc.o: make_malloc.c std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h std_incl.h malloc_incl.h \
+  bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h debug.h
+obj/malloc.o: malloc.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h debug.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h comm.h \
+  network_incl.h fliconv.h
+obj/mallocwrapper.o: mallocwrapper.c
+obj/mapping.o: mapping.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h config.h \
+  include/runtime_config.h lpc_incl.h include/function.h origin.h \
+  applies.h program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h md.h \
+  efun_protos.h
+obj/master.o: master.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h comm.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h network_incl.h fliconv.h master.h efuns_main.h otable.h
+obj/md.o: md.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h file.h \
+  file_incl.h md.h master.h
+obj/mmalloc.o: mmalloc.c
+obj/object.o: object.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h file_incl.h \
+  otable.h backend.h comm.h network_incl.h fliconv.h socket_efuns.h \
+  call_out.h port.h file.h master.h add_action.h
+obj/op_spec.o: op_spec.c
+obj/option_defs.o: option_defs.c
+obj/otable.o: otable.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h otable.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h comm.h network_incl.h fliconv.h simul_efun.h master.h
+obj/parse.o: parse.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h parse.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h master.h add_action.h
+obj/plainwrapper.o: plainwrapper.c
+obj/portbind.o: portbind.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h \
+  network_incl.h
+obj/port.o: port.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h port.h \
+  file_incl.h network_incl.h
+obj/preprocess.o: preprocess.c
+obj/program.o: program.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h
+obj/qsort.o: qsort.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h qsort.h
+obj/rc.o: rc.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h rc.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h \
+  main.h
+obj/reclaim.o: reclaim.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h reclaim.h \
+  call_out.h
+obj/regexp.o: regexp.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h regexp.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h comm.h network_incl.h fliconv.h ed.h
+obj/replace_program.o: replace_program.c std.h arch.h options_incl.h \
+  options.h configure.h portability.h macros.h my_malloc.h std_incl.h \
+  malloc_incl.h bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h \
+  opcodes.h debug.h replace_program.h lpc_incl.h include/function.h \
+  origin.h config.h include/runtime_config.h applies.h program.h lpc.h \
+  function.h buffer.h object.h packages/uids.h packages/../std.h \
+  packages/mudlib_stats.h array.h mapping.h hash.h stralloc.h class.h \
+  simulate.h interpret.h rc.h main.h simul_efun.h efun_protos.h
+obj/scratchpad.o: scratchpad.c std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h std_incl.h malloc_incl.h \
+  bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h scratchpad.h compiler.h trees.h lex.h
+obj/simulate.o: simulate.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h file_incl.h \
+  backend.h simul_efun.h compiler.h trees.h lex.h otable.h comm.h \
+  network_incl.h fliconv.h binaries.h socket_efuns.h md.h eoperators.h \
+  ed.h regexp.h file.h packages/db.h packages/parser.h \
+  packages/../include/parser_error.h master.h add_action.h eval.h
+obj/simul_efun.o: simul_efun.c std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h std_incl.h malloc_incl.h \
+  bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h \
+  simul_efun.h lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h lex.h otable.h
+obj/smalloc.o: smalloc.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h debug.h file_incl.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h comm.h \
+  network_incl.h fliconv.h
+obj/socket_ctrl.o: socket_ctrl.c std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h std_incl.h malloc_incl.h \
+  bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h \
+  socket_ctrl.h network_incl.h lpc_incl.h include/function.h origin.h \
+  config.h include/runtime_config.h applies.h program.h lpc.h function.h \
+  buffer.h object.h packages/uids.h packages/../std.h \
+  packages/mudlib_stats.h array.h mapping.h hash.h stralloc.h class.h \
+  simulate.h interpret.h rc.h main.h file_incl.h file.h
+obj/socket_efuns.o: socket_efuns.c std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h std_incl.h malloc_incl.h \
+  bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h \
+  socket_efuns.h lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h network_incl.h socket_err.h include/socket_err.h socket_ctrl.h \
+  comm.h fliconv.h file.h file_incl.h master.h
+obj/socket_err.o: socket_err.c include/socket_err.h
+obj/sprintf.o: sprintf.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h sprintf.h \
+  lpc_incl.h include/function.h origin.h config.h \
+  include/runtime_config.h applies.h program.h lpc.h function.h buffer.h \
+  object.h packages/uids.h packages/../std.h packages/mudlib_stats.h \
+  array.h mapping.h hash.h stralloc.h class.h simulate.h interpret.h rc.h \
+  main.h efuns_incl.h efun_protos.h simul_efun.h lex.h master.h
+obj/stralloc.o: stralloc.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h comm.h \
+  network_incl.h fliconv.h
+obj/strfuncs.o: strfuncs.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h
+obj/sysmalloc.o: sysmalloc.c std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h std_incl.h malloc_incl.h \
+  bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h debug.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h comm.h \
+  network_incl.h fliconv.h
+obj/trees.o: trees.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h compiler.h \
+  trees.h lex.h
+obj/uvalarm.o: uvalarm.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h uvalarm.h
+obj/wrappedmalloc.o: wrappedmalloc.c std.h arch.h options_incl.h options.h \
+  configure.h portability.h macros.h my_malloc.h std_incl.h malloc_incl.h \
+  bsdmalloc.h smalloc.h wrappedmalloc.h debugmalloc.h debug.h lpc_incl.h \
+  include/function.h origin.h config.h include/runtime_config.h applies.h \
+  program.h lpc.h function.h buffer.h object.h packages/uids.h \
+  packages/../std.h packages/mudlib_stats.h array.h mapping.h hash.h \
+  stralloc.h class.h simulate.h interpret.h rc.h main.h comm.h \
+  network_incl.h fliconv.h
+obj/y.tab.o: y.tab.c std.h arch.h options_incl.h options.h configure.h \
+  portability.h macros.h my_malloc.h std_incl.h malloc_incl.h bsdmalloc.h \
+  smalloc.h wrappedmalloc.h debugmalloc.h opcodes.h debug.h compiler.h \
+  trees.h lex.h program.h scratchpad.h lpc_incl.h include/function.h \
+  origin.h config.h include/runtime_config.h applies.h lpc.h function.h \
+  buffer.h object.h packages/uids.h packages/../std.h \
+  packages/mudlib_stats.h array.h mapping.h hash.h stralloc.h class.h \
+  simulate.h interpret.h rc.h main.h simul_efun.h generate.h icode.h \
+  master.h
