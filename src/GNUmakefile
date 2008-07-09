@@ -6,10 +6,10 @@ PROOF=
 STRFUNCS=
 INSTALL=install -c
 INSTALL_DIR=../bin
-OPTIMIZE=
-CPP=gcc -E
-CFLAGS=-D__USE_FIXED_PROTOTYPES__ -g3 # -O3
-CC=gcc 
+OPTIMIZE=-O3
+CPP=g++ -E
+CFLAGS=-D__USE_FIXED_PROTOTYPES__
+CC=g++
 YACC=bison -d -y
 RANLIB=ranlib
 A=a
@@ -158,7 +158,7 @@ make_func.tab.c: make_func.y cc.h
 	-rm -f make_func.tab.c
 	mv y.tab.c make_func.tab.c
 
-configure.h: edit_source build.MudOS
+configure.h: edit_source build.FluffOS
 	-if test \( ! -r configure.h \) -o \( ! -r configuration \); then \
 	    rm -f configuration; \
 	    touch configuration; \
@@ -210,6 +210,7 @@ spotless: clean
 	-rm -f options_incl.h
 	-rm -f *.diffs
 	-find . -name "*~" -print | xargs rm
+	-rm -f 1.out 2.out
 
 # get ready for recompile
 neat:
@@ -238,6 +239,31 @@ clean: neat
 	-rm -f *.ln tags TAGS
 	-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old addr_server portbind
 	-rm -f Dependencies tmpdepend
+	-touch Dependencies
+
+# remove everything
+distclean: neat
+	-rm -f Makefile.MudOS GNUmakefile.MudOS
+	-rm -f cc.h edit_source
+	-rm -f core y.output testsuite/core testsuite/tmp/*
+	-rm -f testsuite/OPCPROF.* testsuite/opc.*
+	-rm -rf testsuite/binaries testsuite/single/swapfile.*
+	-rm -f testsuite/OBJ_DUMP* testsuite/test_file testsuite/testfile
+	-rm -f testsuite/tmp_eval_file.c testsuite/sf.o testsuite/ed_test
+	-rm -f testsuite/log/log testsuite/log/debug.log testsuite/log/compile
+	-find . -name "*~" -print | xargs rm
+	-find . -name "*.orig" -print | xargs rm
+	-find . -name "*.rej" -print | xargs rm
+	-rm -f *.ln tags TAGS
+	-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old addr_server portbind
+	-rm -f *.exe
+	-rm -f configure.h system_libs options_incl.h insttest configuration
+	-rm -f 1.out 2.out
+	-rm -f local_options
+	-rm -f trash_me.bat trash_me.err
+	-cp -f GNUmakefile.in GNUmakefile
+	-rm -f Dependencies tmpdepend
+	-rm -f semantic* packages/semantic*
 	-touch Dependencies
 
 include Dependencies

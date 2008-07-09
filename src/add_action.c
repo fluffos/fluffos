@@ -119,7 +119,7 @@ void remove_living_name (object_t * ob)
 	    break;
 	hl = &(*hl)->next_hashed_living;
     }
-    DEBUG_CHECK1(*hl == 0, 
+    DEBUG_CHECK1(*hl == 0,
 		 "remove_living_name: Object named %s no in hash list.\n",
 		 ob->living_name);
     *hl = ob->next_hashed_living;
@@ -160,7 +160,7 @@ void setup_new_commands (object_t * dest, object_t * item)
      * Setup the new commands. The order is very important, as commands in
      * the room should override commands defined by the room. Beware that
      * init() in the room may have moved 'item' !
-     * 
+     *
      * The call of init() should really be done by the object itself (except in
      * the -o mode). It might be too slow, though :-(
      */
@@ -227,7 +227,7 @@ static void enable_commands (int num)
 	return;
 
     debug(d_flag, ("Enable commands /%s (ref %d)",
-		   current_object->name, current_object->ref));
+		   current_object->obname, current_object->ref));
 
     if (num) {
 	current_object->flags |= O_ENABLE_COMMANDS;
@@ -265,8 +265,8 @@ static int user_parser (char * buff)
     char *user_verb = 0;
     int where;
     int save_illegal_sentence_action;
-    
-    debug(d_flag, ("cmd [/%s]: %s\n", command_giver->name, buff));
+
+    debug(d_flag, ("cmd [/%s]: %s\n", command_giver->obname, buff));
 
     /* strip trailing spaces. */
     for (p = buff + strlen(buff) - 1; p >= buff; p--) {
@@ -309,7 +309,7 @@ static int user_parser (char * buff)
     for (s = command_giver->sent; s; s = s->next) {
 	svalue_t *ret;
 	object_t *command_object;
-	    
+
 	if (s->flags & (V_NOSPACE | V_SHORT)) {
 	    if (strncmp(buff, s->verb, strlen(s->verb)) != 0)
 		continue;
@@ -329,7 +329,7 @@ static int user_parser (char * buff)
 	if (s->flags & V_NOSPACE) {
 	    int l1 = strlen(s->verb);
 	    int l2 = strlen(verb_buff);
-	    
+
 	    if (l1 < l2)
 		last_verb = verb_buff + l1;
 	    else
@@ -346,7 +346,7 @@ static int user_parser (char * buff)
 	 * the origin is the driver and it will be allowed.
 	 */
 	where = (current_object ? ORIGIN_EFUN : ORIGIN_DRIVER);
-	
+
 	/*
 	 * Remember the object, to update moves.
 	 */
@@ -367,11 +367,11 @@ static int user_parser (char * buff)
 	    ret = apply(s->function.s, s->ob, 1, where);
 	}
 	/* s may be dangling at this point */
-	
+
 	restore_command_giver();
-	
+
 	last_verb = 0;
-	
+
 	/* was this the right verb? */
 	if (ret == 0) {
 	    /* is it still around?  Otherwise, ignore this ...
@@ -388,7 +388,7 @@ static int user_parser (char * buff)
 		}
 	    }
 	}
-	
+
 	if (ret && (ret->type != T_NUMBER || ret->u.number != 0)) {
 #ifdef PACKAGE_MUDLIB_STATS
 	    if (command_giver && command_giver->interactive
@@ -413,7 +413,7 @@ static int user_parser (char * buff)
     }
     notify_no_command();
     illegal_sentence_action = save_illegal_sentence_action;
-    
+
     return 0;
 }
 
@@ -520,7 +520,7 @@ static int remove_action (const char *act, const char *verb)
     if (ob) {
 	for (s = &ob->sent; *s; s = &((*s)->next)) {
 	    sentence_t *tmp;
-	    
+
 	    if (((*s)->ob == current_object) && (!((*s)->flags & V_FUNCTION))
 		&& !strcmp((*s)->function.s, act)
 		&& !strcmp((*s)->verb, verb)) {

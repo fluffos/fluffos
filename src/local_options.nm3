@@ -150,7 +150,7 @@
  *
  * Compat status: very archaic, but easy to support.
  */
-#undef HAS_STATUS_TYPE
+#define HAS_STATUS_TYPE
 
 /* explode():
  *
@@ -167,7 +167,7 @@
  * are ever stripped.  So the example above gives
  * ({ "", "", "x", "y", "", "z", "", "" }).
  */
-#define SANE_EXPLODE_STRING
+#undef SANE_EXPLODE_STRING
 #undef REVERSIBLE_EXPLODE_STRING
 
 /* CAST_CALL_OTHERS: define this if you want to require casting of call_other's;
@@ -252,14 +252,7 @@
  *
  * Compat status: Easily simulated.
  */
-#undef OLD_ED
-
-/* In ed auto-indent, 
- * 1) does the case line get indented after the switch() ?
- * 2) How far do we indent? (this can also be set in the mudlib)
- */
-#undef ED_INDENT_CASE
-#define ED_INDENT_SPACES 4
+#define OLD_ED
 
 /* SENSIBLE_MODIFIERS:
  * Turning this on changes a few things, which may break old code:
@@ -339,7 +332,7 @@
  *
  * The only down side is some people like their logs shorter
  */
-#undef ARGUMENTS_IN_TRACEBACK
+#define ARGUMENTS_IN_TRACEBACK
 
 /* LOCALS_IN_TRACEBACK: similar to ARGUMENTS_IN_TRACEBACK, but for local
  *   variables.  The output looks more or less like:
@@ -349,7 +342,7 @@
  * Same as above.  Tends to produce even longer logs, but very useful for
  * tracking errors.
  */
-#undef LOCALS_IN_TRACEBACK
+#define LOCALS_IN_TRACEBACK
 
 /* MUDLIB_ERROR_HANDLER: If you define this, the driver doesn't do any
  *   handling of runtime errors, other than to turn the heartbeats of
@@ -447,7 +440,7 @@
 /* OPCPROF: define this if you wish to enable OPC profiling. Allows a dump
  *   of the # of times each efun is invoked (via the opcprof() efun).
  */
-#define OPCPROF
+#undef OPCPROF
 
 /* OPCPROF_2D: define this if you wish to enable 2-D OPC profiling. Allows a 
  *   dump of the # of times each *pair* of eoperators is invoked.
@@ -497,17 +490,6 @@
  *   catch_tell(msg) method that calls receive(msg);
 */
 #define INTERACTIVE_CATCH_TELL
-
-/* RECEIVE_ED: define this if you want normal ed output to go to a 
-     receive_ed() apply in the player ob.  Some errors still go directly
-     to output.  Useful for post-processing (perhaps colorizing?) ed
-     output. Prototype:  mixed receive_ed(string txt, string fname);
-     If fname, return a string that ed will output, 0 to let ed handle 
-     the output in the default way, or 1 to handle the output yourself.
-     If fname == 0, output is help text and you may return any of the above
-     or an array of strings that will be more'ed.
-*/
-#undef RECEIVE_ED
 
 /* RESTRICTED_ED: define this if you want restricted ed mode enabled.
  */
@@ -572,7 +554,7 @@
  *
  * A side effect is that 'array' cannot be a variable or function name.
  */
-#define ARRAY_RESERVED_WORD
+#undef ARRAY_RESERVED_WORD
 
 /* REF_RESERVED_WORD: If this is defined then the word 'ref' can be
  *   used to pass arguments to functions by value.  Example:
@@ -590,7 +572,7 @@
  * through their arguments, and against forgetting to pass a reference 
  * to a function which wants one (or accidentally having a variable modified!)
  */
-#define REF_RESERVED_WORD
+#undef REF_RESERVED_WORD
 
 /****************************************************************************
  *                              PACKAGES                                    *
@@ -816,14 +798,12 @@
  */
 /* MAX_LOCAL: maximum number of local variables allowed per LPC function */
 #define CFG_MAX_LOCAL_VARIABLES         50
-/* Increasing max global vars beyond 256 is not recommended */
-#define CFG_MAX_GLOBAL_VARIABLES         256
 
 #define CFG_EVALUATOR_STACK_SIZE        3000
 #define CFG_COMPILER_STACK_SIZE         600000
 #define CFG_MAX_CALL_DEPTH              150
 /* This must be one of 4, 16, 64, 256, 1024, 4096 */
-#define CFG_LIVING_HASH_SIZE		256
+#define CFG_LIVING_HASH_SIZE            256
 
 /* NEXT_MALLOC_DEBUG: define this if using a NeXT and you want to enable
  *   the malloc_check() and/or malloc_debug() efuns.  Run the 'man malloc_debug'
@@ -894,10 +874,7 @@
 
 /* ALLOW_INHERIT_AFTER_FUNCTION: allow inheriting after functions have been defined (this includes prototypes). This caused crashes in v22.2a but it may have been fixed since */
 #define ALLOW_INHERIT_AFTER_FUNCTION
-#undef ALLOW_INHERIT_AFTER_GLOBAL_VARIABLES
-/*PACKAGE_ASYNC: adds some efuns for asyncronous IO */
-#undef PACKAGE_ASYNC
-
+#define ALLOW_INHERIT_AFTER_GLOBAL_VARIABLES
 #define PARSE_DEBUG
 #define FLUFFOS
 #endif

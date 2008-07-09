@@ -254,6 +254,13 @@
  */
 #define OLD_ED
 
+/* In ed auto-indent, 
+ * 1) does the case line get indented after the switch() ?
+ * 2) How far do we indent? (this can also be set in the mudlib)
+ */
+#undef ED_INDENT_CASE
+#define ED_INDENT_SPACES 3
+
 /* SENSIBLE_MODIFIERS:
  * Turning this on changes a few things, which may break old code:
  *
@@ -490,6 +497,17 @@
  *   catch_tell(msg) method that calls receive(msg);
 */
 #undef INTERACTIVE_CATCH_TELL
+
+/* RECEIVE_ED: define this if you want normal ed output to go to a 
+     receive_ed() apply in the player ob.  Some errors still go directly
+     to output.  Useful for post-processing (perhaps colorizing?) ed
+     output. Prototype:  mixed receive_ed(string txt, string fname);
+     If fname, return a string that ed will output, 0 to let ed handle 
+     the output in the default way, or 1 to handle the output yourself.
+     If fname == 0, output is help text and you may return any of the above
+     or an array of strings that will be more'ed.
+*/
+#undef RECEIVE_ED
 
 /* RESTRICTED_ED: define this if you want restricted ed mode enabled.
  */
@@ -802,6 +820,8 @@
  */
 /* MAX_LOCAL: maximum number of local variables allowed per LPC function */
 #define CFG_MAX_LOCAL_VARIABLES		50
+/* Increasing max global vars beyond 256 is not recommended */
+#define CFG_MAX_GLOBAL_VARIABLES         256
 
 #define CFG_EVALUATOR_STACK_SIZE 	3000000
 #define CFG_COMPILER_STACK_SIZE		600000
@@ -858,5 +878,6 @@
 #define USE_ICONV
 #define WOMBLES
 #undef ALLOW_INHERIT_AFTER_FUNCTION
-
+#define PACKAGE_ASYNC
+#define PROG_REF_TYPE short
 #endif

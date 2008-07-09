@@ -5,6 +5,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#define _GNU_SOURCE
+#include <sys/syscall.h> 
 #include "../config.h"
 #include "../interpret.h"
 #include "../file.h"
@@ -19,11 +21,9 @@ void add_req(struct request *req){
 #if defined PACKAGE_COMPRESS && defined linux
 #include <pthread.h>
 #include <zlib.h>
-struct stuff{
-	aiob *aio;
-};
+
 void *gzreadthread(void *data){
-        aiob *aio = (aiob *)data;
+    aiob *aio = (aiob *)data;
 	void *file = gzdopen(dup(aio->aio_fildes), "rb");
 	aio->__return_value = gzread(file, (void *)(aio->aio_buf), aio->aio_nbytes);
 	aio->__error_code = 0;
@@ -32,18 +32,54 @@ void *gzreadthread(void *data){
 }
 
 int aio_gzread(aiob *aio){
-        pthread_t *thread = (pthread_t *)MALLOC(sizeof(pthread_t));
+    pthread_t *thread = (pthread_t *)MALLOC(sizeof(pthread_t));
 	aio->__error_code = EINPROGRESS;
 	pthread_create(thread, NULL, gzreadthread, aio);
 	FREE(thread); //like WE care
 	return 0;
 }
+
+void *gzwritethread(void *data){
+    aiob *aio = (aiob *)data;
+	void *file = gzdopen(dup(aio->aio_fildes), "wb");
+	aio->__return_value = gzwrite(file, (void *)(aio->aio_buf), aio->aio_nbytes);
+	aio->__error_code = 0;
+	gzclose(file);
+	return NULL;
+}
+
+int aio_gzwrite(aiob *aio){
+    pthread_t *thread = (pthread_t *)MALLOC(sizeof(pthread_t));
+	aio->__error_code = EINPROGRESS;
+	pthread_create(thread, NULL, gzwritethread, aio);
+	FREE(thread); //like WE care
+	return 0;
+}
 #endif
+
+#ifdef F_ASYNC_GETDIR
+void *getdirthread(void *data){
+    aiob *aio = (aiob *)data;
+    aio->__return_value = syscall(SYS_getdents, aio->aio_fildes, aio->aio_buf, aio->aio_nbytes); 
+	aio->__error_code = 0;
+	return NULL;
+}
+
+int aio_getdir(aiob *aio){
+    pthread_t *thread = (pthread_t *)MALLOC(sizeof(pthread_t));
+	aio->__error_code = EINPROGRESS;
+	pthread_create(thread, NULL, getdirthread, aio);
+	FREE(thread); //like WE care
+	return 0;
+}
+
+#endif
+
 int add_read(const char *fname, function_to_call_t *fun) {
 	if (fname) {
 	        aiob *aio= (aiob *)MALLOC(sizeof(aiob));
 		memset(aio, 0, sizeof(aiob));
-		printf("fname: %s\n", fname);
+		//printf("fname: %s\n", fname);
 		int fd = open(fname, O_RDONLY);
 		aio->aio_fildes = fd;
 		aio->aio_buf = (char *)MALLOC(READ_FILE_MAX_SIZE);
@@ -62,13 +98,34 @@ int add_read(const char *fname, function_to_call_t *fun) {
 	return 1;
 }
 
-int add_write(const char *fname, char *buf, int size, char append,
-		function_to_call_t *fun) {
+#ifdef F_ASYNC_GETDIR
+extern int max_array_size;
+int add_getdir(const char *fname, function_to_call_t *fun) {
 	if (fname) {
-	        aiob *aio = (aiob *)MALLOC(sizeof(aiob));
+	    aiob *aio= (aiob *)MALLOC(sizeof(aiob));
 		memset(aio, 0, sizeof(aiob));
-		int fd = open(fname, append ? O_CREAT|O_WRONLY|O_APPEND
-				: O_CREAT|O_WRONLY, S_IRWXU|S_IRWXG);
+		//printf("fname: %s\n", fname);
+		int fd = open(fname, O_RDONLY);
+		aio->aio_fildes = fd;
+		aio->aio_buf = (char *)MALLOC(sizeof(struct dirent) * max_array_size);
+		aio->aio_nbytes = sizeof(struct dirent) * max_array_size;
+		struct request *req = (struct request *)MALLOC(sizeof(struct request));
+		req->aio = aio;
+		req->fun = fun;
+		req->type = agetdir;
+		add_req(req);
+		return aio_getdir(aio);
+	}
+	return 1;
+}
+#endif
+
+int add_write(const char *fname, char *buf, int size, char flags, function_to_call_t *fun) {
+	if (fname) {
+	    aiob *aio = (aiob *)MALLOC(sizeof(aiob));
+		memset(aio, 0, sizeof(aiob));
+		int fd = open(fname, flags & 1 ? O_CREAT|O_WRONLY
+				: O_CREAT|O_WRONLY|O_APPEND, S_IRWXU|S_IRWXG);
 		aio->aio_fildes = fd;
 		aio->aio_buf = buf;
 		aio->aio_nbytes = size;
@@ -77,7 +134,12 @@ int add_write(const char *fname, char *buf, int size, char append,
 		req->fun = fun;
 		req->type = awrite;
 		add_req(req);
-		return aio_write(aio);
+#if defined PACKAGE_COMPRESS && defined linux
+		if(flags & 2)
+			return aio_gzwrite(aio);
+		else
+#endif
+			return aio_write(aio);
 	}
 	return 1;
 }
@@ -98,13 +160,42 @@ void handle_read(struct request *req, int val){
 		free_funp(req->fun->f.fp);
 		return;
 	}
-	char *file = (char *)MALLOC(val+1);
+	char *file = new_string(val, "read_file_async: str");
 	memcpy(file, (char *)(aio->aio_buf), val);
 	file[val]=0;
 	push_malloced_string(file);
 	call_efun_callback(req->fun, 1);
 	free_funp(req->fun->f.fp);
 }
+
+#ifdef F_ASYNC_GETDIR
+void handle_getdir(struct request *req, int val){
+	aiob *aio = req->aio;
+	close(aio->aio_fildes);
+	val = aio_return(aio);
+	array_t *ret = allocate_empty_array(val);
+	int i;
+	if(val > -1)
+	{
+		struct dirent *de = (struct dirent *)aio->aio_buf;
+		for(i=0; ((char *)de) - (char *)(aio->aio_buf) < val; i++)
+		{
+			svalue_t *vp = &(ret->item[i]);
+			vp->type = T_STRING;
+			vp->subtype = STRING_MALLOC;
+			//printf("%s ", de->d_name);
+			vp->u.string = string_copy((de->d_name - 1), "encode_stat"); //hmm, wrong struct??
+			de = (struct dirent *)(((char *)de) + de->d_reclen);
+		}
+	}
+    ret = RESIZE_ARRAY(ret, i);
+    ret->size = i;
+	push_refed_array(ret);
+	call_efun_callback(req->fun, 1);
+	free_funp(req->fun->f.fp);
+}
+#endif
+
 
 void handle_write(struct request *req, int val){
 	aiob *aio = req->aio;
@@ -142,6 +233,11 @@ void check_reqs() {
 			case awrite:
 				handle_write(here, val);
 				break;
+#ifdef F_ASYNC_GETDIR
+			case agetdir:
+				handle_getdir(here, val);
+				break;
+#endif
 			case done:
 				//must have had an error while handling it before.
 				break;
@@ -171,7 +267,7 @@ void check_reqs() {
 #ifdef F_ASYNC_READ
 
 void f_async_read(){
-  function_to_call_t *cb = (function_to_call_t *)MALLOC(sizeof(function_to_call_t));
+    function_to_call_t *cb = (function_to_call_t *)MALLOC(sizeof(function_to_call_t));
 	memset(cb, 0, sizeof(function_to_call_t));
 	process_efun_callback(1, cb, F_ASYNC_READ);
 	cb->f.fp->hdr.ref++;
@@ -182,14 +278,26 @@ void f_async_read(){
 
 #ifdef F_ASYNC_WRITE
 void f_async_write(){
-        char *buf = (char *)MALLOC(strlen((sp-1)->u.string));
-	strcpy(buf, (sp-1)->u.string);
+    char *buf = (char *)MALLOC(strlen((sp-2)->u.string));
+	strcpy(buf, (sp-2)->u.string);
 	function_to_call_t *cb = (function_to_call_t *)MALLOC(sizeof(function_to_call_t));
 	memset(cb, 0, sizeof(function_to_call_t));
-	process_efun_callback(2, cb, F_ASYNC_WRITE);
+	process_efun_callback(3, cb, F_ASYNC_WRITE);
 	cb->f.fp->hdr.ref++;
-	add_write(check_valid_path((sp-2)->u.string, current_object, "write_file", 1), buf, strlen(buf), 0, cb);
-	pop_3_elems();
+	add_write(check_valid_path((sp-3)->u.string, current_object, "write_file", 1), buf, strlen(buf), (sp-1)->u.number, cb);
+	pop_n_elems(4);
 }
 #endif
+
+#ifdef F_ASYNC_GETDIR
+void f_async_getdir(){
+    function_to_call_t *cb = (function_to_call_t *)MALLOC(sizeof(function_to_call_t));
+	memset(cb, 0, sizeof(function_to_call_t));
+	process_efun_callback(1, cb, F_ASYNC_READ);
+	cb->f.fp->hdr.ref++;
+	add_getdir(check_valid_path((sp-1)->u.string, current_object, "get_dir", 0), cb);
+	pop_2_elems();
+}
+#endif
+
 #endif

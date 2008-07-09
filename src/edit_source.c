@@ -1263,7 +1263,7 @@ static int check_library (char * lib) {
 
     printf("Checking for library %s ... ", lib);
     ct = fopen("comptest.c", "w");
-    fprintf(ct, "int main() { exit(0); }\n");
+    fprintf(ct, "int main() { return 0; }\n");
     fclose(ct);
 
     sprintf(buf, "%s %s comptest.c %s" TO_DEV_NULL, COMPILER, CFLAGS, lib);
@@ -1527,13 +1527,13 @@ static void handle_configure() {
         printf(" no\n");
     }
 
-    printf("Checking for inline ...");
-    if (!check_prog("INLINE inline", "inline void foo() { }", "foo();", 0)) {
-        printf(" __inline ...");
-        if (!check_prog("INLINE __inline", "__inline void foo() {}", "foo();", 0)) {
+    printf("Not Checking for inline ...(usage in driver code all broken anyway)");
+    //if (!check_prog("INLINE inline", "inline void foo() { }", "foo();", 0)) {
+        //printf(" __inline ...");
+        //if (!check_prog("INLINE __inline", "__inline void foo() {}", "foo();", 0)) {
             fprintf(yyout, "#define INLINE\n");
-        }
-    }
+        //}
+    //}
     printf(" const ...\n");
     if (!check_prog("CONST const", "int foo(const int *, const int *);", "", 0))
         fprintf(yyout, "#define CONST\n");
@@ -1605,6 +1605,11 @@ static void handle_configure() {
     close_output_file();
 
 #ifdef WIN32
+    system("echo Windows detected. Applying libs.");
+    if (lookup_define("HAVE_ZLIB")){
+        system("echo  -lwsock32 -lws2_32 -lz> system_libs");
+    }
+        else system("echo  -lwsock32 -lws2_32 > system_libs");
     system("copy windows\\configure.h tmp.config.h");
     system("type configure.h >> tmp.config.h");
     system("del configure.h");
@@ -1625,9 +1630,10 @@ static void handle_configure() {
     if (!check_prog(0, "", "char *x = malloc(100);", 0))
         check_library("-lmalloc");
 
+    /* we don't currently use it anywhere
     if (!check_prog(0, "", "void *x = dlopen(0, 0);", 0))
         check_library("-ldl");
-
+    */
     check_library("-lsocket");
     check_library("-linet");
     check_library("-lnsl");
@@ -1635,9 +1641,17 @@ static void handle_configure() {
     check_library("-lseq");
     check_library("-lm");
 
+    if (lookup_define("MINGW")){
+        check_library("-lwsock32");
+        check_library("-lws2_32");
+    }
+
     if (lookup_define("HAVE_ZLIB"))
         check_library("-lz");
 
+    if (lookup_define("PACKAGE_ASYNC"))
+        check_library("-lrt");
+    
     fprintf(stderr, "Checking for flaky Linux systems ...\n");
     check_linux_libc();
 
@@ -1655,7 +1669,9 @@ static void handle_configure() {
         if (!(check_library("-lmysqlclient") ||
               check_library("-L/usr/local/lib -lmysqlclient") ||
               check_library("-L/usr/local/lib/mysql -lmysqlclient") ||
-              check_library("-L/usr/local/mysql/lib -lmysqlclient"))) {
+              check_library("-L/usr/local/mysql/lib -lmysqlclient") ||
+              check_library("-L/usr/lib/mysql -lmysqlclient") ||
+              check_library("-L/usr/lib64/mysql -lmysqlclient"))) {
             fprintf(stderr, "Cannot find libmysqlclient.a, compilation is going to fail miserably\n");
         }
     }

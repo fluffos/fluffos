@@ -252,14 +252,7 @@
  *
  * Compat status: Easily simulated.
  */
-#undef OLD_ED
-
-/* In ed auto-indent, 
- * 1) does the case line get indented after the switch() ?
- * 2) How far do we indent? (this can also be set in the mudlib)
- */
-#undef ED_INDENT_CASE
-#define ED_INDENT_SPACES 4
+#define OLD_ED
 
 /* SENSIBLE_MODIFIERS:
  * Turning this on changes a few things, which may break old code:
@@ -339,7 +332,7 @@
  *
  * The only down side is some people like their logs shorter
  */
-#undef ARGUMENTS_IN_TRACEBACK
+#define ARGUMENTS_IN_TRACEBACK
 
 /* LOCALS_IN_TRACEBACK: similar to ARGUMENTS_IN_TRACEBACK, but for local
  *   variables.  The output looks more or less like:
@@ -349,7 +342,7 @@
  * Same as above.  Tends to produce even longer logs, but very useful for
  * tracking errors.
  */
-#undef LOCALS_IN_TRACEBACK
+#define LOCALS_IN_TRACEBACK
 
 /* MUDLIB_ERROR_HANDLER: If you define this, the driver doesn't do any
  *   handling of runtime errors, other than to turn the heartbeats of
@@ -367,7 +360,7 @@
  *   config files by default.  If you don't wish to use this define, you may
  *   always specify a full path to the config file when starting the driver.
  */
-#define CONFIG_FILE_DIR "./"
+#define CONFIG_FILE_DIR "/home/atuin/bin"
 
 /* DEFAULT_PRAGMAS:  This should be a sum of pragmas you want to always
  * be on, i.e.
@@ -397,7 +390,7 @@
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
  *                      compilation error occured.
  */
-#define DEFAULT_PRAGMAS 0
+#define DEFAULT_PRAGMAS PRAGMA_STRICT_TYPES + PRAGMA_ERROR_CONTEXT
 
 /* supress warnings about unused arguments; only warn about unused local
  * variables.  Makes older code (where argument names were required) compile
@@ -417,7 +410,7 @@
  *   once and never again (which can save memory since some objects won't get
  *   reloaded that otherwise would).
  */
-#undef LAZY_RESETS
+#define LAZY_RESETS
 
 /* SAVE_EXTENSION: defines the file extension used by save_object().
  *   and restore_object().  Some sysadmins run scripts that periodically
@@ -447,7 +440,7 @@
 /* OPCPROF: define this if you wish to enable OPC profiling. Allows a dump
  *   of the # of times each efun is invoked (via the opcprof() efun).
  */
-#define OPCPROF
+#undef OPCPROF
 
 /* OPCPROF_2D: define this if you wish to enable 2-D OPC profiling. Allows a 
  *   dump of the # of times each *pair* of eoperators is invoked.
@@ -490,24 +483,13 @@
  * [NOTE: for those who'd rather do such things at the mudlib level, look at
  *  the inherits() efun and the 'valid_object' apply to master.]
  */
-#define PRIVS
+#undef PRIVS
 
 /* INTERACTIVE_CATCH_TELL: define this if you want catch_tell called on
  *   interactives as well as NPCs.  If this is defined, user.c will need a
  *   catch_tell(msg) method that calls receive(msg);
 */
-#define INTERACTIVE_CATCH_TELL
-
-/* RECEIVE_ED: define this if you want normal ed output to go to a 
-     receive_ed() apply in the player ob.  Some errors still go directly
-     to output.  Useful for post-processing (perhaps colorizing?) ed
-     output. Prototype:  mixed receive_ed(string txt, string fname);
-     If fname, return a string that ed will output, 0 to let ed handle 
-     the output in the default way, or 1 to handle the output yourself.
-     If fname == 0, output is help text and you may return any of the above
-     or an array of strings that will be more'ed.
-*/
-#undef RECEIVE_ED
+#undef INTERACTIVE_CATCH_TELL
 
 /* RESTRICTED_ED: define this if you want restricted ed mode enabled.
  */
@@ -563,7 +545,7 @@
  *   saved.  Allowing any file by any wizard to be saved as a
  *   binary is convenient, but may take up a lot of disk space.
  */
-#undef BINARIES
+#define BINARIES
 
 /* ARRAY_RESERVED_WORD: If this is defined then the word 'array' can
  *   be used to define arrays, as in:
@@ -617,13 +599,13 @@
 /* PACKAGE_MATRIX: determines whether or not the 3d graphics efuns (for floats)
  *   are included - see packages/matrix.spec for a list.
  */
-#define PACKAGE_MATRIX
+#undef PACKAGE_MATRIX
 
 /* PACKAGE_MUDLIB_STATS: define this to enable domain and author stats
  *   maintenance by the driver.  These mudlib stats are more domain
  *   based than user based, and replaces the traditional wiz_list stats.
  */
-#define PACKAGE_MUDLIB_STATS
+#undef PACKAGE_MUDLIB_STATS
 
 /* PACKAGE_SOCKETS: define this to enable the socket efunctions.  This
  *   causes HAS_SOCKETS to be defined for all LPC objects.
@@ -633,7 +615,7 @@
 /* PACKAGE_PARSER: Natural language parsing efuns for interactive fiction
  *   type applications
  */
-#define PACKAGE_PARSER
+#undef PACKAGE_PARSER
 
 /* PACKAGE_EXTERNAL: Allows the driver to exec() commands specified in the
  * config file.
@@ -690,7 +672,7 @@
  *   uid to automatically be trusted and to have their euid set to the uid of
  *   the object that forced the object's creation.
  */
-#undef AUTO_TRUST_BACKBONE
+#define AUTO_TRUST_BACKBONE
 
 /*************************************************************************
  *                       FOR EXPERIENCED USERS                           *
@@ -730,7 +712,7 @@
  * prime to any common call_out lengths.  If all this is too confusing, 32
  * isn't a bad number :-)
  */
-#define CALLOUT_CYCLE_SIZE 32
+#define CALLOUT_CYCLE_SIZE 512
 
 /* LARGEST_PRINTABLE_STRING: defines the size of the vsprintf() buffer in
  *   comm.c's add_message(). Instead of blindly making this value larger,
@@ -757,7 +739,7 @@
  * 14      16384           256k
  * 16      65536             1M
  */
-#define APPLY_CACHE_BITS 11
+#define APPLY_CACHE_BITS 20
 
 /* CACHE_STATS: define this if you want call_other (apply_low) cache 
  * statistics.  Causes HAS_CACHE_STATS to be defined in all LPC objects.
@@ -767,7 +749,7 @@
 /* TRACE: define this to enable the trace() and traceprefix() efuns.
  *   (keeping this undefined will cause the driver to run faster).
  */
-#undef TRACE
+#define TRACE
 
 /* RUNTIME_LOADING: On systems which support it, it allows LPC->C compilation
  * 'on the fly' without having to recompile the driver.
@@ -816,14 +798,12 @@
  */
 /* MAX_LOCAL: maximum number of local variables allowed per LPC function */
 #define CFG_MAX_LOCAL_VARIABLES         50
-/* Increasing max global vars beyond 256 is not recommended */
-#define CFG_MAX_GLOBAL_VARIABLES         256
 
 #define CFG_EVALUATOR_STACK_SIZE        3000
-#define CFG_COMPILER_STACK_SIZE         600000
+#define CFG_COMPILER_STACK_SIZE         600
 #define CFG_MAX_CALL_DEPTH              150
 /* This must be one of 4, 16, 64, 256, 1024, 4096 */
-#define CFG_LIVING_HASH_SIZE		256
+#define CFG_LIVING_HASH_SIZE            256
 
 /* NEXT_MALLOC_DEBUG: define this if using a NeXT and you want to enable
  *   the malloc_check() and/or malloc_debug() efuns.  Run the 'man malloc_debug'
@@ -894,11 +874,5 @@
 
 /* ALLOW_INHERIT_AFTER_FUNCTION: allow inheriting after functions have been defined (this includes prototypes). This caused crashes in v22.2a but it may have been fixed since */
 #define ALLOW_INHERIT_AFTER_FUNCTION
-#undef ALLOW_INHERIT_AFTER_GLOBAL_VARIABLES
-/*PACKAGE_ASYNC: adds some efuns for asyncronous IO */
-#undef PACKAGE_ASYNC
-
-#define PARSE_DEBUG
-#define FLUFFOS
 #endif
 

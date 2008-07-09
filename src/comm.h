@@ -13,9 +13,7 @@
 #include "lpc_incl.h"
 #include "network_incl.h"
 
-#ifdef USE_ICONV
 #include "fliconv.h"
-#endif
 
 #define MAX_TEXT                   2048
 #define MAX_SOCKET_PACKET_SIZE     1024

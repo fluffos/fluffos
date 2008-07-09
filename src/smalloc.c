@@ -169,7 +169,7 @@ POINTER CDECL smalloc_malloc (size_t size)
 	next_unused = (u *) large_malloc(SMALL_CHUNK_SIZE + SIZEOF_PTR, 1);
 	if (next_unused == 0)
 	    return 0;
-	
+
 	*next_unused = (u) last_small_chunk;
 	last_small_chunk = next_unused++;
 	count_up(small_chunk_stat, SMALL_CHUNK_SIZE +  SIZEOF_PTR);
@@ -298,8 +298,8 @@ typedef struct free_block_s {
 /* some compilers don't understand forward declarations of static vars. */
 extern free_block_t dummy2;
 
-static free_block_t dummy = { 
-    /* size */ 0, 
+static free_block_t dummy = {
+    /* size */ 0,
     /* parent */ &dummy2,
     /* left */ 0,
     /* right */ 0,
@@ -309,8 +309,8 @@ static free_block_t dummy = {
 free_block_t dummy2 =
 {
     /* size */ 0,
-    /* parent */ 0, 
-    /* left */ &dummy, 
+    /* parent */ 0,
+    /* left */ &dummy,
     /* right */ 0,
     /* balance */ -1
 };
@@ -1415,8 +1415,7 @@ POINTER CDECL smalloc_calloc (size_t nelem, size_t sizel)
  * Functions below can be used to debug malloc.
  */
 
-static void walk_new_small_malloced(func)
-    void (*func) (POINTER, int);
+static void walk_new_small_malloced(void (*func) (POINTER, int))
 {
     int i;
     u *p, *q;
@@ -1452,88 +1451,4 @@ static void walk_new_small_malloced(func)
 }
 #endif
 
-#if 0
 
-int debug_smalloc = 0;
-
-/*
- * Verify that the free list is correct. The upper limit compared to
- * is very machine dependant.
- */
-verify_sfltable()
-{
-    u *p;
-    int i, j;
-    extern int end;
-
-    if (!debug_smalloc)
-	return;
-    if (unused_size > SMALL_CHUNK_SIZE)
-	apa();
-    for (i = 0; i < SMALL_BLOCK_MAX; i++) {
-	for (j = 0, p = sfltable[i]; p; p = *(u **) (p + 1), j++) {
-	    if (p < (u *) & end || p > (u *) 0xfffff)
-		apa();
-	    if (*p - 2 != i)
-		apa();
-	}
-	if (p >= next_unused && p < next_unused + (unused_size >> 2))
-	    apa();
-    }
-    p = free_list;
-    while (p) {
-	if (p >= next_unused && p < next_unused + (unused_size >> 2))
-	    apa();
-	p = l_next_ptr(p);
-    }
-}
-
-verify_free (u * ptr)
-{
-    u *p;
-    int i, j;
-
-    if (!debug_smalloc)
-	return;
-    for (i = 0; i < SMALL_BLOCK_MAX; i++) {
-	for (j = 0, p = sfltable[i]; p; p = *(u **) (p + 1), j++) {
-	    if (*p - 2 != i)
-		apa();
-	    if (ptr >= p && ptr < p + *p)
-		apa();
-	    if (p >= ptr && p < ptr + *ptr)
-		apa();
-	    if (p >= next_unused && p < next_unused + (unused_size >> 2))
-		apa();
-	}
-    }
-
-    p = free_list;
-    while (p) {
-	if (ptr >= p && ptr < p + (*p & MASK))
-	    apa();
-	if (p >= ptr && p < ptr + (*ptr & MASK))
-	    apa();
-	if (p >= next_unused && p < next_unused + (unused_size >> 2))
-	    apa();
-	p = l_next_ptr(p);
-    }
-    if (ptr >= next_unused && ptr < next_unused + (unused_size >> 2))
-	apa();
-}
-
-apa()
-{
-    int i;
-
-    i / 0;
-}
-
-static char *ref;
-test_malloc (char * p)
-{
-    if (p == ref)
-	printf("Found 0x%x\n", p);
-}
-
-#endif				/* 0 (never) */

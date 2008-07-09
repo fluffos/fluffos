@@ -525,10 +525,10 @@ object_t *int_load_object (const char * lname)
 
 static char *make_new_name (const char * str)
 {
-    static unsigned int i;
-    char *p = (char *)DXALLOC(strlen(str) + 12, TAG_OBJ_NAME, "make_new_name");
+    static int i;
+    char *p = (char *)DXALLOC(strlen(str) + 10, TAG_OBJ_NAME, "make_new_name");
 
-    (void) sprintf(p, "%s#%u", str, i);
+    (void) sprintf(p, "%s#%d", str, i);
     i++;
     return p;
 }
@@ -1012,7 +1012,6 @@ void destruct2 (object_t * ob)
     if(obj_list_dangling)
        obj_list_dangling->prev_all = ob;
     obj_list_dangling = ob;
-    ob->prev_all = 0;
 #endif
 
     free_object(&ob, "destruct_object");
@@ -1483,8 +1482,6 @@ sentence_t *alloc_sentence()
 #endif
     p->function.s = 0;
     p->next = 0;
-    p->ob = 0;
-    p->flags = 0;
     return p;
 }
 
@@ -1539,7 +1536,7 @@ void fatal (const char *fmt, ...)
     in_fatal = 1;
     V_START(args, fmt);
     V_VAR(char *, fmt, args);
-    vsnprintf(msg_buf, 2048, fmt, args);
+    vsprintf(msg_buf, fmt, args);
     va_end(args);
     debug_message("******** FATAL ERROR: %s\nFluffOS driver attempting to exit gracefully.\n", msg_buf);
     if (current_file)
@@ -1654,12 +1651,9 @@ static void mudlib_error_handler (char * err, int katch) {
     if (current_object)
         add_mapping_object(m, "object", current_object);
     add_mapping_array(m, "trace", get_svalue_trace());
-    if (current_prog)
-        get_line_number_info(&file, &line);
-    if(file)
-        add_mapping_malloced_string(m, "file", add_slash(file));
-    if(line)
-        add_mapping_pair(m, "line", line);
+    get_line_number_info(&file, &line);
+    add_mapping_malloced_string(m, "file", add_slash(file));
+    add_mapping_pair(m, "line", line);
 
     push_refed_mapping(m);
     if (katch) {
@@ -1825,7 +1819,7 @@ void error (const char * const fmt, ...)
 
     V_START(args, fmt);
     V_VAR(char *, fmt, args);
-    vsnprintf(err_buf + 1, 2046, fmt, args);
+    vsprintf(err_buf + 1, fmt, args);
     va_end(args);
     err_buf[0] = '*';           /* all system errors get a * at the start */
 

@@ -131,7 +131,7 @@
  * The MudOS driver has evolved quite a bit over the years.  These defines  *
  * are mainly to preserve old behavior in case people didn't want to        *
  * rewrite the relevant portions of their code.                             *
- *                                                                          *
+ *									    *
  * In most cases, code which needs these defines should be rewritten when   *
  * possible.  The 'Compat status' field is designed to give an idea how     *
  * likely it is that support for that option will be removed in the near    *
@@ -185,7 +185,7 @@
  * Compat status: Easy to support, and also on the "It's a bug!  No, it's
  * a feature!" religious war list.
  */
-#define NONINTERACTIVE_STDERR_WRITE
+#undef NONINTERACTIVE_STDERR_WRITE
 
 /* NO_LIGHT: define this to disable the set_light() and driver maintenance
  *   of light levels in objects.  You can simulate it via LPC if you want...
@@ -252,14 +252,7 @@
  *
  * Compat status: Easily simulated.
  */
-#undef OLD_ED
-
-/* In ed auto-indent, 
- * 1) does the case line get indented after the switch() ?
- * 2) How far do we indent? (this can also be set in the mudlib)
- */
-#undef ED_INDENT_CASE
-#define ED_INDENT_SPACES 4
+#define OLD_ED
 
 /* SENSIBLE_MODIFIERS:
  * Turning this on changes a few things, which may break old code:
@@ -339,7 +332,7 @@
  *
  * The only down side is some people like their logs shorter
  */
-#undef ARGUMENTS_IN_TRACEBACK
+#define ARGUMENTS_IN_TRACEBACK
 
 /* LOCALS_IN_TRACEBACK: similar to ARGUMENTS_IN_TRACEBACK, but for local
  *   variables.  The output looks more or less like:
@@ -349,7 +342,7 @@
  * Same as above.  Tends to produce even longer logs, but very useful for
  * tracking errors.
  */
-#undef LOCALS_IN_TRACEBACK
+#define LOCALS_IN_TRACEBACK
 
 /* MUDLIB_ERROR_HANDLER: If you define this, the driver doesn't do any
  *   handling of runtime errors, other than to turn the heartbeats of
@@ -367,7 +360,11 @@
  *   config files by default.  If you don't wish to use this define, you may
  *   always specify a full path to the config file when starting the driver.
  */
-#define CONFIG_FILE_DIR "./"
+#ifndef LATTICE
+#define CONFIG_FILE_DIR "../etc"
+#else
+#define CONFIG_FILE_DIR "etc:"
+#endif
 
 /* DEFAULT_PRAGMAS:  This should be a sum of pragmas you want to always
  * be on, i.e.
@@ -397,7 +394,7 @@
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
  *                      compilation error occured.
  */
-#define DEFAULT_PRAGMAS 0
+#define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_STRICT_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_SAVE_TYPES
 
 /* supress warnings about unused arguments; only warn about unused local
  * variables.  Makes older code (where argument names were required) compile
@@ -441,13 +438,13 @@
  * If you anticipate problems with users intentionally typing in ANSI codes
  * to make your terminal flash, etc define this.
  */
-#define NO_ANSI
-#define STRIP_BEFORE_PROCESS_INPUT
+#undef NO_ANSI
+#undef STRIP_BEFORE_PROCESS_INPUT
 
 /* OPCPROF: define this if you wish to enable OPC profiling. Allows a dump
  *   of the # of times each efun is invoked (via the opcprof() efun).
  */
-#define OPCPROF
+#undef OPCPROF
 
 /* OPCPROF_2D: define this if you wish to enable 2-D OPC profiling. Allows a 
  *   dump of the # of times each *pair* of eoperators is invoked.
@@ -498,17 +495,6 @@
 */
 #define INTERACTIVE_CATCH_TELL
 
-/* RECEIVE_ED: define this if you want normal ed output to go to a 
-     receive_ed() apply in the player ob.  Some errors still go directly
-     to output.  Useful for post-processing (perhaps colorizing?) ed
-     output. Prototype:  mixed receive_ed(string txt, string fname);
-     If fname, return a string that ed will output, 0 to let ed handle 
-     the output in the default way, or 1 to handle the output yourself.
-     If fname == 0, output is help text and you may return any of the above
-     or an array of strings that will be more'ed.
-*/
-#undef RECEIVE_ED
-
 /* RESTRICTED_ED: define this if you want restricted ed mode enabled.
  */
 #define RESTRICTED_ED
@@ -529,7 +515,7 @@
  *   sent directly via add_message()).  This is useful if you want to
  *   build a smart client that does something different with snoop messages.
  */
-#define RECEIVE_SNOOP
+#undef RECEIVE_SNOOP
 
 /* PROFILE_FUNCTIONS: define this to be able to measure the CPU time used by
  *   all of the user-defined functions in each LPC object.  Note: defining
@@ -540,7 +526,7 @@
  *   resolution is 1/60 of a second, then any time less than approxmately 15k
  *   microseconds will resolve to zero (0).
  */
-#undef PROFILE_FUNCTIONS
+#define PROFILE_FUNCTIONS
 
 /* NO_BUFFER_TYPE: if this is #define'd then LPC code using the 'buffer'
  *   type won't be allowed to compile (since the 'buffer' type won't be
@@ -563,7 +549,7 @@
  *   saved.  Allowing any file by any wizard to be saved as a
  *   binary is convenient, but may take up a lot of disk space.
  */
-#undef BINARIES
+#define BINARIES
 
 /* ARRAY_RESERVED_WORD: If this is defined then the word 'array' can
  *   be used to define arrays, as in:
@@ -617,13 +603,13 @@
 /* PACKAGE_MATRIX: determines whether or not the 3d graphics efuns (for floats)
  *   are included - see packages/matrix.spec for a list.
  */
-#define PACKAGE_MATRIX
+#undef PACKAGE_MATRIX
 
 /* PACKAGE_MUDLIB_STATS: define this to enable domain and author stats
  *   maintenance by the driver.  These mudlib stats are more domain
  *   based than user based, and replaces the traditional wiz_list stats.
  */
-#define PACKAGE_MUDLIB_STATS
+#undef PACKAGE_MUDLIB_STATS
 
 /* PACKAGE_SOCKETS: define this to enable the socket efunctions.  This
  *   causes HAS_SOCKETS to be defined for all LPC objects.
@@ -641,7 +627,11 @@
 #undef PACKAGE_EXTERNAL
 
 /* NUM_EXTERNAL_CMDS: the number of external commands supported */
+#ifdef PACKAGE_EXTERNAL
 #define NUM_EXTERNAL_CMDS 100
+#else
+#define NUM_EXTERNAL_CMDS 0
+#endif
 
 /* PACKAGE_DB: efuns for external database access using msql */
 #undef PACKAGE_DB
@@ -655,6 +645,11 @@
 #define USE_MYSQL 2
 #define MY_SQL
 #endif
+
+/*PACKAGE DWLIB: some discworld mudlib simuls coded in C (well just one right
+  now) */
+
+#undef PACKAGE_DWLIB
 
 /****************************************************************************
  *                            UID PACKAGE                                   *
@@ -674,11 +669,6 @@
  *
  */
 #undef PACKAGE_UIDS
-
-/*PACKAGE DWLIB: some discworld mudlib simuls coded in C (well just one right
-  now) */
-
-#undef PACKAGE_DWLIB
 
 /* AUTO_SETEUID: when an object is created it's euid is automatically set to
  *   the equivalent of seteuid(getuid(this_object())).  undef AUTO_SETEUID
@@ -709,7 +699,7 @@
  * this option, since it needs 4 bytes to store the function pointers
  * anyway, and this setting is ignored.
  */
-#undef USE_32BIT_ADDRESSES
+#define USE_32BIT_ADDRESSES
 
 /* HEARTBEAT_INTERVAL: define heartbeat interval in microseconds (us).
  *   1,000,000 us = 1 second.  The value of this macro specifies
@@ -721,7 +711,7 @@
  *  to an actual interval of one (1) second and 1,000,001 - 2,000,000 maps to
  *  an actual interval of two (2) seconds, etc.]
  */
-#define HEARTBEAT_INTERVAL 1
+#define HEARTBEAT_INTERVAL 2
 
 /* 
  * CALLOUT_CYCLE_SIZE: This is the number of slots in the call_out list.
@@ -730,7 +720,7 @@
  * prime to any common call_out lengths.  If all this is too confusing, 32
  * isn't a bad number :-)
  */
-#define CALLOUT_CYCLE_SIZE 32
+#define CALLOUT_CYCLE_SIZE 64
 
 /* LARGEST_PRINTABLE_STRING: defines the size of the vsprintf() buffer in
  *   comm.c's add_message(). Instead of blindly making this value larger,
@@ -757,7 +747,7 @@
  * 14      16384           256k
  * 16      65536             1M
  */
-#define APPLY_CACHE_BITS 11
+#define APPLY_CACHE_BITS 14
 
 /* CACHE_STATS: define this if you want call_other (apply_low) cache 
  * statistics.  Causes HAS_CACHE_STATS to be defined in all LPC objects.
@@ -768,6 +758,13 @@
  *   (keeping this undefined will cause the driver to run faster).
  */
 #undef TRACE
+
+/* LPC_TO_C: define this to enable LPC->C compilation.
+ *
+ * [NOTE: BINARIES must also be defined for LPC->C to work.  Actually
+ *  using binaries is not required, though.]
+ */
+#undef LPC_TO_C
 
 /* RUNTIME_LOADING: On systems which support it, it allows LPC->C compilation
  * 'on the fly' without having to recompile the driver.
@@ -782,14 +779,14 @@
  *   out the previous lines of code to an error) eval_instruction() runs about
  *   twice as fast when this is not defined (for the most common eoperators).
  */
-#undef TRACE_CODE
+#define TRACE_CODE
 
 /* HEART_BEAT_CHUNK: The number of heart_beat chunks allocated at a time.
  * A large number wastes memory as some will be sitting around unused, while
  * a small one wastes more CPU reallocating when it needs to grow.  Default
  * to a medium value.
  */
-#define HEART_BEAT_CHUNK      32
+#define HEART_BEAT_CHUNK      64
 
 /* SERVER_IP: For machines with multiple IP addresses, this specifies which
  * one to use.  This is useful for IP accounting and is necessary to be
@@ -797,7 +794,7 @@
  *
  * example: #define SERVER_IP "194.229.18.27"
  */
-#undef SERVER_IP
+#define SERVER_IP "192.168.2.2"
 
 /* Some maximum string sizes
  */
@@ -817,13 +814,13 @@
 /* MAX_LOCAL: maximum number of local variables allowed per LPC function */
 #define CFG_MAX_LOCAL_VARIABLES         50
 /* Increasing max global vars beyond 256 is not recommended */
-#define CFG_MAX_GLOBAL_VARIABLES         256
+#define CFG_MAX_GLOBAL_VARIABLES        256
 
-#define CFG_EVALUATOR_STACK_SIZE        3000
+#define CFG_EVALUATOR_STACK_SIZE        3000000
 #define CFG_COMPILER_STACK_SIZE         600000
 #define CFG_MAX_CALL_DEPTH              150
 /* This must be one of 4, 16, 64, 256, 1024, 4096 */
-#define CFG_LIVING_HASH_SIZE		256
+#define CFG_LIVING_HASH_SIZE            256
 
 /* NEXT_MALLOC_DEBUG: define this if using a NeXT and you want to enable
  *   the malloc_check() and/or malloc_debug() efuns.  Run the 'man malloc_debug'
@@ -850,7 +847,7 @@
  * [NOTE: malloc_debug(6) is a good compromise between efficiency and
  *  completeness of malloc debugging (malloc/free will be about half as fast).]
  */
-#define NEXT_MALLOC_DEBUG
+#undef NEXT_MALLOC_DEBUG
 
 
 /* GET_CHAR_IS_BUFFERED: Normally get_char() is unbuffered.  That is, once
@@ -866,39 +863,41 @@
 /* PACKAGE_COMPRESS: Enable MCCP support and compressed save files
    SAVE_GZ_EXTENSION: save extension for compressed files
  */
-#undef HAVE_ZLIB
-#undef PACKAGE_COMPRESS
+#define HAVE_ZLIB
+#define PACKAGE_COMPRESS
 #define SAVE_GZ_EXTENSION ".o.gz"
 
 /* CALL_OTHER_TYPE_CHECK: enable type checking for call_other()
  * (-> operator on objects)
  */
-#undef CALL_OTHER_TYPE_CHECK
+#undef CALL_OTHER_TYPE_CHECK 
 
 /* CALL_OTHER_WARN, make it warning instead of errors */
-#undef CALL_OTHER_WARN
+#define CALL_OTHER_WARN
 
 /* WARN_TAB: Some versions of the editor built in indent function use
  *   tabs for indenting. This options turns on a warning message for
  *   files indented with tabs instead of spaces.
  */
-#define WARN_TAB
+#undef WARN_TAB
 
-/* USE_ICONV: Use iconv to translate input and output from/to the users char 
+/* USE_ICONV: Use iconv to translate input and output from/to the users char
  * encoding
  */
 #undef USE_ICONV
 
-/* WOMBLES: don't allow spaces between start/end of array/mapping/functional token chars so ({1,2,3}) still works, but ( { 1 , 2 , 3 } ) doesn't and ({ 1 , 2 , 3 }) does.*/
+/* WOMBLES: don't allow spaces between start/end of array/mapping/functional token chars so ({1,2,3}) still works,
+   but ( { 1 , 2 , 3 } ) doesn't and ({ 1 , 2 , 3 }) does.
+ */
 #undef WOMBLES
 
-/* ALLOW_INHERIT_AFTER_FUNCTION: allow inheriting after functions have been defined (this includes prototypes). This caused crashes in v22.2a but it may have been fixed since */
-#define ALLOW_INHERIT_AFTER_FUNCTION
+/* ALLOW_INHERIT_AFTER_FUNCTION: allow inheriting after functions have been defined (this includes prototypes). This caused 
+crashes
+in v22.2a but it may have been fixed since */
+#undef ALLOW_INHERIT_AFTER_FUNCTION
 #undef ALLOW_INHERIT_AFTER_GLOBAL_VARIABLES
-/*PACKAGE_ASYNC: adds some efuns for asyncronous IO */
-#undef PACKAGE_ASYNC
 
-#define PARSE_DEBUG
+#undef PARSE_DEBUG
 #define FLUFFOS
-#endif
 
+#endif

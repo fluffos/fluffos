@@ -441,6 +441,7 @@ void implode_array (funptr_t * fptr, array_t * arr,
             return;
         } else if (n == 1) {
             assign_svalue_no_free(dest, &arr->item[0]);
+            free_array(arr);
             return;
         }
     }
@@ -461,6 +462,7 @@ void implode_array (funptr_t * fptr, array_t * arr,
             break;
     }
     assign_svalue_no_free(dest, v);
+    free_array(arr);
 }
 
 array_t *users()

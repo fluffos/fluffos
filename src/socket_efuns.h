@@ -10,6 +10,10 @@
 #include "lpc_incl.h"
 #include "network_incl.h"
 
+#ifdef MINGW
+#include <ws2tcpip.h>
+#endif
+
 enum socket_mode {
     MUD, STREAM, DATAGRAM, STREAM_BINARY, DATAGRAM_BINARY
 };

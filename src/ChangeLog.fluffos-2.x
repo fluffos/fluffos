@@ -1,16 +1,82 @@
 As MudOS is moving too slow to keep our driver hacks apart, we now call our own
-FluffOS :)
+FluffOS :), note: where it says Cratylus, I got it from his version, usually
+someone else did the work, but I don't know how to find who did what there.
+FluffOS 2.12:
+Crasher fixes in using a mudlib error handler (Cratylus@Dead souls)
+some mingw fixes (Cratylus@Dead souls)
+new localoptions.ds (Cratylus@Dead souls)
+rework of ed to do larger output chunks, more configurability, and bugfixes:
+	mixed receive_ed(string msg, string fname) apply in playerob to 
+	doctor the text (return 0 to have ed output to screen, 1 to have ed
+	output nothing, or return a new string for ed to output).  Need to
+        define RECEIVE_ED in options.h.  ed_start() and ed() take optional 
+        final arg specifying lines on user's screen.  Indentant fixed for 
+        'foreach' and lines with only '//'.  z++ and z-- now work.  Optional 
+        new compile-time defines: ED_INDENT_CASE (should we indent 'case' 
+        after 'switch'?) and ED_INDENT_SPACES <num> for how far autoindent 
+        will indent each level. (hamlet)
+fixed several crashers (comm.c and simulate.c) related to using vsprintf
+	instead of vsnprintf. (hamlet)
+time() now takes an optional arg of 1.  time() remains the same: "when did 
+	this execution begin"  time(1) return real current time (via possibly
+	costly system call). (hamlet)
+added CFG_MAX_GLOBAL_VARIABLES to options.h.  Old setting was an arbitrary 256.
+        (hamlet)
+async writes with compression 
+fixed some memory leaks
+stuff I forgot, it's been too long!
+slightly usuful sfuns if you use async:
+
+void decode(object ob, int flag, function cb, string saved){
+  string *lines = explode(saved, "\n");
+  mixed vars = filter(variables(ob,1), (:strsrch($1[1], "nosave") == -1:));
+  vars = map(vars, (:$1[0]:));
+  if(!flag)
+    map(vars, bind((:store_variable($1, 0):), ob));
+  vars = allocate_mapping(vars, 1);
+
+  foreach(string line in lines){
+    if(line[0] == '#')
+      continue;
+    else {
+      int i = strsrch(line, ' ');
+      if(vars[line[0..i-1]])
+        evaluate(bind((:store_variable, line[0..i-1], restore_variable(line[i+1\..]):), ob));
+    }
+  }
+  evaluate(cb);
+}
+
+void restore_object_async(string name, int flag, function cb){
+  async_read(name, (: decode, previous_object(), flag, cb :));
+}
+
+void save_object_async(string name, int flag, function cb){
+  mixed vars = filter(variables(previous_object(),1), (:strsrch($1[1], "nosave"\) == -1:));
+  string *lines = allocate(sizeof(vars)+1);
+  vars = map(vars, (:$1[0]:));
+  lines[0] = "#"+base_name(previous_object())+".c";
+  for(int i = 0; i < sizeof(vars); i++){
+    string val = save_variable(evaluate(bind((:fetch_variable, vars[i]:), previ\ous_object())));
+    if(flag & 1 || val)
+      lines[i+1] = vars[i] + " " + val;
+  }
+  async_write(name, implode(lines, "\n"), flag | 1, cb);
+}
+
 FluffOS 2.11:
 stop eval_cost() adding to the time you're allowed to run. (libc return a time
      longer than the set time if you query the remaining time right after 
      restarting the timer!
 reset_eval_cost() now stops working after 100*max eval cost.
 hopefully fixed readfile with lines beyond max readsize.
+
 FluffOS 2.10:
 can be compiled with g++
 fix bugs in using arrays as sets 
     int *a=({1<<31,0}); return a-a
 fixed crash in the children efun (hamlet)
+
 FluffOS 2.9:
 removed amiga support.
 included most DS changes, should work on windows now (except for over

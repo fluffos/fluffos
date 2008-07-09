@@ -320,9 +320,9 @@ void f_functions (void) {
     char *end = EndOf(buf);
     program_t *progp = sp->u.ob->prog;
     int offset = (flag&2)?progp->last_inherited:0;
-  
+
     num = (flag&2)?progp->num_functions_defined:progp->num_functions_defined + progp->last_inherited;
-  
+
     if (progp->num_functions_defined &&
         progp->function_table[progp->num_functions_defined-1].funcname[0]
         == APPLY___INIT_SPECIAL_CHAR)
@@ -1105,7 +1105,11 @@ static char *pluralize (const char * str) {
         break;
     case 'G':
     case 'g':
-        if (!strcasecmp(rel + 1, "oose")) {
+    	if (!strcasecmp(rel + 1, "lasses")) {
+    	    found = PLURAL_SAME;
+    	    break;
+    	}
+    	if (!strcasecmp(rel + 1, "oose")) {
             found = PLURAL_CHOP + 4;
             suffix = "eese";
 	    break;
@@ -1194,9 +1198,13 @@ static char *pluralize (const char * str) {
       break;
     case 'R':
     case 'r':
-      if (!strcasecmp(rel + 1, "oof"))
-	found = PLURAL_SUFFIX;
-      break;
+    	if (!strcasecmp(rel + 1, "emains")) {
+    	    found = PLURAL_SAME;
+    	    break;
+    	}
+        if (!strcasecmp(rel + 1, "oof"))
+        	found = PLURAL_SUFFIX;
+        break;
     case 'S':
     case 's':
         if (!strcasecmp(rel + 1, "niff")) {
@@ -2280,9 +2288,10 @@ void f_base_name (void) {
     char *ret;
     i = tmp - name;
     ret = new_string( i, "f_base_name: ret");
-    ret[i] = 0;
     strncpy( ret, name, i );
+    ret[i] = 0;
     FREE_MSTR(name);
+
     push_malloced_string(ret);
   } else {
     push_malloced_string(name);
@@ -2418,8 +2427,8 @@ void shuffle(array_t * args) {
 	int i, j;
 	svalue_t temp;
 
-	/* Hrm, if we have less than two elements, then the order isn't 
-	 * going to change! Let's just leave the old array on the stack. 
+	/* Hrm, if we have less than two elements, then the order isn't
+	 * going to change! Let's just leave the old array on the stack.
 	 */
 	if ( args->size < 2 ) {
 		return;

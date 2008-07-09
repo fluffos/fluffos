@@ -5,26 +5,6 @@
 
 #include "std.h"
 
-strcspn (register char * s, char * set)
-{
-    register char *t;
-    register int count = 0;
-
-    while (*s) {
-	t = set;
-	while (*t && (*s != *t))
-	    t++;
-	if (!*t) {
-	    s++;
-	    count++;
-	} else
-	    break;
-    }
-
-    return (count);
-}
-
-
 INLINE char *memset (char * s, int c, int n)
 {
     if (c == 0)

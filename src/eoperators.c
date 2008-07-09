@@ -1251,8 +1251,7 @@ f__evaluate (void)
         return;
     }
     v = call_function_pointer(arg->u.fp, st_num_arg - 1);
-    free_funp(arg->u.fp);
-    assign_svalue_no_free(sp, v);
+    assign_svalue(sp, v);
 }
 
 INLINE void

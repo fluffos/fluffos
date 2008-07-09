@@ -46,9 +46,9 @@
        function
 
    (2) A definition is an address that executes code when
-       it is jumped to and finishes with a return.  
+       it is jumped to and finishes with a return.
        The address is labeled by the following info:
-       function name, type, flags,number of arguments, number of locals, 
+       function name, type, flags,number of arguments, number of locals,
        argument types.
 
    (3) A prototype does not execute code, and is basically a label with
@@ -70,7 +70,7 @@
    FUNC_PROTOTYPE - see (3)
    FUNC_ALIAS     - This entry refers us to another entry, usually because
                     this function was overloaded by that function
-                    
+
    Sym
  */
 #define FUNC_INHERITED          0x0001
@@ -84,7 +84,7 @@
 #define DECL_HIDDEN             0x0100        /* used by private vars */
 #define DECL_PRIVATE            0x0200        /* Can't be inherited */
 #define DECL_PROTECTED          0x0400       /* Static function or variable */
-#define DECL_PUBLIC             0x0800  
+#define DECL_PUBLIC             0x0800
 #define DECL_NOMASK             0x1000    /* The nomask => not redefineable */
 #define DECL_NOSAVE             0x2000
 #ifndef SENSIBLE_MODIFIERS
@@ -117,17 +117,17 @@
 /* The reason for this is that vars still have a ushort type */
 /* This restriction is not unreasonable, since LPC is still  */
 /* catered for mini-applications (compared to say, C++ or    */
-/* java)..for now - Sym                                      */ 
-  
+/* java)..for now - Sym                                      */
+
 #define TYPE_MOD_ARRAY          0x0040        /* Pointer to a basic type */
 #define TYPE_MOD_CLASS          0x0080        /* a class */
 #define CLASS_NUM_MASK          0x003f
-  
+
 #define LOCAL_MOD_REF           0x0100
 #define LOCAL_MOD_UNUSED        0x0200
-  
+
 #define LOCAL_MODS (LOCAL_MOD_UNUSED|LOCAL_MOD_REF)
-  
+
 typedef struct {
     unsigned char num_arg;
     unsigned char num_local;
@@ -146,7 +146,7 @@ typedef union {
 
 typedef struct {
     unsigned short first_defined;
-    unsigned short first_overload; 
+    unsigned short first_overload;
     unsigned short num_compressed;
     unsigned short num_deleted;
     unsigned char index[1];
@@ -199,7 +199,7 @@ typedef struct program_s {
     const char *filename;                 /* Name of file that defined prog */
     unsigned short flags;
     unsigned short last_inherited;
-    unsigned short ref;                 /* Reference count */
+    unsigned PROG_REF_TYPE ref;                 /* Reference count */
     unsigned short func_ref;
 #ifdef DEBUG
     int extra_ref;              /* Used to verify ref count */

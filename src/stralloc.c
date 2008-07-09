@@ -279,7 +279,7 @@ deallocate_string (char * str)
         prev = &(NEXT(b));
     }
     DEBUG_CHECK1(!b,"stralloc.c: deallocate_string called on non-shared string: %s.\n", str);
-
+    //printf("freeing string: %s\n", str);
     FREE(b);
 }
 

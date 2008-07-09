@@ -15,6 +15,14 @@
 #include "add_action.h"
 #include "eval.h"
 
+#ifdef MINGW
+#define ENOSR 63
+#endif
+
+#ifndef ADDRFAIL_NOTIFY
+#define ADDRFAIL_NOTIFY 0
+#endif
+
 #define TELOPT_COMPRESS 85
 #define TELOPT_COMPRESS2 86
 #define TELOPT_MXP  91  // mud extension protocol
@@ -369,7 +377,7 @@ void init_addr_server (char * hostname, int addr_server_port)
      * connect socket to server address.
      */
     if (connect(server_fd, (struct sockaddr *) & server, sizeof(server)) == -1) {
-        if (socket_errno == ECONNREFUSED)
+        if (socket_errno == ECONNREFUSED && ADDRFAIL_NOTIFY)
             debug_message("Connection to address server (%s %d) refused.\n",
                           hostname, addr_server_port);
         else
@@ -534,13 +542,8 @@ void add_vmessage (object_t *who, const char *format, ...)
     }
     ip = who->interactive;
     new_string_data[0] = '\0';
-    /*
-     * this is dangerous since the data may not all fit into new_string_data
-     * but how to tell if it will without trying it first?  I suppose one
-     * could rewrite vsprintf to accept a maximum length (like strncpy) --
-     * have fun!
-     */
-    vsprintf(new_string_data, format, args);
+
+    vsnprintf(new_string_data, LARGEST_PRINTABLE_STRING, format, args);
     va_end(args);
     len = strlen(new_string_data);
 #ifdef SHADOW_CATCH_MESSAGE
@@ -676,6 +679,7 @@ int flush_message (interactive_t * ip)
 #endif
         if (!num_bytes) {
             ip->iflags |= NET_DEAD;
+            remove_interactive(ip->ob, 0);
             return 0;
         }
         if (num_bytes == -1) {
@@ -693,6 +697,7 @@ int flush_message (interactive_t * ip)
             } else {
               //socket_perror("flush_message: write", 0);
                 ip->iflags |= NET_DEAD;
+                remove_interactive(ip->ob, 0);
                 return 0;
             }
         }
@@ -1551,7 +1556,15 @@ static void new_user_handler (int which)
         OS_socket_close(new_socket_fd);
         return;
     }
+#if !(linux) && !(sun) && !defined(MINGW) && !defined(__CYGWIN__)
+    i = 1;
 
+    if (setsockopt(new_socket_fd, 1, SO_NOSIGPIPE, &i, sizeof(i)) == -1)
+    {
+        socket_perror("new_user_handler: setsockopt SO_NOSIGPIPE", 0);
+        /* it's ok if this fails */
+    }
+#endif
     /* find the first available slot */
     for (i = 0; i < max_users; i++)
         if (!all_users[i]) break;
@@ -1729,7 +1742,7 @@ static char *get_user_command()
         if (ip->message_length) {
             object_t *ob = ip->ob;
             flush_message(ip);
-            if (!IP_VALID(ip, ob))
+            if (!IP_VALID(ip, ob) || (ip->iflags & NET_DEAD))
                 continue;
         }
 
@@ -2717,7 +2730,7 @@ void outbuf_addv (outbuffer_t *outbuf, const char *format, ...)
     V_VAR(outbuffer_t *, outbuf, args);
     V_VAR(char *, format, args);
 
-    vsprintf(buf, format, args);
+    vsnprintf(buf, LARGEST_PRINTABLE_STRING, format, args);
     va_end(args);
 
     if (!outbuf) return;
@@ -2821,8 +2834,8 @@ static int flush_compressed_output (interactive_t *ip) {
                 } else {
                     nBlock =  4096;
                 }
-                nWrite = send (ip->fd, &ip->compress_buf[iStart], nBlock,
-                               ip->out_of_band);
+                nWrite = send(ip->fd, &ip->compress_buf[iStart], nBlock,
+                              ip->out_of_band);
                 if (nWrite < 0) {
                   fprintf(stderr, "Error sending compressed data (%d)\n",
                           errno);

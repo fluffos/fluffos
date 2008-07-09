@@ -5,7 +5,7 @@
 #ifndef _OPTIONS_H_
 #define _OPTIONS_H_
 
-/* 
+/*
  * YOU PROBABLY DO NOT WANT TO MODIFY THIS FILE.
  *
  * Do 'cp options.h local_options' and edit that instead.  local_options,
@@ -121,7 +121,7 @@
  * DEBUGMALLOC_EXTENSIONS) causes the driver to check for memory
  * corruption due to writing before the start or end of a block.  This
  * also adds the check_memory() efun.  Takes a considerable ammount
- * more memory.  Mainly for debugging.  
+ * more memory.  Mainly for debugging.
  */
 #undef CHECK_MEMORY
 
@@ -195,9 +195,9 @@
 #define NO_LIGHT
 
 /* NO_ADD_ACTION: define this to remove add_action, commands, livings, etc.
- * process_input() then becomes the only way to deal with player input. 
+ * process_input() then becomes the only way to deal with player input.
  *
- * Compat status: next to impossible to simulate, hard to replace, and 
+ * Compat status: next to impossible to simulate, hard to replace, and
  * very, very widely used.
  */
 #define NO_ADD_ACTION
@@ -210,7 +210,7 @@
    process_input() then becomes the only way to deal with player input. */
 
 /* NO_ENVIRONMENT: define this to remove the handling of object containment
- * relationships by the driver 
+ * relationships by the driver
  *
  * Compat status: hard to simulate efficiently, and very widely used.
  */
@@ -238,9 +238,9 @@
 #undef OLD_TYPE_BEHAVIOR
 
 /* OLD_RANGE_BEHAVIOR: define this if you want negative indexes in string
- * or buffer range values (not lvalue, i.e. x[-2..-1]; for e.g. not 
- * x[-2..-1] = foo, the latter is always illegal) to mean counting from the 
- * end 
+ * or buffer range values (not lvalue, i.e. x[-2..-1]; for e.g. not
+ * x[-2..-1] = foo, the latter is always illegal) to mean counting from the
+ * end
  *
  * Compat status: Not horribly difficult to replace reliance on this, but not
  * trivial, and cannot be simulated.
@@ -253,6 +253,13 @@
  * Compat status: Easily simulated.
  */
 #define OLD_ED
+
+/* In ed auto-indent,
+ * 1) does the case line get indented after the switch() ?
+ * 2) How far do we indent? (this can also be set in the mudlib)
+ */
+#undef ED_INDENT_CASE
+#define ED_INDENT_SPACES 4
 
 /* SENSIBLE_MODIFIERS:
  * Turning this on changes a few things, which may break old code:
@@ -280,7 +287,7 @@
  ****************************************************************************/
 
 /*
- * Define this in order to use Fermat@Equilibria's MD5 based crypt() instead 
+ * Define this in order to use Fermat@Equilibria's MD5 based crypt() instead
  * of the operating system's.  It has the advantage of giving the same value
  * on all architectures, and being stronger than the standard UNIX crypt().
  */
@@ -289,7 +296,7 @@
 /*
  * Some minor tweaks that make it a bit easier to run code designed to run
  * on LPmud 3.2/3.2.1.  Currently has the following effects:
- * 
+ *
  * . m_indices() and m_values() are synonyms for keys() and values(),
  *   respectively
  * . map_delete() returns it's first argument
@@ -424,7 +431,7 @@
  *   (ASCII 27) to be replaced with a space ' ' before the string is passed
  *   to the action routines added with add_action.
  *
- * STRIP_BEFORE_PROCESS_INPUT allows the location where the stripping is 
+ * STRIP_BEFORE_PROCESS_INPUT allows the location where the stripping is
  * done to be controlled.  If it is defined, then process_input() doesn't
  * see ANSI characters either; if it is undefined ESC chars can be processed
  * by process_input(), but are stripped before add_actions are called.
@@ -442,7 +449,7 @@
  */
 #undef OPCPROF
 
-/* OPCPROF_2D: define this if you wish to enable 2-D OPC profiling. Allows a 
+/* OPCPROF_2D: define this if you wish to enable 2-D OPC profiling. Allows a
  *   dump of the # of times each *pair* of eoperators is invoked.
  *
  * You can't use this and OPCPROF at the same time.
@@ -469,7 +476,7 @@
 #define CALLOUT_HANDLES
 
 /* FLUSH_OUTPUT_IMMEDIATELY: Causes output to be written to sockets
- * immediately after being generated.  Useful for debugging.  
+ * immediately after being generated.  Useful for debugging.
  */
 #undef FLUSH_OUTPUT_IMMEDIATELY
 
@@ -490,6 +497,17 @@
  *   catch_tell(msg) method that calls receive(msg);
 */
 #undef INTERACTIVE_CATCH_TELL
+
+/* RECEIVE_ED: define this if you want normal ed output to go to a
+     receive_ed() apply in the player ob.  Some errors still go directly
+     to output.  Useful for post-processing (perhaps colorizing?) ed
+     output. Prototype:  mixed receive_ed(string txt, string fname);
+     If fname, return a string that ed will output, 0 to let ed handle
+     the output in the default way, or 1 to handle the output yourself.
+     If fname == 0, output is help text and you may return any of the above
+     or an array of strings that will be more'ed.
+*/
+#undef RECEIVE_ED
 
 /* RESTRICTED_ED: define this if you want restricted ed mode enabled.
  */
@@ -569,7 +587,7 @@
  *
  * Note: ref must be used in *both* places; this is intentional.  It protects
  * against passing references to routines which don't intend to return values
- * through their arguments, and against forgetting to pass a reference 
+ * through their arguments, and against forgetting to pass a reference
  * to a function which wants one (or accidentally having a variable modified!)
  */
 #define REF_RESERVED_WORD
@@ -634,7 +652,7 @@
  * databases
  */
 #ifdef PACKAGE_DB
-#undef USE_MSQL 
+#undef USE_MSQL
 #undef MSQL
 #define USE_MYSQL 2
 #define MY_SQL
@@ -682,7 +700,7 @@
  * Most of these options will probably be of no interest to many users.  *
  *************************************************************************/
 
-/* USE_32BIT_ADDRESSES: Use 32 bits for addresses of function, instead of 
+/* USE_32BIT_ADDRESSES: Use 32 bits for addresses of function, instead of
  * the usual 16 bits.  This increases the maximum program size from 64k
  * of LPC bytecode (NOT source) to 4 GB.  Branches are still 16 bits,
  * imposing a 64k limit on catch(), if(), switch(), loops, and most other
@@ -707,7 +725,7 @@
  */
 #define HEARTBEAT_INTERVAL 2000000
 
-/* 
+/*
  * CALLOUT_CYCLE_SIZE: This is the number of slots in the call_out list.
  * It should be approximately the average number of active call_outs, or
  * a few times smaller.  It should also be a power of 2, and also be relatively
@@ -729,7 +747,7 @@
 
 /* APPLY_CACHE_BITS: defines the number of bits to use in the call_other cache
  *   (in interpret.c).
- * 
+ *
  * Memory overhead is (1 << APPLY_CACHE_BITS)*16.
  * [assuming 32 bit pointers and 16 bit shorts]
  *
@@ -743,7 +761,7 @@
  */
 #define APPLY_CACHE_BITS 20
 
-/* CACHE_STATS: define this if you want call_other (apply_low) cache 
+/* CACHE_STATS: define this if you want call_other (apply_low) cache
  * statistics.  Causes HAS_CACHE_STATS to be defined in all LPC objects.
  */
 #define CACHE_STATS
@@ -800,6 +818,8 @@
  */
 /* MAX_LOCAL: maximum number of local variables allowed per LPC function */
 #define CFG_MAX_LOCAL_VARIABLES         50
+/* Increasing max global vars beyond 256 is not recommended */
+#define CFG_MAX_GLOBAL_VARIABLES         256
 
 #define CFG_EVALUATOR_STACK_SIZE        3000
 #define CFG_COMPILER_STACK_SIZE         600
@@ -866,7 +886,7 @@
  */
 #define WARN_TAB
 
-/* USE_ICONV: Use iconv to translate input and output from/to the users char 
+/* USE_ICONV: Use iconv to translate input and output from/to the users char
  * encoding
  */
 #define USE_ICONV
@@ -876,5 +896,14 @@
 
 /* ALLOW_INHERIT_AFTER_FUNCTION: allow inheriting after functions have been defined (this includes prototypes). This caused crashes in v22.2a but it may have been fixed since */
 #undef ALLOW_INHERIT_AFTER_FUNCTION
+
+/*PACKAGE_ASYNC: adds some efuns for asyncronous IO */
+#define PACKAGE_ASYNC
+
+/* PROG_REF_TYPE size of program ref counter:
+ * char for 8 bit, short for 16, int for 32,
+ * long long for 64 (completely useless on 32 bit machines though!) */
+#define PROG_REF_TYPE short
+
 #endif
 

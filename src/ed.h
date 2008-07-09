@@ -76,11 +76,13 @@
 #define SEARCH_FAILED   (ERR-19)
 #define NO_LINE_RANGE   (ERR-20)
 
-#define BUFFER_SIZE     2048    /* stream-buffer size:  == 1 hd cluster */
+// This one hopefully holds a screen's data for the 'z' command.
+// Even if bytes per line is actually 80, this is still 50-ish lines.
+#define BUFFER_SIZE     4096    
 
 #define LGLOB           2       /* line marked global */
 
-#define ED_MAXLINE      2048    /* max number of chars per line */
+#define ED_MAXLINE      2047    /* max number of chars per line */
 #define MAXPAT          256     /* max number of chars per replacemnt pattern */
 #define MAXFNAME        256     /* max file name size */
 
@@ -90,6 +92,11 @@ typedef struct ed_line_s {
     struct ed_line_s *l_next;
     char l_buff[1];
 } ed_line_t;
+
+struct strlst {
+    char *screen;
+    struct strlst *next;
+};
 
 typedef struct ed_buffer_s {
     int nonascii;               /* count of non-ascii chars read */
@@ -109,6 +116,7 @@ typedef struct ed_buffer_s {
     int flags;
     int appending;
     int moring;                 /* used for the wait line of help */
+    struct strlst *helpout;	/* help output linked list */
 #ifdef OLD_ED
     char *exit_fn;              /* Function to be called when user exits */
     char *write_fn;             /* Function to be called when user writes */
@@ -120,13 +128,14 @@ typedef struct ed_buffer_s {
     int shiftwidth;
     int leading_blanks;
     int cur_autoindent;
+    int scroll_lines;
     int restricted;             /* restricted access ed */
 } ed_buffer_t;
 
 /*
  * ed.c
  */
-void ed_start (const char *, const char *, const char *, int, object_t *);
+void ed_start (const char *, const char *, const char *, int, object_t *, int);
 void ed_cmd (char *);
 void save_ed_buffer (object_t *);
 
@@ -142,7 +151,7 @@ void save_ed_buffer (object_t *);
 
 #ifndef OLD_ED
 char *object_ed_cmd (object_t *, const char *);
-char *object_ed_start (object_t *, const char *, int);
+char *object_ed_start (object_t *, const char *, int, int);
 int object_ed_mode (object_t *);
 void object_save_ed_buffer (object_t *);
 ed_buffer_t *find_ed_buffer (object_t *);

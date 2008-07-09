@@ -329,9 +329,9 @@ void message(mixed, mixed, string | string * | object | object *,
     void flush_messages(void | object);
 
 #ifdef OLD_ED
-    void ed(string | void, string | void, string | int | void, int | void);
+    void ed(string | void, string | int | void, string | int | void, int | void, int | void);
 #else
-    string ed_start(string | void, int | void);
+    string ed_start(string | void, int | void, int | void);
     string ed_cmd(string);
     int query_ed_mode();
 #endif

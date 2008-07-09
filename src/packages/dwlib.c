@@ -378,7 +378,7 @@ int reference_allowed(object_t * referee, object_t * referrer_obj, const char * 
 	}
 
 	v = apply( "query_allowed", referee, 0, ORIGIN_EFUN);
-
+	//printf("allow refs:%d\n", v->u.arr->ref);
 	if (v && v->type == T_ARRAY) {
 		vec = v->u.arr;
 		size = vec->size;

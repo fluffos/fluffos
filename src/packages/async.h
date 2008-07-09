@@ -8,6 +8,7 @@ typedef struct aiocb aiob;
 enum atypes {
 		aread,
 		awrite,
+		agetdir,
 		done
 };
 

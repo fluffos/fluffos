@@ -758,7 +758,9 @@ void check_all_blocks (int flag) {
                             mark_svalue(all_users[i]->carryover + j);
                     }
                 }
-                
+                if(all_users[i].compressed_stream)
+                	DO_MARK(all_users[i].compressed_stream, TAG_INTERACTIVE);
+                	
 #ifndef NO_ADD_ACTION
                 if (all_users[i]->iflags & NOTIFY_FAIL_FUNC)
                     all_users[i]->default_err_message.f->hdr.extra_ref++;

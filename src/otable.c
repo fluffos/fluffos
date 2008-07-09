@@ -34,7 +34,7 @@ static object_t **obj_table = 0;
 static object_t **ch_table = 0;
 
 static char *basename(const char *full, int *size) {
-	char *name= new_string(*size = strlen(full), "f_base_name: ret");
+	char *name= new_string(*size = strlen(full), "base_name: name");
 	while (*full == '/') {
 		full++;
 		(*size)--;
@@ -47,7 +47,7 @@ static char *basename(const char *full, int *size) {
 	while (*size > 2&& name[*size-1] == 'c'&& name[*size-2] == '.')
 		*size -= 2;
 	name[*size] = 0;
-
+	name = extend_string(name, *size);
 	return name;
 }
 
@@ -125,7 +125,7 @@ array_t *children(const char * s) {
 		}
 		curr = curr->next_ch_hash;
 	}
-
+	FREE_MSTR(s);
 	vec = resize_array(vec, count);
 	return (vec);
 }

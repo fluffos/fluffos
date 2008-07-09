@@ -41,7 +41,6 @@ INSTALL_DIR="../bin"
 #Enable warnings from the compiler (gcc), if wanted.
 #WARN=-Wall
  
-#Use this with gcc if you have lots of RAM, speeds up compile
 #PIPE=-pipe
 
 # define profiling if you want it
@@ -115,6 +114,10 @@ INSTALL_DIR="../bin"
 # SCO 3.2v4.2
 # ARCH: *sigh* and this one ...
 #OSFLAGS=-DSCO
+
+#Static for compiling Discworld on MINGW
+#OSFLAGS=-static
+
 # try uncommenting this if you are using gcc and at runtime you see socket
 # errors saying that the "set socket nonblocking" operation is not supported.
 # That error is caused by old-style macros (that gcc doesn't normally grok)
@@ -148,7 +151,7 @@ if test "${MAKE-x}" = "x"; then
         make nothing
         if test $? -eq 0; then
             MAKE=make
-            tmp=`make which_makefile 2>/dev/null | grep -v echo`
+            tmp=`make which_makefile 2>./2.out | grep -v echo`
             if test "x$tmp" = "xMakeIsGNU"; then
                 MAKEFILE=GNUmakefile
             else
@@ -161,7 +164,7 @@ if test "${MAKE-x}" = "x"; then
         fi
     fi
 else
-    tmp=`make which_makefile 2>/dev/null | grep -v echo`
+    tmp=`make which_makefile 2>./2.out | grep -v echo`
     if test "x$tmp" = "xMakeIsGNU"; then
         MAKEFILE=GNUmakefile
     else
@@ -188,9 +191,9 @@ if test $? -eq 0; then
 else
     gcc comptest.c
     if test $? -eq 0; then
-        CC="gcc"
+        CC="g++"
         if test "${DEBUG-x}" = "x"; then
-            OPTIMIZE=${OPTIMIZE-"-O2 -fstrength-reduce"}
+            OPTIMIZE=${OPTIMIZE-"-O3"}
         fi
 	GNUC=1
 	CCFLAGS=-D__USE_FIXED_PROTOTYPES__
@@ -214,7 +217,7 @@ Oh darn it's not gcc
 END
 		    cc comptest.c
 		    if test $? -eq 0; then
-			OPTIMIZE=${OPTIMIZE-"-O2 -fstrength-reduce"}
+			OPTIMIZE=${OPTIMIZE-"-O3"}
 			GNUC=1
 		    fi
                 fi
@@ -234,6 +237,7 @@ if test $GNUC; then
     if test "x$tmp" = "xi486" -o "x$tmp" = "xi586"; then
         OPTIMIZE="$OPTIMIZE -m486"
     fi
+    
 fi
 
 #
@@ -244,15 +248,15 @@ cat >comptest.c <<END
 #define foo
 Make this fail if we actually get compiled
 END
-$CC -E comptest.c >/dev/null
+$CC -E comptest.c >./1.out
 if test $? -eq 0; then
     CPP="$CC -E $NEED_OLD_CPP"
 else
-    cpp comptest.c >/dev/null
+    cpp comptest.c >./1.out
     if test $? -eq 0; then
         CPP="cpp"
     else
-        $CC -E -traditional-cpp comptest.c >/dev/null
+        $CC -E -traditional-cpp comptest.c >./1.out
 	if test $? -eq 0; then
 	    CPP="$CC -E -traditional-cpp"
 	else
@@ -363,45 +367,34 @@ case $ARCH in
 	OSFLAGS="$OSFLAGS -DSunOS_5"
 	CFLAGS="$CFLAGS -DSunOS_5"
 	;;
-    Linux*)
-        EXPORT_DYNAMIC=-rdynamic
-	;;
-    FreeBSD)
-	cc -export-dynamic comptest.c
-	if test $? -eq 0; then
-	    EXPORT_DYNAMIC=-export-dynamic
-	else
-	    cc -rdynamic comptest.c
-	    if test $? -eq 0; then
-		EXPORT_DYNAMIC=-rdynamic
-	    fi
-	fi
-	;;
 esac
+#don't use dynamic at the moment
+#    Linux*)
+#        EXPORT_DYNAMIC=-rdynamic
+#	;;
+#    FreeBSD)
+#	cc -export-dynamic comptest.c
+#	if test $? -eq 0; then
+#	    EXPORT_DYNAMIC=-export-dynamic
+#	else
+#	    cc -rdynamic comptest.c
+#	    if test $? -eq 0; then
+#		EXPORT_DYNAMIC=-rdynamic
+#	    fi
+#	fi
+#	;;
+#esac
 
 #
 # check for some missing functions
 #
 rm a.out
 cat >comptest.c <<END
-int main() {
-strchr(0,0); strrchr(0,0);
-}
-END
-$CC $CFLAGS comptest.c
-if test ! -f a.out; then
-    if uname -a | grep "MINGW" | grep -v grep ; then
-	echo "MinGW detected. Skipping weird strchr thing."
-    else
-	echo "MinGW not detected, and no a.out."
-	STR="-Dstrchr=index -Dstrrchr=rindex"
-    fi
-fi
-
-rm a.out
-cat >comptest.c <<END
+#include <string.h>
+#include <stdlib.h>
 int main() {
 memcpy(0,0,0);memset(0,0,0);strtol(0,0,0);strcspn(0,0);
+return 0;
 }
 END
 $CC $CFLAGS comptest.c

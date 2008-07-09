@@ -469,6 +469,7 @@ char *read_file(const char * file, int start, int len) {
 #else
 		gzclose(f);
 #endif
+		str = extend_string(str, 0); /* fix string length */
 		return str;
 	}
 

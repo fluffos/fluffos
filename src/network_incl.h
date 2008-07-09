@@ -36,7 +36,7 @@
 #endif
 
 #ifdef WINSOCK
-#  include <winsock.h>
+#  include <winsock2.h>
 #endif
 
 #endif

@@ -627,36 +627,64 @@ f_ed (void)
 
     if (!st_num_arg) {
         /* ed() */
-        ed_start(0, 0, 0, 0, 0);
+        ed_start(0, 0, 0, 0, 0, 0);
     } else if (st_num_arg == 1) {
         /* ed(fname) */
-        ed_start(sp->u.string, 0, 0, 0, 0);
+        ed_start(sp->u.string, 0, 0, 0, 0, 0);
         pop_stack();
     } else if (st_num_arg == 2) {
-        /* ed(fname,exitfn) */
-        ed_start((sp - 1)->u.string, 0, sp->u.string, 0, current_object);
+        /* ed(fname,exitfn) / ed(fname, scroll_lines) */
+        if(sp->type == T_STRING)
+          ed_start((sp - 1)->u.string, 0, sp->u.string, 0, current_object, 0);
+        else if(sp->type == T_NUMBER)
+          ed_start((sp - 1)->u.string, 0, 0, 0, 0, sp->u.number);
+        else
+          bad_argument(sp, T_NUMBER | T_STRING, 2, F_ED);
         pop_2_elems();
     } else if (st_num_arg == 3) {
-        /* ed(fname,exitfn,restricted) / ed(fname,writefn,exitfn) */
+        /* ed(fname,exitfn,restricted) / ed(fname,writefn,exitfn) /
+           ed(fname,exitfn,scroll_lines) */
         if (sp->type == T_NUMBER) {
-            ed_start((sp - 2)->u.string, 0, (sp - 1)->u.string, sp->u.number,
-                     current_object);
+            if(sp->u.number == 1)
+              ed_start((sp - 2)->u.string, 0, (sp - 1)->u.string, sp->u.number,
+                       current_object, 0);
+            else
+              ed_start((sp - 2)->u.string, 0, (sp - 1)->u.string, 0,
+                       current_object, sp->u.number);
         } else if (sp->type == T_STRING) {
             ed_start((sp - 2)->u.string, (sp - 1)->u.string, sp->u.string, 0,
-                     current_object);
+                     current_object, 0);
         } else {
             bad_argument(sp, T_NUMBER | T_STRING, 3, F_ED);
         }
         pop_3_elems();
-    } else {                    /* st_num_arg == 4 */
-        /* ed(fname,writefn,exitfn,restricted) */
+    } else if (st_num_arg == 4) {
+        /* ed(fname,writefn,exitfn,restricted) / 
+           ed(fname,writefn,exitfn,scroll_lines) */
         if (!((sp - 1)->type == T_STRING))
             bad_argument(sp - 1, T_STRING, 3, F_ED);
         if (!(sp->type == T_NUMBER))
             bad_argument(sp, T_NUMBER, 4, F_ED);
-        ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string,
-                 sp->u.number, current_object);
+        if(sp->u.number == 1)
+          ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string,
+                   sp->u.number, current_object, 0);
+        else
+          ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string,
+                   0, current_object, sp->u.number);
         pop_n_elems(4);
+    } else { /* st_num_arg == 5 */
+        /* ed(fname, writefn, exitfn, restricted, scroll_lines) */
+        if(!(sp->type == T_NUMBER))
+          bad_argument(sp, T_NUMBER, 5, F_ED);
+        if(!((sp-1)->type == T_NUMBER))
+          bad_argument(sp-1, T_NUMBER, 4, F_ED);
+        if(!((sp-2)->type == T_STRING))
+          bad_argument(sp-2, T_STRING, 3, F_ED);
+        
+        ed_start((sp - 4)->u.string, (sp - 3)->u.string, (sp - 2)->u.string,
+                 (sp - 1)->u.number, current_object, sp->u.number);
+        
+        pop_n_elems(5);
     }
 }
 #endif
@@ -691,9 +719,19 @@ void f_ed_start (void)
     char *res;
     const char *fname;
     int restr = 0;
-
-    if (st_num_arg == 2)
-        restr = (sp--)->u.number;
+    int scroll_lines = 20;
+    
+    if (st_num_arg == 3) {
+      scroll_lines = (sp--)->u.number;
+      restr = (sp--)->u.number;
+    }
+    
+    if (st_num_arg == 2) {
+        if(sp->u.number == 1)
+          restr = (sp--)->u.number;
+        else
+          scroll_lines = (sp--)->u.number;
+    }
 
     if (st_num_arg)
         fname = sp->u.string;
@@ -706,7 +744,7 @@ void f_ed_start (void)
     if (current_object->flags & O_IN_EDIT)
         error("ed_start() called while an ed session is already started.\n");
 
-    res = object_ed_start(current_object, fname, restr);
+    res = object_ed_start(current_object, fname, restr, scroll_lines);
 
     if (fname) free_string_svalue(sp);
     else {
@@ -1061,9 +1099,7 @@ f_implode (void)
             
         /* this pulls the extra arg off the stack if it exists */
         implode_array(funp, arr, args, flag);
-        sp--;
-        free_funp(funp);
-        free_array(arr);
+        pop_stack();
     }
 }
 #endif

@@ -18,7 +18,7 @@
 
 INLINE int set_socket_owner (int fd, int which)
 {
-#ifdef OLD_ULTRIX
+#if defined(OLD_ULTRIX) || defined(__CYGWIN__)
     return fcntl(fd, F_SETOWN, which);
 #else
 #ifdef WINSOCK
@@ -87,7 +87,7 @@ INLINE int set_socket_nonblocking (int fd, int which)
 
 #ifdef WIN32
 void SocketPerror (char * what, char * file) {
-    static char *errstrings[] = 
+    static char *errstrings[] =
     {  "Operation would block",
        "Blocking call in progress",
        "WSAEALREADY",
@@ -131,13 +131,13 @@ void SocketPerror (char * what, char * file) {
        "WSANO_RECOVERY",
        "WSANO_DATA"
     };
-    
+
     static char tmpstring[80];
     char *s = tmpstring;
     int sock_errno;
 
     sock_errno = WSAGetLastError();
-    
+
     switch (sock_errno) {
         case WSAEINTR:  strcpy(tmpstring, "Function interrupted");
         case WSAEACCES: strcpy(tmpstring, "Cannot broadcast");

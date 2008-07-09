@@ -139,13 +139,15 @@ f_localtime (void)
 #else                           /* sequent */
 #if (defined(hpux) || defined(_SEQUENT_) || defined(_AIX) || defined(SunOS_5) \
         || defined(SVR4) || defined(sgi) || defined(linux) || defined(cray) \
-       )
+        || defined(__CYGWIN__)\
+    )
     if (!tm->tm_isdst) {
         vec->item[LT_GMTOFF].u.number = timezone;
         vec->item[LT_ZONE].u.string = string_copy(tzname[0], "f_localtime");
     } else {
 #if (defined(_AIX) || defined(hpux) || defined(linux) || defined(cray) \
-        )
+	|| defined(__CYGWIN__)\
+	)
         vec->item[LT_GMTOFF].u.number = timezone;
 #else
         vec->item[LT_GMTOFF].u.number = altzone;
