@@ -35,7 +35,7 @@ mapping_node_t *locked_map_nodes = 0;
   table).
 */
 
-INLINE_STATIC int node_hash (mapping_node_t * mn) {
+INLINE_STATIC unsigned long node_hash (mapping_node_t * mn) {
     return MAP_SVAL_HASH(mn->values[0]);
 }
 

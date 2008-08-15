@@ -9,7 +9,7 @@
 #ifdef HAVE_ZLIB
 #include <zlib.h>
 #endif
-  
+
 #include "lpc_incl.h"
 #include "network_incl.h"
 
@@ -34,7 +34,7 @@
 #ifdef HAVE_ZLIB
 #define COMPRESS_BUF_SIZE MESSAGE_BUF_SIZE
 #endif
-  
+
 enum msgtypes {
     NAMEBYIP = 0, IPBYNAME, DATALEN
 };
@@ -106,7 +106,7 @@ typedef struct interactive_s {
                                              compressed or not */
     unsigned char compress_buf[COMPRESS_BUF_SIZE]; /* compress message buffer*/
 #endif
-    
+
     int message_producer;       /* message buffer producer index */
     int message_consumer;       /* message buffer consumer index */
     int message_length;         /* message buffer length */
@@ -139,7 +139,7 @@ typedef struct interactive_s {
   *     set a variable named ip to ob->interactive, and save ob somewhere;
   *     or if you are just dealing with an ip as input, save ip->ob somewhere.
   *     After calling LPC code, check IP_VALID(ob), or use VALIDATE_IP.
-  * 
+  *
   * Yes, I know VALIDATE_IP uses a goto.  It's due to C's lack of proper
   * exception handling.  Only use it in subroutines that are set up
   * for it (i.e. define a failure label, and are set up to deal with
@@ -175,6 +175,10 @@ extern int add_message_calls;
 
 extern interactive_t **all_users;
 extern int max_users;
+#ifdef HAS_CONSOLE
+extern int has_console;
+extern void restore_sigttin(void);
+#endif
 
 void CDECL add_vmessage (object_t *, const char *, ...);
 void add_message (object_t *, const char *, int);

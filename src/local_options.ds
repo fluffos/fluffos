@@ -898,6 +898,7 @@
 /*PACKAGE_ASYNC: adds some efuns for asyncronous IO */
 #undef PACKAGE_ASYNC
 
+#define PROG_REF_TYPE int
 #define PARSE_DEBUG
 #define FLUFFOS
 #endif

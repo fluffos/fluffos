@@ -48,28 +48,28 @@
  * Isaac Charles (Hamlet) did some reworks 2008/March
  * 1) Many ED_OUTPUTV() things combined for less calls to the output stuff.
  *    (this will be important with future changes and shouldn't hurt now)
- * 2) added an APPLY_RECEIVE_ED to send output within the user ob before 
- *    outputting to the user.  
+ * 2) added an APPLY_RECEIVE_ED to send output within the user ob before
+ *    outputting to the user.
  *    Prototype:  mixed receive_ed(string msg, string fname);
  *    If return is 0, it is a "pass" and normal output occurs.  If return
  *    is 1, we assume receive_ed() called receive() or something else
  *    clever and the text is taken care of.  If return is a string,
  *    that string is sent to the user rather than the original.
- *    If fname is 0, the incoming string is help text.  In this case, 
+ *    If fname is 0, the incoming string is help text.  In this case,
  *    an array of strings may also be returned, which will be separated by
  *    "more" statements.  As above, if 1 is returned, no output, and if 0
  *    is returned, normal output.
- * 3) ed_start() and ed() now take an extra final argument telling 
- *    how many lines on the user's screen.  'z' commands will then scroll 
- *    that many lines (less 1 for the prompt).  'Z' commands scroll that many 
+ * 3) ed_start() and ed() now take an extra final argument telling
+ *    how many lines on the user's screen.  'z' commands will then scroll
+ *    that many lines (less 1 for the prompt).  'Z' commands scroll that many
  *    plus 5.  Why?  I dunno.  Why was it double before?  f_ed() and
  *    f_ed_start() do not require this arg.
  * 5) Minor fixes: fixed indentation for foreach(), and for lines with only
- *    //. 
+ *    //.
  * 6) Minor enhancements: z++ and z-- now work for double-forward or back.
- *    Added ED_INDENT_CASE (should 'case' be indented after switch?) and 
- *    ED_INDENT_SPACES (how many spaces to indent with I) as defines in 
- *    options.h.  Their presence is optional.  All additions to options.h 
+ *    Added ED_INDENT_CASE (should 'case' be indented after switch?) and
+ *    ED_INDENT_SPACES (how many spaces to indent with I) as defines in
+ *    options.h.  Their presence is optional.  All additions to options.h
  *    are optional.  Default behavior is mostly the same as the original ed.
  */
 
@@ -498,7 +498,7 @@ static int esc (char ** s)
 
 /*      doprnt.c        */
 static int doprnt (int from, int to)
-{   svalue_t *ret;
+{
 #if (BUFFER_SIZE) > (ED_MAXLINE)
     char outbf[BUFFER_SIZE];
 #else
@@ -514,7 +514,7 @@ static int doprnt (int from, int to)
     if (to != 0) {
         setCurLn(from);
         while (P_CURLN <= to) {
-            count = prntln(gettxtl(P_CURPTR), tmp, P_LFLG, 
+            count = prntln(gettxtl(P_CURPTR), tmp, P_LFLG,
                            (P_NFLG ? P_CURLN : 0));
             if (P_NET_DEAD)
                 break;
@@ -526,12 +526,12 @@ static int doprnt (int from, int to)
               do_output(outbf);
               pos = outbf;
             }
-            
+
             if(pos > outbf)
               *(pos++) = '\n';
             strcpy(pos, tmp);
             pos += count;
-            
+
             if(P_CURLN == to) {
               do_output(outbf);
               break;
@@ -648,7 +648,7 @@ static int prntln (char * str, char * outstr, int vflg, int lineno)
         *line++ = '$';
 #endif
     *line = EOS;
-    
+
     strcpy(outstr, start);
     return (line - start);
 }
@@ -700,7 +700,7 @@ static int doread (int lin, const char * fname)
     unsigned int bytes;
     unsigned int lines;
     static char str[ED_MAXLINE];
-    
+
     err = 0;
     P_NONASCII = P_NULLCHAR = P_TRUNCATED = 0;
 
@@ -963,7 +963,7 @@ static int getlst()
         /* if it's out of bounds, go to the end of the file. */
         if (num == BAD_LINE_NUMBER)
             num = P_LASTLN;
-        
+
         P_LINE1 = P_LINE2;
         P_LINE2 = num;
         P_NLINES++;
@@ -1088,7 +1088,7 @@ static int ins (const char *str)
         len = cp - str;
         /* cp now points to end of first or only line */
 
-        if ((newl = (ed_line_t *) DXALLOC(sizeof(ed_line_t) + len, 
+        if ((newl = (ed_line_t *) DXALLOC(sizeof(ed_line_t) + len,
                                          TAG_ED, "ins: new")) == NULL)
             return (MEM_FAIL);  /* no memory */
 
@@ -1244,8 +1244,8 @@ static int set()
     if ((*inptr == NL)) {
         char out[512];
         char *pos = out;
-        
-        pos += sprintf(pos, "ed version %d.%d\n", version / 100, 
+
+        pos += sprintf(pos, "ed version %d.%d\n", version / 100,
                                                   version % 100);
         limit = tbl + (sizeof(tbl) / sizeof(struct tbl));
         for (t = tbl; t < limit; t += 2) {
@@ -1253,7 +1253,7 @@ static int set()
                         P_FLAGS & t->t_or_mask ? "on" : "off");
         }
         pos += sprintf(pos, "\nshiftwidth:%d\n", P_SHIFTWIDTH);
-        
+
         ED_OUTPUT(ED_DEST, out);
         return (0);
     }
@@ -1406,7 +1406,7 @@ static void shift (register char * text)
             indent_index++;
         } else {
             // indent_index = (indent_index + 8) & ~7;
-            indent_index = indent_index + ED_TAB_WIDTH - 
+            indent_index = indent_index + ED_TAB_WIDTH -
                            (indent_index % ED_TAB_WIDTH);
         }
     }
@@ -1526,7 +1526,7 @@ static void indent (char * buf)
                 indent_index++;
             } else {
                 // indent_index = (indent_index + 8) & ~7;
-                indent_index = indent_index + ED_TAB_WIDTH - 
+                indent_index = indent_index + ED_TAB_WIDTH -
                                (indent_index % ED_TAB_WIDTH);
             }
         }
@@ -1594,7 +1594,7 @@ static void indent (char * buf)
 
             case '@': {
                 int j = 0;
-                
+
                 if (*p == '@') p++;
                 while (uisalnum(*p) || *p == '_') last_term[j++] = *p++;
                 last_term[j] = '\0';
@@ -1624,9 +1624,9 @@ static void indent (char * buf)
                             if (*q++ == '\t') {
                                 // indent_index = (indent_index + 8) & ~7;
                                 // index2 = (index2 + 8) & ~7;
-                                indent_index = indent_index + ED_TAB_WIDTH - 
+                                indent_index = indent_index + ED_TAB_WIDTH -
                                                (indent_index % ED_TAB_WIDTH);
-                                index2 = index2 + ED_TAB_WIDTH - 
+                                index2 = index2 + ED_TAB_WIDTH -
                                          (index2 % ED_TAB_WIDTH);
 
 
@@ -1638,10 +1638,10 @@ static void indent (char * buf)
                         shi = index2 - indent_index;
                     }
                     p++;
-                    
+
                     if((*p == '\0') && (in_comment == 2))
                       in_comment = 0;
-                      
+
                     continue;
                 }
                 token = TOKEN;
@@ -1841,7 +1841,7 @@ static int indent_code()
     in_ppcontrol = FALSE;
     in_comment = 0;
     in_mblock = 0;
-    
+
     P_FCHANGED = TRUE;
     last = P_LASTLN;
     errs = 0;
@@ -2195,22 +2195,22 @@ static int docmd (int glob)
         switch (*inptr) {
         case '-':
             scr = 0;
-            
+
             while(*inptr == '-') {
               scr += ED_BUFFER->scroll_lines - 2;
               inptr++;
             }
-            
+
             if(scr >= P_LINE1)
               scr = P_LINE1 - 1;
-            
-            if ((st = doprnt(P_LINE1 - (scr), 
+
+            if ((st = doprnt(P_LINE1 - (scr),
                              P_LINE1 + ED_BUFFER->scroll_lines - (scr+2))) < 0)
                 return st;
             break;
 
         case '.':
-            if ((st = doprnt(P_LINE1 - (ED_BUFFER->scroll_lines/2), 
+            if ((st = doprnt(P_LINE1 - (ED_BUFFER->scroll_lines/2),
                              P_LINE1 + (ED_BUFFER->scroll_lines/2-1))) < 0)
                 return st;
             break;
@@ -2220,7 +2220,7 @@ static int docmd (int glob)
             scr = 0;
             while(*(++inptr) == '+')
               scr += ED_BUFFER->scroll_lines - 2;
-            if ((st = doprnt(P_LINE1 + (scr), 
+            if ((st = doprnt(P_LINE1 + (scr),
                 P_LINE1 + ED_BUFFER->scroll_lines + (scr) - 2)) < 0)
                 return st;
             break;
@@ -2234,33 +2234,33 @@ static int docmd (int glob)
         switch (*inptr) {
         case '-':
             scr = 0;
-            
+
             while(*inptr == '-') {
               scr += ED_BUFFER->scroll_lines+3;
               inptr++;
             }
-            
+
             if(scr >= P_LINE1)
               scr = P_LINE1 - 1;
 
-            if ((st = doprnt(P_LINE1 - (scr), 
+            if ((st = doprnt(P_LINE1 - (scr),
                              P_LINE1 + ED_BUFFER->scroll_lines - (scr-3))) < 0)
-              
+
                 return st;
             break;
 
         case '.':
-            if ((st = doprnt(P_LINE1 - (ED_BUFFER->scroll_lines/2+2), 
+            if ((st = doprnt(P_LINE1 - (ED_BUFFER->scroll_lines/2+2),
                              P_LINE1 + (ED_BUFFER->scroll_lines/2+2))) < 0)
                 return st;
             break;
 
         case '+':
         case '\n':
-            scr = 0;    
+            scr = 0;
             while(*(++inptr) == '+')
               scr += ED_BUFFER->scroll_lines+3;
-            if ((st = doprnt(P_LINE1 + (scr), 
+            if ((st = doprnt(P_LINE1 + (scr),
                 P_LINE1 + ED_BUFFER->scroll_lines + (scr) + 3)) < 0)
                 return st;
             break;
@@ -2319,7 +2319,7 @@ static int doglob()
  * code to maintain a list of locked files.
  */
 #ifdef OLD_ED
-void ed_start (const char * file_arg, const char * write_fn, 
+void ed_start (const char * file_arg, const char * write_fn,
                const char * exit_fn, int restricted, object_t * exit_ob,
                int scroll_lines)
 {
@@ -2343,7 +2343,7 @@ void ed_start (const char * file_arg, const char * write_fn,
     ED_BUFFER->shiftwidth = ED_INDENT_SPACES;
     push_object(current_editor);
     setup = apply_master_ob(APPLY_RETRIEVE_ED_SETUP, 1);
-    if (setup && setup != (svalue_t *)-1 && 
+    if (setup && setup != (svalue_t *)-1 &&
         setup->type == T_NUMBER && setup->u.number) {
         ED_BUFFER->flags = setup->u.number & ALL_FLAGS_MASK;
         ED_BUFFER->shiftwidth = setup->u.number & SHIFTWIDTH_MASK;
@@ -2377,12 +2377,12 @@ void ed_start (const char * file_arg, const char * write_fn,
         ED_BUFFER->scroll_lines = scroll_lines;
     else
         ED_BUFFER->scroll_lines = 22;
-           
+
     set_ed_buf();
 
     /*
      * Check for read on startup, since the buffer is read in. But don't
-     * check for write, since we may want to change the file name. 
+     * check for write, since we may want to change the file name.
      */
     if (file_arg
         && (file_arg =
@@ -2544,7 +2544,7 @@ static void print_help (int arg)
     svalue_t *ret;
     struct strlst *curp;
     int i;
-    
+
     switch (arg) {
     case 'I':
         ED_OUTPUT(ED_DEST, "\
@@ -2863,30 +2863,30 @@ that help is desired for. \n", ED_BUFFER->scroll_lines-1,
         }
         else if(ret->type == T_ARRAY) {
           outstr = (char *) 0;
-      
+
           curp = P_HELPOUT = (struct strlst *) DMALLOC(sizeof(struct strlst),
                                                    TAG_TEMPORARY, "ed: help");
           curp->screen = 0;
           curp->next = 0;
-      
+
           for(i=0; i < ret->u.arr->size; i++) {
             if(ret->u.arr->item[i].type != T_STRING)
               continue; // dumb.  just skip.
-        
-            curp->next = (struct strlst *) DMALLOC(sizeof(struct strlst), 
+
+            curp->next = (struct strlst *) DMALLOC(sizeof(struct strlst),
                                                    TAG_TEMPORARY, "ed: help");
             curp = curp->next;
-        
+
             curp->next = 0;
             curp->screen = DMALLOC(sizeof(char) *
                                    (strlen(ret->u.arr->item[i].u.string) + 1),
                                    TAG_TEMPORARY, "ed: help");
             strcpy(curp->screen, ret->u.arr->item[i].u.string);
           }
-      
+
           curp = P_HELPOUT;
           P_HELPOUT = P_HELPOUT->next;
-          FREE(curp);      
+          FREE(curp);
         }
         else {
             outstr = edout; // failsafe if they sent something dumb.
@@ -2898,21 +2898,21 @@ that help is desired for. \n", ED_BUFFER->scroll_lines-1,
         if(outstr) { // We need to figure out the paging
           char tmpc;
           int lines = 0;
-      
+
           curp = P_HELPOUT = (struct strlst *) DMALLOC(sizeof(struct strlst),
                                                    TAG_TEMPORARY, "ed: help");
           curp->next = 0;
-      
+
           brkpt = outstr;
-      
+
           /* This will miss a newline at the start of the output... wah */
           while(*brkpt != '\0') {
             brkpt++;
-            
+
             if((*brkpt == '\n') || (*brkpt == '\0')) {
               lines++;
 
-              if((lines == (ED_BUFFER->scroll_lines - 1)) || 
+              if((lines == (ED_BUFFER->scroll_lines - 1)) ||
                  (*brkpt == '\0')) {
                 if(*brkpt == '\0')
                   tmpc = '\0';
@@ -2920,14 +2920,14 @@ that help is desired for. \n", ED_BUFFER->scroll_lines-1,
                   tmpc = *(brkpt+1); // the one past the newline
                   *(brkpt+1) = '\0';
                 }
-            
+
                 curp->next = (struct strlst *) DMALLOC(sizeof(struct strlst),
                                                 TAG_TEMPORARY, "ed: help");
                 curp = curp->next;
                 curp->screen = (char *)DMALLOC(sizeof(char) * (strlen(outstr) + 1),
                                    TAG_TEMPORARY, "ed: help");
                 strcpy(curp->screen, outstr);
-                
+
                 curp->next = 0;
 
                 if(tmpc != '\0') {
@@ -2940,11 +2940,11 @@ that help is desired for. \n", ED_BUFFER->scroll_lines-1,
             //else
             //  brkpt++;
           };
-      
+
           /* free the dead head */
           curp = P_HELPOUT;
           P_HELPOUT = P_HELPOUT->next;
-          FREE(curp); 
+          FREE(curp);
         }
 
         if(P_HELPOUT)
@@ -2953,16 +2953,16 @@ that help is desired for. \n", ED_BUFFER->scroll_lines-1,
 }
 
 static void print_help2()
-{   
+{
     struct strlst *curp;
-    
+
     ED_OUTPUT(ED_DEST, P_HELPOUT->screen);
-    
+
     curp = P_HELPOUT;
     P_HELPOUT = P_HELPOUT->next;
     FREE(curp->screen);
     FREE(curp);
-    
+
     if(P_HELPOUT) {
       ED_OUTPUT(ED_DEST, "--Return to continue--");
       P_MORE = 1;
@@ -2973,7 +2973,7 @@ static void print_help2()
 #endif                          /* ED */
 
 /****************************************************************
-  Stuff below here is for the new ed() interface. -Beek 
+  Stuff below here is for the new ed() interface. -Beek
  ****************************************************************/
 
 #ifndef OLD_ED
@@ -2991,7 +2991,7 @@ static ed_buffer_t *ed_buffer_list;
 
 static ed_buffer_t *add_ed_buffer (object_t * ob) {
     ed_buffer_t *ret;
-    
+
     ret = ALLOCATE(ed_buffer_t, TAG_ED, "ed_start: ED_BUFFER");
     memset((char *)ret, '\0', sizeof(ed_buffer_t));
 
@@ -3050,17 +3050,17 @@ char *object_ed_start (object_t * ob, const char *fname, int restricted,
     if (restricted) {
         P_RESTRICT = 1;
     }
-    
+
     if(scroll_lines)
         ED_BUFFER->scroll_lines = scroll_lines;
     else
         ED_BUFFER->scroll_lines = 20;
-        
+
     set_ed_buf();
 
     /*
      * Check for read on startup, since the buffer is read in. But don't
-     * check for write, since we may want to change the file name. 
+     * check for write, since we may want to change the file name.
      */
     if (fname
         && (fname =
@@ -3109,9 +3109,9 @@ int object_ed_mode (object_t * ob) {
     current_ed_buffer = find_ed_buffer(ob);
     current_editor = ob;
 
-    if (P_MORE) 
+    if (P_MORE)
         return -2;
-    if (P_APPENDING) 
+    if (P_APPENDING)
         return P_CURLN + 1;
 
     return 0;

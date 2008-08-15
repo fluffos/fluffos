@@ -7,7 +7,6 @@
 #include "compiler.h"
 #include "otable.h"
 #include "comm.h"
-#include "binaries.h"
 #include "socket_efuns.h"
 #include "md.h"
 #include "eoperators.h"
@@ -403,9 +402,7 @@ object_t *int_load_object (const char * lname)
         debug_message("Illegal pathname: /%s\n", real_name);
         error("Illegal path name '/%s'.\n", real_name);
     }
-#ifdef BINARIES
-    if (!(prog = load_binary(real_name, lpc_obj)) && !inherit_file) {
-#endif
+
         /* maybe move this section into compile_file? */
         if (comp_flag) {
             debug_message(" compiling /%s ...", real_name);
@@ -423,9 +420,7 @@ object_t *int_load_object (const char * lname)
         update_compile_av(total_lines);
         total_lines = 0;
         close(f);
-#ifdef BINARIES
-    }
-#endif
+
 
     /* Sorry, can't handle objects without programs yet. */
     if (inherit_file == 0 && (num_parse_error > 0 || prog == 0)) {

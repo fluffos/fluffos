@@ -7,7 +7,7 @@
 #ifndef _FUNC_SPEC_
 long random_number (long);
 long get_current_time (void);
-char *time_string (time_t);
+const char *time_string (time_t);
 void init_usec_clock (void);
 void get_usec_clock (long *, long *);
 int get_cpu_times (unsigned long *, unsigned long *);

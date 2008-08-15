@@ -43,11 +43,10 @@ typedef struct {
 #define A_STRING_NEXT           14      /* next prog string in hash chain */
 #define A_STRING_REFS           15      /* reference count of prog string */
 #define A_INCLUDES              16      /* list of included files */
-#define A_PATCH                 17      /* for save_binary() */
-#define A_FUNCTIONALS           18
-#define A_FUNCTION_DEFS         19
-#define A_VAR_TEMP              20      /* table of variables */
-#define NUMAREAS                22
+#define A_FUNCTIONALS           17
+#define A_FUNCTION_DEFS         18
+#define A_VAR_TEMP              19      /* table of variables */
+#define NUMAREAS                20
 
 #define TREE_MAIN               0
 #define TREE_INIT               1
@@ -278,7 +277,7 @@ char *allocate_in_mem_block (int n, int size)
         do {
             mbp->max_size <<= 1;
         } while (mbp->current_size + size > mbp->max_size);
-        
+
         mbp->block = (char *)DREALLOC(mbp->block, mbp->max_size, TAG_COMPILER, "insert_in_mem_block");
     }
     ret = mbp->block + mbp->current_size;

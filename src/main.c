@@ -4,7 +4,6 @@
 #include "lpc_incl.h"
 #include "backend.h"
 #include "simul_efun.h"
-#include "binaries.h"
 #include "main.h"
 #include "otable.h"
 #include "comm.h"
@@ -24,7 +23,7 @@ int comp_flag = 0;    /* Trace compilations */
 int max_cost;
 int time_to_clean_up;
 const char *default_fail_message;
-int boot_time;
+time_t boot_time;
 int max_array_size;
 int max_buffer_size;
 int max_string_length;
@@ -49,6 +48,10 @@ void init_addr_server();
 
 static void CDECL sig_fpe SIGPROT;
 static void CDECL sig_cld SIGPROT;
+
+#ifdef HAS_CONSOLE
+static void CDECL sig_ttin SIGPROT;
+#endif
 
 #ifdef TRAP_CRASHES
 static void CDECL sig_usr1 SIGPROT;
@@ -89,7 +92,7 @@ int main (int argc, char ** argv)
 #endif
 
 #ifdef INCL_LOCALE_H
-    setlocale(LC_ALL, "");
+    setlocale(LC_ALL, "C");
 #endif
 
 #if !defined(__SASC) && (defined(AMITCP) || defined(AS225))
@@ -272,6 +275,11 @@ int main (int argc, char ** argv)
   case 'N':
       no_ip_demon++;
       continue;
+#ifdef HAS_CONSOLE
+  case 'C':
+      has_console = 1;
+      continue;
+#endif
 #ifdef YYDEBUG
   case 'y':
       yydebug = 1;
@@ -294,9 +302,6 @@ int main (int argc, char ** argv)
     time(&tm);
     debug_message("----------------------------------------------------------------------------\n%s (%s) starting up on %s - %s\n\n", MUD_NAME, version_buf, ARCH, ctime(&tm));
 
-#ifdef BINARIES
-    init_binaries(argc, argv);
-#endif
     add_predefines();
 #ifdef WIN32
     _tzset();
@@ -311,7 +316,7 @@ int main (int argc, char ** argv)
 
     save_context(&econ);
     if (SETJMP(econ.context)) {
-  debug_message("The simul_efun (%s) and master (%s) objects must be loadable.\n", 
+  debug_message("The simul_efun (%s) and master (%s) objects must be loadable.\n",
           SIMUL_EFUN, MASTER_FILE);
   exit(-1);
     } else {
@@ -332,6 +337,7 @@ int main (int argc, char ** argv)
       case 'N':
       case 'm':
       case 'y':
+      case 'C':
     continue;
       case 'f':
     save_context(&econ);
@@ -402,7 +408,7 @@ int main (int argc, char ** argv)
     signal(SIGTERM, sig_term);
     signal(SIGINT, sig_int);
 #ifndef DEBUG
-#if defined(SIGABRT) 
+#if defined(SIGABRT)
     signal(SIGABRT, sig_abrt);
 #endif
 #ifdef SIGIOT
@@ -425,7 +431,14 @@ int main (int argc, char ** argv)
     signal(SIGCLD, sig_cld);
 #endif
 #endif
-    backend();
+
+#ifdef HAS_CONSOLE
+    if(has_console >= 0)
+      signal(SIGTTIN, sig_ttin);
+    signal(SIGTTOU, SIG_IGN);
+#endif
+
+backend();
     return 0;
 }
 
@@ -462,7 +475,7 @@ char *int_string_unlink (const char * str)
 
     mbt = ((malloc_block_t *)str) - 1;
     mbt->ref--;
-    
+
     if (mbt->size == USHRT_MAX) {
   int l = strlen(str + USHRT_MAX) + USHRT_MAX; /* ouch */
 
@@ -478,7 +491,7 @@ char *int_string_unlink (const char * str)
     }
     newmbt->ref = 1;
     CHECK_STRING_STATS;
-    
+
     return (char *)(newmbt + 1);
 }
 
@@ -495,9 +508,10 @@ void debug_message (const char *fmt, ...)
    * check whether config file specified this option
    */
   if (strlen(DEBUG_LOG_FILE))
-      sprintf(deb, "%s/%s", LOG_DIR, DEBUG_LOG_FILE);
+	  snprintf(deb, 1023, "%s/%s", LOG_DIR, DEBUG_LOG_FILE);
   else
-      sprintf(deb, "%s/debug.log", LOG_DIR);
+	  snprintf(deb, 1023, "%s/debug.log", LOG_DIR);
+  deb[1023] = 0;
   while (*deb == '/')
       deb++;
   debug_message_fp = fopen(deb, "w");
@@ -524,33 +538,33 @@ int slow_shut_down_to_do = 0;
 
 char *xalloc (int size)
 {
-    char *p;
-    const char *t;
-    static int going_to_exit;
+	char *p;
+	const char *t;
+	static int going_to_exit;
 
-    if (going_to_exit)
-  exit(3);
+	if (going_to_exit)
+		exit(3);
 #ifdef DEBUG
-    if (size == 0)
-  fatal("Tried to allocate 0 bytes.\n");
+	if (size == 0)
+		fatal("Tried to allocate 0 bytes.\n");
 #endif
-    p = (char *) DMALLOC(size, TAG_MISC, "main.c: xalloc");
-    if (p == 0) {
-  if (reserved_area) {
-      FREE(reserved_area);
-      t = "Temporarily out of MEMORY. Freeing reserve.\n";
-      write(1, t, strlen(t));
-      reserved_area = 0;
-      slow_shut_down_to_do = 6;
-      return xalloc(size);/* Try again */
-  }
-  going_to_exit = 1;
-  fatal("Totally out of MEMORY.\n");
-    }
-    return p;
+	p = (char *) DMALLOC(size, TAG_MISC, "main.c: xalloc");
+	if (p == 0) {
+		if (reserved_area) {
+			FREE(reserved_area);
+			t = "Temporarily out of MEMORY. Freeing reserve.\n";
+			write(1, t, strlen(t));
+			reserved_area = 0;
+			slow_shut_down_to_do = 6;
+			return xalloc(size);/* Try again */
+		}
+		going_to_exit = 1;
+		fatal("Totally out of MEMORY.\n");
+	}
+	return p;
 }
 
-static void CDECL PSIG(sig_cld) 
+static void CDECL PSIG(sig_cld)
 {
 #ifndef WIN32
     int status;
@@ -564,11 +578,43 @@ static void CDECL PSIG(sig_cld)
 #endif
 }
 
-
 static void CDECL PSIG(sig_fpe)
 {
     signal(SIGFPE, sig_fpe);
 }
+
+#ifdef HAS_CONSOLE
+void restore_sigttin(void) {
+  if(has_console >= 0)
+    signal(SIGTTIN, sig_ttin);
+}
+
+/* The console goes to sleep when backgrounded and can
+ * be woken back up with kill -SIGTTIN <pid>
+ */
+static void CDECL PSIG(sig_ttin)
+{   char junk[1024];
+    int fl;
+
+    has_console = !has_console;
+
+    signal(SIGTTIN, SIG_IGN);
+
+    if(has_console) {
+      /* now eat all the gibberish they typed in the console when it was dead */
+      fl = fcntl(STDIN_FILENO, F_GETFL);
+      fcntl(STDIN_FILENO, F_SETFL, fl | O_NONBLOCK);
+
+      while(read(STDIN_FILENO, junk, 1023) > 0);  /* ; */
+
+      /* leaving the output nonblocking is a bad idea.  large outputs tend
+         to get truncated.
+      */
+      fcntl(STDIN_FILENO, F_SETFL, fl);
+    }
+}
+#endif
+
 
 #ifdef TRAP_CRASHES
 

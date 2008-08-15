@@ -8,7 +8,7 @@
 
 struct translation *head;
 
-static struct translation *find_translator(char *encoding){
+static struct translation *find_translator(const char *encoding){
     struct translation *cur = head;
     while(cur){
 	if(!strcmp(cur->name, encoding))
@@ -19,7 +19,7 @@ static struct translation *find_translator(char *encoding){
 }
 
 
-struct translation *get_translator(char *encoding){
+struct translation *get_translator(const char *encoding){
     struct translation *ret = find_translator(encoding);
     if(ret)
 	return ret;
@@ -32,7 +32,7 @@ struct translation *get_translator(char *encoding){
     ret->name = name;
     ret->incoming = iconv_open("UTF-8", encoding);
     ret->outgoing = iconv_open(name, "UTF-8");
-    
+
     ret->next = 0;
     if(ret->incoming == (iconv_t)-1 || ret->outgoing == (iconv_t)-1){
 	FREE(name);
@@ -63,13 +63,13 @@ char *translate(iconv_t tr, const char *mes, int inlen, int *outlen){
       res = (char *)MALLOC(1);
 	reslen = 1;
     }
- 
+
     tmp2 = res;
     len2 = reslen;
 
     while(len){
       iconv(tr, (char **)&tmp, &len, &tmp2, &len2);
-	if(len > 1) 
+	if(len > 1)
 #ifdef PACKAGE_DWLIB
 	    if(tmp[0] == 0xff && tmp[1] == 0xf9){
 		len -=2;
@@ -173,7 +173,7 @@ void f_str_to_arr(){
 }
 
 #endif
-  
+
 #ifdef F_ARR_TO_STR
 void f_arr_to_str(){
   static struct translation *newt = 0;

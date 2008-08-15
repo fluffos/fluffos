@@ -1,6 +1,23 @@
 As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :), note: where it says Cratylus, I got it from his version, usually
 someone else did the work, but I don't know how to find who did what there.
+
+FluffOS 2.13:
+oh no! unlucky number
+removed binaries support
+fixed crasher in restore_string
+fixed some new compiler warnings (gcc 4.3)
+some cleanups in comm.c (Cratylus@Dead souls)
+cygwin and other changes in build.FluffOS (Cratylus@Dead souls)
+set program_t to {0} for silly OSes that don't clear BBS memory (Cratylus@Dead souls) 
+    (I think there may be more places that could go wrong!)
+changed locale to "C" (Cratylus@Dead souls) 
+Added a console, mostly for debugging use.  If driver is started directly
+        rather than through a script, add argument -C and it has a 
+        command-line.  try 'help'.  HAS_CONSOLE must be defined in
+        local_options. (hamlet)
+fixed crasher where we did remove_interactive when people go netdead, bad idea!
+
 FluffOS 2.12:
 Crasher fixes in using a mudlib error handler (Cratylus@Dead souls)
 some mingw fixes (Cratylus@Dead souls)
@@ -17,15 +34,12 @@ rework of ed to do larger output chunks, more configurability, and bugfixes:
         will indent each level. (hamlet)
 fixed several crashers (comm.c and simulate.c) related to using vsprintf
 	instead of vsnprintf. (hamlet)
-time() now takes an optional arg of 1.  time() remains the same: "when did 
-	this execution begin"  time(1) return real current time (via possibly
-	costly system call). (hamlet)
 added CFG_MAX_GLOBAL_VARIABLES to options.h.  Old setting was an arbitrary 256.
         (hamlet)
 async writes with compression 
 fixed some memory leaks
 stuff I forgot, it's been too long!
-slightly usuful sfuns if you use async:
+slightly useful sfuns if you use async:
 
 void decode(object ob, int flag, function cb, string saved){
   string *lines = explode(saved, "\n");

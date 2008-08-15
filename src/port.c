@@ -6,7 +6,7 @@
 #ifndef MINGW
 #include <sys/mman.h>
 #endif
-#if defined(WIN32) 
+#if defined(WIN32)
 int dos_style_link (char * x, char * y) {
     char link_cmd[100];
     sprintf(link_cmd, "copy %s %s", x, y);
@@ -77,9 +77,9 @@ long get_current_time()
     return time(0l);	/* Just use the old time() for now */
 }
 
-char *time_string (time_t t)
+const char *time_string (time_t t)
 {
-    char *res = ctime(&t);
+    const char *res = ctime(&t);
     if(!res)
       res = "ctime failed";
     return res;
@@ -277,7 +277,7 @@ void * sbrkx(long size){
     if(tmp != end)
       return NULL;
   }
-  
+
   newsize = (long)end + size;
   result = end;
   end = newsize;
@@ -289,7 +289,7 @@ void * sbrkx(long size){
 
   if(tmp != (void *) 0x41000000)
     return NULL;
-  
+
   tsize = newsize;
   return result;
 }

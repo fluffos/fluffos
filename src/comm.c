@@ -14,6 +14,7 @@
 #include "master.h"
 #include "add_action.h"
 #include "eval.h"
+#include "console.h"
 
 #ifdef MINGW
 #define ENOSR 63
@@ -21,6 +22,10 @@
 
 #ifndef ADDRFAIL_NOTIFY
 #define ADDRFAIL_NOTIFY 0
+#endif
+
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
 #endif
 
 #define TELOPT_COMPRESS 85
@@ -96,7 +101,6 @@ static void start_compression (interactive_t *);
 static int send_compressed (interactive_t *ip, unsigned char* data, int length);
 
 
-
 #ifdef NO_SNOOP
 #  define handle_snoop(str, len, who)
 #else
@@ -135,6 +139,9 @@ int inet_packets = 0;
 int inet_volume = 0;
 interactive_t **all_users = 0;
 int max_users = 0;
+#ifdef HAS_CONSOLE
+int has_console = -1;
+#endif
 
 /*
  * private local variables.
@@ -189,7 +196,7 @@ receive_snoop (const char * buf, int len, object_t * snooper)
 void init_user_conn()
 {
     struct sockaddr_in sin;
-    unsigned int sin_len;
+    socklen_t sin_len;
     int optval;
     int i;
     int have_fd6;
@@ -377,11 +384,13 @@ void init_addr_server (char * hostname, int addr_server_port)
      * connect socket to server address.
      */
     if (connect(server_fd, (struct sockaddr *) & server, sizeof(server)) == -1) {
-        if (socket_errno == ECONNREFUSED && ADDRFAIL_NOTIFY)
-            debug_message("Connection to address server (%s %d) refused.\n",
-                          hostname, addr_server_port);
-        else
-            socket_perror("init_addr_server: connect", 0);
+    	if(ADDRFAIL_NOTIFY){
+    		if (socket_errno == ECONNREFUSED && ADDRFAIL_NOTIFY)
+    			debug_message("Connection to address server (%s %d) refused.\n",
+    					hostname, addr_server_port);
+    		else
+    			socket_perror("init_addr_server: connect", 0);
+    	}
         OS_socket_close(server_fd);
         return;
     }
@@ -673,13 +682,12 @@ int flush_message (interactive_t * ip)
         } else {
 #endif
         num_bytes = send(ip->fd, ip->message_buf + ip->message_consumer,
-                         length, ip->out_of_band);
+                         length, ip->out_of_band | MSG_NOSIGNAL);
 #ifdef HAVE_ZLIB
         }
 #endif
         if (!num_bytes) {
             ip->iflags |= NET_DEAD;
-            remove_interactive(ip->ob, 0);
             return 0;
         }
         if (num_bytes == -1) {
@@ -697,7 +705,6 @@ int flush_message (interactive_t * ip)
             } else {
               //socket_perror("flush_message: write", 0);
                 ip->iflags |= NET_DEAD;
-                remove_interactive(ip->ob, 0);
                 return 0;
             }
         }
@@ -1386,6 +1393,7 @@ void sigpipe_handler()
 #endif
 {
     debug(connections, ("SIGPIPE received."));
+    //don't comment the next line out, i'm pretty sure we'd crash on the next SIGPIPE, they're not worth it
     signal(SIGPIPE, sigpipe_handler);
 }                               /* sigpipe_handler() */
 
@@ -1410,6 +1418,11 @@ INLINE void make_selectmasks()
      */
     FD_ZERO(&readmask);
     FD_ZERO(&writemask);
+#ifdef HAS_CONSOLE
+    /* set up a console */
+    if(has_console > 0)
+      FD_SET(STDIN_FILENO, &readmask);
+#endif
     /*
      * set new user accept fd in readmask.
      */
@@ -1511,6 +1524,31 @@ INLINE void process_io()
             hname_handler();
         }
     }
+#ifdef HAS_CONSOLE
+    /* Process console input */
+    /* Note: need the has_console on the next line because linux (at least)
+             recycles fds, even STDIN_FILENO
+     */
+    if((has_console > 0) && FD_ISSET(STDIN_FILENO, &readmask)) {
+    	char s[1024];
+    	int sz;
+
+    	if((sz = read(STDIN_FILENO, s, 1023)) > 0) {
+    		s[sz-1] = '\0';
+    		console_command(s);
+    	}
+    	else if(sz == 0) {
+    		printf("Console exiting.  The MUD remains.\n");
+    		has_console = 0;
+    	}
+    	else {
+    		printf("Console read error: %d %d.  Closing console.\n", sz, errno);
+    		has_console = 0;
+    		restore_sigttin();
+    	}
+    }
+#endif
+
 }
 
 /*
@@ -1523,7 +1561,7 @@ static void new_user_handler (int which)
 {
     int new_socket_fd;
     struct sockaddr_in addr;
-    unsigned int length;
+    socklen_t length;
     int i, x;
     object_t *master, *ob;
     svalue_t *ret;
@@ -1531,7 +1569,7 @@ static void new_user_handler (int which)
     length = sizeof(addr);
     debug(connections, ("new_user_handler: accept on fd %d\n", external_port[which].fd));
     new_socket_fd = accept(external_port[which].fd,
-                           (struct sockaddr *) & addr, (unsigned int *) &length);
+                           (struct sockaddr *) & addr, &length);
     if (new_socket_fd < 0) {
 #ifdef EWOULDBLOCK
         if (socket_errno == EWOULDBLOCK) {

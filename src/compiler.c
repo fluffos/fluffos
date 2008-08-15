@@ -5,7 +5,7 @@
 #include "scratchpad.h"
 #include "qsort.h"
 #include "file.h"
-#include "binaries.h"
+
 /* This should be moved with initializers move out of here */
 #include "icode.h"
 #include "lex.h"
@@ -66,7 +66,7 @@ unsigned short *prog_flags, *comp_sorted_funcs;
 char *prog_code;
 char *prog_code_max;
 
-program_t NULL_program;
+program_t NULL_program = {0};
 
 program_t *prog;
 
@@ -2449,11 +2449,6 @@ static program_t *epilog (void) {
     if (p - (char *)prog != size) {
         fprintf(stderr, "Program size miscalculated for /%s.\n", prog->filename);
         fprintf(stderr, "is: %i, expected: %i\n", p-(char *)prog, size);
-    }
-#endif
-#ifdef BINARIES
-    if (pragmas & PRAGMA_SAVE_BINARY) {
-        save_binary(prog, &mem_block[A_INCLUDES], &mem_block[A_PATCH]);
     }
 #endif
 

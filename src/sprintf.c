@@ -228,7 +228,7 @@ static void push_sprintf_state (void) {
 static void sprintf_error (int which, char * premade) {
     char lbuf[2048];
     const char *err;
-    
+
     switch (which) {
     case ERR_BUFF_OVERFLOW:
         err = "BUFF_SIZE overflowed...";
@@ -303,7 +303,7 @@ static void numadd (outbuffer_t * outbuf, long num)
     for (i = num / 10, num_l = nve + 1; i; i /= 10, num_l++);
     if ((space = outbuf_extend(outbuf, num_l))) {
         chop = num_l - space;
-        while (chop--) 
+        while (chop--)
             num /= 10; /* lose that last digits that got chopped */
         p = outbuf->buffer + outbuf->real_size;
         outbuf->real_size += space;
@@ -322,7 +322,7 @@ static void numadd (outbuffer_t * outbuf, long num)
 static void add_space (outbuffer_t * outbuf, int indent)
 {
     int l;
-    
+
     if ((l = outbuf_extend(outbuf, indent))) {
         memset(outbuf->buffer + outbuf->real_size, ' ', l);
         *(outbuf->buffer + outbuf->real_size + l) = 0;
@@ -383,7 +383,7 @@ void svalue_to_string (svalue_t * obj, outbuffer_t * outbuf, int indent, int tra
                 svalue_to_string(&(obj->u.arr->item[i]), outbuf,
                                  indent + 2, 1, 0);
 	    if(obj->u.arr->size)
-	      svalue_to_string(&(obj->u.arr->item[i]), outbuf, 
+	      svalue_to_string(&(obj->u.arr->item[i]), outbuf,
 			       indent + 2, 0, 0);
             outbuf_add(outbuf, "\n");
             add_space(outbuf, indent);
@@ -435,7 +435,7 @@ void svalue_to_string (svalue_t * obj, outbuffer_t * outbuf, int indent, int tra
                 {
                     char buf[10];
                     int n = obj->u.fp->f.functional.num_arg;
-                    
+
                     outbuf_add(outbuf, "<code>(");
                     for (i=1; i < n; i++) {
                         sprintf(buf, "$%i, ", i);
@@ -461,7 +461,7 @@ void svalue_to_string (svalue_t * obj, outbuffer_t * outbuf, int indent, int tra
                     outbuf_add(outbuf, ", ");
                     svalue_to_string(&(obj->u.fp->hdr.args->item[i]), outbuf, indent, 0, 0);
                 }
-            } 
+            }
         }
         outbuf_add(outbuf, " :)");
         break;
@@ -509,7 +509,7 @@ void svalue_to_string (svalue_t * obj, outbuffer_t * outbuf, int indent, int tra
             break;
         }
     default:
-        outbuf_add(outbuf, "!ERROR: GARBAGE SVALUE!");
+    	outbuf_addv(outbuf, "!ERROR: GARBAGE SVALUE: %x!", obj->type);
     }                           /* end of switch (obj->type) */
     if (trailing)
         outbuf_add(outbuf, ",\n");
@@ -518,21 +518,21 @@ void svalue_to_string (svalue_t * obj, outbuffer_t * outbuf, int indent, int tra
 static void add_pad (pad_info_t * pad, int len) {
     char *p;
     int padlen;
-    
+
     if (outbuf_extend(&(sprintf_state->obuff), len) < len)
         ERROR(ERR_BUFF_OVERFLOW);
     p = sprintf_state->obuff.buffer + sprintf_state->obuff.real_size;
     sprintf_state->obuff.real_size += len;
     p[len] = 0;
-    
+
     if (pad && (padlen = pad->len)) {
         char *end;
         const char *pstr = pad->what;
         int i;
         char c;
-        
+
         for (i = 0, end = p + len; p < end; i++) {
-            if (i == padlen) 
+            if (i == padlen)
                 i = 0;
 
             if ((c = pstr[i]) == '\\') {
@@ -626,7 +626,7 @@ static int add_column (cst ** column, int trailing)
             break;
         }
     }
-    add_justified(col_d, done, col->pad, 
+    add_justified(col_d, done, col->pad,
                   col->size, col->info, trailing || col->next);
     col_d += done;
     ret = 1;
@@ -664,14 +664,14 @@ static int add_table (cst ** table)
     tab_data_t *tab_d = tab->d.tab;     /* always tab->d.tab */
     const char *tab_di;                       /* always tab->d.tab[i].cur */
     int end;
-    
+
     for (i = 0; i < tab->nocols && (tab_di = tab_d[i].cur); i++) {
         end = tab_d[i + 1].start - tab_di - 1;
-    
+
         for (done = 0; done != end && tab_di[done] != '\n'; done++)
             ;
         add_justified(tab_di, (done > tab->size ? tab->size : done),
-                      tab->pad, tab->size, tab->info, 
+                      tab->pad, tab->size, tab->info,
                       tab->pad || (i < tab->nocols - 1) || tab->next);
         if (done >= end - 1) {
             tab_di = 0;
@@ -703,7 +703,7 @@ static int add_table (cst ** table)
 
 static int get_curpos() {
     char *p1, *p2;
-    
+
     if (!sprintf_state->obuff.buffer) return 0;
     p1 = sprintf_state->obuff.buffer + sprintf_state->obuff.real_size - 1;
     p2 = p1;
@@ -751,11 +751,11 @@ char *string_print_formatted (const char * format_str, int argc, svalue_t * argv
     STACK_INC;
     sp->type = T_ERROR_HANDLER;
     sp->u.error_handler = pop_sprintf_state;
-    
+
     last = 0;
     for (fpos = 0; 1; fpos++) {
         char c = format_str[fpos];
-        
+
         if (c == '\n' || !c) {
             int column_stat = 0;
 
@@ -965,7 +965,7 @@ char *string_print_formatted (const char * format_str, int argc, svalue_t * argv
             while (1) {
                 if ((finfo & INFO_T) == INFO_T_LPC) {
                     outbuffer_t outbuf;
-                    
+
                     outbuf_zero(&outbuf);
                     svalue_to_string(carg, &outbuf, 0, 0, 0);
                     outbuf_fix(&outbuf);
@@ -1026,7 +1026,7 @@ char *string_print_formatted (const char * format_str, int argc, svalue_t * argv
 #ifdef TCC
 			    puts("tcc has some bugs");
 #endif
-                            tmp = ((format_str[fpos] != '\n') 
+                            tmp = ((format_str[fpos] != '\n')
                                    && (format_str[fpos] != '\0'))
                                 || ((finfo & INFO_ARRAY)
                                     && (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size));
@@ -1037,7 +1037,7 @@ char *string_print_formatted (const char * format_str, int argc, svalue_t * argv
                         } else {/* (finfo & INFO_TABLE) */
                             unsigned int n, len, max_len;
                             const char *p1, *p2;
-                            
+
 #define TABLE carg->u.string
                             (*temp) = ALLOCATE(cst, TAG_TEMPORARY, "string_print: 4");
                             (*temp)->d.tab = 0;
@@ -1054,7 +1054,7 @@ char *string_print_formatted (const char * format_str, int argc, svalue_t * argv
                                     if (p1 - p2 > max_len)
                                         max_len = p1 - p2;
                                     p1++;
-                                    if (*(p2 = p1)) 
+                                    if (*(p2 = p1))
                                         n++;
                                 } else
                                     p1++;
@@ -1067,7 +1067,7 @@ char *string_print_formatted (const char * format_str, int argc, svalue_t * argv
                                                             * separating spaces */
                                 if (!pres)
                                     pres = 1;
-                                
+
                                 /* This moves some entries from the right side
                                  * of the table to fill out the last line,
                                  * which makes the table look a bit nicer.
@@ -1094,7 +1094,7 @@ char *string_print_formatted (const char * format_str, int argc, svalue_t * argv
                                 (*temp)->remainder += (pres - n)*((*temp)->size);
                                 pres = n;
                             }
-                            
+
                             (*temp)->d.tab = CALLOCATE(pres + 1, tab_data_t,
                                              TAG_TEMPORARY, "string_print: 5");
                             (*temp)->nocols = pres;     /* heavy sigh */
@@ -1151,7 +1151,7 @@ char *string_print_formatted (const char * format_str, int argc, svalue_t * argv
                            sprintf(cheat + i, "%ld", sizeof(temp) - 1);
                         else
                            sprintf(cheat + i, "%d", pres);
-                        
+
                         i += strlen(cheat + i);
                     }
                     switch (finfo & INFO_T) {

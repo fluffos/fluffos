@@ -33,7 +33,7 @@ static void config_init() {
     for (i = 0; i < NUM_CONFIG_STRS; i++) {
 	config_str[i] = 0;
     }
-    
+
 }
 
 static void read_config_file (FILE * file)
@@ -60,7 +60,7 @@ static void read_config_file (FILE * file)
 	    size += len + 1;
 	    if (size > buff_size) {
 		tmp = p - buff;
-		buff = RESIZE(buff, buff_size *= 2, char, 
+		buff = RESIZE(buff, buff_size *= 2, char,
 			      TAG_CONFIG, "read_config_file: 2");
 		p = buff + tmp;
 	    }
@@ -126,7 +126,7 @@ static char *process_config_string(char *str) {
     char *p = str;
     char *q;
     int n;
-    
+
     while (*p && isspace(*p))
 	p++;
     n = strlen(p);
@@ -200,13 +200,6 @@ void set_defaults (char * filename)
     CONFIG_STR(__LOG_DIR__) = alloc_cstring(tmp, "config file: ld");
     scan_config_line("include directories : %[^\n]", tmp, 1);
     CONFIG_STR(__INCLUDE_DIRS__) = alloc_cstring(tmp, "config file: id");
-#ifdef BINARIES
-    scan_config_line("save binaries directory : %[^\n]", tmp, 1);
-    CONFIG_STR(__SAVE_BINARIES_DIR__) = alloc_cstring(tmp, "config file: sbd");
-#else
-    CONFIG_STR(__SAVE_BINARIES_DIR__) = alloc_cstring("", "config file: sbd");
-#endif
-
     scan_config_line("master file : %[^\n]", tmp, 1);
     CONFIG_STR(__MASTER_FILE__) = alloc_cstring(tmp, "config file: mf");
     scan_config_line("simulated efun file : %[^\n]", tmp, 0);
@@ -246,7 +239,7 @@ void set_defaults (char * filename)
 	external_port[0].kind = PORT_TELNET;
 	port_start = 1;
     }
-    
+
     scan_config_line("address server port : %d\n",
 		     &CONFIG_INT(__ADDR_SERVER_PORT__), 0);
 
@@ -254,7 +247,7 @@ void set_defaults (char * filename)
 
     scan_config_line("time to clean up : %d\n",
 		     &CONFIG_INT(__TIME_TO_CLEAN_UP__), 1);
-    scan_config_line("time to reset : %d\n", 
+    scan_config_line("time to reset : %d\n",
 		     &CONFIG_INT(__TIME_TO_RESET__), 1);
     scan_config_line("time to swap : %d\n",
 		     &CONFIG_INT(__TIME_TO_SWAP__), 1);
@@ -263,7 +256,7 @@ void set_defaults (char * filename)
     /*
      * not currently used...see options.h
      */
-    scan_config_line("evaluator stack size : %d\n", 
+    scan_config_line("evaluator stack size : %d\n",
 		     &CONFIG_INT(__EVALUATOR_STACK_SIZE__), 0);
     scan_config_line("maximum local variables : %d\n",
 		     &CONFIG_INT(__MAX_LOCAL_VARIABLES__), 0);
@@ -275,23 +268,23 @@ void set_defaults (char * filename)
 
     scan_config_line("inherit chain size : %d\n",
 		     &CONFIG_INT(__INHERIT_CHAIN_SIZE__), 1);
-    scan_config_line("maximum evaluation cost : %d\n", 
+    scan_config_line("maximum evaluation cost : %d\n",
 		     &CONFIG_INT(__MAX_EVAL_COST__), 1);
 
     scan_config_line("maximum array size : %d\n",
 		     &CONFIG_INT(__MAX_ARRAY_SIZE__), 1);
 #ifndef NO_BUFFER_TYPE
-    scan_config_line("maximum buffer size : %d\n", 
+    scan_config_line("maximum buffer size : %d\n",
 		     &CONFIG_INT(__MAX_BUFFER_SIZE__), 1);
 #endif
-    scan_config_line("maximum mapping size : %d\n", 
+    scan_config_line("maximum mapping size : %d\n",
 		     &CONFIG_INT(__MAX_MAPPING_SIZE__), 1);
     scan_config_line("maximum string length : %d\n",
 		     &CONFIG_INT(__MAX_STRING_LENGTH__), 1);
     scan_config_line("maximum bits in a bitfield : %d\n",
 		     &CONFIG_INT(__MAX_BITFIELD_BITS__), 1);
 
-    scan_config_line("maximum byte transfer : %d\n", 
+    scan_config_line("maximum byte transfer : %d\n",
 		     &CONFIG_INT(__MAX_BYTE_TRANSFER__), 1);
     scan_config_line("maximum read file size : %d\n",
 		     &CONFIG_INT(__MAX_READ_FILE_SIZE__), 1);
@@ -318,14 +311,14 @@ void set_defaults (char * filename)
 	if (scan_config_line(kind, tmp, 0)) {
 	    if (sscanf(tmp, "%s %d", kind, &port) == 2) {
 		external_port[i].port = port;
-		if (!strcmp(kind, "telnet")) 
+		if (!strcmp(kind, "telnet"))
 		    external_port[i].kind = PORT_TELNET;
 		else
 		if (!strcmp(kind, "binary")) {
 #ifdef NO_BUFFER_TYPE
 		    fprintf(stderr, "binary ports unavailable with NO_BUFFER_TYPE defined.\n");
 		    exit(-1);
-#endif		    
+#endif
 		    external_port[i].kind = PORT_BINARY;
 		} else
 		if (!strcmp(kind, "ascii"))
@@ -344,7 +337,7 @@ void set_defaults (char * filename)
 		exit(-1);
 	    }
 	}
-    }		    
+    }
 #ifdef PACKAGE_EXTERNAL
     /* check for commands */
     for (i = 0; i < NUM_EXTERNAL_CMDS; i++) {
@@ -353,7 +346,7 @@ void set_defaults (char * filename)
 	    external_cmd[i] = alloc_cstring(tmp, "external cmd");
 	else
 	    external_cmd[i] = 0;
-    }		    
+    }
 #endif
 
     FREE(buff);

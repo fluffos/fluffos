@@ -39,6 +39,8 @@
 #define MAX_WORDS_PER_LINE 256
 #define MAX_WORD_LENGTH 1024
 #define MAX_MATCHES 10
+#define CHAR_FUNC 1024
+#define CHAR_BUF 1024
 
 char *pluralize (char *);
 
@@ -732,7 +734,7 @@ static int tokenize (const char ** rule, int * weightp) {
     }
 
     {
-        char buf[256];
+        char buf[CHAR_BUF];
 
         if (n > 50) {
             strncpy(buf, start, 50);
@@ -1014,7 +1016,7 @@ static hash_entry_t *add_hash_entry (const char * str) {
     return he;
 }
 
-void mark_hash_entry (char * str) {
+void mark_hash_entry (const char * str) {
     int h = DO_HASH(str, HASH_SIZE);
     hash_entry_t *he;
 
@@ -1937,7 +1939,7 @@ static int make_function (char * buf, char * end, int which,
 
 static int check_functions (object_t * obj, parse_state_t * state) {
     object_t *ob;
-    char func[256];
+    char func[CHAR_FUNC];
     int tryy, ret, args;
     
     SET_OB(obj);
@@ -2005,7 +2007,7 @@ static int parallel_check_functions (object_t * obj,
                                        parse_state_t * state,
                                        int which) {
     object_t *ob;
-    char func[256];
+    char func[CHAR_FUNC];
     int tryy, ret, args;
 
     free_parser_error(&parallel_error_info);
@@ -2031,7 +2033,7 @@ static int parallel_check_functions (object_t * obj,
 static void singular_check_functions (int which, parse_state_t * state,
                                         match_t * m) {
     bitvec_t *bv = &m->val.obs;
-    int i, k, ambig = 0, match;
+    int i, k, ambig = 0, match = -1;
     unsigned int j;
     int ordinal = m->ordinal;
     int ord2 = m->ordinal;
@@ -2058,6 +2060,7 @@ static void singular_check_functions (int which, parse_state_t * state,
                                     ordinal = -2;
                                 } else {
                                     m->val.number = BPI * i + k;
+                                    if(m->val.number > MAX_NUM_OBJECTS) abort();
                                     return;
                                 }
                             }
@@ -2071,7 +2074,11 @@ static void singular_check_functions (int which, parse_state_t * state,
                                     match = BPI * i + k;
                                 }
                                 if (m->token & CHOOSE_MODIFIER) {
-                                    if (match >= 0) m->val.number = match;
+                                    if (match >= 0) 
+                                    {
+                                        m->val.number = match;
+                                        if(m->val.number > MAX_NUM_OBJECTS) abort();
+                                    } 
                                     return;
                                 }
                             } else {
@@ -2096,6 +2103,7 @@ static void singular_check_functions (int which, parse_state_t * state,
     if (!has_ordinal) {
         if (ambig == 1) {
             m->val.number = match;
+            if(m->val.number > MAX_NUM_OBJECTS) abort();
             return;
         }
         if (was_error)
@@ -2202,7 +2210,11 @@ static void dependent_check_functions (int which, parse_state_t * state,
                     if (!ret || cache_last_parallel_error(&errinfo))
                         bv->b[i] &= ~j;
                     else {
-                        if (!found_one) m->val.number = BPI * i + k;
+                        if (!found_one) 
+                        {
+                            m->val.number = BPI * i + k;
+                            if(m->val.number > MAX_NUM_OBJECTS) abort();
+                        } 
                         found_one = 1;
                     }
                 }
@@ -2481,6 +2493,8 @@ static void check_object_relations (parse_state_t * state) {
     else matches[direct].val.number = 0; 
     if (indirect_unique) matches[indirect].val.number = found_indirect;
     else matches[indirect].val.number = 0;
+
+    if(matches[indirect].val.number > MAX_NUM_OBJECTS) abort();
     
     if (found_direct < 0) {
         if (use_cached_parallel_error(state, &err) ||
@@ -2495,7 +2509,7 @@ static void check_object_relations (parse_state_t * state) {
 }
 
 static void we_are_finished (parse_state_t * state) {
-    char func[256];
+    char func[CHAR_FUNC];
     char *p;
     int which, mtch;
     int tryy, args;

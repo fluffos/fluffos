@@ -390,8 +390,6 @@
  * PRAGMA_SAVE_TYPES:   save the types of function arguments for checking
  *                      calls to functions in this object by objects that
  *                      inherit it.
- * PRAGMA_SAVE_BINARY:  save a compiled binary version of this file for
- *                      faster loading next time it is needed.
  * PRAGMA_OPTIMIZE:     make a second pass over the generated code to
  *                      optimize it further.  Currently does jump threading.
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
@@ -547,23 +545,6 @@
  *   recognized by the lexer).
  */
 #undef NO_BUFFER_TYPE
-
-/* BINARIES: define this to enable the 'save_binary' pragma.
- *   This pragma, when set in a program, will cause it to save a
- *   binary image when loaded, so that subsequent loadings will
- *   be much faster.  The binaries are saved in the directory
- *   specified in the configuration file.  The binaries will not
- *   load if the LPC source or any of the inherited or included
- *   files are out of date, in which case the file is compiled
- *   normally (and may save a new binary).
- *
- *   In order to save the binary, valid_save_binary() is called
- *   in master.c, and is passed the name of the source file.  If
- *   this returns a non-zero value, the binary is allowed to be
- *   saved.  Allowing any file by any wizard to be saved as a
- *   binary is convenient, but may take up a lot of disk space.
- */
-#define BINARIES
 
 /* ARRAY_RESERVED_WORD: If this is defined then the word 'array' can
  *   be used to define arrays, as in:
@@ -904,6 +885,16 @@
  * char for 8 bit, short for 16, int for 32,
  * long long for 64 (completely useless on 32 bit machines though!) */
 #define PROG_REF_TYPE short
+
+/* HAS_CONSOLE: If defined, the driver can take the argument -C
+ *   which will give the driver an interactive console (you can type
+ *   commands at the terminal.)  Backgrounding the driver will turn off
+ *   the console, but sending signal SIGTTIN (kill -21) to the driver can
+ *   turn it back on.  Typing 'help' will display commands available.
+ *   The intent is to allow the inspection of things that are difficult
+ *   to inspect from inside the mud.
+ */
+#define HAS_CONSOLE
 
 #endif
 

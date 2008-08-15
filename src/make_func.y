@@ -13,7 +13,7 @@
 #include <process.h>
 #endif
 
-    void mf_fatal(char *);
+    void mf_fatal(const char *);
     void yyerror(char const *);
 
     int num_buff = 0;
@@ -21,7 +21,7 @@
     char *oper_codes[MAX_FUNC];
     char *efun_codes[MAX_FUNC], *efun1_codes[MAX_FUNC];
     char *efun_names[MAX_FUNC], *efun1_names[MAX_FUNC];
-    char *key[MAX_FUNC], *buf[MAX_FUNC];
+    const char *key[MAX_FUNC], *buf[MAX_FUNC];
 
     int min_arg = -1, limit_max = 0;
 
@@ -38,7 +38,7 @@ int arg_types[400], last_current_type;
 int curr_arg_types[40], curr_arg_type_size;
 
 struct type {
-    char *name;
+    const char *name;
     int num;
 } types[] = {
 { "void", VOID },
@@ -58,7 +58,7 @@ struct type {
 
 %union {
     int number;
-    char *string;
+    const char *string;
 }
 
 %token ID NUM DEFAULT OPERATOR
@@ -88,7 +88,7 @@ op: ID
 	}
 	oper_codes[op_code] = (char *) malloc(i+1);
 	strcpy(oper_codes[op_code], f_name);
-        free($1);
+        free((void *)$1);
 
 	op_code++;
     } ;
@@ -148,7 +148,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 		if (islower(f_name[i]))
 		    f_name[i] = toupper(f_name[i]);
 	    }
-	    free($3);
+	    free((void *)$3);
 	}
 	for(i=0; i < last_current_type; i++) {
 	    int j;
@@ -180,7 +180,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 
         key[num_buff] = $2;
 	buf[num_buff] = (char *) malloc(strlen(buff) + 1);
-        strcpy(buf[num_buff], buff);
+        strcpy((char *)buf[num_buff], buff);
         num_buff++;
 	min_arg = -1;
 	limit_max = 0;
@@ -204,7 +204,7 @@ basic: ID
 		sprintf(buf, "Invalid type: %s", $1);
 		yyerror(buf);
 	}
-        free($1);
+        free((void *)$1);
     };
 
 arg_list: /* empty */		{ $$ = 0; }
@@ -235,10 +235,10 @@ typel: arg_type			{ $$ = ($1 == VOID && min_arg == -1); }
 
 %%
 
-char *ctype (int n)
+const char *ctype (int n)
 {
     static char buff[100];	/* 100 is such a comfortable size :-) */
-    char *p = (char *)NULL;
+    const char *p = (char *)NULL;
 
     if (n & 0x10000)
 	strcpy(buff, "TYPE_MOD_ARRAY|");
@@ -264,7 +264,7 @@ char *ctype (int n)
     return buff;
 }
 
-char *etype1 (int n)
+const char *etype1 (int n)
 {
     if (n & 0x10000)
 	return "T_ARRAY";
@@ -291,7 +291,7 @@ char *etype1 (int n)
     return "What?";
 }
 
-char *etype (int n)
+const char *etype (int n)
 {
     int i;
     int local_size = 100;
@@ -307,7 +307,7 @@ char *etype (int n)
 	return "T_ANY";
     buff[0] = '\0';
     for(; curr_arg_types[i] != 0; i++) {
-	char *p;
+	const char *p;
 	if (curr_arg_types[i] == VOID)
 	    continue;
 	if (buff[0] != '\0')
@@ -411,7 +411,7 @@ int ident (int c)
 	return OPERATOR;
 
     yylval.string = (char *)malloc(strlen(buff)+1);
-    strcpy(yylval.string, buff);
+    strcpy((char *)yylval.string, buff);
     return ID;
 }
 

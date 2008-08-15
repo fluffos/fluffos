@@ -22,7 +22,6 @@
 #define BIN_DIR                 CONFIG_STR(__BIN_DIR__)
 #define LOG_DIR                 CONFIG_STR(__LOG_DIR__)
 #define INCLUDE_DIRS            CONFIG_STR(__INCLUDE_DIRS__)
-#define SAVE_BINARIES           CONFIG_STR(__SAVE_BINARIES_DIR__)
 #define MASTER_FILE             CONFIG_STR(__MASTER_FILE__)
 #define SIMUL_EFUN              CONFIG_STR(__SIMUL_EFUN_FILE__)
 #define SWAP_FILE               CONFIG_STR(__SWAP_FILE__)

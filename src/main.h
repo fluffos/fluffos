@@ -2,7 +2,7 @@
 #define MAIN_H
 
 #include "lpc_incl.h"
-
+#include <time.h>
 /*
  * main.c
  */
@@ -34,7 +34,7 @@ extern int t_flag;
 extern int comp_flag;
 extern int time_to_clean_up;
 extern const char *default_fail_message;
-extern int boot_time;
+extern time_t boot_time;
 extern int max_cost;
 extern int max_array_size;
 extern int max_buffer_size;

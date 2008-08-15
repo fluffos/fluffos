@@ -176,6 +176,18 @@ fi
 echo MAKE=$MAKE >Makefile.tmp
 
 #
+# Determine if running under Cygwin-32 and use a.exe instead
+# of a.out if so
+#
+if test $CYGWIN; then
+    A_OUT=a.exe
+    echo Using a.exe for Cygwin GNU compiler default executable
+else
+    A_OUT=a.out
+    echo Using standard a.out for compiler default executable
+fi
+
+#
 # Figure out what to use for CC
 #
 cat >comptest.c <<END
@@ -191,9 +203,13 @@ if test $? -eq 0; then
 else
     gcc comptest.c
     if test $? -eq 0; then
-        CC="g++"
+        CC="gcc"
         if test "${DEBUG-x}" = "x"; then
             OPTIMIZE=${OPTIMIZE-"-O3"}
+        fi
+        gcc -m64 comptest.c
+        if test $? -eq 0; then
+            CC="gcc -m64"
         fi
 	GNUC=1
 	CCFLAGS=-D__USE_FIXED_PROTOTYPES__
@@ -352,7 +368,7 @@ int main() {
 }
 END
 $CC $CFLAGS comptest.c
-ARCH=`./a.out`
+ARCH=`./$A_OUT`
 
 cat >comptest.c <<END
 int main(int argc, char **argv) { return 0; }
@@ -385,22 +401,7 @@ esac
 #	;;
 #esac
 
-#
-# check for some missing functions
-#
-rm a.out
-cat >comptest.c <<END
-#include <string.h>
-#include <stdlib.h>
-int main() {
-memcpy(0,0,0);memset(0,0,0);strtol(0,0,0);strcspn(0,0);
-return 0;
-}
-END
-$CC $CFLAGS comptest.c
-if test ! -f a.out; then
-    STRFUNCS=strfuncs.o
-fi
+rm $A_OUT
 
 CFLAGS="$CCFLAGS $OSFLAGS $WARN $PROFIL $DEBUG $DEBUG_MACRO $DEBUG_NON_FATAL $STR $PIPE $NEED_OLD_CPP $INCLUDE $EXPORT_DYNAMIC"
 if test ! "$OBJDIR" = ""; then
@@ -422,6 +423,8 @@ echo YACC=$YACC >>Makefile.tmp
 echo RANLIB=$RANLIB >>Makefile.tmp
 echo A=a >>Makefile.tmp
 echo O=o >>Makefile.tmp
+echo A_OUT=$A_OUT >>Makefile.tmp
+
 
 echo "***************** Configuration completed **************"
 echo "Installing MudOS on $ARCH"

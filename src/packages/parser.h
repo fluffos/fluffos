@@ -25,7 +25,7 @@
 #define OBS_TOKEN	     ADD_MOD(OBJ_A_TOKEN, PLURAL_MODIFIER)
 #define LVS_TOKEN	     ADD_MOD(LIV_A_TOKEN, PLURAL_MODIFIER)
 
-#define MAX_NUM_OBJECTS      1024
+#define MAX_NUM_OBJECTS      4096
 /* must be powers of 2 */
 #define HASH_SIZE            32
 #define VERB_HASH_SIZE       128

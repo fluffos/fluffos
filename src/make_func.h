@@ -19,11 +19,11 @@ extern int op_code, efun_code, efun1_code;
 extern char *oper_codes[MAX_FUNC];
 extern char *efun_codes[MAX_FUNC], *efun1_codes[MAX_FUNC];
 extern char *efun_names[MAX_FUNC], *efun1_names[MAX_FUNC];
-extern char *key[MAX_FUNC], *buf[MAX_FUNC];
+extern const char *key[MAX_FUNC], *buf[MAX_FUNC];
 
 extern int arg_types[400], last_current_type;
 
-char *ctype (int);
-char *etype (int);
+const char *ctype (int);
+const char *etype (int);
 
 #endif

@@ -611,7 +611,8 @@ INLINE_STATIC void add_map_stats (mapping_t * m, int count)
 static int
 restore_mapping (char **str, svalue_t * sv)
 {
-    int size, i, mask, oi, count = 0;
+    int size, i, mask, count = 0;
+    unsigned long oi;
     char c;
     mapping_t *m;
     svalue_t key, value;
@@ -1008,29 +1009,28 @@ restore_string (char * val, svalue_t * sv)
         case '\\':
             {
                 char *news = cp - 1;
-
                 if ((*news++ = *cp++)) {
-                    while ((c = *cp++) != '"') {
+                    while ((c = *cp++) != '"' && c) {
                         if (c == '\\') {
-                            if (!(*news++ = *cp++)) return ROB_STRING_ERROR;
-                        }
-                        else {
+                            if (!(*news++ = *cp++))
+                            	return ROB_STRING_ERROR;
+                        } else {
                             if (c == '\r')
                                 *news++ = '\n';
-                            else *news++ = c;
+                            else
+                            	*news++ = c;
                         }
                     }
-                    if ((c == '\0') || (*cp != '\0')) return ROB_STRING_ERROR;
+                    if ((c == '\0') || (*cp != '\0'))
+                    	return ROB_STRING_ERROR;
                     *news = '\0';
-                    newstr = new_string(news - start,
-                                              "restore_string");
+                    newstr = new_string(news - start, "restore_string");
                     strcpy(newstr, start);
                     sv->u.string = newstr;
                     sv->type = T_STRING;
                     sv->subtype = STRING_MALLOC;
                     return 0;
                 }
-                else return ROB_STRING_ERROR;
             }
 
         case '\0':
@@ -1737,8 +1737,8 @@ int restore_object (object_t * ob, const char * file, int noclear)
 void restore_variable (svalue_t * var, char * str)
 {
     int rc;
-
     rc = restore_svalue(str, var);
+
     if (rc & ROB_ERROR) {
         *var = const0; /* clean up */
         if (rc & ROB_GENERAL_ERROR)
@@ -1852,15 +1852,20 @@ void dealloc_object (object_t * ob, const char * from)
 
 void free_object (object_t ** ob, const char * const from)
 {
+    //note that we get a pointer to a pointer unlike MudOS where it's a pointer to the object
+	//this is so we can clear the variable holding the reference as that shouldn't be used anymore
+	//after freeing it! don't set to NULL as that might still hide such bugs, and I suspect it may
+	//be related to some of the corrupted memory crashes (which dw stopped doing, oh well, I'm sure it
+	//will be back.) Better to find and fix than to hide!
   if(*ob)
     (*ob)->ref--;
 
   if ((*ob)->ref > 0) {
-    *ob = (object_t *)9;//NULL;
+    *ob = (object_t *)9;
     return;
   }
   dealloc_object(*ob, from);
-  *ob = (object_t *)1;//NULL;
+  *ob = (object_t *)1;
 }
 
 /*

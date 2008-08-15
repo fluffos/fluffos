@@ -81,7 +81,11 @@
 #endif
 
 #if defined(SunOS_5)
-#define ARCH "Solaris"
+#  ifdef sparc
+#    define ARCH "Solaris SPARC"
+#  else
+#    define ARCH "Solaris x86"
+#  endif
 #endif
 
 #ifdef _AUX_SOURCE

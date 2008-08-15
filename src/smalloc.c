@@ -108,7 +108,7 @@ static void mark_block (u *);
 static char *esbrk (u);
 static int resort_free_list (void);
 #ifdef DEBUG
-static void walk_new_small_malloced (void (* ()));
+static void walk_new_small_malloced (void (*func) (POINTER, int));
 #endif
 
 #define s_size_ptr(p)	(p)
@@ -1041,7 +1041,7 @@ static char *esbrk (u size)
     static char *current_break = 0;
 
     if (current_break == 0)
-	current_break = sbrkx(0);
+	current_break = (char *)sbrkx(0);
     if (brk(current_break + size) == -1)
 	return 0;
 

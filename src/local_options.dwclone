@@ -390,8 +390,6 @@
  * PRAGMA_SAVE_TYPES:   save the types of function arguments for checking
  *                      calls to functions in this object by objects that
  *                      inherit it.
- * PRAGMA_SAVE_BINARY:  save a compiled binary version of this file for
- *                      faster loading next time it is needed.
  * PRAGMA_OPTIMIZE:     make a second pass over the generated code to
  *                      optimize it further.  Currently does jump threading.
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
@@ -880,4 +878,5 @@
 #undef ALLOW_INHERIT_AFTER_FUNCTION
 #define PACKAGE_ASYNC
 #define PROG_REF_TYPE short
+#define HAS_CONSOLE
 #endif

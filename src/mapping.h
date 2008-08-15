@@ -10,17 +10,17 @@
 #include "hash.h"
 #include "stralloc.h"
 //#define MAP_SVAL_HASH(x) (((POINTER_INT)((x).u.number)) >> 5)
-static long sval_hash(svalue_t x){
+static unsigned long sval_hash(svalue_t x){
     switch(x.type)
     {
         case T_STRING:
             return HASH(BLOCK(x.u.string));
         case T_NUMBER:
-            return x.u.number;
+            return (unsigned long)x.u.number;
         case T_OBJECT:
             //return HASH(BLOCK(x.u.ob->obname));
         default:
-            return (((POINTER_INT)((x).u.number)) >> 5);
+            return (unsigned long)(((POINTER_INT)((x).u.number)) >> 5);
     }
 }
 

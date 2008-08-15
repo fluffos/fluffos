@@ -254,6 +254,13 @@
  */
 #define OLD_ED
 
+/* In ed auto-indent,
+ * 1) does the case line get indented after the switch() ?
+ * 2) How far do we indent? (this can also be set in the mudlib)
+ */
+#undef ED_INDENT_CASE
+#define ED_INDENT_SPACES 4
+
 /* SENSIBLE_MODIFIERS:
  * Turning this on changes a few things, which may break old code:
  *
@@ -494,6 +501,17 @@
  *   catch_tell(msg) method that calls receive(msg);
 */
 #define INTERACTIVE_CATCH_TELL
+
+/* RECEIVE_ED: define this if you want normal ed output to go to a
+     receive_ed() apply in the player ob.  Some errors still go directly
+     to output.  Useful for post-processing (perhaps colorizing?) ed
+     output. Prototype:  mixed receive_ed(string txt, string fname);
+     If fname, return a string that ed will output, 0 to let ed handle
+     the output in the default way, or 1 to handle the output yourself.
+     If fname == 0, output is help text and you may return any of the above
+     or an array of strings that will be more'ed.
+*/
+#undef RECEIVE_ED
 
 /* RESTRICTED_ED: define this if you want restricted ed mode enabled.
  */
@@ -897,7 +915,15 @@ in v22.2a but it may have been fixed since */
 #undef ALLOW_INHERIT_AFTER_FUNCTION
 #undef ALLOW_INHERIT_AFTER_GLOBAL_VARIABLES
 
+/*PACKAGE_ASYNC: adds some efuns for asyncronous IO */
+#undef PACKAGE_ASYNC
+
 #undef PARSE_DEBUG
 #define FLUFFOS
+
+/* PROG_REF_TYPE size of program ref counter:
+ * char for 8 bit, short for 16, int for 32,
+ * long long for 64 (completely useless on 32 bit machines though!) */
+#define PROG_REF_TYPE int
 
 #endif
