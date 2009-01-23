@@ -894,6 +894,4 @@
 
 #define PROG_REF_TYPE short
 #undef HAS_CONSOLE
-
-#define IPV6
 #endif

@@ -144,7 +144,7 @@ void f_db_close (void)
 {
     int ret = 0;
     db_t *db;
-    
+
     valid_database("close", &the_null_array);
 
     db = find_db_conn(sp->u.number);
@@ -649,8 +649,8 @@ static array_t *MySQL_fetch (dbconn_t * c, int row)
                     if (field->flags & BINARY_FLAG) {
 #ifndef NO_BUFFER_TYPE
 		        v->item[i].type = T_BUFFER;
-		        v->item[i].u.buf = allocate_buffer(field->length);
-		        write_buffer(v->item[i].u.buf, 0, target_row[i], field->length);
+		        v->item[i].u.buf = allocate_buffer(field->max_length);
+		        write_buffer(v->item[i].u.buf, 0, target_row[i], field->max_length);
 #else
                         v->item[i] = const0u;
 #endif
@@ -677,15 +677,20 @@ static array_t *MySQL_fetch (dbconn_t * c, int row)
     return v;
 }
 
+#ifndef MYSQL_SOCKET_ADDRESS
+#define MYSQL_SOCKET_ADDRESS "/tmp/mysql.sock"
+#endif
+
 static int MySQL_connect (dbconn_t * c, const char * host, const char * database, const char * username, const char * password)
 {
     int ret;
     MYSQL *tmp;
 
     tmp = ALLOCATE(MYSQL, TAG_DB, "MySQL_connect");
+    tmp = mysql_init(tmp);
     *(c->mysql.errormsg) = 0;
-
-    c->mysql.handle = mysql_connect(tmp, host, username, password);
+    c->mysql.handle = mysql_real_connect(tmp, host, username, password, database, 0, MYSQL_SOCKET_ADDRESS, 0);
+    //c->mysql.handle = mysql_connect(tmp, host, username, password);
     if (!c->mysql.handle) {
 	strncpy(c->mysql.errormsg, mysql_error(tmp), sizeof(c->mysql.errormsg));
 	c->mysql.errormsg[sizeof(c->mysql.errormsg) - 1] = 0;

@@ -27,7 +27,8 @@ typedef struct {
   long idle;
 } ITEMS;
 
-static int strcmpalpha(const char *aname, const char *bname);
+  
+static int strcmpalpha(const char *aname, const char *bname, int depth);
 static int objcmpalpha(const void *, const void *);
 static int itemcmpsize(const void *, const void *);
 static int objcmpsize(const void *, const void *);
@@ -41,7 +42,7 @@ static INLINE void print_obj(int refs, int cpy, const char *obname, long lastref
 
 void console_command(char *s) {
   char verb[11];
-  char args[2][11];
+  char args[3][160];
   int numargs, num[2];
 
   if(strlen(s) > 0) {
@@ -63,32 +64,51 @@ void console_command(char *s) {
     shutdown   End the mud (rapidly)\n\
     help       This.\n\
     objects    Show a listing of all active objects.  Format:\n\
-               objects [qualifier] [val|range]\n\
+               objects [qualifier] [val|range] [prefix=PREFIX]\n\
                qualifiers are:\n\
                  alpha    sort objects alphabetically\n\
                  size     sort objects by (reverse) size\n\
                  idle     sort objects by (reverse) idle time\n\
                  totals   sum together usage of all clones of an obj and\n\
                           display in reverse order of size\n\
+                 depth:<D>    sum together subdirectories past depth D.\n\
                val is a number, specifying number of objects to show,\n\
                from the beginning (positive) or from the end (negative).\n\
                range is st..fin where st and fin can be number of objects\n\
-               from the beginning (positive) or from the end (negative.)\
+                from the beginning (positive) or from the end (negative.)\n\
+               if prefix=PREFIX is present, only items beginning with PREFIX\n\
+                will be displayed.  Note that ranges are applied and /then/ \n\
+                the prefixes are checked.  Specifying both may result in \n\
+                empty output\
 ");
     }
     else { // commands that can be followed by args
+      int DEPTH = 1000; /* allow summarization to dir-level */
+      char *prefix = (char *) 0;
+      int plen = 0;
+
       num[0] = 0;
       num[1] = INT_MAX;
 
-      if((numargs = sscanf(s, "%10s %10s %10s", verb, args[0], args[1]) - 1)
+      if((numargs = sscanf(s, "%10s %159s %159s %159s", verb, args[0], 
+                           args[1], args[2]) - 1) 
          >= 1) {
         int tmp;
-        char *pos = args[numargs-1];
+        char *pos;
 
+        if(numargs && (strncmp("prefix", args[numargs-1], 6) == 0) &&
+           (strlen(args[numargs-1]) > 6)) {
+          prefix = args[numargs-1] + 7;
+          plen = strlen(prefix);
+          numargs--;
+        }
+        
+        if(numargs) {
+          pos = args[numargs-1];
         while((pos = strchr(pos, '<')) != NULL)
           *pos++ = '-';
 
-        if((tmp = sscanf(args[numargs-1], "%d..%d", &num[0], &num[1])) == 2) {
+          if((tmp = sscanf(args[numargs-1], "%d..%d", &num[0], &num[1])) == 2){
         }
         else if(tmp == 1) {
           if(args[numargs-1][strlen(args[numargs-1])-1] != '.') {
@@ -105,14 +125,24 @@ void console_command(char *s) {
         if(tmp)
           numargs--;
       }
+      }
 
       if(strncmp(verb, "objects", strlen(verb)) == 0) {
         object_t **list;
         int count;
+        char *pos2;
         int i;
         long totsz = 0, sz;
         char TOTALS = (char) 0;
 
+        /* allow 'objects depth:3 10' */
+        if(numargs && ((pos2 = strpbrk(args[0], ":=")) != NULL)) {
+          sscanf(pos2+1, "%d", &DEPTH);
+          if(DEPTH < 1)
+            DEPTH = 1;
+          *pos2 = '\0';
+        }
+        
         // get_objects() allocates a string and pushes it onto the stack.
         // probably not a problem here as long as we remember to pop it.
         get_objects(&list, &count, 0, 0);
@@ -124,7 +154,7 @@ void console_command(char *s) {
             qsort(list, (size_t) count, sizeof(object_t *), objcmpsize);
           else if(strncmp("idle", args[0], strlen(args[0])) == 0)
             qsort(list, (size_t) count, sizeof(object_t *), objcmpidle);
-          else { /* This should be "totals" */
+          else { /* This should be "totals" or "depth" */
             TOTALS = (char) 1;
             qsort(list, (size_t) count, sizeof(object_t *), objcmpalpha);
           }
@@ -142,14 +172,27 @@ void console_command(char *s) {
           memset(it, 0, (count+1) * sizeof(ITEMS));
 
           for(i=0; i < count; i++) {
-            if(strcmpalpha(it[lst].name, list[i]->obname)
+            if(strcmpalpha(it[lst].name, list[i]->obname, DEPTH)
                != 0) {
+              int sl;
+              const char *slash = list[i]->obname;
               lst++;
 
+              for(sl = 0; sl < DEPTH; sl++)
+                if((slash = strchr(slash, '/')) == NULL) {
+                  slash = list[i]->obname + strlen(list[i]->obname);
+                  break;
+                }
+                else
+                  slash++;
+                
               strncpy(it[lst].name, list[i]->obname +
-                                    ((strlen(list[i]->obname) > NAME_LEN) ?
-                                     (strlen(list[i]->obname) - NAME_LEN) : 0)
+                                    (((slash - list[i]->obname) > NAME_LEN) ?
+                                     ((slash - list[i]->obname) - NAME_LEN) 
+                                      : 0)
                                   , NAME_LEN);
+              it[lst].name[slash - list[i]->obname] = '\0';
+
               pound = strchr(it[lst].name, '#');
               if(pound != NULL)
                 *pound = '\0';
@@ -184,10 +227,12 @@ void console_command(char *s) {
           num[1]++;
 
           for(i=num[0]; i<=num[1]; i++) {
+            if(!prefix || (strncmp(it[i].name, prefix, plen) == 0)) {
             print_obj(it[i].ref, it[i].cpy, it[i].name, it[i].idle,
                        it[i].mem);
             totsz += it[i].mem;
           }
+        }
         }
         else { // no totals needed
           if(num[0] >= count)
@@ -206,6 +251,7 @@ void console_command(char *s) {
           }
 
           for(i = num[0]; i <= num[1]; i++) {
+            if(!prefix || (strncmp(list[i]->obname, prefix, plen) == 0)) {
             print_obj((int)list[i]->ref, 1, list[i]->obname,
                       (long) list[i]->time_of_ref,
                       sz = (long) list[i]->prog->total_size +
@@ -213,6 +259,7 @@ void console_command(char *s) {
                            (long)sizeof(object_t));
             totsz += sz;
           }
+        }
         }
 
         printf("%4s %4s %-*s %5s %10s\n", "", "", NAME_LEN, "-----", "-----",
@@ -233,16 +280,25 @@ void console_command(char *s) {
   }
 }
 
-static int strcmpalpha(const char *aname, const char *bname) {
-  for(;(*aname == *bname) && (*aname != '#') && (*bname != '#') &&
-       (*aname != '\0') && (*bname != '\0'); aname++, bname++); /* ; */
+static int strcmpalpha(const char *aname, const char *bname, int depth) {
+  int slash = 0;
 
-  if(*aname == '#') {
-    if((*bname != '#') && (*bname != '\0'))
+  for(;(*aname == *bname) && (*aname != '#') && (*bname != '#') &&
+       (*aname != '\0') && (*bname != '\0'); aname++, bname++) {
+    if(*aname == '/')
+      slash++;
+    
+    if(slash == depth)
+      break;
+  }
+
+  if((*aname == '#') || ((slash == depth) && (*aname == '/'))) {
+    if((*bname != '#') && (*bname != '\0') && 
+       ((slash != depth) || (*bname != '/')))
       return 1;
     return 0;
   }
-  if(*bname == '#') {
+  if((*bname == '#') || ((slash == depth) && (*bname == '/'))) {
     if(*aname == '\0')
       return 0;
     return -1;
@@ -255,7 +311,7 @@ static int objcmpalpha(const void *a, const void *b) {
   const char *aname = (*((object_t **) a))->obname;
   const char *bname = (*((object_t **) b))->obname;
 
-  return strcmpalpha(aname, bname);
+  return strcmpalpha(aname, bname, 1000);
 }
 
 static int itemcmpsize(const void *a, const void *b) {
@@ -263,7 +319,7 @@ static int itemcmpsize(const void *a, const void *b) {
   long bsz = (*((ITEMS *) b)).mem;
 
   if(asz == bsz)
-    return strcmpalpha((*((ITEMS *) a)).name, (*((ITEMS *) b)).name);
+    return strcmpalpha((*((ITEMS *) a)).name, (*((ITEMS *) b)).name, 1000);
 
   return (int) (bsz - asz);
 }

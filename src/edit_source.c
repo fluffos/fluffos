@@ -1674,8 +1674,8 @@ static void handle_configure() {
               check_library("-L/usr/local/lib -lmysqlclient") ||
               check_library("-L/usr/local/lib/mysql -lmysqlclient") ||
               check_library("-L/usr/local/mysql/lib -lmysqlclient") ||
-              check_library("-L/usr/lib/mysql -lmysqlclient") ||
-              check_library("-L/usr/lib64/mysql -lmysqlclient"))) {
+              check_library("-L/usr/lib64/mysql -lmysqlclient") ||
+              check_library("-L/usr/lib/mysql -lmysqlclient"))) {
             fprintf(stderr, "Cannot find libmysqlclient.a, compilation is going to fail miserably\n");
         }
     }

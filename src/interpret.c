@@ -550,6 +550,20 @@ svalue_t *call_efun_callback (function_to_call_t * ftc, int n) {
   return v;
 }
 
+svalue_t *safe_call_efun_callback (function_to_call_t * ftc, int n) {
+  svalue_t *v;
+
+  if (ftc->narg)
+    push_some_svalues(ftc->args, ftc->narg);
+  if (ftc->ob) {
+    if (ftc->ob->flags & O_DESTRUCTED)
+      error("Object destructed during efun callback.\n");
+    v = apply(ftc->f.str, ftc->ob, n + ftc->narg, ORIGIN_EFUN);
+  } else
+    v = safe_call_function_pointer(ftc->f.fp, n + ftc->narg);
+  return v;
+}
+
 /*
  * Free several svalues, and free up the space used by the svalues.
  * The svalues must be sequentially located.
@@ -5100,7 +5114,7 @@ int inter_sscanf (svalue_t * arg, svalue_t * s0, svalue_t * s1, int num_arg)
   int number_of_matches;
   int skipme;     /* Encountered a '*' ? */
   int base = 10;
-  int num;
+  long num;
   const char *match;
   char old_char;
   const char *tmp;

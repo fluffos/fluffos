@@ -639,9 +639,10 @@ f_terminal_colour (void)
     resetstrname = findstring("RESET");
     k = sp->u.map->table_size;
     if (resetstrname) {
+       int tmp;
        static svalue_t str = {T_STRING, STRING_SHARED};
        str.u.string = resetstrname;
-       int tmp = MAP_SVAL_HASH(str);
+       tmp = MAP_SVAL_HASH(str);
        for (elt = mtab[tmp & k]; elt; elt = elt->next) {
            if ( elt->values->type == T_STRING &&
                 (elt->values + 1)->type == T_STRING &&
@@ -669,9 +670,10 @@ f_terminal_colour (void)
     for (j = i = 0, k = sp->u.map->table_size; i < num; i++) {
         // Look it up in the mapping.
         if ((cp = findstring(parts[i]))) {
+            int tmp;
             static svalue_t str = {T_STRING, STRING_SHARED};
             str.u.string = cp;
-            int tmp = MAP_SVAL_HASH(str);
+            tmp = MAP_SVAL_HASH(str);
             for (elt = mtab[tmp & k]; elt; elt = elt->next) {
                 if ( elt->values->type == T_STRING &&
                      (elt->values + 1)->type == T_STRING &&
@@ -2119,6 +2121,7 @@ void event(svalue_t * event_ob, const char * event_fun, int numparam,
 					ORIGIN_EFUN);
 		}
 	} else if (event_ob->type == T_OBJECT) {
+		int count = 0;
 		/* First we call the event on the object itself */
 
 		push_object(origin);
@@ -2128,7 +2131,6 @@ void event(svalue_t * event_ob, const char * event_fun, int numparam,
 		apply(name, event_ob->u.ob, numparam + 1, ORIGIN_EFUN);
 
 		/* And then call it on it's inventory..., if it's still around! */
-		int count = 0;
 		if (event_ob && event_ob->u.ob && !(event_ob->u.ob->flags
 				& O_DESTRUCTED))
 			for (ob = event_ob->u.ob->contains; ob; ob = ob->next_inv) {
@@ -2644,4 +2646,89 @@ f_roll_MdN() {
 	sp->u.number = roll; // And change the other!
 }
 
+#endif
+
+#ifdef F_STRING_DIFFERENCE
+int min3( int a, int b, int c ) {
+   if( a < b ) {
+      if( a < c ) {
+         return a;
+      }
+   }
+   else if( b < c ) {
+      return b;
+   }
+   return c;
+}
+
+int levenshtein( char *a, int as, char *b, int bs ) {
+   int *table, skew, nskew, i, j;
+   // Strip common pre- and suffix.  This doesn't change the result.
+   while( as > 0 && a[0] == b[0] ) {
+      a++;
+      b++;
+      as--;
+      bs--;
+   }
+
+   while( as > 0 && a[as - 1] == b[bs - 1] ) {
+      as--;
+      bs--;
+   }
+
+   if( !as ) {                  // Empty string needs bs insertions.
+      return bs;
+   }
+
+   table = CALLOCATE( bs + 1, int, TAG_TEMPORARY, "levenshtein" );
+   for( i = 1; i <= bs; i++ ) {
+      table[i] = i;
+   }
+
+   for( i = 0; i < as; i++ ) {
+      table[0] = i + 1;
+      skew = i;
+      for( j = 1; j <= bs; j++ ) {
+         if( a[i] != b[j - 1] ) {
+            skew++;
+         }
+
+         nskew = table[j];
+         table[j] = min3( table[j - 1] + 1, nskew + 1, skew );
+         skew = nskew;
+      }
+   }
+
+   i = table[bs];
+   FREE( table );
+   return i;
+} /* levenshtein() */
+
+void f_string_difference() {
+   int diff, as, bs;
+   char *a, *b;
+
+   a = sp->u.string;
+   b = ( sp - 1 )->u.string;
+
+   if( !strcmp( a, b ) ) {
+      diff = 0;
+   }
+   else {
+      as = strlen( a );
+      bs = strlen( b );
+
+      // Algorithm is quicker if the shorter string is passed first.
+      if( as < bs ) {
+         diff = levenshtein( a, as, b, bs );
+      }
+      else {
+         diff = levenshtein( b, bs, a, as );
+      }
+   }
+
+   free_string_svalue( sp-- );
+   free_string_svalue( sp );
+   put_number( diff );
+}
 #endif

@@ -32,7 +32,11 @@ typedef struct conn *conn_ptr;
 typedef struct conn {
     int fd;			/* file descriptor                 */
     int state;			/* connection state                */
+#ifndef IPV6
     struct sockaddr_in addr;	/* address struct for connected    */
+#else
+    struct sockaddr_in6 addr;
+#endif
     char sname[SNAME_LEN];	/* symbolic name of connected host */
     int leftover;		/* unprocessed bytes in data queue */
     char buf[IN_BUF_SIZE];

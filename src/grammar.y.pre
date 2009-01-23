@@ -3364,8 +3364,26 @@ function_call:
 	    }
         expr_list ')'
             {
+		ident_hash_elem_t *ihe;
+		int f;
+
 		context = $<number>3;
-		$$ = validate_efun_call(new_efun, $4);
+		ihe = lookup_ident("clone_object");
+
+		if ((f = ihe->dn.simul_num) != -1) {
+		    $$ = $4;
+		    $$->kind = NODE_CALL_1;
+		    $$->v.number = F_SIMUL_EFUN;
+		    $$->l.number = f;
+		    $$->type = (SIMUL(f)->type) & ~DECL_MODS;
+		} else {
+		    $$ = validate_efun_call(lookup_predef("clone_object"), $4);
+#ifdef CAST_CALL_OTHERS
+		    $$->type = TYPE_UNKNOWN;
+#else
+		    $$->type = TYPE_ANY;
+#endif		  
+		}
 		$$ = check_refs(num_refs - $<number>2, $4, $$);
 		num_refs = $<number>2;
             }

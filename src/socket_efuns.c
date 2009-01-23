@@ -25,8 +25,13 @@ lpc_socket_t *lpc_socks = 0;
 int max_lpc_socks = 0;
 
 #ifdef PACKAGE_SOCKETS
+#ifdef IPV6
+static int socket_name_to_sin (const char *, struct sockaddr_in6 *);
+static char *inet_address (struct sockaddr_in6 *);
+#else
 static int socket_name_to_sin (const char *, struct sockaddr_in *);
 static char *inet_address (struct sockaddr_in *);
+#endif
 #endif
 
 /*
@@ -37,7 +42,7 @@ int check_valid_socket (const char * const what, int fd, object_t * owner,
 {
     array_t *info;
     svalue_t *mret;
-    
+
     info = allocate_empty_array(4);
     info->item[0].type = T_NUMBER;
     info->item[0].u.number = fd;
@@ -63,7 +68,7 @@ static void clear_socket (int which, int dofree)
         set_write_callback(which, 0);
         set_close_callback(which, 0);
     }
-    
+
     lpc_socks[which].fd = -1;
     lpc_socks[which].flags = 0;
     lpc_socks[which].mode = MUD;
@@ -91,12 +96,12 @@ static int more_lpc_sockets()
     int i;
 
     max_lpc_socks += 10;
-    
+
     if (!lpc_socks)
         lpc_socks = CALLOCATE(10, lpc_socket_t, TAG_SOCKETS, "more_lpc_sockets");
     else
         lpc_socks = RESIZE(lpc_socks, max_lpc_socks, lpc_socket_t, TAG_SOCKETS, "more_lpc_sockets");
-    
+
     i = max_lpc_socks;
     while (--i >= max_lpc_socks - 10)
         clear_socket(i, 0);
@@ -125,7 +130,7 @@ void set_read_callback (int which, svalue_t * cb)
         } else {
             lpc_socks[which].read_callback.s = make_shared_string(cb->u.string);
         }
-    } else 
+    } else
         lpc_socks[which].read_callback.s = 0;
 }
 
@@ -147,7 +152,7 @@ void set_write_callback (int which, svalue_t * cb)
         } else {
             lpc_socks[which].write_callback.s = make_shared_string(cb->u.string);
         }
-    } else 
+    } else
         lpc_socks[which].write_callback.s = 0;
 }
 
@@ -169,7 +174,7 @@ void set_close_callback (int which, svalue_t * cb)
         } else {
             lpc_socks[which].close_callback.s = make_shared_string(cb->u.string);
         }
-    } else 
+    } else
         lpc_socks[which].close_callback.s = 0;
 }
 
@@ -201,9 +206,9 @@ static void copy_close_callback (int to, int from)
 int find_new_socket (void)
 {
     int i;
-    
+
     for (i = 0; i < max_lpc_socks; i++) {
-        if (lpc_socks[i].state == STATE_CLOSED) 
+        if (lpc_socks[i].state == STATE_CLOSED)
             return i;
     }
     return more_lpc_sockets();
@@ -244,7 +249,11 @@ int socket_create (enum socket_mode mode, svalue_t * read_callback, svalue_t * c
 
     i = find_new_socket();
     if (i >= 0) {
+#ifdef IPV6
+        fd = socket(PF_INET6, type, 0);
+#else
         fd = socket(PF_INET, type, 0);
+#endif
         if (fd == INVALID_SOCKET) {
             socket_perror("socket_create: socket", 0);
             return EESOCKET;
@@ -302,8 +311,11 @@ int socket_create (enum socket_mode mode, svalue_t * read_callback, svalue_t * c
 int socket_bind (int fd, int port, const char * addr)
 {
     socklen_t len;
+#ifdef IPV6
+    struct sockaddr_in6 sin;
+#else
     struct sockaddr_in sin;
-
+#endif
     if (fd < 0 || fd >= max_lpc_socks)
         return EEFDRANGE;
     if (lpc_socks[fd].state == STATE_CLOSED ||
@@ -313,15 +325,24 @@ int socket_bind (int fd, int port, const char * addr)
         return EESECURITY;
     if (lpc_socks[fd].state != STATE_UNBOUND)
         return EEISBOUND;
-
+#ifdef IPV6
+    sin.sin6_family = AF_INET6;
+#else
     sin.sin_family = AF_INET;
-
+#endif
     if (!addr) {
         if (MUD_IP[0])
+#ifdef IPV6
+            inet_pton(AF_INET6, MUD_IP, &(sin.sin6_addr));
+        else
+          	sin.sin6_addr = in6addr_any;
+        sin.sin6_port = htons((u_short) port);
+#else
             sin.sin_addr.s_addr = inet_addr(MUD_IP);
         else
             sin.sin_addr.s_addr = INADDR_ANY;
         sin.sin_port = htons((u_short) port);
+#endif
     } else {
         if (!socket_name_to_sin(addr, &sin))
             return EEBADADDR;
@@ -343,10 +364,17 @@ int socket_bind (int fd, int port, const char * addr)
     }
     lpc_socks[fd].state = STATE_BOUND;
 
+#ifdef IPV6
+    char tmp[INET6_ADDRSTRLEN];
+    debug(sockets, ("socket_bind: bound socket %d to %s.%d\n",
+                 fd, inet_ntop(AF_INET6, &lpc_socks[fd].l_addr.sin6_addr, &tmp, INET6_ADDRSTRLEN),
+                 ntohs(lpc_socks[fd].l_addr.sin6_port)));
+
+#else
     debug(sockets, ("socket_bind: bound socket %d to %s.%d\n",
                  fd, inet_ntoa(lpc_socks[fd].l_addr.sin_addr),
                  ntohs(lpc_socks[fd].l_addr.sin_port)));
-
+#endif
     return EESUCCESS;
 }
 
@@ -390,8 +418,11 @@ int socket_accept (int fd, svalue_t * read_callback, svalue_t * write_callback)
 {
     int accept_fd, i;
     socklen_t len;
+#ifdef IPV6
+    struct sockaddr_in6 sin;
+#else
     struct sockaddr_in sin;
-
+#endif
     if (fd < 0 || fd >= max_lpc_socks)
         return EEFDRANGE;
     if (lpc_socks[fd].state == STATE_CLOSED ||
@@ -530,7 +561,11 @@ int socket_connect (int fd, const char * name, svalue_t * read_callback, svalue_
     }
 #endif
     if (connect(lpc_socks[fd].fd, (struct sockaddr *) & lpc_socks[fd].r_addr,
-                sizeof(struct sockaddr_in)) == -1) {
+#ifdef IPV6
+            sizeof(struct sockaddr_in6)) == -1) {
+#else
+            sizeof(struct sockaddr_in)) == -1) {
+#endif
         switch (socket_errno) {
         case EINTR:
             return EEINTR;
@@ -567,8 +602,11 @@ int socket_write (int fd, svalue_t * message, const char * name)
 {
     int len, off;
     char *buf, *p;
+#ifdef IPV6
+    struct sockaddr_in6 sin;
+#else
     struct sockaddr_in sin;
-
+#endif
     if (fd < 0 || fd >= max_lpc_socks)
         return EEFDRANGE;
     if (lpc_socks[fd].state == STATE_CLOSED ||
@@ -722,7 +760,7 @@ int socket_write (int fd, svalue_t * message, const char * name)
 #endif
         if (off == -1 && socket_errno == EINTR)
             return EEINTR;
-        
+
         //socket_perror("socket_write: send", 0);
         lpc_socks[fd].flags |= S_LINKDEAD;
         socket_close(fd, SC_FORCE | SC_DO_CALLBACK | SC_FINAL_CLOSE);
@@ -780,8 +818,11 @@ void socket_read_select_handler (int fd)
     socklen_t addrlen;
     char buf[BUF_SIZE], addr[ADDR_BUF_SIZE];
     svalue_t value;
+#ifdef IPV6
+    struct sockaddr_in6 sin;
+#else
     struct sockaddr_in sin;
-
+#endif
     debug(sockets, ("read_socket_handler: fd %d state %d\n",
                  fd, lpc_socks[fd].state));
 
@@ -790,7 +831,7 @@ void socket_read_select_handler (int fd)
     case STATE_CLOSED:
     case STATE_FLUSHING:
         return;
-        
+
     case STATE_UNBOUND:
         debug_message("socket_read_select_handler: read on unbound socket %i\n", fd);
         break;
@@ -819,8 +860,14 @@ void socket_read_select_handler (int fd)
 #endif
             debug(sockets, ("read_socket_handler: read %d bytes\n", cc));
             buf[cc] = '\0';
+#ifdef IPV6
+            char tmp[INET6_ADDRSTRLEN];
+            sprintf(addr, "%s %d", inet_ntop(AF_INET6, &sin.sin6_addr, &tmp, INET6_ADDRSTRLEN),
+                                ntohs(sin.sin6_port));
+#else
             sprintf(addr, "%s %d", inet_ntoa(sin.sin_addr),
                     ntohs(sin.sin_port));
+#endif
             push_number(fd);
 #ifndef NO_BUFFER_TYPE
             if (lpc_socks[fd].flags & S_BINARY) {
@@ -1017,7 +1064,7 @@ void socket_write_select_handler (int fd)
         return;
 
     if (lpc_socks[fd].w_buf != NULL) {
-        cc = OS_socket_write(lpc_socks[fd].fd, 
+        cc = OS_socket_write(lpc_socks[fd].fd,
                              lpc_socks[fd].w_buf + lpc_socks[fd].w_off,
                              lpc_socks[fd].w_len);
         if (cc <= -1) {
@@ -1085,7 +1132,7 @@ int socket_close (int fd, int flags)
         push_number(fd);
         call_callback(fd, S_CLOSE_FP, 1);
     }
-    
+
     set_read_callback(fd, 0);
     set_write_callback(fd, 0);
     set_close_callback(fd, 0);
@@ -1098,7 +1145,7 @@ int socket_close (int fd, int flags)
         lpc_socks[fd].state = STATE_FLUSHING;
         return EESUCCESS;
     }
-    
+
     while (OS_socket_close(lpc_socks[fd].fd) == -1 && socket_errno == EINTR)
         ;       /* empty while */
     if (lpc_socks[fd].r_buf != NULL)
@@ -1106,7 +1153,7 @@ int socket_close (int fd, int flags)
     if (lpc_socks[fd].w_buf != NULL)
         FREE(lpc_socks[fd].w_buf);
     clear_socket(fd, 1);
-    
+
     debug(sockets, ("socket_close: closed fd %d\n", fd));
     return EESUCCESS;
 }
@@ -1190,16 +1237,24 @@ const char *socket_error (int error)
  */
 int get_socket_address (int fd, char * addr, int * port, int local)
 {
+#ifdef IPV6
+	struct sockaddr_in6 *addr_in;
+#else
     struct sockaddr_in *addr_in;
-
+#endif
     if (fd < 0 || fd >= max_lpc_socks) {
         addr[0] = '\0';
         *port = 0;
         return EEFDRANGE;
     }
     addr_in = (local ? &lpc_socks[fd].l_addr : &lpc_socks[fd].r_addr);
+#ifdef IPV6
+    *port = ntohs(addr_in->sin6_port);
+    inet_ntop(AF_INET6, &addr_in->sin6_addr, addr, INET6_ADDRSTRLEN);
+#else
     *port = ntohs(addr_in->sin_port);
     strcpy(addr, inet_ntoa(addr_in->sin_addr));
+#endif
     return EESUCCESS;
 }
 
@@ -1236,7 +1291,11 @@ void assign_socket_owner (svalue_t * sv, object_t * ob)
 /*
  * Convert a string representation of an address to a sockaddr_in
  */
+#ifdef IPV6
+static int socket_name_to_sin (const char * name, struct sockaddr_in6 * sin)
+#else
 static int socket_name_to_sin (const char * name, struct sockaddr_in * sin)
+#endif
 {
     int port;
     char *cp, addr[ADDR_BUF_SIZE];
@@ -1251,10 +1310,29 @@ static int socket_name_to_sin (const char * name, struct sockaddr_in * sin)
     *cp = '\0';
     port = atoi(cp + 1);
 
+#ifdef IPV6
+    sin->sin6_family = AF_INET6;
+    struct addrinfo hints, *res;
+    hints.ai_family = AF_INET6;
+    hints.ai_socktype = 0;
+    hints.ai_protocol = 0;
+    hints.ai_flags = AI_CANONNAME| AI_V4MAPPED;
+
+    if(getaddrinfo(addr, "1234", &hints, &res)){
+    	//failed
+    	socket_perror("socket_name_to_sin: getaddrinfo", 0);
+    	        return;
+    }
+    struct sockaddr_in6 tmp;
+    memcpy(&tmp, res->ai_addr, sizeof(tmp));
+    freeaddrinfo(res);
+    sin->sin6_addr = tmp.sin6_addr;
+    sin->sin6_port = htons((u_short) port);
+#else
     sin->sin_family = AF_INET;
     sin->sin_port = htons((u_short) port);
     sin->sin_addr.s_addr = inet_addr(addr);
-
+#endif
     return 1;
 }
 
@@ -1268,7 +1346,7 @@ void close_referencing_sockets (object_t * ob)
     int i;
 
     for (i = 0; i < max_lpc_socks; i++)
-        if (lpc_socks[i].owner_ob == ob && 
+        if (lpc_socks[i].owner_ob == ob &&
             lpc_socks[i].state != STATE_CLOSED &&
             lpc_socks[i].state != STATE_FLUSHING)
             socket_close(i, SC_FORCE);
@@ -1279,10 +1357,26 @@ void close_referencing_sockets (object_t * ob)
 /*
  * Return the string representation of a sockaddr_in
  */
+#ifdef IPV6
+static char *inet_address (struct sockaddr_in6 * sin)
+#else
 static char *inet_address (struct sockaddr_in * sin)
+#endif
 {
+#ifdef IPV6
+    static char addr[INET6_ADDRSTRLEN], port[7];
+    if (!memcmp(&sin->sin6_addr, &in6addr_any, sizeof(in6addr_any)))
+        strcpy(addr, "*");
+    else
+        inet_ntop(AF_INET6, &sin->sin6_addr, &addr, INET6_ADDRSTRLEN);
+    strcat(addr, ".");
+    if (ntohs(sin->sin6_port) == 0)
+        strcpy(port, "*");
+    else
+        sprintf(port, "%d", ntohs(sin->sin6_port));
+    strcat(addr, port);
+#else
     static char addr[32], port[7];
-
     if (ntohl(sin->sin_addr.s_addr) == INADDR_ANY)
         strcpy(addr, "*");
     else
@@ -1293,7 +1387,7 @@ static char *inet_address (struct sockaddr_in * sin)
     else
         sprintf(port, "%d", ntohs(sin->sin_port));
     strcat(addr, port);
-
+#endif
     return (addr);
 }
 
@@ -1320,15 +1414,15 @@ const char *socket_states[] = {
 array_t *socket_status (int which)
 {
     array_t *ret;
-    
+
     if (which < 0 || which >= max_lpc_socks) return 0;
 
     ret = allocate_empty_array(6);
-    
+
     ret->item[0].type = T_NUMBER;
     ret->item[0].subtype = 0;
     ret->item[0].u.number = lpc_socks[which].fd;
-    
+
     ret->item[1].type = T_STRING;
     ret->item[1].subtype = STRING_CONSTANT;
     ret->item[1].u.string = socket_states[lpc_socks[which].state];
@@ -1341,7 +1435,7 @@ array_t *socket_status (int which)
     ret->item[3].subtype = STRING_MALLOC;
     ret->item[3].u.string = string_copy(inet_address(&lpc_socks[which].l_addr),
                                         "socket_status");
-    
+
     ret->item[4].type = T_STRING;
     ret->item[4].subtype = STRING_MALLOC;
     ret->item[4].u.string = string_copy(inet_address(&lpc_socks[which].r_addr),
@@ -1354,7 +1448,7 @@ array_t *socket_status (int which)
     } else {
         ret->item[5] = const0u;
     }
-    
+
     return ret;
 }
 

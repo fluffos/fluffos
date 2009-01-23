@@ -582,13 +582,14 @@ object_t *clone_object (const char * str1, int num_arg)
     reference_prog(ob->prog, "clone_object");
     DEBUG_CHECK(!current_object, "clone_object() from no current_object !\n");
 
-    init_object(new_ob);
-
     new_ob->next_all = obj_list;
     obj_list->prev_all = new_ob;
     new_ob->prev_all = 0;
     obj_list = new_ob;
     enter_object_hash(new_ob);  /* Add name to fast object lookup table */
+
+    init_object(new_ob);
+
     call_create(new_ob, num_arg);
     restore_command_giver();
     /* Never know what can happen ! :-( */

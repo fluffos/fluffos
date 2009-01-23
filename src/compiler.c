@@ -2623,7 +2623,7 @@ static int string_case_compare(void *c1, void *c2) {
     p1 = (i1 ? PROG_STRING(i1) : 0);
     p2 = (i2 ? PROG_STRING(i2) : 0);
 
-    return (p1 - p2);
+    return (p1 < p2)?-1:0;
 }
 
 void prepare_cases (parse_node_t * pn, int start) {

@@ -91,7 +91,7 @@ void init_strings()
     for (htable_size = 1; htable_size < y; htable_size *= 2)
         ;
     htable_size_minus_one = htable_size - 1;
-    base_table = CALLOCATE(htable_size, block_t *, 
+    base_table = CALLOCATE(htable_size, block_t *,
                            TAG_STR_TBL, "init_strings");
 #ifdef STRING_STATS
     overhead_bytes += (sizeof(block_t *) * htable_size);
@@ -158,15 +158,18 @@ alloc_new_string (const char * string, int h)
     block_t *b;
     int len = strlen(string);
     int size;
-
+    int cut = 0;
     if (len > max_string_length) {
         len = max_string_length;
+        cut = 1;
     }
     size = sizeof(block_t) + len + 1;
     b = (block_t *) DXALLOC(size, TAG_SHARED_STRING, "alloc_new_string");
     strncpy(STRING(b), string, len);
     STRING(b)[len] = '\0';      /* strncpy doesn't put on \0 if 'from' too
                                  * long */
+    if(cut)
+    	h = whashstr(string) & htable_size_minus_one;
     SIZE(b) = (len > USHRT_MAX ? USHRT_MAX : len);
     REFS(b) = 1;
     NEXT(b) = base_table[h];
@@ -189,7 +192,7 @@ char *
     } else {
         if (REFS(b))
             REFS(b)++;
-        ADD_STRING(SIZE(b));
+        //no we don't! ADD_STRING(SIZE(b));
     }
     NDBG(b);
     return (STRING(b));
@@ -231,7 +234,7 @@ free_string (const char * str)
 
     b = BLOCK(str);
     DEBUG_CHECK1(b != findblock(str),"stralloc.c: free_string called on non-shared string: %s.\n", str);
-    
+
     /*
      * if a string has been ref'd USHRT_MAX times then we assume that its used
      * often enough to justify never freeing it.
@@ -337,7 +340,7 @@ char *int_new_string (int size)
         return the_null_string;
     }
 #endif
-    
+
     mbt = (malloc_block_t *)DXALLOC(size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, tag);
     if (size < USHRT_MAX) {
         mbt->size = size;
@@ -366,7 +369,7 @@ char *extend_string (const char * str, int len) {
     }
     ADD_STRING_SIZE(mbt->size - oldsize);
     CHECK_STRING_STATS;
-    
+
     return (char *)(mbt + 1);
 }
 

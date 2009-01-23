@@ -2,6 +2,7 @@
  *  comm.c -- communications functions and more.
  *            Dwayne Fontenot (Jacques@TMI)
  */
+
 #include "std.h"
 #include "comm.h"
 #include "main.h"
@@ -94,7 +95,11 @@ static int call_function_interactive (interactive_t *, char *);
 static void print_prompt (interactive_t *);
 static void query_addr_name (object_t *);
 static void got_addr_number (char *, char *);
+#ifdef IPV6
+static void add_ip_entry (struct in6_addr, char *);
+#else
 static void add_ip_entry (long, char *);
+#endif
 static void new_user_handler (int);
 static void end_compression (interactive_t *);
 static void start_compression (interactive_t *);
@@ -195,7 +200,11 @@ receive_snoop (const char * buf, int len, object_t * snooper)
  */
 void init_user_conn()
 {
+#ifdef IPV6
+	struct sockaddr_in6 sin;
+#else
     struct sockaddr_in sin;
+#endif
     socklen_t sin_len;
     int optval;
     int i;
@@ -230,7 +239,11 @@ void init_user_conn()
             /*
              * create socket of proper type.
              */
+#ifdef IPV6
+            if ((external_port[i].fd = socket(PF_INET6, SOCK_STREAM, 0)) == -1) {
+#else
             if ((external_port[i].fd = socket(PF_INET, SOCK_STREAM, 0)) == -1) {
+#endif
                 debug_perror("init_user_conn: socket", 0);
                 exit(1);
             }
@@ -248,12 +261,22 @@ void init_user_conn()
             /*
              * fill in socket address information.
              */
+#ifdef IPV6
+            sin.sin6_family = AF_INET6;
+            if(MUD_IP[0])
+            	inet_pton(AF_INET6, MUD_IP, &(sin.sin6_addr));
+            else
+            	sin.sin6_addr = in6addr_any;
+            sin.sin6_port = htons((u_short) external_port[i].port);
+#else
             sin.sin_family = AF_INET;
-
-            if (MUD_IP[0]) sin.sin_addr.s_addr = inet_addr(MUD_IP);
-            else sin.sin_addr.s_addr = INADDR_ANY;
-
+            if (MUD_IP[0])
+            	sin.sin_addr.s_addr = inet_addr(MUD_IP);
+            else
+            	sin.sin_addr.s_addr = INADDR_ANY;
             sin.sin_port = htons((u_short) external_port[i].port);
+#endif
+
             /*
              * bind name to socket.
              */
@@ -327,11 +350,15 @@ void ipc_remove()
 void init_addr_server (char * hostname, int addr_server_port)
 {
 #ifdef WIN32
-        WORD wVersionRequested = MAKEWORD(1,1);
-        WSADATA wsaData;
-        WSAStartup(wVersionRequested, &wsaData);
+    WORD wVersionRequested = MAKEWORD(1,1);
+    WSADATA wsaData;
+    WSAStartup(wVersionRequested, &wsaData);
 #endif
+#ifdef IPV6
+    struct sockaddr_in6 server;
+#else
     struct sockaddr_in server;
+#endif
     struct hostent *hp;
     int server_fd;
     int optval;
@@ -341,7 +368,32 @@ void init_addr_server (char * hostname, int addr_server_port)
         return;
 
     if (!hostname) return;
+#ifdef IPV6
+    /*
+     * get network host data for hostname.
+     */
+    struct addrinfo hints, *res;
+    hints.ai_family = AF_INET6;
+    hints.ai_socktype = 0;
+    hints.ai_protocol = 0;
+    hints.ai_flags = AI_CANONNAME| AI_V4MAPPED;
 
+    if(getaddrinfo(hostname, "1234", &hints, &res)){
+    	//failed
+    	socket_perror("init_addr_server: getaddrinfo", 0);
+    	        return;
+    }
+
+    memcpy(&server, res->ai_addr, sizeof(server));
+    freeaddrinfo(res);
+    server.sin6_port = htons((u_short) addr_server_port);
+    //inet_pton(AF_INET6, hostname, &(server.sin6_addr));
+    //memcpy((char *) &server.sin6_addr, (char *) hp->h_addr, hp->h_length);
+     /*
+      * create socket of proper type.
+      */
+    server_fd = socket(AF_INET6, SOCK_STREAM, 0);
+#else
     /*
      * get network host data for hostname.
      */
@@ -367,6 +419,7 @@ void init_addr_server (char * hostname, int addr_server_port)
      * create socket of proper type.
      */
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
+#endif
     if (server_fd == INVALID_SOCKET) {  /* problem opening socket */
         socket_perror("init_addr_server: socket", 0);
         return;
@@ -1560,7 +1613,11 @@ INLINE void process_io()
 static void new_user_handler (int which)
 {
     int new_socket_fd;
+#ifdef IPV6
+    struct sockaddr_in6 addr;
+#else
     struct sockaddr_in addr;
+#endif
     socklen_t length;
     int i, x;
     object_t *master, *ob;
@@ -1685,7 +1742,12 @@ static void new_user_handler (int which)
     set_prompt("> ");
 
     memcpy((char *) &all_users[i]->addr, (char *) &addr, length);
+#ifdef IPV6
+    char tmp[INET6_ADDRSTRLEN];
+    debug(connections, ("New connection from %s.\n", inet_ntop(AF_INET6, &addr.sin6_addr, &tmp, INET6_ADDRSTRLEN)));
+#else
     debug(connections, ("New connection from %s.\n", inet_ntoa(addr.sin_addr)));
+#endif
     num_user++;
     /*
      * The user object has one extra reference. It is asserted that the
@@ -1706,7 +1768,11 @@ static void new_user_handler (int which)
             remove_interactive(master_ob, 0);
         else
             free_object(&master, "new_user");
+#ifdef IPV6
+        debug_message("Connection from %s aborted.\n", inet_ntop(AF_INET6, &addr.sin6_addr, tmp, INET6_ADDRSTRLEN));
+#else
         debug_message("Connection from %s aborted.\n", inet_ntoa(addr.sin_addr));
+#endif
         return;
     }
     /*
@@ -2008,13 +2074,23 @@ static void hname_handler()
             *pp++ = 0;
             got_addr_number(pp, hname_buf);
 
-            if (isdigit(hname_buf[0])) {
-                unsigned long laddr;
+            if (isdigit(hname_buf[0]) || hname_buf[0] == ':') {
+
+#ifdef IPV6
+            	struct in6_addr addr;
+            	int ret;
+            	if(1 ==(ret = inet_pton(AF_INET6, hname_buf, &addr))) {
+            		if (strcmp(pp, "0") != 0)
+            		     add_ip_entry(addr, pp);
+            	}
+#else
+            	unsigned long laddr;
 
                 if ((laddr = inet_addr(hname_buf)) != INADDR_NONE) {
                     if (strcmp(pp, "0") != 0)
                         add_ip_entry(laddr, pp);
                 }
+#endif
             }
         }
 
@@ -2548,7 +2624,11 @@ static void got_addr_number (char * number, char * name)
 #undef IPSIZE
 #define IPSIZE 200
 typedef struct {
+#ifdef IPV6
+	struct in6_addr addr;
+#else
     long addr;
+#endif
     char *name;
 } ipentry_t;
 
@@ -2565,6 +2645,10 @@ void mark_iptable() {
 }
 #endif
 
+#ifdef IPV6
+char ipv6addr[INET6_ADDRSTRLEN];
+#endif
+
 char *query_ip_name (object_t * ob)
 {
     int i;
@@ -2573,20 +2657,35 @@ char *query_ip_name (object_t * ob)
         ob = command_giver;
     if (!ob || ob->interactive == 0)
         return NULL;
+#ifdef IPV6
     for (i = 0; i < IPSIZE; i++) {
-        if (iptable[i].addr == ob->interactive->addr.sin_addr.s_addr &&
+        if (!memcmp(&iptable[i].addr, &ob->interactive->addr.sin6_addr, sizeof(ob->interactive->addr.sin6_addr)) &&
             iptable[i].name)
             return (iptable[i].name);
     }
+
+    inet_ntop(AF_INET6, &ob->interactive->addr.sin6_addr, ipv6addr, INET6_ADDRSTRLEN);
+    return ipv6addr;
+#else
+    for (i = 0; i < IPSIZE; i++) {
+            if (iptable[i].addr == ob->interactive->addr.sin_addr.s_addr &&
+                iptable[i].name)
+                return (iptable[i].name);
+    }
     return (inet_ntoa(ob->interactive->addr.sin_addr));
+#endif
 }
 
+#ifdef IPV6
+static void add_ip_entry (struct in6_addr addr, char * name)
+#else
 static void add_ip_entry (long addr, char * name)
+#endif
 {
     int i;
 
     for (i = 0; i < IPSIZE; i++) {
-        if (iptable[i].addr == addr)
+        if (!memcmp(&iptable[i].addr, &addr, sizeof(addr)))
             return;
     }
     iptable[ipcur].addr = addr;
@@ -2602,7 +2701,12 @@ char *query_ip_number (object_t * ob)
         ob = command_giver;
     if (!ob || ob->interactive == 0)
         return 0;
+#ifdef IPV6
+    inet_ntop(AF_INET6, &ob->interactive->addr.sin6_addr, ipv6addr, INET6_ADDRSTRLEN);
+        return &ipv6addr;
+#else
     return (inet_ntoa(ob->interactive->addr.sin_addr));
+#endif
 }
 
 #ifndef INET_NTOA_OK
@@ -2630,7 +2734,7 @@ char *inet_ntoa (struct in_addr ad)
 
 char *query_host_name()
 {
-    static char name[40];
+    static char name[400];
 
     gethostname(name, sizeof(name));
     name[sizeof(name) - 1] = '\0';      /* Just to make sure */

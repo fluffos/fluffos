@@ -75,7 +75,11 @@ typedef struct interactive_s {
 #endif
     int connection_type;        /* the type of connection this is          */
     int fd;                     /* file descriptor for interactive object  */
+#ifdef IPV6
+    struct sockaddr_in6 addr;    /* socket address of interactive object    */
+#else
     struct sockaddr_in addr;    /* socket address of interactive object    */
+#endif
 #ifdef F_QUERY_IP_PORT
     int local_port;             /* which of our ports they connected to    */
 #endif

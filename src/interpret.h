@@ -317,6 +317,7 @@ void setup_variables (int, int, int);
 
 void process_efun_callback (int, function_to_call_t *, int);
 svalue_t *call_efun_callback (function_to_call_t *, int);
+svalue_t *safe_call_efun_callback (function_to_call_t *, int);
 const char *type_name (int c);
 void bad_arg (int, int);
 void bad_argument (svalue_t *, int, int, int);

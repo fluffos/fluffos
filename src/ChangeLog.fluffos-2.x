@@ -2,6 +2,27 @@ As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :), note: where it says Cratylus, I got it from his version, usually
 someone else did the work, but I don't know how to find who did what there.
 
+FluffOS 2.15:
+IPV6 support
+class stats (Skullslayer@Realms of the Dragon)
+some console additions see 'help' in the console (Hamlet)
+some 64 bit fixes (Woom)
+compiles with C90 compilers (that's 19!!! years ago now) (Kalinash@lpmuds.net)
+added string_difference(string, string) which returns the difference between strings as a number (Woom)
+updated MySQL support (Shadyman@lpmuds.net)
+fixed crasher when the master apply doesn't allow an object to be created
+
+
+FluffOS 2.14:
+fixed crasher in async writes.
+fixed bug in switch/case when using more than 2GB memory
+check 64 bit lib before 32 bit version for mysql
+support classes in member_array
+fixed copyright statement in regex file
+fixed memory leak in large shared strings
+fixed some memory leaks in async io
+use clone_object sefun (if present) when cloning objects with new() (Kalinash)
+
 FluffOS 2.13:
 oh no! unlucky number
 removed binaries support

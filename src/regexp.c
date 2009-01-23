@@ -8,7 +8,11 @@
  *      make it consistent with the rest of the code, you will find a
  *      modified version of Henry Specer's regular expression library.
  *      Henry's functions were modified to provide the minimal regular
- *      expression matching, as required by (c) 1986 by University of Toronto.
+ *      expression matching, as required by P1003.  Henry's code was
+ *      copyrighted, and copy of the copyright message and restrictions
+ *      are provided, verbatim, below:
+ *
+ *      Copyright (c) 1986 by University of Toronto.
  *      Written by Henry Spencer.  Not derived from licensed software.
  *
  *      Permission is granted to anyone to use this software for any
@@ -290,7 +294,7 @@ regexp *regcomp (unsigned char * exp,
         FAIL("NULL argument\n");
 
     exp2 = (short *)
-        DXALLOC((strlen((char *)exp) + 1) * (sizeof(short[8]) / sizeof(char[8])), 
+        DXALLOC((strlen((char *)exp) + 1) * (sizeof(short[8]) / sizeof(char[8])),
                 TAG_TEMPORARY, "regcomp: 1");
     for (scan = exp, dest = exp2; (c = *scan++);) {
         switch (c) {
@@ -364,7 +368,7 @@ regexp *regcomp (unsigned char * exp,
     }
 
     /* Allocate space. */
-    r = (regexp *) DXALLOC(sizeof(regexp) + (unsigned) regsize, 
+    r = (regexp *) DXALLOC(sizeof(regexp) + (unsigned) regsize,
                            TAG_TEMPORARY, "regcomp: 2");
     if (r == (regexp *) NULL) {
         FREE(exp2);

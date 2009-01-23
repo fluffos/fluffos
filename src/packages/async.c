@@ -6,7 +6,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #define _GNU_SOURCE
-#include <sys/syscall.h> 
+#include <sys/syscall.h>
 #include "../config.h"
 #include "../interpret.h"
 #include "../file.h"
@@ -32,10 +32,9 @@ void *gzreadthread(void *data){
 }
 
 int aio_gzread(aiob *aio){
-    pthread_t *thread = (pthread_t *)MALLOC(sizeof(pthread_t));
+    pthread_t thread;
 	aio->__error_code = EINPROGRESS;
-	pthread_create(thread, NULL, gzreadthread, aio);
-	FREE(thread); //like WE care
+	pthread_create(&thread, NULL, gzreadthread, aio);
 	return 0;
 }
 
@@ -49,10 +48,9 @@ void *gzwritethread(void *data){
 }
 
 int aio_gzwrite(aiob *aio){
-    pthread_t *thread = (pthread_t *)MALLOC(sizeof(pthread_t));
+    pthread_t thread;
 	aio->__error_code = EINPROGRESS;
-	pthread_create(thread, NULL, gzwritethread, aio);
-	FREE(thread); //like WE care
+	pthread_create(&thread, NULL, gzwritethread, aio);
 	return 0;
 }
 #endif
@@ -60,7 +58,7 @@ int aio_gzwrite(aiob *aio){
 #ifdef F_ASYNC_GETDIR
 void *getdirthread(void *data){
     aiob *aio = (aiob *)data;
-    aio->__return_value = syscall(SYS_getdents, aio->aio_fildes, aio->aio_buf, aio->aio_nbytes); 
+    aio->__return_value = syscall(SYS_getdents, aio->aio_fildes, aio->aio_buf, aio->aio_nbytes);
 	aio->__error_code = 0;
 	return NULL;
 }
@@ -141,6 +139,7 @@ int add_write(const char *fname, char *buf, int size, char flags, function_to_ca
 #endif
 			return aio_write(aio);
 	}
+	FREE(buf);
 	return 1;
 }
 
@@ -149,23 +148,20 @@ void handle_read(struct request *req, int val){
 	close(aio->aio_fildes);
 	if(val){
 		push_number(val);
-		call_efun_callback(req->fun, 1);
-		free_funp(req->fun->f.fp);
+		safe_call_efun_callback(req->fun, 1);
 		return;
 	}
 	val = aio_return(aio);
 	if(val < 0){
 		push_number(val);
-		call_efun_callback(req->fun, 1);
-		free_funp(req->fun->f.fp);
+		safe_call_efun_callback(req->fun, 1);
 		return;
 	}
 	char *file = new_string(val, "read_file_async: str");
 	memcpy(file, (char *)(aio->aio_buf), val);
 	file[val]=0;
 	push_malloced_string(file);
-	call_efun_callback(req->fun, 1);
-	free_funp(req->fun->f.fp);
+	safe_call_efun_callback(req->fun, 1);
 }
 
 #ifdef F_ASYNC_GETDIR
@@ -191,8 +187,7 @@ void handle_getdir(struct request *req, int val){
     ret = RESIZE_ARRAY(ret, i);
     ret->size = i;
 	push_refed_array(ret);
-	call_efun_callback(req->fun, 1);
-	free_funp(req->fun->f.fp);
+	safe_call_efun_callback(req->fun, 1);
 }
 #endif
 
@@ -202,20 +197,17 @@ void handle_write(struct request *req, int val){
 	close(aio->aio_fildes);
 	if(val){
 		push_number(val);
-		call_efun_callback(req->fun, 1);
-		free_funp(req->fun->f.fp);
+		safe_call_efun_callback(req->fun, 1);
 		return;
 	}
 	val = aio_return(aio);
 	if(val < 0){
 		push_number(val);
-		call_efun_callback(req->fun, 1);
-		free_funp(req->fun->f.fp);
+		safe_call_efun_callback(req->fun, 1);
 		return;
 	}
 	push_undefined();
-	call_efun_callback(req->fun, 1);
-	free_funp(req->fun->f.fp);
+	safe_call_efun_callback(req->fun, 1);
 }
 
 void check_reqs() {
@@ -246,19 +238,17 @@ void check_reqs() {
 			}
 			while(*check != here)
 				check = &(*check)->next;
-			struct request *tmp = *check;
 			*check = (*check)->next;
-			fflush(0);
-			FREE((char *)(tmp->aio->aio_buf));
-			FREE(tmp->aio);
-			FREE(tmp->fun);
-			FREE(tmp);
+			FREE((char *)(here->aio->aio_buf));
+			FREE(here->aio);
+			free_funp(here->fun->f.fp);
+			FREE(here->fun);
+			FREE(here);
 		} else {
 			struct request *tmp = *check;
-			if(tmp->next){
-				fflush(0);
+			if(tmp->next)
 				check = &((*check)->next);
-			} else
+			else
 				return;
 		}
 	}
@@ -278,7 +268,7 @@ void f_async_read(){
 
 #ifdef F_ASYNC_WRITE
 void f_async_write(){
-    char *buf = (char *)MALLOC(strlen((sp-2)->u.string));
+    char *buf = (char *)MALLOC(strlen((sp-2)->u.string)+1);
 	strcpy(buf, (sp-2)->u.string);
 	function_to_call_t *cb = (function_to_call_t *)MALLOC(sizeof(function_to_call_t));
 	memset(cb, 0, sizeof(function_to_call_t));

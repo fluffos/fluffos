@@ -46,16 +46,16 @@
 int totals[MAX_CATEGORY];
 int blocks[MAX_CATEGORY];
 
-static char *sources[] = { 
-    "*", "temporary blocks", "permanent blocks", "compiler blocks", 
+static char *sources[] = {
+    "*", "temporary blocks", "permanent blocks", "compiler blocks",
     "data blocks", "miscellaneous blocks", "<#6>", "<#7>", "<#8>", "<#9>",
-    "<#10>", "program blocks", "call_out blocks", "interactives", "ed blocks", 
-    "<#15>", "include list", "permanent identifiers", 
+    "<#10>", "program blocks", "call_out blocks", "interactives", "ed blocks",
+    "<#15>", "include list", "permanent identifiers",
     "identifier hash table", "reserved block", "mudlib stats", "objects",
     "object table", "config table", "simul_efuns", "sentences", "string table",
     "free swap blocks", "uids", "object names", "predefines", "line numbers",
     "compiler local blocks", "compiled program", "users", "debugmalloc overhead",
-    "heart_beat list", "parser", "input_to", "sockets", 
+    "heart_beat list", "parser", "input_to", "sockets",
     "strings", "malloc strings", "shared strings", "function pointers", "arrays",
     "mappings", "mapping nodes", "mapping tables", "buffers", "classes"
 };
@@ -137,7 +137,7 @@ MDmalloc (md_node_t * node, int size, int tag, char * desc)
 #ifdef DEBUGMALLOC_EXTENSIONS
 void set_tag (const void * ptr, int tag) {
     md_node_t *node = PTR_TO_NODET(ptr);
-    
+
     if ((node->tag & 0xff) < MAX_CATEGORY) {
         totals[node->tag & 0xff] -= node->size;
         blocks[node->tag & 0xff]--;
@@ -289,7 +289,7 @@ static void mark_object (object_t * ob) {
         EXTRA_REF(BLOCK(ob->living_name))++;
 
     sent = ob->sent;
-    
+
     while (sent) {
         DO_MARK(sent, TAG_SENTENCE);
         if (sent->flags & V_FUNCTION)
@@ -307,7 +307,7 @@ static void mark_object (object_t * ob) {
 #ifdef PACKAGE_PARSER
     if (ob->pinfo)
         parser_mark(ob->pinfo);
-#endif    
+#endif
 
     if (ob->prog)
         for (i = 0; i < ob->prog->num_variables_total; i++)
@@ -348,7 +348,7 @@ void mark_svalue (svalue_t * sv) {
             EXTRA_REF(BLOCK(sv->u.string))++;
             break;
         }
-    }    
+    }
 }
 
 static void mark_funp (funptr_t* fp) {
@@ -451,19 +451,19 @@ void mark_sockets (void) {
     for (i = 0; i < max_lpc_socks; i++) {
         if (lpc_socks[i].flags & S_READ_FP) {
             lpc_socks[i].read_callback.f->hdr.extra_ref++;
-        } else 
+        } else
         if ((s = lpc_socks[i].read_callback.s)) {
             EXTRA_REF(BLOCK(s))++;
         }
         if (lpc_socks[i].flags & S_WRITE_FP) {
             lpc_socks[i].write_callback.f->hdr.extra_ref++;
-        } else 
+        } else
         if ((s = lpc_socks[i].write_callback.s)) {
             EXTRA_REF(BLOCK(s))++;
         }
         if (lpc_socks[i].flags & S_CLOSE_FP) {
             lpc_socks[i].close_callback.f->hdr.extra_ref++;
-        } else 
+        } else
         if ((s = lpc_socks[i].close_callback.s)) {
             EXTRA_REF(BLOCK(s))++;
         }
@@ -486,7 +486,7 @@ void compute_string_totals (int * asp, int * abp, int * bp) {
     *asp = 0;
     *abp = 0;
     *bp = 0;
-    
+
     for (hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
         for (entry = table[hsh]; entry; entry = entry->next) {
             if (entry->tag == TAG_MALLOC_STRING) {
@@ -515,9 +515,9 @@ void check_string_stats (outbuffer_t * out) {
         + blocks[TAG_MALLOC_STRING & 0xff] * sizeof(malloc_block_t);
     int num = blocks[TAG_SHARED_STRING & 0xff] + blocks[TAG_MALLOC_STRING & 0xff];
     int bytes, as, ab;
-    
+
     compute_string_totals(&as, &ab, &bytes);
-    
+
     if (!base_overhead)
         base_overhead = overhead_bytes - overhead;
     overhead += base_overhead;
@@ -598,11 +598,11 @@ void check_all_blocks (int flag) {
 #if 0
     int num = 0, total = 0;
 #endif
-    
+
     outbuf_zero(&out);
     if (!(flag & 2))
         outbuf_add(&out, "Performing memory tests ...\n");
-    
+
     for (hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
         for (entry = table[hsh]; entry; entry = entry->next) {
             entry->tag &= ~TAG_MARKED;
@@ -641,9 +641,9 @@ void check_all_blocks (int flag) {
             case TAG_MALLOC_STRING:
                 {
                     char *str;
-                
+
                     msbl = NODET_TO_PTR(entry, malloc_block_t *);
-                    /* don't give an error for the return value we are 
+                    /* don't give an error for the return value we are
                        constructing :) */
                     if (msbl == MSTR_BLOCK(out.buffer))
                         break;
@@ -659,11 +659,11 @@ void check_all_blocks (int flag) {
                 ssbl = NODET_TO_PTR(entry, block_t *);
                 EXTRA_REF(ssbl) = 0;
                 break;
-            case TAG_ARRAY: 
+            case TAG_ARRAY:
                 vec = NODET_TO_PTR(entry, array_t *);
                 vec->extra_ref = 0;
                 break;
-            case TAG_CLASS: 
+            case TAG_CLASS:
                 vec = NODET_TO_PTR(entry, array_t *);
                 vec->extra_ref = 0;
                 break;
@@ -684,7 +684,7 @@ void check_all_blocks (int flag) {
             }
         }
     }
-    
+
     if (!(flag & 2)) {
         /* the easy ones to find */
         if (blocks[TAG_SIMULS & 0xff] > 3)
@@ -705,7 +705,7 @@ void check_all_blocks (int flag) {
             outbuf_add(&out, "WARNING: wrong number of call_out blocks allocated.\n");
         if (blocks[TAG_LOCALS & 0xff] > 3)
             outbuf_add(&out, "WARNING: more than 3 local blocks allocated.\n");
-        
+
         if (blocks[TAG_SENTENCE & 0xff] != tot_alloc_sentence)
             outbuf_addv(&out, "WARNING: tot_alloc_sentence is: %i should be: %i\n",
                         tot_alloc_sentence, blocks[TAG_SENTENCE & 0xff]);
@@ -723,6 +723,15 @@ void check_all_blocks (int flag) {
             outbuf_addv(&out, "WARNING: total_array_size is: %i should be: %i\n",
                         total_array_size, totals[TAG_ARRAY & 0xff]);
 #endif
+#ifdef CLASS_STATS
+        if (blocks[TAG_CLASS & 0xff] != num_classes)
+            outbuf_addv(&out, "WARNING: num_classes is: %i should be: %i\n",
+                        num_classes, blocks[TAG_CLASS & 0xff]);
+        if (totals[TAG_CLASS & 0xff] != total_class_size)
+            outbuf_addv(&out, "WARNING: total_class_size is: %i should be: %i\n",
+                        total_class_size, totals[TAG_CLASS & 0xff]);
+#endif
+
         if (blocks[TAG_MAPPING & 0xff] != num_mappings)
             outbuf_addv(&out, "WARNING: num_mappings is: %i should be: %i\n",
                         num_mappings, blocks[TAG_MAPPING & 0xff]);
@@ -735,7 +744,7 @@ void check_all_blocks (int flag) {
 #ifdef STRING_STATS
         check_string_stats(&out);
 #endif
-        
+
 #ifdef PACKAGE_EXTERNAL
         for (i = 0; i < NUM_EXTERNAL_CMDS; i++) {
             if (external_cmd[i]) {
@@ -743,7 +752,7 @@ void check_all_blocks (int flag) {
             }
         }
 #endif
-    
+
         /* now do a mark and sweep check to see what should be alloc'd */
         for (i = 0; i < max_users; i++)
             if (all_users[i]) {
@@ -758,9 +767,9 @@ void check_all_blocks (int flag) {
                             mark_svalue(all_users[i]->carryover + j);
                     }
                 }
-                if(all_users[i].compressed_stream)
-                	DO_MARK(all_users[i].compressed_stream, TAG_INTERACTIVE);
-                	
+                if(all_users[i]->compressed_stream)
+                	DO_MARK(all_users[i]->compressed_stream, TAG_INTERACTIVE);
+
 #ifndef NO_ADD_ACTION
                 if (all_users[i]->iflags & NOTIFY_FAIL_FUNC)
                     all_users[i]->default_err_message.f->hdr.extra_ref++;
@@ -771,12 +780,12 @@ void check_all_blocks (int flag) {
 
         if (*(DEFAULT_FAIL_MESSAGE)) {
           char buf[8192];
-          
+
           strcpy(buf, DEFAULT_FAIL_MESSAGE);
           strcat(buf, "\n");
           EXTRA_REF(BLOCK(findstring(buf)))++;
         }
-        
+
 #ifdef PACKAGE_UIDS
         mark_all_uid_nodes();
 #endif
@@ -800,9 +809,9 @@ void check_all_blocks (int flag) {
         mark_apply_low_cache();
         mark_mapping_node_blocks();
         mark_config();
-        
+
         mark_svalue(&apply_ret_value);
-        
+
         if (master_ob)
             master_ob->extra_ref++;
         if (simul_efun_ob)
@@ -814,7 +823,7 @@ void check_all_blocks (int flag) {
         for (ob = obj_list_destruct; ob; ob = ob->next_all) {
             ob->extra_ref++;
         }
-    
+
         for (hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
             for (entry = table[hsh]; entry; entry = entry->next) {
                 switch (entry->tag & ~TAG_MARKED) {
@@ -822,7 +831,7 @@ void check_all_blocks (int flag) {
                     ident_hash_elem_t *hptr, *first;
                     ident_hash_elem_t **table;
                     int size;
-                    
+
                     table = NODET_TO_PTR(entry, ident_hash_elem_t **);
                     size = (entry->size / 3) / sizeof(ident_hash_elem_t *);
                     for (i = 0; i < size; i++) {
@@ -855,10 +864,10 @@ void check_all_blocks (int flag) {
                         outbuf_addv(&out, "class size doesn't match block size: %s %04x\n", entry->desc, entry->tag);
                     for (i = 0; i < vec->size; i++) mark_svalue(&vec->item[i]);
                     break;
-                case TAG_MAPPING:               
+                case TAG_MAPPING:
                     map = NODET_TO_PTR(entry, mapping_t *);
                     DO_MARK(map->table, TAG_MAP_TBL);
-                    
+
                     i = map->table_size;
                     do {
                         for (node = map->table[i]; node; node = node->next) {
@@ -889,7 +898,7 @@ void check_all_blocks (int flag) {
                                         ob->obname);
                         }
                         if (!tmp)
-                            outbuf_addv(&out, 
+                            outbuf_addv(&out,
                                         "WARNING: %s not in object list.\n",
                                         ob->obname);
                     }
@@ -902,29 +911,29 @@ void check_all_blocks (int flag) {
                     break;
                 case TAG_PROGRAM:
                     prog = NODET_TO_PTR(entry, program_t *);
-                    
+
                     if (prog->line_info) {
                         DO_MARK(prog->file_info, TAG_LINENUMBERS);
                     }
-                    
+
                     for (i = 0; i < prog->num_inherited; i++)
                         prog->inherit[i].prog->extra_ref++;
-                    
+
                     for (i = 0; i < prog->num_functions_defined; i++)
                         if (prog->function_table[i].funcname)
                             EXTRA_REF(BLOCK(prog->function_table[i].funcname))++;
-                    
+
                     for (i = 0; i < prog->num_strings; i++)
                         EXTRA_REF(BLOCK(prog->strings[i]))++;
-                    
+
                     for (i = 0; i < prog->num_variables_defined; i++)
                         EXTRA_REF(BLOCK(prog->variable_table[i]))++;
-                    
+
                     EXTRA_REF(BLOCK(prog->filename))++;
                 }
             }
         }
-        
+
         /* now check */
         for (hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
             for (entry = table[hsh]; entry; entry = entry->next) {
@@ -996,17 +1005,17 @@ void check_all_blocks (int flag) {
                 case TAG_PERM_IDENT:
                     outbuf_addv(&out, "WARNING: Found orphan permanent identifier: %s %04x\n", entry->desc, entry->tag);
                     break;
-                case TAG_STRING: 
+                case TAG_STRING:
                     ptr = NODET_TO_PTR(entry, char *);
                     outbuf_addv(&out, "WARNING: Found orphan malloc'ed string: \"%s\" - %s %04x\n", ptr, entry->desc, entry->tag);
                     break;
                 case TAG_MALLOC_STRING:
                     msbl = NODET_TO_PTR(entry, malloc_block_t *);
-                    /* don't give an error for the return value we are 
+                    /* don't give an error for the return value we are
                        constructing :) */
                     if (msbl == MSTR_BLOCK(out.buffer))
                         break;
-                    
+
                     if (msbl->ref != msbl->extra_ref)
                         outbuf_addv(&out, "Bad ref count for malloc string \"%s\" %s %04x, is %d - should be %d\n", (char *)(msbl + 1), entry->desc, entry->tag, msbl->ref, msbl->extra_ref);
                     break;
@@ -1029,7 +1038,7 @@ void check_all_blocks (int flag) {
             }
         }
     }
-    
+
     if (flag & 1) {
         outbuf_add(&out, "\n\n");
         outbuf_add(&out, "      source                    blks   total\n");

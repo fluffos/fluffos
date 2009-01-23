@@ -251,6 +251,21 @@ static void yyerrorp (const char *);
 #define LEXER
 #include "preprocess.c"
 
+int lookup_predef(char * name)
+{
+    int x;
+
+    for(x = 0; x < (sizeof(predefs) / sizeof(keyword_t)); x++)
+    {
+        if(strcmp(name, predefs[x].word) == 0)
+        {
+            return x;
+        }
+    }
+
+    return -1;
+}
+
 static void merge (char * name, char * dest)
 {
     char *from;
@@ -2101,6 +2116,7 @@ void add_predefines()
 {
     char save_buf[80];
     int i;
+    long tmp;
     lpc_predef_t *tmpf;
 
     add_predefine("MUDOS", -1, "");
@@ -2145,7 +2161,7 @@ void add_predefines()
     }
     sprintf(save_buf, "%ld", sizeof(long));
     add_predefine("SIZEOFINT", -1, save_buf);
-    long tmp = (long)1<<31;
+    tmp = (long)1<<31;
     if(tmp > 0)
       tmp = (long)1<<63;
     sprintf(save_buf, "%ld", tmp-1);

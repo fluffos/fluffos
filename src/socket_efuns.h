@@ -23,15 +23,23 @@ enum socket_state {
 };
 
 #define BUF_SIZE        2048    /* max reliable packet size        */
+#ifdef IPV6
+#define ADDR_BUF_SIZE INET6_ADDRSTRLEN
+#else
 #define ADDR_BUF_SIZE   64      /* max length of address string    */
-
+#endif
 typedef struct {
     int fd;
     short flags;
     enum socket_mode mode;
     enum socket_state state;
+#ifdef IPV6
+    struct sockaddr_in6 l_addr;
+    struct sockaddr_in6 r_addr;
+#else
     struct sockaddr_in l_addr;
     struct sockaddr_in r_addr;
+#endif
     object_t *owner_ob;
     object_t *release_ob;
     union string_or_func read_callback;

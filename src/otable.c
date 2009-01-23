@@ -34,13 +34,14 @@ static object_t **obj_table = 0;
 static object_t **ch_table = 0;
 
 static char *basename(const char *full, int *size) {
+	char *tmp;
 	char *name= new_string(*size = strlen(full), "base_name: name");
 	while (*full == '/') {
 		full++;
 		(*size)--;
 	}
 	strcpy(name, full);
-	char *tmp = strchr(name, '#');
+	tmp = strchr(name, '#');
 	if (tmp) {
 		*size = tmp-name;
 	}
@@ -108,14 +109,15 @@ static object_t *find_obj_n(const char * s) {
 
 array_t *children(const char * s) {
 	object_t *curr;
+	array_t *vec;
 	int size;
+	int count = 0;
 
 	s = basename(s, &size);
 	ch = ObjHash(s);
 	curr = ch_table[ch];
 
-	int count = 0;
-	array_t *vec = allocate_empty_array(max_array_size);
+	vec = allocate_empty_array(max_array_size);
 	while (curr && count < max_array_size) {
 		if (!strncmp(curr->obname, s, size)) { /* found one */
 			vec->item[count].u.ob = curr;
@@ -141,6 +143,8 @@ static int objs_in_table = 0;
 
 void enter_object_hash(object_t * ob) {
 	object_t *s;
+	char *base;
+	int dummy;
 #ifndef DEBUG
 	h = ObjHash(ob->obname);
 #else
@@ -158,8 +162,7 @@ void enter_object_hash(object_t * ob) {
 	objs_in_table++;
 
 	//for children()
-	int dummy;
-	char *base = basename(ob->obname, &dummy);
+	base = basename(ob->obname, &dummy);
 
 	ch = ObjHash(base);
 	ob->next_ch_hash = ch_table[ch];
@@ -174,7 +177,10 @@ void enter_object_hash(object_t * ob) {
  */
 
 void remove_object_hash(object_t * ob) {
+	int dummy;
 	object_t *s;
+	object_t *t = 0;
+	char *base;
 
 	s = find_obj_n(ob->obname); /* this sets h, and cycles the ob to the front */
 	if (!s)
@@ -187,11 +193,9 @@ void remove_object_hash(object_t * ob) {
 	ob->next_hash = 0;
 	objs_in_table--;
 
-	int dummy;
-	char *base = basename(ob->obname, &dummy);
+	base = basename(ob->obname, &dummy);
 	ch = ObjHash(base);
 	FREE_MSTR(base);
-	object_t *t = 0;
 	s = ch_table[ch];
 	while (s && s!=ob) {
 		t = s;

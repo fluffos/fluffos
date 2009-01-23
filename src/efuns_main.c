@@ -1553,38 +1553,50 @@ f_member_array (void)
                 }
                 break;
             case T_NUMBER:
-                if (find->u.number == sv->u.number) break;
+                if (find->u.number == sv->u.number)
+                	break;
                 continue;
             case T_REAL:
-                if (find->u.real == sv->u.real) break;
+                if (find->u.real == sv->u.real)
+                	break;
                 continue;
             case T_ARRAY:
-                if (find->u.arr == sv->u.arr) break;
+                if (find->u.arr == sv->u.arr)
+                	break;
                 continue;
+            case T_CLASS:
+            	if (find->u.arr == sv->u.arr)
+            		break;
+            	continue;
             case T_OBJECT:
             {
                 if (sv->u.ob->flags & O_DESTRUCTED) {
                     assign_svalue(sv, &const0u);
                     continue;
                 }
-                if (find->u.ob == sv->u.ob) break;
+                if (find->u.ob == sv->u.ob)
+                	break;
                 continue;
             }
             case T_MAPPING:
-                if (find->u.map == sv->u.map) break;
+                if (find->u.map == sv->u.map)
+                	break;
                 continue;
             case T_FUNCTION:
-                if (find->u.fp == sv->u.fp) break;
+                if (find->u.fp == sv->u.fp)
+                	break;
                 continue;
 #ifndef NO_BUFFER_TYPE
             case T_BUFFER:
-                if (find->u.buf == sv->u.buf) break;
+                if (find->u.buf == sv->u.buf)
+                	break;
                 continue;
 #endif
             default:
                 if (sv->type == T_OBJECT && (sv->u.ob->flags & O_DESTRUCTED)) {
                     assign_svalue(sv, &const0u);
-                    if (find->type == T_NUMBER && !find->u.number) break;
+                    if (find->type == T_NUMBER && !find->u.number)
+                    	break;
                 }
                 continue;
             }
@@ -1769,6 +1781,13 @@ void f_mud_status (void)
 #else
         outbuf_add(&ob, "<Array statistics disabled, no information available>\n");
 #endif
+#ifdef CLASS_STATS
+        outbuf_addv(&ob, "Classes:\t\t\t%8d %8d\n", num_classes,
+                    total_class_size);
+#else
+        outbuf_add(&ob, "<Class statistics disabled, no information available>\n");
+#endif
+
         outbuf_addv(&ob, "Mappings:\t\t\t%8d %8d\n", num_mappings,
                     total_mapping_size);
         outbuf_addv(&ob, "Mappings(nodes):\t\t%8d\n", total_mapping_nodes);
@@ -1784,6 +1803,9 @@ void f_mud_status (void)
     tot += total_prog_block_size +
 #ifdef ARRAY_STATS
         total_array_size +
+#endif
+#ifdef CLASS_STATS
+        total_class_size +
 #endif
         total_mapping_size +
         tot_alloc_sentence * sizeof(sentence_t) +
@@ -3426,7 +3448,7 @@ f__to_int (void)
             break;
         case T_STRING:
         {
-            int temp;
+            long temp;
             char *p;
 
             temp = strtol(sp->u.string, &p, 10);
@@ -3719,6 +3741,9 @@ f_memory_info (void)
         tot = total_prog_block_size +
 #ifdef ARRAY_STATS
             total_array_size +
+#endif
+#ifdef CLASS_STATS
+            total_class_size +
 #endif
             total_mapping_size +
             tot_alloc_object_size +

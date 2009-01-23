@@ -1122,9 +1122,9 @@ char *string_print_formatted (const char * format_str, int argc, svalue_t * argv
                             add_table(temp);
                         }
                     } else {    /* not column or table */
+			const char *tmp = carg->u.string; //work around tcc bug;
                         if (pres && pres < slen)
                             slen = pres;
-			const char *tmp = carg->u.string; //work around tcc bug;
                         add_justified(tmp, slen, &pad, fs, finfo,
                                       (((format_str[fpos] != '\n') && (format_str[fpos] != '\0'))
                                        || ((finfo & INFO_ARRAY) && (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size)))
@@ -1166,12 +1166,15 @@ char *string_print_formatted (const char * format_str, int argc, svalue_t * argv
                         cheat[i++] = 'c';
                         break;
                     case INFO_T_OCT:
+                    	cheat[i++] = 'l';
                         cheat[i++] = 'o';
                         break;
                     case INFO_T_HEX:
+                    	cheat[i++] = 'l';
                         cheat[i++] = 'x';
                         break;
                     case INFO_T_C_HEX:
+                    	cheat[i++] = 'l';
                         cheat[i++] = 'X';
                         break;
                     default:
