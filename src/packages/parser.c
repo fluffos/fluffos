@@ -108,7 +108,7 @@ static void clear_parallel_errors (saved_error_t **);
 static svalue_t *get_the_error (parser_error_t *, int);
 
 #define isignore(x) (!uisprint(x) || x == '\'')
-#define iskeep(x) (uisalnum(x) || x == '*')
+#define iskeep(x) (uisalnum(x) || x == '*' || x == '?' || x == '!'|| x == '.'|| x == ':')
 
 #define SHARED_STRING(x) ((x)->subtype == STRING_SHARED ? (x)->u.string : findstring((x)->u.string))
 
@@ -1250,10 +1250,11 @@ static int get_single (bitvec_t * bv) {
 /* FIXME: obsolete */
 static char *query_the_short (char * start, char * end, object_t * ob) {
     svalue_t *ret;
-    
-    if (ob->flags & O_DESTRUCTED || 
-        !(ret = apply("the_short", ob, 0, ORIGIN_DRIVER))
-        || ret->type != T_STRING) {
+
+    if (ob==NULL || ob==0x9 || ob==0x0) return strput(start, end, "the thing");
+    if((ob->flags & O_DESTRUCTED) ||
+        (!(ret = apply("the_short", ob, 0, ORIGIN_DRIVER)))
+        || (ret->type != T_STRING)) {
         return strput(start, end, "the thing");
     }
     return strput(start, end, ret->u.string);
@@ -1895,7 +1896,10 @@ static int make_function (char * buf, char * end, int which,
                 push_bitvec_as_array(&matches[match].val.obs, which == 3);
             } else if (matches[match].val.number < 0) {
                 push_number(0);
-            } else if (loaded_objects[matches[match].val.number]->flags & O_DESTRUCTED) {
+            } else if (loaded_objects[matches[match].val.number] == NULL ||
+                loaded_objects[matches[match].val.number] == 0x0 ||
+                loaded_objects[matches[match].val.number] == 0x9 ||
+                loaded_objects[matches[match].val.number]->flags & O_DESTRUCTED) {
                 push_number(0);
             } else 
                 push_object(loaded_objects[matches[match].val.number]);
@@ -2011,16 +2015,18 @@ static int parallel_check_functions (object_t * obj,
     int tryy, ret, args;
 
     free_parser_error(&parallel_error_info);
-    SET_OB(obj);
-    for (tryy = 0, ret = 0; !ret && tryy < 8; tryy++) {
-        if (tryy == 4)
-            SET_OB(parse_vn->handler);
-        args = make_function(func, EndOf(func), which, state, tryy % 4, obj);
-        args += push_real_names(tryy % 4, which);
-        DEBUG_P(("Trying %s ... (/%s)", func, ob->obname));
-        ret = parallel_process_answer(state, apply(func, ob, args, ORIGIN_DRIVER), which);
-        if (ob->flags & O_DESTRUCTED)
-            return 0;
+    if(obj && obj != 0x9){
+        SET_OB(obj);
+        for (tryy = 0, ret = 0; !ret && tryy < 8; tryy++) {
+            if (tryy == 4)
+                SET_OB(parse_vn->handler);
+            args = make_function(func, EndOf(func), which, state, tryy % 4, obj);
+            args += push_real_names(tryy % 4, which);
+            DEBUG_P(("Trying %s ... (/%s)", func, ob->obname));
+            ret = parallel_process_answer(state, apply(func, ob, args, ORIGIN_DRIVER), which);
+            if (ob->flags & O_DESTRUCTED)
+                return 0;
+        }
     }
     if (!ret) {
         if (state->num_errors == 0)
@@ -2568,7 +2574,8 @@ static void we_are_finished (parse_state_t * state) {
         check_object_relations(state);
     }
     if (state->num_errors) {
-        int weight = parse_vn->weight;
+        int weight;
+        if(parse_vn) weight = parse_vn->weight;
         
         if (current_error_info.error_type == ERR_THERE_IS_NO) {
             /* ERR_THERE_IS_NO is basically a STR in place of an OBJ,
@@ -2622,7 +2629,9 @@ static void we_are_finished (parse_state_t * state) {
 
 static void do_the_call (void) {
     int i, n;
-    object_t *ob = best_result->ob;
+    object_t *ob;
+    if(best_result) ob = best_result->ob;
+    else return;
 
     for (i = 0; i < 4; i++) {
         if (ob->flags & O_DESTRUCTED) return;
@@ -2659,7 +2668,7 @@ static void parse_rule (parse_state_t * state) {
 
     DEBUG_INC;
     DEBUG_P(("parse_rule"));
-    while (1) {
+    while (parse_vn) {
         tok = parse_vn->token[state->tok_index++];
         if (state->word_index == num_words && tok) {
             DEBUG_P(("Ran out of words to parse."));
@@ -2823,7 +2832,7 @@ static void parse_rules (void) {
                 parse_rule(&local_state);
             }
         }
-        parse_vn = parse_vn->next;
+        if(parse_vn) parse_vn = parse_vn->next;
     }
 }
 

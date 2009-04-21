@@ -1183,6 +1183,8 @@ static void handle_malloc() {
         the_malloc = "bsdmalloc.c";
     if (lookup_define("MMALLOC"))
         the_malloc = "mmalloc.c";
+    if(lookup_define("MALLOC64"))
+        the_malloc = "64bitmalloc.c";
     if (lookup_define("GNUMALLOC"))
         the_malloc = "gnumalloc.c";
 
@@ -1654,8 +1656,9 @@ static void handle_configure() {
         check_library("-lz");
 
     if (lookup_define("PACKAGE_ASYNC"))
-        check_library("-lrt");
-
+        check_library("-lpthread");
+    if (lookup_define("PACKAGE_HASH"))
+        check_library("-lssl");
     fprintf(stderr, "Checking for flaky Linux systems ...\n");
     check_linux_libc();
 

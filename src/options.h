@@ -64,11 +64,16 @@
  *   * Statistics available. (see wrappers and DO_MSTATS)
  *   * Faster than SMALLOC but more memory overhead.
  *   * Requires sbrk().
+ * MALLOC64
+ *   * Wodan's malloc, uses system malloc for small allocations and spreads
+ *   * large allocations through the 64 bit memory space
+ *   * won't work on 32 bit systems.
  */
 #define SYSMALLOC
 #undef SMALLOC
 #undef BSDMALLOC
 #undef MMALLOC
+#undef MALLOC64
 
 /* You may optionally choose one (or none) of these malloc wrappers.  These
  * can be used in conjunction with any of the above malloc packages.
@@ -880,6 +885,12 @@
 
 /*PACKAGE_ASYNC: adds some efuns for asyncronous IO */
 #define PACKAGE_ASYNC
+
+/*PACKAGE_SHA1: adds a function to calculate the sha1 hash of a string sha1(string)*/
+#undef PACKAGE_SHA1
+
+/*PACKAGE_CRYPTO: adds a function that does multiple hash types hash(hash, string), needs openssl lib and includes and -lssl in system_libs*/
+#undef PACKAGE_CRYPTO
 
 /* PROG_REF_TYPE size of program ref counter:
  * char for 8 bit, short for 16, int for 32,

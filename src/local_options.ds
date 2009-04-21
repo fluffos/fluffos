@@ -861,7 +861,7 @@
  * will only get flushed if get_char() is not called from the first get_char()'s
  * LPC callback handler.
  */
-#undef GET_CHAR_IS_BUFFERED
+#define GET_CHAR_IS_BUFFERED
 
 /* PACKAGE_COMPRESS: Enable MCCP support and compressed save files
    SAVE_GZ_EXTENSION: save extension for compressed files
@@ -898,8 +898,11 @@
 /*PACKAGE_ASYNC: adds some efuns for asyncronous IO */
 #undef PACKAGE_ASYNC
 
+#define PACKAGE_DSLIB
 #define PROG_REF_TYPE int
 #define PARSE_DEBUG
 #define FLUFFOS
+#define HAS_CONSOLE
+#define ANSI_SUBSTITUTE 0x1e
 #endif
 

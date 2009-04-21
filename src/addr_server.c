@@ -344,7 +344,7 @@ void new_conn_handler()
 	    all_conns[conn_index].addr = client;
 
 	    char portname[256];
-	    if(getnameinfo(&client, sizeof(client), all_conns[conn_index].sname, SNAME_LEN, portname, 255, NI_NAMEREQD|NI_NUMERICHOST))
+	    if(getnameinfo((struct sockaddr *)&client, sizeof(client), all_conns[conn_index].sname, SNAME_LEN, portname, 255, NI_NAMEREQD|NI_NUMERICHOST))
 	    	strcpy(all_conns[conn_index].sname, "<unknown>");
 	    total_conns++;
 	    return;

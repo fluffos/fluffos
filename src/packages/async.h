@@ -16,6 +16,7 @@ struct request{
 	aiob *aio;
 	function_to_call_t *fun;
 	struct request *next;
+	svalue_t tmp;
 	enum atypes type;
 };
 

@@ -160,6 +160,7 @@ INLINE int svalue_save_size (svalue_t *);
 INLINE void save_svalue (svalue_t *, char **);
 INLINE int restore_svalue (char *, svalue_t *);
 int save_object (object_t *, const char *, int);
+int save_object_str (object_t *, int, char *, int);
 char *save_variable (svalue_t *);
 int restore_object (object_t *, const char *, int);
 void restore_variable (svalue_t *, char *);

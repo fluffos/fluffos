@@ -2116,10 +2116,37 @@ void add_predefines()
 {
     char save_buf[80];
     int i;
-    long tmp;
     lpc_predef_t *tmpf;
 
     add_predefine("MUDOS", -1, "");
+    add_predefine("FLUFFOS", -1, "");
+#ifdef WIN32
+    add_predefine("__WIN32__", -1, "");
+#endif
+#ifdef RUSAGE
+    add_predefine("__HAS_RUSAGE__", -1, "");
+#endif
+#ifdef M64
+    add_predefine("__M64__", -1, "");
+#endif
+#ifdef PACKAGE_DB
+    add_predefine("__PACKAGE_DB__", -1, "");
+#endif
+#ifdef GET_CHAR_IS_BUFFERED
+    add_predefine("__GET_CHAR_IS_BUFFERED__", -1, "");
+#endif
+#ifdef PACKAGE_DSLIB
+    add_predefine("__DSLIB__", -1, "");
+#endif
+#ifdef PACKAGE_DWLIB
+    add_predefine("__DWLIB__", -1, "");
+#endif
+#ifdef FD_SETSIZE
+    sprintf(save_buf, "%d", FD_SETSIZE);
+#else
+    sprintf(save_buf, "%d", 64);
+#endif
+    add_predefine("__FD_SETSIZE__", -1, save_buf);
     get_version(save_buf);
     add_quoted_predefine("__VERSION__", save_buf);
     sprintf(save_buf, "%d", external_port[0].port);
@@ -2160,11 +2187,8 @@ void add_predefines()
         add_predefine(namebuf, -1, mtext);
     }
     sprintf(save_buf, "%ld", sizeof(long));
-    add_predefine("SIZEOFINT", -1, save_buf);
-    tmp = (long)1<<31;
-    if(tmp > 0)
-      tmp = (long)1<<63;
-    sprintf(save_buf, "%ld", tmp-1);
+    add_predefine("SIZEOFINT", -1, save_buf);    
+    sprintf(save_buf, "%ld", LONG_MAX);
     add_predefine("MAX_INT", -1, save_buf);
 }
 

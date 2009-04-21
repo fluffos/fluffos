@@ -117,7 +117,7 @@ void set_this_user set_this_player(object | int);
 string lower_case(string);
 string replace_string(string, string, string,...);
 int restore_object(string, void | int);
-int save_object(string, void | int);
+int save_object(string | int | void, void | int);
 string save_variable(mixed);
 mixed restore_variable(string);
 object *users();

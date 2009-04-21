@@ -13,6 +13,14 @@
 ****        Jul 2000:
 ****            Andrew@Nanvaent's work included in the MudOS proper
 ****
+****        Apr 2006:
+****            Ajandurah@Demonslair added SQLite v3 support, defining
+****            USE_SQLITE3 in local_options will enable it.
+****
+****        Feb 2009:
+****            Ajandurah@Demonslair added SQLite v2 support, defining
+****            USE_SQLITE2 in local_options will enable it.
+****
 ****    Notes:
 ****      . This package has been restructured so that it can be compiled into
 ****        a driver without any database types defined so that you can write
@@ -99,6 +107,32 @@ static char *   MySQL_errormsg (dbconn_t *);
 
 static db_defn_t mysql = {
     "MySQL", MySQL_connect, MySQL_close, MySQL_execute, MySQL_fetch, NULL, NULL, MySQL_cleanup, NULL, MySQL_errormsg
+};
+#endif
+
+#ifdef USE_SQLITE2
+static int      SQLite2_connect   (dbconn_t *, const char *, const char *, const char *, const char *);
+static int      SQLite2_close     (dbconn_t *);
+static int      SQLite2_execute   (dbconn_t *, const char *);
+static array_t *SQLite2_fetch     (dbconn_t *, int);
+static void     SQLite2_cleanup   (dbconn_t *);
+static char *   SQLite2_errormsg  (dbconn_t *);
+
+static db_defn_t SQLite2 = {
+   "SQLite2", SQLite2_connect, SQLite2_close, SQLite2_execute, SQLite2_fetch, NULL, NULL, SQLite2_cleanup, NULL, SQLite2_errormsg
+};
+#endif
+
+#ifdef USE_SQLITE3
+static int      SQLite3_connect  (dbconn_t *, const char *, const char *, const char *, const char *);
+static int      SQLite3_close    (dbconn_t *);
+static int      SQLite3_execute  (dbconn_t *, const char *);
+static array_t *SQLite3_fetch    (dbconn_t *, int);
+static void     SQLite3_cleanup  (dbconn_t *);
+static char *   SQLite3_errormsg (dbconn_t *);
+
+static db_defn_t SQLite3 = {
+   "SQLite3", SQLite3_connect, SQLite3_close, SQLite3_execute, SQLite3_fetch, NULL, NULL, SQLite3_cleanup, NULL, SQLite3_errormsg
 };
 #endif
 
@@ -269,6 +303,20 @@ void f_db_connect (void)
 #endif
 	    db->type = &mysql;
 	    break;
+#endif
+#ifdef USE_SQLITE2
+#if USE_SQLITE2 - 0
+      case USE_SQLITE2:
+#endif
+         db->type = &SQLite2;
+         break;
+#endif
+#ifdef USE_SQLITE3
+#if USE_SQLITE3 - 0
+      case USE_SQLITE3:
+#endif
+         db->type = &SQLite3;
+         break;
 #endif
     }
 
@@ -832,4 +880,473 @@ static char *msql_errormsg (dbconn_t * c)
 {
     return string_copy(msqlErrMsg, "msql_errormsg");
 }
+#endif
+
+/*
+ * SQLite v2 support
+ * ajandurah@demonslair (Mark Lyndoe)
+ */
+#ifdef USE_SQLITE2
+static int SQLite2_connect (dbconn_t * c, const char * host, const char * database, const char * username, const char * password)
+{    
+   c->SQLite2.handle = sqlite_open(database, 0666, &c->SQLite2.errormsg);
+   if (!c->SQLite2.handle) {
+       sqlite_close(c->SQLite2.handle);
+       return 0;
+   }
+    
+   c->SQLite2.nrows = 0;
+   c->SQLite2.ncolumns = 0;
+   c->SQLite2.last_row = 0;
+   c->SQLite2.step_res = 0;
+   c->SQLite2.values = NULL;
+   c->SQLite2.col_names = NULL;
+   c->SQLite2.vm = NULL;
+   return 1;
+}
+ 
+static int SQLite2_close (dbconn_t * c)
+{
+   if (c->SQLite2.errormsg)
+      free(c->SQLite2.errormsg);
+   
+   if (c->SQLite2.vm)
+      sqlite_finalize(c->SQLite2.vm, NULL);
+   
+   sqlite_close(c->SQLite2.handle);
+   
+   c->SQLite2.handle = 0;
+   c->SQLite2.errormsg = 0;
+   c->SQLite2.nrows = 0;
+   c->SQLite2.ncolumns = 0;
+   c->SQLite2.last_row = 0;
+   c->SQLite2.step_res =0;
+   c->SQLite2.vm = NULL;
+   c->SQLite2.values = NULL;
+   c->SQLite2.col_names = NULL;
+   return 1;
+}
+
+static void SQLite2_cleanup (dbconn_t * c)
+{
+   if (c->SQLite2.errormsg) {
+      free(c->SQLite2.errormsg);
+      c->SQLite2.errormsg = 0;
+   }   
+   
+   if (c->SQLite2.vm) {
+      sqlite_finalize(c->SQLite2.vm, NULL);
+      c->SQLite2.vm = 0;
+      c->SQLite2.last_row = 0;
+      c->SQLite2.step_res = 0;
+   }
+}
+
+static int SQLite2_execute (dbconn_t * c, const char * s)
+{
+   char **result;
+   const char *tail;
+   int ret;
+   
+   /* Oddly enough a sqlite_get_table will execute sql that inserts and updates! */   
+   if (sqlite_get_table(c->SQLite2.handle, s, &result, &c->SQLite2.nrows, &c->SQLite2.ncolumns, NULL) != SQLITE_OK) {
+      sqlite_free_table(result);         
+      return 0;
+   }
+   else {
+      sqlite_free_table(result);
+      c->SQLite2.sql = string_copy(s, "SQLite2_execute");
+      c->SQLite2.last_row = 0;
+      c->SQLite2.step_res = 0;
+      
+      return c->SQLite2.nrows;
+   }
+   
+   return -1;
+}
+
+static array_t *SQLite2_fetch (dbconn_t * c, int row)
+{
+   int last_row, length, i, l, r;
+   char *p_end;
+   const char *tail;
+   double d;
+   array_t *v;
+   
+   if (!c->SQLite2.vm) {
+      /* We don't have a vm yet because the sql has not been compiled.
+       * This is down to db_exec using sqlite_get_table to execute the sql in the
+       * first instance.  This is the reason we saved the sql into the SQLite
+       * structure, compile it now and create a vm.  We return a null array only
+       * if the compile fails.
+       */
+      r = sqlite_compile(c->SQLite2.handle, c->SQLite2.sql, NULL, &c->SQLite2.vm, &c->SQLite2.errormsg);
+      if (r != SQLITE_OK || !c->SQLite2.vm)
+         return &the_null_array;
+   }
+   
+   if (c->SQLite2.step_res && c->SQLite2.step_res != SQLITE_ROW) {
+      return &the_null_array;
+   }
+   
+   if (row < 0 || row > c->SQLite2.nrows) {
+      return &the_null_array;
+   }
+   
+   if (c->SQLite2.ncolumns < 1) {
+      return &the_null_array;
+   }
+   
+   /* If the fetch is for row 0 then we don't return a row containing data values
+    * instead we return the column names. This has proven quite useful in a number
+    * of circumstances when they are unknown ahead of the query. Unlike SQLite3 we
+    * have no means of obtaining them without stepping the virtual machine so we
+    * have no choice. We will have to check the last_row and step_rc later to make
+    * sure we use the values here before we step again.
+    */
+   if (row == 0) {
+      c->SQLite2.step_res = sqlite_step(c->SQLite2.vm, NULL, &c->SQLite2.values, &c->SQLite2.col_names);
+      if (c->SQLite2.step_res == SQLITE_ROW || c->SQLite2.step_res == SQLITE_DONE) {
+         v = allocate_empty_array(c->SQLite2.ncolumns);
+         for (i = 0; i < c->SQLite2.ncolumns; i++) {
+            v->item[i].type = T_STRING;
+            v->item[i].subtype = STRING_MALLOC;
+            v->item[i].u.string = string_copy((char *)c->SQLite2.col_names[i], "SQLite2_fetch");
+         }
+         
+         return v;
+      }
+      
+      return &the_null_array;
+   }
+   
+   /* There is no quick entry to a row in the prepared statement. Thus we have
+    * too loop through until we reach the desired row, but only if the last row
+    * that we fetched is not the previous row... confused? join the club.
+    */
+   last_row = c->SQLite2.last_row;
+   
+   /* If the requested row is before the last row that was accessed then we need
+    * to re-compile the sql and recreate the virtual machine. SQLite3 provides a
+    * facility to reset a vm however SQLite2 does not. This is a downfall of
+    * SQLite in general though, we need to restart everything and walk through
+    * all of the results again until we get to the row we want... sigh
+    */
+   if (row < last_row) {
+      free(c->SQLite2.errormsg);
+      sqlite_finalize(c->SQLite2.vm, NULL);
+      
+      if (sqlite_compile(c->SQLite2.handle, c->SQLite2.sql, &tail, &c->SQLite2.vm, &c->SQLite2.errormsg) != SQLITE_OK)
+         return 0;
+      
+      c->SQLite2.last_row = 0;
+      c->SQLite2.step_res = 0;
+      last_row = 0;
+   }
+   
+   /* If the requested row is the same as the last one, ie: it's been requested
+    * again! we do not need to step forward, so we miss the row location loop
+    * and get straight to the nitty gritty of building the result array. If not
+    * we loop through from the last_row requested to the one requested this time
+    * using sqlite_step(). As long as the result is SQLITE_ROW we move on, if
+    * not then either an error occured or there are no more rows so we return a
+    * null array. The result is stored in the SQLite structure for later checks
+    * so if fetch is called again on a completed or errornous statement we can
+    * fail out sooner saving time.
+    */
+   if ((row != last_row) && (last_row < row)) {
+      for (i = last_row; i < row; i++) {
+         c->SQLite2.step_res = sqlite_step(c->SQLite2.vm, NULL, &c->SQLite2.values, &c->SQLite2.col_names);
+         if (c->SQLite2.step_res == SQLITE_ROW)
+            break;
+         else
+            return &the_null_array;
+      }
+   }
+   
+   /* SQLite v2 does not provide any functions for obtaining the values based on
+    * their datatypes like v3 does.  It is completely typeless and everything is
+    * returned as a (char *).  Thus we need a way of determining if the value is
+    * numeric or a string.  I do make some assumptions here, but all in all it
+    * does work for the vast majority of cases.  There is no support for blobs
+    * to be returned as LPC buffers with v2.  Support for binary data in v2 is
+    * suspect at best and is not recommended anyway, if you need that use v3.
+    *
+    * To determine the datatype, we do the following.  Run the value through
+    * strtoul() if it fails then the value could not be converted to a number
+    * so we assume it's a string and return it as such.  If it works but also
+    * has trailing data, then it might be a real number or a string.  Both
+    * "12.34" and "12 bottles" will cause strtoul() to work returning 12 but
+    * both will also have trailing data.  Thus we try converting it to a real
+    * number using strtod() if this fails then we assume its a string that 
+    * starts with a number ie: "12 bottles" and return it as a string.  If it
+    * works then we return it as a real number (float).
+    *
+    * It's by no means perfect, but it does catch pretty much everything I've
+    * thrown at it and is the best solution, bar walking the embedded datatype
+    * description, if one was set, and working it out from that.
+    */
+   v = allocate_empty_array(c->SQLite2.ncolumns);
+   for (i = 0; i < c->SQLite2.ncolumns; i++) {
+      /* If we have a NULL value get out now or we'll segfault */
+      if (c->SQLite2.values[i] == NULL) {
+         v->item[i] = const0u;
+         continue;
+      }
+      
+      errno = 0;
+      l = strtoul(c->SQLite2.values[i], &p_end, 10);
+      if (errno != 0 || c->SQLite2.values[i] == p_end) {
+         /* The conversion failed so assume it's a string */
+         v->item[i].type = T_STRING;
+         v->item[i].subtype = STRING_MALLOC;
+         v->item[i].u.string = string_copy((char *)c->SQLite2.values[i], "SQLite2_fetch");
+      }
+      
+      else if (*p_end != 0) {
+         /* The conversion left trailing characters behind, see if its a float */
+         errno = 0;
+         d = strtod(c->SQLite2.values[i], &p_end);
+         if (errno != 0 || c->SQLite2.values[i] == p_end || *p_end != 0) {
+            /* The conversion to float failed so it must be a string */
+            v->item[i].type = T_STRING;
+            v->item[i].subtype = STRING_MALLOC;
+            v->item[i].u.string = string_copy((char *)c->SQLite2.values[i], "SQLite2_fetch");
+         }
+         else {
+            /* It was a floating point number */
+            v->item[i].type = T_REAL;
+            v->item[i].u.real = (float)d;
+         }
+      }
+      
+      else if (errno == 0) {
+         /* It was an integer */
+         v->item[i].type = T_NUMBER;
+         v->item[i].u.number = (int)l;
+      }
+      
+      else {
+         /* No idea what it was */
+         v->item[i] = const0u;
+      }
+   }
+   
+   c->SQLite2.last_row = row;
+   return v;
+}
+
+static char *SQLite2_errormsg (dbconn_t * c)
+{
+   return string_copy(c->SQLite2.errormsg, "SQLite2_errormsg");
+}        
+#endif
+
+
+/*
+ * SQLite v3 support
+ * ajandurah@demonslair (Mark Lyndoe)
+ */ 
+#ifdef USE_SQLITE3
+static int SQLite3_connect (dbconn_t * c, const char * host, const char * database, const char * username, const char * password)
+{
+   if (sqlite3_open(database, &c->SQLite3.handle)) {
+      strncpy(c->SQLite3.errormsg, sqlite3_errmsg(c->SQLite3.handle), sizeof(c->SQLite3.errormsg));
+      c->SQLite3.errormsg[sizeof(c->SQLite3.errormsg) - 1] = 0;
+      sqlite3_close(c->SQLite3.handle);
+      return 0;
+   }
+   
+   c->SQLite3.results = 0;
+   c->SQLite3.nrows = 0;
+   c->SQLite3.last_row = 0;
+   c->SQLite3.step_res = 0;
+   return 1;
+}
+
+static int SQLite3_close (dbconn_t * c)
+{
+   if (c->SQLite3.results) {
+      sqlite3_finalize(c->SQLite3.results);
+   }
+   
+   sqlite3_close(c->SQLite3.handle);
+   c->SQLite3.handle = 0;
+   c->SQLite3.nrows = 0;
+   c->SQLite3.last_row = 0;
+   c->SQLite3.step_res = 0;
+   return 1;
+}
+
+static void SQLite3_cleanup (dbconn_t * c)
+{
+   if (c->SQLite3.results) {
+      sqlite3_finalize(c->SQLite3.results);
+      c->SQLite3.results = 0;
+      c->SQLite3.last_row = 0;
+      c->SQLite3.step_res = 0;
+   }
+}
+
+static int SQLite3_execute (dbconn_t * c, const char * s)
+{
+   char **result;
+   
+   if (sqlite3_prepare(c->SQLite3.handle, s, -1, &c->SQLite3.results, 0) != SQLITE_OK) {
+      strncpy(c->SQLite3.errormsg, sqlite3_errmsg(c->SQLite3.handle), sizeof(c->SQLite3.errormsg));
+      c->SQLite3.errormsg[sizeof(c->SQLite3.errormsg) - 1] = 0;
+      return 0;
+   }
+
+   /* There has to be a better way of determining the number of rows in the result
+    * set. sqlite3_prepare() does not provide them, since we need to call sqlite3_step()
+    * to walk through them, which we dont want to do until db_fetch() is called. This
+    * hack means we actually have to execute the full SQL statement to get the row
+    * total.. expensive time wise unfortunately.
+    */
+   if (c->SQLite3.results) {
+      if (sqlite3_get_table(c->SQLite3.handle, s, &result, &c->SQLite3.nrows, &c->SQLite3.ncolumns, NULL) != SQLITE_OK) {
+         sqlite3_free_table(result);
+         sqlite3_finalize(c->SQLite3.results);
+         return 0;
+      }
+            
+      sqlite3_free_table(result);
+      c->SQLite3.last_row = 0;
+      c->SQLite3.step_res = 0;
+      return c->SQLite3.nrows;
+   }
+   
+   return -1;
+}
+
+static array_t *SQLite3_fetch (dbconn_t * c, int row)
+{
+   int cols, last_row, length, i, r;
+   array_t *v;
+   
+   if (!c->SQLite3.results) {
+      return &the_null_array;
+   }
+   
+   if (c->SQLite3.step_res && c->SQLite3.step_res != SQLITE_ROW) {
+      return &the_null_array;
+   }
+   
+   if (row < 0 || row > c->SQLite3.nrows) {
+      return &the_null_array;
+   }
+   
+   cols = sqlite3_column_count(c->SQLite3.results);
+   if (cols < 1) {
+      return &the_null_array;
+   }
+   
+   /* If the fetch is for row 0 then we don't return a row from the prepared
+    * statement, instead we return an array containing the column names. This
+    * ability is useful in a number of circumstances when the column names are
+    * not known in advance for a query. We do not step the statement nor do we
+    * adjust the last_row index since sqlite provides a method to obtain the
+    * column names at any time.
+    */
+   if (row == 0) {
+      v = allocate_empty_array(cols);
+      for (i = 0; i< cols; i++) {
+         v->item[i].type = T_STRING;
+         v->item[i].subtype = STRING_MALLOC;
+         v->item[i].u.string = string_copy((char *)sqlite3_column_name(c->SQLite3.results, i), "SQLite3_fetch");
+      }
+   
+      return v;
+   }
+   
+   /* There is no quick entry to a row in the prepared statement. Thus we have
+    * too loop through till we reach the desired row, but only if the last row
+    * that we fetched is not the previous row... confused? join the club.
+    */
+   last_row = c->SQLite3.last_row;
+  
+   /* If the requested row is before the last row that was accessed then we
+    * reset the compiled statement before continuing. This is because we can't
+    * just select a row at will using sqlite and we can't rewind a step either.
+    * We could just reset the result statement at the end of this function like
+    * the msql and mysql versions, but that gets expensive next time it's called
+    * if we need to walk through everything again... sigh
+    */ 
+   if (row < last_row) {
+      sqlite3_reset(c->SQLite3.results);
+      c->SQLite3.last_row = 0;
+      c->SQLite3.step_res = 0;
+      last_row = 0;
+   }
+   
+   /* If the requested row is the same as the last one, ie: it's been requested
+    * again! we do not need to step forward, so we miss the row location loop
+    * and get straight to the nitty gritty of building the result array. If not
+    * we loop through from the last_row requested to the one requested this time
+    * using sqlite3_step(). As long as the result is SQLITE_ROW we move on, if 
+    * not then either an error occured or there are no more rows so we return a
+    * null array. The result is stored in the sqlite structure for later checks
+    * so if fetch is called again on a completed or errornous statement we can
+    * fail out sooner saving time.
+    */
+   if ((row != last_row) && (last_row < row)) {
+      for (i = last_row; i < row; i++) {
+         c->SQLite3.step_res = sqlite3_step(c->SQLite3.results);
+         
+         if (c->SQLite3.step_res == SQLITE_ROW)
+            break;
+         else
+            return &the_null_array;
+      }
+   }               
+               
+   v = allocate_empty_array(cols);
+   for (i = 0; i < cols; i++) {
+      switch (sqlite3_column_type(c->SQLite3.results, i)) {
+         case SQLITE_INTEGER:
+            v->item[i].type = T_NUMBER;
+            v->item[i].u.number = sqlite3_column_int(c->SQLite3.results, i);
+            break;
+            
+         case SQLITE_FLOAT:
+            v->item[i].type = T_REAL;
+            v->item[i].u.real = (float)sqlite3_column_double(c->SQLite3.results, i);
+            break;
+            
+         case SQLITE3_TEXT:
+            v->item[i].type = T_STRING;
+            v->item[i].subtype = STRING_MALLOC;
+            v->item[i].u.string = string_copy((char *)sqlite3_column_text(c->SQLite3.results, i), "SQLite3_fetch");
+            break;
+         
+         case SQLITE_BLOB:
+#ifndef NO_BUFFER_TYPE
+            length = sqlite3_column_bytes(c->SQLite3.results, i);
+            v->item[i].type = T_BUFFER;
+            v->item[i].u.buf = allocate_buffer(length);
+            write_buffer(v->item[i].u.buf, 0, (char *)sqlite3_column_blob(c->SQLite3.results, i), length);
+#else
+            v->item[i] = const0u;
+#endif
+            break;
+            
+         default:
+            v->item[i] = const0u;
+            break;
+      }
+   }
+
+   c->SQLite3.last_row = row;
+   return v;
+}
+
+static char *SQLite3_errormsg (dbconn_t * c)
+{
+   if (*(c->SQLite3.errormsg)) {
+      return string_copy((char *)c->SQLite3.errormsg, "SQLite3_errormsg:1");
+   }
+   
+   return string_copy((char *)sqlite3_errmsg(c->SQLite3.handle), "SQLite3_errormsg:2");
+}   
 #endif

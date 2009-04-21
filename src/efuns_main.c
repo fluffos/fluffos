@@ -2712,16 +2712,36 @@ f_save_object (void)
 {
     int flag, tmp_eval;
 
-    if (st_num_arg == 2) {
+    if (st_num_arg == 2 ) {
         flag = (sp--)->u.number;
     } else {
         flag = 0;
     }
 
-    flag = save_object(current_object, sp->u.string, flag);
+    if(st_num_arg == 1 && sp->type == T_NUMBER)
+    	flag = sp->u.number;
 
-    free_string_svalue(sp);
-    put_number(flag);
+    if(st_num_arg && sp->type == T_STRING){
+    	flag = save_object(current_object, sp->u.string, flag);
+
+    	free_string_svalue(sp);
+    	put_number(flag);
+    } else {
+    	pop_n_elems(st_num_arg);
+    	char *saved = new_string(MAX_STRING_LENGTH, "save_object_str");
+    	push_malloced_string(saved);
+        int left = MAX_STRING_LENGTH;
+        flag = save_object_str(current_object, flag, saved, left);
+        if(!flag){
+        	pop_stack();
+        	push_undefined();
+        } else {
+        	saved = new_string(strlen(sp->u.string), "save_object_str2");
+        	strcpy(saved, sp->u.string);
+        	pop_stack();
+        	push_malloced_string(saved);
+        }
+    }
 }
 #endif
 

@@ -17,8 +17,12 @@
 #include "eval.h"
 #include "console.h"
 
-#ifdef MINGW
+#ifndef ENOSR
 #define ENOSR 63
+#endif
+
+#ifndef ANSI_SUBSTITUTE
+#define ANSI_SUBSTITUTE 0x20
 #endif
 
 #ifndef ADDRFAIL_NOTIFY
@@ -32,6 +36,11 @@
 #define TELOPT_COMPRESS 85
 #define TELOPT_COMPRESS2 86
 #define TELOPT_MXP  91  // mud extension protocol
+
+#define TELOPT_MSSP 70
+
+#define MSSP_VAR 1
+#define MSSP_VAL 2
 
 static unsigned char telnet_break_response[] = {  28, IAC, WILL, TELOPT_TM };
 static unsigned char telnet_ip_response[]    = { 127, IAC, WILL, TELOPT_TM };
@@ -69,10 +78,14 @@ static unsigned char telnet_compress_v1_response[] = { IAC, SB,
 static unsigned char telnet_compress_v2_response[] = { IAC, SB,
                                               TELOPT_COMPRESS2, IAC,
                                               SE };
+
 #endif
 static unsigned char telnet_do_mxp[]     = { IAC, DO, TELOPT_MXP };
 static unsigned char telnet_will_mxp[]     = { IAC, SB, TELOPT_MXP, IAC, SE };
-
+static unsigned char telnet_will_mssp[] = { IAC, WILL, TELOPT_MSSP };
+static unsigned char telnet_start_mssp[] = { IAC, SB, TELOPT_MSSP };
+static unsigned char telnet_mssp_value[] = {MSSP_VAR, '%', 's', MSSP_VAL, '%', 's', 0};
+static unsigned char telnet_end_sub[] = {IAC, SE};
 //#ifdef DEBUGG
 //static char *slc_names[] = { SLC_NAMELIST };
 //#endif
@@ -223,6 +236,7 @@ void init_user_conn()
         external_port[i].out_volume = 0;
 #endif
         if (!external_port[i].port) {
+#if defined(FD6_KIND) && defined(FD6_PORT)
             if (!have_fd6) continue;
             fd6_which = i;
             have_fd6 = 0;
@@ -235,6 +249,9 @@ void init_user_conn()
             external_port[i].kind = FD6_KIND;
             external_port[i].port = FD6_PORT;
             external_port[i].fd = 6;
+#else
+            continue;
+#endif
         } else {
             /*
              * create socket of proper type.
@@ -712,7 +729,8 @@ int flush_message (interactive_t * ip)
     /*
      * if ip is not valid, do nothing.
      */
-    if (!ip || (ip->iflags & (NET_DEAD | CLOSING))) {
+    if (!ip || !ip->ob || !IP_VALID(ip, ip->ob) ||
+        (ip->ob->flags & O_DESTRUCTED) || (ip->iflags & (NET_DEAD | CLOSING))){
       //debug(connections, ("flush_message: invalid target!\n"));
         return 0;
     }
@@ -777,6 +795,30 @@ int flush_message (interactive_t * ip)
     return 1;
 }                               /* flush_message() */
 
+static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *obp){
+	object_t *ob = obp;
+	if(el->values[0].type == T_STRING && el->values[1].type == T_STRING){
+		char buf[1024];
+		int len = sprintf(buf, telnet_mssp_value, el->values[0].u.string, el->values[1].u.string);
+		add_binary_message(ob, buf, len);
+	} else if (el->values[0].type == T_STRING && el->values[1].type == T_ARRAY && el->values[1].u.arr->size > 0 && el->values[1].u.arr->item[0].type == T_STRING){
+		char buf[10240];
+		int len = sprintf(buf, telnet_mssp_value, el->values[0].u.string, el->values[1].u.arr->item[0].u.string);
+		add_binary_message(ob, buf, len);
+		array_t *ar = el->values[1].u.arr;
+		int i;
+		char val = MSSP_VAL;
+		for(i=1; i < ar->size; i++){
+			if(ar->item[i].type == T_STRING){
+				add_binary_message(ob, &val, 1);
+				add_binary_message(ob, ar->item[i].u.string, strlen(ar->item[i].u.string));
+			}
+		}
+
+	}
+	return 0;
+}
+
 static void copy_chars (interactive_t * ip, char * from, int num_bytes)
 {
     int i, start, x;
@@ -794,7 +836,7 @@ static void copy_chars (interactive_t * ip, char * from, int num_bytes)
 
 #if defined(NO_ANSI) && defined(STRIP_BEFORE_PROCESS_INPUT)
                     case 0x1b:
-                        ip->text[ip->text_end++] = 0x20;
+                        ip->text[ip->text_end++] = ANSI_SUBSTITUTE;
                         break;
 #endif
 
@@ -933,6 +975,59 @@ static void copy_chars (interactive_t * ip, char * from, int num_bytes)
                     case TELOPT_ECHO:
                         /* do nothing, but don't send a wont response */
                         break;
+                    case TELOPT_MSSP:
+                    	add_binary_message(ip->ob, telnet_start_mssp, sizeof(telnet_start_mssp));
+                    	svalue_t *res = apply_master_ob(APPLY_GET_MUD_STATS, 0);
+                    	mapping_t *map;
+                    	if(res <= 0 || res->type != T_MAPPING) {
+                    		map = allocate_mapping(0);
+                    		free_svalue(&apply_ret_value, "telnet neg");
+                    		apply_ret_value.type = T_MAPPING;
+                    		apply_ret_value.u.map = map;
+                    	} else
+                    		map = res->u.map;
+                    	//ok, so we have a mapping, first make sure we send the required values
+                    	char *tmp = findstring("NAME");
+                    	if(tmp){
+                    		svalue_t *name = find_string_in_mapping(map, tmp);
+                    		if(!name || name->type != T_STRING)
+                    			tmp = 0;
+                    	}
+                    	if(!tmp){
+                    		char buf[1024];
+                    		int len = sprintf(buf, telnet_mssp_value, "NAME", MUD_NAME);
+                    		add_binary_message(ip->ob, buf, len);
+                    	}
+                    	tmp = findstring("PLAYERS");
+                    	if(tmp){
+                    		svalue_t *players = find_string_in_mapping(map, tmp);
+                    		if(!players || players->type != T_STRING)
+                    			tmp = 0;
+                    	}
+                    	if(!tmp){
+                    		char buf[1024];
+                    		char num[5];
+                    		sprintf(num, "%d", num_user);
+                    		int len = sprintf(buf, telnet_mssp_value, "PLAYERS", num);
+                    		add_binary_message(ip->ob, buf, len);
+                    	}
+                    	tmp = findstring("UPTIME");
+                    	if(tmp){
+                    		svalue_t *upt = find_string_in_mapping(map, tmp);
+                    		if(!upt || upt->type != T_STRING)
+                    			tmp = 0;
+                    	}
+                    	if(!tmp){
+                    		char buf[1024];
+                    		char num[20];
+
+                    		sprintf(num, "%d", boot_time);
+                    		int len = sprintf(buf, telnet_mssp_value, "UPTIME", num);
+                    		add_binary_message(ip->ob, buf, len);
+                    	}
+                    	//now send the rest
+                    	mapTraverse(map, send_mssp_val, ip->ob);
+                    	add_binary_message(ip->ob, telnet_end_sub, sizeof(telnet_end_sub));
 #ifdef HAVE_ZLIB
                     case TELOPT_COMPRESS :
                       add_binary_message(ip->ob, telnet_compress_v1_response,
@@ -1814,6 +1909,7 @@ static void new_user_handler (int which)
 #endif
         // Ask them if they support mxp.
         add_binary_message(ob, telnet_do_mxp, sizeof(telnet_do_mxp));
+        add_binary_message(ob, telnet_will_mssp, sizeof(telnet_will_mssp));
     }
 
     logon(ob);
@@ -1890,7 +1986,7 @@ static int escape_command (interactive_t * ip, char * user_command)
         return 1;
 #endif
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
-    if (ip->input_to && !(ip->iflags & NOESC))
+    if (ip->input_to && ( !(ip->iflags & NOESC) && !(ip->iflags & I_SINGLE_CHAR) ) )
         return 1;
 #endif
     return 0;
@@ -1951,9 +2047,9 @@ int process_user_command()
     if (!(user_command = get_user_command()))
         return 0;
 
-    ip = command_giver->interactive;
+    if(command_giver) ip = command_giver->interactive;
     current_interactive = command_giver;    /* this is yuck phooey, sigh */
-    clear_notify(ip->ob);
+    if(ip) clear_notify(ip->ob);
     update_load_av();
     debug(connections, ("process_user_command: command_giver = /%s\n", command_giver->obname));
 
@@ -2223,6 +2319,23 @@ static int call_function_interactive (interactive_t * i, char * str)
             free_some_svalues(i->carryover, i->num_carry);
         i->carryover = NULL;
         i->num_carry = 0;
+        i->input_to = 0;
+        if (i->iflags & SINGLE_CHAR) {
+            /*
+             * clear single character mode
+             */
+            i->iflags &= ~SINGLE_CHAR;
+#ifndef GET_CHAR_IS_BUFFERED
+            set_linemode(i);
+#else
+            was_single = 1;
+            if (i->iflags & NOECHO) {
+                was_noecho = 1;
+                i->iflags &= ~NOECHO;
+            }
+#endif
+        }
+
         return (0);
     }
     /*
@@ -2526,7 +2639,7 @@ int query_addr_number (const char * name, svalue_t * call_back)
 
     debug(connections, ("query_addr_number: sent address server %s\n", dbuf));
 
-    if (OS_socket_write(addr_server_fd, buf, msglen + sizeof(int) + sizeof(int)) == -1) {
+    if (addr_server_fd && OS_socket_write(addr_server_fd, buf, msglen + sizeof(int) + sizeof(int)) == -1) {
         switch (socket_errno) {
         case EBADF:
             debug_message("Address server has closed connection.\n");

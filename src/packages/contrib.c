@@ -2708,8 +2708,8 @@ void f_string_difference() {
    int diff, as, bs;
    char *a, *b;
 
-   a = sp->u.string;
-   b = ( sp - 1 )->u.string;
+   a = (char *)sp->u.string;
+   b = (char *)( sp - 1 )->u.string;
 
    if( !strcmp( a, b ) ) {
       diff = 0;
@@ -2731,4 +2731,122 @@ void f_string_difference() {
    free_string_svalue( sp );
    put_number( diff );
 }
+#endif
+
+#ifdef F_QUERY_CHARMODE
+static int query_charmode (object_t * ob){
+    int ret;
+    if (!ob || ob->interactive == 0){
+        ret = -2;
+    }
+    else {
+        ret = (ob->interactive->iflags & I_SINGLE_CHAR);
+    }
+    return ret;
+}
+
+void f_query_charmode (void){
+    int tmp;
+
+    if (st_num_arg){
+        tmp = query_charmode(sp->u.ob);
+        free_object(&sp->u.ob, "f_query_charmode");
+    }
+    else {
+        tmp = -1;
+    }
+    put_number(tmp);
+}
+
+#ifdef F_REMOVE_CHARMODE
+static int remove_charmode (object_t * ob){
+    int ret;
+    if (!ob || ob->interactive == 0){
+        ret = -2;
+    }
+    else {
+        ret = (ob->interactive->iflags &= ~I_SINGLE_CHAR);
+    }
+    return ret;
+}
+
+void f_remove_charmode (void){
+    int tmp;
+
+    if (st_num_arg){
+        tmp = remove_charmode(sp->u.ob);
+        free_object(&sp->u.ob, "f_remove_charmode");
+    }
+    else {
+        tmp = -1;
+    }
+    //if(tmp > 0 && !(tmp & I_SINGLE_CHAR)) tmp = 1;
+    //else tmp = 0;
+    put_number(tmp);
+}
+#endif
+#endif
+#ifdef F_REMOVE_GET_CHAR
+static int remove_get_char (object_t * ob){
+    int ret;
+    if (!ob || ob->interactive == 0){
+        ret = -2;
+    }
+    else ret = 0;
+
+        if (ob->interactive->input_to) {
+            ret = 1;
+            free_sentence(ob->interactive->input_to);
+            if (ob->interactive->num_carry > 0)
+                free_some_svalues(ob->interactive->carryover, ob->interactive->num_carry);
+            ob->interactive->carryover = NULL;
+            ob->interactive->num_carry = 0;
+            ob->interactive->input_to = 0;
+        }
+    else {
+        ret = -1;
+    }
+    return ret;
+}
+
+void f_remove_get_char (void){
+    int tmp;
+
+    if (st_num_arg){
+        tmp = remove_get_char(sp->u.ob);
+        free_object(&sp->u.ob, "f_remove_get_char");
+    }
+    else {
+        tmp = -3;
+    }
+    put_number(tmp);
+}
+
+#endif
+#ifdef F_SEND_NULLBYTE
+void f_send_nullbyte (void){
+    int tmp;
+    object_t *who;
+    tmp = 0;
+
+    if (st_num_arg){
+        who = sp->u.ob;
+        if (!who || (who->flags & O_DESTRUCTED) || !who->interactive ||
+            (who->interactive->iflags & (NET_DEAD | CLOSING))) {
+          tmp = -2;
+        }
+        else {
+          tmp = 1;
+          //""is only the end-of-string zero byte.
+          add_message(who,"",1);
+          flush_message(who->interactive);
+        }
+        free_object(&sp->u.ob, "f_send_nullbyte");
+    }
+    else {
+        tmp = -1;
+    }
+    put_number(tmp);
+}
+
 #endif

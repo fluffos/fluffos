@@ -875,4 +875,15 @@
 
 /* ALLOW_INHERIT_AFTER_FUNCTION: allow inheriting after functions have been defined (this includes prototypes). This caused crashes in v22.2a but it may have been fixed since */
 #undef ALLOW_INHERIT_AFTER_FUNCTION
-
+#undef PACKAGE_DSLIB
+#define ED_INDENT_SPACES 4
+#define PROG_REF_TYPE int
+#undef PARSE_DEBUG
+#define HAS_CONSOLE
+#define FLUFFOS
+#undef ED_INDENT_CASE
+#undef ALLOW_INHERIT_AFTER_GLOBAL_VARIABLES
+#undef ANSI_SUBSTITUTE
+#define CFG_MAX_GLOBAL_VARIABLES         256
+#undef RECEIVE_ED
+#undef PACKAGE_ASYNC

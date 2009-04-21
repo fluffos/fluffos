@@ -2450,7 +2450,7 @@ static void report_status (int status) {
         free_ed_buffer(current_editor);
         return;
     case CHANGED:
-        ED_OUTPUT(ED_DEST, "File has been changed.\n");
+        ED_OUTPUT(ED_DEST, "To quit without saving: Q\nSave and quit: x\n");
         break;
     case SET_FAIL:
         ED_OUTPUT(ED_DEST, "`set' command failed.\n");

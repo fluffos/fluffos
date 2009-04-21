@@ -12,7 +12,8 @@ int lasttime;
 void set_eval(int etime){
 #ifndef WIN32
   long diff;
-  if((diff = time(0)-current_time) > 1){
+  gettimeofday(&tv, NULL);
+  if((diff = tv.tv_sec-current_time) > 1){
 	  diff *= 1000000;
 	  if(diff > max_cost*100){
 		  //put some hard limit to eval times
@@ -22,7 +23,6 @@ void set_eval(int etime){
   }
   signal(SIGVTALRM, sigalrm_handler);
   uvalarm(etime, 0);
-  gettimeofday(&tv, NULL);
 #endif
   outoftime = 0;
 

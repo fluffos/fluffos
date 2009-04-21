@@ -2,6 +2,31 @@ As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :), note: where it says Cratylus, I got it from his version, usually
 someone else did the work, but I don't know how to find who did what there.
 
+FluffOS 2.16
+improved single char mode support (Cratylus)
+	 this includes some new efuns:
+	      int query_charmode(object);
+	      int remove_charmode(object);
+	      int remove_get_char(object);
+efun to send nullbytes (Raudhrskal)
+     int send_nullbyte(object);
+improved ed failure mess (Cratylus)
+new no arguments version of save_object, which returns the save string
+fix to stop iconv looping forever
+faster hashing for big strings (now stops after 1000 chars)
+some new predefines (Cratylus)
+async io fixes, sadly now requires pthreads
+parser update (Cratylus)
+sqlite support (Ajandurah@Demonslair)
+compile warning fixes (Ajandurah@Demonslair)
+crypto and sha1 package (Ajandurah@Demonslair)
+added MSSP support, the driver will call get_mud_stats() on the master ob, 
+      which should return a mapping with the keys/values, if a value is an 
+      array of strings they'll all be sent as values for that key. The driver
+      send the NAME (from config file) PLAYERS and UPTIME values if the 
+      function doesn't exist, if it does but didn't include one of those fields
+      the driver will add the field as those are required.
+new malloc option malloc64 which tries to avoid needing big copies on realloc by spreading all allocations a few MB apart in virtual memory.
 FluffOS 2.15:
 IPV6 support
 class stats (Skullslayer@Realms of the Dragon)

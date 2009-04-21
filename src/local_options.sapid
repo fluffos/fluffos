@@ -925,5 +925,7 @@ in v22.2a but it may have been fixed since */
  * char for 8 bit, short for 16, int for 32,
  * long long for 64 (completely useless on 32 bit machines though!) */
 #define PROG_REF_TYPE int
-
+#undef PACKAGE_DSLIB
+#define HAS_CONSOLE
+#undef ANSI_SUBSTITUTE
 #endif

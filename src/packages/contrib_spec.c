@@ -54,3 +54,7 @@ mixed max( mixed *, int | void );
 mixed min( mixed *, int | void );
 mixed abs( int | float );
 int string_difference( string, string );
+int query_charmode(object);
+int remove_charmode(object);
+int remove_get_char(object);
+int send_nullbyte(object);

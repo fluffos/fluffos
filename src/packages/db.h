@@ -53,6 +53,14 @@
 #undef USE_OLD_FUNCTIONS
 #endif
 
+#ifdef USE_SQLITE2
+#include "/usr/include/sqlite.h"
+#endif
+
+#ifdef USE_SQLITE3
+#include "/usr/include/sqlite3.h"
+#endif
+
 typedef union dbconn_u {
 #ifdef USE_MSQL
     struct tmp_msql {
@@ -66,6 +74,31 @@ typedef union dbconn_u {
         MYSQL *handle;
         MYSQL_RES *results;
     } mysql;
+#endif
+#ifdef USE_SQLITE2
+   struct tmp_sqlite2 {
+      sqlite *handle;
+      sqlite_vm *vm;
+      int nrows;
+      int ncolumns;
+      int last_row;
+      int step_res;      
+      const char **values;
+      const char **col_names;
+      char *sql;
+      char *errormsg;
+   } SQLite2;
+#endif
+#ifdef USE_SQLITE3
+   struct tmp_sqlite3 {
+      sqlite3 *handle;
+      sqlite3_stmt *results;
+      int nrows;
+      int ncolumns;
+      int last_row;
+      int step_res;
+      char errormsg[256];
+   } SQLite3;
 #endif
 } dbconn_t;
 

@@ -767,8 +767,10 @@ void check_all_blocks (int flag) {
                             mark_svalue(all_users[i]->carryover + j);
                     }
                 }
+#ifdef PACKAGE_COMPRESS
                 if(all_users[i]->compressed_stream)
                 	DO_MARK(all_users[i]->compressed_stream, TAG_INTERACTIVE);
+#endif
 
 #ifndef NO_ADD_ACTION
                 if (all_users[i]->iflags & NOTIFY_FAIL_FUNC)

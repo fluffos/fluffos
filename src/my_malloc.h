@@ -60,6 +60,19 @@ void *mmalloc(int size);
 
 #endif
 
+#ifdef MALLOC64
+#define MALLOC(x)       malloc64(x)
+#define FREE(x)         free64(x)
+#define REALLOC(x,y)    realloc64(x,y)
+#define CALLOC(x,y)     calloc64(x,y)
+#ifndef _FUNC_SPEC_
+void free64(void *block);
+void *realloc64(void *block, int size);
+void *calloc64(int num, int size);
+void *malloc64(int size);
+#endif
+#endif
+
 #define DXALLOC(x,tag,desc)     xalloc(x)
 #define DMALLOC(x,tag,desc)     MALLOC(x)
 #define DREALLOC(x,y,tag,desc)  REALLOC(x,y)

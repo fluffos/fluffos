@@ -69,9 +69,8 @@ char *translate(iconv_t tr, const char *mes, int inlen, int *outlen){
 
     while(len){
       iconv(tr, (char **)&tmp, &len, &tmp2, &len2);
-	if(len > 1)
 #ifdef PACKAGE_DWLIB
-	    if(tmp[0] == 0xff && tmp[1] == 0xf9){
+		if(len > 1 && tmp[0] == 0xff && tmp[1] == 0xf9){
 		len -=2;
 		tmp +=2;
 #else
@@ -80,19 +79,21 @@ char *translate(iconv_t tr, const char *mes, int inlen, int *outlen){
 	    } else {
 
 		if(E2BIG == errno){
+		  errno = 0;
 		  tmp = (unsigned char *)mes;
-		    len = strlen(mes)+1;
-		    FREE(res);
-		    reslen *= 2;
-		    res = (char *)MALLOC(reslen);
-		    tmp2 = res;
-		    len2 = reslen;
-		    continue;
+		  len = strlen(mes)+1;
+		  FREE(res);
+		  reslen *= 2;
+		  res = (char *)MALLOC(reslen);
+		  tmp2 = res;
+		  len2 = reslen;
+		  continue;
 		}
 		tmp2[0] = 0;
 		*outlen = reslen - len2;
 		return res;
 	    }
+
     }
     *outlen = reslen - len2;
     return res;
