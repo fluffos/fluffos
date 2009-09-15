@@ -1,0 +1,19 @@
+global s
+global t
+global i
+
+probe process("driver").mark("lpc__entry")
+{
+  if(!i++)
+    t = gettimeofday_us();
+    
+    //  printf("%s %s\n", user_string($arg1), user_string($arg2));
+}
+
+probe process("driver").mark("lpc__return")
+{
+  if(i)
+    i--;
+  if(!i && gettimeofday_us() - t > 1000000)
+    printf("%s(%s):%s %d us\n", user_string($arg1), user_string($arg3), user_string($arg2), gettimeofday_us() - t);
+}

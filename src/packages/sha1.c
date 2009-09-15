@@ -126,9 +126,9 @@ void f_sha1(void)
       h4 = h4 + e;
    }
    
-   sprintf(str, "%x%x%x%x%x", h0, h1, h2, h3, h4);
+   sprintf((char *)str, "%x%x%x%x%x", h0, h1, h2, h3, h4);
    pop_stack();
-   push_malloced_string(string_copy(str, "f_sha1"));
+   push_malloced_string(string_copy((char *)str, "f_sha1"));
    free(str);
 }
 #endif

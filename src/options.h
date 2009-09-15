@@ -74,7 +74,7 @@
 #undef BSDMALLOC
 #undef MMALLOC
 #undef MALLOC64
-
+#undef MALLOC32
 /* You may optionally choose one (or none) of these malloc wrappers.  These
  * can be used in conjunction with any of the above malloc packages.
  *
@@ -910,5 +910,8 @@
 /* IPV6: Use IP version 6 instead of 4, for most people the only difference 
  * will be that numerical IP addresses get ::ffff: added in front.*/
 #define IPV6
+
+/* static user space dtrace probes, try them if you have dtrace! */
+#undef DTRACE
 #endif
 

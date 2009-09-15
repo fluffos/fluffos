@@ -332,7 +332,7 @@
  *
  * The only down side is some people like their logs shorter
  */
-#define ARGUMENTS_IN_TRACEBACK
+#undef ARGUMENTS_IN_TRACEBACK
 
 /* LOCALS_IN_TRACEBACK: similar to ARGUMENTS_IN_TRACEBACK, but for local
  *   variables.  The output looks more or less like:
@@ -342,7 +342,7 @@
  * Same as above.  Tends to produce even longer logs, but very useful for
  * tracking errors.
  */
-#define LOCALS_IN_TRACEBACK
+#undef LOCALS_IN_TRACEBACK
 
 /* MUDLIB_ERROR_HANDLER: If you define this, the driver doesn't do any
  *   handling of runtime errors, other than to turn the heartbeats of
@@ -390,7 +390,7 @@
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
  *                      compilation error occured.
  */
-#define DEFAULT_PRAGMAS PRAGMA_STRICT_TYPES
+#define DEFAULT_PRAGMAS 0
 
 /* supress warnings about unused arguments; only warn about unused local
  * variables.  Makes older code (where argument names were required) compile
@@ -440,7 +440,7 @@
 /* OPCPROF: define this if you wish to enable OPC profiling. Allows a dump
  *   of the # of times each efun is invoked (via the opcprof() efun).
  */
-#undef OPCPROF
+#define OPCPROF
 
 /* OPCPROF_2D: define this if you wish to enable 2-D OPC profiling. Allows a 
  *   dump of the # of times each *pair* of eoperators is invoked.
@@ -489,7 +489,7 @@
  *   interactives as well as NPCs.  If this is defined, user.c will need a
  *   catch_tell(msg) method that calls receive(msg);
 */
-#undef INTERACTIVE_CATCH_TELL
+#define INTERACTIVE_CATCH_TELL
 
 /* RESTRICTED_ED: define this if you want restricted ed mode enabled.
  */
@@ -545,7 +545,7 @@
  *   saved.  Allowing any file by any wizard to be saved as a
  *   binary is convenient, but may take up a lot of disk space.
  */
-#define BINARIES
+#undef BINARIES
 
 /* ARRAY_RESERVED_WORD: If this is defined then the word 'array' can
  *   be used to define arrays, as in:
@@ -672,7 +672,7 @@
  *   uid to automatically be trusted and to have their euid set to the uid of
  *   the object that forced the object's creation.
  */
-#define AUTO_TRUST_BACKBONE
+#undef AUTO_TRUST_BACKBONE
 
 /*************************************************************************
  *                       FOR EXPERIENCED USERS                           *
@@ -879,5 +879,12 @@
 #undef ALLOW_INHERIT_AFTER_GLOBAL_VARIABLES
 #define PARSE_DEBUG
 #define FLUFFOS
+#undef PACKAGE_DSLIB
+#define ED_INDENT_SPACES 4
+#define PROG_REF_TYPE int
+#define HAS_CONSOLE
+#undef ED_INDENT_CASE
+#undef ANSI_SUBSTITUTE
+#undef RECEIVE_ED
+#undef PACKAGE_ASYNC
 #endif
-

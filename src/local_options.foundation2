@@ -888,4 +888,7 @@
 #undef PACKAGE_ASYNC
 #define HAS_CONSOLE
 #endif
-
+#undef IPV6
+#undef MALLOC64
+#undef PACKAGE_CRYPTO
+#undef PACKAGE_SHA1

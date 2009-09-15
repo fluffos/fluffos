@@ -24,6 +24,13 @@
 static int opc_eoper[BASE];
 #endif
 
+
+#ifdef DTRACE
+#include <sys/sdt.h>
+#else
+#define DTRACE_PROBE3(x,y,z,zz,zzz)
+#endif
+
 #ifdef OPCPROF_2D
 /* warning, this is typically 4 * 100 * 100 = 40k */
 static int opc_eoper_2d[BASE+1][BASE+1];
@@ -200,7 +207,7 @@ void push_object (object_t * ob)
 {
   STACK_INC;
 
-  if (!ob || (ob->flags & O_DESTRUCTED)) {
+  if (!ob || (ob->flags & O_DESTRUCTED) || ob->flags & O_BEING_DESTRUCTED) {
     *sp = const0u;
     return;
   }
@@ -1219,24 +1226,31 @@ void pop_control_stack()
 {
   DEBUG_CHECK(csp == (control_stack - 1),
               "Popped out of the control stack\n");
+#ifdef DTRACE
+  if ((csp->framekind & FRAME_MASK) == FRAME_FUNCTION){
+    DTRACE_PROBE3(fluffos, lpc__return, current_object->obname, current_prog->function_table[csp->fr.table_index].funcname, current_prog->filename);
+  }
+#endif
 #ifdef PROFILE_FUNCTIONS
   if ((csp->framekind & FRAME_MASK) == FRAME_FUNCTION) {
-    long secs, usecs, dsecs;
-    function_t *cfp = &current_prog->function_table[csp->fr.table_index];
-    int stof = 0;
+	  long secs, usecs, dsecs;
+	  function_t *cfp = &current_prog->function_table[csp->fr.table_index];
+	  int stof = 0;
 
-    get_cpu_times((unsigned long *) &secs, (unsigned long *) &usecs);
-    dsecs = (((secs - csp->entry_secs) * 1000000)
-             + (usecs - csp->entry_usecs));
-    cfp->self += dsecs;
+	  get_cpu_times((unsigned long *) &secs, (unsigned long *) &usecs);
+	  dsecs = (((secs - csp->entry_secs) * 1000000)
+			  + (usecs - csp->entry_usecs));
+	  cfp->self += dsecs;
 
-    while((csp-stof) != control_stack){
-      if (((csp-stof-1)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
-	(csp-stof)->prog->function_table[(csp-stof-1)->fr.table_index].children += dsecs;
-	break;
-      }
-      stof++;
-    }
+	  while((csp-stof) != control_stack){
+		  if (((csp-stof-1)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
+			  function_t *parent = &((csp-stof)->prog->function_table[(csp-stof-1)->fr.table_index]);
+			  if(parent != cfp) //if it's recursion it's not really a child
+				  parent->children += dsecs;
+			  break;
+		  }
+		  stof++;
+	  }
   }
 #endif
   current_object = csp->ob;
@@ -1480,6 +1494,8 @@ setup_new_frame (int findex)
     do_trace_call(findex);
   }
 #endif
+   DTRACE_PROBE3(fluffos, lpc__entry, current_object->obname, current_prog->function_table[findex].funcname, current_prog->filename);
+
   return &current_prog->function_table[findex];
 }
 
@@ -1535,6 +1551,8 @@ INLINE function_t *setup_inherited_frame (int findex)
     do_trace_call(findex);
   }
 #endif
+  DTRACE_PROBE3(fluffos, lpc__entry, csp->ob->obname, current_prog->function_table[findex].funcname, current_prog->filename);
+
   return &current_prog->function_table[findex];
 }
 
@@ -4146,8 +4164,8 @@ int apply_low (const char * fun, object_t * ob, int num_arg)
           do_trace_call(findex);
         }
 #endif
-
-        previous_ob = current_object;
+        DTRACE_PROBE3(fluffos, lpc__entry, ob->obname, fun, current_prog->filename);
+	previous_ob = current_object;
         current_object = ob;
         IF_DEBUG(save_csp = csp);
         call_program(current_prog, funp->address);
@@ -4245,6 +4263,7 @@ int apply_low (const char * fun, object_t * ob, int num_arg)
         previous_ob = current_object;
         current_object = ob;
         IF_DEBUG(save_csp = csp);
+        DTRACE_PROBE3(fluffos, lpc__entry, ob->obname, fun, current_prog->filename);
         call_program(current_prog, funp->address);
 
         DEBUG_CHECK(save_csp - 1 != csp,
@@ -4310,7 +4329,6 @@ svalue_t *apply (const char * fun, object_t * ob, int num_arg,
     }
   }
 #endif
-
   IF_DEBUG(expected_sp = sp - num_arg);
   if (apply_low(fun, ob, num_arg) == 0)
     return 0;
@@ -4364,10 +4382,10 @@ void call___INIT (object_t * ob)
   caller_type = ORIGIN_DRIVER;
   csp->num_local_variables = 0;
 
-  setup_new_frame(num_functions - 1 + progp->last_inherited);
   previous_ob = current_object;
 
   current_object = ob;
+  setup_new_frame(num_functions - 1 + progp->last_inherited);
   IF_DEBUG(save_csp = csp);
   call_program(current_prog, cfp->address);
 
@@ -4553,9 +4571,9 @@ void call_direct (object_t * ob, int offset, int origin, int num_arg) {
   caller_type = origin;
   csp->num_local_variables = num_arg;
   current_prog = prog;
-  funp = setup_new_frame(offset);
   previous_ob = current_object;
   current_object = ob;
+  funp = setup_new_frame(offset);
   call_program(current_prog, funp->address);
 }
 
@@ -5762,19 +5780,17 @@ void restore_context (error_context_t * econ) {
   while (cgsp != econ->save_cgsp)
     restore_command_giver();
   DEBUG_CHECK(csp < econ->save_csp, "csp is below econ->csp before unwinding.\n");
+
+#if defined(PROFILE_FUNCTIONS) || defined(DTRACE)
+  while(csp > econ->save_csp)
+    pop_control_stack();
+#else
   if (csp > econ->save_csp) {
     /* Unwind the control stack to the saved position */
-#ifdef PROFILE_FUNCTIONS
-    /* PROFILE_FUNCTIONS needs current_prog to be correct in
-       pop_control_stack() */
-    if (csp > econ->save_csp + 1) {
-      csp = econ->save_csp + 1;
-      current_prog = (csp+1)->prog;
-    } else
-#endif
-      csp = econ->save_csp + 1;
+    csp = econ->save_csp + 1;
     pop_control_stack();
   }
+#endif
   pop_n_elems(sp - econ->save_sp);
   refp = global_ref_list;
   while (refp) {

@@ -167,7 +167,7 @@
  * are ever stripped.  So the example above gives
  * ({ "", "", "x", "y", "", "z", "", "" }).
  */
-#undef SANE_EXPLODE_STRING
+#define SANE_EXPLODE_STRING
 #undef REVERSIBLE_EXPLODE_STRING
 
 /* CAST_CALL_OTHERS: define this if you want to require casting of call_other's;
@@ -185,7 +185,7 @@
  * Compat status: Easy to support, and also on the "It's a bug!  No, it's
  * a feature!" religious war list.
  */
-#undef NONINTERACTIVE_STDERR_WRITE
+#define NONINTERACTIVE_STDERR_WRITE
 
 /* NO_LIGHT: define this to disable the set_light() and driver maintenance
  *   of light levels in objects.  You can simulate it via LPC if you want...
@@ -390,7 +390,7 @@
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
  *                      compilation error occured.
  */
-#define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_STRICT_TYPES + PRAGMA_ERROR_CONTEXT
+#define DEFAULT_PRAGMAS PRAGMA_STRICT_TYPES + PRAGMA_ERROR_CONTEXT
 
 /* supress warnings about unused arguments; only warn about unused local
  * variables.  Makes older code (where argument names were required) compile
@@ -410,7 +410,7 @@
  *   once and never again (which can save memory since some objects won't get
  *   reloaded that otherwise would).
  */
-#undef LAZY_RESETS
+#define LAZY_RESETS
 
 /* SAVE_EXTENSION: defines the file extension used by save_object().
  *   and restore_object().  Some sysadmins run scripts that periodically
@@ -434,8 +434,8 @@
  * If you anticipate problems with users intentionally typing in ANSI codes
  * to make your terminal flash, etc define this.
  */
-#undef NO_ANSI
-#undef STRIP_BEFORE_PROCESS_INPUT
+#define NO_ANSI
+#define STRIP_BEFORE_PROCESS_INPUT
 
 /* OPCPROF: define this if you wish to enable OPC profiling. Allows a dump
  *   of the # of times each efun is invoked (via the opcprof() efun).
@@ -483,13 +483,13 @@
  * [NOTE: for those who'd rather do such things at the mudlib level, look at
  *  the inherits() efun and the 'valid_object' apply to master.]
  */
-#define PRIVS
+#undef PRIVS
 
 /* INTERACTIVE_CATCH_TELL: define this if you want catch_tell called on
  *   interactives as well as NPCs.  If this is defined, user.c will need a
  *   catch_tell(msg) method that calls receive(msg);
 */
-#define INTERACTIVE_CATCH_TELL
+#undef INTERACTIVE_CATCH_TELL
 
 /* RESTRICTED_ED: define this if you want restricted ed mode enabled.
  */
@@ -511,7 +511,7 @@
  *   sent directly via add_message()).  This is useful if you want to
  *   build a smart client that does something different with snoop messages.
  */
-#undef RECEIVE_SNOOP
+#define RECEIVE_SNOOP
 
 /* PROFILE_FUNCTIONS: define this to be able to measure the CPU time used by
  *   all of the user-defined functions in each LPC object.  Note: defining
@@ -522,7 +522,7 @@
  *   resolution is 1/60 of a second, then any time less than approxmately 15k
  *   microseconds will resolve to zero (0).
  */
-#define PROFILE_FUNCTIONS
+#undef PROFILE_FUNCTIONS
 
 /* NO_BUFFER_TYPE: if this is #define'd then LPC code using the 'buffer'
  *   type won't be allowed to compile (since the 'buffer' type won't be
@@ -599,7 +599,7 @@
 /* PACKAGE_MATRIX: determines whether or not the 3d graphics efuns (for floats)
  *   are included - see packages/matrix.spec for a list.
  */
-#define PACKAGE_MATRIX
+#undef PACKAGE_MATRIX
 
 /* PACKAGE_MUDLIB_STATS: define this to enable domain and author stats
  *   maintenance by the driver.  These mudlib stats are more domain
@@ -615,7 +615,7 @@
 /* PACKAGE_PARSER: Natural language parsing efuns for interactive fiction
  *   type applications
  */
-#define PACKAGE_PARSER
+#undef PACKAGE_PARSER
 
 /* PACKAGE_EXTERNAL: Allows the driver to exec() commands specified in the
  * config file.
@@ -623,7 +623,7 @@
 #undef PACKAGE_EXTERNAL
 
 /* NUM_EXTERNAL_CMDS: the number of external commands supported */
-#define NUM_EXTERNAL_CMDS 1
+#define NUM_EXTERNAL_CMDS 100
 
 /* PACKAGE_DB: efuns for external database access using msql */
 #undef PACKAGE_DB
@@ -672,7 +672,7 @@
  *   uid to automatically be trusted and to have their euid set to the uid of
  *   the object that forced the object's creation.
  */
-#undef AUTO_TRUST_BACKBONE
+#define AUTO_TRUST_BACKBONE
 
 /*************************************************************************
  *                       FOR EXPERIENCED USERS                           *
@@ -691,7 +691,7 @@
  * this option, since it needs 4 bytes to store the function pointers
  * anyway, and this setting is ignored.
  */
-#define USE_32BIT_ADDRESSES
+#undef USE_32BIT_ADDRESSES
 
 /* HEARTBEAT_INTERVAL: define heartbeat interval in microseconds (us).
  *   1,000,000 us = 1 second.  The value of this macro specifies
@@ -703,7 +703,7 @@
  *  to an actual interval of one (1) second and 1,000,001 - 2,000,000 maps to
  *  an actual interval of two (2) seconds, etc.]
  */
-#define HEARTBEAT_INTERVAL 2
+#define HEARTBEAT_INTERVAL 1
 
 /* 
  * CALLOUT_CYCLE_SIZE: This is the number of slots in the call_out list.
@@ -764,7 +764,7 @@
  *   out the previous lines of code to an error) eval_instruction() runs about
  *   twice as fast when this is not defined (for the most common eoperators).
  */
-#define TRACE_CODE
+#undef TRACE_CODE
 
 /* HEART_BEAT_CHUNK: The number of heart_beat chunks allocated at a time.
  * A large number wastes memory as some will be sitting around unused, while
@@ -841,7 +841,7 @@
  * will only get flushed if get_char() is not called from the first get_char()'s
  * LPC callback handler.
  */
-#define GET_CHAR_IS_BUFFERED
+#undef GET_CHAR_IS_BUFFERED
 
 /* PACKAGE_COMPRESS: Enable MCCP support and compressed save files
    SAVE_GZ_EXTENSION: save extension for compressed files
@@ -874,5 +874,17 @@
 
 /* ALLOW_INHERIT_AFTER_FUNCTION: allow inheriting after functions have been defined (this includes prototypes). This caused crashes in v22.2a but it may have been fixed since */
 #define ALLOW_INHERIT_AFTER_FUNCTION
+#undef PACKAGE_DSLIB
+#define ED_INDENT_SPACES 4
+#define PROG_REF_TYPE int
+#undef PARSE_DEBUG
+#define HAS_CONSOLE
+#define FLUFFOS
+#undef ED_INDENT_CASE
+#undef ALLOW_INHERIT_AFTER_GLOBAL_VARIABLES
+#undef ANSI_SUBSTITUTE
+#define CFG_MAX_GLOBAL_VARIABLES         256
+#undef RECEIVE_ED
+#undef PACKAGE_ASYNC
 #endif
 

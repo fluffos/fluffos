@@ -864,3 +864,7 @@
 #define CFG_MAX_GLOBAL_VARIABLES         256
 #undef RECEIVE_ED
 #undef PACKAGE_ASYNC
+#undef IPV6
+#undef MALLOC64
+#undef PACKAGE_CRYPTO
+#undef PACKAGE_SHA1

@@ -24,6 +24,9 @@
 #ifdef USE_MYSQL
 #define USE_OLD_FUNCTIONS
 #ifndef TCC
+#ifdef INCL_MYSQL_INCLUDE_MYSQL_H
+#include "/usr/mysql/include/mysql/mysql.h"
+#endif
 #ifdef INCL_LOCAL_MYSQL_H
 #include "/usr/local/include/mysql.h"
 #endif
@@ -127,7 +130,8 @@ typedef struct _db {
 } db_t;
 
 void db_cleanup (void);
-
+svalue_t *valid_database (const char * action, array_t * info);
+db_t *find_db_conn (int handle);
 #endif  /* PACKAGES_DB */
 
 #endif  /* PACKAGES_DB_H */

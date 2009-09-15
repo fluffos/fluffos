@@ -929,3 +929,7 @@ in v22.2a but it may have been fixed since */
 #define HAS_CONSOLE
 #undef ANSI_SUBSTITUTE
 #endif
+#undef IPV6
+#undef MALLOC64
+#undef PACKAGE_CRYPTO
+#undef PACKAGE_SHA1

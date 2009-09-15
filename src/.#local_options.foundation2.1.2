@@ -150,7 +150,7 @@
  *
  * Compat status: very archaic, but easy to support.
  */
-#define HAS_STATUS_TYPE
+#undef HAS_STATUS_TYPE
 
 /* explode():
  *
@@ -167,7 +167,7 @@
  * are ever stripped.  So the example above gives
  * ({ "", "", "x", "y", "", "z", "", "" }).
  */
-#undef SANE_EXPLODE_STRING
+#define SANE_EXPLODE_STRING
 #undef REVERSIBLE_EXPLODE_STRING
 
 /* CAST_CALL_OTHERS: define this if you want to require casting of call_other's;
@@ -252,7 +252,7 @@
  *
  * Compat status: Easily simulated.
  */
-#define OLD_ED
+#undef OLD_ED
 
 /* SENSIBLE_MODIFIERS:
  * Turning this on changes a few things, which may break old code:
@@ -390,7 +390,7 @@
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
  *                      compilation error occured.
  */
-#define DEFAULT_PRAGMAS 0
+#define DEFAULT_PRAGMAS PRAGMA_STRICT_TYPES
 
 /* supress warnings about unused arguments; only warn about unused local
  * variables.  Makes older code (where argument names were required) compile
@@ -489,7 +489,7 @@
  *   interactives as well as NPCs.  If this is defined, user.c will need a
  *   catch_tell(msg) method that calls receive(msg);
 */
-#define INTERACTIVE_CATCH_TELL
+#undef INTERACTIVE_CATCH_TELL
 
 /* RESTRICTED_ED: define this if you want restricted ed mode enabled.
  */
@@ -545,7 +545,7 @@
  *   saved.  Allowing any file by any wizard to be saved as a
  *   binary is convenient, but may take up a lot of disk space.
  */
-#undef BINARIES
+#define BINARIES
 
 /* ARRAY_RESERVED_WORD: If this is defined then the word 'array' can
  *   be used to define arrays, as in:
@@ -554,7 +554,7 @@
  *
  * A side effect is that 'array' cannot be a variable or function name.
  */
-#undef ARRAY_RESERVED_WORD
+#define ARRAY_RESERVED_WORD
 
 /* REF_RESERVED_WORD: If this is defined then the word 'ref' can be
  *   used to pass arguments to functions by value.  Example:
@@ -672,7 +672,7 @@
  *   uid to automatically be trusted and to have their euid set to the uid of
  *   the object that forced the object's creation.
  */
-#undef AUTO_TRUST_BACKBONE
+#define AUTO_TRUST_BACKBONE
 
 /*************************************************************************
  *                       FOR EXPERIENCED USERS                           *
@@ -798,6 +798,8 @@
  */
 /* MAX_LOCAL: maximum number of local variables allowed per LPC function */
 #define CFG_MAX_LOCAL_VARIABLES         50
+/* Increasing max global vars beyond 256 is not recommended */
+#define CFG_MAX_GLOBAL_VARIABLES         256
 
 #define CFG_EVALUATOR_STACK_SIZE        3000
 #define CFG_COMPILER_STACK_SIZE         600000
@@ -874,8 +876,16 @@
 
 /* ALLOW_INHERIT_AFTER_FUNCTION: allow inheriting after functions have been defined (this includes prototypes). This caused crashes in v22.2a but it may have been fixed since */
 #define ALLOW_INHERIT_AFTER_FUNCTION
-#define ALLOW_INHERIT_AFTER_GLOBAL_VARIABLES
+#undef ALLOW_INHERIT_AFTER_GLOBAL_VARIABLES
 #define PARSE_DEBUG
 #define FLUFFOS
+#undef PACKAGE_DSLIB
+#undef ED_INDENT_CASE
+#define ED_INDENT_SPACES 4
+#define PROG_REF_TYPE int
+#undef ANSI_SUBSTITUTE
+#undef RECEIVE_ED
+#undef PACKAGE_ASYNC
+#define HAS_CONSOLE
 #endif
 

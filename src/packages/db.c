@@ -80,7 +80,7 @@
 static int  dbConnAlloc, dbConnUsed;
 static db_t *dbConnList;
 
-static db_t * find_db_conn (int);
+db_t * find_db_conn (int);
 static int    create_db_conn (void);
 static void   free_db_conn (db_t *);
 
@@ -146,7 +146,7 @@ static db_defn_t no_db = {
  * security on which objects can tweak your database (we don't want
  * people doing "DELETE * FROM *" or equivalent for us)
  */
-static svalue_t *valid_database (const char * action, array_t * info)
+svalue_t *valid_database (const char * action, array_t * info)
 {
     svalue_t *ret;
 

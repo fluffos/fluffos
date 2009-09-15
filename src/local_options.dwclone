@@ -65,11 +65,12 @@
  *   * Faster than SMALLOC but more memory overhead.
  *   * Requires sbrk().
  */
-#define SYSMALLOC
+#undef SYSMALLOC
 #undef SMALLOC
 #undef BSDMALLOC
 #undef MMALLOC
 #undef MALLOC64
+#define MALLOC32
 /* You may optionally choose one (or none) of these malloc wrappers.  These
  * can be used in conjunction with any of the above malloc packages.
  *
@@ -882,4 +883,5 @@
 #define IPV6
 #undef PACKAGE_CRYPTO
 #define PACKAGE_SHA1
+#define DTRACE
 #endif

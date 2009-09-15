@@ -484,8 +484,8 @@ int socket_accept (int fd, svalue_t * read_callback, svalue_t * write_callback)
 #else
         nb = select(FD_SETSIZE, (int *) 0, (int *) &wmask, (int *) 0, &t);
 #endif
-        if (!(FD_ISSET(accept_fd, &wmask)))
-            lpc_socks[i].flags |= S_BLOCKED;
+        //if (!(FD_ISSET(accept_fd, &wmask)))
+        lpc_socks[i].flags |= S_BLOCKED;
 
         lpc_socks[i].mode = lpc_socks[fd].mode;
         lpc_socks[i].state = STATE_DATA_XFER;
@@ -862,7 +862,7 @@ void socket_read_select_handler (int fd)
             buf[cc] = '\0';
 #ifdef IPV6
             char tmp[INET6_ADDRSTRLEN];
-            sprintf(addr, "%s %d", inet_ntop(AF_INET6, &sin.sin6_addr, &tmp, INET6_ADDRSTRLEN),
+            sprintf(addr, "%s %d", inet_ntop(AF_INET6, &sin.sin6_addr, tmp, INET6_ADDRSTRLEN),
                                 ntohs(sin.sin6_port));
 #else
             sprintf(addr, "%s %d", inet_ntoa(sin.sin_addr),
@@ -1321,7 +1321,7 @@ static int socket_name_to_sin (const char * name, struct sockaddr_in * sin)
     if(getaddrinfo(addr, "1234", &hints, &res)){
     	//failed
     	socket_perror("socket_name_to_sin: getaddrinfo", 0);
-    	        return;
+    	return 0;
     }
     struct sockaddr_in6 tmp;
     memcpy(&tmp, res->ai_addr, sizeof(tmp));
@@ -1368,7 +1368,7 @@ static char *inet_address (struct sockaddr_in * sin)
     if (!memcmp(&sin->sin6_addr, &in6addr_any, sizeof(in6addr_any)))
         strcpy(addr, "*");
     else
-        inet_ntop(AF_INET6, &sin->sin6_addr, &addr, INET6_ADDRSTRLEN);
+        inet_ntop(AF_INET6, &sin->sin6_addr, addr, INET6_ADDRSTRLEN);
     strcat(addr, ".");
     if (ntohs(sin->sin6_port) == 0)
         strcpy(port, "*");

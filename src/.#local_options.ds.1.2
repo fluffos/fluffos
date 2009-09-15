@@ -150,7 +150,7 @@
  *
  * Compat status: very archaic, but easy to support.
  */
-#define HAS_STATUS_TYPE
+#undef HAS_STATUS_TYPE
 
 /* explode():
  *
@@ -167,7 +167,7 @@
  * are ever stripped.  So the example above gives
  * ({ "", "", "x", "y", "", "z", "", "" }).
  */
-#undef SANE_EXPLODE_STRING
+#define SANE_EXPLODE_STRING
 #undef REVERSIBLE_EXPLODE_STRING
 
 /* CAST_CALL_OTHERS: define this if you want to require casting of call_other's;
@@ -192,7 +192,7 @@
  *
  * Compat status: Very dated, easy to simulate, and gross.
  */
-#undef NO_LIGHT
+#define NO_LIGHT
 
 /* NO_ADD_ACTION: define this to remove add_action, commands, livings, etc.
  * process_input() then becomes the only way to deal with player input. 
@@ -226,7 +226,7 @@
  *
  * Compat status: easy to simulate and dated.
  */
-#undef NO_WIZARDS
+#define NO_WIZARDS
 
 /* OLD_TYPE_BEHAVIOR: reintroduces a bug in type-checking that effectively
  * renders compile time type checking useless.  For backwards compatibility.
@@ -252,7 +252,14 @@
  *
  * Compat status: Easily simulated.
  */
-#define OLD_ED
+#undef OLD_ED
+
+/* In ed auto-indent, 
+ * 1) does the case line get indented after the switch() ?
+ * 2) How far do we indent? (this can also be set in the mudlib)
+ */
+#undef ED_INDENT_CASE
+#define ED_INDENT_SPACES 4
 
 /* SENSIBLE_MODIFIERS:
  * Turning this on changes a few things, which may break old code:
@@ -316,7 +323,7 @@
  * On by default, because newer libs use catch() a lot, and it's confusing
  * if the errors don't show up in the logs.
  */
-#undef LOG_CATCHES
+#define LOG_CATCHES
 
 /* ARGUMENTS_IN_TRACEBACK: prints out function call arguments in error
  *   tracebacks, to aid in debugging.  Note: it prints the values of
@@ -332,7 +339,7 @@
  *
  * The only down side is some people like their logs shorter
  */
-#define ARGUMENTS_IN_TRACEBACK
+#undef ARGUMENTS_IN_TRACEBACK
 
 /* LOCALS_IN_TRACEBACK: similar to ARGUMENTS_IN_TRACEBACK, but for local
  *   variables.  The output looks more or less like:
@@ -342,7 +349,7 @@
  * Same as above.  Tends to produce even longer logs, but very useful for
  * tracking errors.
  */
-#define LOCALS_IN_TRACEBACK
+#undef LOCALS_IN_TRACEBACK
 
 /* MUDLIB_ERROR_HANDLER: If you define this, the driver doesn't do any
  *   handling of runtime errors, other than to turn the heartbeats of
@@ -354,13 +361,13 @@
  * errors.  Unfortunately, you need to have one.  Check the testsuite or
  * other libs for an example.
  */
-#undef MUDLIB_ERROR_HANDLER
+#define MUDLIB_ERROR_HANDLER
 
 /* CONFIG_FILE_DIR specifies a directory in which the driver will search for
  *   config files by default.  If you don't wish to use this define, you may
  *   always specify a full path to the config file when starting the driver.
  */
-#define CONFIG_FILE_DIR "/home/atuin/bin"
+#define CONFIG_FILE_DIR "./"
 
 /* DEFAULT_PRAGMAS:  This should be a sum of pragmas you want to always
  * be on, i.e.
@@ -483,13 +490,24 @@
  * [NOTE: for those who'd rather do such things at the mudlib level, look at
  *  the inherits() efun and the 'valid_object' apply to master.]
  */
-#undef PRIVS
+#define PRIVS
 
 /* INTERACTIVE_CATCH_TELL: define this if you want catch_tell called on
  *   interactives as well as NPCs.  If this is defined, user.c will need a
  *   catch_tell(msg) method that calls receive(msg);
 */
-#undef INTERACTIVE_CATCH_TELL
+#define INTERACTIVE_CATCH_TELL
+
+/* RECEIVE_ED: define this if you want normal ed output to go to a 
+     receive_ed() apply in the player ob.  Some errors still go directly
+     to output.  Useful for post-processing (perhaps colorizing?) ed
+     output. Prototype:  mixed receive_ed(string txt, string fname);
+     If fname, return a string that ed will output, 0 to let ed handle 
+     the output in the default way, or 1 to handle the output yourself.
+     If fname == 0, output is help text and you may return any of the above
+     or an array of strings that will be more'ed.
+*/
+#undef RECEIVE_ED
 
 /* RESTRICTED_ED: define this if you want restricted ed mode enabled.
  */
@@ -511,7 +529,7 @@
  *   sent directly via add_message()).  This is useful if you want to
  *   build a smart client that does something different with snoop messages.
  */
-#undef RECEIVE_SNOOP
+#define RECEIVE_SNOOP
 
 /* PROFILE_FUNCTIONS: define this to be able to measure the CPU time used by
  *   all of the user-defined functions in each LPC object.  Note: defining
@@ -545,7 +563,7 @@
  *   saved.  Allowing any file by any wizard to be saved as a
  *   binary is convenient, but may take up a lot of disk space.
  */
-#define BINARIES
+#undef BINARIES
 
 /* ARRAY_RESERVED_WORD: If this is defined then the word 'array' can
  *   be used to define arrays, as in:
@@ -554,7 +572,7 @@
  *
  * A side effect is that 'array' cannot be a variable or function name.
  */
-#undef ARRAY_RESERVED_WORD
+#define ARRAY_RESERVED_WORD
 
 /* REF_RESERVED_WORD: If this is defined then the word 'ref' can be
  *   used to pass arguments to functions by value.  Example:
@@ -572,7 +590,7 @@
  * through their arguments, and against forgetting to pass a reference 
  * to a function which wants one (or accidentally having a variable modified!)
  */
-#undef REF_RESERVED_WORD
+#define REF_RESERVED_WORD
 
 /****************************************************************************
  *                              PACKAGES                                    *
@@ -599,7 +617,7 @@
 /* PACKAGE_MATRIX: determines whether or not the 3d graphics efuns (for floats)
  *   are included - see packages/matrix.spec for a list.
  */
-#undef PACKAGE_MATRIX
+#define PACKAGE_MATRIX
 
 /* PACKAGE_MUDLIB_STATS: define this to enable domain and author stats
  *   maintenance by the driver.  These mudlib stats are more domain
@@ -615,7 +633,7 @@
 /* PACKAGE_PARSER: Natural language parsing efuns for interactive fiction
  *   type applications
  */
-#undef PACKAGE_PARSER
+#define PACKAGE_PARSER
 
 /* PACKAGE_EXTERNAL: Allows the driver to exec() commands specified in the
  * config file.
@@ -623,7 +641,7 @@
 #undef PACKAGE_EXTERNAL
 
 /* NUM_EXTERNAL_CMDS: the number of external commands supported */
-#define NUM_EXTERNAL_CMDS 1
+#define NUM_EXTERNAL_CMDS 100
 
 /* PACKAGE_DB: efuns for external database access using msql */
 #undef PACKAGE_DB
@@ -655,7 +673,7 @@
  * PACKAGE_UIDS: define this if you want a driver that does use uids.
  *
  */
-#define PACKAGE_UIDS
+#undef PACKAGE_UIDS
 
 /*PACKAGE DWLIB: some discworld mudlib simuls coded in C (well just one right
   now) */
@@ -672,7 +690,7 @@
  *   uid to automatically be trusted and to have their euid set to the uid of
  *   the object that forced the object's creation.
  */
-#define AUTO_TRUST_BACKBONE
+#undef AUTO_TRUST_BACKBONE
 
 /*************************************************************************
  *                       FOR EXPERIENCED USERS                           *
@@ -703,7 +721,7 @@
  *  to an actual interval of one (1) second and 1,000,001 - 2,000,000 maps to
  *  an actual interval of two (2) seconds, etc.]
  */
-#define HEARTBEAT_INTERVAL 2
+#define HEARTBEAT_INTERVAL 1
 
 /* 
  * CALLOUT_CYCLE_SIZE: This is the number of slots in the call_out list.
@@ -712,7 +730,7 @@
  * prime to any common call_out lengths.  If all this is too confusing, 32
  * isn't a bad number :-)
  */
-#define CALLOUT_CYCLE_SIZE 512
+#define CALLOUT_CYCLE_SIZE 32
 
 /* LARGEST_PRINTABLE_STRING: defines the size of the vsprintf() buffer in
  *   comm.c's add_message(). Instead of blindly making this value larger,
@@ -739,7 +757,7 @@
  * 14      16384           256k
  * 16      65536             1M
  */
-#define APPLY_CACHE_BITS 20
+#define APPLY_CACHE_BITS 11
 
 /* CACHE_STATS: define this if you want call_other (apply_low) cache 
  * statistics.  Causes HAS_CACHE_STATS to be defined in all LPC objects.
@@ -799,13 +817,13 @@
 /* MAX_LOCAL: maximum number of local variables allowed per LPC function */
 #define CFG_MAX_LOCAL_VARIABLES         50
 /* Increasing max global vars beyond 256 is not recommended */
-#define CFG_MAX_GLOBAL_VARIABLES         300
+#define CFG_MAX_GLOBAL_VARIABLES         256
 
 #define CFG_EVALUATOR_STACK_SIZE        3000
-#define CFG_COMPILER_STACK_SIZE         600
+#define CFG_COMPILER_STACK_SIZE         600000
 #define CFG_MAX_CALL_DEPTH              150
 /* This must be one of 4, 16, 64, 256, 1024, 4096 */
-#define CFG_LIVING_HASH_SIZE            256
+#define CFG_LIVING_HASH_SIZE		256
 
 /* NEXT_MALLOC_DEBUG: define this if using a NeXT and you want to enable
  *   the malloc_check() and/or malloc_debug() efuns.  Run the 'man malloc_debug'
@@ -832,7 +850,7 @@
  * [NOTE: malloc_debug(6) is a good compromise between efficiency and
  *  completeness of malloc debugging (malloc/free will be about half as fast).]
  */
-#undef NEXT_MALLOC_DEBUG
+#define NEXT_MALLOC_DEBUG
 
 
 /* GET_CHAR_IS_BUFFERED: Normally get_char() is unbuffered.  That is, once
@@ -843,7 +861,7 @@
  * will only get flushed if get_char() is not called from the first get_char()'s
  * LPC callback handler.
  */
-#undef GET_CHAR_IS_BUFFERED
+#define GET_CHAR_IS_BUFFERED
 
 /* PACKAGE_COMPRESS: Enable MCCP support and compressed save files
    SAVE_GZ_EXTENSION: save extension for compressed files
@@ -876,6 +894,15 @@
 
 /* ALLOW_INHERIT_AFTER_FUNCTION: allow inheriting after functions have been defined (this includes prototypes). This caused crashes in v22.2a but it may have been fixed since */
 #define ALLOW_INHERIT_AFTER_FUNCTION
-#define ALLOW_INHERIT_AFTER_GLOBAL_VARIABLES
+#undef ALLOW_INHERIT_AFTER_GLOBAL_VARIABLES
+/*PACKAGE_ASYNC: adds some efuns for asyncronous IO */
+#undef PACKAGE_ASYNC
+
+#define PACKAGE_DSLIB
+#define PROG_REF_TYPE int
+#define PARSE_DEBUG
+#define FLUFFOS
+#define HAS_CONSOLE
+#define ANSI_SUBSTITUTE 0x1e
 #endif
 

@@ -887,4 +887,7 @@
 #undef RECEIVE_ED
 #undef PACKAGE_ASYNC
 #endif
-
+#undef IPV6
+#undef MALLOC64
+#undef PACKAGE_CRYPTO
+#undef PACKAGE_SHA1

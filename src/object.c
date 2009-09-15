@@ -1291,14 +1291,13 @@ restore_object_from_gzip (object_t * ob,
     }
     return 0;
 }
-#else
+#endif
 
-static void
+void
 restore_object_from_buff (object_t * ob, char * theBuff,
                             int noclear)
 {
     char *buff, *nextBuff, *tmp,  *space;
-    char var[100];
     int idx;
     svalue_t *sv = ob->variables;
     int rc;
@@ -1319,7 +1318,7 @@ restore_object_from_buff (object_t * ob, char * theBuff,
         restore_object_from_line(ob, buff, noclear);
     }
 }
-#endif
+
 
 /*
  * Save an object to a file.
@@ -1701,7 +1700,7 @@ static void cns_recurse (object_t * ob, int * idx, program_t * prog) {
     *idx += prog->num_variables_defined;
 }
 
-static void clear_non_statics (object_t * ob) {
+void clear_non_statics (object_t * ob) {
     int idx = 0;
     cns_recurse(ob, &idx, ob->prog);
 }
@@ -1782,6 +1781,13 @@ int restore_object (object_t * ob, const char * file, int noclear)
      */
     if (!noclear) {
         clear_non_statics(ob);
+    }
+    error_context_t econ;
+    save_context(&econ);
+    if (SETJMP(econ.context)){
+        restore_context(&econ);
+        gzclose(gzf);
+        return 0;
     }
     while((restore_object_from_gzip(ob, gzf, noclear, &count))){
 	  count++;

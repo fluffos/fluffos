@@ -1244,6 +1244,21 @@ f_has_mxp (void)
 }
 #endif
 
+#ifdef F_HAS_ZMP
+void f_has_zmp (void)
+{
+	int i=0;
+
+	if (sp->u.ob->interactive)
+	{
+		i = sp->u.ob->interactive->iflags & USING_ZMP;
+		i = !!i; //force 1 or 0
+	}
+	free_object(&sp->u.ob, "f_has_zmp");
+	put_number(i);
+}
+#endif
+
 #ifdef F_INTP
 void
 f_intp (void)
@@ -1507,7 +1522,7 @@ f_member_array (void)
 	i = 0;
 
     if (sp->type == T_STRING) {
-        char *res;
+        const char *res;
         if(flag & 2)
           error("member_array: can not search backwards in strings");
         CHECK_TYPES(sp-1, T_NUMBER, 1, F_MEMBER_ARRAY);
@@ -2059,7 +2074,7 @@ f_query_ip_name (void)
 void
 f_query_ip_number (void)
 {
-    char *tmp;
+    const char *tmp;
 
     tmp = query_ip_number(st_num_arg ? sp->u.ob : 0);
     if (st_num_arg) free_object(&(sp--)->u.ob, "f_query_ip_number");

@@ -970,8 +970,9 @@ f_terminal_colour (void)
 #define PLURAL_CHOP    2
 
 static char *pluralize (const char * str) {
-    char *pre, *rel, *end;
-    char *p, *of_buf;
+    char *pre;
+    const char *p, *rel, *end;
+    char *of_buf;
     int of_len = 0, plen, slen;
     int sz;
 
@@ -1401,19 +1402,19 @@ static char *pluralize (const char * str) {
         break;
     }
 
-    p = new_string(sz, "pluralize");
-    p[sz] = 0;
+    char *news = new_string(sz, "pluralize");
+    news[sz] = 0;
 
-    strncpy(p, pre, plen);
+    strncpy(news, pre, plen);
     if (slen)
-        strncpy(p + plen, suffix, slen);
+        strncpy(news + plen, suffix, slen);
     if (of_len) {
-        strcpy(p + plen + slen, of_buf);
+        strcpy(news + plen + slen, of_buf);
         FREE(of_buf);
     }
 
     FREE(pre);
-    return p;
+    return news;
 } /* end of pluralize() */
 
 void
@@ -2849,4 +2850,28 @@ void f_send_nullbyte (void){
     put_number(tmp);
 }
 
+#endif
+
+#ifdef F_RESTORE_FROM_STRING
+void f_restore_from_string(){
+	const char *buf;
+	int noclear;
+	int saved_arg = st_num_arg;
+	if(st_num_arg == 2){
+		buf = (sp-1)->u.string;
+		noclear = sp->u.number;
+	}else{
+		buf = sp->u.string;
+		noclear = 0;
+	}
+	if (!noclear) {
+		clear_non_statics(current_object);
+	}
+	copy_and_push_string(buf); //restore_object_from_buff modifies the string in place, which is ok, copied strings aren't shared
+	restore_object_from_buff(current_object, (char *)sp->u.string, noclear);
+	if(saved_arg == 2)
+		pop_3_elems();
+	else
+		pop_2_elems();
+}
 #endif

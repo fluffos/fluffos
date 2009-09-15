@@ -1185,6 +1185,8 @@ static void handle_malloc() {
         the_malloc = "mmalloc.c";
     if(lookup_define("MALLOC64"))
         the_malloc = "64bitmalloc.c";
+    if(lookup_define("MALLOC32"))
+        the_malloc = "32bitmalloc.c";
     if (lookup_define("GNUMALLOC"))
         the_malloc = "gnumalloc.c";
 
@@ -1596,7 +1598,8 @@ static void handle_configure() {
             if (!(check_include("INCL_LOCAL_MYSQL_H", "/usr/local/include/mysql.h")
                 || check_include("INCL_LOCAL_INCLUDE_MYSQL_MYSQL_H", "/usr/local/include/mysql/mysql.h")
                 || check_include("INCL_LOCAL_MYSQL_MYSQL_H", "/usr/local/mysql/include/mysql.h")
-                || check_include("INCL_MYSQL_MYSQL_H", "/usr/include/mysql/mysql.h"))) {
+                || check_include("INCL_MYSQL_MYSQL_H", "/usr/include/mysql/mysql.h")
+                || check_include("INCL_MYSQL_INCLUDE_MYSQL_H", "/usr/mysql/include/mysql/mysql.h"))) {
                 fprintf(stderr, "Cannot find mysql.h, compilation is going to fail miserably.\n");
             }
         }
@@ -1678,7 +1681,8 @@ static void handle_configure() {
               check_library("-L/usr/local/lib/mysql -lmysqlclient") ||
               check_library("-L/usr/local/mysql/lib -lmysqlclient") ||
               check_library("-L/usr/lib64/mysql -lmysqlclient") ||
-              check_library("-L/usr/lib/mysql -lmysqlclient"))) {
+              check_library("-L/usr/lib/mysql -lmysqlclient") ||
+              check_library("-L/usr/mysql/lib/64/mysql -lmysqlclient"))) {
             fprintf(stderr, "Cannot find libmysqlclient.a, compilation is going to fail miserably\n");
         }
     }

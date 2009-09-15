@@ -14,10 +14,16 @@
 #include "file.h"
 #include "packages/db.h"
 #include "packages/parser.h"
+#include "packages/async.h"
 #include "master.h"
 #include "add_action.h"
 #include "object.h"
 #include "eval.h"
+#ifdef DTRACE
+#include <sys/sdt.h>
+#else
+#define DTRACE_PROBE1(x,y,z)
+#endif
 
 /*
  * 'inherit_file' is used as a flag. If it is set to a string
@@ -1824,7 +1830,7 @@ void error (const char * const fmt, ...)
     vsnprintf(err_buf + 1, 2046, fmt, args);
     va_end(args);
     err_buf[0] = '*';           /* all system errors get a * at the start */
-
+    DTRACE_PROBE1(fluffos, error, (char *)err_buf);
     error_handler(err_buf);
 }
 
@@ -1855,6 +1861,10 @@ void shutdownMudOS (int exit_code)
 #ifdef PACKAGE_MUDLIB_STATS
     save_stat_files();
 #endif
+#ifdef PACKAGE_ASYNC
+    complete_all_asyncio();
+#endif
+
 #ifdef PACKAGE_DB
     db_cleanup();
 #endif

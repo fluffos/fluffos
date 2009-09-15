@@ -84,7 +84,7 @@ void logon (object_t * ob)
 /*
  * This is the backend. We will stay here for ever (almost).
  */
-
+extern int max_fd;
 void backend()
 {
   struct timeval timeout;
@@ -144,9 +144,9 @@ void backend()
     timeout.tv_sec = 1;
     timeout.tv_usec = 0;
 #ifndef hpux
-    nb = select(FD_SETSIZE, &readmask, &writemask, (fd_set *) 0, &timeout);
+    nb = select(max_fd + 1, &readmask, &writemask, (fd_set *) 0, &timeout);
 #else
-    nb = select(FD_SETSIZE, (int *) &readmask, (int *) &writemask,
+    nb = select(max_fd + 1, (int *) &readmask, (int *) &writemask,
 		(int *) 0, &timeout);
 #endif
     /*
@@ -630,8 +630,8 @@ array_t *get_heart_beats() {
 #ifdef F_SET_HIDE
   int apply_valid_hide = 1, display_hidden = 0;
 #endif
-
-  obtab = CALLOCATE(n, object_t *, TAG_TEMPORARY, "heart_beats");
+  if(n)
+	  obtab = CALLOCATE(n, object_t *, TAG_TEMPORARY, "heart_beats");
   while (n--) {
 #ifdef F_SET_HIDE
     if (hb->ob->flags & O_HIDDEN) {
@@ -652,8 +652,8 @@ array_t *get_heart_beats() {
     arr->item[nob].u.ob = obtab[nob];
     add_ref(arr->item[nob].u.ob, "get_heart_beats");
   }
-
-  FREE(obtab);
+  if(n)
+	  FREE(obtab);
 
   return arr;
 }

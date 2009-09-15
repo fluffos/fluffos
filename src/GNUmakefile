@@ -1,20 +1,3 @@
-MAKE=gmake
-SHELL=/bin/sh
-OBJDIR=obj
-DRIVER_BIN=driver
-PROOF=
-STRFUNCS=
-INSTALL=install -c
-INSTALL_DIR=../bin
-OPTIMIZE=-g3 #-fstack-protector
-CPP=gcc -m64 -E
-CFLAGS=-D__USE_FIXED_PROTOTYPES__
-CC=gcc -m64 -pthread
-YACC=byacc -d
-RANLIB=ranlib
-A=a
-O=o
-A_OUT=a.out
 # YOU DO NOT NEED TO CONFIGURE ANYTHING IN THIS FILE.
 #
 # RUN THE SHELL SCRIPT ./build.MudOS to generate the Makefiles, and follow
@@ -109,9 +92,12 @@ grammar.tab.c: grammar.y
 packages/packages.a: packages/*.c
 	$(MAKE) -C packages 'CC=$(CC)' 'CFLAGS=$(CFLAGS) $(OPTIMIZE)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)' 'A=$(A)' 'O=$(O)'
 
-$(DRIVER_BIN): packages/packages.a $(OBJ)
+$(DRIVER_BIN): packages/packages.a $(OBJ) dtrace_compile
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
-	$(PROOF) $(CC) $(CFLAGS) $(OPTIMIZE) $(OBJ) -o $(DRIVER_BIN) packages/packages.a $(EXTRALIBS) `cat system_libs`
+	$(PROOF) $(CC) $(CFLAGS) $(OPTIMIZE) $(OBJ) `./dtrace_compile` -o $(DRIVER_BIN) packages/packages.a $(EXTRALIBS) `cat system_libs`
+
+dtrace_compile: dtrace_compile.c local_options
+	$(CC) dtrace_compile.c -o dtrace_compile
 
 addr_server: files $(OBJDIR)/addr_server.o $(OBJDIR)/socket_ctrl.o $(OBJDIR)/port.o addr_server.h
 	$(CC) $(CFLAGS) $(OPTIMIZE) $(OBJDIR)/socket_ctrl.o $(OBJDIR)/addr_server.o $(OBJDIR)/port.o \

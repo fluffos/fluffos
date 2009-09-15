@@ -30,8 +30,10 @@ void deallocate_program (program_t * progp)
     for (i = 0; i < progp->num_variables_defined; i++)
         free_string(progp->variable_table[i]);
     /* Free all inherited objects */
-    for (i = 0; i < progp->num_inherited; i++)
-        free_prog(&progp->inherit[i].prog);
+    for (i = 0; i < progp->num_inherited; i++){
+    	program_t *tmp = progp->inherit[i].prog;
+    	free_prog(&tmp); //don't want to mess up the prog pointer in the inherited ob
+    }
     free_string(progp->filename);
 
     /*

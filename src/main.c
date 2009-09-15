@@ -312,8 +312,6 @@ int main (int argc, char ** argv)
   init_addr_server(ADDR_SERVER_IP, ADDR_SERVER_PORT);
 #endif        /* NO_IP_DEMON */
 
-    set_eval(max_cost);
-
     save_context(&econ);
     if (SETJMP(econ.context)) {
   debug_message("The simul_efun (%s) and master (%s) objects must be loadable.\n",
@@ -323,6 +321,7 @@ int main (int argc, char ** argv)
   init_simul_efun(SIMUL_EFUN);
   init_master();
     }
+    set_eval(max_cost);
     pop_context(&econ);
 
     for (i = 1; i < argc; i++) {

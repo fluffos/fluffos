@@ -8,10 +8,6 @@ math package updates: Added vector norm, dotprod, distance, angle.
      Added int args to the efuns as apppropriate (Hamlet)
 fixed above so the int args actually work without needing casts for the result
 fixed 64bit malloc for large allocations (never happened on dw, so I doubt it was a problem!)
-added 32bit malloc (malloc32) which is sysmalloc with realloc replaced by 
-      malloc->memcpy->free, saves lots of memory
-telnet environment support (Cratylus)
-windows compile fix for add_action (Cratylus)
 added dtrace support! just define DTRACE in local_options if you have it
 zmp support
     zmp calls from the client result in an apply on the player object
@@ -39,8 +35,6 @@ package async now does sql!
 	with db_exec(), just make an extra connection for your async sql.
 new efun restore_from_string(string savedata), does what it says on the tin, 
     the string format is the same as a save file.
-added optional int argument to request_term_size().  If 0, the client is asked 
-     _not_ to offer any further term size updates (Hamlet, suggested by Detah)
 
 FluffOS 2.16
 improved single char mode support (Cratylus)

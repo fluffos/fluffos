@@ -136,7 +136,7 @@ f_socket_connect (void)
 	/*
 	 * socket descriptor is not bound yet
 	 */
-	char *s;
+	const char *s;
 	int start = 0;
 
 	addr[0] = '\0';
@@ -281,7 +281,7 @@ f_socket_address (void)
  */
     local = (sp--)->u.number;
     if (sp->type & T_OBJECT) {
-        char *tmp;
+        const char *tmp;
 
 /* This is so we can get the address of interactives as well. */
 
@@ -292,7 +292,7 @@ f_socket_address (void)
 	}
 #ifdef IPV6
         char tmp2[INET6_ADDRSTRLEN];
-        tmp = inet_ntop(AF_INET6, &sp->u.ob->interactive->addr.sin6_addr, &tmp2, INET6_ADDRSTRLEN);
+        tmp = inet_ntop(AF_INET6, &sp->u.ob->interactive->addr.sin6_addr, tmp2, INET6_ADDRSTRLEN);
         sprintf(buf, "%s %d", tmp, ntohs(sp->u.ob->interactive->addr.sin6_port));
 #else
         tmp = inet_ntoa(sp->u.ob->interactive->addr.sin_addr);

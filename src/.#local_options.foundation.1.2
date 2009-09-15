@@ -150,7 +150,7 @@
  *
  * Compat status: very archaic, but easy to support.
  */
-#undef HAS_STATUS_TYPE
+#define HAS_STATUS_TYPE
 
 /* explode():
  *
@@ -167,7 +167,7 @@
  * are ever stripped.  So the example above gives
  * ({ "", "", "x", "y", "", "z", "", "" }).
  */
-#define SANE_EXPLODE_STRING
+#undef SANE_EXPLODE_STRING
 #undef REVERSIBLE_EXPLODE_STRING
 
 /* CAST_CALL_OTHERS: define this if you want to require casting of call_other's;
@@ -267,7 +267,7 @@
  *     else, and if you don't know that, you probably don't have any reason
  *     to care about the old meaning).
  */
-#define SENSIBLE_MODIFIERS
+#undef SENSIBLE_MODIFIERS
 
 /****************************************************************************
  *                           MISCELLANEOUS                                  *
@@ -360,7 +360,7 @@
  *   config files by default.  If you don't wish to use this define, you may
  *   always specify a full path to the config file when starting the driver.
  */
-#define CONFIG_FILE_DIR "/home/atuin/bin"
+#define CONFIG_FILE_DIR "./"
 
 /* DEFAULT_PRAGMAS:  This should be a sum of pragmas you want to always
  * be on, i.e.
@@ -390,7 +390,7 @@
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
  *                      compilation error occured.
  */
-#define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_STRICT_TYPES + PRAGMA_ERROR_CONTEXT
+#define DEFAULT_PRAGMAS 0
 
 /* supress warnings about unused arguments; only warn about unused local
  * variables.  Makes older code (where argument names were required) compile
@@ -483,7 +483,7 @@
  * [NOTE: for those who'd rather do such things at the mudlib level, look at
  *  the inherits() efun and the 'valid_object' apply to master.]
  */
-#undef PRIVS
+#define PRIVS
 
 /* INTERACTIVE_CATCH_TELL: define this if you want catch_tell called on
  *   interactives as well as NPCs.  If this is defined, user.c will need a
@@ -511,7 +511,7 @@
  *   sent directly via add_message()).  This is useful if you want to
  *   build a smart client that does something different with snoop messages.
  */
-#undef RECEIVE_SNOOP
+#define RECEIVE_SNOOP
 
 /* PROFILE_FUNCTIONS: define this to be able to measure the CPU time used by
  *   all of the user-defined functions in each LPC object.  Note: defining
@@ -554,7 +554,7 @@
  *
  * A side effect is that 'array' cannot be a variable or function name.
  */
-#define ARRAY_RESERVED_WORD
+#undef ARRAY_RESERVED_WORD
 
 /* REF_RESERVED_WORD: If this is defined then the word 'ref' can be
  *   used to pass arguments to functions by value.  Example:
@@ -572,7 +572,7 @@
  * through their arguments, and against forgetting to pass a reference 
  * to a function which wants one (or accidentally having a variable modified!)
  */
-#define REF_RESERVED_WORD
+#undef REF_RESERVED_WORD
 
 /****************************************************************************
  *                              PACKAGES                                    *
@@ -599,13 +599,13 @@
 /* PACKAGE_MATRIX: determines whether or not the 3d graphics efuns (for floats)
  *   are included - see packages/matrix.spec for a list.
  */
-#undef PACKAGE_MATRIX
+#define PACKAGE_MATRIX
 
 /* PACKAGE_MUDLIB_STATS: define this to enable domain and author stats
  *   maintenance by the driver.  These mudlib stats are more domain
  *   based than user based, and replaces the traditional wiz_list stats.
  */
-#undef PACKAGE_MUDLIB_STATS
+#define PACKAGE_MUDLIB_STATS
 
 /* PACKAGE_SOCKETS: define this to enable the socket efunctions.  This
  *   causes HAS_SOCKETS to be defined for all LPC objects.
@@ -615,7 +615,7 @@
 /* PACKAGE_PARSER: Natural language parsing efuns for interactive fiction
  *   type applications
  */
-#undef PACKAGE_PARSER
+#define PACKAGE_PARSER
 
 /* PACKAGE_EXTERNAL: Allows the driver to exec() commands specified in the
  * config file.
@@ -623,7 +623,7 @@
 #undef PACKAGE_EXTERNAL
 
 /* NUM_EXTERNAL_CMDS: the number of external commands supported */
-#define NUM_EXTERNAL_CMDS 1
+#define NUM_EXTERNAL_CMDS 100
 
 /* PACKAGE_DB: efuns for external database access using msql */
 #undef PACKAGE_DB
@@ -655,7 +655,7 @@
  * PACKAGE_UIDS: define this if you want a driver that does use uids.
  *
  */
-#define PACKAGE_UIDS
+#undef PACKAGE_UIDS
 
 /*PACKAGE DWLIB: some discworld mudlib simuls coded in C (well just one right
   now) */
@@ -703,7 +703,7 @@
  *  to an actual interval of one (1) second and 1,000,001 - 2,000,000 maps to
  *  an actual interval of two (2) seconds, etc.]
  */
-#define HEARTBEAT_INTERVAL 2
+#define HEARTBEAT_INTERVAL 1
 
 /* 
  * CALLOUT_CYCLE_SIZE: This is the number of slots in the call_out list.
@@ -712,7 +712,7 @@
  * prime to any common call_out lengths.  If all this is too confusing, 32
  * isn't a bad number :-)
  */
-#define CALLOUT_CYCLE_SIZE 512
+#define CALLOUT_CYCLE_SIZE 32
 
 /* LARGEST_PRINTABLE_STRING: defines the size of the vsprintf() buffer in
  *   comm.c's add_message(). Instead of blindly making this value larger,
@@ -739,7 +739,7 @@
  * 14      16384           256k
  * 16      65536             1M
  */
-#define APPLY_CACHE_BITS 20
+#define APPLY_CACHE_BITS 11
 
 /* CACHE_STATS: define this if you want call_other (apply_low) cache 
  * statistics.  Causes HAS_CACHE_STATS to be defined in all LPC objects.
@@ -749,7 +749,7 @@
 /* TRACE: define this to enable the trace() and traceprefix() efuns.
  *   (keeping this undefined will cause the driver to run faster).
  */
-#define TRACE
+#undef TRACE
 
 /* RUNTIME_LOADING: On systems which support it, it allows LPC->C compilation
  * 'on the fly' without having to recompile the driver.
@@ -798,9 +798,11 @@
  */
 /* MAX_LOCAL: maximum number of local variables allowed per LPC function */
 #define CFG_MAX_LOCAL_VARIABLES         50
+/* Increasing max global vars beyond 256 is not recommended */
+#define CFG_MAX_GLOBAL_VARIABLES         256
 
 #define CFG_EVALUATOR_STACK_SIZE        3000
-#define CFG_COMPILER_STACK_SIZE         600
+#define CFG_COMPILER_STACK_SIZE         600000
 #define CFG_MAX_CALL_DEPTH              150
 /* This must be one of 4, 16, 64, 256, 1024, 4096 */
 #define CFG_LIVING_HASH_SIZE            256
@@ -873,6 +875,17 @@
 #undef WOMBLES
 
 /* ALLOW_INHERIT_AFTER_FUNCTION: allow inheriting after functions have been defined (this includes prototypes). This caused crashes in v22.2a but it may have been fixed since */
-#undef ALLOW_INHERIT_AFTER_FUNCTION
+#define ALLOW_INHERIT_AFTER_FUNCTION
+#undef ALLOW_INHERIT_AFTER_GLOBAL_VARIABLES
+#define PARSE_DEBUG
+#define FLUFFOS
+#undef PACKAGE_DSLIB
+#undef ED_INDENT_CASE
+#define ED_INDENT_SPACES 4
+#define PROG_REF_TYPE int
+#undef ANSI_SUBSTITUTE
+#undef RECEIVE_ED
+#undef PACKAGE_ASYNC
+#define HAS_CONSOLE
 #endif
 
