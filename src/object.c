@@ -1786,6 +1786,7 @@ int restore_object (object_t * ob, const char * file, int noclear)
     save_context(&econ);
     if (SETJMP(econ.context)){
         restore_context(&econ);
+        pop_context(&econ);
         gzclose(gzf);
         return 0;
     }
@@ -1797,7 +1798,7 @@ int restore_object (object_t * ob, const char * file, int noclear)
 	  }
     }
     gzclose(gzf);
-
+    pop_context(&econ);
 #else
     f = fopen(file, "r");
     if (!f || fstat(fileno(f), &st) == -1) {

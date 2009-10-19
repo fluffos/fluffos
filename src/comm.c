@@ -360,10 +360,17 @@ void init_user_conn()
      * register signal handler for SIGPIPE.
      */
 #if defined(SIGPIPE) && defined(SIGNAL_ERROR)
+#ifdef SIG_IGN
+    if (signal(SIGPIPE, SIG_IGN) == SIGNAL_ERROR) {
+            debug_perror("init_user_conn: signal SIGPIPE",0);
+            exit(5);
+        }
+#else
     if (signal(SIGPIPE, sigpipe_handler) == SIGNAL_ERROR) {
         debug_perror("init_user_conn: signal SIGPIPE",0);
         exit(5);
     }
+#endif
 #endif
 }
 
@@ -1611,6 +1618,7 @@ static char *first_cmd_in_buf (interactive_t * ip)
 /*
  * SIGPIPE handler -- does very little for now.
  */
+#ifndef SIG_IGN
 #ifdef SIGNAL_FUNC_TAKES_INT
 void sigpipe_handler (int sig)
 #else
@@ -1621,7 +1629,7 @@ void sigpipe_handler()
     //don't comment the next line out, i'm pretty sure we'd crash on the next SIGPIPE, they're not worth it
     signal(SIGPIPE, sigpipe_handler);
 }                               /* sigpipe_handler() */
-
+#endif
 /*
  * SIGALRM handler.
  */
@@ -1836,7 +1844,7 @@ static void new_user_handler (int which)
         OS_socket_close(new_socket_fd);
         return;
     }
-#if !(linux) && !(sun) && !defined(MINGW) && !defined(__CYGWIN__)
+#if defined(SO_NOSIGPIPE)
     i = 1;
 
     if (setsockopt(new_socket_fd, 1, SO_NOSIGPIPE, &i, sizeof(i)) == -1)

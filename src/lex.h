@@ -148,7 +148,7 @@ char *get_f_name (int);
 void set_inc_list (char *);
 void start_new_file (int);
 void end_new_file (void);
-int lookup_predef (char *);
+int lookup_predef (const char *);
 void add_predefines (void);
 char *main_file_name (void);
 char *get_defined_name (defined_name_t *);

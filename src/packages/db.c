@@ -76,7 +76,9 @@
 #include "../backend.h"
 
 #include "db.h"
-
+#ifdef PACKAGE_ASYNC
+#include <pthread.h>
+#endif
 static int  dbConnAlloc, dbConnUsed;
 static db_t *dbConnList;
 
@@ -351,13 +353,15 @@ void f_db_connect (void)
  * NOTE: the number of rows on INSERT, UPDATE, and DELETE statements will
  * be zero since there is no result set.
  */
+#ifdef PACKAGE_ASYNC
+extern pthread_mutex_t *db_mut;
+#endif
 #ifdef F_DB_EXEC
 void f_db_exec (void)
 {
     int ret = 0;
     db_t *db;
     array_t *info;
-
     info = allocate_empty_array(1);
     info->item[0].type = T_STRING;
     info->item[0].subtype = STRING_MALLOC;
@@ -369,6 +373,13 @@ void f_db_exec (void)
 	error("Attempt to exec on an invalid database handle\n");
     }
 
+#ifdef PACKAGE_ASYNC
+    if(!db_mut){
+        db_mut = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+    	pthread_mutex_init(db_mut, NULL);
+    }
+    pthread_mutex_lock(db_mut);
+#endif
     if (db->type->cleanup) {
 	db->type->cleanup(&(db->c));
     }
@@ -390,6 +401,9 @@ void f_db_exec (void)
     } else {
 	sp->u.number = ret;
     }
+#ifdef PACKAGE_ASYNC
+    pthread_mutex_unlock(db_mut);
+#endif
 }
 #endif
 

@@ -544,7 +544,11 @@ int name_by_ip (int conn_index, char * buf)
     hints.ai_family = AF_INET6;
     hints.ai_socktype = 0;
     hints.ai_protocol = 0;
+#if defined(AI_V4MAPPED)
     hints.ai_flags = AI_CANONNAME| AI_V4MAPPED;
+#else
+    hints.ai_flags = AI_CANONNAME;
+#endif
     static char out_buf[OUT_BUF_SIZE];
 
     if(getaddrinfo(&buf[sizeof(int)], "0", &hints, &res)){

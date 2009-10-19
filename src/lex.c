@@ -251,7 +251,7 @@ static void yyerrorp (const char *);
 #define LEXER
 #include "preprocess.c"
 
-int lookup_predef(char * name)
+int lookup_predef(const char * name)
 {
     int x;
 

@@ -7,7 +7,9 @@
 #include <fcntl.h>
 #include <pthread.h>
 #ifdef F_ASYNC_GETDIR
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <sys/syscall.h>
 #endif
 #include "../config.h"
@@ -260,12 +262,21 @@ int aio_read(struct request *req){
 }
 
 #ifdef F_ASYNC_DB_EXEC
+pthread_mutex_t *db_mut = NULL;
 
 void *dbexecthread(struct request *req){
 	db_t *db = (db_t *)req->buf;
 	int ret;
 	if (db->type->execute) {
+		pthread_mutex_lock(db_mut);
 		ret = db->type->execute(&(db->c), req->tmp.u.string);
+	   	if (ret == -1)
+	   		if(db->type->error) {
+	   			strncpy(req->path, db->type->error(&(db->c)), MAXPATHLEN-1);
+			} else {
+				strcpy(req->path, "Unknown error");
+			}
+		pthread_mutex_unlock(db_mut);
 	}
 
     req->ret = ret;
@@ -284,9 +295,21 @@ int aio_db_exec(struct request *req){
 void *getdirthread(struct request *req){
 	int fd = open(req->path, O_RDONLY);
 	int size = syscall(SYS_getdents, fd, req->buf, req->size);
+	if(size == -1){
+		close(fd);
+		req->ret = 0;
+		req->status = DONE;
+		return NULL;
+	}
 	req->ret = size;
-	while(size = syscall(SYS_getdents, fd, req->buf+req->ret, req->size-req->ret))
-	      req->ret+=size;
+	while(size = syscall(SYS_getdents, fd, req->buf+req->ret, req->size-req->ret)){
+		if(size == -1){
+			close(fd);
+			req->status = DONE;
+			return NULL;
+		}
+        req->ret+=size;
+	}
 	req->status = DONE;
 	close(fd);
 	return NULL;
@@ -402,12 +425,14 @@ struct linux_dirent {
 
 void handle_getdir(struct request *req){
 	int val = req->ret;
+	if(val>MAX_ARRAY_SIZE)
+	  val = MAX_ARRAY_SIZE;
 	array_t *ret = allocate_empty_array(val);
-	int i;
-	if(val > -1)
+	int i=0;
+	if(val > 0)
 	{
 		struct linux_dirent *de = (struct linux_dirent *)req->buf;
-		for(i=0; ((char *)de) - (char *)(req->buf) < val; i++)
+		for(i=0; i<MAX_ARRAY_SIZE && ((char *)de) - (char *)(req->buf) < val; i++)
 		{
 			svalue_t *vp = &(ret->item[i]);
 			vp->type = T_STRING;
@@ -416,7 +441,7 @@ void handle_getdir(struct request *req){
 			de = (struct linux_dirent *)(((char *)de) + de->d_reclen);
 		}
 	}
-    ret = RESIZE_ARRAY(ret, i);
+    ret = resize_array(ret, i);
     ret->size = i;
 	push_refed_array(ret);
 	FREE((void *)req->buf);
@@ -444,12 +469,7 @@ void handle_db_exec(struct request *req){
 	free_svalue(&req->tmp, "handle_db_exec");
 	int val = req->ret;
 	if(val == -1){
-		db_t *db = (db_t *)req->buf;
-    	if (db->type->error) {
-		    push_malloced_string(db->type->error(&(db->c)));
-		} else {
-			push_constant_string("Unknown error");
-		}
+		copy_and_push_string(req->path);
 	}
 	else
 		push_number(val);
@@ -548,10 +568,15 @@ void f_async_db_exec(){
     if (!db) {
       error("Attempt to exec on an invalid database handle\n");
     }
-
+	if(!db_mut){
+		db_mut = (pthread_mutex_t *) malloc(sizeof(pthread_mutex_t));
+		pthread_mutex_init(db_mut, NULL);
+	}
+	pthread_mutex_lock(db_mut);
     if (db->type->cleanup) {
       db->type->cleanup(&(db->c));
     }
+    pthread_mutex_unlock(db_mut);
     st_num_arg = num_arg;
 	function_to_call_t *cb = get_cb();
 	process_efun_callback(2, cb, F_ASYNC_DB_EXEC);

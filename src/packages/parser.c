@@ -1335,9 +1335,12 @@ static void parse_obj (int tok, parse_state_t * state,
     char *str;
     hash_entry_t *hnode, *last_adj = 0;
     int multiple_adj = 0;
-    int ord_legal = (ordinal == 0), singular_legal = 1;
-    long tmp;
-    match_t *mp;
+    int ord_legal, singular_legal = 1, ord_seen = 0;
+    long tmp, tmp2;
+    match_t *mp = NULL;
+    
+    //if(!ordinal) ordinal = 1;
+    ord_legal = (ordinal == 0);
 
     DEBUG_INC;
     DEBUG_P(("parse_obj:"));
@@ -1354,6 +1357,7 @@ static void parse_obj (int tok, parse_state_t * state,
             continue;
         case SW_ALL:
             singular_legal = 0;
+            ord_seen = 1;
             if (state->word_index < num_words &&
                 check_special_word(words[state->word_index].string, &tmp) == SW_OF) {
                 state->word_index++;
@@ -1390,6 +1394,8 @@ static void parse_obj (int tok, parse_state_t * state,
             }
         case SW_ORDINAL:
             if (ord_legal) {
+                if(!ordinal) ordinal = 1;
+                ord_seen = 1;
                 local_state = *state;
                 parse_obj(tok, &local_state, tmp);
             }
@@ -1403,6 +1409,7 @@ static void parse_obj (int tok, parse_state_t * state,
         if (str != my_string) ord_legal = 0;
         hnode = hash_table[DO_HASH(str, HASH_SIZE)];
         while (hnode) {
+            //if(!ordinal) ordinal = 1;
             if (hnode->name == str) {
                 if (hnode->flags & HV_NICKNAME)
                     expand_node(hnode);
@@ -1450,7 +1457,8 @@ static void parse_obj (int tok, parse_state_t * state,
                     mp = add_match(&local_state, tok & ~PLURAL_MODIFIER,
                                    start, state->word_index - 1);
                     bitvec_copy(&mp->val.obs, &objects);
-                    mp->ordinal = ordinal;
+                    if(ordinal != 0) mp->ordinal = ordinal;
+                    else mp->ordinal = 1;
                     local_state.num_objs++;
                     goto do_the_parse;
 
@@ -1527,6 +1535,11 @@ static void parse_obj (int tok, parse_state_t * state,
 
                 p_skip_it:
                     bitvec_copy(&objects, &save_obs);
+                }
+                else if(!ordinal && mp != NULL){
+                    check_special_word("first", &tmp2);
+                    ordinal = 1;
+                    mp->ordinal = tmp2;
                 }
                 if (hnode->flags & HV_ADJ) {
                     DEBUG_P(("Found adj: %s", str));

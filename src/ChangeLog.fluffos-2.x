@@ -2,6 +2,22 @@ As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :), note: where it says Cratylus, I got it from his version, usually
 someone else did the work, but I don't know how to find who did what there.
 
+FluffOS 2.18
+compiles for netbsd (tiz)
+make more empty arrays point to the_null_array, saves memory and allows 
+     comparing with ({}) to see if arrays are empty (reported by Woom)
+clear this_user etc when runtimes get us all the way back to backend()
+fix the inherits() return value if the inherit was indirectly inherited
+     (reported by Woom)
+member_array now return -1 for failure if you search beyond the end of the array
+     (reported by Woom)
+no longer loops forever when adding a reference whole destructing things with
+     too many references
+fixed crasher in async db_exec
+fixed crasher in filedescriptor leak fix
+parser changed to be less strict (Cratylus)
+stop wasting memory if repeat_string would exceed max string size (reported by woom)
+fixed crasher in pragma optimize
 FluffOS 2.17
 math package updates: Added vector norm, dotprod, distance, angle.
      Also added log2() and round() which works on floats (surprisingly useful).

@@ -2275,7 +2275,7 @@ eval_instruction (char * p)
 
         /* The optimizer has asserted this won't be used again.  Make
          * it look like a number to avoid double frees. */
-        s->type |= T_FREED;
+        s->type = T_NUMBER;
         break;
       }
     case F_LOCAL:

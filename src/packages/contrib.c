@@ -1827,8 +1827,10 @@ void f_repeat_string (void) {
     if (repeat > 0) {
         str = sp->u.string;
         len = SVALUE_STRLEN(sp);
-        if ((newlen = len * repeat) > max_string_length)
+        if ((newlen = len * repeat) > max_string_length){
             repeat = max_string_length / len;
+            newlen = len * repeat;
+        }
     }
     if (repeat <= 0) {
         free_string_svalue(sp);

@@ -181,27 +181,37 @@ void free_empty_array (array_t * p)
 /* Finish setting up an array allocated with ALLOC_ARRAY, resizing it to
    size n */
 static array_t *fix_array (array_t * p, unsigned short n) {
+	if(n){
 #ifdef ARRAY_STATS
-    num_arrays++;
-    total_array_size += sizeof(array_t) + sizeof(svalue_t) * (n-1);
+		num_arrays++;
+		total_array_size += sizeof(array_t) + sizeof(svalue_t) * (n-1);
 #endif
-    p->size = n;
-    p->ref = 1;
-    ms_setup_stats(p);
-    return RESIZE_ARRAY(p, n);
+		p->size = n;
+		p->ref = 1;
+		ms_setup_stats(p);
+		return RESIZE_ARRAY(p, n);
+	}
+	if(p!=&the_null_array)
+		FREE(p);
+	return &the_null_array;
 }
 
 array_t *resize_array (array_t * p, unsigned short n) {
 #ifdef ARRAY_STATS
     total_array_size += (n - p->size) * sizeof(svalue_t);
 #endif
+    if(n){
     ms_remove_stats(p);
     p = RESIZE_ARRAY(p, n);
     if (!p)
         fatal("Out of memory.\n");
     p->size = n;
     ms_setup_stats(p);
-
+    } else {
+    	if(p != &the_null_array)
+    		FREE(p);
+    	return &the_null_array;
+    }
     return p;
 }
 
@@ -1565,10 +1575,6 @@ array_t *subtract_array (array_t * minuend, array_t * subtrahend) {
     free_empty_array(subtrahend);
     free_array(minuend);
     msize = dest - difference->item;
-    if (!msize) {
-        FREE((char *)difference);
-        return &the_null_array;
-    }
     return fix_array(difference, msize);
 }
 

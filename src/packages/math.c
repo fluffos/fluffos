@@ -330,7 +330,7 @@ void f_distance(void) {
   
   if(total == -INT_MAX) {
     pop_2_elems();
-    error("distance: cannot take the dotprod of vectors of different sizes.\n");
+    error("distance: cannot take the distance of vectors of different sizes.\n");
     return;
   }
 

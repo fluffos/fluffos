@@ -1146,7 +1146,7 @@ f_in_input (void)
 int
 inherits (program_t * prog, program_t * thep)
 {
-    int j, k = prog->num_inherited;
+    int j, k = prog->num_inherited, l;
     program_t *pg;
 
     for (j = 0; j < k; j++) {
@@ -1154,8 +1154,8 @@ inherits (program_t * prog, program_t * thep)
             return 1;
         if (!strcmp(pg->filename, thep->filename))
             return 2;
-        if (inherits(pg, thep))
-            return 1;
+        if (l=inherits(pg, thep))
+            return l;
     }
     return 0;
 }
@@ -1617,7 +1617,7 @@ f_member_array (void)
             }
             break;
         }
-        if (i == size)
+        if (i >= size)
             i = -1;                     /* Return -1 for failure */
         free_array(v);
         free_svalue(find, "f_member_array");
