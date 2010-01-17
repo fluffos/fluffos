@@ -17,7 +17,7 @@ object *heart_beats();
 #ifdef COMPAT_32
 object *heart_beat_info heart_beats();
 #endif
-string terminal_colour(string, mapping, void | int, void | int);
+string terminal_colour(string, mapping, int | void, int | void);
 string pluralize(string);
 int file_length(string);
 string upper_case(string);
@@ -50,12 +50,12 @@ mixed fetch_class_member( mixed, int );
 mixed store_class_member( mixed, int, mixed );
 mixed *shuffle(mixed *);
 mixed element_of(mixed *);
-mixed max( mixed *, int | void );
-mixed min( mixed *, int | void );
+mixed max( mixed *, int default:0);
+mixed min( mixed *, int default:0);
 mixed abs( int | float );
 int string_difference( string, string );
 int query_charmode(object);
 int remove_charmode(object);
 int remove_get_char(object);
 int send_nullbyte(object);
-void restore_from_string(string, void | int);
+void restore_from_string(string, int default:0);

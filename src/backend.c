@@ -633,6 +633,8 @@ array_t *get_heart_beats() {
 #endif
 	if(n)
 		obtab = CALLOCATE(n, object_t *, TAG_TEMPORARY, "heart_beats");
+	else
+		obtab = NULL;
 	while (n--) {
 #ifdef F_SET_HIDE
 		if (hb->ob->flags & O_HIDDEN) {
@@ -644,7 +646,7 @@ array_t *get_heart_beats() {
 				continue;
 		}
 #endif
-obtab[nob++] = (hb++)->ob;
+		obtab[nob++] = (hb++)->ob;
 	}
 
 	arr = allocate_empty_array(nob);
@@ -653,7 +655,7 @@ obtab[nob++] = (hb++)->ob;
 		arr->item[nob].u.ob = obtab[nob];
 		add_ref(arr->item[nob].u.ob, "get_heart_beats");
 	}
-	if(n)
+	if(obtab)
 		FREE(obtab);
 
 	return arr;

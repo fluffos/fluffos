@@ -49,7 +49,7 @@
 
 typedef struct malloc_block_s {
 #ifdef DEBUGMALLOC_EXTENSIONS
-    int extra_ref;
+    long extra_ref;
 #endif
     unsigned short size;
     unsigned short ref;
@@ -93,9 +93,9 @@ typedef struct malloc_block_s {
 
 typedef struct block_s {
     struct block_s *next;       /* next block in the hash chain */
-    unsigned long hash; //although it's actually an int, we need a long for alignment in COUNTED_STRING!
-#if defined(DEBUGMALLOC_EXTENSIONS) || (SIZEOF_PTR == 8)
-    int extra_ref;
+    unsigned int hash;
+#if defined(DEBUGMALLOC_EXTENSIONS) //|| (SIZEOF_PTR == 8)
+    long extra_ref;
 #endif
     /* these two must be last */
     unsigned short size;        /* length of the string */

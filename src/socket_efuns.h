@@ -47,7 +47,7 @@ typedef struct {
     union string_or_func close_callback;
     char *r_buf;
     int r_off;
-    long r_len;
+    int r_len;
     char *w_buf;
     int w_off;
     int w_len;

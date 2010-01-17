@@ -909,3 +909,5 @@
 #undef MALLOC64
 #undef PACKAGE_CRYPTO
 #undef PACKAGE_SHA1
+#undef MALLOC32
+#undef DTRACE

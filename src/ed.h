@@ -53,28 +53,28 @@
 #ifndef FALSE
 #define FALSE   0
 #endif
-#define ERR             -2
-#define FATAL           (ERR-1)
-#define CHANGED         (ERR-2)
-#define SET_FAIL        (ERR-3)
-#define SUB_FAIL        (ERR-4)
-#define MEM_FAIL        (ERR-5)
-#define UNRECOG_COMMAND (ERR-6)
+#define EDERR             -2
+#define FATAL           (EDERR-1)
+#define CHANGED         (EDERR-2)
+#define SET_FAIL        (EDERR-3)
+#define SUB_FAIL        (EDERR-4)
+#define MEM_FAIL        (EDERR-5)
+#define UNRECOG_COMMAND (EDERR-6)
 
-#define BAD_LINE_RANGE  (ERR-7)
-#define BAD_LINE_NUMBER (ERR-8)
-#define SYNTAX_ERROR    (ERR-9)
-#define RANGE_ILLEGAL   (ERR-10)
-#define IS_RESTRICTED   (ERR-11)
-#define LINE_OR_RANGE_ILL (ERR-12)
-#define FILE_NAME_ERROR (ERR-13)
-#define MARK_A_TO_Z     (ERR-14)
-#define SUB_BAD_PATTERN (ERR-15)
-#define SUB_BAD_REPLACEMENT (ERR-16)
-#define BAD_DESTINATION (ERR-17)
-#define END_OF_FILE     (ERR-18)
-#define SEARCH_FAILED   (ERR-19)
-#define NO_LINE_RANGE   (ERR-20)
+#define BAD_LINE_RANGE  (EDERR-7)
+#define BAD_LINE_NUMBER (EDERR-8)
+#define SYNTAX_ERROR    (EDERR-9)
+#define RANGE_ILLEGAL   (EDERR-10)
+#define IS_RESTRICTED   (EDERR-11)
+#define LINE_OR_RANGE_ILL (EDERR-12)
+#define FILE_NAME_ERROR (EDERR-13)
+#define MARK_A_TO_Z     (EDERR-14)
+#define SUB_BAD_PATTERN (EDERR-15)
+#define SUB_BAD_REPLACEMENT (EDERR-16)
+#define BAD_DESTINATION (EDERR-17)
+#define END_OF_FILE     (EDERR-18)
+#define SEARCH_FAILED   (EDERR-19)
+#define NO_LINE_RANGE   (EDERR-20)
 
 // This one hopefully holds a screen's data for the 'z' command.
 // Even if bytes per line is actually 80, this is still 50-ish lines.

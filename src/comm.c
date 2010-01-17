@@ -276,10 +276,14 @@ void init_user_conn()
             /*
              * create socket of proper type.
              */
+        	int sockflags = SOCK_STREAM;
+#ifdef SOCK_CLOEXEC
+        	sockflags |= SOCK_CLOEXEC;
+#endif
 #ifdef IPV6
-            if ((external_port[i].fd = socket(PF_INET6, SOCK_STREAM, 0)) == -1) {
+            if ((external_port[i].fd = socket(PF_INET6, sockflags, 0)) == -1) {
 #else
-            if ((external_port[i].fd = socket(PF_INET, SOCK_STREAM, 0)) == -1) {
+            if ((external_port[i].fd = socket(PF_INET, sockflags, 0)) == -1) {
 #endif
                 debug_perror("init_user_conn: socket", 0);
                 exit(1);
@@ -1141,7 +1145,7 @@ static void copy_chars (interactive_t * ip, char * from, int num_bytes)
                                     k++;
                                     if(!(ip->sb_buf[k])) env_buf[j] = ENV_FILLER;
                                     if(ip->sb_buf[k] == 1) env_buf[j] = 1;
-                                    if((ip->sb_buf[k] > 31 && ip->sb_buf[k] < 128)){
+                                    if((ip->sb_buf[k] > 31)){
                                         env_buf[j] = ip->sb_buf[k];
                                     }
                                     if(env_buf[j]) j++;

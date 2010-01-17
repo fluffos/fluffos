@@ -3730,9 +3730,7 @@ f_write_file (void)
 {
     int flags = 0;
 
-    if (st_num_arg == 3) {
-        flags = (sp--)->u.number;
-    }
+    flags = (sp--)->u.number;
     flags = write_file((sp - 1)->u.string, sp->u.string, flags);
     free_string_svalue(sp--);
     free_string_svalue(sp);

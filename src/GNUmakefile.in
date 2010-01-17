@@ -247,6 +247,7 @@ distclean: neat
 	-rm -f configure.h system_libs options_incl.h insttest configuration
 	-rm -f 1.out 2.out
 	-rm -f local_options
+	-rm -f dtrace_compile
 	-rm -f trash_me.bat trash_me.err
 	-cp -f GNUmakefile.in GNUmakefile
 	-rm -f Dependencies tmpdepend

@@ -692,6 +692,8 @@ static array_t *MySQL_fetch (dbconn_t * c, int row)
 		case FIELD_TYPE_SHORT:
 		case FIELD_TYPE_DECIMAL:
 		case FIELD_TYPE_LONG:
+		case FIELD_TYPE_INT24:
+		case FIELD_TYPE_LONGLONG:
 		    v->item[i].type = T_NUMBER;
 		    v->item[i].u.number = atoi(target_row[i]);
 		    break;

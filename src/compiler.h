@@ -152,7 +152,7 @@ typedef struct compiler_temp_t {
 #define PROG_STRING(n)   (((const char **)mem_block[A_STRINGS].block)[n])
 #define CLASS(n)    ((class_def_t *)mem_block[A_CLASS_DEF].block + (n))
 
-#if !defined(__alpha) && !defined(cray)
+#if !defined(__alpha) && !defined(cray) && !defined(__sparc__)
 #define align(x) (((x) + 3) & ~3)
 #else
 #define align(x) (((x) + 7) & ~7)

@@ -65,9 +65,9 @@
  *   * Faster than SMALLOC but more memory overhead.
  *   * Requires sbrk().
  */
-#undef SYSMALLOC
+#define SYSMALLOC
 #undef SMALLOC
-#define BSDMALLOC
+#undef BSDMALLOC
 #undef MMALLOC
 
 /* You may optionally choose one (or none) of these malloc wrappers.  These
@@ -406,7 +406,7 @@
 #define SUPPRESS_ARGUMENT_WARNINGS
 
 /* NO_RESETS: completely disable the periodic calling of reset() */
-#undef NO_RESETS
+#define NO_RESETS
 
 /* LAZY_RESETS: if this is defined, an object will only have reset()
  *   called in it when it is touched via call_other() or move_object()
@@ -909,4 +909,5 @@
 #undef MALLOC64
 #undef PACKAGE_CRYPTO
 #undef PACKAGE_SHA1
-
+#undef MALLOC32
+#undef DTRACE

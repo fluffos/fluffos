@@ -203,7 +203,7 @@ void message(mixed, mixed, string | string * | object | object *,
     mixed read_buffer(string | buffer, void | int, void | int);
     int write_buffer(string | buffer, int, string | buffer | int);
 #endif
-    int write_file(string, string, void | int);
+    int write_file(string, string, int default:0);
     int rename(string, string);
     int write_bytes(string, int, string);
 

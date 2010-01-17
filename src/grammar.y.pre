@@ -133,7 +133,6 @@ int yyparse (void);
     long number;
     float real;
     char *string;
-    int type;
     struct { short num_arg; char flags; } argument;
     ident_hash_elem_t *ihe;
     parse_node_t *node;
@@ -183,11 +182,11 @@ int yyparse (void);
 %type <ihe> L_DEFINED_NAME
 
 /* These hold a type */
-%type <type> type optional_star type_modifier_list 
-%type <type> opt_basic_type L_TYPE_MODIFIER L_BASIC_TYPE basic_type atomic_type
-%type <type> cast arg_type
+%type <number> type optional_star type_modifier_list 
+%type <number> opt_basic_type L_TYPE_MODIFIER L_BASIC_TYPE basic_type atomic_type
+%type <number> cast arg_type
 %ifdef ARRAY_RESERVED_WORD
-%type <type> opt_atomic_type
+%type <number> opt_atomic_type
 %endif
 
 /* This holds compressed and less flexible def_name information */

@@ -2,6 +2,16 @@ As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :), note: where it says Cratylus, I got it from his version, usually
 someone else did the work, but I don't know how to find who did what there.
 
+FluffOS 2.19
+attempt to fix string block alignments. hopefuly helps sparc64
+open sockets as close on exec if available (so they don't end up in external programs started from the driver) 
+fix conflict between ed and solaris (both used the same define!)
+fix bug with freeing an object table in backend.c
+some fixes for sparc64 (Kalinash)
+added missing Mysql data types so they don't always get returned as 0 anymore
+changed some optional efun args to default to 0 instead for slightly cleaner code (woom)
+new addition to pluralize() (diff from cratylus)
+
 FluffOS 2.18
 compiles for netbsd (tiz)
 make more empty arrays point to the_null_array, saves memory and allows 
@@ -18,6 +28,7 @@ fixed crasher in filedescriptor leak fix
 parser changed to be less strict (Cratylus)
 stop wasting memory if repeat_string would exceed max string size (reported by woom)
 fixed crasher in pragma optimize
+
 FluffOS 2.17
 math package updates: Added vector norm, dotprod, distance, angle.
      Also added log2() and round() which works on floats (surprisingly useful).

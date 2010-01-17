@@ -541,6 +541,8 @@ int ip_by_name (int conn_index, char * buf)
 int name_by_ip (int conn_index, char * buf)
 {
     struct addrinfo hints, *res;
+    int ret;
+
     hints.ai_family = AF_INET6;
     hints.ai_socktype = 0;
     hints.ai_protocol = 0;
@@ -551,15 +553,14 @@ int name_by_ip (int conn_index, char * buf)
 #endif
     static char out_buf[OUT_BUF_SIZE];
 
-    if(getaddrinfo(&buf[sizeof(int)], "0", &hints, &res)){
+    if((ret = getaddrinfo(&buf[sizeof(int)], NULL, &hints, &res))){
     	//failed
     	sprintf(out_buf, "%s 0\n", &buf[sizeof(int)]);
-    	DBG(("name_by_ip: malformed address request."));
+    	DBG(("name_by_ip: malformed address request (%d).", ret));
     	OS_socket_write(all_conns[conn_index].fd, out_buf, strlen(out_buf));
     	return 0;
     }
     char tmpbuf[80], tmpp[80];
-    int ret;
     if(ret = getnameinfo(res->ai_addr, res->ai_addrlen, tmpbuf, 79, tmpp, 79, NI_NAMEREQD|NI_NUMERICSERV)){
     	sprintf(out_buf, "%s 0\n", &buf[sizeof(int)]);
     	DBG(("%s", out_buf));

@@ -358,7 +358,7 @@ static int ckglob()
 
     delim = *++inptr;
     if (delim <= ' ')
-        return (ERR);
+        return (EDERR);
 
     glbpat = optpat();
     if (*inptr == delim)
@@ -399,7 +399,7 @@ static int deflt (int def1, int def2)
         P_LINE1 = def1;
         P_LINE2 = def2;
     }
-    return ((P_LINE1 > P_LINE2 || P_LINE1 <= 0) ? ERR : 0);
+    return ((P_LINE1 > P_LINE2 || P_LINE1 <= 0) ? EDERR : 0);
 }
 
 
@@ -708,7 +708,7 @@ static int doread (int lin, const char * fname)
         ED_OUTPUTV(ED_DEST, "\"%s\" ", fname);
     if ((fp = fopen(fname, "r")) == NULL) {
         ED_OUTPUT(ED_DEST, " isn't readable.\n");
-        return ERR;
+        return EDERR;
     }
     setCurLn(lin);
     for (lines = 0, bytes = 0; (err = egets(str, ED_MAXLINE, fp)) > 0;) {
@@ -755,7 +755,7 @@ static int dowrite (int from, int to, const char * fname, int apflg)
         push_number(0);
         res = safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_INTERNAL);
         if (IS_ZERO(res))
-            return (ERR);
+            return (EDERR);
     }
 #endif
 
@@ -766,7 +766,7 @@ static int dowrite (int from, int to, const char * fname, int apflg)
             ED_OUTPUT(ED_DEST, " can't be opened for writing!\n");
         else
             ED_OUTPUT(ED_DEST, "Couldn't open file for writing!\n");
-        return ERR;
+        return EDERR;
     }
     lptr = getptr(from);
     for (lin = from; lin <= to; lin++) {
@@ -805,7 +805,7 @@ static int find (regexp * pat, int dir)
     ed_line_t *lin;
 
     if (!pat)
-        return (ERR);
+        return (EDERR);
     dir ? nextCurLn() : prevCurLn();
     num = P_CURLN;
     lin = P_CURPTR;
@@ -1011,10 +1011,10 @@ static int getrhs (char * sub)
     char *outmax = sub + MAXPAT;
 
     if (delim == NL || *inptr == NL)    /* check for eol */
-        return (ERR);
+        return (EDERR);
     while (*inptr != delim && *inptr != NL) {
         if (sub > outmax)
-            return ERR;
+            return EDERR;
         if (*inptr == ESCAPE) {
             switch (*++inptr) {
             case 'r':
@@ -1129,7 +1129,7 @@ static int join (int first, int last)
         while (*str) {
             if (cp >= buf + ED_MAXLINE - 1) {
                 ED_OUTPUT(ED_DEST, "line too long\n");
-                return ERR;
+                return EDERR;
             }
             *cp++ = *str++;
         }
@@ -1181,7 +1181,7 @@ static int transfer (int num)
     int mid, lin, ntrans;
 
     if (P_LINE1 <= 0 || P_LINE1 > P_LINE2)
-        return (ERR);
+        return (EDERR);
 
     mid = num < P_LINE2 ? num : P_LINE2;
 
@@ -1850,7 +1850,7 @@ static int indent_code()
         setCurLn(lineno);
         indent(gettxtl(P_CURPTR));
         if (errs != 0) {
-            return ERR;
+            return EDERR;
         }
     }
 

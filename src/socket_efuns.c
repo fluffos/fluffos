@@ -246,7 +246,9 @@ int socket_create (enum socket_mode mode, svalue_t * read_callback, svalue_t * c
     default:
         return EEMODENOTSUPP;
     }
-
+#ifdef SOCK_CLOEXEC
+    type |= SOCK_CLOEXEC;
+#endif
     i = find_new_socket();
     if (i >= 0) {
 #ifdef IPV6
