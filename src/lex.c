@@ -30,6 +30,7 @@
 #include "file.h"
 #include "main.h"
 #include "cc.h"
+#include "master.h"
 
 #define NELEM(a) (sizeof (a) / sizeof((a)[0]))
 #define LEX_EOF ((unsigned char) EOF)
@@ -394,10 +395,11 @@ inc_open (char * buf, char * name, int check_local)
 {
     int i, f;
     char *p;
-
+	const char *tmp;
     if (check_local) {
         merge(name, buf);
-        if ((f = open(buf, O_RDONLY)) != -1)
+        tmp = check_valid_path(buf, master_ob, "include", 0);
+        if (tmp && (f = open(tmp, O_RDONLY)) != -1)
             return f;
     }
     /*
@@ -409,7 +411,8 @@ inc_open (char * buf, char * name, int check_local)
     }
     for (i = 0; i < inc_list_size; i++) {
         sprintf(buf, "%s/%s", inc_list[i], name);
-        if ((f = open(buf, O_RDONLY)) != -1) {
+        tmp = check_valid_path(buf, master_ob, "include", 0);
+        if (tmp && (f = open(tmp, O_RDONLY)) != -1) {
             return f;
         }
     }
@@ -1054,7 +1057,16 @@ static void refill_buffer() {
 
             size = correct_read(yyin_desc, p, MAXLINE);
             cur_lbuf->buf_end = p += size;
-            if (size < MAXLINE) { *(last_nl = p) = LEX_EOF; return; }
+            if (size < MAXLINE) {
+            	*(last_nl = p) = LEX_EOF;
+            	if(*(last_nl-1) != '\n'){
+            		if(size +1 > MAXLINE)
+            			yyerror("No newline at end of file.");
+            		*p++ = '\n';
+            		*(last_nl = p) = LEX_EOF;
+            	}
+            	return;
+			}
             while (*--p != '\n');
             if (p == outp - 1) {
                 lexerror("Line too long.");
@@ -1106,7 +1118,14 @@ static void refill_buffer() {
             end = p += size;
             if (flag) cur_lbuf->buf_end = p;
             if (size < MAXLINE) {
-                *(last_nl = p) = LEX_EOF; return;
+            	*(last_nl = p) = LEX_EOF;
+            	if(*(last_nl-1) != '\n'){
+            		if(size +1 > MAXLINE)
+            			yyerror("No newline at end of file.");
+            		*p++ = '\n';
+            		*(last_nl = p) = LEX_EOF;
+            	}
+            	return;
             }
             while (*--p != '\n');
             if (p == outp - 1) {

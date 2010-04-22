@@ -443,9 +443,9 @@ lpc_tree_form (parse_node_t * expr, parse_node_t * dest) {
 }
 #endif
 
-short
+ADDRESS_TYPE
 generate (parse_node_t * node) {
-    short where = CURRENT_PROGRAM_SIZE;
+    ADDRESS_TYPE where = CURRENT_PROGRAM_SIZE;
 
     if (num_parse_error) return 0;
     {
@@ -478,8 +478,8 @@ static void optimizer_end_function (void) {
     }
 }
 
-short generate_function (function_t * f, parse_node_t * node, int num) {
-    short ret;
+ADDRESS_TYPE generate_function (function_t * f, parse_node_t * node, int num) {
+    ADDRESS_TYPE ret;
     if (pragmas & PRAGMA_OPTIMIZE) {
 	optimizer_start_function(num);
 	optimizer_state = 0;

@@ -374,29 +374,35 @@ object_t *int_load_object (const char * lname)
     object_t *ob;
     svalue_t *mret;
     struct stat c_st;
-    char real_name[200], name[200];
+    char real_name[400], name[400], actualname[400];
 
+    const char *pname = check_valid_path(lname, master_ob, "load_object", 0);
+    if(!pname)
+    	error("Read access denied.\n");
     if (++num_objects_this_thread > INHERIT_CHAIN_SIZE)
         error("Inherit chain too deep: > %d when trying to load '%s'.\n", INHERIT_CHAIN_SIZE, lname);
 #ifdef PACKAGE_UIDS
     if (current_object && current_object->euid == NULL)
         error("Can't load objects when no effective user.\n");
 #endif
-    if (strrchr(lname, '#'))
+    if (strrchr(pname, '#'))
         error("Cannot load a clone.\n");
     if (!strip_name(lname, name, sizeof name))
         error("Filenames with consecutive /'s in them aren't allowed (%s).\n",
               lname);
+    if (!strip_name(pname, actualname, sizeof actualname))
+        error("Filenames with consecutive /'s in them aren't allowed (%s).\n",
+              pname);
 
     /*
      * First check that the c-file exists.
      */
-    (void) strcpy(real_name, name);
+    (void) strcpy(real_name, actualname);
     (void) strcat(real_name, ".c");
 
     if (stat(real_name, &c_st) == -1 || S_ISDIR(c_st.st_mode)) {
         save_command_giver(command_giver);
-        ob = load_virtual_object(name, 0);
+        ob = load_virtual_object(actualname, 0);
         restore_command_giver();
         num_objects_this_thread--;
         return ob;
@@ -1645,8 +1651,8 @@ static void add_message_with_location (char * err) {
 #ifdef MUDLIB_ERROR_HANDLER
 static void mudlib_error_handler (char * err, int katch) {
     mapping_t *m;
-    const char *file;
-    int line;
+    const char *file = NULL;
+    int line = 0;
     svalue_t *mret;
 
     m = allocate_mapping(6);

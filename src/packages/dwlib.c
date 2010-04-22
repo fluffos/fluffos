@@ -484,6 +484,9 @@ f_reference_allowed()
 
 	/* Maybe I could learn how to use this :p 
 	 CHECK_TYPES(sp-1, T_NUMBER, 1, F_MEMBER_ARRAY); */
+	
+	if(referrer_obj->flags & O_DESTRUCTED)
+	  referrer_obj = NULL;
 
 	if (sv->type == T_OBJECT && sv->u.ob) {
 		referee = sv->u.ob;
@@ -719,4 +722,124 @@ void f_replace_html() {replace_mxp_html(1,0);}
 
 void f_replace_mxp() {replace_mxp_html(0,1);}
 
+#endif
+
+#ifdef F_ROULETTE_WHEEL
+void f_roulette_wheel() {
+   long num;
+   mapping_t *m = sp->u.map;
+   int j, found;
+   mapping_node_t *elt, **a = m->table;
+   svalue_t *val;
+
+   // Loop through the mapping, adding up the weights.
+   j = m->table_size;
+   if(!j)
+     error("empty mapping in roulette_wheel.\n");
+   num = 0;
+   j--;
+   do {
+      for( elt = a[j]; elt; elt = elt->next ) {
+         val = elt->values + 1;
+
+         if( val->type != T_NUMBER || val->u.number < 0 ) {
+            error( "Weights must be non-negative integers.\n" );
+         }
+
+         num += val->u.number;
+      }
+   } while( j-- );
+
+   num = 1 + random_number( num );
+   found = 0;
+
+   // Loop again, and stop when the sum of the weights comes to num.
+   j = m->table_size-1;
+   do {
+      for( elt = a[j]; elt; elt = elt->next ) {
+         val = elt->values + 1;
+         num -= val->u.number;
+
+         if( num <= 0 ) {
+            found = 1;
+            break;
+         }
+      }
+   } while( j-- && !found );
+
+   if( !found ) {    // This shouldn't happen...
+      error( "Something went wrong!\n" );
+   }
+
+   // val points to the value that tipped the scale.  val - 1 is the key.
+   assign_svalue_no_free( sp, val - 1 );
+   free_mapping( m );
+}
+
+#endif
+
+#ifdef F_REPLACE_OBJECTS
+
+svalue_t replace_tmp = {T_NUMBER};
+svalue_t *replace_objects(svalue_t *thing){
+	int i;
+	switch(thing->type){
+	case T_OBJECT:
+	{
+
+		char buf[2000];
+		strcpy(buf, thing->u.ob->obname);
+		svalue_t *tmp = 0;
+		if(!(thing->u.ob->flags & O_DESTRUCTED)){
+			push_object(thing->u.ob);
+			tmp = safe_apply_master_ob(APPLY_OBJECT_NAME, 1);
+		}else
+			strcat(buf, " (destructed)");
+		if(tmp && tmp->type == T_STRING){
+			strcat(buf, " (\"");
+			strcat(buf, tmp->u.string);
+			strcat(buf, "\")");
+		}
+		copy_and_push_string(buf);
+		assign_svalue(&replace_tmp, sp);
+		pop_stack();
+		return &replace_tmp;
+	}
+	case T_ARRAY:
+	case T_CLASS:
+	{
+		array_t *ar = thing->u.arr;
+		array_t *nar = allocate_array(ar->size);
+		push_refed_array(nar);
+		for(i=0;i<ar->size;i++)
+			assign_svalue(&nar->item[i], replace_objects(&ar->item[i]));
+		assign_svalue(&replace_tmp, sp);
+		pop_stack();
+		replace_tmp.type = thing->type;
+		return &replace_tmp;
+	}
+	case T_MAPPING:
+		push_refed_array(mapping_indices(thing->u.map));
+		push_refed_mapping(allocate_mapping(thing->u.map->table_size));
+		push_number(0);
+		for(i=0;i<(sp-2)->u.arr->size; i++){
+		    svalue_t *key = sp;
+			svalue_t *tmp = find_in_mapping(thing->u.map, &(sp-2)->u.arr->item[i]);
+			assign_svalue(key, replace_objects(&(sp-2)->u.arr->item[i]));
+			assign_svalue_no_free(find_for_insert((sp-1)->u.map, key, 1), replace_objects(tmp));
+			if((sp-1)->u.map->count-i != 1)
+				printf("guilty party:%s\n", key->u.string);
+		}
+		assign_svalue(&replace_tmp, sp-1);
+		pop_3_elems();
+		return &replace_tmp;
+	default:
+		assign_svalue(&replace_tmp, thing);
+		return &replace_tmp;
+	}
+}
+
+void f_replace_objects(){
+	assign_svalue(sp, replace_objects(sp));
+}
 #endif

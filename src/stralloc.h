@@ -48,10 +48,12 @@
 #endif
 
 typedef struct malloc_block_s {
+	void *dummy;
+	int bing;
 #ifdef DEBUGMALLOC_EXTENSIONS
     long extra_ref;
 #endif
-    unsigned short size;
+    unsigned int size;
     unsigned short ref;
 } malloc_block_t;
 
@@ -62,7 +64,7 @@ typedef struct malloc_block_s {
 #define MSTR_UPDATE_SIZE(x, y) SAFE(\
                                     ADD_STRING_SIZE(y - MSTR_SIZE(x));\
                                     MSTR_BLOCK(x)->size = \
-                                    (y > USHRT_MAX ? USHRT_MAX : y);\
+                                    (y > UINT_MAX ? UINT_MAX : y);\
                                 )
 
 #define FREE_MSTR(x) SAFE(\
@@ -79,7 +81,7 @@ typedef struct malloc_block_s {
  * sv->subtype is STRING_MALLOC or STRING_SHARED, and runs significantly
  * faster.
  */
-#define COUNTED_STRLEN(x) ((svalue_strlen_size = MSTR_SIZE(x)), svalue_strlen_size != USHRT_MAX ? svalue_strlen_size : strlen((x)+USHRT_MAX)+USHRT_MAX)
+#define COUNTED_STRLEN(x) ((svalue_strlen_size = MSTR_SIZE(x)), svalue_strlen_size != UINT_MAX ? svalue_strlen_size : strlen((x)+UINT_MAX)+UINT_MAX)
 /* return the number of references to a STRING_MALLOC or STRING_SHARED 
    string */
 #define COUNTED_REF(x)    MSTR_REF(x)
@@ -98,7 +100,7 @@ typedef struct block_s {
     long extra_ref;
 #endif
     /* these two must be last */
-    unsigned short size;        /* length of the string */
+    unsigned int size;        /* length of the string */
     unsigned short refs;        /* reference count    */
 } block_t;
 
@@ -134,7 +136,7 @@ int add_string_status (outbuffer_t *, int);
 
 char *extend_string (const char *, int);
 
-extern int svalue_strlen_size;
+extern unsigned int svalue_strlen_size;
 
 #ifdef STRING_STATS
 extern int num_distinct_strings;

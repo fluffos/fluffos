@@ -265,23 +265,26 @@ int aio_read(struct request *req){
 pthread_mutex_t *db_mut = NULL;
 
 void *dbexecthread(struct request *req){
-	db_t *db = (db_t *)req->buf;
-	int ret;
-	if (db->type->execute) {
-		pthread_mutex_lock(db_mut);
-		ret = db->type->execute(&(db->c), req->tmp.u.string);
-	   	if (ret == -1)
-	   		if(db->type->error) {
-	   			strncpy(req->path, db->type->error(&(db->c)), MAXPATHLEN-1);
-			} else {
-				strcpy(req->path, "Unknown error");
-			}
-		pthread_mutex_unlock(db_mut);
-	}
-
-    req->ret = ret;
-    req->status = DONE;
-    return NULL;
+  db_t *db = (db_t *)req->buf;
+  int ret = -1;
+  if (db->type->execute) {
+    pthread_mutex_lock(db_mut);
+    ret = db->type->execute(&(db->c), req->tmp.u.string);
+    if (ret == -1){
+      if(db->type->error) {
+	strncpy(req->path, db->type->error(&(db->c)), MAXPATHLEN-1);
+      } else {
+	strcpy(req->path, "Unknown error");
+      }
+    }
+    pthread_mutex_unlock(db_mut);
+  } else {
+    strcpy(req->path, "No database exec function!");
+  }
+  
+  req->ret = ret;
+  req->status = DONE;
+  return NULL;
 }
 
 int aio_db_exec(struct request *req){
@@ -583,7 +586,7 @@ void f_async_db_exec(){
 	cb->f.fp->hdr.ref++;
 
 	add_db_exec(db, cb);
-	pop_2_elems();
+	pop_3_elems();
 }
 #endif
 #endif

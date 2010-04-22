@@ -246,9 +246,6 @@ int socket_create (enum socket_mode mode, svalue_t * read_callback, svalue_t * c
     default:
         return EEMODENOTSUPP;
     }
-#ifdef SOCK_CLOEXEC
-    type |= SOCK_CLOEXEC;
-#endif
     i = find_new_socket();
     if (i >= 0) {
 #ifdef IPV6
@@ -272,6 +269,9 @@ int socket_create (enum socket_mode mode, svalue_t * read_callback, svalue_t * c
             OS_socket_close(fd);
             return EENONBLOCK;
         }
+#ifdef FD_CLOEXEC
+        fcntl(fd, F_SETFD, FD_CLOEXEC);
+#endif
         lpc_socks[i].fd = fd;
         lpc_socks[i].flags = S_HEADER;
 
@@ -460,12 +460,18 @@ int socket_accept (int fd, svalue_t * read_callback, svalue_t * write_callback)
      * properly inherit the nonblocking property from the listening socket.
      * Marius, 19-Jun-2000: this happens on other platforms as well, so just
      * do it for everyone
+     * better reset the close on exec as well then
      */
     if (set_socket_nonblocking(accept_fd, 1) == -1) {
         socket_perror("socket_accept: set_socket_nonblocking 1", 0);
         OS_socket_close(accept_fd);
         return EENONBLOCK;
     }
+
+#ifdef FD_CLOEXEC
+    fcntl(accept_fd, F_SETFD, FD_CLOEXEC);
+#endif
+
 
     i = find_new_socket();
     if (i >= 0) {
@@ -480,14 +486,14 @@ int socket_accept (int fd, svalue_t * read_callback, svalue_t * write_callback)
         FD_ZERO(&wmask);
         FD_SET(accept_fd, &wmask);
         t.tv_sec = 0;
-        t.tv_usec = 0;
+        t.tv_usec = 1; //give the kernel some time to open the socket, but not too much!
 #ifndef hpux
-        nb = select(FD_SETSIZE, (fd_set *) 0, &wmask, (fd_set *) 0, &t);
+        nb = select(accept_fd+1, (fd_set *) 0, &wmask, (fd_set *) 0, &t);
 #else
-        nb = select(FD_SETSIZE, (int *) 0, (int *) &wmask, (int *) 0, &t);
+        nb = select(accept_fd+1, (int *) 0, (int *) &wmask, (int *) 0, &t);
 #endif
-        //if (!(FD_ISSET(accept_fd, &wmask)))
-        lpc_socks[i].flags |= S_BLOCKED;
+        if (!(FD_ISSET(accept_fd, &wmask)))
+        	lpc_socks[i].flags |= S_BLOCKED;
 
         lpc_socks[i].mode = lpc_socks[fd].mode;
         lpc_socks[i].state = STATE_DATA_XFER;
@@ -1318,7 +1324,11 @@ static int socket_name_to_sin (const char * name, struct sockaddr_in * sin)
     hints.ai_family = AF_INET6;
     hints.ai_socktype = 0;
     hints.ai_protocol = 0;
+#ifndef AI_V4MAPPED
+    hints.ai_flags = AI_CANONNAME;
+#else
     hints.ai_flags = AI_CANONNAME| AI_V4MAPPED;
+#endif
 
     if(getaddrinfo(addr, "1234", &hints, &res)){
     	//failed

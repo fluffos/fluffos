@@ -853,6 +853,8 @@ int compatible_types (int t1, int t2)
                t2 == (TYPE_MOD_ARRAY | TYPE_ANY) || (t1 == t2);
     } else if (t2 & TYPE_MOD_ARRAY)
         return 0;
+    if(t1>10 || t1 < 0)
+      fatal("compiler.c: unknown type in compatible_types()");
     return compatible[t1] & (1 << t2);
 #endif
 }

@@ -142,7 +142,9 @@ array_t *children(const char * s) {
 static int objs_in_table = 0;
 
 void enter_object_hash(object_t * ob) {
+#ifdef DEBUG
 	object_t *s;
+#endif
 	char *base;
 	int dummy;
 #ifndef DEBUG

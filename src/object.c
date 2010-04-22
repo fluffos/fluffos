@@ -1297,15 +1297,10 @@ void
 restore_object_from_buff (object_t * ob, char * theBuff,
                             int noclear)
 {
-    char *buff, *nextBuff, *tmp,  *space;
-    int idx;
-    svalue_t *sv = ob->variables;
-    int rc;
-    unsigned short t;
+    char *buff, *nextBuff, *tmp;
 
     nextBuff = theBuff;
     while ((buff = nextBuff) && *buff) {
-        svalue_t *v;
 
         if ((tmp = strchr(buff, '\n'))) {
             *tmp = '\0';

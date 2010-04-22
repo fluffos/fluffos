@@ -4002,7 +4002,10 @@ void check_co_args2 (unsigned short *types, int num_arg, const char *name, const
   int exptype, i = 0;
   do{
     argc--;
-    exptype = convert_type(types[i++]);
+    if((types[i] & DECL_MODS) == LOCAL_MOD_REF)
+    	exptype = T_REF;
+    else
+    	exptype = convert_type(types[i++]);
     if(exptype == T_ANY)
       continue;
 
@@ -4018,7 +4021,10 @@ void check_co_args2 (unsigned short *types, int num_arg, const char *name, const
         const char *file;
         int line;
         find_line(pc, current_prog, &file, &line);
+        int prsave = pragmas;
+        pragmas &= ~PRAGMA_ERROR_CONTEXT;
         smart_log(file, line, buf, 1);
+        pragmas = prsave;
       } else
         smart_log("driver", 0, buf, 1);
 #else
@@ -4039,8 +4045,11 @@ void check_co_args (int num_arg, const program_t * prog, function_t * fun, int f
     if(current_prog){
       const char *file;
       int line;
+      int prsave = pragmas;
+      pragmas &= ~PRAGMA_ERROR_CONTEXT;
       find_line(pc, current_prog, &file, &line);
       smart_log(file, line, buf, 1);
+      pragmas = prsave;
     } else
       smart_log("driver", 0, buf, 1);
 #else

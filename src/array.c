@@ -74,7 +74,7 @@ static void ms_setup_stats (array_t * p) {
  * Note that we rely a bit on gcc automatically inlining small routines.
  * Speed maniacs may wish to add INLINE liberally.
  */
-static array_t *int_allocate_empty_array (unsigned short n) {
+static array_t *int_allocate_empty_array (unsigned int n) {
     array_t *p;
 
 #ifdef ARRAY_STATS
@@ -180,7 +180,7 @@ void free_empty_array (array_t * p)
 
 /* Finish setting up an array allocated with ALLOC_ARRAY, resizing it to
    size n */
-static array_t *fix_array (array_t * p, unsigned short n) {
+static array_t *fix_array (array_t * p, unsigned int n) {
 	if(n){
 #ifdef ARRAY_STATS
 		num_arrays++;
@@ -189,6 +189,8 @@ static array_t *fix_array (array_t * p, unsigned short n) {
 		p->size = n;
 		p->ref = 1;
 		ms_setup_stats(p);
+//		if(n>65535)
+//			fatal("big array2");
 		return RESIZE_ARRAY(p, n);
 	}
 	if(p!=&the_null_array)
@@ -196,13 +198,16 @@ static array_t *fix_array (array_t * p, unsigned short n) {
 	return &the_null_array;
 }
 
-array_t *resize_array (array_t * p, unsigned short n) {
+array_t *resize_array (array_t * p, unsigned int n) {
 #ifdef ARRAY_STATS
     total_array_size += (n - p->size) * sizeof(svalue_t);
 #endif
     if(n){
     ms_remove_stats(p);
     p = RESIZE_ARRAY(p, n);
+//    if(n>65535)
+//    			fatal("big array3");
+
     if (!p)
         fatal("Out of memory.\n");
     p->size = n;

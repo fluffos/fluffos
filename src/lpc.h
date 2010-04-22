@@ -36,7 +36,7 @@ union u {
  */
 typedef struct svalue_s {
     short type;
-    short subtype;
+    int subtype;
     union u u;
 } svalue_t;
 

@@ -46,9 +46,7 @@ INLINE int growMap (mapping_t * m)
         int i;
         mapping_node_t **a, **b, **eltp, *elt;
 
-        if (newsize > MAX_TABLE_SIZE)
-                return 0;
-        /* resize the hash table to be twice the old size */
+       /* resize the hash table to be twice the old size */
         m->table = a = RESIZE(m->table, newsize, mapping_node_t *, TAG_MAP_TBL, "growMap");
         if (!a) {
             /*
@@ -494,7 +492,7 @@ INLINE svalue_t *
 find_for_insert (mapping_t * m, svalue_t * lv, int doTheFree)
 {
         int oi = svalue_to_int(lv);
-        unsigned short i = oi & m->table_size;
+        unsigned int i = oi & m->table_size;
         mapping_node_t *n, *newnode, **a = m->table + i;
 
         debug(mapping,("mapping.c: hashed to %d\n", i));
@@ -554,7 +552,7 @@ typedef struct unique_node_s {
 typedef struct unique_m_list_s {
     unique_node_t **utable;
     struct unique_m_list_s *next;
-    unsigned short mask;
+    unsigned int mask;
 } unique_m_list_t;
 
 static unique_m_list_t *g_u_m_list = 0;
@@ -590,7 +588,7 @@ void f_unique_mapping (void)
     array_t *v = arg->u.arr, *ret;
     unsigned int oi, i, numkeys = 0, mask, size;
     unsigned short num_arg = st_num_arg;
-    unsigned short nmask;
+    unsigned int nmask;
     mapping_t *m;
     mapping_node_t **mtable, *elt;
     int *ind, j;
@@ -1077,7 +1075,7 @@ filter_mapping (svalue_t * arg, int num_arg)
     mapping_node_t **b, *newnode, *n;
     int j, count = 0, size;
     svalue_t *ret;
-    unsigned short tb_index;
+    unsigned int tb_index;
     function_to_call_t ftc;
 
     process_efun_callback(1, &ftc, F_FILTER);
@@ -1162,8 +1160,8 @@ INLINE mapping_t *
 compose_mapping (mapping_t *m1, mapping_t *m2, unsigned short flag)
 {
     mapping_node_t *elt, *elt2, **a, **b = m2->table, **prev;
-    unsigned short j = m1->table_size, deleted = 0;
-    unsigned short mask = m2->table_size;
+    unsigned int j = m1->table_size, deleted = 0;
+    unsigned int mask = m2->table_size;
     svalue_t *sv;
 
     debug(mapping,("mapping.c: compose_mapping\n"));

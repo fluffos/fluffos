@@ -862,7 +862,7 @@ void check_all_blocks (int flag) {
                     break;
                 case TAG_CLASS:
                     vec = NODET_TO_PTR(entry, array_t *);
-                    if (entry->size != sizeof(array_t) + sizeof(svalue_t[1]) * (vec->size - 1))
+                    if (vec->size && entry->size != sizeof(array_t) + sizeof(svalue_t[1]) * (vec->size - 1))
                         outbuf_addv(&out, "class size doesn't match block size: %s %04x\n", entry->desc, entry->tag);
                     for (i = 0; i < vec->size; i++) mark_svalue(&vec->item[i]);
                     break;

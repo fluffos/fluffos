@@ -211,6 +211,10 @@ else
         if test $? -eq 0; then
             CC="gcc -m64"
         fi
+	gcc -flto comptest.c
+        if test $? -eq 0; then
+            CC=${CC-"-flto"}
+        fi
 	GNUC=1
 	CCFLAGS=-D__USE_FIXED_PROTOTYPES__
     else

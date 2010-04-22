@@ -277,9 +277,6 @@ void init_user_conn()
              * create socket of proper type.
              */
         	int sockflags = SOCK_STREAM;
-#ifdef SOCK_CLOEXEC
-        	sockflags |= SOCK_CLOEXEC;
-#endif
 #ifdef IPV6
             if ((external_port[i].fd = socket(PF_INET6, sockflags, 0)) == -1) {
 #else
@@ -298,7 +295,9 @@ void init_user_conn()
                 socket_perror("init_user_conn: setsockopt", 0);
                 exit(2);
             }
-
+#ifdef FD_CLOEXEC
+            fcntl(external_port[i].fd, F_SETFD, FD_CLOEXEC);
+#endif
             /*
              * fill in socket address information.
              */
@@ -407,10 +406,12 @@ void init_addr_server (char * hostname, int addr_server_port)
 #else
     struct sockaddr_in server;
 #endif
+#ifndef IPV6
     struct hostent *hp;
+    int addr;
+#endif
     int server_fd;
     int optval;
-    long addr;
 
     if (addr_server_fd >= 0)
         return;
@@ -424,7 +425,11 @@ void init_addr_server (char * hostname, int addr_server_port)
     hints.ai_family = AF_INET6;
     hints.ai_socktype = 0;
     hints.ai_protocol = 0;
+#ifndef AI_V4MAPPED
+    hints.ai_flags = AI_CANONNAME;
+#else
     hints.ai_flags = AI_CANONNAME| AI_V4MAPPED;
+#endif
 
     if(getaddrinfo(hostname, "1234", &hints, &res)){
     	//failed
@@ -594,7 +599,7 @@ void add_message (object_t * who, const char * data, int len)
             if (ip->message_length == MESSAGE_BUF_SIZE)
                 break;
         }
-        if (*cp == '\n' || *cp == -1
+        if ((*cp == '\n' || *cp == -1)
 #ifndef NO_BUFFER_TYPE
             && ip->connection_type != PORT_BINARY
 #endif
@@ -1056,7 +1061,7 @@ static void copy_chars (interactive_t * ip, char * from, int num_bytes)
                     		char buf[1024];
                     		char num[20];
 
-                    		sprintf(num, "%d", boot_time);
+                    		sprintf(num, "%dl", boot_time);
                     		int len = sprintf(buf, (char *)telnet_mssp_value, "UPTIME", num);
                     		add_binary_message(ip->ob, (unsigned char *)buf, len);
                     	}
@@ -1066,14 +1071,18 @@ static void copy_chars (interactive_t * ip, char * from, int num_bytes)
                     }
 #ifdef HAVE_ZLIB
                     case TELOPT_COMPRESS :
-                      add_binary_message(ip->ob, telnet_compress_v1_response,
-                                  sizeof(telnet_compress_v1_response));
-                      start_compression(ip);
+                      if(!ip->compressed_stream){
+                    	  add_binary_message(ip->ob, telnet_compress_v1_response,
+                    			  sizeof(telnet_compress_v1_response));
+                    	  start_compression(ip);
+                      }
                       break;
                     case TELOPT_COMPRESS2 :
-                      add_binary_message(ip->ob, telnet_compress_v2_response,
-                                  sizeof(telnet_compress_v2_response));
-                      start_compression(ip);
+                      if(!ip->compressed_stream){
+                    	  add_binary_message(ip->ob, telnet_compress_v2_response,
+                    			  sizeof(telnet_compress_v2_response));
+                    	  start_compression(ip);
+                      }
                       break;
 #endif
                     case TELOPT_ZMP :
@@ -1396,7 +1405,7 @@ static void get_user_data (interactive_t * ip)
             if (ip->text_end < 4)
                 text_space = 4 - ip->text_end;
             else
-                text_space = *(int *)ip->text - ip->text_end + 4;
+                text_space = *(volatile int *)ip->text - ip->text_end + 4;
             break;
 
         default:
@@ -1452,8 +1461,8 @@ static void get_user_data (interactive_t * ip)
 
             if (num_bytes == text_space) {
                 if (ip->text_end == 4) {
-                    *(int *)ip->text = ntohl(*(int *)ip->text);
-                    if (*(int *)ip->text > MAX_TEXT - 5)
+                    *(volatile int *)ip->text = ntohl(*(int *)ip->text);
+                    if (*(volatile int *)ip->text > MAX_TEXT - 5)
                         remove_interactive(ip->ob, 0);
                 } else {
                     svalue_t value;
@@ -2148,7 +2157,7 @@ static void process_input (interactive_t * ip, char * user_command)
 int process_user_command()
 {
     char *user_command;
-    interactive_t *ip;
+    interactive_t *ip=NULL;//for if(ip) below
 
     /*
      * WARNING: get_user_command() sets command_giver via

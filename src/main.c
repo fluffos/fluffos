@@ -239,9 +239,9 @@ int main (int argc, char ** argv)
     max_cost = MAX_COST;
     reserved_size = RESERVED_SIZE;
     max_array_size = MAX_ARRAY_SIZE;
-    if(max_array_size > 65535){
+    if(max_array_size > 2147483647){
       fprintf(stderr, "Maximum array size can not exceed 65535");
-      max_array_size = 65535;
+      max_array_size = 2147483647;
     }
     max_buffer_size = MAX_BUFFER_SIZE;
     max_string_length = MAX_STRING_LENGTH;

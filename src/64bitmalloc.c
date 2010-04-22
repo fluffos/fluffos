@@ -50,10 +50,24 @@ void *malloc64(int size){
   register unsigned long *res;
   if(size < blocksize){
 	  if(!freelist){
-		  res = (unsigned long *)mmap(where, size+sizeof(long),MAP_FIXED|PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,0,0);
+		  res = (unsigned long *)mmap(where, size+sizeof(long),MAP_FIXED|PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+		  if(res != where){
+			  perror("mmap failed! (55)");
+			  printf("where = %lx\n", where);
+			  res = (unsigned long *)malloc(size+sizeof(long));
+			  if(!res){
+				  perror("malloc: ");
+				  exit(-1);
+			  }
+			  *res=size;
+			  return &res[1];
+		  }
 		  where += blocksize;
 	  }else{
-		  res = (unsigned long *)mmap(freelist->block, size+sizeof(long),MAP_FIXED|PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,0,0);
+		  res = (unsigned long *)mmap(freelist->block, size+sizeof(long),MAP_FIXED|PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+		  if(res != freelist->block)
+			  perror("mmap failed! (60)");
+
 		  struct freeblocks *tmp = freelist;
 		  freelist = freelist->next;
 		  free(tmp);
@@ -62,7 +76,9 @@ void *malloc64(int size){
 	  //just in case something big comes along
 	  int thissize = size / 4096;
 	  thissize++;
-	  res = (unsigned long *)mmap(where, size+sizeof(long),MAP_FIXED|PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,0,0);
+	  res = (unsigned long *)mmap(where, size+sizeof(long),MAP_FIXED|PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+	  if(res != where)
+		  perror("mmap failed! (72)");
 	  where += (thissize*4096);
   }
   if((long)res == -1){

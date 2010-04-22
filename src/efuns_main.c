@@ -2665,7 +2665,7 @@ f_resolve (void)
 void
 f_restore_object (void)
 {
-    int flag, tmp_eval;
+    int flag;
 
     flag = (st_num_arg > 1) ? (sp--)->u.number : 0;
 
@@ -2725,7 +2725,7 @@ f_rmdir (void)
 void
 f_save_object (void)
 {
-    int flag, tmp_eval;
+    int flag;
 
     if (st_num_arg == 2 ) {
         flag = (sp--)->u.number;

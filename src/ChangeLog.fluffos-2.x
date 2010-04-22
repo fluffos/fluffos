@@ -2,6 +2,25 @@ As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :), note: where it says Cratylus, I got it from his version, usually
 someone else did the work, but I don't know how to find who did what there.
 
+FluffOS 2.20
+more error check in malloc64
+bigger arrays   (up to 2^31 elements)
+bigger mappings (see arrays)
+more efficient clean_up()
+setting sockets to close on exec done in a more compatible way (only worked on rather new linux kernels)
+no longer sends mccp messages when already compressed (fixes older cmud vversions)
+some cleanups for compiler warnings
+new roulette_wheel() efun in the dwlib package (Woom)
+new replace_objects() efun int the dwlib package (replaces all object references in the argument with filenames recursively)
+check_valid_path apply now also used for compile paths (source files)
+32BIT fix (Kalinash)
+use less chars for string hashes (faster)
+correctly do tables in (s)printf with utf-8 strings
+use the already existing precalculated string hashes more often
+save string length for bigger strings as well instead of using strlen on strings > 64k all the time
+NetBSD IPV6 fix (Tiz)
+fixed crasher in reference_allowed() (in dwlib.c)
+
 FluffOS 2.19
 attempt to fix string block alignments. hopefuly helps sparc64
 open sockets as close on exec if available (so they don't end up in external programs started from the driver) 
@@ -9,8 +28,8 @@ fix conflict between ed and solaris (both used the same define!)
 fix bug with freeing an object table in backend.c
 some fixes for sparc64 (Kalinash)
 added missing Mysql data types so they don't always get returned as 0 anymore
-changed some optional efun args to default to 0 instead for slightly cleaner code (woom)
-new addition to pluralize() (diff from cratylus)
+changed some optional efun args to default to 0 instead for slightly cleaner code (Woom)
+new addition to pluralize() (diff from Cratylus)
 
 FluffOS 2.18
 compiles for netbsd (tiz)

@@ -198,7 +198,7 @@ static void look_for_objects_to_swap()
 	static int next_server_time;
 #endif
 	object_t *ob;
-	VOLATILE object_t *next_ob;
+	VOLATILE object_t *next_ob, *last_good_ob;
 	error_context_t econ;
 
 #ifndef NO_IP_DEMON
@@ -224,6 +224,7 @@ static void look_for_objects_to_swap()
 	 * destructed too. In that case, the loop is simply restarted.
 	 */
 	next_ob = obj_list;
+	last_good_ob = obj_list;
 	save_context(&econ);
 	if (SETJMP(econ.context))
 		restore_context(&econ);
@@ -231,72 +232,77 @@ static void look_for_objects_to_swap()
 	while ((ob = (object_t *)next_ob)) {
 		int ready_for_clean_up = 0;
 
-		if (ob->flags & O_DESTRUCTED)
-			ob = obj_list;  /* restart */
-			next_ob = ob->next_all;
+		if (ob->flags & O_DESTRUCTED){
+			if(last_good_ob->flags & O_DESTRUCTED)
+				ob = obj_list;  /* restart */
+			else
+				ob = (object_t *)last_good_ob;
+		}
+		next_ob = ob->next_all;
 
-			/*
-			 * Check reference time before reset() is called.
-			 */
-			if (current_time - ob->time_of_ref > time_to_clean_up)
-				ready_for_clean_up = 1;
+		/*
+		 * Check reference time before reset() is called.
+		 */
+		if (current_time - ob->time_of_ref > time_to_clean_up)
+			ready_for_clean_up = 1;
 #if !defined(NO_RESETS) && !defined(LAZY_RESETS)
-			/*
-			 * Should this object have reset(1) called ?
-			 */
-			if ((ob->flags & O_WILL_RESET) && (ob->next_reset < current_time)
-					&& !(ob->flags & O_RESET_STATE)) {
-				debug(d_flag, ("RESET /%s\n", ob->obname));
-				set_eval(max_cost);
-				reset_object(ob);
-				if(ob->flags & O_DESTRUCTED)
-					continue;
-			}
+		/*
+		 * Should this object have reset(1) called ?
+		 */
+		if ((ob->flags & O_WILL_RESET) && (ob->next_reset < current_time)
+				&& !(ob->flags & O_RESET_STATE)) {
+			debug(d_flag, ("RESET /%s\n", ob->obname));
+			set_eval(max_cost);
+			reset_object(ob);
+			if(ob->flags & O_DESTRUCTED)
+				continue;
+		}
 #endif
-			if (time_to_clean_up > 0) {
+		if (time_to_clean_up > 0) {
+			/*
+			 * Has enough time passed, to give the object a chance to
+			 * self-destruct ? Save the O_RESET_STATE, which will be cleared.
+			 *
+			 * Only call clean_up in objects that has defined such a function.
+			 *
+			 * Only if the clean_up returns a non-zero value, will it be called
+			 * again.
+			 */
+
+			if (ready_for_clean_up && (ob->flags & O_WILL_CLEAN_UP)) {
+				int save_reset_state = ob->flags & O_RESET_STATE;
+				svalue_t *svp;
+
+				debug(d_flag, ("clean up /%s\n", ob->obname));
+
 				/*
-				 * Has enough time passed, to give the object a chance to
-				 * self-destruct ? Save the O_RESET_STATE, which will be cleared.
+				 * Supply a flag to the object that says if this program is
+				 * inherited by other objects. Cloned objects might as well
+				 * believe they are not inherited. Swapped objects will not
+				 * have a ref count > 1 (and will have an invalid ob->prog
+				 * pointer).
 				 *
-				 * Only call clean_up in objects that has defined such a function.
-				 *
-				 * Only if the clean_up returns a non-zero value, will it be called
-				 * again.
+				 * Note that if it is in the apply_low cache, it will also
+				 * get a flag of 1, which may cause the mudlib not to clean
+				 * up the object.  This isn't bad because:
+				 * (1) one expects it is rare for objects that have untouched
+				 * long enough to clean_up to still be in the cache, especially
+				 * on busy MUDs.
+				 * (2) the ones that are are the more heavily used ones, so
+				 * keeping them around seems justified.
 				 */
 
-				if (ready_for_clean_up && (ob->flags & O_WILL_CLEAN_UP)) {
-					int save_reset_state = ob->flags & O_RESET_STATE;
-					svalue_t *svp;
-
-					debug(d_flag, ("clean up /%s\n", ob->obname));
-
-					/*
-					 * Supply a flag to the object that says if this program is
-					 * inherited by other objects. Cloned objects might as well
-					 * believe they are not inherited. Swapped objects will not
-					 * have a ref count > 1 (and will have an invalid ob->prog
-					 * pointer).
-					 *
-					 * Note that if it is in the apply_low cache, it will also
-					 * get a flag of 1, which may cause the mudlib not to clean
-					 * up the object.  This isn't bad because:
-					 * (1) one expects it is rare for objects that have untouched
-					 * long enough to clean_up to still be in the cache, especially
-					 * on busy MUDs.
-					 * (2) the ones that are are the more heavily used ones, so
-					 * keeping them around seems justified.
-					 */
-
-					push_number(ob->flags & (O_CLONE) ? 0 : ob->prog->ref);
-					set_eval(max_cost);
-					svp = apply(APPLY_CLEAN_UP, ob, 1, ORIGIN_DRIVER);
-					if (ob->flags & O_DESTRUCTED)
-						continue;
-					if (!svp || (svp->type == T_NUMBER && svp->u.number == 0))
-						ob->flags &= ~O_WILL_CLEAN_UP;
-					ob->flags |= save_reset_state;
-				}
+				push_number(ob->flags & (O_CLONE) ? 0 : ob->prog->ref);
+				set_eval(max_cost);
+				svp = apply(APPLY_CLEAN_UP, ob, 1, ORIGIN_DRIVER);
+				if (ob->flags & O_DESTRUCTED)
+					continue;
+				if (!svp || (svp->type == T_NUMBER && svp->u.number == 0))
+					ob->flags &= ~O_WILL_CLEAN_UP;
+				ob->flags |= save_reset_state;
 			}
+		}
+		last_good_ob = ob;
 	}
 	pop_context(&econ);
 }       /* look_for_objects_to_swap() */

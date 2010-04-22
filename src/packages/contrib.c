@@ -851,7 +851,7 @@ f_terminal_colour (void)
 			}
 			for (k = 0; k < lens[i]; k++) {
 				int n;
-				int endpad;
+				int endpad = wrap-col;
 				char c = p[k];
 				*pt++ = c;
 				buflen++;
@@ -2832,23 +2832,18 @@ void f_send_nullbyte (void){
 	object_t *who;
 	tmp = 0;
 
-	if (st_num_arg){
-		who = sp->u.ob;
-		if (!who || (who->flags & O_DESTRUCTED) || !who->interactive ||
-				(who->interactive->iflags & (NET_DEAD | CLOSING))) {
-			tmp = -2;
-		}
-		else {
-			tmp = 1;
-			//""is only the end-of-string zero byte.
-			add_message(who,"",1);
-			flush_message(who->interactive);
-		}
-		free_object(&sp->u.ob, "f_send_nullbyte");
+	who = sp->u.ob;
+	if (!who || (who->flags & O_DESTRUCTED) || !who->interactive ||
+			(who->interactive->iflags & (NET_DEAD | CLOSING))) {
+		tmp = -2;
 	}
 	else {
-		tmp = -1;
+		tmp = 1;
+		//""is only the end-of-string zero byte.
+		add_message(who,"",1);
+		flush_message(who->interactive);
 	}
+	free_object(&sp->u.ob, "f_send_nullbyte");
 	put_number(tmp);
 }
 

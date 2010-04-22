@@ -5,7 +5,7 @@
 #include "comm.h"
 
 /* used temporarily by SVALUE_STRLEN() */
-int svalue_strlen_size;
+unsigned int svalue_strlen_size;
 
 #ifdef NOISY_DEBUG
 void bp (void) {
@@ -169,8 +169,8 @@ alloc_new_string (const char * string, int h)
     STRING(b)[len] = '\0';      /* strncpy doesn't put on \0 if 'from' too
                                  * long */
     if(cut)
-    	h = whashstr(string) & htable_size_minus_one;
-    SIZE(b) = (len > USHRT_MAX ? USHRT_MAX : len);
+    	h = whashstr(STRING(b)) & htable_size_minus_one;
+    SIZE(b) = (len > UINT_MAX ? UINT_MAX : len);
     REFS(b) = 1;
     NEXT(b) = base_table[h];
     HASH(b) = h;
@@ -249,7 +249,8 @@ free_string (const char * str)
     if (REFS(b) > 0)
         return;
 
-    h = StrHash(str);
+    //h = StrHash(str);
+    h = HASH(BLOCK(str));
     prev = base_table + h;
     while ((b = *prev)) {
         if (STRING(b) == str) {
@@ -272,7 +273,8 @@ deallocate_string (char * str)
     int h;
     block_t *b, **prev;
 
-    h = StrHash(str);
+    //h = StrHash(str);
+    h = HASH(BLOCK(str));
     prev = base_table + h;
     while ((b = *prev)) {
         if (STRING(b) == str) {
@@ -342,12 +344,12 @@ char *int_new_string (int size)
 #endif
 
     mbt = (malloc_block_t *)DXALLOC(size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, tag);
-    if (size < USHRT_MAX) {
+    if (size < UINT_MAX) {
         mbt->size = size;
         ADD_NEW_STRING(size, sizeof(malloc_block_t));
     } else {
-        mbt->size = USHRT_MAX;
-        ADD_NEW_STRING(USHRT_MAX, sizeof(malloc_block_t));
+        mbt->size = UINT_MAX;
+        ADD_NEW_STRING(UINT_MAX, sizeof(malloc_block_t));
     }
     mbt->ref = 1;
     ADD_STRING(mbt->size);
@@ -362,10 +364,10 @@ char *extend_string (const char * str, int len) {
 #endif
 
     mbt = (malloc_block_t *)DREALLOC(MSTR_BLOCK(str), len + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, "extend_string");
-    if (len < USHRT_MAX) {
+    if (len < UINT_MAX) {
         mbt->size = len;
     } else {
-        mbt->size = USHRT_MAX;
+        mbt->size = UINT_MAX;
     }
     ADD_STRING_SIZE(mbt->size - oldsize);
     CHECK_STRING_STATS;

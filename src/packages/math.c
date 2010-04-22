@@ -298,7 +298,6 @@ static float dotprod(array_t *a, array_t *b) {
 }
 
 void f_dotprod(void) {
-  int err;
   float total = vector_op((sp-1)->u.arr, sp->u.arr, dotprod_mult);
   
   if(total == -INT_MAX) {
@@ -325,7 +324,6 @@ static float distance_mult(const float a, const float b) {
 
 /* The (Euclidian) distance between two points */
 void f_distance(void) {
-  int err;
   float total = vector_op((sp-1)->u.arr, sp->u.arr, distance_mult);
   
   if(total == -INT_MAX) {
@@ -347,7 +345,6 @@ void f_distance(void) {
 
 #ifdef F_ANGLE
 void f_angle(void) {
-  float res;
   float dot, norma, normb;
   
   dot = dotprod((sp-1)->u.arr, sp->u.arr);
