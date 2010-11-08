@@ -29,7 +29,7 @@
  * arg_types is the types of all arguments. A 0 is used as a delimiter,
  * marking next argument. An argument can have several types.
  */
-int arg_types[400], last_current_type;
+int arg_types[1000], last_current_type;
 
 /*
  * Store the types of the current efun. They will be copied into the

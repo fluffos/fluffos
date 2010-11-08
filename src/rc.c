@@ -372,6 +372,8 @@ int get_config_item (svalue_t * res, svalue_t * arg)
 	res->type = T_NUMBER;
 	res->u.number = config_int[num - BASE_CONFIG_INT];
     } else {
+    	if(!config_str[num]) //obsolete value, less muds break if we don't renumber!
+    		return 0;
 	res->type = T_STRING;
 	res->subtype = STRING_CONSTANT;
 	res->u.string = config_str[num];

@@ -277,7 +277,7 @@ INLINE void copy_some_svalues (svalue_t *, svalue_t *, int);
 INLINE void transfer_push_some_svalues (svalue_t *, int);
 INLINE void push_some_svalues (svalue_t *, int);
 #ifdef DEBUG
-INLINE void int_free_svalue (svalue_t *, char *);
+INLINE void int_free_svalue (svalue_t *, const char *);
 #else
 INLINE void int_free_svalue (svalue_t *);
 #endif

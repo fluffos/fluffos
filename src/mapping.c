@@ -420,8 +420,7 @@ restore_hash_string (char ** val, svalue_t * sv)
  * svalue_t_to_int: Converts an svalue into an integer index.
  */
 
-INLINE_STATIC int
-svalue_to_int (svalue_t * v)
+int svalue_to_int (svalue_t *v)
 {
     if (v->type == T_STRING && v->subtype != STRING_SHARED) {
         char *p = make_shared_string(v->u.string);

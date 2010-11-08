@@ -593,6 +593,7 @@ static int parse_numeric (char ** cpp, unsigned char c, svalue_t * dest)
     } else {
         dest->type = T_NUMBER;
         dest->u.number = (neg ? -res : res);
+        dest->subtype = 0;
         *cpp = cp;
         return 1;
     }
@@ -673,6 +674,7 @@ restore_mapping (char **str, svalue_t * sv)
             {
                 key.u.number = 0;
                 key.type = T_NUMBER;
+		key.subtype = 0;
                 break;
             }
 
@@ -742,6 +744,7 @@ restore_mapping (char **str, svalue_t * sv)
             {
                 value.u.number = 0;
                 value.type = T_NUMBER;
+                value.subtype = 0;
                 break;
             }
 

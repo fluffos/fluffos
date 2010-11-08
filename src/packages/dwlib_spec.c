@@ -10,3 +10,4 @@ string replace_html(string);
 string replace_mxp(string);
 mixed roulette_wheel( mapping );
 mixed replace_objects(mixed);
+string replace_dollars(string, string *);

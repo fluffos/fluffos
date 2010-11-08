@@ -22,11 +22,11 @@
 #endif
 
 enum atypes {
-		aread,
-		awrite,
-		agetdir,
-		adbexec,
-		done
+	aread,
+	awrite,
+	agetdir,
+	adbexec,
+	done
 };
 
 enum astates {
@@ -214,27 +214,27 @@ int aio_gzread(struct request *req){
 }
 
 void *gzwritethread(struct request *req){
-    int fd = open(req->path, req->flags & 1 ? O_CREAT|O_WRONLY|O_TRUNC
-    		: O_CREAT|O_WRONLY|O_APPEND, S_IRWXU|S_IRWXG);
-    void *file = gzdopen(fd, "wb");
-    req->ret = gzwrite(file, (void *)(req->buf), req->size);
+	int fd = open(req->path, req->flags & 1 ? O_CREAT|O_WRONLY|O_TRUNC
+			: O_CREAT|O_WRONLY|O_APPEND, S_IRWXU|S_IRWXG);
+	void *file = gzdopen(fd, "wb");
+	req->ret = gzwrite(file, (void *)(req->buf), req->size);
 	req->status = DONE;
 	gzclose(file);
 	return NULL;
 }
 
 int aio_gzwrite(struct request *req){
- 	req->status = BUSY;
+	req->status = BUSY;
 	do_stuff(gzwritethread, req);
 	return 0;
 }
 #endif
 
 void *writethread(struct request *req){
-    int fd = open(req->path, req->flags & 1 ? O_CREAT|O_WRONLY|O_TRUNC
-		: O_CREAT|O_WRONLY|O_APPEND, S_IRWXU|S_IRWXG);
+	int fd = open(req->path, req->flags & 1 ? O_CREAT|O_WRONLY|O_TRUNC
+			: O_CREAT|O_WRONLY|O_APPEND, S_IRWXU|S_IRWXG);
 
-    req->ret =  write(fd, req->buf, req->size);
+	req->ret =  write(fd, req->buf, req->size);
 
 	req->status = DONE;
 	close(fd);
@@ -265,26 +265,32 @@ int aio_read(struct request *req){
 pthread_mutex_t *db_mut = NULL;
 
 void *dbexecthread(struct request *req){
-  db_t *db = (db_t *)req->buf;
-  int ret = -1;
-  if (db->type->execute) {
-    pthread_mutex_lock(db_mut);
-    ret = db->type->execute(&(db->c), req->tmp.u.string);
-    if (ret == -1){
-      if(db->type->error) {
-	strncpy(req->path, db->type->error(&(db->c)), MAXPATHLEN-1);
-      } else {
-	strcpy(req->path, "Unknown error");
-      }
-    }
-    pthread_mutex_unlock(db_mut);
-  } else {
-    strcpy(req->path, "No database exec function!");
-  }
-  
-  req->ret = ret;
-  req->status = DONE;
-  return NULL;
+	pthread_mutex_lock(db_mut);
+	db_t *db = find_db_conn((int)req->buf);
+	int ret = -1;
+	if (db->type->execute) {
+		if (db->type->cleanup) {
+			db->type->cleanup(&(db->c));
+		}
+
+		ret = db->type->execute(&(db->c), req->tmp.u.string);
+		if (ret == -1){
+			if(db->type->error) {
+				char *tmp;
+				strncpy(req->path, tmp = db->type->error(&(db->c)), MAXPATHLEN-1);
+				FREE_MSTR(tmp);
+			} else {
+				strcpy(req->path, "Unknown error");
+			}
+		}
+	} else {
+		strcpy(req->path, "No database exec function!");
+	}
+	pthread_mutex_unlock(db_mut);
+
+	req->ret = ret;
+	req->status = DONE;
+	return NULL;
 }
 
 int aio_db_exec(struct request *req){
@@ -311,7 +317,7 @@ void *getdirthread(struct request *req){
 			req->status = DONE;
 			return NULL;
 		}
-        req->ret+=size;
+		req->ret+=size;
 	}
 	req->status = DONE;
 	close(fd);
@@ -385,11 +391,11 @@ int add_write(const char *fname, const char *buf, int size, char flags, function
 }
 
 #ifdef F_ASYNC_DB_EXEC
-int add_db_exec(db_t *db, function_to_call_t *fun) {
+int add_db_exec(int handle, function_to_call_t *fun) {
 	struct request *req = get_req();
 	req->fun = fun;
 	req->type = adbexec;
-	req->buf = (char *)db;
+	req->buf = (char *)handle;
 	assign_svalue_no_free(&req->tmp, sp-1);
 	return aio_db_exec(req);
 }
@@ -417,11 +423,11 @@ void handle_read(struct request *req){
 #ifdef F_ASYNC_GETDIR
 
 struct linux_dirent {
-               unsigned long  d_ino;     /* Inode number */
-               unsigned long  d_off;     /* Offset to next dirent */
-               unsigned short d_reclen;  /* Length of this dirent */
-               char           d_name []; /* Filename (null-terminated) */
-                                   /* length is actually (d_reclen - 2 -
+	unsigned long  d_ino;     /* Inode number */
+	unsigned long  d_off;     /* Offset to next dirent */
+	unsigned short d_reclen;  /* Length of this dirent */
+	char           d_name []; /* Filename (null-terminated) */
+	/* length is actually (d_reclen - 2 -
                                       offsetof(struct linux_dirent, d_name) */
 };
 
@@ -429,7 +435,7 @@ struct linux_dirent {
 void handle_getdir(struct request *req){
 	int val = req->ret;
 	if(val>MAX_ARRAY_SIZE)
-	  val = MAX_ARRAY_SIZE;
+		val = MAX_ARRAY_SIZE;
 	array_t *ret = allocate_empty_array(val);
 	int i=0;
 	if(val > 0)
@@ -444,8 +450,8 @@ void handle_getdir(struct request *req){
 			de = (struct linux_dirent *)(((char *)de) + de->d_reclen);
 		}
 	}
-    ret = resize_array(ret, i);
-    ret->size = i;
+	ret = resize_array(ret, i);
+	ret->size = i;
 	push_refed_array(ret);
 	FREE((void *)req->buf);
 	set_eval(max_cost);
@@ -558,34 +564,29 @@ void f_async_getdir(){
 #endif
 #ifdef F_ASYNC_DB_EXEC
 void f_async_db_exec(){
-    array_t *info;
-    db_t *db;
-    info = allocate_empty_array(1);
-    info->item[0].type = T_STRING;
-    info->item[0].subtype = STRING_MALLOC;
-    info->item[0].u.string = string_copy((sp-1)->u.string, "f_db_exec");
-    int num_arg = st_num_arg;
-    valid_database("exec", info);
+	array_t *info;
+	db_t *db;
+	info = allocate_empty_array(1);
+	info->item[0].type = T_STRING;
+	info->item[0].subtype = STRING_MALLOC;
+	info->item[0].u.string = string_copy((sp-1)->u.string, "f_db_exec");
+	int num_arg = st_num_arg;
+	valid_database("exec", info);
 
-    db = find_db_conn((sp-2)->u.number);
-    if (!db) {
-      error("Attempt to exec on an invalid database handle\n");
-    }
+	db = find_db_conn((sp-2)->u.number);
+	if (!db) {
+		error("Attempt to exec on an invalid database handle\n");
+	}
 	if(!db_mut){
 		db_mut = (pthread_mutex_t *) malloc(sizeof(pthread_mutex_t));
 		pthread_mutex_init(db_mut, NULL);
 	}
-	pthread_mutex_lock(db_mut);
-    if (db->type->cleanup) {
-      db->type->cleanup(&(db->c));
-    }
-    pthread_mutex_unlock(db_mut);
-    st_num_arg = num_arg;
+	st_num_arg = num_arg;
 	function_to_call_t *cb = get_cb();
 	process_efun_callback(2, cb, F_ASYNC_DB_EXEC);
 	cb->f.fp->hdr.ref++;
 
-	add_db_exec(db, cb);
+	add_db_exec((sp-2)->u.number, cb);
 	pop_3_elems();
 }
 #endif

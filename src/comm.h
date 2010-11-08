@@ -66,6 +66,7 @@ enum msgtypes {
 #define USING_LINEMODE      0x2000              /* we've negotiated linemode               */
 #define USING_MXP           0x4000              /* we've negotiated mxp */
 #define USING_ZMP           0x8000              /* we've negotiated zmp */
+#define USING_GMCP			0x10000				/* we've negotiated gmcp */
 
 typedef struct interactive_s {
     object_t *ob;               /* points to the associated object         */

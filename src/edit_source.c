@@ -1662,6 +1662,8 @@ static void handle_configure() {
         check_library("-lpthread");
     if (lookup_define("PACKAGE_HASH"))
         check_library("-lssl");
+    if (lookup_define("PACKAGE_PCRE"))
+        check_library("-lpcre");
     fprintf(stderr, "Checking for flaky Linux systems ...\n");
     check_linux_libc();
 

@@ -2,13 +2,56 @@ As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :), note: where it says Cratylus, I got it from his version, usually
 someone else did the work, but I don't know how to find who did what there.
 
+FluffOS 2.21
+small cleanup in malloc32
+added gmcp support
+      gmcp_enable() gets called when a user has gmcp
+      gmcp() will get called with any received message
+      send_gmcp(string) will send the string as a gmcp message
+      has_gmcp(object) returns if the object supports gmcp
+fixed sorting when the compare function returns values that don't fit in a 32 bit int.
+fixed memory leak in sorting
+new deep_inventory functionality (tiz)
+    it can now take an array of objects, and a function pointer that can return
+    0 don't include this object or it's contents
+    1 do include
+    2 include this object but not it's contents
+    3 don't include this object but do add the contents
+    the function will be called with one object from the inventory (for each object looked at)
+fixed memory leak in new deep_inventory
+added pcre support (Volothamp@Final Realms)
+      string pcre_version(void);
+      version of the pcre lib
+      mixed pcre_match(string | string *, string, void | int);
+      like the regexp efun
+      mixed *pcre_assoc(string, string *, mixed *, mixed | void);
+      like reg_assoc
+      string *pcre_extract(string, string);
+      extract matching parts
+      string pcre_replace(string, string, string *);
+      string replace, one entry in the array for each match
+      string pcre_replace_callback(string, string, string | function, ...);
+      string replace uses a callback to get the replace string (called with the matched string and match number, starting with 0)
+      mapping pcre_cache(void);
+      returns content of the pcre cache (not all that useful)
+fixed memory leaks in pcre efuns
+fixed crashers in pcre efuns
+small optimisation in reg_assoc and pcre_assoc
+fixed memory leak in compiling files
+restore_object will no longer randomly set 0 values as undefined
+fixed crasher in asking for an unused config setting
+sprintf buffer is now big enough for max string size
+fixed crasher in async_db_exec (never seen for real, but it was possible!)
+db_fetch will no longer randomly return some 0s as undefined
+dwlib package now has a replace_dollars function which searches for patterns starting with a $ only, otherwise the same as replace() (but faster as it only scans once)
+
 FluffOS 2.20
-more error check in malloc64
+more error checks in malloc64
 bigger arrays   (up to 2^31 elements)
 bigger mappings (see arrays)
 more efficient clean_up()
 setting sockets to close on exec done in a more compatible way (only worked on rather new linux kernels)
-no longer sends mccp messages when already compressed (fixes older cmud vversions)
+no longer sends mccp messages when already compressed (fixes older cmud versions)
 some cleanups for compiler warnings
 new roulette_wheel() efun in the dwlib package (Woom)
 new replace_objects() efun int the dwlib package (replaces all object references in the argument with filenames recursively)

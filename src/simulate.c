@@ -374,7 +374,7 @@ object_t *int_load_object (const char * lname)
     object_t *ob;
     svalue_t *mret;
     struct stat c_st;
-    char real_name[400], name[400], actualname[400];
+    char real_name[400], name[400], actualname[400], obname[400];
 
     const char *pname = check_valid_path(lname, master_ob, "load_object", 0);
     if(!pname)
@@ -399,6 +399,9 @@ object_t *int_load_object (const char * lname)
      */
     (void) strcpy(real_name, actualname);
     (void) strcat(real_name, ".c");
+
+    (void) strcpy(obname, name);
+        (void) strcat(obname, ".c");
 
     if (stat(real_name, &c_st) == -1 || S_ISDIR(c_st.st_mode)) {
         save_command_giver(command_giver);
@@ -425,7 +428,7 @@ object_t *int_load_object (const char * lname)
             error("Could not read the file '/%s'.\n", real_name);
         }
 	save_command_giver(command_giver);
-	prog = compile_file(f, real_name);
+	prog = compile_file(f, obname);
 	restore_command_giver();
         if (comp_flag)
             debug_message(" done\n");

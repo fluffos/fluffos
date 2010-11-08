@@ -588,10 +588,26 @@ void
 f_deep_inventory (void)
 {
     array_t *vec;
+    int args = st_num_arg;
+    if(st_num_arg==2 && sp->type == T_FUNCTION && ((sp-1)->type==T_ARRAY || (sp-1)->type==T_OBJECT) ) {
+        if((sp-1)->type==T_ARRAY)
+            vec = deep_inventory_array((sp-1)->u.arr, 1 , sp->u.fp); 
+        else /*(sp-1)->type==T_OBJECT*/
+            vec = deep_inventory((sp-1)->u.ob, 0 , sp->u.fp);
+    }
+    else if(st_num_arg==1 && (sp->type==T_FUNCTION || sp->type==T_ARRAY || sp->type==T_OBJECT) ) {
+        if(sp->type==T_FUNCTION)
+            vec = deep_inventory(current_object, 0 , sp->u.fp);
+	else if(sp->type==T_ARRAY)
+	    vec = deep_inventory_array(sp->u.arr, 1 , 0);
+	else /*sp->type==T_OBJECT*/
+            vec = deep_inventory(sp->u.ob, 0 , 0);
+    }
+    else
+        vec = &the_null_array;
 
-    vec = deep_inventory(sp->u.ob, 0);
-    free_object(&sp->u.ob, "f_deep_inventory");
-    put_array(vec);
+    pop_n_elems(args);
+    push_refed_array(vec);
 }
 #endif
 
@@ -1252,6 +1268,20 @@ void f_has_zmp (void)
 	if (sp->u.ob->interactive)
 	{
 		i = sp->u.ob->interactive->iflags & USING_ZMP;
+		i = !!i; //force 1 or 0
+	}
+	free_object(&sp->u.ob, "f_has_zmp");
+	put_number(i);
+}
+#endif
+
+#ifdef F_HAS_GMCP
+void f_has_gmcp(){
+	int i=0;
+
+	if (sp->u.ob->interactive)
+	{
+		i = sp->u.ob->interactive->iflags & USING_GMCP;
 		i = !!i; //force 1 or 0
 	}
 	free_object(&sp->u.ob, "f_has_zmp");
@@ -2270,7 +2300,7 @@ f_reg_assoc (void) {
     if (!(arg[2].type == T_ARRAY))
         error("Bad argument 3 to reg_assoc()\n");
 
-    vec = reg_assoc(arg[0].u.string, arg[1].u.arr, arg[2].u.arr, st_num_arg > 3 ? &arg[3] : &const0);
+    vec = reg_assoc(arg, arg[1].u.arr, arg[2].u.arr, st_num_arg > 3 ? &arg[3] : &const0);
 
     if (st_num_arg == 4)
         pop_3_elems();
@@ -2503,7 +2533,8 @@ f_replace_string (void)
                     *dst2++ = *src++;
                 }
             }
-            memcpy(dst2, src, slimit - src);
+            memmove(dst2, src, slimit - src);
+            //memcpy(dst2, src, slimit - src);
             dst2 += (slimit - src);
             *dst2 = 0;
             arg->u.string = extend_string(dst1, dst2 - dst1);
@@ -3192,7 +3223,7 @@ f_strsrch (void)
                 do {
                     if (*pos == c) break;
                 } while (--pos >= big);
-                if (*pos != c) {
+                if (pos < big) {
                     pos = NULL;
                     break;
                 }

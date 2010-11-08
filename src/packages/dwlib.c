@@ -485,7 +485,7 @@ f_reference_allowed()
 	/* Maybe I could learn how to use this :p 
 	 CHECK_TYPES(sp-1, T_NUMBER, 1, F_MEMBER_ARRAY); */
 	
-	if(referrer_obj->flags & O_DESTRUCTED)
+	if(referrer_obj && referrer_obj->flags & O_DESTRUCTED)
 	  referrer_obj = NULL;
 
 	if (sv->type == T_OBJECT && sv->u.ob) {
@@ -841,5 +841,66 @@ svalue_t *replace_objects(svalue_t *thing){
 
 void f_replace_objects(){
 	assign_svalue(sp, replace_objects(sp));
+}
+#endif
+
+#ifdef F_REPLACE_DOLLARS
+void f_replace_dollars(){
+	char *newstr;
+	const char *oldstr = (sp-1)->u.string;
+	char *currentnew;
+	const char *currentold = oldstr;
+	int i;
+	if(sp->u.arr->size & 1)
+		error("wrong array length for replace_dollars()");
+	for(i=0;i<sp->u.arr->size; i++)
+		if(sp->u.arr->item[i].type != T_STRING)
+			error("replace array should only contain strings");
+	newstr = new_string(MAX_STRING_LENGTH, "replace_dollars");
+	currentnew = newstr;
+	for(i=0;i<COUNTED_STRLEN(oldstr);i++){
+		if(oldstr[i]=='$'){
+			int j;
+			for(j=0;j<sp->u.arr->size;j+=2)
+			{
+				const char *one = sp->u.arr->item[j].u.string;
+				if(!strncmp(one, oldstr+i, COUNTED_STRLEN(one)))
+				{
+					const char *two = sp->u.arr->item[j+1].u.string;
+					int len = i-(currentold-oldstr);
+					if(currentnew + len - newstr > MAX_STRING_LENGTH){
+						FREE_MSTR(newstr);
+						error("string too long");
+					}
+					strncpy(currentnew, currentold, len);
+					currentnew+=len;
+					currentold+=len;
+					currentold+=COUNTED_STRLEN(one);
+					if(currentnew + COUNTED_STRLEN(one) - newstr > MAX_STRING_LENGTH){
+						FREE_MSTR(newstr);
+						error("string too long");
+					}
+					strcpy(currentnew, two);
+					currentnew+=COUNTED_STRLEN(two);
+					break;
+				}
+			}
+		}
+	}
+	if(newstr == currentnew){
+		//nothing happened!
+		FREE_MSTR(newstr);
+		pop_stack();
+		return;
+	}
+
+	if(currentnew + COUNTED_STRLEN(oldstr)-currentold+oldstr - newstr > MAX_STRING_LENGTH){
+		FREE_MSTR(newstr);
+		error("string too long");
+	}
+
+	strcpy(currentnew, currentold);
+	pop_2_elems();
+	push_malloced_string(extend_string(newstr, currentnew-newstr + COUNTED_STRLEN(oldstr)-(currentold-oldstr)));
 }
 #endif

@@ -131,7 +131,7 @@ typedef unsigned int format_info;
                                          * recover */
 
 #define ADD_CHAR(x) {\
-  if (sprintf_state->obuff.real_size == USHRT_MAX) ERROR(ERR_BUFF_OVERFLOW); \
+  if (sprintf_state->obuff.real_size == MAX_STRING_LENGTH) ERROR(ERR_BUFF_OVERFLOW); \
   outbuf_addchar(&(sprintf_state->obuff), x);\
 }
 
@@ -1220,7 +1220,7 @@ char *string_print_formatted (const char * format_str, int argc, svalue_t * argv
                         add_justified(tmp, slen, &pad, fs, finfo,
                                       (((format_str[fpos] != '\n') && (format_str[fpos] != '\0'))
                                        || ((finfo & INFO_ARRAY) && (nelemno < (argv + sprintf_state->cur_arg)->u.arr->size)))
-                                      || carg->u.string[slen - 1] != '\n');
+                                       || (slen && (carg->u.string[slen - 1] != '\n')));
                     }
                 } else if (finfo & INFO_T_INT) {        /* one of the integer
                                                          * types */

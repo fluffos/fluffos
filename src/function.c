@@ -222,15 +222,15 @@ call_function_pointer (funptr_t * funp, int num_arg)
 {
     static func_t *oefun_table = efun_table - BASE;
     array_t *v;
+    int extfr = 1;
     
     if (!funp->hdr.owner || (funp->hdr.owner->flags & O_DESTRUCTED))
         error("Owner (/%s) of function pointer is destructed.\n",
               (funp->hdr.owner ? funp->hdr.owner->obname : "(null)"));
-    
     setup_fake_frame(funp);
     if ((v=funp->hdr.args)) {
         check_for_destr(v);
-	num_arg = merge_arg_lists(num_arg, v, 0);
+        num_arg = merge_arg_lists(num_arg, v, 0);
     }
 
     switch (funp->hdr.type) {
@@ -240,7 +240,6 @@ call_function_pointer (funptr_t * funp, int num_arg)
     case FP_EFUN:
         {
             int i, def;
-            
             fp = sp - num_arg + 1;
 
             i = funp->f.efun.index;
@@ -277,7 +276,7 @@ call_function_pointer (funptr_t * funp, int num_arg)
                     apply_ret_value = const0;
                 else
                     apply_ret_value = *sp--;
-                remove_fake_frame();
+               	remove_fake_frame();
                 return &apply_ret_value;
             }
         }
@@ -288,7 +287,6 @@ call_function_pointer (funptr_t * funp, int num_arg)
 
         if (current_object->prog->function_flags[funp->f.local.index] & (FUNC_PROTOTYPE|FUNC_UNDEFINED))
             error("Undefined lfun pointer called: %s\n", function_name(current_object->prog, funp->f.local.index));
-
         push_control_stack(FRAME_FUNCTION);
         current_prog = funp->hdr.owner->prog;
         
@@ -302,8 +300,8 @@ call_function_pointer (funptr_t * funp, int num_arg)
     }
     case FP_FUNCTIONAL: 
     case FP_FUNCTIONAL | FP_NOT_BINDABLE: {
-        fp = sp - num_arg + 1;
 
+        fp = sp - num_arg + 1;
         push_control_stack(FRAME_FUNP);
         current_prog = funp->f.functional.prog;
         csp->fr.funp = funp;

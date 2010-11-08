@@ -213,7 +213,7 @@ else
         fi
 	gcc -flto comptest.c
         if test $? -eq 0; then
-            CC=${CC-"-flto"}
+            CC="$CC -flto"
         fi
 	GNUC=1
 	CCFLAGS=-D__USE_FIXED_PROTOTYPES__
@@ -341,7 +341,7 @@ cat >comptest.y <<END
 all: FOO
 END
 bison comptest.y
-if test $? -eq 0 && test $CC != "xlc"; then
+if test $? -eq 0 && test "$CC" != "xlc"; then
     YACC="bison -d -y"
 else
     byacc comptest.y

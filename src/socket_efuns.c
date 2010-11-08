@@ -318,6 +318,7 @@ int socket_bind (int fd, int port, const char * addr)
 #else
     struct sockaddr_in sin;
 #endif
+    memset(&sin, 0, sizeof(sin));
     if (fd < 0 || fd >= max_lpc_socks)
         return EEFDRANGE;
     if (lpc_socks[fd].state == STATE_CLOSED ||

@@ -38,6 +38,7 @@
 #define TELOPT_COMPRESS2 86
 #define TELOPT_MXP  91  // mud extension protocol
 #define TELOPT_ZMP  93  // zenith mud protocol
+#define TELOPT_GMCP 200 // something mud communication protocol, how many do we need?
 
 #define MSSP_VAR 1
 #define MSSP_VAL 2
@@ -109,7 +110,8 @@ static unsigned char telnet_will_zmp[] = { IAC, WILL, TELOPT_ZMP};
 static unsigned char telnet_start_zmp[] = { IAC, SB, TELOPT_ZMP};
 static unsigned char telnet_do_newenv[]     = { IAC, DO, TELOPT_NEW_ENVIRON };
 static unsigned char telnet_send_uservar[]     = { IAC, SB, TELOPT_NEW_ENVIRON, NEW_ENV_SEND, IAC, SE };
-
+static unsigned char telnet_do_gmcp[] = {IAC, DO, TELOPT_GMCP};
+static unsigned char telnet_start_gmcp[] = {IAC, SB, TELOPT_GMCP};
 /*
  * local function prototypes.
  */
@@ -238,6 +240,7 @@ void init_user_conn()
 #else
     struct sockaddr_in sin;
 #endif
+    memset(&sin, 0, sizeof(sin));
     socklen_t sin_len;
     int optval;
     int i;
@@ -967,6 +970,10 @@ static void copy_chars (interactive_t * ip, char * from, int num_bytes)
                         apply(APPLY_MXP_ENABLE, ip->ob, 0, ORIGIN_DRIVER);
                         ip->iflags |= USING_MXP;
                         break;
+                    case TELOPT_GMCP:
+                    	apply(APPLY_GMCP_ENABLE, ip->ob, 0, ORIGIN_DRIVER);
+                    	ip->iflags |= USING_GMCP;
+                    	break;
                     case TELOPT_NEW_ENVIRON :
                         add_binary_message(ip->ob, telnet_send_uservar, sizeof(telnet_send_uservar));
                         break;
@@ -1142,7 +1149,7 @@ static void copy_chars (interactive_t * ip, char * from, int num_bytes)
                     case SE:
                         ip->state = TS_DATA;
                         ip->sb_buf[ip->sb_pos] = 0;
-                        switch (ip->sb_buf[0]) {
+                        switch ((unsigned char)ip->sb_buf[0]) {
 
                         case TELOPT_NEW_ENVIRON :
                         {
@@ -1334,6 +1341,11 @@ static void copy_chars (interactive_t * ip, char * from, int num_bytes)
                             	apply(APPLY_ZMP, ip->ob, 2, ORIGIN_DRIVER);
 
                             }
+							break;
+                            case TELOPT_GMCP:
+                            	ip->sb_buf[ip->sb_pos] = 0;
+                            	copy_and_push_string(&ip->sb_buf[1]);
+                            	apply(APPLY_GMCP, ip->ob, 1, ORIGIN_DRIVER);
                             	break;
                             default:
                                 for (x = 0;  x < ip->sb_pos;  x++)
@@ -2028,7 +2040,8 @@ static void new_user_handler (int which)
         add_binary_message(ob, telnet_will_zmp, sizeof(telnet_will_zmp));
         // Also newenv
         add_binary_message(ob, telnet_do_newenv, sizeof(telnet_do_newenv));
-
+        // gmcp *yawn*
+        add_binary_message(ob, telnet_do_gmcp, sizeof(telnet_do_gmcp));
     }
 
     logon(ob);
@@ -2400,6 +2413,7 @@ void remove_interactive (object_t * ob, int dested)
     for (idx = 0; idx < max_users; idx++)
         if (all_users[idx] == ip) break;
     DEBUG_CHECK(idx == max_users, "remove_interactive: could not find and remove user!\n");
+    FREE(ip->sb_buf);
     FREE(ip);
     ob->interactive = 0;
     all_users[idx] = 0;
@@ -3051,20 +3065,20 @@ int outbuf_extend (outbuffer_t * outbuf, int l)
 
     DEBUG_CHECK(l < 0, "Negative length passed to outbuf_extend.\n");
 
-    l = (l > USHRT_MAX ? USHRT_MAX : l);
+    l = (l > MAX_STRING_LENGTH ? MAX_STRING_LENGTH : l);
 
     if (outbuf->buffer) {
         limit = MSTR_SIZE(outbuf->buffer);
         if (outbuf->real_size + l > limit) {
-            if (outbuf->real_size == USHRT_MAX) return 0; /* TRUNCATED */
+	  if (outbuf->real_size == MAX_STRING_LENGTH) return 0; /* TRUNCATED */
 
             /* assume it's going to grow some more */
             limit = (outbuf->real_size + l) * 2;
-            if (limit > USHRT_MAX) {
-                limit = USHRT_MAX;
-                outbuf->buffer = extend_string(outbuf->buffer, USHRT_MAX);
-                return USHRT_MAX - outbuf->real_size;
-            }
+            if (limit > MAX_STRING_LENGTH) {
+                limit = MAX_STRING_LENGTH;
+                outbuf->buffer = extend_string(outbuf->buffer, limit);
+                return limit - outbuf->real_size;
+		}
             outbuf->buffer = extend_string(outbuf->buffer, limit);
         }
     } else {
@@ -3293,6 +3307,14 @@ void f_send_zmp(){
 	add_binary_message(current_object, &zero, 1);
 	add_binary_message(current_object, telnet_end_sub, sizeof(telnet_end_sub));
 	pop_2_elems();
+}
+#endif
+
+#ifdef F_SEND_GMCP
+void f_send_gmcp(){
+	add_binary_message(current_object, telnet_start_gmcp, sizeof(telnet_start_gmcp));
+	add_binary_message(current_object, (const unsigned char *)(sp->u.string), strlen(sp->u.string));
+	add_binary_message(current_object, telnet_end_sub, sizeof(telnet_end_sub));
 }
 #endif
 

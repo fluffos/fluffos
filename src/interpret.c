@@ -427,7 +427,7 @@ void unlink_string_svalue (svalue_t * s) {
  * Use the free_svalue() define to call this
  */
 #ifdef DEBUG
-INLINE void int_free_svalue (svalue_t * v, char * tag)
+INLINE void int_free_svalue (svalue_t * v, const char * tag)
 #else
      INLINE void int_free_svalue (svalue_t * v)
 #endif
@@ -1595,11 +1595,12 @@ void setup_fake_frame (funptr_t * fun) {
   csp->fp = fp;
   csp->prog = current_prog;
   csp->pc = pc;
-  pc = (char *)&fake_program;
   csp->function_index_offset = function_index_offset;
   csp->variable_index_offset = variable_index_offset;
-  caller_type = ORIGIN_FUNCTION_POINTER;
   csp->num_local_variables = 0;
+
+  pc = (char *)&fake_program;
+  caller_type = ORIGIN_FUNCTION_POINTER;
   current_prog = &fake_prog;
   previous_ob = current_object;
   current_object = fun->hdr.owner;

@@ -21,7 +21,7 @@ extern char *efun_codes[MAX_FUNC], *efun1_codes[MAX_FUNC];
 extern char *efun_names[MAX_FUNC], *efun1_names[MAX_FUNC];
 extern const char *key[MAX_FUNC], *buf[MAX_FUNC];
 
-extern int arg_types[400], last_current_type;
+extern int arg_types[1000], last_current_type;
 
 const char *ctype (int);
 const char *etype (int);

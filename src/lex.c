@@ -460,16 +460,17 @@ handle_include (char * name, int global)
         }
         return;
     }
-    name = nameptr = string_copy(name, "handle_include");
+    name = string_copy(name, "handle_include");
+    push_malloced_string(name);
     delim = *name++ == '"' ? '"' : '>';
     for (p = name; *p && *p != delim; p++);
     if (!*p) {
-        FREE_MSTR(nameptr);
+        pop_stack();
         include_error("Missing trailing \" or > in #include", global);
         return;
     }
     if (strlen(name) > sizeof(buf) - 100) {
-        FREE_MSTR(nameptr);
+        pop_stack();
         include_error("Include name too long.", global);
         return;
     }
@@ -499,7 +500,7 @@ handle_include (char * name, int global)
         sprintf(buf, "Cannot #include %s", name);
         include_error(buf, global);
     }
-    FREE_MSTR(nameptr);
+    pop_stack();
 }
 
 static int

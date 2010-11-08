@@ -86,7 +86,7 @@ int random(int);
 #ifndef NO_ENVIRONMENT
 object environment(void | object);
 object *all_inventory(object default: F__THIS_OBJECT);
-object *deep_inventory(object default: F__THIS_OBJECT);
+object *deep_inventory(object | object * | function, void|function default: F__THIS_OBJECT);
 object first_inventory(object|string default: F__THIS_OBJECT);
 object next_inventory(object default: F__THIS_OBJECT);
 void say(string, void | object | object *);
@@ -283,6 +283,8 @@ void message(mixed, mixed, string | string * | object | object *,
     int has_mxp(object default:F__THIS_OBJECT);
     int has_zmp(object default:F__THIS_OBJECT);
     void send_zmp(string, string *);
+    int has_gmcp(object default:F__THIS_OBJECT);
+    void send_gmcp(string);
     string in_edit(object default:F__THIS_OBJECT);
     int in_input(object default:F__THIS_OBJECT);
     int userp(object);
