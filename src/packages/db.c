@@ -112,6 +112,19 @@ static db_defn_t mysql = {
 };
 #endif
 
+#ifdef USE_POSTGRES
+static int      Postgres_connect  (dbconn_t *, const char *, const char *, const char *, const char *);
+static int      Postgres_close    (dbconn_t *);
+static int      Postgres_execute  (dbconn_t *, const char *);
+static array_t *Postgres_fetch    (dbconn_t *, int);
+static void     Postgres_cleanup  (dbconn_t *);
+static char *   Postgres_errormsg (dbconn_t *);
+
+static db_defn_t postgres = {
+  "Postgres", Postgres_connect, Postgres_close, Postgres_execute, Postgres_fetch, NULL, NULL, Postgres_cleanup, NULL, Postgres_errormsg
+};
+#endif
+
 #ifdef USE_SQLITE2
 static int      SQLite2_connect   (dbconn_t *, const char *, const char *, const char *, const char *);
 static int      SQLite2_close     (dbconn_t *);
@@ -318,6 +331,13 @@ void f_db_connect (void)
 	case USE_SQLITE3:
 #endif
 		db->type = &SQLite3;
+		break;
+#endif
+#ifdef USE_POSTGRES
+#if USE_POSTGRES - 0
+	case USE_POSTGRES:
+#endif
+		db->type = &postgres;
 		break;
 #endif
 	}
@@ -1368,4 +1388,105 @@ static char *SQLite3_errormsg (dbconn_t * c)
 
 	return string_copy((char *)sqlite3_errmsg(c->SQLite3.handle), "SQLite3_errormsg:2");
 }   
+#endif
+ /*
+  * Postgres support
+  */
+#ifdef USE_POSTGRES
+static void Postgres_cleanup (dbconn_t * c)
+{
+	c->postgres.res = 0;
+}
+
+static char *Postgres_errormsg (dbconn_t * c)
+{
+	return string_copy(PQerrorMessage(c->postgres.conn), "postgresql_errormsg");
+}
+
+static int Postgres_close (dbconn_t * c)
+{
+	PQclear(c->postgres.res);
+	PQfinish(c->postgres.conn);
+	return 1;
+}
+
+static int Postgres_execute (dbconn_t * c, const char * s)
+{
+	c->postgres.res = PQexec( c->postgres.conn, s );
+
+	if( (PQresultStatus( c->postgres.res )) == PGRES_TUPLES_OK ) {
+		return PQntuples( c->postgres.res );
+	}
+
+	if( PQresultStatus( c->postgres.res ) == PGRES_COMMAND_OK ) {
+		return 0;
+	}
+
+	fprintf(stderr, "FT: Query failed: \"%s\"\n", PQresultErrorMessage(c->postgres.res));
+	return -1;
+}
+
+static int Postgres_connect (dbconn_t * c, const char * host, const char * database, const char * username, const char * password)
+{
+	int buffsize;
+
+	char *connstr = "host = '%s' dbname = '%s' user = '%s' password = '%s'";
+	buffsize = strlen(connstr) + strlen(host) + strlen(database) + strlen(username) + strlen(password);
+	char *conninfo = malloc(buffsize);
+	if( conninfo != NULL ) {
+		sprintf(conninfo,connstr,host,database,username,password);
+	}
+
+	c->postgres.conn = PQconnectdb( conninfo );
+	free(conninfo);
+
+	if( (PQstatus(c->postgres.conn) != CONNECTION_OK) ) {
+		return 0;
+	}
+	return 1;
+}
+
+static array_t *Postgres_fetch (dbconn_t * c, int row)
+{
+	array_t *v;
+	char * field;
+	unsigned int i, num_fields;
+
+	if (!c->postgres.res) {
+		return &the_null_array;
+	}
+
+	num_fields = PQnfields( c->postgres.res );
+
+	if (row < -1 || row > PQntuples( c->postgres.res )) {
+		return &the_null_array;
+	}
+
+	if (num_fields < 1) {
+		return &the_null_array;
+	}
+
+	if(row==-1) {
+		v = allocate_empty_array(num_fields);
+		for( i = 0;i < num_fields; i++ ) {
+			v->item[i].type = T_STRING;
+			v->item[i].subtype = STRING_MALLOC;
+			v->item[i].u.string = string_copy(PQfname(c->postgres.res,i), "f_db_fetch");
+		}
+	}
+
+	if(row>=0){
+		v = allocate_empty_array(num_fields);
+		for (i = 0;i < num_fields;i++) {
+			if( PQgetisnull(c->postgres.res, row, i) ) {
+				v->item[i] = const0u;
+			} else {
+				v->item[i].type = T_STRING;
+				v->item[i].subtype = STRING_MALLOC;
+				v->item[i].u.string = string_copy(PQgetvalue(c->postgres.res,row,i),"postgres_fetch");
+			}
+		}
+	}
+	return v;
+}
 #endif

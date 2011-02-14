@@ -7,6 +7,18 @@
 #include "compiler.h"
 #include "generate.h"
 
+/*
+ * Macro for inserting global variable indices.
+ */
+
+#if CFG_MAX_GLOBAL_VARIABLES <= 256
+#define INS_GLOBAL_INDEX ins_byte
+#elif CFG_MAX_GLOBAL_VARIABLES <= 65536
+#define INS_GLOBAL_INDEX ins_short
+#else
+#error CFG_MAX_GLOBAL_VARIABLES must not be greater than 65536
+#endif
+
 static void ins_real (double);
 static void ins_short (short);
 static void upd_short (int, int, const char *);
@@ -343,7 +355,11 @@ try_to_push (int kind, int value) {
             }
             ins_byte(F_BYTE);
         }
-        ins_byte(value);
+        if (kind == PUSH_GLOBAL) {
+            INS_GLOBAL_INDEX(value);
+        } else {
+            ins_byte(value);
+        }
         return 1;
     }
     return 0;
@@ -403,7 +419,14 @@ i_generate_node (parse_node_t * expr) {
         }
         end_pushes();
         ins_byte(expr->v.number);
-        ins_byte(expr->l.number);
+
+        if ((expr->v.number == F_GLOBAL) ||
+                (expr->v.number == F_GLOBAL_LVALUE)) {
+            INS_GLOBAL_INDEX(expr->l.number);
+        } else {
+            ins_byte(expr->l.number);
+        }
+
         break;
     case NODE_OPCODE_2:
         end_pushes();
@@ -535,6 +558,7 @@ i_generate_node (parse_node_t * expr) {
     case NODE_FOREACH:
         {
             int tmp = 0;
+            int left_is_global = 0;
 
             i_generate_node(expr->v.expr);
             end_pushes();
@@ -554,9 +578,31 @@ i_generate_node (parse_node_t * expr) {
                     tmp |= FOREACH_REF;
             }
             ins_byte(tmp);
-            ins_byte(expr->l.expr->l.number);
-            if (expr->r.expr)
-                ins_byte(expr->r.expr->l.number);
+
+            if (tmp & FOREACH_MAPPING) {
+                if (tmp & FOREACH_LEFT_GLOBAL) {
+                    left_is_global = 1;
+                }
+            } else {
+                if (tmp & FOREACH_RIGHT_GLOBAL) {
+                    left_is_global = 1;
+                }
+            }
+
+            if (left_is_global == 1) {
+                INS_GLOBAL_INDEX(expr->l.expr->l.number);
+            } else {
+                ins_byte(expr->l.expr->l.number);
+            }
+
+            if (expr->r.expr) {
+
+                if (tmp & FOREACH_RIGHT_GLOBAL) {
+                    INS_GLOBAL_INDEX(expr->r.expr->l.number);
+                } else {
+                    ins_byte(expr->r.expr->l.number);
+                }
+            }
         }
         break;
     case NODE_CASE_NUMBER:

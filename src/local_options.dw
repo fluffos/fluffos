@@ -753,7 +753,7 @@
  * 14      16384           256k
  * 16      65536             1M
  */
-#define APPLY_CACHE_BITS 14
+#define APPLY_CACHE_BITS 16
 
 /* CACHE_STATS: define this if you want call_other (apply_low) cache 
  * statistics.  Causes HAS_CACHE_STATS to be defined in all LPC objects.
@@ -813,7 +813,7 @@
 /* MAX_LOCAL: maximum number of local variables allowed per LPC function */
 #define CFG_MAX_LOCAL_VARIABLES		50
 /* Increasing max global vars beyond 256 is not recommended */
-#define CFG_MAX_GLOBAL_VARIABLES         256
+#define CFG_MAX_GLOBAL_VARIABLES         65530
 
 #define CFG_EVALUATOR_STACK_SIZE 	3000000
 #define CFG_COMPILER_STACK_SIZE		600000
@@ -899,4 +899,5 @@
 #undef PACKAGE_CRYPTO
 #undef PACKAGE_SHA1
 #undef DTRACE
+#define PACKAGE_PCRE
 #endif

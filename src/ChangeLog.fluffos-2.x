@@ -2,6 +2,16 @@ As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :), note: where it says Cratylus, I got it from his version, usually
 someone else did the work, but I don't know how to find who did what there.
 
+FluffOS 2.22
+fixed potential crasher in pcre_extract
+removed limit for number of matches in pcre efuns
+added classes() efun (woom)
+	classes(ob) returns a list of class names available in ob
+	classes(ob, 1) returns the same list, with all the fields in the class (type and name)
+you can now have more than 256 Globals (qwer@lpmuds.net)
+added postgres support (unagi@lpmuds.net)
+fixed zmp crash
+removed some obsolete malloc options
 FluffOS 2.21
 small cleanup in malloc32
 added gmcp support

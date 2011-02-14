@@ -1134,6 +1134,8 @@ static void copy_chars (interactive_t * ip, char * from, int num_bytes)
                 	if(ip->sb_size > MAX_STRING_LENGTH)
                 		ip->sb_size = MAX_STRING_LENGTH;
                 	ip->sb_buf = (char *)REALLOC(ip->sb_buf, ip->sb_size);
+                    if (ip->sb_pos < ip->sb_size - 1)
+                        ip->sb_buf[ip->sb_pos++] = from[i];
                 }
                 break;
 
@@ -1324,6 +1326,7 @@ static void copy_chars (interactive_t * ip, char * from, int num_bytes)
                             {
                             	array_t *arr = allocate_array(max_array_size);
                             	ip->sb_buf = (char *)REALLOC(ip->sb_buf, MAX(ip->sb_pos + 2, SB_SIZE));
+                            	ip->sb_size = MAX(ip->sb_pos + 2, SB_SIZE);
                             	ip->sb_buf[ip->sb_pos] = 0;
                             	copy_and_push_string(ip->sb_buf+1);
                             	int off=0;

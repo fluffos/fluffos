@@ -13,32 +13,6 @@
 
 #endif
 
-/* smalloc - choice between replacement or wrapper */
-#if defined(SMALLOC) && !defined(SYSMALLOC)
-#  ifdef SBRK_OK
-#    define smalloc_malloc        malloc
-#    define smalloc_free          free
-#    define smalloc_realloc       realloc
-#    define smalloc_calloc        calloc
-#  else
-#    define MALLOC(x)       smalloc_malloc(x)
-#    define FREE(x)         smalloc_free(x)
-#    define REALLOC(x,y)    smalloc_realloc(x,y)
-#    define CALLOC(x,y)     smalloc_calloc(x,y)
-#  endif
-#endif
-
-/* bsdmalloc - always a replacement */
-#if defined(BSDMALLOC) && !defined(SYSMALLOC)
-#define MALLOC(x)       bsdmalloc_malloc(x)
-#define FREE(x)         bsdmalloc_free(x)
-#define REALLOC(x,y)    bsdmalloc_realloc(x,y)
-#define CALLOC(x,y)     bsdmalloc_calloc(x,y)
-#ifndef _FUNC_SPEC_
-#include "bsdmalloc.h"
-#endif
-#endif
-
 #ifdef MMALLOC 
 #define MALLOC(x)       mmalloc(x)
 #define FREE(x)         mfree(x)

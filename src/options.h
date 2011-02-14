@@ -53,25 +53,15 @@
  *   * No statistics.
  *   * SYSMALLOC incurs no additional CPU or memory overhead.
  *
- * SMALLOC:
- *   * Satoria's smalloc.
- *   * Statistics available. (see wrappers and DO_MSTATS)
- *   * Faster than most system mallocs with modest ammount of memory overhead.
- *   * Can fall back onto system malloc if sbrk() not ok.
- *
- * BSDMALLOC:
- *   * BSD (Berkeley Software Distributions) malloc.
- *   * Statistics available. (see wrappers and DO_MSTATS)
- *   * Faster than SMALLOC but more memory overhead.
- *   * Requires sbrk().
  * MALLOC64
  *   * Wodan's malloc, uses system malloc for small allocations and spreads
  *   * large allocations through the 64 bit memory space
  *   * won't work on 32 bit systems.
+ * MALLOC32
+ *   * fixes realloc by always doing a malloc/memcpy/free instead, try this
+ *   * if you use more memory than expected (or MALLOC64 on a 64bit system).
  */
 #define SYSMALLOC
-#undef SMALLOC
-#undef BSDMALLOC
 #undef MMALLOC
 #undef MALLOC64
 #undef MALLOC32
@@ -639,9 +629,8 @@
  */
 #ifdef PACKAGE_DB
 #undef USE_MSQL
-#undef MSQL
 #define USE_MYSQL 2
-#define MY_SQL
+#undef USE_POSTGRES
 #endif
 
 /****************************************************************************
@@ -804,8 +793,12 @@
  */
 /* MAX_LOCAL: maximum number of local variables allowed per LPC function */
 #define CFG_MAX_LOCAL_VARIABLES         50
-/* Increasing max global vars beyond 256 is not recommended */
-#define CFG_MAX_GLOBAL_VARIABLES         256
+
+/* CFG_MAX_GLOBAL_VARIABLES: This value determines the maximum number of
+ *   global variables per object.  The maximum value is 65536.  There is
+ *   a marginal memory increase for a value over 256.
+ */
+#define CFG_MAX_GLOBAL_VARIABLES        65536
 
 #define CFG_EVALUATOR_STACK_SIZE        3000
 #define CFG_COMPILER_STACK_SIZE         600

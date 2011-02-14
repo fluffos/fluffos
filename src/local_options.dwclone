@@ -539,7 +539,7 @@
  *   resolution is 1/60 of a second, then any time less than approxmately 15k
  *   microseconds will resolve to zero (0).
  */
-#define PROFILE_FUNCTIONS
+#undef PROFILE_FUNCTIONS
 
 /* NO_BUFFER_TYPE: if this is #define'd then LPC code using the 'buffer'
  *   type won't be allowed to compile (since the 'buffer' type won't be
@@ -732,7 +732,7 @@
  *   comm.c's add_message(). Instead of blindly making this value larger,
  *   your mudlib should be coded to not send huge strings to users.
  */
-#define LARGEST_PRINTABLE_STRING 8192
+#define LARGEST_PRINTABLE_STRING 300000
 
 /* MESSAGE_BUFFER_SIZE: determines the size of the buffer for output that
  *   is sent to users.
@@ -753,7 +753,7 @@
  * 14      16384           256k
  * 16      65536             1M
  */
-#define APPLY_CACHE_BITS 14
+#define APPLY_CACHE_BITS 15
 
 /* CACHE_STATS: define this if you want call_other (apply_low) cache 
  * statistics.  Causes HAS_CACHE_STATS to be defined in all LPC objects.
@@ -818,13 +818,13 @@
  * config file.
  */
 /* MAX_LOCAL: maximum number of local variables allowed per LPC function */
-#define CFG_MAX_LOCAL_VARIABLES		50
+#define CFG_MAX_LOCAL_VARIABLES		250
 /* Increasing max global vars beyond 256 is not recommended */
-#define CFG_MAX_GLOBAL_VARIABLES         256
+#define CFG_MAX_GLOBAL_VARIABLES        65530 
 
 #define CFG_EVALUATOR_STACK_SIZE 	3000000
 #define CFG_COMPILER_STACK_SIZE		600000
-#define CFG_MAX_CALL_DEPTH		150
+#define CFG_MAX_CALL_DEPTH		2500
 /* This must be one of 4, 16, 64, 256, 1024, 4096 */
 #define CFG_LIVING_HASH_SIZE		256
 
@@ -883,5 +883,6 @@
 #define IPV6
 #undef PACKAGE_CRYPTO
 #define PACKAGE_SHA1
-#define DTRACE
+#undef DTRACE
+#define PACKAGE_PCRE
 #endif

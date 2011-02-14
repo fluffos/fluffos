@@ -3,6 +3,6 @@
 /*
  * socket_err.h
  */
-extern char *error_strings[];
+extern const char *error_strings[];
 
 #endif

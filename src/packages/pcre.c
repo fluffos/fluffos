@@ -156,6 +156,8 @@ void f_pcre_extract(void)
 	assign_svalue_no_free(&run->pattern, sp);
 	run->subject  = (sp - 1)->u.string;
 	run->s_length = SVALUE_STRLEN(sp - 1);
+	run->ovector = NULL;
+	run->ovecsize = 0;
 
 	if(pcre_magic(run) < 0)
 	{
@@ -167,23 +169,26 @@ void f_pcre_extract(void)
 	}
 
 	/* Pop the 2 arguments from the stack */
-	pop_2_elems();
 
 	if (run->rc < 0) /* No match. could do handling of matching errors if wanted */
 	{
+		pop_2_elems();
 		pcre_free_memory(run);
 		push_refed_array(&the_null_array);
 		return;
 	}
-	else if (run->rc > (OVECCOUNT/3 - 1))
+	else if (run->rc > (run->ovecsize/3 - 1))
 	{
-		error("Too many substrings.\n");
+		pop_2_elems();
 		pcre_free_memory(run);
+		error("Too many substrings.\n");
 		return;
 	}
 
 
 	ret = pcre_get_substrings(run);
+	pop_2_elems();
+
 	push_refed_array(ret);
 
 	pcre_free_memory(run);
@@ -202,7 +207,8 @@ void f_pcre_replace(void)
 
 	run = CALLOCATE(1, pcre_t, TAG_TEMPORARY, "f_pcre_replace: run");
 
-
+	run->ovector = NULL;
+	run->ovecsize = 0;
 	assign_svalue_no_free(&run->pattern, (sp - 1));
 	run->subject = (sp - 2)->u.string;
 	replacements = sp->u.arr;
@@ -226,7 +232,7 @@ void f_pcre_replace(void)
 	}
 
 
-	if (run->rc > (OVECCOUNT/3-1))
+	if (run->rc > (run->ovecsize/3-1))
 	{
 		pcre_free_memory(run);
 		error("Too many substrings.\n");
@@ -272,7 +278,8 @@ void f_pcre_replace_callback(void)
 	arg = sp - num_arg + 1;
 
 	run = CALLOCATE(1, pcre_t, TAG_TEMPORARY, "f_pcre_replace: run");
-
+	run->ovector = NULL;
+	run->ovecsize = 0;
 	run->subject = arg->u.string;
 	assign_svalue_no_free(&run->pattern, (arg + 1));
 
@@ -294,7 +301,7 @@ void f_pcre_replace_callback(void)
 	}
 
 
-	if (run->rc > (OVECCOUNT/3-1))
+	if (run->rc > (run->ovecsize/3-1))
 	{
 		pcre_free_memory(run);
 		error("Too many substrings.\n");
@@ -379,6 +386,14 @@ static pcre *pcre_local_compile(pcre_t *p)
 
 static int pcre_local_exec(pcre_t *p)
 {
+	int size;
+	pcre_fullinfo(p->re, NULL, PCRE_INFO_CAPTURECOUNT, &size);
+	size+=2;
+	size *=3;
+	if(p->ovector)
+		FREE(p->ovector);
+	p->ovector = CALLOCATE(size+1, int, TAG_TEMPORARY, "pcre_local_exec"); //too much, but who cares
+	p->ovecsize = size;
 	p->rc = pcre_exec(
 			p->re,
 			NULL,
@@ -391,7 +406,7 @@ static int pcre_local_exec(pcre_t *p)
 			0,
 #endif
 			p->ovector,
-			OVECCOUNT);
+			size);
 
 	return p->rc;
 }
@@ -432,7 +447,8 @@ static int pcre_match_single(svalue_t *str, svalue_t *pattern)
 	int ret;
 
 	run = CALLOCATE(1, pcre_t, TAG_TEMPORARY, "pcre_match_single : run");
-
+	run->ovector = NULL;
+	run->ovecsize = 0;
 	assign_svalue_no_free(&run->pattern, pattern);
 	run->subject  = str->u.string;
 	run->s_length = SVALUE_STRLEN(str);
@@ -465,7 +481,8 @@ static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag)
 		return &the_null_array;
 
 	run = CALLOCATE(1, pcre_t, TAG_TEMPORARY, "pcre_match : run");
-
+	run->ovector = NULL;
+	run->ovecsize = 0;
 	assign_svalue_no_free(&run->pattern, pattern);
 
 	run->re = pcre_get_cached_pattern(&pcre_cache, &run->pattern);
@@ -584,7 +601,8 @@ static array_t *pcre_assoc(svalue_t *str, array_t *pat, array_t *tok, svalue_t *
 		for (i = 0; i < size; i++)
 		{
 			rgpp[i] = CALLOCATE(1, pcre_t, TAG_TEMPORARY, "pcre_assoc : rgpp[i]");
-
+			rgpp[i]->ovector = NULL;
+			rgpp[i]->ovecsize = 0;
 			assign_svalue_no_free(&rgpp[i]->pattern, &pat->item[i]);
 			rgpp[i]->re = pcre_get_cached_pattern(&pcre_cache, &rgpp[i]->pattern);
 
@@ -852,6 +870,8 @@ static char *pcre_get_replace(pcre_t *run, array_t *replacements)
 static void pcre_free_memory(pcre_t *p)
 {
 	free_svalue(&p->pattern, "pcre_free_memory");
+	if(p->ovector)
+		FREE(p->ovector);
 	FREE(p);
 
 }

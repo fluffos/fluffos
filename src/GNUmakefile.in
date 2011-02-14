@@ -130,7 +130,7 @@ cc.h: GNUmakefile
 
 # the touches here are necessary to fix the modification times; link(2) does
 # 'modify' a file
-files: edit_source sysmalloc.c smalloc.c bsdmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c func_spec.c packages/Makefile.pre packages/GNUmakefile.pre configure.h grammar.y.pre
+files: edit_source sysmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c func_spec.c packages/Makefile.pre packages/GNUmakefile.pre configure.h grammar.y.pre
 	./edit_source -options -malloc -build_func_spec '$(CPP) $(CFLAGS)' \
 	              -process grammar.y.pre
 	./edit_source -process packages/Makefile.pre

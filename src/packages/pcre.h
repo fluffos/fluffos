@@ -11,7 +11,6 @@ The maximum number of capturing groups is:
 */
 #ifndef PCRE_EFUNS
 #define PCRE_EFUNS
-#define OVECCOUNT       99 // Multiple of 3 
 #define PCRE_CACHE_SIZE 256
 
 typedef struct {
@@ -25,7 +24,8 @@ typedef struct {
    int find_all;
    int namecount;
    int name_entry_size;
-   int ovector[OVECCOUNT];
+   int *ovector;
+   int ovecsize;
    int rc;
 /* EXTRA */
 } pcre_t;

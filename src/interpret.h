@@ -37,6 +37,13 @@
 
 #define EXTRACT_UCHAR(p) (*(unsigned char *)(p))
 
+/* GCC's optimiser makes a reasonable job of optimising the READ_USHORT macro.
+ * -- Qwer
+ */
+
+#define READ_UCHAR(p) (*(unsigned char *) (p++))
+#define READ_USHORT(p) (p++, p++, *((unsigned short *) (p - 2)))
+
 /*
  * Control stack element.
  * 'prog' is usually same as 'ob->prog' (current_object), except when

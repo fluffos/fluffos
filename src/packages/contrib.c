@@ -2864,3 +2864,69 @@ void f_restore_from_string(){
 	pop_3_elems();
 }
 #endif
+
+#ifdef F_CLASSES
+void f_classes() {
+   int i, j, num, size, offset, flag;
+   array_t *vec, *subvec, *subsubvec;
+   unsigned short *types;
+   char buf[256];
+   char *end;
+   program_t *prog;
+
+   flag = (sp--)->u.number;
+   end = EndOf( buf );
+
+   prog = sp->u.ob->prog;
+   num = prog->num_classes;
+   vec = allocate_empty_array( num );
+
+   // Pull out data for each class.
+   for( i = 0; i < num; i++ ) {
+      // Do we want additional info on each class?
+      if( flag ) {
+         size = prog->classes[i].size;
+
+         vec->item[i].type = T_ARRAY;
+         subvec = vec->item[i].u.arr = allocate_empty_array( 1 + size );
+
+         // First item of return array: the class's name.
+         subvec->item[0].type = T_STRING;
+         subvec->item[0].subtype = STRING_SHARED;
+         subvec->item[0].u.string = make_shared_string(
+                  prog->strings[prog->classes[i].classname] );
+
+         offset = prog->classes[i].index;
+
+         // Find the name and type of each class member.
+         for( j = 0; j < size; j++, offset++ ) {
+            subvec->item[j + 1].type = T_ARRAY;
+            subsubvec = subvec->item[j + 1].u.arr = allocate_empty_array( 2 );
+
+            // Each subarray contains the member's name...
+            subsubvec->item[0].type = T_STRING;
+            subsubvec->item[0].subtype = STRING_SHARED;
+            subsubvec->item[0].u.string = make_shared_string(
+                     prog->strings[prog->class_members[offset].membername] );
+
+            // ...and type.
+            get_type_name( buf, end, prog->class_members[offset].type );
+            subsubvec->item[1].type = T_STRING;
+            subsubvec->item[1].subtype = STRING_SHARED;
+            subsubvec->item[1].u.string = make_shared_string( buf );
+         }
+      }
+      else {
+         // No additional info. Just pull out the class name.
+         vec->item[i].type = T_STRING;
+         vec->item[i].subtype = STRING_SHARED;
+         vec->item[i].u.string = make_shared_string(
+                  prog->strings[prog->classes[i].classname] );
+      }
+   }
+
+   pop_stack();
+   push_refed_array( vec );
+}
+
+#endif
