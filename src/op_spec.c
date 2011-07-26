@@ -15,10 +15,11 @@ operator break_point;
 /* these must be set up so that F_BRANCH is the last foward branch and
  * F_BRANCH_X + 3 == F_BBRANCH_X
  */
+operator branch_ne, branch_ge, branch_le, branch_eq;
 operator branch_when_zero, branch_when_non_zero, branch;
 operator bbranch_when_zero, bbranch_when_non_zero, bbranch;
 
-operator branch_ne, branch_ge, branch_le, branch_eq, bbranch_lt;
+operator bbranch_lt;
 
 operator foreach, next_foreach, exit_foreach;
 operator loop_cond_local, loop_cond_number;

@@ -2,6 +2,16 @@ As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :), note: where it says Cratylus, I got it from his version, usually
 someone else did the work, but I don't know how to find who did what there.
 
+FluffOS 2.23
+added a terminal_colour_replace apply, this will be called with every string between two %^ delimiters, and will be replaced with whatever is returned.
+fixed protocol number for GMCP
+fixed sprintf code for MSSP uptime
+added defer efun, it takes a function pointer that will be called when the current function ends (even if that was caused by a runtime)
+the old range behaviour warning for negative array indexes is now optional
+the driver can now be compiled to use either struct or class for structs, or even allow both
+fixed crasher in uniq_array
+fixed crasher in socket_status
+added missing ',' in non iconv driver pcre support
 FluffOS 2.22
 fixed potential crasher in pcre_extract
 removed limit for number of matches in pcre efuns

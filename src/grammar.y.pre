@@ -2827,9 +2827,11 @@ expr4:
     |   expr4 '[' comma_expr L_RANGE comma_expr ']'
             {
 %ifndef OLD_RANGE_BEHAVIOR
+%ifdef WARN_OLD_RANGE_BEHAVIOR
                 if ($1->type != TYPE_MAPPING && 
 		    $5->kind == NODE_NUMBER && $5->v.number < 0)
 		    yywarn("A negative constant as the second element of arr[x..y] no longer means indexing from the end.  Use arr[x..<y]");
+%endif
 %endif
                 $$ = make_range_node(F_NN_RANGE, $1, $3, $5);
             }

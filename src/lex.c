@@ -140,7 +140,9 @@ static keyword_t reswords[] =
 #endif
     {"case", L_CASE, 0},
     {"catch", L_CATCH, 0},
+#ifdef STRUCT_CLASS
     {"class", L_CLASS, 0},
+#endif
 #ifdef COMPAT_32
     {"closure", L_BASIC_TYPE, TYPE_FUNCTION},
 #endif
@@ -185,6 +187,9 @@ static keyword_t reswords[] =
     {"status", L_BASIC_TYPE, TYPE_NUMBER},
 #endif
     {"string", L_BASIC_TYPE, TYPE_STRING},
+#ifdef STRUCT_STRUCT
+    {"struct", L_CLASS, 0},
+#endif
     {"switch", L_SWITCH, 0},
     {"time_expression", L_TIME_EXPRESSION, 0},
     {"varargs", L_TYPE_MODIFIER, FUNC_VARARGS },

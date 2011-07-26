@@ -60,12 +60,15 @@
 #define FRAME_EXTERNAL     8
 
 #define FRAME_RETURNED_FROM_CATCH   16
-
+struct defer_list{
+	struct defer_list *next;
+	svalue_t func;
+	svalue_t tp;
+};
 typedef struct control_stack_s {
 #ifdef PROFILE_FUNCTIONS
     unsigned long entry_secs, entry_usecs;
 #endif
-    short framekind;
     union {
         long table_index;
         funptr_t *funp;
@@ -73,13 +76,15 @@ typedef struct control_stack_s {
     object_t *ob;               /* Current object */
     object_t *prev_ob;  /* Save previous object */
     program_t *prog;    /* Current program */
-    int num_local_variables;    /* Local + arguments */
     char *pc;
     svalue_t *fp;
+    struct defer_list *defers;
+    int num_local_variables;    /* Local + arguments */
     int function_index_offset;  /* Used when executing functions in inherited
                                  * programs */
     int variable_index_offset;  /* Same */
     short caller_type;          /* was this a locally called function? */
+    short framekind;
 } control_stack_t;
 
 typedef struct {

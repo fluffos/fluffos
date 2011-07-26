@@ -1041,10 +1041,10 @@ void
 i_generate_final_program (int x) {
     if (!x) {
         UPDATE_PROGRAM_SIZE;
-/* This needs work
- * if (pragmas & PRAGMA_OPTIMIZE)
- *     optimize_icode(0, 0, 0);
- */
+	/* This needs more work */
+//		if (pragmas & PRAGMA_OPTIMIZE)
+//			optimize_icode(0, 0, 0);
+ 
         save_file_info(current_file_id, current_line - current_line_saved);
         switch_to_line(-1); /* generate line numbers for the end */
     }
@@ -1055,7 +1055,7 @@ i_generate_final_program (int x) {
  */
 void
 optimize_icode (char * start, char * pc, char * end) {
-    int instr;
+    int instr = 0, prev;
     if (start == 0) {
         /* we don't optimize the initializer block right now b/c all the
          * stuff we do (jump threading, etc) can't occur there.
@@ -1069,6 +1069,7 @@ optimize_icode (char * start, char * pc, char * end) {
         }
     }
     while (pc < end) {
+    	prev = instr;
         switch (instr = EXTRACT_UCHAR(pc++)) {
 #if SIZEOF_LONG == 4
         case F_NUMBER:
@@ -1086,12 +1087,17 @@ optimize_icode (char * start, char * pc, char * end) {
         case F_CALL_FUNCTION_BY_ADDRESS:
             pc += 3;
             break;
+        case F_BRANCH_NE:
+        case F_BRANCH_GE:
+        case F_BRANCH_LE:
+        case F_BRANCH_EQ:
         case F_BRANCH:
         case F_BRANCH_WHEN_ZERO:
         case F_BRANCH_WHEN_NON_ZERO:
         case F_BBRANCH:
         case F_BBRANCH_WHEN_ZERO:
         case F_BBRANCH_WHEN_NON_ZERO:
+        case F_BBRANCH_LT:
             {
                 char *tmp;
                 short sarg;
@@ -1174,6 +1180,9 @@ optimize_icode (char * start, char * pc, char * end) {
         case F_CATCH:
         case F_AGGREGATE:
         case F_AGGREGATE_ASSOC:
+        case F_NEXT_FOREACH:
+        case F_GLOBAL:
+        case F_GLOBAL_LVALUE:
         case F_STRING:
 #ifdef F_JUMP_WHEN_ZERO
         case F_JUMP_WHEN_ZERO:
@@ -1184,8 +1193,6 @@ optimize_icode (char * start, char * pc, char * end) {
 #endif
             pc += 2;
             break;
-        case F_GLOBAL_LVALUE:
-        case F_GLOBAL:
         case F_SHORT_STRING:
         case F_LOOP_INCR:
         case F_WHILE_DEC:
@@ -1197,6 +1204,7 @@ optimize_icode (char * start, char * pc, char * end) {
         case F_PARSE_COMMAND:
         case F_BYTE:
         case F_NBYTE:
+        case F_TRANSFER_LOCAL:
             pc++;
             break;
         case F_FUNCTION_CONSTRUCTOR:
@@ -1221,28 +1229,43 @@ optimize_icode (char * start, char * pc, char * end) {
         case F_SWITCH:
             {
                 unsigned short stable, etable;
+                char *swstart = pc;
                 pc++; /* table type */
                 LOAD_SHORT(stable, pc);
                 LOAD_SHORT(etable, pc);
                 pc += 2; /* def */
-                DEBUG_CHECK(stable < pc - start || etable < pc - start
+            	//break; //doesn't seem to work!
+                printf("stable: %x pc %x swstart %x etable %x\n", stable, pc, swstart, etable);
+                DEBUG_CHECK(stable < pc - swstart || etable < pc - swstart
                             || etable < stable,
                             "Error in switch table found while optimizing\n");
                 /* recursively optimize the inside of the switch */
                 optimize_icode(start, pc, start + stable);
-                pc = start + etable;
+                pc = swstart + etable;
                 break;
             }
+        case F_PUSH:
+        {
+        	pc+=EXTRACT_UCHAR(pc);
+        	pc++;
+        	break;
+        }
+        case F_EFUNV:
+        	pc++;
         case F_EFUN0:
         case F_EFUN1:
         case F_EFUN2:
         case F_EFUN3:
-        case F_EFUNV:
             instr = EXTRACT_UCHAR(pc++) + ONEARG_MAX;
         default:
-            if ((instr >= BASE) &&
-                (instrs[instr].min_arg != instrs[instr].max_arg))
-                pc++;
+        	if(instr < BASE || instr > NUM_OPCODES)
+        		printf("instr %d prev %d\n", instr, prev);
+        	if(!instr || instr > NUM_OPCODES)
+        		fatal("illegal opcode");
+        	prev = instr;
+//            if ((instr >= BASE) &&
+//                (instrs[instr].min_arg != instrs[instr].max_arg))
+//                pc++;
         }
     }
 }

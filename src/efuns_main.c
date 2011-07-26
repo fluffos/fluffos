@@ -27,6 +27,7 @@
 #include "efun_protos.h"
 #include "add_action.h"
 #include "eval.h"
+#include "interpret.h"
 
 int call_origin = 0;
 
@@ -3942,5 +3943,20 @@ f_next_inventory (void)
         sp->u.ob = ob;
     } else
         *sp = const0;
+}
+#endif
+
+#ifdef F_DEFER
+void f_defer(){
+	struct defer_list *newlist = MALLOC(sizeof(struct defer_list));
+	newlist->next = csp->defers;
+	newlist->func = *sp--;
+	if(command_giver){
+		push_object(command_giver);
+		newlist->tp = *sp--;
+	}
+	else
+		newlist->tp = const0;
+	csp->defers = newlist;
 }
 #endif

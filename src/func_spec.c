@@ -82,6 +82,7 @@ void call_out(string | function, int,...);
 int member_array(mixed, string | mixed *, void | int, void | int);
 int input_to(string | function,...);
 int random(int);
+void defer(function);
 
 #ifndef NO_ENVIRONMENT
 object environment(void | object);

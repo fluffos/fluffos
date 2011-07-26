@@ -1454,7 +1454,7 @@ array_t *socket_status (int which)
     ret->item[4].u.string = string_copy(inet_address(&lpc_socks[which].r_addr),
                                         "socket_status");
 
-    if (lpc_socks[which].owner_ob && !(lpc_socks[which].owner_ob->flags & O_DESTRUCTED)) {
+    if (!(lpc_socks[which].flags & STATE_FLUSHING) && lpc_socks[which].owner_ob && !(lpc_socks[which].owner_ob->flags & O_DESTRUCTED)) {
         ret->item[5].type = T_OBJECT;
         ret->item[5].u.ob = lpc_socks[which].owner_ob;
         add_ref(lpc_socks[which].owner_ob, "socket_status");

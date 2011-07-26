@@ -38,7 +38,7 @@
 #define TELOPT_COMPRESS2 86
 #define TELOPT_MXP  91  // mud extension protocol
 #define TELOPT_ZMP  93  // zenith mud protocol
-#define TELOPT_GMCP 200 // something mud communication protocol, how many do we need?
+#define TELOPT_GMCP 201 // something mud communication protocol, how many do we need?
 
 #define MSSP_VAR 1
 #define MSSP_VAL 2
@@ -1068,7 +1068,7 @@ static void copy_chars (interactive_t * ip, char * from, int num_bytes)
                     		char buf[1024];
                     		char num[20];
 
-                    		sprintf(num, "%dl", boot_time);
+                    		sprintf(num, "%ld", boot_time);
                     		int len = sprintf(buf, (char *)telnet_mssp_value, "UPTIME", num);
                     		add_binary_message(ip->ob, (unsigned char *)buf, len);
                     	}

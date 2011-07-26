@@ -631,7 +631,10 @@ void f_unique_mapping (void)
     while (size--) {
         push_svalue(v->item + size);
         sv = call_efun_callback(&ftc, 1);
-        i = (oi = svalue_to_int(sv)) & mask;
+        if(sv)
+        	i = (oi = svalue_to_int(sv)) & mask;
+        else
+        	i = oi = 0;
         if ((uptr = table[i])) {
             do {
                 if (msameval(&uptr->key, sv)) {

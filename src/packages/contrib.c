@@ -11,7 +11,7 @@
 #include "../simul_efun.h"
 #include "../add_action.h"
 #include "../port.h"
-
+#include "../applies.h"
 #define MAX_COLOUR_STRING 200
 
 /* should be done in configure */
@@ -669,6 +669,13 @@ f_terminal_colour (void)
 	buflen = max_buflen = space_buflen = 0;
 	for (j = i = 0, k = sp->u.map->table_size; i < num; i++) {
 		// Look it up in the mapping.
+		copy_and_push_string(parts[i]);
+		svalue_t *tmp = apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, 1, ORIGIN_EFUN);
+		if(tmp && tmp->type == T_STRING){
+			parts[i] = alloca(SVALUE_STRLEN(tmp)+1);
+			strcpy(parts[i], tmp->u.string);
+		}
+
 		if ((cp = findstring(parts[i]))) {
 			int tmp;
 			static svalue_t str = {T_STRING, STRING_SHARED};

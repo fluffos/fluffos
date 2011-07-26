@@ -242,6 +242,11 @@
  */
 #undef OLD_RANGE_BEHAVIOR
 
+/* define to get a warning for code that might use the old range behavior
+ * when you're not actually using the old range behavior*/
+#undef WARN_OLD_RANGE_BEHAVIOR
+
+
 /* OLD_ED: ed() efun backwards compatible with the old version.  The new
  * version requires/allows a mudlib front end.
  *
@@ -906,5 +911,11 @@
 
 /* static user space dtrace probes, try them if you have dtrace! */
 #undef DTRACE
+
+/* use class keyword for lpc structs */
+#define STRUCT_CLASS
+
+/* use struct keyword for lpc structs */
+#define STRUCT_STRUCT
 #endif
 

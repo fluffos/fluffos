@@ -401,7 +401,7 @@ static int pcre_local_exec(pcre_t *p)
 			p->s_length,
 			0,
 #ifndef USE_ICONV
-			PCRE_NO_UTF8_CHECK
+			PCRE_NO_UTF8_CHECK,
 #else
 			0,
 #endif

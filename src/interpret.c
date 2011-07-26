@@ -1228,6 +1228,7 @@ push_control_stack (int frkind)
   csp->pc = pc;
   csp->function_index_offset = function_index_offset;
   csp->variable_index_offset = variable_index_offset;
+  csp->defers = NULL;
 }
 
 /*
@@ -1265,6 +1266,26 @@ void pop_control_stack()
 	  }
   }
 #endif
+  struct defer_list *stuff = csp->defers;
+  csp->defers = 0;
+  while(stuff){
+	  function_to_call_t ftc;
+	  memset(&ftc, 0, sizeof ftc);
+	  ftc.f.fp = stuff->func.u.fp;
+	  int s = outoftime;
+	  if(outoftime)
+		  set_eval(max_cost);
+	  save_command_giver(stuff->tp.u.ob);
+	  safe_call_efun_callback(&ftc, 0);
+	  restore_command_giver();
+	  outoftime = s;
+	  free_svalue(&(stuff->func), "pop_stack");
+	  free_svalue(&(stuff->tp), "pop_stack");
+
+	  struct defer_list* old = stuff;
+	  stuff = stuff->next;
+	  FREE(old);
+  }
   current_object = csp->ob;
   current_prog = csp->prog;
   previous_ob = csp->prev_ob;
@@ -5799,20 +5820,15 @@ void restore_context (error_context_t * econ) {
   _in_reference_allowed = 0;
 #endif
   /* unwind the command_giver stack to the saved position */
+
+  while(csp > econ->save_csp)
+    pop_control_stack();
+
   while (cgsp != econ->save_cgsp)
     restore_command_giver();
   DEBUG_CHECK(csp < econ->save_csp, "csp is below econ->csp before unwinding.\n");
 
-#if defined(PROFILE_FUNCTIONS) || defined(DTRACE)
-  while(csp > econ->save_csp)
-    pop_control_stack();
-#else
-  if (csp > econ->save_csp) {
-    /* Unwind the control stack to the saved position */
-    csp = econ->save_csp + 1;
-    pop_control_stack();
-  }
-#endif
+
   pop_n_elems(sp - econ->save_sp);
   refp = global_ref_list;
   while (refp) {
