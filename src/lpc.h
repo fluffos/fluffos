@@ -11,7 +11,7 @@ typedef struct {
 union u {
     const char *string;
     long number;
-    float real;
+    double real;
 
     refed_t *refed; /* any of the block below */
 

@@ -2804,7 +2804,7 @@ expr4:
             {
 		if ($1->type == TYPE_ANY) {
 		    int cmi;
-		    unsigned char tp;
+		    unsigned short tp;
 		    
 		    if ((cmi = lookup_any_class_member($3, &tp)) != -1) {
 			CREATE_UNARY_OP_1($$, F_MEMBER, tp, $1, 0);

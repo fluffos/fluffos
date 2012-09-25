@@ -529,7 +529,7 @@ static int parse_numeric (char ** cpp, unsigned char c, svalue_t * dest)
         res += c - '0';
     }
     if (c == '.') {
-        float f1 = 0.0, f2 = 10.0;
+        double f1 = 0.0, f2 = 10.0;
 
         c = *cp++;
         if (!c) {
@@ -569,7 +569,7 @@ static int parse_numeric (char ** cpp, unsigned char c, svalue_t * dest)
         return 1;
     } else if (c == 'e') {
         int expo = 0;
-        float f1;
+        double f1;
 
         if ((c = *cp++) == '+') {
             while ((c = *cp++) && isdigit(c)) {

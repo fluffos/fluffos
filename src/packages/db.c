@@ -1155,7 +1155,7 @@ static array_t *SQLite2_fetch (dbconn_t * c, int row)
 			else {
 				/* It was a floating point number */
 				v->item[i].type = T_REAL;
-				v->item[i].u.real = (float)d;
+				v->item[i].u.real = (double)d;
 			}
 		}
 
@@ -1350,7 +1350,7 @@ static array_t *SQLite3_fetch (dbconn_t * c, int row)
 
 		case SQLITE_FLOAT:
 			v->item[i].type = T_REAL;
-			v->item[i].u.real = (float)sqlite3_column_double(c->SQLite3.results, i);
+			v->item[i].u.real = (double)sqlite3_column_double(c->SQLite3.results, i);
 			break;
 
 		case SQLITE3_TEXT:

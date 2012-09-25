@@ -2,6 +2,17 @@ As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :), note: where it says Cratylus, I got it from his version, usually
 someone else did the work, but I don't know how to find who did what there.
 
+FluffOS 2.24
+LPC floats are now C doubles
+number of structs (or classes) allowed is now 127 
+defer() now hopefully notices if you try to change this_player, so it won't
+	then destroy the change after the deffered function finishes
+changed something for the terminal_colours_replace apply, but can't remember
+	what (need to release more often!)
+added some flags in debug_info
+added some argument checking to replace() (dwlib.c)
+a fix in pcre (woom) (again, can't remember what was fixed)
+
 FluffOS 2.23
 added a terminal_colour_replace apply, this will be called with every string between two %^ delimiters, and will be replaced with whatever is returned.
 fixed protocol number for GMCP

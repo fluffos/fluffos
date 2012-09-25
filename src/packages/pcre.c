@@ -518,7 +518,7 @@ static array_t *pcre_match(array_t *v, svalue_t *pattern, int flag)
 
 		pcre_local_exec(run);
 
-		if (!pcre_query_match(run))
+		if (pcre_query_match(run) != match) //was not checking for match! (woom)
 		{
 			res[size] = 0;
 			continue;

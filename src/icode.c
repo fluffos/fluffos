@@ -52,7 +52,7 @@ static int *forward_branches = 0;
 
 static void ins_real (double l)
 {
-    float f = (float)l;
+    double f = (double)l;
 
     if (prog_code + 4 > prog_code_max) {
         mem_block_t *mbp = &mem_block[A_PROGRAM];

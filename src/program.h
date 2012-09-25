@@ -119,9 +119,9 @@
 /* catered for mini-applications (compared to say, C++ or    */
 /* java)..for now - Sym                                      */
 
-#define TYPE_MOD_ARRAY          0x0040        /* Pointer to a basic type */
+#define TYPE_MOD_ARRAY          0x8000        /* Pointer to a basic type */
 #define TYPE_MOD_CLASS          0x0080        /* a class */
-#define CLASS_NUM_MASK          0x003f
+#define CLASS_NUM_MASK          0x007f
 
 #define LOCAL_MOD_REF           0x0100
 #define LOCAL_MOD_UNUSED        0x0200

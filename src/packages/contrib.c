@@ -526,6 +526,8 @@ f_terminal_colour (void)
 	int wrap = 0;
 	int indent = 0;
 	int fillout = 0;
+	char *rep;
+	int repused;
 
 	if (st_num_arg >= 3) {
 		if (st_num_arg == 4)
@@ -669,14 +671,16 @@ f_terminal_colour (void)
 	buflen = max_buflen = space_buflen = 0;
 	for (j = i = 0, k = sp->u.map->table_size; i < num; i++) {
 		// Look it up in the mapping.
+		repused = 0;
 		copy_and_push_string(parts[i]);
 		svalue_t *tmp = apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, 1, ORIGIN_EFUN);
 		if(tmp && tmp->type == T_STRING){
-			parts[i] = alloca(SVALUE_STRLEN(tmp)+1);
-			strcpy(parts[i], tmp->u.string);
+			rep = alloca(SVALUE_STRLEN(tmp)+1);
+			strcpy(rep, tmp->u.string);
+			repused = 1;
 		}
 
-		if ((cp = findstring(parts[i]))) {
+		if((repused && (cp = findstring(rep))) || (!repused && (cp = findstring(parts[i])))) {
 			int tmp;
 			static svalue_t str = {T_STRING, STRING_SHARED};
 			str.u.string = cp;
@@ -706,7 +710,12 @@ f_terminal_colour (void)
 				lens[i] = SHARED_STRLEN(cp);
 			}
 		} else {
-			lens[i] = strlen(parts[i]);
+			if(repused){
+				parts[i] = rep;
+				lens[i] = wrap?-SVALUE_STRLEN(tmp):SVALUE_STRLEN(tmp);
+			}
+			else
+				lens[i] = strlen(parts[i]);
 		}
 
 		if (lens[i] <= 0) {

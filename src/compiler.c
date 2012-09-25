@@ -329,7 +329,7 @@ static void copy_new_function (program_t * prog, int index,
     ihe->dn.function_num = where;
 }
 
-static int find_class_member (int which, char * name, unsigned char * type) {
+static int find_class_member (int which, char * name, unsigned short * type) {
     int i;
     class_def_t *cd;
     class_member_entry_t *cme;
@@ -351,7 +351,7 @@ static int find_class_member (int which, char * name, unsigned char * type) {
     }
 }
 
-int lookup_any_class_member (char * name, unsigned char * type) {
+int lookup_any_class_member (char * name, unsigned short * type) {
     int nc = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
     int i, ret = -1, nret;
     char *s = findstring(name);
@@ -388,7 +388,7 @@ int lookup_any_class_member (char * name, unsigned char * type) {
     return ret;
 }
 
-int lookup_class_member (int which, char * name, unsigned char * type) {
+int lookup_class_member (int which, char * name, unsigned short * type) {
     char *s = findstring(name);
     int ret;
 

@@ -640,15 +640,14 @@ void f_vowel() {
 
 void f_replace() {
 	svalue_t *arg2 = sp - st_num_arg + 2;
-	if(arg2->type == T_STRING) {
+	if(arg2->type == T_STRING && st_num_arg == 3) {
 		return f_replace_string();
-	} else {
+	} else if (st_num_arg == 2 && arg2->type != T_STRING){
 		array_t *arr = arg2->u.arr;
 		int i = 0;
 		if(arr->size & 1) {
 			error("Wrong array size for replace.\n");
 		}
-		pop_n_elems(st_num_arg-2);
 		sp--;
 
 		for (i=0;i<arr->size;i+=2) {
@@ -662,7 +661,8 @@ void f_replace() {
 			}
 		}
 		free_array(arr);
-	}
+	} else
+		error("Bad arguments for replace.\n");
 }
 
 #endif
@@ -734,10 +734,9 @@ void f_roulette_wheel() {
 
    // Loop through the mapping, adding up the weights.
    j = m->table_size;
-   if(!j)
+   if(!j||!m->count)
      error("empty mapping in roulette_wheel.\n");
    num = 0;
-   j--;
    do {
       for( elt = a[j]; elt; elt = elt->next ) {
          val = elt->values + 1;
@@ -754,7 +753,7 @@ void f_roulette_wheel() {
    found = 0;
 
    // Loop again, and stop when the sum of the weights comes to num.
-   j = m->table_size-1;
+   j = m->table_size;
    do {
       for( elt = a[j]; elt; elt = elt->next ) {
          val = elt->values + 1;

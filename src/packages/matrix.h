@@ -8,12 +8,12 @@
 
 #define RADIANS_PER_DEGREE 0.01745329252
 
-typedef float Matrix[16];
+typedef double Matrix[16];
 
 typedef struct {
-    float x;
-    float y;
-    float z;
+    double x;
+    double y;
+    double z;
 }      Vector;
 
 void translate_matrix (double x, double y, double z, Matrix m);

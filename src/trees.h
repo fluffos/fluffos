@@ -26,7 +26,7 @@ enum control_jump_type {
 
 union parse_value {
     long number;
-    float real;
+    double real;
     struct parse_node_s *expr;
 };
 
@@ -37,7 +37,7 @@ typedef struct parse_node_s {
 #else
     unsigned int line;
 #endif
-    unsigned char type;
+    unsigned short type;
     union parse_value v, l, r; /* left, right, and value */
 } parse_node_t;
 

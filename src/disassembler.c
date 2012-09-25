@@ -544,7 +544,7 @@ disassemble (FILE * f, char * code, int start, int end, program_t * prog)
 
         case F_REAL:
             {
-                float farg;
+                double farg;
 
                 COPY_FLOAT(&farg, pc);
                 sprintf(buff, "%f", farg);

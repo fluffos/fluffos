@@ -1194,7 +1194,7 @@ int yylex()
     static char partial[MAXLINE + 5];   /* extra 5 for safety buffer */
     static char terminator[MAXLINE + 5];
     int is_float;
-    float myreal;
+    double myreal;
     char *partp;
 
     register char *yyp;
@@ -1970,8 +1970,8 @@ int yylex()
             outp--;
             *yyp = 0;
             if (is_float) {
-                sscanf(yytext, "%f", &myreal);
-                yylval.real = (float)myreal;
+                sscanf(yytext, "%lf", &myreal);
+                yylval.real = myreal;
                 return L_REAL;
             } else {
                 yylval.number = atol(yytext);

@@ -37,7 +37,7 @@ f_debug_info (void)
                         flags & O_IS_WIZARD ? "TRUE" : "FALSE");
 #endif
 #ifdef NO_ADD_ACTION
-           outbuf_addv(&out, "O_LISTENER : %s\n",
+           outbuf_addv(&out, "O_LISTENER        : %s\n",
                         flags & O_LISTENER ? "TRUE" : "FALSE");
 #else
            outbuf_addv(&out, "O_ENABLE_COMMANDS : %s\n",
@@ -55,14 +55,22 @@ f_debug_info (void)
                         flags & O_RESET_STATE ? "TRUE" : "FALSE");
            outbuf_addv(&out, "O_WILL_CLEAN_UP   : %s\n",
                         flags & O_WILL_CLEAN_UP ? "TRUE" : "FALSE");
-           outbuf_addv(&out, "O_WILL_RESET: %s\n",
+           outbuf_addv(&out, "O_WILL_RESET      : %s\n",
                         flags & O_WILL_RESET ? "TRUE" : "FALSE");
 #ifdef HAVE_ZLIB
            if (ob->interactive) {
              outbuf_addv(&out, "O_COMPRESSED      : %s\n",
                          ob->interactive->compressed_stream ? "TRUE" :
                          "FALSE");
-             
+             outbuf_addv(&out, "O_ZMP             : %s\n",
+                                      ob->interactive->iflags & USING_ZMP ? "TRUE" :
+                                      "FALSE");
+             outbuf_addv(&out, "O_GMCP            : %s\n",
+                                      ob->interactive->iflags & USING_GMCP ? "TRUE" :
+                                      "FALSE");
+             outbuf_addv(&out, "O_MXP             : %s\n",
+                                      ob->interactive->iflags & USING_MXP ? "TRUE" :
+                                      "FALSE");
            }
 #endif
            

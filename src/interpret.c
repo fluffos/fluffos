@@ -66,7 +66,7 @@ INLINE_STATIC void do_loop_cond_number (void);
 INLINE_STATIC void do_loop_cond_local (void);
 static void do_catch (char *, unsigned short);
 int last_instructions (void);
-static float _strtof (char *, char **);
+static double _strtof (char *, char **);
 #ifdef TRACE_CODE
 static char *get_arg (int, int);
 #endif
@@ -325,7 +325,7 @@ push_number (long n)
 }
 
 INLINE void
-push_real (float n)
+push_real (double n)
 {
   STACK_INC;
   sp->type = T_REAL;
@@ -1276,8 +1276,13 @@ void pop_control_stack()
 	  if(outoftime)
 		  set_eval(max_cost);
 	  save_command_giver(stuff->tp.u.ob);
+	  object_t *cgo = command_giver;
 	  safe_call_efun_callback(&ftc, 0);
+	  int changed = (cgo != command_giver);
+	  cgo = command_giver;
 	  restore_command_giver();
+	  if(changed)
+		  set_command_giver(cgo);
 	  outoftime = s;
 	  free_svalue(&(stuff->func), "pop_stack");
 	  free_svalue(&(stuff->tp), "pop_stack");
@@ -1886,7 +1891,7 @@ eval_instruction (char * p)
   int num_arg;
 #endif
   long i, n;
-  float real;
+  double real;
   svalue_t *lval;
   int instruction;
 #if defined(TRACE_CODE) || defined(TRACE) || defined(OPCPROF) || defined(OPCPROF_2D)
@@ -5250,7 +5255,7 @@ int inter_sscanf (svalue_t * arg, svalue_t * s0, svalue_t * s1, int num_arg)
       }
     case 'f':
       {
-        float tmp_num;
+        double tmp_num;
 
         tmp = in_string;
         tmp_num = _strtof((char *)in_string, (char **)&in_string);
@@ -5471,7 +5476,7 @@ int inter_sscanf (svalue_t * arg, svalue_t * s0, svalue_t * s1, int num_arg)
         }
       case 'f':
         {
-          float tmp_num = _strtof((char *)in_string, (char **)&in_string);
+          double tmp_num = _strtof((char *)in_string, (char **)&in_string);
           if (!skipme2) {
             SSCANF_ASSIGN_SVALUE(T_REAL, u.real, tmp_num);
           }
@@ -5736,10 +5741,10 @@ int strpref (const char * p, const char * s)
   return 1;
 }
 
-static float _strtof (char * nptr, char ** endptr)
+static double _strtof (char * nptr, char ** endptr)
 {
   register char *s = nptr;
-  register float acc;
+  register double acc;
   register int neg, c, any, divv;
 
   divv = 1;
@@ -5765,10 +5770,10 @@ static float _strtof (char * nptr, char ** endptr)
     } else
       break;
     if (divv == 1) {
-      acc *= (float) 10;
-      acc += (float) c;
+      acc *= (double) 10;
+      acc += (double) c;
     } else {
-      acc += (float) c / (float) divv;
+      acc += (double) c / (double) divv;
       divv *= 10;
     }
     any = 1;

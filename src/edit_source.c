@@ -1569,7 +1569,7 @@ static void handle_configure() {
     fprintf(yyout, "#define SIZEOF_INT %i\n", sizeof(int));
     fprintf(yyout, "#define SIZEOF_PTR %i\n", sizeof(char *));
     fprintf(yyout, "#define SIZEOF_SHORT %i\n", sizeof(short));
-    fprintf(yyout, "#define SIZEOF_FLOAT %i\n", sizeof(float));
+    fprintf(yyout, "#define SIZEOF_FLOAT %i\n", sizeof(double));
     fprintf(yyout, "#define SIZEOF_LONG %i\n", sizeof(long));
 
     if (sizeof(unsigned long) == 4)

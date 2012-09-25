@@ -186,12 +186,12 @@
 #endif
 #endif
 
-#if SIZEOF_FLOAT == 4
-#define COPY_FLOAT(x, y) COPY4(x,y)
-#define LOAD_FLOAT(x, y) LOAD4(x,y)
-#define STORE_FLOAT(x, y) STORE4(x,y)
+#if SIZEOF_FLOAT == 8
+#define COPY_FLOAT(x, y) COPY8(x,y)
+#define LOAD_FLOAT(x, y) LOAD8(x,y)
+#define STORE_FLOAT(x, y) STORE8(x,y)
 #else
-!floats of size other than 4 not implemented
+!floats of size other than 8 not implemented
 #endif
 
 #if SIZEOF_PTR == 4
