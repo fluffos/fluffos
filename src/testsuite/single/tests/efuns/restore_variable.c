@@ -1,5 +1,5 @@
-#define ERR(x) ASSERT2(catch(restore_variable(x)), sprintf("%O", x))
-#define IS(x, y) ASSERT2(same(restore_variable(x),y), sprintf("%O", x))
+#define ERR(x) ASSERT2(catch(restore_variable(x)),  sprintf("unexpected successful restore: %O ", x))
+#define IS(x, y) ASSERT2(same(restore_variable(x),y), sprintf("expected: %O, actual: %O", y, restore_variable(x)))
 
 string *value_errs = ({ "\"\"x", "\"\\", "\"\\x\\", "\"\\x\"x",
 		        "-x" });
