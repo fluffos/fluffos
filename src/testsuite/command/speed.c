@@ -169,8 +169,8 @@ int main() {
     TIME("call_other (miss)",50000,this_object()->doesnt_exist());
     TIME("inherited call",100000,ifun());
     TIME("explicit inherited",100000,inh::ifun());
-    TIME("save_object",300,save_object("/tmp/tmp"));
-    TIME("restore_object",1000,restore_object("/tmp/tmp"));
+    TIME("save_object",300,save_object("/tmp"));
+    TIME("restore_object",1000,restore_object("/tmp"));
     SAVETIME(ss, 1000000, save = 0);
     SAVETIME(sm, 1000000, save = 1);
     save = 0;
