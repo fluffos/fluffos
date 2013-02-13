@@ -1,0 +1,4 @@
+calling send_gmcp with ({ /* sizeof() == 1 */
+  "^^^^^^"
+})
+
