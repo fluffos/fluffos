@@ -2473,10 +2473,12 @@ static char *get_user_command()
 				debug_message("Double call to remove_interactive()\n");
 			return;
 		}
-
-		debug(connections, ("Closing connection from %s.\n",
-				inet_ntoa(ip->addr.sin_addr)));
-
+#ifdef IPV6
+    char tmp[INET6_ADDRSTRLEN];
+    debug(connections, ("Closing connection from %s.\n", inet_ntop(AF_INET6, &ip->addr.sin6_addr, &tmp, INET6_ADDRSTRLEN)));
+#else
+		debug(connections, ("Closing connection from %s.\n", inet_ntoa(ip->addr.sin_addr)));
+#endif
 		flush_message(ip);
 		ip->iflags |= CLOSING;
 
