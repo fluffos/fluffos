@@ -682,7 +682,7 @@ static void
 preprocess() {
     register char *yyp, *yyp2;
     int c;
-    int cond;
+    long cond;
 
     while (buffered ? (yyp = yyp2 = outp) : fgets(yyp = yyp2 = defbuf + (DEFMAX >> 1), MAXLINE-1, yyin)) {
         if (!buffered) current_line++;
@@ -1187,6 +1187,8 @@ static void handle_malloc() {
         the_malloc = "64bitmalloc.c";
     if(lookup_define("MALLOC32"))
         the_malloc = "32bitmalloc.c";
+    if(lookup_define("GCMALLOC"))
+        the_malloc = "gcmalloc.c";
     if (lookup_define("GNUMALLOC"))
         the_malloc = "gnumalloc.c";
 
@@ -1566,11 +1568,11 @@ static void handle_configure() {
     find_memmove();
 #endif
 
-    fprintf(yyout, "#define SIZEOF_INT %i\n", sizeof(int));
-    fprintf(yyout, "#define SIZEOF_PTR %i\n", sizeof(char *));
-    fprintf(yyout, "#define SIZEOF_SHORT %i\n", sizeof(short));
-    fprintf(yyout, "#define SIZEOF_FLOAT %i\n", sizeof(double));
-    fprintf(yyout, "#define SIZEOF_LONG %i\n", sizeof(long));
+    fprintf(yyout, "#define SIZEOF_INT %lu\n", sizeof(int));
+    fprintf(yyout, "#define SIZEOF_PTR %lu\n", sizeof(char *));
+    fprintf(yyout, "#define SIZEOF_SHORT %lu\n", sizeof(short));
+    fprintf(yyout, "#define SIZEOF_FLOAT %lu\n", sizeof(double));
+    fprintf(yyout, "#define SIZEOF_LONG %lu\n", sizeof(long));
 
     if (sizeof(unsigned long) == 4)
         fprintf(yyout, "#define UINT32 unsigned long\n");

@@ -266,7 +266,7 @@ pthread_mutex_t *db_mut = NULL;
 
 void *dbexecthread(struct request *req){
 	pthread_mutex_lock(db_mut);
-	db_t *db = find_db_conn((int)req->buf);
+	db_t *db = find_db_conn((long)req->buf);
 	int ret = -1;
 	if (db->type->execute) {
 		if (db->type->cleanup) {
@@ -391,7 +391,7 @@ int add_write(const char *fname, const char *buf, int size, char flags, function
 }
 
 #ifdef F_ASYNC_DB_EXEC
-int add_db_exec(int handle, function_to_call_t *fun) {
+int add_db_exec(long handle, function_to_call_t *fun) {
 	struct request *req = get_req();
 	req->fun = fun;
 	req->type = adbexec;

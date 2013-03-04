@@ -73,7 +73,7 @@ static void get_master_applies (object_t * ob) {
                                TAG_SIMULS, "get_master_applies");
 
     for (i = 0; i < NUM_MASTER_APPLIES; i++) {
-        char *name = applies_table[i];
+        const char *name = applies_table[i];
         int ind, ri;
         
         if (find_function_by_name(ob, name, &ind, &ri)) {

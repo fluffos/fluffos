@@ -367,7 +367,7 @@ int strip_name (const char * src, char * dest, int size) {
  * it.
  *
  */
-object_t *int_load_object (const char * lname)
+object_t *int_load_object (const char * lname, int callcreate)
 {
     int f;
     program_t *prog;
@@ -516,7 +516,7 @@ object_t *int_load_object (const char * lname)
         error("master object: %s() denied permission to load '/%s'.\n", applies_table[APPLY_VALID_OBJECT], name);
     }
 
-    if (init_object(ob))
+    if (init_object(ob) && callcreate)
         call_create(ob, 0);
     if (!(ob->flags & O_DESTRUCTED) &&
         function_exists(APPLY_CLEAN_UP, ob, 1)) {

@@ -2541,9 +2541,7 @@ static void print_help (int arg)
     char *pos = edout;
     char *outstr;
     int n;
-    svalue_t *ret;
     struct strlst *curp;
-    int i;
 
     switch (arg) {
     case 'I':

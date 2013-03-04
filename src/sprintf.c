@@ -412,9 +412,7 @@ void svalue_to_string (svalue_t * obj, outbuffer_t * outbuf, int indent, int tra
 #endif
     case T_FUNCTION:
         {
-            svalue_t tmp;
             object_t *ob;
-            tmp.type = T_ARRAY;
 
             outbuf_add(outbuf, "(: ");
             switch (obj->u.fp->hdr.type) {

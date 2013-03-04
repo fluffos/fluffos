@@ -67,6 +67,7 @@ enum msgtypes {
 #define USING_MXP           0x4000              /* we've negotiated mxp */
 #define USING_ZMP           0x8000              /* we've negotiated zmp */
 #define USING_GMCP			0x10000				/* we've negotiated gmcp */
+#define HANDSHAKE_COMPLETE  0x20000				/* websocket connected */
 
 typedef struct interactive_s {
     object_t *ob;               /* points to the associated object         */
@@ -116,15 +117,21 @@ typedef struct interactive_s {
     int message_producer;       /* message buffer producer index */
     int message_consumer;       /* message buffer consumer index */
     int message_length;         /* message buffer length */
-    char message_buf[MESSAGE_BUF_SIZE]; /* message buffer */
+    unsigned char message_buf[MESSAGE_BUF_SIZE]; /* message buffer */
     int iflags;                 /* interactive flags */
     char out_of_band;           /* Send a telnet sync operation            */
     int state;                  /* Current telnet state.  Bingly wop       */
     int sb_pos;                 /* Telnet suboption negotiation stuff      */
     struct translation *trans;
-    char *sb_buf;
+    unsigned char *sb_buf;
     int sb_size;
     char slc[NSLC][2];
+    char ws_text[MAX_TEXT];        /* input buffer for interactive object     */
+    int ws_text_end;               /* first free char in buffer               */
+    int ws_text_start;             /* where we are up to in user command buffer */
+    int ws_size;
+    int ws_mask;
+    char ws_maskoffs;
 } interactive_t;
 
  /*

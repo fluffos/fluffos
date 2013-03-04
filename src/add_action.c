@@ -181,6 +181,8 @@ void setup_new_commands (object_t * dest, object_t * item)
 	    continue;
 	if (ob->flags & O_DESTRUCTED)
 	    error("An object was destructed at call of " APPLY_INIT "()\n");
+	if (dest != ob->super)
+	    error("An object was moved at call of " APPLY_INIT "()\n");
 	if (ob->flags & O_ENABLE_COMMANDS) {
 	    save_command_giver(ob);
 	    (void) apply(APPLY_INIT, item, 0, ORIGIN_DRIVER);

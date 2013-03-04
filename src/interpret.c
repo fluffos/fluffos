@@ -1235,6 +1235,9 @@ push_control_stack (int frkind)
  * Pop the control stack one element, and restore registers.
  * extern_call must not be modified here, as it is used imediately after pop.
  */
+
+extern int playerchanged;
+
 void pop_control_stack()
 {
   DEBUG_CHECK(csp == (control_stack - 1),
@@ -1276,12 +1279,11 @@ void pop_control_stack()
 	  if(outoftime)
 		  set_eval(max_cost);
 	  save_command_giver(stuff->tp.u.ob);
-	  object_t *cgo = command_giver;
+	  playerchanged = 0;
 	  safe_call_efun_callback(&ftc, 0);
-	  int changed = (cgo != command_giver);
-	  cgo = command_giver;
+	  object_t *cgo = command_giver;
 	  restore_command_giver();
-	  if(changed)
+	  if(playerchanged)
 		  set_command_giver(cgo);
 	  outoftime = s;
 	  free_svalue(&(stuff->func), "pop_stack");
@@ -1915,7 +1917,7 @@ eval_instruction (char * p)
       char *f;
       int l;
       /* this could be much more efficient ... */
-      get_line_number_info(&f, &l);
+      get_line_number_info((const char**)&f, &l);
       show_lpc_line(f, l);
     }
 #  endif
@@ -4059,7 +4061,7 @@ void check_co_args2 (unsigned short *types, int num_arg, const char *name, const
       if(current_prog){
         const char *file;
         int line;
-        find_line(pc, current_prog, &file, &line);
+        get_line_number_info(&file, &line);
         int prsave = pragmas;
         pragmas &= ~PRAGMA_ERROR_CONTEXT;
         smart_log(file, line, buf, 1);
@@ -4086,7 +4088,7 @@ void check_co_args (int num_arg, const program_t * prog, function_t * fun, int f
       int line;
       int prsave = pragmas;
       pragmas &= ~PRAGMA_ERROR_CONTEXT;
-      find_line(pc, current_prog, &file, &line);
+      get_line_number_info(&file, &line);
       smart_log(file, line, buf, 1);
       pragmas = prsave;
     } else
@@ -4221,6 +4223,9 @@ int apply_low (const char * fun, object_t * ob, int num_arg)
         DEBUG_CHECK(save_csp - 1 != csp,
                     "Bad csp after execution in apply_low.\n");
         return 1;
+      } else {
+    	  pop_n_elems(num_arg);
+    	  return 0;
       }
     } /* when we come here, the cache has told us
        * that the function isn't defined in the
@@ -4239,10 +4244,9 @@ int apply_low (const char * fun, object_t * ob, int num_arg)
     } else {
       if (entry->funp){
         free_string((char *)entry->funp);
-	entry->funp = 0;
+        entry->funp = 0;
       }
     }
-
 #ifdef CACHE_STATS
     if (!entry->funp) {
       apply_low_slots_used++;
@@ -4250,6 +4254,7 @@ int apply_low (const char * fun, object_t * ob, int num_arg)
       apply_low_collisions++;
     }
 #endif
+    entry->funp = 0;
     sfun = fun;
     prog = find_function_by_name2(ob, &sfun, &findex, &runtime_index,
                                   &fio, &vio);
@@ -4321,6 +4326,9 @@ int apply_low (const char * fun, object_t * ob, int num_arg)
          * resulting value is always returned on the stack.
          */
         return 1;
+      } else {
+    	  pop_n_elems(num_arg);
+    	  return 0;
       }
     }
 
@@ -4690,48 +4698,39 @@ static int find_line (char * p, const program_t * progp,
   return 0;
 }
 
-static void get_explicit_line_number_info (char * p, const program_t * prog,
+static void get_explicit_line_number_info (char * p, const program_t * progp,
                                              const char ** ret_file, int * ret_line) {
-  find_line(p, prog, ret_file, ret_line);
+  int i = find_line(p, progp, ret_file, ret_line);
+
+  switch (i) {
+  case 1:
+    *ret_file =  "(no program)";
+  case 2:
+    *ret_file = "(fake)";
+  case 3:
+    *ret_file = "(compiled program)";
+  case 4:
+    *ret_file = "(no line numbers)";
+  case 5:
+    *ret_file = "(includes too deep)";
+  }
   if (!(*ret_file))
-    *ret_file = prog->filename;
+    *ret_file = progp->filename;
 }
 
 void get_line_number_info (const char ** ret_file, int * ret_line)
 {
-  find_line(pc, current_prog, ret_file, ret_line);
-  if (!(*ret_file))
-    *ret_file = current_prog->filename;
+  get_explicit_line_number_info(pc, current_prog, ret_file, ret_line);
 }
 
 char* get_line_number (char * p, const program_t * progp)
 {
   static char buf[256];
-  int i;
   const char *file;
   int line;
 
-  i = find_line(p, progp, &file, &line);
+  get_explicit_line_number_info(p, progp, &file, &line);
 
-  switch (i) {
-  case 1:
-    strcpy(buf, "(no program)");
-    return buf;
-  case 2:
-    *buf = 0;
-    return buf;
-  case 3:
-    strcpy(buf, "(compiled program)");
-    return buf;
-  case 4:
-    strcpy(buf, "(no line numbers)");
-    return buf;
-  case 5:
-    strcpy(buf, "(includes too deep)");
-    return buf;
-  }
-  if (!file)
-    file = progp->filename;
   sprintf(buf, "/%s:%d", file, line);
   return buf;
 }

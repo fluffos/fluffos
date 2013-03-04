@@ -20,8 +20,8 @@
 extern int debug_level;
 
 void handle_debug_level (char *);
-void debug_level_set (char *);
-void debug_level_clear (char *);
+void debug_level_set (const char *);
+void debug_level_clear (const char *);
 
 #ifdef DEBUG_MACRO
 #define debug(x,y) if (debug_level & DBG_##x) { printf("%s: ", #x); printf y; putchar('\n'); fflush(stdout); }

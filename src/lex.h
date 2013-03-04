@@ -81,7 +81,7 @@ typedef struct {
 /* the fields above must correspond to struct ident_hash_elem */
     short min_args;             /* Minimum number of arguments. */
     short max_args;             /* Maximum number of arguments. */
-    short ret_type;             /* The return type used by the compiler. */
+    unsigned short ret_type;    /* The return type used by the compiler. */
     unsigned short arg_type1;   /* Type of argument 1 */
     unsigned short arg_type2;   /* Type of argument 2 */
     unsigned short arg_type3;   /* Type of argument 1 */
@@ -115,7 +115,7 @@ typedef struct {
     short max_arg, min_arg;  /* Can't use char to represent -1 */
     short type[4];           /* need a short to hold the biggest type flag */
     short Default;
-    short ret_type;
+    unsigned short ret_type;
     const char *name;
     int arg_index;
 } instr_t;

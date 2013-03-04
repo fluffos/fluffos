@@ -51,7 +51,7 @@
 
    Please refer to options.h for selecting malloc package and wrapper.
 */
-#if (defined(SYSMALLOC) + defined(SMALLOC) + defined(BSDMALLOC) + defined(MMALLOC)) > 1
+#if (defined(SYSMALLOC) + defined(SMALLOC) + defined(BSDMALLOC) + defined(MMALLOC) + defined(GCMALLOC)) > 1
 !Only one malloc package should be defined
 #endif
 
@@ -61,6 +61,10 @@
 
 #if defined(DO_MSTATS) && defined(SYSMALLOC)
 !'DO_MSTATS' not available with 'SYSMALLOC'
+#endif
+
+#if defined(DO_MSTATS) && defined(GCMALLOC)
+!'DO_MSTATS' not available with 'GCMALLOC'
 #endif
 
 #if defined (WRAPPEDMALLOC) && !defined(IN_MALLOC_WRAPPER)

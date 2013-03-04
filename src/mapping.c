@@ -60,7 +60,7 @@ INLINE int growMap (mapping_t * m)
         }
         /* hash table doubles in size -- keep track of the memory used */
         total_mapping_size += sizeof(mapping_node_t *) * oldsize;
-        debug(mapping,("mapping.c: growMap ptr = %p, size = %d\n", m, newsize));
+        debug(mapping,("mapping.c: growMap ptr = %p, size = %d\n", (void *)m, newsize));
         m->unfilled = oldsize * (unsigned)FILL_PERCENT / (unsigned)100;
         m->table_size = newsize - 1;
         /* zero out the new storage area (2nd half of table) */
@@ -96,7 +96,7 @@ INLINE mapping_t *mapTraverse (mapping_t *m, int (*func) (mapping_t *, mapping_n
         mapping_node_t *elt, *nelt;
         int j = m->table_size;
 
-        debug(mapping,("mapTraverse %p\n", m));
+        debug(mapping,("mapTraverse %p\n", (void *)m));
         do {
             for (elt = m->table[j]; elt; elt = nelt) {
                 nelt = elt->next;
@@ -111,7 +111,7 @@ INLINE mapping_t *mapTraverse (mapping_t *m, int (*func) (mapping_t *, mapping_n
 INLINE void
 dealloc_mapping (mapping_t * m)
 {
-        debug(mapping,("mapping.c: actual free of %p\n", m));
+        debug(mapping,("mapping.c: actual free of %p\n", (void *)m));
         num_mappings--;
         {
             int j = m->table_size, c = MAP_COUNT(m);
@@ -147,7 +147,7 @@ dealloc_mapping (mapping_t * m)
 INLINE void
 free_mapping (mapping_t * m)
 {
-        debug(mapping,("mapping.c: free_mapping begin, ptr = %p\n", m));
+        debug(mapping,("mapping.c: free_mapping begin, ptr = %p\n", (void *)m));
         /* some other object is still referencing this mapping */
         if (--m->ref > 0)
                 return;
@@ -234,7 +234,7 @@ allocate_mapping (int n)
 
         if (n > MAX_MAPPING_SIZE) n = MAX_MAPPING_SIZE;
         newmap = ALLOCATE(mapping_t, TAG_MAPPING, "allocate_mapping: 1");
-        debug(mapping,("mapping.c: allocate_mapping begin, newmap = %p\n", newmap));
+        debug(mapping,("mapping.c: allocate_mapping begin, newmap = %p\n", (void *)newmap));
         if (newmap == NULL)
             error("Allocate_mapping - out of memory.\n");
 
@@ -437,15 +437,17 @@ int svalue_to_int (svalue_t *v)
 }
 
 int msameval (svalue_t * arg1, svalue_t * arg2) {
-	return (arg1->u.number == arg2->u.number);
-    /* it's a union so those all do the same anyway! switch (arg1->type | arg2->type) {
-    case T_NUMBER:
-        return arg1->u.number == arg2->u.number;
-    case T_REAL:
-        return arg1->u.real == arg2->u.real;
-    default:
-        return arg1->u.arr == arg2->u.arr;
-    }*/
+	if (sizeof(long) == 8)
+		return (arg1->u.number == arg2->u.number);
+	else
+		switch (arg1->type | arg2->type) {
+		case T_NUMBER:
+			return arg1->u.number == arg2->u.number;
+		case T_REAL:
+			return arg1->u.real == arg2->u.real;
+		default:
+			return arg1->u.arr == arg2->u.arr;
+		}
 }
 
 /*
@@ -499,12 +501,12 @@ find_for_insert (mapping_t * m, svalue_t * lv, int doTheFree)
             do {
                 if (msameval(lv, n->values)) {
                     /* normally, the f_assign would free the old value */
-                    debug(mapping,("mapping.c: found %p\n", n->values));
+                    debug(mapping,("mapping.c: found %p\n", (void *) (n->values)));
                     if (doTheFree) free_svalue(n->values + 1, "find_for_insert");
                     return n->values + 1;
                 }
             } while ((n = n->next));
-            debug(mapping,("mapping.c: didn't find %p\n", lv));
+            debug(mapping,("mapping.c: didn't find %p\n", (void *)lv));
             n = *a;
         }
         else if (!(--m->unfilled)) {
@@ -633,8 +635,10 @@ void f_unique_mapping (void)
         sv = call_efun_callback(&ftc, 1);
         if(sv)
         	i = (oi = svalue_to_int(sv)) & mask;
-        else
+        else {
         	i = oi = 0;
+        	sv = &const0;
+        }
         if ((uptr = table[i])) {
             do {
                 if (msameval(&uptr->key, sv)) {
@@ -1010,7 +1014,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
 {
         mapping_t *newmap;
 
-        debug(mapping,("mapping.c: add_mapping begin: %p, %p", m1, m2));
+        debug(mapping,("mapping.c: add_mapping begin: %p, %p", (void *)m1, (void *)m2));
         if (MAP_COUNT(m1) >= MAP_COUNT(m2)) {
             if (MAP_COUNT(m2)) {
                 add_to_mapping(newmap = copyMapping(m1), m2, 1);

@@ -60,6 +60,18 @@ void *malloc32(int size);
 #endif
 #endif
 
+#ifdef GCMALLOC
+#define MALLOC_NEED_INIT 1
+#define MALLOC(x)       GC_MALLOC((x))
+#define FREE(x)        
+#define REALLOC(x,y)    GC_REALLOC((x),(y))
+#define CALLOC(x,y)     GC_MALLOC(((x)*(y)))
+#ifndef _FUNC_SPEC_
+#include <gc/gc.h>
+void malloc_init();
+#endif
+#endif
+
 #define DXALLOC(x,tag,desc)     xalloc(x)
 #define DMALLOC(x,tag,desc)     MALLOC(x)
 #define DREALLOC(x,y,tag,desc)  REALLOC(x,y)

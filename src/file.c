@@ -484,7 +484,7 @@ char *read_file(const char * file, int start, int len) {
 		p = str;
 		while (start > 1) {
 			/* skip newlines */
-			p2 = (char *)memchr(p, '\n', 2*READ_FILE_MAX_SIZE+str-p);
+			p2 = (char *)memchr(p, '\n', chunk+str-p);
 			if (p2) {
 				p = p2 + 1;
 				start--;

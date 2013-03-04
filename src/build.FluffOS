@@ -4,7 +4,7 @@ if test $# -ne 0; then
     case $1 in
         develop)
 	    echo Preparing to build developmental version of MudOS driver ...
-	    OPTIMIZE="-Wall -Wundef -DPEDANTIC -pedantic -Wmissing-declarations"
+	    OPTIMIZE="-Wall -Wundef -DPEDANTIC -pedantic"
 	    DEBUG="-g -DDEBUG -DDEBUG_MACRO"
             ;;
         debug)
@@ -207,16 +207,20 @@ else
         if test "${DEBUG-x}" = "x"; then
             OPTIMIZE=${OPTIMIZE-"-O3"}
         fi
-        gcc -m64 comptest.c
+        $CC -std=c99 -D_GNU_SOURCE comptest.c
         if test $? -eq 0; then
-            CC="gcc -m64"
+            CC="$CC -std=c99 -D_GNU_SOURCE"
         fi
-	gcc -flto comptest.c
+        $CC -m64 comptest.c
+        if test $? -eq 0; then
+            CC="$CC -m64"
+        fi
+	      $CC -flto comptest.c
         if test $? -eq 0; then
             CC="$CC -flto"
         fi
-	GNUC=1
-	CCFLAGS=-D__USE_FIXED_PROTOTYPES__
+	      GNUC=1
+      	CCFLAGS="-D__USE_FIXED_PROTOTYPES__"
     else
         clcc comptest.c
         if test $? -eq 0; then
@@ -381,12 +385,12 @@ END
 case $ARCH in
     AIX)
         OSFLAGS="$OSFLAGS -D_BSD -D_ALL_SOURCE"
-	CFLAGS="$CFLAGS -D_BSD -D_ALL_SOURCE"
+	      CFLAGS="$CFLAGS -D_BSD -D_ALL_SOURCE"
         ;;    
     Solaris)
-	OSFLAGS="$OSFLAGS -DSunOS_5"
-	CFLAGS="$CFLAGS -DSunOS_5"
-	;;
+      	OSFLAGS="$OSFLAGS -DSunOS_5"
+      	CFLAGS="$CFLAGS -DSunOS_5"
+      	;;
 esac
 #don't use dynamic at the moment
 #    Linux*)

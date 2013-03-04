@@ -1370,28 +1370,28 @@ static void deep_inventory_collect (object_t * ob, array_t * inv, int * i, int m
                 return;
            }
         }
-        if(!fp || fp && fp_result->type==T_NUMBER && fp_result->u.number>0 && !(cur->flags & O_DESTRUCTED)) {
+        if(!fp || (fp && fp_result->type==T_NUMBER && fp_result->u.number>0 && !(cur->flags & O_DESTRUCTED))) {
 #ifdef F_SET_HIDE
             if (cur->flags & O_HIDDEN) {
                 if (valid_hide_flag & 2) {
-                    if(!fp || fp && fp_result->type==T_NUMBER && fp_result->u.number!=3) {
+                    if(!fp || (fp && fp_result->type==T_NUMBER && fp_result->u.number!=3)) {
                         inv->item[*i].type = T_OBJECT;
                         inv->item[*i].u.ob = cur;
                         (*i)++;
                         add_ref(cur, "deep_inventory_collect");
                     }
-                    if(!fp || fp && fp_result->type==T_NUMBER && (fp_result->u.number==1 || fp_result->u.number==3))
+                    if(!fp || (fp && fp_result->type==T_NUMBER && (fp_result->u.number==1 || fp_result->u.number==3)))
                         deep_inventory_collect(cur, inv, i, max, fp);
                 }
             } else {
 #endif
-                if(!fp || fp && fp_result->type==T_NUMBER && fp_result->u.number!=3) {
+                if(!fp || (fp && fp_result->type==T_NUMBER && fp_result->u.number!=3)) {
                     inv->item[*i].type = T_OBJECT;
                     inv->item[*i].u.ob = cur;
                     (*i)++;
                     add_ref(cur, "deep_inventory_collect");
                 }
-                if(!fp || fp && fp_result->type==T_NUMBER && (fp_result->u.number==1 || fp_result->u.number==3))
+                if(!fp || (fp && fp_result->type==T_NUMBER && (fp_result->u.number==1 || fp_result->u.number==3)))
                     deep_inventory_collect(cur, inv, i, max, fp);
 #ifdef F_SET_HIDE
             }
@@ -1439,15 +1439,15 @@ array_t *deep_inventory (object_t * ob, int take_top, funptr_t *fp)
                 return &the_null_array;
             }
         }
-        if(!fp || fp && fp_result->type==T_NUMBER && fp_result->u.number>0 &&
-          !(ob->flags & O_DESTRUCTED)) {
-            if(!fp || fp && fp_result->type==T_NUMBER && fp_result->u.number!=3) {
+        if(!fp || (fp && fp_result->type==T_NUMBER && fp_result->u.number>0 &&
+          !(ob->flags & O_DESTRUCTED))) {
+            if(!fp || (fp && fp_result->type==T_NUMBER && fp_result->u.number!=3)) {
                 dinv->item[0].type = T_OBJECT;
                 dinv->item[0].u.ob = ob;
                 add_ref(ob, "deep_inventory");
                 i=1;
             }
-            if(!fp || fp && fp_result->type==T_NUMBER && (fp_result->u.number==1 || fp_result->u.number==3))
+            if(!fp || (fp && fp_result->type==T_NUMBER && (fp_result->u.number==1 || fp_result->u.number==3)))
                 deep_inventory_collect(ob, dinv, &i, o, fp);
         }
     }
@@ -1510,15 +1510,15 @@ array_t *deep_inventory_array (array_t *arr, int take_top, funptr_t *fp)
                           return &the_null_array;
 		      }
                   }
-                  if(!fp || fp && fp_result->type==T_NUMBER && fp_result->u.number>0 &&
-                    !(arr->item[c].u.ob->flags & O_DESTRUCTED)) {       
-                      if(!fp || fp && fp_result->type==T_NUMBER && fp_result->u.number!=3) {
+                  if(!fp || (fp && fp_result->type==T_NUMBER && fp_result->u.number>0 &&
+                    !(arr->item[c].u.ob->flags & O_DESTRUCTED))) {       
+                      if(!fp || (fp && fp_result->type==T_NUMBER && fp_result->u.number!=3)) {
                           dinv->item[i].type = T_OBJECT;
                           dinv->item[i].u.ob = arr->item[c].u.ob;
                           add_ref(arr->item[c].u.ob, "deep_inventory");
                           i++;
                       }
-                      if(!fp || fp && fp_result->type==T_NUMBER && (fp_result->u.number==1 || fp_result->u.number==3))
+                      if(!fp || (fp && fp_result->type==T_NUMBER && (fp_result->u.number==1 || fp_result->u.number==3)))
                           deep_inventory_collect(arr->item[c].u.ob, dinv, &i, o, fp);
                   }
             }

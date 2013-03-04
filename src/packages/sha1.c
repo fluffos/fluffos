@@ -19,7 +19,7 @@
 #ifdef F_SHA1
 void f_sha1(void)
 {
-   unsigned long int h0,h1,h2,h3,h4,a,b,c,d,e,f,k,temp;
+   unsigned int h0,h1,h2,h3,h4,a,b,c,d,e,f,k,temp;
    int i, j, m;
 
    h0 = 0x67452301;
@@ -29,7 +29,7 @@ void f_sha1(void)
    h4 = 0xC3D2E1F0;
 
    unsigned char *str;
-   str = (unsigned char *)malloc(SVALUE_STRLEN(sp)+100);
+   str = (unsigned char *)MALLOC(SVALUE_STRLEN(sp)+100);
    
    strcpy((char *)str, (const char *)sp->u.string);
    
@@ -68,7 +68,7 @@ void f_sha1(void)
    str[current_length + i] = '\0';
    
    int number_of_chunks = current_length / 64;
-   unsigned long int word[80];
+   unsigned int word[80];
    
    for (i=0; i<number_of_chunks; i++)
    {
@@ -126,9 +126,9 @@ void f_sha1(void)
       h4 = h4 + e;
    }
    
-   sprintf((char *)str, "%x%x%x%x%x", h0, h1, h2, h3, h4);
+   sprintf((char *)str, "%08x%08x%08x%08x%08x", h0, h1, h2, h3, h4);
    pop_stack();
    push_malloced_string(string_copy((char *)str, "f_sha1"));
-   free(str);
+   FREE(str);
 }
 #endif

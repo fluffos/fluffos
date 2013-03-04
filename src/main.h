@@ -12,6 +12,7 @@
 #define PORT_BINARY      2
 #define PORT_ASCII       3
 #define PORT_MUD         4
+#define PORT_WEBSOCKET	 5
 
 typedef struct {
     int kind;

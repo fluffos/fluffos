@@ -222,7 +222,6 @@ call_function_pointer (funptr_t * funp, int num_arg)
 {
     static func_t *oefun_table = efun_table - BASE;
     array_t *v;
-    int extfr = 1;
     
     if (!funp->hdr.owner || (funp->hdr.owner->flags & O_DESTRUCTED))
         error("Owner (/%s) of function pointer is destructed.\n",

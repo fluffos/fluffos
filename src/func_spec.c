@@ -404,6 +404,7 @@ void message(mixed, mixed, string | string * | object | object *,
     string arr_to_str(int *);
 #endif
     void act_mxp();
+    void websocket_handshake_done();
     void request_term_type();
     void start_request_term_type();
     void request_term_size(void | int);

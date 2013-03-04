@@ -54,7 +54,7 @@ static void ins_real (double l)
 {
     double f = (double)l;
 
-    if (prog_code + 4 > prog_code_max) {
+    if (prog_code + sizeof(double) > prog_code_max) {
         mem_block_t *mbp = &mem_block[A_PROGRAM];
 
         UPDATE_PROGRAM_SIZE;
@@ -1235,7 +1235,7 @@ optimize_icode (char * start, char * pc, char * end) {
                 LOAD_SHORT(etable, pc);
                 pc += 2; /* def */
             	//break; //doesn't seem to work!
-                printf("stable: %x pc %x swstart %x etable %x\n", stable, pc, swstart, etable);
+                printf("stable: %x pc %p swstart %p etable %x\n", stable, (void *)pc, (void *)swstart, etable);
                 DEBUG_CHECK(stable < pc - swstart || etable < pc - swstart
                             || etable < stable,
                             "Error in switch table found while optimizing\n");

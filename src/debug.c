@@ -41,7 +41,7 @@ mapping_t *debug_levels() {
     return ret;
 }
 
-void debug_level_set (char * level) {
+void debug_level_set (const char * level) {
     int i;
     
     for (i = 0; i < NELEM(levels); i++) {
@@ -52,7 +52,7 @@ void debug_level_set (char * level) {
     }
 }
 
-void debug_level_clear (char * level) {
+void debug_level_clear (const char * level) {
     int i;
     
     for (i = 0; i < NELEM(levels); i++) {

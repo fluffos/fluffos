@@ -65,6 +65,7 @@
 #undef MMALLOC
 #undef MALLOC64
 #undef MALLOC32
+#undef GCMALLOC /* needs -lgc in system_libs */
 /* You may optionally choose one (or none) of these malloc wrappers.  These
  * can be used in conjunction with any of the above malloc packages.
  *
@@ -316,7 +317,7 @@
  * Similarly for arrays ...
  */
 #define ARRAY_STATS
-
+#define CLASS_STATS
 /* LOG_CATCHES: define this to cause errors that are catch()'d to be
  *   sent to the debug log anyway.
  *
@@ -693,17 +694,9 @@
  */
 #undef USE_32BIT_ADDRESSES
 
-/* HEARTBEAT_INTERVAL: define heartbeat interval in microseconds (us).
- *   1,000,000 us = 1 second.  The value of this macro specifies
- *   the frequency with which the heart_beat method will be called in
- *   those LPC objects which have called set_heart_beat(1).
- *
- * [NOTE: if ualarm() isn't available, alarm() is used instead.  Since
- *  alarm() requires its argument in units of a second, we map 1 - 1,000,000 us
- *  to an actual interval of one (1) second and 1,000,001 - 2,000,000 maps to
- *  an actual interval of two (2) seconds, etc.]
+/* HEARTBEAT_INTERVAL: define heartbeat interval in seconds.
  */
-#define HEARTBEAT_INTERVAL 2000000
+#define HEARTBEAT_INTERVAL 1
 
 /*
  * CALLOUT_CYCLE_SIZE: This is the number of slots in the call_out list.

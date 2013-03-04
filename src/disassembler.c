@@ -28,18 +28,29 @@ f_dump_prog (void)
     int narg = st_num_arg;
     
     if (st_num_arg == 2) {
+      if ((sp-1)->type != T_OBJECT) 
+        bad_argument(sp-1, T_OBJECT, 1, F_DUMP_PROG);
+
         ob = sp[-1].u.ob;
         d = sp->u.number;
         where = 0;
     } else if (st_num_arg == 3) {
+      if ((sp-2)->type != T_OBJECT) 
+        bad_argument(sp-2, T_OBJECT, 1, F_DUMP_PROG);
+
         ob = sp[-2].u.ob;
         d = sp[-1].u.number;
         where = (sp->type == T_STRING) ? sp->u.string : 0;
     } else {
+      if (sp->type != T_OBJECT) 
+        bad_argument(sp, T_OBJECT, 1, F_DUMP_PROG);
+
         ob = sp->u.ob;
         d = 0;
         where = 0;
     }
+
+
     if (!(prog = ob->prog)) {
         error("No program for object.\n");
     } else {
@@ -228,7 +239,7 @@ disassemble (FILE * f, char * code, int start, int end, program_t * prog)
 {
     extern int num_simul_efun;
 
-    long i, j, instr, iarg, is_efun, ri;
+    long i, j, instr, iarg, ri;
     unsigned short sarg;
     unsigned short offset;
     char *pc, buff[2048];
@@ -273,8 +284,6 @@ disassemble (FILE * f, char * code, int start, int end, program_t * prog)
         }
 
         fprintf(f, "%04x: ", (unsigned) (pc - code));
-
-        is_efun = (instr = EXTRACT_UCHAR(pc)) >= BASE;
 
         pc++;
         buff[0] = 0;
@@ -524,7 +533,7 @@ disassemble (FILE * f, char * code, int start, int end, program_t * prog)
             case FP_ANONYMOUS:
             case FP_ANONYMOUS | FP_NOT_BINDABLE:
                 COPY_SHORT(&sarg, &pc[2]);
-                sprintf(buff, "<anonymous function, %d args, %d locals, ends at %04x>\nCode:",
+                sprintf(buff, "<anonymous function, %d args, %d locals, ends at %04ld>\nCode:",
                         pc[0], pc[1], (pc + 3 + sarg - code));
                 pc += 4;
                 break;

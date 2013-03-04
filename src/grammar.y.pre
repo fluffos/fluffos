@@ -130,8 +130,8 @@ int yyparse (void);
 %union
 {
     POINTER_INT pointer_int;
-    long number;
-    float real;
+    long number; /* 4 or 8 */
+    double real; /* 8 */
     char *string;
     struct { short num_arg; char flags; } argument;
     ident_hash_elem_t *ihe;
@@ -1602,10 +1602,10 @@ expr0:
 		   side of the tree node. */
 		CREATE_BINARY_OP($$, $2, r->type, r, l);
 
+    /* allow TYPE_STRING += TYPE_NUMBER | TYPE_OBJECT */
 		if (exact_types && !compatible_types(r->type, l->type) &&
-		    !($2 == F_ADD_EQ
-		      && l->type == TYPE_STRING && 
-		      (COMP_TYPE(r->type, TYPE_NUMBER))||r->type == TYPE_OBJECT)) {
+		    !($2 == F_ADD_EQ && l->type == TYPE_STRING &&
+        ((COMP_TYPE(r->type, TYPE_NUMBER)) || r->type == TYPE_OBJECT))) {
 		    char buf[256];
 		    char *end = EndOf(buf);
 		    char *p;

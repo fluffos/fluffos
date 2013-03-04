@@ -2,6 +2,55 @@ As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :), note: where it says Cratylus, I got it from his version, usually
 someone else did the work, but I don't know how to find who did what there.
 
+FluffOS 2.25
+Compile warning fixes (sunyc@lpmuds.net)
+add_action moved objects fix (vorpal@lpmuds.net)
+Properly report 64 bit linux when starting (sunyc@lpmuds.net)
+heart_beat() now sets current_interactive 
+Changes for C99 (sunyc@lpmuds.net)
+GMCP telnet negotiation now following the correct protocol, probably
+Websocket support, add a port in the config file with type websocket, when it
+	gets a connection on that it will ask the master object for a
+	connection as usual, this object will need to do the websocket
+	handshake, incoming data will go to process_input(), after finishing
+	the handshake call websocket_handshake_done(), after calling that it
+	will act like a normal user connection on the mud side, the other side
+	is a binary websocket. I suggest you change to the normal login object
+	after the handshake.
+Added a break at the end of mssp activation to stop it from turning on mccp as
+	well
+Stop skipping next user input when we get user input (no idea why that was 
+	there) 
+	(vorpal@lpmuds.net)
+Several LPC stack fixes (sunyc@lpmuds.net)
+Added several missing type checks (sunyc@lpmuds.net)
+Fixed wrong int/long variable types, this includes fixing sha1, so if you used
+	that for passwords on 64bit, you'll need to figure out how to get 
+	around sha1 results changing.(sunyc@lpmuds.net, me (with suggestions from 
+	(vorpal@lpmuds.net)))
+sizeof now returns an actual number (reported by vorpal@lpmuds.net)
+Fixed crasher in local_time() (sunyc@lpmuds.net)
+Overflow improvement on eval_cost calculation (sunyc@lpmuds.net)
+Stop reading past the end of the read data in read_file()
+Fixed possible crasher in using floats
+Fixed crasher in call_other type warnings (sunyc@lpmuds.net)
+Several testsuite improvements (sunyc@lpmuds.net)
+Added GCmalloc (sunyc@lpmuds.net)
+Mapping fix for 32bit
+Fixed crasher in f_unique_mapping (reported by sunyc@lpmuds.net)
+options.h fixes (sunyc@lpmuds.net, me)
+Added placeholder for now missing old binary config (sunyc@lpmuds.net)
+File closing fix for compressed files (sunyc@lpmuds.net)
+Fixed zonetime crasher (sunyc@lpmuds.net)
+Fixed is_daylight_savings_time crasher (sunyc@lpmuds.net)
+Fixed remove_get_char crasher (reported by sunyc@lpmuds.net)
+
+FluffOS 2.25
+Fixed the defer() fix 
+Added new test_load() efun which will try to load a file, it will return 0 when 
+      it failed, 1 when the file can load, and error if there was a compilation
+      error
+
 FluffOS 2.24
 LPC floats are now C doubles
 number of structs (or classes) allowed is now 127 

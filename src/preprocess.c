@@ -1,7 +1,7 @@
 /* WARNING: This file is #included into two places, since the definition
    of malloc() differs.  Be careful. */
 
-static int cond_get_exp (int);
+static long cond_get_exp (int);
 static void handle_cond (int);
 
 #ifndef LEXER
@@ -111,7 +111,7 @@ static void handle_elif()
     if (iftop) {
         if (iftop->state == EXPECT_ELSE) {
             /* last cond was false... */
-            int cond;
+            long cond;
             ifstate_t *p = iftop;
 
             /* pop previous condition */
@@ -206,10 +206,10 @@ static char optab2[] =
 
 #define optab1 (_optab-' ')
 
-static int cond_get_exp (int priority)
+static long cond_get_exp (int priority)
 {
     int c;
-    int value, value2, x;
+    long value, value2, x;
 
 #ifdef LEXER
     do

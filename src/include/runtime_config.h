@@ -32,6 +32,8 @@
 #define __LOG_DIR__                 CFG_STR(4)
 #define __INCLUDE_DIRS__            CFG_STR(5)
 
+#define __PLACEHOLDER1__            CFG_STR(6)
+
 #define __MASTER_FILE__             CFG_STR(7)
 #define __SIMUL_EFUN_FILE__         CFG_STR(8)
 #define __SWAP_FILE__               CFG_STR(9)

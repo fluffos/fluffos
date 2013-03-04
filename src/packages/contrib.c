@@ -12,6 +12,7 @@
 #include "../add_action.h"
 #include "../port.h"
 #include "../applies.h"
+#include "../object.h"
 #define MAX_COLOUR_STRING 200
 
 /* should be done in configure */
@@ -75,9 +76,9 @@ void f_named_livings() {
 					continue;
 			}
 #endif
-if (nob == max_array_size)
-	break;
-obtab[nob++] = ob;
+			if (nob == max_array_size)
+				break;
+			obtab[nob++] = ob;
 		}
 	}
 
@@ -641,10 +642,11 @@ f_terminal_colour (void)
 	resetstrname = findstring("RESET");
 	k = sp->u.map->table_size;
 	if (resetstrname) {
-		int tmp;
 		static svalue_t str = {T_STRING, STRING_SHARED};
+		int tmp;
 		str.u.string = resetstrname;
 		tmp = MAP_SVAL_HASH(str);
+
 		for (elt = mtab[tmp & k]; elt; elt = elt->next) {
 			if ( elt->values->type == T_STRING &&
 					(elt->values + 1)->type == T_STRING &&
@@ -673,16 +675,16 @@ f_terminal_colour (void)
 		// Look it up in the mapping.
 		repused = 0;
 		copy_and_push_string(parts[i]);
-		svalue_t *tmp = apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, 1, ORIGIN_EFUN);
-		if(tmp && tmp->type == T_STRING){
-			rep = alloca(SVALUE_STRLEN(tmp)+1);
-			strcpy(rep, tmp->u.string);
+		svalue_t *reptmp = apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, 1, ORIGIN_EFUN);
+		if(reptmp && reptmp->type == T_STRING){
+			rep = (char *)alloca(SVALUE_STRLEN(reptmp)+1);
+			strcpy(rep, reptmp->u.string);
 			repused = 1;
 		}
 
 		if((repused && (cp = findstring(rep))) || (!repused && (cp = findstring(parts[i])))) {
-			int tmp;
 			static svalue_t str = {T_STRING, STRING_SHARED};
+			int tmp;
 			str.u.string = cp;
 			tmp = MAP_SVAL_HASH(str);
 			for (elt = mtab[tmp & k]; elt; elt = elt->next) {
@@ -706,13 +708,25 @@ f_terminal_colour (void)
 					break;
 				}
 			}
-			if (!elt) {
-				lens[i] = SHARED_STRLEN(cp);
+			if (!elt) { //end of for loop, so not found!
+				if(repused){
+					parts[i] = rep;
+					lens[i] = wrap?-SVALUE_STRLEN(reptmp):SVALUE_STRLEN(reptmp);
+					if (curcolourlen + SVALUE_STRLEN(reptmp) < MAX_COLOUR_STRING - 1) {
+						strcat(curcolour, rep);
+						curcolourlen += SVALUE_STRLEN(reptmp);
+					}
+				} else
+					lens[i] = SHARED_STRLEN(cp);
 			}
 		} else {
 			if(repused){
 				parts[i] = rep;
-				lens[i] = wrap?-SVALUE_STRLEN(tmp):SVALUE_STRLEN(tmp);
+				lens[i] = wrap?-SVALUE_STRLEN(reptmp):SVALUE_STRLEN(reptmp);
+				if (curcolourlen + SVALUE_STRLEN(reptmp) < MAX_COLOUR_STRING - 1) {
+					strcat(curcolour, rep);
+					curcolourlen += SVALUE_STRLEN(reptmp);
+				}
 			}
 			else
 				lens[i] = strlen(parts[i]);
@@ -1198,8 +1212,8 @@ static char *pluralize (const char * str) {
 			break;
 		}
 		if (!strcasecmp(rel + 1, "ech")) {
-		    found =  PLURAL_SUFFIX;
-		    suffix = "s";
+			found =  PLURAL_SUFFIX;
+			suffix = "s";
 		}
 		break;
 	case 'O':
@@ -1789,6 +1803,10 @@ void f_zonetime (void)
 
 	old_tz = set_timezone(timezone);
 	retv = ctime((time_t *)&time_val);
+	if(!retv) {
+	  error("bad argument to zonetime.");
+	  return ;
+	}
 	len = strlen(retv);
 	retv[len-1] = '\0';
 	reset_timezone(old_tz);
@@ -1813,10 +1831,9 @@ void f_is_daylight_savings_time (void)
 	old_tz = set_timezone(timezone);
 
 	t = localtime((time_t *)&time_to_check);
-
-	push_number((t->tm_isdst) > 0);
-
-	reset_timezone(old_tz);
+  if (t) {
+  	push_number((t->tm_isdst) > 0);
+  } else push_number(-1);
 }
 #endif
 
@@ -1895,12 +1912,12 @@ static int memory_share (svalue_t * sv) {
 		switch (sv->subtype) {
 		case STRING_MALLOC:
 			return total +
-			(1 + COUNTED_STRLEN(sv->u.string) + sizeof(malloc_block_t))/
-			(COUNTED_REF(sv->u.string));
+					(1 + COUNTED_STRLEN(sv->u.string) + sizeof(malloc_block_t))/
+					(COUNTED_REF(sv->u.string));
 		case STRING_SHARED:
 			return total +
-			(1 + COUNTED_STRLEN(sv->u.string) + sizeof(block_t))/
-			(COUNTED_REF(sv->u.string));
+					(1 + COUNTED_STRLEN(sv->u.string) + sizeof(block_t))/
+					(COUNTED_REF(sv->u.string));
 		}
 		break;
 		case T_ARRAY:
@@ -1911,11 +1928,11 @@ static int memory_share (svalue_t * sv) {
 			/* first svalue is stored inside the array struct, so sizeof(array_t)
 			 * includes one svalue.
 			 */
-			 subtotal = sizeof(array_t) - sizeof(svalue_t);
-			 for (i = 0; i < sv->u.arr->size; i++)
-				 subtotal += memory_share(&sv->u.arr->item[i]);
-			 calldepth--;
-			 return total + subtotal/sv->u.arr->ref;
+			subtotal = sizeof(array_t) - sizeof(svalue_t);
+			for (i = 0; i < sv->u.arr->size; i++)
+				subtotal += memory_share(&sv->u.arr->item[i]);
+			calldepth--;
+			return total + subtotal/sv->u.arr->ref;
 		case T_MAPPING:
 			if (1+calldepth > 100)
 				return 0;
@@ -2807,25 +2824,20 @@ void f_remove_charmode (void){
 #endif
 #ifdef F_REMOVE_GET_CHAR
 static int remove_get_char (object_t * ob){
-	int ret;
 	if (!ob || ob->interactive == 0){
-		ret = -2;
+		return -2;
 	}
-	else ret = 0;
 
 	if (ob->interactive->input_to) {
-		ret = 1;
 		free_sentence(ob->interactive->input_to);
 		if (ob->interactive->num_carry > 0)
 			free_some_svalues(ob->interactive->carryover, ob->interactive->num_carry);
 		ob->interactive->carryover = NULL;
 		ob->interactive->num_carry = 0;
 		ob->interactive->input_to = 0;
+		return 1;
 	}
-	else {
-		ret = -1;
-	}
-	return ret;
+	return -1;
 }
 
 void f_remove_get_char (void){
@@ -2883,66 +2895,106 @@ void f_restore_from_string(){
 
 #ifdef F_CLASSES
 void f_classes() {
-   int i, j, num, size, offset, flag;
-   array_t *vec, *subvec, *subsubvec;
-   unsigned short *types;
-   char buf[256];
-   char *end;
-   program_t *prog;
+	int i, j, num, size, offset, flag;
+	array_t *vec, *subvec, *subsubvec;
+	char buf[256];
+	char *end;
+	program_t *prog;
 
-   flag = (sp--)->u.number;
-   end = EndOf( buf );
+	flag = (sp--)->u.number;
+	end = EndOf( buf );
 
-   prog = sp->u.ob->prog;
-   num = prog->num_classes;
-   vec = allocate_empty_array( num );
+	prog = sp->u.ob->prog;
+	num = prog->num_classes;
+	vec = allocate_empty_array( num );
 
-   // Pull out data for each class.
-   for( i = 0; i < num; i++ ) {
-      // Do we want additional info on each class?
-      if( flag ) {
-         size = prog->classes[i].size;
+	// Pull out data for each class.
+	for( i = 0; i < num; i++ ) {
+		// Do we want additional info on each class?
+		if( flag ) {
+			size = prog->classes[i].size;
 
-         vec->item[i].type = T_ARRAY;
-         subvec = vec->item[i].u.arr = allocate_empty_array( 1 + size );
+			vec->item[i].type = T_ARRAY;
+			subvec = vec->item[i].u.arr = allocate_empty_array( 1 + size );
 
-         // First item of return array: the class's name.
-         subvec->item[0].type = T_STRING;
-         subvec->item[0].subtype = STRING_SHARED;
-         subvec->item[0].u.string = make_shared_string(
-                  prog->strings[prog->classes[i].classname] );
+			// First item of return array: the class's name.
+			subvec->item[0].type = T_STRING;
+			subvec->item[0].subtype = STRING_SHARED;
+			subvec->item[0].u.string = make_shared_string(
+					prog->strings[prog->classes[i].classname] );
 
-         offset = prog->classes[i].index;
+			offset = prog->classes[i].index;
 
-         // Find the name and type of each class member.
-         for( j = 0; j < size; j++, offset++ ) {
-            subvec->item[j + 1].type = T_ARRAY;
-            subsubvec = subvec->item[j + 1].u.arr = allocate_empty_array( 2 );
+			// Find the name and type of each class member.
+			for( j = 0; j < size; j++, offset++ ) {
+				subvec->item[j + 1].type = T_ARRAY;
+				subsubvec = subvec->item[j + 1].u.arr = allocate_empty_array( 2 );
 
-            // Each subarray contains the member's name...
-            subsubvec->item[0].type = T_STRING;
-            subsubvec->item[0].subtype = STRING_SHARED;
-            subsubvec->item[0].u.string = make_shared_string(
-                     prog->strings[prog->class_members[offset].membername] );
+				// Each subarray contains the member's name...
+				subsubvec->item[0].type = T_STRING;
+				subsubvec->item[0].subtype = STRING_SHARED;
+				subsubvec->item[0].u.string = make_shared_string(
+						prog->strings[prog->class_members[offset].membername] );
 
-            // ...and type.
-            get_type_name( buf, end, prog->class_members[offset].type );
-            subsubvec->item[1].type = T_STRING;
-            subsubvec->item[1].subtype = STRING_SHARED;
-            subsubvec->item[1].u.string = make_shared_string( buf );
-         }
-      }
-      else {
-         // No additional info. Just pull out the class name.
-         vec->item[i].type = T_STRING;
-         vec->item[i].subtype = STRING_SHARED;
-         vec->item[i].u.string = make_shared_string(
-                  prog->strings[prog->classes[i].classname] );
-      }
-   }
+				// ...and type.
+				get_type_name( buf, end, prog->class_members[offset].type );
+				subsubvec->item[1].type = T_STRING;
+				subsubvec->item[1].subtype = STRING_SHARED;
+				subsubvec->item[1].u.string = make_shared_string( buf );
+			}
+		}
+		else {
+			// No additional info. Just pull out the class name.
+			vec->item[i].type = T_STRING;
+			vec->item[i].subtype = STRING_SHARED;
+			vec->item[i].u.string = make_shared_string(
+					prog->strings[prog->classes[i].classname] );
+		}
+	}
 
-   pop_stack();
-   push_refed_array( vec );
+	pop_stack();
+	push_refed_array( vec );
+}
+
+#endif
+
+#ifdef F_TEST_LOAD
+const char *saved_extra_name;
+object_t *testloadob;
+static void fix_object_names() {
+	if(testloadob)
+		SETOBNAME(testloadob, saved_extra_name);
+}
+
+void f_test_load(){
+	const char *tmp = sp->u.string;
+	object_t *new_ob, *tmp_ob;
+	if(testloadob = find_object2(sp->u.string)){
+		tmp = testloadob->obname;
+		SETOBNAME(testloadob, "");
+
+	}
+	saved_extra_name = tmp;
+	STACK_INC;
+	sp->type = T_ERROR_HANDLER;
+	sp->u.error_handler = fix_object_names;
+
+
+	new_ob = int_load_object(tmp, 0);
+	if (!new_ob) {
+		if(testloadob)
+			SETOBNAME(testloadob, tmp);
+		sp--;
+		pop_stack();
+		push_number(0);
+		return;
+	}
+	destruct_object(new_ob);
+	sp--;
+	pop_stack();
+	push_number(1);
+	if(testloadob)
+		SETOBNAME(testloadob, saved_extra_name);
 }
 
 #endif

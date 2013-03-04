@@ -370,7 +370,7 @@ int socket_bind (int fd, int port, const char * addr)
 #ifdef IPV6
     char tmp[INET6_ADDRSTRLEN];
     debug(sockets, ("socket_bind: bound socket %d to %s.%d\n",
-                 fd, inet_ntop(AF_INET6, &lpc_socks[fd].l_addr.sin6_addr, &tmp, INET6_ADDRSTRLEN),
+                 fd, inet_ntop(AF_INET6, &lpc_socks[fd].l_addr.sin6_addr, (char *)&tmp, INET6_ADDRSTRLEN),
                  ntohs(lpc_socks[fd].l_addr.sin6_port)));
 
 #else
@@ -477,8 +477,6 @@ int socket_accept (int fd, svalue_t * read_callback, svalue_t * write_callback)
     i = find_new_socket();
     if (i >= 0) {
         fd_set wmask;
-        struct timeval t;
-        int nb;
 
         lpc_socks[i].fd = accept_fd;
         lpc_socks[i].flags = S_HEADER |
@@ -486,13 +484,7 @@ int socket_accept (int fd, svalue_t * read_callback, svalue_t * write_callback)
 
         FD_ZERO(&wmask);
         FD_SET(accept_fd, &wmask);
-        t.tv_sec = 0;
-        t.tv_usec = 1; //give the kernel some time to open the socket, but not too much!
-#ifndef hpux
-        nb = select(accept_fd+1, (fd_set *) 0, &wmask, (fd_set *) 0, &t);
-#else
-        nb = select(accept_fd+1, (int *) 0, (int *) &wmask, (int *) 0, &t);
-#endif
+
         if (!(FD_ISSET(accept_fd, &wmask)))
         	lpc_socks[i].flags |= S_BLOCKED;
 
@@ -947,7 +939,7 @@ void socket_read_select_handler (int fd)
                     DMALLOC(lpc_socks[fd].r_len + 1, TAG_TEMPORARY, "socket_read_select_handler");
                 if (lpc_socks[fd].r_buf == NULL)
                     fatal("Out of memory");
-                debug(sockets, ("read_socket_handler: svalue len is %lu\n",
+                debug(sockets, ("read_socket_handler: svalue len is %d.\n",
                              lpc_socks[fd].r_len));
             }
             if (lpc_socks[fd].r_off < lpc_socks[fd].r_len) {

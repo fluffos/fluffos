@@ -377,8 +377,11 @@ void call_heart_beat()
 						restore_context(&econ);
 					} else {
 						save_command_giver(new_command_giver);
+						if(ob->interactive) //note, NOT same as new_command_giver
+							current_interactive = ob;
 						call_direct(ob, ob->prog->heart_beat - 1,
 								ORIGIN_DRIVER, 0);
+						current_interactive = 0;
 						pop_stack(); /* pop the return value */
 						restore_command_giver();
 					}

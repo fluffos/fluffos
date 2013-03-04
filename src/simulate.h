@@ -45,8 +45,8 @@ int get_char (svalue_t *, int, int, svalue_t *);
 
 int strip_name (const char *, char *, int);
 char *check_name (char *);
-#define load_object(x, y) int_load_object(x)
-object_t *int_load_object (const char *);
+#define load_object(x, y) int_load_object(x, 1)
+object_t *int_load_object (const char *, int);
 object_t *clone_object (const char *, int);
 object_t *environment (svalue_t *);
 object_t *first_inventory (svalue_t *);

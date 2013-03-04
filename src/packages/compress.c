@@ -186,7 +186,6 @@ void f_uncompress_file (void)
 
    in_file = gzopen(real_input_file, "rb");
    if (!in_file) {
-      gzclose(in_file);
       pop_n_elems(num_arg);
       push_number(0);
       return ;
@@ -194,7 +193,7 @@ void f_uncompress_file (void)
 
    out_file = fopen(output_file, "wb");
    if (!out_file) {
-      fclose(out_file);
+      gzclose(in_file);
       pop_n_elems(num_arg);
       push_number(0);
       return ;

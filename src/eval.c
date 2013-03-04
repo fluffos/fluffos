@@ -15,8 +15,9 @@ void set_eval(int etime){
   gettimeofday(&tv, NULL);
   if((diff = tv.tv_sec-current_time) > 1){
 	  diff *= 1000000;
-	  if(diff > max_cost*100){
+	  if(diff > max_cost*100L){
 		  //put some hard limit to eval times
+      debug(d_flag, ("difft:%ld, max_cost:%d", diff, max_cost));
 		  outoftime = 1;
 		  return;
 	  }

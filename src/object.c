@@ -1253,7 +1253,6 @@ restore_object_from_gzip (object_t * ob,
     static char *buff = NULL;
     static long buffsize = 0;
     const char* tmp = "";
-    int idx;
     int t;
 
     t = 65536 << *count; //should be big enough most of the time
@@ -1270,7 +1269,6 @@ restore_object_from_gzip (object_t * ob,
     t = buffsize;
 
     while (!gzeof(gzf) && tmp != Z_NULL) {
-        idx = 0;
         buff[t - 2] = 0;
         // gzgets appaears to pay attension to zero termination even on short
         // strings
@@ -1896,7 +1894,7 @@ void tell_object (object_t * ob, const char * str, int len)
 void dealloc_object (object_t * ob, const char * from)
 {
 #ifdef DEBUG
-    object_t *tmp, *prev_all = 0;
+    object_t *prev_all = 0;
 #endif
 
     debug(d_flag, ("free_object: /%s.\n", ob->obname));

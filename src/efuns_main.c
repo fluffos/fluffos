@@ -570,6 +570,7 @@ f_set_debug_level (void)
 void
 f_clear_debug_level (void) {
     debug_level_clear(sp->u.string);
+    pop_stack();
 }
 
 void
@@ -648,10 +649,15 @@ f_ed (void)
         ed_start(0, 0, 0, 0, 0, 0);
     } else if (st_num_arg == 1) {
         /* ed(fname) */
+        if (!(sp->type == T_STRING))
+            bad_argument(sp, T_STRING, 1, F_ED);
         ed_start(sp->u.string, 0, 0, 0, 0, 0);
         pop_stack();
     } else if (st_num_arg == 2) {
         /* ed(fname,exitfn) / ed(fname, scroll_lines) */
+        if (!((sp - 1)->type == T_STRING))
+            bad_argument(sp - 1, T_STRING, 1, F_ED);
+
         if(sp->type == T_STRING)
           ed_start((sp - 1)->u.string, 0, sp->u.string, 0, current_object, 0);
         else if(sp->type == T_NUMBER)
@@ -662,6 +668,11 @@ f_ed (void)
     } else if (st_num_arg == 3) {
         /* ed(fname,exitfn,restricted) / ed(fname,writefn,exitfn) /
            ed(fname,exitfn,scroll_lines) */
+        if (!((sp - 1)->type == T_STRING))
+            bad_argument(sp - 1, T_STRING, 2, F_ED);
+        if (!((sp - 2)->type == T_STRING))
+            bad_argument(sp - 2, T_STRING, 1, F_ED);
+
         if (sp->type == T_NUMBER) {
             if(sp->u.number == 1)
               ed_start((sp - 2)->u.string, 0, (sp - 1)->u.string, sp->u.number,
@@ -679,10 +690,15 @@ f_ed (void)
     } else if (st_num_arg == 4) {
         /* ed(fname,writefn,exitfn,restricted) /
            ed(fname,writefn,exitfn,scroll_lines) */
-        if (!((sp - 1)->type == T_STRING))
-            bad_argument(sp - 1, T_STRING, 3, F_ED);
         if (!(sp->type == T_NUMBER))
             bad_argument(sp, T_NUMBER, 4, F_ED);
+        if (!((sp - 1)->type == T_STRING))
+            bad_argument(sp - 1, T_STRING, 3, F_ED);
+        if (!((sp - 2)->type == T_STRING))
+            bad_argument(sp - 2, T_STRING, 2, F_ED);
+        if (!((sp - 3)->type == T_STRING))
+            bad_argument(sp - 3, T_STRING, 1, F_ED);
+
         if(sp->u.number == 1)
           ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string,
                    sp->u.number, current_object, 0);
@@ -698,6 +714,10 @@ f_ed (void)
           bad_argument(sp-1, T_NUMBER, 4, F_ED);
         if(!((sp-2)->type == T_STRING))
           bad_argument(sp-2, T_STRING, 3, F_ED);
+        if(!((sp-3)->type == T_STRING))
+          bad_argument(sp-3, T_STRING, 2, F_ED);
+        if(!((sp-4)->type == T_STRING))
+          bad_argument(sp-4, T_STRING, 1, F_ED);
 
         ed_start((sp - 4)->u.string, (sp - 3)->u.string, (sp - 2)->u.string,
                  (sp - 1)->u.number, current_object, sp->u.number);
@@ -796,7 +816,7 @@ f_error (void)
     int l = SVALUE_STRLEN(sp);
     char err_buf[2048];
 
-    if (sp->u.string[l - 1] == '\n')
+    if (l && sp->u.string[l - 1] == '\n')
         l--;
     if (l > 2045) l = 2045;
 
@@ -1171,7 +1191,7 @@ inherits (program_t * prog, program_t * thep)
             return 1;
         if (!strcmp(pg->filename, thep->filename))
             return 2;
-        if (l=inherits(pg, thep))
+        if ((l=inherits(pg, thep)))
             return l;
     }
     return 0;
@@ -2758,9 +2778,10 @@ void
 f_save_object (void)
 {
     int flag;
-
     if (st_num_arg == 2 ) {
         flag = (sp--)->u.number;
+        if(sp->type != T_STRING)
+        	error("first argument must be a string for save_object with 2 args");
     } else {
         flag = 0;
     }
@@ -3075,8 +3096,7 @@ f_sizeof (void)
         i = 0;
         free_svalue(sp, "f_sizeof");
     }
-    sp->type = T_NUMBER;
-    sp->u.number = i;
+    put_number(i);
 }
 #endif
 
@@ -3454,6 +3474,8 @@ f_this_player (void)
 }
 #endif
 
+int playerchanged;
+
 #ifdef F_SET_THIS_PLAYER
 void
 f_set_this_player (void)
@@ -3463,6 +3485,7 @@ f_set_this_player (void)
     else
         set_command_giver(sp->u.ob);
     pop_stack();
+    playerchanged = 1;
 }
 #endif
 
@@ -3948,7 +3971,7 @@ f_next_inventory (void)
 
 #ifdef F_DEFER
 void f_defer(){
-	struct defer_list *newlist = MALLOC(sizeof(struct defer_list));
+	struct defer_list *newlist = (struct defer_list *)MALLOC(sizeof(struct defer_list));
 	newlist->next = csp->defers;
 	newlist->func = *sp--;
 	if(command_giver){

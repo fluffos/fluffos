@@ -33,7 +33,7 @@ static object_t *find_obj_n(const char *);
 static object_t **obj_table = 0;
 static object_t **ch_table = 0;
 
-static char *basename(const char *full, int *size) {
+static char *_basename(const char *full, int *size) {
 	char *tmp;
 	char *name= new_string(*size = strlen(full), "base_name: name");
 	while (*full == '/') {
@@ -113,7 +113,7 @@ array_t *children(const char * s) {
 	int size;
 	int count = 0;
 
-	s = basename(s, &size);
+	s = _basename(s, &size);
 	ch = ObjHash(s);
 	curr = ch_table[ch];
 
@@ -164,7 +164,7 @@ void enter_object_hash(object_t * ob) {
 	objs_in_table++;
 
 	//for children()
-	base = basename(ob->obname, &dummy);
+	base = _basename(ob->obname, &dummy);
 
 	ch = ObjHash(base);
 	ob->next_ch_hash = ch_table[ch];
@@ -195,7 +195,7 @@ void remove_object_hash(object_t * ob) {
 	ob->next_hash = 0;
 	objs_in_table--;
 
-	base = basename(ob->obname, &dummy);
+	base = _basename(ob->obname, &dummy);
 	ch = ObjHash(base);
 	FREE_MSTR(base);
 	s = ch_table[ch];

@@ -310,7 +310,6 @@ void new_conn_handler()
     struct sockaddr_in client;
 #endif
     socklen_t client_len;
-    struct hostent *c_hostent;
     int new_fd;
     int conn_index;
 
@@ -561,7 +560,7 @@ int name_by_ip (int conn_index, char * buf)
     	return 0;
     }
     char tmpbuf[80], tmpp[80];
-    if(ret = getnameinfo(res->ai_addr, res->ai_addrlen, tmpbuf, 79, tmpp, 79, NI_NAMEREQD|NI_NUMERICSERV)){
+    if((ret = getnameinfo(res->ai_addr, res->ai_addrlen, tmpbuf, 79, tmpp, 79, NI_NAMEREQD|NI_NUMERICSERV))){
     	sprintf(out_buf, "%s 0\n", &buf[sizeof(int)]);
     	DBG(("%s", out_buf));
     	OS_socket_write(all_conns[conn_index].fd, out_buf, strlen(out_buf));

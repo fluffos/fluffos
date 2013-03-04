@@ -77,7 +77,7 @@ int external_start (int which, svalue_t * args,
 			}
 		}
 
-		argv = CALLOCATE(n, char *, TAG_TEMPORARY, "external args");
+		argv = CALLOCATE(n+1, char *, TAG_TEMPORARY, "external args");
 
 		argv[0] = cmd;
 
