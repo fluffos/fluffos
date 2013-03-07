@@ -1,5 +1,5 @@
-#ifndef FLUFF_POSIX_TIMERS_H
-#define FLUFF_POSIX_TIMERS_H
+#ifndef POSIX_TIMERS_H
+#define POSIX_TIMERS_H
 
 #ifdef POSIX_TIMERS
 void init_posix_timers(void);

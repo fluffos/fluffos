@@ -12,38 +12,38 @@ int lasttime;
 
 void set_eval(int etime){
 #ifndef WIN32
-    long diff;
-    gettimeofday(&tv, NULL);
-    if((diff = tv.tv_sec-current_time) > 1){
-	diff *= 1000000;
-	if(diff > max_cost*100L){
-	    //put some hard limit to eval times
-	    debug(d_flag, ("difft:%ld, max_cost:%d", diff, max_cost));
-	    outoftime = 1;
-	    return;
+	long diff;
+	gettimeofday(&tv, NULL);
+	if((diff = tv.tv_sec-current_time) > 1){
+		diff *= 1000000;
+		if(diff > max_cost*100L){
+			//put some hard limit to eval times
+			debug(d_flag, ("difft:%ld, max_cost:%d", diff, max_cost));
+			outoftime = 1;
+			return;
+		}
 	}
-    }
 #ifdef POSIX_TIMERS
-    posix_eval_timer_set(etime);
+	posix_eval_timer_set(etime);
 #else
-    signal(SIGVTALRM, sigalrm_handler);
-    uvalarm(etime, 0);
+	signal(SIGVTALRM, sigalrm_handler);
+	uvalarm(etime, 0);
 #endif
 #endif
-    outoftime = 0;
+	outoftime = 0;
 }
 
 int get_eval(){
 #ifndef WIN32
 #ifdef POSIX_TIMERS
-    return posix_eval_timer_get();
+	return posix_eval_timer_get();
 #else
-    struct timeval now;
-    gettimeofday(&now, NULL);
-    return max_cost - (1000000*(now.tv_sec - tv.tv_sec))-(now.tv_usec - tv.tv_usec);
+	struct timeval now;
+	gettimeofday(&now, NULL);
+	return max_cost - (1000000*(now.tv_sec - tv.tv_sec))-(now.tv_usec - tv.tv_usec);
 #endif
 #else
-    return 100;
+	return 100;
 #endif
 }
 
