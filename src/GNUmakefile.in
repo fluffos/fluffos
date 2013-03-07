@@ -58,7 +58,8 @@ SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   socket_efuns.c socket_ctrl.c qsort.c eoperators.c socket_err.c md.c \
   disassembler.c uvalarm.c $(STRFUNCS) \
   replace_program.c master.c function.c \
-  debug.c crypt.c applies_table.c add_action.c eval.c fliconv.c console.c
+  debug.c crypt.c applies_table.c add_action.c eval.c fliconv.c console.c \
+  posix_timers.c
 
 all: $(OBJDIR) cc.h main_build
 main_build2: $(DRIVER_BIN) addr_server portbind

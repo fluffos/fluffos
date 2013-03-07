@@ -1,6 +1,6 @@
 
-SRC=uids.c db.c compress.c math.c develop.c external.c contrib.c sockets.c async.c dwlib.c 
-OBJ=uids.$(O) db.$(O) compress.$(O) math.$(O) develop.$(O) external.$(O) contrib.$(O) sockets.$(O) async.$(O) dwlib.$(O) 
+SRC=dslib.c math.c develop.c matrix.c parser.c contrib.c sockets.c mudlib_stats.c 
+OBJ=dslib.$(O) math.$(O) develop.$(O) matrix.$(O) parser.$(O) contrib.$(O) sockets.$(O) mudlib_stats.$(O) 
 
 .c.$(O):
 	$(CC) $(CFLAGS) -I.. -c $*.c
