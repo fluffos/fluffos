@@ -1433,6 +1433,7 @@ static void handle_configure() {
     check_include("INCL_DOS_H", "dos.h");
     check_include("INCL_USCLKC_H", "usclkc.h");
     check_include("INCL_LIMITS_H", "limits.h");
+    check_include("INCL_FLOAT_H", "float.h");
     check_include("INCL_LOCALE_H", "locale.h");
     if (!check_prog(0, 0, "int x = USHRT_MAX;", 0)) {
         if (!check_prog(0, 0, "int x = MAXSHORT;", 0))
