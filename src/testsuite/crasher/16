@@ -1,0 +1,3 @@
+calling remove_get_char with ({ /* sizeof() == 1 */
+  /clone/login#2
+}) 

@@ -2139,7 +2139,7 @@ static void add_quoted_predefine (const char * def, const char * val)
 
 void add_predefines()
 {
-    char save_buf[80];
+    char save_buf[1024];
     int i;
     lpc_predef_t *tmpf;
 
@@ -2218,6 +2218,12 @@ void add_predefines()
     add_predefine("SIZEOFINT", -1, save_buf);    
     sprintf(save_buf, "%ld", LONG_MAX);
     add_predefine("MAX_INT", -1, save_buf);
+    sprintf(save_buf, "%ld", LONG_MIN);
+    add_predefine("MIN_INT", -1, save_buf);
+    sprintf(save_buf, "%lf", DBL_MAX);
+    add_predefine("MAX_FLOAT", -1, save_buf);
+    sprintf(save_buf, "%lf", DBL_MIN);
+    add_predefine("MIN_FLOAT", -1, save_buf);
 }
 
 void start_new_file (int f)
