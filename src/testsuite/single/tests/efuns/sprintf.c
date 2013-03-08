@@ -201,7 +201,7 @@ mixed make_arg(int x, int trail) {
 void do_tests() {
     int x;
     mixed *mx;
-    string format, shouldbe;
+    string format, shouldbe, actual;
     string hmm;
     
     while (1) {
@@ -209,7 +209,8 @@ void do_tests() {
 	
 	format = "$" + mx[0] + "^";
 	shouldbe = "$" + mx[1] + "^";
-	ASSERT2(sprintf(format, mx[2..]...) == shouldbe, shouldbe);
+  actual = sprintf(format, mx[2..]...);
+	ASSERT2(shouldbe == actual, "expected: " + shouldbe + ", actual: " + actual);
     }
 
     hmm = sprintf("xxx%#-20.5s\n", "This\nis\na\ntest\nof\nsprintf\ntable\nmode\n");

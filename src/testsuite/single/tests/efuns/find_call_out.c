@@ -3,4 +3,5 @@ void do_tests() {
     call_out("foo", 10);
     ASSERT(find_call_out("foo") == 10);
     ASSERT(find_call_out("bar") == -1);
+    remove_call_out("foo");
 }

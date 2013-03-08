@@ -18,10 +18,10 @@ address server ip : localhost
 address server port : 7374
 
 # absolute pathname of mudlib
-mudlib directory : /gdir/apang/beta/testsuite
+mudlib directory : ./
 
 # absolute pathname of driver/config dir
-binary directory : /gdir/apang/beta
+binary directory : ./
 
 # debug.log and author/domain stats are stored here
 log directory : /log
@@ -46,7 +46,7 @@ swap file : /etc/swapfile
 debug log file : debug.log
 
 # This is an include file which is automatically #include'd in all objects
-global include file : <config.h>
+global include file : <globals.h>
 
 # if an object is left alone for a certain time, then the
 # function clean_up will be called. This function can do anything,
@@ -73,7 +73,7 @@ maximum local variables : 30
 
 # Maximum amount of "eval cost" per thread - execution is halted when 
 # it is exceeded.
-maximum evaluation cost : 500000
+maximum evaluation cost : 0x7fffffffff
 
 # This is the maximum array size allowed for one single array.
 maximum array size : 15000

@@ -1,0 +1,4 @@
+calling save_object with ({ /* sizeof() == 2 */
+  32,
+  40
+}) 

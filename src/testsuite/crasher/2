@@ -1,0 +1,3 @@
+calling clear_debug_level with ({ /* sizeof() == 1 */
+  "%d %q %T"
+})
