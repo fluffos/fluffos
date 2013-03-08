@@ -50,6 +50,9 @@
 #ifdef INCL_LIMITS_H
 #  include <limits.h>
 #endif
+#ifdef INCL_FLOAT_H
+#  include <float.h>
+#endif
 #ifdef INCL_MALLOC_H
 #  include <malloc.h>
 #endif
