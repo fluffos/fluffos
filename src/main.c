@@ -14,6 +14,7 @@
 #include "socket_efuns.h"
 #include "master.h"
 #include "eval.h"
+#include "posix_timers.h"
 
 port_def_t external_port[5];
 
@@ -174,6 +175,13 @@ int main (int argc, char ** argv)
 	 * Initialize the microsecond clock.
 	 */
 	init_usec_clock();
+
+#ifdef POSIX_TIMERS
+	/*
+	 * Initialize the POSIX timers.
+	 */
+	init_posix_timers();
+#endif
 
 	/* read in the configuration file */
 
