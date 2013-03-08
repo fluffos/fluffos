@@ -910,5 +910,8 @@
 
 /* use struct keyword for lpc structs */
 #define STRUCT_STRUCT
+
+/* use POSIX timers for eval_cost */
+#define POSIX_TIMERS
 #endif
 
