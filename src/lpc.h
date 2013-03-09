@@ -4,14 +4,23 @@
 /* It is usually better to include "lpc_incl.h" instead of including this
    directly */
 
+/* type definiation for LPC types. */
+typedef int64_t LPC_INT;
+#define LPC_INT_MAX INT64_MAX
+#define LPC_INT_MIN INT64_MIN
+
+typedef double LPC_FLOAT;
+#define LPC_FLOAT_MAX DBL_MAX
+#define LPC_FLOAT_MIN DBL_MIN
+
 typedef struct {
     unsigned short ref;
 } refed_t;
 
 union u {
     const char *string;
-    long number;
-    double real;
+    LPC_INT number;
+    LPC_FLOAT real;
 
     refed_t *refed; /* any of the block below */
 

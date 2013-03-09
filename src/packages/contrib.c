@@ -1793,7 +1793,7 @@ void f_zonetime (void)
 {
 	const char *timezone, *old_tz;
 	char *retv;
-	long time_val;
+	LPC_INT time_val;
 	int len;
 
 	time_val = sp->u.number;
@@ -1819,7 +1819,7 @@ void f_zonetime (void)
 void f_is_daylight_savings_time (void)
 {
 	struct tm *t;
-	long time_to_check;
+	LPC_INT time_to_check;
 	const char *timezone;
 	char *old_tz;
 
@@ -2214,7 +2214,7 @@ void f_event (void){
 
 
 #ifdef F_QUERY_NUM
-void number_as_string (char * buf, long n){
+void number_as_string (char * buf, LPC_INT n){
 	const char *low[] =  { "ten", "eleven", "twelve", "thirteen",
 			"fourteen", "fifteen", "sixteen", "seventeen",
 			"eighteen", "nineteen" };
@@ -2244,7 +2244,7 @@ void number_as_string (char * buf, long n){
 void f_query_num (void){
 	char ret[100];
 	int i;
-	long n, limit;
+	LPC_INT n, limit;
 	int changed = 0;
 	char *res;
 
@@ -2671,7 +2671,7 @@ f_abs() {
 
 void
 f_roll_MdN() {
-	long roll = 0;
+	LPC_INT roll = 0;
 
 	if ( (sp - 1)->u.number > 0 && sp->u.number > 0 ) {
 		while( (sp - 1)->u.number-- )
@@ -2880,7 +2880,7 @@ void f_send_nullbyte (void){
 #ifdef F_RESTORE_FROM_STRING
 void f_restore_from_string(){
 	const char *buf;
-	long noclear;
+	LPC_INT noclear;
 
 	buf = (sp-1)->u.string;
 	noclear = sp->u.number;

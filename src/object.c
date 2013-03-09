@@ -512,7 +512,7 @@ restore_interior_string (char ** val, svalue_t * sv)
 static int parse_numeric (char ** cpp, unsigned char c, svalue_t * dest)
 {
     char *cp = *cpp;
-    long res, neg;
+    LPC_INT res, neg;
 
     if (c == '-') {
         neg = 1;
@@ -529,7 +529,7 @@ static int parse_numeric (char ** cpp, unsigned char c, svalue_t * dest)
         res += c - '0';
     }
     if (c == '.') {
-        double f1 = 0.0, f2 = 10.0;
+        LPC_FLOAT f1 = 0.0, f2 = 10.0;
 
         c = *cp++;
         if (!c) {
@@ -569,7 +569,7 @@ static int parse_numeric (char ** cpp, unsigned char c, svalue_t * dest)
         return 1;
     } else if (c == 'e') {
         int expo = 0;
-        double f1;
+        LPC_FLOAT f1;
 
         if ((c = *cp++) == '+') {
             while ((c = *cp++) && isdigit(c)) {

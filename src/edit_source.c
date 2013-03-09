@@ -6,6 +6,7 @@
 #define NO_OPCODES
 #include "std.h"
 #include "lex.h"
+#include "lpc.h"
 #include "preprocess.h"
 #include "make_func.h"
 #include "cc.h"
@@ -1574,6 +1575,8 @@ static void handle_configure() {
     fprintf(yyout, "#define SIZEOF_SHORT %lu\n", sizeof(short));
     fprintf(yyout, "#define SIZEOF_FLOAT %lu\n", sizeof(double));
     fprintf(yyout, "#define SIZEOF_LONG %lu\n", sizeof(long));
+    fprintf(yyout, "#define SIZEOF_LPC_INT %lu\n", sizeof(LPC_INT));
+    fprintf(yyout, "#define SIZEOF_LPC_FLOAT %lu\n", sizeof(LPC_FLOAT));
 
     if (sizeof(unsigned long) == 4)
         fprintf(yyout, "#define UINT32 unsigned long\n");
