@@ -4705,12 +4705,16 @@ static void get_explicit_line_number_info (char * p, const program_t * progp,
   switch (i) {
   case 1:
     *ret_file =  "(no program)";
+    break;
   case 2:
     *ret_file = "(fake)";
+    break;
   case 3:
     *ret_file = "(compiled program)";
+    break;
   case 4:
     *ret_file = "(no line numbers)";
+    break;
   case 5:
     *ret_file = "(includes too deep)";
   }
