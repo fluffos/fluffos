@@ -163,16 +163,16 @@ static void print_cache_stats (outbuffer_t * ob)
     outbuf_add(ob, "Function cache information\n");
     outbuf_add(ob, "-------------------------------\n");
     outbuf_addv(ob, "%% cache hits:    %10.2f\n",
-             100 * ((double) apply_low_cache_hits / apply_low_call_others));
+             100 * ((LPC_FLOAT) apply_low_cache_hits / apply_low_call_others));
     outbuf_addv(ob, "call_others:     %10lu\n", apply_low_call_others);
     outbuf_addv(ob, "cache hits:      %10lu\n", apply_low_cache_hits);
     outbuf_addv(ob, "cache size:      %10lu\n", APPLY_CACHE_SIZE);
     outbuf_addv(ob, "slots used:      %10lu\n", apply_low_slots_used);
     outbuf_addv(ob, "%% slots used:    %10.2f\n",
-                100 * ((double) apply_low_slots_used / APPLY_CACHE_SIZE));
+                100 * ((LPC_FLOAT) apply_low_slots_used / APPLY_CACHE_SIZE));
     outbuf_addv(ob, "collisions:      %10lu\n", apply_low_collisions);
     outbuf_addv(ob, "%% collisions:    %10.2f\n",
-             100 * ((double) apply_low_collisions / apply_low_call_others));
+             100 * ((LPC_FLOAT) apply_low_collisions / apply_low_call_others));
 }
 
 void f_cache_stats (void)
@@ -911,7 +911,7 @@ f_file_name (void)
 void
 f_file_size (void)
 {
-    long i = file_size(sp->u.string);
+    LPC_INT i = file_size(sp->u.string);
     free_string_svalue(sp);
     put_number(i);
 }
@@ -3511,12 +3511,12 @@ f_time (void)
 void
 f__to_float (void)
 {
-    double temp = 0;
+    LPC_FLOAT temp = 0;
 
     switch(sp->type) {
         case T_NUMBER:
             sp->type = T_REAL;
-            sp->u.real = (double) sp->u.number;
+            sp->u.real = (LPC_FLOAT) sp->u.number;
             break;
         case T_STRING:
             sscanf(sp->u.string, "%lf", &temp);
@@ -3534,11 +3534,11 @@ f__to_int (void)
     switch(sp->type) {
         case T_REAL:
             sp->type = T_NUMBER;
-            sp->u.number = (long) sp->u.real;
+            sp->u.number = (LPC_INT) sp->u.real;
             break;
         case T_STRING:
         {
-            long temp;
+            LPC_INT temp;
             char *p;
 
             temp = strtol(sp->u.string, &p, 10);
@@ -3816,7 +3816,7 @@ void f_reclaim_objects (void)
 void
 f_memory_info (void)
 {
-    long mem;
+    LPC_INT mem;
     object_t *ob;
 
     if (st_num_arg == 0) {

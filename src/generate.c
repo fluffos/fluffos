@@ -251,11 +251,11 @@ static void lpc_tree (parse_node_t * dest, int num) {
     }	
 }
 
-static void lpc_tree_number (parse_node_t * dest, int num) {
+static void lpc_tree_number (parse_node_t * dest, LPC_INT num) {
     CREATE_NUMBER(dest->v.expr, num);
 }
 
-static void lpc_tree_real (parse_node_t * dest, double real) {
+static void lpc_tree_real (parse_node_t * dest, LPC_FLOAT real) {
     CREATE_REAL(dest->v.expr, real);
 }
 
