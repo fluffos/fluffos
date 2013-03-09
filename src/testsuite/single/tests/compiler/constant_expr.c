@@ -1,6 +1,7 @@
 void do_tests() {
     mixed code;
 
+#ifdef __DEBUG__
     // array constants
     code = __TREE__ ( sizeof( ({ 1, 3, 3 }) ) );
     ASSERT(same(code, ({ "number", 3 })));
@@ -34,4 +35,5 @@ void do_tests() {
     ASSERT(1/8.0 == 0.125);
     ASSERT(1.0/2 == 0.5);
     ASSERT(1.0/2.0 == 0.5);
+#endif
 }
