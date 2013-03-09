@@ -42,7 +42,7 @@ void f_id_matrix (void)
 void f_translate (void)
 {
     array_t *matrix;
-    double x, y, z;
+    LPC_FLOAT x, y, z;
     Matrix current_matrix;
     Matrix trans_matrix;
     Matrix final_matrix;
@@ -88,7 +88,7 @@ void f_translate (void)
 void f_scale (void)
 {
     array_t *matrix;
-    double x, y, z;
+    LPC_FLOAT x, y, z;
     Matrix current_matrix;
     Matrix scaling_matrix;
     Matrix final_matrix;
@@ -133,7 +133,7 @@ void f_scale (void)
 void f_rotate_x (void)
 {
     array_t *matrix;
-    double angle;
+    LPC_FLOAT angle;
     Matrix current_matrix;
     Matrix rot_matrix;
     Matrix final_matrix;
@@ -169,7 +169,7 @@ void f_rotate_x (void)
 void f_rotate_y (void)
 {
     array_t *matrix;
-    double angle;
+    LPC_FLOAT angle;
     Matrix current_matrix;
     Matrix rot_matrix;
     Matrix final_matrix;
@@ -205,7 +205,7 @@ void f_rotate_y (void)
 void f_rotate_z (void)
 {
     array_t *matrix;
-    double angle;
+    LPC_FLOAT angle;
     Matrix current_matrix;
     Matrix rot_matrix;
     Matrix final_matrix;
@@ -241,7 +241,7 @@ void f_rotate_z (void)
 void f_lookat_rotate (void)
 {
     array_t *matrix;
-    double x, y, z;
+    LPC_FLOAT x, y, z;
     Matrix current_matrix;
     Matrix lookat_matrix;
     int i;
@@ -282,7 +282,7 @@ void f_lookat_rotate (void)
 void f_lookat_rotate2 (void)
 {
     array_t *matrix;
-    double ex, ey, ez, lx, ly, lz;
+    LPC_FLOAT ex, ey, ez, lx, ly, lz;
     Matrix current_matrix;
     Matrix lookat_matrix;
     int i, j;
@@ -347,7 +347,7 @@ static void print_array (Vector * v, char * label)
 
 static Vector *normalize_array (Vector * v)
 {
-    double xx, yy, zz, mm, m;
+    LPC_FLOAT xx, yy, zz, mm, m;
 
     xx = v->x * v->x;
     yy = v->y * v->y;
@@ -378,7 +378,7 @@ static Vector *points_to_array (Vector * v, Vector * pa, Vector * pb)
     return (v);
 }
 
-void lookat_rotate (Matrix T, double x, double y, double z, Matrix M)
+void lookat_rotate (Matrix T, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix M)
 {
     static Vector N, V, U;
     static Vector ep, lp;
@@ -439,7 +439,7 @@ void lookat_rotate (Matrix T, double x, double y, double z, Matrix M)
 #endif				/* DEBUG */
 }
 
-void lookat_rotate2 (double ex, double ey, double ez, double lx, double ly, double lz, Matrix M)
+void lookat_rotate2 (LPC_FLOAT ex, LPC_FLOAT ey, LPC_FLOAT ez, LPC_FLOAT lx, LPC_FLOAT ly, LPC_FLOAT lz, Matrix M)
 {
     static Vector N, V, U;
     static Vector ep, lp;
@@ -500,7 +500,7 @@ void lookat_rotate2 (double ex, double ey, double ez, double lx, double ly, doub
 #endif				/* DEBUG */
 }
 
-void translate_matrix (double x, double y, double z, Matrix m)
+void translate_matrix (LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix m)
 {
     m[0] = 1.;
     m[1] = 0.;
@@ -520,7 +520,7 @@ void translate_matrix (double x, double y, double z, Matrix m)
     m[15] = 1.;
 }
 
-void scale_matrix (double x, double y, double z, Matrix m)
+void scale_matrix (LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix m)
 {
     m[0] = x;
     m[1] = 0.;
@@ -540,12 +540,12 @@ void scale_matrix (double x, double y, double z, Matrix m)
     m[15] = 1.;
 }
 
-void rotate_x_matrix (double a, Matrix m)
+void rotate_x_matrix (LPC_FLOAT a, Matrix m)
 {
-    double a_rad;
-    double c, s;
+    LPC_FLOAT a_rad;
+    LPC_FLOAT c, s;
 
-    a_rad = (double) (a * RADIANS_PER_DEGREE);
+    a_rad = (LPC_FLOAT) (a * RADIANS_PER_DEGREE);
     c = cos(a_rad);
     s = sin(a_rad);
     m[0] = 1.;
@@ -566,12 +566,12 @@ void rotate_x_matrix (double a, Matrix m)
     m[15] = 1.;
 }
 
-void rotate_y_matrix (double a, Matrix m)
+void rotate_y_matrix (LPC_FLOAT a, Matrix m)
 {
-    double a_rad;
-    double c, s;
+    LPC_FLOAT a_rad;
+    LPC_FLOAT c, s;
 
-    a_rad = (double) (a * RADIANS_PER_DEGREE);
+    a_rad = (LPC_FLOAT) (a * RADIANS_PER_DEGREE);
     c = cos(a_rad);
     s = sin(a_rad);
     m[0] = c;
@@ -592,12 +592,12 @@ void rotate_y_matrix (double a, Matrix m)
     m[15] = 1.;
 }
 
-void rotate_z_matrix (double a, Matrix m)
+void rotate_z_matrix (LPC_FLOAT a, Matrix m)
 {
-    double a_rad;
-    double c, s;
+    LPC_FLOAT a_rad;
+    LPC_FLOAT c, s;
 
-    a_rad = (double) (a * RADIANS_PER_DEGREE);
+    a_rad = (LPC_FLOAT) (a * RADIANS_PER_DEGREE);
     c = cos(a_rad);
     s = sin(a_rad);
     m[0] = c;

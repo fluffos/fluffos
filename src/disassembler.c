@@ -541,23 +541,21 @@ disassemble (FILE * f, char * code, int start, int end, program_t * prog)
             break;
 
         case F_NUMBER:
+        {
+            LPC_INT iarg_tmp;
 
-            COPY_INT(&iarg, pc);
-            sprintf(buff, "%ld", iarg);
-#if SIZEOF_LONG == 4
-            pc += 4;
-#else
-            pc += 8;
-#endif
+            COPY_INT(&iarg_tmp, pc);
+            sprintf(buff, "%ld", iarg_tmp);
+            pc += sizeof(LPC_INT);
             break;
-
+        }
         case F_REAL:
             {
-                double farg;
+                LPC_FLOAT farg;
 
                 COPY_FLOAT(&farg, pc);
                 sprintf(buff, "%f", farg);
-                pc += 4;
+                pc += sizeof(LPC_FLOAT);
                 break;
             }
 
@@ -622,9 +620,9 @@ disassemble (FILE * f, char * code, int start, int end, program_t * prog)
                         COPY_SHORT(&sarg, pc + SIZEOF_PTR);
                         if (ttype == 1 || !parg) {
                             if (sarg == 1)
-                                fprintf(f, "\t%-4ld\t<range start>\n", (long)parg);
+                                fprintf(f, "\t%-4ld\t<range start>\n", (LPC_INT)parg);
                             else
-                                fprintf(f, "\t%-4ld\t%04x\n", (long)parg, addr+sarg);
+                                fprintf(f, "\t%-4ld\t%04x\n", (LPC_INT)parg, addr+sarg);
                         } else {
                             fprintf(f, "\t\"%s\"\t%04x\n",
                             disassem_string(parg), addr+sarg);
