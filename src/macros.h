@@ -172,10 +172,6 @@
 !shorts of size other than 2 not implemented
 #endif
 
-#if SIZEOF_INT == 4
-#define INT_32 int
-#endif
-
 #if SIZEOF_LPC_INT == 4
 #define COPY_INT(x, y) COPY4(x,y)
 #define LOAD_INT(x, y) LOAD4(x,y)
