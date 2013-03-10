@@ -1,12 +1,7 @@
 all:
-	@echo MudOS is currently configured to use 'GNUmakefile'.  Edit 'build.MudOS'
-	@echo if this is not what you want.
+	@echo Please run ./build.FluffOS first.
 
 .DEFAULT:
-	@echo MudOS is currently configured to use 'GNUmakefile'.  Edit 'build.MudOS'
-	@echo if this is not what you want.
+	@echo Please run ./build.FluffOS first.
 
 nothing:
-
-which_makefile:
-	echo MakeIsMake

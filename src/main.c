@@ -106,9 +106,6 @@ int main (int argc, char ** argv)
 	MDinit();
 #endif
 
-#if (defined(PROFILING) && !defined(PROFILE_ON) && defined(HAS_MONCONTROL))
-	moncontrol(0);
-#endif
 #ifdef USE_TZSET
 	tzset();
 #endif
