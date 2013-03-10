@@ -66,7 +66,7 @@ INLINE_STATIC void do_loop_cond_number (void);
 INLINE_STATIC void do_loop_cond_local (void);
 static void do_catch (char *, unsigned short);
 int last_instructions (void);
-static double _strtof (char *, char **);
+static LPC_FLOAT _strtof (char *, char **);
 #ifdef TRACE_CODE
 static char *get_arg (int, int);
 #endif
@@ -316,7 +316,7 @@ int validate_shadowing (object_t * ob)
  * Push a number on the value stack.
  */
 INLINE void
-push_number (long n)
+push_number (LPC_INT n)
 {
   STACK_INC;
   sp->type = T_NUMBER;
@@ -325,7 +325,7 @@ push_number (long n)
 }
 
 INLINE void
-push_real (double n)
+push_real (LPC_FLOAT n)
 {
   STACK_INC;
   sp->type = T_REAL;
@@ -1756,7 +1756,7 @@ INLINE_STATIC void do_loop_cond_local()
 INLINE_STATIC void do_loop_cond_number()
 {
   svalue_t *s1;
-  long i;
+  LPC_INT i;
 
   s1 = fp + EXTRACT_UCHAR(pc++); /* a from (a < b) */
   LOAD_INT(i, pc);
@@ -1892,8 +1892,8 @@ eval_instruction (char * p)
 #ifdef DEBUG
   int num_arg;
 #endif
-  long i, n;
-  double real;
+  LPC_INT i, n;
+  LPC_FLOAT real;
   svalue_t *lval;
   int instruction;
 #if defined(TRACE_CODE) || defined(TRACE) || defined(OPCPROF) || defined(OPCPROF_2D)
@@ -5183,7 +5183,7 @@ int inter_sscanf (svalue_t * arg, svalue_t * s0, svalue_t * s1, int num_arg)
   int number_of_matches;
   int skipme;     /* Encountered a '*' ? */
   int base = 10;
-  long num;
+  LPC_INT num;
   const char *match;
   char old_char;
   const char *tmp;
@@ -5247,18 +5247,20 @@ int inter_sscanf (svalue_t * arg, svalue_t * s0, svalue_t * s1, int num_arg)
       /* fallthrough */
     case 'd':
       {
+        LPC_INT tmp_num;
+
         tmp = in_string;
-        num = strtol((char *)in_string, (char **)&in_string, base);
+        tmp_num = strtol((char *)in_string, (char **)&in_string, base);
         if (tmp == in_string) return number_of_matches;
         if (!skipme) {
-          SSCANF_ASSIGN_SVALUE_NUMBER(num);
+          SSCANF_ASSIGN_SVALUE_NUMBER(tmp_num);
         }
         base = 10;
         continue;
       }
     case 'f':
       {
-        double tmp_num;
+        LPC_FLOAT tmp_num;
 
         tmp = in_string;
         tmp_num = _strtof((char *)in_string, (char **)&in_string);
@@ -5479,7 +5481,7 @@ int inter_sscanf (svalue_t * arg, svalue_t * s0, svalue_t * s1, int num_arg)
         }
       case 'f':
         {
-          double tmp_num = _strtof((char *)in_string, (char **)&in_string);
+          LPC_FLOAT tmp_num = _strtof((char *)in_string, (char **)&in_string);
           if (!skipme2) {
             SSCANF_ASSIGN_SVALUE(T_REAL, u.real, tmp_num);
           }
@@ -5744,10 +5746,10 @@ int strpref (const char * p, const char * s)
   return 1;
 }
 
-static double _strtof (char * nptr, char ** endptr)
+static LPC_FLOAT _strtof (char * nptr, char ** endptr)
 {
   register char *s = nptr;
-  register double acc;
+  register LPC_FLOAT acc;
   register int neg, c, any, divv;
 
   divv = 1;
@@ -5773,10 +5775,10 @@ static double _strtof (char * nptr, char ** endptr)
     } else
       break;
     if (divv == 1) {
-      acc *= (double) 10;
-      acc += (double) c;
+      acc *= (LPC_FLOAT) 10;
+      acc += (LPC_FLOAT) c;
     } else {
-      acc += (double) c / (double) divv;
+      acc += (LPC_FLOAT) c / (LPC_FLOAT) divv;
       divv *= 10;
     }
     any = 1;
