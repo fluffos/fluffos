@@ -49,7 +49,6 @@ static int *forward_branches = 0;
 
 static void ins_real (LPC_FLOAT l)
  {
-    double f = (double)l;
     LPC_FLOAT f = l;
 
     if (prog_code + sizeof(double) > prog_code_max) {

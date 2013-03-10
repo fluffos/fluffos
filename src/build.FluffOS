@@ -22,7 +22,7 @@ else
 fi
 
 # Change this to use another C compiler/preprocessor
-if [ "`uname -s`" -eq "Darwin" ]; then # OSX gcc is very outdated.
+if [ "`uname -s`" = "Darwin" ]; then # OSX gcc is very outdated.
   CC=clang
 else
   CC=gcc
