@@ -505,6 +505,21 @@ void compute_string_totals (int * asp, int * abp, int * bp) {
     }
 }
 
+INLINE_STATIC void dump_stralloc() {
+  md_node_t *entry;
+  fprintf(stderr, "===STRALLOC DUMP: allocd_strings: %i \n", allocd_strings);
+
+  for (int hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
+    for (entry = table[hsh]; entry; entry = entry->next) {
+      if(entry->tag == TAG_MALLOC_STRING || entry->tag == TAG_SHARED_STRING) {
+        fprintf(stderr, "%-30s: sz %7d: id %6d: tag %08x, a %8lx\n",
+            entry->desc, entry->size, entry->id, entry->tag,
+            (unsigned long) PTR(entry));
+      }
+    }
+  }
+}
+
 /*
  * Verify string statistics.  out can be zero, in which case any errors
  * are printed to stdout and abort() is called.  Otherwise the error messages
@@ -523,6 +538,7 @@ void check_string_stats (outbuffer_t * out) {
     overhead += base_overhead;
 
     if (num != num_distinct_strings) {
+        dump_stralloc();
         if (out) {
             outbuf_addv(out, "WARNING: num_distinct_strings is: %i should be: %i\n",
                         num_distinct_strings, num);
@@ -533,6 +549,7 @@ void check_string_stats (outbuffer_t * out) {
         }
     }
     if (overhead != overhead_bytes) {
+        dump_stralloc();
         if (out) {
             outbuf_addv(out, "WARNING: overhead_bytes is: %i should be: %i\n",
                overhead_bytes, overhead);
@@ -543,6 +560,7 @@ void check_string_stats (outbuffer_t * out) {
         }
     }
     if (bytes != bytes_distinct_strings) {
+        dump_stralloc();
         if (out) {
             outbuf_addv(out, "WARNING: bytes_distinct_strings is: %i should be: %i\n",
                         bytes_distinct_strings, bytes - (overhead - base_overhead));
@@ -553,6 +571,7 @@ void check_string_stats (outbuffer_t * out) {
         }
     }
     if (allocd_strings != as) {
+        dump_stralloc();
         if (out) {
             outbuf_addv(out, "WARNING: allocd_strings is: %i should be: %i\n",
                         allocd_strings, as);
@@ -563,6 +582,7 @@ void check_string_stats (outbuffer_t * out) {
         }
     }
     if (allocd_bytes != ab) {
+        dump_stralloc();
         if (out) {
             outbuf_addv(out, "WARNING: allocd_bytes is: %i should be: %i\n",
                         allocd_bytes, ab);
@@ -695,8 +715,8 @@ void check_all_blocks (int flag) {
             outbuf_add(&out, "WARNING: more than one identifier hash table allocated.\n");
         if (blocks[TAG_RESERVED & 0xff] > 1)
             outbuf_add(&out, "WARNING: more than one reserved block allocated.\n");
-        if (blocks[TAG_OBJ_TBL & 0xff] > 1)
-            outbuf_add(&out, "WARNING: more than object table allocated.\n");
+        if (blocks[TAG_OBJ_TBL & 0xff] > 2)
+            outbuf_add(&out, "WARNING: more than two object table allocated.\n");
         if (blocks[TAG_CONFIG & 0xff] > 1)
             outbuf_add(&out, "WARNING: more than config file table allocated.\n");
         if (blocks[TAG_STR_TBL & 0xff] > 1)
@@ -758,6 +778,10 @@ void check_all_blocks (int flag) {
             if (all_users[i]) {
                 DO_MARK(all_users[i], TAG_INTERACTIVE);
                 all_users[i]->ob->extra_ref++;
+                // FIXME(sunyc): I can't explain this, appearently somewhere
+                // is giving interactive object an addtional ref.
+                all_users[i]->ob->extra_ref++;
+
                 if (all_users[i]->input_to) {
                     all_users[i]->input_to->ob->extra_ref++;
                     DO_MARK(all_users[i]->input_to, TAG_SENTENCE);

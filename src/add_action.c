@@ -574,7 +574,7 @@ void remove_sent (object_t * ob, object_t * user)
 void
 f_add_action (void)
 {
-    long flag;
+    LPC_INT flag;
 
     if (st_num_arg == 3) {
 	flag = (sp--)->u.number;
@@ -610,7 +610,7 @@ f_add_action (void)
  */
 void f_command (void)
 {
-    long rc = 0;
+    LPC_INT rc = 0;
 
     if (current_object && !(current_object->flags & O_DESTRUCTED))
     {
@@ -740,7 +740,7 @@ void f_query_verb (void)
 #ifdef F_REMOVE_ACTION
 void f_remove_action (void)
 {
-    long success;
+    LPC_INT success;
 
     success = remove_action((sp - 1)->u.string, sp->u.string);
     free_string_svalue(sp--);

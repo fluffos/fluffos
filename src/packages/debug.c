@@ -59,7 +59,7 @@ void f_thread() {
 	                DMALLOC(len + 5, TAG_TEMPORARY, "socket_write: default");
 	            if (buf == NULL)
 	                break;
-	            *(INT_32 *) buf = htonl((long) len);
+	            *(uint32_t *) buf = htonl((uint32_t) len);
 	            len += 4;
 	            buf[4] = '\0';
 	            p = buf + 4;

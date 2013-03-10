@@ -130,8 +130,8 @@ int yyparse (void);
 %union
 {
     POINTER_INT pointer_int;
-    long number; /* 4 or 8 */
-    double real; /* 8 */
+    LPC_INT number; /* 4 or 8 */
+    LPC_FLOAT real; /* 8 */
     char *string;
     struct { short num_arg; char flags; } argument;
     ident_hash_elem_t *ihe;
@@ -1193,7 +1193,7 @@ for:
 		$7 = pop_value($7);
 		if ($7 && IS_NODE($7, NODE_UNARY_OP, F_INC)
 		    && IS_NODE($7->r.expr, NODE_OPCODE_1, F_LOCAL_LVALUE)) {
-		    long lvar = $7->r.expr->l.number;
+		    LPC_INT lvar = $7->r.expr->l.number;
 		    CREATE_OPCODE_1($7, F_LOOP_INCR, 0, lvar);
 		}
 
@@ -1397,7 +1397,7 @@ first_for_expr:
                 $$ = $2;
                 $$->v.expr = new_node();
 		$$->v.expr->kind = NODE_CASE_NUMBER;
-		$$->v.expr->r.number = ((unsigned long)-1)/2; //maxint
+		$$->v.expr->r.number = LPC_INT_MAX; //maxint
 
                 add_to_mem_block(A_CASES, (char *)&($2), sizeof($2));
             }
@@ -1409,7 +1409,7 @@ first_for_expr:
 		context |= SWITCH_RANGES;
 		$$ = new_node();
 		$$->kind = NODE_CASE_NUMBER;
-                $$->r.number = (long) 1+ ((unsigned long)-1)/2; //maxint +1 wraps to min_int, on all computers i know, just not in the C standard iirc 
+                $$->r.number = LPC_INT_MIN; //maxint +1 wraps to min_int, on all computers i know, just not in the C standard iirc 
                 $$->v.expr = $3;
 
                 add_to_mem_block(A_CASES, (char *)&($$), sizeof($$));
@@ -1966,7 +1966,7 @@ expr0:
 		case NODE_STRING:
 		    if ($3->kind == NODE_STRING) {
 			/* Combine strings */
-			long n1, n2;
+			LPC_INT n1, n2;
 			const char *s1, *s2;
 			char *news;
 			int l;

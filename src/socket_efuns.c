@@ -647,7 +647,7 @@ int socket_write (int fd, svalue_t * message, const char * name)
                 DMALLOC(len + 5, TAG_TEMPORARY, "socket_write: default");
             if (buf == NULL)
                 fatal("Out of memory");
-            *(INT_32 *) buf = htonl((long) len);
+            *(uint32_t *) buf = htonl((uint32_t) len);
             len += 4;
             buf[4] = '\0';
             p = buf + 4;

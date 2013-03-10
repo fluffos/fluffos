@@ -88,10 +88,11 @@ f_atan (void)
 #ifdef F_SQRT
 void
 f_sqrt (void)
-{   double val;
+{ 
+    LPC_FLOAT val;
 
     if(sp->type == T_NUMBER)
-      val = (double) sp->u.number;
+      val = (LPC_FLOAT) sp->u.number;
     else
       val = sp->u.real;
       
@@ -99,7 +100,7 @@ f_sqrt (void)
         error("math: sqrt(x) with (x < 0.0)\n");
         return;
     }
-    sp->u.real = (double) sqrt(val);
+    sp->u.real = (LPC_FLOAT) sqrt(val);
     sp->type = T_REAL;
 }
 #endif
@@ -120,10 +121,10 @@ f_log (void)
 void
 f_log10 (void)
 {
-    double val;
+    LPC_FLOAT val;
 
     if(sp->type == T_NUMBER)
-      val = (double) sp->u.number;
+      val = (LPC_FLOAT) sp->u.number;
     else
       val = sp->u.real;
 
@@ -140,10 +141,10 @@ f_log10 (void)
 void
 f_log2 (void)
 {
-    double val;
+    LPC_FLOAT val;
 
     if(sp->type == T_NUMBER)
-      val = (double) sp->u.number;
+      val = (LPC_FLOAT) sp->u.number;
     else
       val = sp->u.real;
 
@@ -151,7 +152,7 @@ f_log2 (void)
         error("math: log2(x) with (x <= 0.0)\n");
         return;
     }
-    sp->u.real = (double) log2((double)val);
+    sp->u.real = (LPC_FLOAT) log2((LPC_FLOAT)val);
     sp->type = T_REAL;
 }
 #endif
@@ -160,15 +161,15 @@ f_log2 (void)
 void
 f_pow (void)
 {
-    double val, val2;
+    LPC_FLOAT val, val2;
     
     if((sp-1)->type == T_NUMBER)
-      val = (double) (sp-1)->u.number;
+      val = (LPC_FLOAT) (sp-1)->u.number;
     else
       val = (sp-1)->u.real;
       
     if(sp->type == T_NUMBER)
-      val2 = (double) sp->u.number;
+      val2 = (LPC_FLOAT) sp->u.number;
     else
       val2 = sp->u.real;
 
@@ -206,7 +207,7 @@ f_ceil (void)
 #ifdef F_ROUND
 void f_round (void)
 {
-    sp->u.real = (double) round(sp->u.real);
+    sp->u.real = (LPC_FLOAT) round(sp->u.real);
 }
 #endif
 
@@ -215,24 +216,24 @@ void f_round (void)
    Yes, you could use dotprod() below to implement norm(), but in the interest
    of speed, norm() has less cases.
 */
-static double norm(array_t *a) {
-  int len = sp->u.arr->size;
-  double total = 0.0;
+static LPC_FLOAT norm(array_t *a) {
+  LPC_INT len = sp->u.arr->size;
+  LPC_FLOAT total = 0.0;
 
   while(len-- > 0)
     if(a->item[len].type == T_NUMBER)
-      total += SQUARE((double) a->item[len].u.number);
+      total += SQUARE((LPC_FLOAT) a->item[len].u.number);
     else if(a->item[len].type == T_REAL)
       total += SQUARE(a->item[len].u.real);
     else {
       return -INT_MAX + 1;
     }
 
-  return (double) sqrt(total);
+  return (LPC_FLOAT) sqrt(total);
 }
 
 void f_norm(void) {
-  double val = norm(sp->u.arr);
+  LPC_FLOAT val = norm(sp->u.arr);
 
   if(val == (-INT_MAX + 1)) {
     pop_stack();
@@ -246,10 +247,10 @@ void f_norm(void) {
 #endif
 
 #if defined(F_DOTPROD) | defined(F_DISTANCE) | defined(F_ANGLE)
-static double vector_op(array_t *a, array_t *b, 
-			  double (*func)(const double, const double)) {
-  int len = a->size;
-  double total = 0.0;
+static LPC_FLOAT vector_op(array_t *a, array_t *b, 
+			  LPC_FLOAT (*func)(const LPC_FLOAT, const LPC_FLOAT)) {
+  LPC_INT len = a->size;
+  LPC_FLOAT total = 0.0;
 
   if(b->size != len) {
     return -INT_MAX;
@@ -258,18 +259,18 @@ static double vector_op(array_t *a, array_t *b,
   while(len-- > 0) {
     if(b->item[len].type == T_NUMBER) {
       if(a->item[len].type == T_NUMBER)
-        total += func((double) a->item[len].u.number,
-                      (double) b->item[len].u.number);
+        total += func((LPC_FLOAT) a->item[len].u.number,
+                      (LPC_FLOAT) b->item[len].u.number);
       else if(a->item[len].type == T_REAL)
         total += func(a->item[len].u.real,
-                      (double) b->item[len].u.number);
+                      (LPC_FLOAT) b->item[len].u.number);
       else {
         return -INT_MAX + 1;
       }
     }
     else if(b->item[len].type == T_REAL) {
       if(a->item[len].type == T_NUMBER)
-        total += func((double) a->item[len].u.number, 
+        total += func((LPC_FLOAT) a->item[len].u.number, 
                       b->item[len].u.real);
                  
       else if(a->item[len].type == T_REAL)
@@ -288,17 +289,17 @@ static double vector_op(array_t *a, array_t *b,
 #endif
 
 #ifdef F_DOTPROD
-static double dotprod_mult(const double a, const double b) {
+static LPC_FLOAT dotprod_mult(const LPC_FLOAT a, const LPC_FLOAT b) {
   return a * b;
 }
 
 /* dot product of two vectors */
-static double dotprod(array_t *a, array_t *b) {
+static LPC_FLOAT dotprod(array_t *a, array_t *b) {
   return vector_op(a, b, dotprod_mult);
 }
 
 void f_dotprod(void) {
-  double total = vector_op((sp-1)->u.arr, sp->u.arr, dotprod_mult);
+  LPC_FLOAT total = vector_op((sp-1)->u.arr, sp->u.arr, dotprod_mult);
   
   if(total == -INT_MAX) {
     pop_2_elems();
@@ -318,13 +319,13 @@ void f_dotprod(void) {
 #endif
 
 #ifdef F_DISTANCE
-static double distance_mult(const double a, const double b) {
+static LPC_FLOAT distance_mult(const LPC_FLOAT a, const LPC_FLOAT b) {
   return SQUARE(b - a);
 }
 
 /* The (Euclidian) distance between two points */
 void f_distance(void) {
-  double total = vector_op((sp-1)->u.arr, sp->u.arr, distance_mult);
+  LPC_FLOAT total = vector_op((sp-1)->u.arr, sp->u.arr, distance_mult);
   
   if(total == -INT_MAX) {
     pop_2_elems();
@@ -339,13 +340,13 @@ void f_distance(void) {
   }
   
   pop_2_elems();
-  push_real((double)sqrt(total));
+  push_real((LPC_FLOAT)sqrt(total));
 }
 #endif
 
 #ifdef F_ANGLE
 void f_angle(void) {
-  double dot, norma, normb;
+  LPC_FLOAT dot, norma, normb;
   
   dot = dotprod((sp-1)->u.arr, sp->u.arr);
   
@@ -375,6 +376,6 @@ void f_angle(void) {
   }
 
   pop_2_elems();
-  push_real((double)acos( dot / (norma * normb) ));
+  push_real((LPC_FLOAT)acos( dot / (norma * normb) ));
 }
 #endif
