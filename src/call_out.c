@@ -173,6 +173,11 @@ void call_out()
 	static pending_call_t *cop = 0;
 	error_context_t econ;
 	VOLATILE int tm;
+	/* The number of call_outs that will be given a full max_cost time budget;
+	 * any calls beyond this number will get only what time is left over.
+	 */
+	long num_max_cost_calls;
+	int warned_about_recursion = 0;
 
 	current_interactive = 0;
 
@@ -194,8 +199,25 @@ void call_out()
 
 		tm = current_time & (CALLOUT_CYCLE_SIZE - 1);
 		DBG(("   slot %i", tm));
+
+		/* Count how many call_outs are ready to run.  These each will
+		 * be given their own max_cost time budget.  If any immediate
+		 * call_outs are subsequently added to the list, they will all
+		 * run within a single, final max_cost time allocation.  This
+		 * prevents infinite call_out("xyz", 0) loops from wedging the
+		 * driver.
+		 */
+		num_max_cost_calls = 1;
+		for (cop = call_list[tm]; cop && cop->delta == 0; cop = cop->next) {
+			num_max_cost_calls++;
+		}
+		cop = 0;
+
 		while (call_list[tm] && call_list[tm]->delta == 0) {
 			object_t *ob, *new_command_giver;
+
+			/* Count this call_out against the allowed number of full time budget calls */
+			num_max_cost_calls--;
 
 			/*
 			 * Move the first call_out out of the chain.
@@ -213,10 +235,20 @@ void call_out()
 			} else {
 				if (SETJMP(econ.context)) {
 					restore_context(&econ);
-					if (max_eval_error) {
-						debug_message("Maximum evaluation cost reached while trying to process call_outs\n");
-						pop_context(&econ);
-						return;
+					if (outoftime) {
+						if (num_max_cost_calls > 0) {
+							/* Transfer control to the backend loop so that it can attend to other duties */
+							debug_message("Maximum evaluation cost reached while trying to process call_outs\n");
+							pop_context(&econ);
+							return;
+						} else if (!warned_about_recursion) {
+							warned_about_recursion = 1;
+							/* A newly added immediate call_out tripped max_cost.  Force all reamining
+							 * call_outs to run with the outoftime flag set, which will force them to
+							 * throw their errors (this aids in troubleshooting after the fact.)
+							 */
+							debug_message("Maximum evaluation cost reached while processing recursive call_outs; breaking possible loop\n");
+						}
 					}
 				} else {
 					object_t *ob;
@@ -256,10 +288,13 @@ void call_out()
 						extra = cop->vs->size;
 						transfer_push_some_svalues(cop->vs->item, extra);
 						free_empty_array(cop->vs);
-					} else
+					} else {
 						extra = 0;
-					//reset_eval_cost();
-					set_eval(max_cost);
+					}
+
+					if (num_max_cost_calls > 0) {
+						set_eval(max_cost);
+					}
 
 					if (cop->ob) {
 						if (cop->function.s[0] == APPLY___INIT_SPECIAL_CHAR)
