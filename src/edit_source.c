@@ -927,7 +927,7 @@ void make_efun_tables()
     fprintf(files[1], "};\n");
 
     if (efun_code + efun_base >= 65535) {
-        fprintf(stderr, "You have way too many efuns.  Contact the MudOS developers if you really need this many.\n");
+        fprintf(stderr, "You have way too many efuns, and Fluffos will not function, contact developer!\n");
     }
     fprintf(files[2],"\n/* efuns */\n#define NUM_OPCODES %d\n\n", efun_base + efun_code);
 

@@ -33,12 +33,12 @@ connect()
 {
 	object login_ob;
 	mixed err;
-   
+
 	err = catch(login_ob = new(LOGIN_OB));
 
 	if (err) {
 		write("It looks like someone is working on the player object.\n");
-		write(err);
+  	write(err);
 		destruct(this_object());
 	}
 	return login_ob;
@@ -63,7 +63,6 @@ compile_object(string file)
 staticf void
 crash(string, object, object)
 {
-    error("foo\n");
 	foreach (object ob in users())
 	    tell_object(ob, "Master object shouts: Damn!\nMaster object tells you: The game is crashing.\n");
 #if 0

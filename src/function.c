@@ -220,7 +220,6 @@ extern func_t efun_table[];
 svalue_t *
 call_function_pointer (funptr_t * funp, int num_arg)
 {
-    static func_t *oefun_table = efun_table - BASE;
     array_t *v;
     
     if (!funp->hdr.owner || (funp->hdr.owner->flags & O_DESTRUCTED))
@@ -268,7 +267,7 @@ call_function_pointer (funptr_t * funp, int num_arg)
                 for (j = 0; j < n; j++) {
                     CHECK_TYPES(sp - num_arg + j + 1, instrs[i].type[j], j + 1, i);
                 }
-                (*oefun_table[i])();
+                (*efun_table[i - EFUN_BASE])();
 
                 free_svalue(&apply_ret_value, "call_function_pointer");
                 if (instrs[i].ret_type == TYPE_NOVALUE)
