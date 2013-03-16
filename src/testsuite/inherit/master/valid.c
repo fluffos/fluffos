@@ -94,4 +94,17 @@ valid_read(string, mixed, string)
 {
     return 1;
 }
- private int y = 1;
+
+int valid_bind() {
+    // This is really unsafe, but testsuite uses it to test bind()
+    return 1;
+}
+
+int valid_hide() {
+    // same here
+    return 1;
+}
+
+int valid_compile_to_c() {
+    return 1;
+}
