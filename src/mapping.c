@@ -25,6 +25,19 @@ mapping_node_t *locked_map_nodes = 0;
  *   at some point as well.
  */
 
+INLINE unsigned long sval_hash(svalue_t x){
+    switch(x.type)
+    {
+        case T_STRING:
+            return HASH(BLOCK(x.u.string));
+        case T_NUMBER:
+            return (unsigned long)x.u.number;
+        case T_OBJECT:
+            //return HASH(BLOCK(x.u.ob->obname));
+        default:
+            return (unsigned long)(((POINTER_INT)((x).u.number)) >> 5);
+    }
+}
 /*
   growMap: based on hash.c:hsplit() from Larry Wall's Perl.
 

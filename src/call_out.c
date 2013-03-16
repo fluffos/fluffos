@@ -188,7 +188,7 @@ void call_out()
 	}
 
 	real_time = get_current_time();
-	DBG(("Calling call_outs: current_time: %ld real_time: %ld difference: %d",
+	DBG(("Calling call_outs: current_time: %ld real_time: %ld difference: %ld",
 			current_time, real_time, real_time - current_time));
 
 	/* Slowly advance the clock forward towards real_time, doing call_outs

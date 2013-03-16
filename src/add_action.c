@@ -310,7 +310,6 @@ static int user_parser (char * buff)
     illegal_sentence_action = 0;
     for (s = command_giver->sent; s; s = s->next) {
 	svalue_t *ret;
-	object_t *command_object;
 
 	if (s->flags & (V_NOSPACE | V_SHORT)) {
 	    if (strncmp(buff, s->verb, strlen(s->verb)) != 0)
@@ -352,7 +351,6 @@ static int user_parser (char * buff)
 	/*
 	 * Remember the object, to update moves.
 	 */
-	command_object = s->ob;
 	save_command_giver(command_giver);
 	if (s->flags & V_NOSPACE) {
 	    copy_and_push_string(&buff[strlen(s->verb)]);
