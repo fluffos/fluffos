@@ -247,7 +247,7 @@
 #endif
 
 #ifndef INLINE
-#define INLINE
+#define INLINE inline
 #endif
 
 #ifndef INLINE_STATIC
