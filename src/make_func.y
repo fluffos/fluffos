@@ -17,10 +17,10 @@
     void yyerror(char const *);
 
     int num_buff = 0;
-    int op_code, efun_code, efun1_code;
+    int op_code, efun_code;
     char *oper_codes[MAX_FUNC];
-    char *efun_codes[MAX_FUNC], *efun1_codes[MAX_FUNC];
-    char *efun_names[MAX_FUNC], *efun1_names[MAX_FUNC];
+    char *efun_codes[MAX_FUNC];
+    char *efun_names[MAX_FUNC];
     const char *key[MAX_FUNC], *buf[MAX_FUNC];
 
     int min_arg = -1, limit_max = 0;
@@ -126,19 +126,11 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 		if (islower(f_name[i]))
 		    f_name[i] = toupper(f_name[i]);
 	    }
-            if (min_arg == 1 && !limit_max && $5 == 1) {
-	        efun1_codes[efun1_code] = (char *) malloc(len + 1);
-	        strcpy(efun1_codes[efun1_code], f_name);
-		efun1_names[efun1_code] = (char *) malloc(len - 1);
-		strcpy(efun1_names[efun1_code], $2);
-	        efun1_code++;
-	    } else {
 	        efun_codes[efun_code] = (char *) malloc(len + 1);
 	        strcpy(efun_codes[efun_code], f_name);
 		efun_names[efun_code] = (char *) malloc(len - 1);
 		strcpy(efun_names[efun_code], $2);
 	        efun_code++;
-	    }
 	} else {
 	    if (strlen($3) + 1 + 17 > sizeof f_name)
 		mf_fatal("A local buffer was too small(2)!\n");

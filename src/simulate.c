@@ -986,7 +986,7 @@ void destruct2 (object_t * ob)
      * continue to execute, change string and object variables into the
      * number 0.
      */
-    if (ob->prog->num_variables_total > 0) {
+    if (ob->prog && ob->prog->num_variables_total > 0) {
         /*
          * Deallocate variables in this object. The space of the variables
          * are not deallocated until the object structure is freed in

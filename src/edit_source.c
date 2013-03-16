@@ -25,13 +25,6 @@
 #define TO_DEV_NULL ">/dev/null 2>&1"
 #endif
 
-/* Using an include file at this point would be bad */
-#ifdef PEDANTIC
-char *malloc(int);
-char *realloc(char *, int);
-void free(char *);
-#endif
-
 char *outp;
 static int buffered = 0;
 static int nexpands = 0;
@@ -921,31 +914,22 @@ void make_efun_tables()
         fprintf(files[2],"#define %-30s %d\n", oper_codes[i], i+1);
     }
 
-    fprintf(files[2],"\n/* 1 arg efuns */\n#define BASE %d\n\n", op_code+1);
-    for (i = 0; i < efun1_code; i++) {
-        fprintf(files[0],"\tf_%s,\n", efun1_names[i]);
-        fprintf(files[1],"{\"%s\", 0},\n", efun1_names[i]);
-        fprintf(files[2],"#define %-30s %d\n", efun1_codes[i], i+op_code+1);
-        fprintf(files[3],"void f_%s (void);\n", efun1_names[i]);
-    }
-
-    fprintf(files[2],"\n/* efuns */\n#define ONEARG_MAX %d\n\n", efun1_code + op_code+1);
+    int efun_base = op_code + 1;
+    fprintf(files[2],"\n/* efuns */\n#define EFUN_BASE %d\n\n", efun_base);
     for (i = 0; i < efun_code; i++) {
         fprintf(files[0],"\tf_%s,\n", efun_names[i]);
         fprintf(files[1],"{\"%s\", 0},\n", efun_names[i]);
-        fprintf(files[2],"#define %-30s %d\n", efun_codes[i], i+op_code+efun1_code+1);
+        fprintf(files[2],"#define %-30s %d\n", efun_codes[i], i+efun_base);
         fprintf(files[3],"void f_%s (void);\n", efun_names[i]);
     }
+
     fprintf(files[0], "};\n");
     fprintf(files[1], "};\n");
 
-    if (efun1_code + op_code >= 256) {
-        fprintf(stderr, "You have way too many efuns.  Contact the MudOS developers if you really need this many.\n");
+    if (efun_code + efun_base >= 65535) {
+        fprintf(stderr, "You have way too many efuns, and Fluffos will not function, contact developer!\n");
     }
-    if (efun_code >= 256) {
-        fprintf(stderr, "You have way too many efuns.  Contact the MudOS developers if you really need this many.\n");
-    }
-    fprintf(files[2],"\n/* efuns */\n#define NUM_OPCODES %d\n\n", efun_code + efun1_code + op_code);
+    fprintf(files[2],"\n/* efuns */\n#define NUM_OPCODES %d\n\n", efun_base + efun_code);
 
     /* Now sort the main_list */
     for (i = 0; i < num_buff; i++) {
@@ -1108,7 +1092,7 @@ static void handle_process (char * file) {
 static void handle_build_efuns() {
     void yyparse();
 
-    num_buff = op_code = efun_code = efun1_code = 0;
+    num_buff = op_code = efun_code = 0;
 
     open_input_file(FUNC_SPEC_CPP);
     yyparse();
@@ -1169,11 +1153,6 @@ static void handle_applies() {
 }
 
 static void handle_malloc() {
-#ifdef PEDANTIC
-    int unlink(char *);
-    int link(char *, char *);
-#endif
-
     const char *the_malloc = 0, *the_wrapper = 0;
 
     if (lookup_define("SYSMALLOC"))

@@ -4,12 +4,12 @@ if test $# -ne 0; then
     case $1 in
         develop)
 	    echo Preparing to build developmental version of MudOS driver ...
-	    OPTIMIZE="-Wall -Wundef -DPEDANTIC -pedantic"
-	    DEBUG="-g -DDEBUG -DDEBUG_MACRO"
+	    OPTIMIZE="-O0"
+	    DEBUG="-g -Wall -Wundef -pedantic -DDEBUG -DDEBUG_MACRO"
             ;;
         debug)
 	    echo Preparing to build debugging version of MudOS driver ...
-	    OPTIMIZE=
+	    OPTIMIZE="-O3"
 	    DEBUG="-g -DDEBUG -DDEBUG_NON_FATAL -DDEBUG_MACRO"
             ;;
         *)
@@ -31,13 +31,13 @@ fi
 CFLAGS="--std=c99 -D_GNU_SOURCE -march=native -m64 -flto -D__USE_FIXED_PROTOTYPES__"
 CPP="cpp"
 
-OPTIMIZE="-O3"
-DEBUG="-g"
+OPTIMIZE=${OPTIMIZE:-"-O3"}
+DEBUG=${DEBUG:-"-g"}
 
 # Change this to use another bison/yacc implementation.
 YACC="bison -d -y"
 
-# Change this if want to use another 'make' 
+# Change this if want to use another 'make'
 MAKE=make
 INSTALL=install
 
