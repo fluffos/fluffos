@@ -1,0 +1,13 @@
+FluffOS is a range of patches base on MudOS. 
+
+LPC runtime is compatible, if your mud runs on MudOSv22 +, it should run on FluffOS.
+
+Features includes:
+  * Lots of bug fixes.
+  * Compile in 64 bit mode, and provide 64 bit LPC runtime.
+
+To Build:
+  * cd src; ./build.FluffOS; make
+
+Contact:
+  http://www.lpmuds.net

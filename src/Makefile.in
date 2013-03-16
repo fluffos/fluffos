@@ -245,7 +245,7 @@ distclean: neat
 	-rm -f *.ln tags TAGS
 	-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old addr_server portbind
 	-rm -f *.exe
-	-rm -f configure.h system_libs options_incl.h insttest configuration
+	-rm -f configure.h system_libs options_incl.h configuration
 	-rm -f 1.out 2.out
 	-rm -f local_options
 	-rm -f dtrace_compile
