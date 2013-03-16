@@ -21,7 +21,7 @@
 #ifdef OPCPROF
 #include "opc.h"
 
-static int opc_eoper[BASE];
+static int opc_eoper[EFUN_BASE];
 #endif
 
 
@@ -33,7 +33,7 @@ static int opc_eoper[BASE];
 
 #ifdef OPCPROF_2D
 /* warning, this is typically 4 * 100 * 100 = 40k */
-static int opc_eoper_2d[BASE+1][BASE+1];
+static int opc_eoper_2d[EFUN_BASE+1][EFUN_BASE+1];
 static int last_eop = 0;
 #endif
 
@@ -1193,7 +1193,7 @@ void bad_argument (svalue_t * val, int type, int arg, int instr)
 
   outbuf_zero(&outbuf);
   outbuf_addv(&outbuf, "Bad argument %d to %s%s\nExpected: ", arg,
-              query_instr_name(instr), (instr < BASE ? "" : "()"));
+              query_instr_name(instr), (instr < EFUN_BASE ? "" : "()"));
 
   do {
     if (type & j) {
@@ -1900,11 +1900,6 @@ eval_instruction (char * p)
   int real_instruction;
 #endif
   unsigned short offset;
-  static func_t *oefun_table = efun_table - BASE + ONEARG_MAX;
-#ifndef DEBUG
-  static func_t *ooefun_table = efun_table - BASE;
-#endif
-  static instr_t *instrs2 = instrs + ONEARG_MAX;
 
   IF_DEBUG(svalue_t *expected_stack);
 
@@ -1923,10 +1918,14 @@ eval_instruction (char * p)
 #  endif
     instruction = EXTRACT_UCHAR(pc++);
 #if defined(TRACE_CODE) || defined(TRACE) || defined(OPCPROF) || defined(OPCPROF_2D)
-    if (instruction >= F_EFUN0 && instruction <= F_EFUNV)
-      real_instruction = EXTRACT_UCHAR(pc) + ONEARG_MAX;
-    else
-      real_instruction = instruction;
+    real_instruction = instruction;
+    /* real EFUN is stored as an short after F_EFUN0 - F_EFUNV instructions */
+    if (instruction >= F_EFUN0 && instruction <= F_EFUNV) {
+      COPY_SHORT(&real_instruction, pc);
+      if (real_instruction < EFUN_BASE || real_instruction > NUM_OPCODES) {
+        fatal ("Error in icode.");
+      }
+    }
 #  ifdef TRACE_CODE
     previous_instruction[last] = real_instruction;
     previous_pc[last] = pc - 1;
@@ -1939,18 +1938,18 @@ eval_instruction (char * p)
     }
 #  endif
 #  ifdef OPCPROF
-    if (real_instruction < BASE)
+    if (real_instruction < EFUN_BASE)
       opc_eoper[real_instruction]++;
     else
-      opc_efun[real_instruction-BASE].count++;
+      opc_efun[real_instruction - EFUN_BASE].count++;
 #  endif
 #  ifdef OPCPROF_2D
-    if (real_instruction < BASE) {
+    if (real_instruction < EFUN_BASE) {
       if (last_eop) opc_eoper_2d[last_eop][real_instruction]++;
       last_eop = real_instruction;
     } else {
-      if (last_eop) opc_eoper_2d[last_eop][BASE]++;
-      last_eop = BASE;
+      if (last_eop) opc_eoper_2d[last_eop][EFUN_BASE]++;
+      last_eop = EFUN_BASE;
     }
 #  endif
 #endif
@@ -3691,10 +3690,8 @@ eval_instruction (char * p)
          * Compute address of next instruction after the CATCH
          * statement.
          */
-        ((char *) &offset)[0] = pc[0];
-        ((char *) &offset)[1] = pc[1];
-        offset = pc + offset - current_prog->program;
-        pc += 2;
+        LOAD_SHORT(offset, pc);
+        offset = (pc - 2) + offset - current_prog->program;
 
         do_catch(pc, offset);
         if ((csp[1].framekind & (FRAME_EXTERNAL | FRAME_RETURNED_FROM_CATCH)) ==
@@ -3743,78 +3740,77 @@ eval_instruction (char * p)
           error("Trying to put %s in %s\n", type_name(sp->type), type_name(type));
         break;
       }
-#define Instruction (instruction + ONEARG_MAX)
 #ifdef DEBUG
-#define CALL_THE_EFUN goto call_the_efun
+#define CALL_THE_EFUN goto call_the_efun_debug
 #else
-#define CALL_THE_EFUN (*oefun_table[instruction])(); continue
+#define CALL_THE_EFUN SAFE((*efun_table[instruction - EFUN_BASE])();)
 #endif
     case F_EFUN0:
       st_num_arg = 0;
-      instruction = EXTRACT_UCHAR(pc++);
+      LOAD_SHORT(instruction, pc);
       CALL_THE_EFUN;
+      break;
     case F_EFUN1:
       st_num_arg = 1;
-      instruction = EXTRACT_UCHAR(pc++);
-      CHECK_TYPES(sp, instrs2[instruction].type[0], 1, Instruction);
+      LOAD_SHORT(instruction, pc);
+      CHECK_TYPES(sp, instrs[instruction].type[0], 1, instruction);
       CALL_THE_EFUN;
+      break;
     case F_EFUN2:
       st_num_arg = 2;
-      instruction = EXTRACT_UCHAR(pc++);
-      CHECK_TYPES(sp - 1, instrs2[instruction].type[0], 1, Instruction);
-      CHECK_TYPES(sp, instrs2[instruction].type[1], 2, Instruction);
+      LOAD_SHORT(instruction, pc);
+      CHECK_TYPES(sp - 1, instrs[instruction].type[0], 1, instruction);
+      CHECK_TYPES(sp, instrs[instruction].type[1], 2, instruction);
       CALL_THE_EFUN;
+      break;
     case F_EFUN3:
       st_num_arg = 3;
-      instruction = EXTRACT_UCHAR(pc++);
-      CHECK_TYPES(sp - 2, instrs2[instruction].type[0], 1, Instruction);
-      CHECK_TYPES(sp - 1, instrs2[instruction].type[1], 2, Instruction);
-      CHECK_TYPES(sp, instrs2[instruction].type[2], 3, Instruction);
+      LOAD_SHORT(instruction, pc);
+      CHECK_TYPES(sp - 2, instrs[instruction].type[0], 1, instruction);
+      CHECK_TYPES(sp - 1, instrs[instruction].type[1], 2, instruction);
+      CHECK_TYPES(sp, instrs[instruction].type[2], 3, instruction);
       CALL_THE_EFUN;
+      break;
     case F_EFUNV:
       {
         int num;
+        LOAD_SHORT(instruction, pc);
         st_num_arg = EXTRACT_UCHAR(pc++) + num_varargs;
         num_varargs = 0;
-        instruction = EXTRACT_UCHAR(pc++);
-        num = instrs2[instruction].min_arg;
+        num = instrs[instruction].min_arg;
         for (i = 1; i <= num; i++) {
-          CHECK_TYPES(sp - st_num_arg + i, instrs2[instruction].type[i-1], i, Instruction);
+          CHECK_TYPES(sp - st_num_arg + i, instrs[instruction].type[i-1], i, instruction);
         }
         CALL_THE_EFUN;
+        break;
       }
     default:
-      /* optimized 1 arg efun */
-      st_num_arg = 1;
-      CHECK_TYPES(sp, instrs[instruction].type[0], 1, instruction);
-#ifndef DEBUG
-      (*ooefun_table[instruction])();
-      continue;
-#else
-      instruction -= ONEARG_MAX;
-    call_the_efun:
-      /* We have an efun.  Execute it
-       */
-      if (Instruction > NUM_OPCODES) {
-        fatal("Undefined instruction %s (%d)\n",
-              query_instr_name(Instruction), Instruction);
-      }
-      if (Instruction < BASE) {
+      /* un-recognized instruction */
+      if (instruction < EFUN_BASE) {
         fatal("No case for eoperator %s (%d)\n",
-              query_instr_name(Instruction), Instruction);
+              query_instr_name(instruction), instruction);
+      } else {
+        fatal("Undefined instruction %s (%d)\n",
+              query_instr_name(instruction), instruction);
       }
-      if (instrs2[instruction].ret_type == TYPE_NOVALUE)
+      break;
+#ifdef DEBUG
+call_the_efun_debug:
+      /* We have an efun.  Execute it.*/
+      if (instruction < EFUN_BASE || instruction > NUM_OPCODES) {
+        fatal("wrong!");
+      }
+      if (instrs[instruction].ret_type == TYPE_NOVALUE)
         expected_stack = sp - st_num_arg;
       else
         expected_stack = sp - st_num_arg + 1;
       num_arg = st_num_arg;
 
-      (*oefun_table[instruction]) ();
+      (*efun_table[instruction - EFUN_BASE]) ();
 
       if (expected_stack != sp)
         fatal("Bad stack after efun. Instruction %d, num arg %d\n",
               instruction, num_arg);
-      instruction += ONEARG_MAX;
 #endif
     } /* switch (instruction) */
     DEBUG_CHECK1(sp < fp + csp->num_local_variables - 1,
@@ -5578,7 +5574,7 @@ void opcdump (const char *tfn)
     error("Unable to open %s for writing.\n", fn);
     return;
   }
-  for (i = 0; i < BASE; i++) {
+  for (i = 0; i < EFUN_BASE; i++) {
     fprintf(fp, "%-30s: %10d\n",
             query_instr_name(i), opc_eoper[i]);
   }
@@ -5602,7 +5598,7 @@ void opcdump (char * tfn)
   int ind, i, j, len;
   char tbuf[SMALL_STRING_SIZE], *fn;
   FILE *fp;
-  sort_elem_t ops[(BASE + 1) * (BASE + 1)];
+  sort_elem_t ops[(EFUN_BASE + 1) * (EFUN_BASE + 1)];
 
   if ((len = strlen(tfn)) >= (SMALL_STRING_SIZE - 10)) {
     error("Path '%s' too long.\n", tfn);
@@ -5620,17 +5616,17 @@ void opcdump (char * tfn)
     error("Unable to open %s for writing.\n", fn);
     return;
   }
-  for (i = 0; i <= BASE; i++) {
-    for (j = 0; j <= BASE; j++) {
-      ind = i * (BASE + 1) + j;
+  for (i = 0; i <= EFUN_BASE; i++) {
+    for (j = 0; j <= EFUN_BASE; j++) {
+      ind = i * (EFUN_BASE + 1) + j;
       ops[ind].num_calls = opc_eoper_2d[i][j];
       ops[ind].op1 = i;
       ops[ind].op2 = j;
     }
   }
-  quickSort((char *) ops, (BASE + 1) * (BASE + 1), sizeof(sort_elem_t),
+  quickSort((char *) ops, (EFUN_BASE + 1) * (BASE + 1), sizeof(sort_elem_t),
             sort_elem_cmp);
-  for (i = 0; i < (BASE + 1) * (BASE + 1); i++) {
+  for (i = 0; i < (EFUN_BASE + 1) * (EFUN_BASE + 1); i++) {
     if (ops[i].num_calls)
       fprintf(fp, "%-30s %-30s: %10d\n", query_instr_name(ops[i].op1),
               query_instr_name(ops[i].op2), ops[i].num_calls);
@@ -5692,7 +5688,7 @@ int last_instructions()
   i = last;
   do {
     if (previous_instruction[i] != 0)
-      debug_message("%6x: %3d %8s %-25s (%d)\n", previous_pc[i],
+      debug_message("%p: %3d %8s %-25s (%d)\n", previous_pc[i],
                     previous_instruction[i],
                     get_arg(i, (i + 1) %
                             (sizeof previous_instruction / sizeof(int))),

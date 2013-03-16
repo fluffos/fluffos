@@ -773,24 +773,22 @@ i_generate_node (parse_node_t * expr) {
 
             generate_expr_list(expr->r.expr);
             end_pushes();
-            if (f < ONEARG_MAX) {
-                ins_byte(f);
+            /* max_arg == -1 must use F_EFUNV so that varargs expansion works*/
+            if (expr->l.number < 4 && instrs[f].max_arg != -1) {
+              ins_byte(F_EFUN0 + expr->l.number); /* F_EFUN0 to F_EFUN3 */
+              ins_short(f); /* efun instruction */
             } else {
-                /* max_arg == -1 must use F_EFUNV so that varargs expansion works*/
-                if (expr->l.number < 4 && instrs[f].max_arg != -1)
-                    ins_byte(F_EFUN0 + expr->l.number);
-                else {
-                    ins_byte(F_EFUNV);
-                    ins_byte(expr->l.number);
-                }
-                ins_byte(f - ONEARG_MAX);
+              ins_byte(F_EFUNV);
+              ins_short(f); /* efun instruction */
+              ins_byte(expr->l.number); /* num args */
             }
+
             if (novalue_used) {
                 /* the value of a void efun was used.  Put in a zero. */
                 ins_byte(F_CONST0);
             }
             break;
-	}
+	      }
         default:
             fatal("Unknown node %i in i_generate_node.\n", expr->kind);
     }
@@ -1227,9 +1225,10 @@ optimize_icode (char * start, char * pc, char * end) {
         case F_EFUN1:
         case F_EFUN2:
         case F_EFUN3:
-            instr = EXTRACT_UCHAR(pc++) + ONEARG_MAX;
+            // FIXME: these are very outdated.
+            // instr = EXTRACT_UCHAR(pc++) + ONEARG_MAX;
         default:
-        	if(instr < BASE || instr > NUM_OPCODES)
+        	if(instr < EFUN_BASE || instr > NUM_OPCODES)
         		printf("instr %d prev %d\n", instr, prev);
         	if(!instr || instr > NUM_OPCODES)
         		fatal("illegal opcode");

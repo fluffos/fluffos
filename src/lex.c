@@ -2279,14 +2279,13 @@ const char *query_instr_name (int instr)
 {
     const char *name;
     static char num_buf[20];
-
     name = instrs[instr].name;
 
     if (name) {
         if (name[0] == '_') name++;
         return name;
     } else {
-        sprintf(num_buf, "efun%d", instr);
+        sprintf(num_buf, "op%d", instr);
         return num_buf;
     }
 }
@@ -2299,11 +2298,12 @@ static void int_add_instr_name (const char * name, int n, short t)
     instrs[n].ret_type = t;
 }
 
+// TODO: These should have been in same order as generated opcodes.h
 static void init_instrs()
 {
     unsigned int i, n;
 
-    for (i = 0; i < BASE; i++) {
+    for (i = 0; i < EFUN_BASE; i++) {
         instrs[i].ret_type = -1;
     }
     for (i = 0; i < NELEM(predefs); i++) {

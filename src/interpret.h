@@ -76,7 +76,8 @@ typedef struct control_stack_s {
     object_t *ob;               /* Current object */
     object_t *prev_ob;  /* Save previous object */
     program_t *prog;    /* Current program */
-    char *pc;
+    char *pc; /* TODO: change this to unsigned char* */
+
     svalue_t *fp;
     struct defer_list *defers;
     int num_local_variables;    /* Local + arguments */

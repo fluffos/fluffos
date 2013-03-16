@@ -633,17 +633,15 @@ disassemble (FILE * f, char * code, int start, int end, program_t * prog)
                 continue;
             }
         case F_EFUNV:
+            LOAD_SHORT(instr, pc);
             sprintf(buff, "%d", EXTRACT_UCHAR(pc++));
-            instr = EXTRACT_UCHAR(pc++) + ONEARG_MAX;
             break;
         case F_EFUN0:
         case F_EFUN1:
         case F_EFUN2:
         case F_EFUN3:
-            instr = EXTRACT_UCHAR(pc++) + ONEARG_MAX;
-            if (instrs[instr].min_arg != instrs[instr].max_arg) {
-                sprintf(buff, "%ld", instr - F_EFUN0);
-            }
+            LOAD_SHORT(instr, pc);
+            sprintf(buff, "%ld", instr);
             break;
         case 0:
             fprintf(f, "*** zero opcode ***\n");

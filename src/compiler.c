@@ -2008,6 +2008,7 @@ validate_efun_call (int f, parse_node_t * args) {
                 argp += i + 1;
             }
         }
+        args->kind = NODE_EFUN;
         args->l.number = num;
         args->v.number = predefs[f].token;
         args->type = predefs[f].ret_type;
@@ -2015,7 +2016,6 @@ validate_efun_call (int f, parse_node_t * args) {
             args->v.number += NOVALUE_USED_FLAG;
             args->type = TYPE_VOID;
         }
-        args->kind = NODE_EFUN;
     } else {
         CREATE_ERROR(args);
     }
