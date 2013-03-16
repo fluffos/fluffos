@@ -16,6 +16,8 @@
 # remake: 	remove the object files and generated files, and recompile
 # 		     NO reconfiguration is done, etc.
 #
+# test :  automatically run through testsuite standard tests.
+#
 # depend:	automatically create dependency info
 #
 #
@@ -254,5 +256,8 @@ distclean: neat
 	-rm -f Dependencies tmpdepend
 	-rm -f semantic* packages/semantic*
 	-touch Dependencies
+
+test: $(DRIVER_BIN)
+	-cd testsuite && ../driver -ftest etc/config.test
 
 include Dependencies
