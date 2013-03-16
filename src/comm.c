@@ -1344,7 +1344,7 @@ static void copy_chars (interactive_t * ip, char * from, int num_bytes)
 
 											case TELOPT_TTYPE:
 												if (!ip->sb_buf[1]) {
-													copy_and_push_string(ip->sb_buf + 2);
+													copy_and_push_string((const char *)(ip->sb_buf + 2));
 													apply(APPLY_TERMINAL_TYPE, ip->ob, 1, ORIGIN_DRIVER);
 												}
 												break;
@@ -2090,7 +2090,7 @@ static void new_user_handler (int which)
 	memcpy((char *) &all_users[i]->addr, (char *) &addr, length);
 #ifdef IPV6
 	char tmp[INET6_ADDRSTRLEN];
-	debug(connections, ("New connection from %s.\n", inet_ntop(AF_INET6, &addr.sin6_addr, &tmp, INET6_ADDRSTRLEN)));
+	debug(connections, ("New connection from %s.\n", inet_ntop(AF_INET6, &addr.sin6_addr, tmp, INET6_ADDRSTRLEN)));
 #else
 	debug(connections, ("New connection from %s.\n", inet_ntoa(addr.sin_addr)));
 #endif
@@ -2475,7 +2475,7 @@ static char *get_user_command()
 		}
 #ifdef IPV6
     char tmp[INET6_ADDRSTRLEN];
-    debug(connections, ("Closing connection from %s.\n", inet_ntop(AF_INET6, &ip->addr.sin6_addr, &tmp, INET6_ADDRSTRLEN)));
+    debug(connections, ("Closing connection from %s.\n", inet_ntop(AF_INET6, &ip->addr.sin6_addr, tmp, INET6_ADDRSTRLEN)));
 #else
 		debug(connections, ("Closing connection from %s.\n", inet_ntoa(ip->addr.sin_addr)));
 #endif

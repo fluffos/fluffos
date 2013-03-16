@@ -660,7 +660,7 @@ f_terminal_colour (void)
 
 	if(!resetstrlen) {
 		//we really really need one, so just default to ansi reset
-		resetstr = "\e[49;49m\e[0;10m";
+		resetstr = "\033[49;49m\033[0;10m";
 		resetstrlen = 15;
 		add_mapping_string(sp->u.map, "RESET", resetstr);
 	}
@@ -1831,6 +1831,9 @@ void f_is_daylight_savings_time (void)
 	old_tz = set_timezone(timezone);
 
 	t = localtime((time_t *)&time_to_check);
+
+  set_timezone(old_tz);
+
   if (t) {
   	push_number((t->tm_isdst) > 0);
   } else push_number(-1);
@@ -2968,8 +2971,8 @@ static void fix_object_names() {
 
 void f_test_load(){
 	const char *tmp = sp->u.string;
-	object_t *new_ob, *tmp_ob;
-	if(testloadob = find_object2(sp->u.string)){
+	object_t *new_ob;
+	if((testloadob = find_object2(sp->u.string))){
 		tmp = testloadob->obname;
 		SETOBNAME(testloadob, "");
 
@@ -2996,5 +2999,4 @@ void f_test_load(){
 	if(testloadob)
 		SETOBNAME(testloadob, saved_extra_name);
 }
-
 #endif
