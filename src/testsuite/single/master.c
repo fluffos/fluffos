@@ -249,6 +249,13 @@ staticf void error_handler(mapping map, int flag) {
   object ob;
   string str;
 
+  /* Squelch the expected eval_cost errors thrown by the call_out tests */
+  if (map["program"] == "/single/tests/efuns/call_out.c" &&
+      map["error"] == "*Too long evaluation. Execution aborted.\n")
+  {
+      return;
+  }
+
   ob = this_interactive() || this_player();
   if (flag) str = "*Error caught\n";
   else str = "";
