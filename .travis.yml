@@ -1,0 +1,5 @@
+language: c
+script: cd src && cp local_options.test local_options && ./build.FluffOS develop && make clean && make && make test
+compiler:
+  - clang
+  - gcc
