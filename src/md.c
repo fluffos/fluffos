@@ -126,6 +126,9 @@ MDmalloc (md_node_t * node, int size, int tag, char * desc)
     node->tag = tag;
     node->id = count++;
     node->desc = desc ? desc : "default";
+    if(!desc) {
+      fatal("Trying to alloc memory without accounting info.");
+    }
     if (malloc_mask == node->tag) {
         debug_message("MDmalloc: %5d, [%-25s], %8lx:(%d)\n",
                 node->tag, node->desc, PTR(node), node->size);
@@ -530,6 +533,7 @@ void check_string_stats (outbuffer_t * out) {
         + blocks[TAG_MALLOC_STRING & 0xff] * sizeof(malloc_block_t);
     int num = blocks[TAG_SHARED_STRING & 0xff] + blocks[TAG_MALLOC_STRING & 0xff];
     int bytes, as, ab;
+    int need_dump = 0;
 
     compute_string_totals(&as, &ab, &bytes);
 
@@ -538,7 +542,7 @@ void check_string_stats (outbuffer_t * out) {
     overhead += base_overhead;
 
     if (num != num_distinct_strings) {
-        dump_stralloc();
+        need_dump = 1;
         if (out) {
             outbuf_addv(out, "WARNING: num_distinct_strings is: %i should be: %i\n",
                         num_distinct_strings, num);
@@ -549,7 +553,7 @@ void check_string_stats (outbuffer_t * out) {
         }
     }
     if (overhead != overhead_bytes) {
-        dump_stralloc();
+        need_dump = 1;
         if (out) {
             outbuf_addv(out, "WARNING: overhead_bytes is: %i should be: %i\n",
                overhead_bytes, overhead);
@@ -560,7 +564,7 @@ void check_string_stats (outbuffer_t * out) {
         }
     }
     if (bytes != bytes_distinct_strings) {
-        dump_stralloc();
+        need_dump = 1;
         if (out) {
             outbuf_addv(out, "WARNING: bytes_distinct_strings is: %i should be: %i\n",
                         bytes_distinct_strings, bytes - (overhead - base_overhead));
@@ -571,7 +575,7 @@ void check_string_stats (outbuffer_t * out) {
         }
     }
     if (allocd_strings != as) {
-        dump_stralloc();
+        need_dump = 1;
         if (out) {
             outbuf_addv(out, "WARNING: allocd_strings is: %i should be: %i\n",
                         allocd_strings, as);
@@ -582,7 +586,7 @@ void check_string_stats (outbuffer_t * out) {
         }
     }
     if (allocd_bytes != ab) {
-        dump_stralloc();
+        need_dump = 1;
         if (out) {
             outbuf_addv(out, "WARNING: allocd_bytes is: %i should be: %i\n",
                         allocd_bytes, ab);
@@ -591,6 +595,10 @@ void check_string_stats (outbuffer_t * out) {
                    allocd_bytes, ab);
             abort();
         }
+    }
+
+    if (need_dump) {
+        dump_stralloc();
     }
 }
 #endif
@@ -792,8 +800,9 @@ void check_all_blocks (int flag) {
                     }
                 }
 #ifdef PACKAGE_COMPRESS
-                if(all_users[i]->compressed_stream)
+                if(all_users[i]->compressed_stream) {
                 	DO_MARK(all_users[i]->compressed_stream, TAG_INTERACTIVE);
+                }
 #endif
 
 #ifndef NO_ADD_ACTION
@@ -809,7 +818,8 @@ void check_all_blocks (int flag) {
 
           strcpy(buf, DEFAULT_FAIL_MESSAGE);
           strcat(buf, "\n");
-          EXTRA_REF(BLOCK(findstring(buf)))++;
+          char *target = findstring(buf);
+          if (target) EXTRA_REF(BLOCK(target))++;
         }
 
 #ifdef PACKAGE_UIDS
@@ -1058,6 +1068,24 @@ void check_all_blocks (int flag) {
                     break;
                 case TAG_MAP_NODE_BLOCK:
                     outbuf_addv(&out, "WARNING: Found orphan mapping node block: %s %04x\n", entry->desc, entry->tag);
+                    break;
+                /* FIXME: need to account these. */
+                case TAG_PERMANENT: /* only save_object|resotre_object uses this */
+                case TAG_INC_LIST:
+                case TAG_IDENT_TABLE:
+                case TAG_OBJ_TBL:
+                case TAG_SIMULS:
+                case TAG_STR_TBL:
+                case TAG_LOCALS:
+                case TAG_CALL_OUT:
+                case TAG_USERS:
+                case TAG_HEART_BEAT:
+                case TAG_INPUT_TO:
+                    break;
+                default:
+                    if (entry->tag < TAG_MARKED) {
+                      printf("WARNING: unaccounted node block: %s %d\n", entry->desc, entry->tag);
+                    }
                     break;
                 }
                 entry->tag &= ~TAG_MARKED;
