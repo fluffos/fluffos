@@ -1662,6 +1662,9 @@ static void handle_configure() {
     if (lookup_define("GCMALLOC"))
         check_library("-lgc");
 
+    if (lookup_define("CYGWIN"))
+            check_library("-liconv");
+
     if (lookup_define("MINGW")){
         check_library("-lwsock32");
         check_library("-lws2_32");
