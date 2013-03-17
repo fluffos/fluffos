@@ -25,17 +25,20 @@ fi
 if [ "`uname -s`" = "Darwin" ]; then # OSX gcc is very outdated.
   CC=clang
 else
-  CC=gcc
+  CC=${CC:-"gcc"}
 fi
 
-CFLAGS="--std=c99 -D_GNU_SOURCE -march=native -m64 -flto -D__USE_FIXED_PROTOTYPES__"
-CPP="cpp"
+CFLAGS="--std=c99 -march=native -m64 -D_GNU_SOURCE -D__USE_FIXED_PROTOTYPES__"
+# use flto only in gcc
+if [ "$CC" = "gcc" ]; then
+  CFLAGS="$CFLAGS -flto"
+fi
 
 OPTIMIZE=${OPTIMIZE:-"-O3"}
 DEBUG=${DEBUG:-"-g"}
 
-# Change this to use another bison/yacc implementation.
-YACC="bison -d -y"
+# Only support bison for now.
+BISON=bison
 
 # Change this if want to use another 'make'
 MAKE=make
@@ -84,26 +87,19 @@ int main() {
 END
 
 $CC $CFLAGS comptest.c
+
+if test $? -ne 0; then
+    echo "FATAL ERROR: test compile failed."
+    exit 1
+fi
+
 ARCH=`./$A_OUT`
 
-# test ranlib/ar
-ar rcu comptest.a $A_OUT
-if test $? -ne 0; then
-    echo "FATAL ERROR: Could not find ar."
-    exit
-fi
-ranlib comptest.a
-if test $? -eq 0; then
-    RANLIB=ranlib    
-else
-    RANLIB=/bin/true
-fi
-
-rm comptest.a
 rm $A_OUT
+rm comptest.c
 
-if test ! "$OBJDIR" = ""; then
-    mkdir $OBJDIR
+if [ "$OBJDIR" != "" ]; then
+    mkdir -p $OBJDIR
 fi
 
 echo MAKE=$MAKE >GNUmakefile
@@ -116,10 +112,8 @@ echo INSTALL_DIR=$INSTALL_DIR >>GNUmakefile
 echo OPTIMIZE=$OPTIMIZE >>GNUmakefile
 
 echo CC=$CC >>GNUmakefile
-echo CPP=$CPP >>GNUmakefile
 echo CFLAGS=$CFLAGS >>GNUmakefile
-echo YACC=$YACC >>GNUmakefile
-echo RANLIB=$RANLIB >>GNUmakefile
+echo BISON=$BISON >>GNUmakefile
 echo A=a >>GNUmakefile
 echo O=o >>GNUmakefile
 echo A_OUT=$A_OUT >>GNUmakefile
@@ -127,12 +121,12 @@ echo A_OUT=$A_OUT >>GNUmakefile
 cat Makefile.in >> GNUmakefile
 
 echo "***************** Configuration completed **************"
-echo "Installing MudOS on $ARCH"
+echo "Compiling FluffOS on $ARCH."
 echo
 echo "Using $INSTALL to install binaries in $INSTALL_DIR."
-echo "Using $CPP for preprocessing."
+echo "Using $CC -E $CFLAGS for preprocessing."
 echo "Using $CC $CFLAGS to compile."
-echo "Using $YACC $YFLAGS to make the compiler."
-echo "Edit $MAKEFILE if this is not what you want"
+echo "Using $BISON to make the compiler."
+echo "Edit GNUmakefile if this is not what you want"
 echo
-echo "Otherwise, type '$MAKE' to build MudOS, then '$MAKE install'."
+echo "Otherwise, type '$MAKE' to build FluffOS, then '$MAKE install'."

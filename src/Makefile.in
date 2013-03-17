@@ -66,12 +66,17 @@ SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
 all: $(OBJDIR) cc.h main_build
 main_build2: $(DRIVER_BIN) addr_server portbind
 
+build_packages: packages/packages
+	$(MAKE) -C packages 'CC=$(CC)' 'CFLAGS=$(CFLAGS)' 'OBJDIR=.' 'A=$(A)' 'O=$(O)'
+
 main_build: files
+	$(MAKE) build_packages
 	$(MAKE) main_build2
 
 VPATH = $(OBJDIR)
 
 OBJ=$(addprefix $(OBJDIR)/,$(subst .c,.o,$(SRC)))
+PKG_OBJ=$(wildcard packages/*.o)
 
 $(OBJDIR)/%.o: %.c 
 	$(CC) $(CFLAGS) -o $@ -c $<
@@ -87,17 +92,13 @@ which_makefile:
 	echo MakeIsGNU
 
 grammar.tab.c: grammar.y
-	$(YACC) grammar.y
 	-rm -f grammar.tab.*
-	sed "s/y.tab.c/grammar.tab.c/g" y.tab.c  > grammar.tab.c
-	-mv y.tab.h grammar.tab.h
+	$(BISON) grammar.y --defines=grammar.tab.h --output=grammar.tab.c
 
-packages/packages.a: packages/*.c
-	$(MAKE) -C packages 'CC=$(CC)' 'CFLAGS=$(CFLAGS)' 'OBJDIR=../$(OBJDIR)' 'RANLIB=$(RANLIB)' 'A=$(A)' 'O=$(O)'
 
-$(DRIVER_BIN): packages/packages.a $(OBJ) dtrace_compile
+$(DRIVER_BIN): packages $(OBJ) dtrace_compile
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
-	$(PROOF) $(CC) $(CFLAGS) $(OBJ) `./dtrace_compile` -o $(DRIVER_BIN) packages/packages.a $(EXTRALIBS) `cat system_libs`
+	$(PROOF) $(CC) $(CFLAGS) $(OBJ) $(PKG_OBJ) `./dtrace_compile` -o $(DRIVER_BIN) $(EXTRALIBS) `cat system_libs`
 
 dtrace_compile: dtrace_compile.c local_options
 	$(CC) dtrace_compile.c -o dtrace_compile
@@ -134,7 +135,7 @@ cc.h: GNUmakefile
 # the touches here are necessary to fix the modification times; link(2) does
 # 'modify' a file
 files: edit_source sysmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c func_spec.c packages/Makefile.pre packages/GNUmakefile.pre configure.h grammar.y.pre
-	./edit_source -options -malloc -build_func_spec '$(CPP) $(CFLAGS)' \
+	./edit_source -options -malloc -build_func_spec '$(CC) -E $(CFLAGS)' \
 	              -process grammar.y.pre
 	./edit_source -process packages/Makefile.pre
 	./edit_source -process packages/GNUmakefile.pre
@@ -142,11 +143,12 @@ files: edit_source sysmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c
 	touch mallocwrapper.c
 	touch malloc.c
 	touch files
+	-echo "Configuration done: system_libs: "
+	-cat ./system_libs
 
 make_func.tab.c: make_func.y cc.h
-	$(YACC) $(YFLAGS) make_func.y
-	-rm -f make_func.tab.c
-	mv y.tab.c make_func.tab.c
+	-rm -f make_func.tab.*
+	$(BISON) make_func.y --defines=make_func.tab.h --output=make_func.tab.c
 
 configure.h: edit_source build.FluffOS
 	-if test \( ! -r configure.h \) -o \( ! -r configuration \); then \
@@ -257,7 +259,7 @@ distclean: neat
 	-rm -f semantic* packages/semantic*
 	-touch Dependencies
 
-test: $(DRIVER_BIN)
-	-cd testsuite && ../driver -ftest etc/config.test
+test: all
+	cd testsuite && ../driver -ftest etc/config.test
 
 include Dependencies

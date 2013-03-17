@@ -1262,7 +1262,7 @@ restore_object_from_gzip (object_t * ob,
     }
 
     if(!buff){
-      buff = (char *)DXALLOC(t, TAG_TEMPORARY, "restore_object: 6");
+      buff = (char *)DXALLOC(t, TAG_PERMANENT, "restore_object: 6");
 	buffsize = t;
     }
 
@@ -1372,7 +1372,7 @@ static int save_object_recurse (program_t * prog, svalue_t **
             if (new_str) {
                 FREE(new_str);
             }
-        new_str = (char *)DXALLOC(theSize, TAG_TEMPORARY, "save_object: 2");
+        new_str = (char *)DXALLOC(theSize, TAG_PERMANENT, "save_object: 2");
             oldSize = theSize;
         }
 
@@ -1451,7 +1451,7 @@ static int save_object_recurse_str (program_t * prog, svalue_t **svp, int type, 
             if (new_str) {
                 FREE(new_str);
             }
-        new_str = (char *)DXALLOC(theSize, TAG_TEMPORARY, "save_object: 2");
+        new_str = (char *)DXALLOC(theSize, TAG_PERMANENT, "save_object: 2");
             oldSize = theSize;
         }
 
@@ -1812,7 +1812,7 @@ int restore_object (object_t * ob, const char * file, int noclear)
         if (theBuff) {
             FREE(theBuff);
         }
-        theBuff = DXALLOC(tmp_len + 1, TAG_TEMPORARY, "restore_object: 4");
+        theBuff = DXALLOC(tmp_len + 1, TAG_PERMANENT, "restore_object: 4");
         buff_len = tmp_len;
     }
 #ifdef WIN32
