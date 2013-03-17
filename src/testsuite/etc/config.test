@@ -73,7 +73,8 @@ maximum local variables : 30
 
 # Maximum amount of "eval cost" per thread - execution is halted when 
 # it is exceeded.
-maximum evaluation cost : 0x7fffffffff
+# This must be reasonably small for the call_out tests to finish.
+maximum evaluation cost : 0x7fffffff
 
 # This is the maximum array size allowed for one single array.
 maximum array size : 15000

@@ -2026,7 +2026,8 @@ static void new_user_handler (int which)
 	master_ob->interactive->default_err_message.s = 0;
 #endif
 	master_ob->interactive->connection_type = external_port[which].kind;
-	master_ob->interactive->sb_buf = (unsigned char *)MALLOC(SB_SIZE);
+	master_ob->interactive->sb_buf = (unsigned char *)DMALLOC(SB_SIZE,
+      TAG_PERMANENT, "new_user_handler");
 	master_ob->interactive->sb_size = SB_SIZE;
 	master_ob->flags |= O_ONCE_INTERACTIVE;
 	/*
