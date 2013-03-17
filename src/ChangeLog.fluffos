@@ -1,0 +1,220 @@
+As MudOS is moving too slow to keep our driver hacks apart, we now call our own
+FluffOS :)
+new in FluffOS 1.36
+Fixed crasher when doing restore_variable("(//)")
+Fixed crasher when using 256 local variables in a function pointer
+
+new in FluffOS 1.35
+Fixed crasher when too many classes are used (parser using error result)
+Fixed crasher with efun:: in function pointers when the efun override wasn't allowed
+
+new in FluffOS 1.34
+Fixed crashers in the reference keeping linked list
+Fixed crasher when connections are not routed to any object
+Changed compiling for -DDEBUG to work with modern glibc (turrican)
+Fixed bug in regprop() (turrican)
+Fixed crasher in max/min (woom)
+
+new in FluffOS 1.33
+Fixed typo in above line
+Added vowel/add_a and num_classes efuns (Woom)
+Added max/min/rell_MdN efuns (Woom)
+Corrected functions/variables prototype (reported by Woom)
+Changed makefile so make -j<number> works most of the time
+Fixed ++ on LPC floats (reported by Woom)
+Fixed error message + crasher in element_of()
+
+new in FluffOS 1.32
+Fix for nomask and shadows (simon@boo.org)
+Make tab warnings optional (Skullslayer@Realms of the Dragon)
+Compile fix in interpret.c (Skullslayer@Realms of the Dragon)
+this_object() is now the default argument to base_name();
+Fixed crasher in terminal_colour()
+
+new in FluffOS 1.31
+Fixed crasher in terminal_colour()
+Changed heartbeats to run relative to mud time (time() in the mud) and never 
+	never skip them anymore
+Changed eval cost code to use signals, removed kernel module code and the 
+	(VERY) slow fallback code there was before
+
+new in FluffOS 1.30
+added driver apply for mxp reply tags received from clients
+fixed crasher in functions() (DEBUG mode, probably corrupted memory) 
+fixed optimizer bug (Pelle Johansson peljo105 at student.liu.se) (from the
+	mudos develop mailing list)
+
+new in FluffOS 1.29
+fixed bug in terminal_colour()
+can now be compiled with tcc (you need to add a -DTCC flag)
+no longer use alloca in bison
+
+new in FluffOS 1.28
+fixes to compile with other settings than the DW ones (Skullslayer@Realms of the Dragon)
+fix in reverse DNS lookup (Skullslayer@Realms of the Dragon)
+properly do the zlib stuff (Skullslayer@Realms of the Dragon)
+terminal_colour fix (pinkfish)
+new element_of efun which takes a random element from an array
+readded pluralize cases that were accidently lost in the last version
+
+new in FluffOS 1.27
+update to terminal_colour() (Pinkfish)
+added option to use mmap instead of sbrk for included malloc packages
+
+new in FluffOS 1.26
+check resets every 5 minutes
+new malloc package (GNU)
+
+new in FluffOS 1.25
+fixed crasher in icode.c (Pinkfish)
+close external ports for external commands(they don't need the telnet port etc)
+ 
+new in FluffOS 1.24
+added mxp support (Pinkfish)
+updated with respect to MudOS v22.2b14
+
+new in FluffOS 1.23
+fixed crasher in sprintf
+fixed crasher in compressed files (by pinkfish)
+
+new in FluffOS 1.22
+fixed compiling a development version
+eval_cost reset for each call_out()ed function
+some fixes to pluralize()
+
+new in FluffOS 1.21
+changed allocating structure for efun function pointers to allocate space for
+	a full function pointer struct
+fixed the bug in mapping *map=({([])}); map[0]["bing"] = 1;
+no longer convert floats to doubles and back when they go on the LPC stack
+warn for tabs and MSDOS ^M chars in source code
+removed some debugging printfs 
+
+new in FluffOS 1.20
+fixed some array size issues
+cleaned up some source (used pointer + x to index instead of pointer[x])
+fixed some lint warnings
+fixed compiling a DEBUG driver
+fixed compiling with TRACE defined
+added check for corrupted objects in debug mode
+fixed buffer overruns and underruns in pluralize
+new get_garbage() efun, return objects with no external references that are
+	not in other objects and not shadowing anything
+
+new in FluffOS 1.19
+unlink the shared function name string in functions() before returning it.
+fixed compile errors with the intel(R) C++ compiler(7.0)
+
+new in FluffOS 1.18
+call the mudlib crash function even when printing the error trace gave a 
+	fatal error as well.
+added check for destructed objects in apply_low() 
+
+new in FluffOS 1.17
+fixed writing over shared strings (yay const!)
+fixed some buffer overflows
+
+new in FluffOS 1.16
+stop parsing after illegal to inherit error (crasher)
+fixed some uninitialised variables
+started using 'const'
+
+new in FluffOS 1.15
+many local buffers (on the stack) are now bigger to avoid overflow
+class names, class member names and function names are no longer stored as 
+	name, but as classname, membername and funcname instead (for easier
+	debugging)
+now uses the v22.2 database code instead of forward ported v22.1
+fixed bug in call_other type warnings
+
+new in FluffOS 1.14
+changed size of a local sprintf buffer from 100 to 1024 (100 must be really 
+	easy to reach)
+changed object struct name field to obname, there are too many struct fields
+	called name.
+fixed malloc selecting code
+removed part of the crasher fix of 1.13
+
+new in FluffOS 1.13
+fixed crasher in global_ref_list cleanup (just the crasher, i suspect the 
+	list is borken as well
+added base_name() efun
+
+new in FluffOS 1.12
+updated with respect to MudOS v22.2b13
+removed some mixing of signed and unsigned chars
+added mmap based malloc option (MMALLOC)
+added option to make call_other type errors warnings
+
+new in FluffOS 1.11
+shuffle() efun by Taffyd
+crasher fixes (copied from divided skys)
+memory leak fix (also from DS)
+
+new in FluffOS 1.10:
+fixed bug in reference_allowed where invis would stop working
+changed the return value of save_object to the amount of bytes (uncompressed)
+	after the line with the object name (#/global/player)
+exit forked driver if exec fails in external commands, rather than having
+	multiple drivers going.
+
+new in FluffOS 1.9:
+some small fixes to reference_allowed
+fixed (i hope) endless loop in compressed output
+
+new in FluffOS 1.8:
+reference_allowed efun (by Taffyd)
+fixed crasher in ... when used in building arrays (reported by Presto).
+	avoid using it for that though, it's _very_ inefficient.
+
+new in FluffOS 1.7:
+return of the event() efun
+member_array extended for partial searches and searching from the end of the
+	array
+query_num(): returns the int argument as a string in the (1 -> one), optional
+	second argument specifies where it starts returning "many" 
+query_multiple_short(): see discworld lib docs, done by Taffyd.
+
+new in FluffOS 1.6:
+this changelog is now in the FluffOS archive!
+fixed crasher in dumpstat (used by mem_info)
+added (optional) type checking for call_other calls
+changed variable assignment type checking from warnings to errors, using the
+	parser's warning system changed the current file/line variables, and
+	this could happen during compilation...
+updated options.h
+
+new in FluffOS 1.5:
+fixed crasher after errors in save_object. (reported by pinkfish)
+fixed crasher in interpret caused by find_line return a pointer to a local var
+fixed crasher with switch statements that only contain a default case, they
+	are no longer allowed (reported by Vashti)
+
+new in FluffOS 1.4:
+added compressedp efun, it shows if an interactive uses MCCP (pinkfish)
+fixed crasher in type checking code during compilation error (reported by
+	sightblinder)
+fixed crasher in compressedp
+
+new in FluffOS 1.3:
+fixed crasher with buffer overflow in output
+fixed loading compressed save files
+
+new in FluffOS 1.2:
+updated with respect to MudOS v22.2b12
+fixed eval cost bug for first object loaded after the preload
+increased line buffer size for loading compressed save files
+
+new in FluffOS 1.1:
+Uses a kernal module to get cpu times.
+
+FluffOS 1.0:
+changes since MudOS v22.2b11 (as far as i can remember)
+Type warnings added
+compressed save files
+eval limit is now based on time taken, rather than substracting random numbers
+	to account for actions.
+
+Many bug fixes :)
+
+Wodan.

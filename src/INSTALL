@@ -1,0 +1,16 @@
+Complete installation instructions are available in major releases
+(as opposed to minor releases).  The major releases also contain
+documentation, etc.
+
+Short instructions:
+
+1) edit options.h to suit your tastes
+2) type: ./build.MudOS
+3) follow the instructions printed on the screen
+4) you will need a runtime config file and a mudlib in order to use the driver.
+5) look at the example config file in this directory (Config.example)
+6) get a MudOS-compatible mudlib.  Note that many mudlibs require certain
+   setting in options.h, so the documentation of the mudlib should be
+   consulted.  Also, note that many mudlibs come prepackaged with a
+   version of MudOS they are known to work well with.
+7) have fun.

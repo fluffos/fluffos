@@ -1,0 +1,130 @@
+
+                                  It Crashed!!!
+
+                             by Beek and Robocoder
+
+***
+*** Contents
+***
+    1) Introduction
+    2) General Notes
+    3) Unattended operation/automation
+    4) Debugging core files
+    5) Notes for SAS/C Amiga users
+
+***
+*** Introduction
+***
+This file documents some methods of obtaining crash information which
+the MudOS developers may find useful in tracking down hard to reproduce
+crashers (serious bugs).
+
+***
+*** General Notes
+***
+Ok, if your driver crashes, and you want to be helpful, here's what you do:
+
+1. recompile the driver with the -g flag.  Turning off optimization
+   is a good idea too. [This can be done by doing a 'make neat' (or gmake),
+   reruning ./build.MudOS as follows: './build.MudOS debug', then recompile]
+2. go to your bin dir and type 'gdb driver' where driver is the name of your
+   driver executable
+3. It should startup, etc.  When it's ready, type 'run config.foo' or
+   whatever you normally do to run the driver, with 'run' instead of the
+   driver executable name.
+4. Wait for the driver to crash (or cause it to crash, if you know how)
+5. gdb should give you a prompt again.  type 'where'
+6. Post the output of the where command along with anything you know
+   about where/how/why the driver crashed on the MudOS bug report board.
+   Stuff like example LPC source code, a tail of driver.err and/or
+   debug.log, etc may be helpful.  In some cases the driver writes important
+   information to those files as it goes down.
+
+If you actually get a traceback, it makes crashes somewhere between
+10-100x easier to fix (at least!).  Remember to also specify your
+driver version (eg 0.9.19), operating system/architecture, and its
+version (eg SunOS 5.3).
+
+Note:
+  If you didn't use 'gcc', but 'cc' instead (for example), to compile the
+  driver, you will have to use 'dbx' (if you have it).  The same
+  instructions as above apply...just replace instances of 'gdb' with 'dbx'.
+
+***
+*** Unattended operation/automation
+***
+If you want to automate the process of collecting this crash information,
+something you can stick this into your startmud script, read this section.
+Begin by creating a batchfile with the following contents:
+
+     run config.foo >driver.err
+     where
+
+Replace 'config.foo' with the name of your config file, and 'driver.err'
+with whatever you've set up for redirecting the driver's stderr to.
+Where you have 'driver' (or whatever you named the executable) in your
+startmud script, use (depending on the compiler used):
+
+     gdb -batch -x batchfile driver >report
+
+   or: 
+
+     dbx -i driver <batchfile >report
+
+If/when it crashes, send us a copy of the report.
+
+***
+*** Debugging core files
+***
+This section applies to you, if the driver has crashed, leaving a
+core file behind.  A large core file is a good sign.  =)  Some users or
+systems may set a resource limit on the size of core files, eg
+
+    limit coredumpsize 0
+
+preventing them from debugging from the core file.  Remove the limit
+or skip this section.  HP/Apollo (Domain OS) users may be able to use
+'/com/tb' to get traceback information.
+
+Using dbx:                          Using gdb:
+
+    dbx driver core                     gdb driver core
+    where                               where
+    quit                                quit
+
+Replace 'driver' with the path of your driver executable.
+
+Another useful command is 'print', which can be used to print the
+values of variables in the current function, eg
+
+    print str
+
+'dbx' users can also use the 'dump' command to display the names and
+variable values in a function, eg
+
+    dump main >file
+
+***
+*** SAS/C (Amiga)
+***
+If you are using SAS/C, compile with Debug=Symbol and link with AddSym.
+It's a good to turn off optimizations with NoOpt and NoOptPeep.
+You can use either 'cpr' or 'tb'.  For 'cpr', use:
+
+    cpr -line -command "where -a; register" driver config.foo >report
+
+Using 'tb' is a bit more involved.  In building the driver, you must:
+
+    slink with catch.o or catchnr.o to generate snapshot files
+
+so that if/when the driver crashes, the 'tb' utility can be used to process
+the snapshot file.  catch.o will ask first before creating a snapshot file,
+while catchnr.o will not ask -- if the system is in a bad state, and
+catchnr.o is unable to complete writing the snapshot file, the filesystem
+can be potentially corrupted.  Once you have a 'Snapshot.TB' file, use:
+
+    tb -l
+
+to obtain detailed traceback information
+
+                                  --- EOF ---

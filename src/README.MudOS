@@ -1,0 +1,69 @@
+MudOS is an LPmud server (driver) which was originally distributed as an
+enhanced version of the LPmud 3.x driver.  It does not support COMPAT mode,
+but a number of newer mudlibs are available.
+ 
+This is the source (src) directory from the MudOS v21.x distribution.
+ 
+Minor releases of MudOS (those with a minor version number after the decimal,
+e.g. v20.26) are typically released without installation 
+instructions, usage instructions, documentation, or other supporting 
+material (since the size of this other material is fairly large).  Releases 
+of MudOS with version numbers having only one component (e.g. v21) will 
+be released as a combined source/documentation package (e.g. 
+MudOS_v21.tar.Z which is the most recent such release)
+ 
+The minor releases are intended for those who are already familiar with 
+installing and running MudOS.  These fix bugs in older drivers and introduce
+new features.
+
+Alpha and beta versions of future versions are available only in the form
+of patches.
+
+Typically, only those interested in testing for bugs or in being on the
+bleeding edge need install the alpha/beta releases.
+
+When deciding to upgrade, be sure to read the ChangeLog file in the same
+directory as this README to find out about the latest changes to MudOS.
+In the case of alpha and beta releases, also check out ChangeLog.alpha
+and ChangeLog.beta.
+In particular, note the changes marked "compat buster" since these describe 
+changes to the driver which may cause pre-existing mudlibs (such as Lil)
+to break in some minor fashion (the ChangeLog should give enough information
+to allow affected mudlibs to be fixed).
+ 
+Notes:
+
+The official support site for MudOS is http://www.mudos.org/
+
+If you believe that you have found a bug in MudOS that is not listed in the
+Bugs file, please visit the support site and check through the existing bugs
+in the bug database to see if someone else has reported your bug.  If nobody
+has reported the bug, please submit a bug report.  Please try to include as
+much information as you possibly can about the bug.  If you can provide
+details on how to reproduce the problem, that's the best kind of information
+you can give.  If the driver has crashed, read the file IT_CRASHED included
+in this distribution to find out how to collect information for reporting
+your crash.
+ 
+The 'addr_server' file replaces the old hname program.  Unlike hname, 
+addr_server must be started up manually (it takes a single argument which 
+is the port # the addr_server should listen on -- this port # must also be 
+specified in the runtime config file).  If addr_server doesn't work on your 
+machine, its okay to run the driver without it (just set your config file 
+up to point to someone else's addr_server).
+ 
+If the driver errors out at runtime with a message saying that the 
+operation is not supported on the socket, then try using cc instead of gcc 
+(assuming you were using gcc).  Alternatively, try uncommenting 
+NEED_OLD_CPP in the Makefile and then 'make clean' and 'make'.
+ 
+For more information about LPmuds and MUDs in general try reading
+the USENET groups rec.games.mud.{admin,announce,misc,lp,tiny,diku}.
+
+On subdirectories:
+
+amiga/          Contains amiga support files; a crypt package is also
+                provided for systems missing DES crypt()
+include/        Useful #defines for the mudlib to have access to (used by
+                various efuns)
+packages/       This is where efun packages and user efuns should reside
