@@ -1,5 +1,13 @@
 FluffOS is a range of patches base on MudOS. 
 
+The offical release is kept in the master branch, You can download a release tar archive through tags.
+
+Current release: 
+
+2.26.1 https://github.com/fluffos/fluffos/archive/fluffos-2.26.1.tar.gz
+
+Current next branch: next-2.27, pull request should be send to that branch.
+
 LPC runtime is compatible, if your mud runs on MudOSv22 +, it should run on FluffOS.
 
 Features includes:
