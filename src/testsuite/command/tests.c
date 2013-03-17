@@ -40,7 +40,15 @@ main(string fun)
 	write("Checks succeeded.\n");
 	return 1;
     }
+
+    set_eval_limit(0x7fffffff);
+    reset_eval_cost();
+
     fun->do_tests();
+
+    set_eval_limit(0x7fffffff);
+    reset_eval_cost();
+
     if (tp != this_player())
 	error("Bad this_player() after calling " + fun + "\n");
 #if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__CHECK_MEMORY__)
