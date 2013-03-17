@@ -398,7 +398,7 @@ static int user_parser (char * buff)
 		&& !(command_giver->flags & O_IS_WIZARD)
 #endif
 		)
-		add_moves(&command_object->stats, 1);
+		add_moves(&s->ob->stats, 1);
 #endif
 	    if (!illegal_sentence_action)
 		illegal_sentence_action = save_illegal_sentence_action;

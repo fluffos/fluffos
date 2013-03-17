@@ -1658,6 +1658,9 @@ static void handle_configure() {
     check_library("-lseq");
     check_library("-lm");
 
+    if (lookup_define("GCMALLOC"))
+        check_library("-lgc");
+
     if (lookup_define("CYGWIN"))
             check_library("-liconv");
 
