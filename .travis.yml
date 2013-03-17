@@ -1,5 +1,10 @@
 language: c
-script: cd src && cp local_options.test local_options && ./build.FluffOS develop && make clean && make && make test
+
+before_install:
+  - sudo apt-get install -qq bison libz-dev
+
+script: cd src && cp local_options.test local_options && ./build.FluffOS develop && make && make test
+
 compiler:
   - clang
   - gcc
