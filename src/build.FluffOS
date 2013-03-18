@@ -38,15 +38,11 @@ OPTIMIZE=${OPTIMIZE:-"-O3"}
 DEBUG=${DEBUG:-"-g"}
 
 # Only support bison for now.
-BISON=bison
+YACC="bison -y"
 
 # Change this if want to use another 'make'
 MAKE=make
 INSTALL=install
-
-# define this to be where you want the temporary compiled files to go
-# (only used with GNU make)
-OBJDIR=obj
 
 # change this if you wish the driver binary to be named something else
 DRIVER_BIN=driver
@@ -98,27 +94,22 @@ ARCH=`./$A_OUT`
 rm $A_OUT
 rm comptest.c
 
-if [ "$OBJDIR" != "" ]; then
-    mkdir -p $OBJDIR
-fi
+echo MAKE=$MAKE >Makefile
+echo SHELL=/bin/sh >>Makefile
+echo DRIVER_BIN=$DRIVER_BIN >>Makefile
+echo STRFUNCS=$STRFUNCS >>Makefile
+echo INSTALL=$INSTALL >>Makefile
+echo INSTALL_DIR=$INSTALL_DIR >>Makefile
+echo OPTIMIZE=$OPTIMIZE >>Makefile
 
-echo MAKE=$MAKE >GNUmakefile
-echo SHELL=/bin/sh >>GNUmakefile
-echo OBJDIR=$OBJDIR >>GNUmakefile
-echo DRIVER_BIN=$DRIVER_BIN >>GNUmakefile
-echo STRFUNCS=$STRFUNCS >>GNUmakefile
-echo INSTALL=$INSTALL >>GNUmakefile
-echo INSTALL_DIR=$INSTALL_DIR >>GNUmakefile
-echo OPTIMIZE=$OPTIMIZE >>GNUmakefile
+echo CC=$CC >>Makefile
+echo CFLAGS=$CFLAGS >>Makefile
+echo YACC=$YACC >>Makefile
+echo A=a >>Makefile
+echo O=o >>Makefile
+echo A_OUT=$A_OUT >>Makefile
 
-echo CC=$CC >>GNUmakefile
-echo CFLAGS=$CFLAGS >>GNUmakefile
-echo BISON=$BISON >>GNUmakefile
-echo A=a >>GNUmakefile
-echo O=o >>GNUmakefile
-echo A_OUT=$A_OUT >>GNUmakefile
-
-cat Makefile.in >> GNUmakefile
+cat Makefile.in >> Makefile
 
 echo "***************** Configuration completed **************"
 echo "Compiling FluffOS on $ARCH."
@@ -126,7 +117,7 @@ echo
 echo "Using $INSTALL to install binaries in $INSTALL_DIR."
 echo "Using $CC -E $CFLAGS for preprocessing."
 echo "Using $CC $CFLAGS to compile."
-echo "Using $BISON to make the compiler."
-echo "Edit GNUmakefile if this is not what you want"
+echo "Using $YACC to make the compiler."
+echo "Edit Makefile if this is not what you want"
 echo
 echo "Otherwise, type '$MAKE' to build FluffOS, then '$MAKE install'."
