@@ -1,0 +1,99 @@
+Read the Credits.LPmud file for credit information on the original LPmud
+driver (that upon which MudOS is based).  LPmud was originally written
+by Lars Pensj|, April 1989.
+ 
+The following information is not guaranteed to be complete.  (I
+apologize in advance if I have forgotten anyone).  For more information
+read the './doc/driver/done-mudos' and './src/ChangeLog' files.
+ 
+We would like to thank the following muds for extensive testing and numerous
+bug reports:
+ 
+TMI, Portals, Overdrive, Genocide, TMI-2, Vincent's Hollow, DreamShadow,
+Nightmare, Nanvaent, and many others.
+ 
+The MudOS driver was a team effort with specific contributions from the
+following people:
+
+Erik Kay (Wayfarer) - runtime config system, message() efun, and others.
+ 
+John Garnett (Truilkan) - improved mappings implementation, process_input
+   and write_prompt callbacks, C++ style comments, lazy resets,
+   master::valid_override callback, improved shared string management, and
+   others.
+ 
+Dwayne Fontenot (Jacques) - major rewrite of comm.c, TCP socket efuns,
+   ported to AIX 3.2.
+ 
+Dave Richards (Cynosure/Cygnus) - UDP socket efuns, enhanced TCP socket efuns,
+   ported MudOS to the Sequent Symmetry (System V Release 3),
+   and the time_expression() efun.
+ 
+Stephen Iannce (Huthar) - children() and message() efuns, extensive testing of
+   the socket efunctions.
+ 
+Joel York (Shadowhawk) - multiple arguments version of input_to(), dprint
+   option to ed.
+ 
+Bob Farmer (Blackthorn) - fixed various efuns to honor the hidden object 
+   flags, several new efuns, porting to DEC Alpha and others, bug fixes,
+   and others.
+ 
+James Waldrop (Sulam) - helped with reorganizing the huge switch in
+   interpret.c into efunctions.c.
+ 
+Michael Bundy - provided patches allowing MudOS to run on System V Release 4.
+   (built on Dave Richard's System V Release 3 port).
+ 
+Luke Mewborn (Zak) - provided patches allowing MudOS to run on 386BSD
+ 
+Olav Kolbu (Aragorn) - provided patches allowing MudOS to run on Linux 0.99.3,
+    many bug reports and misc fixes, countless compilation errors
+
+Darin Johnson (Darin) - provided various patches and optimizations (including
+   combining prelang.y and postlang.y into compiler.y).
+
+David Bennett (Pinkfish) - provided enhancements for parse_command and for the
+   telnet negotiation code in comm.c (as well as various other small bug 
+   fixes), and the resolve() efun. 
+
+John Fehr (Wildcard) - provided patches allowing MudOS to run on Amiga
+
+Anthon Pang (Robocoder) - provided various patches, optimize function
+	table search, amiga support
+
+Tim Hollebeek (Beek) - LPC->C and patches, compiler rewrite, new function
+	pointers, etc
+
+Ti-Ming Chiang (Symmetry, Cloud) - Countless optimizations; array, mapping and
+	save_object rewrites
+
+Svata Dedic (Belgarat) - Win32 fixes, parser fixes, misc fixes
+
+Martin Tyler (Burty) - lex.c fixes, other misc fixes
+
+Troels Therkelsen (Qualin) - numerous bug reports and ideas
+
+Maarten de Jong - amiga compilation via gcc
+
+George Reese (Descartes) - bug reports, original Win32 port, mSQL support
+
+Mark ? (Mystic) - tons of ideas; fixes for exotic options settings
+
+Skeeter Hartwig (Jihad) - numerous bug reports
+
+David Rudy (Aule) - optimizations; high usage testing and stability patches
+
+Greg Stein (Deathblade) - various fixes and bug reports
+
+Ben Gras (Fermat) - MD5 crypt(), various fixes
+
+Kars de Jong (Turrican) - various bug fixes
+
+Simon Matthews (Andrew) - MySQL support, various patches and bug reports
+
+and tons of others who have accidentally been omitted
+--
+Thanks to Adam Beeman (Buddha) for making numerous suggestions on
+improving the MudOS driver and for providing the TMI site as the original
+MudOS development site.

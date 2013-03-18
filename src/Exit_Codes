@@ -1,0 +1,59 @@
+addr_server:
+    1 - error creating the socket or first arg was not a port #
+    2 - setsockopt() failed or port # was not a number
+    3 - error binding the socket (socket in use?)
+    4 - getsockname() failed
+    5 - couldn't create SIGPIPE handler
+    8 - set_socket_nonblocking() failed
+   10 - listen() failed
+
+make_func:
+    1 - general fatal error
+   -1 - error opening a file
+   -2 - error opening OPC_PROF
+   -3 - error opening OPCODES
+
+driver exit codes:
+   Note: the mudlib can send a shutdown code as an argument to shutdown.
+   Check your mudlib for documentation.
+   -3 - a crash occured while trying to exit via master::crash()
+   -2 - driver successfully shutdown via master::crash()
+   -1 - (a) The config file 'include dirs' setting was malformed
+	(b) bad definition of EXTRACT_UCHAR or memmove()
+        (c) no config file
+        (d) Illegal flag syntax
+        (e) Bad mudlib directory
+        (f) Master object failed to load
+        (g) Simul efun object failed to load
+	    (one existed, but had errors)
+	(h) SIGUSR1 was recieved
+        (i) error in comfing file
+    0 - normal shutdown
+    1 - error creating user connection socket
+        or obscure fatal error in set_inc_list
+        or master called shutdown() from create()
+	or memset() failed
+    2 - setsockopt() failed
+        or driver out of memory and no reserve exists
+    3 - bind() failed
+        or driver ran out of memory again after freeing reserve
+    4 - getsockname() failed
+    5 - error setting up SIGPIPE handler
+    8 - error in set_socket_nonblocking()
+
+  129 - uncaught SIGHUP
+  130 - uncaught SIGINT  (control-C)
+  131 - uncaught SIGQUIT (control-\)
+  132 - uncaught SIGILL  (illegal instruction)
+  133 - uncaught SIGTRAP (trace trap)
+  134 - uncaught SIGABRT (MudOS abort due to failed assertion)
+  135 - uncaught SIGEMT
+  136 - uncaught SIGFPE  (arithmetic exception)
+  137 - uncaught SIGKILL
+  138 - uncaught SIGBUS  (bus error)
+  139 - uncaught SIGSEGV (seg fault)
+  140 - uncaught SIGSYS  (bad system call)
+  143 - uncaught SIGTERM
+  144 - uncaught SIGUSR1
+  145 - uncaught SIGUSR2
+  

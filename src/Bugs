@@ -1,0 +1,318 @@
+The internal message passing functions should be cleaned up.  Currently, a lot
+of stuff calls add_message() directly, while other stuff uses tell_object()
+and friends.  One consequence of this is that even with INTERACTIVE_CATCH_TELL
+defined, not all of the output flows through catch_tell() [ed, for example,
+doesn't, as well as some other efuns].
+
+-----
+
+In the MudOS v22a36 the livings efun gives back HIDDEN things too.
+I don't know why objects used that strange construction.
+I think, it's new form would be more usable.
+As i see this HIDDEN stuff has many leaks, like:
+you can always create an object that you put into all rooms, and look
+for this_player() in the init apply.
+So even if you correct all efuns like livings, heartbeats, named_livings
+and so on, it will never be perfect.
+solve for livings and objects:
+------------------------------- cut here ----------------------------------
+1831c1831
+<     int nob, apply_valid_hide, hide_is_valid = 0;
+---
+>     int nob, display_hidden=-1;
+1836d1835
+<     apply_valid_hide = 1;
+1844,1848c1843,1845
+< 	    if (apply_valid_hide) {
+< 		apply_valid_hide = 0;
+< 		hide_is_valid = valid_hide(current_object);
+< 	    }
+< 	    if (hide_is_valid)
+---
+> 	    if (display_hidden==-1)
+> 		display_hidden = valid_hide(current_object);
+> 	    if (!display_hidden)
+1876c1873
+<     int display_hidden = 0, t_sz, i,j, num_arg = st_num_arg;
+---
+>     int display_hidden = -1, t_sz, i,j, num_arg = st_num_arg;
+1890a1888,1889
+> 	    if (display_hidden==-1)
+> 		display_hidden = valid_hide(current_object);
+1892,1893d1890
+< 		display_hidden = 1 + !!valid_hide(current_object);
+< 	    if (!(display_hidden & 2))
+---------------------------------- cut here --------------------------------
+
+Comment: possibly a better solution is to check O_HIDDEN where O_DESTRUCTED
+is checked.  valid_hide() would be checked when objects load, and would
+set a O_CAN_SEE_HIDDEN bit.  Then every time we run across a
+FRAME_OB_CHANGE, do:
+
+if (current_object & O_CAN_SEE_HIDDEN)
+    object_mask = O_DESTRUCTED;
+else
+    object_mask = O_DESTRUCTED | O_HIDDEN;
+
+Code elsewhere would then look something like:
+
+if (sv->type == T_OBJECT && (sv->u.ob->flags & object_mask)) {
+    free_object(sv->u.ob, "...");
+    *sv = const0;
+}
+
+This would be much more effective at preventing objects from detecting the
+existence of hidden objects.  It would also fix this one:
+
+Various efuns which call valid_hide() don't realize it can error, causing
+them to leak if master::valid_hide() throws an error.
+
+-----
+
+If an include file doesn't end in a newline, something screws up in the
+linked buffer code, causing odd compile errors.
+
+Line numbers get messed up when files don't end in a newline?
+
+-----
+
+RUNTIME_LOADING needs -rdynamic passed in the link on some OS's?
+(reported for a gcc-linux system; possibly a mixed a.out/elf?)
+
+-----
+
+This gives the wrong error message:
+
+unlock the door with the key
+Trying interpretation: unlock:the:door:with:the:key:
+Trying rule: OBJ with OBJ
+  parse_rule
+    parse_obj:
+    Found noun: door
+      parse_rule
+      Matched literal: with
+        parse_obj:
+        Found noun: key
+          parse_rule
+            we_are_finished
+            Trying can_unlock_obj_with_obj ...
+            Trying can_unlock_obj_word_obj ...
+            Trying can_verb_obj_word_obj ...
+            Trying can_verb_rule ...
+            Trying can_unlock_obj_with_obj ...
+            Return value was: 1
+            Trying direct_unlock_obj_with_obj ...
+            Return value was: 1
+            Trying indirect_unlock_obj_with_obj ...
+            Return value was: 0
+            You can't unlock the thing with that.
+ 
+          exiting parse_rule ...
+        parse_rule
+        exiting parse_rule ...
+        parse_rule
+          we_are_finished
+         Trying can_unlock_obj_with_obj ...
+          Trying can_unlock_obj_word_obj ...
+          Trying can_verb_obj_word_obj ...
+          Trying can_verb_rule ...
+          Trying can_unlock_obj_with_obj ...
+          Return value was: 1
+        exiting parse_rule ...
+      Done trying to match OBJ
+    parse_rule
+    last match to error ...
+    Changing last match.
+      parse_obj:
+      Found noun: key
+        parse_rule
+          we_are_finished
+          Trying can_unlock_obj_with_obj ...
+          Trying can_unlock_obj_word_obj ...
+          Trying can_verb_obj_word_obj ...
+          Trying can_verb_rule ...
+          Trying can_unlock_obj_with_obj ...
+          Return value was: 1
+          Trying indirect_unlock_obj_with_obj ...
+          Return value was: 0
+          You can't unlock the thing with that.
+ 
+        exiting parse_rule ...
+      parse_rule
+      exiting parse_rule ...
+      parse_rule
+
+        we_are_finished
+        Trying can_unlock_obj_with_obj ...
+        Trying can_unlock_obj_word_obj ...
+        Trying can_verb_obj_word_obj ...
+        Trying can_verb_rule ...
+        Trying can_unlock_obj_with_obj ...
+        Return value was: 1
+        Have better match; aborting ...
+      exiting parse_rule ...
+    Done trying to match OBJ
+    parse_rule
+    Matched literal: with
+      parse_obj:
+      Found noun: key
+        parse_rule
+          we_are_finished
+          Trying can_unlock_obj_with_obj ...
+          Trying can_unlock_obj_word_obj ...
+          Trying can_verb_obj_word_obj ...
+          Trying can_verb_rule ...
+          Trying can_unlock_obj_with_obj ...
+          Return value was: 1
+          Trying indirect_unlock_obj_with_obj ...
+          Return value was: 0
+          You can't unlock the thing with that.
+ 
+        exiting parse_rule ...
+      parse_rule
+      exiting parse_rule ...
+      parse_rule
+        we_are_finished
+        Trying can_unlock_obj_with_obj ...
+        Trying can_unlock_obj_word_obj ...
+        Trying can_verb_obj_word_obj ...
+        Trying can_verb_rule ...
+        Trying can_unlock_obj_with_obj ...
+        Return value was: 1
+        Have better match; aborting ...
+      exiting parse_rule ...
+    Done trying to match OBJ
+    parse_rule
+    last match to error ...
+    Literal not found in forward search
+    parse_rule
+    last match to error ...
+    Literal not found in forward search
+    parse_rule
+    Ran out of words to parse.
+  Done trying to match OBJ
+There is no door here.
+
+-----
+
+It still seems possible for regexp(explode(read_file(...), "\n"), ...) to
+crash, but I can't reproduce it.
+
+-----
+
+#pragma optimize bug:
+
+;; Function room_of
+049d: local LV0
+049f: ! 
+04a0: || 0006 (04a7)
+04a3: transfer_local LV0
+04a5: objectp 
+04a6: ! 
+04a7: branch_when_zero 0003 (04ab)
+04aa: return_zero 
+04ab: branch 0007 (04b3)
+04ae: local LV1
+04b0: (void)assign_local LV0
+04b2: break_point 
+04b3: local LV0
+04b5: environment 
+04b7: local_lvalue LV1
+04b9: assign 
+04ba: bbranch_when_non_zero 000d (04ae)
+04bd: transfer_local LV0
+04bf: return 
+04c0: return_zero 
+
+object room_of(object obj) {
+    object ob;
+    if(!obj || !objectp(obj)) return 0;
+    while(ob=environment(obj)) obj=ob;
+    return obj;
+}
+
+-----
+
+heart_beat() is not shadowable
+
+-----
+
+    mixed a;
+    do {} while (a = ({ a, "" }));
+
+Profezzorn@TMI-2
+
+Comment:
+    It would be nice if things like this, where all the memory (VM too)
+    is sucked up by a runaway program, didn't cause the driver to
+    shutdown ("Out of memory").
+
+### Nope, this evals out, need to do more work to make it run out of memory
+	-Sym (note: which is not the same as if the driver errors with "Out
+	of memory)
+
+Yet another comment: Whether it evals out or runs out of mem obviously depends
+on the ratio of MAX_EVAL_COST to available memory ...
+
+-----
+
+Range/switch search should be binary, not linear. (in LPC->C)
+
+-----
+
+Probably need a test to see if bison's output actually compiles in
+./build.Mudos;  on a lot of AIX systems bison's use of alloca() fails.
+
+-Beek
+
+-------
+
+One can call private functions in inherited objects via call_out.
+
+------
+
+verbs that no longer have handlers should be deleted from the parser list
+
+---
+
+Line numbers can be screwed up by macro expansion.  Consider the following:
+
+#define IGNORE(x)
+#define USE_ONCE(x) x
+#define USE_TWICE(x) x
+
+// The end of the next line never gets counted.
+IGNORE("foo\
+bar")
+
+// The end of the next line is counted once.
+USE_ONCE("foo\
+bar")
+
+// The end of the next line is counted twice.
+USE_TWICE("foo\
+bar")
+
+So the IGNORE() and USE_TWICE() cases with screw up line numbering.
+Fixing this is non-trivial, since macro expansions are reinserted into
+the input stream.  Outside of quotes, it was handled by replacing
+'\n' with ' ' which is semantically equivalent.  Inside quotes, one has
+to do something like count the newlines as they are parsed, and then
+have add_input() keep track of how many artificial newlines it has created,
+so these can be ignored, which requires a check every time current_line++
+is done ...
+
+There must be a better fix :)
+
+---
+
+codefor int i,j; ({ i++, j})[1]; return i;
+
+;; Function eval_function
+0000: break_point 
+/* Missing:
+ *    local_lvalue LV0
+ *    inc(x)
+ */
+0001: local LV0
+0003: return 

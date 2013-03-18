@@ -1,0 +1,268 @@
+The current implementation of swapping could use a lot of work.  Swapping
+an object in/out isn't that expensive CPU wise, and can save a decent amount
+of memory.  The problem is that cloned programs can't swap, which disables
+swapping for much of the mud ...
+
+-Beek
+
+-----
+
+7. It would be more real, if a new call_out happen after all the previous
+   call_outs of the same delay. (because it were called later)
+   example: call_out("foo",1);
+            call_out("bar",1);
+   now bar will be called first and not foo! It's unreal.
+   could be possible a call_out with 0 delay ? we would use it for
+   safe destruct object.
+
+Comment:
+
+Ideally, a better fix would be for call_out to have a smaller
+granularity, so the second call_out follows the first by whatever the
+time difference between the two was.  This problem will always happen
+if the call_outs are within the granularity, and real small
+granularities (microsecond?) may/may not be desirable.
+
+-----
+
+The names of includes which define no code don't have to be saved for
+line number purposes (although they are still needed for binaries; see
+the other note about merging the two lists)
+
+-----
+
+Master applies should be cached like sefuns are.  Currently, APPLY_*
+are string constants so they always miss the call_other cache, making
+master applies slow.  APPLY_CREATE also always misses the cache, but
+it's always going to miss anyway so no problem :-).  Others like APPLY_ID
+etc should be changed to use shared strings so they can hit.
+
+-----
+
+There should be a NO_HEART_BEATS option
+
+-----
+
+we need to made a single-user option for MudOS that doesn't use sockets
+at all so that people wanting to run MudOS at schools where programs
+aren't allowed to listen on socket (anti-mud policies) can use MudOS
+for developing LPC code for another mud.
+
+--john
+
+-----
+
+From: John Garnett <garnett@gestalt.austin.tx.us>
+
+
+It'd be cool if there were efuns like this:
+
+mapping x;
+
+attach_mapping(mapping x, string filename);
+
+detach_mapping(x);
+
+which would attach mapping x to the database named by filename.
+
+any accesses to the mapping x would in fact manipulate the database.
+
+This would work much the way attached mappings work in Perl.
+
+We could use the dbm database code in UNIX(tm).  Only problem is
+not all UNIX's have dbm's that support multiple databases per
+UNIX process.
+
+-----
+
+In message <9303080120.AA26940@rock.concert.net> Dank writes:
+>powerful.  This seems "grossly unfair" to our more serious gamers.  That's
+>why i need to know the best way to implement (either in the driver or in LPC)
+>an hb_call_out() efun, that operates exactly as call_out() does, except that
+>it calls its function after a set number of _heartbeats_ have elapsed, not
+>after a set number of seconds.
+>  I ran this by Mobydick, and he thought the solution should be sought from
+>you driver folks rather than in the mudlib (course, that may be because
+>he's a mudlib coder :)
+
+I agree; it does seem that we need a variant of call_out that operates in terms
+of number of heartbeats rather than absolute # of seconds.  A few ways
+to do this.
+
+// optionally change the way call_out() works so that muds can change it if
+// they like.
+#define CALL_OUT_UNITS_EQUAL_HEARTBEAT /* or some shorter similar thing */
+
+Or we could make a call_out2() efun that operates in the desired heartbeat units
+(name it something more appropriate than call_out2()).
+
+-----
+
+hmm, save_object() should probably somehow save the subtype of numbers.
+(ie null, undefined, error, etc)
+ 
+ucs_brf@pip.shsu.edu
+
+Comment: with some of the optimizations lately, the subtype of numbers is
+	not always reliable longterm ...
+
+-----
+
+An option for persistent swap files (that the driver can restore/recover
+from), saving clones and the contents of variables.
+
+### This seems to be a fad and a bad idea, but I'll get flamed for saying
+	 that ...
+
+-----
+
+mudlib_stats uses a linked list, it is fast for insertion; however
+  lookup is O(n)...this should be hacked to use an AVL tree (ala uid.c)
+
+-- robo
+
+-----
+
+#pragma no_inherit
+#pragma no_clone
+
+-- Cygnus & Descartes
+
+Comment:
+    Unlike regular C, should these two pragmas should generate warnings
+    (or error out) if the driver wasn't compiled with this option enabled?
+
+    Also, adapt Tensor's idea for uniquep() efun...which queries these
+    flags, telling whether an object is cloneable and/or inheritable
+    (or not, depending on your point of view).
+
+    These aren't object flags as first believed...they have to be stored
+    in the program structure, so that it can be restored from binaries.
+    pragma_no_inherit & pragma_no_clone flags should probably be in
+    simulate.c, disjoint from those in lex.c.
+        clone_object()
+          ob = find_object_no_load()
+          if (ob->prog->flags & P_NO_CLONE)
+            error("Illegal object to clone\n");
+
+          find_object()
+            find_object2() <- avoid calling this again (for performance)
+            load_object()
+
+        inheritance: (compiler/grammar & lpc_compiler/grammar)
+          ob = find_object2()
+
+          if (ob->prog->flags & P_NO_INHERIT)
+             yyerror("Illegal object to inherit\n");
+
+        lex.c
+          init pragma_no_inherit
+               pragma_no_clone
+
+        compiler/grammar & lpc_compiler/grammar
+          set prog flags
+
+-----
+
+Implement compile stacks so we don't have to dump an object (and later
+restart the compile) if an inherited object isn't defined yet.
+
+Note: This would entail requiring the use of bison or pre-yacc'ed grammars
+since most versions of yacc parsers aren't reentrant. -Beek
+
+Actually, I take this back.  One could make the inherit rule look like:
+
+inheritance: type_modifier_list L_INHERIT string_con1 ';'
+    {
+       ...
+       ob = find_object2(file);
+       if (ob == 0) {
+           push_compiler_globals();
+           lex_inherit_hook(file);
+       } else {
+           lex_loaded_inherit_hook();
+       }
+    }
+  program terminator
+    {
+       ... import symbols ...
+    }
+
+terminator:
+    L_ALREADY_LOADED
+  | L_JUST_LOADED
+    {
+       pop_compiler_globals();
+    }
+
+etc ... lex_inherit_hook() cues lex to push it's globals and start a new
+file; lex_loaded_inherit_hook() cues lex to just return L_ALREADY_LOADED
+as the next token (note: in deep inherits this could require a rather
+deep yacc stack)
+
+---
+
+Set up grammar dir for pre-byacc'd and/or pre-bison'd parsers for people
+  with broken 'yacc's.
+
+Support L_ARRAY_CLOSE, L_FUNCTION_CLOSE, and L_MAPPING_CLOSE for consistency;
+L_MAPPING_CLOSE requires a bit more work...
+
+-- robo
+
+-----
+
+Threads :)
+
+-----
+
+Exceptions :)
+
+-----
+
+A make_mapping() efun that obeys the tautology:
+
+make_mapping( keys(m), values(m) ) == m
+
+-----
+
+include_list() efun; also, BINARIES saves a list of includes, but error
+line numbers do as well; the former should be modified to use the latter's
+list (which was added after binaries were)
+
+-----
+
+maybe:
+
+foreach (i, x in ({ 1, 2 }))
+
+foreach (x in ([ 1 : 2, 3 : 4 ]))
+
+foreach (i, j in ({ 1, 2 }), ({ 3, 4, 5 }))
+   for parallel walking
+
+---
+
+The handling of || and && is still suboptimal; it tests twice, and does
+a uneccessary pop for expressions like: (x && y); it completely blows it
+on expressions like 1 || 1 || 1;
+
+---
+
+Profiling shows that a significant amount of CPU is wasted copying stack
+values around in the parser due to the large size of %union.  In most
+cases, only 4 (assuming 32 bit) bytes is needed:
+
+4: /* most stuff */
+5: decl
+8: func_block
+
+so this is a huge waste.  The larger ones could be managed from temporary
+pools (they might even have FIFO ordering, but be careful about parse errors)
+decl seems unavoidable, but 6 should be possible, cutting the size of
+the compile stack and mem that needs to be copied down a bit.
+func_block is only used by function pointers anyway, so isn't that common.
+There is already a stack for the other function temporary and a depth limit
+...
+
+-Beek
