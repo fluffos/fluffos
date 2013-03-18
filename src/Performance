@@ -1,0 +1,53 @@
+How to make MudOS run as fast as possible on your machine.
+
+1) use appropriate optimization flags for your compiler.  If you are using
+gcc 2.3+, then you might want to try the following flags:
+
+-O2 -fomit-frame-pointer -fstrength-reduce
+
+Note that some compilers can produce incorrect code at the higher levels of
+optimization.  If the driver behaves inexplicably, trying lowering the
+optimization level.  See the Platforms file for more information on
+optimization flags for specific platforms.  Also type 'man cc' or ask your
+system guru if you are interested in finding out optimization flag information
+for your particular compiler.
+
+2) choose an appropriate memory management (malloc) package.  Some systems
+have very slow system mallocs (like the HP snake on which malloc used 30%
+of the CPU time allocated to the MudOS driver (according to gprof) for one
+popular mud).  Both smalloc and bsdmalloc are much more efficient, typically
+using less than 1% of the CPU time allocated to the driver.  Note that
+smalloc is more space efficient than bsdmalloc (though slightly slower).
+
+3) Try to make your mudlib as memory efficient as possible.  Include
+clean_up() functions in your objects whenever reasonable and remember
+to use map_delete() to remove elements from mappings when those elements
+are no longer needed.  Also take a look at the reclaim_objects() and
+reload_object() efuns for saving memory.  Don't use array addition
+any more than necessary (especially try not to use it inside a loop
+for building arrays).
+
+4) Do _not_ define TRACE_CODE in options.h.  TRACE_CODE can be useful
+when debugging code but it slows down most simple LPC instructions (in
+eval_instruction()) by a factor of two.
+
+5) Don't give objects heartbeats (set_heart_beat(1)) unless really
+necessary.  Do as little in heart_beat() functions as reasonable.
+Consider turning off heartbeats when not needed and then restarting
+them when again needed.
+
+6) Read the comments in the example config file about hash table size, and
+object hash table size--setting proper (large enough) values for these
+two hash tables greatly increases overall speed.
+
+7) The opcprof() efun can be used to find out which efunctions are being used
+the most.  Rewriting mudlib code that makes extensive use of expensive efuns
+can improve performance somewhat.  In order to find out which efuns are
+expensive, compile the driver with the profiling flags (-pg if using gcc)
+and produce a gmon.out file.  This file can be processed with the gprof
+command to find out the percentage of cpu time spent in various different
+driver functions.
+
+8) try using the time_expression(expr) function to measure the cpu time used
+by various different expressions (time_expression uses the same syntax as
+catch()).
