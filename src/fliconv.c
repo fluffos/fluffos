@@ -28,7 +28,7 @@ struct translation *get_translator(const char *encoding){
     char *name = (char *)DMALLOC(strlen(encoding)+18+1,
         TAG_PERMANENT, "get_translator");
     strcpy(name, encoding);
-#ifdef linux
+#ifdef __linux__
     strcat(name, "//TRANSLIT//IGNORE");
 #endif
     ret->name = name;

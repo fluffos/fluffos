@@ -1034,7 +1034,7 @@ static char *esbrk (u size)
 
 #else
 
-#ifndef linux
+#ifndef __linux__
     extern char *sbrkx();
 #endif				/* linux */
 
