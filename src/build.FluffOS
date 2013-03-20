@@ -28,10 +28,15 @@ else
   CC=${CC:-"gcc"}
 fi
 
-CFLAGS="--std=c99 -march=native -m64 -D_GNU_SOURCE -D__USE_FIXED_PROTOTYPES__"
+# TODO: remove need for _GNU_SOURCE
+CFLAGS="--std=c99 -D_GNU_SOURCE"
+
+# Change to -m32 to compile under 32bit.
+COMPILER_FLAGS=${COMPILER_FLAGS:-"-m64 -march=native"}
+
 # use flto only in gcc
 if [ "$CC" = "gcc" ]; then
-  CFLAGS="$CFLAGS -flto"
+  COMPILER_FLAGS="$COMPILER_FLAGS -flto"
 fi
 
 OPTIMIZE=${OPTIMIZE:-"-O3"}
@@ -57,7 +62,7 @@ INSTALL_DIR="../bin"
 #EXTRALIBS=-L/usr/local/lib -lmsql
 ####### END OF USER CONFIGURABLE OPTIONS
 
-CFLAGS="$CFLAGS $OSFLAGS $WARN $OPTIMIZE $DEBUG"
+CFLAGS="$CFLAGS $COMPILER_FLAGS $WARN $OPTIMIZE $DEBUG"
 
 #
 # Determine if running under Cygwin-32 and use a.exe instead
