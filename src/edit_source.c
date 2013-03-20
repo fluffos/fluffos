@@ -1457,6 +1457,7 @@ static void handle_configure() {
     check_include("INCL_SYS_CRYPT_H", "sys/crypt.h");
     check_include("INCL_CRYPT_H", "crypt.h");
     check_include("INCL_MALLOC_H", "my_malloc.h");
+    check_include("INCL_ALLOCA_H", "alloca.h");
 
     /* for NeXT */
     if (!check_include("INCL_MACH_MACH_H", "mach/mach.h"))
@@ -1514,13 +1515,13 @@ static void handle_configure() {
         printf(" no\n");
     }
 
-    printf("Not Checking for inline ...(usage in driver code all broken anyway)");
-    //if (!check_prog("INLINE inline", "inline void foo() { }", "foo();", 0)) {
-        //printf(" __inline ...");
-        //if (!check_prog("INLINE __inline", "__inline void foo() {}", "foo();", 0)) {
+    printf("Checking for inline ...");
+    if (!check_prog("INLINE inline", "inline void foo() { }", "foo();", 0)) {
+        printf(" __inline ...");
+        if (!check_prog("INLINE __inline", "__inline void foo() {}", "foo();", 0)) {
             fprintf(yyout, "#define INLINE\n");
-        //}
-    //}
+        }
+    }
     printf(" const ...\n");
     if (!check_prog("CONST const", "int foo(const int *, const int *);", "", 0))
         fprintf(yyout, "#define CONST\n");
@@ -1662,6 +1663,8 @@ static void handle_configure() {
         check_library("-lcrypto");
     if (lookup_define("POSIX_TIMERS"))
         check_library("-lrt");
+    if (lookup_define("USE_ICONV"))
+        check_library("-liconv");
     fprintf(stderr, "Checking for flaky Linux systems ...\n");
     check_linux_libc();
 
