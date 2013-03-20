@@ -105,7 +105,7 @@ int dos_style_link (char *, char *);
 #  include <mach.h>
 #endif
 
-#ifdef sun
+#ifdef INCL_ALLOCA_H
 #  include <alloca.h>
 #endif
 
