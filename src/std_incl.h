@@ -28,9 +28,6 @@
 #ifdef INCL_DOS_H
 #  include <dos.h>
 #endif
-#ifdef INCL_SYS_TIMES_H
-#  include <sys/times.h>
-#endif
 #ifdef INCL_USCLKC_H
 #  include <usclkc.h>
 #endif

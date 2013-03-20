@@ -1,10 +1,14 @@
 language: c
 
 before_install:
-  - sudo apt-get install -qq bison libz-dev
+  - sudo apt-get install -qq bison libz-dev gcc-multilib
 
 script: cd src && cp local_options.test local_options && ./build.FluffOS develop && make && make test
 
 compiler:
   - clang
   - gcc
+
+env:
+  - COMPILER_FLAGS="-m32 -mtune=generic"
+  - COMPILER_FLAGS="-m64 -mtune=generic"
