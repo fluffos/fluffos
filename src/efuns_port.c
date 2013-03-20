@@ -22,6 +22,14 @@
 #include <limits.h>
 #endif
 
+/* work around mingw32/cygwin32 c99 bug.*/
+#ifdef __CYGWIN__
+/* defines for the opengroup specifications Derived from Issue 1 of the SVID.  */
+extern __IMPORT long _timezone;
+extern __IMPORT int _daylight;
+extern __IMPORT char *_tzname[2];
+#endif
+
 #ifdef F_CRYPT
 #define SALT_LEN        8
 #ifdef CUSTOM_CRYPT
@@ -140,14 +148,12 @@ f_localtime (void)
 #else                           /* sequent */
 #if (defined(hpux) || defined(_SEQUENT_) || defined(_AIX) || defined(SunOS_5) \
     || defined(SVR4) || defined(sgi) || defined(__linux__) || defined(cray) \
-    || defined(__CYGWIN__)\
     )
       if (!tm->tm_isdst) {
         vec->item[LT_GMTOFF].u.number = timezone;
         vec->item[LT_ZONE].u.string = string_copy(tzname[0], "f_localtime");
       } else {
 #if (defined(_AIX) || defined(hpux) || defined(__linux__) || defined(cray) \
-    || defined(__CYGWIN__)\
     )
         vec->item[LT_GMTOFF].u.number = timezone;
 #else
@@ -156,13 +162,13 @@ f_localtime (void)
         vec->item[LT_ZONE].u.string = string_copy(tzname[1], "f_localtime");
       }
 #else
-#ifndef WIN32
-      vec->item[LT_GMTOFF].u.number = tm->tm_gmtoff;
-      vec->item[LT_ZONE].u.string = string_copy(tm->tm_zone, "f_localtime");
-#else
+#if defined(WIN32) || defined(__CYGWIN32__)
       vec->item[LT_GMTOFF].u.number = _timezone;
       vec->item[LT_ZONE].u.string = string_copy(_tzname[_daylight?1:0],"f_localtime");
-#endif
+#else
+      vec->item[LT_GMTOFF].u.number = tm->tm_gmtoff;
+      vec->item[LT_ZONE].u.string = string_copy(tm->tm_zone, "f_localtime");
+#endif                          /* win32 | cygwin32 */
 #endif
 #endif                          /* sequent */
 #endif                          /* BSD42 */
