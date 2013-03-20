@@ -8,7 +8,7 @@
 #  include <sys/dir.h>
 #endif
 
-#ifndef linux
+#ifndef __linux__
 #ifdef INCL_SYS_DIRENT_H
 #  include <sys/dirent.h>
 #endif
