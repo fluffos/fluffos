@@ -13,6 +13,7 @@ void recurse(string dir) {
 	{
 	    if (subdir == "fail") {
 		foreach (string fn in get_dir(dir + "fail/*.c")) {
+        write("> " + dir + "fail/" + fn + "\n");
 		    ASSERT2(catch(load_object(dir+"fail/"+fn)), "fail/" + fn + " loaded");
 #if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__CHECK_MEMORY__)
 		    leaks = check_memory();
@@ -34,6 +35,10 @@ main(string fun)
 {
     string leaks;
     object tp = this_player();
+
+#if !defined(__CHECK_MEMORY__)
+    write("Warning: CHECK_MEMORY is not defined, not checking memory leaks.\n")
+#endif
     
     if (!fun || fun == "") {
 	recurse("/single/tests/");
@@ -44,6 +49,7 @@ main(string fun)
     set_eval_limit(0x7fffffff);
     reset_eval_cost();
 
+    write("> " + fun + "\n");
     fun->do_tests();
 
     set_eval_limit(0x7fffffff);

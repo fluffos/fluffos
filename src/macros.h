@@ -52,19 +52,19 @@
    Please refer to options.h for selecting malloc package and wrapper.
 */
 #if (defined(SYSMALLOC) + defined(SMALLOC) + defined(BSDMALLOC) + defined(MMALLOC) + defined(GCMALLOC)) > 1
-!Only one malloc package should be defined
+#error Only one malloc package should be defined
 #endif
 
 #if (defined(WRAPPEDMALLOC) + defined(DEBUGMALLOC)) > 1
-!Only one wrapper (at most) should be defined
+#error Only one wrapper (at most) should be defined
 #endif
 
 #if defined(DO_MSTATS) && defined(SYSMALLOC)
-!'DO_MSTATS' not available with 'SYSMALLOC'
+#error 'DO_MSTATS' not available with 'SYSMALLOC'
 #endif
 
 #if defined(DO_MSTATS) && defined(GCMALLOC)
-!'DO_MSTATS' not available with 'GCMALLOC'
+#error 'DO_MSTATS' not available with 'GCMALLOC'
 #endif
 
 #if defined (WRAPPEDMALLOC) && !defined(IN_MALLOC_WRAPPER)
@@ -99,7 +99,7 @@
 #endif
 
 #if !defined(MALLOC) && !defined(EDIT_SOURCE)
-!You need to specify a malloc package in local_options/options.h
+#error You need to specify a malloc package in local_options/options.h
 #endif
 
 #define ALLOCATE(type, tag, desc) ((type *)DXALLOC(sizeof(type), tag, desc))
@@ -169,7 +169,7 @@
 #define LOAD_SHORT(x, y) LOAD2(x,y)
 #define STORE_SHORT(x, y) STORE2(x,y)
 #else
-!shorts of size other than 2 not implemented
+#error shorts of size other than 2 not implemented
 #endif
 
 #if SIZEOF_LPC_INT == 4
@@ -182,7 +182,7 @@
 #define LOAD_INT(x, y) LOAD8(x,y)
 #define STORE_INT(x, y) STORE8(x,y)
 #else
-!ints of size other than 4 not implemented
+#error ints of size other than 4 not implemented
 #endif
 #endif
 
@@ -191,11 +191,7 @@
 #define LOAD_FLOAT(x, y) LOAD8(x,y)
 #define STORE_FLOAT(x, y) STORE8(x,y)
 #else
-!floats of size other than 8 not implemented
-#endif
-
-#if SIZEOF_PTR != SIZEOF_LPC_INT
-!different size of LPC_INT and pointer is not supported.
+#error floats of size other than 8 not implemented
 #endif
 
 #if SIZEOF_PTR == 4
@@ -204,7 +200,7 @@
 #  define STORE_PTR(x, y) STORE4(x,y)
 
 #  define POINTER_INT intptr_t
-#  define INS_POINTER ins_int
+#  define INS_POINTER ins_pointer
 #else
 #  if SIZEOF_PTR == 8
 #    define COPY_PTR(x, y) COPY8(x,y)
@@ -212,9 +208,9 @@
 #    define STORE_PTR(x, y) STORE8(x,y)
 
 #    define POINTER_INT intptr_t
-#    define INS_POINTER ins_int
+#    define INS_POINTER ins_pointer
 #  else
-!pointers of size other than 4 or 8 not implemented
+#error pointers of size other than 4 or 8 not implemented
 #  endif
 #endif
 #endif
