@@ -192,7 +192,7 @@
  * Just use 8 bits for now.
  */
 #if 0
-#if defined(linux)
+#if defined(__linux__)
 #  ifndef CHARBITS
 #    define CHARBITS      0xff
 #  endif
