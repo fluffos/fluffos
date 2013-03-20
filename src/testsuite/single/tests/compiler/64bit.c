@@ -1,7 +1,6 @@
 // These tests can only performed if the driver is compiled for a LP64
 // platform. Tests borrowed from LDMUD.
 // https://raw.github.com/ldmud/ldmud/master/test/t-LP64-issues.c
-#if MAX_INT > 2147483647
 mixed* func1() {
   return ({ "0000770-1 (bitwise AND)", 0,
     ((0x1000000000 & 0x1000000000) == 0x1000000000)
@@ -60,9 +59,7 @@ mixed* func8() {
       (i == 0x11000000000)
   });
 }
-#endif
 
-#if defined(MAX_FLOAT)
 mixed* func_f1() {
   return ({ "float is C double:", 0,
       sprintf("%.16f",
@@ -101,10 +98,8 @@ mixed* func_f5() {
             "2.0000000000000002")
   });
 }
-#endif
 
 nosave mixed *tests = ({
-#if MAX_INT > 2147483647
   (: func1 :),
   (: func2 :),
   (: func3 :),
@@ -113,22 +108,15 @@ nosave mixed *tests = ({
   (: func6 :),
   (: func7 :),
   (: func8 :),
-#endif
-#if defined(MAX_FLOAT)
   (: func_f1 :),
   (: func_f2 :),
   (: func_f3 :),
   (: func_f4 :),
-#endif
 });
 
 void do_tests() {
-#if MAX_INT <= 2147483647
-  write("LPC int is not 64 bit, test not run: MAX_INT:" + MAX_INT + "\n");
-#else
   foreach(mixed test in tests) {
     mixed* result = evaluate(test);
     ASSERT2(result[2], result[0]);
   }
-#endif
 }
