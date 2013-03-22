@@ -34,11 +34,6 @@ CFLAGS="--std=c99 -D_GNU_SOURCE"
 # Change to -m32 to compile under 32bit.
 COMPILER_FLAGS=${COMPILER_FLAGS:-"-m64 -march=native"}
 
-# use flto only in gcc
-if [ "$CC" = "gcc" ]; then
-  COMPILER_FLAGS="$COMPILER_FLAGS -flto"
-fi
-
 OPTIMIZE=${OPTIMIZE:-"-O3"}
 DEBUG=${DEBUG:-"-g"}
 
@@ -87,11 +82,16 @@ int main() {
 }
 END
 
-$CC $CFLAGS comptest.c
+$CC $CFLAGS -o $A_OUT -flto comptest.c
 
-if test $? -ne 0; then
-    echo "FATAL ERROR: test compile failed."
-    exit 1
+if [ $? -eq 0 ]; then
+    CFLAGS="$CFLAGS -flto"
+else
+    $CC $CFLAGS -o $A_OUT comptest.c
+    if [ $? -ne 0 ]; then
+      echo "FATAL ERROR: test compile failed."
+      exit 1
+    fi
 fi
 
 ARCH=`./$A_OUT`
