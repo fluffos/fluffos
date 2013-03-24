@@ -107,73 +107,79 @@ f_localtime (void)
 
     lt = sp->u.number;
     tm = localtime(&lt);
+
+    pop_stack();
+
+    if (!tm) {
+      push_svalue(&const0u);
+      return;
+    }
+
     vec = allocate_empty_array(11);
 
-    if (tm) {
-      vec->item[LT_SEC].type = T_NUMBER;
-      vec->item[LT_SEC].u.number = tm->tm_sec;
-      vec->item[LT_MIN].type = T_NUMBER;
-      vec->item[LT_MIN].u.number = tm->tm_min;
-      vec->item[LT_HOUR].type = T_NUMBER;
-      vec->item[LT_HOUR].u.number = tm->tm_hour;
-      vec->item[LT_MDAY].type = T_NUMBER;
-      vec->item[LT_MDAY].u.number = tm->tm_mday;
-      vec->item[LT_MON].type = T_NUMBER;
-      vec->item[LT_MON].u.number = tm->tm_mon;
-      vec->item[LT_YEAR].type = T_NUMBER;
-      vec->item[LT_YEAR].u.number = tm->tm_year + 1900;
-      vec->item[LT_WDAY].type = T_NUMBER;
-      vec->item[LT_WDAY].u.number = tm->tm_wday;
-      vec->item[LT_YDAY].type = T_NUMBER;
-      vec->item[LT_YDAY].u.number = tm->tm_yday;
-      vec->item[LT_GMTOFF].type = T_NUMBER;
-      vec->item[LT_ZONE].type = T_STRING;
-      vec->item[LT_ZONE].subtype = STRING_MALLOC;
-      vec->item[LT_ISDST].type = T_NUMBER;
+    vec->item[LT_SEC].type = T_NUMBER;
+    vec->item[LT_SEC].u.number = tm->tm_sec;
+    vec->item[LT_MIN].type = T_NUMBER;
+    vec->item[LT_MIN].u.number = tm->tm_min;
+    vec->item[LT_HOUR].type = T_NUMBER;
+    vec->item[LT_HOUR].u.number = tm->tm_hour;
+    vec->item[LT_MDAY].type = T_NUMBER;
+    vec->item[LT_MDAY].u.number = tm->tm_mday;
+    vec->item[LT_MON].type = T_NUMBER;
+    vec->item[LT_MON].u.number = tm->tm_mon;
+    vec->item[LT_YEAR].type = T_NUMBER;
+    vec->item[LT_YEAR].u.number = tm->tm_year + 1900;
+    vec->item[LT_WDAY].type = T_NUMBER;
+    vec->item[LT_WDAY].u.number = tm->tm_wday;
+    vec->item[LT_YDAY].type = T_NUMBER;
+    vec->item[LT_YDAY].u.number = tm->tm_yday;
+    vec->item[LT_GMTOFF].type = T_NUMBER;
+    vec->item[LT_ZONE].type = T_STRING;
+    vec->item[LT_ZONE].subtype = STRING_MALLOC;
+    vec->item[LT_ISDST].type = T_NUMBER;
 #if defined(BSD42) || defined(apollo) || defined(_AUX_SOURCE) \
-      || defined(OLD_ULTRIX)
-      /* 4.2 BSD doesn't seem to provide any way to get these last three values */
-      vec->item[LT_GMTOFF].u.number = 0;
-      vec->item[LT_ZONE].type = T_NUMBER;
-      vec->item[LT_ZONE].u.number = 0;
-      vec->item[LT_ISDST].u.number = -1;
+    || defined(OLD_ULTRIX)
+    /* 4.2 BSD doesn't seem to provide any way to get these last three values */
+    vec->item[LT_GMTOFF].u.number = 0;
+    vec->item[LT_ZONE].type = T_NUMBER;
+    vec->item[LT_ZONE].u.number = 0;
+    vec->item[LT_ISDST].u.number = -1;
 #else                           /* BSD42 */
-      vec->item[LT_ISDST].u.number = tm->tm_isdst;
+    vec->item[LT_ISDST].u.number = tm->tm_isdst;
 #if defined(sequent)
-      vec->item[LT_GMTOFF].u.number = 0;
-      gettimeofday(NULL, &tz);
-      vec->item[LT_GMTOFF].u.number = tz.tz_minuteswest;
-      vec->item[LT_ZONE].u.string =
-        string_copy(timezone(tz.tz_minuteswest, tm->tm_isdst), "f_localtime");
+    vec->item[LT_GMTOFF].u.number = 0;
+    gettimeofday(NULL, &tz);
+    vec->item[LT_GMTOFF].u.number = tz.tz_minuteswest;
+    vec->item[LT_ZONE].u.string =
+      string_copy(timezone(tz.tz_minuteswest, tm->tm_isdst), "f_localtime");
 #else                           /* sequent */
 #if (defined(hpux) || defined(_SEQUENT_) || defined(_AIX) || defined(SunOS_5) \
     || defined(SVR4) || defined(sgi) || defined(__linux__) || defined(cray) \
     )
-      if (!tm->tm_isdst) {
-        vec->item[LT_GMTOFF].u.number = timezone;
-        vec->item[LT_ZONE].u.string = string_copy(tzname[0], "f_localtime");
-      } else {
+    if (!tm->tm_isdst) {
+      vec->item[LT_GMTOFF].u.number = timezone;
+      vec->item[LT_ZONE].u.string = string_copy(tzname[0], "f_localtime");
+    } else {
 #if (defined(_AIX) || defined(hpux) || defined(__linux__) || defined(cray) \
     )
-        vec->item[LT_GMTOFF].u.number = timezone;
+      vec->item[LT_GMTOFF].u.number = timezone;
 #else
-        vec->item[LT_GMTOFF].u.number = altzone;
+      vec->item[LT_GMTOFF].u.number = altzone;
 #endif
-        vec->item[LT_ZONE].u.string = string_copy(tzname[1], "f_localtime");
-      }
+      vec->item[LT_ZONE].u.string = string_copy(tzname[1], "f_localtime");
+    }
 #else
 #if defined(WIN32) || defined(__CYGWIN32__)
-      vec->item[LT_GMTOFF].u.number = _timezone;
-      vec->item[LT_ZONE].u.string = string_copy(_tzname[_daylight?1:0],"f_localtime");
+    vec->item[LT_GMTOFF].u.number = _timezone;
+    vec->item[LT_ZONE].u.string = string_copy(_tzname[_daylight?1:0],"f_localtime");
 #else
-      vec->item[LT_GMTOFF].u.number = tm->tm_gmtoff;
-      vec->item[LT_ZONE].u.string = string_copy(tm->tm_zone, "f_localtime");
+    vec->item[LT_GMTOFF].u.number = tm->tm_gmtoff;
+    vec->item[LT_ZONE].u.string = string_copy(tm->tm_zone, "f_localtime");
 #endif                          /* win32 | cygwin32 */
 #endif
 #endif                          /* sequent */
 #endif                          /* BSD42 */
-    }
-    put_array(vec);
+    push_refed_array(vec);
 }
 #endif
 
