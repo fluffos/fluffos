@@ -86,7 +86,7 @@ grammar.tab.c: grammar.y
 
 $(DRIVER_BIN): $(OBJ) dtrace_compile
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
-	$(CC) $(CFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) `cat system_libs`
+	$(CC) -rdynamic $(CFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) `cat system_libs`
 
 dtrace_compile: dtrace_compile.c local_options
 	$(CC) dtrace_compile.c -o dtrace_compile
