@@ -54,21 +54,16 @@ static void CDECL sig_cld SIGPROT;
 static void CDECL sig_ttin SIGPROT;
 #endif
 
-#ifdef TRAP_CRASHES
 static void CDECL sig_usr1 SIGPROT;
 static void CDECL sig_usr2 SIGPROT;
 static void CDECL sig_term SIGPROT;
 static void CDECL sig_int SIGPROT;
-
-#ifndef DEBUG
-static void CDECL sig_hup SIGPROT,
-CDECL sig_abrt SIGPROT,
-CDECL sig_segv SIGPROT,
-CDECL sig_ill SIGPROT,
-CDECL sig_bus SIGPROT,
-CDECL sig_iot SIGPROT;
-#endif
-#endif
+static void CDECL sig_hup SIGPROT;
+static void CDECL sig_abrt SIGPROT;
+static void CDECL sig_segv SIGPROT;
+static void CDECL sig_ill SIGPROT;
+static void CDECL sig_bus SIGPROT;
+static void CDECL sig_iot SIGPROT;
 
 #ifdef DEBUG_MACRO
 /* used by debug.h: please leave this in here -- Tru (you can change its
@@ -77,16 +72,31 @@ CDECL sig_iot SIGPROT;
 int debug_level = 0;
 #endif
 
+INLINE_STATIC void setup_signal_handlers();
+
 int main (int argc, char ** argv)
 {
 	time_t tm;
 	int i, new_mudlib = 0, got_defaults = 0;
 	char *p;
 	char version_buf[80];
+  struct rlimit rlim;
 #if 0
 	int dtablesize;
 #endif
 	error_context_t econ;
+
+  setup_signal_handlers();
+
+  /* Warn on core dump limit. */
+  if(getrlimit(RLIMIT_CORE, &rlim)) {
+    fprintf(stderr, "Error getting RLIMIT_CORE.");
+  } else {
+    if (rlim.rlim_cur == 0) {
+      fprintf(stderr, "WARNING: rlimit for core dump is 0, you will "
+                      "not get core on crash.\n");
+    }
+  }
 
 #ifdef PROTO_TZSET
 	void tzset();
@@ -393,54 +403,13 @@ int main (int argc, char ** argv)
 		strcpy(buf, DEFAULT_FAIL_MESSAGE);
 		strcat(buf, "\n");
 		default_fail_message = make_shared_string(buf);
-	} else
+	} else {
 		default_fail_message = "What?\n";
+  }
 #ifdef PACKAGE_MUDLIB_STATS
 	restore_stat_files();
 #endif
 	preload_objects(e_flag);
-#ifdef SIGFPE
-	signal(SIGFPE, sig_fpe);
-#endif
-#ifdef TRAP_CRASHES
-#ifdef SIGUSR1
-	signal(SIGUSR1, sig_usr1);
-#endif
-#ifdef SIGUSR2
-	signal(SIGUSR2, sig_usr2);
-#endif
-	signal(SIGTERM, sig_term);
-	signal(SIGINT, sig_int);
-#ifndef DEBUG
-#if defined(SIGABRT)
-	signal(SIGABRT, sig_abrt);
-#endif
-#ifdef SIGIOT
-	signal(SIGIOT, sig_iot);
-#endif
-#ifdef SIGHUP
-	signal(SIGHUP, sig_hup);
-#endif
-#ifdef SIGBUS
-	signal(SIGBUS, sig_bus);
-#endif
-	signal(SIGSEGV, sig_segv);
-	signal(SIGILL, sig_ill);
-#endif        /* DEBUG */
-#endif
-#ifndef WIN32
-#ifdef USE_BSD_SIGNALS
-	signal(SIGCHLD, sig_cld);
-#else
-	signal(SIGCLD, sig_cld);
-#endif
-#endif
-
-#ifdef HAS_CONSOLE
-	if(has_console >= 0)
-		signal(SIGTTIN, sig_ttin);
-	signal(SIGTTOU, SIG_IGN);
-#endif
 
 	backend();
 	return 0;
@@ -568,6 +537,63 @@ char *xalloc (int size)
 	return p;
 }
 
+INLINE_STATIC void setup_signal_handlers() {
+#ifdef SIGFPE
+	signal(SIGFPE, sig_fpe);
+#endif
+#ifdef SIGUSR1
+	signal(SIGUSR1, sig_usr1);
+#endif
+#ifdef SIGUSR2
+	signal(SIGUSR2, sig_usr2);
+#endif
+	signal(SIGTERM, sig_term);
+	signal(SIGINT, sig_int);
+#ifdef SIGABRT
+	signal(SIGABRT, sig_abrt);
+#endif
+#ifdef SIGIOT
+	signal(SIGIOT, sig_iot);
+#endif
+#ifdef SIGHUP
+	signal(SIGHUP, sig_hup);
+#endif
+#ifdef SIGBUS
+	signal(SIGBUS, sig_bus);
+#endif
+#ifdef SIGSEGV
+	signal(SIGSEGV, sig_segv);
+#endif
+#ifdef SIGILL
+	signal(SIGILL, sig_ill);
+#endif
+#ifndef WIN32
+#ifdef USE_BSD_SIGNALS
+	signal(SIGCHLD, sig_cld);
+#else
+	signal(SIGCLD, sig_cld);
+#endif
+#endif
+#ifdef HAS_CONSOLE
+	if(has_console >= 0)
+		signal(SIGTTIN, sig_ttin);
+	signal(SIGTTOU, SIG_IGN);
+#endif
+}
+
+INLINE_STATIC void try_dump_stacktrace() {
+  debug_message("CRASH: Generating backtrace...\n");
+#if __GNUC__ > 2
+  void *bt[100];
+  size_t bt_size;
+
+  bt_size = backtrace(bt, 100);
+  backtrace_symbols_fd(bt, bt_size, STDERR_FILENO);
+#else
+  debug_message("Not under GCC, no backtrace for you.\n");
+#endif /* __unix__ */
+}
+
 static void CDECL PSIG(sig_cld)
 {
 #ifndef WIN32
@@ -619,14 +645,10 @@ if(has_console) {
 }
 #endif
 
-
-#ifdef TRAP_CRASHES
-
 /* send this signal when the machine is about to reboot.  The script
    which restarts the MUD should take an exit code of 1 to mean don't
    restart
  */
-
 static void CDECL PSIG(sig_usr1)
 {
 	push_constant_string("Host machine shutting down");
@@ -640,6 +662,7 @@ static void CDECL PSIG(sig_usr1)
 /* Abort evaluation */
 static void CDECL PSIG(sig_usr2)
 {
+  debug_message("Received SIGUSR2, current eval aborted.\n");
 	outoftime = 1;
 }
 
@@ -649,44 +672,46 @@ static void CDECL PSIG(sig_usr2)
  */
 static void CDECL PSIG(sig_term)
 {
-	fatal("Process terminated");
+	fatal("SIGTERM: Process terminated");
 }
 
 static void CDECL PSIG(sig_int)
 {
-	fatal("Process interrupted");
+	fatal("SIGINT: Process interrupted");
 }
 
-#ifndef DEBUG
 static void CDECL PSIG(sig_segv)
 {
-	fatal("Segmentation fault");
+  /* attempt to dump backtrace using gdb. */
+  try_dump_stacktrace();
+	fatal("SIGSEGV: Segmentation fault");
 }
 
 static void CDECL PSIG(sig_bus)
 {
-	fatal("Bus error");
+  try_dump_stacktrace();
+	fatal("SIGBUS: Bus error");
 }
 
 static void CDECL PSIG(sig_ill)
 {
-	fatal("Illegal instruction");
+  try_dump_stacktrace();
+	fatal("SIGILL: Illegal instruction");
 }
 
 static void CDECL PSIG(sig_hup)
 {
-	fatal("Hangup!");
+	fatal("SIGHUP: Hangup!");
 }
 
 static void CDECL PSIG(sig_abrt)
 {
-	fatal("Aborted");
+  try_dump_stacktrace();
+	fatal("SIGABRT: Aborted");
 }
 
 static void CDECL PSIG(sig_iot)
 {
 	fatal("Aborted(IOT)");
 }
-#endif        /* !DEBUG */
 
-#endif        /* TRAP_CRASHES */
