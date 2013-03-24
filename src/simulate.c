@@ -1559,18 +1559,22 @@ void fatal (const char *fmt, ...)
       debug_message("(current object was /%s)\n", current_object->obname);
 
     dump_trace(1);
-
 #ifdef PACKAGE_MUDLIB_STATS
-        save_stat_files();
+    save_stat_files();
 #endif
   case 1:
     in_fatal = 2;
+#ifdef TRAP_CRASHES
     copy_and_push_string(msg_buf);
     push_object(command_giver);
     push_object(current_object);
     safe_apply_master_ob(APPLY_CRASH, 3);
     debug_message("crash() in master called successfully.  Aborting.\n");
+#endif /* TRAP_CRASHES */
   }
+
+  in_fatal = 0;
+
   /* Make sure we don't trap our abort() */
 #ifdef SIGABRT
   signal(SIGABRT, SIG_DFL);
@@ -1582,10 +1586,9 @@ void fatal (const char *fmt, ...)
   signal(SIGIOT, SIG_DFL);
 #endif
 
-#if !defined(DEBUG_NON_FATAL) || !defined(DEBUG)
+#if !defined(DEBUG_NON_FATAL)
   abort();
 #endif
-  in_fatal = 0;
 }
 
 static int num_error = 0;

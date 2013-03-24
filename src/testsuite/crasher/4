@@ -1,6 +1,0 @@
-calling unique_mapping with ({ /* sizeof() == 2 */
-  ({ /* sizeof() == 1 */
-    (: <code>() :)
-  }),
-  "#^#         #^#"
-})

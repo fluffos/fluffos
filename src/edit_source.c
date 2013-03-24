@@ -1458,6 +1458,7 @@ static void handle_configure() {
     check_include("INCL_CRYPT_H", "crypt.h");
     check_include("INCL_MALLOC_H", "my_malloc.h");
     check_include("INCL_ALLOCA_H", "alloca.h");
+    check_include("INCL_EXECINFO_H", "execinfo.h");
 
     /* for NeXT */
     if (!check_include("INCL_MACH_MACH_H", "mach/mach.h"))
@@ -1515,6 +1516,10 @@ static void handle_configure() {
         printf(" no\n");
     }
 
+    /* TODO: FluffOS inline function is not in the header file, using it will
+     *       cause compiliation failure in lower GCC versions.
+     */
+#if 0
     printf("Checking for inline ...");
     if (!check_prog("INLINE inline", "inline void foo() { }", "foo();", 0)) {
         printf(" __inline ...");
@@ -1522,6 +1527,7 @@ static void handle_configure() {
             fprintf(yyout, "#define INLINE\n");
         }
     }
+#endif
     printf(" const ...\n");
     if (!check_prog("CONST const", "int foo(const int *, const int *);", "", 0))
         fprintf(yyout, "#define CONST\n");

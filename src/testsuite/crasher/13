@@ -1,6 +1,0 @@
-calling terminal_colour with ({ /* sizeof() == 4 */
-  "  -   -   -                    - ",
-  ([ ]),
-  (: shout :),
-  -5050211
-}) 
