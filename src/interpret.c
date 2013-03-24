@@ -478,7 +478,12 @@ INLINE void int_free_svalue (svalue_t * v, const char * tag)
     if (v->type == T_OBJECT)
       debug(d_flag, ("Free_svalue %s (%d) from %s\n", v->u.ob->obname, v->u.ob->ref - 1, tag));
 #endif
-    if (!(--v->u.refed->ref)) {
+    if(v->u.refed->ref == 0) {
+      debug_message("Trying to free non-refed svalue with T_REF type. \n");
+    } else {
+      v->u.refed->ref--;
+    }
+    if (!v->u.refed->ref) {
       switch (v->type) {
       case T_OBJECT:
         dealloc_object(v->u.ob, "free_svalue");

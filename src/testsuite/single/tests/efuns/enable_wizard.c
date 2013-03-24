@@ -5,9 +5,13 @@ void do_tests() {
     enable_wizard(); // fails; not interactive
     ASSERT(!wizardp(this_object()));
 
-    evaluate(bind( (: disable_wizard :), this_player()));
-    ASSERT(!wizardp(this_player()));
-    evaluate(bind( (: enable_wizard :), this_player()));
-    ASSERT(wizardp(this_player()));
+    if(this_player()) {
+      evaluate(bind( (: disable_wizard :), this_player()));
+      ASSERT(!wizardp(this_player()));
+      evaluate(bind( (: enable_wizard :), this_player()));
+      ASSERT(wizardp(this_player()));
+    } else {
+      write("WARNING: no this_player(), test not run.\n");
+    }
 #endif
 }
