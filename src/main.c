@@ -583,15 +583,14 @@ INLINE_STATIC void setup_signal_handlers() {
 
 INLINE_STATIC void try_dump_stacktrace() {
   debug_message("CRASH: Generating backtrace...\n");
-#if __GNUC__ > 2
+#if !defined(__CYGWIN__) && __GNUC__ > 2
   void *bt[100];
   size_t bt_size;
-
   bt_size = backtrace(bt, 100);
   backtrace_symbols_fd(bt, bt_size, STDERR_FILENO);
 #else
-  debug_message("Not under GCC, no backtrace for you.\n");
-#endif /* __unix__ */
+  debug_message("Not able to generate backtrace, please use core.\n");
+#endif
 }
 
 static void CDECL PSIG(sig_cld)
