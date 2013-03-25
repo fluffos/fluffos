@@ -4684,6 +4684,10 @@ static int find_line (char * p, const program_t * progp,
   while (offset > *lns) {
     offset -= *lns;
     lns += (sizeof(ADDRESS_TYPE) + 1);
+    if(offset > progp->program_size || offset < 0) {
+      debug_message("Something is wrong when looking for line number, bail out.");
+      return 0;
+    }
   }
 
 #if !defined(USE_32BIT_ADDRESSES)

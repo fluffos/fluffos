@@ -424,127 +424,133 @@ int write_file (const char * file, const char * str, int flags)
     return 1;
 }
 
-char *read_file(const char * file, int start, int len) {
-	struct stat st;
+/* Reads file, starting from line of "start", with maximum lines of "lines".
+ * Returns a malloced_string.
+ */
+char *read_file(const char * file, int start, int lines) {
+  struct stat st;
+  // Try and keep one buffer for droping all reads into.
+  static char *theBuff = NULL;
+  char *result = NULL;
 #ifndef PACKAGE_COMPRESS
-	FILE *f;
+  FILE *f = NULL;
 #else
-	gzFile f;
+  gzFile f = NULL;
 #endif
-	int chunk;
-	char *str, *p, *p2;
+  int chunk;
+  char *ptr_start, *ptr_end;
+  const char *real_file;
 
-	if (len < 0)
-		return 0;
+  if (lines < 0) {
+    debug_message("read_file: trying to read negative lines: %d", lines);
+    return 0;
+  }
 
-	file = check_valid_path(file, current_object, "read_file", 0);
+  real_file = check_valid_path(file, current_object, "read_file", 0);
 
-	if (!file)
-		return 0;
+  if (!real_file) {
+    debug_message("read_file: validatation failed.\n");
+    return 0;
+  }
+  /*
+   * file doesn't exist, or is really a directory
+   */
+  if (stat(real_file, &st) == -1 || (st.st_mode & S_IFDIR))
+    return 0;
 
-	/*
-	 * file doesn't exist, or is really a directory
-	 */
-	if (stat(file, &st) == -1 || (st.st_mode & S_IFDIR))
-		return 0;
+  if (st.st_size== 0) {
+    /* zero length file */
+    result = new_string(1, "read_file: empty");
+    result[0] = '\0';
+    return result;
+  }
+
 #ifndef PACKAGE_COMPRESS
-	f = fopen(file, FOPEN_READ);
+  f = fopen(real_file, FOPEN_READ);
 #else
-	f = gzopen(file, "rb");
+  f = gzopen(real_file, "rb");
 #endif
-	if (f == 0)
-		return 0;
 
-	if (start < 1)
-		start = 1;
-	if (len == 0)
-		len = 2*READ_FILE_MAX_SIZE;
+  if (f == 0) {
+    debug_message("read_file: open failure: %s.\n", file);
+    return 0;
+  }
 
-	str = new_string(2*READ_FILE_MAX_SIZE, "read_file: str");
-	if (st.st_size== 0) {
-		/* zero length file */
-		str[0] = 0;
+  if (!theBuff) {
+    theBuff = DXALLOC(2 * READ_FILE_MAX_SIZE, TAG_PERMANENT, "read_file: theBuff");
+  }
+
 #ifndef PACKAGE_COMPRESS
-		fclose(f);
+  chunk = fread(theBuff, 1, 2 * READ_FILE_MAX_SIZE, f);
+  fclose(f);
 #else
-		gzclose(f);
-#endif
-		str = extend_string(str, 0); /* fix string length */
-		return str;
-	}
-
-	do {
-#ifndef PACKAGE_COMPRESS
-		chunk = fread(str, 1, 2*READ_FILE_MAX_SIZE, f);
-#else 
-		chunk = gzread(f, str, 2*READ_FILE_MAX_SIZE);
-#endif
-		if (chunk < 1)
-			goto free_str;
-		p = str;
-		while (start > 1) {
-			/* skip newlines */
-			p2 = (char *)memchr(p, '\n', chunk+str-p);
-			if (p2) {
-				p = p2 + 1;
-				start--;
-			} else
-				break;
-		}
-	} while (start > 1);
-
-	p2 = str;
-	while (1) {
-		char c;
-
-		c = *p++;
-		if (p-str > chunk) {
-			if (chunk == 2*READ_FILE_MAX_SIZE) {
-				goto free_str;	//file too big
-			} else
-				break; //reached the end
-		}
-		
-		if (p2-str > READ_FILE_MAX_SIZE)
-			goto free_str;  //file too big
-		
-		if (c == '\0') {
-			FREE_MSTR(str);
-#ifndef PACKAGE_COMPRESS
-			fclose(f);
-#else
-			gzclose(f);
-#endif
-			error("Attempted to read '\\0' into string!\n");
-		}
-		if (c != '\r' || *p != '\n') {
-			*p2++ = c;
-			if (c == '\n' && --len == 0)
-				break; /* done */
-		}
-	}
-
-	*p2 = 0;
-	str = extend_string(str, p2 - str); /* fix string length */
-
-#ifndef PACKAGE_COMPRESS
-	fclose(f);
-#else
-	gzclose(f);
+  chunk = gzread(f, theBuff, 2 * READ_FILE_MAX_SIZE);
+  gzclose(f);
 #endif
 
-	return str;
+  if (chunk < 1) {
+    debug_message("read_file: error when reading %s.\n", file);
+    goto error;
+  }
 
-	/* Error path: unwind allocated resources */
+  if (memchr(theBuff, '\0', chunk)) {
+    debug_message("read_file: Attempted to read '\\0' from %s.\n", file);
+    goto error;
+  }
 
-free_str: 
-	FREE_MSTR(str);
-#ifndef PACKAGE_COMPRESS
-	fclose(f);
-#else
-	gzclose(f);
-#endif
-	return 0;
+  // skip forward for "start"s of '\n'
+  ptr_start = theBuff;
+  while (start > 0) {
+    if ((ptr_start = memchr(ptr_start, '\n', chunk - (ptr_start - theBuff)))) {
+      ptr_start++;
+      start--;
+    } else {
+      // not found
+      debug_message("read_file: reached EOF searching for start: %s.\n", file);
+      goto error;
+    }
+  }
+
+  // past the end.
+  if (ptr_start > theBuff + chunk) {
+    debug_message("read_file: reached EOF searching for start: %s.\n", file);
+    goto error;
+  }
+
+  // search forward for "lines" of '\n' for the end
+  if (lines == 0) {
+    ptr_end = ptr_start + READ_FILE_MAX_SIZE;
+    if (ptr_end > theBuff + chunk) {
+      ptr_end = theBuff + chunk;
+    }
+  } else {
+    ptr_end = ptr_start;
+    while (lines > 0) {
+      if ((ptr_end = memchr(ptr_end, '\n', chunk - (ptr_end - theBuff)))) {
+        ptr_end++;
+        lines--;
+      } else {
+        // not found, directly go to the end.
+        ptr_end = theBuff + chunk;
+        break;
+      }
+    }
+  }
+
+  // result is too big.
+  if (ptr_end - ptr_start > READ_FILE_MAX_SIZE) {
+    debug_message("read_file: result too big.\n");
+    goto error;
+  }
+
+  result = new_string(ptr_end - ptr_start + 1 + 1, "read_file: result");
+  strncpy(result, ptr_start, ptr_end - ptr_start + 1);
+  result[ptr_end - ptr_start + 1] = '\0';
+
+  return result;
+
+error:
+  return 0;
 }
 
 char *read_bytes (const char * file, int start, int len, int * rlen)
