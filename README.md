@@ -1,10 +1,11 @@
-FluffOS is a range of patches base on MudOS. 
+FluffOS
+=======
 
-The offical release is kept in the master branch, You can download a release tar archive through tags.
+FluffOS is fork of MudOS, base on last MudOS release.
 
-Current release: 
+The offical release is kept in the master branch, You can download a release archive through tags.
 
-2.26.1 https://github.com/fluffos/fluffos/archive/fluffos-2.26.1.tar.gz
+Current release: [2.26.1](https://github.com/fluffos/fluffos/archive/fluffos-2.26.1.tar.gz 2.26.1)
 
 Current next branch: next-2.27, pull request should be send to that branch.
 
@@ -15,7 +16,9 @@ Features includes:
   * Compile in 64 bit mode, and provide 64 bit LPC runtime.
 
 To Build:
-  * cd src; ./build.FluffOS; make
+```
+cd src; ./build.FluffOS; make
+```
 
 Contact:
   http://www.lpmuds.net
