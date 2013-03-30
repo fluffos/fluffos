@@ -79,7 +79,7 @@
  *   * Incurs a fair amount of overhead (both memory and CPU)
  */
 #undef WRAPPEDMALLOC
-#undef DEBUGMALLOC
+#define DEBUGMALLOC
 
 /* The following add certain bells and whistles to malloc: */
 
@@ -111,7 +111,7 @@
  * bytes per malloc down to 8.  This macro has no effect if DEBUGMALLOC isn't
  * defined.
  */
-#undef DEBUGMALLOC_EXTENSIONS
+#define DEBUGMALLOC_EXTENSIONS
 
 /* CHECK_MEMORY: defining this (in addition to DEBUGMALLOC and
  * DEBUGMALLOC_EXTENSIONS) causes the driver to check for memory
@@ -119,7 +119,7 @@
  * also adds the check_memory() efun.  Takes a considerable ammount
  * more memory.  Mainly for debugging.
  */
-#undef CHECK_MEMORY
+#define CHECK_MEMORY
 
 /****************************************************************************
  *                          COMPATIBILITY                                   *
@@ -163,7 +163,7 @@
  * are ever stripped.  So the example above gives
  * ({ "", "", "x", "y", "", "z", "", "" }).
  */
-#undef SANE_EXPLODE_STRING
+#define SANE_EXPLODE_STRING
 #undef REVERSIBLE_EXPLODE_STRING
 
 /* CAST_CALL_OTHERS: define this if you want to require casting of call_other's;
@@ -181,7 +181,7 @@
  * Compat status: Easy to support, and also on the "It's a bug!  No, it's
  * a feature!" religious war list.
  */
-#undef NONINTERACTIVE_STDERR_WRITE
+#define NONINTERACTIVE_STDERR_WRITE
 
 /* NO_LIGHT: define this to disable the set_light() and driver maintenance
  *   of light levels in objects.  You can simulate it via LPC if you want...
@@ -196,7 +196,7 @@
  * Compat status: next to impossible to simulate, hard to replace, and
  * very, very widely used.
  */
-#define NO_ADD_ACTION
+#undef NO_ADD_ACTION
 
 /* NO_SNOOP: disables the snoop() efun and all related functionality.
  */
@@ -292,7 +292,7 @@
  * of the operating system's.  It has the advantage of giving the same value
  * on all architectures, and being stronger than the standard UNIX crypt().
  */
-#undef CUSTOM_CRYPT
+#define CUSTOM_CRYPT
 
 /*
  * Some minor tweaks that make it a bit easier to run code designed to run
@@ -396,7 +396,7 @@
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
  *                      compilation error occured.
  */
-#define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_STRICT_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
+#define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
 
 /* supress warnings about unused arguments; only warn about unused local
  * variables.  Makes older code (where argument names were required) compile
@@ -446,7 +446,7 @@
 /* OPCPROF: define this if you wish to enable OPC profiling. Allows a dump
  *   of the # of times each efun is invoked (via the opcprof() efun).
  */
-#undef OPCPROF
+#define OPCPROF
 
 /* OPCPROF_2D: define this if you wish to enable 2-D OPC profiling. Allows a
  *   dump of the # of times each *pair* of eoperators is invoked.
@@ -539,7 +539,7 @@
  *   resolution is 1/60 of a second, then any time less than approxmately 15k
  *   microseconds will resolve to zero (0).
  */
-#undef PROFILE_FUNCTIONS
+#define PROFILE_FUNCTIONS
 
 /* NO_BUFFER_TYPE: if this is #define'd then LPC code using the 'buffer'
  *   type won't be allowed to compile (since the 'buffer' type won't be
@@ -605,7 +605,7 @@
  *   maintenance by the driver.  These mudlib stats are more domain
  *   based than user based, and replaces the traditional wiz_list stats.
  */
-#undef PACKAGE_MUDLIB_STATS
+#define PACKAGE_MUDLIB_STATS
 
 /* PACKAGE_SOCKETS: define this to enable the socket efunctions.  This
  *   causes HAS_SOCKETS to be defined for all LPC objects.
@@ -661,7 +661,7 @@
 /*PACKAGE DWLIB: some discworld mudlib simuls coded in C (well just one right
   now) */
 
-#define PACKAGE_DWLIB
+#undef PACKAGE_DWLIB
 
 /* AUTO_SETEUID: when an object is created it's euid is automatically set to
  *   the equivalent of seteuid(getuid(this_object())).  undef AUTO_SETEUID
@@ -757,7 +757,7 @@
  *   out the previous lines of code to an error) eval_instruction() runs about
  *   twice as fast when this is not defined (for the most common eoperators).
  */
-#undef TRACE_CODE
+#define TRACE_CODE
 
 /* HEART_BEAT_CHUNK: The number of heart_beat chunks allocated at a time.
  * A large number wastes memory as some will be sitting around unused, while
@@ -861,7 +861,7 @@
  *   tabs for indenting. This options turns on a warning message for
  *   files indented with tabs instead of spaces.
  */
-#define WARN_TAB
+#undef WARN_TAB
 
 /* USE_ICONV: Use iconv to translate input and output from/to the users char
  * encoding
@@ -900,7 +900,7 @@
 
 /* IPV6: Use IP version 6 instead of 4, for most people the only difference 
  * will be that numerical IP addresses get ::ffff: added in front.*/
-#define IPV6
+#undef IPV6
 
 /* static user space dtrace probes, try them if you have dtrace! */
 #undef DTRACE
@@ -913,5 +913,5 @@
 
 /* use POSIX timers for eval_cost */
 #define POSIX_TIMERS
-#endif
 
+#endif
