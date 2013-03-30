@@ -15,7 +15,7 @@ valid_shadow(object ob)
 {
 #ifdef __PACKAGE_UIDS__
     if (getuid(ob) == ROOT_UID) {
-        return 0;
+        return 1; /* for test */
     }
 #endif
     if (ob->query_prevent_shadow(previous_object())) {

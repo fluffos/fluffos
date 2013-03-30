@@ -17,6 +17,7 @@ void init_posix_timers(void)
 	int i;
 
 	/* This mimics the behavior of setitimer in uvalarm.c */
+  memset(&sev, 0, sizeof(sev));
 	sev.sigev_signo = SIGVTALRM;
 	sev.sigev_notify = SIGEV_SIGNAL;
 	sev.sigev_value.sival_int = 0;
