@@ -70,6 +70,8 @@ static LPC_FLOAT _strtof (char *, char **);
 #ifdef TRACE_CODE
 static char *get_arg (int, int);
 #endif
+extern inline const char* access_to_name(int);
+extern inline const char* origin_to_name(int);
 
 #ifdef DEBUG
 int stack_in_use_as_temporary = 0;
@@ -4003,10 +4005,6 @@ find_function_by_name2 (object_t * ob, const char ** name,
  * manually !  (Look towards end of this function.)
  */
 
-#ifdef DEBUG
-static char debug_apply_fun[30];/* For debugging */
-#endif
-
 #ifdef CACHE_STATS
 unsigned int apply_low_call_others = 0;
 unsigned int apply_low_cache_hits = 0;
@@ -4022,7 +4020,8 @@ typedef struct cache_entry_s {
   unsigned short variable_index_offset;
 } cache_entry_t;
 
-static cache_entry_t cache[APPLY_CACHE_SIZE];
+static cache_entry_t cache[APPLY_CACHE_SIZE] = { {0} }; // default initialized to 0
+static int cache_mask = APPLY_CACHE_SIZE - 1;
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_apply_low_cache() {
@@ -4110,16 +4109,9 @@ void check_co_args (int num_arg, const program_t * prog, function_t * fun, int f
 
 int apply_low (const char * fun, object_t * ob, int num_arg)
 {
-  /*
-   * static memory is initialized to zero by the system or so Jacques says
-   * :)
-   */
-  const char *sfun;
-  cache_entry_t *entry;
-  program_t *progp, *prog;
-  int ix;
-  POINTER_INT pfun, pprog;
-  static int cache_mask = APPLY_CACHE_SIZE - 1;
+  cache_entry_t *entry; /* The cache entry */
+  program_t *target_prog; /* The target prog to call */
+  int ix; /* The cache index */
   int local_call_origin = call_origin;
   IF_DEBUG(control_stack_t *save_csp);
 
@@ -4138,104 +4130,46 @@ int apply_low (const char * fun, object_t * ob, int num_arg)
     pop_n_elems(num_arg);
     return 0;
   }
-
   ob->flags &= ~O_RESET_STATE;
-#ifdef DEBUG
-  strncpy(debug_apply_fun, fun, sizeof(debug_apply_fun));
-  debug_apply_fun[sizeof debug_apply_fun - 1] = '\0';
-#endif
+#ifndef NO_SHADOWS
   /*
    * If there is a chain of objects shadowing, start with the first of
    * these.
    */
-#ifndef NO_SHADOWS
   while (ob->shadowed && ob->shadowed != current_object &&
-         (!(ob->shadowed->flags & O_DESTRUCTED)))
+      (!(ob->shadowed->flags & O_DESTRUCTED)))
     ob = ob->shadowed;
- retry_for_shadow:
+retry_for_shadow:
 #endif
-
-  progp = ob->prog;
   DEBUG_CHECK(ob->flags & O_DESTRUCTED,"apply() on destructed object\n");
 #ifdef CACHE_STATS
   apply_low_call_others++;
 #endif
-  pfun = (POINTER_INT)fun;
-  pprog = (POINTER_INT)progp;
-  ix = (pfun >> 2)^(pfun >> (2 + APPLY_CACHE_BITS))^(pprog >> 2)^(pprog >> (2 + APPLY_CACHE_BITS));
+  /* Search in cache for this function. */
+  ix = (POINTER_INT)&fun >> 2;
+  ix ^= (POINTER_INT)&fun >> (2 + APPLY_CACHE_BITS);
+  ix ^= (POINTER_INT)&ob->prog >> 2;
+  ix ^= (POINTER_INT)&ob->prog >> (2 + APPLY_CACHE_BITS);
   entry = &cache[ix & cache_mask];
-  if (entry->oprogp == progp &&
-      (entry->progp ? (strcmp(entry->funp->funcname, fun) == 0) :
+  if(entry->oprogp == ob->prog && /* object must match */
+      (entry->progp ? (strcmp(entry->funp->funcname, fun) == 0) : /* function name must match */
        strcmp((char *)entry->funp, fun) == 0)) {
 #ifdef CACHE_STATS
     apply_low_cache_hits++;
 #endif
+    target_prog = entry->progp;
+  } else { /* not found in cache, search the function. */
+    int findex = 0, runtime_index = 0, fio = 0, vio = 0;
+    const char *sfun;
 
-    /* if progp is zero, the cache is telling us the function isn't here*/
-    if (entry->progp) {
-      int need;
-      function_t *funp = entry->funp;
-      int findex = (funp - entry->progp->function_table);
-      int funflags, runtime_index;
-
-      runtime_index = findex + entry->progp->last_inherited + entry->function_index_offset;
-      funflags = entry->oprogp->function_flags[runtime_index];
-
-      need = (local_call_origin == ORIGIN_DRIVER ? DECL_HIDDEN : ((current_object == ob || local_call_origin == ORIGIN_INTERNAL) ? DECL_PROTECTED : DECL_PUBLIC));
-
-      if ((funflags & DECL_ACCESS) >= need) {
-        /*
-         * the cache will tell us in which program the function is,
-         * and where
-         */
-        if(!(funflags & FUNC_VARARGS))
-          check_co_args(num_arg, entry->progp, funp, findex);
-
-        push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);
-        current_prog = entry->progp;
-        caller_type = local_call_origin;
-        csp->num_local_variables = num_arg;
-        function_index_offset = entry->function_index_offset;
-        variable_index_offset = entry->variable_index_offset;
-
-        csp->fr.table_index = findex;
-#ifdef PROFILE_FUNCTIONS
-        get_cpu_times(&(csp->entry_secs), &(csp->entry_usecs));
-        current_prog->function_table[findex].calls++;
+    /* 1) Erase the current entry */
+#ifdef CACHE_STATS
+    if (!entry->funp) {
+      apply_low_slots_used++;
+    } else {
+      apply_low_collisions++;
+    }
 #endif
-
-        if (funflags & FUNC_TRUE_VARARGS)
-          setup_varargs_variables(csp->num_local_variables,
-                                  funp->num_local, funp->num_arg);
-        else
-          setup_variables(csp->num_local_variables,
-                          funp->num_local, funp->num_arg);
-#ifdef TRACE
-        tracedepth++;
-        if (TRACEP(TRACE_CALL)) {
-          do_trace_call(findex);
-        }
-#endif
-        DTRACE_PROBE3(fluffos, lpc__entry, ob->obname, fun, current_prog->filename);
-	previous_ob = current_object;
-        current_object = ob;
-        IF_DEBUG(save_csp = csp);
-        call_program(current_prog, funp->address);
-
-        DEBUG_CHECK(save_csp - 1 != csp,
-                    "Bad csp after execution in apply_low.\n");
-        return 1;
-      } else {
-    	  pop_n_elems(num_arg);
-    	  return 0;
-      }
-    } /* when we come here, the cache has told us
-       * that the function isn't defined in the
-       * object */
-  } else {
-    int findex, runtime_index, fio, vio;
-    /* we have to search the function */
-
     if (entry->oprogp) {
       free_prog(&entry->oprogp);
       entry->oprogp = 0;
@@ -4244,108 +4178,36 @@ int apply_low (const char * fun, object_t * ob, int num_arg)
       free_prog(&entry->progp);
       entry->progp = 0;
     } else {
-      if (entry->funp){
+      if (entry->funp) {
         free_string((char *)entry->funp);
         entry->funp = 0;
       }
     }
-#ifdef CACHE_STATS
-    if (!entry->funp) {
-      apply_low_slots_used++;
-    } else {
-      apply_low_collisions++;
-    }
-#endif
-    entry->funp = 0;
+    /* 2) Search for the function */
     sfun = fun;
-    prog = find_function_by_name2(ob, &sfun, &findex, &runtime_index,
-                                  &fio, &vio);
+    target_prog = find_function_by_name2(ob, &sfun, &findex, &runtime_index, &fio, &vio);
+    /* 3) Save result into cache */
+    entry->oprogp = ob->prog;
+    reference_prog(entry->oprogp, "apply_low() cache oprogp [miss]");
 
-    if (prog) {
-      int need;
-      function_t *funp = &prog->function_table[findex];
-      int funflags = ob->prog->function_flags[runtime_index];
+    entry->progp = target_prog;
+    entry->function_index_offset = fio;
+    entry->variable_index_offset = vio;
 
-      need = (local_call_origin == ORIGIN_DRIVER ? DECL_HIDDEN : ((current_object == ob || local_call_origin == ORIGIN_INTERNAL) ? DECL_PROTECTED : DECL_PUBLIC));
-
-      if ((funflags & DECL_ACCESS) >= need) {
-
-        if(!(funflags & FUNC_VARARGS))
-          check_co_args(num_arg, prog, funp, findex);
-
-        push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);
-        current_prog = prog;
-        caller_type = local_call_origin;
-        /* The searched function is found */
-        entry->oprogp = ob->prog;
-        entry->funp = funp;
-        csp->fr.table_index = findex;
-#ifdef PROFILE_FUNCTIONS
-        get_cpu_times(&(csp->entry_secs), &(csp->entry_usecs));
-        current_prog->function_table[findex].calls++;
-#endif
-        csp->num_local_variables = num_arg;
-        entry->variable_index_offset = variable_index_offset = vio;
-        entry->function_index_offset = function_index_offset = fio;
-        if (funflags & FUNC_TRUE_VARARGS)
-          setup_varargs_variables(csp->num_local_variables,
-                                  funp->num_local,
-                                  funp->num_arg);
-        else
-          setup_variables(csp->num_local_variables,
-                          funp->num_local,
-                          funp->num_arg);
-        entry->progp = current_prog;
-        /* previously, programs had an id_number so they
-         * didn't have be refed while in the cache.  This is
-         * phenomenally stupid, since it wastes 4
-         * bytes/program and 4 bytes/cache entry just to save
-         * an instruction or two.  Actually, less, since
-         * updating the ref count is as quick, or quicker,
-         * than checking the id.
-         *
-         * The other solution is to clear the cache like the
-         * stack is cleared when objects destruct.  However, that
-         * can be expensive, since the cache can be quite large.
-         * [the stack is typically quite small]
-         *
-         * This does have the side effect that checking refs no
-         * longer tells you if a program is inherited by any other
-         * program, but most uses can cope (see appropriate comments).
-         */
-        reference_prog(entry->oprogp, "apply_low() cache [oprogp]");
-        reference_prog(entry->progp, "apply_low() cache [progp]");
-        previous_ob = current_object;
-        current_object = ob;
-        IF_DEBUG(save_csp = csp);
-        DTRACE_PROBE3(fluffos, lpc__entry, ob->obname, fun, current_prog->filename);
-        call_program(current_prog, funp->address);
-
-        DEBUG_CHECK(save_csp - 1 != csp,
-                    "Bad csp after execution in apply_low\n");
-        /*
-         * Arguments and local variables are now removed. One
-         * resulting value is always returned on the stack.
-         */
-        return 1;
+    if (entry->progp) {
+      reference_prog(entry->progp, "apply_low() cache progp [miss]");
+      entry->funp = &target_prog->function_table[findex];
+    } else {
+      if (sfun) {
+        ref_string(sfun);
+        entry->funp = (function_t *)sfun;
       } else {
-    	  pop_n_elems(num_arg);
-    	  return 0;
+        entry->funp = (function_t *)make_shared_string(fun);
       }
     }
-
-    /* We have to mark a function not to be in the object */
-    entry->oprogp = progp;
-    reference_prog(entry->oprogp, "apply_low() cache [oprogp miss]");
-    if (sfun) {
-      ref_string(sfun);
-      entry->funp = (function_t *)sfun;
-    } else
-      entry->funp = (function_t *)make_shared_string(fun);
-    entry->progp = 0;
-  }
+  } /* search in cache */
 #ifndef NO_SHADOWS
-  if (ob->shadowing) {
+  if (!target_prog && ob->shadowing) {
     /*
      * This is an object shadowing another. The function was not
      * found, but can maybe be found in the object we are shadowing.
@@ -4354,9 +4216,73 @@ int apply_low (const char * fun, object_t * ob, int num_arg)
     goto retry_for_shadow;
   }
 #endif
-  /* Failure. Deallocate stack. */
-  pop_n_elems(num_arg);
-  return 0;
+  /* This function is not found, return failure. */
+  if (!target_prog) {
+    pop_n_elems(num_arg);
+    return 0;
+  }
+  /* Ready to call the function now. */
+  {
+    int need;
+    function_t *funp = entry->funp;
+    int findex = (funp - entry->progp->function_table);
+    int funflags, runtime_index;
+
+    runtime_index = findex + entry->progp->last_inherited + entry->function_index_offset;
+    funflags = entry->oprogp->function_flags[runtime_index];
+
+    need = (local_call_origin == ORIGIN_DRIVER ? DECL_HIDDEN : ((current_object == ob || local_call_origin == ORIGIN_INTERNAL) ? DECL_PRIVATE : DECL_PUBLIC));
+
+    // Check whether caller has sufficient permission.
+    if ((funflags & DECL_ACCESS) < need) {
+      debug_message("apply() with insufficient permission: \n"
+          "ob: %s, cob: %s, function: %s, origin: %s, need: %s, has: %s \n",
+          ob ? ob->obname : "null",
+          current_object ? current_object->obname : "null",
+          fun, origin_to_name(local_call_origin),
+          access_to_name(need),
+          access_to_name(funflags & DECL_ACCESS));
+      pop_n_elems(num_arg);
+      return 0;
+    }
+    /* Check arguments */
+    if(!(funflags & FUNC_VARARGS)) {
+      check_co_args(num_arg, entry->progp, funp, findex);
+    }
+    /* Setup new call frame */
+    push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);
+    current_prog = entry->progp;
+    caller_type = local_call_origin;
+    csp->num_local_variables = num_arg;
+    function_index_offset = entry->function_index_offset;
+    variable_index_offset = entry->variable_index_offset;
+    csp->fr.table_index = findex;
+#ifdef PROFILE_FUNCTIONS
+    get_cpu_times(&(csp->entry_secs), &(csp->entry_usecs));
+    current_prog->function_table[findex].calls++;
+#endif
+    /* Setup variables */
+    if (funflags & FUNC_TRUE_VARARGS)
+      setup_varargs_variables(csp->num_local_variables,
+          funp->num_local, funp->num_arg);
+    else
+      setup_variables(csp->num_local_variables,
+          funp->num_local, funp->num_arg);
+#ifdef TRACE
+    tracedepth++;
+    if (TRACEP(TRACE_CALL)) {
+      do_trace_call(findex);
+    }
+#endif
+    DTRACE_PROBE3(fluffos, lpc__entry, ob->obname, fun, current_prog->filename);
+    /* Call the program */
+    previous_ob = current_object;
+    current_object = ob;
+    IF_DEBUG(save_csp = csp);
+    call_program(current_prog, funp->address);
+    DEBUG_CHECK(save_csp - 1 != csp, "Bad csp after execution in apply_low.\n");
+    return 1;
+  } /* target_prog != NULL */
 }
 
 /*
