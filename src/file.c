@@ -477,7 +477,7 @@ char *read_file(const char * file, int start, int lines) {
   }
 
   if (!theBuff) {
-    theBuff = DXALLOC(2 * READ_FILE_MAX_SIZE, TAG_PERMANENT, "read_file: theBuff");
+    theBuff = DXALLOC(2 * READ_FILE_MAX_SIZE + 1, TAG_PERMANENT, "read_file: theBuff");
   }
 
 #ifndef PACKAGE_COMPRESS
@@ -494,25 +494,19 @@ char *read_file(const char * file, int start, int lines) {
   }
 
   if (memchr(theBuff, '\0', chunk)) {
-    debug_message("read_file: Attempted to read '\\0' from %s.\n", file);
+    debug_message("read_file: File %s contains '\\0', use read_bytes intead.\n", file);
     goto error;
   }
+  theBuff[chunk] = '\0';
 
-  // skip forward for "start"s of '\n'
+  // skip forward until the "start"-th line
   ptr_start = theBuff;
-  while (start > 0) {
-    if ((ptr_start = memchr(ptr_start, '\n', chunk - (ptr_start - theBuff)))) {
-      ptr_start++;
-      start--;
-    } else {
-      // not found
-      debug_message("read_file: reached EOF searching for start: %s.\n", file);
-      goto error;
-    }
+  while(start > 1 && ptr_start < theBuff + chunk) {
+    if (*ptr_start++ == '\n') start--;
   }
 
-  // past the end.
-  if (ptr_start > theBuff + chunk) {
+  // not found
+  if (start > 1) {
     debug_message("read_file: reached EOF searching for start: %s.\n", file);
     goto error;
   }
@@ -521,32 +515,27 @@ char *read_file(const char * file, int start, int lines) {
   if (lines == 0) {
     ptr_end = ptr_start + READ_FILE_MAX_SIZE;
     if (ptr_end > theBuff + chunk) {
-      ptr_end = theBuff + chunk;
+      ptr_end = theBuff + chunk + 1;
     }
   } else {
     ptr_end = ptr_start;
-    while (lines > 0) {
-      if ((ptr_end = memchr(ptr_end, '\n', chunk - (ptr_end - theBuff)))) {
-        ptr_end++;
-        lines--;
-      } else {
-        // not found, directly go to the end.
-        ptr_end = theBuff + chunk;
-        break;
-      }
+    while(lines > 0 && ptr_end < theBuff + chunk) {
+      if (*ptr_end++ == '\n') lines--;
+    }
+    // not enough lines, directly go to the end.
+    if (lines > 0) {
+      ptr_end = theBuff + chunk + 1;
     }
   }
 
+  *ptr_end = '\0';
   // result is too big.
-  if (ptr_end - ptr_start > READ_FILE_MAX_SIZE) {
+  if (strlen(ptr_start) > READ_FILE_MAX_SIZE) {
     debug_message("read_file: result too big.\n");
     goto error;
   }
 
-  result = new_string(ptr_end - ptr_start + 1 + 1, "read_file: result");
-  strncpy(result, ptr_start, ptr_end - ptr_start + 1);
-  result[ptr_end - ptr_start + 1] = '\0';
-
+  result = string_copy(ptr_start, "read_file: result");
   return result;
 
 error:

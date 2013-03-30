@@ -2267,17 +2267,23 @@ void
 f_read_file (void)
 {
     char *str;
-    int start,len;
+    int start=0, len=0;
 
-    if (st_num_arg == 3) {
-        len = (sp--)->u.number;
-    } else len = 0;
-    if (st_num_arg > 1)
-        start = (sp--)->u.number;
-    else start = 0;
-
+    switch (st_num_arg) {
+      case 3:
+        len = sp->u.number;
+        pop_stack();
+        /* fall through */
+      case 2:
+        start = sp->u.number;
+        pop_stack();
+        /* fall through */
+      case 1:
+        break;
+      default:
+        error("Wrong number of arguments!");
+    }
     str = read_file(sp->u.string, start, len);
-
     pop_stack();
     if (!str) {
       push_svalue(&const0);
