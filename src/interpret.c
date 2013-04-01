@@ -4038,15 +4038,16 @@ void mark_apply_low_cache() {
 }
 #endif
 
-void check_co_args2 (unsigned short *types, int num_arg, const char *name, const char *ob_name){
-  int argc = num_arg;
+void check_co_args2 (unsigned short *types, int num_arg, const char *name, const char *ob_name, int sparg){
+  int argc = sparg;
   int exptype, i = 0;
   do{
     argc--;
     if((types[i] & DECL_MODS) == LOCAL_MOD_REF)
     	exptype = T_REF;
     else
-    	exptype = convert_type(types[i++]);
+    	exptype = convert_type(types[i]);
+    i++;
     if(exptype == T_ANY)
       continue;
 
@@ -4055,7 +4056,7 @@ void check_co_args2 (unsigned short *types, int num_arg, const char *name, const
       if((sp-argc)->type == T_NUMBER && !(sp-argc)->u.number)
         continue;
       sprintf(buf, "Bad argument %d in call to %s() in %s\nExpected: %s Got %s.\n",
-              num_arg - argc, name, ob_name,
+              i, name, ob_name,
               type_name(exptype), type_name((sp-argc)->type));
 #ifdef CALL_OTHER_WARN
       if(current_prog){
@@ -4072,7 +4073,7 @@ void check_co_args2 (unsigned short *types, int num_arg, const char *name, const
       error(buf);
 #endif
     }
-  } while (argc);
+  } while (i<num_arg);
 }
 
 void check_co_args (int num_arg, const program_t * prog, function_t * fun, int findex) {
@@ -4098,10 +4099,11 @@ void check_co_args (int num_arg, const program_t * prog, function_t * fun, int f
 #endif
   }
 
-  if(num_arg && prog->type_start &&
+  int num_arg_check = MIN(num_arg, fun->num_arg);
+  if(num_arg_check && prog->type_start &&
      prog->type_start[findex] != INDEX_START_NONE)
     check_co_args2(&prog->argument_types[prog->type_start[findex]], num_arg,
-                   fun->funcname, prog->filename);
+                   fun->funcname, prog->filename, num_arg);
 #endif
 }
 

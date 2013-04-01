@@ -1804,6 +1804,7 @@ void f_zonetime (void)
 	old_tz = set_timezone(timezone);
 	retv = ctime((time_t *)&time_val);
 	if(!retv) {
+	  reset_timezone(old_tz);
 	  error("bad argument to zonetime.");
 	  return ;
 	}
@@ -1831,9 +1832,10 @@ void f_is_daylight_savings_time (void)
 	old_tz = set_timezone(timezone);
 
 	t = localtime((time_t *)&time_to_check);
-  if (t) {
-  	push_number((t->tm_isdst) > 0);
-  } else push_number(-1);
+	if (t) {
+	  push_number((t->tm_isdst) > 0);
+	} else push_number(-1);
+	reset_timezone(old_tz);
 }
 #endif
 
