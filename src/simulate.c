@@ -1128,11 +1128,11 @@ void tell_room (object_t * room, svalue_t * v, array_t * avoid)
         break;
     case T_NUMBER:
         buff = txt_buf;
-        sprintf(txt_buf, "%ld", v->u.number);
+        sprintf(txt_buf, "%"LPC_INT_FMTSTR_P, v->u.number);
         break;
     case T_REAL:
         buff = txt_buf;
-        sprintf(txt_buf, "%f", v->u.real);
+        sprintf(txt_buf, "%"LPC_FLOAT_FMTSTR_P, v->u.real);
         break;
     default:
         bad_argument(v, T_OBJECT | T_NUMBER | T_REAL | T_STRING,
@@ -1283,7 +1283,7 @@ int get_char (svalue_t * fun, int flag, int num_arg, svalue_t * args)
 
 void print_svalue (svalue_t * arg)
 {
-    char tbuf[2048];
+    char tbuf[LARGEST_PRINTABLE_STRING+1];
     int len;
 
     if (arg == 0) {
@@ -1304,11 +1304,11 @@ void print_svalue (svalue_t * arg)
             tell_object(command_giver, tbuf, strlen(tbuf));
             break;
         case T_NUMBER:
-            sprintf(tbuf, "%ld", arg->u.number);
+            sprintf(tbuf, "%"LPC_INT_FMTSTR_P, arg->u.number);
             tell_object(command_giver, tbuf, strlen(tbuf));
             break;
         case T_REAL:
-            sprintf(tbuf, "%f", arg->u.real);
+            sprintf(tbuf, "%"LPC_FLOAT_FMTSTR_P, arg->u.real);
             tell_object(command_giver, tbuf, strlen(tbuf));
             break;
         case T_ARRAY:

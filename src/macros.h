@@ -213,7 +213,10 @@
 #error pointers of size other than 4 or 8 not implemented
 #  endif
 #endif
+#if SIZEOF_LONGLONG != 8
+#error long long must be 8 bytes.
 #endif
+#endif /* !defined(EDIT_SOURCE) && !defined(_FUNC_SPEC_) */
 
 #ifndef _FUNC_SPEC_
    char *xalloc (int);

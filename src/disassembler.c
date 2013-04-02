@@ -545,7 +545,7 @@ disassemble (FILE * f, char * code, int start, int end, program_t * prog)
             LPC_INT iarg_tmp;
 
             COPY_INT(&iarg_tmp, pc);
-            sprintf(buff, "%ld", iarg_tmp);
+            sprintf(buff, "%"LPC_INT_FMTSTR_P, iarg_tmp);
             pc += sizeof(LPC_INT);
             break;
         }
@@ -554,7 +554,7 @@ disassemble (FILE * f, char * code, int start, int end, program_t * prog)
                 LPC_FLOAT farg;
 
                 COPY_FLOAT(&farg, pc);
-                sprintf(buff, "%f", farg);
+                sprintf(buff, "%"LPC_FLOAT_FMTSTR_P, farg);
                 pc += sizeof(LPC_FLOAT);
                 break;
             }

@@ -54,7 +54,6 @@ static const char *type_names[] = {
 #ifdef PACKAGE_UIDS
 extern userid_t *backbone_uid;
 #endif
-extern int max_cost;
 extern int call_origin;
 static int find_line (char *, const program_t *, const char **, int *);
 INLINE void push_indexed_lvalue (int);
@@ -66,7 +65,6 @@ INLINE_STATIC void do_loop_cond_number (void);
 INLINE_STATIC void do_loop_cond_local (void);
 static void do_catch (char *, unsigned short);
 int last_instructions (void);
-static LPC_FLOAT _strtof (char *, char **);
 #ifdef TRACE_CODE
 static char *get_arg (int, int);
 #endif
@@ -2380,9 +2378,8 @@ eval_instruction (char * p)
               break;
             case T_STRING:
               {
-                char buff[30];
-
-                sprintf(buff, "%ld", (sp+1)->u.number);
+                char buff[100];
+                sprintf(buff, "%"LPC_INT_FMTSTR_P, (sp+1)->u.number);
                 EXTEND_SVALUE_STRING(sp, buff, "f_add: 2");
                 break;
               }
@@ -2404,9 +2401,8 @@ eval_instruction (char * p)
               break;
             case T_STRING:
               {
-                char buff[40];
-
-                sprintf(buff, "%f", (sp+1)->u.real);
+                char buff[400];
+                sprintf(buff, "%"LPC_FLOAT_FMTSTR_P, (sp+1)->u.real);
                 EXTEND_SVALUE_STRING(sp, buff, "f_add: 2");
                 break;
               }
@@ -2456,17 +2452,15 @@ eval_instruction (char * p)
 	      }
             case T_NUMBER:
               {
-                char buff[30];
-
-                sprintf(buff, "%ld", (sp-1)->u.number);
+                char buff[100];
+                sprintf(buff, "%"LPC_INT_FMTSTR_P, (sp-1)->u.number);
                 SVALUE_STRING_ADD_LEFT(buff, "f_add: 3");
                 break;
               } /* end of T_NUMBER + T_STRING */
             case T_REAL:
               {
-                char buff[40];
-
-                sprintf(buff, "%f", (sp - 1)->u.real);
+                char buff[400];
+                sprintf(buff, "%"LPC_FLOAT_FMTSTR_P, (sp - 1)->u.real);
                 SVALUE_STRING_ADD_LEFT(buff, "f_add: 3");
                 break;
               } /* end of T_REAL + T_STRING */
@@ -2514,14 +2508,12 @@ eval_instruction (char * p)
         if (sp->type == T_STRING) {
           SVALUE_STRING_JOIN(lval, sp, "f_add_eq: 1");
         } else if (sp->type == T_NUMBER) {
-          char buff[30];
-
-          sprintf(buff, "%ld", sp->u.number);
+          char buff[100];
+          sprintf(buff, "%"LPC_INT_FMTSTR_P, sp->u.number);
           EXTEND_SVALUE_STRING(lval, buff, "f_add_eq: 2");
         } else if (sp->type == T_REAL) {
-          char buff[40];
-
-          sprintf(buff, "%f", sp->u.real);
+          char buff[400];
+          sprintf(buff, "%"LPC_FLOAT_FMTSTR_P, sp->u.real);
           EXTEND_SVALUE_STRING(lval, buff, "f_add_eq: 2");
 	} else if(sp->type == T_OBJECT) {
 	  const char *fname = sp->u.ob->obname;
@@ -5181,7 +5173,7 @@ int inter_sscanf (svalue_t * arg, svalue_t * s0, svalue_t * s1, int num_arg)
         LPC_INT tmp_num;
 
         tmp = in_string;
-        tmp_num = strtol((char *)in_string, (char **)&in_string, base);
+        tmp_num = strtoll((char *)in_string, (char **)&in_string, base);
         if (tmp == in_string) return number_of_matches;
         if (!skipme) {
           SSCANF_ASSIGN_SVALUE_NUMBER(tmp_num);
@@ -5194,7 +5186,7 @@ int inter_sscanf (svalue_t * arg, svalue_t * s0, svalue_t * s1, int num_arg)
         LPC_FLOAT tmp_num;
 
         tmp = in_string;
-        tmp_num = _strtof((char *)in_string, (char **)&in_string);
+        tmp_num = strtod((char *)in_string, (char **)&in_string);
         if (tmp == in_string)return number_of_matches;
         if (!skipme) {
           SSCANF_ASSIGN_SVALUE(T_REAL, u.real, tmp_num);
@@ -5402,7 +5394,7 @@ int inter_sscanf (svalue_t * arg, svalue_t * s0, svalue_t * s1, int num_arg)
         base = 16;
       case 'd':
         {
-          num = strtol((char *)in_string, (char **)&in_string, base);
+          num = strtoll((char *)in_string, (char **)&in_string, base);
           /* We already knew it would be matched - Sym */
           if (!skipme2) {
             SSCANF_ASSIGN_SVALUE_NUMBER(num);
@@ -5412,7 +5404,7 @@ int inter_sscanf (svalue_t * arg, svalue_t * s0, svalue_t * s1, int num_arg)
         }
       case 'f':
         {
-          LPC_FLOAT tmp_num = _strtof((char *)in_string, (char **)&in_string);
+          LPC_FLOAT tmp_num = strtod((char *)in_string, (char **)&in_string);
           if (!skipme2) {
             SSCANF_ASSIGN_SVALUE(T_REAL, u.real, tmp_num);
           }
@@ -5587,7 +5579,7 @@ void reset_machine (int first)
 #ifdef TRACE_CODE
 static char *get_arg (int a, int b)
 {
-  static char buff[10];
+  static char buff[50];
   char *from, *to;
 
   from = previous_pc[a];
@@ -5675,53 +5667,6 @@ int strpref (const char * p, const char * s)
     if (*p++ != *s++)
       return 0;
   return 1;
-}
-
-static LPC_FLOAT _strtof (char * nptr, char ** endptr)
-{
-  register char *s = nptr;
-  register LPC_FLOAT acc;
-  register int neg, c, any, divv;
-
-  divv = 1;
-  neg = 0;
-  /*
-   * Skip white space and pick up leading +/- sign if any.
-   */
-  do {
-    c = *s++;
-  } while (isspace(c));
-  if (c == '-') {
-    neg = 1;
-    c = *s++;
-  } else if (c == '+')
-    c = *s++;
-
-  for (acc = 0, any = 0;; c = *s++) {
-    if (isdigit(c))
-      c -= '0';
-    else if ((divv == 1) && (c == '.')) {
-      divv = 10;
-      continue;
-    } else
-      break;
-    if (divv == 1) {
-      acc *= (LPC_FLOAT) 10;
-      acc += (LPC_FLOAT) c;
-    } else {
-      acc += (LPC_FLOAT) c / (LPC_FLOAT) divv;
-      divv *= 10;
-    }
-    any = 1;
-  }
-
-  if (neg)
-    acc = -acc;
-
-  if (endptr != 0)
-    *endptr = any ? s - 1 : (char *) nptr;
-
-  return acc;
 }
 
 #ifdef DEBUGMALLOC_EXTENSIONS

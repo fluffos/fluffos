@@ -13,7 +13,7 @@ void recurse(string dir) {
   {
     if (subdir == "fail") {
       foreach (string fn in get_dir(dir + "fail/*.c")) {
-        write("> " + dir + "fail/" + fn + "\n");
+        write("A> " + dir + "fail/" + fn + "\n");
         ASSERT2(catch(load_object(dir+"fail/"+fn)), "fail/" + fn + " loaded");
 #if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__CHECK_MEMORY__)
         leaks = check_memory();
@@ -29,8 +29,16 @@ void recurse(string dir) {
     // only make sure crasher don't crash, errors are ignored.
     else if (subdir == "crasher") {
       foreach (string fn in get_dir(dir + subdir + "/*.c")) {
-        write("> " + dir + subdir + "/" + fn + "\n");
-        catch((dir + subdir + fn + ".c")->do_tests());
+        write("B> " + dir + subdir + "/" + fn + "\n");
+        catch((dir + subdir + "/" + fn + ".c")->do_tests());
+#if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__CHECK_MEMORY__)
+        leaks = check_memory();
+        if (sizeof(filter(explode(leaks, "\n"), (: $1 && $1[0] :))) != 1) {
+          write("After trying to run: " + dir + subdir + "/" + fn + ".c\n");
+          write(leaks);
+          error("LEAK\n");
+        }
+#endif
       }
     }
     else {
@@ -54,13 +62,11 @@ int main(string fun)
     }
 
   set_eval_limit(0x7fffffff);
-  reset_eval_cost();
 
-  write("> " + fun + "\n");
-  fun->do_tests();
+  write("C> " + fun + "\n");
+  ASSERT_EQ(0, catch(fun->do_tests()));
 
   set_eval_limit(0x7fffffff);
-  reset_eval_cost();
 
   if (tp != this_player())
     error("Bad this_player() after calling " + fun + "\n");

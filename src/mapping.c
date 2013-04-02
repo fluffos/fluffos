@@ -717,8 +717,8 @@ void f_unique_mapping (void)
                         error("Out of memory\n");
                     }
                 }
-
-                elt = ALLOCATE(mapping_node_t, 105,"f_unique_mapping:6");
+                /* FIXME: This leaks memory, can be reproduced by keep calling /single/test/crasher/12.c. */
+                elt = ALLOCATE(mapping_node_t, 105, "f_unique_mapping:6");
                 *elt->values = uptr->key;
                 (elt->values + 1)->type = T_ARRAY;
                 ret = (elt->values + 1)->u.arr = allocate_empty_array(size = uptr->count);

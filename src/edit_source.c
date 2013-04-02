@@ -1413,6 +1413,7 @@ static void handle_configure() {
     check_include("INCL_DOS_H", "dos.h");
     check_include("INCL_USCLKC_H", "usclkc.h");
     check_include("INCL_LIMITS_H", "limits.h");
+    check_include("INCL_INTTYPES_H", "inttypes.h");
     check_include("INCL_FLOAT_H", "float.h");
     check_include("INCL_LOCALE_H", "locale.h");
     if (!check_prog(0, 0, "int x = USHRT_MAX;", 0)) {
@@ -1561,6 +1562,7 @@ static void handle_configure() {
     fprintf(yyout, "#define SIZEOF_SHORT %lu\n", sizeof(short));
     fprintf(yyout, "#define SIZEOF_FLOAT %lu\n", sizeof(double));
     fprintf(yyout, "#define SIZEOF_LONG %lu\n", sizeof(long));
+    fprintf(yyout, "#define SIZEOF_LONGLONG %lu\n", sizeof(long long));
     fprintf(yyout, "#define SIZEOF_LPC_INT %lu\n", sizeof(LPC_INT));
     fprintf(yyout, "#define SIZEOF_LPC_FLOAT %lu\n", sizeof(LPC_FLOAT));
 

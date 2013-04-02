@@ -4,15 +4,15 @@ static int z = 5;
 #else
 nosave int z = 5;
 #endif
-int y = 1;
+int y = 0x7fffffffffffffff;
 
 void do_tests() {
     save_object("/sf");
-    ASSERT(read_file("/sf.o") == "#" + __FILE__ + "\ny 1\n");
+    ASSERT_EQ(read_file("/sf.o") , "#" + __FILE__ + "\ny " + MAX_INT + "\n");
     save_object("/sf", 1);
-    ASSERT(read_file("/sf.o") == "#" + __FILE__ + "\nx 0\ny 1\n");
+    ASSERT_EQ(read_file("/sf.o"),  "#" + __FILE__ + "\nx 0\ny " + MAX_INT + "\n");
 
     // Fluffos new behavior.
-    ASSERT(save_object(0) == "#" + __FILE__ + "\ny 1\n");
-    ASSERT(save_object(1) == "#" + __FILE__ + "\nx 0\ny 1\n");
+    ASSERT_EQ(save_object(0), "#" + __FILE__ + "\ny " + MAX_INT + "\n");
+    ASSERT_EQ(save_object(1), "#" + __FILE__ + "\nx 0\ny " + MAX_INT + "\n");
 }

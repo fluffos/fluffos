@@ -2878,7 +2878,7 @@ f_set_eval_limit (void)
     switch (sp->u.number) {
     case 0:
         sp->u.number = max_cost;
-	set_eval(max_cost);
+	      set_eval(max_cost);
         break;
     case -1:
         sp->u.number = get_eval();
@@ -3529,7 +3529,7 @@ f__to_float (void)
             sp->u.real = (LPC_FLOAT) sp->u.number;
             break;
         case T_STRING:
-            sscanf(sp->u.string, "%lf", &temp);
+            temp = strtod(sp->u.string, NULL);
             free_string_svalue(sp);
             sp->type = T_REAL;
             sp->u.real = temp;
@@ -3551,7 +3551,7 @@ f__to_int (void)
             LPC_INT temp;
             char *p;
 
-            temp = strtol(sp->u.string, &p, 10);
+            temp = strtoll(sp->u.string, &p, 10);
             if (*p) {
                 /* have to be a little careful here.  Checkign if p ==
                  * sp->u.string isn't good enough.
@@ -3559,7 +3559,7 @@ f__to_int (void)
                  * Odd cases:
                  * to_int("  foo")  // p == sp->u.string + 2
                  *
-                 * POSIX guarantees the strtol() works in terms of isspace(),
+                 * POSIX guarantees the strtoll() works in terms of isspace(),
                  * though.  If there is something other than whitespace, then
                  * there was a valid character consistent with the base,
                  * so we were successful.
