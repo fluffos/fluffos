@@ -389,4 +389,40 @@ void mark_svalue (svalue_t *);
 void mark_stack (void);
 #endif
 
+inline const char* origin_to_name(const int origin) {
+  switch(origin) {
+    case ORIGIN_DRIVER:
+      return "driver";
+    case ORIGIN_LOCAL:
+      return "local";
+    case ORIGIN_CALL_OTHER:
+      return "call_other";
+    case ORIGIN_SIMUL_EFUN:
+      return "simul_efun";
+    case ORIGIN_INTERNAL:
+      return "internal";
+    case ORIGIN_EFUN:
+      return "efun";
+    case ORIGIN_FUNCTION_POINTER:
+      return "function_pointer";
+    case ORIGIN_FUNCTIONAL:
+      return "functional";
+  }
+  return "unknown";
+}
+
+inline const char* access_to_name(int mode) {
+  switch (mode) {
+    case DECL_HIDDEN:
+      return "hidden";
+    case DECL_PRIVATE:
+      return "private";
+    case DECL_PROTECTED:
+      return "protected";
+    case DECL_PUBLIC:
+      return "public";
+  }
+  return "unkown";
+}
+
 #endif                          /* _INTERPRET_H */
