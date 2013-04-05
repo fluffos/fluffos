@@ -579,14 +579,18 @@ int create_db_conn (void)
 		if (!dbConnList) {
 			dbConnList = CALLOCATE(dbConnAlloc, db_t, TAG_DB, "create_db_conn");
 		} else {
+#ifdef PACKAGE_ASYNC
 			pthread_mutex_lock(db_mut);
+#endif
 			dbConnList = RESIZE(dbConnList, dbConnAlloc, db_t, TAG_DB, "create_db_conn");
+#ifdef PACKAGE_ASYNC
 			pthread_mutex_unlock(db_mut);
+#endif
 		}
-		while (i < dbConnAlloc) {
-			dbConnList[i++].flags = DB_FLAG_EMPTY;
-		}
-	}
+    while (i < dbConnAlloc) {
+      dbConnList[i++].flags = DB_FLAG_EMPTY;
+    }
+  }
 
 	for (i = 0;  i < dbConnAlloc;  i++) {
 		if (dbConnList[i].flags & DB_FLAG_EMPTY) {
