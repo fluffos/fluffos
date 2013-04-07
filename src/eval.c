@@ -6,19 +6,19 @@
 #include "backend.h"
 #include "posix_timers.h"
 
+static struct timeval tv;
 int outoftime = 0;
-struct timeval tv;
-int lasttime;
+LPC_INT max_cost;
 
-void set_eval(int etime){
+void set_eval(LPC_INT etime){
 #ifndef WIN32
-	long diff;
+	LPC_INT diff;
 	gettimeofday(&tv, NULL);
 	if((diff = tv.tv_sec-current_time) > 1){
 		diff *= 1000000;
 		if(diff > max_cost*100L){
 			//put some hard limit to eval times
-			debug(d_flag, ("difft:%ld, max_cost:%d", diff, max_cost));
+			debug(d_flag, ("difft:%"LPC_INT_FMTSTR_P", max_cost:%"LPC_INT_FMTSTR_P, diff, max_cost));
 			outoftime = 1;
 			return;
 		}
@@ -40,7 +40,7 @@ int get_eval(){
 #else
 	struct timeval now;
 	gettimeofday(&now, NULL);
-	return max_cost - (1000000*(now.tv_sec - tv.tv_sec))-(now.tv_usec - tv.tv_usec);
+	return max_cost - ((LPC_INT)(1000000) *(now.tv_sec - tv.tv_sec))-(now.tv_usec - tv.tv_usec);
 #endif
 #else
 	return 100;

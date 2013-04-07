@@ -230,12 +230,10 @@ static void add_define (const char *, int, const char *);
 static void add_predefine (const char *, int, const char *);
 static int expand_define (void);
 static void add_input (const char *);
-static long cond_get_exp (int);
 static void merge (char *name, char *dest);
 static void add_quoted_predefine (const char *, const char *);
 static void lexerror (const char *);
 static int skip_to (const char *, const char *);
-static void handle_cond (int);
 static int inc_open (char *, char *, int);
 static void include_error (const char *, int);
 static void handle_include (char *, int);
@@ -1194,6 +1192,7 @@ int yylex()
     static char partial[MAXLINE + 5];   /* extra 5 for safety buffer */
     static char terminator[MAXLINE + 5];
     int is_float;
+    LPC_INT mynumber;
     LPC_FLOAT myreal;
     char *partp;
 
@@ -1443,7 +1442,7 @@ int yylex()
                 }
                 outp--;
                 *yyp = 0;
-                yylval.number = atol(yytext) - 1;
+                yylval.number = atoll(yytext) - 1;
                 if (yylval.number < 0)
                     yyerror("In function parameter $num, num must be >= 1.");
                 else if (yylval.number > 254)
@@ -1642,7 +1641,7 @@ int yylex()
                 case '0': case '1': case '2': case '3': case '4':
                 case '5': case '6': case '7': case '8': case '9':
                     outp--;
-                    yylval.number = strtol(outp, &outp, 8);
+                    yylval.number = strtoll(outp, &outp, 8);
                     if (yylval.number > 255) {
                         yywarn("Illegal character constant.");
                         yylval.number = 'x';
@@ -1653,7 +1652,7 @@ int yylex()
                         yylval.number = 'x';
                         yywarn("\\x must be followed by a valid hex value; interpreting as 'x' instead.");
                     } else {
-                        yylval.number = strtol(outp, &outp, 16);
+                        yylval.number = strtoll(outp, &outp, 16);
                         if (yylval.number > 255) {
                             yywarn("Illegal character constant.");
                             yylval.number = 'x';
@@ -1791,7 +1790,7 @@ int yylex()
                         {
                             int tmp;
                             outp--;
-                            tmp = strtol(outp, &outp, 8);
+                            tmp = strtoll(outp, &outp, 8);
                             if (tmp > 255) {
                                 yywarn("Illegal character constant in string.");
                                 tmp = 'x';
@@ -1806,7 +1805,7 @@ int yylex()
                                 *to++ = 'x';
                                 yywarn("\\x must be followed by a valid hex value; interpreting as 'x' instead.");
                             } else {
-                                tmp = strtol(outp, &outp, 16);
+                                tmp = strtoll(outp, &outp, 16);
                                 if (tmp > 255) {
                                     yywarn("Illegal character constant.");
                                     tmp = 'x';
@@ -1878,7 +1877,7 @@ int yylex()
                            {
                                int tmp;
                                outp--;
-                               tmp = strtol(outp, &outp, 8);
+                               tmp = strtoll(outp, &outp, 8);
                                if (tmp > 255) {
                                    yywarn("Illegal character constant in string.");
                                    tmp = 'x';
@@ -1893,7 +1892,7 @@ int yylex()
                                    *yyp++ = 'x';
                                    yywarn("\\x must be followed by a valid hex value; interpreting as 'x' instead.");
                                } else {
-                                   tmp = strtol(outp, &outp, 16);
+                                   tmp = strtoll(outp, &outp, 16);
                                    if (tmp > 255) {
                                        yywarn("Illegal character constant.");
                                        tmp = 'x';
@@ -1935,7 +1934,7 @@ int yylex()
                         break;
                 }
                 outp--;
-                yylval.number = strtol(yytext, (char **) NULL, 0x10);
+                yylval.number = strtoll(yytext, NULL, 16);
                 return L_NUMBER;
             }
             outp--;
@@ -1970,11 +1969,10 @@ int yylex()
             outp--;
             *yyp = 0;
             if (is_float) {
-                sscanf(yytext, "%lf", &myreal);
-                yylval.real = myreal;
+                yylval.real = strtod(yytext, NULL);
                 return L_REAL;
             } else {
-                yylval.number = atol(yytext);
+                yylval.number = strtoll(yytext, NULL, 10);
                 return L_NUMBER;
             }
         default:
@@ -2214,15 +2212,19 @@ void add_predefines()
             fatal("MLEN exceeded");
         add_predefine(namebuf, -1, mtext);
     }
-    sprintf(save_buf, "%ld", sizeof(LPC_INT));
-    add_predefine("SIZEOFINT", -1, save_buf);    
-    sprintf(save_buf, "%ld", LPC_INT_MAX);
+    sprintf(save_buf, "%lu", sizeof(LPC_INT));
+    add_predefine("SIZEOFINT", -1, save_buf);
+
+    sprintf(save_buf, "%"LPC_INT_FMTSTR_P, LPC_INT_MAX);
     add_predefine("MAX_INT", -1, save_buf);
-    sprintf(save_buf, "%ld", LPC_INT_MIN);
+
+    sprintf(save_buf, "%"LPC_INT_FMTSTR_P, LPC_INT_MIN);
     add_predefine("MIN_INT", -1, save_buf);
-    sprintf(save_buf, "%lf", LPC_FLOAT_MAX);
+
+    sprintf(save_buf, "%"LPC_FLOAT_FMTSTR_P, LPC_FLOAT_MAX);
     add_predefine("MAX_FLOAT", -1, save_buf);
-    sprintf(save_buf, "%lf", LPC_FLOAT_MIN);
+
+    sprintf(save_buf, "%"LPC_FLOAT_FMTSTR_P, LPC_FLOAT_MIN);
     add_predefine("MIN_FLOAT", -1, save_buf);
 }
 

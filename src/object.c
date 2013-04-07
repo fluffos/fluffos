@@ -108,26 +108,16 @@ INLINE int svalue_save_size (svalue_t * v)
 
     case T_NUMBER:
         {
-            long res = v->u.number, len;
-#if SIZEOF_LONG == 4
-	      len = res < 0 ? (res = (-res) & 0x7fffffff,3) : 2;
-#else
-	      len = res < 0 ? (res = (-res) & 0x7fffffffffffffff,3) : 2;
-#endif
-            while (res>9) {
-		res /= 10;
-		len++;
-	    }
-            return len;
-        }
-
-    case T_REAL:
-        {
-            char buf[256];
-            sprintf(buf, "%f", v->u.real);
+            char buf[400];
+            sprintf(buf, "%"LPC_INT_FMTSTR_P, v->u.number);
             return (strlen(buf)+1);
         }
-
+    case T_REAL:
+        {
+            char buf[400];
+            sprintf(buf, "%"LPC_FLOAT_FMTSTR_P, v->u.real);
+            return (strlen(buf)+1);
+        }
     default:
         {
             return 1;
@@ -194,36 +184,13 @@ INLINE void save_svalue (svalue_t * v, char ** buf)
 
     case T_NUMBER:
         {
-	    long res = v->u.number, fact;
-	    int len = 1, neg = 0;
-            register char *cp;
-            if (res < 0) {
-		len++;
-		neg = 1;
-#if SIZEOF_LONG == 4
-		res = (-res) & 0x7fffffff;
-#else
-		res = (-res) & 0x7fffffffffffffff;
-#endif
-	    }
-
-            fact = res;
-            while (fact > 9) {
-		fact /= 10;
-		len++;
-	    }
-            *(cp = (*buf += len)) = '\0';
-            do {
-                *--cp = res % 10 + '0';
-                res /= 10;
-            } while (res);
-            if (neg) *(cp-1) = '-';
+            sprintf(*buf, "%"LPC_INT_FMTSTR_P, v->u.number);
+            (*buf) += strlen(*buf);
             return;
         }
-
     case T_REAL:
         {
-            sprintf(*buf, "%f", v->u.real);
+            sprintf(*buf, "%"LPC_FLOAT_FMTSTR_P, v->u.real);
             (*buf) += strlen(*buf);
             return;
         }

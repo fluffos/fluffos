@@ -47,6 +47,9 @@
 #ifdef INCL_LIMITS_H
 #  include <limits.h>
 #endif
+#ifdef INCL_INTTYPES_H
+#  include <inttypes.h>
+#endif
 #ifdef INCL_FLOAT_H
 #  include <float.h>
 #endif

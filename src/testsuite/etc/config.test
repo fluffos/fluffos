@@ -71,10 +71,9 @@ maximum bits in a bitfield : 1200
 # Max number of local variables in a function.
 maximum local variables : 30
 
-# Maximum amount of "eval cost" per thread - execution is halted when 
-# it is exceeded.
-# This must be reasonably small for the call_out tests to finish.
-maximum evaluation cost : 0x7fffffff
+# Maximum amount of "eval cost" per thread - execution is halted when
+# it is exceeded. 32bit value.
+maximum evaluation cost : 2147483647
 
 # This is the maximum array size allowed for one single array.
 maximum array size : 15000

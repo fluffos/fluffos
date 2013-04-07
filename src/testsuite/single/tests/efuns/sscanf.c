@@ -6,7 +6,7 @@ void do_tests() {
     ASSERT(catch(sscanf("you%", "%s%", s)));
     ASSERT(catch(sscanf("you%", "%su%", s)));
     sscanf("you%", "%s%%", s);
-    ASSERT(s == "you");
+    ASSERT_EQ("you", s);
     sscanf("you%", "%su%%", s);
-    ASSERT(s == "yo");
+    ASSERT_EQ("yo", s);
 }
