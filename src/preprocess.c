@@ -1,8 +1,8 @@
 /* WARNING: This file is #included into two places, since the definition
    of malloc() differs.  Be careful. */
 
-static long cond_get_exp (int);
-static void handle_cond (int);
+static LPC_INT cond_get_exp (int);
+static void handle_cond (LPC_INT);
 
 #ifndef LEXER
 #undef DXALLOC
@@ -206,10 +206,10 @@ static char optab2[] =
 
 #define optab1 (_optab-' ')
 
-static long cond_get_exp (int priority)
+static LPC_INT cond_get_exp (int priority)
 {
     int c;
-    long value, value2, x;
+    LPC_INT value, value2, x;
 
 #ifdef LEXER
     do
@@ -413,7 +413,7 @@ static long cond_get_exp (int priority)
 }
 
 static void
-handle_cond (int c)
+handle_cond (LPC_INT c)
 {
     ifstate_t *p;
 

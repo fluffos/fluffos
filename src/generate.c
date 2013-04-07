@@ -605,13 +605,13 @@ dump_tree (parse_node_t * expr) {
     case NODE_UNARY_OP_1:
 	printf("(%s ", instrs[expr->v.number].name);
 	dump_tree(expr->r.expr);
-	printf(" %ld)", expr->l.number);
+	printf(" %"LPC_INT_FMTSTR_P")", expr->l.number);
 	break;
     case NODE_OPCODE_1:
-	printf("(%s %ld)", instrs[expr->v.number].name, expr->l.number);
+	printf("(%s %"LPC_INT_FMTSTR_P")", instrs[expr->v.number].name, expr->l.number);
 	break;
     case NODE_OPCODE_2:
-	printf("(%s %ld %ld)", instrs[expr->v.number].name, expr->l.number, expr->r.number);
+	printf("(%s %"LPC_INT_FMTSTR_P" %"LPC_INT_FMTSTR_P")", instrs[expr->v.number].name, expr->l.number, expr->r.number);
 	break;
     case NODE_RETURN:
 	if (expr->r.expr) {
@@ -623,13 +623,13 @@ dump_tree (parse_node_t * expr) {
 	}
 	break;
     case NODE_STRING:
-	printf("(string %ld)", expr->v.number);
+	printf("(string %"LPC_INT_FMTSTR_P")", expr->v.number);
 	break;
     case NODE_REAL:
-	printf("(real %f)", expr->v.real);
+	printf("(real %"LPC_FLOAT_FMTSTR_P")", expr->v.real);
 	break;
     case NODE_NUMBER:
-	printf("(number %ld)", expr->v.number);
+	printf("(number %"LPC_INT_FMTSTR_P")", expr->v.number);
 	break;
     case NODE_LAND_LOR:
 	if (expr->v.number == F_LAND)
@@ -647,19 +647,19 @@ dump_tree (parse_node_t * expr) {
 	printf(")");
 	break;
     case NODE_CALL_2:
-	printf("(%s %ld %ld %i ", instrs[expr->v.number].name, expr->l.number >> 16,
+	printf("(%s %"LPC_INT_FMTSTR_P" %"LPC_INT_FMTSTR_P" %i ", instrs[expr->v.number].name, expr->l.number >> 16,
 	       expr->l.number & 0xffff, (expr->r.expr ? expr->r.expr->kind : 0));
 	dump_expr_list(expr->r.expr);
 	printf(")");
 	break;
     case NODE_CALL_1:
-	printf("(%s %ld %i ", instrs[expr->v.number].name, expr->l.number,
+	printf("(%s %"LPC_INT_FMTSTR_P" %i ", instrs[expr->v.number].name, expr->l.number,
 	       (expr->r.expr ? expr->r.expr->kind : 0));
 	dump_expr_list(expr->r.expr);
 	printf(")");
 	break;
     case NODE_CALL:
-	printf("(%s %ld ", instrs[expr->v.number].name, expr->l.number);
+	printf("(%s %"LPC_INT_FMTSTR_P" ", instrs[expr->v.number].name, expr->l.number);
 	dump_expr_list(expr->r.expr);
 	printf(")");
 	break;
@@ -680,10 +680,10 @@ dump_tree (parse_node_t * expr) {
 	}
 	break;
     case NODE_PARAMETER:
-	printf("(parameter %ld)", expr->v.number);
+	printf("(parameter %"LPC_INT_FMTSTR_P")", expr->v.number);
 	break;
     case NODE_PARAMETER_LVALUE:
-	printf("(parameter_lvalue %ld)", expr->v.number);
+	printf("(parameter_lvalue %"LPC_INT_FMTSTR_P")", expr->v.number);
 	break;
     case NODE_IF:
 	printf("(if ");
@@ -740,7 +740,7 @@ dump_tree (parse_node_t * expr) {
 	printf(")");
 	break;
     case NODE_FUNCTION_CONSTRUCTOR:
-	printf("(function %ld ", expr->v.number & 0xff);
+	printf("(function %"LPC_INT_FMTSTR_P" ", expr->v.number & 0xff);
 	if (expr->r.expr) {
 	    printf("(array ");
 	    dump_expr_list(expr->r.expr);
@@ -750,25 +750,25 @@ dump_tree (parse_node_t * expr) {
 	}
 	switch (expr->v.number & 0xff) {
 	case FP_SIMUL:
-	    printf("(fp-simul %ld)", expr->v.number >> 8);
+	    printf("(fp-simul %"LPC_INT_FMTSTR_P")", expr->v.number >> 8);
 	    break;
 	case FP_LOCAL:
-	    printf("(fp-local %ld)", expr->v.number >> 8);
+	    printf("(fp-local %"LPC_INT_FMTSTR_P")", expr->v.number >> 8);
 	    break;
 	case FP_EFUN:
 	    printf("(fp-efun %s)", instrs[expr->v.number >> 8].name);
 	    break;
 	case FP_FUNCTIONAL:
 	case FP_FUNCTIONAL | FP_NOT_BINDABLE:
-	    printf("(fp-functional %ld ", expr->v.number >> 8);
+	    printf("(fp-functional %"LPC_INT_FMTSTR_P" ", expr->v.number >> 8);
 	    dump_tree(expr->l.expr);
 	    printf(")");
 	    break;
 	}
-	printf(" %ld)", expr->v.number >> 8);
+	printf(" %"LPC_INT_FMTSTR_P")", expr->v.number >> 8);
 	break;
     case NODE_ANON_FUNC:
-	printf("(anon-func %ld %ld ", expr->v.number, expr->l.number);
+	printf("(anon-func %"LPC_INT_FMTSTR_P" %"LPC_INT_FMTSTR_P" ", expr->v.number, expr->l.number);
 	dump_tree(expr->r.expr);
 	printf(")");
 	break;

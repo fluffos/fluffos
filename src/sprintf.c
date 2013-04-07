@@ -176,7 +176,6 @@ typedef struct _sprintf_state {
 
 static sprintf_state_t  *sprintf_state = NULL;
 
-static void numadd (outbuffer_t *, long num);
 static void add_space (outbuffer_t *, int indent);
 static void add_justified (const char *str, int slen, pad_info_t *pad, int fs, format_info finfo, short int trailing);
 static int add_column (cst ** column, int trailing);
@@ -280,45 +279,6 @@ static void sprintf_error (int which, char * premade) {
     error(lbuf);
 }
 
-static void numadd (outbuffer_t * outbuf, long num)
-{
-    long i, num_l,               /* length of num as a string */
-        nve;                    /* true if num negative */
-    int space;
-    int chop;
-    char *p;
-
-    if (num < 0) {
-        /* Beek: yes, it's possible for num < 0, and num * -1 < 0. */
-        /* Beek: This shouldn't be a hardcoded const (assumes int is 4 bytes)*/
-        /* Wodan: indeed! */
-#if SIZEOF_LONG==4
-        num = (num * -1) & 0x7fffffff;
-#else
-	num = (num * -1) & 0x7fffffffffffffff;
-#endif
-        nve = 1;
-    } else
-        nve = 0;
-    for (i = num / 10, num_l = nve + 1; i; i /= 10, num_l++);
-    if ((space = outbuf_extend(outbuf, num_l))) {
-        chop = num_l - space;
-        while (chop--)
-            num /= 10; /* lose that last digits that got chopped */
-        p = outbuf->buffer + outbuf->real_size;
-        outbuf->real_size += space;
-        p[space] = 0;
-        if (nve) {
-            *p++ = '-';
-            space--;
-        }
-        while (space--) {
-            p[space] = (num % 10) + '0';
-            num /= 10;
-        }
-    }
-}                               /* end of numadd() */
-
 static void add_space (outbuffer_t * outbuf, int indent)
 {
     int l;
@@ -363,10 +323,10 @@ void svalue_to_string (svalue_t * obj, outbuffer_t * outbuf, int indent, int tra
 	}
         break;
     case T_NUMBER:
-        numadd(outbuf, obj->u.number);
+        outbuf_addv(outbuf, "%"LPC_INT_FMTSTR_P, obj->u.number);
         break;
     case T_REAL:
-        outbuf_addv(outbuf, "%f", obj->u.real);
+        outbuf_addv(outbuf, "%"LPC_FLOAT_FMTSTR_P, obj->u.real);
         break;
     case T_STRING:
         outbuf_add(outbuf, "\"");
@@ -377,7 +337,7 @@ void svalue_to_string (svalue_t * obj, outbuffer_t * outbuf, int indent, int tra
         {
             int n = obj->u.arr->size;
             outbuf_add(outbuf, "CLASS( ");
-            numadd(outbuf, n);
+            outbuf_addv(outbuf, "%"LPC_INT_FMTSTR_P, n);
             outbuf_add(outbuf, n == 1 ? " element\n" : " elements\n");
             for (i = 0; i < (obj->u.arr->size) - 1; i++)
                 svalue_to_string(&(obj->u.arr->item[i]), outbuf,
@@ -395,7 +355,7 @@ void svalue_to_string (svalue_t * obj, outbuffer_t * outbuf, int indent, int tra
             outbuf_add(outbuf, "({ })");
         } else {
             outbuf_add(outbuf, "({ /* sizeof() == ");
-            numadd(outbuf, obj->u.arr->size);
+            outbuf_addv(outbuf, "%"LPC_INT_FMTSTR_P, obj->u.arr->size);
             outbuf_add(outbuf, " */\n");
             for (i = 0; i < (obj->u.arr->size) - 1; i++)
                 svalue_to_string(&(obj->u.arr->item[i]), outbuf, indent + 2, 1, 0);
@@ -468,7 +428,7 @@ void svalue_to_string (svalue_t * obj, outbuffer_t * outbuf, int indent, int tra
             outbuf_add(outbuf, "([ ])");
         } else {
             outbuf_add(outbuf, "([ /* sizeof() == ");
-            numadd(outbuf, obj->u.map->count);
+            outbuf_addv(outbuf, "%"LPC_INT_FMTSTR_P, obj->u.map->count);
             outbuf_add(outbuf, " */\n");
             for (i = 0; i <= obj->u.map->table_size; i++) {
                 mapping_node_t *elm;
@@ -488,7 +448,7 @@ void svalue_to_string (svalue_t * obj, outbuffer_t * outbuf, int indent, int tra
             svalue_t *temp;
 
             if (obj->u.ob->flags & O_DESTRUCTED) {
-                numadd(outbuf, 0);
+                outbuf_addv(outbuf, "%"LPC_INT_FMTSTR_P, 0);
                 break;
             }
 
@@ -1222,8 +1182,8 @@ char *string_print_formatted (const char * format_str, int argc, svalue_t * argv
                     }
                 } else if (finfo & INFO_T_INT) {        /* one of the integer
                                                          * types */
-                    char cheat[20];
-                    char temp[100];
+                    char cheat[40];
+                    char temp[400];
 
                     *cheat = '%';
                     i = 1;
@@ -1238,33 +1198,41 @@ char *string_print_formatted (const char * format_str, int argc, svalue_t * argv
                     if (pres) {
                         cheat[i++] = '.';
                         if(pres >= sizeof(temp))
-                           sprintf(cheat + i, "%ld", sizeof(temp) - 1);
+                           sprintf(cheat + i, "%lu", sizeof(temp) - 1);
                         else
                            sprintf(cheat + i, "%d", pres);
 
                         i += strlen(cheat + i);
                     }
+
                     switch (finfo & INFO_T) {
                     case INFO_T_INT:
+                        /* make sure to print out at least 64bits. */
+                        cheat[i++] = 'l';
                         cheat[i++] = 'l';
                         cheat[i++] = 'd';
                         break;
                     case INFO_T_FLOAT:
+                        /* make sure to print out at least 64bits. */
+                        cheat[i++] = 'l';
                         cheat[i++] = 'f';
                         break;
                     case INFO_T_CHAR:
                         cheat[i++] = 'c';
                         break;
                     case INFO_T_OCT:
-                    	cheat[i++] = 'l';
+                        cheat[i++] = 'l';
+                        cheat[i++] = 'l';
                         cheat[i++] = 'o';
                         break;
                     case INFO_T_HEX:
-                    	cheat[i++] = 'l';
+                        cheat[i++] = 'l';
+                        cheat[i++] = 'l';
                         cheat[i++] = 'x';
                         break;
                     case INFO_T_C_HEX:
-                    	cheat[i++] = 'l';
+                        cheat[i++] = 'l';
+                        cheat[i++] = 'l';
                         cheat[i++] = 'X';
                         break;
                     default:

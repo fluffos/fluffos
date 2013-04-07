@@ -398,10 +398,10 @@ static void md_print_array  (array_t * vec) {
           outbuf_add(&out, "INVALID");
           break;
       case T_NUMBER:
-          outbuf_addv(&out, "%ld", vec->item[i].u.number);
+          outbuf_addv(&out, "%"LPC_INT_FMTSTR_P, vec->item[i].u.number);
           break;
       case T_REAL:
-          outbuf_addv(&out, "%f", vec->item[i].u.real);
+          outbuf_addv(&out, "%"LPC_FLOAT_FMTSTR_P, vec->item[i].u.real);
           break;
       case T_STRING:
           outbuf_addv(&out, "\"%s\"", vec->item[i].u.string);

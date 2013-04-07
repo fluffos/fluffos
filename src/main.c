@@ -21,7 +21,6 @@ port_def_t external_port[5];
 static int e_flag = 0;    /* Load empty, without preloads. */
 int t_flag = 0;     /* Disable heart beat and reset */
 int comp_flag = 0;    /* Trace compilations */
-int max_cost;
 int time_to_clean_up;
 const char *default_fail_message;
 time_t boot_time;
@@ -353,6 +352,7 @@ int main (int argc, char ** argv)
 			case 'C':
 				continue;
 			case 'f':
+        debug_message("Calling master::flag(\"%s\")...\n", argv[i] + 2);
 				save_context(&econ);
 				if (SETJMP(econ.context)) {
 					debug_message("Error while calling master::flag(\"%s\"), aborting ...\n", argv[i] + 2);

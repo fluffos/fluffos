@@ -13,7 +13,8 @@ void flag(string str) {
       "/command/tests"->main();
       break;
     default:
-      write("The only supproted flag is 'test'.\n");
+      write("The only supproted flag is 'test', got '" + str + "'.\n");
+      break;
   }
   shutdown(has_error ? -1 : 0);
 }

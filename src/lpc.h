@@ -8,10 +8,12 @@
 typedef int64_t LPC_INT;
 #define LPC_INT_MAX INT64_MAX
 #define LPC_INT_MIN INT64_MIN
+#define LPC_INT_FMTSTR_P PRId64
 
 typedef double LPC_FLOAT;
 #define LPC_FLOAT_MAX DBL_MAX
 #define LPC_FLOAT_MIN DBL_MIN
+#define LPC_FLOAT_FMTSTR_P "lf"
 
 typedef struct {
     unsigned short ref;

@@ -1,24 +1,24 @@
 #!/bin/sh
 
 if test $# -ne 0; then
-    case $1 in
-        develop)
-	    echo Preparing to build developmental version of MudOS driver ...
-	    OPTIMIZE="-O0"
-	    DEBUG="-g -Wall -Wundef -pedantic -DDEBUG -DDEBUG_MACRO"
-            ;;
-        debug)
-	    echo Preparing to build debugging version of MudOS driver ...
-	    OPTIMIZE="-O3"
-	    DEBUG="-g -DDEBUG -DDEBUG_NON_FATAL -DDEBUG_MACRO"
-            ;;
-        *)
-	    echo Unknown build type
-	    exit 1
-            ;;
-    esac
+  case $1 in
+    develop)
+      echo Preparing to build developmental version of MudOS driver ...
+      OPTIMIZE="-O2"
+      DEBUG="-g -Wall -Wundef -pedantic -D_FORTIFY_SOURCE=2 -DDEBUG -DDEBUG_MACRO"
+      ;;
+    debug)
+      echo Preparing to build debugging version of MudOS driver ...
+      OPTIMIZE="-O3"
+      DEBUG="-g -DDEBUG -DDEBUG_NON_FATAL -DDEBUG_MACRO"
+      ;;
+    *)
+      echo Unknown build type
+      exit 1
+      ;;
+  esac
 else
-    echo Preparing to build standard driver ...
+  echo Preparing to build standard driver ...
 fi
 
 # Change this to use another C compiler/preprocessor
@@ -52,7 +52,7 @@ INSTALL_DIR="../bin"
 
 #Enable warnings from the compiler (gcc), if wanted.
 #WARN=-Wall
- 
+
 # Location of libmsgql.a, if you are using PACKAGE_DB
 #EXTRALIBS=-L/usr/local/lib -lmsql
 ####### END OF USER CONFIGURABLE OPTIONS
@@ -64,11 +64,11 @@ CFLAGS="$CFLAGS $COMPILER_FLAGS $WARN $OPTIMIZE $DEBUG"
 # of a.out if so
 #
 if test $CYGWIN; then
-    A_OUT=a.exe
-    echo Using a.exe for Cygwin GNU compiler default executable
+  A_OUT=a.exe
+  echo Using a.exe for Cygwin GNU compiler default executable
 else
-    A_OUT=a.out
-    echo Using standard a.out for compiler default executable
+  A_OUT=a.out
+  echo Using standard a.out for compiler default executable
 fi
 
 #
@@ -78,26 +78,29 @@ cat >comptest.c <<END
 #include <stdio.h>
 #include "arch.h"
 int main() {
-    printf("%s\n", ARCH);
+printf("%s\n", ARCH);
 }
 END
 
 $CC $CFLAGS -o $A_OUT -flto comptest.c
 
 if [ $? -eq 0 ]; then
-    CFLAGS="$CFLAGS -flto"
+  CFLAGS="$CFLAGS -flto"
 else
-    $CC $CFLAGS -o $A_OUT comptest.c
-    if [ $? -ne 0 ]; then
-      echo "FATAL ERROR: test compile failed."
-      exit 1
-    fi
+  $CC $CFLAGS -o $A_OUT comptest.c
+  if [ $? -ne 0 ]; then
+    echo "FATAL ERROR: test compile failed."
+    exit 1
+  fi
 fi
 
 ARCH=`./$A_OUT`
 
 rm $A_OUT
 rm comptest.c
+
+# Force an reconfigure.
+rm configure.h
 
 echo MAKE=$MAKE >Makefile
 echo SHELL=/bin/sh >>Makefile
