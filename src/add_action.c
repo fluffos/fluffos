@@ -615,7 +615,7 @@ void f_command (void)
     if (current_object && !(current_object->flags & O_DESTRUCTED))
     {
 	char buff[1000];
-	int save_eval_cost = get_eval();
+	LPC_INT save_eval_cost = get_eval();
 
 	if (SVALUE_STRLEN(sp) > sizeof(buff) - 1)
 	    error("Too long command.\n");
@@ -629,6 +629,10 @@ void f_command (void)
 #else
              rc = 1;
 #endif
+             // Make sure we at least return 1 eval cost.
+             if (rc <= 0) {
+               rc = 1;
+             }
     }
 
     free_string_svalue(sp);

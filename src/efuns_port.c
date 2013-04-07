@@ -160,8 +160,9 @@ f_localtime (void)
       vec->item[LT_GMTOFF].u.number = tm->tm_gmtoff;
       vec->item[LT_ZONE].u.string = string_copy(tm->tm_zone, "f_localtime");
 #else
-      vec->item[LT_GMTOFF].u.number = _timezone;
-      vec->item[LT_ZONE].u.string = string_copy(_tzname[_daylight?1:0],"f_localtime");
+#if defined(WIN32) || defined(__CYGWIN__)
+    vec->item[LT_GMTOFF].u.number = _timezone;
+    vec->item[LT_ZONE].u.string = string_copy(_tzname[_daylight?1:0],"f_localtime");
 #endif
 #endif
 #endif                          /* sequent */
