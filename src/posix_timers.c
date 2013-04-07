@@ -21,8 +21,11 @@ void init_posix_timers(void)
 	sev.sigev_signo = SIGVTALRM;
 	sev.sigev_notify = SIGEV_SIGNAL;
 	sev.sigev_value.sival_int = 0;
-
+#ifndef __CYGWIN__
 	i = timer_create(CLOCK_THREAD_CPUTIME_ID, &sev, &eval_timer_id);
+#else
+	i = timer_create(CLOCK_REALTIME, &sev, &eval_timer_id);
+#endif
 	if (i < 0) {
 		perror("init_posix_timers: timer_create");
 		exit(-1);

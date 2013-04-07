@@ -2630,7 +2630,7 @@ static int string_case_compare(void *c1, void *c2) {
 
 void prepare_cases (parse_node_t * pn, int start) {
     parse_node_t **ce_start, **ce_end, **ce;
-    long end, last_key, this_key;
+    LPC_INT end, last_key, this_key;
     int direct = 1;
 
     ce_start = (parse_node_t **)&mem_block[A_CASES].block[start];
