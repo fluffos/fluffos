@@ -1,3 +1,3 @@
 #include "spec.h"
 
-string sha1(string);
+string sha1(string|buffer);
