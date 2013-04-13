@@ -322,8 +322,8 @@ f_call_stack (void)
     int i, n = csp - &control_stack[0] + 1;
     array_t *ret;
 
-    if (sp->u.number < 0 || sp->u.number > 3)
-        error("First argument of call_stack() must be 0, 1, 2, or 3.\n");
+    if (sp->u.number < 0 || sp->u.number > 4)
+        error("First argument of call_stack() must be 0, 1, 2, 3, or 4.\n");
 
     ret = allocate_empty_array(n);
 
@@ -376,7 +376,25 @@ f_call_stack (void)
             ret->item[i].u.string = origin_name((csp-i+1)->caller_type);
         }
         break;
+    case 4:
+        for (i = 0; i < n; i++) {
+             ret->item[i].type = T_STRING;
+             if (1 ||((csp - i)->framekind & FRAME_MASK) == FRAME_FUNCTION || ((csp - i)->framekind & FRAME_MASK) == FRAME_FUNP) {
+                 const program_t *prog = (i ? (csp-i+1)->prog : current_prog);
+                 int index = (csp-i)->fr.table_index;
+                 char *progc = (i ? (csp-i+1)->pc:pc);
+                 function_t *cfp = &prog->function_table[index];
+             	ret->item[i].type = T_STRING;
+             	ret->item[i].subtype = STRING_MALLOC;
+             	ret->item[i].u.string = string_copy(get_line_number(progc, prog), "call_stack");
+             } else {
+                 ret->item[i].subtype = STRING_CONSTANT;
+                 ret->item[i].u.string = (((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH) ? "CATCH" : "<function>";
+             }
+         }
+         break;
     }
+
     put_array(ret);
 }
 #endif
