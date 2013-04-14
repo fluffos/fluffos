@@ -129,8 +129,7 @@ int yyparse (void);
  */
 %union
 {
-    POINTER_INT pointer_int;
-    LPC_INT number; /* 4 or 8 */
+    LPC_INT number; /* 8 */
     LPC_FLOAT real; /* 8 */
     char *string;
     struct { short num_arg; char flags; } argument;
@@ -162,12 +161,10 @@ int yyparse (void);
 %type <number> L_PARAMETER single_new_local_def
 
 /* These hold arbitrary numbers */
-%type <number> L_NUMBER 
+%type <number> L_NUMBER
 
-/* These hold numbers that are going to be stuffed into pointers :)
- * Don't ask :)
- */
-%type <pointer_int> constant
+/* These hold number constant, currently only used for switch cases.*/
+%type <number> constant
 
 /* These hold a real number */
 %type <real>   L_REAL
@@ -1442,12 +1439,11 @@ first_for_expr:
 
 		$$ = new_node();
 		$$->kind = NODE_CASE_NUMBER;
-                $$->r.expr = (parse_node_t *)$1;
+                $$->r.number = (LPC_INT)$1;
             }
     |   string_con1
             {
-		int str;
-		
+		POINTER_INT str;
 		str = store_prog_string($1);
                 scratch_free($1);
                 if (context & SWITCH_NUMBERS)
@@ -1455,7 +1451,7 @@ first_for_expr:
                 context |= SWITCH_STRINGS;
 		$$ = new_node();
 		$$->kind = NODE_CASE_STRING;
-                $$->r.number = str;
+                $$->r.number = (LPC_INT)str;
             }
     ;
 

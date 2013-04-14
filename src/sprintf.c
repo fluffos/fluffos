@@ -337,7 +337,7 @@ void svalue_to_string (svalue_t * obj, outbuffer_t * outbuf, int indent, int tra
         {
             int n = obj->u.arr->size;
             outbuf_add(outbuf, "CLASS( ");
-            outbuf_addv(outbuf, "%"LPC_INT_FMTSTR_P, n);
+            outbuf_addv(outbuf, "%d", n);
             outbuf_add(outbuf, n == 1 ? " element\n" : " elements\n");
             for (i = 0; i < (obj->u.arr->size) - 1; i++)
                 svalue_to_string(&(obj->u.arr->item[i]), outbuf,
@@ -355,7 +355,7 @@ void svalue_to_string (svalue_t * obj, outbuffer_t * outbuf, int indent, int tra
             outbuf_add(outbuf, "({ })");
         } else {
             outbuf_add(outbuf, "({ /* sizeof() == ");
-            outbuf_addv(outbuf, "%"LPC_INT_FMTSTR_P, obj->u.arr->size);
+            outbuf_addv(outbuf, "%d", obj->u.arr->size);
             outbuf_add(outbuf, " */\n");
             for (i = 0; i < (obj->u.arr->size) - 1; i++)
                 svalue_to_string(&(obj->u.arr->item[i]), outbuf, indent + 2, 1, 0);
@@ -428,7 +428,7 @@ void svalue_to_string (svalue_t * obj, outbuffer_t * outbuf, int indent, int tra
             outbuf_add(outbuf, "([ ])");
         } else {
             outbuf_add(outbuf, "([ /* sizeof() == ");
-            outbuf_addv(outbuf, "%"LPC_INT_FMTSTR_P, obj->u.map->count);
+            outbuf_addv(outbuf, "%u", obj->u.map->count);
             outbuf_add(outbuf, " */\n");
             for (i = 0; i <= obj->u.map->table_size; i++) {
                 mapping_node_t *elm;
@@ -448,7 +448,7 @@ void svalue_to_string (svalue_t * obj, outbuffer_t * outbuf, int indent, int tra
             svalue_t *temp;
 
             if (obj->u.ob->flags & O_DESTRUCTED) {
-                outbuf_addv(outbuf, "%"LPC_INT_FMTSTR_P, 0);
+                outbuf_addv(outbuf, "%d", 0);
                 break;
             }
 

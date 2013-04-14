@@ -269,4 +269,7 @@
 #define uisascii(x) isascii((unsigned char)x)
 #define uisprint(x) isprint((unsigned char)x)
 
+/* Compare two number */
+#define COMPARE_NUMS(x,y) (((x) > (y) ? 1 : ((x) < (y) ? -1 : 0)))
+
 #endif

@@ -1116,8 +1116,6 @@ map_string (svalue_t * arg, int num_arg)
 #ifdef F_SORT_ARRAY
 static function_to_call_t *sort_array_ftc;
 
-#define COMPARE_NUMS(x,y) (x < y ? -1 : (x > y ? 1 : 0))
-
 array_t *builtin_sort_array (array_t * inlist, int dir)
 {
     qsort((char *) inlist->item, inlist->size, sizeof(inlist->item),

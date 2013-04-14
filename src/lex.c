@@ -1192,8 +1192,6 @@ int yylex()
     static char partial[MAXLINE + 5];   /* extra 5 for safety buffer */
     static char terminator[MAXLINE + 5];
     int is_float;
-    LPC_INT mynumber;
-    LPC_FLOAT myreal;
     char *partp;
 
     register char *yyp;
