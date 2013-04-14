@@ -22,14 +22,6 @@
 #include <limits.h>
 #endif
 
-/* work around mingw32/cygwin32 c99 bug.*/
-#ifdef __CYGWIN__
-/* defines for the opengroup specifications Derived from Issue 1 of the SVID.  */
-extern __IMPORT long _timezone;
-extern __IMPORT int _daylight;
-extern __IMPORT char *_tzname[2];
-#endif
-
 #ifdef F_CRYPT
 #define SALT_LEN        8
 #ifdef CUSTOM_CRYPT
@@ -169,7 +161,7 @@ f_localtime (void)
       vec->item[LT_ZONE].u.string = string_copy(tzname[1], "f_localtime");
     }
 #else
-#if defined(WIN32) || defined(__CYGWIN32__)
+#if defined(WIN32) || defined(__CYGWIN__)
     vec->item[LT_GMTOFF].u.number = _timezone;
     vec->item[LT_ZONE].u.string = string_copy(_tzname[_daylight?1:0],"f_localtime");
 #else
