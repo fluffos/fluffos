@@ -331,6 +331,7 @@ static int max_heart_beats = 0;
 static int heart_beat_index = 0;
 static int num_hb_objs = 0;
 static int num_hb_to_do = 0;
+int time_for_hb = 0;
 
 static int num_hb_calls = 0;  /* starts */
 static float perc_hb_probes = 100.0;  /* decaying avge of how many complete */

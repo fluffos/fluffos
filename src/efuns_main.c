@@ -260,7 +260,7 @@ f_call_out (void)
     svalue_t *arg = sp - st_num_arg + 1;
     int num = st_num_arg - 2;
 #ifdef CALLOUT_HANDLES
-    int ret;
+    LPC_INT ret;
 
     if (!(current_object->flags & O_DESTRUCTED)) {
         ret = new_call_out(current_object, arg, arg[1].u.number, num, arg + 2);

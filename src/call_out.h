@@ -9,9 +9,9 @@
 void call_out (void);
 void reclaim_call_outs (void);
 #ifdef CALLOUT_HANDLES
-int find_call_out_by_handle (int);
-int remove_call_out_by_handle (int);
-int new_call_out (object_t *, svalue_t *, int, int, svalue_t *);
+int find_call_out_by_handle (LPC_INT);
+int remove_call_out_by_handle (LPC_INT);
+LPC_INT new_call_out (object_t *, svalue_t *, int, int, svalue_t *);
 #else
 void new_call_out (object_t *, svalue_t *, int, int, svalue_t *);
 #endif
