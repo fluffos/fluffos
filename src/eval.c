@@ -9,6 +9,7 @@
 int outoftime = 0;
 struct timeval tv;
 int lasttime;
+LPC_INT max_cost;
 
 void set_eval(int etime){
 #ifndef WIN32

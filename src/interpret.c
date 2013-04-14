@@ -54,7 +54,6 @@ static const char *type_names[] = {
 #ifdef PACKAGE_UIDS
 extern userid_t *backbone_uid;
 #endif
-extern int max_cost;
 extern int call_origin;
 static int find_line (char *, const program_t *, const char **, int *);
 INLINE void push_indexed_lvalue (int);

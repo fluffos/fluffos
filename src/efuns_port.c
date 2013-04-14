@@ -165,6 +165,7 @@ f_localtime (void)
     vec->item[LT_ZONE].u.string = string_copy(_tzname[_daylight?1:0],"f_localtime");
 #endif
 #endif
+#endif
 #endif                          /* sequent */
 #endif                          /* BSD42 */
     }
