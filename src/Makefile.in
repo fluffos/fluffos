@@ -80,13 +80,8 @@ OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   call_out.o otable.o dumpstat.o stralloc.o hash.o \
   port.o reclaim.o parse.o simul_efun.o sprintf.o program.o \
   compiler.o avltree.o icode.o trees.o generate.o scratchpad.o \
-<<<<<<< HEAD
-  socket_efuns.o socket_ctrl.o qsort.o eoperators.o socket_err.o md.o \
-  disassembler.o uvalarm.o $(STRFUNCS) \
-=======
   socket_efuns.o socket_ctrl.o eoperators.o socket_err.o md.o \
-  disassembler.o uvalarm.o \
->>>>>>> d6a33fc... Remove the obsolete qsort implementation.
+  disassembler.o uvalarm.o $(STRFUNCS) \
   replace_program.o master.o function.o \
   debug.o crypt.o add_action.o eval.o fliconv.o console.o applies_table.o \
   posix_timers.o

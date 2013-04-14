@@ -55,7 +55,7 @@ SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   call_out.c otable.c dumpstat.c stralloc.c hash.c \
   port.c reclaim.c parse.c simul_efun.c sprintf.c program.c \
   compiler.c avltree.c icode.c trees.c generate.c scratchpad.c \
-  socket_efuns.c socket_ctrl.c qsort.c eoperators.c socket_err.c md.c \
+  socket_efuns.c socket_ctrl.c eoperators.c socket_err.c md.c \
   disassembler.c uvalarm.c $(STRFUNCS) \
   replace_program.c master.c function.c \
   debug.c crypt.c applies_table.c add_action.c eval.c fliconv.c console.c \
