@@ -1778,17 +1778,6 @@ static void sigpipe_handler(void)
 	signal(SIGPIPE, sigpipe_handler);
 }                               /* sigpipe_handler() */
 #endif
-/*
- * SIGALRM handler.
- */
-#ifdef SIGNAL_FUNC_TAKES_INT
-void sigalrm_handler (int sig)
-#else
-void sigalrm_handler()
-#endif
-{
-	outoftime = 1;
-}                               /* sigalrm_handler() */
 
 int max_fd;
 
