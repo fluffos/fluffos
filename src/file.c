@@ -449,7 +449,6 @@ char *read_file(const char * file, int start, int lines) {
   real_file = check_valid_path(file, current_object, "read_file", 0);
 
   if (!real_file) {
-    debug_message("read_file: validatation failed.\n");
     return 0;
   }
   /*
@@ -472,7 +471,7 @@ char *read_file(const char * file, int start, int lines) {
 #endif
 
   if (f == 0) {
-    debug_message("read_file: open failure: %s.\n", file);
+    debug_message("read_file: fail to open: %s.\n", file);
     return 0;
   }
 
@@ -488,14 +487,14 @@ char *read_file(const char * file, int start, int lines) {
   gzclose(f);
 #endif
 
-  if (chunk < 1) {
-    debug_message("read_file: error when reading %s.\n", file);
-    goto error;
+  if (chunk == 0) {
+    debug_message("read_file: read error: %s.\n", file);
+    return 0;
   }
 
   if (memchr(theBuff, '\0', chunk)) {
-    debug_message("read_file: File %s contains '\\0', use read_bytes intead.\n", file);
-    goto error;
+    debug_message("read_file: file contains '\\0': %s.\n", file);
+    return 0;
   }
   theBuff[chunk] = '\0';
 
@@ -508,7 +507,7 @@ char *read_file(const char * file, int start, int lines) {
   // not found
   if (start > 1) {
     debug_message("read_file: reached EOF searching for start: %s.\n", file);
-    goto error;
+    return 0;
   }
 
   // search forward for "lines" of '\n' for the end
@@ -531,15 +530,12 @@ char *read_file(const char * file, int start, int lines) {
   *ptr_end = '\0';
   // result is too big.
   if (strlen(ptr_start) > READ_FILE_MAX_SIZE) {
-    debug_message("read_file: result too big.\n");
-    goto error;
+    debug_message("read_file: result too big: %s.\n", file);
+    return 0;
   }
 
   result = string_copy(ptr_start, "read_file: result");
   return result;
-
-error:
-  return 0;
 }
 
 char *read_bytes (const char * file, int start, int len, int * rlen)

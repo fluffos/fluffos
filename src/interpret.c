@@ -478,12 +478,11 @@ INLINE void int_free_svalue (svalue_t * v, const char * tag)
     if (v->type == T_OBJECT)
       debug(d_flag, ("Free_svalue %s (%d) from %s\n", v->u.ob->obname, v->u.ob->ref - 1, tag));
 #endif
-    if(v->u.refed->ref == 0) {
-      debug_message("Trying to free non-refed svalue with T_REF type. \n");
-    } else {
+    /* TODO: Set to 0 on condition that REF overflow to negative. */
+    if(v->u.refed->ref > 0) {
       v->u.refed->ref--;
     }
-    if (!v->u.refed->ref) {
+    if (v->u.refed->ref == 0) {
       switch (v->type) {
       case T_OBJECT:
         dealloc_object(v->u.ob, "free_svalue");
@@ -4227,9 +4226,9 @@ retry_for_shadow:
     // Check whether caller has sufficient permission.
     if ((funflags & DECL_ACCESS) < need) {
       debug_message("apply() with insufficient permission: \n"
-          "ob: %s, cob: %s, function: %s, origin: %s, need: %s, has: %s \n",
-          ob ? ob->obname : "null",
+          "cob: %s, ob: %s, function: %s, origin: %s, needs: %s, has: %s \n",
           current_object ? current_object->obname : "null",
+          ob ? ob->obname : "null",
           fun, origin_to_name(local_call_origin),
           access_to_name(need),
           access_to_name(funflags & DECL_ACCESS));
@@ -4273,7 +4272,7 @@ retry_for_shadow:
     call_program(current_prog, funp->address);
     DEBUG_CHECK(save_csp - 1 != csp, "Bad csp after execution in apply_low.\n");
     return 1;
-  } /* target_prog != NULL */
+  }
 }
 
 /*
