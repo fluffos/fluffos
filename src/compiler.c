@@ -3,6 +3,7 @@
 #include "compiler.h"
 #include "generate.h"
 #include "scratchpad.h"
+#include "qsort.h"
 #include "file.h"
 
 /* This should be moved with initializers move out of here */
@@ -2089,7 +2090,7 @@ INLINE_STATIC void copy_in (int which, char ** start) {
     *start += align(size);
 }
 
-static int compare_funcs (const void *x, const void *y) {
+static int compare_funcs (void *x, void *y) {
     char *n1 = FUNC(*(unsigned short *)x)->funcname;
     char *n2 = FUNC(*(unsigned short *)y)->funcname;
     int sp1, sp2;
@@ -2144,8 +2145,8 @@ static void handle_functions() {
         i = num_func;
         while (i--) func_index_map[i] = i;
 
-        qsort(func_index_map, num_func, sizeof(unsigned short),
-            compare_funcs);
+        quickSort(func_index_map, num_func, sizeof(unsigned short),
+                  compare_funcs);
 
         i = num_func;
         while (i--)
@@ -2599,7 +2600,7 @@ the_file_name (char * name)
     return tmp;
 }
 
-static int case_compare(const void *c1, const void *c2) {
+static int case_compare(void *c1, void *c2) {
     if ((*(parse_node_t **)c1)->kind == NODE_DEFAULT)
         return -1;
     if ((*(parse_node_t **)c2)->kind == NODE_DEFAULT)
@@ -2610,7 +2611,7 @@ static int case_compare(const void *c1, const void *c2) {
     return 0;
 }
 
-static int string_case_compare(const void *c1, const void *c2) {
+static int string_case_compare(void *c1, void *c2) {
     int i1, i2;
     const char *p1, *p2;
 
@@ -2644,11 +2645,11 @@ void prepare_cases (parse_node_t * pn, int start) {
     }
 
     if (pn->kind == NODE_SWITCH_STRINGS)
-      qsort((char *)ce_start, ce_end - ce_start, sizeof(parse_node_t *),
-          string_case_compare);
+        quickSort((char *)ce_start, ce_end - ce_start, sizeof(parse_node_t *),
+                  string_case_compare);
     else
-      qsort((char *)ce_start, ce_end - ce_start, sizeof(parse_node_t *),
-          case_compare);
+        quickSort((char *)ce_start, ce_end - ce_start, sizeof(parse_node_t *),
+                  case_compare);
 
     ce = ce_start;
     if ((*ce)->kind == NODE_DEFAULT) {

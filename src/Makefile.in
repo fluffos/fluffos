@@ -58,7 +58,7 @@ SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   call_out.c otable.c dumpstat.c stralloc.c hash.c \
   port.c reclaim.c parse.c simul_efun.c sprintf.c program.c \
   compiler.c avltree.c icode.c trees.c generate.c scratchpad.c \
-  socket_efuns.c socket_ctrl.c eoperators.c socket_err.c md.c \
+  socket_efuns.c socket_ctrl.c qsort.c eoperators.c socket_err.c md.c \
   disassembler.c uvalarm.c $(STRFUNCS) \
   replace_program.c master.c function.c \
   debug.c crypt.c add_action.c eval.c fliconv.c console.c applies_table.c \
@@ -80,7 +80,7 @@ OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   call_out.o otable.o dumpstat.o stralloc.o hash.o \
   port.o reclaim.o parse.o simul_efun.o sprintf.o program.o \
   compiler.o avltree.o icode.o trees.o generate.o scratchpad.o \
-  socket_efuns.o socket_ctrl.o eoperators.o socket_err.o md.o \
+  socket_efuns.o socket_ctrl.o qsort.o eoperators.o socket_err.o md.o \
   disassembler.o uvalarm.o $(STRFUNCS) \
   replace_program.o master.o function.o \
   debug.o crypt.o add_action.o eval.o fliconv.o console.o applies_table.o \

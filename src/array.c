@@ -3,6 +3,7 @@
 #include "comm.h"
 #include "regexp.h"
 #include "backend.h"
+#include "qsort.h"
 #include "md.h"
 #include "efun_protos.h"
 
@@ -17,9 +18,9 @@ int num_arrays;
 int total_array_size;
 #endif
 
-INLINE_STATIC int builtin_sort_array_cmp_fwd (const void *, const void *);
-INLINE_STATIC int builtin_sort_array_cmp_rev (const void *, const void *);
-INLINE_STATIC int sort_array_cmp (const void *, const void *);
+INLINE_STATIC int builtin_sort_array_cmp_fwd (void *, void *);
+INLINE_STATIC int builtin_sort_array_cmp_rev (void *, void *);
+INLINE_STATIC int sort_array_cmp (void *, void *);
 INLINE_STATIC long alist_cmp (svalue_t *, svalue_t *);
 /*
  * Make an empty array for everyone to use, never to be deallocated.
@@ -1120,13 +1121,13 @@ static function_to_call_t *sort_array_ftc;
 
 array_t *builtin_sort_array (array_t * inlist, int dir)
 {
-    qsort((char *) inlist->item, inlist->size, sizeof(inlist->item),
-      (dir<0) ? builtin_sort_array_cmp_rev : builtin_sort_array_cmp_fwd);
+    quickSort((char *) inlist->item, inlist->size, sizeof(inlist->item),
+              (dir<0) ? builtin_sort_array_cmp_rev : builtin_sort_array_cmp_fwd);
 
     return inlist;
 }
 
-INLINE_STATIC int builtin_sort_array_cmp_fwd (const void *vp1, const void *vp2)
+INLINE_STATIC int builtin_sort_array_cmp_fwd (void *vp1, void *vp2)
 {
     svalue_t *p1 = (svalue_t *)vp1;
     svalue_t *p2 = (svalue_t *)vp2;
@@ -1181,7 +1182,7 @@ INLINE_STATIC int builtin_sort_array_cmp_fwd (const void *vp1, const void *vp2)
     return 0;
 }
 
-INLINE_STATIC int builtin_sort_array_cmp_rev (const void *vp1, const void *vp2)
+INLINE_STATIC int builtin_sort_array_cmp_rev (void *vp1, void *vp2)
 {
     svalue_t *p1 = (svalue_t *)vp1;
     svalue_t *p2 = (svalue_t *)vp2;
@@ -1237,7 +1238,7 @@ INLINE_STATIC int builtin_sort_array_cmp_rev (const void *vp1, const void *vp2)
 }
 
 INLINE_STATIC
-int sort_array_cmp (const void *vp1, const void *vp2) {
+int sort_array_cmp (void *vp1, void *vp2) {
     svalue_t *p1 = (svalue_t *)vp1;
     svalue_t *p2 = (svalue_t *)vp2;
     svalue_t *d;
@@ -1291,7 +1292,7 @@ f_sort_array (void)
 
             tmp = copy_array(tmp);
             push_refed_array(tmp);
-            qsort((char *) tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
+            quickSort((char *) tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
             sort_array_ftc = old_ptr;
             sp--;//remove tmp from stack, but we don't want to free it!
             break;
