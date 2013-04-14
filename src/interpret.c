@@ -12,7 +12,6 @@
 #include "sprintf.h"
 #include "comm.h"
 #include "port.h"
-#include "qsort.h"
 #include "compiler.h"
 #include "regexp.h"
 #include "master.h"
@@ -5515,7 +5514,7 @@ typedef struct {
   int num_calls;
 } sort_elem_t;
 
-int sort_elem_cmp (sort_elem_t * se1, sort_elem_t * se2) {
+int sort_elem_cmp (const sort_elem_t * se1, const sort_elem_t * se2) {
   return se2->num_calls - se1->num_calls;
 }
 
@@ -5550,8 +5549,8 @@ void opcdump (char * tfn)
       ops[ind].op2 = j;
     }
   }
-  quickSort((char *) ops, (EFUN_BASE + 1) * (BASE + 1), sizeof(sort_elem_t),
-            sort_elem_cmp);
+  qsort((char *) ops, (EFUN_BASE + 1) * (BASE + 1), sizeof(sort_elem_t),
+      sort_elem_cmp);
   for (i = 0; i < (EFUN_BASE + 1) * (EFUN_BASE + 1); i++) {
     if (ops[i].num_calls)
       fprintf(fp, "%-30s %-30s: %10d\n", query_instr_name(ops[i].op1),
