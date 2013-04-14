@@ -407,8 +407,9 @@ inline const char* origin_to_name(const int origin) {
       return "function_pointer";
     case ORIGIN_FUNCTIONAL:
       return "functional";
+    default:
+      return "unknown";
   }
-  return "unknown";
 }
 
 inline const char* access_to_name(int mode) {
@@ -421,8 +422,13 @@ inline const char* access_to_name(int mode) {
       return "protected";
     case DECL_PUBLIC:
       return "public";
+#ifndef SENSIBLE_MODIFIERS
+    case DECL_VISIBILE:
+      return "visible";
+#endif
+    default:
+      return "unknown";
   }
-  return "unkown";
 }
 
 #endif                          /* _INTERPRET_H */
