@@ -15,6 +15,11 @@
 #ifndef PORTABILITY_H
 #define PORTABILITY_H
 
+/* CYGWIN with old POSIX needs this. */
+#ifdef __CYGWIN__
+#undef __STRICT_ANSI__
+#endif
+
 /* define this if you have an Ultrix system that the driver won't otherwise
    compile on (doesn't seem to be needed for DECstations).
 */

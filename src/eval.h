@@ -3,5 +3,5 @@
 extern int outoftime;
 extern LPC_INT max_cost;
 void set_eval(LPC_INT time);
-int get_eval();
+LPC_INT get_eval();
 #endif
