@@ -163,7 +163,7 @@
  * are ever stripped.  So the example above gives
  * ({ "", "", "x", "y", "", "z", "", "" }).
  */
-#undef SANE_EXPLODE_STRING
+#define SANE_EXPLODE_STRING
 #undef REVERSIBLE_EXPLODE_STRING
 
 /* CAST_CALL_OTHERS: define this if you want to require casting of call_other's;
@@ -913,5 +913,23 @@
 
 /* use POSIX timers for eval_cost */
 #define POSIX_TIMERS
-#endif
 
+/* SANE_SORTING: Use system provided fastest sorting routine for various
+ * sorting , including sort_array EFUN.
+ *
+ * This replace the old internal version qsort which only sorts to one
+ * direction repetitively. so following LPC code:
+ *
+ *    sort_array(({4,3,2,1}), (: -($1<$2) :));
+ *
+ * can still return ({1,2,3,4}), even though it only returns -1 and 0.
+ *
+ * It is recommended to fix your LPC code to not rely on this behavior.
+ *
+ * Your LPC code should return 1, 0, -1 for situation where first argument
+ * is less than, equal to, or greater than the second argument. This will
+ * will work with both implementation.
+ */
+#define SANE_SORTING
+
+#endif /* _OPTIONS_H */
