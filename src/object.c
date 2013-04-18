@@ -1700,7 +1700,7 @@ int restore_object (object_t * ob, const char * file, int noclear)
 #ifdef HAVE_ZLIB
     else {
       if (gz_sel == -1) gz_sel = strlen(SAVE_GZ_EXTENSION);
-      if (strcmp(file + len - gz_sel, SAVE_GZ_EXTENSION) == 0)
+      if (len >= gz_sel && strcmp(file + len - gz_sel, SAVE_GZ_EXTENSION) == 0)
           len -= gz_sel;
     }
     name = new_string(len + gz_sel, "restore_object");
