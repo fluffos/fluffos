@@ -2550,13 +2550,13 @@ f_replace_string (void)
                     cur++;
                     if ((cur >= first) &&  (cur <= last)) {
                         if (rlen) {
-                            memcpy(dst2, replace, rlen);
+                            memmove(dst2, replace, rlen);
                             dst2 += rlen;
                         }
                         src += plen;
                         if (cur == last) break;
                     } else {
-                        memcpy(dst2, src, plen);
+                        memmove(dst2, src, plen);
                         dst2 += plen;
                         src += plen;
                     }
@@ -2565,7 +2565,6 @@ f_replace_string (void)
                 }
             }
             memmove(dst2, src, slimit - src);
-            //memcpy(dst2, src, slimit - src);
             dst2 += (slimit - src);
             *dst2 = 0;
             arg->u.string = extend_string(dst1, dst2 - dst1);
@@ -2630,7 +2629,7 @@ f_replace_string (void)
                             FREE_MSTR(dst1);
                             return;
                         }
-                        memcpy(dst2, replace, rlen);
+                        memmove(dst2, replace, rlen);
                         dst2 += rlen;
                         dlen += rlen;
                         src += plen;
@@ -2644,7 +2643,7 @@ f_replace_string (void)
                             FREE_MSTR(dst1);
                             return;
                         }
-                        memcpy(dst2, src, plen);
+                        memmove(dst2, src, plen);
                         dst2 += plen;
                         src += plen;
                     }
@@ -2666,7 +2665,7 @@ f_replace_string (void)
                 FREE_MSTR(dst1);
                 return;
             }
-            memcpy(dst2, src, slimit - src);
+            memmove(dst2, src, slimit - src);
             dst2 += (slimit - src);
         } else { /* plen <= 1 */
             /* Beek: plen == 1 */
