@@ -5,7 +5,7 @@ if test $# -ne 0; then
     develop)
       echo Preparing to build developmental version of MudOS driver ...
       OPTIMIZE="-O2"
-      DEBUG="-g -Wall -Wundef -pedantic -D_FORTIFY_SOURCE=2 -DDEBUG -DDEBUG_MACRO"
+      DEBUG="-g -Wall -Wextra -Wno-missing-field-initializers -pedantic -D_FORTIFY_SOURCE=2 -DDEBUG -DDEBUG_MACRO"
       ;;
     debug)
       echo Preparing to build debugging version of MudOS driver ...
