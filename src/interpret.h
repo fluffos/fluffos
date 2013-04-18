@@ -421,7 +421,7 @@ inline const char* access_to_name(int mode) {
     case DECL_PUBLIC:
       return "public";
 #ifndef SENSIBLE_MODIFIERS
-    case DECL_VISIBILE:
+    case DECL_VISIBLE:
       return "visible";
 #endif
     default:
