@@ -2449,7 +2449,7 @@ static program_t *epilog (void) {
 #ifdef DEBUG
     if (p - (char *)prog != size) {
         fprintf(stderr, "Program size miscalculated for /%s.\n", prog->filename);
-        fprintf(stderr, "is: %ld, expected: %d\n", p-(char *)prog, size);
+        fprintf(stderr, "is: %d, expected: %d\n", p-(char *)prog, size);
     }
 #endif
 
@@ -2600,36 +2600,34 @@ the_file_name (char * name)
 }
 
 static int case_compare(const void *c1, const void *c2) {
+    /* sort DEFAULT to the end */
     if ((*(parse_node_t **)c1)->kind == NODE_DEFAULT)
         return -1;
     if ((*(parse_node_t **)c2)->kind == NODE_DEFAULT)
         return 1;
-
-    if ((*(parse_node_t **)c1)->r.number > (*(parse_node_t **)c2)->r.number) return 1;
-    if ((*(parse_node_t **)c1)->r.number < (*(parse_node_t **)c2)->r.number) return -1;
-    return 0;
+    return COMPARE_NUMS(
+      (*(parse_node_t **)c1)->r.number, (*(parse_node_t **)c2)->r.number);
 }
 
 static int string_case_compare(const void *c1, const void *c2) {
-    int i1, i2;
-    const char *p1, *p2;
+    LPC_INT x, y;
 
+    /* sort DEFAULT to the end */
     if ((*(parse_node_t **)c1)->kind == NODE_DEFAULT)
         return -1;
     if ((*(parse_node_t **)c2)->kind == NODE_DEFAULT)
         return 1;
-
-    i1 = (*(parse_node_t **)c1)->r.number;
-    i2 = (*(parse_node_t **)c2)->r.number;
-    p1 = (i1 ? PROG_STRING(i1) : 0);
-    p2 = (i2 ? PROG_STRING(i2) : 0);
-
-    return (p1 < p2)?-1:0;
+    x = (*(parse_node_t **)c1)->r.number;
+    y = (*(parse_node_t **)c2)->r.number;
+    x = x ? ((LPC_INT)((POINTER_INT)PROG_STRING(x))) : 0;
+    y = y ? ((LPC_INT)((POINTER_INT)PROG_STRING(y))) : 0;
+    return COMPARE_NUMS(x, y);
 }
 
 void prepare_cases (parse_node_t * pn, int start) {
     parse_node_t **ce_start, **ce_end, **ce;
-    LPC_INT end, last_key, this_key;
+    LPC_INT last_key, this_key;
+    int end;
     int direct = 1;
 
     ce_start = (parse_node_t **)&mem_block[A_CASES].block[start];
@@ -2644,10 +2642,10 @@ void prepare_cases (parse_node_t * pn, int start) {
     }
 
     if (pn->kind == NODE_SWITCH_STRINGS)
-      qsort((char *)ce_start, ce_end - ce_start, sizeof(parse_node_t *),
+      qsort(ce_start, ce_end - ce_start, sizeof(parse_node_t *),
           string_case_compare);
     else
-      qsort((char *)ce_start, ce_end - ce_start, sizeof(parse_node_t *),
+      qsort(ce_start, ce_end - ce_start, sizeof(parse_node_t *),
           case_compare);
 
     ce = ce_start;

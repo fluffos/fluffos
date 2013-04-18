@@ -14,8 +14,6 @@
 #define PUSH_WHAT      (3 << 6)
 #define PUSH_MASK      (0xff ^ (PUSH_WHAT))
 
-#define SWITCH_CASE_SIZE (2 + sizeof(char *))
-
 /* Trace defines */
 #ifdef TRACE
 #  define TRACE_CALL 1
