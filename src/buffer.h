@@ -11,7 +11,7 @@ typedef struct buffer_s {
     /* first two elements of struct must be 'ref' followed by 'size' */
     unsigned short ref;
     unsigned int size;
-#ifdef DEBUG
+#ifdef DEBUGMALLOC_EXTENSIONS
     unsigned short extra_ref;
 #endif
     unsigned char item[1];
