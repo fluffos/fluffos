@@ -5515,7 +5515,7 @@ typedef struct {
 } sort_elem_t;
 
 int sort_elem_cmp (const sort_elem_t * se1, const sort_elem_t * se2) {
-  return se2->num_calls - se1->num_calls;
+  return COMPARE_NUMS(se2->num_calls, se1->num_calls);
 }
 
 void opcdump (char * tfn)
