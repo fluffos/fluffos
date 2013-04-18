@@ -921,7 +921,7 @@ f_sub_eq()
  *           Table is followed by 1 int that is minimum key value.
  *           Each table entry is a short address to jump to.
  *   0xfN  - integer labels.  N is size as a power of 2.
- *           Each table entry is 1 long (key) followed by 1 short (address).
+ *           Each table entry is 1 LPC_INT (key) followed by 1 short (address).
  *   0xNf  - string labels.  Otherwise same as for integer labels.
  *
  * For normal string or integer tables, if the address is 0 or 1,
@@ -934,6 +934,8 @@ f_sub_eq()
  * Binary search is used on the normal tables.
  */
 
+#define SWITCH_CASE_SIZE (sizeof(LPC_INT) + sizeof(short))
+
 /* offsets from 'pc' */
 #define SW_TYPE         0
 #define SW_TABLE        1
@@ -942,22 +944,20 @@ f_sub_eq()
 
 /* offsets used for range (L_ for lower member, U_ for upper member) */
 #define L_LOWER 0
-#define L_TYPE  (sizeof(char *))
+#define L_TYPE  (sizeof(LPC_INT))
 #define L_UPPER (SWITCH_CASE_SIZE)
-#define L_ADDR  (SWITCH_CASE_SIZE + sizeof(char *))
+#define L_ADDR  (SWITCH_CASE_SIZE + sizeof(LPC_INT))
 #define U_LOWER (-SWITCH_CASE_SIZE)
-#define U_TYPE  (-SWITCH_CASE_SIZE + sizeof(char *))
+#define U_TYPE  (-SWITCH_CASE_SIZE + sizeof(LPC_INT))
 #define U_UPPER 0
-#define U_ADDR  (sizeof(char *))
+#define U_ADDR  (sizeof(LPC_INT))
 
 INLINE void
 f_switch()
 {
     unsigned short offset, end_off;
-    long d;
-    POINTER_INT s;
-    POINTER_INT r;
-    long i;
+    int i, d;
+    LPC_INT s, r;
     char *l, *end_tab;
     static unsigned short off_tab[] =
     {
@@ -980,11 +980,11 @@ f_switch()
             sp--;
         } else if (sp->type == T_STRING) {
             if (sp->subtype == STRING_SHARED) {
-                s = (POINTER_INT)sp->u.string;
+                s = (LPC_INT)((POINTER_INT)sp->u.string);
                 free_string(sp->u.string);
                 sp--;
             } else {
-                s = (POINTER_INT)findstring(sp->u.string);
+                s = (LPC_INT)((POINTER_INT)findstring(sp->u.string));
                 free_string_svalue(sp--);
             }
             if (s == 0) {
@@ -1011,8 +1011,8 @@ f_switch()
      */
 
     if (i >= 13) {
-        if (i == 14) {
-            char *zz = end_tab - SIZEOF_LONG;
+        if (i == 0xe) {
+            char *zz = end_tab - sizeof(LPC_INT);
             /* fastest switch format : lookup table */
             l = pc + offset;
             COPY_INT(&d, zz);
@@ -1032,7 +1032,6 @@ f_switch()
         } else
             fatal("unsupported switch table format.\n");
     }
-    
     /*
      * l - current entry we are looking at. 
      * d - size to add/subtract from l each iteration. 
@@ -1044,14 +1043,14 @@ f_switch()
     if (d < SWITCH_CASE_SIZE)
         d = 0;
     for (;;) {
-        COPY_PTR(&r, l);
+        COPY_INT(&r, l);
         if (s < r) {
             if (d < SWITCH_CASE_SIZE) {
                 /* test if entry is part of a range */
                 /* Don't worry about reading from F_BREAK (byte before table) */
                 COPY_SHORT(&offset, l + U_TYPE);
                 if (offset <= 1) {
-                    COPY_PTR(&r, l + U_LOWER);
+                    COPY_INT(&r, l + U_LOWER);
                     if (s >= r) {
                         /* s is in the range */
                         COPY_SHORT(&offset, l + U_ADDR);
@@ -1077,7 +1076,7 @@ f_switch()
                 /* test if entry is part of a range */
                 COPY_SHORT(&offset, l + L_TYPE);
                 if (offset <= 1) {
-                    COPY_PTR(&r, l + L_UPPER);
+                    COPY_INT(&r, l + L_UPPER);
                     if (s <= r) {
                         /* s is in the range */
                         COPY_SHORT(&offset, l + L_ADDR);
@@ -1116,7 +1115,7 @@ f_switch()
             /* found the key - but could be part of a range... */
             if (!l[U_TYPE] && !l[U_TYPE + 1]) {
                 /* end of range with lookup table */
-                COPY_PTR(&r, l + U_LOWER);
+                COPY_INT(&r, l + U_LOWER);
                 l = pc + offset + (s - r) * sizeof(short);
                 COPY_SHORT(&offset, l);
             }

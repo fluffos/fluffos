@@ -8,11 +8,6 @@ void heart_beat() {
 	set_heart_beat(2);
 	ASSERT(query_heart_beat(this_object()) == 2);
 	break;
-    case 1:
-	ASSERT(query_heart_beat(this_object()) == 2);
-	set_heart_beat(-1);
-	ASSERT(query_heart_beat(this_object()) == 2);
-	break;
     case 2:
 	ASSERT(query_heart_beat(this_object()) == 2);
 	set_heart_beat(0);

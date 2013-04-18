@@ -5,6 +5,7 @@
 #include "backend.h"
 #include "md.h"
 #include "efun_protos.h"
+#include "old_qsort_inc.h"
 
 /*
  * This file contains functions used to manipulate arrays.
@@ -1116,8 +1117,6 @@ map_string (svalue_t * arg, int num_arg)
 #ifdef F_SORT_ARRAY
 static function_to_call_t *sort_array_ftc;
 
-#define COMPARE_NUMS(x,y) (x < y ? -1 : (x > y ? 1 : 0))
-
 array_t *builtin_sort_array (array_t * inlist, int dir)
 {
     qsort((char *) inlist->item, inlist->size, sizeof(inlist->item),
@@ -1183,57 +1182,7 @@ INLINE_STATIC int builtin_sort_array_cmp_fwd (const void *vp1, const void *vp2)
 
 INLINE_STATIC int builtin_sort_array_cmp_rev (const void *vp1, const void *vp2)
 {
-    svalue_t *p1 = (svalue_t *)vp1;
-    svalue_t *p2 = (svalue_t *)vp2;
-    switch(p1->type | p2->type) {
-        case T_STRING:
-        {
-            return strcmp(p2->u.string, p1->u.string);
-        }
-
-        case T_NUMBER:
-        {
-            return COMPARE_NUMS(p2->u.number, p1->u.number);
-        }
-
-        case T_REAL:
-        {
-            return COMPARE_NUMS(p2->u.real, p1->u.real);
-        }
-
-        case T_ARRAY:
-        {
-            array_t *v1 = p1->u.arr, *v2 = p2->u.arr;
-            if (!v1->size  || !v2->size)
-                error("Illegal to have empty array in array for sort_array()\n");
-
-
-            switch(v1->item[0].type | v2->item[0].type) {
-                case T_STRING:
-                {
-                    return strcmp(v2->item[0].u.string, v1->item[0].u.string);
-                }
-
-                case T_NUMBER:
-                {
-                    return COMPARE_NUMS(v2->item[0].u.number, v1->item[0].u.number);
-                }
-
-                case T_REAL:
-                {
-                    return COMPARE_NUMS(v2->item[0].u.real, v1->item[0].u.real);
-                }
-                default:
-                {
-                    /* Temp. long err msg till I can think of a better one - Sym */
-                    error("sort_array() cannot handle arrays of arrays whose 1st elems\naren't strings/ints/floats\n");
-                }
-            }
-        }
-
-    }
-    error("built-in sort_array() can only handle homogeneous arrays of strings/ints/floats/arrays\n");
-    return 0;
+    return builtin_sort_array_cmp_fwd(vp2, vp1);
 }
 
 INLINE_STATIC
@@ -1291,7 +1240,11 @@ f_sort_array (void)
 
             tmp = copy_array(tmp);
             push_refed_array(tmp);
+#ifdef SANE_SORTING
             qsort((char *) tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
+#else
+            old_quickSort((char *) tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
+#endif
             sort_array_ftc = old_ptr;
             sp--;//remove tmp from stack, but we don't want to free it!
             break;

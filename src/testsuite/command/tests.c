@@ -64,7 +64,7 @@ int main(string fun)
   set_eval_limit(0x7fffffff);
 
   write("C> " + fun + "\n");
-  ASSERT_EQ(0, catch(fun->do_tests()));
+  ASSERT(!catch(fun->do_tests()));
 
   set_eval_limit(0x7fffffff);
 

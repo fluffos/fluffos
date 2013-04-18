@@ -663,12 +663,12 @@ i_generate_node (parse_node_t * expr) {
                 while (pn) {
                     if (expr->kind == NODE_SWITCH_STRINGS) {
                         if (pn->r.number) {
-                            INS_POINTER((POINTER_INT)
-                                        PROG_STRING(pn->r.number));
+                            ins_int((LPC_INT)((POINTER_INT)(PROG_STRING(pn->r.number))));
                         } else
-                            INS_POINTER((POINTER_INT)0);
-                    } else
-                        INS_POINTER((POINTER_INT)pn->r.expr);
+                            ins_int((LPC_INT)0);
+                    } else {
+                        ins_int(pn->r.number);
+                    }
                     if (pn->v.number == 1)
                         ins_short(1);
                     else
