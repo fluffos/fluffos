@@ -173,11 +173,13 @@ void call_out()
 	static pending_call_t *cop = 0;
 	error_context_t econ;
 	VOLATILE int tm;
+#ifdef CALLOUT_LOOP_PROTECTION
 	/* The number of call_outs that will be given a full max_cost time budget;
 	 * any calls beyond this number will get only what time is left over.
 	 */
-	long num_max_cost_calls;
+	int num_max_cost_calls;
 	int warned_about_recursion = 0;
+#endif
 
 	current_interactive = 0;
 
@@ -200,6 +202,7 @@ void call_out()
 		tm = current_time & (CALLOUT_CYCLE_SIZE - 1);
 		DBG(("   slot %i", tm));
 
+#ifdef CALLOUT_LOOP_PROTECTION
 		/* Count how many call_outs are ready to run.  These each will
 		 * be given their own max_cost time budget.  If any immediate
 		 * call_outs are subsequently added to the list, they will all
@@ -212,12 +215,15 @@ void call_out()
 			num_max_cost_calls++;
 		}
 		cop = 0;
+#endif
 
 		while (call_list[tm] && call_list[tm]->delta == 0) {
 			object_t *ob, *new_command_giver;
 
+#ifdef CALLOUT_LOOP_PROTECTION
 			/* Count this call_out against the allowed number of full time budget calls */
 			num_max_cost_calls--;
+#endif
 
 			/*
 			 * Move the first call_out out of the chain.
@@ -236,11 +242,14 @@ void call_out()
 				if (SETJMP(econ.context)) {
 					restore_context(&econ);
 					if (outoftime) {
+#ifdef CALLOUT_LOOP_PROTECTION
 						if (num_max_cost_calls > 0) {
+#endif
 							/* Transfer control to the backend loop so that it can attend to other duties */
 							debug_message("Maximum evaluation cost reached while trying to process call_outs\n");
 							pop_context(&econ);
 							return;
+#ifdef CALLOUT_LOOP_PROTECTION
 						} else if (!warned_about_recursion) {
 							warned_about_recursion = 1;
 							/* A newly added immediate call_out tripped max_cost.  Force all reamining
@@ -249,6 +258,7 @@ void call_out()
 							 */
 							debug_message("Maximum evaluation cost reached while processing recursive call_outs; breaking possible loop\n");
 						}
+#endif
 					}
 				} else {
 					object_t *ob;
@@ -292,9 +302,13 @@ void call_out()
 						extra = 0;
 					}
 
+#ifdef CALLOUT_LOOP_PROTECTION
 					if (num_max_cost_calls > 0) {
+#endif
 						set_eval(max_cost);
+#ifdef CALLOUT_LOOP_PROTECTION
 					}
+#endif
 
 					if (cop->ob) {
 						if (cop->function.s[0] == APPLY___INIT_SPECIAL_CHAR)

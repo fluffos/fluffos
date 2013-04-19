@@ -474,6 +474,19 @@
  */
 #define CALLOUT_HANDLES
 
+/* CALLOUT_LOOP_PROTECTION: If this is defined, all new zero-delay call_outs
+ * added while already processing call_outs will run under a single evaluation
+ * cost allotment.  In the event of an infinite loop, the eval timer will
+ * expire and a "Maximum evaluation cost" error will be thrown.
+ *
+ * If this option is undefined, all call_outs (including zero-delay ones added
+ * by another call_out) will be given a full evaluation time budget.  Unless
+ * the mudlib takes steps to protect against loops by overriding call_out()
+ * with a sefun, an infinite loop will hang the driver, requiring it to be
+ * killed and restarted.
+ */
+#define CALLOUT_LOOP_PROTECTION
+
 /* FLUSH_OUTPUT_IMMEDIATELY: Causes output to be written to sockets
  * immediately after being generated.  Useful for debugging.
  */
