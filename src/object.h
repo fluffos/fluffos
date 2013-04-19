@@ -70,7 +70,7 @@ typedef struct sentence_s {
 typedef struct object_s {
     unsigned short ref;         /* Reference count. */
     unsigned short flags;       /* Bits or'ed together from above */
-#ifdef DEBUG
+#ifdef DEBUGMALLOC_EXTENSIONS
     unsigned int extra_ref;     /* Used to check ref count. */
 #endif
     const char * const obname;

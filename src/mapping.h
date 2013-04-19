@@ -35,7 +35,7 @@ typedef struct mapping_node_block_s {
 typedef struct mapping_s {
     unsigned short ref;         /* how many times this map has been
                                  * referenced */
-#ifdef DEBUG
+#ifdef DEBUGMALLOC_EXTENSIONS
     int extra_ref;
 #endif
     mapping_node_t **table;     /* the hash table */

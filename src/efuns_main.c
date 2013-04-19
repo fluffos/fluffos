@@ -2840,7 +2840,7 @@ f_say (void)
     array_t *avoid;
     static array_t vtmp =
     {1,
-#ifdef DEBUG
+#ifdef DEBUGMALLOC_EXTENSIONS
      1,
 #endif
      1,
@@ -3333,7 +3333,7 @@ f_tell_room (void)
     array_t *avoid;
     static array_t vtmp =
     {1,
-#ifdef DEBUG
+#ifdef DEBUGMALLOC_EXTENSIONS
      1,
 #endif
      1,

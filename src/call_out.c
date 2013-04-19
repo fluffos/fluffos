@@ -474,7 +474,6 @@ int print_call_out_usage (outbuffer_t * ob, int verbose)
 }
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-#ifdef DEBUG
 void mark_call_outs()
 {
 	pending_call_t *cop;
@@ -497,7 +496,6 @@ void mark_call_outs()
 		}
 	}
 }
-#endif
 #endif
 /*
  * Construct an array of all pending call_outs. Every item in the array
