@@ -31,7 +31,7 @@ typedef struct {
 typedef struct {
     unsigned short ref;
     short type;                 /* FP_* is used */
-#ifdef DEBUG
+#ifdef DEBUGMALLOC_EXTENSIONS
     int extra_ref;
 #endif
     struct object_s *owner;

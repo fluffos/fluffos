@@ -41,7 +41,7 @@ static object_t *restrict_destruct;
 #endif
 
 object_t *obj_list, *obj_list_destruct;
-#ifdef DEBUG
+#ifdef DEBUGMALLOC_EXTENSIONS
 int tot_dangling_object = 0;
 object_t *obj_list_dangling = 0;
 #endif

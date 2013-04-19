@@ -6,7 +6,7 @@
 
 typedef struct array_s {
     unsigned short ref;
-#ifdef DEBUG
+#ifdef DEBUGMALLOC_EXTENSIONS
     int extra_ref;
 #endif
     int size;
