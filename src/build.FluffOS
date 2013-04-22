@@ -29,10 +29,11 @@ else
 fi
 
 # TODO: remove need for _GNU_SOURCE
-CFLAGS="--std=c99 -D_GNU_SOURCE"
+CFLAGS="--std=c99 -D_GNU_SOURCE -fno-omit-frame-pointer"
 
-# Change to -m32 to compile under 32bit.
-COMPILER_FLAGS=${COMPILER_FLAGS:-"-m64 -march=native"}
+# By default driver compile to native environment, you can
+# add "-m64" to force compile under 64bit, "-m32" for 32bit.
+COMPILER_FLAGS=${COMPILER_FLAGS:-"-march=native"}
 
 OPTIMIZE=${OPTIMIZE:-"-O3"}
 DEBUG=${DEBUG:-"-g"}

@@ -484,6 +484,8 @@
  * the mudlib takes steps to protect against loops by overriding call_out()
  * with a sefun, an infinite loop will hang the driver, requiring it to be
  * killed and restarted.
+ *
+ * Old code should work fine with this added.
  */
 #define CALLOUT_LOOP_PROTECTION
 
@@ -924,7 +926,10 @@
 /* use struct keyword for lpc structs */
 #define STRUCT_STRUCT
 
-/* use POSIX timers for eval_cost */
+/* use POSIX timers for eval_cost.
+ *
+ * Old code should works fine with this added.
+ */
 #define POSIX_TIMERS
 
 /* SANE_SORTING: Use system provided fastest sorting routine for various
@@ -942,6 +947,9 @@
  * Your LPC code should return 1, 0, -1 for situation where first argument
  * is less than, equal to, or greater than the second argument. This will
  * will work with both implementation.
+ *
+ * Old code should work fine with this added, easy to inspect by searching
+ * for sort_array.
  */
 #define SANE_SORTING
 
