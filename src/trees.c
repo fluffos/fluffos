@@ -74,6 +74,7 @@ new_node() {
         free_block_list = cur_block->next;
     } else {
         cur_block = ALLOCATE(parse_node_block_t, TAG_COMPILER, "new_node");
+        memset(cur_block, 0, sizeof(parse_node_block_t));
     }
     /* add to block list */
     cur_block->next = parse_block_list;
@@ -103,6 +104,7 @@ new_node_no_line() {
       free_block_list = cur_block->next;
     } else {
         cur_block = ALLOCATE(parse_node_block_t, TAG_COMPILER, "new_node");
+        memset(cur_block, 0, sizeof(parse_node_block_t));
     }
     /* add to block list */
     cur_block->next = parse_block_list;

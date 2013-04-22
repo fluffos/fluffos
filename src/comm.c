@@ -2113,12 +2113,10 @@ static void new_user_handler (int which)
 			|| !master_ob->interactive) {
 		if (master_ob->interactive)
 			remove_interactive(master_ob, 0);
-		else
-			free_object(&master, "new_user");
 #ifdef IPV6
-		debug_message("Connection from %s aborted.\n", inet_ntop(AF_INET6, &addr.sin6_addr, tmp, INET6_ADDRSTRLEN));
+		debug_message("Can not accept connection from %s due to error in connect().\n", inet_ntop(AF_INET6, &addr.sin6_addr, tmp, INET6_ADDRSTRLEN));
 #else
-		debug_message("Connection from %s aborted.\n", inet_ntoa(addr.sin_addr));
+		debug_message("Can not accept connection from %s due to error in connect().\n");
 #endif
 		return;
 	}
