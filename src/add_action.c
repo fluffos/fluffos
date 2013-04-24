@@ -621,16 +621,17 @@ void f_command (void)
 	strncpy(buff, sp->u.string, sizeof(buff));
 	buff[sizeof(buff) - 1] = 0;
 
-	if (parse_command(buff, current_object))
+	if (parse_command(buff, current_object)) {
 #ifndef WIN32
              rc = save_eval_cost - get_eval();
 #else
              rc = 1;
 #endif
-             // Make sure we at least return 1 eval cost.
+             // return at least 1 eval cost on success.
              if (rc <= 0) {
                rc = 1;
              }
+        }
     }
 
     free_string_svalue(sp);

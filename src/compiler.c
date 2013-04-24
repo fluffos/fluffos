@@ -54,9 +54,12 @@ int current_tree;
 
 function_context_t function_context;
 
+/* only lower 16bits are used */
 int exact_types, global_modifiers;
 
+/* 16bits modifier + 16bits type */
 int current_type;
+
 int var_defined;
 
 unsigned short *comp_def_index_map, *func_index_map;
