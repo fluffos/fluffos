@@ -144,8 +144,8 @@ int yyparse (void);
 	char num_local;
 	char max_num_locals; 
 	short context; 
-	short save_current_type; 
-	short save_exact_types;
+	unsigned short save_current_type;
+	unsigned short save_exact_types;
     } func_block; /* 8 */
 }
 
