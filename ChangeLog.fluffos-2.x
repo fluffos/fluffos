@@ -2,48 +2,22 @@ As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :), note: where it says Cratylus, I got it from his version, usually
 someone else did the work, but I don't know how to find who did what there.
 
-FluffOS 2.27-sunyc-rc1
-
-New compile options:
-  POSIX_TIMERS: better time preceision tracking for eval cost. (voltara@lpmuds.net)
-  CALLOUT_LOOP_PROTECTION: protect call_out(0) loops. (voltara@lpmuds.net)
-  SANE_SORTING: Use faster sorting implementation for "sort_array()", but requires
-                LPC code to return conforming results.
-
-General:
-  Build script improvement and compile/warning fixes.
-  Build under 32bit environment is now supported.
-  Build under CYGWIN is now supported.
-  Multiple crasher/memory leaks is fixed.
-  Documentation has been moved to root directory.
-  Enable Travis CI to automate test/build for each commit.
-  Auto print backtrace dump when driver crash.
-  Print warning on startup if core dump limit is 0.
-  Compile fix for db.c without PACKAGE_ASYNC. (mactorg@lpmuds.net)
-  General code quality improvements.
-
-Packages:
-  PACKAGE_CRYPTO: build fixes and enhancements. (voltara@lpmuds.net)
-  PACKAGE_SHA1: Fix incorrect sha1() hash generation, verified with tests.
-                (voltara@lpmuds.net)
-
-Test:
-  "make test" will launch testsuite and report any problems.
-  DEBUGMALLOC, DEBUGMALLOC_EXTENSIONS and CHECK_MEMORY is working now.
-  Extensive 64bit runtime tests is added.
-  Switch operator tests.
-  Benchmarker and auto-crasher improvments.
-
-LPC:
-  LPC runtime is strictly 64bit now and everything should conform.
-  MIN_INT, MAX_FLOAT, MIN_FLOAT predefines.
-  Maximum number of EFUNs has been raised to 65535 from 256.
-
-Known Issues:
-  "-MAX_INT" still not being parsed correctly in LPC, see
-    src/testsuite/single/tests/64bit.c for details.
-  unique_mapping() EFUN still leaks memory.
-  crasher in testsuite needs improvments.
+FluffOS 2.27
+Fixed Changelog name for 2.26
+fix incorrect sha1() hashes  (Voltara <voltara@gmail.com>)
+Fix db.c with PACKAGE_ASYNC. (mactorg@lpmuds.net)
+allow floating point for heart beat interval
+added extra file:linenumber result for call_stack(4)
+fix call_other type errors as warnings and some timezone leaking bugs (driver timezone would be changed after efun/error in efun)
+Fix a valgrind complain in posix_timer.c (Yucong Sun <sunyucong@gmail.com>)
+Testsuit fixes. (Yucong Sun <sunyucong@gmail.com>)
+compile with C99  (Yucong Sun <sunyucong@gmail.com>)
+Unbreak DEBUG_MALLOC & CHECK_MEMORY, now everything is accounted for. (Yucong Sun <sunyucong@gmail.com>)
+Crypto package multiple fixes and enhancements (Voltara <voltara@gmail.com>)
+Code cleanup/fixes (Yucong Sun <sunyucong@gmail.com>)
+LPC MIN_INT, MAX_FLOAT, MIN_FLOAT predefines. (Yucong Sun <sunyucong@gmail.com>)
+Added POSIX_TIMERS alternative for eval timer (Voltara <voltara@gmail.com>)
+IPV6 compile fix on unbuntu. (Yucong Sun <sunyucong@gmail.com>)
 
 FluffOS 2.26.1
 testlib stuff is actually in there
