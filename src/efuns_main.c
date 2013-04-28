@@ -163,16 +163,16 @@ static void print_cache_stats (outbuffer_t * ob)
     outbuf_add(ob, "Function cache information\n");
     outbuf_add(ob, "-------------------------------\n");
     outbuf_addv(ob, "%% cache hits:    %10.2f\n",
-             100 * ((double) apply_low_cache_hits / apply_low_call_others));
+             100 * ((LPC_FLOAT) apply_low_cache_hits / apply_low_call_others));
     outbuf_addv(ob, "call_others:     %10lu\n", apply_low_call_others);
     outbuf_addv(ob, "cache hits:      %10lu\n", apply_low_cache_hits);
     outbuf_addv(ob, "cache size:      %10lu\n", APPLY_CACHE_SIZE);
     outbuf_addv(ob, "slots used:      %10lu\n", apply_low_slots_used);
     outbuf_addv(ob, "%% slots used:    %10.2f\n",
-                100 * ((double) apply_low_slots_used / APPLY_CACHE_SIZE));
+                100 * ((LPC_FLOAT) apply_low_slots_used / APPLY_CACHE_SIZE));
     outbuf_addv(ob, "collisions:      %10lu\n", apply_low_collisions);
     outbuf_addv(ob, "%% collisions:    %10.2f\n",
-             100 * ((double) apply_low_collisions / apply_low_call_others));
+             100 * ((LPC_FLOAT) apply_low_collisions / apply_low_call_others));
 }
 
 void f_cache_stats (void)
@@ -260,7 +260,7 @@ f_call_out (void)
     svalue_t *arg = sp - st_num_arg + 1;
     int num = st_num_arg - 2;
 #ifdef CALLOUT_HANDLES
-    int ret;
+    LPC_INT ret;
 
     if (!(current_object->flags & O_DESTRUCTED)) {
         ret = new_call_out(current_object, arg, arg[1].u.number, num, arg + 2);
@@ -322,8 +322,8 @@ f_call_stack (void)
     int i, n = csp - &control_stack[0] + 1;
     array_t *ret;
 
-    if (sp->u.number < 0 || sp->u.number > 3)
-        error("First argument of call_stack() must be 0, 1, 2, or 3.\n");
+    if (sp->u.number < 0 || sp->u.number > 4)
+        error("First argument of call_stack() must be 0, 1, 2, 3, or 4.\n");
 
     ret = allocate_empty_array(n);
 
@@ -376,7 +376,25 @@ f_call_stack (void)
             ret->item[i].u.string = origin_name((csp-i+1)->caller_type);
         }
         break;
+    case 4:
+        for (i = 0; i < n; i++) {
+             ret->item[i].type = T_STRING;
+             if (1 ||((csp - i)->framekind & FRAME_MASK) == FRAME_FUNCTION || ((csp - i)->framekind & FRAME_MASK) == FRAME_FUNP) {
+                 const program_t *prog = (i ? (csp-i+1)->prog : current_prog);
+                 int index = (csp-i)->fr.table_index;
+                 char *progc = (i ? (csp-i+1)->pc:pc);
+                 function_t *cfp = &prog->function_table[index];
+             	ret->item[i].type = T_STRING;
+             	ret->item[i].subtype = STRING_MALLOC;
+             	ret->item[i].u.string = string_copy(get_line_number(progc, prog), "call_stack");
+             } else {
+                 ret->item[i].subtype = STRING_CONSTANT;
+                 ret->item[i].u.string = (((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH) ? "CATCH" : "<function>";
+             }
+         }
+         break;
     }
+
     put_array(ret);
 }
 #endif
@@ -911,7 +929,7 @@ f_file_name (void)
 void
 f_file_size (void)
 {
-    long i = file_size(sp->u.string);
+    LPC_INT i = file_size(sp->u.string);
     free_string_svalue(sp);
     put_number(i);
 }
@@ -3511,12 +3529,12 @@ f_time (void)
 void
 f__to_float (void)
 {
-    double temp = 0;
+    LPC_FLOAT temp = 0;
 
     switch(sp->type) {
         case T_NUMBER:
             sp->type = T_REAL;
-            sp->u.real = (double) sp->u.number;
+            sp->u.real = (LPC_FLOAT) sp->u.number;
             break;
         case T_STRING:
             sscanf(sp->u.string, "%lf", &temp);
@@ -3534,11 +3552,11 @@ f__to_int (void)
     switch(sp->type) {
         case T_REAL:
             sp->type = T_NUMBER;
-            sp->u.number = (long) sp->u.real;
+            sp->u.number = (LPC_INT) sp->u.real;
             break;
         case T_STRING:
         {
-            long temp;
+            LPC_INT temp;
             char *p;
 
             temp = strtol(sp->u.string, &p, 10);
@@ -3816,7 +3834,7 @@ void f_reclaim_objects (void)
 void
 f_memory_info (void)
 {
-    long mem;
+    LPC_INT mem;
     object_t *ob;
 
     if (st_num_arg == 0) {

@@ -15,6 +15,11 @@
 #ifndef PORTABILITY_H
 #define PORTABILITY_H
 
+/* CYGWIN with old POSIX needs this. */
+#ifdef __CYGWIN__
+#undef __STRICT_ANSI__
+#endif
+
 /* define this if you have an Ultrix system that the driver won't otherwise
    compile on (doesn't seem to be needed for DECstations).
 */
@@ -120,7 +125,7 @@
 #define SIGNAL_FUNC_TAKES_INT defined(_AIX) || defined(NeXT) \
     || defined(_SEQUENT_) || defined(SVR4) \
     || defined(__386BSD__) || defined(apollo) || defined(cray) \
-    || defined(SunOS_5) || defined(__bsdi__) || defined(linux)
+    || defined(SunOS_5) || defined(__bsdi__) || defined(__linux__)
 
 /* Define MEMPAGESIZE to be some value if you wish to use BSDMALLOC
  * _and_ your system does not support the getpagesize() system call.
@@ -131,7 +136,7 @@
  *
  * FIXME: configure should check for getpagesize().
  */
-#if !defined(linux) && !defined(__386BSD__) && !defined(__FreeBSD__) \
+#if !defined(__linux__) && !defined(__386BSD__) && !defined(__FreeBSD__) \
 	&& !defined(OSF) && !defined(SunOS_4) && !defined(sgi)
 #  ifdef _SC_PAGE_SIZE
 #    define MEMPAGESIZE sysconf(_SC_PAGE_SIZE)
@@ -151,7 +156,7 @@
 /* otherwise make_func will break */
 #ifndef _FUNC_SPEC_
 /* these should be obtained from .h files when Linux .h structure stabilizes */
-#  if defined(linux) || defined(_M_UNIX)
+#  if defined(__linux__) || defined(_M_UNIX)
 /* This has FD_SETSIZE on some Linux's (Linuces?) */
 #    include <sys/time.h>
 #    include <sys/socket.h>

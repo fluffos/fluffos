@@ -23,10 +23,12 @@ struct translation *get_translator(const char *encoding){
     struct translation *ret = find_translator(encoding);
     if(ret)
 	return ret;
-    ret = (struct translation *)MALLOC(sizeof(struct translation));
-    char *name = (char *)MALLOC(strlen(encoding)+18+1);
+    ret = (struct translation *)DMALLOC(sizeof(struct translation),
+        TAG_PERMANENT, "get_translator");
+    char *name = (char *)DMALLOC(strlen(encoding)+18+1,
+        TAG_PERMANENT, "get_translator");
     strcpy(name, encoding);
-#ifdef linux
+#ifdef __linux__
     strcat(name, "//TRANSLIT//IGNORE");
 #endif
     ret->name = name;
@@ -60,7 +62,7 @@ char *translate(iconv_t tr, const char *mes, int inlen, int *outlen){
     char *tmp2;
 
     if(!res){
-      res = (char *)MALLOC(1);
+      res = (char *)DMALLOC(1, TAG_PERMANENT, "translate");
 	reslen = 1;
     }
 
@@ -84,7 +86,7 @@ char *translate(iconv_t tr, const char *mes, int inlen, int *outlen){
 		  len = strlen(mes)+1;
 		  FREE(res);
 		  reslen *= 2;
-		  res = (char *)MALLOC(reslen);
+		  res = (char *)DMALLOC(reslen, TAG_PERMANENT, "translate");
 		  tmp2 = res;
 		  len2 = reslen;
 		  continue;
@@ -182,7 +184,7 @@ void f_arr_to_str(){
     newt = get_translator("UTF-32");
   }
   int len = sp->u.arr->size;
-  int *in = (int *)MALLOC(sizeof(int)*(len+1));
+  int *in = (int *)DMALLOC(sizeof(int)*(len+1), TAG_TEMPORARY, "f_arr_to_str");
   char *trans;
   in[len] = 0;
   while(len--)

@@ -343,7 +343,7 @@ parse_node_t *insert_pop_value (parse_node_t * expr) {
             break;
         case F_ASSIGN:
             if (IS_NODE(expr->r.expr, NODE_OPCODE_1, F_LOCAL_LVALUE)) {
-                long tmp = expr->r.expr->l.number;
+                LPC_INT tmp = expr->r.expr->l.number;
                 expr->kind = NODE_UNARY_OP_1;
                 expr->r.expr = expr->l.expr;
                 expr->v.number = F_VOID_ASSIGN_LOCAL;
@@ -421,7 +421,7 @@ parse_node_t *optimize_loop_test (parse_node_t * pn) {
             ret = pn;
     } else if (IS_NODE(pn, NODE_UNARY_OP, F_POST_DEC) &&
                IS_NODE(pn->r.expr, NODE_OPCODE_1, F_LOCAL_LVALUE)) {
-        long lvar = pn->r.expr->l.number;
+        LPC_INT lvar = pn->r.expr->l.number;
         CREATE_OPCODE_1(ret, F_WHILE_DEC, 0, lvar);
     } else
         ret = pn;

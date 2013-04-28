@@ -126,6 +126,9 @@ MDmalloc (md_node_t * node, int size, int tag, char * desc)
     node->tag = tag;
     node->id = count++;
     node->desc = desc ? desc : "default";
+    if(!desc) {
+      fatal("Trying to alloc memory without accounting info.");
+    }
     if (malloc_mask == node->tag) {
         debug_message("MDmalloc: %5d, [%-25s], %8lx:(%d)\n",
                 node->tag, node->desc, PTR(node), node->size);
@@ -505,6 +508,21 @@ void compute_string_totals (int * asp, int * abp, int * bp) {
     }
 }
 
+INLINE_STATIC void dump_stralloc() {
+  md_node_t *entry;
+  fprintf(stderr, "===STRALLOC DUMP: allocd_strings: %i \n", allocd_strings);
+
+  for (int hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
+    for (entry = table[hsh]; entry; entry = entry->next) {
+      if(entry->tag == TAG_MALLOC_STRING || entry->tag == TAG_SHARED_STRING) {
+        fprintf(stderr, "%-30s: sz %7d: id %6d: tag %08x, a %8lx\n",
+            entry->desc, entry->size, entry->id, entry->tag,
+            (unsigned long) PTR(entry));
+      }
+    }
+  }
+}
+
 /*
  * Verify string statistics.  out can be zero, in which case any errors
  * are printed to stdout and abort() is called.  Otherwise the error messages
@@ -515,6 +533,7 @@ void check_string_stats (outbuffer_t * out) {
         + blocks[TAG_MALLOC_STRING & 0xff] * sizeof(malloc_block_t);
     int num = blocks[TAG_SHARED_STRING & 0xff] + blocks[TAG_MALLOC_STRING & 0xff];
     int bytes, as, ab;
+    int need_dump = 0;
 
     compute_string_totals(&as, &ab, &bytes);
 
@@ -523,6 +542,7 @@ void check_string_stats (outbuffer_t * out) {
     overhead += base_overhead;
 
     if (num != num_distinct_strings) {
+        need_dump = 1;
         if (out) {
             outbuf_addv(out, "WARNING: num_distinct_strings is: %i should be: %i\n",
                         num_distinct_strings, num);
@@ -533,6 +553,7 @@ void check_string_stats (outbuffer_t * out) {
         }
     }
     if (overhead != overhead_bytes) {
+        need_dump = 1;
         if (out) {
             outbuf_addv(out, "WARNING: overhead_bytes is: %i should be: %i\n",
                overhead_bytes, overhead);
@@ -543,6 +564,7 @@ void check_string_stats (outbuffer_t * out) {
         }
     }
     if (bytes != bytes_distinct_strings) {
+        need_dump = 1;
         if (out) {
             outbuf_addv(out, "WARNING: bytes_distinct_strings is: %i should be: %i\n",
                         bytes_distinct_strings, bytes - (overhead - base_overhead));
@@ -553,6 +575,7 @@ void check_string_stats (outbuffer_t * out) {
         }
     }
     if (allocd_strings != as) {
+        need_dump = 1;
         if (out) {
             outbuf_addv(out, "WARNING: allocd_strings is: %i should be: %i\n",
                         allocd_strings, as);
@@ -563,6 +586,7 @@ void check_string_stats (outbuffer_t * out) {
         }
     }
     if (allocd_bytes != ab) {
+        need_dump = 1;
         if (out) {
             outbuf_addv(out, "WARNING: allocd_bytes is: %i should be: %i\n",
                         allocd_bytes, ab);
@@ -571,6 +595,10 @@ void check_string_stats (outbuffer_t * out) {
                    allocd_bytes, ab);
             abort();
         }
+    }
+
+    if (need_dump) {
+        dump_stralloc();
     }
 }
 #endif
@@ -695,8 +723,8 @@ void check_all_blocks (int flag) {
             outbuf_add(&out, "WARNING: more than one identifier hash table allocated.\n");
         if (blocks[TAG_RESERVED & 0xff] > 1)
             outbuf_add(&out, "WARNING: more than one reserved block allocated.\n");
-        if (blocks[TAG_OBJ_TBL & 0xff] > 1)
-            outbuf_add(&out, "WARNING: more than object table allocated.\n");
+        if (blocks[TAG_OBJ_TBL & 0xff] > 2)
+            outbuf_add(&out, "WARNING: more than two object table allocated.\n");
         if (blocks[TAG_CONFIG & 0xff] > 1)
             outbuf_add(&out, "WARNING: more than config file table allocated.\n");
         if (blocks[TAG_STR_TBL & 0xff] > 1)
@@ -758,6 +786,10 @@ void check_all_blocks (int flag) {
             if (all_users[i]) {
                 DO_MARK(all_users[i], TAG_INTERACTIVE);
                 all_users[i]->ob->extra_ref++;
+                // FIXME(sunyc): I can't explain this, appearently somewhere
+                // is giving interactive object an addtional ref.
+                all_users[i]->ob->extra_ref++;
+
                 if (all_users[i]->input_to) {
                     all_users[i]->input_to->ob->extra_ref++;
                     DO_MARK(all_users[i]->input_to, TAG_SENTENCE);
@@ -768,8 +800,9 @@ void check_all_blocks (int flag) {
                     }
                 }
 #ifdef PACKAGE_COMPRESS
-                if(all_users[i]->compressed_stream)
+                if(all_users[i]->compressed_stream) {
                 	DO_MARK(all_users[i]->compressed_stream, TAG_INTERACTIVE);
+                }
 #endif
 
 #ifndef NO_ADD_ACTION
@@ -785,7 +818,8 @@ void check_all_blocks (int flag) {
 
           strcpy(buf, DEFAULT_FAIL_MESSAGE);
           strcat(buf, "\n");
-          EXTRA_REF(BLOCK(findstring(buf)))++;
+          char *target = findstring(buf);
+          if (target) EXTRA_REF(BLOCK(target))++;
         }
 
 #ifdef PACKAGE_UIDS
@@ -1034,6 +1068,24 @@ void check_all_blocks (int flag) {
                     break;
                 case TAG_MAP_NODE_BLOCK:
                     outbuf_addv(&out, "WARNING: Found orphan mapping node block: %s %04x\n", entry->desc, entry->tag);
+                    break;
+                /* FIXME: need to account these. */
+                case TAG_PERMANENT: /* only save_object|resotre_object uses this */
+                case TAG_INC_LIST:
+                case TAG_IDENT_TABLE:
+                case TAG_OBJ_TBL:
+                case TAG_SIMULS:
+                case TAG_STR_TBL:
+                case TAG_LOCALS:
+                case TAG_CALL_OUT:
+                case TAG_USERS:
+                case TAG_HEART_BEAT:
+                case TAG_INPUT_TO:
+                    break;
+                default:
+                    if (entry->tag < TAG_MARKED) {
+                      printf("WARNING: unaccounted node block: %s %d\n", entry->desc, entry->tag);
+                    }
                     break;
                 }
                 entry->tag &= ~TAG_MARKED;

@@ -392,7 +392,7 @@
  *                      calls to functions in this object by objects that
  *                      inherit it.
  * PRAGMA_OPTIMIZE:     make a second pass over the generated code to
- *                      optimize it further.  Currently does jump threading.
+ *                      optimize it further.  Currently maybe broken.
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
  *                      compilation error occured.
  */
@@ -877,7 +877,7 @@
 /*PACKAGE_ASYNC: adds some efuns for asyncronous IO */
 #define PACKAGE_ASYNC
 
-/*PACKAGE_SHA1: adds a function to calculate the sha1 hash of a string sha1(string)*/
+/*PACKAGE_SHA1: adds a function to calculate the sha1 hash of a string sha1(string).  Use PACKAGE_CRYPTO instead if possible. */
 #undef PACKAGE_SHA1
 
 /*PACKAGE_CRYPTO: adds a function that does multiple hash types hash(hash, string), needs openssl lib and includes and -lssl in system_libs*/
@@ -910,5 +910,8 @@
 
 /* use struct keyword for lpc structs */
 #define STRUCT_STRUCT
+
+/* use POSIX timers for eval_cost */
+#define POSIX_TIMERS
 #endif
 

@@ -1250,13 +1250,9 @@ int sort_array_cmp (void *vp1, void *vp2) {
     if (!d || d->type != T_NUMBER) {
         return 0;
     } else {
-        long n = d->u.number;
-	//the sort functions all use int, so sometimes the numbers don't fit!
-	if(n)
-	  if(n>0)
-	    n=1;
-	  else
-	    n=-1;
+        LPC_INT n = d->u.number;
+        // sanitize the result.
+        if(n) { n = n > 0 ? 1 : -1; }
         return n;
     }
 }

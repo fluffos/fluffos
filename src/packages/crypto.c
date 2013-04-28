@@ -9,12 +9,26 @@
  * -- coded by Ajandurah@Demonslair (Mark Lyndoe) 10/03/09
  */
 
-#include <openssl/md2.h>
-#include <openssl/md4.h>
-#include <openssl/md5.h>
+#include <openssl/opensslconf.h>
+
+#ifndef OPENSSL_NO_SHA
 #include <openssl/sha.h>
+#endif
+#ifndef OPENSSL_NO_MD5
+#include <openssl/md5.h>
+#endif
+#ifndef OPENSSL_NO_MD2
+#include <openssl/md2.h>
+#endif
+#ifndef OPENSSL_NO_MD4
+#include <openssl/md4.h>
+#endif
+#ifndef OPENSSL_NO_MDC2
 #include <openssl/mdc2.h>
+#endif
+#ifndef OPENSSL_NO_RIPEMD160
 #include <openssl/ripemd.h>
+#endif
 
 #ifdef LATTICE
 #include "/lpc_incl.h"
@@ -24,92 +38,81 @@
 #endif
 
 #ifdef F_HASH
-char *hexdump(unsigned char *data, size_t len)
+INLINE_STATIC char *hexdump(const unsigned char *data, int len)
 {
-   char *buf;
-   int i;
+   const char hexchars[] = "0123456789abcdef";
+   char *result, *p;
    
-   buf = malloc((len*2)+1);
-   memset(buf, '\0', (len*2));
+   p = result = new_string(len * 2 + 1, "f_hash");
    
-   for (i=0; i<len; i++)
-   {
-      sprintf(strchr(buf,0), "%02x", data[i]);
+   while (len--) {
+     *p++ = hexchars[(*data) >> 4];
+     *p++ = hexchars[(*data++) & 0xf];
    }
+
+   *p = 0;
    
-   return buf;
+   return result;
 }
 
 void f_hash(void)
 {
-   const char *algo;
-   const char *data;
-   char *res;
+   const char *algo, *data;
+   char *result = NULL;
+   int data_len;
    
    algo = (sp - 1)->u.string;
    data = sp->u.string;
+   data_len = SVALUE_STRLEN(sp);
 
-   /* MD2 Digest */
-   if (strcasecmp(algo, (const char *)"md2") == 0)
-   {
-      unsigned char md[MD2_DIGEST_LENGTH];
-      MD2((unsigned char *)data, strlen(data), md);
-      res = hexdump(md, MD2_DIGEST_LENGTH);
-   }
-   
-   /* MD4 Digest */
-   else if (strcasecmp(algo, (const char *)"md4") == 0)
-   {
-      unsigned char md[MD4_DIGEST_LENGTH];
-      MD4((unsigned char *)data, strlen(data), md);      
-      res = hexdump(md, MD4_DIGEST_LENGTH);      
-   }
+#define DO_HASH_IF(id, func, hash_size) SAFE( \
+   if (strcasecmp(algo, id) == 0) { \
+      unsigned char md[hash_size]; \
+      func((unsigned char *) data, data_len, md); \
+      result = hexdump(md, hash_size); \
+   } \
+)
 
-   /* MD5 Digest */
-   else if (strcasecmp(algo, (const char *)"md5") == 0)
-   {
-      unsigned char md[MD5_DIGEST_LENGTH];
-      MD5((unsigned char *)data, strlen(data), md);      
-      res = hexdump(md, MD5_DIGEST_LENGTH);      
-   }
+#ifndef OPENSSL_NO_SHA1
+   DO_HASH_IF("sha1", SHA1, SHA_DIGEST_LENGTH);
+#endif
+
+#ifndef OPENSSL_NO_MD5
+   DO_HASH_IF("md5", MD5, MD5_DIGEST_LENGTH);
+#endif
    
-   /* MDC2 Digest */
-   else if (strcasecmp(algo, (const char *)"mdc2") == 0)
-   {
-      unsigned char md[MDC2_DIGEST_LENGTH];
-      MDC2((unsigned char *)data, strlen(data), md);      
-      res = hexdump(md, MDC2_DIGEST_LENGTH);      
-   }
+#ifndef OPENSSL_NO_SHA256
+   DO_HASH_IF("sha256", SHA256, SHA256_DIGEST_LENGTH);
+   DO_HASH_IF("sha224", SHA224, SHA224_DIGEST_LENGTH);
+#endif
    
-   /* RIPEMD160 Digest */
-   else if (strcasecmp(algo, (const char *)"ripemd160") == 0)
-   {
-      unsigned char md[RIPEMD160_DIGEST_LENGTH];
-      RIPEMD160((unsigned char *)data, strlen(data), md);      
-      res = hexdump(md, RIPEMD160_DIGEST_LENGTH);      
-   }
+#ifndef OPENSSL_NO_SHA512
+   DO_HASH_IF("sha512", SHA512, SHA512_DIGEST_LENGTH);
+   DO_HASH_IF("sha384", SHA384, SHA384_DIGEST_LENGTH);
+#endif
    
-   /* SHA1 Digest */
-   else if (strcasecmp(algo, (const char *)"sha1") == 0)
-   {
-      unsigned char md[SHA_DIGEST_LENGTH];
-      SHA1((unsigned char *)data, strlen(data), md);
-      res = hexdump(md, SHA_DIGEST_LENGTH);
-   }
+#ifndef OPENSSL_NO_MD2
+   DO_HASH_IF("md2", MD2, MD2_DIGEST_LENGTH);
+#endif
    
-   else
-   {
-      pop_stack();
-      res = malloc(29 + strlen(algo));
-      sprintf(res, "hash() unknown hash type: %s.\n", algo);
-      error(res);
+#ifndef OPENSSL_NO_MD4
+   DO_HASH_IF("md4", MD4, MD4_DIGEST_LENGTH);
+#endif
+
+#ifndef OPENSSL_NO_MDC2
+   DO_HASH_IF("mdc2", MDC2, MDC2_DIGEST_LENGTH);
+#endif
+   
+#ifndef OPENSSL_NO_RIPEMD160
+   DO_HASH_IF("ripemd160", RIPEMD160, RIPEMD160_DIGEST_LENGTH);
+#endif
+
+   if (!result) {
+      error("hash() unknown hash type: %s", algo);
    }
    
    /* Pop the arguments off the stack and push the result */
-   free_string_svalue(sp--);
-   free_string_svalue(sp);
-
-   sp->subtype = STRING_MALLOC;
-   sp->u.string = res;
+   pop_n_elems(st_num_arg);
+   push_malloced_string(result);
 }
 #endif

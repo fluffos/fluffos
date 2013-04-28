@@ -19,16 +19,13 @@
 #error CFG_MAX_GLOBAL_VARIABLES must not be greater than 65536
 #endif
 
-static void ins_real (double);
+static void ins_real (LPC_FLOAT);
 static void ins_short (short);
 static void upd_short (int, int, const char *);
 static void ins_byte (unsigned char);
 static void upd_byte (int, unsigned char);
-static void write_number (long);
-static void ins_int (long);
-#if SIZEOF_PTR == 8
-static void ins_long (long);
-#endif
+static void write_number (LPC_INT);
+static void ins_int (LPC_INT);
 void i_generate_node (parse_node_t *);
 static void i_generate_if_branch (parse_node_t *, int);
 static void i_generate_loop (int, parse_node_t *, parse_node_t *,
@@ -50,9 +47,9 @@ static parse_node_t *branch_list[3];
 static int nforward_branches, nforward_branches_max;
 static int *forward_branches = 0;
 
-static void ins_real (double l)
-{
-    double f = (double)l;
+static void ins_real (LPC_FLOAT l)
+ {
+    LPC_FLOAT f = l;
 
     if (prog_code + sizeof(double) > prog_code_max) {
         mem_block_t *mbp = &mem_block[A_PROGRAM];
@@ -85,13 +82,14 @@ static void ins_short (short l)
 }
 
 /*
- * Store a 4 byte number. It is stored in such a way as to be sure
+ * Store a 8 byte number. It is stored in such a way as to be sure
  * that correct byte order is used, regardless of machine architecture.
  */
-static void ins_int (long l)
+// FIXME: needs ins_int32 & ins_int64 to support 32bit compile.
+static void ins_int (LPC_INT l)
 {
 
-    if (prog_code + SIZEOF_LONG > prog_code_max) {
+    if (prog_code + sizeof(LPC_INT) > prog_code_max) {
         mem_block_t *mbp = &mem_block[A_PROGRAM];
         UPDATE_PROGRAM_SIZE;
         realloc_mem_block(mbp);
@@ -101,25 +99,6 @@ static void ins_int (long l)
     }
     STORE_INT(prog_code, l);
 }
-
-/*
- * Store a 8 byte number. It is stored in such a way as to be sure
- * that correct byte order is used, regardless of machine architecture.
- */
-#if SIZEOF_PTR == 8
-static void ins_long (long l)
-{
-    if (prog_code + 8 > prog_code_max) {
-        mem_block_t *mbp = &mem_block[A_PROGRAM];
-        UPDATE_PROGRAM_SIZE;
-        realloc_mem_block(mbp);
-
-        prog_code = mbp->block + mbp->current_size;
-        prog_code_max = mbp->block + mbp->max_size;
-    }
-    STORE_PTR(prog_code, l);
-}
-#endif
 
 static void upd_short (int offset, int l, const char * where)
 {
@@ -236,7 +215,7 @@ static void write_small_number (int val) {
     ins_byte(val);
 }
 
-static void write_number (long val)
+static void write_number (LPC_INT val)
 {
     if ((val & ~0xff) == 0)
         write_small_number(val);
@@ -250,11 +229,7 @@ static void write_number (long val)
             ins_short(val);
         } else {
             ins_byte(F_NUMBER);
-#if SIZEOF_LONG == 4
             ins_int(val);
-#else
-	    ins_long(val);
-#endif
         }
     }
 }
@@ -433,11 +408,7 @@ i_generate_node (parse_node_t * expr) {
         ins_byte(expr->v.number);
         ins_byte(expr->l.number);
         if (expr->v.number == F_LOOP_COND_NUMBER)
-#if SIZEOF_LONG == 8
-            ins_long(expr->r.number);
-#else
-	    ins_int(expr->r.number);
-#endif
+	          ins_int(expr->r.number);
         else
             ins_byte(expr->r.number);
         break;

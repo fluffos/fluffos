@@ -1194,7 +1194,7 @@ int yylex()
     static char partial[MAXLINE + 5];   /* extra 5 for safety buffer */
     static char terminator[MAXLINE + 5];
     int is_float;
-    double myreal;
+    LPC_FLOAT myreal;
     char *partp;
 
     register char *yyp;
@@ -2139,7 +2139,7 @@ static void add_quoted_predefine (const char * def, const char * val)
 
 void add_predefines()
 {
-    char save_buf[80];
+    char save_buf[1024];
     int i;
     lpc_predef_t *tmpf;
 
@@ -2214,10 +2214,16 @@ void add_predefines()
             fatal("MLEN exceeded");
         add_predefine(namebuf, -1, mtext);
     }
-    sprintf(save_buf, "%ld", sizeof(long));
+    sprintf(save_buf, "%ld", sizeof(LPC_INT));
     add_predefine("SIZEOFINT", -1, save_buf);    
-    sprintf(save_buf, "%ld", LONG_MAX);
+    sprintf(save_buf, "%ld", LPC_INT_MAX);
     add_predefine("MAX_INT", -1, save_buf);
+    sprintf(save_buf, "%ld", LPC_INT_MIN);
+    add_predefine("MIN_INT", -1, save_buf);
+    sprintf(save_buf, "%lf", LPC_FLOAT_MAX);
+    add_predefine("MAX_FLOAT", -1, save_buf);
+    sprintf(save_buf, "%lf", LPC_FLOAT_MIN);
+    add_predefine("MIN_FLOAT", -1, save_buf);
 }
 
 void start_new_file (int f)

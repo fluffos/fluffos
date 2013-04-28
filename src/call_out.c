@@ -29,7 +29,7 @@ typedef struct pending_call_s {
 	object_t *command_giver;
 #endif
 #ifdef CALLOUT_HANDLES
-	int handle;
+	LPC_INT handle;
 #endif
 } pending_call_t;
 
@@ -78,7 +78,7 @@ INLINE_STATIC void free_call (pending_call_t * cop)
  * Setup a new call out.
  */
 #ifdef CALLOUT_HANDLES
-int
+LPC_INT
 #else
 void
 #endif
@@ -284,8 +284,10 @@ void call_out()
 				call_list[tm]->delta--;
 			current_time++;
 			DBG(("   current_time = %ld", current_time));
+#ifndef POSIX_TIMERS
 			if(!(current_time%HEARTBEAT_INTERVAL))
 				call_heart_beat();
+#endif
 		} else {
 			/* We're done! */
 			break;
@@ -293,6 +295,13 @@ void call_out()
 	}
 	DBG(("Done."));
 	pop_context(&econ);
+#ifdef POSIX_TIMERS
+	if(time_for_hb){
+		call_heart_beat();
+		time_for_hb--;
+	}
+#endif
+
 }
 
 static int time_left (int slot, int delay) {
@@ -340,7 +349,7 @@ int remove_call_out (object_t * ob, const char * fun)
 }
 
 #ifdef CALLOUT_HANDLES
-int remove_call_out_by_handle (int handle)
+int remove_call_out_by_handle (LPC_INT handle)
 {
 	pending_call_t **copp, *cop;
 	int delay = 0;
@@ -362,7 +371,7 @@ int remove_call_out_by_handle (int handle)
 	return -1;
 }
 
-int find_call_out_by_handle (int handle)
+int find_call_out_by_handle (LPC_INT handle)
 {
 	pending_call_t *cop;
 	int delay = 0;

@@ -1,6 +1,7 @@
 #ifndef FLUFF_EVAL_H
 #define FLUFF_EVAL_H
 extern int outoftime;
-void set_eval(int time);
-int get_eval();
+extern LPC_INT max_cost;
+void set_eval(LPC_INT time);
+LPC_INT get_eval();
 #endif
