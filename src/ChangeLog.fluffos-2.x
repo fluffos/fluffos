@@ -2,7 +2,24 @@ As MudOS is moving too slow to keep our driver hacks apart, we now call our own
 FluffOS :), note: where it says Cratylus, I got it from his version, usually
 someone else did the work, but I don't know how to find who did what there.
 
-FluffOS 2.25
+FluffOS 2.27
+Fixed Changelog name for 2.26
+fix incorrect sha1() hashes  (Voltara <voltara@gmail.com>)
+Fix db.c with PACKAGE_ASYNC. (mactorg@lpmuds.net)
+allow floating point for heart beat interval
+added extra file:linenumber result for call_stack(4)
+fix call_other type errors as warnings and some timezone leaking bugs (driver timezone would be changed after efun/error in efun)
+Fix a valgrind complain in posix_timer.c (Yucong Sun <sunyucong@gmail.com>)
+Testsuit fixes. (Yucong Sun <sunyucong@gmail.com>)
+compile with C99  (Yucong Sun <sunyucong@gmail.com>)
+Unbreak DEBUG_MALLOC & CHECK_MEMORY, now everything is accounted for. (Yucong Sun <sunyucong@gmail.com>)
+Crypto package multiple fixes and enhancements (Voltara <voltara@gmail.com>)
+Code cleanup/fixes (Yucong Sun <sunyucong@gmail.com>)
+LPC MIN_INT, MAX_FLOAT, MIN_FLOAT predefines. (Yucong Sun <sunyucong@gmail.com>)
+Added POSIX_TIMERS alternative for eval timer (Voltara <voltara@gmail.com>)
+IPV6 compile fix on unbuntu. (Yucong Sun <sunyucong@gmail.com>)
+
+FluffOS 2.26
 Compile warning fixes (sunyc@lpmuds.net)
 add_action moved objects fix (vorpal@lpmuds.net)
 Properly report 64 bit linux when starting (sunyc@lpmuds.net)
