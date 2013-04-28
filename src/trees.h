@@ -5,6 +5,7 @@
 #ifndef _TREES_H
 #define _TREES_H
 #include "std.h"
+#include "lpc_incl.h"
 #define NODES_PER_BLOCK         256
 
 enum node_type {
@@ -25,8 +26,8 @@ enum control_jump_type {
 };
 
 union parse_value {
-    long number;
-    double real;
+    LPC_INT number;
+    LPC_FLOAT real;
     struct parse_node_s *expr;
 };
 

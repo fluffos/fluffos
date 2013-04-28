@@ -201,7 +201,7 @@ typedef struct program_s {
     unsigned short last_inherited;
     unsigned PROG_REF_TYPE ref;                 /* Reference count */
     unsigned short func_ref;
-#ifdef DEBUG
+#ifdef DEBUGMALLOC_EXTENSIONS
     int extra_ref;              /* Used to verify ref count */
     int extra_func_ref;
 #endif

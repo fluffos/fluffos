@@ -139,14 +139,14 @@ f_localtime (void)
         string_copy(timezone(tz.tz_minuteswest, tm->tm_isdst), "f_localtime");
 #else                           /* sequent */
 #if (defined(hpux) || defined(_SEQUENT_) || defined(_AIX) || defined(SunOS_5) \
-    || defined(SVR4) || defined(sgi) || defined(linux) || defined(cray) \
+    || defined(SVR4) || defined(sgi) || defined(__linux__) || defined(cray) \
     || defined(__CYGWIN__)\
     )
       if (!tm->tm_isdst) {
         vec->item[LT_GMTOFF].u.number = timezone;
         vec->item[LT_ZONE].u.string = string_copy(tzname[0], "f_localtime");
       } else {
-#if (defined(_AIX) || defined(hpux) || defined(linux) || defined(cray) \
+#if (defined(_AIX) || defined(hpux) || defined(__linux__) || defined(cray) \
     || defined(__CYGWIN__)\
     )
         vec->item[LT_GMTOFF].u.number = timezone;
@@ -160,8 +160,10 @@ f_localtime (void)
       vec->item[LT_GMTOFF].u.number = tm->tm_gmtoff;
       vec->item[LT_ZONE].u.string = string_copy(tm->tm_zone, "f_localtime");
 #else
-      vec->item[LT_GMTOFF].u.number = _timezone;
-      vec->item[LT_ZONE].u.string = string_copy(_tzname[_daylight?1:0],"f_localtime");
+#if defined(WIN32) || defined(__CYGWIN__)
+    vec->item[LT_GMTOFF].u.number = _timezone;
+    vec->item[LT_ZONE].u.string = string_copy(_tzname[_daylight?1:0],"f_localtime");
+#endif
 #endif
 #endif
 #endif                          /* sequent */

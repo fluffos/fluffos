@@ -92,10 +92,10 @@
 #define ARCH "A/UX"
 #endif
 
-#if defined(linux) || defined(__linux)
+#if defined(__linux__)
 #  ifdef __mc68000
 #    define ARCH "Linux/m68k"
-#  elif __x86_64
+#  elif defined(__x86_64)
 #      define ARCH "Linux/x86-64"
 #  else
 #    ifdef __alpha

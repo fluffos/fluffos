@@ -198,11 +198,7 @@ void CDECL add_vmessage (object_t *, const char *, ...);
 void add_message (object_t *, const char *, int);
 void add_binary_message (object_t *, const unsigned char *, int);
 
-#ifdef SIGNAL_FUNC_TAKES_INT
-void sigalrm_handler (int);
-#else
-void sigalrm_handler (void);
-#endif
+
 void update_ref_counts_for_users (void);
 INLINE void make_selectmasks (void);
 void init_user_conn (void);

@@ -1778,17 +1778,6 @@ static void sigpipe_handler(void)
 	signal(SIGPIPE, sigpipe_handler);
 }                               /* sigpipe_handler() */
 #endif
-/*
- * SIGALRM handler.
- */
-#ifdef SIGNAL_FUNC_TAKES_INT
-void sigalrm_handler (int sig)
-#else
-void sigalrm_handler()
-#endif
-{
-	outoftime = 1;
-}                               /* sigalrm_handler() */
 
 int max_fd;
 
@@ -2026,7 +2015,8 @@ static void new_user_handler (int which)
 	master_ob->interactive->default_err_message.s = 0;
 #endif
 	master_ob->interactive->connection_type = external_port[which].kind;
-	master_ob->interactive->sb_buf = (unsigned char *)MALLOC(SB_SIZE);
+	master_ob->interactive->sb_buf = (unsigned char *)DMALLOC(SB_SIZE,
+      TAG_PERMANENT, "new_user_handler");
 	master_ob->interactive->sb_size = SB_SIZE;
 	master_ob->flags |= O_ONCE_INTERACTIVE;
 	/*
@@ -2473,10 +2463,12 @@ static char *get_user_command()
 				debug_message("Double call to remove_interactive()\n");
 			return;
 		}
-
-		debug(connections, ("Closing connection from %s.\n",
-				inet_ntoa(ip->addr.sin_addr)));
-
+#ifdef IPV6
+    char tmp[INET6_ADDRSTRLEN];
+    debug(connections, ("Closing connection from %s.\n", inet_ntop(AF_INET6, &ip->addr.sin6_addr, &tmp, INET6_ADDRSTRLEN)));
+#else
+		debug(connections, ("Closing connection from %s.\n", inet_ntoa(ip->addr.sin_addr)));
+#endif
 		flush_message(ip);
 		ip->iflags |= CLOSING;
 

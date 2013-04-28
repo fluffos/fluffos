@@ -192,7 +192,7 @@ char *
     } else {
         if (REFS(b))
             REFS(b)++;
-        //no we don't! ADD_STRING(SIZE(b));
+       ADD_STRING(SIZE(b));
     }
     NDBG(b);
     return (STRING(b));
