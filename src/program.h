@@ -129,27 +129,27 @@
 #define LOCAL_MODS (LOCAL_MOD_UNUSED|LOCAL_MOD_REF)
 
 typedef struct {
-    unsigned char num_arg;
-    unsigned char num_local;
-    unsigned short f_index; /* Index in sorted function table */
+  unsigned char num_arg;
+  unsigned char num_local;
+  unsigned short f_index; /* Index in sorted function table */
 } runtime_defined_t;
 
 typedef struct {
-    unsigned short offset;
-    unsigned short function_index_offset;
+  unsigned short offset;
+  unsigned short function_index_offset;
 } runtime_inherited_t;
 
 typedef union {
-    runtime_defined_t def;
-    runtime_inherited_t inh;
+  runtime_defined_t def;
+  runtime_inherited_t inh;
 } runtime_function_u;
 
 typedef struct {
-    unsigned short first_defined;
-    unsigned short first_overload;
-    unsigned short num_compressed;
-    unsigned short num_deleted;
-    unsigned char index[1];
+  unsigned short first_defined;
+  unsigned short first_overload;
+  unsigned short num_compressed;
+  unsigned short num_deleted;
+  unsigned char index[1];
 } compressed_offset_table_t;
 
 #ifdef USE_32BIT_ADDRESSES
@@ -161,97 +161,97 @@ typedef struct {
 #endif
 
 typedef struct {
-    char *funcname;
-    unsigned short type;
-    unsigned char num_arg;
-    unsigned char num_local;
-    ADDRESS_TYPE address;
+  char *funcname;
+  unsigned short type;
+  unsigned char num_arg;
+  unsigned char num_local;
+  ADDRESS_TYPE address;
 #ifdef PROFILE_FUNCTIONS
-    unsigned long calls, self, children;
+  unsigned long calls, self, children;
 #endif
 } function_t;
 
 typedef struct {
-    unsigned short classname;
-    unsigned short type;
-    unsigned short size;
-    unsigned short index;
+  unsigned short classname;
+  unsigned short type;
+  unsigned short size;
+  unsigned short index;
 } class_def_t;
 
 typedef struct {
-    unsigned short membername;
-    unsigned short type;
+  unsigned short membername;
+  unsigned short type;
 } class_member_entry_t;
 
 typedef struct {
-    char *name;
-    unsigned short type;        /* Type of variable. See above. TYPE_ */
+  char *name;
+  unsigned short type;        /* Type of variable. See above. TYPE_ */
 } variable_t;
 
 typedef struct {
-    struct program_s *prog;
-    unsigned short function_index_offset;
-    unsigned short variable_index_offset;
-    unsigned short type_mod;
+  struct program_s *prog;
+  unsigned short function_index_offset;
+  unsigned short variable_index_offset;
+  unsigned short type_mod;
 } inherit_t;
 
 typedef struct program_s {
-    const char *filename;                 /* Name of file that defined prog */
-    unsigned short flags;
-    unsigned short last_inherited;
-    unsigned PROG_REF_TYPE ref;                 /* Reference count */
-    unsigned short func_ref;
+  const char *filename;                 /* Name of file that defined prog */
+  unsigned short flags;
+  unsigned short last_inherited;
+  unsigned PROG_REF_TYPE ref;                 /* Reference count */
+  unsigned short func_ref;
 #ifdef DEBUGMALLOC_EXTENSIONS
-    int extra_ref;              /* Used to verify ref count */
-    int extra_func_ref;
+  int extra_ref;              /* Used to verify ref count */
+  int extra_func_ref;
 #endif
-    char *program;              /* The binary instructions */
-    unsigned char *line_info;   /* Line number information */
-    unsigned short *file_info;
-    int line_swap_index;        /* Where line number info is swapped */
-    function_t *function_table;
-    unsigned short *function_flags; /* separate for alignment reasons */
-    class_def_t *classes;
-    class_member_entry_t *class_members;
-    char **strings;             /* All strings uses by the program */
-    char **variable_table;      /* variables defined by this program */
-    unsigned short *variable_types;     /* variables defined by this program */
-    inherit_t *inherit; /* List of inherited prgms */
-    int total_size;             /* Sum of all data in this struct */
-    /*
-     * The types of function arguments are saved where 'argument_types'
-     * points. It can be a variable number of arguments, so allocation is
-     * done dynamically. To know where first argument is found for function
-     * 'n' (number of function), use 'type_start[n]'. These two arrays will
-     * only be allocated if '#pragma save_types' has been specified. This
-     * #pragma should be specified in files that are commonly used for
-     * inheritance. There are several lines of code that depends on the type
-     * length (16 bits) of 'type_start' (sorry !).
-     */
-    unsigned short *argument_types;
+  char *program;              /* The binary instructions */
+  unsigned char *line_info;   /* Line number information */
+  unsigned short *file_info;
+  int line_swap_index;        /* Where line number info is swapped */
+  function_t *function_table;
+  unsigned short *function_flags; /* separate for alignment reasons */
+  class_def_t *classes;
+  class_member_entry_t *class_members;
+  char **strings;             /* All strings uses by the program */
+  char **variable_table;      /* variables defined by this program */
+  unsigned short *variable_types;     /* variables defined by this program */
+  inherit_t *inherit; /* List of inherited prgms */
+  int total_size;             /* Sum of all data in this struct */
+  /*
+   * The types of function arguments are saved where 'argument_types'
+   * points. It can be a variable number of arguments, so allocation is
+   * done dynamically. To know where first argument is found for function
+   * 'n' (number of function), use 'type_start[n]'. These two arrays will
+   * only be allocated if '#pragma save_types' has been specified. This
+   * #pragma should be specified in files that are commonly used for
+   * inheritance. There are several lines of code that depends on the type
+   * length (16 bits) of 'type_start' (sorry !).
+   */
+  unsigned short *argument_types;
 #define INDEX_START_NONE                65535
-    unsigned short *type_start;
-    /*
-     * And now some general size information.
-     */
-    unsigned short heart_beat;  /* Index of the heart beat function. 0 means
+  unsigned short *type_start;
+  /*
+   * And now some general size information.
+   */
+  unsigned short heart_beat;  /* Index of the heart beat function. 0 means
                                  * no heart beat */
-    unsigned short program_size;/* size of this instruction code */
-    unsigned short num_classes;
-    unsigned short num_functions_defined;
-    unsigned short num_strings;
-    unsigned short num_variables_total;
-    unsigned short num_variables_defined;
-    unsigned short num_inherited;
+  unsigned short program_size;/* size of this instruction code */
+  unsigned short num_classes;
+  unsigned short num_functions_defined;
+  unsigned short num_strings;
+  unsigned short num_variables_total;
+  unsigned short num_variables_defined;
+  unsigned short num_inherited;
 } program_t;
 
 extern int total_num_prog_blocks;
 extern int total_prog_block_size;
-void reference_prog (program_t *, const char *);
-void free_prog (program_t **);
-void deallocate_program (program_t *);
-char *variable_name (program_t *, int);
-function_t *find_func_entry (program_t *, int);
+void reference_prog(program_t *, const char *);
+void free_prog(program_t **);
+void deallocate_program(program_t *);
+char *variable_name(program_t *, int);
+function_t *find_func_entry(program_t *, int);
 
 #endif
 

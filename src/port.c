@@ -7,10 +7,11 @@
 #include <sys/mman.h>
 #endif
 #if defined(WIN32)
-int dos_style_link (char * x, char * y) {
-    char link_cmd[100];
-    sprintf(link_cmd, "copy %s %s", x, y);
-    return system(link_cmd);
+int dos_style_link(char *x, char *y)
+{
+  char link_cmd[100];
+  sprintf(link_cmd, "copy %s %s", x, y);
+  return system(link_cmd);
 }
 #endif
 
@@ -23,44 +24,44 @@ int dos_style_link (char * x, char * y) {
 #endif
 
 #ifdef sun
-time_t time (time_t *);
+time_t time(time_t *);
 #endif
 
 /*
  * Return a pseudo-random number in the range 0 .. n-1
  */
-long random_number (long n)
+long random_number(long n)
 {
 #if defined(RAND) || defined(DRAND48)
-    static char called = 0;
+  static char called = 0;
 
-    if (!called) {
-	time_t tim;
+  if (!called) {
+    time_t tim;
 
-	time(&tim);
+    time(&tim);
 #  ifdef RAND
-	srand(tim);
+    srand(tim);
 #  else
-	srand48(tim);
+    srand48(tim);
 #  endif
-	called = 1;
-    }				/* endif */
+    called = 1;
+  }               /* endif */
 #  ifdef RAND
 #    ifdef MINGW
-    return rand() % n;
+  return rand() % n;
 #    else
-    return 1 + (long) ((float)n * rand() / (RAND_MAX+1.0);
+  return 1 + (long)((float)n * rand() / (RAND_MAX + 1.0);
 #endif
 #  else
-    return (long)(drand48() * n);
+  return (long)(drand48() * n);
 #  endif
 #else
 #  ifdef RANDOM
-    return random() % n;
-#  else				/* RANDOM */
-    return current_time % n;	/* You really don't want to use this method */
-#  endif			/* RANDOM */
-#endif				/* RAND */
+  return random() % n;
+#  else             /* RANDOM */
+  return current_time % n;    /* You really don't want to use this method */
+#  endif            /* RANDOM */
+#endif              /* RAND */
 }
 
 /*
@@ -74,15 +75,16 @@ long random_number (long n)
 
 long get_current_time()
 {
-    return time(0l);	/* Just use the old time() for now */
+  return time(0l);    /* Just use the old time() for now */
 }
 
-const char *time_string (time_t t)
+const char *time_string(time_t t)
 {
-    const char *res = ctime(&t);
-    if(!res)
-      res = "ctime failed";
-    return res;
+  const char *res = ctime(&t);
+  if (!res) {
+    res = "ctime failed";
+  }
+  return res;
 }
 
 /*
@@ -91,7 +93,7 @@ const char *time_string (time_t t)
 void init_usec_clock()
 {
 #ifdef _SEQUENT_
-    usclk_init();
+  usclk_init();
 #endif
 }
 
@@ -99,123 +101,124 @@ void init_usec_clock()
  * Get a microsecond clock sample.
  */
 void
-get_usec_clock (long * sec, long * usec)
+get_usec_clock(long *sec, long *usec)
 {
 #ifdef HAS_GETTIMEOFDAY
-    struct timeval tv;
+  struct timeval tv;
 
-    gettimeofday(&tv, NULL);
-    *sec = tv.tv_sec;
-    *usec = tv.tv_usec;
+  gettimeofday(&tv, NULL);
+  *sec = tv.tv_sec;
+  *usec = tv.tv_usec;
 #else
 #ifdef _SEQUENT_
-           *sec = 0;
-    *usec = GETUSCLK();
+  *sec = 0;
+  *usec = GETUSCLK();
 #else
-    *sec = time(0);
-    *usec = 0;
+  *sec = time(0);
+  *usec = 0;
 #endif
 #endif
 }
 
 #ifdef USE_POSIX_SIGNALS
 int
-port_sigblock (sigset_t mask)
+port_sigblock(sigset_t mask)
 {
-    sigset_t omask;
+  sigset_t omask;
 
-    sigprocmask(SIG_BLOCK, &mask, &omask);
-    return (omask);
+  sigprocmask(SIG_BLOCK, &mask, &omask);
+  return (omask);
 }
 
 int
-port_sigmask (int sig)
+port_sigmask(int sig)
 {
-    sigset_t set;
+  sigset_t set;
 
-    sigemptyset(&set);
-    sigaddset(&set, sig);
-    return (set);
+  sigemptyset(&set);
+  sigaddset(&set, sig);
+  return (set);
 }
 
 void
-     (*port_signal(sig, func)) ()
-    int sig;
-    void (*func) ();
+(*port_signal(sig, func))()
+int sig;
+void (*func)();
 {
-    struct sigaction act, oact;
+  struct sigaction act, oact;
 
-    act.sa_handler = func;
-    act.sa_mask = 0;
-    act.sa_flags = 0;
-    if (sigaction(sig, &act, &oact) == -1)
-	return ((void (*) ()) -1);
-    return (oact.sa_handler);
+  act.sa_handler = func;
+  act.sa_mask = 0;
+  act.sa_flags = 0;
+  if (sigaction(sig, &act, &oact) == -1) {
+    return ((void ( *)()) - 1);
+  }
+  return (oact.sa_handler);
 }
 
 int
-port_sigsetmask (sigset_t mask)
+port_sigsetmask(sigset_t mask)
 {
-    sigset_t omask;
+  sigset_t omask;
 
-    sigprocmask(SIG_SETMASK, &mask, &omask);
-    return (omask);
+  sigprocmask(SIG_SETMASK, &mask, &omask);
+  return (omask);
 }
 #endif
 
 int
-get_cpu_times (unsigned long * secs, unsigned long * usecs)
+get_cpu_times(unsigned long *secs, unsigned long *usecs)
 {
 #ifdef RUSAGE
-    struct rusage rus;
+  struct rusage rus;
 #endif
 #if defined(TIMES) && !defined(RUSAGE)
-    struct tms t;
-    unsigned long total;
+  struct tms t;
+  unsigned long total;
 #endif
 #ifdef GET_PROCESS_STATS
-    struct process_stats ps;
+  struct process_stats ps;
 #endif
 
-#ifdef RUSAGE			/* start RUSAGE */
-    if (getrusage(RUSAGE_SELF, &rus) < 0) {
-	return 0;
-    }
-    *secs = rus.ru_utime.tv_sec + rus.ru_stime.tv_sec;
-    *usecs = rus.ru_utime.tv_usec + rus.ru_stime.tv_usec;
-    return 1;
-#else				/* end then RUSAGE */
-
-#ifdef GET_PROCESS_STATS	/* start GET_PROCESS_STATS */
-    if (get_process_stats(NULL, PS_SELF, &ps, NULL) == -1) {
-	return 0;
-    }
-    *secs = ps.ps_utime.tv_sec + ps.ps_stime.tv_sec;
-    *usecs = ps.ps_utime.tv_usec + ps.ps_stime.tv_usec;
-    return 1;
-#else				/* end then GET_PROCESS_STATS */
-
-#ifdef TIMES			/* start TIMES */
-    times(&t);
-    *secs = (total = t.tms_utime + t.tms_stime) / CLK_TCK;
-    *usecs = ((total - (*secs * CLK_TCK)) * 1000000) / CLK_TCK;
-    return 1;
-#else				/* end then TIMES */
-
+#ifdef RUSAGE           /* start RUSAGE */
+  if (getrusage(RUSAGE_SELF, &rus) < 0) {
     return 0;
-#endif				/* end TIMES */
-#endif				/* end else GET_PROCESS_STATS */
-#endif				/* end else RUSAGE */
+  }
+  *secs = rus.ru_utime.tv_sec + rus.ru_stime.tv_sec;
+  *usecs = rus.ru_utime.tv_usec + rus.ru_stime.tv_usec;
+  return 1;
+#else               /* end then RUSAGE */
+
+#ifdef GET_PROCESS_STATS    /* start GET_PROCESS_STATS */
+  if (get_process_stats(NULL, PS_SELF, &ps, NULL) == -1) {
+    return 0;
+  }
+  *secs = ps.ps_utime.tv_sec + ps.ps_stime.tv_sec;
+  *usecs = ps.ps_utime.tv_usec + ps.ps_stime.tv_usec;
+  return 1;
+#else               /* end then GET_PROCESS_STATS */
+
+#ifdef TIMES            /* start TIMES */
+  times(&t);
+  *secs = (total = t.tms_utime + t.tms_stime) / CLK_TCK;
+  *usecs = ((total - (*secs * CLK_TCK)) * 1000000) / CLK_TCK;
+  return 1;
+#else               /* end then TIMES */
+
+  return 0;
+#endif              /* end TIMES */
+#endif              /* end else GET_PROCESS_STATS */
+#endif              /* end else RUSAGE */
 }
 
 /* return the current working directory */
 char *
-     get_current_dir (char * buf, int limit)
+get_current_dir(char *buf, int limit)
 {
 #ifdef HAS_GETCWD
-    return getcwd(buf, limit);	/* POSIX */
+  return getcwd(buf, limit);  /* POSIX */
 #else
-    return getwd(buf);		/* BSD */
+  return getwd(buf);      /* BSD */
 #endif
 }
 
@@ -226,56 +229,61 @@ char *
 extern char *sys_errlist[];
 extern int sys_nerr;
 
-char *port_strerror (int which)
+char *port_strerror(int which)
 {
-    if ((which < 0) || (which >= sys_nerr)) {
-	return "unknown error";
-    } else {
-	return sys_errlist[which];
-    }
+  if ((which < 0) || (which >= sys_nerr)) {
+    return "unknown error";
+  } else {
+    return sys_errlist[which];
+  }
 }
-#endif				/* STRERROR */
+#endif              /* STRERROR */
 
 #ifdef MEMMOVE_MISSING
 /* for those without memmove() and a working bcopy() that can handle overlaps */
-INLINE char *memmove (register char * b, register char * a, register int s)
+INLINE char *memmove(register char *b, register char *a, register int s)
 {
-    char *r = b;
+  char *r = b;
 
-    if (b < a) {
-	while (s--)
-	    *(b++) = *(a++);
-    } else if (b > a) {
-	b += s;
-	a += s;
-	while (s--)
-	    *(--b) = *(--a);
+  if (b < a) {
+    while (s--) {
+      *(b++) = *(a++);
     }
-    return r;
+  } else if (b > a) {
+    b += s;
+    a += s;
+    while (s--) {
+      *(--b) = *(--a);
+    }
+  }
+  return r;
 }
 #endif
 
 #ifdef WIN32
-char *WinStrError(int err) {
-    static char buf[30];
-    if (errno < 10000) return strerror(err);
-    sprintf(buf, "error #%d", err);
-    return buf;
+char *WinStrError(int err)
+{
+  static char buf[30];
+  if (errno < 10000) { return strerror(err); }
+  sprintf(buf, "error #%d", err);
+  return buf;
 }
 #endif
 
 #ifdef MMAP_SBRK
-void * sbrkx(long size){
+void *sbrkx(long size)
+{
   static void *end = 0;
   static unsigned long tsize = 0;
   void *tmp, *result;
   long long newsize;
-  if(!end){
-    tmp = mmap((void *)0x41000000, 4096, PROT_READ|PROT_WRITE, MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS,0,0);
-    tsize=4096;
-    end=(void *)0x41000000;
-    if(tmp != end)
+  if (!end) {
+    tmp = mmap((void *)0x41000000, 4096, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+    tsize = 4096;
+    end = (void *)0x41000000;
+    if (tmp != end) {
       return NULL;
+    }
   }
 
   newsize = (long)end + size;
@@ -287,8 +295,9 @@ void * sbrkx(long size){
 
   tmp = mremap((void *)0x41000000, tsize, newsize, 0);
 
-  if(tmp != (void *) 0x41000000)
+  if (tmp != (void *) 0x41000000) {
     return NULL;
+  }
 
   tsize = newsize;
   return result;
@@ -296,7 +305,8 @@ void * sbrkx(long size){
 
 #else
 
-void *sbrkx(long size){
+void *sbrkx(long size)
+{
 #ifndef MINGW
   return sbrk(size);
 #endif

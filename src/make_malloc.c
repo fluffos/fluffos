@@ -6,13 +6,15 @@
 #include "std.h"
 
 #if !defined(THE_MALLOC) && !defined(THE_WRAPPER)
-int main() {
-    puts("Memory package and/or malloc wrapper incorrectly specified in options.h\n");
+int main()
+{
+  puts("Memory package and/or malloc wrapper incorrectly specified in options.h\n");
 }
 #else
-int main() {
-    unlink("malloc.c");
-    unlink("mallocwrapper.c");
-    return 0;
+int main()
+{
+  unlink("malloc.c");
+  unlink("mallocwrapper.c");
+  return 0;
 }
 #endif

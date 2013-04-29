@@ -17,20 +17,20 @@ extern object_t *current_heart_beat;
 extern error_context_t *current_error_context;
 extern int time_for_hb;
 
-void backend (void);
-void clear_state (void);
-void logon (object_t *);
-int parse_command (char *, object_t *);
-int set_heart_beat (object_t *, int);
-int query_heart_beat (object_t *);
-int heart_beat_status (outbuffer_t *, int);
-void preload_objects (int);
-INLINE void remove_destructed_objects (void);
-void update_load_av (void);
-void update_compile_av (int);
-char *query_load_av (void);
-array_t *get_heart_beats (void);
-int query_time_used (void);
-void call_heart_beat (void);
+void backend(void);
+void clear_state(void);
+void logon(object_t *);
+int parse_command(char *, object_t *);
+int set_heart_beat(object_t *, int);
+int query_heart_beat(object_t *);
+int heart_beat_status(outbuffer_t *, int);
+void preload_objects(int);
+INLINE void remove_destructed_objects(void);
+void update_load_av(void);
+void update_compile_av(int);
+char *query_load_av(void);
+array_t *get_heart_beats(void);
+int query_time_used(void);
+void call_heart_beat(void);
 
 #endif

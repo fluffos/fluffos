@@ -41,23 +41,23 @@ extern void *_default_morecore(long);
 
 /* Data structure giving per-block information. */
 union info {
-    struct {
-	int type;		/* Zero for a large block, or positive
-				   giving the logarithm to the base two
-				   of the fragment size. */
-	union {
-	    struct {
-		int nfree;	/* Free fragments in a fragmented block. */
-		int first;	/* First free fragment of the block. */
-	    } frag;
-	    int size;		/* Size (in blocks) of a large cluster. */
-	} info;
-    } busy;
-    struct {
-	int size;		/* Size (in blocks) of a free cluster. */
-	int next;		/* Index of next free cluster. */
-	int prev;		/* Index of previous free cluster. */
-    } free;
+  struct {
+    int type;       /* Zero for a large block, or positive
+                   giving the logarithm to the base two
+                   of the fragment size. */
+    union {
+      struct {
+        int nfree;  /* Free fragments in a fragmented block. */
+        int first;  /* First free fragment of the block. */
+      } frag;
+      int size;       /* Size (in blocks) of a large cluster. */
+    } info;
+  } busy;
+  struct {
+    int size;       /* Size (in blocks) of a free cluster. */
+    int next;       /* Index of next free cluster. */
+    int prev;       /* Index of previous free cluster. */
+  } free;
 };
 
 /* Pointer to first block of the heap. */
@@ -78,8 +78,8 @@ extern int _heaplimit;
 
 /* Doubly linked lists of free fragments. */
 struct list {
-    struct list *next;
-    struct list *prev;
+  struct list *next;
+  struct list *prev;
 };
 
 /* Count of blocks for each fragment size. */
@@ -91,6 +91,6 @@ extern struct list _fraghead[];
 void *gnumalloc(size_t);
 void gnufree(void *);
 void *gnurealloc(void *, size_t);
-void *gnucalloc(size_t,size_t);
+void *gnucalloc(size_t, size_t);
 
 #endif

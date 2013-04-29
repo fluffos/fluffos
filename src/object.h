@@ -59,77 +59,77 @@
 
 typedef struct sentence_s {
 #ifndef NO_ADD_ACTION
-    char *verb;
+  char *verb;
 #endif
-    struct sentence_s *next;
-    struct object_s *ob;
-    union string_or_func function;
-    int flags;
+  struct sentence_s *next;
+  struct object_s *ob;
+  union string_or_func function;
+  int flags;
 } sentence_t;
 
 typedef struct object_s {
-    unsigned short ref;         /* Reference count. */
-    unsigned short flags;       /* Bits or'ed together from above */
+  unsigned short ref;         /* Reference count. */
+  unsigned short flags;       /* Bits or'ed together from above */
 #ifdef DEBUGMALLOC_EXTENSIONS
-    unsigned int extra_ref;     /* Used to check ref count. */
+  unsigned int extra_ref;     /* Used to check ref count. */
 #endif
-    const char * const obname;
-    struct object_s *next_hash;
-    struct object_s *next_ch_hash;
-    /* the fields above must match lpc_object_t */
-    int load_time;              /* time when this object was created */
+  const char *const obname;
+  struct object_s *next_hash;
+  struct object_s *next_ch_hash;
+  /* the fields above must match lpc_object_t */
+  int load_time;              /* time when this object was created */
 #ifndef NO_RESET
-    int next_reset;             /* Time of next reset of this object */
+  int next_reset;             /* Time of next reset of this object */
 #endif
-    int time_of_ref;            /* Time when last referenced. Used by clean_uo */
-    program_t *prog;
-    struct object_s *next_all;
-    struct object_s *prev_all;
+  int time_of_ref;            /* Time when last referenced. Used by clean_uo */
+  program_t *prog;
+  struct object_s *next_all;
+  struct object_s *prev_all;
 #ifndef NO_ENVIRONMENT
-    struct object_s *next_inv;
-    struct object_s *contains;
-    struct object_s *super;     /* Which object surround us ? */
+  struct object_s *next_inv;
+  struct object_s *contains;
+  struct object_s *super;     /* Which object surround us ? */
 #endif
-    struct interactive_s *interactive;  /* Data about an interactive user */
-    char *replaced_program;     /* Program replaced with */
+  struct interactive_s *interactive;  /* Data about an interactive user */
+  char *replaced_program;     /* Program replaced with */
 #ifndef NO_LIGHT
-    short total_light;
+  short total_light;
 #endif
 #ifndef NO_SHADOWS
-    struct object_s *shadowing; /* Is this object shadowing ? */
-    struct object_s *shadowed;  /* Is this object shadowed ? */
+  struct object_s *shadowing; /* Is this object shadowing ? */
+  struct object_s *shadowed;  /* Is this object shadowed ? */
 #endif                          /* NO_SHADOWS */
 #ifndef NO_ADD_ACTION
-    sentence_t *sent;
-    struct object_s *next_hashed_living;
-    char *living_name;          /* Name of living object if in hash */
+  sentence_t *sent;
+  struct object_s *next_hashed_living;
+  char *living_name;          /* Name of living object if in hash */
 #endif
 #ifdef PACKAGE_UIDS
-    userid_t *uid;              /* the "owner" of this object */
-    userid_t *euid;             /* the effective "owner" */
+  userid_t *uid;              /* the "owner" of this object */
+  userid_t *euid;             /* the effective "owner" */
 #endif
 #ifdef PRIVS
-    char *privs;                /* object's privledges */
+  char *privs;                /* object's privledges */
 #endif                          /* PRIVS */
 #ifdef PACKAGE_MUDLIB_STATS
-    statgroup_t stats;          /* mudlib stats */
+  statgroup_t stats;          /* mudlib stats */
 #endif
 #ifdef PACKAGE_PARSER
-    struct parse_info_s *pinfo;
+  struct parse_info_s *pinfo;
 #endif
-    svalue_t variables[1];      /* All variables to this program */
-    /* The variables MUST come last in the struct */
+  svalue_t variables[1];      /* All variables to this program */
+  /* The variables MUST come last in the struct */
 } object_t;
 
-typedef int (* get_objectsfn_t) (object_t *, void *);
+typedef int (* get_objectsfn_t)(object_t *, void *);
 
 #ifdef DEBUG
 #define add_ref(ob, str) SAFE(\
                               if(ob->ref++ > 32000){\
-                            	  ob->flags |= O_BEING_DESTRUCTED;\
-				destruct_object(ob);\
-				error("ref count too high!\n");\
-			      } \
+                                  ob->flags |= O_BEING_DESTRUCTED;\
+                destruct_object(ob);\
+                error("ref count too high!\n");\
+                  } \
                               debug(d_flag, \
                               ("Add_ref %s (%d) from %s\n", \
                                      ob->obname, ob->ref, str));\
@@ -157,37 +157,37 @@ extern object_t **cgsp;
 extern int num_hidden;
 #endif
 
-void bufcat (char **, char *);
-INLINE int svalue_save_size (svalue_t *);
-INLINE void save_svalue (svalue_t *, char **);
-INLINE int restore_svalue (char *, svalue_t *);
-int save_object (object_t *, const char *, int);
-int save_object_str (object_t *, int, char *, int);
-char *save_variable (svalue_t *);
-int restore_object (object_t *, const char *, int);
-void restore_variable (svalue_t *, char *);
-object_t *get_empty_object (int);
-void reset_object (object_t *);
-void call_create (object_t *, int);
-void reload_object (object_t *);
-void free_object (object_t **, const char * const);
+void bufcat(char **, char *);
+INLINE int svalue_save_size(svalue_t *);
+INLINE void save_svalue(svalue_t *, char **);
+INLINE int restore_svalue(char *, svalue_t *);
+int save_object(object_t *, const char *, int);
+int save_object_str(object_t *, int, char *, int);
+char *save_variable(svalue_t *);
+int restore_object(object_t *, const char *, int);
+void restore_variable(svalue_t *, char *);
+object_t *get_empty_object(int);
+void reset_object(object_t *);
+void call_create(object_t *, int);
+void reload_object(object_t *);
+void free_object(object_t **, const char *const);
 #ifdef F_SET_HIDE
-INLINE int valid_hide (object_t *);
-INLINE int object_visible (object_t *);
+INLINE int valid_hide(object_t *);
+INLINE int object_visible(object_t *);
 #else
 #define object_visible(x) 1
 #endif
-void tell_npc (object_t *, const char *);
-void tell_object (object_t *, const char *, int);
-int find_global_variable (program_t *, const char * const, unsigned short *, int);
-void dealloc_object (object_t *, const char *);
-void get_objects (object_t ***, int *, get_objectsfn_t, void *);
+void tell_npc(object_t *, const char *);
+void tell_object(object_t *, const char *, int);
+int find_global_variable(program_t *, const char *const, unsigned short *, int);
+void dealloc_object(object_t *, const char *);
+void get_objects(object_t ** *, int *, get_objectsfn_t, void *);
 #ifdef DEBUGMALLOC_EXTENSIONS
-void mark_command_giver_stack (void);
+void mark_command_giver_stack(void);
 #endif
-void save_command_giver (object_t *);
-void restore_command_giver (void);
-void set_command_giver (object_t *);
-void clear_non_statics (object_t * ob);
-void restore_object_from_buff (object_t * ob, char * theBuff, int noclear);
+void save_command_giver(object_t *);
+void restore_command_giver(void);
+void set_command_giver(object_t *);
+void clear_non_statics(object_t *ob);
+void restore_object_from_buff(object_t *ob, char *theBuff, int noclear);
 #endif

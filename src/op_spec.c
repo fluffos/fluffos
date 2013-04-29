@@ -31,7 +31,7 @@ operator lor, land;
 operator catch, end_catch;
 operator time_expression, end_time_expression;
 
-operator switch;
+operator switch ;
 
 operator call_function_by_address, call_inherited, return, return_zero;
 

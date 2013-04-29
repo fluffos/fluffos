@@ -40,7 +40,7 @@
 #define V_START(vlist, last_arg) va_start(vlist, last_arg)
 #define V_VAR(type, var, vlist)
 #define SAFE(x) do { x } while (0)
- 
+
 
 /*
    Define for MALLOC, FREE, REALLOC, and CALLOC depend upon what malloc
@@ -112,7 +112,7 @@
 #  define DEBUG_CHECK1(x, y, a) if (x) fatal(y, a)
 #  define DEBUG_CHECK2(x, y, a, b) if (x) fatal(y, a, b)
 #else
-#  define IF_DEBUG(x) 
+#  define IF_DEBUG(x)
 #  define DEBUG_CHECK(x, y)
 #  define DEBUG_CHECK1(x, y, a)
 #  define DEBUG_CHECK2(x, y, a, b)
@@ -219,17 +219,17 @@
 #endif /* !defined(EDIT_SOURCE) && !defined(_FUNC_SPEC_) */
 
 #ifndef _FUNC_SPEC_
-   char *xalloc (int);
+char *xalloc(int);
 #  ifdef DEBUGMALLOC
-      char *int_string_copy (const char * const, char *);
-      char *int_string_unlink (const char *, char *);
-      char *int_new_string (int, char *);
-      char *int_alloc_cstring (const char *, char *);
+char *int_string_copy(const char *const, char *);
+char *int_string_unlink(const char *, char *);
+char *int_new_string(int, char *);
+char *int_alloc_cstring(const char *, char *);
 #  else
-      char *int_string_copy (const char * const);
-      char *int_string_unlink (const char *);
-      char *int_new_string (int);
-      char *int_alloc_cstring (const char *);
+char *int_string_copy(const char *const);
+char *int_string_unlink(const char *);
+char *int_new_string(int);
+char *int_alloc_cstring(const char *);
 #  endif
 #endif
 

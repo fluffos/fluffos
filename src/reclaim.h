@@ -4,6 +4,6 @@
 /*
  * reclaim.c
  */
-int reclaim_objects (void);
+int reclaim_objects(void);
 
 #endif

@@ -8,101 +8,106 @@
 
 struct translation *head;
 
-static struct translation *find_translator(const char *encoding){
-    struct translation *cur = head;
-    while(cur){
-	if(!strcmp(cur->name, encoding))
-	    break;
-	cur = cur->next;
+static struct translation *find_translator(const char *encoding) {
+  struct translation *cur = head;
+  while (cur) {
+    if (!strcmp(cur->name, encoding)) {
+      break;
     }
-    return cur;
+    cur = cur->next;
+  }
+  return cur;
 }
 
 
-struct translation *get_translator(const char *encoding){
-    struct translation *ret = find_translator(encoding);
-    if(ret)
-	return ret;
-    ret = (struct translation *)DMALLOC(sizeof(struct translation),
-        TAG_PERMANENT, "get_translator");
-    char *name = (char *)DMALLOC(strlen(encoding)+18+1,
-        TAG_PERMANENT, "get_translator");
-    strcpy(name, encoding);
-#ifdef __linux__
-    strcat(name, "//TRANSLIT//IGNORE");
-#endif
-    ret->name = name;
-    ret->incoming = iconv_open("UTF-8", encoding);
-    ret->outgoing = iconv_open(name, "UTF-8");
-
-    ret->next = 0;
-    if(ret->incoming == (iconv_t)-1 || ret->outgoing == (iconv_t)-1){
-	FREE(name);
-	FREE(ret);
-	return 0;
-    }
-    name[strlen(encoding)] = 0;
-    if(!head)
-	head = ret;
-    else {
-	struct translation *cur = head;
-	while(cur->next)
-	    cur = cur->next;
-	cur->next = ret;
-    }
+struct translation *get_translator(const char *encoding) {
+  struct translation *ret = find_translator(encoding);
+  if (ret) {
     return ret;
-}
-
-char *translate(iconv_t tr, const char *mes, int inlen, int *outlen){
-    size_t len = inlen;
-    size_t len2;
-    unsigned char *tmp = (unsigned char *)mes;
-    static char *res = 0;
-    static size_t reslen = 0;
-    char *tmp2;
-
-    if(!res){
-      res = (char *)DMALLOC(1, TAG_PERMANENT, "translate");
-	reslen = 1;
-    }
-
-    tmp2 = res;
-    len2 = reslen;
-
-    while(len){
-      iconv(tr, (char **)&tmp, &len, &tmp2, &len2);
-#ifdef PACKAGE_DWLIB
-		if(len > 1 && tmp[0] == 0xff && tmp[1] == 0xf9){
-		len -=2;
-		tmp +=2;
-#else
-		if(0){
+  }
+  ret = (struct translation *)DMALLOC(sizeof(struct translation),
+                                      TAG_PERMANENT, "get_translator");
+  char *name = (char *)DMALLOC(strlen(encoding) + 18 + 1,
+                               TAG_PERMANENT, "get_translator");
+  strcpy(name, encoding);
+#ifdef __linux__
+  strcat(name, "//TRANSLIT//IGNORE");
 #endif
-	    } else {
+  ret->name = name;
+  ret->incoming = iconv_open("UTF-8", encoding);
+  ret->outgoing = iconv_open(name, "UTF-8");
 
-		if(E2BIG == errno){
-		  errno = 0;
-		  tmp = (unsigned char *)mes;
-		  len = strlen(mes)+1;
-		  FREE(res);
-		  reslen *= 2;
-		  res = (char *)DMALLOC(reslen, TAG_PERMANENT, "translate");
-		  tmp2 = res;
-		  len2 = reslen;
-		  continue;
-		}
-		tmp2[0] = 0;
-		*outlen = reslen - len2;
-		return res;
-	    }
-
+  ret->next = 0;
+  if (ret->incoming == (iconv_t) - 1 || ret->outgoing == (iconv_t) - 1) {
+    FREE(name);
+    FREE(ret);
+    return 0;
+  }
+  name[strlen(encoding)] = 0;
+  if (!head) {
+    head = ret;
+  } else {
+    struct translation *cur = head;
+    while (cur->next) {
+      cur = cur->next;
     }
-    *outlen = reslen - len2;
-    return res;
+    cur->next = ret;
+  }
+  return ret;
+}
+
+char *translate(iconv_t tr, const char *mes, int inlen, int *outlen)
+{
+  size_t len = inlen;
+  size_t len2;
+  unsigned char *tmp = (unsigned char *)mes;
+  static char *res = 0;
+  static size_t reslen = 0;
+  char *tmp2;
+
+  if (!res) {
+    res = (char *)DMALLOC(1, TAG_PERMANENT, "translate");
+    reslen = 1;
+  }
+
+  tmp2 = res;
+  len2 = reslen;
+
+  while (len) {
+    iconv(tr, (char **)&tmp, &len, &tmp2, &len2);
+#ifdef PACKAGE_DWLIB
+    if (len > 1 && tmp[0] == 0xff && tmp[1] == 0xf9) {
+      len -= 2;
+      tmp += 2;
+#else
+    if (0) {
+#endif
+    } else {
+
+      if (E2BIG == errno) {
+        errno = 0;
+        tmp = (unsigned char *)mes;
+        len = strlen(mes) + 1;
+        FREE(res);
+        reslen *= 2;
+        res = (char *)DMALLOC(reslen, TAG_PERMANENT, "translate");
+        tmp2 = res;
+        len2 = reslen;
+        continue;
+      }
+      tmp2[0] = 0;
+      *outlen = reslen - len2;
+      return res;
+    }
+
+  }
+  *outlen = reslen - len2;
+  return res;
 }
 
 #else
-char *translate(iconv_t tr, const char *mes, int inlen, int *outlen){
+char *translate(iconv_t tr, const char *mes, int inlen, int *outlen)
+{
   *outlen = inlen;
   return (char *)mes;
 }
@@ -110,19 +115,21 @@ char *translate(iconv_t tr, const char *mes, int inlen, int *outlen){
 
 
 
-char *translate_easy(iconv_t tr, char *mes){
+char *translate_easy(iconv_t tr, char *mes)
+{
   int dummy;
-  char *res = translate(tr, mes, strlen(mes)+1, &dummy);
+  char *res = translate(tr, mes, strlen(mes) + 1, &dummy);
   return res;
 }
 
 
 
 #ifdef F_SET_ENCODING
-void f_set_encoding(){
-  if(current_object->interactive){
+void f_set_encoding()
+{
+  if (current_object->interactive) {
     struct translation *newt = get_translator((char *)sp->u.string);
-    if(newt){
+    if (newt) {
       current_object->interactive->trans = newt;
       return;
     }
@@ -133,11 +140,13 @@ void f_set_encoding(){
 #endif
 
 #ifdef F_TO_UTF8
-void f_to_utf8(){
+void f_to_utf8()
+{
   struct translation *newt = get_translator((char *)sp->u.string);
   pop_stack();
-  if(!newt)
+  if (!newt) {
     error("unknown encoding");
+  }
   char *text = (char *)sp->u.string;
   char *translated = translate_easy(newt->incoming, text);
   pop_stack();
@@ -146,11 +155,13 @@ void f_to_utf8(){
 #endif
 
 #ifdef F_UTF8_TO
-void f_utf8_to(){
+void f_utf8_to()
+{
   struct translation *newt = get_translator((char *)sp->u.string);
   pop_stack();
-  if(!newt)
+  if (!newt) {
     error("unknown encoding");
+  }
   char *text = (char *)sp->u.string;
   char *translated = translate_easy(newt->outgoing, text);
   pop_stack();
@@ -159,18 +170,20 @@ void f_utf8_to(){
 #endif
 
 #ifdef F_STR_TO_ARR
-void f_str_to_arr(){
+void f_str_to_arr()
+{
   static struct translation *newt = 0;
-  if(!newt){
+  if (!newt) {
     newt = get_translator("UTF-32");
     translate_easy(newt->outgoing, " ");
   }
   int len;
-  int *trans = (int *)translate(newt->outgoing, sp->u.string, SVALUE_STRLEN(sp)+1, &len);
-  len/=4;
+  int *trans = (int *)translate(newt->outgoing, sp->u.string, SVALUE_STRLEN(sp) + 1, &len);
+  len /= 4;
   array_t *arr = allocate_array(len);
-  while(len--)
+  while (len--) {
     arr->item[len].u.number = trans[len];
+  }
   free_svalue(sp, "str_to_arr");
   put_array(arr);
 }
@@ -178,19 +191,21 @@ void f_str_to_arr(){
 #endif
 
 #ifdef F_ARR_TO_STR
-void f_arr_to_str(){
+void f_arr_to_str()
+{
   static struct translation *newt = 0;
-  if(!newt){
+  if (!newt) {
     newt = get_translator("UTF-32");
   }
   int len = sp->u.arr->size;
-  int *in = (int *)DMALLOC(sizeof(int)*(len+1), TAG_TEMPORARY, "f_arr_to_str");
+  int *in = (int *)DMALLOC(sizeof(int) * (len + 1), TAG_TEMPORARY, "f_arr_to_str");
   char *trans;
   in[len] = 0;
-  while(len--)
+  while (len--) {
     in[len] = sp->u.arr->item[len].u.number;
+  }
 
-  trans = translate(newt->incoming, (char *)in, (sp->u.arr->size+1)*4, &len);
+  trans = translate(newt->incoming, (char *)in, (sp->u.arr->size + 1) * 4, &len);
   FREE(in);
   pop_stack();
   copy_and_push_string(trans);
@@ -199,12 +214,14 @@ void f_arr_to_str(){
 #endif
 
 #ifdef F_STRWIDTH
-void f_strwidth(){
+void f_strwidth()
+{
   int len = SVALUE_STRLEN(sp);
   int width = 0;
   int i;
-  for(i=0; i<len; i++)
+  for (i = 0; i < len; i++) {
     width += !(((sp->u.string[i]) & 0xc0) == 0x80);
+  }
   pop_stack();
   push_number(width);
 }

@@ -9,42 +9,42 @@
 #define NODES_PER_BLOCK         256
 
 enum node_type {
-    NODE_RETURN, NODE_TWO_VALUES, NODE_OPCODE, NODE_OPCODE_1, NODE_OPCODE_2,
-    NODE_UNARY_OP, NODE_UNARY_OP_1, NODE_BINARY_OP, NODE_BINARY_OP_1,
-    NODE_TERNARY_OP, NODE_TERNARY_OP_1, NODE_CONTROL_JUMP, NODE_LOOP,
-    NODE_CALL, NODE_CALL_1, NODE_CALL_2, NODE_LAND_LOR, NODE_FOREACH,
-    NODE_LVALUE_EFUN, NODE_SWITCH_RANGES, NODE_SWITCH_STRINGS, 
-    NODE_SWITCH_DIRECT, NODE_SWITCH_NUMBERS, NODE_CASE_NUMBER,
-    NODE_CASE_STRING, NODE_DEFAULT, NODE_IF, NODE_BRANCH_LINK, NODE_PARAMETER,
-    NODE_PARAMETER_LVALUE, NODE_EFUN, NODE_ANON_FUNC, NODE_REAL, NODE_NUMBER,
-    NODE_STRING, NODE_FUNCTION_CONSTRUCTOR, NODE_CATCH, NODE_TIME_EXPRESSION,
-    NODE_FUNCTION
+  NODE_RETURN, NODE_TWO_VALUES, NODE_OPCODE, NODE_OPCODE_1, NODE_OPCODE_2,
+  NODE_UNARY_OP, NODE_UNARY_OP_1, NODE_BINARY_OP, NODE_BINARY_OP_1,
+  NODE_TERNARY_OP, NODE_TERNARY_OP_1, NODE_CONTROL_JUMP, NODE_LOOP,
+  NODE_CALL, NODE_CALL_1, NODE_CALL_2, NODE_LAND_LOR, NODE_FOREACH,
+  NODE_LVALUE_EFUN, NODE_SWITCH_RANGES, NODE_SWITCH_STRINGS,
+  NODE_SWITCH_DIRECT, NODE_SWITCH_NUMBERS, NODE_CASE_NUMBER,
+  NODE_CASE_STRING, NODE_DEFAULT, NODE_IF, NODE_BRANCH_LINK, NODE_PARAMETER,
+  NODE_PARAMETER_LVALUE, NODE_EFUN, NODE_ANON_FUNC, NODE_REAL, NODE_NUMBER,
+  NODE_STRING, NODE_FUNCTION_CONSTRUCTOR, NODE_CATCH, NODE_TIME_EXPRESSION,
+  NODE_FUNCTION
 };
 
 enum control_jump_type {
-    CJ_BREAK_SWITCH = 2, CJ_BREAK = 0, CJ_CONTINUE = 1
+  CJ_BREAK_SWITCH = 2, CJ_BREAK = 0, CJ_CONTINUE = 1
 };
 
 union parse_value {
-    LPC_INT number;
-    LPC_FLOAT real;
-    struct parse_node_s *expr;
+  LPC_INT number;
+  LPC_FLOAT real;
+  struct parse_node_s *expr;
 };
 
 typedef struct parse_node_s {
-    short kind;
-#if !defined(USE_32BIT_ADDRESSES) 
-    short line;
+  short kind;
+#if !defined(USE_32BIT_ADDRESSES)
+  short line;
 #else
-    unsigned int line;
+  unsigned int line;
 #endif
-    unsigned short type;
-    union parse_value v, l, r; /* left, right, and value */
+  unsigned short type;
+  union parse_value v, l, r; /* left, right, and value */
 } parse_node_t;
 
 typedef struct parse_node_block_s {
-    struct parse_node_block_s *next;
-    parse_node_t nodes[NODES_PER_BLOCK];
+  struct parse_node_block_s *next;
+  parse_node_t nodes[NODES_PER_BLOCK];
 } parse_node_block_t;
 
 #define IS_NODE(vn, nt, op) ((vn)->kind == nt && (vn)->v.number == op)
@@ -257,24 +257,24 @@ typedef struct parse_node_block_s {
                                )
 
 /* tree functions */
-void free_tree (void);
-void release_tree (void);
-void lock_expressions (void);
-void unlock_expressions (void);
+void free_tree(void);
+void release_tree(void);
+void lock_expressions(void);
+void unlock_expressions(void);
 /* node functions */
-parse_node_t *new_node (void);
-parse_node_t *new_node_no_line (void);
-parse_node_t *make_branched_node (short, char, 
-                                       parse_node_t *, parse_node_t *);
+parse_node_t *new_node(void);
+parse_node_t *new_node_no_line(void);
+parse_node_t *make_branched_node(short, char,
+                                 parse_node_t *, parse_node_t *);
 /* parser grammar functions */
-parse_node_t *binary_int_op (parse_node_t *, parse_node_t *, 
-                                  char, const char *);
-parse_node_t *make_range_node (int, parse_node_t *,
-                                         parse_node_t *,
-                                         parse_node_t *);
-parse_node_t *insert_pop_value (parse_node_t *);
-parse_node_t *pop_value (parse_node_t *);
-parse_node_t *optimize_loop_test (parse_node_t *);
-int is_boolean (parse_node_t *);
+parse_node_t *binary_int_op(parse_node_t *, parse_node_t *,
+                            char, const char *);
+parse_node_t *make_range_node(int, parse_node_t *,
+                              parse_node_t *,
+                              parse_node_t *);
+parse_node_t *insert_pop_value(parse_node_t *);
+parse_node_t *pop_value(parse_node_t *);
+parse_node_t *optimize_loop_test(parse_node_t *);
+int is_boolean(parse_node_t *);
 
 #endif

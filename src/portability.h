@@ -2,7 +2,7 @@
  * portability.h: global portability #defines for MudOS, an LPmud driver
  *
  * If you have to have to change this file to get MudOS to compile and
- * run on your system, please provide us wth a copy of your modified 
+ * run on your system, please provide us wth a copy of your modified
  * portability.h file and the name of the type of system you are using.
  */
 
@@ -32,7 +32,7 @@
 #  ifndef WIN32
 #    define WIN32
 #      ifndef _FUNC_SPEC_
-         typedef char * caddr_t;
+typedef char *caddr_t;
 #      endif
 #  endif
 #  define symlink(x, y) dos_style_link(x, y)
@@ -132,19 +132,19 @@
  * This page size should be terms of the number of bytes in a page of
  * system memory (not necessarily the same as the hardware page size).
  * You may be able to ascertain the correct value by searching your
- * /usr/include files or asking your system adminstrator.  
+ * /usr/include files or asking your system adminstrator.
  *
  * FIXME: configure should check for getpagesize().
  */
 #if !defined(__linux__) && !defined(__386BSD__) && !defined(__FreeBSD__) \
-	&& !defined(OSF) && !defined(SunOS_4) && !defined(sgi)
+    && !defined(OSF) && !defined(SunOS_4) && !defined(sgi)
 #  ifdef _SC_PAGE_SIZE
 #    define MEMPAGESIZE sysconf(_SC_PAGE_SIZE)
 #  else
 #    ifdef _SC_PAGESIZE
 #      define MEMPAGESIZE sysconf(_SC_PAGESIZE)
 #    else
-       /* taken from smalloc.c's CHUNK_SIZE */
+/* taken from smalloc.c's CHUNK_SIZE */
 #      define MEMPAGESIZE 0x40000
 #    endif
 #  endif
@@ -278,4 +278,4 @@
 #endif
 #endif
 
-#endif				/* _PORT_H */
+#endif              /* _PORT_H */

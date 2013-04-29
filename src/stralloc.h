@@ -7,7 +7,7 @@
 
 /* implementation */
 #ifdef NOISY_DEBUG
-   void bp (void);
+void bp(void);
 #  ifdef NOISY_STRING
 #    define NDBG(x) if (strcmp(STRING(x), NOISY_STRING)==0) \
                     debug_message("%s - %d\n", STRING(x), REFS(x)), bp()
@@ -21,9 +21,9 @@
 #if defined(DEBUGMALLOC_EXTENSIONS) && defined(STRING_STATS)
 /* Uncomment for very complete string ref checking, but be warned it runs
    _very_ slowly.  A conditional definition like:
-   
+
    (current_prog && strcmp(current_prog->name, "foo") == 0 ? check_string_stats(0) : 0)
-   
+
    is usually best.
  */
 #define CHECK_STRING_STATS /* check_string_stats(0) */
@@ -48,16 +48,16 @@
 #endif
 
 typedef struct malloc_block_s {
-	void *dummy;
-	int bing;
+  void *dummy;
+  int bing;
 #ifdef DEBUGMALLOC_EXTENSIONS
-    long extra_ref;
+  long extra_ref;
 #endif
-    unsigned int size;
-    unsigned short ref;
+  unsigned int size;
+  unsigned short ref;
 } malloc_block_t;
 
-#define MSTR_BLOCK(x) (((malloc_block_t *)(x)) - 1) 
+#define MSTR_BLOCK(x) (((malloc_block_t *)(x)) - 1)
 #define MSTR_EXTRA_REF(x) (MSTR_BLOCK(x)->extra_ref)
 #define MSTR_REF(x) (MSTR_BLOCK(x)->ref)
 #define MSTR_SIZE(x) (MSTR_BLOCK(x)->size)
@@ -82,7 +82,7 @@ typedef struct malloc_block_s {
  * faster.
  */
 #define COUNTED_STRLEN(x) ((svalue_strlen_size = MSTR_SIZE(x)), svalue_strlen_size != UINT_MAX ? svalue_strlen_size : strlen((x)+UINT_MAX)+UINT_MAX)
-/* return the number of references to a STRING_MALLOC or STRING_SHARED 
+/* return the number of references to a STRING_MALLOC or STRING_SHARED
    string */
 #define COUNTED_REF(x)    MSTR_REF(x)
 
@@ -94,14 +94,14 @@ typedef struct malloc_block_s {
 #define DEC_COUNTED_REF(x) (!(MSTR_REF(x) == 0 || --MSTR_REF(x) > 0))
 
 typedef struct block_s {
-    struct block_s *next;       /* next block in the hash chain */
-    unsigned int hash;
+  struct block_s *next;       /* next block in the hash chain */
+  unsigned int hash;
 #if defined(DEBUGMALLOC_EXTENSIONS) //|| (SIZEOF_PTR == 8)
-    long extra_ref;
+  long extra_ref;
 #endif
-    /* these two must be last */
-    unsigned int size;        /* length of the string */
-    unsigned short refs;        /* reference count    */
+  /* these two must be last */
+  unsigned int size;        /* length of the string */
+  unsigned short refs;        /* reference count    */
 } block_t;
 
 #define NEXT(x) (x)->next
@@ -126,15 +126,15 @@ typedef struct block_s {
 /*
  * stralloc.c
  */
-void init_strings (void);
-char *findstring (const char *);
-char *make_shared_string (const char *);
-const char *ref_string (const char *);
-void free_string (const char *);
-void deallocate_string (char *);
-int add_string_status (outbuffer_t *, int);
+void init_strings(void);
+char *findstring(const char *);
+char *make_shared_string(const char *);
+const char *ref_string(const char *);
+void free_string(const char *);
+void deallocate_string(char *);
+int add_string_status(outbuffer_t *, int);
 
-char *extend_string (const char *, int);
+char *extend_string(const char *, int);
 
 extern unsigned int svalue_strlen_size;
 
