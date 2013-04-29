@@ -1,9 +1,9 @@
 language: c
 
 before_install:
-  - sudo apt-get update -qq && sudo apt-get install -qq bison libz-dev gcc-multilib zlib1g-dev:i386
+  - sudo apt-get update -qq && sudo apt-get install -qq bison libz-dev gcc-multilib valgrind zlib1g-dev:i386 libc6-dbg:i386
 
-script: cd src && cp local_options.test local_options && ./build.FluffOS develop && make && make test
+script: cd src && cp local_options.test local_options && ./build.FluffOS develop && make && cd testsuite && valgrind --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes ../driver etc/config.test -ftest
 
 compiler:
   - clang
