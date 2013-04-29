@@ -1389,21 +1389,7 @@ static void verbose_check_prog (const char * msg, const char * def, const char *
     else printf(" does not exist\n");
 }
 
-static int check_configure_version() {
-    char buf[1024];
-    FILE *ct;
-
-    ct = fopen("comptest.c", "w");
-    fprintf(ct, "#include \"configure.h\"\n\n#if CONFIGURE_VERSION < %i\nthrash and die\n#endif\n\nint main() { }\n", CONFIGURE_VERSION);
-    fclose(ct);
-
-    sprintf(buf, "%s %s comptest.c -o comptest " TO_DEV_NULL, COMPILER, CFLAGS);
-    return !compile(buf);
-}
-
 static void handle_configure() {
-    if (check_configure_version()) return;
-
     open_output_file("configure.h");
 
 #ifndef WIN32
