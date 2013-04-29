@@ -9,9 +9,9 @@ Current Release
 ---------------
 The offical release is kept in the master branch, You can download a release archive through tags.
 
-Current release: [2.26.1](https://github.com/fluffos/fluffos/archive/fluffos-2.26.1.tar.gz)
+Current release: [2.27](https://github.com/fluffos/fluffos/archive/fluffos-2.27.tar.gz)
 
-Current next branch: next-2.27, pull request should be send to that branch.
+Current development branch: [next-3.0](https://github.com/fluffos/fluffos/tree/next-3.0), pull request should be sent to this branch.
 
 Fetatures
 ---------
