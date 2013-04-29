@@ -79,7 +79,7 @@
 #endif
 
 #if defined(WIN32)
-int dos_style_link (char *, char *);
+int dos_style_link(char *, char *);
 #define link(x, y) dos_style_link(x, y)
 #endif
 

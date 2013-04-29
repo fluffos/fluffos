@@ -12,17 +12,17 @@
 #define PORT_BINARY      2
 #define PORT_ASCII       3
 #define PORT_MUD         4
-#define PORT_WEBSOCKET	 5
+#define PORT_WEBSOCKET   5
 
 typedef struct {
-    int kind;
-    int port;
-    int fd;
+  int kind;
+  int port;
+  int fd;
 #ifdef F_NETWORK_STATS
-    int in_packets;
-    int in_volume;
-    int out_packets;
-    int out_volume;
+  int in_packets;
+  int in_volume;
+  int out_packets;
+  int out_volume;
 #endif
 } port_def_t;
 

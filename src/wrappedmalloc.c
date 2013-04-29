@@ -11,48 +11,48 @@
 #include "comm.h"
 
 typedef struct stats_s {
-    unsigned int free_calls, alloc_calls, realloc_calls;
+  unsigned int free_calls, alloc_calls, realloc_calls;
 }       stats_t;
 
 static stats_t stats;
 
 void wrappedmalloc_init()
 {
-    stats.free_calls = 0;
-    stats.alloc_calls = 0;
-    stats.realloc_calls = 0;
+  stats.free_calls = 0;
+  stats.alloc_calls = 0;
+  stats.realloc_calls = 0;
 }
 
-INLINE void *wrappedrealloc (void * ptr, int size)
+INLINE void *wrappedrealloc(void *ptr, int size)
 {
-    stats.realloc_calls++;
-    return (void *) REALLOC(ptr, size);
+  stats.realloc_calls++;
+  return (void *) REALLOC(ptr, size);
 }
 
-INLINE void *wrappedmalloc (int size)
+INLINE void *wrappedmalloc(int size)
 {
-    stats.alloc_calls++;
-    return (void *) MALLOC(size);
+  stats.alloc_calls++;
+  return (void *) MALLOC(size);
 }
 
-INLINE void *wrappedcalloc (int nitems, int size)
+INLINE void *wrappedcalloc(int nitems, int size)
 {
-    stats.alloc_calls++;
-    return (void *) CALLOC(nitems, size);
+  stats.alloc_calls++;
+  return (void *) CALLOC(nitems, size);
 }
 
-INLINE void wrappedfree (void * ptr)
+INLINE void wrappedfree(void *ptr)
 {
-    stats.free_calls++;
-    FREE(ptr);
+  stats.free_calls++;
+  FREE(ptr);
 }
 
-void dump_malloc_data (outbuffer_t * ob)
+void dump_malloc_data(outbuffer_t *ob)
 {
-    outbuf_add(ob, "using wrapped malloc:\n\n");
-    outbuf_addv(ob, "#alloc calls:     %10lu\n", stats.alloc_calls);
-    outbuf_addv(ob, "#free calls:      %10lu\n", stats.free_calls);
-    outbuf_addv(ob, "#alloc - #free:   %10lu\n",
-		stats.alloc_calls - stats.free_calls);
-    outbuf_addv(ob, "#realloc calls:   %10lu\n", stats.realloc_calls);
+  outbuf_add(ob, "using wrapped malloc:\n\n");
+  outbuf_addv(ob, "#alloc calls:     %10lu\n", stats.alloc_calls);
+  outbuf_addv(ob, "#free calls:      %10lu\n", stats.free_calls);
+  outbuf_addv(ob, "#alloc - #free:   %10lu\n",
+              stats.alloc_calls - stats.free_calls);
+  outbuf_addv(ob, "#realloc calls:   %10lu\n", stats.realloc_calls);
 }

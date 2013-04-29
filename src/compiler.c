@@ -10,40 +10,40 @@
 #include "lex.h"
 #include "simul_efun.h"
 
-static void clean_parser (void);
-static void prolog (int, char *);
-static program_t *epilog (void);
-static void show_overload_warnings (void);
+static void clean_parser(void);
+static void prolog(int, char *);
+static program_t *epilog(void);
+static void show_overload_warnings(void);
 
 #define CT(x) (1 << (x))
 #define CT_SIMPLE(x) (CT(TYPE_ANY) | CT(x))
 
 short compatible[11] = {
-    /* UNKNOWN */  0,
-    /* ANY */      0xfff,
-    /* NOVALUE to*/CT_SIMPLE(TYPE_NOVALUE) | CT(TYPE_VOID) | CT(TYPE_NUMBER),
-    /* VOID to*/   CT_SIMPLE(TYPE_VOID) | CT(TYPE_NUMBER),
-    /* NUMBER to*/ CT_SIMPLE(TYPE_NUMBER) | CT(TYPE_REAL),
-    /* STRING */   CT_SIMPLE(TYPE_STRING),
-    /* OBJECT */   CT_SIMPLE(TYPE_OBJECT),
-    /* MAPPING */  CT_SIMPLE(TYPE_MAPPING),
-    /* FUNCTION */ CT_SIMPLE(TYPE_FUNCTION),
-    /* REAL */     CT_SIMPLE(TYPE_REAL) | CT(TYPE_NUMBER),
-    /* BUFFER */   CT_SIMPLE(TYPE_BUFFER),
+  /* UNKNOWN */  0,
+  /* ANY */      0xfff,
+  /* NOVALUE to*/CT_SIMPLE(TYPE_NOVALUE) | CT(TYPE_VOID) | CT(TYPE_NUMBER),
+  /* VOID to*/   CT_SIMPLE(TYPE_VOID) | CT(TYPE_NUMBER),
+  /* NUMBER to*/ CT_SIMPLE(TYPE_NUMBER) | CT(TYPE_REAL),
+  /* STRING */   CT_SIMPLE(TYPE_STRING),
+  /* OBJECT */   CT_SIMPLE(TYPE_OBJECT),
+  /* MAPPING */  CT_SIMPLE(TYPE_MAPPING),
+  /* FUNCTION */ CT_SIMPLE(TYPE_FUNCTION),
+  /* REAL */     CT_SIMPLE(TYPE_REAL) | CT(TYPE_NUMBER),
+  /* BUFFER */   CT_SIMPLE(TYPE_BUFFER),
 };
 
 short is_type[11] = {
-    /* UNKNOWN */ 0,
-    /* ANY */     0xfff,
-    /* NOVALUE */ CT_SIMPLE(TYPE_NOVALUE) | CT(TYPE_VOID),
-    /* VOID */    CT_SIMPLE(TYPE_VOID) | CT(TYPE_NOVALUE),
-    /* NUMBER */  CT_SIMPLE(TYPE_NUMBER),
-    /* STRING */  CT_SIMPLE(TYPE_STRING),
-    /* OBJECT */  CT_SIMPLE(TYPE_OBJECT),
-    /* MAPPING */ CT_SIMPLE(TYPE_MAPPING),
-    /* FUNCTION */CT_SIMPLE(TYPE_FUNCTION),
-    /* REAL */    CT_SIMPLE(TYPE_REAL),
-    /* BUFFER */  CT_SIMPLE(TYPE_BUFFER),
+  /* UNKNOWN */ 0,
+  /* ANY */     0xfff,
+  /* NOVALUE */ CT_SIMPLE(TYPE_NOVALUE) | CT(TYPE_VOID),
+  /* VOID */    CT_SIMPLE(TYPE_VOID) | CT(TYPE_NOVALUE),
+  /* NUMBER */  CT_SIMPLE(TYPE_NUMBER),
+  /* STRING */  CT_SIMPLE(TYPE_STRING),
+  /* OBJECT */  CT_SIMPLE(TYPE_OBJECT),
+  /* MAPPING */ CT_SIMPLE(TYPE_MAPPING),
+  /* FUNCTION */CT_SIMPLE(TYPE_FUNCTION),
+  /* REAL */    CT_SIMPLE(TYPE_REAL),
+  /* BUFFER */  CT_SIMPLE(TYPE_BUFFER),
 };
 
 mem_block_t mem_block[NUMAREAS];
@@ -86,156 +86,165 @@ int current_number_of_locals = 0;
 int max_num_locals = 0;
 
 /* This function has strput() semantics; see comments in simulate.c */
-char *get_two_types (char * where, char * end, int type1, int type2)
+char *get_two_types(char *where, char *end, int type1, int type2)
 {
-    where = strput(where, end, "( ");
-    where = get_type_name(where, end, type1);
-    where = strput(where, end, "vs ");
-    where = get_type_name(where, end, type2);
-    where = strput(where, end, ")");
+  where = strput(where, end, "( ");
+  where = get_type_name(where, end, type1);
+  where = strput(where, end, "vs ");
+  where = get_type_name(where, end, type2);
+  where = strput(where, end, ")");
 
-    return where;
+  return where;
 }
 
 void init_locals()
 {
-    type_of_locals = CALLOCATE(CFG_MAX_LOCAL_VARIABLES,unsigned short,
-                               TAG_LOCALS, "init_locals:1");
-    locals = CALLOCATE(CFG_MAX_LOCAL_VARIABLES, local_info_t,
-                       TAG_LOCALS, "init_locals:2");
-    type_of_locals_ptr = type_of_locals;
-    locals_ptr = locals;
-    locals_size = type_of_locals_size = CFG_MAX_LOCAL_VARIABLES;
-    current_number_of_locals = max_num_locals = 0;
+  type_of_locals = CALLOCATE(CFG_MAX_LOCAL_VARIABLES, unsigned short,
+                             TAG_LOCALS, "init_locals:1");
+  locals = CALLOCATE(CFG_MAX_LOCAL_VARIABLES, local_info_t,
+                     TAG_LOCALS, "init_locals:2");
+  type_of_locals_ptr = type_of_locals;
+  locals_ptr = locals;
+  locals_size = type_of_locals_size = CFG_MAX_LOCAL_VARIABLES;
+  current_number_of_locals = max_num_locals = 0;
 }
 
-void free_all_local_names (int flag)
+void free_all_local_names(int flag)
 {
-    int i;
+  int i;
 
-    for (i=0; i < current_number_of_locals; i++) {
-        if (flag && (type_of_locals_ptr[locals_ptr[i].runtime_index] & LOCAL_MOD_UNUSED)) {
-            char buf[256];
-            char *end = EndOf(buf);
-            char *p;
+  for (i = 0; i < current_number_of_locals; i++) {
+    if (flag && (type_of_locals_ptr[locals_ptr[i].runtime_index] & LOCAL_MOD_UNUSED)) {
+      char buf[256];
+      char *end = EndOf(buf);
+      char *p;
 
-            p = strput(buf, end, "Unused local variable '");
-            p = strput(p, end, locals_ptr[i].ihe->name);
-            p = strput(p, end, "'");
-            yywarn(buf);
-        }
-        locals_ptr[i].ihe->sem_value--;
-        locals_ptr[i].ihe->dn.local_num = -1;
+      p = strput(buf, end, "Unused local variable '");
+      p = strput(p, end, locals_ptr[i].ihe->name);
+      p = strput(p, end, "'");
+      yywarn(buf);
     }
-    current_number_of_locals = 0;
-    max_num_locals = 0;
+    locals_ptr[i].ihe->sem_value--;
+    locals_ptr[i].ihe->dn.local_num = -1;
+  }
+  current_number_of_locals = 0;
+  max_num_locals = 0;
 }
 
-void deactivate_current_locals() {
-    int i;
+void deactivate_current_locals()
+{
+  int i;
 
-    for (i = 0; i < current_number_of_locals; i++)
-        locals_ptr[i].ihe->dn.local_num = -1;
+  for (i = 0; i < current_number_of_locals; i++) {
+    locals_ptr[i].ihe->dn.local_num = -1;
+  }
 }
 
-void reactivate_current_locals() {
-    int i;
+void reactivate_current_locals()
+{
+  int i;
 
-    for (i = 0; i < current_number_of_locals; i++) {
-        locals_ptr[i].ihe->dn.local_num = locals_ptr[i].runtime_index;
-        locals_ptr[i].ihe->sem_value++;
-    }
+  for (i = 0; i < current_number_of_locals; i++) {
+    locals_ptr[i].ihe->dn.local_num = locals_ptr[i].runtime_index;
+    locals_ptr[i].ihe->sem_value++;
+  }
 }
 
 void clean_up_locals()
 {
-    int offset;
+  int offset;
 
-    offset = locals_ptr + current_number_of_locals - locals;
-    while (offset--) {
-        locals[offset].ihe->sem_value--;
-        locals[offset].ihe->dn.local_num = -1;
-    }
-    current_number_of_locals = 0;
-    max_num_locals = 0;
-    locals_ptr = locals;
-    type_of_locals_ptr = type_of_locals;
+  offset = locals_ptr + current_number_of_locals - locals;
+  while (offset--) {
+    locals[offset].ihe->sem_value--;
+    locals[offset].ihe->dn.local_num = -1;
+  }
+  current_number_of_locals = 0;
+  max_num_locals = 0;
+  locals_ptr = locals;
+  type_of_locals_ptr = type_of_locals;
 }
 
-void pop_n_locals (int num) {
-    int lcur_start;
-    int ltype_start, i1;
-
-    DEBUG_CHECK(num < 0, "pop_n_locals called with num < 0");
-    if (num == 0)
-        return;
-
-    lcur_start = current_number_of_locals -= num;
-    ltype_start = locals_ptr[lcur_start].runtime_index;
-
-    i1 = num;
-    while (i1--) {
-        if (type_of_locals_ptr[ltype_start] & LOCAL_MOD_UNUSED) {
-            char buf[256];
-            char *end = EndOf(buf);
-            char *p;
-
-            p = strput(buf, end, "Unused local variable '");
-            p = strput(p, end, locals_ptr[lcur_start].ihe->name);
-            p = strput(p, end, "'");
-            yywarn(buf);
-        }
-        locals_ptr[lcur_start].ihe->sem_value--;
-        locals_ptr[lcur_start].ihe->dn.local_num = -1;
-        ++lcur_start;
-        ++ltype_start;
-    }
-}
-
-int add_local_name (const char * str, int type)
+void pop_n_locals(int num)
 {
-    if (max_num_locals == CFG_MAX_LOCAL_VARIABLES) {
-        yyerror("Too many local variables");
-        return 0;
-    } else {
-        ident_hash_elem_t *ihe;
+  int lcur_start;
+  int ltype_start, i1;
 
-        ihe = find_or_add_ident(str,FOA_NEEDS_MALLOC);
-        type_of_locals_ptr[max_num_locals] = type;
-        locals_ptr[current_number_of_locals].ihe = ihe;
-        locals_ptr[current_number_of_locals++].runtime_index = max_num_locals;
-        if (ihe->dn.local_num == -1)
-            ihe->sem_value++;
-        return ihe->dn.local_num = max_num_locals++;
+  DEBUG_CHECK(num < 0, "pop_n_locals called with num < 0");
+  if (num == 0) {
+    return;
+  }
+
+  lcur_start = current_number_of_locals -= num;
+  ltype_start = locals_ptr[lcur_start].runtime_index;
+
+  i1 = num;
+  while (i1--) {
+    if (type_of_locals_ptr[ltype_start] & LOCAL_MOD_UNUSED) {
+      char buf[256];
+      char *end = EndOf(buf);
+      char *p;
+
+      p = strput(buf, end, "Unused local variable '");
+      p = strput(p, end, locals_ptr[lcur_start].ihe->name);
+      p = strput(p, end, "'");
+      yywarn(buf);
     }
+    locals_ptr[lcur_start].ihe->sem_value--;
+    locals_ptr[lcur_start].ihe->dn.local_num = -1;
+    ++lcur_start;
+    ++ltype_start;
+  }
 }
 
-void reallocate_locals() {
-    int offset;
-    offset = type_of_locals_ptr - type_of_locals;
-    type_of_locals = RESIZE(type_of_locals, type_of_locals_size += CFG_MAX_LOCAL_VARIABLES,
-                            unsigned short, TAG_LOCALS, "reallocate_locals:1");
-    type_of_locals_ptr = type_of_locals + offset;
-    offset = locals_ptr - locals;
-    locals = RESIZE(locals, locals_size,
-                    local_info_t, TAG_LOCALS, "reallocate_locals:2");
-    locals_ptr = locals + offset;
+int add_local_name(const char *str, int type)
+{
+  if (max_num_locals == CFG_MAX_LOCAL_VARIABLES) {
+    yyerror("Too many local variables");
+    return 0;
+  } else {
+    ident_hash_elem_t *ihe;
+
+    ihe = find_or_add_ident(str, FOA_NEEDS_MALLOC);
+    type_of_locals_ptr[max_num_locals] = type;
+    locals_ptr[current_number_of_locals].ihe = ihe;
+    locals_ptr[current_number_of_locals++].runtime_index = max_num_locals;
+    if (ihe->dn.local_num == -1) {
+      ihe->sem_value++;
+    }
+    return ihe->dn.local_num = max_num_locals++;
+  }
+}
+
+void reallocate_locals()
+{
+  int offset;
+  offset = type_of_locals_ptr - type_of_locals;
+  type_of_locals = RESIZE(type_of_locals, type_of_locals_size += CFG_MAX_LOCAL_VARIABLES,
+                          unsigned short, TAG_LOCALS, "reallocate_locals:1");
+  type_of_locals_ptr = type_of_locals + offset;
+  offset = locals_ptr - locals;
+  locals = RESIZE(locals, locals_size,
+                  local_info_t, TAG_LOCALS, "reallocate_locals:2");
+  locals_ptr = locals + offset;
 }
 
 /* Fix a inherited class type for the current program */
-static void fix_class_type (int * t, program_t * from) {
-    ident_hash_elem_t *ihe;
-    int num;
+static void fix_class_type(int *t, program_t *from)
+{
+  ident_hash_elem_t *ihe;
+  int num;
 
-    if ((*t) & TYPE_MOD_CLASS) {
-        ihe = lookup_ident(from->strings[from->classes[(*t) & CLASS_NUM_MASK].classname]);
-        if (ihe && ((num = ihe->dn.class_num) != -1)) {
-            (*t) = (*t & ~CLASS_NUM_MASK) | num;
-        } else {
-	    if(!num_parse_error)
-		fatal("Cannot find class %s (%s,%d).\n",from->strings[from->classes[(*t) & CLASS_NUM_MASK].classname], current_file, current_line);
-        }
+  if ((*t) & TYPE_MOD_CLASS) {
+    ihe = lookup_ident(from->strings[from->classes[(*t) & CLASS_NUM_MASK].classname]);
+    if (ihe && ((num = ihe->dn.class_num) != -1)) {
+      (*t) = (*t & ~CLASS_NUM_MASK) | num;
+    } else {
+      if (!num_parse_error) {
+        fatal("Cannot find class %s (%s,%d).\n", from->strings[from->classes[(*t) & CLASS_NUM_MASK].classname], current_file, current_line);
+      }
     }
+  }
 }
 
 
@@ -244,41 +253,45 @@ static void fix_class_type (int * t, program_t * from) {
  * It is very important that they are stored in the same order with the
  * same index.
  */
-void copy_variables (program_t * from, int type) {
-    int i;
+void copy_variables(program_t *from, int type)
+{
+  int i;
 
-    for (i = 0; i < from->num_inherited; i++) {
-        int t = DECL_MODIFY(type, from->inherit[i].type_mod);
+  for (i = 0; i < from->num_inherited; i++) {
+    int t = DECL_MODIFY(type, from->inherit[i].type_mod);
 
-        /* 'private' vars become 'hidden' */
-        if (from->inherit[i].type_mod & DECL_PRIVATE)
-          t = (t & ~DECL_PRIVATE) | DECL_HIDDEN;
-
-        t &= ~FUNC_VARARGS; /* for 'varargs inherit' */
-
-        copy_variables(from->inherit[i].prog, t);
+    /* 'private' vars become 'hidden' */
+    if (from->inherit[i].type_mod & DECL_PRIVATE) {
+      t = (t & ~DECL_PRIVATE) | DECL_HIDDEN;
     }
-    for (i = 0; i < from->num_variables_defined; i++) {
-        int t = DECL_MODIFY(from->variable_types[i], type);
 
-        /* 'private' vars become 'hidden' */
-        if (from->variable_types[i] & DECL_PRIVATE)
-            t = (t & ~DECL_PRIVATE) | DECL_HIDDEN;
+    t &= ~FUNC_VARARGS; /* for 'varargs inherit' */
 
-        t &= ~FUNC_VARARGS; /* for 'varargs inherit' */
+    copy_variables(from->inherit[i].prog, t);
+  }
+  for (i = 0; i < from->num_variables_defined; i++) {
+    int t = DECL_MODIFY(from->variable_types[i], type);
 
-        /* Handle classes */
-        fix_class_type(&t, from);
-
-        define_variable(from->variable_table[i], t);
+    /* 'private' vars become 'hidden' */
+    if (from->variable_types[i] & DECL_PRIVATE) {
+      t = (t & ~DECL_PRIVATE) | DECL_HIDDEN;
     }
+
+    t &= ~FUNC_VARARGS; /* for 'varargs inherit' */
+
+    /* Handle classes */
+    fix_class_type(&t, from);
+
+    define_variable(from->variable_table[i], t);
+  }
 }
 
-static int add_new_function_entry() {
-    int index = mem_block[A_FUNCTION_DEFS].current_size / sizeof(compiler_temp_t);
-    allocate_in_mem_block(A_FUNCTION_DEFS, sizeof(compiler_temp_t));
+static int add_new_function_entry()
+{
+  int index = mem_block[A_FUNCTION_DEFS].current_size / sizeof(compiler_temp_t);
+  allocate_in_mem_block(A_FUNCTION_DEFS, sizeof(compiler_temp_t));
 
-    return index;
+  return index;
 }
 
 /* copy a function verbatim into this object, and possibly add it to the
@@ -297,305 +310,319 @@ static int add_new_function_entry() {
    removed. - Sym
  */
 
-static void copy_new_function (program_t * prog, int index,
-                                 program_t * defprog, int defindex,
-                                 int typemod) {
-    ident_hash_elem_t *ihe;
+static void copy_new_function(program_t *prog, int index,
+                              program_t *defprog, int defindex,
+                              int typemod)
+{
+  ident_hash_elem_t *ihe;
 
-    int where = add_new_function_entry();
-    int f = prog->function_flags[index];
+  int where = add_new_function_entry();
+  int f = prog->function_flags[index];
 
-    if (f & FUNC_ALIAS) {
-        f = FUNC_ALIAS | prog->function_flags[f & ~FUNC_ALIAS];
-    }
+  if (f & FUNC_ALIAS) {
+    f = FUNC_ALIAS | prog->function_flags[f & ~FUNC_ALIAS];
+  }
 
-    /* 'private' functions become 'hidden' */
-    if (f & DECL_PRIVATE)
-        f = (f & ~DECL_PRIVATE) | DECL_HIDDEN;
+  /* 'private' functions become 'hidden' */
+  if (f & DECL_PRIVATE) {
+    f = (f & ~DECL_PRIVATE) | DECL_HIDDEN;
+  }
 
-    f = DECL_MODIFY(typemod, f) | FUNC_INHERITED;
-    f &= ~DECL_NOSAVE;
+  f = DECL_MODIFY(typemod, f) | FUNC_INHERITED;
+  f &= ~DECL_NOSAVE;
 
-    FUNCTION_FLAGS(where) = f;
+  FUNCTION_FLAGS(where) = f;
 
-    FUNCTION_TEMP(where)->prog = defprog;
-    FUNCTION_TEMP(where)->u.func = defprog->function_table + defindex;
-    FUNCTION_TEMP(where)->offset = NUM_INHERITS - 1;
-    FUNCTION_TEMP(where)->function_index_offset = index;
-    FUNCTION_NEXT(where) = 0;
+  FUNCTION_TEMP(where)->prog = defprog;
+  FUNCTION_TEMP(where)->u.func = defprog->function_table + defindex;
+  FUNCTION_TEMP(where)->offset = NUM_INHERITS - 1;
+  FUNCTION_TEMP(where)->function_index_offset = index;
+  FUNCTION_NEXT(where) = 0;
 
-    /* add the identifier */
-    ihe = find_or_add_ident(defprog->function_table[defindex].funcname,
-                            FOA_GLOBAL_SCOPE);
-    ihe->sem_value++; /* we knew it was the first, so dn.function_num = -1 */
-    ihe->dn.function_num = where;
+  /* add the identifier */
+  ihe = find_or_add_ident(defprog->function_table[defindex].funcname,
+                          FOA_GLOBAL_SCOPE);
+  ihe->sem_value++; /* we knew it was the first, so dn.function_num = -1 */
+  ihe->dn.function_num = where;
 }
 
-static int find_class_member (int which, char * name, unsigned short * type) {
-    int i;
-    class_def_t *cd;
-    class_member_entry_t *cme;
+static int find_class_member(int which, char *name, unsigned short *type)
+{
+  int i;
+  class_def_t *cd;
+  class_member_entry_t *cme;
 
-    DEBUG_CHECK(!findstring(name), "name in find_class_member must be a shared string.\n");
+  DEBUG_CHECK(!findstring(name), "name in find_class_member must be a shared string.\n");
 
-    cd = ((class_def_t *)mem_block[A_CLASS_DEF].block) + which;
-    cme = ((class_member_entry_t *)mem_block[A_CLASS_MEMBER].block) + cd->index;
-    for (i = 0; i < cd->size; i++) {
-        if (PROG_STRING(cme[i].membername) == name)
-            break;
+  cd = ((class_def_t *)mem_block[A_CLASS_DEF].block) + which;
+  cme = ((class_member_entry_t *)mem_block[A_CLASS_MEMBER].block) + cd->index;
+  for (i = 0; i < cd->size; i++) {
+    if (PROG_STRING(cme[i].membername) == name) {
+      break;
     }
-    if (i == cd->size) {
-        if (type) *type = TYPE_ANY;
-        return -1;
-    } else {
-        if (type) *type = cme[i].type;
-        return i;
-    }
+  }
+  if (i == cd->size) {
+    if (type) { *type = TYPE_ANY; }
+    return -1;
+  } else {
+    if (type) { *type = cme[i].type; }
+    return i;
+  }
 }
 
-int lookup_any_class_member (char * name, unsigned short * type) {
-    int nc = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
-    int i, ret = -1, nret;
-    char *s = findstring(name);
+int lookup_any_class_member(char *name, unsigned short *type)
+{
+  int nc = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
+  int i, ret = -1, nret;
+  char *s = findstring(name);
 
-    if (s) {
-        for (i = 0; i < nc; i++) {
-            nret = find_class_member(i, s, type);
-            if (nret == -1) continue;
-            if (ret != -1 && nret != ret) {
-                char buf[256];
-                char *end = EndOf(buf);
-                char *p;
-
-                p = strput(buf, end, "More than one class in scope has member '");
-                p = strput(p, end, name);
-                p = strput(buf, end, "'; use a cast to disambiguate");
-                yyerror(buf);
-            }
-            ret = nret;
-        }
-    }
-
-    if (ret == -1) {
+  if (s) {
+    for (i = 0; i < nc; i++) {
+      nret = find_class_member(i, s, type);
+      if (nret == -1) { continue; }
+      if (ret != -1 && nret != ret) {
         char buf[256];
         char *end = EndOf(buf);
         char *p;
 
-        p = strput(buf, end, "No class in scope has no member '");
+        p = strput(buf, end, "More than one class in scope has member '");
         p = strput(p, end, name);
-        p = strput(p, end, "'");
+        p = strput(buf, end, "'; use a cast to disambiguate");
         yyerror(buf);
+      }
+      ret = nret;
     }
+  }
 
-    return ret;
+  if (ret == -1) {
+    char buf[256];
+    char *end = EndOf(buf);
+    char *p;
+
+    p = strput(buf, end, "No class in scope has no member '");
+    p = strput(p, end, name);
+    p = strput(p, end, "'");
+    yyerror(buf);
+  }
+
+  return ret;
 }
 
-int lookup_class_member (int which, char * name, unsigned short * type) {
-    char *s = findstring(name);
-    int ret;
+int lookup_class_member(int which, char *name, unsigned short *type)
+{
+  char *s = findstring(name);
+  int ret;
 
-    if (s)
-        ret = find_class_member(which, s, type);
-    else
-        ret = -1;
+  if (s) {
+    ret = find_class_member(which, s, type);
+  } else {
+    ret = -1;
+  }
 
-    if (ret == -1) {
-        class_def_t *cd = ((class_def_t *)mem_block[A_CLASS_DEF].block) + which;
+  if (ret == -1) {
+    class_def_t *cd = ((class_def_t *)mem_block[A_CLASS_DEF].block) + which;
+    char buf[256];
+    char *end = EndOf(buf);
+    char *p;
+
+    p = strput(buf, end, "Class '");
+    p = strput(p, end, PROG_STRING(cd->classname));
+    p = strput(p, end, "' has no member '");
+    p = strput(p, end, name);
+    p = strput(p, end, "'");
+
+    yyerror(buf);
+  }
+  return ret;
+}
+
+parse_node_t *reorder_class_values(int which, parse_node_t *node)
+{
+  class_def_t *cd;
+  parse_node_t **tmp;
+  int i;
+
+  cd = ((class_def_t *)mem_block[A_CLASS_DEF].block) + which;
+  tmp = CALLOCATE(cd->size, parse_node_t *, TAG_COMPILER,
+                  "reorder_class_values");
+
+  for (i = 0; i < cd->size; i++) {
+    tmp[i] = 0;
+  }
+
+  while (node) {
+    i = lookup_class_member(which, (char *)node->l.expr, 0);
+    if (i != -1) {
+      if (tmp[i]) {
         char buf[256];
         char *end = EndOf(buf);
         char *p;
 
-        p = strput(buf, end, "Class '");
+        p = strput(buf, end, "Redefinition of member '");
+        p = strput(p, end, (char *) node->l.expr);
+        p = strput(p, end, "' in instantiation of class  '");
         p = strput(p, end, PROG_STRING(cd->classname));
-        p = strput(p, end, "' has no member '");
-        p = strput(p, end, name);
         p = strput(p, end, "'");
-
         yyerror(buf);
+      } else {
+        tmp[i] = node->v.expr;
+      }
     }
-    return ret;
+    scratch_free((char *) node->l.expr);
+
+    node = node->r.expr;
+  }
+  i = cd->size;
+  node = 0;
+  while (i--) {
+    parse_node_t *newnode;
+    if (tmp[i]) {
+      CREATE_STATEMENTS(newnode, tmp[i], node);
+    } else {
+      CREATE_STATEMENTS(newnode, 0, node);
+      CREATE_NUMBER(newnode->l.expr, 0);
+    }
+    node = newnode;
+  }
+
+  FREE(tmp);
+  return node;
 }
 
-parse_node_t *reorder_class_values (int which, parse_node_t * node) {
-    class_def_t *cd;
-    parse_node_t **tmp;
-    int i;
+static void check_class(char *name, program_t *prog, int idx, int nidx)
+{
+  class_def_t *sd1, *sd2;
+  class_member_entry_t *sme1, *sme2;
+  int i, n;
 
-    cd = ((class_def_t *)mem_block[A_CLASS_DEF].block) + which;
-    tmp = CALLOCATE(cd->size, parse_node_t *, TAG_COMPILER,
-                    "reorder_class_values");
+  sd1 = &prog->classes[idx];
+  sd2 = CLASS(nidx);
 
-    for (i = 0; i < cd->size; i++)
-        tmp[i] = 0;
+  n = sd1->size;
+  if (sd1->size != sd2->size) {
+    char buf[256];
+    char *end = EndOf(buf);
+    char *p;
 
-    while (node) {
-        i = lookup_class_member(which, (char *)node->l.expr, 0);
-        if (i != -1) {
-            if (tmp[i]) {
-                char buf[256];
-                char *end = EndOf(buf);
-                char *p;
+    p = strput(buf, end, "Definitions of class '");
+    p = strput(p, end, name);
+    p = strput(p, end, "' differ in size.");
+    yyerror(buf);
+    return;
+  }
 
-                p = strput(buf, end, "Redefinition of member '");
-                p = strput(p, end, (char *) node->l.expr);
-                p = strput(p, end, "' in instantiation of class  '");
-                p = strput(p, end, PROG_STRING(cd->classname));
-                p = strput(p, end, "'");
-                yyerror(buf);
-            } else {
-                tmp[i] = node->v.expr;
-            }
-        }
-        scratch_free((char *) node->l.expr);
+  sme1 = &prog->class_members[sd1->index];
+  sme2 = (class_member_entry_t *)mem_block[A_CLASS_MEMBER].block + sd2->index;
 
-        node = node->r.expr;
+  for (i = 0; i < n; i++) {
+    int newtype;
+
+    newtype = sme1[i].type;
+
+    fix_class_type(&newtype, prog);
+
+    if (sme2[i].type != newtype ||
+        prog->strings[sme1[i].membername] != PROG_STRING(sme2[i].membername)) {
+      char buf[512];
+      char *end = EndOf(buf);
+      char *p;
+
+      p = strput(buf, end, "Definitions of class '");
+      p = strput(p, end, name);
+      p = strput(p, end, "' disagree.");
+      yyerror(buf);
+      return;
     }
-    i = cd->size;
-    node = 0;
-    while (i--) {
-        parse_node_t *newnode;
-        if (tmp[i]) {
-            CREATE_STATEMENTS(newnode, tmp[i], node);
-        } else {
-            CREATE_STATEMENTS(newnode, 0, node);
-            CREATE_NUMBER(newnode->l.expr, 0);
-        }
-        node = newnode;
-    }
-
-    FREE(tmp);
-    return node;
+  }
 }
 
-static void check_class (char * name, program_t * prog, int idx, int nidx) {
-    class_def_t *sd1, *sd2;
-    class_member_entry_t *sme1, *sme2;
-    int i, n;
+void copy_structures(program_t *prog)
+{
+  class_def_t *sd;
+  class_member_entry_t *sme;
+  ident_hash_elem_t *ihe;
+  char *str;
+  int sm_off = mem_block[A_CLASS_MEMBER].current_size / sizeof(class_member_entry_t);
+  int sd_off = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
+  int i, j, offset;
 
-    sd1 = &prog->classes[idx];
-    sd2 = CLASS(nidx);
+  if (prog->num_classes + sd_off > CLASS_NUM_MASK) {
+    char buf[512];
+    char *end = EndOf(buf);
+    char *p;
 
-    n = sd1->size;
-    if (sd1->size != sd2->size) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
+    p = strput(buf, end, "Too many classes, max is ");
+    p = strput_int(p, end, CLASS_NUM_MASK - 1);
+    p = strput(p, end, ".\n");
+    yyerror(buf);
+    return;
+  }
 
-        p = strput(buf, end, "Definitions of class '");
-        p = strput(p, end, name);
-        p = strput(p, end, "' differ in size.");
-        yyerror(buf);
-        return;
+  for (i = 0; i < prog->num_classes; i++) {
+    str = prog->strings[prog->classes[i].classname];
+    ihe = find_or_add_ident(str, FOA_GLOBAL_SCOPE);
+    if (ihe->dn.class_num == -1) {
+      ihe->dn.class_num = sd_off++;
+      ihe->sem_value++;
+    } else {
+      check_class(str, prog, i, ihe->dn.class_num);
+      continue;
     }
+    sd = (class_def_t *)allocate_in_mem_block(A_CLASS_DEF, sizeof(class_def_t));
+    sd->classname = store_prog_string(str);
+    sd->size = prog->classes[i].size;
+    sd->index = sm_off;
+    sm_off += sd->size;
+    sme = (class_member_entry_t *)allocate_in_mem_block(A_CLASS_MEMBER, sizeof(class_member_entry_t) * sd->size);
+    offset = prog->classes[i].index;
+    for (j = 0; j < sd->size; j++) {
+      int oldtype = prog->class_members[offset + j].type;
 
-    sme1 = &prog->class_members[sd1->index];
-    sme2 = (class_member_entry_t *)mem_block[A_CLASS_MEMBER].block + sd2->index;
-
-    for (i = 0; i < n; i++) {
-        int newtype;
-
-        newtype = sme1[i].type;
-
-        fix_class_type(&newtype, prog);
-
-        if (sme2[i].type != newtype ||
-            prog->strings[sme1[i].membername] != PROG_STRING(sme2[i].membername)) {
-            char buf[512];
-            char *end = EndOf(buf);
-            char *p;
-
-            p = strput(buf, end, "Definitions of class '");
-            p = strput(p, end, name);
-            p = strput(p, end, "' disagree.");
-            yyerror(buf);
-            return;
-        }
+      fix_class_type(&oldtype, prog);
+      sme[j].type = oldtype;
+      sme[j].membername = store_prog_string(prog->strings[prog->class_members[offset + j].membername]);
     }
-}
-
-void copy_structures (program_t * prog) {
-    class_def_t *sd;
-    class_member_entry_t *sme;
-    ident_hash_elem_t *ihe;
-    char *str;
-    int sm_off = mem_block[A_CLASS_MEMBER].current_size / sizeof(class_member_entry_t);
-    int sd_off = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
-    int i, j, offset;
-
-    if (prog->num_classes + sd_off > CLASS_NUM_MASK) {
-        char buf[512];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Too many classes, max is ");
-        p = strput_int(p, end, CLASS_NUM_MASK - 1);
-        p = strput(p, end, ".\n");
-        yyerror(buf);
-        return;
-    }
-
-    for (i = 0; i < prog->num_classes; i++) {
-        str = prog->strings[prog->classes[i].classname];
-        ihe = find_or_add_ident(str, FOA_GLOBAL_SCOPE);
-        if (ihe->dn.class_num == -1) {
-            ihe->dn.class_num = sd_off++;
-            ihe->sem_value++;
-        } else {
-            check_class(str, prog, i, ihe->dn.class_num);
-            continue;
-        }
-        sd = (class_def_t *)allocate_in_mem_block(A_CLASS_DEF, sizeof(class_def_t));
-        sd->classname = store_prog_string(str);
-        sd->size = prog->classes[i].size;
-        sd->index = sm_off;
-        sm_off += sd->size;
-        sme = (class_member_entry_t *)allocate_in_mem_block(A_CLASS_MEMBER, sizeof(class_member_entry_t) * sd->size);
-        offset = prog->classes[i].index;
-        for (j = 0; j < sd->size; j++) {
-            int oldtype = prog->class_members[offset + j].type;
-
-            fix_class_type(&oldtype, prog);
-            sme[j].type = oldtype;
-            sme[j].membername = store_prog_string(prog->strings[prog->class_members[offset + j].membername]);
-        }
-    }
+  }
 }
 
 typedef struct ovlwarn_s {
-    struct ovlwarn_s *next;
-    char *func;
-    char *warn;
+  struct ovlwarn_s *next;
+  char *func;
+  char *warn;
 } ovlwarn_t;
 
 ovlwarn_t *overload_warnings = 0;
 
-static void remove_overload_warnings (char * func) {
-    ovlwarn_t **p;
-    ovlwarn_t *tmp;
+static void remove_overload_warnings(char *func)
+{
+  ovlwarn_t **p;
+  ovlwarn_t *tmp;
 
-    p = &overload_warnings;
-    while (*p) {
-        if (!func || (*p)->func == func) {
-            FREE((*p)->warn);
-            tmp = *p;
-            *p = (*p)->next;
-            FREE(tmp);
-        } else
-            p = &(*p)->next;
+  p = &overload_warnings;
+  while (*p) {
+    if (!func || (*p)->func == func) {
+      FREE((*p)->warn);
+      tmp = *p;
+      *p = (*p)->next;
+      FREE(tmp);
+    } else {
+      p = &(*p)->next;
     }
+  }
 }
 
-static void show_overload_warnings() {
-    ovlwarn_t *p, *next;
-    p = overload_warnings;
-    while (p) {
-        yywarn(p->warn);
-        FREE(p->warn);
-        next = p->next;
-        FREE(p);
-        p = next;
-    }
-    overload_warnings = 0;
+static void show_overload_warnings()
+{
+  ovlwarn_t *p, *next;
+  p = overload_warnings;
+  while (p) {
+    yywarn(p->warn);
+    FREE(p->warn);
+    next = p->next;
+    FREE(p);
+    p = next;
+  }
+  overload_warnings = 0;
 }
 
 /* Overload the function index with the new definition
@@ -614,141 +641,143 @@ static void show_overload_warnings() {
    1st inh defined < .. < last inh defined <
    defined
  */
-static void overload_function (program_t * prog, int index,
-                                 program_t * defprog, int defindex,
-                                 int oldindex, int typemod) {
-    int f;
-    int oldflags = FUNCTION_FLAGS(oldindex);
-    function_t *definition = &defprog->function_table[defindex];
-    int newflags = prog->function_flags[index];
-    int replace;
-    compiler_temp_t *newdef;
+static void overload_function(program_t *prog, int index,
+                              program_t *defprog, int defindex,
+                              int oldindex, int typemod)
+{
+  int f;
+  int oldflags = FUNCTION_FLAGS(oldindex);
+  function_t *definition = &defprog->function_table[defindex];
+  int newflags = prog->function_flags[index];
+  int replace;
+  compiler_temp_t *newdef;
 
-    if (newflags & FUNC_ALIAS)
-        newflags = FUNC_ALIAS | prog->function_flags[newflags & ~FUNC_ALIAS];
+  if (newflags & FUNC_ALIAS) {
+    newflags = FUNC_ALIAS | prog->function_flags[newflags & ~FUNC_ALIAS];
+  }
 
-    /* check that we aren't overloading a nomask function */
-    if ((oldflags & DECL_NOMASK) &&
-        !((oldflags|newflags) & (FUNC_NO_CODE))) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
+  /* check that we aren't overloading a nomask function */
+  if ((oldflags & DECL_NOMASK) &&
+      !((oldflags | newflags) & (FUNC_NO_CODE))) {
+    char buf[256];
+    char *end = EndOf(buf);
+    char *p;
 
-        p = strput(buf, end, "Illegal to redefine 'nomask' function \"");
-        p = strput(p, end, definition->funcname);
-        p = strput(p, end, "\"");
-        yyerror(buf);
-    }
+    p = strput(buf, end, "Illegal to redefine 'nomask' function \"");
+    p = strput(p, end, definition->funcname);
+    p = strput(p, end, "\"");
+    yyerror(buf);
+  }
 
-    /* Try to prevent some confusion re: overloading.
-     * Warn them about the behavior of inheriting the same function
-     * from two branches.
-     *
-     * Note that we don't want to scream now, b/c if the function is
-     * overloaded later this becomes irrelevant.
-     *
-     * Note also that this is real spammy if you inherit the same object
-     * twice.  Something should be done about that.
+  /* Try to prevent some confusion re: overloading.
+   * Warn them about the behavior of inheriting the same function
+   * from two branches.
+   *
+   * Note that we don't want to scream now, b/c if the function is
+   * overloaded later this becomes irrelevant.
+   *
+   * Note also that this is real spammy if you inherit the same object
+   * twice.  Something should be done about that.
+   */
+  if ((pragmas & PRAGMA_WARNINGS) &&
+      !((oldflags | newflags) & (FUNC_NO_CODE | DECL_PRIVATE | DECL_HIDDEN))
+      && (oldflags & FUNC_INHERITED)
+     ) {
+    /* don't scream if one is private.  Why not?  Because I said so.
+     * private is pretty screwed up anyway.  In the future there
+     * won't be such a clash b/c private won't come up the tree.
+     * This also give the coder a way to shut the compiler up when
+     * you do inherit the same object twice in different branches :)
      */
-    if ((pragmas & PRAGMA_WARNINGS) &&
-        !((oldflags|newflags) & (FUNC_NO_CODE|DECL_PRIVATE|DECL_HIDDEN))
-        && (oldflags & FUNC_INHERITED)
-        ) {
-        /* don't scream if one is private.  Why not?  Because I said so.
-         * private is pretty screwed up anyway.  In the future there
-         * won't be such a clash b/c private won't come up the tree.
-         * This also give the coder a way to shut the compiler up when
-         * you do inherit the same object twice in different branches :)
-         */
-        if (!(oldflags & (DECL_PRIVATE|DECL_HIDDEN)) && !(newflags & (DECL_PRIVATE|DECL_HIDDEN))) {
-            char buf[1024];
-            char *end = EndOf(buf);
-            char *p;
-            ovlwarn_t *ow;
-            compiler_temp_t *func_entry = FUNCTION_TEMP(oldindex);
-            program_t *prog2 = INHERIT(func_entry->offset)->prog;
-            program_t *defprog2;
+    if (!(oldflags & (DECL_PRIVATE | DECL_HIDDEN)) && !(newflags & (DECL_PRIVATE | DECL_HIDDEN))) {
+      char buf[1024];
+      char *end = EndOf(buf);
+      char *p;
+      ovlwarn_t *ow;
+      compiler_temp_t *func_entry = FUNCTION_TEMP(oldindex);
+      program_t *prog2 = INHERIT(func_entry->offset)->prog;
+      program_t *defprog2;
 
-            defprog2 = func_entry->prog;
-            p = strput(buf, end, definition->funcname);
-            p = strput(p, end, "() inherited from both /");
-            p = strput(p, end, defprog->filename);
-            if (prog != defprog) {
-                p = strput(p, end, " (via /");
-                p = strput(p, end, prog->filename);
-                p = strput(p, end, ")");
-            }
-            p = strput(p, end, " and /");
-            p = strput(p, end, defprog2->filename);
-            if (prog2 != defprog2) {
-                p = strput(p, end, " (via /");
-                p = strput(p, end, prog2->filename);
-                p = strput(p, end, ")");
-            }
-            p = strput(p, end, "; using the definition in /");
-            p = strput(p, end, prog->filename);
-            p = strput(p, end, ".");
+      defprog2 = func_entry->prog;
+      p = strput(buf, end, definition->funcname);
+      p = strput(p, end, "() inherited from both /");
+      p = strput(p, end, defprog->filename);
+      if (prog != defprog) {
+        p = strput(p, end, " (via /");
+        p = strput(p, end, prog->filename);
+        p = strput(p, end, ")");
+      }
+      p = strput(p, end, " and /");
+      p = strput(p, end, defprog2->filename);
+      if (prog2 != defprog2) {
+        p = strput(p, end, " (via /");
+        p = strput(p, end, prog2->filename);
+        p = strput(p, end, ")");
+      }
+      p = strput(p, end, "; using the definition in /");
+      p = strput(p, end, prog->filename);
+      p = strput(p, end, ".");
 
-            ow = ALLOCATE(ovlwarn_t, TAG_COMPILER, "overload warning");
-            ow->next = overload_warnings;
-            ow->func = definition->funcname;
-            ow->warn = alloc_cstring(buf, "overload warning");
-            overload_warnings = ow;
-        }
+      ow = ALLOCATE(ovlwarn_t, TAG_COMPILER, "overload warning");
+      ow->next = overload_warnings;
+      ow->func = definition->funcname;
+      ow->warn = alloc_cstring(buf, "overload warning");
+      overload_warnings = ow;
     }
+  }
 
-    /* A new function also has to be inserted, since this spot will be
-     * used when this function is called in an object inheriting us.  Point
-     * it at the overloaded function.
-     * No need to set much here because epilog() will fixup this entry
-     * later.
-     */
+  /* A new function also has to be inserted, since this spot will be
+   * used when this function is called in an object inheriting us.  Point
+   * it at the overloaded function.
+   * No need to set much here because epilog() will fixup this entry
+   * later.
+   */
 
-    newdef = ALLOCATE(compiler_temp_t, TAG_COMPILER, "overload_function");
+  newdef = ALLOCATE(compiler_temp_t, TAG_COMPILER, "overload_function");
 
-    /* The resolution order is given in above comments */
-    if (oldflags & FUNC_ALIAS) replace = 1;
-    else if (newflags & FUNC_ALIAS) replace = 0;
-    else if (!(newflags & (FUNC_PROTOTYPE|FUNC_UNDEFINED))) {
-        if (oldflags & (FUNC_PROTOTYPE|FUNC_INHERITED|FUNC_UNDEFINED))
-            replace = 1;
-        else replace = 0;
-    } else {
-        if ((oldflags & (FUNC_PROTOTYPE|FUNC_UNDEFINED)) &&
-            (oldflags & FUNC_INHERITED))
-            replace = 1;
-        else replace = 0;
+  /* The resolution order is given in above comments */
+  if (oldflags & FUNC_ALIAS) { replace = 1; }
+  else if (newflags & FUNC_ALIAS) { replace = 0; }
+  else if (!(newflags & (FUNC_PROTOTYPE | FUNC_UNDEFINED))) {
+    if (oldflags & (FUNC_PROTOTYPE | FUNC_INHERITED | FUNC_UNDEFINED)) {
+      replace = 1;
+    } else { replace = 0; }
+  } else {
+    if ((oldflags & (FUNC_PROTOTYPE | FUNC_UNDEFINED)) &&
+        (oldflags & FUNC_INHERITED)) {
+      replace = 1;
+    } else { replace = 0; }
+  }
+
+  if (replace) {
+    /* We win */
+    if (!(oldflags & FUNC_INHERITED)) {
+      /* Mark entry for removal */
+      FUNC(FUNCTION_TEMP(oldindex)->u.index)->address = ADDRESS_MAX;
     }
+    *newdef = *FUNCTION_TEMP(oldindex);
+    FUNCTION_TEMP(oldindex)->next = newdef;
+    newdef = FUNCTION_TEMP(oldindex);
+  } else {
+    compiler_temp_t *oldnext = FUNCTION_TEMP(oldindex)->next;
+    newdef->next = oldnext;
+    FUNCTION_TEMP(oldindex)->next = newdef;
+  }
 
-    if (replace) {
-        /* We win */
-        if (!(oldflags & FUNC_INHERITED)) {
-            /* Mark entry for removal */
-            FUNC(FUNCTION_TEMP(oldindex)->u.index)->address = ADDRESS_MAX;
-        }
-        *newdef = *FUNCTION_TEMP(oldindex);
-        FUNCTION_TEMP(oldindex)->next = newdef;
-        newdef = FUNCTION_TEMP(oldindex);
-    } else {
-        compiler_temp_t *oldnext = FUNCTION_TEMP(oldindex)->next;
-        newdef->next = oldnext;
-        FUNCTION_TEMP(oldindex)->next = newdef;
-    }
+  newdef->offset = NUM_INHERITS - 1;
+  newdef->function_index_offset = index;
+  newdef->prog = defprog;
+  newdef->u.func = defprog->function_table + defindex;
 
-    newdef->offset = NUM_INHERITS - 1;
-    newdef->function_index_offset = index;
-    newdef->prog = defprog;
-    newdef->u.func = defprog->function_table + defindex;
+  f = (newflags & FUNC_MASK) | FUNC_INHERITED;
 
-    f = (newflags & FUNC_MASK) | FUNC_INHERITED;
+  /* 'private' functions become 'hidden' */
+  if (f & DECL_PRIVATE) { f = (f & ~DECL_PRIVATE) | DECL_HIDDEN; }
 
-    /* 'private' functions become 'hidden' */
-    if (f & DECL_PRIVATE) f = (f & ~DECL_PRIVATE) | DECL_HIDDEN;
+  f = DECL_MODIFY(typemod, f);
+  f &= ~DECL_NOSAVE;
 
-    f = DECL_MODIFY(typemod, f);
-    f &= ~DECL_NOSAVE;
-
-    newdef->flags = f;
+  newdef->flags = f;
 }
 
 /*
@@ -763,70 +792,71 @@ static void overload_function (program_t * prog, int index,
  * definition). If an function defined by inheritance is called, then one
  * special definition will be made at first call.
  */
-int copy_functions (program_t * from, int typemod)
+int copy_functions(program_t *from, int typemod)
 {
-    int i, initializer = -1, num_functions;
-    ident_hash_elem_t *ihe;
-    int num;
+  int i, initializer = -1, num_functions;
+  ident_hash_elem_t *ihe;
+  int num;
 
-    num_functions = from->num_functions_defined + from->last_inherited;
+  num_functions = from->num_functions_defined + from->last_inherited;
 
-    if (from->num_functions_defined &&
-        (from->function_table[from->num_functions_defined - 1].funcname[0] == APPLY___INIT_SPECIAL_CHAR))
-        initializer = --num_functions;
+  if (from->num_functions_defined &&
+      (from->function_table[from->num_functions_defined - 1].funcname[0] == APPLY___INIT_SPECIAL_CHAR)) {
+    initializer = --num_functions;
+  }
 
-    for (i = 0; i < num_functions; i++) {
-        program_t *prog = from;
-        int index = i;
-        function_t *funp;
-        int low, mid, high;
+  for (i = 0; i < num_functions; i++) {
+    program_t *prog = from;
+    int index = i;
+    function_t *funp;
+    int low, mid, high;
 
-        /* Walk up the inheritance tree to the real definition */
-        if (prog->function_flags[index] & FUNC_ALIAS) {
-            index = prog->function_flags[index] & ~FUNC_ALIAS;
-        }
-
-        while (prog->function_flags[index] & FUNC_INHERITED) {
-            low = 0;
-            high = prog->num_inherited -1;
-
-            while (high > low) {
-                mid = (low + high + 1) >> 1;
-                if (prog->inherit[mid].function_index_offset > index)
-                    high = mid -1;
-                else low = mid;
-            }
-            index -= prog->inherit[low].function_index_offset;
-            prog = prog->inherit[low].prog;
-        }
-
-        index -= prog->last_inherited;
-
-        funp = prog->function_table + index;
-
-
-        ihe = lookup_ident(funp->funcname);
-        if (ihe && ((num = ihe->dn.function_num)!=-1)) {
-          /* The function has already been defined in this object */
-            overload_function(from, i, prog,index, num, typemod);
-        } else {
-            copy_new_function(from, i, prog, index, typemod);
-        }
+    /* Walk up the inheritance tree to the real definition */
+    if (prog->function_flags[index] & FUNC_ALIAS) {
+      index = prog->function_flags[index] & ~FUNC_ALIAS;
     }
-    return initializer;
+
+    while (prog->function_flags[index] & FUNC_INHERITED) {
+      low = 0;
+      high = prog->num_inherited - 1;
+
+      while (high > low) {
+        mid = (low + high + 1) >> 1;
+        if (prog->inherit[mid].function_index_offset > index) {
+          high = mid - 1;
+        } else { low = mid; }
+      }
+      index -= prog->inherit[low].function_index_offset;
+      prog = prog->inherit[low].prog;
+    }
+
+    index -= prog->last_inherited;
+
+    funp = prog->function_table + index;
+
+
+    ihe = lookup_ident(funp->funcname);
+    if (ihe && ((num = ihe->dn.function_num) != -1)) {
+      /* The function has already been defined in this object */
+      overload_function(from, i, prog, index, num, typemod);
+    } else {
+      copy_new_function(from, i, prog, index, typemod);
+    }
+  }
+  return initializer;
 }
 
-void type_error (const char * str, int type)
+void type_error(const char *str, int type)
 {
-    static char buff[512];
-    char *end = EndOf(buff);
-    char *p;
+  static char buff[512];
+  char *end = EndOf(buff);
+  char *p;
 
-    p = strput(buff, end, str);
-    p = strput(p, end, ": \"");
-    p = get_type_name(p, end, type);
-    p = strput(p, end, "\"");
-    yyerror(buff);
+  p = strput(buff, end, str);
+  p = strput(p, end, ": \"");
+  p = get_type_name(p, end, type);
+  p = strput(p, end, "\"");
+  yyerror(buff);
 }
 
 /*
@@ -834,58 +864,68 @@ void type_error (const char * str, int type)
  */
 
 /* This one really is t1->t2; it isn't symmetric, since int->void isn't allowed. */
-int compatible_types (int t1, int t2)
+int compatible_types(int t1, int t2)
 {
 #ifdef OLD_TYPE_BEHAVIOR
-    /* The old version effectively was almost always was true */
-    return 1;
+  /* The old version effectively was almost always was true */
+  return 1;
 #else
-    t1 &= ~DECL_MODS;
-    t2 &= ~DECL_MODS;
-    if (t1 == TYPE_ANY || t2 == TYPE_ANY) return 1;
-    if ((t1 == (TYPE_ANY | TYPE_MOD_ARRAY) && (t2 & TYPE_MOD_ARRAY)))
-        return 1;
-    if ((t2 == (TYPE_ANY | TYPE_MOD_ARRAY) && (t1 & TYPE_MOD_ARRAY)))
-        return 1;
-    if (t1 & TYPE_MOD_CLASS)
-        return t1 == t2;
-    if (t1 & TYPE_MOD_ARRAY) {
-        if (!(t2 & TYPE_MOD_ARRAY)) return 0;
-        return t1 == (TYPE_MOD_ARRAY | TYPE_ANY) ||
-               t2 == (TYPE_MOD_ARRAY | TYPE_ANY) || (t1 == t2);
-    } else if (t2 & TYPE_MOD_ARRAY)
-        return 0;
-    if(t1>10 || t1 < 0)
-      fatal("compiler.c: unknown type in compatible_types()");
-    return compatible[t1] & (1 << t2);
+  t1 &= ~DECL_MODS;
+  t2 &= ~DECL_MODS;
+  if (t1 == TYPE_ANY || t2 == TYPE_ANY) { return 1; }
+  if ((t1 == (TYPE_ANY | TYPE_MOD_ARRAY) && (t2 & TYPE_MOD_ARRAY))) {
+    return 1;
+  }
+  if ((t2 == (TYPE_ANY | TYPE_MOD_ARRAY) && (t1 & TYPE_MOD_ARRAY))) {
+    return 1;
+  }
+  if (t1 & TYPE_MOD_CLASS) {
+    return t1 == t2;
+  }
+  if (t1 & TYPE_MOD_ARRAY) {
+    if (!(t2 & TYPE_MOD_ARRAY)) { return 0; }
+    return t1 == (TYPE_MOD_ARRAY | TYPE_ANY) ||
+           t2 == (TYPE_MOD_ARRAY | TYPE_ANY) || (t1 == t2);
+  } else if (t2 & TYPE_MOD_ARRAY) {
+    return 0;
+  }
+  if (t1 > 10 || t1 < 0) {
+    fatal("compiler.c: unknown type in compatible_types()");
+  }
+  return compatible[t1] & (1 << t2);
 #endif
 }
 
 /* This one is symmetric.  Used for comparison operators, etc */
-int compatible_types2 (int t1, int t2)
+int compatible_types2(int t1, int t2)
 {
 #ifdef OLD_TYPE_BEHAVIOR
-    /* The old version effectively was almost always was true */
-    return 1;
+  /* The old version effectively was almost always was true */
+  return 1;
 #else
-    t1 &= ~DECL_MODS;
-    t2 &= ~DECL_MODS;
-    if (t1 == TYPE_ANY || t2 == TYPE_ANY) return 1;
-    if ((t1 == (TYPE_ANY | TYPE_MOD_ARRAY) && (t2 & TYPE_MOD_ARRAY)))
-        return 1;
-    if ((t2 == (TYPE_ANY | TYPE_MOD_ARRAY) && (t1 & TYPE_MOD_ARRAY)))
-        return 1;
-    if (t1 & TYPE_MOD_CLASS)
-        return t1 == t2;
-    if (t1 & TYPE_MOD_ARRAY) {
-        if (!(t2 & TYPE_MOD_ARRAY)) return 0;
-        return t1 == (TYPE_MOD_ARRAY | TYPE_ANY) ||
-               t2 == (TYPE_MOD_ARRAY | TYPE_ANY) || (t1 == t2);
-    } else if (t2 & TYPE_MOD_ARRAY)
-        return 0;
-    if (compatible[t1] & (1 << t2))
-        return 1;
-    return compatible[t2] & (1 << t1);
+  t1 &= ~DECL_MODS;
+  t2 &= ~DECL_MODS;
+  if (t1 == TYPE_ANY || t2 == TYPE_ANY) { return 1; }
+  if ((t1 == (TYPE_ANY | TYPE_MOD_ARRAY) && (t2 & TYPE_MOD_ARRAY))) {
+    return 1;
+  }
+  if ((t2 == (TYPE_ANY | TYPE_MOD_ARRAY) && (t1 & TYPE_MOD_ARRAY))) {
+    return 1;
+  }
+  if (t1 & TYPE_MOD_CLASS) {
+    return t1 == t2;
+  }
+  if (t1 & TYPE_MOD_ARRAY) {
+    if (!(t2 & TYPE_MOD_ARRAY)) { return 0; }
+    return t1 == (TYPE_MOD_ARRAY | TYPE_ANY) ||
+           t2 == (TYPE_MOD_ARRAY | TYPE_ANY) || (t1 == t2);
+  } else if (t2 & TYPE_MOD_ARRAY) {
+    return 0;
+  }
+  if (compatible[t1] & (1 << t2)) {
+    return 1;
+  }
+  return compatible[t2] & (1 << t1);
 #endif
 }
 
@@ -899,128 +939,133 @@ int compatible_types2 (int t1, int t2)
  *
  * Note: this function is now only used for resolving :: references
  */
-static int find_matching_function (program_t * prog, char * name,
-                                     parse_node_t * node) {
-    int high = prog->num_functions_defined - 1;
-    int low = 0;
-    int i, res;
+static int find_matching_function(program_t *prog, char *name,
+                                  parse_node_t *node)
+{
+  int high = prog->num_functions_defined - 1;
+  int low = 0;
+  int i, res;
 
-    /* Search our function table */
-    while (high >= low) {
-        int mid = (high + low)/2;
-        char *p = prog->function_table[mid].funcname;
+  /* Search our function table */
+  while (high >= low) {
+    int mid = (high + low) / 2;
+    char *p = prog->function_table[mid].funcname;
 
-        if (name < p)
-            high = mid-1;
-        else if (name > p)
-            low = mid+1;
-        else {
-            int ri;
-            int flags;
-            int type;
+    if (name < p) {
+      high = mid - 1;
+    } else if (name > p) {
+      low = mid + 1;
+    } else {
+      int ri;
+      int flags;
+      int type;
 
-            /* Rely on the fact that functions in the table are not inherited
-               or aliased */
-            /* Non-inherited aliased ones are always removed anyway */
-            ri = prog->last_inherited + mid;
+      /* Rely on the fact that functions in the table are not inherited
+         or aliased */
+      /* Non-inherited aliased ones are always removed anyway */
+      ri = prog->last_inherited + mid;
 
-            flags = prog->function_flags[ri];
+      flags = prog->function_flags[ri];
 
-            if (flags & (FUNC_UNDEFINED | FUNC_PROTOTYPE)) return 0;
-            if (flags & DECL_PRIVATE) return -1;
+      if (flags & (FUNC_UNDEFINED | FUNC_PROTOTYPE)) { return 0; }
+      if (flags & DECL_PRIVATE) { return -1; }
 
-            node->kind = NODE_CALL_2;
-            node->v.number = F_CALL_INHERITED;
-            node->l.number = ri;
-            type = prog->function_table[mid].type;
-            fix_class_type(&type, prog);
-            node->type = type;
-            return 1;
-        }
+      node->kind = NODE_CALL_2;
+      node->v.number = F_CALL_INHERITED;
+      node->l.number = ri;
+      type = prog->function_table[mid].type;
+      fix_class_type(&type, prog);
+      node->type = type;
+      return 1;
     }
+  }
 
-    /* Search inherited function tables */
-    i = prog->num_inherited;
-    while (i--) {
-        if ((res = find_matching_function(prog->inherit[i].prog, name, node))) {
-            if ((res == -1) || (prog->inherit[i].type_mod & DECL_PRIVATE))
-                return -1;
+  /* Search inherited function tables */
+  i = prog->num_inherited;
+  while (i--) {
+    if ((res = find_matching_function(prog->inherit[i].prog, name, node))) {
+      if ((res == -1) || (prog->inherit[i].type_mod & DECL_PRIVATE)) {
+        return -1;
+      }
 
-            node->l.number += prog->inherit[i].function_index_offset;
-            return 1;
-        }
+      node->l.number += prog->inherit[i].function_index_offset;
+      return 1;
     }
-    return 0;
+  }
+  return 0;
 }
 
-int arrange_call_inherited (char * name, parse_node_t * node)
+int arrange_call_inherited(char *name, parse_node_t *node)
 {
-    inherit_t *ip;
-    int num_inherits, super_length;
-    char *super_name, *p, *real_name = name;
-    char *shared_string;
-    int ret;
+  inherit_t *ip;
+  int num_inherits, super_length;
+  char *super_name, *p, *real_name = name;
+  char *shared_string;
+  int ret;
 
-    if (real_name[0] == ':') {
-        super_name = 0;
-        real_name += 2;         /* There will be exactly two ':' */
-        super_length = 0;
-    } else if ((p = strchr(real_name, ':'))) {
-        super_name = name;
-        real_name = p+2;
-        super_length = real_name - super_name - 2;
-    } else
-      fatal("no : in inherit call ???");
+  if (real_name[0] == ':') {
+    super_name = 0;
+    real_name += 2;         /* There will be exactly two ':' */
+    super_length = 0;
+  } else if ((p = strchr(real_name, ':'))) {
+    super_name = name;
+    real_name = p + 2;
+    super_length = real_name - super_name - 2;
+  } else {
+    fatal("no : in inherit call ???");
+  }
 
-    num_inherits = NUM_INHERITS;
-    /* no need to look for it unless its in the shared string table */
-    if ((shared_string = findstring(real_name))) {
-        ip = (inherit_t *) mem_block[A_INHERITS].block;
-        for (; num_inherits > 0; ip++, num_inherits--) {
-            int tmp;
+  num_inherits = NUM_INHERITS;
+  /* no need to look for it unless its in the shared string table */
+  if ((shared_string = findstring(real_name))) {
+    ip = (inherit_t *) mem_block[A_INHERITS].block;
+    for (; num_inherits > 0; ip++, num_inherits--) {
+      int tmp;
 
-            if (super_name) {
-                int l = SHARED_STRLEN(ip->prog->filename);  /* Including .c */
+      if (super_name) {
+        int l = SHARED_STRLEN(ip->prog->filename);  /* Including .c */
 
-                if (l - 2 < super_length)
-                    continue;
-                if (strncmp(super_name, ip->prog->filename + l - 2 -super_length,
-                            super_length) != 0 ||
-                    !((l - 2 == super_length) ||
-                     ((ip->prog->filename + l - 3 - super_length)[0] == '/')))
-                    continue;
-            }
-
-            if ((tmp = find_matching_function(ip->prog, shared_string, node))) {
-                if (tmp == -1 || (ip->type_mod & DECL_PRIVATE)) {
-                    yyerror("Called function is private.");
-
-                    goto invalid;
-                }
-
-                ret = node->l.number + ip->function_index_offset;
-                node->l.number |= ((ip - (inherit_t *) mem_block[A_INHERITS].block) << 16);
-                return ret;
-            }
+        if (l - 2 < super_length) {
+          continue;
         }
-    }                           /* if in shared string table */
-    {
-        char buff[256];
-        char *end = EndOf(buff);
-        char *p;
+        if (strncmp(super_name, ip->prog->filename + l - 2 - super_length,
+                    super_length) != 0 ||
+            !((l - 2 == super_length) ||
+              ((ip->prog->filename + l - 3 - super_length)[0] == '/'))) {
+          continue;
+        }
+      }
 
-        p = strput(buff, end, "No such inherited function ");
-        p = strput(p, end, name);
-        yyerror(buff);
+      if ((tmp = find_matching_function(ip->prog, shared_string, node))) {
+        if (tmp == -1 || (ip->type_mod & DECL_PRIVATE)) {
+          yyerror("Called function is private.");
+
+          goto invalid;
+        }
+
+        ret = node->l.number + ip->function_index_offset;
+        node->l.number |= ((ip - (inherit_t *) mem_block[A_INHERITS].block) << 16);
+        return ret;
+      }
     }
+  }                           /* if in shared string table */
+  {
+    char buff[256];
+    char *end = EndOf(buff);
+    char *p;
 
-  invalid:
-    node->kind = NODE_CALL_2;
-    node->v.number = F_CALL_INHERITED;
-    node->l.number = 0;
-    node->type = TYPE_ANY;
+    p = strput(buff, end, "No such inherited function ");
+    p = strput(p, end, name);
+    yyerror(buff);
+  }
 
-    return -1;
+invalid:
+  node->kind = NODE_CALL_2;
+  node->v.number = F_CALL_INHERITED;
+  node->l.number = 0;
+  node->type = TYPE_ANY;
+
+  return -1;
 }
 
 /*
@@ -1032,1714 +1077,1815 @@ int arrange_call_inherited (char * name, parse_node_t * node)
 /* Warning: returns an index into A_FUNCTIONS, not the full
  * function list
  */
-int define_new_function (const char * name, int num_arg, int num_local,
-                           int flags, int type)
+int define_new_function(const char *name, int num_arg, int num_local,
+                        int flags, int type)
 {
-    int oldindex, num, newindex;
-    unsigned short argument_start_index;
-    ident_hash_elem_t *ihe;
-    function_t *funp = 0;
-    compiler_temp_t *newfunc;
+  int oldindex, num, newindex;
+  unsigned short argument_start_index;
+  ident_hash_elem_t *ihe;
+  function_t *funp = 0;
+  compiler_temp_t *newfunc;
 
-    oldindex = (ihe = lookup_ident(name)) ? ihe->dn.function_num : -1;
-    if (oldindex >= 0) {
-        int funflags = FUNCTION_FLAGS(oldindex);
+  oldindex = (ihe = lookup_ident(name)) ? ihe->dn.function_num : -1;
+  if (oldindex >= 0) {
+    int funflags = FUNCTION_FLAGS(oldindex);
 
-        funp = FUNCTION_DEF(oldindex);
+    funp = FUNCTION_DEF(oldindex);
 
-        /*
-         * The function was already defined. It may be one of several
-         * reasons:
-         *
-         * 1.   There has been a prototype.
-         * 2.   There was a function with the same name defined by inheritance.
-         * 3.   This function has been called, but not yet defined.
-         * 4.   The function is doubly defined.
-         * 5.   A "late" prototype has been encountered.
-         */
-        if (funflags & FUNC_ALIAS) {
-            fatal("Inconsistent aliasing of functions!\n");
-        }
-
-        if (!(funflags & (FUNC_INHERITED|FUNC_PROTOTYPE|FUNC_UNDEFINED))
-            && !(flags & FUNC_PROTOTYPE)) {
-            char buff[256];
-            char *end = EndOf(buff);
-            char *p;
-
-            p = strput(buff, end, "Redeclaration of function ");
-            p = strput(p, end, name);
-            p = strput(p, end, ".");
-            yyerror(buff);
-            return -1;
-        }
-        /*
-         * It was either an undefined but used funtion, or an inherited
-         * function. In both cases, we now consider this to be THE new
-         * definition. It might also have been a prototype to an already
-         * defined function, in which case we simply return.
-         *
-         * Check arguments only when types are supposed to be tested, and if
-         * this function really has been defined already.
-         *
-         * 'nomask' functions may not be redefined.
-         */
-        if ((funflags & DECL_NOMASK) &&
-            !((flags|funflags) & (FUNC_UNDEFINED|FUNC_PROTOTYPE))) {
-            char buf[256];
-            char *end = EndOf(buf);
-            char *p;
-
-            p = strput(buf, end, "Illegal to redefine 'nomask' function \"");
-            p = strput(p, end, name);
-            p = strput(p, end, "\"");
-            yyerror(buf);
-        }
-
-        /* only check prototypes for matching.  It shouldn't be required that
-           overloading a function must have the same signature */
-        if (exact_types && ((flags|funflags) & FUNC_PROTOTYPE)) {
-            int funtype, i;
-
-            funtype = funp->type;
-            if (FUNCTION_TEMP(oldindex)->prog) {
-                fix_class_type(&funtype, FUNCTION_TEMP(oldindex)->prog);
-            }
-            /* This should be changed to catch two prototypes which disagree */
-            if (funtype != TYPE_UNKNOWN) {
-                if (funp->num_arg != num_arg
-                    && !((flags|funflags) & FUNC_VARARGS))
-                    yywarn("Number of arguments disagrees with previous definition.");
-                if (!(funflags & FUNC_STRICT_TYPES))
-                    yywarn("Called function not compiled with type testing.");
-
-                /* Now check that argument types wasn't changed. */
-                if (!compatible_types(type, funtype)) {
-                    char buff[512];
-                    char *end = EndOf(buff);
-                    char *p;
-
-                    if (FUNCTION_TEMP(oldindex)->prog) {
-                        p = strput(buff, end, "Function ");
-                        p = strput(p, end, name);
-                        p = strput(p, end, " inherited from '/");
-                        p = strput(p, end, FUNCTION_TEMP(oldindex)->prog->filename);
-                        p = strput(p, end, "' does not match ");
-                    } else {
-                        if (funflags & FUNC_PROTOTYPE)
-                            p = strput(buff, end, "Previous function prototype ");
-                        else p = strput(buff, end, "Previous function declaration ");
-                        p = strput(p, end, "for ");
-                        p = strput(p, end, name);
-                        p = strput(p, end, " does not match ");
-                    }
-                    p = strput(p, end, "current function in return type ");
-                    p = get_two_types(p, end, funtype, type);
-
-                    yywarn(buff);
-                }
-
-                for (i = 0; i < num_arg; i++) {
-                    /* FIXME: check arg types here */
-
-                }
-            }
-        }
-
-        /* If it was yet another prototype, then simply return. */
-        /* provided the current winning definition is an undefined */
-        /* or prototype itself */
-
-        if ((flags & FUNC_PROTOTYPE) &&
-            !(funflags & (FUNC_PROTOTYPE|FUNC_UNDEFINED)))
-            return -1; /* unused for prototypes */
-
-        if (pragmas & PRAGMA_WARNINGS)
-            remove_overload_warnings(funp->funcname);
-
-        /* If there was already a definition at this level (due to a
-         * prototype), clear it out.  Don't free the function name, though;
-         * the name is the same, and the ident hash table might be counting
-         * on it to stay allocated.
-         */
-        if (FUNCTION_PROG(oldindex) == 0) {
-            num = FUNCTION_TEMP(oldindex)->u.index;
-            funp = FUNC(num);
-        } else
-            funp = 0;
-    }
-    if (!funp) {
-        num = mem_block[A_FUNCTIONS].current_size / sizeof(function_t);
-        funp = (function_t *)allocate_in_mem_block(A_FUNCTIONS, sizeof(function_t));
-        funp->funcname = make_shared_string(name);
-        argument_start_index = INDEX_START_NONE;
-        add_to_mem_block(A_ARGUMENT_INDEX, (char *) &argument_start_index,
-                         sizeof argument_start_index);
-
+    /*
+     * The function was already defined. It may be one of several
+     * reasons:
+     *
+     * 1.   There has been a prototype.
+     * 2.   There was a function with the same name defined by inheritance.
+     * 3.   This function has been called, but not yet defined.
+     * 4.   The function is doubly defined.
+     * 5.   A "late" prototype has been encountered.
+     */
+    if (funflags & FUNC_ALIAS) {
+      fatal("Inconsistent aliasing of functions!\n");
     }
 
-    if (oldindex < 0) {
-        newindex = add_new_function_entry();
-        ihe = find_or_add_ident(funp->funcname, FOA_GLOBAL_SCOPE);
-        ihe->sem_value++;
-        ihe->dn.function_num = newindex;
-        newfunc = FUNCTION_TEMP(newindex);
-        newfunc->next = (compiler_temp_t *) NULL;
+    if (!(funflags & (FUNC_INHERITED | FUNC_PROTOTYPE | FUNC_UNDEFINED))
+        && !(flags & FUNC_PROTOTYPE)) {
+      char buff[256];
+      char *end = EndOf(buff);
+      char *p;
+
+      p = strput(buff, end, "Redeclaration of function ");
+      p = strput(p, end, name);
+      p = strput(p, end, ".");
+      yyerror(buff);
+      return -1;
+    }
+    /*
+     * It was either an undefined but used funtion, or an inherited
+     * function. In both cases, we now consider this to be THE new
+     * definition. It might also have been a prototype to an already
+     * defined function, in which case we simply return.
+     *
+     * Check arguments only when types are supposed to be tested, and if
+     * this function really has been defined already.
+     *
+     * 'nomask' functions may not be redefined.
+     */
+    if ((funflags & DECL_NOMASK) &&
+        !((flags | funflags) & (FUNC_UNDEFINED | FUNC_PROTOTYPE))) {
+      char buf[256];
+      char *end = EndOf(buf);
+      char *p;
+
+      p = strput(buf, end, "Illegal to redefine 'nomask' function \"");
+      p = strput(p, end, name);
+      p = strput(p, end, "\"");
+      yyerror(buf);
+    }
+
+    /* only check prototypes for matching.  It shouldn't be required that
+       overloading a function must have the same signature */
+    if (exact_types && ((flags | funflags) & FUNC_PROTOTYPE)) {
+      int funtype, i;
+
+      funtype = funp->type;
+      if (FUNCTION_TEMP(oldindex)->prog) {
+        fix_class_type(&funtype, FUNCTION_TEMP(oldindex)->prog);
+      }
+      /* This should be changed to catch two prototypes which disagree */
+      if (funtype != TYPE_UNKNOWN) {
+        if (funp->num_arg != num_arg
+            && !((flags | funflags) & FUNC_VARARGS)) {
+          yywarn("Number of arguments disagrees with previous definition.");
+        }
+        if (!(funflags & FUNC_STRICT_TYPES)) {
+          yywarn("Called function not compiled with type testing.");
+        }
+
+        /* Now check that argument types wasn't changed. */
+        if (!compatible_types(type, funtype)) {
+          char buff[512];
+          char *end = EndOf(buff);
+          char *p;
+
+          if (FUNCTION_TEMP(oldindex)->prog) {
+            p = strput(buff, end, "Function ");
+            p = strput(p, end, name);
+            p = strput(p, end, " inherited from '/");
+            p = strput(p, end, FUNCTION_TEMP(oldindex)->prog->filename);
+            p = strput(p, end, "' does not match ");
+          } else {
+            if (funflags & FUNC_PROTOTYPE) {
+              p = strput(buff, end, "Previous function prototype ");
+            } else { p = strput(buff, end, "Previous function declaration "); }
+            p = strput(p, end, "for ");
+            p = strput(p, end, name);
+            p = strput(p, end, " does not match ");
+          }
+          p = strput(p, end, "current function in return type ");
+          p = get_two_types(p, end, funtype, type);
+
+          yywarn(buff);
+        }
+
+        for (i = 0; i < num_arg; i++) {
+          /* FIXME: check arg types here */
+
+        }
+      }
+    }
+
+    /* If it was yet another prototype, then simply return. */
+    /* provided the current winning definition is an undefined */
+    /* or prototype itself */
+
+    if ((flags & FUNC_PROTOTYPE) &&
+        !(funflags & (FUNC_PROTOTYPE | FUNC_UNDEFINED))) {
+      return -1;    /* unused for prototypes */
+    }
+
+    if (pragmas & PRAGMA_WARNINGS) {
+      remove_overload_warnings(funp->funcname);
+    }
+
+    /* If there was already a definition at this level (due to a
+     * prototype), clear it out.  Don't free the function name, though;
+     * the name is the same, and the ident hash table might be counting
+     * on it to stay allocated.
+     */
+    if (FUNCTION_PROG(oldindex) == 0) {
+      num = FUNCTION_TEMP(oldindex)->u.index;
+      funp = FUNC(num);
     } else {
-        newfunc = ALLOCATE(compiler_temp_t, TAG_TEMPORARY, "define_new_function");
-        *newfunc = *FUNCTION_TEMP(oldindex);
-
-        /* We are going to rewrite stuff at oldindex */
-        FUNCTION_TEMP(oldindex)->next = newfunc;
-        newfunc = FUNCTION_TEMP(oldindex);
-
-        newindex = oldindex;
+      funp = 0;
     }
+  }
+  if (!funp) {
+    num = mem_block[A_FUNCTIONS].current_size / sizeof(function_t);
+    funp = (function_t *)allocate_in_mem_block(A_FUNCTIONS, sizeof(function_t));
+    funp->funcname = make_shared_string(name);
+    argument_start_index = INDEX_START_NONE;
+    add_to_mem_block(A_ARGUMENT_INDEX, (char *) &argument_start_index,
+                     sizeof argument_start_index);
 
-    newfunc->prog = 0;
-    newfunc->u.index = num;
+  }
 
-    if (exact_types)
-        flags |= FUNC_STRICT_TYPES;
-    DEBUG_CHECK(!(flags & DECL_ACCESS), "No access level for function!\n");
-    newfunc->flags = flags;
+  if (oldindex < 0) {
+    newindex = add_new_function_entry();
+    ihe = find_or_add_ident(funp->funcname, FOA_GLOBAL_SCOPE);
+    ihe->sem_value++;
+    ihe->dn.function_num = newindex;
+    newfunc = FUNCTION_TEMP(newindex);
+    newfunc->next = (compiler_temp_t *) NULL;
+  } else {
+    newfunc = ALLOCATE(compiler_temp_t, TAG_TEMPORARY, "define_new_function");
+    *newfunc = *FUNCTION_TEMP(oldindex);
+
+    /* We are going to rewrite stuff at oldindex */
+    FUNCTION_TEMP(oldindex)->next = newfunc;
+    newfunc = FUNCTION_TEMP(oldindex);
+
+    newindex = oldindex;
+  }
+
+  newfunc->prog = 0;
+  newfunc->u.index = num;
+
+  if (exact_types) {
+    flags |= FUNC_STRICT_TYPES;
+  }
+  DEBUG_CHECK(!(flags & DECL_ACCESS), "No access level for function!\n");
+  newfunc->flags = flags;
 
 
 
-    funp->num_local = num_local;
-    funp->num_arg = num_arg;
-    funp->type = type;
-    funp->address = 0;
+  funp->num_local = num_local;
+  funp->num_arg = num_arg;
+  funp->type = type;
+  funp->address = 0;
 #ifdef PROFILE_FUNCTIONS
-    funp->calls = 0L;
-    funp->self = 0L;
-    funp->children = 0L;
+  funp->calls = 0L;
+  funp->self = 0L;
+  funp->children = 0L;
 #endif
 
-    if (exact_types && num_arg) {
-        int i;
+  if (exact_types && num_arg) {
+    int i;
 
-        if (!(flags & FUNC_PROTOTYPE)) {
-            for (i = 0; i < current_number_of_locals; i++) {
-                if (type_of_locals_ptr[locals_ptr[i].runtime_index] & LOCAL_MOD_UNUSED) {
-                    char buf[256];
-                    char *end = EndOf(buf);
-                    char *p;
+    if (!(flags & FUNC_PROTOTYPE)) {
+      for (i = 0; i < current_number_of_locals; i++) {
+        if (type_of_locals_ptr[locals_ptr[i].runtime_index] & LOCAL_MOD_UNUSED) {
+          char buf[256];
+          char *end = EndOf(buf);
+          char *p;
 
-                    p = strput(buf, end, "Unused local variable '");
-                    p = strput(p, end, locals_ptr[i].ihe->name);
-                    p = strput(p, end, "'");
-                    yywarn(buf);
-                    type_of_locals_ptr[locals_ptr[i].runtime_index] &= ~LOCAL_MOD_UNUSED;
-                }
-            }
+          p = strput(buf, end, "Unused local variable '");
+          p = strput(p, end, locals_ptr[i].ihe->name);
+          p = strput(p, end, "'");
+          yywarn(buf);
+          type_of_locals_ptr[locals_ptr[i].runtime_index] &= ~LOCAL_MOD_UNUSED;
         }
-        *((unsigned short *)mem_block[A_ARGUMENT_INDEX].block + num) =
-            mem_block[A_ARGUMENT_TYPES].current_size / sizeof(unsigned short);
-        add_to_mem_block(A_ARGUMENT_TYPES, (char *)type_of_locals_ptr,
-                         num_arg * sizeof(*type_of_locals_ptr));
+      }
+    }
+    *((unsigned short *)mem_block[A_ARGUMENT_INDEX].block + num) =
+      mem_block[A_ARGUMENT_TYPES].current_size / sizeof(unsigned short);
+    add_to_mem_block(A_ARGUMENT_TYPES, (char *)type_of_locals_ptr,
+                     num_arg * sizeof(*type_of_locals_ptr));
 #ifndef SUPPRESS_ARGUMENT_WARNINGS
-        if (flags & FUNC_PROTOTYPE) {
-            int i;
+    if (flags & FUNC_PROTOTYPE) {
+      int i;
 
-            for (i = 0; i < num_arg; i++) {
-                if (*locals_ptr[i].ihe->name)
-                    type_of_locals_ptr[i] |= LOCAL_MOD_UNUSED;
-            }
+      for (i = 0; i < num_arg; i++) {
+        if (*locals_ptr[i].ihe->name) {
+          type_of_locals_ptr[i] |= LOCAL_MOD_UNUSED;
         }
+      }
+    }
 #endif
-    }
-    return newindex;
+  }
+  return newindex;
 }
 
-int define_variable (char * name, int type)
+int define_variable(char *name, int type)
 {
-    variable_t *dummy;
-    int n;
-    ident_hash_elem_t *ihe;
+  variable_t *dummy;
+  int n;
+  ident_hash_elem_t *ihe;
 
-    n = (mem_block[A_VAR_TEMP].current_size / sizeof(variable_t));
+  n = (mem_block[A_VAR_TEMP].current_size / sizeof(variable_t));
 
-    ihe = find_or_add_ident(name, FOA_GLOBAL_SCOPE);
-    if (ihe->dn.global_num == -1) {
-        ihe->sem_value++;
-        ihe->dn.global_num = n;
+  ihe = find_or_add_ident(name, FOA_GLOBAL_SCOPE);
+  if (ihe->dn.global_num == -1) {
+    ihe->sem_value++;
+    ihe->dn.global_num = n;
 
-        if (n >= CFG_MAX_GLOBAL_VARIABLES) {
-            yyerror("Too many global variables");
-        }
-    } else {
-        char buf[CFG_MAX_GLOBAL_VARIABLES];
-        char *end = EndOf(buf);
-        char *p;
+    if (n >= CFG_MAX_GLOBAL_VARIABLES) {
+      yyerror("Too many global variables");
+    }
+  } else {
+    char buf[CFG_MAX_GLOBAL_VARIABLES];
+    char *end = EndOf(buf);
+    char *p;
 
-        p = strput(buf, end, "Redeclaration of global variable '");
-        p = strput(p, end, ihe->name);
-        p = strput(p, end, "'.");
-        yywarn(buf);
+    p = strput(buf, end, "Redeclaration of global variable '");
+    p = strput(p, end, ihe->name);
+    p = strput(p, end, "'.");
+    yywarn(buf);
 
-        if (VAR_TEMP(ihe->dn.global_num)->type & DECL_NOMASK) {
-            char buf[CFG_MAX_GLOBAL_VARIABLES];
-            char *end = EndOf(buf);
-            char *p;
+    if (VAR_TEMP(ihe->dn.global_num)->type & DECL_NOMASK) {
+      char buf[CFG_MAX_GLOBAL_VARIABLES];
+      char *end = EndOf(buf);
+      char *p;
 
-            p = strput(buf, end, "Illegal to redefine 'nomask' variable \"");
-            p = strput(p, end, name);
-            p = strput(p, end, "\"");
-            yyerror(buf);
-        }
-        /* Okay, the nasty idiots have two variables of the same name in
-           the same object.  This causes headaches for save_object().
-           To keep save_object sane, we need to make one static */
-        if (!(VAR_TEMP(ihe->dn.global_num)->type & DECL_NOSAVE))
-            type |= DECL_NOSAVE;
-
-        /* hidden variables don't cause variables that are visible to become
-           invisible; we only add them above (in the !hide case) for better
-           error messages */
-        if (!(type & DECL_HIDDEN))
-            ihe->dn.global_num = n;
+      p = strput(buf, end, "Illegal to redefine 'nomask' variable \"");
+      p = strput(p, end, name);
+      p = strput(p, end, "\"");
+      yyerror(buf);
+    }
+    /* Okay, the nasty idiots have two variables of the same name in
+       the same object.  This causes headaches for save_object().
+       To keep save_object sane, we need to make one static */
+    if (!(VAR_TEMP(ihe->dn.global_num)->type & DECL_NOSAVE)) {
+      type |= DECL_NOSAVE;
     }
 
-    dummy = (variable_t *)allocate_in_mem_block(A_VAR_TEMP, sizeof(variable_t));
-    dummy->name = name;
-    dummy->type = type;
+    /* hidden variables don't cause variables that are visible to become
+       invisible; we only add them above (in the !hide case) for better
+       error messages */
+    if (!(type & DECL_HIDDEN)) {
+      ihe->dn.global_num = n;
+    }
+  }
 
-    return n;
+  dummy = (variable_t *)allocate_in_mem_block(A_VAR_TEMP, sizeof(variable_t));
+  dummy->name = name;
+  dummy->type = type;
+
+  return n;
 }
 
-int define_new_variable (char * name, int type) {
-    int n;
-    unsigned short *tp;
-    char **np;
+int define_new_variable(char *name, int type)
+{
+  int n;
+  unsigned short *tp;
+  char **np;
 
-    var_defined = 1;
-    name = make_shared_string(name);
-    n = define_variable(name, type);
-    np = (char **)allocate_in_mem_block(A_VAR_NAME, sizeof(char*));
-    *np = name;
-    tp = (unsigned short *)allocate_in_mem_block(A_VAR_TYPE, sizeof(unsigned short));
-    *tp = type;
+  var_defined = 1;
+  name = make_shared_string(name);
+  n = define_variable(name, type);
+  np = (char **)allocate_in_mem_block(A_VAR_NAME, sizeof(char *));
+  *np = name;
+  tp = (unsigned short *)allocate_in_mem_block(A_VAR_TYPE, sizeof(unsigned short));
+  *tp = type;
 
-    return n;
+  return n;
 }
 
-parse_node_t *check_refs (int num, parse_node_t * elist, parse_node_t * pn) {
-    int tmp = num;
+parse_node_t *check_refs(int num, parse_node_t *elist, parse_node_t *pn)
+{
+  int tmp = num;
 
+  elist = elist->r.expr;
+
+  while (elist) {
+    if (IS_NODE(elist->v.expr, NODE_UNARY_OP_1, F_MAKE_REF)) {
+      tmp--;
+    }
     elist = elist->r.expr;
+  }
+  DEBUG_CHECK(tmp < 0, "Oops, found more refs than is possible!\n");
+  if (tmp) {
+    /* if we didn't find all the refs at the top level of the argument
+     * list, then at least one is buried; i.e. something illegal like
+     * func(x = ref y), func(ref y + 1), etc
+     */
+    yyerror("Illegal use of ref");
+  }
+  if (num) {
+    parse_node_t *ret;
 
-    while (elist) {
-        if (IS_NODE(elist->v.expr, NODE_UNARY_OP_1, F_MAKE_REF))
-            tmp--;
-        elist = elist->r.expr;
-    }
-    DEBUG_CHECK(tmp < 0, "Oops, found more refs than is possible!\n");
-    if (tmp) {
-        /* if we didn't find all the refs at the top level of the argument
-         * list, then at least one is buried; i.e. something illegal like
-         * func(x = ref y), func(ref y + 1), etc
-         */
-        yyerror("Illegal use of ref");
-    }
-    if (num) {
-        parse_node_t *ret;
-
-        CREATE_UNARY_OP_1(ret, F_KILL_REFS, pn->type, pn, num);
-        return ret;
-    }
-    return pn;
+    CREATE_UNARY_OP_1(ret, F_KILL_REFS, pn->type, pn, num);
+    return ret;
+  }
+  return pn;
 }
 
 /* we know here that x has two modifiers, and hidden isn't one of them */
-int decl_fix (int x) {
-    int rest = x & ~DECL_ACCESS;
+int decl_fix(int x)
+{
+  int rest = x & ~DECL_ACCESS;
 
 #ifndef SENSIBLE_MODIFIERS
-    if (x & DECL_VISIBLE)
-        return rest | DECL_VISIBLE;
+  if (x & DECL_VISIBLE) {
+    return rest | DECL_VISIBLE;
+  }
 #endif
-    if (x & DECL_PRIVATE)
-        return rest | DECL_PRIVATE;
+  if (x & DECL_PRIVATE) {
+    return rest | DECL_PRIVATE;
+  }
 
-    /* only possibility left is 'public protected' */
-    return rest | DECL_PROTECTED;
+  /* only possibility left is 'public protected' */
+  return rest | DECL_PROTECTED;
 }
 
 const char *compiler_type_names[] = {"unknown", "mixed", "void", "void",
-                               "int", "string", "object", "mapping",
-                               "function", "float", "buffer" };
+                                     "int", "string", "object", "mapping",
+                                     "function", "float", "buffer"
+                                    };
 
 /* This routine has the semantics of strput(); see comments in simulate.c */
 
-char *get_type_modifiers (char * where, char * end, int type)
+char *get_type_modifiers(char *where, char *end, int type)
 {
 #ifdef SENSIBLE_MODIFIERS
-    if (type & DECL_HIDDEN)
-        where = strput(where, end, "hidden ");
-    if (type & DECL_PRIVATE)
-        where = strput(where, end, "private ");
-    if (type & DECL_PROTECTED)
-        where = strput(where, end, "protected ");
-    if (type & DECL_NOSAVE)
-        where = strput(where, end, "nosave ");
+  if (type & DECL_HIDDEN) {
+    where = strput(where, end, "hidden ");
+  }
+  if (type & DECL_PRIVATE) {
+    where = strput(where, end, "private ");
+  }
+  if (type & DECL_PROTECTED) {
+    where = strput(where, end, "protected ");
+  }
+  if (type & DECL_NOSAVE) {
+    where = strput(where, end, "nosave ");
+  }
 #else
-    if (type & DECL_HIDDEN)
-        where = strput(where, end, "hidden ");
-    if (type & DECL_VISIBLE)
-        where = strput(where, end, "public ");
-    if (type & DECL_PRIVATE)
-        where = strput(where, end, "private ");
-    if (type & DECL_PROTECTED)
-        where = strput(where, end, "static ");
+  if (type & DECL_HIDDEN) {
+    where = strput(where, end, "hidden ");
+  }
+  if (type & DECL_VISIBLE) {
+    where = strput(where, end, "public ");
+  }
+  if (type & DECL_PRIVATE) {
+    where = strput(where, end, "private ");
+  }
+  if (type & DECL_PROTECTED) {
+    where = strput(where, end, "static ");
+  }
 #endif
-    /* no output for public */
-    if (type & DECL_NOMASK)
-        where = strput(where, end, "nomask ");
-    if (type & FUNC_VARARGS)
-        where = strput(where, end, "varargs ");
+  /* no output for public */
+  if (type & DECL_NOMASK) {
+    where = strput(where, end, "nomask ");
+  }
+  if (type & FUNC_VARARGS) {
+    where = strput(where, end, "varargs ");
+  }
 
-    return where;
+  return where;
 }
 
-char *get_type_name (char * where, char * end, int type)
+char *get_type_name(char *where, char *end, int type)
 {
-    int pointer = 0;
+  int pointer = 0;
 
-    where = get_type_modifiers(where, end, type);
-    type &= ~DECL_MODS;
-    if (type & TYPE_MOD_ARRAY) {
-        pointer = 1;
-        type &= ~TYPE_MOD_ARRAY;
-    }
-    if (type & TYPE_MOD_CLASS) {
-        where = strput(where, end, "class ");
-        /* we're sometimes called from outside the compiler * /
-        if (current_file)
-            where = strput(where, end, PROG_STRING(CLASS(type & ~TYPE_MOD_CLASS)->name));
-            and that just doesn't work */
-    } else {
-        DEBUG_CHECK(type >= sizeof compiler_type_names / sizeof compiler_type_names[0], "Bad type\n");
-        where = strput(where, end, compiler_type_names[type]);
-    }
-    where = strput(where, end, " ");
+  where = get_type_modifiers(where, end, type);
+  type &= ~DECL_MODS;
+  if (type & TYPE_MOD_ARRAY) {
+    pointer = 1;
+    type &= ~TYPE_MOD_ARRAY;
+  }
+  if (type & TYPE_MOD_CLASS) {
+    where = strput(where, end, "class ");
+    /* we're sometimes called from outside the compiler * /
+    if (current_file)
+        where = strput(where, end, PROG_STRING(CLASS(type & ~TYPE_MOD_CLASS)->name));
+        and that just doesn't work */
+  } else {
+    DEBUG_CHECK(type >= sizeof compiler_type_names / sizeof compiler_type_names[0], "Bad type\n");
+    where = strput(where, end, compiler_type_names[type]);
+  }
+  where = strput(where, end, " ");
 #ifdef ARRAY_RESERVED_WORD
-    if (pointer) {
-        /* use just "array" instead of "mixed array" */
-        if (type == TYPE_ANY) {
-            where -= strlen(compiler_type_names[type]) + 1;
-        }
-        where = strput(where, end, "array ");
+  if (pointer) {
+    /* use just "array" instead of "mixed array" */
+    if (type == TYPE_ANY) {
+      where -= strlen(compiler_type_names[type]) + 1;
     }
+    where = strput(where, end, "array ");
+  }
 #else
-    if (pointer)
-        where = strput(where, end, "* ");
+  if (pointer) {
+    where = strput(where, end, "* ");
+  }
 #endif
-    return where;
+  return where;
 }
 
 #define STRING_HASH(var,str) \
     var = (long)str ^ (long)str >> 16; \
     var = (var ^ var >> 8) & 0xff;
 
-short store_prog_string (const char * str)
+short store_prog_string(const char *str)
 {
-    short i, next, *next_tab, *idxp;
-    char **p;
-    unsigned char hash, mask, *tagp;
+  short i, next, *next_tab, *idxp;
+  char **p;
+  unsigned char hash, mask, *tagp;
 
-    str = make_shared_string(str);
-    STRING_HASH(hash, str);
-    idxp = &string_idx[hash];
+  str = make_shared_string(str);
+  STRING_HASH(hash, str);
+  idxp = &string_idx[hash];
 
-    /* string_tags is a big bit-array, so find correct bit */
-    mask = 1 << (hash & 7);
-    tagp = &string_tags[hash >> 3];
+  /* string_tags is a big bit-array, so find correct bit */
+  mask = 1 << (hash & 7);
+  tagp = &string_tags[hash >> 3];
 
-    p = (char **)&PROG_STRING(0);
-    next_tab = (short *) mem_block[A_STRING_NEXT].block;
+  p = (char **)&PROG_STRING(0);
+  next_tab = (short *) mem_block[A_STRING_NEXT].block;
 
-    if (*tagp & mask) {
-        /* search hash chain to see if it's there */
-        for (i = *idxp; i >= 0; i = next_tab[i]) {
-            if (p[i] == str) {
-                free_string(str);       /* needed as string is only free'ed
+  if (*tagp & mask) {
+    /* search hash chain to see if it's there */
+    for (i = *idxp; i >= 0; i = next_tab[i]) {
+      if (p[i] == str) {
+        free_string(str);       /* needed as string is only free'ed
                                          * once. */
-                ((short *) mem_block[A_STRING_REFS].block)[i]++;
-                return i;
-            }
-        }
-        next = *idxp;
-    } else {
-        *tagp |= mask;
-        next = -1;
+        ((short *) mem_block[A_STRING_REFS].block)[i]++;
+        return i;
+      }
     }
+    next = *idxp;
+  } else {
+    *tagp |= mask;
+    next = -1;
+  }
 
+  /*
+   * New string, add to table
+   */
+
+  if (freed_string >= 0) {
+    /* reuse freed string */
+    int top;
+
+    i = freed_string;
+
+    top = mem_block[A_STRINGS].current_size / sizeof str;
+    for (freed_string++; freed_string < top; freed_string++) {
+      if (p[freed_string] == 0) {
+        break;
+      }
+    }
+    if (freed_string >= top) {
+      freed_string = -1;
+    }
+  } else {
+    /* grow by one element. */
+    allocate_in_mem_block(A_STRINGS, sizeof str);
+    allocate_in_mem_block(A_STRING_NEXT, sizeof(short));
+    allocate_in_mem_block(A_STRING_REFS, sizeof(short));
+    /* test if number of strings isn't too large ? */
+    i = mem_block[A_STRINGS].current_size / sizeof str - 1;
+  }
+  PROG_STRING(i) = str;
+  ((short *) mem_block[A_STRING_NEXT].block)[i] = next;
+  ((short *) mem_block[A_STRING_REFS].block)[i] = 1;
+  *idxp = i;
+  return i;
+}
+
+void free_prog_string(short num)
+{
+  short i, prv, *next_tab, top, *idxp;
+  char **p, *str;
+  unsigned char hash, mask;
+
+  top = mem_block[A_STRINGS].current_size / sizeof(char *) - 1;
+  if (num < 0 || num > top) {
+    yyerror("free_prog_string: index out of range.\n");
+    return;
+  }
+  if (--((short *) mem_block[A_STRING_REFS].block)[num] >= 1) {
+    return;
+  }
+
+  p = (char **) mem_block[A_STRINGS].block;
+  next_tab = (short *) mem_block[A_STRING_NEXT].block;
+
+  str = p[num];
+  STRING_HASH(hash, str);
+  idxp = &string_idx[hash];
+
+  for (prv = -1, i = *idxp; i != num; prv = i, i = next_tab[i]) {
+    if (i == -1) {
+      yyerror("free_prog_string: string not in prog table.\n");
+      return;
+    }
+  }
+
+  if (prv == -1) {            /* string is head of list */
+    *idxp = next_tab[i];
+    if (*idxp == -1) {
+      /* clear tag bit since hash chain now empty */
+      mask = 1 << (hash & 7);
+      string_tags[hash >> 3] &= ~mask;
+    }
+  } else {                    /* easy unlink */
+    next_tab[prv] = next_tab[i];
+  }
+
+  free_string(str);           /* important */
+  p[i] = 0;
+  if (i != top) {
+    if (i < freed_string || freed_string == -1) {
+      freed_string = i;
+    }
+  } else {
+    /* shrink table */
+    mem_block[A_STRINGS].current_size -= sizeof str;
+    mem_block[A_STRING_REFS].current_size -= sizeof(short);
+    mem_block[A_STRING_NEXT].current_size -= sizeof(short);
+  }
+}
+
+int validate_function_call(int f, parse_node_t *args)
+{
+  function_t *funp = FUNCTION_DEF(f);
+  int funflags = FUNCTION_FLAGS(f);
+  int num_arg = (args ? args->kind : 0);
+  int num_var = 0;
+  parse_node_t *pn = args;
+  unsigned short *arg_types = 0;
+  program_t *prog;
+
+  while (pn) {
+    if (pn->type & 1) { num_var++; }
+    pn = pn->r.expr;
+  }
+
+  /* Make sure it isn't private */
+  if (funflags & DECL_HIDDEN) {
+    char buf[256];
+    char *end = EndOf(buf);
+    char *p;
+
+    p = strput(buf, end, "Illegal to call inherited private function '");
+    p = strput(p, end, funp->funcname);
+    p = strput(p, end, "'");
+    yyerror(buf);
+  }
+
+  /*
+   * Verify that the function has been defined already.
+   */
+  if (exact_types) {
+    if ((funflags & FUNC_UNDEFINED)) {
+      char buf[256];
+      char *end = EndOf(buf);
+      char *p;
+
+      p = strput(buf, end, "Function ");
+      p = strput(p, end, funp->funcname);
+      p = strput(p, end, " undefined");
+      yyerror(buf);
+    }
     /*
-     * New string, add to table
+     * Check number of arguments.
      */
+    if (!(funflags & FUNC_VARARGS) &&
+        (funflags & FUNC_STRICT_TYPES)) {
+      char buff[256];
+      char *end = EndOf(buff);
+      char *p;
 
-    if (freed_string >= 0) {
-        /* reuse freed string */
-        int top;
-
-        i = freed_string;
-
-        top = mem_block[A_STRINGS].current_size / sizeof str;
-        for (freed_string++; freed_string < top; freed_string++) {
-            if (p[freed_string] == 0)
-                break;
-        }
-        if (freed_string >= top)
-            freed_string = -1;
-    } else {
-        /* grow by one element. */
-        allocate_in_mem_block(A_STRINGS, sizeof str);
-        allocate_in_mem_block(A_STRING_NEXT, sizeof(short));
-        allocate_in_mem_block(A_STRING_REFS, sizeof(short));
-        /* test if number of strings isn't too large ? */
-        i = mem_block[A_STRINGS].current_size / sizeof str - 1;
-    }
-    PROG_STRING(i) = str;
-    ((short *) mem_block[A_STRING_NEXT].block)[i] = next;
-    ((short *) mem_block[A_STRING_REFS].block)[i] = 1;
-    *idxp = i;
-    return i;
-}
-
-void free_prog_string (short num)
-{
-    short i, prv, *next_tab, top, *idxp;
-    char **p, *str;
-    unsigned char hash, mask;
-
-    top = mem_block[A_STRINGS].current_size / sizeof(char *) - 1;
-    if (num < 0 || num > top) {
-        yyerror("free_prog_string: index out of range.\n");
-        return;
-    }
-    if (--((short *) mem_block[A_STRING_REFS].block)[num] >= 1)
-        return;
-
-    p = (char **) mem_block[A_STRINGS].block;
-    next_tab = (short *) mem_block[A_STRING_NEXT].block;
-
-    str = p[num];
-    STRING_HASH(hash, str);
-    idxp = &string_idx[hash];
-
-    for (prv = -1, i = *idxp; i != num; prv = i, i = next_tab[i]) {
-        if (i == -1) {
-            yyerror("free_prog_string: string not in prog table.\n");
-            return;
-        }
-    }
-
-    if (prv == -1) {            /* string is head of list */
-        *idxp = next_tab[i];
-        if (*idxp == -1) {
-            /* clear tag bit since hash chain now empty */
-            mask = 1 << (hash & 7);
-            string_tags[hash >> 3] &= ~mask;
-        }
-    } else {                    /* easy unlink */
-        next_tab[prv] = next_tab[i];
-    }
-
-    free_string(str);           /* important */
-    p[i] = 0;
-    if (i != top) {
-        if (i < freed_string || freed_string == -1)
-            freed_string = i;
-    } else {
-        /* shrink table */
-        mem_block[A_STRINGS].current_size -= sizeof str;
-        mem_block[A_STRING_REFS].current_size -= sizeof(short);
-        mem_block[A_STRING_NEXT].current_size -= sizeof(short);
-    }
-}
-
-int validate_function_call (int f, parse_node_t * args)
-{
-    function_t *funp = FUNCTION_DEF(f);
-    int funflags = FUNCTION_FLAGS(f);
-    int num_arg = ( args ? args->kind : 0 );
-    int num_var = 0;
-    parse_node_t *pn = args;
-    unsigned short *arg_types = 0;
-    program_t *prog;
-
-    while (pn) {
-        if (pn->type & 1) num_var++;
-        pn = pn->r.expr;
-    }
-
-    /* Make sure it isn't private */
-    if (funflags & DECL_HIDDEN) {
-        char buf[256];
-        char *end = EndOf(buf);
-        char *p;
-
-        p = strput(buf, end, "Illegal to call inherited private function '");
+      if (num_var) {
+        p = strput(buff, end, "Illegal to pass a variable number of arguments to non-varargs function ");
         p = strput(p, end, funp->funcname);
-        p = strput(p, end, "'");
-        yyerror(buf);
+        p = strput(p, end, "\n");
+        yyerror(buff);
+      } else if (funp->num_arg != num_arg) {
+        p = strput(buff, end, "Wrong number of arguments to ");
+        p = strput(p, end, funp->funcname);
+        p = strput(p, end, "\n    Expected: ");
+        p = strput_int(p, end, funp->num_arg);
+        p = strput(p, end, "  Got: ");
+        p = strput_int(p, end, num_arg);
+        yyerror(buff);
+      }
     }
-
     /*
-     * Verify that the function has been defined already.
+     * Check the argument types.
      */
-    if (exact_types) {
-        if ((funflags & FUNC_UNDEFINED)) {
-            char buf[256];
-            char *end = EndOf(buf);
-            char *p;
-
-            p = strput(buf, end, "Function ");
-            p = strput(p, end, funp->funcname);
-            p = strput(p, end, " undefined");
-            yyerror(buf);
+    if ((prog = FUNCTION_PROG(f))) {
+      int which = (FUNCTION_TEMP(f)->u.func - prog->function_table);
+      if (prog->type_start) {
+        int start = prog->type_start[which];
+        if (start != INDEX_START_NONE) {
+          arg_types = prog->argument_types + start;
         }
-        /*
-         * Check number of arguments.
-         */
-        if (!(funflags & FUNC_VARARGS) &&
-            (funflags & FUNC_STRICT_TYPES)) {
-            char buff[256];
-            char *end = EndOf(buff);
-            char *p;
-
-            if (num_var) {
-                p = strput(buff, end, "Illegal to pass a variable number of arguments to non-varargs function ");
-                p = strput(p, end, funp->funcname);
-                p = strput(p, end, "\n");
-                yyerror(buff);
-            } else if (funp->num_arg != num_arg) {
-                p = strput(buff, end, "Wrong number of arguments to ");
-                p = strput(p, end, funp->funcname);
-                p = strput(p, end, "\n    Expected: ");
-                p = strput_int(p, end, funp->num_arg);
-                p = strput(p, end, "  Got: ");
-                p = strput_int(p, end, num_arg);
-                yyerror(buff);
-            }
-        }
-        /*
-         * Check the argument types.
-         */
-        if ((prog = FUNCTION_PROG(f))) {
-            int which = (FUNCTION_TEMP(f)->u.func - prog->function_table);
-            if (prog->type_start) {
-                int start = prog->type_start[which];
-                if (start != INDEX_START_NONE)
-                    arg_types = prog->argument_types + start;
-            }
-        } else {
-            int which = FUNCTION_TEMP(f)->u.index;
-            int start = *((unsigned short *)mem_block[A_ARGUMENT_INDEX].block + which);
-            if (start != INDEX_START_NONE)
-                arg_types = (unsigned short *)mem_block[A_ARGUMENT_TYPES].block + start;
-        }
-
-        if (arg_types) {
-            int arg, i, tmp;
-            parse_node_t *enode = args;
-            int fnarg = funp->num_arg;
-
-            if (funflags & FUNC_TRUE_VARARGS)
-                fnarg--;
-
-            for (i = 0; (unsigned) i < fnarg && i < num_arg; i++) {
-                if (enode->type & 1) break;
-                tmp = enode->v.expr->type;
-
-                arg = arg_types[i];
-                if (prog)
-                    fix_class_type(&arg, prog);
-
-                if (!compatible_types(tmp, arg)) {
-                    char buff[256];
-                    char *end = EndOf(buff);
-                    char *p;
-
-                    p = strput(buff, end, "Bad type for argument ");
-                    p = strput_int(p, end, i+1);
-                    p = strput(p, end, " of ");
-                    p = strput(p, end, funp->funcname);
-                    p = strput(p, end, " ");
-                    p = get_two_types(p, end, arg_types[i], tmp);
-                    yyerror(buff);
-                }
-                enode = enode->r.expr;
-            }
-        }
+      }
+    } else {
+      int which = FUNCTION_TEMP(f)->u.index;
+      int start = *((unsigned short *)mem_block[A_ARGUMENT_INDEX].block + which);
+      if (start != INDEX_START_NONE) {
+        arg_types = (unsigned short *)mem_block[A_ARGUMENT_TYPES].block + start;
+      }
     }
-    return funp->type;
+
+    if (arg_types) {
+      int arg, i, tmp;
+      parse_node_t *enode = args;
+      int fnarg = funp->num_arg;
+
+      if (funflags & FUNC_TRUE_VARARGS) {
+        fnarg--;
+      }
+
+      for (i = 0; (unsigned) i < fnarg && i < num_arg; i++) {
+        if (enode->type & 1) { break; }
+        tmp = enode->v.expr->type;
+
+        arg = arg_types[i];
+        if (prog) {
+          fix_class_type(&arg, prog);
+        }
+
+        if (!compatible_types(tmp, arg)) {
+          char buff[256];
+          char *end = EndOf(buff);
+          char *p;
+
+          p = strput(buff, end, "Bad type for argument ");
+          p = strput_int(p, end, i + 1);
+          p = strput(p, end, " of ");
+          p = strput(p, end, funp->funcname);
+          p = strput(p, end, " ");
+          p = get_two_types(p, end, arg_types[i], tmp);
+          yyerror(buff);
+        }
+        enode = enode->r.expr;
+      }
+    }
+  }
+  return funp->type;
 }
 
 parse_node_t *
-promote_to_float (parse_node_t * node) {
-    parse_node_t *expr;
-    if (node->kind == NODE_NUMBER) {
-        node->kind = NODE_REAL;
-        node->v.real = node->v.number;
-        return node;
-    }
-    expr = new_node();
-    expr->kind = NODE_EFUN;
-    expr->v.number = predefs[to_float_efun].token;
-    expr->type = TYPE_REAL;
-    expr->l.number = 1;
-    expr->r.expr = new_node_no_line();
-    expr->r.expr->kind = 1;
-    expr->r.expr->l.expr = expr->r.expr;
-    expr->r.expr->type = 0;
-    expr->r.expr->v.expr = node;
-    expr->r.expr->r.expr = 0;
-    return expr;
+promote_to_float(parse_node_t *node)
+{
+  parse_node_t *expr;
+  if (node->kind == NODE_NUMBER) {
+    node->kind = NODE_REAL;
+    node->v.real = node->v.number;
+    return node;
+  }
+  expr = new_node();
+  expr->kind = NODE_EFUN;
+  expr->v.number = predefs[to_float_efun].token;
+  expr->type = TYPE_REAL;
+  expr->l.number = 1;
+  expr->r.expr = new_node_no_line();
+  expr->r.expr->kind = 1;
+  expr->r.expr->l.expr = expr->r.expr;
+  expr->r.expr->type = 0;
+  expr->r.expr->v.expr = node;
+  expr->r.expr->r.expr = 0;
+  return expr;
 }
 
 parse_node_t *
-promote_to_int (parse_node_t * node) {
-    parse_node_t *expr;
-    if (node->kind == NODE_REAL) {
-        node->kind = NODE_NUMBER;
-        node->v.number = node->v.real;
-        return node;
-    }
-    expr = new_node();
-    expr->kind = NODE_EFUN;
-    expr->v.number = predefs[to_int_efun].token;
-    expr->type = TYPE_NUMBER;
-    expr->l.number = 1;
-    expr->r.expr = new_node_no_line();
-    expr->r.expr->kind = 1;
-    expr->r.expr->l.expr = expr->r.expr;
-    expr->r.expr->type = 0;
-    expr->r.expr->v.expr = node;
-    expr->r.expr->r.expr = 0;
-    return expr;
+promote_to_int(parse_node_t *node)
+{
+  parse_node_t *expr;
+  if (node->kind == NODE_REAL) {
+    node->kind = NODE_NUMBER;
+    node->v.number = node->v.real;
+    return node;
+  }
+  expr = new_node();
+  expr->kind = NODE_EFUN;
+  expr->v.number = predefs[to_int_efun].token;
+  expr->type = TYPE_NUMBER;
+  expr->l.number = 1;
+  expr->r.expr = new_node_no_line();
+  expr->r.expr->kind = 1;
+  expr->r.expr->l.expr = expr->r.expr;
+  expr->r.expr->type = 0;
+  expr->r.expr->v.expr = node;
+  expr->r.expr->r.expr = 0;
+  return expr;
 }
 
-int convert_type (int type){
-    switch(type & (~DECL_MODS)) {
+int convert_type(int type)
+{
+  switch (type & (~DECL_MODS)) {
     case TYPE_UNKNOWN:
     case TYPE_NOVALUE:
     case TYPE_VOID:
-        return T_INVALID;
+      return T_INVALID;
     case TYPE_ANY:
-        return T_ANY;
+      return T_ANY;
     case TYPE_NUMBER:
-        return T_NUMBER;
+      return T_NUMBER;
     case TYPE_STRING:
-        return T_STRING;
+      return T_STRING;
     case TYPE_OBJECT:
-        return T_OBJECT;
+      return T_OBJECT;
     case TYPE_MAPPING:
-        return T_MAPPING;
+      return T_MAPPING;
     case TYPE_FUNCTION:
-        return T_FUNCTION;
+      return T_FUNCTION;
     case TYPE_REAL:
-        return T_REAL;
+      return T_REAL;
     case TYPE_BUFFER:
-        return T_BUFFER;
+      return T_BUFFER;
     default:
-        if(type & TYPE_MOD_ARRAY)
-            return T_ARRAY;
-        else if(type & TYPE_MOD_CLASS)
-            return T_CLASS;
-        else
-            return T_ANY; //we probably forgot one then, should we get here
-    }
+      if (type & TYPE_MOD_ARRAY) {
+        return T_ARRAY;
+      } else if (type & TYPE_MOD_CLASS) {
+        return T_CLASS;
+      } else {
+        return T_ANY;    //we probably forgot one then, should we get here
+      }
+  }
 }
 
-parse_node_t *add_type_check (parse_node_t * node, int intype) {
-    parse_node_t *expr, *expr2;
-    int type;
+parse_node_t *add_type_check(parse_node_t *node, int intype)
+{
+  parse_node_t *expr, *expr2;
+  int type;
 
-    if(!(pragmas & PRAGMA_STRICT_TYPES))
-      return node;
+  if (!(pragmas & PRAGMA_STRICT_TYPES)) {
+    return node;
+  }
 
-    switch(intype & (~DECL_MODS)) {
+  switch (intype & (~DECL_MODS)) {
     case 0:
     case 3:
-        //error situation, don't bother
-        return node;
+      //error situation, don't bother
+      return node;
     case TYPE_NUMBER:
-        type = T_NUMBER;
-        break;
+      type = T_NUMBER;
+      break;
     case TYPE_STRING:
-        type = T_STRING;
-        break;
+      type = T_STRING;
+      break;
     case TYPE_OBJECT:
-        type = T_OBJECT;
-        break;
+      type = T_OBJECT;
+      break;
     case TYPE_MAPPING:
-        type = T_MAPPING;
-        break;
+      type = T_MAPPING;
+      break;
     case TYPE_FUNCTION:
-        type = T_FUNCTION;
-        break;
+      type = T_FUNCTION;
+      break;
     case TYPE_REAL:
-        type = T_REAL;
-        break;
+      type = T_REAL;
+      break;
     case TYPE_BUFFER:
-        type = T_BUFFER;
-        break;
+      type = T_BUFFER;
+      break;
     default:
-        if(intype & TYPE_MOD_ARRAY)
-            type = T_ARRAY;
-        else if(intype & TYPE_MOD_CLASS)
-            type = T_CLASS;
-        else
-            fatal("unknown type %d in type check\n", intype);
-    }
+      if (intype & TYPE_MOD_ARRAY) {
+        type = T_ARRAY;
+      } else if (intype & TYPE_MOD_CLASS) {
+        type = T_CLASS;
+      } else {
+        fatal("unknown type %d in type check\n", intype);
+      }
+  }
 
-    CREATE_NUMBER(expr2, type);
-    CREATE_BINARY_OP(expr, F_TYPE_CHECK, intype, node, expr2);
-    return expr;
+  CREATE_NUMBER(expr2, type);
+  CREATE_BINARY_OP(expr, F_TYPE_CHECK, intype, node, expr2);
+  return expr;
 }
 
 
-parse_node_t *do_promotions (parse_node_t * node, int type) {
-    if (type == TYPE_REAL) {
-        if (node->type == TYPE_NUMBER || node->kind == NODE_NUMBER)
-            return promote_to_float(node);
+parse_node_t *do_promotions(parse_node_t *node, int type)
+{
+  if (type == TYPE_REAL) {
+    if (node->type == TYPE_NUMBER || node->kind == NODE_NUMBER) {
+      return promote_to_float(node);
     }
-    if (type == TYPE_NUMBER && node->type == TYPE_REAL)
-        return promote_to_int(node);
-    if(type != TYPE_ANY && type != node->type)
-        return add_type_check(node, type);
+  }
+  if (type == TYPE_NUMBER && node->type == TYPE_REAL) {
+    return promote_to_int(node);
+  }
+  if (type != TYPE_ANY && type != node->type) {
+    return add_type_check(node, type);
+  }
 
-    return node;
+  return node;
 }
 
 /* Take a NODE_CALL, and discard the call, preserving only the args with
    side effects */
 parse_node_t *
-throw_away_call (parse_node_t * pn) {
-    parse_node_t *enode;
-    parse_node_t *ret = 0;
-    parse_node_t *arg;
-
-    enode = pn->r.expr;
-    while (enode) {
-        arg = insert_pop_value(enode->v.expr);
-        if (arg) {
-            /* woops.  Don't lose the side effect. */
-            if (ret) {
-                parse_node_t *tmp;
-                CREATE_STATEMENTS(tmp, ret, arg);
-                ret = tmp;
-            } else {
-                ret = arg;
-            }
-        }
-        enode = enode->r.expr;
-    }
-    return ret;
-}
-
-parse_node_t *
-throw_away_mapping (parse_node_t * pn) {
-    parse_node_t *enode;
-    parse_node_t *ret = 0;
-    parse_node_t *arg;
-
-    enode = pn->r.expr;
-    while (enode) {
-        arg = insert_pop_value(enode->v.expr->l.expr);
-        if (arg) {
-            /* woops.  Don't lose the side effect. */
-            if (ret) {
-                parse_node_t *tmp;
-                CREATE_STATEMENTS(tmp, ret, arg);
-                ret = tmp;
-            } else {
-                ret = arg;
-            }
-        }
-        arg = insert_pop_value(enode->v.expr->r.expr);
-        if (arg) {
-            /* woops.  Don't lose the side effect. */
-            if (ret) {
-                parse_node_t *tmp;
-                CREATE_STATEMENTS(tmp, ret, arg);
-                ret = tmp;
-            } else {
-                ret = arg;
-            }
-        }
-        enode = enode->r.expr;
-    }
-    return ret;
-}
-
-parse_node_t *
-validate_efun_call (int f, parse_node_t * args) {
-    int num = args->v.number;
-    int min_arg, max_arg, def, *argp;
-    int num_var = 0;
-    parse_node_t *pn = args->r.expr;
-
-    while (pn) {
-        if (pn->type & 1) num_var++;
-        pn = pn->r.expr;
-    }
-
-    if (f != -1) {
-        /* should this move out of here? */
-        switch (predefs[f].token) {
-#ifdef F_SIZEOF
-        case F_SIZEOF:
-            /* Obscene crap like: sizeof( ({ 1, i++, x + 1, foo() }) )
-             *                    -> i++, foo(), 4
-             */
-            if (!pn && num == 1 &&
-                IS_NODE(args->r.expr->v.expr, NODE_CALL, F_AGGREGATE)) {
-                parse_node_t *repl, *ret, *node;
-
-                CREATE_NUMBER(node, args->r.expr->v.expr->l.number);
-                ret = throw_away_call(args->r.expr->v.expr);
-                if (ret) {
-                    CREATE_TWO_VALUES(repl, TYPE_NUMBER, ret, node);
-                    return repl;
-                } else
-                    return node;
-            }
-#endif
-        }
-
-        min_arg = predefs[f].min_args;
-        max_arg = predefs[f].max_args;
-
-        def = predefs[f].Default;
-        if (!num_var && def != DEFAULT_NONE && num == min_arg -1) {
-            parse_node_t *tmp;
-            tmp = new_node_no_line();
-            tmp->r.expr = 0;
-            tmp->type = 0;
-            args->l.expr->r.expr = tmp;
-            if (def == DEFAULT_THIS_OBJECT) {
-                tmp->v.expr = new_node_no_line();
-                tmp->v.expr->kind = NODE_EFUN;
-                tmp->v.expr->v.number = predefs[this_efun].token;
-                tmp->v.expr->l.number = 0;
-                tmp->v.expr->type = TYPE_ANY;
-                tmp->v.expr->r.expr = 0;
-            } else {
-                CREATE_NUMBER(tmp->v.expr, def);
-            }
-            args->v.number++;
-            num++;
-        } else if (num_var && max_arg != -1) {
-            char buff[256];
-            char *end = EndOf(buff);
-            char *p;
-
-            p = strput(buff, end, "Illegal to pass variable number of arguments to non-varargs efun ");
-            p = strput(p, end, predefs[f].word);
-            yyerror(buff);
-            CREATE_ERROR(args);
-            return args;
-        } else if ((num - num_var) < min_arg) {
-            char buff[256];
-            char *end = EndOf(buff);
-            char *p;
-
-            p = strput(buff, end, "Too few arguments to ");
-            p = strput(p, end, predefs[f].word);
-            CREATE_ERROR(args);
-            yyerror(buff);
-            return args;
-        } else if (num > max_arg && max_arg != -1) {
-            char buff[256];
-            char *end = EndOf(buff);
-            char *p;
-
-            p = strput(buff, end, "Too many arguments to ");
-            p = strput(p, end, predefs[f].word);
-            yyerror(buff);
-            CREATE_ERROR(args);
-            return args;
-        }
-        if (max_arg != -1 && exact_types) {
-            /*
-             * Now check all types of arguments to efuns.
-             */
-            int i, argn, tmp;
-            char buff[256];
-            char *end = EndOf(buff);
-            char *p;
-            parse_node_t *enode = args;
-            argp = &efun_arg_types[predefs[f].arg_index];
-
-            for (argn = 0; argn < num; argn++) {
-                enode = enode->r.expr;
-                if (enode->type & 1) break;
-                /* this can happen for default args */
-                if (!enode->v.expr) break;
-                tmp = enode->v.expr->type;
-                for (i=0; !compatible_types(tmp, argp[i]) && argp[i] != 0; i++)
-                    ;
-
-                if (argp[i] == 0) {
-                    p = strput(buff, end, "Bad argument ");
-                    p = strput_int(p, end, argn + 1);
-                    p = strput(p, end, " to efun ");
-                    p = strput(p, end, predefs[f].word);
-                    p = strput(p, end, "()");
-                    yyerror(buff);
-                } else {
-                    /* check for (int) -> (float) promotion */
-                    if (tmp == TYPE_NUMBER && argp[i] == TYPE_REAL) {
-                        for (i++; argp[i] && argp[i] != TYPE_NUMBER; i++)
-                            ;
-                        if (!argp[i])
-                            enode->v.expr = promote_to_float(enode->v.expr);
-                    }
-                    else if (tmp == TYPE_REAL && argp[i] == TYPE_NUMBER) {
-                        for (i++; argp[i] && argp[i] != TYPE_REAL; i++)
-                            ;
-                        if (!argp[i])
-                            enode->v.expr = promote_to_int(enode->v.expr);
-                    }
-                }
-                while (argp[i] != 0)
-                    i++;
-                argp += i + 1;
-            }
-        }
-        args->kind = NODE_EFUN;
-        args->l.number = num;
-        args->v.number = predefs[f].token;
-        args->type = predefs[f].ret_type;
-        if (args->type == TYPE_NOVALUE) {
-            args->v.number += NOVALUE_USED_FLAG;
-            args->type = TYPE_VOID;
-        }
-    } else {
-        CREATE_ERROR(args);
-    }
-    return args;
-}
-
-void yyerror (const char * str)
+throw_away_call(parse_node_t *pn)
 {
-    extern int num_parse_error;
+  parse_node_t *enode;
+  parse_node_t *ret = 0;
+  parse_node_t *arg;
 
-    function_context.num_parameters = -1;
-    if (num_parse_error > 5) {
-        lex_fatal = 1;
-        return;
+  enode = pn->r.expr;
+  while (enode) {
+    arg = insert_pop_value(enode->v.expr);
+    if (arg) {
+      /* woops.  Don't lose the side effect. */
+      if (ret) {
+        parse_node_t *tmp;
+        CREATE_STATEMENTS(tmp, ret, arg);
+        ret = tmp;
+      } else {
+        ret = arg;
+      }
     }
-    smart_log(current_file, current_line, str, 0);
-#ifdef PACKAGE_MUDLIB_STATS
-    add_errors_for_file (current_file, 1);
-#endif
-    num_parse_error++;
+    enode = enode->r.expr;
+  }
+  return ret;
 }
 
-void yywarn (const char * str) {
-    if (!(pragmas & PRAGMA_WARNINGS)) return;
+parse_node_t *
+throw_away_mapping(parse_node_t *pn)
+{
+  parse_node_t *enode;
+  parse_node_t *ret = 0;
+  parse_node_t *arg;
 
-    smart_log(current_file, current_line, str, 1);
+  enode = pn->r.expr;
+  while (enode) {
+    arg = insert_pop_value(enode->v.expr->l.expr);
+    if (arg) {
+      /* woops.  Don't lose the side effect. */
+      if (ret) {
+        parse_node_t *tmp;
+        CREATE_STATEMENTS(tmp, ret, arg);
+        ret = tmp;
+      } else {
+        ret = arg;
+      }
+    }
+    arg = insert_pop_value(enode->v.expr->r.expr);
+    if (arg) {
+      /* woops.  Don't lose the side effect. */
+      if (ret) {
+        parse_node_t *tmp;
+        CREATE_STATEMENTS(tmp, ret, arg);
+        ret = tmp;
+      } else {
+        ret = arg;
+      }
+    }
+    enode = enode->r.expr;
+  }
+  return ret;
+}
+
+parse_node_t *
+validate_efun_call(int f, parse_node_t *args)
+{
+  int num = args->v.number;
+  int min_arg, max_arg, def, *argp;
+  int num_var = 0;
+  parse_node_t *pn = args->r.expr;
+
+  while (pn) {
+    if (pn->type & 1) { num_var++; }
+    pn = pn->r.expr;
+  }
+
+  if (f != -1) {
+    /* should this move out of here? */
+    switch (predefs[f].token) {
+#ifdef F_SIZEOF
+      case F_SIZEOF:
+        /* Obscene crap like: sizeof( ({ 1, i++, x + 1, foo() }) )
+         *                    -> i++, foo(), 4
+         */
+        if (!pn && num == 1 &&
+            IS_NODE(args->r.expr->v.expr, NODE_CALL, F_AGGREGATE)) {
+          parse_node_t *repl, *ret, *node;
+
+          CREATE_NUMBER(node, args->r.expr->v.expr->l.number);
+          ret = throw_away_call(args->r.expr->v.expr);
+          if (ret) {
+            CREATE_TWO_VALUES(repl, TYPE_NUMBER, ret, node);
+            return repl;
+          } else {
+            return node;
+          }
+        }
+#endif
+    }
+
+    min_arg = predefs[f].min_args;
+    max_arg = predefs[f].max_args;
+
+    def = predefs[f].Default;
+    if (!num_var && def != DEFAULT_NONE && num == min_arg - 1) {
+      parse_node_t *tmp;
+      tmp = new_node_no_line();
+      tmp->r.expr = 0;
+      tmp->type = 0;
+      args->l.expr->r.expr = tmp;
+      if (def == DEFAULT_THIS_OBJECT) {
+        tmp->v.expr = new_node_no_line();
+        tmp->v.expr->kind = NODE_EFUN;
+        tmp->v.expr->v.number = predefs[this_efun].token;
+        tmp->v.expr->l.number = 0;
+        tmp->v.expr->type = TYPE_ANY;
+        tmp->v.expr->r.expr = 0;
+      } else {
+        CREATE_NUMBER(tmp->v.expr, def);
+      }
+      args->v.number++;
+      num++;
+    } else if (num_var && max_arg != -1) {
+      char buff[256];
+      char *end = EndOf(buff);
+      char *p;
+
+      p = strput(buff, end, "Illegal to pass variable number of arguments to non-varargs efun ");
+      p = strput(p, end, predefs[f].word);
+      yyerror(buff);
+      CREATE_ERROR(args);
+      return args;
+    } else if ((num - num_var) < min_arg) {
+      char buff[256];
+      char *end = EndOf(buff);
+      char *p;
+
+      p = strput(buff, end, "Too few arguments to ");
+      p = strput(p, end, predefs[f].word);
+      CREATE_ERROR(args);
+      yyerror(buff);
+      return args;
+    } else if (num > max_arg && max_arg != -1) {
+      char buff[256];
+      char *end = EndOf(buff);
+      char *p;
+
+      p = strput(buff, end, "Too many arguments to ");
+      p = strput(p, end, predefs[f].word);
+      yyerror(buff);
+      CREATE_ERROR(args);
+      return args;
+    }
+    if (max_arg != -1 && exact_types) {
+      /*
+       * Now check all types of arguments to efuns.
+       */
+      int i, argn, tmp;
+      char buff[256];
+      char *end = EndOf(buff);
+      char *p;
+      parse_node_t *enode = args;
+      argp = &efun_arg_types[predefs[f].arg_index];
+
+      for (argn = 0; argn < num; argn++) {
+        enode = enode->r.expr;
+        if (enode->type & 1) { break; }
+        /* this can happen for default args */
+        if (!enode->v.expr) { break; }
+        tmp = enode->v.expr->type;
+        for (i = 0; !compatible_types(tmp, argp[i]) && argp[i] != 0; i++) {
+          ;
+        }
+
+        if (argp[i] == 0) {
+          p = strput(buff, end, "Bad argument ");
+          p = strput_int(p, end, argn + 1);
+          p = strput(p, end, " to efun ");
+          p = strput(p, end, predefs[f].word);
+          p = strput(p, end, "()");
+          yyerror(buff);
+        } else {
+          /* check for (int) -> (float) promotion */
+          if (tmp == TYPE_NUMBER && argp[i] == TYPE_REAL) {
+            for (i++; argp[i] && argp[i] != TYPE_NUMBER; i++) {
+              ;
+            }
+            if (!argp[i]) {
+              enode->v.expr = promote_to_float(enode->v.expr);
+            }
+          } else if (tmp == TYPE_REAL && argp[i] == TYPE_NUMBER) {
+            for (i++; argp[i] && argp[i] != TYPE_REAL; i++) {
+              ;
+            }
+            if (!argp[i]) {
+              enode->v.expr = promote_to_int(enode->v.expr);
+            }
+          }
+        }
+        while (argp[i] != 0) {
+          i++;
+        }
+        argp += i + 1;
+      }
+    }
+    args->kind = NODE_EFUN;
+    args->l.number = num;
+    args->v.number = predefs[f].token;
+    args->type = predefs[f].ret_type;
+    if (args->type == TYPE_NOVALUE) {
+      args->v.number += NOVALUE_USED_FLAG;
+      args->type = TYPE_VOID;
+    }
+  } else {
+    CREATE_ERROR(args);
+  }
+  return args;
+}
+
+void yyerror(const char *str)
+{
+  extern int num_parse_error;
+
+  function_context.num_parameters = -1;
+  if (num_parse_error > 5) {
+    lex_fatal = 1;
+    return;
+  }
+  smart_log(current_file, current_line, str, 0);
+#ifdef PACKAGE_MUDLIB_STATS
+  add_errors_for_file(current_file, 1);
+#endif
+  num_parse_error++;
+}
+
+void yywarn(const char *str)
+{
+  if (!(pragmas & PRAGMA_WARNINGS)) { return; }
+
+  smart_log(current_file, current_line, str, 1);
 }
 
 /*
  * Compile an LPC file.
  */
 program_t *
-compile_file (int f, char * name) {
-    int yyparse (void);
-    static int guard = 0;
-    program_t *prog;
-    extern int func_present;
+compile_file(int f, char *name)
+{
+  int yyparse(void);
+  static int guard = 0;
+  program_t *prog;
+  extern int func_present;
 
-    /* The parser isn't reentrant.  On a few occasions (compile
-     * errors, valid_override) LPC code is called during compilation,
-     * causing the possibility of arriving here again.
-     */
-    if (guard || current_file) {
-        error("Object cannot be loaded during compilation.\n");
-    }
-    guard = 1;
+  /* The parser isn't reentrant.  On a few occasions (compile
+   * errors, valid_override) LPC code is called during compilation,
+   * causing the possibility of arriving here again.
+   */
+  if (guard || current_file) {
+    error("Object cannot be loaded during compilation.\n");
+  }
+  guard = 1;
 
-    prolog(f, name);
-    func_present = 0;
-    yyparse();
-    prog = epilog();
+  prolog(f, name);
+  func_present = 0;
+  yyparse();
+  prog = epilog();
 
-    guard = 0;
-    return prog;
+  guard = 0;
+  return prog;
 }
 
-int get_id_number() {
-    static int current_id_number = 1;
-    return current_id_number++;
+int get_id_number()
+{
+  static int current_id_number = 1;
+  return current_id_number++;
 }
 
-INLINE_STATIC void copy_in (int which, char ** start) {
-    char *block;
-    int size;
+INLINE_STATIC void copy_in(int which, char **start)
+{
+  char *block;
+  int size;
 
-    size = mem_block[which].current_size;
-    if (!size) return;
+  size = mem_block[which].current_size;
+  if (!size) { return; }
 
-    block = mem_block[which].block;
-    memcpy(*start, block, size);
+  block = mem_block[which].block;
+  memcpy(*start, block, size);
 
-    *start += align(size);
+  *start += align(size);
 }
 
-static int compare_funcs (const void *x, const void *y) {
-    char *n1 = FUNC(*(unsigned short *)x)->funcname;
-    char *n2 = FUNC(*(unsigned short *)y)->funcname;
-    int sp1, sp2;
+static int compare_funcs(const void *x, const void *y)
+{
+  char *n1 = FUNC(*(unsigned short *)x)->funcname;
+  char *n2 = FUNC(*(unsigned short *)y)->funcname;
+  int sp1, sp2;
 
-    /* make sure #global_init# stays last; also shuffle empty entries to
-     * the end so we can delete them easily.
-     */
-    if (n1[0] == '#')
-        sp1 = 1;
-    else if (FUNC(*(unsigned short *)x)->address == ADDRESS_MAX)
-        sp1 = 2;
-    else
-        sp1 = 0;
+  /* make sure #global_init# stays last; also shuffle empty entries to
+   * the end so we can delete them easily.
+   */
+  if (n1[0] == '#') {
+    sp1 = 1;
+  } else if (FUNC(*(unsigned short *)x)->address == ADDRESS_MAX) {
+    sp1 = 2;
+  } else {
+    sp1 = 0;
+  }
 
-    if (n2[0] == '#')
-        sp2 = 1;
-    else if (FUNC(*(unsigned short *)y)->address == ADDRESS_MAX)
-        sp2 = 2;
-    else
-        sp2 = 0;
+  if (n2[0] == '#') {
+    sp2 = 1;
+  } else if (FUNC(*(unsigned short *)y)->address == ADDRESS_MAX) {
+    sp2 = 2;
+  } else {
+    sp2 = 0;
+  }
 
-    if (sp1 < sp2)
-        return -1;
-    if (sp1 > sp2)
-        return 1;
+  if (sp1 < sp2) {
+    return -1;
+  }
+  if (sp1 > sp2) {
+    return 1;
+  }
 
-    if (n1 < n2)
-        return -1;
-    if (n1 > n2)
-        return 1;
+  if (n1 < n2) {
+    return -1;
+  }
+  if (n1 > n2) {
+    return 1;
+  }
 
-    return 0;
+  return 0;
 }
 
-static void handle_functions() {
-    int num_func, total_func;
-    int i;
-    compiler_temp_t *cur_def;
-    int new_index, num_def;
-    int final_index;
-    inherit_t *inheritp;
+static void handle_functions()
+{
+  int num_func, total_func;
+  int i;
+  compiler_temp_t *cur_def;
+  int new_index, num_def;
+  int final_index;
+  inherit_t *inheritp;
 
-    /* Pass one: Sort the compiler functions first                        */
+  /* Pass one: Sort the compiler functions first                        */
 
-    num_func = total_func = mem_block[A_FUNCTIONS].current_size / sizeof (function_t);
-    if (num_func) {
-        func_index_map = CALLOCATE(num_func, unsigned short,
-                                   TAG_TEMPORARY, "handle_functions");
-        comp_sorted_funcs = CALLOCATE(num_func, unsigned short,
-                                      TAG_TEMPORARY, "handle_functions");
-
-        i = num_func;
-        while (i--) func_index_map[i] = i;
-
-        qsort(func_index_map, num_func, sizeof(unsigned short),
-            compare_funcs);
-
-        i = num_func;
-        while (i--)
-            comp_sorted_funcs[func_index_map[i]] = i;
-
-        while (num_func &&
-               FUNC(func_index_map[num_func-1])->address == ADDRESS_MAX)
-            num_func--;
-    }
-
-    if (NUM_INHERITS) {
-        program_t *inherited_prog;
-
-        inheritp = INHERIT(NUM_INHERITS - 1);
-
-        inherited_prog = inheritp->prog;
-
-        comp_last_inherited = inheritp->function_index_offset
-            + inherited_prog->last_inherited +
-            inherited_prog->num_functions_defined;
-
-        if (inherited_prog->num_functions_defined &&
-            inherited_prog->function_table[inherited_prog->num_functions_defined -1].funcname[0] == APPLY___INIT_SPECIAL_CHAR) comp_last_inherited--;
-    } else comp_last_inherited = 0;
-
-    /* Pass one: We allocate space for the comp_def_index_map             */
-    /*           and prog_flags, and fill them out in sequential order    */
-
-    num_def = mem_block[A_FUNCTION_DEFS].current_size/sizeof(compiler_temp_t);
-    if (num_def) {
-        comp_def_index_map = CALLOCATE(num_def, unsigned short,
-                                       TAG_TEMPORARY, "handle functions");
-        prog_flags = CALLOCATE(comp_last_inherited + total_func, unsigned short,
+  num_func = total_func = mem_block[A_FUNCTIONS].current_size / sizeof(function_t);
+  if (num_func) {
+    func_index_map = CALLOCATE(num_func, unsigned short,
                                TAG_TEMPORARY, "handle_functions");
+    comp_sorted_funcs = CALLOCATE(num_func, unsigned short,
+                                  TAG_TEMPORARY, "handle_functions");
 
-        for (i = 0; i < num_def; i++) {
-            cur_def = FUNCTION_TEMP(i);
+    i = num_func;
+    while (i--) { func_index_map[i] = i; }
 
-            if (cur_def->flags & FUNC_INHERITED) {
-                final_index = INHERIT(cur_def->offset)->function_index_offset
-                    + cur_def->function_index_offset;
-            } else {
-                final_index = comp_last_inherited +
-                              comp_sorted_funcs[cur_def->u.index];
-            }
-            if (cur_def->flags & FUNC_ALIAS) {
-                fatal("Aliasing difficulties!\n");
-                exit(1);
-            }
+    qsort(func_index_map, num_func, sizeof(unsigned short),
+          compare_funcs);
 
-            comp_def_index_map[i] = final_index;
-            prog_flags[final_index] = cur_def->flags;
-
-            while ((cur_def = cur_def->next)) {
-                if (cur_def->flags & FUNC_INHERITED) {
-                    new_index = INHERIT(cur_def->offset)->function_index_offset
-                        + cur_def->function_index_offset;
-                } else {
-                    new_index = comp_last_inherited +
-                                comp_sorted_funcs[cur_def->u.index];
-                }
-                /* We aren't worried about repeating new_indices */
-                /* because it's all the same value               */
-                /* except the case where new_index is actually final_index */
-
-                if (new_index != final_index) {
-                    prog_flags[new_index] = FUNC_ALIAS | final_index;
-                }
-            }
-        }
+    i = num_func;
+    while (i--) {
+      comp_sorted_funcs[func_index_map[i]] = i;
     }
 
-    if (total_func)
-        FREE((char *) comp_sorted_funcs);
+    while (num_func &&
+           FUNC(func_index_map[num_func - 1])->address == ADDRESS_MAX) {
+      num_func--;
+    }
+  }
+
+  if (NUM_INHERITS) {
+    program_t *inherited_prog;
+
+    inheritp = INHERIT(NUM_INHERITS - 1);
+
+    inherited_prog = inheritp->prog;
+
+    comp_last_inherited = inheritp->function_index_offset
+                          + inherited_prog->last_inherited +
+                          inherited_prog->num_functions_defined;
+
+    if (inherited_prog->num_functions_defined &&
+        inherited_prog->function_table[inherited_prog->num_functions_defined - 1].funcname[0] == APPLY___INIT_SPECIAL_CHAR) { comp_last_inherited--; }
+  } else { comp_last_inherited = 0; }
+
+  /* Pass one: We allocate space for the comp_def_index_map             */
+  /*           and prog_flags, and fill them out in sequential order    */
+
+  num_def = mem_block[A_FUNCTION_DEFS].current_size / sizeof(compiler_temp_t);
+  if (num_def) {
+    comp_def_index_map = CALLOCATE(num_def, unsigned short,
+                                   TAG_TEMPORARY, "handle functions");
+    prog_flags = CALLOCATE(comp_last_inherited + total_func, unsigned short,
+                           TAG_TEMPORARY, "handle_functions");
+
+    for (i = 0; i < num_def; i++) {
+      cur_def = FUNCTION_TEMP(i);
+
+      if (cur_def->flags & FUNC_INHERITED) {
+        final_index = INHERIT(cur_def->offset)->function_index_offset
+                      + cur_def->function_index_offset;
+      } else {
+        final_index = comp_last_inherited +
+                      comp_sorted_funcs[cur_def->u.index];
+      }
+      if (cur_def->flags & FUNC_ALIAS) {
+        fatal("Aliasing difficulties!\n");
+        exit(1);
+      }
+
+      comp_def_index_map[i] = final_index;
+      prog_flags[final_index] = cur_def->flags;
+
+      while ((cur_def = cur_def->next)) {
+        if (cur_def->flags & FUNC_INHERITED) {
+          new_index = INHERIT(cur_def->offset)->function_index_offset
+                      + cur_def->function_index_offset;
+        } else {
+          new_index = comp_last_inherited +
+                      comp_sorted_funcs[cur_def->u.index];
+        }
+        /* We aren't worried about repeating new_indices */
+        /* because it's all the same value               */
+        /* except the case where new_index is actually final_index */
+
+        if (new_index != final_index) {
+          prog_flags[new_index] = FUNC_ALIAS | final_index;
+        }
+      }
+    }
+  }
+
+  if (total_func) {
+    FREE((char *) comp_sorted_funcs);
+  }
 }
 
 /*
  * The program has been compiled. Prepare a 'program_t' to be returned.
  */
-static program_t *epilog (void) {
-    int size, i, lnsz, lnoff;
-    char *p;
-    int num_func;
-    ident_hash_elem_t *ihe;
-    program_t *prog;
-    compiler_temp_t *fundefp, *nextdefp;
+static program_t *epilog(void)
+{
+  int size, i, lnsz, lnoff;
+  char *p;
+  int num_func;
+  ident_hash_elem_t *ihe;
+  program_t *prog;
+  compiler_temp_t *fundefp, *nextdefp;
 
-    if (num_parse_error > 0 || inherit_file) {
-        /* don't print these; they can be wrong, since we didn't parse the
-           entire file */
-        if (pragmas & PRAGMA_WARNINGS)
-            remove_overload_warnings(0);
-        clean_parser();
-        end_new_file();
-        free_string(current_file);
-        current_file = 0;
-        return 0;
+  if (num_parse_error > 0 || inherit_file) {
+    /* don't print these; they can be wrong, since we didn't parse the
+       entire file */
+    if (pragmas & PRAGMA_WARNINGS) {
+      remove_overload_warnings(0);
     }
-
-    if (pragmas & PRAGMA_WARNINGS)
-        show_overload_warnings();
-
-    /*
-     * Define the #global_init# function, but only if there was any code
-     * to initialize.
-     */
-    UPDATE_PROGRAM_SIZE;
-
-    if (comp_trees[TREE_INIT]) {
-        parse_node_t *pn, *newnode;
-        int fun;
-        /* end the __INIT function */
-        CREATE_RETURN(pn, 0);
-        newnode = comp_trees[TREE_INIT];
-        CREATE_TWO_VALUES(comp_trees[TREE_INIT], 0,
-                          newnode, pn);
-        fun = define_new_function(APPLY___INIT, 0, 0,
-                                  DECL_HIDDEN | FUNC_STRICT_TYPES, TYPE_VOID);
-        pn = new_node_no_line();
-        pn->kind = NODE_FUNCTION;
-        pn->v.number = fun;
-        pn->l.number = 0;
-        pn->r.expr = comp_trees[TREE_INIT];
-        comp_trees[TREE_INIT] = pn;
-    }
-
-    /* Do stuff with functions first */
-    /* calculate comp_last_inherited also */
-    handle_functions();
-
-    /* generate the trees */
-
-    current_tree = TREE_MAIN;
-    generate(comp_trees[TREE_MAIN]);
-
-    current_tree = TREE_INIT;
-    generate(comp_trees[TREE_INIT]);
-
-    current_tree = TREE_MAIN;
-
-    generate_final_program(0);
-    UPDATE_PROGRAM_SIZE;
-
-    if (mem_block[0].current_size > ADDRESS_MAX) {
-        yyerror("Program too large");
-        clean_parser();
-        end_new_file();
-        free_string(current_file);
-        current_file = 0;
-        return 0;
-    }
-
-    generate_final_program(1);
-
-    free_tree();
-
-    size = align(sizeof (program_t));
-
-    /* delete argument information if we're not saving it */
-    if (!(pragmas & PRAGMA_SAVE_TYPES))
-        mem_block[A_ARGUMENT_TYPES].current_size = 0;
-    if (!(mem_block[A_ARGUMENT_TYPES].current_size))
-        mem_block[A_ARGUMENT_INDEX].current_size = 0;
-
-    for (i=0; i<NUMPAREAS; i++)
-        if (i != A_LINENUMBERS && i != A_FILE_INFO &&
-            i != A_FUNCTION_DEFS && i != A_FUNCTIONS &&
-            i != A_ARGUMENT_INDEX)
-            size += align(mem_block[i].current_size);
-
-    num_func = mem_block[A_FUNCTIONS].current_size/sizeof(function_t);
-
-    while (num_func &&
-           FUNC(func_index_map[num_func - 1])->address == ADDRESS_MAX)
-        num_func--;
-
-    size += align((num_func * sizeof(function_t)));   /* A_FUNCTIONS */
-
-    /* function flags */
-    size += align(((comp_last_inherited + num_func) * sizeof(unsigned short)));
-
-    /* A_ARGUMENT_INDEX */
-    if (mem_block[A_ARGUMENT_INDEX].current_size)
-        size += align(num_func * sizeof(unsigned short));
-
-    p = (char *)DXALLOC(size, TAG_PROGRAM, "epilog: 1");
-    prog = (program_t *)p;
-    *prog = NULL_program;
-    prog->total_size = size;
-    prog->ref = 0;
-    prog->func_ref = 0;
-    ihe = lookup_ident("heart_beat");
-    if (ihe && ihe->dn.function_num != -1) {
-        prog->heart_beat = comp_def_index_map[ihe->dn.function_num] + 1;
-        if (prog_flags && prog_flags[prog->heart_beat-1] &
-            (FUNC_PROTOTYPE|FUNC_UNDEFINED))
-            prog->heart_beat = 0;
-    } else
-        prog->heart_beat = 0;
-    prog->filename = current_file;
-
+    clean_parser();
+    end_new_file();
+    free_string(current_file);
     current_file = 0;
+    return 0;
+  }
 
-    total_num_prog_blocks++;
-    total_prog_block_size += size;
+  if (pragmas & PRAGMA_WARNINGS) {
+    show_overload_warnings();
+  }
 
-    /* Format is now:
-     * <short total size> <short line_info_offset> <file info> <line info>
-     */
-    lnoff = 2 + (mem_block[A_FILE_INFO].current_size / sizeof(short));
-    lnsz = lnoff * sizeof(short) + mem_block[A_LINENUMBERS].current_size;
+  /*
+   * Define the #global_init# function, but only if there was any code
+   * to initialize.
+   */
+  UPDATE_PROGRAM_SIZE;
 
-    prog->file_info = (unsigned short *) DXALLOC(lnsz, TAG_LINENUMBERS
-                                                    , "epilog");
+  if (comp_trees[TREE_INIT]) {
+    parse_node_t *pn, *newnode;
+    int fun;
+    /* end the __INIT function */
+    CREATE_RETURN(pn, 0);
+    newnode = comp_trees[TREE_INIT];
+    CREATE_TWO_VALUES(comp_trees[TREE_INIT], 0,
+                      newnode, pn);
+    fun = define_new_function(APPLY___INIT, 0, 0,
+                              DECL_HIDDEN | FUNC_STRICT_TYPES, TYPE_VOID);
+    pn = new_node_no_line();
+    pn->kind = NODE_FUNCTION;
+    pn->v.number = fun;
+    pn->l.number = 0;
+    pn->r.expr = comp_trees[TREE_INIT];
+    comp_trees[TREE_INIT] = pn;
+  }
 
-    prog->file_info[0] = (unsigned short)lnsz;
-    prog->file_info[1] = (unsigned short)lnoff;
+  /* Do stuff with functions first */
+  /* calculate comp_last_inherited also */
+  handle_functions();
 
-    memcpy(((char*)&prog->file_info[2]),
-           mem_block[A_FILE_INFO].block,
-           mem_block[A_FILE_INFO].current_size);
+  /* generate the trees */
 
-    prog->line_info = (unsigned char *)(&prog->file_info[lnoff]);
-    memcpy(((char*)&prog->file_info[lnoff]),
-           mem_block[A_LINENUMBERS].block,
-           mem_block[A_LINENUMBERS].current_size);
+  current_tree = TREE_MAIN;
+  generate(comp_trees[TREE_MAIN]);
 
-    p += align(sizeof(program_t));
-    prog->program = p;
-    prog->program_size = mem_block[A_PROGRAM].current_size;
-    copy_in(A_PROGRAM, &p);
+  current_tree = TREE_INIT;
+  generate(comp_trees[TREE_INIT]);
 
+  current_tree = TREE_MAIN;
 
-    /* copy the functions in */
-    prog->last_inherited = comp_last_inherited;
-    prog->num_functions_defined = num_func;
+  generate_final_program(0);
+  UPDATE_PROGRAM_SIZE;
 
-    prog->function_table = (function_t *)p;
-    for (i = 0; i < num_func; i++)
-        prog->function_table[i] = *FUNC(func_index_map[i]);
+  if (mem_block[0].current_size > ADDRESS_MAX) {
+    yyerror("Program too large");
+    clean_parser();
+    end_new_file();
+    free_string(current_file);
+    current_file = 0;
+    return 0;
+  }
 
-    p += align(sizeof(function_t) * num_func);
+  generate_final_program(1);
 
+  free_tree();
 
-    prog->function_flags = (unsigned short *)p;
-    if (prog_flags) {
-        memcpy(p,prog_flags,
-               (comp_last_inherited + num_func) * sizeof(unsigned short));
-        FREE((char *)prog_flags);
+  size = align(sizeof(program_t));
+
+  /* delete argument information if we're not saving it */
+  if (!(pragmas & PRAGMA_SAVE_TYPES)) {
+    mem_block[A_ARGUMENT_TYPES].current_size = 0;
+  }
+  if (!(mem_block[A_ARGUMENT_TYPES].current_size)) {
+    mem_block[A_ARGUMENT_INDEX].current_size = 0;
+  }
+
+  for (i = 0; i < NUMPAREAS; i++)
+    if (i != A_LINENUMBERS && i != A_FILE_INFO &&
+        i != A_FUNCTION_DEFS && i != A_FUNCTIONS &&
+        i != A_ARGUMENT_INDEX) {
+      size += align(mem_block[i].current_size);
     }
-    p += align(sizeof(unsigned short) * (comp_last_inherited + num_func));
 
-    if (mem_block[A_ARGUMENT_INDEX].current_size) {
-        unsigned short *dest;
+  num_func = mem_block[A_FUNCTIONS].current_size / sizeof(function_t);
 
-        prog->argument_types = (unsigned short *)p;
-        copy_in(A_ARGUMENT_TYPES, &p);
+  while (num_func &&
+         FUNC(func_index_map[num_func - 1])->address == ADDRESS_MAX) {
+    num_func--;
+  }
 
-        dest = prog->type_start = (unsigned short *)p;
-        i = num_func;
-        while (i--)
-            dest[i] = *((unsigned short *) mem_block[A_ARGUMENT_INDEX].block
-                        + func_index_map[i]);
-        p += align(num_func * sizeof(unsigned short));
-    } else {
-        prog->argument_types = 0;
-        prog->type_start = 0;
+  size += align((num_func * sizeof(function_t)));   /* A_FUNCTIONS */
+
+  /* function flags */
+  size += align(((comp_last_inherited + num_func) * sizeof(unsigned short)));
+
+  /* A_ARGUMENT_INDEX */
+  if (mem_block[A_ARGUMENT_INDEX].current_size) {
+    size += align(num_func * sizeof(unsigned short));
+  }
+
+  p = (char *)DXALLOC(size, TAG_PROGRAM, "epilog: 1");
+  prog = (program_t *)p;
+  *prog = NULL_program;
+  prog->total_size = size;
+  prog->ref = 0;
+  prog->func_ref = 0;
+  ihe = lookup_ident("heart_beat");
+  if (ihe && ihe->dn.function_num != -1) {
+    prog->heart_beat = comp_def_index_map[ihe->dn.function_num] + 1;
+    if (prog_flags && prog_flags[prog->heart_beat - 1] &
+        (FUNC_PROTOTYPE | FUNC_UNDEFINED)) {
+      prog->heart_beat = 0;
     }
+  } else {
+    prog->heart_beat = 0;
+  }
+  prog->filename = current_file;
 
-    prog->classes = (class_def_t *)p;
-    prog->num_classes = mem_block[A_CLASS_DEF].current_size /
-          sizeof (class_def_t);
-    copy_in(A_CLASS_DEF, &p);
+  current_file = 0;
 
-    prog->class_members = (class_member_entry_t *)p;
-    copy_in(A_CLASS_MEMBER, &p);
+  total_num_prog_blocks++;
+  total_prog_block_size += size;
 
-    prog->strings = (char **)p;
-    prog->num_strings = mem_block[A_STRINGS].current_size /
-          sizeof (char *);
-    copy_in(A_STRINGS, &p);
+  /* Format is now:
+   * <short total size> <short line_info_offset> <file info> <line info>
+   */
+  lnoff = 2 + (mem_block[A_FILE_INFO].current_size / sizeof(short));
+  lnsz = lnoff * sizeof(short) + mem_block[A_LINENUMBERS].current_size;
 
-    prog->num_variables_defined = mem_block[A_VAR_NAME].current_size /
-        sizeof (char *);
-    prog->num_variables_total = mem_block[A_VAR_TEMP].current_size /
-          sizeof (variable_t);
+  prog->file_info = (unsigned short *) DXALLOC(lnsz, TAG_LINENUMBERS
+                    , "epilog");
 
-    prog->variable_table = (char **)p;
-    copy_in(A_VAR_NAME, &p);
-    prog->variable_types = (unsigned short *)p;
-    copy_in(A_VAR_TYPE, &p);
+  prog->file_info[0] = (unsigned short)lnsz;
+  prog->file_info[1] = (unsigned short)lnoff;
 
-    prog->num_inherited = mem_block[A_INHERITS].current_size /
-          sizeof (inherit_t);
-    if (prog->num_inherited) {
-        prog->inherit = (inherit_t *)p;
-        copy_in(A_INHERITS, &p);
-    } else
-        prog->inherit = 0;
+  memcpy(((char *)&prog->file_info[2]),
+         mem_block[A_FILE_INFO].block,
+         mem_block[A_FILE_INFO].current_size);
+
+  prog->line_info = (unsigned char *)(&prog->file_info[lnoff]);
+  memcpy(((char *)&prog->file_info[lnoff]),
+         mem_block[A_LINENUMBERS].block,
+         mem_block[A_LINENUMBERS].current_size);
+
+  p += align(sizeof(program_t));
+  prog->program = p;
+  prog->program_size = mem_block[A_PROGRAM].current_size;
+  copy_in(A_PROGRAM, &p);
+
+
+  /* copy the functions in */
+  prog->last_inherited = comp_last_inherited;
+  prog->num_functions_defined = num_func;
+
+  prog->function_table = (function_t *)p;
+  for (i = 0; i < num_func; i++) {
+    prog->function_table[i] = *FUNC(func_index_map[i]);
+  }
+
+  p += align(sizeof(function_t) * num_func);
+
+
+  prog->function_flags = (unsigned short *)p;
+  if (prog_flags) {
+    memcpy(p, prog_flags,
+           (comp_last_inherited + num_func) * sizeof(unsigned short));
+    FREE((char *)prog_flags);
+  }
+  p += align(sizeof(unsigned short) * (comp_last_inherited + num_func));
+
+  if (mem_block[A_ARGUMENT_INDEX].current_size) {
+    unsigned short *dest;
+
+    prog->argument_types = (unsigned short *)p;
+    copy_in(A_ARGUMENT_TYPES, &p);
+
+    dest = prog->type_start = (unsigned short *)p;
+    i = num_func;
+    while (i--)
+      dest[i] = *((unsigned short *) mem_block[A_ARGUMENT_INDEX].block
+                  + func_index_map[i]);
+    p += align(num_func * sizeof(unsigned short));
+  } else {
+    prog->argument_types = 0;
+    prog->type_start = 0;
+  }
+
+  prog->classes = (class_def_t *)p;
+  prog->num_classes = mem_block[A_CLASS_DEF].current_size /
+                      sizeof(class_def_t);
+  copy_in(A_CLASS_DEF, &p);
+
+  prog->class_members = (class_member_entry_t *)p;
+  copy_in(A_CLASS_MEMBER, &p);
+
+  prog->strings = (char **)p;
+  prog->num_strings = mem_block[A_STRINGS].current_size /
+                      sizeof(char *);
+  copy_in(A_STRINGS, &p);
+
+  prog->num_variables_defined = mem_block[A_VAR_NAME].current_size /
+                                sizeof(char *);
+  prog->num_variables_total = mem_block[A_VAR_TEMP].current_size /
+                              sizeof(variable_t);
+
+  prog->variable_table = (char **)p;
+  copy_in(A_VAR_NAME, &p);
+  prog->variable_types = (unsigned short *)p;
+  copy_in(A_VAR_TYPE, &p);
+
+  prog->num_inherited = mem_block[A_INHERITS].current_size /
+                        sizeof(inherit_t);
+  if (prog->num_inherited) {
+    prog->inherit = (inherit_t *)p;
+    copy_in(A_INHERITS, &p);
+  } else {
+    prog->inherit = 0;
+  }
 
 #ifdef DEBUG
-    if (p - (char *)prog != size) {
-        fprintf(stderr, "Program size miscalculated for /%s.\n", prog->filename);
-        fprintf(stderr, "is: %d, expected: %d\n", p-(char *)prog, size);
-    }
+  if (p - (char *)prog != size) {
+    fprintf(stderr, "Program size miscalculated for /%s.\n", prog->filename);
+    fprintf(stderr, "is: %d, expected: %d\n", p - (char *)prog, size);
+  }
 #endif
 
-    for (i = 0; i < mem_block[A_FUNCTION_DEFS].current_size / sizeof(*fundefp); i++) {
-        fundefp = FUNCTION_TEMP(i)->next;
-        while (fundefp) {
-            nextdefp = fundefp->next;
-            FREE((char *) fundefp);
-            fundefp = nextdefp;
-        }
+  for (i = 0; i < mem_block[A_FUNCTION_DEFS].current_size / sizeof(*fundefp); i++) {
+    fundefp = FUNCTION_TEMP(i)->next;
+    while (fundefp) {
+      nextdefp = fundefp->next;
+      FREE((char *) fundefp);
+      fundefp = nextdefp;
     }
+  }
 
-    for (i=0; i<NUMAREAS; i++)
-        FREE((char *)mem_block[i].block);
-    if (comp_def_index_map) FREE((char *) comp_def_index_map);
-    if (func_index_map) FREE((char *) func_index_map);
+  for (i = 0; i < NUMAREAS; i++) {
+    FREE((char *)mem_block[i].block);
+  }
+  if (comp_def_index_map) { FREE((char *) comp_def_index_map); }
+  if (func_index_map) { FREE((char *) func_index_map); }
 
-    /*  marion
-        Do referencing here - avoid multiple referencing when an object
-        inherits more than one object and one of the inherited is already
-        loaded and not the last inherited
-    */
-    reference_prog (prog, "epilog");
-    for (i = 0; (unsigned)i < prog->num_inherited; i++) {
-        reference_prog (prog->inherit[i].prog, "inheritance");
-    }
-    release_tree();
-    uninitialize_parser();
-    scratch_destroy();
-    clean_up_locals();
-    free_unused_identifiers();
-    end_new_file();
+  /*  marion
+      Do referencing here - avoid multiple referencing when an object
+      inherits more than one object and one of the inherited is already
+      loaded and not the last inherited
+  */
+  reference_prog(prog, "epilog");
+  for (i = 0; (unsigned)i < prog->num_inherited; i++) {
+    reference_prog(prog->inherit[i].prog, "inheritance");
+  }
+  release_tree();
+  uninitialize_parser();
+  scratch_destroy();
+  clean_up_locals();
+  free_unused_identifiers();
+  end_new_file();
 
-    return prog;
+  return prog;
 }
 
 /*
  * Initialize the environment that the compiler needs.
  */
-static void prolog (int f, char * name) {
-    int i;
+static void prolog(int f, char *name)
+{
+  int i;
 
-    function_context.num_parameters = -1;
-    num_parse_error = 0;
-    global_modifiers = 0;
-    var_defined = 0;
+  function_context.num_parameters = -1;
+  num_parse_error = 0;
+  global_modifiers = 0;
+  var_defined = 0;
 
-    /* Initialize memory blocks where the result of the compilation
-     * will be stored.
-     */
-    for (i=0; i < NUMAREAS; i++) {
-      mem_block[i].block = (char *)DXALLOC(START_BLOCK_SIZE, TAG_COMPILER, "prolog: 2");
-        mem_block[i].current_size = 0;
-        mem_block[i].max_size = START_BLOCK_SIZE;
-    }
-    for (i = 0; i < NUMTREES; i++) {
-        comp_trees[i] = 0;
-    }
-    prog_flags = 0;
-    func_index_map = 0;
-    comp_def_index_map = 0;
+  /* Initialize memory blocks where the result of the compilation
+   * will be stored.
+   */
+  for (i = 0; i < NUMAREAS; i++) {
+    mem_block[i].block = (char *)DXALLOC(START_BLOCK_SIZE, TAG_COMPILER, "prolog: 2");
+    mem_block[i].current_size = 0;
+    mem_block[i].max_size = START_BLOCK_SIZE;
+  }
+  for (i = 0; i < NUMTREES; i++) {
+    comp_trees[i] = 0;
+  }
+  prog_flags = 0;
+  func_index_map = 0;
+  comp_def_index_map = 0;
 
-    memset(string_tags, 0, sizeof(string_tags));
-    freed_string = -1;
-    initialize_parser();
+  memset(string_tags, 0, sizeof(string_tags));
+  freed_string = -1;
+  initialize_parser();
 
-    current_file = make_shared_string(name);
-    current_file_id = add_program_file(name, 1);
+  current_file = make_shared_string(name);
+  current_file_id = add_program_file(name, 1);
 
-    /*
-     * if we've got a simul_efun object and we're not reloading it, make a copy
-     * of its class definitions in the object we're compiling now.
-     */
-    if (simul_efun_ob && *simul_efun_ob->obname)
-        copy_structures(simul_efun_ob->prog);
+  /*
+   * if we've got a simul_efun object and we're not reloading it, make a copy
+   * of its class definitions in the object we're compiling now.
+   */
+  if (simul_efun_ob && *simul_efun_ob->obname) {
+    copy_structures(simul_efun_ob->prog);
+  }
 
-    start_new_file(f);
+  start_new_file(f);
 }
 
 /*
  * The program has errors, clean things up.
  */
-static void clean_parser() {
-    int i, n;
-    function_t *funp;
-    compiler_temp_t *fundefp, *nextdefp;
+static void clean_parser()
+{
+  int i, n;
+  function_t *funp;
+  compiler_temp_t *fundefp, *nextdefp;
 
-    /*
-     * Free function stuff.
-     */
-    for (i = 0; i < mem_block[A_FUNCTIONS].current_size / sizeof(function_t); i++) {
-        funp = FUNC(i);
-        if (funp->funcname) free_string(funp->funcname);
+  /*
+   * Free function stuff.
+   */
+  for (i = 0; i < mem_block[A_FUNCTIONS].current_size / sizeof(function_t); i++) {
+    funp = FUNC(i);
+    if (funp->funcname) { free_string(funp->funcname); }
+  }
+
+  for (i = 0; i < mem_block[A_FUNCTION_DEFS].current_size /
+       sizeof(compiler_temp_t); i++) {
+    fundefp = FUNCTION_TEMP(i)->next;
+    while (fundefp) {
+      nextdefp = fundefp->next;
+      FREE((char *) fundefp);
+      fundefp = nextdefp;
     }
+  }
 
-    for (i = 0; i < mem_block[A_FUNCTION_DEFS].current_size /
-             sizeof(compiler_temp_t); i++) {
-        fundefp = FUNCTION_TEMP(i)->next;
-        while (fundefp) {
-            nextdefp = fundefp->next;
-            FREE((char *) fundefp);
-            fundefp = nextdefp;
-        }
-    }
+  n = mem_block[A_STRINGS].current_size / sizeof(char *);
+  for (i = 0; i < n; i++) {
+    free_string(*((char **)mem_block[A_STRINGS].block + i));
+  }
+  n = mem_block[A_VAR_NAME].current_size / sizeof(char *);
+  for (i = 0; i < n; i++) {
+    free_string(*((char **)mem_block[A_VAR_NAME].block + i));
+  }
 
-    n = mem_block[A_STRINGS].current_size / sizeof(char *);
-    for (i = 0; i < n; i++) {
-        free_string(*((char **)mem_block[A_STRINGS].block + i));
-    }
-    n = mem_block[A_VAR_NAME].current_size / sizeof(char *);
-    for (i = 0; i < n; i++) {
-        free_string(*((char **)mem_block[A_VAR_NAME].block + i));
-    }
+  prog = 0;
+  for (i = 0; i < NUMAREAS; i++) {
+    FREE(mem_block[i].block);
+  }
+  if (comp_def_index_map) { FREE((char *) comp_def_index_map); }
+  if (func_index_map) { FREE((char *) func_index_map); }
+  if (prog_flags) { FREE((char *) prog_flags); }
 
-    prog = 0;
-    for (i=0; i<NUMAREAS; i++)
-        FREE(mem_block[i].block);
-    if (comp_def_index_map) FREE((char *) comp_def_index_map);
-    if (func_index_map) FREE((char *) func_index_map);
-    if (prog_flags) FREE((char *) prog_flags);
-
-    /* don't need the parse trees any more */
-    release_tree();
-    uninitialize_parser();
-    clean_up_locals();
-    scratch_destroy();
-    free_unused_identifiers();
+  /* don't need the parse trees any more */
+  release_tree();
+  uninitialize_parser();
+  clean_up_locals();
+  scratch_destroy();
+  free_unused_identifiers();
 }
 
 char *
-the_file_name (char * name)
+the_file_name(char *name)
 {
-    char *tmp;
-    int len;
+  char *tmp;
+  int len;
 
-    len = strlen(name);
-    if (len < 3) {
-        return string_copy(name, "the_file_name");
-    }
-    tmp = new_string(len - 1, "the_file_name");
-    if (!tmp) {
-        return string_copy(name, "the_file_name");
-    }
-    tmp[0] = '/';
-    strncpy(tmp + 1, name, len - 2);
-    tmp[len - 1] = '\0';
-    return tmp;
+  len = strlen(name);
+  if (len < 3) {
+    return string_copy(name, "the_file_name");
+  }
+  tmp = new_string(len - 1, "the_file_name");
+  if (!tmp) {
+    return string_copy(name, "the_file_name");
+  }
+  tmp[0] = '/';
+  strncpy(tmp + 1, name, len - 2);
+  tmp[len - 1] = '\0';
+  return tmp;
 }
 
-static int case_compare(const void *c1, const void *c2) {
-    /* sort DEFAULT to the end */
-    if ((*(parse_node_t **)c1)->kind == NODE_DEFAULT)
-        return -1;
-    if ((*(parse_node_t **)c2)->kind == NODE_DEFAULT)
-        return 1;
-    return COMPARE_NUMS(
-      (*(parse_node_t **)c1)->r.number, (*(parse_node_t **)c2)->r.number);
+static int case_compare(const void *c1, const void *c2)
+{
+  /* sort DEFAULT to the end */
+  if ((*(parse_node_t **)c1)->kind == NODE_DEFAULT) {
+    return -1;
+  }
+  if ((*(parse_node_t **)c2)->kind == NODE_DEFAULT) {
+    return 1;
+  }
+  return COMPARE_NUMS(
+           (*(parse_node_t **)c1)->r.number, (*(parse_node_t **)c2)->r.number);
 }
 
-static int string_case_compare(const void *c1, const void *c2) {
-    LPC_INT x, y;
+static int string_case_compare(const void *c1, const void *c2)
+{
+  LPC_INT x, y;
 
-    /* sort DEFAULT to the end */
-    if ((*(parse_node_t **)c1)->kind == NODE_DEFAULT)
-        return -1;
-    if ((*(parse_node_t **)c2)->kind == NODE_DEFAULT)
-        return 1;
-    x = (*(parse_node_t **)c1)->r.number;
-    y = (*(parse_node_t **)c2)->r.number;
-    x = x ? ((LPC_INT)((POINTER_INT)PROG_STRING(x))) : 0;
-    y = y ? ((LPC_INT)((POINTER_INT)PROG_STRING(y))) : 0;
-    return COMPARE_NUMS(x, y);
+  /* sort DEFAULT to the end */
+  if ((*(parse_node_t **)c1)->kind == NODE_DEFAULT) {
+    return -1;
+  }
+  if ((*(parse_node_t **)c2)->kind == NODE_DEFAULT) {
+    return 1;
+  }
+  x = (*(parse_node_t **)c1)->r.number;
+  y = (*(parse_node_t **)c2)->r.number;
+  x = x ? ((LPC_INT)((POINTER_INT)PROG_STRING(x))) : 0;
+  y = y ? ((LPC_INT)((POINTER_INT)PROG_STRING(y))) : 0;
+  return COMPARE_NUMS(x, y);
 }
 
-void prepare_cases (parse_node_t * pn, int start) {
-    parse_node_t **ce_start, **ce_end, **ce;
-    LPC_INT last_key, this_key;
-    int end;
-    int direct = 1;
+void prepare_cases(parse_node_t *pn, int start)
+{
+  parse_node_t **ce_start, **ce_end, **ce;
+  LPC_INT last_key, this_key;
+  int end;
+  int direct = 1;
 
-    ce_start = (parse_node_t **)&mem_block[A_CASES].block[start];
-    end = mem_block[A_CASES].current_size;
-    ce_end = (parse_node_t **)&mem_block[A_CASES].block[end];
+  ce_start = (parse_node_t **)&mem_block[A_CASES].block[start];
+  end = mem_block[A_CASES].current_size;
+  ce_end = (parse_node_t **)&mem_block[A_CASES].block[end];
 
-    if (ce_start == ce_end) {
-        /* no cases */
-        pn->v.expr = 0;
-        mem_block[A_CASES].current_size = start;
-        return;
-    }
+  if (ce_start == ce_end) {
+    /* no cases */
+    pn->v.expr = 0;
+    mem_block[A_CASES].current_size = start;
+    return;
+  }
 
-    if (pn->kind == NODE_SWITCH_STRINGS)
-      qsort(ce_start, ce_end - ce_start, sizeof(parse_node_t *),
+  if (pn->kind == NODE_SWITCH_STRINGS)
+    qsort(ce_start, ce_end - ce_start, sizeof(parse_node_t *),
           string_case_compare);
-    else
-      qsort(ce_start, ce_end - ce_start, sizeof(parse_node_t *),
+  else
+    qsort(ce_start, ce_end - ce_start, sizeof(parse_node_t *),
           case_compare);
 
-    ce = ce_start;
-    if ((*ce)->kind == NODE_DEFAULT) {
-        if (ce + 1 == ce_end) {
-            /* only a default */
-            pn->v.expr = *ce;
-            (*ce)->l.expr = 0;
-            mem_block[A_CASES].current_size = start;
-            return;
-        }
-        ce++;
-        (*(ce-1))->l.expr = *ce;
+  ce = ce_start;
+  if ((*ce)->kind == NODE_DEFAULT) {
+    if (ce + 1 == ce_end) {
+      /* only a default */
+      pn->v.expr = *ce;
+      (*ce)->l.expr = 0;
+      mem_block[A_CASES].current_size = start;
+      return;
     }
-    if ((*ce)->v.expr) {
-        last_key = (*ce)->v.expr->r.number;
-        direct = 0;
-    } else
-        last_key = (*ce)->r.number;
     ce++;
-    while (ce < ce_end) {
-        this_key = (*ce)->r.number;
-        if (pn->kind == NODE_SWITCH_RANGES && this_key <= last_key) {
-            char buf[1024];
-            char *end = EndOf(buf);
-            char *p;
-            const char *f1, *f2;
-            int fi1, fi2;
-            int l1, l2;
+    (*(ce - 1))->l.expr = *ce;
+  }
+  if ((*ce)->v.expr) {
+    last_key = (*ce)->v.expr->r.number;
+    direct = 0;
+  } else {
+    last_key = (*ce)->r.number;
+  }
+  ce++;
+  while (ce < ce_end) {
+    this_key = (*ce)->r.number;
+    if (pn->kind == NODE_SWITCH_RANGES && this_key <= last_key) {
+      char buf[1024];
+      char *end = EndOf(buf);
+      char *p;
+      const char *f1, *f2;
+      int fi1, fi2;
+      int l1, l2;
 
-            /* make sure line numbers exist for the cases */
-            save_file_info(current_file_id, current_line - current_line_saved);
-            current_line_saved = current_line;
+      /* make sure line numbers exist for the cases */
+      save_file_info(current_file_id, current_line - current_line_saved);
+      current_line_saved = current_line;
 
-            translate_absolute_line((*ce)->line,
-                                    (unsigned short *)mem_block[A_FILE_INFO].block,
-                                    &fi1, &l1);
-            translate_absolute_line((*(ce-1))->line,
-                                    (unsigned short *)mem_block[A_FILE_INFO].block,
-                                    &fi2, &l2);
-            f1 = PROG_STRING(fi1 - 1);
-            f2 = PROG_STRING(fi2 - 1);
+      translate_absolute_line((*ce)->line,
+                              (unsigned short *)mem_block[A_FILE_INFO].block,
+                              &fi1, &l1);
+      translate_absolute_line((*(ce - 1))->line,
+                              (unsigned short *)mem_block[A_FILE_INFO].block,
+                              &fi2, &l2);
+      f1 = PROG_STRING(fi1 - 1);
+      f2 = PROG_STRING(fi2 - 1);
 
-            p = strput(buf, end, "Overlapping cases: ");
-            if (f1) {
-                p = strput(p, end, f1);
-                p = strput(p, end, ":");
-            } else
-                p = strput(p, end, "line ");
-            p = strput_int(p, end, l1);
-            p = strput(p, end, " and ");
-            if (f2) {
-                p = strput(p, end, f2);
-                p = strput(p, end, ":");
-            } else
-                p = strput(p, end, "line ");
-            p = strput_int(p, end, l2);
-            p = strput(p, end, ".");
-            yyerror(buf);
-        }
-        (*(ce-1))->l.expr = *ce;
-        if ((*ce)->v.expr) {
-            last_key = (*ce)->v.expr->r.number;
-            direct = 0;
-        } else {
-            if (last_key + 1 != this_key) direct = 0;
-            last_key = this_key;
-        }
-        ce++;
+      p = strput(buf, end, "Overlapping cases: ");
+      if (f1) {
+        p = strput(p, end, f1);
+        p = strput(p, end, ":");
+      } else {
+        p = strput(p, end, "line ");
+      }
+      p = strput_int(p, end, l1);
+      p = strput(p, end, " and ");
+      if (f2) {
+        p = strput(p, end, f2);
+        p = strput(p, end, ":");
+      } else {
+        p = strput(p, end, "line ");
+      }
+      p = strput_int(p, end, l2);
+      p = strput(p, end, ".");
+      yyerror(buf);
     }
-    (*(ce_end-1))->l.expr = 0;
-    if (direct && pn->kind == NODE_SWITCH_NUMBERS)
-        pn->kind = NODE_SWITCH_DIRECT;
-    pn->v.expr = *(ce_start);
-    mem_block[A_CASES].current_size = start;
+    (*(ce - 1))->l.expr = *ce;
+    if ((*ce)->v.expr) {
+      last_key = (*ce)->v.expr->r.number;
+      direct = 0;
+    } else {
+      if (last_key + 1 != this_key) { direct = 0; }
+      last_key = this_key;
+    }
+    ce++;
+  }
+  (*(ce_end - 1))->l.expr = 0;
+  if (direct && pn->kind == NODE_SWITCH_NUMBERS) {
+    pn->kind = NODE_SWITCH_DIRECT;
+  }
+  pn->v.expr = *(ce_start);
+  mem_block[A_CASES].current_size = start;
 }
 
 void
-save_file_info (int file_id, int lines) {
-    short fi[2];
+save_file_info(int file_id, int lines)
+{
+  short fi[2];
 
-    fi[0] = lines;
-    fi[1] = file_id;
-    add_to_mem_block(A_FILE_INFO, (char *)&fi[0], sizeof(fi));
+  fi[0] = lines;
+  fi[1] = file_id;
+  add_to_mem_block(A_FILE_INFO, (char *)&fi[0], sizeof(fi));
 }
 
 int
-add_program_file (char * name, int top) {
-    if (!top)
-        add_to_mem_block(A_INCLUDES, name, strlen(name)+1);
-    return store_prog_string(name) + 1;
+add_program_file(char *name, int top)
+{
+  if (!top) {
+    add_to_mem_block(A_INCLUDES, name, strlen(name) + 1);
+  }
+  return store_prog_string(name) + 1;
 }
 
 

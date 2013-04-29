@@ -3,8 +3,8 @@
  * by David Bennett (ddt@discworld.imaginary.com)
  */
 
-int compress_file(string, string|void);
-int uncompress_file(string, string|void);
+int compress_file(string, string | void);
+int uncompress_file(string, string | void);
 
-buffer compress(string|buffer);
-buffer uncompress(string|buffer);
+buffer compress(string | buffer);
+buffer uncompress(string | buffer);

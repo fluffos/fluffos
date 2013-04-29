@@ -60,9 +60,7 @@ VPATH = .:./packages
 # 2) use edit_source preprocess stuff.
 # 3) main build.
 
-all: main_build
-
-main_build: files
+all: local_options files
 	$(MAKE) build_packages
 	$(MAKE) build_binaries
 
@@ -82,13 +80,13 @@ grammar.tab.c: grammar.y
 	-rm -f grammar.tab.*
 	$(YACC) -d grammar.y
 	mv y.tab.c grammar.tab.c
-	mv y.tab.h grammar.tab.h 
+	mv y.tab.h grammar.tab.h
 
 $(DRIVER_BIN): $(OBJ) dtrace_compile
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
 	$(CC) -rdynamic $(CFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) `cat system_libs`
 
-dtrace_compile: dtrace_compile.c local_options
+dtrace_compile: dtrace_compile.c
 	$(CC) dtrace_compile.c -o dtrace_compile
 
 addr_server: files addr_server.o socket_ctrl.o port.o addr_server.h
@@ -120,20 +118,11 @@ files: edit_source sysmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c
 make_func.tab.c: make_func.y cc.h
 	-rm -f make_func.tab.*
 	$(YACC) -d make_func.y
-	mv y.tab.h make_func.tab.h 
+	mv y.tab.h make_func.tab.h
 	mv y.tab.c make_func.tab.c
 
-configure.h: edit_source build.FluffOS
-	-if test \( ! -r configure.h \) -o \( ! -r configuration \); then \
-	    rm -f configuration; \
-	    touch configuration; \
-	fi
-	if test "Machine `uname -a` Configure version 5" = "`cat configuration`"; then \
-	    echo "Skipping configuration ..."; \
-	else \
-	    ./edit_source -configure; \
-	    echo "Machine `uname -a` Configure version 5" > configuration; \
-	fi
+configure.h: edit_source local_options
+	./edit_source -configure
 
 edit_source: edit_source.o hash.o make_func.tab.o
 	$(CC) $(CFLAGS) edit_source.o hash.o make_func.tab.o -o edit_source
@@ -151,9 +140,9 @@ install: all
 	$(INSTALL) addr_server $(INSTALL_DIR)
 	$(INSTALL) portbind $(INSTALL_DIR)
 
-# remove everything except configuration
+# remove everything
 clean:
-	-(cd packages; $(MAKE) "A=$(A)" "O=$(O)" clean)
+	-$(MAKE) -C packages "A=$(A)" "O=$(O)" clean
 	-rm -rf *.$(O) *.tab.c *.tab.h
 	-rm -f efun_defs.c option_defs.c
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
@@ -182,7 +171,7 @@ clean:
 	-touch Dependencies
 
 reconfigure: clean
-	rm -f configure.h system_libs options_incl.h configuration
+	rm -f configure.h system_libs options_incl.h
 
 test: all
 	cd testsuite && ../driver -ftest etc/config.test

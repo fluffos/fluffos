@@ -32,16 +32,16 @@ typedef struct {
 } defined_name_t;
 
 typedef struct ifstate_s {
-    struct ifstate_s *next;
-    int state;
+  struct ifstate_s *next;
+  int state;
 } ifstate_t;
 
 typedef struct defn_s {
-    struct defn_s *next;
-    char *name;
-    char *exps;
-    int flags;
-    int nargs;
+  struct defn_s *next;
+  char *name;
+  char *exps;
+  int flags;
+  int nargs;
 } defn_t;
 
 /* must be a power of 4 */
@@ -64,36 +64,36 @@ typedef struct defn_s {
 #define INDENT_HASH_SIZE 1024 /* must be a power of 2 */
 
 typedef struct ident_hash_elem_s {
-    const char *name;
-    short token; /* only flags */
-    unsigned short sem_value; /* for these, a count of the ambiguity */
-    struct ident_hash_elem_s *next;
-/* the fields above must correspond to struct keyword_t */
-    struct ident_hash_elem_s *next_dirty;
-    defined_name_t dn;
+  const char *name;
+  short token; /* only flags */
+  unsigned short sem_value; /* for these, a count of the ambiguity */
+  struct ident_hash_elem_s *next;
+  /* the fields above must correspond to struct keyword_t */
+  struct ident_hash_elem_s *next_dirty;
+  defined_name_t dn;
 } ident_hash_elem_t;
 
 typedef struct {
-    const char *word;
-    unsigned short token;       /* flags here too */
-    unsigned short sem_value;   /* semantic value for predefined tokens */
-    ident_hash_elem_t *next;
-/* the fields above must correspond to struct ident_hash_elem */
-    short min_args;             /* Minimum number of arguments. */
-    short max_args;             /* Maximum number of arguments. */
-    unsigned short ret_type;    /* The return type used by the compiler. */
-    unsigned short arg_type1;   /* Type of argument 1 */
-    unsigned short arg_type2;   /* Type of argument 2 */
-    unsigned short arg_type3;   /* Type of argument 1 */
-    unsigned short arg_type4;   /* Type of argument 2 */
-    short arg_index;            /* Index pointing to where to find arg type */
-    short Default;              /* an efun to use as default for last
+  const char *word;
+  unsigned short token;       /* flags here too */
+  unsigned short sem_value;   /* semantic value for predefined tokens */
+  ident_hash_elem_t *next;
+  /* the fields above must correspond to struct ident_hash_elem */
+  short min_args;             /* Minimum number of arguments. */
+  short max_args;             /* Maximum number of arguments. */
+  unsigned short ret_type;    /* The return type used by the compiler. */
+  unsigned short arg_type1;   /* Type of argument 1 */
+  unsigned short arg_type2;   /* Type of argument 2 */
+  unsigned short arg_type3;   /* Type of argument 1 */
+  unsigned short arg_type4;   /* Type of argument 2 */
+  short arg_index;            /* Index pointing to where to find arg type */
+  short Default;              /* an efun to use as default for last
                                  * argument */
 } keyword_t;
 
 typedef struct lpc_predef_s {
-    char *flag;
-    struct lpc_predef_s *next;
+  char *flag;
+  struct lpc_predef_s *next;
 } lpc_predef_t;
 
 #define EXPECT_ELSE 1
@@ -112,12 +112,12 @@ extern lpc_predef_t *lpc_predefs;
 #define F_ALIAS_FLAG 1024
 
 typedef struct {
-    short max_arg, min_arg;  /* Can't use char to represent -1 */
-    short type[4];           /* need a short to hold the biggest type flag */
-    short Default;
-    unsigned short ret_type;
-    const char *name;
-    int arg_index;
+  short max_arg, min_arg;  /* Can't use char to represent -1 */
+  short type[4];           /* need a short to hold the biggest type flag */
+  short Default;
+  unsigned short ret_type;
+  const char *name;
+  int arg_index;
 } instr_t;
 
 /*
@@ -139,27 +139,27 @@ extern keyword_t predefs[];
 extern int lex_fatal;
 extern int arrow_efun, evaluate_efun, this_efun, to_float_efun, to_int_efun, new_efun;
 
-INLINE void push_function_context (void);
-void pop_function_context (void);
-int yylex (void);
-void init_num_args (void);
-const char *query_instr_name (int);
-char *get_f_name (int);
-void set_inc_list (char *);
-void start_new_file (int);
-void end_new_file (void);
-int lookup_predef (const char *);
-void add_predefines (void);
-char *main_file_name (void);
-char *get_defined_name (defined_name_t *);
-ident_hash_elem_t *find_or_add_ident (const char *, int);
-ident_hash_elem_t *find_or_add_perm_ident (const char *);
-ident_hash_elem_t *lookup_ident (const char *);
-void free_unused_identifiers (void);
-void init_identifiers (void);
-char *show_error_context (void);
+INLINE void push_function_context(void);
+void pop_function_context(void);
+int yylex(void);
+void init_num_args(void);
+const char *query_instr_name(int);
+char *get_f_name(int);
+void set_inc_list(char *);
+void start_new_file(int);
+void end_new_file(void);
+int lookup_predef(const char *);
+void add_predefines(void);
+char *main_file_name(void);
+char *get_defined_name(defined_name_t *);
+ident_hash_elem_t *find_or_add_ident(const char *, int);
+ident_hash_elem_t *find_or_add_perm_ident(const char *);
+ident_hash_elem_t *lookup_ident(const char *);
+void free_unused_identifiers(void);
+void init_identifiers(void);
+char *show_error_context(void);
 #ifdef DEBUGMALLOC_EXTENSIONS
-void mark_all_defines (void);
+void mark_all_defines(void);
 #endif
 
 #endif
