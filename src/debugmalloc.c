@@ -68,6 +68,7 @@ INLINE void *debugmalloc(int size, int tag, char *desc)
   }
   stats.alloc_calls++;
   tmp = (void *) MALLOC(size + MD_OVERHEAD);
+  memset(tmp, 'M', size + MD_OVERHEAD);
   MDmalloc(tmp, size, tag, desc);
   NOISY3("malloc: %i (%x), %s\n", size, (md_node_t *)tmp + 1, desc);
   return (md_node_t *) tmp + 1;
@@ -96,7 +97,7 @@ INLINE void debugfree(void *ptr)
   stats.free_calls++;
   tmp = (md_node_t *) ptr - 1;
   if (MDfree(tmp)) {
-    memset(ptr, 'x', tmp->size);
+    memset(ptr, 'F', tmp->size);
     FREE(tmp);      /* only free if safe to do so */
   }
 }
