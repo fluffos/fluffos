@@ -8,7 +8,8 @@
 unsigned int svalue_strlen_size;
 
 #ifdef NOISY_DEBUG
-void bp (void) {
+void bp(void)
+{
 }
 #endif
 /*
@@ -66,7 +67,7 @@ int num_str_searches = 0;
 #define hfindblock(s, h) sfindblock(s, h = StrHash(s))
 #define findblock(s) sfindblock(s, StrHash(s))
 
-INLINE_STATIC block_t *sfindblock (const char *, int);
+INLINE_STATIC block_t *sfindblock(const char *, int);
 
 /*
  * hash table - list of pointers to heads of string chains.
@@ -80,26 +81,27 @@ static block_t **base_table = (block_t **) 0;
 static int htable_size;
 static int htable_size_minus_one;
 
-INLINE_STATIC block_t *alloc_new_string (const char *, int);
+INLINE_STATIC block_t *alloc_new_string(const char *, int);
 
 void init_strings()
 {
-    int x, y;
+  int x, y;
 
-    /* ensure that htable size is a power of 2 */
-    y = HTABLE_SIZE;
-    for (htable_size = 1; htable_size < y; htable_size *= 2)
-        ;
-    htable_size_minus_one = htable_size - 1;
-    base_table = CALLOCATE(htable_size, block_t *,
-                           TAG_STR_TBL, "init_strings");
+  /* ensure that htable size is a power of 2 */
+  y = HTABLE_SIZE;
+  for (htable_size = 1; htable_size < y; htable_size *= 2) {
+    ;
+  }
+  htable_size_minus_one = htable_size - 1;
+  base_table = CALLOCATE(htable_size, block_t *,
+                         TAG_STR_TBL, "init_strings");
 #ifdef STRING_STATS
-    overhead_bytes += (sizeof(block_t *) * htable_size);
+  overhead_bytes += (sizeof(block_t *) * htable_size);
 #endif
 
-    for (x = 0; x < htable_size; x++) {
-        base_table[x] = 0;
-    }
+  for (x = 0; x < htable_size; x++) {
+    base_table[x] = 0;
+  }
 }
 
 /*
@@ -110,92 +112,94 @@ void init_strings()
  */
 
 INLINE_STATIC block_t *
-        sfindblock (const char * s, int h)
+sfindblock(const char *s, int h)
 {
-    block_t *curr, *prev;
+  block_t *curr, *prev;
 
-    curr = base_table[h];
-    prev = NULL;
+  curr = base_table[h];
+  prev = NULL;
 #ifdef STRING_STATS
-    num_str_searches++;
+  num_str_searches++;
 #endif
 
-    while (curr) {
+  while (curr) {
 #ifdef STRING_STATS
-        search_len++;
+    search_len++;
 #endif
-        if (*(STRING(curr)) == *s && !strcmp(STRING(curr), s)) {        /* found it */
-            if (prev) {         /* not at head of list */
-                NEXT(prev) = NEXT(curr);
-                NEXT(curr) = base_table[h];
-                base_table[h] = curr;
-            }
-            return (curr);      /* pointer to string */
-        }
-        prev = curr;
-        curr = NEXT(curr);
+    if (*(STRING(curr)) == *s && !strcmp(STRING(curr), s)) {        /* found it */
+      if (prev) {         /* not at head of list */
+        NEXT(prev) = NEXT(curr);
+        NEXT(curr) = base_table[h];
+        base_table[h] = curr;
+      }
+      return (curr);      /* pointer to string */
     }
-    return ((block_t *) 0);     /* not found */
+    prev = curr;
+    curr = NEXT(curr);
+  }
+  return ((block_t *) 0);     /* not found */
 }
 
 char *
-     findstring (const char * s)
+findstring(const char *s)
 {
-    block_t *b;
+  block_t *b;
 
-    if ((b = findblock(s))) {
-        return STRING(b);
-    } else {
-        return (NULL);
-    }
+  if ((b = findblock(s))) {
+    return STRING(b);
+  } else {
+    return (NULL);
+  }
 }
 
 /* alloc_new_string: Make a space for a string.  */
 
 INLINE_STATIC block_t *
-alloc_new_string (const char * string, int h)
+alloc_new_string(const char *string, int h)
 {
-    block_t *b;
-    int len = strlen(string);
-    int size;
-    int cut = 0;
-    if (len > max_string_length) {
-        len = max_string_length;
-        cut = 1;
-    }
-    size = sizeof(block_t) + len + 1;
-    b = (block_t *) DXALLOC(size, TAG_SHARED_STRING, "alloc_new_string");
-    strncpy(STRING(b), string, len);
-    STRING(b)[len] = '\0';      /* strncpy doesn't put on \0 if 'from' too
+  block_t *b;
+  int len = strlen(string);
+  int size;
+  int cut = 0;
+  if (len > max_string_length) {
+    len = max_string_length;
+    cut = 1;
+  }
+  size = sizeof(block_t) + len + 1;
+  b = (block_t *) DXALLOC(size, TAG_SHARED_STRING, "alloc_new_string");
+  strncpy(STRING(b), string, len);
+  STRING(b)[len] = '\0';      /* strncpy doesn't put on \0 if 'from' too
                                  * long */
-    if(cut)
-    	h = whashstr(STRING(b)) & htable_size_minus_one;
-    SIZE(b) = (len > UINT_MAX ? UINT_MAX : len);
-    REFS(b) = 1;
-    NEXT(b) = base_table[h];
-    HASH(b) = h;
-    base_table[h] = b;
-    ADD_NEW_STRING(SIZE(b), sizeof(block_t));
-    ADD_STRING(SIZE(b));
-    return (b);
+  if (cut) {
+    h = whashstr(STRING(b)) & htable_size_minus_one;
+  }
+  SIZE(b) = (len > UINT_MAX ? UINT_MAX : len);
+  REFS(b) = 1;
+  NEXT(b) = base_table[h];
+  HASH(b) = h;
+  base_table[h] = b;
+  ADD_NEW_STRING(SIZE(b), sizeof(block_t));
+  ADD_STRING(SIZE(b));
+  return (b);
 }
 
 char *
-     make_shared_string (const char * str)
+make_shared_string(const char *str)
 {
-    block_t *b;
-    int h;
+  block_t *b;
+  int h;
 
-    b = hfindblock(str, h);     /* hfindblock macro sets h = StrHash(s) */
-    if (!b) {
-        b = alloc_new_string(str, h);
-    } else {
-        if (REFS(b))
-            REFS(b)++;
-       ADD_STRING(SIZE(b));
+  b = hfindblock(str, h);     /* hfindblock macro sets h = StrHash(s) */
+  if (!b) {
+    b = alloc_new_string(str, h);
+  } else {
+    if (REFS(b)) {
+      REFS(b)++;
     }
-    NDBG(b);
-    return (STRING(b));
+    ADD_STRING(SIZE(b));
+  }
+  NDBG(b);
+  return (STRING(b));
 }
 
 /*
@@ -203,21 +207,22 @@ char *
 */
 
 const char *
-ref_string (const char * str)
+ref_string(const char *str)
 {
-    block_t *b;
+  block_t *b;
 
-    b = BLOCK(str);
+  b = BLOCK(str);
 #ifdef DEBUG
-    if (b != findblock(str)) {
-        fatal("stralloc.c: called ref_string on non-shared string: %s.\n", str);
-    }
+  if (b != findblock(str)) {
+    fatal("stralloc.c: called ref_string on non-shared string: %s.\n", str);
+  }
 #endif                          /* defined(DEBUG) */
-    if (REFS(b))
-        REFS(b)++;
-    NDBG(b);
-    ADD_STRING(SIZE(b));
-    return str;
+  if (REFS(b)) {
+    REFS(b)++;
+  }
+  NDBG(b);
+  ADD_STRING(SIZE(b));
+  return str;
 }
 
 /* free_string: fatal to call free_string on a non-shared string */
@@ -227,91 +232,94 @@ ref_string (const char * str)
  */
 
 void
-free_string (const char * str)
+free_string(const char *str)
 {
-    block_t **prev, *b;
-    int h;
+  block_t **prev, *b;
+  int h;
 
-    b = BLOCK(str);
-    DEBUG_CHECK1(b != findblock(str),"stralloc.c: free_string called on non-shared string: %s.\n", str);
+  b = BLOCK(str);
+  DEBUG_CHECK1(b != findblock(str), "stralloc.c: free_string called on non-shared string: %s.\n", str);
 
-    /*
-     * if a string has been ref'd USHRT_MAX times then we assume that its used
-     * often enough to justify never freeing it.
-     */
-    if (!REFS(b))
-        return;
+  /*
+   * if a string has been ref'd USHRT_MAX times then we assume that its used
+   * often enough to justify never freeing it.
+   */
+  if (!REFS(b)) {
+    return;
+  }
 
-    REFS(b)--;
-    SUB_STRING(SIZE(b));
+  REFS(b)--;
+  SUB_STRING(SIZE(b));
 
-    NDBG(b);
-    if (REFS(b) > 0)
-        return;
+  NDBG(b);
+  if (REFS(b) > 0) {
+    return;
+  }
 
-    //h = StrHash(str);
-    h = HASH(BLOCK(str));
-    prev = base_table + h;
-    while ((b = *prev)) {
-        if (STRING(b) == str) {
-            *prev = NEXT(b);
-            break;
-        }
-        prev = &(NEXT(b));
+  //h = StrHash(str);
+  h = HASH(BLOCK(str));
+  prev = base_table + h;
+  while ((b = *prev)) {
+    if (STRING(b) == str) {
+      *prev = NEXT(b);
+      break;
     }
+    prev = &(NEXT(b));
+  }
 
-    DEBUG_CHECK1(!b, "free_string: not found in string table! (\"%s\")\n", str);
+  DEBUG_CHECK1(!b, "free_string: not found in string table! (\"%s\")\n", str);
 
-    SUB_NEW_STRING(SIZE(b), sizeof(block_t));
-    FREE(b);
-    CHECK_STRING_STATS;
+  SUB_NEW_STRING(SIZE(b), sizeof(block_t));
+  FREE(b);
+  CHECK_STRING_STATS;
 }
 
 void
-deallocate_string (char * str)
+deallocate_string(char *str)
 {
-    int h;
-    block_t *b, **prev;
+  int h;
+  block_t *b, **prev;
 
-    //h = StrHash(str);
-    h = HASH(BLOCK(str));
-    prev = base_table + h;
-    while ((b = *prev)) {
-        if (STRING(b) == str) {
-            *prev = NEXT(b);
-            break;
-        }
-        prev = &(NEXT(b));
+  //h = StrHash(str);
+  h = HASH(BLOCK(str));
+  prev = base_table + h;
+  while ((b = *prev)) {
+    if (STRING(b) == str) {
+      *prev = NEXT(b);
+      break;
     }
-    DEBUG_CHECK1(!b,"stralloc.c: deallocate_string called on non-shared string: %s.\n", str);
-    //printf("freeing string: %s\n", str);
-    FREE(b);
+    prev = &(NEXT(b));
+  }
+  DEBUG_CHECK1(!b, "stralloc.c: deallocate_string called on non-shared string: %s.\n", str);
+  //printf("freeing string: %s\n", str);
+  FREE(b);
 }
 
 int
-add_string_status (outbuffer_t * out, int verbose)
+add_string_status(outbuffer_t *out, int verbose)
 {
 #ifdef STRING_STATS
-    if (verbose == 1) {
-        outbuf_add(out, "All strings:\n");
-        outbuf_add(out, "-------------------------\t Strings    Bytes\n");
-    }
-    if (verbose != -1)
-        outbuf_addv(out, "All strings:\t\t\t%8d %8d + %d overhead\n",
-              num_distinct_strings, bytes_distinct_strings, overhead_bytes);
-    if (verbose == 1) {
-        outbuf_addv(out, "Total asked for\t\t\t%8d %8d\n",
-                    allocd_strings, allocd_bytes);
-        outbuf_addv(out, "Space actually required/total string bytes %d%%\n",
-            (bytes_distinct_strings + overhead_bytes) * 100 / allocd_bytes);
-        outbuf_addv(out, "Searches: %d    Average search length: %6.3f\n",
-                  num_str_searches, (double) search_len / num_str_searches);
-    }
-    return (bytes_distinct_strings + overhead_bytes);
+  if (verbose == 1) {
+    outbuf_add(out, "All strings:\n");
+    outbuf_add(out, "-------------------------\t Strings    Bytes\n");
+  }
+  if (verbose != -1)
+    outbuf_addv(out, "All strings:\t\t\t%8d %8d + %d overhead\n",
+                num_distinct_strings, bytes_distinct_strings, overhead_bytes);
+  if (verbose == 1) {
+    outbuf_addv(out, "Total asked for\t\t\t%8d %8d\n",
+                allocd_strings, allocd_bytes);
+    outbuf_addv(out, "Space actually required/total string bytes %d%%\n",
+                (bytes_distinct_strings + overhead_bytes) * 100 / allocd_bytes);
+    outbuf_addv(out, "Searches: %d    Average search length: %6.3f\n",
+                num_str_searches, (double) search_len / num_str_searches);
+  }
+  return (bytes_distinct_strings + overhead_bytes);
 #else
-    if (verbose)
-        outbuf_add(out, "<String statistics disabled, no information available>\n");
-    return 0;
+  if (verbose) {
+    outbuf_add(out, "<String statistics disabled, no information available>\n");
+  }
+  return 0;
 #endif
 }
 
@@ -328,115 +336,116 @@ char *the_null_string = (char *)&the_null_string_blocks[1];
 */
 
 #ifdef DEBUGMALLOC
-char *int_new_string (int size, char * tag)
+char *int_new_string(int size, char *tag)
 #else
-char *int_new_string (int size)
+char *int_new_string(int size)
 #endif
 {
-    malloc_block_t *mbt;
+  malloc_block_t *mbt;
 
 #if 0
-    if (!size) {
-        the_null_string_blocks[0].ref++;
-        ADD_NEW_STRING(0, sizeof(malloc_block_t));
-        return the_null_string;
-    }
+  if (!size) {
+    the_null_string_blocks[0].ref++;
+    ADD_NEW_STRING(0, sizeof(malloc_block_t));
+    return the_null_string;
+  }
 #endif
 
-    mbt = (malloc_block_t *)DXALLOC(size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, tag);
-    if (size < UINT_MAX) {
-        mbt->size = size;
-        ADD_NEW_STRING(size, sizeof(malloc_block_t));
-    } else {
-        mbt->size = UINT_MAX;
-        ADD_NEW_STRING(UINT_MAX, sizeof(malloc_block_t));
-    }
-    mbt->ref = 1;
-    ADD_STRING(mbt->size);
-    CHECK_STRING_STATS;
-    return (char *)(mbt + 1);
+  mbt = (malloc_block_t *)DXALLOC(size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, tag);
+  if (size < UINT_MAX) {
+    mbt->size = size;
+    ADD_NEW_STRING(size, sizeof(malloc_block_t));
+  } else {
+    mbt->size = UINT_MAX;
+    ADD_NEW_STRING(UINT_MAX, sizeof(malloc_block_t));
+  }
+  mbt->ref = 1;
+  ADD_STRING(mbt->size);
+  CHECK_STRING_STATS;
+  return (char *)(mbt + 1);
 }
 
-char *extend_string (const char * str, int len) {
-    malloc_block_t *mbt;
+char *extend_string(const char *str, int len)
+{
+  malloc_block_t *mbt;
 #ifdef STRING_STATS
-    int oldsize = MSTR_SIZE(str);
+  int oldsize = MSTR_SIZE(str);
 #endif
 
-    mbt = (malloc_block_t *)DREALLOC(MSTR_BLOCK(str), len + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, "extend_string");
-    if (len < UINT_MAX) {
-        mbt->size = len;
-    } else {
-        mbt->size = UINT_MAX;
-    }
-    ADD_STRING_SIZE(mbt->size - oldsize);
-    CHECK_STRING_STATS;
+  mbt = (malloc_block_t *)DREALLOC(MSTR_BLOCK(str), len + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, "extend_string");
+  if (len < UINT_MAX) {
+    mbt->size = len;
+  } else {
+    mbt->size = UINT_MAX;
+  }
+  ADD_STRING_SIZE(mbt->size - oldsize);
+  CHECK_STRING_STATS;
 
-    return (char *)(mbt + 1);
+  return (char *)(mbt + 1);
 }
 
 #ifdef DEBUGMALLOC
-char *int_alloc_cstring (const char * str, char * tag)
+char *int_alloc_cstring(const char *str, char *tag)
 #else
-char *int_alloc_cstring (const char * str)
+char *int_alloc_cstring(const char *str)
 #endif
 {
-    char *ret;
+  char *ret;
 
-    ret = (char *)DXALLOC(strlen(str) + 1, TAG_STRING, tag);
-    strcpy(ret, str);
-    return ret;
+  ret = (char *)DXALLOC(strlen(str) + 1, TAG_STRING, tag);
+  strcpy(ret, str);
+  return ret;
 }
 
 #ifdef DEBUGMALLOC
-char *int_string_copy (const char * const str, char * desc)
+char *int_string_copy(const char *const str, char *desc)
 #else
-char *int_string_copy (const char * const str)
+char *int_string_copy(const char *const str)
 #endif
 {
-	char *p;
-	int len;
+  char *p;
+  int len;
 
-	DEBUG_CHECK(!str, "Null string passed to string_copy.\n");
-	len = strlen(str);
-	if (len > max_string_length) {
-		len = max_string_length;
-		p = new_string(len, desc);
-		(void) strncpy(p, str, len);
-		p[len] = '\0';
-	} else {
-		p = new_string(len, desc);
-		(void) strncpy(p, str, len + 1);
-	}
-	return p;
+  DEBUG_CHECK(!str, "Null string passed to string_copy.\n");
+  len = strlen(str);
+  if (len > max_string_length) {
+    len = max_string_length;
+    p = new_string(len, desc);
+    (void) strncpy(p, str, len);
+    p[len] = '\0';
+  } else {
+    p = new_string(len, desc);
+    (void) strncpy(p, str, len + 1);
+  }
+  return p;
 }
 
 #ifdef DEBUGMALLOC
-char *int_string_unlink (const char * str, char * desc)
+char *int_string_unlink(const char *str, char *desc)
 #else
-char *int_string_unlink (const char * str)
+char *int_string_unlink(const char *str)
 #endif
 {
-	malloc_block_t *mbt, *newmbt;
+  malloc_block_t *mbt, *newmbt;
 
-	mbt = ((malloc_block_t *)str) - 1;
-	mbt->ref--;
+  mbt = ((malloc_block_t *)str) - 1;
+  mbt->ref--;
 
-	if (mbt->size == USHRT_MAX) {
-		int l = strlen(str + USHRT_MAX) + USHRT_MAX; /* ouch */
+  if (mbt->size == USHRT_MAX) {
+    int l = strlen(str + USHRT_MAX) + USHRT_MAX; /* ouch */
 
-		newmbt = (malloc_block_t *)DXALLOC(l + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc);
-		memcpy((char *)(newmbt + 1), (char *)(mbt + 1), l+1);
-		newmbt->size = USHRT_MAX;
-		ADD_NEW_STRING(USHRT_MAX, sizeof(malloc_block_t));
-	} else {
-		newmbt = (malloc_block_t *)DXALLOC(mbt->size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc);
-		memcpy((char *)(newmbt + 1), (char *)(mbt + 1), mbt->size+1);
-		newmbt->size = mbt->size;
-		ADD_NEW_STRING(mbt->size, sizeof(malloc_block_t));
-	}
-	newmbt->ref = 1;
-	CHECK_STRING_STATS;
+    newmbt = (malloc_block_t *)DXALLOC(l + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc);
+    memcpy((char *)(newmbt + 1), (char *)(mbt + 1), l + 1);
+    newmbt->size = USHRT_MAX;
+    ADD_NEW_STRING(USHRT_MAX, sizeof(malloc_block_t));
+  } else {
+    newmbt = (malloc_block_t *)DXALLOC(mbt->size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc);
+    memcpy((char *)(newmbt + 1), (char *)(mbt + 1), mbt->size + 1);
+    newmbt->size = mbt->size;
+    ADD_NEW_STRING(mbt->size, sizeof(malloc_block_t));
+  }
+  newmbt->ref = 1;
+  CHECK_STRING_STATS;
 
-	return (char *)(newmbt + 1);
+  return (char *)(newmbt + 1);
 }

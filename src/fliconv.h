@@ -6,11 +6,11 @@
 #else
 typedef void *iconv_t;
 #endif
-struct translation{
-    char *name;
-    iconv_t incoming;
-    iconv_t outgoing;
-    struct translation *next;
+struct translation {
+  char *name;
+  iconv_t incoming;
+  iconv_t outgoing;
+  struct translation *next;
 };
 
 char *translate(iconv_t tr, const char *mes, int inlen, int *outlen);

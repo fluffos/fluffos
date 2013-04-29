@@ -392,11 +392,11 @@
  *                      calls to functions in this object by objects that
  *                      inherit it.
  * PRAGMA_OPTIMIZE:     make a second pass over the generated code to
- *                      optimize it further.  Currently maybe broken.
+ *                      optimize it further.
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
  *                      compilation error occured.
  */
-#define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_STRICT_TYPES + PRAGMA_ERROR_CONTEXT
+#define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_STRICT_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
 
 /* supress warnings about unused arguments; only warn about unused local
  * variables.  Makes older code (where argument names were required) compile
@@ -913,7 +913,7 @@
  */
 #define HAS_CONSOLE
 
-/* IPV6: Use IP version 6 instead of 4, for most people the only difference 
+/* IPV6: Use IP version 6 instead of 4, for most people the only difference
  * will be that numerical IP addresses get ::ffff: added in front.*/
 #define IPV6
 

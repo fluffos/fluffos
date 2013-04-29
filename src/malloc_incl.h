@@ -2,17 +2,17 @@
 #define MALLOC_INCL_H
 
 typedef struct {
-    int real_size;
-    char *buffer;
+  int real_size;
+  char *buffer;
 } outbuffer_t;
 
-void outbuf_zero (outbuffer_t *);
-void outbuf_add (outbuffer_t *, const char *);
-void outbuf_addchar (outbuffer_t *, char);
-void CDECL outbuf_addv (outbuffer_t *, const char *, ...);
-void outbuf_fix (outbuffer_t *);
-void outbuf_push (outbuffer_t *);
-int outbuf_extend (outbuffer_t *, int);
+void outbuf_zero(outbuffer_t *);
+void outbuf_add(outbuffer_t *, const char *);
+void outbuf_addchar(outbuffer_t *, char);
+void CDECL outbuf_addv(outbuffer_t *, const char *, ...);
+void outbuf_fix(outbuffer_t *);
+void outbuf_push(outbuffer_t *);
+int outbuf_extend(outbuffer_t *, int);
 
 #include "bsdmalloc.h"
 #include "smalloc.h"

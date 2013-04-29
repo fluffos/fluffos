@@ -16,28 +16,28 @@ typedef double LPC_FLOAT;
 #define LPC_FLOAT_FMTSTR_P "lf"
 
 typedef struct {
-    unsigned short ref;
+  unsigned short ref;
 } refed_t;
 
 union u {
-    const char *string;
-    LPC_INT number;
-    LPC_FLOAT real;
+  const char *string;
+  LPC_INT number;
+  LPC_FLOAT real;
 
-    refed_t *refed; /* any of the block below */
+  refed_t *refed; /* any of the block below */
 
 #ifndef NO_BUFFER_TYPE
-    struct buffer_s *buf;
+  struct buffer_s *buf;
 #endif
-    struct object_s *ob;
-    struct array_s *arr;
-    struct mapping_s *map;
-    struct funptr_s *fp;
+  struct object_s *ob;
+  struct array_s *arr;
+  struct mapping_s *map;
+  struct funptr_s *fp;
 
-    struct svalue_s *lvalue;
-    struct ref_s *ref;
-    unsigned char *lvalue_byte;
-    void (*error_handler) (void);
+  struct svalue_s *lvalue;
+  struct ref_s *ref;
+  unsigned char *lvalue_byte;
+  void (*error_handler)(void);
 };
 
 /*
@@ -46,17 +46,17 @@ union u {
  * differently, which will affect how it should be freed.
  */
 typedef struct svalue_s {
-    short type;
-    int subtype;
-    union u u;
+  short type;
+  int subtype;
+  union u u;
 } svalue_t;
 
 typedef struct ref_s {
-    unsigned short ref;
-    struct ref_s *next, *prev;
-    struct control_stack_s *csp;
-    svalue_t *lvalue;
-    svalue_t sv;
+  unsigned short ref;
+  struct ref_s *next, *prev;
+  struct control_stack_s *csp;
+  svalue_t *lvalue;
+  svalue_t sv;
 } ref_t;
 
 /* values for type field of svalue struct */

@@ -15,8 +15,8 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
+ *  This product includes software developed by the University of
+ *  California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,27 +36,29 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)ualarm.c	5.5 (Berkeley) 2/23/91";
-#endif				/* LIBC_SCCS and not lint */
+#endif              /* LIBC_SCCS and not lint */
 
-#define	USPS	1000000		/* # of microseconds in a second */
+#define USPS    1000000     /* # of microseconds in a second */
 
 /*
  * Generate a SIGALRM signal in ``usecs'' microseconds.
  * If ``reload'' is non-zero, keep generating SIGALRM
  * every ``reload'' microseconds after the first signal.
  */
-unsigned uvalarm (unsigned int usecs, unsigned int reload) {
-    struct itimerval newv, old;
+unsigned uvalarm(unsigned int usecs, unsigned int reload)
+{
+  struct itimerval newv, old;
 
-    newv.it_interval.tv_usec = reload % USPS;
-    newv.it_interval.tv_sec = reload / USPS;
+  newv.it_interval.tv_usec = reload % USPS;
+  newv.it_interval.tv_sec = reload / USPS;
 
-    newv.it_value.tv_usec = usecs % USPS;
-    newv.it_value.tv_sec = usecs / USPS;
+  newv.it_value.tv_usec = usecs % USPS;
+  newv.it_value.tv_sec = usecs / USPS;
 
-    if (setitimer(ITIMER_VIRTUAL, &newv, &old) == 0)
-	return old.it_value.tv_sec * USPS + old.it_value.tv_usec;
-    /* else */
-    return -1;
+  if (setitimer(ITIMER_VIRTUAL, &newv, &old) == 0) {
+    return old.it_value.tv_sec * USPS + old.it_value.tv_usec;
+  }
+  /* else */
+  return -1;
 }
 #endif

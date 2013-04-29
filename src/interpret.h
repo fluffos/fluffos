@@ -58,55 +58,55 @@
 #define FRAME_EXTERNAL     8
 
 #define FRAME_RETURNED_FROM_CATCH   16
-struct defer_list{
-	struct defer_list *next;
-	svalue_t func;
-	svalue_t tp;
+struct defer_list {
+  struct defer_list *next;
+  svalue_t func;
+  svalue_t tp;
 };
 typedef struct control_stack_s {
 #ifdef PROFILE_FUNCTIONS
-    unsigned long entry_secs, entry_usecs;
+  unsigned long entry_secs, entry_usecs;
 #endif
-    union {
-        long table_index;
-        funptr_t *funp;
-    } fr;
-    object_t *ob;               /* Current object */
-    object_t *prev_ob;  /* Save previous object */
-    program_t *prog;    /* Current program */
-    char *pc; /* TODO: change this to unsigned char* */
+  union {
+    long table_index;
+    funptr_t *funp;
+  } fr;
+  object_t *ob;               /* Current object */
+  object_t *prev_ob;  /* Save previous object */
+  program_t *prog;    /* Current program */
+  char *pc; /* TODO: change this to unsigned char* */
 
-    svalue_t *fp;
-    struct defer_list *defers;
-    int num_local_variables;    /* Local + arguments */
-    int function_index_offset;  /* Used when executing functions in inherited
+  svalue_t *fp;
+  struct defer_list *defers;
+  int num_local_variables;    /* Local + arguments */
+  int function_index_offset;  /* Used when executing functions in inherited
                                  * programs */
-    int variable_index_offset;  /* Same */
-    short caller_type;          /* was this a locally called function? */
-    short framekind;
+  int variable_index_offset;  /* Same */
+  short caller_type;          /* was this a locally called function? */
+  short framekind;
 } control_stack_t;
 
 typedef struct {
-    object_t *ob;
-    union {
-        funptr_t *fp;
-        const char *str;
-    } f;
-    int narg;
-    svalue_t *args;
+  object_t *ob;
+  union {
+    funptr_t *fp;
+    const char *str;
+  } f;
+  int narg;
+  svalue_t *args;
 } function_to_call_t;
 
 typedef struct error_context_s {
-    jmp_buf context;
-    control_stack_t *save_csp;
-    svalue_t *save_sp;
-    object_t **save_cgsp;
-    struct error_context_s *save_context;
+  jmp_buf context;
+  control_stack_t *save_csp;
+  svalue_t *save_sp;
+  object_t **save_cgsp;
+  struct error_context_s *save_context;
 } error_context_t;
 
 typedef struct {
-    function_t *func;
-    int index;
+  function_t *func;
+  int index;
 } function_lookup_info_t;
 
 #define IS_ZERO(x) (!(x) || (((x)->type == T_NUMBER) && ((x)->u.number == 0)))
@@ -164,12 +164,12 @@ typedef struct {
         if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) { \
             ssj_res = (char *) extend_string((x)->u.string, ssj_len); \
             if (!ssj_res) fatal("Out of memory!\n"); \
-            (void) strcpy(ssj_res + ssj_r, (y)->u.string);	\
+            (void) strcpy(ssj_res + ssj_r, (y)->u.string);  \
             free_string_svalue(y); \
         } else { \
             ssj_res = (char *) new_string(ssj_len, z); \
-            strcpy(ssj_res, (x)->u.string);	       \
-            strcpy(ssj_res + ssj_r, (y)->u.string);	       \
+            strcpy(ssj_res, (x)->u.string);        \
+            strcpy(ssj_res + ssj_r, (y)->u.string);        \
             free_string_svalue(y); \
             free_string_svalue(x); \
             (x)->subtype = STRING_MALLOC; \
@@ -253,7 +253,7 @@ extern svalue_t *sp;
 extern svalue_t *fp;
 extern svalue_t *end_of_stack;
 extern svalue_t catch_value;
-extern control_stack_t control_stack[CFG_MAX_CALL_DEPTH+5];
+extern control_stack_t control_stack[CFG_MAX_CALL_DEPTH + 5];
 extern control_stack_t *csp;
 extern int too_deep_error;
 extern int max_eval_error;
@@ -276,119 +276,120 @@ extern ref_t *global_ref_list;
 extern int lv_owner_type;
 extern refed_t *lv_owner;
 
-void kill_ref (ref_t *);
-ref_t *make_ref (void);
+void kill_ref(ref_t *);
+ref_t *make_ref(void);
 
-void init_interpreter (void);
-void call_direct (object_t *, int, int, int);
-void eval_instruction (char *p);
-INLINE void assign_svalue (svalue_t *, svalue_t *);
-INLINE void assign_svalue_no_free (svalue_t *, svalue_t *);
-INLINE void copy_some_svalues (svalue_t *, svalue_t *, int);
-INLINE void transfer_push_some_svalues (svalue_t *, int);
-INLINE void push_some_svalues (svalue_t *, int);
+void init_interpreter(void);
+void call_direct(object_t *, int, int, int);
+void eval_instruction(char *p);
+INLINE void assign_svalue(svalue_t *, svalue_t *);
+INLINE void assign_svalue_no_free(svalue_t *, svalue_t *);
+INLINE void copy_some_svalues(svalue_t *, svalue_t *, int);
+INLINE void transfer_push_some_svalues(svalue_t *, int);
+INLINE void push_some_svalues(svalue_t *, int);
 #ifdef DEBUG
-INLINE void int_free_svalue (svalue_t *, const char *);
+INLINE void int_free_svalue(svalue_t *, const char *);
 #else
-INLINE void int_free_svalue (svalue_t *);
+INLINE void int_free_svalue(svalue_t *);
 #endif
-INLINE void free_string_svalue (svalue_t *);
-INLINE void free_some_svalues (svalue_t *, int);
-INLINE void push_object (object_t *);
-INLINE void push_number (LPC_INT);
-INLINE void push_real (LPC_FLOAT);
-INLINE void push_undefined (void);
-INLINE void copy_and_push_string (const char *);
-INLINE void share_and_push_string (const char *);
-INLINE void push_array (array_t *);
-INLINE void push_refed_array (array_t *);
+INLINE void free_string_svalue(svalue_t *);
+INLINE void free_some_svalues(svalue_t *, int);
+INLINE void push_object(object_t *);
+INLINE void push_number(LPC_INT);
+INLINE void push_real(LPC_FLOAT);
+INLINE void push_undefined(void);
+INLINE void copy_and_push_string(const char *);
+INLINE void share_and_push_string(const char *);
+INLINE void push_array(array_t *);
+INLINE void push_refed_array(array_t *);
 #ifndef NO_BUFFER_TYPE
-INLINE void push_buffer (buffer_t *);
-INLINE void push_refed_buffer (buffer_t *);
+INLINE void push_buffer(buffer_t *);
+INLINE void push_refed_buffer(buffer_t *);
 #endif
-INLINE void push_mapping (mapping_t *);
-INLINE void push_refed_mapping (mapping_t *);
-INLINE void push_class (array_t *);
-INLINE void push_refed_class (array_t *);
-INLINE void push_malloced_string (const char *);
-INLINE void push_shared_string (const char *);
-INLINE void push_constant_string (const char *);
-INLINE void pop_stack (void);
-INLINE void pop_n_elems (int);
-INLINE void pop_2_elems (void);
-INLINE void pop_3_elems (void);
-INLINE function_t *setup_inherited_frame (int);
-INLINE program_t *find_function_by_name (object_t *, const char *, int *, int *);
-char *function_name (program_t *, int);
-void remove_object_from_stack (object_t *);
-void setup_fake_frame (funptr_t *);
-void remove_fake_frame (void);
-void push_indexed_lvalue (int);
-void setup_variables (int, int, int);
+INLINE void push_mapping(mapping_t *);
+INLINE void push_refed_mapping(mapping_t *);
+INLINE void push_class(array_t *);
+INLINE void push_refed_class(array_t *);
+INLINE void push_malloced_string(const char *);
+INLINE void push_shared_string(const char *);
+INLINE void push_constant_string(const char *);
+INLINE void pop_stack(void);
+INLINE void pop_n_elems(int);
+INLINE void pop_2_elems(void);
+INLINE void pop_3_elems(void);
+INLINE function_t *setup_inherited_frame(int);
+INLINE program_t *find_function_by_name(object_t *, const char *, int *, int *);
+char *function_name(program_t *, int);
+void remove_object_from_stack(object_t *);
+void setup_fake_frame(funptr_t *);
+void remove_fake_frame(void);
+void push_indexed_lvalue(int);
+void setup_variables(int, int, int);
 
-void process_efun_callback (int, function_to_call_t *, int);
-svalue_t *call_efun_callback (function_to_call_t *, int);
-svalue_t *safe_call_efun_callback (function_to_call_t *, int);
-const char *type_name (int c);
-void bad_arg (int, int);
-void bad_argument (svalue_t *, int, int, int);
-void check_for_destr (array_t *);
-int is_static (const char *, object_t *);
-int apply_low (const char *, object_t *, int);
-svalue_t *apply (const char *, object_t *, int, int);
-svalue_t *call_function_pointer (funptr_t *, int);
-svalue_t *safe_call_function_pointer (funptr_t *, int);
-svalue_t *safe_apply (const char *, object_t *, int, int);
-void call___INIT (object_t *);
-array_t *call_all_other (array_t *, const char *, int);
-const char *function_exists (const char *, object_t *, int);
-void call_function (program_t *, int);
-void mark_apply_low_cache (void);
-void translate_absolute_line (int, unsigned short *, int *, int *);
-char *add_slash (const char * const);
-int strpref (const char *, const char *);
-array_t *get_svalue_trace (void);
-void do_trace (const char *, const char *, const char *);
-const char *dump_trace (int);
-void opcdump (const char *);
-int inter_sscanf (svalue_t *, svalue_t *, svalue_t *, int);
-char * get_line_number_if_any (void);
-char *get_line_number (char *, const program_t *);
-void get_line_number_info (const char **, int *);
-void get_version (char *);
-void reset_machine (int);
-void unlink_string_svalue (svalue_t *);
-void copy_lvalue_range (svalue_t *);
-void assign_lvalue_range (svalue_t *);
-void debug_perror (const char *, const char *);
+void process_efun_callback(int, function_to_call_t *, int);
+svalue_t *call_efun_callback(function_to_call_t *, int);
+svalue_t *safe_call_efun_callback(function_to_call_t *, int);
+const char *type_name(int c);
+void bad_arg(int, int);
+void bad_argument(svalue_t *, int, int, int);
+void check_for_destr(array_t *);
+int is_static(const char *, object_t *);
+int apply_low(const char *, object_t *, int);
+svalue_t *apply(const char *, object_t *, int, int);
+svalue_t *call_function_pointer(funptr_t *, int);
+svalue_t *safe_call_function_pointer(funptr_t *, int);
+svalue_t *safe_apply(const char *, object_t *, int, int);
+void call___INIT(object_t *);
+array_t *call_all_other(array_t *, const char *, int);
+const char *function_exists(const char *, object_t *, int);
+void call_function(program_t *, int);
+void mark_apply_low_cache(void);
+void translate_absolute_line(int, unsigned short *, int *, int *);
+char *add_slash(const char *const);
+int strpref(const char *, const char *);
+array_t *get_svalue_trace(void);
+void do_trace(const char *, const char *, const char *);
+const char *dump_trace(int);
+void opcdump(const char *);
+int inter_sscanf(svalue_t *, svalue_t *, svalue_t *, int);
+char *get_line_number_if_any(void);
+char *get_line_number(char *, const program_t *);
+void get_line_number_info(const char **, int *);
+void get_version(char *);
+void reset_machine(int);
+void unlink_string_svalue(svalue_t *);
+void copy_lvalue_range(svalue_t *);
+void assign_lvalue_range(svalue_t *);
+void debug_perror(const char *, const char *);
 
 
 
 #ifndef NO_SHADOWS
-int validate_shadowing (object_t *);
+int validate_shadowing(object_t *);
 #endif
 
 #if !defined(NO_RESETS) && defined(LAZY_RESETS)
-void try_reset (object_t *);
+void try_reset(object_t *);
 #endif
 
-void pop_context (error_context_t *);
-void restore_context (error_context_t *);
-int save_context (error_context_t *);
+void pop_context(error_context_t *);
+void restore_context(error_context_t *);
+int save_context(error_context_t *);
 
-void pop_control_stack (void);
-INLINE function_t *setup_new_frame (int);
-INLINE void push_control_stack (int);
+void pop_control_stack(void);
+INLINE function_t *setup_new_frame(int);
+INLINE void push_control_stack(int);
 
-void break_point (void);
+void break_point(void);
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-void mark_svalue (svalue_t *);
-void mark_stack (void);
+void mark_svalue(svalue_t *);
+void mark_stack(void);
 #endif
 
-inline const char* origin_to_name(const int origin) {
-  switch(origin) {
+inline const char *origin_to_name(const int origin)
+{
+  switch (origin) {
     case ORIGIN_DRIVER:
       return "driver";
     case ORIGIN_LOCAL:
@@ -410,7 +411,8 @@ inline const char* origin_to_name(const int origin) {
   }
 }
 
-inline const char* access_to_name(int mode) {
+inline const char *access_to_name(int mode)
+{
   switch (mode) {
     case DECL_HIDDEN:
       return "hidden";

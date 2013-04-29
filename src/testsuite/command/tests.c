@@ -5,8 +5,9 @@ int main(string fun);
 void recurse(string dir) {
   mixed leaks;
 
-  foreach (string file in get_dir(dir + "*.c"))
+  foreach (string file in sort_array(get_dir(dir + "*.c"), (: random(2) - random(2) :))) {
     main(dir + file);
+  }
   foreach (string subdir in map(filter(get_dir(dir + "*", -1),
           (: $1[1] == -2 :)),
         (: $1[0] :)) - ({ ".", ".." }))

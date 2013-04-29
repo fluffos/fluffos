@@ -5,18 +5,6 @@
 #ifndef _OPTIONS_H_
 #define _OPTIONS_H_
 
-/*
- * YOU PROBABLY DO NOT WANT TO MODIFY THIS FILE.
- *
- * Do 'cp options.h local_options' and edit that instead.  local_options,
- * if it exists, overrides this file.
- *
- * The advantage is that when you upgrade to a newer MudOS driver, you can
- * simply copy your local_options file into the src directory.  The build
- * process will warn you if new options have been added that you should
- * choose settings for.
- */
-
 /****************************************************************************
  * EVERY time you change ANYTHING in this file, RECOMPILE from scratch.     *
  * (type "make clean" then "make" on a UNIX system) Failure to do so may    *
@@ -392,11 +380,11 @@
  *                      calls to functions in this object by objects that
  *                      inherit it.
  * PRAGMA_OPTIMIZE:     make a second pass over the generated code to
- *                      optimize it further.  Currently maybe broken.
+ *                      optimize it further.
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
  *                      compilation error occured.
  */
-#define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT
+#define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
 
 /* supress warnings about unused arguments; only warn about unused local
  * variables.  Makes older code (where argument names were required) compile

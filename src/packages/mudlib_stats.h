@@ -11,49 +11,49 @@
 #define MUDLIB_STATS_H
 
 typedef struct _mstats {
-    /* the name of the stat group */
-    const char *name;
-    int length;
-    /* the next data element in the linked list */
-    struct _mstats *next;
-    /* statistics */
-    int moves;
-    int heart_beats;
-    int size_array;
-    int errors;
-    int objects;
+  /* the name of the stat group */
+  const char *name;
+  int length;
+  /* the next data element in the linked list */
+  struct _mstats *next;
+  /* statistics */
+  int moves;
+  int heart_beats;
+  int size_array;
+  int errors;
+  int objects;
 }       mudlib_stats_t;
 
 
 typedef struct _statgroup {
-    mudlib_stats_t *domain;
-    mudlib_stats_t *author;
+  mudlib_stats_t *domain;
+  mudlib_stats_t *author;
 }          statgroup_t;
 
 #define DOMAIN_STATS_FILE_NAME "domain_stats"
 #define AUTHOR_STATS_FILE_NAME "author_stats"
 
-void assign_stats (statgroup_t *, struct object_s *);
-void null_stats (statgroup_t *);
-void init_stats_for_object (struct object_s *);
+void assign_stats(statgroup_t *, struct object_s *);
+void null_stats(statgroup_t *);
+void init_stats_for_object(struct object_s *);
 
-void add_moves (statgroup_t *, int);
-INLINE void add_heart_beats (statgroup_t *, int);
-void add_array_size (statgroup_t *, int);
-void add_errors (statgroup_t *, int);
-void add_errors_for_file (const char *, int);
-void add_objects (statgroup_t *, int);
-struct mapping_s *get_domain_stats (const char *);
-struct mapping_s *get_author_stats (const char *);
-void mudlib_stats_decay (void);
-void save_stat_files (void);
-void restore_stat_files (void);
-void set_author (const char *);
-mudlib_stats_t *set_master_author (const char *);
-mudlib_stats_t *set_backbone_domain (const char *);
-int check_valid_stat_entry (mudlib_stats_t *);
+void add_moves(statgroup_t *, int);
+INLINE void add_heart_beats(statgroup_t *, int);
+void add_array_size(statgroup_t *, int);
+void add_errors(statgroup_t *, int);
+void add_errors_for_file(const char *, int);
+void add_objects(statgroup_t *, int);
+struct mapping_s *get_domain_stats(const char *);
+struct mapping_s *get_author_stats(const char *);
+void mudlib_stats_decay(void);
+void save_stat_files(void);
+void restore_stat_files(void);
+void set_author(const char *);
+mudlib_stats_t *set_master_author(const char *);
+mudlib_stats_t *set_backbone_domain(const char *);
+int check_valid_stat_entry(mudlib_stats_t *);
 #ifdef DEBUGMALLOC_EXTENSIONS
-void mark_mudlib_stats (void);
+void mark_mudlib_stats(void);
 #endif
 
 #endif

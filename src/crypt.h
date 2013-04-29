@@ -1,7 +1,7 @@
 #ifndef CRYPT_H
 #define CRYPT_H
 
-/* Number of bytes in salt (raw, fully used, not printable-encoded bytes). 
+/* Number of bytes in salt (raw, fully used, not printable-encoded bytes).
  * This is configurable, but don't set it too high (up to say 10). But 4
  * is plenty really, 2^32 salts possible (the DES-style crypt used only 4096).
  */
@@ -10,7 +10,7 @@
 /* Magic string, used in hashing. Configurable. */
 #define MD5_MAGIC "xyzz"
 
-/* Maximum length (in bytes) of digested data. 
+/* Maximum length (in bytes) of digested data.
  * This is /not/ configurable! Don't change it.
  */
 #define MD5_MAXLEN  55
@@ -28,10 +28,10 @@ typedef unsigned char BytE;
 
 char *custom_crypt(const char *key, const char *salt, unsigned char *rawout);
 
-int MD5Digest ( BytE *, unsigned long buflen, BytE *);
-int encode ( unsigned char *, BytE *, int );
-void decode ( unsigned char *, BytE *, int );
-void getsalt (BytE *, BytE * );
-void crunchbuffer (BytE *buf, SIGNED int *, char *, SIGNED int, int );
+int MD5Digest(BytE *, unsigned long buflen, BytE *);
+int encode(unsigned char *, BytE *, int);
+void decode(unsigned char *, BytE *, int);
+void getsalt(BytE *, BytE *);
+void crunchbuffer(BytE *buf, SIGNED int *, char *, SIGNED int, int);
 
 #endif

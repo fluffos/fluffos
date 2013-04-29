@@ -78,7 +78,7 @@
 
 // This one hopefully holds a screen's data for the 'z' command.
 // Even if bytes per line is actually 80, this is still 50-ish lines.
-#define BUFFER_SIZE     4096    
+#define BUFFER_SIZE     4096
 
 #define LGLOB           2       /* line marked global */
 
@@ -87,57 +87,57 @@
 #define MAXFNAME        256     /* max file name size */
 
 typedef struct ed_line_s {
-    int l_stat;                 /* empty, mark */
-    struct ed_line_s *l_prev;
-    struct ed_line_s *l_next;
-    char l_buff[1];
+  int l_stat;                 /* empty, mark */
+  struct ed_line_s *l_prev;
+  struct ed_line_s *l_next;
+  char l_buff[1];
 } ed_line_t;
 
 struct strlst {
-    char *screen;
-    struct strlst *next;
+  char *screen;
+  struct strlst *next;
 };
 
 typedef struct ed_buffer_s {
-    int nonascii;               /* count of non-ascii chars read */
-    int nullchar;               /* count of null chars read */
-    int truncated;              /* count of lines truncated */
-    char fname[MAXFNAME];
-    int fchanged;               /* file-changed? flag */
-    int nofname;
-    int mark['z' - 'a' + 1];
-    regexp *oldpat;
+  int nonascii;               /* count of non-ascii chars read */
+  int nullchar;               /* count of null chars read */
+  int truncated;              /* count of lines truncated */
+  char fname[MAXFNAME];
+  int fchanged;               /* file-changed? flag */
+  int nofname;
+  int mark['z' - 'a' + 1];
+  regexp *oldpat;
 
-    ed_line_t Line0;
-    int CurLn;
-    ed_line_t *CurPtr;          /* CurLn and CurPtr must be kept in step */
-    int LastLn;
-    int Line1, Line2, nlines;
-    int flags;
-    int appending;
-    int moring;                 /* used for the wait line of help */
-    struct strlst *helpout;	/* help output linked list */
+  ed_line_t Line0;
+  int CurLn;
+  ed_line_t *CurPtr;          /* CurLn and CurPtr must be kept in step */
+  int LastLn;
+  int Line1, Line2, nlines;
+  int flags;
+  int appending;
+  int moring;                 /* used for the wait line of help */
+  struct strlst *helpout; /* help output linked list */
 #ifdef OLD_ED
-    char *exit_fn;              /* Function to be called when user exits */
-    char *write_fn;             /* Function to be called when user writes */
-    object_t *exit_ob;  /* in this object */
+  char *exit_fn;              /* Function to be called when user exits */
+  char *write_fn;             /* Function to be called when user writes */
+  object_t *exit_ob;  /* in this object */
 #else
-    object_t *owner;
-    struct ed_buffer_s *next_ed_buf;
+  object_t *owner;
+  struct ed_buffer_s *next_ed_buf;
 #endif
-    int shiftwidth;
-    int leading_blanks;
-    int cur_autoindent;
-    int scroll_lines;
-    int restricted;             /* restricted access ed */
+  int shiftwidth;
+  int leading_blanks;
+  int cur_autoindent;
+  int scroll_lines;
+  int restricted;             /* restricted access ed */
 } ed_buffer_t;
 
 /*
  * ed.c
  */
-void ed_start (const char *, const char *, const char *, int, object_t *, int);
-void ed_cmd (char *);
-void save_ed_buffer (object_t *);
+void ed_start(const char *, const char *, const char *, int, object_t *, int);
+void ed_cmd(char *);
+void save_ed_buffer(object_t *);
 
 #ifdef OLD_ED
 #define ED_OUTPUT(x, y) add_message(x, y, strlen(y))
@@ -150,12 +150,12 @@ void save_ed_buffer (object_t *);
 #endif
 
 #ifndef OLD_ED
-char *object_ed_cmd (object_t *, const char *);
-char *object_ed_start (object_t *, const char *, int, int);
-int object_ed_mode (object_t *);
-void object_save_ed_buffer (object_t *);
-ed_buffer_t *find_ed_buffer (object_t *);
-void object_ed_output (char *);
+char *object_ed_cmd(object_t *, const char *);
+char *object_ed_start(object_t *, const char *, int, int);
+int object_ed_mode(object_t *);
+void object_save_ed_buffer(object_t *);
+ed_buffer_t *find_ed_buffer(object_t *);
+void object_ed_output(char *);
 void object_ed_outputv(char *, ...);
 
 extern outbuffer_t current_ed_results;

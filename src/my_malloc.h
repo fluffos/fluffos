@@ -5,7 +5,7 @@
  * to use sysmalloc or malloc replacements
  */
 #if defined(SYSMALLOC) || \
-    (defined(SMALLOC) && defined(SBRK_OK)) 
+    (defined(SMALLOC) && defined(SBRK_OK))
 #define MALLOC(x)       malloc(x)
 #define FREE(x)         free(x)
 #define REALLOC(x,y)    realloc(x,y)
@@ -13,7 +13,7 @@
 
 #endif
 
-#ifdef MMALLOC 
+#ifdef MMALLOC
 #define MALLOC(x)       mmalloc(x)
 #define FREE(x)         mfree(x)
 #define REALLOC(x,y)    mrealloc(x,y)
@@ -63,7 +63,7 @@ void *malloc32(int size);
 #ifdef GCMALLOC
 #define MALLOC_NEED_INIT 1
 #define MALLOC(x)       GC_MALLOC((x))
-#define FREE(x)        
+#define FREE(x)
 #define REALLOC(x,y)    GC_REALLOC((x),(y))
 #define CALLOC(x,y)     GC_MALLOC(((x)*(y)))
 #ifndef _FUNC_SPEC_

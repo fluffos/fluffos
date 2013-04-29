@@ -80,8 +80,8 @@
 #define __OBJECT_HASH_TABLE_SIZE__        CFG_INT(20)
 #define __LIVING_HASH_TABLE_SIZE__        CFG_INT(21)
 
-#define __FD6_PORT__		    CFG_INT(22)
-#define __FD6_KIND__		    CFG_INT(23)
+#define __FD6_PORT__            CFG_INT(22)
+#define __FD6_KIND__            CFG_INT(23)
 
 #define RUNTIME_CONFIG_NEXT CFG_INT(24)
 
@@ -92,4 +92,4 @@
 #define NUM_CONFIG_STRS (BASE_CONFIG_INT - BASE_CONFIG_STR)
 #define NUM_CONFIG_INTS (RUNTIME_CONFIG_NEXT - BASE_CONFIG_INT)
 
-#endif				/* RUNTIME_CONFIG_H */
+#endif              /* RUNTIME_CONFIG_H */

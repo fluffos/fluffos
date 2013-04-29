@@ -14,14 +14,14 @@
  */
 
 #define SCRATCHPAD_SIZE  4096
-#define SDEBUG(x) 
-#define SDEBUG2(x) 
+#define SDEBUG(x)
+#define SDEBUG2(x)
 
 #define SCRATCH_MAGIC ((unsigned char)0xbb)
 
 typedef struct sp_block_s {
-    struct sp_block_s *next, *prev;
-    char block[2]; /* block[0] must be nonzero, usually SCRATCH_MAGIC */
+  struct sp_block_s *next, *prev;
+  char block[2]; /* block[0] must be nonzero, usually SCRATCH_MAGIC */
 } sp_block_t;
 
 #define scratch_free_last() \
@@ -40,15 +40,15 @@ extern unsigned char *scratch_end;
 /*
  *  scratchpad.c
  */
-void scratch_destroy (void);
-char *scratch_copy (const char *);
-char *scratch_alloc (int);
-void scratch_free (char *);
-char *scratch_join (char *, char *);
-char *scratch_join2 (char *, char *);
-char *scratch_realloc (char *, int);
-char *scratch_copy_string (char *);
-char *scratch_large_alloc (int);
+void scratch_destroy(void);
+char *scratch_copy(const char *);
+char *scratch_alloc(int);
+void scratch_free(char *);
+char *scratch_join(char *, char *);
+char *scratch_join2(char *, char *);
+char *scratch_realloc(char *, int);
+char *scratch_copy_string(char *);
+char *scratch_large_alloc(int);
 
 #endif
 
