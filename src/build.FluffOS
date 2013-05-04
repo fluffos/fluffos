@@ -25,11 +25,11 @@ fi
 if [ "`uname -s`" = "Darwin" ]; then # OSX gcc is very outdated.
   CC=clang
 else
-  CC=${CC:-"gcc"}
+  CC=${CC:-"g++"}
 fi
 
 # TODO: remove need for _GNU_SOURCE
-CFLAGS="--std=c99 -D_GNU_SOURCE -fno-omit-frame-pointer"
+CFLAGS="--std=c++0x -D_GNU_SOURCE -fno-omit-frame-pointer"
 
 # By default driver compile to native environment, you can
 # add "-m64" to force compile under 64bit, "-m32" for 32bit.
@@ -51,7 +51,7 @@ DRIVER_BIN=driver
 # Set INSTALL_DIR to the directory where you want to install the executables.
 INSTALL_DIR="../bin"
 
-#Enable warnings from the compiler (gcc), if wanted.
+#Enable warnings from the compiler (g++), if wanted.
 #WARN=-Wall
 
 # Location of libmsgql.a, if you are using PACKAGE_DB

@@ -2436,7 +2436,7 @@ eval_instruction(char *p)
                 break;
               case T_STRING: {
                 char buff[100];
-                sprintf(buff, "%"LPC_INT_FMTSTR_P, (sp + 1)->u.number);
+                sprintf(buff, "%" LPC_INT_FMTSTR_P, (sp + 1)->u.number);
                 EXTEND_SVALUE_STRING(sp, buff, "f_add: 2");
                 break;
               }
@@ -2457,7 +2457,7 @@ eval_instruction(char *p)
                 break;
               case T_STRING: {
                 char buff[400];
-                sprintf(buff, "%"LPC_FLOAT_FMTSTR_P, (sp + 1)->u.real);
+                sprintf(buff, "%" LPC_FLOAT_FMTSTR_P, (sp + 1)->u.real);
                 EXTEND_SVALUE_STRING(sp, buff, "f_add: 2");
                 break;
               }
@@ -2503,13 +2503,13 @@ eval_instruction(char *p)
               }
               case T_NUMBER: {
                 char buff[100];
-                sprintf(buff, "%"LPC_INT_FMTSTR_P, (sp - 1)->u.number);
+                sprintf(buff, "%" LPC_INT_FMTSTR_P, (sp - 1)->u.number);
                 SVALUE_STRING_ADD_LEFT(buff, "f_add: 3");
                 break;
               } /* end of T_NUMBER + T_STRING */
               case T_REAL: {
                 char buff[400];
-                sprintf(buff, "%"LPC_FLOAT_FMTSTR_P, (sp - 1)->u.real);
+                sprintf(buff, "%" LPC_FLOAT_FMTSTR_P, (sp - 1)->u.real);
                 SVALUE_STRING_ADD_LEFT(buff, "f_add: 3");
                 break;
               } /* end of T_REAL + T_STRING */
@@ -2556,11 +2556,11 @@ eval_instruction(char *p)
               SVALUE_STRING_JOIN(lval, sp, "f_add_eq: 1");
             } else if (sp->type == T_NUMBER) {
               char buff[100];
-              sprintf(buff, "%"LPC_INT_FMTSTR_P, sp->u.number);
+              sprintf(buff, "%" LPC_INT_FMTSTR_P, sp->u.number);
               EXTEND_SVALUE_STRING(lval, buff, "f_add_eq: 2");
             } else if (sp->type == T_REAL) {
               char buff[400];
-              sprintf(buff, "%"LPC_FLOAT_FMTSTR_P, sp->u.real);
+              sprintf(buff, "%" LPC_FLOAT_FMTSTR_P, sp->u.real);
               EXTEND_SVALUE_STRING(lval, buff, "f_add_eq: 2");
             } else if (sp->type == T_OBJECT) {
               const char *fname = sp->u.ob->obname;
@@ -3878,7 +3878,10 @@ do_catch(char *pc, unsigned short new_pc_offset)
   csp->num_local_variables = (csp - 1)->num_local_variables; /* marion */
 #endif
 
-  if (SETJMP(econ.context)) {
+  try{assign_svalue(&catch_value, &const1);
+  /* note, this will work, since csp->extern_call won't be used */
+  eval_instruction(pc);
+  }catch(const char *){
     /*
      * They did a throw() or error. That means that the control stack
      * must be restored manually here.
@@ -3897,10 +3900,6 @@ do_catch(char *pc, unsigned short new_pc_offset)
       pop_context(&econ);
       error("Can't catch too deep recursion error.\n");
     }
-  } else {
-    assign_svalue(&catch_value, &const1);
-    /* note, this will work, since csp->extern_call won't be used */
-    eval_instruction(pc);
   }
   pop_context(&econ);
 }
@@ -4453,11 +4452,11 @@ safe_apply(const char *fun, object_t *ob, int num_arg, int where)
   if (!save_context(&econ)) {
     return 0;
   }
-  if (!SETJMP(econ.context)) {
+  try{
     if (!(ob->flags & O_DESTRUCTED)) {
       ret = apply(fun, ob, num_arg, where);
     } else { ret = 0; }
-  } else {
+  } catch(const char *) {
     restore_context(&econ);
     pop_n_elems(num_arg); /* saved state had args on stack already */
     ret = 0;
@@ -4799,17 +4798,9 @@ const char *dump_trace(int how)
    * won't make the object_name() apply and save_context() might fail
    * here (too deep recursion)
    */
-  if (!too_deep_error) {
-    if (!save_context(&econ)) {
-      return 0;
-    }
-    context_saved = 1;
-    if (SETJMP(econ.context)) {
-      restore_context(&econ);
-      pop_context(&econ);
-      return 0;
-    }
-  }
+  if (!save_context(&econ))
+    return 0;
+  try{
 #endif
 
 #ifdef TRACE_CODE
@@ -4984,9 +4975,11 @@ const char *dump_trace(int how)
 #endif
   debug_message("--- end trace ---\n");
 #if defined(ARGUMENTS_IN_TRACEBACK) || defined(LOCALS_IN_TRACEBACK)
-  if (context_saved) {
-    pop_context(&econ);
+}catch(const char *){
+    restore_context(&econ);
+    ret = 0;
   }
+  pop_context(&econ);
 #endif
   return ret;
 }

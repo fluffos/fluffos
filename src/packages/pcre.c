@@ -315,14 +315,7 @@ void f_pcre_replace_callback(void)
     pcre_free_memory(run);
     error("context stack full!\n");
   }
-  if (SETJMP(econ.context)) {
-    restore_context(&econ);
-    /* condition was restored to where it was when we came in */
-    pcre_free_memory(run);
-    pop_context(&econ);
-    error("error in callback!\n");
-  }
-
+  try{
   for (i = 0; i < run->rc - 1; i++) {
     svalue_t *v;
     push_svalue(arr->item + i);
@@ -338,6 +331,13 @@ void f_pcre_replace_callback(void)
       assign_svalue_no_free(&r->item[i], &arr->item[i]);
     }
   }
+	}catch(const char *){
+		restore_context(&econ);
+		/* condition was restored to where it was when we came in */
+		pcre_free_memory(run);
+		pop_context(&econ);
+		error("error in callback!\n");
+	}
   pop_context(&econ);
   ret = pcre_get_replace(run, r);
 

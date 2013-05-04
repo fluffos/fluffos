@@ -66,7 +66,7 @@ void init_posix_timers(void)
   it.it_interval.tv_nsec = (interv - (double)it.it_interval.tv_sec) * 1000000000;
   it.it_value.tv_sec = 0;
   it.it_value.tv_nsec = 1;
-  sev.sigev_value.sival_ptr = call_heart_beat;
+    sev.sigev_value.sival_ptr = (void *)call_heart_beat;
   i = timer_create(CLOCK_MONOTONIC, &sev, &hb_timer_id);
   if (i < 0) {
     perror("init_posix_timers: timer_create");
