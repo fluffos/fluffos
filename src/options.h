@@ -953,9 +953,6 @@
  */
 #define SANE_SORTING
 
-/* RANDOM_HB: Add randomly objects in HB list. */
-#define RANDOM_HB
-
 /* PACKAGE_RL: Trim efuns
  */
 #define PACKAGE_TRIM
