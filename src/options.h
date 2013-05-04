@@ -953,4 +953,8 @@
  */
 #define SANE_SORTING
 
+/* PACKAGE_RL: Trim efuns
+ */
+#define PACKAGE_TRIM
+
 #endif /* _OPTIONS_H */
