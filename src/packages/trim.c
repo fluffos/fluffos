@@ -35,7 +35,8 @@ char *ltrim(const char *str){
   ptr_end   = ptr_start + strlen(ptr_start) - 1;
 
   // Search initial text skipping leading whitespaces.
-  while(isspace(*ptr_start))
+  // I don't use "isspace" because i don't want that remove \n, \t, etc.
+  while(*ptr_start == ' ' && ptr_start <= ptr_end)
     ptr_start++;
 
   // There aren't any text.
@@ -72,11 +73,11 @@ char *rtrim(const char *str){
   ptr_end   = str + strlen(str) - 1;
 
   // Search final text skipping trailing whitespaces.
-  while(isspace(*ptr_end) && ptr_end > str)
+  while(ptr_end >= str && isspace(*ptr_end))
     ptr_end--;
 
   // There aren't any text.
-  if(ptr_end == str){
+  if(ptr_end < str){
     ret = new_string(1, "trim:empty");
     ret[0] = '\0';
     return ret;
@@ -110,7 +111,7 @@ f_trim(void)
   str = ltrim(rtrim(sp->u.string));
 
   // Update string.
-  put_malloced_string(str);
+  put_constant_string(str);
 }
 #endif
 
@@ -134,7 +135,7 @@ f_ltrim(void)
   str = ltrim(sp->u.string);
 
   // Update string.
-  put_malloced_string(str);
+  put_constant_string(str);
 }
 #endif
 
@@ -158,6 +159,6 @@ f_rtrim(void)
   str = rtrim(sp->u.string);
 
   // Update string.
-  put_malloced_string(str);
+  put_constant_string(str);
 }
 #endif
