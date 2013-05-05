@@ -119,8 +119,9 @@ void backend()
 #endif
   clear_state();
   save_context(&econ);
-  while(1)
-    try{
+  if (SETJMP(econ.context)) {
+    restore_context(&econ);
+  }
   clear_state();
   if (!t_flag && first_call) {
     first_call = 0;
@@ -181,9 +182,6 @@ void backend()
     check_reqs();
 #endif
   }
-		}catch(const char *){
-			restore_context(&econ);
-		}
 }       /* backend() */
 
 
@@ -242,8 +240,9 @@ static void look_for_objects_to_swap()
   next_ob = obj_list;
   last_good_ob = obj_list;
   save_context(&econ);
-  while(1)
-    try{
+  if (SETJMP(econ.context)) {
+    restore_context(&econ);
+  }
 
   while ((ob = (object_t *)next_ob)) {
     int ready_for_clean_up = 0;
@@ -325,11 +324,6 @@ static void look_for_objects_to_swap()
     }
     last_good_ob = ob;
   }
-	break;
-		}catch(const char *){
-			restore_context(&econ);
-
-		}
   pop_context(&econ);
 }       /* look_for_objects_to_swap() */
 
@@ -401,7 +395,10 @@ void call_heart_beat()
           add_heart_beats(&ob->stats, 1);
 #endif
           set_eval(max_cost);
-					try{
+
+          if (SETJMP(econ.context)) {
+            restore_context(&econ);
+          } else {
             save_command_giver(new_command_giver);
             if (ob->interactive) { //note, NOT same as new_command_giver
               current_interactive = ob;
@@ -411,8 +408,6 @@ void call_heart_beat()
             current_interactive = 0;
             pop_stack(); /* pop the return value */
             restore_command_giver();
-					} catch(const char *){
-							restore_context(&econ);
           }
 
           current_object = 0;
@@ -560,15 +555,13 @@ void preload_objects(int eflag)
   error_context_t econ;
 
   save_context(&econ);
-	try{
-		push_number(eflag);
-		ret = apply_master_ob(APPLY_EPILOG, 1);
-	}catch(const char *){
+  if (SETJMP(econ.context)) {
     restore_context(&econ);
     pop_context(&econ);
     return;
   }
-
+  push_number(eflag);
+  ret = apply_master_ob(APPLY_EPILOG, 1);
   pop_context(&econ);
   if ((ret == 0) || (ret == (svalue_t *) - 1) || (ret->type != T_ARRAY)) {
     return;
@@ -584,8 +577,10 @@ void preload_objects(int eflag)
   ix = 0;
   /* in case of an error, effectively do a 'continue' */
   save_context(&econ);
-  while(1)
-    try{
+  if (SETJMP(econ.context)) {
+    restore_context(&econ);
+    ix++;
+  }
   for (; ix < prefiles->size; ix++) {
     if (prefiles->item[ix].type != T_STRING) {
       continue;
@@ -597,11 +592,6 @@ void preload_objects(int eflag)
     (void) apply_master_ob(APPLY_PRELOAD, 1);
   }
   free_array((array_t *)prefiles);
-	break;
-		}catch(const char *){
-			restore_context(&econ);
-			ix++;
-		}
   pop_context(&econ);
 }       /* preload_objects() */
 

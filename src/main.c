@@ -15,7 +15,6 @@
 #include "master.h"
 #include "eval.h"
 #include "posix_timers.h"
-#include <execinfo.h>
 
 port_def_t external_port[5];
 
@@ -331,14 +330,13 @@ int main(int argc, char **argv)
 #endif        /* NO_IP_DEMON */
 
   save_context(&econ);
-
-	try {
+  if (SETJMP(econ.context)) {
+    debug_message("The simul_efun (%s) and master (%s) objects must be loadable.\n",
+                  SIMUL_EFUN, MASTER_FILE);
+    exit(-1);
+  } else {
     init_simul_efun(SIMUL_EFUN);
     init_master();
-	}catch(const char *){
-		debug_message("The simul_efun (%s) and master (%s) objects must be loadable.\n",
-						SIMUL_EFUN, MASTER_FILE);
-		exit(-1);
   }
   set_eval(max_cost);
   pop_context(&econ);
@@ -360,17 +358,16 @@ int main(int argc, char **argv)
         case 'f':
           debug_message("Calling master::flag(\"%s\")...\n", argv[i] + 2);
           save_context(&econ);
-				try{
+          if (SETJMP(econ.context)) {
+            debug_message("Error while calling master::flag(\"%s\"), aborting ...\n", argv[i] + 2);
+            exit(-1);
+          }
           push_constant_string(argv[i] + 2);
           apply_master_ob(APPLY_FLAG, 1);
           if (MudOS_is_being_shut_down) {
             debug_message("Shutdown by master object.\n");
             exit(0);
           }
-				}catch(const char *){
-					debug_message("Error while calling master::flag(\"%s\"), aborting ...\n", argv[i] + 2);
-					exit(-1);
-				}
           pop_context(&econ);
           continue;
         case 'e':

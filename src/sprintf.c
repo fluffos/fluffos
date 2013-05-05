@@ -327,10 +327,10 @@ void svalue_to_string(svalue_t *obj, outbuffer_t *outbuf, int indent, int traili
       }
       break;
     case T_NUMBER:
-      outbuf_addv(outbuf, "%" LPC_INT_FMTSTR_P, obj->u.number);
+      outbuf_addv(outbuf, "%"LPC_INT_FMTSTR_P, obj->u.number);
       break;
     case T_REAL:
-      outbuf_addv(outbuf, "%" LPC_FLOAT_FMTSTR_P, obj->u.real);
+      outbuf_addv(outbuf, "%"LPC_FLOAT_FMTSTR_P, obj->u.real);
       break;
     case T_STRING:
       outbuf_add(outbuf, "\"");

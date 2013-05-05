@@ -2238,16 +2238,16 @@ void add_predefines()
   sprintf(save_buf, "%lu", sizeof(LPC_INT));
   add_predefine("SIZEOFINT", -1, save_buf);
 
-  sprintf(save_buf, "%" LPC_INT_FMTSTR_P, LPC_INT_MAX);
+  sprintf(save_buf, "%"LPC_INT_FMTSTR_P, LPC_INT_MAX);
   add_predefine("MAX_INT", -1, save_buf);
 
-  sprintf(save_buf, "%" LPC_INT_FMTSTR_P, LPC_INT_MIN);
+  sprintf(save_buf, "%"LPC_INT_FMTSTR_P, LPC_INT_MIN);
   add_predefine("MIN_INT", -1, save_buf);
 
-  sprintf(save_buf, "%" LPC_FLOAT_FMTSTR_P, LPC_FLOAT_MAX);
+  sprintf(save_buf, "%"LPC_FLOAT_FMTSTR_P, LPC_FLOAT_MAX);
   add_predefine("MAX_FLOAT", -1, save_buf);
 
-  sprintf(save_buf, "%" LPC_FLOAT_FMTSTR_P, LPC_FLOAT_MIN);
+  sprintf(save_buf, "%"LPC_FLOAT_FMTSTR_P, LPC_FLOAT_MIN);
   add_predefine("MIN_FLOAT", -1, save_buf);
 }
 

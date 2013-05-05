@@ -1191,11 +1191,11 @@ void tell_room(object_t *room, svalue_t *v, array_t *avoid)
       break;
     case T_NUMBER:
       buff = txt_buf;
-      sprintf(txt_buf, "%" LPC_INT_FMTSTR_P, v->u.number);
+      sprintf(txt_buf, "%"LPC_INT_FMTSTR_P, v->u.number);
       break;
     case T_REAL:
       buff = txt_buf;
-      sprintf(txt_buf, "%" LPC_FLOAT_FMTSTR_P, v->u.real);
+      sprintf(txt_buf, "%"LPC_FLOAT_FMTSTR_P, v->u.real);
       break;
     default:
       bad_argument(v, T_OBJECT | T_NUMBER | T_REAL | T_STRING,
@@ -1379,11 +1379,11 @@ void print_svalue(svalue_t *arg)
         tell_object(command_giver, tbuf, strlen(tbuf));
         break;
       case T_NUMBER:
-        sprintf(tbuf, "%" LPC_INT_FMTSTR_P, arg->u.number);
+        sprintf(tbuf, "%"LPC_INT_FMTSTR_P, arg->u.number);
         tell_object(command_giver, tbuf, strlen(tbuf));
         break;
       case T_REAL:
-        sprintf(tbuf, "%" LPC_FLOAT_FMTSTR_P, arg->u.real);
+        sprintf(tbuf, "%"LPC_FLOAT_FMTSTR_P, arg->u.real);
         tell_object(command_giver, tbuf, strlen(tbuf));
         break;
       case T_ARRAY:
@@ -1703,7 +1703,7 @@ static int num_mudlib_error = 0;
 void throw_error()
 {
   if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) {
-        throw("throw error");
+    LONGJMP(current_error_context->context, 1);
     fatal("Throw_error failed!");
   }
   error("Throw with no catch.\n");
@@ -1834,7 +1834,7 @@ void error_handler(char *err)
     catch_value.type = T_STRING;
     catch_value.subtype = STRING_MALLOC;
     catch_value.u.string = string_copy(err, "caught error");
-    throw("error handler");
+    LONGJMP(current_error_context->context, 1);
     fatal("Catch() longjump failed");
   }
 
@@ -1843,7 +1843,7 @@ void error_handler(char *err)
     debug_message("Error '%s' while trying to print error trace -- trace suppressed.\n", err);
     too_deep_error = max_eval_error = 0;
     if (current_error_context) {
-      throw("error handler error");
+      LONGJMP(current_error_context->context, 1);
     }
     fatal("LONGJMP failed or no error context for error.\n");
   }
@@ -1918,8 +1918,9 @@ void error_handler(char *err)
   }
   num_error--;
   too_deep_error = max_eval_error = 0;
-  if (current_error_context) 
-    throw("error handler error2");
+  if (current_error_context) {
+    LONGJMP(current_error_context->context, 1);
+  }
   fatal("LONGJMP failed or no error context for error.\n");
 }
 

@@ -31,7 +31,7 @@ INLINE_STATIC void doSwap(register char *one, register char *two,
 
 /* qsort adapted from page 87 of K&R 2nd edition */
 
-static void qSort(void *v, int left, int right, int size, int rightmost, int (*compar)(const void *, const void *))
+static void qSort(void *v, int left, int right, int size, int rightmost, int (*compar)(void *, void *))
 {
   int i, last, szleft;
 
@@ -51,7 +51,7 @@ static void qSort(void *v, int left, int right, int size, int rightmost, int (*c
   qSort(v, last + 1, right, size, rightmost, compar);
 }
 
-void old_quickSort(void *a, int nmemb, int size, int (*compar)(const void *, const void *))
+void old_quickSort(void *a, int nmemb, int size, int (*compar)(void *, void *))
 {
   if (nmemb < 2) {
     return;

@@ -244,7 +244,28 @@ void call_out()
         free_call(cop);
         cop = 0;
       } else {
-	try {
+        if (SETJMP(econ.context)) {
+          restore_context(&econ);
+          if (outoftime) {
+#ifdef CALLOUT_LOOP_PROTECTION
+            if (num_max_cost_calls > 0) {
+#endif
+              /* Transfer control to the backend loop so that it can attend to other duties */
+              debug_message("Maximum evaluation cost reached while trying to process call_outs\n");
+              pop_context(&econ);
+              return;
+#ifdef CALLOUT_LOOP_PROTECTION
+            } else if (!warned_about_recursion) {
+              warned_about_recursion = 1;
+              /* A newly added immediate call_out tripped max_cost.  Force all reamining
+               * call_outs to run with the outoftime flag set, which will force them to
+               * throw their errors (this aids in troubleshooting after the fact.)
+               */
+              debug_message("Maximum evaluation cost reached while processing recursive call_outs; breaking possible loop\n");
+            }
+#endif
+          }
+        } else {
           object_t *ob;
 
           ob = cop->ob;
@@ -308,27 +329,6 @@ void call_out()
           }
 
           restore_command_giver();
-	}catch(const char *){
-	  restore_context(&econ);
-          if (outoftime) {
-#ifdef CALLOUT_LOOP_PROTECTION
-            if (num_max_cost_calls > 0) {
-#endif
-              /* Transfer control to the backend loop so that it can attend to other duties */
-              debug_message("Maximum evaluation cost reached while trying to process call_outs\n");
-              pop_context(&econ);
-              return;
-#ifdef CALLOUT_LOOP_PROTECTION
-            } else if (!warned_about_recursion) {
-              warned_about_recursion = 1;
-              /* A newly added immediate call_out tripped max_cost.  Force all reamining
-               * call_outs to run with the outoftime flag set, which will force them to
-               * throw their errors (this aids in troubleshooting after the fact.)
-               */
-              debug_message("Maximum evaluation cost reached while processing recursive call_outs; breaking possible loop\n");
-            }
-#endif
-          }
         }
         free_called_call(cop);
         cop = 0;

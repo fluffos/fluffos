@@ -346,9 +346,9 @@ safe_call_function_pointer(funptr_t *funp, int num_arg)
   if (!save_context(&econ)) {
     return 0;
   }
-  try {
+  if (!SETJMP(econ.context)) {
     ret = call_function_pointer(funp, num_arg);
-  } catch(const char *) {
+  } else {
     restore_context(&econ);
     /* condition was restored to where it was when we came in */
     pop_n_elems(num_arg);
