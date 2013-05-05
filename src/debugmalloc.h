@@ -11,7 +11,7 @@ void dump_malloc_data(outbuffer_t *);
 
 #    ifdef DEBUGMALLOC_EXTENSIONS
 void set_malloc_mask(int);
-char *dump_debugmalloc(char *, int);
+char *dump_debugmalloc(const char *, int);
 #    endif
 #  else
 /* not DEBUGMALLOC */

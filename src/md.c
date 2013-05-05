@@ -93,7 +93,7 @@ void MDinit()
 }
 
 void
-MDmalloc(md_node_t *node, int size, int tag, char *desc)
+MDmalloc(md_node_t *node, int size, int tag, const char *desc)
 {
   unsigned long h;
   static int count = 0;
@@ -216,7 +216,7 @@ MDfree(void *ptr)
 }
 
 #ifdef DEBUGMALLOC_EXTENSIONS
-char *dump_debugmalloc(char *tfn, int mask)
+char *dump_debugmalloc(const char *tfn, int mask)
 {
   int j, total = 0, chunks = 0, total2 = 0;
   const char *fn;
@@ -420,10 +420,10 @@ static void md_print_array(array_t *vec)
         outbuf_add(&out, "INVALID");
         break;
       case T_NUMBER:
-        outbuf_addv(&out, "%"LPC_INT_FMTSTR_P, vec->item[i].u.number);
+        outbuf_addv(&out, "%" LPC_INT_FMTSTR_P, vec->item[i].u.number);
         break;
       case T_REAL:
-        outbuf_addv(&out, "%"LPC_FLOAT_FMTSTR_P, vec->item[i].u.real);
+        outbuf_addv(&out, "%" LPC_FLOAT_FMTSTR_P, vec->item[i].u.real);
         break;
       case T_STRING:
         outbuf_addv(&out, "\"%s\"", vec->item[i].u.string);

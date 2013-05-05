@@ -1122,7 +1122,7 @@ static void handle_process(char *file)
   fprintf(stderr, "Creating '%s' from '%s' ...\n", buf, file);
 
 #ifdef DEBUG
-  /* pass down the DEBUG define from CFLAGS */
+  /* pass down the DEBUG define from CXXFLAGS */
   add_define("DEBUG", -1, " ");
 #endif
 
@@ -1272,7 +1272,7 @@ static int check_include2(const char *tag, const char *file,
           before, file, after);
   fclose(ct);
 
-  sprintf(buf, "%s %s -c comptest.c " TO_DEV_NULL, COMPILER, CFLAGS);
+  sprintf(buf, "%s %s -c comptest.c " TO_DEV_NULL, COMPILER, CXXFLAGS);
   if (!compile(buf)) {
     fprintf(yyout, "#define %s\n", tag);
     /* Make sure the define exists for later checks */
@@ -1294,7 +1294,7 @@ static int check_include(const char *tag, const char *file)
   fprintf(ct, "#include \"configure.h\"\n#include \"std_incl.h\"\n#include \"file_incl.h\"\n#include <%s>\n", file);
   fclose(ct);
 
-  sprintf(buf, "%s %s -c comptest.c " TO_DEV_NULL, COMPILER, CFLAGS);
+  sprintf(buf, "%s %s -c comptest.c " TO_DEV_NULL, COMPILER, CXXFLAGS);
   if (!compile(buf)) {
     fprintf(yyout, "#define %s\n", tag);
     /* Make sure the define exists for later checks */
@@ -1316,7 +1316,7 @@ static int check_library(const char *lib)
   fprintf(ct, "int main() { return 0; }\n");
   fclose(ct);
 
-  sprintf(buf, "%s %s comptest.c %s" TO_DEV_NULL, COMPILER, CFLAGS, lib);
+  sprintf(buf, "%s %s comptest.c %s" TO_DEV_NULL, COMPILER, CXXFLAGS, lib);
   if (!compile(buf)) {
     fprintf(yyout, " %s", lib);
     printf("exists\n");
@@ -1338,7 +1338,7 @@ static int check_ret_type(char *tag, char *pre,
   fprintf(ct, "%s\n\n%s%s();\n", pre, type, func);
   fclose(ct);
 
-  sprintf(buf, "%s %s -c comptest.c >/dev/null 2>&1", COMPILER, CFLAGS);
+  sprintf(buf, "%s %s -c comptest.c >/dev/null 2>&1", COMPILER, CXXFLAGS);
   if (!system(buf)) {
     fprintf(yyout, "#define %s\n", tag);
     printf("returns %s\n", type);
@@ -1359,7 +1359,7 @@ static int check_prog(const char *tag, const char *pre, const char *code, int an
   fprintf(ct, "#include \"configure.h\"\n#include \"std_incl.h\"\n%s\n\nint main() {%s}\n", (pre ? pre : ""), code);
   fclose(ct);
 
-  sprintf(buf, "%s %s comptest.c -o comptest" TO_DEV_NULL, COMPILER, CFLAGS);
+  sprintf(buf, "%s %s comptest.c -o comptest" TO_DEV_NULL, COMPILER, CXXFLAGS);
   if (!compile(buf) && (!andrun || !system("./comptest"))) {
     if (tag) {
       fprintf(yyout, "#define %s\n", tag);
@@ -1381,7 +1381,7 @@ static int check_code(const char *pre, const char *code)
   fprintf(ct, "#include \"configure.h\"\n#include \"std_incl.h\"\n%s\n\nint main() {%s}\n", (pre ? pre : ""), code);
   fclose(ct);
 
-  sprintf(buf, "%s %s comptest.c -o comptest" TO_DEV_NULL, COMPILER, CFLAGS);
+  sprintf(buf, "%s %s comptest.c -o comptest" TO_DEV_NULL, COMPILER, CXXFLAGS);
   if (compile(buf) || (rc = system("./comptest")) == 127 || rc == -1) {
     return -1;
   }
@@ -1474,6 +1474,7 @@ static void handle_configure()
   check_include("INCL_USCLKC_H", "usclkc.h");
   check_include("INCL_LIMITS_H", "limits.h");
   check_include("INCL_INTTYPES_H", "inttypes.h");
+  check_include("INCL_STDINT_H", "stdint.h");
   check_include("INCL_FLOAT_H", "float.h");
   check_include("INCL_LOCALE_H", "locale.h");
   if (!check_prog(0, 0, "int x = USHRT_MAX;", 0)) {

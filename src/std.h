@@ -2,7 +2,8 @@
 #define STD_H
 
 /* This stuff should be included EVERYWHERE */
-
+#define __STDC_LIMIT_MACROS
+#define __STDC_FORMAT_MACROS
 /* the definition of ARCH */
 #include "arch.h"
 
@@ -30,7 +31,6 @@
 #   endif
 #endif
 #include "debug.h"
-
 #endif
 
 
