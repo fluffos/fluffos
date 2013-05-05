@@ -119,71 +119,71 @@ void backend()
 #endif
   clear_state();
   save_context(&econ);
-  while(1)
-    try{
-  clear_state();
-  if (!t_flag && first_call) {
-    first_call = 0;
-    call_heart_beat();
-  }
+  while (1)
+    try {
+      clear_state();
+      if (!t_flag && first_call) {
+        first_call = 0;
+        call_heart_beat();
+      }
 
-  while (1) {
-    /* Has to be cleared if we jumped out of process_user_command() */
-    current_interactive = 0;
-    set_eval(max_cost);
+      while (1) {
+        /* Has to be cleared if we jumped out of process_user_command() */
+        current_interactive = 0;
+        set_eval(max_cost);
 
-    if (obj_list_replace || obj_list_destruct) {
-      remove_destructed_objects();
-    }
+        if (obj_list_replace || obj_list_destruct) {
+          remove_destructed_objects();
+        }
 
-    /*
-     * shut down MudOS if MudOS_is_being_shut_down is set.
-     */
-    if (MudOS_is_being_shut_down) {
-      shutdownMudOS(0);
-    }
-    if (slow_shut_down_to_do) {
-      int tmp = slow_shut_down_to_do;
+        /*
+         * shut down MudOS if MudOS_is_being_shut_down is set.
+         */
+        if (MudOS_is_being_shut_down) {
+          shutdownMudOS(0);
+        }
+        if (slow_shut_down_to_do) {
+          int tmp = slow_shut_down_to_do;
 
-      slow_shut_down_to_do = 0;
-      slow_shut_down(tmp);
-    }
-    /*
-     * select
-     */
-    make_selectmasks();
-    timeout.tv_sec = 1;
-    timeout.tv_usec = 0;
+          slow_shut_down_to_do = 0;
+          slow_shut_down(tmp);
+        }
+        /*
+         * select
+         */
+        make_selectmasks();
+        timeout.tv_sec = 1;
+        timeout.tv_usec = 0;
 #ifndef hpux
-    nb = select(max_fd + 1, &readmask, &writemask, (fd_set *) 0, &timeout);
+        nb = select(max_fd + 1, &readmask, &writemask, (fd_set *) 0, &timeout);
 #else
-    nb = select(max_fd + 1, (int *) &readmask, (int *) &writemask,
-                (int *) 0, &timeout);
+        nb = select(max_fd + 1, (int *) &readmask, (int *) &writemask,
+                    (int *) 0, &timeout);
 #endif
-    /*
-     * process I/O if necessary.
-     */
-    if (nb > 0) {
-      process_io();
-    }
-    /*
-     * process user commands.
-     */
-    for (i = 0; process_user_command() && i < max_users; i++) {
-      ;
-    }
+        /*
+         * process I/O if necessary.
+         */
+        if (nb > 0) {
+          process_io();
+        }
+        /*
+         * process user commands.
+         */
+        for (i = 0; process_user_command() && i < max_users; i++) {
+          ;
+        }
 
-    /*
-     * call outs
-     */
-    call_out();
+        /*
+         * call outs
+         */
+        call_out();
 #ifdef PACKAGE_ASYNC
-    check_reqs();
+        check_reqs();
 #endif
-  }
-		}catch(const char *){
-			restore_context(&econ);
-		}
+      }
+    } catch (const char *) {
+      restore_context(&econ);
+    }
 }       /* backend() */
 
 
@@ -242,94 +242,94 @@ static void look_for_objects_to_swap()
   next_ob = obj_list;
   last_good_ob = obj_list;
   save_context(&econ);
-  while(1)
-    try{
+  while (1)
+    try {
 
-  while ((ob = (object_t *)next_ob)) {
-    int ready_for_clean_up = 0;
+      while ((ob = (object_t *)next_ob)) {
+        int ready_for_clean_up = 0;
 
-    if (ob->flags & O_DESTRUCTED) {
-      if (last_good_ob->flags & O_DESTRUCTED) {
-        ob = obj_list;    /* restart */
-      } else {
-        ob = (object_t *)last_good_ob;
-      }
-    }
-    next_ob = ob->next_all;
-
-    /*
-     * Check reference time before reset() is called.
-     */
-    if (current_time - ob->time_of_ref > time_to_clean_up) {
-      ready_for_clean_up = 1;
-    }
-#if !defined(NO_RESETS) && !defined(LAZY_RESETS)
-    /*
-     * Should this object have reset(1) called ?
-     */
-    if ((ob->flags & O_WILL_RESET) && (ob->next_reset < current_time)
-        && !(ob->flags & O_RESET_STATE)) {
-      debug(d_flag, ("RESET /%s\n", ob->obname));
-      set_eval(max_cost);
-      reset_object(ob);
-      if (ob->flags & O_DESTRUCTED) {
-        continue;
-      }
-    }
-#endif
-    if (time_to_clean_up > 0) {
-      /*
-       * Has enough time passed, to give the object a chance to
-       * self-destruct ? Save the O_RESET_STATE, which will be cleared.
-       *
-       * Only call clean_up in objects that has defined such a function.
-       *
-       * Only if the clean_up returns a non-zero value, will it be called
-       * again.
-       */
-
-      if (ready_for_clean_up && (ob->flags & O_WILL_CLEAN_UP)) {
-        int save_reset_state = ob->flags & O_RESET_STATE;
-        svalue_t *svp;
-
-        debug(d_flag, ("clean up /%s\n", ob->obname));
+        if (ob->flags & O_DESTRUCTED) {
+          if (last_good_ob->flags & O_DESTRUCTED) {
+            ob = obj_list;    /* restart */
+          } else {
+            ob = (object_t *)last_good_ob;
+          }
+        }
+        next_ob = ob->next_all;
 
         /*
-         * Supply a flag to the object that says if this program is
-         * inherited by other objects. Cloned objects might as well
-         * believe they are not inherited. Swapped objects will not
-         * have a ref count > 1 (and will have an invalid ob->prog
-         * pointer).
-         *
-         * Note that if it is in the apply_low cache, it will also
-         * get a flag of 1, which may cause the mudlib not to clean
-         * up the object.  This isn't bad because:
-         * (1) one expects it is rare for objects that have untouched
-         * long enough to clean_up to still be in the cache, especially
-         * on busy MUDs.
-         * (2) the ones that are are the more heavily used ones, so
-         * keeping them around seems justified.
+         * Check reference time before reset() is called.
          */
+        if (current_time - ob->time_of_ref > time_to_clean_up) {
+          ready_for_clean_up = 1;
+        }
+#if !defined(NO_RESETS) && !defined(LAZY_RESETS)
+        /*
+         * Should this object have reset(1) called ?
+         */
+        if ((ob->flags & O_WILL_RESET) && (ob->next_reset < current_time)
+            && !(ob->flags & O_RESET_STATE)) {
+          debug(d_flag, ("RESET /%s\n", ob->obname));
+          set_eval(max_cost);
+          reset_object(ob);
+          if (ob->flags & O_DESTRUCTED) {
+            continue;
+          }
+        }
+#endif
+        if (time_to_clean_up > 0) {
+          /*
+           * Has enough time passed, to give the object a chance to
+           * self-destruct ? Save the O_RESET_STATE, which will be cleared.
+           *
+           * Only call clean_up in objects that has defined such a function.
+           *
+           * Only if the clean_up returns a non-zero value, will it be called
+           * again.
+           */
 
-        push_number(ob->flags & (O_CLONE) ? 0 : ob->prog->ref);
-        set_eval(max_cost);
-        svp = apply(APPLY_CLEAN_UP, ob, 1, ORIGIN_DRIVER);
-        if (ob->flags & O_DESTRUCTED) {
-          continue;
+          if (ready_for_clean_up && (ob->flags & O_WILL_CLEAN_UP)) {
+            int save_reset_state = ob->flags & O_RESET_STATE;
+            svalue_t *svp;
+
+            debug(d_flag, ("clean up /%s\n", ob->obname));
+
+            /*
+             * Supply a flag to the object that says if this program is
+             * inherited by other objects. Cloned objects might as well
+             * believe they are not inherited. Swapped objects will not
+             * have a ref count > 1 (and will have an invalid ob->prog
+             * pointer).
+             *
+             * Note that if it is in the apply_low cache, it will also
+             * get a flag of 1, which may cause the mudlib not to clean
+             * up the object.  This isn't bad because:
+             * (1) one expects it is rare for objects that have untouched
+             * long enough to clean_up to still be in the cache, especially
+             * on busy MUDs.
+             * (2) the ones that are are the more heavily used ones, so
+             * keeping them around seems justified.
+             */
+
+            push_number(ob->flags & (O_CLONE) ? 0 : ob->prog->ref);
+            set_eval(max_cost);
+            svp = apply(APPLY_CLEAN_UP, ob, 1, ORIGIN_DRIVER);
+            if (ob->flags & O_DESTRUCTED) {
+              continue;
+            }
+            if (!svp || (svp->type == T_NUMBER && svp->u.number == 0)) {
+              ob->flags &= ~O_WILL_CLEAN_UP;
+            }
+            ob->flags |= save_reset_state;
+          }
         }
-        if (!svp || (svp->type == T_NUMBER && svp->u.number == 0)) {
-          ob->flags &= ~O_WILL_CLEAN_UP;
-        }
-        ob->flags |= save_reset_state;
+        last_good_ob = ob;
       }
-    }
-    last_good_ob = ob;
-  }
-	break;
-		}catch(const char *){
-			restore_context(&econ);
+      break;
+    } catch (const char *) {
+      restore_context(&econ);
 
-		}
+    }
   pop_context(&econ);
 }       /* look_for_objects_to_swap() */
 
@@ -401,7 +401,7 @@ void call_heart_beat()
           add_heart_beats(&ob->stats, 1);
 #endif
           set_eval(max_cost);
-					try{
+          try {
             save_command_giver(new_command_giver);
             if (ob->interactive) { //note, NOT same as new_command_giver
               current_interactive = ob;
@@ -411,8 +411,8 @@ void call_heart_beat()
             current_interactive = 0;
             pop_stack(); /* pop the return value */
             restore_command_giver();
-					} catch(const char *){
-							restore_context(&econ);
+          } catch (const char *) {
+            restore_context(&econ);
           }
 
           current_object = 0;
@@ -560,10 +560,10 @@ void preload_objects(int eflag)
   error_context_t econ;
 
   save_context(&econ);
-	try{
-		push_number(eflag);
-		ret = apply_master_ob(APPLY_EPILOG, 1);
-	}catch(const char *){
+  try {
+    push_number(eflag);
+    ret = apply_master_ob(APPLY_EPILOG, 1);
+  } catch (const char *) {
     restore_context(&econ);
     pop_context(&econ);
     return;
@@ -584,24 +584,24 @@ void preload_objects(int eflag)
   ix = 0;
   /* in case of an error, effectively do a 'continue' */
   save_context(&econ);
-  while(1)
-    try{
-  for (; ix < prefiles->size; ix++) {
-    if (prefiles->item[ix].type != T_STRING) {
-      continue;
+  while (1)
+    try {
+      for (; ix < prefiles->size; ix++) {
+        if (prefiles->item[ix].type != T_STRING) {
+          continue;
+        }
+
+        set_eval(max_cost);
+
+        push_svalue(((array_t *)prefiles)->item + ix);
+        (void) apply_master_ob(APPLY_PRELOAD, 1);
+      }
+      free_array((array_t *)prefiles);
+      break;
+    } catch (const char *) {
+      restore_context(&econ);
+      ix++;
     }
-
-    set_eval(max_cost);
-
-    push_svalue(((array_t *)prefiles)->item + ix);
-    (void) apply_master_ob(APPLY_PRELOAD, 1);
-  }
-  free_array((array_t *)prefiles);
-	break;
-		}catch(const char *){
-			restore_context(&econ);
-			ix++;
-		}
   pop_context(&econ);
 }       /* preload_objects() */
 

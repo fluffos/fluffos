@@ -84,7 +84,7 @@ INLINE void *debugcalloc(int nitems, int size, int tag, char *desc)
 
   stats.alloc_calls++;
   tmp = (void *) CALLOC(nitems * size + MD_OVERHEAD, 1);
-  MDmalloc((md_node_t*)tmp, nitems * size, tag, desc);
+  MDmalloc((md_node_t *)tmp, nitems * size, tag, desc);
   NOISY3("calloc: %i (%x), %s\n", nitems * size, (md_node_t *)tmp + 1, desc);
   return (md_node_t *) tmp + 1;
 }

@@ -244,7 +244,7 @@ void call_out()
         free_call(cop);
         cop = 0;
       } else {
-	try {
+        try {
           object_t *ob;
 
           ob = cop->ob;
@@ -308,8 +308,8 @@ void call_out()
           }
 
           restore_command_giver();
-	}catch(const char *){
-	  restore_context(&econ);
+        } catch (const char *) {
+          restore_context(&econ);
           if (outoftime) {
 #ifdef CALLOUT_LOOP_PROTECTION
             if (num_max_cost_calls > 0) {

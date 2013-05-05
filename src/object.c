@@ -1740,20 +1740,20 @@ int restore_object(object_t *ob, const char *file, int noclear)
   error_context_t econ;
   save_context(&econ);
   try {
-  while ((restore_object_from_gzip(ob, gzf, noclear, &count))) {
-    count++;
-    gzseek(gzf, 0, SEEK_SET);
-    if (!noclear) {
-      clear_non_statics(ob);
+    while ((restore_object_from_gzip(ob, gzf, noclear, &count))) {
+      count++;
+      gzseek(gzf, 0, SEEK_SET);
+      if (!noclear) {
+        clear_non_statics(ob);
+      }
     }
+    gzclose(gzf);
+  } catch (const char *) {
+    restore_context(&econ);
+    pop_context(&econ);
+    gzclose(gzf);
+    return 0;
   }
-  gzclose(gzf);
-    }catch(const char *){
-    	restore_context(&econ);
-    	        pop_context(&econ);
-    	        gzclose(gzf);
-    	        return 0;
-    }
   pop_context(&econ);
 #else
   f = fopen(file, "r");

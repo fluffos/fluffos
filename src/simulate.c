@@ -1703,7 +1703,7 @@ static int num_mudlib_error = 0;
 void throw_error()
 {
   if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) {
-        throw("throw error");
+    throw("throw error");
     fatal("Throw_error failed!");
   }
   error("Throw with no catch.\n");
@@ -1918,7 +1918,7 @@ void error_handler(char *err)
   }
   num_error--;
   too_deep_error = max_eval_error = 0;
-  if (current_error_context) 
+  if (current_error_context)
     throw("error handler error2");
   fatal("LONGJMP failed or no error context for error.\n");
 }

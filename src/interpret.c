@@ -3878,10 +3878,11 @@ do_catch(char *pc, unsigned short new_pc_offset)
   csp->num_local_variables = (csp - 1)->num_local_variables; /* marion */
 #endif
 
-  try{assign_svalue(&catch_value, &const1);
-  /* note, this will work, since csp->extern_call won't be used */
-  eval_instruction(pc);
-  }catch(const char *){
+  try {
+    assign_svalue(&catch_value, &const1);
+    /* note, this will work, since csp->extern_call won't be used */
+    eval_instruction(pc);
+  } catch (const char *) {
     /*
      * They did a throw() or error. That means that the control stack
      * must be restored manually here.
@@ -4452,11 +4453,11 @@ safe_apply(const char *fun, object_t *ob, int num_arg, int where)
   if (!save_context(&econ)) {
     return 0;
   }
-  try{
+  try {
     if (!(ob->flags & O_DESTRUCTED)) {
       ret = apply(fun, ob, num_arg, where);
     } else { ret = 0; }
-  } catch(const char *) {
+  } catch (const char *) {
     restore_context(&econ);
     pop_n_elems(num_arg); /* saved state had args on stack already */
     ret = 0;
@@ -4800,25 +4801,107 @@ const char *dump_trace(int how)
    */
   if (!save_context(&econ))
     return 0;
-  try{
+  try {
 #endif
 
 #ifdef TRACE_CODE
-  if (how) {
-    last_instructions();
-  }
+    if (how) {
+      last_instructions();
+    }
 #endif
-  debug_message("--- trace ---\n");
-  for (p = &control_stack[0]; p < csp; p++) {
+    debug_message("--- trace ---\n");
+    for (p = &control_stack[0]; p < csp; p++) {
+      switch (p[0].framekind & FRAME_MASK) {
+        case FRAME_FUNCTION:
+          get_trace_details(p[1].prog, p[0].fr.table_index,
+                            &fname, &num_arg, &num_local);
+          dump_trace_line(fname, p[1].prog->filename, p[1].ob->obname,
+                          get_line_number(p[1].pc, p[1].prog));
+          if (strcmp(fname, "heart_beat") == 0) {
+            ret = p->ob ? p->ob->obname : 0;
+          }
+          break;
+        case FRAME_FUNP: {
+          outbuffer_t tmpbuf;
+          svalue_t tmpval;
+
+          tmpbuf.real_size = 0;
+          tmpbuf.buffer = 0;
+
+          tmpval.type = T_FUNCTION;
+          tmpval.u.fp = p[0].fr.funp;
+
+          svalue_to_string(&tmpval, &tmpbuf, 0, 0, 0);
+
+          dump_trace_line(tmpbuf.buffer, p[1].prog->filename, p[1].ob->obname,
+                          get_line_number(p[1].pc, p[1].prog));
+
+          FREE_MSTR(tmpbuf.buffer);
+          num_arg = p[0].fr.funp->f.functional.num_arg;
+          num_local = p[0].fr.funp->f.functional.num_local;
+        }
+        break;
+        case FRAME_FAKE:
+          dump_trace_line("<fake>", p[1].prog->filename, p[1].ob->obname,
+                          get_line_number(p[1].pc, p[1].prog));
+          num_arg = -1;
+          break;
+        case FRAME_CATCH:
+          dump_trace_line("<catch>", p[1].prog->filename, p[1].ob->obname,
+                          get_line_number(p[1].pc, p[1].prog));
+          num_arg = -1;
+          break;
+#ifdef DEBUG
+        default:
+          fatal("unknown type of frame\n");
+#endif
+      }
+#ifdef ARGUMENTS_IN_TRACEBACK
+      if (num_arg != -1) {
+        ptr = p[1].fp;
+        debug_message("arguments were (");
+        for (i = 0; i < num_arg; i++) {
+          outbuffer_t outbuf;
+
+          if (i) {
+            debug_message(",");
+          }
+          outbuf_zero(&outbuf);
+          svalue_to_string(&ptr[i], &outbuf, 0, 0, 0);
+          /* don't need to fix length here */
+          debug_message("%s", outbuf.buffer);
+          FREE_MSTR(outbuf.buffer);
+        }
+        debug_message(")\n");
+      }
+#endif
+#ifdef LOCALS_IN_TRACEBACK
+      if (num_local > 0 && num_arg != -1) {
+        ptr = p[1].fp + num_arg;
+        debug_message("locals were: ");
+        for (i = 0; i < num_local; i++) {
+          outbuffer_t outbuf;
+
+          if (i) {
+            debug_message(",");
+          }
+          outbuf_zero(&outbuf);
+          svalue_to_string(&ptr[i], &outbuf, 0, 0, 0);
+          /* no need to fix length */
+          debug_message("%s", outbuf.buffer);
+          FREE_MSTR(outbuf.buffer);
+        }
+        debug_message("\n");
+      }
+#endif
+    }
     switch (p[0].framekind & FRAME_MASK) {
       case FRAME_FUNCTION:
-        get_trace_details(p[1].prog, p[0].fr.table_index,
+        get_trace_details(current_prog, p[0].fr.table_index,
                           &fname, &num_arg, &num_local);
-        dump_trace_line(fname, p[1].prog->filename, p[1].ob->obname,
-                        get_line_number(p[1].pc, p[1].prog));
-        if (strcmp(fname, "heart_beat") == 0) {
-          ret = p->ob ? p->ob->obname : 0;
-        }
+        debug_message("'%15s' in '/%20s' ('/%20s') %s\n",
+                      fname, current_prog->filename, current_object->obname,
+                      get_line_number(pc, current_prog));
         break;
       case FRAME_FUNP: {
         outbuffer_t tmpbuf;
@@ -4832,32 +4915,30 @@ const char *dump_trace(int how)
 
         svalue_to_string(&tmpval, &tmpbuf, 0, 0, 0);
 
-        dump_trace_line(tmpbuf.buffer, p[1].prog->filename, p[1].ob->obname,
-                        get_line_number(p[1].pc, p[1].prog));
-
+        debug_message("'%s' in '/%20s' ('/%20s') %s\n",
+                      tmpbuf.buffer,
+                      current_prog->filename, current_object->obname,
+                      get_line_number(pc, current_prog));
         FREE_MSTR(tmpbuf.buffer);
         num_arg = p[0].fr.funp->f.functional.num_arg;
         num_local = p[0].fr.funp->f.functional.num_local;
       }
       break;
       case FRAME_FAKE:
-        dump_trace_line("<fake>", p[1].prog->filename, p[1].ob->obname,
-                        get_line_number(p[1].pc, p[1].prog));
+        debug_message("'     <fake>' in '/%20s' ('/%20s') %s\n",
+                      current_prog->filename, current_object->obname,
+                      get_line_number(pc, current_prog));
         num_arg = -1;
         break;
       case FRAME_CATCH:
-        dump_trace_line("<catch>", p[1].prog->filename, p[1].ob->obname,
-                        get_line_number(p[1].pc, p[1].prog));
+        debug_message("'          CATCH' in '/%20s' ('/%20s') %s\n",
+                      current_prog->filename, current_object->obname,
+                      get_line_number(pc, current_prog));
         num_arg = -1;
         break;
-#ifdef DEBUG
-      default:
-        fatal("unknown type of frame\n");
-#endif
     }
 #ifdef ARGUMENTS_IN_TRACEBACK
     if (num_arg != -1) {
-      ptr = p[1].fp;
       debug_message("arguments were (");
       for (i = 0; i < num_arg; i++) {
         outbuffer_t outbuf;
@@ -4866,8 +4947,8 @@ const char *dump_trace(int how)
           debug_message(",");
         }
         outbuf_zero(&outbuf);
-        svalue_to_string(&ptr[i], &outbuf, 0, 0, 0);
-        /* don't need to fix length here */
+        svalue_to_string(&fp[i], &outbuf, 0, 0, 0);
+        /* no need to fix length */
         debug_message("%s", outbuf.buffer);
         FREE_MSTR(outbuf.buffer);
       }
@@ -4876,7 +4957,7 @@ const char *dump_trace(int how)
 #endif
 #ifdef LOCALS_IN_TRACEBACK
     if (num_local > 0 && num_arg != -1) {
-      ptr = p[1].fp + num_arg;
+      ptr = fp + num_arg;
       debug_message("locals were: ");
       for (i = 0; i < num_local; i++) {
         outbuffer_t outbuf;
@@ -4893,89 +4974,9 @@ const char *dump_trace(int how)
       debug_message("\n");
     }
 #endif
-  }
-  switch (p[0].framekind & FRAME_MASK) {
-    case FRAME_FUNCTION:
-      get_trace_details(current_prog, p[0].fr.table_index,
-                        &fname, &num_arg, &num_local);
-      debug_message("'%15s' in '/%20s' ('/%20s') %s\n",
-                    fname, current_prog->filename, current_object->obname,
-                    get_line_number(pc, current_prog));
-      break;
-    case FRAME_FUNP: {
-      outbuffer_t tmpbuf;
-      svalue_t tmpval;
-
-      tmpbuf.real_size = 0;
-      tmpbuf.buffer = 0;
-
-      tmpval.type = T_FUNCTION;
-      tmpval.u.fp = p[0].fr.funp;
-
-      svalue_to_string(&tmpval, &tmpbuf, 0, 0, 0);
-
-      debug_message("'%s' in '/%20s' ('/%20s') %s\n",
-                    tmpbuf.buffer,
-                    current_prog->filename, current_object->obname,
-                    get_line_number(pc, current_prog));
-      FREE_MSTR(tmpbuf.buffer);
-      num_arg = p[0].fr.funp->f.functional.num_arg;
-      num_local = p[0].fr.funp->f.functional.num_local;
-    }
-    break;
-    case FRAME_FAKE:
-      debug_message("'     <fake>' in '/%20s' ('/%20s') %s\n",
-                    current_prog->filename, current_object->obname,
-                    get_line_number(pc, current_prog));
-      num_arg = -1;
-      break;
-    case FRAME_CATCH:
-      debug_message("'          CATCH' in '/%20s' ('/%20s') %s\n",
-                    current_prog->filename, current_object->obname,
-                    get_line_number(pc, current_prog));
-      num_arg = -1;
-      break;
-  }
-#ifdef ARGUMENTS_IN_TRACEBACK
-  if (num_arg != -1) {
-    debug_message("arguments were (");
-    for (i = 0; i < num_arg; i++) {
-      outbuffer_t outbuf;
-
-      if (i) {
-        debug_message(",");
-      }
-      outbuf_zero(&outbuf);
-      svalue_to_string(&fp[i], &outbuf, 0, 0, 0);
-      /* no need to fix length */
-      debug_message("%s", outbuf.buffer);
-      FREE_MSTR(outbuf.buffer);
-    }
-    debug_message(")\n");
-  }
-#endif
-#ifdef LOCALS_IN_TRACEBACK
-  if (num_local > 0 && num_arg != -1) {
-    ptr = fp + num_arg;
-    debug_message("locals were: ");
-    for (i = 0; i < num_local; i++) {
-      outbuffer_t outbuf;
-
-      if (i) {
-        debug_message(",");
-      }
-      outbuf_zero(&outbuf);
-      svalue_to_string(&ptr[i], &outbuf, 0, 0, 0);
-      /* no need to fix length */
-      debug_message("%s", outbuf.buffer);
-      FREE_MSTR(outbuf.buffer);
-    }
-    debug_message("\n");
-  }
-#endif
-  debug_message("--- end trace ---\n");
+    debug_message("--- end trace ---\n");
 #if defined(ARGUMENTS_IN_TRACEBACK) || defined(LOCALS_IN_TRACEBACK)
-}catch(const char *){
+  } catch (const char *) {
     restore_context(&econ);
     ret = 0;
   }

@@ -348,7 +348,7 @@ safe_call_function_pointer(funptr_t *funp, int num_arg)
   }
   try {
     ret = call_function_pointer(funp, num_arg);
-  } catch(const char *) {
+  } catch (const char *) {
     restore_context(&econ);
     /* condition was restored to where it was when we came in */
     pop_n_elems(num_arg);
