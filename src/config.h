@@ -62,9 +62,6 @@
 #define sigsetmask(m)   port_sigsetmask(m)
 #endif
 
-#define SETJMP(x) setjmp(x)
-#define LONGJMP(x,y) longjmp(x,y)
-
 #define APPLY_CACHE_SIZE (1 << APPLY_CACHE_BITS)
 
 #define NUM_CONSTS 5
