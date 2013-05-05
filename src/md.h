@@ -10,7 +10,7 @@ typedef struct md_node_s {
 #ifdef DEBUGMALLOC_EXTENSIONS
   int id;
   int tag;
-  char *desc;
+  const char *desc;
 #endif
 #ifdef CHECK_MEMORY
   int magic;
@@ -49,7 +49,7 @@ extern int malloc_mask;
 extern unsigned int total_malloced;
 extern unsigned int hiwater;
 void MDinit(void);
-void MDmalloc(md_node_t *, int, int, char *);
+void MDmalloc(md_node_t *, int, int, const char *);
 int MDfree(void *);
 
 #ifdef DEBUGMALLOC_EXTENSIONS

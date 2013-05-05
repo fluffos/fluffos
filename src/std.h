@@ -31,7 +31,6 @@
 #   endif
 #endif
 #include "debug.h"
-#include <stdint.h>
 #endif
 
 

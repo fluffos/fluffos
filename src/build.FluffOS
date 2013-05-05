@@ -23,13 +23,13 @@ fi
 
 # Change this to use another C compiler/preprocessor
 if [ "`uname -s`" = "Darwin" ]; then # OSX gcc is very outdated.
-  CC=clang
+  CXX="clang++"
 else
-  CC=${CC:-"g++"}
+  CXX=${CXX:-"g++"}
 fi
 
 # TODO: remove need for _GNU_SOURCE
-CFLAGS="--std=c++0x -D_GNU_SOURCE -fno-omit-frame-pointer"
+CXXFLAGS="--std=c++0x -D_GNU_SOURCE -fno-omit-frame-pointer"
 
 # By default driver compile to native environment, you can
 # add "-m64" to force compile under 64bit, "-m32" for 32bit.
@@ -58,7 +58,7 @@ INSTALL_DIR="../bin"
 #EXTRALIBS=-L/usr/local/lib -lmsql
 ####### END OF USER CONFIGURABLE OPTIONS
 
-CFLAGS="$CFLAGS $COMPILER_FLAGS $WARN $OPTIMIZE $DEBUG"
+CXXFLAGS="$CXXFLAGS $COMPILER_FLAGS $WARN $OPTIMIZE $DEBUG"
 
 #
 # Determine if running under Cygwin-32 and use a.exe instead
@@ -83,12 +83,12 @@ printf("%s\n", ARCH);
 }
 END
 
-$CC $CFLAGS -o $A_OUT -flto comptest.c
+$CXX $CXXFLAGS -o $A_OUT -flto comptest.c
 
 if [ $? -eq 0 ]; then
-  CFLAGS="$CFLAGS -flto"
+  CXXFLAGS="$CXXFLAGS -flto"
 else
-  $CC $CFLAGS -o $A_OUT comptest.c
+  $CXX $CXXFLAGS -o $A_OUT comptest.c
   if [ $? -ne 0 ]; then
     echo "FATAL ERROR: test compile failed."
     exit 1
@@ -111,8 +111,8 @@ echo INSTALL=$INSTALL >>Makefile
 echo INSTALL_DIR=$INSTALL_DIR >>Makefile
 echo OPTIMIZE=$OPTIMIZE >>Makefile
 
-echo CC=$CC >>Makefile
-echo CFLAGS=$CFLAGS >>Makefile
+echo CXX=$CXX >>Makefile
+echo CXXFLAGS=$CXXFLAGS >>Makefile
 echo YACC=$YACC >>Makefile
 echo A=a >>Makefile
 echo O=o >>Makefile
@@ -124,8 +124,8 @@ echo "***************** Configuration completed **************"
 echo "Compiling FluffOS on $ARCH."
 echo
 echo "Using $INSTALL to install binaries in $INSTALL_DIR."
-echo "Using $CC -E $CFLAGS for preprocessing."
-echo "Using $CC $CFLAGS to compile."
+echo "Using $CXX -E $CXXFLAGS for preprocessing."
+echo "Using $CXX $CXXFLAGS to compile."
 echo "Using $YACC to make the compiler."
 echo "Edit Makefile if this is not what you want"
 echo

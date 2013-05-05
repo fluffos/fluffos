@@ -1,13 +1,13 @@
 include packages
 
 .c.$(O):
-	$(CC) $(CFLAGS) -I.. -c $*.c
+	$(CXX) $(CXXFLAGS) -I.. -c -x c++ $*.c
 
 all: $(OBJ)
 
 # special db stuff
 db.$(O): db.c
-	$(CC) $(CFLAGS) -I.. -I/usr/include/mysql -c $*.c
+	$(CXX) $(CXXFLAGS) -I.. -I/usr/include/mysql -c -x c++ $*.c
 
 clean:
 	rm -f *.$(O)

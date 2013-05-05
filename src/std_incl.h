@@ -50,6 +50,9 @@
 #ifdef INCL_INTTYPES_H
 #  include <inttypes.h>
 #endif
+#ifdef INCL_STDINT_H
+#  include <stdint.h>
+#endif
 #ifdef INCL_FLOAT_H
 #  include <float.h>
 #endif
