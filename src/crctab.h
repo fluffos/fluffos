@@ -40,7 +40,7 @@
 /*     using byte-swap instructions.                                   */
 
 #ifdef NEED_CRC_TABLE
-static long cr3tab[] = {
+static int64_t cr3tab[] = {
   /* CRC polynomial 0xedb88320 */
   0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
   0xe963a535, 0x9e6495a3,
@@ -110,8 +110,8 @@ static long cr3tab[] = {
 #endif
 
 #ifdef NFGM
-long UPDC32(b, c)
-long c;
+int64_t UPDC32(b, c)
+int64_t c;
 {
   return (cr3tab[(c ^ b) & 0xff] ^((c >> 8) & 0x00FFFFFF));
 }

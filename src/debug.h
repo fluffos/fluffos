@@ -1,7 +1,7 @@
 /* debug.h: added by Truilkan: 92/02/08 */
 
 /* this include file adds some nice debugging capabilities.  You can
-   use -DDEBUG_MACRO in CFLAGS in the Makefile to let the debug code
+   use -DDEBUG_MACRO in the Makefile to let the debug code
    be compiled in.  If DEBUG_MACRO is not defined then the debug code
    is removed by the C preprocessor.  The global variable debug_level
    is defined in main.c.  The debug_level typically starts out at zero

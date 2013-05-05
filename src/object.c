@@ -104,12 +104,12 @@ INLINE int svalue_save_size(svalue_t *v)
 
     case T_NUMBER: {
       char buf[400];
-      sprintf(buf, "%"LPC_INT_FMTSTR_P, v->u.number);
+      sprintf(buf, "%" LPC_INT_FMTSTR_P, v->u.number);
       return (strlen(buf) + 1);
     }
     case T_REAL: {
       char buf[400];
-      sprintf(buf, "%"LPC_FLOAT_FMTSTR_P, v->u.real);
+      sprintf(buf, "%" LPC_FLOAT_FMTSTR_P, v->u.real);
       return (strlen(buf) + 1);
     }
     default: {
@@ -172,12 +172,12 @@ INLINE void save_svalue(svalue_t *v, char **buf)
     }
 
     case T_NUMBER: {
-      sprintf(*buf, "%"LPC_INT_FMTSTR_P, v->u.number);
+      sprintf(*buf, "%" LPC_INT_FMTSTR_P, v->u.number);
       (*buf) += strlen(*buf);
       return;
     }
     case T_REAL: {
-      sprintf(*buf, "%"LPC_FLOAT_FMTSTR_P, v->u.real);
+      sprintf(*buf, "%" LPC_FLOAT_FMTSTR_P, v->u.real);
       (*buf) += strlen(*buf);
       return;
     }
@@ -1739,20 +1739,21 @@ int restore_object(object_t *ob, const char *file, int noclear)
   }
   error_context_t econ;
   save_context(&econ);
-  if (SETJMP(econ.context)) {
+  try {
+    while ((restore_object_from_gzip(ob, gzf, noclear, &count))) {
+      count++;
+      gzseek(gzf, 0, SEEK_SET);
+      if (!noclear) {
+        clear_non_statics(ob);
+      }
+    }
+    gzclose(gzf);
+  } catch (const char *) {
     restore_context(&econ);
     pop_context(&econ);
     gzclose(gzf);
     return 0;
   }
-  while ((restore_object_from_gzip(ob, gzf, noclear, &count))) {
-    count++;
-    gzseek(gzf, 0, SEEK_SET);
-    if (!noclear) {
-      clear_non_statics(ob);
-    }
-  }
-  gzclose(gzf);
   pop_context(&econ);
 #else
   f = fopen(file, "r");

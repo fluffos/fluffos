@@ -53,7 +53,7 @@ INLINE void *debugrealloc(void *ptr, int size, int tag, char *desc)
   tmp = (md_node_t *) ptr - 1;
   if (MDfree(tmp)) {
     tmp = (void *) REALLOC(tmp, size + MD_OVERHEAD);
-    MDmalloc(tmp, size, tag, desc);
+    MDmalloc((md_node_t *)tmp, size, tag, desc);
     return (md_node_t *) tmp + 1;
   }
   return (void *) 0;
@@ -69,7 +69,7 @@ INLINE void *debugmalloc(int size, int tag, char *desc)
   stats.alloc_calls++;
   tmp = (void *) MALLOC(size + MD_OVERHEAD);
   memset(tmp, 'M', size + MD_OVERHEAD);
-  MDmalloc(tmp, size, tag, desc);
+  MDmalloc((md_node_t *)tmp, size, tag, desc);
   NOISY3("malloc: %i (%x), %s\n", size, (md_node_t *)tmp + 1, desc);
   return (md_node_t *) tmp + 1;
 }
@@ -84,7 +84,7 @@ INLINE void *debugcalloc(int nitems, int size, int tag, char *desc)
 
   stats.alloc_calls++;
   tmp = (void *) CALLOC(nitems * size + MD_OVERHEAD, 1);
-  MDmalloc(tmp, nitems * size, tag, desc);
+  MDmalloc((md_node_t *)tmp, nitems * size, tag, desc);
   NOISY3("calloc: %i (%x), %s\n", nitems * size, (md_node_t *)tmp + 1, desc);
   return (md_node_t *) tmp + 1;
 }

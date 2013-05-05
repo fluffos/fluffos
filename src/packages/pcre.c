@@ -315,28 +315,28 @@ void f_pcre_replace_callback(void)
     pcre_free_memory(run);
     error("context stack full!\n");
   }
-  if (SETJMP(econ.context)) {
+  try {
+    for (i = 0; i < run->rc - 1; i++) {
+      svalue_t *v;
+      push_svalue(arr->item + i);
+      push_number(i);
+      v = call_efun_callback(&ftc, 2);
+
+
+      /* Mimic behaviour of map(string, function) when function pointer returns null,
+       ie return the input.  */
+      if (v && v->type == T_STRING && v->u.string != NULL) {
+        assign_svalue_no_free(&r->item[i], v);
+      } else {
+        assign_svalue_no_free(&r->item[i], &arr->item[i]);
+      }
+    }
+  } catch (const char *) {
     restore_context(&econ);
     /* condition was restored to where it was when we came in */
     pcre_free_memory(run);
     pop_context(&econ);
     error("error in callback!\n");
-  }
-
-  for (i = 0; i < run->rc - 1; i++) {
-    svalue_t *v;
-    push_svalue(arr->item + i);
-    push_number(i);
-    v = call_efun_callback(&ftc, 2);
-
-
-    /* Mimic behaviour of map(string, function) when function pointer returns null,
-     ie return the input.  */
-    if (v && v->type == T_STRING && v->u.string != NULL) {
-      assign_svalue_no_free(&r->item[i], v);
-    } else {
-      assign_svalue_no_free(&r->item[i], &arr->item[i]);
-    }
   }
   pop_context(&econ);
   ret = pcre_get_replace(run, r);
