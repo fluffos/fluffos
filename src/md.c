@@ -970,6 +970,7 @@ void check_all_blocks(int flag)
                   tmp = tmp->next_all;
                 }
               }
+#ifdef DEBUG
               if (!tmp) {
                 tmp = obj_list_dangling;
                 while (tmp && tmp != ob) {
@@ -980,6 +981,7 @@ void check_all_blocks(int flag)
                               "WARNING: %s is dangling.\n",
                               ob->obname);
               }
+#endif
               if (!tmp)
                 outbuf_addv(&out,
                             "WARNING: %s not in object list.\n",
