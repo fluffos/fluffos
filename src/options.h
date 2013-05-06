@@ -716,6 +716,21 @@
 /*PACKAGE_CRYPTO: adds a function that does multiple hash types hash(hash, string), needs openssl lib and includes and -lssl in system_libs*/
 #undef PACKAGE_CRYPTO
 
+/*
+  PACKAGE_TRIM: Add efuns for remove leading / trailing whitespaces in a string.
+  Functions:
+    - trim: Remove leading and trailing whitespaces.
+      Example:
+        - "    my test   " : "my test"
+    - ltrim: Remove leading whitespaces.
+      Example:
+        - "    my test   " : "my test   "
+    - rtrim: Remove trailing whitespaces.
+      Example:
+        - "    my test   " : "    my test"
+ */
+#define PACKAGE_TRIM
+
 /****************************************************************************
  *                            UID PACKAGE                                   *
  *                            -----------                                   *
@@ -932,4 +947,3 @@
 #define POSIX_TIMERS
 
 #endif /* _OPTIONS_H */
-
