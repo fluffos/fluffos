@@ -447,17 +447,19 @@ void debug_message(const char *fmt, ...)
     }
     debug_message_fp = fopen(deb, "w");
     if (!debug_message_fp) {
-      /* darn.  We're in trouble */
       perror(deb);
-      abort();
+      /* use stderr by default. */
+      debug_message_fp = stderr;
     }
   }
 
-  V_START(args, fmt);
-  V_VAR(char *, fmt, args);
-  vfprintf(debug_message_fp, fmt, args);
-  fflush(debug_message_fp);
-  va_end(args);
+  if (debug_message_fp != stderr) {
+    V_START(args, fmt);
+    V_VAR(char *, fmt, args);
+    vfprintf(debug_message_fp, fmt, args);
+    fflush(debug_message_fp);
+    va_end(args);
+  }
   V_START(args, fmt);
   V_VAR(char *, fmt, args);
   vfprintf(stderr, fmt, args);

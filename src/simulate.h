@@ -23,7 +23,7 @@ extern object_t *current_interactive;
 extern char *inherit_file;
 extern int tot_alloc_sentence;
 extern int MudOS_is_being_shut_down;
-#ifdef DEBUGMALLOC_EXTENSIONS
+#ifdef DEBUG
 extern object_t *obj_list_dangling;
 extern int tot_dangling_object;
 #endif

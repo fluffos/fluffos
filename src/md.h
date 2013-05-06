@@ -20,11 +20,10 @@ typedef struct md_node_s {
 #ifdef CHECK_MEMORY
 #define MD_OVERHEAD (sizeof(md_node_t) + sizeof(int))
 #define MD_MAGIC 0x4bee4bee
-
-void check_all_blocks(int);
 #else
 #define MD_OVERHEAD (sizeof(md_node_t))
 #endif
+void check_all_blocks(int);
 
 #define MD_TABLE_BITS 14
 #define MD_TABLE_SIZE (1 << MD_TABLE_BITS)

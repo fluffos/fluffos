@@ -29,11 +29,12 @@ INLINE_STATIC long alist_cmp(svalue_t *, svalue_t *);
 
 array_t the_null_array = {
   1,                          /* Ref count, which will ensure that it will
-                                 * never be deallocated */
-#ifdef DEBUG
+                              * never be deallocated */
+#ifdef DEBUGMALLOC_EXTENSIONS
   1,                          /* extra ref */
 #endif
   0,                          /* size */
+  { { 0 } }, /* item */
 };
 
 #ifdef PACKAGE_MUDLIB_STATS
