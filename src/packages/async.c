@@ -209,7 +209,7 @@ void add_req(struct request *req)
 
 void *gzreadthread(struct request *req)
 {
-  void *file = gzopen(req->path, "rb");
+  auto file = gzopen(req->path, "rb");
   req->ret = gzread(file, (void *)(req->buf), req->size);
   req->status = DONE;
   gzclose(file);
@@ -227,7 +227,7 @@ void *gzwritethread(struct request *req)
 {
   int fd = open(req->path, req->flags & 1 ? O_CREAT | O_WRONLY | O_TRUNC
                 : O_CREAT | O_WRONLY | O_APPEND, S_IRWXU | S_IRWXG);
-  void *file = gzdopen(fd, "wb");
+  auto file = gzdopen(fd, "wb");
   req->ret = gzwrite(file, (void *)(req->buf), req->size);
   req->status = DONE;
   gzclose(file);
