@@ -16,7 +16,7 @@ void recurse(string dir) {
       foreach (string fn in get_dir(dir + "fail/*.c")) {
         write("A> " + dir + "fail/" + fn + "\n");
         ASSERT2(catch(load_object(dir+"fail/"+fn)), "fail/" + fn + " loaded");
-#if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__CHECK_MEMORY__)
+#if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__PACKAGE_DEVELOP__)
         leaks = check_memory();
         if (sizeof(filter(explode(leaks, "\n"), (: $1 && $1[0] :))) != 1) {
           write("After trying to compile: " + dir + "fail/" + fn + "\n");
@@ -32,7 +32,7 @@ void recurse(string dir) {
       foreach (string fn in get_dir(dir + subdir + "/*.c")) {
         write("B> " + dir + subdir + "/" + fn + "\n");
         catch((dir + subdir + "/" + fn + ".c")->do_tests());
-#if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__CHECK_MEMORY__)
+#if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__PACKAGE_DEVELOP__)
         leaks = check_memory();
         if (sizeof(filter(explode(leaks, "\n"), (: $1 && $1[0] :))) != 1) {
           write("After trying to run: " + dir + subdir + "/" + fn + ".c\n");
@@ -52,15 +52,11 @@ int main(string fun)
   string leaks;
   object tp = this_player();
 
-#if !defined(__CHECK_MEMORY__)
-  write("Warning: CHECK_MEMORY is not defined, not checking memory leaks.\n")
-#endif
-
-    if (!fun || fun == "") {
-      recurse("/single/tests/");
-      write("Checks succeeded.\n");
-      return 1;
-    }
+  if (!fun || fun == "") {
+    recurse("/single/tests/");
+    write("Checks succeeded.\n");
+    return 1;
+  }
 
   set_eval_limit(0x7fffffff);
 
@@ -71,7 +67,7 @@ int main(string fun)
 
   if (tp != this_player())
     error("Bad this_player() after calling " + fun + "\n");
-#if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__CHECK_MEMORY__)
+#if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__PACKAGE_DEVELOP__)
   leaks = check_memory();
   if (sizeof(filter(explode(leaks, "\n"), (: $1 && $1[0] :))) != 1) {
     write("After calling: " + fun + "\n");
