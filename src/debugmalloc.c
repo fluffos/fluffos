@@ -40,7 +40,7 @@ void debugmalloc_init()
   MDinit();
 }
 
-INLINE void *debugrealloc(void *ptr, int size, int tag, char *desc)
+INLINE void *debugrealloc(void *ptr, int size, int tag, const char *desc)
 {
   void *tmp;
 
@@ -59,7 +59,7 @@ INLINE void *debugrealloc(void *ptr, int size, int tag, char *desc)
   return (void *) 0;
 }
 
-INLINE void *debugmalloc(int size, int tag, char *desc)
+INLINE void *debugmalloc(int size, int tag, const char *desc)
 {
   void *tmp;
 
@@ -74,7 +74,7 @@ INLINE void *debugmalloc(int size, int tag, char *desc)
   return (md_node_t *) tmp + 1;
 }
 
-INLINE void *debugcalloc(int nitems, int size, int tag, char *desc)
+INLINE void *debugcalloc(int nitems, int size, int tag, const char *desc)
 {
   void *tmp;
 

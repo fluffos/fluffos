@@ -1,9 +1,9 @@
 #ifndef DEBUGMALLOC_H
 #  define DEBUGMALLOC_H
 #  ifdef DEBUGMALLOC
-void *debugmalloc(int, int, char *);
-void *debugrealloc(void *, int, int, char *);
-void *debugcalloc(int, int, int, char *);
+void *debugmalloc(int, int, const char *);
+void *debugrealloc(void *, int, int, const char *);
+void *debugcalloc(int, int, int, const char *);
 void debugfree(void *);
 
 void debugmalloc_init(void);

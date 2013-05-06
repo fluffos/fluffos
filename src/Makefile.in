@@ -82,7 +82,7 @@ grammar.tab.c: grammar.y
 	mv y.tab.c grammar.tab.c
 	mv y.tab.h grammar.tab.h
 
-$(DRIVER_BIN): $(OBJ) dtrace_compile
+$(DRIVER_BIN): $(OBJ) packages/*.$(O) dtrace_compile
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
 	$(CXX) -rdynamic $(CXXFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) `cat system_libs`
 

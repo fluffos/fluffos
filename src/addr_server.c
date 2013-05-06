@@ -329,7 +329,7 @@ void new_conn_handler()
     return;
   }
   if (total_conns >= MAX_CONNS) {
-    char *message = "no available slots -- closing connection.\n";
+    const char *message = "no available slots -- closing connection.\n";
 
     fprintf(stderr, "new_conn_handler: no available connection slots.\n");
     OS_socket_write(new_fd, message, strlen(message));

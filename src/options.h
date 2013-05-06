@@ -673,7 +673,7 @@
  *   maintenance by the driver.  These mudlib stats are more domain
  *   based than user based, and replaces the traditional wiz_list stats.
  */
-#undef PACKAGE_MUDLIB_STATS
+#define PACKAGE_MUDLIB_STATS
 
 /* PACKAGE_SOCKETS: define this to enable the socket efunctions.  This
  *   causes HAS_SOCKETS to be defined for all LPC objects.
@@ -711,7 +711,7 @@
 #define PACKAGE_ASYNC
 
 /*PACKAGE_SHA1: adds a function to calculate the sha1 hash of a string sha1(string).  Use PACKAGE_CRYPTO instead if possible. */
-#undef PACKAGE_SHA1
+#define PACKAGE_SHA1
 
 /*PACKAGE_CRYPTO: adds a function that does multiple hash types hash(hash, string), needs openssl lib and includes and -lssl in system_libs*/
 #undef PACKAGE_CRYPTO
