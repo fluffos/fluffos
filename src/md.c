@@ -46,7 +46,7 @@
 int totals[MAX_CATEGORY];
 int blocks[MAX_CATEGORY];
 
-static char *sources[] = {
+static const char *sources[] = {
   "*", "temporary blocks", "permanent blocks", "compiler blocks",
   "data blocks", "miscellaneous blocks", "<#6>", "<#7>", "<#8>", "<#9>",
   "<#10>", "program blocks", "call_out blocks", "interactives", "ed blocks",

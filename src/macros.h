@@ -221,10 +221,10 @@
 #ifndef _FUNC_SPEC_
 char *xalloc(int);
 #  ifdef DEBUGMALLOC
-char *int_string_copy(const char *const, char *);
-char *int_string_unlink(const char *, char *);
-char *int_new_string(int, char *);
-char *int_alloc_cstring(const char *, char *);
+char *int_string_copy(const char *const, const char *);
+char *int_string_unlink(const char *, const char *);
+char *int_new_string(int, const char *);
+char *int_alloc_cstring(const char *, const char *);
 #  else
 char *int_string_copy(const char *const);
 char *int_string_unlink(const char *);

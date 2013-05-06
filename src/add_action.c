@@ -13,7 +13,7 @@ static int      num_living_names;
 static int      num_searches = 1;
 static int      search_length = 1;
 static int      illegal_sentence_action;
-static char        *last_verb;
+static const char        *last_verb;
 static object_t    *illegal_sentence_ob;
 
 static void notify_no_command(void)
