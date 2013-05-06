@@ -28,13 +28,15 @@ INLINE_STATIC long alist_cmp(svalue_t *, svalue_t *);
  */
 
 array_t the_null_array = {
-  1,                          /* Ref count, which will ensure that it will
-                              * never be deallocated */
+  1,   /* ref, always 1. */
 #ifdef DEBUGMALLOC_EXTENSIONS
-  1,                          /* extra ref */
+  1,   /* extra_ref */
 #endif
-  0,                          /* size */
-  { { 0 } }, /* item */
+  0,  /* size */
+#ifdef PACKAGE_MUDLIB_STATS
+  { 0 }, /* statgroup_t stats */
+#endif
+  { { 0 , 0, { 0 } } }, /* svalue_t item[1] */
 };
 
 #ifdef PACKAGE_MUDLIB_STATS

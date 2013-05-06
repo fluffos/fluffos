@@ -922,7 +922,7 @@ void make_efun_tables()
       char buf[100];
       int size = strlen(outfiles[i]) - 2;
       strncpy(buf, outfiles[i], size);
-      buf[size + 1] = '\0';
+      buf[size] = '\0';
       fprintf(files[i],
               "#ifndef __AUTOGEN_%s_H\n#define __AUTOGEN_%s_H\n\n", buf, buf);
     }

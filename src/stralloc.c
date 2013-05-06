@@ -336,7 +336,7 @@ char *the_null_string = (char *)&the_null_string_blocks[1];
 */
 
 #ifdef DEBUGMALLOC
-char *int_new_string(int size, char *tag)
+char *int_new_string(int size, const char *tag)
 #else
 char *int_new_string(int size)
 #endif
@@ -385,7 +385,7 @@ char *extend_string(const char *str, int len)
 }
 
 #ifdef DEBUGMALLOC
-char *int_alloc_cstring(const char *str, char *tag)
+char *int_alloc_cstring(const char *str, const char *tag)
 #else
 char *int_alloc_cstring(const char *str)
 #endif
@@ -398,7 +398,7 @@ char *int_alloc_cstring(const char *str)
 }
 
 #ifdef DEBUGMALLOC
-char *int_string_copy(const char *const str, char *desc)
+char *int_string_copy(const char *const str, const char *desc)
 #else
 char *int_string_copy(const char *const str)
 #endif
@@ -421,7 +421,7 @@ char *int_string_copy(const char *const str)
 }
 
 #ifdef DEBUGMALLOC
-char *int_string_unlink(const char *str, char *desc)
+char *int_string_unlink(const char *str, const char *desc)
 #else
 char *int_string_unlink(const char *str)
 #endif

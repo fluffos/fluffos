@@ -46,7 +46,7 @@
 int totals[MAX_CATEGORY];
 int blocks[MAX_CATEGORY];
 
-static char *sources[] = {
+static const char *sources[] = {
   "*", "temporary blocks", "permanent blocks", "compiler blocks",
   "data blocks", "miscellaneous blocks", "<#6>", "<#7>", "<#8>", "<#9>",
   "<#10>", "program blocks", "call_out blocks", "interactives", "ed blocks",
@@ -970,6 +970,7 @@ void check_all_blocks(int flag)
                   tmp = tmp->next_all;
                 }
               }
+#ifdef DEBUG
               if (!tmp) {
                 tmp = obj_list_dangling;
                 while (tmp && tmp != ob) {
@@ -980,6 +981,7 @@ void check_all_blocks(int flag)
                               "WARNING: %s is dangling.\n",
                               ob->obname);
               }
+#endif
               if (!tmp)
                 outbuf_addv(&out,
                             "WARNING: %s not in object list.\n",
