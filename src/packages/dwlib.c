@@ -496,7 +496,7 @@ f_reference_allowed()
       /* If we have a find_player() efun, then we need to sue
        * the following method.  This hasn't been tested!
        */
-      referrer = find_living_object(sv[1].u.string, 1);
+      referrer_obj = find_living_object(sv[1].u.string, 1);
 #else
       if (simul_efun_ob) {
         push_svalue(&sv[1]);

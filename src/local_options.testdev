@@ -1,0 +1,12 @@
+#include "options.h"
+
+#define DEBUGMALLOC
+#define DEBUGMALLOC_EXTENSIONS
+#define CHECK_MEMORY
+
+#define NONINTERACTIVE_STDERR_WRITE
+#define NO_LIGHT
+#undef NO_ADD_ACTION
+#undef NO_SNOOP
+#undef NO_ENVIRONMENT
+#undef NO_WIZARDS

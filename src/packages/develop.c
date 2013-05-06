@@ -81,7 +81,7 @@ f_debug_info(void)
 #endif
       outbuf_addv(&out, "time_of_ref : %d\n", ob->time_of_ref);
       outbuf_addv(&out, "ref         : %d\n", ob->ref);
-#ifdef DEBUG
+#ifdef DEBUGMALLOC_EXTENSIONS
       outbuf_addv(&out, "extra_ref   : %d\n", ob->extra_ref);
 #endif
       outbuf_addv(&out, "name        : '/%s'\n", ob->obname);

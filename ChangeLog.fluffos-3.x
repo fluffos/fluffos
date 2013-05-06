@@ -1,20 +1,31 @@
-Wodan announced 3.x release will be maintained by "Yucong Sun" (sunyucong@gmail.com)
-for now.
-
-FluffOS 3.x will focus on modernizing driver, currently planned improvemnets
-includes cpp support, LPC JIT compiler and multithreading.
+Wodan announced 3.x release will be maintained by
+"Yucong Sun" (sunyucong@gmail.com) for now.
 
 Please submit issue to https://github.com/fluffos/fluffos
 
-Feature Status:
-  64bit runtime on all platform (done)
-  switch to clang/llvm c++ compiler
+Major changes compare to 2.x:
+  Support 32bit platform, CYGWIN build. (alpha2 done)
+  64bit LPC runtime on all platforms (alpha2 done)
+  switch to c++ language (alpha3 done)
+  EFUN limit has been raised to 65535 (alpha2)
+  CALLOUT_LOOP_PROTECTION, SANE_SORTING (alpha2)
+
+TODOs:
   switch to autoconf
   switch to TCMalloc
   get rid of edit_source
-  get rid of addr_server
+  get rid of addr_server/multi-threading
   LPC JIT compiler
-  multi-threading
+
+================================================================================
+  Per release ChangeLog
+================================================================================
+
+FluffOS 3.0-alpha3
+  FluffOS has switched to c++ language.
+  use try/catch instead of longjmp. (wodan)
+  Code quality improvment.
+  Fix using DEBUG without DEBUGMALLOC_EXTENSIONS cause memory corruption.
 
 FluffOS 3.0-alpha2
 

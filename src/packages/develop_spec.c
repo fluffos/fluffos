@@ -25,8 +25,3 @@
     string traceprefix(string | int);
     int trace(int);
 #endif
-
-#if defined(NeXT) && defined(NEXT_MALLOC_DEBUG)
-    int malloc_check();
-    int malloc_debug(int);
-#endif

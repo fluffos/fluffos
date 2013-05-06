@@ -306,37 +306,3 @@ f_rusage(void)
 #endif                          /* WIN32 */
 
 #endif
-
-#ifdef F_MALLOC_CHECK
-/* this efun only useful on the NeXT (func_spec.c has #ifdef NeXT).  A
-   non-zero return value indicates that some memory corruption has occurred
-   at some time prior to this calling of this efun.
-*/
-void
-f_malloc_check(void)
-{
-  push_number(NXMallocCheck());
-}
-#endif
-
-#ifdef F_MALLOC_DEBUG
-/* NeXT specific efun for setting the debugging level of NeXT's built-in
-   malloc.
-*/
-void
-f_malloc_debug(void)
-{
-  int level;
-
-  level = sp->u.number;
-  if (level < 0) {
-    int rc;
-
-    rc = malloc_debug(0);
-    malloc_singlethreaded();
-    sp->u.number = rc;
-  } else {
-    sp->u.number = malloc_debug(level);
-  }
-}
-#endif
