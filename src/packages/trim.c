@@ -197,3 +197,4 @@ f_rtrim(void)
   put_malloced_string(str);
 }
 #endif
+ 

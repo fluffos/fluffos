@@ -12,3 +12,4 @@
 string trim(mixed, string | void);
 string ltrim(mixed, string | void);
 string rtrim(mixed, string | void);
+ 
