@@ -22,7 +22,7 @@
 #include "../lpc_incl.h"
 
 /*
-  Function that removes leading whitespaces.
+  Function that removes leading whitespaces / character list..
 */
 char *ltrim(const char *str, const char *charlist){
   const char *ptr_start, *ptr_end;
@@ -51,7 +51,7 @@ char *ltrim(const char *str, const char *charlist){
     return ret;
   }
 
-  // We prepare a substring without whitespaces and return it.
+  // We prepare a substring without whitespaces / character list and return it.
   size = ptr_end - ptr_start + 1;
   ret = new_string(size, "ltrim");
   strncpy(ret, ptr_start, size);
@@ -60,7 +60,7 @@ char *ltrim(const char *str, const char *charlist){
 }
 
 /*
-  Function that removes trailing whitespaces.
+  Function that removes trailing whitespaces / character list..
 */
 char *rtrim(const char *str, const char *charlist){
   const char *ptr_end;
@@ -88,7 +88,7 @@ char *rtrim(const char *str, const char *charlist){
     return ret;
   }
 
-  // We prepare a substring without whitespaces and return it.
+  // We prepare a substring without whitespaces / character list and return it.
   size = ptr_end - str + 1;
   ret = new_string(size, "rtrim");
   strncpy(ret, str, size);
@@ -101,7 +101,6 @@ void
 f_trim(void)
 {
   const char *str, *charlist = NULL;
-
 
   // If use 2 arguments, we get characters to remove and positioning in previous parameter.
   if(st_num_arg == 2){
