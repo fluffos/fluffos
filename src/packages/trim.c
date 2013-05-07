@@ -1,15 +1,15 @@
 /*
   Author: Zoilder (RL-Mud)
   Date: 03/05/2013
-  Description: Package that remove leading / trailing whitespaces in a string.
+  Description: Package that remove leading / trailing whitespaces and other type of characters (\n \t ...) in a string.
   Functions:
-    - trim: Remove leading and trailing whitespaces.
+    - trim: Remove leading and trailing whitespaces (and others).
       Example:
         - "    my test   " : "my test"
-    - ltrim: Remove leading whitespaces.
+    - ltrim: Remove leading whitespaces (and others).
       Example:
         - "    my test   " : "my test   "
-    - rtrim: Remove trailing whitespaces.
+    - rtrim: Remove trailing whitespaces (and others).
       Example:
         - "    my test   " : "    my test"
 */
