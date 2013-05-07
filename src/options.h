@@ -728,6 +728,12 @@
     - rtrim: Remove trailing whitespaces (and others).
       Example:
         - "    my test   " : "    my test"
+
+  Characters that remove:
+    ' '  (0x20)	space (SPC)
+    '\t' (0x09)	horizontal tab (TAB)
+    '\n' (0x0a)	newline (LF)
+    '\r' (0x0d)	carriage return (CR)
  */
 #define PACKAGE_TRIM
 
