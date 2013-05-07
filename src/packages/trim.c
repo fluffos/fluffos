@@ -35,8 +35,7 @@ char *ltrim(const char *str){
   ptr_end   = &str[strlen(str) - 1];
 
   // Search initial text skipping leading whitespaces.
-  // I don't use "isspace" because i don't want that remove \n, \t, etc.
-  while(ptr_start <= ptr_end && *ptr_start == ' ')
+  while(ptr_start <= ptr_end && isspace(*ptr_start))
     ptr_start++;
 
   // There aren't any text.
@@ -74,7 +73,7 @@ char *rtrim(const char *str){
 
   // Search final text skipping trailing whitespaces.
   // I don't use "isspace" because i don't want that remove \n, \t, etc.
-  while(ptr_end >= str && *ptr_end== ' ')
+  while(ptr_end >= str && isspace(*ptr_end))
     ptr_end--;
 
   // There aren't any text.
@@ -105,14 +104,15 @@ f_trim(void)
   }
   
   // Parameter is string.
-    // Unlink for modify string withoud modify origin string.
+    // Unlink for modify string without modify origin string.
   unlink_string_svalue(sp);
 
   // Remove blank spaces.
   str = ltrim(rtrim(sp->u.string));
 
   // Update string.
-  put_constant_string(str);
+  free_svalue(sp, "f_trim");
+  put_malloced_string(str);
 }
 #endif
 
@@ -136,7 +136,8 @@ f_ltrim(void)
   str = ltrim(sp->u.string);
 
   // Update string.
-  put_constant_string(str);
+  free_svalue(sp, "f_ltrim");
+  put_malloced_string(str);
 }
 #endif
 
@@ -160,6 +161,7 @@ f_rtrim(void)
   str = rtrim(sp->u.string);
 
   // Update string.
-  put_constant_string(str);
+  free_svalue(sp, "f_rtrim");
+  put_malloced_string(str);
 }
 #endif
