@@ -5,6 +5,7 @@
 */
 #include "spec.h"
 
+// Parameter 1 could be int for allow trim(0) in mudlib and return "" in that case.
 string trim(string | int);
 string ltrim(string | int);
 string rtrim(string | int);
