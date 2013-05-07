@@ -66,6 +66,7 @@
 #undef MALLOC64
 #undef MALLOC32
 #undef GCMALLOC /* needs -lgc in system_libs */
+
 /* You may optionally choose one (or none) of these malloc wrappers.  These
  * can be used in conjunction with any of the above malloc packages.
  *
@@ -277,6 +278,56 @@
  */
 #define SENSIBLE_MODIFIERS
 
+/* use class keyword for lpc structs */
+#define STRUCT_CLASS
+
+/* use struct keyword for lpc structs */
+#define STRUCT_STRUCT
+
+/* SANE_SORTING: Use system provided fastest sorting routine for various
+ * sorting, including sort_array EFUN.
+ *
+ * This replace the old internal version qsort which only sorts to one
+ * direction repetitively. so following LPC code:
+ *
+ *    sort_array(({4,3,2,1}), (: -($1<$2) :));
+ *
+ * can still return ({1,2,3,4}), even though it only returns -1 and 0.
+ *
+ * It is recommended to fix your LPC code to not rely on this behavior.
+ *
+ * Your LPC code should return 1, 0, -1 for situation where first argument
+ * is less than, equal to, or greater than the second argument. This will
+ * will work with both implementation.
+ *
+ * Old code should work fine with this added, easy to inspect by searching
+ * for sort_array.
+ */
+#define SANE_SORTING
+
+/* WARN_TAB: Some versions of the editor built in indent function use
+ *   tabs for indenting. This options turns on a warning message for
+ *   files indented with tabs instead of spaces.
+ */
+#undef WARN_TAB
+
+/* WOMBLES: don't allow spaces between start/end of array/mapping/functional token chars so ({1,2,3}) still works, but ( { 1 , 2 , 3 } ) doesn't and ({ 1 , 2 , 3 }) does.*/
+#define WOMBLES
+
+/* ALLOW_INHERIT_AFTER_FUNCTION: allow inheriting after functions have been defined (this includes prototypes).
+ * This caused crashes in v22.2a but it may have been fixed since.
+ * sunyc: 2013-05-05, no crash observed anymore, changing to default true.
+ */
+#define ALLOW_INHERIT_AFTER_FUNCTION
+
+/* CALL_OTHER_TYPE_CHECK: enable type checking for call_other()
+ * (-> operator on objects)
+ */
+#undef CALL_OTHER_TYPE_CHECK
+
+/* CALL_OTHER_WARN, make it warning instead of errors */
+#undef CALL_OTHER_WARN
+
 /****************************************************************************
  *                           MISCELLANEOUS                                  *
  *                          ---------------                                 *
@@ -291,8 +342,10 @@
  * Define this in order to use Fermat@Equilibria's MD5 based crypt() instead
  * of the operating system's.  It has the advantage of giving the same value
  * on all architectures, and being stronger than the standard UNIX crypt().
+ *
+ * Consider use PACKAGE_CRYPTO instead.
  */
-#undef CUSTOM_CRYPT
+#define CUSTOM_CRYPT
 
 /*
  * Some minor tweaks that make it a bit easier to run code designed to run
@@ -396,7 +449,7 @@
  * PRAGMA_ERROR_CONTEXT:include some text telling where on the line a
  *                      compilation error occured.
  */
-#define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_STRICT_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
+#define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
 
 /* supress warnings about unused arguments; only warn about unused local
  * variables.  Makes older code (where argument names were required) compile
@@ -620,7 +673,7 @@
  *   maintenance by the driver.  These mudlib stats are more domain
  *   based than user based, and replaces the traditional wiz_list stats.
  */
-#undef PACKAGE_MUDLIB_STATS
+#define PACKAGE_MUDLIB_STATS
 
 /* PACKAGE_SOCKETS: define this to enable the socket efunctions.  This
  *   causes HAS_SOCKETS to be defined for all LPC objects.
@@ -653,6 +706,38 @@
 #define USE_MYSQL 2
 #undef USE_POSTGRES
 #endif
+
+/*PACKAGE_ASYNC: adds some efuns for asyncronous IO */
+#define PACKAGE_ASYNC
+
+/*PACKAGE_SHA1: adds a function to calculate the sha1 hash of a string sha1(string).  Use PACKAGE_CRYPTO instead if possible. */
+#define PACKAGE_SHA1
+
+/*PACKAGE_CRYPTO: adds a function that does multiple hash types hash(hash, string), needs openssl lib and includes and -lssl in system_libs*/
+#undef PACKAGE_CRYPTO
+
+/*
+  PACKAGE_TRIM: Add efuns for remove leading / trailing whitespaces and other type of characters (\n \t ...) in a string.
+  Functions:
+    - trim: Remove leading and trailing whitespaces (and others).
+      Example:
+        - "    my test   " : "my test"
+    - ltrim: Remove leading whitespaces (and others).
+      Example:
+        - "    my test   " : "my test   "
+    - rtrim: Remove trailing whitespaces (and others).
+      Example:
+        - "    my test   " : "    my test"
+
+  Characters that remove by default (it can be configured as parameter 2 in efuns):
+    ' '	(0x20)	space (SPC)
+    '\t'	(0x09)	horizontal tab (TAB)
+    '\n'	(0x0a)	newline (LF)
+    '\v'	(0x0b)	vertical tab (VT)
+    '\f'	(0x0c)	feed (FF)
+    '\r'	(0x0d)	carriage return (CR)
+ */
+#define PACKAGE_TRIM
 
 /****************************************************************************
  *                            UID PACKAGE                                   *
@@ -819,34 +904,6 @@
 /* This must be one of 4, 16, 64, 256, 1024, 4096 */
 #define CFG_LIVING_HASH_SIZE            256
 
-/* NEXT_MALLOC_DEBUG: define this if using a NeXT and you want to enable
- *   the malloc_check() and/or malloc_debug() efuns.  Run the 'man malloc_debug'
- *   command on the NeXT to find out what the arguments to malloc_debug(int)
- *   mean.  The malloc_check() efun calls the NeXT NXMallocCheck() system
- *   call which does a consistency check on malloc's data structures (this
- *   consistency check is done at each malloc() and free() for certain
- *   malloc_debug() levels).  A non-zero return value indicates there was
- *   a consistency problem.  For those NeXT users wanting a bit more
- *   performance out of malloc, try defining NEXT_MALLOC_DEBUG and calling the
- *   malloc_debug(-1) efun (with an arg of -1).  This will turn all
- *   malloc debugging off and call malloc_singlethreaded() which the NeXT
- *   malloc man page claims can make NeXT system malloc 10% to 15% faster.
- *
- * [NOTE: This #define has no affect on the driver if not using the
- *  NeXTSTEP OS.]
- *
- * Warning: if you use a NeXT and define NEXT_MALLOC_DEBUG, be sure to
- *          protect the use of the malloc_check() and malloc_debug() efuns
- *          since setting certain debug levels can cause malloc() and free()
- *          to become _very_ slow (protect efuns by using simul_efuns and
- *          valid_override).
- *
- * [NOTE: malloc_debug(6) is a good compromise between efficiency and
- *  completeness of malloc debugging (malloc/free will be about half as fast).]
- */
-#define NEXT_MALLOC_DEBUG
-
-
 /* GET_CHAR_IS_BUFFERED: Normally get_char() is unbuffered.  That is, once
  * a character is received for get_char(), anything else is in the input
  * stream is immediately thrown away.  This can be very undesirable, especially
@@ -864,39 +921,10 @@
 #define PACKAGE_COMPRESS
 #define SAVE_GZ_EXTENSION ".o.gz"
 
-/* CALL_OTHER_TYPE_CHECK: enable type checking for call_other()
- * (-> operator on objects)
- */
-#undef CALL_OTHER_TYPE_CHECK
-
-/* CALL_OTHER_WARN, make it warning instead of errors */
-#undef CALL_OTHER_WARN
-
-/* WARN_TAB: Some versions of the editor built in indent function use
- *   tabs for indenting. This options turns on a warning message for
- *   files indented with tabs instead of spaces.
- */
-#define WARN_TAB
-
 /* USE_ICONV: Use iconv to translate input and output from/to the users char
  * encoding
  */
 #define USE_ICONV
-
-/* WOMBLES: don't allow spaces between start/end of array/mapping/functional token chars so ({1,2,3}) still works, but ( { 1 , 2 , 3 } ) doesn't and ({ 1 , 2 , 3 }) does.*/
-#define WOMBLES
-
-/* ALLOW_INHERIT_AFTER_FUNCTION: allow inheriting after functions have been defined (this includes prototypes). This caused crashes in v22.2a but it may have been fixed since */
-#undef ALLOW_INHERIT_AFTER_FUNCTION
-
-/*PACKAGE_ASYNC: adds some efuns for asyncronous IO */
-#define PACKAGE_ASYNC
-
-/*PACKAGE_SHA1: adds a function to calculate the sha1 hash of a string sha1(string).  Use PACKAGE_CRYPTO instead if possible. */
-#undef PACKAGE_SHA1
-
-/*PACKAGE_CRYPTO: adds a function that does multiple hash types hash(hash, string), needs openssl lib and includes and -lssl in system_libs*/
-#undef PACKAGE_CRYPTO
 
 /* PROG_REF_TYPE size of program ref counter:
  * char for 8 bit, short for 16, int for 32,
@@ -920,37 +948,10 @@
 /* static user space dtrace probes, try them if you have dtrace! */
 #undef DTRACE
 
-/* use class keyword for lpc structs */
-#define STRUCT_CLASS
-
-/* use struct keyword for lpc structs */
-#define STRUCT_STRUCT
-
 /* use POSIX timers for eval_cost.
  *
  * Old code should works fine with this added.
  */
 #define POSIX_TIMERS
-
-/* SANE_SORTING: Use system provided fastest sorting routine for various
- * sorting , including sort_array EFUN.
- *
- * This replace the old internal version qsort which only sorts to one
- * direction repetitively. so following LPC code:
- *
- *    sort_array(({4,3,2,1}), (: -($1<$2) :));
- *
- * can still return ({1,2,3,4}), even though it only returns -1 and 0.
- *
- * It is recommended to fix your LPC code to not rely on this behavior.
- *
- * Your LPC code should return 1, 0, -1 for situation where first argument
- * is less than, equal to, or greater than the second argument. This will
- * will work with both implementation.
- *
- * Old code should work fine with this added, easy to inspect by searching
- * for sort_array.
- */
-#define SANE_SORTING
 
 #endif /* _OPTIONS_H */
