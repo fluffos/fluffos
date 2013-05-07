@@ -1,0 +1,2 @@
+SRC=trim.c uids.c db.c compress.c rl.c math.c develop.c external.c contrib.c sockets.c sha1.c async.c mudlib_stats.c 
+OBJ=trim.$(O) uids.$(O) db.$(O) compress.$(O) rl.$(O) math.$(O) develop.$(O) external.$(O) contrib.$(O) sockets.$(O) sha1.$(O) async.$(O) mudlib_stats.$(O) 
