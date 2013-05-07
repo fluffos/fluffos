@@ -729,7 +729,7 @@
       Example:
         - "    my test   " : "    my test"
 
-  Characters that remove by default (it can be configure as parameter 2 in efuns):
+  Characters that remove by default (it can be configured as parameter 2 in efuns):
     ' '  (0x20)	space (SPC)
     '\t' (0x09)	horizontal tab (TAB)
     '\n' (0x0a)	newline (LF)
