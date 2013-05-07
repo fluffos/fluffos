@@ -53,7 +53,7 @@ char *ltrim(const char *str, const char *charlist){
 
   // We prepare a substring without whitespaces and return it.
   size = ptr_end - ptr_start + 1;
-  ret = new_string(size, "f_trim");
+  ret = new_string(size, "ltrim");
   strncpy(ret, ptr_start, size);
   ret[size] = '\0';
   return ret;
@@ -90,7 +90,7 @@ char *rtrim(const char *str, const char *charlist){
 
   // We prepare a substring without whitespaces and return it.
   size = ptr_end - str + 1;
-  ret = new_string(size, "f_trim");
+  ret = new_string(size, "rtrim");
   strncpy(ret, str, size);
   ret[size] = '\0';
   return ret;
