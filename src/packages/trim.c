@@ -24,14 +24,14 @@
 /*
   Function that removes leading whitespaces.
 */
-char *ltrim(const char *str){
+char *ltrim(const char *str, const char *charlist){
   const char *ptr_start, *ptr_end;
   char *ret;
   int size;
 
   // Is str is null or empty, we return empty string.
   if(!str || str[0] == '\0'){
-    ret = new_string(1, "trim:empty");
+    ret = new_string(0, "ltrim:empty");
     ret[0] = '\0';
     return ret;
   }
@@ -40,13 +40,13 @@ char *ltrim(const char *str){
   ptr_start = str;
   ptr_end   = &str[strlen(str) - 1];
 
-  // Search initial text skipping leading whitespaces.
-  while(ptr_start <= ptr_end && isspace(*ptr_start))
+  // Search final text skipping leading whitespaces / character list.
+  while(ptr_start <= ptr_end && (!charlist && isspace(*ptr_start) || charlist && strchr(charlist, *ptr_start)))
     ptr_start++;
 
   // There aren't any text.
   if(ptr_start > ptr_end){
-    ret = new_string(1, "trim:empty");
+    ret = new_string(0, "ltrim:empty");
     ret[0] = '\0';
     return ret;
   }
@@ -62,14 +62,14 @@ char *ltrim(const char *str){
 /*
   Function that removes trailing whitespaces.
 */
-char *rtrim(const char *str){
+char *rtrim(const char *str, const char *charlist){
   const char *ptr_end;
   char *ret;
   int size;
 
   // Is str is null or empty, we return empty string.
   if(!str || str[0] == '\0'){
-    ret = new_string(1, "trim:empty");
+    ret = new_string(0, "rtrim:empty");
     ret[0] = '\0';
     return ret;
   }
@@ -77,14 +77,13 @@ char *rtrim(const char *str){
   // End of string.
   ptr_end   = &str[strlen(str) - 1];
 
-  // Search final text skipping trailing whitespaces.
-  // I don't use "isspace" because i don't want that remove \n, \t, etc.
-  while(ptr_end >= str && isspace(*ptr_end))
+  // Search final text skipping trailing whitespaces / character list.
+  while(ptr_end >= str && (!charlist && isspace(*ptr_end) || charlist && strchr(charlist, *ptr_end)))
     ptr_end--;
 
   // There aren't any text.
   if(ptr_end < str){
-    ret = new_string(1, "trim:empty");
+    ret = new_string(0, "rtrim:empty");
     ret[0] = '\0';
     return ret;
   }
@@ -101,7 +100,17 @@ char *rtrim(const char *str){
 void
 f_trim(void)
 {
-  const char *str;
+  const char *str, *charlist = NULL;
+
+
+  // If use 2 arguments, we get characters to remove and positioning in previous parameter.
+  if(st_num_arg == 2){
+  	// Not strings will be ignored.
+    if(sp->type == T_STRING)
+      charlist = sp->u.string;
+
+    free_svalue(sp--, "f_trim");
+  }
 
   // If parameter isn't string, we return "".
   if(sp->type != T_STRING){
@@ -114,7 +123,7 @@ f_trim(void)
   unlink_string_svalue(sp);
 
   // Remove blank spaces.
-  str = ltrim(rtrim(sp->u.string));
+  str = ltrim(rtrim(sp->u.string, charlist), charlist);
 
   // Update string.
   free_svalue(sp, "f_trim");
@@ -126,7 +135,16 @@ f_trim(void)
 void
 f_ltrim(void)
 {
-  const char *str;
+  const char *str, *charlist = NULL;
+
+  // If use 2 arguments, we get characters to remove and positioning in previous parameter.
+  if(st_num_arg == 2){
+  	// Not strings will be ignored.
+    if(sp->type == T_STRING)
+      charlist = sp->u.string;
+
+    free_svalue(sp--, "f_ltrim");
+  }
 
   // If parameter isn't string, we return "".
   if(sp->type != T_STRING){
@@ -139,7 +157,7 @@ f_ltrim(void)
   unlink_string_svalue(sp);
 
   // Remove blank spaces.
-  str = ltrim(sp->u.string);
+  str = ltrim(sp->u.string, charlist);
 
   // Update string.
   free_svalue(sp, "f_ltrim");
@@ -151,20 +169,29 @@ f_ltrim(void)
 void
 f_rtrim(void)
 {
-  const char *str;
+  const char *str, *charlist = NULL;
+
+	// If use 2 arguments, we get characters to remove and positioning in previous parameter.
+  if(st_num_arg == 2){
+  	// Not strings will be ignored.
+    if(sp->type == T_STRING)
+      charlist = sp->u.string;
+
+    free_svalue(sp--, "f_rtrim");
+  }
 
   // If parameter isn't string, we return "".
   if(sp->type != T_STRING){
     put_constant_string("");
     return;
   }
-  
+
   // Parameter is string.
     // Unlink for modify string withoud modify origin string.
   unlink_string_svalue(sp);
 
   // Remove blank spaces.
-  str = rtrim(sp->u.string);
+  str = rtrim(sp->u.string, charlist);
 
   // Update string.
   free_svalue(sp, "f_rtrim");

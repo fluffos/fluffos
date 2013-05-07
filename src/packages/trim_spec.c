@@ -5,7 +5,10 @@
 */
 #include "spec.h"
 
-// Parameter 1 could be int for allow trim(0) in mudlib and return "" in that case.
-string trim(string | int);
-string ltrim(string | int);
-string rtrim(string | int);
+/*
+  Parameter 1: Is mixed, so if it isn't string, it returns "".
+  Parameter 2: Could be string, with a list of characters leading / trailing to remove. Void use isspace function.
+*/
+string trim(mixed, string | void);
+string ltrim(mixed, string | void);
+string rtrim(mixed, string | void);
