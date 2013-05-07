@@ -22,7 +22,7 @@
 #include "../lpc_incl.h"
 
 /*
-  Function that removes leading whitespaces / character list..
+  Function that removes leading whitespaces / character list.
 */
 char *ltrim(const char *str, const char *charlist){
   const char *ptr_start, *ptr_end;
@@ -60,7 +60,7 @@ char *ltrim(const char *str, const char *charlist){
 }
 
 /*
-  Function that removes trailing whitespaces / character list..
+  Function that removes trailing whitespaces / character list.
 */
 char *rtrim(const char *str, const char *charlist){
   const char *ptr_end;
