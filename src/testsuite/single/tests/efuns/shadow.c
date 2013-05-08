@@ -25,6 +25,8 @@ void do_tests() {
     ASSERT(catch(shadow(ob)));
     ASSERT(catch(shadow(new(__FILE__))));
 
+    // clean up.
+    destruct(ob);
 #endif
 }
 
