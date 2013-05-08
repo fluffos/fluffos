@@ -278,4 +278,12 @@ typedef char *caddr_t;
 #endif
 #endif
 
+#ifdef SIGNAL_FUNC_TAKES_INT
+#define SIGPROT (int)
+#define PSIG(z) z (int sig)
+#else
+#define SIGPROT (void)
+#define PSIG(z) z()
+#endif
+
 #endif              /* _PORT_H */

@@ -1,5 +1,8 @@
 void do_tests() {
-    string foo = read_file("/testfile");
+    string foo;
+    ASSERT(cp("/single/master.c", "/testfile"));
+
+    foo = read_file("/testfile");
     
     ASSERT(!read_bytes("/does_not_exist"));
     ASSERT(!read_bytes("/does_not_exist", 1));

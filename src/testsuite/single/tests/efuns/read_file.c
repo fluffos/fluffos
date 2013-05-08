@@ -1,7 +1,11 @@
 void do_tests() {
-    string foo = read_bytes("/testfile");
-    string mid = implode(explode(foo, "\n")[9..18], "\n") + "\n";
-    string all = implode(explode(foo, "\n")[9..<1], "\n") + "\n";
+    string foo, mid, all;
+
+    ASSERT(cp("/single/master.c", "/testfile"));
+
+    foo = read_bytes("/testfile");
+    mid = implode(explode(foo, "\n")[9..18], "\n") + "\n";
+    all = implode(explode(foo, "\n")[9..<1], "\n") + "\n";
 
     ASSERT(!read_file("/single", 10, 10));
     ASSERT(foo == read_file("/testfile"));

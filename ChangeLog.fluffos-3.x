@@ -4,7 +4,7 @@ Wodan announced 3.x release will be maintained by
 Please submit issue to https://github.com/fluffos/fluffos
 
 Major changes compare to 2.x:
-  C++ (G++ 4.6+, CLANG 2.9+) compiling is now required (alpha3 done)
+  C++11 (G++ 4.6+, CLANG 2.9+) environment is required (alpha3 done)
   Support 32bit platform, CYGWIN build. (alpha2 done)
   64bit LPC runtime on all platforms (alpha2 done)
   EFUN limit has been raised to 65535 (alpha2)
@@ -18,7 +18,7 @@ TODOs:
   LPC JIT compiler
 
 ================================================================================
-  Per release ChangeLog
+  Per-release ChangeLog
 ================================================================================
 
 FluffOS 3.0-alpha3
