@@ -11,6 +11,8 @@ void flag(string str) {
   switch (str) {
     case "test":
       "/command/tests"->main();
+      "/command/tests"->main();
+      "/command/tests"->main();
       break;
     default:
       write("The only supproted flag is 'test', got '" + str + "'.\n");
