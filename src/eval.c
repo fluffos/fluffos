@@ -27,7 +27,7 @@ void set_eval(LPC_INT etime)
 #ifdef POSIX_TIMERS
   posix_eval_timer_set(etime);
 #else
-  signal(SIGVTALRM, sigalrm_handler);
+  signal(SIGVTALRM, (__sighandler_t)sigalrm_handler);
   uvalarm(etime, 0);
 #endif
 #endif
