@@ -1500,16 +1500,8 @@ static void handle_configure()
 
   check_include("INCL_SYS_STAT_H", "sys/stat.h");
 
-  /* sys/dir.h is BSD, dirent is sys V.  Try to do it the BSD way first. */
-  /* If that fails, fall back to sys V */
-  if (check_prog("BSD_READDIR", "#include <sys/dir.h>", "struct direct *d; d->d_namlen;", 0)) {
-    check_include("INCL_SYS_DIR_H", "sys/dir.h");
-  } else {
-    /* could be either of these */
-    check_include("INCL_DIRENT_H", "dirent.h");
-    check_include("INCL_SYS_DIRENT_H", "sys/dirent.h");
-    fprintf(yyout, "#define USE_STRUCT_DIRENT\n");
-  }
+  check_include("INCL_DIRENT_H", "dirent.h");
+  check_include("INCL_SYS_DIRENT_H", "sys/dirent.h");
 
   check_include("INCL_SYS_FILIO_H", "sys/filio.h");
   check_include("INCL_SYS_SOCKIO_H", "sys/sockio.h");

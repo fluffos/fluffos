@@ -102,11 +102,7 @@ array_t *get_dir(const char *path, int flags)
   int namelen, do_match = 0;
 
 #ifndef WIN32
-#ifdef USE_STRUCT_DIRENT
   struct dirent *de;
-#else
-  struct direct *de;
-#endif
 #endif
   struct stat st;
   char *endtemp;
@@ -200,11 +196,7 @@ array_t *get_dir(const char *path, int flags)
   _findclose(FileHandle);
 #else
   for (de = readdir(dirp); de; de = readdir(dirp)) {
-#ifdef USE_STRUCT_DIRENT
     namelen = strlen(de->d_name);
-#else
-    namelen = de->d_namlen;
-#endif
     if (!do_match && (strcmp(de->d_name, ".") == 0 ||
                       strcmp(de->d_name, "..") == 0)) {
       continue;
@@ -257,11 +249,7 @@ array_t *get_dir(const char *path, int flags)
   strcat(endtemp++, "/");
 
   for (i = 0, de = readdir(dirp); i < count; de = readdir(dirp)) {
-#ifdef USE_STRUCT_DIRENT
     namelen = strlen(de->d_name);
-#else
-    namelen = de->d_namlen;
-#endif
     if (!do_match && (strcmp(de->d_name, ".") == 0 ||
                       strcmp(de->d_name, "..") == 0)) {
       continue;
