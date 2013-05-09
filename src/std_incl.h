@@ -125,6 +125,10 @@ int dos_style_link(char *, char *);
 #include <execinfo.h>
 #endif
 
+#ifdef INCL_SYS_RUSAGE_H
+#include <sys/rusage.h>
+#endif
+
 /* Note: This is now only used if _both_ USHRT_MAX and MAXSHORT fail to exist*/
 #ifndef USHRT_MAX
 #define USHRT_MAX ((1 << (sizeof(short)*8)) - 1)
