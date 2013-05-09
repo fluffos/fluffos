@@ -1580,23 +1580,6 @@ static void handle_configure()
     printf(" no\n");
   }
 
-  /* TODO: FluffOS inline function is not in the header file, using it will
-   *       cause compiliation failure in lower GCC versions.
-   */
-#if 0
-  printf("Checking for inline ...");
-  if (!check_prog(" inline", "inline void foo() { }", "foo();", 0)) {
-    printf(" __inline ...");
-    if (!check_prog(" __inline", "__inline void foo() {}", "foo();", 0)) {
-      fprintf(yyout, "#define \n");
-    }
-  }
-#endif
-  printf(" const ...\n");
-  if (!check_prog("CONST const", "int foo(const int *, const int *);", "", 0)) {
-    fprintf(yyout, "#define CONST\n");
-  }
-
   verbose_check_prog("Checking for strerror()", "HAS_STRERROR",
                      "", "strerror(12);", 0);
   verbose_check_prog("Checking for POSIX getcwd()", "HAS_GETCWD",

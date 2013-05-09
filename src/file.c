@@ -20,8 +20,8 @@ int legal_path(const char *);
 static int match_string(char *, char *);
 static int copy(const char *from, const char *to);
 static int do_move(const char *from, const char *to, int flag);
-static int CDECL pstrcmp(CONST void *, CONST void *);
-static int CDECL parrcmp(CONST void *, CONST void *);
+static int CDECL pstrcmp(const void *, const void *);
+static int CDECL parrcmp(const void *, const void *);
 static void encode_stat(svalue_t *, int, char *, struct stat *);
 
 #define MAX_LINES 50
@@ -29,7 +29,7 @@ static void encode_stat(svalue_t *, int, char *, struct stat *);
 /*
  * These are used by qsort in get_dir().
  */
-static int CDECL pstrcmp(CONST void *p1, CONST void *p2)
+static int CDECL pstrcmp(const void *p1, const void *p2)
 {
   svalue_t *x = (svalue_t *)p1;
   svalue_t *y = (svalue_t *)p2;
@@ -37,7 +37,7 @@ static int CDECL pstrcmp(CONST void *p1, CONST void *p2)
   return strcmp(x->u.string, y->u.string);
 }
 
-static int CDECL parrcmp(CONST void *p1, CONST void *p2)
+static int CDECL parrcmp(const void *p1, const void *p2)
 {
   svalue_t *x = (svalue_t *)p1;
   svalue_t *y = (svalue_t *)p2;
