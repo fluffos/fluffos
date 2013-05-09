@@ -5,7 +5,7 @@ before_install:
 
 script: cd src && cp local_options.testdev local_options && ./build.FluffOS develop && make && cd testsuite && valgrind --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes ../driver etc/config.test -ftest && cd .. && cp local_options.testrelease local_options && ./build.FluffOS && make clean && make && cd testsuite && valgrind --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes ../driver etc/config.test -ftest
 
-after_failure: tail -n 50 testsuite/log/*
+after_failure: tail -n 50 log/*
 
 compiler:
   - clang

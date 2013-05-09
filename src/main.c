@@ -39,14 +39,6 @@ int no_ip_demon = 0;
 void init_addr_server();
 #endif        /* NO_IP_DEMON */
 
-#ifdef SIGNAL_FUNC_TAKES_INT
-#define SIGPROT (int)
-#define PSIG(z) z (int sig)
-#else
-#define SIGPROT (void)
-#define PSIG(z) z()
-#endif
-
 static void CDECL sig_fpe SIGPROT;
 static void CDECL sig_cld SIGPROT;
 
