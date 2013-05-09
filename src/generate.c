@@ -215,7 +215,7 @@ optimize(parse_node_t *expr)
 }
 
 #ifdef DEBUG
-char *lpc_tree_name[] = {
+const char *lpc_tree_name[] = {
   "return", "two values", "opcode", "opcode_1", "opcode_2",
   "unary op", "unary op_1", "binary op", "binary op_1",
   "ternary op", "ternary op_1", "control jump", "loop", "call",
