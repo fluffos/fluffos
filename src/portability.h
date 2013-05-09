@@ -20,14 +20,6 @@
 #undef __STRICT_ANSI__
 #endif
 
-/* define this if you have an Ultrix system that the driver won't otherwise
-   compile on (doesn't seem to be needed for DECstations).
-*/
-#undef OLD_ULTRIX
-
-/* define this if you're using HP-UX 7.x (or below?) */
-#undef OLD_HPUX
-
 #if defined(WINNT) || defined(WIN95)
 #  ifndef WIN32
 #    define WIN32
@@ -56,8 +48,7 @@ typedef char *caddr_t;
    also can run HP-UX or not, but to be sure we check ....
     -bobf
 */
-#if (defined(hp200) || defined(hp300) || defined(hp400) || defined(hp500)) \
-        && !defined(hpux)
+#if (defined(hp200) || defined(hp300) || defined(hp400) || defined(hp500))
 #  define hp68k
 #  define _ANSI_H
 #endif
@@ -83,12 +74,6 @@ typedef char *caddr_t;
  */
 #if (!defined(sparc))
 #  define INET_NTOA_OK
-#endif
-
-/* the !defined(_FUNC_SPEC) is needed to allow make_func to work okay. */
-#if defined(hpux) && !defined(OLD_HPUX) && !defined(_FUNC_SPEC_)
-#  include <sys/syscall.h>
-#  define getrusage(a, b) syscall(SYS_GETRUSAGE, (a), (b))
 #endif
 
 /*

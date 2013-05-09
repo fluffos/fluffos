@@ -18,7 +18,7 @@
 
 int set_socket_owner(int fd, int which)
 {
-#if defined(OLD_ULTRIX) || defined(__CYGWIN__)
+#if defined(__CYGWIN__)
   return fcntl(fd, F_SETOWN, which);
 #else
 #ifdef WINSOCK
@@ -35,11 +35,7 @@ int set_socket_owner(int fd, int which)
 
 int set_socket_async(int fd, int which)
 {
-#ifdef OLD_ULTRIX
-  return fcntl(fd, F_SETFL, FASYNC);
-#else
   return OS_socket_ioctl(fd, FIOASYNC, &which);
-#endif
 }
 
 /*
@@ -48,17 +44,9 @@ int set_socket_async(int fd, int which)
 
 int set_socket_nonblocking(int fd, int which)
 {
-#if !defined(OLD_ULTRIX) && !defined(_SEQUENT_)
+#if !defined(_SEQUENT_)
   int result;
 #endif
-
-#ifdef OLD_ULTRIX
-  if (which) {
-    return fcntl(fd, F_SETFL, FNDELAY);
-  } else {
-    return fcntl(fd, F_SETFL, FNBLOCK);
-  }
-#else
 
 #ifdef _SEQUENT_
   int flags = fcntl(fd, F_GETFL, 0);
@@ -84,7 +72,6 @@ int set_socket_nonblocking(int fd, int which)
   }
 #endif
   return result;
-#endif
 
 #endif
 }

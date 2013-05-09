@@ -131,8 +131,7 @@ f_localtime(void)
   vec->item[LT_ZONE].type = T_STRING;
   vec->item[LT_ZONE].subtype = STRING_MALLOC;
   vec->item[LT_ISDST].type = T_NUMBER;
-#if defined(BSD42) || defined(apollo) || defined(_AUX_SOURCE) \
-    || defined(OLD_ULTRIX)
+#if defined(BSD42) || defined(apollo) || defined(_AUX_SOURCE)
   /* 4.2 BSD doesn't seem to provide any way to get these last three values */
   vec->item[LT_GMTOFF].u.number = 0;
   vec->item[LT_ZONE].type = T_NUMBER;
@@ -147,14 +146,13 @@ f_localtime(void)
   vec->item[LT_ZONE].u.string =
     string_copy(timezone(tz.tz_minuteswest, tm->tm_isdst), "f_localtime");
 #else                           /* sequent */
-#if (defined(hpux) || defined(_SEQUENT_) || defined(_AIX) || defined(SunOS_5) \
-    || defined(SVR4) || defined(sgi) || defined(__linux__) || defined(cray) \
-    )
+#if defined(_SEQUENT_) || defined(_AIX) || defined(SunOS_5) \
+    || defined(SVR4) || defined(sgi) || defined(__linux__) || defined(cray)
   if (!tm->tm_isdst) {
     vec->item[LT_GMTOFF].u.number = timezone;
     vec->item[LT_ZONE].u.string = string_copy(tzname[0], "f_localtime");
   } else {
-#if (defined(_AIX) || defined(hpux) || defined(__linux__) || defined(cray) \
+#if (defined(_AIX) || defined(__linux__) || defined(cray) \
     )
     vec->item[LT_GMTOFF].u.number = timezone;
 #else

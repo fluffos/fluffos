@@ -130,14 +130,6 @@
 #define ARCH "386bsd"
 #endif
 
-#if !defined(ARCH) && defined(ultrix)
-#define ARCH "Ultrix"
-#endif
-
-#if !defined(ARCH) && defined(hpux)
-#define ARCH "HP/UX"
-#endif
-
 #if !defined(ARCH) && defined(sgi)
 #define ARCH "IRIX"
 #endif

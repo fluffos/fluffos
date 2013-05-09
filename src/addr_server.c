@@ -660,11 +660,7 @@ int main(int argc, char **argv)
         FD_SET(all_conns[i].fd, &readmask);
       }
     }
-#ifndef hpux
     nb = select(FD_SETSIZE, &readmask, (fd_set *) 0, (fd_set *) 0, &timeout);
-#else
-    nb = select(FD_SETSIZE, (int *) &readmask, (int *) 0, (int *) 0, &timeout);
-#endif
     if (nb != 0) {
       aserv_process_io(nb);
     }

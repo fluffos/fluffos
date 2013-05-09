@@ -98,11 +98,6 @@ int dos_style_link(char *, char *);
 #  include <sys/param.h>
 #endif
 
-#ifdef OLD_ULTRIX
-#  include <stddef.h>
-#  define size_t unsigned
-#endif
-
 #ifdef INCL_MACH_MACH_H
 #  include <mach/mach.h>
 #endif
