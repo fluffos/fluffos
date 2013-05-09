@@ -215,50 +215,8 @@ get_cpu_times(unsigned long *secs, unsigned long *usecs)
 char *
 get_current_dir(char *buf, int limit)
 {
-#ifdef HAS_GETCWD
   return getcwd(buf, limit);  /* POSIX */
-#else
-  return getwd(buf);      /* BSD */
-#endif
 }
-
-#ifndef HAS_STRERROR
-/* for those systems without strerror() but with sys_errlist, sys_nerr */
-/* Warning: Sun has a prototype for strerror, but no definition for it,
-   so we can't use that name */
-extern char *sys_errlist[];
-extern int sys_nerr;
-
-char *port_strerror(int which)
-{
-  if ((which < 0) || (which >= sys_nerr)) {
-    return "unknown error";
-  } else {
-    return sys_errlist[which];
-  }
-}
-#endif              /* STRERROR */
-
-#ifdef MEMMOVE_MISSING
-/* for those without memmove() and a working bcopy() that can handle overlaps */
-char *memmove(register char *b, register char *a, register int s)
-{
-  char *r = b;
-
-  if (b < a) {
-    while (s--) {
-      *(b++) = *(a++);
-    }
-  } else if (b > a) {
-    b += s;
-    a += s;
-    while (s--) {
-      *(--b) = *(--a);
-    }
-  }
-  return r;
-}
-#endif
 
 #ifdef WIN32
 char *WinStrError(int err)

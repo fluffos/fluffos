@@ -54,13 +54,6 @@ static char sccsid[] = "@(#)malloc.c	5.11 (Berkeley) 2/23/91";
 #undef NULL
 #define NULL 0
 
-#ifdef _SEQUENT_
-typedef unsigned char u_char;
-typedef unsigned short u_short;
-typedef unsigned int u_int;
-
-#endif
-
 /*
  * The overhead on a block is at least 4 bytes.  When free, this space
  * contains a pointer to the next free block, and the bottom two bits must

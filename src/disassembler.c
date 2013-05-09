@@ -266,11 +266,7 @@ disassemble(FILE *f, char *code, int start, int end, program_t *prog)
       }
       offsets[(i << 1) + 1] = i;
     }
-#ifdef _SEQUENT_
-    qsort((void *) &offsets[0],
-#else
     qsort((char *) &offsets[0],
-#endif
           NUM_FUNS_D, sizeof(short) * 2, short_compare);
     next_func = 0;
   } else {

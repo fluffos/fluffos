@@ -1580,10 +1580,6 @@ static void handle_configure()
     printf(" no\n");
   }
 
-  verbose_check_prog("Checking for strerror()", "HAS_STRERROR",
-                     "", "strerror(12);", 0);
-  verbose_check_prog("Checking for POSIX getcwd()", "HAS_GETCWD",
-                     "", "getcwd(\"\", 1000);", 0);
   verbose_check_prog("Checking for getrusage()", "RUSAGE",
                      "", "getrusage(0, 0);", 0);
   verbose_check_prog("Checking for times()", "TIMES",

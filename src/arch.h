@@ -14,11 +14,6 @@
  * in MudOS is not used.
  */
 #ifdef __CYGWIN__
-#undef WINNT
-#undef WIN95
-#undef WIN98
-#undef WINSOCK
-#undef WIN32
 #define ARCH "Cygwin-32"
 #endif
 

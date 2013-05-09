@@ -416,7 +416,7 @@ int write_file(const char *file, const char *str, int flags)
     gf = gzopen(file, (flags & 1) ? "w" : "a");
     if (!gf)
       error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n",
-            file, (flags & 1) ? "overwrite" : "append", port_strerror(errno));
+            file, (flags & 1) ? "overwrite" : "append", strerror(errno));
   } else {
 #endif
 #ifdef WIN32
@@ -429,7 +429,7 @@ int write_file(const char *file, const char *str, int flags)
 #endif
     if (f == 0) {
       error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n",
-            file, (flags & 1) ? "overwrite" : "append", port_strerror(errno));
+            file, (flags & 1) ? "overwrite" : "append", strerror(errno));
     }
 #ifdef PACKAGE_COMPRESS
   }
@@ -1004,9 +1004,9 @@ static int do_move(const char *from, const char *to, int flag)
 void debug_perror(const char *what, const char *file)
 {
   if (file) {
-    debug_message("System Error: %s:%s:%s\n", what, file, port_strerror(errno));
+    debug_message("System Error: %s:%s:%s\n", what, file, strerror(errno));
   } else {
-    debug_message("System Error: %s:%s\n", what, port_strerror(errno));
+    debug_message("System Error: %s:%s\n", what, strerror(errno));
   }
 }
 

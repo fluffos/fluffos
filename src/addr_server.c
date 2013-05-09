@@ -60,9 +60,9 @@ void debug_perror(const char *, const char *);
 void debug_perror(const char *what, const char *file)
 {
   if (file) {
-    fprintf(stderr, "System Error: %s:%s:%s\n", what, file, port_strerror(errno));
+    fprintf(stderr, "System Error: %s:%s:%s\n", what, file, strerror(errno));
   } else {
-    fprintf(stderr, "System Error: %s:%s\n", what, port_strerror(errno));
+    fprintf(stderr, "System Error: %s:%s\n", what, strerror(errno));
   }
 }
 

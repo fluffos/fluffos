@@ -12,9 +12,6 @@ void init_usec_clock(void);
 void get_usec_clock(long *, long *);
 int get_cpu_times(unsigned long *, unsigned long *);
 char *get_current_dir(char *, int);
-#ifndef HAS_STRERROR
-char *port_strerror(int);
-#endif
 #endif
 
 #endif
