@@ -1825,7 +1825,7 @@ static void sigpipe_handler(void)
 
 int max_fd;
 
-INLINE void make_selectmasks()
+void make_selectmasks()
 {
   int i;
   max_fd = addr_server_fd;
@@ -1903,7 +1903,7 @@ INLINE void make_selectmasks()
 /*
  * Process I/O.
  */
-INLINE void process_io()
+void process_io()
 {
   int i;
 

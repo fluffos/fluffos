@@ -158,9 +158,9 @@ extern int num_hidden;
 #endif
 
 void bufcat(char **, char *);
-INLINE int svalue_save_size(svalue_t *);
-INLINE void save_svalue(svalue_t *, char **);
-INLINE int restore_svalue(char *, svalue_t *);
+int svalue_save_size(svalue_t *);
+void save_svalue(svalue_t *, char **);
+int restore_svalue(char *, svalue_t *);
 int save_object(object_t *, const char *, int);
 int save_object_str(object_t *, int, char *, int);
 char *save_variable(svalue_t *);
@@ -172,8 +172,8 @@ void call_create(object_t *, int);
 void reload_object(object_t *);
 void free_object(object_t **, const char *const);
 #ifdef F_SET_HIDE
-INLINE int valid_hide(object_t *);
-INLINE int object_visible(object_t *);
+int valid_hide(object_t *);
+int object_visible(object_t *);
 #else
 #define object_visible(x) 1
 #endif

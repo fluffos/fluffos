@@ -245,14 +245,6 @@ char *int_alloc_cstring(const char *);
 #   define alloc_cstring(x,y) int_alloc_cstring(x)
 #endif
 
-#ifndef INLINE
-#define INLINE
-#endif
-
-#ifndef INLINE_STATIC
-#  define INLINE_STATIC static INLINE
-#endif
-
 /* The ANSI versions must take an unsigned char, and must work on EOF.  These
  * versions take a (possibly signed) char, and do not work correctly on EOF.
  *

@@ -241,7 +241,7 @@ char *port_strerror(int which)
 
 #ifdef MEMMOVE_MISSING
 /* for those without memmove() and a working bcopy() that can handle overlaps */
-INLINE char *memmove(register char *b, register char *a, register int s)
+char *memmove(register char *b, register char *a, register int s)
 {
   char *r = b;
 

@@ -272,7 +272,7 @@ morecore(int bucket)
   }
 }
 
-INLINE void
+void
 bsdmalloc_free(void *cp)
 {
   register int size;
@@ -442,7 +442,7 @@ show_mstats(outbuffer_t *ob, char *s)
 /* linux */
 #undef calloc
 #endif
-INLINE void *bsdmalloc_calloc(size_t num, register size_t size)
+void *bsdmalloc_calloc(size_t num, register size_t size)
 {
   register void *p;
 

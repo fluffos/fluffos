@@ -38,7 +38,7 @@ void null_stats(statgroup_t *);
 void init_stats_for_object(struct object_s *);
 
 void add_moves(statgroup_t *, int);
-INLINE void add_heart_beats(statgroup_t *, int);
+void add_heart_beats(statgroup_t *, int);
 void add_array_size(statgroup_t *, int);
 void add_errors(statgroup_t *, int);
 void add_errors_for_file(const char *, int);

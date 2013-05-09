@@ -608,7 +608,7 @@ void preload_objects(int eflag)
 /* All destructed objects are moved into a sperate linked list,
  * and deallocated after program execution.  */
 
-INLINE void remove_destructed_objects()
+void remove_destructed_objects()
 {
   object_t *ob, *next;
 

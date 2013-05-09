@@ -55,13 +55,13 @@ union string_or_func {
 
 void dealloc_funp(funptr_t *);
 void push_refed_funp(funptr_t *);
-INLINE void push_funp(funptr_t *);
-INLINE void free_funp(funptr_t *);
+void push_funp(funptr_t *);
+void free_funp(funptr_t *);
 int merge_arg_lists(int, struct array_s *, int);
-INLINE funptr_t *make_efun_funp(int, struct svalue_s *);
-INLINE funptr_t *make_lfun_funp(int, struct svalue_s *);
-INLINE funptr_t *make_simul_funp(int, struct svalue_s *);
-INLINE funptr_t *make_functional_funp(short, short, short,
-                                      struct svalue_s *, int);
+funptr_t *make_efun_funp(int, struct svalue_s *);
+funptr_t *make_lfun_funp(int, struct svalue_s *);
+funptr_t *make_simul_funp(int, struct svalue_s *);
+funptr_t *make_functional_funp(short, short, short,
+                               struct svalue_s *, int);
 
 #endif

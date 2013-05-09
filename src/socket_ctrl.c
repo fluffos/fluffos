@@ -16,7 +16,7 @@
  * set process receiving SIGIO/SIGURG signals to us.
  */
 
-INLINE int set_socket_owner(int fd, int which)
+int set_socket_owner(int fd, int which)
 {
 #if defined(OLD_ULTRIX) || defined(__CYGWIN__)
   return fcntl(fd, F_SETOWN, which);
@@ -33,7 +33,7 @@ INLINE int set_socket_owner(int fd, int which)
  * allow receipt of asynchronous I/O signals.
  */
 
-INLINE int set_socket_async(int fd, int which)
+int set_socket_async(int fd, int which)
 {
 #ifdef OLD_ULTRIX
   return fcntl(fd, F_SETFL, FASYNC);
@@ -46,7 +46,7 @@ INLINE int set_socket_async(int fd, int which)
  * set socket non-blocking
  */
 
-INLINE int set_socket_nonblocking(int fd, int which)
+int set_socket_nonblocking(int fd, int which)
 {
 #if !defined(OLD_ULTRIX) && !defined(_SEQUENT_)
   int result;

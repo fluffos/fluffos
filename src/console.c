@@ -34,8 +34,8 @@ static int itemcmpsize(const void *, const void *);
 static int objcmpsize(const void *, const void *);
 static int objcmpidle(const void *, const void *);
 
-static INLINE void print_obj(int refs, int cpy, const char *obname, long lastref,
-                             long sz)
+static  void print_obj(int refs, int cpy, const char *obname, long lastref,
+                       long sz)
 {
   printf("%4d %4d %-*s %5ld %10ld\n", refs, cpy, NAME_LEN,
          obname, ((long)time(0) - lastref), sz);

@@ -139,7 +139,7 @@ extern keyword_t predefs[];
 extern int lex_fatal;
 extern int arrow_efun, evaluate_efun, this_efun, to_float_efun, to_int_efun, new_efun;
 
-INLINE void push_function_context(void);
+void push_function_context(void);
 void pop_function_context(void);
 int yylex(void);
 void init_num_args(void);

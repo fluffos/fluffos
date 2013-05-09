@@ -282,43 +282,43 @@ ref_t *make_ref(void);
 void init_interpreter(void);
 void call_direct(object_t *, int, int, int);
 void eval_instruction(char *p);
-INLINE void assign_svalue(svalue_t *, svalue_t *);
-INLINE void assign_svalue_no_free(svalue_t *, svalue_t *);
-INLINE void copy_some_svalues(svalue_t *, svalue_t *, int);
-INLINE void transfer_push_some_svalues(svalue_t *, int);
-INLINE void push_some_svalues(svalue_t *, int);
+void assign_svalue(svalue_t *, svalue_t *);
+void assign_svalue_no_free(svalue_t *, svalue_t *);
+void copy_some_svalues(svalue_t *, svalue_t *, int);
+void transfer_push_some_svalues(svalue_t *, int);
+void push_some_svalues(svalue_t *, int);
 #ifdef DEBUG
-INLINE void int_free_svalue(svalue_t *, const char *);
+void int_free_svalue(svalue_t *, const char *);
 #else
-INLINE void int_free_svalue(svalue_t *);
+void int_free_svalue(svalue_t *);
 #endif
-INLINE void free_string_svalue(svalue_t *);
-INLINE void free_some_svalues(svalue_t *, int);
-INLINE void push_object(object_t *);
-INLINE void push_number(LPC_INT);
-INLINE void push_real(LPC_FLOAT);
-INLINE void push_undefined(void);
-INLINE void copy_and_push_string(const char *);
-INLINE void share_and_push_string(const char *);
-INLINE void push_array(array_t *);
-INLINE void push_refed_array(array_t *);
+void free_string_svalue(svalue_t *);
+void free_some_svalues(svalue_t *, int);
+void push_object(object_t *);
+void push_number(LPC_INT);
+void push_real(LPC_FLOAT);
+void push_undefined(void);
+void copy_and_push_string(const char *);
+void share_and_push_string(const char *);
+void push_array(array_t *);
+void push_refed_array(array_t *);
 #ifndef NO_BUFFER_TYPE
-INLINE void push_buffer(buffer_t *);
-INLINE void push_refed_buffer(buffer_t *);
+void push_buffer(buffer_t *);
+void push_refed_buffer(buffer_t *);
 #endif
-INLINE void push_mapping(mapping_t *);
-INLINE void push_refed_mapping(mapping_t *);
-INLINE void push_class(array_t *);
-INLINE void push_refed_class(array_t *);
-INLINE void push_malloced_string(const char *);
-INLINE void push_shared_string(const char *);
-INLINE void push_constant_string(const char *);
-INLINE void pop_stack(void);
-INLINE void pop_n_elems(int);
-INLINE void pop_2_elems(void);
-INLINE void pop_3_elems(void);
-INLINE function_t *setup_inherited_frame(int);
-INLINE program_t *find_function_by_name(object_t *, const char *, int *, int *);
+void push_mapping(mapping_t *);
+void push_refed_mapping(mapping_t *);
+void push_class(array_t *);
+void push_refed_class(array_t *);
+void push_malloced_string(const char *);
+void push_shared_string(const char *);
+void push_constant_string(const char *);
+void pop_stack(void);
+void pop_n_elems(int);
+void pop_2_elems(void);
+void pop_3_elems(void);
+function_t *setup_inherited_frame(int);
+program_t *find_function_by_name(object_t *, const char *, int *, int *);
 char *function_name(program_t *, int);
 void remove_object_from_stack(object_t *);
 void setup_fake_frame(funptr_t *);
@@ -377,8 +377,8 @@ void restore_context(error_context_t *);
 int save_context(error_context_t *);
 
 void pop_control_stack(void);
-INLINE function_t *setup_new_frame(int);
-INLINE void push_control_stack(int);
+function_t *setup_new_frame(int);
+void push_control_stack(int);
 
 void break_point(void);
 

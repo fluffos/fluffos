@@ -204,7 +204,7 @@ void add_moves(statgroup_t *st, int moves)
   }
 }
 
-INLINE void add_heart_beats(statgroup_t *st, int hbs)
+void add_heart_beats(statgroup_t *st, int hbs)
 {
   if (st) {
     if (st->domain) {

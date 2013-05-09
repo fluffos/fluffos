@@ -38,7 +38,7 @@
 #endif
 
 #ifdef F_HASH
-INLINE_STATIC char *hexdump(const unsigned char *data, int len)
+static char *hexdump(const unsigned char *data, int len)
 {
   const char hexchars[] = "0123456789abcdef";
   char *result, *p;

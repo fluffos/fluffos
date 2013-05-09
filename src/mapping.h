@@ -10,7 +10,7 @@
 #include "hash.h"
 #include "stralloc.h"
 //#define MAP_SVAL_HASH(x) (((POINTER_INT)((x).u.number)) >> 5)
-INLINE unsigned long sval_hash(svalue_t);
+unsigned long sval_hash(svalue_t);
 
 typedef struct mapping_node_s {
   struct mapping_node_s *next;
@@ -80,17 +80,17 @@ extern mapping_node_t *locked_map_nodes;
 
 int msameval(svalue_t *, svalue_t *);
 int mapping_save_size(mapping_t *);
-INLINE mapping_t *mapTraverse(mapping_t *, int ( *)(mapping_t *, mapping_node_t *, void *), void *);
-INLINE mapping_t *load_mapping_from_aggregate(svalue_t *, int);
-INLINE mapping_t *allocate_mapping(int);
-INLINE mapping_t *allocate_mapping2(array_t *, svalue_t *);
-INLINE void free_mapping(mapping_t *);
-INLINE svalue_t *find_in_mapping(mapping_t *, svalue_t *);
+mapping_t *mapTraverse(mapping_t *, int ( *)(mapping_t *, mapping_node_t *, void *), void *);
+mapping_t *load_mapping_from_aggregate(svalue_t *, int);
+mapping_t *allocate_mapping(int);
+mapping_t *allocate_mapping2(array_t *, svalue_t *);
+void free_mapping(mapping_t *);
+svalue_t *find_in_mapping(mapping_t *, svalue_t *);
 svalue_t *find_string_in_mapping(mapping_t *, const char *);
-INLINE svalue_t *find_for_insert(mapping_t *, svalue_t *, int);
-INLINE void absorb_mapping(mapping_t *, mapping_t *);
-INLINE void mapping_delete(mapping_t *, svalue_t *);
-INLINE mapping_t *add_mapping(mapping_t *, mapping_t *);
+svalue_t *find_for_insert(mapping_t *, svalue_t *, int);
+void absorb_mapping(mapping_t *, mapping_t *);
+void mapping_delete(mapping_t *, svalue_t *);
+mapping_t *add_mapping(mapping_t *, mapping_t *);
 mapping_node_t *new_map_node(void);
 int restore_hash_string(char **str, svalue_t *);
 int growMap(mapping_t *);
@@ -98,7 +98,7 @@ void free_node(mapping_t *, mapping_node_t *);
 void unlock_mapping(mapping_t *);
 void map_mapping(svalue_t *, int);
 void filter_mapping(svalue_t *, int);
-INLINE mapping_t *compose_mapping(mapping_t *, mapping_t *, unsigned short);
+mapping_t *compose_mapping(mapping_t *, mapping_t *, unsigned short);
 array_t *mapping_indices(mapping_t *);
 array_t *mapping_values(mapping_t *);
 array_t *mapping_each(mapping_t *);

@@ -1,4 +1,3 @@
-#define SUPPRESS_COMPILER_INLINES
 #include "std.h"
 #include "file_incl.h"
 #include "lpc_incl.h"
@@ -64,7 +63,7 @@ static void CDECL sig_iot SIGPROT;
 int debug_level = 0;
 #endif
 
-INLINE_STATIC void setup_signal_handlers();
+static void setup_signal_handlers();
 
 int main(int argc, char **argv)
 {
@@ -491,7 +490,7 @@ char *xalloc(int size)
   return p;
 }
 
-INLINE_STATIC void setup_signal_handlers()
+static void setup_signal_handlers()
 {
 #ifdef SIGFPE
   signal(SIGFPE, sig_fpe);
@@ -537,7 +536,7 @@ INLINE_STATIC void setup_signal_handlers()
 #endif
 }
 
-INLINE_STATIC void try_dump_stacktrace()
+static void try_dump_stacktrace()
 {
   debug_message("CRASH: Generating backtrace...\n");
 #if !defined(__CYGWIN__) && __GNUC__ > 2

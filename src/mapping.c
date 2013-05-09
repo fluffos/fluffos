@@ -25,7 +25,7 @@ mapping_node_t *locked_map_nodes = 0;
  *   at some point as well.
  */
 
-INLINE unsigned long sval_hash(svalue_t x)
+unsigned long sval_hash(svalue_t x)
 {
   switch (x.type) {
     case T_STRING:
@@ -48,12 +48,12 @@ INLINE unsigned long sval_hash(svalue_t x)
   table).
 */
 
-INLINE_STATIC unsigned long node_hash(mapping_node_t *mn)
+static unsigned long node_hash(mapping_node_t *mn)
 {
   return MAP_SVAL_HASH(mn->values[0]);
 }
 
-INLINE int growMap(mapping_t *m)
+int growMap(mapping_t *m)
 {
   int oldsize = m->table_size + 1;
   int newsize = oldsize << 1;
@@ -105,7 +105,7 @@ INLINE int growMap(mapping_t *m)
   -- Truilkan 92/07/19
 */
 
-INLINE mapping_t *mapTraverse(mapping_t *m, int (*func)(mapping_t *, mapping_node_t *, void *), void *extra)
+mapping_t *mapTraverse(mapping_t *m, int (*func)(mapping_t *, mapping_node_t *, void *), void *extra)
 {
   mapping_node_t *elt, *nelt;
   int j = m->table_size;
@@ -122,7 +122,7 @@ INLINE mapping_t *mapTraverse(mapping_t *m, int (*func)(mapping_t *, mapping_nod
 
 /* free_mapping */
 
-INLINE void
+void
 dealloc_mapping(mapping_t *m)
 {
   debug(mapping, ("mapping.c: actual free of %p\n", (void *)m));
@@ -158,7 +158,7 @@ dealloc_mapping(mapping_t *m)
   debug(mapping, ("mapping.c: free_mapping end\n"));
 }
 
-INLINE void
+void
 free_mapping(mapping_t *m)
 {
   debug(mapping, ("mapping.c: free_mapping begin, ptr = %p\n", (void *)m));
@@ -247,7 +247,7 @@ void free_node(mapping_t *m, mapping_node_t *mn)
    doing many deletions from the map.
 */
 
-INLINE mapping_t *
+mapping_t *
 allocate_mapping(int n)
 {
   mapping_t *newmap;
@@ -293,7 +293,7 @@ allocate_mapping(int n)
   return newmap;
 }
 
-INLINE mapping_t *
+mapping_t *
 allocate_mapping2(array_t *arr, svalue_t *sv)
 {
   mapping_t *newmap;
@@ -320,7 +320,7 @@ allocate_mapping2(array_t *arr, svalue_t *sv)
   return newmap;
 }
 
-INLINE mapping_t *
+mapping_t *
 mkmapping(array_t *k, array_t *v)
 {
   mapping_t *newmap;
@@ -341,7 +341,7 @@ mkmapping(array_t *k, array_t *v)
   copyMapping: make a copy of a mapping
 */
 
-INLINE_STATIC mapping_t *
+static mapping_t *
 copyMapping(mapping_t *m)
 {
   mapping_t *newmap;
@@ -388,7 +388,7 @@ copyMapping(mapping_t *m)
   return newmap;
 }
 
-INLINE int
+int
 restore_hash_string(char **val, svalue_t *sv)
 {
   register char *cp = *val;
@@ -474,7 +474,7 @@ int msameval(svalue_t *arg1, svalue_t *arg2)
    mapping_delete: delete an element from the mapping
 */
 
-INLINE void mapping_delete(mapping_t *m, svalue_t *lv)
+void mapping_delete(mapping_t *m, svalue_t *lv)
 {
   int i = svalue_to_int(lv) & m->table_size;
   mapping_node_t **prev = m->table + i, *elt;
@@ -509,7 +509,7 @@ INLINE void mapping_delete(mapping_t *m, svalue_t *lv)
  * into an lvalue.
  */
 
-INLINE svalue_t *
+svalue_t *
 find_for_insert(mapping_t *m, svalue_t *lv, int doTheFree)
 {
   int oi = svalue_to_int(lv);
@@ -762,7 +762,7 @@ void f_unique_mapping(void)
  * array of svalues. Format of data: LHS RHS LHS2 RHS2... (uses hash table)
  */
 
-INLINE mapping_t *
+mapping_t *
 load_mapping_from_aggregate(svalue_t *sp, int n)
 {
   mapping_t *m;
@@ -830,7 +830,7 @@ load_mapping_from_aggregate(svalue_t *sp, int n)
 
 /* is ok */
 
-INLINE svalue_t *
+svalue_t *
 find_in_mapping(mapping_t *m, svalue_t *lv)
 {
   int i = svalue_to_int(lv) & m->table_size;
@@ -869,7 +869,7 @@ find_string_in_mapping(mapping_t *m, const char *p)
     add_to_mapping: adds mapping m2 to m1
 */
 
-INLINE_STATIC void
+static void
 add_to_mapping(mapping_t *m1, mapping_t *m2, int free_flag)
 {
   int mask = m1->table_size, j = m2->table_size;
@@ -945,7 +945,7 @@ add_to_mapping(mapping_t *m1, mapping_t *m2, int free_flag)
                             if they have common keys
 */
 
-INLINE_STATIC void
+static void
 unique_add_to_mapping(mapping_t *m1, mapping_t *m2, int free_flag)
 {
   int mask = m1->table_size, j = m2->table_size;
@@ -1015,7 +1015,7 @@ unique_add_to_mapping(mapping_t *m1, mapping_t *m2, int free_flag)
   m1->count += count;
 }
 
-INLINE void absorb_mapping(mapping_t *m1, mapping_t *m2)
+void absorb_mapping(mapping_t *m1, mapping_t *m2)
 {
   if (MAP_COUNT(m2)) {
     if (m1 != m2) {
@@ -1029,7 +1029,7 @@ INLINE void absorb_mapping(mapping_t *m1, mapping_t *m2)
    in two old mappings.  (uses hash table)
 */
 
-INLINE mapping_t *
+mapping_t *
 add_mapping(mapping_t *m1, mapping_t *m2)
 {
   mapping_t *newmap;
@@ -1179,7 +1179,7 @@ filter_mapping(svalue_t *arg, int num_arg)
 
 /* compose_mapping */
 
-INLINE mapping_t *
+mapping_t *
 compose_mapping(mapping_t *m1, mapping_t *m2, unsigned short flag)
 {
   mapping_node_t *elt, *elt2, **a, **b = m2->table, **prev;

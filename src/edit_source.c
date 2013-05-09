@@ -1585,10 +1585,10 @@ static void handle_configure()
    */
 #if 0
   printf("Checking for inline ...");
-  if (!check_prog("INLINE inline", "inline void foo() { }", "foo();", 0)) {
+  if (!check_prog(" inline", "inline void foo() { }", "foo();", 0)) {
     printf(" __inline ...");
-    if (!check_prog("INLINE __inline", "__inline void foo() {}", "foo();", 0)) {
-      fprintf(yyout, "#define INLINE\n");
+    if (!check_prog(" __inline", "__inline void foo() {}", "foo();", 0)) {
+      fprintf(yyout, "#define \n");
     }
   }
 #endif

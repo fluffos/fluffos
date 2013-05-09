@@ -18,10 +18,10 @@ int num_arrays;
 int total_array_size;
 #endif
 
-INLINE_STATIC int builtin_sort_array_cmp_fwd(const void *, const void *);
-INLINE_STATIC int builtin_sort_array_cmp_rev(const void *, const void *);
-INLINE_STATIC int sort_array_cmp(const void *, const void *);
-INLINE_STATIC long alist_cmp(svalue_t *, svalue_t *);
+static int builtin_sort_array_cmp_fwd(const void *, const void *);
+static int builtin_sort_array_cmp_rev(const void *, const void *);
+static int sort_array_cmp(const void *, const void *);
+static long alist_cmp(svalue_t *, svalue_t *);
 /*
  * Make an empty array for everyone to use, never to be deallocated.
  * It is cheaper to reuse it, than to use MALLOC() and allocate.
@@ -70,7 +70,6 @@ static void ms_setup_stats(array_t *p)
  * have already been moved somewhere else or freed, and should be ignored.
  *
  * Note that we rely a bit on gcc automatically inlining small routines.
- * Speed maniacs may wish to add INLINE liberally.
  */
 static array_t *int_allocate_empty_array(unsigned int n)
 {
@@ -1175,7 +1174,7 @@ array_t *builtin_sort_array(array_t *inlist, int dir)
   return inlist;
 }
 
-INLINE_STATIC int builtin_sort_array_cmp_fwd(const void *vp1, const void *vp2)
+static int builtin_sort_array_cmp_fwd(const void *vp1, const void *vp2)
 {
   svalue_t *p1 = (svalue_t *)vp1;
   svalue_t *p2 = (svalue_t *)vp2;
@@ -1223,12 +1222,12 @@ INLINE_STATIC int builtin_sort_array_cmp_fwd(const void *vp1, const void *vp2)
   return 0;
 }
 
-INLINE_STATIC int builtin_sort_array_cmp_rev(const void *vp1, const void *vp2)
+static int builtin_sort_array_cmp_rev(const void *vp1, const void *vp2)
 {
   return builtin_sort_array_cmp_fwd(vp2, vp1);
 }
 
-INLINE_STATIC
+static
 int sort_array_cmp(const void *vp1, const void *vp2)
 {
   svalue_t *p1 = (svalue_t *)vp1;
@@ -1536,7 +1535,7 @@ array_t *deep_inventory_array(array_t *arr, int take_top, funptr_t *fp)
 }
 #endif
 
-INLINE_STATIC long alist_cmp(svalue_t *p1, svalue_t *p2)
+static long alist_cmp(svalue_t *p1, svalue_t *p2)
 {
   long d;
 
@@ -1552,7 +1551,7 @@ INLINE_STATIC long alist_cmp(svalue_t *p1, svalue_t *p2)
   return 0;
 }
 
-INLINE_STATIC svalue_t *alist_sort(array_t *inlist)
+static svalue_t *alist_sort(array_t *inlist)
 {
   long size, j, curix, parix, child1, child2, flag;
   svalue_t *sv_tab, *tmp, *table, *sv_ptr, val;

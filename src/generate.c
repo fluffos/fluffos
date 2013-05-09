@@ -1,4 +1,3 @@
-#define SUPPRESS_COMPILER_INLINES
 #include "std.h"
 #include "generate.h"
 #include "compiler.h"
