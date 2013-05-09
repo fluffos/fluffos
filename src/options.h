@@ -716,6 +716,29 @@
 /*PACKAGE_CRYPTO: adds a function that does multiple hash types hash(hash, string), needs openssl lib and includes and -lssl in system_libs*/
 #undef PACKAGE_CRYPTO
 
+/*
+  PACKAGE_TRIM: Add efuns for remove leading / trailing whitespaces and other type of characters (\n \t ...) in a string.
+  Functions:
+    - trim: Remove leading and trailing whitespaces (and others).
+      Example:
+        - "    my test   " : "my test"
+    - ltrim: Remove leading whitespaces (and others).
+      Example:
+        - "    my test   " : "my test   "
+    - rtrim: Remove trailing whitespaces (and others).
+      Example:
+        - "    my test   " : "    my test"
+
+  Characters that remove by default (it can be configured as parameter 2 in efuns):
+    ' '	(0x20)	space (SPC)
+    '\t'	(0x09)	horizontal tab (TAB)
+    '\n'	(0x0a)	newline (LF)
+    '\v'	(0x0b)	vertical tab (VT)
+    '\f'	(0x0c)	feed (FF)
+    '\r'	(0x0d)	carriage return (CR)
+ */
+#define PACKAGE_TRIM
+
 /****************************************************************************
  *                            UID PACKAGE                                   *
  *                            -----------                                   *
