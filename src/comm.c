@@ -1825,7 +1825,7 @@ static void sigpipe_handler(void)
 
 int max_fd;
 
-INLINE void make_selectmasks()
+void make_selectmasks()
 {
   int i;
   max_fd = addr_server_fd;
@@ -1903,7 +1903,7 @@ INLINE void make_selectmasks()
 /*
  * Process I/O.
  */
-INLINE void process_io()
+void process_io()
 {
   int i;
 
@@ -3177,29 +3177,6 @@ const char *query_ip_number(object_t *ob)
   return (inet_ntoa(ob->interactive->addr.sin_addr));
 #endif
 }
-
-#ifndef INET_NTOA_OK
-/*
- * Note: if the address string is "a.b.c.d" the address number is
- *       a * 256^3 + b * 256^2 + c * 256 + d
- */
-char *inet_ntoa(struct in_addr ad)
-{
-  u_long s_ad;
-  int a, b, c, d;
-  static char addr[20];       /* 16 + 1 should be enough */
-
-  s_ad = ad.s_addr;
-  d = s_ad % 256;
-  s_ad /= 256;
-  c = s_ad % 256;
-  s_ad /= 256;
-  b = s_ad % 256;
-  a = s_ad / 256;
-  sprintf(addr, "%d.%d.%d.%d", a, b, c, d);
-  return (addr);
-}
-#endif                          /* INET_NTOA_OK */
 
 char *query_host_name()
 {

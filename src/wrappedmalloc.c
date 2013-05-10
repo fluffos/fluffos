@@ -23,25 +23,25 @@ void wrappedmalloc_init()
   stats.realloc_calls = 0;
 }
 
-INLINE void *wrappedrealloc(void *ptr, int size)
+void *wrappedrealloc(void *ptr, int size)
 {
   stats.realloc_calls++;
   return (void *) REALLOC(ptr, size);
 }
 
-INLINE void *wrappedmalloc(int size)
+void *wrappedmalloc(int size)
 {
   stats.alloc_calls++;
   return (void *) MALLOC(size);
 }
 
-INLINE void *wrappedcalloc(int nitems, int size)
+void *wrappedcalloc(int nitems, int size)
 {
   stats.alloc_calls++;
   return (void *) CALLOC(nitems, size);
 }
 
-INLINE void wrappedfree(void *ptr)
+void wrappedfree(void *ptr)
 {
   stats.free_calls++;
   FREE(ptr);

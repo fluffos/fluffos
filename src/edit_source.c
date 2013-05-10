@@ -1409,35 +1409,6 @@ static void check_linux_libc()
   }
 }
 
-static const char *memmove_prog = "\
-char buf[80];\n\
-strcpy(buf,\"0123456789ABCDEF\");\n\
-memmove(&buf[1],&buf[4],13);\n\
-if(strcmp(buf,\"0456789ABCDEF\")) exit(-1);\n\
-memmove(&buf[8],&buf[6],9);\n\
-if(strcmp(buf,\"0456789A9ABCDEF\")) exit(-1);\n\
-return 0;\n";
-
-static int check_memmove(const char *tag, const char *str)
-{
-  return check_prog(tag, str, memmove_prog, 1);
-}
-
-static void find_memmove()
-{
-  printf("Checking for memmove() ...");
-  if (check_memmove(0, "")) {
-    printf(" exists\n");
-    return;
-  }
-  if (check_memmove("USE_BCOPY", "#define memmove(a,b,c) bcopy(b,a,c)")) {
-    printf(" simulating via bcopy()\n");
-    return;
-  }
-  printf(" missing; using MudOS's version\n");
-  fprintf(yyout, "#define MEMMOVE_MISSING\n");
-}
-
 static void verbose_check_prog(const char *msg, const char *def, const char *pre,
                                const char *prog, int andrun)
 {
@@ -1451,156 +1422,6 @@ static void handle_configure()
 {
   open_output_file("configure.h");
 
-#ifndef WIN32
-  check_include("INCL_STDLIB_H", "stdlib.h");
-  check_include("INCL_UNISTD_H", "unistd.h");
-  if (check_include("INCL_TIME_H", "time.h")) {
-    if (!check_prog(0, "#include <time.h>", "tzset();", 0)) {
-      if (check_prog(0, 0, "void tzset(); tzset();", 0)) {
-        fprintf(yyout, "#define PROTO_TZSET\n#define USE_TZSET\n");
-      }
-    } else {
-      fprintf(yyout, "#define USE_TZSET\n");
-    }
-  } else {
-    if (check_prog(0, 0, "void tzset(); tzset();", 0)) {
-      fprintf(yyout, "#define PROTO_TZSET\n#define USE_TZSET\n");
-    }
-  }
-  check_include("INCL_SYS_TIMES_H", "sys/times.h");
-  check_include("INCL_FCNTL_H", "fcntl.h");
-  check_include("INCL_SYS_TIME_H", "sys/time.h");
-  check_include("INCL_DOS_H", "dos.h");
-  check_include("INCL_USCLKC_H", "usclkc.h");
-  check_include("INCL_LIMITS_H", "limits.h");
-  check_include("INCL_INTTYPES_H", "inttypes.h");
-  check_include("INCL_STDINT_H", "stdint.h");
-  check_include("INCL_FLOAT_H", "float.h");
-  check_include("INCL_LOCALE_H", "locale.h");
-  if (!check_prog(0, 0, "int x = USHRT_MAX;", 0)) {
-    if (!check_prog(0, 0, "int x = MAXSHORT;", 0)) {
-      check_include("INCL_VALUES_H", "values.h");
-    }
-    fprintf(yyout, "#define USHRT_MAX  (MAXSHORT)\n");
-  }
-
-  check_include("INCL_NETINET_IN_H", "netinet/in.h");
-  check_include("INCL_ARPA_INET_H", "arpa/inet.h");
-
-  check_include("INCL_SYS_TYPES_H", "sys/types.h");
-  check_include("INCL_SYS_IOCTL_H", "sys/ioctl.h");
-  check_include("INCL_SYS_SOCKET_H", "sys/socket.h");
-  check_include("INCL_NETDB_H", "netdb.h");
-  /* TELOPT_NAWS is missing from <arpa/telnet.h> on some systems */
-  check_include2("INCL_ARPA_TELNET_H", "arpa/telnet.h", "", "int i=TELOPT_NAWS;");
-  check_include("INCL_SYS_SEMA_H", "sys/sema.h");
-  check_include("INCL_SYS_SOCKETVAR_H", "sys/socketvar.h");
-  check_include("INCL_SOCKET_H", "socket.h");
-  check_include("INCL_RESOLVE_H", "resolve.h");
-
-  check_include("INCL_SYS_STAT_H", "sys/stat.h");
-
-  /* sys/dir.h is BSD, dirent is sys V.  Try to do it the BSD way first. */
-  /* If that fails, fall back to sys V */
-  if (check_prog("BSD_READDIR", "#include <sys/dir.h>", "struct direct *d; d->d_namlen;", 0)) {
-    check_include("INCL_SYS_DIR_H", "sys/dir.h");
-  } else {
-    /* could be either of these */
-    check_include("INCL_DIRENT_H", "dirent.h");
-    check_include("INCL_SYS_DIRENT_H", "sys/dirent.h");
-    fprintf(yyout, "#define USE_STRUCT_DIRENT\n");
-  }
-
-  check_include("INCL_SYS_FILIO_H", "sys/filio.h");
-  check_include("INCL_SYS_SOCKIO_H", "sys/sockio.h");
-  check_include("INCL_SYS_MKDEV_H", "sys/mkdev.h");
-  check_include("INCL_SYS_RESOURCE_H", "sys/resource.h");
-  check_include("INCL_SYS_RUSAGE_H", "sys/rusage.h");
-  check_include("INCL_SYS_WAIT_H", "sys/wait.h");
-  check_include("INCL_SYS_CRYPT_H", "sys/crypt.h");
-  check_include("INCL_CRYPT_H", "crypt.h");
-  check_include("INCL_MALLOC_H", "my_malloc.h");
-  check_include("INCL_ALLOCA_H", "alloca.h");
-  check_include("INCL_EXECINFO_H", "execinfo.h");
-
-  /* for NeXT */
-  if (!check_include("INCL_MACH_MACH_H", "mach/mach.h")) {
-    check_include("INCL_MACH_H", "mach.h");
-  }
-
-  /* figure out what we need to do to get major()/minor() */
-  check_include("INCL_SYS_SYSMACROS_H", "sys/sysmacros.h");
-
-#ifdef DEBUG
-  /* includes just to shut up gcc's warnings on some systems */
-  check_include("INCL_BSTRING_H", "bstring.h");
-#endif
-
-  /* Runtime loading support */
-  if (check_include("INCL_DLFCN_H", "dlfcn.h")) {
-    if (!check_prog(0, "#include <dlfcn.h>", "int x = RTLD_LAZY;", 0)) {
-      fprintf(yyout, "#define RTLD_LAZY      1\n");
-    }
-  } else {
-    if (!check_prog(0, 0, "int x = RTLD_LAZY;", 0)) {
-      fprintf(yyout, "#define RTLD_LAZY     1\n");
-    }
-  }
-
-  /* SunOS is missing definition for INADDR_NONE */
-  printf("Checking for missing INADDR_NONE ... ");
-  if (!check_prog(0, "#include <netinet/in.h>", "int x = INADDR_NONE;", 0)) {
-    printf("missing\n");
-    fprintf(yyout, "#define INADDR_NONE (unsigned int)0xffffffff\n");
-  } else { printf("ok\n"); }
-
-  printf("Checking for random number generator ...");
-  if (check_prog("DRAND48", 0, "srand48(0);", 0)) {
-    printf(" using drand48()\n");
-  } else if (check_prog("RAND", 0, "srand(0);", 0)) {
-    printf(" using rand()\n");
-  } else if (check_prog("RANDOM", 0, "srandom(0);", 0)) {
-    printf("using random()\n");
-  } else {
-    printf("WARNING: did not find a random number generator\n");
-    exit(-1);
-  }
-
-  if (check_prog("USE_BSD_SIGNALS", 0, "SIGCHLD; wait3(0, 0, 0);", 0)) {
-    printf("Using BSD signals.\n");
-  } else {
-    printf("Using System V signals.\n");
-  }
-
-  printf("Checking if signal() returns SIG_ERR on error ...");
-  if (check_prog("SIGNAL_ERROR SIG_ERR", 0, "if (signal(0, 0) == SIG_ERR) ;", 0)) {
-    printf(" yes\n");
-  } else {
-    fprintf(yyout, "#define SIGNAL_ERROR BADSIG\n");
-    printf(" no\n");
-  }
-
-  /* TODO: FluffOS inline function is not in the header file, using it will
-   *       cause compiliation failure in lower GCC versions.
-   */
-#if 0
-  printf("Checking for inline ...");
-  if (!check_prog("INLINE inline", "inline void foo() { }", "foo();", 0)) {
-    printf(" __inline ...");
-    if (!check_prog("INLINE __inline", "__inline void foo() {}", "foo();", 0)) {
-      fprintf(yyout, "#define INLINE\n");
-    }
-  }
-#endif
-  printf(" const ...\n");
-  if (!check_prog("CONST const", "int foo(const int *, const int *);", "", 0)) {
-    fprintf(yyout, "#define CONST\n");
-  }
-
-  verbose_check_prog("Checking for strerror()", "HAS_STRERROR",
-                     "", "strerror(12);", 0);
-  verbose_check_prog("Checking for POSIX getcwd()", "HAS_GETCWD",
-                     "", "getcwd(\"\", 1000);", 0);
   verbose_check_prog("Checking for getrusage()", "RUSAGE",
                      "", "getrusage(0, 0);", 0);
   verbose_check_prog("Checking for times()", "TIMES",
@@ -1617,9 +1438,6 @@ static void handle_configure()
     fprintf(yyout, "#define BIGENDIAN 1\n");
     fflush(yyout);
   } else { printf("little\n"); }
-
-  find_memmove();
-#endif
 
   fprintf(yyout, "#define SIZEOF_INT %lu\n", sizeof(int));
   fprintf(yyout, "#define SIZEOF_PTR %lu\n", sizeof(char *));

@@ -13,7 +13,6 @@
  *   Added get_array_block()...using @@ENDMARKER to return array of strings
  */
 
-#define SUPPRESS_COMPILER_INLINES
 #include "std.h"
 #include "file_incl.h"
 #include "lpc_incl.h"
@@ -1171,7 +1170,7 @@ static void refill_buffer()
 
 static int function_flag = 0;
 
-INLINE void push_function_context()
+void push_function_context()
 {
   function_context_t *fc;
   parse_node_t *node;

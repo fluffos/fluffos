@@ -1,11 +1,10 @@
-#define SUPPRESS_COMPILER_INLINES
 #include "std.h"
 #include "lpc_incl.h"
 #include "eoperators.h"
 #include "compiler.h"
 #include "replace_program.h"
 
-INLINE void
+void
 dealloc_funp(funptr_t *fp)
 {
   program_t *prog = 0;
@@ -41,7 +40,7 @@ dealloc_funp(funptr_t *fp)
   FREE(fp);
 }
 
-INLINE void
+void
 free_funp(funptr_t *fp)
 {
   fp->hdr.ref--;
@@ -51,7 +50,7 @@ free_funp(funptr_t *fp)
   dealloc_funp(fp);
 }
 
-INLINE void
+void
 push_refed_funp(funptr_t *fp)
 {
   STACK_INC;
@@ -59,7 +58,7 @@ push_refed_funp(funptr_t *fp)
   sp->u.fp = fp;
 }
 
-INLINE void
+void
 push_funp(funptr_t *fp)
 {
   STACK_INC;
@@ -101,7 +100,7 @@ int merge_arg_lists(int num_arg, array_t *arr, int start)
   return num_arg;
 }
 
-INLINE funptr_t *
+funptr_t *
 make_efun_funp(int opcode, svalue_t *args)
 {
   funptr_t *fp;
@@ -125,7 +124,7 @@ make_efun_funp(int opcode, svalue_t *args)
   return fp;
 }
 
-INLINE funptr_t *
+funptr_t *
 make_lfun_funp(int index, svalue_t *args)
 {
   funptr_t *fp;
@@ -163,7 +162,7 @@ make_lfun_funp(int index, svalue_t *args)
   return fp;
 }
 
-INLINE funptr_t *
+funptr_t *
 make_simul_funp(int index, svalue_t *args)
 {
   funptr_t *fp;
@@ -187,7 +186,7 @@ make_simul_funp(int index, svalue_t *args)
   return fp;
 }
 
-INLINE funptr_t *
+funptr_t *
 make_functional_funp(short num_arg, short num_local, short len, svalue_t *args, int flag)
 {
   funptr_t *fp;

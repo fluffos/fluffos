@@ -1,4 +1,3 @@
-#define SUPPRESS_COMPILER_INLINES
 #include "std.h"
 #include "lpc_incl.h"
 #include "file_incl.h"
@@ -62,7 +61,7 @@ static char *make_new_name(const char *);
 static void send_say(object_t *, const char *, array_t *);
 #endif
 
-INLINE void check_legal_string(const char *s)
+void check_legal_string(const char *s)
 {
   if (strlen(s) > LARGEST_PRINTABLE_STRING) {
     error("Printable strings limited to length of %d.\n",

@@ -7,18 +7,10 @@
 /* the definition of ARCH */
 #include "arch.h"
 
-#ifdef EDIT_SOURCE
-#define CONST
-#define INLINE
-#else
+#ifndef EDIT_SOURCE
 /* all options and configuration */
 #include "options_incl.h"
 #include "configure.h"
-
-#   ifdef PEDANTIC
-#      undef INLINE
-#      define INLINE
-#   endif
 #endif
 
 #include "portability.h"

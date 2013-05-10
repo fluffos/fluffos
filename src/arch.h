@@ -14,11 +14,6 @@
  * in MudOS is not used.
  */
 #ifdef __CYGWIN__
-#undef WINNT
-#undef WIN95
-#undef WIN98
-#undef WINSOCK
-#undef WIN32
 #define ARCH "Cygwin-32"
 #endif
 
@@ -128,14 +123,6 @@
 
 #if !defined(ARCH) && defined(__386BSD__)
 #define ARCH "386bsd"
-#endif
-
-#if !defined(ARCH) && defined(ultrix)
-#define ARCH "Ultrix"
-#endif
-
-#if !defined(ARCH) && defined(hpux)
-#define ARCH "HP/UX"
 #endif
 
 #if !defined(ARCH) && defined(sgi)

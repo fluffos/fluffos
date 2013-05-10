@@ -509,7 +509,7 @@ static void add_pad(pad_info_t *pad, int len)
   }
 }
 
-INLINE_STATIC void add_nstr(const char *str, int len)
+static void add_nstr(const char *str, int len)
 {
   if (outbuf_extend(&(sprintf_state->obuff), len) < len) {
     ERROR(ERR_BUFF_OVERFLOW);

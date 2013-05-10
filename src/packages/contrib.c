@@ -1,4 +1,4 @@
-#define SUPPRESS_COMPILER_INLINES
+#define SUPPRESS_COMPILER_S
 #include "../std.h"
 #include "../lpc_incl.h"
 #include "../comm.h"

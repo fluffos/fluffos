@@ -15,10 +15,10 @@
 #define LEN sizeof(svalue_t)
 #define MAX_LEN 1000
 
-INLINE_STATIC void doSwap(char *, char *, int);
+static void doSwap(char *, char *, int);
 static void qSort(void *, int, int, int, int, int ( *)());
-INLINE_STATIC void doSwap(register char *one, register char *two,
-                          register int size)
+static void doSwap(register char *one, register char *two,
+                   register int size)
 {
   register char t;
 

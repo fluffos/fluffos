@@ -20,8 +20,8 @@ int legal_path(const char *);
 static int match_string(char *, char *);
 static int copy(const char *from, const char *to);
 static int do_move(const char *from, const char *to, int flag);
-static int CDECL pstrcmp(CONST void *, CONST void *);
-static int CDECL parrcmp(CONST void *, CONST void *);
+static int CDECL pstrcmp(const void *, const void *);
+static int CDECL parrcmp(const void *, const void *);
 static void encode_stat(svalue_t *, int, char *, struct stat *);
 
 #define MAX_LINES 50
@@ -29,7 +29,7 @@ static void encode_stat(svalue_t *, int, char *, struct stat *);
 /*
  * These are used by qsort in get_dir().
  */
-static int CDECL pstrcmp(CONST void *p1, CONST void *p2)
+static int CDECL pstrcmp(const void *p1, const void *p2)
 {
   svalue_t *x = (svalue_t *)p1;
   svalue_t *y = (svalue_t *)p2;
@@ -37,7 +37,7 @@ static int CDECL pstrcmp(CONST void *p1, CONST void *p2)
   return strcmp(x->u.string, y->u.string);
 }
 
-static int CDECL parrcmp(CONST void *p1, CONST void *p2)
+static int CDECL parrcmp(const void *p1, const void *p2)
 {
   svalue_t *x = (svalue_t *)p1;
   svalue_t *y = (svalue_t *)p2;
@@ -102,11 +102,7 @@ array_t *get_dir(const char *path, int flags)
   int namelen, do_match = 0;
 
 #ifndef WIN32
-#ifdef USE_STRUCT_DIRENT
   struct dirent *de;
-#else
-  struct direct *de;
-#endif
 #endif
   struct stat st;
   char *endtemp;
@@ -200,11 +196,7 @@ array_t *get_dir(const char *path, int flags)
   _findclose(FileHandle);
 #else
   for (de = readdir(dirp); de; de = readdir(dirp)) {
-#ifdef USE_STRUCT_DIRENT
     namelen = strlen(de->d_name);
-#else
-    namelen = de->d_namlen;
-#endif
     if (!do_match && (strcmp(de->d_name, ".") == 0 ||
                       strcmp(de->d_name, "..") == 0)) {
       continue;
@@ -257,11 +249,7 @@ array_t *get_dir(const char *path, int flags)
   strcat(endtemp++, "/");
 
   for (i = 0, de = readdir(dirp); i < count; de = readdir(dirp)) {
-#ifdef USE_STRUCT_DIRENT
     namelen = strlen(de->d_name);
-#else
-    namelen = de->d_namlen;
-#endif
     if (!do_match && (strcmp(de->d_name, ".") == 0 ||
                       strcmp(de->d_name, "..") == 0)) {
       continue;
@@ -416,7 +404,7 @@ int write_file(const char *file, const char *str, int flags)
     gf = gzopen(file, (flags & 1) ? "w" : "a");
     if (!gf)
       error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n",
-            file, (flags & 1) ? "overwrite" : "append", port_strerror(errno));
+            file, (flags & 1) ? "overwrite" : "append", strerror(errno));
   } else {
 #endif
 #ifdef WIN32
@@ -429,7 +417,7 @@ int write_file(const char *file, const char *str, int flags)
 #endif
     if (f == 0) {
       error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n",
-            file, (flags & 1) ? "overwrite" : "append", port_strerror(errno));
+            file, (flags & 1) ? "overwrite" : "append", strerror(errno));
     }
 #ifdef PACKAGE_COMPRESS
   }
@@ -1004,9 +992,9 @@ static int do_move(const char *from, const char *to, int flag)
 void debug_perror(const char *what, const char *file)
 {
   if (file) {
-    debug_message("System Error: %s:%s:%s\n", what, file, port_strerror(errno));
+    debug_message("System Error: %s:%s:%s\n", what, file, strerror(errno));
   } else {
-    debug_message("System Error: %s:%s\n", what, port_strerror(errno));
+    debug_message("System Error: %s:%s\n", what, strerror(errno));
   }
 }
 

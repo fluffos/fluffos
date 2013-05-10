@@ -102,6 +102,8 @@ rm comptest.c
 
 # Force an reconfigure.
 rm configure.h
+rm conf.h
+CXX=$CXX CXXFLAGS=$CXXFLAGS ./configure
 
 echo MAKE=$MAKE >Makefile
 echo SHELL=/bin/sh >>Makefile

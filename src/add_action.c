@@ -63,7 +63,7 @@ void clear_notify(object_t *ob)
   ip->default_err_message.s = 0;
 }
 
-INLINE_STATIC int hash_living_name(const char *str)
+static int hash_living_name(const char *str)
 {
   return whashstr(str) & (CFG_LIVING_HASH_SIZE - 1);
 }

@@ -67,7 +67,7 @@ static void free_called_call(pending_call_t *cop)
   call_list_free = cop;
 }
 
-INLINE_STATIC void free_call(pending_call_t *cop)
+static void free_call(pending_call_t *cop)
 {
   if (cop->vs) {
     free_array(cop->vs);

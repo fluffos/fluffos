@@ -266,8 +266,7 @@ parse_node_t *throw_away_mapping(parse_node_t *);
     mbp->current_size += Size; \
 } while (0)
 
-#ifndef SUPPRESS_COMPILER_INLINES
-INLINE_STATIC
+static
 char *allocate_in_mem_block(int n, int size)
 {
   mem_block_t *mbp = &mem_block[n];
@@ -285,7 +284,6 @@ char *allocate_in_mem_block(int n, int size)
   return ret;
 }
 
-#endif
 #endif
 
 

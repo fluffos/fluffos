@@ -1906,7 +1906,7 @@ void f_mud_status(void)
       outbuf_add(&ob, "Open-file-test succeeded.\n");
       unlink(".mudos_test_file");
     } else {
-      outbuf_addv(&ob, "Open file test failed: %s\n", port_strerror(errno));
+      outbuf_addv(&ob, "Open file test failed: %s\n", strerror(errno));
     }
 
     outbuf_addv(&ob, "current working directory: %s\n\n",

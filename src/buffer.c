@@ -13,14 +13,14 @@ buffer_t null_buf = {
   0                           /* size */
 };
 
-INLINE buffer_t *
+buffer_t *
 null_buffer()
 {
   null_buf.ref++;
   return &null_buf;
 }                               /* null_buffer() */
 
-INLINE void
+void
 free_buffer(buffer_t *b)
 {
   b->ref--;
