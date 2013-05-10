@@ -29,6 +29,18 @@
 # **** NOTE: If you add something here, also add it to the OBJ= rule below,
 # **** or non-GNU makes will die
 # **************************************************************************
+# @configure_input@
+@SET_MAKE@
+
+CXX=@CXX@
+CXXFLAGS=@CXXFLAGS@
+YACC=@YACC@
+O=@OBJEXT@
+DRIVER_BIN=@DRIVER_BIN@@EXEEXT@
+INSTALL=@INSTALL@
+INSTALL_DIR=@bindir@
+OPTIMIZE=@OPTIMIZE@
+
 SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   backend.c array.c mapping.c comm.c ed.c regexp.c buffer.c crc32.c \
   malloc.c mallocwrapper.c class.c efuns_main.c efuns_port.c \
@@ -178,5 +190,17 @@ reconfigure: clean
 
 test: all
 	cd testsuite && ../driver -ftest etc/config.test
+
+help:
+	@echo "***************** Configuration completed **************"
+	@echo "Compiling FluffOS as $(DRIVER_BIN) for @target@."
+	@echo
+	@echo "Using $(INSTALL) to install binaries in $(INSTALL_DIR)."
+	@echo "Using $(CXX) -E $(CXXFLAGS) for preprocessing."
+	@echo "Using $(CXX) $(CXXFLAGS) to compile."
+	@echo "Using $(YACC) to make the compiler."
+	@echo "Edit Makefile if this is not what you want"
+	@echo
+	@echo "Otherwise, type '$(MAKE)' to build FluffOS, then '$(MAKE) install'."
 
 include Dependencies
