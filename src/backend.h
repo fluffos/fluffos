@@ -25,7 +25,7 @@ int set_heart_beat(object_t *, int);
 int query_heart_beat(object_t *);
 int heart_beat_status(outbuffer_t *, int);
 void preload_objects(int);
-INLINE void remove_destructed_objects(void);
+void remove_destructed_objects(void);
 void update_load_av(void);
 void update_compile_av(int);
 char *query_load_av(void);

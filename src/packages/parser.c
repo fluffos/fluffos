@@ -235,7 +235,7 @@ static void debug_parse(char *fmt, ...)
 }
 #endif
 
-INLINE_STATIC void bitvec_copy(bitvec_t *b1, bitvec_t *b2)
+static void bitvec_copy(bitvec_t *b1, bitvec_t *b2)
 {
   int i, n = b2->last;
 
@@ -245,12 +245,12 @@ INLINE_STATIC void bitvec_copy(bitvec_t *b1, bitvec_t *b2)
   }
 }
 
-INLINE_STATIC void bitvec_zero(bitvec_t *bv)
+static void bitvec_zero(bitvec_t *bv)
 {
   bv->last = 0;
 }
 
-INLINE_STATIC void bitvec_set(bitvec_t *bv, int elem)
+static void bitvec_set(bitvec_t *bv, int elem)
 {
   int which = BV_WHICH(elem);
 
@@ -267,7 +267,7 @@ INLINE_STATIC void bitvec_set(bitvec_t *bv, int elem)
   }
 }
 
-INLINE_STATIC int intersect(bitvec_t *bv1, bitvec_t *bv2)
+static int intersect(bitvec_t *bv1, bitvec_t *bv2)
 {
   int i, found = 0;
   int n = (bv1->last < bv2->last ? bv1->last : bv2->last);
@@ -331,8 +331,8 @@ static void all_objects(bitvec_t *bv, int remote_flag)
  * alloca() would be better for this, but MudOS doesn't currently use it.
  */
 
-INLINE_STATIC match_t *add_match(parse_state_t *state, int token,
-                                 int start, int end)
+static match_t *add_match(parse_state_t *state, int token,
+                          int start, int end)
 {
   match_t *ret;
 

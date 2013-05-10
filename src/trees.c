@@ -9,7 +9,6 @@
  *
  */
 
-#define SUPPRESS_COMPILER_INLINES
 #include "std.h"
 #include "lpc_incl.h"
 #include "compiler.h"

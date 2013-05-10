@@ -530,7 +530,7 @@ void compute_string_totals(int *asp, int *abp, int *bp)
   }
 }
 
-INLINE_STATIC void dump_stralloc()
+static void dump_stralloc()
 {
   md_node_t *entry;
   fprintf(stderr, "===STRALLOC DUMP: allocd_strings: %i \n", allocd_strings);

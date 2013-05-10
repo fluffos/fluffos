@@ -15,7 +15,7 @@
 void dump_prog(program_t *, const char *, int);
 static void disassemble(FILE *, char *, int, int, program_t *);
 static const char *disassem_string(const char *);
-static int CDECL short_compare(CONST void *, CONST void *);
+static int CDECL short_compare(const void *, const void *);
 static void dump_line_numbers(FILE *, program_t *);
 
 void
@@ -230,7 +230,7 @@ static const char *disassem_string(const char *str)
 #define CLSS     prog->classes
 
 static int CDECL
-short_compare(CONST void *a, CONST void *b)
+short_compare(const void *a, const void *b)
 {
   int x = *(unsigned short *)a;
   int y = *(unsigned short *)b;
@@ -266,11 +266,7 @@ disassemble(FILE *f, char *code, int start, int end, program_t *prog)
       }
       offsets[(i << 1) + 1] = i;
     }
-#ifdef _SEQUENT_
-    qsort((void *) &offsets[0],
-#else
     qsort((char *) &offsets[0],
-#endif
           NUM_FUNS_D, sizeof(short) * 2, short_compare);
     next_func = 0;
   } else {

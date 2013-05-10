@@ -19,20 +19,20 @@
 #error CFG_MAX_GLOBAL_VARIABLES must not be greater than 65536
 #endif
 
-INLINE_STATIC void ins_real(LPC_FLOAT);
-INLINE_STATIC void ins_short(short);
-INLINE_STATIC void upd_short(int, int, const char *);
-INLINE_STATIC void ins_byte(unsigned char);
-INLINE_STATIC void upd_byte(int, unsigned char);
-INLINE_STATIC void write_number(LPC_INT);
-INLINE_STATIC void ins_int(LPC_INT);
-INLINE_STATIC void ins_pointer(POINTER_INT);
+static void ins_real(LPC_FLOAT);
+static void ins_short(short);
+static void upd_short(int, int, const char *);
+static void ins_byte(unsigned char);
+static void upd_byte(int, unsigned char);
+static void write_number(LPC_INT);
+static void ins_int(LPC_INT);
+static void ins_pointer(POINTER_INT);
 void i_generate_node(parse_node_t *);
 static void i_generate_if_branch(parse_node_t *, int);
 static void i_generate_loop(int, parse_node_t *, parse_node_t *,
                             parse_node_t *);
 static void i_update_branch_list(parse_node_t *, const char *);
-INLINE_STATIC int try_to_push(int, int);
+static int try_to_push(int, int);
 
 static int foreach_depth = 0;
 
@@ -48,7 +48,7 @@ static parse_node_t *branch_list[3];
 static int nforward_branches, nforward_branches_max;
 static int *forward_branches = 0;
 
-INLINE_STATIC void ins_real(LPC_FLOAT l)
+static void ins_real(LPC_FLOAT l)
 {
   LPC_FLOAT f = l;
 
@@ -69,7 +69,7 @@ INLINE_STATIC void ins_real(LPC_FLOAT l)
  * that correct byte order is used, regardless of machine architecture.
  * Also beware that some machines can't write a word to odd addresses.
  */
-INLINE_STATIC void ins_short(short l)
+static void ins_short(short l)
 {
   if (prog_code + 2 > prog_code_max) {
     mem_block_t *mbp = &mem_block[A_PROGRAM];
@@ -86,7 +86,7 @@ INLINE_STATIC void ins_short(short l)
  * Store a LPC int number. It is stored in such a way as to be sure
  * that correct byte order is used, regardless of machine architecture.
  */
-INLINE_STATIC void ins_int(LPC_INT l)
+static void ins_int(LPC_INT l)
 {
 
   if (prog_code + sizeof(LPC_INT) > prog_code_max) {
@@ -100,7 +100,7 @@ INLINE_STATIC void ins_int(LPC_INT l)
   STORE_INT(prog_code, l);
 }
 
-INLINE_STATIC void ins_pointer(POINTER_INT l)
+static void ins_pointer(POINTER_INT l)
 {
 
   if (prog_code + sizeof(POINTER_INT) > prog_code_max) {
@@ -114,7 +114,7 @@ INLINE_STATIC void ins_pointer(POINTER_INT l)
   STORE_PTR(prog_code, l);
 }
 
-INLINE_STATIC void upd_short(int offset, int l, const char *where)
+static void upd_short(int offset, int l, const char *where)
 {
   unsigned short s;
 
@@ -226,14 +226,14 @@ static void initialize_push(void)
  * This varies since there are several opcodes (for
  * optimizing speed and/or size).
  */
-INLINE_STATIC void write_small_number(int val)
+static void write_small_number(int val)
 {
   if (try_to_push(PUSH_NUMBER, val)) { return; }
   ins_byte(F_BYTE);
   ins_byte(val);
 }
 
-INLINE_STATIC void write_number(LPC_INT val)
+static void write_number(LPC_INT val)
 {
   if ((val & ~0xff) == 0) {
     write_small_number(val);
@@ -291,7 +291,7 @@ generate_lvalue_list(parse_node_t *expr)
   }
 }
 
-INLINE_STATIC void
+static void
 switch_to_line(unsigned int line)
 {
   unsigned int sz = CURRENT_PROGRAM_SIZE - last_size_generated;
@@ -323,7 +323,7 @@ switch_to_line(unsigned int line)
   line_being_generated = line;
 }
 
-INLINE_STATIC int
+static int
 try_to_push(int kind, int value)
 {
   if (push_state) {

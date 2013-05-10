@@ -33,7 +33,7 @@ char *strput_int(char *, char *, int);
 void CDECL debug_fatal(char *, ...);
 void CDECL fatal(const char *, ...);
 void CDECL error(const char *const, ...);
-INLINE void check_legal_string(const char *);
+void check_legal_string(const char *);
 #ifndef NO_LIGHT
 void add_light(object_t *, int);
 #endif

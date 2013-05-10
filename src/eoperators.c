@@ -3,7 +3,6 @@
         inside eval_instruction() in interpret.c.
 */
 
-#define SUPPRESS_COMPILER_INLINES
 #include "std.h"
 #include "lpc_incl.h"
 #include "efuns_incl.h"
@@ -16,7 +15,7 @@
 #include "simul_efun.h"
 #include "eoperators.h"
 
-INLINE void f_and()
+void f_and()
 {
   if (sp->type == T_ARRAY && (sp - 1)->type == T_ARRAY) {
     sp--;
@@ -30,7 +29,7 @@ INLINE void f_and()
   sp->subtype = 0;
 }
 
-INLINE void
+void
 f_and_eq()
 {
   svalue_t *argp;
@@ -52,7 +51,7 @@ f_and_eq()
   sp->subtype = 0;
 }
 
-INLINE void
+void
 f_div_eq()
 {
   svalue_t *argp = (sp--)->u.lvalue;
@@ -91,7 +90,7 @@ f_div_eq()
   }
 }
 
-INLINE void
+void
 f_eq()
 {
   int i;
@@ -185,7 +184,7 @@ f_eq()
   put_number(i);
 }
 
-INLINE void
+void
 f_ge()
 {
   int i = sp->type;
@@ -227,7 +226,7 @@ f_ge()
   }
 }
 
-INLINE void
+void
 f_gt()
 {
   int i = sp->type;
@@ -268,7 +267,7 @@ f_gt()
   }
 }
 
-INLINE void
+void
 f_le()
 {
   int i = sp->type;
@@ -314,7 +313,7 @@ f_le()
   sp->subtype = 0;
 }
 
-INLINE void
+void
 f_lt()
 {
   int i = sp->type;
@@ -353,7 +352,7 @@ f_lt()
   sp->subtype = 0;
 }
 
-INLINE void
+void
 f_lsh()
 {
   CHECK_TYPES((sp - 1), T_NUMBER, 1, F_LSH);
@@ -362,7 +361,7 @@ f_lsh()
   sp->u.number <<= (sp + 1)->u.number;
 }
 
-INLINE void
+void
 f_lsh_eq()
 {
   svalue_t *argp;
@@ -378,7 +377,7 @@ f_lsh_eq()
   sp->subtype = 0;
 }
 
-INLINE void
+void
 f_mod_eq()
 {
   svalue_t *argp;
@@ -396,7 +395,7 @@ f_mod_eq()
   sp->subtype = 0;
 }
 
-INLINE void
+void
 f_mult_eq()
 {
   svalue_t *argp = (sp--)->u.lvalue;
@@ -440,7 +439,7 @@ f_mult_eq()
 }
 
 
-INLINE void
+void
 f_ne()
 {
   int i;
@@ -537,7 +536,7 @@ f_ne()
   sp->u.number = i;
 }
 
-INLINE void
+void
 f_or()
 {
   if (sp->type == T_ARRAY && (sp - 1)->type == T_ARRAY) {
@@ -551,7 +550,7 @@ f_or()
   sp->u.number |= (sp + 1)->u.number;
 }
 
-INLINE void
+void
 f_or_eq()
 {
   svalue_t *argp;
@@ -573,7 +572,7 @@ f_or_eq()
   sp->subtype = 0;
 }
 
-INLINE void
+void
 f_parse_command()
 {
   svalue_t *arg;
@@ -633,7 +632,7 @@ f_parse_command()
   fp->subtype = 0;
 }
 
-INLINE void
+void
 f_range(int code)
 {
   int from, to, len;
@@ -737,7 +736,7 @@ f_range(int code)
   }
 }
 
-INLINE void
+void
 f_extract_range(int code)
 {
   int from,  len;
@@ -808,7 +807,7 @@ f_extract_range(int code)
   }
 }
 
-INLINE void
+void
 f_rsh()
 {
   CHECK_TYPES((sp - 1), T_NUMBER, 1, F_RSH);
@@ -817,7 +816,7 @@ f_rsh()
   sp->u.number >>= (sp + 1)->u.number;
 }
 
-INLINE void
+void
 f_rsh_eq()
 {
   svalue_t *argp;
@@ -832,7 +831,7 @@ f_rsh_eq()
   sp->subtype = 0;
 }
 
-INLINE void
+void
 f_sub_eq()
 {
   svalue_t *argp = (sp--)->u.lvalue;
@@ -928,7 +927,7 @@ f_sub_eq()
 #define U_UPPER 0
 #define U_ADDR  (sizeof(LPC_INT))
 
-INLINE void
+void
 f_switch()
 {
   unsigned short offset, end_off;
@@ -1139,7 +1138,7 @@ call_simul_efun(unsigned short index, int num_arg)
   }
 }
 
-INLINE void
+void
 f_xor()
 {
   CHECK_TYPES((sp - 1), T_NUMBER, 1, F_XOR);
@@ -1148,7 +1147,7 @@ f_xor()
   sp->u.number ^= (sp + 1)->u.number;
 }
 
-INLINE void
+void
 f_xor_eq()
 {
   svalue_t *argp;
@@ -1162,7 +1161,7 @@ f_xor_eq()
   sp->u.number = argp->u.number ^= sp->u.number;
 }
 
-INLINE void
+void
 f_function_constructor()
 {
   funptr_t *fp;
@@ -1213,7 +1212,7 @@ f_function_constructor()
   push_refed_funp(fp);
 }
 
-INLINE void
+void
 f__evaluate(void)
 {
   svalue_t *v;
@@ -1232,7 +1231,7 @@ f__evaluate(void)
   assign_svalue(sp, v);
 }
 
-INLINE void
+void
 f_sscanf()
 {
   svalue_t *fp;

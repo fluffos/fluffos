@@ -95,10 +95,6 @@ f_localtime(void)
   array_t *vec;
   time_t lt;
 
-#ifdef sequent
-  struct timezone tz;
-#endif
-
   lt = sp->u.number;
   tm = localtime(&lt);
 
@@ -131,48 +127,13 @@ f_localtime(void)
   vec->item[LT_ZONE].type = T_STRING;
   vec->item[LT_ZONE].subtype = STRING_MALLOC;
   vec->item[LT_ISDST].type = T_NUMBER;
-#if defined(BSD42) || defined(apollo) || defined(_AUX_SOURCE) \
-    || defined(OLD_ULTRIX)
-  /* 4.2 BSD doesn't seem to provide any way to get these last three values */
-  vec->item[LT_GMTOFF].u.number = 0;
-  vec->item[LT_ZONE].type = T_NUMBER;
-  vec->item[LT_ZONE].u.number = 0;
-  vec->item[LT_ISDST].u.number = -1;
-#else                           /* BSD42 */
   vec->item[LT_ISDST].u.number = tm->tm_isdst;
-#if defined(sequent)
-  vec->item[LT_GMTOFF].u.number = 0;
-  gettimeofday(NULL, &tz);
-  vec->item[LT_GMTOFF].u.number = tz.tz_minuteswest;
-  vec->item[LT_ZONE].u.string =
-    string_copy(timezone(tz.tz_minuteswest, tm->tm_isdst), "f_localtime");
-#else                           /* sequent */
-#if (defined(hpux) || defined(_SEQUENT_) || defined(_AIX) || defined(SunOS_5) \
-    || defined(SVR4) || defined(sgi) || defined(__linux__) || defined(cray) \
-    )
+  vec->item[LT_GMTOFF].u.number = timezone;
   if (!tm->tm_isdst) {
-    vec->item[LT_GMTOFF].u.number = timezone;
     vec->item[LT_ZONE].u.string = string_copy(tzname[0], "f_localtime");
   } else {
-#if (defined(_AIX) || defined(hpux) || defined(__linux__) || defined(cray) \
-    )
-    vec->item[LT_GMTOFF].u.number = timezone;
-#else
-    vec->item[LT_GMTOFF].u.number = altzone;
-#endif
     vec->item[LT_ZONE].u.string = string_copy(tzname[1], "f_localtime");
   }
-#else
-#if defined(WIN32) || defined(__CYGWIN__)
-  vec->item[LT_GMTOFF].u.number = _timezone;
-  vec->item[LT_ZONE].u.string = string_copy(_tzname[_daylight ? 1 : 0], "f_localtime");
-#else
-  vec->item[LT_GMTOFF].u.number = tm->tm_gmtoff;
-  vec->item[LT_ZONE].u.string = string_copy(tm->tm_zone, "f_localtime");
-#endif                          /* win32 | cygwin32 */
-#endif
-#endif                          /* sequent */
-#endif                          /* BSD42 */
   push_refed_array(vec);
 }
 #endif
@@ -191,8 +152,7 @@ f_rusage(void)
 {
   struct rusage rus;
   mapping_t *m;
-  long usertime, stime;
-  int maxrss;
+  long usertime, stime, maxrss;
 
   if (getrusage(RUSAGE_SELF, &rus) < 0) {
     m = allocate_mapping(0);
@@ -202,17 +162,11 @@ f_rusage(void)
     usertime = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
     stime = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_usec / 1000;
     maxrss = rus.ru_maxrss;
-#ifdef sun
-    maxrss *= getpagesize() / 1024;
-#else
-#ifdef __linux__
     fd = open("/proc/self/statm", O_RDONLY);
     buf[read(fd, buf, 256)] = 0;
     close(fd);
-    sscanf(buf, "%*d %d %*s", &maxrss);
+    sscanf(buf, "%*d %ld %*s", &maxrss);
     maxrss *= getpagesize() / 1024;
-#endif
-#endif
     m = allocate_mapping(16);
     add_mapping_pair(m, "utime", usertime);
     add_mapping_pair(m, "stime", stime);

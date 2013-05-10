@@ -34,7 +34,7 @@ fd_set readmask;
 
 int name_by_ip(int, char *);
 int ip_by_name(int, char *);
-INLINE_STATIC void process_queue(void);
+static void process_queue(void);
 void init_conns(void);
 void init_conn_sock(int, char *);
 
@@ -44,7 +44,7 @@ void sigpipe_handler(int);
 void sigpipe_handler(void);
 #endif
 
-INLINE void aserv_process_io(int);
+void aserv_process_io(int);
 void enqueue_datapending(int, int);
 void handle_top_event(void);
 void dequeue_top_event(void);
@@ -60,9 +60,9 @@ void debug_perror(const char *, const char *);
 void debug_perror(const char *what, const char *file)
 {
   if (file) {
-    fprintf(stderr, "System Error: %s:%s:%s\n", what, file, port_strerror(errno));
+    fprintf(stderr, "System Error: %s:%s:%s\n", what, file, strerror(errno));
   } else {
-    fprintf(stderr, "System Error: %s:%s\n", what, port_strerror(errno));
+    fprintf(stderr, "System Error: %s:%s\n", what, strerror(errno));
   }
 }
 
@@ -194,7 +194,7 @@ void sigpipe_handler()
 /*
  * I/O handler.
  */
-INLINE void aserv_process_io(int nb)
+void aserv_process_io(int nb)
 {
   int i;
 
@@ -225,7 +225,7 @@ INLINE void aserv_process_io(int nb)
   }
 }
 
-INLINE_STATIC void process_queue()
+static void process_queue()
 {
   int i;
 
@@ -660,11 +660,7 @@ int main(int argc, char **argv)
         FD_SET(all_conns[i].fd, &readmask);
       }
     }
-#ifndef hpux
     nb = select(FD_SETSIZE, &readmask, (fd_set *) 0, (fd_set *) 0, &timeout);
-#else
-    nb = select(FD_SETSIZE, (int *) &readmask, (int *) 0, (int *) 0, &timeout);
-#endif
     if (nb != 0) {
       aserv_process_io(nb);
     }

@@ -20,13 +20,13 @@ object_t *previous_ob;
 int tot_alloc_object, tot_alloc_object_size;
 
 char *save_mapping(mapping_t *m);
-INLINE_STATIC int restore_array(char **str, svalue_t *);
-INLINE_STATIC int restore_class(char **str, svalue_t *);
+static int restore_array(char **str, svalue_t *);
+static int restore_class(char **str, svalue_t *);
 
 #ifdef F_SET_HIDE
 int num_hidden = 0;
 
-INLINE int
+int
 valid_hide(object_t *obj)
 {
   svalue_t *ret;
@@ -43,7 +43,7 @@ valid_hide(object_t *obj)
 int save_svalue_depth = 0, max_depth;
 int *sizes = 0;
 
-INLINE int svalue_save_size(svalue_t *v)
+int svalue_save_size(svalue_t *v)
 {
   switch (v->type) {
     case T_STRING: {
@@ -118,7 +118,7 @@ INLINE int svalue_save_size(svalue_t *v)
   }
 }
 
-INLINE void save_svalue(svalue_t *v, char **buf)
+void save_svalue(svalue_t *v, char **buf)
 {
   switch (v->type) {
     case T_STRING: {
@@ -205,7 +205,7 @@ INLINE void save_svalue(svalue_t *v, char **buf)
   }
 }
 
-INLINE_STATIC int
+static int
 restore_internal_size(const char **str, int is_mapping, int depth)
 {
   register const char *cp = *str;
@@ -304,7 +304,7 @@ restore_internal_size(const char **str, int is_mapping, int depth)
 
 
 
-INLINE_STATIC int
+static int
 restore_size(const char **str, int is_mapping)
 {
   register const char *cp = *str;
@@ -377,7 +377,7 @@ restore_size(const char **str, int is_mapping)
   return -1;
 }
 
-INLINE_STATIC int
+static int
 restore_interior_string(char **val, svalue_t *sv)
 {
   register char *cp = *val;
@@ -530,7 +530,7 @@ static int parse_numeric(char **cpp, unsigned char c, svalue_t *dest)
   }
 }
 
-INLINE_STATIC void add_map_stats(mapping_t *m, int count)
+static void add_map_stats(mapping_t *m, int count)
 {
   total_mapping_nodes += count;
   total_mapping_size += count * sizeof(mapping_node_t);
@@ -750,7 +750,7 @@ key_error:
 }
 
 
-INLINE_STATIC int
+static int
 restore_class(char **str, svalue_t *ret)
 {
   int size;
@@ -838,7 +838,7 @@ error:
   return err;
 }
 
-INLINE_STATIC int
+static int
 restore_array(char **str, svalue_t *ret)
 {
   int size;
@@ -926,7 +926,7 @@ error:
   return err;
 }
 
-INLINE_STATIC int
+static int
 restore_string(char *val, svalue_t *sv)
 {
   register char *cp = val;
@@ -990,7 +990,7 @@ restore_string(char *val, svalue_t *sv)
 
 /* for this case, the variable in question has been set to zero already,
    and we don't have to worry about preserving it */
-INLINE int
+int
 restore_svalue(char *cp, svalue_t *v)
 {
   int ret;
@@ -1037,7 +1037,7 @@ restore_svalue(char *cp, svalue_t *v)
 
 /* for this case, we're being careful and want to leave the value alone on
    an error */
-INLINE_STATIC int
+static int
 safe_restore_svalue(char *cp, svalue_t *v)
 {
   int ret;
@@ -2008,7 +2008,7 @@ void call_create(object_t *ob, int num_arg)
 }
 
 #ifdef F_SET_HIDE
-INLINE int object_visible(object_t *ob)
+int object_visible(object_t *ob)
 {
   if (ob->flags & O_HIDDEN) {
     if (current_object->flags & O_HIDDEN) {

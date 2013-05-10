@@ -200,12 +200,12 @@ void add_binary_message(object_t *, const unsigned char *, int);
 
 
 void update_ref_counts_for_users(void);
-INLINE void make_selectmasks(void);
+void make_selectmasks(void);
 void init_user_conn(void);
 void init_addr_server(char *, int);
 void ipc_remove(void);
 void set_prompt(const char *);
-INLINE void process_io(void);
+void process_io(void);
 int process_user_command(void);
 int replace_interactive(object_t *, object_t *);
 int set_call(object_t *, sentence_t *, int);

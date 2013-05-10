@@ -2182,7 +2182,7 @@ int get_id_number()
   return current_id_number++;
 }
 
-INLINE_STATIC void copy_in(int which, char **start)
+static void copy_in(int which, char **start)
 {
   char *block;
   int size;
