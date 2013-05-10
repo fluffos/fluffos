@@ -14,7 +14,6 @@
 #include "master.h"
 #include "eval.h"
 #include "posix_timers.h"
-#include <execinfo.h>
 
 port_def_t external_port[5];
 
@@ -89,10 +88,6 @@ int main(int argc, char **argv)
     }
   }
 
-#ifdef PROTO_TZSET
-  void tzset();
-#endif
-
 #ifdef INCL_LOCALE_H
   setlocale(LC_ALL, "C");
 #endif
@@ -107,7 +102,7 @@ int main(int argc, char **argv)
   MDinit();
 #endif
 
-#ifdef USE_TZSET
+#ifdef HAVE_TZSET
   tzset();
 #endif
   boot_time = get_current_time();
@@ -522,11 +517,7 @@ static void setup_signal_handlers()
   signal(SIGILL, sig_ill);
 #endif
 #ifndef WIN32
-#ifdef USE_BSD_SIGNALS
   signal(SIGCHLD, sig_cld);
-#else
-  signal(SIGCLD, sig_cld);
-#endif
 #endif
 #ifdef HAS_CONSOLE
   if (has_console >= 0) {
@@ -553,14 +544,9 @@ static void CDECL PSIG(sig_cld)
 {
 #ifndef WIN32
   int status;
-#ifdef USE_BSD_SIGNALS
   while (wait3(&status, WNOHANG, NULL) > 0) {
     ;
   }
-#else
-  wait(&status);
-  signal(SIGCLD, sig_cld);
-#endif
 #endif
 }
 

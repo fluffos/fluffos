@@ -41,7 +41,6 @@
 #define V_VAR(type, var, vlist)
 #define SAFE(x) do { x } while (0)
 
-
 /*
    Define for MALLOC, FREE, REALLOC, and CALLOC depend upon what malloc
    package and optional wrapper is used.  This technique is used because
@@ -263,5 +262,7 @@ char *int_alloc_cstring(const char *);
 
 /* Compare two number */
 #define COMPARE_NUMS(x,y) (((x) > (y) ? 1 : ((x) < (y) ? -1 : 0)))
+
+#define SIGNAL_ERROR SIG_ERR
 
 #endif

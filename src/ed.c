@@ -1470,7 +1470,6 @@ static int subst(regexp *pat, char *sub, int gflg, int pflag)
  * optimize for this editor.   Dworkin 920510
  */
 #define error(s)               { ED_OUTPUTV(ED_DEST, s, lineno); errs++; return; }
-#define bool char
 static int lineno, errs;
 static int shi;                 /* the current shift (negative for left
                                  * shift) */
@@ -1549,7 +1548,7 @@ static void shift(register char *text)
 static char *stack, *stackbot;  /* token stack */
 static int *ind, *indbot;       /* indent stack */
 static char quote;              /* ' or " */
-static bool in_ppcontrol, after_keyword_t, in_mblock;   /* status */
+static char in_ppcontrol, after_keyword_t, in_mblock;   /* status */
 int in_comment;
 static char last_term[ED_MAXLINE + 5];
 static int last_term_len;
@@ -1574,7 +1573,7 @@ static void indent(char *buf)
   register long indent_index;
   register int top, token;
   char *start;
-  bool do_indent;
+  char do_indent;
 
   /*
    * Problem: in this editor memory for deleted lines is reclaimed. So we
@@ -1942,7 +1941,6 @@ static int indent_code()
   return 0;
 }
 
-#undef bool
 #undef error
 /* end of indent code */
 

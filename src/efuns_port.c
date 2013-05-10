@@ -152,8 +152,7 @@ f_rusage(void)
 {
   struct rusage rus;
   mapping_t *m;
-  long usertime, stime;
-  int maxrss;
+  long usertime, stime, maxrss;
 
   if (getrusage(RUSAGE_SELF, &rus) < 0) {
     m = allocate_mapping(0);
@@ -166,7 +165,7 @@ f_rusage(void)
     fd = open("/proc/self/statm", O_RDONLY);
     buf[read(fd, buf, 256)] = 0;
     close(fd);
-    sscanf(buf, "%*d %d %*s", &maxrss);
+    sscanf(buf, "%*d %ld %*s", &maxrss);
     maxrss *= getpagesize() / 1024;
     m = allocate_mapping(16);
     add_mapping_pair(m, "utime", usertime);

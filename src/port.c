@@ -6,14 +6,6 @@
 #ifndef MINGW
 #include <sys/mman.h>
 #endif
-#if defined(WIN32)
-int dos_style_link(char *x, char *y)
-{
-  char link_cmd[100];
-  sprintf(link_cmd, "copy %s %s", x, y);
-  return system(link_cmd);
-}
-#endif
 
 /* for get_cpu_times() */
 #ifdef GET_PROCESS_STATS
@@ -23,45 +15,22 @@ int dos_style_link(char *x, char *y)
 #include <sys/resource.h>
 #endif
 
-#ifdef sun
-time_t time(time_t *);
-#endif
-
 /*
  * Return a pseudo-random number in the range 0 .. n-1
  */
+// FIXME: drand48 doesn't provide enough random bits for 64bit LPC int.
 long random_number(long n)
 {
-#if defined(RAND) || defined(DRAND48)
   static char called = 0;
 
   if (!called) {
     time_t tim;
 
     time(&tim);
-#  ifdef RAND
-    srand(tim);
-#  else
     srand48(tim);
-#  endif
     called = 1;
   }               /* endif */
-#  ifdef RAND
-#    ifdef MINGW
-  return rand() % n;
-#    else
-  return 1 + (long)((float)n * rand() / (RAND_MAX + 1.0);
-#endif
-#  else
   return (long)(drand48() * n);
-#  endif
-#else
-#  ifdef RANDOM
-  return random() % n;
-#  else             /* RANDOM */
-  return current_time % n;    /* You really don't want to use this method */
-#  endif            /* RANDOM */
-#endif              /* RAND */
 }
 
 /*

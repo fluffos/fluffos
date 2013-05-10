@@ -1,132 +1,87 @@
 #if !defined(STD_INCL_H) && !defined(_FUNC_SPEC_)
 #define STD_INCL_H
 
-#ifdef INCL_STDLIB_H
-#  include <stdlib.h>
-#endif
-#ifdef INCL_UNISTD_H
-#  include <unistd.h>
-#endif
+#include "conf.h"
 
-#include <sys/types.h>
 #include <stdio.h>
-#include <setjmp.h>
+#include <stdarg.h>
 #include <signal.h>
 #include <math.h>
 #include <ctype.h>
 #include <errno.h>
-#ifdef INCL_FCNTL_H
+#include <setjmp.h>
+
+#ifdef HAVE_STDLIB_H
+#  include <stdlib.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#  include <unistd.h>
+#endif
+#ifdef HAVE_SYS_TYPES_H
+#  include <sys/types.h>
+#endif
+#ifdef HAVE_FCNTL_H
 #  include <fcntl.h>
 #endif
-
-#ifdef INCL_TIME_H
+#ifdef HAVE_TIME_H
 #  include <time.h>
 #endif
-#ifdef INCL_SYS_TIME_H
+#ifdef HAVE_SYS_TIME_H
 #  include <sys/time.h>
 #endif
-#ifdef INCL_DOS_H
-#  include <dos.h>
-#endif
-#ifdef INCL_USCLKC_H
-#  include <usclkc.h>
-#endif
-
-#ifdef INCL_SYS_WAIT_H
+#ifdef HAVE_SYS_WAIT_H
 #  include <sys/wait.h>
 #endif
-#ifdef INCL_SYS_CRYPT_H
+#ifdef HAVE_SYS_CRYPT_H
 #  include <sys/crypt.h>
 #endif
-#ifdef INCL_CRYPT_H
+#ifdef HAVE_CRYPT_H
 #  include <crypt.h>
 #endif
-#ifdef INCL_VALUES_H
+#ifdef HAVE_VALUES_H
 #  include <values.h>
 #endif
-#ifdef INCL_LIMITS_H
+#ifdef HAVE_LIMITS_H
 #  include <limits.h>
 #endif
-#ifdef INCL_INTTYPES_H
+#ifdef HAVE_INTTYPES_H
 #  include <inttypes.h>
 #endif
-#ifdef INCL_STDINT_H
+#ifdef HAVE_STDINT_H
 #  include <stdint.h>
 #endif
-#ifdef INCL_FLOAT_H
+#ifdef HAVE_FLOAT_H
 #  include <float.h>
 #endif
-#ifdef INCL_MALLOC_H
+#ifdef HAVE_MALLOC_H
 #  include <malloc.h>
 #endif
-#ifdef INCL_LOCALE_H
+#ifdef HAVE_LOCALE_H
 #  include <locale.h>
 #endif
-
-#ifdef INCL_DLFCN_H
+#ifdef HAVE_DLFCN_H
 #  include <dlfcn.h>
 #endif
-
-#ifndef _AUX_SOURCE
-/* supposedly, memmove is in here, but not defined in any lib */
-#  include <string.h>
+#ifdef HAVE_NETINET_IN_H
+#  include <netinet/in.h>
 #endif
-
-#ifndef NO_SOCKETS
-#  ifdef INCL_NETINET_IN_H
-#    include <netinet/in.h>
-#  endif
-#  ifdef INCL_ARPA_INET_H
-#    include <arpa/inet.h>
-#  endif
+#ifdef HAVE_ARPA_INET_H
+#include <arpa/inet.h>
 #endif
-
-#if defined(WIN32)
-int dos_style_link(char *, char *);
-#define link(x, y) dos_style_link(x, y)
-#endif
-
-#ifdef NeXT
-#  include <libc.h>
-#endif
-
-#ifdef WIN32
-#  include <sys/timeb.h>
-#endif
-
-#if !defined(NeXT) && !defined(WIN32)
-#  include <sys/param.h>
-#endif
-
-#ifdef INCL_MACH_MACH_H
-#  include <mach/mach.h>
-#endif
-
-#ifdef INCL_MACH_H
-#  include <mach.h>
-#endif
-
-#ifdef INCL_ALLOCA_H
+#ifdef HAVE_ALLOCA_H
 #  include <alloca.h>
 #endif
-
-#include <stdarg.h>
-
-#ifdef INCL_BSTRING_H
-#include <bstring.h>
-#endif
-
-#ifdef INCL_EXECINFO_H
+#ifdef HAVE_EXECINFO_H
 #include <execinfo.h>
 #endif
-
-#ifdef INCL_SYS_RUSAGE_H
+#ifdef HAVE_SYS_RUSAGE_H
 #include <sys/rusage.h>
 #endif
-
-/* Note: This is now only used if _both_ USHRT_MAX and MAXSHORT fail to exist*/
-#ifndef USHRT_MAX
-#define USHRT_MAX ((1 << (sizeof(short)*8)) - 1)
+#ifdef HAVE_STRING_H
+#include <string.h>
+#endif
+#ifdef HAVE_SYS_PARAM_H
+#include <sys/param.h>
 #endif
 
-#endif
+#endif /* STD_INCL_H */

@@ -103,9 +103,12 @@ cc.h:
 	echo '#define CXXFLAGS "$(CXXFLAGS)"' >> cc.h
 	echo '#define OPTIMIZE "$(OPTIMIZE)"' >> cc.h
 
+conf.h:
+	./configure
+
 # the touches here are necessary to fix the modification times; link(2) does
 # 'modify' a file
-files: edit_source sysmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c func_spec.c configure.h grammar.y.pre
+files: conf.h edit_source sysmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c func_spec.c configure.h grammar.y.pre
 	./edit_source -options -malloc -build_func_spec '$(CXX) -E $(CXXFLAGS)' \
 	              -process grammar.y.pre
 	./edit_source -build_efuns -build_applies
@@ -171,7 +174,7 @@ clean:
 	-touch Dependencies
 
 reconfigure: clean
-	rm -f configure.h system_libs options_incl.h
+	rm -f conf.h configure.h system_libs options_incl.h
 
 test: all
 	cd testsuite && ../driver -ftest etc/config.test
