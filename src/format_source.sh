@@ -21,6 +21,5 @@ ASTYLE="astyle \
 "
 
 for f in `find . -regex ".*\.[ch]$" | grep -v "compat" | grep -v "testsuite" | grep -v "_spec"`; do
-  echo $ASTYLE $f
-  $ASTYLE $f
+  if [ -s $f ]; then $ASTYLE $f; fi
 done
