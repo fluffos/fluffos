@@ -2,11 +2,17 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([FluffOS], [3.0])
-AC_CONFIG_HEADERS([conf.h])
+AC_INIT([FluffOS],[3.0])
+
+AC_CANONICAL_TARGET
+
+AC_LANG(C++)
 
 # Checks for programs.
 AC_PROG_CXX
+AC_PROG_YACC
+AC_PROG_INSTALL
+AC_PROG_MAKE_SET
 
 # Checks for libraries.
 
@@ -34,5 +40,12 @@ AC_FUNC_REALLOC
 AC_FUNC_STRTOD
 AC_FUNC_WAIT3
 AC_CHECK_FUNCS([atexit drand48 doprnt dup2 floor getcwd gethostbyaddr gethostbyname gethostname getpagesize gettimeofday inet_ntoa memchr memmove memset mkdir munmap pow putenv regcomp rmdir select setlocale socket sqrt strcasecmp strchr strcspn strerror strncasecmp strpbrk strrchr strstr strtol strtoul tzset utime])
+
+AC_SUBST([ARCH])
+AC_SUBST([DRIVER_BIN])
+AC_SUBST([OPTIMIZE])
+
+AC_CONFIG_HEADERS([conf.h])
+AC_CONFIG_FILES([Makefile packages/Makefile])
 
 AC_OUTPUT

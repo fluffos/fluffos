@@ -265,4 +265,12 @@ char *int_alloc_cstring(const char *);
 
 #define SIGNAL_ERROR SIG_ERR
 
+#ifdef CUSTOM_CRYPT
+#  define CRYPT(x, y) custom_crypt(x, y, 0)
+#  define OLDCRYPT(x, y) crypt(x, y)
+#else
+#  define CRYPT(x, y) crypt(x, y)
+#  define OLDCRYPT(x, y) crypt(x, y)
+#endif
+
 #endif
