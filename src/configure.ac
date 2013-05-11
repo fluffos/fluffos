@@ -21,7 +21,7 @@ AC_FUNC_ALLOCA
 AC_HEADER_RESOLV
 AC_HEADER_DIRENT
 AC_HEADER_MAJOR
-AC_CHECK_HEADERS([arpa/inet.h arpa/telnet.h execinfo.h fcntl.h float.h inttypes.h libintl.h limits.h locale.h malloc.h netdb.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/ioctl.h sys/param.h sys/resource.h sys/socket.h sys/stat.h sys/time.h sys/wait.h time.h unistd.h values.h])
+AC_CHECK_HEADERS([arpa/inet.h arpa/telnet.h execinfo.h fcntl.h float.h inttypes.h libintl.h limits.h locale.h malloc.h netdb.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/ioctl.h sys/param.h sys/resource.h sys/rusage.h sys/socket.h sys/stat.h sys/time.h sys/wait.h time.h unistd.h values.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_INT64_T
