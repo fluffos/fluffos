@@ -455,7 +455,7 @@ query_heart_beat(object_t *ob)
 
 int set_heart_beat(object_t *ob, int to)
 {
-  int index;
+  int index, x;
 
   if (ob->flags & O_DESTRUCTED) { return 0; }
 
@@ -500,6 +500,8 @@ int set_heart_beat(object_t *ob, int to)
   } else {
     heart_beat_t *hb;
 
+  // Zoilder 2013 May 13: It doesn't use Random Heart Beat.
+# ifndef HEARTBEAT_RANDOM
     if (!max_heart_beats)
       heart_beats = CALLOCATE(max_heart_beats = HEART_BEAT_CHUNK,
                               heart_beat_t, TAG_HEART_BEAT,
@@ -510,8 +512,44 @@ int set_heart_beat(object_t *ob, int to)
                            heart_beat_t, TAG_HEART_BEAT,
                            "set_heart_beat: 1");
     }
+    
+    x = num_hb_objs++;
 
-    hb = &heart_beats[num_hb_objs++];
+    debug(d_flag, ("Normal HB. Number Objects: %d. Actual Object: %s\n", num_hb_objs, current_object->obname));
+# else
+    // Create a new pointer for heart_beats.
+    heart_beat_t *tmp = 0;
+
+    // Calculate max_heart_beats.
+    if(!max_heart_beats || num_hb_objs == max_heart_beats)
+      max_heart_beats += HEART_BEAT_CHUNK;
+
+    // Allocate the tmp data.
+    tmp = CALLOCATE(max_heart_beats,
+                    heart_beat_t, TAG_HEART_BEAT,
+                    "set_heart_beat: 1");
+
+    // Get position for new HB.
+    x = random_number( ++num_hb_objs );
+    debug(d_flag, ("Random HB. Random Pos. X: %d. Actual Number Objects: %d. Actual Object: %s\n", x, num_hb_objs, current_object->obname));
+
+    // Fill tmp array.
+    for(int i = 0; i < num_hb_objs - 1; i++){
+      // 0..x-1: Same position.
+      if(i < x)
+        tmp[i] = heart_beats[i];
+      // x..n: Other HB.
+      else if(i >= x)
+      tmp[i + 1] = heart_beats[i];
+    }
+
+    // Change heart_beats arrays.
+    FREE(heart_beats);
+    heart_beats = tmp;
+# endif
+
+    // Update pos. with actual heart beat.
+    hb = &heart_beats[x];
     hb->ob = ob;
     if (to < 0) { to = 1; }
     hb->time_to_heart_beat = to;
