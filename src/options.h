@@ -798,6 +798,11 @@
  */
 #define HEARTBEAT_INTERVAL 1
 
+/* HEARTBEAT_RANDOM: Instead of always append heartbeat to the end of the list, 
+ * insert it randomly for more dynamism.
+ */
+#undef HEARTBEAT_RANDOM
+
 /*
  * CALLOUT_CYCLE_SIZE: This is the number of slots in the call_out list.
  * It should be approximately the average number of active call_outs, or
