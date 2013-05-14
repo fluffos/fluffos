@@ -499,6 +499,7 @@ int set_heart_beat(object_t *ob, int to)
     DEBUG_CHECK(index < 0, "Couldn't find enabled object in heart_beat list!\n");
   } else {
     heart_beat_t *hb;
+    int next_hb;
 
     if (!max_heart_beats)
       heart_beats = CALLOCATE(max_heart_beats = HEART_BEAT_CHUNK,
@@ -511,7 +512,19 @@ int set_heart_beat(object_t *ob, int to)
                            "set_heart_beat: 1");
     }
 
-    hb = &heart_beats[num_hb_objs++];
+    next_hb = num_hb_objs++;
+
+#ifdef HEARTBEAT_RANDOM
+    // Randomize. With '+1' new object could be in the end of the list.
+    next_hb = random_number(next_hb + 1);
+
+    // Shift array to make room for next_hb.
+      memmove(&heart_beats[next_hb+1], &heart_beats[next_hb], (num_hb_objs - 1 - next_hb) * sizeof(heart_beat_t));
+
+#endif
+
+    // Update pos. with actual heart beat.
+    hb = &heart_beats[next_hb];
     hb->ob = ob;
     if (to < 0) { to = 1; }
     hb->time_to_heart_beat = to;
