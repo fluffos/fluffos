@@ -261,9 +261,9 @@ void getsalt(BytE *to, BytE *from)
 }
 
 void crunchbuffer(BytE *buf,            /* Buffer to be crunched.       */
-                  SIGNED int *len,      /* Length now used in buf.      */
+                  int *len,      /* Length now used in buf.      */
                   char *addition,       /* What to add to buf.          */
-                  SIGNED int addlen,    /* Length of addition.          */
+                  int addlen,    /* Length of addition.          */
                   int maxlen            /* How many bytes in buf.       */
                  )
 {
@@ -317,7 +317,7 @@ char *custom_crypt(const char *key, const char *salt, unsigned char *rawout)
   static BytE buffer[MD5_MAXLEN],
          abuffer[MD5_MAXLEN],
          thesalt[MD5_SALTLEN];
-  SIGNED int used = 0, len, i;
+  int used = 0, len, i;
   static BytE /* encode()d salt, encode()d digest, salt seperator
                      * and null terminating byte:
                      */

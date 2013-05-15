@@ -280,7 +280,7 @@ static void show_block(u *ptr)
 
 #if defined(atarist) || defined (sun) || defined(AMIGA)
 /* there is a type signed char */
-typedef SIGNED char balance_t;
+typedef char balance_t;
 
 #define BALANCE_T_BITS 8
 #else

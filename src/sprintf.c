@@ -169,7 +169,7 @@ typedef struct ColumnSlashTable {
 typedef struct _sprintf_state {
   outbuffer_t             obuff;
   cst                     *csts;
-  SIGNED int              cur_arg;
+  int                     cur_arg;
   svalue_t                clean;
   struct _sprintf_state   *next;
 } sprintf_state_t;

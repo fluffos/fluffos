@@ -1,40 +1,12 @@
 #ifndef MACROS_H
 #define MACROS_H
 
-#ifdef __STDC__
-#define ANSI_STRING_HACK(x) #x
-#define DONT_ASK_WHY(x) (x)
-#define WHERE (__FILE__ ":" DONT_ASK_WHY(x))
-#else
-#define WHERE "non-ansi compilers are a pain"
-#endif
-
 /*
  * Some useful macros...
  */
 #ifdef BUFSIZ
 #  define PROT_STDIO(x) (x ()
 #endif                          /* BUFSIZ */
-
-/* ANSI/K&R compatibility stuff;
- *
- * The correct way to prototype a function now is:
- *
- * foobar (int, char *);
- *
- * foobar (int x, char * y) { ... }
- */
-/* xlc can't handle an ANSI protoype followed by a K&R def, and varargs
- * functions must be done K&R (b/c va_dcl is K&R style) so don't prototype
- * vararg function arguments under AIX
- */
-#if defined(__STDC__) || defined(WIN32)
-#  define VOLATILE volatile
-#  define SIGNED signed
-#else                           /* __STDC__ */
-#  define VOLATILE
-#  define SIGNED
-#endif                          /* __STDC__ */
 
 /* do things both ways ... */
 #define V_START(vlist, last_arg) va_start(vlist, last_arg)

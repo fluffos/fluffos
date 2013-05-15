@@ -177,7 +177,7 @@ void call_out()
   long extra, real_time;
   static pending_call_t *cop = 0;
   error_context_t econ;
-  VOLATILE int tm;
+  volatile int tm;
 #ifdef CALLOUT_LOOP_PROTECTION
   /* The number of call_outs that will be given a full max_cost time budget;
    * any calls beyond this number will get only what time is left over.

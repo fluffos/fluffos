@@ -4407,7 +4407,7 @@ $as_echo "#define AC_APPLE_UNIVERSAL_BUILD 1" >>confdefs.h
      as_fn_error $? "unknown endianness
  presetting ac_cv_c_bigendian=no (or yes) will help" "$LINENO" 5 ;;
  esac
- // needed by crypt.c
+ # needed by crypt.c
 ac_fn_c_find_intX_t "$LINENO" "64" "ac_cv_c_int64_t"
 case $ac_cv_c_int64_t in #(
   no|yes) ;; #(
