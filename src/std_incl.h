@@ -1,8 +1,6 @@
 #if !defined(STD_INCL_H) && !defined(_FUNC_SPEC_)
 #define STD_INCL_H
 
-#include "conf.h"
-
 #include <stdio.h>
 #include <stdarg.h>
 #include <signal.h>

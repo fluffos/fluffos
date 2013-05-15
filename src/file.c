@@ -856,15 +856,12 @@ static int copy(const char *from, const char *to)
     close(ifd);
     return 1;
   }
-#ifdef HAS_FCHMOD
   if (fchmod(ofd, from_stats.st_mode & 0777)) {
     close(ifd);
     close(ofd);
     unlink(to);
     return 1;
   }
-#endif
-
   while ((len = read(ifd, buf, sizeof(buf))) > 0) {
     int wrote = 0;
     char *bp = buf;

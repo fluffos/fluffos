@@ -163,57 +163,36 @@
                          *x++ = ((char *)(&(y)))[6]; \
                          *x++ = ((char *)(&(y)))[7]
 
-#if SIZEOF_SHORT == 2
 #define COPY_SHORT(x, y) COPY2(x,y)
 #define LOAD_SHORT(x, y) LOAD2(x,y)
 #define STORE_SHORT(x, y) STORE2(x,y)
-#else
-#error shorts of size other than 2 not implemented
-#endif
 
-#if SIZEOF_LPC_INT == 4
-#define COPY_INT(x, y) COPY4(x,y)
-#define LOAD_INT(x, y) LOAD4(x,y)
-#define STORE_INT(x, y) STORE4(x,y)
-#else
-#if SIZEOF_LPC_INT == 8
+/* LPC INT */
 #define COPY_INT(x, y) COPY8(x,y)
 #define LOAD_INT(x, y) LOAD8(x,y)
 #define STORE_INT(x, y) STORE8(x,y)
-#else
-#error ints of size other than 4 not implemented
-#endif
-#endif
 
-#if SIZEOF_LPC_FLOAT == 8
+/* LPC FLOAT */
 #define COPY_FLOAT(x, y) COPY8(x,y)
 #define LOAD_FLOAT(x, y) LOAD8(x,y)
 #define STORE_FLOAT(x, y) STORE8(x,y)
-#else
-#error floats of size other than 8 not implemented
-#endif
 
-#if SIZEOF_PTR == 4
+#if SIZEOF_CHAR_P == 4
 #  define COPY_PTR(x, y) COPY4(x,y)
 #  define LOAD_PTR(x, y) LOAD4(x,y)
 #  define STORE_PTR(x, y) STORE4(x,y)
 
 #  define POINTER_INT intptr_t
 #  define INS_POINTER ins_pointer
-#else
-#  if SIZEOF_PTR == 8
+#elif SIZEOF_CHAR_P == 8
 #    define COPY_PTR(x, y) COPY8(x,y)
 #    define LOAD_PTR(x, y) LOAD8(x,y)
 #    define STORE_PTR(x, y) STORE8(x,y)
 
 #    define POINTER_INT intptr_t
 #    define INS_POINTER ins_pointer
-#  else
-#error pointers of size other than 4 or 8 not implemented
-#  endif
-#endif
-#if SIZEOF_LONGLONG != 8
-#error long long must be 8 bytes.
+#else
+#  error pointers of size other than 4 or 8 not implemented
 #endif
 #endif /* !defined(EDIT_SOURCE) && !defined(_FUNC_SPEC_) */
 

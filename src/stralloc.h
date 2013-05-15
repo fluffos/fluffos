@@ -96,7 +96,7 @@ typedef struct malloc_block_s {
 typedef struct block_s {
   struct block_s *next;       /* next block in the hash chain */
   unsigned int hash;
-#if defined(DEBUGMALLOC_EXTENSIONS) //|| (SIZEOF_PTR == 8)
+#if defined(DEBUGMALLOC_EXTENSIONS) //|| (SIZEOF_CHAR_P == 8)
   long extra_ref;
 #endif
   /* these two must be last */

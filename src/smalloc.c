@@ -131,9 +131,9 @@ POINTER CDECL smalloc_malloc(size_t size)
     return large_malloc(size, 0);
   }
 
-#if SIZEOF_PTR > SIZEOF_INT
-  if (size < SIZEOF_PTR) {
-    size = SIZEOF_PTR;
+#if SIZEOF_CHAR_P > SIZEOF_INT
+  if (size < SIZEOF_CHAR_P) {
+    size = SIZEOF_CHAR_P;
   }
 #endif
 
@@ -170,15 +170,15 @@ POINTER CDECL smalloc_malloc(size_t size)
     }
 
     fake("Allocating new small chunk.");
-    next_unused = (u *) large_malloc(SMALL_CHUNK_SIZE + SIZEOF_PTR, 1);
+    next_unused = (u *) large_malloc(SMALL_CHUNK_SIZE + SIZEOF_CHAR_P, 1);
     if (next_unused == 0) {
       return 0;
     }
 
     *next_unused = (u) last_small_chunk;
     last_small_chunk = next_unused++;
-    count_up(small_chunk_stat, SMALL_CHUNK_SIZE +  SIZEOF_PTR);
-    count_up(small_alloc_stat, SIZEOF_PTR);
+    count_up(small_chunk_stat, SMALL_CHUNK_SIZE +  SIZEOF_CHAR_P);
+    count_up(small_alloc_stat, SIZEOF_CHAR_P);
     unused_size = SMALL_CHUNK_SIZE;
   } else {
     fake("Allocated from chunk.");
@@ -187,7 +187,7 @@ POINTER CDECL smalloc_malloc(size_t size)
   temp = (u *) s_next_ptr(next_unused);
   *s_size_ptr(next_unused) = size >> 2;
   unused_size -= size;
-  if (unused_size < (SIZEOF_INT + SIZEOF_PTR)) {
+  if (unused_size < (SIZEOF_INT + SIZEOF_CHAR_P)) {
     count_up(small_alloc_stat, unused_size);
     if ((size + unused_size) < (SMALL_BLOCK_MAX_BYTES + SIZEOF_INT)) {
       /*

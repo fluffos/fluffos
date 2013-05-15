@@ -1422,41 +1422,6 @@ static void handle_configure()
 {
   open_output_file("configure.h");
 
-  verbose_check_prog("Checking for getrusage()", "RUSAGE",
-                     "", "getrusage(0, 0);", 0);
-  verbose_check_prog("Checking for times()", "TIMES",
-                     "", "times(0);", 0);
-  verbose_check_prog("Checking for gettimeofday()", "HAS_GETTIMEOFDAY",
-                     "", "gettimeofday(0, 0);", 0);
-  verbose_check_prog("Checking for fchmod()", "HAS_FCHMOD",
-                     "", "fchmod(0, 0);", 0);
-
-  printf("Checking for big or little endian ... ");
-  if (!check_code("char num[] = { 0x11, 0x22, 0x33, 0x44 }; int *foo = (int *)num;",
-                  "return (*foo == 0x44332211);")) {
-    printf("big\n");
-    fprintf(yyout, "#define BIGENDIAN 1\n");
-    fflush(yyout);
-  } else { printf("little\n"); }
-
-  fprintf(yyout, "#define SIZEOF_INT %lu\n", sizeof(int));
-  fprintf(yyout, "#define SIZEOF_PTR %lu\n", sizeof(char *));
-  fprintf(yyout, "#define SIZEOF_SHORT %lu\n", sizeof(short));
-  fprintf(yyout, "#define SIZEOF_FLOAT %lu\n", sizeof(double));
-  fprintf(yyout, "#define SIZEOF_LONG %lu\n", sizeof(long));
-  fprintf(yyout, "#define SIZEOF_LONGLONG %lu\n", sizeof(long long));
-  fprintf(yyout, "#define SIZEOF_LPC_INT %lu\n", sizeof(LPC_INT));
-  fprintf(yyout, "#define SIZEOF_LPC_FLOAT %lu\n", sizeof(LPC_FLOAT));
-
-  if (sizeof(unsigned long) == 4) {
-    fprintf(yyout, "#define UINT32 unsigned long\n");
-  } else if (sizeof(unsigned int) == 4) {
-    fprintf(yyout, "#define UINT32 unsigned int\n");
-  } else {
-    printf("WARNING: could not find a 32 bit integral type.\n");
-    exit(-1);
-  }
-
   /* PACKAGE_DB stuff */
   if (lookup_define("PACKAGE_DB")) {
     /* -I would be nicer for added include paths, but we don't have an easy way to
@@ -1486,8 +1451,6 @@ static void handle_configure()
       }
     }
   }
-
-  fprintf(yyout, "#define CONFIGURE_VERSION   %i\n\n", CONFIGURE_VERSION);
 
   close_output_file();
 

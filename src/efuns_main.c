@@ -526,7 +526,7 @@ f_crc32(void)
 {
   int len;
   unsigned char *buf;
-  UINT32 crc;
+  uint32_t crc;
 
   if (sp->type == T_STRING) {
     len = SVALUE_STRLEN(sp);

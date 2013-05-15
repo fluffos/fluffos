@@ -63,7 +63,7 @@
  *      #define MIRROR(l)    ( (l) = ( ((l) << 24) | (((l) & 0x0000ff00) << 8)
 | (((l) & 0x00ff0000) >> 8) | ((l) >> 24) ) )
  */
-#ifdef BIGENDIAN
+#ifdef WORDS_BIGENDIAN
 #define MIRROR(l)
 #else
 #define MIRROR(l)       ( (l) = ( ((l) << 24) | (((l) & 0x0000ff00) << 8) | (((l) & 0x00ff0000) >> 8) | ((l) >> 24) ) )
@@ -82,7 +82,7 @@
 /* Table T constructed from a sine function, mentioned in RFC, section 3.4.
  * Table T[i], 1 <= i <= 64,    = trunc (4294967296 * |sin i|).
  */
-UINT32 T[64] = {
+uint32_t T[64] = {
   0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a,
   0xa8304613, 0xfd469501, 0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be,
   0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821, 0xf61e2562, 0xc040b340,
@@ -109,8 +109,8 @@ int MD5Digest(BytE *buf,   /* Buffer to be digested.               */
 #define OC 0x98badcfe
 #define OD 0x10325476
 
-  UINT32 A = OA, B = OB, C = OC, D = OD;
-  static UINT32 Block[16];  /* One block: 512 bits. */
+  uint32_t A = OA, B = OB, C = OC, D = OD;
+  static uint32_t Block[16];  /* One block: 512 bits. */
 
   if (buflen > MD5_MAXLEN) { return 0; }      /* Too large. */
 

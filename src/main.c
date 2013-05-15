@@ -164,11 +164,6 @@ int main(int argc, char **argv)
 #  endif
 #endif
   current_time = get_current_time();
-  /*
-   * Initialize the microsecond clock.
-   */
-  init_usec_clock();
-
 #ifdef POSIX_TIMERS
   /*
    * Initialize the POSIX timers.
