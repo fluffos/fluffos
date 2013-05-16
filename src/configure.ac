@@ -34,7 +34,7 @@ F_HAVE_PREDEFINE([PACKAGE_ASYNC], [AC_SEARCH_LIBS([pthread_create], [pthread])])
 F_HAVE_PREDEFINE([PACKAGE_PCRE], [AC_SEARCH_LIBS([pcre_match], [pcre])])
 F_HAVE_PREDEFINE([PACKAGE_CRYPTO], [AC_SEARCH_LIBS([SHA1], [ssl])])
 F_HAVE_PREDEFINE([POSIX_TIMERS], [AC_SEARCH_LIBS([timer_create], [rt])])
-F_HAVE_PREDEFINE([USE_ICONV], [AC_SEARCH_LIBS([iconv], [iconv])])
+F_HAVE_PREDEFINE([USE_ICONV], [AC_SEARCH_LIBS([iconv_open], [iconv])])
 
 F_HAVE_PREDEFINE([USE_MSQL], [AC_SEARCH_LIBS([msqlConnect], [msql])])
 F_HAVE_PREDEFINE([USE_MYSQL], [AC_SEARCH_LIBS([mysql_real_connect], [mysqlclient])])
