@@ -14,15 +14,6 @@ AC_PROG_YACC
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
 
-# Checks local_options
-AC_CHECK_FILE([local_options], [], [AC_MSG_ERROR([You must have a local_options file, see options.h.])])
-
-# Checks for libraries.
-AC_SEARCH_LIBS([sin], [m])
-AC_SEARCH_LIBS([crypt], [crypt])
-AC_SEARCH_LIBS([malloc], [malloc])
-AC_SEARCH_LIBS([gethostbyname], [nsl])
-
 AC_DEFUN([F_HAVE_PREDEFINE], [AC_COMPILE_IFELSE(
   [AC_LANG_SOURCE(
     [[
@@ -31,7 +22,10 @@ AC_DEFUN([F_HAVE_PREDEFINE], [AC_COMPILE_IFELSE(
       #error not defined
       #endif
     ]]
-  )], $2, [], [])])
+  )], $2, $3, [])])
+
+# Checks local_options exist
+F_HAVE_PREDEFINE([__cplusplus], [], [AC_MSG_ERROR([[You must have local_options file, see options.h.]])])
 
 # Checking local_options related libraries
 F_HAVE_PREDEFINE([HAVE_ZLIB], [AC_SEARCH_LIBS([gzread], [z])])
@@ -45,6 +39,12 @@ F_HAVE_PREDEFINE([USE_ICONV], [AC_SEARCH_LIBS([iconv], [iconv])])
 F_HAVE_PREDEFINE([USE_MSQL], [AC_SEARCH_LIBS([msqlConnect], [msql])])
 F_HAVE_PREDEFINE([USE_MYSQL], [AC_SEARCH_LIBS([mysql_real_connect], [mysqlclient])])
 F_HAVE_PREDEFINE([USE_POSTGRES], [AC_SEARCH_LIBS([PQconnectdb], [pq])])
+
+# Checks for libraries.
+AC_SEARCH_LIBS([sqrt], [m])
+AC_SEARCH_LIBS([crypt], [crypt])
+AC_SEARCH_LIBS([malloc], [malloc])
+AC_SEARCH_LIBS([gethostbyname], [nsl])
 
 # Checks for header files.
 AC_FUNC_ALLOCA
@@ -75,7 +75,7 @@ AC_FUNC_REALLOC
 AC_FUNC_STRTOD
 AC_FUNC_WAIT3
 
-AC_CHECK_FUNCS([atexit drand48 doprnt dup2 floor getcwd gethostbyaddr gethostbyname gethostname getpagesize inet_ntoa memchr memmove memset mkdir munmap pow putenv regcomp rmdir select setlocale socket sqrt strcasecmp strchr strcspn strerror strncasecmp strpbrk strrchr strstr strtol strtoul tzset utime])
+AC_CHECK_FUNCS([atexit drand48 doprnt dup2 floor getcwd gethostbyaddr gethostbyname gethostname getpagesize inet_ntoa memchr memmove memset mkdir munmap pow putenv regcomp rmdir select setlocale socket strcasecmp strchr strcspn strerror strncasecmp strpbrk strrchr strstr strtol strtoul tzset utime])
 
 AC_CHECK_FUNCS([getrusage])
 
