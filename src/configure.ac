@@ -53,7 +53,7 @@ AC_SUBST([ARCH])
 AC_SUBST([DRIVER_BIN])
 AC_SUBST([OPTIMIZE])
 
-AC_CONFIG_HEADERS([conf.h])
+AC_CONFIG_HEADERS([configure.h])
 AC_CONFIG_FILES([Makefile packages/Makefile])
 
 AC_OUTPUT

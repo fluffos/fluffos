@@ -1,5 +1,3 @@
-#define CONFIGURE_VERSION       5
-
 #define EDIT_SOURCE
 #define NO_MALLOC
 #define NO_SOCKETS
@@ -1420,56 +1418,7 @@ static void verbose_check_prog(const char *msg, const char *def, const char *pre
 
 static void handle_configure()
 {
-  open_output_file("configure.h");
-
-  /* PACKAGE_DB stuff */
-  if (lookup_define("PACKAGE_DB")) {
-    /* -I would be nicer for added include paths, but we don't have an easy way to
-     * set -I paths right now
-     */
-    if (lookup_define("USE_MSQL")) {
-      if (!(check_include("INCL_LOCAL_MSQL_H", "/usr/local/include/msql.h")
-            || check_include("INCL_LOCAL_MSQL_MSQL_H", "/usr/local/msql/include/msql.h")
-            || check_include("INCL_LOCAL_MINERVA_MSQL_H", "/usr/local/Minerva/include/msql.h")
-            || check_include("INCL_LIB_HUGHES_MSQL_H", "/usr/lib/Hughes/include/msql.h"))) {
-        fprintf(stderr, "Cannot find msql.h, compilation is going to fail miserably.\n");
-      }
-    }
-    if (lookup_define("USE_MYSQL")) {
-      if (!(check_include("INCL_LOCAL_MYSQL_H", "/usr/local/include/mysql.h")
-            || check_include("INCL_LOCAL_INCLUDE_MYSQL_MYSQL_H", "/usr/local/include/mysql/mysql.h")
-            || check_include("INCL_LOCAL_MYSQL_MYSQL_H", "/usr/local/mysql/include/mysql.h")
-            || check_include("INCL_MYSQL_MYSQL_H", "/usr/include/mysql/mysql.h")
-            || check_include("INCL_MYSQL_INCLUDE_MYSQL_H", "/usr/mysql/include/mysql/mysql.h"))) {
-        fprintf(stderr, "Cannot find mysql.h, compilation is going to fail miserably.\n");
-      }
-    }
-    if (lookup_define("USE_POSTGRES")) {
-      if (!(check_include("USE_POSTGRES", "/usr/include/postgresql/libpq-fe.h"))) {
-        fprintf(stderr,
-                "Cannot find libpq-fe.h, compilation is going to fail miserably.\n");
-      }
-    }
-  }
-
-  close_output_file();
-
-#ifdef WIN32
-  system("echo Windows detected. Applying libs.");
-  if (lookup_define("HAVE_ZLIB")) {
-    system("echo  -lwsock32 -lws2_32 -lz> system_libs");
-  } else { system("echo  -lwsock32 -lws2_32 > system_libs"); }
-  system("copy windows\\configure.h tmp.config.h");
-  system("type configure.h >> tmp.config.h");
-  system("del configure.h");
-  system("rename tmp.config.h configure.h");
-#else
-
   open_output_file("system_libs");
-  check_library("-lresolv");
-  check_library("-lbsd");
-  check_library("-lBSD");
-  check_library("-ly");
 
   /* don't add -lcrypt if crypt() is in libc.a */
   if (!check_prog(0, "#include \"lint.h\"",
@@ -1558,7 +1507,6 @@ static void handle_configure()
   }
   fprintf(yyout, "\n\n");
   close_output_file();
-#endif
 }
 
 int main(int argc, char **argv)

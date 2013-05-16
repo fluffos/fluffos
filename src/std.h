@@ -7,13 +7,11 @@
 /* the definition of ARCH */
 #include "arch.h"
 
-/* the autoconf definations. */
-#include "conf.h"
+#include "configure.h"
 
 #ifndef EDIT_SOURCE
 /* all options and configuration */
 #include "options_incl.h"
-#include "configure.h"
 #endif
 
 #include "portability.h"
