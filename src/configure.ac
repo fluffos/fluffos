@@ -14,12 +14,14 @@ AC_PROG_YACC
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
 
+# Checks local_options
+AC_CHECK_FILE([local_options], [], [AC_MSG_ERROR([You must have a local_options file, see options.h.])])
+
 # Checks for libraries.
 AC_SEARCH_LIBS([sin], [m])
 AC_SEARCH_LIBS([crypt], [crypt])
 AC_SEARCH_LIBS([malloc], [malloc])
-AC_SEARCH_LIBS([gethostbyname], [nsl nsl_s])
-
+AC_SEARCH_LIBS([gethostbyname], [nsl])
 
 # Checks for header files.
 AC_FUNC_ALLOCA
