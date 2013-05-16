@@ -30,6 +30,9 @@
 /* Define to 1 if you have the `atexit' function. */
 #undef HAVE_ATEXIT
 
+/* Define to 1 if you have the <crypt.h> header file. */
+#undef HAVE_CRYPT_H
+
 /* Define to 1 if you have the <dirent.h> header file, and it defines `DIR'.
    */
 #undef HAVE_DIRENT_H
@@ -206,6 +209,9 @@
 
 /* Define to 1 if `st_rdev' is a member of `struct stat'. */
 #undef HAVE_STRUCT_STAT_ST_RDEV
+
+/* Define to 1 if you have the <sys/crypt.h> header file. */
+#undef HAVE_SYS_CRYPT_H
 
 /* Define to 1 if you have the <sys/dir.h> header file, and it defines `DIR'.
    */
