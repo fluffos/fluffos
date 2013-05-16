@@ -150,19 +150,6 @@ int main(int argc, char **argv)
     exit(-1);
   }
 
-#ifdef RAND
-  srand(get_current_time());
-#else
-#  ifdef DRAND48
-  srand48(get_current_time());
-#  else
-#    ifdef RANDOM
-  srandom(get_current_time());
-#    else
-  fprintf(stderr, "Warning: no random number generator specified!\n");
-#    endif
-#  endif
-#endif
   current_time = get_current_time();
 #ifdef POSIX_TIMERS
   /*
