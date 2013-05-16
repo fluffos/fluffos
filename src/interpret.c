@@ -3,7 +3,6 @@
 #include "efuns_incl.h"
 #include "file.h"
 #include "file_incl.h"
-#include "patchlevel.h"
 #include "backend.h"
 #include "simul_efun.h"
 #include "eoperators.h"
@@ -194,7 +193,7 @@ ref_t *make_ref(void)
 
 void get_version(char *buff)
 {
-  sprintf(buff, "FluffOS %s", PATCH_LEVEL);
+  sprintf(buff, "%s", PACKAGE_STRING);
 }
 
 /*

@@ -6,15 +6,10 @@
 #define _OPTIONS_H_
 
 /*
- * YOU PROBABLY DO NOT WANT TO MODIFY THIS FILE.
+ * YOU SHOULD NOT MODIFY THIS FILE DIRECTLY.
  *
- * Do 'cp options.h local_options' and edit that instead.  local_options,
- * if it exists, overrides this file.
+ * Do 'cp options.h local_options' and edit that instead.
  *
- * The advantage is that when you upgrade to a newer MudOS driver, you can
- * simply copy your local_options file into the src directory.  The build
- * process will warn you if new options have been added that you should
- * choose settings for.
  */
 
 /****************************************************************************

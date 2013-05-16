@@ -1081,18 +1081,13 @@ optimize_icode(char *start, char *pc, char *end)
   while (pc < end) {
     prev = instr;
     switch (instr = EXTRACT_UCHAR(pc++)) {
-#if SIZEOF_LONG == 4
-      case F_NUMBER:
-#endif
-      case F_REAL:
       case F_CALL_INHERITED:
         pc += 4;
         break;
-#if SIZEOF_LONG == 8
       case F_NUMBER:
+      case F_REAL:
         pc += 8;
         break;
-#endif
       case F_SIMUL_EFUN:
       case F_CALL_FUNCTION_BY_ADDRESS:
         pc += 3;

@@ -32,6 +32,6 @@ int MD5Digest(BytE *, unsigned long buflen, BytE *);
 int encode(unsigned char *, BytE *, int);
 void decode(unsigned char *, BytE *, int);
 void getsalt(BytE *, BytE *);
-void crunchbuffer(BytE *buf, SIGNED int *, char *, SIGNED int, int);
+void crunchbuffer(BytE *buf, int *, char *, int, int);
 
 #endif
