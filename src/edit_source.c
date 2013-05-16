@@ -1386,27 +1386,6 @@ static int check_code(const char *pre, const char *code)
   return rc;
 }
 
-static void check_linux_libc()
-{
-  char buf[1024];
-  FILE *ct;
-
-  ct = fopen("comptest.c", "w");
-  fprintf(ct, "int main() { }\n");
-  fclose(ct);
-
-  sprintf(buf, "%s -g comptest.c -o comptest >/dev/null 2>&1", COMPILER);
-  if (system(buf)) {
-    fprintf(stderr, "   libg.a/so installed wrong, trying workaround ...\n");
-    sprintf(buf, "%s -g comptest.c -lc -o comptest >/dev/null 2>&1", COMPILER);
-    if (system(buf)) {
-      fprintf(stderr, "*** FAILED.\n");
-      exit(-1);
-    }
-    fprintf(yyout, " -lc");
-  }
-}
-
 static void verbose_check_prog(const char *msg, const char *def, const char *pre,
                                const char *prog, int andrun)
 {
@@ -1420,38 +1399,8 @@ static void handle_configure()
 {
   open_output_file("system_libs");
 
-  /* don't add -lcrypt if crypt() is in libc.a */
-  if (!check_prog(0, "#include \"lint.h\"",
-                  "char *x = crypt(\"foo\", \"bar\");", 0)) {
-    check_library("-lcrypt");
-  }
-  /* don't add -lmalloc if malloc() works */
-  if (!check_prog(0, "", "char *x = malloc(100);", 0)) {
-    check_library("-lmalloc");
-  }
-
-  /* we don't currently use it anywhere
-  if (!check_prog(0, "", "void *x = dlopen(0, 0);", 0))
-      check_library("-ldl");
-  */
-  check_library("-lsocket");
-  check_library("-linet");
-  check_library("-lnsl");
-  check_library("-lnsl_s");
-  check_library("-lseq");
-  check_library("-lm");
-
   if (lookup_define("GCMALLOC")) {
     check_library("-lgc");
-  }
-
-  if (lookup_define("CYGWIN")) {
-    check_library("-liconv");
-  }
-
-  if (lookup_define("MINGW")) {
-    check_library("-lwsock32");
-    check_library("-lws2_32");
   }
 
   if (lookup_define("HAVE_ZLIB")) {
@@ -1476,8 +1425,6 @@ static void handle_configure()
   if (lookup_define("USE_ICONV")) {
     check_library("-liconv");
   }
-  fprintf(stderr, "Checking for flaky Linux systems ...\n");
-  check_linux_libc();
 
   /* PACKAGE_DB stuff */
   if (lookup_define("PACKAGE_DB") && lookup_define("USE_MSQL")) {

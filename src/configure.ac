@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([FluffOS],[3.0])
+AC_INIT([FluffOS],[v3.0-alpha4])
 
 AC_CANONICAL_TARGET
 
@@ -15,6 +15,11 @@ AC_PROG_INSTALL
 AC_PROG_MAKE_SET
 
 # Checks for libraries.
+AC_SEARCH_LIBS([sin], [m])
+AC_SEARCH_LIBS([crypt], [crypt])
+AC_SEARCH_LIBS([malloc], [malloc])
+AC_SEARCH_LIBS([gethostbyname], [nsl nsl_s])
+
 
 # Checks for header files.
 AC_FUNC_ALLOCA
