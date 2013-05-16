@@ -23,6 +23,29 @@ AC_SEARCH_LIBS([crypt], [crypt])
 AC_SEARCH_LIBS([malloc], [malloc])
 AC_SEARCH_LIBS([gethostbyname], [nsl])
 
+AC_DEFUN([F_HAVE_PREDEFINE], [AC_COMPILE_IFELSE(
+  [AC_LANG_SOURCE(
+    [[
+      #include "local_options"
+      #ifndef $1
+      #error not defined
+      #endif
+    ]]
+  )], $2, [], [])])
+
+# Checking local_options related libraries
+F_HAVE_PREDEFINE([HAVE_ZLIB], [AC_SEARCH_LIBS([gzread], [z])])
+F_HAVE_PREDEFINE([GCMALLOC], [AC_SEARCH_LIBS([GC_init], [gc])])
+F_HAVE_PREDEFINE([PACKAGE_ASYNC], [AC_SEARCH_LIBS([pthread_create], [pthread])])
+F_HAVE_PREDEFINE([PACKAGE_PCRE], [AC_SEARCH_LIBS([pcre_match], [pcre])])
+F_HAVE_PREDEFINE([PACKAGE_CRYPTO], [AC_SEARCH_LIBS([SHA1], [ssl])])
+F_HAVE_PREDEFINE([POSIX_TIMERS], [AC_SEARCH_LIBS([timer_create], [rt])])
+F_HAVE_PREDEFINE([USE_ICONV], [AC_SEARCH_LIBS([iconv], [iconv])])
+
+F_HAVE_PREDEFINE([USE_MSQL], [AC_SEARCH_LIBS([msqlConnect], [msql])])
+F_HAVE_PREDEFINE([USE_MYSQL], [AC_SEARCH_LIBS([mysql_real_connect], [mysqlclient])])
+F_HAVE_PREDEFINE([USE_POSTGRES], [AC_SEARCH_LIBS([PQconnectdb], [pq])])
+
 # Checks for header files.
 AC_FUNC_ALLOCA
 AC_HEADER_RESOLV

@@ -29,7 +29,7 @@ static int nexpands = 0;
 
 FILE *yyin = 0, *yyout = 0;
 
-#define SYNTAX "edit_source [-process file] [-options] [-malloc] [-build_func_spec 'command'] [-build_efuns] [-configure]\n"
+#define SYNTAX "edit_source [-process file] [-options] [-malloc] [-build_func_spec 'command'] [-build_efuns]\n"
 
 /* The files we fool with.  (Actually, there are more.  See -process).
  *
@@ -1395,67 +1395,6 @@ static void verbose_check_prog(const char *msg, const char *def, const char *pre
   } else { printf(" does not exist\n"); }
 }
 
-static void handle_configure()
-{
-  open_output_file("system_libs");
-
-  if (lookup_define("GCMALLOC")) {
-    check_library("-lgc");
-  }
-
-  if (lookup_define("HAVE_ZLIB")) {
-    check_library("-lz");
-  }
-
-  if (lookup_define("PACKAGE_ASYNC")) {
-    check_library("-lpthread");
-  }
-  if (lookup_define("PACKAGE_HASH")) {
-    check_library("-lssl");
-  }
-  if (lookup_define("PACKAGE_PCRE")) {
-    check_library("-lpcre");
-  }
-  if (lookup_define("PACKAGE_CRYPTO")) {
-    check_library("-lcrypto");
-  }
-  if (lookup_define("POSIX_TIMERS")) {
-    check_library("-lrt");
-  }
-  if (lookup_define("USE_ICONV")) {
-    check_library("-liconv");
-  }
-
-  /* PACKAGE_DB stuff */
-  if (lookup_define("PACKAGE_DB") && lookup_define("USE_MSQL")) {
-    if (!(check_library("-lmsql") ||
-          check_library("-L/usr/local/lib -lmsql") ||
-          check_library("-L/usr/local/msql/lib -lmsql") ||
-          check_library("-L/usr/local/Minerva/lib -lmsql") ||
-          check_library("-L/usr/lib/Hughes/lib -lmsql"))) {
-      fprintf(stderr, "Cannot find libmsql.a, compilation is going to fail miserably\n");
-    }
-  }
-  if (lookup_define("PACKAGE_DB") && lookup_define("USE_MYSQL")) {
-    if (!(check_library("-lmysqlclient") ||
-          check_library("-L/usr/local/lib -lmysqlclient") ||
-          check_library("-L/usr/local/lib/mysql -lmysqlclient") ||
-          check_library("-L/usr/local/mysql/lib -lmysqlclient") ||
-          check_library("-L/usr/lib64/mysql -lmysqlclient") ||
-          check_library("-L/usr/lib/mysql -lmysqlclient") ||
-          check_library("-L/usr/mysql/lib/64/mysql -lmysqlclient"))) {
-      fprintf(stderr, "Cannot find libmysqlclient.a, compilation is going to fail miserably\n");
-    }
-  }
-  if (lookup_define("PACKAGE_DB") && lookup_define("USE_POSTGRES")) {
-    if (!(check_library("-lpq"))) {
-      fprintf(stderr, "Cannot find libpq.a, compilation is going to fail miserably\n");
-    }
-  }
-  fprintf(yyout, "\n\n");
-  close_output_file();
-}
-
 int main(int argc, char **argv)
 {
   int idx = 1;
@@ -1465,10 +1404,8 @@ int main(int argc, char **argv)
       fprintf(stderr, SYNTAX);
       exit(-1);
     }
-    if (strcmp(argv[idx], "-configure") == 0) {
-      handle_options(0);
-      handle_configure();
-    } else if (strcmp(argv[idx], "-process") == 0) {
+
+    if (strcmp(argv[idx], "-process") == 0) {
       handle_process(argv[++idx]);
     } else if (strcmp(argv[idx], "-options") == 0) {
       handle_options(1);
