@@ -207,7 +207,7 @@ static void look_for_objects_to_swap()
   static int next_server_time;
 #endif
   object_t *ob;
-  VOLATILE object_t *next_ob, *last_good_ob;
+  volatile object_t *next_ob, *last_good_ob;
   error_context_t econ;
 
 #ifndef NO_IP_DEMON
@@ -549,9 +549,9 @@ int heart_beat_status(outbuffer_t *ob, int verbose)
  */
 void preload_objects(int eflag)
 {
-  VOLATILE array_t *prefiles;
+  volatile array_t *prefiles;
   svalue_t *ret;
-  VOLATILE int ix;
+  volatile int ix;
   error_context_t econ;
 
   save_context(&econ);

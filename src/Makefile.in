@@ -34,6 +34,7 @@
 
 CXX=@CXX@
 CXXFLAGS=@CXXFLAGS@
+LIBS=@LIBS@
 YACC=@YACC@
 O=@OBJEXT@
 DRIVER_BIN=@DRIVER_BIN@@EXEEXT@
@@ -96,17 +97,17 @@ grammar.tab.c: grammar.y
 
 $(DRIVER_BIN): $(OBJ) packages/*.$(O) dtrace_compile
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
-	$(CXX) -rdynamic $(CXXFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) `cat system_libs`
+	$(CXX) -rdynamic $(CXXFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS)
 
 dtrace_compile: dtrace_compile.c
 	$(CXX) $(CXXFLAGS) -x c++ dtrace_compile.c -o dtrace_compile
 
 addr_server: files addr_server.o socket_ctrl.o port.o addr_server.h
 	$(CXX) $(CXXFLAGS) socket_ctrl.o addr_server.o port.o \
-	-o addr_server `cat system_libs`
+	-o addr_server $(LIBS)
 
 portbind: portbind.o
-	$(CXX) $(CXXFLAGS) portbind.o -o portbind `cat system_libs`
+	$(CXX) $(CXXFLAGS) portbind.o -o portbind $(LIBS)
 
 cc.h:
 	rm -f cc.h
@@ -115,29 +116,21 @@ cc.h:
 	echo '#define CXXFLAGS "$(CXXFLAGS)"' >> cc.h
 	echo '#define OPTIMIZE "$(OPTIMIZE)"' >> cc.h
 
-conf.h:
-	./configure
-
 # the touches here are necessary to fix the modification times; link(2) does
 # 'modify' a file
-files: conf.h edit_source sysmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c func_spec.c configure.h grammar.y.pre
+files: edit_source sysmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c func_spec.c configure.h grammar.y.pre
 	./edit_source -options -malloc -build_func_spec '$(CXX) -E $(CXXFLAGS)' \
 	              -process grammar.y.pre
 	./edit_source -build_efuns -build_applies
 	touch mallocwrapper.c
 	touch malloc.c
 	touch files
-	-echo "Configuration done: system_libs: "
-	-cat ./system_libs
 
 make_func.tab.c: make_func.y cc.h
 	-rm -f make_func.tab.*
 	$(YACC) -d make_func.y
 	mv y.tab.h make_func.tab.h
 	mv y.tab.c make_func.tab.c
-
-configure.h: edit_source local_options
-	./edit_source -configure
 
 edit_source: edit_source.o hash.o make_func.tab.o
 	$(CXX) $(CXXFLAGS) edit_source.o hash.o make_func.tab.o -o edit_source
@@ -186,7 +179,7 @@ clean:
 	-touch Dependencies
 
 reconfigure: clean
-	rm -f conf.h configure.h system_libs options_incl.h
+	rm -f conf.h configure.h options_incl.h
 
 test: all
 	cd testsuite && ../driver -ftest etc/config.test

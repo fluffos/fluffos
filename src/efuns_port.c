@@ -16,12 +16,6 @@
 #include "efun_protos.h"
 #include <stdio.h>
 
-/* get a value for CLK_TCK for use by times() */
-#if (defined(TIMES) && !defined(RUSAGE))
-/* this may need #ifdef'd to handle different types of machines */
-#include <limits.h>
-#endif
-
 #ifdef F_CRYPT
 #define SALT_LEN        8
 #ifdef CUSTOM_CRYPT
@@ -139,14 +133,6 @@ f_localtime(void)
 #endif
 
 #ifdef F_RUSAGE
-#ifdef WIN32
-void f_rusage(void)
-{
-  error("rusage() not supported under Windows.\n");
-}
-#else
-
-#ifdef RUSAGE
 void
 f_rusage(void)
 {
@@ -162,11 +148,6 @@ f_rusage(void)
     usertime = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
     stime = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_usec / 1000;
     maxrss = rus.ru_maxrss;
-    fd = open("/proc/self/statm", O_RDONLY);
-    buf[read(fd, buf, 256)] = 0;
-    close(fd);
-    sscanf(buf, "%*d %ld %*s", &maxrss);
-    maxrss *= getpagesize() / 1024;
     m = allocate_mapping(16);
     add_mapping_pair(m, "utime", usertime);
     add_mapping_pair(m, "stime", stime);
@@ -187,76 +168,4 @@ f_rusage(void)
   }
   push_refed_mapping(m);
 }
-#else
-
-#ifdef GET_PROCESS_STATS
-void
-f_rusage(void)
-{
-  struct process_stats ps;
-  mapping_t *m;
-  int utime, stime, maxrss;
-
-  if (get_process_stats(NULL, PS_SELF, &ps, NULL) == -1) {
-    m = allocate_mapping(0);
-  } else {
-    utime = ps.ps_utime.tv_sec * 1000 + ps.ps_utime.tv_usec / 1000;
-    stime = ps.ps_stime.tv_sec * 1000 + ps.ps_stime.tv_usec / 1000;
-    maxrss = ps.ps_maxrss * getpagesize() / 1024;
-
-    m = allocate_mapping(19);
-    add_mapping_pair(m, "utime", utime);
-    add_mapping_pair(m, "stime", stime);
-    add_mapping_pair(m, "maxrss", maxrss);
-    add_mapping_pair(m, "pagein", ps.ps_pagein);
-    add_mapping_pair(m, "reclaim", ps.ps_reclaim);
-    add_mapping_pair(m, "zerofill", ps.ps_zerofill);
-    add_mapping_pair(m, "pffincr", ps.ps_pffincr);
-    add_mapping_pair(m, "pffdecr", ps.ps_pffdecr);
-    add_mapping_pair(m, "swap", ps.ps_swap);
-    add_mapping_pair(m, "syscall", ps.ps_syscall);
-    add_mapping_pair(m, "volcsw", ps.ps_volcsw);
-    add_mapping_pair(m, "involcsw", ps.ps_involcsw);
-    add_mapping_pair(m, "signal", ps.ps_signal);
-    add_mapping_pair(m, "lread", ps.ps_lread);
-    add_mapping_pair(m, "lwrite", ps.ps_lwrite);
-    add_mapping_pair(m, "bread", ps.ps_bread);
-    add_mapping_pair(m, "bwrite", ps.ps_bwrite);
-    add_mapping_pair(m, "phread", ps.ps_phread);
-    add_mapping_pair(m, "phwrite", ps.ps_phwrite);
-  }
-  push_refed_mapping(m);
-}
-#else
-
-#ifdef TIMES                    /* has times() but not getrusage() */
-
-/*
-  warning times are reported in processor dependent units of time.
-  see man pages for 'times' to figure out how long a tick is on your system.
-*/
-
-void
-f_rusage(void)
-{
-  mapping_t *m;
-  struct tms t;
-
-  times(&t);
-  m = allocate_mapping(2);
-  add_mapping_pair(m, "utime", t.tms_utime * 1000 / CLK_TCK);
-  add_mapping_pair(m, "stime", t.tms_stime * 1000 / CLK_TCK);
-  push_refed_mapping(m);
-}
-
-#else
-
-#endif                          /* TIMES */
-
-#endif                          /* GET_PROCESS_STATS */
-
-#endif                          /* RUSAGE */
-
-#endif                          /* WIN32 */
-
 #endif

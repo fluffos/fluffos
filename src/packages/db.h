@@ -4,68 +4,27 @@
 #ifdef PACKAGE_DB
 
 #ifdef USE_POSTGRES
-#include "/usr/include/postgresql/libpq-fe.h"
+#include "<postgresql/libpq-fe.h>"
 #endif
 
 #ifdef USE_MSQL
 /* MSQL v2 requires this so that it knows the right prototypes */
 #define _OS_UNIX
-
-#ifdef INCL_LOCAL_MSQL_H
-#include "/usr/local/include/msql.h"
-#endif
-#ifdef INCL_LOCAL_MSQL_MSQL_H
-#include "/usr/local/msql/include/msql.h"
-#endif
-#ifdef INCL_LOCAL_MINERVA_MSQL_H
-#include "/usr/local/Minerva/include/msql.h"
-#endif
-#ifdef INCL_LIB_HUGHES_MSQL_H
-#include "/usr/lib/Hughes/include/msql.h"
-#endif
+#include "<msql.h>"
 #endif
 
 #ifdef USE_MYSQL
 #define USE_OLD_FUNCTIONS
-#ifndef TCC
-#ifdef INCL_MYSQL_INCLUDE_MYSQL_H
-#include "/usr/mysql/include/mysql/mysql.h"
-#endif
-#ifdef INCL_LOCAL_MYSQL_H
-#include "/usr/local/include/mysql.h"
-#endif
-#ifdef INCL_LOCAL_INCLUDE_MYSQL_MYSQL_H
-#include "/usr/local/include/mysql/mysql.h"
-#endif
-#ifdef INCL_LOCAL_MYSQL_MYSQL_H
-#include "/usr/local/mysql/include/mysql.h"
-#endif
-#ifdef INCL_MYSQL_MYSQL_H
-#include "/usr/include/mysql/mysql.h"
-#endif
-#else
-#ifdef INCL_LOCAL_MYSQL_H
-#include <mysql.h>
-#endif
-#ifdef INCL_LOCAL_INCLUDE_MYSQL_MYSQL_H
-#include <mysql/mysql.h>
-#endif
-#ifdef INCL_LOCAL_MYSQL_MYSQL_H
-#include "/usr/local/mysql/include/mysql.h"
-#endif
-#ifdef INCL_MYSQL_MYSQL_H
-#include <mysql/mysql.h>
-#endif
-#endif
+#include "<mysql/mysql.h>"
 #undef USE_OLD_FUNCTIONS
 #endif
 
 #ifdef USE_SQLITE2
-#include "/usr/include/sqlite.h"
+#include "<sqlite.h>"
 #endif
 
 #ifdef USE_SQLITE3
-#include "/usr/include/sqlite3.h"
+#include "<sqlite3.h>"
 #endif
 
 

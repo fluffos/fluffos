@@ -1,5 +1,3 @@
-#define CONFIGURE_VERSION       5
-
 #define EDIT_SOURCE
 #define NO_MALLOC
 #define NO_SOCKETS
@@ -31,7 +29,7 @@ static int nexpands = 0;
 
 FILE *yyin = 0, *yyout = 0;
 
-#define SYNTAX "edit_source [-process file] [-options] [-malloc] [-build_func_spec 'command'] [-build_efuns] [-configure]\n"
+#define SYNTAX "edit_source [-process file] [-options] [-malloc] [-build_func_spec 'command'] [-build_efuns]\n"
 
 /* The files we fool with.  (Actually, there are more.  See -process).
  *
@@ -1388,27 +1386,6 @@ static int check_code(const char *pre, const char *code)
   return rc;
 }
 
-static void check_linux_libc()
-{
-  char buf[1024];
-  FILE *ct;
-
-  ct = fopen("comptest.c", "w");
-  fprintf(ct, "int main() { }\n");
-  fclose(ct);
-
-  sprintf(buf, "%s -g comptest.c -o comptest >/dev/null 2>&1", COMPILER);
-  if (system(buf)) {
-    fprintf(stderr, "   libg.a/so installed wrong, trying workaround ...\n");
-    sprintf(buf, "%s -g comptest.c -lc -o comptest >/dev/null 2>&1", COMPILER);
-    if (system(buf)) {
-      fprintf(stderr, "*** FAILED.\n");
-      exit(-1);
-    }
-    fprintf(yyout, " -lc");
-  }
-}
-
 static void verbose_check_prog(const char *msg, const char *def, const char *pre,
                                const char *prog, int andrun)
 {
@@ -1416,186 +1393,6 @@ static void verbose_check_prog(const char *msg, const char *def, const char *pre
   if (check_prog(def, pre, prog, andrun)) {
     printf(" exists\n");
   } else { printf(" does not exist\n"); }
-}
-
-static void handle_configure()
-{
-  open_output_file("configure.h");
-
-  verbose_check_prog("Checking for getrusage()", "RUSAGE",
-                     "", "getrusage(0, 0);", 0);
-  verbose_check_prog("Checking for times()", "TIMES",
-                     "", "times(0);", 0);
-  verbose_check_prog("Checking for gettimeofday()", "HAS_GETTIMEOFDAY",
-                     "", "gettimeofday(0, 0);", 0);
-  verbose_check_prog("Checking for fchmod()", "HAS_FCHMOD",
-                     "", "fchmod(0, 0);", 0);
-
-  printf("Checking for big or little endian ... ");
-  if (!check_code("char num[] = { 0x11, 0x22, 0x33, 0x44 }; int *foo = (int *)num;",
-                  "return (*foo == 0x44332211);")) {
-    printf("big\n");
-    fprintf(yyout, "#define BIGENDIAN 1\n");
-    fflush(yyout);
-  } else { printf("little\n"); }
-
-  fprintf(yyout, "#define SIZEOF_INT %lu\n", sizeof(int));
-  fprintf(yyout, "#define SIZEOF_PTR %lu\n", sizeof(char *));
-  fprintf(yyout, "#define SIZEOF_SHORT %lu\n", sizeof(short));
-  fprintf(yyout, "#define SIZEOF_FLOAT %lu\n", sizeof(double));
-  fprintf(yyout, "#define SIZEOF_LONG %lu\n", sizeof(long));
-  fprintf(yyout, "#define SIZEOF_LONGLONG %lu\n", sizeof(long long));
-  fprintf(yyout, "#define SIZEOF_LPC_INT %lu\n", sizeof(LPC_INT));
-  fprintf(yyout, "#define SIZEOF_LPC_FLOAT %lu\n", sizeof(LPC_FLOAT));
-
-  if (sizeof(unsigned long) == 4) {
-    fprintf(yyout, "#define UINT32 unsigned long\n");
-  } else if (sizeof(unsigned int) == 4) {
-    fprintf(yyout, "#define UINT32 unsigned int\n");
-  } else {
-    printf("WARNING: could not find a 32 bit integral type.\n");
-    exit(-1);
-  }
-
-  /* PACKAGE_DB stuff */
-  if (lookup_define("PACKAGE_DB")) {
-    /* -I would be nicer for added include paths, but we don't have an easy way to
-     * set -I paths right now
-     */
-    if (lookup_define("USE_MSQL")) {
-      if (!(check_include("INCL_LOCAL_MSQL_H", "/usr/local/include/msql.h")
-            || check_include("INCL_LOCAL_MSQL_MSQL_H", "/usr/local/msql/include/msql.h")
-            || check_include("INCL_LOCAL_MINERVA_MSQL_H", "/usr/local/Minerva/include/msql.h")
-            || check_include("INCL_LIB_HUGHES_MSQL_H", "/usr/lib/Hughes/include/msql.h"))) {
-        fprintf(stderr, "Cannot find msql.h, compilation is going to fail miserably.\n");
-      }
-    }
-    if (lookup_define("USE_MYSQL")) {
-      if (!(check_include("INCL_LOCAL_MYSQL_H", "/usr/local/include/mysql.h")
-            || check_include("INCL_LOCAL_INCLUDE_MYSQL_MYSQL_H", "/usr/local/include/mysql/mysql.h")
-            || check_include("INCL_LOCAL_MYSQL_MYSQL_H", "/usr/local/mysql/include/mysql.h")
-            || check_include("INCL_MYSQL_MYSQL_H", "/usr/include/mysql/mysql.h")
-            || check_include("INCL_MYSQL_INCLUDE_MYSQL_H", "/usr/mysql/include/mysql/mysql.h"))) {
-        fprintf(stderr, "Cannot find mysql.h, compilation is going to fail miserably.\n");
-      }
-    }
-    if (lookup_define("USE_POSTGRES")) {
-      if (!(check_include("USE_POSTGRES", "/usr/include/postgresql/libpq-fe.h"))) {
-        fprintf(stderr,
-                "Cannot find libpq-fe.h, compilation is going to fail miserably.\n");
-      }
-    }
-  }
-
-  fprintf(yyout, "#define CONFIGURE_VERSION   %i\n\n", CONFIGURE_VERSION);
-
-  close_output_file();
-
-#ifdef WIN32
-  system("echo Windows detected. Applying libs.");
-  if (lookup_define("HAVE_ZLIB")) {
-    system("echo  -lwsock32 -lws2_32 -lz> system_libs");
-  } else { system("echo  -lwsock32 -lws2_32 > system_libs"); }
-  system("copy windows\\configure.h tmp.config.h");
-  system("type configure.h >> tmp.config.h");
-  system("del configure.h");
-  system("rename tmp.config.h configure.h");
-#else
-
-  open_output_file("system_libs");
-  check_library("-lresolv");
-  check_library("-lbsd");
-  check_library("-lBSD");
-  check_library("-ly");
-
-  /* don't add -lcrypt if crypt() is in libc.a */
-  if (!check_prog(0, "#include \"lint.h\"",
-                  "char *x = crypt(\"foo\", \"bar\");", 0)) {
-    check_library("-lcrypt");
-  }
-  /* don't add -lmalloc if malloc() works */
-  if (!check_prog(0, "", "char *x = malloc(100);", 0)) {
-    check_library("-lmalloc");
-  }
-
-  /* we don't currently use it anywhere
-  if (!check_prog(0, "", "void *x = dlopen(0, 0);", 0))
-      check_library("-ldl");
-  */
-  check_library("-lsocket");
-  check_library("-linet");
-  check_library("-lnsl");
-  check_library("-lnsl_s");
-  check_library("-lseq");
-  check_library("-lm");
-
-  if (lookup_define("GCMALLOC")) {
-    check_library("-lgc");
-  }
-
-  if (lookup_define("CYGWIN")) {
-    check_library("-liconv");
-  }
-
-  if (lookup_define("MINGW")) {
-    check_library("-lwsock32");
-    check_library("-lws2_32");
-  }
-
-  if (lookup_define("HAVE_ZLIB")) {
-    check_library("-lz");
-  }
-
-  if (lookup_define("PACKAGE_ASYNC")) {
-    check_library("-lpthread");
-  }
-  if (lookup_define("PACKAGE_HASH")) {
-    check_library("-lssl");
-  }
-  if (lookup_define("PACKAGE_PCRE")) {
-    check_library("-lpcre");
-  }
-  if (lookup_define("PACKAGE_CRYPTO")) {
-    check_library("-lcrypto");
-  }
-  if (lookup_define("POSIX_TIMERS")) {
-    check_library("-lrt");
-  }
-  if (lookup_define("USE_ICONV")) {
-    check_library("-liconv");
-  }
-  fprintf(stderr, "Checking for flaky Linux systems ...\n");
-  check_linux_libc();
-
-  /* PACKAGE_DB stuff */
-  if (lookup_define("PACKAGE_DB") && lookup_define("USE_MSQL")) {
-    if (!(check_library("-lmsql") ||
-          check_library("-L/usr/local/lib -lmsql") ||
-          check_library("-L/usr/local/msql/lib -lmsql") ||
-          check_library("-L/usr/local/Minerva/lib -lmsql") ||
-          check_library("-L/usr/lib/Hughes/lib -lmsql"))) {
-      fprintf(stderr, "Cannot find libmsql.a, compilation is going to fail miserably\n");
-    }
-  }
-  if (lookup_define("PACKAGE_DB") && lookup_define("USE_MYSQL")) {
-    if (!(check_library("-lmysqlclient") ||
-          check_library("-L/usr/local/lib -lmysqlclient") ||
-          check_library("-L/usr/local/lib/mysql -lmysqlclient") ||
-          check_library("-L/usr/local/mysql/lib -lmysqlclient") ||
-          check_library("-L/usr/lib64/mysql -lmysqlclient") ||
-          check_library("-L/usr/lib/mysql -lmysqlclient") ||
-          check_library("-L/usr/mysql/lib/64/mysql -lmysqlclient"))) {
-      fprintf(stderr, "Cannot find libmysqlclient.a, compilation is going to fail miserably\n");
-    }
-  }
-  if (lookup_define("PACKAGE_DB") && lookup_define("USE_POSTGRES")) {
-    if (!(check_library("-lpq"))) {
-      fprintf(stderr, "Cannot find libpq.a, compilation is going to fail miserably\n");
-    }
-  }
-  fprintf(yyout, "\n\n");
-  close_output_file();
-#endif
 }
 
 int main(int argc, char **argv)
@@ -1607,10 +1404,8 @@ int main(int argc, char **argv)
       fprintf(stderr, SYNTAX);
       exit(-1);
     }
-    if (strcmp(argv[idx], "-configure") == 0) {
-      handle_options(0);
-      handle_configure();
-    } else if (strcmp(argv[idx], "-process") == 0) {
+
+    if (strcmp(argv[idx], "-process") == 0) {
       handle_process(argv[++idx]);
     } else if (strcmp(argv[idx], "-options") == 0) {
       handle_options(1);

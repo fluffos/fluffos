@@ -27,8 +27,8 @@
 #define FOA_NEEDS_MALLOC       0x2
 
 typedef struct {
-  SIGNED short local_num, global_num, efun_num;
-  SIGNED short function_num, simul_num, class_num;
+  short local_num, global_num, efun_num;
+  short function_num, simul_num, class_num;
 } defined_name_t;
 
 typedef struct ifstate_s {

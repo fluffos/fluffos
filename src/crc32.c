@@ -10,10 +10,10 @@
    by others.  See the comments in the file (crctab.h) for the credits.
 */
 
-UINT32
+uint32_t
 compute_crc32(unsigned char *buf, int len)
 {
-  register UINT32 crc = 0xFFFFFFFFL;
+  register uint32_t crc = 0xFFFFFFFFL;
   register int j;
 
   j = len;

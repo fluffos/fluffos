@@ -67,7 +67,11 @@ void init_posix_timers(void)
   it.it_value.tv_sec = 0;
   it.it_value.tv_nsec = 1;
   sev.sigev_value.sival_ptr = (void *)call_heart_beat;
+#ifndef __CYGWIN__
   i = timer_create(CLOCK_MONOTONIC, &sev, &hb_timer_id);
+#else
+  i = timer_create(CLOCK_REALTIME, &sev, &hb_timer_id);
+#endif
   if (i < 0) {
     perror("init_posix_timers: timer_create");
     exit(-1);
