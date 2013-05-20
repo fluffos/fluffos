@@ -4,6 +4,8 @@ Wodan announced 3.x release will be maintained by
 Please submit issue to https://github.com/fluffos/fluffos
 
 Major changes compare to 2.x:
+  switch to autoconf (alpha4 done)
+  PACKAGE_TRIM (alpha4 done)
   C++11 (G++ 4.6+, CLANG 2.9+) environment is required (alpha3 done)
   Support 32bit platform, CYGWIN build. (alpha2 done)
   64bit LPC runtime on all platforms (alpha2 done)
@@ -11,15 +13,24 @@ Major changes compare to 2.x:
   CALLOUT_LOOP_PROTECTION, SANE_SORTING (alpha2)
 
 TODOs:
-  switch to autoconf
+  switch to automake
   switch to TCMalloc
   get rid of edit_source
-  get rid of addr_server/multi-threading
+  get rid of addr_server/add multi-threading
   LPC JIT compiler
 
 ================================================================================
   Per-release ChangeLog
 ================================================================================
+FluffOS 3.0-alpha4
+  PACKAGE_TRIM: (zoilder), rtrim, ltrim, and trim for string trimming.
+
+  FluffOS has switched to use autoconf for compatibility detection.
+  This has lead to removal of almost half of the code in edit_source.c
+  Note: the correct way to build is still to launch ./build.FluffOS first,
+    then make.
+  Other general code quality imporvements, many old crafts has been removed.
+  FluffOS 3.0 will only support mondern linux distributions.
 
 FluffOS 3.0-alpha3
   FluffOS has switched to c++ language.
