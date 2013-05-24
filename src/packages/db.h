@@ -4,27 +4,27 @@
 #ifdef PACKAGE_DB
 
 #ifdef USE_POSTGRES
-#include "<postgresql/libpq-fe.h>"
+#include <postgresql/libpq-fe.h>
 #endif
 
 #ifdef USE_MSQL
 /* MSQL v2 requires this so that it knows the right prototypes */
 #define _OS_UNIX
-#include "<msql.h>"
+#include <msql.h>
 #endif
 
 #ifdef USE_MYSQL
 #define USE_OLD_FUNCTIONS
-#include "<mysql/mysql.h>"
+#include <mysql/mysql.h>
 #undef USE_OLD_FUNCTIONS
 #endif
 
 #ifdef USE_SQLITE2
-#include "<sqlite.h>"
+#include <sqlite.h>
 #endif
 
 #ifdef USE_SQLITE3
-#include "<sqlite3.h>"
+#include <sqlite3.h>
 #endif
 
 
