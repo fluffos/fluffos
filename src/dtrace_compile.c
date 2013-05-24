@@ -4,9 +4,9 @@ int main()
 {
 #ifdef DTRACE
 #ifdef _LP64
-  system("dtrace -G -64 -s fluffos.d obj/*.o > /dev/null");
+  system("dtrace -G -64 -s fluffos.d *.o packages/*.o > /dev/null");
 #else
-  system("dtrace -G -32 -s fluffos.d obj/*.o > /dev/null");
+  system("dtrace -G -32 -s fluffos.d *.o packages/*.o > /dev/null");
 #endif
   printf("fluffos.o");
 #endif
