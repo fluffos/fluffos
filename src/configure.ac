@@ -22,9 +22,9 @@ AC_DEFUN([F_HAVE_PREDEFINE], [AC_COMPILE_IFELSE(
       #error not defined
       #endif
     ]]
-  )], $2, $3, [])])
+  )], [$2], [$3], [])])
 
-# Checks local_options exist
+# Checks local_options exist, use a grauntee exist predefine.
 F_HAVE_PREDEFINE([__cplusplus], [], [AC_MSG_ERROR([[You must have local_options file, see options.h.]])])
 
 # Checking local_options related libraries
@@ -40,7 +40,14 @@ F_HAVE_PREDEFINE([USE_ICONV], [AC_SEARCH_LIBS([iconv_open], [iconv])])
 F_HAVE_PREDEFINE([USE_ICONV], [AC_SEARCH_LIBS([libiconv_open], [iconv])])
 
 F_HAVE_PREDEFINE([USE_MSQL], [AC_SEARCH_LIBS([msqlConnect], [msql])])
-F_HAVE_PREDEFINE([USE_MYSQL], [AC_SEARCH_LIBS([mysql_real_connect], [mysqlclient])])
+
+F_HAVE_PREDEFINE([USE_MYSQL],
+                 [AC_CHECK_HEADER([mysql/mysql.h], [],
+                                  [AC_MSG_ERROR([[mysql.h is not found, it needs to be in /usr/include/mysql/ for now.]])])])
+F_HAVE_PREDEFINE([USE_MYSQL],
+                 [AC_SEARCH_LIBS([mysql_real_connect], [mysqlclient], [], 
+                                 [AC_MSG_ERROR([[libmysqlclient is not found.]])])])
+
 F_HAVE_PREDEFINE([USE_POSTGRES], [AC_SEARCH_LIBS([PQconnectdb], [pq])])
 
 # Checks for libraries.
