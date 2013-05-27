@@ -25,5 +25,9 @@ crypto.$(O): crypto.c
 db.$(O): db.c
 	$(CXX) $(CXXFLAGS) -I.. @MYSQL_CFLAGS@ @POSTGRESQL_CFLAGS@ @SQLITE3_CFLAGS@ -c -x c++ $*.c
 
+# pcre
+pcre.$(O): pcre.c
+	$(CXX) $(CXXFLAGS) -I.. @PCRE_CFLAGS@ -c -x c++ $*.c
+
 clean:
 	rm -f *.$(O)

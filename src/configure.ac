@@ -61,7 +61,6 @@ F_HAVE_PREDEFINE([__cplusplus], [], [AC_MSG_ERROR([[You must have local_options 
 F_HAVE_PREDEFINE([HAVE_ZLIB], [AC_SEARCH_LIBS([gzread], [z])])
 F_HAVE_PREDEFINE([GCMALLOC], [AC_SEARCH_LIBS([GC_init], [gc])])
 F_HAVE_PREDEFINE([PACKAGE_ASYNC], [AC_SEARCH_LIBS([pthread_create], [pthread])])
-F_HAVE_PREDEFINE([PACKAGE_PCRE], [AC_SEARCH_LIBS([pcre_match], [pcre])])
 F_HAVE_PREDEFINE([POSIX_TIMERS], [AC_SEARCH_LIBS([timer_create], [rt])])
 
 # iconv has redirect on CYGWIN.
@@ -72,18 +71,21 @@ F_HAVE_PREDEFINE([USE_MSQL], [AC_SEARCH_LIBS([msqlConnect], [msql])])
 
 F_HAVE_PREDEFINE([USE_MYSQL], [AX_LIB_MYSQL()])
 F_HAVE_PREDEFINE([USE_MYSQL], [F_HAVE_PREDEFINE([HAVE_MYSQL], [],
-  [AC_MSG_ERROR([[Fail to find mysql header/library, try changing --with_mysql flag]])])])
+  [AC_MSG_ERROR([[Fail to find MYSQL header/library, try changing --with_mysql flag]])])])
 
 F_HAVE_PREDEFINE([USE_POSTGRES], [AX_LIB_POSTGRESQL()])
 F_HAVE_PREDEFINE([USE_POSTGRES], [F_HAVE_PREDEFINE([HAVE_POSTGRESQL], [],
-  [AC_MSG_ERROR([[Fail to find postgresql header/library, try changing --with_postgresql flag.]])])])
+  [AC_MSG_ERROR([[Fail to find POSTGRESQL header/library, try changing --with_postgresql flag.]])])])
 
 F_HAVE_PREDEFINE([USE_SQLITE3], [AX_LIB_SQLITE3()])
 F_HAVE_PREDEFINE([USE_SQLITE3], [F_HAVE_PREDEFINE([HAVE_SQLITE3], [],
-  [AC_MSG_ERROR([[Fail to find sqlite3 header/library, try changing --with_sqlite3 flag.]])])])
+  [AC_MSG_ERROR([[Fail to find SQLITE3 header/library, try changing --with_sqlite3 flag.]])])])
 
 F_HAVE_PREDEFINE([PACKAGE_CRYPTO], [AX_CHECK_OPENSSL([],
   [AC_MSG_ERROR([[Fail to find OPENSSL header/library, try changing --with_openssl flag.]])])])
+
+F_HAVE_PREDEFINE([PACKAGE_PCRE], [AX_PATH_LIB_PCRE([],
+  [AC_MSG_ERROR([[Fail to find PCRE header/library, try changing --with_pcre flag.]])])])
 
 AC_SUBST([ARCH])
 AC_SUBST([DRIVER_BIN])

@@ -97,7 +97,7 @@ grammar.tab.c: grammar.y
 
 $(DRIVER_BIN): $(OBJ) packages/*.$(O) dtrace_compile
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
-	$(CXX) -rdynamic $(CXXFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) @MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@
+	$(CXX) -rdynamic $(CXXFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) @MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@
 
 dtrace_compile: dtrace_compile.c
 	$(CXX) $(CXXFLAGS) -x c++ dtrace_compile.c -o dtrace_compile
@@ -196,6 +196,7 @@ help:
 	@if [ -n "@POSTGRESQL_VERSION@" ];then echo "POSTGRESQL: @POSTGRESQL_VERSION@, @POSTGRESQL_CFLAGS@, @POSTGRESQL_LDFLAGS@"; fi
 	@if [ -n "@SQLITE3_VERSION@" ]; then echo "SQLite3: @SQLITE3_VERSION@, @SQLITE3_CFLAGS@, @SQLITE3_LDFLAGS@"; fi
 	@if [ -n "@OPENSSL_LIBS@" ]; then echo "OPENSSL: @OPENSSL_LIBS@, @OPENSSL_INCLUDES@, @OPENSSL_LDFLAGS@"; fi
+	@if [ -n "@PCRE_LIBS@" ]; then echo "PCRE: @PCRE_LIBS@, @PCRE_CFLAGS@"; fi
 	@echo "Edit Makefile if this is not what you want"
 	@echo
 	@echo "Otherwise, type '$(MAKE)' to build FluffOS, then '$(MAKE) install'."
