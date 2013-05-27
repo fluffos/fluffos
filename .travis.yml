@@ -1,9 +1,9 @@
 language: cpp
 
 before_install:
-  - sudo apt-get update -qq && sudo apt-get install -qq bison libz-dev gcc-multilib g++-multilib valgrind zlib1g-dev:i386 libc6-dbg:i386
+  - travis_retry sudo apt-get update -qq && sudo apt-get install -qq bison valgrind libz-dev libmysqlclient-dev libpq-dev libsqlite3-dev libssl-dev
 
-script: cd src && cp local_options.testdev local_options && ./build.FluffOS develop && make && cd testsuite && valgrind --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver etc/config.test -ftest && cd .. && cp local_options.testrelease local_options && ./build.FluffOS && make clean && make && cd testsuite && valgrind --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver etc/config.test -ftest
+script: cd src && cp local_options.$CONFIG local_options && ./build.FluffOS $TYPE && make && cd testsuite && valgrind --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver etc/config.test -ftest
 
 after_failure: tail -n 50 log/*
 
@@ -12,5 +12,5 @@ compiler:
   - gcc
 
 env:
-  - COMPILER_FLAGS="-m32 -mtune=generic"
-  - COMPILER_FLAGS="-m64 -mtune=generic"
+  - COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev"
+  - COMPILER_FLAGS="-m64 -mtune=generic" TYPE="" CONFIG="testrelease"
