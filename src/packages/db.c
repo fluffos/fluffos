@@ -1443,7 +1443,7 @@ static int Postgres_connect(dbconn_t *c, const char *host, const char *database,
 
   char *connstr = "host = '%s' dbname = '%s' user = '%s' password = '%s'";
   buffsize = strlen(connstr) + strlen(host) + strlen(database) + strlen(username) + strlen(password);
-  char *conninfo = malloc(buffsize);
+  char *conninfo = (char *)malloc(buffsize);
   if (conninfo != NULL) {
     sprintf(conninfo, connstr, host, database, username, password);
   }
