@@ -6,15 +6,9 @@ if test $# -ne 0; then
       echo Preparing to build developmental version of MudOS driver ...
       OPTIMIZE="-O0"
       DEBUG="-g -Wall -pedantic -D_FORTIFY_SOURCE=2 -DDEBUG -DDEBUG_MACRO"
-      ;;
-    debug)
-      echo Preparing to build debugging version of MudOS driver ...
-      OPTIMIZE="-O3"
-      DEBUG="-g -DDEBUG -DDEBUG_NON_FATAL -DDEBUG_MACRO"
+      shift
       ;;
     *)
-      echo Unknown build type
-      exit 1
       ;;
   esac
 else
@@ -52,5 +46,4 @@ CXXFLAGS="$CXXFLAGS $COMPILER_FLAGS $WARN $OPTIMIZE $DEBUG"
 
 # Force an reconfigure.
 rm configure.h
-CC=$CC CXXFLAGS=$CXXFLAGS MAKE=$MAKE ARCH=$ARCH DRIVER_BIN=$DRIVER_BIN OPTIMIZE=$OPTIMIZE ./configure --bindir=$INSTALL_DIR && $MAKE help
-
+CXXFLAGS=$CXXFLAGS MAKE=$MAKE ARCH=$ARCH DRIVER_BIN=$DRIVER_BIN OPTIMIZE=$OPTIMIZE ./configure --bindir=$INSTALL_DIR $@ && $MAKE help

@@ -1,1 +1,2 @@
-autoreconf -vf -Wall --install
+#!/bin/sh
+autoreconf -I m4 -vf -Wall --install

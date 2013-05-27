@@ -3,6 +3,7 @@
 
 AC_PREREQ([2.68])
 AC_INIT([FluffOS],[v3.0-alpha4])
+AC_CONFIG_MACRO_DIR([m4])
 
 AC_CANONICAL_TARGET
 
@@ -13,42 +14,6 @@ AC_PROG_CXX
 AC_PROG_YACC
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
-
-AC_DEFUN([F_HAVE_PREDEFINE], [AC_COMPILE_IFELSE(
-  [AC_LANG_SOURCE(
-    [[
-      #include "local_options"
-      #ifndef $1
-      #error not defined
-      #endif
-    ]]
-  )], [$2], [$3], [])])
-
-# Checks local_options exist, use a grauntee exist predefine.
-F_HAVE_PREDEFINE([__cplusplus], [], [AC_MSG_ERROR([[You must have local_options file, see options.h.]])])
-
-# Checking local_options related libraries
-F_HAVE_PREDEFINE([HAVE_ZLIB], [AC_SEARCH_LIBS([gzread], [z])])
-F_HAVE_PREDEFINE([GCMALLOC], [AC_SEARCH_LIBS([GC_init], [gc])])
-F_HAVE_PREDEFINE([PACKAGE_ASYNC], [AC_SEARCH_LIBS([pthread_create], [pthread])])
-F_HAVE_PREDEFINE([PACKAGE_PCRE], [AC_SEARCH_LIBS([pcre_match], [pcre])])
-F_HAVE_PREDEFINE([PACKAGE_CRYPTO], [AC_SEARCH_LIBS([SHA1], [ssl])])
-F_HAVE_PREDEFINE([POSIX_TIMERS], [AC_SEARCH_LIBS([timer_create], [rt])])
-
-# iconv has redirect on CYGWIN.
-F_HAVE_PREDEFINE([USE_ICONV], [AC_SEARCH_LIBS([iconv_open], [iconv])])
-F_HAVE_PREDEFINE([USE_ICONV], [AC_SEARCH_LIBS([libiconv_open], [iconv])])
-
-F_HAVE_PREDEFINE([USE_MSQL], [AC_SEARCH_LIBS([msqlConnect], [msql])])
-
-F_HAVE_PREDEFINE([USE_MYSQL],
-                 [AC_CHECK_HEADER([mysql/mysql.h], [],
-                                  [AC_MSG_ERROR([[mysql.h is not found, it needs to be in /usr/include/mysql/ for now.]])])])
-F_HAVE_PREDEFINE([USE_MYSQL],
-                 [AC_SEARCH_LIBS([mysql_real_connect], [mysqlclient], [], 
-                                 [AC_MSG_ERROR([[libmysqlclient is not found.]])])])
-
-F_HAVE_PREDEFINE([USE_POSTGRES], [AC_SEARCH_LIBS([PQconnectdb], [pq])])
 
 # Checks for libraries.
 AC_SEARCH_LIBS([sqrt], [m])
@@ -88,6 +53,37 @@ AC_FUNC_WAIT3
 AC_CHECK_FUNCS([atexit drand48 doprnt dup2 floor getcwd gethostbyaddr gethostbyname gethostname getpagesize inet_ntoa memchr memmove memset mkdir munmap pow putenv regcomp rmdir select setlocale socket strcasecmp strchr strcspn strerror strncasecmp strpbrk strrchr strstr strtol strtoul tzset utime])
 
 AC_CHECK_FUNCS([getrusage])
+
+# Checks local_options exist, use a grauntee exist predefine.
+F_HAVE_PREDEFINE([__cplusplus], [], [AC_MSG_ERROR([[You must have local_options file, see options.h.]])])
+
+# Checking local_options related libraries
+F_HAVE_PREDEFINE([HAVE_ZLIB], [AC_SEARCH_LIBS([gzread], [z])])
+F_HAVE_PREDEFINE([GCMALLOC], [AC_SEARCH_LIBS([GC_init], [gc])])
+F_HAVE_PREDEFINE([PACKAGE_ASYNC], [AC_SEARCH_LIBS([pthread_create], [pthread])])
+F_HAVE_PREDEFINE([PACKAGE_PCRE], [AC_SEARCH_LIBS([pcre_match], [pcre])])
+F_HAVE_PREDEFINE([POSIX_TIMERS], [AC_SEARCH_LIBS([timer_create], [rt])])
+
+# iconv has redirect on CYGWIN.
+F_HAVE_PREDEFINE([USE_ICONV], [AC_SEARCH_LIBS([iconv_open], [iconv])])
+F_HAVE_PREDEFINE([USE_ICONV], [AC_SEARCH_LIBS([libiconv_open], [iconv])])
+
+F_HAVE_PREDEFINE([USE_MSQL], [AC_SEARCH_LIBS([msqlConnect], [msql])])
+
+F_HAVE_PREDEFINE([USE_MYSQL], [AX_LIB_MYSQL()])
+F_HAVE_PREDEFINE([USE_MYSQL], [F_HAVE_PREDEFINE([HAVE_MYSQL], [],
+  [AC_MSG_ERROR([[Fail to find mysql header/library, try changing --with_mysql flag]])])])
+
+F_HAVE_PREDEFINE([USE_POSTGRES], [AX_LIB_POSTGRESQL()])
+F_HAVE_PREDEFINE([USE_POSTGRES], [F_HAVE_PREDEFINE([HAVE_POSTGRESQL], [],
+  [AC_MSG_ERROR([[Fail to find postgresql header/library, try changing --with_postgresql flag.]])])])
+
+F_HAVE_PREDEFINE([USE_SQLITE3], [AX_LIB_SQLITE3()])
+F_HAVE_PREDEFINE([USE_SQLITE3], [F_HAVE_PREDEFINE([HAVE_SQLITE3], [],
+  [AC_MSG_ERROR([[Fail to find sqlite3 header/library, try changing --with_sqlite3 flag.]])])])
+
+F_HAVE_PREDEFINE([PACKAGE_CRYPTO], [AX_CHECK_OPENSSL([],
+  [AC_MSG_ERROR([[Fail to find OPENSSL header/library, try changing --with_openssl flag.]])])])
 
 AC_SUBST([ARCH])
 AC_SUBST([DRIVER_BIN])

@@ -17,9 +17,13 @@ OPTIMIZE=@OPTIMIZE@
 
 all: $(OBJ)
 
+# crypto
+crypto.$(O): crypto.c
+	$(CXX) $(CXXFLAGS) -I.. @OPENSSL_INCLUDES@ -c -x c++ $*.c
+
 # special db stuff
 db.$(O): db.c
-	$(CXX) $(CXXFLAGS) -I.. -I/usr/include/mysql -c -x c++ $*.c
+	$(CXX) $(CXXFLAGS) -I.. @MYSQL_CFLAGS@ @POSTGRESQL_CFLAGS@ @SQLITE3_CFLAGS@ -c -x c++ $*.c
 
 clean:
 	rm -f *.$(O)
