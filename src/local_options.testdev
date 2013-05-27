@@ -18,3 +18,4 @@
 #define USE_SQLITE3 3
 
 #define PACKAGE_CRYPTO
+#define PACKAGE_PCRE
