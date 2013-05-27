@@ -712,9 +712,9 @@
 #undef PACKAGE_CRYPTO
 
 /*
-  PACKAGE_TRIM: efuns for remove leading / trailing whitepsaces (or chars in provided list)
+  PACKAGE_TRIM: efuns for remove leading / trailing whitepsaces (or chars in provided charset)
   Functions:
-    - trim: Remove leading and trailing whitespaces (or in provided list).
+    - trim: Remove leading and trailing whitespaces (or in provided charset).
       Example:
         - "    my test   " : "my test"
     - ltrim: Remove leading whitespaces (and others).
