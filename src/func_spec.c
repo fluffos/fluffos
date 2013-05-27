@@ -326,9 +326,7 @@ int uptime();
 int strcmp(string, string);
 
 #ifndef WIN32
-#if (defined(RUSAGE) || defined(GET_PROCESS_STATS) || defined(TIMES))
 mapping rusage();
-#endif                          /* RUSAGE */
 #endif
 
 void flush_messages(void | object);
