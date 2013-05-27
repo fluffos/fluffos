@@ -13,10 +13,12 @@ Major changes compare to 2.x:
   CALLOUT_LOOP_PROTECTION, SANE_SORTING (alpha2)
 
 TODOs:
+  add boost asio for async networking.
+  get rid of addr_server
+  remove SQLITE2 support from package/db.c
   switch to automake
   switch to TCMalloc
   get rid of edit_source
-  get rid of addr_server/add multi-threading
   LPC JIT compiler
 
 ================================================================================
