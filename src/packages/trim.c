@@ -20,7 +20,11 @@ static inline std::string &ltrim(std::string &s, const std::string &charlist)
   if (charlist.empty()) {
     s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
   } else {
-    s.erase(s.begin(), s.begin() + s.find_first_not_of(charlist));
+    int pos = s.find_first_not_of(charlist);
+    if(pos == -1)
+      s.clear();
+    else
+      s.erase(s.begin(), s.begin() + pos);
   }
   return s;
 }
