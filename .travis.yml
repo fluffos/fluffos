@@ -1,7 +1,7 @@
 language: cpp
 
 before_install:
-  - travis_retry sudo apt-get update -qq && sudo apt-get install -qq bison valgrind libz-dev libmysqlclient-dev libpq-dev libsqlite3-dev libssl-dev
+  - travis_retry sudo apt-get update -qq && sudo apt-get install -qq bison valgrind libz-dev libmysqlclient-dev libpq-dev libsqlite3-dev libssl-dev libpcre3-dev
 
 script: cd src && cp local_options.$CONFIG local_options && ./build.FluffOS $TYPE && make && cd testsuite && valgrind --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver etc/config.test -ftest
 

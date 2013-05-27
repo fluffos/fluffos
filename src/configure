@@ -603,6 +603,8 @@ ac_subst_vars='LTLIBOBJS
 OPTIMIZE
 DRIVER_BIN
 ARCH
+PCRE_CFLAGS
+PCRE_LIBS
 OPENSSL_LDFLAGS
 OPENSSL_LIBS
 OPENSSL_INCLUDES
@@ -697,6 +699,7 @@ with_mysql
 with_postgresql
 with_sqlite3
 with_openssl
+with_pcre
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1335,6 +1338,7 @@ Optional Packages:
   --with-sqlite3=[ARG]    use SQLite 3 library [default=yes], optionally
                           specify the prefix for sqlite3 library
   --with-openssl=DIR      root of the OpenSSL directory
+  --with-pcre[=prefix]    compile xmlpcre part (via libpcre check)
 
 Some influential environment variables:
   CXX         C++ compiler command
@@ -5920,76 +5924,6 @@ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
       #include "local_options"
-      #ifndef PACKAGE_PCRE
-      #error not defined
-      #endif
-
-
-_ACEOF
-if ac_fn_cxx_try_compile "$LINENO"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing pcre_match" >&5
-$as_echo_n "checking for library containing pcre_match... " >&6; }
-if ${ac_cv_search_pcre_match+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_func_search_save_LIBS=$LIBS
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char pcre_match ();
-int
-main ()
-{
-return pcre_match ();
-  ;
-  return 0;
-}
-_ACEOF
-for ac_lib in '' pcre; do
-  if test -z "$ac_lib"; then
-    ac_res="none required"
-  else
-    ac_res=-l$ac_lib
-    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
-  fi
-  if ac_fn_cxx_try_link "$LINENO"; then :
-  ac_cv_search_pcre_match=$ac_res
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext
-  if ${ac_cv_search_pcre_match+:} false; then :
-  break
-fi
-done
-if ${ac_cv_search_pcre_match+:} false; then :
-
-else
-  ac_cv_search_pcre_match=no
-fi
-rm conftest.$ac_ext
-LIBS=$ac_func_search_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_pcre_match" >&5
-$as_echo "$ac_cv_search_pcre_match" >&6; }
-ac_res=$ac_cv_search_pcre_match
-if test "$ac_res" != no; then :
-  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
-
-fi
-
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-      #include "local_options"
       #ifndef POSIX_TIMERS
       #error not defined
       #endif
@@ -6448,7 +6382,7 @@ _ACEOF
 if ac_fn_cxx_try_compile "$LINENO"; then :
 
 else
-  as_fn_error $? "Fail to find mysql header/library, try changing --with_mysql flag" "$LINENO" 5
+  as_fn_error $? "Fail to find MYSQL header/library, try changing --with_mysql flag" "$LINENO" 5
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
@@ -6638,7 +6572,7 @@ _ACEOF
 if ac_fn_cxx_try_compile "$LINENO"; then :
 
 else
-  as_fn_error $? "Fail to find postgresql header/library, try changing --with_postgresql flag." "$LINENO" 5
+  as_fn_error $? "Fail to find POSTGRESQL header/library, try changing --with_postgresql flag." "$LINENO" 5
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
@@ -7368,7 +7302,7 @@ _ACEOF
 if ac_fn_cxx_try_compile "$LINENO"; then :
 
 else
-  as_fn_error $? "Fail to find sqlite3 header/library, try changing --with_sqlite3 flag." "$LINENO" 5
+  as_fn_error $? "Fail to find SQLITE3 header/library, try changing --with_sqlite3 flag." "$LINENO" 5
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
@@ -7535,6 +7469,162 @@ rm -f core conftest.err conftest.$ac_objext \
     LIBS="$save_LIBS"
 
 
+
+
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+      #include "local_options"
+      #ifndef PACKAGE_PCRE
+      #error not defined
+      #endif
+
+
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking lib pcre" >&5
+$as_echo_n "checking lib pcre... " >&6; }
+
+# Check whether --with-pcre was given.
+if test "${with_pcre+set}" = set; then :
+  withval=$with_pcre;
+else
+  with_pcre="yes"
+fi
+
+if test ".$with_pcre" = ".no" ; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: disabled" >&5
+$as_echo "disabled" >&6; }
+  as_fn_error $? "Fail to find PCRE header/library, try changing --with_pcre flag." "$LINENO" 5
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: (testing)" >&5
+$as_echo "(testing)" >&6; }
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for pcre_study in -lpcre" >&5
+$as_echo_n "checking for pcre_study in -lpcre... " >&6; }
+if ${ac_cv_lib_pcre_pcre_study+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lpcre  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char pcre_study ();
+int
+main ()
+{
+return pcre_study ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_lib_pcre_pcre_study=yes
+else
+  ac_cv_lib_pcre_pcre_study=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_pcre_pcre_study" >&5
+$as_echo "$ac_cv_lib_pcre_pcre_study" >&6; }
+if test "x$ac_cv_lib_pcre_pcre_study" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBPCRE 1
+_ACEOF
+
+  LIBS="-lpcre $LIBS"
+
+fi
+
+  if test "$ac_cv_lib_pcre_pcre_study" = "yes" ; then
+     PCRE_LIBS="-lpcre"
+     { $as_echo "$as_me:${as_lineno-$LINENO}: checking lib pcre" >&5
+$as_echo_n "checking lib pcre... " >&6; }
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: $PCRE_LIBS" >&5
+$as_echo "$PCRE_LIBS" >&6; }
+
+  else
+     OLDLDFLAGS="$LDFLAGS" ; LDFLAGS="$LDFLAGS -L$with_pcre/lib"
+     OLDCPPFLAGS="$CPPFLAGS" ; CPPFLAGS="$CPPFLAGS -I$with_pcre/include"
+     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for pcre_compile in -lpcre" >&5
+$as_echo_n "checking for pcre_compile in -lpcre... " >&6; }
+if ${ac_cv_lib_pcre_pcre_compile+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lpcre  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char pcre_compile ();
+int
+main ()
+{
+return pcre_compile ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_lib_pcre_pcre_compile=yes
+else
+  ac_cv_lib_pcre_pcre_compile=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_pcre_pcre_compile" >&5
+$as_echo "$ac_cv_lib_pcre_pcre_compile" >&6; }
+if test "x$ac_cv_lib_pcre_pcre_compile" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBPCRE 1
+_ACEOF
+
+  LIBS="-lpcre $LIBS"
+
+fi
+
+     CPPFLAGS="$OLDCPPFLAGS"
+     LDFLAGS="$OLDLDFLAGS"
+     if test "$ac_cv_lib_pcre_pcre_compile" = "yes" ; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: .setting PCRE_LIBS -L$with_pcre/lib -lpcre" >&5
+$as_echo ".setting PCRE_LIBS -L$with_pcre/lib -lpcre" >&6; }
+        PCRE_LIBS="-L$with_pcre/lib -lpcre"
+        test -d "$with_pcre/include" && PCRE_CFLAGS="-I$with_pcre/include"
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking lib pcre" >&5
+$as_echo_n "checking lib pcre... " >&6; }
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: $PCRE_LIBS" >&5
+$as_echo "$PCRE_LIBS" >&6; }
+
+     else
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking lib pcre" >&5
+$as_echo_n "checking lib pcre... " >&6; }
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: no, (WARNING)" >&5
+$as_echo "no, (WARNING)" >&6; }
+        as_fn_error $? "Fail to find PCRE header/library, try changing --with_pcre flag." "$LINENO" 5
+     fi
+  fi
+fi
 
 
 
