@@ -19,3 +19,5 @@
 
 #define PACKAGE_CRYPTO
 #define PACKAGE_PCRE
+
+#define REVERSE_DEFER
