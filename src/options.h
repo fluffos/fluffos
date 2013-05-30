@@ -949,4 +949,13 @@
  */
 #define POSIX_TIMERS
 
+/*
+  REVERSE_DEFER: 
+  
+  If not defined executes defer functions in LIFO mode.
+  
+  If defined executes defer functions in FIFO mode.
+*/
+#define REVERSE_DEFER
+
 #endif /* _OPTIONS_H */
