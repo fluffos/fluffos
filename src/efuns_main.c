@@ -4122,7 +4122,15 @@ f_next_inventory(void)
 void f_defer()
 {
   struct defer_list *newlist = (struct defer_list *)MALLOC(sizeof(struct defer_list));
+  // In reverse mode, newlist always will be the last data.
+#ifdef REVERSE_DEFER
+  newlist->next = NULL;
+  // In normal mode, newlist always will be the first data.
+#else
   newlist->next = csp->defers;
+#endif
+
+  // Configure the new item.
   newlist->func = *sp--;
   if (command_giver) {
     push_object(command_giver);
@@ -4130,6 +4138,23 @@ void f_defer()
   } else {
     newlist->tp = const0;
   }
+
+  // In reverse mode, if list is not null, then add new item to the end.
+#ifdef REVERSE_DEFER
+	// If list is null, then init it with new item.
+  if(csp->defers == NULL)
+    csp->defers = newlist;
+  else{
+    // Search last defer.
+    struct defer_list *last_defer = csp->defers;
+    while (last_defer->next)
+      last_defer = last_defer->next;
+
+    last_defer->next = newlist;
+  }
+  // In normal mode, actual newlist will be init of defers list.
+#else
   csp->defers = newlist;
+#endif
 }
 #endif
