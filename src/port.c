@@ -52,63 +52,12 @@ const char *time_string(time_t t)
 void
 get_usec_clock(long *sec, long *usec)
 {
-#ifdef HAVE_GETTIMEOFDAY
   struct timeval tv;
 
   gettimeofday(&tv, NULL);
   *sec = tv.tv_sec;
   *usec = tv.tv_usec;
-#else
-  *sec = time(0);
-  *usec = 0;
-#endif
 }
-
-#ifdef USE_POSIX_SIGNALS
-int
-port_sigblock(sigset_t mask)
-{
-  sigset_t omask;
-
-  sigprocmask(SIG_BLOCK, &mask, &omask);
-  return (omask);
-}
-
-int
-port_sigmask(int sig)
-{
-  sigset_t set;
-
-  sigemptyset(&set);
-  sigaddset(&set, sig);
-  return (set);
-}
-
-void
-(*port_signal(sig, func))()
-int sig;
-void (*func)();
-{
-  struct sigaction act, oact;
-
-  act.sa_handler = func;
-  act.sa_mask = 0;
-  act.sa_flags = 0;
-  if (sigaction(sig, &act, &oact) == -1) {
-    return ((void ( *)()) - 1);
-  }
-  return (oact.sa_handler);
-}
-
-int
-port_sigsetmask(sigset_t mask)
-{
-  sigset_t omask;
-
-  sigprocmask(SIG_SETMASK, &mask, &omask);
-  return (omask);
-}
-#endif
 
 long get_cpu_times(unsigned long *secs, unsigned long *usecs)
 {
