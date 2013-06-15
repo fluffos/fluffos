@@ -55,13 +55,6 @@
 #define FD6_PORT        CONFIG_INT(__FD6_PORT__)
 #define FD6_KIND        CONFIG_INT(__FD6_KIND__)
 
-#ifdef USE_POSIX_SIGNALS
-#define sigblock(m) port_sigblock(m)
-#define sigmask(s)  port_sigmask(s)
-#define signal(s,f) port_signal(s,f)
-#define sigsetmask(m)   port_sigsetmask(m)
-#endif
-
 #define APPLY_CACHE_SIZE (1 << APPLY_CACHE_BITS)
 
 #define NUM_CONSTS 5
