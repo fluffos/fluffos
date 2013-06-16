@@ -1638,7 +1638,13 @@ void fatal(const char *fmt, ...)
       V_VAR(char *, fmt, args);
       vsnprintf(msg_buf, 2048, fmt, args);
       va_end(args);
-      debug_message("******** FATAL ERROR: %s\nFluffOS driver attempting to exit gracefully.\n", msg_buf);
+      debug_message("******** FATAL ERROR: %s\n", msg_buf);
+#ifdef DEBUG
+      // make DEBUG driver directly crash, if there is debugger
+      // it will catch the problem and allow debugging.
+      break;
+#endif
+      debug_message("FluffOS driver attempting to exit gracefully.\n", msg_buf);
       if (current_file) {
         debug_message("(occured during compilation of %s at line %d)\n", current_file, current_line);
       }

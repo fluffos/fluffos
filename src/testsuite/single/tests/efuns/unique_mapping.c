@@ -1,0 +1,24 @@
+// Test for unique_mapping
+// By Yucong Sun (sunyucong@gmail.com)
+
+void do_tests() {
+    mixed* arr = ({ 1, 2, 3, 4, 5 });
+
+	// standard behavior
+    // key is in sorted order, and values in the list
+    // is in reverse order.
+    ASSERT_EQ(([ 0: ({ 4, 2 }), 1: ({ 5, 3, 1 }) ]),
+      unique_mapping(arr, (: $1 % 2 :)));
+
+    ASSERT_EQ(([ 0: ({ 5, 4, 3, 2, 1}) ]),
+      unique_mapping(arr, (: 0 :)));
+
+    // if the callback produced error, or doesn't exist,
+    // result is grouped to 0;
+    ASSERT_EQ(([ 0: ({ 5, 4, 3, 2, 1}) ]),
+      unique_mapping(arr, "none-exists"));
+
+    // Old behavior, error in callback are passed through.
+    ASSERT_EQ("whatever",
+    		catch(unique_mapping(arr, (: throw("whatever") :))));
+ }
