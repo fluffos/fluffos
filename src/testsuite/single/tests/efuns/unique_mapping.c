@@ -13,12 +13,11 @@ void do_tests() {
     ASSERT_EQ(([ 0: ({ 5, 4, 3, 2, 1}) ]),
       unique_mapping(arr, (: 0 :)));
 
-    // if the callback produced error, or doesn't exist,
-    // result is grouped to 0;
+    // if the callback doesn't exist, result is grouped to 0
     ASSERT_EQ(([ 0: ({ 5, 4, 3, 2, 1}) ]),
       unique_mapping(arr, "none-exists"));
 
     // Old behavior, error in callback are passed through.
     ASSERT_EQ("whatever",
     		catch(unique_mapping(arr, (: throw("whatever") :))));
- }
+}

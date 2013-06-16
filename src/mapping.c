@@ -566,8 +566,7 @@ find_for_insert(mapping_t *m, svalue_t *lv, int doTheFree)
 #ifdef F_UNIQUE_MAPPING
 
 struct unique_svalue_compare {
-  bool operator()(svalue_t l, svalue_t r) const
-  {
+  bool operator()(svalue_t l, svalue_t r) const {
     return svalue_to_int(&l) < svalue_to_int(&r);
   }
 };
@@ -610,7 +609,7 @@ void f_unique_mapping(void)
 
   // Translate into LPC mapping
   mapping_t *m = allocate_mapping(0);
-  for (auto item: result) {
+for (auto item: result) {
     auto key = item.first;
     auto values = item.second;
 
@@ -618,7 +617,7 @@ void f_unique_mapping(void)
     svalue_t *l = find_for_insert(m, &key, 0);
     l->type = T_ARRAY;
     l->u.arr = allocate_empty_array(values.size());
-    for (unsigned int i=0; i< values.size(); i++) {
+    for (unsigned int i = 0; i < values.size(); i++) {
       // values are copied.
       assign_svalue_no_free(&l->u.arr->item[i], values[i]);
     }
