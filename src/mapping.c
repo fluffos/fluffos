@@ -1,5 +1,8 @@
 /* 92/04/18 - cleaned up in accordance with ./src/style.guidelines */
 
+#include <deque>
+#include <map>
+
 #include "std.h"
 #include "config.h"
 #include "lpc_incl.h"
@@ -25,7 +28,7 @@ mapping_node_t *locked_map_nodes = 0;
  *   at some point as well.
  */
 
-unsigned long sval_hash(svalue_t x)
+LPC_INT sval_hash(svalue_t x)
 {
   switch (x.type) {
     case T_STRING:
@@ -35,7 +38,7 @@ unsigned long sval_hash(svalue_t x)
     case T_OBJECT:
       //return HASH(BLOCK(x.u.ob->obname));
     default:
-      return (unsigned long)(((POINTER_INT)((x).u.number)) >> 5);
+      return (LPC_INT)(((POINTER_INT)((x).u.number)) >> 5);
   }
 }
 /*
@@ -439,7 +442,7 @@ restore_hash_string(char **val, svalue_t *sv)
  * svalue_t_to_int: Converts an svalue into an integer index.
  */
 
-int svalue_to_int(svalue_t *v)
+LPC_INT svalue_to_int(svalue_t *v)
 {
   if (v->type == T_STRING && v->subtype != STRING_SHARED) {
     char *p = make_shared_string(v->u.string);
@@ -562,198 +565,66 @@ find_for_insert(mapping_t *m, svalue_t *lv, int doTheFree)
 
 #ifdef F_UNIQUE_MAPPING
 
-typedef struct unique_node_s {
-  svalue_t key;
-  int count;
-  struct unique_node_s *next;
-  int *indices;
-} unique_node_t;
-
-typedef struct unique_m_list_s {
-  unique_node_t **utable;
-  struct unique_m_list_s *next;
-  unsigned int mask;
-} unique_m_list_t;
-
-static unique_m_list_t *g_u_m_list = 0;
-
-static void unique_mapping_error_handler(void)
-{
-  unique_m_list_t *nlist = g_u_m_list;
-  unique_node_t **table = nlist->utable;
-  unique_node_t *uptr, *nptr;
-  int mask = nlist->mask;
-
-  g_u_m_list = g_u_m_list->next;
-
-  do {
-    if ((uptr = table[mask])) {
-      do {
-        nptr = uptr->next;
-        free_svalue(&uptr->key, "unique_mapping_error_handler");
-        FREE((char *) uptr->indices);
-        FREE((char *) uptr);
-      } while ((uptr = nptr));
-    }
-  } while (mask--);
-  FREE((char *) table);
-  FREE((char *) nlist);
-}
+struct unique_svalue_compare {
+  bool operator()(svalue_t l, svalue_t r) const
+  {
+    return svalue_to_int(&l) < svalue_to_int(&r);
+  }
+};
 
 void f_unique_mapping(void)
 {
-  unique_m_list_t *nlist;
-  svalue_t *arg = sp - st_num_arg + 1, *sv;
-  unique_node_t **table, *uptr, *nptr;
-  array_t *v = arg->u.arr, *ret;
-  unsigned int oi, i, numkeys = 0, mask, size;
+  svalue_t *arg = sp - st_num_arg + 1;
+  array_t *v = arg->u.arr;
   unsigned short num_arg = st_num_arg;
-  unsigned int nmask;
-  mapping_t *m;
-  mapping_node_t **mtable, *elt;
-  int *ind, j;
-  function_to_call_t ftc;
 
-  process_efun_callback(1, &ftc, F_UNIQUE_MAPPING);
-
-  size = v->size;
-  if (!size) {
-    pop_n_elems(num_arg - 1);
-    free_array(v);
-    sp->type = T_MAPPING;
-    sp->u.map = allocate_mapping(0);
+  if (!v || !v->size) {
+    pop_n_elems(num_arg);
+    push_refed_mapping(allocate_mapping(0));
     return;
   }
 
-  if (size > MAP_HASH_TABLE_SIZE) {
-    size |= size >> 1;
-    size |= size >> 2;
-    size |= size >> 4;
-    if (size & 0xff00) { size |= size >> 8; }
-    mask = size++;
-  } else { mask = (size = MAP_HASH_TABLE_SIZE) - 1; }
+  // prepare the call back.
+  function_to_call_t ftc;
+  process_efun_callback(1, &ftc, F_UNIQUE_MAPPING);
 
-  table = (unique_node_t **) DXALLOC(size *= sizeof(unique_node_t *),
-                                     100, "f_unique_mapping:1");
-  if (!table) { error("Unique_mapping - Out of memory.\n"); }
-  memset(table, 0, size);
-
-  nlist = ALLOCATE(unique_m_list_t, 101, "f_unique_mapping:2");
-  nlist->next = g_u_m_list;
-  nlist->utable = table;
-  nlist->mask = mask;
-  g_u_m_list = nlist;
-
-  STACK_INC;
-  sp->type = T_ERROR_HANDLER;
-  sp->u.error_handler = unique_mapping_error_handler;
-
-  size = v->size;
+  // for each item in the array, call the callback and group
+  // item with same result together.
+  typedef std::map<svalue_t, std::deque<svalue_t *>, unique_svalue_compare> MapResult;
+  MapResult result;
+  int size = v->size;
   while (size--) {
+    svalue_t *sv;
     push_svalue(v->item + size);
     sv = call_efun_callback(&ftc, 1);
-    if (sv) {
-      i = (oi = svalue_to_int(sv)) & mask;
-    } else {
-      i = oi = 0;
+    if (!sv) {
       sv = &const0;
     }
-    if ((uptr = table[i])) {
-      do {
-        if (msameval(&uptr->key, sv)) {
-          ind = uptr->indices = RESIZE(uptr->indices, uptr->count + 1,
-                                       int, 102, "f_unique_mapping:3");
-          ind[uptr->count++] = size;
-          break;
-        }
-      } while ((uptr = uptr->next));
-    }
-    if (!uptr) {
-      uptr = ALLOCATE(unique_node_t, 103, "f_unique_mapping:4");
-      assign_svalue_no_free(&uptr->key, sv);
-      uptr->count = 1;
-      uptr->indices = ALLOCATE(int, 104, "f_unique_mapping:5");
-      uptr->indices[0] = size;
-      uptr->next = table[i];
-      table[i] = uptr;
-      numkeys++;
-    }
+    // Initialize the entry, Key is copied
+    auto ret = result.insert(MapResult::value_type(*sv, std::deque<svalue_t *>()));
+    // NOTE: going through array in reverse order , but put the result in the
+    // back of the array, this is to preserve the observed behavior of old
+    // implementation.
+    ret.first->second.push_back(v->item + size);
   }
 
-  m = allocate_mapping(nmask = numkeys << 1);
-  mtable = m->table;
-  numkeys = 0;
+  // Translate into LPC mapping
+  mapping_t *m = allocate_mapping(0);
+  for (auto item: result) {
+    auto key = item.first;
+    auto values = item.second;
 
-  if (nmask > MAP_HASH_TABLE_SIZE) {
-    nmask |= nmask >> 1;
-    nmask |= nmask >> 2;
-    nmask |= nmask >> 4;
-    if (size & 0xff00) { nmask |= nmask >> 8; }
-  } else { nmask = MAP_HASH_TABLE_SIZE - 1; }
-  j = mask;
-  sv = v->item;
-
-  do {
-    if ((uptr = table[j])) {
-      do {
-        nptr = uptr->next;
-        oi = MAP_SVAL_HASH(uptr->key);
-        i = oi & nmask;
-        if (!mtable[i] && !(--m->unfilled)) {
-          if (growMap(m)) {
-            mtable = m->table;
-            nmask <<= 1;
-            nmask--;
-          } else {
-            do {
-              do {
-                nptr = uptr->next;
-                free_svalue(&uptr->key, "f_unique_mapping");
-                FREE((char *) uptr->indices);
-                FREE((char *) uptr);
-              } while ((uptr = nptr));
-              uptr = table[--j];
-            } while (j >= 0);
-#ifdef PACKAGE_MUDLIB_STATS
-            add_array_size(&m->stats, numkeys << 1);
-#endif
-            total_mapping_size += sizeof(mapping_node_t) * (m->count = numkeys);
-            total_mapping_nodes += numkeys;
-            free_mapping(m);
-            error("Out of memory\n");
-          }
-        }
-        /* FIXME: This leaks memory, can be reproduced by keep calling /single/test/crasher/12.c. */
-        elt = ALLOCATE(mapping_node_t, 105, "f_unique_mapping:6");
-        *elt->values = uptr->key;
-        (elt->values + 1)->type = T_ARRAY;
-        ret = (elt->values + 1)->u.arr = allocate_empty_array(size = uptr->count);
-        ind = uptr->indices;
-        while (size--) {
-          assign_svalue_no_free(ret->item + size, sv + ind[size]);
-        }
-        elt->next = mtable[i];
-        mtable[i] = elt;
-        FREE((char *) ind);
-        FREE((char *) uptr);
-        numkeys++;
-      } while ((uptr = nptr));
+    // key is copied, but not freed, will be freed together with map.
+    svalue_t *l = find_for_insert(m, &key, 0);
+    l->type = T_ARRAY;
+    l->u.arr = allocate_empty_array(values.size());
+    for (unsigned int i=0; i< values.size(); i++) {
+      // values are copied.
+      assign_svalue_no_free(&l->u.arr->item[i], values[i]);
     }
-  } while (j--);
-
-#ifdef PACKAGE_MUDLIB_STATS
-  add_array_size(&m->stats, numkeys << 1);
-#endif
-  total_mapping_size += sizeof(mapping_node_t) * (m->count = numkeys);
-  total_mapping_nodes += numkeys;
-  FREE((char *) table);
-  g_u_m_list = g_u_m_list->next;
-  FREE((char *) nlist);
-  sp--;
-  pop_n_elems(num_arg - 1);
-  free_array(v);
-  sp->type = T_MAPPING;
-  sp->u.map = m;
+  }
+  pop_n_elems(num_arg);
+  push_refed_mapping(m);
 }
 #endif /* End of unique_mapping */
 
