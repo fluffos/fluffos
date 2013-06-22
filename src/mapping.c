@@ -1,13 +1,13 @@
 /* 92/04/18 - cleaned up in accordance with ./src/style.guidelines */
 
-#include <deque>
-#include <map>
-
 #include "std.h"
 #include "config.h"
 #include "lpc_incl.h"
 #include "md.h"
 #include "efun_protos.h"
+
+#include <deque>
+#include <map>
 
 int num_mappings = 0;
 int total_mapping_size = 0;
