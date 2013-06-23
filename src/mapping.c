@@ -609,7 +609,7 @@ void f_unique_mapping(void)
 
   // Translate into LPC mapping
   mapping_t *m = allocate_mapping(0);
-for (auto item: result) {
+  for (auto item: result) {
     auto key = item.first;
     auto values = item.second;
 
