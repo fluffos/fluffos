@@ -43,7 +43,7 @@ INSTALL_DIR=@bindir@
 OPTIMIZE=@OPTIMIZE@
 
 SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
-  backend.c array.c mapping.c comm.c ed.c regexp.c buffer.c crc32.c \
+  backend.c array.c mapping.cc comm.c ed.c regexp.c buffer.c crc32.c \
   malloc.c mallocwrapper.c class.c efuns_main.c efuns_port.c \
   call_out.c otable.c dumpstat.c stralloc.c hash.c \
   port.c reclaim.c parse.c simul_efun.c sprintf.c program.c \
