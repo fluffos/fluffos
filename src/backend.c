@@ -10,6 +10,8 @@
 #include "master.h"
 #include "eval.h"
 
+#include "event.h"
+
 #ifdef PACKAGE_ASYNC
 #include "packages/async.h"
 #endif
@@ -91,34 +93,19 @@ void logon(object_t *ob)
 /*
  * This is the backend. We will stay here for ever (almost).
  */
-extern int max_fd;
 void backend()
 {
-  struct timeval timeout;
-  int i, nb;
+  int i;
   volatile int first_call = 1;
   int there_is_a_port = 0;
   error_context_t econ;
 
-  debug_message("Initializations complete.\n\n");
-  for (i = 0; i < 5; i++) {
-    if (external_port[i].port) {
-      debug_message("Accepting connections on port %d.\n",
-                    external_port[i].port);
-      there_is_a_port = 1;
-    }
-  }
-
-  if (!there_is_a_port) {
-    debug_message("No external ports specified.\n");
-  }
-
-  init_user_conn();   /* initialize user connection socket */
 #ifdef SIGHUP
   signal(SIGHUP, startshutdownMudOS);
 #endif
   clear_state();
   save_context(&econ);
+
   while (1)
     try {
       clear_state();
@@ -148,30 +135,32 @@ void backend()
           slow_shut_down_to_do = 0;
           slow_shut_down(tmp);
         }
-        /*
-         * select
-         */
-        make_selectmasks();
-        timeout.tv_sec = 1;
-        timeout.tv_usec = 0;
-        nb = select(max_fd + 1, &readmask, &writemask, (fd_set *) 0, &timeout);
-        /*
-         * process I/O if necessary.
-         */
-        if (nb > 0) {
-          process_io();
-        }
+
+        // Loop for network event for 1 sec.
+        debug_message("Looping for network event for 1sec! \n");
+
+        add_user_write_event();
+#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
+        add_lpc_sock_event();
+#endif
+        run_for_at_most_one_second(g_event_base);
+
         /*
          * process user commands.
          */
         for (i = 0; process_user_command() && i < max_users; i++) {
           ;
         }
-
         /*
          * call outs
          */
         call_out();
+#ifdef POSIX_TIMERS
+        if (time_for_hb) {
+          call_heart_beat();
+          time_for_hb--;
+        }
+#endif
 #ifdef PACKAGE_ASYNC
         check_reqs();
 #endif
@@ -202,27 +191,9 @@ void backend()
 static void look_for_objects_to_swap()
 {
   static int next_time;
-#ifndef NO_IP_DEMON
-  extern int no_ip_demon;
-  static int next_server_time;
-#endif
   object_t *ob;
   volatile object_t *next_ob, *last_good_ob;
   error_context_t econ;
-
-#ifndef NO_IP_DEMON
-  if (current_time >= next_server_time) {
-    /* initialize the address server.  if it is already initialized, then
-     * this is a nop.  this will cause the driver to reattempt connecting
-     * to the address server once every 15 minutes in the event that it
-     * has gone down.
-     */
-    if (!no_ip_demon && next_server_time) {
-      init_addr_server(ADDR_SERVER_IP, ADDR_SERVER_PORT);
-    }
-    next_server_time = current_time + 15 * 60;
-  }
-#endif
 
   if (current_time < next_time) {
     return;    /* Not time to look yet */

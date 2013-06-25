@@ -14,6 +14,7 @@
 #include "network_incl.h"
 
 #include "fliconv.h"
+#include "event2/event.h"
 
 #define MAX_TEXT                   2048
 #define MAX_SOCKET_PACKET_SIZE     1024
@@ -132,6 +133,11 @@ typedef struct interactive_s {
   int ws_size;
   int ws_mask;
   char ws_maskoffs;
+
+  // libevent event handle.
+  struct event *ev_read;
+  struct event *ev_write;
+
 } interactive_t;
 
 /*
@@ -202,7 +208,6 @@ void add_binary_message(object_t *, const unsigned char *, int);
 void update_ref_counts_for_users(void);
 void make_selectmasks(void);
 void init_user_conn(void);
-void init_addr_server(char *, int);
 void ipc_remove(void);
 void set_prompt(const char *);
 void process_io(void);
@@ -211,10 +216,7 @@ int replace_interactive(object_t *, object_t *);
 int set_call(object_t *, sentence_t *, int);
 void remove_interactive(object_t *, int);
 int flush_message(interactive_t *);
-int query_addr_number(const char *, svalue_t *);
-char *query_ip_name(object_t *);
-const char *query_ip_number(object_t *);
-char *query_host_name(void);
+
 int query_idle(object_t *);
 #ifndef NO_SNOOP
 int new_set_snoop(object_t *, object_t *);
@@ -225,5 +227,7 @@ object_t *query_snooping(object_t *);
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_iptable(void);
 #endif
+
+void new_user_handler(port_def_t *);
 
 #endif                          /* COMM_H */

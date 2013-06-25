@@ -354,13 +354,6 @@ void call_out()
   }
   DBG(("Done."));
   pop_context(&econ);
-#ifdef POSIX_TIMERS
-  if (time_for_hb) {
-    call_heart_beat();
-    time_for_hb--;
-  }
-#endif
-
 }
 
 static int time_left(int slot, int delay)

@@ -12,6 +12,7 @@
 #include "file_incl.h"
 #include "file.h"
 #include "comm.h"
+#include "dns.h"
 #include "parse.h"
 #include "sprintf.h"
 #include "backend.h"
@@ -2830,12 +2831,11 @@ f_replace_string(void)
 void
 f_resolve(void)
 {
-  int i;
+  LPC_INT i;
 
-  i = query_addr_number((sp - 1)->u.string, sp);
-  pop_stack();
-  free_string_svalue(sp);
-  put_number(i);
+  i = query_addr_by_name((sp - 1)->u.string, sp);
+  pop_2_elems();
+  push_number(i);
 }
 #endif
 

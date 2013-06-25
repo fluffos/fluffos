@@ -86,6 +86,17 @@ static void clear_socket(int which, int dofree)
   lpc_socks[which].w_buf = NULL;
   lpc_socks[which].w_off = 0;
   lpc_socks[which].w_len = 0;
+
+  // cleanup event listeners
+  if (lpc_socks[which].ev_read != NULL) {
+    event_free(lpc_socks[which].ev_read);
+  }
+
+  if (lpc_socks[which].ev_write != NULL) {
+    event_free(lpc_socks[which].ev_write);
+  }
+  lpc_socks[which].ev_read = NULL;
+  lpc_socks[which].ev_write = NULL;
 }
 
 /*
@@ -226,6 +237,44 @@ int find_new_socket(void)
 }
 
 #ifdef PACKAGE_SOCKETS
+extern struct event_base *g_event_base;
+
+void on_lpc_sock_read(evutil_socket_t fd, short what, void *arg)
+{
+  debug_message("Got an event on lpc socket %d:%s%s%s%s \n",
+                (int) fd,
+                (what & EV_TIMEOUT) ? " timeout" : "",
+                (what & EV_READ)    ? " read" : "",
+                (what & EV_WRITE)   ? " write" : "",
+                (what & EV_SIGNAL)  ? " signal" : "");
+
+  auto lpc = (lpc_socket_t *)arg;
+  //FIXME: pointer arith
+  socket_read_select_handler(lpc - lpc_socks);
+}
+void on_lpc_sock_write(evutil_socket_t fd, short what, void *arg)
+{
+  debug_message("Got an event on lpc socket %d:%s%s%s%s \n",
+                (int) fd,
+                (what & EV_TIMEOUT) ? " timeout" : "",
+                (what & EV_READ)    ? " read" : "",
+                (what & EV_WRITE)   ? " write" : "",
+                (what & EV_SIGNAL)  ? " signal" : "");
+
+  auto lpc = (lpc_socket_t *)arg;
+  //FIXME: pointer arith
+  socket_write_select_handler(lpc - lpc_socks);
+}
+
+// Initialize LPC socket data structure and register events
+void init_lpc_socket(lpc_socket_t *target, evutil_socket_t fd) {
+  memset(target, 0, sizeof(lpc_socket_t));
+
+  target->ev_read = event_new(g_event_base, fd, EV_READ,
+      on_lpc_sock_read, target);
+  target->ev_write = event_new(g_event_base, fd, EV_WRITE,
+      on_lpc_sock_write, target);
+}
 
 /*
  * Create an LPC efun socket
@@ -283,6 +332,9 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
 #ifdef FD_CLOEXEC
     fcntl(fd, F_SETFD, FD_CLOEXEC);
 #endif
+
+    init_lpc_socket(&lpc_socks[i], fd);
+
     lpc_socks[i].fd = fd;
     lpc_socks[i].flags = S_HEADER;
 
@@ -298,17 +350,7 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
 #endif
     lpc_socks[i].mode = mode;
     lpc_socks[i].state = STATE_UNBOUND;
-    memset((char *) &lpc_socks[i].l_addr, 0, sizeof(lpc_socks[i].l_addr));
-    memset((char *) &lpc_socks[i].r_addr, 0, sizeof(lpc_socks[i].r_addr));
     lpc_socks[i].owner_ob = current_object;
-    lpc_socks[i].release_ob = NULL;
-    lpc_socks[i].r_buf = NULL;
-    lpc_socks[i].r_off = 0;
-    lpc_socks[i].r_len = 0;
-    lpc_socks[i].w_buf = NULL;
-    lpc_socks[i].w_off = 0;
-    lpc_socks[i].w_len = 0;
-
     current_object->flags |= O_EFUN_SOCKET;
 
     debug(sockets, ("socket_create: created socket %d mode %d fd %d\n",
@@ -505,15 +547,18 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback)
 
   i = find_new_socket();
   if (i >= 0) {
+    init_lpc_socket(&lpc_socks[i], accept_fd);
+
     fd_set wmask;
 
     lpc_socks[i].fd = accept_fd;
     lpc_socks[i].flags = S_HEADER |
                          (lpc_socks[fd].flags & S_BINARY);
 
+    // FIXME: this doesn't seems right, there is no select() involved.
+    // it's always going to be false.
     FD_ZERO(&wmask);
     FD_SET(accept_fd, &wmask);
-
     if (!(FD_ISSET(accept_fd, &wmask))) {
       lpc_socks[i].flags |= S_BLOCKED;
     }
@@ -525,15 +570,6 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback)
       lpc_socks[i].l_addr = lpc_socks[fd].l_addr;
     }
     lpc_socks[i].r_addr = sin;
-    lpc_socks[i].owner_ob = NULL;
-    lpc_socks[i].release_ob = NULL;
-    lpc_socks[i].r_buf = NULL;
-    lpc_socks[i].r_off = 0;
-    lpc_socks[i].r_len = 0;
-    lpc_socks[i].w_buf = NULL;
-    lpc_socks[i].w_off = 0;
-    lpc_socks[i].w_len = 0;
-
     lpc_socks[i].owner_ob = current_object;
     set_read_callback(i, read_callback);
     set_write_callback(i, write_callback);
