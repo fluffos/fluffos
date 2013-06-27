@@ -13,6 +13,7 @@
 # PARTICULAR PURPOSE.
 
 m4_include([m4/ax_check_openssl.m4])
+m4_include([m4/ax_lib_event.m4])
 m4_include([m4/ax_lib_mysql.m4])
 m4_include([m4/ax_lib_postgresql.m4])
 m4_include([m4/ax_lib_sqlite3.m4])

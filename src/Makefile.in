@@ -83,7 +83,7 @@ build_packages:
 build_binaries: $(DRIVER_BIN) addr_server portbind
 
 .c.$(O):
-	$(CXX) -c $(CXXFLAGS) -x c++ -o $@ $<
+	$(CXX) -c $(CXXFLAGS) @LIBEVENT_CPPFLAGS@ -x c++ -o $@ $<
 
 lex.o: lex.c preprocess.c cc.h grammar.tab.c
 
@@ -97,7 +97,7 @@ grammar.tab.c: grammar.y
 
 $(DRIVER_BIN): $(OBJ) packages/*.$(O) dtrace_compile
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
-	$(CXX) -rdynamic $(CXXFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) @MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@
+	$(CXX) -rdynamic $(CXXFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) @MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@ @LIBEVENT_LIBS@ @LIBEVENT_LDFLAGS@
 
 dtrace_compile: dtrace_compile.c
 	$(CXX) $(CXXFLAGS) -x c++ dtrace_compile.c -o dtrace_compile
@@ -192,6 +192,7 @@ help:
 	@echo "Using $(CXX) -E $(CXXFLAGS) for preprocessing."
 	@echo "Using $(CXX) $(CXXFLAGS) to compile."
 	@echo "Using $(YACC) to make the compiler."
+	@if [ -n "@LIBEVENT_LIBS@" ]; then echo "LIBEVENT: @LIBEVENT_LIBS@, @LIBEVENT_CPPFLAGS@, @LIBEVENT_LDFLAGS@"; fi
 	@if [ -n "@MYSQL_VERSION@" ]; then echo "MYSQL: @MYSQL_VERSION@, @MYSQL_CFLAGS@, @MYSQL_LDFLAGS@"; fi
 	@if [ -n "@POSTGRESQL_VERSION@" ];then echo "POSTGRESQL: @POSTGRESQL_VERSION@, @POSTGRESQL_CFLAGS@, @POSTGRESQL_LDFLAGS@"; fi
 	@if [ -n "@SQLITE3_VERSION@" ]; then echo "SQLite3: @SQLITE3_VERSION@, @SQLITE3_CFLAGS@, @SQLITE3_LDFLAGS@"; fi

@@ -2220,7 +2220,7 @@ f_query_idle(void)
 void
 f_query_ip_name(void)
 {
-  char *tmp;
+  const char *tmp;
 
   tmp = query_ip_name(st_num_arg ? sp->u.ob : 0);
   if (st_num_arg) { free_object(&(sp--)->u.ob, "f_query_ip_name"); }
