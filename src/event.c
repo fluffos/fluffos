@@ -10,7 +10,8 @@
 struct event_base *g_event_base = NULL;
 
 // Init a new event loop.
-event_base* init_event_base() {
+event_base *init_event_base()
+{
 #ifdef DEBUG
   event_enable_debug_mode();
 #endif
@@ -27,33 +28,71 @@ int run_for_at_most_one_second(struct event_base *base)
 {
   int r;
   struct timeval one_second = {1, 0};
-  static struct event *ev = evtimer_new(base, exit_after_one_second, base);
+  static struct event *ev = NULL;
 
+  if (ev == NULL) {
+    ev = evtimer_new(base, exit_after_one_second, base);
+  }
   event_add(ev, &one_second);
+  debug(event, "Entering event loop for at most 1 sec! \n");
   r = event_base_loop(base, EVLOOP_ONCE);
 
   return r;
 }
 
+static void on_user_read(evutil_socket_t fd, short what, void *arg)
+{
+  debug(event, "Got an event on user socket %d:%s%s%s%s \n",
+        (int) fd,
+        (what & EV_TIMEOUT) ? " timeout" : "",
+        (what & EV_READ)    ? " read" : "",
+        (what & EV_WRITE)   ? " write" : "",
+        (what & EV_SIGNAL)  ? " signal" : "");
+
+  auto user = (interactive_t *)arg;
+
+  get_user_data(user);
+}
+
+static void on_user_write(evutil_socket_t fd, short what, void *arg)
+{
+  debug(event, "Got an event on user socket %d:%s%s%s%s \n",
+        (int) fd,
+        (what & EV_TIMEOUT) ? " timeout" : "",
+        (what & EV_READ)    ? " read" : "",
+        (what & EV_WRITE)   ? " write" : "",
+        (what & EV_SIGNAL)  ? " signal" : "");
+
+  auto user = (interactive_t *)arg;
+  flush_message(user);
+}
+
+void new_user_event_listener(interactive_t *user)
+{
+  user->ev_read = event_new(g_event_base, user->fd, EV_READ | EV_PERSIST, on_user_read, user);
+  user->ev_write = event_new(g_event_base, user->fd, EV_WRITE, on_user_write, user);
+  event_add(user->ev_read, NULL);
+  event_add(user->ev_write, NULL);
+}
+
 static void on_external_port_event(evutil_socket_t fd, short what, void *arg)
 {
-  debug_message("Got an event on listen socket %d:%s%s%s%s",
-                (int) fd,
-                (what & EV_TIMEOUT) ? " timeout" : "",
-                (what & EV_READ)    ? " read" : "",
-                (what & EV_WRITE)   ? " write" : "",
-                (what & EV_SIGNAL)  ? " signal" : "");
+  debug(event, "Got an event on listen socket %d:%s%s%s%s",
+        (int) fd,
+        (what & EV_TIMEOUT) ? " timeout" : "",
+        (what & EV_READ)    ? " read" : "",
+        (what & EV_WRITE)   ? " write" : "",
+        (what & EV_SIGNAL)  ? " signal" : "");
 
   // FIXME: remove the need to pass the argument.
   new_user_handler((port_def_t *)arg);
 }
 
-struct event* new_external_port_event(port_def_t *port) {
-  struct event *ev;
-  ev = event_new(g_event_base, port->fd,
-      EV_READ| EV_PERSIST, on_external_port_event, port);
-  event_add(ev, NULL);
-  return ev;
+void new_external_port_event_listener(port_def_t *port)
+{
+  port->ev_read = event_new(g_event_base, port->fd,
+                            EV_READ | EV_PERSIST, on_external_port_event, port);
+  event_add(port->ev_read, NULL);
 }
 
 // FIXME: rethink if this is necessary.
@@ -86,12 +125,9 @@ void add_lpc_sock_event()
 
 static void on_console_event(evutil_socket_t fd, short what, void *arg)
 {
-  debug_message("Got an event on stdin socket %d:%s%s%s%s \n",
-                (int) fd,
-                (what & EV_TIMEOUT) ? " timeout" : "",
-                (what & EV_READ)    ? " read" : "",
-                (what & EV_WRITE)   ? " write" : "",
-                (what & EV_SIGNAL)  ? " signal" : "");
+  debug(event, "Got an event on stdin socket %d:%s%s%s%s \n", (int) fd,
+        (what & EV_TIMEOUT) ? " timeout" : "", (what & EV_READ) ? " read" : "",
+        (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
 
   if (has_console <= 0) {
     event_del((struct event *)arg);
@@ -100,13 +136,13 @@ static void on_console_event(evutil_socket_t fd, short what, void *arg)
   on_console_input();
 }
 
-void init_console() {
+void init_console(struct event_base *base)
+{
   if (has_console > 0) {
     debug_message("Opening console... \n");
-    struct event* ev_console = NULL;
-    ev_console = event_new(
-        g_event_base, STDIN_FILENO,
-        EV_READ | EV_PERSIST, on_console_event, ev_console);
+    struct event *ev_console = NULL;
+    ev_console = event_new(base, STDIN_FILENO,
+                           EV_READ | EV_PERSIST, on_console_event, ev_console);
     event_add(ev_console, NULL);
   }
 }

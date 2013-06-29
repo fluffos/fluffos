@@ -153,9 +153,9 @@ f_bind(void)
   }
   if ((old_fp->hdr.type & 0x0f) == FP_FUNCTIONAL) {
     new_fp->f.functional.prog->func_ref++;
-    debug(d_flag, ("add func ref /%s: now %i\n",
-                   new_fp->f.functional.prog->filename,
-                   new_fp->f.functional.prog->func_ref));
+    debug(d_flag, "add func ref /%s: now %i\n",
+          new_fp->f.functional.prog->filename,
+          new_fp->f.functional.prog->func_ref);
   }
 
   free_funp(old_fp);

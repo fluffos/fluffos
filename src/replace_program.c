@@ -41,7 +41,7 @@ void replace_programs(void)
 
     num_fewer = r_ob->ob->prog->num_variables_total - r_ob->new_prog->num_variables_total;
 
-    debug(d_flag, ("%d less variables\n", num_fewer));
+    debug(d_flag, "%d less variables\n", num_fewer);
 
     tot_alloc_object_size -= num_fewer * sizeof(svalue_t[1]);
     if ((offset = r_ob->var_offset)) {
@@ -114,28 +114,28 @@ static program_t *search_inherited(char *str, program_t *prg, int *offpnt)
   program_t *tmp;
   int i;
 
-  debug(d_flag, ("search_inherited started"));
-  debug(d_flag, ("searching for PRG(/%s) in PRG(/%s)", str, prg->filename));
-  debug(d_flag, ("num_inherited=%d\n", prg->num_inherited));
+  debug(d_flag, "search_inherited started");
+  debug(d_flag, "searching for PRG(/%s) in PRG(/%s)", str, prg->filename);
+  debug(d_flag, "num_inherited=%d\n", prg->num_inherited);
 
   for (i = 0; i < prg->num_inherited; i++) {
-    debug(d_flag, ("index %d:", i));
-    debug(d_flag, ("checking PRG(/%s)", prg->inherit[i].prog->filename));
+    debug(d_flag, "index %d:", i);
+    debug(d_flag, "checking PRG(/%s)", prg->inherit[i].prog->filename);
 
     if (strcmp(str, prg->inherit[i].prog->filename) == 0) {
-      debug(d_flag, ("match found"));
+      debug(d_flag, "match found");
 
       *offpnt = prg->inherit[i].variable_index_offset;
       return prg->inherit[i].prog;
     } else if ((tmp = search_inherited(str, prg->inherit[i].prog,
                                        offpnt))) {
-      debug(d_flag, ("deferred match found"));
+      debug(d_flag, "deferred match found");
 
       *offpnt += prg->inherit[i].variable_index_offset;
       return tmp;
     }
   }
-  debug(d_flag, ("search_inherited failed"));
+  debug(d_flag, "search_inherited failed");
 
   return (program_t *) 0;
 }

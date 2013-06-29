@@ -211,6 +211,7 @@ void init_user_conn(void);
 void ipc_remove(void);
 void set_prompt(const char *);
 void process_io(void);
+void get_user_data(interactive_t *);
 int process_user_command(void);
 int replace_interactive(object_t *, object_t *);
 int set_call(object_t *, sentence_t *, int);

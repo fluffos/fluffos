@@ -51,8 +51,8 @@ check_svalue(svalue_t *v)
         if (v->u.fp->hdr.type == (FP_LOCAL | FP_NOT_BINDABLE)) {
           prog = v->u.fp->hdr.owner->prog;
           prog->func_ref--;
-          debug(d_flag, ("subtr func ref /%s: now %i\n",
-                         prog->filename, prog->func_ref));
+          debug(d_flag, "subtr func ref /%s: now %i\n",
+                prog->filename, prog->func_ref);
           if (!prog->ref && !prog->func_ref) {
             deallocate_program(prog);
           }

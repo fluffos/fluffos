@@ -546,7 +546,7 @@ object_t *int_load_object(const char *lname, int callcreate)
   restore_command_giver();
 
   if (ob) {
-    debug(d_flag, ("--/%s loaded", ob->obname));
+    debug(d_flag, "--/%s loaded", ob->obname);
   }
 
   ob->load_time = current_time;
@@ -848,7 +848,7 @@ void destruct_object(object_t *ob)
   ob->shadowed = 0;
 #endif
 
-  debug(d_flag, ("Deobject_t /%s (ref %d)", ob->obname, ob->ref));
+  debug(d_flag, "Deobject_t /%s (ref %d)", ob->obname, ob->ref);
 
 #ifndef NO_ENVIRONMENT
   /* try to move our contents somewhere */
@@ -1029,7 +1029,7 @@ void destruct2(object_t *ob)
   sentence_t *s;
 #endif
 
-  debug(d_flag, ("Destruct-2 object /%s (ref %d)", ob->obname, ob->ref));
+  debug(d_flag, "Destruct-2 object /%s (ref %d)", ob->obname, ob->ref);
 
   /*
    * We must deallocate variables here, not in 'free_object()'. That is

@@ -6,15 +6,15 @@ int total_num_prog_blocks, total_prog_block_size;
 void reference_prog(program_t *progp, const char *from)
 {
   progp->ref++;
-  debug(d_flag, ("reference_prog: /%s ref %d (%s)\n",
-                 progp->filename, progp->ref, from));
+  debug(d_flag, "reference_prog: /%s ref %d (%s)\n",
+        progp->filename, progp->ref, from);
 }
 
 void deallocate_program(program_t *progp)
 {
   int i;
 
-  debug(d_flag, ("free_prog: /%s\n", progp->filename));
+  debug(d_flag, "free_prog: /%s\n", progp->filename);
 
   total_prog_block_size -= progp->total_size;
   total_num_prog_blocks -= 1;

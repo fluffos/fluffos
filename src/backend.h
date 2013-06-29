@@ -17,7 +17,8 @@ extern object_t *current_heart_beat;
 extern error_context_t *current_error_context;
 extern int time_for_hb;
 
-void backend(void);
+void backend(struct event_base *);
+
 void clear_state(void);
 void logon(object_t *);
 int parse_command(char *, object_t *);

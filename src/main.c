@@ -1,5 +1,7 @@
 #include "std.h"
 
+#include <string>
+
 #include "file_incl.h"
 #include "lpc_incl.h"
 #include "backend.h"
@@ -385,12 +387,12 @@ int main(int argc, char **argv)
   init_user_conn();
 
 #ifdef HAS_CONSOLE
-  init_console();
+  init_console(base);
 #endif
 
   debug_message("Initializations complete.\n\n");
 
-  backend();
+  backend(base);
 
   return 0;
 }
@@ -424,22 +426,32 @@ void debug_message(const char *fmt, ...)
     }
   }
 
-  if (debug_message_fp != stderr) {
-    fprintf(debug_message_fp, "[%ld]", time(NULL));
+  std::string result;
 
-    V_START(args, fmt);
-    V_VAR(char *, fmt, args);
-    vfprintf(debug_message_fp, fmt, args);
-    fflush(debug_message_fp);
-    va_end(args);
+  // FIXME: hack, adding a time header for message that doesn't contain "\n"
+  if (strchr(fmt, '\n') == NULL) {
+    char message[1024];
+    time_t rawtime;
+    time(&rawtime);
+    strftime(message, sizeof(message), "[%Y-%m-%d %H:%M:%S] ",
+             localtime(&rawtime));
+    result = std::string(message);
   }
-  fprintf(stderr, "[%ld]", time(NULL));
 
+  char message[1024];
   V_START(args, fmt);
   V_VAR(char *, fmt, args);
-  vfprintf(stderr, fmt, args);
-  fflush(stderr);
+  vsnprintf(message, 1024, fmt, args);
   va_end(args);
+
+  result.append(message);
+
+  if (debug_message_fp != stderr) {
+    fprintf(debug_message_fp, "%s", result.c_str());
+    fflush(debug_message_fp);
+  }
+  fprintf(stderr, "%s", result.c_str());
+  fflush(stderr);
 }
 
 int slow_shut_down_to_do = 0;

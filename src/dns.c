@@ -11,7 +11,8 @@
 
 static struct evdns_base *g_dns_base = NULL;
 
-void init_dns_event_base(struct event_base *base) {
+void init_dns_event_base(struct event_base *base)
+{
   // Configure a DNS resolver with default nameserver
   g_dns_base = evdns_base_new(base, 1);
 }

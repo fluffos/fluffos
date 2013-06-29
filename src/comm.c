@@ -132,7 +132,6 @@ static void sigpipe_handler(void);
 #endif
 #endif
 
-static void get_user_data(interactive_t *);
 static char *get_user_command(void);
 static char *first_cmd_in_buf(interactive_t *);
 static int cmd_in_buf(interactive_t *);
@@ -355,7 +354,7 @@ void init_user_conn()
      * listen on socket for connections.
      */
     debug_message("Accepting connections on port %d.\n",
-        external_port[i].port);
+                  external_port[i].port);
     if (listen(external_port[i].fd, 128) == -1) {
       socket_perror("init_user_conn: listen", 0);
       if (i != fd6_which) {
@@ -363,7 +362,7 @@ void init_user_conn()
       }
     }
     // Listen on connetion event
-    external_port[i].ev_read = new_external_port_event(&external_port[i]);
+    new_external_port_event_listener(&external_port[i]);
   }
   if (have_fd6) {
     debug_message("No more ports available; fd #6 ignored.\n");
@@ -1315,11 +1314,14 @@ static void copy_chars(interactive_t *ip, char *from, int num_bytes)
  * Read pending data for a user into user->interactive->text.
  * This also does telnet negotiation.
  */
-static void get_user_data(interactive_t *ip)
+void get_user_data(interactive_t *ip)
 {
   int  num_bytes, text_space;
   char buf[MAX_TEXT];
   int ws_space;
+
+  debug(connections, "get_user_data: USER %d\n", ip->fd);
+
   /* compute how much data we can read right now */
   switch (ip->connection_type) {
     case PORT_WEBSOCKET:
@@ -1368,7 +1370,7 @@ static void get_user_data(interactive_t *ip)
   }
 
   /* read the data from the socket */
-  //debug(connections, ("get_user_data: read on fd %d\n", ip->fd));
+  debug(connections, "get_user_data: read on fd %d\n", ip->fd);
   num_bytes = OS_socket_read(ip->fd, buf, text_space);
 
   if (!num_bytes) {
@@ -1382,7 +1384,7 @@ static void get_user_data(interactive_t *ip)
   if (num_bytes == -1) {
 #ifdef EWOULDBLOCK
     if (socket_errno == EWOULDBLOCK) {
-      debug(connections, ("get_user_data: read on fd %d: Operation would block.\n", ip->fd));
+      debug(connections, "get_user_data: read on fd %d: Operation would block.\n", ip->fd);
       return;
     }
 #endif
@@ -1693,35 +1695,6 @@ static void sigpipe_handler(void)
 }                               /* sigpipe_handler() */
 #endif
 
-extern struct event_base *g_event_base;
-void on_user_read(evutil_socket_t fd, short what, void *arg)
-{
-  debug_message("Got an event on user socket %d:%s%s%s%s \n",
-                (int) fd,
-                (what & EV_TIMEOUT) ? " timeout" : "",
-                (what & EV_READ)    ? " read" : "",
-                (what & EV_WRITE)   ? " write" : "",
-                (what & EV_SIGNAL)  ? " signal" : "");
-
-  auto user = (interactive_t *)arg;
-
-  debug(connections, ("get_user_data: USER %d\n", user->fd));
-  get_user_data(user);
-}
-
-void on_user_write(evutil_socket_t fd, short what, void *arg)
-{
-  debug_message("Got an event on user socket %d:%s%s%s%s \n",
-                (int) fd,
-                (what & EV_TIMEOUT) ? " timeout" : "",
-                (what & EV_READ)    ? " read" : "",
-                (what & EV_WRITE)   ? " write" : "",
-                (what & EV_SIGNAL)  ? " signal" : "");
-
-  auto user = (interactive_t *)arg;
-  flush_message(user);
-}
-
 /*
  * This is the new user connection handler. This function is called by the
  * event handler when data is pending on the listening socket (new_user_fd).
@@ -1742,7 +1715,7 @@ void new_user_handler(port_def_t *port)
   svalue_t *ret;
 
   length = sizeof(addr);
-  debug(connections, ("new_user_handler: accept on fd %d\n", port->fd));
+  debug(connections, "new_user_handler: accept on fd %d\n", port->fd);
   new_socket_fd = accept(port->fd,
                          (struct sockaddr *) & addr, &length);
   if (new_socket_fd < 0) {
@@ -1865,13 +1838,7 @@ void new_user_handler(port_def_t *port)
   all_users[i]->external_port = (port - external_port); // FIXME: pointer arith
 #endif
 
-  // XXX: setup event listeners.
-  all_users[i]->ev_read = event_new(
-                            g_event_base, new_socket_fd, EV_READ | EV_PERSIST, on_user_read, all_users[i]);
-  all_users[i]->ev_write = event_new(
-                             g_event_base, new_socket_fd, EV_WRITE, on_user_write, all_users[i]);
-  event_add(all_users[i]->ev_read, NULL);
-  event_add(all_users[i]->ev_write, NULL);
+  new_user_event_listener(all_users[i]);
 
   // all_users[i] setup finishes
   set_prompt("> ");
@@ -1879,9 +1846,9 @@ void new_user_handler(port_def_t *port)
   memcpy((char *) &all_users[i]->addr, (char *) &addr, length);
 #ifdef IPV6
   char tmp[INET6_ADDRSTRLEN];
-  debug(connections, ("New connection from %s.\n", inet_ntop(AF_INET6, &addr.sin6_addr, tmp, INET6_ADDRSTRLEN)));
+  debug(connections, "New connection from %s.\n", inet_ntop(AF_INET6, &addr.sin6_addr, tmp, INET6_ADDRSTRLEN));
 #else
-  debug(connections, ("New connection from %s.\n", inet_ntoa(addr.sin_addr)));
+  debug(connections, "New connection from %s.\n", inet_ntoa(addr.sin_addr));
 #endif
   num_user++;
   /*
@@ -2006,7 +1973,7 @@ static char *get_user_command()
   }
 
   /* got a command - return it and set command_giver */
-  debug(connections, ("get_user_command: user_command = (%s)\n", user_command));
+  debug(connections, "get_user_command: user_command = (%s)\n", user_command);
   save_command_giver(ip->ob);
 
 #ifndef GET_CHAR_IS_BUFFERED
@@ -2103,7 +2070,7 @@ int process_user_command()
   current_interactive = command_giver;    /* this is yuck phooey, sigh */
   if (ip) { clear_notify(ip->ob); }
   update_load_av();
-  debug(connections, ("process_user_command: command_giver = /%s\n", command_giver->obname));
+  debug(connections, "process_user_command: command_giver = /%s\n", command_giver->obname);
 
   if (!ip) {
     goto exit;
@@ -2199,9 +2166,9 @@ void remove_interactive(object_t *ob, int dested)
   }
 #ifdef IPV6
   char tmp[INET6_ADDRSTRLEN];
-  debug(connections, ("Closing connection from %s.\n", inet_ntop(AF_INET6, &ip->addr.sin6_addr, tmp, INET6_ADDRSTRLEN)));
+  debug(connections, "Closing connection from %s.\n", inet_ntop(AF_INET6, &ip->addr.sin6_addr, tmp, INET6_ADDRSTRLEN));
 #else
-  debug(connections, ("Closing connection from %s.\n", inet_ntoa(ip->addr.sin_addr)));
+  debug(connections, "Closing connection from %s.\n", inet_ntoa(ip->addr.sin_addr));
 #endif
   flush_message(ip);
   ip->iflags |= CLOSING;
@@ -2239,7 +2206,7 @@ void remove_interactive(object_t *ob, int dested)
   }
 #endif
 
-  debug(connections, ("remove_interactive: closing fd %d\n", ip->fd));
+  debug(connections, "remove_interactive: closing fd %d\n", ip->fd);
   if (OS_socket_close(ip->fd) == -1) {
     socket_perror("remove_interactive: close", 0);
   }

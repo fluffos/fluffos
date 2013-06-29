@@ -7,7 +7,7 @@
 #include "sprintf.h"
 #include "eval.h"
 
-#define DBG(x) debug(call_out, x)
+#define DBG(...) debug(call_out, __VA_ARGS__)
 
 /*
  * This file implements delayed calls of functions.
@@ -93,7 +93,7 @@ new_call_out(object_t *ob, svalue_t *fun, int delay,
     delay = 0;
   }
 
-  DBG(("new_call_out: /%s delay %i", ob->obname, delay));
+  DBG("new_call_out: /%s delay %i", ob->obname, delay);
 
   if (!call_list_free) {
     int i;
@@ -110,12 +110,12 @@ new_call_out(object_t *ob, svalue_t *fun, int delay,
   call_list_free = call_list_free->next;
 
   if (fun->type == T_STRING) {
-    DBG(("  function: %s", fun->u.string));
+    DBG("  function: %s", fun->u.string);
     cop->function.s = make_shared_string(fun->u.string);
     cop->ob = ob;
     add_ref(ob, "call_out");
   } else {
-    DBG(("  function: <function>"));
+    DBG("  function: <function>");
     cop->function.f = fun->u.fp;
     fun->u.fp->hdr.ref++;
     cop->ob = 0;
@@ -138,8 +138,8 @@ new_call_out(object_t *ob, svalue_t *fun, int delay,
   /* number of cycles */
   delay = delay / CALLOUT_CYCLE_SIZE;
 
-  DBG(("Current time: %ld  Executes at: %ld  Slot: %d  Delay: %d",
-       current_time, current_time + delay, tm, delay));
+  DBG("Current time: %ld  Executes at: %ld  Slot: %d  Delay: %d",
+      current_time, current_time + delay, tm, delay);
 
   for (copp = &call_list[tm]; *copp; copp = &(*copp)->next) {
     if ((*copp)->delta > delay) {
@@ -195,8 +195,8 @@ void call_out()
   }
 
   real_time = get_current_time();
-  DBG(("Calling call_outs: current_time: %ld real_time: %ld difference: %ld",
-       current_time, real_time, real_time - current_time));
+  DBG("Calling call_outs: current_time: %ld real_time: %ld difference: %ld",
+      current_time, real_time, real_time - current_time);
 
   /* Slowly advance the clock forward towards real_time, doing call_outs
    * as we go.
@@ -205,7 +205,7 @@ void call_out()
   while (1) {
 
     tm = current_time & (CALLOUT_CYCLE_SIZE - 1);
-    DBG(("   slot %i", tm));
+    DBG("   slot %i", tm);
 
 #ifdef CALLOUT_LOOP_PROTECTION
     /* Count how many call_outs are ready to run.  These each will
@@ -237,10 +237,10 @@ void call_out()
       call_list[tm] = call_list[tm]->next;
       ob = (cop->ob ? cop->ob : cop->function.f->hdr.owner);
 
-      DBG(("      /%s", (ob ? ob->obname : "(null)")));
+      DBG("      /%s", (ob ? ob->obname : "(null)"));
 
       if (!ob || (ob->flags & O_DESTRUCTED)) {
-        DBG(("         (destructed)"));
+        DBG("         (destructed)");
         free_call(cop);
         cop = 0;
       } else {
@@ -263,7 +263,7 @@ void call_out()
             new_command_giver = ob;
           }
           if (new_command_giver) {
-            DBG(("         command_giver: /%s", new_command_giver->obname));
+            DBG("         command_giver: /%s", new_command_giver->obname);
           }
 #endif
           save_command_giver(new_command_giver);
@@ -341,7 +341,7 @@ void call_out()
         call_list[tm]->delta--;
       }
       current_time++;
-      DBG(("   current_time = %ld", current_time));
+      DBG("   current_time = %ld", current_time);
 #ifndef POSIX_TIMERS
       if (!(current_time % HEARTBEAT_INTERVAL)) {
         call_heart_beat();
@@ -352,7 +352,7 @@ void call_out()
       break;
     }
   }
-  DBG(("Done."));
+  DBG("Done.");
   pop_context(&econ);
 }
 
@@ -379,12 +379,12 @@ int remove_call_out(object_t *ob, const char *fun)
 
   if (!ob) { return -1; }
 
-  DBG(("remove_call_out: /%s \"%s\"", ob->obname, fun));
+  DBG("remove_call_out: /%s \"%s\"", ob->obname, fun);
 
   for (i = 0; i < CALLOUT_CYCLE_SIZE; i++) {
     delay = 0;
     for (copp = &call_list[i]; *copp; copp = &(*copp)->next) {
-      DBG(("   Slot: %i\n", i));
+      DBG("   Slot: %i\n", i);
       delay += (*copp)->delta;
       if ((*copp)->ob == ob && strcmp((*copp)->function.s, fun) == 0) {
         cop = *copp;
@@ -393,12 +393,12 @@ int remove_call_out(object_t *ob, const char *fun)
         }
         *copp = cop->next;
         free_call(cop);
-        DBG(("   found."));
+        DBG("   found.");
         return time_left(i, delay);
       }
     }
   }
-  DBG(("   not found."));
+  DBG("   not found.");
   return -1;
 }
 
@@ -408,8 +408,8 @@ int remove_call_out_by_handle(LPC_INT handle)
   pending_call_t **copp, *cop;
   int delay = 0;
 
-  DBG(("remove_call_out_by_handle: handle: %i slot: %i",
-       handle, handle & (CALLOUT_CYCLE_SIZE - 1)));
+  DBG("remove_call_out_by_handle: handle: %i slot: %i",
+      handle, handle & (CALLOUT_CYCLE_SIZE - 1));
 
   for (copp = &call_list[handle & (CALLOUT_CYCLE_SIZE - 1)]; *copp; copp = &(*copp)->next) {
     delay += (*copp)->delta;
@@ -431,8 +431,8 @@ int find_call_out_by_handle(LPC_INT handle)
   pending_call_t *cop;
   int delay = 0;
 
-  DBG(("find_call_out_by_handle: handle: %i slot: %i",
-       handle, handle & (CALLOUT_CYCLE_SIZE - 1)));
+  DBG("find_call_out_by_handle: handle: %i slot: %i",
+      handle, handle & (CALLOUT_CYCLE_SIZE - 1));
 
   for (cop = call_list[handle & (CALLOUT_CYCLE_SIZE - 1)]; cop; cop = cop->next) {
     delay += cop->delta;
@@ -452,11 +452,11 @@ int find_call_out(object_t *ob, const char *fun)
 
   if (!ob) { return -1; }
 
-  DBG(("find_call_out: /%s \"%s\"", ob->obname, fun));
+  DBG("find_call_out: /%s \"%s\"", ob->obname, fun);
 
   for (i = 0; i < CALLOUT_CYCLE_SIZE; i++) {
     delay = 0;
-    DBG(("   Slot: %i", i));
+    DBG("   Slot: %i", i);
     for (cop = call_list[i]; cop; cop = cop->next) {
       delay += cop->delta;
       if (cop->ob == ob && strcmp(cop->function.s, fun) == 0) {

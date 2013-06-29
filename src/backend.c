@@ -93,11 +93,10 @@ void logon(object_t *ob)
 /*
  * This is the backend. We will stay here for ever (almost).
  */
-void backend()
+void backend(struct event_base *base)
 {
   int i;
   volatile int first_call = 1;
-  int there_is_a_port = 0;
   error_context_t econ;
 
 #ifdef SIGHUP
@@ -136,15 +135,11 @@ void backend()
           slow_shut_down(tmp);
         }
 
-        // Loop for network event for 1 sec.
-        debug_message("Looping for network event for 1sec! \n");
-
         add_user_write_event();
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
         add_lpc_sock_event();
 #endif
-        run_for_at_most_one_second(g_event_base);
-
+        run_for_at_most_one_second(base);
         /*
          * process user commands.
          */
@@ -235,7 +230,7 @@ static void look_for_objects_to_swap()
          */
         if ((ob->flags & O_WILL_RESET) && (ob->next_reset < current_time)
             && !(ob->flags & O_RESET_STATE)) {
-          debug(d_flag, ("RESET /%s\n", ob->obname));
+          debug(d_flag, "RESET /%s\n", ob->obname);
           set_eval(max_cost);
           reset_object(ob);
           if (ob->flags & O_DESTRUCTED) {
@@ -258,7 +253,7 @@ static void look_for_objects_to_swap()
             int save_reset_state = ob->flags & O_RESET_STATE;
             svalue_t *svp;
 
-            debug(d_flag, ("clean up /%s\n", ob->obname));
+            debug(d_flag, "clean up /%s\n", ob->obname);
 
             /*
              * Supply a flag to the object that says if this program is

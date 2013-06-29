@@ -20,7 +20,8 @@ debug_t levels[] = {
   E(sockets),
   E(comp_func_tab),
   E(LPC),
-  E(LPC_line)
+  E(LPC_line),
+  E(event),
 };
 
 #define NELEM(x) (sizeof(x)/sizeof(x[0]))
