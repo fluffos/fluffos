@@ -234,13 +234,6 @@ receive_snoop(const char *buf, int len, object_t *snooper)
  */
 void init_user_conn()
 {
-#ifdef IPV6
-  struct sockaddr_in6 sin;
-#else
-  struct sockaddr_in sin;
-#endif
-  memset(&sin, 0, sizeof(sin));
-  socklen_t sin_len;
   int optval;
   int i;
   int have_fd6;
@@ -248,7 +241,8 @@ void init_user_conn()
 
   /* Check for fd #6 open as a valid socket */
   optval = 1;
-  have_fd6 = (setsockopt(6, SOL_SOCKET, SO_REUSEADDR, (char *)&optval, sizeof(optval)) == 0);
+  have_fd6 = (setsockopt(6, SOL_SOCKET, SO_REUSEADDR, (char *) &optval,
+                         sizeof(optval)) == 0);
 
   for (i = 0; i < 5; i++) {
 #ifdef F_NETWORK_STATS
@@ -259,7 +253,9 @@ void init_user_conn()
 #endif
     if (!external_port[i].port) {
 #if defined(FD6_KIND) && defined(FD6_PORT)
-      if (!have_fd6) { continue; }
+      if (!have_fd6) {
+        continue;
+      }
       fd6_which = i;
       have_fd6 = 0;
       if (FD6_KIND == PORT_UNDEFINED || FD6_PORT < 1) {
@@ -276,14 +272,40 @@ void init_user_conn()
 #endif
     } else {
       /*
+       * fill in socket address information.
+       */
+      struct addrinfo *res;
+
+      char service[NI_MAXSERV];
+      snprintf(service, sizeof(service), "%u", external_port[i].port);
+
+      struct addrinfo hints;
+      memset(&hints, 0, sizeof(struct addrinfo));
+#ifdef IPV6
+      hints.ai_family = AF_UNSPEC; /* Allow IPv6 and IPv4 */
+#else
+      hints.ai_family = AF_INET; /* Allow IPv4 */
+#endif
+      hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
+      hints.ai_flags = AI_PASSIVE | AI_NUMERICHOST | AI_NUMERICSERV;
+
+      int ret;
+      if (MUD_IP[0]) {
+        ret = getaddrinfo(MUD_IP, service, &hints, &res);
+      } else {
+        ret = getaddrinfo(NULL, service, &hints, &res);
+      }
+
+      if (ret) {
+        debug_message("Error listening, getaddrinfo: %s \n", gai_strerror(ret));
+        exit(3);
+      }
+
+      /*
        * create socket of proper type.
        */
-      int sockflags = SOCK_STREAM;
-#ifdef IPV6
-      if ((external_port[i].fd = socket(PF_INET6, sockflags, 0)) == -1) {
-#else
-      if ((external_port[i].fd = socket(PF_INET, sockflags, 0)) == -1) {
-#endif
+      if ((external_port[i].fd = socket(res->ai_family, res->ai_socktype,
+                                        res->ai_protocol)) == -1) {
         debug_perror("init_user_conn: socket", 0);
         exit(1);
       }
@@ -297,50 +319,23 @@ void init_user_conn()
         socket_perror("init_user_conn: setsockopt", 0);
         exit(2);
       }
+
 #ifdef FD_CLOEXEC
       fcntl(external_port[i].fd, F_SETFD, FD_CLOEXEC);
-#endif
-      /*
-       * fill in socket address information.
-       */
-#ifdef IPV6
-      sin.sin6_family = AF_INET6;
-      if (MUD_IP[0]) {
-        inet_pton(AF_INET6, MUD_IP, &(sin.sin6_addr));
-      } else {
-        sin.sin6_addr = in6addr_any;
-      }
-      sin.sin6_port = htons((u_short) external_port[i].port);
-#else
-      sin.sin_family = AF_INET;
-      if (MUD_IP[0]) {
-        sin.sin_addr.s_addr = inet_addr(MUD_IP);
-      } else {
-        sin.sin_addr.s_addr = INADDR_ANY;
-      }
-      sin.sin_port = htons((u_short) external_port[i].port);
 #endif
 
       /*
        * bind name to socket.
        */
-      if (bind(external_port[i].fd, (struct sockaddr *) & sin,
-               sizeof(sin)) == -1) {
+      if (bind(external_port[i].fd, res->ai_addr, res->ai_addrlen) == -1) {
         socket_perror("init_user_conn: bind", 0);
         exit(3);
       }
+
+      // cleanup
+      freeaddrinfo(res);
     }
-    /*
-     * get socket name.
-     */
-    sin_len = sizeof(sin);
-    if (getsockname(external_port[i].fd, (struct sockaddr *) & sin,
-                    &sin_len) == -1) {
-      socket_perror("init_user_conn: getsockname", 0);
-      if (i != fd6_which) {
-        exit(4);
-      }
-    }
+
     /*
      * set socket non-blocking,
      */
@@ -353,8 +348,7 @@ void init_user_conn()
     /*
      * listen on socket for connections.
      */
-    debug_message("Accepting connections on port %d.\n",
-                  external_port[i].port);
+    debug_message("Accepting connections on port %d.\n", external_port[i].port);
     if (listen(external_port[i].fd, 128) == -1) {
       socket_perror("init_user_conn: listen", 0);
       if (i != fd6_which) {
