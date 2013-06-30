@@ -34,10 +34,9 @@ void on_addr_name_result(int err, char type, int count,
   auto result = (char *)addresses;
 
   if (err) {
-    debug_message("DNS reverse lookup fail: %s.\n",
-                  evdns_err_to_string(err));
+    debug(dns, "DNS reverse lookup fail: %s.\n", evdns_err_to_string(err));
   } else {
-    debug_message("Got reverse lookup result: %s\n", result);
+    debug(dns, "Got reverse lookup result: %s\n", result);
     add_ip_entry(query->addr, query->size, result);
   }
   delete query;
@@ -49,7 +48,7 @@ void query_name_by_addr(object_t *ob)
   auto query = new addr_name_query_t;
 
   const char *addr = query_ip_number(ob);
-  debug_message("query_name_by_addr: starting lookup for %s.\n", addr);
+  debug(dns, "query_name_by_addr: starting lookup for %s.\n", addr);
   free_string(addr);
 
   query->addr = (sockaddr *)&ob->interactive->addr;
@@ -81,21 +80,19 @@ void on_query_addr_by_name_finish(evutil_socket_t fd, short what, void *arg)
   auto query = (addr_number_query *)arg;
 
   if (query->err) {
-    debug_message("DNS lookup fail: %" LPC_INT_FMTSTR_P
-                  ",request: %s, err: %s.\n",
-                  query->key, query->name, evutil_gai_strerror(query->err));
+    debug(dns, "DNS lookup fail: %" LPC_INT_FMTSTR_P ",request: %s, err: %s.\n",
+        query->key, query->name, evutil_gai_strerror(query->err));
     push_undefined();
     push_undefined();
   } else {
-    debug_message("DNS lookup success: %d \n", query->key);
+    debug(dns, "DNS lookup success: %d \n", query->key);
     // push the name
     push_shared_string(query->name);
 
     // push IP address
     char host[NI_MAXHOST];
-    int ret = getnameinfo(
-                query->res->ai_addr, query->res->ai_addrlen, host, sizeof(host),
-                NULL, 0, NI_NUMERICHOST);
+    int ret = getnameinfo(query->res->ai_addr, query->res->ai_addrlen, host,
+                          sizeof(host), NULL, 0, NI_NUMERICHOST);
     if (!ret) {
       copy_and_push_string(host);
     } else {
@@ -165,7 +162,7 @@ LPC_INT query_addr_by_name(const char *name, svalue_t *call_back)
   query->req = evdns_getaddrinfo(
                  g_dns_base, name, NULL, &hints, on_getaddr_result, query);
 
-  debug_message("DNS lookup scheduled: %d, %s\n", query->key, name);
+  debug(dns, "DNS lookup scheduled: %d, %s\n", query->key, name);
 
   return query->key;
 }                               /* query_addr_number() */
