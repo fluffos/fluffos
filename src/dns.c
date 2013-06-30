@@ -59,7 +59,7 @@ void query_name_by_addr(object_t *ob)
                  on_addr_name_result, query);
 #else
   query->req = evdns_base_resolve_reverse(
-                 g_dns_base, ob->interactive->addr.sin_addr, 0,
+                 g_dns_base, &ob->interactive->addr.sin_addr, 0,
                  on_addr_name_result, query);
 #endif
 }
