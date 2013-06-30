@@ -24,14 +24,11 @@
 lpc_socket_t *lpc_socks = 0;
 int max_lpc_socks = 0;
 
+
+
 #ifdef PACKAGE_SOCKETS
-#ifdef IPV6
-static int socket_name_to_sin(const char *, struct sockaddr_in6 *);
-static char *inet_address(struct sockaddr_in6 *);
-#else
-static int socket_name_to_sin(const char *, struct sockaddr_in *);
-static char *inet_address(struct sockaddr_in *);
-#endif
+static int string_to_sockaddr(const char *, struct sockaddr *, socklen_t *len);
+static char *old_sockaddr_to_string(struct sockaddr *, socklen_t);
 #endif
 
 /*
@@ -75,6 +72,8 @@ static void clear_socket(int which, int dofree)
   lpc_socks[which].state = STATE_CLOSED;
   memset((char *) &lpc_socks[which].l_addr, 0, sizeof(lpc_socks[which].l_addr));
   memset((char *) &lpc_socks[which].r_addr, 0, sizeof(lpc_socks[which].r_addr));
+  lpc_socks[which].l_addrlen = 0;
+  lpc_socks[which].r_addrlen = 0;
   lpc_socks[which].owner_ob = NULL;
   lpc_socks[which].release_ob = NULL;
   lpc_socks[which].read_callback.s = 0;
@@ -90,13 +89,13 @@ static void clear_socket(int which, int dofree)
   // cleanup event listeners
   if (lpc_socks[which].ev_read != NULL) {
     event_free(lpc_socks[which].ev_read);
+    lpc_socks[which].ev_read = NULL;
   }
 
   if (lpc_socks[which].ev_write != NULL) {
     event_free(lpc_socks[which].ev_write);
+    lpc_socks[which].ev_write = NULL;
   }
-  lpc_socks[which].ev_read = NULL;
-  lpc_socks[which].ev_write = NULL;
 }
 
 /*
@@ -241,7 +240,7 @@ extern struct event_base *g_event_base;
 
 void on_lpc_sock_read(evutil_socket_t fd, short what, void *arg)
 {
-  debug_message("Got an event on lpc socket %d:%s%s%s%s \n",
+  debug(event, "Got an event on socket %d:%s%s%s%s \n",
                 (int) fd,
                 (what & EV_TIMEOUT) ? " timeout" : "",
                 (what & EV_READ)    ? " read" : "",
@@ -254,7 +253,7 @@ void on_lpc_sock_read(evutil_socket_t fd, short what, void *arg)
 }
 void on_lpc_sock_write(evutil_socket_t fd, short what, void *arg)
 {
-  debug_message("Got an event on lpc socket %d:%s%s%s%s \n",
+  debug(event, "Got an event on socket %d:%s%s%s%s \n",
                 (int) fd,
                 (what & EV_TIMEOUT) ? " timeout" : "",
                 (what & EV_READ)    ? " read" : "",
@@ -267,13 +266,16 @@ void on_lpc_sock_write(evutil_socket_t fd, short what, void *arg)
 }
 
 // Initialize LPC socket data structure and register events
-void init_lpc_socket(lpc_socket_t *target, evutil_socket_t fd)
+void init_lpc_socket(lpc_socket_t *target, evutil_socket_t real_fd)
 {
   memset(target, 0, sizeof(lpc_socket_t));
 
-  target->ev_read = event_new(g_event_base, fd, EV_READ,
+  target->l_addrlen = sizeof(target->l_addr);
+  target->r_addrlen = sizeof(target->r_addr);
+
+  target->ev_read = event_new(g_event_base, real_fd, EV_READ | EV_PERSIST,
                               on_lpc_sock_read, target);
-  target->ev_write = event_new(g_event_base, fd, EV_WRITE,
+  target->ev_write = event_new(g_event_base, real_fd, EV_WRITE,
                                on_lpc_sock_write, target);
 }
 
@@ -310,9 +312,9 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
   i = find_new_socket();
   if (i >= 0) {
 #ifdef IPV6
-    fd = socket(PF_INET6, type, 0);
+    fd = socket(AF_INET6, type, 0);
 #else
-    fd = socket(PF_INET, type, 0);
+    fd = socket(AF_INET, type, 0);
 #endif
     if (fd == INVALID_SOCKET) {
       socket_perror("socket_create: socket", 0);
@@ -330,6 +332,7 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
       OS_socket_close(fd);
       return EENONBLOCK;
     }
+
 #ifdef FD_CLOEXEC
     fcntl(fd, F_SETFD, FD_CLOEXEC);
 #endif
@@ -354,8 +357,8 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
     lpc_socks[i].owner_ob = current_object;
     current_object->flags |= O_EFUN_SOCKET;
 
-    debug(sockets, "socket_create: created socket %d mode %d fd %d\n",
-          i, mode, fd);
+    debug(sockets, "socket_create: created lpc socket %d (real fd %d) mode %d\n",
+          i, fd, mode);
   }
 
   return i;
@@ -366,13 +369,12 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
  */
 int socket_bind(int fd, int port, const char *addr)
 {
+  struct sockaddr_storage sockaddr;
   socklen_t len;
-#ifdef IPV6
-  struct sockaddr_in6 sin;
-#else
-  struct sockaddr_in sin;
-#endif
-  memset(&sin, 0, sizeof(sin));
+
+  memset(&sockaddr, 0, sizeof(sockaddr));
+  len = sizeof(sockaddr);
+
   if (fd < 0 || fd >= max_lpc_socks) {
     return EEFDRANGE;
   }
@@ -386,59 +388,67 @@ int socket_bind(int fd, int port, const char *addr)
   if (lpc_socks[fd].state != STATE_UNBOUND) {
     return EEISBOUND;
   }
+
+  char service[NI_MAXSERV];
+  snprintf(service, sizeof(service), "%u", port);
+
+  struct addrinfo hints;
+  memset(&hints, 0, sizeof(struct addrinfo));
 #ifdef IPV6
-  sin.sin6_family = AF_INET6;
+  hints.ai_family = AF_INET6;
 #else
-  sin.sin_family = AF_INET;
+  hints.ai_family = AF_INET;
 #endif
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_flags = AI_PASSIVE | AI_V4MAPPED;
+  hints.ai_protocol = 0; /* Any protocol */
+
   if (!addr) {
-    if (MUD_IP[0])
-#ifdef IPV6
-      inet_pton(AF_INET6, MUD_IP, &(sin.sin6_addr));
-    else {
-      sin.sin6_addr = in6addr_any;
+    int ret;
+    struct addrinfo *result = NULL;
+    if (MUD_IP[0] != '\0') {
+      debug(sockets, "socket_bind: binding to mud ip: %s.\n", MUD_IP);
+      ret = getaddrinfo(MUD_IP, service, &hints, &result);
+    } else {
+      debug(sockets, "socket_bind: binding to any address.\n");
+      ret = getaddrinfo(NULL, service, &hints, &result);
     }
-    sin.sin6_port = htons((u_short) port);
-#else
-      sin.sin_addr.s_addr = inet_addr(MUD_IP);
-    else {
-      sin.sin_addr.s_addr = INADDR_ANY;
+    if(ret) {
+      debug(sockets, "socket_bind: error %s \n", gai_strerror(ret));
+      return EEBADADDR;
     }
-    sin.sin_port = htons((u_short) port);
-#endif
+
+    memcpy(&sockaddr, result->ai_addr, result->ai_addrlen);
+    len = result->ai_addrlen;
+    freeaddrinfo(result);
   } else {
-    if (!socket_name_to_sin(addr, &sin)) {
+    if (!string_to_sockaddr(addr, (struct sockaddr *)&sockaddr, &len)) {
       return EEBADADDR;
     }
   }
 
-  if (bind(lpc_socks[fd].fd, (struct sockaddr *) & sin, sizeof(sin)) == -1) {
+  if (bind(lpc_socks[fd].fd, (struct sockaddr *)&sockaddr, len) == -1) {
     switch (socket_errno) {
       case EADDRINUSE:
+        debug(sockets, "socket_bind: address is in use.");
         return EEADDRINUSE;
       default:
         socket_perror("socket_bind: bind", 0);
         return EEBIND;
     }
   }
-  len = sizeof(sin);
-  if (getsockname(lpc_socks[fd].fd, (struct sockaddr *) & lpc_socks[fd].l_addr, &len) == -1) {
+
+  // fill-in socket information.
+  if (getsockname(lpc_socks[fd].fd, (struct sockaddr *)&lpc_socks[fd].l_addr, &lpc_socks[fd].l_addrlen) == -1) {
     socket_perror("socket_bind: getsockname", 0);
     return EEGETSOCKNAME;
   }
+
   lpc_socks[fd].state = STATE_BOUND;
 
-#ifdef IPV6
-  char tmp[INET6_ADDRSTRLEN];
-  debug(sockets, "socket_bind: bound socket %d to %s.%d\n",
-        fd, inet_ntop(AF_INET6, &lpc_socks[fd].l_addr.sin6_addr, (char *)&tmp, INET6_ADDRSTRLEN),
-        ntohs(lpc_socks[fd].l_addr.sin6_port));
+  debug(sockets, "socket_bind: bound lpc socket %d (real fd %d) to %s.\n",
+      fd, lpc_socks[fd].fd, sockaddr_to_string((struct sockaddr *)&lpc_socks[fd].l_addr, lpc_socks[fd].l_addrlen));
 
-#else
-  debug(sockets, "socket_bind: bound socket %d to %s.%d\n",
-        fd, inet_ntoa(lpc_socks[fd].l_addr.sin_addr),
-        ntohs(lpc_socks[fd].l_addr.sin_port));
-#endif
   return EESUCCESS;
 }
 
@@ -476,6 +486,8 @@ int socket_listen(int fd, svalue_t *callback)
 
   current_object->flags |= O_EFUN_SOCKET;
 
+  event_add(lpc_socks[fd].ev_read, NULL);
+
   debug(sockets, "socket_listen: listen on socket %d\n", fd);
 
   return EESUCCESS;
@@ -487,12 +499,8 @@ int socket_listen(int fd, svalue_t *callback)
 int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback)
 {
   int accept_fd, i;
-  socklen_t len;
-#ifdef IPV6
-  struct sockaddr_in6 sin;
-#else
-  struct sockaddr_in sin;
-#endif
+  struct sockaddr_storage addr;
+  socklen_t addrlen;
   if (fd < 0 || fd >= max_lpc_socks) {
     return EEFDRANGE;
   }
@@ -512,8 +520,8 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback)
 
   lpc_socks[fd].flags &= ~S_WACCEPT;
 
-  len = sizeof(sin);
-  accept_fd = accept(lpc_socks[fd].fd, (struct sockaddr *) & sin, &len);
+  addrlen = sizeof(addr);
+  accept_fd = accept(lpc_socks[fd].fd, (struct sockaddr *) &addr, &addrlen);
   if (accept_fd == -1) {
     switch (socket_errno) {
 #ifdef EWOULDBLOCK
@@ -545,7 +553,6 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback)
   fcntl(accept_fd, F_SETFD, FD_CLOEXEC);
 #endif
 
-
   i = find_new_socket();
   if (i >= 0) {
     init_lpc_socket(&lpc_socks[i], accept_fd);
@@ -566,17 +573,23 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback)
 
     lpc_socks[i].mode = lpc_socks[fd].mode;
     lpc_socks[i].state = STATE_DATA_XFER;
-    len = sizeof(sin);
-    if (getsockname(lpc_socks[i].fd, (struct sockaddr *)&lpc_socks[i].l_addr, &len) == -1) {
+
+    if (getsockname(lpc_socks[i].fd, (struct sockaddr *)&lpc_socks[i].l_addr, &lpc_socks[i].l_addrlen) == -1) {
       lpc_socks[i].l_addr = lpc_socks[fd].l_addr;
+      lpc_socks[i].l_addrlen = lpc_socks[fd].l_addrlen;
     }
-    lpc_socks[i].r_addr = sin;
+
+    lpc_socks[i].r_addr = addr;
+    lpc_socks[i].r_addrlen = addrlen;
     lpc_socks[i].owner_ob = current_object;
     set_read_callback(i, read_callback);
     set_write_callback(i, write_callback);
     copy_close_callback(i, fd);
 
     current_object->flags |= O_EFUN_SOCKET;
+
+    event_add(lpc_socks[i].ev_read, NULL);
+    event_add(lpc_socks[i].ev_write, NULL);
 
     debug(sockets, "socket_accept: accept on socket %d\n", fd);
     debug(sockets, "socket_accept: new socket %d on fd %d\n", i, accept_fd);
@@ -616,8 +629,8 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
     case STATE_DATA_XFER:
       return EEISCONN;
   }
-
-  if (!socket_name_to_sin(name, &lpc_socks[fd].r_addr)) {
+  if (!string_to_sockaddr(name, (sockaddr *)&lpc_socks[fd].r_addr, &lpc_socks[fd].r_addrlen)) {
+    debug(sockets, "socket_connect: bad address: %s", name);
     return EEBADADDR;
   }
 
@@ -626,20 +639,7 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
 
   current_object->flags |= O_EFUN_SOCKET;
 
-#ifdef WINSOCK
-  /* Turn on blocking for connect to ensure correct errors */
-  if (set_socket_nonblocking(lpc_socks[fd].fd, 0) == -1) {
-    socket_perror("socket_connect: set_socket_nonblocking 0", 0);
-    OS_socket_close(fd);
-    return EENONBLOCK;
-  }
-#endif
-  if (connect(lpc_socks[fd].fd, (struct sockaddr *) & lpc_socks[fd].r_addr,
-#ifdef IPV6
-              sizeof(struct sockaddr_in6)) == -1) {
-#else
-              sizeof(struct sockaddr_in)) == -1) {
-#endif
+  if (connect(lpc_socks[fd].fd, (struct sockaddr *)&lpc_socks[fd].r_addr, lpc_socks[fd].r_addrlen) == -1) {
     switch (socket_errno) {
       case EINTR:
         return EEINTR;
@@ -656,15 +656,12 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
         return EECONNECT;
     }
   }
-#ifdef WINSOCK
-  if (set_socket_nonblocking(lpc_socks[fd].fd, 1) == -1) {
-    socket_perror("socket_connect: set_socket_nonblocking 1", 0);
-    OS_socket_close(fd);
-    return EENONBLOCK;
-  }
-#endif
+
   lpc_socks[fd].state = STATE_DATA_XFER;
   lpc_socks[fd].flags |= S_BLOCKED;
+
+  event_add(lpc_socks[fd].ev_read, NULL);
+  event_add(lpc_socks[fd].ev_write, NULL);
 
   return EESUCCESS;
 }
@@ -676,11 +673,10 @@ int socket_write(int fd, svalue_t *message, const char *name)
 {
   int len, off;
   char *buf, *p;
-#ifdef IPV6
-  struct sockaddr_in6 sin;
-#else
-  struct sockaddr_in sin;
-#endif
+
+  struct sockaddr_storage addr;
+  socklen_t addrlen;
+
   if (fd < 0 || fd >= max_lpc_socks) {
     return EEFDRANGE;
   }
@@ -695,7 +691,7 @@ int socket_write(int fd, svalue_t *message, const char *name)
     if (name == NULL) {
       return EENOADDR;
     }
-    if (!socket_name_to_sin(name, &sin)) {
+    if (!string_to_sockaddr(name, (sockaddr *)&addr, &addrlen)) {
       return EEBADADDR;
     }
   } else {
@@ -711,8 +707,9 @@ int socket_write(int fd, svalue_t *message, const char *name)
   }
 
   switch (lpc_socks[fd].mode) {
-
     case MUD:
+      debug(sockets, "socket_write: sending tcp message to %s\n", sockaddr_to_string(
+          (struct sockaddr *)&lpc_socks[fd].r_addr, lpc_socks[fd].r_addrlen));
       switch (message->type) {
 
         case T_OBJECT:
@@ -739,6 +736,8 @@ int socket_write(int fd, svalue_t *message, const char *name)
       break;
 
     case STREAM:
+      debug(sockets, "socket_write: sending tcp message to %s\n",
+            sockaddr_to_string((struct sockaddr *)&lpc_socks[fd].r_addr, lpc_socks[fd].r_addrlen));
       switch (message->type) {
 #ifndef NO_BUFFER_TYPE
         case T_BUFFER:
@@ -791,13 +790,14 @@ int socket_write(int fd, svalue_t *message, const char *name)
       break;
 
     case DATAGRAM:
+      debug(sockets, "socket_write: sending udp message to %s\n",
+            sockaddr_to_string((struct sockaddr *)&addr, addrlen));
       switch (message->type) {
-
         case T_STRING:
           if ((off = sendto(lpc_socks[fd].fd, (char *)message->u.string,
                             strlen(message->u.string) + 1, 0,
-                            (struct sockaddr *) & sin, sizeof(sin))) == -1) {
-            //socket_perror("socket_write: sendto", 0);
+                            (struct sockaddr *) &addr, addrlen)) == -1) {
+            socket_perror("socket_write: sendto", 0);
             return EESENDTO;
           }
           break;
@@ -806,8 +806,8 @@ int socket_write(int fd, svalue_t *message, const char *name)
         case T_BUFFER:
           if ((off = sendto(lpc_socks[fd].fd, (char *)message->u.buf->item,
                             message->u.buf->size, 0,
-                            (struct sockaddr *) & sin, sizeof(sin))) == -1) {
-            //socket_perror("socket_write: sendto", 0);
+                            (struct sockaddr *) &addr, addrlen)) == -1) {
+            socket_perror("socket_write: sendto", 0);
             return EESENDTO;
           }
           break;
@@ -903,14 +903,12 @@ static void call_callback(int fd, int what, int num_arg)
 void socket_read_select_handler(int fd)
 {
   int cc = 0;
-  socklen_t addrlen;
-  char buf[BUF_SIZE], addr[ADDR_BUF_SIZE];
+  char buf[BUF_SIZE];
   svalue_t value;
-#ifdef IPV6
-  struct sockaddr_in6 sin;
-#else
-  struct sockaddr_in sin;
-#endif
+
+  struct sockaddr_storage sockaddr;
+  socklen_t addrlen;
+
   debug(sockets, "read_socket_handler: fd %d state %d\n",
         fd, lpc_socks[fd].state);
 
@@ -932,10 +930,12 @@ void socket_read_select_handler(int fd)
           break;
 
         case DATAGRAM:
+        {
+          char addr[NI_MAXHOST + NI_MAXSERV];
           debug(sockets, ("read_socket_handler: DATA_XFER DATAGRAM\n"));
-          addrlen = sizeof(sin);
+          addrlen = sizeof(sockaddr);
           cc = recvfrom(lpc_socks[fd].fd, buf, sizeof(buf) - 1, 0,
-                        (struct sockaddr *) & sin, &addrlen);
+                        (struct sockaddr *) &sockaddr, &addrlen);
           if (cc <= 0) {
             break;
           }
@@ -949,14 +949,20 @@ void socket_read_select_handler(int fd)
 #endif
           debug(sockets, "read_socket_handler: read %d bytes\n", cc);
           buf[cc] = '\0';
-#ifdef IPV6
-          char tmp[INET6_ADDRSTRLEN];
-          sprintf(addr, "%s %d", inet_ntop(AF_INET6, &sin.sin6_addr, tmp, INET6_ADDRSTRLEN),
-                  ntohs(sin.sin6_port));
-#else
-          sprintf(addr, "%s %d", inet_ntoa(sin.sin_addr),
-                  ntohs(sin.sin_port));
-#endif
+          // Translate socket address into "address port" format.
+          {
+            char host[NI_MAXHOST], service[NI_MAXSERV];
+            int ret = getnameinfo((struct sockaddr *) &sockaddr, addrlen, host,
+                sizeof(host), service, sizeof(service),
+                NI_NUMERICHOST | NI_NUMERICSERV);
+            if (ret) {
+              debug(sockets, "socket_read_select_handler: bad addr: %s",
+                  gai_strerror(ret));
+              addr[0] = '\0';
+            } else {
+              sprintf(addr, "%s %s", host, service);
+            }
+          }
           push_number(fd);
 #ifndef NO_BUFFER_TYPE
           if (lpc_socks[fd].flags & S_BINARY) {
@@ -979,6 +985,7 @@ void socket_read_select_handler(int fd)
           debug(sockets, ("read_socket_handler: apply\n"));
           call_callback(fd, S_READ_FP, 3);
           return;
+        }
         case STREAM_BINARY:
         case DATAGRAM_BINARY:
           ;
@@ -1157,7 +1164,7 @@ void socket_write_select_handler(int fd)
 
   /* if the socket isn't blocked, we've got nothing to send */
   /* if the socket is linkdead, don't send -- could block */
-  if (!(lpc_socks[fd].flags & S_BLOCKED) || lpc_socks[fd].flags & S_LINKDEAD) {
+  if (!(lpc_socks[fd].flags & S_BLOCKED) || (lpc_socks[fd].flags & S_LINKDEAD)) {
     return;
   }
 
@@ -1260,7 +1267,7 @@ int socket_close(int fd, int flags)
   }
   clear_socket(fd, 1);
 
-  debug(sockets, "socket_close: closed fd %d\n", fd);
+  debug(sockets, "socket_close: closed lpc fd %d\n", fd);
   return EESUCCESS;
 }
 
@@ -1351,27 +1358,38 @@ const char *socket_error(int error)
 
 /*
  * Return the remote address for an LPC efun socket
+ * NOTE: Due to the way package/sockets.c is written, this function can be
+ * called for unbounded socket, on this case, this should return "::" or
+ * "0.0.0.0".
  */
 int get_socket_address(int fd, char *addr, int *port, int local)
 {
-#ifdef IPV6
-  struct sockaddr_in6 *addr_in;
-#else
-  struct sockaddr_in *addr_in;
-#endif
+  struct sockaddr *sockaddr;
+  socklen_t addrlen;
+
+  addr[0] = '\0';
+  *port = 0;
+
   if (fd < 0 || fd >= max_lpc_socks) {
-    addr[0] = '\0';
-    *port = 0;
     return EEFDRANGE;
   }
-  addr_in = (local ? &lpc_socks[fd].l_addr : &lpc_socks[fd].r_addr);
+  sockaddr = (local ? (struct sockaddr *)&lpc_socks[fd].l_addr : (struct sockaddr *)&lpc_socks[fd].r_addr);
+  addrlen = (local ? lpc_socks[fd].l_addrlen : lpc_socks[fd].r_addrlen);
+
+  char host[NI_MAXHOST], service[NI_MAXSERV];
+  int ret = getnameinfo(sockaddr, addrlen, host, sizeof(host),
+      service, sizeof(service),
+      NI_NUMERICHOST | NI_NUMERICSERV);
+  if(ret) {
 #ifdef IPV6
-  *port = ntohs(addr_in->sin6_port);
-  inet_ntop(AF_INET6, &addr_in->sin6_addr, addr, INET6_ADDRSTRLEN);
+    strcpy(addr, "::");
 #else
-  *port = ntohs(addr_in->sin_port);
-  strcpy(addr, inet_ntoa(addr_in->sin_addr));
+    strcpy(addr, "0.0.0.0");
 #endif
+  } else {
+    strcpy(addr, host);
+    *port = atoi(service);
+  }
   return EESUCCESS;
 }
 
@@ -1410,54 +1428,46 @@ void assign_socket_owner(svalue_t *sv, object_t *ob)
 
 /*
  * Convert a string representation of an address to a sockaddr_in
+ * The format of the string is "ip port", the delimiter is a whitespace.
  */
-#ifdef IPV6
-static int socket_name_to_sin(const char *name, struct sockaddr_in6 *sin)
-#else
-static int socket_name_to_sin(const char *name, struct sockaddr_in *sin)
-#endif
+static int string_to_sockaddr(const char *name, struct sockaddr *addr, socklen_t *len)
 {
-  int port;
-  char *cp, addr[ADDR_BUF_SIZE];
-
-  strncpy(addr, name, ADDR_BUF_SIZE);
-  addr[ADDR_BUF_SIZE - 1] = '\0';
-
-  cp = strchr(addr, ' ');
+  const char *cp = strchr(name, ' ');
   if (cp == NULL) {
+    debug(sockets, "socket_name_to_sin: malformed address: %s", name);
     return 0;
   }
 
-  *cp = '\0';
-  port = atoi(cp + 1);
+  char host[NI_MAXHOST], service[NI_MAXSERV];
+
+  memset(host, 0, sizeof(host));
+  memset(service, 0, sizeof(service));
+
+  memcpy(host, name, cp - name);
+  strncpy(service, cp + 1, sizeof(service));
+
+  struct addrinfo hints, *res;
 
 #ifdef IPV6
-  sin->sin6_family = AF_INET6;
-  struct addrinfo hints, *res;
   hints.ai_family = AF_INET6;
-  hints.ai_socktype = 0;
-  hints.ai_protocol = 0;
-#ifndef AI_V4MAPPED
-  hints.ai_flags = AI_CANONNAME;
 #else
-  hints.ai_flags = AI_CANONNAME | AI_V4MAPPED;
+  hints.ai_family = AF_INET;
 #endif
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_protocol = 0;
+  hints.ai_flags = AI_V4MAPPED | AI_NUMERICHOST | AI_NUMERICSERV;
 
-  if (getaddrinfo(addr, "1234", &hints, &res)) {
-    //failed
-    socket_perror("socket_name_to_sin: getaddrinfo", 0);
+  int ret;
+  if ((ret = getaddrinfo(host, service, &hints, &res))) {
+    debug(sockets, "socket_name_to_sin: getaddrinfo error: %s", gai_strerror(ret));
     return 0;
   }
-  struct sockaddr_in6 tmp;
-  memcpy(&tmp, res->ai_addr, sizeof(tmp));
+
+  memcpy(addr, res->ai_addr, res->ai_addrlen);
+  if(len != NULL) *len = res->ai_addrlen;
+
   freeaddrinfo(res);
-  sin->sin6_addr = tmp.sin6_addr;
-  sin->sin6_port = htons((u_short) port);
-#else
-  sin->sin_family = AF_INET;
-  sin->sin_port = htons((u_short) port);
-  sin->sin_addr.s_addr = inet_addr(addr);
-#endif
+
   return 1;
 }
 
@@ -1481,44 +1491,28 @@ void close_referencing_sockets(object_t *ob)
 #ifdef PACKAGE_SOCKETS
 
 /*
- * Return the string representation of a sockaddr_in
+ * Return the string representation of a sockaddr.
+ * NOTE: this special format is exposed to userland and should be preserved.
  */
-#ifdef IPV6
-static char *inet_address(struct sockaddr_in6 *sin)
-#else
-static char *inet_address(struct sockaddr_in *sin)
-#endif
-{
-#ifdef IPV6
-  static char addr[INET6_ADDRSTRLEN], port[7];
-  if (!memcmp(&sin->sin6_addr, &in6addr_any, sizeof(in6addr_any))) {
-    strcpy(addr, "*");
-  } else {
-    inet_ntop(AF_INET6, &sin->sin6_addr, addr, INET6_ADDRSTRLEN);
+static char *old_sockaddr_to_string(struct sockaddr *addr, socklen_t len) {
+  static char result[NI_MAXHOST + NI_MAXSERV];
+
+  char host[NI_MAXHOST], service[NI_MAXSERV];
+  int ret = getnameinfo(addr, len, host, sizeof(host),
+      service, sizeof(service),
+      NI_NUMERICHOST | NI_NUMERICSERV);
+
+  if(ret) {
+    debug(sockets, "inet_address: %s", gai_strerror(ret));
+    memset(result, 0, sizeof(result));
+    return result;
   }
-  strcat(addr, ".");
-  if (ntohs(sin->sin6_port) == 0) {
-    strcpy(port, "*");
-  } else {
-    sprintf(port, "%d", ntohs(sin->sin6_port));
-  }
-  strcat(addr, port);
-#else
-  static char addr[32], port[7];
-  if (ntohl(sin->sin_addr.s_addr) == INADDR_ANY) {
-    strcpy(addr, "*");
-  } else {
-    strcpy(addr, inet_ntoa(sin->sin_addr));
-  }
-  strcat(addr, ".");
-  if (ntohs(sin->sin_port) == 0) {
-    strcpy(port, "*");
-  } else {
-    sprintf(port, "%d", ntohs(sin->sin_port));
-  }
-  strcat(addr, port);
-#endif
-  return (addr);
+
+  snprintf(result, sizeof(result), "%s.%s",
+      ((strcmp(host, "::") == 0 || strcmp(host, "0.0.0.0") == 0) ? "*" : host),
+      ((strcmp(service, "0") == 0) ? "*" : service));
+
+  return result;
 }
 
 const char *socket_modes[] = {
@@ -1563,13 +1557,13 @@ array_t *socket_status(int which)
 
   ret->item[3].type = T_STRING;
   ret->item[3].subtype = STRING_MALLOC;
-  ret->item[3].u.string = string_copy(inet_address(&lpc_socks[which].l_addr),
-                                      "socket_status");
+  ret->item[3].u.string = string_copy(
+      old_sockaddr_to_string((struct sockaddr *)&lpc_socks[which].l_addr, lpc_socks[which].l_addrlen), "socket_status");
 
   ret->item[4].type = T_STRING;
   ret->item[4].subtype = STRING_MALLOC;
-  ret->item[4].u.string = string_copy(inet_address(&lpc_socks[which].r_addr),
-                                      "socket_status");
+  ret->item[3].u.string = string_copy(
+      old_sockaddr_to_string((struct sockaddr *)&lpc_socks[which].r_addr, lpc_socks[which].r_addrlen), "socket_status");
 
   if (!(lpc_socks[which].flags & STATE_FLUSHING) && lpc_socks[which].owner_ob && !(lpc_socks[which].owner_ob->flags & O_DESTRUCTED)) {
     ret->item[5].type = T_OBJECT;

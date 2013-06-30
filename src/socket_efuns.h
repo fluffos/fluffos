@@ -33,13 +33,10 @@ typedef struct {
   short flags;
   enum socket_mode mode;
   enum socket_state state;
-#ifdef IPV6
-  struct sockaddr_in6 l_addr;
-  struct sockaddr_in6 r_addr;
-#else
-  struct sockaddr_in l_addr;
-  struct sockaddr_in r_addr;
-#endif
+  struct sockaddr_storage l_addr;
+  struct sockaddr_storage r_addr;
+  socklen_t l_addrlen;
+  socklen_t r_addrlen;
   object_t *owner_ob;
   object_t *release_ob;
   union string_or_func read_callback;

@@ -79,11 +79,8 @@ typedef struct interactive_s {
 #endif
   int connection_type;        /* the type of connection this is          */
   int fd;                     /* file descriptor for interactive object  */
-#ifdef IPV6
-  struct sockaddr_in6 addr;    /* socket address of interactive object    */
-#else
-  struct sockaddr_in addr;    /* socket address of interactive object    */
-#endif
+  struct sockaddr_storage addr;    /* socket address of interactive object    */
+  socklen_t addrlen;
 #ifdef F_QUERY_IP_PORT
   int local_port;             /* which of our ports they connected to    */
 #endif
@@ -230,5 +227,24 @@ void mark_iptable(void);
 #endif
 
 void new_user_handler(port_def_t *);
+
+inline const char* sockaddr_to_string(const sockaddr* addr, socklen_t len) {
+  static char result[NI_MAXHOST + NI_MAXSERV];
+
+  char host[NI_MAXHOST], service[NI_MAXSERV];
+  int ret = getnameinfo(addr, len, host, sizeof(host),
+      service, sizeof(service),
+      NI_NUMERICHOST | NI_NUMERICSERV);
+
+  if(ret) {
+    strcpy(result, "<invalid address>");
+    return result;
+  }
+
+  snprintf(result, sizeof(result),
+      strchr(host, ':') != NULL ? "[%s]:%s" : "%s:%s", host, service);
+
+  return result;
+}
 
 #endif                          /* COMM_H */

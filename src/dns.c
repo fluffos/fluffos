@@ -21,7 +21,7 @@ static void add_ip_entry(struct sockaddr *, socklen_t size, char *);
 
 typedef struct addr_name_query_s {
   sockaddr *addr;
-  socklen_t size;
+  socklen_t addrlen;
   struct evdns_request *req;
 } addr_name_query_t;
 
@@ -31,13 +31,15 @@ void on_addr_name_result(int err, char type, int count,
 {
 
   auto query = (addr_name_query_t *)arg;
-  auto result = (char *)addresses;
 
   if (err) {
     debug(dns, "DNS reverse lookup fail: %s.\n", evdns_err_to_string(err));
+  } else if (count == 0) {
+    debug(dns, "DNS reverse lookup returns no result.\n");
   } else {
-    debug(dns, "Got reverse lookup result: %s\n", result);
-    add_ip_entry(query->addr, query->size, result);
+    auto result = *((char **)addresses);
+    debug(dns, "DNS reverse lookup result: %d: %s\n", type, result);
+    add_ip_entry(query->addr, query->addrlen, result);
   }
   delete query;
 }
@@ -52,16 +54,27 @@ void query_name_by_addr(object_t *ob)
   free_string(addr);
 
   query->addr = (sockaddr *)&ob->interactive->addr;
-  query->size = sizeof(ob->interactive->addr);
-#ifdef IPV6
-  query->req = evdns_base_resolve_reverse_ipv6(
-                 g_dns_base, &ob->interactive->addr.sin6_addr, 0,
-                 on_addr_name_result, query);
-#else
-  query->req = evdns_base_resolve_reverse(
-                 g_dns_base, &ob->interactive->addr.sin_addr, 0,
-                 on_addr_name_result, query);
-#endif
+  query->addrlen = ob->interactive->addrlen;
+
+  // Check for mapped v4 address, if we are querying for v6 address.
+  if (query->addr->sa_family == AF_INET6) {
+    in6_addr *addr6 = &(((sockaddr_in6 *)(query->addr))->sin6_addr);
+    if (IN6_IS_ADDR_V4MAPPED(addr6) || IN6_IS_ADDR_V4COMPAT(addr6)) {
+      in_addr *addr4 = &((in_addr *)(addr6))[3];
+      debug(dns, "Found mapped v4 address, using extracted v4 address to resolve.\n")
+      query->req = evdns_base_resolve_reverse(
+                     g_dns_base, addr4, 0,
+                     on_addr_name_result, query);
+    } else {
+      query->req = evdns_base_resolve_reverse_ipv6(
+                     g_dns_base, addr6, 0,
+                     on_addr_name_result, query);
+    }
+  } else {
+    in_addr *addr4 = &((sockaddr_in *)query->addr)->sin_addr;
+    query->req = evdns_base_resolve_reverse(
+                   g_dns_base, addr4, 0, on_addr_name_result, query);
+  }
 }
 
 struct addr_number_query {
@@ -85,7 +98,6 @@ void on_query_addr_by_name_finish(evutil_socket_t fd, short what, void *arg)
     push_undefined();
     push_undefined();
   } else {
-    debug(dns, "DNS lookup success: %d \n", query->key);
     // push the name
     copy_and_push_string(query->name);
 
@@ -96,9 +108,12 @@ void on_query_addr_by_name_finish(evutil_socket_t fd, short what, void *arg)
     if (!ret) {
       copy_and_push_string(host);
     } else {
+      debug(dns, "on_query_addr_by_name_finish: getnameinfo: %s \n", gai_strerror(ret));
       push_undefined();
     }
+    debug(dns, "DNS lookup success: id %d: %s -> %s \n", query->key, query->name, host);
   }
+
 
   // push the key
   push_number(query->key);
@@ -140,14 +155,10 @@ LPC_INT query_addr_by_name(const char *name, svalue_t *call_back)
 
   struct evutil_addrinfo hints;
   memset(&hints, 0, sizeof(hints));
-#ifdef IPV6
   hints.ai_family = AF_UNSPEC;
-#else
-  hints.ai_family = AF_INET;
-#endif
-  hints.ai_flags = EVUTIL_AI_ADDRCONFIG | EVUTIL_AI_V4MAPPED | EVUTIL_AI_ALL;
+  hints.ai_flags = 0; // EVUTIL_AI_V4MAPPED | EVUTIL_AI_ADDRCONFIG;
   hints.ai_socktype = SOCK_STREAM;
-  hints.ai_protocol = IPPROTO_TCP;
+  hints.ai_protocol = 0;
 
   auto query = new addr_number_query;
   memset(query, 0, sizeof(addr_number_query));
@@ -170,6 +181,7 @@ LPC_INT query_addr_by_name(const char *name, svalue_t *call_back)
 #define IPSIZE 200
 typedef struct {
   struct sockaddr_storage addr;
+  socklen_t addrlen;
   char *name;
 } ipentry_t;
 
@@ -199,8 +211,9 @@ const char *query_ip_name(object_t *ob)
     return NULL;
   }
   for (i = 0; i < IPSIZE; i++) {
-    if (!memcmp(&iptable[i].addr, &ob->interactive->addr,
-                sizeof(iptable[i].addr)) &&
+    if (iptable[i].addrlen == ob->interactive->addrlen &&
+        !memcmp(&iptable[i].addr, &ob->interactive->addr,
+            ob->interactive->addrlen) &&
         iptable[i].name) {
       return (iptable[i].name);
     }
@@ -213,11 +226,14 @@ static void add_ip_entry(struct sockaddr *addr, socklen_t size, char *name)
   int i;
 
   for (i = 0; i < IPSIZE; i++) {
-    if (!memcmp(&iptable[i].addr, addr, sizeof(iptable[i].addr))) {
+    if (iptable[i].addrlen == size &&
+        !memcmp(&iptable[i].addr, addr, size)) {
       return;
     }
   }
   memcpy(&iptable[ipcur].addr, addr, size);
+  iptable[ipcur].addrlen = size;
+
   if (iptable[ipcur].name) {
     free_string(iptable[ipcur].name);
   }
