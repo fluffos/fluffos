@@ -1,4 +1,7 @@
 #include "std.h"
+
+#include <string>
+
 #include "file_incl.h"
 #include "lpc_incl.h"
 #include "backend.h"
@@ -14,6 +17,9 @@
 #include "master.h"
 #include "eval.h"
 #include "posix_timers.h"
+#include "console.h"
+#include "event.h"
+#include "dns.h"
 
 port_def_t external_port[5];
 
@@ -31,11 +37,6 @@ char *reserved_area;    /* reserved for MALLOC() */
 static char *mud_lib;
 
 double consts[NUM_CONSTS];
-
-#ifndef NO_IP_DEMON
-int no_ip_demon = 0;
-void init_addr_server();
-#endif        /* NO_IP_DEMON */
 
 static void CDECL sig_fpe SIGPROT;
 static void CDECL sig_cld SIGPROT;
@@ -257,9 +258,6 @@ int main(int argc, char **argv)
         }
         fprintf(stderr, "Illegal flag syntax: %s\n", argv[i]);
         exit(-1);
-      case 'N':
-        no_ip_demon++;
-        continue;
 #ifdef HAS_CONSOLE
       case 'C':
         has_console = 1;
@@ -292,11 +290,8 @@ int main(int argc, char **argv)
   _tzset();
 #endif
 
-#ifndef NO_IP_DEMON
-  if (!no_ip_demon && ADDR_SERVER_IP) {
-    init_addr_server(ADDR_SERVER_IP, ADDR_SERVER_PORT);
-  }
-#endif        /* NO_IP_DEMON */
+  auto base = init_event_base();
+  init_dns_event_base(base);
 
   save_context(&econ);
 
@@ -352,7 +347,7 @@ int main(int argc, char **argv)
           if (argv[i][2]) {
             debug_level_set(&argv[i][2]);
           } else {
-            debug_level |= DBG_d_flag;
+            debug_level |= DBG_DEFAULT;
           }
           debug_message("Debug Level: %d\n", debug_level);
 #else
@@ -388,7 +383,17 @@ int main(int argc, char **argv)
 #endif
   preload_objects(e_flag);
 
-  backend();
+  // initialize user connection socket
+  init_user_conn();
+
+#ifdef HAS_CONSOLE
+  init_console(base);
+#endif
+
+  debug_message("Initializations complete.\n\n");
+
+  backend(base);
+
   return 0;
 }
 
@@ -421,18 +426,32 @@ void debug_message(const char *fmt, ...)
     }
   }
 
-  if (debug_message_fp != stderr) {
-    V_START(args, fmt);
-    V_VAR(char *, fmt, args);
-    vfprintf(debug_message_fp, fmt, args);
-    fflush(debug_message_fp);
-    va_end(args);
+  std::string result;
+
+  // FIXME: hack, adding a time header for message that doesn't contain "\n"
+  if (strchr(fmt, '\n') == NULL) {
+    char message[1024];
+    time_t rawtime;
+    time(&rawtime);
+    strftime(message, sizeof(message), "[%Y-%m-%d %H:%M:%S] ",
+             localtime(&rawtime));
+    result = std::string(message);
   }
+
+  char message[1024];
   V_START(args, fmt);
   V_VAR(char *, fmt, args);
-  vfprintf(stderr, fmt, args);
-  fflush(stderr);
+  vsnprintf(message, 1024, fmt, args);
   va_end(args);
+
+  result.append(message);
+
+  if (debug_message_fp != stderr) {
+    fprintf(debug_message_fp, "%s", result.c_str());
+    fflush(debug_message_fp);
+  }
+  fprintf(stderr, "%s", result.c_str());
+  fflush(stderr);
 }
 
 int slow_shut_down_to_do = 0;

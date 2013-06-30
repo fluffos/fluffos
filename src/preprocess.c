@@ -251,7 +251,7 @@ static LPC_INT cond_get_exp(int priority)
         value = -value;
         break;
       case UPLUS:
-        value = value;
+        // nothing
         break;
       default:
         yyerrorp("illegal unary operator in %cif");

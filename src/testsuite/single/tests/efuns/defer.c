@@ -5,7 +5,7 @@ void my_func(int num){
   result += ({ num });
 
   // this_player check.
-  ASSERT(this_player() == tp);
+  ASSERT_EQ(this_player(), tp);
 
   // Reverse defer: last result = max result
 #ifdef __REVERSE_DEFER__
@@ -18,7 +18,7 @@ void my_func(int num){
 
 void do_tests() {
   result = ({ });
-  tp == this_player();
+  tp = this_player();
 
   // In normal mode, second defer is executed first.
   // In reverse mode, first defer is executed first.

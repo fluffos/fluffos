@@ -454,7 +454,7 @@ char *read_file(const char *file, int start, int lines)
   const char *real_file;
 
   if (lines < 0) {
-    debug_message("read_file: trying to read negative lines: %d", lines);
+    debug(file, "read_file: trying to read negative lines: %d", lines);
     return 0;
   }
 
@@ -484,7 +484,7 @@ char *read_file(const char *file, int start, int lines)
 #endif
 
   if (f == 0) {
-    debug_message("read_file: fail to open: %s.\n", file);
+    debug(file, "read_file: fail to open: %s.\n", file);
     return 0;
   }
 
@@ -501,12 +501,12 @@ char *read_file(const char *file, int start, int lines)
 #endif
 
   if (chunk == 0) {
-    debug_message("read_file: read error: %s.\n", file);
+    debug(file, "read_file: read error: %s.\n", file);
     return 0;
   }
 
   if (memchr(theBuff, '\0', chunk)) {
-    debug_message("read_file: file contains '\\0': %s.\n", file);
+    debug(file, "read_file: file contains '\\0': %s.\n", file);
     return 0;
   }
   theBuff[chunk] = '\0';
@@ -519,7 +519,7 @@ char *read_file(const char *file, int start, int lines)
 
   // not found
   if (start > 1) {
-    debug_message("read_file: reached EOF searching for start: %s.\n", file);
+    debug(file, "read_file: reached EOF searching for start: %s.\n", file);
     return 0;
   }
 
@@ -543,7 +543,7 @@ char *read_file(const char *file, int start, int lines)
   *ptr_end = '\0';
   // result is too big.
   if (strlen(ptr_start) > READ_FILE_MAX_SIZE) {
-    debug_message("read_file: result too big: %s.\n", file);
+    debug(file, "read_file: result too big: %s.\n", file);
     return 0;
   }
 

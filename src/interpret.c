@@ -494,7 +494,7 @@ void int_free_svalue(svalue_t *v)
   } else if ((v->type & T_REFED) && !(v->type & T_FREED)) {
 #ifdef DEBUG_MACRO
     if (v->type == T_OBJECT) {
-      debug(d_flag, ("Free_svalue %s (%d) from %s\n", v->u.ob->obname, v->u.ob->ref - 1, tag));
+      debug(d_flag, "Free_svalue %s (%d) from %s\n", v->u.ob->obname, v->u.ob->ref - 1, tag);
     }
 #endif
     /* TODO: Set to 0 on condition that REF overflow to negative. */

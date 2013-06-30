@@ -17,6 +17,9 @@
 #include "eval.h"
 #include "console.h"
 
+#include "event.h"
+#include "dns.h"
+
 #ifndef ENOSR
 #define ENOSR 63
 #endif
@@ -129,21 +132,14 @@ static void sigpipe_handler(void);
 #endif
 #endif
 
-static void hname_handler(void);
-static void get_user_data(interactive_t *);
 static char *get_user_command(void);
 static char *first_cmd_in_buf(interactive_t *);
 static int cmd_in_buf(interactive_t *);
 static int call_function_interactive(interactive_t *, char *);
 static void print_prompt(interactive_t *);
-static void query_addr_name(object_t *);
-static void got_addr_number(char *, char *);
-#ifdef IPV6
-static void add_ip_entry(struct in6_addr, char *);
-#else
-static void add_ip_entry(long, char *);
-#endif
-static void new_user_handler(int);
+
+void new_user_handler(port_def_t *);
+
 static void end_compression(interactive_t *);
 static void start_compression(interactive_t *);
 static int send_compressed(interactive_t *ip, unsigned char *data, int length);
@@ -190,11 +186,6 @@ int max_users = 0;
 #ifdef HAS_CONSOLE
 int has_console = -1;
 #endif
-
-/*
- * private local variables.
- */
-static int addr_server_fd = -1;
 
 static
 void set_linemode(interactive_t *ip)
@@ -243,13 +234,6 @@ receive_snoop(const char *buf, int len, object_t *snooper)
  */
 void init_user_conn()
 {
-#ifdef IPV6
-  struct sockaddr_in6 sin;
-#else
-  struct sockaddr_in sin;
-#endif
-  memset(&sin, 0, sizeof(sin));
-  socklen_t sin_len;
   int optval;
   int i;
   int have_fd6;
@@ -257,7 +241,8 @@ void init_user_conn()
 
   /* Check for fd #6 open as a valid socket */
   optval = 1;
-  have_fd6 = (setsockopt(6, SOL_SOCKET, SO_REUSEADDR, (char *)&optval, sizeof(optval)) == 0);
+  have_fd6 = (setsockopt(6, SOL_SOCKET, SO_REUSEADDR, (char *) &optval,
+                         sizeof(optval)) == 0);
 
   for (i = 0; i < 5; i++) {
 #ifdef F_NETWORK_STATS
@@ -268,7 +253,9 @@ void init_user_conn()
 #endif
     if (!external_port[i].port) {
 #if defined(FD6_KIND) && defined(FD6_PORT)
-      if (!have_fd6) { continue; }
+      if (!have_fd6) {
+        continue;
+      }
       fd6_which = i;
       have_fd6 = 0;
       if (FD6_KIND == PORT_UNDEFINED || FD6_PORT < 1) {
@@ -285,14 +272,40 @@ void init_user_conn()
 #endif
     } else {
       /*
+       * fill in socket address information.
+       */
+      struct addrinfo *res;
+
+      char service[NI_MAXSERV];
+      snprintf(service, sizeof(service), "%u", external_port[i].port);
+
+      struct addrinfo hints;
+      memset(&hints, 0, sizeof(struct addrinfo));
+#ifdef IPV6
+      hints.ai_family = AF_UNSPEC; /* Allow IPv6 and IPv4 */
+#else
+      hints.ai_family = AF_INET; /* Allow IPv4 */
+#endif
+      hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
+      hints.ai_flags = AI_PASSIVE | AI_NUMERICHOST | AI_NUMERICSERV;
+
+      int ret;
+      if (MUD_IP[0]) {
+        ret = getaddrinfo(MUD_IP, service, &hints, &res);
+      } else {
+        ret = getaddrinfo(NULL, service, &hints, &res);
+      }
+
+      if (ret) {
+        debug_message("Error listening, getaddrinfo: %s \n", gai_strerror(ret));
+        exit(3);
+      }
+
+      /*
        * create socket of proper type.
        */
-      int sockflags = SOCK_STREAM;
-#ifdef IPV6
-      if ((external_port[i].fd = socket(PF_INET6, sockflags, 0)) == -1) {
-#else
-      if ((external_port[i].fd = socket(PF_INET, sockflags, 0)) == -1) {
-#endif
+      if ((external_port[i].fd = socket(res->ai_family, res->ai_socktype,
+                                        res->ai_protocol)) == -1) {
         debug_perror("init_user_conn: socket", 0);
         exit(1);
       }
@@ -306,50 +319,23 @@ void init_user_conn()
         socket_perror("init_user_conn: setsockopt", 0);
         exit(2);
       }
+
 #ifdef FD_CLOEXEC
       fcntl(external_port[i].fd, F_SETFD, FD_CLOEXEC);
-#endif
-      /*
-       * fill in socket address information.
-       */
-#ifdef IPV6
-      sin.sin6_family = AF_INET6;
-      if (MUD_IP[0]) {
-        inet_pton(AF_INET6, MUD_IP, &(sin.sin6_addr));
-      } else {
-        sin.sin6_addr = in6addr_any;
-      }
-      sin.sin6_port = htons((u_short) external_port[i].port);
-#else
-      sin.sin_family = AF_INET;
-      if (MUD_IP[0]) {
-        sin.sin_addr.s_addr = inet_addr(MUD_IP);
-      } else {
-        sin.sin_addr.s_addr = INADDR_ANY;
-      }
-      sin.sin_port = htons((u_short) external_port[i].port);
 #endif
 
       /*
        * bind name to socket.
        */
-      if (bind(external_port[i].fd, (struct sockaddr *) & sin,
-               sizeof(sin)) == -1) {
+      if (bind(external_port[i].fd, res->ai_addr, res->ai_addrlen) == -1) {
         socket_perror("init_user_conn: bind", 0);
         exit(3);
       }
+
+      // cleanup
+      freeaddrinfo(res);
     }
-    /*
-     * get socket name.
-     */
-    sin_len = sizeof(sin);
-    if (getsockname(external_port[i].fd, (struct sockaddr *) & sin,
-                    &sin_len) == -1) {
-      socket_perror("init_user_conn: getsockname", 0);
-      if (i != fd6_which) {
-        exit(4);
-      }
-    }
+
     /*
      * set socket non-blocking,
      */
@@ -362,12 +348,15 @@ void init_user_conn()
     /*
      * listen on socket for connections.
      */
+    debug_message("Accepting connections on port %d.\n", external_port[i].port);
     if (listen(external_port[i].fd, 128) == -1) {
       socket_perror("init_user_conn: listen", 0);
       if (i != fd6_which) {
         exit(10);
       }
     }
+    // Listen on connetion event
+    new_external_port_event_listener(&external_port[i]);
   }
   if (have_fd6) {
     debug_message("No more ports available; fd #6 ignored.\n");
@@ -393,141 +382,19 @@ void init_user_conn()
 /*
  * Shut down new user accept file descriptor.
  */
-void ipc_remove()
+void shutdown_external_ports()
 {
   int i;
 
   for (i = 0; i < 5; i++) {
     if (!external_port[i].port) { continue; }
+    if(external_port[i].ev_read) event_free(external_port[i].ev_read);
     if (OS_socket_close(external_port[i].fd) == -1) {
       socket_perror("ipc_remove: close", 0);
     }
   }
 
   debug_message("closed external ports\n");
-}
-
-void init_addr_server(char *hostname, int addr_server_port)
-{
-#ifdef WIN32
-  WORD wVersionRequested = MAKEWORD(1, 1);
-  WSADATA wsaData;
-  WSAStartup(wVersionRequested, &wsaData);
-#endif
-#ifdef IPV6
-  struct sockaddr_in6 server;
-#else
-  struct sockaddr_in server;
-#endif
-#ifndef IPV6
-  struct hostent *hp;
-  int addr;
-#endif
-  int server_fd;
-  int optval;
-
-  if (addr_server_fd >= 0) {
-    return;
-  }
-
-  if (!hostname) { return; }
-#ifdef IPV6
-  /*
-   * get network host data for hostname.
-   */
-  struct addrinfo hints, *res;
-  hints.ai_family = AF_INET6;
-  hints.ai_socktype = 0;
-  hints.ai_protocol = 0;
-#ifndef AI_V4MAPPED
-  hints.ai_flags = AI_CANONNAME;
-#else
-  hints.ai_flags = AI_CANONNAME | AI_V4MAPPED;
-#endif
-
-  if (getaddrinfo(hostname, "1234", &hints, &res)) {
-    //failed
-    socket_perror("init_addr_server: getaddrinfo", 0);
-    return;
-  }
-
-  memcpy(&server, res->ai_addr, sizeof(server));
-  freeaddrinfo(res);
-  server.sin6_port = htons((u_short) addr_server_port);
-  //inet_pton(AF_INET6, hostname, &(server.sin6_addr));
-  //memcpy((char *) &server.sin6_addr, (char *) hp->h_addr, hp->h_length);
-  /*
-   * create socket of proper type.
-   */
-  server_fd = socket(AF_INET6, SOCK_STREAM, 0);
-#else
-  /*
-   * get network host data for hostname.
-   */
-  if (hostname[0] >= '0' && hostname[0] <= '9' &&
-      (addr = inet_addr(hostname)) != -1) {
-    hp = gethostbyaddr((char *)&addr, sizeof(addr), AF_INET);
-  } else {
-    hp = gethostbyname(hostname);
-  }
-  if (hp == NULL) {
-    socket_perror("init_addr_server: gethostbyname", 0);
-    return;
-  }
-
-  /*
-   * set up address information for server.
-   */
-  server.sin_family = AF_INET;
-  server.sin_port = htons((u_short) addr_server_port);
-  server.sin_addr.s_addr = inet_addr(hostname);
-  memcpy((char *) &server.sin_addr, (char *) hp->h_addr, hp->h_length);
-  /*
-   * create socket of proper type.
-   */
-  server_fd = socket(AF_INET, SOCK_STREAM, 0);
-#endif
-  if (server_fd == INVALID_SOCKET) {  /* problem opening socket */
-    socket_perror("init_addr_server: socket", 0);
-    return;
-  }
-  /*
-   * enable local address reuse.
-   */
-  optval = 1;
-  if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, (char *) &optval,
-                 sizeof(optval)) == -1) {
-    socket_perror("init_addr_server: setsockopt", 0);
-    return;
-  }
-  /*
-   * connect socket to server address.
-   */
-  if (connect(server_fd, (struct sockaddr *) & server, sizeof(server)) == -1) {
-    if (ADDRFAIL_NOTIFY) {
-      if (socket_errno == ECONNREFUSED && ADDRFAIL_NOTIFY)
-        debug_message("Connection to address server (%s %d) refused.\n",
-                      hostname, addr_server_port);
-      else {
-        socket_perror("init_addr_server: connect", 0);
-      }
-    }
-    OS_socket_close(server_fd);
-    return;
-  }
-  addr_server_fd = server_fd;
-  debug_message("Connected to address server on %s port %d\n", hostname,
-                addr_server_port);
-  /*
-   * set socket non-blocking.
-   */
-  if (set_socket_nonblocking(server_fd, 1) == -1) {
-    socket_perror("init_addr_server: set_socket_nonblocking 1", 0);
-    return;
-  }
-#ifdef WIN32
-  WSACleanup();
-#endif
 }
 
 /*
@@ -791,7 +658,7 @@ int flush_message(interactive_t *ip)
    */
   if (!ip || !ip->ob || !IP_VALID(ip, ip->ob) ||
       (ip->ob->flags & O_DESTRUCTED) || (ip->iflags & (NET_DEAD | CLOSING))) {
-    //debug(connections, ("flush_message: invalid target!\n"));
+    debug(connections, ("flush_message: invalid target!\n"));
     return 0;
   }
   /*
@@ -803,9 +670,6 @@ int flush_message(interactive_t *ip)
     } else {
       length = MESSAGE_BUF_SIZE - ip->message_consumer;
     }
-    /* Need to use send to get out of band data
-    num_bytes = write(ip->fd,ip->message_buf + ip->message_consumer,length);
-     */
 #ifdef HAVE_ZLIB
     if (ip->compressed_stream) {
       num_bytes = send_compressed(ip, (unsigned char *)ip->message_buf +
@@ -848,17 +712,17 @@ int flush_message(interactive_t *ip)
     if (num_bytes == -1) {
 #ifdef EWOULDBLOCK
       if (socket_errno == EWOULDBLOCK) {
-        //debug(connections, ("flush_message: write: Operation would block\n"));
+        debug(connections, ("flush_message: write: Operation would block\n"));
         return 1;
 #else
       if (0) {
         ;
 #endif
       } else if (socket_errno == EINTR) {
-        //debug(connections, ("flush_message: write: Interrupted system call"));
+        debug(connections, ("flush_message: write: Interrupted system call"));
         return 1;
       } else {
-        //socket_perror("flush_message: write", 0);
+        socket_perror("flush_message: write", 0);
         ip->iflags |= NET_DEAD;
         return 0;
       }
@@ -1443,11 +1307,14 @@ static void copy_chars(interactive_t *ip, char *from, int num_bytes)
  * Read pending data for a user into user->interactive->text.
  * This also does telnet negotiation.
  */
-static void get_user_data(interactive_t *ip)
+void get_user_data(interactive_t *ip)
 {
   int  num_bytes, text_space;
   char buf[MAX_TEXT];
   int ws_space;
+
+  debug(connections, "get_user_data: USER %d\n", ip->fd);
+
   /* compute how much data we can read right now */
   switch (ip->connection_type) {
     case PORT_WEBSOCKET:
@@ -1467,6 +1334,7 @@ static void get_user_data(interactive_t *ip)
       if (ip->ws_size && ws_space > ip->ws_size) {
         ws_space = ip->ws_size;    //keep the next packet in the socket
       }
+      break;
     case PORT_TELNET:
       text_space = MAX_TEXT - ip->text_end;
 
@@ -1479,10 +1347,6 @@ static void get_user_data(interactive_t *ip)
           ip->text_start = 0;
         }
       }
-      if (ip->connection_type == PORT_WEBSOCKET) {
-        text_space = MIN(text_space, ws_space);
-      }
-
       break;
 
     case PORT_MUD:
@@ -1499,11 +1363,11 @@ static void get_user_data(interactive_t *ip)
   }
 
   /* read the data from the socket */
-  //debug(connections, ("get_user_data: read on fd %d\n", ip->fd));
+  debug(connections, "get_user_data: read on fd %d\n", ip->fd);
   num_bytes = OS_socket_read(ip->fd, buf, text_space);
 
   if (!num_bytes) {
-    //if (ip->iflags & CLOSING)
+    // if (ip->iflags & CLOSING)
     //    debug_message("get_user_data: tried to read from closing fd.\n");
     ip->iflags |= NET_DEAD;
     remove_interactive(ip->ob, 0);
@@ -1513,12 +1377,12 @@ static void get_user_data(interactive_t *ip)
   if (num_bytes == -1) {
 #ifdef EWOULDBLOCK
     if (socket_errno == EWOULDBLOCK) {
-      //        debug(connections, ("get_user_data: read on fd %d: Operation would block.\n", ip->fd));
+      debug(connections, "get_user_data: read on fd %d: Operation would block.\n", ip->fd);
       return;
     }
 #endif
-    //      debug_message("get_user_data: read on fd %d\n", ip->fd);
-    //      socket_perror("get_user_data: read", 0);
+    debug_message("get_user_data: read on fd %d\n", ip->fd);
+    socket_perror("get_user_data: read", 0);
     ip->iflags |= NET_DEAD;
     remove_interactive(ip->ob, 0);
     return;
@@ -1605,8 +1469,8 @@ static void get_user_data(interactive_t *ip)
         str[num_bytes] = 0;
         push_malloced_string(str);
         if (current_interactive) {
-          printf("eek! someone already here\n");
-          exit(1);
+          fatal("eek! someone already here\n");
+          return;
         }
         object_t *ob = ip->ob;
         set_command_giver(ob);
@@ -1617,6 +1481,7 @@ static void get_user_data(interactive_t *ip)
 
         break; //they're not allowed to send the other stuff until we replied, so all data should be handshake stuff
       }
+      break;
     case PORT_TELNET:
       copy_chars(ip, buf, num_bytes);
       if (cmd_in_buf(ip)) {
@@ -1823,194 +1688,25 @@ static void sigpipe_handler(void)
 }                               /* sigpipe_handler() */
 #endif
 
-int max_fd;
-
-void make_selectmasks()
-{
-  int i;
-  max_fd = addr_server_fd;
-  /*
-   * generate readmask and writemask for select() call.
-   */
-  FD_ZERO(&readmask);
-  FD_ZERO(&writemask);
-#ifdef HAS_CONSOLE
-  /* set up a console */
-  if (has_console > 0) {
-    FD_SET(STDIN_FILENO, &readmask);
-  }
-#endif
-  /*
-   * set new user accept fd in readmask.
-   */
-  for (i = 0; i < 5; i++) {
-    if (!external_port[i].port) { continue; }
-    FD_SET(external_port[i].fd, &readmask);
-    if (external_port[i].fd > max_fd) {
-      max_fd = external_port[i].fd;
-    }
-  }
-  /*
-   * set user fds in readmask.
-   */
-  for (i = 0; i < max_users; i++) {
-    if (!all_users[i] || (all_users[i]->iflags & (CLOSING | CMD_IN_BUF))) {
-      continue;
-    }
-    /*
-     * if this user needs more input to make a complete command, set his
-     * fd so we can get it.
-     */
-    FD_SET(all_users[i]->fd, &readmask);
-    if (all_users[i]->fd > max_fd) {
-      max_fd = all_users[i]->fd;
-    }
-    if (all_users[i]->message_length != 0) {
-      FD_SET(all_users[i]->fd, &writemask);
-    }
-  }
-  /*
-   * if addr_server_fd is set, set its fd in readmask.
-   */
-  if (addr_server_fd >= 0) {
-    FD_SET(addr_server_fd, &readmask);
-
-  }
-#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
-  /*
-   * set fd's for efun sockets.
-   */
-  for (i = 0; i < max_lpc_socks; i++) {
-    if (lpc_socks[i].state != STATE_CLOSED) {
-      if (lpc_socks[i].state != STATE_FLUSHING &&
-          (lpc_socks[i].flags & S_WACCEPT) == 0) {
-        FD_SET(lpc_socks[i].fd, &readmask);
-        if (lpc_socks[i].fd > max_fd) {
-          max_fd = lpc_socks[i].fd;
-        }
-      }
-      if (lpc_socks[i].flags & S_BLOCKED) {
-        FD_SET(lpc_socks[i].fd, &writemask);
-        if (lpc_socks[i].fd > max_fd) {
-          max_fd = lpc_socks[i].fd;
-        }
-      }
-    }
-  }
-#endif
-}                               /* make_selectmasks() */
-
-/*
- * Process I/O.
- */
-void process_io()
-{
-  int i;
-
-  /*
-   * check for new user connection.
-   */
-  for (i = 0; i < 5; i++) {
-    if (!external_port[i].port) { continue; }
-    if (FD_ISSET(external_port[i].fd, &readmask)) {
-      debug(connections, ("process_io: NEW_USER\n"));
-      new_user_handler(i);
-    }
-  }
-  /*
-   * check for data pending on user connections.
-   */
-  for (i = 0; i < max_users; i++) {
-    if (!all_users[i] || (all_users[i]->iflags & (CLOSING | CMD_IN_BUF))) {
-      continue;
-    }
-    if (all_users[i]->iflags & NET_DEAD) {
-      remove_interactive(all_users[i]->ob, 0);
-      continue;
-    }
-    if (FD_ISSET(all_users[i]->fd, &readmask)) {
-      debug(connections, ("process_io: USER %d\n", i));
-      get_user_data(all_users[i]);
-      if (!all_users[i]) {
-        continue;
-      }
-    }
-    if (FD_ISSET(all_users[i]->fd, &writemask)) {
-      flush_message(all_users[i]);
-    }
-  }
-#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
-  /*
-   * check for data pending on efun socket connections.
-   */
-  for (i = 0; i < max_lpc_socks; i++) {
-    if (lpc_socks[i].state != STATE_CLOSED)
-      if (FD_ISSET(lpc_socks[i].fd, &readmask)) {
-        socket_read_select_handler(i);
-      }
-    if (lpc_socks[i].state != STATE_CLOSED)
-      if (FD_ISSET(lpc_socks[i].fd, &writemask)) {
-        socket_write_select_handler(i);
-      }
-  }
-#endif
-  /*
-   * check for data pending from address server.
-   */
-  if (addr_server_fd >= 0) {
-    if (FD_ISSET(addr_server_fd, &readmask)) {
-      debug(connections, ("process_io: IP_DAEMON\n"));
-      hname_handler();
-    }
-  }
-#ifdef HAS_CONSOLE
-  /* Process console input */
-  /* Note: need the has_console on the next line because linux (at least)
-           recycles fds, even STDIN_FILENO
-   */
-  if ((has_console > 0) && FD_ISSET(STDIN_FILENO, &readmask)) {
-    char s[1024];
-    int sz;
-
-    if ((sz = read(STDIN_FILENO, s, 1023)) > 0) {
-      s[sz - 1] = '\0';
-      console_command(s);
-    } else if (sz == 0) {
-      printf("Console exiting.  The MUD remains.\n");
-      has_console = 0;
-    } else {
-      printf("Console read error: %d %d.  Closing console.\n", sz, errno);
-      has_console = 0;
-      restore_sigttin();
-    }
-  }
-#endif
-
-}
-
 /*
  * This is the new user connection handler. This function is called by the
  * event handler when data is pending on the listening socket (new_user_fd).
  * If space is available, an interactive data structure is initialized and
  * the user is connected.
  */
-static void new_user_handler(int which)
+void new_user_handler(port_def_t *port)
 {
   int new_socket_fd;
-#ifdef IPV6
-  struct sockaddr_in6 addr;
-#else
-  struct sockaddr_in addr;
-#endif
+  struct sockaddr_storage addr;
   socklen_t length;
   int i, x;
   object_t *master, *ob;
   svalue_t *ret;
 
+  debug(connections, "new_user_handler: accept on fd %d\n", port->fd);
+
   length = sizeof(addr);
-  debug(connections, ("new_user_handler: accept on fd %d\n", external_port[which].fd));
-  new_socket_fd = accept(external_port[which].fd,
-                         (struct sockaddr *) & addr, &length);
+  new_socket_fd = accept(port->fd, (struct sockaddr *) &addr, &length);
   if (new_socket_fd < 0) {
 #ifdef EWOULDBLOCK
     if (socket_errno == EWOULDBLOCK) {
@@ -2043,6 +1739,7 @@ static void new_user_handler(int which)
     /* it's ok if this fails */
   }
 #endif
+
   /* find the first available slot */
   for (i = 0; i < max_users; i++)
     if (!all_users[i]) { break; }
@@ -2068,7 +1765,7 @@ static void new_user_handler(int which)
 #ifndef NO_ADD_ACTION
   master_ob->interactive->default_err_message.s = 0;
 #endif
-  master_ob->interactive->connection_type = external_port[which].kind;
+  master_ob->interactive->connection_type = port->kind;
   master_ob->interactive->sb_buf = (unsigned char *)DMALLOC(SB_SIZE,
                                    TAG_PERMANENT, "new_user_handler");
   master_ob->interactive->sb_size = SB_SIZE;
@@ -2124,21 +1821,24 @@ static void new_user_handler(int which)
   all_users[i] = master_ob->interactive;
   all_users[i]->fd = new_socket_fd;
 #ifdef F_QUERY_IP_PORT
-  all_users[i]->local_port = external_port[which].port;
+  all_users[i]->local_port = port->port;
 #endif
 #ifdef F_NETWORK_STATS
-  all_users[i]->external_port = which;
+  all_users[i]->external_port = (port - external_port); // FIXME: pointer arith
 #endif
+
+  new_user_event_listener(all_users[i]);
+
+  // all_users[i] setup finishes
   set_prompt("> ");
 
-  memcpy((char *) &all_users[i]->addr, (char *) &addr, length);
-#ifdef IPV6
-  char tmp[INET6_ADDRSTRLEN];
-  debug(connections, ("New connection from %s.\n", inet_ntop(AF_INET6, &addr.sin6_addr, tmp, INET6_ADDRSTRLEN)));
-#else
-  debug(connections, ("New connection from %s.\n", inet_ntoa(addr.sin_addr)));
-#endif
+  memcpy((char *) &all_users[i]->addr, (char *)&addr, length);
+
+  char host[NI_MAXHOST];
+  getnameinfo((sockaddr *)&addr, length, host, sizeof(host), NULL, 0 , NI_NUMERICHOST);
+  debug(connections, "New connection from %s.\n", host);
   num_user++;
+
   /*
    * The user object has one extra reference. It is asserted that the
    * master_ob is loaded.  Save a pointer to the master ob incase it
@@ -2147,7 +1847,7 @@ static void new_user_handler(int which)
    */
   master = master_ob;
   add_ref(master_ob, "new_user");
-  push_number(external_port[which].port);
+  push_number(port->port);
   ret = apply_master_ob(APPLY_CONNECT, 1);
   /* master_ob->interactive can be zero if the master object self
      destructed in the above (don't ask) */
@@ -2157,11 +1857,7 @@ static void new_user_handler(int which)
     if (master_ob->interactive) {
       remove_interactive(master_ob, 0);
     }
-#ifdef IPV6
-    debug_message("Can not accept connection from %s due to error in connect().\n", inet_ntop(AF_INET6, &addr.sin6_addr, tmp, INET6_ADDRSTRLEN));
-#else
-    debug_message("Can not accept connection from %s due to error in connect().\n");
-#endif
+    debug_message("Can not accept connection from %s due to error in connect().\n", host);
     return;
   }
   /*
@@ -2189,11 +1885,9 @@ static void new_user_handler(int which)
   master_ob->interactive = 0;
   add_ref(ob, "new_user");
   set_command_giver(ob);
-  if (addr_server_fd >= 0) {
-    query_addr_name(ob);
-  }
+  query_name_by_addr(ob);
 
-  if (external_port[which].kind == PORT_TELNET) {
+  if (port->kind == PORT_TELNET) {
     /* Ask permission to ask them for their terminal type */
     add_binary_message(ob, telnet_do_ttype, sizeof(telnet_do_ttype));
     /* Ask them for their window size */
@@ -2237,7 +1931,7 @@ static char *get_user_command()
     ip = all_users[NextCmdGiver++];
     NextCmdGiver %= max_users;
 
-    if (!ip || !ip->ob || ip->ob->flags & O_DESTRUCTED) {
+    if (!ip || !ip->ob || (ip->ob->flags & O_DESTRUCTED)) {
       continue;
     }
 
@@ -2263,7 +1957,7 @@ static char *get_user_command()
   }
 
   /* got a command - return it and set command_giver */
-  debug(connections, ("get_user_command: user_command = (%s)\n", user_command));
+  debug(connections, "get_user_command: user_command = (%s)\n", user_command);
   save_command_giver(ip->ob);
 
 #ifndef GET_CHAR_IS_BUFFERED
@@ -2360,7 +2054,7 @@ int process_user_command()
   current_interactive = command_giver;    /* this is yuck phooey, sigh */
   if (ip) { clear_notify(ip->ob); }
   update_load_av();
-  debug(connections, ("process_user_command: command_giver = /%s\n", command_giver->obname));
+  debug(connections, "process_user_command: command_giver = /%s\n", command_giver->obname);
 
   if (!ip) {
     goto exit;
@@ -2368,7 +2062,7 @@ int process_user_command()
 
   user_command = translate_easy(ip->trans->incoming, user_command);
 
-  if (ip->iflags & USING_MXP && user_command[0] == ' ' && user_command[1] == '[' && user_command[3] == 'z') {
+  if ((ip->iflags & USING_MXP) && user_command[0] == ' ' && user_command[1] == '[' && user_command[3] == 'z') {
     svalue_t *ret;
     copy_and_push_string(user_command);
 
@@ -2432,85 +2126,6 @@ exit:
   return 1;
 }
 
-#define HNAME_BUF_SIZE 200
-/*
- * This is the hname input data handler. This function is called by the
- * master handler when data is pending on the hname socket (addr_server_fd).
- */
-
-static void hname_handler()
-{
-  static char hname_buf[HNAME_BUF_SIZE];
-  static int hname_buf_pos;
-  int num_bytes;
-
-  num_bytes = HNAME_BUF_SIZE - hname_buf_pos - 1; /* room for nul */
-  num_bytes = OS_socket_read(addr_server_fd, hname_buf + hname_buf_pos, num_bytes);
-  if (num_bytes <= 0) {
-    if (num_bytes == -1) {
-#ifdef EWOULDBLOCK
-      if (socket_errno == EWOULDBLOCK) {
-        debug(connections, ("hname_handler: read on fd %d: Operation would block.\n",
-                            addr_server_fd));
-        return;
-      }
-#endif
-      debug_message("hname_handler: read on fd %d\n", addr_server_fd);
-      socket_perror("hname_handler: read", 0);
-    } else {
-      debug_message("hname_handler: closing address server connection.\n");
-    }
-    OS_socket_close(addr_server_fd);
-    addr_server_fd = -1;
-    return;
-  }
-
-  hname_buf_pos += num_bytes;
-  hname_buf[hname_buf_pos] = 0;
-  debug(connections, ("hname_handler: address server replies: %s", hname_buf));
-
-  while (hname_buf_pos) {
-    char *nl, *pp;
-
-    /* if there's no newline, there's more data to come */
-    if (!(nl = strchr(hname_buf, '\n'))) {
-      break;
-    }
-    *nl++ = 0;
-
-    if ((pp = strchr(hname_buf, ' ')) != 0) {
-      *pp++ = 0;
-      got_addr_number(pp, hname_buf);
-
-      if (isdigit(hname_buf[0]) || hname_buf[0] == ':') {
-
-#ifdef IPV6
-        struct in6_addr addr;
-        int ret;
-        if (1 == (ret = inet_pton(AF_INET6, hname_buf, &addr))) {
-          if (strcmp(pp, "0") != 0) {
-            add_ip_entry(addr, pp);
-          }
-        }
-#else
-        unsigned long laddr;
-
-        if ((laddr = inet_addr(hname_buf)) != INADDR_NONE) {
-          if (strcmp(pp, "0") != 0) {
-            add_ip_entry(laddr, pp);
-          }
-        }
-#endif
-      }
-    }
-
-    hname_buf_pos -= (nl - hname_buf);
-    if (hname_buf_pos) {
-      memmove(hname_buf, nl, hname_buf_pos + 1);    /* be sure to get the nul */
-    }
-  }
-}
-
 /*
  * Remove an interactive user immediately.
  */
@@ -2535,9 +2150,9 @@ void remove_interactive(object_t *ob, int dested)
   }
 #ifdef IPV6
   char tmp[INET6_ADDRSTRLEN];
-  debug(connections, ("Closing connection from %s.\n", inet_ntop(AF_INET6, &ip->addr.sin6_addr, tmp, INET6_ADDRSTRLEN)));
+  debug(connections, "Closing connection from %s.\n", inet_ntop(AF_INET6, &ip->addr.sin6_addr, tmp, INET6_ADDRSTRLEN));
 #else
-  debug(connections, ("Closing connection from %s.\n", inet_ntoa(ip->addr.sin_addr)));
+  debug(connections, "Closing connection from %s.\n", inet_ntoa(ip->addr.sin_addr));
 #endif
   flush_message(ip);
   ip->iflags |= CLOSING;
@@ -2575,7 +2190,7 @@ void remove_interactive(object_t *ob, int dested)
   }
 #endif
 
-  debug(connections, ("remove_interactive: closing fd %d\n", ip->fd));
+  debug(connections, "remove_interactive: closing fd %d\n", ip->fd);
   if (OS_socket_close(ip->fd) == -1) {
     socket_perror("remove_interactive: close", 0);
   }
@@ -2601,6 +2216,11 @@ void remove_interactive(object_t *ob, int dested)
   for (idx = 0; idx < max_users; idx++)
     if (all_users[idx] == ip) { break; }
   DEBUG_CHECK(idx == max_users, "remove_interactive: could not find and remove user!\n");
+
+  // Cleanup events
+  event_free(ip->ev_read);
+  event_free(ip->ev_write);
+
   FREE(ip->sb_buf);
   FREE(ip);
   ob->interactive = 0;
@@ -2899,284 +2519,6 @@ int new_set_snoop(object_t *by, object_t *victim)
   return 1;
 }                               /* set_new_snoop() */
 #endif
-
-static void query_addr_name(object_t *ob)
-{
-  static char buf[100];
-  static char *dbuf = &buf[sizeof(int) + sizeof(int) + sizeof(int)];
-  int msglen;
-  int msgtype;
-
-  sprintf(dbuf, "%s", query_ip_number(ob));
-  msglen = sizeof(int) + strlen(dbuf) + 1;
-
-  msgtype = DATALEN;
-  memcpy(buf, (char *) &msgtype, sizeof(msgtype));
-  memcpy(&buf[sizeof(int)], (char *) &msglen, sizeof(msglen));
-
-  msgtype = NAMEBYIP;
-  memcpy(&buf[sizeof(int) + sizeof(int)], (char *) &msgtype, sizeof(msgtype));
-  debug(connections, ("query_addr_name: sent address server %s\n", dbuf));
-
-  if (OS_socket_write(addr_server_fd, buf, msglen + sizeof(int) + sizeof(int)) == -1) {
-    switch (socket_errno) {
-      case EBADF:
-        debug_message("Address server has closed connection.\n");
-        addr_server_fd = -1;
-        break;
-      default:
-        socket_perror("query_addr_name: write", 0);
-        break;
-    }
-  }
-}                               /* query_addr_name() */
-
-#define IPSIZE 200
-typedef struct {
-  char *name;
-  svalue_t call_back;
-  object_t *ob_to_call;
-} ipnumberentry_t;
-
-static ipnumberentry_t ipnumbertable[IPSIZE];
-
-/*
- * Does a call back on the current_object with the function call_back.
- */
-int query_addr_number(const char *name, svalue_t *call_back)
-{
-  static char buf[100];
-  static char *dbuf = &buf[sizeof(int) + sizeof(int) + sizeof(int)];
-  int msglen;
-  int msgtype;
-  int i;
-
-  if ((addr_server_fd < 0) || (strlen(name) >=
-                               100 - (sizeof(msgtype) + sizeof(msglen) + sizeof(int)))) {
-    share_and_push_string(name);
-    push_undefined();
-    if (call_back->type == T_STRING) {
-      apply(call_back->u.string, current_object, 2, ORIGIN_INTERNAL);
-    } else {
-      call_function_pointer(call_back->u.fp, 2);
-    }
-    return 0;
-  }
-  strcpy(dbuf, name);
-  msglen = sizeof(int) + strlen(name) + 1;
-
-  msgtype = DATALEN;
-  memcpy(buf, (char *) &msgtype, sizeof(msgtype));
-  memcpy(&buf[sizeof(int)], (char *) &msglen, sizeof(msglen));
-
-  msgtype = NAMEBYIP;
-  for (i = 0; i < strlen(name); i++) {
-    if (isalpha(name[i])) {
-      msgtype = IPBYNAME;
-      break;
-    }
-  }
-
-  memcpy(&buf[sizeof(int) + sizeof(int)], (char *) &msgtype, sizeof(msgtype));
-
-  debug(connections, ("query_addr_number: sent address server %s\n", dbuf));
-
-  if (addr_server_fd && OS_socket_write(addr_server_fd, buf, msglen + sizeof(int) + sizeof(int)) == -1) {
-    switch (socket_errno) {
-      case EBADF:
-        debug_message("Address server has closed connection.\n");
-        addr_server_fd = -1;
-        break;
-      default:
-        socket_perror("query_addr_name: write", 0);
-        break;
-    }
-    share_and_push_string(name);
-    push_undefined();
-    if (call_back->type == T_STRING) {
-      apply(call_back->u.string, current_object, 2, ORIGIN_INTERNAL);
-    } else {
-      call_function_pointer(call_back->u.fp, 2);
-    }
-    return 0;
-  } else {
-    int i;
-
-    /* We put ourselves into the pending name lookup entry table */
-    /* Find the first free entry */
-    for (i = 0; i < IPSIZE && ipnumbertable[i].name; i++) {
-      ;
-    }
-    if (i == IPSIZE) {
-      /* We need to error...  */
-      share_and_push_string(name);
-      push_undefined();
-      if (call_back->type == T_STRING) {
-        apply(call_back->u.string, current_object, 2, ORIGIN_INTERNAL);
-      } else {
-        call_function_pointer(call_back->u.fp, 2);
-      }
-      return 0;
-    }
-    /* Create our entry... */
-    ipnumbertable[i].name = make_shared_string(name);
-    assign_svalue_no_free(&ipnumbertable[i].call_back, call_back);
-    ipnumbertable[i].ob_to_call = current_object;
-    add_ref(current_object, "query_addr_number: ");
-    return i + 1;
-  }
-}                               /* query_addr_number() */
-
-static void got_addr_number(char *number, char *name)
-{
-  int i;
-  char *theName, *theNumber;
-
-  /* First remove all the dested ones... */
-  for (i = 0; i < IPSIZE; i++)
-    if (ipnumbertable[i].name
-        && ipnumbertable[i].ob_to_call->flags & O_DESTRUCTED) {
-      free_svalue(&ipnumbertable[i].call_back, "got_addr_number");
-      free_string(ipnumbertable[i].name);
-      free_object(&ipnumbertable[i].ob_to_call, "got_addr_number: ");
-      ipnumbertable[i].name = NULL;
-    }
-  for (i = 0; i < IPSIZE; i++) {
-    if (ipnumbertable[i].name && strcmp(name, ipnumbertable[i].name) == 0) {
-      /* Found one, do the call back... */
-      theName = ipnumbertable[i].name;
-      theNumber = number;
-
-      if (uisdigit(theName[0])) {
-        char *tmp;
-
-        tmp = theName;
-        theName = theNumber;
-        theNumber = tmp;
-      }
-      if (strcmp(theName, "0")) {
-        share_and_push_string(theName);
-      } else {
-        push_undefined();
-      }
-      if (strcmp(theNumber, "0")) {
-        share_and_push_string(theNumber);
-      } else {
-        push_undefined();
-      }
-      push_number(i + 1);
-      if (ipnumbertable[i].call_back.type == T_STRING)
-        safe_apply(ipnumbertable[i].call_back.u.string,
-                   ipnumbertable[i].ob_to_call,
-                   3, ORIGIN_INTERNAL);
-      else {
-        safe_call_function_pointer(ipnumbertable[i].call_back.u.fp, 3);
-      }
-      free_svalue(&ipnumbertable[i].call_back, "got_addr_number");
-      free_string(ipnumbertable[i].name);
-      free_object(&ipnumbertable[i].ob_to_call, "got_addr_number: ");
-      ipnumbertable[i].name = NULL;
-    }
-  }
-}                               /* got_addr_number() */
-
-#undef IPSIZE
-#define IPSIZE 200
-typedef struct {
-#ifdef IPV6
-  struct in6_addr addr;
-#else
-  long addr;
-#endif
-  char *name;
-} ipentry_t;
-
-static ipentry_t iptable[IPSIZE];
-static int ipcur;
-
-#ifdef DEBUGMALLOC_EXTENSIONS
-void mark_iptable()
-{
-  int i;
-
-  for (i = 0; i < IPSIZE; i++)
-    if (iptable[i].name) {
-      EXTRA_REF(BLOCK(iptable[i].name))++;
-    }
-}
-#endif
-
-#ifdef IPV6
-char ipv6addr[INET6_ADDRSTRLEN];
-#endif
-
-char *query_ip_name(object_t *ob)
-{
-  int i;
-
-  if (ob == 0) {
-    ob = command_giver;
-  }
-  if (!ob || ob->interactive == 0) {
-    return NULL;
-  }
-#ifdef IPV6
-  for (i = 0; i < IPSIZE; i++) {
-    if (!memcmp(&iptable[i].addr, &ob->interactive->addr.sin6_addr, sizeof(ob->interactive->addr.sin6_addr)) &&
-        iptable[i].name) {
-      return (iptable[i].name);
-    }
-  }
-
-  inet_ntop(AF_INET6, &ob->interactive->addr.sin6_addr, ipv6addr, INET6_ADDRSTRLEN);
-  return ipv6addr;
-#else
-  for (i = 0; i < IPSIZE; i++) {
-    if (iptable[i].addr == ob->interactive->addr.sin_addr.s_addr &&
-        iptable[i].name) {
-      return (iptable[i].name);
-    }
-  }
-  return (inet_ntoa(ob->interactive->addr.sin_addr));
-#endif
-}
-
-#ifdef IPV6
-static void add_ip_entry(struct in6_addr addr, char *name)
-#else
-static void add_ip_entry(long addr, char *name)
-#endif
-{
-  int i;
-
-  for (i = 0; i < IPSIZE; i++) {
-    if (!memcmp(&iptable[i].addr, &addr, sizeof(addr))) {
-      return;
-    }
-  }
-  iptable[ipcur].addr = addr;
-  if (iptable[ipcur].name) {
-    free_string(iptable[ipcur].name);
-  }
-  iptable[ipcur].name = make_shared_string(name);
-  ipcur = (ipcur + 1) % IPSIZE;
-}
-
-const char *query_ip_number(object_t *ob)
-{
-  if (ob == 0) {
-    ob = command_giver;
-  }
-  if (!ob || ob->interactive == 0) {
-    return 0;
-  }
-#ifdef IPV6
-  inet_ntop(AF_INET6, &ob->interactive->addr.sin6_addr, ipv6addr, INET6_ADDRSTRLEN);
-  return &ipv6addr[0];
-#else
-  return (inet_ntoa(ob->interactive->addr.sin_addr));
-#endif
-}
 
 char *query_host_name()
 {

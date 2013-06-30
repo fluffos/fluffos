@@ -14,8 +14,9 @@
 
 #ifdef HAS_CONSOLE
 #include "comm.h"
-#include "object.h"
 #include "dumpstat.h"
+#include "event.h"
+#include "object.h"
 
 #define NAME_LEN 50
 
@@ -34,6 +35,8 @@ static int itemcmpsize(const void *, const void *);
 static int objcmpsize(const void *, const void *);
 static int objcmpidle(const void *, const void *);
 
+static void console_command(char *s);
+
 static  void print_obj(int refs, int cpy, const char *obname, long lastref,
                        long sz)
 {
@@ -41,7 +44,25 @@ static  void print_obj(int refs, int cpy, const char *obname, long lastref,
          obname, ((long)time(0) - lastref), sz);
 }
 
-void console_command(char *s)
+void on_console_input()
+{
+  char s[1024];
+  int sz;
+
+  if ((sz = read(STDIN_FILENO, s, 1023)) > 0) {
+    s[sz - 1] = '\0';
+    console_command(s);
+  } else if (sz == 0) {
+    printf("Console exiting.  The MUD remains.\n");
+    has_console = 0;
+  } else {
+    printf("Console read error: %d %d.  Closing console.\n", sz, errno);
+    has_console = 0;
+    restore_sigttin();
+  }
+}
+
+static void console_command(char *s)
 {
   char verb[11];
   char args[3][160];

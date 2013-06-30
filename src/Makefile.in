@@ -43,7 +43,7 @@ INSTALL_DIR=@bindir@
 OPTIMIZE=@OPTIMIZE@
 
 SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
-  backend.c array.c mapping.c comm.c ed.c regexp.c buffer.c crc32.c \
+  backend.c array.c mapping.cc comm.c ed.c regexp.c buffer.c crc32.c \
   malloc.c mallocwrapper.c class.c efuns_main.c efuns_port.c \
   call_out.c otable.c dumpstat.c stralloc.c hash.c \
   port.c reclaim.c parse.c simul_efun.c sprintf.c program.c \
@@ -52,7 +52,7 @@ SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
   disassembler.c uvalarm.c \
   replace_program.c master.c function.c \
   debug.c crypt.c applies_table.c add_action.c eval.c fliconv.c console.c \
-  posix_timers.c
+  posix_timers.c event.c dns.c
 
 OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   backend.o array.o mapping.o comm.o ed.o regexp.o buffer.o crc32.o \
@@ -64,7 +64,7 @@ OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   disassembler.o uvalarm.o \
   replace_program.o master.o function.o \
   debug.o crypt.o applies_table.o add_action.o eval.o fliconv.o console.o \
-  posix_timers.o
+  posix_timers.o event.o dns.o
 
 VPATH = .:./packages
 
@@ -80,10 +80,10 @@ all: local_options files
 build_packages:
 	$(MAKE) -C packages 'CC=$(CXX)' 'CXXFLAGS=$(CXXFLAGS)' 'A=$(A)' 'O=$(O)'
 
-build_binaries: $(DRIVER_BIN) addr_server portbind
+build_binaries: $(DRIVER_BIN) portbind
 
 .c.$(O):
-	$(CXX) -c $(CXXFLAGS) -x c++ -o $@ $<
+	$(CXX) -c $(CXXFLAGS) @LIBEVENT_CPPFLAGS@ -x c++ -o $@ $<
 
 lex.o: lex.c preprocess.c cc.h grammar.tab.c
 
@@ -97,14 +97,10 @@ grammar.tab.c: grammar.y
 
 $(DRIVER_BIN): $(OBJ) packages/*.$(O) dtrace_compile
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
-	$(CXX) -rdynamic $(CXXFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) @MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@
+	$(CXX) -rdynamic $(CXXFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) @MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@ @LIBEVENT_LIBS@ @LIBEVENT_LDFLAGS@
 
 dtrace_compile: dtrace_compile.c
 	$(CXX) $(CXXFLAGS) -x c++ dtrace_compile.c -o dtrace_compile
-
-addr_server: files addr_server.o socket_ctrl.o port.o addr_server.h
-	$(CXX) $(CXXFLAGS) socket_ctrl.o addr_server.o port.o \
-	-o addr_server $(LIBS)
 
 portbind: portbind.o
 	$(CXX) $(CXXFLAGS) portbind.o -o portbind $(LIBS)
@@ -145,7 +141,6 @@ make_func.tab.o: make_func.tab.c
 install: all
 	-mkdir $(INSTALL_DIR)
 	$(INSTALL) $(DRIVER_BIN) $(INSTALL_DIR)
-	$(INSTALL) addr_server $(INSTALL_DIR)
 	$(INSTALL) portbind $(INSTALL_DIR)
 
 # remove everything
@@ -170,7 +165,7 @@ clean:
 	-find . -name "*.orig" -print | xargs rm
 	-find . -name "*.rej" -print | xargs rm
 	-rm -f *.ln tags TAGS
-	-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old addr_server portbind *.exe
+	-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old portbind *.exe
 	-rm -f Dependencies tmpdepend
 	-rm -f 1.out 2.out
 	-rm -f dtrace_compile
@@ -192,6 +187,7 @@ help:
 	@echo "Using $(CXX) -E $(CXXFLAGS) for preprocessing."
 	@echo "Using $(CXX) $(CXXFLAGS) to compile."
 	@echo "Using $(YACC) to make the compiler."
+	@if [ -n "@LIBEVENT_LIBS@" ]; then echo "LIBEVENT: @LIBEVENT_LIBS@, @LIBEVENT_CPPFLAGS@, @LIBEVENT_LDFLAGS@"; fi
 	@if [ -n "@MYSQL_VERSION@" ]; then echo "MYSQL: @MYSQL_VERSION@, @MYSQL_CFLAGS@, @MYSQL_LDFLAGS@"; fi
 	@if [ -n "@POSTGRESQL_VERSION@" ];then echo "POSTGRESQL: @POSTGRESQL_VERSION@, @POSTGRESQL_CFLAGS@, @POSTGRESQL_LDFLAGS@"; fi
 	@if [ -n "@SQLITE3_VERSION@" ]; then echo "SQLite3: @SQLITE3_VERSION@, @SQLITE3_CFLAGS@, @SQLITE3_LDFLAGS@"; fi

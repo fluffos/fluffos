@@ -12,6 +12,9 @@ name : Testsuite
 # port number to accept users on
 port number : 4000
 
+# Restrict IP binding, if omitted, bind to all addresses.
+mud ip : 127.0.0.1
+
 # the address server is an external program that lets the mud translate
 # internet names to numbers (and vice versa).  select an unused port.
 address server ip : localhost

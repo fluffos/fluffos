@@ -24,9 +24,10 @@ void debug_level_set(const char *);
 void debug_level_clear(const char *);
 
 #ifdef DEBUG_MACRO
-#define debug(x,y) if (debug_level & DBG_##x) { printf("%s: ", #x); printf y; putchar('\n'); fflush(stdout); }
+#define debug(x,...) if (debug_level & DBG_##x) { \
+  debug_message("%s: ", #x); debug_message( __VA_ARGS__ ); }
 #else
-#define debug(x,y)
+#define debug(x,...)
 #endif
 
 /* Would be nice to have tons of these; should go to arbitrary bitsets */
@@ -39,5 +40,9 @@ void debug_level_clear(const char *);
 #define DBG_comp_func_tab   64
 #define DBG_LPC         128
 #define DBG_LPC_line        256
+#define DBG_event 512
+#define DBG_dns 1024
+#define DBG_file 2048
 
+#define DBG_DEFAULT (DBG_connections | DBG_sockets | DBG_dns | DBG_file)
 #endif

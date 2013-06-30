@@ -1797,7 +1797,7 @@ int restore_object(object_t *ob, const char *file, int noclear)
   restore_object_from_buff(ob, theBuff, noclear);
 #endif
   current_object = save;
-  debug(d_flag, ("Object /%s restored from /%s.\n", ob->obname, file));
+  debug(d_flag, "Object /%s restored from /%s.\n", ob->obname, file);
 
   return 1;
 }
@@ -1860,7 +1860,7 @@ void dealloc_object(object_t *ob, const char *from)
   object_t *prev_all = 0;
 #endif
 
-  debug(d_flag, ("free_object: /%s.\n", ob->obname));
+  debug(d_flag, "free_object: /%s.\n", ob->obname);
 
   if (!(ob->flags & O_DESTRUCTED)) {
     if (ob->next_all != ob)
@@ -1894,7 +1894,7 @@ void dealloc_object(object_t *ob, const char *from)
   }
 #endif
   if (ob->obname) {
-    debug(d_flag, ("Free object /%s\n", ob->obname));
+    debug(d_flag, "Free object /%s\n", ob->obname);
 
     DEBUG_CHECK1(lookup_object_hash(ob->obname) == ob,
                  "Freeing object /%s but name still in name table", ob->obname);

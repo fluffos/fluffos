@@ -143,8 +143,6 @@ f_rusage(void)
   if (getrusage(RUSAGE_SELF, &rus) < 0) {
     m = allocate_mapping(0);
   } else {
-    char buf[256];
-    int fd;
     usertime = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
     stime = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_usec / 1000;
     maxrss = rus.ru_maxrss;

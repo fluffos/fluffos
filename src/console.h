@@ -9,7 +9,8 @@
 #include "options_incl.h"
 
 #ifdef HAS_CONSOLE
-extern void console_command(char *);
+void on_console_input();
+void console_command(char *);
 #endif
 
 #endif
