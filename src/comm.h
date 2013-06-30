@@ -208,7 +208,7 @@ void add_binary_message(object_t *, const unsigned char *, int);
 void update_ref_counts_for_users(void);
 void make_selectmasks(void);
 void init_user_conn(void);
-void ipc_remove(void);
+void shutdown_external_ports(void);
 void set_prompt(const char *);
 void process_io(void);
 void get_user_data(interactive_t *);

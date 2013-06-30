@@ -7,6 +7,7 @@
 #include "console.h" // for console
 #include "socket_efuns.h"  // for lpc sockets
 
+//FIXME: rewrite other part so this could become static.
 struct event_base *g_event_base = NULL;
 
 // Init a new event loop.
@@ -16,6 +17,7 @@ event_base *init_event_base()
   event_enable_debug_mode();
 #endif
   g_event_base = event_base_new();
+  debug_message("Event backend in use: %s\n",event_base_get_method(g_event_base));
   return g_event_base;
 }
 
@@ -77,7 +79,7 @@ void new_user_event_listener(interactive_t *user)
 
 static void on_external_port_event(evutil_socket_t fd, short what, void *arg)
 {
-  debug(event, "Got an event on listen socket %d:%s%s%s%s",
+  debug(event, "Got an event on listen socket %d:%s%s%s%s \n",
         (int) fd,
         (what & EV_TIMEOUT) ? " timeout" : "",
         (what & EV_READ)    ? " read" : "",

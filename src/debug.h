@@ -43,4 +43,5 @@ void debug_level_clear(const char *);
 #define DBG_event 512
 #define DBG_dns 1024
 
+#define DBG_DEFAULT (DBG_connections | DBG_sockets | DBG_dns)
 #endif

@@ -87,7 +87,7 @@ void on_query_addr_by_name_finish(evutil_socket_t fd, short what, void *arg)
   } else {
     debug(dns, "DNS lookup success: %d \n", query->key);
     // push the name
-    push_shared_string(query->name);
+    copy_and_push_string(query->name);
 
     // push IP address
     char host[NI_MAXHOST];

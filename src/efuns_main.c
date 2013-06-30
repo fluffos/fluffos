@@ -2226,7 +2226,8 @@ f_query_ip_name(void)
   tmp = query_ip_name(st_num_arg ? sp->u.ob : 0);
   if (st_num_arg) { free_object(&(sp--)->u.ob, "f_query_ip_name"); }
   if (!tmp) { push_number(0); }
-  else { share_and_push_string(tmp); }
+  else { push_shared_string(tmp); }
+  // no need to free
 }
 #endif
 
@@ -2239,7 +2240,9 @@ f_query_ip_number(void)
   tmp = query_ip_number(st_num_arg ? sp->u.ob : 0);
   if (st_num_arg) { free_object(&(sp--)->u.ob, "f_query_ip_number"); }
   if (!tmp) { push_number(0); }
-  else { share_and_push_string(tmp); }
+  else { copy_and_push_string(tmp); }
+
+  if(tmp) free_string(tmp);
 }
 #endif
 

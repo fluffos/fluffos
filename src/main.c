@@ -347,7 +347,7 @@ int main(int argc, char **argv)
           if (argv[i][2]) {
             debug_level_set(&argv[i][2]);
           } else {
-            debug_level |= DBG_d_flag;
+            debug_level |= DBG_DEFAULT;
           }
           debug_message("Debug Level: %d\n", debug_level);
 #else

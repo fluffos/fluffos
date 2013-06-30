@@ -382,12 +382,13 @@ void init_user_conn()
 /*
  * Shut down new user accept file descriptor.
  */
-void ipc_remove()
+void shutdown_external_ports()
 {
   int i;
 
   for (i = 0; i < 5; i++) {
     if (!external_port[i].port) { continue; }
+    if(external_port[i].ev_read) event_free(external_port[i].ev_read);
     if (OS_socket_close(external_port[i].fd) == -1) {
       socket_perror("ipc_remove: close", 0);
     }
@@ -712,7 +713,6 @@ int flush_message(interactive_t *ip)
 #ifdef EWOULDBLOCK
       if (socket_errno == EWOULDBLOCK) {
         debug(connections, ("flush_message: write: Operation would block\n"));
-        event_add(ip->ev_write, NULL);
         return 1;
 #else
       if (0) {
@@ -720,7 +720,6 @@ int flush_message(interactive_t *ip)
 #endif
       } else if (socket_errno == EINTR) {
         debug(connections, ("flush_message: write: Interrupted system call"));
-        event_add(ip->ev_write, NULL);
         return 1;
       } else {
         socket_perror("flush_message: write", 0);
@@ -1698,20 +1697,16 @@ static void sigpipe_handler(void)
 void new_user_handler(port_def_t *port)
 {
   int new_socket_fd;
-#ifdef IPV6
-  struct sockaddr_in6 addr;
-#else
-  struct sockaddr_in addr;
-#endif
+  struct sockaddr_storage addr;
   socklen_t length;
   int i, x;
   object_t *master, *ob;
   svalue_t *ret;
 
-  length = sizeof(addr);
   debug(connections, "new_user_handler: accept on fd %d\n", port->fd);
-  new_socket_fd = accept(port->fd,
-                         (struct sockaddr *) & addr, &length);
+
+  length = sizeof(addr);
+  new_socket_fd = accept(port->fd, (struct sockaddr *) &addr, &length);
   if (new_socket_fd < 0) {
 #ifdef EWOULDBLOCK
     if (socket_errno == EWOULDBLOCK) {
@@ -1837,14 +1832,13 @@ void new_user_handler(port_def_t *port)
   // all_users[i] setup finishes
   set_prompt("> ");
 
-  memcpy((char *) &all_users[i]->addr, (char *) &addr, length);
-#ifdef IPV6
-  char tmp[INET6_ADDRSTRLEN];
-  debug(connections, "New connection from %s.\n", inet_ntop(AF_INET6, &addr.sin6_addr, tmp, INET6_ADDRSTRLEN));
-#else
-  debug(connections, "New connection from %s.\n", inet_ntoa(addr.sin_addr));
-#endif
+  memcpy((char *) &all_users[i]->addr, (char *)&addr, length);
+
+  char host[NI_MAXHOST];
+  getnameinfo((sockaddr *)&addr, length, host, sizeof(host), NULL, 0 , NI_NUMERICHOST);
+  debug(connections, "New connection from %s.\n", host);
   num_user++;
+
   /*
    * The user object has one extra reference. It is asserted that the
    * master_ob is loaded.  Save a pointer to the master ob incase it
@@ -1863,11 +1857,7 @@ void new_user_handler(port_def_t *port)
     if (master_ob->interactive) {
       remove_interactive(master_ob, 0);
     }
-#ifdef IPV6
-    debug_message("Can not accept connection from %s due to error in connect().\n", inet_ntop(AF_INET6, &addr.sin6_addr, tmp, INET6_ADDRSTRLEN));
-#else
-    debug_message("Can not accept connection from %s due to error in connect().\n");
-#endif
+    debug_message("Can not accept connection from %s due to error in connect().\n", host);
     return;
   }
   /*
@@ -2228,8 +2218,6 @@ void remove_interactive(object_t *ob, int dested)
   DEBUG_CHECK(idx == max_users, "remove_interactive: could not find and remove user!\n");
 
   // Cleanup events
-  event_del(ip->ev_read);
-  event_del(ip->ev_write);
   event_free(ip->ev_read);
   event_free(ip->ev_write);
 
