@@ -14,8 +14,6 @@ void outbuf_fix(outbuffer_t *);
 void outbuf_push(outbuffer_t *);
 int outbuf_extend(outbuffer_t *, int);
 
-#include "bsdmalloc.h"
-#include "smalloc.h"
 #include "wrappedmalloc.h"
 #include "debugmalloc.h"
 

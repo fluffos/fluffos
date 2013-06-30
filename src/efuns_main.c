@@ -1500,12 +1500,6 @@ void f_malloc_status(void)
 #ifdef MMALLOC
   outbuf_add(&ob, "Using mmap malloc");
 #endif
-#ifdef BSDMALLOC
-  outbuf_add(&ob, "Using BSD malloc");
-#endif
-#ifdef SMALLOC
-  outbuf_add(&ob, "Using Smalloc");
-#endif
 #ifdef SYSMALLOC
   outbuf_add(&ob, "Using system malloc");
 #endif

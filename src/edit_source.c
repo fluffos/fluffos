@@ -1203,12 +1203,6 @@ static void handle_malloc()
   if (lookup_define("SYSMALLOC")) {
     the_malloc = "sysmalloc.c";
   }
-  if (lookup_define("SMALLOC")) {
-    the_malloc = "smalloc.c";
-  }
-  if (lookup_define("BSDMALLOC")) {
-    the_malloc = "bsdmalloc.c";
-  }
   if (lookup_define("MMALLOC")) {
     the_malloc = "mmalloc.c";
   }
@@ -1220,9 +1214,6 @@ static void handle_malloc()
   }
   if (lookup_define("GCMALLOC")) {
     the_malloc = "gcmalloc.c";
-  }
-  if (lookup_define("GNUMALLOC")) {
-    the_malloc = "gnumalloc.c";
   }
 
   if (lookup_define("WRAPPEDMALLOC")) {
