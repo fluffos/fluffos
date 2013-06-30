@@ -77,43 +77,11 @@ static incstate *inctop = 0;
 
 static void add_define(const char *, int, const char *);
 
-#ifdef WIN32
-#include <io.h>
 
-int compile(char *command)
-{
-  FILE *tf = fopen("trash_me.bat", "wt+");
-
-  fprintf(tf, "%s%s\n%s",
-          "@echo off\n",
-          command,
-          "if errorlevel == 1 goto error\n"
-          "del trash_me.err >nul\n"
-          "goto ok\n"
-          ":error\n"
-          "echo ERROR > trash_me.err\n"
-          ":ok\n");
-  fclose(tf);
-
-  if (!system("trash_me.bat > nul")) { return 1; }
-  if (_access("trash_me.err", 0)) { return 1; }
-  return 0;
-}
-#else
 int compile(char *str)
 {
   return system(str);
 }
-#endif
-
-#if defined(WIN32)
-int dos_style_link(char *x, char *y)
-{
-  char link_cmd[100];
-  sprintf(link_cmd, "copy %s %s", x, y);
-  return system(link_cmd);
-}
-#endif
 
 void yyerror(const char *str)
 {
@@ -1247,143 +1215,6 @@ static void handle_malloc()
   if (link(the_malloc, "malloc.c") == -1) {
     perror("link malloc.c");
   }
-}
-
-static int check_include2(const char *tag, const char *file,
-                          const char *before, const char *after)
-{
-  char buf[1024];
-  FILE *ct;
-
-  printf("Checking for include file <%s> ... ", file);
-  ct = fopen("comptest.c", "w");
-  fprintf(ct, "#include \"configure.h\"\n#include \"std_incl.h\"\n%s\n#include <%s>\n%s\n",
-          before, file, after);
-  fclose(ct);
-
-  sprintf(buf, "%s %s -c comptest.c " TO_DEV_NULL, COMPILER, CXXFLAGS);
-  if (!compile(buf)) {
-    fprintf(yyout, "#define %s\n", tag);
-    /* Make sure the define exists for later checks */
-    fflush(yyout);
-    printf("exists\n");
-    return 1;
-  }
-  printf("does not exist or is unusable\n");
-  return 0;
-}
-
-static int check_include(const char *tag, const char *file)
-{
-  char buf[1024];
-  FILE *ct;
-
-  printf("Checking for include file <%s> ... ", file);
-  ct = fopen("comptest.c", "w");
-  fprintf(ct, "#include \"configure.h\"\n#include \"std_incl.h\"\n#include \"file_incl.h\"\n#include <%s>\n", file);
-  fclose(ct);
-
-  sprintf(buf, "%s %s -c comptest.c " TO_DEV_NULL, COMPILER, CXXFLAGS);
-  if (!compile(buf)) {
-    fprintf(yyout, "#define %s\n", tag);
-    /* Make sure the define exists for later checks */
-    fflush(yyout);
-    printf("exists\n");
-    return 1;
-  }
-  printf("does not exist\n");
-  return 0;
-}
-
-static int check_library(const char *lib)
-{
-  char buf[1024];
-  FILE *ct;
-
-  printf("Checking for library %s ... ", lib);
-  ct = fopen("comptest.c", "w");
-  fprintf(ct, "int main() { return 0; }\n");
-  fclose(ct);
-
-  sprintf(buf, "%s %s comptest.c %s" TO_DEV_NULL, COMPILER, CXXFLAGS, lib);
-  if (!compile(buf)) {
-    fprintf(yyout, " %s", lib);
-    printf("exists\n");
-    return 1;
-  }
-  printf("does not exist\n");
-  return 0;
-}
-
-#if 0 /* not used any more */
-static int check_ret_type(char *tag, char *pre,
-                          char *type, char *func)
-{
-  char buf[1024];
-  FILE *ct;
-
-  printf("Checking return type of %s() ...", func);
-  ct = fopen("comptest.c", "w");
-  fprintf(ct, "%s\n\n%s%s();\n", pre, type, func);
-  fclose(ct);
-
-  sprintf(buf, "%s %s -c comptest.c >/dev/null 2>&1", COMPILER, CXXFLAGS);
-  if (!system(buf)) {
-    fprintf(yyout, "#define %s\n", tag);
-    printf("returns %s\n", type);
-    return 1;
-  }
-  printf("does not return %s\n", type);
-  return 0;
-}
-#endif
-
-/* This should check a.out existence, not exit value */
-static int check_prog(const char *tag, const char *pre, const char *code, int andrun)
-{
-  char buf[1024];
-  FILE *ct;
-
-  ct = fopen("comptest.c", "w");
-  fprintf(ct, "#include \"configure.h\"\n#include \"std_incl.h\"\n%s\n\nint main() {%s}\n", (pre ? pre : ""), code);
-  fclose(ct);
-
-  sprintf(buf, "%s %s comptest.c -o comptest" TO_DEV_NULL, COMPILER, CXXFLAGS);
-  if (!compile(buf) && (!andrun || !system("./comptest"))) {
-    if (tag) {
-      fprintf(yyout, "#define %s\n", tag);
-      fflush(yyout);
-    }
-    return 1;
-  }
-
-  return 0;
-}
-
-static int check_code(const char *pre, const char *code)
-{
-  char buf[1024];
-  FILE *ct;
-  int rc;
-
-  ct = fopen("comptest.c", "w");
-  fprintf(ct, "#include \"configure.h\"\n#include \"std_incl.h\"\n%s\n\nint main() {%s}\n", (pre ? pre : ""), code);
-  fclose(ct);
-
-  sprintf(buf, "%s %s comptest.c -o comptest" TO_DEV_NULL, COMPILER, CXXFLAGS);
-  if (compile(buf) || (rc = system("./comptest")) == 127 || rc == -1) {
-    return -1;
-  }
-  return rc;
-}
-
-static void verbose_check_prog(const char *msg, const char *def, const char *pre,
-                               const char *prog, int andrun)
-{
-  printf("%s ...", msg);
-  if (check_prog(def, pre, prog, andrun)) {
-    printf(" exists\n");
-  } else { printf(" does not exist\n"); }
 }
 
 int main(int argc, char **argv)

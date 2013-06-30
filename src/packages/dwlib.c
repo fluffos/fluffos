@@ -470,7 +470,6 @@ void
 f_reference_allowed()
 {
   svalue_t *sv = sp - st_num_arg + 1;
-  svalue_t *v;
   object_t *referee = NULL;
   object_t *referrer_obj = command_giver; /* Default to this_player(). */
   const char *referrer_name = NULL;
@@ -480,7 +479,7 @@ f_reference_allowed()
   /* Maybe I could learn how to use this :p
    CHECK_TYPES(sp-1, T_NUMBER, 1, F_MEMBER_ARRAY); */
 
-  if (referrer_obj && referrer_obj->flags & O_DESTRUCTED) {
+  if (referrer_obj && (referrer_obj->flags & O_DESTRUCTED)) {
     referrer_obj = NULL;
   }
 
@@ -499,6 +498,7 @@ f_reference_allowed()
       referrer_obj = find_living_object(sv[1].u.string, 1);
 #else
       if (simul_efun_ob) {
+        svalue_t *v;
         push_svalue(&sv[1]);
         v = apply("find_player", simul_efun_ob, 1, ORIGIN_EFUN);
 

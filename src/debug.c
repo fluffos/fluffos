@@ -6,7 +6,7 @@
 mapping_t *debug_levels(void);
 
 typedef struct {
-  char *name;
+  const char *name;
   int bit;
 } debug_t;
 

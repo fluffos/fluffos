@@ -35,7 +35,6 @@ static int itemcmpsize(const void *, const void *);
 static int objcmpsize(const void *, const void *);
 static int objcmpidle(const void *, const void *);
 
-static void on_console_input(evutil_socket_t fd, short what, void *arg);
 static void console_command(char *s);
 
 static  void print_obj(int refs, int cpy, const char *obname, long lastref,
