@@ -86,6 +86,17 @@ static void clear_socket(int which, int dofree)
   lpc_socks[which].w_buf = NULL;
   lpc_socks[which].w_off = 0;
   lpc_socks[which].w_len = 0;
+
+  // cleanup event listeners
+  if (lpc_socks[which].ev_read != NULL) {
+    event_free(lpc_socks[which].ev_read);
+  }
+
+  if (lpc_socks[which].ev_write != NULL) {
+    event_free(lpc_socks[which].ev_write);
+  }
+  lpc_socks[which].ev_read = NULL;
+  lpc_socks[which].ev_write = NULL;
 }
 
 /*
@@ -226,6 +237,45 @@ int find_new_socket(void)
 }
 
 #ifdef PACKAGE_SOCKETS
+extern struct event_base *g_event_base;
+
+void on_lpc_sock_read(evutil_socket_t fd, short what, void *arg)
+{
+  debug_message("Got an event on lpc socket %d:%s%s%s%s \n",
+                (int) fd,
+                (what & EV_TIMEOUT) ? " timeout" : "",
+                (what & EV_READ)    ? " read" : "",
+                (what & EV_WRITE)   ? " write" : "",
+                (what & EV_SIGNAL)  ? " signal" : "");
+
+  auto lpc = (lpc_socket_t *)arg;
+  //FIXME: pointer arith
+  socket_read_select_handler(lpc - lpc_socks);
+}
+void on_lpc_sock_write(evutil_socket_t fd, short what, void *arg)
+{
+  debug_message("Got an event on lpc socket %d:%s%s%s%s \n",
+                (int) fd,
+                (what & EV_TIMEOUT) ? " timeout" : "",
+                (what & EV_READ)    ? " read" : "",
+                (what & EV_WRITE)   ? " write" : "",
+                (what & EV_SIGNAL)  ? " signal" : "");
+
+  auto lpc = (lpc_socket_t *)arg;
+  //FIXME: pointer arith
+  socket_write_select_handler(lpc - lpc_socks);
+}
+
+// Initialize LPC socket data structure and register events
+void init_lpc_socket(lpc_socket_t *target, evutil_socket_t fd)
+{
+  memset(target, 0, sizeof(lpc_socket_t));
+
+  target->ev_read = event_new(g_event_base, fd, EV_READ,
+                              on_lpc_sock_read, target);
+  target->ev_write = event_new(g_event_base, fd, EV_WRITE,
+                               on_lpc_sock_write, target);
+}
 
 /*
  * Create an LPC efun socket
@@ -283,6 +333,9 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
 #ifdef FD_CLOEXEC
     fcntl(fd, F_SETFD, FD_CLOEXEC);
 #endif
+
+    init_lpc_socket(&lpc_socks[i], fd);
+
     lpc_socks[i].fd = fd;
     lpc_socks[i].flags = S_HEADER;
 
@@ -298,21 +351,11 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
 #endif
     lpc_socks[i].mode = mode;
     lpc_socks[i].state = STATE_UNBOUND;
-    memset((char *) &lpc_socks[i].l_addr, 0, sizeof(lpc_socks[i].l_addr));
-    memset((char *) &lpc_socks[i].r_addr, 0, sizeof(lpc_socks[i].r_addr));
     lpc_socks[i].owner_ob = current_object;
-    lpc_socks[i].release_ob = NULL;
-    lpc_socks[i].r_buf = NULL;
-    lpc_socks[i].r_off = 0;
-    lpc_socks[i].r_len = 0;
-    lpc_socks[i].w_buf = NULL;
-    lpc_socks[i].w_off = 0;
-    lpc_socks[i].w_len = 0;
-
     current_object->flags |= O_EFUN_SOCKET;
 
-    debug(sockets, ("socket_create: created socket %d mode %d fd %d\n",
-                    i, mode, fd));
+    debug(sockets, "socket_create: created socket %d mode %d fd %d\n",
+          i, mode, fd);
   }
 
   return i;
@@ -387,14 +430,14 @@ int socket_bind(int fd, int port, const char *addr)
 
 #ifdef IPV6
   char tmp[INET6_ADDRSTRLEN];
-  debug(sockets, ("socket_bind: bound socket %d to %s.%d\n",
-                  fd, inet_ntop(AF_INET6, &lpc_socks[fd].l_addr.sin6_addr, (char *)&tmp, INET6_ADDRSTRLEN),
-                  ntohs(lpc_socks[fd].l_addr.sin6_port)));
+  debug(sockets, "socket_bind: bound socket %d to %s.%d\n",
+        fd, inet_ntop(AF_INET6, &lpc_socks[fd].l_addr.sin6_addr, (char *)&tmp, INET6_ADDRSTRLEN),
+        ntohs(lpc_socks[fd].l_addr.sin6_port));
 
 #else
-  debug(sockets, ("socket_bind: bound socket %d to %s.%d\n",
-                  fd, inet_ntoa(lpc_socks[fd].l_addr.sin_addr),
-                  ntohs(lpc_socks[fd].l_addr.sin_port)));
+  debug(sockets, "socket_bind: bound socket %d to %s.%d\n",
+        fd, inet_ntoa(lpc_socks[fd].l_addr.sin_addr),
+        ntohs(lpc_socks[fd].l_addr.sin_port));
 #endif
   return EESUCCESS;
 }
@@ -433,7 +476,7 @@ int socket_listen(int fd, svalue_t *callback)
 
   current_object->flags |= O_EFUN_SOCKET;
 
-  debug(sockets, ("socket_listen: listen on socket %d\n", fd));
+  debug(sockets, "socket_listen: listen on socket %d\n", fd);
 
   return EESUCCESS;
 }
@@ -505,15 +548,18 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback)
 
   i = find_new_socket();
   if (i >= 0) {
+    init_lpc_socket(&lpc_socks[i], accept_fd);
+
     fd_set wmask;
 
     lpc_socks[i].fd = accept_fd;
     lpc_socks[i].flags = S_HEADER |
                          (lpc_socks[fd].flags & S_BINARY);
 
+    // FIXME: this doesn't seems right, there is no select() involved.
+    // it's always going to be false.
     FD_ZERO(&wmask);
     FD_SET(accept_fd, &wmask);
-
     if (!(FD_ISSET(accept_fd, &wmask))) {
       lpc_socks[i].flags |= S_BLOCKED;
     }
@@ -525,15 +571,6 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback)
       lpc_socks[i].l_addr = lpc_socks[fd].l_addr;
     }
     lpc_socks[i].r_addr = sin;
-    lpc_socks[i].owner_ob = NULL;
-    lpc_socks[i].release_ob = NULL;
-    lpc_socks[i].r_buf = NULL;
-    lpc_socks[i].r_off = 0;
-    lpc_socks[i].r_len = 0;
-    lpc_socks[i].w_buf = NULL;
-    lpc_socks[i].w_off = 0;
-    lpc_socks[i].w_len = 0;
-
     lpc_socks[i].owner_ob = current_object;
     set_read_callback(i, read_callback);
     set_write_callback(i, write_callback);
@@ -541,8 +578,8 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback)
 
     current_object->flags |= O_EFUN_SOCKET;
 
-    debug(sockets, ("socket_accept: accept on socket %d\n", fd));
-    debug(sockets, ("socket_accept: new socket %d on fd %d\n", i, accept_fd));
+    debug(sockets, "socket_accept: accept on socket %d\n", fd);
+    debug(sockets, "socket_accept: new socket %d on fd %d\n", i, accept_fd);
   } else {
     OS_socket_close(accept_fd);
   }
@@ -874,8 +911,8 @@ void socket_read_select_handler(int fd)
 #else
   struct sockaddr_in sin;
 #endif
-  debug(sockets, ("read_socket_handler: fd %d state %d\n",
-                  fd, lpc_socks[fd].state));
+  debug(sockets, "read_socket_handler: fd %d state %d\n",
+        fd, lpc_socks[fd].state);
 
   switch (lpc_socks[fd].state) {
 
@@ -910,7 +947,7 @@ void socket_read_select_handler(int fd)
             inet_socket_in_volume++;
           }
 #endif
-          debug(sockets, ("read_socket_handler: read %d bytes\n", cc));
+          debug(sockets, "read_socket_handler: read %d bytes\n", cc);
           buf[cc] = '\0';
 #ifdef IPV6
           char tmp[INET6_ADDRSTRLEN];
@@ -977,7 +1014,7 @@ void socket_read_select_handler(int fd)
               inet_socket_in_volume += cc;
             }
 #endif
-            debug(sockets, ("read_socket_handler: read %d bytes\n", cc));
+            debug(sockets, "read_socket_handler: read %d bytes\n", cc);
             lpc_socks[fd].r_off += cc;
             if (lpc_socks[fd].r_off != 4) {
               return;
@@ -994,8 +1031,8 @@ void socket_read_select_handler(int fd)
             if (lpc_socks[fd].r_buf == NULL) {
               fatal("Out of memory");
             }
-            debug(sockets, ("read_socket_handler: svalue len is %d.\n",
-                            lpc_socks[fd].r_len));
+            debug(sockets, "read_socket_handler: svalue len is %d.\n",
+                  lpc_socks[fd].r_len);
           }
           if (lpc_socks[fd].r_off < lpc_socks[fd].r_len) {
             cc = OS_socket_read(lpc_socks[fd].fd, lpc_socks[fd].r_buf +
@@ -1012,7 +1049,7 @@ void socket_read_select_handler(int fd)
               inet_socket_in_volume += cc;
             }
 #endif
-            debug(sockets, ("read_socket_handler: read %d bytes\n", cc));
+            debug(sockets, "read_socket_handler: read %d bytes\n", cc);
             lpc_socks[fd].r_off += cc;
             if (lpc_socks[fd].r_off != lpc_socks[fd].r_len) {
               return;
@@ -1051,7 +1088,7 @@ void socket_read_select_handler(int fd)
             inet_socket_in_volume += cc;
           }
 #endif
-          debug(sockets, ("read_socket_handler: read %d bytes\n", cc));
+          debug(sockets, "read_socket_handler: read %d bytes\n", cc);
           buf[cc] = '\0';
           push_number(fd);
 #ifndef NO_BUFFER_TYPE
@@ -1115,8 +1152,8 @@ void socket_write_select_handler(int fd)
 {
   int cc;
 
-  debug(sockets, ("write_socket_handler: fd %d state %d\n",
-                  fd, lpc_socks[fd].state));
+  debug(sockets, "write_socket_handler: fd %d state %d\n",
+        fd, lpc_socks[fd].state);
 
   /* if the socket isn't blocked, we've got nothing to send */
   /* if the socket is linkdead, don't send -- could block */
@@ -1223,7 +1260,7 @@ int socket_close(int fd, int flags)
   }
   clear_socket(fd, 1);
 
-  debug(sockets, ("socket_close: closed fd %d\n", fd));
+  debug(sockets, "socket_close: closed fd %d\n", fd);
   return EESUCCESS;
 }
 

@@ -12,6 +12,7 @@
 #include "file_incl.h"
 #include "file.h"
 #include "comm.h"
+#include "dns.h"
 #include "parse.h"
 #include "sprintf.h"
 #include "backend.h"
@@ -152,9 +153,9 @@ f_bind(void)
   }
   if ((old_fp->hdr.type & 0x0f) == FP_FUNCTIONAL) {
     new_fp->f.functional.prog->func_ref++;
-    debug(d_flag, ("add func ref /%s: now %i\n",
-                   new_fp->f.functional.prog->filename,
-                   new_fp->f.functional.prog->func_ref));
+    debug(d_flag, "add func ref /%s: now %i\n",
+          new_fp->f.functional.prog->filename,
+          new_fp->f.functional.prog->func_ref);
   }
 
   free_funp(old_fp);
@@ -1499,12 +1500,6 @@ void f_malloc_status(void)
 #ifdef MMALLOC
   outbuf_add(&ob, "Using mmap malloc");
 #endif
-#ifdef BSDMALLOC
-  outbuf_add(&ob, "Using BSD malloc");
-#endif
-#ifdef SMALLOC
-  outbuf_add(&ob, "Using Smalloc");
-#endif
 #ifdef SYSMALLOC
   outbuf_add(&ob, "Using system malloc");
 #endif
@@ -2220,12 +2215,13 @@ f_query_idle(void)
 void
 f_query_ip_name(void)
 {
-  char *tmp;
+  const char *tmp;
 
   tmp = query_ip_name(st_num_arg ? sp->u.ob : 0);
   if (st_num_arg) { free_object(&(sp--)->u.ob, "f_query_ip_name"); }
   if (!tmp) { push_number(0); }
-  else { share_and_push_string(tmp); }
+  else { push_shared_string(tmp); }
+  // no need to free
 }
 #endif
 
@@ -2238,7 +2234,9 @@ f_query_ip_number(void)
   tmp = query_ip_number(st_num_arg ? sp->u.ob : 0);
   if (st_num_arg) { free_object(&(sp--)->u.ob, "f_query_ip_number"); }
   if (!tmp) { push_number(0); }
-  else { share_and_push_string(tmp); }
+  else { copy_and_push_string(tmp); }
+
+  if(tmp) free_string(tmp);
 }
 #endif
 
@@ -2830,12 +2828,11 @@ f_replace_string(void)
 void
 f_resolve(void)
 {
-  int i;
+  LPC_INT i;
 
-  i = query_addr_number((sp - 1)->u.string, sp);
-  pop_stack();
-  free_string_svalue(sp);
-  put_number(i);
+  i = query_addr_by_name((sp - 1)->u.string, sp);
+  pop_2_elems();
+  push_number(i);
 }
 #endif
 

@@ -77,7 +77,7 @@ int growMap(mapping_t *m)
   }
   /* hash table doubles in size -- keep track of the memory used */
   total_mapping_size += sizeof(mapping_node_t *) * oldsize;
-  debug(mapping, ("mapping.c: growMap ptr = %p, size = %d\n", (void *)m, newsize));
+  debug(mapping, "mapping.c: growMap ptr = %p, size = %d\n", (void *)m, newsize);
   m->unfilled = oldsize * (unsigned)FILL_PERCENT / (unsigned)100;
   m->table_size = newsize - 1;
   /* zero out the new storage area (2nd half of table) */
@@ -113,7 +113,7 @@ mapping_t *mapTraverse(mapping_t *m, int (*func)(mapping_t *, mapping_node_t *, 
   mapping_node_t *elt, *nelt;
   int j = m->table_size;
 
-  debug(mapping, ("mapTraverse %p\n", (void *)m));
+  debug(mapping, "mapTraverse %p\n", (void *)m);
   do {
     for (elt = m->table[j]; elt; elt = nelt) {
       nelt = elt->next;
@@ -128,7 +128,7 @@ mapping_t *mapTraverse(mapping_t *m, int (*func)(mapping_t *, mapping_node_t *, 
 void
 dealloc_mapping(mapping_t *m)
 {
-  debug(mapping, ("mapping.c: actual free of %p\n", (void *)m));
+  debug(mapping, "mapping.c: actual free of %p\n", (void *)m);
   num_mappings--;
   {
     int j = m->table_size, c = MAP_COUNT(m);
@@ -164,7 +164,7 @@ dealloc_mapping(mapping_t *m)
 void
 free_mapping(mapping_t *m)
 {
-  debug(mapping, ("mapping.c: free_mapping begin, ptr = %p\n", (void *)m));
+  debug(mapping, "mapping.c: free_mapping begin, ptr = %p\n", (void *)m);
   /* some other object is still referencing this mapping */
   if (--m->ref > 0) {
     return;
@@ -258,7 +258,7 @@ allocate_mapping(int n)
 
   if (n > MAX_MAPPING_SIZE) { n = MAX_MAPPING_SIZE; }
   newmap = ALLOCATE(mapping_t, TAG_MAPPING, "allocate_mapping: 1");
-  debug(mapping, ("mapping.c: allocate_mapping begin, newmap = %p\n", (void *)newmap));
+  debug(mapping, "mapping.c: allocate_mapping begin, newmap = %p\n", (void *)newmap);
   if (newmap == NULL) {
     error("Allocate_mapping - out of memory.\n");
   }
@@ -487,13 +487,13 @@ void mapping_delete(mapping_t *m, svalue_t *lv)
       if (msameval(elt->values, lv)) {
         if (!(*prev = elt->next) && !m->table[i]) {
           m->unfilled++;
-          debug(mapping, ("mapping delete: bucket empty, unfilled = %i",
-                          m->unfilled));
+          debug(mapping, "mapping delete: bucket empty, unfilled = %i",
+                          m->unfilled);
         }
         m->count--;
         total_mapping_nodes--;
         total_mapping_size -= sizeof(mapping_node_t);
-        debug(mapping, ("mapping delete: count = %i", MAP_COUNT(m)));
+        debug(mapping, "mapping delete: count = %i", MAP_COUNT(m));
         free_svalue(elt->values, "mapping_delete");
         free_node(m, elt);
         return;
@@ -519,17 +519,17 @@ find_for_insert(mapping_t *m, svalue_t *lv, int doTheFree)
   unsigned int i = oi & m->table_size;
   mapping_node_t *n, *newnode, **a = m->table + i;
 
-  debug(mapping, ("mapping.c: hashed to %d\n", i));
+  debug(mapping, "mapping.c: hashed to %d\n", i);
   if ((n = *a)) {
     do {
       if (msameval(lv, n->values)) {
         /* normally, the f_assign would free the old value */
-        debug(mapping, ("mapping.c: found %p\n", (void *)(n->values)));
+        debug(mapping, "mapping.c: found %p\n", (void *)(n->values));
         if (doTheFree) { free_svalue(n->values + 1, "find_for_insert"); }
         return n->values + 1;
       }
     } while ((n = n->next));
-    debug(mapping, ("mapping.c: didn't find %p\n", (void *)lv));
+    debug(mapping, "mapping.c: didn't find %p\n", (void *)lv);
     n = *a;
   } else if (!(--m->unfilled)) {
     int size = m->table_size + 1;
@@ -609,7 +609,7 @@ void f_unique_mapping(void)
 
   // Translate into LPC mapping
   mapping_t *m = allocate_mapping(0);
-for (auto item: result) {
+  for (auto item: result) {
     auto key = item.first;
     auto values = item.second;
 
@@ -639,7 +639,7 @@ load_mapping_from_aggregate(svalue_t *sp, int n)
   int mask, i, oi, count = 0;
   mapping_node_t **a, *elt, *elt2;
 
-  debug(mapping, ("mapping.c: load_mapping_from_aggregate begin, size = %d\n", n));
+  debug(mapping, "mapping.c: load_mapping_from_aggregate begin, size = %d\n", n);
   m = allocate_mapping(n >> 1);
   if (!n) { return m; }
   mask = m->table_size;
@@ -904,7 +904,7 @@ add_mapping(mapping_t *m1, mapping_t *m2)
 {
   mapping_t *newmap;
 
-  debug(mapping, ("mapping.c: add_mapping begin: %p, %p", (void *)m1, (void *)m2));
+  debug(mapping, "mapping.c: add_mapping begin: %p, %p", (void *)m1, (void *)m2);
   if (MAP_COUNT(m1) >= MAP_COUNT(m2)) {
     if (MAP_COUNT(m2)) {
       add_to_mapping(newmap = copyMapping(m1), m2, 1);
@@ -1107,7 +1107,7 @@ mapping_indices(mapping_t *m)
   mapping_node_t *elt, **a = m->table;
   svalue_t *sv;
 
-  debug(mapping, ("mapping_indices: size = %d\n", MAP_COUNT(m)));
+  debug(mapping, "mapping_indices: size = %d\n", MAP_COUNT(m));
 
   v = allocate_empty_array(MAP_COUNT(m));
   sv = v->item;
@@ -1129,7 +1129,7 @@ mapping_values(mapping_t *m)
   mapping_node_t *elt, **a = m->table;
   svalue_t *sv;
 
-  debug(mapping, ("mapping_values: size = %d\n", MAP_COUNT(m)));
+  debug(mapping, "mapping_values: size = %d\n", MAP_COUNT(m));
 
   v = allocate_empty_array(MAP_COUNT(m));
   sv = v->item;

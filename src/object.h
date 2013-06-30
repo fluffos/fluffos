@@ -131,8 +131,8 @@ typedef int (* get_objectsfn_t)(object_t *, void *);
                 error("ref count too high!\n");\
                   } \
                               debug(d_flag, \
-                              ("Add_ref %s (%d) from %s\n", \
-                                     ob->obname, ob->ref, str));\
+                              "Add_ref %s (%d) from %s\n", \
+                                     ob->obname, ob->ref, str);\
                               )
 #else
 #define add_ref(ob, str) if(ob->ref++ > 32000){ob->flags|=O_BEING_DESTRUCTED;destruct_object(ob);error("ref count too high!\n");}

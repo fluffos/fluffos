@@ -22,7 +22,8 @@
 
    Please refer to options.h for selecting malloc package and wrapper.
 */
-#if (defined(SYSMALLOC) + defined(SMALLOC) + defined(BSDMALLOC) + defined(MMALLOC) + defined(GCMALLOC)) > 1
+#if (defined(SYSMALLOC) + defined(MMALLOC) + defined(GCMALLOC) + \
+  defined(MALLOC64) + defined(MALLOC32)) > 1
 #error Only one malloc package should be defined
 #endif
 
@@ -74,7 +75,7 @@
 #endif
 
 #define ALLOCATE(type, tag, desc) ((type *)DXALLOC(sizeof(type), tag, desc))
-#define CALLOCATE(num, type, tag, desc) ((type *)DXALLOC(sizeof(type[1]) * (num), tag, desc))
+#define CALLOCATE(num, type, tag, desc) ((type *)DCALLOC(sizeof(type[1]), num, tag, desc))
 #define RESIZE(ptr, num, type, tag, desc) ((type *)DREALLOC((void *)ptr, sizeof(type) * (num), tag, desc))
 
 #ifdef DEBUG

@@ -51,6 +51,8 @@ typedef struct {
   char *w_buf;
   int w_off;
   int w_len;
+  struct event *ev_read;
+  struct event *ev_write;
 } lpc_socket_t;
 
 extern lpc_socket_t *lpc_socks;

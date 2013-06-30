@@ -19,7 +19,7 @@ void set_eval(LPC_INT etime)
     diff *= 1000000;
     if (diff > max_cost * 100L) {
       //put some hard limit to eval times
-      debug(d_flag, ("difft:%" LPC_INT_FMTSTR_P ", max_cost:%" LPC_INT_FMTSTR_P, diff, max_cost));
+      debug(d_flag, "difft:%" LPC_INT_FMTSTR_P ", max_cost:%" LPC_INT_FMTSTR_P, diff, max_cost);
       outoftime = 1;
       return;
     }

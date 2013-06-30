@@ -6,7 +6,7 @@
 mapping_t *debug_levels(void);
 
 typedef struct {
-  char *name;
+  const char *name;
   int bit;
 } debug_t;
 
@@ -20,7 +20,10 @@ debug_t levels[] = {
   E(sockets),
   E(comp_func_tab),
   E(LPC),
-  E(LPC_line)
+  E(LPC_line),
+  E(event),
+  E(dns),
+  E(file),
 };
 
 #define NELEM(x) (sizeof(x)/sizeof(x[0]))

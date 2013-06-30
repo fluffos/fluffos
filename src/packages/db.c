@@ -1271,7 +1271,7 @@ static int SQLite3_execute(dbconn_t *c, const char *s)
 
 static array_t *SQLite3_fetch(dbconn_t *c, int row)
 {
-  int cols, last_row, length, i, r;
+  int cols, last_row, length, i;
   array_t *v;
 
   if (!c->SQLite3.results) {
@@ -1441,7 +1441,7 @@ static int Postgres_connect(dbconn_t *c, const char *host, const char *database,
 {
   int buffsize;
 
-  char *connstr = "host = '%s' dbname = '%s' user = '%s' password = '%s'";
+  const char *connstr = "host = '%s' dbname = '%s' user = '%s' password = '%s'";
   buffsize = strlen(connstr) + strlen(host) + strlen(database) + strlen(username) + strlen(password);
   char *conninfo = (char *)malloc(buffsize);
   if (conninfo != NULL) {
@@ -1460,7 +1460,6 @@ static int Postgres_connect(dbconn_t *c, const char *host, const char *database,
 static array_t *Postgres_fetch(dbconn_t *c, int row)
 {
   array_t *v;
-  char *field;
   unsigned int i, num_fields;
 
   if (!c->postgres.res) {

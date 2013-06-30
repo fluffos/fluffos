@@ -31,7 +31,7 @@ enum atypes {
 
 enum astates {
   BUSY,
-  DONE,
+  DONE
 };
 
 struct request {
@@ -330,7 +330,7 @@ void *getdirthread(struct request *req)
     return NULL;
   }
   req->ret = size;
-  while (size = syscall(SYS_getdents, fd, req->buf + req->ret, req->size - req->ret)) {
+  while ((size = syscall(SYS_getdents, fd, req->buf + req->ret, req->size - req->ret))) {
     if (size == -1) {
       close(fd);
       req->status = DONE;

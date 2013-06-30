@@ -30,8 +30,8 @@ dealloc_funp(funptr_t *fp)
 
   if (prog) {
     prog->func_ref--;
-    debug(d_flag, ("subtr func ref /%s: now %i\n",
-                   prog->filename, prog->func_ref));
+    debug(d_flag, "subtr func ref /%s: now %i\n",
+          prog->filename, prog->func_ref);
     if (!prog->func_ref && !prog->ref) {
       deallocate_program(prog);
     }
@@ -141,9 +141,9 @@ make_lfun_funp(int index, svalue_t *args)
   fp->hdr.type = FP_LOCAL | FP_NOT_BINDABLE;
 
   fp->hdr.owner->prog->func_ref++;
-  debug(d_flag, ("add func ref /%s: now %i\n",
-                 fp->hdr.owner->prog->filename,
-                 fp->hdr.owner->prog->func_ref));
+  debug(d_flag, "add func ref /%s: now %i\n",
+        fp->hdr.owner->prog->filename,
+        fp->hdr.owner->prog->func_ref);
 
   newindex = index + function_index_offset;
   if (current_object->prog->function_flags[newindex] & FUNC_ALIAS) {
@@ -202,9 +202,9 @@ make_functional_funp(short num_arg, short num_local, short len, svalue_t *args, 
   fp->hdr.type = FP_FUNCTIONAL + flag;
 
   current_prog->func_ref++;
-  debug(d_flag, ("add func ref /%s: now %i\n",
-                 current_prog->filename,
-                 current_prog->func_ref));
+  debug(d_flag, "add func ref /%s: now %i\n",
+        current_prog->filename,
+        current_prog->func_ref);
 
   fp->f.functional.prog = current_prog;
   fp->f.functional.offset = pc - current_prog->program;

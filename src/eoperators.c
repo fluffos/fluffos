@@ -343,10 +343,13 @@ f_lt()
         case T_NUMBER:
         case T_REAL:
           bad_argument(sp, T_NUMBER | T_REAL, 2, F_LT);
+          break;
         case T_STRING:
           bad_argument(sp, T_STRING, 2, F_LT);
+          break;
         default:
           bad_argument(sp - 1, T_NUMBER | T_STRING | T_REAL, 1, F_LT);
+          break;
       }
   }
   sp->subtype = 0;

@@ -2579,7 +2579,7 @@ static program_t *epilog(void)
 #ifdef DEBUG
   if (p - (char *)prog != size) {
     fprintf(stderr, "Program size miscalculated for /%s.\n", prog->filename);
-    fprintf(stderr, "is: %d, expected: %d\n", p - (char *)prog, size);
+    fprintf(stderr, "is: %ld, expected: %d\n", p - (char *)prog, size);
   }
 #endif
 

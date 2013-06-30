@@ -250,8 +250,8 @@ static void enable_commands(int num)
     return;
   }
 
-  debug(d_flag, ("Enable commands /%s (ref %d)",
-                 current_object->obname, current_object->ref));
+  debug(d_flag, "Enable commands /%s (ref %d)",
+        current_object->obname, current_object->ref);
 
   if (num) {
     current_object->flags |= O_ENABLE_COMMANDS;
@@ -293,7 +293,7 @@ static int user_parser(char *buff)
   int where;
   int save_illegal_sentence_action;
 
-  debug(d_flag, ("cmd [/%s]: %s\n", command_giver->obname, buff));
+  debug(d_flag, "cmd [/%s]: %s\n", command_giver->obname, buff);
 
   /* strip trailing spaces. */
   for (p = buff + strlen(buff) - 1; p >= buff; p--) {
@@ -353,8 +353,8 @@ static int user_parser(char *buff)
      */
 
     if (!(s->flags & V_FUNCTION))
-      debug(d_flag, ("Local command %s on /%s",
-                     s->function.s, s->ob->obname));
+      debug(d_flag, "Local command %s on /%s",
+            s->function.s, s->ob->obname);
 
     if (s->flags & V_NOSPACE) {
       int l1 = strlen(s->verb);
@@ -440,8 +440,10 @@ static int user_parser(char *buff)
       switch (illegal_sentence_action) {
         case 1:
           error("Illegal to call remove_action() [caller was /%s] from a verb returning zero.\n", illegal_sentence_ob->obname);
+          break;
         case 2:
           error("Illegal to move or destruct an object (/%s) defining actions from a verb function which returns zero.\n", illegal_sentence_ob->obname);
+          break;
       }
     }
   }
@@ -522,11 +524,11 @@ static void add_action(svalue_t *str, const char *cmd, int flag)
                  * did wrong. */
   p = alloc_sentence();
   if (str->type == T_STRING) {
-    debug(d_flag, ("--Add action %s", str->u.string));
+    debug(d_flag, "--Add action %s", str->u.string);
     p->function.s = make_shared_string(str->u.string);
     p->flags = flag;
   } else {
-    debug(d_flag, ("--Add action <function>"));
+    debug(d_flag, "--Add action <function>");
 
     p->function.f = str->u.fp;
     str->u.fp->hdr.ref++;
@@ -593,7 +595,7 @@ void remove_sent(object_t *ob, object_t *user)
     if ((*s)->ob == ob) {
 #ifdef DEBUG
       if (!((*s)->flags & V_FUNCTION)) {
-        debug(d_flag, ("--Unlinking sentence %s\n", (*s)->function.s));
+        debug(d_flag, "--Unlinking sentence %s\n", (*s)->function.s);
       }
 #endif
 
