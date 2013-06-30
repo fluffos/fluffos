@@ -42,6 +42,7 @@ void debug_level_clear(const char *);
 #define DBG_LPC_line        256
 #define DBG_event 512
 #define DBG_dns 1024
+#define DBG_file 2048
 
-#define DBG_DEFAULT (DBG_connections | DBG_sockets | DBG_dns)
+#define DBG_DEFAULT (DBG_connections | DBG_sockets | DBG_dns | DBG_file)
 #endif

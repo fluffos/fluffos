@@ -22,6 +22,8 @@ debug_t levels[] = {
   E(LPC),
   E(LPC_line),
   E(event),
+  E(dns),
+  E(file),
 };
 
 #define NELEM(x) (sizeof(x)/sizeof(x[0]))
