@@ -2236,7 +2236,7 @@ f_query_ip_number(void)
   if (!tmp) { push_number(0); }
   else { copy_and_push_string(tmp); }
 
-  if(tmp) free_string(tmp);
+  if (tmp) free_string(tmp);
 }
 #endif
 

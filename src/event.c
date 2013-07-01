@@ -13,11 +13,13 @@
 //FIXME: rewrite other part so this could become static.
 struct event_base *g_event_base = NULL;
 
-static void libevent_log(int severity, const char *msg) {
+static void libevent_log(int severity, const char *msg)
+{
   debug(event, "%d:%s\n", severity, msg);
 }
 
-static void libevent_dns_log(int severity, const char *msg) {
+static void libevent_dns_log(int severity, const char *msg)
+{
   debug(dns, "%d:%s\n", severity, msg);
 }
 
@@ -31,7 +33,7 @@ event_base *init_event_base()
 #endif
 
   g_event_base = event_base_new();
-  debug_message("Event backend in use: %s\n",event_base_get_method(g_event_base));
+  debug_message("Event backend in use: %s\n", event_base_get_method(g_event_base));
   return g_event_base;
 }
 
@@ -47,7 +49,7 @@ int run_for_at_most_one_second(struct event_base *base)
   static struct event *ev = NULL;
   static int in_loop = 0;
 
-  if(in_loop) {
+  if (in_loop) {
     fatal("Reentrant into event loop, this means some event handler not "
           "using safe_apply, not recoverable.\n");
     return 0;
@@ -74,7 +76,7 @@ static void on_user_read(evutil_socket_t fd, short what, void *arg)
 
   auto data = (user_event_data *)arg;
   auto user = all_users[data->idx];
-  if(user != NULL) get_user_data(user);
+  if (user != NULL) get_user_data(user);
 }
 
 static void on_user_write(evutil_socket_t fd, short what, void *arg)
@@ -88,7 +90,7 @@ static void on_user_write(evutil_socket_t fd, short what, void *arg)
 
   auto data = (user_event_data *)arg;
   auto user = all_users[data->idx];
-  if(user != NULL) flush_message(user);
+  if (user != NULL) flush_message(user);
 }
 
 void new_user_event_listener(int idx)
@@ -156,11 +158,11 @@ void add_lpc_sock_event()
 void on_lpc_sock_read(evutil_socket_t fd, short what, void *arg)
 {
   debug(event, "Got an event on socket %d:%s%s%s%s \n",
-                (int) fd,
-                (what & EV_TIMEOUT) ? " timeout" : "",
-                (what & EV_READ)    ? " read" : "",
-                (what & EV_WRITE)   ? " write" : "",
-                (what & EV_SIGNAL)  ? " signal" : "");
+        (int) fd,
+        (what & EV_TIMEOUT) ? " timeout" : "",
+        (what & EV_READ)    ? " read" : "",
+        (what & EV_WRITE)   ? " write" : "",
+        (what & EV_SIGNAL)  ? " signal" : "");
 
   auto data = (lpc_socket_event_data *)arg;
   socket_read_select_handler(data->idx);
@@ -168,11 +170,11 @@ void on_lpc_sock_read(evutil_socket_t fd, short what, void *arg)
 void on_lpc_sock_write(evutil_socket_t fd, short what, void *arg)
 {
   debug(event, "Got an event on socket %d:%s%s%s%s \n",
-                (int) fd,
-                (what & EV_TIMEOUT) ? " timeout" : "",
-                (what & EV_READ)    ? " read" : "",
-                (what & EV_WRITE)   ? " write" : "",
-                (what & EV_SIGNAL)  ? " signal" : "");
+        (int) fd,
+        (what & EV_TIMEOUT) ? " timeout" : "",
+        (what & EV_READ)    ? " read" : "",
+        (what & EV_WRITE)   ? " write" : "",
+        (what & EV_SIGNAL)  ? " signal" : "");
 
   auto data = (lpc_socket_event_data *)arg;
   socket_write_select_handler(data->idx);

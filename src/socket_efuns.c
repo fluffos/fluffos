@@ -362,7 +362,7 @@ int socket_bind(int fd, int port, const char *addr)
       debug(sockets, "socket_bind: binding to any address.\n");
       ret = getaddrinfo(NULL, service, &hints, &result);
     }
-    if(ret) {
+    if (ret) {
       debug(sockets, "socket_bind: error %s \n", gai_strerror(ret));
       return EEBADADDR;
     }
@@ -396,7 +396,7 @@ int socket_bind(int fd, int port, const char *addr)
   lpc_socks[fd].state = STATE_BOUND;
 
   debug(sockets, "socket_bind: bound lpc socket %d (real fd %d) to %s.\n",
-      fd, lpc_socks[fd].fd, sockaddr_to_string((struct sockaddr *)&lpc_socks[fd].l_addr, lpc_socks[fd].l_addrlen));
+        fd, lpc_socks[fd].fd, sockaddr_to_string((struct sockaddr *)&lpc_socks[fd].l_addr, lpc_socks[fd].l_addrlen));
 
   return EESUCCESS;
 }
@@ -658,7 +658,7 @@ int socket_write(int fd, svalue_t *message, const char *name)
   switch (lpc_socks[fd].mode) {
     case MUD:
       debug(sockets, "socket_write: sending tcp message to %s\n", sockaddr_to_string(
-          (struct sockaddr *)&lpc_socks[fd].r_addr, lpc_socks[fd].r_addrlen));
+              (struct sockaddr *)&lpc_socks[fd].r_addr, lpc_socks[fd].r_addrlen));
       switch (message->type) {
 
         case T_OBJECT:
@@ -878,8 +878,7 @@ void socket_read_select_handler(int fd)
         case STREAM:
           break;
 
-        case DATAGRAM:
-        {
+        case DATAGRAM: {
           char addr[NI_MAXHOST + NI_MAXSERV];
           debug(sockets, ("read_socket_handler: DATA_XFER DATAGRAM\n"));
           addrlen = sizeof(sockaddr);
@@ -902,11 +901,11 @@ void socket_read_select_handler(int fd)
           {
             char host[NI_MAXHOST], service[NI_MAXSERV];
             int ret = getnameinfo((struct sockaddr *) &sockaddr, addrlen, host,
-                sizeof(host), service, sizeof(service),
-                NI_NUMERICHOST | NI_NUMERICSERV);
+                                  sizeof(host), service, sizeof(service),
+                                  NI_NUMERICHOST | NI_NUMERICSERV);
             if (ret) {
               debug(sockets, "socket_read_select_handler: bad addr: %s",
-                  gai_strerror(ret));
+                    gai_strerror(ret));
               addr[0] = '\0';
             } else {
               sprintf(addr, "%s %s", host, service);
@@ -1206,15 +1205,15 @@ int socket_close(int fd, int flags)
   }
 
   // cleanup event listeners
-  if(lpc_socks[fd].ev_read != NULL) {
-       event_free(lpc_socks[fd].ev_read);
-       lpc_socks[fd].ev_read = NULL;
+  if (lpc_socks[fd].ev_read != NULL) {
+    event_free(lpc_socks[fd].ev_read);
+    lpc_socks[fd].ev_read = NULL;
   }
-  if(lpc_socks[fd].ev_write != NULL) {
-       event_free(lpc_socks[fd].ev_write);
-       lpc_socks[fd].ev_write = NULL;
+  if (lpc_socks[fd].ev_write != NULL) {
+    event_free(lpc_socks[fd].ev_write);
+    lpc_socks[fd].ev_write = NULL;
   }
-  if(lpc_socks[fd].ev_data != NULL) {
+  if (lpc_socks[fd].ev_data != NULL) {
     delete lpc_socks[fd].ev_data;
     lpc_socks[fd].ev_data = NULL;
   }
@@ -1341,9 +1340,9 @@ int get_socket_address(int fd, char *addr, int *port, int local)
 
   char host[NI_MAXHOST], service[NI_MAXSERV];
   int ret = getnameinfo(sockaddr, addrlen, host, sizeof(host),
-      service, sizeof(service),
-      NI_NUMERICHOST | NI_NUMERICSERV);
-  if(ret) {
+                        service, sizeof(service),
+                        NI_NUMERICHOST | NI_NUMERICSERV);
+  if (ret) {
 #ifdef IPV6
     strcpy(addr, "::");
 #else
@@ -1427,7 +1426,7 @@ static int string_to_sockaddr(const char *name, struct sockaddr *addr, socklen_t
   }
 
   memcpy(addr, res->ai_addr, res->ai_addrlen);
-  if(len != NULL) *len = res->ai_addrlen;
+  if (len != NULL) *len = res->ai_addrlen;
 
   freeaddrinfo(res);
 
@@ -1457,23 +1456,24 @@ void close_referencing_sockets(object_t *ob)
  * Return the string representation of a sockaddr.
  * NOTE: this special format is exposed to userland and should be preserved.
  */
-static char *old_sockaddr_to_string(struct sockaddr *addr, socklen_t len) {
+static char *old_sockaddr_to_string(struct sockaddr *addr, socklen_t len)
+{
   static char result[NI_MAXHOST + NI_MAXSERV];
 
   char host[NI_MAXHOST], service[NI_MAXSERV];
   int ret = getnameinfo(addr, len, host, sizeof(host),
-      service, sizeof(service),
-      NI_NUMERICHOST | NI_NUMERICSERV);
+                        service, sizeof(service),
+                        NI_NUMERICHOST | NI_NUMERICSERV);
 
-  if(ret) {
+  if (ret) {
     debug(sockets, "inet_address: %s", gai_strerror(ret));
     memset(result, 0, sizeof(result));
     return result;
   }
 
   snprintf(result, sizeof(result), "%s.%s",
-      ((strcmp(host, "::") == 0 || strcmp(host, "0.0.0.0") == 0) ? "*" : host),
-      ((strcmp(service, "0") == 0) ? "*" : service));
+           ((strcmp(host, "::") == 0 || strcmp(host, "0.0.0.0") == 0) ? "*" : host),
+           ((strcmp(service, "0") == 0) ? "*" : service));
 
   return result;
 }
@@ -1521,12 +1521,12 @@ array_t *socket_status(int which)
   ret->item[3].type = T_STRING;
   ret->item[3].subtype = STRING_MALLOC;
   ret->item[3].u.string = string_copy(
-      old_sockaddr_to_string((struct sockaddr *)&lpc_socks[which].l_addr, lpc_socks[which].l_addrlen), "socket_status");
+                            old_sockaddr_to_string((struct sockaddr *)&lpc_socks[which].l_addr, lpc_socks[which].l_addrlen), "socket_status");
 
   ret->item[4].type = T_STRING;
   ret->item[4].subtype = STRING_MALLOC;
   ret->item[3].u.string = string_copy(
-      old_sockaddr_to_string((struct sockaddr *)&lpc_socks[which].r_addr, lpc_socks[which].r_addrlen), "socket_status");
+                            old_sockaddr_to_string((struct sockaddr *)&lpc_socks[which].r_addr, lpc_socks[which].r_addrlen), "socket_status");
 
   if (!(lpc_socks[which].flags & STATE_FLUSHING) && lpc_socks[which].owner_ob && !(lpc_socks[which].owner_ob->flags & O_DESTRUCTED)) {
     ret->item[5].type = T_OBJECT;

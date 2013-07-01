@@ -392,7 +392,7 @@ void shutdown_external_ports()
 
   for (i = 0; i < 5; i++) {
     if (!external_port[i].port) { continue; }
-    if(external_port[i].ev_read) event_free(external_port[i].ev_read);
+    if (external_port[i].ev_read) event_free(external_port[i].ev_read);
     if (OS_socket_close(external_port[i].fd) == -1) {
       socket_perror("ipc_remove: close", 0);
     }
@@ -2165,7 +2165,7 @@ void remove_interactive(object_t *ob, int dested)
     return;
   }
   debug(connections, "Closing connection from %s.\n",
-      sockaddr_to_string((struct sockaddr *)&ip->addr, ip->addrlen));
+        sockaddr_to_string((struct sockaddr *)&ip->addr, ip->addrlen));
   flush_message(ip);
   ip->iflags |= CLOSING;
 
@@ -2203,15 +2203,15 @@ void remove_interactive(object_t *ob, int dested)
 #endif
 
   // Cleanup events
-  if(ip->ev_read != NULL) {
+  if (ip->ev_read != NULL) {
     event_free(ip->ev_read);
     ip->ev_read = NULL;
   }
-  if(ip->ev_write != NULL) {
+  if (ip->ev_write != NULL) {
     event_free(ip->ev_write);
     ip->ev_write = NULL;
   }
-  if(ip->ev_data != NULL) {
+  if (ip->ev_data != NULL) {
     delete ip->ev_data;
     ip->ev_data = NULL;
   }

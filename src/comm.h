@@ -229,21 +229,22 @@ void mark_iptable(void);
 
 void new_user_handler(port_def_t *);
 
-inline const char* sockaddr_to_string(const sockaddr* addr, socklen_t len) {
+inline const char *sockaddr_to_string(const sockaddr *addr, socklen_t len)
+{
   static char result[NI_MAXHOST + NI_MAXSERV];
 
   char host[NI_MAXHOST], service[NI_MAXSERV];
   int ret = getnameinfo(addr, len, host, sizeof(host),
-      service, sizeof(service),
-      NI_NUMERICHOST | NI_NUMERICSERV);
+                        service, sizeof(service),
+                        NI_NUMERICHOST | NI_NUMERICSERV);
 
-  if(ret) {
+  if (ret) {
     strcpy(result, "<invalid address>");
     return result;
   }
 
   snprintf(result, sizeof(result),
-      strchr(host, ':') != NULL ? "[%s]:%s" : "%s:%s", host, service);
+           strchr(host, ':') != NULL ? "[%s]:%s" : "%s:%s", host, service);
 
   return result;
 }
