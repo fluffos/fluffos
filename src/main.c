@@ -426,31 +426,17 @@ void debug_message(const char *fmt, ...)
     }
   }
 
-  std::string result;
-
-  // FIXME: hack, adding a time header for message that doesn't contain "\n"
-  if (strchr(fmt, '\n') == NULL) {
-    char message[1024];
-    time_t rawtime;
-    time(&rawtime);
-    strftime(message, sizeof(message), "[%Y-%m-%d %H:%M:%S] ",
-             localtime(&rawtime));
-    result = std::string(message);
-  }
-
   char message[1024];
   V_START(args, fmt);
   V_VAR(char *, fmt, args);
   vsnprintf(message, 1024, fmt, args);
   va_end(args);
 
-  result.append(message);
-
   if (debug_message_fp != stderr) {
-    fprintf(debug_message_fp, "%s", result.c_str());
+    fprintf(debug_message_fp, "%s", message);
     fflush(debug_message_fp);
   }
-  fprintf(stderr, "%s", result.c_str());
+  fprintf(stderr, "%s", message);
   fflush(stderr);
 }
 
