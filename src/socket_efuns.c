@@ -13,6 +13,7 @@
 #include "comm.h"
 #include "file.h"
 #include "master.h"
+#include "event.h"
 
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 
@@ -85,17 +86,8 @@ static void clear_socket(int which, int dofree)
   lpc_socks[which].w_buf = NULL;
   lpc_socks[which].w_off = 0;
   lpc_socks[which].w_len = 0;
-
-  // cleanup event listeners
-  if (lpc_socks[which].ev_read != NULL) {
-    event_free(lpc_socks[which].ev_read);
-    lpc_socks[which].ev_read = NULL;
-  }
-
-  if (lpc_socks[which].ev_write != NULL) {
-    event_free(lpc_socks[which].ev_write);
-    lpc_socks[which].ev_write = NULL;
-  }
+  lpc_socks[which].ev_read = NULL;
+  lpc_socks[which].ev_write = NULL;
 }
 
 /*
@@ -236,49 +228,6 @@ int find_new_socket(void)
 }
 
 #ifdef PACKAGE_SOCKETS
-extern struct event_base *g_event_base;
-
-void on_lpc_sock_read(evutil_socket_t fd, short what, void *arg)
-{
-  debug(event, "Got an event on socket %d:%s%s%s%s \n",
-                (int) fd,
-                (what & EV_TIMEOUT) ? " timeout" : "",
-                (what & EV_READ)    ? " read" : "",
-                (what & EV_WRITE)   ? " write" : "",
-                (what & EV_SIGNAL)  ? " signal" : "");
-
-  auto lpc = (lpc_socket_t *)arg;
-  //FIXME: pointer arith
-  socket_read_select_handler(lpc - lpc_socks);
-}
-void on_lpc_sock_write(evutil_socket_t fd, short what, void *arg)
-{
-  debug(event, "Got an event on socket %d:%s%s%s%s \n",
-                (int) fd,
-                (what & EV_TIMEOUT) ? " timeout" : "",
-                (what & EV_READ)    ? " read" : "",
-                (what & EV_WRITE)   ? " write" : "",
-                (what & EV_SIGNAL)  ? " signal" : "");
-
-  auto lpc = (lpc_socket_t *)arg;
-  //FIXME: pointer arith
-  socket_write_select_handler(lpc - lpc_socks);
-}
-
-// Initialize LPC socket data structure and register events
-void init_lpc_socket(lpc_socket_t *target, evutil_socket_t real_fd)
-{
-  memset(target, 0, sizeof(lpc_socket_t));
-
-  target->l_addrlen = sizeof(target->l_addr);
-  target->r_addrlen = sizeof(target->r_addr);
-
-  target->ev_read = event_new(g_event_base, real_fd, EV_READ | EV_PERSIST,
-                              on_lpc_sock_read, target);
-  target->ev_write = event_new(g_event_base, real_fd, EV_WRITE,
-                               on_lpc_sock_write, target);
-}
-
 /*
  * Create an LPC efun socket
  */
@@ -337,7 +286,7 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
     fcntl(fd, F_SETFD, FD_CLOEXEC);
 #endif
 
-    init_lpc_socket(&lpc_socks[i], fd);
+    new_lpc_socket_event_listener(i, fd);
 
     lpc_socks[i].fd = fd;
     lpc_socks[i].flags = S_HEADER;
@@ -555,7 +504,7 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback)
 
   i = find_new_socket();
   if (i >= 0) {
-    init_lpc_socket(&lpc_socks[i], accept_fd);
+    new_lpc_socket_event_listener(i, accept_fd);
 
     fd_set wmask;
 
@@ -1254,6 +1203,20 @@ int socket_close(int fd, int flags)
      */
     lpc_socks[fd].state = STATE_FLUSHING;
     return EESUCCESS;
+  }
+
+  // cleanup event listeners
+  if(lpc_socks[fd].ev_read != NULL) {
+       event_free(lpc_socks[fd].ev_read);
+       lpc_socks[fd].ev_read = NULL;
+  }
+  if(lpc_socks[fd].ev_write != NULL) {
+       event_free(lpc_socks[fd].ev_write);
+       lpc_socks[fd].ev_write = NULL;
+  }
+  if(lpc_socks[fd].ev_data != NULL) {
+    delete lpc_socks[fd].ev_data;
+    lpc_socks[fd].ev_data = NULL;
   }
 
   while (OS_socket_close(lpc_socks[fd].fd) == -1 && socket_errno == EINTR) {

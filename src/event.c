@@ -152,6 +152,41 @@ void add_lpc_sock_event()
     }
   }
 }
+
+void on_lpc_sock_read(evutil_socket_t fd, short what, void *arg)
+{
+  debug(event, "Got an event on socket %d:%s%s%s%s \n",
+                (int) fd,
+                (what & EV_TIMEOUT) ? " timeout" : "",
+                (what & EV_READ)    ? " read" : "",
+                (what & EV_WRITE)   ? " write" : "",
+                (what & EV_SIGNAL)  ? " signal" : "");
+
+  auto data = (lpc_socket_event_data *)arg;
+  socket_read_select_handler(data->idx);
+}
+void on_lpc_sock_write(evutil_socket_t fd, short what, void *arg)
+{
+  debug(event, "Got an event on socket %d:%s%s%s%s \n",
+                (int) fd,
+                (what & EV_TIMEOUT) ? " timeout" : "",
+                (what & EV_READ)    ? " read" : "",
+                (what & EV_WRITE)   ? " write" : "",
+                (what & EV_SIGNAL)  ? " signal" : "");
+
+  auto data = (lpc_socket_event_data *)arg;
+  socket_write_select_handler(data->idx);
+}
+
+// Initialize LPC socket data structure and register events
+void new_lpc_socket_event_listener(int idx, evutil_socket_t real_fd)
+{
+  auto data = new lpc_socket_event_data;
+  data->idx = idx;
+  lpc_socks[idx].ev_read = event_new(g_event_base, real_fd, EV_READ | EV_PERSIST, on_lpc_sock_read, data);
+  lpc_socks[idx].ev_write = event_new(g_event_base, real_fd, EV_WRITE, on_lpc_sock_write, data);
+  lpc_socks[idx].ev_data = data;
+}
 #endif
 
 #ifdef HAS_CONSOLE
