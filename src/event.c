@@ -2,6 +2,7 @@
 
 #include <event2/event.h>
 #include <event2/dns.h>
+#include <event2/util.h>
 
 #include "comm.h" // for user socket
 #include "console.h" // for console
@@ -10,12 +11,23 @@
 //FIXME: rewrite other part so this could become static.
 struct event_base *g_event_base = NULL;
 
+static void libevent_log(int severity, const char *msg) {
+  debug(event, "%d:%s\n", severity, msg);
+}
+
+static void libevent_dns_log(int severity, const char *msg) {
+  debug(dns, "%d:%s\n", severity, msg);
+}
+
 // Init a new event loop.
 event_base *init_event_base()
 {
 #ifdef DEBUG
   event_enable_debug_mode();
+  event_set_log_callback(libevent_log);
+  evdns_set_log_fn(libevent_dns_log);
 #endif
+
   g_event_base = event_base_new();
   debug_message("Event backend in use: %s\n",event_base_get_method(g_event_base));
   return g_event_base;

@@ -62,7 +62,7 @@ f_socket_bind(void)
   get_socket_address(fd, addr, &port, 0);
 
   if (VALID_SOCKET("bind")) {
-    i = socket_bind(fd, arg[1].u.number, (num_arg == 3 ? arg[2].u.string : 0));
+    i = socket_bind(fd, arg[1].u.number, (num_arg == 3 ? arg[2].u.string : NULL));
     pop_n_elems(num_arg - 1);
     sp->u.number = i;
   } else {
@@ -154,9 +154,8 @@ f_socket_connect(void)
     }
 #ifdef DEBUG
   } else {
-    fprintf(stderr, "socket_connect: socket already bound to address/port: %s/%d\n",
-            addr, port);
-    fprintf(stderr, "socket_connect: requested on: %s\n", (sp - 2)->u.string);
+    debug_message("socket_connect: socket already bound to address/port: %s/%d\n", addr, port);
+    debug_message("socket_connect: but requested to connect to: %s\n", (sp - 2)->u.string);
 #endif
   }
 
@@ -291,18 +290,19 @@ f_socket_address(void)
       *sp = const0u;
       return;
     }
-#ifdef IPV6
-    char tmp2[INET6_ADDRSTRLEN];
-    tmp = inet_ntop(AF_INET6, &sp->u.ob->interactive->addr.sin6_addr, tmp2, INET6_ADDRSTRLEN);
-    sprintf(buf, "%s %d", tmp, ntohs(sp->u.ob->interactive->addr.sin6_port));
-#else
-    tmp = inet_ntoa(sp->u.ob->interactive->addr.sin_addr);
-    sprintf(buf, "%s %d", tmp,
-            ntohs(sp->u.ob->interactive->addr.sin_port));
-#endif
+
+    char host[NI_MAXHOST], service[NI_MAXSERV];
+    int ret= getnameinfo((struct sockaddr *)&sp->u.ob->interactive->addr, sp->u.ob->interactive->addrlen,
+        host, sizeof(host), service, sizeof(service), NI_NUMERICHOST | NI_NUMERICSERV);
+    if(ret) {
+      strcpy(host, "0.0.0.0");
+      strcpy(service, "0");
+    }
+    sprintf(buf, "%s %s", host, service);
+
     str = string_copy(buf, "f_socket_address");
-    free_object(&sp->u.ob, "f_socket_address:2");
-    put_malloced_string(str);
+    pop_stack();
+    push_malloced_string(str);
     return;
   }
   get_socket_address(sp->u.number, addr, &port, local);

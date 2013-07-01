@@ -1,4 +1,3 @@
-#define SUPPRESS_COMPILER_S
 #include "../std.h"
 #include "../lpc_incl.h"
 #include "../comm.h"
@@ -161,14 +160,26 @@ f_store_variable(void)
   svalue_t *sv;
   unsigned short type;
 
-  idx = find_global_variable(current_object->prog, (sp - 1)->u.string, &type, 0);
-  if (idx == -1) {
-    error("No variable named '%s'!\n", (sp - 1)->u.string);
+  const char *name = NULL;
+  object_t *ob;
+
+  if (st_num_arg == 3) {
+    ob = sp->u.ob;
+    sv = (sp - 1);
+    name = (sp - 2)->u.string;
+  } else {
+    ob = current_object;
+    sv = sp;
+    name = (sp - 1)->u.string;
   }
-  sv = &current_object->variables[idx];
-  free_svalue(sv, "f_store_variable");
-  *sv = *sp--;
-  free_string_svalue(sp--);
+
+  idx = find_global_variable(ob->prog, name, &type, 0);
+  if (idx == -1 || (type & DECL_PRIVATE)) {
+    error("No variable named '%s'!\n", name);
+    return ;
+  }
+  ob->variables[idx] = *sv;
+  pop_n_elems(st_num_arg);
 }
 #endif
 
@@ -177,16 +188,26 @@ void
 f_fetch_variable(void)
 {
   int idx;
-  svalue_t *sv;
   unsigned short type;
 
-  idx = find_global_variable(current_object->prog, sp->u.string, &type, 0);
-  if (idx == -1) {
-    error("No variable named '%s'!\n", sp->u.string);
+  const char *name = NULL;
+  object_t *ob;
+
+  if (st_num_arg == 2) {
+    ob = sp->u.ob;
+    name = (sp -1)->u.string;
+  } else {
+    ob = current_object;
+    name = (sp)->u.string;
   }
-  sv = &current_object->variables[idx];
-  free_string_svalue(sp--);
-  push_svalue(sv);
+
+  idx = find_global_variable(ob->prog, name, &type, 0);
+
+  if (idx == -1 || (type & DECL_PRIVATE)) {
+    error("No variable named '%s'!\n", name);
+  }
+  pop_n_elems(st_num_arg);
+  push_svalue(&ob->variables[idx]);
 }
 #endif
 
