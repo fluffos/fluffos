@@ -1853,7 +1853,7 @@ void new_user_handler(port_def_t *port)
   master = master_ob;
   add_ref(master_ob, "new_user");
   push_number(port->port);
-  ret = apply_master_ob(APPLY_CONNECT, 1);
+  ret = safe_apply_master_ob(APPLY_CONNECT, 1);
   /* master_ob->interactive can be zero if the master object self
      destructed in the above (don't ask) */
   set_command_giver(0);
@@ -1913,7 +1913,18 @@ void new_user_handler(port_def_t *port)
     add_binary_message(ob, telnet_will_gmcp, sizeof(telnet_will_gmcp));
   }
 
-  logon(ob);
+  // Call logon() on the object.
+  if (!(ob->flags & O_DESTRUCTED)) {
+    /* current_object no longer set */
+    ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
+    if (ret == NULL) {
+      debug_message("new_user_handler: logon() on object %s has failed, the user is left dangling.\n", ob->obname);
+    }
+    /* function not existing is no longer fatal */
+  } else {
+    debug_message("new_user_handler: object is gone before logon(), the user is left dangling. \n");
+  }
+
   debug(connections, ("new_user_handler: end\n"));
   set_command_giver(0);
 }                               /* new_user_handler() */
@@ -2191,6 +2202,12 @@ void remove_interactive(object_t *ob, int dested)
   }
 #endif
 
+  // Cleanup events
+  event_free(ip->ev_read);
+  event_free(ip->ev_write);
+  ip->ev_read = NULL;
+  ip->ev_write = NULL;
+
   debug(connections, "remove_interactive: closing fd %d\n", ip->fd);
   if (OS_socket_close(ip->fd) == -1) {
     socket_perror("remove_interactive: close", 0);
@@ -2217,10 +2234,6 @@ void remove_interactive(object_t *ob, int dested)
   for (idx = 0; idx < max_users; idx++)
     if (all_users[idx] == ip) { break; }
   DEBUG_CHECK(idx == max_users, "remove_interactive: could not find and remove user!\n");
-
-  // Cleanup events
-  event_free(ip->ev_read);
-  event_free(ip->ev_write);
 
   FREE(ip->sb_buf);
   FREE(ip);

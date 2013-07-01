@@ -80,16 +80,6 @@ static void report_holes()
 }
 #endif
 
-void logon(object_t *ob)
-{
-  if (ob->flags & O_DESTRUCTED) {
-    return;
-  }
-  /* current_object no longer set */
-  apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
-  /* function not existing is no longer fatal */
-}
-
 /*
  * This is the backend. We will stay here for ever (almost).
  */
