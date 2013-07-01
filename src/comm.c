@@ -1831,7 +1831,7 @@ void new_user_handler(port_def_t *port)
   all_users[i]->external_port = (port - external_port); // FIXME: pointer arith
 #endif
 
-  new_user_event_listener(all_users[i]);
+  new_user_event_listener(i);
 
   // all_users[i] setup finishes
   set_prompt("> ");
@@ -2203,10 +2203,18 @@ void remove_interactive(object_t *ob, int dested)
 #endif
 
   // Cleanup events
-  event_free(ip->ev_read);
-  event_free(ip->ev_write);
-  ip->ev_read = NULL;
-  ip->ev_write = NULL;
+  if(ip->ev_read != NULL) {
+    event_free(ip->ev_read);
+    ip->ev_read = NULL;
+  }
+  if(ip->ev_write != NULL) {
+    event_free(ip->ev_write);
+    ip->ev_write = NULL;
+  }
+  if(ip->ev_data != NULL) {
+    delete ip->ev_data;
+    ip->ev_data = NULL;
+  }
 
   debug(connections, "remove_interactive: closing fd %d\n", ip->fd);
   if (OS_socket_close(ip->fd) == -1) {
