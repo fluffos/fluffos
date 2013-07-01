@@ -5,7 +5,7 @@ if test $# -ne 0; then
     develop)
       echo Preparing to build developmental version of MudOS driver ...
       OPTIMIZE="-O0"
-      DEBUG="-g -Wall -pedantic -D_FORTIFY_SOURCE=2 -DDEBUG -DDEBUG_MACRO"
+      DEBUG="-g -gdwarf-2 -Wall -pedantic -D_FORTIFY_SOURCE=2 -DDEBUG -DDEBUG_MACRO"
       shift
       ;;
     *)
@@ -23,7 +23,8 @@ CXXFLAGS="--std=c++0x -D_GNU_SOURCE -fno-omit-frame-pointer"
 COMPILER_FLAGS=${COMPILER_FLAGS:-"-march=native"}
 
 OPTIMIZE=${OPTIMIZE:-"-O3"}
-DEBUG=${DEBUG:-"-g"}
+# GCC 4.8 default to dwarf-4, but old gdb etc can't read them.
+DEBUG=${DEBUG:-"-g -gdwarf-2"}
 
 # Change this if you want to use another make.
 MAKE=make

@@ -282,12 +282,12 @@ void init_user_conn()
       struct addrinfo hints;
       memset(&hints, 0, sizeof(struct addrinfo));
 #ifdef IPV6
-      hints.ai_family = AF_UNSPEC; /* Allow IPv6 and IPv4 */
+      hints.ai_family = AF_INET6;
 #else
-      hints.ai_family = AF_INET; /* Allow IPv4 */
+      hints.ai_family = AF_INET;
 #endif
-      hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
-      hints.ai_flags = AI_PASSIVE | AI_NUMERICHOST | AI_NUMERICSERV;
+      hints.ai_socktype = SOCK_STREAM;
+      hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV | AI_V4MAPPED;
 
       int ret;
       if (MUD_IP[0]) {
@@ -348,7 +348,11 @@ void init_user_conn()
     /*
      * listen on socket for connections.
      */
-    debug_message("Accepting connections on port %d.\n", external_port[i].port);
+    sockaddr_storage addr;
+    socklen_t len = sizeof(addr);
+    getsockname(external_port[i].fd, (sockaddr *)&addr, &len);
+    debug_message("Accepting connections on %s.\n", sockaddr_to_string((sockaddr *)&addr, len));
+
     if (listen(external_port[i].fd, 128) == -1) {
       socket_perror("init_user_conn: listen", 0);
       if (i != fd6_which) {
@@ -1833,6 +1837,7 @@ void new_user_handler(port_def_t *port)
   set_prompt("> ");
 
   memcpy((char *) &all_users[i]->addr, (char *)&addr, length);
+  all_users[i]->addrlen = length;
 
   char host[NI_MAXHOST];
   getnameinfo((sockaddr *)&addr, length, host, sizeof(host), NULL, 0 , NI_NUMERICHOST);
@@ -2148,12 +2153,8 @@ void remove_interactive(object_t *ob, int dested)
     }
     return;
   }
-#ifdef IPV6
-  char tmp[INET6_ADDRSTRLEN];
-  debug(connections, "Closing connection from %s.\n", inet_ntop(AF_INET6, &ip->addr.sin6_addr, tmp, INET6_ADDRSTRLEN));
-#else
-  debug(connections, "Closing connection from %s.\n", inet_ntoa(ip->addr.sin_addr));
-#endif
+  debug(connections, "Closing connection from %s.\n",
+      sockaddr_to_string((struct sockaddr *)&ip->addr, ip->addrlen));
   flush_message(ip);
   ip->iflags |= CLOSING;
 
