@@ -20,7 +20,6 @@ extern int time_for_hb;
 void backend(struct event_base *);
 
 void clear_state(void);
-void logon(object_t *);
 int parse_command(char *, object_t *);
 int set_heart_beat(object_t *, int);
 int query_heart_beat(object_t *);

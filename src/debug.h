@@ -25,7 +25,14 @@ void debug_level_clear(const char *);
 
 #ifdef DEBUG_MACRO
 #define debug(x,...) if (debug_level & DBG_##x) { \
-  debug_message("%s: ", #x); debug_message( __VA_ARGS__ ); }
+  char buf[1024], tbuf[64]; \
+  time_t rawtime; \
+  time(&rawtime); \
+  strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %H:%M:%S", localtime(&rawtime)); \
+  snprintf(buf, sizeof(buf), __VA_ARGS__); \
+  debug_message("[%s] %s: %s", tbuf, #x, buf);  \
+}
+
 #else
 #define debug(x,...)
 #endif
