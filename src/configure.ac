@@ -54,13 +54,14 @@ AC_CHECK_FUNCS([atexit drand48 doprnt dup2 floor getcwd gethostbyaddr gethostbyn
 
 AC_CHECK_FUNCS([getrusage])
 
+# This check must before all F_HAVE_PREDEFINE checks.
+# Checks local_options exist, use a grauntee exist predefine.
+F_HAVE_PREDEFINE([__cplusplus], [], [AC_MSG_ERROR([[You must have local_options file, see options.h.]])])
+
 # FluffOS need libevent 2.0+
 AX_LIB_EVENT([2.0])
 F_HAVE_PREDEFINE([HAVE_LIBEVENT], [],
   [AC_MSG_ERROR([[Fail to find libevent (2.0+) header/library, install libevent-dev or change --with_libevent]])])
-
-# Checks local_options exist, use a grauntee exist predefine.
-F_HAVE_PREDEFINE([__cplusplus], [], [AC_MSG_ERROR([[You must have local_options file, see options.h.]])])
 
 # Checking local_options related libraries
 F_HAVE_PREDEFINE([HAVE_ZLIB], [AC_SEARCH_LIBS([gzread], [z])])
