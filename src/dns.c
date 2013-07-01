@@ -20,7 +20,7 @@ void init_dns_event_base(struct event_base *base)
 static void add_ip_entry(struct sockaddr *, socklen_t size, char *);
 
 typedef struct addr_name_query_s {
-  sockaddr *addr;
+  sockaddr_storage addr;
   socklen_t addrlen;
   struct evdns_request *req;
 } addr_name_query_t;
@@ -39,7 +39,7 @@ void on_addr_name_result(int err, char type, int count,
   } else {
     auto result = *((char **)addresses);
     debug(dns, "DNS reverse lookup result: %d: %s\n", type, result);
-    add_ip_entry(query->addr, query->addrlen, result);
+    add_ip_entry((sockaddr *)&query->addr, query->addrlen, result);
   }
   delete query;
 }
@@ -53,12 +53,14 @@ void query_name_by_addr(object_t *ob)
   debug(dns, "query_name_by_addr: starting lookup for %s.\n", addr);
   free_string(addr);
 
-  query->addr = (sockaddr *)&ob->interactive->addr;
+  // By the time resolve finish, ob may be already gone, we have to
+  // copy the address.
+  memcpy(&query->addr, &ob->interactive->addr, ob->interactive->addrlen);
   query->addrlen = ob->interactive->addrlen;
 
   // Check for mapped v4 address, if we are querying for v6 address.
-  if (query->addr->sa_family == AF_INET6) {
-    in6_addr *addr6 = &(((sockaddr_in6 *)(query->addr))->sin6_addr);
+  if (query->addr.ss_family == AF_INET6) {
+    in6_addr *addr6 = &(((sockaddr_in6 *)(&query->addr))->sin6_addr);
     if (IN6_IS_ADDR_V4MAPPED(addr6) || IN6_IS_ADDR_V4COMPAT(addr6)) {
       in_addr *addr4 = &((in_addr *)(addr6))[3];
       debug(dns, "Found mapped v4 address, using extracted v4 address to resolve.\n")
@@ -71,7 +73,7 @@ void query_name_by_addr(object_t *ob)
                      on_addr_name_result, query);
     }
   } else {
-    in_addr *addr4 = &((sockaddr_in *)query->addr)->sin_addr;
+    in_addr *addr4 = &((sockaddr_in *)&query->addr)->sin_addr;
     query->req = evdns_base_resolve_reverse(
                    g_dns_base, addr4, 0, on_addr_name_result, query);
   }
@@ -111,7 +113,7 @@ void on_query_addr_by_name_finish(evutil_socket_t fd, short what, void *arg)
       debug(dns, "on_query_addr_by_name_finish: getnameinfo: %s \n", gai_strerror(ret));
       push_undefined();
     }
-    debug(dns, "DNS lookup success: id %d: %s -> %s \n", query->key, query->name, host);
+    debug(dns, "DNS lookup success: id %" LPC_INT_FMTSTR_P ": %s -> %s \n", query->key, query->name, host);
   }
 
 
@@ -173,7 +175,7 @@ LPC_INT query_addr_by_name(const char *name, svalue_t *call_back)
   query->req = evdns_getaddrinfo(
                  g_dns_base, name, NULL, &hints, on_getaddr_result, query);
 
-  debug(dns, "DNS lookup scheduled: %d, %s\n", query->key, name);
+  debug(dns, "DNS lookup scheduled: %" LPC_INT_FMTSTR_P ", %s\n", query->key, name);
 
   return query->key;
 }                               /* query_addr_number() */
