@@ -5738,6 +5738,26 @@ fi
 done
 
 
+# This check must before all F_HAVE_PREDEFINE checks.
+# Checks local_options exist, use a grauntee exist predefine.
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+      #include "local_options"
+      #ifndef __cplusplus
+      #error not defined
+      #endif
+
+
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+
+else
+  as_fn_error $? "You must have local_options file, see options.h." "$LINENO" 5
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+
 # FluffOS need libevent 2.0+
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -6613,25 +6633,6 @@ if ac_fn_cxx_try_compile "$LINENO"; then :
 
 else
   as_fn_error $? "Fail to find libevent (2.0+) header/library, install libevent-dev or change --with_libevent" "$LINENO" 5
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-
-
-# Checks local_options exist, use a grauntee exist predefine.
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-      #include "local_options"
-      #ifndef __cplusplus
-      #error not defined
-      #endif
-
-
-_ACEOF
-if ac_fn_cxx_try_compile "$LINENO"; then :
-
-else
-  as_fn_error $? "You must have local_options file, see options.h." "$LINENO" 5
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 

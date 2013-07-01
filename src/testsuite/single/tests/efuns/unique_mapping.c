@@ -20,4 +20,8 @@ void do_tests() {
     // Old behavior, error in callback are passed through.
     ASSERT_EQ("whatever",
     		catch(unique_mapping(arr, (: throw("whatever") :))));
+
+    arr = ({ this_player(), "123", arr });
+    ASSERT_EQ(([ 0: ({ ({ 1, 2, 3, 4, 5 }), "123", this_player() }) ]),
+      unique_mapping(arr, (: 0 :)));
 }
