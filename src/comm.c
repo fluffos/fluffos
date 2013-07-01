@@ -2191,6 +2191,12 @@ void remove_interactive(object_t *ob, int dested)
   }
 #endif
 
+  // Cleanup events
+  event_free(ip->ev_read);
+  event_free(ip->ev_write);
+  ip->ev_read = NULL;
+  ip->ev_write = NULL;
+
   debug(connections, "remove_interactive: closing fd %d\n", ip->fd);
   if (OS_socket_close(ip->fd) == -1) {
     socket_perror("remove_interactive: close", 0);
@@ -2217,10 +2223,6 @@ void remove_interactive(object_t *ob, int dested)
   for (idx = 0; idx < max_users; idx++)
     if (all_users[idx] == ip) { break; }
   DEBUG_CHECK(idx == max_users, "remove_interactive: could not find and remove user!\n");
-
-  // Cleanup events
-  event_free(ip->ev_read);
-  event_free(ip->ev_write);
 
   FREE(ip->sb_buf);
   FREE(ip);
