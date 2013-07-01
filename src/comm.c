@@ -1913,7 +1913,18 @@ void new_user_handler(port_def_t *port)
     add_binary_message(ob, telnet_will_gmcp, sizeof(telnet_will_gmcp));
   }
 
-  logon(ob);
+  // Call logon() on the object.
+  if (!(ob->flags & O_DESTRUCTED)) {
+    /* current_object no longer set */
+    ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
+    if (ret == NULL) {
+      debug_message("new_user_handler: logon() on object %s has failed, the user is left dangling.\n", ob->obname);
+    }
+    /* function not existing is no longer fatal */
+  } else {
+    debug_message("new_user_handler: object is gone before logon(), the user is left dangling. \n");
+  }
+
   debug(connections, ("new_user_handler: end\n"));
   set_command_giver(0);
 }                               /* new_user_handler() */
