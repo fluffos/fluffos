@@ -195,7 +195,7 @@ f_fetch_variable(void)
 
   if (st_num_arg == 2) {
     ob = sp->u.ob;
-    name = (sp -1)->u.string;
+    name = (sp - 1)->u.string;
   } else {
     ob = current_object;
     name = (sp)->u.string;

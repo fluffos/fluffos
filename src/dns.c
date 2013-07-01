@@ -96,7 +96,7 @@ void on_query_addr_by_name_finish(evutil_socket_t fd, short what, void *arg)
 
   if (query->err) {
     debug(dns, "DNS lookup fail: %" LPC_INT_FMTSTR_P ",request: %s, err: %s.\n",
-        query->key, query->name, evutil_gai_strerror(query->err));
+          query->key, query->name, evutil_gai_strerror(query->err));
     push_undefined();
     push_undefined();
   } else {
@@ -215,7 +215,7 @@ const char *query_ip_name(object_t *ob)
   for (i = 0; i < IPSIZE; i++) {
     if (iptable[i].addrlen == ob->interactive->addrlen &&
         !memcmp(&iptable[i].addr, &ob->interactive->addr,
-            ob->interactive->addrlen) &&
+                ob->interactive->addrlen) &&
         iptable[i].name) {
       return (iptable[i].name);
     }
