@@ -144,6 +144,7 @@ void add_lpc_sock_event()
 }
 #endif
 
+#ifdef HAS_CONSOLE
 static void on_console_event(evutil_socket_t fd, short what, void *arg)
 {
   debug(event, "Got an event on stdin socket %d:%s%s%s%s \n", (int) fd,
@@ -167,3 +168,4 @@ void init_console(struct event_base *base)
     event_add(ev_console, NULL);
   }
 }
+#endif
