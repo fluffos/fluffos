@@ -50,6 +50,7 @@ typedef struct {
   int w_len;
   struct event *ev_read;
   struct event *ev_write;
+  struct lpc_socket_event_data *ev_data;
 } lpc_socket_t;
 
 extern lpc_socket_t *lpc_socks;
