@@ -1853,7 +1853,7 @@ void new_user_handler(port_def_t *port)
   master = master_ob;
   add_ref(master_ob, "new_user");
   push_number(port->port);
-  ret = apply_master_ob(APPLY_CONNECT, 1);
+  ret = safe_apply_master_ob(APPLY_CONNECT, 1);
   /* master_ob->interactive can be zero if the master object self
      destructed in the above (don't ask) */
   set_command_giver(0);

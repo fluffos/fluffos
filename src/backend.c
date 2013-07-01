@@ -86,7 +86,7 @@ void logon(object_t *ob)
     return;
   }
   /* current_object no longer set */
-  apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
+  safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
   /* function not existing is no longer fatal */
 }
 
