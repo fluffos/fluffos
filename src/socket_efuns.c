@@ -1525,7 +1525,7 @@ array_t *socket_status(int which)
 
   ret->item[4].type = T_STRING;
   ret->item[4].subtype = STRING_MALLOC;
-  ret->item[3].u.string = string_copy(
+  ret->item[4].u.string = string_copy(
                             old_sockaddr_to_string((struct sockaddr *)&lpc_socks[which].r_addr, lpc_socks[which].r_addrlen), "socket_status");
 
   if (!(lpc_socks[which].flags & STATE_FLUSHING) && lpc_socks[which].owner_ob && !(lpc_socks[which].owner_ob->flags & O_DESTRUCTED)) {
