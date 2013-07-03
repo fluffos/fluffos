@@ -90,9 +90,6 @@ int main(int argc, char **argv)
 #ifdef INCL_LOCALE_H
   setlocale(LC_ALL, "C");
 #endif
-#ifdef MALLOC_NEED_INIT
-  malloc_init();
-#endif
 
 #ifdef WRAPPEDMALLOC
   wrappedmalloc_init();

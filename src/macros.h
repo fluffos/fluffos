@@ -31,14 +31,6 @@
 #error Only one wrapper (at most) should be defined
 #endif
 
-#if defined(DO_MSTATS) && defined(SYSMALLOC)
-#error 'DO_MSTATS' not available with 'SYSMALLOC'
-#endif
-
-#if defined(DO_MSTATS) && defined(GCMALLOC)
-#error 'DO_MSTATS' not available with 'GCMALLOC'
-#endif
-
 #if defined (WRAPPEDMALLOC) && !defined(IN_MALLOC_WRAPPER)
 
 #  define MALLOC(x)               wrappedmalloc(x)

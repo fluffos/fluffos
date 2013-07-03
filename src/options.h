@@ -57,10 +57,8 @@
  *   * if you use more memory than expected (or MALLOC64 on a 64bit system).
  */
 #define SYSMALLOC
-#undef MMALLOC
 #undef MALLOC64
 #undef MALLOC32
-#undef GCMALLOC /* needs -lgc in system_libs */
 
 /* You may optionally choose one (or none) of these malloc wrappers.  These
  * can be used in conjunction with any of the above malloc packages.
@@ -78,25 +76,6 @@
 #undef DEBUGMALLOC
 
 /* The following add certain bells and whistles to malloc: */
-
-/*
- * SBRK_OK: do not define this unless SMALLOC is chosen above.
- *   Defining this causes smalloc to use the low level memory allocation
- *   routines, and to act as a malloc replacement.  Conversely, undef'ing
- *   SBRK_OK causes smalloc to act as a wrapper for the system malloc
- *   routines.
- *
- * Note:
- *   NeXTStep 3.x users should always #undef SBRK_OK.
- */
-#undef SBRK_OK
-
-/* DO_MSTATS: do not define this unless BSDMALLOC or SMALLOC is chosen above.
- *   Defining this causes those replacement mallocs to keep statistics that
- *   the malloc_status() efun will print out (including total memory
- *   allocated/used).
- */
-#undef DO_MSTATS
 
 /* DEBUGMALLOC_EXTENSIONS: defining this (in addition to DEBUGMALLOC) enables
  * the set_malloc_mask(int) and debugmalloc(string,int) efuns.  These two
