@@ -1,7 +1,5 @@
 #include "std.h"
 
-#include <string>
-
 #include "file_incl.h"
 #include "lpc_incl.h"
 #include "backend.h"
@@ -38,23 +36,23 @@ static char *mud_lib;
 
 double consts[NUM_CONSTS];
 
-static void CDECL sig_fpe SIGPROT;
-static void CDECL sig_cld SIGPROT;
+static void CDECL sig_fpe(int);
+static void CDECL sig_cld(int);
 
 #ifdef HAS_CONSOLE
-static void CDECL sig_ttin SIGPROT;
+static void CDECL sig_ttin(int);
 #endif
 
-static void CDECL sig_usr1 SIGPROT;
-static void CDECL sig_usr2 SIGPROT;
-static void CDECL sig_term SIGPROT;
-static void CDECL sig_int SIGPROT;
-static void CDECL sig_hup SIGPROT;
-static void CDECL sig_abrt SIGPROT;
-static void CDECL sig_segv SIGPROT;
-static void CDECL sig_ill SIGPROT;
-static void CDECL sig_bus SIGPROT;
-static void CDECL sig_iot SIGPROT;
+static void CDECL sig_usr1(int);
+static void CDECL sig_usr2(int);
+static void CDECL sig_term(int);
+static void CDECL sig_int(int);
+static void CDECL sig_hup(int);
+static void CDECL sig_abrt(int);
+static void CDECL sig_segv(int);
+static void CDECL sig_ill(int);
+static void CDECL sig_bus(int);
+static void CDECL sig_iot(int);
 
 #ifdef DEBUG_MACRO
 /* used by debug.h: please leave this in here -- Tru (you can change its
@@ -474,38 +472,25 @@ char *xalloc(int size)
 
 static void setup_signal_handlers()
 {
-#ifdef SIGFPE
   signal(SIGFPE, sig_fpe);
-#endif
-#ifdef SIGUSR1
   signal(SIGUSR1, sig_usr1);
-#endif
-#ifdef SIGUSR2
   signal(SIGUSR2, sig_usr2);
-#endif
   signal(SIGTERM, sig_term);
   signal(SIGINT, sig_int);
-#ifdef SIGABRT
   signal(SIGABRT, sig_abrt);
-#endif
-#ifdef SIGIOT
   signal(SIGIOT, sig_iot);
-#endif
-#ifdef SIGHUP
   signal(SIGHUP, sig_hup);
-#endif
-#ifdef SIGBUS
   signal(SIGBUS, sig_bus);
-#endif
-#ifdef SIGSEGV
   signal(SIGSEGV, sig_segv);
-#endif
-#ifdef SIGILL
   signal(SIGILL, sig_ill);
-#endif
-#ifndef WIN32
   signal(SIGCHLD, sig_cld);
-#endif
+  /*
+   * register signal handler for SIGPIPE.
+   */
+  if (signal(SIGPIPE, SIG_IGN) == SIGNAL_ERROR) {
+    debug_perror("can't ignore signal SIGPIPE", 0);
+    exit(5);
+  }
 #ifdef HAS_CONSOLE
   if (has_console >= 0) {
     signal(SIGTTIN, sig_ttin);
@@ -527,7 +512,7 @@ static void try_dump_stacktrace()
 #endif
 }
 
-static void CDECL PSIG(sig_cld)
+static void CDECL sig_cld(int sig)
 {
 #ifndef WIN32
   int status;
@@ -537,7 +522,7 @@ static void CDECL PSIG(sig_cld)
 #endif
 }
 
-static void CDECL PSIG(sig_fpe)
+static void CDECL sig_fpe(int sig)
 {
   signal(SIGFPE, sig_fpe);
 }
@@ -553,7 +538,7 @@ void restore_sigttin(void)
 /* The console goes to sleep when backgrounded and can
  * be woken back up with kill -SIGTTIN <pid>
  */
-static void CDECL PSIG(sig_ttin)
+static void CDECL sig_ttin(int sig)
 {
   char junk[1024];
   int fl;
@@ -581,7 +566,7 @@ static void CDECL PSIG(sig_ttin)
    which restarts the MUD should take an exit code of 1 to mean don't
    restart
  */
-static void CDECL PSIG(sig_usr1)
+static void CDECL sig_usr1(int sig)
 {
   push_constant_string("Host machine shutting down");
   push_undefined();
@@ -592,7 +577,7 @@ static void CDECL PSIG(sig_usr1)
 }
 
 /* Abort evaluation */
-static void CDECL PSIG(sig_usr2)
+static void CDECL sig_usr2(int sig)
 {
   debug_message("Received SIGUSR2, current eval aborted.\n");
   outoftime = 1;
@@ -602,47 +587,47 @@ static void CDECL PSIG(sig_usr2)
  * Actually, doing all this stuff from a signal is probably illegal
  * -Beek
  */
-static void CDECL PSIG(sig_term)
+static void CDECL sig_term(int sig)
 {
   fatal("SIGTERM: Process terminated");
 }
 
-static void CDECL PSIG(sig_int)
+static void CDECL sig_int(int sig)
 {
   fatal("SIGINT: Process interrupted");
 }
 
-static void CDECL PSIG(sig_segv)
+static void CDECL sig_segv(int sig)
 {
   /* attempt to dump backtrace using gdb. */
   try_dump_stacktrace();
   fatal("SIGSEGV: Segmentation fault");
 }
 
-static void CDECL PSIG(sig_bus)
+static void CDECL sig_bus(int sig)
 {
   try_dump_stacktrace();
   fatal("SIGBUS: Bus error");
 }
 
-static void CDECL PSIG(sig_ill)
+static void CDECL sig_ill(int sig)
 {
   try_dump_stacktrace();
   fatal("SIGILL: Illegal instruction");
 }
 
-static void CDECL PSIG(sig_hup)
+static void CDECL sig_hup(int sig)
 {
   fatal("SIGHUP: Hangup!");
 }
 
-static void CDECL PSIG(sig_abrt)
+static void CDECL sig_abrt(int sig)
 {
   try_dump_stacktrace();
   fatal("SIGABRT: Aborted");
 }
 
-static void CDECL PSIG(sig_iot)
+static void CDECL sig_iot(int sig)
 {
   fatal("Aborted(IOT)");
 }

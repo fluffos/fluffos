@@ -10,11 +10,7 @@ static timer_t eval_timer_id,  hb_timer_id;
 /*
  * SIGALRM handler.
  */
-#ifdef SIGNAL_FUNC_TAKES_INT
 void sigalrm_handler(int sig, siginfo_t *si, void *uc)
-#else
-void sigalrm_handler()
-#endif
 {
 #ifndef POSIX_TIMERS
   outoftime = 1;
