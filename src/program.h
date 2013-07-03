@@ -199,7 +199,7 @@ typedef struct program_s {
   const char *filename;                 /* Name of file that defined prog */
   unsigned short flags;
   unsigned short last_inherited;
-  unsigned PROG_REF_TYPE ref;                 /* Reference count */
+  unsigned int ref;                 /* Reference count */
   unsigned short func_ref;
 #ifdef DEBUGMALLOC_EXTENSIONS
   int extra_ref;              /* Used to verify ref count */

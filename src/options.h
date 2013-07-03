@@ -921,11 +921,6 @@
  */
 #define USE_ICONV
 
-/* PROG_REF_TYPE size of program ref counter:
- * char for 8 bit, short for 16, int for 32,
- * long long for 64 (completely useless on 32 bit machines though!) */
-#define PROG_REF_TYPE short
-
 /* HAS_CONSOLE: If defined, the driver can take the argument -C
  *   which will give the driver an interactive console (you can type
  *   commands at the terminal.)  Backgrounding the driver will turn off
