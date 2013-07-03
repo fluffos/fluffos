@@ -840,14 +840,6 @@
  */
 #define HEART_BEAT_CHUNK      32
 
-/* SERVER_IP: For machines with multiple IP addresses, this specifies which
- * one to use.  This is useful for IP accounting and is necessary to be
- * able to do ident lookups on such machines.
- *
- * example: #define SERVER_IP "194.229.18.27"
- */
-#undef SERVER_IP
-
 /* Some maximum string sizes
  */
 #define SMALL_STRING_SIZE     100
