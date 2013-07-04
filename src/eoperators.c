@@ -930,12 +930,12 @@ f_sub_eq()
 #define U_UPPER 0
 #define U_ADDR  (sizeof(LPC_INT))
 
-void
-f_switch()
+// FIXME: The variable naming scheme is horrible, need to
+// read again and rename what i, d, s, r to something meaningful.
+void f_switch()
 {
   unsigned short offset, end_off;
-  int i, d;
-  LPC_INT s, r;
+  LPC_INT  i, d, s, r;
   char *l, *end_tab;
   static unsigned short off_tab[] = {
     0 * SWITCH_CASE_SIZE, 1 * SWITCH_CASE_SIZE, 3 * SWITCH_CASE_SIZE,
@@ -950,8 +950,7 @@ f_switch()
   COPY_SHORT(&end_off, pc + SW_ENDTAB);
 
   if ((i = EXTRACT_UCHAR(pc) >> 4) != 0xf) {
-    /* String table, find correct
-                                                 * key */
+    /* String table, find correct key */
     if (sp->type == T_NUMBER && !sp->u.number) {
       /* special case: 0 as a string */
       s = 0;
