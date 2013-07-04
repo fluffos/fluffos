@@ -9,9 +9,9 @@ Current Release
 ---------------
 The offical release is kept in the master branch, You can download a release archive through tags.
 
-Current release: [2.27](https://github.com/fluffos/fluffos/archive/fluffos-2.27.tar.gz)
+Current STABLE release: [2.27](https://github.com/fluffos/fluffos/archive/fluffos-2.27.tar.gz)
 
-Current development branch: [next-3.0](https://github.com/fluffos/fluffos/tree/next-3.0), pull request should be sent to this branch.
+Current DEV branch: [next-3.0](https://github.com/fluffos/fluffos/tree/next-3.0), pull request should be sent to this branch.
 
 Fetatures
 ---------
@@ -24,14 +24,35 @@ Fetatures
   * ICONV support, code in UTF-8, dynamic transaltion on output (optional)
   * POSIX timer for better time precision. (optional)
   * More strict type checking (optional)
+  * libevent integration, epoll backend.
 
 To Build
 --------
+FLUFFOS 3.0 requires GCC 4.6+ or LLVM clang 2.9 + to compile, and uses c++11 features.
+
+FLUFFOS 3.0 requires libevent 2.0+ to build and run.
+
+Debian/Ubuntu:
 ```
-cd src
-cp options.h local_options
-./build.FluffOS
-make
+$ sudo apt-get install libevent libevent-dev
+```
+
+CentOS:
+  download and install libevent yourself through [libevent.org](http://libevent.org/).
+
+
+Some efun packages also require addtional libraries, see options.h for detials.
+
+To Build fluffos 3.0
+
+```
+$ cd src  
+$ cp options.h local_options
+
+<edit local_options to you need>
+
+$ ./build.FluffOS
+$ make
 ```
 
 Copyright
@@ -53,6 +74,11 @@ In addition, the entire package is copyright 1995 by Tim Hollebeek.
 FluffOS is a range of patches to MudOS distributed as the patched source tree for convenience.
 LPmud and MudOS copyright restrictions still apply.
 
+ChangeLog
+---------
+See ChangeLog.fluffos-3.x file for details.
+
 Contact
 -------
-  http://www.lpmuds.net
+  * http://www.lpmuds.net  [Board: Driver](http://lpmuds.net/smf/index.php?board=2.0)
+  * Maintainer : sunyucong at gmail dot com
