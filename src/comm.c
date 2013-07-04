@@ -124,13 +124,6 @@ static unsigned char telnet_start_gmcp[] = {IAC, SB, TELOPT_GMCP};
 /*
  * local function prototypes.
  */
-#ifndef SIG_IGN
-#ifdef SIGNAL_FUNC_TAKES_INT
-static void sigpipe_handler(int);
-#else
-static void sigpipe_handler(void);
-#endif
-#endif
 
 static char *get_user_command(void);
 static char *first_cmd_in_buf(interactive_t *);
@@ -365,22 +358,6 @@ void init_user_conn()
   if (have_fd6) {
     debug_message("No more ports available; fd #6 ignored.\n");
   }
-  /*
-   * register signal handler for SIGPIPE.
-   */
-#if defined(SIGPIPE) && defined(SIGNAL_ERROR)
-#ifdef SIG_IGN
-  if (signal(SIGPIPE, SIG_IGN) == SIGNAL_ERROR) {
-    debug_perror("init_user_conn: signal SIGPIPE", 0);
-    exit(5);
-  }
-#else
-  if (signal(SIGPIPE, sigpipe_handler) == SIGNAL_ERROR) {
-    debug_perror("init_user_conn: signal SIGPIPE", 0);
-    exit(5);
-  }
-#endif
-#endif
 }
 
 /*
@@ -1676,21 +1653,6 @@ static char *first_cmd_in_buf(interactive_t *ip)
 
   return p;
 }
-/*
- * SIGPIPE handler -- does very little for now.
- */
-#ifndef SIG_IGN
-#ifdef SIGNAL_FUNC_TAKES_INT
-static void sigpipe_handler(int sig)
-#else
-static void sigpipe_handler(void)
-#endif
-{
-  debug(connections, ("SIGPIPE received."));
-  //don't comment the next line out, i'm pretty sure we'd crash on the next SIGPIPE, they're not worth it
-  signal(SIGPIPE, sigpipe_handler);
-}                               /* sigpipe_handler() */
-#endif
 
 /*
  * This is the new user connection handler. This function is called by the

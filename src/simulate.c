@@ -1958,11 +1958,7 @@ void error(const char *const fmt, ...)
  */
 int MudOS_is_being_shut_down;
 
-#ifdef SIGNAL_FUNC_TAKES_INT
 void startshutdownMudOS(int sig)
-#else
-void startshutdownMudOS()
-#endif
 {
   MudOS_is_being_shut_down = 1;
 }
@@ -2029,11 +2025,7 @@ void slow_shut_down(int minutes)
     shout_string("FluffOS driver shouts: Out of memory.\n");
     restore_command_giver();
     current_object = save_current;
-#ifdef SIGNAL_FUNC_TAKES_INT
     startshutdownMudOS(1);
-#else
-    startshutdownMudOS();
-#endif
     return;
   }
 }

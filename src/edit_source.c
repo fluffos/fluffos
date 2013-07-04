@@ -1171,17 +1171,11 @@ static void handle_malloc()
   if (lookup_define("SYSMALLOC")) {
     the_malloc = "sysmalloc.c";
   }
-  if (lookup_define("MMALLOC")) {
-    the_malloc = "mmalloc.c";
-  }
   if (lookup_define("MALLOC64")) {
     the_malloc = "64bitmalloc.c";
   }
   if (lookup_define("MALLOC32")) {
     the_malloc = "32bitmalloc.c";
-  }
-  if (lookup_define("GCMALLOC")) {
-    the_malloc = "gcmalloc.c";
   }
 
   if (lookup_define("WRAPPEDMALLOC")) {

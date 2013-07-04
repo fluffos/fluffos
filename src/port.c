@@ -5,22 +5,22 @@
 #include <unistd.h>
 #include <sys/resource.h>
 
-/*
- * Return a pseudo-random number in the range 0 .. n-1
- */
-// FIXME: drand48 doesn't provide enough random bits for 64bit LPC int.
-long random_number(long n)
+#include <random>
+
+// Returns a pseudo-random number in the range 0 .. n-1
+int64_t random_number(int64_t n)
 {
-  static char called = 0;
+  static bool called = 0;
+  static std::mt19937_64 engine;
 
-  if (!called) {
-    time_t tim;
-
-    time(&tim);
-    srand48(tim);
+  if(!called) {
+    std::random_device rd;
+    engine.seed(rd());
     called = 1;
-  }               /* endif */
-  return (long)(drand48() * n);
+  }
+
+  std::uniform_int_distribution<int64_t> dist(0, n-1);
+  return dist(engine);
 }
 
 /*

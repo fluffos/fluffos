@@ -57,10 +57,8 @@
  *   * if you use more memory than expected (or MALLOC64 on a 64bit system).
  */
 #define SYSMALLOC
-#undef MMALLOC
 #undef MALLOC64
 #undef MALLOC32
-#undef GCMALLOC /* needs -lgc in system_libs */
 
 /* You may optionally choose one (or none) of these malloc wrappers.  These
  * can be used in conjunction with any of the above malloc packages.
@@ -78,25 +76,6 @@
 #undef DEBUGMALLOC
 
 /* The following add certain bells and whistles to malloc: */
-
-/*
- * SBRK_OK: do not define this unless SMALLOC is chosen above.
- *   Defining this causes smalloc to use the low level memory allocation
- *   routines, and to act as a malloc replacement.  Conversely, undef'ing
- *   SBRK_OK causes smalloc to act as a wrapper for the system malloc
- *   routines.
- *
- * Note:
- *   NeXTStep 3.x users should always #undef SBRK_OK.
- */
-#undef SBRK_OK
-
-/* DO_MSTATS: do not define this unless BSDMALLOC or SMALLOC is chosen above.
- *   Defining this causes those replacement mallocs to keep statistics that
- *   the malloc_status() efun will print out (including total memory
- *   allocated/used).
- */
-#undef DO_MSTATS
 
 /* DEBUGMALLOC_EXTENSIONS: defining this (in addition to DEBUGMALLOC) enables
  * the set_malloc_mask(int) and debugmalloc(string,int) efuns.  These two
@@ -861,14 +840,6 @@
  */
 #define HEART_BEAT_CHUNK      32
 
-/* SERVER_IP: For machines with multiple IP addresses, this specifies which
- * one to use.  This is useful for IP accounting and is necessary to be
- * able to do ident lookups on such machines.
- *
- * example: #define SERVER_IP "194.229.18.27"
- */
-#undef SERVER_IP
-
 /* Some maximum string sizes
  */
 #define SMALL_STRING_SIZE     100
@@ -920,11 +891,6 @@
  * encoding
  */
 #define USE_ICONV
-
-/* PROG_REF_TYPE size of program ref counter:
- * char for 8 bit, short for 16, int for 32,
- * long long for 64 (completely useless on 32 bit machines though!) */
-#define PROG_REF_TYPE short
 
 /* HAS_CONSOLE: If defined, the driver can take the argument -C
  *   which will give the driver an interactive console (you can type
