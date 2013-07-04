@@ -83,7 +83,9 @@ build_packages:
 build_binaries: $(DRIVER_BIN) portbind
 
 .c.$(O):
-	$(CXX) -c $(CXXFLAGS) @LIBEVENT_CPPFLAGS@ -x c++ -o $@ $<
+	$(CXX) -c $(CXXFLAGS) @LIBEVENT_CPPFLAGS@ -MMD -MP -x c++ -o $@ $<
+
+-include $(SRC:.c=.d)
 
 lex.o: lex.c preprocess.c cc.h grammar.tab.c
 
@@ -146,7 +148,7 @@ install: all
 # remove everything
 clean:
 	-$(MAKE) -C packages "A=$(A)" "O=$(O)" clean
-	-rm -rf *.$(O) *.tab.c *.tab.h
+	-rm -rf *.$(O) *.d *.tab.c *.tab.h
 	-rm -f efun_defs.c option_defs.c
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
 	-rm -f malloc.c mallocwrapper.c
@@ -166,12 +168,10 @@ clean:
 	-find . -name "*.rej" -print | xargs rm
 	-rm -f *.ln tags TAGS
 	-rm -f $(DRIVER_BIN) $(DRIVER_BIN).old portbind *.exe
-	-rm -f Dependencies tmpdepend
 	-rm -f 1.out 2.out
 	-rm -f dtrace_compile
 	-rm -f testsuite/log/author_stats testsuite/log/domain_stats
 	-rm -f testsuite/tmp.o                                  
-	-touch Dependencies
 
 reconfigure: clean
 	rm -f conf.h configure.h options_incl.h
@@ -196,5 +196,3 @@ help:
 	@echo "Edit Makefile if this is not what you want"
 	@echo
 	@echo "Otherwise, type '$(MAKE)' to build FluffOS, then '$(MAKE) install'."
-
-include Dependencies
