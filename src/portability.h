@@ -97,9 +97,4 @@
 #endif
 #endif
 
-/* FIXME: remove this all together */
-#define SIGNAL_FUNC_TAKES_INT
-#define SIGPROT (int)
-#define PSIG(z) z (int sig)
-
 #endif              /* _PORT_H */

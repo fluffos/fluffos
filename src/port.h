@@ -5,7 +5,7 @@
  * port.c
  */
 #ifndef _FUNC_SPEC_
-long random_number(long);
+int64_t random_number(int64_t);
 long get_current_time(void);
 const char *time_string(time_t);
 void get_usec_clock(long *, long *);

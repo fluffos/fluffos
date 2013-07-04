@@ -68,11 +68,7 @@ void error_needs_free(char *);
 void throw_error(void);
 void error_handler(char *);
 
-#ifdef SIGNAL_FUNC_TAKES_INT
 void startshutdownMudOS(int);
-#else
-void startshutdownMudOS(void);
-#endif
 void shutdownMudOS(int);
 void slow_shut_down(int);
 

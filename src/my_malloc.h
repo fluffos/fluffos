@@ -4,33 +4,11 @@
 /*
  * to use sysmalloc or malloc replacements
  */
-#if defined(SYSMALLOC) || \
-    (defined(SMALLOC) && defined(SBRK_OK))
+#if defined(SYSMALLOC)
 #define MALLOC(x)       malloc(x)
 #define FREE(x)         free(x)
 #define REALLOC(x,y)    realloc(x,y)
 #define CALLOC(x,y)     calloc(x,y)
-
-#endif
-
-#ifdef MMALLOC
-#define MALLOC(x)       mmalloc(x)
-#define FREE(x)         mfree(x)
-#define REALLOC(x,y)    mrealloc(x,y)
-#define CALLOC(x,y)     mcalloc(x,y)
-#ifndef _FUNC_SPEC_
-void mfree(void *block);
-void *mrealloc(void *block, int size);
-void *mcalloc(int num, int size);
-void *mmalloc(int size);
-#endif
-#endif
-
-#ifdef GNUMALLOC
-#define MALLOC(x)       gnumalloc(x)
-#define FREE(x)         gnufree(x)
-#define REALLOC(x,y)    gnurealloc(x,y)
-#define CALLOC(x,y)     gnucalloc(x,y)
 
 #endif
 
@@ -57,18 +35,6 @@ void free32(void *block);
 void *realloc32(void *block, int size);
 void *calloc32(int num, int size);
 void *malloc32(int size);
-#endif
-#endif
-
-#ifdef GCMALLOC
-#define MALLOC_NEED_INIT 1
-#define MALLOC(x)       GC_MALLOC((x))
-#define FREE(x)
-#define REALLOC(x,y)    GC_REALLOC((x),(y))
-#define CALLOC(x,y)     GC_MALLOC(((x)*(y)))
-#ifndef _FUNC_SPEC_
-#include <gc/gc.h>
-void malloc_init();
 #endif
 #endif
 
