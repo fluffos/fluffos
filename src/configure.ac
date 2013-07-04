@@ -15,11 +15,8 @@ AC_PROG_YACC
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
 
-# Checks for libraries.
-AC_SEARCH_LIBS([sqrt], [m])
-AC_SEARCH_LIBS([crypt], [crypt])
-AC_SEARCH_LIBS([malloc], [malloc])
-AC_SEARCH_LIBS([gethostbyname], [nsl])
+# Check C++11 support.
+AX_CXX_COMPILE_STDCXX_11([noext], [mandatory])
 
 # Checks for header files.
 AC_FUNC_ALLOCA
@@ -36,11 +33,15 @@ AC_TYPE_SIZE_T
 AC_CHECK_MEMBERS([struct stat.st_rdev])
 AC_TYPE_UINT32_T
 
-# FIXME: remove all these.
+# FIXME: remove these two, this is currently needed by macro.h
 AC_CHECK_SIZEOF([int])
 AC_CHECK_SIZEOF([char *])
 
 # Checks for library functions.
+AC_SEARCH_LIBS([sqrt], [m])
+AC_SEARCH_LIBS([crypt], [crypt])
+AC_SEARCH_LIBS([malloc], [malloc])
+
 AC_FUNC_ERROR_AT_LINE
 AC_FUNC_FORK
 AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
@@ -50,7 +51,7 @@ AC_FUNC_REALLOC
 AC_FUNC_STRTOD
 AC_FUNC_WAIT3
 
-AC_CHECK_FUNCS([atexit drand48 doprnt dup2 floor getcwd gethostbyaddr gethostbyname gethostname getpagesize inet_ntoa memchr memmove memset mkdir munmap pow putenv regcomp rmdir select setlocale socket strcasecmp strchr strcspn strerror strncasecmp strpbrk strrchr strstr strtol strtoul tzset utime])
+AC_CHECK_FUNCS([atexit drand48 doprnt dup2 floor getcwd gethostname gettimeofday getpagesize memchr memmove memset mkdir munmap pow putenv regcomp rmdir setlocale socket sqrt strcasecmp strchr strcspn strerror strncasecmp strpbrk strrchr strstr strtol strtoul tzset utime])
 
 AC_CHECK_FUNCS([getrusage])
 
