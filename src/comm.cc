@@ -2702,7 +2702,7 @@ static int flush_compressed_output(interactive_t *ip)
           break;
         }
         debug(connections, "flush_compressed_output: Error sending compressed data: %s.\n",
-            evutil_socket_error_to_string(evutil_socket_geterror(ip->fd)));
+              evutil_socket_error_to_string(evutil_socket_geterror(ip->fd)));
 
         return FALSE; /* write error */
       }

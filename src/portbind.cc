@@ -104,7 +104,7 @@ int main(int argc, char **argv)
     HANDLE_ERROR(setuid, setuid(uid));
   }
 
-  argv[0] = (char*)driver_name;
+  argv[0] = (char *)driver_name;
   /* exec the driver */
   HANDLE_ERROR(execv, execv(driver_name, argv));
 #endif

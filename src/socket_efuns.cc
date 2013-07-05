@@ -400,7 +400,7 @@ int socket_bind(int fd, int port, const char *addr)
         fd, lpc_socks[fd].fd, sockaddr_to_string((struct sockaddr *)&lpc_socks[fd].l_addr, lpc_socks[fd].l_addrlen));
 
   // register read event.
-  if(lpc_socks[fd].mode == DATAGRAM || lpc_socks[fd].mode == DATAGRAM_BINARY) {
+  if (lpc_socks[fd].mode == DATAGRAM || lpc_socks[fd].mode == DATAGRAM_BINARY) {
     event_add(lpc_socks[fd].ev_read, NULL);
   }
 
@@ -599,7 +599,7 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
         break;
       default:
         debug(sockets, "socket_connect: lpc socket %d (real fd %d) connect error: %s.\n",
-            fd, lpc_socks[fd].fd, evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
+              fd, lpc_socks[fd].fd, evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
         return EECONNECT;
     }
   }
@@ -745,7 +745,7 @@ int socket_write(int fd, svalue_t *message, const char *name)
                             strlen(message->u.string) + 1, 0,
                             (struct sockaddr *) &addr, addrlen)) == -1) {
             debug(sockets, "socket_write: sendto error: %s.\n",
-               evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
+                  evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
             return EESENDTO;
           }
           break;
@@ -756,7 +756,7 @@ int socket_write(int fd, svalue_t *message, const char *name)
                             message->u.buf->size, 0,
                             (struct sockaddr *) &addr, addrlen)) == -1) {
             debug(sockets, "socket_write: sendto error: %s.\n",
-               evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
+                  evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
             return EESENDTO;
           }
           break;
@@ -798,8 +798,8 @@ int socket_write(int fd, svalue_t *message, const char *name)
     }
 
     debug(sockets, "socket_write: lpc socket %d (real fd %d) send error: %s.\n",
-        fd, lpc_socks[fd].fd,
-        evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
+          fd, lpc_socks[fd].fd,
+          evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
     lpc_socks[fd].flags |= S_LINKDEAD;
     socket_close(fd, SC_FORCE | SC_DO_CALLBACK | SC_FINAL_CLOSE);
     return EESEND;
