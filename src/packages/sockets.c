@@ -281,10 +281,7 @@ f_socket_address(void)
    */
   local = (sp--)->u.number;
   if (sp->type & T_OBJECT) {
-    const char *tmp;
-
     /* This is so we can get the address of interactives as well. */
-
     if (!sp->u.ob->interactive) {
       free_object(&sp->u.ob, "f_socket_address:1");
       *sp = const0u;

@@ -1407,7 +1407,7 @@ int yylex()
             } else {
               while (isspace(c)) {
                 if (c == '\n') {
-                  if ((yyp == last_nl + 1)) {
+                  if (yyp == last_nl + 1) {
                     outp = yyp;
                     refill_buffer();
                     yyp = outp;
