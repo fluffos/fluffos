@@ -488,7 +488,7 @@ void mapping_delete(mapping_t *m, svalue_t *lv)
         if (!(*prev = elt->next) && !m->table[i]) {
           m->unfilled++;
           debug(mapping, "mapping delete: bucket empty, unfilled = %i",
-                          m->unfilled);
+                m->unfilled);
         }
         m->count--;
         total_mapping_nodes--;

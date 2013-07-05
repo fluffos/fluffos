@@ -125,11 +125,11 @@ void backend(struct event_base *base)
           slow_shut_down(tmp);
         }
 
-        add_user_write_event();
-#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
-        add_lpc_sock_event();
-#endif
+        /* Run event loop for at most 1 second, this current handles
+         * listening socket events, user socket events, and lpc socket events.
+         */
         run_for_at_most_one_second(base);
+
         /*
          * process user commands.
          */

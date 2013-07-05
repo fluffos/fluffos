@@ -16,7 +16,7 @@ else
 fi
 
 # TODO: remove need for _GNU_SOURCE
-CXXFLAGS="--std=c++0x -D_GNU_SOURCE -fno-omit-frame-pointer"
+CXXFLAGS="-fno-omit-frame-pointer -D_GNU_SOURCE"
 
 # By default driver compile to native environment, you can
 # add "-m64" to force compile under 64bit, "-m32" for 32bit.

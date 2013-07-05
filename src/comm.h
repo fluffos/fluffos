@@ -239,6 +239,7 @@ inline const char *sockaddr_to_string(const sockaddr *addr, socklen_t len)
                         NI_NUMERICHOST | NI_NUMERICSERV);
 
   if (ret) {
+    debug(sockets, "sockaddr_to_string fail: %s.\n", evutil_gai_strerror(ret));
     strcpy(result, "<invalid address>");
     return result;
   }

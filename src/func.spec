@@ -1,6 +1,6 @@
 #include "spec.h"
 
-#include "op_spec.c"
+#include "op.spec"
 /*
  * This file specifies types and arguments for efuns.
  * An argument can have two different types with the syntax 'type1 | type2'.

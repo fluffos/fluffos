@@ -39,14 +39,15 @@ FILE *yyin = 0, *yyout = 0;
 #define PACKAGES          "packages/packages"
 #define OPTIONS_H         "options.h"
 #define LOCAL_OPTIONS     "local_options"
-#define OPTION_DEFINES    "option_defs.c"
-#define FUNC_SPEC         "func_spec.c"
-#define FUNC_SPEC_CPP     "func_spec.cpp"
+#define OPTION_DEFINES    "option_defs.cc"
+#define FUNC_SPEC         "func.spec"
+#define FUNC_SPEC_CPP     "func.spec.generated"
 #define EFUN_TABLE        "efunctions.h"
 #define OPC_PROF          "opc.h"
 #define OPCODES           "opcodes.h"
 #define EFUN_PROTO        "efun_protos.h"
-#define EFUN_DEFS         "efun_defs.c"
+#define EFUN_DEFS         "efun_defs.cc"
+#define APPLIES_TABLE     "applies_table.cc"
 
 #define PRAGMA_NOTE_CASE_START 1
 
@@ -497,7 +498,7 @@ static int skip_to(const char *token, const char *atoken)
   }
 }
 
-#include "preprocess.c"
+#include "preprocess.cc"
 
 static int maybe_open_input_file(const char *fn)
 {
@@ -1054,7 +1055,7 @@ static void handle_build_func_spec(char *command)
   sprintf(buf, "%s %s >%s", command, FUNC_SPEC, FUNC_SPEC_CPP);
   system(buf);
   for (i = 0; i < num_packages; i++) {
-    sprintf(buf, "%s -I. packages/%s_spec.c >>%s",
+    sprintf(buf, "%s -I. packages/%s.spec >>%s",
             command, packages[i], FUNC_SPEC_CPP);
     system(buf);
   }
@@ -1062,7 +1063,7 @@ static void handle_build_func_spec(char *command)
   open_output_file(PACKAGES);
   fprintf(yyout, "SRC=");
   for (i = 0; i < num_packages; i++) {
-    fprintf(yyout, "%s.c ", packages[i]);
+    fprintf(yyout, "%s.cc ", packages[i]);
   }
   fprintf(yyout, "\nOBJ=");
   for (i = 0; i < num_packages; i++) {
@@ -1114,7 +1115,7 @@ static void handle_applies()
 {
   FILE *f = fopen("applies", "r");
   FILE *out = fopen("applies.h", "w");
-  FILE *table = fopen("applies_table.c", "w");
+  FILE *table = fopen(APPLIES_TABLE, "w");
   char buf[8192];
   char *colon;
   char *p;
@@ -1169,20 +1170,20 @@ static void handle_malloc()
   const char *the_malloc = 0, *the_wrapper = 0;
 
   if (lookup_define("SYSMALLOC")) {
-    the_malloc = "sysmalloc.c";
+    the_malloc = "sysmalloc.cc";
   }
   if (lookup_define("MALLOC64")) {
-    the_malloc = "64bitmalloc.c";
+    the_malloc = "64bitmalloc.cc";
   }
   if (lookup_define("MALLOC32")) {
-    the_malloc = "32bitmalloc.c";
+    the_malloc = "32bitmalloc.cc";
   }
 
   if (lookup_define("WRAPPEDMALLOC")) {
-    the_wrapper = "wrappedmalloc.c";
+    the_wrapper = "wrappedmalloc.cc";
   }
   if (lookup_define("DEBUGMALLOC")) {
-    the_wrapper = "debugmalloc.c";
+    the_wrapper = "debugmalloc.cc";
   }
 
   if (!the_malloc && !the_wrapper) {
@@ -1191,23 +1192,23 @@ static void handle_malloc()
   }
 
   if (unlink("malloc.c") == -1 && errno != ENOENT) {
-    perror("unlink malloc.c");
+    perror("unlink malloc.cc");
   }
   if (unlink("mallocwrapper.c") == -1 && errno != ENOENT) {
-    perror("unlink mallocwrapper.c");
+    perror("unlink mallocwrapper.cc");
   }
 
   if (the_wrapper) {
     printf("Using memory allocation package: %s\n\t\tWrapped with: %s\n",
            the_malloc, the_wrapper);
-    if (link(the_wrapper, "mallocwrapper.c") == -1) {
-      perror("link mallocwrapper.c");
+    if (link(the_wrapper, "mallocwrapper.cc") == -1) {
+      perror("link mallocwrapper.cc");
     }
   } else {
     printf("Using memory allocation package: %s\n", the_malloc);
   }
-  if (link(the_malloc, "malloc.c") == -1) {
-    perror("link malloc.c");
+  if (link(the_malloc, "malloc.cc") == -1) {
+    perror("link malloc.cc");
   }
 }
 

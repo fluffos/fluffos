@@ -5644,7 +5644,7 @@ void reset_machine(int first)
 {
   csp = control_stack - 1;
   if (first) {
-    sp = &start_of_stack[-1];
+    sp = start_of_stack - 1;
   } else {
     pop_n_elems(sp - start_of_stack + 1);
     IF_DEBUG(stack_in_use_as_temporary = 0);

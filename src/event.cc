@@ -128,33 +128,6 @@ void new_external_port_event_listener(port_def_t *port)
   event_add(port->ev_read, NULL);
 }
 
-// FIXME: rethink if this is necessary.
-// Watch write event for users, this will make sure user message
-// will get flushed at least once each round, if connection allows.
-void add_user_write_event()
-{
-  for (int i = 0; i < max_users; i++) {
-    if (all_users[i] && all_users[i]->message_length != 0)
-      event_add(all_users[i]->ev_write, NULL);
-  }
-}
-
-#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
-void add_lpc_sock_event()
-{
-  for (int i = 0; i < max_lpc_socks; i++) {
-    if (lpc_socks[i].state != STATE_CLOSED) {
-      if (lpc_socks[i].state != STATE_FLUSHING &&
-          (lpc_socks[i].flags & S_WACCEPT) == 0) {
-        event_add(lpc_socks[i].ev_read, NULL);
-      }
-      if (lpc_socks[i].flags & S_BLOCKED) {
-        event_add(lpc_socks[i].ev_write, NULL);
-      }
-    }
-  }
-}
-
 void on_lpc_sock_read(evutil_socket_t fd, short what, void *arg)
 {
   debug(event, "Got an event on socket %d:%s%s%s%s \n",
@@ -189,7 +162,6 @@ void new_lpc_socket_event_listener(int idx, evutil_socket_t real_fd)
   lpc_socks[idx].ev_write = event_new(g_event_base, real_fd, EV_WRITE, on_lpc_sock_write, data);
   lpc_socks[idx].ev_data = data;
 }
-#endif
 
 #ifdef HAS_CONSOLE
 static void on_console_event(evutil_socket_t fd, short what, void *arg)

@@ -1,4 +1,4 @@
-include packages
+-include packages
 
 # @configure_input@
 @SET_MAKE@
@@ -12,22 +12,23 @@ INSTALL=@INSTALL@
 INSTALL_DIR=@bindir@
 OPTIMIZE=@OPTIMIZE@
 
-.c.$(O):
-	$(CXX) $(CXXFLAGS) -I.. -c -x c++ $*.c
+.cc.$(O):
+	$(CXX) -c -I.. $(CXXFLAGS) -x c++ -o $@ $<
 
 all: $(OBJ)
 
 # crypto
-crypto.$(O): crypto.c
-	$(CXX) $(CXXFLAGS) -I.. @OPENSSL_INCLUDES@ -c -x c++ $*.c
+crypto.$(O): crypto.cc
+	$(CXX) -c $(CXXFLAGS) -I.. @OPENSSL_INCLUDES@ -x c++ -o $@ $<
 
 # special db stuff
-db.$(O): db.c
-	$(CXX) $(CXXFLAGS) -I.. @MYSQL_CFLAGS@ @POSTGRESQL_CFLAGS@ @SQLITE3_CFLAGS@ -c -x c++ $*.c
+db.$(O): db.cc
+	$(CXX) -c $(CXXFLAGS) -I.. @MYSQL_CFLAGS@ @POSTGRESQL_CFLAGS@ @SQLITE3_CFLAGS@ -x c++ -o $@ $<
 
 # pcre
-pcre.$(O): pcre.c
-	$(CXX) $(CXXFLAGS) -I.. @PCRE_CFLAGS@ -c -x c++ $*.c
+pcre.$(O): pcre.cc
+	$(CXX) -c $(CXXFLAGS) -I.. @PCRE_CFLAGS@ -x c++ -o $@ $<
 
 clean:
-	rm -f *.$(O)
+	-rm -f *.d
+	-rm -f *.$(O)

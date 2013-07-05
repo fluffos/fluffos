@@ -26,14 +26,12 @@ struct user_event_data {
   int idx;
 };
 void new_user_event_listener(int);
-void add_user_write_event();
 
 // LPC socket event
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 struct lpc_socket_event_data {
   int idx;
 };
-void add_lpc_sock_event();
 void new_lpc_socket_event_listener(int, evutil_socket_t);
 #endif
 
