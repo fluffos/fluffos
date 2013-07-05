@@ -697,6 +697,10 @@ int socket_write(int fd, svalue_t *message, const char *name)
 #ifndef NO_BUFFER_TYPE
         case T_BUFFER:
           len = message->u.buf->size;
+          if(len == 0) {
+            debug(sockets, "socket_write: trying to send 0 length buffer, ignored.\n");
+            return EESUCCESS;
+          }
           buf = (char *) DMALLOC(len, TAG_TEMPORARY, "socket_write: T_BUFFER");
           if (buf == NULL) {
             fatal("Out of memory");
@@ -706,6 +710,10 @@ int socket_write(int fd, svalue_t *message, const char *name)
 #endif
         case T_STRING:
           len = SVALUE_STRLEN(message);
+          if(len == 0) {
+            debug(sockets, "socket_write: trying to send 0 length string, ignored.\n");
+            return EESUCCESS;
+          }
           buf = (char *) DMALLOC(len + 1, TAG_TEMPORARY, "socket_write: T_STRING");
           if (buf == NULL) {
             fatal("Out of memory");
@@ -717,6 +725,10 @@ int socket_write(int fd, svalue_t *message, const char *name)
           svalue_t *el;
 
           len = message->u.arr->size * sizeof(int);
+          if(len == 0) {
+            debug(sockets, "socket_write: trying to send 0 length array, ignored.\n");
+            return EESUCCESS;
+          }
           buf = (char *) DMALLOC(len + 1, TAG_TEMPORARY, "socket_write: T_ARRAY");
           if (buf == NULL) {
             fatal("Out of memory");
@@ -792,16 +804,16 @@ int socket_write(int fd, svalue_t *message, const char *name)
     FREE(buf);
     return EESUCCESS;
   }
+  debug(sockets, "socket_write: message size %d.\n", len);
   off = OS_socket_write(lpc_socks[fd].fd, buf, len);
   if (off <= 0) {
     FREE(buf);
-
-#ifdef EWOULDBLOCK
     if (off == -1 && socket_errno == EWOULDBLOCK) {
+      debug(sockets, "socket_write: write would block.\n");
       return EEWOULDBLOCK;
     }
-#endif
     if (off == -1 && socket_errno == EINTR) {
+      debug(sockets, "socket_write: write interrupted.\n");
       return EEINTR;
     }
 
@@ -827,6 +839,7 @@ int socket_write(int fd, svalue_t *message, const char *name)
     lpc_socks[fd].w_buf = buf;
     lpc_socks[fd].w_off = off;
     lpc_socks[fd].w_len = len - off;
+    debug(sockets, "socket_write: wrote %d out of %d bytes, will call back.\n", off, len);
     event_add(lpc_socks[fd].ev_write, NULL);
     return EECALLBACK;
   }
