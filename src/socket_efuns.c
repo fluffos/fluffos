@@ -388,6 +388,7 @@ int socket_bind(int fd, int port, const char *addr)
   }
 
   // fill-in socket information.
+  lpc_socks[fd].l_addrlen = sizeof(lpc_socks[fd].l_addr);
   if (getsockname(lpc_socks[fd].fd, (struct sockaddr *)&lpc_socks[fd].l_addr, &lpc_socks[fd].l_addrlen) == -1) {
     socket_perror("socket_bind: getsockname", 0);
     return EEGETSOCKNAME;
@@ -523,6 +524,7 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback)
     lpc_socks[i].mode = lpc_socks[fd].mode;
     lpc_socks[i].state = STATE_DATA_XFER;
 
+    lpc_socks[i].l_addrlen = sizeof(lpc_socks[i].l_addr);
     if (getsockname(lpc_socks[i].fd, (struct sockaddr *)&lpc_socks[i].l_addr, &lpc_socks[i].l_addrlen) == -1) {
       lpc_socks[i].l_addr = lpc_socks[fd].l_addr;
       lpc_socks[i].l_addrlen = lpc_socks[fd].l_addrlen;
