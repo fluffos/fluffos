@@ -13,9 +13,7 @@ INSTALL_DIR=@bindir@
 OPTIMIZE=@OPTIMIZE@
 
 .cc.$(O):
-	$(CXX) -c -I.. $(CXXFLAGS) -MMD -MP -x c++ -o $@ $<
-
--include $(SRC:.cc=.d)
+	$(CXX) -c -I.. $(CXXFLAGS) -x c++ -o $@ $<
 
 all: $(OBJ)
 

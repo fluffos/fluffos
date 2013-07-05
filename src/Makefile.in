@@ -83,9 +83,7 @@ build_packages:
 build_binaries: $(DRIVER_BIN) portbind
 
 .cc.$(O):
-	$(CXX) -c $(CXXFLAGS) @LIBEVENT_CPPFLAGS@ -MMD -MP -x c++ -o $@ $<
-
--include $(SRC:.cc=.d)
+	$(CXX) -c $(CXXFLAGS) @LIBEVENT_CPPFLAGS@ -x c++ -o $@ $<
 
 lex.o: lex.cc preprocess.cc cc.h grammar.tab.cc
 
