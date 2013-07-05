@@ -129,16 +129,6 @@ void new_external_port_event_listener(port_def_t *port)
 }
 
 // FIXME: rethink if this is necessary.
-// Watch write event for users, this will make sure user message
-// will get flushed at least once each round, if connection allows.
-void add_user_write_event()
-{
-  for (int i = 0; i < max_users; i++) {
-    if (all_users[i] && all_users[i]->message_length != 0)
-      event_add(all_users[i]->ev_write, NULL);
-  }
-}
-
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 void add_lpc_sock_event()
 {

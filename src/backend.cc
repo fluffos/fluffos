@@ -124,8 +124,6 @@ void backend(struct event_base *base)
           slow_shut_down_to_do = 0;
           slow_shut_down(tmp);
         }
-
-        add_user_write_event();
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
         add_lpc_sock_event();
 #endif

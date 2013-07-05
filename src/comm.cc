@@ -493,6 +493,7 @@ void add_message(object_t *who, const char *data, int len)
 
   handle_snoop(data, len, ip);
 
+  event_add(ip->ev_write, NULL);
 #ifdef FLUSH_OUTPUT_IMMEDIATELY
   flush_message(ip);
 #endif
@@ -503,92 +504,21 @@ void add_message(object_t *who, const char *data, int len)
 /* WARNING: this can only handle results < LARGEST_PRINTABLE_STRING in size */
 void add_vmessage(object_t *who, const char *format, ...)
 {
-  int len;
-  interactive_t *ip;
-  char *cp, new_string_data[LARGEST_PRINTABLE_STRING + 1];
-  va_list args;
+  char new_string_data[LARGEST_PRINTABLE_STRING + 1];
 
+  va_list args;
   V_START(args, format);
   V_VAR(object_t *, who, args);
   V_VAR(char *, format, args);
-  /*
-   * if who->interactive is not valid, write message on stderr.
-   * (maybe)
-   */
-  if (!who || (who->flags & O_DESTRUCTED) || !who->interactive ||
-      (who->interactive->iflags & (NET_DEAD | CLOSING))) {
-#ifdef NONINTERACTIVE_STDERR_WRITE
-    putc(']', stderr);
-    vfprintf(stderr, format, args);
-#endif
-    va_end(args);
-    return;
-  }
-  ip = who->interactive;
+
   new_string_data[0] = '\0';
-
-  vsnprintf(new_string_data, LARGEST_PRINTABLE_STRING, format, args);
+  // FIXME: vsnprintf returns length of string, so we could
+  // handle arbitrary length, should fix this.
+  vsnprintf(new_string_data, sizeof(new_string_data), format, args);
   va_end(args);
-  len = strlen(new_string_data);
-#ifdef SHADOW_CATCH_MESSAGE
-  /*
-   * shadow handling.
-   */
-  if (shadow_catch_message(who, new_string_data)) {
-#ifdef SNOOP_SHADOWED
-    handle_snoop(new_string_data, len, ip);
-#endif
-    return;
-  }
-#endif                          /* NO_SHADOWS */
 
-  /*
-   * write message into ip->message_buf.
-   */
-  for (cp = new_string_data; *cp != '\0'; cp++) {
-    if (ip->message_length == MESSAGE_BUF_SIZE) {
-      if (!flush_message(ip)) {
-        debug(connections, ("Broken connection during add_message."));
-        return;
-      }
-      if (ip->message_length == MESSAGE_BUF_SIZE) {
-        break;
-      }
-    }
-    if (*cp == '\n') {
-      if (ip->message_length == (MESSAGE_BUF_SIZE - 1)) {
-        if (!flush_message(ip)) {
-          debug(connections, ("Broken connection during add_message.\n"));
-          return;
-        }
-        if (ip->message_length == (MESSAGE_BUF_SIZE - 1)) {
-          break;
-        }
-      }
-      ip->message_buf[ip->message_producer] = '\r';
-      ip->message_producer = (ip->message_producer + 1)
-                             % MESSAGE_BUF_SIZE;
-      ip->message_length++;
-    }
-    ip->message_buf[ip->message_producer] = *cp;
-    ip->message_producer = (ip->message_producer + 1) % MESSAGE_BUF_SIZE;
-    ip->message_length++;
-  }
-  if (ip->message_length != 0) {
-    if (!flush_message(ip)) {
-      debug(connections, ("Broken connection during add_message.\n"));
-      return;
-    }
-  }
-
-  handle_snoop(new_string_data, len, ip);
-
-#ifdef FLUSH_OUTPUT_IMMEDIATELY
-  flush_message(ip);
-#endif
-
-  add_message_calls++;
-}                               /* add_message() */
+  add_message(who, new_string_data, strlen(new_string_data));
+}
 
 void add_binary_message(object_t *who, const unsigned char *data, int len)
 {
@@ -691,11 +621,13 @@ int flush_message(interactive_t *ip)
       return 0;
     }
     if (num_bytes == -1) {
-      if (socket_errno == EWOULDBLOCK) {
+      if (socket_errno == EWOULDBLOCK || socket_errno == EAGAIN) {
         debug(connections, ("flush_message: write: Operation would block.\n"));
+        event_add(ip->ev_write, NULL);
         return 1;
       } else if (socket_errno == EINTR) {
         debug(connections, ("flush_message: write: Interrupted system call.\n"));
+        event_add(ip->ev_write, NULL);
         return 1;
       } else {
         debug(connections, "flush_message: write failed: %s, user connection dead.\n",
@@ -1289,6 +1221,8 @@ void get_user_data(interactive_t *ip)
   int  num_bytes, text_space;
   char buf[MAX_TEXT];
   int ws_space;
+
+  text_space = sizeof(buf);
 
   debug(connections, "get_user_data: USER %d\n", ip->fd);
 
@@ -2763,6 +2697,7 @@ static int flush_compressed_output(interactive_t *ip)
             || errno == ENOSR
 #endif
            ) {
+          event_add(ip->ev_write, NULL);
           ret = 2;
           break;
         }
