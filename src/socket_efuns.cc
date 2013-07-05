@@ -1130,7 +1130,8 @@ void socket_write_select_handler(int fd)
             errno == EINTR)) {
         return;
       }
-
+      debug(sockets, "lpc_socket: write failed: %s, connection dead.\n",
+            evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
       lpc_socks[fd].flags |= S_LINKDEAD;
       if (lpc_socks[fd].state == STATE_FLUSHING) {
         lpc_socks[fd].flags &= ~S_BLOCKED;

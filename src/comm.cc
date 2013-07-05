@@ -691,19 +691,15 @@ int flush_message(interactive_t *ip)
       return 0;
     }
     if (num_bytes == -1) {
-#ifdef EWOULDBLOCK
       if (socket_errno == EWOULDBLOCK) {
-        debug(connections, ("flush_message: write: Operation would block\n"));
+        debug(connections, ("flush_message: write: Operation would block.\n"));
         return 1;
-#else
-      if (0) {
-        ;
-#endif
       } else if (socket_errno == EINTR) {
-        debug(connections, ("flush_message: write: Interrupted system call"));
+        debug(connections, ("flush_message: write: Interrupted system call.\n"));
         return 1;
       } else {
-        socket_perror("flush_message: write", 0);
+        debug(connections, "flush_message: write failed: %s, user connection dead.\n",
+              evutil_socket_error_to_string(evutil_socket_geterror(ip->fd)));
         ip->iflags |= NET_DEAD;
         return 0;
       }
@@ -2762,9 +2758,6 @@ static int flush_compressed_output(interactive_t *ip)
       nWrite = send(ip->fd, &ip->compress_buf[iStart], nBlock,
                     ip->out_of_band);
       if (nWrite < 0) {
-        fprintf(stderr, "Error sending compressed data (%d)\n",
-                errno);
-
         if (errno == EAGAIN
 #ifndef WIN32
             || errno == ENOSR
@@ -2773,6 +2766,8 @@ static int flush_compressed_output(interactive_t *ip)
           ret = 2;
           break;
         }
+        debug(connections, "flush_compressed_output: Error sending compressed data: %s.\n",
+            evutil_socket_error_to_string(evutil_socket_geterror(ip->fd)));
 
         return FALSE; /* write error */
       }
