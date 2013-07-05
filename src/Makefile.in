@@ -42,17 +42,17 @@ INSTALL=@INSTALL@
 INSTALL_DIR=@bindir@
 OPTIMIZE=@OPTIMIZE@
 
-SRC=grammar.tab.c lex.c main.c rc.c interpret.c simulate.c file.c object.c \
-  backend.c array.c mapping.cc comm.c ed.c regexp.c buffer.c crc32.c \
-  malloc.c mallocwrapper.c class.c efuns_main.c efuns_port.c \
-  call_out.c otable.c dumpstat.c stralloc.c hash.c \
-  port.c reclaim.c parse.c simul_efun.c sprintf.c program.c \
-  compiler.c avltree.c icode.c trees.c generate.c scratchpad.c \
-  socket_efuns.c socket_ctrl.c eoperators.c socket_err.c md.c \
-  disassembler.c uvalarm.c \
-  replace_program.c master.c function.c \
-  debug.c crypt.c applies_table.c add_action.c eval.c fliconv.c console.c \
-  posix_timers.c event.c dns.c
+SRC=grammar.tab.cc lex.cc main.cc rc.cc interpret.cc simulate.cc file.cc object.cc \
+  backend.cc array.cc mapping..cc comm.cc ed.cc regexp.cc buffer.cc crc32.cc \
+  malloc.cc mallocwrapper.cc class.cc efuns_main.cc efuns_port.cc \
+  call_out.cc otable.cc dumpstat.cc stralloc.cc hash.cc \
+  port.cc reclaim.cc parse.cc simul_efun.cc sprintf.cc program.cc \
+  compiler.cc avltree.cc icode.cc trees.cc generate.cc scratchpad.cc \
+  socket_efuns.cc socket_ctrl.cc eoperators.cc socket_err.cc md.cc \
+  disassembler.cc uvalarm.cc \
+  replace_program.cc master.cc function.cc \
+  debug.cc crypt.cc applies_table.cc add_action.cc eval.cc fliconv.cc console.cc \
+  posix_timers.cc event.cc dns.c
 
 OBJ=grammar.tab.o lex.o main.o rc.o interpret.o simulate.o file.o object.o \
   backend.o array.o mapping.o comm.o ed.o regexp.o buffer.o crc32.o \
@@ -82,27 +82,27 @@ build_packages:
 
 build_binaries: $(DRIVER_BIN) portbind
 
-.c.$(O):
+.cc.$(O):
 	$(CXX) -c $(CXXFLAGS) @LIBEVENT_CPPFLAGS@ -MMD -MP -x c++ -o $@ $<
 
--include $(SRC:.c=.d)
+-include $(SRC:.cc=.d)
 
-lex.o: lex.c preprocess.c cc.h grammar.tab.c
+lex.o: lex.cc preprocess.cc cc.h grammar.tab.cc
 
-grammar.tab.o: grammar.tab.c opcodes.h
+grammar.tab.o: grammar.tab.cc opcodes.h
 
-grammar.tab.c: grammar.y
+grammar.tab.cc: grammar.y
 	-rm -f grammar.tab.*
 	$(YACC) -d grammar.y
-	mv y.tab.c grammar.tab.c
+	mv y.tab.c grammar.tab.cc
 	mv y.tab.h grammar.tab.h
 
 $(DRIVER_BIN): $(OBJ) packages/*.$(O) dtrace_compile
 	-mv -f $(DRIVER_BIN) $(DRIVER_BIN).old
 	$(CXX) -rdynamic $(CXXFLAGS) $(OBJ) packages/*.$(O) `./dtrace_compile` -o $(DRIVER_BIN) $(LIBS) @MYSQL_LDFLAGS@ @POSTGRESQL_LDFLAGS@ @SQLITE3_LDFLAGS@ @OPENSSL_LDFLAGS@ @OPENSSL_LIBS@ @PCRE_LIBS@ @LIBEVENT_LIBS@ @LIBEVENT_LDFLAGS@
 
-dtrace_compile: dtrace_compile.c
-	$(CXX) $(CXXFLAGS) -x c++ dtrace_compile.c -o dtrace_compile
+dtrace_compile: dtrace_compile.cc
+	$(CXX) $(CXXFLAGS) -x c++ dtrace_compile.cc -o dtrace_compile
 
 portbind: portbind.o
 	$(CXX) $(CXXFLAGS) portbind.o -o portbind $(LIBS)
@@ -116,28 +116,28 @@ cc.h:
 
 # the touches here are necessary to fix the modification times; link(2) does
 # 'modify' a file
-files: edit_source sysmalloc.c debugmalloc.c wrappedmalloc.c options.h op_spec.c func_spec.c configure.h grammar.y.pre
-	./edit_source -options -malloc -build_func_spec '$(CXX) -E $(CXXFLAGS)' \
+files: edit_source sysmalloc.cc debugmalloc.cc wrappedmalloc.cc options.h op.spec func.spec configure.h grammar.y.pre
+	./edit_source -options -malloc -build_func_spec '$(CXX) -E $(CXXFLAGS) -x c++' \
 	              -process grammar.y.pre
 	./edit_source -build_efuns -build_applies
-	touch mallocwrapper.c
-	touch malloc.c
+	touch mallocwrapper.cc
+	touch malloc.cc
 	touch files
 
-make_func.tab.c: make_func.y cc.h
+make_func.tab.cc: make_func.y cc.h
 	-rm -f make_func.tab.*
 	$(YACC) -d make_func.y
 	mv y.tab.h make_func.tab.h
-	mv y.tab.c make_func.tab.c
+	mv y.tab.c make_func.tab.cc
 
 edit_source: edit_source.o hash.o make_func.tab.o
 	$(CXX) $(CXXFLAGS) edit_source.o hash.o make_func.tab.o -o edit_source
 
 # don't optimize these two
-edit_source.o: edit_source.c preprocess.c cc.h
+edit_source.o: edit_source.cc preprocess.cc cc.h
 	$(CXX) $(CXXFLAGS) -o $@ -c -x c++ $<
 
-make_func.tab.o: make_func.tab.c
+make_func.tab.o: make_func.tab.cc
 	$(CXX) $(CXXFLAGS) -o $@ -c -x c++ $<
 
 install: all
@@ -148,11 +148,11 @@ install: all
 # remove everything
 clean:
 	-$(MAKE) -C packages "A=$(A)" "O=$(O)" clean
-	-rm -rf *.$(O) *.d *.tab.c *.tab.h
-	-rm -f efun_defs.c option_defs.c
+	-rm -rf *.$(O) *.d *.tab.cc *.tab.h
+	-rm -f efun_defs.cc option_defs.cc
 	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
-	-rm -f malloc.c mallocwrapper.c
-	-rm -f func_spec.cpp applies.h applies_table.c files
+	-rm -f malloc.cc mallocwrapper.cc
+	-rm -f efun.spec.generated applies.h applies_table.cc files
 	-rm -f grammar.y comptest* a.out *.exe
 	-rm -f packages/packages
 	-rm -f Makefile.MudOS GNUmakefile.MudOS

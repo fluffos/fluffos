@@ -120,10 +120,10 @@ int arrow_efun, evaluate_efun, this_efun, to_float_efun, to_int_efun, new_efun;
  * only by the runtime.
  */
 keyword_t predefs[] =
-#include "efun_defs.c"
+#include "efun_defs.cc"
 
   const char * option_defs[] =
-#include "option_defs.c"
+#include "option_defs.cc"
 
 static keyword_t reswords[] = {
 #ifdef DEBUG
@@ -252,7 +252,7 @@ static ident_hash_elem_t *quick_alloc_ident_entry(void);
 static void yyerrorp(const char *);
 
 #define LEXER
-#include "preprocess.c"
+#include "preprocess.cc"
 
 int lookup_predef(const char *name)
 {
