@@ -1316,7 +1316,7 @@ static int set()
     inptr++;
   }
 
-  if ((*inptr == NL)) {
+  if (*inptr == NL) {
     char out[512];
     char *pos = out;
 

@@ -388,6 +388,7 @@ int socket_bind(int fd, int port, const char *addr)
   }
 
   // fill-in socket information.
+  lpc_socks[fd].l_addrlen = sizeof(lpc_socks[fd].l_addr);
   if (getsockname(lpc_socks[fd].fd, (struct sockaddr *)&lpc_socks[fd].l_addr, &lpc_socks[fd].l_addrlen) == -1) {
     socket_perror("socket_bind: getsockname", 0);
     return EEGETSOCKNAME;
@@ -397,6 +398,11 @@ int socket_bind(int fd, int port, const char *addr)
 
   debug(sockets, "socket_bind: bound lpc socket %d (real fd %d) to %s.\n",
         fd, lpc_socks[fd].fd, sockaddr_to_string((struct sockaddr *)&lpc_socks[fd].l_addr, lpc_socks[fd].l_addrlen));
+
+  // register read event.
+  if (lpc_socks[fd].mode == DATAGRAM || lpc_socks[fd].mode == DATAGRAM_BINARY) {
+    event_add(lpc_socks[fd].ev_read, NULL);
+  }
 
   return EESUCCESS;
 }
@@ -506,23 +512,14 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback)
   if (i >= 0) {
     new_lpc_socket_event_listener(i, accept_fd);
 
-    fd_set wmask;
-
     lpc_socks[i].fd = accept_fd;
     lpc_socks[i].flags = S_HEADER |
                          (lpc_socks[fd].flags & S_BINARY);
 
-    // FIXME: this doesn't seems right, there is no select() involved.
-    // it's always going to be false.
-    FD_ZERO(&wmask);
-    FD_SET(accept_fd, &wmask);
-    if (!(FD_ISSET(accept_fd, &wmask))) {
-      lpc_socks[i].flags |= S_BLOCKED;
-    }
-
     lpc_socks[i].mode = lpc_socks[fd].mode;
     lpc_socks[i].state = STATE_DATA_XFER;
 
+    lpc_socks[i].l_addrlen = sizeof(lpc_socks[i].l_addr);
     if (getsockname(lpc_socks[i].fd, (struct sockaddr *)&lpc_socks[i].l_addr, &lpc_socks[i].l_addrlen) == -1) {
       lpc_socks[i].l_addr = lpc_socks[fd].l_addr;
       lpc_socks[i].l_addrlen = lpc_socks[fd].l_addrlen;
@@ -601,7 +598,8 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
       case EINPROGRESS:
         break;
       default:
-        socket_perror("socket_connect: connect", 0);
+        debug(sockets, "socket_connect: lpc socket %d (real fd %d) connect error: %s.\n",
+              fd, lpc_socks[fd].fd, evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
         return EECONNECT;
     }
   }
@@ -746,7 +744,8 @@ int socket_write(int fd, svalue_t *message, const char *name)
           if ((off = sendto(lpc_socks[fd].fd, (char *)message->u.string,
                             strlen(message->u.string) + 1, 0,
                             (struct sockaddr *) &addr, addrlen)) == -1) {
-            socket_perror("socket_write: sendto", 0);
+            debug(sockets, "socket_write: sendto error: %s.\n",
+                  evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
             return EESENDTO;
           }
           break;
@@ -756,7 +755,8 @@ int socket_write(int fd, svalue_t *message, const char *name)
           if ((off = sendto(lpc_socks[fd].fd, (char *)message->u.buf->item,
                             message->u.buf->size, 0,
                             (struct sockaddr *) &addr, addrlen)) == -1) {
-            socket_perror("socket_write: sendto", 0);
+            debug(sockets, "socket_write: sendto error: %s.\n",
+                  evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
             return EESENDTO;
           }
           break;
@@ -797,7 +797,9 @@ int socket_write(int fd, svalue_t *message, const char *name)
       return EEINTR;
     }
 
-    //socket_perror("socket_write: send", 0);
+    debug(sockets, "socket_write: lpc socket %d (real fd %d) send error: %s.\n",
+          fd, lpc_socks[fd].fd,
+          evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
     lpc_socks[fd].flags |= S_LINKDEAD;
     socket_close(fd, SC_FORCE | SC_DO_CALLBACK | SC_FINAL_CLOSE);
     return EESEND;
@@ -817,6 +819,7 @@ int socket_write(int fd, svalue_t *message, const char *name)
     lpc_socks[fd].w_buf = buf;
     lpc_socks[fd].w_off = off;
     lpc_socks[fd].w_len = len - off;
+    event_add(lpc_socks[fd].ev_write, NULL);
     return EECALLBACK;
   }
   FREE(buf);
@@ -1107,8 +1110,8 @@ void socket_write_select_handler(int fd)
 {
   int cc;
 
-  debug(sockets, "write_socket_handler: fd %d state %d\n",
-        fd, lpc_socks[fd].state);
+  debug(sockets, "write_socket_handler: lpc socket %d (real fd %d) state %d\n",
+        fd, lpc_socks[fd].fd, lpc_socks[fd].state);
 
   /* if the socket isn't blocked, we've got nothing to send */
   /* if the socket is linkdead, don't send -- could block */
@@ -1120,15 +1123,17 @@ void socket_write_select_handler(int fd)
     cc = OS_socket_write(lpc_socks[fd].fd,
                          lpc_socks[fd].w_buf + lpc_socks[fd].w_off,
                          lpc_socks[fd].w_len);
-    if (cc <= -1) {
+    if (cc < 0) {
       if (cc == -1 && (
-#ifdef EWOULDBLOCK
             errno == EWOULDBLOCK ||
-#endif
+            errno == EAGAIN ||
             errno == EINTR)) {
+        event_add(lpc_socks[fd].ev_write, NULL);
         return;
       }
-
+      debug(sockets, "write_socket_handler: lpc_socket %d (real fd %d) write failed: %s, connection dead.\n",
+            fd, lpc_socks[fd].fd,
+            evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
       lpc_socks[fd].flags |= S_LINKDEAD;
       if (lpc_socks[fd].state == STATE_FLUSHING) {
         lpc_socks[fd].flags &= ~S_BLOCKED;

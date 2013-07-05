@@ -431,7 +431,7 @@ int find_call_out_by_handle(LPC_INT handle)
   pending_call_t *cop;
   int delay = 0;
 
-  DBG("find_call_out_by_handle: handle: %i slot: %i",
+  DBG("find_call_out_by_handle: handle: %" LPC_INT_FMTSTR_P " slot: %" LPC_INT_FMTSTR_P,
       handle, handle & (CALLOUT_CYCLE_SIZE - 1));
 
   for (cop = call_list[handle & (CALLOUT_CYCLE_SIZE - 1)]; cop; cop = cop->next) {

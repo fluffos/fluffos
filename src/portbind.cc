@@ -10,7 +10,7 @@ int main(int argc, char **argv)
 #ifndef WIN32
   int port = -1;
   char *ipaddress = 0;
-  char *driver_name = "./driver";
+  const char *driver_name = "./driver";
   int uid = -1;
   int gid = -1;
 
@@ -85,7 +85,7 @@ int main(int argc, char **argv)
   HANDLE_ERROR(close, close(fd));
 
   /* set local address reuse */
-  HANDLE_ERROR(setsockopt, setsockopt(6, SOL_SOCKET, SO_REUSEADDR, (char *)&optval, sizeof(optval)) == -1);
+  HANDLE_ERROR(setsockopt, setsockopt(6, SOL_SOCKET, SO_REUSEADDR, (char *)&optval, sizeof(optval)));
 
   /* setup our address */
   sin.sin_family = AF_INET;
@@ -104,7 +104,7 @@ int main(int argc, char **argv)
     HANDLE_ERROR(setuid, setuid(uid));
   }
 
-  argv[0] = driver_name;
+  argv[0] = (char *)driver_name;
   /* exec the driver */
   HANDLE_ERROR(execv, execv(driver_name, argv));
 #endif

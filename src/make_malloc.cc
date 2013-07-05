@@ -13,8 +13,8 @@ int main()
 #else
 int main()
 {
-  unlink("malloc.c");
-  unlink("mallocwrapper.c");
+  unlink("malloc.cc");
+  unlink("mallocwrapper.cc");
   return 0;
 }
 #endif

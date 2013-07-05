@@ -1309,7 +1309,7 @@ void regdump(regexp *r)
  */
 static char *regprop(char *op)
 {
-  register char *p;
+  const char *p;
   static char buf[50];
 
   strcpy(buf, ":");

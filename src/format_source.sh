@@ -20,6 +20,6 @@ ASTYLE="astyle \
 --lineend=linux \
 "
 
-for f in `find . -regex ".*\.[ch]$" | grep -v "compat" | grep -v "testsuite" | grep -v "_spec"`; do
+for f in `find . -regextype posix-extended -regex ".*\.(cc|h)$" | grep -v "compat" | grep -v "testsuite" `; do
   if [ -s $f ]; then $ASTYLE $f; fi
 done
