@@ -290,7 +290,7 @@ void init_user_conn()
       }
 
       if (ret) {
-        debug_message("Error listening, getaddrinfo: %s \n", gai_strerror(ret));
+        debug_message("init_user_conn: getaddrinfo error: %s \n", gai_strerror(ret));
         exit(3);
       }
 
@@ -299,7 +299,7 @@ void init_user_conn()
        */
       if ((external_port[i].fd = socket(res->ai_family, res->ai_socktype,
                                         res->ai_protocol)) == -1) {
-        debug_perror("init_user_conn: socket", 0);
+        socket_perror("init_user_conn: socket", 0);
         exit(1);
       }
 
@@ -1292,8 +1292,8 @@ void get_user_data(interactive_t *ip)
       return;
     }
 #endif
-    debug_message("get_user_data: read on fd %d\n", ip->fd);
-    socket_perror("get_user_data: read", 0);
+    debug(connections, "get_user_data: fd %d, read error: %s.\n", ip->fd,
+        evutil_socket_error_to_string(evutil_socket_geterror(ip->fd)));
     ip->iflags |= NET_DEAD;
     remove_interactive(ip->ob, 0);
     return;
@@ -1604,14 +1604,11 @@ void new_user_handler(port_def_t *port)
   length = sizeof(addr);
   new_socket_fd = accept(port->fd, (struct sockaddr *) &addr, &length);
   if (new_socket_fd < 0) {
-#ifdef EWOULDBLOCK
     if (socket_errno == EWOULDBLOCK) {
       debug(connections, ("new_user_handler: accept: Operation would block\n"));
     } else {
-#else
-    if (1) {
-#endif
-      socket_perror("new_user_handler: accept", 0);
+      debug(connections, "new_user_handler: fd %d, accept error: %s.\n", port->fd,
+            evutil_socket_error_to_string(evutil_socket_geterror(port->fd)));
     }
     return;
   }
@@ -1627,15 +1624,6 @@ void new_user_handler(port_def_t *port)
     OS_socket_close(new_socket_fd);
     return;
   }
-#if defined(SO_NOSIGPIPE)
-  i = 1;
-
-  if (setsockopt(new_socket_fd, 1, SO_NOSIGPIPE, &i, sizeof(i)) == -1) {
-    socket_perror("new_user_handler: setsockopt SO_NOSIGPIPE", 0);
-    /* it's ok if this fails */
-  }
-#endif
-
   /* find the first available slot */
   for (i = 0; i < max_users; i++)
     if (!all_users[i]) { break; }
@@ -2110,7 +2098,8 @@ void remove_interactive(object_t *ob, int dested)
 
   debug(connections, "remove_interactive: closing fd %d\n", ip->fd);
   if (OS_socket_close(ip->fd) == -1) {
-    socket_perror("remove_interactive: close", 0);
+    debug(connections, "remove_interactive: close error: %s",
+        evutil_socket_error_to_string(evutil_socket_geterror(ip->fd)));
   }
 #ifdef F_SET_HIDE
   if (ob->flags & O_HIDDEN) {
@@ -2611,7 +2600,7 @@ void outbuf_push(outbuffer_t *outbuf)
 #ifdef HAVE_ZLIB
 void *zlib_alloc(void *opaque, unsigned int items, unsigned int size)
 {
-  return CALLOC(items, size);
+  return DCALLOC(items, size, TAG_TEMPORARY, "zlib_alloc");
 }
 
 void zlib_free(void *opaque, void *address)
