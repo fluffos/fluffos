@@ -17,6 +17,7 @@ AC_PROG_MAKE_SET
 
 # Check C++11 support.
 AX_CXX_COMPILE_STDCXX_11([noext], [mandatory])
+AX_CHECK_LINK_FLAG([-flto], [AX_APPEND_COMPILE_FLAGS([-flto])])
 
 # Checks for header files.
 AC_FUNC_ALLOCA
