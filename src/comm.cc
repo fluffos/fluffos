@@ -1620,7 +1620,8 @@ void new_user_handler(port_def_t *port)
    * do it for everyone
    */
   if (set_socket_nonblocking(new_socket_fd, 1) == -1) {
-    socket_perror("new_user_handler: set_socket_nonblocking 1", 0);
+    debug(connections, "new_user_handler: fd %d, set_socket_nonblocking 1 error: %s.\n", new_socket_fd,
+          evutil_socket_error_to_string(evutil_socket_geterror(new_socket_fd)));
     OS_socket_close(new_socket_fd);
     return;
   }
