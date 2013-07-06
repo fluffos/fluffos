@@ -716,34 +716,40 @@ object_t *object_present(svalue_t *v, object_t *ob)
   }
   return 0;
 }
-
+// If string doesn't end with number, then Look for a object that
+// id(str) returns true, return that object.
+// If string is in format of "xxx 1", then look for the <digits>-th
+// object that id("xx") returns true.
 static object_t *object_present2(const char *str, object_t *ob)
 {
   svalue_t *ret;
-  const char *p;
-  int count = 0, length;
 
-  length = strlen(str);
+  const char *name = NULL;
+  int namelen = 0, count = 0;
 
-  if (length) {
-    p = str + length - 1;
-    if (uisdigit(*p)) {
-      do {
-        p--;
-      } while (p > str && uisdigit(*p));
+  if (str[0] == '\0') {
+    return NULL;
+  }
 
-      if (*p == ' ') {
-        count = atoi(p + 1) - 1;
-        length = p - str;
-      }
+  // default case
+  name = str;
+  namelen = strlen(str);
+
+  // If string ends with number, try to separate name and count.
+  if(uisdigit(name[namelen - 1])) {
+    const char *ptr = strrchr(name, ' ');
+    if (ptr != NULL) {
+      namelen = ptr - name;
+      count = atoi(ptr + 1);
     }
   }
+
   for (; ob; ob = ob->next_inv) {
-    char *np;
-    np = new_string(length, "object_present2");
-    memcpy(np, str, length);
-    np[length] = 0;
-    push_malloced_string(np);
+    char *str_to_push = new_string(namelen, "object_present2");
+    memcpy(str_to_push, name, namelen);
+    str_to_push[namelen] = 0;
+    push_malloced_string(str_to_push);
+
     ret = apply(APPLY_ID, ob, 1, ORIGIN_DRIVER);
     if (ob->flags & O_DESTRUCTED) {
       return 0;
@@ -751,7 +757,7 @@ static object_t *object_present2(const char *str, object_t *ob)
     if (IS_ZERO(ret)) {
       continue;
     }
-    if (count-- > 0) {
+    if (--count > 0) {
       continue;
     }
     return ob;
