@@ -82,4 +82,6 @@
 #include <sys/param.h>
 #endif
 
+#include <event2/util.h>
+
 #endif /* STD_INCL_H */

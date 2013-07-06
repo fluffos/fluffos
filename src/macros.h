@@ -1,13 +1,6 @@
 #ifndef MACROS_H
 #define MACROS_H
 
-/*
- * Some useful macros...
- */
-#ifdef BUFSIZ
-#  define PROT_STDIO(x) (x ()
-#endif                          /* BUFSIZ */
-
 /* do things both ways ... */
 #define V_START(vlist, last_arg) va_start(vlist, last_arg)
 #define V_VAR(type, var, vlist)
@@ -22,8 +15,7 @@
 
    Please refer to options.h for selecting malloc package and wrapper.
 */
-#if (defined(SYSMALLOC) + defined(MMALLOC) + defined(GCMALLOC) + \
-  defined(MALLOC64) + defined(MALLOC32)) > 1
+#if (defined(SYSMALLOC) + defined(MALLOC64) + defined(MALLOC32)) > 1
 #error Only one malloc package should be defined
 #endif
 
@@ -207,14 +199,17 @@ char *int_alloc_cstring(const char *);
 /* Compare two number */
 #define COMPARE_NUMS(x,y) (((x) > (y) ? 1 : ((x) < (y) ? -1 : 0)))
 
-#define SIGNAL_ERROR SIG_ERR
-
 #ifdef CUSTOM_CRYPT
 #  define CRYPT(x, y) custom_crypt(x, y, 0)
 #  define OLDCRYPT(x, y) crypt(x, y)
 #else
 #  define CRYPT(x, y) crypt(x, y)
 #  define OLDCRYPT(x, y) crypt(x, y)
+#endif
+
+/* FIXME: This is planned to become core functionaltiy set, remove this define entirely. */
+#ifndef DEBUG_MACRO
+#define DEBUG_MACRO
 #endif
 
 #endif
