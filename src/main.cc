@@ -498,7 +498,6 @@ static void setup_signal_handlers()
 
 static void try_dump_stacktrace()
 {
-  debug_message("CRASH: Generating backtrace...\n");
 #if !defined(__CYGWIN__) && __GNUC__ > 2
   void *bt[100];
   size_t bt_size;
