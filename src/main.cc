@@ -484,7 +484,7 @@ static void setup_signal_handlers()
   /*
    * register signal handler for SIGPIPE.
    */
-  if (signal(SIGPIPE, SIG_IGN) == SIGNAL_ERROR) {
+  if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
     debug_perror("can't ignore signal SIGPIPE", 0);
     exit(5);
   }
