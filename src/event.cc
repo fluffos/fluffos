@@ -51,17 +51,20 @@ int run_for_at_most_one_second(struct event_base *base)
 
   if (in_loop) {
     fatal("Reentrant into event loop, this means some event handler not "
-          "using safe_apply, not recoverable.\n");
+          "using safe_apply, jumped out of event loop, this is driver bug, "
+          "please file bug report.\n");
     return 0;
   }
   if (ev == NULL) {
     ev = evtimer_new(base, exit_after_one_second, base);
   }
   event_add(ev, &one_second);
+
   debug(event, "Entering event loop for at most 1 sec! \n");
   in_loop = 1;
   r = event_base_loop(base, EVLOOP_ONCE);
   in_loop = 0;
+
   return r;
 }
 
