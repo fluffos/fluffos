@@ -33,6 +33,7 @@ Misc:
   * FluffOS now provide 64bit LPC runtime regardless of host system. (including 32bit linux/CYGWIN).
   * addr_server is now obsolete and deleted, the functionaltiy is built-in. (alpha6)
   * DEBUG_MACRO is now always true, the functionaltiy is being canonicalized as built-in.
+  * Various bug/crash fixes.
 
 TODOs:
   Use event backend to schedule call_out, heart_beat and object swap/reclaim routine.
@@ -48,7 +49,7 @@ Known Issues:
 ================================================================================
   Per-release ChangeLog
 ================================================================================
-FluffOS 3.0-alpha6
+FluffOS 3.0-alpha6.1
 
 Major Stuff:
   * Libevent 2.0 integration: epoll() for user and lpc sockets!
@@ -83,6 +84,9 @@ Other:
   * Add configure check for C++ 11.
   * Allow passing CXXFLAGS to build.FluffOS.
   * Fix crash when sending 0 length message through lpc socket.
+  * Fix buffer underrun in present("1").
+  * deleted text/html version of document, moved nroff version to /doc.
+  * add back "-flto" compile option.
 
 FluffOS 3.0-alpha5
     REVERSE_DEFER, fifo execution for defer()
