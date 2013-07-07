@@ -21,6 +21,8 @@
 void CDECL alarm_loop(void *);
 #endif
 
+#include <vector> // std::vector
+#include <algorithm> // std::find_if
 error_context_t *current_error_context = 0;
 
 /*
@@ -303,11 +305,8 @@ typedef struct {
   short time_to_heart_beat;
 } heart_beat_t;
 
-static heart_beat_t *heart_beats = 0;
+static std::vector<heart_beat_t *> heart_beats;
 static int max_heart_beats = 0;
-static int heart_beat_index = 0;
-static int num_hb_objs = 0;
-static int num_hb_to_do = 0;
 int time_for_hb = 0;
 
 static int num_hb_calls = 0;  /* starts */
@@ -318,15 +317,21 @@ void call_heart_beat()
   object_t *ob;
   heart_beat_t *curr_hb;
   error_context_t econ;
+  std::vector<heart_beat_t *> hbs(heart_beats);
+  int num_hb_to_do, heart_beat_index;
 
   current_interactive = 0;
+  if(num_hb_to_do = heart_beats.size()){
+    // Randomize.
+#ifdef HEARTBEAT_RANDOM
+    std::random_shuffle ( hbs.begin(), hbs.end() );
+#endif
 
-  if ((num_hb_to_do = num_hb_objs)) {
     num_hb_calls++;
-    heart_beat_index = 0;
     save_context(&econ);
-    while (1) {
-      ob = (curr_hb = &heart_beats[heart_beat_index])->ob;
+
+    for (auto curr_hb:hbs){
+      ob = curr_hb->ob;
       DEBUG_CHECK(!(ob->flags & O_HEART_BEAT),
                   "Heartbeat not set in object on heartbeat list!");
       /* is it time to do a heart beat ? */
@@ -365,22 +370,23 @@ void call_heart_beat()
           } catch (const char *) {
             restore_context(&econ);
           }
-
           current_object = 0;
         }
       }
-      if (++heart_beat_index == num_hb_to_do) {
-        break;
-      }
+
+      heart_beat_index++;
     }
+
     pop_context(&econ);
     if (heart_beat_index < num_hb_to_do) {
       perc_hb_probes = 100 * (float) heart_beat_index / num_hb_to_do;
     } else {
       perc_hb_probes = 100.0;
     }
+    
     heart_beat_index = num_hb_to_do = 0;
   }
+
   current_prog = 0;
   current_heart_beat = 0;
   look_for_objects_to_swap();
@@ -392,15 +398,17 @@ void call_heart_beat()
 int
 query_heart_beat(object_t *ob)
 {
-  int index;
+  std::vector<heart_beat_t *>::iterator i;
 
   if (!(ob->flags & O_HEART_BEAT)) { return 0; }
-  index = num_hb_objs;
-  while (index--) {
-    if (heart_beats[index].ob == ob) {
-      return heart_beats[index].time_to_heart_beat;
-    }
-  }
+
+  i = find_if(heart_beats.begin(), heart_beats.end(), [ob](const heart_beat_t *hb) { return hb->ob == ob; });
+
+  // It has HB.
+  if(i != heart_beats.end())
+    return (*i)->time_to_heart_beat;
+
+  // It hasn't HB.
   return 0;
 }       /* query_heart_beat() */
 
@@ -408,7 +416,6 @@ query_heart_beat(object_t *ob)
  * If an object removes something from the list from within a heart beat,
  * various pointers in call_heart_beat could be stuffed, so we must
  * check current_heart_beat and adjust pointers.  */
-
 int set_heart_beat(object_t *ob, int to)
 {
   int index;
@@ -418,61 +425,49 @@ int set_heart_beat(object_t *ob, int to)
   if (!to) {
     int num;
 
-    index = num_hb_objs;
-    while (index--) {
-      if (heart_beats[index].ob == ob) { break; }
-    }
-    if (index < 0) { return 0; }
+    // Find if object is in heart beats vector and remove it.
+    std::vector<heart_beat_t *>::iterator i;
+    i = find_if(heart_beats.begin(), heart_beats.end(), [ob](const heart_beat_t *hb) { return hb->ob == ob; });
 
-    if (num_hb_to_do) {
-      if (index <= heart_beat_index) {
-        heart_beat_index--;
-      }
-      if (index < num_hb_to_do) {
-        num_hb_to_do--;
-      }
-    }
+    // It hasn't HB.
+    if(i == heart_beats.end())
+      return 0;
 
-    if ((num = (num_hb_objs - (index + 1)))) {
-      memmove(heart_beats + index, heart_beats + (index + 1), num * sizeof(heart_beat_t));
-    }
+    // It has HB. Remove.
+    heart_beats.erase(i);
 
-    num_hb_objs--;
+    // Deactivate Heart Beat Flag.
     ob->flags &= ~O_HEART_BEAT;
+
     return 1;
   }
 
   if (ob->flags & O_HEART_BEAT) {
     if (to < 0) { return 0; }
 
-    index = num_hb_objs;
-    while (index--) {
-      if (heart_beats[index].ob == ob) {
-        heart_beats[index].time_to_heart_beat = heart_beats[index].heart_beat_ticks = to;
-        break;
-      }
-    }
-    DEBUG_CHECK(index < 0, "Couldn't find enabled object in heart_beat list!\n");
+    std::vector<heart_beat_t *>::const_iterator i;
+    i = find_if(heart_beats.begin(), heart_beats.end(), [ob](const heart_beat_t *hb) { return hb->ob == ob; });
+
+    // It hasn't HB.
+    DEBUG_CHECK(i == heart_beats.end(), "Couldn't find enabled object in heart_beat list!\n");
+
+    // It has HB.
+    (*i)->time_to_heart_beat = (*i)->heart_beat_ticks = to;
   } else {
     heart_beat_t *hb;
 
     if (!max_heart_beats)
-      heart_beats = CALLOCATE(max_heart_beats = HEART_BEAT_CHUNK,
-                              heart_beat_t, TAG_HEART_BEAT,
-                              "set_heart_beat: 1");
-    else if (num_hb_objs == max_heart_beats) {
-      max_heart_beats += HEART_BEAT_CHUNK;
-      heart_beats = RESIZE(heart_beats, max_heart_beats,
-                           heart_beat_t, TAG_HEART_BEAT,
-                           "set_heart_beat: 1");
-    }
+      heart_beats.reserve(max_heart_beats = HEART_BEAT_CHUNK);
+    else if (heart_beats.size() == max_heart_beats)
+      heart_beats.resize(max_heart_beats += HEART_BEAT_CHUNK);
 
-    hb = &heart_beats[num_hb_objs++];
+    hb = ALLOCATE(heart_beat_t, TAG_HEART_BEAT, "set_heart_beat: 1");
     hb->ob = ob;
     if (to < 0) { to = 1; }
     hb->time_to_heart_beat = to;
     hb->heart_beat_ticks = to;
     ob->flags |= O_HEART_BEAT;
+    heart_beats.push_back(hb);
   }
 
   return 1;
@@ -486,7 +481,7 @@ int heart_beat_status(outbuffer_t *ob, int verbose)
     outbuf_add(ob, "Heart beat information:\n");
     outbuf_add(ob, "-----------------------\n");
     outbuf_addv(ob, "Number of objects with heart beat: %d, starts: %d\n",
-                num_hb_objs, num_hb_calls);
+                heart_beats.size(), num_hb_calls);
 
     /* passing floats to varargs isn't highly portable so let sprintf
     handle it */
@@ -633,42 +628,43 @@ char *query_load_av()
 #ifdef F_HEART_BEATS
 array_t *get_heart_beats()
 {
-  int nob = 0, n = num_hb_objs;
-  heart_beat_t *hb = heart_beats;
-  object_t **obtab;
+  int nob = 0;
+  std::vector<object_t *> obtab;
   array_t *arr;
 #ifdef F_SET_HIDE
   int apply_valid_hide = 1, display_hidden = 0;
 #endif
-  if (n) {
-    obtab = CALLOCATE(n, object_t *, TAG_TEMPORARY, "heart_beats");
-  } else {
-    obtab = NULL;
-  }
-  while (n--) {
+
+  if (!heart_beats.empty()) {
+    obtab.reserve(heart_beats.size());
+
+    for (auto hb:heart_beats) {
 #ifdef F_SET_HIDE
-    if (hb->ob->flags & O_HIDDEN) {
-      if (apply_valid_hide) {
-        apply_valid_hide = 0;
-        display_hidden = valid_hide(current_object);
+      if (hb->ob->flags & O_HIDDEN) {
+        if (apply_valid_hide) {
+          apply_valid_hide = 0;
+          display_hidden = valid_hide(current_object);
+        }
+        if (!display_hidden) {
+          continue;
+        }
       }
-      if (!display_hidden) {
-        continue;
-      }
-    }
 #endif
-    obtab[nob++] = (hb++)->ob;
+      obtab.push_back(hb->ob);
+    }
   }
 
-  arr = allocate_empty_array(nob);
-  while (nob--) {
+  arr = allocate_empty_array(obtab.size());
+
+  for (auto ob:obtab){
     arr->item[nob].type = T_OBJECT;
-    arr->item[nob].u.ob = obtab[nob];
+    arr->item[nob].u.ob = ob;
     add_ref(arr->item[nob].u.ob, "get_heart_beats");
+    nob++;
   }
-  if (obtab) {
-    FREE(obtab);
-  }
+
+  if (obtab.size())
+    obtab.clear();
 
   return arr;
 }
