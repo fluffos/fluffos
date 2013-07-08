@@ -178,7 +178,7 @@ f_store_variable(void)
     error("No variable named '%s'!\n", name);
     return ;
   }
-  ob->variables[idx] = *sv;
+  assign_svalue(&ob->variables[idx], sv);
   pop_n_elems(st_num_arg);
 }
 #endif
