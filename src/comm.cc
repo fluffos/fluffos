@@ -1625,6 +1625,12 @@ void new_user_handler(port_def_t *port)
     OS_socket_close(new_socket_fd);
     return;
   }
+
+  if (set_socket_tcp_nodelay(new_socket_fd, 1) == -1) {
+    debug(connections, "new_user_handler: fd %d, set_socket_tcp_nodelay error: %s.\n", new_socket_fd,
+          evutil_socket_error_to_string(evutil_socket_geterror(new_socket_fd)));
+  }
+
   /* find the first available slot */
   for (i = 0; i < max_users; i++)
     if (!all_users[i]) { break; }

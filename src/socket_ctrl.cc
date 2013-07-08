@@ -5,6 +5,8 @@
 #include "file_incl.h"
 #include "file.h"
 
+#include <netinet/tcp.h> // TCP_NODELAY
+
 /*
   ioctl.c: part of the MudOS release -- Truilkan@TMI
 
@@ -74,6 +76,16 @@ int set_socket_nonblocking(int fd, int which)
   return result;
 
 #endif
+}
+
+/*
+ * set socket non-blocking
+ */
+
+int set_socket_tcp_nodelay(int fd, int which)
+{
+  int flag = 1;
+  return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
 }
 
 #ifdef WIN32
