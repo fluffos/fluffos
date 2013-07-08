@@ -7,6 +7,7 @@
 int set_socket_nonblocking(int, int);
 int set_socket_owner(int, int);
 int set_socket_async(int, int);
+int set_socket_tcp_nodelay(int, int);
 
 #ifdef WIN32
 void SocketPerror(char *, char *);

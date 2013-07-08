@@ -285,6 +285,13 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
       return EENONBLOCK;
     }
 
+    if (type == SOCK_STREAM) {
+      if (set_socket_tcp_nodelay(fd, 1) == -1) {
+        debug(sockets, "socket_accept: set_socket_tcp_nodelay error: %s.\n",
+              evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+      }
+    }
+
 #ifdef FD_CLOEXEC
     fcntl(fd, F_SETFD, FD_CLOEXEC);
 #endif
@@ -510,6 +517,11 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback)
         evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
     OS_socket_close(accept_fd);
     return EENONBLOCK;
+  }
+
+  if (set_socket_tcp_nodelay(accept_fd, 1) == -1) {
+    debug(sockets, "socket_accept: set_socket_tcp_nodelay error: %s.\n",
+          evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
   }
 
 #ifdef FD_CLOEXEC
