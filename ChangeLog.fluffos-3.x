@@ -49,6 +49,11 @@ Known Issues:
 ================================================================================
   Per-release ChangeLog
 ================================================================================
+FluffOS 3.0-alpha6.2
+
+  * Fixed memory corruption issue for store_variable(), added test.
+  * Enable TCP_NODELAY on user socket and lpc socket by default.
+
 FluffOS 3.0-alpha6.1
 
 Major Stuff:
