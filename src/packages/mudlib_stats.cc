@@ -7,18 +7,11 @@
  * and will be a little more general purpose than wiz_list was
  */
 
-#ifdef LATTICE
-#include "/lpc_incl.h"
-#include "/backend.h"
-#include "/md.h"
-#include "/master.h"
-#else
 #include "../lpc_incl.h"
 #include "../backend.h"
 #include "../md.h"
 #include "../master.h"
 #include "../efun_protos.h"
-#endif
 
 #include "mudlib_stats.h"
 

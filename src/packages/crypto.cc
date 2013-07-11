@@ -30,12 +30,8 @@
 #include <openssl/ripemd.h>
 #endif
 
-#ifdef LATTICE
-#include "/lpc_incl.h"
-#else
 #include "../lpc_incl.h"
 #include "../efun_protos.h"
-#endif
 
 #ifdef F_HASH
 static char *hexdump(const unsigned char *data, int len)

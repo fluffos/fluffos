@@ -3,20 +3,12 @@
   inside eval_instruction() in interpret.c.
 */
 
-#ifdef LATTICE
-#include "/lpc_incl.h"
-#include "/socket_err.h"
-#include "/include/socket_err.h"
-#include "/socket_efuns.h"
-#include "/comm.h"
-#else
 #include "../lpc_incl.h"
 #include "../socket_err.h"
 #include "../include/socket_err.h"
 #include "../socket_efuns.h"
 #include "../comm.h"
 #include "../efun_protos.h"
-#endif
 
 #define VALID_SOCKET(x) check_valid_socket((x), fd, get_socket_owner(fd), addr, port)
 
