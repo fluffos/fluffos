@@ -6,16 +6,6 @@
  * An argument can have two different types with the syntax 'type1 | type2'.
  * An argument is marked as optional if it also takes the type 'void'.
  *
- * Comment out the efuns that you do not want.  Be careful not to comment
- * out something that you need.
- *
- * The order in which the efuns are listed here is the order in which opcode
- * #'s will be assigned.  It is in your interest to move the least frequently
- * used efuns to the bottom of this file (and the most frequently used
- * ones to the top).  The opcprof() efun could help you find out which
- * efuns are most often and least often used.  The reason for ordering
- * the efuns is that only the first 255 efuns are represented using
- * a single byte.  Any additional efuns require two bytes.
  */
 
 #ifdef NO_BUFFER_TYPE
