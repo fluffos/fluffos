@@ -12,12 +12,8 @@
 
 #include <math.h>
 #include <limits.h>
-#ifdef LATTICE
-#include "/lpc_incl.h"
-#else
 #include "../lpc_incl.h"
 #include "../efun_protos.h"
-#endif
 
 #define SQUARE(n) ((n)*(n))
 

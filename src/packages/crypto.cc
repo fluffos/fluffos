@@ -30,12 +30,8 @@
 #include <openssl/ripemd.h>
 #endif
 
-#ifdef LATTICE
-#include "/lpc_incl.h"
-#else
 #include "../lpc_incl.h"
 #include "../efun_protos.h"
-#endif
 
 #ifdef F_HASH
 static char *hexdump(const unsigned char *data, int len)
@@ -43,14 +39,14 @@ static char *hexdump(const unsigned char *data, int len)
   const char hexchars[] = "0123456789abcdef";
   char *result, *p;
 
-  p = result = new_string(len * 2 + 1, "f_hash");
+  p = result = new_string(len * 2, "f_hash");
 
   while (len--) {
     *p++ = hexchars[(*data) >> 4];
     *p++ = hexchars[(*data++) & 0xf];
   }
 
-  *p = 0;
+  *p = '\0';
 
   return result;
 }

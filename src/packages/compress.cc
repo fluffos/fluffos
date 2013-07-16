@@ -3,15 +3,9 @@
  * by David Bennett (ddt@discworld.imaginary.com)
  */
 
-#ifdef LATTICE
-#include "/lpc_incl.h"
-#include "/file_incl.h"
-#include "/file.h"
-#else
 #include "../lpc_incl.h"
 #include "../file_incl.h"
 #include "../file.h"
-#endif
 
 #include <zlib.h>
 
