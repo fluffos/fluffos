@@ -1,15 +1,8 @@
-#ifdef LATTICE
-#include "/lpc_incl.h"
-#include "/comm.h"
-#include "/md.h"
-#include "/sprintf.h"
-#else
 #include "../lpc_incl.h"
 #include "../comm.h"
 #include "../md.h"
 #include "../sprintf.h"
 #include "../efun_protos.h"
-#endif
 
 static object_t *ob;
 

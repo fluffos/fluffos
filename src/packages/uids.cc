@@ -8,14 +8,6 @@
  *   94.07.14 - Robocoder - replaced linked list with AVL tree, and
  *                made uids into shared strings
  */
-#ifdef LATTICE
-#include "/lpc_incl.h"
-#include "/eoperators.h"
-#include "/avltree.h"
-#include "/md.h"
-#include "/uids.h"
-#include "/master.h"
-#else
 #include "../lpc_incl.h"
 #include "../eoperators.h"
 #include "../avltree.h"
@@ -23,7 +15,6 @@
 #include "uids.h"
 #include "../master.h"
 #include "../efun_protos.h"
-#endif
 
 static object_t *ob;
 
