@@ -49,6 +49,10 @@ Known Issues:
 ================================================================================
   Per-release ChangeLog
 ================================================================================
+
+FluffOS 3.0-alpha6.3
+  * Fixed memory corruption issue for PACKAGE_CRYPTO, added a test.
+
 FluffOS 3.0-alpha6.2
 
   * Fixed memory corruption issue for store_variable(), added test.
