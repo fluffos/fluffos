@@ -3749,6 +3749,25 @@ else
   :
 fi
 
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+      #include <vector>
+      int main() {
+        std::vector<int> v = {0, 1, 2};
+        for (auto& i : v);
+      }
+
+
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+
+else
+  as_fn_error $? "
+  You compiler version is too old! FluffOS need g++ 4.6+ or clang 3.0+." "$LINENO" 5
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
 
 # Checks for header files.
 ac_ext=cpp
