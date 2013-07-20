@@ -49,6 +49,8 @@ Known Issues:
 ================================================================================
   Per-release ChangeLog
 ================================================================================
+FluffOS 3.0-alpha6.4
+  * Fixed efun present() issue for object id that ends with digits, added test.
 
 FluffOS 3.0-alpha6.3
   * Fixed memory corruption issue for PACKAGE_CRYPTO, added a test.

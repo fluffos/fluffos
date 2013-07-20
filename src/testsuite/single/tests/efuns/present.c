@@ -37,8 +37,8 @@ void create(string arg) {
 void do_tests() {
 #ifndef __NO_ENVIRONMENT__
   // if first argument is string, second argument is 0/missing,
-  // searches for a object that id(name) = 1 in this object inventory
-  // and this object's environment's inventory. Returns the found object.
+  // searches for a object that id(name) == 1 in this object inventory
+  // then this object's environment's inventory. Returns the found object.
   ASSERT_EQ(o4, present("foo2"));
 
   // if first argument is string, second argument is object,
@@ -60,6 +60,11 @@ void do_tests() {
 
   // not ended with number, so treated as id="foo 10 "
   ASSERT_EQ(0, present("foo 10 ", this_object()));
+
+  // ended with a digit, but second part is not only digits.
+  // still use full string to search.
+  ASSERT_EQ(0, present("foo a1", this_object()));
+  ASSERT_EQ(0, present("foo 1a1", this_object()));
 
   // If object is hidden (via set_hide()), and current object is not hidable.
   // returns 0. In test case everything is hideable, so we can still find
