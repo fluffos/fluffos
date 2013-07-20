@@ -739,8 +739,11 @@ static object_t *object_present2(const char *str, object_t *ob)
   if(uisdigit(name[namelen - 1])) {
     const char *ptr = strrchr(name, ' ');
     if (ptr != NULL) {
-      namelen = ptr - name;
-      count = atoi(ptr + 1);
+      // Make sure second part has only digits
+      if (strspn(ptr + 1, "1234567890") == strlen(ptr+1)) {
+        namelen = ptr - name;
+        count = atoi(ptr + 1);
+      }
     }
   }
 
