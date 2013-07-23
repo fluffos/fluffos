@@ -442,7 +442,7 @@ static int user_parser(char *buff)
           error("Illegal to call remove_action() [caller was /%s] from a verb returning zero.\n", illegal_sentence_ob->obname);
           break;
         case 2:
-          error("Illegal to move or destruct an object (/%s) defining actions from a verb function which returns zero.\n", illegal_sentence_ob->obname);
+          error("Illegal to move or destruct an object (/%s) defining actions from a verb function(%s) in object(/%s) which returns zero.\n", illegal_sentence_ob->obname, user_verb, s->ob->obname);
           break;
       }
     }
