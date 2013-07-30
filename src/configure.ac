@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([FluffOS],[v3.0-alpha6.4])
+AC_INIT([FluffOS],[v3.0-alpha7])
 AC_CONFIG_MACRO_DIR([m4])
 
 AC_CANONICAL_TARGET
@@ -18,6 +18,8 @@ AC_PROG_MAKE_SET
 # Check C++11 support.
 AX_CXX_COMPILE_STDCXX_11([noext], [mandatory])
 AX_CHECK_LINK_FLAG([-flto], [AX_APPEND_COMPILE_FLAGS([-flto])])
+F_SUPPORT_CXX11([], [AC_MSG_ERROR([
+  [You compiler version is too old! FluffOS need g++ 4.6+ or clang 3.0+.]])])
 
 # Checks for header files.
 AC_FUNC_ALLOCA
