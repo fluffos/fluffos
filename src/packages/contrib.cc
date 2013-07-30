@@ -730,6 +730,7 @@ f_terminal_colour(void)
     repused = 0;
     copy_and_push_string(parts[i]);
     svalue_t *reptmp = apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, 1, ORIGIN_EFUN);
+
     if (reptmp && reptmp->type == T_STRING) {
       rep = (char *)alloca(SVALUE_STRLEN(reptmp) + 1);
       strcpy(rep, reptmp->u.string);
@@ -765,11 +766,18 @@ f_terminal_colour(void)
       if (!elt) { //end of for loop, so not found!
         if (repused) {
           parts[i] = rep;
-          lens[i] = wrap ? -SVALUE_STRLEN(reptmp) : SVALUE_STRLEN(reptmp);
-          if (curcolourlen + SVALUE_STRLEN(reptmp) < MAX_COLOUR_STRING - 1) {
-            strcat(curcolour, rep);
-            curcolourlen += SVALUE_STRLEN(reptmp);
+
+          // First Character is scape character.
+          if(rep[0] == 27) {
+            lens[i] = wrap ? -SVALUE_STRLEN(reptmp) : SVALUE_STRLEN(reptmp);
+            if (curcolourlen + SVALUE_STRLEN(reptmp) < MAX_COLOUR_STRING - 1) {
+              strcat(curcolour, rep);
+              curcolourlen += SVALUE_STRLEN(reptmp);
+            }
           }
+          // Only Text.
+          else
+            lens[i] = SVALUE_STRLEN(reptmp);
         } else {
           lens[i] = SHARED_STRLEN(cp);
         }
@@ -777,11 +785,18 @@ f_terminal_colour(void)
     } else {
       if (repused) {
         parts[i] = rep;
-        lens[i] = wrap ? -SVALUE_STRLEN(reptmp) : SVALUE_STRLEN(reptmp);
-        if (curcolourlen + SVALUE_STRLEN(reptmp) < MAX_COLOUR_STRING - 1) {
-          strcat(curcolour, rep);
-          curcolourlen += SVALUE_STRLEN(reptmp);
+
+        // First Character is scape character.
+        if(rep[0] == 27) {
+          lens[i] = wrap ? -SVALUE_STRLEN(reptmp) : SVALUE_STRLEN(reptmp);
+          if (curcolourlen + SVALUE_STRLEN(reptmp) < MAX_COLOUR_STRING - 1) {
+            strcat(curcolour, rep);
+            curcolourlen += SVALUE_STRLEN(reptmp);
+          }
         }
+        // Only Text.
+        else
+          lens[i] = SVALUE_STRLEN(reptmp);
       } else {
         lens[i] = strlen(parts[i]);
       }
