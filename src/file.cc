@@ -278,6 +278,44 @@ array_t *get_dir(const char *path, int flags)
   return v;
 }
 
+int tail (const char* path)
+{
+    char buff[1000];
+    FILE *f;
+    struct stat st;
+    int offset;
+
+    path = check_valid_path(path, current_object, "tail", 0);
+
+    if (path == 0)
+        return 0;
+#ifdef LATTICE
+    if (stat(path, &st) == -1)
+        return 0;
+#endif
+    f = fopen(path, "r");
+    if (f == 0)
+        return 0;
+#ifndef LATTICE
+    if (fstat(fileno(f), &st) == -1)
+        fatal("Could not stat an open file.\n");
+#endif
+    offset = st.st_size - 54 * 20;
+    if (offset < 0)
+        offset = 0;
+    if (fseek(f, offset, 0) == -1)
+        fatal("Could not seek.\n");
+    /* Throw away the first incomplete line. */
+    if (offset > 0)
+        (void) fgets(buff, sizeof buff, f);
+    while (fgets(buff, sizeof buff, f)) {
+        tell_object(command_giver, buff,strlen(buff));
+    }
+    fclose(f);
+    return 1;
+}
+
+
 int remove_file(const char *path)
 {
   path = check_valid_path(path, current_object, "remove_file", 1);

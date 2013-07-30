@@ -39,7 +39,7 @@ char *read_bytes(const char *, int, int, int *);
 int write_file(const char *, const char *, int);
 int write_bytes(const char *, int, const char *, int);
 array_t *get_dir(const char *, int);
-int tail(char *);
+int tail(const char *);
 int file_size(const char *);
 int copy_file(const char *, const char *);
 int do_rename(const char *, const char *, int);
