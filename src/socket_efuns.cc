@@ -1444,7 +1444,7 @@ static int string_to_sockaddr(const char *name, struct sockaddr *addr, socklen_t
   memset(service, 0, sizeof(service));
 
   memcpy(host, name, cp - name);
-  strncpy(service, cp + 1, sizeof(service));
+  strncpy(service, cp + 1, sizeof(service) - 1);
 
   struct addrinfo hints, *res;
 
