@@ -184,8 +184,9 @@ static
 void set_linemode(interactive_t *ip)
 {
   if (ip->iflags & USING_LINEMODE) {
-    add_binary_message(ip->ob, telnet_line_mode, sizeof(telnet_line_mode));
-    add_binary_message(ip->ob, telnet_lm_mode, sizeof(telnet_lm_mode));
+    add_binary_message_noflush(ip->ob, telnet_line_mode, sizeof(telnet_line_mode));
+    add_binary_message_noflush(ip->ob, telnet_lm_mode, sizeof(telnet_lm_mode));
+    flush_message(ip);
   } else {
     add_binary_message(ip->ob, telnet_no_single, sizeof(telnet_no_single));
   }
@@ -520,7 +521,7 @@ void add_vmessage(object_t *who, const char *format, ...)
   add_message(who, new_string_data, strlen(new_string_data));
 }
 
-void add_binary_message(object_t *who, const unsigned char *data, int len)
+void add_binary_message_noflush(object_t *who, const unsigned char *data,int len)
 {
   interactive_t *ip;
   const unsigned char *cp, *end;
@@ -552,9 +553,14 @@ void add_binary_message(object_t *who, const unsigned char *data, int len)
     ip->message_producer = (ip->message_producer + 1) % MESSAGE_BUF_SIZE;
     ip->message_length++;
   }
-
-  flush_message(ip);
   add_message_calls++;
+}
+
+void add_binary_message(object_t *who, const unsigned char *data, int len) {
+  add_binary_message_noflush(who, data, len);
+  if (who && who->interactive) {
+    flush_message(who->interactive);
+  }
 }
 
 /*
@@ -662,17 +668,17 @@ static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *obp)
   } else if (el->values[0].type == T_STRING && el->values[1].type == T_ARRAY && el->values[1].u.arr->size > 0 && el->values[1].u.arr->item[0].type == T_STRING) {
     char buf[10240];
     int len = sprintf(buf, (char *)telnet_mssp_value, el->values[0].u.string, el->values[1].u.arr->item[0].u.string);
-    add_binary_message(ob, (unsigned char *)buf, len);
+    add_binary_message_noflush(ob, (unsigned char *)buf, len);
     array_t *ar = el->values[1].u.arr;
     int i;
     unsigned char val = MSSP_VAL;
     for (i = 1; i < ar->size; i++) {
       if (ar->item[i].type == T_STRING) {
-        add_binary_message(ob, &val, 1);
-        add_binary_message(ob, (const unsigned char *)ar->item[i].u.string, strlen(ar->item[i].u.string));
+        add_binary_message_noflush(ob, &val, 1);
+        add_binary_message_noflush(ob, (const unsigned char *)ar->item[i].u.string, strlen(ar->item[i].u.string));
       }
     }
-
+    flush_message(ob->interactive);
   }
   return 0;
 }
@@ -1781,23 +1787,26 @@ void new_user_handler(port_def_t *port)
 
   if (port->kind == PORT_TELNET) {
     /* Ask permission to ask them for their terminal type */
-    add_binary_message(ob, telnet_do_ttype, sizeof(telnet_do_ttype));
+    add_binary_message_noflush(ob, telnet_do_ttype, sizeof(telnet_do_ttype));
     /* Ask them for their window size */
-    add_binary_message(ob, telnet_do_naws, sizeof(telnet_do_naws));
+    add_binary_message_noflush(ob, telnet_do_naws, sizeof(telnet_do_naws));
 #ifdef HAVE_ZLIB
-    add_binary_message(ob, telnet_compress_send_request_v2,
+    add_binary_message_noflush(ob, telnet_compress_send_request_v2,
                        sizeof(telnet_compress_send_request_v2));
 #endif
     // Ask them if they support mxp.
-    add_binary_message(ob, telnet_do_mxp, sizeof(telnet_do_mxp));
+    add_binary_message_noflush(ob, telnet_do_mxp, sizeof(telnet_do_mxp));
     // And mssp
-    add_binary_message(ob, telnet_will_mssp, sizeof(telnet_will_mssp));
+    add_binary_message_noflush(ob, telnet_will_mssp, sizeof(telnet_will_mssp));
     // May as well ask for zmp while we're there!
-    add_binary_message(ob, telnet_will_zmp, sizeof(telnet_will_zmp));
+    add_binary_message_noflush(ob, telnet_will_zmp, sizeof(telnet_will_zmp));
     // Also newenv
-    add_binary_message(ob, telnet_do_newenv, sizeof(telnet_do_newenv));
+    add_binary_message_noflush(ob, telnet_do_newenv, sizeof(telnet_do_newenv));
     // gmcp *yawn*
-    add_binary_message(ob, telnet_will_gmcp, sizeof(telnet_will_gmcp));
+    add_binary_message_noflush(ob, telnet_will_gmcp, sizeof(telnet_will_gmcp));
+
+    // LAST: flush out packet.
+    flush_message(ob->interactive);
   }
 
   // Call logon() on the object.
@@ -2762,18 +2771,19 @@ void f_act_mxp()
 #ifdef F_SEND_ZMP
 void f_send_zmp()
 {
-  add_binary_message(current_object, telnet_start_zmp, sizeof(telnet_start_zmp));
-  add_binary_message(current_object, (const unsigned char *)(sp - 1)->u.string, strlen((sp - 1)->u.string));
+  add_binary_message_noflush(current_object, telnet_start_zmp, sizeof(telnet_start_zmp));
+  add_binary_message_noflush(current_object, (const unsigned char *)(sp - 1)->u.string, strlen((sp - 1)->u.string));
   int i;
   unsigned char zero = 0;
   for (i = 0; i < sp->u.arr->size; i++) {
     if (sp->u.arr->item[i].type == T_STRING) {
-      add_binary_message(current_object, &zero, 1);
-      add_binary_message(current_object, (const unsigned char *)sp->u.arr->item[i].u.string, strlen(sp->u.arr->item[i].u.string));
+      add_binary_message_noflush(current_object, &zero, 1);
+      add_binary_message_noflush(current_object, (const unsigned char *)sp->u.arr->item[i].u.string, strlen(sp->u.arr->item[i].u.string));
     }
   }
-  add_binary_message(current_object, &zero, 1);
-  add_binary_message(current_object, telnet_end_sub, sizeof(telnet_end_sub));
+  add_binary_message_noflush(current_object, &zero, 1);
+  add_binary_message_noflush(current_object, telnet_end_sub, sizeof(telnet_end_sub));
+  flush_message(current_object->interactive);
   pop_2_elems();
 }
 #endif
@@ -2781,9 +2791,10 @@ void f_send_zmp()
 #ifdef F_SEND_GMCP
 void f_send_gmcp()
 {
-  add_binary_message(current_object, telnet_start_gmcp, sizeof(telnet_start_gmcp));
-  add_binary_message(current_object, (const unsigned char *)(sp->u.string), strlen(sp->u.string));
-  add_binary_message(current_object, telnet_end_sub, sizeof(telnet_end_sub));
+  add_binary_message_noflush(current_object, telnet_start_gmcp, sizeof(telnet_start_gmcp));
+  add_binary_message_noflush(current_object, (const unsigned char *)(sp->u.string), strlen(sp->u.string));
+  add_binary_message_noflush(current_object, telnet_end_sub, sizeof(telnet_end_sub));
+  flush_message(current_object->interactive);
 
   pop_stack();
 }
@@ -2830,21 +2841,20 @@ void f_websocket_handshake_done()
   current_interactive->interactive->iflags |= HANDSHAKE_COMPLETE;
   object_t *ob = current_interactive; //command_giver;
   /* Ask permission to ask them for their terminal type */
-  add_binary_message(ob, telnet_do_ttype, sizeof(telnet_do_ttype));
+  add_binary_message_noflush(ob, telnet_do_ttype, sizeof(telnet_do_ttype));
   /* Ask them for their window size */
-  add_binary_message(ob, telnet_do_naws, sizeof(telnet_do_naws));
-
+  add_binary_message_noflush(ob, telnet_do_naws, sizeof(telnet_do_naws));
   // Ask them if they support mxp.
-  add_binary_message(ob, telnet_do_mxp, sizeof(telnet_do_mxp));
+  add_binary_message_noflush(ob, telnet_do_mxp, sizeof(telnet_do_mxp));
   // And mssp
-  add_binary_message(ob, telnet_will_mssp, sizeof(telnet_will_mssp));
+  add_binary_message_noflush(ob, telnet_will_mssp, sizeof(telnet_will_mssp));
   // May as well ask for zmp while we're there!
-
-  add_binary_message(ob, telnet_will_zmp, sizeof(telnet_will_zmp));
+  add_binary_message_noflush(ob, telnet_will_zmp, sizeof(telnet_will_zmp));
   // Also newenv
-  add_binary_message(ob, telnet_do_newenv, sizeof(telnet_do_newenv));
+  add_binary_message_noflush(ob, telnet_do_newenv, sizeof(telnet_do_newenv));
   // gmcp *yawn*
-  add_binary_message(ob, telnet_will_gmcp, sizeof(telnet_will_gmcp));
-
+  add_binary_message_noflush(ob, telnet_will_gmcp, sizeof(telnet_will_gmcp));
+  // Flush message
+  flush_message(ob->interactive);
 }
 #endif

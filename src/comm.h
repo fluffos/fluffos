@@ -200,8 +200,8 @@ extern void restore_sigttin(void);
 
 void CDECL add_vmessage(object_t *, const char *, ...);
 void add_message(object_t *, const char *, int);
+void add_binary_message_noflush(object_t *, const unsigned char *, int);
 void add_binary_message(object_t *, const unsigned char *, int);
-
 
 void update_ref_counts_for_users(void);
 void make_selectmasks(void);
