@@ -1665,6 +1665,7 @@ void fatal(const char *fmt, ...)
 #ifdef PACKAGE_MUDLIB_STATS
       save_stat_files();
 #endif
+      /* fall through */
     case 1:
       in_fatal = 2;
 #ifdef TRAP_CRASHES
