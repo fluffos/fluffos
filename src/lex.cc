@@ -2199,6 +2199,7 @@ void add_predefines()
   }
   add_quoted_predefine("__ARCH__", ARCH);
   add_quoted_predefine("__COMPILER__", COMPILER);
+  add_quoted_predefine("__CXXFLAGS__", CXXFLAGS);
   add_quoted_predefine("__OPTIMIZATION__", OPTIMIZE);
 
   /* Backwards Compat */
