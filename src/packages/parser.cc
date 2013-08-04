@@ -214,7 +214,7 @@ void parser_mark(parse_info_t *pinfo)
 
 #if defined(DEBUG) || defined(PARSE_DEBUG)
 /* Usage:  DEBUG_P(("foo: %s:%i", str, i)); */
-static void debug_parse(char *fmt, ...)
+static void debug_parse(const char *fmt, ...)
 {
   va_list args;
   char buf[2048];
@@ -380,7 +380,7 @@ static int parse_copy_array(array_t *arr, char *** sarrp)
   return n;
 }
 
-static void add_special_word(char *wrd, int kind, int arg)
+static void add_special_word(const char *wrd, int kind, int arg)
 {
   char *p = make_shared_string(wrd);
   int h = DO_HASH(p, SPECIAL_HASH_SIZE);
@@ -393,7 +393,7 @@ static void add_special_word(char *wrd, int kind, int arg)
   special_table[h] = swp;
 }
 
-static int check_special_word(char *wrd, long *arg)
+static int check_special_word(const char *wrd, long *arg)
 {
   int h = DO_HASH(wrd, SPECIAL_HASH_SIZE);
   special_word_t *swp = special_table[h];
@@ -411,7 +411,7 @@ static int check_special_word(char *wrd, long *arg)
 
     *arg = strtol(wrd, &p, 10);
     if (p && *p) {
-      char *ending = "th";
+      const char *ending = "th";
 
       if (p - wrd < 2 || *(p - 2) != '1') {
         switch (*(p - 1)) {
@@ -1371,7 +1371,7 @@ static char *query_the_short(char *start, char *end, object_t *ob)
 {
   svalue_t *ret;
 
-  if (ob == NULL || ob == 0x9 || ob == 0x0) { return strput(start, end, "the thing"); }
+  if (ob == NULL || (intptr_t)ob == 0x9 || ob == 0x0) { return strput(start, end, "the thing"); }
   if ((ob->flags & O_DESTRUCTED) ||
       (!(ret = apply("the_short", ob, 0, ORIGIN_DRIVER)))
       || (ret->type != T_STRING)) {
@@ -1971,7 +1971,7 @@ static void push_bitvec_as_array(bitvec_t *bv, int errors_too)
  *  two more parser apply calls. direct_ and indirect_ applies are
  *  called sometimes more than once
  */
-static char *prefixes[] = { "can_", "direct_", "indirect_", "do_",
+static const char *prefixes[] = { "can_", "direct_", "indirect_", "do_",
                             /* Belgarat: names for the second pass with filled object arguments */
                             "direct_", "indirect_"
                           };
@@ -2062,7 +2062,7 @@ put_obj_value:
           push_number(0);
         } else if (loaded_objects[matches[match].val.number] == NULL ||
                    loaded_objects[matches[match].val.number] == 0x0 ||
-                   loaded_objects[matches[match].val.number] == 0x9 ||
+                   (intptr_t)loaded_objects[matches[match].val.number] == 0x9 ||
                    loaded_objects[matches[match].val.number]->flags & O_DESTRUCTED) {
           push_number(0);
         } else {
@@ -2189,7 +2189,7 @@ static int parallel_check_functions(object_t *obj,
   int tryy, ret, args;
 
   free_parser_error(&parallel_error_info);
-  if (obj && obj != 0x9) {
+  if (obj && (intptr_t)obj != 0x9) {
     SET_OB(obj);
     for (tryy = 0, ret = 0; !ret && tryy < 8; tryy++) {
       if (tryy == 4) {
