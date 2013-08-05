@@ -49,6 +49,9 @@ Known Issues:
 ================================================================================
   Per-release ChangeLog
 ================================================================================
+FluffOS 3.0-alpha6.5
+  * Fixed efun terminal_colour for allow use the return string from terminal_colour_replace apply correctly when it isn't ansi color.
+
 FluffOS 3.0-alpha6.4
   * Fixed efun present() issue for object id that ends with digits, added test.
 
