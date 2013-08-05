@@ -2879,6 +2879,22 @@ f_rm(void)
 }
 #endif
 
+#ifdef F_TAIL
+void
+f_tail (void)
+{
+    if (tail((const char*)sp->u.string)){
+        free_string_svalue(sp);
+        *sp = const1;
+    }
+    else {
+        free_string_svalue(sp);
+        *sp = const0;
+    }
+}
+#endif
+
+
 #ifdef F_RMDIR
 void
 f_rmdir(void)

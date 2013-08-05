@@ -206,6 +206,7 @@ int cp(string, string);
 int link(string, string);
 int mkdir(string);
 int rm(string);
+int tail(string);
 int rmdir(string);
 
 /* the bit string functions */
