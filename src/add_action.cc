@@ -250,13 +250,15 @@ static void enable_commands(int num)
     return;
   }
 
-  debug(d_flag, "Enable commands /%s (ref %d)",
-        current_object->obname, current_object->ref);
-
   if (num) {
+    debug(add_action, "Enable commands: %s (ref %d)\n",
+          current_object->obname, current_object->ref);
+
     current_object->flags |= O_ENABLE_COMMANDS;
     set_command_giver(current_object);
   } else {
+    debug(add_action, "Disable commands: %s (ref %d)\n",
+          current_object->obname, current_object->ref);
 #ifndef NO_ENVIRONMENT
     /* Remove all sentences defined for the object */
     if (current_object->flags & O_ENABLE_COMMANDS) {
@@ -293,7 +295,7 @@ static int user_parser(char *buff)
   int where;
   int save_illegal_sentence_action;
 
-  debug(d_flag, "cmd [/%s]: %s\n", command_giver->obname, buff);
+  debug(add_action, "cmd [/%s]: '%s'\n", command_giver->obname, buff);
 
   /* strip trailing spaces. */
   for (p = buff + strlen(buff) - 1; p >= buff; p--) {
@@ -353,7 +355,7 @@ static int user_parser(char *buff)
      */
 
     if (!(s->flags & V_FUNCTION))
-      debug(d_flag, "Local command %s on /%s",
+      debug(add_action, "Local command %s on /%s\n",
             s->function.s, s->ob->obname);
 
     if (s->flags & V_NOSPACE) {
@@ -524,11 +526,13 @@ static void add_action(svalue_t *str, const char *cmd, int flag)
                  * did wrong. */
   p = alloc_sentence();
   if (str->type == T_STRING) {
-    debug(d_flag, "--Add action %s", str->u.string);
+    debug(add_action, "--Add action '%s' (ob: %s func: '%s')\n",
+        cmd, ob->obname, str->u.string);
     p->function.s = make_shared_string(str->u.string);
     p->flags = flag;
   } else {
-    debug(d_flag, "--Add action <function>");
+    debug(add_action, "--Add action '%s' (ob: %s func: <function>)\n",
+        cmd, ob->obname);
 
     p->function.f = str->u.fp;
     str->u.fp->hdr.ref++;
@@ -595,7 +599,8 @@ void remove_sent(object_t *ob, object_t *user)
     if ((*s)->ob == ob) {
 #ifdef DEBUG
       if (!((*s)->flags & V_FUNCTION)) {
-        debug(d_flag, "--Unlinking sentence %s\n", (*s)->function.s);
+        debug(add_action, "--Unlinking sentence %s (user: %s ob: %s)\n",
+            (*s)->function.s, user->obname, ob->obname);
       }
 #endif
 
