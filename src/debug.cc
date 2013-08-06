@@ -24,6 +24,7 @@ debug_t levels[] = {
   E(event),
   E(dns),
   E(file),
+  E(add_action),
 };
 
 #define NELEM(x) (sizeof(x)/sizeof(x[0]))

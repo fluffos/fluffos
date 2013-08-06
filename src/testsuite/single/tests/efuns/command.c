@@ -15,8 +15,12 @@ void do_tests() {
     add_action( (: action :), "foo");
     comms = commands();
     disable_commands();
+    // disable_commands() will not clear out
+    // actions added by itself.
+    ASSERT_EQ(comms, commands())
+
     if (save_tp)
-	evaluate(bind( (: enable_commands :), save_tp));
+      evaluate(bind( (: enable_commands :), save_tp));
     
     ASSERT(command("foo"));
     ASSERT_EQ(0, command("whatever"));
