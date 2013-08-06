@@ -20,6 +20,8 @@ EFUN/Package changes:
   * PACKAGE_CONTRIB: store_variable | fetch_variable accept an object as 3rd last argument. (Lonely@NT)
   * PACKAGE_CRYPTO: build fixes and enhancements. (voltara@lpmuds.net)
   * PACKAGE_SHA1: Fix incorrect sha1() hash generation, verified with tests. (voltara@lpmuds.net)
+  * disable_commands() now accept a int argument, which default to 1, same as old behavior.
+    When passing 0, actions added by its environment, sibling, inventory will not be cleared.
 
 New compile options/packages:
   * PACKAGE_TRIM: (zoilder), rtrim, ltrim, and trim for string trimming.
@@ -34,6 +36,7 @@ Misc:
   * addr_server is now obsolete and deleted, the functionaltiy is built-in. (alpha6)
   * DEBUG_MACRO is now always true, the functionaltiy is being canonicalized as built-in.
   * Various bug/crash fixes.
+  * new LPC predefine __CXXFLAGS__.
 
 TODOs:
   Use event backend to schedule call_out, heart_beat and object swap/reclaim routine.
@@ -49,6 +52,14 @@ Known Issues:
 ================================================================================
   Per-release ChangeLog
 ================================================================================
+
+FluffOS 3.0-alpha7
+  * Check c++11 capability during configuring.
+  * new LPC predefine __CXXFLAGS__.
+  * Fixes cmud/zmud problem with TCP_NODELAY with MCCP.
+  * new debug macro "-dadd_action" to show add_action related logs.
+  * disable_commands() now accepts one int argument. (see above).
+
 FluffOS 3.0-alpha6.4
   * Fixed efun present() issue for object id that ends with digits, added test.
 
