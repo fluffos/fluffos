@@ -36,6 +36,7 @@ Misc:
   * addr_server is now obsolete and deleted, the functionaltiy is built-in. (alpha6)
   * DEBUG_MACRO is now always true, the functionaltiy is being canonicalized as built-in.
   * Various bug/crash fixes.
+  * new LPC predefine __CXXFLAGS__.
 
 TODOs:
   Use event backend to schedule call_out, heart_beat and object swap/reclaim routine.
@@ -53,6 +54,10 @@ Known Issues:
 ================================================================================
 
 FluffOS 3.0-alpha7
+  * Check c++11 capability during configuring.
+  * new LPC predefine __CXXFLAGS__.
+  * Fixes cmud/zmud problem with TCP_NODELAY with MCCP.
+  * new debug macro "-dadd_action" to show add_action related logs.
   * disable_commands() now accepts one int argument. (see above).
 
 FluffOS 3.0-alpha6.4
