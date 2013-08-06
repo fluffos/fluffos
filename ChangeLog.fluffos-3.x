@@ -20,6 +20,8 @@ EFUN/Package changes:
   * PACKAGE_CONTRIB: store_variable | fetch_variable accept an object as 3rd last argument. (Lonely@NT)
   * PACKAGE_CRYPTO: build fixes and enhancements. (voltara@lpmuds.net)
   * PACKAGE_SHA1: Fix incorrect sha1() hash generation, verified with tests. (voltara@lpmuds.net)
+  * disable_commands() now accept a int argument, which default to 1, same as old behavior.
+    When passing 0, actions added by its environment, sibling, inventory will not be cleared.
 
 New compile options/packages:
   * PACKAGE_TRIM: (zoilder), rtrim, ltrim, and trim for string trimming.
@@ -49,6 +51,10 @@ Known Issues:
 ================================================================================
   Per-release ChangeLog
 ================================================================================
+
+FluffOS 3.0-alpha7
+  * disable_commands() now accepts one int argument. (see above).
+
 FluffOS 3.0-alpha6.4
   * Fixed efun present() issue for object id that ends with digits, added test.
 

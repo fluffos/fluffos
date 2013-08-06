@@ -235,12 +235,15 @@ void setup_new_commands(object_t *dest, object_t *item)
 }
 
 /*
- * This will enable an object to use commands normally only
+ * If enable == 1, this enables current object to use commands normally only
  * accessible by interactive users.
- * Also check if the user is a wizard. Wizards must not affect the
- * value of the wizlist ranking.
+ *
+ * Otherwise if enable == 0, it will disable commands, living() will return
+ * false.  If clear == 1, it will also remove all actions that was previously
+ * added to current_object by its environment, sibling and inventory.
+ * (action added by itself is retained)
  */
-static void enable_commands(int num)
+static void enable_commands(int enable, int clear)
 {
 #ifndef NO_ENVIRONMENT
   object_t *pp;
@@ -250,7 +253,7 @@ static void enable_commands(int num)
     return;
   }
 
-  if (num) {
+  if (enable) {
     debug(add_action, "Enable commands: %s (ref %d)\n",
           current_object->obname, current_object->ref);
 
@@ -260,8 +263,9 @@ static void enable_commands(int num)
     debug(add_action, "Disable commands: %s (ref %d)\n",
           current_object->obname, current_object->ref);
 #ifndef NO_ENVIRONMENT
-    /* Remove all sentences defined for the object */
-    if (current_object->flags & O_ENABLE_COMMANDS) {
+    if (clear) {
+      debug(add_action, "Clearing all actions: %s\n", current_object->obname);
+      /* Remove all sentences defined for the object */
       if (current_object->super) {
         remove_sent(current_object->super, current_object);
         for (pp = current_object->super->contains; pp; pp = pp->next_inv) {
@@ -697,14 +701,15 @@ void f_commands(void)
 #ifdef F_DISABLE_COMMANDS
 void f_disable_commands(void)
 {
-  enable_commands(0);
+  enable_commands(0, sp->u.number);
+  pop_stack();
 }
 #endif
 
 #ifdef F_ENABLE_COMMANDS
 void f_enable_commands(void)
 {
-  enable_commands(1);
+  enable_commands(1, 0);
 }
 #endif
 

@@ -93,7 +93,7 @@ int command(string);
 int remove_action(string, string);
 int living(object default: F__THIS_OBJECT);
 mixed *commands();
-void disable_commands();
+void disable_commands(int default: 1);
 void enable_commands();
 void set_living_name(string);
 object *livings();
