@@ -5,13 +5,7 @@
 disable_commands() - makes a living object non-living
 
 .SH SYNOPSIS
-
-Depercated:
-  int disable_commands( void );
-
-Since FluffOS 3.0-alpha7:
-
-  int disable_commands( int clear_actions = 1 );
+int disable_commands( void );
 
 .SH DESCRIPTION
 Makes a living object non-living, that is, add_actions have no effects,
@@ -19,15 +13,9 @@ livingp returns false, and, if the object is interactive, disallows
 the user to type in commands other than for an input_to.  disable_commands
 always returns 0.
 
-Since FluffOS 3.0-alpha7:
-This function receive a int, default to 1. have same meaning of old form.
-
-When clear > 0, Driver will remove all previously added actions
-to this object by its environment, sibling and inventory. (Action added by
-itself is not removed.) This is the old behavior.
-
-When clear == 0, Driver will not remove previously added actions, this is
-the recommend usage.
+calling disable_commands() also have side-effct of clearing all actions
+previously added by other object, it also removes actions that was defined
+by this object.
 
 .SH SEE ALSO
 enable_commands(3)
