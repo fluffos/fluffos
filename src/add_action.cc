@@ -236,17 +236,16 @@ void setup_new_commands(object_t *dest, object_t *item)
 
 /*
  * If enable == 1, this enables current object to use commands normally only
- * accessible by interactive users.
+ * accessible by interactive users. if toggle_action == 1, it will also setup
+ * actions by calling init() on this_object's environment, sibling then inventory.
  *
- * Otherwise if enable == 0, it will disable commands, living() will return
- * false.  If clear == 1, it will also remove all actions that was previously
- * added to current_object by its environment, sibling and inventory.
- * (action added by itself is retained)
+ * Otherwise if enable == 0, it will disable commands, clear all actions,
+ * make living() return false.
  */
-static void enable_commands(int enable, int clear)
+static void enable_commands(int enable, int toggle_action)
 {
 #ifndef NO_ENVIRONMENT
-  object_t *pp;
+
 #endif
 
   if (current_object->flags & O_DESTRUCTED) {
@@ -259,22 +258,35 @@ static void enable_commands(int enable, int clear)
 
     current_object->flags |= O_ENABLE_COMMANDS;
     set_command_giver(current_object);
+    if (toggle_action) {
+      // NOTE: gotcha for re-enabling commands after disabling commands.
+      //
+      // Imagine in room A, player B, has a item C.
+      // If B moved into A, then get item C. The order should have been [A, C]
+      // If B get C first, then moved into A, the order would have been [C, A].
+      // So, we don't know the "exact" order of init we should call.
+      // here we just simply stick to one order, room first, item second.
+      if (current_object->super) {
+        setup_new_commands(current_object->super, current_object);
+      }
+      for (object_t *pp = current_object->contains; pp; pp = pp->next_inv) {
+        setup_new_commands(current_object, pp);
+      }
+    }
   } else {
     debug(add_action, "Disable commands: %s (ref %d)\n",
           current_object->obname, current_object->ref);
 #ifndef NO_ENVIRONMENT
-    if (clear) {
-      debug(add_action, "Clearing all actions: %s\n", current_object->obname);
-      /* Remove all sentences defined for the object */
-      if (current_object->super) {
-        remove_sent(current_object->super, current_object);
-        for (pp = current_object->super->contains; pp; pp = pp->next_inv) {
-          remove_sent(pp, current_object);
-        }
-      }
-      for (pp = current_object->contains; pp; pp = pp->next_inv) {
+    debug(add_action, "Clearing all actions: %s\n", current_object->obname);
+    /* Remove all sentences defined for the object */
+    if (current_object->super) {
+      remove_sent(current_object->super, current_object);
+      for (object_t *pp = current_object->super->contains; pp; pp = pp->next_inv) {
         remove_sent(pp, current_object);
       }
+    }
+    for (object_t *pp = current_object->contains; pp; pp = pp->next_inv) {
+      remove_sent(pp, current_object);
     }
 #endif
     current_object->flags &= ~O_ENABLE_COMMANDS;
@@ -701,15 +713,15 @@ void f_commands(void)
 #ifdef F_DISABLE_COMMANDS
 void f_disable_commands(void)
 {
-  enable_commands(0, sp->u.number);
-  pop_stack();
+  enable_commands(0, 0);
 }
 #endif
 
 #ifdef F_ENABLE_COMMANDS
 void f_enable_commands(void)
 {
-  enable_commands(1, 0);
+  enable_commands(1, sp->u.number);
+  pop_stack();
 }
 #endif
 
