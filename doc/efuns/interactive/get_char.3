@@ -8,24 +8,24 @@ get_char - causes next character of input to be sent to a specified function
 varargs void get_char( string | function fun, int flag, ... );
 
 .SH DESCRIPTION
-Enable next character of user input to be sent to the function `fun' as
+Enable next character of user input to be sent to the function 'fun' as
 an argument. The input character will not be parsed by the driver.
 .PP
 Note that get_char is non-blocking which means that the object calling
 get_char does not pause waiting for input.  Instead the object continues
 to execute any statements following the get_char.  The specified function
-`fun' will not be called until the user input has been collected.
+'fun' will not be called until the user input has been collected.
 .PP
 If "get_char()" is called more than once in the same execution, only the
 first call has any effect.
 .PP
-If optional argument `flag' is non-zero, the char given by the player will
+If optional argument 'flag' is non-zero, the char given by the player will
 not be echoed, and is not seen if snooped (this is useful for collecting
 passwords).
 .PP
-The function `fun' will be called with the user input as its first argument
+The function 'fun' will be called with the user input as its first argument
 (a string). Any additional arguments supplied to get_char will be passed on to
-`fun' as arguments following the user input.
+'fun' as arguments following the user input.
 
 .SH BUGS
 Please note that get_char has a significant bug in MudOS 0.9 and

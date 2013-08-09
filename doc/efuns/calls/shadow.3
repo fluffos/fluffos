@@ -8,21 +8,21 @@ shadow() - shadow one or more functions in some object
 object shadow( object ob, int flag );
 
 .SH DESCRIPTION
-If `flag' is 1 or missing, then current object will shadow `ob'. If
-`flag' is 0, then either 0 will be returned, or the object that is
-already shadowing `ob'.
+If 'flag' is 1 or missing, then current object will shadow 'ob'. If
+'flag' is 0, then either 0 will be returned, or the object that is
+already shadowing 'ob'.
 .PP
 The master object defines the function "valid_shadow()".  If it returns 1
 the target object can't be shadowed, and the "shadow()" function will
-return 0 instead of `ob'.
+return 0 instead of 'ob'.
 .PP
-If an object `a' shadows an object `b', then all "call_other(func)" to `b'
-will be redirected to `a'. If object `a' has not defined the function,
-then the call will be forwarded to `b' (as if there were no shadow).
-There is only one object that can call functions in `b' with
-call_other(), and that is `a'. Not even object `b' can "call_other()"
-itself. All normal (internal) function calls inside `b' will however remain
-internal to `b'.
+If an object 'a' shadows an object 'b', then all "call_other(func)" to 'b'
+will be redirected to 'a'. If object 'a' has not defined the function,
+then the call will be forwarded to 'b' (as if there were no shadow).
+There is only one object that can call functions in 'b' with
+call_other(), and that is 'a'. Not even object 'b' can "call_other()"
+itself. All normal (internal) function calls inside 'b' will however remain
+internal to 'b'.
 .PP
 There are two ways to remove the shadow. Either destruct it, or the object
 that was shadowed. In the latter case, the shadow will also be destructed
