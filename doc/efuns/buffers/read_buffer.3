@@ -10,12 +10,12 @@ string | buffer read_buffer( string | buffer src,
                              int start,  int len );
  
 .SH DESCRIPTION
-If `src' is a string (filename), then the filename will be read, starting
-at byte # `start', for `len' bytes, and returned as a buffer.  If neither
+If 'src' is a string (filename), then the filename will be read, starting
+at byte # 'start', for 'len' bytes, and returned as a buffer.  If neither
 argument is given, the entire file is read.
  
-If `src' is a buffer, then characters are read from the buffer beginning
-at byte # `start' in the buffer, and for `len' # of bytes, and returned
+If 'src' is a buffer, then characters are read from the buffer beginning
+at byte # 'start' in the buffer, and for 'len' # of bytes, and returned
 as a string.
  
 Note that the maximum number of bytes you can read from a file and into

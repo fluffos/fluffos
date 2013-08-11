@@ -9,11 +9,11 @@ mixed unique_array( object *obarr, string separator, void | mixed skip );
 mixed unique_array( mixed *arr, function f, void | mixed skip );
 
 .SH DESCRIPTION
-Groups objects together for which the `separator' function returns the same 
-value. `obarr' should be an array of objects, other types are ignored.
-The `separator' function is called only once in each object in `obarr'.
-THe optional `skip' parameter enables a pre-filter on `obarr', skipping
-elements which match `skip'.
+Groups objects together for which the 'separator' function returns the same 
+value. 'obarr' should be an array of objects, other types are ignored.
+The 'separator' function is called only once in each object in 'obarr'.
+THe optional 'skip' parameter enables a pre-filter on 'obarr', skipping
+elements which match 'skip'.
 The second form works a bit differently.  each element of the array is
 passed to f and the elements are partitioned based on the return value
 of f.  In particular, the array does not need to be composed of

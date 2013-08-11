@@ -13,9 +13,9 @@ unknown call_other( object ob | object *obs,
 Calls a function in another object, with [optional] argument(s).  The return
 value is returned from the other object, so it cannot be known at compile
 time and may need to be cast if using type checking.  The function named
-`func' will be called in `ob', with arguments 3, 4, etc given as arguments
-1, 2, etc to `func' in `ob'.  call_other will return the return value of
-`func'.  If the first argument is an array instead of an object, then
+'func' will be called in 'ob', with arguments 3, 4, etc given as arguments
+1, 2, etc to 'func' in 'ob'.  call_other will return the return value of
+'func'.  If the first argument is an array instead of an object, then
 the call will be done in all elements of that array (all elements should be
 of type object), and an array of returns will be returned.  If argument 2
 is an array instead of a string, then the first element in the array should
