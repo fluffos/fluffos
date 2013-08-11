@@ -567,6 +567,11 @@ find_for_insert(mapping_t *m, svalue_t *lv, int doTheFree)
 
 struct unique_svalue_compare {
   bool operator()(svalue_t l, svalue_t r) const {
+    DEBUG_CHECK(
+        ((l.type == T_STRING && l.subtype != STRING_SHARED) ||
+         (r.type == T_STRING && r.subtype != STRING_SHARED)),
+        "unique_mapping: using non-shared string! "
+        "Memory corruption will happen.");
     return svalue_to_int(&l) < svalue_to_int(&r);
   }
 };
@@ -599,7 +604,16 @@ void f_unique_mapping(void)
     if (!sv) {
       sv = &const0;
     }
-    // Initialize the entry, Key is copied
+
+    // FIXME: special hack.
+    // svalue_to_int will modify parameter to make sure it is shared string,
+    // Thus we must call it here to "fix" sv before we insert it into map.
+    //
+    // The correct fix here should be change svalue_to_int to *not* modify
+    // param and make sure all call site only pass shared string.
+    svalue_to_int(sv);
+
+    // Initialize the entry, Key is a copy of sv.
     auto ret = result.insert(MapResult::value_type(*sv, std::deque<svalue_t *>()));
     // NOTE: going through array in reverse order , but put the result in the
     // back of the array, this is to preserve the observed behavior of old
@@ -613,6 +627,9 @@ void f_unique_mapping(void)
     auto key = item.first;
     auto values = item.second;
 
+    // FIXME: find_for_insert can actually throw error if we exceeded maximum
+    // mapping size! we will leave garbage when that happens.
+    //
     // key is copied, but not freed, will be freed together with map.
     svalue_t *l = find_for_insert(m, &key, 0);
     l->type = T_ARRAY;

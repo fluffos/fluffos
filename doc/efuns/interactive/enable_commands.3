@@ -5,13 +5,13 @@
 enable_commands() - allow object to use 'player' commands
 
 .SH SYNOPSIS
-Depercated:
+Deprecated:
   void enable_commands( void );
 
 Since FluffOS 3.0-alpha7.1:
   void enable_commands( int setup_actions = 0 );
 
-.SH DESRIPTION
+.SH DESCRIPTION
 enable_commands() marks this_object() as a living object, and allows
 it to use commands added with add_action() (by using command()).
 When enable_commands() is called, the driver also looks for the

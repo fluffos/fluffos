@@ -24,4 +24,12 @@ void do_tests() {
     arr = ({ this_player(), "123", arr });
     ASSERT_EQ(([ 0: ({ ({ 1, 2, 3, 4, 5 }), "123", this_player() }) ]),
       unique_mapping(arr, (: 0 :)));
+
+    arr = ({ "alpha","bravo","charlie","apple","bongo","cat" });
+
+    ASSERT_EQ( (["a": ({ "apple", "alpha" }),
+                 "b": ({ "bongo", "bravo" }),
+                 "c": ({ "cat", "charlie" }),
+                ]),
+               unique_mapping(arr, (: $1[0..0] :) ));
 }

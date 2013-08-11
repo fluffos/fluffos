@@ -8,9 +8,9 @@ set_reset - modify the time until reset on an object
 varargs void set_reset( object ob, int time );
  
 .SH DESCRIPTION
-Sets the time until reset on `ob' to `time' seconds from now.  If `time'
+Sets the time until reset on 'ob' to 'time' seconds from now.  If 'time'
 is omitted, the driver's normal reset time setting formula is applied
-to `ob', that is,
+to 'ob', that is,
 .PP
 reset time = current_time + reset_time / 2 + random(reset_time / 2)
  
