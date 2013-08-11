@@ -37,6 +37,7 @@ Misc:
   * DEBUG_MACRO is now always true, the functionaltiy is being canonicalized as built-in.
   * Various bug/crash fixes.
   * new LPC predefine __CXXFLAGS__.
+  * /doc is restored and content will be updated for each EFUN/Apply changes.
 
 TODOs:
   Use event backend to schedule call_out, heart_beat and object swap/reclaim routine.
@@ -52,6 +53,12 @@ Known Issues:
 ================================================================================
   Per-release ChangeLog
 ================================================================================
+
+FluffOS 3.0-alpha7.2
+  * unique_mapping() crash when callback returns a non-shared string.
+  * move some outdated doc to /doc/archive.
+  * some format change in EFUN/APPLY doc.
+
 FluffOS 3.0-alpha7.1
   * disable_commands() change is reverted, not thought through.
   * enable_commands() now accepts a int instead (see 3.0 vs 2.0)
