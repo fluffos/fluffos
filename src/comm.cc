@@ -573,8 +573,7 @@ int flush_message(interactive_t *ip)
   /*
    * if ip is not valid, do nothing.
    */
-  if (!ip || !ip->ob || !IP_VALID(ip, ip->ob) ||
-      (ip->ob->flags & O_DESTRUCTED) || (ip->iflags & (NET_DEAD | CLOSING))) {
+  if (!ip || (ip->iflags & (NET_DEAD | CLOSING))) {
     debug(connections, ("flush_message: invalid target!\n"));
     return 0;
   }
