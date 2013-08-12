@@ -32,4 +32,11 @@ void do_tests() {
                  "c": ({ "cat", "charlie" }),
                 ]),
                unique_mapping(arr, (: $1[0..0] :) ));
+
+     ASSERT_EQ( 1, sizeof(
+              unique_mapping( arr , (: this_object() :) ) ));
+
+    // Crashers.
+    ASSERT_EQ(6, sizeof(unique_mapping( arr , (: allocate(1) :) ) ));
+    ASSERT_EQ(6, sizeof(unique_mapping( arr , (: allocate_mapping(1) :)) ));
 }
