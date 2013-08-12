@@ -521,7 +521,7 @@ void add_vmessage(object_t *who, const char *format, ...)
   add_message(who, new_string_data, strlen(new_string_data));
 }
 
-void add_binary_message_noflush(object_t *who, const unsigned char *data,int len)
+void add_binary_message_noflush(object_t *who, const unsigned char *data, int len)
 {
   interactive_t *ip;
   const unsigned char *cp, *end;
@@ -556,7 +556,8 @@ void add_binary_message_noflush(object_t *who, const unsigned char *data,int len
   add_message_calls++;
 }
 
-void add_binary_message(object_t *who, const unsigned char *data, int len) {
+void add_binary_message(object_t *who, const unsigned char *data, int len)
+{
   add_binary_message_noflush(who, data, len);
   if (who && who->interactive) {
     flush_message(who->interactive);
@@ -573,8 +574,7 @@ int flush_message(interactive_t *ip)
   /*
    * if ip is not valid, do nothing.
    */
-  if (!ip || !ip->ob || !IP_VALID(ip, ip->ob) ||
-      (ip->ob->flags & O_DESTRUCTED) || (ip->iflags & (NET_DEAD | CLOSING))) {
+  if (!ip || (ip->iflags & (NET_DEAD | CLOSING))) {
     debug(connections, ("flush_message: invalid target!\n"));
     return 0;
   }
@@ -1299,7 +1299,7 @@ void get_user_data(interactive_t *ip)
     }
 #endif
     debug(connections, "get_user_data: fd %d, read error: %s.\n", ip->fd,
-        evutil_socket_error_to_string(evutil_socket_geterror(ip->fd)));
+          evutil_socket_error_to_string(evutil_socket_geterror(ip->fd)));
     ip->iflags |= NET_DEAD;
     remove_interactive(ip->ob, 0);
     return;
@@ -1792,7 +1792,7 @@ void new_user_handler(port_def_t *port)
     add_binary_message_noflush(ob, telnet_do_naws, sizeof(telnet_do_naws));
 #ifdef HAVE_ZLIB
     add_binary_message_noflush(ob, telnet_compress_send_request_v2,
-                       sizeof(telnet_compress_send_request_v2));
+                               sizeof(telnet_compress_send_request_v2));
 #endif
     // Ask them if they support mxp.
     add_binary_message_noflush(ob, telnet_do_mxp, sizeof(telnet_do_mxp));
@@ -2115,7 +2115,7 @@ void remove_interactive(object_t *ob, int dested)
   debug(connections, "remove_interactive: closing fd %d\n", ip->fd);
   if (OS_socket_close(ip->fd) == -1) {
     debug(connections, "remove_interactive: close error: %s",
-        evutil_socket_error_to_string(evutil_socket_geterror(ip->fd)));
+          evutil_socket_error_to_string(evutil_socket_geterror(ip->fd)));
   }
 #ifdef F_SET_HIDE
   if (ob->flags & O_HIDDEN) {

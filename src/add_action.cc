@@ -543,12 +543,12 @@ static void add_action(svalue_t *str, const char *cmd, int flag)
   p = alloc_sentence();
   if (str->type == T_STRING) {
     debug(add_action, "--Add action '%s' (ob: %s func: '%s')\n",
-        cmd, ob->obname, str->u.string);
+          cmd, ob->obname, str->u.string);
     p->function.s = make_shared_string(str->u.string);
     p->flags = flag;
   } else {
     debug(add_action, "--Add action '%s' (ob: %s func: <function>)\n",
-        cmd, ob->obname);
+          cmd, ob->obname);
 
     p->function.f = str->u.fp;
     str->u.fp->hdr.ref++;
@@ -616,7 +616,7 @@ void remove_sent(object_t *ob, object_t *user)
 #ifdef DEBUG
       if (!((*s)->flags & V_FUNCTION)) {
         debug(add_action, "--Unlinking sentence %s (user: %s ob: %s)\n",
-            (*s)->function.s, user->obname, ob->obname);
+              (*s)->function.s, user->obname, ob->obname);
       }
 #endif
 
