@@ -568,10 +568,10 @@ find_for_insert(mapping_t *m, svalue_t *lv, int doTheFree)
 struct unique_svalue_compare {
   bool operator()(svalue_t l, svalue_t r) const {
     DEBUG_CHECK(
-        ((l.type == T_STRING && l.subtype != STRING_SHARED) ||
-         (r.type == T_STRING && r.subtype != STRING_SHARED)),
-        "unique_mapping: using non-shared string! "
-        "Memory corruption will happen.");
+      ((l.type == T_STRING && l.subtype != STRING_SHARED) ||
+       (r.type == T_STRING && r.subtype != STRING_SHARED)),
+      "unique_mapping: using non-shared string! "
+      "Memory corruption will happen.");
     return svalue_to_int(&l) < svalue_to_int(&r);
   }
 };
@@ -613,24 +613,36 @@ void f_unique_mapping(void)
     // param and make sure all call site only pass shared string.
     svalue_to_int(sv);
 
-    // Initialize the entry, Key is a copy of sv.
-    auto ret = result.insert(MapResult::value_type(*sv, std::deque<svalue_t *>()));
+    // If key is not in the map yet, we need to make a copy and insert it.
+    //
+    // Important: sv is pointing to a static global value and will be freed on
+    // next efun call, since we need the value it contains,  we need to make a
+    // deep copy.
+    //
+    // We also need to free the key when we done, it is done in the loop below.
+    if (result.find(*sv) == result.end()) {
+      svalue_t key;
+      assign_svalue_no_free(&key, sv);
+
+      result.insert(MapResult::value_type(key, std::deque<svalue_t *>()));
+    }
+
     // NOTE: going through array in reverse order , but put the result in the
     // back of the array, this is to preserve the observed behavior of old
     // implementation.
-    ret.first->second.push_back(v->item + size);
+    result.find(*sv)->second.push_back(v->item + size);
   }
 
-  // Translate into LPC mapping
+  // Translate result into LPC mapping
   mapping_t *m = allocate_mapping(0);
-  for (auto item: result) {
+for (auto & item: result) {
     auto key = item.first;
     auto values = item.second;
 
     // FIXME: find_for_insert can actually throw error if we exceeded maximum
     // mapping size! we will leave garbage when that happens.
     //
-    // key is copied, but not freed, will be freed together with map.
+    // key is copied, but not freed, the value is freed at the end of the loop.
     svalue_t *l = find_for_insert(m, &key, 0);
     l->type = T_ARRAY;
     l->u.arr = allocate_empty_array(values.size());
@@ -638,6 +650,8 @@ void f_unique_mapping(void)
       // values are copied.
       assign_svalue_no_free(&l->u.arr->item[i], values[i]);
     }
+    // Free reference
+    free_svalue(&key, "unique_mapping");
   }
   pop_n_elems(num_arg);
   push_refed_mapping(m);

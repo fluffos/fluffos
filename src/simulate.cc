@@ -736,11 +736,11 @@ static object_t *object_present2(const char *str, object_t *ob)
   namelen = strlen(str);
 
   // If string ends with number, try to separate name and count.
-  if(uisdigit(name[namelen - 1])) {
+  if (uisdigit(name[namelen - 1])) {
     const char *ptr = strrchr(name, ' ');
     if (ptr != NULL) {
       // Make sure second part has only digits
-      if (strspn(ptr + 1, "1234567890") == strlen(ptr+1)) {
+      if (strspn(ptr + 1, "1234567890") == strlen(ptr + 1)) {
         namelen = ptr - name;
         count = atoi(ptr + 1);
       }

@@ -26,6 +26,7 @@ void bp(void);
 
    is usually best.
  */
+void check_string_stats(outbuffer_t *);
 #define CHECK_STRING_STATS /* check_string_stats(0) */
 #else
 #define CHECK_STRING_STATS
