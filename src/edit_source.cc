@@ -38,6 +38,7 @@ FILE *yyin = 0, *yyout = 0;
 #define OPTIONS_INCL      "options_incl.h"
 #define PACKAGES          "packages/packages"
 #define OPTIONS_H         "options.h"
+#define OPTIONS_INTERNAL_H "options_internal.h"
 #define LOCAL_OPTIONS     "local_options"
 #define OPTION_DEFINES    "option_defs.cc"
 #define FUNC_SPEC         "func.spec"
@@ -1012,9 +1013,9 @@ static void write_options_incl(int local)
 {
   open_output_file(OPTIONS_INCL);
   if (local) {
-    fprintf(yyout, "#include \"%s\"\n", LOCAL_OPTIONS);
+    fprintf(yyout, "#include \"options_internal.h\"\n#include \"%s\"\n", LOCAL_OPTIONS);
   } else {
-    fprintf(yyout, "#include \"%s\"\n", OPTIONS_H);
+    fprintf(yyout, "#include \"options_internal.h\"\n#include \"%s\"\n", OPTIONS_H);
   }
   close_output_file();
 }
@@ -1042,6 +1043,15 @@ static void handle_options(int full)
             LOCAL_OPTIONS, OPTIONS_H, OPTIONS_H);
     write_options_incl(0);
   }
+
+  // Re-process options
+  open_input_file(OPTIONS_INTERNAL_H);
+  ppchar = '#';
+  preprocess();
+
+  open_input_file(OPTIONS_INCL);
+  ppchar = '#';
+  preprocess();
 
   create_option_defines();
 }

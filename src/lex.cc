@@ -192,9 +192,6 @@ static keyword_t reswords[] = {
   {"switch", L_SWITCH, 0},
   {"time_expression", L_TIME_EXPRESSION, 0},
   {"varargs", L_TYPE_MODIFIER, FUNC_VARARGS },
-#ifdef VIRTUAL_RESERVED_WORD
-  {"virtual", L_TYPE_MODIFIER, 0 },
-#endif
   {"void", L_BASIC_TYPE, TYPE_VOID},
   {"while", L_WHILE, 0},
 };
