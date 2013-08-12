@@ -267,20 +267,20 @@ int socket_create(enum socket_mode mode, svalue_t *read_callback, svalue_t *clos
 #endif
     if (fd == INVALID_SOCKET) {
       debug(sockets, "socket_create: socket error: %s.\n",
-          evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+            evutil_socket_error_to_string(evutil_socket_geterror(fd)));
       return EESOCKET;
     }
     optval = 1;
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *) &optval,
                    sizeof(optval)) == -1) {
       debug(sockets, "socket_create: setsockopt error: %s.\n",
-          evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+            evutil_socket_error_to_string(evutil_socket_geterror(fd)));
       OS_socket_close(fd);
       return EESETSOCKOPT;
     }
     if (set_socket_nonblocking(fd, 1) == -1) {
       debug(sockets, "socket_create: set_socket_nonblocking error: %s.\n",
-          evutil_socket_error_to_string(evutil_socket_geterror(fd)));
+            evutil_socket_error_to_string(evutil_socket_geterror(fd)));
       OS_socket_close(fd);
       return EENONBLOCK;
     }
@@ -393,7 +393,7 @@ int socket_bind(int fd, int port, const char *addr)
         return EEADDRINUSE;
       default:
         debug(sockets, "socket_bind: bind error: %s.\n",
-            evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
+              evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
         return EEBIND;
     }
   }
@@ -402,7 +402,7 @@ int socket_bind(int fd, int port, const char *addr)
   lpc_socks[fd].l_addrlen = sizeof(lpc_socks[fd].l_addr);
   if (getsockname(lpc_socks[fd].fd, (struct sockaddr *)&lpc_socks[fd].l_addr, &lpc_socks[fd].l_addrlen) == -1) {
     debug(sockets, "socket_bind: getsockname error: %s.\n",
-        evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
+          evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
     return EEGETSOCKNAME;
   }
 
@@ -446,7 +446,7 @@ int socket_listen(int fd, svalue_t *callback)
 
   if (listen(lpc_socks[fd].fd, 5) == -1) {
     debug(sockets, "socket_listen: listen error: %s.\n",
-        evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
+          evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
     return EELISTEN;
   }
   lpc_socks[fd].state = STATE_LISTEN;
@@ -500,7 +500,7 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback)
         return EEINTR;
       default:
         debug(sockets, "socket_accept: accept error: %s.\n",
-            evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
+              evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
         return EEACCEPT;
     }
   }
@@ -514,7 +514,7 @@ int socket_accept(int fd, svalue_t *read_callback, svalue_t *write_callback)
    */
   if (set_socket_nonblocking(accept_fd, 1) == -1) {
     debug(sockets, "socket_accept: set_socket_nonblocking 1 error: %s.\n",
-        evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
+          evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
     OS_socket_close(accept_fd);
     return EENONBLOCK;
   }
@@ -709,7 +709,7 @@ int socket_write(int fd, svalue_t *message, const char *name)
 #ifndef NO_BUFFER_TYPE
         case T_BUFFER:
           len = message->u.buf->size;
-          if(len == 0) {
+          if (len == 0) {
             debug(sockets, "socket_write: trying to send 0 length buffer, ignored.\n");
             return EESUCCESS;
           }
@@ -722,7 +722,7 @@ int socket_write(int fd, svalue_t *message, const char *name)
 #endif
         case T_STRING:
           len = SVALUE_STRLEN(message);
-          if(len == 0) {
+          if (len == 0) {
             debug(sockets, "socket_write: trying to send 0 length string, ignored.\n");
             return EESUCCESS;
           }
@@ -737,7 +737,7 @@ int socket_write(int fd, svalue_t *message, const char *name)
           svalue_t *el;
 
           len = message->u.arr->size * sizeof(int);
-          if(len == 0) {
+          if (len == 0) {
             debug(sockets, "socket_write: trying to send 0 length array, ignored.\n");
             return EESUCCESS;
           }
