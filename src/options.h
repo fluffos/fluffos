@@ -60,42 +60,6 @@
 #undef MALLOC64
 #undef MALLOC32
 
-/* You may optionally choose one (or none) of these malloc wrappers.  These
- * can be used in conjunction with any of the above malloc packages.
- *
- * WRAPPEDMALLOC:
- *   * Limited statistics.
- *   * Limited additional cpu overhead and no additional memory overhead.
- *
- * DEBUGMALLOC:
- *   * Statistics on precisely how much memory has been malloc'd (as well
- *     as the stats provided by WRAPPEDMALLOC).
- *   * Incurs a fair amount of overhead (both memory and CPU)
- */
-#undef WRAPPEDMALLOC
-#undef DEBUGMALLOC
-
-/* The following add certain bells and whistles to malloc: */
-
-/* DEBUGMALLOC_EXTENSIONS: defining this (in addition to DEBUGMALLOC) enables
- * the set_malloc_mask(int) and debugmalloc(string,int) efuns.  These two
- * efuns basically allow you to cause certain malloc's and free's (with tags
- * selected by a specified mask) to print debug information (addr, tag,
- * description, size) to stdio (in the shell that invoked the driver) or to a
- * file.  Not defining this does reduce the overhead of DEBUGMALLOC from 16
- * bytes per malloc down to 8.  This macro has no effect if DEBUGMALLOC isn't
- * defined.
- */
-#undef DEBUGMALLOC_EXTENSIONS
-
-/* CHECK_MEMORY: defining this (in addition to DEBUGMALLOC and
- * DEBUGMALLOC_EXTENSIONS) causes the driver to check for memory
- * corruption due to writing before the start or end of a block.  This
- * also adds the check_memory() efun.  Takes a considerable ammount
- * more memory.  Mainly for debugging.
- */
-#undef CHECK_MEMORY
-
 /****************************************************************************
  *                          COMPATIBILITY                                   *
  *                         ---------------                                  *
@@ -116,13 +80,6 @@
  *          instructions for details.                                       *
  ****************************************************************************/
 
-/* HAS_STATUS_TYPE: old MudOS drivers had a 'status' type which was
- * identical to the 'int' type.  Define this to bring it back.
- *
- * Compat status: very archaic, but easy to support.
- */
-#undef HAS_STATUS_TYPE
-
 /* explode():
  *
  * The old behavior (#undef both of the below) strips any number of
@@ -140,23 +97,6 @@
  */
 #define SANE_EXPLODE_STRING
 #undef REVERSIBLE_EXPLODE_STRING
-
-/* CAST_CALL_OTHERS: define this if you want to require casting of call_other's;
- *   this was the default behavior of the driver prior to this addition.
- *
- * Compat status: code that requires it doesn't break, and it promotes
- * sloppy coding with no benefits.
- */
-#undef CAST_CALL_OTHERS
-
-/* NONINTERACTIVE_STDERR_WRITE: if defined, all writes/tells/etc to
- *   noninteractive objects will be written to stderr prefixed with a ']'
- *   (old behavior).
- *
- * Compat status: Easy to support, and also on the "It's a bug!  No, it's
- * a feature!" religious war list.
- */
-#undef NONINTERACTIVE_STDERR_WRITE
 
 /* NO_LIGHT: define this to disable the set_light() and driver maintenance
  *   of light levels in objects.  You can simulate it via LPC if you want...
@@ -199,30 +139,6 @@
  */
 #define NO_WIZARDS
 
-/* OLD_TYPE_BEHAVIOR: reintroduces a bug in type-checking that effectively
- * renders compile time type checking useless.  For backwards compatibility.
- *
- * Compat status: dealing with all the resulting compile errors can be
- * a huge pain even if they are correct, and the impact on the code is
- * small.
- */
-#undef OLD_TYPE_BEHAVIOR
-
-/* OLD_RANGE_BEHAVIOR: define this if you want negative indexes in string
- * or buffer range values (not lvalue, i.e. x[-2..-1]; for e.g. not
- * x[-2..-1] = foo, the latter is always illegal) to mean counting from the
- * end
- *
- * Compat status: Not horribly difficult to replace reliance on this, but not
- * trivial, and cannot be simulated.
- */
-#undef OLD_RANGE_BEHAVIOR
-
-/* define to get a warning for code that might use the old range behavior
- * when you're not actually using the old range behavior*/
-#undef WARN_OLD_RANGE_BEHAVIOR
-
-
 /* OLD_ED: ed() efun backwards compatible with the old version.  The new
  * version requires/allows a mudlib front end.
  *
@@ -252,12 +168,6 @@
  */
 #define SENSIBLE_MODIFIERS
 
-/* use class keyword for lpc structs */
-#define STRUCT_CLASS
-
-/* use struct keyword for lpc structs */
-#define STRUCT_STRUCT
-
 /* SANE_SORTING: Use system provided fastest sorting routine for various
  * sorting, including sort_array EFUN.
  *
@@ -285,14 +195,10 @@
  */
 #undef WARN_TAB
 
-/* WOMBLES: don't allow spaces between start/end of array/mapping/functional token chars so ({1,2,3}) still works, but ( { 1 , 2 , 3 } ) doesn't and ({ 1 , 2 , 3 }) does.*/
-#define WOMBLES
-
-/* ALLOW_INHERIT_AFTER_FUNCTION: allow inheriting after functions have been defined (this includes prototypes).
- * This caused crashes in v22.2a but it may have been fixed since.
- * sunyc: 2013-05-05, no crash observed anymore, changing to default true.
- */
-#define ALLOW_INHERIT_AFTER_FUNCTION
+/* WOMBLES: don't allow spaces between start/end of array/mapping/functional
+ * token chars so ({1,2,3}) still works, but ( { 1 , 2 , 3 } ) doesn't
+ * and ({ 1 , 2 , 3 }) does.*/
+#undef WOMBLES
 
 /* CALL_OTHER_TYPE_CHECK: enable type checking for call_other()
  * (-> operator on objects)
@@ -332,52 +238,6 @@
  * . heart_beat_info() is a synonym for heart_beats()
  */
 #undef COMPAT_32
-
-/*
- * Keep statistics about allocated strings, etc.  Which can be viewed with
- * the mud_status() efun.  If this is off, mud_status() and memory_info()
- * ignore allocated strings, but string operations run faster.
- */
-#define STRING_STATS
-
-/*
- * Similarly for arrays ...
- */
-#define ARRAY_STATS
-#define CLASS_STATS
-/* LOG_CATCHES: define this to cause errors that are catch()'d to be
- *   sent to the debug log anyway.
- *
- * On by default, because newer libs use catch() a lot, and it's confusing
- * if the errors don't show up in the logs.
- */
-#define LOG_CATCHES
-
-/* ARGUMENTS_IN_TRACEBACK: prints out function call arguments in error
- *   tracebacks, to aid in debugging.  Note: it prints the values of
- *   the arguments at the time of the error, not when the function
- *   was called.  It looks like this:
- *
- * Failed to load file: read_buffer
- * program: command/update.c, object: command/update line 15
- * '    commandHook' in '        clone/user.c' ('        clone/user#1')line 72
- * arguments were ("/read_buffer.c")
- * '           main' in '    command/update.c' ('      command/update')line 15
- * arguments were ("/read_buffer.c")
- *
- * The only down side is some people like their logs shorter
- */
-#define ARGUMENTS_IN_TRACEBACK
-
-/* LOCALS_IN_TRACEBACK: similar to ARGUMENTS_IN_TRACEBACK, but for local
- *   variables.  The output looks more or less like:
- *
- * locals: 1, "local_value"
- *
- * Same as above.  Tends to produce even longer logs, but very useful for
- * tracking errors.
- */
-#define LOCALS_IN_TRACEBACK
 
 /* MUDLIB_ERROR_HANDLER: If you define this, the driver doesn't do any
  *   handling of runtime errors, other than to turn the heartbeats of
@@ -424,12 +284,6 @@
  *                      compilation error occured.
  */
 #define DEFAULT_PRAGMAS PRAGMA_WARNINGS + PRAGMA_SAVE_TYPES + PRAGMA_ERROR_CONTEXT + PRAGMA_OPTIMIZE
-
-/* supress warnings about unused arguments; only warn about unused local
- * variables.  Makes older code (where argument names were required) compile
- * more quietly.
- */
-#define SUPPRESS_ARGUMENT_WARNINGS
 
 /* NO_RESETS: completely disable the periodic calling of reset() */
 #undef NO_RESETS
@@ -482,24 +336,10 @@
  */
 #undef OPCPROF_2D
 
-/* TRAP_CRASHES:  define this if you want MudOS to call crash() in master.c
- *   and then shutdown when signals are received that would normally crash the
- *   driver.
- */
-#define TRAP_CRASHES
-
 /* THIS_PLAYER_IN_CALL_OUT: define this if you wish this_player() to be
  *   usable from within call_out() callbacks.
  */
 #define THIS_PLAYER_IN_CALL_OUT
-
-/* CALLOUT_HANDLES: If this is defined, call_out() returns an integer, which
- * can be passed to remove_call_out() or find_call_out().  Removing call_outs
- * by name is still allowed, but is significantly less efficient, and also
- * doesn't work for function pointers.  This option adds 4 bytes overhead
- * per callout to keep track of the handle.
- */
-#define CALLOUT_HANDLES
 
 /* CALLOUT_LOOP_PROTECTION: If this is defined, all new zero-delay call_outs
  * added while already processing call_outs will run under a single evaluation
@@ -582,39 +422,6 @@
  *   microseconds will resolve to zero (0).
  */
 #undef PROFILE_FUNCTIONS
-
-/* NO_BUFFER_TYPE: if this is #define'd then LPC code using the 'buffer'
- *   type won't be allowed to compile (since the 'buffer' type won't be
- *   recognized by the lexer).
- */
-#undef NO_BUFFER_TYPE
-
-/* ARRAY_RESERVED_WORD: If this is defined then the word 'array' can
- *   be used to define arrays, as in:
- *
- * int array x = ({ .... });
- *
- * A side effect is that 'array' cannot be a variable or function name.
- */
-#undef ARRAY_RESERVED_WORD
-
-/* REF_RESERVED_WORD: If this is defined then the word 'ref' can be
- *   used to pass arguments to functions by value.  Example:
- *
- * void inc(int ref x) {
- *     x++;
- * }
- *
- * ... y = 1; inc(ref y); ...
- *
- * A side effect is that 'ref' cannot be a variable or function name.
- *
- * Note: ref must be used in *both* places; this is intentional.  It protects
- * against passing references to routines which don't intend to return values
- * through their arguments, and against forgetting to pass a reference
- * to a function which wants one (or accidentally having a variable modified!)
- */
-#define REF_RESERVED_WORD
 
 /****************************************************************************
  *                              PACKAGES                                    *
@@ -792,40 +599,10 @@
  */
 #define MESSAGE_BUFFER_SIZE 4096
 
-/* APPLY_CACHE_BITS: defines the number of bits to use in the call_other cache
- *   (in interpret.c).
- *
- * Memory overhead is (1 << APPLY_CACHE_BITS)*16.
- * [assuming 32 bit pointers and 16 bit shorts]
- *
- * ACB:    entries:     overhead:
- *  6         64             1k
- *  8        256             4k
- * 10       1024            16k
- * 12       4096            64k
- * 14      16384           256k
- * 16      65536             1M
- */
-#define APPLY_CACHE_BITS 20
-
-/* CACHE_STATS: define this if you want call_other (apply_low) cache
- * statistics.  Causes HAS_CACHE_STATS to be defined in all LPC objects.
- */
-#define CACHE_STATS
-
 /* TRACE: define this to enable the trace() and traceprefix() efuns.
  *   (keeping this undefined will cause the driver to run faster).
  */
 #define TRACE
-
-/* RUNTIME_LOADING: On systems which support it, it allows LPC->C compilation
- * 'on the fly' without having to recompile the driver.
- *
- * Note: This currently only works on machines that have the dlopen() system
- * call.  SunOS and IRIX do, as do a number of others.  AIX and Ultrix don't.
- * Linux does if you are using ELF.
- */
-#undef RUNTIME_LOADING
 
 /* TRACE_CODE: define this to enable code tracing (the driver will print
  *   out the previous lines of code to an error) eval_instruction() runs about
@@ -890,7 +667,7 @@
 /* USE_ICONV: Use iconv to translate input and output from/to the users char
  * encoding
  */
-#define USE_ICONV
+#undef USE_ICONV
 
 /* HAS_CONSOLE: If defined, the driver can take the argument -C
  *   which will give the driver an interactive console (you can type

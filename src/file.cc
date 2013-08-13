@@ -472,7 +472,7 @@ char *read_file(const char *file, int start, int lines)
 
   if (st.st_size == 0) {
     /* zero length file */
-    result = new_string(1, "read_file: empty");
+    result = new_string(0, "read_file: empty");
     result[0] = '\0';
     return result;
   }

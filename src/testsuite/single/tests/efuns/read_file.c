@@ -3,6 +3,11 @@ void do_tests() {
 
     ASSERT(cp("/single/master.c", "/testfile"));
 
+    rm("/testfile.zerolength");
+    write_file("/testfile.zerolength", "");
+    foo = read_file("/testfile.zerolength");
+    ASSERT_EQ("", foo);
+
     foo = read_bytes("/testfile");
     mid = implode(explode(foo, "\n")[9..18], "\n") + "\n";
     all = implode(explode(foo, "\n")[9..<1], "\n") + "\n";
