@@ -967,7 +967,7 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
             ip->sb_size = MAX_STRING_LENGTH;
           }
           ip->sb_buf = (unsigned char *)DREALLOC(ip->sb_buf, ip->sb_size,
-              TAG_TEMPORARY, "comm: TS_SB");
+                                                 TAG_TEMPORARY, "comm: TS_SB");
           if (ip->sb_pos < ip->sb_size - 1) {
             ip->sb_buf[ip->sb_pos++] = from[i];
           }
@@ -1010,8 +1010,8 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
                     // In case something is wrong, we simply ignore all
                     // environment variables, to be safe.
                     debug_message("TELNET Environment: client %s sent malformed"
-                        " request, skipped!\n",
-                        sockaddr_to_string((sockaddr *)&ip->addr, ip->addrlen));
+                                  " request, skipped!\n",
+                                  sockaddr_to_string((sockaddr *)&ip->addr, ip->addrlen));
                     env_buf[0] = '\0';
                     break;
                   }
