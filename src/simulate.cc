@@ -1817,7 +1817,6 @@ void error_handler(char *err)
 
   if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) {
     /* user catches this error */
-#ifdef LOG_CATCHES
     /* This is added so that catches generate messages in the log file. */
 #ifdef MUDLIB_ERROR_HANDLER
     if (num_mudlib_error) {
@@ -1840,7 +1839,6 @@ void error_handler(char *err)
         num_mudlib_error--;
       }
     }
-#endif
 #endif
     if (max_eval_error) {
       outoftime = 1;

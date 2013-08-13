@@ -153,11 +153,11 @@ typedef struct {
 } compressed_offset_table_t;
 
 #ifdef USE_32BIT_ADDRESSES
-#define ADDRESS_TYPE    unsigned int
-#define ADDRESS_MAX     UINT_MAX
+#define ADDRESS_TYPE    uint32_t
+#define ADDRESS_MAX     UINT32_MAX
 #else
-#define ADDRESS_TYPE    unsigned short
-#define ADDRESS_MAX     USHRT_MAX
+#define ADDRESS_TYPE    uint16_t
+#define ADDRESS_MAX     UINT16_MAX
 #endif
 
 typedef struct {
