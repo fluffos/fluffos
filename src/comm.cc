@@ -683,7 +683,7 @@ static int send_mssp_val(mapping_t *map, mapping_node_t *el, void *obp)
   return 0;
 }
 
-static void copy_chars(interactive_t *ip, char *from, int num_bytes)
+static void copy_chars(interactive_t *ip, unsigned const char *from, int num_bytes)
 {
   int i, start, x;
   unsigned char dont_response[3] = { IAC, DONT, 0 };
@@ -966,7 +966,8 @@ static void copy_chars(interactive_t *ip, char *from, int num_bytes)
           if (ip->sb_size > MAX_STRING_LENGTH) {
             ip->sb_size = MAX_STRING_LENGTH;
           }
-          ip->sb_buf = (unsigned char *)REALLOC(ip->sb_buf, ip->sb_size);
+          ip->sb_buf = (unsigned char *)DREALLOC(ip->sb_buf, ip->sb_size,
+              TAG_TEMPORARY, "comm: TS_SB");
           if (ip->sb_pos < ip->sb_size - 1) {
             ip->sb_buf[ip->sb_pos++] = from[i];
           }
@@ -992,14 +993,29 @@ static void copy_chars(interactive_t *ip, char *from, int num_bytes)
                 char env_buf[BUF_SIZE];
                 j = 0;
                 k = 1;
-                while (ip->sb_buf[k] > -1 && k < (ip->sb_pos - 1)) {
+                while (k < (ip->sb_pos - 1)) {
                   k++;
-                  if (!(ip->sb_buf[k])) { env_buf[j] = ENV_FILLER; }
-                  if (ip->sb_buf[k] == 1) { env_buf[j] = 1; }
-                  if ((ip->sb_buf[k] > 31)) {
+                  // RFC 1572: variable type can be either 0 (VAR) or
+                  // 3 (USERVAR)
+                  if (ip->sb_buf[k] == 0 || ip->sb_buf[k] == 3) {
+                    env_buf[j] = ENV_FILLER;
+                  } else if (ip->sb_buf[k] == 1) {
+                    // RFC 1572: variable type/value separator: 1
+                    env_buf[j] = 1;
+                    // These are either variable name or values.
+                  } else if (ip->sb_buf[k] > 31) {
                     env_buf[j] = ip->sb_buf[k];
+                  } else {
+                    // FIXME: we don't handle case of 2 (ESC) either.
+                    // In case something is wrong, we simply ignore all
+                    // environment variables, to be safe.
+                    debug_message("TELNET Environment: client %s sent malformed"
+                        " request, skipped!\n",
+                        sockaddr_to_string((sockaddr *)&ip->addr, ip->addrlen));
+                    env_buf[0] = '\0';
+                    break;
                   }
-                  if (env_buf[j]) { j++; }
+                  j++;
                 }
                 env_buf[j] = 0;
                 copy_and_push_string(env_buf);
@@ -1225,7 +1241,7 @@ static void copy_chars(interactive_t *ip, char *from, int num_bytes)
 void get_user_data(interactive_t *ip)
 {
   int  num_bytes, text_space;
-  char buf[MAX_TEXT];
+  unsigned char buf[MAX_TEXT];
   int ws_space;
 
   text_space = sizeof(buf);
