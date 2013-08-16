@@ -28,9 +28,9 @@ event_base *init_event_base()
 {
 #ifdef DEBUG
   event_enable_debug_mode();
+#endif
   event_set_log_callback(libevent_log);
   evdns_set_log_fn(libevent_dns_log);
-#endif
 
   g_event_base = event_base_new();
   debug_message("Event backend in use: %s\n", event_base_get_method(g_event_base));
@@ -68,6 +68,55 @@ int run_for_at_most_one_second(struct event_base *base)
   return r;
 }
 
+static void on_user_command(evutil_socket_t, short, void *);
+
+static void maybe_schedule_user_command(void *arg) {
+  auto data = (user_event_data *)arg;
+  auto user = all_users[data->idx];
+
+  // If user has a complete command, schedule a command execution.
+  // TODO: 1. in the future, probbaly should use a permeant event for user
+  //       command, it would allow us to set priority.
+  if (user->iflags & CMD_IN_BUF) {
+    event_base_once(g_event_base, -1, EV_TIMEOUT, on_user_command, arg, NULL);
+  }
+}
+
+static void on_user_command(evutil_socket_t fd, short what, void *arg) {
+  debug(event, "User has an full command ready: %d:%s%s%s%s \n",
+        (int) fd,
+        (what & EV_TIMEOUT) ? " timeout" : "",
+        (what & EV_READ)    ? " read" : "",
+        (what & EV_WRITE)   ? " write" : "",
+        (what & EV_SIGNAL)  ? " signal" : "");
+
+  auto data = (user_event_data *)arg;
+  auto user = all_users[data->idx];
+
+  if (user == NULL) {
+    fatal("on_user_command: user == NULL, Driver BUG.");
+    return;
+  }
+
+  // FIXME: this function currently calls into mudlib and will throw errors
+  // This catch block should be moved one level down.
+  error_context_t econ;
+  try {
+    if (!save_context(&econ)) {
+      fatal("BUG: on_user_comamnd can not save context!");
+    }
+    process_user_command(user);
+  } catch (const char *)  {
+    restore_context(&econ);
+  }
+  // if user still have pending command, continue to schedule it.
+  //
+  // NOTE: It is important to only execute one command here, then schedule next
+  // command at the tail, This ensure users have a fair chance that no one can
+  // keep running commands.
+  maybe_schedule_user_command(data);
+}
+
 static void on_user_read(evutil_socket_t fd, short what, void *arg)
 {
   debug(event, "Got an event on user socket %d:%s%s%s%s \n",
@@ -79,7 +128,16 @@ static void on_user_read(evutil_socket_t fd, short what, void *arg)
 
   auto data = (user_event_data *)arg;
   auto user = all_users[data->idx];
-  if (user != NULL) get_user_data(user);
+
+  if (user == NULL) {
+    fatal("on_user_read: user == NULL, Driver BUG.");
+    return;
+  }
+
+  // Read user input
+  get_user_data(user);
+
+  maybe_schedule_user_command(data);
 }
 
 static void on_user_write(evutil_socket_t fd, short what, void *arg)
@@ -93,7 +151,13 @@ static void on_user_write(evutil_socket_t fd, short what, void *arg)
 
   auto data = (user_event_data *)arg;
   auto user = all_users[data->idx];
-  if (user != NULL) flush_message(user);
+
+ if (user == NULL) {
+   fatal("on_user_read: user == NULL, Driver BUG.");
+   return;
+ }
+
+  flush_message(user);
 }
 
 void new_user_event_listener(int idx)
