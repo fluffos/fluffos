@@ -276,23 +276,12 @@ inheritance:
 %endif
 		
 		if (!($1 & DECL_ACCESS)) $1 |= DECL_PUBLIC;
-#ifndef ALLOW_INHERIT_AFTER_FUNCTION
-		if (func_present)
-		    yyerror("Illegal to inherit after defining functions.");
-#endif
 		if (var_defined)
 		    yyerror("Illegal to inherit after defining global variables.");
-#ifndef ALLOW_INHERIT_AFTER_FUNCTION
-		if (func_present || var_defined){
-#else
 		if (var_defined){
-#endif
 		  inherit_file = 0;
 		  YYACCEPT;
 		}
-#ifdef NEVER
-		} //stupid bison
-#endif
 		ob = find_object2($3);
 		if (ob == 0) {
 		    inherit_file = alloc_cstring($3, "inherit");

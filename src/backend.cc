@@ -125,17 +125,20 @@ void backend(struct event_base *base)
           slow_shut_down(tmp);
         }
 
+#if DEBUG
+        try {
+#endif
         /* Run event loop for at most 1 second, this current handles
          * listening socket events, user socket events, and lpc socket events.
          */
         run_for_at_most_one_second(base);
 
-        /*
-         * process user commands.
-         */
-        for (i = 0; process_user_command() && i < max_users; i++) {
-          ;
+#if DEBUG
+        } catch (...) { // catch everything
+          fatal("BUG: jumped out of event loop!");
         }
+#endif
+
         /*
          * call outs
          */
