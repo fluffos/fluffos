@@ -1005,7 +1005,7 @@ static void handle_local_defines(int check)
         problem = 1;
       }
       if (offical_defines.find(p->name) == offical_defines.end()) {
-        fprintf(stderr, "WARNING: %s contains extra setting '%s'.\n"
+        fprintf(stderr, "WARNING: %s contains extra setting '%s'.\n",
                 LOCAL_OPTIONS, p->name);
       }
     }
