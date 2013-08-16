@@ -210,7 +210,7 @@ void shutdown_external_ports(void);
 void set_prompt(const char *);
 void process_io(void);
 void get_user_data(interactive_t *);
-int process_user_command(void);
+int process_user_command(interactive_t *);
 int replace_interactive(object_t *, object_t *);
 int set_call(object_t *, sentence_t *, int);
 void remove_interactive(object_t *, int);

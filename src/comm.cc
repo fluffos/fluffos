@@ -1408,7 +1408,7 @@ void get_user_data(interactive_t *ip)
         object_t *ob = ip->ob;
         set_command_giver(ob);
         current_interactive = ob;
-        apply(APPLY_PROCESS_INPUT, ob, 1, ORIGIN_DRIVER);
+        safe_apply(APPLY_PROCESS_INPUT, ob, 1, ORIGIN_DRIVER);
         set_command_giver(0);
         current_interactive = 0;
 
@@ -1443,7 +1443,7 @@ void get_user_data(interactive_t *ip)
             push_undefined();
           }
           ip->text_end = 0;
-          apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
+          safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
         }
       }
       break;
@@ -1469,7 +1469,7 @@ void get_user_data(interactive_t *ip)
           str = new_string(nl - p, "PORT_ASCII");
           memcpy(str, p, nl - p + 1);
           push_malloced_string(str);
-          apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
+          safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
         }
 
         if (ip->text_start == ip->text_end) {
@@ -1490,7 +1490,7 @@ void get_user_data(interactive_t *ip)
       memcpy(buffer->item, buf, num_bytes);
 
       push_refed_buffer(buffer);
-      apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
+      safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
     }
     break;
 #endif
@@ -1846,53 +1846,33 @@ void new_user_handler(port_def_t *port)
  * command in their buffer.  A command is defined to be a single character
  * when SINGLE_CHAR is set, or a newline terminated string otherwise.
  */
-static char *get_user_command()
+static char *get_user_command(interactive_t *ip)
 {
-  static int NextCmdGiver = 0;
+  char *user_command = NULL;
 
-  int i;
-  interactive_t *ip;
-  char *user_command = 0;
-
-  /* find and return a user command */
-  for (i = 0; i < max_users; i++) {
-    ip = all_users[NextCmdGiver++];
-    NextCmdGiver %= max_users;
-
-    if (!ip || !ip->ob || (ip->ob->flags & O_DESTRUCTED)) {
-      continue;
-    }
-
-    /* if we've got text to send, try to flush it, could lose the link here */
-    if (ip->message_length) {
-      object_t *ob = ip->ob;
-      flush_message(ip);
-      if (!IP_VALID(ip, ob) || (ip->iflags & NET_DEAD)) {
-        continue;
-      }
-    }
-
-    /* if there's a command in the buffer, pull it out! */
-    if (ip->iflags & CMD_IN_BUF) {
-      user_command = first_cmd_in_buf(ip);
-      break;
-    }
+  if (!ip || !ip->ob || (ip->ob->flags & O_DESTRUCTED)) {
+    return NULL;
   }
 
-  /* no command found - return 0 */
+  /* if there's a command in the buffer, pull it out! */
+  if (ip->iflags & CMD_IN_BUF) {
+    user_command = first_cmd_in_buf(ip);
+  }
+
+  /* no command found - return NULL */
   if (!user_command) {
-    return 0;
+    return NULL;
   }
 
   /* got a command - return it and set command_giver */
   debug(connections, "get_user_command: user_command = (%s)\n", user_command);
   save_command_giver(ip->ob);
 
-#ifndef GET_CHAR_IS_BUFFERED
+  #ifndef GET_CHAR_IS_BUFFERED
   if (ip->iflags & NOECHO) {
-#else
+  #else
   if ((ip->iflags & NOECHO) && !(ip->iflags & SINGLE_CHAR)) {
-#endif
+  #endif
     /* must not enable echo before the user input is received */
     add_binary_message(command_giver, telnet_no_echo, sizeof(telnet_no_echo));
     ip->iflags &= ~NOECHO;
@@ -1965,23 +1945,28 @@ static void process_input(interactive_t *ip, char *user_command)
  * This function calls get_user_command() to get a user command.
  * One user command is processed per execution of this function.
  */
-int process_user_command()
+int process_user_command(interactive_t *ip)
 {
   char *user_command;
-  interactive_t *ip = NULL; //for if(ip) below
 
   /*
    * WARNING: get_user_command() sets command_giver via
    * save_command_giver(), but only when the return is non-zero!
    */
-  if (!(user_command = get_user_command())) {
+  if (!(user_command = get_user_command(ip))) {
     return 0;
   }
 
-  if (command_giver) { ip = command_giver->interactive; }
+  if (ip != command_giver->interactive) {
+    fatal("BUG: process_user_command.");
+  }
+
   current_interactive = command_giver;    /* this is yuck phooey, sigh */
   if (ip) { clear_notify(ip->ob); }
+
+  // FIXME: move this to somewhere else
   update_load_av();
+
   debug(connections, "process_user_command: command_giver = /%s\n", command_giver->obname);
 
   if (!ip) {
@@ -1994,7 +1979,7 @@ int process_user_command()
     svalue_t *ret;
     copy_and_push_string(user_command);
 
-    ret = apply(APPLY_MXP_TAG, ip->ob, 1, ORIGIN_DRIVER);
+    ret = safe_apply(APPLY_MXP_TAG, ip->ob, 1, ORIGIN_DRIVER);
     if (ret && ret->type == T_NUMBER && ret->u.number) {
       goto exit;
     }
