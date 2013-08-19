@@ -2032,6 +2032,10 @@ exit:
    */
   if (IP_VALID(ip, command_giver)) {
     print_prompt(ip);
+    // FIXME: this doesn't belong here, should be moved to event.cc
+    if (ip->iflags & CMD_IN_BUF) {
+      event_active(ip->ev_command, EV_TIMEOUT, 0);
+    }
   }
 
   current_interactive = 0;
@@ -2107,6 +2111,10 @@ void remove_interactive(object_t *ob, int dested)
   if (ip->ev_write != NULL) {
     event_free(ip->ev_write);
     ip->ev_write = NULL;
+  }
+  if (ip->ev_command != NULL) {
+    event_free(ip->ev_command);
+    ip->ev_command = NULL;
   }
   if (ip->ev_data != NULL) {
     delete ip->ev_data;

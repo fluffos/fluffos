@@ -70,16 +70,11 @@ int run_for_at_most_one_second(struct event_base *base)
 
 static void on_user_command(evutil_socket_t, short, void *);
 
-static void maybe_schedule_user_command(void *arg)
+static void maybe_schedule_user_command(interactive_t *user)
 {
-  auto data = (user_event_data *)arg;
-  auto user = all_users[data->idx];
-
   // If user has a complete command, schedule a command execution.
-  // TODO: 1. in the future, probably should use a permanent event,
-  // it would allow us to set priority.
   if (user->iflags & CMD_IN_BUF) {
-    event_base_once(g_event_base, -1, EV_TIMEOUT, on_user_command, arg, NULL);
+    event_active(user->ev_command, EV_TIMEOUT, 0);
   }
 }
 
@@ -116,7 +111,9 @@ static void on_user_command(evutil_socket_t fd, short what, void *arg)
   // NOTE: It is important to only execute one command here, then schedule next
   // command at the tail, This ensure users have a fair chance that no one can
   // keep running commands.
-  maybe_schedule_user_command(data);
+  // currently inside process_user_command().
+  //
+  // maybe_schedule_user_command(user);
 }
 
 static void on_user_read(evutil_socket_t fd, short what, void *arg)
@@ -138,8 +135,7 @@ static void on_user_read(evutil_socket_t fd, short what, void *arg)
 
   // Read user input
   get_user_data(user);
-
-  maybe_schedule_user_command(data);
+  maybe_schedule_user_command(user);
 }
 
 static void on_user_write(evutil_socket_t fd, short what, void *arg)
@@ -171,10 +167,12 @@ void new_user_event_listener(int idx)
 
   user->ev_read = event_new(g_event_base, user->fd, EV_READ | EV_PERSIST, on_user_read, data);
   user->ev_write = event_new(g_event_base, user->fd, EV_WRITE, on_user_write, data);
+  user->ev_command = event_new(g_event_base, -1, EV_TIMEOUT | EV_PERSIST, on_user_command, data);
   user->ev_data = data;
 
   event_add(user->ev_read, NULL);
   event_add(user->ev_write, NULL);
+  event_add(user->ev_command, NULL);
 }
 
 static void on_external_port_event(evutil_socket_t fd, short what, void *arg)

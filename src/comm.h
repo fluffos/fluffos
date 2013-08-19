@@ -134,6 +134,7 @@ typedef struct interactive_s {
   // libevent event handle.
   struct event *ev_read;
   struct event *ev_write;
+  struct event *ev_command;
   struct user_event_data *ev_data;
 
 } interactive_t;
