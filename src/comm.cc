@@ -1868,11 +1868,11 @@ static char *get_user_command(interactive_t *ip)
   debug(connections, "get_user_command: user_command = (%s)\n", user_command);
   save_command_giver(ip->ob);
 
-  #ifndef GET_CHAR_IS_BUFFERED
+#ifndef GET_CHAR_IS_BUFFERED
   if (ip->iflags & NOECHO) {
-  #else
+#else
   if ((ip->iflags & NOECHO) && !(ip->iflags & SINGLE_CHAR)) {
-  #endif
+#endif
     /* must not enable echo before the user input is received */
     add_binary_message(command_giver, telnet_no_echo, sizeof(telnet_no_echo));
     ip->iflags &= ~NOECHO;

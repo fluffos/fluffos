@@ -70,19 +70,21 @@ int run_for_at_most_one_second(struct event_base *base)
 
 static void on_user_command(evutil_socket_t, short, void *);
 
-static void maybe_schedule_user_command(void *arg) {
+static void maybe_schedule_user_command(void *arg)
+{
   auto data = (user_event_data *)arg;
   auto user = all_users[data->idx];
 
   // If user has a complete command, schedule a command execution.
-  // TODO: 1. in the future, probbaly should use a permeant event for user
-  //       command, it would allow us to set priority.
+  // TODO: 1. in the future, probably should use a permanent event,
+  // it would allow us to set priority.
   if (user->iflags & CMD_IN_BUF) {
     event_base_once(g_event_base, -1, EV_TIMEOUT, on_user_command, arg, NULL);
   }
 }
 
-static void on_user_command(evutil_socket_t fd, short what, void *arg) {
+static void on_user_command(evutil_socket_t fd, short what, void *arg)
+{
   debug(event, "User has an full command ready: %d:%s%s%s%s \n",
         (int) fd,
         (what & EV_TIMEOUT) ? " timeout" : "",
@@ -152,10 +154,10 @@ static void on_user_write(evutil_socket_t fd, short what, void *arg)
   auto data = (user_event_data *)arg;
   auto user = all_users[data->idx];
 
- if (user == NULL) {
-   fatal("on_user_read: user == NULL, Driver BUG.");
-   return;
- }
+  if (user == NULL) {
+    fatal("on_user_read: user == NULL, Driver BUG.");
+    return;
+  }
 
   flush_message(user);
 }

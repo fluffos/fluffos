@@ -139,7 +139,7 @@ new_call_out(object_t *ob, svalue_t *fun, int delay,
   delay = delay / CALLOUT_CYCLE_SIZE;
 
   DBG_CALLOUT("Current time: %ld  Executes at: %ld  Slot: %d  Delay: %d\n",
-      current_time, current_time + delay, tm, delay);
+              current_time, current_time + delay, tm, delay);
 
   for (copp = &call_list[tm]; *copp; copp = &(*copp)->next) {
     if ((*copp)->delta > delay) {
@@ -196,7 +196,7 @@ void call_out()
 
   real_time = get_current_time();
   DBG_CALLOUT("Calling call_outs: current_time: %ld real_time: %ld difference: %ld\n",
-      current_time, real_time, real_time - current_time);
+              current_time, real_time, real_time - current_time);
 
   /* Slowly advance the clock forward towards real_time, doing call_outs
    * as we go.
@@ -409,7 +409,7 @@ int remove_call_out_by_handle(LPC_INT handle)
   int delay = 0;
 
   DBG_CALLOUT("remove_call_out_by_handle: handle: %i slot: %i\n",
-      handle, handle & (CALLOUT_CYCLE_SIZE - 1));
+              handle, handle & (CALLOUT_CYCLE_SIZE - 1));
 
   for (copp = &call_list[handle & (CALLOUT_CYCLE_SIZE - 1)]; *copp; copp = &(*copp)->next) {
     delay += (*copp)->delta;
@@ -432,7 +432,7 @@ int find_call_out_by_handle(LPC_INT handle)
   int delay = 0;
 
   DBG_CALLOUT("find_call_out_by_handle: handle: %" LPC_INT_FMTSTR_P " slot: %" LPC_INT_FMTSTR_P "\n",
-      handle, handle & (CALLOUT_CYCLE_SIZE - 1));
+              handle, handle & (CALLOUT_CYCLE_SIZE - 1));
 
   for (cop = call_list[handle & (CALLOUT_CYCLE_SIZE - 1)]; cop; cop = cop->next) {
     delay += cop->delta;
