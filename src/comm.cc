@@ -1419,6 +1419,7 @@ void get_user_data(interactive_t *ip)
       copy_chars(ip, buf, num_bytes);
       if (cmd_in_buf(ip)) {
         ip->iflags |= CMD_IN_BUF;
+        event_active(ip->ev_command, EV_TIMEOUT, 0);
       }
       break;
 
@@ -1868,11 +1869,11 @@ static char *get_user_command(interactive_t *ip)
   debug(connections, "get_user_command: user_command = (%s)\n", user_command);
   save_command_giver(ip->ob);
 
-  #ifndef GET_CHAR_IS_BUFFERED
+#ifndef GET_CHAR_IS_BUFFERED
   if (ip->iflags & NOECHO) {
-  #else
+#else
   if ((ip->iflags & NOECHO) && !(ip->iflags & SINGLE_CHAR)) {
-  #endif
+#endif
     /* must not enable echo before the user input is received */
     add_binary_message(command_giver, telnet_no_echo, sizeof(telnet_no_echo));
     ip->iflags &= ~NOECHO;
@@ -2032,6 +2033,10 @@ exit:
    */
   if (IP_VALID(ip, command_giver)) {
     print_prompt(ip);
+    // FIXME: this doesn't belong here, should be moved to event.cc
+    if (ip->iflags & CMD_IN_BUF) {
+      event_active(ip->ev_command, EV_TIMEOUT, 0);
+    }
   }
 
   current_interactive = 0;
@@ -2107,6 +2112,10 @@ void remove_interactive(object_t *ob, int dested)
   if (ip->ev_write != NULL) {
     event_free(ip->ev_write);
     ip->ev_write = NULL;
+  }
+  if (ip->ev_command != NULL) {
+    event_free(ip->ev_command);
+    ip->ev_command = NULL;
   }
   if (ip->ev_data != NULL) {
     delete ip->ev_data;

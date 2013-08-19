@@ -22,3 +22,5 @@
 #define PACKAGE_PARSER
 
 #define REVERSE_DEFER
+
+#define USE_ICONV
