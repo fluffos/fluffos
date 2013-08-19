@@ -128,10 +128,10 @@ void backend(struct event_base *base)
 #if DEBUG
         try {
 #endif
-        /* Run event loop for at most 1 second, this current handles
-         * listening socket events, user socket events, and lpc socket events.
-         */
-        run_for_at_most_one_second(base);
+          /* Run event loop for at most 1 second, this current handles
+           * listening socket events, user socket events, and lpc socket events.
+           */
+          run_for_at_most_one_second(base);
 
 #if DEBUG
         } catch (...) { // catch everything
