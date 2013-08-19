@@ -1419,6 +1419,7 @@ void get_user_data(interactive_t *ip)
       copy_chars(ip, buf, num_bytes);
       if (cmd_in_buf(ip)) {
         ip->iflags |= CMD_IN_BUF;
+        event_active(ip->ev_command, EV_TIMEOUT, 0);
       }
       break;
 

@@ -134,8 +134,12 @@ static void on_user_read(evutil_socket_t fd, short what, void *arg)
   }
 
   // Read user input
+  auto idx = data->idx;
+
   get_user_data(user);
-  maybe_schedule_user_command(user);
+
+  // TODO: currently get_user_data will schedule command execution.
+  // should probabaly move here.
 }
 
 static void on_user_write(evutil_socket_t fd, short what, void *arg)
