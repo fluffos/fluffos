@@ -54,6 +54,20 @@ Known Issues:
   Per-release ChangeLog
 ================================================================================
 
+FluffOS 3.0-alpha7.3
+  * User command execution is now integrated into event loop.
+    (at least 10% CPU decrease and better fairness among users).
+  * Fixed unique_mapping() crash when callback returns new objects/array etc.
+  * Fixed memory corruption issue with unsupported TELNET environment negoation.
+  * Fixed memory corruption when reading 0 length file.
+  * restored USE_ICONV in auto testing.
+  * Moved many options into options_internal.h, all the local_options override still works.
+    edit_source will print out "extra" defines local_options contains.
+    This pave the road for reducing complexity of options.h in the future.
+  * ALLOW_INHERIT_AFTER_FUNCTION is now default, no crash anymore.
+  * Previously if a user object is destructed, the message in the buffer would be lost.
+    Now the driver will correctly send them out before terminating connection.
+
 FluffOS 3.0-alpha7.2
   * unique_mapping() crash when callback returns a non-shared string.
   * move some outdated doc to /doc/archive.
