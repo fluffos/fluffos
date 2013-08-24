@@ -1977,8 +1977,12 @@ object_t *get_empty_object(int num_var)
 void reset_object(object_t *ob)
 {
   /* Be sure to update time first ! */
+#ifdef RANDOMIZED_RESETS
   ob->next_reset = current_time + TIME_TO_RESET / 2 +
                    random_number(TIME_TO_RESET / 2);
+#else
+    ob->next_reset = current_time + TIME_TO_RESET;
+#endif
 
   save_command_giver(0);
   if (!apply(APPLY_RESET, ob, 0, ORIGIN_DRIVER)) {
