@@ -299,6 +299,14 @@
  */
 #undef LAZY_RESETS
 
+
+/* RANDOMIZED_RESETS: if this is defined, the reset() will be called in randomized
+ *   time interval. The interval vary from TIME_TO_RESET/2 to TIME_TO_RESET-1 .
+ *   if this is undefined, the reset() will be called among all objects at the same time,
+ *   with the interval as TIME_TO_RESET
+*/
+#define RANDOMIZED_RESETS
+
 /* SAVE_EXTENSION: defines the file extension used by save_object().
  *   and restore_object().  Some sysadmins run scripts that periodically
  *   scan for and remove files ending in .o (but many mudlibs are already
