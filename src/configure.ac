@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([FluffOS],[v3.0-alpha7.3])
+AC_INIT([FluffOS],[v3.0-alpha7.4])
 AC_CONFIG_MACRO_DIR([m4])
 
 AC_CANONICAL_TARGET
