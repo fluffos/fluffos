@@ -85,6 +85,7 @@ void check_legal_string(const char *s)
  * p = strput(p, end, ...);
  * p = strput(p, end, ...);
  */
+// TODO: Move strput and strput_int to stralloc.c or somewhere similar.
 char *strput(char *x, char *limit, const char *y)
 {
   while ((*x++ = *y++)) {
