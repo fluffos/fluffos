@@ -1750,7 +1750,7 @@ void new_user_handler(port_def_t *port)
   all_users[i]->addrlen = length;
 
   debug(connections, "New connection from %s.\n",
-      sockaddr_to_string((sockaddr *)&addr, length));
+        sockaddr_to_string((sockaddr *)&addr, length));
   num_user++;
 
   /*
@@ -1772,7 +1772,7 @@ void new_user_handler(port_def_t *port)
       remove_interactive(master_ob, 0);
     }
     debug_message("Can not accept connection from %s due to error in connect().\n",
-        sockaddr_to_string((sockaddr *)&addr, length));
+                  sockaddr_to_string((sockaddr *)&addr, length));
     return;
   }
   /*
