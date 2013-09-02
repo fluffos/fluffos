@@ -1749,9 +1749,8 @@ void new_user_handler(port_def_t *port)
   memcpy((char *) &all_users[i]->addr, (char *)&addr, length);
   all_users[i]->addrlen = length;
 
-  char host[NI_MAXHOST];
-  getnameinfo((sockaddr *)&addr, length, host, sizeof(host), NULL, 0 , NI_NUMERICHOST);
-  debug(connections, "New connection from %s.\n", host);
+  debug(connections, "New connection from %s.\n",
+        sockaddr_to_string((sockaddr *)&addr, length));
   num_user++;
 
   /*
@@ -1772,7 +1771,8 @@ void new_user_handler(port_def_t *port)
     if (master_ob->interactive) {
       remove_interactive(master_ob, 0);
     }
-    debug_message("Can not accept connection from %s due to error in connect().\n", host);
+    debug_message("Can not accept connection from %s due to error in connect().\n",
+                  sockaddr_to_string((sockaddr *)&addr, length));
     return;
   }
   /*
