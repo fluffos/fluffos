@@ -22,6 +22,9 @@ crypto.$(O): crypto.cc
 	$(CXX) -c $(CXXFLAGS) -I.. @OPENSSL_INCLUDES@ -x c++ -o $@ $<
 
 # special db stuff
+async.$(O): async.cc
+	$(CXX) -c $(CXXFLAGS) -I.. @MYSQL_CFLAGS@ @POSTGRESQL_CFLAGS@ @SQLITE3_CFLAGS@ -x c++ -o $@ $<
+
 db.$(O): db.cc
 	$(CXX) -c $(CXXFLAGS) -I.. @MYSQL_CFLAGS@ @POSTGRESQL_CFLAGS@ @SQLITE3_CFLAGS@ -x c++ -o $@ $<
 
