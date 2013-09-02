@@ -475,7 +475,9 @@ static void setup_signal_handlers()
   signal(SIGTERM, sig_term);
   signal(SIGINT, sig_int);
   signal(SIGABRT, sig_abrt);
+#ifdef SIGIOT
   signal(SIGIOT, sig_iot);
+#endif
   signal(SIGHUP, sig_hup);
   signal(SIGBUS, sig_bus);
   signal(SIGSEGV, sig_segv);
