@@ -111,7 +111,8 @@ static void on_user_command(evutil_socket_t fd, short what, void *arg)
   // NOTE: It is important to only execute one command here, then schedule next
   // command at the tail, This ensure users have a fair chance that no one can
   // keep running commands.
-  // currently inside process_user_command().
+  //
+  // currently command scehduling is done inside process_user_command().
   //
   // maybe_schedule_user_command(user);
 }
@@ -134,12 +135,11 @@ static void on_user_read(evutil_socket_t fd, short what, void *arg)
   }
 
   // Read user input
-  auto idx = data->idx;
 
   get_user_data(user);
 
-  // TODO: currently get_user_data will schedule command execution.
-  // should probabaly move here.
+  // TODO: currently get_user_data() will schedule command execution.
+  // should probably move it here.
 }
 
 static void on_user_write(evutil_socket_t fd, short what, void *arg)
