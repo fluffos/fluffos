@@ -14,7 +14,7 @@
 #define PORT_MUD         4
 #define PORT_WEBSOCKET   5
 
-typedef struct {
+typedef struct port_def_s {
   int kind;
   int port;
   int fd;

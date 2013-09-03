@@ -9,6 +9,8 @@
 #include "comm.h" // for user socket
 #include "console.h" // for console
 #include "socket_efuns.h"  // for lpc sockets
+#include "call_out.h" // for call_out
+#include "eval.h" // for set_eval
 
 //FIXME: rewrite other part so this could become static.
 struct event_base *g_event_base = NULL;
@@ -42,7 +44,7 @@ static void exit_after_one_second(evutil_socket_t fd, short events, void *arg)
   event_base_loopbreak((struct event_base *)arg);
 }
 
-int run_for_at_most_one_second(struct event_base *base)
+int run_for_at_least_one_second(struct event_base *base)
 {
   int r;
   struct timeval one_second = {1, 0};
@@ -62,7 +64,7 @@ int run_for_at_most_one_second(struct event_base *base)
 
   debug(event, "Entering event loop for at most 1 sec! \n");
   in_loop = 1;
-  r = event_base_loop(base, EVLOOP_ONCE);
+  r = event_base_loop(base, 0);
   in_loop = 0;
 
   return r;
@@ -102,10 +104,15 @@ static void on_user_command(evutil_socket_t fd, short what, void *arg)
     if (!save_context(&econ)) {
       fatal("BUG: on_user_comamnd can not save context!");
     }
+    set_eval(max_cost);
     process_user_command(user);
   } catch (const char *)  {
     restore_context(&econ);
   }
+
+  /* Has to be cleared if we jumped out of process_user_command() */
+  current_interactive = 0;
+
   // if user still have pending command, continue to schedule it.
   //
   // NOTE: It is important to only execute one command here, then schedule next
@@ -232,6 +239,15 @@ void new_lpc_socket_event_listener(int idx, evutil_socket_t real_fd)
   lpc_socks[idx].ev_read = event_new(g_event_base, real_fd, EV_READ | EV_PERSIST, on_lpc_sock_read, data);
   lpc_socks[idx].ev_write = event_new(g_event_base, real_fd, EV_WRITE, on_lpc_sock_write, data);
   lpc_socks[idx].ev_data = data;
+}
+
+static void on_callout_event(evutil_socket_t fd, short what, void *arg)
+{
+  debug(event, "Got an callout event on socket %d:%s%s%s%s \n", (int) fd,
+        (what & EV_TIMEOUT) ? " timeout" : "", (what & EV_READ) ? " read" : "",
+        (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
+  auto data = (pending_call_t *)arg;
+  call_out(data);
 }
 
 #ifdef HAS_CONSOLE

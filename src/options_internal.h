@@ -184,12 +184,7 @@
  */
 #define TRAP_CRASHES
 
-/* CALLOUT_HANDLES: If this is defined, call_out() returns an integer, which
- * can be passed to remove_call_out() or find_call_out().  Removing call_outs
- * by name is still allowed, but is significantly less efficient, and also
- * doesn't work for function pointers.  This option adds 4 bytes overhead
- * per callout to keep track of the handle.
- */
+/* This define has became default.*/
 #define CALLOUT_HANDLES
 
 #endif

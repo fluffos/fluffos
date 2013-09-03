@@ -179,7 +179,7 @@ reconfigure: clean
 	rm -f conf.h configure.h options_incl.h
 
 test: all
-	cd testsuite && ../driver -ftest etc/config.test
+	cd testsuite && ../driver -d -ftest etc/config.test
 
 help:
 	@echo "***************** Configuration completed **************"

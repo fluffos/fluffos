@@ -275,14 +275,9 @@ void add_objects(statgroup_t *st, int objects)
  */
 void mudlib_stats_decay()
 {
-  mudlib_stats_t *dl;
-  static int next_time;
+  add_tick_event(60 * 60, tick_event::callback_type(mudlib_stats_decay));
 
-  /* Perform this once every hour. */
-  if (next_time > current_time) {
-    return;
-  }
-  next_time = current_time + 60 * 60;
+  mudlib_stats_t *dl;
   for (dl = domains; dl; dl = dl->next) {
     dl->moves = dl->moves * 99 / 100;
     dl->heart_beats = dl->heart_beats * 9 / 10;

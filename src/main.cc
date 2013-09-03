@@ -1,5 +1,7 @@
 #include "std.h"
 
+#include <cstdlib>  // for std::srand
+
 #include "file_incl.h"
 #include "lpc_incl.h"
 #include "backend.h"
@@ -102,6 +104,9 @@ int main(int argc, char **argv)
   tzset();
 #endif
   boot_time = get_current_time();
+
+  // Seed random number
+  std::srand(boot_time);
 
   const0.type = T_NUMBER;
   const0.u.number = 0;
