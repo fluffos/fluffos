@@ -50,21 +50,13 @@
 #define ARRAY_STATS
 #define CLASS_STATS
 
-/* APPLY_CACHE_BITS: defines the number of bits to use in the call_other cache
+/* APPLY_CACHE_BITS: defines the number of bits to use in the func lookup cache
  *   (in interpret.c).
  *
- * Memory overhead is (1 << APPLY_CACHE_BITS)*16.
- * [assuming 32 bit pointers and 16 bit shorts]
- *
- * ACB:    entries:     overhead:
- *  6         64             1k
- *  8        256             4k
- * 10       1024            16k
- * 12       4096            64k
- * 14      16384           256k
- * 16      65536             1M
+ *   20 bites : (1  << 22) * (3 * 8 + 2 * 2) ~= 112MB.
  */
-#define APPLY_CACHE_BITS 20
+#define APPLY_CACHE_BITS 22
+
 /* CACHE_STATS: define this if you want call_other (apply_low) cache
  * statistics.  Causes HAS_CACHE_STATS to be defined in all LPC objects.
  */
