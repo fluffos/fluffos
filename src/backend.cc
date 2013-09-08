@@ -125,11 +125,7 @@ static void report_holes()
  */
 void backend(struct event_base *base)
 {
-#ifdef SIGHUP
-  signal(SIGHUP, startshutdownMudOS);
-#endif
-
-  //FIXME: handle this in call_tick_events().
+  // FIXME: handle this in call_tick_events().
   error_context_t econ;
   save_context(&econ);
 

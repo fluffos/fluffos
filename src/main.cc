@@ -49,7 +49,6 @@ static void CDECL sig_usr1(int);
 static void CDECL sig_usr2(int);
 static void CDECL sig_term(int);
 static void CDECL sig_int(int);
-static void CDECL sig_hup(int);
 static void CDECL sig_abrt(int);
 static void CDECL sig_segv(int);
 static void CDECL sig_ill(int);
@@ -483,7 +482,7 @@ static void setup_signal_handlers()
 #ifdef SIGIOT
   signal(SIGIOT, sig_iot);
 #endif
-  signal(SIGHUP, sig_hup);
+  signal(SIGHUP, startshutdownMudOS);
   signal(SIGBUS, sig_bus);
   signal(SIGSEGV, sig_segv);
   signal(SIGILL, sig_ill);
@@ -617,11 +616,6 @@ static void CDECL sig_ill(int sig)
 {
   try_dump_stacktrace();
   fatal("SIGILL: Illegal instruction");
-}
-
-static void CDECL sig_hup(int sig)
-{
-  fatal("SIGHUP: Hangup!");
 }
 
 static void CDECL sig_abrt(int sig)
