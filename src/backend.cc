@@ -125,13 +125,15 @@ static void report_holes()
  */
 void backend(struct event_base *base)
 {
-  error_context_t econ;
-
 #ifdef SIGHUP
   signal(SIGHUP, startshutdownMudOS);
 #endif
-  clear_state();
+
+  //FIXME: handle this in call_tick_events().
+  error_context_t econ;
   save_context(&econ);
+
+  clear_state();
 
   // Register various tick events
   add_tick_event(0, tick_event::callback_type(call_heart_beat));
