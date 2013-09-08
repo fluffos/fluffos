@@ -34,6 +34,7 @@ struct tick_event {
 };
 
 tick_event *add_tick_event(long tick, tick_event::callback_type callback);
+void clear_tick_events();
 
 void backend(struct event_base *);
 

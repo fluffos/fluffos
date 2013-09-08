@@ -68,6 +68,14 @@ void call_tick_events()
   }
 }
 
+void clear_tick_events() {
+  while(!g_tick_queue.empty()) {
+    auto event = g_tick_queue.top();
+    delete event;
+    g_tick_queue.pop();
+  }
+}
+
 object_t *current_heart_beat;
 static void look_for_objects_to_swap(void);
 void call_heart_beat(void);
