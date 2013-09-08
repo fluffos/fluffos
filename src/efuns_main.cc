@@ -3929,7 +3929,7 @@ f_dump_file_descriptors(void)
 #ifdef F_RECLAIM_OBJECTS
 void f_reclaim_objects(void)
 {
-  push_number(reclaim_objects());
+  push_number(reclaim_objects(false));
 }
 #endif
 

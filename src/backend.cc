@@ -4,6 +4,7 @@
 #include "backend.h"
 #include "comm.h"
 #include "replace_program.h"
+#include "reclaim.h"
 #include "socket_efuns.h"
 #include "call_out.h"
 #include "port.h"
@@ -142,6 +143,7 @@ void backend(struct event_base *base)
   // Register various tick events
   add_tick_event(0, tick_event::callback_type(call_heart_beat));
   add_tick_event(5 * 60, tick_event::callback_type(look_for_objects_to_swap));
+  add_tick_event(30 * 60, tick_event::callback_type(std::bind(reclaim_objects, true)));
 #ifdef PACKAGE_MUDLIB_STATS
   add_tick_event(60 * 60, tick_event::callback_type(mudlib_stats_decay));
 #endif
