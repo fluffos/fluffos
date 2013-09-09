@@ -9,7 +9,6 @@
 #include "comm.h" // for user socket
 #include "console.h" // for console
 #include "socket_efuns.h"  // for lpc sockets
-#include "call_out.h" // for call_out
 #include "eval.h" // for set_eval
 
 //FIXME: rewrite other part so this could become static.
@@ -239,15 +238,6 @@ void new_lpc_socket_event_listener(int idx, evutil_socket_t real_fd)
   lpc_socks[idx].ev_read = event_new(g_event_base, real_fd, EV_READ | EV_PERSIST, on_lpc_sock_read, data);
   lpc_socks[idx].ev_write = event_new(g_event_base, real_fd, EV_WRITE, on_lpc_sock_write, data);
   lpc_socks[idx].ev_data = data;
-}
-
-static void on_callout_event(evutil_socket_t fd, short what, void *arg)
-{
-  debug(event, "Got an callout event on socket %d:%s%s%s%s \n", (int) fd,
-        (what & EV_TIMEOUT) ? " timeout" : "", (what & EV_READ) ? " read" : "",
-        (what & EV_WRITE) ? " write" : "", (what & EV_SIGNAL) ? " signal" : "");
-  auto data = (pending_call_t *)arg;
-  call_out(data);
 }
 
 #ifdef HAS_CONSOLE
