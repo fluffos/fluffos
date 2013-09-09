@@ -16,6 +16,7 @@
 #include "add_action.h"
 #include "eval.h"
 #include "console.h"
+#include "port.h"  // get_current_time
 
 #include "event.h"
 #include "dns.h"
@@ -1702,7 +1703,7 @@ void new_user_handler(port_def_t *port)
 #ifndef NO_SNOOP
   master_ob->interactive->snooped_by = 0;
 #endif
-  master_ob->interactive->last_time = current_time;
+  master_ob->interactive->last_time = get_current_time();
 #ifdef TRACE
   master_ob->interactive->trace_level = 0;
   master_ob->interactive->trace_prefix = 0;
@@ -1879,7 +1880,7 @@ static char *get_user_command(interactive_t *ip)
     ip->iflags &= ~NOECHO;
   }
 
-  ip->last_time = current_time;
+  ip->last_time = get_current_time();
   return user_command;
 }                               /* get_user_command() */
 
@@ -2487,7 +2488,7 @@ int query_idle(object_t *ob)
   if (!ob->interactive) {
     error("query_idle() of non-interactive object.\n");
   }
-  return (current_time - ob->interactive->last_time);
+  return (get_current_time() - ob->interactive->last_time);
 }                               /* query_idle() */
 
 #ifdef F_EXEC

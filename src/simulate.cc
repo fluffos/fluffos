@@ -2002,6 +2002,9 @@ void shutdownMudOS(int exit_code)
   int i;
 
   shout_string("FluffOS driver shouts: shutting down immediately.\n");
+
+  clear_tick_events();
+
 #ifdef PACKAGE_MUDLIB_STATS
   save_stat_files();
 #endif

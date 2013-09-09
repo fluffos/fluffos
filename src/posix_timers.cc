@@ -17,10 +17,6 @@ void sigalrm_handler(int sig, siginfo_t *si, void *uc)
 #else
   if (!si->si_value.sival_ptr) {
     outoftime = 1;
-  } else {
-    if (si->si_value.sival_ptr == call_heart_beat) {
-      time_for_hb++;
-    }
   }
 #endif
 }                               /* sigalrm_handler() */
@@ -56,23 +52,6 @@ void init_posix_timers(void)
     perror("init_posix_timers: sigaction");
     exit(-1);
   }
-  double interv = HEARTBEAT_INTERVAL;
-  struct itimerspec it;
-  it.it_interval.tv_sec = (int)interv;
-  it.it_interval.tv_nsec = (interv - (double)it.it_interval.tv_sec) * 1000000000;
-  it.it_value.tv_sec = 0;
-  it.it_value.tv_nsec = 1;
-  sev.sigev_value.sival_ptr = (void *)call_heart_beat;
-#ifndef __CYGWIN__
-  i = timer_create(CLOCK_MONOTONIC, &sev, &hb_timer_id);
-#else
-  i = timer_create(CLOCK_REALTIME, &sev, &hb_timer_id);
-#endif
-  if (i < 0) {
-    perror("init_posix_timers: timer_create");
-    exit(-1);
-  }
-  timer_settime(hb_timer_id, 0, &it, NULL);
 }
 
 /* Set the eval_timer to the given number of microseconds */
@@ -100,6 +79,4 @@ LPC_INT posix_eval_timer_get(void)
 
   return it.it_value.tv_sec * (LPC_INT)(1000000) + it.it_value.tv_nsec / 1000;
 }
-
-
 #endif

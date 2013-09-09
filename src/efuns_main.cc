@@ -268,7 +268,6 @@ f_call_out(void)
 {
   svalue_t *arg = sp - st_num_arg + 1;
   int num = st_num_arg - 2;
-#ifdef CALLOUT_HANDLES
   LPC_INT ret;
 
   if (!(current_object->flags & O_DESTRUCTED)) {
@@ -284,16 +283,6 @@ f_call_out(void)
   /* the function */
   free_svalue(sp, "call_out");
   put_number(ret);
-#else
-  if (!(current_object->flags & O_DESTRUCTED)) {
-    new_call_out(current_object, arg, arg[1].u.number, num, arg + 2);
-    sp -= num + 1;
-  } else {
-    pop_n_elems(num);
-    sp--;
-  }
-  free_svalue(sp--, "call_out");
-#endif
 }
 #endif
 
@@ -561,7 +550,7 @@ f_ctime(void)
     cp = time_string((time_t)sp->u.number);
   } else {
     push_number(0);
-    cp = time_string((time_t)current_time);
+    cp = time_string((time_t)get_current_time());
   }
   if ((nl = strchr(cp, '\n'))) {
     l = nl - cp;
@@ -1000,16 +989,12 @@ void
 f_find_call_out(void)
 {
   int i;
-#ifdef CALLOUT_HANDLES
   if (sp->type == T_NUMBER) {
-    i = find_call_out_by_handle(sp->u.number);
+    i = find_call_out_by_handle(current_object, sp->u.number);
   } else { /* T_STRING */
-#endif
     i = find_call_out(current_object, sp->u.string);
     free_string_svalue(sp);
-#ifdef CALLOUT_HANDLES
   }
-#endif
   put_number(i);
 }
 #endif
@@ -2488,16 +2473,12 @@ f_remove_call_out(void)
   int i;
 
   if (st_num_arg) {
-#ifdef CALLOUT_HANDLES
     if (sp->type == T_STRING) {
-#endif
       i = remove_call_out(current_object, sp->u.string);
       free_string_svalue(sp);
-#ifdef CALLOUT_HANDLES
     } else {
-      i = remove_call_out_by_handle(sp->u.number);
+      i = remove_call_out_by_handle(current_object, sp->u.number);
     }
-#endif
   } else {
     remove_all_call_out(current_object);
     i = 0;
@@ -3650,7 +3631,7 @@ f_throw(void)
 void
 f_time(void)
 {
-  push_number(current_time);
+  push_number(get_current_time());
 }
 #endif
 
@@ -3766,7 +3747,7 @@ f_undefinedp(void)
 void
 f_uptime(void)
 {
-  push_number(current_time - boot_time);
+  push_number(get_current_time() - boot_time);
 }
 #endif
 
@@ -3948,7 +3929,7 @@ f_dump_file_descriptors(void)
 #ifdef F_RECLAIM_OBJECTS
 void f_reclaim_objects(void)
 {
-  push_number(reclaim_objects());
+  push_number(reclaim_objects(false));
 }
 #endif
 
