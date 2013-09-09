@@ -550,7 +550,7 @@ f_ctime(void)
     cp = time_string((time_t)sp->u.number);
   } else {
     push_number(0);
-    cp = time_string((time_t)current_time);
+    cp = time_string((time_t)get_current_time());
   }
   if ((nl = strchr(cp, '\n'))) {
     l = nl - cp;
@@ -3631,7 +3631,7 @@ f_throw(void)
 void
 f_time(void)
 {
-  push_number(current_time);
+  push_number(get_current_time());
 }
 #endif
 
@@ -3747,7 +3747,7 @@ f_undefinedp(void)
 void
 f_uptime(void)
 {
-  push_number(current_time - boot_time);
+  push_number(get_current_time() - boot_time);
 }
 #endif
 
