@@ -4,6 +4,7 @@
 #include "backend.h"
 #include "comm.h"
 #include "replace_program.h"
+#include "reclaim.h"
 #include "socket_efuns.h"
 #include "call_out.h"
 #include "port.h"
@@ -21,12 +22,60 @@
 void CDECL alarm_loop(void *);
 #endif
 
+#include <functional>
+#include <queue>
+
 error_context_t *current_error_context = 0;
 
 /*
  * The 'current_time' is updated in the call_out cycles
  */
 long current_time;
+
+struct tick_event_compare {
+  bool operator()(tick_event *l, tick_event *r) const {
+    return l->tick > r->tick;
+  }
+};
+
+static std::priority_queue<tick_event *, std::deque<tick_event *>, tick_event_compare> g_tick_queue;
+
+tick_event *add_tick_event(long delay_secs, tick_event::callback_type callback)
+{
+  auto event = new tick_event(current_time + delay_secs, callback);
+  g_tick_queue.push(event);
+  return event;
+}
+
+void call_tick_events()
+{
+  const tick_event *event = g_tick_queue.top();
+  while (event->tick <= current_time) {
+    g_tick_queue.pop();
+
+    if (event->valid) {
+      // TODO: push error handling into callback.
+      error_context_t econ;
+      try {
+        save_context(&econ);
+        event->callback();
+      } catch (const char *) {
+        pop_context(&econ);
+      }
+    }
+    delete event;
+
+    event = g_tick_queue.top();
+  }
+}
+
+void clear_tick_events() {
+  while(!g_tick_queue.empty()) {
+    auto event = g_tick_queue.top();
+    delete event;
+    g_tick_queue.pop();
+  }
+}
 
 object_t *current_heart_beat;
 static void look_for_objects_to_swap(void);
@@ -85,29 +134,25 @@ static void report_holes()
  */
 void backend(struct event_base *base)
 {
-  int i;
-  volatile int first_call = 1;
+  // FIXME: handle this in call_tick_events().
   error_context_t econ;
-
-#ifdef SIGHUP
-  signal(SIGHUP, startshutdownMudOS);
-#endif
-  clear_state();
   save_context(&econ);
+
+  clear_state();
+
+  // Register various tick events
+  add_tick_event(0, tick_event::callback_type(call_heart_beat));
+  add_tick_event(5 * 60, tick_event::callback_type(look_for_objects_to_swap));
+  add_tick_event(30 * 60, tick_event::callback_type(std::bind(reclaim_objects, true)));
+#ifdef PACKAGE_MUDLIB_STATS
+  add_tick_event(60 * 60, tick_event::callback_type(mudlib_stats_decay));
+#endif
 
   while (1)
     try {
       clear_state();
-      if (!t_flag && first_call) {
-        first_call = 0;
-        call_heart_beat();
-      }
 
       while (1) {
-        /* Has to be cleared if we jumped out of process_user_command() */
-        current_interactive = 0;
-        set_eval(max_cost);
-
         if (obj_list_replace || obj_list_destruct) {
           remove_destructed_objects();
         }
@@ -125,31 +170,31 @@ void backend(struct event_base *base)
           slow_shut_down(tmp);
         }
 
+        if (!g_tick_queue.empty()) {
+          call_tick_events();
+        }
+
 #if DEBUG
         try {
 #endif
-          /* Run event loop for at most 1 second, this current handles
+          /* Run event loop for at least 1 second, this current handles
            * listening socket events, user socket events, and lpc socket events.
+           *
+           * It currently also handles user command, longer term plan is to
+           * merge all callbacks execution into tick event loop and move all
+           * I/O to dedicated threads.
            */
-          run_for_at_most_one_second(base);
+          run_for_at_least_one_second(base);
 
 #if DEBUG
         } catch (...) { // catch everything
           fatal("BUG: jumped out of event loop!");
         }
 #endif
+        current_time++;
 
-        /*
-         * call outs
-         */
-        call_out();
-#ifdef POSIX_TIMERS
-        if (time_for_hb) {
-          call_heart_beat();
-          time_for_hb--;
-        }
-#endif
 #ifdef PACKAGE_ASYNC
+        // TODO: Move this into timer based.
         check_reqs();
 #endif
       }
@@ -163,8 +208,6 @@ void backend(struct event_base *base)
  * Despite the name, this routine takes care of several things.
  * It will run once every 15 minutes.
  *
- * . It will attempt to reconnect to the address server if the connection has
- *   been lost.
  * . It will loop through all objects.
  *
  *   . If an object is found in a state of not having done reset, and the
@@ -178,15 +221,12 @@ void backend(struct event_base *base)
  */
 static void look_for_objects_to_swap()
 {
-  static int next_time;
+  /* Next time is in 5 minutes */
+  add_tick_event(5 * 60, tick_event::callback_type(look_for_objects_to_swap));
+
   object_t *ob;
   volatile object_t *next_ob, *last_good_ob;
   error_context_t econ;
-
-  if (current_time < next_time) {
-    return;    /* Not time to look yet */
-  }
-  next_time = current_time + 5 * 60; /* Next time is in 5 minutes */
 
   /*
    * Objects object can be destructed, which means that next object to
@@ -318,6 +358,9 @@ static float perc_hb_probes = 100.0;  /* decaying avge of how many complete */
 
 void call_heart_beat()
 {
+  // Register for next call
+  add_tick_event(HEARTBEAT_INTERVAL, tick_event::callback_type(call_heart_beat));
+
   object_t *ob;
   heart_beat_t *curr_hb;
   error_context_t econ;
@@ -386,10 +429,6 @@ void call_heart_beat()
   }
   current_prog = 0;
   current_heart_beat = 0;
-  look_for_objects_to_swap();
-#ifdef PACKAGE_MUDLIB_STATS
-  mudlib_stats_decay();
-#endif
 }       /* call_heart_beat() */
 
 int

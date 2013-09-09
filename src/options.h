@@ -492,8 +492,9 @@
  */
 #ifdef PACKAGE_DB
 #undef USE_MSQL
-#define USE_MYSQL 2
+#define USE_MYSQL 1
 #undef USE_POSTGRES
+#undef USE_SQLITE3
 #endif
 
 /*PACKAGE_ASYNC: adds some efuns for asyncronous IO */
@@ -528,6 +529,11 @@
  */
 #define PACKAGE_TRIM
 
+/*PACKAGE DWLIB: some discworld mudlib simuls coded in C (well just one right
+  now) */
+
+#undef PACKAGE_DWLIB
+
 /****************************************************************************
  *                            UID PACKAGE                                   *
  *                            -----------                                   *
@@ -547,11 +553,7 @@
  */
 #define PACKAGE_UIDS
 
-/*PACKAGE DWLIB: some discworld mudlib simuls coded in C (well just one right
-  now) */
-
-#define PACKAGE_DWLIB
-
+#ifdef PACKAGE_UIDS
 /* AUTO_SETEUID: when an object is created it's euid is automatically set to
  *   the equivalent of seteuid(getuid(this_object())).  undef AUTO_SETEUID
  *   if you would rather have the euid of the created object be set to 0.
@@ -563,6 +565,7 @@
  *   the object that forced the object's creation.
  */
 #undef AUTO_TRUST_BACKBONE
+#endif
 
 /*************************************************************************
  *                       FOR EXPERIENCED USERS                           *
@@ -587,15 +590,6 @@
  */
 #define HEARTBEAT_INTERVAL 1
 
-/*
- * CALLOUT_CYCLE_SIZE: This is the number of slots in the call_out list.
- * It should be approximately the average number of active call_outs, or
- * a few times smaller.  It should also be a power of 2, and also be relatively
- * prime to any common call_out lengths.  If all this is too confusing, 32
- * isn't a bad number :-)
- */
-#define CALLOUT_CYCLE_SIZE 512
-
 /* LARGEST_PRINTABLE_STRING: defines the size of the vsprintf() buffer in
  *   comm.c's add_message(). Instead of blindly making this value larger,
  *   your mudlib should be coded to not send huge strings to users.
@@ -617,43 +611,6 @@
  *   twice as fast when this is not defined (for the most common eoperators).
  */
 #undef TRACE_CODE
-
-/* HEART_BEAT_CHUNK: The number of heart_beat chunks allocated at a time.
- * A large number wastes memory as some will be sitting around unused, while
- * a small one wastes more CPU reallocating when it needs to grow.  Default
- * to a medium value.
- */
-#define HEART_BEAT_CHUNK      32
-
-/* Some maximum string sizes
- */
-#define SMALL_STRING_SIZE     100
-#define LARGE_STRING_SIZE     1000
-#define COMMAND_BUF_SIZE      2000
-
-/* Number of levels of nested datastructures allowed -- this limit prevents
- * crashes from occuring when saving objects containing variables containing
- * recursive datastructures (with circular references).
- */
-#define MAX_SAVE_SVALUE_DEPTH 100
-
-/* Miscellaneous config options that should probably be in the runtime
- * config file.
- */
-/* MAX_LOCAL: maximum number of local variables allowed per LPC function */
-#define CFG_MAX_LOCAL_VARIABLES         50
-
-/* CFG_MAX_GLOBAL_VARIABLES: This value determines the maximum number of
- *   global variables per object.  The maximum value is 65536.  There is
- *   a marginal memory increase for a value over 256.
- */
-#define CFG_MAX_GLOBAL_VARIABLES        65536
-
-#define CFG_EVALUATOR_STACK_SIZE        3000
-#define CFG_COMPILER_STACK_SIZE         600
-#define CFG_MAX_CALL_DEPTH              150
-/* This must be one of 4, 16, 64, 256, 1024, 4096 */
-#define CFG_LIVING_HASH_SIZE            256
 
 /* GET_CHAR_IS_BUFFERED: Normally get_char() is unbuffered.  That is, once
  * a character is received for get_char(), anything else is in the input

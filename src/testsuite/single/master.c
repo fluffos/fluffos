@@ -11,14 +11,13 @@ void flag(string str) {
   switch (str) {
     case "test":
       "/command/tests"->main();
-      "/command/tests"->main();
-      "/command/tests"->main();
       break;
     default:
       write("The only supproted flag is 'test', got '" + str + "'.\n");
       break;
   }
-  shutdown(has_error ? -1 : 0);
+  if (has_error) { shutdown(-1); }
+  // otherwise wait for auto shutdown
 }
 
 void catch_tell(string str) {
