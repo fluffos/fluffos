@@ -17,9 +17,10 @@
 #include "eval.h"
 #include "console.h"
 #include "port.h"  // get_current_time
-
 #include "event.h"
 #include "dns.h"
+
+#include <algorithm>
 
 #ifndef ENOSR
 #define ENOSR 63
@@ -46,10 +47,6 @@
 
 #define MSSP_VAR 1
 #define MSSP_VAL 2
-
-#ifndef MAX
-#define MAX(x,y) (((x)>(y))?(x):(y))
-#endif
 
 #ifndef ENV_FILLER
 #define ENV_FILLER 0x1e
@@ -126,7 +123,7 @@ static unsigned char telnet_start_gmcp[] = {IAC, SB, TELOPT_GMCP};
  * local function prototypes.
  */
 
-static char *get_user_command(void);
+static char *get_user_command(interactive_t *);
 static char *first_cmd_in_buf(interactive_t *);
 static int cmd_in_buf(interactive_t *);
 static int call_function_interactive(interactive_t *, char *);
@@ -1174,8 +1171,8 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
                 break;
               case TELOPT_ZMP: {
                 array_t *arr = allocate_array(max_array_size);
-                ip->sb_buf = (unsigned char *)REALLOC(ip->sb_buf, MAX(ip->sb_pos + 2, SB_SIZE));
-                ip->sb_size = MAX(ip->sb_pos + 2, SB_SIZE);
+                ip->sb_buf = (unsigned char *)REALLOC(ip->sb_buf, std::max(ip->sb_pos + 2, SB_SIZE));
+                ip->sb_size = std::max(ip->sb_pos + 2, SB_SIZE);
                 ip->sb_buf[ip->sb_pos] = 0;
                 copy_and_push_string((char *)ip->sb_buf + 1);
                 int off = 0;

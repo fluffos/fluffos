@@ -79,6 +79,8 @@
 #include "file.h"
 #include "master.h"
 
+#include <algorithm>
+
 #ifndef ED_INDENT_SPACES
 #define ED_INDENT_SPACES 4
 #endif
@@ -234,14 +236,6 @@ static struct tbl {
 
 
 /*________  Macros  ________________________________________________________*/
-
-#ifndef max
-#define max(a,b)        ((a) > (b) ? (a) : (b))
-#endif
-
-#ifndef min
-#define min(a,b)        ((a) < (b) ? (a) : (b))
-#endif
 
 #define nextln(l)       ((l)+1 > P_LASTLN ? 0 : (l)+1)
 #define prevln(l)       ((l)-1 < 0 ? P_LASTLN : (l)-1)
@@ -1026,7 +1020,7 @@ static int getlst()
     }
     inptr++;
   }
-  P_NLINES = min(P_NLINES, 2);
+  P_NLINES = std::min(P_NLINES, 2);
   if (P_NLINES == 0) {
     P_LINE2 = P_CURLN;
   }
