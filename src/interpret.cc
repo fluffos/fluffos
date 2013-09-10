@@ -1,3 +1,6 @@
+#include <algorithm>
+#include <functional>
+
 #include "std.h"
 #include "lpc_incl.h"
 #include "efuns_incl.h"
@@ -14,8 +17,6 @@
 #include "regexp.h"
 #include "master.h"
 #include "eval.h"
-
-#include <functional>
 
 #ifdef OPCPROF
 #include "opc.h"
@@ -4148,7 +4149,7 @@ void check_co_args(int num_arg, const program_t *prog, function_t *fun, int find
 #endif
   }
 
-  int num_arg_check = MIN(num_arg, fun->num_arg);
+  int num_arg_check = std::min(num_arg, fun->num_arg);
   if (num_arg_check && prog->type_start &&
       prog->type_start[findex] != INDEX_START_NONE)
     check_co_args2(&prog->argument_types[prog->type_start[findex]], num_arg,
