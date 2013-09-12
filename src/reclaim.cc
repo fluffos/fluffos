@@ -10,6 +10,7 @@
 #include "reclaim.h"
 #include "call_out.h"
 #include "backend.h"
+#include "port.h"
 
 #include <functional>
 
@@ -117,7 +118,7 @@ gc_mapping(mapping_t *m)
 int reclaim_objects(bool is_auto)
 {
   if (is_auto) {
-    add_tick_event(30 * 60, tick_event::callback_type(std::bind(reclaim_objects, true)));
+    add_tick_event(30 + random_number(30), tick_event::callback_type(std::bind(reclaim_objects, true)));
   }
   int i;
   object_t *ob;
