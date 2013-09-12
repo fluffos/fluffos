@@ -64,13 +64,23 @@ void call_tick_events()
 
   // TODO: randomly shuffle the events
 
+  // FIXME: push econ check into event callback!
+  error_context_t econ;
+  if (!save_context(&econ)) {
+    fatal("BUG: call_tick_events can not save context!");
+  }
   for (auto iter = all_events.begin(); iter != all_events.end(); iter++) {
     auto event = *iter;
     if(event->valid) {
-      event->callback();
+      try {
+        event->callback();
+      } catch (const char *) {
+        restore_context(&econ);
+      }
     }
     delete event;
   }
+  pop_context(&econ);
 }
 
 void clear_tick_events() {
@@ -148,7 +158,7 @@ void backend(struct event_base *base)
   // Register various tick events
   add_tick_event(0, tick_event::callback_type(call_heart_beat));
   add_tick_event(5 * 60, tick_event::callback_type(look_for_objects_to_swap));
-  add_tick_event(30 * 60, tick_event::callback_type(std::bind(reclaim_objects, true)));
+  add_tick_event(60, tick_event::callback_type(std::bind(reclaim_objects, true)));
 #ifdef PACKAGE_MUDLIB_STATS
   add_tick_event(60 * 60, tick_event::callback_type(mudlib_stats_decay));
 #endif
@@ -211,7 +221,7 @@ void backend(struct event_base *base)
 
 /*
  * Despite the name, this routine takes care of several things.
- * It will run once every 15 minutes.
+ * It will run once every 5 minutes.
  *
  * . It will loop through all objects.
  *
