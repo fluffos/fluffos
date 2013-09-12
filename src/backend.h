@@ -22,14 +22,12 @@ extern int time_for_hb;
 // API for register event to be executed on each tick.
 struct tick_event {
   bool valid;
-  long tick;
 
   typedef std::function<void ()> callback_type;
   callback_type callback;
 
-  tick_event(long tick, callback_type callback) :
+  tick_event(callback_type &callback) :
     valid(true),
-    tick(tick),
     callback(callback) {}
 };
 

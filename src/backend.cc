@@ -22,58 +22,63 @@
 void CDECL alarm_loop(void *);
 #endif
 
+#include <deque>
 #include <functional>
-#include <queue>
+#include <map>
 
 error_context_t *current_error_context = 0;
 
 /*
- * The 'current_time' is updated in the call_out cycles
+ * The 'current_time' is updated in the backend loop.
  */
 long current_time;
 
-struct tick_event_compare {
-  bool operator()(tick_event *l, tick_event *r) const {
-    return l->tick > r->tick;
-  }
-};
-
-static std::priority_queue<tick_event *, std::deque<tick_event *>, tick_event_compare> g_tick_queue;
+static std::multimap<long, tick_event *, std::less<long>> g_tick_queue;
 
 tick_event *add_tick_event(long delay_secs, tick_event::callback_type callback)
 {
-  auto event = new tick_event(current_time + delay_secs, callback);
-  g_tick_queue.push(event);
+  auto event = new tick_event(callback);
+  g_tick_queue.insert(std::make_pair(current_time + delay_secs, event));
   return event;
 }
 
 void call_tick_events()
 {
-  const tick_event *event = g_tick_queue.top();
-  while (event->tick <= current_time) {
-    g_tick_queue.pop();
+  if(g_tick_queue.empty()) {
+    return ;
+  }
 
-    if (event->valid) {
-      // TODO: push error handling into callback.
-      error_context_t econ;
-      try {
-        save_context(&econ);
-        event->callback();
-      } catch (const char *) {
-        pop_context(&econ);
-      }
+  auto iter_start = g_tick_queue.cbegin();
+  if (iter_start->first > current_time) {
+    return;
+  }
+  auto iter_end = g_tick_queue.upper_bound(current_time);
+
+  std::deque<tick_event *> all_events;
+
+  // Extract all eligible events
+  for (auto iter = iter_start; iter != iter_end; iter++) {
+    all_events.push_back(iter->second);
+  }
+  g_tick_queue.erase(iter_start, iter_end);
+
+  // TODO: randomly shuffle the events
+
+  for (auto iter = all_events.begin(); iter != all_events.end(); iter++) {
+    auto event = *iter;
+    if(event->valid) {
+      event->callback();
     }
     delete event;
-
-    event = g_tick_queue.top();
   }
 }
 
 void clear_tick_events() {
-  while(!g_tick_queue.empty()) {
-    auto event = g_tick_queue.top();
-    delete event;
-    g_tick_queue.pop();
+  if(!g_tick_queue.empty()) {
+    for (auto iter = g_tick_queue.cbegin(); iter != g_tick_queue.cend(); iter++) {
+      delete iter->second;
+    }
+    g_tick_queue.clear();
   }
 }
 
