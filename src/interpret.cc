@@ -1,3 +1,6 @@
+#include <algorithm>
+#include <functional>
+
 #include "std.h"
 #include "lpc_incl.h"
 #include "efuns_incl.h"
@@ -4059,7 +4062,6 @@ typedef struct cache_entry_s {
 } cache_entry_t;
 
 static cache_entry_t cache[APPLY_CACHE_SIZE] = { {0} }; // default initialized to 0
-static int cache_mask = APPLY_CACHE_SIZE - 1;
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_apply_low_cache()
@@ -4147,7 +4149,7 @@ void check_co_args(int num_arg, const program_t *prog, function_t *fun, int find
 #endif
   }
 
-  int num_arg_check = MIN(num_arg, fun->num_arg);
+  int num_arg_check = std::min(num_arg, fun->num_arg);
   if (num_arg_check && prog->type_start &&
       prog->type_start[findex] != INDEX_START_NONE)
     check_co_args2(&prog->argument_types[prog->type_start[findex]], num_arg,
@@ -4160,7 +4162,6 @@ int apply_low(const char *fun, object_t *ob, int num_arg)
 {
   cache_entry_t *entry; /* The cache entry */
   program_t *target_prog; /* The target prog to call */
-  int ix; /* The cache index */
   int local_call_origin = call_origin;
   IF_DEBUG(control_stack_t * save_csp);
 
@@ -4197,11 +4198,11 @@ retry_for_shadow:
   apply_low_call_others++;
 #endif
   /* Search in cache for this function. */
-  ix = (POINTER_INT)&fun >> 2;
-  ix ^= (POINTER_INT)&fun >> (2 + APPLY_CACHE_BITS);
-  ix ^= (POINTER_INT)&ob->prog >> 2;
-  ix ^= (POINTER_INT)&ob->prog >> (2 + APPLY_CACHE_BITS);
-  entry = &cache[ix & cache_mask];
+  uint64_t ix; /* The cache index */
+  std::hash<void *> hash_fn;
+  ix = hash_fn((void *)fun);
+  ix ^= hash_fn((void *)ob->prog);
+  entry = &cache[ix % APPLY_CACHE_SIZE];
   if (entry->oprogp == ob->prog && /* object must match */
       (entry->progp ? (strcmp(entry->funp->funcname, fun) == 0) : /* function name must match */
        strcmp((char *)entry->funp, fun) == 0)) {

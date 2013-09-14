@@ -9,6 +9,10 @@
 #include "lpc_incl.h"
 #include "reclaim.h"
 #include "call_out.h"
+#include "backend.h"
+#include "port.h"
+
+#include <functional>
 
 #define MAX_RECURSION 25
 
@@ -111,8 +115,11 @@ gc_mapping(mapping_t *m)
   } while (j--);
 }
 
-int reclaim_objects()
+int reclaim_objects(bool is_auto)
 {
+  if (is_auto) {
+    add_tick_event(30 + random_number(30), tick_event::callback_type(std::bind(reclaim_objects, true)));
+  }
   int i;
   object_t *ob;
 

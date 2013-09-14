@@ -1981,7 +1981,7 @@ void reset_object(object_t *ob)
   ob->next_reset = current_time + TIME_TO_RESET / 2 +
                    random_number(TIME_TO_RESET / 2);
 #else
-    ob->next_reset = current_time + TIME_TO_RESET;
+  ob->next_reset = current_time + TIME_TO_RESET;
 #endif
 
   save_command_giver(0);

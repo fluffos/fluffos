@@ -50,21 +50,13 @@
 #define ARRAY_STATS
 #define CLASS_STATS
 
-/* APPLY_CACHE_BITS: defines the number of bits to use in the call_other cache
+/* APPLY_CACHE_BITS: defines the number of bits to use in the func lookup cache
  *   (in interpret.c).
  *
- * Memory overhead is (1 << APPLY_CACHE_BITS)*16.
- * [assuming 32 bit pointers and 16 bit shorts]
- *
- * ACB:    entries:     overhead:
- *  6         64             1k
- *  8        256             4k
- * 10       1024            16k
- * 12       4096            64k
- * 14      16384           256k
- * 16      65536             1M
+ *   20 bites : (1  << 22) * (3 * 8 + 2 * 2) ~= 112MB.
  */
-#define APPLY_CACHE_BITS 20
+#define APPLY_CACHE_BITS 22
+
 /* CACHE_STATS: define this if you want call_other (apply_low) cache
  * statistics.  Causes HAS_CACHE_STATS to be defined in all LPC objects.
  */
@@ -184,12 +176,48 @@
  */
 #define TRAP_CRASHES
 
-/* CALLOUT_HANDLES: If this is defined, call_out() returns an integer, which
- * can be passed to remove_call_out() or find_call_out().  Removing call_outs
- * by name is still allowed, but is significantly less efficient, and also
- * doesn't work for function pointers.  This option adds 4 bytes overhead
- * per callout to keep track of the handle.
- */
+/* This define has became default, define it has no value.*/
 #define CALLOUT_HANDLES
+
+/* This define is gone */
+#undef CALLOUT_CYCLE_SIZE
+
+
+/* HEART_BEAT_CHUNK: The number of heart_beat chunks allocated at a time.
+ * A large number wastes memory as some will be sitting around unused, while
+ * a small one wastes more CPU reallocating when it needs to grow.  Default
+ * to a medium value.
+ */
+#define HEART_BEAT_CHUNK      32
+
+/* Some maximum string sizes
+ */
+#define SMALL_STRING_SIZE     100
+#define LARGE_STRING_SIZE     1000
+#define COMMAND_BUF_SIZE      2000
+
+/* Number of levels of nested datastructures allowed -- this limit prevents
+ * crashes from occuring when saving objects containing variables containing
+ * recursive datastructures (with circular references).
+ */
+#define MAX_SAVE_SVALUE_DEPTH 100
+
+/* Miscellaneous config options that should probably be in the runtime
+ * config file.
+ */
+/* MAX_LOCAL: maximum number of local variables allowed per LPC function */
+#define CFG_MAX_LOCAL_VARIABLES         50
+
+/* CFG_MAX_GLOBAL_VARIABLES: This value determines the maximum number of
+ *   global variables per object.  The maximum value is 65536.  There is
+ *   a marginal memory increase for a value over 256.
+ */
+#define CFG_MAX_GLOBAL_VARIABLES        65536
+
+#define CFG_EVALUATOR_STACK_SIZE        3000
+#define CFG_COMPILER_STACK_SIZE         600
+#define CFG_MAX_CALL_DEPTH              150
+/* This must be one of 4, 16, 64, 256, 1024, 4096 */
+#define CFG_LIVING_HASH_SIZE            256
 
 #endif

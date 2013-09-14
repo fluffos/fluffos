@@ -1,9 +1,9 @@
 void do_the_nasty_deed() {
-    shutdown(55);
+    shutdown(0);
     ASSERT(0);
 }
 
 void do_tests() {
     // This one is hard to test :-)
-    call_out( (: do_the_nasty_deed :), 60);
+    call_out( (: do_the_nasty_deed :), 15);
 }

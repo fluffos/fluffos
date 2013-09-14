@@ -765,8 +765,13 @@ void check_all_blocks(int flag)
     if (blocks[TAG_STR_TBL & 0xff] > 1) {
       outbuf_add(&out, "WARNING: more than string table allocated.\n");
     }
-    if (totals[TAG_CALL_OUT & 0xff] != print_call_out_usage(&out, -1)) {
-      outbuf_add(&out, "WARNING: wrong number of call_out blocks allocated.\n");
+    {
+      int a = totals[TAG_CALL_OUT & 0xff];
+      int b = print_call_out_usage(&out, -1);
+      if (a != b) {
+        outbuf_addv(&out, "WARNING: wrong number of call_out blocks allocated: %d vs %d.\n", a, b);
+        print_call_out_usage(&out, 1);
+      }
     }
     if (blocks[TAG_LOCALS & 0xff] > 3) {
       outbuf_add(&out, "WARNING: more than 3 local blocks allocated.\n");

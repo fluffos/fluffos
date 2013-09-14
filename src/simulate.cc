@@ -85,6 +85,7 @@ void check_legal_string(const char *s)
  * p = strput(p, end, ...);
  * p = strput(p, end, ...);
  */
+// TODO: Move strput and strput_int to stralloc.c or somewhere similar.
 char *strput(char *x, char *limit, const char *y)
 {
   while ((*x++ = *y++)) {
@@ -1847,8 +1848,9 @@ void error_handler(char *err)
     catch_value.type = T_STRING;
     catch_value.subtype = STRING_MALLOC;
     catch_value.u.string = string_copy(err, "caught error");
+
     throw("error handler");
-    fatal("Catch() longjump failed");
+    fatal("throw error failed");
   }
 
   if (num_error > 0) {
@@ -1857,8 +1859,8 @@ void error_handler(char *err)
     too_deep_error = max_eval_error = 0;
     if (current_error_context) {
       throw("error handler error");
+      fatal("throw error failed");
     }
-    fatal("LONGJMP failed or no error context for error.\n");
   }
 
   num_error++;
@@ -1931,9 +1933,10 @@ void error_handler(char *err)
   }
   num_error--;
   too_deep_error = max_eval_error = 0;
-  if (current_error_context)
+  if (current_error_context) {
     throw("error handler error2");
-  fatal("LONGJMP failed or no error context for error.\n");
+    fatal("throw error failed.\n");
+  }
 }
 
 void error_needs_free(char *s)
@@ -1961,6 +1964,24 @@ void error(const char *const fmt, ...)
   error_handler(err_buf);
 }
 
+// FIXME: error() above should be fixed to optionally not throw, so that
+// driver code that not called into LPC can still use it.
+void safe_error(const char *const fmt, ...)
+{
+  error_context_t econ;
+  try {
+    if (!save_context(&econ)) {
+      return ;
+    }
+    va_list args;
+    V_START(args, fmt);
+    error(fmt, args);
+    va_end(args);
+  } catch (const char *msg) {
+    pop_context(&econ);
+  }
+}
+
 /*
  * This one is called from HUP.
  */
@@ -1981,6 +2002,9 @@ void shutdownMudOS(int exit_code)
   int i;
 
   shout_string("FluffOS driver shouts: shutting down immediately.\n");
+
+  clear_tick_events();
+
 #ifdef PACKAGE_MUDLIB_STATS
   save_stat_files();
 #endif

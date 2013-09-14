@@ -1,44 +1,38 @@
 #include "std.h"
 #include "call_out.h"
 #include "backend.h"
+#include "event.h"
 #include "comm.h"
 #include "port.h"
 #include "eoperators.h"
 #include "sprintf.h"
 #include "eval.h"
 
+#include <queue>
+#include <unordered_map>
+
 #define DBG_CALLOUT(...) debug(call_out, __VA_ARGS__)
 
 /*
  * This file implements delayed calls of functions.
- * Static functions can not be called this way.
- *
- * Allocate the structures several in one chunk, to get rid of malloc
- * overhead.
  */
 
-#define CHUNK_SIZE  20
+// main callout map, for fastest reference
+typedef std::unordered_map<LPC_INT, pending_call_t *> CalloutHandleMapType;
+static CalloutHandleMapType g_callout_handle_map;
 
-typedef struct pending_call_s {
-  int delta;
-  union string_or_func function;
-  object_t *ob;
-  array_t *vs;
-  struct pending_call_s *next;
-#ifdef THIS_PLAYER_IN_CALL_OUT
-  object_t *command_giver;
-#endif
-#ifdef CALLOUT_HANDLES
-  LPC_INT handle;
-#endif
-} pending_call_t;
+// Key is the pointer to the object, this provides an fast way for
+// remove_call_out() with object only, this map may contains invalidated
+// references and only get pruned during reclaim_callouts();
+typedef std::unordered_multimap<object_t *, LPC_INT> CalloutObjectMapType;
+static CalloutObjectMapType g_callout_object_handle_map;
 
-static pending_call_t *call_list[CALLOUT_CYCLE_SIZE];
-static pending_call_t *call_list_free;
-static int num_call;
-#ifdef CALLOUT_HANDLES
-static int unique = 0;
-#endif
+// TODO: It maybe possible to change to a per-object counter.
+
+// this counter starts with 1 because common wrong usage by passing a 0
+// (Uninitialized string) to remove_call_out, this allows us to quickly filter
+// that wrong call.
+static uint64_t unique = 1;
 
 static void free_call(pending_call_t *);
 static void free_called_call(pending_call_t *);
@@ -49,22 +43,25 @@ void remove_all_call_out(object_t *);
  */
 static void free_called_call(pending_call_t *cop)
 {
-  cop->next = call_list_free;
   if (cop->ob) {
     free_string(cop->function.s);
     free_object(&cop->ob, "free_call");
   } else {
     free_funp(cop->function.f);
   }
-  cop->function.s = 0;
+  cop->ob = NULL;
+  cop->function.s = NULL;
 #ifdef THIS_PLAYER_IN_CALL_OUT
   if (cop->command_giver) {
     free_object(&cop->command_giver, "free_call");
     cop->command_giver = 0;
   }
 #endif
-  cop->ob = 0;
-  call_list_free = cop;
+  if (cop->tick_event != NULL) {
+    cop->tick_event->valid = false;  // Will be freed by tick loop itself.
+    cop->tick_event = NULL;
+  }
+  FREE(cop);
 }
 
 static void free_call(pending_call_t *cop)
@@ -78,36 +75,20 @@ static void free_call(pending_call_t *cop)
 /*
  * Setup a new call out.
  */
-#ifdef CALLOUT_HANDLES
-LPC_INT
-#else
-void
-#endif
-new_call_out(object_t *ob, svalue_t *fun, int delay,
-             int num_args, svalue_t *arg)
+LPC_INT new_call_out(object_t *ob, svalue_t *fun, int delay,
+                     int num_args, svalue_t *arg)
 {
-  pending_call_t *cop, **copp;
-  int tm;
-
   if (delay < 0) {
     delay = 0;
   }
 
   DBG_CALLOUT("new_call_out: /%s delay %i\n", ob->obname, delay);
 
-  if (!call_list_free) {
-    int i;
+  pending_call_t *cop = CALLOCATE(1, pending_call_t,
+                                  TAG_CALL_OUT, "new_call_out");
 
-    call_list_free = CALLOCATE(CHUNK_SIZE, pending_call_t,
-                               TAG_CALL_OUT, "new_call_out: call_list_free");
-    for (i = 0; i < CHUNK_SIZE - 1; i++) {
-      call_list_free[i].next = &call_list_free[i + 1];
-    }
-    call_list_free[CHUNK_SIZE - 1].next = 0;
-    num_call += CHUNK_SIZE;
-  }
-  cop = call_list_free;
-  call_list_free = call_list_free->next;
+  cop->target_time = current_time + delay;
+  DBG_CALLOUT("  target_time: %ld\n", cop->target_time);
 
   if (fun->type == T_STRING) {
     DBG_CALLOUT("  function: %s\n", fun->u.string);
@@ -120,6 +101,18 @@ new_call_out(object_t *ob, svalue_t *fun, int delay,
     fun->u.fp->hdr.ref++;
     cop->ob = 0;
   }
+
+  cop->handle = current_time + (++unique);
+  if (unique > 0xffffffff) {
+    unique = 1;  // force wrapping around.
+  }
+  DBG_CALLOUT("  handle: %" LPC_INT_FMTSTR_P "\n", cop->handle);
+
+  g_callout_handle_map.insert(std::make_pair(cop->handle, cop));
+  g_callout_object_handle_map.insert(
+    std::make_pair(cop->ob ? cop->ob : fun->u.fp->hdr.owner,
+                   cop->handle));
+
 #ifdef THIS_PLAYER_IN_CALL_OUT
   cop->command_giver = command_giver; /* save current user context */
   if (command_giver) {
@@ -133,38 +126,10 @@ new_call_out(object_t *ob, svalue_t *fun, int delay,
     cop->vs = 0;
   }
 
-  /* Find out which slot this one fits in */
-  tm = (delay + current_time) & (CALLOUT_CYCLE_SIZE - 1);
-  /* number of cycles */
-  delay = delay / CALLOUT_CYCLE_SIZE;
+  auto callback = std::bind(call_out, cop);
+  cop->tick_event = add_tick_event(delay, tick_event::callback_type(callback));
 
-  DBG_CALLOUT("Current time: %ld  Executes at: %ld  Slot: %d  Delay: %d\n",
-              current_time, current_time + delay, tm, delay);
-
-  for (copp = &call_list[tm]; *copp; copp = &(*copp)->next) {
-    if ((*copp)->delta > delay) {
-      (*copp)->delta -= delay;
-      cop->delta = delay;
-      cop->next = *copp;
-      *copp = cop;
-#ifdef CALLOUT_HANDLES
-      tm += CALLOUT_CYCLE_SIZE * ++unique;
-      cop->handle = tm;
-      return tm;
-#else
-      return;
-#endif
-    }
-    delay -= (*copp)->delta;
-  }
-  *copp = cop;
-  cop->delta = delay;
-  cop->next = 0;
-#ifdef CALLOUT_HANDLES
-  tm += CALLOUT_CYCLE_SIZE * ++unique;
-  cop->handle = tm;
-  return tm;
-#endif
+  return cop->handle;
 }
 
 /*
@@ -172,348 +137,255 @@ new_call_out(object_t *ob, svalue_t *fun, int delay,
  * if it is a living object. Check for shadowing objects, which may also
  * be living objects.
  */
-void call_out()
+void call_out(pending_call_t *cop)
 {
-  long extra, real_time;
-  static pending_call_t *cop = 0;
-  error_context_t econ;
-  volatile int tm;
-#ifdef CALLOUT_LOOP_PROTECTION
-  /* The number of call_outs that will be given a full max_cost time budget;
-   * any calls beyond this number will get only what time is left over.
-   */
-  int num_max_cost_calls;
-  int warned_about_recursion = 0;
-#endif
-
   current_interactive = 0;
 
-  /* could be still allocated if an error occured during a call_out */
-  if (cop) {
-    free_called_call(cop);
-    cop = 0;
+  object_t *ob, *new_command_giver;
+  ob = (cop->ob ? cop->ob : cop->function.f->hdr.owner);
+
+  DBG_CALLOUT("Executing callout: %s\n", ob ? ob->obname : "(null)");
+
+  DBG_CALLOUT("  handle: %ld\n", cop->handle);
+
+  DBG_CALLOUT("  target_time: %ld, current_time: %ld, real_time: %ld\n",
+              cop->target_time, current_time, get_current_time());
+
+  // Remove self from callout map
+  {
+    int found = g_callout_handle_map.erase(cop->handle);
+    DEBUG_CHECK(!found, "BUG: Rogue callout, not found in map.\n");
   }
 
-  real_time = get_current_time();
-  DBG_CALLOUT("Calling call_outs: current_time: %ld real_time: %ld difference: %ld\n",
-              current_time, real_time, real_time - current_time);
+  if (!ob || (ob->flags & O_DESTRUCTED)) {
+    DBG_CALLOUT("  ob destructed, ignored.\n");
+    free_call(cop);
+    return ;
+  }
 
-  /* Slowly advance the clock forward towards real_time, doing call_outs
-   * as we go.
-   */
-  save_context(&econ);
-  while (1) {
+  // FIXME: Figure out why this is useful. Maybe a security thing.
+  if (cop->ob && cop->function.s[0] == APPLY___INIT_SPECIAL_CHAR) {
+    DBG_CALLOUT("  Trying to call illegal function, ignored.\n");
+    free_call(cop);
+    return ;
+  }
 
-    tm = current_time & (CALLOUT_CYCLE_SIZE - 1);
-    DBG_CALLOUT("   slot %i\n", tm);
-
-#ifdef CALLOUT_LOOP_PROTECTION
-    /* Count how many call_outs are ready to run.  These each will
-     * be given their own max_cost time budget.  If any immediate
-     * call_outs are subsequently added to the list, they will all
-     * run within a single, final max_cost time allocation.  This
-     * prevents infinite call_out("xyz", 0) loops from wedging the
-     * driver.
-     */
-    num_max_cost_calls = 1;
-    for (cop = call_list[tm]; cop && cop->delta == 0; cop = cop->next) {
-      num_max_cost_calls++;
-    }
-    cop = 0;
-#endif
-
-    while (call_list[tm] && call_list[tm]->delta == 0) {
-      object_t *ob, *new_command_giver;
-
-#ifdef CALLOUT_LOOP_PROTECTION
-      /* Count this call_out against the allowed number of full time budget calls */
-      num_max_cost_calls--;
-#endif
-
-      /*
-       * Move the first call_out out of the chain.
-       */
-      cop = call_list[tm];
-      call_list[tm] = call_list[tm]->next;
-      ob = (cop->ob ? cop->ob : cop->function.f->hdr.owner);
-
-      DBG_CALLOUT("      /%s\n", (ob ? ob->obname : "(null)"));
-
-      if (!ob || (ob->flags & O_DESTRUCTED)) {
-        DBG_CALLOUT("         (destructed)\n");
-        free_call(cop);
-        cop = 0;
-      } else {
-        try {
-          object_t *ob;
-
-          ob = cop->ob;
 #ifndef NO_SHADOWS
-          if (ob)
-            while (ob->shadowing) {
-              ob = ob->shadowing;
-            }
+  if (cop->ob)
+    while (cop->ob->shadowing) {
+      ob = cop->ob->shadowing;
+    }
 #endif
-          new_command_giver = 0;
+  new_command_giver = 0;
 #ifdef THIS_PLAYER_IN_CALL_OUT
-          if (cop->command_giver &&
-              !(cop->command_giver->flags & O_DESTRUCTED)) {
-            new_command_giver = cop->command_giver;
-          } else if (ob && (ob->flags & O_LISTENER)) {
-            new_command_giver = ob;
-          }
-          if (new_command_giver) {
-            DBG_CALLOUT("         command_giver: /%s\n", new_command_giver->obname);
-          }
-#endif
-          save_command_giver(new_command_giver);
-          /* current object no longer set */
-
-          if (cop->vs) {
-            array_t *vec = cop->vs;
-            svalue_t *svp = vec->item + vec->size;
-
-            while (svp-- > vec->item) {
-              if (svp->type == T_OBJECT &&
-                  (svp->u.ob->flags & O_DESTRUCTED)) {
-                free_object(&svp->u.ob, "call_out");
-                *svp = const0u;
-              }
-            }
-            /* cop->vs is ref one */
-            extra = cop->vs->size;
-            transfer_push_some_svalues(cop->vs->item, extra);
-            free_empty_array(cop->vs);
-          } else {
-            extra = 0;
-          }
-
-#ifdef CALLOUT_LOOP_PROTECTION
-          if (num_max_cost_calls > 0) {
-#endif
-            set_eval(max_cost);
-#ifdef CALLOUT_LOOP_PROTECTION
-          }
-#endif
-
-          if (cop->ob) {
-            if (cop->function.s[0] == APPLY___INIT_SPECIAL_CHAR) {
-              error("Illegal function name\n");
-            }
-
-            (void) apply(cop->function.s, cop->ob, extra,
-                         ORIGIN_INTERNAL);
-          } else {
-            (void) call_function_pointer(cop->function.f, extra);
-          }
-
-          restore_command_giver();
-        } catch (const char *) {
-          restore_context(&econ);
-          if (outoftime) {
-#ifdef CALLOUT_LOOP_PROTECTION
-            if (num_max_cost_calls > 0) {
-#endif
-              /* Transfer control to the backend loop so that it can attend to other duties */
-              debug_message("Maximum evaluation cost reached while trying to process call_outs\n");
-              pop_context(&econ);
-              return;
-#ifdef CALLOUT_LOOP_PROTECTION
-            } else if (!warned_about_recursion) {
-              warned_about_recursion = 1;
-              /* A newly added immediate call_out tripped max_cost.  Force all reamining
-               * call_outs to run with the outoftime flag set, which will force them to
-               * throw their errors (this aids in troubleshooting after the fact.)
-               */
-              debug_message("Maximum evaluation cost reached while processing recursive call_outs; breaking possible loop\n");
-            }
-#endif
-          }
-        }
-        free_called_call(cop);
-        cop = 0;
-      }
-    }
-    /* Ok, no more scheduled call_outs for current_time */
-    if (current_time < real_time) {
-      /* Time marches onward! */
-      if (call_list[tm]) {
-        call_list[tm]->delta--;
-      }
-      current_time++;
-      DBG_CALLOUT("   current_time = %ld\n", current_time);
-#ifndef POSIX_TIMERS
-      if (!(current_time % HEARTBEAT_INTERVAL)) {
-        call_heart_beat();
-      }
-#endif
-    } else {
-      /* We're done! */
-      break;
-    }
+  if (cop->command_giver &&
+      !(cop->command_giver->flags & O_DESTRUCTED)) {
+    new_command_giver = cop->command_giver;
+  } else if (ob && (ob->flags & O_LISTENER)) {
+    new_command_giver = ob;
   }
-  DBG_CALLOUT("Done.\n");
-  pop_context(&econ);
+  if (new_command_giver) {
+    DBG_CALLOUT("  command_giver: /%s\n", new_command_giver->obname);
+  }
+#endif
+  int num_callout_args = 0;
+
+  if (cop->vs) {
+    array_t *vec = cop->vs;
+    svalue_t *svp = vec->item + vec->size;
+    num_callout_args = vec->size;
+
+    while (svp-- > vec->item) {
+      if (svp->type == T_OBJECT &&
+          (svp->u.ob->flags & O_DESTRUCTED)) {
+        free_object(&svp->u.ob, "call_out");
+        *svp = const0u;
+      }
+    }
+    /* cop->vs is ref one */
+    transfer_push_some_svalues(cop->vs->item, vec->size);
+    free_empty_array(cop->vs);
+  }
+
+  // Executing LPC callback
+  set_eval(max_cost);
+
+  save_command_giver(new_command_giver);
+  /* current object no longer set */
+  if (cop->ob) {
+    DBG_CALLOUT("  func: %s\n", cop->function.s);
+    (void) safe_apply(cop->function.s, cop->ob, num_callout_args,
+                      ORIGIN_INTERNAL);
+  } else {
+    DBG_CALLOUT("  func: <function>\n");
+    (void) safe_call_function_pointer(cop->function.f, num_callout_args);
+  }
+  restore_command_giver();
+
+  free_called_call(cop);
 }
 
-static int time_left(int slot, int delay)
+static int time_left(pending_call_t *cop)
 {
-  int current_slot = current_time & (CALLOUT_CYCLE_SIZE - 1);
-  if (slot >= current_slot) {
-    return (slot - current_slot) + delay * CALLOUT_CYCLE_SIZE;
-  } else {
-    return (slot - current_slot) + (delay + 1) * CALLOUT_CYCLE_SIZE;
-  }
+  // FIXME: This is not fully correct, call_out actually operates in
+  // real time, but target_time was set base on current_time, so we need to
+  // substract current_time here to get a correct value.
+  return cop->target_time - current_time;
 }
 
 /*
- * Throw away a call out. First call to this function is discarded.
+ * Throw away a call out.
  * The time left until execution is returned.
- * -1 is returned if no call out pending.
+ * -1 is returned if no callout with this function is pending.
  */
 int remove_call_out(object_t *ob, const char *fun)
 {
-  pending_call_t **copp, *cop;
-  int delay;
-  int i;
-
   if (!ob) { return -1; }
 
   DBG_CALLOUT("remove_call_out: /%s \"%s\"\n", ob->obname, fun);
 
-  for (i = 0; i < CALLOUT_CYCLE_SIZE; i++) {
-    delay = 0;
-    for (copp = &call_list[i]; *copp; copp = &(*copp)->next) {
-      DBG_CALLOUT("   Slot: %i\n", i);
-      delay += (*copp)->delta;
-      if ((*copp)->ob == ob && strcmp((*copp)->function.s, fun) == 0) {
-        cop = *copp;
-        if (cop->next) {
-          cop->next->delta += cop->delta;
-        }
-        *copp = cop->next;
-        free_call(cop);
-        DBG_CALLOUT("   found.\n");
-        return time_left(i, delay);
-      }
+  auto range = g_callout_object_handle_map.equal_range(ob);
+  auto iter = range.first;
+  while (iter != range.second) {
+    auto iter_handle = g_callout_handle_map.find(iter->second);
+    if (iter_handle == g_callout_handle_map.end()) {
+      iter = g_callout_object_handle_map.erase(iter);
+      continue;
     }
-  }
-  DBG_CALLOUT("   not found.\n");
-  return -1;
-}
+    auto cop = iter_handle->second;
 
-#ifdef CALLOUT_HANDLES
-int remove_call_out_by_handle(LPC_INT handle)
-{
-  pending_call_t **copp, *cop;
-  int delay = 0;
-
-  DBG_CALLOUT("remove_call_out_by_handle: handle: %i slot: %i\n",
-              handle, handle & (CALLOUT_CYCLE_SIZE - 1));
-
-  for (copp = &call_list[handle & (CALLOUT_CYCLE_SIZE - 1)]; *copp; copp = &(*copp)->next) {
-    delay += (*copp)->delta;
-    if ((*copp)->handle == handle) {
-      cop = *copp;
-      if (cop->next) {
-        cop->next->delta += cop->delta;
-      }
-      *copp = cop->next;
+    if (cop->ob == ob && strcmp(cop->function.s, fun) == 0) {
+      auto remaining_time = time_left(cop);
       free_call(cop);
-      return time_left(handle & (CALLOUT_CYCLE_SIZE - 1), delay);
+      g_callout_handle_map.erase(iter_handle);
+      g_callout_object_handle_map.erase(iter);
+
+      DBG_CALLOUT("  found: remaining time %d.\n", remaining_time);
+      return remaining_time;
     }
+    iter++;
   }
+  DBG_CALLOUT("  not found.\n");
   return -1;
 }
 
-int find_call_out_by_handle(LPC_INT handle)
+int remove_call_out_by_handle(object_t *ob, LPC_INT handle)
 {
-  pending_call_t *cop;
-  int delay = 0;
+  if (!ob) { return -1; }
 
-  DBG_CALLOUT("find_call_out_by_handle: handle: %" LPC_INT_FMTSTR_P " slot: %" LPC_INT_FMTSTR_P "\n",
-              handle, handle & (CALLOUT_CYCLE_SIZE - 1));
+  DBG_CALLOUT("remove_call_out_by_handle: ob: %s, handle: %" LPC_INT_FMTSTR_P ".\n",
+              ob->obname, handle);
 
-  for (cop = call_list[handle & (CALLOUT_CYCLE_SIZE - 1)]; cop; cop = cop->next) {
-    delay += cop->delta;
-    if (cop->handle == handle) {
-      return time_left(handle & (CALLOUT_CYCLE_SIZE - 1), delay);
-    }
+  if (handle == 0 || handle < unique) {
+    DBG_CALLOUT("  invalid handle, ignored.\n");
+    return -1;
   }
+
+  auto iter = g_callout_handle_map.find(handle);
+  if (iter != g_callout_handle_map.end()) {
+    auto cop = iter->second;
+    auto remaining_time = time_left(cop);
+    free_call(cop);
+
+    g_callout_handle_map.erase(iter);
+
+    DBG_CALLOUT("  found: remaining time %d.\n", remaining_time);
+    return remaining_time;
+  }
+  DBG_CALLOUT("  not found.\n");
   return -1;
 }
-#endif
+
+int find_call_out_by_handle(object_t *ob, LPC_INT handle)
+{
+  DBG_CALLOUT("find_call_out_by_handle: ob: %s, handle: %" LPC_INT_FMTSTR_P "\n",
+              ob->obname, handle);
+
+  if (handle == 0 || handle < unique) {
+    DBG_CALLOUT("  invalid handle, ignored.\n");
+    return -1;
+  }
+
+  auto iter = g_callout_handle_map.find(handle);
+  if (iter != g_callout_handle_map.end()) {
+    auto cop = iter->second;
+    if (cop->handle == handle &&
+        (cop->ob == ob || cop->function.f->hdr.owner == ob)) {
+      auto remaining_time = time_left(cop);
+      DBG_CALLOUT("  found: remaining time %d.\n", remaining_time);
+      return remaining_time;
+    }
+  }
+  DBG_CALLOUT("  not found.\n");
+  return -1;
+}
 
 int find_call_out(object_t *ob, const char *fun)
 {
-  pending_call_t *cop;
-  int delay;
-  int i;
-
   if (!ob) { return -1; }
 
-  DBG_CALLOUT("find_call_out: /%s \"%s\"\n", ob->obname, fun);
+  DBG_CALLOUT("find_call_out: ob:%s \"%s\"\n", ob->obname, fun);
 
-  for (i = 0; i < CALLOUT_CYCLE_SIZE; i++) {
-    delay = 0;
-    DBG_CALLOUT("   Slot: %i\n", i);
-    for (cop = call_list[i]; cop; cop = cop->next) {
-      delay += cop->delta;
-      if (cop->ob == ob && strcmp(cop->function.s, fun) == 0) {
-        return time_left(i, delay);
-      }
+  auto range = g_callout_object_handle_map.equal_range(ob);
+  auto iter = range.first;
+  while (iter != range.second) {
+    auto iter_handle = g_callout_handle_map.find(iter->second);
+    if (iter_handle == g_callout_handle_map.end()) {
+      iter = g_callout_object_handle_map.erase(iter);
+      continue;
     }
+    auto cop = iter_handle->second;
+    if (cop->ob == ob && strcmp(cop->function.s, fun) == 0) {
+      auto remaining_time = time_left(cop);
+      DBG_CALLOUT("  found: remaining time %d.\n", remaining_time);
+      return remaining_time;
+    }
+    iter++;
   }
+  DBG_CALLOUT("  not found.\n");
   return -1;
 }
 
 int print_call_out_usage(outbuffer_t *ob, int verbose)
 {
-  int i, j;
-  pending_call_t *cop;
-
-  for (i = 0, j = 0; j < CALLOUT_CYCLE_SIZE; j++)
-    for (cop = call_list[j]; cop; cop = cop->next) {
-      i++;
-    }
-
   if (verbose == 1) {
     outbuf_add(ob, "Call out information:\n");
     outbuf_add(ob, "---------------------\n");
-    outbuf_addv(ob, "Number of allocated call outs: %8d, %8d bytes\n",
-                num_call, num_call * sizeof(pending_call_t));
-    outbuf_addv(ob, "Current length: %d\n", i);
+    outbuf_addv(ob, "Number of allocated call outs: %8d, %8d bytes.\n",
+                g_callout_handle_map.size(), g_callout_handle_map.size() * sizeof(pending_call_t));
+    outbuf_addv(ob, "Current handle map bucket: %d\n", g_callout_handle_map.bucket_count());
+    outbuf_addv(ob, "Current handle map load_factor: %f\n", g_callout_handle_map.load_factor());
+    outbuf_addv(ob, "Current object map bucket: %d\n", g_callout_object_handle_map.bucket_count());
+    outbuf_addv(ob, "Current object map load_factor: %f\n", g_callout_object_handle_map.load_factor());
+    outbuf_addv(ob, "Number of garbage entry in object map: %d\n", g_callout_object_handle_map.size() - g_callout_handle_map.size());
   } else {
     if (verbose != -1)
-      outbuf_addv(ob, "call out:\t\t\t%8d %8d (current length %d)\n", num_call,
-                  num_call * sizeof(pending_call_t), i);
+      outbuf_addv(ob, "call out:\t\t\t%8d %8d (load_factor %f)\n",
+                  g_callout_handle_map.size(), g_callout_handle_map.size() * sizeof(pending_call_t),
+                  g_callout_handle_map.load_factor());
   }
-  return num_call * sizeof(pending_call_t);
+  return g_callout_handle_map.size() * sizeof(pending_call_t);
 }
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_call_outs()
 {
-  pending_call_t *cop;
-  int i;
-
-  for (i = 0; i < CALLOUT_CYCLE_SIZE; i++) {
-    for (cop = call_list[i]; cop; cop = cop->next) {
-      if (cop->vs) {
-        cop->vs->extra_ref++;
-      }
-      if (cop->ob) {
-        cop->ob->extra_ref++;
-        EXTRA_REF(BLOCK(cop->function.s))++;
-      } else {
-        cop->function.f->hdr.extra_ref++;
-      }
-#ifdef THIS_PLAYER_IN_CALL_OUT
-      if (cop->command_giver) {
-        cop->command_giver->extra_ref++;
-      }
-#endif
+  for (auto iter = g_callout_handle_map.cbegin(); iter != g_callout_handle_map.cend(); iter++) {
+    auto cop = iter->second;
+    if (cop->vs) {
+      cop->vs->extra_ref++;
     }
+    if (cop->ob) {
+      cop->ob->extra_ref++;
+      EXTRA_REF(BLOCK(cop->function.s))++;
+    } else {
+      cop->function.f->hdr.extra_ref++;
+    }
+#ifdef THIS_PLAYER_IN_CALL_OUT
+    if (cop->command_giver) {
+      cop->command_giver->extra_ref++;
+    }
+#endif
   }
 }
 #endif
@@ -526,65 +398,60 @@ void mark_call_outs()
  */
 array_t *get_all_call_outs()
 {
-  int i, j, delay;
-  pending_call_t *cop;
-  array_t *v;
-
-  for (i = 0, j = 0; j < CALLOUT_CYCLE_SIZE; j++)
-    for (cop = call_list[j]; cop; cop = cop->next) {
-      object_t *ob = (cop->ob ? cop->ob : cop->function.f->hdr.owner);
-      if (ob && !(ob->flags & O_DESTRUCTED)) {
-        i++;
-      }
+  int i = 0;
+  for (auto iter = g_callout_handle_map.cbegin(); iter != g_callout_handle_map.cend(); iter++) {
+    auto cop = iter->second;
+    object_t *ob = (cop->ob ? cop->ob : cop->function.f->hdr.owner);
+    if (ob && !(ob->flags & O_DESTRUCTED)) {
+      i++;
     }
+  }
 
-  v = allocate_empty_array(i);
+  array_t *v = allocate_empty_array(i);
 
-  for (i = 0, j = 0; j < CALLOUT_CYCLE_SIZE; j++) {
-    delay = 0;
-    for (cop = call_list[j]; cop; cop = cop->next) {
-      array_t *vv;
-      object_t *ob;
-
-      delay += cop->delta;
-      ob = (cop->ob ? cop->ob : cop->function.f->hdr.owner);
-      if (!ob || (ob->flags & O_DESTRUCTED)) {
-        continue;
-      }
-      vv = allocate_empty_array(3);
-      if (cop->ob) {
-        vv->item[0].type = T_OBJECT;
-        vv->item[0].u.ob = cop->ob;
-        add_ref(cop->ob, "get_all_call_outs");
-        vv->item[1].type = T_STRING;
-        vv->item[1].subtype = STRING_SHARED;
-        vv->item[1].u.string = make_shared_string(cop->function.s);
-      } else {
-        outbuffer_t tmpbuf;
-        svalue_t tmpval;
-
-        tmpbuf.real_size = 0;
-        tmpbuf.buffer = 0;
-
-        tmpval.type = T_FUNCTION;
-        tmpval.u.fp = cop->function.f;
-
-        svalue_to_string(&tmpval, &tmpbuf, 0, 0, 0);
-
-        vv->item[0].type = T_OBJECT;
-        vv->item[0].u.ob = cop->function.f->hdr.owner;
-        add_ref(cop->function.f->hdr.owner, "get_all_call_outs");
-        vv->item[1].type = T_STRING;
-        vv->item[1].subtype = STRING_SHARED;
-        vv->item[1].u.string = make_shared_string(tmpbuf.buffer);
-        FREE_MSTR(tmpbuf.buffer);
-      }
-      vv->item[2].type = T_NUMBER;
-      vv->item[2].u.number = time_left(j, delay);
-
-      v->item[i].type = T_ARRAY;
-      v->item[i++].u.arr = vv;  /* Ref count is already 1 */
+  i = 0;
+  for (auto iter = g_callout_handle_map.cbegin(); iter != g_callout_handle_map.cend(); iter++) {
+    auto cop = iter->second;
+    array_t *vv;
+    object_t *ob;
+    ob = (cop->ob ? cop->ob : cop->function.f->hdr.owner);
+    if (!ob || (ob->flags & O_DESTRUCTED)) {
+      continue;
     }
+    vv = allocate_empty_array(3);
+    if (cop->ob) {
+      vv->item[0].type = T_OBJECT;
+      vv->item[0].u.ob = cop->ob;
+      add_ref(cop->ob, "get_all_call_outs");
+      vv->item[1].type = T_STRING;
+      vv->item[1].subtype = STRING_SHARED;
+      vv->item[1].u.string = make_shared_string(cop->function.s);
+    } else {
+      outbuffer_t tmpbuf;
+      svalue_t tmpval;
+
+      tmpbuf.real_size = 0;
+      tmpbuf.buffer = 0;
+
+      tmpval.type = T_FUNCTION;
+      tmpval.u.fp = cop->function.f;
+
+      svalue_to_string(&tmpval, &tmpbuf, 0, 0, 0);
+
+      vv->item[0].type = T_OBJECT;
+      vv->item[0].u.ob = cop->function.f->hdr.owner;
+      add_ref(cop->function.f->hdr.owner, "get_all_call_outs");
+      vv->item[1].type = T_STRING;
+      vv->item[1].subtype = STRING_SHARED;
+      vv->item[1].u.string = make_shared_string(tmpbuf.buffer);
+      FREE_MSTR(tmpbuf.buffer);
+    }
+    vv->item[2].type = T_NUMBER;
+    vv->item[2].u.number = time_left(cop);
+
+    v->item[i].type = T_ARRAY;
+    v->item[i].u.arr = vv;  /* Ref count is already 1 */
+    i++;
   }
   return v;
 }
@@ -592,48 +459,82 @@ array_t *get_all_call_outs()
 void
 remove_all_call_out(object_t *obj)
 {
-  pending_call_t **copp, *cop;
-  int i;
+  int i = 0;
 
-  for (i = 0; i < CALLOUT_CYCLE_SIZE; i++) {
-    copp = &call_list[i];
-    while (*copp) {
-      if (((*copp)->ob &&
-           (((*copp)->ob == obj) || ((*copp)->ob->flags & O_DESTRUCTED))) ||
-          (!(*copp)->ob &&
-           ((*copp)->function.f->hdr.owner == obj ||
-            !(*copp)->function.f->hdr.owner ||
-            (*copp)->function.f->hdr.owner->flags & O_DESTRUCTED))) {
-        cop = *copp;
-        if (cop->next) {
-          cop->next->delta += cop->delta;
-        }
-        *copp = cop->next;
-        free_call(cop);
-      } else {
-        copp = &(*copp)->next;
-      }
+  auto range = g_callout_object_handle_map.equal_range(obj);
+  auto iter = range.first;
+
+  while (iter != range.second) {
+    auto iter_handle = g_callout_handle_map.find(iter->second);
+    if (iter_handle == g_callout_handle_map.end()) {
+      iter = g_callout_object_handle_map.erase(iter);
+      continue;
+    }
+    auto cop = iter_handle->second;
+    if ((cop->ob &&
+         ((cop->ob == obj) || (cop->ob->flags & O_DESTRUCTED))) ||
+        (!(cop->ob) &&
+         (cop->function.f->hdr.owner == obj ||
+          !cop->function.f->hdr.owner ||
+          (cop->function.f->hdr.owner->flags & O_DESTRUCTED)))) {
+      free_call(cop);
+      g_callout_handle_map.erase(iter_handle);
+      iter = g_callout_object_handle_map.erase(iter);
+      i++;
+    } else {
+      iter++;
     }
   }
+  DBG_CALLOUT("remove_all_call_out: removed %d callouts.\n", i);
 }
 
 void reclaim_call_outs()
 {
-  pending_call_t *cop;
-  int i;
+  DBG_CALLOUT("!!! reclaiming callouts.\n");
 
-  remove_all_call_out(0); /* removes call_outs to destructed objects */
-
-#ifdef THIS_PLAYER_IN_CALL_OUT
-  for (i = 0; i < CALLOUT_CYCLE_SIZE; i++) {
-    cop = call_list[i];
-    while (cop) {
-      if (cop->command_giver && (cop->command_giver->flags & O_DESTRUCTED)) {
-        free_object(&cop->command_giver, "reclaim_call_outs");
-        cop->command_giver = 0;
+  // removes call_outs to destructed objects
+  int i = 0;
+  {
+    auto iter = g_callout_handle_map.begin();
+    while (iter != g_callout_handle_map.end()) {
+      auto cop = iter->second;
+      if ((cop->ob && (cop->ob->flags & O_DESTRUCTED)) ||
+          (!cop->ob && (cop->function.f->hdr.owner->flags & O_DESTRUCTED))) {
+        free_call(cop);
+        iter = g_callout_handle_map.erase(iter);
+        i++;
+      } else {
+        iter++;
       }
-      cop = cop->next;
     }
   }
+  DBG_CALLOUT("reclaim_call_outs: %d callouts with destructed object.\n", i);
+
+  // GC all invalid object->handle entries
+  i = 0;
+  {
+    auto iter = g_callout_object_handle_map.begin();
+    while (iter != g_callout_object_handle_map.end()) {
+      if (g_callout_handle_map.find(iter->second) == g_callout_handle_map.end()) {
+        iter = g_callout_object_handle_map.erase(iter);
+        i++;
+      } else {
+        iter++;
+      }
+    }
+  }
+  DBG_CALLOUT("reclaim_call_outs: %d garbage in object handle map.\n", i);
+
+#ifdef THIS_PLAYER_IN_CALL_OUT
+  i = 0;
+  for (auto iter = g_callout_handle_map.cbegin(); iter != g_callout_handle_map.cend(); iter++) {
+    auto cop = iter->second;
+    if (cop->command_giver && (cop->command_giver->flags & O_DESTRUCTED)) {
+      free_object(&cop->command_giver, "reclaim_call_outs");
+      cop->command_giver = 0;
+      i++;
+    }
+  }
+  DBG_CALLOUT("reclaim_call_outs: %d callouts with command_giver gone.\n", i);
 #endif
 }

@@ -66,10 +66,6 @@ typedef struct minfo_s {
 #define mapping_too_large() \
     error("Mapping exceeded maximum allowed size of %d.\n",MAX_MAPPING_SIZE);
 
-#ifndef max
-#define max(x,y) ((x) > (y)) ? (x) : (y)
-#endif
-
 /*
  * mapping.c
  */

@@ -85,6 +85,10 @@ build_binaries: $(DRIVER_BIN) portbind
 .cc.$(O):
 	$(CXX) -c $(CXXFLAGS) @LIBEVENT_CPPFLAGS@ -x c++ -o $@ $<
 
+# FIXME: simulate.c currently calls package_async, which depends on package/DB, this need to be fixed.
+simulate.$(O): simulate.cc
+	$(CXX) -c $(CXXFLAGS) @LIBEVENT_CPPFLAGS@ @MYSQL_CFLAGS@ @POSTGRESQL_CFLAGS@ @SQLITE3_CFLAGS@  -x c++ -o $@ $<
+
 lex.o: lex.cc preprocess.cc cc.h grammar.tab.cc
 
 grammar.tab.o: grammar.tab.cc opcodes.h
@@ -175,7 +179,7 @@ reconfigure: clean
 	rm -f conf.h configure.h options_incl.h
 
 test: all
-	cd testsuite && ../driver -ftest etc/config.test
+	cd testsuite && ../driver -d -ftest etc/config.test
 
 help:
 	@echo "***************** Configuration completed **************"

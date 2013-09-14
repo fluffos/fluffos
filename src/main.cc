@@ -1,5 +1,7 @@
 #include "std.h"
 
+#include <cstdlib>  // for std::srand
+
 #include "file_incl.h"
 #include "lpc_incl.h"
 #include "backend.h"
@@ -47,7 +49,6 @@ static void CDECL sig_usr1(int);
 static void CDECL sig_usr2(int);
 static void CDECL sig_term(int);
 static void CDECL sig_int(int);
-static void CDECL sig_hup(int);
 static void CDECL sig_abrt(int);
 static void CDECL sig_segv(int);
 static void CDECL sig_ill(int);
@@ -102,6 +103,9 @@ int main(int argc, char **argv)
   tzset();
 #endif
   boot_time = get_current_time();
+
+  // Seed random number
+  std::srand(boot_time);
 
   const0.type = T_NUMBER;
   const0.u.number = 0;
@@ -475,8 +479,10 @@ static void setup_signal_handlers()
   signal(SIGTERM, sig_term);
   signal(SIGINT, sig_int);
   signal(SIGABRT, sig_abrt);
+#ifdef SIGIOT
   signal(SIGIOT, sig_iot);
-  signal(SIGHUP, sig_hup);
+#endif
+  signal(SIGHUP, startshutdownMudOS);
   signal(SIGBUS, sig_bus);
   signal(SIGSEGV, sig_segv);
   signal(SIGILL, sig_ill);
@@ -610,11 +616,6 @@ static void CDECL sig_ill(int sig)
 {
   try_dump_stacktrace();
   fatal("SIGILL: Illegal instruction");
-}
-
-static void CDECL sig_hup(int sig)
-{
-  fatal("SIGHUP: Hangup!");
 }
 
 static void CDECL sig_abrt(int sig)

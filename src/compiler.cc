@@ -2888,6 +2888,23 @@ add_program_file(char *name, int top)
   return store_prog_string(name) + 1;
 }
 
+char *allocate_in_mem_block(int n, int size)
+{
+  mem_block_t *mbp = &mem_block[n];
+  char *ret;
+
+  if (mbp->current_size + size > mbp->max_size) {
+    do {
+      mbp->max_size <<= 1;
+    } while (mbp->current_size + size > mbp->max_size);
+
+    mbp->block = (char *)DREALLOC(mbp->block, mbp->max_size, TAG_COMPILER, "insert_in_mem_block");
+  }
+  ret = mbp->block + mbp->current_size;
+  mbp->current_size += size;
+  return ret;
+}
+
 
 
 

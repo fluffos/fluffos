@@ -4,6 +4,8 @@
 #include "interpret.h"
 #include "object.h"
 
+#include <functional>
+
 #define NULL_ERROR_CONTEXT       0
 #define NORMAL_ERROR_CONTEXT     1
 #define CATCH_ERROR_CONTEXT      2
@@ -16,6 +18,21 @@ extern long current_time;
 extern object_t *current_heart_beat;
 extern error_context_t *current_error_context;
 extern int time_for_hb;
+
+// API for register event to be executed on each tick.
+struct tick_event {
+  bool valid;
+
+  typedef std::function<void ()> callback_type;
+  callback_type callback;
+
+  tick_event(callback_type &callback) :
+    valid(true),
+    callback(callback) {}
+};
+
+tick_event *add_tick_event(long tick, tick_event::callback_type callback);
+void clear_tick_events();
 
 void backend(struct event_base *);
 

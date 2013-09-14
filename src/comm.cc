@@ -16,9 +16,11 @@
 #include "add_action.h"
 #include "eval.h"
 #include "console.h"
-
+#include "port.h"  // get_current_time
 #include "event.h"
 #include "dns.h"
+
+#include <algorithm>
 
 #ifndef ENOSR
 #define ENOSR 63
@@ -45,10 +47,6 @@
 
 #define MSSP_VAR 1
 #define MSSP_VAL 2
-
-#ifndef MAX
-#define MAX(x,y) (((x)>(y))?(x):(y))
-#endif
 
 #ifndef ENV_FILLER
 #define ENV_FILLER 0x1e
@@ -125,7 +123,7 @@ static unsigned char telnet_start_gmcp[] = {IAC, SB, TELOPT_GMCP};
  * local function prototypes.
  */
 
-static char *get_user_command(void);
+static char *get_user_command(interactive_t *);
 static char *first_cmd_in_buf(interactive_t *);
 static int cmd_in_buf(interactive_t *);
 static int call_function_interactive(interactive_t *, char *);
@@ -1173,8 +1171,8 @@ static void copy_chars(interactive_t *ip, unsigned const char *from, int num_byt
                 break;
               case TELOPT_ZMP: {
                 array_t *arr = allocate_array(max_array_size);
-                ip->sb_buf = (unsigned char *)REALLOC(ip->sb_buf, MAX(ip->sb_pos + 2, SB_SIZE));
-                ip->sb_size = MAX(ip->sb_pos + 2, SB_SIZE);
+                ip->sb_buf = (unsigned char *)REALLOC(ip->sb_buf, std::max(ip->sb_pos + 2, SB_SIZE));
+                ip->sb_size = std::max(ip->sb_pos + 2, SB_SIZE);
                 ip->sb_buf[ip->sb_pos] = 0;
                 copy_and_push_string((char *)ip->sb_buf + 1);
                 int off = 0;
@@ -1702,7 +1700,7 @@ void new_user_handler(port_def_t *port)
 #ifndef NO_SNOOP
   master_ob->interactive->snooped_by = 0;
 #endif
-  master_ob->interactive->last_time = current_time;
+  master_ob->interactive->last_time = get_current_time();
 #ifdef TRACE
   master_ob->interactive->trace_level = 0;
   master_ob->interactive->trace_prefix = 0;
@@ -1749,9 +1747,8 @@ void new_user_handler(port_def_t *port)
   memcpy((char *) &all_users[i]->addr, (char *)&addr, length);
   all_users[i]->addrlen = length;
 
-  char host[NI_MAXHOST];
-  getnameinfo((sockaddr *)&addr, length, host, sizeof(host), NULL, 0 , NI_NUMERICHOST);
-  debug(connections, "New connection from %s.\n", host);
+  debug(connections, "New connection from %s.\n",
+        sockaddr_to_string((sockaddr *)&addr, length));
   num_user++;
 
   /*
@@ -1772,7 +1769,8 @@ void new_user_handler(port_def_t *port)
     if (master_ob->interactive) {
       remove_interactive(master_ob, 0);
     }
-    debug_message("Can not accept connection from %s due to error in connect().\n", host);
+    debug_message("Can not accept connection from %s due to error in connect().\n",
+                  sockaddr_to_string((sockaddr *)&addr, length));
     return;
   }
   /*
@@ -1879,7 +1877,7 @@ static char *get_user_command(interactive_t *ip)
     ip->iflags &= ~NOECHO;
   }
 
-  ip->last_time = current_time;
+  ip->last_time = get_current_time();
   return user_command;
 }                               /* get_user_command() */
 
@@ -2487,7 +2485,7 @@ int query_idle(object_t *ob)
   if (!ob->interactive) {
     error("query_idle() of non-interactive object.\n");
   }
-  return (current_time - ob->interactive->last_time);
+  return (get_current_time() - ob->interactive->last_time);
 }                               /* query_idle() */
 
 #ifdef F_EXEC
