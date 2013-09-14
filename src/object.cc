@@ -1977,7 +1977,7 @@ object_t *get_empty_object(int num_var)
 void reset_object(object_t *ob)
 {
   /* Be sure to update time first ! */
-#ifdef RANDOMIZED_RESETS
+#ifndef DERANDOMIZED_RESETS
   ob->next_reset = current_time + TIME_TO_RESET / 2 +
                    random_number(TIME_TO_RESET / 2);
 #else
