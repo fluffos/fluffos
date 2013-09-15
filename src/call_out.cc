@@ -87,7 +87,7 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, int delay,
   pending_call_t *cop = CALLOCATE(1, pending_call_t,
                                   TAG_CALL_OUT, "new_call_out");
 
-  cop->target_time = current_time + delay;
+  cop->target_time = current_virtual_time + delay;
   DBG_CALLOUT("  target_time: %ld\n", cop->target_time);
 
   if (fun->type == T_STRING) {
@@ -102,7 +102,7 @@ LPC_INT new_call_out(object_t *ob, svalue_t *fun, int delay,
     cop->ob = 0;
   }
 
-  cop->handle = current_time + (++unique);
+  cop->handle = current_virtual_time + (++unique);
   if (unique > 0xffffffff) {
     unique = 1;  // force wrapping around.
   }
@@ -149,7 +149,7 @@ void call_out(pending_call_t *cop)
   DBG_CALLOUT("  handle: %ld\n", cop->handle);
 
   DBG_CALLOUT("  target_time: %ld, current_time: %ld, real_time: %ld\n",
-              cop->target_time, current_time, get_current_time());
+              cop->target_time, current_virtual_time, get_current_time());
 
   // Remove self from callout map
   {
@@ -230,7 +230,7 @@ static int time_left(pending_call_t *cop)
   // FIXME: This is not fully correct, call_out actually operates in
   // real time, but target_time was set base on current_time, so we need to
   // substract current_time here to get a correct value.
-  return cop->target_time - current_time;
+  return cop->target_time - current_virtual_time;
 }
 
 /*

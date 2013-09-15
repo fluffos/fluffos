@@ -4169,7 +4169,7 @@ int apply_low(const char *fun, object_t *ob, int num_arg)
     local_call_origin = ORIGIN_DRIVER;
   }
   call_origin = 0;
-  ob->time_of_ref = current_time; /* Used by the swapper */
+  ob->time_of_ref = current_virtual_time; /* Used by the swapper */
   /*
    * This object will now be used, and is thus a target for reset later on
    * (when time due).
@@ -4614,7 +4614,7 @@ void call_direct(object_t *ob, int offset, int origin, int num_arg)
   function_t *funp;
   program_t *prog = ob->prog;
 
-  ob->time_of_ref = current_time;
+  ob->time_of_ref = current_virtual_time;
   push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);
   caller_type = origin;
   csp->num_local_variables = num_arg;

@@ -31,14 +31,14 @@ error_context_t *current_error_context = 0;
 /*
  * The 'current_time' is updated in the backend loop.
  */
-long current_time;
+long current_virtual_time;
 
 static std::multimap<long, tick_event *, std::less<long>> g_tick_queue;
 
 tick_event *add_tick_event(long delay_secs, tick_event::callback_type callback)
 {
   auto event = new tick_event(callback);
-  g_tick_queue.insert(std::make_pair(current_time + delay_secs, event));
+  g_tick_queue.insert(std::make_pair(current_virtual_time + delay_secs, event));
   return event;
 }
 
@@ -49,10 +49,10 @@ void call_tick_events()
   }
 
   auto iter_start = g_tick_queue.cbegin();
-  if (iter_start->first > current_time) {
+  if (iter_start->first > current_virtual_time) {
     return;
   }
-  auto iter_end = g_tick_queue.upper_bound(current_time);
+  auto iter_end = g_tick_queue.upper_bound(current_virtual_time);
 
   std::deque<tick_event *> all_events;
 
@@ -163,6 +163,8 @@ void backend(struct event_base *base)
   add_tick_event(60 * 60, tick_event::callback_type(mudlib_stats_decay));
 #endif
 
+  current_virtual_time = get_current_time();
+
   while (1)
     try {
       clear_state();
@@ -185,28 +187,32 @@ void backend(struct event_base *base)
           slow_shut_down(tmp);
         }
 
-        if (!g_tick_queue.empty()) {
-          call_tick_events();
+        int64_t real_time = get_current_time();
+
+        while(current_virtual_time < real_time) {
+          if (!g_tick_queue.empty()) {
+            call_tick_events();
+          }
+          current_virtual_time++;
         }
 
 #if DEBUG
         try {
 #endif
-          /* Run event loop for at least 1 second, this current handles
+          /* Run event loop for at most 1 second, this current handles
            * listening socket events, user socket events, and lpc socket events.
            *
            * It currently also handles user command, longer term plan is to
            * merge all callbacks execution into tick event loop and move all
            * I/O to dedicated threads.
            */
-          run_for_at_least_one_second(base);
+          run_for_at_most_one_second(base);
 
 #if DEBUG
         } catch (...) { // catch everything
           fatal("BUG: jumped out of event loop!");
         }
 #endif
-        current_time++;
 
 #ifdef PACKAGE_ASYNC
         // TODO: Move this into timer based.
@@ -269,14 +275,14 @@ static void look_for_objects_to_swap()
         /*
          * Check reference time before reset() is called.
          */
-        if (current_time - ob->time_of_ref > time_to_clean_up) {
+        if (current_virtual_time - ob->time_of_ref > time_to_clean_up) {
           ready_for_clean_up = 1;
         }
 #if !defined(NO_RESETS) && !defined(LAZY_RESETS)
         /*
          * Should this object have reset(1) called ?
          */
-        if ((ob->flags & O_WILL_RESET) && (ob->next_reset < current_time)
+        if ((ob->flags & O_WILL_RESET) && (ob->next_reset < current_virtual_time)
             && !(ob->flags & O_RESET_STATE)) {
           debug(d_flag, "RESET /%s\n", ob->obname);
           set_eval(max_cost);
@@ -640,17 +646,17 @@ void update_load_av()
   static int acc = 0;
 
   acc++;
-  if (current_time == last_time) {
+  if (current_virtual_time == last_time) {
     return;
   }
-  n = current_time - last_time;
+  n = current_virtual_time - last_time;
   if (n < NUM_CONSTS) {
     c = consts[n];
   } else {
     c = exp(-n / 900.0);
   }
   load_av = c * load_av + acc * (1 - c) / n;
-  last_time = current_time;
+  last_time = current_virtual_time;
   acc = 0;
 }       /* update_load_av() */
 
@@ -665,17 +671,17 @@ update_compile_av(int lines)
   static int acc = 0;
 
   acc += lines;
-  if (current_time == last_time) {
+  if (current_virtual_time == last_time) {
     return;
   }
-  n = current_time - last_time;
+  n = current_virtual_time - last_time;
   if (n < NUM_CONSTS) {
     c = consts[n];
   } else {
     c = exp(-n / 900.0);
   }
   compile_av = c * compile_av + acc * (1 - c) / n;
-  last_time = current_time;
+  last_time = current_virtual_time;
   acc = 0;
 }       /* update_compile_av() */
 

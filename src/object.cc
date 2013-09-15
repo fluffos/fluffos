@@ -1978,10 +1978,10 @@ void reset_object(object_t *ob)
 {
   /* Be sure to update time first ! */
 #ifdef RANDOMIZED_RESETS
-  ob->next_reset = current_time + TIME_TO_RESET / 2 +
+  ob->next_reset = current_virtual_time + TIME_TO_RESET / 2 +
                    random_number(TIME_TO_RESET / 2);
 #else
-  ob->next_reset = current_time + TIME_TO_RESET;
+  ob->next_reset = current_virtual_time + TIME_TO_RESET;
 #endif
 
   save_command_giver(0);
@@ -1996,7 +1996,7 @@ void reset_object(object_t *ob)
 void call_create(object_t *ob, int num_arg)
 {
   /* Be sure to update time first ! */
-  ob->next_reset = current_time + TIME_TO_RESET / 2 +
+  ob->next_reset = current_virtual_time + TIME_TO_RESET / 2 +
                    random_number(TIME_TO_RESET / 2);
 
   call___INIT(ob);
