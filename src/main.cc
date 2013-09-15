@@ -150,7 +150,7 @@ int main(int argc, char **argv)
     exit(-1);
   }
 
-  current_time = get_current_time();
+  current_virtual_time = get_current_time();
 #ifdef POSIX_TIMERS
   /*
    * Initialize the POSIX timers.

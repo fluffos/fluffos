@@ -4013,11 +4013,11 @@ void
 f_set_reset(void)
 {
   if (st_num_arg == 2) {
-    (sp - 1)->u.ob->next_reset = current_time + sp->u.number;
+    (sp - 1)->u.ob->next_reset = current_virtual_time + sp->u.number;
     free_object(&(--sp)->u.ob, "f_set_reset:1");
     sp--;
   } else {
-    sp->u.ob->next_reset = current_time + TIME_TO_RESET / 2 +
+    sp->u.ob->next_reset = current_virtual_time + TIME_TO_RESET / 2 +
                            random_number(TIME_TO_RESET / 2);
     free_object(&(sp--)->u.ob, "f_set_reset:2");
   }

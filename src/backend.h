@@ -14,7 +14,7 @@
 /*
  * backend.c
  */
-extern long current_time;
+extern long current_virtual_time;
 extern object_t *current_heart_beat;
 extern error_context_t *current_error_context;
 extern int time_for_hb;
