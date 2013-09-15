@@ -163,6 +163,8 @@ void backend(struct event_base *base)
   add_tick_event(60 * 60, tick_event::callback_type(mudlib_stats_decay));
 #endif
 
+  current_virtual_time = get_current_time();
+
   while (1)
     try {
       clear_state();
@@ -185,28 +187,32 @@ void backend(struct event_base *base)
           slow_shut_down(tmp);
         }
 
-        if (!g_tick_queue.empty()) {
-          call_tick_events();
+        int64_t real_time = get_current_time();
+
+        while(current_virtual_time < real_time) {
+          if (!g_tick_queue.empty()) {
+            call_tick_events();
+          }
+          current_virtual_time++;
         }
 
 #if DEBUG
         try {
 #endif
-          /* Run event loop for at least 1 second, this current handles
+          /* Run event loop for at most 1 second, this current handles
            * listening socket events, user socket events, and lpc socket events.
            *
            * It currently also handles user command, longer term plan is to
            * merge all callbacks execution into tick event loop and move all
            * I/O to dedicated threads.
            */
-          run_for_at_least_one_second(base);
+          run_for_at_most_one_second(base);
 
 #if DEBUG
         } catch (...) { // catch everything
           fatal("BUG: jumped out of event loop!");
         }
 #endif
-        current_virtual_time++;
 
 #ifdef PACKAGE_ASYNC
         // TODO: Move this into timer based.
