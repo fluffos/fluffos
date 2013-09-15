@@ -17,7 +17,7 @@ typedef struct port_def_s port_def_t;
 extern struct event_base *g_event_base;
 
 event_base *init_event_base();
-int run_for_at_least_one_second(struct event_base *);
+int run_for_at_most_one_second(struct event_base *);
 
 // Listening socket event
 void new_external_port_event_listener(port_def_t *);

@@ -309,7 +309,7 @@ static object_t *load_virtual_object(const char *name, int clone)
 
   /* finish initialization */
   new_ob->flags |= O_VIRTUAL;
-  new_ob->load_time = current_time;
+  new_ob->load_time = current_virtual_time;
 #ifdef PACKAGE_MUDLIB_STATS
   init_stats_for_object(new_ob);
   add_objects(&new_ob->stats, 1);
@@ -511,7 +511,7 @@ object_t *int_load_object(const char *lname, int callcreate)
         num_objects_this_thread--;
         return 0;
       }
-      ob->load_time = current_time;
+      ob->load_time = current_virtual_time;
     }
     num_objects_this_thread--;
     return ob;
@@ -550,7 +550,7 @@ object_t *int_load_object(const char *lname, int callcreate)
     debug(d_flag, "--/%s loaded", ob->obname);
   }
 
-  ob->load_time = current_time;
+  ob->load_time = current_virtual_time;
   num_objects_this_thread--;
 
   return ob;
@@ -2112,7 +2112,7 @@ void do_message(svalue_t *lclass, svalue_t *msg, array_t *scope, array_t *exclud
 #if !defined(NO_RESETS) && defined(LAZY_RESETS)
 void try_reset(object_t *ob)
 {
-  if ((ob->next_reset < current_time) && !(ob->flags & O_RESET_STATE)) {
+  if ((ob->next_reset < current_virtual_time) && !(ob->flags & O_RESET_STATE)) {
     debug(d_flag, ("(lazy) RESET /%s\n", ob->obname));
 
     /* need to set the flag here to prevent infinite loops in apply_low */
