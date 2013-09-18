@@ -25,7 +25,7 @@ char* translate_easy(char* encoding, char* input)
   return output;
 }
 
-void f_gb2utf8()
+void f_gb_to_utf8()
 {
   char *text = (char *)sp->u.string;
   char *translated = translate_easy("gbk", text);
@@ -33,6 +33,13 @@ void f_gb2utf8()
   copy_and_push_string(translated);
 	
 }
-
+void f_utf8_to_gb()
+{
+  char *text = (char *)sp->u.string;
+  char *translated = translate_easy("gbk", text);
+  pop_stack();
+  copy_and_push_string(translated);
+	
+}
 #endif
 
