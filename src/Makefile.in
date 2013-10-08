@@ -195,6 +195,8 @@ help:
 	@if [ -n "@SQLITE3_VERSION@" ]; then echo "SQLite3: @SQLITE3_VERSION@, @SQLITE3_CFLAGS@, @SQLITE3_LDFLAGS@"; fi
 	@if [ -n "@OPENSSL_LIBS@" ]; then echo "OPENSSL: @OPENSSL_LIBS@, @OPENSSL_INCLUDES@, @OPENSSL_LDFLAGS@"; fi
 	@if [ -n "@PCRE_LIBS@" ]; then echo "PCRE: @PCRE_LIBS@, @PCRE_CFLAGS@"; fi
+	@echo "Compiler Version"
+	-@$(CXX) -v
 	@echo "Edit Makefile if this is not what you want"
 	@echo
 	@echo "Otherwise, type '$(MAKE)' to build FluffOS, then '$(MAKE) install'."
