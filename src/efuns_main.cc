@@ -3286,10 +3286,13 @@ f_stat(void)
     if (buf.st_mode & S_IFREG) {    /* if a regular file */
       v = allocate_empty_array(3);
       v->item[0].type = T_NUMBER;
+      v->item[0].subtype = 0;
       v->item[0].u.number = buf.st_size;
       v->item[1].type = T_NUMBER;
+      v->item[1].subtype = 0;
       v->item[1].u.number = buf.st_mtime;
       v->item[2].type = T_NUMBER;
+      v->item[2].subtype = 0;
       ob = find_object2(path);
       if (ob && !object_visible(ob)) {
         ob = 0;
