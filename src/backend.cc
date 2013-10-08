@@ -201,7 +201,7 @@ void backend(struct event_base *base)
            * merge all callbacks execution into tick event loop and move all
            * I/O to dedicated threads.
            */
-          run_for_at_most_one_second(base);
+          run_for_at_least_one_second(base);
 
 #if DEBUG
         } catch (...) { // catch everything
