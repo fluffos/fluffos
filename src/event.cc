@@ -43,7 +43,7 @@ static void exit_after_one_second(evutil_socket_t fd, short events, void *arg)
   event_base_loopbreak((struct event_base *)arg);
 }
 
-int run_for_at_most_one_second(struct event_base *base)
+int run_for_at_least_one_second(struct event_base *base)
 {
   int r;
   struct timeval one_second = {1, 0};
@@ -61,9 +61,9 @@ int run_for_at_most_one_second(struct event_base *base)
   }
   event_add(ev, &one_second);
 
-  debug(event, "Entering event loop for at most 1 sec! \n");
+  debug(event, "Entering event loop for at least 1 sec! \n");
   in_loop = 1;
-  r = event_base_loop(base, EVLOOP_ONCE);
+  r = event_base_loop(base, 0);
   in_loop = 0;
 
   return r;

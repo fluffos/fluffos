@@ -1,11 +1,11 @@
 language: cpp
 
 before_install:
-  - travis_retry sudo apt-get update -qq && sudo apt-get install -qq bison valgrind libz-dev libmysqlclient-dev libpq-dev libsqlite3-dev libssl-dev libpcre3-dev libevent-dev
+  - travis_retry sudo apt-get update -qq
 
-script: cd src && cp local_options.$CONFIG local_options && ./build.FluffOS $TYPE && make && cd testsuite && valgrind --malloc-fill=0x75 --free-fill=0x73 --track-origins=yes --leak-check=full ../driver etc/config.test -ftest -d
+script: sh -x ./.travis_build.sh
 
-after_failure: tail -n 50 log/*
+after_failure: cat src/config.log; tail -n 50 src/testsuite/log/*
 
 compiler:
   - clang
@@ -14,3 +14,5 @@ compiler:
 env:
   - COMPILER_FLAGS="-m64 -mtune=generic" TYPE="develop" CONFIG="testdev"
   - COMPILER_FLAGS="-m64 -mtune=generic" TYPE="" CONFIG="testrelease"
+  - BUILD="i386" COMPILER_FLAGS="-m32 -mtune=generic" TYPE="develop" CONFIG="testdev32"
+  - BUILD="i386" COMPILER_FLAGS="-m32 -mtune=generic" TYPE="" CONFIG="testrelease32"
