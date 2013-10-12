@@ -53,7 +53,7 @@
 /* APPLY_CACHE_BITS: defines the number of bits to use in the func lookup cache
  *   (in interpret.c).
  *
- *   20 bites : (1  << 22) * (3 * 8 + 2 * 2) ~= 112MB.
+ *   22 bites : (1  << 22) * (3 * 8 + 2 * 2) ~= 112MB.
  */
 #define APPLY_CACHE_BITS 22
 
@@ -214,7 +214,7 @@
  */
 #define CFG_MAX_GLOBAL_VARIABLES        65536
 
-#define CFG_EVALUATOR_STACK_SIZE        3000
+#define CFG_EVALUATOR_STACK_SIZE        6000
 #define CFG_COMPILER_STACK_SIZE         600
 #define CFG_MAX_CALL_DEPTH              150
 /* This must be one of 4, 16, 64, 256, 1024, 4096 */
