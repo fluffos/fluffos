@@ -22,6 +22,10 @@ typedef struct pending_call_s {
 } pending_call_t;
 
 void call_out(pending_call_t *cop);
+
+/* only at exit */
+void clear_call_outs(void);
+
 void reclaim_call_outs(void);
 int find_call_out_by_handle(object_t *, LPC_INT);
 int remove_call_out_by_handle(object_t *, LPC_INT);

@@ -1,6 +1,7 @@
 #include "std.h"
 #include "lpc_incl.h"
 #include "file_incl.h"
+#include "call_out.h"
 #include "backend.h"
 #include "simul_efun.h"
 #include "compiler.h"
@@ -2003,7 +2004,11 @@ void shutdownMudOS(int exit_code)
 
   shout_string("FluffOS driver shouts: shutting down immediately.\n");
 
+#ifdef DEBUG
+  /* clean up heap allocations so valgrind don't consider them lost.*/
+  clear_call_outs();
   clear_tick_events();
+#endif
 
 #ifdef PACKAGE_MUDLIB_STATS
   save_stat_files();

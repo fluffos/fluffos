@@ -85,13 +85,15 @@ void call_tick_events()
 
 void clear_tick_events()
 {
+  int i = 0;
   if (!g_tick_queue.empty()) {
-    for (auto iter = g_tick_queue.cbegin(); iter != g_tick_queue.cend();
-         iter++) {
-      delete iter->second;
+    for (auto iter: g_tick_queue) {
+      delete iter.second;
+      i++;
     }
     g_tick_queue.clear();
   }
+  debug_message("clear_tick_events: %d leftover events cleared.\n", i);
 }
 
 object_t *current_heart_beat;
