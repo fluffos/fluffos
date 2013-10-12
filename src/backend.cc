@@ -35,7 +35,7 @@ long current_virtual_time;
 
 static std::multimap<long, tick_event *, std::less<long>> g_tick_queue;
 
-tick_event *add_tick_event(long delay_secs,
+tick_event *add_tick_event(int delay_secs,
                            tick_event::callback_type callback)
 {
   auto event = new tick_event(callback);
@@ -70,8 +70,7 @@ void call_tick_events()
   if (!save_context(&econ)) {
     fatal("BUG: call_tick_events can not save context!");
   }
-  for (auto iter = all_events.begin(); iter != all_events.end(); iter++) {
-    auto event = *iter;
+  for (auto event: all_events) {
     if (event->valid) {
       try {
         event->callback();
