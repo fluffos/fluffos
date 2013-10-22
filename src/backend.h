@@ -31,7 +31,8 @@ struct tick_event {
     callback(callback) {}
 };
 
-tick_event *add_tick_event(long tick, tick_event::callback_type callback);
+// Register a event to run after a certain number of seconds.
+tick_event *add_tick_event(int, tick_event::callback_type);
 void clear_tick_events();
 
 void backend(struct event_base *);

@@ -35,7 +35,7 @@ long current_virtual_time;
 
 static std::multimap<long, tick_event *, std::less<long>> g_tick_queue;
 
-tick_event *add_tick_event(long delay_secs,
+tick_event *add_tick_event(int delay_secs,
                            tick_event::callback_type callback)
 {
   auto event = new tick_event(callback);
@@ -70,8 +70,7 @@ void call_tick_events()
   if (!save_context(&econ)) {
     fatal("BUG: call_tick_events can not save context!");
   }
-  for (auto iter = all_events.begin(); iter != all_events.end(); iter++) {
-    auto event = *iter;
+  for (auto event: all_events) {
     if (event->valid) {
       try {
         event->callback();
@@ -86,13 +85,15 @@ void call_tick_events()
 
 void clear_tick_events()
 {
+  int i = 0;
   if (!g_tick_queue.empty()) {
-    for (auto iter = g_tick_queue.cbegin(); iter != g_tick_queue.cend();
-         iter++) {
-      delete iter->second;
+    for (auto iter: g_tick_queue) {
+      delete iter.second;
+      i++;
     }
     g_tick_queue.clear();
   }
+  debug_message("clear_tick_events: %d leftover events cleared.\n", i);
 }
 
 object_t *current_heart_beat;
@@ -201,7 +202,7 @@ void backend(struct event_base *base)
            * merge all callbacks execution into tick event loop and move all
            * I/O to dedicated threads.
            */
-          run_for_at_least_one_second(base);
+          run_for_at_most_one_second(base);
 
 #if DEBUG
         } catch (...) { // catch everything

@@ -8,7 +8,6 @@
 #include "sprintf.h"
 #include "eval.h"
 
-#include <queue>
 #include <unordered_map>
 
 #define DBG_CALLOUT(...) debug(call_out, __VA_ARGS__)
@@ -486,6 +485,18 @@ remove_all_call_out(object_t *obj)
     }
   }
   DBG_CALLOUT("remove_all_call_out: removed %d callouts.\n", i);
+}
+
+void clear_call_outs() {
+  int i = 0;
+  auto iter = g_callout_handle_map.begin();
+  while (iter != g_callout_handle_map.end()) {
+    auto cop = iter->second;
+    free_call(cop);
+    iter = g_callout_handle_map.erase(iter);
+    i++;
+  }
+  debug_message("clear_call_outs: %d leftover callouts cleared.\n", i);
 }
 
 void reclaim_call_outs()
