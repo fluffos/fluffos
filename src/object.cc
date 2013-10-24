@@ -1422,7 +1422,7 @@ static int save_object_recurse_str(program_t *prog, svalue_t **svp, int type, in
 int sel = -1;
 
 #ifdef HAVE_ZLIB
-int gz_sel = -1;
+static const int SAVE_EXTENSION_GZ_LENGTH = strlen(SAVE_GZ_EXTENSION);
 #endif
 
 int
@@ -1460,11 +1460,8 @@ save_object(object_t *ob, const char *file, int save_zeros)
     len -= sel;
   }
 #ifdef HAVE_ZLIB
-  if (gz_sel == -1) {
-    gz_sel = strlen(SAVE_GZ_EXTENSION);
-  }
   if (save_compressed) {
-    name = new_string(len + gz_sel, "save_object");
+    name = new_string(len + SAVE_EXTENSION_GZ_LENGTH, "save_object");
     strcpy(name, file);
     strcpy(name + len, SAVE_GZ_EXTENSION);
   } else
@@ -1552,7 +1549,7 @@ save_object(object_t *ob, const char *file, int save_zeros)
       char buf[1024];
       // When compressed, unlink the uncompressed name too.
       strcpy(buf, file);
-      len = strlen(buf) - gz_sel;
+      len = strlen(buf) - SAVE_EXTENSION_GZ_LENGTH;
       strcpy(buf + len, SAVE_EXTENSION);
       unlink(buf);
     }
@@ -1691,12 +1688,11 @@ int restore_object(object_t *ob, const char *file, int noclear)
 
 #ifdef HAVE_ZLIB
   else {
-    if (gz_sel == -1) { gz_sel = strlen(SAVE_GZ_EXTENSION); }
-    if (len >= gz_sel && strcmp(file + len - gz_sel, SAVE_GZ_EXTENSION) == 0) {
-      len -= gz_sel;
+    if (len >= SAVE_EXTENSION_GZ_LENGTH && strcmp(file + len - SAVE_EXTENSION_GZ_LENGTH, SAVE_GZ_EXTENSION) == 0) {
+      len -= SAVE_EXTENSION_GZ_LENGTH;
     }
   }
-  name = new_string(len + gz_sel, "restore_object");
+  name = new_string(len + SAVE_EXTENSION_GZ_LENGTH, "restore_object");
   strncpy(name, file, len);
   strcpy(name + len, SAVE_GZ_EXTENSION);
   pos = 0;
