@@ -627,6 +627,8 @@ int socket_connect(int fd, const char *name, svalue_t *read_callback, svalue_t *
   lpc_socks[fd].state = STATE_DATA_XFER;
   lpc_socks[fd].flags |= S_BLOCKED;
 
+  debug(sockets, "socket_connect: lpc socket %d (real fd %d) connected.\n", fd, lpc_socks[fd].fd);
+
   event_add(lpc_socks[fd].ev_read, NULL);
   event_add(lpc_socks[fd].ev_write, NULL);
 
@@ -774,7 +776,7 @@ int socket_write(int fd, svalue_t *message, const char *name)
       switch (message->type) {
         case T_STRING:
           if ((off = sendto(lpc_socks[fd].fd, (char *)message->u.string,
-                            strlen(message->u.string) + 1, 0,
+                            SVALUE_STRLEN(message), 0,
                             (struct sockaddr *) &addr, addrlen)) == -1) {
             debug(sockets, "socket_write: sendto error: %s.\n",
                   evutil_socket_error_to_string(evutil_socket_geterror(lpc_socks[fd].fd)));
