@@ -122,7 +122,11 @@ f_localtime(void)
   vec->item[LT_ZONE].subtype = STRING_MALLOC;
   vec->item[LT_ISDST].type = T_NUMBER;
   vec->item[LT_ISDST].u.number = tm->tm_isdst;
+#ifdef __FreeBSD__
+  vec->item[LT_GMTOFF].u.number = tm->tm_gmtoff;
+#else
   vec->item[LT_GMTOFF].u.number = timezone;
+#endif
   if (!tm->tm_isdst) {
     vec->item[LT_ZONE].u.string = string_copy(tzname[0], "f_localtime");
   } else {
