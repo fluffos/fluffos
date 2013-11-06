@@ -62,6 +62,8 @@ New features
   * Various time tracking efun uses real world time as it should be.
   * Driver now calls reclaim_objects() automatically.
   * Default evaluator stack has been increased to 6000.
+Bug Fix:
+  * Sending string over UDP port now doesn't contain trailing \0.
 Misc
   * Moved many internal options to options_internal.
   * Optimized funciton lookup cache, also increased default cache size. (CPU saver!)
