@@ -40,7 +40,8 @@ Misc:
   * /doc is restored and content will be updated for each EFUN/Apply changes.
 
 TODOs:
-  Use event backend to schedule call_out, heart_beat and object swap/reclaim routine.
+  Seperate out LPC runtime library.
+  Mulit-threading networking layer.
   remove SQLITE2 support from package/db.c
   bundle with google-glog library.
   LPC JIT compiler (bundle with LLVM).
@@ -53,6 +54,22 @@ Known Issues:
 ================================================================================
   Per-release ChangeLog
 ================================================================================
+
+FluffOS 3.0-alpha7.4
+New features
+  * PACKAGE_DB: MYSQL NewDecimal Type This is needed in my system for read
+    a column SUM(xxx) in a SELECT. (Zoilder)
+  * Various time tracking efun uses real world time as it should be.
+  * Driver now calls reclaim_objects() automatically.
+  * Default evaluator stack has been increased to 6000.
+Misc
+  * Moved many internal options to options_internal.
+  * Optimized funciton lookup cache, also increased default cache size. (CPU saver!)
+  * New tick_event loop and callback tree implementation.
+  * Adjusted backend() loop, should have no behavior change.
+  * Adding back 32bit compile mode test.
+  * various compile fixing, althrough not complete, but should be compileable under
+    CYGWIN64 and freebsd using gcc 4.8.
 
 FluffOS 3.0-alpha7.3
   * User command execution is now integrated into event loop.

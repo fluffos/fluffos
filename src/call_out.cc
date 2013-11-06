@@ -487,7 +487,8 @@ remove_all_call_out(object_t *obj)
   DBG_CALLOUT("remove_all_call_out: removed %d callouts.\n", i);
 }
 
-void clear_call_outs() {
+void clear_call_outs()
+{
   int i = 0;
   auto iter = g_callout_handle_map.begin();
   while (iter != g_callout_handle_map.end()) {
