@@ -44,6 +44,7 @@ AC_CHECK_SIZEOF([char *])
 AC_SEARCH_LIBS([sqrt], [m])
 AC_SEARCH_LIBS([crypt], [crypt])
 AC_SEARCH_LIBS([malloc], [malloc])
+AC_SEARCH_LIBS([backtrace], [execinfo])
 
 AC_FUNC_ERROR_AT_LINE
 AC_FUNC_FORK
