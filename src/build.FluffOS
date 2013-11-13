@@ -15,9 +15,6 @@ else
   echo Preparing to build standard driver ...
 fi
 
-# TODO: remove need for _GNU_SOURCE
-CXXFLAGS="$CXXFLAGS -fno-omit-frame-pointer -D_GNU_SOURCE"
-
 # By default driver compile to native environment, you can
 # add "-m64" to force compile under 64bit, "-m32" for 32bit.
 COMPILER_FLAGS=${COMPILER_FLAGS:-"-march=native"}
@@ -39,8 +36,6 @@ INSTALL_DIR=`dirname $(pwd)`/bin
 #Enable warnings from the compiler (g++), if wanted.
 #WARN=-Wall
 
-# Location of libmsgql.a, if you are using PACKAGE_DB
-#EXTRALIBS=-L/usr/local/lib -lmsql
 ####### END OF USER CONFIGURABLE OPTIONS
 
 CXXFLAGS="$CXXFLAGS $COMPILER_FLAGS $WARN $OPTIMIZE $DEBUG"

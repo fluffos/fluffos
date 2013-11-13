@@ -2,29 +2,35 @@
  * portability.h: global portability defines.
  */
 
-/* Don't be fooled, windows support is broken for now!  - sunyc@2013-05-09 */
 
 #ifndef PORTABILITY_H
 #define PORTABILITY_H
 
-/* CYGWIN with old POSIX needs this. */
+/* some platform don't have sighandler_t */
+#ifndef HAVE_SIGHANDLER_T
+typedef void (*sighandler_t)(int);
+#endif
+
+/* CYGWIN build is working. - sunyc@2013-11-12 */
 #ifdef __CYGWIN__
-#undef __STRICT_ANSI__
 #undef WINNT
 #undef WIN95
 #undef WIN98
 #undef WINSOCK
 #undef WIN32
+/* CYGWIN needs this to proper setup POSIX env. */
+#undef __STRICT_ANSI__
 #endif
 
+/* Don't be fooled, windows support is broken, use cygwin instead,
+   these are left here temporally for historical references.
+   - sunyc@2013-05-09 */
 #if defined(__WIN32__)
 #define WINSOCK
 #define CDECL __cdecl
 #else
 #define CDECL
 #endif /* __WIN32__ */
-
-
 
 #ifdef WINSOCK
 /* Windows stuff */

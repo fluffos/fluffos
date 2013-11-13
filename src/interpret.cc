@@ -1,6 +1,3 @@
-#include <algorithm>
-#include <functional>
-
 #include "std.h"
 #include "lpc_incl.h"
 #include "efuns_incl.h"
@@ -17,6 +14,9 @@
 #include "regexp.h"
 #include "master.h"
 #include "eval.h"
+
+#include <algorithm>
+#include <functional>
 
 #ifdef OPCPROF
 #include "opc.h"

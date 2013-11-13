@@ -14,6 +14,7 @@
 
 m4_include([m4/ax_append_compile_flags.m4])
 m4_include([m4/ax_append_flag.m4])
+m4_include([m4/ax_append_link_flags.m4])
 m4_include([m4/ax_check_compile_flag.m4])
 m4_include([m4/ax_check_link_flag.m4])
 m4_include([m4/ax_check_openssl.m4])
